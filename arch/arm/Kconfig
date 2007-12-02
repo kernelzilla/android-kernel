@@ -602,6 +602,7 @@ config ARCH_PXA
 config ARCH_MSM
 	bool "Qualcomm MSM"
 	select CPU_V6
+	select GENERIC_GPIO
 	select GENERIC_TIME
 	select GENERIC_CLOCKEVENTS
 	help
