@@ -20,5 +20,5 @@ obj-$(CONFIG_PM) += pm.o
 obj-$(CONFIG_MSM_CPU_FREQ_SCREEN) += cpufreq.o
 
 
-obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
+obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o board-halibut-keypad.o
 obj-$(CONFIG_MACH_TROUT) += board-dream.o
