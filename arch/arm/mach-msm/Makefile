@@ -5,6 +5,7 @@ obj-y += vreg.o
 obj-y += acpuclock.o
 obj-y += clock.o clock-7x01a.o
 obj-y += gpio.o generic_gpio.o
+obj-y += nand_partitions.o
 
 obj-$(CONFIG_MSM_SMD) += smd.o smd_tty.o smd_qmi.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter.o
