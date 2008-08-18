@@ -136,7 +136,7 @@ static u32 phys_mempool_size = 0x600000;
 #if !defined(CONFIG_ARCH_OMAP2430) && !defined(CONFIG_ARCH_OMAP3430)
 static int tc_wordswapon = 1;	/* Default value is always TRUE */
 #else
-static int tc_wordswapon = 0;	/* Default value is always true */
+static int tc_wordswapon;	/* Default value is always true */
 #endif
 
 
@@ -577,7 +577,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 			DRV_RemoveAllResources(pCtxtclosed);
 			if (pCtxtclosed->hProcessor != NULL) {
 				DRV_GetProcCtxtList(&pCtxttraverse,
-						    (struct DRV_OBJECT *)hDrvObject);
+					    (struct DRV_OBJECT *)hDrvObject);
 				if (pCtxttraverse->next == NULL) {
 					PROC_Detach(pCtxtclosed->hProcessor);
 				} else {
@@ -606,8 +606,9 @@ static int bridge_open(struct inode *ip, struct file *filp)
 				}
 			}
 			pTmp = pCtxtclosed->next;
-			DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject, pCtxtclosed,
-					      (void *)pCtxtclosed->pid);
+			DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject,
+					     pCtxtclosed,
+					     (void *)pCtxtclosed->pid);
 		} else {
 			pTmp = pCtxtclosed->next;
 		}
@@ -616,7 +617,8 @@ static int bridge_open(struct inode *ip, struct file *filp)
 func_cont:
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(dsp_status))
-		dsp_status = DRV_InsertProcContext((struct DRV_OBJECT *)hDrvObject, &pPctxt);
+		dsp_status = DRV_InsertProcContext(
+				(struct DRV_OBJECT *)hDrvObject, &pPctxt);
 
 	if (pPctxt != NULL) {
 		PRCS_GetCurrentHandle(&hProcess);

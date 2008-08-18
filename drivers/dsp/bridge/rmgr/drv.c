@@ -425,7 +425,7 @@ DSP_STATUS DRV_RemoveNodeResElement(HANDLE hNodeRes, HANDLE hPCtxt)
 }
 
 /* Actual Node De-Allocation */
-DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt)
+static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;

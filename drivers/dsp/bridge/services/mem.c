@@ -82,7 +82,7 @@ static struct GT_Mask MEM_debugMask = { NULL, NULL };	/* GT trace variable */
 
 static u32 cRefs;		/* module reference count */
 
-static bool extPhysMemPoolEnabled = false;
+static bool extPhysMemPoolEnabled;
 
 struct extPhysMemPool {
 	u32 physMemBase;

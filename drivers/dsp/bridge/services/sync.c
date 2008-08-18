@@ -108,7 +108,7 @@ struct SYNC_DPCCSOBJECT {
 
 /*  ----------------------------------- Globals */
 #if GT_TRACE
-static struct GT_Mask SYNC_debugMask = { NULL, NULL };     /* GT trace variable */
+static struct GT_Mask SYNC_debugMask = { NULL, NULL };  /* GT trace variable */
 #endif
 
 static int test_and_set(volatile void *ptr, int val)

@@ -899,7 +899,8 @@ DSP_STATUS CDECL DEV_GetSymbol(struct DEV_OBJECT *hDevObject,
 		status = DEV_GetCodMgr(hDevObject, &hCodMgr);
 		if (DSP_SUCCEEDED(status)) {
 			DBC_Assert(hCodMgr != NULL);
-			status = COD_GetSymValue(hCodMgr, (char *)pstrSym, pulValue);
+			status = COD_GetSymValue(hCodMgr, (char *)pstrSym,
+				 pulValue);
 		}
 	} else {
 		status = DSP_EHANDLE;

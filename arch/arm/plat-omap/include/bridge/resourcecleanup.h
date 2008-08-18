@@ -23,7 +23,8 @@
 extern DSP_STATUS DRV_GetProcCtxtList(struct PROCESS_CONTEXT **pPctxt,
 				struct DRV_OBJECT *hDrvObject);
 
-extern DSP_STATUS DRV_InsertProcContext(struct DRV_OBJECT *hDrVObject, HANDLE hPCtxt);
+extern DSP_STATUS DRV_InsertProcContext(struct DRV_OBJECT *hDrVObject,
+					HANDLE hPCtxt);
 
 extern DSP_STATUS DRV_RemoveAllDMMResElements(HANDLE pCtxt);
 

@@ -69,7 +69,8 @@
 #include "_deh.h"
 #include <_tiomap_mmu.h>
 
-static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN, HW_ELEM_SIZE_16BIT,
+static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN,
+					HW_ELEM_SIZE_16BIT,
 					HW_MMU_CPUES} ;
 #define VirtToPhys(x)       ((x) - PAGE_OFFSET + PHYS_OFFSET)
 /*
@@ -405,7 +406,8 @@ void CDECL WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 		case DSP_MMUFAULT:
 			/* MMU fault routine should have set err info
 			 * structure */
-			pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->hWmdContext;
+			pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->
+					hWmdContext;
 			pDehMgr->errInfo.dwErrMask = DSP_MMUFAULT;
 			printk(KERN_INFO "WMD_DEH_Notify: DSP_MMUFAULT,"
 				"errInfo = 0x%x\n", dwErrInfo);

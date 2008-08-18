@@ -174,7 +174,9 @@ struct WCD_Cmd {
 } ;
 
 /*  ----------------------------------- Globals */
+#if GT_TRACE
 static struct GT_Mask WCD_debugMask = { NULL, NULL };	/* Core VxD Mask */
+#endif
 static u32 WCD_cRefs;
 
 /*

@@ -53,7 +53,7 @@ static char *GT_2format = "%s - %d(%d): ";
 
 static unsigned char *GT_tMask[GT_BOUND];
 
-static bool curInit = false;
+static bool curInit;
 static char *separator;
 static unsigned char tabMem[GT_BOUND][sizeof(unsigned char) * GT_BOUND];
 

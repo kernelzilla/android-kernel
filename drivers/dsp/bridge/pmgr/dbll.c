@@ -221,13 +221,13 @@ static bool nameMatch(void *name, void *sp);
 static void symDelete(void *sp);
 
 #if GT_TRACE
-static struct GT_Mask DBLL_debugMask = { NULL, NULL };     /* GT trace variable */
+static struct GT_Mask DBLL_debugMask = { NULL, NULL };  /* GT trace variable */
 #endif
 
 static u32 cRefs; 		/* module reference count */
 
 /* Symbol Redefinition */
-static int bRedefinedSymbol = 0;
+static int bRedefinedSymbol;
 static int bGblSearch = 1;
 
 /*

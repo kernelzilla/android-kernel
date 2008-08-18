@@ -776,10 +776,13 @@ func_cont2:
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					  REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
-			DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pPctxt,
-					 *phNode, 0);
+			DRV_GetProcContext((u32)hProcess,
+					 (struct DRV_OBJECT *)hDrvObject,
+					 &pPctxt, *phNode, 0);
 			if (pPctxt == NULL) {
-				DRV_InsertProcContext((struct DRV_OBJECT *)hDrvObject, &pPctxt);
+				DRV_InsertProcContext(
+					(struct DRV_OBJECT *)hDrvObject,
+					&pPctxt);
 				if (pPctxt != NULL) {
 					DRV_ProcUpdatestate(pPctxt,
 							PROC_RES_ALLOCATED);
@@ -795,8 +798,9 @@ func_cont2:
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
-			DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pPctxt,
-					 *phNode, 0);
+			DRV_GetProcContext((u32)hProcess,
+					 (struct DRV_OBJECT *)hDrvObject,
+					 &pPctxt, *phNode, 0);
 			if (pPctxt != NULL) {
 				DRV_InsertNodeResElement(*phNode, &nodeRes,
 							 pPctxt);
@@ -1775,7 +1779,8 @@ func_cont1:
 	if (DSP_FAILED(res_status))
 		goto func_cont;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, hNode, 0);
+	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject,
+			 &pCtxt, hNode, 0);
 	if (pCtxt == NULL)
 		goto func_cont;
 

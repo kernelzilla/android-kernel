@@ -99,7 +99,7 @@ struct DRV_EXT {
 
 /*  ----------------------------------- Globals */
 #if GT_TRACE
-static struct GT_Mask CFG_debugMask = { NULL, NULL };	/* CFG debug Mask           */
+static struct GT_Mask CFG_debugMask = { NULL, NULL };	/* CFG debug Mask */
 #endif
 
 /*

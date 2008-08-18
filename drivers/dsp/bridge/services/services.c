@@ -63,7 +63,7 @@
 
 /*  ----------------------------------- Globals */
 #if GT_TRACE
-static struct GT_Mask SERVICES_debugMask = { NULL, NULL };	/* GT trace var. */
+static struct GT_Mask SERVICES_debugMask = { NULL, NULL };  /* GT trace var. */
 #endif
 
 static u32 cRefs;		/* SERVICES module reference count */

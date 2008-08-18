@@ -98,7 +98,7 @@ void GS_frees(void *ptr, u32 size)
  */
 void GS_init(void)
 {
-	static bool curInit = false;
+	static bool curInit;
 
 	if (curInit == false) {
 		curInit = true;

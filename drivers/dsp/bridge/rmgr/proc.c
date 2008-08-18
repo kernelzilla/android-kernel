@@ -365,7 +365,8 @@ func_end:
 	if (DSP_FAILED(res_status))
 		goto func_cont;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDRVObject, &pPctxt, NULL, 0);
+	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDRVObject,
+			 &pPctxt, NULL, 0);
 	if (pPctxt == NULL) {
 		DRV_InsertProcContext((struct DRV_OBJECT *)hDRVObject, &pPctxt);
 		if (pPctxt != NULL) {
@@ -377,7 +378,9 @@ func_cont:
 	PRCS_GetCurrentHandle(&hProcess);
 	res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDRVObject, &pPctxt, NULL, 0);
+		DRV_GetProcContext((u32)hProcess,
+				 (struct DRV_OBJECT *)hDRVObject, &pPctxt,
+				 NULL, 0);
 		if (pPctxt != NULL)
 			pPctxt->hProcessor = (DSP_HPROCESSOR)*phProcessor;
 
@@ -634,7 +637,9 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
 	res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
 	/* res_status = CFG_GetObject(REG_DRV_OBJECT, (u32*)&hDRVObject); */
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDRVObject, &pPctxt, NULL, 0);
+		DRV_GetProcContext((u32)hProcess,
+				 (struct DRV_OBJECT *)hDRVObject, &pPctxt,
+				 NULL, 0);
 		if (pPctxt != NULL)
 			pPctxt->hProcessor = NULL;
 	}
@@ -1383,8 +1388,9 @@ DSP_STATUS PROC_Map(DSP_HPROCESSOR hProcessor, void *pMpuAddr, u32 ulSize,
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					  REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
-			if (DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt,
-			   NULL, (u32)pMpuAddr) != DSP_ENOTFOUND) {
+			if (DRV_GetProcContext((u32)hProcess,
+			   (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL,
+			   (u32)pMpuAddr) != DSP_ENOTFOUND) {
 				DRV_InsertDMMResElement(&dmmRes, pCtxt);
 				DRV_UpdateDMMResElement(dmmRes, (u32)pMpuAddr,
 						ulSize, (u32)pReqAddr,
@@ -1737,7 +1743,8 @@ DSP_STATUS PROC_UnMap(DSP_HPROCESSOR hProcessor, void *pMapAddr)
 	if (DSP_FAILED(res_status))
 		goto func_end;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL, (u32)pMapAddr);
+	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject,
+			 &pCtxt, NULL, (u32)pMapAddr);
 	if (pCtxt != NULL) {
 		if (DRV_GetDMMResElement((u32)pMapAddr, &dmmRes, pCtxt) !=
 		   DSP_ENOTFOUND)
