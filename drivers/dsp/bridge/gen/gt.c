@@ -238,14 +238,14 @@ s32 _GT_trace(struct GT_Mask *mask, char *format, ...)
 	va_end(va);
 #ifdef DEBUG
 	if (GT->PIDFXN == NULL) {
-		(*GT->PRINTFXN)(GT_1format, mask->modName, GT->TIDFXN ?
+		printk(GT_1format, mask->modName, GT->TIDFXN ?
 		(*GT->TIDFXN)() : 0);
 	} else {
-		(*GT->PRINTFXN)(GT_2format, mask->modName, (*GT->PIDFXN)(),
+		printk(GT_2format, mask->modName, (*GT->PIDFXN)(),
 		GT->TIDFXN ? (*GT->TIDFXN)() : 0);
 	}
 #endif
-	(*GT->PRINTFXN)(format, arg1, arg2, arg3, arg4, arg5, arg6);
+	printk(format, arg1, arg2, arg3, arg4, arg5, arg6);
 
 	return 0;
 }
@@ -257,7 +257,7 @@ s32 _GT_trace(struct GT_Mask *mask, char *format, ...)
  */
 static void error(char *string)
 {
-	(*GT->PRINTFXN)("GT: %s", string);
+	printk("GT: %s", string);
 }
 
 /*

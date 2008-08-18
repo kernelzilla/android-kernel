@@ -101,7 +101,7 @@ DSP_STATUS DBG_Trace(u8 bLevel, char *pstrFormat, ...)
 	va_end(va);
 
 	if (bLevel & *(DBG_debugMask).flags)
-		(*GT->PRINTFXN)(pstrFormat, arg1, arg2, arg3, arg4, arg5, arg6);
+		printk(pstrFormat, arg1, arg2, arg3, arg4, arg5, arg6);
 
 	return DSP_SOK;
 }

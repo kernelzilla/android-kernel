@@ -89,8 +89,8 @@ static void error(char *fmt, ...)
 
 	va_end(va);
 
-	(*GT->PRINTFXN) ("ERROR: ");
-	(*GT->PRINTFXN) (fmt, arg1, arg2, arg3, arg4, arg5, arg6);
+	printk("ERROR: ");
+	printk(fmt, arg1, arg2, arg3, arg4, arg5, arg6);
 
 #if (defined DEBUG) || (defined DDSP_DEBUG_PRODUCT)
 	if (in_interrupt()) {
