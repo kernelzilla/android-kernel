@@ -117,17 +117,6 @@ struct TIMER_OBJECT {
 static struct GT_Mask CLK_debugMask = { NULL, NULL };	/* GT trace variable */
 #endif
 
-struct GPT6_configuration {
-	u32 config;
-	u32 tier;
-	u32 twer;
-	u32 tclr;
-	u32 tldr;
-	u32 ttgr;
-};
-/* Shadow settings to save the GPT6 timer settings */
-struct GPT6_configuration  gpt6_config;
-
 /*
  *  ======== CLK_Exit ========
  *  Purpose:
