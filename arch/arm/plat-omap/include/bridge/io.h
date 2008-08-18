@@ -98,7 +98,7 @@
  *      Resources, if any acquired in IO_Init(), are freed when the last
  *      client of IO calls IO_Exit().
  */
-	extern void IO_Exit();
+	extern void IO_Exit(void);
 
 /*
  *  ======== IO_Init ========
@@ -111,7 +111,7 @@
  *  Ensures:
  *      A requirement for each of the other public CHNL functions.
  */
-	extern bool IO_Init();
+	extern bool IO_Init(void);
 
 /*
  *  ======== IO_OnLoaded ========

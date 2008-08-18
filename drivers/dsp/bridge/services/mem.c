@@ -199,7 +199,7 @@ void MEM_ExtPhysPoolInit(u32 poolPhysBase, u32 poolSize)
 	}
 }
 
-void MEM_ExtPhysPoolRelease(void)
+static void MEM_ExtPhysPoolRelease(void)
 {
 	GT_0trace(MEM_debugMask, GT_1CLASS,
 		  "Releasing External memory pool \n");
@@ -215,7 +215,7 @@ void MEM_ExtPhysPoolRelease(void)
  *     Allocate physically contiguous, uncached memory from external memory pool
  */
 
-void *MEM_ExtPhysMemAlloc(u32 bytes, u32 align, OUT u32 *pPhysAddr)
+static void *MEM_ExtPhysMemAlloc(u32 bytes, u32 align, OUT u32 *pPhysAddr)
 {
 	u32 newAllocPtr;
 	u32 offset;
@@ -236,7 +236,7 @@ void *MEM_ExtPhysMemAlloc(u32 bytes, u32 align, OUT u32 *pPhysAddr)
 			  "ExtPhysical Memory Allocation "
 			  "unable to allocate memory for bytes = 0x%x \n",
 			  bytes);
-		pPhysAddr = 0;
+		pPhysAddr = NULL;
 		return NULL;
 	} else {
 		offset = (extMemPool.nextPhysAllocPtr & (align - 1));

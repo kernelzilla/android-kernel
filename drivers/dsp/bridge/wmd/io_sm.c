@@ -719,7 +719,7 @@ func_cont:
 	mapAttrs |= DSP_MAPELEMSIZE32;
 	/* Map the L4 peripherals */
 	{
-		int i = 0;
+		i = 0;
 		while (L4PeripheralTable[i].physAddr && DSP_SUCCEEDED(status)) {
 				status = hIOMgr->pIntfFxns->pfnBrdMemMap
 					(hIOMgr->hWmdContext,

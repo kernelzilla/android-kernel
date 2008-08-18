@@ -59,7 +59,7 @@
 #include "_tiomap.h"
 #include "mmu_fault.h"
 
-u32 dmmuEventMask;
+static u32 dmmuEventMask;
 u32 faultAddr;
 
 static bool MMU_CheckIfFault(struct WMD_DEV_CONTEXT *pDevContext);

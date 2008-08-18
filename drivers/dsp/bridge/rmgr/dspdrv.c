@@ -195,7 +195,7 @@ u32 DSP_Init(OUT u32 *initStatus)
 		}
 		/* Remove the Driver Object */
 		(void)DRV_Destroy(drvObject);
-		drvObject = 0;
+		drvObject = NULL;
 		WCD_Exit();
 		GT_0trace(curTrace, GT_7CLASS,
 			 "DSP_Init:Logical device Failed to Load\n");

@@ -209,11 +209,11 @@ DSP_STATUS COD_Create(OUT struct COD_MANAGER **phMgr, char *pstrDummyFile,
 	zlAttrs.baseImage = true;
 	zlAttrs.logWrite = NULL;
 	zlAttrs.logWriteHandle = NULL;
-	zlAttrs.write = 0;
-	zlAttrs.rmmHandle = 0;
-	zlAttrs.wHandle = 0;
-	zlAttrs.symHandle = 0;
-	zlAttrs.symArg = 0;
+	zlAttrs.write = NULL;
+	zlAttrs.rmmHandle = NULL;
+	zlAttrs.wHandle = NULL;
+	zlAttrs.symHandle = NULL;
+	zlAttrs.symArg = NULL;
 
 	hMgrNew->attrs = zlAttrs;
 

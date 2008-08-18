@@ -190,7 +190,7 @@ static struct CMM_ATTRS CMM_DFLTALCTATTRS = {
 };
 
 /* Address translator default attrs */
-struct CMM_XLATORATTRS CMM_DFLTXLATORATTRS = {
+static struct CMM_XLATORATTRS CMM_DFLTXLATORATTRS = {
 	1,	/* ulSegId, does not have to match CMM_DFLTALCTATTRS ulSegId */
 	0,			/* dwDSPBufs */
 	0,			/* dwDSPBufSize */

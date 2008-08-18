@@ -342,7 +342,7 @@ void DBLL_exit(void)
 		CSL_Exit();
 		GH_exit();
 #if GT_TRACE
-		DBLL_debugMask.flags = 0;
+		DBLL_debugMask.flags = NULL;
 #endif
 	}
 

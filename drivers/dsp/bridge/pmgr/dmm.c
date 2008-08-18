@@ -328,7 +328,7 @@ DSP_STATUS DMM_GetHandle(DSP_HPROCESSOR hProcessor,
 		status = DEV_GetDmmMgr(hDevObject, phDmmMgr);
 
 	GT_2trace(DMM_debugMask, GT_4CLASS, "Leaving DMM_GetHandle status %x, "
-		 "*phDmmMgr %x\n", status, phDmmMgr ? *phDmmMgr : 0);
+		 "*phDmmMgr %x\n", status, phDmmMgr ? *phDmmMgr : NULL);
 	return status;
 }
 
@@ -542,7 +542,7 @@ DSP_STATUS DMM_UnReserveMemory(struct DMM_OBJECT *hDmmMgr, u32 rsvAddr)
  *  Purpose:
  *      Returns a region containing the specified memory region
  */
-struct MapPage *GetRegion(u32 aAddr)
+static struct MapPage *GetRegion(u32 aAddr)
 {
 	struct MapPage *currRegion = NULL;
 	u32   i = 0;
@@ -567,7 +567,7 @@ struct MapPage *GetRegion(u32 aAddr)
  *  Purpose:
  *  Returns the requested free region
  */
-struct MapPage *GetFreeRegion(u32 aSize)
+static struct MapPage *GetFreeRegion(u32 aSize)
 {
 	struct MapPage *currRegion = NULL;
 	u32   i = 0;
@@ -615,7 +615,7 @@ struct MapPage *GetFreeRegion(u32 aSize)
  *  Purpose:
  *  Returns the requestedmapped region
  */
-struct MapPage *GetMappedRegion(u32 aAddr)
+static struct MapPage *GetMappedRegion(u32 aAddr)
 {
 	u32   i = 0;
 	struct MapPage *currRegion = NULL;

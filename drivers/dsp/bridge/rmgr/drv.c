@@ -123,6 +123,7 @@
 #include <strm.h>
 #include <nodepriv.h>
 #include <wmdchnl.h>
+#include <resourcecleanup.h>
 #endif
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
@@ -158,11 +159,12 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 fRequest);
 static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 fRequest);
 
 #ifndef RES_CLEANUP_DISABLE
-
-
 /* GPP PROCESS CLEANUP CODE */
-static DSP_STATUS PrintProcessInformation(void);
 
+static DSP_STATUS PrintProcessInformation(void);
+static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt);
+static DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt);
+static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt);
 extern enum NODE_STATE NODE_GetState(HANDLE hNode);
 
 /* Get the process context list from driver object */
@@ -533,8 +535,6 @@ DSP_STATUS 	DRV_RemoveDMMResElement(HANDLE hDMMRes, HANDLE hPCtxt)
 	return status;
 }
 
-
-
 /* Update DMM resource status */
 DSP_STATUS DRV_UpdateDMMResElement(HANDLE hDMMRes, u32 pMpuAddr, u32 ulSize,
 				  u32 pReqAddr, u32 pMapAddr,
@@ -555,7 +555,7 @@ DSP_STATUS DRV_UpdateDMMResElement(HANDLE hDMMRes, u32 pMpuAddr, u32 ulSize,
 }
 
 /* Actual DMM De-Allocation */
-DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
+static DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
@@ -761,7 +761,7 @@ DSP_STATUS 	DRV_ProcRemoveSTRMResElement(HANDLE hSTRMRes, HANDLE hPCtxt)
 
 
 /* Actual Stream De-Allocation */
-DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
+static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
@@ -861,6 +861,7 @@ DSP_STATUS DRV_ProcUpdateSTRMRes(u32 uNumBufs, HANDLE hSTRMRes, HANDLE hPCtxt)
 	(*STRMRes)->uNumBufs = uNumBufs;
 	return status;
 }
+
 /* Displaying the resources allocated by a process */
 DSP_STATUS DRV_ProcDisplayResInfo(u8 *pBuf1, u32 *pSize)
 {
@@ -877,7 +878,7 @@ DSP_STATUS DRV_ProcDisplayResInfo(u8 *pBuf1, u32 *pSize)
 	DSP_STATUS status = DSP_SOK;
 
 	CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	DRV_GetProcCtxtList(&pCtxt, hDrvObject);
+	DRV_GetProcCtxtList(&pCtxt, (struct DRV_OBJECT *)hDrvObject);
 	GT_0trace(curTrace, GT_ENTER, "*********************"
 		 "DRV_ProcDisplayResourceInfo:*\n");
 	while (pCtxt != NULL) {
@@ -1538,7 +1539,7 @@ DSP_STATUS DRV_RequestResources(u32 dwContext, u32 *pDevNodeString)
 		GT_0trace(curTrace, GT_7CLASS,
 			 "Failed to reserve bridge resources ");
 	}
-	DBC_Ensure((DSP_SUCCEEDED(status) && pDevNodeString != 0 &&
+	DBC_Ensure((DSP_SUCCEEDED(status) && pDevNodeString != NULL &&
 		  !LST_IsEmpty(pDRVObject->devNodeString)) ||
 		  (DSP_FAILED(status) && *pDevNodeString == 0));
 

@@ -122,7 +122,7 @@ void dload_syms_error(struct Dynamic_Loader_Sym *syms, const char *errtxt, ...)
  *	returned.  Individual errors are reported during the load process
  *	using syms->Error_Report().
  ***********************************************************************/
-extern int Dynamic_Load_Module(struct Dynamic_Loader_Stream *module,
+int Dynamic_Load_Module(struct Dynamic_Loader_Stream *module,
 			struct Dynamic_Loader_Sym *syms ,
 			struct Dynamic_Loader_Allocate *alloc,
 			struct Dynamic_Loader_Initialize *init,
@@ -234,7 +234,7 @@ extern int Dynamic_Load_Module(struct Dynamic_Loader_Stream *module,
  *      returned.  Individual errors are reported during the load process
  *      using syms->Error_Report().
  ***********************************************************************/
-extern int
+int
 Dynamic_Open_Module(struct Dynamic_Loader_Stream *module,
 		    struct Dynamic_Loader_Sym *syms,
 		    struct Dynamic_Loader_Allocate *alloc,
@@ -503,7 +503,7 @@ static void allocate_sections(struct dload_state *dlthis)
 	}
 	/* initialize the handle header */
 	hndl->dm.hnext = hndl->dm.hprev = hndl;	/* circular list */
-	hndl->dm.hroot = 0;
+	hndl->dm.hroot = NULL;
 	hndl->dm.dbthis = 0;
 	dlthis->myhandle = hndl;	/* save away for return */
 	/* pointer to the section list of allocated sections */
@@ -738,7 +738,6 @@ static void dload_symbols(struct dload_state *dlthis)
 		s32 delta;
 		struct doff_syment_t *input_sym;
 		unsigned syms_in_buf;
-		int siz;
 		struct doff_syment_t my_sym_buf[MY_SYM_BUF_SIZ];
 		input_sym = my_sym_buf;
 		syms_in_buf = symbols_left > MY_SYM_BUF_SIZ ?
@@ -821,7 +820,6 @@ static void dload_symbols(struct dload_state *dlthis)
 			/* This symbol is an absolute symbol */
 			if (sp->secnn == DN_ABS && ((sp->sclass == DN_EXT) ||
 						   (sp->sclass == DN_EXTLAB))) {
-				struct dynload_symbol *symp;
 				symp = dlthis->mysym->Find_Matching_Symbol
 						      (dlthis->mysym, sname);
 				if (!symp)
@@ -1699,7 +1697,7 @@ static void init_module_handle(struct dload_state *dlthis)
  *	Zero for success. On error, the number of errors detected is returned.
  * Individual errors are reported using syms->Error_Report().
  ************************************************************************/
-extern int Dynamic_Unload_Module(DLOAD_mhandle mhandle,
+int Dynamic_Unload_Module(DLOAD_mhandle mhandle,
 		struct Dynamic_Loader_Sym *syms,
 		struct Dynamic_Loader_Allocate *alloc,
 		struct Dynamic_Loader_Initialize *init)

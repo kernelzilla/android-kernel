@@ -20,11 +20,10 @@
 #include <drv.h>
 
 
-extern DSP_STATUS DRV_DisplayProcContext(HANDLE hDrvObject);
+extern DSP_STATUS DRV_GetProcCtxtList(struct PROCESS_CONTEXT **pPctxt,
+				struct DRV_OBJECT *hDrvObject);
 
-extern DSP_STATUS DRV_GetProcCtxtList(HANDLE pPctxt, HANDLE hDrvObject);
-
-extern DSP_STATUS DRV_InsertProcContext(HANDLE hDrvObject, HANDLE pPctxt);
+extern DSP_STATUS DRV_InsertProcContext(struct DRV_OBJECT *hDrVObject, HANDLE hPCtxt);
 
 extern DSP_STATUS DRV_RemoveAllDMMResElements(HANDLE pCtxt);
 
@@ -35,14 +34,15 @@ extern DSP_STATUS DRV_ProcUpdatestate(HANDLE pCtxt,
 
 extern DSP_STATUS DRV_ProcSetPID(HANDLE pCtxt, s32 hProcess);
 
-extern DSP_STATUS DRV_GetProcContext(HANDLE phProcess, HANDLE hDrvObject,
-				     HANDLE pCtxt, DSP_HNODE hNode,
-				     u32 pMapAddr);
+extern DSP_STATUS DRV_GetProcContext(u32 phProcess,
+				struct DRV_OBJECT *hDrvObject,
+				HANDLE hPCtxt, DSP_HNODE hNode,
+				u32 pMapAddr);
 
 extern DSP_STATUS DRV_RemoveAllResources(HANDLE pPctxt);
 
-extern DSP_STATUS DRV_RemoveProcContext(HANDLE hDRVObject, HANDLE hPCtxt,
-					HANDLE hProcess);
+extern DSP_STATUS DRV_RemoveProcContext(struct DRV_OBJECT *hDRVObject,
+				     HANDLE hPCtxt, HANDLE hProcess);
 
 extern DSP_STATUS DRV_GetNodeResElement(HANDLE hNode, HANDLE nodeRes,
 					HANDLE pCtxt);
@@ -50,13 +50,11 @@ extern DSP_STATUS DRV_GetNodeResElement(HANDLE hNode, HANDLE nodeRes,
 extern DSP_STATUS DRV_InsertNodeResElement(HANDLE hNode, HANDLE nodeRes,
 					    HANDLE pCtxt);
 
-extern DSP_STATUS DRV_ProcNodeUpdateHeapStatus(HANDLE nodeRes, int status);
-
-extern DSP_STATUS DRV_ProcNodeUpdateStreamStatus(HANDLE nodeRes, int status);
+extern void DRV_ProcNodeUpdateHeapStatus(HANDLE hNodeRes, s32 status);
 
 extern DSP_STATUS DRV_RemoveNodeResElement(HANDLE nodeRes, HANDLE status);
 
-extern DSP_STATUS DRV_ProcNodeUpdateStatus(HANDLE nodeRes, int status);
+extern void DRV_ProcNodeUpdateStatus(HANDLE hNodeRes, s32 status);
 
 extern DSP_STATUS DRV_UpdateDMMResElement(HANDLE dmmRes, u32 pMpuAddr,
 					  u32 ulSize, u32 pReqAddr,

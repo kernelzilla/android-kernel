@@ -156,7 +156,7 @@ DLOAD_module_info DLOAD_module_open(struct Dynamic_Loader_Stream *module,
 
 	/* Check that mandatory arguments are present */
 	if (!module || !syms) {
-		if (syms != 0)
+		if (syms != NULL)
 			dload_syms_error(syms, "Required parameter is NULL");
 
 		return NULL;

@@ -209,7 +209,7 @@ DSP_STATUS STRM_AllocateBuffer(struct STRM_OBJECT *hStrm, u32 uSize,
 	if (DSP_FAILED(res_status))
 		goto func_end;
 
-	DRV_GetProcContext(hProcess, hDrvObject, &pCtxt, NULL, 0);
+	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL, 0);
 	if (pCtxt != NULL) {
 		if (DRV_GetSTRMResElement(hStrm, &hSTRMRes, pCtxt) !=
 		   DSP_ENOTFOUND) {
@@ -280,7 +280,7 @@ DSP_STATUS STRM_Close(struct STRM_OBJECT *hStrm)
 	if (DSP_FAILED(res_status))
 		goto func_end;
 
-	DRV_GetProcContext(hProcess, hDrvObject, &pCtxt, NULL, 0);
+	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL, 0);
 	if (pCtxt != NULL) {
 		if (DRV_GetSTRMResElement(hStrm, &hSTRMRes, pCtxt) !=
 		   DSP_ENOTFOUND) {
@@ -428,7 +428,7 @@ DSP_STATUS STRM_FreeBuffer(struct STRM_OBJECT *hStrm, u8 **apBuffer,
 	PRCS_GetCurrentHandle(&hProcess);
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext(hProcess, hDrvObject, &pCtxt, NULL, 0);
+		DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL, 0);
 		if (pCtxt != NULL) {
 			if (DRV_GetSTRMResElement(hStrm, hSTRMRes, pCtxt) !=
 			   DSP_ENOTFOUND) {
@@ -773,7 +773,7 @@ func_cont:
 	PRCS_GetCurrentHandle(&hProcess);
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext(hProcess, hDrvObject, &pCtxt, hNode, 0);
+		DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject, &pCtxt, hNode, 0);
 		if (pCtxt != NULL)
 			DRV_ProcInsertSTRMResElement(*phStrm, &hSTRMRes, pCtxt);
 

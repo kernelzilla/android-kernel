@@ -69,7 +69,7 @@
 #include "_deh.h"
 #include <_tiomap_mmu.h>
 
-struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN, HW_ELEM_SIZE_16BIT,
+static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN, HW_ELEM_SIZE_16BIT,
 					HW_MMU_CPUES} ;
 #define VirtToPhys(x)       ((x) - PAGE_OFFSET + PHYS_OFFSET)
 /*

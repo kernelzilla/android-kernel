@@ -61,7 +61,7 @@ DSP_STATUS PWR_SleepDSP(IN CONST u32 sleepCode, IN CONST u32 timeout)
 	u32 arg = timeout;
 
 	for (hDevObject = (struct DEV_OBJECT *)DRV_GetFirstDevObject();
-			  hDevObject != 0;
+			  hDevObject != NULL;
 			hDevObject =
 				(struct DEV_OBJECT *)DRV_GetNextDevObject
 				((u32)hDevObject)) {
@@ -101,7 +101,7 @@ DSP_STATUS PWR_WakeDSP(IN CONST u32 timeout)
 	u32 arg = timeout;
 
 	for (hDevObject = (struct DEV_OBJECT *)DRV_GetFirstDevObject();
-	     hDevObject != 0;
+	     hDevObject != NULL;
 	     hDevObject = (struct DEV_OBJECT *)DRV_GetNextDevObject
 			  ((u32)hDevObject)) {
 		if (DSP_SUCCEEDED(DEV_GetWMDContext(hDevObject,
@@ -132,7 +132,7 @@ DSP_STATUS PWR_PM_PreScale(IN u16 voltage_domain, u32 level)
 	arg[1] = level;
 
 	for (hDevObject = (struct DEV_OBJECT *)DRV_GetFirstDevObject();
-	    hDevObject != 0;
+	    hDevObject != NULL;
 	    hDevObject = (struct DEV_OBJECT *)DRV_GetNextDevObject
 			 ((u32)hDevObject)) {
 		if (DSP_SUCCEEDED(DEV_GetWMDContext(hDevObject,
@@ -164,7 +164,7 @@ DSP_STATUS PWR_PM_PostScale(IN u16 voltage_domain, u32 level)
 	arg[1] = level;
 
 	for (hDevObject = (struct DEV_OBJECT *)DRV_GetFirstDevObject();
-	     hDevObject != 0;
+	     hDevObject != NULL;
 	     hDevObject = (struct DEV_OBJECT *)DRV_GetNextDevObject
 			  ((u32)hDevObject)) {
 		if (DSP_SUCCEEDED(DEV_GetWMDContext(hDevObject,

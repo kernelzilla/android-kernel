@@ -174,8 +174,8 @@ struct WCD_Cmd {
 } ;
 
 /*  ----------------------------------- Globals */
-struct GT_Mask WCD_debugMask = { NULL, NULL };	/* Core VxD Mask */
-u32 WCD_cRefs;
+static struct GT_Mask WCD_debugMask = { NULL, NULL };	/* Core VxD Mask */
+static u32 WCD_cRefs;
 
 /*
  *  Function table.
@@ -183,7 +183,7 @@ u32 WCD_cRefs;
  *  numbers defined in wcdioctl.h  This is how an IOCTL number in user mode
  *  turns into a function call in kernel mode.
  */
-struct WCD_Cmd WCD_cmdTable[] = {
+static struct WCD_Cmd WCD_cmdTable[] = {
 	/* MGR module */
 	{MGRWRAP_EnumNode_Info, CMD_MGR_ENUMNODE_INFO_OFFSET},
 	{MGRWRAP_EnumProc_Info, CMD_MGR_ENUMPROC_INFO_OFFSET},

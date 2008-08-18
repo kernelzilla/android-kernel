@@ -56,9 +56,9 @@ static u32 ulExtEnd;
 
 static u32 ulShm0End;
 static u32 ulDynExtBase;
-u32 ulTraceSecBeg;
-u32 ulTraceSecEnd;
-u32 ulShmBaseVirt;
+static u32 ulTraceSecBeg;
+static u32 ulTraceSecEnd;
+static u32 ulShmBaseVirt;
 
 bool bSymbolsReloaded = true;
 
@@ -73,11 +73,8 @@ DSP_STATUS ReadExtDspData(struct WMD_DEV_CONTEXT *hDevContext,
 	DSP_STATUS	status = DSP_SOK;
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 	u32	offset;
-	static u32	ulShmBaseVirt;
 	u32	ulTLBBaseVirt = 0;
 	u32	ulShmOffsetVirt = 0;
-	static u32	ulTraceSecBeg;
-	static u32	ulTraceSecEnd;
 	u32	dwExtProgVirtMem;
 	u32	dwBaseAddr = pDevContext->dwDspExtBaseAddr;
 	bool	bTraceRead = false;

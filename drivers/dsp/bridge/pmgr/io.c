@@ -59,6 +59,7 @@
 /*  ----------------------------------- This */
 #include <ioobj.h>
 #include <iodefs.h>
+#include <io.h>
 
 /*  ----------------------------------- Globals */
 static u32 cRefs;

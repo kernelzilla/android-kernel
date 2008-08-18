@@ -132,10 +132,11 @@ static char *num_procs = "C55=1";
 static s32 shm_size = 0x400000;	/* 4 MB */
 static u32 phys_mempool_base = 0x87000000;
 static u32 phys_mempool_size = 0x600000;
+
 #if !defined(CONFIG_ARCH_OMAP2430) && !defined(CONFIG_ARCH_OMAP3430)
 static int tc_wordswapon = 1;	/* Default value is always TRUE */
 #else
-static int tc_wordswapon = 0;	/* Default value is always TRUE */
+static int tc_wordswapon = 0;	/* Default value is always true */
 #endif
 
 
@@ -544,7 +545,7 @@ static void __exit bridge_exit(void)
 /* This function is called when an application opens handle to the
  * bridge driver. */
 
-int bridge_open(struct inode *ip, struct file *filp)
+static int bridge_open(struct inode *ip, struct file *filp)
 {
 	int status = 0;
 #ifndef RES_CLEANUP_DISABLE
@@ -564,7 +565,7 @@ int bridge_open(struct inode *ip, struct file *filp)
 	if (DSP_FAILED(dsp_status))
 		goto func_cont;
 
-	DRV_GetProcCtxtList(&pCtxtclosed, hDrvObject);
+	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
 	while (pCtxtclosed != NULL) {
 		tsk = find_task_by_vpid(pCtxtclosed->pid);
 
@@ -576,7 +577,7 @@ int bridge_open(struct inode *ip, struct file *filp)
 			DRV_RemoveAllResources(pCtxtclosed);
 			if (pCtxtclosed->hProcessor != NULL) {
 				DRV_GetProcCtxtList(&pCtxttraverse,
-						    hDrvObject);
+						    (struct DRV_OBJECT *)hDrvObject);
 				if (pCtxttraverse->next == NULL) {
 					PROC_Detach(pCtxtclosed->hProcessor);
 				} else {
@@ -605,7 +606,7 @@ int bridge_open(struct inode *ip, struct file *filp)
 				}
 			}
 			pTmp = pCtxtclosed->next;
-			DRV_RemoveProcContext(hDrvObject, pCtxtclosed,
+			DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject, pCtxtclosed,
 					      (void *)pCtxtclosed->pid);
 		} else {
 			pTmp = pCtxtclosed->next;
@@ -615,7 +616,7 @@ int bridge_open(struct inode *ip, struct file *filp)
 func_cont:
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(dsp_status))
-		dsp_status = DRV_InsertProcContext(hDrvObject, &pPctxt);
+		dsp_status = DRV_InsertProcContext((struct DRV_OBJECT *)hDrvObject, &pPctxt);
 
 	if (pPctxt != NULL) {
 		PRCS_GetCurrentHandle(&hProcess);
@@ -630,7 +631,7 @@ func_cont:
 
 /* This function is called when an application closes handle to the bridge
  * driver. */
-int bridge_release(struct inode *ip, struct file *filp)
+static int bridge_release(struct inode *ip, struct file *filp)
 {
 	int status;
 	HANDLE pid;
@@ -657,14 +658,14 @@ static void bridge_free(struct device *dev)
 
 
 /* This function provides IO interface to the bridge driver. */
-int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
+static int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
 		unsigned long args)
 {
 	int status;
 	u32 retval = DSP_SOK;
 	union Trapped_Args pBufIn;
 
-	DBC_Require(filp != 0);
+	DBC_Require(filp != NULL);
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 	status = omap34xxbridge_suspend_lockout(&bridge_suspend_data, filp);
 	if (status != 0)
@@ -699,7 +700,7 @@ int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
 }
 
 /* This function maps kernel space memory to user space memory. */
-int bridge_mmap(struct file *filp, struct vm_area_struct *vma)
+static int bridge_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 #if GT_TRACE
 	u32 offset = vma->vm_pgoff << PAGE_SHIFT;

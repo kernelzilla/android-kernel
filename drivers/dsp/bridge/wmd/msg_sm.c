@@ -63,6 +63,7 @@
 
 /*  ----------------------------------- This */
 #include <_msg_sm.h>
+#include <wmdmsg.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define MSGQ_SIGNATURE      0x5147534d	/* "QGSM" */

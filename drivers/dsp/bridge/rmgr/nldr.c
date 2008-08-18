@@ -746,7 +746,7 @@ void NLDR_Exit(void)
 
 	if (cRefs == 0) {
 		RMM_exit();
-		NLDR_debugMask.flags = 0;
+		NLDR_debugMask.flags = NULL;
 	}
 
 	DBC_Ensure(cRefs >= 0);
@@ -1403,8 +1403,8 @@ static DSP_STATUS LoadLib(struct NLDR_NODEOBJECT *hNldrNode,
 		if (nLibs > 0) {
 			depLibUUIDs = MEM_Calloc(sizeof(struct DSP_UUID) *
 				      nLibs, MEM_PAGED);
-			persistentDepLibs = MEM_Calloc(sizeof(bool) *
-					    nLibs, MEM_PAGED);
+			persistentDepLibs =
+				MEM_Calloc(sizeof(bool) * nLibs, MEM_PAGED);
 			if (!depLibUUIDs || !persistentDepLibs)
 				status = DSP_EMEMORY;
 
