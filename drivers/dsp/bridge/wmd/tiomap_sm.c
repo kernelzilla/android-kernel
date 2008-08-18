@@ -78,7 +78,6 @@ extern struct constraint_handle *dsp_constraint_handle;
 #ifndef DEBUG
 #define TIHELEN_INT_TIMEOUT     1
 #define LOOP_COUNT              1000000
-extern u64 tiomap1510_liTicksPerSecond;	/* Timer frequency */
 #endif
 
 extern struct MAILBOX_CONTEXT mboxsetting;

@@ -136,9 +136,6 @@ static DSP_STATUS run_IdleBoot(u32 prcm_base, u32 cm_base,
 void GetHWRegs(u32 prcm_base, u32 cm_base);
 
 /*  ----------------------------------- Globals */
-#ifndef DEBUG
-u64 tiomap1510_liTicksPerSecond;	/* Timer frequency */
-#endif
 
 /* Attributes of L2 page tables for DSP MMU */
 struct PageInfo {
@@ -248,10 +245,6 @@ void CDECL WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
 
 	DBC_Require(pstrWMDFileName != NULL);
 	DBG_Trace(DBG_ENTER, "In the WMD_DRV_Entry \n");
-
-#ifndef DEBUG
-	tiomap1510_liTicksPerSecond = HZ;
-#endif
 
 	if (CSL_Strcmp(pstrWMDFileName, "UMA") == 0)
 		*ppDrvInterface = &drvInterfaceFxns;

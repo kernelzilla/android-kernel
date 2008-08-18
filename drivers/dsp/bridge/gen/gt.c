@@ -51,7 +51,7 @@ enum GT_State {
 static char *GT_1format = "%s - %d: ";
 static char *GT_2format = "%s - %d(%d): ";
 
-unsigned char *GT_tMask[GT_BOUND];
+static unsigned char *GT_tMask[GT_BOUND];
 
 static bool curInit = false;
 static char *separator;

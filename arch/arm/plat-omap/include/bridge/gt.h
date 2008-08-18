@@ -271,8 +271,6 @@ extern struct GT_Config _GT_params;
 
 #else				/* GT_TRACE == 1 */
 
-extern char *GT_format;
-extern u8 *GT_tMask[GT_BOUND];
 
 #define GT_create(mask, modName)    _GT_create((mask), (modName))
 #define GT_curLine()                ((u16)__LINE__)
