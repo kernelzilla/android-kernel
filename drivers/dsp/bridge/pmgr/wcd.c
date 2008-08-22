@@ -567,7 +567,7 @@ u32 MGRWRAP_WaitForBridgeEvents(union Trapped_Args *args)
 
 	/* get the array of pointers to user structures */
 	cp_fm_usr(aNotifications, args->ARGS_MGR_WAIT.aNotifications,
-		 status, uCount);
+	 status, uCount);
 	/* get the events */
 	for (i = 0; i < uCount; i++) {
 		cp_fm_usr(&notifications[i], aNotifications[i], status, 1);
@@ -642,7 +642,8 @@ u32 PROCWRAP_Attach(union Trapped_Args *args)
  */
 u32 PROCWRAP_Ctrl(union Trapped_Args *args)
 {
-	u32 cbDataSize, *pSize = (u32 *)args->ARGS_PROC_CTRL.pArgs;
+	u32 cbDataSize, __user *pSize = (u32 __user *)
+			args->ARGS_PROC_CTRL.pArgs;
 	u8 *pArgs = NULL;
 	DSP_STATUS status = DSP_SOK;
 
@@ -835,9 +836,11 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 {
 	s32 i, len;
 	DSP_STATUS status = DSP_SOK;
-	u8 *temp;
+	u8 __user *temp;
+	u8 *temp1;
 	s32 argc = args->ARGS_PROC_LOAD.iArgc;
 	u8 **argv, **envp = NULL;
+
 
 	DBC_Require(argc > 0);
 	DBC_Require(argc <= MAX_LOADARGS);
@@ -850,7 +853,7 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 	for (i = 0; DSP_SUCCEEDED(status) && (i < argc); i++) {
 		if (argv[i] != NULL) {
 			temp = argv[i];	/* User space pointer to argument */
-			len = strlen_user((char *)temp);
+			len = strlen_user(temp);
 			/* Kernel space pointer to argument */
 			argv[i] = MEM_Alloc(len, MEM_NONPAGED);
 			if (argv[i] == NULL) {
@@ -866,8 +869,8 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 		len = 0;
 		do {
 			len++;
-			get_user(temp, args->ARGS_PROC_LOAD.aEnvp);
-		} while (temp);
+			get_user(temp1, args->ARGS_PROC_LOAD.aEnvp);
+		} while (temp1);
 		envp = MEM_Alloc(len * sizeof(u8 *), MEM_NONPAGED);
 		if (envp == NULL)
 			status = DSP_EMEMORY;
@@ -875,7 +878,7 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 		cp_fm_usr(envp, args->ARGS_PROC_LOAD.aEnvp, status, len);
 		for (i = 0; DSP_SUCCEEDED(status) && (envp[i] != NULL); i++) {
 			temp = envp[i];	/* User space pointer to argument */
-			len = strlen_user((char *)temp);
+			len = strlen_user(temp);
 			/* Kernel space pointer to argument */
 			envp[i] = MEM_Alloc(len, MEM_NONPAGED);
 			if (envp[i] == NULL) {
@@ -1037,7 +1040,7 @@ u32 NODEWRAP_Allocate(union Trapped_Args *args)
 	DSP_STATUS status = DSP_SOK;
 	struct DSP_UUID nodeId;
 	u32 cbDataSize;
-	u32 *pSize = (u32 *)args->ARGS_NODE_ALLOCATE.pArgs;
+	u32 __user *pSize = (u32 __user *)args->ARGS_NODE_ALLOCATE.pArgs;
 	u8 *pArgs = NULL;
 	struct DSP_NODEATTRIN attrIn, *pAttrIn = NULL;
 	struct NODE_OBJECT *hNode;
@@ -1130,7 +1133,7 @@ u32 NODEWRAP_Connect(union Trapped_Args *args)
 	struct DSP_STRMATTR attrs;
 	struct DSP_STRMATTR *pAttrs = NULL;
 	u32 cbDataSize;
-	u32 *pSize = (u32 *)args->ARGS_NODE_CONNECT.pConnParam;
+	u32 __user *pSize = (u32 __user *)args->ARGS_NODE_CONNECT.pConnParam;
 	u8 *pArgs = NULL;
 
 	GT_0trace(WCD_debugMask, GT_ENTER, "NODEWRAP_Connect: entered\n");
