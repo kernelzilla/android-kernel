@@ -289,6 +289,9 @@ static void omap_sram_idle(void)
 				omap3_per_save_context();
 		}
 		if (core_next_state == PWRDM_POWER_OFF) {
+			prm_set_mod_reg_bits(OMAP3430_AUTO_OFF,
+					     OMAP3430_GR_MOD,
+					     OMAP3_PRM_VOLTCTRL_OFFSET);
 			omap3_core_save_context();
 			omap3_prcm_save_context();
 		}
@@ -321,6 +324,10 @@ static void omap_sram_idle(void)
 			omap3_prcm_restore_context();
 			omap3_sram_restore_context();
 		}
+		if (core_next_state == PWRDM_POWER_OFF)
+			prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF,
+					       OMAP3430_GR_MOD,
+					       OMAP3_PRM_VOLTCTRL_OFFSET);
 		if (per_next_state < PWRDM_POWER_ON) {
 			per_prev_state =
 				pwrdm_read_prev_pwrst(per_pwrdm);
@@ -888,8 +895,8 @@ static void __init configure_vc(void)
 				OMAP3_PRM_VC_I2C_CFG_OFFSET);
 
 	/* Setup voltctrl and other setup times */
-	prm_write_mod_reg(OMAP3430_AUTO_RET, OMAP3430_GR_MOD,
-			OMAP3_PRM_VOLTCTRL_OFFSET);
+	prm_write_mod_reg(OMAP3430_AUTO_RET | OMAP3430_AUTO_SLEEP,
+			  OMAP3430_GR_MOD, OMAP3_PRM_VOLTCTRL_OFFSET);
 
 	prm_write_mod_reg(OMAP3430_CLKSETUP_DURATION, OMAP3430_GR_MOD,
 			OMAP3_PRM_CLKSETUP_OFFSET);

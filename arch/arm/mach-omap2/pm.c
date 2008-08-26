@@ -29,11 +29,13 @@
 #include <asm/atomic.h>
 
 #include <mach/pm.h>
+#include "prm-regbits-34xx.h"
 #include "pm.h"
 
 unsigned short enable_dyn_sleep;
 unsigned short clocks_off_while_idle;
 unsigned short enable_off_mode;
+unsigned short voltage_off_while_idle;
 atomic_t sleep_block = ATOMIC_INIT(0);
 
 static ssize_t idle_show(struct kobject *, struct kobj_attribute *, char *);
@@ -49,6 +51,9 @@ static struct kobj_attribute clocks_off_while_idle_attr =
 static struct kobj_attribute enable_off_mode_attr =
 	__ATTR(enable_off_mode, 0644, idle_show, idle_store);
 
+static struct kobj_attribute voltage_off_while_idle_attr =
+	__ATTR(voltage_off_while_idle, 0644, idle_show, idle_store);
+
 static ssize_t idle_show(struct kobject *kobj, struct kobj_attribute *attr,
 			 char *buf)
 {
@@ -58,6 +63,8 @@ static ssize_t idle_show(struct kobject *kobj, struct kobj_attribute *attr,
 		return sprintf(buf, "%hu\n", clocks_off_while_idle);
 	else if (attr == &enable_off_mode_attr)
 		return sprintf(buf, "%hu\n", enable_off_mode);
+	else if (attr == &voltage_off_while_idle_attr)
+		return sprintf(buf, "%hu\n", voltage_off_while_idle);
 	else
 		return -EINVAL;
 }
@@ -80,6 +87,15 @@ static ssize_t idle_store(struct kobject *kobj, struct kobj_attribute *attr,
 	} else if (attr == &enable_off_mode_attr) {
 		enable_off_mode = value;
 		omap3_pm_off_mode_enable(enable_off_mode);
+	} else if (attr == &voltage_off_while_idle_attr) {
+		voltage_off_while_idle = value;
+		if (voltage_off_while_idle)
+			prm_set_mod_reg_bits(OMAP3430_SEL_OFF, OMAP3430_GR_MOD,
+					OMAP3_PRM_VOLTCTRL_OFFSET);
+		else
+			prm_clear_mod_reg_bits(OMAP3430_SEL_OFF,
+					OMAP3430_GR_MOD,
+					OMAP3_PRM_VOLTCTRL_OFFSET);
 	} else {
 		return -EINVAL;
 	}
@@ -123,9 +139,20 @@ static int __init omap_pm_init(void)
 		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
 	error = sysfs_create_file(power_kobj,
 				  &enable_off_mode_attr.attr);
-	if (error)
+	if (error) {
 		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+		return error;
+	}
 
+	voltage_off_while_idle = 0;
+	/* Going to 0V on anything under ES2.1 will eventually cause a crash */
+	if (system_rev > OMAP3430_REV_ES2_0) {
+		error = sysfs_create_file(power_kobj,
+				  &voltage_off_while_idle_attr.attr);
+		if (error)
+			printk(KERN_ERR "sysfs_create_file failed: %d\n",
+								error);
+	}
 	return error;
 }
 
