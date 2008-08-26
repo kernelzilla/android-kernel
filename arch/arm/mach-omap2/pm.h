@@ -20,6 +20,7 @@ extern int omap3_pm_init(void);
 extern unsigned short enable_dyn_sleep;
 extern unsigned short clocks_off_while_idle;
 extern unsigned short enable_off_mode;
+extern unsigned short voltage_off_while_idle;
 extern atomic_t sleep_block;
 
 extern void omap2_block_sleep(void);
