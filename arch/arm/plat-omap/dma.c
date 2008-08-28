@@ -51,6 +51,12 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
 
 static int enable_1510_mode;
 
+static struct omap_dma_global_context_registers {
+	u32 dma_irqenable_l0;
+	u32 dma_ocp_sysconfig;
+	u32 dma_gcr;
+} omap_dma_global_context;
+
 struct omap_dma_lch {
 	int next_lch;
 	int dev_id;
@@ -2303,6 +2309,26 @@ void omap_stop_lcd_dma(void)
 	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
 }
 EXPORT_SYMBOL(omap_stop_lcd_dma);
+
+void omap_dma_global_context_save(void)
+{
+	omap_dma_global_context.dma_irqenable_l0 =
+		dma_read(IRQENABLE_L0);
+	omap_dma_global_context.dma_ocp_sysconfig =
+		dma_read(OCP_SYSCONFIG);
+	omap_dma_global_context.dma_gcr = dma_read(GCR);
+}
+EXPORT_SYMBOL(omap_dma_global_context_save);
+
+void omap_dma_global_context_restore(void)
+{
+	dma_write(omap_dma_global_context.dma_gcr, GCR);
+	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
+		OCP_SYSCONFIG);
+	dma_write(omap_dma_global_context.dma_irqenable_l0,
+		IRQENABLE_L0);
+}
+EXPORT_SYMBOL(omap_dma_global_context_restore);
 
 /*----------------------------------------------------------------------------*/
 
