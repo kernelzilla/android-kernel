@@ -63,12 +63,20 @@
 #include "_tiomap_util.h"
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#include <asm/arch/resource.h>
+#ifndef CONFIG_OMAP3_PM
+#include <mach/omap-pm.h>
+#include <mach/board-3430sdp.h>
+#else
+#include <mach/resource.h>
+#endif
 #endif
 #endif
 extern s32 dsp_test_sleepstate;
 #ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifdef CONFIG_OMAP3_PM
 extern struct constraint_handle *dsp_constraint_handle;
+#endif
 #endif
 extern struct MAILBOX_CONTEXT mboxsetting;
 
@@ -95,6 +103,10 @@ DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
 						  (u32)*(pConstraintVal+1));
 
 	/* Set the new constraint in resource framework */
+#ifndef CONFIG_OMAP3_PM
+	omap_pm_dsp_set_min_opp((u32)*(pConstraintVal+1));
+	return DSP_SOK;
+#else
 	if (constraint_set(dsp_constraint_handle,
 			   (u32)*(pConstraintVal+1)) == 0)
 		return DSP_SOK;
@@ -103,6 +115,7 @@ DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
 			 "handle_constraints_set: Constraint set failed\n");
 		return DSP_EFAIL;
 	}
+#endif /*#ifndef CONFIG_OMAP3_PM*/
 #endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS */
 #endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM */
 	return DSP_SOK;
@@ -162,12 +175,24 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 				return status;
 			IO_SHMsetting(hIOMgr, SHM_GETOPP, &opplevel);
 			/* Set the OPP to low level before moving to OFF mode */
+#ifndef CONFIG_OMAP3_PM
+			if (opplevel != VDD1_OPP1) {
+				DBG_Trace(DBG_LEVEL5,
+					"Tiomap_pwr.c - DSP requested"
+					" OPP = %d, MPU requesting low"
+					" OPP %d instead\n", opplevel,
+					VDD1_OPP1);
+				omap_pm_dsp_set_min_opp(VDD1_OPP1);
+				status = DSP_SOK;
+			}
+
+#else
 			if (opplevel != CO_VDD1_OPP1) {
-					DBG_Trace(DBG_LEVEL5,
-						"Tiomap_pwr.c - DSP requested"
-						" OPP = %d, MPU requesting low"
-						" OPP %d instead\n", opplevel,
-						CO_VDD1_OPP1);
+				DBG_Trace(DBG_LEVEL5,
+					"Tiomap_pwr.c - DSP requested"
+					" OPP = %d, MPU requesting low"
+					" OPP %d instead\n", opplevel,
+					CO_VDD1_OPP1);
 				if (constraint_set(dsp_constraint_handle,
 						  CO_VDD1_OPP1) != 0) {
 					DBG_Trace(DBG_LEVEL7,
@@ -176,6 +201,7 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 					status = DSP_EFAIL;
 				}
 			}
+#endif
 #endif
 		} else {
 			DBG_Trace(DBG_LEVEL7,

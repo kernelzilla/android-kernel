@@ -60,8 +60,12 @@
 #include <linux/cdev.h>
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+#include <mach/omap-pm.h>
+#else
 #include <asm/arch/resource.h>
 #include <asm/arch/prcm_34xx.h>
+#endif
 #endif
 #endif
 
@@ -104,6 +108,16 @@
 #include <drv.h>
 #include <dbreg.h>
 #endif
+
+#ifndef DISABLE_BRIDGE_PM
+#ifndef DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+#define PRCM_VDD1 1
+struct clk *clk_handle;
+#endif
+#endif
+#endif
+
 
 #define BRIDGE_NAME "C6410"
 /*  ----------------------------------- Globals */
@@ -238,38 +252,60 @@ static struct platform_device omap_dspbridge_dev = {
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
-/* The number of OPPs supported in the system */
-s32 dsp_max_opps = CO_VDD1_OPP5-2;
+#ifndef CONFIG_OMAP3_PM
+/* Maximum Opps that can be requested by IVA*/
+s32 dsp_max_opps = VDD1_OPP3;
+/*vdd1 rate table*/
+const struct vdd_prcm_config vdd1_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{S125M, VDD1_OPP1, 0},
+	/*OPP2*/
+	{S250M, VDD1_OPP2, 0},
+	/*OPP3*/
+	{S500M, VDD1_OPP3, 0},
+	/*OPP4*/
+	{S550M, VDD1_OPP4, 0},
+	/*OPP5*/
+	{S600M, VDD1_OPP5, 0},
+};
+#else
+/* Maximum Opps that can be requested by IVA*/
+s32 dsp_max_opps = CO_VDD1_OPP3;
+#endif
+
 u32 vdd1_dsp_freq[6][4] = {
-
-	 {0, 0, 0, 0},
-
-	 {0, 90000, 0, 86000},
-
+	{0, 0, 0, 0},
+	/*OPP1*/
+	{0, 90000, 0, 86000},
+	/*OPP2*/
 	{0, 180000, 80000, 170000},
-
+	/*OPP3*/
 	{0, 360000, 160000, 340000},
-
+	/*OPP4*/
 	{0, 396000, 325000, 376000},
-
+	/*OPP5*/
 	{0, 430000, 355000, 430000},
 };
 
-/* The handle for setting constraints */
-struct constraint_handle *dsp_constraint_handle;
-struct constraint_handle *mpu_constraint_handle;
 
 static int dspbridge_post_scale(struct notifier_block *op, unsigned long level,
 				void *ptr)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 	PWR_PM_PostScale(PRCM_VDD1, level);
-#endif
-#endif
 	return 0;
 }
 
+#ifndef CONFIG_OMAP3_PM
+static struct notifier_block iva_clk_notifier = {
+	.notifier_call = dspbridge_post_scale,
+	NULL,
+};
+
+#else
+/* The handle for setting constraints */
+struct constraint_handle *dsp_constraint_handle;
+struct constraint_handle *mpu_constraint_handle;
 
 static struct notifier_block omap34xxbridge_post_scale = {
 	.notifier_call = dspbridge_post_scale,
@@ -279,6 +315,7 @@ static struct constraint_id cnstr_id_vdd1 = {
 	.type = RES_OPP_CO,
 	.data = (void *)"vdd1_opp",
 };
+#endif
 #endif
 #endif
 
@@ -309,6 +346,9 @@ static int __init bridge_init(void)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
+#ifndef CONFIG_OMAP3_PM
+	u32 retvalue = 0;
+#endif
 
 	/* use 2.6 device model */
 	if (driver_major) {
@@ -451,8 +491,27 @@ static int __init bridge_init(void)
 			GT_0trace(driverTrace, GT_5CLASS,
 					"DSP/BIOS Bridge driver loaded\n");
 		}
- #ifndef CONFIG_DISABLE_BRIDGE_PM
- #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+		clk_handle = clk_get(NULL, "iva2_ck");
+		if (!clk_handle) {
+			GT_0trace(driverTrace, GT_7CLASS,
+			"clk_get failed to get iva2_ck \n");
+		} else {
+			GT_0trace(driverTrace, GT_7CLASS,
+			"clk_get PASS to get iva2_ck \n");
+		}
+		retvalue = clk_notifier_register(clk_handle, &iva_clk_notifier);
+		if (!retvalue) {
+			GT_0trace(driverTrace, GT_7CLASS,
+			"clk_notifier_register PASS for iva2_ck \n");
+		} else {
+			GT_0trace(driverTrace, GT_7CLASS,
+			"clk_notifier_register FAIL for iva2_ck \n");
+		}
+
+#else
 		/* Register for the constraints */
 		dsp_constraint_handle = constraint_get("dspbridge",
 						      &cnstr_id_vdd1);
@@ -464,6 +523,7 @@ static int __init bridge_init(void)
 		constraint_register_post_notification(mpu_constraint_handle,
 						 &omap34xxbridge_post_scale,
 						 CO_VDD1_OPP5 + 1);
+#endif
 #endif
 #endif
 	}
@@ -480,11 +540,28 @@ static void __exit bridge_exit(void)
 {
 	dev_t devno;
 	bool ret;
+#ifndef CONFIG_OMAP3_PM
+	u32 retvalue = 0;
+#endif
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
 	/* remove the constraints */
+#ifndef CONFIG_OMAP3_PM
+	retvalue = clk_notifier_unregister(clk_handle, &iva_clk_notifier);
+	if (!retvalue) {
+		GT_0trace(driverTrace, GT_7CLASS,
+		"clk_notifier_unregister PASS for iva2_ck \n");
+	} else {
+		GT_0trace(driverTrace, GT_7CLASS,
+		"clk_notifier_unregister PASS for iva2_ck \n");
+	}
+
+	clk_put(clk_handle);
+	clk_handle = NULL;
+
+#else
 	if (dsp_constraint_handle != NULL) {
 		GT_0trace(driverTrace, GT_7CLASS,
 			 "bridge_exit: remove constraints\n");
@@ -513,6 +590,7 @@ static void __exit bridge_exit(void)
 			 "mpu_constraint_handle is NULL\n");
 
 	}
+#endif /*#ifndef CONFIG_OMAP3_PM*/
 #endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS*/
 #endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM*/
 	/* unregister bridge driver */

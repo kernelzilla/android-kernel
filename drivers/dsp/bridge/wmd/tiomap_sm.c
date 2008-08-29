@@ -69,8 +69,12 @@
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+#include <mach/omap-pm.h>
+#else
 #include <asm/arch/resource.h>
 extern struct constraint_handle *dsp_constraint_handle;
+#endif
 #endif
 #endif
 
@@ -189,6 +193,18 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		pDevContext->dwBrdState = BRD_RUNNING;
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+		opplevel = omap_pm_dsp_get_opp();
+		/* If OPP is at minimum level, increase it before waking up
+		* the DSP */
+		if (opplevel == 1) {
+			omap_pm_dsp_set_min_opp(opplevel+1);
+			DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP:Setting "
+			"the vdd1 constraint level to %d before "
+			"waking DSP \n", (opplevel + 1));
+		}
+
+#else
 		opplevel = constraint_get_level(dsp_constraint_handle);
 		/* If OPP is at minimum level, increase it before waking up
 		 * the DSP */
@@ -204,6 +220,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 				 "waking DSP \n", (opplevel + 1));
 		}
 
+#endif
 #endif
 #endif
 		/* Read MMU register to invoke short wakeup of DSP */

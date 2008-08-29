@@ -155,7 +155,12 @@
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+#include <mach/omap-pm.h>
+#include <mach/board-3430sdp.h>
+#else
 #include <asm/arch/resource.h>
+#endif
 #endif
 #endif
 
@@ -373,9 +378,9 @@ static struct NLDR_FXNS nldrFxns = {
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifdef CONFIG_OMAP3_PM
 extern struct constraint_handle *mpu_constraint_handle;
-/*The maximum number of OPPs that DSP bridge can request */
-extern s32 dsp_max_opps;
+#endif
 #endif
 #endif
 
@@ -1360,14 +1365,21 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
 		/* Boost the OPP level to max level that DSP can be requested */
+#ifndef CONFIG_OMAP3_PM
+		omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP3].speed);
+		GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
+		"after setting to VDD1_OPP3 is %d\n",
+		omap_pm_dsp_get_opp());
+#else
 		if (constraint_set(mpu_constraint_handle,
-		   dsp_max_opps) != 0)
+		   CO_VDD1_OPP3) != 0)
 			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
-			"Constraint set of %d failed\n", dsp_max_opps);
+			"Constraint set of %d failed\n", CO_VDD1_OPP3);
 		else
 			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
 				 "Constraint set of %d passed\n",
-				 dsp_max_opps);
+				 CO_VDD1_OPP3);
+#endif
 #endif
 #endif
 		status = hNodeMgr->nldrFxns.pfnLoad(hNode->hNldrNode,
@@ -1387,6 +1399,12 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
 		/* Request the lowest OPP level*/
+#ifndef CONFIG_OMAP3_PM
+		omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP1].speed);
+		GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
+		"after setting to VDD1_OPP1 is %d\n",
+		omap_pm_dsp_get_opp());
+#else
 		if (constraint_set(mpu_constraint_handle,
 		   (CO_VDD1_OPP1)) != 0) {
 			GT_1trace(NODE_debugMask, GT_4CLASS,
@@ -1396,6 +1414,7 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
 			"Constraint set of %d passed\n", CO_VDD1_OPP1);
 		}
+#endif
 #endif
 #endif
 		/* Get address of iAlg functions, if socket node */

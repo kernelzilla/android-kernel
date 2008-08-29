@@ -113,7 +113,11 @@
 #include <host_os.h>
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifndef CONFIG_OMAP3_PM
+#include <mach/omap-pm.h>
+#else
 #include <asm/arch/resource.h>
+#endif
 #endif
 #endif
 
@@ -247,12 +251,14 @@ extern u32 DRV_GetFirstDevExtension();
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#ifdef CONFIG_OMAP3_PM
 /* The maximum number of OPPs that are supported by Baseport */
 extern s32 dsp_max_opps;
 /* The Vdd1 opp table information */
 extern u32 vdd1_dsp_freq[6][4] ;
 /* The contraint handle for OPP information */
 extern struct constraint_handle *dsp_constraint_handle;
+#endif
 #endif
 #endif
 /*
@@ -368,9 +374,8 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
 		if (hIOMgr->hIRQ) {
 			/* Disable interrupts from the board:  */
 			if (DSP_SUCCEEDED(DEV_GetWMDContext(hIOMgr->hDevObject,
-			   &hWmdContext))) {
+			   &hWmdContext)))
 				DBC_Assert(hWmdContext);
-			}
 			(void)CHNLSM_DisableInterrupt(hWmdContext);
 			(void)ISR_Uninstall(hIOMgr->hIRQ);
 			(void)DPC_Destroy(hIOMgr->hDPC);
@@ -620,9 +625,8 @@ func_cont1:
 			 numBytes);
 		for (i = 0; i < 4; i++) {
 			if (!(numBytes >= pgSize[i]) ||
-			   !((allBits & (pgSize[i]-1)) == 0)) {
+			   !((allBits & (pgSize[i]-1)) == 0))
 				continue;
-			}
 			if (ndx < MAX_LOCK_TLB_ENTRIES) {
 				/* This is the physical address written to
 				 * DSP MMU */
@@ -1748,7 +1752,11 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 		DBG_Trace(DBG_LEVEL5, "OPP shared memory - max OPP number: "
 			 "%d\n", hIOMgr->pSharedMem->oppTableStruct.numOppPts);
 		/* Update the current OPP number */
+#ifndef CONFIG_OMAP3_PM
+		i = omap_pm_dsp_get_opp();
+#else
 		i = constraint_get_level(dsp_constraint_handle);
+#endif
 		hIOMgr->pSharedMem->oppTableStruct.currOppPt = i;
 		DBG_Trace(DBG_LEVEL7, "OPP value programmed to shared memory: "
 			 "%d\n", i);
