@@ -21,13 +21,9 @@
  *      Interrupt services.
  *
  *  Public Functions:
- *      ISR_Disable
  *      ISR_Exit
- *      ISR_GetStatus
  *      ISR_Init
  *      ISR_Install
- *      ISR_Restore
- *      ISR_SimulateInt
  *      ISR_Uninstall
  *
  *  Notes:
@@ -80,19 +76,6 @@
 	typedef bool (CDECL *ISR_PROC) (void *pRefData);
 
 /*
- *  ======== ISR_Disable ========
- *  Purpose:
- *      Turns off interrupts to begin a critical section of code.
- *      Not implemented in CE
- *  Parameters:
- *      pFlags: Location to store flags.
- *  Returns:
- *  Requires:
- *  Ensures:
- */
-	extern void CDECL ISR_Disable(OUT u32 *pFlags);
-
-/*
  *  ======== ISR_Exit ========
  *  Purpose:
  *      Discontinue usage of the ISR module.
@@ -104,25 +87,6 @@
  *      Resources acquired in ISR_Init() are freed.
  */
 	extern void CDECL ISR_Exit();
-
-/*
- *  ======== ISR_GetStatus ========
- *  Purpose:
- *      Return platform specific status flags containing information about
- *      a virtualized IRQ.  Used by clients for debugging only.
- *      Not implemented.
- *  Parameters:
- *      hIRQ:       Interrupt object handle as returned by ISR_Install().
- *      pdwFlags:   Location to store status flags on output.
- *  Returns:
- *      DSP_SOK:        Success;
- *      DSP_ENOTIMPL:   Not implemented
- *  Requires:
- *      pdwFlags != NULL.
- *  Ensures:
- */
-	extern DSP_STATUS CDECL ISR_GetStatus(IN struct ISR_IRQ *hIRQ,
-					      OUT u32 *pdwFlags);
 
 /*
  *  ======== ISR_Init ========
@@ -170,36 +134,7 @@
 					    IN u32 dwIntrType,
 					    IN void *pRefData);
 
-/*
- *  ======== ISR_Restore ========
- *  Purpose:
- *      In CE, the client should use ISR_Install to restore the interrupt.
- *  Parameters:
- *      saveFlags: To save or not to save.
- *  Returns:
- *  Requires:
- *  Ensures:
- */
-	extern void CDECL ISR_Restore(IN u32 saveFlags);
 
-/*
- *  ======== ISR_SimulateInt ========
- *  Purpose:
- *      Simulate a hardware interrupt.
- *  Parameters:
- *      hIRQ:       Interrupt object handle as returned by ISR_Install().
- *  Returns:
- *      DSP_SOK:        Success;
- *      DSP_ENOTIMPL:   Not yet implemented.
- *      DSP_EHANDLE:    Invalid hIRQ.
- *  Requires:
- *      DSP_SOK:    An interrupt handler must have been previously installed
- *                  with ISR_Install().
- *  Ensures:
- *      DSP_SOK:    The ISR installed by ISR_Install() will be called, before
- *                  or after this function returns.
- */
-	extern DSP_STATUS CDECL ISR_SimulateInt(IN struct ISR_IRQ *hIRQ);
 
 /*
  *  ======== ISR_Uninstall ========

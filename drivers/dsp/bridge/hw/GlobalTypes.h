@@ -208,8 +208,7 @@
 #define READ_UPPER_8BITS_OF_16(value16bits)\
     (((u8)((u32)(value16bits) >> UPPER_8BIT_SHIFT)) & LOWER_8BIT_MASK)
 
-/* 8 bit tpyes */
-typedef signed   char  WORD8;
+
 
 /* UWORD16:  16 bit tpyes */
 
@@ -232,9 +231,7 @@ typedef volatile unsigned long  REG_UWORD32;
  * Type to be used for floating point calculation. Note that floating point
  * calculation is very CPU expensive, and you should only  use if you
  * absolutely need this. */
-#ifndef OMAPBRIDGE_TYPES
-typedef float  FLOAT;
-#endif
+
 
 /* boolean_t:  Boolean Type True, False */
 /* ReturnCode_t:  Return codes to be returned by all library functions */

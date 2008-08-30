@@ -105,27 +105,6 @@
 					     void *pBuf, u32 ulNumBytes,
 					     u32 nMemSpace);
 
-	typedef bool(CDECL *COD_ALLOCFXN) (void *pPrivRef, u32 space,
-					    u32 ulNumBytes, u32 ulAlign,
-					    u32 *ulDspAddr, bool fReserved);
-
-	typedef bool(CDECL *COD_FREEFXN) (void *pPrivReg, u32 ulDspAddr,
-					   u32 space, u32 ulNumBytes,
-					   bool fReserved);
-
-/*
- *  ======== COD_LOADATTRS ========
- *
- *  Attributes that specify alloc, free, and write functions when loading
- *  or unloading a section.
- */
-	 struct COD_LOADATTRS {
-		void *pWHandle;	/* Handle to pass to write fxn */
-		void *pAHandle;	/* Handle to pass to alloc/free fxns */
-		COD_WRITEFXN pfnWrite;
-		COD_ALLOCFXN pfnAlloc;
-		COD_FREEFXN pfnFree;
-	} ;
 
 /*
  *  ======== COD_Close ========
@@ -377,27 +356,6 @@
 					     COD_WRITEFXN pfnWrite, void *pArb,
 					     char *envp[]);
 
-/*
- *  ======== COD_LoadSection ========
- *  Purpose:
- *      Load a named section in the COFF file. (For overlay support).
- *  Parameters:
- *      hManager:       COD manager.
- *      pstrSect:       Name of the section, with or without leading "."
- *      pAttrs:         Specifies alloc, free, and write function.
- *  Returns:
- *      DSP_SOK:        Success
- *      DSP_EFWRITE:    Failed to write section to target.
- *  Requires:
- *      COD module initialized.
- *      valid hManager.
- *      pstrSect != NULL;
- *  Ensures:
- *
- */
-	extern DSP_STATUS CDECL COD_LoadSection(struct COD_MANAGER *hManager,
-					      IN char *pstrSect,
-					      IN struct COD_LOADATTRS *pAttrs);
 
 /*
  *  ======== COD_Open ========
@@ -470,25 +428,6 @@ extern DSP_STATUS COD_OpenBase(struct COD_MANAGER *hMgr, IN char *pszCoffPath,
 						OUT char *pstrContent,
 						IN u32 cContentSize);
 
-/*
- *  ======== COD_UnloadSection ========
- *  Purpose:
- *      Unload a named section in the COFF file. (For overlay support).
- *  Parameters:
- *      hManager:   COD manager.
- *      pstrSect:   name of the section, with or without leading "."
- *      pAttrs:     Specifies free function.
- *  Returns:
- *      DSP_SOK:    Success.
- *  Requires:
- *      COD module initialized.
- *      valid hManager.
- *      pstrSect != NULL;
- *  Ensures:
- *
- */
-	extern DSP_STATUS CDECL COD_UnloadSection(struct COD_MANAGER *hManager,
-					      IN char *pstrSect,
-					      IN struct COD_LOADATTRS *pAttrs);
+
 
 #endif				/* COD_ */

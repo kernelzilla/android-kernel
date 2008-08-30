@@ -110,8 +110,6 @@ struct loadMonStruct {
 
 #endif
 
-	typedef u32 SMWORD;
-
 	enum SHM_DESCTYPE {
 		SHM_CURROPP = 0,
 		SHM_OPPINFO = 1,

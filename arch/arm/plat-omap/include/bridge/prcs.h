@@ -23,7 +23,6 @@
  *  Public Functions:
  *      PRCS_Exit
  *      PRCS_GetCurrentHandle
- *      PRCS_GetCurThreadHandle
  *      PRCS_Init
  *
  *! Revision History:
@@ -69,21 +68,7 @@
  */
 	extern DSP_STATUS PRCS_GetCurrentHandle(OUT HANDLE *phProcess);
 
-/*
- *  ======== PRCS_GetCurThreadHandle ========
- *  Purpose:
- *      Retrieve the current thread handle
- *  Parameters:
- *      phThread:       Location to store the current thread handle.
- *  Returns:
- *      DSP_SOK:        Success.
- *      DSP_EPOINTER:   Invalid argument.
- *  Requires:
- *      PRCS initialized.
- *  Ensures:
- *      If returned DSP_SOK, phThread is a valid pseudo thread handle.
- */
-	extern DSP_STATUS PRCS_GetCurThreadHandle(OUT HANDLE *phThread);
+
 
 /*
  *  ======== PRCS_Init ========

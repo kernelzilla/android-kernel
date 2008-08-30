@@ -93,8 +93,6 @@
 /*  ----------------------------------- This */
 #include <devdefs.h>
 
-/* Notification callback for DEV clients BRD and CHNL */
-	typedef void(CDECL *DEV_CALLBACK) (void *pArb, u32 ulStatus);
 
 /*
  *  ======== DEV_BrdWriteFxn ========
@@ -717,24 +715,7 @@
 	extern DSP_STATUS CDECL DEV_NotifyClients(struct DEV_OBJECT *hDevObject,
 						  u32 ulStatus);
 
-/*
- *  ======== DEV_RegisterNotify ========
- *  Purpose:
- *      Register a callback function and callback argument for DEV to call
- *      when a change in device status occurs.
- *  Parameters:
- *      hDevObject:  Handle to device object created with DEV_CreateDevice().
- *  Returns:
- *      DSP_SOK:       Success.
- *      DSP_EHANDLE:   Invalid Dev Object handle.
- *  Requires:
- *      DEV Initialized.
- *  Ensures:
- */
-	extern DSP_STATUS CDECL DEV_RegisterNotify(struct DEV_OBJECT
-						   *hDevObject,
-						   void *pArb,
-						   DEV_CALLBACK lpCallback);
+
 
 /*
  *  ======== DEV_RemoveDevice ========

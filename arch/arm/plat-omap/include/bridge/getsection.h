@@ -18,10 +18,7 @@
 #ifndef _GETSECTION_H_
 #define _GETSECTION_H_
 
-#ifndef _SIZE_T			/* Linux sets _SIZE_T on defining size_t */
-typedef unsigned int size_t;
-#define _SIZE_T
-#endif
+
 #include "dynamic_loader.h"
 
 /*

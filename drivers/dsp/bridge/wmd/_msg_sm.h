@@ -81,10 +81,10 @@
  *  size -          Number of messages to be read by the GPP.
  */
 struct MSG {
-	SMWORD bufEmpty;	/* to/from DSP buffer is empty */
-	SMWORD postSWI;	/* Set to "1" to post MSG SWI */
-	SMWORD size;	/* Number of messages to/from the DSP */
-	SMWORD resvd;
+	u32 bufEmpty;	/* to/from DSP buffer is empty */
+	u32 postSWI;	/* Set to "1" to post MSG SWI */
+	u32 size;	/* Number of messages to/from the DSP */
+	u32 resvd;
 } ;
 
 /*

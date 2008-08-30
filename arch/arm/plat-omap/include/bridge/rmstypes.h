@@ -36,6 +36,5 @@
 #include <std.h>
 typedef u32 RMS_WORD;
 typedef char RMS_CHAR;
-typedef u32 RMS_STATUS;
 
 #endif				/* RMSTYPES_ */
