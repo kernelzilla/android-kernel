@@ -281,8 +281,6 @@ static DSP_STATUS WMD_BRD_Monitor(struct WMD_DEV_CONTEXT *hDevContext)
     if ((temp & 0x03) != 0x03 || (temp & 0x03) != 0x02) {
 		/* IVA2 is not in ON state */
 		/* Read and set PM_PWSTCTRL_IVA2  to ON */
-		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
-				     &pwrState);
 		HW_PWR_IVA2PowerStateSet(resources.dwPrmBase,
 					  HW_PWR_DOMAIN_DSP,
 					  HW_PWR_STATE_ON);
@@ -753,9 +751,7 @@ static DSP_STATUS WMD_BRD_Stop(struct WMD_DEV_CONTEXT *hDevContext)
 				 "for iva2_fck\n");
 			}
 		/* IVA2 is not in OFF state */
-		/* Read and set PM_PWSTCTRL_IVA2  to OFF */
-		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
-				     &pwrState);
+		/* Set PM_PWSTCTRL_IVA2  to OFF */
 		HW_PWR_IVA2PowerStateSet(resources.dwPrmBase,
 					  HW_PWR_DOMAIN_DSP,
 					  HW_PWR_STATE_OFF);
@@ -2054,8 +2050,7 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
 	HW_PWRST_IVA2RegGet(prm_base, &temp);
 	 if ((temp & 0x03) != 0x03 || (temp & 0x03) != 0x02) {
 		/* IVA2 is not in ON state */
-		/* Read and set PM_PWSTCTRL_IVA2  to ON */
-		HW_PWR_IVA2StateGet(prm_base, HW_PWR_DOMAIN_DSP, &pwrState);
+		/* Set PM_PWSTCTRL_IVA2  to ON */
 		HW_PWR_IVA2PowerStateSet(prm_base, HW_PWR_DOMAIN_DSP,
 					  HW_PWR_STATE_ON);
 		/* Set the SW supervised state transition */
