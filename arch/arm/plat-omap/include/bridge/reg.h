@@ -122,8 +122,8 @@
  *      - phKey is NULL.
  *      - length of pstrKey < REG_MAXREGPATHLENGTH.
  *  Ensures:
- *      - CSL_Strlen(pstrSubkey) is > CSL_Strlen(pstrKey) &&
- *      - CSL_Strlen(pstrSubkey) is < REG_MAXREGPATHLENGTH
+ *      - strlen(pstrSubkey) is > strlen(pstrKey) &&
+ *      - strlen(pstrSubkey) is < REG_MAXREGPATHLENGTH
  */
 	extern DSP_STATUS REG_EnumKey(OPTIONAL IN HANDLE *phKey,
 				      IN u32 dwIndex, IN CONST char *pstrKey,

@@ -689,9 +689,9 @@ func_cont2:
 	   (char *)pNode->dcdProps.objData.nodeObj.ndbProps.uStackSegName !=
 	   NULL) {
 		label = MEM_Calloc(sizeof(STACKSEGLABEL)+1, MEM_PAGED);
-		CSL_Strcpyn(label, STACKSEGLABEL, sizeof(STACKSEGLABEL)+1);
+               strncpy(label, STACKSEGLABEL, sizeof(STACKSEGLABEL)+1);
 
-		if (CSL_Strcmp((char *)pNode->dcdProps.objData.nodeObj.
+               if (strcmp((char *)pNode->dcdProps.objData.nodeObj.
 				     ndbProps.uStackSegName, label) == 0) {
 			status = hNodeMgr->nldrFxns.pfnGetFxnAddr(pNode->
 				 hNldrNode, "DYNEXT_BEG", &dynextBase);
@@ -1144,13 +1144,13 @@ DSP_STATUS NODE_Connect(struct NODE_OBJECT *hNode1, u32 uStream1,
 			} else {
 				/* Copy "/dbpipe<pipId>" name to device names */
 				pstrDevName1 = pOutput->szDevice;
-				CSL_Strcpyn(pstrDevName1, PIPEPREFIX,
+                               strncpy(pstrDevName1, PIPEPREFIX,
 					   sizeof(PIPEPREFIX));
-				pstrDevName1 += CSL_Strlen(pstrDevName1);
+                               pstrDevName1 += strlen(pstrDevName1);
 				CSL_NumToAscii(pstrDevName1, pipeId);
 				pstrDevName1 = pOutput->szDevice;
 				pstrDevName2 = pInput->szDevice;
-				CSL_Strcpyn(pstrDevName2, pstrDevName1,
+                               strncpy(pstrDevName2, pstrDevName1,
 					   PIPENAMELEN);
 			}
 		}
@@ -1225,9 +1225,8 @@ func_cont2:
 				hNode1->outputs[uStream1].devId = chnlId;
 				pOutput->szDevice = pstrDevName;
 			}
-			CSL_Strcpyn(pstrDevName, HOSTPREFIX,
-				   sizeof(HOSTPREFIX));
-			pstrDevName += CSL_Strlen(pstrDevName);
+                       strncpy(pstrDevName, HOSTPREFIX, sizeof(HOSTPREFIX));
+                       pstrDevName += strlen(pstrDevName);
 			CSL_NumToAscii(pstrDevName, chnlId);
 		}
 	}
@@ -1249,7 +1248,7 @@ func_cont2:
 		}
 		/* Set up create args */
 		pStream->type = DEVICECONNECT;
-		dwLength = CSL_Strlen(hDevNode->pstrDevName);
+               dwLength = strlen(hDevNode->pstrDevName);
 		if (pConnParam != NULL) {
 			pstrmDef->szDevice = MEM_Calloc(dwLength + 1 +
 						(u32) pConnParam->cbData,
@@ -1262,10 +1261,10 @@ func_cont2:
 			status = DSP_EMEMORY;
 		} else {
 			/* Copy device name */
-			CSL_Strcpyn(pstrmDef->szDevice, hDevNode->pstrDevName,
+                       strncpy(pstrmDef->szDevice, hDevNode->pstrDevName,
 				   dwLength);
 			if (pConnParam != NULL) {
-				CSL_Strncat(pstrmDef->szDevice,
+                               strncat(pstrmDef->szDevice,
 					   (char *)pConnParam->cData,
 					   (u32)pConnParam->cbData);
 			}
@@ -3136,13 +3135,14 @@ static DSP_STATUS GetNodeProps(struct DCD_MANAGER *hDcdMgr,
 #endif
 		} else {
 			/* Copy device name */
-			uLen = CSL_Strlen(pndbProps->acName);
+                       DBC_Require(pndbProps->acName);
+                       uLen = strlen(pndbProps->acName);
 			DBC_Assert(uLen < MAXDEVNAMELEN);
 			hNode->pstrDevName = MEM_Calloc(uLen + 1, MEM_PAGED);
 			if (hNode->pstrDevName == NULL) {
 				status = DSP_EMEMORY;
 			} else {
-				CSL_Strcpyn(hNode->pstrDevName,
+                               strncpy(hNode->pstrDevName,
 					   pndbProps->acName, uLen);
 			}
 		}

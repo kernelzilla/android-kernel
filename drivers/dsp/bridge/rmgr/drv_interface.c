@@ -441,7 +441,7 @@ static int __init bridge_init(void)
 		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
 			    sizeof(temp));
 		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *)base_img,
-			    CSL_Strlen(base_img) + 1);
+                           strlen(base_img) + 1);
 	} else {
 		temp = false;
 		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
@@ -449,7 +449,7 @@ static int __init bridge_init(void)
 		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *) "\0", (u32)2);
 	}
 	REG_SetValue(NULL, NULL, NUMPROCS, REG_SZ, (u8 *) num_procs,
-		    CSL_Strlen(num_procs) + 1);
+                   strlen(num_procs) + 1);
 
 	if (shm_size >= 0x10000) {	/* 64 KB */
 		initStatus = REG_SetValue(NULL, NULL, SHMSIZE, REG_DWORD,

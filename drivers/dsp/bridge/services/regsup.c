@@ -164,7 +164,7 @@ DSP_STATUS regsupGetValue(char *valName, void *pBuf, u32 *dataSize)
 	/*  Need to search through the entries looking for the right one.  */
 	for (i = 0; i < pRegKey->numValueEntries; i++) {
 		/*  See if the name matches.  */
-		if (CSL_Strncmp(pRegKey->values[i].name, valName,
+               if (strncmp(pRegKey->values[i].name, valName,
 		    BRIDGE_MAX_NAME_SIZE) == 0) {
 
 			/*  We have a match!  Copy out the data.  */
@@ -208,7 +208,7 @@ DSP_STATUS regsupSetValue(char *valName, void *pBuf, u32 dataSize)
 	/*  Need to search through the entries looking for the right one.  */
 	for (i = 0; i < pRegKey->numValueEntries; i++) {
 		/*  See if the name matches.  */
-		if (CSL_Strncmp(pRegKey->values[i].name, valName,
+               if (strncmp(pRegKey->values[i].name, valName,
 		    BRIDGE_MAX_NAME_SIZE) == 0) {
 			/*  Make sure the new data size is the same.  */
 			if (dataSize != pRegKey->values[i].dataSize) {
@@ -238,9 +238,8 @@ DSP_STATUS regsupSetValue(char *valName, void *pBuf, u32 dataSize)
 		/*  No match, need to make a new entry  */
 		/*  First check to see if we can make any more entries.  */
 		if (pRegKey->numValueEntries < BRIDGE_MAX_NUM_REG_ENTRIES) {
-			CSL_Strcpyn(pRegKey->
-				values[pRegKey->numValueEntries].name, valName,
-				BRIDGE_MAX_NAME_SIZE);
+                       strncpy(pRegKey->values[pRegKey->numValueEntries].name,
+                               valName, BRIDGE_MAX_NAME_SIZE);
 			pRegKey->values[pRegKey->numValueEntries].pData =
 					MEM_Alloc(dataSize, MEM_NONPAGED);
 			if (pRegKey->values[pRegKey->numValueEntries].pData !=
@@ -274,22 +273,25 @@ DSP_STATUS regsupEnumValue(IN u32 dwIndex, IN CONST char *pstrKey,
 {
 	DSP_STATUS retVal = REG_E_INVALIDSUBKEY;
 	u32 i;
-	u32 dwKeyLen = CSL_Strlen(pstrKey);
+       u32 dwKeyLen;
 	u32 count = 0;
+
+       DBC_Require(pstrKey);
+       dwKeyLen = strlen(pstrKey);
 
 	/*  Need to search through the entries looking for the right one.  */
 	for (i = 0; i < pRegKey->numValueEntries; i++) {
 		/*  See if the name matches.  */
-		if ((CSL_Strncmp(pRegKey->values[i].name, pstrKey,
+               if ((strncmp(pRegKey->values[i].name, pstrKey,
 		    dwKeyLen) == 0) && count++ == dwIndex) {
 			/*  We have a match!  Copy out the data.  */
 			memcpy(pstrData, pRegKey->values[i].pData,
 				pRegKey->values[i].dataSize);
 			/*  Get the size for the caller.  */
 			*pdwDataSize = pRegKey->values[i].dataSize;
-			*pdwValueSize = CSL_Strlen(&(pRegKey->
+                       *pdwValueSize = strlen(&(pRegKey->
 						values[i].name[dwKeyLen]));
-			CSL_Strcpyn(pstrValue,
+                       strncpy(pstrValue,
 				    &(pRegKey->values[i].name[dwKeyLen]),
 				    *pdwValueSize + 1);
 			GT_3trace(REG_debugMask, GT_2CLASS,
@@ -320,7 +322,7 @@ DSP_STATUS regsupDeleteValue(IN CONST char *pstrSubkey,
 	for (i = 0; ((i < BRIDGE_MAX_NUM_REG_ENTRIES) &&
 	    (i < pRegKey->numValueEntries)); i++) {
 		/*  See if the name matches...  */
-		if (CSL_Strncmp(pRegKey->values[i].name, pstrValue,
+               if (strncmp(pRegKey->values[i].name, pstrValue,
 		    BRIDGE_MAX_NAME_SIZE) == 0) {
 			/* We have a match!  Delete this key.  To delete a
 			 * key, we free all resources associated with this
@@ -336,8 +338,7 @@ DSP_STATUS regsupDeleteValue(IN CONST char *pstrSubkey,
 				pRegKey->values[i].pData = NULL;
 			} else {
 				/* move the last one here */
-				CSL_Strcpyn(pRegKey->values[i].name,
-				    pRegKey->
+                               strncpy(pRegKey->values[i].name, pRegKey->
 				    values[pRegKey->numValueEntries - 1].name,
 				    BRIDGE_MAX_NAME_SIZE);
 				pRegKey->values[i].dataSize =

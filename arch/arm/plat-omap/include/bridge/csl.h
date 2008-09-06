@@ -21,20 +21,13 @@
  *
  *  Public Functions:
  *      CSL_AnsiToWchar
- *      CSL_Atoi
  *      CSL_ByteSwap
  *      CSL_Exit
  *      CSL_Init
  *      CSL_NumToAscii
- *      CSL_Strcmp
- *      CSL_Strcpyn
- *      CSL_Strlen
- *      CSL_Strncat
- *      CSL_Strncmp
  *      CSL_Strtok
  *      CSL_Strtokr
  *      CSL_WcharToAnsi
- *      CSL_Wstrlen
  *
  *! Revision History:
  *! ================
@@ -57,20 +50,6 @@
 #define CSL_
 
 #include <host_os.h>
-/*
- *  ======== CSL_Atoi ========
- *  Purpose:
- *      Convert a 1 or 2 digit string number into an integer
- *  Parameters:
- *      ptstrSrc:   pointer to string.
- *  Returns:
- *      Integer
- *  Requires:
- *      CSL initialized.
- *      ptstrSrc is a valid string pointer.
- *  Ensures:
- */
-	extern s32 CSL_Atoi(IN CONST char *ptstrSrc);
 
 /*
  *  ======== CSL_Exit ========
@@ -113,119 +92,6 @@
  */
 	extern void CSL_NumToAscii(OUT char *pstrNumber, IN u32 dwNum);
 
-/*
- *  ======== CSL_Strcmp ========
- *  Purpose:
- *      Compare 2 ASCII strings.  Works the same way as stdio's strcmp.
- *  Parameters:
- *      pstrStr1:   char * 1.
- *      pstrStr2:   char * 2.
- *  Returns:
- *      A signed value that gives the results of the comparison:
- *      Zero:   String1 equals String2.
- *      < Zero: String1 is less than String2.
- *      > Zero: String1 is greater than String2.
- *  Requires:
- *      CSL initialized.
- *      pstrStr1 is valid.
- *      pstrStr2 is valid.
- *  Ensures:
- */
-	extern s32 CSL_Strcmp(IN CONST char *pstrStr1, IN CONST char *pstrStr2);
-
-/*
- *  ======== CSL_Strcpyn ========
- *  Purpose:
- *      Safe strcpy function.
- *  Parameters:
- *      pstrDest:   Ptr to destination buffer.
- *      pstrSrc:    Ptr to source buffer.
- *      cMax:       Size of destination buffer.
- *  Returns:
- *      Ptr to destination buffer; or NULL if error.
- *  Requires:
- *      CSL initialized.
- *      pstrDest is valid.
- *      pstrSrc is valid.
- *  Ensures:
- *      Will not copy more than cMax bytes from pstrSrc into pstrDest.
- *      pstrDest will be terminated by a NULL character.
- */
-	extern char *CSL_Strcpyn(OUT char *pstrDest, IN CONST char *pstrSrc,
-				IN u32 cMax);
-
-/*
- *  ======== CSL_Strstr ========
- *  Purpose:
- *      Find substring in a stringn.
- *  Parameters:
- *      haystack:   Ptr to string1.
- *      needle:    Ptr to substring to catch.
- *  Returns:
- *      Ptr to first char matching the substring in the main string.
- *  Requires:
- *      CSL initialized.
- *      haystack is valid.
- *      needle is valid.
- *  Ensures:
- */
-	extern char *CSL_Strstr(IN CONST char *haystack, IN CONST char *needle);
-
-/*
- *  ======== CSL_Strlen ========
- *  Purpose:
- *      Determine the length of a null terminated ASCI string.
- *  Parameters:
- *      pstrSrc:    pointer to string.
- *  Returns:
- *      String length in bytes.
- *  Requires:
- *      CSL initialized.
- *      pstrSrc is a valid string pointer.
- *  Ensures:
- */
-	extern u32 CSL_Strlen(IN CONST char *pstrSrc);
-
-/*
- *  ======== CSL_Strncat ========
- *  Purpose:
- *      Concatenate two strings together.
- *  Parameters:
- *      pszDest:    Destination string.
- *      pszSrc:     Source string.
- *      dwSize:     Number of characters to copy.
- *  Returns:
- *      Pointer to destination string.
- *  Requires:
- *      CSL initialized.
- *      pszDest and pszSrc are valid pointers.
- *  Ensures:
- */
-	extern char *CSL_Strncat(IN char *pszDest,
-				IN char *pszSrc, IN u32 dwSize);
-
-/*
- *  ======== CSL_Strncmp ========
- *  Purpose:
- *      Compare at most n characters of two ASCII strings.  Works the same
- *      way as stdio's strncmp.
- *  Parameters:
- *      pstrStr1:   char * 1.
- *      pstrStr2:   char * 2.
- *      n:          Number of characters to compare.
- *  Returns:
- *      A signed value that gives the results of the comparison:
- *      Zero:   String1 equals String2.
- *      < Zero: String1 is less than String2.
- *      > Zero: String1 is greater than String2.
- *  Requires:
- *      CSL initialized.
- *      pstrStr1 is valid.
- *      pstrStr2 is valid.
- *  Ensures:
- */
-	extern s32 CSL_Strncmp(IN CONST char *pstrStr1,
-				IN CONST char *pstrStr2, IN u32 n);
 
 /*
  *  ======== CSL_Strtok ========

@@ -242,7 +242,7 @@ static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
 		}
 		*lpTmpBuf = '\0';    /* Make sure tmp buf is null terminated */
 		/* Cut output down to input buf size */
-		CSL_Strcpyn(lpBufStart, lpTmpStart, nBytes);
+               strncpy(lpBufStart, lpTmpStart, nBytes);
 		/*Make sure output is null terminated */
 		lpBufStart[nBytes - 1] = '\0';
 		MEM_Free(lpTmpStart);

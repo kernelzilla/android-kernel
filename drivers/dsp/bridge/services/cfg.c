@@ -46,7 +46,7 @@
  *! 03-Feb-2000 rr: Module init/exit is handled by SERVICES Init/Exit.
  *!		    GT Changes.
  *! 31-Jan-2000 rr: Comments and bugfixes:  modified after code review
- *! 07-Jan-2000 rr: CFG_GetBoardName Ensure class checks CSL_Strlen of the
+ *! 07-Jan-2000 rr: CFG_GetBoardName Ensure class checks strlen of the
  *!                 read value from the registry against the passed in BufSize;
  *!                 CFG_GetZLFile,CFG_GetWMDFileName and
  *!                 CFG_GetExecFile also modified same way.
@@ -173,7 +173,7 @@ DSP_STATUS CFG_GetDevObject(struct CFG_DEVNODE *hDevNode, OUT u32 *pdwValue)
 	if (DSP_SUCCEEDED(status)) {
 
 		/* check the device string and then call the REG_SetValue*/
-		if (!(CSL_Strcmp((char *)((struct DRV_EXT *)hDevNode)->szString,
+               if (!(strcmp((char *)((struct DRV_EXT *)hDevNode)->szString,
 							"TIOMAP1510"))) {
 			GT_0trace(CFG_debugMask, GT_1CLASS,
 				  "Fetching DSP Device from "
@@ -281,8 +281,7 @@ DSP_STATUS CFG_GetExecFile(struct CFG_DEVNODE *hDevNode, u32 ulBufSize,
 	}
 #endif
 	DBC_Ensure(((status == DSP_SOK) &&
-		  (CSL_Strlen(pstrExecFile) <= ulBufSize))
-		  || (status != DSP_SOK));
+                 (strlen(pstrExecFile) <= ulBufSize)) || (status != DSP_SOK));
 	return status;
 }
 
@@ -418,7 +417,7 @@ DSP_STATUS CFG_SetDevObject(struct CFG_DEVNODE *hDevNode, u32 dwValue)
 	if (DSP_SUCCEEDED(status)) {
 		/* Store the WCD device object in the Registry */
 
-		if (!(CSL_Strcmp((char *)hDevNode, "TIOMAP1510"))) {
+               if (!(strcmp((char *)hDevNode, "TIOMAP1510"))) {
 			GT_0trace(CFG_debugMask, GT_1CLASS,
 				  "Registering the DSP Device \n");
 			status = REG_SetValue(NULL, (char *)hDevNode,

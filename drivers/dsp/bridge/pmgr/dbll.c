@@ -412,7 +412,7 @@ bool DBLL_getCAddr(struct DBLL_LibraryObj *zlLib, char *name,
 
 	cname[0] = '_';
 
-	CSL_Strcpyn(cname + 1, name, sizeof(cname) - 2);
+       strncpy(cname + 1, name, sizeof(cname) - 2);
 	cname[MAXEXPR] = '\0'; 	/* insure '\0' string termination */
 
 	/* Check for C name, if not found */
@@ -669,7 +669,7 @@ DSP_STATUS DBLL_open(struct DBLL_TarObj *target, char *file, DBLL_Flags flags,
 		 " 0x%x\n", target, file, pLib);
 	zlLib = zlTarget->head;
 	while (zlLib != NULL) {
-		if (CSL_Strcmp(zlLib->fileName, file) == 0) {
+               if (strcmp(zlLib->fileName, file) == 0) {
 			/* Library is already opened */
 			zlLib->openRef++;
 			break;
@@ -691,7 +691,7 @@ DSP_STATUS DBLL_open(struct DBLL_TarObj *target, char *file, DBLL_Flags flags,
 			zlLib->openRef++;
 			zlLib->pTarget = zlTarget;
 			/* Keep a copy of the file name */
-			zlLib->fileName = MEM_Calloc(CSL_Strlen(file) + 1,
+                       zlLib->fileName = MEM_Calloc(strlen(file) + 1,
 							MEM_PAGED);
 			if (zlLib->fileName == NULL) {
 				GT_0trace(DBLL_debugMask, GT_6CLASS,
@@ -699,8 +699,8 @@ DSP_STATUS DBLL_open(struct DBLL_TarObj *target, char *file, DBLL_Flags flags,
 					 "allocation failed\n");
 				status = DSP_EMEMORY;
 			} else {
-				CSL_Strcpyn(zlLib->fileName, file,
-					   CSL_Strlen(file) + 1);
+                               strncpy(zlLib->fileName, file,
+                                          strlen(file) + 1);
 			}
 			zlLib->symTab = NULL;
 		}
@@ -1021,10 +1021,8 @@ static bool nameMatch(void *key, void *value)
 	DBC_Require(value != NULL);
 
 	if ((key != NULL) && (value != NULL)) {
-		if (CSL_Strcmp((char *)key, ((struct Symbol *)value)->
-		   name) == 0) {
+               if (strcmp((char *)key, ((struct Symbol *)value)->name) == 0)
 			return true;
-		}
 	}
 	return false;
 }
@@ -1182,6 +1180,7 @@ static struct dynload_symbol *addToSymbolTable(struct Dynamic_Loader_Sym *this,
 	struct dynload_symbol *retVal;
 
 	DBC_Require(this != NULL);
+       DBC_Require(name);
 	lib = pSymbol->lib;
 	DBC_Require(MEM_IsValidHandle(lib, DBLL_LIBSIGNATURE));
 
@@ -1199,15 +1198,15 @@ static struct dynload_symbol *addToSymbolTable(struct Dynamic_Loader_Sym *this,
 		}
 	}
 	/* Allocate string to copy symbol name */
-	symbol.name = (char *)MEM_Calloc(CSL_Strlen((char *const)name) + 1,
+       symbol.name = (char *)MEM_Calloc(strlen((char *const)name) + 1,
 							MEM_PAGED);
 	if (symbol.name == NULL)
 		return NULL;
 
 	if (symbol.name != NULL) {
 		/* Just copy name (value will be filled in by dynamic loader) */
-		CSL_Strcpyn(symbol.name, (char *const)name,
-			   CSL_Strlen((char *const)name) + 1);
+               strncpy(symbol.name, (char *const)name,
+                          strlen((char *const)name) + 1);
 
 		/* Add symbol to symbol table */
 		symPtr = (struct Symbol *)GH_insert(lib->symTab, (void *)name,
@@ -1324,7 +1323,8 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
 
 	/* Attempt to extract the segment ID and requirement information from
 	 the name of the section */
-	tokenLen = CSL_Strlen((char *)(info->name)) + 1;
+       DBC_Require(info->name);
+       tokenLen = strlen((char *)(info->name)) + 1;
 
 	szSectName = MEM_Calloc(tokenLen, MEM_PAGED);
 	szLastToken = MEM_Calloc(tokenLen, MEM_PAGED);
@@ -1335,12 +1335,11 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
 		status = DSP_EMEMORY;
 		goto func_cont;
 	}
-	CSL_Strcpyn(szSectName, (char *)(info->name), tokenLen);
+       strncpy(szSectName, (char *)(info->name), tokenLen);
 	pToken = CSL_Strtokr(szSectName, ":", &pszCur);
 	while (pToken) {
-		CSL_Strcpyn(szSecLastToken, szLastToken,
-			   CSL_Strlen(szLastToken) + 1);
-		CSL_Strcpyn(szLastToken, pToken, CSL_Strlen(pToken) + 1);
+               strncpy(szSecLastToken, szLastToken, strlen(szLastToken) + 1);
+               strncpy(szLastToken, pToken, strlen(pToken) + 1);
 		pToken = CSL_Strtokr(NULL, ":", &pszCur);
 		count++; 	/* optimizes processing*/
 	}
@@ -1349,16 +1348,16 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
 	 within the section name - only process if there are at least three
 	 tokens within the section name (just a minor optimization)*/
 	if (count >= 3)
-		req = CSL_Atoi(szLastToken);
+               strict_strtol(szLastToken, 10, (long *)&req);
 
 	if ((req == 0) || (req == 1)) {
-		if (CSL_Strcmp(szSecLastToken, "DYN_DARAM") == 0) {
+               if (strcmp(szSecLastToken, "DYN_DARAM") == 0) {
 			segId = 0;
 		} else {
-			if (CSL_Strcmp(szSecLastToken, "DYN_SARAM") == 0) {
+                       if (strcmp(szSecLastToken, "DYN_SARAM") == 0) {
 				segId = 1;
 			} else {
-				if (CSL_Strcmp(szSecLastToken,
+                               if (strcmp(szSecLastToken,
 				   "DYN_EXTERNAL") == 0) {
 					segId = 2;
 				}

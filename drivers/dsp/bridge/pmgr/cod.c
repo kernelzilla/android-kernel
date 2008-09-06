@@ -308,7 +308,7 @@ DSP_STATUS CDECL COD_GetBaseName(struct COD_MANAGER *hManager, char *pszName,
 	DBC_Require(pszName != NULL);
 
 	if (uSize <= COD_MAXPATHLENGTH)
-		CSL_Strcpyn(pszName, hManager->szZLFile, uSize);
+               strncpy(pszName, hManager->szZLFile, uSize);
 	else
 		status = DSP_EFAIL;
 
@@ -628,7 +628,7 @@ DSP_STATUS COD_OpenBase(struct COD_MANAGER *hMgr, IN char *pszCoffPath,
 	} else {
 		/* hang onto the library for subsequent sym table usage */
 		hMgr->baseLib = lib;
-		CSL_Strcpyn(hMgr->szZLFile, pszCoffPath, COD_MAXPATHLENGTH);
+               strncpy(hMgr->szZLFile, pszCoffPath, COD_MAXPATHLENGTH);
 	}
 
 	return status;

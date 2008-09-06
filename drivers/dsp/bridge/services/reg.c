@@ -71,8 +71,8 @@ DSP_STATUS REG_DeleteValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 	DSP_STATUS status;
 	DBC_Require(pstrSubkey && pstrValue);
 	DBC_Require(phKey == NULL);
-	DBC_Require(CSL_Strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
-	DBC_Require(CSL_Strlen(pstrValue) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_DeleteValue: entered\n");
 
@@ -102,7 +102,7 @@ DSP_STATUS REG_EnumValue(IN HANDLE *phKey, IN u32 dwIndex,
 		    pdwDataSize);
 	DBC_Require(*pdwValueSize <= REG_MAXREGPATHLENGTH);
 	DBC_Require(phKey == NULL);
-	DBC_Require(CSL_Strlen(pstrKey) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrKey) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_EnumValue: entered\n");
 
@@ -135,8 +135,8 @@ DSP_STATUS REG_GetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 
 	DBC_Require(pstrSubkey && pstrValue && pbData);
 	DBC_Require(phKey == NULL);
-	DBC_Require(CSL_Strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
-	DBC_Require(CSL_Strlen(pstrValue) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_GetValue: entered\n");
 
@@ -181,7 +181,7 @@ DSP_STATUS REG_SetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 	DBC_Require(pstrValue && pbData);
 	DBC_Require(phKey == NULL);
 	DBC_Require(dwDataSize > 0);
-	DBC_Require(CSL_Strlen(pstrValue) < REG_MAXREGPATHLENGTH);
+       DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
 	/*  We need to use regsup calls...  */
 	/*  ...for now we don't need the key handle or  */

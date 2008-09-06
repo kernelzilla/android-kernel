@@ -246,7 +246,7 @@ void CDECL WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
 	DBC_Require(pstrWMDFileName != NULL);
 	DBG_Trace(DBG_ENTER, "In the WMD_DRV_Entry \n");
 
-	if (CSL_Strcmp(pstrWMDFileName, "UMA") == 0)
+       if (strcmp(pstrWMDFileName, "UMA") == 0)
 		*ppDrvInterface = &drvInterfaceFxns;
 	else
 		DBG_Trace(DBG_LEVEL7, "WMD_DRV_Entry Unknown WMD file name");
@@ -969,33 +969,32 @@ static DSP_STATUS WMD_DEV_Create(OUT struct WMD_DEV_CONTEXT **ppDevContext,
 		    align_size, &pg_tbl_pa);
 	/* Check if the PA is aligned for us */
 	if ((pg_tbl_pa) & (align_size-1)) {
-	    /* PA not aligned to page table size ,
-	     * try with more allocation and align */
-	    MEM_FreePhysMem((void *)pg_tbl_va, pg_tbl_pa, pPtAttrs->L1size);
-	    /* we like to get aligned on L1 table size */
-	    pg_tbl_va = (u32) MEM_AllocPhysMem((pPtAttrs->L1size)*2,
+               /* PA not aligned to page table size ,
+                * try with more allocation and align */
+               MEM_FreePhysMem((void *)pg_tbl_va, pg_tbl_pa, pPtAttrs->L1size);
+               /* we like to get aligned on L1 table size */
+               pg_tbl_va = (u32) MEM_AllocPhysMem((pPtAttrs->L1size)*2,
 			 align_size, &pg_tbl_pa);
-	    /* We should be able to get aligned table now */
-	    pPtAttrs->L1TblAllocPa = pg_tbl_pa;
-	    pPtAttrs->L1TblAllocVa = pg_tbl_va;
-	    pPtAttrs->L1TblAllocSz = pPtAttrs->L1size * 2;
-	    /* Align the PA to the next 'align'  boundary */
-	    pPtAttrs->L1BasePa = ((pg_tbl_pa) + (align_size-1)) &
+               /* We should be able to get aligned table now */
+               pPtAttrs->L1TblAllocPa = pg_tbl_pa;
+               pPtAttrs->L1TblAllocVa = pg_tbl_va;
+               pPtAttrs->L1TblAllocSz = pPtAttrs->L1size * 2;
+               /* Align the PA to the next 'align'  boundary */
+               pPtAttrs->L1BasePa = ((pg_tbl_pa) + (align_size-1)) &
 				 (~(align_size-1));
-	    pPtAttrs->L1BaseVa = pg_tbl_va + (pPtAttrs->L1BasePa -
+               pPtAttrs->L1BaseVa = pg_tbl_va + (pPtAttrs->L1BasePa -
 				 pg_tbl_pa);
 	} else {
-	    /* We got aligned PA, cool */
-	    pPtAttrs->L1TblAllocPa = pg_tbl_pa;
-	    pPtAttrs->L1TblAllocVa = pg_tbl_va;
-	    pPtAttrs->L1TblAllocSz = pPtAttrs->L1size;
-	    pPtAttrs->L1BasePa = pg_tbl_pa;
-	    pPtAttrs->L1BaseVa = pg_tbl_va;
+               /* We got aligned PA, cool */
+               pPtAttrs->L1TblAllocPa = pg_tbl_pa;
+               pPtAttrs->L1TblAllocVa = pg_tbl_va;
+               pPtAttrs->L1TblAllocSz = pPtAttrs->L1size;
+               pPtAttrs->L1BasePa = pg_tbl_pa;
+               pPtAttrs->L1BaseVa = pg_tbl_va;
 	}
-	if (pPtAttrs->L1BaseVa) {
-			memset((u8 *)pPtAttrs->L1BaseVa, 0x00,
-			pPtAttrs->L1size);
-	}
+       if (pPtAttrs->L1BaseVa)
+               memset((u8 *)pPtAttrs->L1BaseVa, 0x00, pPtAttrs->L1size);
+
 		/* number of L2 page tables = DMM pool used + SHMMEM +EXTMEM +
 		 * L4 pages */
 		pPtAttrs->L2NumPages = ((DMMPOOLSIZE >> 20) + 6);
@@ -1010,10 +1009,9 @@ static DSP_STATUS WMD_DEV_Create(OUT struct WMD_DEV_CONTEXT **ppDevContext,
 	pPtAttrs->L2TblAllocSz = pPtAttrs->L2size;
 	pPtAttrs->L2BasePa = pg_tbl_pa;
 	pPtAttrs->L2BaseVa = pg_tbl_va;
-	if (pPtAttrs->L2BaseVa) {
-			memset((u8 *)pPtAttrs->L2BaseVa, 0x00,
-			pPtAttrs->L2size);
-	}
+       if (pPtAttrs->L2BaseVa)
+               memset((u8 *)pPtAttrs->L2BaseVa, 0x00, pPtAttrs->L2size);
+
 	pPtAttrs->pgInfo = MEM_Calloc(pPtAttrs->L2NumPages *
 				sizeof(struct PageInfo), MEM_NONPAGED);
 		DBG_Trace(DBG_LEVEL1, "L1 pa %x, va %x, size %x\n L2 pa %x, va "

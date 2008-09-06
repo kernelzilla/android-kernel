@@ -1507,7 +1507,7 @@ DSP_STATUS DRV_RequestResources(u32 dwContext, u32 *pDevNodeString)
 		pszdevNode = MEM_Calloc(sizeof(struct DRV_EXT), MEM_NONPAGED);
 		if (pszdevNode) {
 			LST_InitElem(&pszdevNode->link);
-			CSL_Strcpyn((char *) pszdevNode->szString,
+                       strncpy((char *) pszdevNode->szString,
 				 (char *)dwContext, MAXREGPATHLENGTH);
 			/* Update the Driver Object List */
 			*pDevNodeString = (u32)pszdevNode->szString;
@@ -1526,7 +1526,7 @@ DSP_STATUS DRV_RequestResources(u32 dwContext, u32 *pDevNodeString)
 		*pDevNodeString = 0;
 	}
 
-	if (!(CSL_Strcmp((char *) dwContext, "TIOMAP1510"))) {
+       if (!(strcmp((char *) dwContext, "TIOMAP1510"))) {
 		GT_0trace(curTrace, GT_1CLASS,
 			  " Allocating resources for UMA \n");
 		status = RequestBridgeResourcesDSP(dwContext, DRV_ASSIGN);
@@ -1559,7 +1559,7 @@ DSP_STATUS DRV_ReleaseResources(u32 dwContext, struct DRV_OBJECT *hDrvObject)
 
 	GT_0trace(curTrace, GT_ENTER, "Entering DRV_Release Resources\n");
 
-	if (!(CSL_Strcmp((char *)((struct DRV_EXT *)dwContext)->szString,
+       if (!(strcmp((char *)((struct DRV_EXT *)dwContext)->szString,
 	   "TIOMAP1510"))) {
 		GT_0trace(curTrace, GT_1CLASS,
 			 " Releasing DSP-Bridge resources \n");

@@ -50,7 +50,7 @@
  *! 11-Jan-2001 jeh Changes to DCD_GetObjectDef to match node.cdb, proc.cdb.
  *! 12-Dec-2000 kc: Added DCD_AutoUnregister. MSGNODE, DAISNODE added in
  *!                 GetAttrsFromBuf
- *! 22-Nov-2000 kc: Replaced sprintf() calls with CSL_Strncat.
+ *! 22-Nov-2000 kc: Replaced sprintf() calls with strncat.
  *! 09-Nov-2000 kc: Optimized DCD module.
  *! 30-Oct-2000 kc: Added DCD_AutoRegister function; changed local var. names.
  *! 29-Sep-2000 kc: Added code review changes (src/reviews/dcd_reviews.txt).
@@ -318,15 +318,15 @@ DSP_STATUS DCD_EnumerateObject(IN s32 cIndex, IN enum DSP_DCDOBJTYPE objType,
 		 * Pre-determine final key length. It's length of DCD_REGKEY +
 		 *  "_\0" + length of szObjType string + terminating NULL.
 		 */
-		dwKeyLen = CSL_Strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
+               dwKeyLen = strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
 		DBC_Assert(dwKeyLen < REG_MAXREGPATHLENGTH);
 
 		/* Create proper REG key; concatenate DCD_REGKEY with
 		 * objType. */
-		CSL_Strcpyn(szRegKey, DCD_REGKEY, CSL_Strlen(DCD_REGKEY) + 1);
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen("_\0")) <
+               strncpy(szRegKey, DCD_REGKEY, strlen(DCD_REGKEY) + 1);
+               if ((strlen(szRegKey) + strlen("_\0")) <
 		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, "_\0", 2);
+                       strncat(szRegKey, "_\0", 2);
 		} else {
 			status = DSP_EFAIL;
 		}
@@ -340,10 +340,10 @@ DSP_STATUS DCD_EnumerateObject(IN s32 cIndex, IN enum DSP_DCDOBJTYPE objType,
 			status = DSP_EFAIL;
 		} else {
 			status = DSP_SOK;
-			if ((CSL_Strlen(szRegKey) + CSL_Strlen(szObjType)) <
+                       if ((strlen(szRegKey) + strlen(szObjType)) <
 			   REG_MAXREGPATHLENGTH) {
-				CSL_Strncat(szRegKey, szObjType,
-					   CSL_Strlen(szObjType) + 1);
+                               strncat(szRegKey, szObjType,
+                                          strlen(szObjType) + 1);
 			} else {
 				status = DSP_EFAIL;
 			}
@@ -501,13 +501,13 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 	}
 	 /* Pre-determine final key length. It's length of DCD_REGKEY +
 	 *  "_\0" + length of szObjType string + terminating NULL */
-	dwKeyLen = CSL_Strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
+       dwKeyLen = strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
 	DBC_Assert(dwKeyLen < REG_MAXREGPATHLENGTH);
 	/* Create proper REG key; concatenate DCD_REGKEY with objType. */
-	CSL_Strcpyn(szRegKey, DCD_REGKEY, CSL_Strlen(DCD_REGKEY) + 1);
+       strncpy(szRegKey, DCD_REGKEY, strlen(DCD_REGKEY) + 1);
 
-	if ((CSL_Strlen(szRegKey) + CSL_Strlen("_\0")) < REG_MAXREGPATHLENGTH)
-		CSL_Strncat(szRegKey, "_\0", 2);
+       if ((strlen(szRegKey) + strlen("_\0")) < REG_MAXREGPATHLENGTH)
+               strncat(szRegKey, "_\0", 2);
 	else
 		status = DSP_EFAIL;
 
@@ -517,22 +517,20 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 	} else {
 		status = DSP_SOK;
 
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen(szObjType)) <
+               if ((strlen(szRegKey) + strlen(szObjType)) <
 		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szObjType,
-				   CSL_Strlen(szObjType) + 1);
+                       strncat(szRegKey, szObjType, strlen(szObjType) + 1);
 		} else {
 			status = DSP_EFAIL;
 		}
 		/* Create UUID value to set in registry. */
 		UUID_UuidToString(pObjUuid, szUuid, MAXUUIDLEN);
 
-		if ((CSL_Strlen(szRegKey) + MAXUUIDLEN) <
-		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szUuid, MAXUUIDLEN);
-		} else {
+               if ((strlen(szRegKey) + MAXUUIDLEN) < REG_MAXREGPATHLENGTH)
+                       strncat(szRegKey, szUuid, MAXUUIDLEN);
+               else
 			status = DSP_EFAIL;
-		}
+
 		/* Retrieve paths from the registry based on struct DSP_UUID */
 		dwBufSize = REG_MAXREGPATHLENGTH;
 	}
@@ -555,12 +553,12 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 		goto func_end;
 	}
 	/* Ensure szUuid + 1 is not greater than sizeof szSectName. */
-	DBC_Assert((CSL_Strlen(szUuid) + 1) < sizeof(szSectName));
+       DBC_Assert((strlen(szUuid) + 1) < sizeof(szSectName));
 	/* Create section name based on node UUID. A period is
 	 * pre-pended to the UUID string to form the section name.
 	 * I.e. ".24BC8D90_BB45_11d4_B756_006008BDB66F" */
-	CSL_Strcpyn(szSectName, ".", 2);
-	CSL_Strncat(szSectName, szUuid, CSL_Strlen(szUuid));
+       strncpy(szSectName, ".", 2);
+       strncat(szSectName, szUuid, strlen(szUuid));
 	/* Get section information. */
 	status = COD_GetSection(lib, szSectName, &ulAddr, &ulLen);
 	if (DSP_FAILED(status)) {
@@ -574,7 +572,7 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 #ifdef _DB_TIOMAP
 	pTempCoffBuf = MEM_Calloc(ulLen + 4, MEM_PAGED);
 
-	if (CSL_Strstr(szRegData, "iva") == NULL) {
+       if (strstr(szRegData, "iva") == NULL) {
 		/* Locate section by objectID and read its content. */
 		status = COD_ReadSection(lib, szSectName, pszCoffBuf, ulLen);
 	} else {
@@ -587,7 +585,7 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 #endif
 	if (DSP_SUCCEEDED(status)) {
 		/* Compres DSP buffer to conform to PC format. */
-		if (CSL_Strstr(szRegData, "iva") == NULL) {
+               if (strstr(szRegData, "iva") == NULL) {
 			CompressBuf(pszCoffBuf, ulLen, DSPWORDSIZE);
 		} else {
 			CompressBuf(pszCoffBuf, ulLen, 1);
@@ -775,12 +773,12 @@ DSP_STATUS DCD_GetLibraryName(IN struct DCD_MANAGER *hDcdMgr,
 	 *  Pre-determine final key length. It's length of DCD_REGKEY +
 	 *  "_\0" + length of szObjType string + terminating NULL.
 	 */
-	dwKeyLen = CSL_Strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
+       dwKeyLen = strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
 	DBC_Assert(dwKeyLen < REG_MAXREGPATHLENGTH);
 	/* Create proper REG key; concatenate DCD_REGKEY with objType. */
-	CSL_Strcpyn(szRegKey, DCD_REGKEY, CSL_Strlen(DCD_REGKEY) + 1);
-	if ((CSL_Strlen(szRegKey) + CSL_Strlen("_\0")) < REG_MAXREGPATHLENGTH)
-		CSL_Strncat(szRegKey, "_\0", 2);
+       strncpy(szRegKey, DCD_REGKEY, strlen(DCD_REGKEY) + 1);
+       if ((strlen(szRegKey) + strlen("_\0")) < REG_MAXREGPATHLENGTH)
+               strncat(szRegKey, "_\0", 2);
 	else
 		status = DSP_EFAIL;
 
@@ -809,18 +807,17 @@ DSP_STATUS DCD_GetLibraryName(IN struct DCD_MANAGER *hDcdMgr,
 		status = DSP_EFAIL;
 	} else {
 		status = DSP_SOK;
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen(szObjType))
+               if ((strlen(szRegKey) + strlen(szObjType))
 		   < REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szObjType,
-				   CSL_Strlen(szObjType) + 1);
+                       strncat(szRegKey, szObjType, strlen(szObjType) + 1);
 		} else {
 			status = DSP_EFAIL;
 		}
 		/* Create UUID value to find match in registry. */
 		UUID_UuidToString(pUuid, szUuid, MAXUUIDLEN);
-		if ((CSL_Strlen(szRegKey) + MAXUUIDLEN) <
+               if ((strlen(szRegKey) + MAXUUIDLEN) <
 		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szUuid, MAXUUIDLEN);
+                       strncat(szRegKey, szUuid, MAXUUIDLEN);
 		} else {
 			status = DSP_EFAIL;
 		}
@@ -835,28 +832,26 @@ DSP_STATUS DCD_GetLibraryName(IN struct DCD_MANAGER *hDcdMgr,
 		if (fPhaseSplit)
 			*fPhaseSplit = false;
 
-		CSL_Strcpyn(szRegKey, DCD_REGKEY, CSL_Strlen(DCD_REGKEY) + 1);
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen("_\0")) <
+               strncpy(szRegKey, DCD_REGKEY, strlen(DCD_REGKEY) + 1);
+               if ((strlen(szRegKey) + strlen("_\0")) <
 		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, "_\0", 2);
+                       strncat(szRegKey, "_\0", 2);
 		} else {
 			status = DSP_EFAIL;
 		}
 		sprintf(szObjType, "%d", DSP_DCDLIBRARYTYPE);
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen(szObjType))
+               if ((strlen(szRegKey) + strlen(szObjType))
 		   < REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szObjType,
-				   CSL_Strlen(szObjType) + 1);
+                       strncat(szRegKey, szObjType, strlen(szObjType) + 1);
 		} else {
 			status = DSP_EFAIL;
 		}
 		UUID_UuidToString(pUuid, szUuid, MAXUUIDLEN);
-		if ((CSL_Strlen(szRegKey) + MAXUUIDLEN) <
-		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szUuid, MAXUUIDLEN);
-		} else {
+               if ((strlen(szRegKey) + MAXUUIDLEN) < REG_MAXREGPATHLENGTH)
+                       strncat(szRegKey, szUuid, MAXUUIDLEN);
+               else
 			status = DSP_EFAIL;
-		}
+
 		status = REG_GetValue(NULL, szRegKey, szRegKey,
 					(u8 *)pstrLibName, pdwSize);
 	}
@@ -947,12 +942,12 @@ DSP_STATUS DCD_RegisterObject(IN struct DSP_UUID *pUuid,
 	 * Pre-determine final key length. It's length of DCD_REGKEY +
 	 *  "_\0" + length of szObjType string + terminating NULL.
 	 */
-	dwKeyLen = CSL_Strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
+       dwKeyLen = strlen(DCD_REGKEY) + 1 + sizeof(szObjType) + 1;
 	DBC_Assert(dwKeyLen < REG_MAXREGPATHLENGTH);
 	/* Create proper REG key; concatenate DCD_REGKEY with objType. */
-	CSL_Strcpyn(szRegKey, DCD_REGKEY, CSL_Strlen(DCD_REGKEY) + 1);
-	if ((CSL_Strlen(szRegKey) + CSL_Strlen("_\0")) < REG_MAXREGPATHLENGTH)
-		CSL_Strncat(szRegKey, "_\0", 2);
+       strncpy(szRegKey, DCD_REGKEY, strlen(DCD_REGKEY) + 1);
+       if ((strlen(szRegKey) + strlen("_\0")) < REG_MAXREGPATHLENGTH)
+               strncat(szRegKey, "_\0", 2);
 	else
 		status = DSP_EFAIL;
 
@@ -961,21 +956,19 @@ DSP_STATUS DCD_RegisterObject(IN struct DSP_UUID *pUuid,
 		status = DSP_EFAIL;
 	} else {
 		status = DSP_SOK;
-		if ((CSL_Strlen(szRegKey) + CSL_Strlen(szObjType)) <
+               if ((strlen(szRegKey) + strlen(szObjType)) <
 		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szObjType,
-				   CSL_Strlen(szObjType) + 1);
+                       strncat(szRegKey, szObjType, strlen(szObjType) + 1);
 		} else {
 			status = DSP_EFAIL;
 		}
 		/* Create UUID value to set in registry. */
 		UUID_UuidToString(pUuid, szUuid, MAXUUIDLEN);
-		if ((CSL_Strlen(szRegKey) + MAXUUIDLEN) <
-		   REG_MAXREGPATHLENGTH) {
-			CSL_Strncat(szRegKey, szUuid, MAXUUIDLEN);
-		} else {
+               if ((strlen(szRegKey) + MAXUUIDLEN) < REG_MAXREGPATHLENGTH)
+                       strncat(szRegKey, szUuid, MAXUUIDLEN);
+               else
 			status = DSP_EFAIL;
-		}
+
 	}
 
 	if (DSP_SUCCEEDED(status)) {
@@ -986,7 +979,7 @@ DSP_STATUS DCD_RegisterObject(IN struct DSP_UUID *pUuid,
 		if (pszPathName) {
 			/* Add new reg value (UUID+objType) with COFF path
 			 * info. */
-			dwPathSize = CSL_Strlen(pszPathName) + 1;
+                       dwPathSize = strlen(pszPathName) + 1;
 			status = REG_SetValue(NULL, szRegKey, szRegKey, REG_SZ,
 					     (u8 *)pszPathName, dwPathSize);
 			GT_3trace(curTrace, GT_6CLASS,
@@ -1163,11 +1156,12 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		token = CSL_Strtokr(NULL, seps, &pszCur);
 
 		/* acName */
+               DBC_Require(token);
 		cLen = strlen(token);
 		if (cLen > DSP_MAXNAMELEN - 1)
 			cLen = DSP_MAXNAMELEN - 1;
 
-		CSL_Strcpyn(pGenObj->objData.nodeObj.ndbProps.acName,
+               strncpy(pGenObj->objData.nodeObj.ndbProps.acName,
 			   token, cLen);
 		pGenObj->objData.nodeObj.ndbProps.acName[cLen] = '\0';
 		token = CSL_Strtokr(NULL, seps, &pszCur);
@@ -1246,6 +1240,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		token = CSL_Strtokr(NULL, seps, &pszCur);
 
 		/* char * pstrCreatePhaseFxn */
+               DBC_Require(token);
 		cLen = strlen(token);
 		pGenObj->objData.nodeObj.pstrCreatePhaseFxn =
 			MEM_Calloc(cLen + 1, MEM_PAGED);
@@ -1255,6 +1250,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		token = CSL_Strtokr(NULL, seps, &pszCur);
 
 		/* char * pstrExecutePhaseFxn */
+               DBC_Require(token);
 		cLen = strlen(token);
 		pGenObj->objData.nodeObj.pstrExecutePhaseFxn =
 			 MEM_Calloc(cLen + 1, MEM_PAGED);
@@ -1264,6 +1260,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		token = CSL_Strtokr(NULL, seps, &pszCur);
 
 		/* char * pstrDeletePhaseFxn */
+               DBC_Require(token);
 		cLen = strlen(token);
 		pGenObj->objData.nodeObj.pstrDeletePhaseFxn =
 			MEM_Calloc(cLen + 1, MEM_PAGED);

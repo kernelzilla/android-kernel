@@ -416,8 +416,8 @@ static DSP_STATUS GetExecFile(struct CFG_DEVNODE *hDevNode,
 		return CFG_GetExecFile(hDevNode, size, execFile);
 	} else if (devType == IVA_UNIT) {
 		if (iva_img) {
-			len = CSL_Strlen(iva_img);
-			CSL_Strcpyn(execFile, iva_img, len + 1);
+                       len = strlen(iva_img);
+                       strncpy(execFile, iva_img, len + 1);
 			return DSP_SOK;
 		}
 	}
@@ -1148,13 +1148,13 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 				DBC_Assert(pProcObject->g_pszLastCoff == NULL);
 				/* Allocate memory for pszLastCoff */
 				pProcObject->g_pszLastCoff = MEM_Calloc(
-					(CSL_Strlen((char *)aArgv[0]) + 1),
+                                       (strlen((char *)aArgv[0]) + 1),
 					MEM_PAGED);
 				/* If memory allocated, save COFF file name*/
 				if (pProcObject->g_pszLastCoff) {
-					CSL_Strcpyn(pProcObject->g_pszLastCoff,
+                                       strncpy(pProcObject->g_pszLastCoff,
 						(char *)aArgv[0],
-						(CSL_Strlen((char *)aArgv[0])
+                                               (strlen((char *)aArgv[0])
 						+ 1));
 				}
 			}

@@ -186,7 +186,7 @@
 	((uuid1).usData3 == (uuid2).usData3) && \
 	((uuid1).ucData4 == (uuid2).ucData4) && \
 	((uuid1).ucData5 == (uuid2).ucData5) && \
-	(CSL_Strncmp((void *)(uuid1).ucData6, (void *)(uuid2).ucData6, 6)) == 0)
+       (strncmp((void *)(uuid1).ucData6, (void *)(uuid2).ucData6, 6)) == 0)
 
     /*
      *  ======== MemInfo ========
@@ -1040,8 +1040,9 @@ static DSP_STATUS AddOvlyInfo(void *handle, struct DBLL_SectInfo *sectInfo,
 	/* Find the node it belongs to */
 	for (i = 0; i < hNldr->nOvlyNodes; i++) {
 		pNodeName = hNldr->ovlyTable[i].pNodeName;
-		if (CSL_Strncmp(pNodeName, pSectName + 1,
-				CSL_Strlen(pNodeName)) == 0) {
+               DBC_Require(pNodeName);
+               if (strncmp(pNodeName, pSectName + 1,
+                               strlen(pNodeName)) == 0) {
 				/* Found the node */
 				break;
 		}
@@ -1055,14 +1056,14 @@ static DSP_STATUS AddOvlyInfo(void *handle, struct DBLL_SectInfo *sectInfo,
 
 	if (*pch) {
 		pch++;	/* Skip over the ':' */
-		if (CSL_Strncmp(pch, PCREATE, CSL_Strlen(PCREATE)) == 0) {
+               if (strncmp(pch, PCREATE, strlen(PCREATE)) == 0) {
 			status = AddOvlySect(hNldr, &hNldr->ovlyTable[i].
 				pCreateSects, sectInfo, &fExists, addr, nBytes);
 			if (DSP_SUCCEEDED(status) && !fExists)
 				hNldr->ovlyTable[i].nCreateSects++;
 
 		} else
-		if (CSL_Strncmp(pch, PDELETE, CSL_Strlen(PDELETE)) == 0) {
+               if (strncmp(pch, PDELETE, strlen(PDELETE)) == 0) {
 			status = AddOvlySect(hNldr, &hNldr->ovlyTable[i].
 					    pDeleteSects, sectInfo, &fExists,
 					    addr, nBytes);
@@ -1070,7 +1071,7 @@ static DSP_STATUS AddOvlyInfo(void *handle, struct DBLL_SectInfo *sectInfo,
 				hNldr->ovlyTable[i].nDeleteSects++;
 
 		} else
-		if (CSL_Strncmp(pch, PEXECUTE, CSL_Strlen(PEXECUTE)) == 0) {
+               if (strncmp(pch, PEXECUTE, strlen(PEXECUTE)) == 0) {
 			status = AddOvlySect(hNldr, &hNldr->ovlyTable[i].
 					    pExecuteSects, sectInfo, &fExists,
 					    addr, nBytes);
@@ -1120,14 +1121,14 @@ static DSP_STATUS AddOvlyNode(struct DSP_UUID *pUuid,
 		} else {
 			/* Add node to table */
 			hNldr->ovlyTable[hNldr->nNode].uuid = *pUuid;
-			uLen = CSL_Strlen(objDef.objData.nodeObj.ndbProps.
-					 acName);
+                       DBC_Require(objDef.objData.nodeObj.ndbProps.acName);
+                       uLen = strlen(objDef.objData.nodeObj.ndbProps.acName);
 			pNodeName = objDef.objData.nodeObj.ndbProps.acName;
 			pBuf = MEM_Calloc(uLen + 1, MEM_PAGED);
 			if (pBuf == NULL) {
 				status = DSP_EMEMORY;
 			} else {
-				CSL_Strcpyn(pBuf, pNodeName, uLen);
+                               strncpy(pBuf, pNodeName, uLen);
 				hNldr->ovlyTable[hNldr->nNode].pNodeName = pBuf;
 				hNldr->nNode++;
 			}

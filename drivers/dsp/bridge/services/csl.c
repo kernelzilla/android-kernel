@@ -25,12 +25,6 @@
  *      CSL_Exit
  *      CSL_Init
  *      CSL_NumToAscii
- *      CSL_Strcmp
- *      CSL_Strstr
- *      CSL_Strcpyn
- *      CSL_Strlen
- *      CSL_Strncat
- *      CSL_Strncmp
  *      CSL_Strtokr
  *
  *! Revision History:
@@ -78,20 +72,6 @@
 #if GT_TRACE
 static struct GT_Mask CSL_DebugMask = { NULL, NULL };	/* GT trace var. */
 #endif
-
-/*
- *  ======= CSL_Atoi =======
- *  Purpose:
- *      Convert a string to an integer
- */
-s32 CSL_Atoi(IN CONST char *ptstrSrc)
-{
-	char *end_position;
-
-	DBC_Require(ptstrSrc);
-
-	return simple_strtol(ptstrSrc, &end_position, 10);
-}
 
 /*
  *  ======== CSL_Exit ========
@@ -145,89 +125,8 @@ void CSL_NumToAscii(OUT char *pstrNumber, u32 dwNum)
 	}
 }
 
-/*
- *  ======== CSL_Strcmp ========
- *  Purpose:
- *      Compare 2 ASCII strings.  Works the same was as stdio's strcmp.
- */
-s32 CSL_Strcmp(IN CONST char *pstrStr1, IN CONST char *pstrStr2)
-{
-	return strcmp(pstrStr1, pstrStr2);
-}
 
-/*
- *  ======== CSL_Strstr ========
- *  Purpose:
- *      Find substring in a stringn.
- *  Parameters:
- *      haystack:   Ptr to string1.
- *      needle:    Ptr to substring to catch.
- *  Returns:
- *      Ptr to first char matching the substring in the main string.
- *  Requires:
- *      CSL initialized.
- *      haystack is valid.
- *      needle is valid.
- *  Ensures:
- */
 
-char *CSL_Strstr(IN CONST char *haystack, IN CONST char *needle)
-{
-	return strstr(haystack, needle);
-}
-
-/*
- *  ======== CSL_Strcpyn ========
- *  Purpose:
- *      Safe strcpy function.
- */
-char *CSL_Strcpyn(OUT char *pstrDest, IN CONST char *pstrSrc, u32 cMax)
-{
-	return strncpy(pstrDest, pstrSrc, cMax);
-}
-
-/*
- *  ======== CSL_Strlen ========
- *  Purpose:
- *      Determine the length of a null terminated ASCII string.
- */
-u32 CSL_Strlen(IN CONST char *pstrSrc)
-{
-	CONST char *pStr = pstrSrc;
-	u32 retVal;
-
-	DBC_Require(pstrSrc);
-
-	while (*pStr++)
-		;;
-
-	retVal = (u32) (pStr - pstrSrc - 1);
-	return retVal;
-}
-
-/*
- *  ======== CSL_Strncat ========
- *  Purpose:
- *      Concatenate two strings together
- */
-char *CSL_Strncat(IN char *pszDest, IN char *pszSrc, IN u32 dwSize)
-{
-
-	DBC_Require(pszDest && pszSrc);
-
-	return strncat(pszDest, pszSrc, dwSize);
-}
-
-/*
- *  ======== CSL_Strncmp ========
- *  Purpose:
- *      Compare at most n characters of two ASCII strings.  Works the same
- *      way as stdio's strncmp.
- */
-s32 CSL_Strncmp(IN CONST char *pstrStr1, IN CONST char *pstrStr2, u32 n)
-{
-	return strncmp(pstrStr1, pstrStr2, n);
-}
 
 /*
  *  ======= CSL_Strtokr =======
