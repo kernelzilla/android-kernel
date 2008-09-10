@@ -78,6 +78,7 @@ extern s32 dsp_test_sleepstate;
 extern struct constraint_handle *dsp_constraint_handle;
 #endif
 #endif
+#endif
 extern struct MAILBOX_CONTEXT mboxsetting;
 
 extern void GetHWRegs(u32 prm_base, u32 cm_base);
@@ -522,8 +523,8 @@ DSP_STATUS PostScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 			  "in wrong state");
 		return DSP_EFAIL;
 	}
-#endif /* CONFIG_DISABLE_BRIDGE_DVFS */
-#endif /* CONFIG_DISABLE_BRIDGE_PM */
+#endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS*/
+#endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM*/
 	return DSP_SOK;
 }
 

@@ -6,19 +6,20 @@ menuconfig MPU_BRIDGE
 	tristate "DSP Bridge driver"
 	default n
 	help
-	  DSP/BIOS Bridge is designed for platforms that contain a GPP and one or
-	  more attached DSPs.  The GPP is considered the master or "host" processor,
-	  and the attached DSPs are processing resources that can be utilized by
-	  applications and drivers running on the GPP.
+	  DSP/BIOS Bridge is designed for platforms that contain a GPP and
+	  one or more attached DSPs.  The GPP is considered the master or
+	  "host" processor, and the attached DSPs are processing resources
+	  that can be utilized by applications and drivers running on the GPP.
 
 config DISABLE_BRIDGE_DVFS
 	bool "Disable Bridge Dynamic Voltage and Frequency Scaling (DVFS)"
 	depends on MPU_BRIDGE
 	default y
 	help
-	  DVFS allows DSP Bridge to initiate the operating point change to scale
-	  the chip voltage and frequency in order to match the performance and
-	  power consumption to the current processing requirements.
+	  DVFS allows DSP Bridge to initiate the operating point change to
+	  scale the chip voltage and frequency in order to match the
+	  performance and power consumption to the current processing
+	  requirements.
 
 config DISABLE_BRIDGE_PM
 	bool "Disable Bridge Power Management"

@@ -30,9 +30,10 @@
 #include <linux/autoconf.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
-#include <asm/uaccess.h>
-#include <asm/irq.h>
-#include <asm/io.h>
+#include <linux/semaphore.h>
+#include <linux/uaccess.h>
+#include <linux/irq.h>
+#include <linux/io.h>
 #include <linux/syscalls.h>
 #include <linux/version.h>
 #include <linux/kernel.h>

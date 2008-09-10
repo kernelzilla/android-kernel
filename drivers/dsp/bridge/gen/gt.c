@@ -48,8 +48,10 @@ enum GT_State {
 	GT_DIGITS
 } ;
 
+#ifdef CONFIG_BRIDGE_DEBUG
 static char *GT_1format = "%s - %d: ";
 static char *GT_2format = "%s - %d(%d): ";
+#endif /* CONFIG_BRIDGE_DEBUG */
 
 static unsigned char *GT_tMask[GT_BOUND];
 

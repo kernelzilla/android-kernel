@@ -127,7 +127,7 @@ struct clk *clk_handle;
 s32 dsp_debug;
 
 /* This is a test variable used by Bridge to test different sleep states */
-static s32 dsp_test_sleepstate;
+s32 dsp_test_sleepstate;
 struct bridge_dev {
 	struct cdev cdev;
 };
@@ -137,7 +137,9 @@ static struct bridge_dev *bridge_device;
 static struct class *bridge_class;
 
 static u32 driverContext;
+#ifdef CONFIG_BRIDGE_DEBUG
 static char *GT_str;
+#endif /* CONFIG_BRIDGE_DEBUG */
 static s32 driver_major = DRIVER_MAJOR;
 static s32 driver_minor = DRIVER_MINOR;
 static char *base_img;
@@ -213,7 +215,10 @@ MODULE_AUTHOR("Texas Instruments");
 MODULE_LICENSE("GPL");
 
 static char *driver_name = DRIVER_NAME;
+
+#ifdef CONFIG_BRIDGE_DEBUG
 static struct GT_Mask driverTrace;
+#endif /* CONFIG_BRIDGE_DEBUG */
 
 static struct file_operations bridge_fops = {
 	.open		= bridge_open,
@@ -334,6 +339,10 @@ static struct platform_driver bridge_driver_ldm = {
 
 };
 
+struct device dspbridge_device = {
+	.driver = &bridge_driver_ldm.driver,
+};
+
 #endif
 
 /* Initialization routine. Executed when the driver is loaded (as a kernel
@@ -392,8 +401,8 @@ static int __init bridge_init(void)
 		GT_0trace(driverTrace, GT_7CLASS,
 				"Error creating bridge class \n");
 
-	device_create(bridge_class, NULL, MKDEV(driver_major,
-			driver_minor), NULL, "DspBridge");
+	device_create(bridge_class, NULL, MKDEV(driver_major, driver_minor),
+			NULL, "DspBridge");
 
 	GT_init();
 	GT_create(&driverTrace, "LD");
