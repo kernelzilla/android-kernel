@@ -1,4 +1,4 @@
-/* arch/arm/mach-msm/include/mach/memory.h
+/* arch/arm/mach-msm/memory.c
  *
  * Copyright (C) 2007 Google, Inc.
  *
@@ -13,13 +13,17 @@
  *
  */
 
-#ifndef __ASM_ARCH_MEMORY_H
-#define __ASM_ARCH_MEMORY_H
+#include <linux/mm.h>
+#include <linux/mm_types.h>
+#include <asm/pgtable.h>
 
-/* physical offset of RAM */
-#define PHYS_OFFSET		UL(0x10000000)
-
-#define HAS_ARCH_IO_REMAP_PFN_RANGE
-
-#endif
-
+int arch_io_remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
+			    unsigned long pfn, unsigned long size, pgprot_t prot)
+{
+	unsigned long pfn_addr = pfn << PAGE_SHIFT;
+	if ((pfn_addr >= 0x88000000) && (pfn_addr < 0xD0000000)) {
+		prot = pgprot_device(prot);
+		printk("remapping device %lx\n", prot);
+	}
+	return remap_pfn_range(vma, addr, pfn, size, prot);
+}
