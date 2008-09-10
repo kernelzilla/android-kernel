@@ -72,7 +72,7 @@
 #ifndef CONFIG_OMAP3_PM
 #include <mach/omap-pm.h>
 #else
-#include <asm/arch/resource.h>
+#include <mach/resource.h>
 extern struct constraint_handle *dsp_constraint_handle;
 #endif
 #endif

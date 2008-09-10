@@ -155,7 +155,7 @@
 #include <mach/omap-pm.h>
 #include <mach/board-3430sdp.h>
 #else
-#include <asm/arch/resource.h>
+#include <mach/resource.h>
 #endif
 #endif
 #endif

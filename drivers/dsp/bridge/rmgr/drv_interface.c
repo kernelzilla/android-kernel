@@ -63,8 +63,8 @@
 #ifndef CONFIG_OMAP3_PM
 #include <mach/omap-pm.h>
 #else
-#include <asm/arch/resource.h>
-#include <asm/arch/prcm_34xx.h>
+#include <mach/resource.h>
+#include <mach/prcm_34xx.h>
 #endif
 #endif
 #endif

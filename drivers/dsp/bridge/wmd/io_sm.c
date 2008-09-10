@@ -116,7 +116,7 @@
 #ifndef CONFIG_OMAP3_PM
 #include <mach/omap-pm.h>
 #else
-#include <asm/arch/resource.h>
+#include <mach/resource.h>
 #endif
 #endif
 #endif
