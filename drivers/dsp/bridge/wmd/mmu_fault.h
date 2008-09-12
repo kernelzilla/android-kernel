@@ -41,12 +41,5 @@
  */
 irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData);
 
-/*
- *  ========PrintDspTraceBuffer ========
- *      Print DSP tracebuffer.
- */
-
-extern DSP_STATUS  PrintDspTraceBuffer(struct DEH_MGR *hDehMgr);
-
 #endif				/* MMU_FAULT_ */
 

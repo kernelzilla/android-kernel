@@ -326,4 +326,13 @@
 
 	extern void IO_IntrDSP2(IN struct IO_MGR *pIOMgr, IN u16 wMbVal);
 
+       extern void IO_SM_init(void);
+
+/*
+ *  ========PrintDspTraceBuffer ========
+ *      Print DSP tracebuffer.
+ */
+       extern DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT
+                                               *hWmdContext);
+
 #endif				/* IOSM_ */

@@ -67,6 +67,7 @@
 #include "_tiomap.h"
 #include "_deh.h"
 #include <_tiomap_mmu.h>
+#include <io_sm.h>
 
 static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN,
 					HW_ELEM_SIZE_16BIT,
@@ -186,186 +187,6 @@ DSP_STATUS WMD_DEH_RegisterNotify(struct DEH_MGR *hDehMgr, u32 uEventMask,
 
 
 /*
- *  ======== PackTraceBuffer ========
- *      Removes extra nulls from the trace buffer returned from the DSP.
- *      Works even on buffers that already are packed (null removed); but has
- *      one bug in that case -- loses the last character (replaces with '\0').
- *      Continues through conversion for full set of nBytes input characters.
- *  Parameters:
- *    lpBuf:            Pointer to input/output buffer
- *    nBytes:           Number of characters in the buffer
- *    ulNumWords:       Number of DSP words in the buffer.  Indicates potential
- *                      number of extra carriage returns to generate.
- *  Returns:
- *      DSP_SOK:        Success.
- *      DSP_EMEMORY:    Unable to allocate memory.
- *  Requires:
- *      lpBuf must be a fully allocated writable block of at least nBytes.
- *      There are no more than ulNumWords extra characters needed (the number of
- *      linefeeds minus the number of NULLS in the input buffer).
- */
-#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
-	&& GT_TRACE
-static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
-{
-	DSP_STATUS status = DSP_SOK;
-
-	char *lpTmpBuf;
-	char *lpBufStart;
-	char *lpTmpStart;
-	u32 nCnt;
-	char thisChar;
-
-	/* tmp workspace, 1 KB longer than input buf */
-	lpTmpBuf = MEM_Calloc((nBytes + ulNumWords), MEM_PAGED);
-	if (lpTmpBuf == NULL) {
-		DBG_Trace(DBG_LEVEL7, "PackTrace buffer:OutofMemory \n");
-		status = DSP_EMEMORY;
-	}
-
-	if (DSP_SUCCEEDED(status)) {
-		lpBufStart = lpBuf;
-		lpTmpStart = lpTmpBuf;
-		for (nCnt = nBytes; nCnt > 0; nCnt--) {
-			thisChar = *lpBuf++;
-			switch (thisChar) {
-			case '\0':	/* Skip null bytes */
-				break;
-			case '\n':	/* Convert \n to \r\n */
-				/* NOTE: do not reverse order; Some OS */
-				/* editors control doesn't understand "\n\r" */
-				*lpTmpBuf++ = '\r';
-				*lpTmpBuf++ = '\n';
-				break;
-			default:	/* Copy in the actual ascii byte */
-				*lpTmpBuf++ = thisChar;
-				break;
-			}
-		}
-		*lpTmpBuf = '\0';    /* Make sure tmp buf is null terminated */
-		/* Cut output down to input buf size */
-               strncpy(lpBufStart, lpTmpStart, nBytes);
-		/*Make sure output is null terminated */
-		lpBufStart[nBytes - 1] = '\0';
-		MEM_Free(lpTmpStart);
-	}
-
-	return status;
-}
-#endif	   /* ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT)) && GT_TRACE */
-
-/*
- *  ======== PrintDspTraceBuffer ========
- *      Prints the trace buffer returned from the DSP (if DBG_Trace is enabled).
- *  Parameters:
- *    hDehMgr:          Handle to DEH manager object
- *                      number of extra carriage returns to generate.
- *  Returns:
- *      DSP_SOK:        Success.
- *      DSP_EMEMORY:    Unable to allocate memory.
- *  Requires:
- *      hDehMgr muse be valid. Checked in WMD_DEH_Notify.
- */
-DSP_STATUS PrintDspTraceBuffer(struct DEH_MGR *hDehMgr)
-{
-	DSP_STATUS status = DSP_SOK;
-
-#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
-	&& GT_TRACE
-
-	struct COD_MANAGER *hCodMgr;
-	u32 ulTraceEnd;
-	u32 ulTraceBegin;
-	u32 ulNumBytes = 0;
-	u32 ulNumWords = 0;
-	u32 ulWordSize = 2;
-	CONST u32 uMaxSize = 512;
-	char *pszBuf;
-	u16 *lpszBuf;
-	struct WMD_DRV_INTERFACE *pIntfFxns;
-	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)hDehMgr;
-	struct DEV_OBJECT *hDevObject = ((struct WMD_DEV_CONTEXT *)
-					pDehMgr->hWmdContext)->hDevObject;
-
-	status = DEV_GetCodMgr(hDevObject, &hCodMgr);
-	if (DSP_FAILED(status)) {
-		DBG_Trace(DBG_LEVEL7,
-			 "PrintDspTraceBuffer: Failed on DEV_GetCodMgr.\n");
-	}
-
-	if (DSP_SUCCEEDED(status)) {
-		/* Look for SYS_PUTCBEG/SYS_PUTCEND: */
-		status = COD_GetSymValue(hCodMgr, COD_TRACEBEG, &ulTraceBegin);
-		DBG_Trace(DBG_LEVEL1,
-			 "PrintDspTraceBuffer: ulTraceBegin Value 0x%x\n",
-			 ulTraceBegin);
-		if (DSP_FAILED(status)) {
-			DBG_Trace(DBG_LEVEL7, "PrintDspTraceBuffer: Failed on "
-				 "COD_GetSymValue.\n");
-		}
-	}
-	if (DSP_SUCCEEDED(status)) {
-		status = COD_GetSymValue(hCodMgr, COD_TRACEEND, &ulTraceEnd);
-		DBG_Trace(DBG_LEVEL1,
-			 "PrintDspTraceBuffer: ulTraceEnd Value 0x%x\n",
-			 ulTraceEnd);
-		if (DSP_FAILED(status)) {
-			DBG_Trace(DBG_LEVEL7, "PrintDspTraceBuffer: Failed on "
-				 "COD_GetSymValue.\n");
-		}
-	}
-	if (DSP_SUCCEEDED(status)) {
-		ulNumBytes = (ulTraceEnd - ulTraceBegin) * ulWordSize;
-		 /*  If the chip type is 55 then the addresses will be
-		 *  byte addresses; convert them to word addresses.  */
-		if (ulNumBytes > uMaxSize)
-			ulNumBytes = uMaxSize;
-
-		/* make sure the data we request fits evenly */
-		ulNumBytes = (ulNumBytes / ulWordSize) * ulWordSize;
-		DBG_Trace(DBG_LEVEL1, "PrintDspTraceBuffer: ulNumBytes 0x%x\n",
-			 ulNumBytes);
-		ulNumWords = ulNumBytes * ulWordSize;
-		DBG_Trace(DBG_LEVEL1, "PrintDspTraceBuffer: ulNumWords 0x%x\n",
-			 ulNumWords);
-		status = DEV_GetIntfFxns(hDevObject, &pIntfFxns);
-	}
-
-
-	if (DSP_SUCCEEDED(status)) {
-		pszBuf = MEM_Calloc(uMaxSize, MEM_NONPAGED);
-		lpszBuf = MEM_Calloc(ulNumBytes * 2, MEM_NONPAGED);
-		if (pszBuf != NULL) {
-			/* Read bytes from the DSP trace buffer... */
-			status = (*pIntfFxns->pfnBrdRead)(pDehMgr->hWmdContext,
-				 (u8 *)pszBuf, (u32)ulTraceBegin,
-				 ulNumBytes, 0);
-			if (DSP_FAILED(status)) {
-				DBG_Trace(DBG_LEVEL7, "PrintDspTraceBuffer: "
-					 "Failed to Read Trace Buffer.\n");
-			}
-			if (DSP_SUCCEEDED(status)) {
-				/* Pack and do newline conversion */
-				DBG_Trace(DBG_LEVEL1, "PrintDspTraceBuffer: "
-					 "before pack and unpack.\n");
-				PackTraceBuffer(pszBuf, ulNumBytes, ulNumWords);
-				DBG_Trace(DBG_LEVEL7, "DSP Trace Buffer:\n%s\n",
-					 pszBuf);
-			}
-			MEM_Free(pszBuf);
-			MEM_Free(lpszBuf);
-		} else {
-			DBG_Trace(DBG_LEVEL7, "PrintDspTraceBuffer: Failed to "
-				 "allocate trace buffer.\n");
-			status = DSP_EMEMORY;
-		}
-	}
-#endif
-	return status;
-}
-
-
-/*
  *  ======== WMD_DEH_Notify ========
  *      DEH error notification function. Informs user about the error.
  */
@@ -456,11 +277,6 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 			/* Clear MMU interrupt */
 			HW_MMU_EventAck(resources.dwDmmuBase,
 					 HW_MMU_TRANSLATION_FAULT);
-			DBG_Trace(DBG_LEVEL6,
-				 "***** PrintDspTraceBuffer: before\n");
-			PrintDspTraceBuffer(hDehMgr);
-			DBG_Trace(DBG_LEVEL6,
-				 "***** PrintDspTraceBuffer: after \n");
 			break;
 		default:
 			DBG_Trace(DBG_LEVEL6,
@@ -468,6 +284,9 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 				 "0x%x\n", dwErrInfo);
 			break;
 		}
+               /* Call DSP Trace Buffer */
+               PrintDspTraceBuffer(hDehMgr->hWmdContext);
+
 		/* Signal DSP error/exception event. */
 		NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
 	}
@@ -503,4 +322,3 @@ DSP_STATUS WMD_DEH_GetInfo(struct DEH_MGR *hDehMgr,
 
 	return status;
 }
-

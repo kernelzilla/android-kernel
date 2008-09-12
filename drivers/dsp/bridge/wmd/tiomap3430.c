@@ -246,6 +246,8 @@ void WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
 	DBC_Require(pstrWMDFileName != NULL);
 	DBG_Trace(DBG_ENTER, "In the WMD_DRV_Entry \n");
 
+       IO_SM_init(); /* Initialization of io_sm module */
+
        if (strcmp(pstrWMDFileName, "UMA") == 0)
 		*ppDrvInterface = &drvInterfaceFxns;
 	else

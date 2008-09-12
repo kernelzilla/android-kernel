@@ -137,7 +137,6 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
 			HW_MMU_EventDisable(resources.dwDmmuBase,
 					    HW_MMU_ALL_INTERRUPTS);
 		}
-		PrintDspTraceBuffer(pDehMgr);
 	}
        return IRQ_HANDLED;
 }

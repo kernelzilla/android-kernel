@@ -165,6 +165,7 @@
 /*  ----------------------------------- This */
 #include <io_sm.h>
 #include "_msg_sm.h"
+#include <gt.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define OUTPUTNOTREADY  0xffff
@@ -260,6 +261,11 @@ extern struct constraint_handle *dsp_constraint_handle;
 #endif
 #endif
 #endif
+
+#if GT_TRACE
+static struct GT_Mask dsp_trace_mask = { NULL, NULL }; /* GT trace variable */
+#endif
+
 /*
  *  ======== WMD_IO_Create ========
  *      Create an IO manager object.
@@ -1796,6 +1802,8 @@ void PrintDSPDebugTrace(struct IO_MGR *hIOMgr)
 {
 	u32 ulNewMessageLength = 0, ulGPPCurPointer;
 
+       GT_0trace(dsp_trace_mask, GT_ENTER, "Entering PrintDSPDebugTrace\n");
+
 	while (true) {
 		/* Get the DSP current pointer */
 		ulGPPCurPointer = *(u32 *) (hIOMgr->ulTraceBufferCurrent);
@@ -1818,8 +1826,7 @@ void PrintDSPDebugTrace(struct IO_MGR *hIOMgr)
 			 * pointer */
 			hIOMgr->ulGPPReadPointer += ulNewMessageLength;
 			/* Print the trace messages */
-			DBG_Trace(DBG_LEVEL3, "hIOMgr->pMsg=0x%x",
-				 hIOMgr->pMsg);
+                       GT_0trace(dsp_trace_mask, GT_1CLASS, hIOMgr->pMsg);
 		}
 		/* Handle trace buffer wraparound */
 		else if (ulGPPCurPointer < hIOMgr->ulGPPReadPointer) {
@@ -1840,10 +1847,199 @@ void PrintDSPDebugTrace(struct IO_MGR *hIOMgr)
 			hIOMgr->ulGPPReadPointer = hIOMgr->ulTraceBufferBegin +
 						   ulNewMessageLength;
 			/* Print the trace messages */
-			DBG_Trace(DBG_LEVEL3, "hIOMgr->pMsg=0x%x",
-				 hIOMgr->pMsg);
+                       GT_0trace(dsp_trace_mask, GT_1CLASS, hIOMgr->pMsg);
 		}
 	}
 }
 #endif
 
+/*
+ *  ======== PackTraceBuffer ========
+ *      Removes extra nulls from the trace buffer returned from the DSP.
+ *      Works even on buffers that already are packed (null removed); but has
+ *      one bug in that case -- loses the last character (replaces with '\0').
+ *      Continues through conversion for full set of nBytes input characters.
+ *  Parameters:
+ *    lpBuf:            Pointer to input/output buffer
+ *    nBytes:           Number of characters in the buffer
+ *    ulNumWords:       Number of DSP words in the buffer.  Indicates potential
+ *                      number of extra carriage returns to generate.
+ *  Returns:
+ *      DSP_SOK:        Success.
+ *      DSP_EMEMORY:    Unable to allocate memory.
+ *  Requires:
+ *      lpBuf must be a fully allocated writable block of at least nBytes.
+ *      There are no more than ulNumWords extra characters needed (the number of
+ *      linefeeds minus the number of NULLS in the input buffer).
+ */
+#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
+       && GT_TRACE
+static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
+{
+       DSP_STATUS status = DSP_SOK;
+
+       char *lpTmpBuf;
+       char *lpBufStart;
+       char *lpTmpStart;
+       u32 nCnt;
+       char thisChar;
+
+       /* tmp workspace, 1 KB longer than input buf */
+       lpTmpBuf = MEM_Calloc((nBytes + ulNumWords), MEM_PAGED);
+       if (lpTmpBuf == NULL) {
+               DBG_Trace(DBG_LEVEL7, "PackTrace buffer:OutofMemory \n");
+               status = DSP_EMEMORY;
+       }
+
+       if (DSP_SUCCEEDED(status)) {
+               lpBufStart = lpBuf;
+               lpTmpStart = lpTmpBuf;
+               for (nCnt = nBytes; nCnt > 0; nCnt--) {
+                       thisChar = *lpBuf++;
+                       switch (thisChar) {
+                       case '\0':      /* Skip null bytes */
+                               break;
+                       case '\n':      /* Convert \n to \r\n */
+                               /* NOTE: do not reverse order; Some OS */
+                               /* editors control doesn't understand "\n\r" */
+                               *lpTmpBuf++ = '\r';
+                               *lpTmpBuf++ = '\n';
+                               break;
+                       default:        /* Copy in the actual ascii byte */
+                               *lpTmpBuf++ = thisChar;
+                               break;
+                       }
+               }
+               *lpTmpBuf = '\0';    /* Make sure tmp buf is null terminated */
+               /* Cut output down to input buf size */
+               strncpy(lpBufStart, lpTmpStart, nBytes);
+               /*Make sure output is null terminated */
+               lpBufStart[nBytes - 1] = '\0';
+               MEM_Free(lpTmpStart);
+       }
+
+       return status;
+}
+#endif    /* ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT)) && GT_TRACE */
+
+/*
+ *  ======== PrintDspTraceBuffer ========
+ *      Prints the trace buffer returned from the DSP (if DBG_Trace is enabled).
+ *  Parameters:
+ *    hDehMgr:          Handle to DEH manager object
+ *                      number of extra carriage returns to generate.
+ *  Returns:
+ *      DSP_SOK:        Success.
+ *      DSP_EMEMORY:    Unable to allocate memory.
+ *  Requires:
+ *      hDehMgr muse be valid. Checked in WMD_DEH_Notify.
+ */
+DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT *hWmdContext)
+{
+       DSP_STATUS status = DSP_SOK;
+
+#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
+       && GT_TRACE
+
+       struct COD_MANAGER *hCodMgr;
+       u32 ulTraceEnd;
+       u32 ulTraceBegin;
+       u32 ulNumBytes = 0;
+       u32 ulNumWords = 0;
+       u32 ulWordSize = 2;
+       CONST u32 uMaxSize = 512;
+       char *pszBuf;
+       u16 *lpszBuf;
+
+       struct WMD_DEV_CONTEXT *pWmdContext = (struct WMD_DEV_CONTEXT *)
+                                                       hWmdContext;
+       struct WMD_DRV_INTERFACE *pIntfFxns;
+       struct DEV_OBJECT *pDevObject = (struct DEV_OBJECT *)
+                                               pWmdContext->hDevObject;
+
+       status = DEV_GetCodMgr(pDevObject, &hCodMgr);
+       if (DSP_FAILED(status))
+               GT_0trace(dsp_trace_mask, GT_2CLASS,
+                        "PrintDspTraceBuffer: Failed on DEV_GetCodMgr.\n");
+
+       if (DSP_SUCCEEDED(status)) {
+               /* Look for SYS_PUTCBEG/SYS_PUTCEND: */
+               status = COD_GetSymValue(hCodMgr, COD_TRACEBEG, &ulTraceBegin);
+               GT_1trace(dsp_trace_mask, GT_2CLASS,
+                        "PrintDspTraceBuffer: ulTraceBegin Value 0x%x\n",
+                        ulTraceBegin);
+               if (DSP_FAILED(status))
+                       GT_0trace(dsp_trace_mask, GT_2CLASS,
+                                "PrintDspTraceBuffer: Failed on "
+                                "COD_GetSymValue.\n");
+
+       }
+       if (DSP_SUCCEEDED(status)) {
+               status = COD_GetSymValue(hCodMgr, COD_TRACEEND, &ulTraceEnd);
+               GT_1trace(dsp_trace_mask, GT_2CLASS,
+                        "PrintDspTraceBuffer: ulTraceEnd Value 0x%x\n",
+                        ulTraceEnd);
+               if (DSP_FAILED(status))
+                       GT_0trace(dsp_trace_mask, GT_2CLASS,
+                                "PrintDspTraceBuffer: Failed on "
+                                "COD_GetSymValue.\n");
+
+       }
+       if (DSP_SUCCEEDED(status)) {
+               ulNumBytes = (ulTraceEnd - ulTraceBegin) * ulWordSize;
+                /*  If the chip type is 55 then the addresses will be
+                *  byte addresses; convert them to word addresses.  */
+               if (ulNumBytes > uMaxSize)
+                       ulNumBytes = uMaxSize;
+
+               /* make sure the data we request fits evenly */
+               ulNumBytes = (ulNumBytes / ulWordSize) * ulWordSize;
+               GT_1trace(dsp_trace_mask, GT_2CLASS, "PrintDspTraceBuffer: "
+                        "ulNumBytes 0x%x\n", ulNumBytes);
+               ulNumWords = ulNumBytes * ulWordSize;
+               GT_1trace(dsp_trace_mask, GT_2CLASS, "PrintDspTraceBuffer: "
+                        "ulNumWords 0x%x\n", ulNumWords);
+               status = DEV_GetIntfFxns(pDevObject, &pIntfFxns);
+       }
+
+       if (DSP_SUCCEEDED(status)) {
+               pszBuf = MEM_Calloc(uMaxSize, MEM_NONPAGED);
+               lpszBuf = MEM_Calloc(ulNumBytes * 2, MEM_NONPAGED);
+               if (pszBuf != NULL) {
+                       /* Read bytes from the DSP trace buffer... */
+                       status = (*pIntfFxns->pfnBrdRead)(hWmdContext,
+                                (u8 *)pszBuf, (u32)ulTraceBegin,
+                                ulNumBytes, 0);
+                       if (DSP_FAILED(status))
+                               GT_0trace(dsp_trace_mask, GT_2CLASS,
+                                        "PrintDspTraceBuffer: "
+                                        "Failed to Read Trace Buffer.\n");
+
+                       if (DSP_SUCCEEDED(status)) {
+                               /* Pack and do newline conversion */
+                               GT_0trace(dsp_trace_mask, GT_2CLASS,
+                                        "PrintDspTraceBuffer: "
+                                        "before pack and unpack.\n");
+                               PackTraceBuffer(pszBuf, ulNumBytes, ulNumWords);
+                               GT_1trace(dsp_trace_mask, GT_1CLASS,
+                                        "DSP Trace Buffer:\n%s\n", pszBuf);
+                       }
+                       MEM_Free(pszBuf);
+                       MEM_Free(lpszBuf);
+               } else {
+                       GT_0trace(dsp_trace_mask, GT_2CLASS,
+                                "PrintDspTraceBuffer: Failed to "
+                                "allocate trace buffer.\n");
+                       status = DSP_EMEMORY;
+               }
+       }
+#endif
+       return status;
+}
+
+void IO_SM_init(void)
+{
+
+       GT_create(&dsp_trace_mask, "DT"); /* DSP Trace Mask */
+
+}
