@@ -94,8 +94,6 @@ typedef void *HANDLE;		/* h    */
 
 #define TEXT(x) x
 
-#define CDECL
-
 #define DLLIMPORT
 #define DLLEXPORT
 

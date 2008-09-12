@@ -836,7 +836,7 @@ func_end:
  *      Decrement reference count, and free resources when reference count is
  *      0.
  */
-void CDECL PROC_Exit(void)
+void PROC_Exit(void)
 {
 	DBC_Require(cRefs > 0);
 
@@ -971,7 +971,7 @@ DSP_STATUS PROC_GetTrace(DSP_HPROCESSOR hProcessor, u8 *pBuf, u32 uMaxSize)
  *  Purpose:
  *      Initialize PROC's private state, keeping a reference count on each call
  */
-bool CDECL PROC_Init(void)
+bool PROC_Init(void)
 {
 	bool fRetval = true;
 

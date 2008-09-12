@@ -369,7 +369,7 @@ DSP_STATUS PrintDspTraceBuffer(struct DEH_MGR *hDehMgr)
  *  ======== WMD_DEH_Notify ========
  *      DEH error notification function. Informs user about the error.
  */
-void CDECL WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
+void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 			 u32 dwErrInfo)
 {
 	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)hDehMgr;

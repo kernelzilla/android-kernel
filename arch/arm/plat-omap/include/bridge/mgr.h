@@ -194,7 +194,7 @@
  *  Ensures:
  *      When reference count == 0, MGR's private resources are freed.
  */
-	extern void CDECL MGR_Exit();
+       extern void MGR_Exit();
 
 /*
  *  ======== MGR_GetDCDHandle ========
@@ -213,7 +213,7 @@
  *      DSP_SOK and *phDCDHandle != NULL ||
  *      DSP_EFAIL and *phDCDHandle == NULL
  */
-	extern DSP_STATUS CDECL MGR_GetDCDHandle(IN struct MGR_OBJECT
+       extern DSP_STATUS MGR_GetDCDHandle(IN struct MGR_OBJECT
 						 *hMGRHandle,
 						 OUT u32 *phDCDHandle);
 
@@ -229,6 +229,6 @@
  *  Ensures:
  *      TRUE: A requirement for the other public MGR functions.
  */
-	extern bool CDECL MGR_Init();
+       extern bool MGR_Init();
 
 #endif				/* MGR_ */

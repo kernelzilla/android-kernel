@@ -393,7 +393,7 @@ func_end:
  *      Decrement reference count, and free resources when reference count is
  *      0.
  */
-void CDECL MGR_Exit(void)
+void MGR_Exit(void)
 {
 	DBC_Require(cRefs > 0);
 	cRefs--;
@@ -433,7 +433,7 @@ DSP_STATUS MGR_GetDCDHandle(struct MGR_OBJECT *hMGRHandle,
  *  ======== MGR_Init ========
  *      Initialize MGR's private state, keeping a reference count on each call.
  */
-bool CDECL MGR_Init(void)
+bool MGR_Init(void)
 {
 	bool fRetval = true;
 	bool fInitDCD = false;

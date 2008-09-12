@@ -86,7 +86,7 @@
 	} ;
 
 /* DCD Internal Callback Type */
-	typedef DSP_STATUS(CDECL *DCD_REGISTERFXN) (IN struct DSP_UUID *pUuid,
+       typedef DSP_STATUS(*DCD_REGISTERFXN) (IN struct DSP_UUID *pUuid,
 						IN enum DSP_DCDOBJTYPE objType,
 						IN void *handle);
 

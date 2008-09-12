@@ -101,7 +101,7 @@
  *  Function prototypes for writing memory to a DSP system, allocating
  *  and freeing DSP memory.
  */
-	typedef u32(CDECL *COD_WRITEFXN) (void *pPrivRef, u32 ulDspAddr,
+       typedef u32(*COD_WRITEFXN) (void *pPrivRef, u32 ulDspAddr,
 					     void *pBuf, u32 ulNumBytes,
 					     u32 nMemSpace);
 
@@ -120,7 +120,7 @@
  *  Ensures:
  *
  */
-	extern void CDECL COD_Close(struct COD_LIBRARYOBJ *lib);
+       extern void COD_Close(struct COD_LIBRARYOBJ *lib);
 
 /*
  *  ======== COD_Create ========
@@ -146,7 +146,7 @@
  *      pstrZLFile != NULL
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_Create(OUT struct COD_MANAGER **phManager,
+       extern DSP_STATUS COD_Create(OUT struct COD_MANAGER **phManager,
 				    char *pstrZLFile,
 				    IN OPTIONAL CONST struct COD_ATTRS *attrs);
 
@@ -163,7 +163,7 @@
  *      valid hManager.
  *  Ensures:
  */
-	extern void CDECL COD_Delete(struct COD_MANAGER *hManager);
+       extern void COD_Delete(struct COD_MANAGER *hManager);
 
 /*
  *  ======== COD_Exit ========
@@ -178,7 +178,7 @@
  *  Ensures:
  *      Resources acquired in COD_Init() are freed.
  */
-	extern void CDECL COD_Exit();
+       extern void COD_Exit();
 
 /*
  *  ======== COD_GetBaseLib ========
@@ -195,7 +195,7 @@
  *      plib != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_GetBaseLib(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_GetBaseLib(struct COD_MANAGER *hManager,
 					       struct DBLL_LibraryObj **plib);
 
 /*
@@ -215,7 +215,7 @@
  *      pszName != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_GetBaseName(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_GetBaseName(struct COD_MANAGER *hManager,
 						char *pszName, u32 uSize);
 
 /*
@@ -233,7 +233,7 @@
  *      pulEntry != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_GetEntry(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_GetEntry(struct COD_MANAGER *hManager,
 					     u32 *pulEntry);
 
 /*
@@ -251,7 +251,7 @@
  *      phLoader != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_GetLoader(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_GetLoader(struct COD_MANAGER *hManager,
 					      struct DBLL_TarObj **phLoader);
 
 /*
@@ -280,7 +280,7 @@
  *      else:  *puAddr == 0 and *puLen == 0;
  *
  */
-	extern DSP_STATUS CDECL COD_GetSection(struct COD_LIBRARYOBJ *lib,
+       extern DSP_STATUS COD_GetSection(struct COD_LIBRARYOBJ *lib,
 					       IN char *pstrSect,
 					       OUT u32 *puAddr,
 					       OUT u32 *puLen);
@@ -306,7 +306,7 @@
  *      pulValue != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_GetSymValue(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_GetSymValue(struct COD_MANAGER *hManager,
 						IN char *pstrSym,
 						OUT u32 *pulValue);
 
@@ -322,7 +322,7 @@
  *  Ensures:
  *      A requirement for each of the other public COD functions.
  */
-	extern bool CDECL COD_Init();
+       extern bool COD_Init();
 
 /*
  *  ======== COD_LoadBase ========
@@ -351,7 +351,7 @@
  *      pfnWrite != NULL.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL COD_LoadBase(struct COD_MANAGER *hManager,
+       extern DSP_STATUS COD_LoadBase(struct COD_MANAGER *hManager,
 					     u32 nArgc, char *aArgs[],
 					     COD_WRITEFXN pfnWrite, void *pArb,
 					     char *envp[]);
@@ -423,7 +423,7 @@ extern DSP_STATUS COD_OpenBase(struct COD_MANAGER *hMgr, IN char *pszCoffPath,
  *  Ensures:
  *      DSP_SOK:  *pstrContent stores the content of the named section.
  */
-	extern DSP_STATUS CDECL COD_ReadSection(struct COD_LIBRARYOBJ *lib,
+       extern DSP_STATUS COD_ReadSection(struct COD_LIBRARYOBJ *lib,
 						IN char *pstrSect,
 						OUT char *pstrContent,
 						IN u32 cContentSize);

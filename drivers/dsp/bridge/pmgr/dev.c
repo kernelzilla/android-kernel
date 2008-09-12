@@ -419,7 +419,7 @@ DSP_STATUS DEV_CreateDevice(OUT struct DEV_OBJECT **phDevObject,
  *      (PROC Auto_Start) or PROC_Load this fxn is called. This creates
  *      the Node Manager and updates the DEV Object.
  */
-DSP_STATUS CDECL DEV_Create2(struct DEV_OBJECT *hDevObject)
+DSP_STATUS DEV_Create2(struct DEV_OBJECT *hDevObject)
 {
 	DSP_STATUS status = DSP_SOK;
 	struct DEV_OBJECT *pDevObject = hDevObject;
@@ -452,7 +452,7 @@ DSP_STATUS CDECL DEV_Create2(struct DEV_OBJECT *hDevObject)
  *  Purpose:
  *      Destroys the Node manager for this device.
  */
-DSP_STATUS CDECL DEV_Destroy2(struct DEV_OBJECT *hDevObject)
+DSP_STATUS DEV_Destroy2(struct DEV_OBJECT *hDevObject)
 {
 	DSP_STATUS status = DSP_SOK;
 	struct DEV_OBJECT *pDevObject = hDevObject;
@@ -835,7 +835,7 @@ struct DEV_OBJECT *DEV_GetNext(struct DEV_OBJECT *hDevObject)
 /*
  *  ========= DEV_GetMsgMgr ========
  */
-void CDECL DEV_GetMsgMgr(struct DEV_OBJECT *hDevObject,
+void DEV_GetMsgMgr(struct DEV_OBJECT *hDevObject,
 			OUT struct MSG_MGR **phMsgMgr)
 {
 	DBC_Require(cRefs > 0);
@@ -850,7 +850,7 @@ void CDECL DEV_GetMsgMgr(struct DEV_OBJECT *hDevObject,
  *  Purpose:
  *      Retrieve the Node Manager Handle
  */
-DSP_STATUS CDECL DEV_GetNodeManager(struct DEV_OBJECT *hDevObject,
+DSP_STATUS DEV_GetNodeManager(struct DEV_OBJECT *hDevObject,
 				   OUT struct NODE_MGR **phNodeMgr)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -882,7 +882,7 @@ DSP_STATUS CDECL DEV_GetNodeManager(struct DEV_OBJECT *hDevObject,
 /*
  *  ======== DEV_GetSymbol ========
  */
-DSP_STATUS CDECL DEV_GetSymbol(struct DEV_OBJECT *hDevObject,
+DSP_STATUS DEV_GetSymbol(struct DEV_OBJECT *hDevObject,
 			      IN CONST char *pstrSym, OUT u32 *pulValue)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -951,7 +951,7 @@ DSP_STATUS DEV_GetWMDContext(struct DEV_OBJECT *hDevObject,
  *      Decrement reference count, and free resources when reference count is
  *      0.
  */
-void CDECL DEV_Exit(void)
+void DEV_Exit(void)
 {
 	DBC_Require(cRefs > 0);
 
@@ -973,7 +973,7 @@ void CDECL DEV_Exit(void)
  *  Purpose:
  *      Initialize DEV's private state, keeping a reference count on each call.
  */
-bool CDECL DEV_Init(void)
+bool DEV_Init(void)
 {
 	bool fCmm, fDmm, fRetval = true;
 
@@ -1038,7 +1038,7 @@ DSP_STATUS DEV_NotifyClients(struct DEV_OBJECT *hDevObject, u32 ulStatus)
 /*
  *  ======== DEV_RemoveDevice ========
  */
-DSP_STATUS CDECL DEV_RemoveDevice(struct CFG_DEVNODE *hDevNode)
+DSP_STATUS DEV_RemoveDevice(struct CFG_DEVNODE *hDevNode)
 {
 	struct DEV_OBJECT *hDevObject;	/* handle to device object */
 	DSP_STATUS status = DSP_SOK;
@@ -1111,7 +1111,7 @@ void DEV_SetMsgMgr(struct DEV_OBJECT *hDevObject, struct MSG_MGR *hMgr)
  *  Purpose:
  *      Initializes the new device with the BRIDGE environment.
  */
-DSP_STATUS CDECL DEV_StartDevice(struct CFG_DEVNODE *hDevNode)
+DSP_STATUS DEV_StartDevice(struct CFG_DEVNODE *hDevNode)
 {
 	struct DEV_OBJECT *hDevObject = NULL;	/* handle to 'Bridge Device */
 	struct CFG_HOSTRES hostRes;	/* resources struct. */
@@ -1267,7 +1267,7 @@ static DSP_STATUS InitCodMgr(struct DEV_OBJECT *pDevObject)
  *  Ensures:
  *      DSP_SOK and List is not Empty.
  */
-DSP_STATUS CDECL DEV_InsertProcObject(struct DEV_OBJECT *hDevObject,
+DSP_STATUS DEV_InsertProcObject(struct DEV_OBJECT *hDevObject,
 				     u32 hProcObject,
 				     OUT bool *pbAlreadyAttached)
 {
@@ -1313,7 +1313,7 @@ DSP_STATUS CDECL DEV_InsertProcObject(struct DEV_OBJECT *hDevObject,
  *  Details:
  *      List will be deleted when the DEV is destroyed.
  */
-DSP_STATUS CDECL DEV_RemoveProcObject(struct DEV_OBJECT *hDevObject,
+DSP_STATUS DEV_RemoveProcObject(struct DEV_OBJECT *hDevObject,
 				     u32 hProcObject)
 {
 	DSP_STATUS status = DSP_EFAIL;
@@ -1343,7 +1343,7 @@ DSP_STATUS CDECL DEV_RemoveProcObject(struct DEV_OBJECT *hDevObject,
 	return status;
 }
 
-DSP_STATUS CDECL DEV_GetDevType(struct DEV_OBJECT *hdevObject, u32 *devType)
+DSP_STATUS DEV_GetDevType(struct DEV_OBJECT *hdevObject, u32 *devType)
 {
 	DSP_STATUS status = DSP_SOK;
 	struct DEV_OBJECT *pDevObject = (struct DEV_OBJECT *)hdevObject;

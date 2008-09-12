@@ -353,9 +353,9 @@ static DSP_STATUS GetNodeProps(struct DCD_MANAGER *hDcdMgr,
 static DSP_STATUS GetProcProps(struct NODE_MGR *hNodeMgr,
 			      struct DEV_OBJECT *hDevObject);
 static DSP_STATUS GetRMSFxns(struct NODE_MGR *hNodeMgr);
-static CDECL u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
+static u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
 			u32 ulNumBytes, u32 nMemSpace);
-static CDECL u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
+static u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
 			u32 ulNumBytes, u32 nMemSpace);
 #if GT_TRACE
 static struct GT_Mask NODE_debugMask = { NULL, NULL };  /* GT trace variable */
@@ -2232,7 +2232,7 @@ bool NODE_Init(void)
  *  Purpose:
  *      Gets called when RMS_EXIT is received for a node.
  */
-CDECL void NODE_OnExit(struct NODE_OBJECT *hNode, s32 nStatus)
+void NODE_OnExit(struct NODE_OBJECT *hNode, s32 nStatus)
 {
 	DBC_Assert(MEM_IsValidHandle(hNode, NODE_SIGNATURE));
 	/* Set node state to done */
@@ -3325,7 +3325,7 @@ static DSP_STATUS GetRMSFxns(struct NODE_MGR *hNodeMgr)
  *  Purpose:
  *      Called during overlay.Sends command to RMS to copy a block of data.
  */
-static CDECL u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
+static u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
 			u32 ulNumBytes, u32 nMemSpace)
 {
 	struct NODE_OBJECT *hNode = (struct NODE_OBJECT *)pPrivRef;
@@ -3359,7 +3359,7 @@ static CDECL u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
 /*
  *  ======== Write ========
  */
-static CDECL u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
+static u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
 			u32 ulNumBytes, u32 nMemSpace)
 {
 	struct NODE_OBJECT *hNode = (struct NODE_OBJECT *) pPrivRef;

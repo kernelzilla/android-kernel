@@ -80,7 +80,7 @@
 #define PG_ALIGN_HIGH(addr, pg_size) (((addr)+(pg_size)-1) & PG_MASK(pg_size))
 
 /* API return value and calling convention */
-#define DBAPI                       DSP_STATUS CDECL
+#define DBAPI                       DSP_STATUS
 
 /* Infinite time value for the uTimeout parameter to DSPStream_Select() */
 #define DSP_FOREVER                 (-1)

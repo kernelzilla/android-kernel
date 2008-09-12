@@ -65,7 +65,7 @@
  *  Requires:
  *  Ensures:
  */
-	typedef u32(CDECL *NLDR_OVLYFXN) (void *pPrivRef, u32 ulDspRunAddr,
+       typedef u32(*NLDR_OVLYFXN) (void *pPrivRef, u32 ulDspRunAddr,
 					     u32 ulDspLoadAddr,
 					     u32 ulNumBytes, u32 nMemSpace);
 
@@ -84,7 +84,7 @@
  *  Requires:
  *  Ensures:
  */
-	typedef u32(CDECL *NLDR_WRITEFXN) (void *pPrivRef,
+       typedef u32(*NLDR_WRITEFXN) (void *pPrivRef,
 					      u32 ulDspAddr, void *pBuf,
 					      u32 ulNumBytes, u32 nMemSpace);
 

@@ -115,7 +115,7 @@
  *      pHostBuf != NULL
  *  Ensures:
  */
-	extern u32 CDECL DEV_BrdWriteFxn(void *pArb,
+       extern u32 DEV_BrdWriteFxn(void *pArb,
 					   u32 ulDspAddr,
 					   void *pHostBuf,
 					   u32 ulNumBytes, u32 nMemSpace);
@@ -158,7 +158,7 @@
  *      Otherwise, does not create the device object, ensures the WMD module is
  *      unloaded, and sets *phDevObject to NULL.
  */
-	extern DSP_STATUS CDECL DEV_CreateDevice(OUT struct DEV_OBJECT
+       extern DSP_STATUS DEV_CreateDevice(OUT struct DEV_OBJECT
 						 **phDevObject,
 						 IN CONST char *pstrWMDFileName,
 						 IN CONST struct CFG_HOSTRES
@@ -204,7 +204,7 @@
  *      Otherwise, does not create the device object, ensures the WMD module is
  *      unloaded, and sets *phDevObject to NULL.
  */
-	extern DSP_STATUS CDECL DEV_CreateIVADevice(OUT struct DEV_OBJECT
+       extern DSP_STATUS DEV_CreateIVADevice(OUT struct DEV_OBJECT
 				**phDevObject,
 				IN CONST char *pstrWMDFileName,
 				IN CONST struct CFG_HOSTRES *pHostConfig,
@@ -229,7 +229,7 @@
  *      DSP_SOK and hDevObject->hNodeMgr != NULL
  *      else    hDevObject->hNodeMgr == NULL
  */
-	extern DSP_STATUS CDECL DEV_Create2(IN struct DEV_OBJECT *hDevObject);
+       extern DSP_STATUS DEV_Create2(IN struct DEV_OBJECT *hDevObject);
 
 /*
  *  ======== DEV_Destroy2 ========
@@ -247,7 +247,7 @@
  *      DSP_SOK and hDevObject->hNodeMgr == NULL
  *      else    DSP_EFAIL.
  */
-	extern DSP_STATUS CDECL DEV_Destroy2(IN struct DEV_OBJECT *hDevObject);
+       extern DSP_STATUS DEV_Destroy2(IN struct DEV_OBJECT *hDevObject);
 
 /*
  *  ======== DEV_DestroyDevice ========
@@ -265,7 +265,7 @@
  *      DEV Initialized.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL DEV_DestroyDevice(struct DEV_OBJECT
+       extern DSP_STATUS DEV_DestroyDevice(struct DEV_OBJECT
 						  *hDevObject);
 
 /*
@@ -287,7 +287,7 @@
  *                      or NULL.
  *      else:           *phMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetChnlMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetChnlMgr(struct DEV_OBJECT *hDevObject,
 					       OUT struct CHNL_MGR **phMgr);
 
 /*
@@ -310,7 +310,7 @@
  *                      or NULL.
  *      else:           *phMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetCmmMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetCmmMgr(struct DEV_OBJECT *hDevObject,
 					      OUT struct CMM_OBJECT **phMgr);
 
 /*
@@ -333,7 +333,7 @@
  *                      or NULL.
  *      else:           *phMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetDmmMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetDmmMgr(struct DEV_OBJECT *hDevObject,
 					      OUT struct DMM_OBJECT **phMgr);
 
 /*
@@ -354,7 +354,7 @@
  *      DSP_SOK:        *phCodMgr contains a handle to a COD manager object.
  *      else:           *phCodMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetCodMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetCodMgr(struct DEV_OBJECT *hDevObject,
 					     OUT struct COD_MANAGER **phCodMgr);
 
 /*
@@ -374,7 +374,7 @@
  *      DSP_SOK:    *phDehMgr contains a handle to a DEH manager object.
  *      else:       *phDehMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetDehMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetDehMgr(struct DEV_OBJECT *hDevObject,
 					      OUT struct DEH_MGR **phDehMgr);
 
 /*
@@ -395,7 +395,7 @@
  *      DSP_SOK:        *phDevNode contains a platform specific device ID;
  *      else:           *phDevNode is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetDevNode(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetDevNode(struct DEV_OBJECT *hDevObject,
 					OUT struct CFG_DEVNODE **phDevNode);
 
 /*
@@ -416,7 +416,7 @@
  *      DSP_SOK:        *phDevNode contains a platform specific device ID;
  *      else:           *phDevNode is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetDevType(struct DEV_OBJECT *hdevObject,
+       extern DSP_STATUS DEV_GetDevType(struct DEV_OBJECT *hdevObject,
 					       u32 *devType);
 
 /*
@@ -437,7 +437,7 @@
  *      A subsequent call to DEV_GetNext will return the next device object in
  *      the list.
  */
-	extern struct DEV_OBJECT *CDECL DEV_GetFirst();
+       extern struct DEV_OBJECT *DEV_GetFirst();
 
 /*
  *  ======== DEV_GetIntfFxns ========
@@ -457,7 +457,7 @@
  *      DSP_SOK:        *ppIntfFxns contains a pointer to the WMD interface;
  *      else:           *ppIntfFxns is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetIntfFxns(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetIntfFxns(struct DEV_OBJECT *hDevObject,
 				OUT struct WMD_DRV_INTERFACE **ppIntfFxns);
 
 /*
@@ -478,7 +478,7 @@
  *      DSP_SOK:        *phMgr contains a handle to an IO manager object.
  *      else:           *phMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetIOMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetIOMgr(struct DEV_OBJECT *hDevObject,
 					     OUT struct IO_MGR **phMgr);
 
 /*
@@ -503,7 +503,7 @@
  *      A subsequent call to DEV_GetNext will return the next device object in
  *      the list.
  */
-	extern struct DEV_OBJECT *CDECL DEV_GetNext(struct DEV_OBJECT
+       extern struct DEV_OBJECT *DEV_GetNext(struct DEV_OBJECT
 						    *hDevObject);
 
 /*
@@ -520,7 +520,7 @@
  *      phNodeMgr != NULL.
  *  Ensures:
  */
-	extern void CDECL DEV_GetMsgMgr(struct DEV_OBJECT *hDevObject,
+       extern void DEV_GetMsgMgr(struct DEV_OBJECT *hDevObject,
 					OUT struct MSG_MGR **phMsgMgr);
 
 /*
@@ -542,7 +542,7 @@
  *      DSP_SOK:        *phNodeMgr contains a handle to a Node manager object.
  *      else:           *phNodeMgr is NULL.
  */
-	extern DSP_STATUS CDECL DEV_GetNodeManager(struct DEV_OBJECT
+       extern DSP_STATUS DEV_GetNodeManager(struct DEV_OBJECT
 					*hDevObject,
 					OUT struct NODE_MGR **phNodeMgr);
 
@@ -567,7 +567,7 @@
  *  Ensures:
  *      DSP_SOK:        *pulValue contains the symbol value;
  */
-	extern DSP_STATUS CDECL DEV_GetSymbol(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetSymbol(struct DEV_OBJECT *hDevObject,
 					      IN CONST char *pstrSym,
 					      OUT u32 *pulValue);
 
@@ -588,7 +588,7 @@
  *      DSP_SOK:        *phWmdContext contains context handle;
  *      else:           *phWmdContext is NULL;
  */
-	extern DSP_STATUS CDECL DEV_GetWMDContext(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_GetWMDContext(struct DEV_OBJECT *hDevObject,
 				OUT struct WMD_DEV_CONTEXT **phWmdContext);
 
 /*
@@ -603,7 +603,7 @@
  *  Ensures:
  *      When reference count == 0, DEV's private resources are freed.
  */
-	extern void CDECL DEV_Exit();
+       extern void DEV_Exit();
 
 /*
  *  ======== DEV_Init ========
@@ -616,7 +616,7 @@
  *  Ensures:
  *      TRUE: A requirement for the other public DEV functions.
  */
-	extern bool CDECL DEV_Init();
+       extern bool DEV_Init();
 
 /*
  *  ======== DEV_IsLocked ========
@@ -634,7 +634,7 @@
  *      DEV Initialized.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL DEV_IsLocked(IN struct DEV_OBJECT *hDevObject);
+       extern DSP_STATUS DEV_IsLocked(IN struct DEV_OBJECT *hDevObject);
 
 /*
  *  ======== DEV_InsertProcObject ========
@@ -659,7 +659,7 @@
  *      this is the first Processor attaching.
  *      If it is False, there are already processors attached.
  */
-	extern DSP_STATUS CDECL DEV_InsertProcObject(IN struct DEV_OBJECT
+       extern DSP_STATUS DEV_InsertProcObject(IN struct DEV_OBJECT
 						     *hDevObject,
 						     IN u32 hProcObject,
 						     OUT bool *
@@ -688,7 +688,7 @@
  *      List will be deleted when the DEV is destroyed.
  *
  */
-	extern DSP_STATUS CDECL DEV_RemoveProcObject(struct DEV_OBJECT
+       extern DSP_STATUS DEV_RemoveProcObject(struct DEV_OBJECT
 						     *hDevObject,
 						     u32 hProcObject);
 
@@ -712,7 +712,7 @@
  *      delivered to clients.  This function does not ensure that
  *      the notifications will ever be delivered.
  */
-	extern DSP_STATUS CDECL DEV_NotifyClients(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_NotifyClients(struct DEV_OBJECT *hDevObject,
 						  u32 ulStatus);
 
 
@@ -729,7 +729,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL DEV_RemoveDevice(struct CFG_DEVNODE *hDevNode);
+       extern DSP_STATUS DEV_RemoveDevice(struct CFG_DEVNODE *hDevNode);
 
 /*
  *  ======== DEV_SetChnlMgr ========
@@ -746,7 +746,7 @@
  *      DEV Initialized.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL DEV_SetChnlMgr(struct DEV_OBJECT *hDevObject,
+       extern DSP_STATUS DEV_SetChnlMgr(struct DEV_OBJECT *hDevObject,
 					       struct CHNL_MGR *hMgr);
 
 /*
@@ -761,7 +761,7 @@
  *      DEV Initialized.
  *  Ensures:
  */
-	extern void CDECL DEV_SetMsgMgr(struct DEV_OBJECT *hDevObject,
+       extern void DEV_SetMsgMgr(struct DEV_OBJECT *hDevObject,
 					struct MSG_MGR *hMgr);
 
 /*
@@ -780,6 +780,6 @@
  *      DEV initialized.
  *  Ensures:
  */
-	extern DSP_STATUS CDECL DEV_StartDevice(struct CFG_DEVNODE *hDevNode);
+       extern DSP_STATUS DEV_StartDevice(struct CFG_DEVNODE *hDevNode);
 
 #endif				/* DEV_ */

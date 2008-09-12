@@ -239,7 +239,7 @@ static struct WMD_DRV_INTERFACE drvInterfaceFxns = {
  *  purpose:
  *      Mini Driver entry point.
  */
-void CDECL WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
+void WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
 	      IN CONST char *pstrWMDFileName)
 {
 

@@ -100,7 +100,7 @@
  *      DSP_SOK:        Board is in BRD_IDLE state;
  *      else:           Board state is indeterminate.
  */
-	typedef DSP_STATUS(CDECL
+       typedef DSP_STATUS(
 			   *WMD_BRD_MONITOR) (struct WMD_DEV_CONTEXT
 			   *hDevContext);
 
@@ -121,7 +121,7 @@
  *      ulBrdState  <= BRD_LASTSTATE.
  *  Update the Board state to the specified state.
  */
-	typedef DSP_STATUS(CDECL
+       typedef DSP_STATUS(
 			   *WMD_BRD_SETSTATE) (struct WMD_DEV_CONTEXT
 			   *hDevContext, u32 ulBrdState);
 
@@ -144,7 +144,7 @@
  *                      Interrupts to the PC are enabled.
  *      else:           Board state is indeterminate.
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_START) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_START) (struct WMD_DEV_CONTEXT
 						*hDevContext, u32 dwDSPAddr);
 
 /*
@@ -167,7 +167,7 @@
  *                      Interrupts to the PC are enabled.
  *      else:           Board state is indeterminate.
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_MEMCOPY) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_MEMCOPY) (struct WMD_DEV_CONTEXT
 					     *hDevContext,
 					     u32 ulDspDestAddr,
 					     u32 ulDspSrcAddr,
@@ -192,7 +192,7 @@
  *      pHostBuf != NULL.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_MEMWRITE) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_MEMWRITE) (struct WMD_DEV_CONTEXT
 					*hDevContext,
 					IN u8 *pHostBuf,
 					u32 dwDSPAddr, u32 ulNumBytes,
@@ -215,7 +215,7 @@
  *      hDevContext != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_MEMMAP) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_MEMMAP) (struct WMD_DEV_CONTEXT
 					*hDevContext, u32 ulMpuAddr,
 					u32 ulVirtAddr, u32 ulNumBytes,
 					u32 ulMapAttrs);
@@ -235,7 +235,7 @@
  *      hDevContext != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_MEMUNMAP) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_MEMUNMAP) (struct WMD_DEV_CONTEXT
 					*hDevContext,
 					u32 ulVirtAddr,
 					u32 ulNumBytes);
@@ -257,7 +257,7 @@
  *                      Interrupts to the PC are disabled.
  *      else:           Board state is indeterminate.
  */
-	typedef DSP_STATUS(CDECL *WMD_BRD_STOP) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_BRD_STOP) (struct WMD_DEV_CONTEXT
 					*hDevContext);
 
 /*
@@ -275,7 +275,7 @@
  *  Ensures:
  *      *pdwState is one of {BRD_STOPPED, BRD_IDLE, BRD_RUNNING, BRD_UNKNOWN};
  */
-	typedef DSP_STATUS(CDECL *
+       typedef DSP_STATUS(*
 			   WMD_BRD_STATUS) (struct WMD_DEV_CONTEXT *hDevContext,
 					    OUT BRD_STATUS * pdwState);
 
@@ -300,7 +300,7 @@
  *  Ensures:
  *  Will not write more than ulNumBytes bytes into pHostBuf.
  */
-typedef DSP_STATUS(CDECL *WMD_BRD_READ) (struct WMD_DEV_CONTEXT *hDevContext,
+typedef DSP_STATUS(*WMD_BRD_READ) (struct WMD_DEV_CONTEXT *hDevContext,
 						  OUT u8 *pHostBuf,
 						  u32 dwDSPAddr,
 						  u32 ulNumBytes,
@@ -326,7 +326,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_READ) (struct WMD_DEV_CONTEXT *hDevContext,
  *      pHostBuf != NULL.
  *  Ensures:
  */
-typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
+typedef DSP_STATUS(*WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
 						   IN u8 *pHostBuf,
 						   u32 dwDSPAddr,
 						   u32 ulNumBytes,
@@ -363,7 +363,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      No channel manager exists for this board.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_CREATE)(OUT struct CHNL_MGR
+       typedef DSP_STATUS(*WMD_CHNL_CREATE)(OUT struct CHNL_MGR
 						    **phChnlMgr,
 						    struct DEV_OBJECT
 						    *hDevObject,
@@ -384,7 +384,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      DSP_SOK: Cancels I/O on each open channel. Closes each open channel.
  *          CHNL_Create may subsequently be called for the same device.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_DESTROY) (struct CHNL_MGR
+       typedef DSP_STATUS(*WMD_CHNL_DESTROY) (struct CHNL_MGR
 						      *hChnlMgr);
 /*
  *  ======== WMD_DEH_Notify ========
@@ -401,7 +401,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *     ulEventMask with a valid exception
  *  Ensures:
  */
-	typedef void (CDECL *WMD_DEH_NOTIFY)(struct DEH_MGR *hDehMgr,
+       typedef void (*WMD_DEH_NOTIFY)(struct DEH_MGR *hDehMgr,
 					u32 ulEventMask, u32 dwErrInfo);
 
 
@@ -448,7 +448,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      DSP_SOK:                *phChnl is a valid channel.
  *      else:                   *phChnl is set to NULL if (phChnl != NULL);
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_OPEN) (OUT struct CHNL_OBJECT
+       typedef DSP_STATUS(*WMD_CHNL_OPEN) (OUT struct CHNL_OBJECT
 						   **phChnl,
 						   struct CHNL_MGR *hChnlMgr,
 						   CHNL_MODE uMode,
@@ -473,7 +473,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Ensures:
  *      DSP_SOK:        hChnl is no longer valid.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_CLOSE) (struct CHNL_OBJECT *hChnl);
+       typedef DSP_STATUS(*WMD_CHNL_CLOSE) (struct CHNL_OBJECT *hChnl);
 
 /*
  *  ======== WMD_CHNL_AddIOReq ========
@@ -512,7 +512,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *          corresponding IOC for this I/O request will have its status flag
  *          set to CHNL_IOCSTATEOS.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_ADDIOREQ) (struct CHNL_OBJECT
+       typedef DSP_STATUS(*WMD_CHNL_ADDIOREQ) (struct CHNL_OBJECT
 						       *hChnl,
 						       void *pHostBuf,
 						       u32 cBytes,
@@ -545,7 +545,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *          returns, the channel event object will be left in a signalled
  *          state.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_GETIOC) (struct CHNL_OBJECT *hChnl,
+       typedef DSP_STATUS(*WMD_CHNL_GETIOC) (struct CHNL_OBJECT *hChnl,
 						     u32 dwTimeOut,
 						     OUT struct CHNL_IOC *pIOC);
 
@@ -567,7 +567,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Ensures:
  *      Subsequent I/O requests to this channel will not be accepted.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_CANCELIO) (struct CHNL_OBJECT
+       typedef DSP_STATUS(*WMD_CHNL_CANCELIO) (struct CHNL_OBJECT
 						       *hChnl);
 
 /*
@@ -587,7 +587,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Ensures:
  *      DSP_SOK:            No I/O requests will be pending on this channel.
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_FLUSHIO) (struct CHNL_OBJECT *hChnl,
+       typedef DSP_STATUS(*WMD_CHNL_FLUSHIO) (struct CHNL_OBJECT *hChnl,
 						      u32 dwTimeOut);
 
 /*
@@ -606,7 +606,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      DSP_SOK:        pInfo points to a filled in CHNL_INFO struct,
  *                      if (pInfo != NULL).
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_GETINFO) (struct CHNL_OBJECT *hChnl,
+       typedef DSP_STATUS(*WMD_CHNL_GETINFO) (struct CHNL_OBJECT *hChnl,
 						      OUT struct CHNL_INFO
 						      *pChnlInfo);
 
@@ -628,7 +628,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      DSP_SOK:            pMgrInfo points to a filled in CHNL_MGRINFO
  *                          struct, if (pMgrInfo != NULL).
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_GETMGRINFO) (struct CHNL_MGR
+       typedef DSP_STATUS(*WMD_CHNL_GETMGRINFO) (struct CHNL_MGR
 							 *hChnlMgr,
 							 u32 uChnlID,
 							 OUT struct CHNL_MGRINFO
@@ -660,7 +660,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Requires:
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_IDLE) (struct CHNL_OBJECT *hChnl,
+       typedef DSP_STATUS(*WMD_CHNL_IDLE) (struct CHNL_OBJECT *hChnl,
 						   u32 dwTimeOut,
 						   bool fFlush);
 
@@ -689,7 +689,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      uNotifyType == DSP_SIGNALEVENT.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_CHNL_REGISTERNOTIFY)
+       typedef DSP_STATUS(*WMD_CHNL_REGISTERNOTIFY)
 				(struct CHNL_OBJECT *hChnl,
 				u32 uEventMask,
 				u32 uNotifyType,
@@ -733,7 +733,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      function returns, they must not be stored into the device context
  *      structure.
  */
-	typedef DSP_STATUS(CDECL *WMD_DEV_CREATE) (OUT struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_DEV_CREATE) (OUT struct WMD_DEV_CONTEXT
 						    **phDevContext,
 						    struct DEV_OBJECT
 						    *hDevObject,
@@ -758,7 +758,7 @@ typedef DSP_STATUS(CDECL *WMD_BRD_WRITE)(struct WMD_DEV_CONTEXT *hDevContext,
  *      IOCTL completion routines provided.
  *  Ensures:
  */
-typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
+typedef DSP_STATUS(*WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
 					u32 dwCmd,
 					IN OUT void *pArgs);
 
@@ -779,7 +779,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Ensures:
  *      DSP_SOK: Device context is freed.
  */
-	typedef DSP_STATUS(CDECL *WMD_DEV_DESTROY) (struct WMD_DEV_CONTEXT
+       typedef DSP_STATUS(*WMD_DEV_DESTROY) (struct WMD_DEV_CONTEXT
 					     *hDevContext);
 
 /*
@@ -798,7 +798,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      phDehMgr != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_DEH_CREATE) (OUT struct DEH_MGR
+       typedef DSP_STATUS(*WMD_DEH_CREATE) (OUT struct DEH_MGR
 						    **phDehMgr,
 						    struct DEV_OBJECT
 						    *hDevObject);
@@ -816,7 +816,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      hDehMgr != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_DEH_DESTROY) (struct DEH_MGR *hDehMgr);
+       typedef DSP_STATUS(*WMD_DEH_DESTROY) (struct DEH_MGR *hDehMgr);
 
 /*
  *  ======== WMD_DEH_RegisterNotify ========
@@ -831,7 +831,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      hDehMgr != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_DEH_REGISTERNOTIFY)
+       typedef DSP_STATUS(*WMD_DEH_REGISTERNOTIFY)
 				(struct DEH_MGR *hDehMgr,
 				u32 uEventMask, u32 uNotifyType,
 				struct DSP_NOTIFICATION *hNotification);
@@ -851,7 +851,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      pErrorInfo != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_DEH_GETINFO) (struct DEH_MGR *phDehMgr,
+       typedef DSP_STATUS(*WMD_DEH_GETINFO) (struct DEH_MGR *phDehMgr,
 					struct DSP_ERRORINFO *pErrInfo);
 
 /*
@@ -874,7 +874,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      phIOMgr != NULL;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_IO_CREATE) (OUT struct IO_MGR **phIOMgr,
+       typedef DSP_STATUS(*WMD_IO_CREATE) (OUT struct IO_MGR **phIOMgr,
 					struct DEV_OBJECT *hDevObject,
 					IN CONST struct IO_ATTRS *pMgrAttrs);
 
@@ -892,7 +892,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      Valid hIOMgr;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_IO_DESTROY) (struct IO_MGR *hIOMgr);
+       typedef DSP_STATUS(*WMD_IO_DESTROY) (struct IO_MGR *hIOMgr);
 
 /*
  *  ======== WMD_IO_OnLoaded ========
@@ -909,7 +909,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      Valid hIOMgr;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_IO_ONLOADED) (struct IO_MGR *hIOMgr);
+       typedef DSP_STATUS(*WMD_IO_ONLOADED) (struct IO_MGR *hIOMgr);
 
 /*
  *  ======== WMD_IO_GETPROCLOAD ========
@@ -925,7 +925,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      Valid hIOMgr;
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_IO_GETPROCLOAD)(struct IO_MGR *hIOMgr,
+       typedef DSP_STATUS(*WMD_IO_GETPROCLOAD)(struct IO_MGR *hIOMgr,
 			   struct DSP_PROCLOADSTAT *pProcLoadStat);
 
 /*
@@ -946,7 +946,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      hDevObject != NULL.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_MSG_CREATE)
+       typedef DSP_STATUS(*WMD_MSG_CREATE)
 				(OUT struct MSG_MGR **phMsgMgr,
 				struct DEV_OBJECT *hDevObject,
 				MSG_ONEXIT msgCallback);
@@ -973,7 +973,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Ensures:
  *      phMsgQueue !=NULL <==> DSP_SOK.
  */
-	typedef DSP_STATUS(CDECL *WMD_MSG_CREATEQUEUE)
+       typedef DSP_STATUS(*WMD_MSG_CREATEQUEUE)
 				(struct MSG_MGR *hMsgMgr,
 				OUT struct MSG_QUEUE **phMsgQueue,
 				u32 dwId, u32 uMaxMsgs, HANDLE h);
@@ -989,7 +989,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      Valid hMsgMgr.
  *  Ensures:
  */
-	typedef void(CDECL *WMD_MSG_DELETE) (struct MSG_MGR *hMsgMgr);
+       typedef void(*WMD_MSG_DELETE) (struct MSG_MGR *hMsgMgr);
 
 /*
  *  ======== WMD_MSG_DeleteQueue ========
@@ -1003,7 +1003,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      Valid hMsgQueue.
  *  Ensures:
  */
-	typedef void(CDECL *WMD_MSG_DELETEQUEUE) (struct MSG_QUEUE *hMsgQueue);
+       typedef void(*WMD_MSG_DELETEQUEUE) (struct MSG_QUEUE *hMsgQueue);
 
 /*
  *  ======== WMD_MSG_Get ========
@@ -1024,7 +1024,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      pMsg != NULL.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_MSG_GET) (struct MSG_QUEUE *hMsgQueue,
+       typedef DSP_STATUS(*WMD_MSG_GET) (struct MSG_QUEUE *hMsgQueue,
 						 struct DSP_MSG *pMsg,
 						 u32 uTimeout);
 
@@ -1047,7 +1047,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      pMsg != NULL.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_MSG_PUT) (struct MSG_QUEUE *hMsgQueue,
+       typedef DSP_STATUS(*WMD_MSG_PUT) (struct MSG_QUEUE *hMsgQueue,
 						 IN CONST struct DSP_MSG *pMsg,
 						 u32 uTimeout);
 
@@ -1072,7 +1072,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      uEventMask == DSP_NODEMESSAGEREADY || uEventMask == 0.
  *  Ensures:
  */
-	typedef DSP_STATUS(CDECL *WMD_MSG_REGISTERNOTIFY)
+       typedef DSP_STATUS(*WMD_MSG_REGISTERNOTIFY)
 				(struct MSG_QUEUE *hMsgQueue,
 				u32 uEventMask, u32 uNotifyType,
 				struct DSP_NOTIFICATION *hNotification);
@@ -1092,7 +1092,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *      dwId != 0.
  *  Ensures:
  */
-	typedef void(CDECL *WMD_MSG_SETQUEUEID) (struct MSG_QUEUE *hMsgQueue,
+       typedef void(*WMD_MSG_SETQUEUEID) (struct MSG_QUEUE *hMsgQueue,
 						  u32 dwId);
 
 /*
@@ -1187,7 +1187,7 @@ typedef DSP_STATUS(CDECL *WMD_DEV_CTRL)(struct WMD_DEV_CONTEXT *hDevContext,
  *  Details:
  *      Win95: Called during the Device_Init phase.
  */
-	void CDECL WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
+       void WMD_DRV_Entry(OUT struct WMD_DRV_INTERFACE **ppDrvInterface,
 				 IN CONST char *pstrWMDFileName);
 
 #endif				/* WMD_ */

@@ -836,8 +836,7 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 {
 	s32 i, len;
 	DSP_STATUS status = DSP_SOK;
-	u8 __user *temp;
-	u8 *temp1;
+       char *temp;
 	s32 argc = args->ARGS_PROC_LOAD.iArgc;
 	u8 **argv, **envp = NULL;
 
@@ -852,8 +851,9 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 	cp_fm_usr(argv, args->ARGS_PROC_LOAD.aArgv, status, argc);
 	for (i = 0; DSP_SUCCEEDED(status) && (i < argc); i++) {
 		if (argv[i] != NULL) {
-			temp = argv[i];	/* User space pointer to argument */
-			len = strlen_user(temp);
+                        /* User space pointer to argument */
+                       temp = (char *) argv[i];
+                       len = strlen_user((char *)temp);
 			/* Kernel space pointer to argument */
 			argv[i] = MEM_Alloc(len, MEM_NONPAGED);
 			if (argv[i] == NULL) {
@@ -869,16 +869,17 @@ u32 PROCWRAP_Load(union Trapped_Args *args)
 		len = 0;
 		do {
 			len++;
-			get_user(temp1, args->ARGS_PROC_LOAD.aEnvp);
-		} while (temp1);
+                       get_user(temp, args->ARGS_PROC_LOAD.aEnvp);
+               } while (temp);
 		envp = MEM_Alloc(len * sizeof(u8 *), MEM_NONPAGED);
 		if (envp == NULL)
 			status = DSP_EMEMORY;
 
 		cp_fm_usr(envp, args->ARGS_PROC_LOAD.aEnvp, status, len);
 		for (i = 0; DSP_SUCCEEDED(status) && (envp[i] != NULL); i++) {
-			temp = envp[i];	/* User space pointer to argument */
-			len = strlen_user(temp);
+                        /* User space pointer to argument */
+                       temp = (char *)envp[i];
+                       len = strlen_user((char *)temp);
 			/* Kernel space pointer to argument */
 			envp[i] = MEM_Alloc(len, MEM_NONPAGED);
 			if (envp[i] == NULL) {

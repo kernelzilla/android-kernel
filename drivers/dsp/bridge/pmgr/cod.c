@@ -139,7 +139,7 @@ static bool NoOp();
 /*
  *  ======== COD_Close ========
  */
-void CDECL COD_Close(struct COD_LIBRARYOBJ *lib)
+void COD_Close(struct COD_LIBRARYOBJ *lib)
 {
 	struct COD_MANAGER *hMgr;
 
@@ -281,7 +281,7 @@ void COD_Exit(void)
  *  Purpose:
  *      Get handle to the base image DBL library.
  */
-DSP_STATUS CDECL COD_GetBaseLib(struct COD_MANAGER *hManager,
+DSP_STATUS COD_GetBaseLib(struct COD_MANAGER *hManager,
 				struct DBLL_LibraryObj **plib)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -298,7 +298,7 @@ DSP_STATUS CDECL COD_GetBaseLib(struct COD_MANAGER *hManager,
 /*
  *  ======== COD_GetBaseName ========
  */
-DSP_STATUS CDECL COD_GetBaseName(struct COD_MANAGER *hManager, char *pszName,
+DSP_STATUS COD_GetBaseName(struct COD_MANAGER *hManager, char *pszName,
 				u32 uSize)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -340,7 +340,7 @@ DSP_STATUS COD_GetEntry(struct COD_MANAGER *hManager, u32 *pulEntry)
  *  Purpose:
  *      Get handle to the DBLL loader.
  */
-DSP_STATUS CDECL COD_GetLoader(struct COD_MANAGER *hManager,
+DSP_STATUS COD_GetLoader(struct COD_MANAGER *hManager,
 			       struct DBLL_TarObj **phLoader)
 {
 	DSP_STATUS status = DSP_SOK;

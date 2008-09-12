@@ -62,7 +62,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT*
+       extern DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT*
 							hDevContext);
 
 /*
@@ -79,7 +79,7 @@
  *      All data objects touched must be locked in memory.
  *  Ensures:
  */
-	extern void CDECL CHNLSM_DPC(struct WMD_DEV_CONTEXT *hDevContext);
+       extern void CHNLSM_DPC(struct WMD_DEV_CONTEXT *hDevContext);
 
 /*
  *  ======== CHNLSM_EnableInterrupt ========
@@ -91,7 +91,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT*
+       extern DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT*
 						       hDevContext);
 
 /*
@@ -106,7 +106,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT*
+       extern DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT*
 						    hDevContext);
 
 /*
@@ -124,7 +124,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT*
+       extern DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT*
 						     hDevContext, u16 wMbVal);
 
 /*
@@ -151,7 +151,7 @@
  *  Ensures:
  *      If the interrupt is *not* shared, this routine must return TRUE.
  */
-	extern bool CDECL CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext,
+       extern bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext,
 				     OUT bool *pfSchedDPC,
 				     OUT u16 *pwIntrVal);
 
@@ -168,7 +168,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS CDECL CHNLSM_Read(struct WMD_DEV_CONTEXT *hDevContext,
+       extern DSP_STATUS CHNLSM_Read(struct WMD_DEV_CONTEXT *hDevContext,
 					    OUT u8 *pHostBuf,
 					    u32 dwDSPAddr, u32 ulNumBytes);
 
@@ -203,7 +203,7 @@
  *  Requires:
  *  Ensures:
  */
-       extern DSP_STATUS CDECL CHNLSM_Write(struct WMD_DEV_CONTEXT *hDevContext,
+       extern DSP_STATUS CHNLSM_Write(struct WMD_DEV_CONTEXT *hDevContext,
 					    IN u8 *pHostBuf,
 					    u32 dwDSPAddr, u32 ulNumBytes);
 

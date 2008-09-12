@@ -60,7 +60,7 @@
  *      However, the DPC may take hardware interrupts during execution.
  *      Interrupts to the processor are enabled.
  */
-	typedef void(CDECL *DPC_PROC) (void *pRefData);
+       typedef void(*DPC_PROC) (void *pRefData);
 
 /*
  *  ======== DPC_Cancel ========
@@ -77,7 +77,7 @@
  *      If the DPC has already executed, is executing, or was not yet
  *      scheduled, this function will have no effect.
  */
-	extern DSP_STATUS CDECL DPC_Cancel(IN struct DPC_OBJECT *hDPC);
+       extern DSP_STATUS DPC_Cancel(IN struct DPC_OBJECT *hDPC);
 
 /*
  *  ======== DPC_Create ========
@@ -98,7 +98,7 @@
  *      DSP_SOK: DPC object is created;
  *      else: *phDPC is set to NULL.
  */
-	extern DSP_STATUS CDECL DPC_Create(OUT struct DPC_OBJECT **phDPC,
+       extern DSP_STATUS DPC_Create(OUT struct DPC_OBJECT **phDPC,
 					   IN DPC_PROC pfnDPC,
 					   IN void *pRefData);
 
@@ -119,7 +119,7 @@
  *  Ensures:
  *      (SUCCESS && hDPC is NULL) or DSP_EFAILED status
  */
-	extern DSP_STATUS CDECL DPC_Destroy(IN struct DPC_OBJECT *hDPC);
+       extern DSP_STATUS DPC_Destroy(IN struct DPC_OBJECT *hDPC);
 
 /*
  *  ======== DPC_Exit ========
@@ -132,7 +132,7 @@
  *  Ensures:
  *      Resources acquired in DPC_Init() are freed.
  */
-	extern void CDECL DPC_Exit();
+       extern void DPC_Exit();
 
 /*
  *  ======== DPC_Init ========
@@ -145,7 +145,7 @@
  *  Ensures:
  *      A requirement for each of the other public DPC functions.
  */
-	extern bool CDECL DPC_Init();
+       extern bool DPC_Init();
 
 /*
  *  ======== DPC_Schedule ========
@@ -162,6 +162,6 @@
  *  Ensures:
  *      DSP_SOK:        The DPC will not be called before this function returns.
  */
-	extern DSP_STATUS CDECL DPC_Schedule(IN struct DPC_OBJECT *hDPC);
+       extern DSP_STATUS DPC_Schedule(IN struct DPC_OBJECT *hDPC);
 
 #endif				/* DPC_ */
