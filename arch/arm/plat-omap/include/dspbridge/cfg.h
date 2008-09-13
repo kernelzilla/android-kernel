@@ -64,8 +64,8 @@
 
 #ifndef CFG_
 #define CFG_
-#include <host_os.h>
-#include <cfgdefs.h>
+#include <dspbridge/host_os.h>
+#include <dspbridge/cfgdefs.h>
 
 /*
  *  ======== CFG_Exit ========

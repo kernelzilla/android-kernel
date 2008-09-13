@@ -38,7 +38,7 @@
  *! 11-Jul-1997 dlr:	_5t_, and STD_SPOXTASK keyword for Tasking
  *! 12-Jun-1997 mf: 	_TMS320C60 -> _TMS320C6200
  *! 13-Feb-1997 mf:	_62_, with 32-bit LgInt
- *! 26-Nov-1996 kw: 	merged bios-c00's and wsx-a27's <std.h> changes
+ *! 26-Nov-1996 kw: 	merged bios-c00's and wsx-a27's <dspbridge/std.h> changes
  *!			*and* revision history
  *! 12-Sep-1996 kw: 	added C54x #ifdef's
  *! 21-Aug-1996 mf: 	removed #define main smain for _21_

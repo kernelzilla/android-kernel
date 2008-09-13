@@ -46,9 +46,9 @@
 #ifndef CHNLPRIV_
 #define CHNLPRIV_
 
-#include <chnldefs.h>
-#include <devdefs.h>
-#include <sync.h>
+#include <dspbridge/chnldefs.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/sync.h>
 
 /* CHNL Object validation signatures: */
 #define CHNL_MGRSIGNATURE   0x52474D43	/* "CMGR" (in reverse). */

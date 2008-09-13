@@ -41,27 +41,27 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <mem.h>
-#include <sync.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Others */
-#include <dbdcd.h>
-#include <dbreg.h>
-#include <drv.h>
-#include <dev.h>
+#include <dspbridge/dbdcd.h>
+#include <dspbridge/dbreg.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- This */
-#include <mgr.h>
+#include <dspbridge/mgr.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define ZLDLLNAME               ""

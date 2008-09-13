@@ -38,9 +38,9 @@
 #ifndef NODEPRIV_
 #define NODEPRIV_
 
-#include <strmdefs.h>
-#include <nodedefs.h>
-#include <nldrdefs.h>
+#include <dspbridge/strmdefs.h>
+#include <dspbridge/nodedefs.h>
+#include <dspbridge/nldrdefs.h>
 
 /* DSP address of node environment structure */
 	typedef u32 NODE_ENV;

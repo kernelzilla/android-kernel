@@ -35,29 +35,29 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <gt.h>
-#include <dbc.h>
-#include <gh.h>
+#include <dspbridge/gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gh.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <mem.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
 
 /* Dynamic loader library interface */
-#include <dynamic_loader.h>
-#include <getsection.h>
+#include <dspbridge/dynamic_loader.h>
+#include <dspbridge/getsection.h>
 
 /*  ----------------------------------- This */
-#include <dbll.h>
-#include <rmm.h>
+#include <dspbridge/dbll.h>
+#include <dspbridge/rmm.h>
 
 #define DBLL_TARGSIGNATURE      0x544c4c44	/* "TLLD" */
 #define DBLL_LIBSIGNATURE       0x4c4c4c44	/* "LLLD" */

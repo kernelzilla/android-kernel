@@ -49,7 +49,7 @@
 #ifndef CSL_
 #define CSL_
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*
  *  ======== CSL_Exit ========

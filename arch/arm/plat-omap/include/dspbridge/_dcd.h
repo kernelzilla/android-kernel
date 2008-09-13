@@ -54,7 +54,7 @@
 #ifndef _WCD_
 #define _WCD_
 
-#include <wcdioctl.h>
+#include <dspbridge/wcdioctl.h>
 
 /*
  *  ======== WCD_CallDevIOCtl ========

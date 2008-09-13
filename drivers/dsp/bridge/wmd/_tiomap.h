@@ -46,12 +46,12 @@
 #ifndef _TIOMAP_
 #define _TIOMAP_
 
-#include <devdefs.h>
+#include <dspbridge/devdefs.h>
 #include <hw_defs.h>
 #include <hw_mbox.h>
-#include <wmdioctl.h>		/* for WMDIOCTL_EXTPROC defn */
-#include "sync.h"
-#include "clk.h"
+#include <dspbridge/wmdioctl.h>		/* for WMDIOCTL_EXTPROC defn */
+#include <dspbridge/sync.h>
+#include <dspbridge/clk.h>
 
 struct MAP_L4PERIPHERAL {
 	u32 physAddr;

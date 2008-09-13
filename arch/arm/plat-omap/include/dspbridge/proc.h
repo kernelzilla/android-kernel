@@ -62,8 +62,8 @@
 #ifndef PROC_
 #define PROC_
 
-#include <cfgdefs.h>
-#include <devdefs.h>
+#include <dspbridge/cfgdefs.h>
+#include <dspbridge/devdefs.h>
 
 /*
  *  ======== PROC_Attach ========

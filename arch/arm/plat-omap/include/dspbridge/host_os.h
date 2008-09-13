@@ -53,7 +53,7 @@
 #include <linux/vmalloc.h>
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
-#include <dbtype.h>
+#include <dspbridge/dbtype.h>
 
 #if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3430)
 #include <mach/clock.h>

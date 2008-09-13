@@ -52,20 +52,20 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- This */
-#include <mem.h>
-#include <list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/list.h>
 
 /*  ----------------------------------- Defines */
 #define MEM_512MB   0x1fffffff

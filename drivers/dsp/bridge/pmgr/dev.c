@@ -84,7 +84,7 @@
  *! 06-Oct-2000 rr: DEV_Destroy2 and DEV_Create2 added.
  *! 02-Oct-2000 rr: DEV_GetNodeManager added.
  *! 11-Aug-2000 ag: Added DEV_GetCmmMgr(), CMM_Init() & CMM_Exit().
- *!                 Removed <std.h> & <stdwin.h>, added <dbtype.h>
+ *!                 Removed <dspbridge/std.h> & <stdwin.h>, added <dspbridge/dbtype.h>
  *! 10-Aug-2000 rr: DEV_InsertProcObject/RemoveProcObject added.
  *!                 DEV_Cleanup calls PROC_Detach if it is a matching process.
  *! 27-Jul-2000 rr: DEV is in new directoy DEV and produces devlib.lib
@@ -113,46 +113,46 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <ldr.h>
-#include <list.h>
-#include <mem.h>
-#include <util.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/ldr.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <cod.h>
-#include <drv.h>
-#include <proc.h>
-#include <dmm.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/dmm.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <mgr.h>
-#include <node.h>
+#include <dspbridge/mgr.h>
+#include <dspbridge/node.h>
 
 /*  ----------------------------------- Others */
-#include <dbreg.h>
-#include <wcd.h>		/* WCD version info. */
+#include <dspbridge/dbreg.h>
+#include <dspbridge/wcd.h>		/* WCD version info. */
 
-#include <chnl.h>
-#include <io.h>
-#include <msg.h>
-#include <cmm.h>
+#include <dspbridge/chnl.h>
+#include <dspbridge/io.h>
+#include <dspbridge/msg.h>
+#include <dspbridge/cmm.h>
 
 /*  ----------------------------------- This */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 

@@ -48,18 +48,18 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- This */
-#include <list.h>
+#include <dspbridge/list.h>
 
 /*  ----------------------------------- Globals */
 #if GT_TRACE

@@ -33,8 +33,8 @@
 #ifndef IOOBJ_
 #define IOOBJ_
 
-#include <devdefs.h>
-#include <wmd.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/wmd.h>
 
 /*
  *  This struct is the first field in a IO_MGR struct, as implemented in

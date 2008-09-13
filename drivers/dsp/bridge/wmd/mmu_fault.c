@@ -32,22 +32,22 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <host_os.h>
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/host_os.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <dpc.h>
-#include <mem.h>
-#include <drv.h>
+#include <dspbridge/dpc.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/drv.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmddeh.h>
+#include <dspbridge/wmddeh.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
@@ -55,7 +55,7 @@
 
 /*  ----------------------------------- This */
 #include "_deh.h"
-#include <cfg.h>
+#include <dspbridge/cfg.h>
 #include "_tiomap_mmu.h"
 #include "_tiomap.h"
 #include "mmu_fault.h"

@@ -66,10 +66,10 @@
 #ifndef WCDIOCTL_
 #define WCDIOCTL_
 
-#include <mem.h>
-#include <cmm.h>
-#include <strmdefs.h>
-#include <dbdcd.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/cmm.h>
+#include <dspbridge/strmdefs.h>
+#include <dspbridge/dbdcd.h>
 
 union Trapped_Args {
 

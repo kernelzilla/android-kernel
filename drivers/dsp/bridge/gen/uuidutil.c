@@ -33,17 +33,17 @@
  */
 
 /*  ----------------------------------- Host OS  */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
+#include <dspbridge/dbc.h>
 
 /*  ----------------------------------- This */
-#include <uuidutil.h>
+#include <dspbridge/uuidutil.h>
 
 /*
  *  ======== UUID_UuidToString ========

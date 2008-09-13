@@ -47,7 +47,7 @@
 #ifndef MGR_
 #define MGR_
 
-#include <mgrpriv.h>
+#include <dspbridge/mgrpriv.h>
 
 #define MAX_EVENTS 32
 

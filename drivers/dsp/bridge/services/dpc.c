@@ -45,22 +45,22 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- This */
-#include <dpc.h>
+#include <dspbridge/dpc.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define SIGNATURE       0x5f435044	/* "DPC_" (in reverse). */

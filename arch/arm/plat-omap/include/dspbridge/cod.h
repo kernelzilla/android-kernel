@@ -71,7 +71,7 @@
 #ifndef COD_
 #define COD_
 
-#include <dblldefs.h>
+#include <dspbridge/dblldefs.h>
 
 #define COD_MAXPATHLENGTH       255
 #define COD_TRACEBEG            "SYS_PUTCBEG"

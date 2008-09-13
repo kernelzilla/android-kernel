@@ -36,25 +36,25 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <mem.h>
-#include <kfile.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/kfile.h>
 
 /*  ----------------------------------- This */
-#include <dbof.h>
-#include <dbl.h>
+#include <dspbridge/dbof.h>
+#include <dspbridge/dbl.h>
 
 #define DBL_TARGSIGNATURE      0x544c4244	/* "TLBD" */
 #define DBL_LIBSIGNATURE       0x4c4c4244	/* "LLBD" */

@@ -61,9 +61,9 @@
 #ifndef DRV_
 #define DRV_
 
-#include <devdefs.h>
+#include <dspbridge/devdefs.h>
 
-#include <drvdefs.h>
+#include <dspbridge/drvdefs.h>
 
 #define DRV_ASSIGN     1
 #define DRV_RELEASE    0

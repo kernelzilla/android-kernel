@@ -29,8 +29,8 @@
 #ifndef NLDRDEFS_
 #define NLDRDEFS_
 
-#include <dbdcddef.h>
-#include <devdefs.h>
+#include <dspbridge/dbdcddef.h>
+#include <dspbridge/devdefs.h>
 
 #define NLDR_MAXPATHLENGTH       255
 /* NLDR Objects: */

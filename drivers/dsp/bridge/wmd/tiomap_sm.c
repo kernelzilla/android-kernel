@@ -37,26 +37,26 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbg.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <drv.h>
-#include <util.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/util.h>
 
 /*  ----------------------------------- Mini Driver */
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <wcd.h>
-#include <dev.h>
+#include <dspbridge/wcd.h>
+#include <dspbridge/dev.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
@@ -64,7 +64,7 @@
 
 /*  ----------------------------------- This */
 #include "_tiomap.h"
-#include <chnl_sm.h>
+#include <dspbridge/chnl_sm.h>
 #include "_tiomap_pwr.h"
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM

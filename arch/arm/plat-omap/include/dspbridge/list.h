@@ -50,7 +50,7 @@
 #ifndef LIST_
 #define LIST_
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 #define LST_IsEmpty(l)      (((l)->head.next == &(l)->head))
 

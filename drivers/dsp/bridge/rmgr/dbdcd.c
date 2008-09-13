@@ -62,29 +62,29 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <mem.h>
-#include <reg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/reg.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <cod.h>
+#include <dspbridge/cod.h>
 
 /*  ----------------------------------- Others */
-#include <uuidutil.h>
+#include <dspbridge/uuidutil.h>
 
 /*  ----------------------------------- This */
-#include <dbdcd.h>
+#include <dspbridge/dbdcd.h>
 
 /*  ----------------------------------- Global defines. */
 #define SIGNATURE       0x5f444344	/* "DCD_" (in reverse). */

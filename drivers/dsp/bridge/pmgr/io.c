@@ -38,28 +38,28 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <mem.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- This */
 #include <ioobj.h>
-#include <iodefs.h>
-#include <io.h>
+#include <dspbridge/iodefs.h>
+#include <dspbridge/io.h>
 
 /*  ----------------------------------- Globals */
 static u32 cRefs;

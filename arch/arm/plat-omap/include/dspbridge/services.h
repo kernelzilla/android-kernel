@@ -32,7 +32,7 @@
 #ifndef SERVICES_
 #define SERVICES_
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 /*
  *  ======== SERVICES_Exit ========
  *  Purpose:

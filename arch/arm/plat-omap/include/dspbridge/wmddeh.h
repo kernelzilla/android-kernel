@@ -41,9 +41,9 @@
 #ifndef WMDDEH_
 #define WMDDEH_
 
-#include <devdefs.h>
+#include <dspbridge/devdefs.h>
 
-#include <dehdefs.h>
+#include <dspbridge/dehdefs.h>
 
 	extern DSP_STATUS WMD_DEH_Create(OUT struct DEH_MGR **phDehMgr,
 					 struct DEV_OBJECT *hDevObject);

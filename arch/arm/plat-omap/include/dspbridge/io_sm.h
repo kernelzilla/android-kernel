@@ -52,10 +52,10 @@
 #ifndef IOSM_
 #define IOSM_
 
-#include <_chnl_sm.h>
-#include <host_os.h>
+#include <dspbridge/_chnl_sm.h>
+#include <dspbridge/host_os.h>
 
-#include <iodefs.h>
+#include <dspbridge/iodefs.h>
 
 #define IO_INPUT            0
 #define IO_OUTPUT           1

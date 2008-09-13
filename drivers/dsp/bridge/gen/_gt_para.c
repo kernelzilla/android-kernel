@@ -35,13 +35,13 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
+#include <dspbridge/std.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <gt.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- Function Prototypes */
 static void error(char *msg, ...);

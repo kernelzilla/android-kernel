@@ -67,10 +67,10 @@
 #ifndef CMM_
 #define CMM_
 
-#include <devdefs.h>
+#include <dspbridge/devdefs.h>
 
-#include <cmmdefs.h>
-#include <host_os.h>
+#include <dspbridge/cmmdefs.h>
+#include <dspbridge/host_os.h>
 
 /*
  *  ======== CMM_CallocBuf ========

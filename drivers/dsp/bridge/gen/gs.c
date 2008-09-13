@@ -30,14 +30,14 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
 #include <linux/types.h>
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- This */
-#include <gs.h>
+#include <dspbridge/gs.h>
 
 /*  ----------------------------------- Globals */
 static u32 cumsize;

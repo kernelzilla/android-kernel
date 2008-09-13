@@ -28,9 +28,9 @@
 #ifndef _DEH_
 #define _DEH_
 
-#include <dpc.h>
-#include <ntfy.h>
-#include <wmd.h>
+#include <dspbridge/dpc.h>
+#include <dspbridge/ntfy.h>
+#include <dspbridge/wmd.h>
 
 #define SIGNATURE       0x5f484544	/* "DEH_" backwards */
 

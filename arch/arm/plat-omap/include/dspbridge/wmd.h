@@ -62,13 +62,13 @@
 #ifndef WMD_
 #define WMD_
 
-#include <brddefs.h>
-#include <cfgdefs.h>
-#include <chnlpriv.h>
-#include <dehdefs.h>
-#include <devdefs.h>
-#include <iodefs.h>
-#include <msgdefs.h>
+#include <dspbridge/brddefs.h>
+#include <dspbridge/cfgdefs.h>
+#include <dspbridge/chnlpriv.h>
+#include <dspbridge/dehdefs.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/iodefs.h>
+#include <dspbridge/msgdefs.h>
 
 /*
  *  Any IOCTLS at or above this value are reserved for standard WMD

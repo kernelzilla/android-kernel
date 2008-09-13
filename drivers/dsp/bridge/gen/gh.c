@@ -19,13 +19,13 @@
  *  ======== gh.c ========
  */
 
-#include <std.h>
+#include <dspbridge/std.h>
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
-#include <gs.h>
+#include <dspbridge/gs.h>
 
-#include <gh.h>
+#include <dspbridge/gh.h>
 
 struct Elem {
 	struct Elem *next;

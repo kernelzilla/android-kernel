@@ -92,50 +92,50 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <mem.h>
-#include <ntfy.h>
-#include <services.h>
-#include <util.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/ntfy.h>
+#include <dspbridge/services.h>
+#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <chnl.h>
-#include <dev.h>
-#include <drv.h>
+#include <dspbridge/chnl.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/drv.h>
 
-#include <proc.h>
-#include <strm.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/strm.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <disp.h>
-#include <mgr.h>
-#include <node.h>
-#include <rmm.h>
+#include <dspbridge/disp.h>
+#include <dspbridge/mgr.h>
+#include <dspbridge/node.h>
+#include <dspbridge/rmm.h>
 
 
 /*  ----------------------------------- Others */
-#include <msg.h>
-#include <cmm.h>
-#include <io.h>
+#include <dspbridge/msg.h>
+#include <dspbridge/cmm.h>
+#include <dspbridge/io.h>
 
 /*  ----------------------------------- This */
-#include <_dcd.h>
-#include <dbdcd.h>
+#include <dspbridge/_dcd.h>
+#include <dspbridge/dbdcd.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <resourcecleanup.h>
+#include <dspbridge/resourcecleanup.h>
 #endif
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */

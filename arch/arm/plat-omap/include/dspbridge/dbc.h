@@ -32,7 +32,7 @@
  *
  *! Revision History:
  *! ================
- *! 11-Aug-2000 ag: Removed include <std.h>
+ *! 11-Aug-2000 ag: Removed include <dspbridge/std.h>
  *! 22-Apr-1996 gp: Created.
  */
 
@@ -46,7 +46,7 @@
 /* Assertion Macros: */
 #if GT_TRACE
 
-#include <gt.h>
+#include <dspbridge/gt.h>
 
 #define DBC_Assert(exp) \
     if (!(exp)) \

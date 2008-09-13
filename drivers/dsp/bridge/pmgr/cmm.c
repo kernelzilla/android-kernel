@@ -94,27 +94,27 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <errbase.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/errbase.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <list.h>
-#include <mem.h>
-#include <sync.h>
-#include <util.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
+#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
-#include <proc.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/proc.h>
 
 /*  ----------------------------------- This */
-#include <cmm.h>
+#include <dspbridge/cmm.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 /* Object signatures */

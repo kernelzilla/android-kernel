@@ -26,7 +26,7 @@
 #define GB_
 
 #define GB_NOBITS (~0)
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 typedef s32 GB_BitNum;
 struct GB_TMap;
 

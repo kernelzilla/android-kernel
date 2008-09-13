@@ -56,9 +56,9 @@
 #ifndef STRM_
 #define STRM_
 
-#include <dev.h>
+#include <dspbridge/dev.h>
 
-#include <strmdefs.h>
+#include <dspbridge/strmdefs.h>
 
 /*
  *  ======== STRM_AllocateBuffer ========

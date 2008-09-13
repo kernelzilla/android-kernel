@@ -51,18 +51,18 @@
  */
 
 /* ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- This */
-#include <csl.h>
+#include <dspbridge/csl.h>
 
 /* Is character c in the string pstrDelim? */
 #define IsDelimiter(c, pstrDelim) ((c != '\0') && \

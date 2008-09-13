@@ -41,9 +41,9 @@
 #ifndef DBDCD_
 #define DBDCD_
 
-#include <dbdcddef.h>
-#include <host_os.h>
-#include <nldrdefs.h>
+#include <dspbridge/dbdcddef.h>
+#include <dspbridge/host_os.h>
+#include <dspbridge/nldrdefs.h>
 
 /*
  *  ======== DCD_AutoRegister ========

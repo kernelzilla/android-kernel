@@ -52,20 +52,20 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <list.h>
-#include <mem.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- This */
-#include <rmm.h>
+#include <dspbridge/rmm.h>
 
 #define RMM_TARGSIGNATURE   0x544d4d52	/* "TMMR" */
 

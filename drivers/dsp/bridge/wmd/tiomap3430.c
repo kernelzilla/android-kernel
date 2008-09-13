@@ -27,26 +27,26 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
-#include <util.h>
-#include <reg.h>
-#include <dbreg.h>
-#include <cfg.h>
-#include <drv.h>
-#include <csl.h>
-#include <sync.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/util.h>
+#include <dspbridge/reg.h>
+#include <dspbridge/dbreg.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/sync.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
@@ -56,19 +56,19 @@
 #include <hw_mbox.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmd.h>
-#include <wmdchnl.h>
-#include <wmddeh.h>
-#include <wmdio.h>
-#include <wmdmsg.h>
-#include <pwr.h>
-#include <chnl_sm.h>
-#include <io_sm.h>
+#include <dspbridge/wmd.h>
+#include <dspbridge/wmdchnl.h>
+#include <dspbridge/wmddeh.h>
+#include <dspbridge/wmdio.h>
+#include <dspbridge/wmdmsg.h>
+#include <dspbridge/pwr.h>
+#include <dspbridge/chnl_sm.h>
+#include <dspbridge/io_sm.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
-#include <wcd.h>
-#include <dmm.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/wcd.h>
+#include <dspbridge/dmm.h>
 
 /*  ----------------------------------- Local */
 #include "_tiomap.h"

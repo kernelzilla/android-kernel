@@ -62,37 +62,37 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
-#include <sync.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Mini Driver */
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <nodepriv.h>
+#include <dspbridge/nodepriv.h>
 
 /*  ----------------------------------- Others */
-#include <cmm.h>
+#include <dspbridge/cmm.h>
 
 /*  ----------------------------------- This */
-#include <strm.h>
+#include <dspbridge/strm.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <cfg.h>
-#include <dbreg.h>
-#include <resourcecleanup.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/dbreg.h>
+#include <dspbridge/resourcecleanup.h>
 #endif
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */

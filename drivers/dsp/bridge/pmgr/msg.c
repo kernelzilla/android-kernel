@@ -36,30 +36,30 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <list.h>
-#include <mem.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- Mini Driver */
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- This */
 #include <msgobj.h>
-#include <msg.h>
+#include <dspbridge/msg.h>
 
 /*  ----------------------------------- Globals */
 #if GT_TRACE

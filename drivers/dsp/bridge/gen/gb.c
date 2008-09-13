@@ -30,11 +30,11 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
+#include <dspbridge/std.h>
 #include <linux/types.h>
 /*  ----------------------------------- This */
-#include <gs.h>
-#include <gb.h>
+#include <dspbridge/gs.h>
+#include <dspbridge/gb.h>
 
 typedef GB_BitNum GB_WordNum;
 

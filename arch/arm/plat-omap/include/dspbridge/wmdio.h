@@ -35,8 +35,8 @@
 #ifndef WMDIO_
 #define WMDIO_
 
-#include <devdefs.h>
-#include <iodefs.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/iodefs.h>
 
 	extern DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 					struct DEV_OBJECT *hDevObject,

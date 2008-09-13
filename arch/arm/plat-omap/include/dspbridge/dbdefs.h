@@ -70,9 +70,9 @@
 
 #include <linux/types.h>
 
-#include <dbtype.h>		/* GPP side type definitions           */
-#include <std.h>		/* DSP/BIOS type definitions           */
-#include <rms_sh.h>		/* Types shared between GPP and DSP    */
+#include <dspbridge/dbtype.h>		/* GPP side type definitions           */
+#include <dspbridge/std.h>		/* DSP/BIOS type definitions           */
+#include <dspbridge/rms_sh.h>		/* Types shared between GPP and DSP    */
 
 #define PG_SIZE_4K 4096
 #define PG_MASK(pg_size) (~((pg_size)-1))

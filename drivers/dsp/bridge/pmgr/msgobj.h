@@ -33,9 +33,9 @@
 #ifndef MSGOBJ_
 #define MSGOBJ_
 
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
-#include <msgdefs.h>
+#include <dspbridge/msgdefs.h>
 
 /*
  *  This struct is the first field in a MSG_MGR struct, as implemented in

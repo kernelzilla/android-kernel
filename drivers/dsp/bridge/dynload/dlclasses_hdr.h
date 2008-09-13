@@ -31,7 +31,7 @@
  *****************************************************************************
  *****************************************************************************/
 
-#include "dynamic_loader.h"
+#include <dspbridge/dynamic_loader.h>
 
 #include "DLstream.h"
 #include "DLsymtab.h"

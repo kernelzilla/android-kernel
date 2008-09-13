@@ -33,7 +33,7 @@
 /*
  *  DSP-side definitions.
  */
-#include <std.h>
+#include <dspbridge/std.h>
 typedef u32 RMS_WORD;
 typedef char RMS_CHAR;
 

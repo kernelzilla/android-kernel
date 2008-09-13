@@ -39,7 +39,7 @@
 
 #ifndef DBG_
 #define DBG_
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 #include <linux/types.h>
 
 /* Levels of trace debug messages: */

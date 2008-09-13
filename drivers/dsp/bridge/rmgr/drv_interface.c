@@ -46,7 +46,7 @@
 
 /*  ----------------------------------- Host OS */
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 
@@ -70,42 +70,42 @@
 #endif
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <gt.h>
-#include <dbc.h>
+#include <dspbridge/gt.h>
+#include <dspbridge/dbc.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <services.h>
-#include <sync.h>
-#include <reg.h>
-#include <csl.h>
+#include <dspbridge/services.h>
+#include <dspbridge/sync.h>
+#include <dspbridge/reg.h>
+#include <dspbridge/csl.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <wcdioctl.h>
-#include <_dcd.h>
-#include <dspdrv.h>
-#include <dbreg.h>
+#include <dspbridge/wcdioctl.h>
+#include <dspbridge/_dcd.h>
+#include <dspbridge/dspdrv.h>
+#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <pwr.h>
+#include <dspbridge/pwr.h>
 
 /*  ----------------------------------- This */
 #include <drv_interface.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <cfg.h>
-#include <resourcecleanup.h>
-#include <chnl.h>
-#include <proc.h>
-#include <cfg.h>
-#include <dev.h>
-#include <drvdefs.h>
-#include <drv.h>
-#include <dbreg.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/resourcecleanup.h>
+#include <dspbridge/chnl.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/drvdefs.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/dbreg.h>
 #endif
 
 #ifndef DISABLE_BRIDGE_PM

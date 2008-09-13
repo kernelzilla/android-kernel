@@ -73,24 +73,24 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <reg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/reg.h>
 
 /*  ----------------------------------- Others */
-#include <dbreg.h>
+#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- This */
-#include <cfg.h>
-#include <list.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/list.h>
 
 struct DRV_EXT {
 	struct LST_ELEM link;

@@ -53,7 +53,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 
-#include <utildefs.h>
+#include <dspbridge/utildefs.h>
 
 /*
  *  ======== UTIL_CDTestDll ========

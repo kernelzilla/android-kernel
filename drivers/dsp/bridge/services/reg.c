@@ -34,26 +34,26 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <mem.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- Others */
-#include <dbreg.h>
+#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- This */
-#include <reg.h>
+#include <dspbridge/reg.h>
 #include <regsup.h>
 
 #if GT_TRACE

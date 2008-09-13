@@ -40,25 +40,25 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <list.h>
-#include <mem.h>
-#include <sync.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- This */
-#include <ntfy.h>
+#include <dspbridge/ntfy.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define NTFY_SIGNATURE      0x5946544e	/* "YFTN" */

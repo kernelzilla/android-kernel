@@ -55,12 +55,12 @@
 #ifndef _CHNL_SM_
 #define _CHNL_SM_
 
-#include <wcd.h>
-#include <wmd.h>
-#include <dpc.h>
+#include <dspbridge/wcd.h>
+#include <dspbridge/wmd.h>
+#include <dspbridge/dpc.h>
 
-#include <list.h>
-#include <ntfy.h>
+#include <dspbridge/list.h>
+#include <dspbridge/ntfy.h>
 
 /*
  *  These target side symbols define the beginning and ending addresses

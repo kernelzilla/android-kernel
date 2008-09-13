@@ -37,7 +37,7 @@
 #ifndef WMDMSG_
 #define WMDMSG_
 
-#include <msgdefs.h>
+#include <dspbridge/msgdefs.h>
 
 	extern DSP_STATUS WMD_MSG_Create(OUT struct MSG_MGR **phMsgMgr,
 					 struct DEV_OBJECT *hDevObject,

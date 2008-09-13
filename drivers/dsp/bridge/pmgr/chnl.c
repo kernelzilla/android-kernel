@@ -63,35 +63,35 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <csl.h>
-#include <dpc.h>
-#include <list.h>
-#include <mem.h>
-#include <sync.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/dpc.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <proc.h>
-#include <dev.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- Others */
-#include <chnlpriv.h>
+#include <dspbridge/chnlpriv.h>
 #include <chnlobj.h>
 
 /*  ----------------------------------- This */
-#include <chnl.h>
+#include <dspbridge/chnl.h>
 
 /*  ----------------------------------- Globals */
 static u32 cRefs;

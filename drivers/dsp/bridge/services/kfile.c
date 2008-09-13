@@ -42,23 +42,23 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <mem.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- This */
-#include <kfile.h>
+#include <dspbridge/kfile.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define SIGNATURE           0x4c49464b	/* hex code of KFIL (reversed) */

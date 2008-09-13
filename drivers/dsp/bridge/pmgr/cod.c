@@ -56,29 +56,29 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <kfile.h>
-#include <ldr.h>
-#include <mem.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/kfile.h>
+#include <dspbridge/ldr.h>
+#include <dspbridge/mem.h>
 
 /*  ----------------------------------- Platform Manager */
 /* Include appropriate loader header file */
-#include <dbll.h>
+#include <dspbridge/dbll.h>
 
 /*  ----------------------------------- This */
-#include <cod.h>
+#include <dspbridge/cod.h>
 
 /* magic number for handle validation */
 #define MAGIC	 0xc001beef

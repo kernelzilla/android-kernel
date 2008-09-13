@@ -48,7 +48,7 @@
 #ifndef RMS_SH_
 #define RMS_SH_
 
-#include <rmstypes.h>
+#include <dspbridge/rmstypes.h>
 
 /* Node Types: */
 #define RMS_TASK                1	/* Task node */

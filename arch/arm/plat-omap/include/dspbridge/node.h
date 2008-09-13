@@ -63,11 +63,11 @@
 #ifndef NODE_
 #define NODE_
 
-#include <procpriv.h>
+#include <dspbridge/procpriv.h>
 
-#include <nodedefs.h>
-#include <dispdefs.h>
-#include <nldrdefs.h>
+#include <dspbridge/nodedefs.h>
+#include <dspbridge/dispdefs.h>
+#include <dspbridge/nldrdefs.h>
 
 /*
  *  ======== NODE_Allocate ========

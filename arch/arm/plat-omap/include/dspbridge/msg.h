@@ -39,8 +39,8 @@
 #ifndef MSG_
 #define MSG_
 
-#include <devdefs.h>
-#include <msgdefs.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/msgdefs.h>
 
 /*
  *  ======== MSG_Create ========

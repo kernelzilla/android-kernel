@@ -35,7 +35,7 @@
 #ifndef CMMDEFS_
 #define CMMDEFS_
 
-#include <list.h>
+#include <dspbridge/list.h>
 
 /* Cmm attributes used in CMM_Create() */
 	struct CMM_MGRATTRS {

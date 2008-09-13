@@ -36,10 +36,10 @@
 #ifndef IO_
 #define IO_
 
-#include <cfgdefs.h>
-#include <devdefs.h>
+#include <dspbridge/cfgdefs.h>
+#include <dspbridge/devdefs.h>
 
-#include <iodefs.h>
+#include <dspbridge/iodefs.h>
 
 /*
  *  ======== IO_Create ========

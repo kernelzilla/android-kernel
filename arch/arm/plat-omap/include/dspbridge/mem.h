@@ -68,8 +68,8 @@
 #ifndef MEM_
 #define MEM_
 
-#include <host_os.h>
-#include <memdefs.h>
+#include <dspbridge/host_os.h>
+#include <dspbridge/memdefs.h>
 
 /*
  *  ======== MEM_Alloc ========

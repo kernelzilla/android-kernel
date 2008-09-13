@@ -31,8 +31,8 @@
 #ifndef DBL_
 #define DBL_
 
-#include <dbdefs.h>
-#include <dbldefs.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/dbldefs.h>
 
 /*
  *  ======== DBL_close ========

@@ -36,9 +36,9 @@
 #ifndef PWR_
 #define PWR_
 
-#include <dbdefs.h>
-#include <errbase.h>
-#include <pwr_sh.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
+#include <dspbridge/pwr_sh.h>
 
 /*
  *  ======== PWR_SleepDSP ========

@@ -42,8 +42,8 @@
 #ifndef DBDCDDEF_
 #define DBDCDDEF_
 
-#include <dbdefs.h>
-#include <mgrpriv.h>		/* for MGR_PROCESSOREXTINFO */
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/mgrpriv.h>		/* for MGR_PROCESSOREXTINFO */
 
 /*
  *  The following defines are critical elements for the DCD module:

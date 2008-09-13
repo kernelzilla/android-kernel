@@ -29,10 +29,10 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
+#include <dspbridge/std.h>
 
 /*  ----------------------------------- This */
-#include <gt.h>
+#include <dspbridge/gt.h>
 
 #define GT_WILD	'*'
 

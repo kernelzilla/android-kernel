@@ -35,8 +35,8 @@
 #ifndef _MSG_SM_
 #define _MSG_SM_
 
-#include <list.h>
-#include <msgdefs.h>
+#include <dspbridge/list.h>
+#include <dspbridge/msgdefs.h>
 
 /*
  *  These target side symbols define the beginning and ending addresses

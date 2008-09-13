@@ -47,37 +47,37 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <gt.h>
-#include <dbc.h>
+#include <dspbridge/gt.h>
+#include <dspbridge/dbc.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <dev.h>
-#include <mem.h>
-#include <sync.h>
-#include <csl.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
+#include <dspbridge/csl.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
-#include <chnldefs.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/chnldefs.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <nodedefs.h>
-#include <nodepriv.h>
-#include <rms_sh.h>
+#include <dspbridge/nodedefs.h>
+#include <dspbridge/nodepriv.h>
+#include <dspbridge/rms_sh.h>
 
 /*  ----------------------------------- This */
-#include <disp.h>
+#include <dspbridge/disp.h>
 
 #define DISP_SIGNATURE       0x50534944	/* "PSID" */
 

@@ -30,21 +30,21 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
-#include <drv.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/drv.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
-#include <util.h>
-#include <cfg.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/util.h>
+#include <dspbridge/cfg.h>
 
 /*  ----------------------------------- specific to this file */
 #include "_tiomap.h"

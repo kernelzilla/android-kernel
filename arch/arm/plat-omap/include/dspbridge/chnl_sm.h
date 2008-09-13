@@ -50,7 +50,7 @@
 #ifndef CHNLSM_
 #define CHNLSM_
 
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*
  *  ======== CHNLSM_DisableInterrupt ========

@@ -43,27 +43,27 @@
  */
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
+#include <dspbridge/dbc.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <list.h>
-#include <mem.h>
-#include <sync.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- Others */
-#include <io_sm.h>
+#include <dspbridge/io_sm.h>
 
 /*  ----------------------------------- This */
 #include <_msg_sm.h>
-#include <wmdmsg.h>
+#include <dspbridge/wmdmsg.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define MSGQ_SIGNATURE      0x5147534d	/* "QGSM" */

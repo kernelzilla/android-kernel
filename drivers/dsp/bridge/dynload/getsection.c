@@ -16,7 +16,7 @@
 
 
 
-#include "getsection.h"
+#include <dspbridge/getsection.h>
 #include "header.h"
 
 /*

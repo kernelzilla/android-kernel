@@ -32,7 +32,7 @@
 #ifndef DMM_
 #define DMM_
 
-#include <dbdefs.h>
+#include <dspbridge/dbdefs.h>
 
 	struct DMM_OBJECT;
 

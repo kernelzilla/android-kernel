@@ -94,62 +94,62 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <csl.h>
-#include <list.h>
-#include <mem.h>
-#include <proc.h>
-#include <strm.h>
-#include <sync.h>
-#include <ntfy.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/strm.h>
+#include <dspbridge/sync.h>
+#include <dspbridge/ntfy.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <cmm.h>
-#include <cod.h>
-#include <dev.h>
-#include <msg.h>
+#include <dspbridge/cmm.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/msg.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <dbdcd.h>
-#include <disp.h>
-#include <rms_sh.h>
+#include <dspbridge/dbdcd.h>
+#include <dspbridge/disp.h>
+#include <dspbridge/rms_sh.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmd.h>
-#include <wmdioctl.h>
+#include <dspbridge/wmd.h>
+#include <dspbridge/wmdioctl.h>
 
 /*  ----------------------------------- Others */
-#include <gb.h>
+#include <dspbridge/gb.h>
 #ifdef DEBUG
-#include <uuidutil.h>
-#include <dbg.h>
+#include <dspbridge/uuidutil.h>
+#include <dspbridge/dbg.h>
 #endif
 
 /*  ----------------------------------- This */
-#include <nodepriv.h>
-#include <node.h>
+#include <dspbridge/nodepriv.h>
+#include <dspbridge/node.h>
 
 /* Static/Dynamic Loader includes */
-#include <dbll.h>
-#include <nldr.h>
+#include <dspbridge/dbll.h>
+#include <dspbridge/nldr.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <drv.h>
-#include <drvdefs.h>
-#include <dbreg.h>
-#include <resourcecleanup.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/drvdefs.h>
+#include <dspbridge/dbreg.h>
+#include <dspbridge/resourcecleanup.h>
 #endif
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM

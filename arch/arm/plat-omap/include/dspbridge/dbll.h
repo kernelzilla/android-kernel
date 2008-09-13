@@ -29,8 +29,8 @@
 #ifndef DBLL_
 #define DBLL_
 
-#include <dbdefs.h>
-#include <dblldefs.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/dblldefs.h>
 
 	extern void DBLL_close(struct DBLL_LibraryObj *lib);
 	extern DSP_STATUS DBLL_create(struct DBLL_TarObj **pTarget,

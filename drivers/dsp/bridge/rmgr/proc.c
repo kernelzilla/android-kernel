@@ -101,52 +101,52 @@
  */
 
 /* ------------------------------------ Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <csl.h>
-#include <list.h>
-#include <mem.h>
-#include <ntfy.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/list.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/ntfy.h>
 
 /*  ----------------------------------- Mini Driver */
-#include <wmd.h>
+#include <dspbridge/wmd.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <cod.h>
-#include <dev.h>
-#include <drv.h>
-#include <procpriv.h>
-#include <dmm.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/drv.h>
+#include <dspbridge/procpriv.h>
+#include <dspbridge/dmm.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <mgr.h>
-#include <node.h>
-#include <nldr.h>
-#include <rmm.h>
+#include <dspbridge/mgr.h>
+#include <dspbridge/node.h>
+#include <dspbridge/nldr.h>
+#include <dspbridge/rmm.h>
 
 /*  ----------------------------------- Others */
-#include <dbdcd.h>
-#include <dbreg.h>
-#include <msg.h>
-#include <wmdioctl.h>
+#include <dspbridge/dbdcd.h>
+#include <dspbridge/dbreg.h>
+#include <dspbridge/msg.h>
+#include <dspbridge/wmdioctl.h>
 
 /*  ----------------------------------- This */
-#include <proc.h>
-#include <pwr.h>
+#include <dspbridge/proc.h>
+#include <dspbridge/pwr.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <resourcecleanup.h>
+#include <dspbridge/resourcecleanup.h>
 #endif
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS

@@ -35,8 +35,8 @@
 #ifndef CHNLOBJ_
 #define CHNLOBJ_
 
-#include <chnldefs.h>
-#include <wmd.h>
+#include <dspbridge/chnldefs.h>
+#include <dspbridge/wmd.h>
 
 /* Object validateion macros: */
 #define CHNL_IsValidMgr(h) \

@@ -110,7 +110,7 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
 #ifndef CONFIG_OMAP3_PM
@@ -122,50 +122,50 @@
 #endif
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <cfg.h>
-#include <dpc.h>
-#include <mem.h>
-#include <ntfy.h>
-#include <sync.h>
-#include <reg.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/dpc.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/ntfy.h>
+#include <dspbridge/sync.h>
+#include <dspbridge/reg.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
 #include <hw_mmu.h>
 
 /*  ----------------------------------- Mini Driver */
-#include <wmddeh.h>
-#include <wmdio.h>
-#include <wmdioctl.h>
+#include <dspbridge/wmddeh.h>
+#include <dspbridge/wmdio.h>
+#include <dspbridge/wmdioctl.h>
 #include <_tiomap.h>
 #include <tiomap_io.h>
 #include <_tiomap_pwr.h>
 #include <tiomap_io.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <cod.h>
-#include <dev.h>
-#include <chnl_sm.h>
-#include <dbreg.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/chnl_sm.h>
+#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- Others */
-#include <rms_sh.h>
-#include <mgr.h>
+#include <dspbridge/rms_sh.h>
+#include <dspbridge/mgr.h>
 #include "_cmm.h"
 
 /*  ----------------------------------- This */
-#include <io_sm.h>
+#include <dspbridge/io_sm.h>
 #include "_msg_sm.h"
-#include <gt.h>
+#include <dspbridge/gt.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define OUTPUTNOTREADY  0xffff

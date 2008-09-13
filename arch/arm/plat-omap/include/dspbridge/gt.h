@@ -41,7 +41,7 @@
 #define GT_TRACE 0	    /* 0 = "trace compiled out"; 1 = "trace active" */
 #endif
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 #if !defined(GT_ASSERT) || GT_TRACE
 #define GT_ASSERT 1

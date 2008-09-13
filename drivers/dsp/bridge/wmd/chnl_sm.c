@@ -114,32 +114,32 @@
  */
 
 /*  ----------------------------------- OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <mem.h>
-#include <cfg.h>
-#include <csl.h>
-#include <sync.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Mini-Driver */
-#include <wmd.h>
-#include <wmdchnl.h>
+#include <dspbridge/wmd.h>
+#include <dspbridge/wmdchnl.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- Others */
-#include <io_sm.h>
+#include <dspbridge/io_sm.h>
 
 /*  ----------------------------------- Define for This */
 #define USERMODE_ADDR   PAGE_OFFSET

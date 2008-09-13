@@ -21,7 +21,7 @@
  *
  *! Revision History:
  *! ================
- *! 17-Dec-2001 ag: added #include <mbx_sh.h> for shared mailbox codes.
+ *! 17-Dec-2001 ag: added #include <dspbridge/mbx_sh.h> for shared mailbox codes.
  *! 10-Dec-2001 kc: added DEH error base value and error max value.
  *! 11-Sep-2001 kc: created.
  */
@@ -29,7 +29,7 @@
 #ifndef DEHDEFS_
 #define DEHDEFS_
 
-#include <mbx_sh.h>		/* shared mailbox codes */
+#include <dspbridge/mbx_sh.h>		/* shared mailbox codes */
 
 /* DEH object manager */
 	struct DEH_MGR;

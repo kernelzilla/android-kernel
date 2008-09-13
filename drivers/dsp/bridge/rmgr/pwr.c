@@ -32,20 +32,20 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- This */
-#include <pwr.h>
+#include <dspbridge/pwr.h>
 
 /*  ----------------------------------- Resource Manager */
-#include <devdefs.h>
-#include <drv.h>
+#include <dspbridge/devdefs.h>
+#include <dspbridge/drv.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
+#include <dspbridge/dev.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmdioctl.h>
+#include <dspbridge/wmdioctl.h>
 
 /*
  *  ======== PWR_SleepDSP ========

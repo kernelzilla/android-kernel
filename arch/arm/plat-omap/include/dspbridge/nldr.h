@@ -41,11 +41,11 @@
  *! 17-Apr-2002 jeh     Created.
  */
 
-#include <dbdefs.h>
-#include <dbdcddef.h>
-#include <dev.h>
-#include <rmm.h>
-#include <nldrdefs.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/dbdcddef.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/rmm.h>
+#include <dspbridge/nldrdefs.h>
 
 #ifndef NLDR_
 #define NLDR_

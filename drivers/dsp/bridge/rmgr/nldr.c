@@ -50,33 +50,33 @@
  *! 05-Aug-2002 jeh Created.
  */
 
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
-#include <dbc.h>
-#include <gt.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/gt.h>
 #ifdef DEBUG
-#include <dbg.h>
+#include <dspbridge/dbg.h>
 #endif
 
 /* OS adaptation layer */
-#include <csl.h>
-#include <mem.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/mem.h>
 
 /* Platform manager */
-#include <cod.h>
-#include <dev.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/dev.h>
 
 /* Resource manager */
-#include <dbll.h>
-#include <dbdcd.h>
-#include <rmm.h>
-#include <uuidutil.h>
+#include <dspbridge/dbll.h>
+#include <dspbridge/dbdcd.h>
+#include <dspbridge/rmm.h>
+#include <dspbridge/uuidutil.h>
 
-#include <nldr.h>
+#include <dspbridge/nldr.h>
 
 #define NLDR_SIGNATURE      0x52444c4e	/* "RDLN" */
 #define NLDR_NODESIGNATURE  0x4e444c4e	/* "NDLN" */

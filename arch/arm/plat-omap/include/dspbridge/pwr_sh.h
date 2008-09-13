@@ -27,7 +27,7 @@
 #ifndef PWR_SH_
 #define PWR_SH_
 
-#include <mbx_sh.h>
+#include <dspbridge/mbx_sh.h>
 
 /* valid sleep command codes that can be sent by GPP via mailbox: */
 #define PWR_DEEPSLEEP           MBX_PM_DSPIDLE

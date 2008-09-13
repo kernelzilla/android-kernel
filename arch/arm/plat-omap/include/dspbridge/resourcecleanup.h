@@ -16,8 +16,8 @@
 
 #ifndef RES_CLEANUP_DISABLE
 
-#include <nodepriv.h>
-#include <drv.h>
+#include <dspbridge/nodepriv.h>
+#include <dspbridge/drv.h>
 
 
 extern DSP_STATUS DRV_GetProcCtxtList(struct PROCESS_CONTEXT **pPctxt,

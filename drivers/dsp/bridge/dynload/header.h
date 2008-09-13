@@ -33,7 +33,7 @@ typedef unsigned int            uint_least32_t;
 typedef unsigned short int	uint_least16_t;
 
 #include "doff.h"
-#include "dynamic_loader.h"
+#include <dspbridge/dynamic_loader.h>
 #include "params.h"
 #include "dload_internal.h"
 #include "reloc_table.h"

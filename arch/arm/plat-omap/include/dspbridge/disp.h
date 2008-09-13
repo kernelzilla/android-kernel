@@ -46,10 +46,10 @@
 #ifndef DISP_
 #define DISP_
 
-#include <dbdefs.h>
-#include <nodedefs.h>
-#include <nodepriv.h>
-#include <dispdefs.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/nodedefs.h>
+#include <dspbridge/nodepriv.h>
+#include <dspbridge/dispdefs.h>
 
 /*
  *  ======== DISP_Create ========

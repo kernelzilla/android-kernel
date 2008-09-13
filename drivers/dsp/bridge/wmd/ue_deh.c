@@ -32,31 +32,31 @@
  */
 
 /*  ----------------------------------- Host OS */
-#include <host_os.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
-#include <std.h>
-#include <dbdefs.h>
-#include <errbase.h>
+#include <dspbridge/std.h>
+#include <dspbridge/dbdefs.h>
+#include <dspbridge/errbase.h>
 
 /*  ----------------------------------- Trace & Debug */
-#include <dbc.h>
-#include <dbg.h>
+#include <dspbridge/dbc.h>
+#include <dspbridge/dbg.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <csl.h>
-#include <cfg.h>
-#include <dpc.h>
-#include <mem.h>
-#include <ntfy.h>
-#include <drv.h>
+#include <dspbridge/csl.h>
+#include <dspbridge/cfg.h>
+#include <dspbridge/dpc.h>
+#include <dspbridge/mem.h>
+#include <dspbridge/ntfy.h>
+#include <dspbridge/drv.h>
 
 /*  ----------------------------------- Link Driver */
-#include <wmddeh.h>
+#include <dspbridge/wmddeh.h>
 
 /*  ----------------------------------- Platform Manager */
-#include <dev.h>
-#include <wcd.h>
+#include <dspbridge/dev.h>
+#include <dspbridge/wcd.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
@@ -68,7 +68,7 @@
 #include "_deh.h"
 #include "_tiomap_mmu.h"
 #include "_tiomap_pwr.h"
-#include <io_sm.h>
+#include <dspbridge/io_sm.h>
 
 static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN,
 					HW_ELEM_SIZE_16BIT,

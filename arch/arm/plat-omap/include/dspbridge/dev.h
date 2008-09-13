@@ -80,18 +80,18 @@
 #define DEV_
 
 /*  ----------------------------------- Module Dependent Headers */
-#include <chnldefs.h>
-#include <cmm.h>
-#include <cod.h>
-#include <dehdefs.h>
-#include <nodedefs.h>
-#include <dispdefs.h>
-#include <wmd.h>
-#include <dmm.h>
-#include <host_os.h>
+#include <dspbridge/chnldefs.h>
+#include <dspbridge/cmm.h>
+#include <dspbridge/cod.h>
+#include <dspbridge/dehdefs.h>
+#include <dspbridge/nodedefs.h>
+#include <dspbridge/dispdefs.h>
+#include <dspbridge/wmd.h>
+#include <dspbridge/dmm.h>
+#include <dspbridge/host_os.h>
 
 /*  ----------------------------------- This */
-#include <devdefs.h>
+#include <dspbridge/devdefs.h>
 
 
 /*

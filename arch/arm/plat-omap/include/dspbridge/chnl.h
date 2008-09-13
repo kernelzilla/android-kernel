@@ -57,7 +57,7 @@
 #ifndef CHNL_
 #define CHNL_
 
-#include <chnlpriv.h>
+#include <dspbridge/chnlpriv.h>
 
 /*
  *  ======== CHNL_AddIOReq ========
