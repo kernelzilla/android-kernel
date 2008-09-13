@@ -91,7 +91,6 @@
 
 #ifndef RES_CLEANUP_DISABLE
 #include <cfg.h>
-#include <prcs.h>
 #include <dbreg.h>
 #include <resourcecleanup.h>
 #endif
@@ -162,7 +161,7 @@ DSP_STATUS STRM_AllocateBuffer(struct STRM_OBJECT *hStrm, u32 uSize,
 	u32 i;
 	#ifndef RES_CLEANUP_DISABLE
 	DSP_STATUS res_status = DSP_SOK;
-	HANDLE	     hProcess;
+       u32                  hProcess;
 	HANDLE	     pCtxt = NULL;
 	HANDLE	     hDrvObject;
 	HANDLE hSTRMRes;
@@ -204,12 +203,14 @@ DSP_STATUS STRM_AllocateBuffer(struct STRM_OBJECT *hStrm, u32 uSize,
 	if (DSP_FAILED(status))
 		goto func_end;
 
-	PRCS_GetCurrentHandle(&hProcess);
+       /* Return PID instead of process handle */
+       hProcess = current->pid;
+
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(res_status))
 		goto func_end;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject,
+       DRV_GetProcContext(hProcess, (struct DRV_OBJECT *)hDrvObject,
 			 &pCtxt, NULL, 0);
 	if (pCtxt != NULL) {
 		if (DRV_GetSTRMResElement(hStrm, &hSTRMRes, pCtxt) !=
@@ -235,7 +236,7 @@ DSP_STATUS STRM_Close(struct STRM_OBJECT *hStrm)
 
 
 #ifndef RES_CLEANUP_DISABLE
-    HANDLE	      hProcess;
+    u32                      hProcess;
     HANDLE	      pCtxt = NULL;
     HANDLE	      hDrvObject;
     HANDLE	      hSTRMRes;
@@ -276,12 +277,14 @@ DSP_STATUS STRM_Close(struct STRM_OBJECT *hStrm)
 		goto func_end;
 
 	/* Update the node and stream resource status */
-	PRCS_GetCurrentHandle(&hProcess);
+       /* Return PID instead of process handle */
+       hProcess = current->pid;
+
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(res_status))
 		goto func_end;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject,
+       DRV_GetProcContext(hProcess, (struct DRV_OBJECT *)hDrvObject,
 			 &pCtxt, NULL, 0);
 	if (pCtxt != NULL) {
 		if (DRV_GetSTRMResElement(hStrm, &hSTRMRes, pCtxt) !=
@@ -398,7 +401,7 @@ DSP_STATUS STRM_FreeBuffer(struct STRM_OBJECT *hStrm, u8 **apBuffer,
 
 	#ifndef RES_CLEANUP_DISABLE
 	DSP_STATUS res_status = DSP_SOK;
-	HANDLE	     hProcess;
+       u32                  hProcess;
 	HANDLE	     pCtxt = NULL;
 	HANDLE	     hDrvObject;
 	HANDLE 		    hSTRMRes = NULL;
@@ -427,10 +430,12 @@ DSP_STATUS STRM_FreeBuffer(struct STRM_OBJECT *hStrm, u8 **apBuffer,
 	}
 #ifndef RES_CLEANUP_DISABLE
 	/* Update the node and stream resource status */
-	PRCS_GetCurrentHandle(&hProcess);
+       /* Return PID instead of process handle */
+       hProcess = current->pid;
+
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext((u32)hProcess,
+               DRV_GetProcContext(hProcess,
 				 (struct DRV_OBJECT *)hDrvObject, &pCtxt,
 				 NULL, 0);
 		if (pCtxt != NULL) {
@@ -634,7 +639,7 @@ DSP_STATUS STRM_Open(struct NODE_OBJECT *hNode, u32 uDir, u32 uIndex,
 
 	#ifndef RES_CLEANUP_DISABLE
 	DSP_STATUS res_status = DSP_SOK;
-	HANDLE	     hProcess;
+       u32                  hProcess;
 	HANDLE	     pCtxt = NULL;
 	HANDLE	     hDrvObject;
 	HANDLE 		    hSTRMRes;
@@ -774,10 +779,12 @@ func_cont:
 		(void)DeleteStrm(pStrm);
 
 #ifndef RES_CLEANUP_DISABLE
-	PRCS_GetCurrentHandle(&hProcess);
+       /* Return PID instead of process handle */
+       hProcess = current->pid;
+
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-		DRV_GetProcContext((u32)hProcess,
+               DRV_GetProcContext(hProcess,
 				 (struct DRV_OBJECT *)hDrvObject, &pCtxt,
 				 hNode, 0);
 		if (pCtxt != NULL)

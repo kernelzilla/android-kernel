@@ -129,7 +129,6 @@
 #include <mem.h>
 #include <cfg.h>
 #include <csl.h>
-#include <prcs.h>
 #include <sync.h>
 
 /*  ----------------------------------- Mini-Driver */
@@ -935,7 +934,8 @@ DSP_STATUS WMD_CHNL_Open(OUT struct CHNL_OBJECT **phChnl,
 			pChnl->uMode = uMode;
 			pChnl->hUserEvent = hSyncEvent;	/* for Linux */
 			pChnl->hSyncEvent = hSyncEvent;
-			PRCS_GetCurrentHandle(&pChnl->hProcess);
+                       /* get the process handle */
+                       pChnl->hProcess = current->pid;
 			pChnl->pCBArg = 0;
 			pChnl->cBytesMoved = 0;
 			/* Default to proc-copy */

@@ -148,7 +148,6 @@
 #ifndef RES_CLEANUP_DISABLE
 #include <drv.h>
 #include <drvdefs.h>
-#include <prcs.h>
 #include <dbreg.h>
 #include <resourcecleanup.h>
 #endif
@@ -426,7 +425,7 @@ DSP_STATUS NODE_Allocate(struct PROC_OBJECT *hProcessor,
 
 	HANDLE	     hDrvObject;
 	HANDLE	     nodeRes;
-	HANDLE	     hProcess;
+       u32                  hProcess;
 	struct PROCESS_CONTEXT   *pPctxt = NULL;
 	DSP_STATUS res_status = DSP_SOK;
 
@@ -777,11 +776,13 @@ func_cont2:
 
 #ifndef RES_CLEANUP_DISABLE
 	if (DSP_SUCCEEDED(status)) {
-		PRCS_GetCurrentHandle(&hProcess);
+               /* Return PID instead of process handle */
+               hProcess = current->pid;
+
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					  REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
-			DRV_GetProcContext((u32)hProcess,
+                       DRV_GetProcContext(hProcess,
 					 (struct DRV_OBJECT *)hDrvObject,
 					 &pPctxt, *phNode, 0);
 			if (pPctxt == NULL) {
@@ -791,7 +792,7 @@ func_cont2:
 				if (pPctxt != NULL) {
 					DRV_ProcUpdatestate(pPctxt,
 							PROC_RES_ALLOCATED);
-					DRV_ProcSetPID(pPctxt, (s32) hProcess);
+                                       DRV_ProcSetPID(pPctxt, hProcess);
 					pPctxt->hProcessor =
 						 (DSP_HPROCESSOR)hProcessor;
 				}
@@ -799,11 +800,13 @@ func_cont2:
 		}
 	}
 	if (DSP_SUCCEEDED(status)) {
-		PRCS_GetCurrentHandle(&hProcess);
+               /* Return PID instead of process handle */
+               hProcess = current->pid;
+
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
-			DRV_GetProcContext((u32)hProcess,
+                       DRV_GetProcContext(hProcess,
 					 (struct DRV_OBJECT *)hDrvObject,
 					 &pPctxt, *phNode, 0);
 			if (pPctxt != NULL) {
@@ -1663,7 +1666,7 @@ DSP_STATUS NODE_Delete(struct NODE_OBJECT *hNode)
 	struct WMD_DRV_INTERFACE *pIntfFxns;
 
 #ifndef RES_CLEANUP_DISABLE
-	HANDLE		hProcess;
+       u32                     hProcess;
 	HANDLE		nodeRes;
 	HANDLE		hDrvObject;
 	struct PROCESS_CONTEXT *pCtxt = NULL;
@@ -1794,12 +1797,13 @@ func_cont1:
 	 *  DeleteNode() fails if SM buffers not freed by client!  */
 #ifndef RES_CLEANUP_DISABLE
 	/* Update the node and stream resource status */
-	PRCS_GetCurrentHandle(&hProcess);
+       /* Return PID instead of process handle */
+       hProcess = current->pid;
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(res_status))
 		goto func_cont;
 
-	DRV_GetProcContext((u32)hProcess, (struct DRV_OBJECT *)hDrvObject,
+       DRV_GetProcContext(hProcess, (struct DRV_OBJECT *)hDrvObject,
 			 &pCtxt, hNode, 0);
 	if (pCtxt == NULL)
 		goto func_cont;

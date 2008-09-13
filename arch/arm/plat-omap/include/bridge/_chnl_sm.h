@@ -183,7 +183,7 @@ struct loadMonStruct {
 		struct SYNC_OBJECT *hSyncEvent;
 		/* Name of Sync event */
 		char szEventName[SYNC_MAXNAMELENGTH + 1];
-		HANDLE hProcess;	/* Process which created this channel */
+               u32 hProcess;   /* Process which created this channel */
 		u32 pCBArg;	/* Argument to use with callback */
 		struct LST_LIST *pIORequests;	/* List of IOR's to driver */
 		s32 cIOCs;	/* Number of IOC's in queue */

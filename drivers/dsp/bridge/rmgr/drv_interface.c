@@ -83,7 +83,6 @@
 #include <sync.h>
 #include <reg.h>
 #include <csl.h>
-#include <prcs.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <wcdioctl.h>
@@ -636,7 +635,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 {
 	int status = 0;
 #ifndef RES_CLEANUP_DISABLE
-	HANDLE	     hProcess;
+       u32     hProcess;
 	DSP_STATUS dsp_status = DSP_SOK;
 	HANDLE	     hDrvObject = NULL;
 	struct PROCESS_CONTEXT    *pPctxt = NULL;
@@ -708,9 +707,11 @@ func_cont:
 				(struct DRV_OBJECT *)hDrvObject, &pPctxt);
 
 	if (pPctxt != NULL) {
-		PRCS_GetCurrentHandle(&hProcess);
+               /* Return PID instead of process handle */
+               hProcess = current->pid;
+
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
-		DRV_ProcSetPID(pPctxt, (s32) hProcess);
+               DRV_ProcSetPID(pPctxt, hProcess);
 	}
 #endif
 
@@ -723,14 +724,14 @@ func_cont:
 static int bridge_release(struct inode *ip, struct file *filp)
 {
 	int status;
-	HANDLE pid;
+       u32 pid;
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_release\n");
 
-	status = PRCS_GetCurrentHandle(&pid);
+       /* Return PID instead of process handle */
+       pid = current->pid;
 
-	if (DSP_SUCCEEDED(status))
-		status = DSP_Close((u32) pid);
+       status = DSP_Close(pid);
 
 
 	(status == true) ? (status = 0) : (status = -1);

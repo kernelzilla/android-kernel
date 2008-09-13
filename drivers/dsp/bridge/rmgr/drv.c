@@ -117,7 +117,6 @@
 #include <dev.h>
 
 #ifndef RES_CLEANUP_DISABLE
-#include <prcs.h>
 #include <node.h>
 #include <proc.h>
 #include <strm.h>
