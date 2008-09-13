@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/bridge/wcd.h
+ * arch/arm/plat-omap/include/dspbridge/wcd.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

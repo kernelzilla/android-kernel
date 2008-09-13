@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/bridge/strm.h
+ * arch/arm/plat-omap/include/dspbridge/strm.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

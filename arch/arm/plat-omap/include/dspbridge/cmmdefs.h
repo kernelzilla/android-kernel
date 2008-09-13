@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/bridge/cmmdefs.h
+ * arch/arm/plat-omap/include/dspbridge/cmmdefs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

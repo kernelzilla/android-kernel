@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/bridge/dbdcddef.h
+ * arch/arm/plat-omap/include/dspbridge/dbdcddef.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *
