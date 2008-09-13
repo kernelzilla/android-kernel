@@ -66,7 +66,8 @@
 #include "mmu_fault.h"
 #include "_tiomap.h"
 #include "_deh.h"
-#include <_tiomap_mmu.h>
+#include "_tiomap_mmu.h"
+#include "_tiomap_pwr.h"
 #include <io_sm.h>
 
 static struct HW_MMUMapAttrs_t  mapAttrs = { HW_LITTLE_ENDIAN,
@@ -215,6 +216,8 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 	if (MEM_IsValidHandle(pDehMgr, SIGNATURE)) {
 		printk(KERN_INFO "WMD_DEH_Notify: ********** DEVICE EXCEPTION "
 			"**********\n");
+		pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->hWmdContext;
+
 		switch (ulEventMask) {
 		case DSP_SYSERROR:
 			/* reset errInfo structure before use */
@@ -229,8 +232,6 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 		case DSP_MMUFAULT:
 			/* MMU fault routine should have set err info
 			 * structure */
-			pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->
-					hWmdContext;
 			pDehMgr->errInfo.dwErrMask = DSP_MMUFAULT;
 			printk(KERN_INFO "WMD_DEH_Notify: DSP_MMUFAULT,"
 				"errInfo = 0x%x\n", dwErrInfo);
@@ -287,6 +288,10 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
                /* Call DSP Trace Buffer */
                PrintDspTraceBuffer(hDehMgr->hWmdContext);
 
+		/* Set the Board state as ERROR */
+		pDevContext->dwBrdState = BRD_ERROR;
+		/* Disable all the clocks that were enabled by DSP */
+		(void)DSP_PeripheralClocks_Disable(pDevContext, NULL);
 		/* Signal DSP error/exception event. */
 		NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
 	}

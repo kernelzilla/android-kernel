@@ -65,6 +65,7 @@
 /*  ----------------------------------- This */
 #include "_tiomap.h"
 #include <chnl_sm.h>
+#include "_tiomap_pwr.h"
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS

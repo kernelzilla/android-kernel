@@ -45,7 +45,7 @@
 #define BRD_HIBERNATION 0x7		/* MPU initiated hibernation */
 #define BRD_RETENTION     0x8       /* Retention mode */
 #define BRD_DSP_HIBERNATION     0x9       /* DSP initiated hibernation */
-
+#define BRD_ERROR		0xA       /* Board state is Error */
 	typedef u32 BRD_STATUS;
 
 /* BRD Object */

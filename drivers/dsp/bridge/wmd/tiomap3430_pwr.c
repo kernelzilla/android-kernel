@@ -81,12 +81,6 @@ extern struct constraint_handle *dsp_constraint_handle;
 #endif
 extern struct MAILBOX_CONTEXT mboxsetting;
 
-extern void GetHWRegs(u32 prm_base, u32 cm_base);
-DSP_STATUS DSP_PeripheralClocks_Disable(struct WMD_DEV_CONTEXT *pDevContext,
-					IN void *pArgs);
-DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
-				       IN void *pArgs);
-
 /*
  *  ======== handle_constraints_set ========
  *  	Sets new DSP constraint

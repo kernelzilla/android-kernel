@@ -1669,7 +1669,7 @@ DSP_STATUS NODE_Delete(struct NODE_OBJECT *hNode)
 	struct PROCESS_CONTEXT *pCtxt = NULL;
 	DSP_STATUS res_status = DSP_SOK;
 #endif
-
+	struct DSP_PROCESSORSTATE procStatus;
 	DBC_Require(cRefs > 0);
 	GT_1trace(NODE_debugMask, GT_ENTER, "NODE_Delete: hNode: 0x%x\n",
 		  hNode);
@@ -1745,9 +1745,18 @@ func_cont1:
 			} else if (procId == IVA_UNIT)
 				ulDeleteFxn = (u32)hNode->nodeEnv;
 			if (DSP_SUCCEEDED(status)) {
-				status = DISP_NodeDelete(hDisp, hNode,
-					 hNodeMgr->ulFxnAddrs[RMSDELETENODE],
-					 ulDeleteFxn, hNode->nodeEnv);
+				status = PROC_GetState(hProcessor, &procStatus,
+					sizeof(struct DSP_PROCESSORSTATE));
+				GT_1trace(NODE_debugMask, GT_4CLASS,
+						 "NODE_Delete: proc Status "
+						 "0x%x\n", procStatus.iState);
+				if (procStatus.iState != PROC_ERROR) {
+					status = DISP_NodeDelete(hDisp, hNode,
+					hNodeMgr->ulFxnAddrs[RMSDELETENODE],
+					ulDeleteFxn, hNode->nodeEnv);
+				} else
+					NODE_SetState(hNode, NODE_DONE);
+
 				/* Unload execute, if not unloaded, and delete
 				 * function */
 				if (state == NODE_RUNNING &&
@@ -1779,18 +1788,11 @@ func_cont1:
 	hNodeMgr->uNumNodes--;
 	/* Decrement count of nodes created on DSP */
 	if ((state != NODE_ALLOCATED) || ((state == NODE_ALLOCATED) &&
-	   (hNode->nodeEnv != (u32) NULL))) {
+	(hNode->nodeEnv != (u32) NULL)))
 		hNodeMgr->uNumCreated--;
-		/* This is not acceptable since in deep sleep, all the
-		 * peripherals are switched off We just need to put DSP
-		 * CPU in idle mode */
-	}
 	 /*  Free host-side resources allocated by NODE_Create()
 	 *  DeleteNode() fails if SM buffers not freed by client!  */
 #ifndef RES_CLEANUP_DISABLE
-	if (DSP_FAILED(status))
-		goto func_cont;
-
 	/* Update the node and stream resource status */
 	PRCS_GetCurrentHandle(&hProcess);
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
@@ -1801,7 +1803,6 @@ func_cont1:
 			 &pCtxt, hNode, 0);
 	if (pCtxt == NULL)
 		goto func_cont;
-
 	if (DRV_GetNodeResElement(hNode, &nodeRes, pCtxt) != DSP_ENOTFOUND) {
 		GT_0trace(NODE_debugMask, GT_5CLASS, "\nNODE_Delete12:\n");
 		DRV_ProcNodeUpdateStatus(nodeRes, false);
@@ -1811,17 +1812,14 @@ func_cont:
 	GT_0trace(NODE_debugMask, GT_ENTER, "\nNODE_Delete13:\n ");
 	DeleteNode(hNode);
 #ifndef RES_CLEANUP_DISABLE
-	if (DSP_SUCCEEDED(status)) {
-		GT_0trace(NODE_debugMask, GT_5CLASS, "\nNODE_Delete2:\n ");
-		if (pCtxt != NULL)
-			DRV_RemoveNodeResElement(nodeRes, (HANDLE)pCtxt);
-
-	}
+	GT_0trace(NODE_debugMask, GT_5CLASS, "\nNODE_Delete2:\n ");
+	if (pCtxt != NULL)
+		DRV_RemoveNodeResElement(nodeRes, (HANDLE)pCtxt);
 #endif
 	GT_0trace(NODE_debugMask, GT_ENTER, "\nNODE_Delete3:\n ");
-			/* Exit critical section */
-			(void)SYNC_LeaveCS(hNodeMgr->hSync);
-			PROC_NotifyClients(hProcessor, DSP_NODESTATECHANGE);
+	/* Exit critical section */
+	(void)SYNC_LeaveCS(hNodeMgr->hSync);
+	PROC_NotifyClients(hProcessor, DSP_NODESTATECHANGE);
 func_end:
 	return status;
 }
@@ -2597,6 +2595,12 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 	GT_1trace(NODE_debugMask, GT_ENTER,
 		 "NODE_Terminate: hNode: 0x%x\n", hNode);
 
+	if (pNode->hProcessor == NULL) {
+		GT_1trace(NODE_debugMask, GT_4CLASS,
+		"NODE_Terminate: pNode->hProcessor = 0x%x\n",
+		pNode->hProcessor);
+		goto func_end;
+	}
 	status = PROC_GetProcessorId(pNode->hProcessor, &procId);
 
 	if (DSP_SUCCEEDED(status)) {
@@ -2703,7 +2707,7 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 		}
 		(void)SYNC_LeaveCS(hNodeMgr->hSync);
 	}		/*End of SYNC_EnterCS */
-
+func_end:
 	return status;
 }
 

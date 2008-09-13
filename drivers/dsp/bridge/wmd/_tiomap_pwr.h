@@ -77,6 +77,24 @@ DSP_STATUS PreScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs);
  */
 DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
 				 IN void *pArgs);
+/*
+ *  ======== DSP_PeripheralClocks_Disable ========
+ *  	This function disables all the peripheral clocks that
+ *	were enabled by DSP. Call this function only when
+ *	DSP is entering Hibernation or when DSP is in
+ *	Error state
+ */
+DSP_STATUS DSP_PeripheralClocks_Disable(struct WMD_DEV_CONTEXT *pDevContext,
+					IN void *pArgs);
+
+/*
+ *  ======== DSP_PeripheralClocks_Enable ========
+ *  	This function enables all the peripheral clocks that
+ *	were requested by DSP.
+ */
+DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
+				       IN void *pArgs);
+
 
 #endif				/* _TIOMAP_PWR_ */
 

@@ -910,6 +910,9 @@ DSP_STATUS PROC_GetState(DSP_HPROCESSOR hProcessor,
 			case BRD_LOADED:
 				pProcStatus->iState = PROC_LOADED;
 				break;
+			case BRD_ERROR:
+				pProcStatus->iState = PROC_ERROR;
+				break;
 			default:
 				status = DSP_EFAIL;
 				break;

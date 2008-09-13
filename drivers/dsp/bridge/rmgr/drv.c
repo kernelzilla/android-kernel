@@ -431,35 +431,40 @@ static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt)
 	DSP_STATUS status = DSP_SOK;
 	struct NODE_RES_OBJECT *pNodeList = NULL;
 	struct NODE_RES_OBJECT *pNodeRes = NULL;
+	u32  nState;
 
 	DBC_Assert(hPCtxt != NULL);
 	pNodeList = pCtxt->pNodeList;
 	while (pNodeList != NULL) {
 		GT_0trace(curTrace, GT_ENTER, "DRV_ProcFreeNodeRes: 1");
-	pNodeRes = pNodeList;
-	pNodeList = pNodeList->next;
-	if (pNodeRes->nodeAllocated) {
-			if (NODE_GetState(pNodeRes->hNode) &
-			  (NODE_ALLOCATED | NODE_CREATED |
-			  NODE_RUNNING | NODE_PAUSED/*| NODE_TERMINATING */)) {
-				GT_1trace(curTrace, GT_5CLASS,
-					 "Calling Node_Terminate for Node:"
-					 " 0x%x\n", pNodeRes->hNode);
-				status = NODE_Terminate
-					(pNodeRes->hNode, &status);
-				GT_1trace(curTrace, GT_5CLASS,
-					 "Calling Node_Delete for Node:"
-					 " 0x%x\n", pNodeRes->hNode);
-				status = NODE_Delete(pNodeRes->hNode);
-				GT_1trace(curTrace, GT_5CLASS,
+		pNodeRes = pNodeList;
+		pNodeList = pNodeList->next;
+		if (pNodeRes->nodeAllocated) {
+			nState = NODE_GetState(pNodeRes->hNode) ;
+			GT_1trace(curTrace, GT_5CLASS,
+				"DRV_ProcFreeNodeRes: Node state %x\n", nState);
+			if (nState <= NODE_DELETING) {
+				if ((nState == NODE_RUNNING) ||
+					(nState == NODE_PAUSED) ||
+					(nState == NODE_TERMINATING)) {
+					GT_1trace(curTrace, GT_5CLASS,
+					"Calling Node_Terminate for Node:"
+					" 0x%x\n", pNodeRes->hNode);
+					status = NODE_Terminate
+						(pNodeRes->hNode, &status);
+					GT_1trace(curTrace, GT_5CLASS,
+						 "Calling Node_Delete for Node:"
+						 " 0x%x\n", pNodeRes->hNode);
+					status = NODE_Delete(pNodeRes->hNode);
+					GT_1trace(curTrace, GT_5CLASS,
 					"the status after the NodeDelete %x\n",
 					status);
-			} else /*if (NODE_GetState(pNodeRes->hNode)
-				== NODE_DONE)*/ {
-				status = NODE_Delete(pNodeRes->hNode);
+				} else if ((nState == NODE_ALLOCATED)
+					|| (nState == NODE_CREATED))
+					status = NODE_Delete(pNodeRes->hNode);
 			}
-			pNodeRes->nodeAllocated = 0;
 		}
+		pNodeRes->nodeAllocated = 0;
 	}
 	return status;
 }
@@ -1300,9 +1305,8 @@ u32 DRV_GetFirstDevObject(void)
 	if (DSP_SUCCEEDED
 	    (CFG_GetObject((u32 *)&pDrvObject, REG_DRV_OBJECT))) {
 		if ((pDrvObject->devList != NULL) &&
-		   !LST_IsEmpty(pDrvObject->devList)) {
+		   !LST_IsEmpty(pDrvObject->devList))
 			dwDevObject = (u32) LST_First(pDrvObject->devList);
-		}
 	}
 
 	return dwDevObject;

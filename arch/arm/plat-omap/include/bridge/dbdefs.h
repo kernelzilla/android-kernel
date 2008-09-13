@@ -221,7 +221,8 @@
 	enum DSP_PROCSTATE {
 		PROC_STOPPED,
 		PROC_LOADED,
-		PROC_RUNNING
+		PROC_RUNNING,
+		PROC_ERROR
 	} ;
 
 /* Node types */
