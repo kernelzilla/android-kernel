@@ -1,5 +1,5 @@
 /*
- * bridge/inc/memdefs.h
+ * linux/arch/arm/plat-omap/include/dspbridge//memdefs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

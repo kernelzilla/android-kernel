@@ -1,5 +1,5 @@
 /*
- * bridge/inc/getsection.h
+ * linux/arch/arm/plat-omap/include/dspbridge//getsection.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

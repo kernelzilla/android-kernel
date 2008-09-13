@@ -1,5 +1,5 @@
 /*
- * bridge/inc/drv.h
+ * linux/arch/arm/plat-omap/include/dspbridge//drv.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

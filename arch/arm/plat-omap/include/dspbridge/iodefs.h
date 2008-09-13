@@ -1,5 +1,5 @@
 /*
- * bridge/inc/iodefs.h
+ * linux/arch/arm/plat-omap/include/dspbridge//iodefs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

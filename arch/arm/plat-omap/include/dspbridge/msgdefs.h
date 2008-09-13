@@ -1,5 +1,5 @@
 /*
- * bridge/inc/msgdefs.h
+ * linux/arch/arm/plat-omap/include/dspbridge//msgdefs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

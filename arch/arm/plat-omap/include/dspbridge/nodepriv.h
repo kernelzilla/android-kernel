@@ -1,5 +1,5 @@
 /*
- * bridge/inc/nodepriv.h
+ * linux/arch/arm/plat-omap/include/dspbridge//nodepriv.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

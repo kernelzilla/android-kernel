@@ -1,5 +1,5 @@
 /*
- * bridge/inc/kfile.h
+ * linux/arch/arm/plat-omap/include/dspbridge//kfile.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

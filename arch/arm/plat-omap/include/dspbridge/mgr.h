@@ -1,5 +1,5 @@
 /*
- * bridge/inc/mgr.h
+ * linux/arch/arm/plat-omap/include/dspbridge//mgr.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *
