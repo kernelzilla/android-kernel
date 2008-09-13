@@ -39,7 +39,7 @@
  *  ======== MMU_FaultIsr ========
  *      ISR to be triggered by a DSP MMU fault interrupt.
  */
-	void MMU_FaultIsr(IN void *pRefData);
+irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData);
 
 /*
  *  ========PrintDspTraceBuffer ========

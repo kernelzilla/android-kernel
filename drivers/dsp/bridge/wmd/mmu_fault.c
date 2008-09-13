@@ -55,6 +55,7 @@
 
 /*  ----------------------------------- This */
 #include "_deh.h"
+#include <cfg.h>
 #include "_tiomap_mmu.h"
 #include "_tiomap.h"
 #include "mmu_fault.h"
@@ -85,7 +86,7 @@ void MMU_FaultDpc(IN void *pRefData)
  *  ======== MMU_FaultIsr ========
  *      ISR to be triggered by a DSP MMU fault interrupt.
  */
-void MMU_FaultIsr(IN void *pRefData)
+irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
 {
 	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)pRefData;
 	struct WMD_DEV_CONTEXT *pDevContext;
@@ -94,7 +95,7 @@ void MMU_FaultIsr(IN void *pRefData)
 
 
 	DBG_Trace(DBG_LEVEL1, "Entering DEH_DspMmuIsr: 0x%x\n", pRefData);
-
+       DBC_Require(irq == INT_DSP_MMU_IRQ);
 	DBC_Require(MEM_IsValidHandle(pDehMgr, SIGNATURE));
 
 	if (MEM_IsValidHandle(pDehMgr, SIGNATURE)) {
@@ -138,6 +139,7 @@ void MMU_FaultIsr(IN void *pRefData)
 		}
 		PrintDspTraceBuffer(pDehMgr);
 	}
+       return IRQ_HANDLED;
 }
 
 

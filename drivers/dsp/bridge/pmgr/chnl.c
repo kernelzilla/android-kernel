@@ -78,7 +78,6 @@
 #include <cfg.h>
 #include <csl.h>
 #include <dpc.h>
-#include <isr.h>
 #include <list.h>
 #include <mem.h>
 #include <sync.h>

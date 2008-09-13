@@ -196,7 +196,6 @@ struct IO_MGR {
 	u8 *pMsgInput; 	/* Address of input messages    */
 	u8 *pMsgOutput; 	/* Address of output messages   */
 	u32 uSMBufSize; 	/* Size of a shared memory I/O channel */
-	struct ISR_IRQ *hIRQ; 		/* Virutalized IRQ handle       */
 	bool fSharedIRQ; 	/* Is this IRQ shared?	  */
 	struct DPC_OBJECT *hDPC; 	/* DPC object handle	    */
 	struct SYNC_CSOBJECT *hCSObj; 	/* Critical section object handle */
@@ -335,18 +334,19 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 		IO_DisableInterrupt(hWmdContext);
 		if (devType == DSP_UNIT) {
 			/* Plug the channel ISR:. */
-			status = ISR_Install(&pIOMgr->hIRQ, &hostRes, IO_ISR,
-				 ISR_MAILBOX1, (void *)pIOMgr);
+                       if ((request_irq(INT_MAIL_MPU_IRQ, IO_ISR, 0,
+                                           "DspBridge", (void *)pIOMgr)) == 0)
+                               status = DSP_SOK;
+                       else
+                               status = DSP_EFAIL;
 		}
-		if (DSP_SUCCEEDED(status)) {
-			/* Enable interrupt used for dsp i/o link */
-			/* moved  IO_EnableInterrupt(hWmdContext); */
-		} else {
+               if (DSP_SUCCEEDED(status))
+                       DBG_Trace(DBG_LEVEL1, "ISR_IRQ Object 0x%x \n",
+                                                pIOMgr);
+               else
 			status = CHNL_E_ISR;
-		}
-	} else {
+       } else
 		status = CHNL_E_ISR;
-	}
 func_cont:
 	if (DSP_FAILED(status)) {
 		/* Cleanup: */
@@ -371,15 +371,15 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
 	struct WMD_DEV_CONTEXT *hWmdContext;
 	if (MEM_IsValidHandle(hIOMgr, IO_MGRSIGNATURE)) {
 		/* Unplug IRQ:    */
-		if (hIOMgr->hIRQ) {
-			/* Disable interrupts from the board:  */
-			if (DSP_SUCCEEDED(DEV_GetWMDContext(hIOMgr->hDevObject,
-			   &hWmdContext)))
-				DBC_Assert(hWmdContext);
-			(void)CHNLSM_DisableInterrupt(hWmdContext);
-			(void)ISR_Uninstall(hIOMgr->hIRQ);
-			(void)DPC_Destroy(hIOMgr->hDPC);
+               /* Disable interrupts from the board:  */
+               if (DSP_SUCCEEDED(DEV_GetWMDContext(hIOMgr->hDevObject,
+                  &hWmdContext))) {
+                       DBC_Assert(hWmdContext);
 		}
+               (void)CHNLSM_DisableInterrupt(hWmdContext);
+               /* Linux function to uninstall ISR */
+               free_irq(INT_MAIL_MPU_IRQ, (void *)hIOMgr);
+               (void)DPC_Destroy(hIOMgr->hDPC);
 #ifndef DSP_TRACEBUF_DISABLED
 		if (hIOMgr->pMsg)
 			MEM_Free(hIOMgr->pMsg);
@@ -1056,10 +1056,11 @@ void IO_DPC(IN OUT void *pRefData)
  *      Calls the WMD's CHNL_ISR to determine if this interrupt is ours, then
  *      schedules a DPC to dispatch I/O.
  */
-bool IO_ISR(IN void *pRefData)
+irqreturn_t IO_ISR(int irq, IN void *pRefData)
 {
 	struct IO_MGR *hIOMgr = (struct IO_MGR *)pRefData;
 	bool fSchedDPC;
+       DBC_Require(irq == INT_MAIL_MPU_IRQ);
 	DBC_Require(MEM_IsValidHandle(hIOMgr, IO_MGRSIGNATURE));
 	DBG_Trace(DBG_LEVEL3, "Entering IO_ISR(0x%x)\n", pRefData);
 	/* Call WMD's CHNLSM_ISR() to see if interrupt is ours, and process. */
@@ -1082,13 +1083,10 @@ bool IO_ISR(IN void *pRefData)
 				DPC_Schedule(hIOMgr->hDPC);
 			}
 		}
-		return true;
-	} else {
+       } else
 		/* Ensure that, if WMD didn't claim it, the IRQ is shared. */
 		DBC_Ensure(hIOMgr->fSharedIRQ);
-		/* If not ours, return false. */
-		return false;
-	}
+       return IRQ_HANDLED;
 }
 
 /*

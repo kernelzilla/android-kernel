@@ -29,7 +29,6 @@
 #define _DEH_
 
 #include <dpc.h>
-#include <isr.h>
 #include <ntfy.h>
 #include <wmd.h>
 
@@ -41,7 +40,6 @@ struct DEH_MGR {
 	struct WMD_DEV_CONTEXT *hWmdContext;	/* WMD device context. */
 	struct NTFY_OBJECT *hNtfy;	/* NTFY object                  */
 	struct DPC_OBJECT *hMmuFaultDpc;	/* DPC object handle.  */
-	struct ISR_IRQ *hMmuFaultIsr;	/* DSP MMU ISR handle.          */
 	struct DSP_ERRORINFO errInfo;	/* DSP exception info.          */
 } ;
 

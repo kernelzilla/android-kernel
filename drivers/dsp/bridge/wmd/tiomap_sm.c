@@ -49,7 +49,6 @@
 /*  ----------------------------------- OS Adaptation Layer */
 #include <cfg.h>
 #include <drv.h>
-#include <isr.h>
 #include <util.h>
 
 /*  ----------------------------------- Mini Driver */

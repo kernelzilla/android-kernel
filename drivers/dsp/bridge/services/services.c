@@ -47,7 +47,6 @@
 #include <csl.h>
 #include <dbg.h>
 #include <dpc.h>
-#include <isr.h>
 #include <kfile.h>
 #include <list.h>
 #include <mem.h>
@@ -92,7 +91,6 @@ void SERVICES_Exit(void)
 		PRCS_Exit();
 		LST_Exit();
 		KFILE_Exit();
-		ISR_Exit();
 		DPC_Exit();
 		DBG_Exit();
 		CSL_Exit();
@@ -113,7 +111,7 @@ void SERVICES_Exit(void)
 bool SERVICES_Init(void)
 {
 	bool fInit = true;
-	bool fCFG, fCSL, fDBG, fDPC, fISR, fKFILE, fLST, fMEM;
+       bool fCFG, fCSL, fDBG, fDPC, fKFILE, fLST, fMEM;
 	bool fPRCS, fREG, fSYNC, fCLK, fUTIL, fNTFY;
 
 	DBC_Require(cRefs >= 0);
@@ -133,7 +131,6 @@ bool SERVICES_Init(void)
 		fCSL = CSL_Init();
 		fDBG = DBG_Init();
 		fDPC = DPC_Init();
-		fISR = ISR_Init();
 		fKFILE = KFILE_Init();
 		fLST = LST_Init();
 		fPRCS = PRCS_Init();
@@ -143,7 +140,7 @@ bool SERVICES_Init(void)
 		fUTIL = UTIL_Init();
 		fNTFY = NTFY_Init();
 
-		fInit = fCFG && fCSL && fDBG && fDPC && fISR && fKFILE &&
+               fInit = fCFG && fCSL && fDBG && fDPC && fKFILE &&
 			fLST && fMEM && fPRCS && fREG && fSYNC && fCLK && fUTIL;
 
 		if (!fInit) {
@@ -170,9 +167,6 @@ bool SERVICES_Init(void)
 
 			if (fKFILE)
 				KFILE_Exit();
-
-			if (fISR)
-				ISR_Exit();
 
 			if (fDPC)
 				DPC_Exit();

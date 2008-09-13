@@ -132,8 +132,7 @@
  *      Interrupts are disabled and EOI for this interrupt has been sent.
  *  Ensures:
  */
-	extern bool IO_ISR(IN void *pRefData);
-
+       irqreturn_t IO_ISR(int irq, IN void *pRefData);
 /*
  *  ======== IO_RequestChnl ========
  *  Purpose:
