@@ -1506,12 +1506,17 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 				/* vaCurr aligned to pteSize? */
 				if ((pteSize != 0) && (remBytesL2 >= pteSize) &&
 				   !(vaCurr & (pteSize - 1))) {
-					HW_MMU_PteClear(pteAddrL2, vaCurr,
-							 pteSize);
-					remBytesL2 -= pteSize;
-					vaCurr += pteSize;
-					pteAddrL2 += (pteSize >> 12) *
-						      sizeof(u32);
+					if (HW_MMU_PteClear(pteAddrL2,
+						vaCurr, pteSize) == RET_OK) {
+						status = DSP_SOK;
+						remBytesL2 -= pteSize;
+						vaCurr += pteSize;
+						pteAddrL2 += (pteSize >> 12) *
+								sizeof(u32);
+					} else {
+						status = DSP_EFAIL;
+						goto EXIT_LOOP;
+					}
 				} else {
 					status = DSP_EFAIL;
 				}
@@ -1522,9 +1527,13 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 				if (pt->pgInfo[L2PageNum].numEntries == 0) {
 					/* Clear the L1 PTE pointing to the
 					 * L2 PT */
-					status = HW_MMU_PteClear(L1BaseVa,
-						 vaCurrOrig,
-						 HW_MMU_COARSE_PAGE_SIZE);
+					if (RET_OK == HW_MMU_PteClear(L1BaseVa,
+					vaCurrOrig, HW_MMU_COARSE_PAGE_SIZE))
+						status = DSP_SOK;
+					else {
+						status = DSP_EFAIL;
+						goto EXIT_LOOP;
+					}
 				}
 				remBytes -= pteCount * PG_SIZE_4K;
 			} else {
@@ -1540,15 +1549,22 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 			/* pteSize = 1 MB or 16 MB */
 			if ((pteSize != 0) && (remBytes >= pteSize) &&
 			   !(vaCurr & (pteSize - 1))) {
-				HW_MMU_PteClear(L1BaseVa, vaCurr, pteSize);
-				remBytes -= pteSize;
-				vaCurr += pteSize;
+				if (HW_MMU_PteClear(L1BaseVa,
+					vaCurr, pteSize) == RET_OK) {
+					status = DSP_SOK;
+					remBytes -= pteSize;
+					vaCurr += pteSize;
+				} else {
+					status = DSP_EFAIL;
+					goto EXIT_LOOP;
+				}
 		} else {
 			status = DSP_EFAIL;
 		}
 	}
 	 /* It is better to flush the TLB here, so that any stale old entries
 	 * get flushed */
+EXIT_LOOP:
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_LEVEL1, "WMD_BRD_MemUnMap vaCurr %x, pteAddrL1 %x "
 		  "pteAddrL2 %x\n", vaCurr, pteAddrL1, pteAddrL2);
