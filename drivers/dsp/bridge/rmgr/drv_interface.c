@@ -145,8 +145,8 @@ static char *base_img;
 char *iva_img;
 static char *num_procs = "C55=1";
 static s32 shm_size = 0x400000;	/* 4 MB */
-static u32 phys_mempool_base = 0x87000000;
-static u32 phys_mempool_size = 0x600000;
+static u32 phys_mempool_base;
+static u32 phys_mempool_size;
 
 #if !defined(CONFIG_ARCH_OMAP2430) && !defined(CONFIG_ARCH_OMAP3430)
 static int tc_wordswapon = 1;	/* Default value is always TRUE */
