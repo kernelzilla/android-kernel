@@ -110,7 +110,7 @@
 		u32 cPosition;	/* Total bytes transferred.        */
 		u32 cIOCs;	/* Number of IOCs in queue.               */
 		u32 cIOReqs;	/* Number of IO Requests in queue.        */
-		HANDLE hProcess;	/* Process owning this channel.     */
+               u32 hProcess;   /* Process owning this channel.     */
 		/*
 		 * Name of channel I/O completion event. Not required in Linux
 		 */

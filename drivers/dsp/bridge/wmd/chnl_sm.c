@@ -916,7 +916,6 @@ DSP_STATUS WMD_CHNL_Open(OUT struct CHNL_OBJECT **phChnl,
 	pChnl->cChirps = pAttrs->uIOReqs;
 	pChnl->cIOCs = 0;
 	pChnl->cIOReqs = 0;
-	/* #WinCE# Let SYNC_ create our event  */
 	status = SYNC_OpenEvent(&hSyncEvent, pSyncAttrs);
 	if (DSP_SUCCEEDED(status)) {
 		status = NTFY_Create(&pChnl->hNtfy);
