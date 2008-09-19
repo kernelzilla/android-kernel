@@ -137,7 +137,7 @@ static inline void MLST_RemoveElem(struct LST_LIST *pList,
 	pCurElem->prev = NULL;
 }
 
-void MEM_Check(void)
+static void MEM_Check(void)
 {
 	struct memInfo *pMem;
 	struct LST_ELEM *last = &mMan.lst.head;

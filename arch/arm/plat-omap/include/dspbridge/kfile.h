@@ -143,7 +143,7 @@
  *      pBuffer is a valid pointer.
  *  Ensures:
  */
-	extern s32 KFILE_Read(OUT void *buffer,
+	extern s32 KFILE_Read(OUT void __user*buffer,
 			      IN s32 size, IN s32 count,
 			      IN struct KFILE_FileObj *hFile);
 

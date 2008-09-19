@@ -225,21 +225,35 @@
 		PROC_ERROR
 	} ;
 
-/* Node types */
-	enum DSP_NODETYPE {
+/*
+ *  Node types: Message node, task node, xDAIS socket node, and
+ *  device node. _NODE_GPP is used when defining a stream connection
+ *  between a task or socket node and the GPP.
+ *
+ */
+	enum NODE_TYPE {
 		NODE_DEVICE,
 		NODE_TASK,
 		NODE_DAISSOCKET,
-		NODE_MESSAGE
+		NODE_MESSAGE,
+		NODE_GPP
 	} ;
 
-/* Node states */
-	enum DSP_NODESTATE {
+/*
+ *  ======== NODE_STATE ========
+ *  Internal node states.
+ */
+	enum NODE_STATE {
 		NODE_ALLOCATED,
 		NODE_CREATED,
 		NODE_RUNNING,
 		NODE_PAUSED,
-		NODE_DONE
+		NODE_DONE,
+		NODE_CREATING,
+		NODE_STARTING,
+		NODE_PAUSING,
+		NODE_TERMINATING,
+		NODE_DELETING,
 	} ;
 
 /* Stream states */
@@ -370,7 +384,7 @@
 		u32 cbStruct;
 		struct DSP_UUID uiNodeID;
 		char acName[DSP_MAXNAMELEN];
-		enum DSP_NODETYPE uNodeType;
+		enum NODE_TYPE uNodeType;
 		u32 bCacheOnGPP;
 		struct DSP_RESOURCEREQMTS dspResourceReqmts;
 		s32 iPriority;
@@ -405,7 +419,7 @@
 		u32 cbStruct;
 		struct DSP_NDBPROPS nbNodeDatabaseProps;
 		u32 uExecutionPriority;
-		enum DSP_NODESTATE nsExecutionState;
+		enum NODE_STATE nsExecutionState;
 		DSP_HNODE hDeviceOwner;
 		u32 uNumberStreams;
 		struct DSP_STREAMCONNECT scStreamConnection[16];

@@ -876,8 +876,8 @@ DSP_STATUS PROC_GetDevObject(DSP_HPROCESSOR hProcessor,
 		*phDevObject = NULL;
 	}
 
-	DBC_Ensure((DSP_SUCCEEDED(status) && *phDevObject > 0) ||
-		   (DSP_FAILED(status) && *phDevObject == 0));
+	DBC_Ensure((DSP_SUCCEEDED(status) && *phDevObject != NULL) ||
+		   (DSP_FAILED(status) && *phDevObject == NULL));
 
 	return status;
 }

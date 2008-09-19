@@ -206,7 +206,8 @@ struct KFILE_FileObj *KFILE_Open(CONST char *pszFileName, CONST char *pszMode)
  *      Reads a specified number of bytes into a buffer.
  */
 s32
-KFILE_Read(void *pBuffer, s32 cSize, s32 cCount, struct KFILE_FileObj *hFile)
+KFILE_Read(void __user*pBuffer, s32 cSize, s32 cCount,
+			struct KFILE_FileObj *hFile)
 {
 	u32 dwBytesRead = 0;
 	s32 cRetVal = 0;

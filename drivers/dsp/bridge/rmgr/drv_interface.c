@@ -164,8 +164,8 @@ struct omap34xx_bridge_suspend_data {
 
 static struct omap34xx_bridge_suspend_data bridge_suspend_data;
 
-int omap34xxbridge_suspend_lockout(struct omap34xx_bridge_suspend_data *s,
-				  struct file *f)
+static int omap34xxbridge_suspend_lockout(
+		struct omap34xx_bridge_suspend_data *s, struct file *f)
 {
 	if ((s)->suspended) {
 		if ((f)->f_flags & O_NONBLOCK)
@@ -227,7 +227,7 @@ static struct file_operations bridge_fops = {
 };
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
-u32 timeOut = 1000;
+static u32 timeOut = 1000;
 
 static int bridge_suspend(struct platform_device *pdev, pm_message_t state);
 static int bridge_resume(struct platform_device *pdev);
@@ -354,9 +354,6 @@ static int __init bridge_init(void)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
-#ifndef CONFIG_OMAP3_PM
-	u32 retvalue = 0;
-#endif
 
 	/* use 2.6 device model */
 	if (driver_major) {
@@ -510,8 +507,7 @@ static int __init bridge_init(void)
 			GT_0trace(driverTrace, GT_7CLASS,
 			"clk_get PASS to get iva2_ck \n");
 		}
-		retvalue = clk_notifier_register(clk_handle, &iva_clk_notifier);
-		if (!retvalue) {
+		if (!clk_notifier_register(clk_handle, &iva_clk_notifier)) {
 			GT_0trace(driverTrace, GT_7CLASS,
 			"clk_notifier_register PASS for iva2_ck \n");
 		} else {
@@ -548,17 +544,13 @@ static void __exit bridge_exit(void)
 {
 	dev_t devno;
 	bool ret;
-#ifndef CONFIG_OMAP3_PM
-	u32 retvalue = 0;
-#endif
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
 	/* remove the constraints */
 #ifndef CONFIG_OMAP3_PM
-	retvalue = clk_notifier_unregister(clk_handle, &iva_clk_notifier);
-	if (!retvalue) {
+	if (!clk_notifier_unregister(clk_handle, &iva_clk_notifier)) {
 		GT_0trace(driverTrace, GT_7CLASS,
 		"clk_notifier_unregister PASS for iva2_ck \n");
 	} else {

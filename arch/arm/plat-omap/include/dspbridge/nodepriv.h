@@ -97,41 +97,6 @@
 	} ;
 
 /*
- *  Node types: Message node, task node, xDAIS socket node, and
- *  device node. _NODE_GPP is used when defining a stream connection
- *  between a task or socket node and the GPP.
- *
- *  ~~~~~~~~~~~~~~
- *  TO DO:
- *  Clean up when Node Manager uses only one critical section.
- *  ~~~~~~~~~~~~~~
- */
-	enum NODE_TYPE {
-		_NODE_DEVICE = NODE_DEVICE,
-		_NODE_TASK = NODE_TASK,
-		_NODE_DAISSOCKET = NODE_DAISSOCKET,
-		_NODE_MESSAGE = NODE_MESSAGE,
-		NODE_GPP
-	} ;
-
-/*
- *  ======== NODE_STATE ========
- *  Internal node states.
- */
-	enum NODE_STATE {
-		_NODE_ALLOCATED = NODE_ALLOCATED,
-		_NODE_CREATED = NODE_CREATED,
-		_NODE_RUNNING = NODE_RUNNING,
-		_NODE_PAUSED = NODE_PAUSED,
-		_NODE_DONE = NODE_DONE,
-		NODE_CREATING,
-		NODE_STARTING,
-		NODE_PAUSING,
-		NODE_TERMINATING,
-		NODE_DELETING,
-	} ;
-
-/*
  *  ======== NODE_GetChannelId ========
  *  Purpose:
  *      Get the channel index reserved for a stream connection between the

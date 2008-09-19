@@ -211,8 +211,8 @@ func_cont:
 	} else {
 		GT_0trace(curTrace, GT_7CLASS, "DSP_Init Failed\n");
 	}			/* End WCD_InitComplete2 */
-	DBC_Ensure((DSP_SUCCEEDED(status) && drvObject > 0) ||
-		  (DSP_FAILED(status) && drvObject == 0));
+	DBC_Ensure((DSP_SUCCEEDED(status) && drvObject != NULL) ||
+		  (DSP_FAILED(status) && drvObject == NULL));
 	*initStatus = status;
 	/* Return the Driver Object */
 	return (u32)drvObject;

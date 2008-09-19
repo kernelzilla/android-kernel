@@ -707,7 +707,6 @@ static DSP_STATUS WMD_BRD_Stop(struct WMD_DEV_CONTEXT *hDevContext)
 	struct CFG_HOSTRES resources;
 	struct PgTableAttrs *pPtAttrs;
 	u32 dspPwrState;
-	enum HW_PwrState_t pwrState;
 	DSP_STATUS clk_status;
 
 	DBG_Trace(DBG_ENTER, "Entering WMD_BRD_Stop:\nhDevContext: 0x%x\n",
