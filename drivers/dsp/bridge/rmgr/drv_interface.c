@@ -147,14 +147,7 @@ static char *num_procs = "C55=1";
 static s32 shm_size = 0x400000;	/* 4 MB */
 static u32 phys_mempool_base;
 static u32 phys_mempool_size;
-
-#if !defined(CONFIG_ARCH_OMAP2430) && !defined(CONFIG_ARCH_OMAP3430)
-static int tc_wordswapon = 1;	/* Default value is always TRUE */
-#else
-static int tc_wordswapon;	/* Default value is always true */
-#endif
-
-
+static int tc_wordswapon;	/* Default value is always false */
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 struct omap34xx_bridge_suspend_data {
@@ -242,7 +235,6 @@ static int omap34xx_bridge_probe(struct platform_device *dev)
 	return 0;
 }
 
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3430)
 static struct platform_device omap_dspbridge_dev = {
 		.name = BRIDGE_NAME,
 		.id = -1,
@@ -341,8 +333,6 @@ static struct platform_driver bridge_driver_ldm = {
 struct device dspbridge_device = {
 	.driver = &bridge_driver_ldm.driver,
 };
-
-#endif
 
 /* Initialization routine. Executed when the driver is loaded (as a kernel
  * module), or when the system is booted (when included as part of the kernel

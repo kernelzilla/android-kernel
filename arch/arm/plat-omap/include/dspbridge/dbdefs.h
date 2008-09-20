@@ -373,11 +373,9 @@
 		u32 uConnectedNodeStreamIndex;
 	} ;
 
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3430)
 	struct DSP_NODEPROFS {
 		u32 ulHeapSize;
 	} ;
-#endif
 
 /* The DSP_NDBPROPS structure reports the attributes of a node */
 	struct DSP_NDBPROPS {

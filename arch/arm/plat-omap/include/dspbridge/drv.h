@@ -68,8 +68,6 @@
 #define DRV_ASSIGN     1
 #define DRV_RELEASE    0
 
-#ifdef CONFIG_ARCH_OMAP3430
-
 /* Provide the DSP Internal memory windows that can be accessed from L3 address
  * space */
 
@@ -113,8 +111,6 @@
 
 #define OMAP_PRCM_VDD1_DOMAIN 1
 #define OMAP_PRCM_VDD2_DOMAIN 2
-
-#endif
 
 #ifndef RES_CLEANUP_DISABLE
 

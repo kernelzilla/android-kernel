@@ -76,8 +76,6 @@
 #define _CHNL_WORDSIZE 4	/* default _CHNL_WORDSIZE is 2 bytes/word */
 #endif
 
-#ifdef CONFIG_ARCH_OMAP3430
-
 #define MAXOPPS 16
 
 struct oppTableEntry {
@@ -107,8 +105,6 @@ struct loadMonStruct {
     u32 predDspFreq;
 };
 
-#endif
-
 	enum SHM_DESCTYPE {
 		SHM_CURROPP = 0,
 		SHM_OPPINFO = 1,
@@ -131,7 +127,6 @@ struct loadMonStruct {
 		u32 arg;	/* Arg for Issue/Reclaim (23 bits for 55x). */
 		u32 resvd;	/* Keep structure size even for 32-bit DSPs */
 
-#ifdef CONFIG_ARCH_OMAP3430
 		/* Operating Point structure */
 		struct oppStruct  oppTableStruct;
 		/* Operating Point Request structure */
@@ -140,7 +135,6 @@ struct loadMonStruct {
 		struct loadMonStruct loadMonInfo;
 		char dummy[184];             /* padding to 256 byte boundary */
 		u32 shm_dbg_var[64];         /* shared memory debug variables */
-#endif
 	} ;
 
 	/* Channel Manager: only one created per board: */

@@ -96,8 +96,6 @@
 		u32 dwChnlOffset;
 		u32 dwChnlBufSize;
 		u32 dwNumChnls;
-
-#ifdef CONFIG_ARCH_OMAP3430
 		u32 dwPrmBase;
 		u32 dwCmBase;
 		u32 dwPerBase;
@@ -106,7 +104,6 @@
 		u32 dwDmmuBase;
 		u32 dwDipiBase;
 		u32 dwSysCtrlBase;
-#endif
 	} ;
 
 	struct CFG_DSPMEMDESC {

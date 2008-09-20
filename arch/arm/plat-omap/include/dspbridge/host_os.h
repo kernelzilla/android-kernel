@@ -54,14 +54,8 @@
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
 #include <dspbridge/dbtype.h>
-
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3430)
 #include <mach/clock.h>
-#ifdef CONFIG_ARCH_OMAP3430
 #include <linux/clk.h>
-#endif
-#endif
-
 #include <linux/pagemap.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
@@ -73,9 +67,7 @@
 #define SEEK_END        2	/* Seek from end of file.  */
 
 /* TODO -- Remove, once BP defines them */
-#ifdef CONFIG_ARCH_OMAP3430
 #define INT_MAIL_MPU_IRQ        26
 #define INT_DSP_MMU_IRQ        28
-#endif
 
 #endif
