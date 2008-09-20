@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/common/inc/hw_defs.h
+ * hw_defs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

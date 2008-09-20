@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/services/services.c
+ * services.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

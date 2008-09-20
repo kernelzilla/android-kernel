@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/dspss/hw_dspss64P.c
+ * hw_dspss64P.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

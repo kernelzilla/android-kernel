@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/gen/gb.c
+ * gb.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

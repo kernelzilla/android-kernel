@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/wmd/linux/omap/2430/_tiomap_mmu.h
+ * _tiomap_mmu.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

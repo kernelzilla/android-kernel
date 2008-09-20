@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/pmgr/chnlobj.h
+ * chnlobj.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/wmd/linux/omap/3430/tiomap.c
+ * tiomap.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/plat-omap/include/dspbridge//io_sm.h
+ * io_sm.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

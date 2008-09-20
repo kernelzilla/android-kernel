@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/plat-omap/include/dspbridge//dmm.h
+ * dmm.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

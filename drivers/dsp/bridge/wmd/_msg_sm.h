@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/wmd/linux/omap/wmdchnl/common/_msg_sm.h
+ * _msg_sm.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

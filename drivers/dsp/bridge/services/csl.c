@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/services/csl.c
+ * csl.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

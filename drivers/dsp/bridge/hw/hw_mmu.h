@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/inc/hw_mmu.h
+ * hw_mmu.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

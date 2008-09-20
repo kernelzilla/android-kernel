@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/services/regsup.h
+ * regsup.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

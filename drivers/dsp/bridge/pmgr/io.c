@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/pmgr/io.c
+ * io.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

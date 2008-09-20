@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/dynload/cload.c
+ * cload.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

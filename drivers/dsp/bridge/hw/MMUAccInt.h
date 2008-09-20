@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/mmu/MMUAccInt.h
+ * MMUAccInt.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

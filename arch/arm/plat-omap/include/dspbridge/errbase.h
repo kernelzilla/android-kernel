@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/plat-omap/include/dspbridge//errbase.h
+ * errbase.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

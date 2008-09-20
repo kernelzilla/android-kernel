@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/rmgr/dbdcd.c
+ * dbdcd.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

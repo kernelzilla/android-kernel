@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/dspbridge/wmdio.h
+ * wmdio.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/pmgr/msgobj.h
+ * msgobj.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

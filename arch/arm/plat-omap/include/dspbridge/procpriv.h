@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/dspbridge/procpriv.h
+ * procpriv.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

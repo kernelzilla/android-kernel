@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/inc/GlobalTypes.h
+ * GlobalTypes.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/dspbridge/strmdefs.h
+ * strmdefs.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

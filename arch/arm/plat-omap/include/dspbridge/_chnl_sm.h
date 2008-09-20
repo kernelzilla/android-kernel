@@ -1,5 +1,5 @@
 /*
- * arch/arm/plat-omap/include/dspbridge/_chnl_sm.h
+ * _chnl_sm.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

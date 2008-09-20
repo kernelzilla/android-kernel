@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/dynload/header.h
+ * header.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

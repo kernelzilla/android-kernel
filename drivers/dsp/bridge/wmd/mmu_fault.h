@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/wmd/linux/omap/common/mmu_fault.h
+ * mmu_fault.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

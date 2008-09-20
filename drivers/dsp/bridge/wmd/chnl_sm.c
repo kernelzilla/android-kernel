@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/wmd/linux/omap/wmdchnl/common/chnl_sm.c
+ * chnl_sm.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

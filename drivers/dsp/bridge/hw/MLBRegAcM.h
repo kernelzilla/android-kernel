@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/mbox/MLBRegAcM.h
+ * MLBRegAcM.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

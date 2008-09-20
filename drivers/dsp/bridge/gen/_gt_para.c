@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/gen/linux/_gt_para.c
+ * _gt_para.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

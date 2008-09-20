@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/inc/hw_mbox.h
+ * hw_mbox.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

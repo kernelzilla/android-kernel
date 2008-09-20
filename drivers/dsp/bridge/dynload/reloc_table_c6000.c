@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/dynload/reloc_table_c6000.c
+ * reloc_table_c6000.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

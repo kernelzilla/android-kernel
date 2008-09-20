@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/hw/omap3/prcm/PRCMRegAcM.h
+ * PRCMRegAcM.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

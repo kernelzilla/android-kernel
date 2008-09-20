@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/rmgr/dspdrv.c
+ * dspdrv.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

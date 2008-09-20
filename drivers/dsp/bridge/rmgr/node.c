@@ -1,5 +1,5 @@
 /*
- * linux/drivers/dsp/bridge/rmgr/node.c
+ * node.c
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

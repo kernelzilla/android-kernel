@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/plat-omap/include/dspbridge//gh.h
+ * gh.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *

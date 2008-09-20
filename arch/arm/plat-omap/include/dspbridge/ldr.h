@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/plat-omap/include/dspbridge//ldr.h
+ * ldr.h
  *
  * DSP-BIOS Bridge driver support functions for TI OMAP processors.
  *
