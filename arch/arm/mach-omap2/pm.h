@@ -17,6 +17,12 @@
 extern int omap2_pm_init(void);
 extern int omap3_pm_init(void);
 
+#ifdef CONFIG_CPU_IDLE
+int omap3_idle_init(void);
+#else
+static inline int omap3_idle_init(void) { return 0; }
+#endif
+
 extern unsigned short enable_dyn_sleep;
 extern unsigned short clocks_off_while_idle;
 extern unsigned short enable_off_mode;

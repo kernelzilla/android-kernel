@@ -842,9 +842,8 @@ int __init omap3_pm_init(void)
 	omap_push_sram_idle();
 	suspend_set_ops(&omap_pm_ops);
 
-#ifndef CONFIG_CPU_IDLE
 	pm_idle = omap3_pm_idle;
-#endif
+	omap3_idle_init();
 
 	pwrdm_add_wkdep(neon_pwrdm, mpu_pwrdm);
 	/*

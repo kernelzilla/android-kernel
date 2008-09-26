@@ -276,5 +276,4 @@ int omap3_idle_init(void)
 	core_pd = pwrdm_lookup("core_pwrdm");
 	return 0;
 }
-device_initcall(omap3_idle_init);
 #endif /* CONFIG_CPU_IDLE */
