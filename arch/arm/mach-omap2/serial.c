@@ -138,8 +138,6 @@ static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
 #ifdef CONFIG_PM
 #ifdef CONFIG_ARCH_OMAP3
 
-static int enable_off_mode; /* to be removed by full off-mode patches */
-
 static void omap_uart_save_context(struct omap_uart_state *uart)
 {
 	u16 lcr = 0;
