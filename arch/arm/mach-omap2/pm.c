@@ -33,6 +33,7 @@
 
 unsigned short enable_dyn_sleep;
 unsigned short clocks_off_while_idle;
+unsigned short enable_off_mode;
 atomic_t sleep_block = ATOMIC_INIT(0);
 
 static ssize_t idle_show(struct kobject *, struct kobj_attribute *, char *);
@@ -45,6 +46,9 @@ static struct kobj_attribute sleep_while_idle_attr =
 static struct kobj_attribute clocks_off_while_idle_attr =
 	__ATTR(clocks_off_while_idle, 0644, idle_show, idle_store);
 
+static struct kobj_attribute enable_off_mode_attr =
+	__ATTR(enable_off_mode, 0644, idle_show, idle_store);
+
 static ssize_t idle_show(struct kobject *kobj, struct kobj_attribute *attr,
 			 char *buf)
 {
@@ -52,6 +56,8 @@ static ssize_t idle_show(struct kobject *kobj, struct kobj_attribute *attr,
 		return sprintf(buf, "%hu\n", enable_dyn_sleep);
 	else if (attr == &clocks_off_while_idle_attr)
 		return sprintf(buf, "%hu\n", clocks_off_while_idle);
+	else if (attr == &enable_off_mode_attr)
+		return sprintf(buf, "%hu\n", enable_off_mode);
 	else
 		return -EINVAL;
 }
@@ -67,13 +73,16 @@ static ssize_t idle_store(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 	}
 
-	if (attr == &sleep_while_idle_attr)
+	if (attr == &sleep_while_idle_attr) {
 		enable_dyn_sleep = value;
-	else if (attr == &clocks_off_while_idle_attr)
+	} else if (attr == &clocks_off_while_idle_attr) {
 		clocks_off_while_idle = value;
-	else
+	} else if (attr == &enable_off_mode_attr) {
+		enable_off_mode = value;
+		omap3_pm_off_mode_enable(enable_off_mode);
+	} else {
 		return -EINVAL;
-
+	}
 	return n;
 }
 
@@ -110,6 +119,10 @@ static int __init omap_pm_init(void)
 		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
 	error = sysfs_create_file(power_kobj,
 				  &clocks_off_while_idle_attr.attr);
+	if (error)
+		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+	error = sysfs_create_file(power_kobj,
+				  &enable_off_mode_attr.attr);
 	if (error)
 		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
 
