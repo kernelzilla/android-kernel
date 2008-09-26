@@ -7,6 +7,9 @@
  * Tony Lindgren <tony@atomide.com>
  * Jouni Hogander
  *
+ * Copyright (C) 2007 Texas Instruments, Inc.
+ * Rajendra Nayak <rnayak@ti.com>
+ *
  * Copyright (C) 2005 Texas Instruments, Inc.
  * Richard Woodruff <r-woodruff2@ti.com>
  *
@@ -27,11 +30,15 @@
 #include <mach/gpio.h>
 #include <mach/sram.h>
 #include <mach/pm.h>
+#include <mach/prcm.h>
 #include <mach/clockdomain.h>
 #include <mach/powerdomain.h>
 #include <mach/serial.h>
 #include <mach/control.h>
+#include <mach/serial.h>
+#include <mach/gpio.h>
 #include <mach/sdrc.h>
+#include <mach/gpmc.h>
 #include <asm/tlbflush.h>
 
 #include "cm.h"
@@ -41,6 +48,11 @@
 #include "prm.h"
 #include "pm.h"
 #include "smartreflex.h"
+
+/* Scratchpad offsets */
+#define OMAP343X_TABLE_ADDRESS_OFFSET	   0x31
+#define OMAP343X_TABLE_VALUE_OFFSET	   0x30
+#define OMAP343X_CONTROL_REG_VALUE_OFFSET  0x32
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -59,6 +71,46 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 
 static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+
+static inline void omap3_per_save_context(void)
+{
+	omap3_gpio_save_context();
+}
+
+static inline void omap3_per_restore_context(void)
+{
+	omap3_gpio_restore_context();
+}
+
+static void omap3_core_save_context(void)
+{
+	u32 control_padconf_off;
+	/* Save the padconf registers */
+	control_padconf_off =
+	omap_ctrl_readl(OMAP343X_CONTROL_PADCONF_OFF);
+	control_padconf_off |= START_PADCONF_SAVE;
+	omap_ctrl_writel(control_padconf_off, OMAP343X_CONTROL_PADCONF_OFF);
+	/* wait for the save to complete */
+	while (!omap_ctrl_readl(OMAP343X_CONTROL_GENERAL_PURPOSE_STATUS)
+			& PADCONF_SAVE_DONE)
+		;
+	/* Save the Interrupt controller context */
+	omap3_intc_save_context();
+	/* Save the GPMC context */
+	omap3_gpmc_save_context();
+	/* Save the system control module context, padconf already save above*/
+	omap3_control_save_context();
+}
+
+static void omap3_core_restore_context(void)
+{
+	/* Restore the control module context, padconf restored by h/w */
+	omap3_control_restore_context();
+	/* Restore the GPMC context */
+	omap3_gpmc_restore_context();
+	/* Restore the interrupt controller context */
+	omap3_intc_restore_context();
+}
 
 /* PRCM Interrupt Handler for wakeups */
 static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
@@ -188,6 +240,7 @@ static void omap_sram_idle(void)
 	int mpu_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
+	int core_prev_state, per_prev_state;
 
 	if (!_omap_sram_idle)
 		return;
@@ -230,8 +283,15 @@ static void omap_sram_idle(void)
 		omap_uart_prepare_idle(1);
 		/* PER changes only with core */
 		per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
-		if (per_next_state < PWRDM_POWER_ON)
+		if (per_next_state < PWRDM_POWER_ON) {
 			omap_uart_prepare_idle(2);
+			if (per_next_state == PWRDM_POWER_OFF)
+				omap3_per_save_context();
+		}
+		if (core_next_state == PWRDM_POWER_OFF) {
+			omap3_core_save_context();
+			omap3_prcm_save_context();
+		}
 		/* Enable IO-PAD wakeup */
 		prm_set_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
 	}
@@ -255,6 +315,18 @@ static void omap_sram_idle(void)
 
 		/* Disable IO-PAD wakeup */
 		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
+		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+		if (core_prev_state == PWRDM_POWER_OFF) {
+			omap3_core_restore_context();
+			omap3_prcm_restore_context();
+			omap3_sram_restore_context();
+		}
+		if (per_next_state < PWRDM_POWER_ON) {
+			per_prev_state =
+				pwrdm_read_prev_pwrst(per_pwrdm);
+			if (per_prev_state == PWRDM_POWER_OFF)
+				omap3_per_restore_context();
+		}
 		omap2_gpio_resume_after_retention();
 	}
 
@@ -714,6 +786,7 @@ int __init omap3_pm_init(void)
 	/* XXX prcm_setup_regs needs to be before enabling hw
 	 * supervised mode for powerdomains */
 	prcm_setup_regs();
+	omap3_save_scratchpad_contents();
 
 	ret = request_irq(INT_34XX_PRCM_MPU_IRQ,
 			  (irq_handler_t)prcm_interrupt_handler,
