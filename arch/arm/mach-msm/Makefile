@@ -4,5 +4,6 @@ obj-y += proc_comm.o
 obj-y += vreg.o
 obj-y += clock.o clock-7x01a.o
 
-obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
+obj-$(CONFIG_MSM_SMD) += smd.o
 
+obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
