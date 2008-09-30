@@ -56,10 +56,9 @@ config MACH_HALIBUT
 	  Support for the Qualcomm SURF7201A eval board.
 
 config MACH_TROUT
+	depends on ARCH_MSM
 	default y
-	bool "HTC Dream (aka trout)"
-	help
-	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
+	bool "Trout"
 
 choice
 	prompt "Default Timer"
