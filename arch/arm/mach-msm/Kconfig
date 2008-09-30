@@ -31,6 +31,11 @@ config MACH_HALIBUT
 	help
 	  Support for the Qualcomm SURF7201A eval board.
 
+config MACH_TROUT
+	depends on ARCH_MSM
+	default y
+	bool "Trout"
+
 choice
 	prompt "Default Timer"
 	default MSM7X00A_USE_GP_TIMER
