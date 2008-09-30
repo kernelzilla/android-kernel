@@ -42,4 +42,12 @@ config SENSORS_PCA963X
 	 This driver can also be built as a module.  If so, the module
 	 will be called pca963X.
 
+config SENSORS_MT9T013
+	tristate "MT9T013 Camera Driver"
+	depends on I2C
+	default y
+	help
+	 MT9T013 Camera Driver implemented by HTC.
+
+
 endmenu
