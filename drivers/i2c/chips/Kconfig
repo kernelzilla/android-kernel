@@ -26,6 +26,12 @@ config SENSORS_TSL2550
 	  This driver can also be built as a module.  If so, the module
 	  will be called tsl2550.
 
+config SENSORS_AKM8976
+	tristate "AKM8976 Compass Driver"
+	depends on I2C
+	help
+	 AKM8976 Compass Driver implemented by HTC.
+
 config SENSORS_PCA963X
 	tristate "Philips PCA963X 4-bit I2C-bus LED"
 	depends on I2C && EXPERIMENTAL
