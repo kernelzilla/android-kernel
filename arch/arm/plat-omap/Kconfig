@@ -199,6 +199,13 @@ config OMAP_32K_TIMER
 
 endchoice
 
+config OMAP3_DEBOBS
+	bool "OMAP 3430 Debug observability support"
+	depends on ARCH_OMAP3 && DEBUG_FS
+	default n
+	help
+	  Use ETK pads for debug observability
+
 config OMAP_32K_TIMER_HZ
        int "Kernel internal timer frequency for 32KHz timer"
        range 32 1024
