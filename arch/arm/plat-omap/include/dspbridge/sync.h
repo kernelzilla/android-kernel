@@ -55,6 +55,11 @@
 #ifndef _SYNC_H
 #define _SYNC_H
 
+#include <asm/semaphore.h>
+
+#define SIGNATURECS     0x53435953	/* "SYCS" (in reverse) */
+#define SIGNATUREDPCCS  0x53445953	/* "SYDS" (in reverse) */
+
 /* Special timeout value indicating an infinite wait: */
 #define SYNC_INFINITE  0xffffffff
 
@@ -63,14 +68,12 @@
 
 /* Generic SYNC object: */
 	struct SYNC_OBJECT;
-	/*typedef struct SYNC_OBJECT *SYNC_HOBJECT;*/
 
 /* Generic SYNC CS object: */
-	struct SYNC_CSOBJECT;
-	/*typedef struct SYNC_CSOBJECT *SYNC_HCSOBJECT;*/
-
-/* Used SYNC_CSOBJECT instead of SYNC_DPCCSOBJECT to avoid warnings */
-	/*typedef struct SYNC_CSOBJECT *SYNC_HDPCCSOBJECT;*/
+struct SYNC_CSOBJECT {
+	u32 dwSignature;	/* used for object validation */
+	struct semaphore sem;
+} ;
 
 /* SYNC object attributes: */
 	struct SYNC_ATTRS {

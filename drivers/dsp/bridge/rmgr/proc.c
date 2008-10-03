@@ -118,7 +118,7 @@
 #include <dspbridge/list.h>
 #include <dspbridge/mem.h>
 #include <dspbridge/ntfy.h>
-
+#include <dspbridge/sync.h>
 /*  ----------------------------------- Mini Driver */
 #include <dspbridge/wmd.h>
 
@@ -196,6 +196,8 @@ static struct GT_Mask PROC_DebugMask = { NULL, NULL };	/* WCD MGR Mask */
 #endif
 
 static u32 cRefs;
+
+struct SYNC_CSOBJECT *hProcLock;	/* For critical sections */
 
 #ifndef CONFIG_DISABLE_BRIDGE_PM
 #ifndef CONFIG_DISABLE_BRIDGE_DVFS
@@ -733,12 +735,13 @@ DSP_STATUS PROC_FlushMemory(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 		 "Entered PROC_FlushMemory, args:\n\t"
 		 "hProcessor: 0x%x pMpuAddr: 0x%x ulSize 0x%x, ulFlags 0x%x\n",
 		 hProcessor, pMpuAddr, ulSize, ulFlags);
-
+	/* Critical section */
+	(void)SYNC_EnterCS(hProcLock);
 	MEM_FlushCache(pMpuAddr, ulSize, FlushMemType);
+	(void)SYNC_LeaveCS(hProcLock);
 
 	GT_1trace(PROC_DebugMask, GT_ENTER, "Leaving PROC_FlushMemory [0x%x]",
 		 status);
-
 	return status;
 }
 
@@ -759,7 +762,10 @@ DSP_STATUS PROC_InvalidateMemory(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 		 "Entered PROC_InvalidateMemory, args:\n\t"
 		 "hProcessor: 0x%x pMpuAddr: 0x%x ulSize 0x%x\n", hProcessor,
 		 pMpuAddr, ulSize);
+	(void)SYNC_EnterCS(hProcLock);
 	MEM_FlushCache(pMpuAddr, ulSize, FlushMemType);
+	(void)SYNC_LeaveCS(hProcLock);
+
 	GT_1trace(PROC_DebugMask, GT_ENTER,
 		 "Leaving PROC_InvalidateMemory [0x%x]", status);
 	return status;
@@ -846,6 +852,9 @@ func_end:
 void PROC_Exit(void)
 {
 	DBC_Require(cRefs > 0);
+
+	if (hProcLock)
+		(void)SYNC_DeleteCS(hProcLock);
 
 	cRefs--;
 
@@ -992,6 +1001,8 @@ bool PROC_Init(void)
 		DBC_Assert(!PROC_DebugMask.flags);
 		GT_create(&PROC_DebugMask, "PR");  /* "PR" for Processor */
 
+		MEM_AllocObject(hProcLock, struct SYNC_CSOBJECT, SIGNATURECS);
+		(void)SYNC_InitializeCS(&hProcLock);
 	}
 
 	if (fRetval)
@@ -1384,6 +1395,8 @@ DSP_STATUS PROC_Map(DSP_HPROCESSOR hProcessor, void *pMpuAddr, u32 ulSize,
 	GT_3trace(PROC_DebugMask, GT_ENTER, "PROC_Map: vaAlign %x, paAlign %x, "
 		 "sizeAlign %x\n", vaAlign, paAlign, sizeAlign);
 
+	/* Critical section */
+	(void)SYNC_EnterCS(hProcLock);
 	status = DMM_GetHandle(pProcObject, &hDmmMgr);
 	if (DSP_FAILED(status)) {
 		GT_1trace(PROC_DebugMask, GT_7CLASS,
@@ -1406,6 +1419,8 @@ DSP_STATUS PROC_Map(DSP_HPROCESSOR hProcessor, void *pMpuAddr, u32 ulSize,
 	} else {
 		DMM_UnMapMemory(hDmmMgr, vaAlign, &sizeAlign);
 	}
+	(void)SYNC_LeaveCS(hProcLock);
+
 #ifndef RES_CLEANUP_DISABLE
 	if (DSP_SUCCEEDED(status)) {
 		/* Update the node and stream resource status */
@@ -1532,9 +1547,9 @@ DSP_STATUS PROC_ReserveMemory(DSP_HPROCESSOR hProcessor, u32 ulSize,
 	if (DSP_FAILED(status)) {
 		GT_1trace(PROC_DebugMask, GT_7CLASS, "PROC_ReserveMemory: "
 			 "Failed to get DMM Mgr handle: 0x%x\n", status);
-	} else {
+	} else
 		status = DMM_ReserveMemory(hDmmMgr, ulSize, (u32 *)ppRsvAddr);
-	}
+
 	GT_1trace(PROC_DebugMask, GT_ENTER, "Leaving PROC_ReserveMemory [0x%x]",
 		 status);
 	return status;
@@ -1743,6 +1758,8 @@ DSP_STATUS PROC_UnMap(DSP_HPROCESSOR hProcessor, void *pMapAddr)
 	vaAlign = PG_ALIGN_LOW((u32) pMapAddr, PG_SIZE_4K);
 
 	status = DMM_GetHandle(hProcessor, &hDmmMgr);
+	/* Critical section */
+	(void)SYNC_EnterCS(hProcLock);
 	if (DSP_FAILED(status)) {
 		GT_1trace(PROC_DebugMask, GT_7CLASS, "PROC_UnMap: "
 			 "Failed to get DMM Mgr handle: 0x%x\n", status);
@@ -1751,12 +1768,12 @@ DSP_STATUS PROC_UnMap(DSP_HPROCESSOR hProcessor, void *pMapAddr)
 		 This function returns error if the VA is not mapped */
 		status = DMM_UnMapMemory(hDmmMgr, (u32) vaAlign, &sizeAlign);
 	}
-
 	/* Remove mapping from the page tables. */
 	if (DSP_SUCCEEDED(status)) {
 		status = (*pProcObject->pIntfFxns->pfnBrdMemUnMap)
 			 (pProcObject->hWmdContext, vaAlign, sizeAlign);
 	}
+	(void)SYNC_LeaveCS(hProcLock);
 #ifndef RES_CLEANUP_DISABLE
 	GT_1trace(PROC_DebugMask, GT_ENTER,
 		   "PROC_UnMap DRV_GetDMMResElement "
@@ -1804,7 +1821,7 @@ DSP_STATUS PROC_UnReserveMemory(DSP_HPROCESSOR hProcessor, void *pRsvAddr)
 	status = DMM_GetHandle(pProcObject, &hDmmMgr);
 	if (DSP_FAILED(status))
 		GT_1trace(PROC_DebugMask, GT_7CLASS,
-			 "PROC_Map: Failed to get DMM Mgr "
+			 "PROC_UnReserveMemory: Failed to get DMM Mgr "
 			 "handle: 0x%x\n", status);
 	else
 		status = DMM_UnReserveMemory(hDmmMgr, (u32) pRsvAddr);

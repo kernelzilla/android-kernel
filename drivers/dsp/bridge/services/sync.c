@@ -15,7 +15,7 @@
  */
 
 /*
- *  ======== syncce.c ========
+ *  ======== sync.c ========
  *  Purpose:
  *      Synchronization services.
  *
@@ -68,8 +68,6 @@
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define SIGNATURE       0x434e5953	/* "SYNC" (in reverse) */
-#define SIGNATURECS     0x53435953	/* "SYCS" (in reverse) */
-#define SIGNATUREDPCCS  0x53445953	/* "SYDS" (in reverse) */
 
 enum wait_state {
 	wo_waiting,
@@ -94,11 +92,6 @@ struct SYNC_OBJECT {
 	spinlock_t sync_lock;
 	struct WAIT_OBJECT *pWaitObj;
 };
-
-struct SYNC_CSOBJECT {
-	u32 dwSignature;	/* used for object validation */
-	struct semaphore sem;
-} ;
 
 struct SYNC_DPCCSOBJECT {
 	u32 dwSignature;	/* used for object validation */
