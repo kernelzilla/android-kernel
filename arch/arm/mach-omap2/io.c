@@ -38,6 +38,8 @@
 #include <mach/clockdomain.h>
 #include "clockdomains.h"
 
+#include <mach/omap-pm.h>
+
 /*
  * The machine specific code may provide the extra mapping besides the
  * default mapping provided here.
@@ -197,9 +199,11 @@ void __init omap2_map_common_io(void)
 void __init omap2_init_common_hw(struct omap_sdrc_params *sp)
 {
 	omap2_mux_init();
+	omap_pm_if_early_init();
 	pwrdm_init(powerdomains_omap);
 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
 	omap2_clk_init();
+	omap_pm_if_init(NULL, NULL);
 	omap2_sdrc_init(sp);
 	gpmc_init();
 }
