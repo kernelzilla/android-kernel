@@ -26,6 +26,7 @@ extern atomic_t sleep_block;
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
 extern void omap3_pm_off_mode_enable(int);
+extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 
 
 #ifdef CONFIG_PM_DEBUG

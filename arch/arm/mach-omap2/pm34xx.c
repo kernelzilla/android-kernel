@@ -71,8 +71,6 @@ static void (*saved_idle)(void);
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 
-static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
-
 static inline void omap3_per_save_context(void)
 {
 	omap3_gpio_save_context();
@@ -388,7 +386,7 @@ static int omap3_fclks_active(void)
 	return 0;
 }
 
-static int omap3_can_sleep(void)
+int omap3_can_sleep(void)
 {
 	if (!enable_dyn_sleep)
 		return 0;
@@ -404,7 +402,7 @@ static int omap3_can_sleep(void)
 /* This sets pwrdm state (other than mpu & core. Currently only ON &
  * RET are supported. Function is assuming that clkdm doesn't have
  * hw_sup mode enabled. */
-static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 {
 	u32 cur_state;
 	int sleep_switch = 0;
