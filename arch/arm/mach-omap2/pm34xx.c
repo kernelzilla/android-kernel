@@ -231,7 +231,7 @@ static void restore_table_entry(void)
 	restore_control_register(control_reg_value);
 }
 
-static void omap_sram_idle(void)
+void omap_sram_idle(void)
 {
 	/* Variable to tell what needs to be saved and restored
 	 * in omap_sram_idle*/
@@ -844,7 +844,9 @@ int __init omap3_pm_init(void)
 	omap_push_sram_idle();
 	suspend_set_ops(&omap_pm_ops);
 
+#ifndef CONFIG_CPU_IDLE
 	pm_idle = omap3_pm_idle;
+#endif
 
 	pwrdm_add_wkdep(neon_pwrdm, mpu_pwrdm);
 	/*
