@@ -143,6 +143,7 @@ extern void omap2_allow_sleep(void);
 static inline void omap2_block_sleep(void) { }
 static inline void omap2_allow_sleep(void) { }
 #endif
+extern int omap3_can_sleep(void);
 extern void omap730_cpu_suspend(unsigned short, unsigned short);
 extern void omap1510_cpu_suspend(unsigned short, unsigned short);
 extern void omap1610_cpu_suspend(unsigned short, unsigned short);

@@ -51,10 +51,12 @@ struct omap3_processor_cx {
 
 struct omap3_processor_cx omap3_power_states[OMAP3_MAX_STATES];
 struct omap3_processor_cx current_cx_state;
-struct powerdomain *mpu_pd;
+struct powerdomain *mpu_pd, *core_pd;
 
 static int omap3_idle_bm_check(void)
 {
+	if (!omap3_can_sleep())
+		return 1;
 	return 0;
 }
 
@@ -80,24 +82,23 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 	local_irq_disable();
 	local_fiq_disable();
 
-	/* Program MPU to target state */
-	if (cx->mpu_state < PWRDM_POWER_ON)
-		pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
+	set_pwrdm_state(mpu_pd, cx->mpu_state);
+	set_pwrdm_state(core_pd, cx->core_state);
+
+	if (omap_irq_pending())
+		goto return_sleep_time;
 
 	/* Execute ARM wfi */
 	omap_sram_idle();
 
-	/* Program MPU to ON */
-	if (cx->mpu_state < PWRDM_POWER_ON)
-		pwrdm_set_next_pwrst(mpu_pd, PWRDM_POWER_ON);
-
+return_sleep_time:
 	getnstimeofday(&ts_postidle);
 	ts_idle = timespec_sub(ts_postidle, ts_preidle);
 
 	local_irq_enable();
 	local_fiq_enable();
 
-	return timespec_to_ns(&ts_idle);
+	return (u32)timespec_to_ns(&ts_idle)/1000;
 }
 
 /**
@@ -186,7 +187,7 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/* C4 . MPU CSWR + Core CSWR*/
-	omap3_power_states[OMAP3_STATE_C4].valid = 0;
+	omap3_power_states[OMAP3_STATE_C4].valid = 1;
 	omap3_power_states[OMAP3_STATE_C4].type = OMAP3_STATE_C4;
 	omap3_power_states[OMAP3_STATE_C4].sleep_latency = 2500;
 	omap3_power_states[OMAP3_STATE_C4].wakeup_latency = 7500;
@@ -268,6 +269,7 @@ int omap3_idle_init(void)
 		return -EIO;
 	}
 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+	core_pd = pwrdm_lookup("core_pwrdm");
 	return 0;
 }
 device_initcall(omap3_idle_init);
