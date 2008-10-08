@@ -26,6 +26,7 @@
 #include <mach/pm.h>
 #include <mach/prcm.h>
 #include <mach/powerdomain.h>
+#include <mach/control.h>
 
 #ifdef CONFIG_CPU_IDLE
 
@@ -177,7 +178,7 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/* C3 . MPU OFF + Core active */
-	omap3_power_states[OMAP3_STATE_C3].valid = 0;
+	omap3_power_states[OMAP3_STATE_C3].valid = 1;
 	omap3_power_states[OMAP3_STATE_C3].type = OMAP3_STATE_C3;
 	omap3_power_states[OMAP3_STATE_C3].sleep_latency = 1500;
 	omap3_power_states[OMAP3_STATE_C3].wakeup_latency = 1800;
@@ -198,7 +199,7 @@ void omap_init_power_states(void)
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C5 . MPU OFF + Core CSWR */
-	omap3_power_states[OMAP3_STATE_C5].valid = 0;
+	omap3_power_states[OMAP3_STATE_C5].valid = 1;
 	omap3_power_states[OMAP3_STATE_C5].type = OMAP3_STATE_C5;
 	omap3_power_states[OMAP3_STATE_C5].sleep_latency = 3000;
 	omap3_power_states[OMAP3_STATE_C5].wakeup_latency = 8500;
@@ -237,6 +238,8 @@ int omap3_idle_init(void)
 	struct omap3_processor_cx *cx;
 	struct cpuidle_state *state;
 	struct cpuidle_device *dev;
+
+	omap3_save_scratchpad_contents();
 
 	omap_init_power_states();
 	cpuidle_register_driver(&omap3_idle_driver);
