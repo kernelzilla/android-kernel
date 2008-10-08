@@ -135,6 +135,7 @@ void clk_allow_idle(struct clk *clk);
 
 extern void omap_pm_idle(void);
 extern void omap_pm_suspend(void);
+extern void omap_sram_idle(void);
 #ifdef CONFIG_PM
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
