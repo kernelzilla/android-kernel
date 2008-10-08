@@ -114,32 +114,11 @@ return_sleep_time:
 static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 			       struct cpuidle_state *state)
 {
-	struct cpuidle_state *new_state = NULL;
-	int i, j;
-
 	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
-
-		/* Find current state in list */
-		for (i = 0; i < OMAP3_MAX_STATES; i++)
-			if (state == &dev->states[i])
-				break;
-		BUG_ON(i == OMAP3_MAX_STATES);
-
-		/* Back up to non 'CHECK_BM' state */
-		for (j = i - 1;  j > 0; j--) {
-			struct cpuidle_state *s = &dev->states[j];
-
-			if (!(s->flags & CPUIDLE_FLAG_CHECK_BM)) {
-				new_state = s;
-				break;
-			}
-		}
-
-		pr_debug("%s: Bus activity: Entering %s (instead of %s)\n",
-			__func__, new_state->name, state->name);
+		if (dev->safe_state)
+			return dev->safe_state->enter(dev, dev->safe_state);
 	}
-
-	return omap3_enter_idle(dev, new_state ? : state);
+	return omap3_enter_idle(dev, state);
 }
 
 DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
@@ -258,6 +237,8 @@ int omap3_idle_init(void)
 		state->flags = cx->flags;
 		state->enter = (state->flags & CPUIDLE_FLAG_CHECK_BM) ?
 			omap3_enter_idle_bm : omap3_enter_idle;
+		if (cx->type == OMAP3_STATE_C1)
+			dev->safe_state = state;
 		sprintf(state->name, "C%d", count+1);
 		count++;
 	}
