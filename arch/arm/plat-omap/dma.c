@@ -2322,6 +2322,9 @@ EXPORT_SYMBOL(omap_dma_global_context_save);
 
 void omap_dma_global_context_restore(void)
 {
+	dma_write(0x2, OCP_SYSCONFIG);
+	while (!__raw_readl(omap_dma_base + OMAP_DMA4_SYSSTATUS))
+		;
 	dma_write(omap_dma_global_context.dma_gcr, GCR);
 	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
 		OCP_SYSCONFIG);
@@ -2329,6 +2332,18 @@ void omap_dma_global_context_restore(void)
 		IRQENABLE_L0);
 }
 EXPORT_SYMBOL(omap_dma_global_context_restore);
+
+void omap_dma_disable_irq(int lch)
+{
+	u32 val;
+
+	if (cpu_class_is_omap2()) {
+		/* Disable interrupts */
+		val = dma_read(IRQENABLE_L0);
+		val &= ~(1 << lch);
+		dma_write(val, IRQENABLE_L0);
+	}
+}
 
 /*----------------------------------------------------------------------------*/
 
