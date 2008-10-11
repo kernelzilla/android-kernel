@@ -215,8 +215,8 @@ HW_STATUS HW_MBOX_EventDisable(const u32 baseAddress,
 		    (u32)userId);
 
 	/* update enable value */
-	irqDisableReg &= ~((u32)(events)) << (((u32)(mailBoxId)) *
-		     HW_MBOX_ID_WIDTH);
+	irqDisableReg &= ~(((u32)(events)) << (((u32)(mailBoxId)) *
+		     HW_MBOX_ID_WIDTH));
 
 	/* write new enable status */
 	MLBMAILBOX_IRQENABLE___0_3WriteRegister32(baseAddress, (u32)userId,
