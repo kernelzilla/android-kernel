@@ -38,6 +38,7 @@
 #include <mach/serial.h>
 #include <mach/gpio.h>
 #include <mach/sdrc.h>
+#include <mach/dma.h>
 #include <mach/gpmc.h>
 #include <mach/dma.h>
 #include <asm/tlbflush.h>
@@ -65,6 +66,8 @@ struct power_state {
 static LIST_HEAD(pwrst_list);
 
 static void (*_omap_sram_idle)(u32 *addr, int save_state);
+
+static int (*_omap_save_secure_sram)(u32 *addr);
 
 static void (*saved_idle)(void);
 
@@ -111,6 +114,33 @@ static void omap3_core_restore_context(void)
 	/* Restore the interrupt controller context */
 	omap3_intc_restore_context();
 	omap_dma_global_context_restore();
+}
+
+static void omap3_save_secure_ram_context(u32 target_mpu_state)
+{
+	u32 ret;
+
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+		/* Disable dma irq before calling secure rom code API */
+		omap_dma_disable_irq(0);
+		omap_dma_disable_irq(1);
+		/*
+		 * MPU next state must be set to POWER_ON temporarily,
+		 * otherwise the WFI executed inside the ROM code
+		 * will hang the system.
+		 */
+		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+		ret = _omap_save_secure_sram((u32 *)
+				__pa(omap3_secure_ram_storage));
+		pwrdm_set_next_pwrst(mpu_pwrdm, target_mpu_state);
+		/* Following is for error tracking, it should not happen */
+		if (ret) {
+			printk(KERN_ERR "save_secure_sram() returns %08x\n",
+				ret);
+			while (1)
+				;
+		}
+	}
 }
 
 /* PRCM Interrupt Handler for wakeups */
@@ -295,6 +325,7 @@ void omap_sram_idle(void)
 					     OMAP3_PRM_VOLTCTRL_OFFSET);
 			omap3_core_save_context();
 			omap3_prcm_save_context();
+			omap3_save_secure_ram_context(mpu_next_state);
 		}
 		/* Enable IO-PAD wakeup */
 		prm_set_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
@@ -798,6 +829,9 @@ void omap_push_sram_idle(void)
 {
 	_omap_sram_idle = omap_sram_push(omap34xx_cpu_suspend,
 					omap34xx_cpu_suspend_sz);
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		_omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
+				save_secure_ram_context_sz);
 }
 
 int __init omap3_pm_init(void)
@@ -810,7 +844,6 @@ int __init omap3_pm_init(void)
 	/* XXX prcm_setup_regs needs to be before enabling hw
 	 * supervised mode for powerdomains */
 	prcm_setup_regs();
-	omap3_save_scratchpad_contents();
 
 	ret = request_irq(INT_34XX_PRCM_MPU_IRQ,
 			  (irq_handler_t)prcm_interrupt_handler,
@@ -853,6 +886,15 @@ int __init omap3_pm_init(void)
 	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
 	*/
 	pwrdm_add_wkdep(per_pwrdm, core_pwrdm);
+
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+		omap3_secure_ram_storage =
+			kmalloc(0x8000, GFP_KERNEL);
+		if (!omap3_secure_ram_storage)
+			printk(KERN_ERR "Memory allocation failed when"
+					"allocating for secure sram context\n");
+	}
+	omap3_save_scratchpad_contents();
 
 err1:
 	return ret;
