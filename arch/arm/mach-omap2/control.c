@@ -207,8 +207,12 @@ void omap3_save_scratchpad_contents(void)
 
 	/* Populate the Scratchpad contents */
 	scratchpad_contents.boot_config_ptr = 0x0;
-	scratchpad_contents.public_restore_ptr =
-			 virt_to_phys(get_restore_pointer());
+	if (system_rev != OMAP3430_REV_ES3_0)
+		scratchpad_contents.public_restore_ptr =
+			virt_to_phys(get_restore_pointer());
+	else
+		scratchpad_contents.public_restore_ptr =
+			virt_to_phys(get_es3_restore_pointer());
 	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 		scratchpad_contents.secure_ram_restore_ptr = 0x0;
 	else
