@@ -570,6 +570,7 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
 		omap2_clkdm_wakeup(clkdm);
 
 	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_clkdm_state_switch(clkdm);
 
 	return 0;
 }
@@ -621,6 +622,8 @@ int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
 		_clkdm_del_autodeps(clkdm);
 	else
 		omap2_clkdm_sleep(clkdm);
+
+	pwrdm_clkdm_state_switch(clkdm);
 
 	return 0;
 }
