@@ -172,6 +172,8 @@ static void omap_sram_idle(void)
 	disable_smartreflex(SR1);
 	disable_smartreflex(SR2);
 
+	pwrdm_pre_transition();
+
 	omap2_gpio_prepare_for_retention();
 	omap_uart_prepare_idle(0);
 	omap_uart_prepare_idle(1);
@@ -187,6 +189,9 @@ static void omap_sram_idle(void)
 	/* Enable smartreflex after WFI */
 	enable_smartreflex(SR1);
 	enable_smartreflex(SR2);
+
+	pwrdm_post_transition();
+
 }
 
 /*
@@ -280,6 +285,7 @@ static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 	if (sleep_switch) {
 		omap2_clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
 		pwrdm_wait_transition(pwrdm);
+		pwrdm_state_switch(pwrdm);
 	}
 
 err:
