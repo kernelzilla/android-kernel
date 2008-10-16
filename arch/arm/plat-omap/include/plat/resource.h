@@ -68,6 +68,7 @@ struct users_list {
 	u8 usage;
 };
 
+extern struct shared_resource *resources_omap[];
 /* Shared resource Framework API's */
 void resource_init(struct shared_resource **resources);
 int resource_register(struct shared_resource *res);
