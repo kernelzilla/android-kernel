@@ -33,6 +33,7 @@ obj-$(CONFIG_OMAP_SMARTREFLEX)		+= smartreflex.o
 # Clock framework
 obj-$(CONFIG_ARCH_OMAP2)		+= clock24xx.o
 obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o
+obj-$(CONFIG_OMAP_PM_SRF)		+=  resource34xx.o
 
 # DSP
 obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o

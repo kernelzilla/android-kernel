@@ -28,3 +28,5 @@ obj-y += $(i2c-omap-m) $(i2c-omap-y)
 obj-$(CONFIG_OMAP_MBOX_FWK) += mailbox.o
 
 obj-$(CONFIG_OMAP_PM_NOOP) += omap-pm-noop.o
+obj-$(CONFIG_OMAP_PM_SRF) += omap-pm-srf.o \
+				resource.o
