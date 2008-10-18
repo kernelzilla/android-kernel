@@ -15,6 +15,7 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/platform_device.h>
 
 #include <mach/cpu.h>
 #include <mach/powerdomain.h>
@@ -46,6 +47,12 @@ struct omapdev {
 	struct list_head node;
 };
 
+
+void omapdev_init(struct omapdev **odev_list);
+
+struct powerdomain *omapdev_get_pwrdm(struct omapdev *odev);
+
+struct omapdev *omapdev_find_pdev(struct platform_device *pdev);
 
 
 #endif
