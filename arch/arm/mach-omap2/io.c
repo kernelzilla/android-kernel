@@ -29,6 +29,8 @@
 #include <mach/sdrc.h>
 #include <mach/gpmc.h>
 
+#include "omapdev-common.h"
+
 #include "clock.h"
 
 #include <mach/powerdomain.h>
@@ -202,6 +204,7 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sp)
 	omap_pm_if_early_init();
 	pwrdm_init(powerdomains_omap);
 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
+	omapdev_init(omapdevs);
 	omap2_clk_init();
 	omap_pm_if_init(NULL, NULL);
 	omap2_sdrc_init(sp);
