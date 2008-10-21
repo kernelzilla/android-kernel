@@ -55,8 +55,6 @@
 #ifndef _SYNC_H
 #define _SYNC_H
 
-#include <asm/semaphore.h>
-
 #define SIGNATURECS     0x53435953	/* "SYCS" (in reverse) */
 #define SIGNATUREDPCCS  0x53445953	/* "SYDS" (in reverse) */
 
