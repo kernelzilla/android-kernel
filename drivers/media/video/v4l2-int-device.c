@@ -67,6 +67,25 @@ static void __v4l2_int_device_try_attach_all(void)
 	}
 }
 
+static struct v4l2_int_slave dummy_slave = {
+	/* Dummy pointer to avoid underflow in find_ioctl. */
+	.ioctls = (void *)sizeof(struct v4l2_int_ioctl_desc),
+	.num_ioctls = 0,
+};
+
+static struct v4l2_int_device dummy = {
+	.type = v4l2_int_type_slave,
+	.u = {
+		.slave = &dummy_slave,
+	},
+};
+
+struct v4l2_int_device *v4l2_int_device_dummy()
+{
+	return &dummy;
+}
+EXPORT_SYMBOL_GPL(v4l2_int_device_dummy);
+
 void v4l2_int_device_try_attach_all(void)
 {
 	mutex_lock(&mutex);
