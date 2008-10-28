@@ -93,9 +93,8 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 			core_state = PWRDM_POWER_RET;
 	}
 
-	set_pwrdm_state(mpu_pd, mpu_state);
-	set_pwrdm_state(core_pd, core_state);
-	set_pwrdm_state(per_pd, core_state); /* PER only changes w/CORE */
+	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
+	pwrdm_set_next_pwrst(core_pd, core_state);
 
 	if (omap_irq_pending())
 		goto return_sleep_time;
