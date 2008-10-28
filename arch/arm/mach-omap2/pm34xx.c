@@ -312,7 +312,7 @@ void omap_sram_idle(void)
 
 	/* NEON control */
 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
-		set_pwrdm_state(neon_pwrdm, mpu_next_state);
+		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
 
 	/* CORE & PER */
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
