@@ -197,7 +197,8 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
 	struct seq_file *s = (struct seq_file *)user;
 
 	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
-		strcmp(clkdm->name, "wkup_clkdm") == 0)
+		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
+		strncmp(clkdm->name, "dpll", 4) == 0)
 		return 0;
 
 	seq_printf(s, "%s->%s (%d)", clkdm->name,
@@ -214,7 +215,8 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
 	int i;
 
 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
-		strcmp(pwrdm->name, "wkup_pwrdm") == 0)
+		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
+		strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
 
 	if (pwrdm->state != pwrdm_read_pwrst(pwrdm))
