@@ -33,6 +33,7 @@
 #include <mach/prcm.h>
 #include <mach/clockdomain.h>
 #include <mach/powerdomain.h>
+#include <mach/resource.h>
 #include <mach/serial.h>
 #include <mach/control.h>
 #include <mach/serial.h>
@@ -814,6 +815,10 @@ void omap3_pm_off_mode_enable(int enable)
 	else
 		state = PWRDM_POWER_RET;
 
+#ifdef CONFIG_OMAP_PM_SRF
+	if (resource_refresh())
+		printk(KERN_ERR "Error: could not refresh resources\n");
+#endif
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		pwrst->next_state = state;
 		set_pwrdm_state(pwrst->pwrdm, state);
