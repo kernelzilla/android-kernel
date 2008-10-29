@@ -71,6 +71,7 @@ struct users_list {
 extern struct shared_resource *resources_omap[];
 /* Shared resource Framework API's */
 void resource_init(struct shared_resource **resources);
+int resource_refresh(void);
 int resource_register(struct shared_resource *res);
 int resource_unregister(struct shared_resource *res);
 int resource_request(const char *name, struct device *dev,

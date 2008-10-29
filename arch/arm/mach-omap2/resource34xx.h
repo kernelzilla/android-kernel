@@ -80,6 +80,13 @@ static struct shared_resource_ops pd_lat_res_ops = {
 	.change_level 	= set_pd_latency,
 };
 
+static struct shared_resource core_pwrdm_latency = {
+	.name		= "core_pwrdm_latency",
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+	.resource_data	= &core_qos_req_added,
+	.ops		= &lat_res_ops,
+};
+
 static struct pd_latency_db iva2_pwrdm_lat_db = {
 	.pwrdm_name = "iva2_pwrdm",
 	.latency[PD_LATENCY_OFF] = 1100,
@@ -103,6 +110,14 @@ static struct pd_latency_db gfx_pwrdm_lat_db = {
 	.latency[PD_LATENCY_ON]	 = 0
 };
 
+static struct pd_latency_db sgx_pwrdm_lat_db = {
+	.pwrdm_name = "sgx_pwrdm",
+	.latency[PD_LATENCY_OFF] = 1000,
+	.latency[PD_LATENCY_RET] = 100,
+	.latency[PD_LATENCY_INACT] = -1,
+	.latency[PD_LATENCY_ON]	 = 0
+};
+
 static struct shared_resource gfx_pwrdm_latency = {
 	.name		= "gfx_pwrdm_latency",
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES1),
@@ -113,7 +128,7 @@ static struct shared_resource gfx_pwrdm_latency = {
 static struct shared_resource sgx_pwrdm_latency = {
 	.name 		= "sgx_pwrdm_latency",
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2),
-	.resource_data  = &gfx_pwrdm_lat_db,
+	.resource_data  = &sgx_pwrdm_lat_db,
 	.ops		= &pd_lat_res_ops,
 };
 
@@ -211,6 +226,7 @@ struct shared_resource *resources_omap[] __initdata = {
 	&mpu_latency,
 	&core_latency,
 	/* Power Domain Latency resources */
+	&core_pwrdm_latency,
 	&iva2_pwrdm_latency,
 	&gfx_pwrdm_latency,
 	&sgx_pwrdm_latency,

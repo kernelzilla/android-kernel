@@ -224,6 +224,27 @@ void resource_init(struct shared_resource **resources)
 }
 
 /**
+ * resource_refresh - Refresh the states of all current resources
+ *
+ * If a condition in power domains has changed that requires refreshing
+ * power domain states, this function can be used to restore correct
+ * states according to shared resources.
+ * Returns 0 on success, non-zero, if some resource cannot be refreshed.
+ */
+int resource_refresh(void)
+{
+	struct shared_resource *resp = NULL;
+	int ret = 0;
+
+	list_for_each_entry(resp, &res_list, node) {
+		ret = update_resource_level(resp);
+		if (ret)
+			break;
+	}
+	return ret;
+}
+
+/**
  * resource_register - registers and initializes a resource
  * @res: struct shared_resource * to register
  *
@@ -347,10 +368,16 @@ int resource_request(const char *name, struct device *dev,
 	}
 	user->level = level;
 
-	/* Recompute and set the current level for the resource */
-	ret = update_resource_level(resp);
 res_unlock:
 	spin_unlock_irqrestore(&res_lock, flags);
+	/*
+	 * Recompute and set the current level for the resource.
+	 * NOTE: update_resource level moved out of spin_lock, as it may call
+	 * pm_qos_add_requirement, which does a kzmalloc. This won't be allowed
+	 * in iterrupt context. The spin_lock still protects add/remove users.
+	 */
+	if (!ret)
+		ret = update_resource_level(resp);
 	return ret;
 }
 EXPORT_SYMBOL(resource_request);
