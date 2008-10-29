@@ -25,10 +25,7 @@
 #include <mach/omap-pm.h>
 #include <mach/powerdomain.h>
 #include <mach/resource.h>
-/* TODO: Put this back in once tiocp layer is available */
-/*
-#include <asm/arch/tiocp.h>
-*/
+#include <mach/omapdev.h>
 
 static struct omap_opp *dsp_opps;
 static struct omap_opp *mpu_opps;
@@ -102,8 +99,9 @@ void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
 
 void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 {
-	/* struct tiocp *tiocp_dev; */
+	struct omapdev *odev;
 	struct powerdomain *pwrdm_dev;
+	struct platform_device *pdev;
 	char *lat_res_name;
 
 	if (!dev || t < -1) {
@@ -111,10 +109,30 @@ void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 		return;
 	};
 	/* Look for the devices Power Domain */
-	/* TODO: Put this back in once tiocp layer is available
-	tiocp_dev = container_of(dev, struct tiocp, dev);
-	pwrdm_dev = tiocp_dev->pwrdm;
-	*/
+	/*
+	 * WARNING! If device is not a platform device, container_of will
+	 * return a pointer to unknown memory!
+	 * TODO: Either change omap-pm interface to support only platform
+	 * devices, or change the underlying omapdev implementation to
+	 * support normal devices.
+	 */
+	pdev = container_of(dev, struct platform_device, dev);
+
+	/* Try to catch non platform devices. */
+	if (pdev->name == NULL) {
+		printk(KERN_ERR "OMAP-PM: Error: platform device not valid\n");
+		return;
+	}
+
+	odev = omapdev_find_pdev(pdev);
+	if (odev) {
+		pwrdm_dev = omapdev_get_pwrdm(odev);
+	} else {
+		printk(KERN_ERR "OMAP-PM: Error: Could not find omapdev "
+						"for %s\n", pdev->name);
+		return;
+	}
+
 	lat_res_name = kmalloc(MAX_LATENCY_RES_NAME, GFP_KERNEL);
 	if (!lat_res_name) {
 		printk(KERN_ERR "OMAP-PM: FATAL ERROR: kmalloc failed\n");

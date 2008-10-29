@@ -20,6 +20,7 @@
 #include <mach/powerdomain.h>
 #include <mach/clockdomain.h>
 #include "resource34xx.h"
+#include "pm.h"
 
 /**
  * init_latency - Initializes the mpu/core latency resource.
@@ -84,10 +85,14 @@ void init_pd_latency(struct shared_resource *resp)
 	struct pd_latency_db *pd_lat_db;
 
 	resp->no_of_users = 0;
-	resp->curr_level = PD_LATENCY_OFF;
+	if (enable_off_mode)
+		resp->curr_level = PD_LATENCY_OFF;
+	else
+		resp->curr_level = PD_LATENCY_RET;
 	pd_lat_db = resp->resource_data;
 	/* Populate the power domain associated with the latency resource */
 	pd_lat_db->pd = pwrdm_lookup(pd_lat_db->pwrdm_name);
+	set_pwrdm_state(pd_lat_db->pd, resp->curr_level);
 	return;
 }
 
@@ -117,6 +122,9 @@ int set_pd_latency(struct shared_resource *resp, u32 latency)
 			break;
 		}
 	}
+
+	if (!enable_off_mode && pd_lat_level == PD_LATENCY_OFF)
+		pd_lat_level = PD_LATENCY_RET;
 
 	resp->curr_level = pd_lat_level;
 	set_pwrdm_state(pwrdm, pd_lat_level);
