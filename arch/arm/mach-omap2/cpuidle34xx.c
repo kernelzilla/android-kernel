@@ -27,13 +27,13 @@
 #include <mach/prcm.h>
 #include <mach/powerdomain.h>
 #include <mach/control.h>
+#include <mach/serial.h>
 
 #include "pm.h"
 
 #ifdef CONFIG_CPU_IDLE
 
 #define OMAP3_MAX_STATES 7
-#define OMAP3_STATE_C0 0 /* C0 - System executing code */
 #define OMAP3_STATE_C1 1 /* C1 - MPU WFI + Core active */
 #define OMAP3_STATE_C2 2 /* C2 - MPU CSWR + Core active */
 #define OMAP3_STATE_C3 3 /* C3 - MPU OFF + Core active */
@@ -54,7 +54,7 @@ struct omap3_processor_cx {
 
 struct omap3_processor_cx omap3_power_states[OMAP3_MAX_STATES];
 struct omap3_processor_cx current_cx_state;
-struct powerdomain *mpu_pd, *core_pd;
+struct powerdomain *mpu_pd, *core_pd, *per_pd;
 
 static int omap3_idle_bm_check(void)
 {
@@ -95,6 +95,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 
 	set_pwrdm_state(mpu_pd, mpu_state);
 	set_pwrdm_state(core_pd, core_state);
+	set_pwrdm_state(per_pd, core_state); /* PER only changes w/CORE */
 
 	if (omap_irq_pending())
 		goto return_sleep_time;
@@ -124,11 +125,15 @@ return_sleep_time:
 static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 			       struct cpuidle_state *state)
 {
+	struct cpuidle_state *new_state = state;
+
 	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
-		if (dev->safe_state)
-			return dev->safe_state->enter(dev, dev->safe_state);
+		BUG_ON(!dev->safe_state);
+		new_state = dev->safe_state;
 	}
-	return omap3_enter_idle(dev, state);
+
+	dev->last_state = new_state;
+	return omap3_enter_idle(dev, new_state);
 }
 
 DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
@@ -136,7 +141,6 @@ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
 /* omap3_init_power_states - Initialises the OMAP3 specific C states.
  *
  * Below is the desciption of each C state.
- *	C0 . System executing code (Not an idle state)
  *	C1 . MPU WFI + Core active
  *	C2 . MPU CSWR + Core active
  *	C3 . MPU OFF + Core active
@@ -164,7 +168,8 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C2].threshold = 300;
 	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_RET;
 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
-	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
+	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID |
+				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C3 . MPU OFF + Core active */
 	omap3_power_states[OMAP3_STATE_C3].valid = 1;
@@ -174,7 +179,8 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C3].threshold = 4000;
 	omap3_power_states[OMAP3_STATE_C3].mpu_state = PWRDM_POWER_OFF;
 	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_ON;
-	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID;
+	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID |
+				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C4 . MPU CSWR + Core CSWR*/
 	omap3_power_states[OMAP3_STATE_C4].valid = 1;
@@ -199,7 +205,7 @@ void omap_init_power_states(void)
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C6 . MPU OFF + Core OFF */
-	omap3_power_states[OMAP3_STATE_C6].valid = 0;
+	omap3_power_states[OMAP3_STATE_C6].valid = 1;
 	omap3_power_states[OMAP3_STATE_C6].type = OMAP3_STATE_C6;
 	omap3_power_states[OMAP3_STATE_C6].sleep_latency = 10000;
 	omap3_power_states[OMAP3_STATE_C6].wakeup_latency = 30000;
@@ -229,6 +235,10 @@ int omap3_idle_init(void)
 	struct cpuidle_device *dev;
 
 	omap3_save_scratchpad_contents();
+
+	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+	core_pd = pwrdm_lookup("core_pwrdm");
+	per_pd = pwrdm_lookup("per_pwrdm");
 
 	omap_init_power_states();
 	cpuidle_register_driver(&omap3_idle_driver);
