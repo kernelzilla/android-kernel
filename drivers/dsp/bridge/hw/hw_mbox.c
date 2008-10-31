@@ -251,5 +251,19 @@ HW_STATUS HW_MBOX_EventAck(const u32 baseAddress, const HW_MBOX_Id_t mailBoxId,
 	MLBMAILBOX_IRQSTATUS___0_3WriteRegister32(baseAddress, (u32)userId,
 					     (u32)irqStatusReg);
 
+	/*
+	 * FIXME: Replace all this custom register access with standard
+	 * __raw_read/write().
+	 *
+	 * FIXME: Replace all interrupt handlers with standard linux style
+	 * interrupt handlers.
+	 *
+	 * FIXME: Replace direct access to PRCM registers with omap standard
+	 * PRCM register access.
+	 *
+	 * Flush posted write for the irq status to avoid spurious interrupts.
+	 */
+	MLBMAILBOX_IRQSTATUS___0_3ReadRegister32(baseAddress, (u32)userId);
+
 	return status;
 }
