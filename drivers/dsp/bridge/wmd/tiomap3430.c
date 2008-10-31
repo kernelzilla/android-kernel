@@ -1142,8 +1142,6 @@ static DSP_STATUS WMD_DEV_Ctrl(struct WMD_DEV_CONTEXT *pDevContext, u32 dwCmd,
 		DBG_Trace(DBG_LEVEL5, "WMDIOCTL_PWR_HIBERNATE\n");
 		status = handle_hibernation_fromDSP(pDevContext);
 		break;
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 	case WMDIOCTL_PRESCALE_NOTIFY:
 		DBG_Trace(DBG_LEVEL5, "WMDIOCTL_PRESCALE_NOTIFY\n");
 		status = PreScale_DSP(pDevContext, pArgs);
@@ -1156,8 +1154,6 @@ static DSP_STATUS WMD_DEV_Ctrl(struct WMD_DEV_CONTEXT *pDevContext, u32 dwCmd,
 		DBG_Trace(DBG_LEVEL5, "WMDIOCTL_CONSTRAINT_REQUEST\n");
 		status = handle_constraints_set(pDevContext, pArgs);
 		break;
-#endif
-#endif
 	default:
 		status = DSP_EFAIL;
 		DBG_Trace(DBG_LEVEL7, "Error in WMD_BRD_Ioctl \n");
@@ -1292,10 +1288,13 @@ static DSP_STATUS WMD_BRD_MemMap(struct WMD_DEV_CONTEXT *hDevContext,
 	u32 *pPhysAddrPageTbl = NULL;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
+	struct CFG_HOSTRES resources;
 
 	DBG_Trace(DBG_ENTER, "> WMD_BRD_MemMap hDevContext %x, pa %x, va %x, "
 		 "size %x, ulMapAttr %x\n", hDevContext, ulMpuAddr, ulVirtAddr,
 		 ulNumBytes, ulMapAttr);
+	status = CFG_GetHostResources(
+		 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 	if (ulNumBytes == 0)
 		return DSP_EINVALIDARG;
 
@@ -1423,6 +1422,12 @@ func_cont:
 	 * This is called from here instead from PteUpdate to avoid unnecessary
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
+	HW_PWRST_IVA2RegGet(resources.dwPrmBase, &temp);
+	if ((temp & 0x03) != 0x03 || (temp & 0x03) != 0x02) {
+		DBG_Trace(DBG_LEVEL7, "temp value is 0x%x\n", temp);
+		CLK_Enable(SERVICESCLK_iva2_ck);
+		WakeDSP(pDevContext, NULL);
+	}
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemMap status %x\n", status);
 	return status;
@@ -1564,6 +1569,7 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 	 /* It is better to flush the TLB here, so that any stale old entries
 	 * get flushed */
 EXIT_LOOP:
+	IO_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_LEVEL1, "WMD_BRD_MemUnMap vaCurr %x, pteAddrL1 %x "
 		  "pteAddrL2 %x\n", vaCurr, pteAddrL1, pteAddrL2);
@@ -2048,6 +2054,7 @@ func_cont:
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
 	/* Waking up DSP before calling TLB Flush */
+	IO_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_LEVEL7, "< WMD_BRD_MemMap  at end status %x\n", status);
 	return status;

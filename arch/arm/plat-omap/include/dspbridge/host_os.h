@@ -70,4 +70,24 @@
 #define INT_MAIL_MPU_IRQ        26
 #define INT_DSP_MMU_IRQ        28
 
+#ifdef CONFIG_PM
+struct dspbridge_platform_data {
+	void 	(*dsp_set_min_opp)(u8 opp_id);
+	u8 	(*dsp_get_opp)(void);
+	void 	(*cpu_set_freq)(unsigned long f);
+	unsigned long (*cpu_get_freq)(void);
+	unsigned long mpu_speed[6];
+};
+
+#define PRCM_VDD1 1
+
+#ifndef CONFIG_OMAP_PM_SRF
+#define VDD1_OPP1 1
+#define VDD1_OPP2 2
+#define VDD1_OPP3 3
+#define VDD1_OPP4 4
+#define VDD1_OPP5 5
+#endif
+
+#endif
 #endif

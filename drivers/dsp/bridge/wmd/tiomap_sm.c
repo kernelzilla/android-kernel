@@ -67,15 +67,8 @@
 #include <dspbridge/chnl_sm.h>
 #include "_tiomap_pwr.h"
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
-#else
-#include <mach/resource.h>
-extern struct constraint_handle *dsp_constraint_handle;
-#endif
-#endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+extern struct platform_device omap_dspbridge_dev;
 #endif
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
@@ -172,10 +165,10 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	DSP_STATUS status = DSP_SOK;
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-	u32 opplevel;
-#endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
+	u32 opplevel = 0;
 #endif
 	HW_STATUS hwStatus;
 	u32 mbxFull;
@@ -187,56 +180,38 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	status = CFG_GetHostResources(
 			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 			&resources);
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+		if (pdata->dsp_get_opp)
+			opplevel = (*pdata->dsp_get_opp)();
+
+		/* If OPP is at minimum level, increase it before waking up
+		* the DSP */
+		if (opplevel == 1) {
+			if (pdata->dsp_set_min_opp) {
+				(*pdata->dsp_set_min_opp)(opplevel+1);
+				DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP: "
+					"Setting the vdd1 opp level to %d "
+					"before waking DSP \n",
+					(opplevel + 1));
+			}
+		}
+
+#endif
 
 	if  (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
 		pDevContext->dwBrdState = BRD_RUNNING;
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-		opplevel = omap_pm_dsp_get_opp();
-		/* If OPP is at minimum level, increase it before waking up
-		* the DSP */
-		if (opplevel == 1) {
-			omap_pm_dsp_set_min_opp(opplevel+1);
-			DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP:Setting "
-			"the vdd1 constraint level to %d before "
-			"waking DSP \n", (opplevel + 1));
-		}
 
-#else
-		opplevel = constraint_get_level(dsp_constraint_handle);
-		/* If OPP is at minimum level, increase it before waking up
-		 * the DSP */
-		if (opplevel == 1) {
-			if (constraint_set(dsp_constraint_handle,
-			   (opplevel+1)) != 0) {
-				DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP: "
-					 "Constraint set failed\n");
-				return DSP_EFAIL;
-			}
-			DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP:Setting "
-				 "the vdd1 constraint level to %d before "
-				 "waking DSP \n", (opplevel + 1));
-		}
-
-#endif
-#endif
-#endif
-		/* Read MMU register to invoke short wakeup of DSP */
 		temp = (u32) *((REG_UWORD32 *) ((u32)
 		       (resources.dwDmmuBase) + 0x10));
 
 		/* Restore mailbox settings */
 		status = HW_MBOX_restoreSettings(resources.dwMboxBase);
-		DBG_Trace(DBG_LEVEL6, "MailBoxSettings: SYSCONFIG = 0x%x\n",
-			  mboxsetting.sysconfig);
-		DBG_Trace(DBG_LEVEL6, "MailBoxSettings: IRQENABLE0 = 0x%x\n",
-			  mboxsetting.irqEnable0);
-		DBG_Trace(DBG_LEVEL6, "MailBoxSettings: IRQENABLE1 = 0x%x\n",
-			 mboxsetting.irqEnable1);
-		/* Restart the peripheral clocks that were disabled */
-		DSP_PeripheralClocks_Enable(hDevContext, NULL);
+
+		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
+			/* Restart the peripheral clocks that were disabled */
+			DSP_PeripheralClocks_Enable(hDevContext, NULL);
+		}
 
 	}
 	while (--cnt) {

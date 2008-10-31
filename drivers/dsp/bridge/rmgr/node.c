@@ -152,16 +152,6 @@
 #include <dspbridge/resourcecleanup.h>
 #endif
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
-#include <mach/board-3430sdp.h>
-#else
-#include <mach/resource.h>
-#endif
-#endif
-#endif
 
 #define NODE_SIGNATURE      0x45444f4e	/* "EDON" */
 #define NODEMGR_SIGNATURE   0x52474d4e	/* "RGMN" */
@@ -374,13 +364,8 @@ static struct NLDR_FXNS nldrFxns = {
 	NLDR_Load,
 	NLDR_Unload,
 };
-
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifdef CONFIG_OMAP3_PM
-extern struct constraint_handle *mpu_constraint_handle;
-#endif
-#endif
+#ifdef CONFIG_PM
+extern struct platform_device omap_dspbridge_dev;
 #endif
 
 enum NODE_STATE NODE_GetState(HANDLE hNode)
@@ -1324,6 +1309,11 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	bool bJustWokeDSP = false;
 	struct DSP_CBDATA cbData;
 	u32 procId = 255;
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
+#endif
+
 
 	DBC_Require(cRefs > 0);
 	GT_1trace(NODE_debugMask, GT_ENTER, "NODE_Create: hNode: 0x%x\n",
@@ -1364,24 +1354,18 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 
 	if (DSP_SUCCEEDED(status)) {
 		/* If node's create function is not loaded, load it */
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 		/* Boost the OPP level to max level that DSP can be requested */
-#ifndef CONFIG_OMAP3_PM
-		omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP3].speed);
-		GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
-		"after setting to VDD1_OPP3 is %d\n",
-		omap_pm_dsp_get_opp());
-#else
-		if (constraint_set(mpu_constraint_handle,
-		   CO_VDD1_OPP3) != 0)
-			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
-			"Constraint set of %d failed\n", CO_VDD1_OPP3);
-		else
-			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
-				 "Constraint set of %d passed\n",
-				 CO_VDD1_OPP3);
-#endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifndef CONFIG_CPU_FREQ
+		if (pdata->cpu_set_freq) {
+			(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP3]);
+
+			if (pdata->dsp_get_opp) {
+				GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
+				"after setting to VDD1_OPP3 is %d\n",
+				(*pdata->dsp_get_opp)());
+			}
+		}
 #endif
 #endif
 		status = hNodeMgr->nldrFxns.pfnLoad(hNode->hNldrNode,
@@ -1398,25 +1382,18 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 				 "NODE_Create: failed to load"
 				 " create code: 0x%x\n", status);
 		}
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 		/* Request the lowest OPP level*/
-#ifndef CONFIG_OMAP3_PM
-		omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP1].speed);
-		GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
-		"after setting to VDD1_OPP1 is %d\n",
-		omap_pm_dsp_get_opp());
-#else
-		if (constraint_set(mpu_constraint_handle,
-		   (CO_VDD1_OPP1)) != 0) {
-			GT_1trace(NODE_debugMask, GT_4CLASS,
-				 "NODE_Create: Constraint set of %d "
-				 "failed\n", CO_VDD1_OPP1);
-		} else {
-			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Create:"
-			"Constraint set of %d passed\n", CO_VDD1_OPP1);
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifndef CONFIG_CPU_FREQ
+		if (pdata->cpu_set_freq) {
+			(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP1]);
+
+			if (pdata->dsp_get_opp) {
+				GT_1trace(NODE_debugMask, GT_4CLASS, "opp level"
+				"after setting to VDD1_OPP1 is %d\n",
+				(*pdata->dsp_get_opp)());
+			}
 		}
-#endif
 #endif
 #endif
 		/* Get address of iAlg functions, if socket node */

@@ -11,23 +11,15 @@ menuconfig MPU_BRIDGE
 	  "host" processor, and the attached DSPs are processing resources
 	  that can be utilized by applications and drivers running on the GPP.
 
-config DISABLE_BRIDGE_DVFS
-	bool "Disable Bridge Dynamic Voltage and Frequency Scaling (DVFS)"
+config BRIDGE_DVFS
+	bool "Enable Bridge Dynamic Voltage and Frequency Scaling (DVFS)"
 	depends on MPU_BRIDGE
-	default y
+	default n
 	help
 	  DVFS allows DSP Bridge to initiate the operating point change to
 	  scale the chip voltage and frequency in order to match the
 	  performance and power consumption to the current processing
 	  requirements.
-
-config DISABLE_BRIDGE_PM
-	bool "Disable Bridge Power Management"
-	depends on MPU_BRIDGE && PM
-	default y
-	help
-	  DSP Bridge employs power management techniques to save dynamic and
-	  static power consumption of the IVA sub system.
 
 config BRIDGE_DEBUG
 	bool "DSP Bridge Debug Support"

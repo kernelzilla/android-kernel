@@ -100,9 +100,8 @@ static struct SERVICES_Clk_t SERVICES_Clks[] = {
 	{NULL, ""}
 };
 
-
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-extern struct platform_device dspbridge_device;
+#ifdef CONFIG_PM
+extern struct platform_device omap_dspbridge_dev;
 #endif
 
 
@@ -153,8 +152,8 @@ bool CLK_Init(void)
 	/* Get the clock handles from base port and store locally */
 	while (i < SERVICESCLK_NOT_DEFINED) {
 		/* get the handle from BP */
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-		clk_handle = clk_get(&dspbridge_device.dev,
+#ifndef CONFIG_PM
+		clk_handle = clk_get(&omap_dspbridge_dev.dev,
 			     SERVICES_Clks[i].clk_name);
 #else
 		clk_handle = clk_get(NULL, SERVICES_Clks[i].clk_name);

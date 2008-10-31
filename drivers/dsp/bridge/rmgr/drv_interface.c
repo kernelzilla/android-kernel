@@ -58,16 +58,8 @@
 #include <linux/init.h>
 #include <linux/moduleparam.h>
 #include <linux/cdev.h>
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
-#else
-#include <mach/resource.h>
-#include <mach/prcm_34xx.h>
-#endif
-#endif
-#endif
+
+#include <mach/board-3430sdp.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <dspbridge/std.h>
@@ -108,14 +100,12 @@
 #include <dspbridge/dbreg.h>
 #endif
 
-#ifndef DISABLE_BRIDGE_PM
-#ifndef DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#define PRCM_VDD1 1
-struct clk *clk_handle;
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+#include <mach/omap-pm.h>
 #endif
 #endif
-#endif
+
 
 
 #define BRIDGE_NAME "C6410"
@@ -149,7 +139,7 @@ static u32 phys_mempool_base;
 static u32 phys_mempool_size;
 static int tc_wordswapon;	/* Default value is always false */
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 struct omap34xx_bridge_suspend_data {
 	int suspended;
 	wait_queue_head_t suspend_wq;
@@ -219,40 +209,20 @@ static struct file_operations bridge_fops = {
 	.mmap		= bridge_mmap,
 };
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 static u32 timeOut = 1000;
+#ifdef CONFIG_BRIDGE_DVFS
+static struct clk *clk_handle;
+s32 dsp_max_opps = VDD1_OPP3;
+#endif
 
 static int bridge_suspend(struct platform_device *pdev, pm_message_t state);
 static int bridge_resume(struct platform_device *pdev);
-#endif
 
-static void bridge_free(struct device *dev);
-
-static int omap34xx_bridge_probe(struct platform_device *dev);
-
-static int omap34xx_bridge_probe(struct platform_device *dev)
-{
-	return 0;
-}
-
-static struct platform_device omap_dspbridge_dev = {
-		.name = BRIDGE_NAME,
-		.id = -1,
-		.num_resources = 0,
-		.dev = {
-		.release = bridge_free,
-		},
-		.resource = NULL,
-};
-
-
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
 /* Maximum Opps that can be requested by IVA*/
-s32 dsp_max_opps = VDD1_OPP3;
 /*vdd1 rate table*/
-const struct vdd_prcm_config vdd1_rate_table[] = {
+#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+const struct vdd_prcm_config vdd1_rate_table_bridge[] = {
 	{0, 0, 0},
 	/*OPP1*/
 	{S125M, VDD1_OPP1, 0},
@@ -265,10 +235,38 @@ const struct vdd_prcm_config vdd1_rate_table[] = {
 	/*OPP5*/
 	{S600M, VDD1_OPP5, 0},
 };
-#else
-/* Maximum Opps that can be requested by IVA*/
-s32 dsp_max_opps = CO_VDD1_OPP3;
 #endif
+#endif
+
+static void bridge_free(struct device *dev);
+
+static int omap34xx_bridge_probe(struct platform_device *dev);
+
+static int omap34xx_bridge_probe(struct platform_device *dev)
+{
+	return 0;
+}
+
+static struct dspbridge_platform_data dspbridge_pdata = {
+#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+	.dsp_set_min_opp = omap_pm_dsp_set_min_opp,
+	.dsp_get_opp = omap_pm_dsp_get_opp,
+	.cpu_set_freq = omap_pm_cpu_set_freq,
+	.cpu_get_freq = omap_pm_cpu_get_freq,
+#endif
+
+};
+
+struct platform_device omap_dspbridge_dev = {
+		.name = BRIDGE_NAME,
+		.id = -1,
+		.num_resources = 0,
+		.dev = {
+		.release = bridge_free,
+		.platform_data = &dspbridge_pdata,
+		},
+		.resource = NULL,
+};
 
 u32 vdd1_dsp_freq[6][4] = {
 	{0, 0, 0, 0},
@@ -284,6 +282,7 @@ u32 vdd1_dsp_freq[6][4] = {
 	{0, 430000, 355000, 430000},
 };
 
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
 
 static int dspbridge_post_scale(struct notifier_block *op, unsigned long level,
 				void *ptr)
@@ -292,27 +291,11 @@ static int dspbridge_post_scale(struct notifier_block *op, unsigned long level,
 	return 0;
 }
 
-#ifndef CONFIG_OMAP3_PM
 static struct notifier_block iva_clk_notifier = {
 	.notifier_call = dspbridge_post_scale,
 	NULL,
 };
 
-#else
-/* The handle for setting constraints */
-struct constraint_handle *dsp_constraint_handle;
-struct constraint_handle *mpu_constraint_handle;
-
-static struct notifier_block omap34xxbridge_post_scale = {
-	.notifier_call = dspbridge_post_scale,
-	NULL,
-};
-static struct constraint_id cnstr_id_vdd1 = {
-	.type = RES_OPP_CO,
-	.data = (void *)"vdd1_opp",
-};
-#endif
-#endif
 #endif
 
 static struct platform_driver bridge_driver_ldm = {
@@ -321,7 +304,7 @@ static struct platform_driver bridge_driver_ldm = {
 	      .name     = BRIDGE_NAME,
 	 },
       .probe = omap34xx_bridge_probe,
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
       .suspend = bridge_suspend,
       .resume = bridge_resume,
 #endif
@@ -344,6 +327,9 @@ static int __init bridge_init(void)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
+	int i = 0;
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
 
 	/* use 2.6 device model */
 	if (driver_major) {
@@ -409,7 +395,7 @@ static int __init bridge_init(void)
 	if (!status)
 		status = platform_device_register(&omap_dspbridge_dev);
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 	/* Initialize the wait queue */
 	if (!status) {
 		bridge_suspend_data.suspended = 0;
@@ -486,9 +472,11 @@ static int __init bridge_init(void)
 			GT_0trace(driverTrace, GT_5CLASS,
 					"DSP/BIOS Bridge driver loaded\n");
 		}
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
+#ifdef CONFIG_PM
+#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+		for (i = 0; i < 5; i++)
+			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].speed;
+
 		clk_handle = clk_get(NULL, "iva2_ck");
 		if (!clk_handle) {
 			GT_0trace(driverTrace, GT_7CLASS,
@@ -505,19 +493,6 @@ static int __init bridge_init(void)
 			"clk_notifier_register FAIL for iva2_ck \n");
 		}
 
-#else
-		/* Register for the constraints */
-		dsp_constraint_handle = constraint_get("dspbridge",
-						      &cnstr_id_vdd1);
-		constraint_register_post_notification(dsp_constraint_handle,
-						 &omap34xxbridge_post_scale,
-						 CO_VDD1_OPP5 + 1);
-		mpu_constraint_handle = constraint_get("mpubridge",
-						      &cnstr_id_vdd1);
-		constraint_register_post_notification(mpu_constraint_handle,
-						 &omap34xxbridge_post_scale,
-						 CO_VDD1_OPP5 + 1);
-#endif
 #endif
 #endif
 	}
@@ -536,10 +511,9 @@ static void __exit bridge_exit(void)
 	bool ret;
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-	/* remove the constraints */
-#ifndef CONFIG_OMAP3_PM
+	/* unregister the clock notifier */
+#ifdef CONFIG_PM
+#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
 	if (!clk_notifier_unregister(clk_handle, &iva_clk_notifier)) {
 		GT_0trace(driverTrace, GT_7CLASS,
 		"clk_notifier_unregister PASS for iva2_ck \n");
@@ -551,38 +525,8 @@ static void __exit bridge_exit(void)
 	clk_put(clk_handle);
 	clk_handle = NULL;
 
-#else
-	if (dsp_constraint_handle != NULL) {
-		GT_0trace(driverTrace, GT_7CLASS,
-			 "bridge_exit: remove constraints\n");
-		constraint_remove(dsp_constraint_handle);
-		constraint_unregister_post_notification(dsp_constraint_handle,
-						&omap34xxbridge_post_scale,
-						CO_VDD1_OPP5 + 1);
-		constraint_put(dsp_constraint_handle);
-		dsp_constraint_handle = NULL;
-	} else {
-		GT_0trace(driverTrace, GT_7CLASS,
-			 "dsp_constraint_handle is NULL\n");
-
-	}
-	if (mpu_constraint_handle != NULL) {
-		GT_0trace(driverTrace, GT_7CLASS,
-			 "bridge_exit: remove constraints\n");
-		constraint_remove(mpu_constraint_handle);
-		constraint_unregister_post_notification(mpu_constraint_handle,
-						&omap34xxbridge_post_scale,
-						CO_VDD1_OPP5 + 1);
-		constraint_put(mpu_constraint_handle);
-		mpu_constraint_handle = NULL;
-	} else {
-		GT_0trace(driverTrace, GT_7CLASS,
-			 "mpu_constraint_handle is NULL\n");
-
-	}
-#endif /*#ifndef CONFIG_OMAP3_PM*/
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS*/
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM*/
+#endif
+#endif /*#ifdef CONFIG_PM*/
 	/* unregister bridge driver */
 	platform_device_unregister(&omap_dspbridge_dev);
 	platform_driver_unregister(&bridge_driver_ldm);
@@ -738,7 +682,7 @@ static int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
 	union Trapped_Args pBufIn;
 
 	DBC_Require(filp != NULL);
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 	status = omap34xxbridge_suspend_lockout(&bridge_suspend_data, filp);
 	if (status != 0)
 		return status;
@@ -814,7 +758,7 @@ DSP_STATUS DRV_RemoveAllResources(HANDLE hPCtxt)
 }
 #endif
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 
 static int bridge_suspend(struct platform_device *pdev, pm_message_t state)
 {

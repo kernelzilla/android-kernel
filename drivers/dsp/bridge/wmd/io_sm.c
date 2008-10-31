@@ -111,15 +111,6 @@
 
 /*  ----------------------------------- Host OS */
 #include <dspbridge/host_os.h>
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
-#else
-#include <mach/resource.h>
-#endif
-#endif
-#endif
 
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <dspbridge/std.h>
@@ -249,18 +240,16 @@ static DSP_STATUS registerSHMSegs(struct IO_MGR *hIOMgr,
 
 extern u32 DRV_GetFirstDevExtension();
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifdef CONFIG_OMAP3_PM
-/* The maximum number of OPPs that are supported by Baseport */
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+/* The maximum number of OPPs that are supported */
 extern s32 dsp_max_opps;
 /* The Vdd1 opp table information */
 extern u32 vdd1_dsp_freq[6][4] ;
-/* The contraint handle for OPP information */
-extern struct constraint_handle *dsp_constraint_handle;
+
+extern struct platform_device omap_dspbridge_dev;
 #endif
-#endif
-#endif
+
+
 
 #if GT_TRACE
 static struct GT_Mask dsp_trace_mask = { NULL, NULL }; /* GT trace variable */
@@ -1714,9 +1703,10 @@ void IO_IntrDSP2(IN struct IO_MGR *pIOMgr, IN u16 wMbVal)
 DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 			 IN void *pArgs)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
 	u32 i;
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
 
 	switch (desc) {
 	case SHM_CURROPP:
@@ -1756,11 +1746,8 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 		DBG_Trace(DBG_LEVEL5, "OPP shared memory - max OPP number: "
 			 "%d\n", hIOMgr->pSharedMem->oppTableStruct.numOppPts);
 		/* Update the current OPP number */
-#ifndef CONFIG_OMAP3_PM
-		i = omap_pm_dsp_get_opp();
-#else
-		i = constraint_get_level(dsp_constraint_handle);
-#endif
+		if (pdata->dsp_get_opp)
+			i = (*pdata->dsp_get_opp)();
 		hIOMgr->pSharedMem->oppTableStruct.currOppPt = i;
 		DBG_Trace(DBG_LEVEL7, "OPP value programmed to shared memory: "
 			 "%d\n", i);
@@ -1773,7 +1760,6 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 		break;
 
 	}
-#endif
 #endif
 	return DSP_SOK;
 }

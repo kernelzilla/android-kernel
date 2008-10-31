@@ -148,16 +148,6 @@
 #ifndef RES_CLEANUP_DISABLE
 #include <dspbridge/resourcecleanup.h>
 #endif
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
-#include <mach/board-3430sdp.h>
-#else
-#include <mach/resource.h>
-#endif
-#endif
-#endif
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define PROC_SIGNATURE	   0x434F5250	/* "PROC" (in reverse). */
 #define MAXCMDLINELEN       255
@@ -199,12 +189,8 @@ static u32 cRefs;
 
 struct SYNC_CSOBJECT *hProcLock;	/* For critical sections */
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifdef CONFIG_OMAP3_PM
-extern struct constraint_handle *mpu_constraint_handle;
-#endif
-#endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+extern struct platform_device omap_dspbridge_dev;
 #endif
 
 /*  ----------------------------------- Function Prototypes */
@@ -1053,6 +1039,10 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 #ifdef OPT_LOAD_TIME_INSTRUMENTATION
 	do_gettimeofday(&tv1);
 #endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
+#endif
 	GT_2trace(PROC_DebugMask, GT_ENTER, "Entered PROC_Load, args:\n\t"
 		 "hProcessor:  0x%x\taArgv: 0x%x\n", hProcessor, aArgv[0]);
 	/* Call the WMD_BRD_Load Fxn */
@@ -1223,19 +1213,11 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 	if (DSP_SUCCEEDED(status)) {
 		/* Now, attempt to load an exec: */
 
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 	/* Boost the OPP level to Maximum level supported by baseport*/
-#ifndef CONFIG_OMAP3_PM
-	omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP5].speed);
-#else
-	if (constraint_set(mpu_constraint_handle, CO_VDD1_OPP5) != 0)
-		GT_1trace(PROC_DebugMask, GT_4CLASS, "PROC_Load:"
-			  "Constraint set of %d failed\n", CO_VDD1_OPP5);
-	else
-		GT_1trace(PROC_DebugMask, GT_4CLASS, "PROC_Load:"
-			 "Constraint set of %d passed\n", CO_VDD1_OPP5);
-#endif
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifndef CONFIG_CPU_FREQ
+	if (pdata->cpu_set_freq)
+		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP5]);
 #endif
 #endif
 		status = COD_LoadBase(hCodMgr, iArgc, (char **)aArgv,
@@ -1255,21 +1237,11 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 					 "COD_Load  status 0x%x \n", status);
 			}
 		}
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-	/* Requesting the lowest opp supported by baseport*/
-#ifndef CONFIG_OMAP3_PM
-		omap_pm_cpu_set_freq(vdd1_rate_table[VDD1_OPP1].speed);
-#else
-		if (constraint_set(mpu_constraint_handle, CO_VDD1_OPP1) != 0)
-			GT_1trace(PROC_DebugMask, GT_4CLASS, "PROC_Load:"
-				 "Constraint setting of %d failed\n",
-				 CO_VDD1_OPP1);
-		else
-			GT_1trace(PROC_DebugMask, GT_4CLASS, "PROC_Load:"
-				 "Constraint setting  of %d passed\n",
-				 CO_VDD1_OPP1);
-#endif
+	/* Requesting the lowest opp supported*/
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifndef CONFIG_CPU_FREQ
+	if (pdata->cpu_set_freq)
+		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP1]);
 #endif
 #endif
 

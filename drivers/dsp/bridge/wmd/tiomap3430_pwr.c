@@ -61,24 +61,15 @@
 #include "_tiomap.h"
 #include "_tiomap_pwr.h"
 #include "_tiomap_util.h"
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifndef CONFIG_OMAP3_PM
-#include <mach/omap-pm.h>
+#ifdef CONFIG_PM
 #include <mach/board-3430sdp.h>
-#else
-#include <mach/resource.h>
 #endif
-#endif
+#ifdef CONFIG_PM
+extern struct platform_device omap_dspbridge_dev;
+#define VDD1_OPP1 1
+#define VDD1_OPP5 5
 #endif
 extern s32 dsp_test_sleepstate;
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
-#ifdef CONFIG_OMAP3_PM
-extern struct constraint_handle *dsp_constraint_handle;
-#endif
-#endif
-#endif
 extern struct MAILBOX_CONTEXT mboxsetting;
 
 /*
@@ -88,31 +79,21 @@ extern struct MAILBOX_CONTEXT mboxsetting;
 DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
 				  IN void *pArgs)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
 	u32 *pConstraintVal;
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
 
 	pConstraintVal = (u32 *)(pArgs);
 	/* Read the target value requested by DSP  */
 	DBG_Trace(DBG_LEVEL7, "handle_constraints_set: opp requested = 0x%x\n",
 						  (u32)*(pConstraintVal+1));
 
-	/* Set the new constraint in resource framework */
-#ifndef CONFIG_OMAP3_PM
-	omap_pm_dsp_set_min_opp((u32)*(pConstraintVal+1));
+	/* Set the new opp value */
+	if (pdata->dsp_set_min_opp)
+		(*pdata->dsp_set_min_opp)((u32)*(pConstraintVal+1));
 	return DSP_SOK;
-#else
-	if (constraint_set(dsp_constraint_handle,
-			   (u32)*(pConstraintVal+1)) == 0)
-		return DSP_SOK;
-	else {
-		DBG_Trace(DBG_LEVEL7,
-			 "handle_constraints_set: Constraint set failed\n");
-		return DSP_EFAIL;
-	}
-#endif /*#ifndef CONFIG_OMAP3_PM*/
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS */
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM */
+#endif /* #if (defined  CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS) */
 	return DSP_SOK;
 }
 
@@ -122,13 +103,15 @@ DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
  */
 DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+	DSP_STATUS status = DSP_SOK;
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
 	u16 usCount = TIHELEN_ACKTIMEOUT;
 	struct CFG_HOSTRES resources;
-	DSP_STATUS status = DSP_SOK;
 	enum HW_PwrState_t pwrState;
 	u32 opplevel;
 	struct IO_MGR *hIOMgr;
+	struct dspbridge_platform_data *pdata =
+				omap_dspbridge_dev.dev.platform_data;
 
 	status = CFG_GetHostResources(
 		 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
@@ -164,40 +147,22 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 		if (DSP_SUCCEEDED(status)) {
 			/* Update the Bridger Driver state */
 			pDevContext->dwBrdState = BRD_DSP_HIBERNATION;
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
 			status = DEV_GetIOMgr(pDevContext->hDevObject, &hIOMgr);
 			if (DSP_FAILED(status))
 				return status;
 			IO_SHMsetting(hIOMgr, SHM_GETOPP, &opplevel);
 			/* Set the OPP to low level before moving to OFF mode */
-#ifndef CONFIG_OMAP3_PM
 			if (opplevel != VDD1_OPP1) {
 				DBG_Trace(DBG_LEVEL5,
 					"Tiomap_pwr.c - DSP requested"
 					" OPP = %d, MPU requesting low"
 					" OPP %d instead\n", opplevel,
 					VDD1_OPP1);
-				omap_pm_dsp_set_min_opp(VDD1_OPP1);
+				if (pdata->dsp_set_min_opp)
+					(*pdata->dsp_set_min_opp)(VDD1_OPP1);
 				status = DSP_SOK;
 			}
 
-#else
-			if (opplevel != CO_VDD1_OPP1) {
-				DBG_Trace(DBG_LEVEL5,
-					"Tiomap_pwr.c - DSP requested"
-					" OPP = %d, MPU requesting low"
-					" OPP %d instead\n", opplevel,
-					CO_VDD1_OPP1);
-				if (constraint_set(dsp_constraint_handle,
-						  CO_VDD1_OPP1) != 0) {
-					DBG_Trace(DBG_LEVEL7,
-						"handle_hibernation_fromDSP:"
-						"Constraint set failed\n");
-					status = DSP_EFAIL;
-				}
-			}
-#endif
-#endif
 		} else {
 			DBG_Trace(DBG_LEVEL7,
 				 "handle_hibernation_fromDSP- FAILED\n");
@@ -206,7 +171,7 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 	return status;
 
 #endif
-	return DSP_SOK;
+	return status;
 
 }
 /*
@@ -217,7 +182,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 		   IN void *pArgs)
 {
 	DSP_STATUS status = DSP_SOK;
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 	struct CFG_HOSTRES resources;
 	u16 usCount = TIHELEN_ACKTIMEOUT;
 	enum HW_PwrState_t pwrState;
@@ -311,7 +276,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 DSP_STATUS WakeDSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 {
 	DSP_STATUS status = DSP_SOK;
-#ifndef CONFIG_DISABLE_BRIDGE_PM
+#ifdef CONFIG_PM
 	struct CFG_HOSTRES resources;
 	enum HW_PwrState_t pwrState;
 
@@ -441,8 +406,7 @@ DSP_STATUS DSPPeripheralClkCtrl(struct WMD_DEV_CONTEXT *pDevContext,
  */
 DSP_STATUS PreScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
 	u32 level;
 	u32 voltage_domain;
 
@@ -468,8 +432,7 @@ DSP_STATUS PreScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 			  " state in wrong state");
 		return DSP_EFAIL;
 	}
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS */
-#endif  /*#ifndef CONFIG_DISABLE_BRIDGE_PM */
+#endif /* #if (defined CONFIG_PM)&&(CONFIG_BRIDGE_DVFS) */
 	return DSP_SOK;
 }
 
@@ -480,8 +443,7 @@ DSP_STATUS PreScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
  */
 DSP_STATUS PostScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 {
-#ifndef CONFIG_DISABLE_BRIDGE_PM
-#ifndef CONFIG_DISABLE_BRIDGE_DVFS
+#if (defined CONFIG_PM) && (CONFIG_BRIDGE_DVFS)
 	u32 level;
 	u32 voltage_domain;
 	struct IO_MGR *hIOMgr;
@@ -517,8 +479,7 @@ DSP_STATUS PostScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 			  "in wrong state");
 		return DSP_EFAIL;
 	}
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_DVFS*/
-#endif /*#ifndef CONFIG_DISABLE_BRIDGE_PM*/
+#endif /* #if (defined CONFIG_PM)&&(CONFIG_BRIDGE_DVFS) */
 	return DSP_SOK;
 }
 
