@@ -1773,15 +1773,13 @@ func_cont1:
 	 /*  Free host-side resources allocated by NODE_Create()
 	 *  DeleteNode() fails if SM buffers not freed by client!  */
 #ifndef RES_CLEANUP_DISABLE
-	/* Update the node and stream resource status */
        /* Return PID instead of process handle */
        hProcess = current->pid;
 	res_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(res_status))
 		goto func_cont;
-
-       DRV_GetProcContext(hProcess, (struct DRV_OBJECT *)hDrvObject,
-			 &pCtxt, hNode, 0);
+	DRV_GetProcContext(0, (struct DRV_OBJECT *)hDrvObject,
+						&pCtxt, hNode, 0);
 	if (pCtxt == NULL)
 		goto func_cont;
 	if (DRV_GetNodeResElement(hNode, &nodeRes, pCtxt) != DSP_ENOTFOUND) {
