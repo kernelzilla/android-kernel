@@ -285,13 +285,13 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 				 "0x%x\n", dwErrInfo);
 			break;
 		}
-               /* Call DSP Trace Buffer */
-               PrintDspTraceBuffer(hDehMgr->hWmdContext);
-
 		/* Set the Board state as ERROR */
 		pDevContext->dwBrdState = BRD_ERROR;
 		/* Disable all the clocks that were enabled by DSP */
 		(void)DSP_PeripheralClocks_Disable(pDevContext, NULL);
+		/* Call DSP Trace Buffer */
+		PrintDspTraceBuffer(hDehMgr->hWmdContext);
+
 		/* Signal DSP error/exception event. */
 		NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
 	}
