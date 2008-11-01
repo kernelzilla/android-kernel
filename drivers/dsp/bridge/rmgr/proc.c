@@ -627,6 +627,11 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
 		if (pProcObject->hNtfy)
 			NTFY_Delete(pProcObject->hNtfy);
 
+		if (pProcObject->g_pszLastCoff) {
+			MEM_Free(pProcObject->g_pszLastCoff);
+			pProcObject->g_pszLastCoff = NULL;
+		}
+
 		/* Remove the Proc from the DEV List */
 		(void)DEV_RemoveProcObject(pProcObject->hDevObject,
 			(u32)pProcObject);
