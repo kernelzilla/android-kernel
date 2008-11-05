@@ -315,19 +315,20 @@ void omap_sram_idle(void)
 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
 
-	/* CORE & PER */
+	/* PER */
+	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+	if (per_next_state < PWRDM_POWER_ON) {
+		omap2_gpio_prepare_for_retention();
+		omap_uart_prepare_idle(2);
+		if (per_next_state == PWRDM_POWER_OFF)
+			omap3_per_save_context();
+	}
+
+	/* CORE */
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	if (core_next_state < PWRDM_POWER_ON) {
-		omap2_gpio_prepare_for_retention();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
-		/* PER changes only with core */
-		per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
-		if (per_next_state < PWRDM_POWER_ON) {
-			omap_uart_prepare_idle(2);
-			if (per_next_state == PWRDM_POWER_OFF)
-				omap3_per_save_context();
-		}
 		if (core_next_state == PWRDM_POWER_OFF) {
 			prm_set_mod_reg_bits(OMAP3430_AUTO_OFF,
 					     OMAP3430_GR_MOD,
@@ -373,14 +374,8 @@ void omap_sram_idle(void)
 		restore_table_entry();
 
 
+	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
-		if (per_next_state < PWRDM_POWER_ON)
-			omap_uart_resume_idle(2);
-		omap_uart_resume_idle(1);
-		omap_uart_resume_idle(0);
-
-		/* Disable IO-PAD wakeup */
-		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
 		if (core_prev_state == PWRDM_POWER_OFF) {
 			omap3_core_restore_context();
@@ -391,14 +386,20 @@ void omap_sram_idle(void)
 			prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF,
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
-		if (per_next_state < PWRDM_POWER_ON) {
-			per_prev_state =
-				pwrdm_read_prev_pwrst(per_pwrdm);
-			if (per_prev_state == PWRDM_POWER_OFF)
-				omap3_per_restore_context();
-		}
+	}
+
+	/* PER */
+	if (per_next_state < PWRDM_POWER_ON) {
+		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
+		omap_uart_resume_idle(2);
+		if (per_prev_state == PWRDM_POWER_OFF)
+			omap3_per_restore_context();
 		omap2_gpio_resume_after_retention();
 	}
+
+	/* Disable IO-PAD wakeup */
+	if (core_next_state < PWRDM_POWER_ON)
+		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
 
 	/* Enable smartreflex after WFI */
 	enable_smartreflex(SR1);
