@@ -50,7 +50,6 @@ struct clock_state
 static struct clock_state drv_state = { 0 };
 
 static void __init acpuclk_init(void);
-static unsigned long acpuclk_get_rate(void);
 
 /* MSM7201A Levels 3-6 all correspond to 1.2V, level 7 corresponds to 1.325V. */
 enum {
@@ -135,13 +134,13 @@ static int pc_pll_request(unsigned id, unsigned on)
 unsigned long acpuclk_power_collapse(void) {
 	int ret = acpuclk_get_rate();
 	acpuclk_set_rate(drv_state.power_collapse_khz, 1);
-	return ret;
+	return ret * 1000;
 }
 
 unsigned long acpuclk_wait_for_irq(void) {
 	int ret = acpuclk_get_rate();
 	acpuclk_set_rate(drv_state.wait_for_irq_khz, 1);
-	return ret;
+	return ret * 1000;
 }
 
 static int acpuclk_set_vdd_level(int vdd)
@@ -242,6 +241,9 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	uint32_t reg_clkctl;
 	struct clkctl_acpu_speed *cur_s, *tgt_s, *strt_s;
 	int rc = 0;
+#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
+	struct cpufreq_freqs freqs;
+#endif
 
 	strt_s = cur_s = drv_state.current_speed;
 
@@ -268,6 +270,12 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 
 	if (!for_power_collapse) {
 		mutex_lock(&drv_state.lock);
+#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
+		freqs.old = cur_s->a11clk_khz;
+		freqs.new = tgt_s->a11clk_khz;
+		freqs.cpu = smp_processor_id();
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+#endif
 		if (strt_s->pll != tgt_s->pll && tgt_s->pll != ACPU_PLL_TCXO) {
 			if ((rc = pc_pll_request(tgt_s->pll, 1)) < 0) {
 				printk(KERN_ERR "PLL enable failed (%d)\n", rc);
@@ -344,6 +352,9 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 			printk(KERN_ERR "acpuclock: Unable to drop ACPU vdd\n");
 	}
 
+#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+#endif
 #if PERF_SWITCH_DEBUG
 	printk(KERN_DEBUG "%s: ACPU speed change complete\n", __FUNCTION__);
 #endif
@@ -397,14 +408,19 @@ static void __init acpuclk_init(void)
 		       current_vdd, speed->vdd);
 }
 
-static unsigned long acpuclk_get_rate(void)
+unsigned long acpuclk_get_rate(void)
 {
 	WARN_ONCE(drv_state.current_speed == NULL,
 		  "acpuclk_get_rate: not initialized\n");
 	if (drv_state.current_speed)
-		return drv_state.current_speed->a11clk_khz * 1000;
+		return drv_state.current_speed->a11clk_khz;
 	else
 		return 0;
+}
+
+uint32_t acpuclk_get_switch_time(void)
+{
+	return drv_state.acpu_switch_time_us;
 }
 
 /*----------------------------------------------------------------------------
