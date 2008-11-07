@@ -54,6 +54,8 @@ struct clkctl_acpu_speed
 
 
 int acpuclk_set_rate(unsigned long rate, int for_power_collapse);
+unsigned long acpuclk_get_rate(void);
+uint32_t acpuclk_get_switch_time(void);
 unsigned long acpuclk_wait_for_irq(void);
 unsigned long acpuclk_power_collapse(void);
 
