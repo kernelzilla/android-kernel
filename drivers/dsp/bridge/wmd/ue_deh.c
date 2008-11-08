@@ -121,7 +121,7 @@ DSP_STATUS WMD_DEH_Create(OUT struct DEH_MGR **phDehMgr,
 			pDehMgr->errInfo.dwVal3 = 0L;
 			/* Install ISR function for DSP MMU fault */
                        if ((request_irq(INT_DSP_MMU_IRQ, MMU_FaultIsr, 0,
-                                           "DspBridge", (void *)pDehMgr)) == 0)
+                                           "DspBridge\tiommu fault", (void *)pDehMgr)) == 0)
                                status = DSP_SOK;
                        else
                                status = DSP_EFAIL;

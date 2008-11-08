@@ -330,7 +330,7 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 		if (devType == DSP_UNIT) {
 			/* Plug the channel ISR:. */
                        if ((request_irq(INT_MAIL_MPU_IRQ, IO_ISR, 0,
-                                           "DspBridge", (void *)pIOMgr)) == 0)
+                                           "DspBridge\tmailbox", (void *)pIOMgr)) == 0)
                                status = DSP_SOK;
                        else
                                status = DSP_EFAIL;
