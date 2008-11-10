@@ -27,6 +27,7 @@
 #include <linux/limits.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
+#include <linux/cpufreq.h>
 
 #include <mach/clock.h>
 #include <mach/sram.h>
@@ -658,6 +659,36 @@ static void omap3_clkoutx2_recalc(struct clk *clk, unsigned long parent_rate,
  */
 #if defined(CONFIG_ARCH_OMAP3)
 
+#ifdef CONFIG_CPU_FREQ
+static struct cpufreq_frequency_table freq_table[MAX_VDD1_OPP+1];
+
+void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+{
+	struct omap_opp *prcm;
+	int i = 0;
+
+	/* Avoid registering the 120% Overdrive with CPUFreq */
+	prcm = mpu_opps + MAX_VDD1_OPP - 1;
+	for (; prcm->rate; prcm--) {
+		freq_table[i].index = i;
+		freq_table[i].frequency = prcm->rate / 1000;
+		i++;
+	}
+
+	if (i == 0) {
+		printk(KERN_WARNING "%s: failed to initialize frequency \
+								table\n",
+								__func__);
+		return;
+	}
+
+	freq_table[i].index = i;
+	freq_table[i].frequency = CPUFREQ_TABLE_END;
+
+	*table = &freq_table[0];
+}
+#endif
+
 static struct clk_functions omap2_clk_functions = {
 	.clk_register		= omap2_clk_register,
 	.clk_enable		= omap2_clk_enable,
@@ -668,6 +699,9 @@ static struct clk_functions omap2_clk_functions = {
 	.clk_set_parent		= omap2_clk_set_parent,
 	.clk_get_parent		= omap2_clk_get_parent,
 	.clk_disable_unused	= omap2_clk_disable_unused,
+#ifdef CONFIG_CPU_FREQ
+	.clk_init_cpufreq_table = omap2_clk_init_cpufreq_table,
+#endif
 };
 
 /*
@@ -840,12 +874,11 @@ unsigned short get_opp(struct omap_opp *opp_freq_table,
 
 	if (prcm_config->rate <= freq)
 		return prcm_config->opp_id; /* Return the Highest OPP */
-	for (; prcm_config->rate; prcm_config--) {
+	for (; prcm_config->rate; prcm_config--)
 		if (prcm_config->rate < freq)
 			return (prcm_config+1)->opp_id;
 		else if (prcm_config->rate == freq)
 			return prcm_config->opp_id;
-	}
 	/* Return the least OPP */
 	return (prcm_config+1)->opp_id;
 }
@@ -924,6 +957,10 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 		clk_set_rate(dpll1_clk, prcm_vdd->rate);
 		clk_set_rate(dpll2_clk, dsp_opps[index].rate);
 		curr_vdd1_prcm_set = prcm_vdd;
+		omap2_clksel_recalc(&mpu_ck);
+		propagate_rate(&mpu_ck);
+		omap2_clksel_recalc(&iva2_ck);
+		propagate_rate(&iva2_ck);
 #ifndef CONFIG_CPU_FREQ
 		/*Update loops_per_jiffy if processor speed is being changed*/
 		loops_per_jiffy = compute_lpj(loops_per_jiffy,
@@ -932,6 +969,8 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	} else {
 		clk_set_rate(dpll3_clk, prcm_vdd->rate);
 		curr_vdd2_prcm_set = prcm_vdd;
+		omap2_clksel_recalc(&core_ck);
+		propagate_rate(&core_ck);
 	}
 	return 0;
 }
