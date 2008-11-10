@@ -17,6 +17,7 @@
  */
 
 #include <linux/pm_qos_params.h>
+#include <linux/cpufreq.h>
 #include <mach/powerdomain.h>
 #include <mach/clockdomain.h>
 #include "smartreflex.h"
@@ -158,16 +159,26 @@ void init_opp(struct shared_resource *resp)
 
 int set_opp(struct shared_resource *resp, u32 target_level)
 {
-	unsigned long mpu_freq, l3_freq, tput, t_opp;;
+	unsigned long mpu_freq, mpu_old_freq, l3_freq, tput, t_opp;
 	int ind;
 	struct bus_throughput_db *tput_db;
+	struct cpufreq_freqs freqs_notify;
 
 	if (resp->curr_level == target_level)
 		return 0;
 
 	if (strcmp(resp->name, "vdd1_opp") == 0) {
+		mpu_old_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
+					curr_vdd1_prcm_set->opp_id);
 		mpu_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					target_level);
+#ifdef CONFIG_CPU_FREQ
+		freqs_notify.old = mpu_old_freq/1000;
+		freqs_notify.new = mpu_freq/1000;
+		freqs_notify.cpu = 0;
+		/* Send pre notification to CPUFreq */
+		cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+#endif
 		t_opp = ID_VDD(PRCM_VDD1) |
 			ID_OPP_NO(mpu_opps[target_level].opp_id);
 		if (resp->curr_level > target_level) {
@@ -182,6 +193,10 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 			clk_set_rate(vdd1_clk, mpu_freq);
 		}
 		resp->curr_level = curr_vdd1_prcm_set->opp_id;
+#ifdef CONFIG_CPU_FREQ
+		/* Send a post notification to CPUFreq */
+		cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+#endif
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
 		tput_db = resp->resource_data;
 		tput = target_level;
