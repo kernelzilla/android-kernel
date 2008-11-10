@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/device.h>
+#include <linux/module.h>
 
 #include <mach/omap-pm.h>
 #include <mach/powerdomain.h>
@@ -173,6 +174,7 @@ void omap_pm_set_max_sdma_lat(struct device *dev, long t)
 	}
 }
 
+static struct device dummy_dsp_dev;
 
 /*
  * DSP Bridge-specific constraints
@@ -188,6 +190,7 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 
 	return NULL;
 }
+EXPORT_SYMBOL(omap_pm_dsp_get_opp_table);
 
 void omap_pm_dsp_set_min_opp(u8 opp_id)
 {
@@ -199,34 +202,21 @@ void omap_pm_dsp_set_min_opp(u8 opp_id)
 	pr_debug("OMAP PM: DSP requests minimum VDD1 OPP to be %d\n", opp_id);
 
 	/*
-	 *
-	 * For l-o dev tree, our VDD1 clk is keyed on OPP ID, so we
-	 * can just test to see which is higher, the CPU's desired OPP
-	 * ID or the DSP's desired OPP ID, and use whichever is
-	 * highest.
-	 *
-	 * In CDP12.14+, the VDD1 OPP custom clock that controls the DSP
-	 * rate is keyed on MPU speed, not the OPP ID.  So we need to
-	 * map the OPP ID to the MPU speed for use with clk_set_rate()
-	 * if it is higher than the current OPP clock rate.
-	 *
+	 * For now pass a dummy_dev struct for SRF to identify the caller.
+	 * Maybe its good to have DSP pass this as an argument
 	 */
+	resource_request("vdd1_opp", &dummy_dsp_dev, opp_id);
+	return;
 }
+EXPORT_SYMBOL(omap_pm_dsp_set_min_opp);
 
 u8 omap_pm_dsp_get_opp(void)
 {
 	pr_debug("OMAP PM: DSP requests current DSP OPP ID\n");
-
-	/*
-	 * For l-o dev tree, call clk_get_rate() on VDD1 OPP clock
-	 *
-	 * CDP12.14+:
-	 * Call clk_get_rate() on the OPP custom clock, map that to an
-	 * OPP ID using the tables defined in board-*.c/chip-*.c files.
-	 */
-
+	return resource_get_level("vdd1_opp");
 	return 0;
 }
+EXPORT_SYMBOL(omap_pm_dsp_get_opp);
 
 /*
  * CPUFreq-originated constraint
@@ -248,6 +238,8 @@ struct cpufreq_frequency_table **omap_pm_cpu_get_freq_table(void)
 	return NULL;
 }
 
+static struct device dummy_cpufreq_dev;
+
 void omap_pm_cpu_set_freq(unsigned long f)
 {
 	if (f == 0) {
@@ -258,26 +250,17 @@ void omap_pm_cpu_set_freq(unsigned long f)
 	pr_debug("OMAP PM: CPUFreq requests CPU frequency to be set to %lu\n",
 		 f);
 
-	/*
-	 * For l-o dev tree, determine whether MPU freq or DSP OPP id
-	 * freq is higher.  Find the OPP ID corresponding to the
-	 * higher frequency.  Call clk_round_rate() and clk_set_rate()
-	 * on the OPP custom clock.
-	 *
-	 * CDP should just be able to set the VDD1 OPP clock rate here.
-	 */
+	resource_request("mpu_freq", &dummy_cpufreq_dev, f);
+	return;
 }
+EXPORT_SYMBOL(omap_pm_cpu_set_freq);
 
 unsigned long omap_pm_cpu_get_freq(void)
 {
 	pr_debug("OMAP PM: CPUFreq requests current CPU frequency\n");
-
-	/*
-	 * Call clk_get_rate() on the mpu_ck.
-	 */
-
-	return 0;
+	return resource_get_level("mpu_freq");
 }
+EXPORT_SYMBOL(omap_pm_cpu_get_freq);
 
 /*
  * Device context loss tracking
