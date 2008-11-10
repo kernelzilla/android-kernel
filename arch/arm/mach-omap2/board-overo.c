@@ -359,7 +359,7 @@ static int __init overo_i2c_init(void)
 
 static void __init overo_init_irq(void)
 {
-	omap2_init_common_hw(mt46h32m32lf6_sdrc_params);
+	omap2_init_common_hw(mt46h32m32lf6_sdrc_params, NULL, NULL, NULL);
 	omap_init_irq();
 	omap_gpio_init();
 }
