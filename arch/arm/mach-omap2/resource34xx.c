@@ -19,6 +19,7 @@
 #include <linux/pm_qos_params.h>
 #include <mach/powerdomain.h>
 #include <mach/clockdomain.h>
+#include "smartreflex.h"
 #include "resource34xx.h"
 #include "pm.h"
 
@@ -157,10 +158,24 @@ void init_opp(struct shared_resource *resp)
 int set_opp(struct shared_resource *resp, u32 target_level)
 {
 	unsigned long mpu_freq;
+
+	if (resp->curr_level == target_level)
+		return 0;
+
 	if (strcmp(resp->name, "vdd1_opp") == 0) {
 		mpu_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					target_level);
-		clk_set_rate(vdd1_clk, mpu_freq);
+		if (resp->curr_level > target_level) {
+			/* Scale Frequency and then voltage */
+			clk_set_rate(vdd1_clk, mpu_freq);
+			sr_voltagescale_vcbypass(PRCM_VDD1,
+					mpu_opps[target_level-1].vsel);
+		} else {
+			/* Scale Voltage and then frequency */
+			sr_voltagescale_vcbypass(PRCM_VDD1,
+					mpu_opps[target_level-1].vsel);
+			clk_set_rate(vdd1_clk, mpu_freq);
+		}
 		resp->curr_level = curr_vdd1_prcm_set->opp_id;
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
 		/* Not supported yet */

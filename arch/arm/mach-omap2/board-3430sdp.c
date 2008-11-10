@@ -68,39 +68,39 @@
 static struct omap_opp mpu_rate_table[] = {
 	{0, 0, 0},
 	/*OPP1*/
-	{S125M, VDD1_OPP1, 0},
+	{S125M, VDD1_OPP1, 0x18},
 	/*OPP2*/
-	{S250M, VDD1_OPP2, 0},
+	{S250M, VDD1_OPP2, 0x20},
 	/*OPP3*/
-	{S500M, VDD1_OPP3, 0},
+	{S500M, VDD1_OPP3, 0x30},
 	/*OPP4*/
-	{S550M, VDD1_OPP4, 0},
+	{S550M, VDD1_OPP4, 0x36},
 	/*OPP5*/
-	{S600M, VDD1_OPP5, 0},
+	{S600M, VDD1_OPP5, 0x3C},
 };
 
 static struct omap_opp l3_rate_table[] = {
 	{0, 0, 0},
 	/*OPP1*/
-	{0, VDD2_OPP1, 0},
+	{0, VDD2_OPP1, 0x18},
 	/*OPP2*/
-	{S83M, VDD2_OPP2, 0},
+	{S83M, VDD2_OPP2, 0x20},
 	/*OPP3*/
-	{S166M, VDD2_OPP3, 0},
+	{S166M, VDD2_OPP3, 0x2C},
 };
 
 struct omap_opp dsp_rate_table[] = {
 	{0, 0, 0},
 	/*OPP1*/
-	{S90M, VDD1_OPP1, 0},
+	{S90M, VDD1_OPP1, 0x18},
 	/*OPP2*/
-	{S180M, VDD1_OPP2, 0},
+	{S180M, VDD1_OPP2, 0x20},
 	/*OPP3*/
-	{S360M, VDD1_OPP3, 0},
+	{S360M, VDD1_OPP3, 0x30},
 	/*OPP4*/
-	{S400M, VDD1_OPP4, 0},
+	{S400M, VDD1_OPP4, 0x36},
 	/*OPP5*/
-	{S430M, VDD1_OPP5, 0},
+	{S430M, VDD1_OPP5, 0x3C},
 };
 
 #define CONFIG_DISABLE_HFCLK 1
