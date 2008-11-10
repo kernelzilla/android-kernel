@@ -22,7 +22,15 @@
 #define __ARCH_ARM_MACH_OMAP2_RESOURCE_H
 
 #include <mach/resource.h>
+#include <linux/clk.h>
+#include <mach/clock.h>
 #include <mach/powerdomain.h>
+#include <mach/omap-pm.h>
+
+extern struct omap_opp *curr_vdd1_prcm_set;
+extern struct omap_opp *curr_vdd2_prcm_set;
+extern unsigned long get_freq(struct  omap_opp *, unsigned short);
+extern unsigned short get_opp(struct omap_opp *, unsigned long);
 
 /*
  * mpu_latency/core_latency are used to control the cpuidle C state.
@@ -222,6 +230,66 @@ static struct shared_resource emu_pwrdm_latency = {
 	.ops		= &pd_lat_res_ops,
 };
 
+void init_opp(struct shared_resource *resp);
+int set_opp(struct shared_resource *resp, u32 target_level);
+int validate_opp(struct shared_resource *resp, u32 target_level);
+void init_freq(struct shared_resource *resp);
+int set_freq(struct shared_resource *resp, u32 target_level);
+int validate_freq(struct shared_resource *resp, u32 target_level);
+
+struct bus_throughput_db {
+	/* Throughput for each OPP/Freq of the bus */
+	unsigned long throughput[3];
+};
+
+static struct shared_resource_ops opp_res_ops = {
+	.init           = init_opp,
+	.change_level   = set_opp,
+	.validate_level = validate_opp,
+};
+
+static struct shared_resource vdd1_opp = {
+	.name           = "vdd1_opp",
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+	.ops            = &opp_res_ops,
+};
+
+/* Throughput in KiB/s */
+static struct bus_throughput_db l3_throughput_db = {
+	.throughput[0] = 0,
+	.throughput[1] = 2656000,
+	.throughput[2] = 5312000,
+};
+
+static struct shared_resource vdd2_opp = {
+	.name           = "vdd2_opp",
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+	.resource_data  = &l3_throughput_db,
+	.ops            = &opp_res_ops,
+};
+
+static char linked_res[] = "vdd1_opp";
+
+static struct shared_resource_ops freq_res_ops = {
+	.init           = init_freq,
+	.change_level   = set_freq,
+	.validate_level = validate_freq,
+};
+
+static struct shared_resource mpu_freq = {
+	.name           = "mpu_freq",
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+	.resource_data  = &linked_res,
+	.ops            = &freq_res_ops,
+};
+
+static struct shared_resource dsp_freq = {
+	.name           = "dsp_freq",
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+	.resource_data  = &linked_res,
+	.ops            = &freq_res_ops,
+};
+
 struct shared_resource *resources_omap[] __initdata = {
 	&mpu_latency,
 	&core_latency,
@@ -236,6 +304,11 @@ struct shared_resource *resources_omap[] __initdata = {
 	&neon_pwrdm_latency,
 	&usbhost_pwrdm_latency,
 	&emu_pwrdm_latency,
+	/* OPP/frequency resources */
+	&vdd1_opp,
+	&vdd2_opp,
+	&mpu_freq,
+	&dsp_freq,
 	NULL
 };
 
