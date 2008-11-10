@@ -20,6 +20,7 @@
 #define __ARCH_ARM_MACH_OMAP2_CLOCK34XX_H
 
 #include <mach/control.h>
+#include <mach/omap-pm.h>
 
 #include "clock.h"
 #include "cm.h"
@@ -38,6 +39,9 @@ static int omap3_noncore_dpll_enable(struct clk *clk);
 static void omap3_noncore_dpll_disable(struct clk *clk);
 static int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate);
 static int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);
+static void omap3_table_recalc(struct clk *clk);
+static long omap3_round_to_table_rate(struct clk *clk, unsigned long rate);
+static int omap3_select_table_rate(struct clk *clk, unsigned long rate);
 
 /* Maximum DPLL multiplier, divider values for OMAP3 */
 #define OMAP3_MAX_DPLL_MULT		2048
@@ -3310,6 +3314,24 @@ static struct clk wdt1_fck = {
 	.recalc		= &followparent_recalc,
 };
 
+static struct clk virt_vdd1_prcm_set = {
+	.name = "virt_vdd1_prcm_set",
+	.flags = CLOCK_IN_OMAP343X | VIRTUAL_CLOCK | ALWAYS_ENABLED,
+	.parent = &mpu_ck, /* Indexed by mpu speed, no parent */
+	.recalc = &omap3_table_recalc, /*sets are keyed on mpu rate */
+	.set_rate = &omap3_select_table_rate,
+	.round_rate = &omap3_round_to_table_rate,
+};
+
+static struct clk virt_vdd2_prcm_set = {
+	.name = "virt_vdd2_prcm_set",
+	.flags = CLOCK_IN_OMAP343X | VIRTUAL_CLOCK | ALWAYS_ENABLED,
+	.parent = &core_ck,
+	.recalc = &omap3_table_recalc,
+	.set_rate = &omap3_select_table_rate,
+	.round_rate = &omap3_round_to_table_rate,
+};
+
 static struct clk *onchip_34xx_clks[] __initdata = {
 	&omap_32k_fck,
 	&virt_12m_ck,
@@ -3530,6 +3552,9 @@ static struct clk *onchip_34xx_clks[] __initdata = {
 	&secure_32k_fck,
 	&gpt12_fck,
 	&wdt1_fck,
+	/* virtual group clock */
+	&virt_vdd1_prcm_set,
+	&virt_vdd2_prcm_set,
 };
 
 #endif

@@ -33,6 +33,10 @@ struct omap_opp {
 	u16 min_vdd;
 };
 
+extern struct omap_opp *mpu_opps;
+extern struct omap_opp *dsp_opps;
+extern struct omap_opp *l3_opps;
+
 /*
  * agent_id values for use with omap_pm_set_min_bus_tput():
  *
@@ -46,25 +50,25 @@ struct omap_opp {
 
 /**
  * omap_pm_if_early_init - OMAP PM init code called before clock fw init
+ * @mpu_opp_table: array ptr to struct omap_opp for MPU
+ * @dsp_opp_table: array ptr to struct omap_opp for DSP
+ * @l3_opp_table : array ptr to struct omap_opp for CORE
  *
  * Initialize anything that must be configured before the clock
  * framework starts.  The "_if_" is to avoid name collisions with the
  * PM idle-loop code.
  */
-int __init omap_pm_if_early_init(void);
+int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
+				 struct omap_opp *dsp_opp_table,
+				 struct omap_opp *l3_opp_table);
 
 /**
  * omap_pm_if_init - OMAP PM init code called after clock fw init
- * @mpu_opp_table: array ptr to struct omap_opp for MPU
- * @dsp_opp_table: array ptr to struct omap_opp for DSP
- * @l3_opp_table : array ptr to struct omap_opp for CORE
  *
  * The main initialization code.  OPP tables are passed in here.  The
  * "_if_" is to avoid name collisions with the PM idle-loop code.
  */
-int __init omap_pm_if_init(struct omap_opp *mpu_opp_table,
-			   struct omap_opp *dsp_opp_table,
-			   struct omap_opp *l3_opp_table);
+int __init omap_pm_if_init(void);
 
 /**
  * omap_pm_if_exit - OMAP PM exit code

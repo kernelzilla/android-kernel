@@ -204,12 +204,13 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sp,
 				 struct omap_opp *l3_opps)
 {
 	omap2_mux_init();
-	omap_pm_if_early_init();
+	/* The OPP tables have to be registered before a clk init */
+	omap_pm_if_early_init(mpu_opps, dsp_opps, l3_opps);
 	pwrdm_init(powerdomains_omap);
 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
 	omapdev_init(omapdevs);
 	omap2_clk_init();
-	omap_pm_if_init(mpu_opps, dsp_opps, l3_opps);
+	omap_pm_if_init();
 	omap2_sdrc_init(sp);
 	gpmc_init();
 }
