@@ -134,7 +134,8 @@ int set_pd_latency(struct shared_resource *resp, u32 latency)
 
 static struct clk *vdd1_clk;
 static struct clk *vdd2_clk;
-static struct device dummy_srf_dev;
+static struct device dummy_mpu_dev;
+static struct device dummy_dsp_dev;
 
 /**
  * init_opp - Initialize the OPP resource
@@ -157,7 +158,9 @@ void init_opp(struct shared_resource *resp)
 
 int set_opp(struct shared_resource *resp, u32 target_level)
 {
-	unsigned long mpu_freq;
+	unsigned long mpu_freq, l3_freq, tput, t_opp;;
+	int ind;
+	struct bus_throughput_db *tput_db;
 
 	if (resp->curr_level == target_level)
 		return 0;
@@ -165,20 +168,53 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	if (strcmp(resp->name, "vdd1_opp") == 0) {
 		mpu_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					target_level);
+		t_opp = ID_VDD(PRCM_VDD1) |
+			ID_OPP_NO(mpu_opps[target_level].opp_id);
 		if (resp->curr_level > target_level) {
 			/* Scale Frequency and then voltage */
 			clk_set_rate(vdd1_clk, mpu_freq);
-			sr_voltagescale_vcbypass(PRCM_VDD1,
-					mpu_opps[target_level-1].vsel);
+			sr_voltagescale_vcbypass(t_opp,
+					mpu_opps[target_level].vsel);
 		} else {
 			/* Scale Voltage and then frequency */
-			sr_voltagescale_vcbypass(PRCM_VDD1,
-					mpu_opps[target_level-1].vsel);
+			sr_voltagescale_vcbypass(t_opp,
+					mpu_opps[target_level].vsel);
 			clk_set_rate(vdd1_clk, mpu_freq);
 		}
 		resp->curr_level = curr_vdd1_prcm_set->opp_id;
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
-		/* Not supported yet */
+		tput_db = resp->resource_data;
+		tput = target_level;
+		/* using the throughput db map to the appropriate L3 Freq */
+		for (ind = 1; ind < MAX_VDD2_OPP; ind++)
+			if (tput_db->throughput[ind] > tput)
+				target_level = ind;
+
+		/* Set the highest OPP possible */
+		if (ind == MAX_VDD2_OPP)
+			target_level = ind-1;
+
+		if (resp->curr_level == target_level)
+			return 0;
+
+		resp->curr_level = target_level;
+
+		l3_freq = get_freq(l3_opps + MAX_VDD2_OPP,
+					target_level);
+		t_opp = ID_VDD(PRCM_VDD2) |
+			ID_OPP_NO(l3_opps[target_level].opp_id);
+		if (resp->curr_level > target_level) {
+			/* Scale Frequency and then voltage */
+			clk_set_rate(vdd2_clk, l3_freq);
+			sr_voltagescale_vcbypass(t_opp,
+					l3_opps[target_level].vsel);
+		} else {
+			/* Scale Voltage and then frequency */
+			sr_voltagescale_vcbypass(t_opp,
+					l3_opps[target_level].vsel);
+			clk_set_rate(vdd2_clk, l3_freq);
+		}
+		resp->curr_level = curr_vdd2_prcm_set->opp_id;
 	}
 	return 0;
 }
@@ -220,16 +256,13 @@ int set_freq(struct shared_resource *resp, u32 target_level)
 {
 	unsigned int vdd1_opp;
 
-	if (strcmp(resp->name, "mpu_freq") == 0)
+	if (strcmp(resp->name, "mpu_freq") == 0) {
 		vdd1_opp = get_opp(mpu_opps + MAX_VDD1_OPP, target_level);
-	else if (strcmp(resp->name, "dsp_freq") == 0)
+		resource_request("vdd1_opp", &dummy_mpu_dev, vdd1_opp);
+	} else if (strcmp(resp->name, "dsp_freq") == 0) {
 		vdd1_opp = get_opp(dsp_opps + MAX_VDD1_OPP, target_level);
-
-	if (vdd1_opp == MIN_VDD1_OPP)
-		resource_release("vdd1_opp", &dummy_srf_dev);
-	else
-		resource_request("vdd1_opp", &dummy_srf_dev, vdd1_opp);
-
+		resource_request("vdd1_opp", &dummy_dsp_dev, vdd1_opp);
+	}
 	resp->curr_level = target_level;
 	return 0;
 }
