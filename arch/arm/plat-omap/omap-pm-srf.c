@@ -82,21 +82,16 @@ void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
 		return;
 	};
 
-	if (r == 0)
+	if (r == 0) {
 		pr_debug("OMAP PM: remove min bus tput constraint: "
 			 "dev %s for agent_id %d\n", dev_name(dev), agent_id);
-	else
+		resource_release("vdd2_opp", dev);
+	} else {
 		pr_debug("OMAP PM: add min bus tput constraint: "
 			 "dev %s for agent_id %d: rate %ld KiB\n",
 			 dev_name(dev), agent_id, r);
-
-	/*
-	 * This code should model the interconnect and compute the
-	 * required clock frequency, convert that to a VDD2 OPP ID, then
-	 * set the VDD2 OPP appropriately.
-	 *
-	 * TI CDP code can call constraint_set here on the VDD2 OPP.
-	 */
+		resource_request("vdd2_opp", dev, r);
+	}
 }
 
 void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
