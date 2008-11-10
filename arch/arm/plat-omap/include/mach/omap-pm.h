@@ -57,12 +57,14 @@ int __init omap_pm_if_early_init(void);
  * omap_pm_if_init - OMAP PM init code called after clock fw init
  * @mpu_opp_table: array ptr to struct omap_opp for MPU
  * @dsp_opp_table: array ptr to struct omap_opp for DSP
+ * @l3_opp_table : array ptr to struct omap_opp for CORE
  *
  * The main initialization code.  OPP tables are passed in here.  The
  * "_if_" is to avoid name collisions with the PM idle-loop code.
  */
 int __init omap_pm_if_init(struct omap_opp *mpu_opp_table,
-			   struct omap_opp *dsp_opp_table);
+			   struct omap_opp *dsp_opp_table,
+			   struct omap_opp *l3_opp_table);
 
 /**
  * omap_pm_if_exit - OMAP PM exit code

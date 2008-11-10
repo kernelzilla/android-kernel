@@ -206,7 +206,7 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sp)
 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
 	omapdev_init(omapdevs);
 	omap2_clk_init();
-	omap_pm_if_init(NULL, NULL);
+	omap_pm_if_init(NULL, NULL, NULL);
 	omap2_sdrc_init(sp);
 	gpmc_init();
 }
