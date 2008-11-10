@@ -198,7 +198,10 @@ void __init omap2_map_common_io(void)
 	omapfb_reserve_sdram();
 }
 
-void __init omap2_init_common_hw(struct omap_sdrc_params *sp)
+void __init omap2_init_common_hw(struct omap_sdrc_params *sp,
+				 struct omap_opp *mpu_opps,
+				 struct omap_opp *dsp_opps,
+				 struct omap_opp *l3_opps)
 {
 	omap2_mux_init();
 	omap_pm_if_early_init();
@@ -206,7 +209,7 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sp)
 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
 	omapdev_init(omapdevs);
 	omap2_clk_init();
-	omap_pm_if_init(NULL, NULL, NULL);
+	omap_pm_if_init(mpu_opps, dsp_opps, l3_opps);
 	omap2_sdrc_init(sp);
 	gpmc_init();
 }
