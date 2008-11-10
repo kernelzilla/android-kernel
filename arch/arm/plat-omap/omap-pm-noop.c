@@ -28,6 +28,7 @@
 
 static struct omap_opp *dsp_opps;
 static struct omap_opp *mpu_opps;
+static struct omap_opp *l3_opps;
 
 /*
  * Device-driver-originated constraints (via board-*.c files)
@@ -316,10 +317,12 @@ int __init omap_pm_if_early_init(void)
 
 /* Must be called after clock framework is initialized */
 int __init omap_pm_if_init(struct omap_opp *mpu_opp_table,
-			   struct omap_opp *dsp_opp_table)
+			   struct omap_opp *dsp_opp_table,
+			   struct omap_opp *l3_opp_table)
 {
 	mpu_opps = mpu_opp_table;
 	dsp_opps = dsp_opp_table;
+	l3_opps = l3_opp_table;
 	return 0;
 }
 
