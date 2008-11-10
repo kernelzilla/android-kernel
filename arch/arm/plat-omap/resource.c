@@ -33,8 +33,8 @@
 /* res_list contains all registered struct shared_resource */
 static LIST_HEAD(res_list);
 
-/* res_lock protects res_list add and del ops */
-static DEFINE_SPINLOCK(res_lock);
+/* res_mutex protects res_list add and del ops */
+static DECLARE_MUTEX(res_mutex);
 
 /* Static Pool of users for a resource used till kmalloc becomes available */
 struct  users_list usr_list[MAX_USERS];
@@ -73,18 +73,17 @@ static struct shared_resource *_resource_lookup(const char *name)
  *
  * Looks for a registered resource by its name. Returns a pointer to
  * the struct shared_resource if found, else returns NULL.
- * The function holds spinlocks and takes care of atomicity.
+ * The function holds mutex and takes care of atomicity.
  */
 static struct shared_resource *resource_lookup(const char *name)
 {
 	struct shared_resource *res;
-	unsigned long flags;
 
 	if (!name)
 		return NULL;
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	res = _resource_lookup(name);
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 
 	return res;
 }
@@ -254,8 +253,6 @@ int resource_refresh(void)
  */
 int resource_register(struct shared_resource *resp)
 {
-	unsigned long flags;
-
 	if (!resp)
 		return -EINVAL;
 
@@ -268,7 +265,7 @@ int resource_register(struct shared_resource *resp)
 
 	INIT_LIST_HEAD(&resp->users_list);
 
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	/* Add the resource to the resource list */
 	list_add(&resp->node, &res_list);
 
@@ -276,7 +273,7 @@ int resource_register(struct shared_resource *resp)
 	if (resp->ops->init)
 		resp->ops->init(resp);
 
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 	pr_debug("resource: registered %s\n", resp->name);
 
 	return 0;
@@ -292,15 +289,13 @@ EXPORT_SYMBOL(resource_register);
  */
 int resource_unregister(struct shared_resource *resp)
 {
-	unsigned long flags;
-
 	if (!resp)
 		return -EINVAL;
 
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	/* delete the resource from the resource list */
 	list_del(&resp->node);
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 
 	pr_debug("resource: unregistered %s\n", resp->name);
 
@@ -330,9 +325,8 @@ int resource_request(const char *name, struct device *dev,
 	struct shared_resource *resp;
 	struct  users_list *user;
 	int 	found = 0, ret = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	resp = _resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_request: Invalid resource name\n");
@@ -368,7 +362,7 @@ int resource_request(const char *name, struct device *dev,
 	user->level = level;
 
 res_unlock:
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 	/*
 	 * Recompute and set the current level for the resource.
 	 * NOTE: update_resource level moved out of spin_lock, as it may call
@@ -398,9 +392,8 @@ int resource_release(const char *name, struct device *dev)
 	struct shared_resource *resp;
 	struct users_list *user;
 	int found = 0, ret = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	resp = _resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_release: Invalid resource name\n");
@@ -428,7 +421,7 @@ int resource_release(const char *name, struct device *dev)
 	/* Recompute and set the current level for the resource */
 	ret = update_resource_level(resp);
 res_unlock:
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(resource_release);
@@ -444,17 +437,16 @@ int resource_get_level(const char *name)
 {
 	struct shared_resource *resp;
 	u32 ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&res_lock, flags);
+	down(&res_mutex);
 	resp = _resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_release: Invalid resource name\n");
-		spin_unlock_irqrestore(&res_lock, flags);
+		up(&res_mutex);
 		return -EINVAL;
 	}
 	ret = resp->curr_level;
-	spin_unlock_irqrestore(&res_lock, flags);
+	up(&res_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(resource_get_level);
