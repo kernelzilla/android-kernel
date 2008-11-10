@@ -385,7 +385,7 @@ static void __init overo_init_irq(void)
 	omap_board_config = overo_config;
 	omap_board_config_size = ARRAY_SIZE(overo_config);
 	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
-			     mt46h32m32lf6_sdrc_params);
+			     mt46h32m32lf6_sdrc_params, NULL, NULL, NULL);
 	omap_init_irq();
 	omap_gpio_init();
 }

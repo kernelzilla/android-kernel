@@ -37,12 +37,71 @@
 #include <plat/common.h>
 #include <plat/dma.h>
 #include <plat/gpmc.h>
+#include <plat/clock.h>
 
 #include <plat/control.h>
 #include <plat/gpmc-smc91x.h>
+#include <plat/omap-pm.h>
 
 #include "sdram-qimonda-hyb18m512160af-6.h"
 #include "mmc-twl4030.h"
+#include "pm.h"
+
+/* MPU speeds */
+#define S600M   600000000
+#define S550M   550000000
+#define S500M   500000000
+#define S250M   250000000
+#define S125M   125000000
+
+/* DSP speeds */
+#define S430M   430000000
+#define S400M   400000000
+#define S360M   360000000
+#define S180M   180000000
+#define S90M    90000000
+
+/* L3 speeds */
+#define S83M    83000000
+#define S166M   166000000
+
+static struct omap_opp mpu_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{S125M, VDD1_OPP1, 0},
+	/*OPP2*/
+	{S250M, VDD1_OPP2, 0},
+	/*OPP3*/
+	{S500M, VDD1_OPP3, 0},
+	/*OPP4*/
+	{S550M, VDD1_OPP4, 0},
+	/*OPP5*/
+	{S600M, VDD1_OPP5, 0},
+};
+
+static struct omap_opp l3_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{0, VDD2_OPP1, 0},
+	/*OPP2*/
+	{S83M, VDD2_OPP2, 0},
+	/*OPP3*/
+	{S166M, VDD2_OPP3, 0},
+};
+
+struct omap_opp dsp_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{S90M, VDD1_OPP1, 0},
+	/*OPP2*/
+	{S180M, VDD1_OPP2, 0},
+	/*OPP3*/
+	{S360M, VDD1_OPP3, 0},
+	/*OPP4*/
+	{S400M, VDD1_OPP4, 0},
+	/*OPP5*/
+	{S430M, VDD1_OPP5, 0},
+};
 
 #define SDP3430_TS_GPIO_IRQ_SDPV1	3
 #define SDP3430_TS_GPIO_IRQ_SDPV2	2
@@ -181,7 +240,8 @@ static void __init omap_3430sdp_init_irq(void)
 {
 	omap_board_config = sdp3430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
-	omap2_init_common_hw(hyb18m512160af6_sdrc_params, NULL);
+	omap2_init_common_hw(hyb18m512160af6_sdrc_params, NULL, mpu_rate_table,
+			     dsp_rate_table, l3_rate_table);
 	omap_init_irq();
 	omap_gpio_init();
 }
