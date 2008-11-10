@@ -27,9 +27,9 @@
 #include <mach/resource.h>
 #include <mach/omapdev.h>
 
-static struct omap_opp *dsp_opps;
-static struct omap_opp *mpu_opps;
-static struct omap_opp *l3_opps;
+struct omap_opp *dsp_opps;
+struct omap_opp *mpu_opps;
+struct omap_opp *l3_opps;
 
 #define LAT_RES_POSTAMBLE "_latency"
 #define MAX_LATENCY_RES_NAME 30
@@ -340,19 +340,19 @@ void omap_pm_pwrdm_inactive(struct powerdomain *pwrdm)
  * Should be called before clk framework since clk fw will call
  * omap_pm_pwrdm_{in,}active()
  */
-int __init omap_pm_if_early_init(void)
-{
-	return 0;
-}
-
-/* Must be called after clock framework is initialized */
-int __init omap_pm_if_init(struct omap_opp *mpu_opp_table,
-			   struct omap_opp *dsp_opp_table,
-			   struct omap_opp *l3_opp_table)
+int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
+				 struct omap_opp *dsp_opp_table,
+				 struct omap_opp *l3_opp_table)
 {
 	mpu_opps = mpu_opp_table;
 	dsp_opps = dsp_opp_table;
 	l3_opps = l3_opp_table;
+	return 0;
+}
+
+/* Must be called after clock framework is initialized */
+int __init omap_pm_if_init(void)
+{
 	resource_init(resources_omap);
 	return 0;
 }
