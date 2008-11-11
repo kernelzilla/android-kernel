@@ -580,6 +580,7 @@ bool MEM_Init(void)
 		mMan.lst.head.next = &mMan.lst.head;
 		mMan.lst.head.prev = &mMan.lst.head;
 		mMan.lst.head.self = NULL;
+		spin_lock_init(&mMan.lock);
 #endif
 
 	}
