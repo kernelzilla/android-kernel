@@ -925,7 +925,7 @@ int __init omap3_pm_init(void)
 
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 		omap3_secure_ram_storage =
-			kmalloc(0x8000, GFP_KERNEL);
+			kmalloc(0x803F, GFP_KERNEL);
 		if (!omap3_secure_ram_storage)
 			printk(KERN_ERR "Memory allocation failed when"
 					"allocating for secure sram context\n");
