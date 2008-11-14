@@ -18,6 +18,7 @@
 
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
+#include <mach/dma.h>
 #include "devices.h"
 #include "proc_comm.h"
 
@@ -85,6 +86,70 @@ struct platform_device msm_device_uart3 = {
 	.id	= 2,
 	.num_resources	= ARRAY_SIZE(resources_uart3),
 	.resource	= resources_uart3,
+};
+
+static struct resource msm_uart1_dm_resources[] = {
+	{
+		.start = MSM_UART1DM_PHYS,
+		.end   = MSM_UART1DM_PHYS + PAGE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = INT_UART1DM_IRQ,
+		.end   = INT_UART1DM_RX,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = DMOV_HSUART1_TX_CHAN,
+		.end   = DMOV_HSUART1_RX_CHAN,
+		.name  = "uartdm_chanels",
+		.flags = IORESOURCE_DMA,
+	},
+	{
+		.start = DMOV_HSUART1_TX_CRCI,
+		.end   = DMOV_HSUART1_RX_CRCI,
+		.name  = "uartdm_crci",
+		.flags = IORESOURCE_DMA,
+	},
+};
+
+struct platform_device msm_device_uart_dm1 = {
+	.name = "msm_serial_hs",
+	.id = 1,
+	.num_resources = ARRAY_SIZE(msm_uart1_dm_resources),
+	.resource = msm_uart1_dm_resources,
+};
+
+static struct resource msm_uart2_dm_resources[] = {
+	{
+		.start = MSM_UART2DM_PHYS,
+		.end   = MSM_UART2DM_PHYS + PAGE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = INT_UART2DM_IRQ,
+		.end   = INT_UART2DM_RX,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = DMOV_HSUART2_TX_CHAN,
+		.end   = DMOV_HSUART2_RX_CHAN,
+		.name  = "uartdm_chanels",
+		.flags = IORESOURCE_DMA,
+	},
+	{
+		.start = DMOV_HSUART2_TX_CRCI,
+		.end   = DMOV_HSUART2_RX_CRCI,
+		.name  = "uartdm_crci",
+		.flags = IORESOURCE_DMA,
+	},
+};
+
+struct platform_device msm_device_uart_dm2 = {
+	.name = "msm_serial_hs",
+	.id = 2,
+	.num_resources = ARRAY_SIZE(msm_uart2_dm_resources),
+	.resource = msm_uart2_dm_resources,
 };
 
 static struct resource resources_i2c[] = {
