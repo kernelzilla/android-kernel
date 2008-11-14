@@ -1,6 +1,8 @@
 /* linux/include/asm-arm/arch-msm/dma.h
  *
  * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2008 QUALCOMM Incorporated.
+ * Copyright (c) 2008 QUALCOMM USA, INC.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -32,6 +34,7 @@ struct msm_dmov_cmd {
 
 void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
 void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
+void msm_dmov_flush(unsigned int id);
 int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 
@@ -65,6 +68,7 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_FLUSH3(ch)       DMOV_SD3(0x140, ch)
 #define DMOV_FLUSH4(ch)       DMOV_SD3(0x180, ch)
 #define DMOV_FLUSH5(ch)       DMOV_SD3(0x1C0, ch)
+#define DMOV_FLUSH_TYPE       (1 << 31)
 
 #define DMOV_STATUS(ch)       DMOV_SD3(0x200, ch)
 #define DMOV_STATUS_RSLT_COUNT(n)    (((n) >> 29))
@@ -95,6 +99,19 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_TSIF_CRCI        10
 
 #define DMOV_USB_CHAN         11
+
+#define DMOV_HSUART1_TX_CHAN   4
+#define DMOV_HSUART1_TX_CRCI   8
+
+#define DMOV_HSUART1_RX_CHAN   9
+#define DMOV_HSUART1_RX_CRCI   9
+
+#define DMOV_HSUART2_TX_CHAN   4
+#define DMOV_HSUART2_TX_CRCI   14
+
+#define DMOV_HSUART2_RX_CHAN   11
+#define DMOV_HSUART2_RX_CRCI   15
+
 
 /* no client rate control ifc (eg, ram) */
 #define DMOV_NONE_CRCI        0
