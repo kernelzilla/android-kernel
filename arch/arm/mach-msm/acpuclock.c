@@ -380,7 +380,7 @@ out:
 static void __init acpuclk_init(void)
 {
 	struct clkctl_acpu_speed *speed;
-	uint32_t div, sel, current_vdd;
+	uint32_t div, sel;
 
 	/*
 	 * Determine the rate of ACPU clock
@@ -411,14 +411,6 @@ static void __init acpuclk_init(void)
 	drv_state.current_speed = speed;
 
 	printk(KERN_INFO "ACPU running at %d KHz\n", speed->a11clk_khz);
-	/*
-	 * Ensure that the current freq is okay at this VDD. Earlier
-	 * versions of the bootloader would not update VDD properly.
-	 */
-	current_vdd = readl(A11S_VDD_SVS_PLEVEL_ADDR) & 0x07;
-	if (speed->vdd != current_vdd)
-		printk(KERN_WARNING "WARNING - Bad VDD (%d != %d) for this freq\n",
-		       current_vdd, speed->vdd);
 }
 
 unsigned long acpuclk_get_rate(void)
