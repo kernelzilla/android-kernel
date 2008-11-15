@@ -992,7 +992,6 @@ bool PROC_Init(void)
 		DBC_Assert(!PROC_DebugMask.flags);
 		GT_create(&PROC_DebugMask, "PR");  /* "PR" for Processor */
 
-		MEM_AllocObject(hProcLock, struct SYNC_CSOBJECT, SIGNATURECS);
 		(void)SYNC_InitializeCS(&hProcLock);
 	}
 
