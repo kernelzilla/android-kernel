@@ -47,7 +47,10 @@ struct omap3_prcm_regs {
 	u32 emu_cm_clksel;
 	u32 emu_cm_clkstctrl;
 	u32 pll_cm_autoidle2;
+	u32 pll_cm_clksel4;
 	u32 pll_cm_clksel5;
+	u32 pll_cm_clken;
+	u32 pll_cm_clken2;
 	u32 cm_polctrl;
 	u32 iva2_cm_fclken;
 	u32 core_cm_fclken1;
@@ -243,8 +246,14 @@ void omap3_prcm_save_context(void)
 			 cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSTCTRL);
 	prcm_context.pll_cm_autoidle2 =
 			 cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
+	prcm_context.pll_cm_clksel4 =
+			cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL4);
 	prcm_context.pll_cm_clksel5 =
 			 cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKSEL5);
+	prcm_context.pll_cm_clken =
+			cm_read_mod_reg(PLL_MOD, CM_CLKEN);
+	prcm_context.pll_cm_clken2 =
+			cm_read_mod_reg(PLL_MOD, OMAP3430ES2_CM_CLKEN2);
 	prcm_context.cm_polctrl = __raw_readl(OMAP3430_CM_POLCTRL);
 	prcm_context.iva2_cm_fclken =
 			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_FCLKEN);
@@ -390,8 +399,13 @@ void omap3_prcm_restore_context(void)
 					 CM_CLKSTCTRL);
 	cm_write_mod_reg(prcm_context.pll_cm_autoidle2, PLL_MOD,
 					 CM_AUTOIDLE2);
+	cm_write_mod_reg(prcm_context.pll_cm_clksel4, PLL_MOD,
+					OMAP3430ES2_CM_CLKSEL4);
 	cm_write_mod_reg(prcm_context.pll_cm_clksel5, PLL_MOD,
 					 OMAP3430ES2_CM_CLKSEL5);
+	cm_write_mod_reg(prcm_context.pll_cm_clken, PLL_MOD, CM_CLKEN);
+	cm_write_mod_reg(prcm_context.pll_cm_clken2, PLL_MOD,
+					OMAP3430ES2_CM_CLKEN2);
 	__raw_writel(prcm_context.cm_polctrl, OMAP3430_CM_POLCTRL);
 	cm_write_mod_reg(prcm_context.iva2_cm_fclken, OMAP3430_IVA2_MOD,
 					 CM_FCLKEN);
