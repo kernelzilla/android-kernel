@@ -140,6 +140,7 @@
 #include <dspbridge/dbreg.h>
 #include <dspbridge/msg.h>
 #include <dspbridge/wmdioctl.h>
+#include <dspbridge/drv.h>
 
 /*  ----------------------------------- This */
 #include <dspbridge/proc.h>
@@ -632,25 +633,27 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
 			pProcObject->g_pszLastCoff = NULL;
 		}
 
+#ifndef RES_CLEANUP_DISABLE
+		/* Return PID instead of process handle */
+		hProcess = current->pid;
+
+		res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
+		if (DSP_SUCCEEDED(res_status)) {
+			DRV_GetProcContext(hProcess,
+				(struct DRV_OBJECT *)hDRVObject, &pPctxt,
+					 NULL, 0);
+			if (pPctxt != NULL) {
+				DRV_ProcFreeDMMRes(pPctxt);
+				pPctxt->hProcessor = NULL;
+			}
+		}
+#endif
+
 		/* Remove the Proc from the DEV List */
 		(void)DEV_RemoveProcObject(pProcObject->hDevObject,
 			(u32)pProcObject);
 		/* Free the Processor Object */
 		MEM_FreeObject(pProcObject);
-#ifndef RES_CLEANUP_DISABLE
-       /* Return PID instead of process handle */
-       hProcess = current->pid;
-
-	res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
-	/* res_status = CFG_GetObject(REG_DRV_OBJECT, (u32*)&hDRVObject); */
-	if (DSP_SUCCEEDED(res_status)) {
-               DRV_GetProcContext(hProcess,
-				 (struct DRV_OBJECT *)hDRVObject, &pPctxt,
-				 NULL, 0);
-		if (pPctxt != NULL)
-			pPctxt->hProcessor = NULL;
-	}
-#endif
 	} else {
 		status = DSP_EHANDLE;
 		GT_0trace(PROC_DebugMask, GT_7CLASS,

@@ -427,4 +427,17 @@ struct PROCESS_CONTEXT{
 	extern DSP_STATUS DRV_ReleaseResources(IN u32 dwContext,
 					       struct DRV_OBJECT *hDrvObject);
 
+/*
+ *  ======== DRV_ProcFreeDMMRes ========
+ *  Purpose:
+ *       Actual DMM De-Allocation.
+ *  Parameters:
+ *      hPCtxt:      Path to the driver Registry Key.
+ *  Returns:
+ *      DSP_SOK if success;
+ */
+
+
+	extern DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt);
+
 #endif				/* DRV_ */

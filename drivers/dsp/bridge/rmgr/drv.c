@@ -162,7 +162,6 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 fRequest);
 
 static DSP_STATUS PrintProcessInformation(void);
 static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt);
-static DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt);
 static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt);
 extern enum NODE_STATE NODE_GetState(HANDLE hNode);
 
@@ -559,7 +558,7 @@ DSP_STATUS DRV_UpdateDMMResElement(HANDLE hDMMRes, u32 pMpuAddr, u32 ulSize,
 }
 
 /* Actual DMM De-Allocation */
-static DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
+DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
