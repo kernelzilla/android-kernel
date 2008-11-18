@@ -193,11 +193,13 @@ static struct resource resources_sdc1[] = {
 		.end	= INT_SDC1_1,
 		.flags	= IORESOURCE_IRQ,
 	},
+#if 0
 	{
 		.start	= 8,
 		.end	= 8,
 		.flags	= IORESOURCE_DMA,
 	},
+#endif
 };
 
 static struct resource resources_sdc2[] = {
