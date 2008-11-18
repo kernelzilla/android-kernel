@@ -60,7 +60,7 @@ config OMAP_DEBUG_CLOCKDOMAIN
 
 config OMAP_SMARTREFLEX
 	bool "SmartReflex support"
-	depends on ARCH_OMAP34XX && TWL4030_CORE
+	depends on ARCH_OMAP34XX && TWL4030_CORE && PM
 	help
 	  Say Y if you want to enable SmartReflex.
 
@@ -273,6 +273,7 @@ config OMAP_PM_NOOP
 	bool "No-op/debug PM layer"
 
 config OMAP_PM_SRF
+	depends on PM
 	bool "PM layer implemented using SRF"
 
 endchoice

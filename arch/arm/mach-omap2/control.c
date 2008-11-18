@@ -26,6 +26,7 @@
 
 static void __iomem *omap2_ctrl_base;
 
+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
 struct omap3_scratchpad {
 	u32 boot_config_ptr;
 	u32 public_restore_ptr;
@@ -133,6 +134,7 @@ struct omap3_control_regs {
 };
 
 static struct omap3_control_regs control_context;
+#endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
 
 #define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
 
@@ -176,7 +178,7 @@ void omap_ctrl_writel(u32 val, u16 offset)
 	__raw_writel(val, OMAP_CTRL_REGADDR(offset));
 }
 
-#ifdef CONFIG_ARCH_OMAP3
+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
 /*
  * Clears the scratchpad contents in case of cold boot-
  * called during bootup
@@ -425,4 +427,4 @@ void omap3_control_restore_context(void)
 	omap_ctrl_writel(control_context.csi, OMAP343X_CONTROL_CSI);
 	return;
 }
-#endif /* CONFIG_ARCH_OMAP3 */
+#endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */

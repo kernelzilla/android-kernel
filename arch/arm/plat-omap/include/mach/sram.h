@@ -63,6 +63,11 @@ extern u32 omap3_sram_configure_core_dpll(u32 sdrc_rfr_ctrl,
 					  u32 sdrc_actim_ctrla,
 					  u32 sdrc_actim_ctrlb, u32 m2);
 extern unsigned long omap3_sram_configure_core_dpll_sz;
+
+#ifdef CONFIG_PM
 extern void omap_push_sram_idle(void);
+#else
+static inline void omap_push_sram_idle(void) {}
+#endif /* CONFIG_PM */
 
 #endif
