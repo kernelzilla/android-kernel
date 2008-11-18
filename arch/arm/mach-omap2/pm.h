@@ -32,7 +32,11 @@ extern void *omap3_secure_ram_storage;
 
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
+#ifdef CONFIG_ARCH_OMAP3
 extern void omap3_pm_off_mode_enable(int);
+#else
+#define omap3_pm_off_mode_enable(int) do {} while (0);
+#endif
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 
 
