@@ -67,7 +67,9 @@
 struct power_state {
 	struct powerdomain *pwrdm;
 	u32 next_state;
+#ifdef CONFIG_SUSPEND
 	u32 saved_state;
+#endif
 	struct list_head node;
 };
 
@@ -525,6 +527,7 @@ out:
 	local_irq_enable();
 }
 
+#ifdef CONFIG_SUSPEND
 static int omap3_pm_prepare(void)
 {
 	saved_idle = pm_idle;
@@ -599,6 +602,7 @@ static struct platform_suspend_ops omap_pm_ops = {
 	.finish		= omap3_pm_finish,
 	.valid		= suspend_valid_only_mem,
 };
+#endif /* CONFIG_SUSPEND */
 
 
 /**
@@ -909,7 +913,10 @@ int __init omap3_pm_init(void)
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 
 	omap_push_sram_idle();
+
+#ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
+#endif /* CONFIG_SUSPEND */
 
 	pm_idle = omap3_pm_idle;
 	omap3_idle_init();
