@@ -985,6 +985,9 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 		omap2_clksel_recalc(&core_ck);
 		propagate_rate(&core_ck);
 	}
+
+	omap3_save_scratchpad_contents();
+
 	return 0;
 }
 
