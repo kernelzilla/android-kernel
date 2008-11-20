@@ -401,6 +401,73 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	return platform_device_register(pdev);
 }
 
+static struct resource resources_mddi0[] = {
+	{
+		.start	= MSM_PMDH_PHYS,
+		.end	= MSM_PMDH_PHYS + MSM_PMDH_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_MDDI_PRI,
+		.end	= INT_MDDI_PRI,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct resource resources_mddi1[] = {
+	{
+		.start	= MSM_EMDH_PHYS,
+		.end	= MSM_EMDH_PHYS + MSM_EMDH_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_MDDI_EXT,
+		.end	= INT_MDDI_EXT,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_mddi0 = {
+	.name = "msm_mddi",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(resources_mddi0),
+	.resource = resources_mddi0,
+	.dev = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+struct platform_device msm_device_mddi1 = {
+	.name = "msm_mddi",
+	.id = 1,
+	.num_resources = ARRAY_SIZE(resources_mddi1),
+	.resource = resources_mddi1,
+	.dev = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+static struct resource resources_mdp[] = {
+	{
+		.start	= MSM_MDP_PHYS,
+		.end	= MSM_MDP_PHYS + MSM_MDP_SIZE - 1,
+		.name	= "mdp",
+		.flags	= IORESOURCE_MEM
+	},
+	{
+		.start	= INT_MDP,
+		.end	= INT_MDP,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_mdp = {
+	.name = "msm_mdp",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(resources_mdp),
+	.resource = resources_mdp,
+};
+
 #define CLOCK(clk_name, clk_id, clk_dev, clk_flags, clk_arch) {	\
 	.name = clk_name, \
 	.id = clk_id, \
