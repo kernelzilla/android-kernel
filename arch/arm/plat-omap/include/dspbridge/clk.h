@@ -70,7 +70,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void CLK_Exit();
+	extern void CLK_Exit(void);
 
 /*
  *  ======== CLK_Init ========
@@ -83,7 +83,7 @@
  *  Ensures:
  *      CLK initialized.
  */
-	extern bool CLK_Init();
+	extern bool CLK_Init(void);
 
 
 /*

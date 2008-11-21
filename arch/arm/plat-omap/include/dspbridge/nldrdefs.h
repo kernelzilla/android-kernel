@@ -130,7 +130,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EMEMORY:    Insufficient memory on GPP.
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldr.
  *      pNodeProps != NULL.
  *      phNldrNode != NULL.
@@ -159,7 +159,7 @@
  *      DSP_SOK:        Success;
  *      DSP_EMEMORY:    Insufficient memory for requested resources.
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      phNldr != NULL.
  *      hDevObject != NULL.
  *	pAttrs != NULL.
@@ -180,7 +180,7 @@
  *      hNldr:          Node manager object.
  *  Returns:
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldr.
  *  Ensures:
  *	hNldr invalid
@@ -194,12 +194,12 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      NLDR_Init() successfully called before.
+ *      NLDR_Init(void) successfully called before.
  *  Ensures:
- *      Any resources acquired in NLDR_Init() will be freed when last NLDR
- *      client calls NLDR_Exit().
+ *      Any resources acquired in NLDR_Init(void) will be freed when last NLDR
+ *      client calls NLDR_Exit(void).
  */
-	typedef void(*NLDR_EXITFXN) ();
+	typedef void(*NLDR_EXITFXN) (void);
 
 /*
  *  ======== NLDR_Free ========
@@ -209,7 +209,7 @@
  *      hNldrNode:      Handle returned from NLDR_Allocate().
  *  Returns:
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldrNode.
  *  Ensures:
  */
@@ -228,7 +228,7 @@
  *      DSP_SOK:        Success.
  *      DSP_ESYMBOL:    Address of function not found.
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldrNode.
  *      pulAddr != NULL;
  *      pstrFxn != NULL;
@@ -247,7 +247,7 @@
  *      TRUE if initialization succeeded, FALSE otherwise.
  *  Ensures:
  */
-	typedef bool(*NLDR_INITFXN) ();
+	typedef bool(*NLDR_INITFXN) (void);
 
 /*
  *  ======== NLDR_Load ========
@@ -264,7 +264,7 @@
  *      DSP_EDYNLOAD:           Failure in dynamic loader library.
  *      DSP_EFWRITE:            Failed to write phase's code or date to target.
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldrNode.
  *  Ensures:
  */
@@ -282,7 +282,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EMEMORY:    Insufficient memory on GPP.
  *  Requires:
- *      NLDR_Init() called.
+ *      NLDR_Init(void) called.
  *      Valid hNldrNode.
  *  Ensures:
  */

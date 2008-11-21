@@ -72,7 +72,7 @@
  *      DSP_SOK:        Success;
  *      DSP_EHANDLE:    Invalid hChnl.
  *  Requires:
- *      CHNL_Init() called.
+ *      CHNL_Init(void) called.
  *      No thread must be blocked on this channel's I/O completion event.
  *  Ensures:
  *      DSP_SOK:        The I/O completion event for this channel is freed.
@@ -106,7 +106,7 @@
  *      CHNL_E_INVALIDMEMBASE:  Invalid base address for DSP communications.
  *      CHNL_E_MGREXISTS:       Channel manager already exists for this device.
  *  Requires:
- *      CHNL_Init() called.
+ *      CHNL_Init(void) called.
  *      phChnlMgr != NULL.
  *      pMgrAttrs != NULL.
  *  Ensures:
@@ -128,7 +128,7 @@
  *      DSP_SOK:            Success.
  *      DSP_EHANDLE:        hChnlMgr was invalid.
  *  Requires:
- *      CHNL_Init() called.
+ *      CHNL_Init(void) called.
  *  Ensures:
  *      DSP_SOK:            Cancels I/O on each open channel.
  *                          Closes each open channel.
@@ -144,12 +144,12 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      CHNL_Init() previously called.
+ *      CHNL_Init(void) previously called.
  *  Ensures:
- *      Resources, if any acquired in CHNL_Init(), are freed when the last
- *      client of CHNL calls CHNL_Exit().
+ *      Resources, if any acquired in CHNL_Init(void), are freed when the last
+ *      client of CHNL calls CHNL_Exit(void).
  */
-	extern void CHNL_Exit();
+	extern void CHNL_Exit(void);
 
 
 /*
@@ -163,7 +163,7 @@
  *  Ensures:
  *      A requirement for each of the other public CHNL functions.
  */
-	extern bool CHNL_Init();
+	extern bool CHNL_Init(void);
 
 
 

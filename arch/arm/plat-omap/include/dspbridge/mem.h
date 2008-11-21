@@ -170,7 +170,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void MEM_Exit();
+	extern void MEM_Exit(void);
 
 /*
  *  ======== MEM_FlushCache ========
@@ -268,7 +268,7 @@
  *  Ensures:
  *      MEM initialized.
  */
-	extern bool MEM_Init();
+	extern bool MEM_Init(void);
 
 /*
  *  ======== MEM_IsValidHandle ========

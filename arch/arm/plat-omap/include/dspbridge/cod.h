@@ -176,9 +176,9 @@
  *  Requires:
  *      COD initialized.
  *  Ensures:
- *      Resources acquired in COD_Init() are freed.
+ *      Resources acquired in COD_Init(void) are freed.
  */
-       extern void COD_Exit();
+       extern void COD_Exit(void);
 
 /*
  *  ======== COD_GetBaseLib ========
@@ -322,7 +322,7 @@
  *  Ensures:
  *      A requirement for each of the other public COD functions.
  */
-       extern bool COD_Init();
+       extern bool COD_Init(void);
 
 /*
  *  ======== COD_LoadBase ========

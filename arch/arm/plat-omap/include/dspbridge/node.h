@@ -90,7 +90,7 @@
  *      DSP_EFAIL:          A failure occured, unable to allocate node.
  *      DSP_EWRONGSTATE:    Proccessor is not in the running state.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      hProcessor != NULL.
  *      pNodeId != NULL.
  *      phNode != NULL.
@@ -124,7 +124,7 @@
  *      DSP_EFAIL:      General Failure.
  *      DSP_ESIZE:      Invalid Size.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pBuffer != NULL.
  *  Ensures:
  */
@@ -153,7 +153,7 @@
  *                          being restarted.
  *      DSP_EFAIL:          Unable to change node's runtime priority level.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  *      DSP_SOK && (Node's current priority == nPriority)
  */
@@ -223,7 +223,7 @@
  *                              Device node to device node, or device node to
  *                              GPP), the two nodes are on different DSPs.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS NODE_Connect(struct NODE_OBJECT *hNode1,
@@ -254,7 +254,7 @@
  *      DSP_EUSER1-16:      A user-defined failure occurred on the DSP.
  *      DSP_EFAIL:          A failure occurred, unable to create node.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode);
@@ -275,7 +275,7 @@
  *      DSP_EMEMORY:    Insufficient memory for requested resources.
  *      DSP_EFAIL:      General failure.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      phNodeMgr != NULL.
  *      hDevObject != NULL.
  *  Ensures:
@@ -303,7 +303,7 @@
  *      DSP_EFAIL:          A failure occurred in deleting the node.
  *      DSP_ESYMBOL:        Delete function not found in the COFF file.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  *      DSP_SOK:            hNode is invalid.
  */
@@ -318,7 +318,7 @@
  *  Returns:
  *      DSP_SOK:        Success.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      Valid hNodeMgr.
  *  Ensures:
  */
@@ -361,12 +361,12 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      NODE_Init() successfully called before.
+ *      NODE_Init(void) successfully called before.
  *  Ensures:
- *      Any resources acquired in NODE_Init() will be freed when last NODE
- *      client calls NODE_Exit().
+ *      Any resources acquired in NODE_Init(void) will be freed when last NODE
+ *      client calls NODE_Exit(void).
  */
-	extern void NODE_Exit();
+	extern void NODE_Exit(void);
 
 /*
  *  ======== NODE_FreeMsgBuf ========
@@ -381,7 +381,7 @@
  *      DSP_EHANDLE:    Invalid node handle.
  *      DSP_EFAIL:      Failure to free the buffer.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pBuffer != NULL.
  *  Ensures:
  */
@@ -404,7 +404,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EHANDLE:    Invalid hNode.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pAttr != NULL.
  *  Ensures:
  *      DSP_SOK:        *pAttrs contains the node's current attributes.
@@ -432,7 +432,7 @@
  *      DSP_ETIMEOUT:   Timeout occurred and no message is available.
  *      DSP_EFAIL:      Error occurred while trying to retrieve a message.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pMessage != NULL.
  *  Ensures:
  */
@@ -464,7 +464,7 @@
  *      TRUE if initialization succeeded, FALSE otherwise.
  *  Ensures:
  */
-	extern bool NODE_Init();
+	extern bool NODE_Init(void);
 
 /*
  *  ======== NODE_OnExit ========
@@ -495,7 +495,7 @@
  *      DSP_EWRONGSTSATE:   Node is not in NODE_RUNNING state.
  *      DSP_EFAIL:          Failed to pause node.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS NODE_Pause(struct NODE_OBJECT *hNode);
@@ -519,7 +519,7 @@
  *      DSP_EWRONGSTATE:    Node is in invalid state for sending messages.
  *      DSP_EFAIL:          Unable to send message.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pMsg != NULL.
  *  Ensures:
  */
@@ -544,7 +544,7 @@
  *      DSP_ENOTIMPL:   Notification type specified by uNotifyType is not
  *                      supported.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      hNotification != NULL.
  *  Ensures:
  */
@@ -572,7 +572,7 @@
  *      DSP_EFAIL:          Unable to start or resume execution.
  *      DSP_ESYMBOL:        Execute function not found in the COFF file.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS NODE_Run(struct NODE_OBJECT *hNode);
@@ -595,7 +595,7 @@
  *      DSP_EWRONGSTATE:    Operation not valid for the current node state.
  *      DSP_EFAIL:          Unable to terminate the node.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      pStatus != NULL.
  *  Ensures:
  */

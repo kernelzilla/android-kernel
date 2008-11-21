@@ -74,11 +74,11 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      CFG_Init() was previously called.
+ *      CFG_Init(void) was previously called.
  *  Ensures:
- *      Resources acquired in CFG_Init() are freed.
+ *      Resources acquired in CFG_Init(void) are freed.
  */
-	extern void CFG_Exit();
+	extern void CFG_Exit(void);
 
 /*
  *  ======== CFG_GetAutoStart ========
@@ -298,7 +298,7 @@
  *  Ensures:
  *      A requirement for each of the other public CFG functions.
  */
-	extern bool CFG_Init();
+	extern bool CFG_Init(void);
 
 /*
  *  ======== CFG_SetDevObject ========

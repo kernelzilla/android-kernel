@@ -66,7 +66,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void DBG_Exit();
+	extern void DBG_Exit(void);
 
 /*
  *  ======== DBG_Init ========
@@ -78,7 +78,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern bool DBG_Init();
+	extern bool DBG_Init(void);
 
 /*
  *  ======== DBG_Trace ========
@@ -101,8 +101,8 @@
 	extern DSP_STATUS DBG_Trace(IN u8 bLevel, IN char *pstrFormat, ...);
 #else
 
-#define DBG_Exit()
-#define DBG_Init() true
+#define DBG_Exit(void)
+#define DBG_Init(void) true
 #define DBG_Trace(bLevel, pstrFormat, args...)
 
 #endif	     /* ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT)) && GT_TRACE */

@@ -62,7 +62,7 @@
  *      CHNL_E_INVALIDWORDSIZE: Invalid DSP word size.  Must be > 0.
  *      CHNL_E_INVALIDMEMBASE:  Invalid base address for DSP communications.
  *  Requires:
- *      IO_Init() called.
+ *      IO_Init(void) called.
  *      phIOMgr != NULL.
  *      pMgrAttrs != NULL.
  *  Ensures:
@@ -81,7 +81,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EHANDLE:    hIOMgr was invalid.
  *  Requires:
- *      IO_Init() called.
+ *      IO_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS IO_Destroy(struct IO_MGR *hIOMgr);
@@ -93,10 +93,10 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      IO_Init() previously called.
+ *      IO_Init(void) previously called.
  *  Ensures:
- *      Resources, if any acquired in IO_Init(), are freed when the last
- *      client of IO calls IO_Exit().
+ *      Resources, if any acquired in IO_Init(void), are freed when the last
+ *      client of IO calls IO_Exit(void).
  */
 	extern void IO_Exit(void);
 
@@ -124,7 +124,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EHANDLE:    hIOMgr was invalid.
  *  Requires:
- *      IO_Init() called.
+ *      IO_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS IO_OnLoaded(struct IO_MGR *hIOMgr);

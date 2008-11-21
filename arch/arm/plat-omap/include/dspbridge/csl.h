@@ -60,9 +60,9 @@
  *  Requires:
  *      CSL initialized.
  *  Ensures:
- *      Resources acquired in CSL_Init() are freed.
+ *      Resources acquired in CSL_Init(void) are freed.
  */
-	extern void CSL_Exit();
+	extern void CSL_Exit(void);
 
 /*
  *  ======== CSL_Init ========
@@ -75,7 +75,7 @@
  *  Ensures:
  *      A requirement for each of the other public CSL functions.
  */
-	extern bool CSL_Init();
+	extern bool CSL_Init(void);
 
 /*
  *  ======== CSL_NumToAscii ========

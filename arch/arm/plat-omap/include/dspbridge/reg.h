@@ -178,7 +178,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void REG_Exit();
+	extern void REG_Exit(void);
 
 /*
  *  ======== REG_GetValue ========
@@ -222,7 +222,7 @@
  *  Ensures:
  *      REG initialized.
  */
-	extern bool REG_Init();
+	extern bool REG_Init(void);
 
 /*
  *  ======== REG_SetValue ========

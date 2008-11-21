@@ -54,7 +54,7 @@
  *      msgCallback:        Called whenever an RMS_EXIT message is received.
  *  Returns:
  *  Requires:
- *      MSG_Init() called.
+ *      MSG_Init(void) called.
  *      phMsgMgr != NULL.
  *      hDevObject != NULL.
  *      msgCallback != NULL.
@@ -72,7 +72,7 @@
  *      hMsgMgr:            Handle returned from MSG_Create().
  *  Returns:
  *  Requires:
- *      MSG_Init() called.
+ *      MSG_Init(void) called.
  *      Valid hMsgMgr.
  *  Ensures:
  */
@@ -85,12 +85,12 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      MSG_Init() successfully called before.
+ *      MSG_Init(void) successfully called before.
  *  Ensures:
- *      Any resources acquired in MSG_Init() will be freed when last MSG
- *      client calls MSG_Exit().
+ *      Any resources acquired in MSG_Init(void) will be freed when last MSG
+ *      client calls MSG_Exit(void).
  */
-	extern void MSG_Exit();
+	extern void MSG_Exit(void);
 
 /*
  *  ======== MSG_Init ========
@@ -101,6 +101,6 @@
  *      TRUE if initialization succeeded, FALSE otherwise.
  *  Ensures:
  */
-	extern bool MSG_Init();
+	extern bool MSG_Init(void);
 
 #endif				/* MSG_ */

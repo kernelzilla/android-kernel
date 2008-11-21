@@ -49,7 +49,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EMEMORY:    Memory allocation failure.
  *  Requires:
- *      NTFY_Init() called.
+ *      NTFY_Init(void) called.
  *      phNtfy != NULL.
  *  Ensures:
  *      DSP_SUCCEEDED(status) <==>  IsValid(*phNtfy).
@@ -64,7 +64,7 @@
  *      hNtfy:  Handle returned from NTFY_Create().
  *  Returns:
  *  Requires:
- *      NTFY_Init() called.
+ *      NTFY_Init(void) called.
  *      IsValid(hNtfy).
  *  Ensures:
  */
@@ -77,10 +77,10 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      NTFY_Init() successfully called before.
+ *      NTFY_Init(void) successfully called before.
  *  Ensures:
  */
-	extern void NTFY_Exit();
+	extern void NTFY_Exit(void);
 
 /*
  *  ======== NTFY_Init ========
@@ -91,7 +91,7 @@
  *      TRUE if initialization succeeded, FALSE otherwise.
  *  Ensures:
  */
-	extern bool NTFY_Init();
+	extern bool NTFY_Init(void);
 
 /*
  *  ======== NTFY_Notify ========
@@ -104,7 +104,7 @@
  *      uEventMask: The type of event that has occurred.
  *  Returns:
  *  Requires:
- *      NTFY_Init() called.
+ *      NTFY_Init(void) called.
  *      IsValid(hNtfy).
  *  Ensures:
  */
@@ -131,7 +131,7 @@
  *      DSP_EHANDLE:        NULL hNotification, hNotification event name
  *                          too long, or hNotification event name NULL.
  *  Requires:
- *      NTFY_Init() called.
+ *      NTFY_Init(void) called.
  *      IsValid(hNtfy).
  *      hNotification != NULL.
  *      uNotifyType is DSP_SIGNALEVENT

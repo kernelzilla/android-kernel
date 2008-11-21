@@ -85,13 +85,13 @@
  *  Requires:
  *  Ensures:
  */
-	extern bool WCD_Init();
+	extern bool WCD_Init(void);
 
 /*
  *  ======== WCD_InitComplete2 ========
  *  Purpose:
  *      Perform any required WCD, and WMD initialization which
- *      cannot not be performed in WCD_Init() or DEV_StartDevice() due
+ *      cannot not be performed in WCD_Init(void) or DEV_StartDevice() due
  *      to the fact that some services are not yet
  *      completely initialized.
  *  Parameters:
@@ -102,21 +102,21 @@
  *      WCD initialized.
  *  Ensures:
  */
-	extern DSP_STATUS WCD_InitComplete2();
+	extern DSP_STATUS WCD_InitComplete2(void);
 
 /*
  *  ======== WCD_Exit ========
  *  Purpose:
- *      Exit all modules initialized in WCD_Init().
+ *      Exit all modules initialized in WCD_Init(void).
  *      This procedure is called when the class driver is unloaded.
  *  Parameters:
  *  Returns:
  *  Requires:
- *      WCD_Init() was previously called.
+ *      WCD_Init(void) was previously called.
  *  Ensures:
- *      Resources acquired in WCD_Init() are freed.
+ *      Resources acquired in WCD_Init(void) are freed.
  */
-	extern void WCD_Exit();
+	extern void WCD_Exit(void);
 
 /* MGR wrapper functions */
 	extern u32 MGRWRAP_EnumNode_Info(union Trapped_Args *args);

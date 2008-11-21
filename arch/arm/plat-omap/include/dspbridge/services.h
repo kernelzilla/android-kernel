@@ -21,8 +21,8 @@
  *      Provide loading and unloading of SERVICES modules.
  *
  *  Public Functions:
- *      SERVICES_Exit()
- *      SERVICES_Init()
+ *      SERVICES_Exit(void)
+ *      SERVICES_Init(void)
  *
  *! Revision History:
  *! ================
@@ -45,7 +45,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void SERVICES_Exit();
+	extern void SERVICES_Exit(void);
 
 /*
  *  ======== SERVICES_Init ========
@@ -58,6 +58,6 @@
  *  Ensures:
  *      SERVICES modules initialized.
  */
-	extern bool SERVICES_Init();
+	extern bool SERVICES_Init(void);
 
 #endif				/* SERVICES_ */

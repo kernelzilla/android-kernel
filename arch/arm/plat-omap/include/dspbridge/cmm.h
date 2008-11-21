@@ -112,7 +112,7 @@
  *      DSP_EFAIL:      Failed to initialize critical sect sync object.
  *
  *  Requires:
- *      CMM_Init() called.
+ *      CMM_Init(void) called.
  *      phCmmMgr != NULL.
  *      pMgrAttrs->ulMinBlockSize >= 4 bytes.
  *  Ensures:
@@ -155,7 +155,7 @@
  *     CMM is initialized.
  *  Ensures:
  */
-	extern void CMM_Exit();
+	extern void CMM_Exit(void);
 
 /*
  *  ======== CMM_FreeBuf ========
@@ -227,7 +227,7 @@
  *  Ensures:
  *      CMM initialized.
  */
-	extern bool CMM_Init();
+	extern bool CMM_Init(void);
 
 /*
  *  ======== CMM_RegisterGPPSMSeg ========

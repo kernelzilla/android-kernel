@@ -252,7 +252,7 @@ struct PROCESS_CONTEXT{
  *  Requires:
  *  Ensures:
  */
-	extern void DRV_Exit();
+	extern void DRV_Exit(void);
 
 /*
  *  ======== DRV_GetFirstDevObject ========
@@ -266,7 +266,7 @@ struct PROCESS_CONTEXT{
  *      0 if it fails to retrieve the First Dev Object
  *  Ensures:
  */
-	extern u32 DRV_GetFirstDevObject();
+	extern u32 DRV_GetFirstDevObject(void);
 
 /*
  *  ======== DRV_GetFirstDevExtension ========
@@ -280,7 +280,7 @@ struct PROCESS_CONTEXT{
  *      0:                  Failed to Get the Device Extension
  *  Ensures:
  */
-	extern u32 DRV_GetFirstDevExtension();
+	extern u32 DRV_GetFirstDevExtension(void);
 
 /*
  *  ======== DRV_GetDevObject ========
@@ -348,7 +348,7 @@ struct PROCESS_CONTEXT{
  *  Requires:
  *  Ensures:
  */
-	extern DSP_STATUS DRV_Init();
+	extern DSP_STATUS DRV_Init(void);
 
 /*
  *  ======== DRV_InsertDevObject ========

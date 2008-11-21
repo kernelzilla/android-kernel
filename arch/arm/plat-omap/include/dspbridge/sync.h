@@ -140,7 +140,7 @@ struct SYNC_CSOBJECT {
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void SYNC_Exit();
+	extern void SYNC_Exit(void);
 
 /*
  *  ======== SYNC_Init ========
@@ -153,7 +153,7 @@ struct SYNC_CSOBJECT {
  *  Ensures:
  *      SYNC initialized.
  */
-	extern bool SYNC_Init();
+	extern bool SYNC_Init(void);
 
 /*
  *  ======== SYNC_InitializeCS ========

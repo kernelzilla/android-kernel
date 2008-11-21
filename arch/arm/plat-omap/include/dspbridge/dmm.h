@@ -75,9 +75,9 @@
 				     struct DEV_OBJECT *hDevObject,
 				     IN CONST struct DMM_MGRATTRS *pMgrAttrs);
 
-	extern bool DMM_Init();
+	extern bool DMM_Init(void);
 
-	extern void DMM_Exit();
+	extern void DMM_Exit(void);
 
 	extern DSP_STATUS DMM_CreateTables(struct DMM_OBJECT *hDmmMgr,
 						u32 addr, u32 size);

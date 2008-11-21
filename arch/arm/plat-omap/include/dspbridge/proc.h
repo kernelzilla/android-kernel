@@ -246,7 +246,7 @@
  *  Ensures:
  *      When reference count == 0, PROC's private resources are freed.
  */
-       extern void PROC_Exit();
+       extern void PROC_Exit(void);
 
 /*
  * ======== PROC_GetDevObject =========
@@ -280,7 +280,7 @@
  *  Ensures:
  *      TRUE: A requirement for the other public PROC functions.
  */
-       extern bool PROC_Init();
+       extern bool PROC_Init(void);
 
 /*
  *  ======== PROC_GetState ========

@@ -128,11 +128,11 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      DPC_Init() was previously called.
+ *      DPC_Init(void) was previously called.
  *  Ensures:
- *      Resources acquired in DPC_Init() are freed.
+ *      Resources acquired in DPC_Init(void) are freed.
  */
-       extern void DPC_Exit();
+       extern void DPC_Exit(void);
 
 /*
  *  ======== DPC_Init ========
@@ -145,7 +145,7 @@
  *  Ensures:
  *      A requirement for each of the other public DPC functions.
  */
-       extern bool DPC_Init();
+       extern bool DPC_Init(void);
 
 /*
  *  ======== DPC_Schedule ========

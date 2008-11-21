@@ -67,7 +67,7 @@
  *      DSP_EMEMORY:            Insufficient memory for requested resources.
  *      DSP_EFAIL:              Unable to create dispatcher.
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      pDispAttrs != NULL.
  *      hDevObject != NULL.
  *      phDispObject != NULL.
@@ -87,7 +87,7 @@
  *      hDispObject:  Node Dispatcher object.
  *  Returns:
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      Valid hDispObject.
  *  Ensures:
  *      hDispObject is invalid.
@@ -101,12 +101,12 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      DISP_Init() previously called.
+ *      DISP_Init(void) previously called.
  *  Ensures:
- *      Any resources acquired in DISP_Init() will be freed when last DISP
- *      client calls DISP_Exit().
+ *      Any resources acquired in DISP_Init(void) will be freed when last DISP
+ *      client calls DISP_Exit(void).
  */
-	extern void DISP_Exit();
+	extern void DISP_Exit(void);
 
 /*
  *  ======== DISP_Init ========
@@ -117,7 +117,7 @@
  *      TRUE if initialization succeeded, FALSE otherwise.
  *  Ensures:
  */
-	extern bool DISP_Init();
+	extern bool DISP_Init(void);
 
 /*
  *  ======== DISP_NodeChangePriority ========
@@ -134,7 +134,7 @@
  *      DSP_SOK:                Success.
  *      DSP_ETIMEOUT:           A timeout occurred before the DSP responded.
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      Valid hDispObject.
  *      hNode != NULL.
  *  Ensures:
@@ -166,7 +166,7 @@
  *      DSP_EUSER:      A user-defined failure occurred.
  *      DSP_EFAIL:      A failure occurred, unable to create node.
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      Valid hDispObject.
  *      pArgs != NULL.
  *      hNode != NULL.
@@ -197,7 +197,7 @@
  *      DSP_SOK:        Success.
  *      DSP_ETIMEOUT:   A timeout occurred before the DSP responded.
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      Valid hDispObject.
  *      hNode != NULL.
  *  Ensures:
@@ -223,7 +223,7 @@
  *      DSP_SOK:        Success.
  *      DSP_ETIMEOUT:   A timeout occurred before the DSP responded.
  *  Requires:
- *      DISP_Init() called.
+ *      DISP_Init(void) called.
  *      Valid hDispObject.
  *      hNode != NULL.
  *  Ensures:

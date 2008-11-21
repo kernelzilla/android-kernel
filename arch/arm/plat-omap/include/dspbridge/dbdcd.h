@@ -168,7 +168,7 @@
  *      DCD initialized.
  *  Ensures:
  */
-	extern void DCD_Exit();
+	extern void DCD_Exit(void);
 
 /*
  *  ======== DCD_GetDepLibs ========
@@ -340,7 +340,7 @@
  *  Ensures:
  *      DCD initialized.
  */
-	extern bool DCD_Init();
+	extern bool DCD_Init(void);
 
 /*
  *  ======== DCD_RegisterObject ========

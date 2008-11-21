@@ -194,7 +194,7 @@
  *  Ensures:
  *      When reference count == 0, MGR's private resources are freed.
  */
-       extern void MGR_Exit();
+       extern void MGR_Exit(void);
 
 /*
  *  ======== MGR_GetDCDHandle ========
@@ -229,6 +229,6 @@
  *  Ensures:
  *      TRUE: A requirement for the other public MGR functions.
  */
-       extern bool MGR_Init();
+       extern bool MGR_Init(void);
 
 #endif				/* MGR_ */

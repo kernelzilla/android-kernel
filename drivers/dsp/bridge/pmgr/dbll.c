@@ -970,7 +970,7 @@ static DSP_STATUS dofOpen(struct DBLL_LibraryObj *zlLib)
 	DSP_STATUS status = DSP_SOK;
 
 	/* First open the file for the dynamic loader, then open COF */
-	zlLib->fp = (void *)((Fxn)(open))(zlLib->fileName, "rb");
+	zlLib->fp = (void *)((DBLL_FOpenFxn)(open))(zlLib->fileName, "rb");
 
 	/* Open DOFF module */
 	if (zlLib->fp && zlLib->desc == NULL) {

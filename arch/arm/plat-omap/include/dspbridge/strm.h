@@ -76,7 +76,7 @@
  *      DSP_EFAIL:      Failure occurred, unable to allocate buffers.
  *      DSP_ESIZE:      uSize must be > 0 bytes.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      apBuffer != NULL.
  *  Ensures:
  */
@@ -98,7 +98,7 @@
  *                      been reclaimed.
  *      DSP_EFAIL:      Failure to close stream.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS STRM_Close(struct STRM_OBJECT *hStrm);
@@ -117,7 +117,7 @@
  *      DSP_EMEMORY:    Insufficient memory for requested resources.
  *      DSP_EFAIL:      General failure.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      phStrmMgr != NULL.
  *      hDev != NULL.
  *  Ensures:
@@ -135,7 +135,7 @@
  *      hStrmMgr:       Handle to STRM manager object from STRM_Create.
  *  Returns:
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      Valid hStrmMgr.
  *  Ensures:
  *      hStrmMgr is not valid.
@@ -149,10 +149,10 @@
  *  Parameters:
  *  Returns:
  *  Requires:
- *      STRM_Init() successfully called before.
+ *      STRM_Init(void) successfully called before.
  *  Ensures:
  */
-	extern void STRM_Exit();
+	extern void STRM_Exit(void);
 
 /*
  *  ======== STRM_FreeBuffer ========
@@ -167,7 +167,7 @@
  *      DSP_EHANDLE:    Invalid stream handle.
  *      DSP_EFAIL:      Failure occurred, unable to free buffers.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      apBuffer != NULL.
  *  Ensures:
  */
@@ -186,7 +186,7 @@
  *      DSP_SOK:        Success.
  *      DSP_EHANDLE:    Invalid hStrm.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      phEvent != NULL.
  *  Ensures:
  */
@@ -208,7 +208,7 @@
  *      DSP_ESIZE:          uStreamInfoSize < sizeof(DSP_STREAMINFO).
  *      DSP_EFAIL:          Unable to get stream info.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      pStreamInfo != NULL.
  *  Ensures:
  */
@@ -237,7 +237,7 @@
  *      DSP_ERESTART:   A critical error occurred, DSP is being restarted.
  *      DSP_EFAIL:      Unable to idle stream.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *  Ensures:
  */
 	extern DSP_STATUS STRM_Idle(struct STRM_OBJECT *hStrm, bool fFlush);
@@ -252,7 +252,7 @@
  *  Requires:
  *  Ensures:
  */
-	extern bool STRM_Init();
+	extern bool STRM_Init(void);
 
 /*
  *  ======== STRM_Issue ========
@@ -270,7 +270,7 @@
  *      DSP_ESTREAMFULL:    The stream is full.
  *      DSP_EFAIL:          Failure occurred, unable to issue buffer.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      pBuf != NULL.
  *  Ensures:
  */
@@ -298,7 +298,7 @@
  *      DSP_ENODETYPE:  hNode is not a task or DAIS socket node.
  *      DSP_EFAIL:      Unable to open stream.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      phStrm != NULL.
  *      pAttr != NULL.
  *  Ensures:
@@ -323,7 +323,7 @@
  *      DSP_EHANDLE:    Invalid hStrm.
  *      DSP_EFAIL:      Failure occurred, unable to prepare buffer.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      pBuffer != NULL.
  *  Ensures:
  */
@@ -350,7 +350,7 @@
  *                      retrieved.
  *      DSP_EFAIL:      Failure occurred, unable to reclaim buffer.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      pBufPtr != NULL.
  *      pulBytes != NULL.
  *      pdwArg != NULL.
@@ -377,7 +377,7 @@
  *      DSP_ENOTIMPL:   Notification type specified by uNotifyType is not
  *                      supported.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      hNotification != NULL.
  *  Ensures:
  */
@@ -403,7 +403,7 @@
  *      DSP_ETIMEOUT:   A timeout occurred before a stream became ready.
  *      DSP_EFAIL:      Failure occurred, unable to select a stream.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      aStrmTab != NULL.
  *      nStrms > 0.
  *      pMask != NULL.
@@ -430,7 +430,7 @@
  *      DSP_EHANDLE:    Invalid hStrm.
  *      DSP_EFAIL:      Failure occurred, unable to unprepare buffer.
  *  Requires:
- *      STRM_Init() called.
+ *      STRM_Init(void) called.
  *      pBuffer != NULL.
  *  Ensures:
  */

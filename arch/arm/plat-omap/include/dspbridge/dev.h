@@ -437,7 +437,7 @@
  *      A subsequent call to DEV_GetNext will return the next device object in
  *      the list.
  */
-       extern struct DEV_OBJECT *DEV_GetFirst();
+       extern struct DEV_OBJECT *DEV_GetFirst(void);
 
 /*
  *  ======== DEV_GetIntfFxns ========
@@ -603,7 +603,7 @@
  *  Ensures:
  *      When reference count == 0, DEV's private resources are freed.
  */
-       extern void DEV_Exit();
+       extern void DEV_Exit(void);
 
 /*
  *  ======== DEV_Init ========
@@ -616,7 +616,7 @@
  *  Ensures:
  *      TRUE: A requirement for the other public DEV functions.
  */
-       extern bool DEV_Init();
+       extern bool DEV_Init(void);
 
 /*
  *  ======== DEV_IsLocked ========

@@ -86,7 +86,7 @@
  *      "empty" element, because its "next" and "prev" pointers point at
  *      the same location (the element itself).
  */
-	extern struct LST_LIST *LST_Create();
+	extern struct LST_LIST *LST_Create(void);
 
 /*
  *  ======== LST_Delete ========
@@ -122,7 +122,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void LST_Exit();
+	extern void LST_Exit(void);
 
 /*
  *  ======== LST_First ========
@@ -182,7 +182,7 @@
  *  Ensures:
  *      LST initialized.
  */
-	extern bool LST_Init();
+	extern bool LST_Init(void);
 
 /*
  *  ======== LST_InitElem ========

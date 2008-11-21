@@ -115,7 +115,7 @@
  *      DSP_EVALUE:     The node's stream corresponding to uIndex and uDir
  *                      is not a stream to or from the host.
  *  Requires:
- *      NODE_Init() called.
+ *      NODE_Init(void) called.
  *      Valid uDir.
  *      pulId != NULL.
  *  Ensures:

@@ -90,7 +90,7 @@
  *  Ensures:
  *      Resources used by module are freed when cRef reaches zero.
  */
-	extern void KFILE_Exit();
+	extern void KFILE_Exit(void);
 
 /*
  *  ======== KFILE_Init ========
@@ -103,7 +103,7 @@
  *  Ensures:
  *      KFILE initialized.
  */
-	extern bool KFILE_Init();
+	extern bool KFILE_Init(void);
 
 /*
  *  ======== KFILE_Open ========
