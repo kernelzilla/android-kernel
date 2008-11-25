@@ -200,7 +200,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 
 	if  (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
-		pDevContext->dwBrdState = BRD_RUNNING;
 
 		temp = (u32) *((REG_UWORD32 *) ((u32)
 		       (resources.dwDmmuBase) + 0x10));
@@ -208,11 +207,12 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		/* Restore mailbox settings */
 		status = HW_MBOX_restoreSettings(resources.dwMboxBase);
 
-		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
-			/* Restart the peripheral clocks that were disabled */
+                /* Restart the peripheral clocks that were disabled only
+                 * in DSP initiated Hibernation case.*/
+		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION)
 			DSP_PeripheralClocks_Enable(hDevContext, NULL);
-		}
 
+		pDevContext->dwBrdState = BRD_RUNNING;
 	}
 	while (--cnt) {
 		hwStatus = HW_MBOX_IsFull(resources.dwMboxBase,
