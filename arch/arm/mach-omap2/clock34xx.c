@@ -667,6 +667,9 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 	struct omap_opp *prcm;
 	int i = 0;
 
+	if (!mpu_opps)
+		return;
+
 	/* Avoid registering the 120% Overdrive with CPUFreq */
 	prcm = mpu_opps + MAX_VDD1_OPP - 1;
 	for (; prcm->rate; prcm--) {
@@ -823,20 +826,24 @@ int __init omap2_clk_init(void)
 	dpll3_clk = clk_get(NULL, "dpll3_m2_ck");
 
 	mpu_speed = dpll1_clk->rate;
-	prcm_vdd = mpu_opps + MAX_VDD1_OPP;
-	for (; prcm_vdd->rate; prcm_vdd--) {
-		if (prcm_vdd->rate <= mpu_speed) {
-			curr_vdd1_prcm_set = prcm_vdd;
-			break;
+	if (mpu_opps) {
+		prcm_vdd = mpu_opps + MAX_VDD1_OPP;
+		for (; prcm_vdd->rate; prcm_vdd--) {
+			if (prcm_vdd->rate <= mpu_speed) {
+				curr_vdd1_prcm_set = prcm_vdd;
+				break;
+			}
 		}
 	}
 
 	core_speed = dpll3_clk->rate;
-	prcm_vdd = l3_opps + MAX_VDD2_OPP;
-	for (; prcm_vdd->rate; prcm_vdd--) {
-		if (prcm_vdd->rate <= core_speed) {
-			curr_vdd2_prcm_set = prcm_vdd;
-			break;
+	if (l3_opps) {
+		prcm_vdd = l3_opps + MAX_VDD2_OPP;
+		for (; prcm_vdd->rate; prcm_vdd--) {
+			if (prcm_vdd->rate <= core_speed) {
+				curr_vdd2_prcm_set = prcm_vdd;
+				break;
+			}
 		}
 	}
 
@@ -903,6 +910,9 @@ static long omap3_round_to_table_rate(struct clk *clk, unsigned long rate)
 	if ((clk != &virt_vdd1_prcm_set) && (clk != &virt_vdd2_prcm_set))
 		return -EINVAL;
 
+	if (!mpu_opps || !dsp_opps || !l3_opps)
+		return -EINVAL;
+
 	highest_rate = -EINVAL;
 
 	if (clk == &virt_vdd1_prcm_set)
@@ -927,6 +937,9 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	int index = 0;
 
 	if ((clk != &virt_vdd1_prcm_set) && (clk != &virt_vdd2_prcm_set))
+		return -EINVAL;
+
+	if (!mpu_opps || !dsp_opps || !l3_opps)
 		return -EINVAL;
 
 	if (clk == &virt_vdd1_prcm_set) {

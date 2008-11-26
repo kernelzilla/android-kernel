@@ -31,7 +31,6 @@
 #include <mach/clock.h>
 #if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
 #include <mach/omap-pm.h>
-#include "../mach-omap2/pm.h"
 #endif
 
 #define VERY_HI_RATE	900000000
@@ -107,9 +106,8 @@ static int omap_target(struct cpufreq_policy *policy,
 #endif
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-#elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)\
-	&& defined(CONFIG_MACH_OMAP_3430SDP)
-	{
+#elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+	if (mpu_opps) {
 		int ind;
 		for (ind = 1; ind <= MAX_VDD1_OPP; ind++) {
 			if (mpu_opps[ind].rate/1000 >= freqs.new) {
