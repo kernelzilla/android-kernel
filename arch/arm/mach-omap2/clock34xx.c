@@ -32,6 +32,8 @@
 #include <plat/cpu.h>
 #include <plat/clock.h>
 #include <plat/sram.h>
+#include <plat/omap-pm.h>
+
 #include <asm/div64.h>
 #include <asm/clkdev.h>
 
@@ -1047,6 +1049,9 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 	struct omap_opp *prcm;
 	int i = 0;
 
+	if (!mpu_opps)
+		return;
+
 	/* Avoid registering the 120% Overdrive with CPUFreq */
 	prcm = mpu_opps + MAX_VDD1_OPP - 1;
 	for (; prcm->rate; prcm--) {
@@ -1276,6 +1281,9 @@ static long omap3_round_to_table_rate(struct clk *clk, unsigned long rate)
 	if ((clk != &virt_vdd1_prcm_set) && (clk != &virt_vdd2_prcm_set))
 		return -EINVAL;
 
+	if (!mpu_opps || !dsp_opps || !l3_opps)
+		return -EINVAL;
+
 	highest_rate = -EINVAL;
 
 	if (clk == &virt_vdd1_prcm_set)
@@ -1300,6 +1308,9 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	int index = 0;
 
 	if ((clk != &virt_vdd1_prcm_set) && (clk != &virt_vdd2_prcm_set))
+		return -EINVAL;
+
+	if (!mpu_opps || !dsp_opps || !l3_opps)
 		return -EINVAL;
 
 	if (clk == &virt_vdd1_prcm_set) {
