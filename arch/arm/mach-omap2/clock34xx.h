@@ -1262,6 +1262,39 @@ static struct clk d2d_26m_fck = {
 	.recalc		= &followparent_recalc,
 };
 
+static struct clk modem_fck = {
+	.name		= "modem_fck",
+	.parent		= &sys_ck,
+	.prcm_mod	= CORE_MOD,
+	.enable_reg	= CM_FCLKEN1,
+	.enable_bit	= OMAP3430_EN_MODEM_SHIFT,
+	.flags		= CLOCK_IN_OMAP343X,
+	.clkdm		= { .name = "d2d_clkdm" },
+	.recalc		= &followparent_recalc,
+};
+
+static struct clk sad2d_ick = {
+	.name		= "sad2d_ick",
+	.parent		= &l3_ick,
+	.prcm_mod	= CORE_MOD,
+	.enable_reg	= CM_ICLKEN1,
+	.enable_bit	= OMAP3430_EN_SAD2D_SHIFT,
+	.flags		= CLOCK_IN_OMAP343X,
+	.clkdm		= { .name = "d2d_clkdm" },
+	.recalc		= &followparent_recalc,
+};
+
+static struct clk mad2d_ick = {
+	.name		= "mad2d_ick",
+	.parent		= &l3_ick,
+	.prcm_mod	= CORE_MOD,
+	.enable_reg	= CM_ICLKEN3,
+	.enable_bit	= OMAP3430_EN_MAD2D_SHIFT,
+	.flags		= CLOCK_IN_OMAP343X,
+	.clkdm		= { .name = "d2d_clkdm" },
+	.recalc		= &followparent_recalc,
+};
+
 static const struct clksel omap343x_gpt_clksel[] = {
 	{ .parent = &omap_32k_fck, .rates = gpt_32k_rates },
 	{ .parent = &sys_ck,	   .rates = gpt_sys_rates },
@@ -2165,8 +2198,6 @@ static struct clk usb_l4_ick = {
 	.clkdm		= { .name = "core_l4_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
 };
-
-/* XXX MDM_INTC_ICK, SAD2D_ICK ?? */
 
 /* SECURITY_L4_ICK2 based clocks */
 
@@ -3399,6 +3430,9 @@ static struct clk *onchip_34xx_clks[] __initdata = {
 	&sgx_fck,
 	&sgx_ick,
 	&d2d_26m_fck,
+	&modem_fck,
+	&sad2d_ick,
+	&mad2d_ick,
 	&gpt10_fck,
 	&gpt11_fck,
 	&cpefuse_fck,
