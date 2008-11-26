@@ -698,6 +698,7 @@ static void __init prcm_setup_regs(void)
 	 * Note that in the long run this should be done by clockfw
 	 */
 	cm_write_mod_reg(
+		OMAP3430_AUTO_MODEM |
 		OMAP3430ES2_AUTO_MMC3 |
 		OMAP3430ES2_AUTO_ICR |
 		OMAP3430_AUTO_AES2 |
@@ -725,7 +726,7 @@ static void __init prcm_setup_regs(void)
 		OMAP3430_AUTO_OMAPCTRL |
 		OMAP3430ES1_AUTO_FSHOSTUSB |
 		OMAP3430_AUTO_HSOTGUSB |
-		OMAP3430ES1_AUTO_D2D | /* This is es1 only */
+		OMAP3430_AUTO_SAD2D |
 		OMAP3430_AUTO_SSI,
 		CORE_MOD, CM_AUTOIDLE1);
 
@@ -739,6 +740,7 @@ static void __init prcm_setup_regs(void)
 
 	if (omap_rev() > OMAP3430_REV_ES1_0) {
 		cm_write_mod_reg(
+			OMAP3430_AUTO_MAD2D |
 			OMAP3430ES2_AUTO_USBTLL,
 			CORE_MOD, CM_AUTOIDLE3);
 	}
