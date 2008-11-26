@@ -144,6 +144,10 @@ static struct device dummy_dsp_dev;
 void init_opp(struct shared_resource *resp)
 {
 	resp->no_of_users = 0;
+
+	if (!mpu_opps || !dsp_opps || !l3_opps)
+		return 0;
+
 	/* Initialize the current level of the OPP resource
 	* to the  opp set by u-boot.
 	*/
@@ -167,6 +171,9 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	if (resp->curr_level == target_level)
 		return 0;
 
+	if (!mpu_opps || !dsp_opps || !l3_opps)
+		return 0;
+
 	if (strcmp(resp->name, "vdd1_opp") == 0) {
 		mpu_old_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					curr_vdd1_prcm_set->opp_id);
@@ -184,12 +191,16 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		if (resp->curr_level > target_level) {
 			/* Scale Frequency and then voltage */
 			clk_set_rate(vdd1_clk, mpu_freq);
+#ifdef CONFIG_OMAP_SMARTREFLEX
 			sr_voltagescale_vcbypass(t_opp,
 					mpu_opps[target_level].vsel);
+#endif
 		} else {
+#ifdef CONFIG_OMAP_SMARTREFLEX
 			/* Scale Voltage and then frequency */
 			sr_voltagescale_vcbypass(t_opp,
 					mpu_opps[target_level].vsel);
+#endif
 			clk_set_rate(vdd1_clk, mpu_freq);
 		}
 		resp->curr_level = curr_vdd1_prcm_set->opp_id;
@@ -221,12 +232,16 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		if (resp->curr_level > target_level) {
 			/* Scale Frequency and then voltage */
 			clk_set_rate(vdd2_clk, l3_freq);
+#ifdef CONFIG_OMAP_SMARTREFLEX
 			sr_voltagescale_vcbypass(t_opp,
 					l3_opps[target_level].vsel);
+#endif
 		} else {
+#ifdef CONFIG_OMAP_SMARTREFLEX
 			/* Scale Voltage and then frequency */
 			sr_voltagescale_vcbypass(t_opp,
 					l3_opps[target_level].vsel);
+#endif
 			clk_set_rate(vdd2_clk, l3_freq);
 		}
 		resp->curr_level = curr_vdd2_prcm_set->opp_id;
@@ -253,6 +268,9 @@ void init_freq(struct shared_resource *resp)
 	char *linked_res_name;
 	resp->no_of_users = 0;
 
+	if (!mpu_opps || !dsp_opps)
+		return;
+
 	linked_res_name = (char *)resp->resource_data;
 	/* Initialize the current level of the Freq resource
 	* to the frequency set by u-boot.
@@ -270,6 +288,9 @@ void init_freq(struct shared_resource *resp)
 int set_freq(struct shared_resource *resp, u32 target_level)
 {
 	unsigned int vdd1_opp;
+
+	if (!mpu_opps || !dsp_opps)
+		return 0;
 
 	if (strcmp(resp->name, "mpu_freq") == 0) {
 		vdd1_opp = get_opp(mpu_opps + MAX_VDD1_OPP, target_level);
