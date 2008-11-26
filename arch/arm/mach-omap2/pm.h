@@ -34,8 +34,12 @@ extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
 #ifdef CONFIG_ARCH_OMAP3
 extern void omap3_pm_off_mode_enable(int);
+extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
+extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
 #else
 #define omap3_pm_off_mode_enable(int) do {} while (0);
+#define omap3_pm_get_suspend_state(pwrdm) do {} while (0);
+#define omap3_pm_set_suspend_state(pwrdm, state) do {} while (0);
 #endif
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 
