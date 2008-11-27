@@ -496,7 +496,47 @@ static void __exit bridge_exit(void)
 {
 	dev_t devno;
 	bool ret;
+	DSP_STATUS dsp_status = DSP_SOK;
+	HANDLE	     hDrvObject = NULL;
+	struct PROCESS_CONTEXT	*pTmp = NULL;
+	struct PROCESS_CONTEXT    *pCtxtclosed = NULL;
+	struct PROCESS_CONTEXT    *pCtxttraverse = NULL;
+
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
+
+	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
+	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
+	while (pCtxtclosed != NULL) {
+		DRV_RemoveAllResources(pCtxtclosed);
+		if (pCtxtclosed->hProcessor != NULL) {
+			DRV_GetProcCtxtList(&pCtxttraverse,
+					    (struct DRV_OBJECT *)hDrvObject);
+			if (pCtxttraverse->next == NULL) {
+				PROC_Detach(pCtxtclosed->hProcessor);
+				goto func_cont;
+			}
+			if ((pCtxtclosed->pid == pCtxttraverse->pid) &&
+			   (pCtxttraverse->next != NULL)) {
+				pCtxttraverse =	pCtxttraverse->next;
+			}
+			while ((pCtxttraverse != NULL) &&
+			      (pCtxtclosed->hProcessor
+			      != pCtxttraverse->hProcessor)) {
+				pCtxttraverse =	pCtxttraverse->next;
+				if ((pCtxttraverse != NULL) &&
+				   (pCtxtclosed->pid == pCtxttraverse->pid)) {
+					pCtxttraverse = pCtxttraverse->next;
+				}
+			}
+			if (pCtxttraverse == NULL)
+				PROC_Detach(pCtxtclosed->hProcessor);
+		}
+func_cont:
+		pTmp = pCtxtclosed->next;
+		DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject,
+				     pCtxtclosed, (void *)pCtxtclosed->pid);
+		pCtxtclosed = pTmp;
+	}
 
 	/* unregister the clock notifier */
 #ifdef CONFIG_BRIDGE_DVFS
