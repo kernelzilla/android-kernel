@@ -132,6 +132,8 @@ static struct omapdev sad2d_3xxx_omapdev = {
 static struct omapdev ssi_3xxx_omapdev = {
 	.name		= "ssi_omapdev",
 	.pwrdm		= { .name = "core_pwrdm" },
+	.pdev_name	= "omap_ssi",
+	.pdev_id	= -1,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
