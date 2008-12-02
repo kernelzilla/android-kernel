@@ -15,6 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/dma-mapping.h>
 
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
@@ -102,7 +103,7 @@ static struct resource msm_uart1_dm_resources[] = {
 	{
 		.start = DMOV_HSUART1_TX_CHAN,
 		.end   = DMOV_HSUART1_RX_CHAN,
-		.name  = "uartdm_chanels",
+		.name  = "uartdm_channels",
 		.flags = IORESOURCE_DMA,
 	},
 	{
@@ -113,11 +114,17 @@ static struct resource msm_uart1_dm_resources[] = {
 	},
 };
 
+static u64 msm_uart_dm1_dma_mask = DMA_BIT_MASK(32);
+
 struct platform_device msm_device_uart_dm1 = {
 	.name = "msm_serial_hs",
-	.id = 1,
+	.id = 0,
 	.num_resources = ARRAY_SIZE(msm_uart1_dm_resources),
 	.resource = msm_uart1_dm_resources,
+	.dev		= {
+		.dma_mask = &msm_uart_dm1_dma_mask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	},
 };
 
 static struct resource msm_uart2_dm_resources[] = {
@@ -134,7 +141,7 @@ static struct resource msm_uart2_dm_resources[] = {
 	{
 		.start = DMOV_HSUART2_TX_CHAN,
 		.end   = DMOV_HSUART2_RX_CHAN,
-		.name  = "uartdm_chanels",
+		.name  = "uartdm_channels",
 		.flags = IORESOURCE_DMA,
 	},
 	{
@@ -145,11 +152,17 @@ static struct resource msm_uart2_dm_resources[] = {
 	},
 };
 
+static u64 msm_uart_dm2_dma_mask = DMA_BIT_MASK(32);
+
 struct platform_device msm_device_uart_dm2 = {
 	.name = "msm_serial_hs",
-	.id = 2,
+	.id = 1,
 	.num_resources = ARRAY_SIZE(msm_uart2_dm_resources),
 	.resource = msm_uart2_dm_resources,
+	.dev		= {
+		.dma_mask = &msm_uart_dm2_dma_mask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	},
 };
 
 static struct resource resources_i2c[] = {
