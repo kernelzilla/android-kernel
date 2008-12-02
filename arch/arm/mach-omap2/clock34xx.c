@@ -994,6 +994,7 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 
 	if (clk == &virt_vdd1_prcm_set) {
 		curr_mpu_speed = curr_vdd1_prcm_set->rate;
+		clk->rate = prcm_vdd->rate;
 		clk_set_rate(dpll1_clk, prcm_vdd->rate);
 		clk_set_rate(dpll2_clk, dsp_opps[index].rate);
 		curr_vdd1_prcm_set = prcm_vdd;
