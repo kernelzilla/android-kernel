@@ -147,6 +147,12 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
 							VERY_HI_RATE) / 1000;
 	}
 
+	clk_set_rate(mpu_clk, policy->cpuinfo.max_freq * 1000);
+
+	policy->min = policy->cpuinfo.min_freq;
+	policy->max = policy->cpuinfo.max_freq;
+	policy->cur = omap_getspeed(0);
+
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
 
