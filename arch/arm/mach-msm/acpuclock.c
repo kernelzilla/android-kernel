@@ -101,6 +101,18 @@ static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
 };
 #endif
 
+#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
+static struct cpufreq_frequency_table freq_table[] = {
+	{ 0, 19200 },
+	{ 1, 122880 },
+	{ 2, 128000 },
+	{ 3, 245760 },
+	{ 4, 384000 },
+	{ 5, 528000 },
+	{ 6, CPUFREQ_TABLE_END },
+};
+#endif
+
 static int pc_pll_request(unsigned id, unsigned on)
 {
 	int res;
@@ -333,7 +345,6 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 		udelay(drv_state.acpu_switch_time_us);
 	}
 
-
 	/* Nothing else to do for power collapse. */
 	if (for_power_collapse)
 		return 0;
@@ -451,4 +462,7 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	drv_state.wait_for_irq_khz = clkdata->wait_for_irq_khz;
 	acpuclk_init();
 	lpj_init();
+#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
+	cpufreq_frequency_table_get_attr(freq_table, smp_processor_id());
+#endif
 }
