@@ -35,8 +35,6 @@
 
 	.macro	waituart,rd,rx
 	@ wait for TX_READY
-	teq	\rx, #0
-	bne	1002f
 1001:	ldr	\rd, [\rx, #0x08]
 	tst	\rd, #0x04
 	beq	1001b
