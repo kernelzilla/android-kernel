@@ -64,6 +64,20 @@ enum {
 	VDD_END
 };
 
+struct clkctl_acpu_speed {
+	unsigned int	a11clk_khz;
+	int		pll;
+	unsigned int	a11clk_src_sel;
+	unsigned int	a11clk_src_div;
+	unsigned int	ahbclk_khz;
+	unsigned int	ahbclk_div;
+	int		vdd;
+	unsigned long	lpj; /* loops_per_jiffy */
+/* Index in acpu_freq_tbl[] for steppings. */
+	short		down;
+	short		up;
+};
+
 /*
  * ACPU speed table. Complete table is shown but certain speeds are commented
  * out to optimized speed switching. Initalize loops_per_jiffy to 0.
