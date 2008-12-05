@@ -164,7 +164,7 @@ struct PROC_OBJECT {
 	struct LST_ELEM link;		/* Link to next PROC_OBJECT */
 	u32 dwSignature;	/* Used for object validation */
 	struct DEV_OBJECT *hDevObject;	/* Device this PROC represents */
-       u32 hProcess;   /* Process owning this Processor */
+	u32 hProcess;   /* Process owning this Processor */
 	struct MGR_OBJECT *hMgrObject;	/* Manager Object Handle */
 	u32 uAttachCount;	/* Processor attach count */
 	u32 uProcessor;	/* Processor number */
@@ -190,7 +190,7 @@ static u32 cRefs;
 
 struct SYNC_CSOBJECT *hProcLock;	/* For critical sections */
 
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
@@ -1046,7 +1046,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 #ifdef OPT_LOAD_TIME_INSTRUMENTATION
 	do_gettimeofday(&tv1);
 #endif
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
 #endif
@@ -1221,11 +1221,9 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 		/* Now, attempt to load an exec: */
 
 	/* Boost the OPP level to Maximum level supported by baseport*/
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-#ifndef CONFIG_CPU_FREQ
+#if defined(CONFIG_BRIDGE_DVFS) && defined(CONFIG_CPU_FREQ)
 	if (pdata->cpu_set_freq)
 		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP5]);
-#endif
 #endif
 		status = COD_LoadBase(hCodMgr, iArgc, (char **)aArgv,
 				     DEV_BrdWriteFxn,
@@ -1245,11 +1243,9 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 			}
 		}
 	/* Requesting the lowest opp supported*/
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-#ifndef CONFIG_CPU_FREQ
+#if defined(CONFIG_BRIDGE_DVFS) && defined(CONFIG_CPU_FREQ)
 	if (pdata->cpu_set_freq)
 		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP1]);
-#endif
 #endif
 
 	}

@@ -1429,6 +1429,7 @@ func_cont:
 		WakeDSP(pDevContext, NULL);
 	}
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+	CLK_Disable(SERVICESCLK_iva2_ck);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemMap status %x\n", status);
 	return status;
 }

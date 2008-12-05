@@ -14,7 +14,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-
 /*
  *  ======== node.c ========
  *
@@ -172,36 +171,36 @@
 #define PIPENAMELEN     (sizeof(PIPEPREFIX) + MAXDEVSUFFIXLEN)
 #define HOSTNAMELEN     (sizeof(HOSTPREFIX) + MAXDEVSUFFIXLEN)
 
-#define MAXDEVNAMELEN	   32	/* DSP_NDBPROPS.acName size */
-#define CREATEPHASE	     1
-#define EXECUTEPHASE	    2
-#define DELETEPHASE	     3
+#define MAXDEVNAMELEN	32	/* DSP_NDBPROPS.acName size */
+#define CREATEPHASE	1
+#define EXECUTEPHASE	2
+#define DELETEPHASE	3
 
 /* Define default STRM parameters */
 /*
  *  TBD: Put in header file, make global DSP_STRMATTRS with defaults,
  *  or make defaults configurable.
  */
-#define DEFAULTBUFSIZE	  32
-#define DEFAULTNBUFS	    2
-#define DEFAULTSEGID	    0
+#define DEFAULTBUFSIZE		32
+#define DEFAULTNBUFS		2
+#define DEFAULTSEGID		0
 #define DEFAULTALIGNMENT	0
-#define DEFAULTTIMEOUT	  10000
+#define DEFAULTTIMEOUT		10000
 
-#define RMSQUERYSERVER	  0
-#define RMSCONFIGURESERVER      1
-#define RMSCREATENODE	   2
-#define RMSEXECUTENODE	  3
-#define RMSDELETENODE	   4
-#define RMSCHANGENODEPRIORITY   5
-#define RMSREADMEMORY	   6
-#define RMSWRITEMEMORY	  7
-#define RMSCOPY		 8
-#define MAXTIMEOUT              2000
+#define RMSQUERYSERVER		0
+#define RMSCONFIGURESERVER	1
+#define RMSCREATENODE		2
+#define RMSEXECUTENODE		3
+#define RMSDELETENODE		4
+#define RMSCHANGENODEPRIORITY	5
+#define RMSREADMEMORY		6
+#define RMSWRITEMEMORY		7
+#define RMSCOPY			8
+#define MAXTIMEOUT		2000
 
-#define NUMRMSFXNS	      9
+#define NUMRMSFXNS		9
 
-#define PWR_TIMEOUT	     500	/* default PWR timeout in msec */
+#define PWR_TIMEOUT		500	/* default PWR timeout in msec */
 
 #define STACKSEGLABEL "L1DSRAM_HEAP"  /* Label for DSP Stack Segment Address */
 
@@ -346,6 +345,7 @@ static u32 Ovly(void *pPrivRef, u32 ulDspRunAddr, u32 ulDspLoadAddr,
 			u32 ulNumBytes, u32 nMemSpace);
 static u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
 			u32 ulNumBytes, u32 nMemSpace);
+
 #if GT_TRACE
 static struct GT_Mask NODE_debugMask = { NULL, NULL };  /* GT trace variable */
 #endif
@@ -364,7 +364,8 @@ static struct NLDR_FXNS nldrFxns = {
 	NLDR_Load,
 	NLDR_Unload,
 };
-#ifdef CONFIG_PM
+
+#ifdef CONFIG_BRIDGE_DVFS
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
@@ -407,13 +408,11 @@ DSP_STATUS NODE_Allocate(struct PROC_OBJECT *hProcessor,
 	u32 mapAttrs = 0x0;
 
 #ifndef RES_CLEANUP_DISABLE
-
 	HANDLE	     hDrvObject;
 	HANDLE	     nodeRes;
        u32                  hProcess;
 	struct PROCESS_CONTEXT   *pPctxt = NULL;
 	DSP_STATUS res_status = DSP_SOK;
-
 #endif
 
 	DBC_Require(cRefs > 0);
@@ -1311,11 +1310,10 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	u32 procId = 255;
 	struct DSP_PROCESSORSTATE procStatus;
 	struct PROC_OBJECT *hProcessor;
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
 #endif
-
 
 	DBC_Require(cRefs > 0);
 	GT_1trace(NODE_debugMask, GT_ENTER, "NODE_Create: hNode: 0x%x\n",
@@ -1370,8 +1368,7 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	if (DSP_SUCCEEDED(status)) {
 		/* If node's create function is not loaded, load it */
 		/* Boost the OPP level to max level that DSP can be requested */
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-#ifndef CONFIG_CPU_FREQ
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 		if (pdata->cpu_set_freq) {
 			(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP3]);
 
@@ -1381,7 +1378,6 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 				(*pdata->dsp_get_opp)());
 			}
 		}
-#endif
 #endif
 		status = hNodeMgr->nldrFxns.pfnLoad(hNode->hNldrNode,
 						   NLDR_CREATE);
@@ -1398,8 +1394,7 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 				 " create code: 0x%x\n", status);
 		}
 		/* Request the lowest OPP level*/
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-#ifndef CONFIG_CPU_FREQ
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 		if (pdata->cpu_set_freq) {
 			(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP1]);
 
@@ -1409,7 +1404,6 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 				(*pdata->dsp_get_opp)());
 			}
 		}
-#endif
 #endif
 		/* Get address of iAlg functions, if socket node */
 		if (DSP_SUCCEEDED(status)) {

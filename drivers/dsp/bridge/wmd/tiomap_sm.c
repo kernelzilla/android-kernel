@@ -67,7 +67,7 @@
 #include <dspbridge/chnl_sm.h>
 #include "_tiomap_pwr.h"
 
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
@@ -165,7 +165,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	DSP_STATUS status = DSP_SOK;
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
 	u32 opplevel = 0;
@@ -180,7 +180,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	status = CFG_GetHostResources(
 			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 			&resources);
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 		if (pdata->dsp_get_opp)
 			opplevel = (*pdata->dsp_get_opp)();
 
@@ -195,7 +195,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 					(opplevel + 1));
 			}
 		}
-
 #endif
 
 	if  (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||

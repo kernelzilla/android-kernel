@@ -100,13 +100,7 @@
 #include <dspbridge/dbreg.h>
 #endif
 
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
 #include <mach/omap-pm.h>
-#endif
-#endif
-
-
 
 #define BRIDGE_NAME "C6410"
 /*  ----------------------------------- Globals */
@@ -221,7 +215,7 @@ static int bridge_resume(struct platform_device *pdev);
 
 /* Maximum Opps that can be requested by IVA*/
 /*vdd1 rate table*/
-#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+#ifdef CONFIG_BRIDGE_DVFS
 const struct vdd_prcm_config vdd1_rate_table_bridge[] = {
 	{0, 0, 0},
 	/*OPP1*/
@@ -248,7 +242,7 @@ static int omap34xx_bridge_probe(struct platform_device *dev)
 }
 
 static struct dspbridge_platform_data dspbridge_pdata = {
-#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+#ifdef CONFIG_BRIDGE_DVFS
 	.dsp_set_min_opp = omap_pm_dsp_set_min_opp,
 	.dsp_get_opp = omap_pm_dsp_get_opp,
 	.cpu_set_freq = omap_pm_cpu_set_freq,
@@ -282,8 +276,7 @@ u32 vdd1_dsp_freq[6][4] = {
 	{0, 430000, 355000, 430000},
 };
 
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
-
+#ifdef CONFIG_BRIDGE_DVFS
 static int dspbridge_post_scale(struct notifier_block *op, unsigned long level,
 				void *ptr)
 {
@@ -295,7 +288,6 @@ static struct notifier_block iva_clk_notifier = {
 	.notifier_call = dspbridge_post_scale,
 	NULL,
 };
-
 #endif
 
 static struct platform_driver bridge_driver_ldm = {
@@ -327,9 +319,11 @@ static int __init bridge_init(void)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
+#ifdef CONFIG_BRIDGE_DVFS
 	int i = 0;
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
+#endif
 
 	/* use 2.6 device model */
 	if (driver_major) {
@@ -382,13 +376,9 @@ static int __init bridge_init(void)
 #ifdef DEBUG
 	if (GT_str)
 		GT_set(GT_str);
-
-#else
-#if (defined DDSP_DEBUG_PRODUCT) && GT_TRACE
+#elif defined(DDSP_DEBUG_PRODUCT) && GT_TRACE
 	GT_set("**=67");
 #endif
-#endif
-
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_init\n");
 	status = platform_driver_register(&bridge_driver_ldm);
@@ -472,8 +462,7 @@ static int __init bridge_init(void)
 			GT_0trace(driverTrace, GT_5CLASS,
 					"DSP/BIOS Bridge driver loaded\n");
 		}
-#ifdef CONFIG_PM
-#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+#ifdef CONFIG_BRIDGE_DVFS
 		for (i = 0; i < 5; i++)
 			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].speed;
 
@@ -492,8 +481,6 @@ static int __init bridge_init(void)
 			GT_0trace(driverTrace, GT_7CLASS,
 			"clk_notifier_register FAIL for iva2_ck \n");
 		}
-
-#endif
 #endif
 	}
 
@@ -512,8 +499,7 @@ static void __exit bridge_exit(void)
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
 
 	/* unregister the clock notifier */
-#ifdef CONFIG_PM
-#if (defined CONFIG_OMAP_PM_NOOP) || (defined CONFIG_OMAP_PM_SRF)
+#ifdef CONFIG_BRIDGE_DVFS
 	if (!clk_notifier_unregister(clk_handle, &iva_clk_notifier)) {
 		GT_0trace(driverTrace, GT_7CLASS,
 		"clk_notifier_unregister PASS for iva2_ck \n");
@@ -524,9 +510,8 @@ static void __exit bridge_exit(void)
 
 	clk_put(clk_handle);
 	clk_handle = NULL;
+#endif /* #ifdef CONFIG_BRIDGE_DVFS */
 
-#endif
-#endif /*#ifdef CONFIG_PM*/
 	/* unregister bridge driver */
 	platform_device_unregister(&omap_dspbridge_dev);
 	platform_driver_unregister(&bridge_driver_ldm);
@@ -686,7 +671,6 @@ static int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
 	status = omap34xxbridge_suspend_lockout(&bridge_suspend_data, filp);
 	if (status != 0)
 		return status;
-
 #endif
 
 	GT_0trace(driverTrace, GT_ENTER, " -> driver_ioctl\n");
@@ -759,7 +743,6 @@ DSP_STATUS DRV_RemoveAllResources(HANDLE hPCtxt)
 #endif
 
 #ifdef CONFIG_PM
-
 static int bridge_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	u32 status = DSP_EFAIL;
@@ -789,8 +772,8 @@ static int bridge_resume(struct platform_device *pdev)
 		return -1;
 	}
 }
-
 #endif
+
 /* Bridge driver initialization and de-initialization functions */
 module_init(bridge_init);
 module_exit(bridge_exit);

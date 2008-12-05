@@ -151,6 +151,7 @@
 /*  ----------------------------------- Others */
 #include <dspbridge/rms_sh.h>
 #include <dspbridge/mgr.h>
+#include <dspbridge/drv.h>
 #include "_cmm.h"
 
 /*  ----------------------------------- This */
@@ -238,9 +239,7 @@ static DSP_STATUS registerSHMSegs(struct IO_MGR *hIOMgr,
 				  struct COD_MANAGER *hCodMan,
 				  u32 dwGPPBasePA);
 
-extern u32 DRV_GetFirstDevExtension();
-
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 /* The maximum number of OPPs that are supported */
 extern s32 dsp_max_opps;
 /* The Vdd1 opp table information */
@@ -248,8 +247,6 @@ extern u32 vdd1_dsp_freq[6][4] ;
 
 extern struct platform_device omap_dspbridge_dev;
 #endif
-
-
 
 #if GT_TRACE
 static struct GT_Mask dsp_trace_mask = { NULL, NULL }; /* GT trace variable */
@@ -1703,7 +1700,7 @@ void IO_IntrDSP2(IN struct IO_MGR *pIOMgr, IN u16 wMbVal)
 DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 			 IN void *pArgs)
 {
-#if (defined CONFIG_PM) && (defined CONFIG_BRIDGE_DVFS)
+#ifdef CONFIG_BRIDGE_DVFS
 	u32 i;
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
@@ -1858,8 +1855,7 @@ void PrintDSPDebugTrace(struct IO_MGR *hIOMgr)
  *      There are no more than ulNumWords extra characters needed (the number of
  *      linefeeds minus the number of NULLS in the input buffer).
  */
-#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
-       && GT_TRACE
+#if (defined(DEBUG) || defined(DDSP_DEBUG_PRODUCT)) && GT_TRACE
 static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
 {
        DSP_STATUS status = DSP_SOK;
@@ -1906,7 +1902,7 @@ static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
 
        return status;
 }
-#endif    /* ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT)) && GT_TRACE */
+#endif    /* (defined(DEBUG) || defined(DDSP_DEBUG_PRODUCT)) && GT_TRACE */
 
 /*
  *  ======== PrintDspTraceBuffer ========
@@ -1924,8 +1920,7 @@ DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT *hWmdContext)
 {
        DSP_STATUS status = DSP_SOK;
 
-#if ((defined DEBUG) || (defined DDSP_DEBUG_PRODUCT))\
-       && GT_TRACE
+#if (defined(DEBUG) || defined(DDSP_DEBUG_PRODUCT)) && GT_TRACE
 
        struct COD_MANAGER *hCodMgr;
        u32 ulTraceEnd;
