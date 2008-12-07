@@ -155,7 +155,7 @@
  *      case, it is a blocking call there will be a context switching
  *      hence it may not represent the absolute busy wait time.
  */
-	extern inline void UTIL_Wait(IN u32 dwMicroSeconds)
+	static inline void UTIL_Wait(IN u32 dwMicroSeconds)
 	{
 		if (dwMicroSeconds / 1000 <= 1) {
 			/* <= 1 millisecond delay */

@@ -65,8 +65,6 @@
 #include <mach/board-3430sdp.h>
 
 extern struct platform_device omap_dspbridge_dev;
-#define VDD1_OPP1 1
-#define VDD1_OPP5 5
 #endif
 extern s32 dsp_test_sleepstate;
 extern struct MAILBOX_CONTEXT mboxsetting;
