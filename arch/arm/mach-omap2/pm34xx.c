@@ -348,7 +348,7 @@ void omap_sram_idle(void)
 	 * autocount. This is needed on ES3.0 to avoid SDRAM controller
 	 * hang-ups.
 	 */
-	if (system_rev >= OMAP3430_REV_ES3_0 &&
+	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
 	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
 	    core_next_state == PWRDM_POWER_OFF) {
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
@@ -366,7 +366,7 @@ void omap_sram_idle(void)
 	_omap_sram_idle(omap3_arm_context, save_state);
 
 	/* Restore normal SDRAM settings */
-	if (system_rev >= OMAP3430_REV_ES3_0 &&
+	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
 	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
