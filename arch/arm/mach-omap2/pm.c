@@ -231,7 +231,7 @@ static int __init omap_pm_init(void)
 #endif
 	voltage_off_while_idle = 0;
 	/* Going to 0V on anything under ES2.1 will eventually cause a crash */
-	if (system_rev > OMAP3430_REV_ES2_0) {
+	if (omap_rev() > OMAP3430_REV_ES2_0) {
 		error = sysfs_create_file(power_kobj,
 				  &voltage_off_while_idle_attr.attr);
 		if (error)
