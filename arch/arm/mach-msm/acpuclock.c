@@ -91,12 +91,14 @@ static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
 };
 #else /* Table of freq we currently use. */
 static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
-	{ 19200, ACPU_PLL_TCXO, 0, 0, 19200, 0, VDD_0, 0, 0, 3 },
-	{ 122880, ACPU_PLL_0, 4, 1, 61440, 1, VDD_3, 0, 0, 3 },
-	{ 128000, ACPU_PLL_1, 1, 5, 64000, 1, VDD_3, 0, 0, 4 },
-	{ 245760, ACPU_PLL_0, 4, 0, 81920, 2, VDD_4, 0, 0, 4 },
+	{ 19200, ACPU_PLL_TCXO, 0, 0, 19200, 0, VDD_0, 0, 0, 4 },
+	{ 122880, ACPU_PLL_0, 4, 1, 61440, 1, VDD_3, 0, 0, 4 },
+	{ 128000, ACPU_PLL_1, 1, 5, 64000, 1, VDD_3, 0, 0, 6 },
+	{ 176000, ACPU_PLL_2, 2, 5, 88000, 1, VDD_3, 0, 0, 5 },
+	{ 245760, ACPU_PLL_0, 4, 0, 81920, 2, VDD_4, 0, 0, 5 },
+	{ 352000, ACPU_PLL_2, 2, 2, 88000, 3, VDD_5, 0, 3, 7 },
 	{ 384000, ACPU_PLL_1, 1, 1, 128000, 2, VDD_6, 0, 2, -1 },
-	{ 528000, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 0, 4, -1 },
+	{ 528000, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 0, 5, -1 },
 	{ 0, 0, 0, 0, 0, 0, 0},
 };
 #endif
