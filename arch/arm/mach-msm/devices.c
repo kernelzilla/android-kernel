@@ -97,7 +97,8 @@ static struct resource msm_uart1_dm_resources[] = {
 	},
 	{
 		.start = INT_UART1DM_IRQ,
-		.end   = INT_UART1DM_RX,
+		.end   = INT_UART1DM_IRQ,
+		.name  = "uartdm_irq",
 		.flags = IORESOURCE_IRQ,
 	},
 	{
