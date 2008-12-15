@@ -914,6 +914,8 @@ DSP_STATUS PROC_GetState(DSP_HPROCESSOR hProcessor,
 			case BRD_STOPPED:
 				pProcStatus->iState = PROC_STOPPED;
 				break;
+			case BRD_DSP_HIBERNATION:
+				/* Fall through */
 			case BRD_RUNNING:
 				pProcStatus->iState = PROC_RUNNING;
 				break;
@@ -924,6 +926,7 @@ DSP_STATUS PROC_GetState(DSP_HPROCESSOR hProcessor,
 				pProcStatus->iState = PROC_ERROR;
 				break;
 			default:
+				pProcStatus->iState = 0xFF;
 				status = DSP_EFAIL;
 				break;
 			}
@@ -956,7 +959,8 @@ DSP_STATUS PROC_GetState(DSP_HPROCESSOR hProcessor,
 	}
 	GT_2trace(PROC_DebugMask, GT_ENTER,
 		 "Exiting PROC_GetState, results:\n\t"
-		 "status:  0x%x\n\tpProcStatus: 0x%x\n", status, *pProcStatus);
+		 "status:  0x%x\n\tpProcStatus: 0x%x\n", status,
+		 pProcStatus->iState);
 	return status;
 }
 
