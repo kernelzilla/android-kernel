@@ -98,7 +98,11 @@ static struct resource msm_uart1_dm_resources[] = {
 	{
 		.start = INT_UART1DM_IRQ,
 		.end   = INT_UART1DM_IRQ,
-		.name  = "uartdm_irq",
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = INT_UART1DM_RX,
+		.end   = INT_UART1DM_RX,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
@@ -136,6 +140,11 @@ static struct resource msm_uart2_dm_resources[] = {
 	},
 	{
 		.start = INT_UART2DM_IRQ,
+		.end   = INT_UART2DM_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = INT_UART2DM_RX,
 		.end   = INT_UART2DM_RX,
 		.flags = IORESOURCE_IRQ,
 	},
