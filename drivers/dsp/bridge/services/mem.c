@@ -481,21 +481,21 @@ void MEM_FlushCache(void *pMemBuf, u32 cBytes, s32 FlushType)
 	switch (FlushType) {
 	/* invalidate only */
 	case PROC_INVALIDATE_MEM:
-		dmac_inv_range(pMemBuf, pMemBuf + cBytes - 1);
+		dmac_inv_range(pMemBuf, pMemBuf + cBytes);
 		outer_inv_range(__pa((u32)pMemBuf), __pa((u32)pMemBuf +
-				cBytes - 1));
+				cBytes));
 	break;
 	/* writeback only */
 	case PROC_WRITEBACK_MEM:
-		dmac_clean_range(pMemBuf, pMemBuf + cBytes - 1);
+		dmac_clean_range(pMemBuf, pMemBuf + cBytes);
 		outer_clean_range(__pa((u32)pMemBuf), __pa((u32)pMemBuf +
-				  cBytes - 1));
+				  cBytes));
 	break;
 	/* writeback and invalidate */
 	case PROC_WRITEBACK_INVALIDATE_MEM:
-		dmac_flush_range(pMemBuf, pMemBuf + cBytes - 1);
+		dmac_flush_range(pMemBuf, pMemBuf + cBytes);
 		outer_flush_range(__pa((u32)pMemBuf), __pa((u32)pMemBuf +
-				  cBytes - 1));
+				  cBytes));
 	break;
 	default:
 		GT_1trace(MEM_debugMask, GT_6CLASS, "MEM_FlushCache: invalid "
