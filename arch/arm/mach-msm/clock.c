@@ -48,7 +48,7 @@ static inline int pc_clk_set_rate(unsigned id, unsigned rate)
 	return msm_proc_comm(PCOM_CLKCTL_RPC_SET_RATE, &id, &rate);
 }
 
-static inline int pc_clk_set_min_rate(unsigned id, unsigned rate)
+static int pc_clk_set_min_rate(unsigned id, unsigned rate)
 {
 	return msm_proc_comm(PCOM_CLKCTL_RPC_MIN_RATE, &id, &rate);
 }
@@ -147,12 +147,21 @@ EXPORT_SYMBOL(clk_get_rate);
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
 	int ret;
-	if (clk->flags & CLKFLAG_USE_MIN_MAX_TO_SET) {
+	if (clk->flags & CLKFLAG_USE_MAX_TO_SET) {
 		ret = pc_clk_set_max_rate(clk->id, rate);
 		if (ret)
 			return ret;
-		return pc_clk_set_min_rate(clk->id, rate);
 	}
+	if (clk->flags & CLKFLAG_USE_MIN_TO_SET) {
+		ret = pc_clk_set_min_rate(clk->id, rate);
+		if (ret)
+			return ret;
+	}
+
+	if (clk->flags & CLKFLAG_USE_MAX_TO_SET ||
+		clk->flags & CLKFLAG_USE_MIN_TO_SET)
+		return ret;
+
 	return pc_clk_set_rate(clk->id, rate);
 }
 EXPORT_SYMBOL(clk_set_rate);
