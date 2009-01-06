@@ -271,6 +271,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	uint32_t reg_clkctl;
 	struct clkctl_acpu_speed *cur_s, *tgt_s, *strt_s;
 	int rc = 0;
+	unsigned int plls_enabled = 0, pll;
 
 	strt_s = cur_s = drv_state.current_speed;
 
@@ -295,13 +296,19 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 			tgt_s--;
 	}
 
+	if (strt_s->pll != ACPU_PLL_TCXO)
+		plls_enabled |= 1 << strt_s->pll;
+
 	if (!for_power_collapse) {
 		mutex_lock(&drv_state.lock);
 		if (strt_s->pll != tgt_s->pll && tgt_s->pll != ACPU_PLL_TCXO) {
-			if ((rc = pc_pll_request(tgt_s->pll, 1)) < 0) {
-				printk(KERN_ERR "PLL enable failed (%d)\n", rc);
+			rc = pc_pll_request(tgt_s->pll, 1);
+			if (rc < 0) {
+				pr_err("PLL%d enable failed (%d)\n",
+					tgt_s->pll, rc);
 				goto out;
 			}
+			plls_enabled |= 1 << tgt_s->pll;
 		}
 		/* Increase VDD if needed. */
 		if (tgt_s->vdd > cur_s->vdd) {
@@ -347,6 +354,17 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
 			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
 #endif
+		if (!for_power_collapse&& cur_s->pll != ACPU_PLL_TCXO
+		    && !(plls_enabled & (1 << cur_s->pll))) {
+			rc = pc_pll_request(cur_s->pll, 1);
+			if (rc < 0) {
+				pr_err("PLL%d enable failed (%d)\n",
+					cur_s->pll, rc);
+				goto out;
+			}
+			plls_enabled |= 1 << cur_s->pll;
+		}
+
 		acpuclk_set_div(cur_s);
 		drv_state.current_speed = cur_s;
 		/* Re-adjust lpj for the new clock speed. */
@@ -358,13 +376,16 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	if (for_power_collapse)
 		return 0;
 
-	/* Disable PLL we are not using anymore. */
-	if (strt_s->pll != tgt_s->pll && tgt_s->pll != ACPU_PLL_TCXO) {
-		if ((rc = pc_pll_request(strt_s->pll, 0)) < 0) {
-			printk(KERN_ERR "PLL disable failed (%d)\n", rc);
-			goto out;
+	/* Disable PLLs we are not using anymore. */
+	plls_enabled &= ~(1 << tgt_s->pll);
+	for (pll = ACPU_PLL_0; pll <= ACPU_PLL_2; pll++)
+		if (plls_enabled & (1 << pll)) {
+			rc = pc_pll_request(pll, 0);
+			if (rc < 0) {
+				pr_err("PLL%d disable failed (%d)\n", pll, rc);
+				goto out;
+			}
 		}
-	}
 
 	/* Change the AXI bus frequency if we can. */
 	if (strt_s->axiclk_khz != tgt_s->axiclk_khz) {
