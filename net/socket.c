@@ -556,10 +556,6 @@ static inline int __sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 		return err;
 
 	err = sock->ops->sendmsg(iocb, sock, msg, size);
-#ifdef CONFIG_UID_STAT
-	if (err > 0)
-		update_tcp_snd(current_uid(), err);
-#endif
 	return err;
 }
 
@@ -686,10 +682,6 @@ static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 	si->flags = flags;
 
 	err = sock->ops->recvmsg(iocb, sock, msg, size, flags);
-#ifdef CONFIG_UID_STAT
-	if (err > 0)
-		update_tcp_rcv(current_uid(), err);
-#endif
 	return err;
 }
 

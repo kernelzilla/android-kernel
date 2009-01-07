@@ -120,7 +120,7 @@ static struct uid_stat *create_stat(uid_t uid) {
 	return new_uid;
 }
 
-int update_tcp_snd(uid_t uid, int size) {
+int uid_stat_tcp_snd(uid_t uid, int size) {
 	struct uid_stat *entry;
 	if ((entry = find_uid_stat(uid)) == NULL &&
 		((entry = create_stat(uid)) == NULL)) {
@@ -130,7 +130,7 @@ int update_tcp_snd(uid_t uid, int size) {
 	return 0;
 }
 
-int update_tcp_rcv(uid_t uid, int size) {
+int uid_stat_tcp_rcv(uid_t uid, int size) {
 	struct uid_stat *entry;
 	if ((entry = find_uid_stat(uid)) == NULL &&
 		((entry = create_stat(uid)) == NULL)) {
