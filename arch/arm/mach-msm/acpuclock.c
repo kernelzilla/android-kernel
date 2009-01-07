@@ -271,9 +271,6 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	uint32_t reg_clkctl;
 	struct clkctl_acpu_speed *cur_s, *tgt_s, *strt_s;
 	int rc = 0;
-#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
-	struct cpufreq_freqs freqs;
-#endif
 
 	strt_s = cur_s = drv_state.current_speed;
 
@@ -300,12 +297,6 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 
 	if (!for_power_collapse) {
 		mutex_lock(&drv_state.lock);
-#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
-		freqs.old = cur_s->a11clk_khz;
-		freqs.new = tgt_s->a11clk_khz;
-		freqs.cpu = smp_processor_id();
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-#endif
 		if (strt_s->pll != tgt_s->pll && tgt_s->pll != ACPU_PLL_TCXO) {
 			if ((rc = pc_pll_request(tgt_s->pll, 1)) < 0) {
 				printk(KERN_ERR "PLL enable failed (%d)\n", rc);
@@ -388,9 +379,6 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 			printk(KERN_ERR "acpuclock: Unable to drop ACPU vdd\n");
 	}
 
-#ifdef CONFIG_MSM_CPU_FREQ_ONDEMAND
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-#endif
 #if PERF_SWITCH_DEBUG
 	printk(KERN_DEBUG "%s: ACPU speed change complete\n", __FUNCTION__);
 #endif
