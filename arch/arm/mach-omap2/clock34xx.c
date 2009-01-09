@@ -960,6 +960,7 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	struct omap_opp *prcm_vdd = NULL;
 	unsigned long found_speed = 0, curr_mpu_speed;
 	int index = 0;
+	int l3_div;
 
 	if ((clk != &virt_vdd1_prcm_set) && (clk != &virt_vdd2_prcm_set))
 		return -EINVAL;
@@ -1001,7 +1002,9 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 					curr_mpu_speed/1000, found_speed/1000);
 #endif
 	} else {
-		clk_set_rate(dpll3_clk, prcm_vdd->rate);
+		l3_div = cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+			OMAP3430_CLKSEL_L3_MASK;
+		clk_set_rate(dpll3_clk, prcm_vdd->rate * l3_div);
 		curr_vdd2_prcm_set = prcm_vdd;
 	}
 
