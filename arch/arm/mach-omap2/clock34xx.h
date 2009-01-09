@@ -3316,8 +3316,9 @@ static struct clk wdt1_fck = {
 
 static struct clk virt_vdd1_prcm_set = {
 	.name = "virt_vdd1_prcm_set",
-	.flags = CLOCK_IN_OMAP343X | VIRTUAL_CLOCK | ALWAYS_ENABLED,
+	.flags = CLOCK_IN_OMAP343X | ALWAYS_ENABLED,
 	.parent = &mpu_ck, /* Indexed by mpu speed, no parent */
+	.clkdm = { .name = "virt_opp_clkdm" },
 	.recalc = &omap3_table_recalc, /*sets are keyed on mpu rate */
 	.set_rate = &omap3_select_table_rate,
 	.round_rate = &omap3_round_to_table_rate,
@@ -3325,8 +3326,9 @@ static struct clk virt_vdd1_prcm_set = {
 
 static struct clk virt_vdd2_prcm_set = {
 	.name = "virt_vdd2_prcm_set",
-	.flags = CLOCK_IN_OMAP343X | VIRTUAL_CLOCK | ALWAYS_ENABLED,
+	.flags = CLOCK_IN_OMAP343X | ALWAYS_ENABLED,
 	.parent = &core_ck,
+	.clkdm = { .name = "virt_opp_clkdm" },
 	.recalc = &omap3_table_recalc,
 	.set_rate = &omap3_select_table_rate,
 	.round_rate = &omap3_round_to_table_rate,

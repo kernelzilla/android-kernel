@@ -797,11 +797,8 @@ int __init omap2_clk_init(void)
 	for (clkp = onchip_34xx_clks;
 	     clkp < onchip_34xx_clks + ARRAY_SIZE(onchip_34xx_clks);
 	     clkp++) {
-		if ((*clkp)->flags & cpu_clkflg) {
+		if ((*clkp)->flags & cpu_clkflg)
 			clk_register(*clkp);
-			if (!((*clkp)->flags & VIRTUAL_CLOCK))
-				omap2_init_clk_clkdm(*clkp);
-		}
 	}
 
 	/* REVISIT: Not yet ready for OMAP3 */
@@ -970,10 +967,6 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 		clk_set_rate(dpll1_clk, prcm_vdd->rate);
 		clk_set_rate(dpll2_clk, dsp_opps[index].rate);
 		curr_vdd1_prcm_set = prcm_vdd;
-		omap2_clksel_recalc(&mpu_ck);
-		propagate_rate(&mpu_ck);
-		omap2_clksel_recalc(&iva2_ck);
-		propagate_rate(&iva2_ck);
 #ifndef CONFIG_CPU_FREQ
 		/*Update loops_per_jiffy if processor speed is being changed*/
 		loops_per_jiffy = compute_lpj(loops_per_jiffy,
@@ -982,8 +975,6 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	} else {
 		clk_set_rate(dpll3_clk, prcm_vdd->rate);
 		curr_vdd2_prcm_set = prcm_vdd;
-		omap2_clksel_recalc(&core_ck);
-		propagate_rate(&core_ck);
 	}
 
 	omap3_save_scratchpad_contents();
