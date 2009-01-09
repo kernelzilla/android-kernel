@@ -183,8 +183,10 @@ int resource_access_opp_lock(int res, int delta)
 
 int resource_set_opp_level(int res, u32 target_level, int flags)
 {
-	unsigned long mpu_freq, mpu_old_freq, l3_freq, req_l3_freq, t_opp;
+	unsigned long mpu_freq, mpu_old_freq, l3_freq, t_opp;
+#ifdef CONFIG_CPU_FREQ
 	struct cpufreq_freqs freqs_notify;
+#endif
 	struct shared_resource *resp;
 
 	if (res == VDD1_OPP)
