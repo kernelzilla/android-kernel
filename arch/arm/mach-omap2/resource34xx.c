@@ -139,6 +139,8 @@ static struct shared_resource *vdd1_resp;
 static struct shared_resource *vdd2_resp;
 static struct device dummy_mpu_dev;
 static struct device dummy_dsp_dev;
+static int vdd1_lock;
+static int vdd2_lock;
 
 /**
  * init_opp - Initialize the OPP resource
@@ -167,7 +169,19 @@ void init_opp(struct shared_resource *resp)
 
 static struct device vdd2_dev;
 
-int set_opp_level(int res, u32 target_level)
+int resource_access_opp_lock(int res, int delta)
+{
+	if (res == VDD1_OPP) {
+		vdd1_lock += delta;
+		return vdd1_lock;
+	} else if (res == VDD2_OPP) {
+		vdd2_lock += delta;
+		return vdd2_lock;
+	}
+	return -EINVAL;
+}
+
+int resource_set_opp_level(int res, u32 target_level, int flags)
 {
 	unsigned long mpu_freq, mpu_old_freq, l3_freq, req_l3_freq, t_opp;
 	struct cpufreq_freqs freqs_notify;
@@ -187,6 +201,8 @@ int set_opp_level(int res, u32 target_level)
 		return 0;
 
 	if (res == VDD1_OPP) {
+		if (flags != OPP_IGNORE_LOCK && vdd1_lock)
+			return 0;
 		mpu_old_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					curr_vdd1_prcm_set->opp_id);
 		mpu_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
@@ -221,6 +237,8 @@ int set_opp_level(int res, u32 target_level)
 		cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
 #endif
 	} else {
+		if (flags != OPP_IGNORE_LOCK && vdd2_lock)
+			return 0;
 		l3_freq = get_freq(l3_opps + MAX_VDD2_OPP,
 					target_level);
 		t_opp = ID_VDD(PRCM_VDD2) |
@@ -252,7 +270,7 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	int ind;
 
 	if (resp == vdd1_resp) {
-		set_opp_level(VDD1_OPP, target_level);
+		resource_set_opp_level(VDD1_OPP, target_level, 0);
 	} else if (resp == vdd2_resp) {
 		tput = target_level;
 
@@ -268,7 +286,7 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		/* Set the highest OPP possible */
 		if (ind > MAX_VDD2_OPP)
 			target_level = ind-1;
-		set_opp_level(VDD2_OPP, target_level);
+		resource_set_opp_level(VDD2_OPP, target_level, 0);
 	}
 	return 0;
 }
