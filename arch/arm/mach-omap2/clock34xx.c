@@ -1008,7 +1008,9 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 		curr_vdd2_prcm_set = prcm_vdd;
 	}
 
+#ifdef CONFIG_PM
 	omap3_save_scratchpad_contents();
+#endif
 
 	return 0;
 }
