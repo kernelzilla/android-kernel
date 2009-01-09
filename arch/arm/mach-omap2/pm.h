@@ -24,7 +24,13 @@ extern int omap3_can_sleep(void);
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern int omap3_idle_init(void);
 
-extern int set_opp_level(int res, u32 target_level);
+extern int resource_set_opp_level(int res, u32 target_level, int flags);
+extern int resource_access_opp_lock(int res, int delta);
+#define resource_lock_opp(res) resource_access_opp_lock(res, 1)
+#define resource_unlock_opp(res) resource_access_opp_lock(res, -1)
+#define resource_get_opp_lock(res) resource_access_opp_lock(res, 0)
+
+#define OPP_IGNORE_LOCK 0x1
 
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
 extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
