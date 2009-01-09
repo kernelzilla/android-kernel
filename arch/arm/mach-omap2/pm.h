@@ -42,7 +42,13 @@ extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
 #define omap3_pm_set_suspend_state(pwrdm, state) do {} while (0);
 #endif
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
-extern int set_opp_level(int res, u32 target_level);
+extern int resource_set_opp_level(int res, u32 target_level, int flags);
+extern int resource_access_opp_lock(int res, int delta);
+#define resource_lock_opp(res) resource_access_opp_lock(res, 1)
+#define resource_unlock_opp(res) resource_access_opp_lock(res, -1)
+#define resource_get_opp_lock(res) resource_access_opp_lock(res, 0)
+
+#define OPP_IGNORE_LOCK 0x1
 
 #ifdef CONFIG_PM_DEBUG
 extern void omap2_pm_dump(int mode, int resume, unsigned int us);
