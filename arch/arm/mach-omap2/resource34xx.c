@@ -135,6 +135,8 @@ int set_pd_latency(struct shared_resource *resp, u32 latency)
 
 static struct clk *vdd1_clk;
 static struct clk *vdd2_clk;
+static struct shared_resource *vdd1_resp;
+static struct shared_resource *vdd2_resp;
 static struct device dummy_mpu_dev;
 static struct device dummy_dsp_dev;
 
@@ -154,19 +156,29 @@ void init_opp(struct shared_resource *resp)
 	if (strcmp(resp->name, "vdd1_opp") == 0) {
 		resp->curr_level = curr_vdd1_prcm_set->opp_id;
 		vdd1_clk = clk_get(NULL, "virt_vdd1_prcm_set");
+		vdd1_resp = resp;
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
 		resp->curr_level = curr_vdd2_prcm_set->opp_id;
 		vdd2_clk = clk_get(NULL, "virt_vdd2_prcm_set");
+		vdd2_resp = resp;
 	}
 	return;
 }
 
-int set_opp(struct shared_resource *resp, u32 target_level)
+static struct device vdd2_dev;
+
+int set_opp_level(int res, u32 target_level)
 {
-	unsigned long mpu_freq, mpu_old_freq, l3_freq, tput, t_opp;
-	int ind;
-	struct bus_throughput_db *tput_db;
+	unsigned long mpu_freq, mpu_old_freq, l3_freq, req_l3_freq, t_opp;
 	struct cpufreq_freqs freqs_notify;
+	struct shared_resource *resp;
+
+	if (res == VDD1_OPP)
+		resp = vdd1_resp;
+	else if (res == VDD2_OPP)
+		resp = vdd2_resp;
+	else
+		return 0;
 
 	if (resp->curr_level == target_level)
 		return 0;
@@ -174,7 +186,7 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	if (!mpu_opps || !dsp_opps || !l3_opps)
 		return 0;
 
-	if (strcmp(resp->name, "vdd1_opp") == 0) {
+	if (res == VDD1_OPP) {
 		mpu_old_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
 					curr_vdd1_prcm_set->opp_id);
 		mpu_freq = get_freq(mpu_opps + MAX_VDD1_OPP,
@@ -208,23 +220,7 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		/* Send a post notification to CPUFreq */
 		cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
 #endif
-	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
-		tput_db = resp->resource_data;
-		tput = target_level;
-		/* using the throughput db map to the appropriate L3 Freq */
-		for (ind = 1; ind < MAX_VDD2_OPP; ind++)
-			if (tput_db->throughput[ind] > tput)
-				target_level = ind;
-
-		/* Set the highest OPP possible */
-		if (ind == MAX_VDD2_OPP)
-			target_level = ind-1;
-
-		if (resp->curr_level == target_level)
-			return 0;
-
-		resp->curr_level = target_level;
-
+	} else {
 		l3_freq = get_freq(l3_opps + MAX_VDD2_OPP,
 					target_level);
 		t_opp = ID_VDD(PRCM_VDD2) |
@@ -245,6 +241,34 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 			clk_set_rate(vdd2_clk, l3_freq);
 		}
 		resp->curr_level = curr_vdd2_prcm_set->opp_id;
+	}
+	return 0;
+}
+
+int set_opp(struct shared_resource *resp, u32 target_level)
+{
+	unsigned long tput;
+	unsigned long req_l3_freq;
+	int ind;
+
+	if (resp == vdd1_resp) {
+		set_opp_level(VDD1_OPP, target_level);
+	} else if (resp == vdd2_resp) {
+		tput = target_level;
+
+		/* Convert the tput in KiB/s to Bus frequency in MHz */
+		req_l3_freq = (tput * 1000)/4;
+
+		for (ind = 2; ind <= MAX_VDD2_OPP; ind++)
+			if ((l3_opps + ind)->rate >= req_l3_freq) {
+				target_level = ind;
+				break;
+			}
+
+		/* Set the highest OPP possible */
+		if (ind > MAX_VDD2_OPP)
+			target_level = ind-1;
+		set_opp_level(VDD2_OPP, target_level);
 	}
 	return 0;
 }
