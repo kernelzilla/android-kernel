@@ -82,6 +82,10 @@
 
 #define OMAP34XX_MAILBOX_BASE	(L4_34XX_BASE + 0x94000)
 
+/* VDD OPP identifiers */
+#define VDD1_OPP	0x1
+#define VDD2_OPP	0x2
+
 /* VDD1 OPPS */
 #define VDD1_OPP1	0x1
 #define VDD1_OPP2	0x2
