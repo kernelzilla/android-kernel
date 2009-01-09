@@ -1341,10 +1341,6 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 		clk_set_rate(dpll1_clk, prcm_vdd->rate);
 		clk_set_rate(dpll2_clk, dsp_opps[index].rate);
 		curr_vdd1_prcm_set = prcm_vdd;
-		omap2_clksel_recalc(&mpu_ck);
-		propagate_rate(&mpu_ck);
-		omap2_clksel_recalc(&iva2_ck);
-		propagate_rate(&iva2_ck);
 #ifndef CONFIG_CPU_FREQ
 		/*Update loops_per_jiffy if processor speed is being changed*/
 		loops_per_jiffy = compute_lpj(loops_per_jiffy,
@@ -1353,8 +1349,6 @@ static int omap3_select_table_rate(struct clk *clk, unsigned long rate)
 	} else {
 		clk_set_rate(dpll3_clk, prcm_vdd->rate);
 		curr_vdd2_prcm_set = prcm_vdd;
-		omap2_clksel_recalc(&core_ck);
-		propagate_rate(&core_ck);
 	}
 
 	omap3_save_scratchpad_contents();
