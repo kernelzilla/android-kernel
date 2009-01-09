@@ -42,6 +42,7 @@ extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
 #define omap3_pm_set_suspend_state(pwrdm, state) do {} while (0);
 #endif
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+extern int set_opp_level(int res, u32 target_level);
 
 #ifdef CONFIG_PM_DEBUG
 extern void omap2_pm_dump(int mode, int resume, unsigned int us);
