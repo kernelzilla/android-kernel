@@ -44,8 +44,12 @@
 #include <plat/mux.h>
 #include <plat/usb.h>
 #include <plat/timer-gp.h>
+#include <plat/clock.h>
+#include <plat/omap-pm.h>
 
 #include "mmc-twl4030.h"
+#include "pm.h"
+#include "omap3-opp.h"
 
 #define GPMC_CS0_BASE  0x60
 #define GPMC_CS_SIZE   0x30
@@ -358,7 +362,8 @@ static void __init omap3_beagle_init_irq(void)
 	omap_board_config = omap3_beagle_config;
 	omap_board_config_size = ARRAY_SIZE(omap3_beagle_config);
 	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
-			     mt46h32m32lf6_sdrc_params, NULL, NULL, NULL);
+			     mt46h32m32lf6_sdrc_params, omap3_mpu_rate_table,
+			     omap3_dsp_rate_table, omap3_l3_rate_table);
 	omap_init_irq();
 #ifdef CONFIG_OMAP_32K_TIMER
 	omap2_gp_clockevent_set_gptimer(12);
