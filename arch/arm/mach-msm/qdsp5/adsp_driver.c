@@ -18,6 +18,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/platform_device.h>
+#include <linux/sched.h>
 #include <linux/uaccess.h>
 
 #include "adsp.h"
