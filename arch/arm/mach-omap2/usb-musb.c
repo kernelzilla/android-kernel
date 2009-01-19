@@ -32,6 +32,9 @@
 #include <mach/mux.h>
 #include <mach/usb.h>
 
+#define AUTOIDLE        (1 << 0)
+#define OTG_SYSCONFIG	(OMAP34XX_HSUSB_OTG_BASE + 0x404)
+
 static struct resource musb_resources[] = {
 	[0] = { /* start and end set dynamically */
 		.flags	= IORESOURCE_MEM,
@@ -182,4 +185,8 @@ void __init usb_musb_init(void)
 		printk(KERN_ERR "Unable to register HS-USB (MUSB) device\n");
 		return;
 	}
+
+	/* Enable smartidle on MUSB to improve C1 wakeup latency */
+	if (cpu_is_omap34xx())
+		omap_writel(AUTOIDLE, OTG_SYSCONFIG);
 }
