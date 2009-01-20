@@ -53,6 +53,8 @@
 #include "smartreflex.h"
 #include "sdrc.h"
 
+static int regset_save_on_suspend;
+
 #define SDRC_POWER_AUTOCOUNT_SHIFT 8
 #define SDRC_POWER_AUTOCOUNT_MASK (0xffff << SDRC_POWER_AUTOCOUNT_SHIFT)
 #define SDRC_POWER_CLKCTRL_SHIFT 4
@@ -380,6 +382,9 @@ void omap_sram_idle(void)
 			SDRC_SELF_REFRESH_ON_AUTOCOUNT, SDRC_POWER);
 	}
 
+	if (regset_save_on_suspend)
+		pm_dbg_regset_save(1);
+
 	/*
 	 * omap3_arm_context is the location where ARM registers
 	 * get saved. The restore path then reads from this
@@ -543,7 +548,10 @@ static int omap3_pm_suspend(void)
 	}
 
 	omap_uart_prepare_suspend();
+
+	regset_save_on_suspend = 1;
 	omap_sram_idle();
+	regset_save_on_suspend = 0;
 
 restore:
 	/* Restore next_pwrsts */
@@ -1071,6 +1079,8 @@ static void __init configure_vc(void)
 			OMAP3_PRM_VOLTOFFSET_OFFSET);
 	prm_write_mod_reg(prm_setup.voltsetup2, OMAP3430_GR_MOD,
 			OMAP3_PRM_VOLTSETUP2_OFFSET);
+
+	pm_dbg_regset_init(1);
 }
 
 static int __init omap3_pm_early_init(void)
