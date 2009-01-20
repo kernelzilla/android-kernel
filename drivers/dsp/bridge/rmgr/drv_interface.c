@@ -241,16 +241,17 @@ static int omap34xx_bridge_probe(struct platform_device *dev)
 	return 0;
 }
 
-static struct dspbridge_platform_data dspbridge_pdata = {
 #ifdef CONFIG_BRIDGE_DVFS
+static struct dspbridge_platform_data dspbridge_pdata = {
 	.dsp_set_min_opp = omap_pm_dsp_set_min_opp,
 	.dsp_get_opp = omap_pm_dsp_get_opp,
 	.cpu_set_freq = omap_pm_cpu_set_freq,
 	.cpu_get_freq = omap_pm_cpu_get_freq,
-#endif
-
 };
+#else
+static struct dspbridge_platform_data dspbridge_pdata;
 
+#endif
 struct platform_device omap_dspbridge_dev = {
 		.name = BRIDGE_NAME,
 		.id = -1,

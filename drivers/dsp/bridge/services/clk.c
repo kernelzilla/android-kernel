@@ -100,11 +100,7 @@ static struct SERVICES_Clk_t SERVICES_Clks[] = {
 	{NULL, ""}
 };
 
-#ifdef CONFIG_PM
 extern struct platform_device omap_dspbridge_dev;
-#endif
-
-
 
 /* Generic TIMER object: */
 struct TIMER_OBJECT {
