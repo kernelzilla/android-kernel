@@ -1,3 +1,4 @@
+
 /*
  * tiomap.c
  *
@@ -1285,10 +1286,10 @@ static DSP_STATUS WMD_BRD_MemMap(struct WMD_DEV_CONTEXT *hDevContext,
 	struct HW_MMUMapAttrs_t hwAttrs;
 	u32 numOfActualTabEntries = 0;
 	u32 temp = 0;
+	struct CFG_HOSTRES resources;
 	u32 *pPhysAddrPageTbl = NULL;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
-	struct CFG_HOSTRES resources;
 
 	DBG_Trace(DBG_ENTER, "> WMD_BRD_MemMap hDevContext %x, pa %x, va %x, "
 		 "size %x, ulMapAttr %x\n", hDevContext, ulMpuAddr, ulVirtAddr,
@@ -1423,13 +1424,15 @@ func_cont:
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
 	HW_PWRST_IVA2RegGet(resources.dwPrmBase, &temp);
-	if ((temp & 0x03) != 0x03 || (temp & 0x03) != 0x02) {
+	if ((temp & HW_PWR_STATE_ON) == HW_PWR_STATE_OFF) {
+		/* IVA domain is not in ON state*/
 		DBG_Trace(DBG_LEVEL7, "temp value is 0x%x\n", temp);
 		CLK_Enable(SERVICESCLK_iva2_ck);
 		WakeDSP(pDevContext, NULL);
-	}
-	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
-	CLK_Disable(SERVICESCLK_iva2_ck);
+		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+		CLK_Disable(SERVICESCLK_iva2_ck);
+	} else
+		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemMap status %x\n", status);
 	return status;
 }
