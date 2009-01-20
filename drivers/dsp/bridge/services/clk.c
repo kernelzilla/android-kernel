@@ -331,7 +331,7 @@ s32 CLK_Get_UseCnt(IN enum SERVICES_ClkId clk_id)
 	pClk = SERVICES_Clks[clk_id].clk_handle;
 
 	if (pClk) {
-		useCount =  clk_get_usecount(pClk);
+		useCount =  pClk->usecount; /* FIXME: usecount shouldn't be used */
 	} else {
 		GT_1trace(CLK_debugMask, GT_7CLASS,
 			  "CLK_GetRate: failed to get "
