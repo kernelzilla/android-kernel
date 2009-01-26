@@ -396,7 +396,8 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
 	int i;
 
 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
-		strcmp(pwrdm->name, "wkup_pwrdm") == 0)
+		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
+		strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
 
 	pwrdm_state_switch(pwrdm);

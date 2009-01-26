@@ -409,8 +409,6 @@ void omap_sram_idle(void)
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
 
-	omap2_clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
-
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON) {
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
@@ -433,6 +431,7 @@ void omap_sram_idle(void)
 
 	pwrdm_post_transition();
 
+	omap2_clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
 }
 
 /*
