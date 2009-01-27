@@ -20,6 +20,7 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/list.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -32,6 +33,37 @@
 
 #include "proc_comm.h"
 #include "acpuclock.h"
+
+
+#define A11S_CLK_CNTL_ADDR (MSM_CSR_BASE + 0x100)
+#define A11S_CLK_SEL_ADDR (MSM_CSR_BASE + 0x104)
+#define A11S_VDD_SVS_PLEVEL_ADDR (MSM_CSR_BASE + 0x124)
+
+/*
+ * ARM11 clock configuration for specific ACPU speeds
+ */
+
+#define ACPU_PLL_TCXO	-1
+#define ACPU_PLL_0	0
+#define ACPU_PLL_1	1
+#define ACPU_PLL_2	2
+#define ACPU_PLL_3	3
+
+struct clkctl_acpu_speed
+{
+	unsigned int	a11clk_khz;
+	int		pll;
+	unsigned int	a11clk_src_sel;
+	unsigned int	a11clk_src_div;
+	unsigned int	ahbclk_khz;
+	unsigned int	ahbclk_div;
+	int		vdd;
+	unsigned long	lpj; /* loops_per_jiffy */
+/* Index in acpu_freq_tbl[] for steppings. */
+	short		down;
+	short		up;
+};
+
 
 #define PERF_SWITCH_DEBUG 0
 #define PERF_SWITCH_STEP_DEBUG 0
