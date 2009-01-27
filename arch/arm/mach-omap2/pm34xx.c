@@ -466,6 +466,10 @@ static int omap3_fclks_active(void)
 	fck_core1 &= ~(OMAP3430_EN_UART1 | OMAP3430_EN_UART2);
 	fck_per &= ~OMAP3430_EN_UART3;
 
+	/* Ignore GPIO clocks.  Handled by GPIO prepare-idle hooks */
+	fck_per &= ~(OMAP3430_EN_GPIO2 | OMAP3430_EN_GPIO3 |
+		     OMAP3430_EN_GPIO4 | OMAP3430_EN_GPIO5 | OMAP3430_EN_GPIO6);
+
 	if (fck_core1 | fck_core3 | fck_sgx | fck_dss |
 	    fck_cam | fck_per | fck_usbhost)
 		return 1;
