@@ -1,5 +1,27 @@
 if ARCH_MSM
 
+choice
+	prompt "Qualcomm MSM SoC Type"
+	default ARCH_MSM7X00A
+
+config ARCH_MSM7X00A
+	bool "MSM7x00A / MSM7x01A"
+	select ARCH_MSM_ARM11
+	select CPU_V6
+
+config ARCH_QSD8X50
+	bool "QSD8x50"
+	select ARCH_MSM_SCORPION
+	select CPU_V7
+
+endchoice
+
+config ARCH_MSM_ARM11
+	bool
+
+config ARCH_MSM_SCORPION
+	bool
+
 config MSM_AMSS_VERSION
 	int
 	default 6210 if MSM_AMSS_VERSION_6210
@@ -50,24 +72,30 @@ choice
 endchoice
 
 comment "MSM Board Type"
-	depends on ARCH_MSM
 
 config MACH_HALIBUT
-	depends on ARCH_MSM
+	depends on ARCH_MSM7X00A
 	default y
 	bool "Halibut Board (QCT SURF7201A)"
 	help
 	  Support for the Qualcomm SURF7201A eval board.
 
 config MACH_TROUT
-	depends on ARCH_MSM
+	depends on ARCH_MSM7X00A
 	default y
 	bool "Trout (HTC Dream, T-Mobile G1, Google ADP1)"
 	help
 	 Select this to support HTC Dream, T-Mobile G1, Google ADP1.
 
+config MACH_SWORDFISH
+	depends on ARCH_QSD8X50
+	default y
+	bool "Swordfish Board (QCT SURF8250)"
+	help
+	  Support for the Qualcomm SURF8250 eval board.
+
 config MACH_SAPPHIRE
-	depends on ARCH_MSM
+	depends on ARCH_MSM7X00A
 	default y
 	bool "Sapphire"
 
