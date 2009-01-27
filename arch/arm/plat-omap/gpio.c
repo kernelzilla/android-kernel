@@ -154,6 +154,7 @@ struct gpio_bank {
 	spinlock_t lock;
 	struct gpio_chip chip;
 	struct clk *dbck;
+	u32 dbck_enable_mask;
 };
 
 #define METHOD_MPUIO		0
@@ -489,6 +490,7 @@ void omap_set_gpio_debounce(int gpio, int enable)
 		goto done;
 
 	if (cpu_is_omap34xx()) {
+		bank->dbck_enable_mask = val;
 		if (enable)
 			clk_enable(bank->dbck);
 		else
@@ -1633,6 +1635,9 @@ void omap2_gpio_prepare_for_idle(int power_state)
 		struct gpio_bank *bank = &gpio_bank[i];
 		u32 l1, l2;
 
+		if (cpu_is_omap34xx() && bank->dbck_enable_mask)
+			clk_disable(bank->dbck);
+
 		if (power_state > PWRDM_POWER_OFF)
 			continue;
 
@@ -1675,6 +1680,9 @@ void omap2_gpio_resume_after_idle(void)
 	for (i = min; i < gpio_bank_count; i++) {
 		struct gpio_bank *bank = &gpio_bank[i];
 		u32 l;
+
+		if (cpu_is_omap34xx() && bank->dbck_enable_mask)
+			clk_enable(bank->dbck);
 
 		if (!workaround_enabled)
 			continue;
