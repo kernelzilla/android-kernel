@@ -43,6 +43,10 @@ static struct map_desc msm_io_desc[] __initdata = {
 	MSM_DEVICE(GPIO1),
 	MSM_DEVICE(GPIO2),
 	MSM_DEVICE(CLK_CTL),
+#ifdef CONFIG_ARCH_MSM_SCORPION
+	MSM_DEVICE(SIRC),
+	MSM_DEVICE(SCPLL),
+#endif
 	MSM_DEVICE(AD5),
 	MSM_DEVICE(MDC),
 #ifdef CONFIG_MSM_DEBUG_UART
@@ -58,11 +62,13 @@ static struct map_desc msm_io_desc[] __initdata = {
 
 void __init msm_map_common_io(void)
 {
+#ifdef CONFIG_ARCH_MSM_ARM11
 	/* Make sure the peripheral register window is closed, since
 	 * we will use PTE flags (TEX[1]=1,B=0,C=1) to determine which
 	 * pages are peripheral interface or not.
 	 */
 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
+#endif
 
 	iotable_init(msm_io_desc, ARRAY_SIZE(msm_io_desc));
 }
@@ -70,6 +76,7 @@ void __init msm_map_common_io(void)
 void __iomem *
 __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 {
+#ifdef CONFIG_ARCH_MSM_ARM11
 	if (mtype == MT_DEVICE) {
 		/* The peripherals in the 88000000 - D0000000 range
 		 * are only accessable by type MT_DEVICE_NONSHARED.
@@ -78,7 +85,7 @@ __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 		if ((phys_addr >= 0x88000000) && (phys_addr < 0xD0000000))
 			mtype = MT_DEVICE_NONSHARED;
 	}
-
+#endif
 	return __arm_ioremap_caller(phys_addr, size, mtype,
 		__builtin_return_address(0));
 }
