@@ -1,4 +1,5 @@
 obj-y += io.o idle.o irq.o timer.o dma.o memory.o
+obj-$(CONFIG_ARCH_MSM_SCORPION) += sirc.o
 obj-y += devices.o
 obj-y += proc_comm.o
 obj-y += vreg.o
