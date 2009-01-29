@@ -24,6 +24,10 @@ obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 
 obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o board-halibut-panel.o
 obj-$(CONFIG_MACH_HALIBUT) += board-halibut-keypad.o fish_battery.o
+obj-$(CONFIG_MACH_SWORDFISH) += board-swordfish.o
+obj-$(CONFIG_MACH_SWORDFISH) += board-swordfish-keypad.o fish_battery.o
+obj-$(CONFIG_MACH_SWORDFISH) += board-swordfish-panel.o
+obj-$(CONFIG_MACH_SWORDFISH) += board-swordfish-mmc.o
 obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-keypad.o board-trout-panel.o
 obj-$(CONFIG_MACH_TROUT) += htc_akm_cal.o htc_wifi_nvs.o htc_acoustic.o
