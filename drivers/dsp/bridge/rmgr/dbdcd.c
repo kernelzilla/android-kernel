@@ -473,7 +473,7 @@ DSP_STATUS DCD_GetObjectDef(IN struct DCD_MANAGER *hDcdMgr,
 	u32 dwBufSize;	/* Used by REG functions */
 	char szRegKey[REG_MAXREGPATHLENGTH];
 	char *szUuid;		/*[MAXUUIDLEN];*/
-	char szRegData[MAXUUIDLEN];
+	char szRegData[REG_MAXREGPATHLENGTH];
 	char szSectName[MAXUUIDLEN + 2];	/* ".[UUID]\0" */
 	char *pszCoffBuf;
 	u32 dwKeyLen;		/* Len of REG key. */
