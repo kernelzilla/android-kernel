@@ -987,8 +987,6 @@ DSP_STATUS NODE_Connect(struct NODE_OBJECT *hNode1, u32 uStream1,
 {
 	struct NODE_MGR *hNodeMgr;
 	char *pstrDevName = NULL;
-	char *pstrDevName1;
-	char *pstrDevName2;
 	enum NODE_TYPE node1Type = NODE_TASK;
 	enum NODE_TYPE node2Type = NODE_TASK;
 	struct NODE_STRMDEF *pstrmDef;
@@ -1130,15 +1128,9 @@ DSP_STATUS NODE_Connect(struct NODE_OBJECT *hNode1, u32 uStream1,
 				status = DSP_EMEMORY;
 			} else {
 				/* Copy "/dbpipe<pipId>" name to device names */
-				pstrDevName1 = pOutput->szDevice;
-                               strncpy(pstrDevName1, PIPEPREFIX,
-					   sizeof(PIPEPREFIX));
-                               pstrDevName1 += strlen(pstrDevName1);
-				CSL_NumToAscii(pstrDevName1, pipeId);
-				pstrDevName1 = pOutput->szDevice;
-				pstrDevName2 = pInput->szDevice;
-                               strncpy(pstrDevName2, pstrDevName1,
-					   PIPENAMELEN);
+				sprintf(pOutput->szDevice, "%s%d",
+						PIPEPREFIX, pipeId);
+				strcpy(pInput->szDevice, pOutput->szDevice);
 			}
 		}
 	}
@@ -1212,9 +1204,7 @@ func_cont2:
 				hNode1->outputs[uStream1].devId = chnlId;
 				pOutput->szDevice = pstrDevName;
 			}
-                       strncpy(pstrDevName, HOSTPREFIX, sizeof(HOSTPREFIX));
-                       pstrDevName += strlen(pstrDevName);
-			CSL_NumToAscii(pstrDevName, chnlId);
+			sprintf(pstrDevName, "%s%d", HOSTPREFIX, chnlId);
 		}
 	}
 	/* Connecting task node to device node? */

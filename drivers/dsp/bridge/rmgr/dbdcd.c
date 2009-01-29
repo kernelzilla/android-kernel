@@ -692,12 +692,12 @@ DSP_STATUS DCD_GetObjects(IN struct DCD_MANAGER *hDcdMgr, IN char *pszCoffPath,
 				 "with 1 word for IVA !!\n");
 		}
 		/* Read from buffer and register object in buffer. */
-		pToken = CSL_Strtokr(pszCoffBuf, seps, &pszCur);
-		while (pToken != NULL) {
+		pszCur = pszCoffBuf;
+		while ((pToken = strsep(&pszCur, seps)) && *pToken != '\0') {
 			/*  Retrieve UUID string. */
 			UUID_UuidFromString(pToken, &dspUuid);
 			/*  Retrieve object type */
-			pToken = CSL_Strtokr(NULL, seps, &pszCur);
+			pToken = strsep(&pszCur, seps);
 			/*  Retrieve object type */
 			cObjectType = Atoi(pToken);
 			/*
@@ -722,8 +722,6 @@ DSP_STATUS DCD_GetObjects(IN struct DCD_MANAGER *hDcdMgr, IN char *pszCoffPath,
 				/* if error occurs, break from while loop. */
 				break;
 			}
-			/* Get next token */
-			pToken = CSL_Strtokr(NULL, seps, &pszCur);
 		}
 	} else {
 		status = DSP_EDCDREADSECT;
@@ -1137,23 +1135,25 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		    || (objType == DSP_DCDPROCESSORTYPE));
 	DBC_Require(pGenObj != NULL);
 
+
 	switch (objType) {
 	case DSP_DCDNODETYPE:
 		/*
 		 * Parse COFF sect buffer to retrieve individual tokens used
 		 * to fill in object attrs.
 		 */
-		token = CSL_Strtokr(pszBuf, seps, &pszCur);
+		pszCur = pszBuf;
+		token = strsep(&pszCur, seps);
 
 		/* u32 cbStruct */
 		pGenObj->objData.nodeObj.ndbProps.cbStruct =
 				(u32) Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* DSP_UUID uiNodeID */
 		UUID_UuidFromString(token,
 				  &pGenObj->objData.nodeObj.ndbProps.uiNodeID);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* acName */
                DBC_Require(token);
@@ -1164,80 +1164,80 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
                strncpy(pGenObj->objData.nodeObj.ndbProps.acName,
 			   token, cLen);
 		pGenObj->objData.nodeObj.ndbProps.acName[cLen] = '\0';
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		/* u32 uNodeType */
 		pGenObj->objData.nodeObj.ndbProps.uNodeType = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		/* u32 bCacheOnGPP */
 		pGenObj->objData.nodeObj.ndbProps.bCacheOnGPP = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		/* DSP_RESOURCEREQMTS dspResourceReqmts */
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.cbStruct =
 				(u32) Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uStaticDataSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uGlobalDataSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uProgramMemSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uWCExecutionTime = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uWCPeriod = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uWCDeadline = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uAvgExectionTime = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.nodeObj.ndbProps.dspResourceReqmts.
 			uMinimumPeriod = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* s32 iPriority */
 		pGenObj->objData.nodeObj.ndbProps.iPriority = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uStackSize */
 		pGenObj->objData.nodeObj.ndbProps.uStackSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uSysStackSize */
 		pGenObj->objData.nodeObj.ndbProps.uSysStackSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uStackSeg */
 		pGenObj->objData.nodeObj.ndbProps.uStackSeg = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uMessageDepth */
 		pGenObj->objData.nodeObj.ndbProps.uMessageDepth = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uNumInputStreams */
 		pGenObj->objData.nodeObj.ndbProps.uNumInputStreams =
 			Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uNumOutputStreams */
 		pGenObj->objData.nodeObj.ndbProps.uNumOutputStreams =
 			Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* u32 uTimeout */
 		pGenObj->objData.nodeObj.ndbProps.uTimeout =
 			Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* char * pstrCreatePhaseFxn */
                DBC_Require(token);
@@ -1247,7 +1247,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		strncpy(pGenObj->objData.nodeObj.pstrCreatePhaseFxn,
 			token, cLen);
 		pGenObj->objData.nodeObj.pstrCreatePhaseFxn[cLen] = '\0';
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* char * pstrExecutePhaseFxn */
                DBC_Require(token);
@@ -1257,7 +1257,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		strncpy(pGenObj->objData.nodeObj.pstrExecutePhaseFxn,
 			token, cLen);
 		pGenObj->objData.nodeObj.pstrExecutePhaseFxn[cLen] = '\0';
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* char * pstrDeletePhaseFxn */
                DBC_Require(token);
@@ -1267,15 +1267,15 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		strncpy(pGenObj->objData.nodeObj.pstrDeletePhaseFxn,
 			token, cLen);
 		pGenObj->objData.nodeObj.pstrDeletePhaseFxn[cLen] = '\0';
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* Segment id for message buffers */
 		pGenObj->objData.nodeObj.uMsgSegid = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* Message notification type */
 		pGenObj->objData.nodeObj.uMsgNotifyType = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		/* char * pstrIAlgName */
 		if (token) {
@@ -1285,25 +1285,25 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 			strncpy(pGenObj->objData.nodeObj.pstrIAlgName,
 				token, cLen);
 			pGenObj->objData.nodeObj.pstrIAlgName[cLen] = '\0';
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 		}
 
 		/* Load type (static, dynamic, or overlay) */
 		if (token) {
 			pGenObj->objData.nodeObj.usLoadType = Atoi(token);
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 		}
 
 		/* Dynamic load data requirements */
 		if (token) {
 			pGenObj->objData.nodeObj.ulDataMemSegMask = Atoi(token);
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 		}
 
 		/* Dynamic load code requirements */
 		if (token) {
 			pGenObj->objData.nodeObj.ulCodeMemSegMask = Atoi(token);
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 		}
 
 		/* Extract node profiles into node properties */
@@ -1313,7 +1313,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 				Atoi(token);
 			for (i = 0; i < pGenObj->objData.nodeObj.ndbProps.
 			    uCountProfiles; i++) {
-				token = CSL_Strtokr(NULL, seps, &pszCur);
+				token = strsep(&pszCur, seps);
 				if (token) {
 					/* Heap Size for the node */
 					pGenObj->objData.nodeObj.ndbProps.
@@ -1322,7 +1322,7 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 				}
 			}
 		}
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 		if (token) {
 			pGenObj->objData.nodeObj.ndbProps.uStackSegName =
 				(u32)(token);
@@ -1335,34 +1335,35 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		 * Parse COFF sect buffer to retrieve individual tokens used
 		 * to fill in object attrs.
 		 */
-		token = CSL_Strtokr(pszBuf, seps, &pszCur);
+		pszCur = pszBuf;
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.cbStruct = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.uProcessorFamily = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.uProcessorType = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.uClockRate = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.ulInternalMemSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.ulExternalMemSize = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.uProcessorID = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.tyRunningRTOS = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.nNodeMinPriority = Atoi(token);
-		token = CSL_Strtokr(NULL, seps, &pszCur);
+		token = strsep(&pszCur, seps);
 
 		pGenObj->objData.procObj.nNodeMaxPriority = Atoi(token);
 
@@ -1370,11 +1371,11 @@ static DSP_STATUS GetAttrsFromBuf(char *pszBuf, u32 ulBufSize,
 		/* Proc object may contain additional(extended) attributes. */
 		/* attr must match proc.hxx */
 		for (iEntry = 0; iEntry < 7; iEntry++) {
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 			pGenObj->objData.extProcObj.tyTlb[iEntry].ulGppPhys =
 				Atoi(token);
 
-			token = CSL_Strtokr(NULL, seps, &pszCur);
+			token = strsep(&pszCur, seps);
 			pGenObj->objData.extProcObj.tyTlb[iEntry].ulDspVirt =
 				Atoi(token);
 		}
@@ -1553,8 +1554,8 @@ static DSP_STATUS GetDepLibInfo(IN struct DCD_MANAGER *hDcdMgr,
 	/* Compress and format DSP buffer to conform to PC format. */
 	CompressBuf(pszCoffBuf, ulLen, DSPWORDSIZE);
 	/* Read from buffer */
-	pToken = CSL_Strtokr(pszCoffBuf, seps, &pszCur);
-	while (pToken != NULL) {
+	pszCur = pszCoffBuf;
+	while ((pToken = strsep(&pszCur, seps)) && *pToken != '\0') {
 		if (fGetUuids) {
 			if (nDepLibs >= *pNumLibs) {
 				/* Gone beyond the limit */
@@ -1564,21 +1565,19 @@ static DSP_STATUS GetDepLibInfo(IN struct DCD_MANAGER *hDcdMgr,
 				UUID_UuidFromString(pToken,
 						 &(pDepLibUuids[nDepLibs]));
 				/* Is this library persistent? */
-				pToken = CSL_Strtokr(NULL, seps, &pszCur);
+				pToken = strsep(&pszCur, seps);
 				pPersistentDepLibs[nDepLibs] = Atoi(pToken);
 				nDepLibs++;
 			}
 		} else {
 			/* Advanc to next token */
-			pToken = CSL_Strtokr(NULL, seps, &pszCur);
+			pToken = strsep(&pszCur, seps);
 			if (Atoi(pToken))
 				(*pNumPersLibs)++;
 
 			/* Just counting number of dependent libraries */
 			(*pNumLibs)++;
 		}
-		/* Get next token */
-		pToken = CSL_Strtokr(NULL, seps, &pszCur);
 	}
 func_cont:
 	if (lib)

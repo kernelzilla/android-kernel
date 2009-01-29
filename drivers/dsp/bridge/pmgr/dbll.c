@@ -1336,11 +1336,11 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
 		goto func_cont;
 	}
        strncpy(szSectName, (char *)(info->name), tokenLen);
-	pToken = CSL_Strtokr(szSectName, ":", &pszCur);
-	while (pToken) {
+	pszCur = szSectName;
+	while ((pToken = strsep(&pszCur, ":")) && *pToken != '\0') {
                strncpy(szSecLastToken, szLastToken, strlen(szLastToken) + 1);
                strncpy(szLastToken, pToken, strlen(pToken) + 1);
-		pToken = CSL_Strtokr(NULL, ":", &pszCur);
+		pToken = strsep(&pszCur, ":");
 		count++; 	/* optimizes processing*/
 	}
 	/* If pToken is 0 or 1, and szSecLastToken is DYN_DARAM or DYN_SARAM,
