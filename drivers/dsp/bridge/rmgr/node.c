@@ -223,7 +223,6 @@ struct NODE_MGR {
 	struct GB_TMap *zChnlMap;	/* Zero-Copy Channel alloc bit map */
 	struct NTFY_OBJECT *hNtfy;	/* Manages registered notifications */
 	struct SYNC_CSOBJECT *hSync;	/* For critical sections */
-	struct SYNC_CSOBJECT *hAllocSync; /* For NODE_Alloc critical sections */
 	u32 ulFxnAddrs[NUMRMSFXNS];	/* RMS function addresses */
 	struct MSG_MGR *hMsg;
 
@@ -469,7 +468,7 @@ func_cont:
 	}
 	pNode->hNodeMgr = hNodeMgr;
 	/* This critical section protects GetNodeProps */
-	status = SYNC_EnterCS(hNodeMgr->hAllocSync);
+	status = SYNC_EnterCS(hNodeMgr->hSync);
 	if (procId != DSP_UNIT)
 		goto func_cont3;
 
@@ -549,7 +548,7 @@ func_cont:
 	}
 
 func_cont3:
-	(void)SYNC_LeaveCS(hNodeMgr->hAllocSync);
+	(void)SYNC_LeaveCS(hNodeMgr->hSync);
 func_cont1:
 	if (pAttrIn != NULL) {
 		/* Overrides of NBD properties */
@@ -1547,13 +1546,6 @@ DSP_STATUS NODE_CreateMgr(OUT struct NODE_MGR **phNodeMgr,
 		status = SYNC_InitializeCS(&pNodeMgr->hSync);
 		if (DSP_FAILED(status))
 			status = DSP_EMEMORY;
-
-		if (DSP_SUCCEEDED(status)) {
-			status = SYNC_InitializeCS(&pNodeMgr->hAllocSync);
-			if (DSP_FAILED(status))
-				status = DSP_EMEMORY;
-
-		}
 	}
 	if (DSP_SUCCEEDED(status)) {
 		pNodeMgr->chnlMap = GB_create(pNodeMgr->ulNumChnls);
@@ -2927,9 +2919,6 @@ static void DeleteNodeMgr(struct NODE_MGR *hNodeMgr)
 		if (hNodeMgr->hSync)
 			SYNC_DeleteCS(hNodeMgr->hSync);
 
-		if (hNodeMgr->hSync)
-			SYNC_DeleteCS(hNodeMgr->hAllocSync);
-
 		if (hNodeMgr->hStrmMgr)
 			STRM_Delete(hNodeMgr->hStrmMgr);
 
@@ -3287,6 +3276,12 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 			status = DSP_EFAIL;
 	}
 
+	/*  Enter the critical section.  This is needed because
+	* DCD_GetObjectDef will ultimately end up calling DBLL_open/close,
+	* which needs to be protected in order to not corrupt the zlib manager
+	* (COD). */
+	status = SYNC_EnterCS(hNodeMgr->hSync);
+
 	if (DSP_SUCCEEDED(status)) {
 		dcdNodeProps.pstrCreatePhaseFxn = NULL;
 		dcdNodeProps.pstrExecutePhaseFxn = NULL;
@@ -3311,6 +3306,9 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 			if (dcdNodeProps.pstrIAlgName)
 				MEM_Free(dcdNodeProps.pstrIAlgName);
 		}
+		/*  Leave the critical section, we're done.  */
+		(void)SYNC_LeaveCS(hNodeMgr->hSync);
+
 	}
 
 	return status;
