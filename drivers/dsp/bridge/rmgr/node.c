@@ -2620,6 +2620,7 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 	DSP_STATUS status = DSP_SOK;
 	u32 procId, killTimeOut;
 	struct DEH_MGR *hDehMgr;
+	struct DSP_PROCESSORSTATE procStatus;
 
 	DBC_Require(cRefs > 0);
 	DBC_Require(pStatus != NULL);
@@ -2673,6 +2674,20 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 		 */
 		GT_1trace(NODE_debugMask, GT_5CLASS,
 			 "NODE_Terminate: env = 0x%x\n", hNode->nodeEnv);
+
+		status = PROC_GetState(pNode->hProcessor, &procStatus,
+					sizeof(struct DSP_PROCESSORSTATE));
+		if (DSP_FAILED(status))
+			goto func_cont;
+		/* If processor is in error state then don't attempt to send
+		 * A kill task command */
+		if (procStatus.iState == PROC_ERROR) {
+			GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_Terminate:"
+				" proc Status 0x%x\n", procStatus.iState);
+			status = DSP_EFAIL;
+			goto func_cont;
+		}
+
 		msg.dwCmd = RMS_EXIT;
 		msg.dwArg1 = hNode->nodeEnv;
 		killmsg.dwCmd = RMS_KILLTASK;
@@ -2724,6 +2739,7 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 				status = DSP_SOK;
 		}
 	}
+func_cont:
 	if (DSP_SUCCEEDED(status)) {
 		/* Enter CS before getting exit status, in case node was
 		 * deleted. */
