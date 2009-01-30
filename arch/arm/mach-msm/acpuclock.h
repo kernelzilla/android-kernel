@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef __ARCH_ARM_MACH_MSM_CLOCK_H
-#define __ARCH_ARM_MACH_MSM_CLOCK_H
+#ifndef __ARCH_ARM_MACH_MSM_ACPUCLOCK_H
+#define __ARCH_ARM_MACH_MSM_ACPUCLOCK_H
 
 #include <linux/list.h>
 
