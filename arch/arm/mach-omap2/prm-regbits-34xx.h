@@ -437,10 +437,10 @@
 /* PM_PWSTST_EMU specific bits */
 
 /* PRM_VC_SMPS_SA */
-#define OMAP3430_PRM_VC_SMPS_SA_SA1_SHIFT		16
-#define OMAP3430_PRM_VC_SMPS_SA_SA1_MASK		(0x7f << 16)
-#define OMAP3430_PRM_VC_SMPS_SA_SA0_SHIFT		0
-#define OMAP3430_PRM_VC_SMPS_SA_SA0_MASK		(0x7f << 0)
+#define OMAP3430_SMPS_SA1_SHIFT				16
+#define OMAP3430_SMPS_SA1_MASK				(0x7f << 16)
+#define OMAP3430_SMPS_SA0_SHIFT				0
+#define OMAP3430_SMPS_SA0_MASK				(0x7f << 0)
 
 /* PRM_VC_SMPS_VOL_RA */
 #define OMAP3430_VOLRA1_SHIFT				16
@@ -454,17 +454,15 @@
 #define OMAP3430_CMDRA0_SHIFT				0
 #define OMAP3430_CMDRA0_MASK				(0xff << 0)
 
-/* PRM_VC_CMD_VAL_0 specific bits */
+/* PRM_VC_CMD_VAL specific bits */
 #define OMAP3430_VC_CMD_ON_SHIFT			24
-#define OMAP3430_VC_CMD_ON_MASK				(0xFF << 24)
+#define OMAP3430_VC_CMD_ON_MASK				(0xff << 24)
 #define OMAP3430_VC_CMD_ONLP_SHIFT			16
-#define OMAP3430_VC_CMD_ONLP_MASK			(0xFF << 16)
+#define OMAP3430_VC_CMD_ONLP_MASK			(0xff << 16)
 #define OMAP3430_VC_CMD_RET_SHIFT			8
-#define OMAP3430_VC_CMD_RET_MASK			(0xFF << 8)
+#define OMAP3430_VC_CMD_RET_MASK			(0xff << 8)
 #define OMAP3430_VC_CMD_OFF_SHIFT			0
-#define OMAP3430_VC_CMD_OFF_MASK			(0xFF << 0)
-
-/* PRM_VC_CMD_VAL_1 specific bits */
+#define OMAP3430_VC_CMD_OFF_MASK			(0xff << 0)
 
 /* PRM_VC_CH_CONF */
 #define OMAP3430_CMD1					(1 << 20)

@@ -45,6 +45,7 @@
 #include "cm-regbits-34xx.h"
 #include "prm-regbits-34xx.h"
 
+#include "smartreflex.h"
 #include "prm.h"
 #include "pm.h"
 #include "sdrc.h"
@@ -356,6 +357,11 @@ void omap_sram_idle(void)
 		printk(KERN_ERR "Invalid mpu state in sram_idle\n");
 		return;
 	}
+
+	/* Disable smartreflex before entering WFI */
+	disable_smartreflex(SR1);
+	disable_smartreflex(SR2);
+
 	pwrdm_pre_transition();
 
 	/* NEON control */
@@ -466,6 +472,10 @@ void omap_sram_idle(void)
 		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
 		omap3_disable_io_chain();
 	}
+
+	/* Enable smartreflex after WFI */
+	enable_smartreflex(SR1);
+	enable_smartreflex(SR2);
 
 	pwrdm_post_transition();
 
@@ -1096,4 +1106,82 @@ err2:
 	return ret;
 }
 
+/* PRM_VC_CMD_VAL_0 specific bits */
+#define OMAP3430_VC_CMD_VAL0_ON				(0x3 << 4)
+#define OMAP3430_VC_CMD_VAL0_ONLP			(0x3 << 3)
+#define OMAP3430_VC_CMD_VAL0_RET			(0x3 << 3)
+#define OMAP3430_VC_CMD_VAL0_OFF			(0x3 << 3)
+
+/* PRM_VC_CMD_VAL_1 specific bits */
+#define OMAP3430_VC_CMD_VAL1_ON				(0xB << 2)
+#define OMAP3430_VC_CMD_VAL1_ONLP			(0x3 << 3)
+#define OMAP3430_VC_CMD_VAL1_RET			(0x3 << 3)
+#define OMAP3430_VC_CMD_VAL1_OFF			(0x3 << 3)
+
+/* Constants to define setup durations */
+#define OMAP3430_CLKSETUP_DURATION			0xff
+#define OMAP3430_VOLTSETUP_TIME2			0xfff
+#define OMAP3430_VOLTSETUP_TIME1			0xfff
+#define OMAP3430_VOLTOFFSET_DURATION			0xff
+#define OMAP3430_VOLTSETUP2_DURATION			0xff
+
+static void __init configure_vc(void)
+{
+	prm_write_mod_reg((R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA1_SHIFT) |
+			  (R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA0_SHIFT),
+			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_SA_OFFSET);
+	prm_write_mod_reg((R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			  (R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
+			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET);
+
+	prm_write_mod_reg(
+		(OMAP3430_VC_CMD_VAL0_ON << OMAP3430_VC_CMD_ON_SHIFT) |
+		(OMAP3430_VC_CMD_VAL0_ONLP << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(OMAP3430_VC_CMD_VAL0_RET << OMAP3430_VC_CMD_RET_SHIFT) |
+		(OMAP3430_VC_CMD_VAL0_OFF << OMAP3430_VC_CMD_OFF_SHIFT),
+		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
+
+	prm_write_mod_reg(
+		(OMAP3430_VC_CMD_VAL1_ON << OMAP3430_VC_CMD_ON_SHIFT) |
+		(OMAP3430_VC_CMD_VAL1_ONLP << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(OMAP3430_VC_CMD_VAL1_RET << OMAP3430_VC_CMD_RET_SHIFT) |
+		(OMAP3430_VC_CMD_VAL1_OFF << OMAP3430_VC_CMD_OFF_SHIFT),
+		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
+
+	prm_write_mod_reg(OMAP3430_CMD1 | OMAP3430_RAV1, OMAP3430_GR_MOD,
+			  OMAP3_PRM_VC_CH_CONF_OFFSET);
+
+	prm_write_mod_reg(OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | OMAP3430_SREN,
+			  OMAP3430_GR_MOD,
+			  OMAP3_PRM_VC_I2C_CFG_OFFSET);
+
+	/* Setup voltctrl and other setup times */
+	prm_write_mod_reg(OMAP3430_AUTO_RET, OMAP3430_GR_MOD,
+			  OMAP3_PRM_VOLTCTRL_OFFSET);
+
+	prm_write_mod_reg(OMAP3430_CLKSETUP_DURATION, OMAP3430_GR_MOD,
+			  OMAP3_PRM_CLKSETUP_OFFSET);
+	prm_write_mod_reg(
+		(OMAP3430_VOLTSETUP_TIME2 << OMAP3430_SETUP_TIME2_SHIFT) |
+		(OMAP3430_VOLTSETUP_TIME1 << OMAP3430_SETUP_TIME1_SHIFT),
+		OMAP3430_GR_MOD, OMAP3_PRM_VOLTSETUP1_OFFSET);
+
+	prm_write_mod_reg(OMAP3430_VOLTOFFSET_DURATION, OMAP3430_GR_MOD,
+			OMAP3_PRM_VOLTOFFSET_OFFSET);
+	prm_write_mod_reg(OMAP3430_VOLTSETUP2_DURATION, OMAP3430_GR_MOD,
+			OMAP3_PRM_VOLTSETUP2_OFFSET);
+}
+
+static int __init omap3_pm_early_init(void)
+{
+	prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL, OMAP3430_GR_MOD,
+				OMAP3_PRM_POLCTRL_OFFSET);
+
+	configure_vc();
+
+	return 0;
+}
+
+arch_initcall(omap3_pm_early_init);
 late_initcall(omap3_pm_init);
+
