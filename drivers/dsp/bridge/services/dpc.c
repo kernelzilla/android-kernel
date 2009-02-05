@@ -121,8 +121,7 @@ DSP_STATUS DPC_Create(OUT struct DPC_OBJECT **phDPC, DPC_PROC pfnDPC,
 			pDPCObject->numRequestedMax = 0;
 			pDPCObject->cEntryCount = 0;
 #endif
-			pDPCObject->dpc_lock =
-				__SPIN_LOCK_UNLOCKED(pDPCObject.dpc_lock);
+			spin_lock_init(&pDPCObject->dpc_lock);
 			*phDPC = pDPCObject;
 		} else {
 			GT_0trace(DPC_DebugMask, GT_6CLASS,

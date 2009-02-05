@@ -192,7 +192,7 @@ DSP_STATUS SYNC_OpenEvent(OUT struct SYNC_OBJECT **phEvent,
 	if (pEvent != NULL) {
 		pEvent->state = so_reset;
 		pEvent->pWaitObj = NULL;
-		pEvent->sync_lock = __SPIN_LOCK_UNLOCKED(pEvent.sync_lock);
+		spin_lock_init(&pEvent->sync_lock);
 	} else {
 		status = DSP_EMEMORY;
 		GT_0trace(SYNC_debugMask, GT_6CLASS,
@@ -541,8 +541,7 @@ DSP_STATUS SYNC_InitializeDPCCS(OUT struct SYNC_CSOBJECT **phCSObj)
 				SIGNATUREDPCCS);
 		if (pCSObj != NULL) {
 			pCSObj->count = 1;
-			pCSObj->sync_dpccs_lock =
-				__SPIN_LOCK_UNLOCKED(pCSObj.sync_dpccs_lock);
+			spin_lock_init(&pCSObj->sync_dpccs_lock);
 		} else {
 			status = DSP_EMEMORY;
 			GT_0trace(SYNC_debugMask, GT_6CLASS,
