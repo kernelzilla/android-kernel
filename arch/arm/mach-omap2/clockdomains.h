@@ -40,7 +40,7 @@ static struct clockdomain cm_clkdm = {
 static struct clockdomain virt_opp_clkdm = {
 	.name		= "virt_opp_clkdm",
 	.pwrdm		= { .name = "wkup_pwrdm" },
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX | CHIP_IS_OMAP3430),
 };
 
 /*
