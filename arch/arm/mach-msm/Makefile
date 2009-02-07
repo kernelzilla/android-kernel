@@ -3,7 +3,7 @@ obj-y += devices.o
 obj-y += proc_comm.o
 obj-y += vreg.o
 obj-y += acpuclock.o
-obj-y += clock.o clock-7x01a.o
+obj-y += clock.o
 obj-y += gpio.o generic_gpio.o
 obj-y += nand_partitions.o
 
