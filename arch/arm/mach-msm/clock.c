@@ -180,12 +180,13 @@ EXPORT_SYMBOL(clk_set_flags);
 
 void __init msm_clock_init(void)
 {
-	unsigned n;
+	struct clk *clk;
 
 	spin_lock_init(&clocks_lock);
 	mutex_lock(&clocks_mutex);
-	for (n = 0; n < msm_num_clocks; n++)
-		list_add_tail(&msm_clocks[n].list, &clocks);
+	for (clk = msm_clocks; clk && clk->name; clk++) {
+		list_add_tail(&clk->list, &clocks);
+	}
 	mutex_unlock(&clocks_mutex);
 }
 
