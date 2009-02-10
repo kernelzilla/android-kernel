@@ -33,9 +33,18 @@ extern void *omap3_secure_ram_storage;
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
 #ifdef CONFIG_ARCH_OMAP3
+struct prm_setup_times {
+	u16 clksetup;
+	u16 voltsetup_time1;
+	u16 voltsetup_time2;
+	u16 voltoffset;
+	u16 voltsetup2;
+};
+
 extern void omap3_pm_off_mode_enable(int);
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
 extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
+extern void omap3_set_prm_setup_times(struct prm_setup_times *setup_times);
 #else
 #define omap3_pm_off_mode_enable(int) do {} while (0);
 #define omap3_pm_get_suspend_state(pwrdm) do {} while (0);
