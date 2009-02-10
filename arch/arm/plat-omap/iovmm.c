@@ -523,8 +523,6 @@ static struct sg_table *unmap_vm_area(struct iommu *obj, const u32 da,
 	struct sg_table *sgt = NULL;
 	struct iovm_struct *area;
 
-	BUG_ON(in_interrupt());
-
 	if (!IS_ALIGNED(da, PAGE_SIZE)) {
 		dev_err(obj->dev, "%s: alignment err(%08x)\n", __func__, da);
 		return NULL;
