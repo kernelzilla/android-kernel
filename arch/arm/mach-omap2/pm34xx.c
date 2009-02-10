@@ -81,6 +81,14 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 static struct powerdomain *cam_pwrdm;
 
+static struct prm_setup_times prm_setup = {
+	.clksetup = 0xff,
+	.voltsetup_time1 = 0xfff,
+	.voltsetup_time2 = 0xfff,
+	.voltoffset = 0xff,
+	.voltsetup2 = 0xff,
+};
+
 static inline void omap3_per_save_context(void)
 {
 	omap_gpio_save_context();
@@ -986,6 +994,15 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
 	return -EINVAL;
 }
 
+void omap3_set_prm_setup_times(struct prm_setup_times *setup_times)
+{
+	prm_setup.clksetup = setup_times->clksetup;
+	prm_setup.voltsetup_time1 = setup_times->voltsetup_time1;
+	prm_setup.voltsetup_time2 = setup_times->voltsetup_time2;
+	prm_setup.voltoffset = setup_times->voltoffset;
+	prm_setup.voltsetup2 = setup_times->voltsetup2;
+}
+
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
 	struct power_state *pwrst;
@@ -1140,6 +1157,7 @@ err2:
 
 static void __init configure_vc(void)
 {
+
 	prm_write_mod_reg((R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA1_SHIFT) |
 			  (R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA0_SHIFT),
 			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_SA_OFFSET);
@@ -1168,20 +1186,22 @@ static void __init configure_vc(void)
 			  OMAP3430_GR_MOD,
 			  OMAP3_PRM_VC_I2C_CFG_OFFSET);
 
-	/* Setup voltctrl and other setup times */
+	/* Setup value for voltctrl */
 	prm_write_mod_reg(OMAP3430_AUTO_RET,
 			  OMAP3430_GR_MOD, OMAP3_PRM_VOLTCTRL_OFFSET);
 
-	prm_write_mod_reg(OMAP3430_CLKSETUP_DURATION, OMAP3430_GR_MOD,
-			  OMAP3_PRM_CLKSETUP_OFFSET);
-	prm_write_mod_reg(
-		(OMAP3430_VOLTSETUP_TIME2 << OMAP3430_SETUP_TIME2_SHIFT) |
-		(OMAP3430_VOLTSETUP_TIME1 << OMAP3430_SETUP_TIME1_SHIFT),
-		OMAP3430_GR_MOD, OMAP3_PRM_VOLTSETUP1_OFFSET);
+	/* Write setup times */
+	prm_write_mod_reg(prm_setup.clksetup, OMAP3430_GR_MOD,
+			OMAP3_PRM_CLKSETUP_OFFSET);
+	prm_write_mod_reg((prm_setup.voltsetup_time2 <<
+			OMAP3430_SETUP_TIME2_SHIFT) |
+			(prm_setup.voltsetup_time1 <<
+			OMAP3430_SETUP_TIME1_SHIFT),
+			OMAP3430_GR_MOD, OMAP3_PRM_VOLTSETUP1_OFFSET);
 
-	prm_write_mod_reg(OMAP3430_VOLTOFFSET_DURATION, OMAP3430_GR_MOD,
+	prm_write_mod_reg(prm_setup.voltoffset, OMAP3430_GR_MOD,
 			OMAP3_PRM_VOLTOFFSET_OFFSET);
-	prm_write_mod_reg(OMAP3430_VOLTSETUP2_DURATION, OMAP3430_GR_MOD,
+	prm_write_mod_reg(prm_setup.voltsetup2, OMAP3430_GR_MOD,
 			OMAP3_PRM_VOLTSETUP2_OFFSET);
 }
 
