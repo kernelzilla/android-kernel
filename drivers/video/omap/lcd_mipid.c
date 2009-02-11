@@ -22,8 +22,8 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/spi/spi.h>
+#include <linux/omapfb.h>
 
-#include <mach/omapfb.h>
 #include <mach/lcd_mipid.h>
 
 #include "../../cbus/tahvo.h"

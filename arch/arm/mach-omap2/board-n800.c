@@ -27,6 +27,7 @@
 #include <linux/i2c/lm8323.h>
 #include <linux/i2c/menelaus.h>
 #include <linux/i2c/lp5521.h>
+#include <linux/omapfb.h>
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -39,7 +40,6 @@
 #include <mach/lcd_mipid.h>
 #include <mach/clock.h>
 #include <mach/gpio-switch.h>
-#include <mach/omapfb.h>
 #include <mach/blizzard.h>
 
 #include <../drivers/cbus/tahvo.h>

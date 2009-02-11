@@ -24,9 +24,9 @@
 #include <linux/vmalloc.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/omapfb.h>
 
 #include <mach/sram.h>
-#include <mach/omapfb.h>
 #include <mach/board.h>
 
 #include "dispc.h"
