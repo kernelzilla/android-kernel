@@ -318,8 +318,7 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
                INIT_WORK(&pIOMgr->io_workq, (void *(*)(void *))IO_DispatchPM);
                ref_count = 1;
        } else
-               PREPARE_WORK(&pIOMgr->io_workq,
-                       (void *(*)(void *))IO_DispatchPM);
+               PREPARE_WORK(&pIOMgr->io_workq, (void *)IO_DispatchPM);
 
 	/* Initialize CHNL_MGR object:    */
 #ifndef DSP_TRACEBUF_DISABLED
@@ -389,7 +388,7 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
 		/* Unplug IRQ:    */
                /* Disable interrupts from the board:  */
                if (DSP_SUCCEEDED(DEV_GetWMDContext(hIOMgr->hDevObject,
-                       &hWmdContext)))
+                      &hWmdContext)))
                                DBC_Assert(hWmdContext);
                (void)CHNLSM_DisableInterrupt(hWmdContext);
                flush_workqueue(bridge_workqueue);
@@ -1017,6 +1016,7 @@ static void IO_DispatchPM(struct work_struct *work)
 			pIOMgr->iQuePowerTail = 0;
 
 	}
+
 }
 
 /*
@@ -1081,6 +1081,7 @@ irqreturn_t IO_ISR(int irq, IN void *pRefData)
        DBC_Require(irq == INT_MAIL_MPU_IRQ);
 	DBC_Require(MEM_IsValidHandle(hIOMgr, IO_MGRSIGNATURE));
 	DBG_Trace(DBG_LEVEL3, "Entering IO_ISR(0x%x)\n", pRefData);
+
 	/* Call WMD's CHNLSM_ISR() to see if interrupt is ours, and process. */
 	if (IO_CALLISR(hIOMgr->hWmdContext, &fSchedDPC, &hIOMgr->wIntrVal)) {
 		{
@@ -1783,6 +1784,8 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 	default:
 		break;
 
+				queue_work(bridge_workqueue,
+							 &(hIOMgr->io_workq));
 	}
 #endif
 	return DSP_SOK;

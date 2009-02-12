@@ -33,7 +33,7 @@
 /* width in bits of MBOX Id */
 #define HW_MBOX_ID_WIDTH	   2
 
-struct MAILBOX_CONTEXT mboxsetting = {0, 0, 0};
+struct MAILBOX_CONTEXT mboxsetting = {0x4, 0x1, 0x1};
 
 /* Saves the mailbox context */
 HW_STATUS HW_MBOX_saveSettings(u32 baseAddress)
