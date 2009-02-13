@@ -785,7 +785,6 @@ func_cont2:
 	if (DSP_SUCCEEDED(status)) {
                /* Return PID instead of process handle */
                hProcess = current->pid;
-
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
@@ -1241,8 +1240,8 @@ func_cont2:
 				   dwLength);
 			if (pConnParam != NULL) {
                                strncat(pstrmDef->szDevice,
-					   (char *)pConnParam->cData,
-					   (u32)pConnParam->cbData);
+                                       (char *)pConnParam->cData,
+                                       (u32)pConnParam->cbData);
 			}
 			hDevNode->hDeviceOwner = hNode;
 		}
@@ -1299,7 +1298,7 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	u32 procId = 255;
 	struct DSP_PROCESSORSTATE procStatus;
 	struct PROC_OBJECT *hProcessor;
-#ifdef CONFIG_BRIDGE_DVFS
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
 #endif

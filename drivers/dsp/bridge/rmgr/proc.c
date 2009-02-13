@@ -145,6 +145,7 @@
 /*  ----------------------------------- This */
 #include <dspbridge/proc.h>
 #include <dspbridge/pwr.h>
+#include <mach-omap2/omap3-opp.h>
 
 #ifndef RES_CLEANUP_DISABLE
 #include <dspbridge/resourcecleanup.h>
@@ -209,7 +210,7 @@ static char **PrependEnvp(char **newEnvp, char **envp, s32 cEnvp, s32 cNewEnvp,
  */
 DSP_STATUS
 PROC_Attach(u32 uProcessor, OPTIONAL CONST struct DSP_PROCESSORATTRIN *pAttrIn,
-	   OUT DSP_HPROCESSOR *phProcessor)
+       OUT DSP_HPROCESSOR *phProcessor)
 {
 	DSP_STATUS status = DSP_SOK;
 	struct DEV_OBJECT *hDevObject;
@@ -379,7 +380,7 @@ func_cont:
 
 	res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(res_status)) {
-               DRV_GetProcContext(hProcess,
+                       DRV_GetProcContext(hProcess,
 				 (struct DRV_OBJECT *)hDRVObject, &pPctxt,
 				 NULL, 0);
 		if (pPctxt != NULL)
@@ -671,8 +672,8 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
  *      on a DSP processor.
  */
 DSP_STATUS PROC_EnumNodes(DSP_HPROCESSOR hProcessor, OUT DSP_HNODE *aNodeTab,
-			 IN u32 uNodeTabSize, OUT u32 *puNumNodes,
-			 OUT u32 *puAllocated)
+               IN u32 uNodeTabSize, OUT u32 *puNumNodes,
+               OUT u32 *puAllocated)
 {
 	DSP_STATUS status = DSP_EFAIL;
 	struct PROC_OBJECT *pProcObject = (struct PROC_OBJECT *)hProcessor;
@@ -1050,7 +1051,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 #ifdef OPT_LOAD_TIME_INSTRUMENTATION
 	do_gettimeofday(&tv1);
 #endif
-#ifdef CONFIG_BRIDGE_DVFS
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	struct dspbridge_platform_data *pdata =
 				omap_dspbridge_dev.dev.platform_data;
 #endif
@@ -1176,8 +1177,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 				if (pProcObject->g_pszLastCoff) {
                                        strncpy(pProcObject->g_pszLastCoff,
 						(char *)aArgv[0],
-                                               (strlen((char *)aArgv[0])
-						+ 1));
+                                       (strlen((char *)aArgv[0]) + 1));
 				}
 			}
 		}
@@ -1225,7 +1225,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 		/* Now, attempt to load an exec: */
 
 	/* Boost the OPP level to Maximum level supported by baseport*/
-#if defined(CONFIG_BRIDGE_DVFS) && defined(CONFIG_CPU_FREQ)
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	if (pdata->cpu_set_freq)
 		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP5]);
 #endif
@@ -1247,7 +1247,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 			}
 		}
 	/* Requesting the lowest opp supported*/
-#if defined(CONFIG_BRIDGE_DVFS) && defined(CONFIG_CPU_FREQ)
+#if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	if (pdata->cpu_set_freq)
 		(*pdata->cpu_set_freq)(pdata->mpu_speed[VDD1_OPP1]);
 #endif
@@ -1354,11 +1354,11 @@ DSP_STATUS PROC_Map(DSP_HPROCESSOR hProcessor, void *pMpuAddr, u32 ulSize,
 	struct PROC_OBJECT *pProcObject = (struct PROC_OBJECT *)hProcessor;
 
 #ifndef RES_CLEANUP_DISABLE
-           u32               hProcess;
-	    HANDLE	      pCtxt = NULL;
-	    HANDLE	      hDrvObject;
-	    HANDLE	      dmmRes;
-		DSP_STATUS res_status = DSP_SOK;
+       u32               hProcess;
+       HANDLE        pCtxt = NULL;
+       HANDLE        hDrvObject;
+       HANDLE        dmmRes;
+       DSP_STATUS res_status = DSP_SOK;
 #endif
 
 	GT_6trace(PROC_DebugMask, GT_ENTER, "Entered PROC_Map, args:\n\t"
@@ -1410,8 +1410,8 @@ DSP_STATUS PROC_Map(DSP_HPROCESSOR hProcessor, void *pMpuAddr, u32 ulSize,
 					  REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {
                        if (DRV_GetProcContext(hProcess,
-			   (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL,
-			   (u32)pMpuAddr) != DSP_ENOTFOUND) {
+                               (struct DRV_OBJECT *)hDrvObject, &pCtxt, NULL,
+                                       (u32)pMpuAddr) != DSP_ENOTFOUND) {
 				DRV_InsertDMMResElement(&dmmRes, pCtxt);
 				DRV_UpdateDMMResElement(dmmRes, (u32)pMpuAddr,
 						ulSize, (u32)pReqAddr,

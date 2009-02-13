@@ -99,6 +99,8 @@
 		u32 dwPrmBase;
 		u32 dwCmBase;
 		u32 dwPerBase;
+               u32 dwPerPmBase;
+               u32 dwCorePmBase;
 		u32 dwWdTimerDspBase;
 		u32 dwMboxBase;
 		u32 dwDmmuBase;

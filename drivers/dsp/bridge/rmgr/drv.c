@@ -1672,7 +1672,10 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 				iounmap((void *)pResources->dwDmmuBase);
 			if (pResources->dwPerBase)
 				iounmap((void *)pResources->dwPerBase);
-
+                       if (pResources->dwPerPmBase)
+                               iounmap((void *)pResources->dwPerPmBase);
+                       if (pResources->dwCorePmBase)
+                               iounmap((void *)pResources->dwCorePmBase);
 			if (pResources->dwSysCtrlBase) {
 				iounmap((void *)pResources->dwSysCtrlBase);
 				/* don't set pResources->dwSysCtrlBase to null
@@ -1806,6 +1809,10 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 bRequest)
 							OMAP_DSP_MEM3_SIZE);
 		pResources->dwPerBase = (u32)ioremap(OMAP_PER_CM_BASE,
 							OMAP_PER_CM_SIZE);
+               pResources->dwPerPmBase = (u32)ioremap(OMAP_PER_PRM_BASE,
+                                                       OMAP_PER_PRM_SIZE);
+               pResources->dwCorePmBase = (u32)ioremap(OMAP_CORE_PRM_BASE,
+                                                       OMAP_CORE_PRM_SIZE);
 		pResources->dwDmmuBase = (u32)ioremap(OMAP_DMMU_BASE,
 							OMAP_DMMU_SIZE);
 		pResources->dwWdTimerDspBase = 0;

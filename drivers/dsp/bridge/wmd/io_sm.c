@@ -111,6 +111,7 @@
 
 /*  ----------------------------------- Host OS */
 #include <dspbridge/host_os.h>
+#include <linux/workqueue.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <dspbridge/std.h>
@@ -197,6 +198,7 @@ struct IO_MGR {
 	/* private extnd proc info; mmu setup */
 	struct MGR_PROCESSOREXTINFO extProcInfo;
 	struct CMM_OBJECT *hCmmMgr; 	/* Shared Mem Mngr	      */
+       struct work_struct io_workq;     /*workqueue */
 	u32 dQuePowerMbxVal[MAX_PM_REQS];
 	u32 iQuePowerHead;
 	u32 iQuePowerTail;
@@ -215,7 +217,7 @@ struct IO_MGR {
 static void IO_DispatchChnl(IN struct IO_MGR *pIOMgr,
 			   IN OUT struct CHNL_OBJECT *pChnl, u32 iMode);
 static void IO_DispatchMsg(IN struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr);
-static void IO_DispatchPM(IN struct IO_MGR *pIOMgr);
+static void IO_DispatchPM(struct work_struct *work);
 static void NotifyChnlComplete(struct CHNL_OBJECT *pChnl,
 				struct CHNL_IRP *pChirp);
 static void InputChnl(struct IO_MGR *pIOMgr, struct CHNL_OBJECT *pChnl,
@@ -230,6 +232,7 @@ static u32 ReadData(struct WMD_DEV_CONTEXT *hDevContext, void *pDest,
 			void *pSrc, u32 uSize);
 static u32 WriteData(struct WMD_DEV_CONTEXT *hDevContext, void *pDest,
 			void *pSrc, u32 uSize);
+static struct workqueue_struct *bridge_workqueue;
 #ifndef DSP_TRACEBUF_DISABLED
 void PrintDSPDebugTrace(struct IO_MGR *hIOMgr);
 #endif
@@ -267,6 +270,7 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 	struct CFG_HOSTRES hostRes;
 	struct CFG_DEVNODE *hDevNode;
 	struct CHNL_MGR *hChnlMgr;
+       static int ref_count;
 	u32 devType;
 	/* Check DBC requirements:  */
 	DBC_Require(phIOMgr != NULL);
@@ -291,12 +295,32 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 	if (DSP_FAILED(status))
 		goto func_cont;
 
+    /*
+     *  Create a Single Threaded Work Queue
+     */
+
+       if (ref_count == 0)
+               bridge_workqueue = create_workqueue("bridge_work-queue");
+
+       if (bridge_workqueue <= 0)
+               DBG_Trace(DBG_LEVEL1, "Workque Create"
+                       " failed 0x%d \n", bridge_workqueue);
+
+
 	/* Allocate IO manager object: */
 	MEM_AllocObject(pIOMgr, struct IO_MGR, IO_MGRSIGNATURE);
 	if (pIOMgr == NULL) {
 		status = DSP_EMEMORY;
 		goto func_cont;
 	}
+       /*Intializing Work Element*/
+       if (ref_count == 0) {
+               INIT_WORK(&pIOMgr->io_workq, (void *(*)(void *))IO_DispatchPM);
+               ref_count = 1;
+       } else
+               PREPARE_WORK(&pIOMgr->io_workq,
+                       (void *(*)(void *))IO_DispatchPM);
+
 	/* Initialize CHNL_MGR object:    */
 #ifndef DSP_TRACEBUF_DISABLED
 	pIOMgr->pMsg = NULL;
@@ -327,16 +351,16 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 		if (devType == DSP_UNIT) {
 			/* Plug the channel ISR:. */
                        if ((request_irq(INT_MAIL_MPU_IRQ, IO_ISR, 0,
-                                           "DspBridge\tmailbox", (void *)pIOMgr)) == 0)
+                               "DspBridge\tmailbox", (void *)pIOMgr)) == 0)
                                status = DSP_SOK;
                        else
                                status = DSP_EFAIL;
 		}
-               if (DSP_SUCCEEDED(status))
-                       DBG_Trace(DBG_LEVEL1, "ISR_IRQ Object 0x%x \n",
-                                                pIOMgr);
-               else
-			status = CHNL_E_ISR;
+       if (DSP_SUCCEEDED(status))
+               DBG_Trace(DBG_LEVEL1, "ISR_IRQ Object 0x%x \n",
+                               pIOMgr);
+       else
+               status = CHNL_E_ISR;
        } else
 		status = CHNL_E_ISR;
 func_cont:
@@ -365,10 +389,10 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
 		/* Unplug IRQ:    */
                /* Disable interrupts from the board:  */
                if (DSP_SUCCEEDED(DEV_GetWMDContext(hIOMgr->hDevObject,
-                  &hWmdContext))) {
-                       DBC_Assert(hWmdContext);
-		}
+                       &hWmdContext)))
+                               DBC_Assert(hWmdContext);
                (void)CHNLSM_DisableInterrupt(hWmdContext);
+               flush_workqueue(bridge_workqueue);
                /* Linux function to uninstall ISR */
                free_irq(INT_MAIL_MPU_IRQ, (void *)hIOMgr);
                (void)DPC_Destroy(hIOMgr->hDPC);
@@ -379,9 +403,9 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
 		SYNC_DeleteCS(hIOMgr->hCSObj); 	/* Leak Fix. */
 		/* Free this IO manager object: */
 		MEM_FreeObject(hIOMgr);
-	} else {
+       } else
 		status = DSP_EHANDLE;
-	}
+
 	return status;
 }
 
@@ -936,12 +960,14 @@ static void IO_DispatchMsg(IN struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
  *  ======== IO_DispatchPM ========
  *      Performs I/O dispatch on PM related messages from DSP
  */
-static void IO_DispatchPM(IN struct IO_MGR *pIOMgr)
+static void IO_DispatchPM(struct work_struct *work)
 {
+       struct IO_MGR *pIOMgr =
+                               container_of(work, struct IO_MGR, io_workq);
 	DSP_STATUS status;
 	u32 pArg[2];
 
-	DBC_Require(MEM_IsValidHandle(pIOMgr, IO_MGRSIGNATURE));
+       /*DBC_Require(MEM_IsValidHandle(pIOMgr, IO_MGRSIGNATURE));*/
 
 	DBG_Trace(DBG_LEVEL7, "IO_DispatchPM: Entering IO_DispatchPM : \n");
 
@@ -1035,7 +1061,7 @@ void IO_DPC(IN OUT void *pRefData)
 			PrintDSPDebugTrace(pIOMgr);
 	}
 #endif
-	IO_DispatchPM(pIOMgr);
+
 #ifndef DSP_TRACEBUF_DISABLED
 	PrintDSPDebugTrace(pIOMgr);
 #endif
@@ -1066,6 +1092,7 @@ irqreturn_t IO_ISR(int irq, IN void *pRefData)
 				if (hIOMgr->iQuePowerHead >= MAX_PM_REQS)
 					hIOMgr->iQuePowerHead = 0;
 
+                               queue_work(bridge_workqueue, &hIOMgr->io_workq);
 			}
 			if (hIOMgr->wIntrVal == MBX_DEH_RESET) {
 				DBG_Trace(DBG_LEVEL6, "*** DSP RESET ***\n");
@@ -1859,7 +1886,6 @@ void PrintDSPDebugTrace(struct IO_MGR *hIOMgr)
 static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
 {
        DSP_STATUS status = DSP_SOK;
-
        char *lpTmpBuf;
        char *lpBufStart;
        char *lpTmpStart;
@@ -1880,16 +1906,16 @@ static DSP_STATUS PackTraceBuffer(char *lpBuf, u32 nBytes, u32 ulNumWords)
                        thisChar = *lpBuf++;
                        switch (thisChar) {
                        case '\0':      /* Skip null bytes */
-                               break;
+                       break;
                        case '\n':      /* Convert \n to \r\n */
-                               /* NOTE: do not reverse order; Some OS */
-                               /* editors control doesn't understand "\n\r" */
-                               *lpTmpBuf++ = '\r';
-                               *lpTmpBuf++ = '\n';
-                               break;
+                       /* NOTE: do not reverse order; Some OS */
+                       /* editors control doesn't understand "\n\r" */
+                       *lpTmpBuf++ = '\r';
+                       *lpTmpBuf++ = '\n';
+                       break;
                        default:        /* Copy in the actual ascii byte */
-                               *lpTmpBuf++ = thisChar;
-                               break;
+                       *lpTmpBuf++ = thisChar;
+                       break;
                        }
                }
                *lpTmpBuf = '\0';    /* Make sure tmp buf is null terminated */
@@ -1921,7 +1947,6 @@ DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT *hWmdContext)
        DSP_STATUS status = DSP_SOK;
 
 #if (defined(DEBUG) || defined(DDSP_DEBUG_PRODUCT)) && GT_TRACE
-
        struct COD_MANAGER *hCodMgr;
        u32 ulTraceEnd;
        u32 ulTraceBegin;
@@ -1933,53 +1958,51 @@ DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT *hWmdContext)
        u16 *lpszBuf;
 
        struct WMD_DEV_CONTEXT *pWmdContext = (struct WMD_DEV_CONTEXT *)
-                                                       hWmdContext;
+                                               hWmdContext;
        struct WMD_DRV_INTERFACE *pIntfFxns;
        struct DEV_OBJECT *pDevObject = (struct DEV_OBJECT *)
-                                               pWmdContext->hDevObject;
+                                       pWmdContext->hDevObject;
 
        status = DEV_GetCodMgr(pDevObject, &hCodMgr);
        if (DSP_FAILED(status))
                GT_0trace(dsp_trace_mask, GT_2CLASS,
-                        "PrintDspTraceBuffer: Failed on DEV_GetCodMgr.\n");
+               "PrintDspTraceBuffer: Failed on DEV_GetCodMgr.\n");
 
        if (DSP_SUCCEEDED(status)) {
                /* Look for SYS_PUTCBEG/SYS_PUTCEND: */
                status = COD_GetSymValue(hCodMgr, COD_TRACEBEG, &ulTraceBegin);
                GT_1trace(dsp_trace_mask, GT_2CLASS,
-                        "PrintDspTraceBuffer: ulTraceBegin Value 0x%x\n",
-                        ulTraceBegin);
+                       "PrintDspTraceBuffer: ulTraceBegin Value 0x%x\n",
+                       ulTraceBegin);
                if (DSP_FAILED(status))
                        GT_0trace(dsp_trace_mask, GT_2CLASS,
-                                "PrintDspTraceBuffer: Failed on "
-                                "COD_GetSymValue.\n");
-
+                               "PrintDspTraceBuffer: Failed on "
+                               "COD_GetSymValue.\n");
        }
        if (DSP_SUCCEEDED(status)) {
                status = COD_GetSymValue(hCodMgr, COD_TRACEEND, &ulTraceEnd);
                GT_1trace(dsp_trace_mask, GT_2CLASS,
-                        "PrintDspTraceBuffer: ulTraceEnd Value 0x%x\n",
-                        ulTraceEnd);
+                       "PrintDspTraceBuffer: ulTraceEnd Value 0x%x\n",
+                       ulTraceEnd);
                if (DSP_FAILED(status))
                        GT_0trace(dsp_trace_mask, GT_2CLASS,
-                                "PrintDspTraceBuffer: Failed on "
-                                "COD_GetSymValue.\n");
-
+                               "PrintDspTraceBuffer: Failed on "
+                               "COD_GetSymValue.\n");
        }
        if (DSP_SUCCEEDED(status)) {
                ulNumBytes = (ulTraceEnd - ulTraceBegin) * ulWordSize;
-                /*  If the chip type is 55 then the addresses will be
-                *  byte addresses; convert them to word addresses.  */
+               /*  If the chip type is 55 then the addresses will be
+               *  byte addresses; convert them to word addresses.  */
                if (ulNumBytes > uMaxSize)
                        ulNumBytes = uMaxSize;
 
                /* make sure the data we request fits evenly */
                ulNumBytes = (ulNumBytes / ulWordSize) * ulWordSize;
                GT_1trace(dsp_trace_mask, GT_2CLASS, "PrintDspTraceBuffer: "
-                        "ulNumBytes 0x%x\n", ulNumBytes);
+                       "ulNumBytes 0x%x\n", ulNumBytes);
                ulNumWords = ulNumBytes * ulWordSize;
                GT_1trace(dsp_trace_mask, GT_2CLASS, "PrintDspTraceBuffer: "
-                        "ulNumWords 0x%x\n", ulNumWords);
+                       "ulNumWords 0x%x\n", ulNumWords);
                status = DEV_GetIntfFxns(pDevObject, &pIntfFxns);
        }
 
@@ -1989,28 +2012,28 @@ DSP_STATUS PrintDspTraceBuffer(struct WMD_DEV_CONTEXT *hWmdContext)
                if (pszBuf != NULL) {
                        /* Read bytes from the DSP trace buffer... */
                        status = (*pIntfFxns->pfnBrdRead)(hWmdContext,
-                                (u8 *)pszBuf, (u32)ulTraceBegin,
-                                ulNumBytes, 0);
+                               (u8 *)pszBuf, (u32)ulTraceBegin,
+                               ulNumBytes, 0);
                        if (DSP_FAILED(status))
                                GT_0trace(dsp_trace_mask, GT_2CLASS,
-                                        "PrintDspTraceBuffer: "
-                                        "Failed to Read Trace Buffer.\n");
+                                       "PrintDspTraceBuffer: "
+                                       "Failed to Read Trace Buffer.\n");
 
                        if (DSP_SUCCEEDED(status)) {
                                /* Pack and do newline conversion */
                                GT_0trace(dsp_trace_mask, GT_2CLASS,
-                                        "PrintDspTraceBuffer: "
-                                        "before pack and unpack.\n");
+                                       "PrintDspTraceBuffer: "
+                                       "before pack and unpack.\n");
                                PackTraceBuffer(pszBuf, ulNumBytes, ulNumWords);
                                GT_1trace(dsp_trace_mask, GT_1CLASS,
-                                        "DSP Trace Buffer:\n%s\n", pszBuf);
+                                       "DSP Trace Buffer:\n%s\n", pszBuf);
                        }
                        MEM_Free(pszBuf);
                        MEM_Free(lpszBuf);
                } else {
                        GT_0trace(dsp_trace_mask, GT_2CLASS,
-                                "PrintDspTraceBuffer: Failed to "
-                                "allocate trace buffer.\n");
+                               "PrintDspTraceBuffer: Failed to "
+                               "allocate trace buffer.\n");
                        status = DSP_EMEMORY;
                }
        }

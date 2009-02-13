@@ -57,6 +57,7 @@
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/wcd.h>
 #include <dspbridge/dev.h>
+#include <dspbridge/io_sm.h>
 
 /* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
@@ -175,41 +176,49 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	struct CFG_HOSTRES resources;
 	u16 cnt = 10;
 	u32 temp;
-	/* We are waiting indefinitely here. This needs to be fixed in the
-	 * second phase */
+
 	status = CFG_GetHostResources(
 			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 			&resources);
+       if (DSP_FAILED(status))
+               return DSP_EFAIL;
 #ifdef CONFIG_BRIDGE_DVFS
+       if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
+           pDevContext->dwBrdState == BRD_HIBERNATION) {
 		if (pdata->dsp_get_opp)
 			opplevel = (*pdata->dsp_get_opp)();
-
-		/* If OPP is at minimum level, increase it before waking up
-		* the DSP */
 		if (opplevel == 1) {
-			if (pdata->dsp_set_min_opp) {
+                       if (pdata->dsp_set_min_opp)
 				(*pdata->dsp_set_min_opp)(opplevel+1);
-				DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP: "
-					"Setting the vdd1 opp level to %d "
-					"before waking DSP \n",
-					(opplevel + 1));
-			}
 		}
+       }
 #endif
 
-	if  (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
+       if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
-
-		temp = (u32) *((REG_UWORD32 *) ((u32)
-		       (resources.dwDmmuBase) + 0x10));
-
 		/* Restore mailbox settings */
+               /* Restart the peripheral clocks that were disabled only
+               * in DSP initiated Hibernation case.*/
+               if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
+                       DSP_PeripheralClocks_Enable(hDevContext, NULL);
+                /* Enabling Dpll in lock mode*/
+                       temp = (u32) *((REG_UWORD32 *)
+                                       ((u32) (resources.dwCmBase) + 0x34));
+                       temp = (temp & 0xFFFFFFFE) | 0x1;
+                       *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
+                                       (u32) temp;
+                       temp = (u32) *((REG_UWORD32 *)
+                                       ((u32) (resources.dwCmBase) + 0x4));
+                       temp = (temp & 0xFFFFFC8) | 0x37;
+
+                       *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
+                                       (u32) temp;
+               }
 		status = HW_MBOX_restoreSettings(resources.dwMboxBase);
 
-                /* Restart the peripheral clocks that were disabled only
-                 * in DSP initiated Hibernation case.*/
-		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION)
-			DSP_PeripheralClocks_Enable(hDevContext, NULL);
+               /*  Access MMU SYS CONFIG register to generate a short wakeup */
+               temp = (u32) *((REG_UWORD32 *) ((u32)
+                       (resources.dwDmmuBase) + 0x10));
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
@@ -238,7 +247,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 
 /*
  *  ======== CHNLSM_InterruptDSP2 ========
- *      Set MBX value & send an interrupt to the DSP processor(s).
+ *     Set MBX value & send an interrupt to the DSP processor(s).
  */
 DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
 				u16 wMbVal)

@@ -101,6 +101,7 @@
 #endif
 
 #include <mach/omap-pm.h>
+#include <mach-omap2/omap3-opp.h>
 
 #define BRIDGE_NAME "C6410"
 /*  ----------------------------------- Globals */
@@ -216,7 +217,7 @@ static int bridge_resume(struct platform_device *pdev);
 /* Maximum Opps that can be requested by IVA*/
 /*vdd1 rate table*/
 #ifdef CONFIG_BRIDGE_DVFS
-const struct vdd_prcm_config vdd1_rate_table_bridge[] = {
+const struct omap_opp  vdd1_rate_table_bridge[] = {
 	{0, 0, 0},
 	/*OPP1*/
 	{S125M, VDD1_OPP1, 0},
@@ -465,7 +466,7 @@ static int __init bridge_init(void)
 		}
 #ifdef CONFIG_BRIDGE_DVFS
 		for (i = 0; i < 5; i++)
-			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].speed;
+                       pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].rate;
 
 		clk_handle = clk_get(NULL, "iva2_ck");
 		if (!clk_handle) {

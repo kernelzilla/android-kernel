@@ -95,6 +95,12 @@ DSP_STATUS DSP_PeripheralClocks_Disable(struct WMD_DEV_CONTEXT *pDevContext,
 DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
 				       IN void *pArgs);
 
+/*
+ *  ======== DSPClkWakeupEventCtrl ========
+ *     This function sets the group selction bits for while
+ *     enabling/disabling.
+ */
+void DSPClkWakeupEventCtrl(u32 ClkId, bool enable);
 
 #endif				/* _TIOMAP_PWR_ */
 
