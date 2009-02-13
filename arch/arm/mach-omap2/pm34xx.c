@@ -79,8 +79,6 @@ static void (*_omap_sram_idle)(u32 *addr, int save_state);
 
 static int (*_omap_save_secure_sram)(u32 *addr);
 
-static void (*saved_idle)(void);
-
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 static struct powerdomain *cam_pwrdm;
@@ -561,6 +559,8 @@ out:
 }
 
 #ifdef CONFIG_SUSPEND
+static void (*saved_idle)(void);
+
 static int omap3_pm_prepare(void)
 {
 	saved_idle = pm_idle;
