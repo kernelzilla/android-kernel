@@ -1036,16 +1036,16 @@ err2:
 }
 
 /* PRM_VC_CMD_VAL_0 specific bits */
-#define OMAP3430_VC_CMD_VAL0_ON				(0x3 << 4)
-#define OMAP3430_VC_CMD_VAL0_ONLP			(0x3 << 3)
-#define OMAP3430_VC_CMD_VAL0_RET			(0x3 << 3)
-#define OMAP3430_VC_CMD_VAL0_OFF			(0x3 << 4)
+#define OMAP3430_VC_CMD_VAL0_ON		0x30
+#define OMAP3430_VC_CMD_VAL0_ONLP	0x1E
+#define OMAP3430_VC_CMD_VAL0_RET	0x1E
+#define OMAP3430_VC_CMD_VAL0_OFF	0x30
 
 /* PRM_VC_CMD_VAL_1 specific bits */
-#define OMAP3430_VC_CMD_VAL1_ON				(0xB << 2)
-#define OMAP3430_VC_CMD_VAL1_ONLP			(0x3 << 3)
-#define OMAP3430_VC_CMD_VAL1_RET			(0x3 << 3)
-#define OMAP3430_VC_CMD_VAL1_OFF			(0xB << 2)
+#define OMAP3430_VC_CMD_VAL1_ON		0x2C
+#define OMAP3430_VC_CMD_VAL1_ONLP	0x1E
+#define OMAP3430_VC_CMD_VAL1_RET	0x1E
+#define OMAP3430_VC_CMD_VAL1_OFF	0x2C
 
 static void __init configure_vc(void)
 {
