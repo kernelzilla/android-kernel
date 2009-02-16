@@ -315,7 +315,7 @@ DSP_STATUS WMD_IO_Create(OUT struct IO_MGR **phIOMgr,
 	}
        /*Intializing Work Element*/
        if (ref_count == 0) {
-               INIT_WORK(&pIOMgr->io_workq, (void *(*)(void *))IO_DispatchPM);
+               INIT_WORK(&pIOMgr->io_workq, (void *)IO_DispatchPM);
                ref_count = 1;
        } else
                PREPARE_WORK(&pIOMgr->io_workq, (void *)IO_DispatchPM);

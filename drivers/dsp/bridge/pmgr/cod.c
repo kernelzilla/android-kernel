@@ -134,7 +134,7 @@ static struct DBLL_Fxns dbllFxns = {
 	(DBLL_UnloadSectFxn) DBLL_unloadSect,
 };
 
-static bool NoOp();
+static bool NoOp(void);
 
 /*
  *  ======== COD_Close ========
