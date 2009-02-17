@@ -26,6 +26,6 @@ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-keypad.o board-trout-panel.o
 obj-$(CONFIG_MACH_TROUT) += htc_akm_cal.o htc_wifi_nvs.o htc_acoustic.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-mmc.o board-trout-wifi.o
-obj-$(CONFIG_TROUT_H2W) += board-trout-h2w.o
 obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
 obj-$(CONFIG_TROUT_PWRSINK) += htc_pwrsink.o
+obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
