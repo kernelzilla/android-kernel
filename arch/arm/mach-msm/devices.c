@@ -540,6 +540,8 @@ struct platform_device msm_device_mdp = {
 		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_ALL)
 #define CLK_7X00A(name, id, dev, flags) \
 		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_MSM7X00A)
+#define CLK_8X50(name, id, dev, flags) \
+		CLOCK(name, id, dev, flags, CLKFLAG_ARCH_QSD8X50)
 
 #define OFF CLKFLAG_AUTO_OFF
 #define MINMAX (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_USE_MAX_TO_SET)
@@ -587,6 +589,10 @@ struct clk msm_clocks[] = {
 	CLK_ALL("vdc_clk", VDC_CLK, NULL, OFF | MINMAX),
 	CLK_ALL("vfe_clk", VFE_CLK, NULL, OFF),
 	CLK_ALL("vfe_mdc_clk", VFE_MDC_CLK, NULL, OFF),
-
+#if defined(CONFIG_ARCH_QSD8X50)
+	CLK_8X50("lcdc_pclk_clk", LCDC_PCLK, &msm_device_mdp.dev, 0),
+	CLK_8X50("lcdc_pad_pclk_clk", LCDC_PAD_PCLK, &msm_device_mdp.dev, 0),
+	CLK_8X50("mdp_vsync_clk", MDP_VSYNC_CLK, &msm_device_mdp.dev, 0),
+#endif
 	CLOCK(NULL, 0, NULL, 0, 0),
 };

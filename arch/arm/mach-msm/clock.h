@@ -24,6 +24,7 @@
 #define CLKFLAG_USE_MIN_TO_SET		(0x00000004)
 
 #define CLKFLAG_ARCH_MSM7X00A		(0x00010000)
+#define CLKFLAG_ARCH_QSD8X50		(0x00020000)
 #define CLKFLAG_ARCH_ALL		(0xffff0000)
 
 struct clk {
@@ -81,14 +82,19 @@ struct clk {
 #define USB_HS_PCLK	37  /* High speed USB pbus clock */
 #define USB_OTG_CLK	38  /* Full speed USB clock */
 #define VDC_CLK		39  /* Video controller clock */
-#if CONFIG_MSM_AMSS_VERSION >= 6350
+#if CONFIG_MSM_AMSS_VERSION >= 6350 || defined(CONFIG_ARCH_QSD8X50)
 #define VFE_MDC_CLK	40  /* VFE MDDI client clock */
 #define VFE_CLK		41  /* Camera / Video Front End clock */
-#else/* For radio code base others */
+#else
+/* older AMSS versions had these flipped */
 #define VFE_MDC_CLK	41  /* VFE MDDI client clock */
 #define VFE_CLK		40  /* Camera / Video Front End clock */
 #endif
-#define NR_CLKS		42
+#define LCDC_PCLK	42
+#define LCDC_PAD_PCLK	43
+#define MDP_VSYNC_CLK	44
+
+#define NR_CLKS		45
 
 extern struct clk msm_clocks[];
 
