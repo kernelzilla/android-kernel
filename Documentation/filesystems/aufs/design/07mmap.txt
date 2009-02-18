@@ -1,0 +1,43 @@
+
+# Copyright (C) 2005-2009 Junjiro Okajima
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
+mmap(2) -- File Memory Mapping
+----------------------------------------------------------------------
+In aufs, the file-mapped pages are shared between the file on a branch
+and the virtual one in aufs by overriding vm_operation, particularly
+->fault().
+
+In aufs_mmap(),
+- get and store vm_ops of the real file on a branch.
+- map the file of aufs by generic_file_mmap() and set aufs's vm
+  operations.
+
+In aufs_fault(),
+- get the file of aufs from the passed vma, sleep if needed.
+- get the real file on a branch from the aufs file.
+- a race may happen. for instance a multithreaded library. so some lock
+  is implemented.
+- call ->fault() in the previously stored vm_ops with setting the
+  real file on a branch to vm_file.
+- restore vm_file and wake_up if someone else got sleep.
+
+When a branch is added to or deleted from aufs, the same-named file may
+unveil and its contents will be replaced by the new one when a process
+read(2) through previously opened file.
+(Some users may not want to refresh the filedata. For such users, I
+have a plan to implement a mount option 'refrof' which decides to
+refresh the opened files or not. See plan.txt too.)
+In this case, an already mapped file will not be updated since the
+contents are a part of a process already and it should not be changed by
+aufs branch manipulation. Of course, in case of the deleting branch has a
+busy file, it cannot be deleted from the union.
+
+In Unionfs, it took an approach which the memory pages mapped to
+filedata are copied from the lower (real) file into the Unionfs's
+virtual one and handles it by address_space operations. Recently Unionfs
+changed it to this approach which aufs adopted since Jul 2006.

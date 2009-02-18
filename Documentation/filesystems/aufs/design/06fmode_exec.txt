@@ -1,0 +1,24 @@
+
+# Copyright (C) 2005-2009 Junjiro Okajima
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
+FMODE_EXEC and deny_write()
+----------------------------------------------------------------------
+Generally Unix prevents an executing file from writing its filedata.
+In linux it is implemented by deny_write() and allow_write().
+When a file is executed by exec() family, open_exec() (and sys_uselib())
+they opens the file and calls deny_write(). If the file is aufs's virtual
+one, it has no meaning. The file which deny_write() is really necessary
+is the file on a branch. But the FMODE_EXEC flag is not passed to
+->open() operation. So aufs adopt a dirty trick.
+
+- in order to get FMODE_EXEC, aufs ->lookup() and ->d_revalidate() set
+  nd->intent.open.file->private_data to nd->intent.open.flags temporary.
+- in aufs ->open(), when FMODE_EXEC is set in file->private_data, it
+  calls deny_write() for the file on a branch.
+- when the aufs file is released, allow_write() for the file on a branch
+  is called.
