@@ -123,7 +123,7 @@ And then,
 $ mkdir /tmp/rw /tmp/aufs
 # mount -t aufs -o br=/tmp/rw:${HOME}=ro none /tmp/aufs
 
-Here is another example.
+Here is another example. The result is equivalent.
 # mount -t aufs -o br=/tmp/rw:${HOME} none /tmp/aufs
   Or
 # mount -t aufs -o br:/tmp/rw none /tmp/aufs
