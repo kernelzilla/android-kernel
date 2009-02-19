@@ -21,7 +21,7 @@
 
 #include <linux/ioctl.h>
 
-#define AUFS_VERSION	"aufs2-base5"
+#define AUFS_VERSION	"aufs2-priv"
 
 /* todo? move this to linux-2.6.19/include/magic.h */
 #define AUFS_SUPER_MAGIC	('a' << 24 | 'u' << 16 | 'f' << 8 | 's')
