@@ -75,7 +75,7 @@ int au_finfo_init(struct file *file)
 	struct dentry *dentry;
 	union {
 		void *p;
-		unsigned long ul;
+		fmode_t m;
 	} u;
 
 	dentry = file->f_dentry;
@@ -97,7 +97,7 @@ int au_finfo_init(struct file *file)
 
 	/* cf. au_store_oflag() */
 	u.p = file->private_data;
-	file->f_mode |= (u.ul & FMODE_EXEC);
+	file->f_mode |= (u.m & FMODE_EXEC);
 	file->private_data = finfo;
 	return 0; /* success */
 

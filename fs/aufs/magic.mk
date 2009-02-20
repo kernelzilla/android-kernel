@@ -33,14 +33,6 @@ ifdef CONFIG_XFS_FS
 ccflags-y += -DXFS_SB_MAGIC=0x58465342
 endif
 
-# defined in ${srctree}/mm/shmem.c
-# bool
-ccflags-$(CONFIG_TMPFS) += -DTMPFS_MAGIC=0x01021994
-
-# defined in ${srctree}/fs/sysfs/mount.c
-# bool
-ccflags-$(CONFIG_SYSFS) += -DSYSFS_MAGIC=0x62656572
-
 # defined in ${srctree}/fs/configfs/mount.c
 # tristate
 ifdef CONFIG_CONFIGFS_FS

@@ -52,8 +52,7 @@ static inline void vfsub_copy_inode_size(struct inode *inode,
 
 int vfsub_update_h_iattr(struct path *h_path, int *did);
 struct file *vfsub_filp_open(const char *path, int oflags, int mode);
-int vfsub_path_lookup(const char *name, unsigned int flags,
-		      struct nameidata *nd);
+int vfsub_kern_path(const char *name, unsigned int flags, struct path *path);
 struct dentry *vfsub_lookup_one_len(const char *name, struct dentry *parent,
 				    int len);
 struct dentry *vfsub_lookup_hash(struct nameidata *nd);

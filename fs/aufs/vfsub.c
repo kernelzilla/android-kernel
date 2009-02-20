@@ -51,16 +51,15 @@ struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 	return file;
 }
 
-int vfsub_path_lookup(const char *name, unsigned int flags,
-		      struct nameidata *nd)
+int vfsub_kern_path(const char *name, unsigned int flags, struct path *path)
 {
 	int err;
 
 	/* lockdep_off(); */
-	err = path_lookup(name, flags, nd);
+	err = kern_path(name, flags, path);
 	/* lockdep_on(); */
-	if (!err && nd->path.dentry->d_inode)
-		vfsub_update_h_iattr(&nd->path, /*did*/NULL); /*ignore*/
+	if (!err && path->dentry->d_inode)
+		vfsub_update_h_iattr(path, /*did*/NULL); /*ignore*/
 	return err;
 }
 

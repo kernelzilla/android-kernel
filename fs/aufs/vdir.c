@@ -744,9 +744,9 @@ int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir)
 		while (!is_deblk_end(&vdir_cache->vd_last.p, &deblk_end)) {
 			de = vdir_cache->vd_last.p.de;
 			AuDbg("%.*s, off%lld, i%lu, dt%d\n",
-				  de->de_str.len, de->de_str.name,
-				  file->f_pos, (unsigned long)de->de_ino,
-				  de->de_type);
+			      de->de_str.len, de->de_str.name,
+			      file->f_pos, (unsigned long)de->de_ino,
+			      de->de_type);
 			err = filldir(dirent, de->de_str.name, de->de_str.len,
 				      file->f_pos, de->de_ino, de->de_type);
 			if (unlikely(err)) {

@@ -526,7 +526,6 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 		   aufs_bindex_t bindex)
 {
 	int err;
-	struct nameidata nd;
 	struct au_opt_add *add = &opt->add;
 	char *p;
 
@@ -540,13 +539,11 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 			add->perm = br_perm_val(p);
 	}
 
-	err = vfsub_path_lookup(add->pathname, lkup_dirflags, &nd);
+	err = vfsub_kern_path(add->pathname, lkup_dirflags, &add->path);
 	if (!err) {
-		/* keep it path_get()ed */
-		add->path = nd.path;
 		if (!p) {
 			add->perm = AuBrPerm_RO;
-			if (au_test_fs_rr(nd.path.dentry->d_sb))
+			if (au_test_fs_rr(add->path.dentry->d_sb))
 				add->perm = AuBrPerm_RR;
 			else if (!bindex && !(sb_flags & MS_RDONLY))
 				add->perm = AuBrPerm_RW;
@@ -561,19 +558,15 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 	return err;
 }
 
-static int au_opts_parse_del(struct au_opt_del *del, substring_t args[],
-			     struct nameidata *nd)
+static int au_opts_parse_del(struct au_opt_del *del, substring_t args[])
 {
 	int err;
 
 	del->pathname = args[0].from;
 	AuDbg("del path %s\n", del->pathname);
 
-	err = vfsub_path_lookup(del->pathname, lkup_dirflags, nd);
-	if (!err)
-		/* keep it get-ed */
-		del->h_path = nd->path;
-	else
+	err = vfsub_kern_path(del->pathname, lkup_dirflags, &del->h_path);
+	if (unlikely(err))
 		AuErr("lookup failed %s (%d)\n", del->pathname, err);
 
 	return err;
@@ -604,10 +597,10 @@ static int au_opts_parse_idel(struct super_block *sb, aufs_bindex_t bindex,
 }
 #endif
 
-static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[],
-			     struct nameidata *nd)
+static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[])
 {
 	int err;
+	struct path path;
 	char *p;
 
 	err = -EINVAL;
@@ -619,7 +612,7 @@ static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[],
 	}
 
 	*p++ = 0;
-	err = vfsub_path_lookup(mod->path, lkup_dirflags, nd);
+	err = vfsub_kern_path(mod->path, lkup_dirflags, &path);
 	if (unlikely(err)) {
 		AuErr("lookup failed %s (%d)\n", mod->path, err);
 		goto out;
@@ -627,8 +620,8 @@ static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[],
 
 	mod->perm = br_perm_val(p);
 	AuDbg("mod path %s, perm 0x%x, %s\n", mod->path, mod->perm, p);
-	mod->h_root = dget(nd->path.dentry);
-	path_put(&nd->path);
+	mod->h_root = dget(path.dentry);
+	path_put(&path);
 
  out:
 	return err;
@@ -690,13 +683,14 @@ static int au_opts_parse_xino(struct super_block *sb, struct au_opt_xino *xino,
 static
 int au_opts_parse_xino_itrunc_path(struct super_block *sb,
 				   struct au_opt_xino_itrunc *xino_itrunc,
-				   substring_t args[], struct nameidata *nd)
+				   substring_t args[])
 {
 	int err;
 	aufs_bindex_t bend, bindex;
+	struct path path;
 	struct dentry *root;
 
-	err = vfsub_path_lookup(args[0].from, lkup_dirflags, nd);
+	err = vfsub_kern_path(args[0].from, lkup_dirflags, &path);
 	if (unlikely(err)) {
 		AuErr("lookup failed %s (%d)\n", args[0].from, err);
 		goto out;
@@ -707,13 +701,13 @@ int au_opts_parse_xino_itrunc_path(struct super_block *sb,
 	aufs_read_lock(root, AuLock_FLUSH);
 	bend = au_sbend(sb);
 	for (bindex = 0; bindex <= bend; bindex++) {
-		if (au_h_dptr(root, bindex) == nd->path.dentry) {
+		if (au_h_dptr(root, bindex) == path.dentry) {
 			xino_itrunc->bindex = bindex;
 			break;
 		}
 	}
 	aufs_read_unlock(root, !AuLock_IR);
-	path_put(&nd->path);
+	path_put(&path);
 
 	if (unlikely(xino_itrunc->bindex < 0)) {
 		AuErr("no such branch %s\n", args[0].from);
@@ -740,7 +734,6 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 	} u;
 	struct {
 		substring_t args[MAX_OPT_ARGS];
-		struct nameidata nd;
 	} *a;
 
 	err = -ENOMEM;
@@ -797,7 +790,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				opt->type = token;
 			break;
 		case Opt_del:
-			err = au_opts_parse_del(&opt->del, a->args, &a->nd);
+			err = au_opts_parse_del(&opt->del, a->args);
 			if (!err)
 				opt->type = token;
 			break;
@@ -814,7 +807,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			break;
 #endif
 		case Opt_mod:
-			err = au_opts_parse_mod(&opt->mod, a->args, &a->nd);
+			err = au_opts_parse_mod(&opt->mod, a->args);
 			if (!err)
 				opt->type = token;
 			break;
@@ -838,7 +831,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 
 		case Opt_trunc_xino_path:
 			err = au_opts_parse_xino_itrunc_path
-				(sb, &opt->xino_itrunc, a->args, &a->nd);
+				(sb, &opt->xino_itrunc, a->args);
 			if (!err)
 				opt->type = token;
 			break;

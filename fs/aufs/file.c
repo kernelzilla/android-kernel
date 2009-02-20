@@ -509,12 +509,6 @@ static int aufs_readpage(struct file *file __maybe_unused, struct page *page)
 
 /* they will never be called. */
 #ifdef CONFIG_AUFS_DEBUG
-static int aufs_prepare_write(struct file *file, struct page *page,
-			      unsigned from, unsigned to)
-{ AuUnsupport(); return 0; }
-static int aufs_commit_write(struct file *file, struct page *page,
-			     unsigned from, unsigned to)
-{ AuUnsupport(); return 0; }
 static int aufs_write_begin(struct file *file, struct address_space *mapping,
 			    loff_t pos, unsigned len, unsigned flags,
 			    struct page **pagep, void **fsdata)
@@ -546,8 +540,6 @@ struct address_space_operations aufs_aop = {
 	.writepage	= aufs_writepage,
 	.sync_page	= aufs_sync_page,
 	.set_page_dirty	= aufs_set_page_dirty,
-	.prepare_write	= aufs_prepare_write,
-	.commit_write	= aufs_commit_write,
 	.write_begin	= aufs_write_begin,
 	.write_end	= aufs_write_end,
 	.invalidatepage	= aufs_invalidatepage,
