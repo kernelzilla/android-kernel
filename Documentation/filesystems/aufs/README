@@ -1,7 +1,7 @@
 
 Aufs2 -- advanced multi layered unificaton filesystem version 2
 http://aufs.sf.net
-Junjiro Okajima
+Junjiro R. Okajima
 
 
 0. Introduction
@@ -88,29 +88,69 @@ See design/08plan.txt in detail.
 
 2. Download
 ----------------------------------------
-(snipped from the mainline version)
+Kindly one of aufs user, the Center for Scientific Computing and Free
+Software (C3SL), Federal University of Parana offered me a public GIT
+tree space.
+
+There are three GIT trees, aufs2-2.6, aufs2-standalone and aufs2-util.
+While the aufs2-util is always necessary, you need either of aufs2-2.6
+or aufs2-standalone.
+
+The aufs2-2.6 tree includes the whole linux-2.6 GIT tree,
+git://git.kernel.org/.../torvalds/linux-2.6.git.
+And you cannot select CONFIG_AUFS_FS=m for this version, eg. you cannot
+build aufs2 as an externel kernel module.
+If you already have linux-2.6 GIT tree, you may want to pull and merge
+the "aufs2" branch from this tree.
+
+On the other hand, the aufs2-standalone tree has only aufs2 source files
+and a necessary patch, and you can select CONFIG_AUFS_FS=m. In other
+words, the aufs2-standalone tree is generated from aufs2-2.6 tree by,
+- extract new files and modifications.
+- generate a single patch file from modifications.
+- generate a ChangeLog file from git-log.
+- commit the files newly and no log messages. this is not git-pull.
+
+Both of aufs2-2.6 and aufs2-standalone trees have a branch whose name is
+in form of "aufs2-xx" where "xx" represents the linux kernel version,
+"linux-2.6.xx".
+
+o aufs2-2.6 tree
+$ git clone --reference /your/linux-2.6/git/tree \
+	http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-2.6.git \
+	aufs2-2.6.git
+- if you don't have linux-2.6 GIT tree, then remove "--reference ..."
+$ cd aufs2-2.6.git
+$ git checkout aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+
+o aufs2-standalone tree
+$ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
+	aufs2-standalone.git
+$ cd aufs2-standalone.git
+$ git checkout aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+- apply "aufs2-standalone.patch" to your kernel source files.
+
+o aufs2-util tree
+$ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-util.git \
+	aufs2-util.git
+$ cd aufs2-util.git
+- no particular tag/branch currently.
+
 
 3. Configuration and Compilation
 ----------------------------------------
 For aufs2-2.6 tree,
-- enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS
-- set other aufs configurations if necessary
+- enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS.
+- set other aufs configurations if necessary.
 
 For aufs2-standalone tree,
-- enable CONFIG_AUFS_FS, you can select =m
-- edit fs/aufs/config.mk and set other aufs configurations if necessary
+- enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS, you can select =m.
+- edit fs/aufs/config.mk and set other aufs configurations if necessary.
 
 And then,
-- build your kernel (or a module) by simple "make"
+- build your kernel (or a module) by "make"
 - install it and reboot your system
-- build aufs2-util and install it
-
-Makefile in aufs2-util have some customizable make-variables.
-- KDIR
-  specify your kernel source path if necessary
-- DESTDIR
-  specify your install path if necessary.
-  some commands have to be installed under /sbin.
+- read README in aufs2-util, build and install it
 
 
 4. Usage
@@ -188,7 +228,7 @@ helpful for me to keep on developing aufs.
 7.
 ----------------------------------------
 If you are an experienced user, no explanation is needed. Aufs is
-just a linux filesystem module.
+just a linux filesystem.
 
 
 Enjoy!
