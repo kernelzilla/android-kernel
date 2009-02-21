@@ -371,9 +371,18 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	int err;
 	struct au_iattr ia;
 	struct dentry *h_d;
+	struct inode *h_inode;
+	struct super_block *h_sb;
 
-	if (h_dentry->d_inode)
+	err = 0;
+	h_sb = h_dentry->d_sb;
+	h_inode = h_dentry->d_inode;
+	if (h_inode)
 		au_iattr_save(&ia, h_dentry->d_inode);
+	else if (au_test_nfs(h_sb) || au_test_fuse(h_sb))
+		/* nfs d_revalidate may return 0 for negative dentry */
+		/* fuse d_revalidate always return 0 for negative dentry */
+		goto out;
 
 	/* main purpose is namei.c:cached_lookup() and d_revalidate */
 	h_d = au_lkup_one(&h_dentry->d_name, h_parent, br, /*nd*/NULL);
@@ -381,17 +390,15 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	if (IS_ERR(h_d))
 		goto out;
 
-	/* fuse d_revalidate always return 0 for negative dentries */
 	err = 0;
-	if (unlikely((h_d != h_dentry
-		     || h_d->d_inode != h_dentry->d_inode
-		     || (h_dentry->d_inode
-			 && au_iattr_test(&ia, h_dentry->d_inode)))
-		     && !au_test_fuse(h_parent->d_sb)))
+	if (unlikely(h_d != h_dentry
+		     || h_d->d_inode != h_inode
+		     || (h_inode && au_iattr_test(&ia, h_inode))))
 		err = -EBUSY;
 	dput(h_d);
 
  out:
+	AuTraceErr(err);
 	return err;
 }
 
