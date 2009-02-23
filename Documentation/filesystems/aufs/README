@@ -121,13 +121,13 @@ $ git clone --reference /your/linux-2.6/git/tree \
 	aufs2-2.6.git
 - if you don't have linux-2.6 GIT tree, then remove "--reference ..."
 $ cd aufs2-2.6.git
-$ git checkout aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+$ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
 
 o aufs2-standalone tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
 	aufs2-standalone.git
 $ cd aufs2-standalone.git
-$ git checkout aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+$ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
 - apply "aufs2-standalone.patch" to your kernel source files.
 
 o aufs2-util tree
