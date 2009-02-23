@@ -70,7 +70,7 @@ MODULE_LICENSE("GPL");
 /* MODULE_LICENSE("GPL v2"); */
 MODULE_AUTHOR("Junjiro R. Okajima");
 MODULE_DESCRIPTION(AUFS_NAME
-	" -- Advanced multi layered unificaton filesystem");
+	" -- Advanced multi layered unification filesystem");
 MODULE_VERSION(AUFS_VERSION);
 
 /* it should be 'byte', but param_set_byte() prints it by "%c" */
