@@ -789,7 +789,7 @@ static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 	/* no need file_list_lock() since sbinfo is locked? defered? */
 	err = 0;
 	list_for_each_entry(file, &sb->s_files, f_u.fu_list) {
-		if (!au_test_aufs_file(file))
+		if (special_file(file->f_dentry->d_inode->i_mode))
 			continue;
 
 		AuDbg("%.*s\n", AuDLNPair(file->f_dentry));
