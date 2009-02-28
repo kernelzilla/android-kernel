@@ -11,6 +11,7 @@
  * handling file/dir, and address_space operation
  */
 
+#include <linux/fsnotify.h>
 #include <linux/pagemap.h>
 #include "aufs.h"
 
@@ -81,11 +82,12 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 			goto out_br;
 		}
 	}
+	fsnotify_open(h_dentry);
 	goto out; /* success */
 
-out_br:
+ out_br:
 	atomic_dec(&br->br_count);
-out:
+ out:
 	return h_file;
 }
 
