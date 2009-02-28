@@ -311,6 +311,7 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 	atomic_set(&br->br_count, 0);
 	br->br_xino_upper = AUFS_XINO_TRUNC_INIT;
 	atomic_set(&br->br_xino_running, 0);
+	br->br_id = au_new_br_id(sb);
 
 	if (au_br_writable(add->perm)) {
 		err = au_wbr_init(br, sb, add->perm, &add->path);
@@ -327,7 +328,6 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 		}
 	}
 
-	br->br_id = au_new_br_id(sb);
 	sysaufs_br_init(br);
 	mntget(add->path.mnt);
 
