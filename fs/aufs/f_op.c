@@ -158,6 +158,7 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 	au_unpin(&pin);
 	err = vfsub_write_u(h_file, buf, count, ppos);
 	au_cpup_attr_timesizes(inode);
+	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
@@ -233,6 +234,7 @@ aufs_splice_write(struct pipe_inode_info *pipe, struct file *file, loff_t *ppos,
 	au_unpin(&pin);
 	err = vfsub_splice_from(pipe, h_file, ppos, len, flags);
 	au_cpup_attr_timesizes(inode);
+	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
