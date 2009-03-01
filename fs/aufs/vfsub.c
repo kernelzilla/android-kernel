@@ -395,6 +395,46 @@ long vfsub_splice_from(struct pipe_inode_info *pipe, struct file *out,
 	return err;
 }
 
+/* cf. open.c:do_sys_truncate() and do_sys_ftruncate() */
+int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
+		struct file *h_file)
+{
+	int err;
+	struct inode *h_inode;
+
+	h_inode = h_path->dentry->d_inode;
+	if (!h_file) {
+		err = mnt_want_write(h_path->mnt);
+		if (err)
+			goto out;
+		err = inode_permission(h_inode, MAY_WRITE);
+		if (err)
+			goto out_mnt;
+		err = get_write_access(h_inode);
+		if (err)
+			goto out_mnt;
+		err = break_lease(h_inode, FMODE_WRITE);
+		if (err)
+			goto out_inode;
+	}
+
+	err = locks_verify_truncate(h_inode, h_file, length);
+	if (!err) {
+		lockdep_off();
+		err = do_truncate(h_path->dentry, length, attr, h_file);
+		lockdep_on();
+	}
+
+ out_inode:
+	if (!h_file)
+		put_write_access(h_inode);
+ out_mnt:
+	if (!h_file)
+		mnt_drop_write(h_path->mnt);
+ out:
+	return err;
+}
+
 /* ---------------------------------------------------------------------- */
 
 struct au_vfsub_mkdir_args {
