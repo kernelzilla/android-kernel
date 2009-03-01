@@ -417,7 +417,6 @@ int au_pin(struct au_pin *pin, struct dentry *dentry, aufs_bindex_t bindex,
 /* ---------------------------------------------------------------------- */
 
 #define AuIcpup_DID_CPUP	1
-#define AuIcpup_GOT_WACC	(1 << 1)
 #define au_ftest_icpup(flags, name)	((flags) & AuIcpup_##name)
 #define au_fset_icpup(flags, name)	{ (flags) |= AuIcpup_##name; }
 #define au_fclr_icpup(flags, name)	{ (flags) &= ~AuIcpup_##name; }
@@ -532,49 +531,6 @@ static int au_lock_and_icpup(struct dentry *dentry, struct iattr *ia,
 	return err;
 }
 
-static int au_attr_trunc(struct dentry *dentry, struct iattr *ia,
-			 struct au_icpup_args *a)
-{
-	int err;
-	struct inode *inode;
-
-	err = inode_permission(a->h_inode, MAY_WRITE);
-	if (unlikely(err))
-		goto out;
-
-	err = -EPERM;
-	if (unlikely(IS_APPEND(a->h_inode)))
-		goto out;
-
-	err = get_write_access(a->h_inode);
-	if (unlikely(err))
-		goto out;
-	au_fset_icpup(a->flags, GOT_WACC);
-
-	err = break_lease(a->h_inode, FMODE_WRITE);
-	if (unlikely(err))
-		goto out_put;
-
-	err = locks_verify_truncate(a->h_inode, NULL, ia->ia_size);
-	if (unlikely(err))
-		goto out_put;
-
-	inode = dentry->d_inode;
-	if (ia->ia_size < i_size_read(inode)) {
-		/* unmap only */
-		err = vmtruncate(inode, ia->ia_size);
-		if (unlikely(err))
-			goto out_put;
-	}
-	goto out; /* success */
-
- out_put:
-	au_fclr_icpup(a->flags, GOT_WACC);
-	put_write_access(a->h_inode);
- out:
-	return err;
-}
-
 static int aufs_setattr(struct dentry *dentry, struct iattr *ia)
 {
 	int err;
@@ -612,16 +568,25 @@ static int aufs_setattr(struct dentry *dentry, struct iattr *ia)
 		ia->ia_valid &= ~ATTR_FILE;
 	}
 
-	if (ia->ia_valid & ATTR_SIZE) {
-		err = au_attr_trunc(dentry, ia, a);
-		if (unlikely(err))
-			goto out_unlock;
-	}
-
 	a->h_path.mnt = au_sbr_mnt(sb, a->btgt);
-	err = vfsub_notify_change(&a->h_path, ia);
-	if (au_ftest_icpup(a->flags, GOT_WACC))
-		put_write_access(a->h_path.dentry->d_inode);
+	if (ia->ia_valid & ATTR_SIZE) {
+		struct file *f;
+
+		if (ia->ia_size < i_size_read(inode)) {
+			/* unmap only */
+			err = vmtruncate(inode, ia->ia_size);
+			if (unlikely(err))
+				goto out_unlock;
+		}
+
+		f = NULL;
+		if (ia->ia_valid & ATTR_FILE)
+			f = ia->ia_file;
+		mutex_unlock(&a->h_inode->i_mutex);
+		err = vfsub_trunc(&a->h_path, ia->ia_size, ia->ia_valid, f);
+		mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
+	} else
+		err = vfsub_notify_change(&a->h_path, ia);
 	if (!err)
 		au_cpup_attr_changeable(inode);
 
