@@ -56,6 +56,11 @@ In the above sample, assume the inode number of /ro/fileA is i111 and
 aufs assigns the inode number i999 for fileA. Then aufs writes 999 as
 4(8) bytes at 111 * 4(8) bytes offset in the xino file.
 
+When the inode numbers are not contiguous, the xino file will be sparse
+which has a hole in it and doesn't consume as much disk space as it
+might appear. If your branch filesystem consumes disk space for such
+holes, then you should specify 'xino=' option at mounting aufs.
+
 Also a writable branch has three kinds of "whiteout bases". All these
 are existed when the branch is joined to aufs and the names are
 whiteout-ed doubly, so that users will never see their names in aufs

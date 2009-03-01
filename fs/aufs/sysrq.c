@@ -46,7 +46,7 @@ static void sysrq_sb(struct super_block *sb)
 #endif
 	pr_warning(AUFS_NAME ": files\n");
 	list_for_each_entry(file, &sb->s_files, f_u.fu_list)
-		if (au_test_aufs_file(file))
+		if (!special_file(file->f_dentry->d_inode->i_mode))
 			au_dpri_file(file);
 
 	au_plevel = plevel;

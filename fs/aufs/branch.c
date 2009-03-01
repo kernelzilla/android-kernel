@@ -311,6 +311,7 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 	atomic_set(&br->br_count, 0);
 	br->br_xino_upper = AUFS_XINO_TRUNC_INIT;
 	atomic_set(&br->br_xino_running, 0);
+	br->br_id = au_new_br_id(sb);
 
 	if (au_br_writable(add->perm)) {
 		err = au_wbr_init(br, sb, add->perm, &add->path);
@@ -327,7 +328,6 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 		}
 	}
 
-	br->br_id = au_new_br_id(sb);
 	sysaufs_br_init(br);
 	mntget(add->path.mnt);
 
@@ -784,12 +784,23 @@ static int need_sigen_inc(int old, int new)
 static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 {
 	int err;
-	struct file *file, *hf;
+	unsigned long n, ul, bytes, files;
+	aufs_bindex_t bstart;
+	struct file *file, *hf, **a;
+	const int step_bytes = 1024, /* memory allocation unit */
+		step_files = step_bytes / sizeof(*a);
+
+	err = -ENOMEM;
+	n = 0;
+	bytes = step_bytes;
+	files = step_files;
+	a = kmalloc(bytes, GFP_NOFS);
+	if (unlikely(!a))
+		goto out;
 
 	/* no need file_list_lock() since sbinfo is locked? defered? */
-	err = 0;
 	list_for_each_entry(file, &sb->s_files, f_u.fu_list) {
-		if (!au_test_aufs_file(file))
+		if (special_file(file->f_dentry->d_inode->i_mode))
 			continue;
 
 		AuDbg("%.*s\n", AuDLNPair(file->f_dentry));
@@ -798,26 +809,52 @@ static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 			err = -EBUSY;
 			FiMustNoWaiters(file);
 			fi_read_unlock(file);
-			break;
+			goto out_free;
 		}
 
+		bstart = au_fbstart(file);
 		if (!S_ISREG(file->f_dentry->d_inode->i_mode)
 		    || !(file->f_mode & FMODE_WRITE)
-		    || au_fbstart(file) != bindex) {
+		    || bstart != bindex) {
 			FiMustNoWaiters(file);
 			fi_read_unlock(file);
 			continue;
 		}
 
-		/* todo: already flushed? */
-		hf = au_h_fptr(file, au_fbstart(file));
-		hf->f_flags = au_file_roflags(hf->f_flags);
-		hf->f_mode &= ~FMODE_WRITE;
-		put_write_access(hf->f_dentry->d_inode);
+		hf = au_h_fptr(file, bstart);
 		FiMustNoWaiters(file);
 		fi_read_unlock(file);
+
+		if (n < files)
+			a[n++] = hf;
+		else {
+			void *p;
+
+			err = -ENOMEM;
+			bytes += step_bytes;
+			files += step_files;
+			p = krealloc(a, bytes, GFP_NOFS);
+			if (p) {
+				a = p;
+				a[n++] = hf;
+			} else
+				goto out_free;
+		}
 	}
 
+	err = 0;
+	for (ul = 0; ul < n; ul++) {
+		/* todo: already flushed? */
+		hf = a[ul];
+		hf->f_flags = au_file_roflags(hf->f_flags);
+		hf->f_mode &= ~FMODE_WRITE;
+		file_release_write(hf);
+		mnt_drop_write(hf->f_vfsmnt);
+	}
+
+ out_free:
+	kfree(a);
+ out:
 	return err;
 }
 
@@ -863,14 +900,22 @@ int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
 			err = au_br_mod_files_ro(sb, bindex);
 			/* aufs_write_lock() calls ..._child() */
 			di_write_lock_child(root);
-		}
 
-		if (unlikely(err)) {
-			rerr = au_br_init_wh(sb, br, br->br_perm, mod->h_root);
-			if (unlikely(rerr))
-				AuIOErr("nested error %d (%d)\n", rerr, err);
+			if (unlikely(err)) {
+				rerr = -ENOMEM;
+				br->br_wbr = kmalloc(sizeof(*br->br_wbr),
+						     GFP_NOFS);
+				if (br->br_wbr)
+					rerr = au_br_init_wh
+						(sb, br, br->br_perm,
+						 mod->h_root);
+				if (unlikely(rerr)) {
+					AuIOErr("nested error %d (%d)\n",
+						rerr, err);
+					br->br_perm = mod->perm;
+				}
+			}
 		}
-
 	} else if (au_br_writable(mod->perm)) {
 		/* ro --> rw */
 		err = -ENOMEM;

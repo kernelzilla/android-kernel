@@ -144,11 +144,5 @@ static inline int au_test_mmapped(struct file *f)
 	return !!(au_fi(f)->fi_h_vm_ops);
 }
 
-static inline int au_test_aufs_file(struct file *f)
-{
-	return !(f->f_dentry->d_inode->i_mode
-		 & (S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK));
-}
-
 #endif /* __KERNEL__ */
 #endif /* __AUFS_FILE_H__ */
