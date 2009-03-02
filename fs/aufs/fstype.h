@@ -257,6 +257,33 @@ static inline int au_test_securityfs(struct super_block *sb __maybe_unused)
 #endif
 }
 
+static inline int au_test_squashfs(struct super_block *sb __maybe_unused)
+{
+#if defined(CONFIG_SQUASHFS) || defined(CONFIG_SQUASHFS_MODULE)
+	return sb->s_magic == SQUASHFS_MAGIC;
+#else
+	return 0;
+#endif
+}
+
+static inline int au_test_btrfs(struct super_block *sb __maybe_unused)
+{
+#if defined(CONFIG_BTRFS_FS) || defined(CONFIG_BTRFS_FS_MODULE)
+	return sb->s_magic == BTRFS_SUPER_MAGIC;
+#else
+	return 0;
+#endif
+}
+
+static inline int au_test_xenfs(struct super_block *sb __maybe_unused)
+{
+#if defined(CONFIG_XENFS) || defined(CONFIG_XENFS_MODULE)
+	return sb->s_magic == XENFS_SUPER_MAGIC;
+#else
+	return 0;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 /*
  * they can't be an aufs branch.
@@ -267,6 +294,7 @@ static inline int au_test_fs_unsuppoted(struct super_block *sb)
 		|| au_test_sysfs(sb)
 		|| au_test_configfs(sb)
 		|| au_test_securityfs(sb)
+		|| au_test_xenfs(sb)
 		|| au_test_ramfs(sb)
 		/* || !strcmp(au_sbtype(sb), "unionfs") */
 		|| au_test_aufs(sb); /* will be supported in next version */
@@ -307,6 +335,7 @@ static inline int au_test_fs_refresh_iattr(struct super_block *sb)
 		|| au_test_fuse(sb)
 		/* || au_test_smbfs(sb) */	/* untested */
 		/* || au_test_ocfs2(sb) */	/* untested */
+		/* || au_test_btrfs(sb) */	/* untested */
 		/* || au_test_coda(sb) */	/* untested */
 		/* || au_test_v9fs(sb) */	/* untested */
 		;
@@ -395,7 +424,8 @@ static inline int au_test_fs_trunc_xino(struct super_block *sb)
  */
 static inline int au_test_fs_rr(struct super_block *sb)
 {
-	return au_test_iso9660(sb)
+	return au_test_squashfs(sb)
+		|| au_test_iso9660(sb)
 		|| au_test_cramfs(sb)
 		|| au_test_romfs(sb);
 }

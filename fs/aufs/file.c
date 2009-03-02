@@ -69,7 +69,8 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 		flags = au_file_roflags(flags);
 	flags &= ~O_CREAT;
 	atomic_inc(&br->br_count);
-	h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags);
+	h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags,
+			     current_cred());
 	if (IS_ERR(h_file))
 		goto out_br;
 

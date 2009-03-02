@@ -38,7 +38,6 @@ static int h_permission(struct inode *h_inode, int mask,
 	if ((write_mask && !au_br_writable(brperm))
 	    || (au_test_nfs(h_inode->i_sb) && S_ISDIR(h_inode->i_mode)
 		&& write_mask && !(mask & MAY_READ))
-	    || !h_inode->i_op
 	    || !h_inode->i_op->permission) {
 		/* AuLabel(generic_permission); */
 		err = generic_permission(h_inode, mask, NULL);
@@ -745,8 +744,8 @@ static int h_readlink(struct dentry *dentry, int bindex, char __user *buf,
 	h_dentry = au_h_dptr(dentry, bindex);
 	if (unlikely(/* !h_dentry
 		     || !h_dentry->d_inode
-		     || */ !h_dentry->d_inode->i_op
-		     || !h_dentry->d_inode->i_op->readlink))
+		     || !h_dentry->d_inode->i_op
+		     || */ !h_dentry->d_inode->i_op->readlink))
 		goto out;
 
 	err = security_inode_readlink(h_dentry);

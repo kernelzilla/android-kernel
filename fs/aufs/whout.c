@@ -205,7 +205,7 @@ static int do_unlink_wh(struct inode *h_dir, struct path *h_path)
 	 * this may be a violation of unix fs semantics.
 	 */
 	force = (h_dir->i_mode & S_ISVTX)
-		&& h_path->dentry->d_inode->i_uid != current->fsuid;
+		&& h_path->dentry->d_inode->i_uid != current_fsuid();
 	return vfsub_unlink(h_dir, h_path, force);
 }
 
@@ -273,7 +273,7 @@ static int test_linkable(struct dentry *h_root)
 {
 	struct inode *h_dir = h_root->d_inode;
 
-	if (h_dir->i_op && h_dir->i_op->link)
+	if (h_dir->i_op->link)
 		return 0;
 
 	AuErr("%.*s (%s) doesn't support link(2), use noplink and rw+nolwh\n",

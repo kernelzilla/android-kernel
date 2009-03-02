@@ -218,7 +218,7 @@ static int au_do_fsync_dir(struct file *file, int datasync)
 		if (!h_file || au_test_ro(sb, bindex, inode))
 			continue;
 
-		err = (int)do_fsync(h_file, datasync);
+		err = vfs_fsync(h_file, h_file->f_dentry, datasync);
 		if (!err) {
 			h_mtx = &h_file->f_dentry->d_inode->i_mutex;
 			mutex_lock(h_mtx);
