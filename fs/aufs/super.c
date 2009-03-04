@@ -157,7 +157,7 @@ static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 	if (d->d_parent == h_root
 	    && name->len == len
 	    && !memcmp(name->name, AUFS_XINO_FNAME, len))
-		   goto out;
+		goto out;
 
 	seq_puts(seq, ",xino=");
 	err = au_xino_path(seq, f);
