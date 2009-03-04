@@ -74,7 +74,7 @@ int au_finfo_init(struct file *file)
 	struct au_finfo *finfo;
 	struct dentry *dentry;
 	union {
-		void *p;
+		unsigned int u;
 		fmode_t m;
 	} u;
 
@@ -96,7 +96,7 @@ int au_finfo_init(struct file *file)
 	/* smp_mb(); */ /* atomic_set */
 
 	/* cf. au_store_oflag() */
-	u.p = file->private_data;
+	u.u = (unsigned int)file->private_data;
 	file->f_mode |= (u.m & FMODE_EXEC);
 	file->private_data = finfo;
 	return 0; /* success */
