@@ -85,6 +85,19 @@ See design/08plan.txt in detail.
 - delegation mode (dlgt)
 - intent.open/create (file open in a single lookup)
 
+Features or just an idea in the future (see also design/*.txt),
+- reorder the branch index without del/re-add.
+- permanent xino files
+- an option for refreshing the opened files after add/del branches
+- 'move' policy for copy-up between two writable branches, after
+  checking free space.
+- remount option copy/move between two branches. (almost done)
+- O_DIRECT
+- light version, without branch manipulation. (unnecessary?)
+- copyup in userspace
+- inotify in userspace
+- xattr, acl
+
 
 2. Download
 ----------------------------------------
