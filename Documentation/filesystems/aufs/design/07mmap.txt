@@ -34,8 +34,9 @@ have a plan to implement a mount option 'refrof' which decides to
 refresh the opened files or not. See plan.txt too.)
 In this case, an already mapped file will not be updated since the
 contents are a part of a process already and it should not be changed by
-aufs branch manipulation. Of course, in case of the deleting branch has a
-busy file, it cannot be deleted from the union.
+aufs branch manipulation. (Even if MAP_SHARED is specified, currently).
+Of course, in case of the deleting branch has a busy file, it cannot be
+deleted from the union.
 
 In Unionfs, it took an approach which the memory pages mapped to
 filedata are copied from the lower (real) file into the Unionfs's
