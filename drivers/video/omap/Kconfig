@@ -10,7 +10,11 @@ config FB_OMAP
 
 config FB_OMAP_LCD_VGA
         bool "Use LCD in VGA mode"
-	        depends on MACH_OMAP_3430SDP || MACH_OMAP_LDP
+	depends on MACH_OMAP_3430SDP || MACH_OMAP_LDP
+
+config FB_OMAP_LCD_WVGA
+        bool "Use LCD in VGA mode"
+	depends on ARCH_OMAP34XX && MACH_OMAP_ZOOM2
 
 choice
 	depends on FB_OMAP && MACH_OVERO
