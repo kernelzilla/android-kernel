@@ -197,6 +197,7 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)hDehMgr;
 	struct WMD_DEV_CONTEXT *pDevContext;
 	DSP_STATUS status = DSP_SOK;
+	DSP_STATUS status1 = DSP_EFAIL;
 	u32 memPhysical = 0;
 	u32 HW_MMU_MAX_TLB_COUNT = 31;
 	u32 extern faultAddr;
@@ -285,6 +286,11 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 				 "0x%x\n", dwErrInfo);
 			break;
 		}
+
+		/* Filter subsequent notifications when an error occurs */
+		if (pDevContext->dwBrdState != BRD_ERROR)
+			status1 = DSP_SOK;
+
 		/* Set the Board state as ERROR */
 		pDevContext->dwBrdState = BRD_ERROR;
 		/* Disable all the clocks that were enabled by DSP */
@@ -292,8 +298,11 @@ void WMD_DEH_Notify(struct DEH_MGR *hDehMgr, u32 ulEventMask,
 		/* Call DSP Trace Buffer */
 		PrintDspTraceBuffer(hDehMgr->hWmdContext);
 
-		/* Signal DSP error/exception event. */
-		NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
+		if (DSP_SUCCEEDED(status1)) {
+			/* Signal DSP error/exception event. */
+			NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
+		}
+
 	}
 	DBG_Trace(DBG_LEVEL1, "Exiting WMD_DEH_Notify\n");
 
