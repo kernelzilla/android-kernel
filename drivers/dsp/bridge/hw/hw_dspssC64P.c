@@ -27,6 +27,7 @@
 
 /* PROJECT SPECIFIC INCLUDE FILES */
 #include <GlobalTypes.h>
+#include <linux/io.h>
 #include <hw_defs.h>
 #include <hw_dspssC64P.h>
 #include <IVA2RegAcM.h>
@@ -43,13 +44,13 @@ HW_STATUS HW_DSPSS_BootModeSet(const u32 baseAddress,
 
 	/* if Boot mode it DIRECT BOOT, check that the bootAddress is
 	 * aligned to atleast 1K :: TODO */
-	WR_MEM_32_VOLATILE((baseAddress) + offset, bootMode);
+	__raw_writel(bootMode, (baseAddress) + offset);
 
 	offset = SYSC_IVA2BOOTADDR_OFFSET;
 
 	alignedBootAddr = bootAddress & SYSC_IVA2BOOTADDR_MASK;
 
-	WR_MEM_32_VOLATILE((baseAddress) + offset, alignedBootAddr);
+	__raw_writel(alignedBootAddr, (baseAddress) + offset);
 
 	return status;
 }
