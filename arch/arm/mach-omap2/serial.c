@@ -25,6 +25,7 @@
 #include <mach/board.h>
 #include <mach/clock.h>
 #include <mach/control.h>
+#include <mach/gpio.h>
 
 #include "prm.h"
 #include "pm.h"
@@ -91,7 +92,20 @@ static struct plat_serial8250_port serial_platform_data[] = {
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-	}, {
+	},
+#define QUART_CLK (1843200)
+#ifdef CONFIG_MACH_OMAP_ZOOM2
+	{
+		.membase        = 0,
+                .mapbase        = 0x10000000,
+		.irq            = OMAP_GPIO_IRQ(102),
+		.flags          = UPF_BOOT_AUTOCONF|UPF_IOREMAP|UPF_SHARE_IRQ,
+		.iotype         = UPIO_MEM,
+		.regshift       = 1,
+		.uartclk        = QUART_CLK,
+	},
+#endif
+	{
 		.flags		= 0
 	}
 };
