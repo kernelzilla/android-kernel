@@ -417,9 +417,12 @@ void omap_sram_idle(void)
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON) {
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
-		omap2_gpio_resume_after_idle();
-		if (per_prev_state == PWRDM_POWER_OFF)
+		if (per_prev_state == PWRDM_POWER_OFF) {
 			omap3_per_restore_context();
+			omap3_gpio_restore_pad_context(0);
+		} else if (per_next_state == PWRDM_POWER_OFF)
+			omap3_gpio_restore_pad_context(1);
+		omap2_gpio_resume_after_idle();
 		omap_uart_resume_idle(2);
 		if (per_state_modified)
 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
