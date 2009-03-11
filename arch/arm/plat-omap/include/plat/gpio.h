@@ -78,6 +78,7 @@ extern void omap_set_gpio_debounce(int gpio, int enable);
 extern void omap_set_gpio_debounce_time(int gpio, int enable);
 extern void omap_gpio_save_context(void);
 extern void omap_gpio_restore_context(void);
+extern void omap3_gpio_restore_pad_context(int restore_oe);
 /*-------------------------------------------------------------------------*/
 
 /* Wrappers for "new style" GPIO calls, using the new infrastructure
