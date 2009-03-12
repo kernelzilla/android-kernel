@@ -2060,7 +2060,7 @@ static int __devinit smc911x_drv_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto out;
 	}
-
+#ifndef SMC_MEM_RESERVED
 	/*
 	 * Request the regions.
 	 */
@@ -2068,7 +2068,7 @@ static int __devinit smc911x_drv_probe(struct platform_device *pdev)
 		 ret = -EBUSY;
 		 goto out;
 	}
-
+#endif
 	ndev = alloc_etherdev(sizeof(struct smc911x_local));
 	if (!ndev) {
 		printk("%s: could not allocate device.\n", CARDNAME);
