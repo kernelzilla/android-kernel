@@ -16,9 +16,6 @@
 
 #include "pm.h"
 
-static int vdd1_locked;
-static int vdd2_locked;
-
 #ifdef CONFIG_OMAP_PM_SRF
 static ssize_t vdd_opp_show(struct kobject *, struct kobj_attribute *, char *);
 static ssize_t vdd_opp_store(struct kobject *k, struct kobj_attribute *,
@@ -36,6 +33,9 @@ static struct kobj_attribute vdd2_lock_attr =
 #endif
 
 #ifdef CONFIG_OMAP_PM_SRF
+static int vdd1_locked;
+static int vdd2_locked;
+
 static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr,
 			 char *buf)
 {
