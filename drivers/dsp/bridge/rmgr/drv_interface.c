@@ -405,7 +405,7 @@ static int __init bridge_init(void)
 		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
 			    sizeof(temp));
 		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *)base_img,
-                           strlen(base_img) + 1);
+						strlen(base_img) + 1);
 	} else {
 		temp = false;
 		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
@@ -413,7 +413,7 @@ static int __init bridge_init(void)
 		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *) "\0", (u32)2);
 	}
 	REG_SetValue(NULL, NULL, NUMPROCS, REG_SZ, (u8 *) num_procs,
-                   strlen(num_procs) + 1);
+						strlen(num_procs) + 1);
 
 	if (shm_size >= 0x10000) {	/* 64 KB */
 		initStatus = REG_SetValue(NULL, NULL, SHMSIZE, REG_DWORD,
@@ -455,18 +455,9 @@ static int __init bridge_init(void)
 			    sizeof(tc_wordswapon));
 	}
 	if (DSP_SUCCEEDED(initStatus)) {
-		driverContext = DSP_Init(&initStatus);
-		if (DSP_FAILED(initStatus)) {
-			status = -1;
-			GT_0trace(driverTrace, GT_7CLASS,
-				 "DSP/BIOS Bridge initialization Failed\n");
-		} else {
-			GT_0trace(driverTrace, GT_5CLASS,
-					"DSP/BIOS Bridge driver loaded\n");
-		}
 #ifdef CONFIG_BRIDGE_DVFS
-		for (i = 0; i < 5; i++)
-                       pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].rate;
+		for (i = 0; i < 6; i++)
+			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].rate;
 
 		clk_handle = clk_get(NULL, "iva2_ck");
 		if (!clk_handle) {
@@ -484,6 +475,15 @@ static int __init bridge_init(void)
 			"clk_notifier_register FAIL for iva2_ck \n");
 		}
 #endif
+		driverContext = DSP_Init(&initStatus);
+		if (DSP_FAILED(initStatus)) {
+			status = -1;
+			GT_0trace(driverTrace, GT_7CLASS,
+				 "DSP/BIOS Bridge initialization Failed\n");
+		} else {
+			GT_0trace(driverTrace, GT_5CLASS,
+					"DSP/BIOS Bridge driver loaded\n");
+		}
 	}
 
 	DBC_Assert(status == 0);
@@ -660,11 +660,11 @@ func_cont:
 				(struct DRV_OBJECT *)hDrvObject, &pPctxt);
 
 	if (pPctxt != NULL) {
-               /* Return PID instead of process handle */
-               hProcess = current->pid;
+			/* Return PID instead of process handle */
+			hProcess = current->pid;
 
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
-               DRV_ProcSetPID(pPctxt, hProcess);
+			DRV_ProcSetPID(pPctxt, hProcess);
 	}
 #endif
 
