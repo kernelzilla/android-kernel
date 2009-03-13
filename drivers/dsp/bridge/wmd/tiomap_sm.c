@@ -30,10 +30,9 @@
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
-DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
+DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
-	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 	u32 numMbxMsg;
 	u32 mbxValue;
 	struct CFG_HOSTRES resources;
@@ -80,11 +79,11 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 	return status;
 }
 
-DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
+DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	struct CFG_HOSTRES resources;
 
-	DBG_Trace(DBG_ENTER, "CHNLSM_DisableInterrupt(0x%x)\n", hDevContext);
+	DBG_Trace(DBG_ENTER, "CHNLSM_DisableInterrupt(0x%x)\n", pDevContext);
 
 	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 			     &resources);
@@ -93,10 +92,9 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 	return DSP_SOK;
 }
 
-DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
+DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
-	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 
 #ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
@@ -130,7 +128,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		/* Restart the peripheral clocks that were disabled only
 		 * in DSP initiated Hibernation case.*/
 		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
-			DSP_PeripheralClocks_Enable(hDevContext, NULL);
+			DSP_PeripheralClocks_Enable(pDevContext, NULL);
 			/* Enabling Dpll in lock mode*/
 			temp = (u32) *((REG_UWORD32 *)
 				       ((u32) (resources.dwCmBase) + 0x34));
@@ -174,21 +172,21 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	return DSP_SOK;
 }
 
-DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
+DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 				u16 wMbVal)
 {
-	hDevContext->wIntrVal2Dsp = wMbVal;
-	return CHNLSM_InterruptDSP(hDevContext);
+	pDevContext->wIntrVal2Dsp = wMbVal;
+	return CHNLSM_InterruptDSP(pDevContext);
 }
 
-bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, bool *pfSchedDPC,
+bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *pDevContext, bool *pfSchedDPC,
 		u16 *pwIntrVal)
 {
 	struct CFG_HOSTRES resources;
 	u32 numMbxMsg;
 	u32 mbxValue;
 
-	DBG_Trace(DBG_ENTER, "CHNLSM_ISR(0x%x)\n", hDevContext);
+	DBG_Trace(DBG_ENTER, "CHNLSM_ISR(0x%x)\n", pDevContext);
 
 	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 
