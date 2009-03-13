@@ -14,42 +14,21 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <dspbridge/host_os.h>
-#include <dspbridge/std.h>
 #include <dspbridge/dbdefs.h>
 #include <dspbridge/errbase.h>
 
-#include <dspbridge/dbg.h>
-
 #include <dspbridge/cfg.h>
 #include <dspbridge/drv.h>
-#include <dspbridge/util.h>
-
-#include <dspbridge/wmd.h>
-
-#include <dspbridge/wcd.h>
 #include <dspbridge/dev.h>
-#include <dspbridge/io_sm.h>
 
-#include <hw_defs.h>
-#include <hw_mbox.h>
+#include <dspbridge/dbg.h>
 
 #include "_tiomap.h"
-#include <dspbridge/chnl_sm.h>
 #include "_tiomap_pwr.h"
 
 #ifdef CONFIG_BRIDGE_DVFS
 extern struct platform_device omap_dspbridge_dev;
 #endif
-
-#ifndef DEBUG
-#define TIHELEN_INT_TIMEOUT     1
-#define LOOP_COUNT              1000000
-#endif
-
-extern struct MAILBOX_CONTEXT mboxsetting;
-extern DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT
-					     *pDevContext, IN void *pArgs);
 
 DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 {
