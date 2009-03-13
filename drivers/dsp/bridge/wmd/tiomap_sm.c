@@ -14,41 +14,26 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-/*
- *  ======== tiomap_sm.c ========
- *  Description:
- *      Implements lower edge channel class library functions.
- *
- */
-
-/*  ----------------------------------- Host OS */
 #include <dspbridge/host_os.h>
-/*  ----------------------------------- DSP/BIOS Bridge */
 #include <dspbridge/std.h>
 #include <dspbridge/dbdefs.h>
 #include <dspbridge/errbase.h>
 
-/*  ----------------------------------- Trace & Debug */
 #include <dspbridge/dbg.h>
 
-/*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/cfg.h>
 #include <dspbridge/drv.h>
 #include <dspbridge/util.h>
 
-/*  ----------------------------------- Mini Driver */
 #include <dspbridge/wmd.h>
 
-/*  ----------------------------------- Platform Manager */
 #include <dspbridge/wcd.h>
 #include <dspbridge/dev.h>
 #include <dspbridge/io_sm.h>
 
-/* ------------------------------------ Hardware Abstraction Layer */
 #include <hw_defs.h>
 #include <hw_mbox.h>
 
-/*  ----------------------------------- This */
 #include "_tiomap.h"
 #include <dspbridge/chnl_sm.h>
 #include "_tiomap_pwr.h"
@@ -57,7 +42,6 @@
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
-/*  ----------------------------------- Defines, Data Structures, Typedefs */
 #ifndef DEBUG
 #define TIHELEN_INT_TIMEOUT     1
 #define LOOP_COUNT              1000000
@@ -66,10 +50,7 @@ extern struct platform_device omap_dspbridge_dev;
 extern struct MAILBOX_CONTEXT mboxsetting;
 extern DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT
 					     *pDevContext, IN void *pArgs);
-/*
- *  ======== CHNLSM_EnableInterrupt ========
- *      Enables interrupts from DSP.
- */
+
 DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -122,10 +103,6 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 	return status;
 }
 
-/*
- *  ======== CHNLSM_DisableInterrupt ========
- *      Disables interrupts from DSP.
- */
 DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -142,10 +119,6 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 	return status;
 }
 
-/*
- *  ======== CHNLSM_InterruptDSP ========
- *      Send an interrupt to the DSP processor(s).
- */
 DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -230,10 +203,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	return status;
 }
 
-/*
- *  ======== CHNLSM_InterruptDSP2 ========
- *     Set MBX value & send an interrupt to the DSP processor(s).
- */
 DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
 				u16 wMbVal)
 {
@@ -244,17 +213,11 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
 	return CHNLSM_InterruptDSP(hDevContext);
 }
 
-/*
- *  ======== CHNLSM_DPC ========
- */
 void CHNLSM_DPC(struct WMD_DEV_CONTEXT *hDevContext)
 {
 	DBG_Trace(DBG_ENTER, "CHNLSM_DPC(0x%x)\n", hDevContext);
 }
 
-/*
- *  ======== CHNLSM_ISR ========
- */
 bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
 		OUT u16 *pwIntrVal)
 {
@@ -286,4 +249,3 @@ bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
 	*pfSchedDPC = true;
 	return fMyInterrupt;
 }
-
