@@ -109,7 +109,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 	u32 opplevel = 0;
 #endif
 	struct CFG_HOSTRES resources;
-	u16 cnt = 10;
+	unsigned long timeout;
 	u32 temp;
 
 	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
@@ -156,12 +156,12 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
+	timeout = jiffies + msecs_to_jiffies(10);
 	while (fifo_full((void __iomem *) resources.dwMboxBase, 0)) {
-		if (--cnt == 0) {
+		if (time_after(jiffies, timeout)) {
 			DBG_Trace(DBG_LEVEL7, "Timed out waiting for DSP mailbox \n");
 			return WMD_E_TIMEOUT;
 		}
-		mdelay(1);
 	}
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
 		  pDevContext->wIntrVal2Dsp);
