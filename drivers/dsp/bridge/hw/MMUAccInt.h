@@ -41,7 +41,6 @@
 #define EASIL1_MMUMMU_LD_TLBWriteRegister32   (MMU_BASE_EASIL1 + 214)
 #define EASIL1_MMUMMU_CAMWriteRegister32   (MMU_BASE_EASIL1 + 226)
 #define EASIL1_MMUMMU_RAMWriteRegister32 (MMU_BASE_EASIL1 + 268)
-#define EASIL1_MMUMMU_GFLUSHGlobalFlushWrite32 (MMU_BASE_EASIL1 + 317)
 #define EASIL1_MMUMMU_FLUSH_ENTRYWriteRegister32  (MMU_BASE_EASIL1 + 322)
 
 /* Register offset address definitions */
@@ -73,7 +72,5 @@
 #define MMU_MMU_LOCK_BaseValue_OFFSET   10
 #define MMU_MMU_LOCK_CurrentVictim_MASK   0x3f0
 #define MMU_MMU_LOCK_CurrentVictim_OFFSET    4
-#define MMU_MMU_GFLUSH_GlobalFlush_MASK 0x1
-#define MMU_MMU_GFLUSH_GlobalFlush_OFFSET   0
 
 #endif /* _MMU_ACC_INT_H */

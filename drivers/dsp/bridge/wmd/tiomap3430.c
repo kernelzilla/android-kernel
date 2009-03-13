@@ -94,6 +94,9 @@
 #define MMU_LARGE_PAGE_MASK      0xFFFF0000
 #define MMU_SMALL_PAGE_MASK      0xFFFFF000
 #define PAGES_II_LVL_TABLE   512
+
+#define MMU_GFLUSH 0x60
+
 /* Forward Declarations: */
 static DSP_STATUS WMD_BRD_Monitor(struct WMD_DEV_CONTEXT *pDevContext);
 static DSP_STATUS WMD_BRD_Read(struct WMD_DEV_CONTEXT *pDevContext,
@@ -241,6 +244,11 @@ static struct WMD_DRV_INTERFACE drvInterfaceFxns = {
 	WMD_MSG_SetQueueId,
 };
 
+static inline void tlb_flush_all(const u32 base)
+{
+    __raw_writeb(__raw_readb(base + MMU_GFLUSH) | 1, base + MMU_GFLUSH);
+}
+
 static inline void flush_all(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	struct CFG_HOSTRES resources;
@@ -253,10 +261,10 @@ static inline void flush_all(struct WMD_DEV_CONTEXT *pDevContext)
 	    (temp & HW_PWR_STATE_ON) == HW_PWR_STATE_RET) {
 		CLK_Enable(SERVICESCLK_iva2_ck);
 		WakeDSP(pDevContext, NULL);
-		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+		tlb_flush_all(pDevContext->dwDSPMmuBase);
 		CLK_Disable(SERVICESCLK_iva2_ck);
 	} else
-		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+		tlb_flush_all(pDevContext->dwDSPMmuBase);
 }
 
 /*

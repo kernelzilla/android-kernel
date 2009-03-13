@@ -212,15 +212,6 @@ HW_STATUS HW_MMU_VictimNumSet(const u32 baseAddress,
     return status;
 }
 
-HW_STATUS HW_MMU_TLBFlushAll(const u32 baseAddress)
-{
-    HW_STATUS status = RET_OK;
-
-    MMUMMU_GFLUSHGlobalFlushWrite32(baseAddress, HW_SET);
-
-    return status;
-}
-
 HW_STATUS HW_MMU_EventAck(const u32 baseAddress, u32 irqMask)
 {
     HW_STATUS status = RET_OK;

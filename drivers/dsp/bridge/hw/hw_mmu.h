@@ -91,8 +91,6 @@ extern HW_STATUS HW_MMU_TLBFlush(const u32 baseAddress,
 				    u32 virtualAddr,
 				    u32 pageSize);
 
-extern HW_STATUS HW_MMU_TLBFlushAll(const u32 baseAddress);
-
 extern HW_STATUS HW_MMU_TLBAdd(const u32     baseAddress,
 				  u32	   physicalAddr,
 				  u32	   virtualAddr,

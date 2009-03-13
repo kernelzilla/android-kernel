@@ -239,20 +239,6 @@
 }
 
 
-#define MMUMMU_GFLUSHGlobalFlushWrite32(baseAddress, value)\
-{\
-    const u32 offset = MMU_MMU_GFLUSH_OFFSET;\
-    register u32 data = RD_MEM_32_VOLATILE((baseAddress)+offset);\
-    register u32 newValue = (value);\
-    _DEBUG_LEVEL_1_EASI(EASIL1_MMUMMU_GFLUSHGlobalFlushWrite32);\
-    data &= ~(MMU_MMU_GFLUSH_GlobalFlush_MASK);\
-    newValue <<= MMU_MMU_GFLUSH_GlobalFlush_OFFSET;\
-    newValue &= MMU_MMU_GFLUSH_GlobalFlush_MASK;\
-    newValue |= data;\
-    WR_MEM_32_VOLATILE(baseAddress+offset, newValue);\
-}
-
-
 #define MMUMMU_FLUSH_ENTRYWriteRegister32(baseAddress, value)\
 {\
     const u32 offset = MMU_MMU_FLUSH_ENTRY_OFFSET;\
