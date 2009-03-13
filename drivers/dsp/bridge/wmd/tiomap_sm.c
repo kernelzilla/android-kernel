@@ -156,7 +156,7 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
-	timeout = jiffies + msecs_to_jiffies(10);
+	timeout = jiffies + msecs_to_jiffies(1);
 	while (fifo_full((void __iomem *) resources.dwMboxBase, 0)) {
 		if (time_after(jiffies, timeout)) {
 			printk(KERN_ERR "dspbridge: timed out waiting for mailbox\n");
