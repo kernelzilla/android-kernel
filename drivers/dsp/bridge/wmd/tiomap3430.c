@@ -241,6 +241,24 @@ static struct WMD_DRV_INTERFACE drvInterfaceFxns = {
 	WMD_MSG_SetQueueId,
 };
 
+static inline void flush_all(struct WMD_DEV_CONTEXT *pDevContext)
+{
+	struct CFG_HOSTRES resources;
+	u32 temp = 0;
+
+	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
+	HW_PWRST_IVA2RegGet(resources.dwPrmBase, &temp);
+
+	if ((temp & HW_PWR_STATE_ON) == HW_PWR_STATE_OFF ||
+	    (temp & HW_PWR_STATE_ON) == HW_PWR_STATE_RET) {
+		CLK_Enable(SERVICESCLK_iva2_ck);
+		WakeDSP(pDevContext, NULL);
+		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+		CLK_Disable(SERVICESCLK_iva2_ck);
+	} else
+		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+}
+
 /*
  *  ======== WMD_DRV_Entry ========
  *  purpose:
@@ -1324,17 +1342,14 @@ static DSP_STATUS WMD_BRD_MemMap(struct WMD_DEV_CONTEXT *hDevContext,
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 	struct HW_MMUMapAttrs_t hwAttrs;
 	u32 numOfActualTabEntries = 0;
-	u32 temp = 0;
-	struct CFG_HOSTRES resources;
 	u32 *pPhysAddrPageTbl = NULL;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
+	u32 temp = 0;
 
 	DBG_Trace(DBG_ENTER, "> WMD_BRD_MemMap hDevContext %x, pa %x, va %x, "
 		 "size %x, ulMapAttr %x\n", hDevContext, ulMpuAddr, ulVirtAddr,
 		 ulNumBytes, ulMapAttr);
-	status = CFG_GetHostResources(
-		 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 	if (ulNumBytes == 0)
 		return DSP_EINVALIDARG;
 
@@ -1462,16 +1477,7 @@ func_cont:
 	 * This is called from here instead from PteUpdate to avoid unnecessary
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
-	HW_PWRST_IVA2RegGet(resources.dwPrmBase, &temp);
-
-       if ((temp & HW_PWR_STATE_ON) == HW_PWR_STATE_OFF ||
-               (temp & HW_PWR_STATE_ON) == HW_PWR_STATE_RET) {
-		CLK_Enable(SERVICESCLK_iva2_ck);
-		WakeDSP(pDevContext, NULL);
-		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
-		CLK_Disable(SERVICESCLK_iva2_ck);
-	} else
-		HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+	flush_all(pDevContext);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemMap status %x\n", status);
 	return status;
 }
@@ -1612,8 +1618,7 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 	 /* It is better to flush the TLB here, so that any stale old entries
 	 * get flushed */
 EXIT_LOOP:
-	CHNLSM_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
-	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+	flush_all(pDevContext);
 	DBG_Trace(DBG_LEVEL1, "WMD_BRD_MemUnMap vaCurr %x, pteAddrL1 %x "
 		  "pteAddrL2 %x\n", vaCurr, pteAddrL1, pteAddrL2);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemUnMap status %x remBytes %x, "
@@ -2096,9 +2101,7 @@ func_cont:
 	 * This is called from here instead from PteUpdate to avoid unnecessary
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
-	/* Waking up DSP before calling TLB Flush */
-	CHNLSM_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
-	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
+	flush_all(pDevContext);
 	DBG_Trace(DBG_LEVEL7, "< WMD_BRD_MemMap  at end status %x\n", status);
 	return status;
 }
