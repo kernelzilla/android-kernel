@@ -33,7 +33,6 @@ extern struct platform_device omap_dspbridge_dev;
 DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
-	HW_STATUS hwStatus;
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 	u32 numMbxMsg;
 	u32 mbxValue;
@@ -45,25 +44,25 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 
 	/* Read the messages in the mailbox until the message queue is empty */
 
-	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-				      &resources);
-	status = DEV_GetDevType(pDevContext->hDevObject, &devType);
+	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
+			     &resources);
+	DEV_GetDevType(pDevContext->hDevObject, &devType);
 	status = DEV_GetIOMgr(pDevContext->hDevObject, &hIOMgr);
 	if (devType == DSP_UNIT) {
-		hwStatus = HW_MBOX_NumMsgGet(resources.dwMboxBase,
-					     MBOX_DSP2ARM, &numMbxMsg);
+		HW_MBOX_NumMsgGet(resources.dwMboxBase,
+				  MBOX_DSP2ARM, &numMbxMsg);
 		while (numMbxMsg != 0) {
-			hwStatus = HW_MBOX_MsgRead(resources.dwMboxBase,
-						   MBOX_DSP2ARM,
-						   &mbxValue);
+			HW_MBOX_MsgRead(resources.dwMboxBase,
+					MBOX_DSP2ARM,
+					&mbxValue);
 			numMbxMsg--;
 		}
 		/* clear the DSP mailbox as well...*/
-		hwStatus = HW_MBOX_NumMsgGet(resources.dwMboxBase,
-					     MBOX_ARM2DSP, &numMbxMsg);
+		HW_MBOX_NumMsgGet(resources.dwMboxBase,
+				  MBOX_ARM2DSP, &numMbxMsg);
 		while (numMbxMsg != 0) {
-			hwStatus = HW_MBOX_MsgRead(resources.dwMboxBase,
-						   MBOX_ARM2DSP, &mbxValue);
+			HW_MBOX_MsgRead(resources.dwMboxBase,
+					MBOX_ARM2DSP, &mbxValue);
 			numMbxMsg--;
 			UTIL_Wait(10);
 
@@ -72,10 +71,10 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 					 HW_MBOX_INT_NEW_MSG);
 		}
 		/* Enable the new message events on this IRQ line */
-		hwStatus = HW_MBOX_EventEnable(resources.dwMboxBase,
-					       MBOX_DSP2ARM,
-					       MBOX_ARM,
-					       HW_MBOX_INT_NEW_MSG);
+		HW_MBOX_EventEnable(resources.dwMboxBase,
+				    MBOX_DSP2ARM,
+				    MBOX_ARM,
+				    HW_MBOX_INT_NEW_MSG);
 	}
 
 	return status;
@@ -83,17 +82,15 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 
 DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 {
-	DSP_STATUS status = DSP_SOK;
-	HW_STATUS hwStatus;
 	struct CFG_HOSTRES resources;
 
 	DBG_Trace(DBG_ENTER, "CHNLSM_DisableInterrupt(0x%x)\n", hDevContext);
 
-	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-				      &resources);
-	hwStatus = HW_MBOX_EventDisable(resources.dwMboxBase, MBOX_DSP2ARM,
-					MBOX_ARM, HW_MBOX_INT_NEW_MSG);
-	return status;
+	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
+			     &resources);
+	HW_MBOX_EventDisable(resources.dwMboxBase, MBOX_DSP2ARM,
+			     MBOX_ARM, HW_MBOX_INT_NEW_MSG);
+	return DSP_SOK;
 }
 
 DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
@@ -106,7 +103,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		omap_dspbridge_dev.dev.platform_data;
 	u32 opplevel = 0;
 #endif
-	HW_STATUS hwStatus;
 	u32 mbxFull;
 	struct CFG_HOSTRES resources;
 	u16 cnt = 10;
@@ -148,7 +144,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 			*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
 				(u32) temp;
 		}
-		status = HW_MBOX_restoreSettings(resources.dwMboxBase);
+		HW_MBOX_restoreSettings(resources.dwMboxBase);
 
 		/*  Access MMU SYS CONFIG register to generate a short wakeup */
 		temp = (u32) *((REG_UWORD32 *) ((u32)
@@ -157,8 +153,8 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
 	while (--cnt) {
-		hwStatus = HW_MBOX_IsFull(resources.dwMboxBase,
-					   MBOX_ARM2DSP, &mbxFull);
+		HW_MBOX_IsFull(resources.dwMboxBase,
+			       MBOX_ARM2DSP, &mbxFull);
 		if (mbxFull)
 			UTIL_Wait(1000);	/* wait for 1 ms)      */
 		else
@@ -166,36 +162,28 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	}
 	if (!cnt) {
 		DBG_Trace(DBG_LEVEL7, "Timed out waiting for DSP mailbox \n");
-		status = WMD_E_TIMEOUT;
-		return status;
+		return WMD_E_TIMEOUT;
 	}
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
 		  pDevContext->wIntrVal2Dsp);
 
-	hwStatus = HW_MBOX_MsgWrite(resources.dwMboxBase, MBOX_ARM2DSP,
-				    pDevContext->wIntrVal2Dsp);
+	HW_MBOX_MsgWrite(resources.dwMboxBase, MBOX_ARM2DSP,
+			 pDevContext->wIntrVal2Dsp);
 	/* set the Mailbox interrupt to default value */
 	pDevContext->wIntrVal2Dsp = MBX_PCPY_CLASS;
-	return status;
+	return DSP_SOK;
 }
 
 DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
 				u16 wMbVal)
 {
-	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
-
-	pDevContext->wIntrVal2Dsp = wMbVal;
-
+	hDevContext->wIntrVal2Dsp = wMbVal;
 	return CHNLSM_InterruptDSP(hDevContext);
 }
 
-bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
-		OUT u16 *pwIntrVal)
+bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, bool *pfSchedDPC,
+		u16 *pwIntrVal)
 {
-	bool fMyInterrupt = true;	/*
-					 * We own the mbx and
-					 * we're not sharing it
-					 */
 	struct CFG_HOSTRES resources;
 	u32 numMbxMsg;
 	u32 mbxValue;
@@ -217,5 +205,5 @@ bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
 	}
 	/* Set *pfSchedDPC to true; */
 	*pfSchedDPC = true;
-	return fMyInterrupt;
+	return true;
 }
