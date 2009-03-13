@@ -19,28 +19,6 @@
  *  Description:
  *      Definitions and types private to this WMD.
  *
- *! Revision History
- *! ================
- *! 12-Apr-2004 hp:  Removed the L4 entry of Dsp DMA , not needed
- *! 08-Mar-2004 sb:  Added the Dynamic Memory Mapping feature - PgTableAttrs
- *! 21-Mar-2003 sb:  Added numTLBEntries to struct WMD_DEV_CONTEXT
- *! 20-Feb-2003 vp:  Ported to Linux platform.
- *! 30-Jul-2002 rr:  Modified TBC_ID_VALUE to 0xb47002f.
- *! 10-May-2002 sg:  Added ARM_SYSST_OFFSET and IDLE_DSP_MASK.
- *! 14-Mar-2002 rr:  Added Boot vector field to pDevContext.
- *!                  Added TBC Register defines and value for OMAP1510.
- *! 12-Jan-2002 ag:  wIntrVal2Dsp Added.
- *! 05-Nov-2001 kc:  Added MMU fault related definitions.
- *! 03-Aug-2001 ag   Added TLB table for OEM cofig of DSP-MMU.
- *! 23-Aug-2001 rr:  Added API_SIZE define.
- *! 16-Aug-2001 rr:  Added dwDspExtBaseAddr to access the Ext memory.
- *! 24-Jul-2001 ag:  Added Internal SRAM MMU table entry.
- *! 27-Jun-2001 rr:  Name changed to _tihelen.h.
- *! 27-Jun-2001 ag:  Added dwIntAddr in WMD_DEV_CONTEXT used for MB INTRs msk.
- *! 07-May-2001 ag:  Added DSP Clock Module CLKM2.
- *!                  Added TIHEL_SDRAMPHYSBASE used for DSP MMU init.
- *!                  Added ClearBit() MACRO.
- *! 18-Jan-2001 rr:  Created
  */
 
 #ifndef _TIOMAP_

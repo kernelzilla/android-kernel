@@ -27,24 +27,6 @@
  *      UTIL_GetSysInfo
  *      UTIL_Init
  *      UTIL_Wait
- *
- *  Private Functions:
- *      isspace
- *
- *  Notes:
- *
- *! Revision History
- *! ================
- *! 12-Aug-2000 ag: Added UTIL_GetSysInfo().
- *! 31-Jan-2000 rr: Comments modifed for UTIL_Wait fxn.
- *! 17-Jan-2000 rr: UTIL_Wait fxn added. Busy waits x number of micro seconds.
- *! 12-Nov-1999 kc: Modified UTIL_CmdLineToArgs for use by different tests.
- *! 02-Nov-1999 kc: Removed parameter from UTIL_CDTestDll.
- *! 29-Oct-1999 kc: Cleaned up for code review.
- *! 08-Oct-1999 kc: Renamed UTIL_TestDllExec to UTIL_CDTestDll; added
- *!                 UTIL_CmdLineToArgs(); added isspace private func.
- *! 26-Dec-1996 cr: Created from misc pieces of wcd95.c, ktest.c.
- *
  */
 
 #ifndef _UTIL_H

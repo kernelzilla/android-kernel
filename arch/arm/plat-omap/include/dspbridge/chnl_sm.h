@@ -36,15 +36,6 @@
  *      Currently, CHNLSM_Read() and CHNLSM_Write() are not called, but must
  *      be defined to link.
  *
- *! Revision History:
- *! ================
- *! 06-Jan-2002 ag: Added CHNLSM_InterruptDSP2 to set Mailbox value.
- *! 05-Nov-2001 kc: Updated CHNLSM_ISR to read value returned by interrupt.
- *! 21-Jan-2000 ag: Updated comments per code review.
- *! 18-Dec-1997 gp: Added CDECL.
- *! 16-Jun-1997 gp: Added function UpdateSHMLength().
- *! 13-Nov-1996 gp: Renamed CHNL_ to CHNLSM_.
- *! 10-Jul-1996 gp: Created.
  */
 
 #ifndef CHNLSM_

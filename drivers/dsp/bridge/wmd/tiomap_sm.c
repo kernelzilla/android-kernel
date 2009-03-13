@@ -19,21 +19,6 @@
  *  Description:
  *      Implements lower edge channel class library functions.
  *
- *! Revision History:
- *! ================
- *! 05-Jan-2004 vp    Updated for the new HW library for 24xx platform.
- *! 12-Feb-2004 hp    use 'CFG_GetHostResources' to fetch virtual addresses of
- *!           PRCM, dMMU components.
- *! 08-Oct-2002 rr    Renamed to tiomap1510_sm.c
- *! 15-Feb-2002 ag    Remove #include <pkfuncs.h> & util.h.
- *! 07-Jan-2001 ag    Set DSP MBX val (to DSP) contained in DEV context.
- *! 05-Nov-2001 kc:   Modified CHNLSM_ISR to read mailbox1 interrupt values
- *! 26-Sep-2001 rr:   InterruptDSP does not spin forever for retail build.
- *! 29-Aug-2001 rr:   Cleaned up the non referenced variables.
- *! 26-Jul-2001 jeh   Enable interrupt to DSP.
- *! 28-Jun-2001 ag    Disable INTR gen to DSP in CHNLSM_InterruptDSP().
- *! 26-Jun-2001 ag    Added INTR support.
- *! 17-May-2000 ag    Initial. No INTR support.
  */
 
 /*  ----------------------------------- Host OS */
