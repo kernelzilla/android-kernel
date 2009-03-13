@@ -981,8 +981,6 @@ void IO_DPC(IN OUT void *pRefData)
 			WMD_DEH_Notify(hDehMgr, DSP_SYSERROR, pIOMgr->wIntrVal);
 
 	}
-	/* Call WMD's DPC: */
-	IO_CALLDPC(pIOMgr->hWmdContext);
 	IO_DispatchChnl(pIOMgr, NULL, IO_SERVICE);
 #ifdef CHNL_MESSAGES
 	if (pMsgMgr) {

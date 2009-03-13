@@ -192,11 +192,6 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *hDevContext,
 	return CHNLSM_InterruptDSP(hDevContext);
 }
 
-void CHNLSM_DPC(struct WMD_DEV_CONTEXT *hDevContext)
-{
-	DBG_Trace(DBG_ENTER, "CHNLSM_DPC(0x%x)\n", hDevContext);
-}
-
 bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
 		OUT u16 *pwIntrVal)
 {

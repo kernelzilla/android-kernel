@@ -79,7 +79,6 @@
 #define IO_EnableInterrupt(h)   CHNLSM_EnableInterrupt(h)
 #define IO_InterruptDSP(h)      CHNLSM_InterruptDSP(h)
 #define IO_InterruptDSP2(h, v)  CHNLSM_InterruptDSP2(h, v)
-#define IO_CALLDPC(h)           CHNLSM_DPC(h)
 #define IO_CALLISR(h, pFlag, pwMBRegVal)   CHNLSM_ISR(h, pFlag, pwMBRegVal)
 
 /*

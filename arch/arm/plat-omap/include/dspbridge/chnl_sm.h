@@ -23,7 +23,6 @@
  *
  *  Public Functions:
  *      CHNLSM_DisableInterrupt;
- *      CHNLSM_DPC;
  *      CHNLSM_EnableInterrupt;
  *      CHNLSM_InterruptDSP;
  *      CHNLSM_ISR;
@@ -55,22 +54,6 @@
  */
        extern DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT*
 							hDevContext);
-
-/*
- *  ======== CHNLSM_DPC ========
- *  Purpose:
- *      This mini-driver's deferred processing routine.  Finishes processing
- *      deferred by the WMD's ISR.
- *  Parameters:
- *      hDevContext:    Handle to mini-driver defined device info.
- *  Returns:
- *  Requires:
- *      Must not block.
- *      Must not acquire resources.
- *      All data objects touched must be locked in memory.
- *  Ensures:
- */
-       extern void CHNLSM_DPC(struct WMD_DEV_CONTEXT *hDevContext);
 
 /*
  *  ======== CHNLSM_EnableInterrupt ========
