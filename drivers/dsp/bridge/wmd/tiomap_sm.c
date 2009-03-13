@@ -30,6 +30,13 @@
 extern struct platform_device omap_dspbridge_dev;
 #endif
 
+#define MAILBOX_FIFOSTATUS(m) (0x80 + 4 * (m))
+
+static inline unsigned int fifo_full(void __iomem *mbox_base, int mbox_id)
+{
+	return __raw_readl(mbox_base + MAILBOX_FIFOSTATUS(mbox_id)) & 0x1;
+}
+
 DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
@@ -101,7 +108,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 		omap_dspbridge_dev.dev.platform_data;
 	u32 opplevel = 0;
 #endif
-	u32 mbxFull;
 	struct CFG_HOSTRES resources;
 	u16 cnt = 10;
 	u32 temp;
@@ -150,17 +156,12 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
-	while (--cnt) {
-		HW_MBOX_IsFull(resources.dwMboxBase,
-			       MBOX_ARM2DSP, &mbxFull);
-		if (mbxFull)
-			mdelay(1);
-		else
-			break;
-	}
-	if (!cnt) {
-		DBG_Trace(DBG_LEVEL7, "Timed out waiting for DSP mailbox \n");
-		return WMD_E_TIMEOUT;
+	while (fifo_full((void __iomem *) resources.dwMboxBase, 0)) {
+		if (--cnt == 0) {
+			DBG_Trace(DBG_LEVEL7, "Timed out waiting for DSP mailbox \n");
+			return WMD_E_TIMEOUT;
+		}
+		mdelay(1);
 	}
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
 		  pDevContext->wIntrVal2Dsp);

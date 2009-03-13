@@ -130,41 +130,6 @@ extern HW_STATUS HW_MBOX_MsgWrite(
 		  );
 
 /*
-* FUNCTION      : HW_MBOX_IsFull
-*
-* INPUTS:
-*
-*   Identifier  : baseAddress
-*   Type	: const u32
-*   Description : Base Address of instance of Mailbox module
-*
-*   Identifier  : mailBoxId
-*   Type	: const HW_MBOX_Id_t
-*   Description : Mail Box Sub module Id to check
-*
-* OUTPUTS:
-*
-*   Identifier  : pIsFull
-*   Type	: u32 *const
-*   Description : false means mail box not Full
-*		 true means mailbox full.
-*
-* RETURNS:
-*
-*   Type	: ReturnCode_t
-*   Description : RET_OK	      No errors occured
-*		 RET_BAD_NULL_PARAM  Address/pointer Paramater was set to 0/NULL
-*		 RET_INVALID_ID      Invalid Id used
-*
-* PURPOSE:      : this function reads the full status register for mailbox.
-*/
-extern HW_STATUS HW_MBOX_IsFull(
-		      const u32	 baseAddress,
-		      const HW_MBOX_Id_t   mailBoxId,
-		      u32 *const	pIsFull
-		  );
-
-/*
 * FUNCTION      : HW_MBOX_NumMsgGet
 *
 * INPUTS:
