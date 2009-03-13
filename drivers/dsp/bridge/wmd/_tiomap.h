@@ -361,7 +361,6 @@ struct WMD_DEV_CONTEXT {
 	u32 dwBrdState;	/* Last known board state.      */
 	u32 ulIntMask;	/* int mask                     */
 	u16 ioBase;	/* Board I/O base               */
-	u16 wIntrVal2Dsp;	/* MBX value to DSP. See mbx_sh.h */
 	u32 numTLBEntries;	/* DSP MMU TLB entry counter    */
 	u32 fixedTLBEntries;	/* Fixed DSPMMU TLB entry count */
 

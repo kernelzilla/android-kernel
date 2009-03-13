@@ -1076,8 +1076,6 @@ static DSP_STATUS WMD_DEV_Create(OUT struct WMD_DEV_CONTEXT **ppDevContext,
 
 	if (DSP_SUCCEEDED(status)) {
 		/* Set the Endianism Register */ /* Need to set this */
-		/* default to Proc-copy */
-		pDevContext->wIntrVal2Dsp = MBX_PCPY_CLASS;
 		/* Retrieve the TC u16 SWAP Option */
 		status = REG_GetValue(NULL, CURRENTCONFIG, TCWORDSWAP,
 				     (u8 *)&tcWordSwap, &tcWordSwapSize);

@@ -112,8 +112,6 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 	unsigned long timeout;
 	u32 temp;
 
-	pDevContext->wIntrVal2Dsp = wMbVal;
-
 	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 				      &resources);
 	if (DSP_FAILED(status))
@@ -166,12 +164,10 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 		}
 	}
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
-		  pDevContext->wIntrVal2Dsp);
+		  wMbVal);
 
 	HW_MBOX_MsgWrite(resources.dwMboxBase, MBOX_ARM2DSP,
-			 pDevContext->wIntrVal2Dsp);
-	/* set the Mailbox interrupt to default value */
-	pDevContext->wIntrVal2Dsp = MBX_PCPY_CLASS;
+			 wMbVal);
 	return DSP_SOK;
 }
 
