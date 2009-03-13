@@ -45,38 +45,37 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 
 	/* Read the messages in the mailbox until the message queue is empty */
 
-	status = CFG_GetHostResources(
-			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-			&resources);
+	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
+				      &resources);
 	status = DEV_GetDevType(pDevContext->hDevObject, &devType);
 	status = DEV_GetIOMgr(pDevContext->hDevObject, &hIOMgr);
 	if (devType == DSP_UNIT) {
 		hwStatus = HW_MBOX_NumMsgGet(resources.dwMboxBase,
-					       MBOX_DSP2ARM, &numMbxMsg);
+					     MBOX_DSP2ARM, &numMbxMsg);
 		while (numMbxMsg != 0) {
 			hwStatus = HW_MBOX_MsgRead(resources.dwMboxBase,
-						     MBOX_DSP2ARM,
-						     &mbxValue);
+						   MBOX_DSP2ARM,
+						   &mbxValue);
 			numMbxMsg--;
 		}
 		/* clear the DSP mailbox as well...*/
 		hwStatus = HW_MBOX_NumMsgGet(resources.dwMboxBase,
-					       MBOX_ARM2DSP, &numMbxMsg);
+					     MBOX_ARM2DSP, &numMbxMsg);
 		while (numMbxMsg != 0) {
 			hwStatus = HW_MBOX_MsgRead(resources.dwMboxBase,
-						    MBOX_ARM2DSP, &mbxValue);
+						   MBOX_ARM2DSP, &mbxValue);
 			numMbxMsg--;
 			UTIL_Wait(10);
 
 			HW_MBOX_EventAck(resources.dwMboxBase, MBOX_ARM2DSP,
-					  HW_MBOX_U1_DSP1,
-					  HW_MBOX_INT_NEW_MSG);
+					 HW_MBOX_U1_DSP1,
+					 HW_MBOX_INT_NEW_MSG);
 		}
 		/* Enable the new message events on this IRQ line */
 		hwStatus = HW_MBOX_EventEnable(resources.dwMboxBase,
-						 MBOX_DSP2ARM,
-						 MBOX_ARM,
-						 HW_MBOX_INT_NEW_MSG);
+					       MBOX_DSP2ARM,
+					       MBOX_ARM,
+					       HW_MBOX_INT_NEW_MSG);
 	}
 
 	return status;
@@ -90,11 +89,10 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *hDevContext)
 
 	DBG_Trace(DBG_ENTER, "CHNLSM_DisableInterrupt(0x%x)\n", hDevContext);
 
-	status = CFG_GetHostResources(
-			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-			&resources);
+	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
+				      &resources);
 	hwStatus = HW_MBOX_EventDisable(resources.dwMboxBase, MBOX_DSP2ARM,
-					  MBOX_ARM, HW_MBOX_INT_NEW_MSG);
+					MBOX_ARM, HW_MBOX_INT_NEW_MSG);
 	return status;
 }
 
@@ -105,7 +103,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 
 #ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
+		omap_dspbridge_dev.dev.platform_data;
 	u32 opplevel = 0;
 #endif
 	HW_STATUS hwStatus;
@@ -114,48 +112,47 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 	u16 cnt = 10;
 	u32 temp;
 
-	status = CFG_GetHostResources(
-			(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-			&resources);
-       if (DSP_FAILED(status))
-               return DSP_EFAIL;
+	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
+				      &resources);
+	if (DSP_FAILED(status))
+		return DSP_EFAIL;
 #ifdef CONFIG_BRIDGE_DVFS
-       if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
-           pDevContext->dwBrdState == BRD_HIBERNATION) {
+	if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
+	    pDevContext->dwBrdState == BRD_HIBERNATION) {
 		if (pdata->dsp_get_opp)
 			opplevel = (*pdata->dsp_get_opp)();
 		if (opplevel == 1) {
-                       if (pdata->dsp_set_min_opp)
+			if (pdata->dsp_set_min_opp)
 				(*pdata->dsp_set_min_opp)(opplevel+1);
 		}
-       }
+	}
 #endif
 
-       if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
+	if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
 		/* Restore mailbox settings */
-               /* Restart the peripheral clocks that were disabled only
-               * in DSP initiated Hibernation case.*/
-               if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
-                       DSP_PeripheralClocks_Enable(hDevContext, NULL);
-                /* Enabling Dpll in lock mode*/
-                       temp = (u32) *((REG_UWORD32 *)
-                                       ((u32) (resources.dwCmBase) + 0x34));
-                       temp = (temp & 0xFFFFFFFE) | 0x1;
-                       *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
-                                       (u32) temp;
-                       temp = (u32) *((REG_UWORD32 *)
-                                       ((u32) (resources.dwCmBase) + 0x4));
-                       temp = (temp & 0xFFFFFC8) | 0x37;
+		/* Restart the peripheral clocks that were disabled only
+		 * in DSP initiated Hibernation case.*/
+		if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION) {
+			DSP_PeripheralClocks_Enable(hDevContext, NULL);
+			/* Enabling Dpll in lock mode*/
+			temp = (u32) *((REG_UWORD32 *)
+				       ((u32) (resources.dwCmBase) + 0x34));
+			temp = (temp & 0xFFFFFFFE) | 0x1;
+			*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
+				(u32) temp;
+			temp = (u32) *((REG_UWORD32 *)
+				       ((u32) (resources.dwCmBase) + 0x4));
+			temp = (temp & 0xFFFFFC8) | 0x37;
 
-                       *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
-                                       (u32) temp;
-               }
+			*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
+				(u32) temp;
+		}
 		status = HW_MBOX_restoreSettings(resources.dwMboxBase);
 
-               /*  Access MMU SYS CONFIG register to generate a short wakeup */
-               temp = (u32) *((REG_UWORD32 *) ((u32)
-                       (resources.dwDmmuBase) + 0x10));
+		/*  Access MMU SYS CONFIG register to generate a short wakeup */
+		temp = (u32) *((REG_UWORD32 *) ((u32)
+						(resources.dwDmmuBase) + 0x10));
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	}
@@ -173,10 +170,10 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *hDevContext)
 		return status;
 	}
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
-		 pDevContext->wIntrVal2Dsp);
+		  pDevContext->wIntrVal2Dsp);
 
 	hwStatus = HW_MBOX_MsgWrite(resources.dwMboxBase, MBOX_ARM2DSP,
-				     pDevContext->wIntrVal2Dsp);
+				    pDevContext->wIntrVal2Dsp);
 	/* set the Mailbox interrupt to default value */
 	pDevContext->wIntrVal2Dsp = MBX_PCPY_CLASS;
 	return status;
@@ -205,8 +202,7 @@ bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *hDevContext, OUT bool *pfSchedDPC,
 
 	DBG_Trace(DBG_ENTER, "CHNLSM_ISR(0x%x)\n", hDevContext);
 
-	CFG_GetHostResources(
-		(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
+	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 
 	HW_MBOX_NumMsgGet(resources.dwMboxBase, MBOX_DSP2ARM, &numMbxMsg);
 
