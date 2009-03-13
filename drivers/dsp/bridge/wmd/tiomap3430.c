@@ -775,7 +775,7 @@ static DSP_STATUS WMD_BRD_Stop(struct WMD_DEV_CONTEXT *hDevContext)
 	HW_PWRST_IVA2RegGet(resources.dwPrmBase, &dspPwrState);
 	if (dspPwrState != HW_PWR_STATE_OFF) {
 
-			IO_InterruptDSP2(pDevContext, MBX_PM_DSPIDLE);
+			CHNLSM_InterruptDSP2(pDevContext, MBX_PM_DSPIDLE);
 
 			mdelay(10);
 
@@ -1614,7 +1614,7 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 	 /* It is better to flush the TLB here, so that any stale old entries
 	 * get flushed */
 EXIT_LOOP:
-	IO_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
+	CHNLSM_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_LEVEL1, "WMD_BRD_MemUnMap vaCurr %x, pteAddrL1 %x "
 		  "pteAddrL2 %x\n", vaCurr, pteAddrL1, pteAddrL2);
@@ -2099,7 +2099,7 @@ func_cont:
 	 * repetition while mapping non-contiguous physical regions of a virtual
 	 * region */
 	/* Waking up DSP before calling TLB Flush */
-	IO_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
+	CHNLSM_InterruptDSP2(pDevContext, MBX_PM_DSPWAKEUP);
 	HW_MMU_TLBFlushAll(pDevContext->dwDSPMmuBase);
 	DBG_Trace(DBG_LEVEL7, "< WMD_BRD_MemMap  at end status %x\n", status);
 	return status;
