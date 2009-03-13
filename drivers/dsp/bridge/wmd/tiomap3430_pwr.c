@@ -130,7 +130,7 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 	/* Wait for DSP to move into Off state,  how much time should
 	 * we wait? */
 	while ((pwrState != HW_PWR_STATE_OFF) && --usCount) {
-		UTIL_Wait(PWR_WAIT_USECS);
+		udelay(500);
 		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 				    &pwrState);
 	}
@@ -252,7 +252,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 	/* Wait for DSP to move into Standby state,  how much time
 	 * should we wait?*/
 	while ((pwrState != targetPwrState) && --usCount) {
-		UTIL_Wait(PWR_WAIT_USECS);
+		udelay(500);
 		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 				    &pwrState);
 	}

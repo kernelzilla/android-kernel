@@ -466,9 +466,9 @@ static DSP_STATUS WMD_BRD_Start(struct WMD_DEV_CONTEXT *hDevContext,
 		/* Reset and Unreset the RST2, so that BOOTADDR is copied to
 		 * IVA2 SYSC register */
 		HW_RST_Reset(resources.dwPrmBase, HW_RST2_IVA2);
-		UTIL_Wait(100);
+		udelay(100);
 		HW_RST_UnReset(resources.dwPrmBase, HW_RST2_IVA2);
-		UTIL_Wait(100);
+		udelay(100);
 		DBG_Trace(DBG_LEVEL6, "WMD_BRD_Start 0 ****** \n");
 		GetHWRegs(resources.dwPrmBase, resources.dwCmBase);
 		/* Disbale the DSP MMU */
@@ -777,7 +777,7 @@ static DSP_STATUS WMD_BRD_Stop(struct WMD_DEV_CONTEXT *hDevContext)
 
 			IO_InterruptDSP2(pDevContext, MBX_PM_DSPIDLE);
 
-			UTIL_Wait(10000);	/* 10 msec */
+			mdelay(10);
 
 			GetHWRegs(resources.dwPrmBase, resources.dwCmBase);
 
@@ -1094,7 +1094,7 @@ static DSP_STATUS WMD_DEV_Create(OUT struct WMD_DEV_CONTEXT **ppDevContext,
 				 "WMD_DEV_create:Reset mail box and "
 				 "enable the clock Fail\n");
 		}
-		UTIL_Wait(5);
+		udelay(5);
 		/* 24xx-Linux MMU address is obtained from the host
 		 * resources struct */
 		pDevContext->dwDSPMmuBase = resources.dwDmmuBase;
@@ -2225,7 +2225,7 @@ bool WaitForStart(struct WMD_DEV_CONTEXT *pDevContext, u32 dwSyncAddr)
 
 	/*  Wait for response from board */
 	while (*((volatile u16 *)dwSyncAddr) && --usCount)
-		UTIL_Wait(TIHELEN_WRITE_DELAY);
+		udelay(10);
 
 	/*  If timed out: return FALSE */
 	if (!usCount) {

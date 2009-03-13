@@ -28,10 +28,6 @@
 #ifndef _TIOMAP_PWR_
 #define _TIOMAP_PWR_
 
-/* Wait time between MBX and IDLE checks for PWR */
-#define PWR_WAIT_USECS          500
-#define PWR_WAIT_MSECS          50
-
 /*
  * ======== WakeDSP =========
  * Wakes up the DSP from DeepSleep

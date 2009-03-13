@@ -30,7 +30,6 @@
 
 /* Time out Values in uSeconds*/
 #define TIHELEN_ACKTIMEOUT  10000
-#define TIHELEN_WRITE_DELAY 10
 
 /*  Time delay for HOM->SAM transition. */
 #define  WAIT_SAM   1000000	/* in usec (1000 millisec) */

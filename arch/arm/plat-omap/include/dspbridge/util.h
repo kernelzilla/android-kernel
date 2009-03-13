@@ -26,7 +26,6 @@
  *      UTIL_Exit
  *      UTIL_GetSysInfo
  *      UTIL_Init
- *      UTIL_Wait
  */
 
 #ifndef _UTIL_H
@@ -118,38 +117,6 @@
 	extern inline bool UTIL_Init(void)
 	{
 		return true;
-	}
-
-/*
- *  ======== UTIL_Wait ========
- *  Purpose:
- *      This fucntion busy waits given a certain number of micro seconds
- *      independent of the processor speed. This is acheived by the
- *      OEM functions QueryPerformanceCounter and QueryPerformanceFrequency.
- *  Parameters:
- *      u32   Number of Micro seconds to busy wait
- *  Returns:
- *          Nothing
- *  Requires:
- *          UTIL_Initalized.
- *  Ensures:
- *      Busy waits x Micro seconds or Sleeps X milli seconds; in that
- *      case, it is a blocking call there will be a context switching
- *      hence it may not represent the absolute busy wait time.
- */
-	static inline void UTIL_Wait(IN u32 dwMicroSeconds)
-	{
-		if (dwMicroSeconds / 1000 <= 1) {
-			/* <= 1 millisecond delay */
-			udelay(dwMicroSeconds);
-		} else if (dwMicroSeconds * HZ / 1000000 <= 1) {
-			/* <= 10 millisecond delay */
-			mdelay(dwMicroSeconds / 1000);
-		} else {
-			/* > 10 millisecond delay */
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(dwMicroSeconds * HZ / 1000000);
-		}
 	}
 
 #endif				/* _UTIL_H */

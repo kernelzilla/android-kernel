@@ -63,7 +63,7 @@ DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 			HW_MBOX_MsgRead(resources.dwMboxBase,
 					MBOX_ARM2DSP, &mbxValue);
 			numMbxMsg--;
-			UTIL_Wait(10);
+			udelay(10);
 
 			HW_MBOX_EventAck(resources.dwMboxBase, MBOX_ARM2DSP,
 					 HW_MBOX_U1_DSP1,
@@ -154,7 +154,7 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 		HW_MBOX_IsFull(resources.dwMboxBase,
 			       MBOX_ARM2DSP, &mbxFull);
 		if (mbxFull)
-			UTIL_Wait(1000);	/* wait for 1 ms)      */
+			mdelay(1);
 		else
 			break;
 	}
