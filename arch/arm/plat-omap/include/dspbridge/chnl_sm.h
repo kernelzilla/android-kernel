@@ -24,7 +24,6 @@
  *  Public Functions:
  *      CHNLSM_DisableInterrupt;
  *      CHNLSM_EnableInterrupt;
- *      CHNLSM_InterruptDSP;
  *      CHNLSM_ISR;
  *      CHNLSM_Read;
  *      CHNLSM_UpdateSHMLength;
@@ -67,21 +66,6 @@
  */
        extern DSP_STATUS CHNLSM_EnableInterrupt(struct WMD_DEV_CONTEXT*
 						       hDevContext);
-
-/*
- *  ======== CHNLSM_InterruptDSP ========
- *  Purpose:
- *      Send an interrupt to the DSP processor(s).
- *  Parameters:
- *      hDevContext:    Handle to mini-driver defined device info.
- *  Returns:
- *      DSP_SOK:        Interrupt sent;
- *      else:           Unable to send interrupt.
- *  Requires:
- *  Ensures:
- */
-       extern DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT*
-						    hDevContext);
 
 /*
  *  ======== CHNLSM_InterruptDSP2 ========

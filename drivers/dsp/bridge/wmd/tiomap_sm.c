@@ -99,18 +99,20 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 	return DSP_SOK;
 }
 
-DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
+DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
+				u16 wMbVal)
 {
-	DSP_STATUS status = DSP_SOK;
-
 #ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
 		omap_dspbridge_dev.dev.platform_data;
 	u32 opplevel = 0;
 #endif
 	struct CFG_HOSTRES resources;
+	DSP_STATUS status = DSP_SOK;
 	unsigned long timeout;
 	u32 temp;
+
+	pDevContext->wIntrVal2Dsp = wMbVal;
 
 	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
 				      &resources);
@@ -171,13 +173,6 @@ DSP_STATUS CHNLSM_InterruptDSP(struct WMD_DEV_CONTEXT *pDevContext)
 	/* set the Mailbox interrupt to default value */
 	pDevContext->wIntrVal2Dsp = MBX_PCPY_CLASS;
 	return DSP_SOK;
-}
-
-DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
-				u16 wMbVal)
-{
-	pDevContext->wIntrVal2Dsp = wMbVal;
-	return CHNLSM_InterruptDSP(pDevContext);
 }
 
 bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *pDevContext, bool *pfSchedDPC,
