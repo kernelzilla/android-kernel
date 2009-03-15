@@ -135,6 +135,7 @@ $ git clone --reference /your/linux-2.6/git/tree \
 - if you don't have linux-2.6 GIT tree, then remove "--reference ..."
 $ cd aufs2-2.6.git
 $ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+				# aufs2 (no -xx) for the latest -rc version.
 
 o aufs2-standalone tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
