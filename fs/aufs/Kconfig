@@ -54,6 +54,14 @@ config AUFS_HINOTIFY
 	It will have a negative impact to the performance.
 	See detail in aufs.5.
 
+config AUFS_EXPORT
+	bool "NFS-exportable aufs"
+	depends on EXPORTFS
+	help
+	If you want to export your mounted aufs via NFS, then enable this
+	option. There are several requirements for this configuration.
+	See detail in aufs.5.
+
 config AUFS_DEBUG
 	bool "Debug aufs"
 	help
@@ -75,4 +83,13 @@ config AUFS_BDEV_LOOP
 	help
 	Automatic configuration for internal use.
 	Convert =[ym] into =y.
+
+config AUFS_INO_T_64
+	bool
+	depends on 64BIT && !(ALPHA || S390)
+	default y
+	help
+	Automatic configuration for internal use.
+	/* typedef unsigned long/int __kernel_ino_t */
+	/* alpha and s390x are int */
 endif
