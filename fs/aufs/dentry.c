@@ -389,7 +389,7 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 		     || (h_dentry->d_inode
 			 && au_iattr_test(&ia, h_dentry->d_inode)))
 		     && !au_test_fuse(h_parent->d_sb)))
-		err = -EBUSY;
+		err = au_busy_or_stale();
 	dput(h_d);
 
  out:

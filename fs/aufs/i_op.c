@@ -352,7 +352,7 @@ int au_do_pin(struct au_pin *p)
 
 	/* udba case */
 	if (unlikely(!p->hdir || !h_dir)) {
-		err = -EBUSY;
+		err = au_busy_or_stale();
 		if (!au_ftest_pin(p->flags, DI_LOCKED))
 			di_read_unlock(p->parent, AuLock_IR);
 		dput(p->parent);
@@ -385,7 +385,7 @@ int au_do_pin(struct au_pin *p)
 	au_unpin(p);
  out_err:
 	AuErr("err %d\n", err);
-	err = -EBUSY;
+	err = au_busy_or_stale();
  out:
 	return err;
 }
