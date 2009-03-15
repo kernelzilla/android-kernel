@@ -26,8 +26,14 @@ struct kset *sysaufs_ket;
 }
 
 static struct sysaufs_si_attr sysaufs_si_attr_xino = AuSiAttr(xino);
+#ifdef CONFIG_AUFS_EXPORT
+static struct sysaufs_si_attr sysaufs_si_attr_xigen = AuSiAttr(xigen);
+#endif
 struct attribute *sysaufs_si_attrs[] = {
 	&sysaufs_si_attr_xino.attr,
+#ifdef CONFIG_AUFS_EXPORT
+	&sysaufs_si_attr_xigen.attr,
+#endif
 	NULL,
 };
 

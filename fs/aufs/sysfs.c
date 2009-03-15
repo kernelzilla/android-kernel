@@ -157,6 +157,21 @@ int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
 	return err;
 }
 
+#ifdef CONFIG_AUFS_EXPORT
+int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb)
+{
+	int err;
+	struct kstat st;
+	struct au_sbinfo *sbinfo;
+
+	err = 0;
+	sbinfo = au_sbi(sb);
+	if (au_opt_test(au_mntflags(sb), XINO))
+		err = sysaufs_sbi_xi(seq, sbinfo->si_xigen, &st);
+	return err;
+}
+#endif
+
 /*
  * the lifetime of branch is independent from the entry under sysfs.
  * sysfs handles the lifetime of the entry, and never call ->show() after it is
