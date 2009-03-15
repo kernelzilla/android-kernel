@@ -146,6 +146,7 @@ equivalent to \[oq]add:0:BRANCH.\[cq]
 .TP
 .B xino=filename
 Use external inode number bitmap and translation table.
+When CONFIG_AUFS_EXPORT is enabled, external inode generation table too.
 It is set to
 <FirstWritableBranch>/\*[AUFS_XINO_FNAME] by default, or
 \*[AUFS_XINO_DEFPATH].
@@ -155,7 +156,7 @@ The files are created per an aufs and per a branch filesystem, and
 unlinked. So you
 cannot find this file, but it exists and is read/written frequently by
 aufs.
-(cf. External Inode Number Bitmap, Translation Table).
+(cf. External Inode Number Bitmap, Translation Table and Generation Table).
 .
 .TP
 .B noxino
@@ -165,20 +166,20 @@ If you use this option,
 Some applications will not work correctly.
 .\" And pseudo link feature will not work after the inode cache is
 .\" shrunk.
-(cf. External Inode Number Bitmap, Translation Table).
+(cf. External Inode Number Bitmap, Translation Table and Generation Table).
 .
 .TP
 .B trunc_xib
 Truncate the external inode number bitmap file. The truncation is done
 automatically when you delete a branch unless you do not specify
 \[oq]notrunc_xib\[cq] option.
-(cf. External Inode Number Bitmap, Translation Table).
+(cf. External Inode Number Bitmap, Translation Table and Generation Table).
 .
 .TP
 .B notrunc_xib
 Stop truncating the external inode number bitmap file when you delete
 a branch.
-(cf. External Inode Number Bitmap, Translation Table).
+(cf. External Inode Number Bitmap, Translation Table and Generation Table).
 .
 .TP
 .B create_policy | create=CREATE_POLICY
@@ -536,11 +537,13 @@ Also you may want to try \[oq]noplink\[cq] mount option, while it is not recomme
 .\" .fi
 
 .\" ----------------------------------------------------------------------
-.SH External Inode Number Bitmap, Translation Table (xino)
+.SH External Inode Number Bitmap, Translation Table and Generation Table (xino)
 Aufs uses one external bitmap file and one external inode number
 translation table files per an aufs and per a branch
 filesystem by default.
-The bitmap is for recycling aufs inode number
+Additionally when CONFIG_AUFS_EXPORT is enabled, one external inode
+generation table is added.
+The bitmap (and the generation table) is for recycling aufs inode number
 and the others
 are a table for converting an inode number on a branch to
 an aufs inode number. The default path
@@ -1125,6 +1128,46 @@ is nearest upper one from the copyup-source.
 .B cpup=bu | bottom\-up
 Selects the nearest upper writable branch from the copyup-source,
 regardless the existence of the parent dir.
+
+.\" ----------------------------------------------------------------------
+.SH Exporting Aufs via NFS
+Aufs is supporting NFS-exporting.
+Since aufs has no actual block device, you need to add NFS \[oq]fsid\[cq] option at
+exporting. Refer to the manual of NFS about the detail of this option.
+
+There are some limitations or requirements.
+.RS
+.Bu
+The branch filesystem must support NFS-exporting.
+.Bu
+NFSv2 is not supported. When you mount the exported aufs from your NFS
+client, you will need to some NFS options like v3 or nfsvers=3,
+especially if it is nfsroot.
+.Bu
+If the size of the NFS file handle on your branch filesystem is large,
+aufs will
+not be able to handle it. The maximum size of NFSv3 file
+handle for a filesystem is 64 bytes. Aufs uses 24 bytes for 32bit
+system, plus 12 bytes for 64bit system. The rest is a room for a file
+handle of a branch filesystem.
+.Bu
+The External Inode Number Bitmap, Translation Table and Generation Table
+(xino) is
+required since NFS file
+handle is based upon inode number. The mount option \[oq]xino\[cq] is enabled
+by default.
+The external inode generation table and its sysfs entry
+(<sysfs>/fs/aufs/si_*/xigen) is created when CONFIG_AUFS_EXPORT is
+enabled even if you don\[aq]t export aufs actually.
+The size of the external inode generation table grows only, never be
+truncated. You might need to pay attention to the free space of the
+filesystem where xino files are placed. By default, it is the first
+writable branch.
+.Bu
+The branch filesystems must be accessible, which means \[oq]not hidden.\[cq]
+It means you need to \[oq]mount \-\-move\[cq] when you use initramfs and
+switch_root(8), or chroot(8).
+.RE
 
 .\" ----------------------------------------------------------------------
 .SH Dentry and Inode Caches
