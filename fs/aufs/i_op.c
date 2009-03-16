@@ -815,7 +815,9 @@ static void aufs_put_link(struct dentry *dentry __maybe_unused,
 
 /* ---------------------------------------------------------------------- */
 
-static void aufs_truncate_range(struct inode *inode, loff_t start, loff_t end)
+static void aufs_truncate_range(struct inode *inode __maybe_unused,
+				loff_t start __maybe_unused,
+				loff_t end __maybe_unused)
 {
 	AuUnsupport();
 }
