@@ -375,6 +375,7 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	struct super_block *h_sb;
 
 	err = 0;
+	memset(&ia, -1, sizeof(ia));
 	h_sb = h_dentry->d_sb;
 	h_inode = h_dentry->d_inode;
 	if (h_inode)
