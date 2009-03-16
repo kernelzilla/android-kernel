@@ -372,6 +372,7 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	struct au_iattr ia;
 	struct dentry *h_d;
 
+	memset(&ia, -1, sizeof(ia));
 	if (h_dentry->d_inode)
 		au_iattr_save(&ia, h_dentry->d_inode);
 
