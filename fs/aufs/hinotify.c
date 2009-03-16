@@ -575,9 +575,9 @@ static void postproc(void *_args)
 
 /* ---------------------------------------------------------------------- */
 
-static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
-			 u32 cookie, const char *h_child_name,
-			 struct inode *h_child_inode)
+static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
+			 u32 mask, u32 cookie __maybe_unused,
+			 const char *h_child_name, struct inode *h_child_inode)
 {
 	struct au_hinotify *hinotify;
 	struct postproc_args *args;
@@ -702,7 +702,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 		AuErr("wkq %d\n", wkq_err);
 }
 
-static void aufs_inotify_destroy(struct inotify_watch *watch)
+static void aufs_inotify_destroy(struct inotify_watch *watch __maybe_unused)
 {
 	return;
 }
