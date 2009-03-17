@@ -129,11 +129,13 @@ int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
 	      int *do_update);
 
 /* xino.c */
+#define Au_LOFF_MAX	((loff_t)LLONG_MAX)
 int au_xib_trunc(struct super_block *sb);
 ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
 		   loff_t *pos);
 ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 		    loff_t *pos);
+struct file *au_xino_create2(struct file *base_file, struct file *copy_src);
 struct file *au_xino_create(struct super_block *sb, char *fname, int silent);
 ino_t au_xino_new_ino(struct super_block *sb);
 int au_xino_write0(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,

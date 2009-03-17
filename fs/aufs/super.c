@@ -52,7 +52,9 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino)
 	if (!(inode->i_state & I_NEW))
 		goto out;
 
-	err = au_iinfo_init(inode);
+	err = au_xigen_new(inode);
+	if (!err)
+		err = au_iinfo_init(inode);
 	if (!err)
 		inode->i_version++;
 	else {
@@ -762,6 +764,7 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data,
 	sb->s_op = &aufs_sop;
 	sb->s_magic = AUFS_SUPER_MAGIC;
 	sb->s_maxbytes = 0;
+	au_export_init(sb);
 
 	err = alloc_root(sb);
 	if (unlikely(err)) {

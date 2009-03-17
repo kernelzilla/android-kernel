@@ -76,7 +76,6 @@ Also there are many enhancements in aufs1, such as:
 
 Currently these features are dropped temporary from this version, aufs2.
 See design/08plan.txt in detail.
-- exporting via NFS
 - test only the highest one for the directory permission (dirperm1)
 - show whiteout mode (shwh)
 - copyup on open (coo=)

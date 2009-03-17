@@ -393,9 +393,10 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 
 	err = 0;
 	if (unlikely(h_d != h_dentry
-		     || h_d->d_inode != h_inode
-		     || (h_inode && au_iattr_test(&ia, h_inode))))
-		err = -EBUSY;
+		     || h_d->d_inode != h_dentry->d_inode
+		     || (h_dentry->d_inode
+			 && au_iattr_test(&ia, h_dentry->d_inode))))
+		err = au_busy_or_stale();
 	dput(h_d);
 
  out:

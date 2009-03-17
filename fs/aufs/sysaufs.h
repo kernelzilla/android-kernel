@@ -50,6 +50,9 @@ extern struct attribute_group *sysaufs_attr_group;
 extern struct kobj_type *sysaufs_ktype;
 
 int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb);
+#ifdef CONFIG_AUFS_EXPORT
+int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb);
+#endif
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf);
 
@@ -68,6 +71,14 @@ int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
 {
 	return 0;
 }
+
+#ifdef CONFIG_AUFS_EXPORT
+static inline
+int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb)
+{
+	return 0;
+}
+#endif
 
 static inline
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,

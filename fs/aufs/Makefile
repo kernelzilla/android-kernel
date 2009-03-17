@@ -15,5 +15,6 @@ aufs-y := module.o sbinfo.o super.o branch.o xino.o sysaufs.o opts.o \
 aufs-$(CONFIG_SYSFS) += sysfs.o
 aufs-$(CONFIG_AUFS_BDEV_LOOP) += loop.o
 aufs-$(CONFIG_AUFS_HINOTIFY) += hinotify.o
+aufs-$(CONFIG_AUFS_EXPORT) += export.o
 aufs-$(CONFIG_AUFS_DEBUG) += debug.o
 aufs-$(CONFIG_AUFS_MAGIC_SYSRQ) += sysrq.o
