@@ -370,11 +370,13 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 {
 	int err;
 	struct au_iattr ia;
+	struct inode *h_inode;
 	struct dentry *h_d;
 
 	memset(&ia, -1, sizeof(ia));
-	if (h_dentry->d_inode)
-		au_iattr_save(&ia, h_dentry->d_inode);
+	h_inode = h_dentry->d_inode;
+	if (h_inode)
+		au_iattr_save(&ia, h_inode);
 
 	/* main purpose is namei.c:cached_lookup() and d_revalidate */
 	h_d = au_lkup_one(&h_dentry->d_name, h_parent, br, /*nd*/NULL);
@@ -385,9 +387,8 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	/* fuse d_revalidate always return 0 for negative dentries */
 	err = 0;
 	if (unlikely((h_d != h_dentry
-		     || h_d->d_inode != h_dentry->d_inode
-		     || (h_dentry->d_inode
-			 && au_iattr_test(&ia, h_dentry->d_inode)))
+		     || h_d->d_inode != h_inode
+		     || (h_inode && au_iattr_test(&ia, h_inode)))
 		     && !au_test_fuse(h_parent->d_sb)))
 		err = au_busy_or_stale();
 	dput(h_d);
