@@ -309,8 +309,6 @@ int omap3_idle_init(void)
 		       __func__);
 		return -EIO;
 	}
-	mpu_pd = pwrdm_lookup("mpu_pwrdm");
-	core_pd = pwrdm_lookup("core_pwrdm");
 	return 0;
 }
 #endif /* CONFIG_CPU_IDLE */
