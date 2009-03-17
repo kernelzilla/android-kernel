@@ -372,7 +372,6 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	struct au_iattr ia;
 	struct inode *h_inode;
 	struct dentry *h_d;
-	struct inode *h_inode;
 	struct super_block *h_sb;
 
 	err = 0;
