@@ -56,7 +56,7 @@ config AUFS_HINOTIFY
 
 config AUFS_EXPORT
 	bool "NFS-exportable aufs"
-	depends on EXPORTFS
+	depends on EXPORTFS = y
 	help
 	If you want to export your mounted aufs via NFS, then enable this
 	option. There are several requirements for this configuration.
