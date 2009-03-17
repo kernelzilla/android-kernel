@@ -370,6 +370,7 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 {
 	int err;
 	struct au_iattr ia;
+	struct inode *h_inode;
 	struct dentry *h_d;
 	struct inode *h_inode;
 	struct super_block *h_sb;
@@ -379,7 +380,7 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 	h_sb = h_dentry->d_sb;
 	h_inode = h_dentry->d_inode;
 	if (h_inode)
-		au_iattr_save(&ia, h_dentry->d_inode);
+		au_iattr_save(&ia, h_inode);
 	else if (au_test_nfs(h_sb) || au_test_fuse(h_sb))
 		/* nfs d_revalidate may return 0 for negative dentry */
 		/* fuse d_revalidate always return 0 for negative dentry */
@@ -393,9 +394,8 @@ static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
 
 	err = 0;
 	if (unlikely(h_d != h_dentry
-		     || h_d->d_inode != h_dentry->d_inode
-		     || (h_dentry->d_inode
-			 && au_iattr_test(&ia, h_dentry->d_inode))))
+		     || h_d->d_inode != h_inode
+		     || (h_inode && au_iattr_test(&ia, h_inode))))
 		err = au_busy_or_stale();
 	dput(h_d);
 
