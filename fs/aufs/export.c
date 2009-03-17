@@ -445,7 +445,7 @@ static char *au_build_path(struct dentry *h_parent, struct path *h_rootpath,
 	return p;
 }
 
-static noinline_for_stack
+static
 struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 			      ino_t ino, __u32 *fh, int fh_len,
 			      struct au_nfsd_si_lock *nsi_lock)
@@ -456,7 +456,7 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 	struct vfsmount *h_mnt;
 	struct au_branch *br;
 	int err;
-	struct nameidata nd;
+	struct path path;
 
 	br = au_sbr(sb, bindex);
 	/* au_br_get(br); */
@@ -485,33 +485,33 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 		goto out_h_parent;
 
 	root = sb->s_root;
-	nd.path.mnt = h_mnt;
+	path.mnt = h_mnt;
 	di_read_lock_parent(root, !AuLock_IR);
-	nd.path.dentry = au_h_dptr(root, bindex);
+	path.dentry = au_h_dptr(root, bindex);
 	di_read_unlock(root, !AuLock_IR);
-	p = au_build_path(h_parent, &nd.path, pathname, PAGE_SIZE, sb);
+	p = au_build_path(h_parent, &path, pathname, PAGE_SIZE, sb);
 	dentry = (void *)p;
 	if (IS_ERR(p))
 		goto out_pathname;
 
 	si_read_unlock(sb);
-	err = vfsub_path_lookup(p, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &nd);
+	err = vfsub_kern_path(p, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &path);
 	dentry = ERR_PTR(err);
 	if (unlikely(err))
 		goto out_relock;
 
 	dentry = ERR_PTR(-ENOENT);
-	AuDebugOn(au_test_anon(nd.path.dentry));
-	if (unlikely(!nd.path.dentry->d_inode))
-		goto out_nd;
+	AuDebugOn(au_test_anon(path.dentry));
+	if (unlikely(!path.dentry->d_inode))
+		goto out_path;
 
-	if (ino != nd.path.dentry->d_inode->i_ino)
-		dentry = au_lkup_by_ino(&nd.path, ino, /*nsi_lock*/NULL);
+	if (ino != path.dentry->d_inode->i_ino)
+		dentry = au_lkup_by_ino(&path, ino, /*nsi_lock*/NULL);
 	else
-		dentry = dget(nd.path.dentry);
+		dentry = dget(path.dentry);
 
- out_nd:
-	path_put(&nd.path);
+ out_path:
+	path_put(&path);
  out_relock:
 	if (unlikely(si_nfsd_read_lock(sb, nsi_lock) < 0))
 		if (!IS_ERR(dentry)) {
