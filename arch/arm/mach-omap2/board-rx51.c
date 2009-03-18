@@ -31,6 +31,8 @@
 #include <plat/gpmc.h>
 #include <plat/usb.h>
 
+#include "omap3-opp.h"
+
 #define RX51_GPIO_SLEEP_IND 162
 
 struct omap_sdrc_params *rx51_get_sdram_timings(void);
@@ -85,7 +87,10 @@ static void __init rx51_init_irq(void)
 	omap_board_config = rx51_config;
 	omap_board_config_size = ARRAY_SIZE(rx51_config);
 	sdrc_params = rx51_get_sdram_timings();
-	omap2_init_common_hw(sdrc_params, sdrc_params);
+	omap2_init_common_hw(sdrc_params, sdrc_params,
+			     omap3_mpu_rate_table,
+			     omap3_dsp_rate_table,
+			     omap3_l3_rate_table);
 	omap_init_irq();
 	omap_gpio_init();
 }
