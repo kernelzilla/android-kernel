@@ -321,6 +321,8 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
 	struct twl4030_hsmmc_info *c;
 	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
 
+	printk("%s:%d\n", __func__, __LINE__);
+
 	if (cpu_is_omap2430()) {
 		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
 		control_devconf1_offset = OMAP243X_CONTROL_DEVCONF1;
@@ -334,6 +336,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
 		struct twl_mmc_controller *twl = hsmmc + c->mmc - 1;
 		struct omap_mmc_platform_data *mmc = hsmmc_data[c->mmc - 1];
 
+		printk("%s:%d\n", __func__, __LINE__);
 		if (!c->mmc || c->mmc > nr_hsmmc) {
 			pr_debug("MMC%d: no such controller\n", c->mmc);
 			continue;
