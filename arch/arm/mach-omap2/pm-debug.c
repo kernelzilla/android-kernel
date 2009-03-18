@@ -22,7 +22,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/timer.h>
+#include <linux/sched.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -334,14 +334,12 @@ static const char pwrdm_state_names[][4] = {
 void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
 {
 	s64 t;
-	struct timespec now;
 
 	if (!pm_dbg_init_done)
 		return ;
 
 	/* Update timer for previous state */
-	getnstimeofday(&now);
-	t = timespec_to_ns(&now);
+	t = sched_clock();
 
 	pwrdm->state_timer[prev] += t - pwrdm->timer;
 
@@ -504,11 +502,9 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
 {
 	int i;
 	s64 t;
-	struct timespec now;
 	struct dentry *d;
 
-	getnstimeofday(&now);
-	t = timespec_to_ns(&now);
+	t = sched_clock();
 
 	for (i = 0; i < 4; i++)
 		pwrdm->state_timer[i] = 0;

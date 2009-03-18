@@ -144,6 +144,8 @@ static struct gpio_led gpio_leds[];
 static int beagle_twl_gpio_setup(struct device *dev,
 		unsigned gpio, unsigned ngpio)
 {
+	printk("%s:%d\n", __func__, __LINE__);
+
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
 	omap_cfg_reg(AH8_34XX_GPIO29);
 	mmc[0].gpio_cd = gpio + 0;
