@@ -32,6 +32,8 @@
 #include <mach/gpmc.h>
 #include <mach/usb.h>
 
+#include "omap3-opp.h"
+
 static struct omap_uart_config rx51_uart_config = {
 	.enabled_uarts	= ((1 << 0) | (1 << 1) | (1 << 2)),
 };
@@ -62,7 +64,8 @@ static struct omap_board_config_kernel rx51_config[] = {
 
 static void __init rx51_init_irq(void)
 {
-	omap2_init_common_hw(rx51_get_sdram_timings());
+	omap2_init_common_hw(rx51_get_sdram_timings(), omap3_mpu_rate_table,
+			     omap3_dsp_rate_table, omap3_l3_rate_table);
 	omap_init_irq();
 	omap_gpio_init();
 }
