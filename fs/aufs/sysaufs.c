@@ -25,12 +25,14 @@ struct kset *sysaufs_ket;
 	.show   = sysaufs_si_##_name,				\
 }
 
-static struct sysaufs_si_attr sysaufs_si_attr_xino = AuSiAttr(xino);
+static struct sysaufs_si_attr sysaufs_si_attr_xi_path = AuSiAttr(xi_path),
+	sysaufs_si_attr_xib = AuSiAttr(xib);
 #ifdef CONFIG_AUFS_EXPORT
 static struct sysaufs_si_attr sysaufs_si_attr_xigen = AuSiAttr(xigen);
 #endif
 struct attribute *sysaufs_si_attrs[] = {
-	&sysaufs_si_attr_xino.attr,
+	&sysaufs_si_attr_xi_path.attr,
+	&sysaufs_si_attr_xib.attr,
 #ifdef CONFIG_AUFS_EXPORT
 	&sysaufs_si_attr_xigen.attr,
 #endif

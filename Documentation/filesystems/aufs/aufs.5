@@ -362,6 +362,14 @@ If your linux version is linux\-2.6.24 and earlier, you need to enable
 CONFIG_AUFS_SYSAUFS too.
 Currently this is for developers only.
 The default is \[oq]a\[cq].
+.
+.TP
+.B debug= 0 | 1
+Specifies disable(0) or enable(1) debug print in aufs.
+This parameter can be changed dynamically.
+You need to enable CONFIG_AUFS_DEBUG.
+Currently this is for developers only.
+The default is \[oq]0\[cq] (disable).
 
 .\" ----------------------------------------------------------------------
 .SH Branch Syntax
