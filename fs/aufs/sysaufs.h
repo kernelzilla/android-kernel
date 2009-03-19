@@ -47,7 +47,6 @@ struct au_branch;
 #ifdef CONFIG_SYSFS
 /* sysfs.c */
 extern struct attribute_group *sysaufs_attr_group;
-extern struct kobj_type *sysaufs_ktype;
 
 int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb);
 #ifdef CONFIG_AUFS_EXPORT
@@ -64,7 +63,6 @@ void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex);
 
 #else
 #define sysaufs_attr_group	NULL
-#define sysaufs_ktype		NULL
 
 static inline
 int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)

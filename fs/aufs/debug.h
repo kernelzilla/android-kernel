@@ -25,20 +25,18 @@
 
 #ifdef CONFIG_AUFS_DEBUG
 #define AuDebugOn(a)		BUG_ON(a)
-extern atomic_t au_cond;
+
+/* module parameter */
+extern int aufs_debug;
 static inline void au_debug(int n)
 {
-	atomic_set(&au_cond, n);
+	aufs_debug = n;
 	smp_mb();
 }
 
 static inline int au_debug_test(void)
 {
-	int ret;
-
-	ret = atomic_read(&au_cond);
-	smp_mb();
-	return ret;
+	return aufs_debug;
 }
 #else
 #define AuDebugOn(a)		do {} while (0)

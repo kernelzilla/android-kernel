@@ -13,7 +13,9 @@
 
 #include "aufs.h"
 
-atomic_t au_cond = ATOMIC_INIT(0);
+int aufs_debug;
+MODULE_PARM_DESC(debug, "debug print");
+module_param_named(debug, aufs_debug, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 char *au_plevel = KERN_DEBUG;
 #define dpri(fmt, arg...) do { \

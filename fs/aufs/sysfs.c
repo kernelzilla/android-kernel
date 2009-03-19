@@ -16,36 +16,7 @@
 #include <linux/sysfs.h>
 #include "aufs.h"
 
-#ifdef CONFIG_AUFS_DEBUG
-static ssize_t debug_show(struct kobject *kobj __maybe_unused,
-			  struct kobj_attribute *attr __maybe_unused,
-			  char *buf)
-{
-	return sprintf(buf, "%d\n", au_debug_test());
-}
-
-static ssize_t debug_store(struct kobject *kobj __maybe_unused,
-			   struct kobj_attribute *attr __maybe_unused,
-			   const char *buf, size_t sz)
-{
-	if (unlikely(!sz || (*buf != '0' && *buf != '1')))
-		return -EOPNOTSUPP;
-
-	if (*buf == '0')
-		au_debug(0);
-	else if (*buf == '1')
-		au_debug(1);
-	return sz;
-}
-
-static struct kobj_attribute au_debug_attr = __ATTR(debug, S_IRUGO | S_IWUSR,
-						    debug_show, debug_store);
-#endif
-
 static struct attribute *au_attr[] = {
-#ifdef CONFIG_AUFS_DEBUG
-	&au_debug_attr.attr,
-#endif
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 
@@ -54,50 +25,6 @@ static struct attribute_group sysaufs_attr_group_body = {
 };
 
 struct attribute_group *sysaufs_attr_group = &sysaufs_attr_group_body;
-
-/* ---------------------------------------------------------------------- */
-
-/*
- * they are copied from linux/lib/kobject.c,
- * and will be exported in the future.
- */
-static ssize_t au_attr_show(struct kobject *kobj, struct attribute *attr,
-			    char *buf)
-{
-	struct kobj_attribute *kattr;
-	ssize_t ret = -EIO;
-
-	kattr = container_of(attr, struct kobj_attribute, attr);
-	if (kattr->show)
-		ret = kattr->show(kobj, kattr, buf);
-	return ret;
-}
-
-#ifdef CONFIG_AUFS_DEBUG
-static ssize_t au_attr_store(struct kobject *kobj, struct attribute *attr,
-			     const char *buf, size_t count)
-{
-	struct kobj_attribute *kattr;
-	ssize_t ret = -EIO;
-
-	kattr = container_of(attr, struct kobj_attribute, attr);
-	if (kattr->store)
-		ret = kattr->store(kobj, kattr, buf, count);
-	return ret;
-}
-#endif
-
-static struct sysfs_ops sysaufs_ops = {
-	.show   = au_attr_show,
-#ifdef CONFIG_AUFS_DEBUG
-	.store  = au_attr_store
-#endif
-};
-
-static struct kobj_type sysaufs_ktype_body = {
-	.sysfs_ops = &sysaufs_ops
-};
-struct kobj_type *sysaufs_ktype = &sysaufs_ktype_body;
 
 /* ---------------------------------------------------------------------- */
 
