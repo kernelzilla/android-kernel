@@ -391,7 +391,7 @@ DSP_STATUS WMD_IO_Destroy(struct IO_MGR *hIOMgr)
                       &hWmdContext)))
                                DBC_Assert(hWmdContext);
                (void)CHNLSM_DisableInterrupt(hWmdContext);
-               flush_workqueue(bridge_workqueue);
+               destroy_workqueue(bridge_workqueue);
                /* Linux function to uninstall ISR */
                free_irq(INT_MAIL_MPU_IRQ, (void *)hIOMgr);
                (void)DPC_Destroy(hIOMgr->hDPC);
