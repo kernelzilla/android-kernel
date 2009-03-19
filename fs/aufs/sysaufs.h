@@ -48,7 +48,8 @@ struct au_branch;
 /* sysfs.c */
 extern struct attribute_group *sysaufs_attr_group;
 
-int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb);
+int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb);
+int sysaufs_si_xib(struct seq_file *seq, struct super_block *sb);
 #ifdef CONFIG_AUFS_EXPORT
 int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb);
 #endif
@@ -65,7 +66,13 @@ void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex);
 #define sysaufs_attr_group	NULL
 
 static inline
-int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
+int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
+{
+	return 0;
+}
+
+static inline
+int sysaufs_si_xib(struct seq_file *seq, struct super_block *sb)
 {
 	return 0;
 }

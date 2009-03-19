@@ -31,6 +31,12 @@ struct au_xino_file {
 	struct mutex		xi_nondir_mtx;
 
 	/* todo: make xino files an array to support huge inode number */
+
+#ifdef CONFIG_SYSFS
+	/* an entry under sysfs per mount-point */
+	char			xi_name[8];
+	struct attribute	xi_attr;
+#endif
 };
 
 /* members for writable branch only */
