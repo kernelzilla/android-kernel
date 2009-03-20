@@ -34,6 +34,7 @@
 #include <mach/powerdomain.h>
 #include <mach/omapdev.h>
 #include <mach/resource.h>
+#include <mach/omap34xx.h>
 
 #include "prm-regbits-34xx.h"
 #include "pm.h"
