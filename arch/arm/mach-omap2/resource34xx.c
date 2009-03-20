@@ -20,6 +20,7 @@
 #include <linux/cpufreq.h>
 #include <mach/powerdomain.h>
 #include <mach/clockdomain.h>
+#include <mach/omap34xx.h>
 #include "smartreflex.h"
 #include "resource34xx.h"
 #include "pm.h"
