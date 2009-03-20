@@ -21,6 +21,7 @@
 
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
+#include <plat/omap34xx.h>
 
 #include "smartreflex.h"
 #include "resource34xx.h"

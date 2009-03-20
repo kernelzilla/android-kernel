@@ -13,6 +13,7 @@
 #include <linux/device.h>
 
 #include <plat/resource.h>
+#include <plat/omap34xx.h>
 
 #include "pm.h"
 
