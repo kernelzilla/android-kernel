@@ -975,6 +975,8 @@ int __init omap3_pm_init(void)
 #endif /* CONFIG_SUSPEND */
 
 	pm_idle = omap3_pm_idle;
+
+	omap3_save_scratchpad_contents();
 	omap3_idle_init();
 
 	pwrdm_add_wkdep(neon_pwrdm, mpu_pwrdm);
@@ -992,10 +994,7 @@ int __init omap3_pm_init(void)
 		if (!omap3_secure_ram_storage)
 			printk(KERN_ERR "Memory allocation failed when"
 					"allocating for secure sram context\n");
-	}
-	omap3_save_scratchpad_contents();
 
-	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 		local_irq_disable();
 		local_fiq_disable();
 
