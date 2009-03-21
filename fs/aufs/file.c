@@ -20,11 +20,14 @@
  * because FMODE_EXEC flag is not passed to f_op->open(),
  * set it to file->private_data temporary.
  */
-void au_store_oflag(struct nameidata *nd)
+void au_store_oflag(struct nameidata *nd, struct inode *inode)
 {
 	if (nd
-	    && !(nd->flags & LOOKUP_CONTINUE)
-	    && (nd->flags & LOOKUP_OPEN))
+	    /* && !(nd->flags & LOOKUP_CONTINUE) */
+	    && (nd->flags & LOOKUP_OPEN)
+	    && (nd->intent.open.flags & FMODE_EXEC)
+	    && inode
+	    && S_ISREG(inode->i_mode))
 		nd->intent.open.file->private_data
 			= (void *)nd->intent.open.flags;
 	/* smp_mb(); */
