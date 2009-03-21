@@ -150,6 +150,7 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 		AuErr("%.*s open err %ld\n", AuLNPair(name), PTR_ERR(file));
 		goto out_dput;
 	}
+	AuDebugOn(!file->f_op);
 
 	err = vfsub_unlink(dir, &file->f_path, /*force*/0);
 	if (unlikely(err)) {
@@ -866,12 +867,10 @@ static au_readf_t find_readf(struct file *h_file)
 {
 	const struct file_operations *fop = h_file->f_op;
 
-	if (fop) {
-		if (fop->read)
-			return fop->read;
-		if (fop->aio_read)
-			return do_sync_read;
-	}
+	if (fop->read)
+		return fop->read;
+	if (fop->aio_read)
+		return do_sync_read;
 	return ERR_PTR(-ENOSYS);
 }
 
@@ -879,12 +878,10 @@ static au_writef_t find_writef(struct file *h_file)
 {
 	const struct file_operations *fop = h_file->f_op;
 
-	if (fop) {
-		if (fop->write)
-			return fop->write;
-		if (fop->aio_write)
-			return do_sync_write;
-	}
+	if (fop->write)
+		return fop->write;
+	if (fop->aio_write)
+		return do_sync_write;
 	return ERR_PTR(-ENOSYS);
 }
 
