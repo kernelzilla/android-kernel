@@ -45,6 +45,7 @@ struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 	lockdep_on();
 	if (IS_ERR(file))
 		goto out;
+	AuDebugOn(!file->f_op);
 	vfsub_update_h_iattr(&file->f_path, /*did*/NULL); /*ignore*/
 
  out:
