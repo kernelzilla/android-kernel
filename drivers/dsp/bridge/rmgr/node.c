@@ -3285,16 +3285,23 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 		 pNodeId, pNodeProps);
 
 	status = PROC_GetDevObject(hProcessor, &hDevObject);
-	if (DSP_SUCCEEDED(status)) {
-		status = DEV_GetNodeManager(hDevObject, &hNodeMgr);
-		if (hNodeMgr == NULL)
-			status = DSP_EFAIL;
+	if (DSP_FAILED(status))
+		goto func_end;
+
+	status = DEV_GetNodeManager(hDevObject, &hNodeMgr);
+	if (DSP_FAILED(status))
+		goto func_end;
+	if (hNodeMgr == NULL) {
+		status = DSP_EFAIL;
+		goto func_end;
 	}
 
-	/*  Enter the critical section.  This is needed because
-	* DCD_GetObjectDef will ultimately end up calling DBLL_open/close,
-	* which needs to be protected in order to not corrupt the zlib manager
-	* (COD). */
+	/*
+	 * Enter the critical section. This is needed because
+	 * DCD_GetObjectDef will ultimately end up calling DBLL_open/close,
+	 * which needs to be protected in order to not corrupt the zlib manager
+	 * (COD).
+	 */
 	status = SYNC_EnterCS(hNodeMgr->hSync);
 
 	if (DSP_SUCCEEDED(status)) {
@@ -3323,9 +3330,8 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 		}
 		/*  Leave the critical section, we're done.  */
 		(void)SYNC_LeaveCS(hNodeMgr->hSync);
-
 	}
-
+func_end:
 	return status;
 }
 
