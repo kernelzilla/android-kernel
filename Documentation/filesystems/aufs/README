@@ -200,8 +200,9 @@ See sample dir in CVS tree on SourceForge.
 When you have any problems or strange behaviour in aufs, please let me
 know with:
 - /proc/mounts (instead of the output of mount(8))
-- /sys/fs/aufs/* (if you have them)
 - /sys/module/aufs/*
+- /sys/fs/aufs/* (if you have them)
+- /debug/aufs/* (if you have them)
 - linux kernel version
   if your kernel is not plain, for example modified by distributor,
   the url where i can download its source is necessary too.
