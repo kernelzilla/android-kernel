@@ -13,6 +13,7 @@ aufs-y := module.o sbinfo.o super.o branch.o xino.o sysaufs.o opts.o \
 
 # all are boolean
 aufs-$(CONFIG_SYSFS) += sysfs.o
+aufs-$(CONFIG_DEBUG_FS) += dbgaufs.o
 aufs-$(CONFIG_AUFS_BDEV_LOOP) += loop.o
 aufs-$(CONFIG_AUFS_HINOTIFY) += hinotify.o
 aufs-$(CONFIG_AUFS_EXPORT) += export.o

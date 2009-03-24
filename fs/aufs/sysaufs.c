@@ -25,17 +25,9 @@ struct kset *sysaufs_ket;
 	.show   = sysaufs_si_##_name,				\
 }
 
-static struct sysaufs_si_attr sysaufs_si_attr_xi_path = AuSiAttr(xi_path),
-	sysaufs_si_attr_xib = AuSiAttr(xib);
-#ifdef CONFIG_AUFS_EXPORT
-static struct sysaufs_si_attr sysaufs_si_attr_xigen = AuSiAttr(xigen);
-#endif
+static struct sysaufs_si_attr sysaufs_si_attr_xi_path = AuSiAttr(xi_path);
 struct attribute *sysaufs_si_attrs[] = {
 	&sysaufs_si_attr_xi_path.attr,
-	&sysaufs_si_attr_xib.attr,
-#ifdef CONFIG_AUFS_EXPORT
-	&sysaufs_si_attr_xigen.attr,
-#endif
 	NULL,
 };
 
@@ -56,14 +48,23 @@ int sysaufs_si_init(struct au_sbinfo *sbinfo)
 	int err;
 
 	sbinfo->si_kobj.kset = sysaufs_ket;
-	err = kobject_init_and_add(&sbinfo->si_kobj, &au_sbi_ktype,
-				   /*&sysaufs_ket->kobj*/NULL,
-				   "si_%lx", sysaufs_si_id(sbinfo));
+	/* cf. sysaufs_name() */
+	err = kobject_init_and_add
+		(&sbinfo->si_kobj, &au_sbi_ktype, /*&sysaufs_ket->kobj*/NULL,
+		 SysaufsSiNamePrefix "%lx", sysaufs_si_id(sbinfo));
+
+	dbgaufs_si_null(sbinfo);
+	if (!err) {
+		err = dbgaufs_si_init(sbinfo);
+		if (unlikely(err))
+			kobject_put(&sbinfo->si_kobj);
+	}
 	return err;
 }
 
 void sysaufs_fin(void)
 {
+	dbgaufs_fin();
 	sysfs_remove_group(&sysaufs_ket->kobj, sysaufs_attr_group);
 	kset_unregister(sysaufs_ket);
 }
@@ -72,16 +73,23 @@ int __init sysaufs_init(void)
 {
 	int err;
 
-	get_random_bytes(&sysaufs_si_mask, sizeof(sysaufs_si_mask));
+	do {
+		get_random_bytes(&sysaufs_si_mask, sizeof(sysaufs_si_mask));
+	} while (!sysaufs_si_mask);
 
 	sysaufs_ket = kset_create_and_add(AUFS_NAME, NULL, fs_kobj);
 	err = PTR_ERR(sysaufs_ket);
 	if (IS_ERR(sysaufs_ket))
 		goto out;
 	err = sysfs_create_group(&sysaufs_ket->kobj, sysaufs_attr_group);
-	if (unlikely(err))
+	if (unlikely(err)) {
 		kset_unregister(sysaufs_ket);
+		goto out;
+	}
 
+	err = dbgaufs_init();
+	if (unlikely(err))
+		sysaufs_fin();
  out:
 	return err;
 }

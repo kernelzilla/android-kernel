@@ -19,6 +19,7 @@
 #include <linux/fs.h>
 #include <linux/sysfs.h>
 #include <linux/aufs_type.h>
+#include "module.h"
 
 struct sysaufs_si_attr {
 	struct attribute attr;
@@ -43,16 +44,20 @@ static inline unsigned long sysaufs_si_id(struct au_sbinfo *sbinfo)
 	return sysaufs_si_mask ^ (unsigned long)sbinfo;
 }
 
+#define SysaufsSiNamePrefix	"si_"
+#define SysaufsSiNameLen	(sizeof(SysaufsSiNamePrefix) + 16)
+static inline void sysaufs_name(struct au_sbinfo *sbinfo, char *name)
+{
+	snprintf(name, SysaufsSiNameLen, SysaufsSiNamePrefix "%lx",
+		 sysaufs_si_id(sbinfo));
+}
+
 struct au_branch;
 #ifdef CONFIG_SYSFS
 /* sysfs.c */
 extern struct attribute_group *sysaufs_attr_group;
 
 int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb);
-int sysaufs_si_xib(struct seq_file *seq, struct super_block *sb);
-#ifdef CONFIG_AUFS_EXPORT
-int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb);
-#endif
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf);
 
@@ -70,20 +75,6 @@ int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
 {
 	return 0;
 }
-
-static inline
-int sysaufs_si_xib(struct seq_file *seq, struct super_block *sb)
-{
-	return 0;
-}
-
-#ifdef CONFIG_AUFS_EXPORT
-static inline
-int sysaufs_si_xigen(struct seq_file *seq, struct super_block *sb)
-{
-	return 0;
-}
-#endif
 
 static inline
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,

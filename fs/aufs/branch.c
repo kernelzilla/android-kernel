@@ -304,7 +304,7 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 	int err;
 
 	err = 0;
-	br->br_xino.xi_file = NULL;
+	memset(&br->br_xino, 0, sizeof(br->br_xino));
 	mutex_init(&br->br_xino.xi_nondir_mtx);
 	br->br_perm = add->perm;
 	br->br_mnt = add->path.mnt; /* set first, mntget() later */

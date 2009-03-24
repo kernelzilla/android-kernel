@@ -141,6 +141,12 @@ struct au_sbinfo {
 	 * but using sysfs is majority.
 	 */
 	struct kobject		si_kobj;
+#ifdef CONFIG_DEBUG_FS
+	struct dentry		 *si_dbgaufs, *si_dbgaufs_xib;
+#ifdef CONFIG_AUFS_EXPORT
+	struct dentry		 *si_dbgaufs_xigen;
+#endif
+#endif
 
 	/* dirty, necessary for unmounting, sysfs and sysrq */
 	struct super_block	*si_sb;
@@ -254,6 +260,19 @@ static inline int au_busy_or_stale(void)
 	return -EBUSY;
 }
 #endif /* CONFIG_AUFS_EXPORT */
+
+/* ---------------------------------------------------------------------- */
+
+static inline void dbgaufs_si_null(struct au_sbinfo *sbinfo)
+{
+#ifdef CONFIG_DEBUG_FS
+	sbinfo->si_dbgaufs = NULL;
+	sbinfo->si_dbgaufs_xib = NULL;
+#ifdef CONFIG_AUFS_EXPORT
+	sbinfo->si_dbgaufs_xigen = NULL;
+#endif
+#endif
+}
 
 /* ---------------------------------------------------------------------- */
 
