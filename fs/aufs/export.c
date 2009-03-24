@@ -256,13 +256,13 @@ static struct vfsmount *au_mnt_get(struct super_block *sb)
 	/* the order (reverse) will not be a problem */
 	list_for_each_entry(pos, &ns->list, mnt_list)
 		if (pos->mnt_sb == sb) {
-			mnt = pos;
+			mnt = mntget(pos);
 			break;
 		}
 	spin_unlock(&vfsmount_lock);
 	AuDebugOn(!mnt);
 
-	return mntget(mnt);
+	return mnt;
 }
 
 struct au_nfsd_si_lock {
