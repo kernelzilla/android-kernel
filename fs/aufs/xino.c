@@ -114,8 +114,7 @@ ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 /*
  * create a new xinofile at the same place/path as @base_file.
  */
-static struct file *au_xino_create2(struct file *base_file,
-				    struct file *copy_src)
+struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 {
 	struct file *file;
 	struct dentry *base, *dentry, *parent;
@@ -152,6 +151,7 @@ static struct file *au_xino_create2(struct file *base_file,
 		AuErr("%.*s open err %ld\n", AuLNPair(name), PTR_ERR(file));
 		goto out_dput;
 	}
+	AuDebugOn(!file->f_op);
 
 	err = vfsub_unlink(dir, &file->f_path, /*force*/0);
 	if (unlikely(err)) {
@@ -868,12 +868,10 @@ static au_readf_t find_readf(struct file *h_file)
 {
 	const struct file_operations *fop = h_file->f_op;
 
-	if (fop) {
-		if (fop->read)
-			return fop->read;
-		if (fop->aio_read)
-			return do_sync_read;
-	}
+	if (fop->read)
+		return fop->read;
+	if (fop->aio_read)
+		return do_sync_read;
 	return ERR_PTR(-ENOSYS);
 }
 
@@ -881,12 +879,10 @@ static au_writef_t find_writef(struct file *h_file)
 {
 	const struct file_operations *fop = h_file->f_op;
 
-	if (fop) {
-		if (fop->write)
-			return fop->write;
-		if (fop->aio_write)
-			return do_sync_write;
-	}
+	if (fop->write)
+		return fop->write;
+	if (fop->aio_write)
+		return do_sync_write;
 	return ERR_PTR(-ENOSYS);
 }
 
@@ -1042,6 +1038,7 @@ void au_xino_clr(struct super_block *sb)
 {
 	struct au_sbinfo *sbinfo;
 
+	au_xigen_clr(sb);
 	xino_clear_xib(sb);
 	xino_clear_br(sb);
 	sbinfo = au_sbi(sb);
@@ -1083,6 +1080,8 @@ int au_xino_set(struct super_block *sb, struct au_opt_xino *xino, int remount)
 	mutex_lock_nested(&dir->i_mutex, AuLsc_I_PARENT);
 	/* mnt_want_write() is unnecessary here */
 	err = au_xino_set_xib(sb, xino->file);
+	if (!err)
+		err = au_xigen_set(sb, xino->file);
 	if (!err)
 		err = au_xino_set_br(sb, xino->file);
 	mutex_unlock(&dir->i_mutex);
