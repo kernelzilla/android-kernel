@@ -1,4 +1,4 @@
-.ds AUFS_VERSION aufs2-base6
+.ds AUFS_VERSION aufs2
 .ds AUFS_XINO_FNAME .aufs.xino
 .ds AUFS_XINO_DEFPATH /tmp/.aufs.xino
 .ds AUFS_DIRWH_DEF 3
@@ -157,6 +157,12 @@ unlinked. So you
 cannot find this file, but it exists and is read/written frequently by
 aufs.
 (cf. External Inode Number Bitmap, Translation Table and Generation Table).
+
+If you enable CONFIG_SYSFS, the path of xino files are not shown in
+/proc/mounts (and /etc/mtab), instead it is shown in
+<sysfs>/fs/aufs/si_<id>/xi_path.
+Otherwise, it is shown in /proc/mounts unless it is not the default
+path.
 .
 .TP
 .B noxino
@@ -326,23 +332,14 @@ Specifies to use the branch path data file under sysfs or not.
 If the number of your branches is large or their path is long
 and you meet the limitation of mount(8) ro /etc/mtab, you need to
 enable CONFIG_SYSFS and set aufs module parameter brs=1.
-If your linux version is linux\-2.6.24 and earlier, you need to enable
-CONFIG_AUFS_SYSAUFS too.
 
 When this parameter is set as 1, aufs does not show \[oq]br:\[cq] (or dirs=)
-mount option through /proc/mounts, and /sbin/mount.aufs does not put it
-to /etc/mtab. So you can keep yourself from the page limitation of
+mount option through /proc/mounts (and /etc/mtab). So you can
+keep yourself from the page limitation of
 mount(8) or /etc/mtab.
 Aufs shows branch paths through <sysfs>/fs/aufs/si_XXX/brNNN.
 Actually the file under sysfs has also a size limitation, but I don\[aq]t
 think it is harmful.
-
-The default is brs=0, which means <sysfs>/fs/aufs/si_XXX/brNNN does not exist
-and \[oq]br:\[cq] option will appear in /proc/mounts, and /etc/mtab if you
-install /sbin/mount.aufs.
-If you did not enable CONFIG_AUFS_SYSAUFS (for
-linux\-2.6.24 and earlier), this parameter will be
-ignored.
 
 There is one more side effect in setting 1 to this parameter.
 If you rename your branch, the branch path written in /etc/mtab will be
@@ -353,13 +350,13 @@ If you set 1, /etc/mtab will not hold the branch path and you will not
 meet such trouble. On the other hand, the entires for the
 branch path under sysfs are generated dynamically. So it must not be obsoleted.
 But I don\[aq]t think users want to rename branches so often.
+
+If CONFIG_SYSFS is disable, this paramater is always set to 0.
 .
 .TP
 .B sysrq=key
 Specifies MagicSysRq key for debugging aufs.
 You need to enable both of CONFIG_MAGIC_SYSRQ and CONFIG_AUFS_DEBUG.
-If your linux version is linux\-2.6.24 and earlier, you need to enable
-CONFIG_AUFS_SYSAUFS too.
 Currently this is for developers only.
 The default is \[oq]a\[cq].
 .
@@ -370,6 +367,10 @@ This parameter can be changed dynamically.
 You need to enable CONFIG_AUFS_DEBUG.
 Currently this is for developers only.
 The default is \[oq]0\[cq] (disable).
+
+.\" ----------------------------------------------------------------------
+.SH Entries under Sysfs and Debugfs
+See linux/Documentation/ABI/*/{sys,debug}fs-aufs.
 
 .\" ----------------------------------------------------------------------
 .SH Branch Syntax
@@ -385,7 +386,8 @@ permission flags for that branch.
 Comma, colon and the permission flags string (including \[oq]=\[cq])in the path
 are not allowed.
 
-Any filesystem can be a branch, except aufs, sysfs, procfs and unionfs.
+Any filesystem can be a branch, But some are not accepted such like
+sysfs, procfs and unionfs.
 If you specify such filesystems as an aufs branch, aufs will return an error
 saying it is unsupported.
 
@@ -562,6 +564,12 @@ will be \*[AUFS_XINO_DEFPATH].
 .\" A user who executes mount(8) needs the privilege to create xino
 .\" file.
 
+If you enable CONFIG_SYSFS, the path of xino files are not shown in
+/proc/mounts (and /etc/mtab), instead it is shown in
+<sysfs>/fs/aufs/si_<id>/xi_path.
+Otherwise, it is shown in /proc/mounts unless it is not the default
+path.
+
 Those files are always opened and read/write by aufs frequently.
 If your writable branch is on flash memory device, it is recommended
 to put xino files on other than flash memory by specifying \[oq]xino=\[cq]
@@ -602,11 +610,11 @@ supported largest inode number is less than LLONG_MAX/8\-1.
 
 The xino files are always hidden, i.e. removed. So you cannot
 do \[oq]ls \-l xino_file\[cq].
-If you enable CONFIG_SYSFS, you can check these information through
-<sysfs>/fs/aufs/<si_id>/xino (for linux\-2.6.24 and earlier, you
-need to enable CONFIG_AUFS_SYSAUFS too).
-The first line in <sysfs>/fs/aufs/<si_id>/xino (and xigen) shows the
-information of the bitmap file, in the format of,
+If you enable CONFIG_DEBUG_FS, you can check these information through
+<debugfs>/aufs/<si_id>/{xib,xi[0-9]*,xigen}. xib is for the bitmap file,
+xi0 ix for the first branch, and xi1 is for the next. xigen is for the
+generation table.
+xib and xigen are in the format of,
 
 .nf
 <blocks>x<block size> <file size>
@@ -623,7 +631,7 @@ pre-allocation feature.
 The rests are hidden xino file information in the format of,
 
 .nf
-<branch index>: <file count>, <blocks>x<block size> <file size>
+<file count>, <blocks>x<block size> <file size>
 .fi
 
 If the file count is larger than 1, it means some of your branches are
@@ -633,7 +641,8 @@ since xino file is a sparse file, i.e. a hole in a file which does not
 consume any disk blocks.
 
 Once you unmount aufs, the xino files for that aufs are totally gone.
-It means that the inode number is not permanent.
+It means that the inode number is not permanent across umount or
+shutdown.
 
 The xino files should be created on the filesystem except NFS.
 If your first writable branch is NFS, you will need to specify xino
@@ -944,8 +953,8 @@ about the file will be discarded and aufs re-lookup it. So the data will
 be updated.
 When an error condition occurs between UDBA and aufs operation, aufs
 will return an error, including EIO.
-To use this option, you need linux\-2.6.18 and later, and need to
-enable CONFIG_INOTIFY and CONFIG_AUFS_UDBA_INOTIFY.
+To use this option, you need to enable CONFIG_INOTIFY and
+CONFIG_AUFS_UDBA_INOTIFY.
 
 To rename/rmdir a directory on a branch directory may reveal the same named
 directory on the lower branch. Aufs tries re-lookuping the renamed
@@ -1164,8 +1173,8 @@ The External Inode Number Bitmap, Translation Table and Generation Table
 required since NFS file
 handle is based upon inode number. The mount option \[oq]xino\[cq] is enabled
 by default.
-The external inode generation table and its sysfs entry
-(<sysfs>/fs/aufs/si_*/xigen) is created when CONFIG_AUFS_EXPORT is
+The external inode generation table and its debugfs entry
+(<debugfs>/aufs/si_*/xigen) is created when CONFIG_AUFS_EXPORT is
 enabled even if you don\[aq]t export aufs actually.
 The size of the external inode generation table grows only, never be
 truncated. You might need to pay attention to the free space of the
