@@ -51,7 +51,7 @@ struct au_finfo {
 
 /* file.c */
 extern struct address_space_operations aufs_aop;
-void au_store_oflag(struct nameidata *nd);
+void au_store_oflag(struct nameidata *nd, struct inode *inode);
 unsigned int au_file_roflags(unsigned int flags);
 struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 		       struct file *file);

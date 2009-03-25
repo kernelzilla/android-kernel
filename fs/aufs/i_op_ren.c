@@ -615,7 +615,7 @@ static int au_ren_lock(struct au_ren_args *a)
 		goto out; /* success */
 	}
 
-	err = -EBUSY;
+	err = au_busy_or_stale();
 
  out_unlock:
 	au_ren_unlock(a);

@@ -125,7 +125,12 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 	int err, npositive;
 	aufs_bindex_t bstart;
 
-	IMustLock(dir);
+	/* temporary workaround for a bug in NFSD readdir */
+	if (!au_test_nfsd(current))
+		IMustLock(dir);
+	else
+		WARN_ONCE(!mutex_is_locked(&dir->i_mutex),
+			  "a known problem of NFSD readdir in 2.6.28\n");
 
 	sb = dir->i_sb;
 	si_read_lock(sb, AuLock_FLUSH);
@@ -166,7 +171,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 	ret = d_splice_alias(inode, dentry);
 	if (unlikely(IS_ERR(ret) && inode))
 		ii_write_unlock(inode);
-	au_store_oflag(nd);
+	au_store_oflag(nd, inode);
 
  out_unlock:
 	di_write_unlock(dentry);
@@ -351,7 +356,7 @@ int au_do_pin(struct au_pin *p)
 
 	/* udba case */
 	if (unlikely(!p->hdir || !h_dir)) {
-		err = -EBUSY;
+		err = au_busy_or_stale();
 		if (!au_ftest_pin(p->flags, DI_LOCKED))
 			di_read_unlock(p->parent, AuLock_IR);
 		dput(p->parent);
@@ -384,7 +389,7 @@ int au_do_pin(struct au_pin *p)
 	au_unpin(p);
  out_err:
 	AuErr("err %d\n", err);
-	err = -EBUSY;
+	err = au_busy_or_stale();
  out:
 	return err;
 }

@@ -107,6 +107,12 @@ struct au_sbinfo {
 	/* reserved for future use */
 	/* unsigned long long	si_xib_limit; */	/* Max xib file size */
 
+#ifdef CONFIG_AUFS_EXPORT
+	/* i_generation */
+	struct file		*si_xigen;
+	atomic_t		si_xigen_next;
+#endif
+
 	/* readdir cache time, max, in HZ */
 	unsigned long		si_rdcache;
 
@@ -135,6 +141,12 @@ struct au_sbinfo {
 	 * but using sysfs is majority.
 	 */
 	struct kobject		si_kobj;
+#ifdef CONFIG_DEBUG_FS
+	struct dentry		 *si_dbgaufs, *si_dbgaufs_xib;
+#ifdef CONFIG_AUFS_EXPORT
+	struct dentry		 *si_dbgaufs_xigen;
+#endif
+#endif
 
 	/* dirty, necessary for unmounting, sysfs and sysrq */
 	struct super_block	*si_sb;
@@ -189,6 +201,77 @@ int au_cpdown_dirs(struct dentry *dentry, aufs_bindex_t bdst);
 static inline struct au_sbinfo *au_sbi(struct super_block *sb)
 {
 	return sb->s_fs_info;
+}
+
+/* ---------------------------------------------------------------------- */
+
+#ifdef CONFIG_AUFS_EXPORT
+void au_export_init(struct super_block *sb);
+
+static inline int au_test_nfsd(struct task_struct *tsk)
+{
+	return !tsk->mm && !strcmp(tsk->comm, "nfsd");
+}
+
+int au_xigen_inc(struct inode *inode);
+int au_xigen_new(struct inode *inode);
+int au_xigen_set(struct super_block *sb, struct file *base);
+void au_xigen_clr(struct super_block *sb);
+
+static inline int au_busy_or_stale(void)
+{
+	if (!au_test_nfsd(current))
+		return -EBUSY;
+	return -ESTALE;
+}
+#else
+static inline void au_export_init(struct super_block *sb)
+{
+	/* nothing */
+}
+
+static inline int au_test_nfsd(struct task_struct *tsk)
+{
+	return 0;
+}
+
+static inline int au_xigen_inc(struct inode *inode)
+{
+	return 0;
+}
+
+static inline int au_xigen_new(struct inode *inode)
+{
+	return 0;
+}
+
+static inline int au_xigen_set(struct super_block *sb, struct file *base)
+{
+	return 0;
+}
+
+static inline void au_xigen_clr(struct super_block *sb)
+{
+	/* empty */
+}
+
+static inline int au_busy_or_stale(void)
+{
+	return -EBUSY;
+}
+#endif /* CONFIG_AUFS_EXPORT */
+
+/* ---------------------------------------------------------------------- */
+
+static inline void dbgaufs_si_null(struct au_sbinfo *sbinfo)
+{
+#ifdef CONFIG_DEBUG_FS
+	sbinfo->si_dbgaufs = NULL;
+	sbinfo->si_dbgaufs_xib = NULL;
+#ifdef CONFIG_AUFS_EXPORT
+	sbinfo->si_dbgaufs_xigen = NULL;
+#endif
+#endif
 }
 
 /* ---------------------------------------------------------------------- */

@@ -218,10 +218,16 @@ void au_iinfo_fin(struct inode *inode)
 {
 	ino_t ino;
 	aufs_bindex_t bend;
-	unsigned char unlinked;
+	unsigned char unlinked = !inode->i_nlink || IS_DEADDIR(inode);
 	struct au_iinfo *iinfo;
 	struct au_hinode *hi;
 	struct super_block *sb;
+
+	if (unlinked) {
+		int err = au_xigen_inc(inode);
+		if (unlikely(err))
+			AuWarn1("failed resetting i_generation, %d\n", err);
+	}
 
 	iinfo = au_ii(inode);
 	/* bad_inode case */
@@ -233,7 +239,6 @@ void au_iinfo_fin(struct inode *inode)
 
 	if (iinfo->ii_bstart >= 0) {
 		sb = inode->i_sb;
-		unlinked = !inode->i_nlink;
 		ino = 0;
 		if (unlinked)
 			ino = inode->i_ino;

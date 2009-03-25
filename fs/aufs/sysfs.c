@@ -16,36 +16,7 @@
 #include <linux/sysfs.h>
 #include "aufs.h"
 
-#ifdef CONFIG_AUFS_DEBUG
-static ssize_t debug_show(struct kobject *kobj __maybe_unused,
-			  struct kobj_attribute *attr __maybe_unused,
-			  char *buf)
-{
-	return sprintf(buf, "%d\n", au_debug_test());
-}
-
-static ssize_t debug_store(struct kobject *kobj __maybe_unused,
-			   struct kobj_attribute *attr __maybe_unused,
-			   const char *buf, size_t sz)
-{
-	if (unlikely(!sz || (*buf != '0' && *buf != '1')))
-		return -EOPNOTSUPP;
-
-	if (*buf == '0')
-		au_debug(0);
-	else if (*buf == '1')
-		au_debug(1);
-	return sz;
-}
-
-static struct kobj_attribute au_debug_attr = __ATTR(debug, S_IRUGO | S_IWUSR,
-						    debug_show, debug_store);
-#endif
-
 static struct attribute *au_attr[] = {
-#ifdef CONFIG_AUFS_DEBUG
-	&au_debug_attr.attr,
-#endif
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 
@@ -57,103 +28,15 @@ struct attribute_group *sysaufs_attr_group = &sysaufs_attr_group_body;
 
 /* ---------------------------------------------------------------------- */
 
-/*
- * they are copied from linux/lib/kobject.c,
- * and will be exported in the future.
- */
-static ssize_t au_attr_show(struct kobject *kobj, struct attribute *attr,
-			    char *buf)
-{
-	struct kobj_attribute *kattr;
-	ssize_t ret = -EIO;
-
-	kattr = container_of(attr, struct kobj_attribute, attr);
-	if (kattr->show)
-		ret = kattr->show(kobj, kattr, buf);
-	return ret;
-}
-
-#ifdef CONFIG_AUFS_DEBUG
-static ssize_t au_attr_store(struct kobject *kobj, struct attribute *attr,
-			     const char *buf, size_t count)
-{
-	struct kobj_attribute *kattr;
-	ssize_t ret = -EIO;
-
-	kattr = container_of(attr, struct kobj_attribute, attr);
-	if (kattr->store)
-		ret = kattr->store(kobj, kattr, buf, count);
-	return ret;
-}
-#endif
-
-static struct sysfs_ops sysaufs_ops = {
-	.show   = au_attr_show,
-#ifdef CONFIG_AUFS_DEBUG
-	.store  = au_attr_store
-#endif
-};
-
-static struct kobj_type sysaufs_ktype_body = {
-	.sysfs_ops = &sysaufs_ops
-};
-struct kobj_type *sysaufs_ktype = &sysaufs_ktype_body;
-
-/* ---------------------------------------------------------------------- */
-
-static int sysaufs_sbi_xi(struct seq_file *seq, struct file *xf,
-			  struct kstat *st)
+int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
-
-	err = vfs_getattr(xf->f_vfsmnt, xf->f_dentry, st);
-	if (!err) {
-		seq_printf(seq, "%llux%lu %lld",
-			   st->blocks, st->blksize, (long long)st->size);
-		seq_putc(seq, '\n');
-	} else
-		seq_printf(seq, "err %d\n", err);
-
-	return err;
-}
-
-int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
-{
-	int err;
-	aufs_bindex_t bend, bindex;
-	struct kstat st;
-	struct au_sbinfo *sbinfo;
-	struct file *xf;
 
 	err = 0;
-	sbinfo = au_sbi(sb);
-	if (!au_opt_test(au_mntflags(sb), XINO))
-		goto out; /* success */
-
-	xf = sbinfo->si_xib;
-	err = au_xino_path(seq, xf);
-	seq_putc(seq, '\n');
-	if (!err)
-		err = sysaufs_sbi_xi(seq, xf, &st);
-
-	bend = au_sbend(sb);
-	for (bindex = 0; !err && bindex <= bend; bindex++) {
-		xf = au_sbr(sb, bindex)->br_xino.xi_file;
-		if (!xf)
-			continue;
-
-		seq_printf(seq, "%d: ", bindex);
-		err = vfs_getattr(xf->f_vfsmnt, xf->f_dentry, &st);
-		if (!err) {
-			seq_printf(seq, "%ld, %llux%lu %lld",
-				   (long)file_count(xf), st.blocks, st.blksize,
-				   (long long)st.size);
-			seq_putc(seq, '\n');
-		} else
-			seq_printf(seq, "err %d\n", err);
+	if (au_opt_test(au_mntflags(sb), XINO)) {
+		err = au_xino_path(seq, au_sbi(sb)->si_xib);
+		seq_putc(seq, '\n');
 	}
-
- out:
 	return err;
 }
 
@@ -162,20 +45,15 @@ int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
  * sysfs handles the lifetime of the entry, and never call ->show() after it is
  * unlinked.
  */
-#define SysaufsBr_PREFIX "br"
-static int sysaufs_sbi_br(struct seq_file *seq, struct super_block *sb,
-			  aufs_bindex_t bindex)
+static int sysaufs_si_br(struct seq_file *seq, struct super_block *sb,
+			 aufs_bindex_t bindex)
 {
-	int err;
 	struct path path;
 	struct dentry *root;
 	struct au_branch *br;
 
-	err = -ENOENT;
-	if (unlikely(au_sbend(sb) < bindex))
-		goto out;
+	AuDbg("b%d\n", bindex);
 
-	err = 0;
 	root = sb->s_root;
 	di_read_lock_parent(root, !AuLock_IR);
 	br = au_sbr(sb, bindex);
@@ -184,9 +62,7 @@ static int sysaufs_sbi_br(struct seq_file *seq, struct super_block *sb,
 	au_seq_path(seq, &path);
 	di_read_unlock(root, !AuLock_IR);
 	seq_printf(seq, "=%s\n", au_optstr_br_perm(br->br_perm));
-
- out:
-	return err;
+	return 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -207,12 +83,15 @@ static struct seq_file *au_seq(char *p, ssize_t len)
 	return seq;
 }
 
+#define SysaufsBr_PREFIX "br"
+
 /* todo: file size may exceed PAGE_SIZE */
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf)
 {
 	ssize_t err;
 	long l;
+	aufs_bindex_t bend;
 	struct au_sbinfo *sbinfo;
 	struct super_block *sb;
 	struct seq_file *seq;
@@ -239,11 +118,16 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 		cattr++;
 	}
 
+	bend = au_sbend(sb);
 	if (!strncmp(name, SysaufsBr_PREFIX, sizeof(SysaufsBr_PREFIX) - 1)) {
 		name += sizeof(SysaufsBr_PREFIX) - 1;
 		err = strict_strtol(name, 10, &l);
-		if (!err)
-			err = sysaufs_sbi_br(seq, sb, (aufs_bindex_t)l);
+		if (!err) {
+			if (l <= bend)
+				err = sysaufs_si_br(seq, sb, (aufs_bindex_t)l);
+			else
+				err = -ENOENT;
+		}
 		goto out_seq;
 	}
 	BUG();
@@ -272,17 +156,21 @@ void sysaufs_br_init(struct au_branch *br)
 
 void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex)
 {
-	struct au_sbinfo *sbinfo;
+	struct au_branch *br;
+	struct kobject *kobj;
 	aufs_bindex_t bend;
+
+	dbgaufs_brs_del(sb, bindex);
 
 	if (!sysaufs_brs)
 		return;
 
-	sbinfo = au_sbi(sb);
+	kobj = &au_sbi(sb)->si_kobj;
 	bend = au_sbend(sb);
-	for (; bindex <= bend; bindex++)
-		sysfs_remove_file(&sbinfo->si_kobj,
-				  &au_sbr(sb, bindex)->br_attr);
+	for (; bindex <= bend; bindex++) {
+		br = au_sbr(sb, bindex);
+		sysfs_remove_file(kobj, &br->br_attr);
+	}
 }
 
 void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
@@ -292,6 +180,8 @@ void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 	struct kobject *kobj;
 	struct au_branch *br;
 
+	dbgaufs_brs_add(sb, bindex);
+
 	if (!sysaufs_brs)
 		return;
 
@@ -299,8 +189,8 @@ void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 	bend = au_sbend(sb);
 	for (; bindex <= bend; bindex++) {
 		br = au_sbr(sb, bindex);
-		snprintf(br->br_name, sizeof(br->br_name),
-			 SysaufsBr_PREFIX "%d", bindex);
+		snprintf(br->br_name, sizeof(br->br_name), SysaufsBr_PREFIX
+			 "%d", bindex);
 		err = sysfs_create_file(kobj, &br->br_attr);
 		if (unlikely(err))
 			AuWarn("failed %s under sysfs(%d)\n", br->br_name, err);

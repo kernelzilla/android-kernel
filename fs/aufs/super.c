@@ -52,7 +52,9 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino)
 	if (!(inode->i_state & I_NEW))
 		goto out;
 
-	err = au_iinfo_init(inode);
+	err = au_xigen_new(inode);
+	if (!err)
+		err = au_iinfo_init(inode);
 	if (!err)
 		inode->i_version++;
 	else {
@@ -130,6 +132,9 @@ static void au_show_wbr_create(struct seq_file *m, int v,
 
 static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 {
+#ifdef CONFIG_SYSFS
+	return 0;
+#else
 	int err;
 	const int len = sizeof(AUFS_XINO_FNAME) - 1;
 	aufs_bindex_t bindex, brid;
@@ -164,6 +169,7 @@ static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 
  out:
 	return err;
+#endif
 }
 
 /* seq_file will re-call me in case of too long string */
@@ -394,6 +400,7 @@ static void aufs_put_super(struct super_block *sb)
 		return;
 
 	aufs_umount_begin(sb);
+	dbgaufs_si_fin(sbinfo);
 	kobject_put(&sbinfo->si_kobj);
 }
 
@@ -762,6 +769,7 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data,
 	sb->s_op = &aufs_sop;
 	sb->s_magic = AUFS_SUPER_MAGIC;
 	sb->s_maxbytes = 0;
+	au_export_init(sb);
 
 	err = alloc_root(sb);
 	if (unlikely(err)) {

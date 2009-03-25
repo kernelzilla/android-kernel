@@ -76,7 +76,6 @@ Also there are many enhancements in aufs1, such as:
 
 Currently these features are dropped temporary from this version, aufs2.
 See design/08plan.txt in detail.
-- exporting via NFS
 - test only the highest one for the directory permission (dirperm1)
 - show whiteout mode (shwh)
 - copyup on open (coo=)
@@ -201,8 +200,9 @@ See sample dir in CVS tree on SourceForge.
 When you have any problems or strange behaviour in aufs, please let me
 know with:
 - /proc/mounts (instead of the output of mount(8))
-- /sys/fs/aufs/* (if you have them)
 - /sys/module/aufs/*
+- /sys/fs/aufs/* (if you have them)
+- /debug/aufs/* (if you have them)
 - linux kernel version
   if your kernel is not plain, for example modified by distributor,
   the url where i can download its source is necessary too.
