@@ -121,6 +121,8 @@ struct clk_functions {
 	int		(*clk_enable)(struct clk *clk);
 	void		(*clk_disable)(struct clk *clk);
 	long		(*clk_round_rate)(struct clk *clk, unsigned long rate);
+	long		(*clk_round_rate_parent)(struct clk *clk,
+						 struct clk *parent);
 	int		(*clk_set_rate)(struct clk *clk, unsigned long rate);
 	int		(*clk_set_parent)(struct clk *clk, struct clk *parent);
 	struct clk *	(*clk_get_parent)(struct clk *clk);
