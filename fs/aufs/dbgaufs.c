@@ -89,6 +89,7 @@ static ssize_t dbgaufs_xi_read(struct file *file, char __user *buf,
 
 static int dbgaufs_xib_open(struct inode *inode, struct file *file)
 {
+	int err;
 	struct au_sbinfo *sbinfo;
 	struct super_block *sb;
 
@@ -203,6 +204,7 @@ void dbgaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 #ifdef CONFIG_AUFS_EXPORT
 static int dbgaufs_xigen_open(struct inode *inode, struct file *file)
 {
+	int err;
 	struct au_sbinfo *sbinfo;
 	struct super_block *sb;
 
