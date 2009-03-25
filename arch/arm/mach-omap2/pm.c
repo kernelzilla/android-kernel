@@ -125,6 +125,7 @@ static ssize_t idle_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 #ifdef CONFIG_OMAP_PM_SRF
+#include <mach/omap34xx.h>
 static int vdd1_locked;
 static int vdd2_locked;
 

@@ -26,6 +26,7 @@
 #include <mach/clock.h>
 #include <mach/powerdomain.h>
 #include <mach/omap-pm.h>
+#include <mach/omap34xx.h>
 
 extern struct omap_opp *curr_vdd1_prcm_set;
 extern struct omap_opp *curr_vdd2_prcm_set;
