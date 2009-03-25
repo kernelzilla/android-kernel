@@ -27,8 +27,8 @@
 #include <plat/powerdomain.h>
 #include <plat/resource.h>
 #include <plat/clock.h>
-#include <plat/powerdomain.h>
 #include <plat/omap-pm.h>
+#include <plat/omap34xx.h>
 
 extern struct omap_opp *curr_vdd1_prcm_set;
 extern struct omap_opp *curr_vdd2_prcm_set;

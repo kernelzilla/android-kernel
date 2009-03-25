@@ -33,6 +33,7 @@ static struct kobj_attribute vdd2_lock_attr =
 #endif
 
 #ifdef CONFIG_OMAP_PM_SRF
+#include <plat/omap34xx.h>
 static int vdd1_locked;
 static int vdd2_locked;
 
