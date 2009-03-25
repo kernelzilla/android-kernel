@@ -90,9 +90,14 @@ static ssize_t dbgaufs_xi_read(struct file *file, char __user *buf,
 static int dbgaufs_xib_open(struct inode *inode, struct file *file)
 {
 	struct au_sbinfo *sbinfo;
+	struct super_block *sb;
 
 	sbinfo = inode->i_private;
-	return dbgaufs_xi_open(sbinfo->si_xib, file, /*do_fcnt*/0);
+	sb = sbinfo->si_sb;
+	si_noflush_read_lock(sb);
+	err = dbgaufs_xi_open(sbinfo->si_xib, file, /*do_fcnt*/0);
+	si_read_unlock(sb);
+	return err;
 }
 
 static struct file_operations dbgaufs_xib_fop = {
@@ -199,9 +204,14 @@ void dbgaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 static int dbgaufs_xigen_open(struct inode *inode, struct file *file)
 {
 	struct au_sbinfo *sbinfo;
+	struct super_block *sb;
 
 	sbinfo = inode->i_private;
-	return dbgaufs_xi_open(sbinfo->si_xigen, file, /*do_fcnt*/0);
+	sb = sbinfo->si_sb;
+	si_noflush_read_lock(sb);
+	err = dbgaufs_xi_open(sbinfo->si_xigen, file, /*do_fcnt*/0);
+	si_read_unlock(sb);
+	return err;
 }
 
 static struct file_operations dbgaufs_xigen_fop = {
