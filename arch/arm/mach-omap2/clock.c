@@ -871,6 +871,36 @@ struct clk *omap2_clk_get_parent(struct clk *clk)
 	return clk->parent;
 }
 
+/**
+ * omap2_clk_round_rate_parent - return the rate for @clk if parent were changed
+ * @clk: struct clk that may change parents
+ * @new_parent: the struct clk that @clk may be reparented under
+ *
+ * Given a struct clk @clk and a new parent struct clk @new_parent,
+ * determine what @clk's rate would be after the reparent operation.
+ * Returns the new clock rate or -EINVAL upon error.
+ */
+long omap2_clk_round_rate_parent(struct clk *clk, struct clk *new_parent)
+{
+	u32 field_val, parent_div;
+	long rate;
+
+	if (!clk->clksel || !new_parent)
+		return -EINVAL;
+
+	parent_div = _omap2_clksel_get_src_field(new_parent, clk, &field_val);
+	if (!parent_div)
+		return -EINVAL;
+
+	/* CLKSEL clocks follow their parents' rates, divided by a divisor */
+	rate = new_parent->rate;
+	if (parent_div > 0)
+		rate /= parent_div;
+
+	return rate;
+}
+
+
 /* DPLL rate rounding code */
 
 /**
