@@ -58,7 +58,7 @@ int dbgaufs_si_init(struct au_sbinfo *sbinfo)
 #define dbgaufs_fin()	do {} while (0)
 
 static inline
-int __init dbgaufs_init(void);
+int __init dbgaufs_init(void)
 {
 	return 0;
 }
