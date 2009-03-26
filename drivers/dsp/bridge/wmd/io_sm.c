@@ -770,7 +770,7 @@ func_cont:
 			 (u8 *)hIOMgr->pMsgOutput);
 		DBG_Trace(DBG_LEVEL7, "** (proc) MAX MSGS IN SHARED MEMORY: "
 			 "0x%x\n", hMsgMgr->uMaxMsgs);
-		memzero((void *) hIOMgr->pSharedMem, sizeof(struct SHM));
+		memset((void *) hIOMgr->pSharedMem, 0, sizeof(struct SHM));
 	}
 #ifndef DSP_TRACEBUF_DISABLED
 	if (DSP_SUCCEEDED(status)) {
