@@ -78,6 +78,8 @@ int au_finfo_init(struct file *file)
 		fmode_t m;
 	} u;
 
+	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
+
 	dentry = file->f_dentry;
 	finfo = au_cache_alloc_finfo();
 	if (unlikely(!finfo))
