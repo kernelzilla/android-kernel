@@ -366,8 +366,14 @@ static struct NLDR_FXNS nldrFxns = {
 
 enum NODE_STATE NODE_GetState(HANDLE hNode)
 {
-   struct NODE_OBJECT *pNode = (struct NODE_OBJECT *)hNode;
-   return pNode->nState;
+       struct NODE_OBJECT *pNode = (struct NODE_OBJECT *)hNode;
+       if (!MEM_IsValidHandle(pNode, NODE_SIGNATURE)) {
+               GT_1trace(NODE_debugMask, GT_5CLASS,
+                "NODE_GetState:hNode 0x%x\n", pNode);
+               return  -1;
+       } else
+               return pNode->nState;
+
 }
 
 /*
@@ -1315,10 +1321,6 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 		status = DSP_EFAIL;
 		goto func_end;
 	}
-	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
-		status = DSP_EHANDLE;
-		goto func_end;
-	}
 	/* create struct DSP_CBDATA struct for PWR calls */
 	cbData.cbData = PWR_TIMEOUT;
 	nodeType = NODE_GetType(hNode);
@@ -2146,8 +2148,13 @@ enum NLDR_LOADTYPE NODE_GetLoadType(struct NODE_OBJECT *hNode)
 
 	DBC_Require(cRefs > 0);
 	DBC_Require(MEM_IsValidHandle(hNode, NODE_SIGNATURE));
-
-	return hNode->dcdProps.objData.nodeObj.usLoadType;
+       if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+               GT_1trace(NODE_debugMask, GT_5CLASS,
+                        "NODE_GetLoadType: Failed. hNode:"
+                         " 0x%x\n", hNode);
+               return -1;
+       } else
+               return hNode->dcdProps.objData.nodeObj.usLoadType;
 }
 
 /*
@@ -2159,8 +2166,13 @@ u32 NODE_GetTimeout(struct NODE_OBJECT *hNode)
 {
 	DBC_Require(cRefs > 0);
 	DBC_Require(MEM_IsValidHandle(hNode, NODE_SIGNATURE));
-
-	return hNode->uTimeout;
+       if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+               GT_1trace(NODE_debugMask, GT_5CLASS,
+                        "NODE_GetTimeout: Failed. hNode:"
+                         " 0x%x\n", hNode);
+               return 0;
+       } else
+               return hNode->uTimeout;
 }
 
 /*
@@ -2174,9 +2186,12 @@ enum NODE_TYPE NODE_GetType(struct NODE_OBJECT *hNode)
 
 	if (hNode == (struct NODE_OBJECT *) DSP_HGPPNODE)
 		nodeType = NODE_GPP;
-	else
-		nodeType = hNode->nType;
-
+	else {
+                if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE))
+                        nodeType = -1;
+                else
+                        nodeType = hNode->nType;
+	}
 	return nodeType;
 }
 
@@ -2772,6 +2787,8 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 	DSP_STATUS status;
 	DBC_Require(MEM_IsValidHandle(hNode, NODE_SIGNATURE));
 	hNodeMgr = hNode->hNodeMgr;
+       if (!MEM_IsValidHandle(hNodeMgr, NODEMGR_SIGNATURE))
+               return;
 	hXlator = hNode->hXlator;
 	nodeType = NODE_GetType(hNode);
 	if (nodeType != NODE_DEVICE) {
@@ -2783,6 +2800,8 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 		if (hNode->hMsgQueue) {
 			pIntfFxns = hNodeMgr->pIntfFxns;
 			(*pIntfFxns->pfnMsgDeleteQueue) (hNode->hMsgQueue);
+                       hNode->hMsgQueue = NULL;
+
 		}
 		if (hNode->hSyncDone)
 			(void) SYNC_CloseEvent(hNode->hSyncDone);
@@ -2794,6 +2813,7 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 				FreeStream(hNodeMgr, stream);
 			}
 			MEM_Free(hNode->inputs);
+                       hNode->inputs = NULL;
 		}
 		if (hNode->outputs) {
 			for (i = 0; i < MaxOutputs(hNode); i++) {
@@ -2801,6 +2821,7 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 				FreeStream(hNodeMgr, stream);
 			}
 			MEM_Free(hNode->outputs);
+                       hNode->outputs = NULL;
 		}
 		taskArgs = hNode->createArgs.asa.taskArgs;
 		if (taskArgs.strmInDef) {
@@ -2808,6 +2829,7 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 				if (taskArgs.strmInDef[i].szDevice) {
 					MEM_Free(taskArgs.strmInDef[i].
 						szDevice);
+                                       taskArgs.strmInDef[i].szDevice = NULL;
 				}
 			}
 			MEM_Free(taskArgs.strmInDef);
@@ -2818,6 +2840,7 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 				if (taskArgs.strmOutDef[i].szDevice) {
 					MEM_Free(taskArgs.strmOutDef[i].
 						szDevice);
+                                       taskArgs.strmOutDef[i].szDevice = NULL;
 				}
 			}
 			MEM_Free(taskArgs.strmOutDef);
@@ -2849,37 +2872,55 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 		}
 	}
 	if (nodeType != NODE_MESSAGE) {
-		if (hNode->streamConnect)
+               if (hNode->streamConnect) {
 			MEM_Free(hNode->streamConnect);
-
+                       hNode->streamConnect = NULL;
+               }
 	}
-	if (hNode->pstrDevName)
+       if (hNode->pstrDevName) {
 		MEM_Free(hNode->pstrDevName);
+               hNode->pstrDevName = NULL;
+       }
 
-	if (hNode->hNtfy)
+       if (hNode->hNtfy) {
 		NTFY_Delete(hNode->hNtfy);
+               hNode->hNtfy = NULL;
+       }
 
 	/* These were allocated in DCD_GetObjectDef (via NODE_Allocate) */
-	if (hNode->dcdProps.objData.nodeObj.pstrCreatePhaseFxn)
+       if (hNode->dcdProps.objData.nodeObj.pstrCreatePhaseFxn) {
 		MEM_Free(hNode->dcdProps.objData.nodeObj.pstrCreatePhaseFxn);
+               hNode->dcdProps.objData.nodeObj.pstrCreatePhaseFxn = NULL;
+       }
 
-	if (hNode->dcdProps.objData.nodeObj.pstrExecutePhaseFxn)
+       if (hNode->dcdProps.objData.nodeObj.pstrExecutePhaseFxn) {
 		MEM_Free(hNode->dcdProps.objData.nodeObj.pstrExecutePhaseFxn);
+               hNode->dcdProps.objData.nodeObj.pstrExecutePhaseFxn = NULL;
+       }
 
-	if (hNode->dcdProps.objData.nodeObj.pstrDeletePhaseFxn)
+       if (hNode->dcdProps.objData.nodeObj.pstrDeletePhaseFxn) {
 		MEM_Free(hNode->dcdProps.objData.nodeObj.pstrDeletePhaseFxn);
+               hNode->dcdProps.objData.nodeObj.pstrDeletePhaseFxn = NULL;
+       }
 
-	if (hNode->dcdProps.objData.nodeObj.pstrIAlgName)
+       if (hNode->dcdProps.objData.nodeObj.pstrIAlgName) {
 		MEM_Free(hNode->dcdProps.objData.nodeObj.pstrIAlgName);
+               hNode->dcdProps.objData.nodeObj.pstrIAlgName = NULL;
+       }
 
 	/* Free all SM address translator resources */
-	if (hXlator)
+       if (hXlator) {
 		(void) CMM_XlatorDelete(hXlator, TRUE);	/* force free */
+               hXlator = NULL;
+       }
 
-	if (hNode->hNldrNode)
+       if (hNode->hNldrNode) {
 		hNodeMgr->nldrFxns.pfnFree(hNode->hNldrNode);
+               hNode->hNldrNode = NULL;
+       }
 
 	MEM_FreeObject(hNode);
+       hNode = NULL;
 }
 
 /*

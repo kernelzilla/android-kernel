@@ -1163,6 +1163,8 @@ static void InputChnl(struct IO_MGR *pIOMgr, struct CHNL_OBJECT *pChnl,
 	pChnl = pChnlMgr->apChannel[chnlId];
 	if ((pChnl != NULL) && CHNL_IsInput(pChnl->uMode)) {
 		if ((pChnl->dwState & ~CHNL_STATEEOS) == CHNL_STATEREADY) {
+                       if (!pChnl->pIORequests)
+                               goto func_end;
 			/* Get the I/O request, and attempt a transfer:  */
 			pChirp = (struct CHNL_IRP *)LST_GetHead(pChnl->
 				 pIORequests);
@@ -1202,6 +1204,8 @@ static void InputChnl(struct IO_MGR *pIOMgr, struct CHNL_OBJECT *pChnl,
 						 "chnl = 0x%x\n", pChnl);
 				}
 				/* Tell DSP if no more I/O buffers available: */
+                               if (!pChnl->pIORequests)
+                                       goto func_end;
 				if (LST_IsEmpty(pChnl->pIORequests)) {
 					IO_AndValue(pIOMgr->hWmdContext,
 						   struct SHM, sm, hostFreeMask,
@@ -1273,6 +1277,9 @@ static void InputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 		addr = (u32)&(((struct MSG_DSPMSG *)pMsgInput)->dwId);
 		msg.dwId = ReadExt32BitDspData(pIOMgr->hWmdContext, addr);
 		pMsgInput += sizeof(struct MSG_DSPMSG);
+               if (!hMsgMgr->queueList)
+                       goto func_end;
+
 		/* Determine which queue to put the message in */
 		hMsgQueue = (struct MSG_QUEUE *)LST_First(hMsgMgr->queueList);
 		DBG_Trace(DBG_LEVEL7, "InputMsg RECVD: dwCmd=0x%x dwArg1=0x%x "
@@ -1281,8 +1288,8 @@ static void InputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 		 /*  Interrupt may occur before shared memory and message
 		 *  input locations have been set up. If all nodes were
 		 *  cleaned up, hMsgMgr->uMaxMsgs should be 0.  */
-		if (hMsgQueue)
-			DBC_Assert(uMsgs <= hMsgMgr->uMaxMsgs);
+               if (hMsgQueue && uMsgs > hMsgMgr->uMaxMsgs)
+                       goto func_end;
 
 		while (hMsgQueue != NULL) {
 			if (msg.dwId == hMsgQueue->dwId) {
@@ -1297,9 +1304,11 @@ static void InputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 				} else {
 					/* Not an exit acknowledgement, queue
 					 * the message */
+                                       if (!hMsgQueue->msgFreeList)
+                                               goto func_end;
 					pMsg = (struct MSG_FRAME *)LST_GetHead
 						(hMsgQueue->msgFreeList);
-					if (pMsg) {
+                                       if (hMsgQueue->msgUsedList && pMsg) {
 						pMsg->msgData = msg;
 						LST_PutTail(hMsgQueue->
 						      msgUsedList,
@@ -1318,6 +1327,9 @@ static void InputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 				}
 				break;
 			}
+
+                       if (!hMsgMgr->queueList || !hMsgQueue)
+                               goto func_end;
 			hMsgQueue = (struct MSG_QUEUE *)LST_Next(hMsgMgr->
 				    queueList, (struct LST_ELEM *)hMsgQueue);
 		}
@@ -1331,6 +1343,9 @@ static void InputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 			   true);
 		CHNLSM_InterruptDSP2(pIOMgr->hWmdContext, MBX_PCPY_CLASS);
 	}
+func_end:
+       return;
+
 }
 
 /*
@@ -1395,9 +1410,8 @@ static void OutputChnl(struct IO_MGR *pIOMgr, struct CHNL_OBJECT *pChnl,
 		goto func_end;
 
 	pChnl = pChnlMgr->apChannel[chnlId];
-	if (!pChnl) {
+       if (!pChnl || !pChnl->pIORequests) {
 		/* Shouldn't get here: */
-		DBC_Assert(pChnl == NULL);
 		goto func_end;
 	}
 	/* Get the I/O request, and attempt a transfer:  */
@@ -1406,7 +1420,9 @@ static void OutputChnl(struct IO_MGR *pIOMgr, struct CHNL_OBJECT *pChnl,
 		goto func_end;
 
 	pChnl->cIOReqs--;
-	DBC_Assert(pChnl->cIOReqs >= 0);
+       if (pChnl->cIOReqs < 0 || !pChnl->pIORequests)
+               goto func_end;
+
 	/* Record fact that no more I/O buffers available:  */
 	if (LST_IsEmpty(pChnl->pIORequests))
 		pChnlMgr->dwOutputMask &= ~(1 << chnlId);
@@ -1469,9 +1485,13 @@ static void OutputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 		pMsgOutput = pIOMgr->pMsgOutput;
 		/* Copy uMsgs messages into shared memory */
 		for (i = 0; i < uMsgs; i++) {
-			pMsg = (struct MSG_FRAME *)LST_GetHead(hMsgMgr->
-				msgUsedList);
-			DBC_Assert(pMsg != NULL);
+                       if (!hMsgMgr->msgUsedList) {
+                               DBG_Trace(DBG_LEVEL3, "msgUsedList is NULL\n");
+                               pMsg = NULL;
+                               goto func_end;
+                       } else
+                               pMsg = (struct MSG_FRAME *)LST_GetHead(
+                                       hMsgMgr->msgUsedList);
 			if (pMsg != NULL) {
 				val = (pMsg->msgData).dwId;
 				addr = (u32)&(((struct MSG_DSPMSG *)
@@ -1496,6 +1516,8 @@ static void OutputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 				WriteExt32BitDspData(pIOMgr->hWmdContext, addr,
 						    val);
 				pMsgOutput += sizeof(struct MSG_DSPMSG);
+                               if (!hMsgMgr->msgFreeList)
+                                       goto func_end;
 				LST_PutTail(hMsgMgr->msgFreeList,
 					   (struct LST_ELEM *) pMsg);
 				SYNC_SetEvent(hMsgMgr->hSyncEvent);
@@ -1522,6 +1544,9 @@ static void OutputMsg(struct IO_MGR *pIOMgr, struct MSG_MGR *hMsgMgr)
 			CHNLSM_InterruptDSP2(pIOMgr->hWmdContext, MBX_PCPY_CLASS);
 		}
 	}
+func_end:
+       return;
+
 }
 
 /*
