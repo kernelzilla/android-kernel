@@ -411,6 +411,7 @@ DSP_STATUS NODE_Allocate(struct PROC_OBJECT *hProcessor,
 	struct CFG_HOSTRES hostRes;
 	u32 pMappedAddr = 0;
 	u32 mapAttrs = 0x0;
+	struct DSP_PROCESSORSTATE procStatus;
 #ifdef DSP_DMM_DEBUG
 	struct DMM_OBJECT *hDmmMgr;
 	struct PROC_OBJECT *pProcObject = (struct PROC_OBJECT *)hProcessor;
@@ -450,6 +451,20 @@ DSP_STATUS NODE_Allocate(struct PROC_OBJECT *hProcessor,
 
 	if (DSP_FAILED(status))
 		goto func_cont;
+
+	status = PROC_GetState(hProcessor, &procStatus,
+			sizeof(struct DSP_PROCESSORSTATE));
+	if (DSP_FAILED(status))
+		goto func_end;
+	/* If processor is in error state then don't attempt
+	    to send the message */
+	if (procStatus.iState == PROC_ERROR) {
+		GT_1trace(NODE_debugMask, GT_5CLASS,
+			"NODE_Allocate: proc Status 0x%x\n",
+			procStatus.iState);
+		status = DSP_EFAIL;
+		goto func_end;
+	}
 
 	/* Assuming that 0 is not a valid function address */
 	if (hNodeMgr->ulFxnAddrs[0] == 0) {
@@ -818,6 +833,7 @@ func_cont2:
 	DBC_Ensure((DSP_FAILED(status) && (*phNode == NULL)) ||
 		  (DSP_SUCCEEDED(status)
 		    && MEM_IsValidHandle((*phNode), NODE_SIGNATURE)));
+func_end:
 	return status;
 }
 
@@ -3334,10 +3350,29 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 	struct DEV_OBJECT *hDevObject;
 	DSP_STATUS status = DSP_SOK;
 	struct DCD_NODEPROPS   dcdNodeProps;
+	struct DSP_PROCESSORSTATE procStatus;
 
 	DBC_Require(cRefs > 0);
 	DBC_Require(hProcessor != NULL);
 	DBC_Require(pNodeId != NULL);
+
+	if (hProcessor == NULL || pNodeId == NULL) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
+	status = PROC_GetState(hProcessor, &procStatus,
+			sizeof(struct DSP_PROCESSORSTATE));
+	if (DSP_FAILED(status))
+		goto func_end;
+	/* If processor is in error state then don't attempt
+	    to send the message */
+	if (procStatus.iState == PROC_ERROR) {
+		GT_1trace(NODE_debugMask, GT_5CLASS,
+			"NODE_GetUUIDProps: proc Status 0x%x\n",
+			procStatus.iState);
+		status = DSP_EFAIL;
+		goto func_end;
+	}
 
 	GT_3trace(NODE_debugMask, GT_ENTER,
 		 "NODE_GetUUIDProps: " "\thProcessor: "
@@ -3345,15 +3380,12 @@ DSP_STATUS NODE_GetUUIDProps(DSP_HPROCESSOR hProcessor,
 		 pNodeId, pNodeProps);
 
 	status = PROC_GetDevObject(hProcessor, &hDevObject);
-	if (DSP_FAILED(status))
-		goto func_end;
-
-	status = DEV_GetNodeManager(hDevObject, &hNodeMgr);
-	if (DSP_FAILED(status))
-		goto func_end;
-	if (hNodeMgr == NULL) {
-		status = DSP_EFAIL;
-		goto func_end;
+	if (DSP_SUCCEEDED(status) && hDevObject != NULL) {
+		status = DEV_GetNodeManager(hDevObject, &hNodeMgr);
+		if (hNodeMgr == NULL) {
+			status = DSP_EHANDLE;
+			goto func_end;
+		}
 	}
 
 	/*
@@ -3439,7 +3471,7 @@ static DSP_STATUS GetRMSFxns(struct NODE_MGR *hNodeMgr)
 			}
 		}
 	}
-
+func_end:
 	return status;
 }
 
