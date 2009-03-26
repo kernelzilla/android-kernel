@@ -103,6 +103,35 @@ static inline void omap3_per_restore_context(void)
 	omap3_gpio_restore_context();
 }
 
+static void omap3_enable_io_chain(void)
+{
+	int timeout = 0;
+
+	if (omap_rev() >= OMAP3430_REV_ES3_1) {
+		prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN, WKUP_MOD, PM_WKEN);
+		/* Do a readback to assure write has been done */
+		prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+
+		while (!(prm_read_mod_reg(WKUP_MOD, PM_WKST) &
+			 OMAP3430_ST_IO_CHAIN)) {
+			timeout++;
+			if (timeout > 1000) {
+				printk(KERN_ERR "Wake up daisy chain "
+				       "activation failed.\n");
+				return;
+			}
+			prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN,
+					     WKUP_MOD, PM_WKST);
+		}
+	}
+}
+
+static void omap3_disable_io_chain(void)
+{
+	if (omap_rev() >= OMAP3430_REV_ES3_1)
+		prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN, WKUP_MOD, PM_WKEN);
+}
+
 static void omap3_core_save_context(void)
 {
 	u32 control_padconf_off;
@@ -360,8 +389,9 @@ void omap_sram_idle(void)
 			omap3_core_save_context();
 			omap3_prcm_save_context();
 		}
-		/* Enable IO-PAD wakeup */
+		/* Enable IO-PAD and IO-CHAIN wakeups */
 		prm_set_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
+		omap3_enable_io_chain();
 	}
 
 	/*
@@ -430,9 +460,11 @@ void omap_sram_idle(void)
 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
 	}
 
-	/* Disable IO-PAD wakeup */
-	if (core_next_state < PWRDM_POWER_ON)
+	/* Disable IO-PAD and IO-CHAIN wakeup */
+	if (core_next_state < PWRDM_POWER_ON) {
 		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
+		omap3_disable_io_chain();
+	}
 
 	/* Enable smartreflex after WFI */
 	enable_smartreflex(SR1);
