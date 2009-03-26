@@ -2322,14 +2322,20 @@ EXPORT_SYMBOL(omap_dma_global_context_save);
 
 void omap_dma_global_context_restore(void)
 {
-	dma_write(0x2, OCP_SYSCONFIG);
-	while (!__raw_readl(omap_dma_base + OMAP_DMA4_SYSSTATUS))
-		;
 	dma_write(omap_dma_global_context.dma_gcr, GCR);
 	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
 		OCP_SYSCONFIG);
 	dma_write(omap_dma_global_context.dma_irqenable_l0,
 		IRQENABLE_L0);
+
+	/*
+	 * A bug in ROM code leaves IRQ status for channels 0 and 1 uncleared
+	 * after secure sram context save and restore. Hence we need to
+	 * manually clear those IRQs to avoid spurious interrupts. This
+	 * affects only secure devices.
+	 */
+	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
+		dma_write(0x3 , IRQSTATUS_L0);
 }
 EXPORT_SYMBOL(omap_dma_global_context_restore);
 
@@ -2465,8 +2471,8 @@ static int __init omap_init_dma(void)
 	if (cpu_class_is_omap2())
 		setup_irq(INT_24XX_SDMA_IRQ0, &omap24xx_dma_irq);
 
-	/* Enable smartidle idlemodes and autoidle */
 	if (cpu_is_omap34xx()) {
+		/* Enable smartidle idlemodes and autoidle */
 		u32 v = dma_read(OCP_SYSCONFIG);
 		v &= ~(DMA_SYSCONFIG_MIDLEMODE_MASK |
 				DMA_SYSCONFIG_SIDLEMODE_MASK |
@@ -2475,6 +2481,13 @@ static int __init omap_init_dma(void)
 			DMA_SYSCONFIG_SIDLEMODE(DMA_IDLEMODE_SMARTIDLE) |
 			DMA_SYSCONFIG_AUTOIDLE);
 		dma_write(v , OCP_SYSCONFIG);
+		/* reserve dma channels 0 and 1 in high security devices */
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			printk(KERN_INFO "Reserving DMA channels 0 and 1 for "
+					"HS ROM code\n");
+			dma_chan[0].dev_id = 0;
+			dma_chan[1].dev_id = 1;
+		}
 	}
 
 
