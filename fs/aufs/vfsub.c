@@ -478,6 +478,8 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 		fmode_t m;
 	} u;
 
+	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
+
 	h_inode = h_path->dentry->d_inode;
 	if (!h_file) {
 		err = mnt_want_write(h_path->mnt);
