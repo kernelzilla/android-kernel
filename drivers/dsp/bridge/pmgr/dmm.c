@@ -121,6 +121,9 @@ static u32  TableSize;/* The size of virtual and physical pages tables */
 static struct MapPage *GetRegion(u32 addr);
 static struct MapPage *GetFreeRegion(u32 aSize);
 static struct MapPage *GetMappedRegion(u32 aAddr);
+#ifdef DSP_DMM_DEBUG
+u32 DMM_MemMapDump(struct DMM_OBJECT *hDmmMgr);
+#endif
 
 /*  ======== DMM_CreateTables ========
  *  Purpose:
@@ -644,3 +647,46 @@ u32 *DMM_GetPhysicalAddrTable(void)
 			pPhysicalAddrTable);
 	return pPhysicalAddrTable;
 }
+
+#ifdef DSP_DMM_DEBUG
+u32 DMM_MemMapDump(struct DMM_OBJECT *hDmmMgr)
+{
+	struct MapPage *curNode = NULL;
+	u32 i;
+	u32 freemem = 0;
+	u32 bigsize = 0;
+
+	SYNC_EnterCS(hDmmMgr->hDmmLock);
+
+	if (pVirtualMappingTable != NULL) {
+		for (i = 0; i < TableSize; i +=
+				pVirtualMappingTable[i].RegionSize) {
+			curNode = pVirtualMappingTable + i;
+			if (curNode->bReserved == TRUE)	{
+				/*printk("RESERVED size = 0x%x, "
+					"Map size = 0x%x\n",
+					(curNode->RegionSize * PG_SIZE_4K),
+					(curNode->bMapped == false) ? 0 :
+					(curNode->MappedSize * PG_SIZE_4K));
+*/
+			} else {
+/*				printk("UNRESERVED size = 0x%x\n",
+					(curNode->RegionSize * PG_SIZE_4K));
+*/
+				freemem += (curNode->RegionSize * PG_SIZE_4K);
+				if (curNode->RegionSize > bigsize)
+					bigsize = curNode->RegionSize;
+			}
+		}
+	}
+	printk(KERN_INFO "Total DSP VA FREE memory = %d Mbytes\n",
+			freemem/(1024*1024));
+	printk(KERN_INFO "Total DSP VA USED memory= %d Mbytes \n",
+			(((TableSize * PG_SIZE_4K)-freemem))/(1024*1024));
+	printk(KERN_INFO "DSP VA - Biggest FREE block = %d Mbytes \n\n",
+			(bigsize*PG_SIZE_4K/(1024*1024)));
+	SYNC_LeaveCS(hDmmMgr->hDmmLock);
+
+	return 0;
+}
+#endif

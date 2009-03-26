@@ -349,6 +349,10 @@ static u32 Write(void *pPrivRef, u32 ulDspAddr, void *pBuf,
 static struct GT_Mask NODE_debugMask = { NULL, NULL };  /* GT trace variable */
 #endif
 
+#ifdef DSP_DMM_DEBUG
+extern u32 DMM_MemMapDump(struct DMM_OBJECT *hDmmMgr);
+#endif
+
 static u32 cRefs;		/* module reference count */
 
 /* Dynamic loader functions. */
@@ -407,6 +411,10 @@ DSP_STATUS NODE_Allocate(struct PROC_OBJECT *hProcessor,
 	struct CFG_HOSTRES hostRes;
 	u32 pMappedAddr = 0;
 	u32 mapAttrs = 0x0;
+#ifdef DSP_DMM_DEBUG
+	struct DMM_OBJECT *hDmmMgr;
+	struct PROC_OBJECT *pProcObject = (struct PROC_OBJECT *)hProcessor;
+#endif
 
 #ifndef RES_CLEANUP_DISABLE
 	HANDLE	     hDrvObject;
@@ -527,6 +535,11 @@ func_cont:
 			 "NODE_Allocate: DSPProcessor_Reserve"
 			 " Memory successful: 0x%x\n", status);
 	}
+#ifdef DSP_DMM_DEBUG
+	status = DMM_GetHandle(pProcObject, &hDmmMgr);
+	if (DSP_SUCCEEDED(status))
+		DMM_MemMapDump(hDmmMgr);
+#endif
 	if (DSP_FAILED(status))
 		goto func_cont3;
 
@@ -2784,6 +2797,11 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 	struct STREAM stream;
 	struct NODE_MSGARGS msgArgs;
 	struct NODE_TASKARGS taskArgs;
+#ifdef DSP_DMM_DEBUG
+	struct DMM_OBJECT *hDmmMgr;
+	struct PROC_OBJECT *pProcObject =
+			(struct PROC_OBJECT *)hNode->hProcessor;
+#endif
 	DSP_STATUS status;
 	DBC_Require(MEM_IsValidHandle(hNode, NODE_SIGNATURE));
 	hNodeMgr = hNode->hNodeMgr;
@@ -2869,6 +2887,11 @@ static void DeleteNode(struct NODE_OBJECT *hNode)
 					 "failed. Status = 0x%x\n",
 					 (u32)status);
 			}
+#ifdef DSP_DMM_DEBUG
+			status = DMM_GetHandle(pProcObject, &hDmmMgr);
+			if (DSP_SUCCEEDED(status))
+				DMM_MemMapDump(hDmmMgr);
+#endif
 		}
 	}
 	if (nodeType != NODE_MESSAGE) {
