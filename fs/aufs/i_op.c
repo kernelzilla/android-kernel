@@ -130,7 +130,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 		IMustLock(dir);
 	else
 		WARN_ONCE(!mutex_is_locked(&dir->i_mutex),
-			  "a known problem of NFSD readdir in 2.6.28\n");
+			  "a known problem of NFSD readdir since 2.6.28\n");
 
 	sb = dir->i_sb;
 	si_read_lock(sb, AuLock_FLUSH);
