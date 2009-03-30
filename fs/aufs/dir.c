@@ -169,7 +169,6 @@ static int au_do_fsync_dir_no_file(struct dentry *dentry, int datasync)
 	for (bindex = au_dbstart(dentry); !err && bindex <= bend; bindex++) {
 		struct path h_path;
 		struct inode *h_inode;
-		struct file_operations *fop;
 
 		if (au_test_ro(sb, bindex, inode))
 			continue;
@@ -185,10 +184,11 @@ static int au_do_fsync_dir_no_file(struct dentry *dentry, int datasync)
 		/* todo: inotiry fired? */
 		h_path.mnt = au_sbr_mnt(sb, bindex);
 		mutex_lock(&h_inode->i_mutex);
-		fop = (void *)h_inode->i_fop;
 		err = filemap_fdatawrite(h_inode->i_mapping);
-		if (!err && fop && fop->fsync)
-			err = fop->fsync(NULL, h_path.dentry, datasync);
+		AuDebugOn(!h_inode->i_fop);
+		if (!err && h_inode->i_fop->fsync)
+			err = h_inode->i_fop->fsync(NULL, h_path.dentry,
+						    datasync);
 		if (!err)
 			err = filemap_fdatawrite(h_inode->i_mapping);
 		if (!err)

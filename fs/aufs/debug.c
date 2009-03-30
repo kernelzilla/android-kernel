@@ -212,12 +212,14 @@ static int do_pri_br(aufs_bindex_t bindex, struct au_branch *br)
 	struct vfsmount *mnt;
 	struct super_block *sb;
 
-	if (!br || IS_ERR(br)
-	    || !(mnt = br->br_mnt) || IS_ERR(mnt)
-	    || !(sb = mnt->mnt_sb) || IS_ERR(sb)) {
-		dpri("s%d: err %ld\n", bindex, PTR_ERR(br));
-		return -1;
-	}
+	if (!br || IS_ERR(br))
+		goto out;
+	mnt = br->br_mnt;
+	if (!mnt || IS_ERR(mnt))
+		goto out;
+	sb = mnt->mnt_sb;
+	if (!sb || IS_ERR(sb))
+		goto out;
 
 	dpri("s%d: {perm 0x%x, cnt %d, wbr %p}, "
 	     "%s, dev 0x%02x%02x, flags 0x%lx, cnt(BIAS) %d, active %d, "
@@ -227,6 +229,10 @@ static int do_pri_br(aufs_bindex_t bindex, struct au_branch *br)
 	     sb->s_flags, sb->s_count - S_BIAS,
 	     atomic_read(&sb->s_active), !!br->br_xino.xi_file);
 	return 0;
+
+ out:
+	dpri("s%d: err %ld\n", bindex, PTR_ERR(br));
+	return -1;
 }
 
 void au_dpri_sb(struct super_block *sb)
