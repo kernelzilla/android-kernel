@@ -73,10 +73,7 @@ int au_finfo_init(struct file *file)
 {
 	struct au_finfo *finfo;
 	struct dentry *dentry;
-	union {
-		void *p;
-		unsigned long ul;
-	} u;
+	unsigned long ul;
 
 	dentry = file->f_dentry;
 	finfo = au_cache_alloc_finfo();
@@ -96,8 +93,8 @@ int au_finfo_init(struct file *file)
 	/* smp_mb(); */ /* atomic_set */
 
 	/* cf. au_store_oflag() */
-	u.p = file->private_data;
-	file->f_mode |= (u.ul & FMODE_EXEC);
+	ul = (unsigned long)file->private_data;
+	file->f_mode |= (ul & FMODE_EXEC);
 	file->private_data = finfo;
 	return 0; /* success */
 
