@@ -36,10 +36,12 @@ void au_store_oflag(struct nameidata *nd, struct inode *inode)
 	    && (nd->flags & LOOKUP_OPEN)
 	    && (nd->intent.open.flags & u.u)
 	    && inode
-	    && S_ISREG(inode->i_mode))
-		nd->intent.open.file->private_data
-			= (void *)nd->intent.open.flags;
-	/* smp_mb(); */
+	    && S_ISREG(inode->i_mode)) {
+		/* suppress a warning in lp64 */
+		unsigned long flags = nd->intent.open.flags;
+		nd->intent.open.file->private_data = (void *)flags;
+		/* smp_mb(); */
+	}
 }
 
 /* drop flags for writing */
