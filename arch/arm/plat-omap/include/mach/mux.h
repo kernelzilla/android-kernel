@@ -803,6 +803,12 @@ enum omap34xx_index {
 	AE5_34XX_GPIO143,
 	H19_34XX_GPIO164_OUT,
 	J25_34XX_GPIO170,
+	AF21_3430_GPIO8,
+	B23_3430_GPIO167,
+	R21_3430_GPIO163,
+
+	/* McSPI */
+	AB1_3430_McSPI1_CS2,
 };
 
 struct omap_mux_cfg {
