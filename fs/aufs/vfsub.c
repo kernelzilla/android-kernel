@@ -149,9 +149,8 @@ int vfsub_create(struct inode *dir, struct path *path, int mode)
 
 		memset(&h_nd, 0, sizeof(h_nd));
 		h_nd.flags = LOOKUP_CREATE;
-		/* cf. fs/namei.c:open_to_namei_flags() */
-		h_nd.intent.open.flags = O_CREAT | O_RDONLY;
-		h_nd.intent.open.flags++;
+		h_nd.intent.open.flags = O_CREAT
+			| vfsub_fmode_to_uint(FMODE_READ);
 		h_nd.intent.open.create_mode = mode;
 		h_nd.path.dentry = path->dentry->d_parent;
 		h_nd.path.mnt = path->mnt;
@@ -473,12 +472,6 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 {
 	int err;
 	struct inode *h_inode;
-	union {
-		unsigned int u;
-		fmode_t m;
-	} u;
-
-	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
 
 	h_inode = h_path->dentry->d_inode;
 	if (!h_file) {
@@ -491,8 +484,7 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 		err = get_write_access(h_inode);
 		if (err)
 			goto out_mnt;
-		u.m = FMODE_WRITE;
-		err = break_lease(h_inode, u.u);
+		err = break_lease(h_inode, vfsub_fmode_to_uint(FMODE_WRITE));
 		if (err)
 			goto out_inode;
 	}

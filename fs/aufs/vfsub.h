@@ -127,6 +127,34 @@ static inline loff_t vfsub_llseek(struct file *file, loff_t offset, int origin)
 
 /* ---------------------------------------------------------------------- */
 
+/* dirty workaround for strict type of fmode_t */
+union vfsub_fmu {
+	fmode_t fm;
+	unsigned int ui;
+};
+
+static inline unsigned int vfsub_fmode_to_uint(fmode_t fm)
+{
+	union vfsub_fmu u = {
+		.fm = fm
+	};
+
+	BUILD_BUG_ON(sizeof(u.fm) != sizeof(u.ui));
+
+	return u.ui;
+}
+
+static inline fmode_t vfsub_uint_to_fmode(unsigned int ui)
+{
+	union vfsub_fmu u = {
+		.ui = ui
+	};
+
+	return u.fm;
+}
+
+/* ---------------------------------------------------------------------- */
+
 int vfsub_sio_mkdir(struct inode *dir, struct path *path, int mode);
 int vfsub_sio_rmdir(struct inode *dir, struct path *path);
 int vfsub_sio_notify_change(struct path *path, struct iattr *ia);
