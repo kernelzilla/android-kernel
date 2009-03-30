@@ -845,11 +845,13 @@ static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 	err = 0;
 	for (ul = 0; ul < n; ul++) {
 		/* todo: already flushed? */
+		/* cf. fs/super.c:mark_files_ro() */
 		hf = a[ul];
-		hf->f_flags = au_file_roflags(hf->f_flags);
 		hf->f_mode &= ~FMODE_WRITE;
-		file_release_write(hf);
-		mnt_drop_write(hf->f_vfsmnt);
+		if (!file_check_writeable(hf)) {
+			file_release_write(hf);
+			mnt_drop_write(hf->f_vfsmnt);
+		}
 	}
 
  out_free:
