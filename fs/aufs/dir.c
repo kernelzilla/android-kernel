@@ -54,7 +54,9 @@ static int reopen_dir(struct file *file)
 		au_set_h_fptr(file, bindex, NULL);
 	au_set_fbend(file, btail);
 
+	spin_lock(&file->f_lock);
 	flags = file->f_flags;
+	spin_unlock(&file->f_lock);
 	for (bindex = bstart; bindex <= btail; bindex++) {
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (!h_dentry)
