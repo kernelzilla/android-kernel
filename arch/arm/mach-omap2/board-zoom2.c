@@ -372,6 +372,7 @@ static struct synaptics_i2c_rmi_platform_data synaptics_platform_data[] = {
 		.version	= 0x0,
 		.power		= &synaptics_power,
 		.flags		= SYNAPTICS_SWAP_XY,
+		.irqflags	= IRQF_TRIGGER_LOW,
 	}
 };
 
