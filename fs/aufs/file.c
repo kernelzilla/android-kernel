@@ -22,19 +22,10 @@
  */
 void au_store_oflag(struct nameidata *nd, struct inode *inode)
 {
-	union {
-		fmode_t fm;
-		unsigned int u;
-	} u = {
-		.fm = FMODE_EXEC
-	};
-
-	BUILD_BUG_ON(sizeof(u.fm) != sizeof(u.u));
-
 	if (nd
 	    /* && !(nd->flags & LOOKUP_CONTINUE) */
 	    && (nd->flags & LOOKUP_OPEN)
-	    && (nd->intent.open.flags & u.u)
+	    && (nd->intent.open.flags & vfsub_fmode_to_uint(FMODE_EXEC))
 	    && inode
 	    && S_ISREG(inode->i_mode)) {
 		/* suppress a warning in lp64 */
