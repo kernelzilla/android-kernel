@@ -76,7 +76,7 @@ struct au_vdir {
 /* ---------------------------------------------------------------------- */
 
 /* dir.c */
-extern struct file_operations aufs_dir_fop;
+extern const struct file_operations aufs_dir_fop;
 void au_add_nlink(struct inode *dir, struct inode *h_dir);
 void au_sub_nlink(struct inode *dir, struct inode *h_dir);
 int au_test_empty_lower(struct dentry *dentry);

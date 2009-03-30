@@ -529,7 +529,7 @@ static int aufs_fasync(int fd, struct file *file, int flag)
 
 /* ---------------------------------------------------------------------- */
 
-struct file_operations aufs_file_fop = {
+const struct file_operations aufs_file_fop = {
 	/*
 	 * while generic_file_llseek/_unlocked() don't use BKL,
 	 * don't use it since it operates file->f_mapping->host.

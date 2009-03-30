@@ -63,7 +63,7 @@ int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 			  int wlock);
 
 /* f_op.c */
-extern struct file_operations aufs_file_fop;
+extern const struct file_operations aufs_file_fop;
 int aufs_flush(struct file *file, fl_owner_t id);
 
 /* finfo.c */
