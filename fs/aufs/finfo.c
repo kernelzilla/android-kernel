@@ -77,6 +77,7 @@ int au_finfo_init(struct file *file)
 		unsigned int u;
 		fmode_t m;
 	} u;
+	unsigned long ul;
 
 	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
 
@@ -98,7 +99,9 @@ int au_finfo_init(struct file *file)
 	/* smp_mb(); */ /* atomic_set */
 
 	/* cf. au_store_oflag() */
-	u.u = (unsigned int)file->private_data;
+	/* suppress a warning in lp64 and strict type */
+	ul = (unsigned long)file->private_data;
+	u.u = ul;
 	file->f_mode |= (u.m & FMODE_EXEC);
 	file->private_data = finfo;
 	return 0; /* success */
