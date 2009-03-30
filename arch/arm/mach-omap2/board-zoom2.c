@@ -23,6 +23,7 @@
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl4030.h>
+#include <linux/interrupt.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
