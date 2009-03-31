@@ -1525,6 +1525,11 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		goto err;
 
 	set_fb_fix(fbi);
+
+	r = fb_alloc_cmap(&fbi->cmap, 256, 0);
+	if (r)
+		dev_err(fbdev->dev, "unable to allocate color map memory\n");
+
 err:
 	return r;
 }
