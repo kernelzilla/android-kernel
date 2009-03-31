@@ -590,7 +590,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	DSP_STATUS dsp_status = DSP_SOK;
 	HANDLE	     hDrvObject = NULL;
 	struct PROCESS_CONTEXT    *pPctxt = NULL;
-	struct PROCESS_CONTEXT	*pTmp = NULL;
+	struct PROCESS_CONTEXT	*next_node = NULL;
 	struct PROCESS_CONTEXT    *pCtxtclosed = NULL;
 	struct PROCESS_CONTEXT    *pCtxttraverse = NULL;
 	struct task_struct *tsk = NULL;
@@ -605,6 +605,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
 	while (pCtxtclosed != NULL) {
 		tsk = find_task_by_vpid(pCtxtclosed->pid);
+		next_node = pCtxtclosed->next;
 
 		if ((tsk == NULL) || (tsk->exit_state == EXIT_ZOMBIE)) {
 
@@ -642,14 +643,11 @@ static int bridge_open(struct inode *ip, struct file *filp)
 					}
 				}
 			}
-			pTmp = pCtxtclosed->next;
 			DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject,
 					     pCtxtclosed,
 					     (void *)pCtxtclosed->pid);
-		} else {
-			pTmp = pCtxtclosed->next;
 		}
-		pCtxtclosed = pTmp;
+		pCtxtclosed = next_node;
 	}
 func_cont:
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
