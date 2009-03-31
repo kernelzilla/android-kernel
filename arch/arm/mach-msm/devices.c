@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
+#include <linux/interrupt.h>
 
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
@@ -527,6 +528,34 @@ struct platform_device msm_device_mdp = {
 	.id = 0,
 	.num_resources = ARRAY_SIZE(resources_mdp),
 	.resource = resources_mdp,
+};
+
+static struct resource resources_tssc[] = {
+	{
+		.start	= MSM_TSSC_PHYS,
+		.end	= MSM_TSSC_PHYS + MSM_TSSC_SIZE - 1,
+		.name	= "tssc",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_TCHSCRN1,
+		.end	= INT_TCHSCRN1,
+		.name	= "tssc1",
+		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
+	},
+	{
+		.start	= INT_TCHSCRN2,
+		.end	= INT_TCHSCRN2,
+		.name	= "tssc2",
+		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
+	},
+};
+
+struct platform_device msm_device_touchscreen = {
+	.name = "msm_touchscreen",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(resources_tssc),
+	.resource = resources_tssc,
 };
 
 #define CLOCK(clk_name, clk_id, clk_dev, clk_flags, clk_arch) {	\
