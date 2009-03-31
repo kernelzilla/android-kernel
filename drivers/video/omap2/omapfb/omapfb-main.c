@@ -1193,6 +1193,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 
 		if(!va) {
 			printk(KERN_ERR "vrfb: ioremap failed\n");
+			omap_vrfb_release_ctx(&rg->vrfb);
 			return -ENOMEM;
 		}
 
