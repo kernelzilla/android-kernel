@@ -254,10 +254,13 @@ static inline int au_test_vfat(struct super_block *sb)
  */
 static inline int au_test_fs_unsuppoted(struct super_block *sb)
 {
-	return au_test_procfs(sb)
+	return
+#ifndef CONFIG_AUFS_BR_RAMFS
+		au_test_ramfs(sb) ||
+#endif
+		au_test_procfs(sb)
 		|| au_test_sysfs(sb)
 		|| au_test_configfs(sb)
-		|| au_test_ramfs(sb)
 		/* || !strcmp(au_sbtype(sb), "unionfs") */
 		|| au_test_aufs(sb); /* will be supported in next version */
 }
@@ -275,6 +278,9 @@ static inline int au_test_fs_null_nd(struct super_block *sb)
 static inline int au_test_fs_remote(struct super_block *sb)
 {
 	return !au_test_tmpfs(sb)
+#ifdef CONFIG_AUFS_BR_RAMFS
+		&& !au_test_ramfs(sb)
+#endif
 		&& !(sb->s_type->fs_flags & FS_REQUIRES_DEV);
 }
 
@@ -312,7 +318,6 @@ static inline int au_test_fs_bad_iattr_size(struct super_block *sb)
 		/* || au_test_ocfs2(sb) */	/* untested */
 		/* || au_test_ocfs2_dlmfs(sb) */ /* untested */
 		/* || au_test_sysv(sb) */	/* untested */
-		/* || au_test_ramfs(sb)*/	/* unsupported */
 		/* || au_test_ubifs(sb) */	/* untested */
 		/* || au_test_minix(sb) */	/* untested */
 		;
@@ -369,7 +374,11 @@ static inline int au_test_fs_bad_xino(struct super_block *sb)
 {
 	return au_test_fs_remote(sb)
 		|| au_test_fs_bad_iattr_size(sb)
+#ifdef CONFIG_AUFS_BR_RAMFS
+		|| !(au_test_ramfs(sb) || au_test_fs_null_nd(sb))
+#else
 		|| !au_test_fs_null_nd(sb) /* to keep xino code simple */
+#endif
 		/* don't want unnecessary work for xino */
 		|| au_test_aufs(sb)
 		|| au_test_ecryptfs(sb);
@@ -377,7 +386,8 @@ static inline int au_test_fs_bad_xino(struct super_block *sb)
 
 static inline int au_test_fs_trunc_xino(struct super_block *sb)
 {
-	return au_test_tmpfs(sb);
+	return au_test_tmpfs(sb)
+		|| au_test_ramfs(sb);
 }
 
 /*
