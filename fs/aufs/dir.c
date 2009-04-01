@@ -504,7 +504,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 
 /* ---------------------------------------------------------------------- */
 
-struct file_operations aufs_dir_fop = {
+const struct file_operations aufs_dir_fop = {
 	.read		= generic_read_dir,
 	.readdir	= aufs_readdir,
 	.unlocked_ioctl	= aufs_ioctl_dir,
