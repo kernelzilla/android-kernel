@@ -690,12 +690,6 @@ static int bridge_release(struct inode *ip, struct file *filp)
 	return status;
 }
 
-static void bridge_free(struct device *dev)
-{
-	/* nothing to Free */
-}
-
-
 /* This function provides IO interface to the bridge driver. */
 static int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
 		unsigned long args)

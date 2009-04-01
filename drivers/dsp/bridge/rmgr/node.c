@@ -3471,7 +3471,7 @@ static DSP_STATUS GetRMSFxns(struct NODE_MGR *hNodeMgr)
 			}
 		}
 	}
-func_end:
+
 	return status;
 }
 
