@@ -1500,6 +1500,13 @@ strerror(3) or something.
 For example, the \[oq]errno\[cq] in the message \[oq]I/O Error, write failed (\-28)\[cq]
 is 28 which means ENOSPC or \[oq]No space left on device.\[cq]
 
+When CONFIG_AUFS_BR_RAMFS is enabled, you can specify ramfs as an aufs
+branch. Since ramfs is simple, it doesn't set the maximum link count
+originally. In aufs, it is very dangerous, particulary for
+whiteouts. Finally aufs sets the maxmimum link count for ramfs. Tha
+value is 32000 which is borrowed from ext2.
+
+
 .\" .SH Current Limitation
 .
 .\" ----------------------------------------------------------------------
