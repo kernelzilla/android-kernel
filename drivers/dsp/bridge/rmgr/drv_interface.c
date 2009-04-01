@@ -559,24 +559,24 @@ static int bridge_resume(struct platform_device *pdev)
 #define bridge_resume NULL
 #endif
 
-static struct platform_driver bridge_driver_ldm = {
+static struct platform_driver bridge_driver = {
 	.driver = {
 		.name = BRIDGE_NAME,
 	},
 	.probe	 = omap34xx_bridge_probe,
-	.remove	 = omap34xx_bridge_remove,
+	.remove	 = __devexit_p(omap34xx_bridge_remove),
 	.suspend = bridge_suspend,
 	.resume	 = bridge_resume,
 };
 
 static int __init bridge_init(void)
 {
-	return platform_driver_register(&bridge_driver_ldm);
+	return platform_driver_register(&bridge_driver);
 }
 
 static void __exit bridge_exit(void)
 {
-	platform_driver_unregister(&bridge_driver_ldm);
+	platform_driver_unregister(&bridge_driver);
 }
 
 /* This function is called when an application opens handle to the
