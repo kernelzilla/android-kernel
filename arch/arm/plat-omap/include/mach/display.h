@@ -211,6 +211,8 @@ struct omap_dss_display_config {
 	int panel_reset_gpio;
 	int ctrl_reset_gpio;
 
+	int max_backlight_level;
+
 	const char *name;		/* for debug */
 	const char *ctrl_name;
 	const char *panel_name;
@@ -225,6 +227,7 @@ struct omap_dss_display_config {
 	void (*ctrl_disable)(struct omap_display *display);
 	int (*set_backlight)(struct omap_display *display,
 			int level);
+	int (*get_backlight)(struct omap_display *display);
 };
 
 struct device;
