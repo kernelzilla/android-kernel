@@ -237,12 +237,32 @@ int vfsub_mknod(struct inode *dir, struct path *path, int mode, dev_t dev)
 	return err;
 }
 
+/* ramfs doesn't check i_nlink in link(2), aufs sets a limit for it */
+static int au_test_nlink(struct inode *inode)
+{
+#ifndef CONFIG_AUFS_BR_RAMFS
+	return 0;
+#else
+	/* borrowing the upper limit from EXT2_LINK_MAX */
+	const unsigned int ramfs_link_max = 32000;
+
+	if (!au_test_ramfs(inode->i_sb)
+	    || inode->i_nlink < ramfs_link_max)
+		return 0;
+	return -EMLINK;
+#endif
+}
+
 int vfsub_link(struct dentry *src_dentry, struct inode *dir, struct path *path)
 {
 	int err;
 	struct dentry *d;
 
 	IMustLock(dir);
+
+	err = au_test_nlink(src_dentry->d_inode);
+	if (unlikely(err))
+		return err;
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
