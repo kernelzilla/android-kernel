@@ -294,6 +294,7 @@ bool dispc_trans_key_enabled(enum omap_channel ch);
 
 void dispc_set_lcd_timings(struct omap_video_timings *timings);
 unsigned long dispc_fclk_rate(void);
+unsigned long dispc_lclk_rate(void);
 unsigned long dispc_pclk_rate(void);
 void dispc_set_pol_freq(struct omap_panel *panel);
 void find_lck_pck_divs(bool is_tft, unsigned long req_pck, unsigned long fck,

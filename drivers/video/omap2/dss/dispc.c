@@ -1850,6 +1850,21 @@ unsigned long dispc_fclk_rate(void)
 	return r;
 }
 
+unsigned long dispc_lclk_rate(void)
+{
+	int lcd;
+	unsigned long r;
+	u32 l;
+
+	l = dispc_read_reg(DISPC_DIVISOR);
+
+	lcd = FLD_GET(l, 23, 16);
+
+	r = dispc_fclk_rate();
+
+	return r / lcd;
+}
+
 unsigned long dispc_pclk_rate(void)
 {
 	int lcd, pcd;
