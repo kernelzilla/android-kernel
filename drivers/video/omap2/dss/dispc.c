@@ -778,7 +778,7 @@ static void _dispc_set_vid_size(enum omap_plane plane, int width, int height)
 	dispc_write_reg(vsi_reg[plane-1], val);
 }
 
-static void _dispc_set_pix_inc(enum omap_plane plane, u16 inc)
+static void _dispc_set_pix_inc(enum omap_plane plane, s32 inc)
 {
 	const struct dispc_reg ri_reg[] = { DISPC_GFX_PIXEL_INC,
 				     DISPC_VID_PIXEL_INC(0),
@@ -787,7 +787,7 @@ static void _dispc_set_pix_inc(enum omap_plane plane, u16 inc)
 	dispc_write_reg(ri_reg[plane], inc);
 }
 
-static void _dispc_set_row_inc(enum omap_plane plane, u16 inc)
+static void _dispc_set_row_inc(enum omap_plane plane, s32 inc)
 {
 	const struct dispc_reg ri_reg[] = { DISPC_GFX_ROW_INC,
 				     DISPC_VID_ROW_INC(0),
@@ -1123,7 +1123,7 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	}
 }
 
-static int pixinc(int pixels, u8 ps)
+static s32 pixinc(int pixels, u8 ps)
 {
 	if (pixels == 1)
 		return 1;
@@ -1140,7 +1140,7 @@ static void calc_rotation_offset(u8 rotation, bool mirror,
 		u16 width, u16 height,
 		enum omap_color_mode color_mode, bool fieldmode,
 		unsigned *offset0, unsigned *offset1,
-		u16 *row_inc, u16 *pix_inc)
+		s32 *row_inc, s32 *pix_inc)
 {
 	u8 ps;
 	u16 fbw, fbh;
@@ -1298,8 +1298,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	bool fieldmode = 0;
 	int cconv = 0;
 	unsigned offset0, offset1;
-	u16 row_inc;
-	u16 pix_inc;
+	s32 row_inc;
+	s32 pix_inc;
 
 	if (plane == OMAP_DSS_GFX) {
 		if (width != out_width || height != out_height)
