@@ -50,3 +50,9 @@ endif
 ifdef CONFIG_UBIFS_FS
 ccflags-y += -DUBIFS_SUPER_MAGIC=0x24051905
 endif
+
+# defined in ${srctree}/fs/debugfs/inode.c
+# boolean
+ifdef CONFIG_DEBUG_FS
+ccflags-y += -DDEBUGFS_MAGIC=0x64626720
+endif

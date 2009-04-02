@@ -257,6 +257,15 @@ static inline int au_test_securityfs(struct super_block *sb __maybe_unused)
 #endif
 }
 
+static inline int au_test_debugfs(struct super_block *sb __maybe_unused)
+{
+#ifdef CONFIG_DEBUG_FS
+	return sb->s_magic == DEBUGFS_MAGIC;
+#else
+	return 0;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 /*
  * they can't be an aufs branch.
@@ -270,6 +279,7 @@ static inline int au_test_fs_unsuppoted(struct super_block *sb)
 		au_test_procfs(sb)
 		|| au_test_sysfs(sb)
 		|| au_test_configfs(sb)
+		|| au_test_debugfs(sb)
 		|| au_test_securityfs(sb)
 		/* || !strcmp(au_sbtype(sb), "unionfs") */
 		|| au_test_aufs(sb); /* will be supported in next version */
