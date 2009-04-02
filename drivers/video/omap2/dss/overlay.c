@@ -331,6 +331,9 @@ static int dss_ovl_set_overlay_info(struct omap_overlay *ovl,
 	int r;
 	struct omap_overlay_info old_info;
 
+	if (info->paddr == 0)
+		return -EINVAL;
+
 	old_info = ovl->info;
 	ovl->info = *info;
 

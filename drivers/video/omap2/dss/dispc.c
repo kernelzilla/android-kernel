@@ -1301,6 +1301,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 row_inc;
 	s32 pix_inc;
 
+	if (paddr == 0)
+		return -EINVAL;
+
 	if (plane == OMAP_DSS_GFX) {
 		if (width != out_width || height != out_height)
 			return -EINVAL;
