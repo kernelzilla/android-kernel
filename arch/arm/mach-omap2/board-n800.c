@@ -41,6 +41,8 @@
 #include <mach/clock.h>
 #include <mach/gpio-switch.h>
 #include <mach/blizzard.h>
+#include <mach/display.h>
+#include <mach/vram.h>
 
 #include <../drivers/cbus/tahvo.h>
 #include <../drivers/media/video/tcm825x.h>
@@ -161,47 +163,15 @@ static struct omap_uart_config n800_uart_config __initdata = {
 
 #include "../../../drivers/cbus/retu.h"
 
-static struct omap_fbmem_config n800_fbmem0_config __initdata = {
-	.size = 752 * 1024,
-};
-
-static struct omap_fbmem_config n800_fbmem1_config __initdata = {
-	.size = 752 * 1024,
-};
-
-static struct omap_fbmem_config n800_fbmem2_config __initdata = {
-	.size = 752 * 1024,
-};
-
 static struct omap_tmp105_config n800_tmp105_config __initdata = {
 	.tmp105_irq_pin = 125,
 	.set_power = n800_tmp105_set_power,
 };
 
-static void mipid_shutdown(struct mipid_platform_data *pdata)
-{
-	if (pdata->nreset_gpio != -1) {
-		pr_info("shutdown LCD\n");
-		gpio_set_value(pdata->nreset_gpio, 0);
-		msleep(120);
-	}
-}
 
-static struct mipid_platform_data n800_mipid_platform_data = {
-	.shutdown = mipid_shutdown,
-};
 
-static void __init mipid_dev_init(void)
-{
-	const struct omap_lcd_config *conf;
 
-	conf = omap_get_config(OMAP_TAG_LCD, struct omap_lcd_config);
-	if (conf != NULL) {
-		n800_mipid_platform_data.nreset_gpio = conf->nreset_gpio;
-		n800_mipid_platform_data.data_lines = conf->data_lines;
-	}
-}
-
+/* DISPLAY */
 static struct {
 	struct clk *sys_ck;
 } blizzard;
@@ -216,11 +186,180 @@ static int blizzard_get_clocks(void)
 	return 0;
 }
 
-static unsigned long blizzard_get_clock_rate(struct device *dev)
+static unsigned long blizzard_get_clock_rate(void)
 {
 	return clk_get_rate(blizzard.sys_ck);
 }
 
+static int n800_pn800_enable(struct omap_display *display)
+{
+	if (display->hw_config.panel_reset_gpio != -1) {
+		printk("enabling panel gpio\n");
+		gpio_direction_output(display->hw_config.panel_reset_gpio, 1);
+	}
+
+	return 0;
+}
+
+static void n800_pn800_disable(struct omap_display *display)
+{
+	if (display->hw_config.panel_reset_gpio != -1) {
+		printk("disabling panel gpio\n");
+		gpio_direction_output(display->hw_config.panel_reset_gpio, 0);
+		msleep(120);
+	}
+}
+
+static int n800_blizzard_enable(struct omap_display *display)
+{
+	printk("enabling bliz powers\n");
+
+	/* Vcore to 1.475V */
+	tahvo_set_clear_reg_bits(0x07, 0, 0xf);
+	msleep(10);
+
+	clk_enable(blizzard.sys_ck);
+
+	if (display->hw_config.ctrl_reset_gpio != -1)
+		gpio_direction_output(display->hw_config.ctrl_reset_gpio, 1);
+
+	printk("osc_ck %lu\n", blizzard_get_clock_rate());
+
+	return 0;
+}
+
+static void n800_blizzard_disable(struct omap_display *display)
+{
+	printk("disabling bliz powers\n");
+
+	if (display->hw_config.ctrl_reset_gpio != -1)
+		gpio_direction_output(display->hw_config.ctrl_reset_gpio, 0);
+
+	clk_disable(blizzard.sys_ck);
+
+	/* Vcore to 1.005V */
+	tahvo_set_clear_reg_bits(0x07, 0xf, 0);
+}
+
+static int n800_set_backlight_level(struct omap_display *display, int level)
+{
+	return 0;
+}
+
+static struct omap_dss_display_config n800_dsi_display_data = {
+	.type = OMAP_DISPLAY_TYPE_DBI,
+	.name = "lcd",
+	.ctrl_name = "ctrl-blizzard",
+	.panel_name = "panel-pn800",
+	.panel_reset_gpio = -1,
+	.ctrl_reset_gpio = N800_BLIZZARD_POWERDOWN_GPIO,
+	.panel_enable = n800_pn800_enable,
+	.panel_disable = n800_pn800_disable,
+	.ctrl_enable = n800_blizzard_enable,
+	.ctrl_disable = n800_blizzard_disable,
+	.set_backlight = n800_set_backlight_level,
+	.u.rfbi = {
+		.channel = 0,
+		/* 8 for cmd mode, 16 for pixel data. ctrl-blizzard handles switching */
+		.data_lines = 8,
+	},
+	.panel_data = 0, // XXX used for panel datalines
+};
+static struct omap_dss_board_info n800_dss_data = {
+	.num_displays = 1,
+	.displays = {
+		&n800_dsi_display_data,
+	},
+};
+
+static struct platform_device n800_dss_device = {
+	.name          = "omapdss",
+	.id            = -1,
+	.dev            = {
+		.platform_data = &n800_dss_data,
+	},
+};
+
+static void __init n800_display_init(void)
+{
+	int r;
+	const struct omap_lcd_config *conf;
+
+	conf = omap_get_config(OMAP_TAG_LCD, struct omap_lcd_config);
+	if (conf != NULL) {
+		n800_dsi_display_data.panel_reset_gpio = conf->nreset_gpio;
+		n800_dsi_display_data.panel_data =
+			(void*)(u32)conf->data_lines; // XXX
+		//printk("\n\nTULI %d\n\n", conf->data_lines);
+	} else {
+		printk("\n\nEI TULLU MIOTÄÄÄ\n\n");
+	}
+
+	blizzard_get_clocks();
+	clk_enable(blizzard.sys_ck); // XXX always enable
+
+	//omapfb_set_ctrl_platform_data(&n800_blizzard_data);
+	//
+	if (n800_dsi_display_data.ctrl_reset_gpio != -1) {
+		r = gpio_request(n800_dsi_display_data.ctrl_reset_gpio,
+				"Blizzard pd");
+		if (r < 0) {
+			n800_dsi_display_data.ctrl_reset_gpio = -1;
+			printk(KERN_ERR "Unable to get Blizzard GPIO\n");
+		} else {
+			gpio_direction_output(n800_dsi_display_data.ctrl_reset_gpio,
+					1);
+			// XXX always enable
+		}
+	}
+
+	if (n800_dsi_display_data.panel_reset_gpio != -1) {
+		r = gpio_request(n800_dsi_display_data.panel_reset_gpio,
+				"panel reset");
+		if (r < 0) {
+			n800_dsi_display_data.panel_reset_gpio = -1;
+			printk(KERN_ERR "Unable to get pn800 GPIO\n");
+		} else {
+			gpio_direction_output(n800_dsi_display_data.panel_reset_gpio,
+					1);
+			// XXX always enable
+		}
+	}
+}
+
+/* DISPLAY END */
+
+
+
+
+
+static void mipid_shutdown(struct mipid_platform_data *pdata)
+{
+	if (pdata->nreset_gpio != -1) {
+		pr_info("shutdown LCD\n");
+		gpio_set_value(pdata->nreset_gpio, 0);
+		msleep(120);
+	}
+}
+
+static struct mipid_platform_data n800_mipid_platform_data = {
+	.shutdown = mipid_shutdown,
+};
+
+#if 0
+static void __init mipid_dev_init(void)
+{
+	const struct omap_lcd_config *conf;
+
+	conf = omap_get_config(OMAP_TAG_LCD, struct omap_lcd_config);
+	if (conf != NULL) {
+		n800_mipid_platform_data.nreset_gpio = conf->nreset_gpio;
+		n800_mipid_platform_data.data_lines = conf->data_lines;
+	}
+}
+#endif
+
+#if 0
 static void blizzard_enable_clocks(int enable)
 {
 	if (enable)
@@ -265,14 +404,12 @@ static void __init blizzard_dev_init(void)
 	gpio_direction_output(N800_BLIZZARD_POWERDOWN_GPIO, 1);
 
 	blizzard_get_clocks();
-	omapfb_set_ctrl_platform_data(&n800_blizzard_data);
+	//omapfb_set_ctrl_platform_data(&n800_blizzard_data);
 }
+#endif
 
 static struct omap_board_config_kernel n800_config[] __initdata = {
 	{ OMAP_TAG_UART,	                &n800_uart_config },
-	{ OMAP_TAG_FBMEM,			&n800_fbmem0_config },
-	{ OMAP_TAG_FBMEM,			&n800_fbmem1_config },
-	{ OMAP_TAG_FBMEM,			&n800_fbmem2_config },
 	{ OMAP_TAG_TMP105,			&n800_tmp105_config },
 };
 
@@ -379,7 +516,7 @@ static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
 
 static struct spi_board_info n800_spi_board_info[] __initdata = {
 	{
-		.modalias	= "lcd_mipid",
+		.modalias	= "panel-n800",
 		.bus_num	= 1,
 		.chip_select	= 1,
 		.max_speed_hz	= 4000000,
@@ -404,7 +541,7 @@ static struct spi_board_info n800_spi_board_info[] __initdata = {
 
 static struct spi_board_info n810_spi_board_info[] __initdata = {
 	{
-		.modalias	 = "lcd_mipid",
+		.modalias	 = "panel-n800",
 		.bus_num	 = 1,
 		.chip_select	 = 1,
 		.max_speed_hz	 = 4000000,
@@ -582,6 +719,7 @@ static struct platform_device *n800_devices[] __initdata = {
 #if defined(CONFIG_CBUS_RETU_HEADSET)
 	&retu_headset_device,
 #endif
+	&n800_dss_device,
 };
 
 #ifdef CONFIG_MENELAUS
@@ -713,9 +851,10 @@ void __init nokia_n800_common_init(void)
 	if (machine_is_nokia_n810())
 		i2c_register_board_info(2, n810_i2c_board_info_2,
 			ARRAY_SIZE(n810_i2c_board_info_2));
-		
-	mipid_dev_init();
-	blizzard_dev_init();
+
+	//mipid_dev_init();
+	//blizzard_dev_init();
+	n800_display_init();
 }
 
 static void __init nokia_n800_init(void)
@@ -735,6 +874,7 @@ void __init nokia_n800_map_io(void)
 	omap_board_config_size = ARRAY_SIZE(n800_config);
 
 	omap2_set_globals_242x();
+	omap2_set_sdram_vram(800 * 480 * 2 * 3, 0);
 	omap2_map_common_io();
 }
 

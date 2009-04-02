@@ -18,4 +18,14 @@ config PANEL_SHARP_LS037V7DW01
         depends on OMAP2_DSS
         help
           LCD Panel used in TI's SDP3430 and EVM boards
+
+config PANEL_N800
+        tristate "Panel N8x0"
+        help
+          N8x0 LCD (hack)
+
+config CTRL_BLIZZARD
+        tristate "Blizzard Controller"
+        help
+          Blizzard Controller (hack)
 endmenu
