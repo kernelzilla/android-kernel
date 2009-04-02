@@ -28,4 +28,12 @@ config CTRL_BLIZZARD
         tristate "Blizzard Controller"
         help
           Blizzard Controller (hack)
+
+config PANEL_ACX565AKM
+        tristate "ACX565AKM LCD Panel"
+        depends on OMAP2_DSS_SDI
+        select BACKLIGHT_CLASS_DEVICE
+        help
+          LCD Panel used in RX51
+
 endmenu
