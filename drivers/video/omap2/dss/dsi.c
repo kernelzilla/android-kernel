@@ -2624,17 +2624,28 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 		u16 x, u16 y, u16 w, u16 h)
 {
 	int bytespp = 3;
+	int len;
 	int total_len;
-	int line_packet_len;
+	int packet_payload;
+	int packet_len;
 	u32 l;
 
 	if (dsi.update_mode == OMAP_DSS_UPDATE_MANUAL)
 		DSSDBG("dsi_update_screen_dispc(%d,%d %dx%d)\n",
 				x, y, w, h);
 
-	/* TODO: one packet could be longer, I think? Max is the line buffer */
-	line_packet_len = w * bytespp + 1;	/* 1 byte for DCS cmd */
-	total_len = line_packet_len * h;
+	len = w * h * bytespp;
+
+	/* XXX: one packet could be longer, I think? Line buffer is
+	 * 1024 x 24bits, but we have to put DCS cmd there also.
+	 * 1023 * 3 should work, but causes strange color effects. */
+	packet_payload = min(w, (u16)1020) * bytespp;
+
+	packet_len = packet_payload + 1;	/* 1 byte for DCS cmd */
+	total_len = (len / packet_payload) * packet_len;
+
+	if (len % packet_payload)
+		total_len += (len % packet_payload) + 1;
 
 	display->ctrl->setup_update(display, x, y, w, h);
 
@@ -2646,7 +2657,7 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 	l = FLD_VAL(total_len, 23, 0); /* TE_SIZE */
 	dsi_write_reg(DSI_VC_TE(1), l);
 
-	dsi_vc_write_long_header(1, DSI_DT_DCS_LONG_WRITE, line_packet_len, 0);
+	dsi_vc_write_long_header(1, DSI_DT_DCS_LONG_WRITE, packet_len, 0);
 
 	if (dsi.use_te)
 		l = FLD_MOD(l, 1, 30, 30); /* TE_EN */
