@@ -41,6 +41,7 @@
 #include <mach/board-overo.h>
 #include <mach/board.h>
 #include <mach/common.h>
+#include <mach/display.h>
 #include <mach/gpio.h>
 #include <mach/gpmc.h>
 #include <mach/hardware.h>
@@ -175,6 +176,9 @@ static void __init overo_ads7846_init(void)
 #else
 static inline void __init overo_ads7846_init(void) { return; }
 #endif
+
+static int lcd_enabled;
+static int dvi_enabled;
 
 static struct mtd_partition overo_nand_partitions[] = {
 	{
@@ -360,22 +364,101 @@ static void __init overo_init_irq(void)
 	omap_gpio_init();
 }
 
-static struct platform_device overo_lcd_device = {
-	.name		= "overo_lcd",
-	.id		= -1,
+/* DSS */
+
+#define OVERO_GPIO_LCD_EN 144
+
+static void __init overo_display_init(void)
+{
+	int r;
+
+	r = gpio_request(OVERO_GPIO_LCD_EN, "display enable");
+	if (r)
+		printk("fail1\n");
+	r = gpio_direction_output(OVERO_GPIO_LCD_EN, 1);
+	if (r)
+		printk("fail2\n");
+	gpio_export(OVERO_GPIO_LCD_EN, 0);
+}
+
+static int overo_panel_enable_dvi(struct omap_display *display)
+{
+	if (lcd_enabled) {
+		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
+		return -EINVAL;
+	}
+	dvi_enabled = 1;
+
+	gpio_set_value(OVERO_GPIO_LCD_EN, 1);
+
+	return 0;
+}
+
+static void overo_panel_disable_dvi(struct omap_display *display)
+{
+	gpio_set_value(OVERO_GPIO_LCD_EN, 0);
+
+	dvi_enabled = 0;
+}
+
+static struct omap_dss_display_config overo_display_data_dvi = {
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.name = "dvi",
+	.panel_name = "panel-generic",
+	.u.dpi.data_lines = 24,
+	.panel_enable = overo_panel_enable_dvi,
+	.panel_disable = overo_panel_disable_dvi,
 };
 
-static struct omap_lcd_config overo_lcd_config __initdata = {
-	.ctrl_name	= "internal",
+static int overo_panel_enable_lcd(struct omap_display *display)
+{
+	if (dvi_enabled) {
+		printk(KERN_ERR "cannot enable LCD, DVI is enabled\n");
+		return -EINVAL;
+	}
+
+	gpio_set_value(OVERO_GPIO_LCD_EN, 1);
+	lcd_enabled = 1;
+	return 0;
+}
+
+static void overo_panel_disable_lcd(struct omap_display *display)
+{
+	gpio_set_value(OVERO_GPIO_LCD_EN, 0);
+	lcd_enabled = 0;
+}
+
+static struct omap_dss_display_config overo_display_data_lcd = {
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.name = "lcd",
+	.panel_name = "samsung-lte430wq-f0c",
+	.u.dpi.data_lines = 24,
+	.panel_enable = overo_panel_enable_lcd,
+	.panel_disable = overo_panel_disable_lcd,
+ };
+
+static struct omap_dss_board_info overo_dss_data = {
+	.num_displays = 2,
+	.displays = {
+		&overo_display_data_dvi,
+		&overo_display_data_lcd,
+	}
+};
+
+static struct platform_device overo_dss_device = {
+	.name          = "omapdss",
+	.id            = -1,
+	.dev            = {
+		.platform_data = &overo_dss_data,
+	},
 };
 
 static struct omap_board_config_kernel overo_config[] __initdata = {
 	{ OMAP_TAG_UART,	&overo_uart_config },
-	{ OMAP_TAG_LCD,		&overo_lcd_config },
 };
 
 static struct platform_device *overo_devices[] __initdata = {
-	&overo_lcd_device,
+	&overo_dss_device,
 };
 
 static void __init overo_init(void)
@@ -390,6 +473,7 @@ static void __init overo_init(void)
 	overo_flash_init();
 	overo_init_smsc911x();
 	overo_ads7846_init();
+	overo_display_init();
 
 	if ((gpio_request(OVERO_GPIO_W2W_NRESET,
 			  "OVERO_GPIO_W2W_NRESET") == 0) &&
