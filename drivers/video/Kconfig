@@ -2132,6 +2132,7 @@ config FB_MX3
          an LCD display with your i.MX31 system, say Y here.
 
 source "drivers/video/omap/Kconfig"
+source "drivers/video/omap2/Kconfig"
 
 source "drivers/video/backlight/Kconfig"
 source "drivers/video/display/Kconfig"
