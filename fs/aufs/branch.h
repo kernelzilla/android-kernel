@@ -133,7 +133,8 @@ int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
 	      int *do_update);
 
 /* xino.c */
-#define Au_LOFF_MAX	((loff_t)LLONG_MAX)
+static const loff_t au_loff_max = LLONG_MAX;
+
 int au_xib_trunc(struct super_block *sb);
 ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
 		   loff_t *pos);
