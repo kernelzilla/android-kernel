@@ -36,4 +36,14 @@ config PANEL_ACX565AKM
         help
           LCD Panel used in RX51
 
+config CTRL_EDISCO
+        tristate "Edisco Controller"
+        help
+          Toshiba EDISCO Controller
+
+config PANEL_SHOLES
+        tristate "Sholes Panel"
+        help
+	  LCD Panel used in sholes
+
 endmenu

@@ -65,6 +65,9 @@ obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o \
 obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
 					   mmc-twl4030.o \
                                            board-ldp-flash.o
+obj-$(CONFIG_MACH_OMAP_SHOLES)		+= board-sholes.o \
+					   board-sholes-flash.o \
+					   board-sholes-panel.o
 obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o \
 					   board-apollon-mmc.o	\
 					   board-apollon-keys.o
