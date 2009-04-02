@@ -50,6 +50,8 @@
 #define OMAPFB_UPDATE_WINDOW	OMAP_IOW(54, struct omapfb_update_window)
 #define OMAPFB_SETUP_MEM	OMAP_IOW(55, struct omapfb_mem_info)
 #define OMAPFB_QUERY_MEM	OMAP_IOW(56, struct omapfb_mem_info)
+#define OMAPFB_WAITFORVSYNC	OMAP_IO(57)
+#define OMAPFB_MEMORY_READ	OMAP_IOR(58, struct omapfb_memory_read)
 
 #define OMAPFB_CAPS_GENERIC_MASK	0x00000fff
 #define OMAPFB_CAPS_LCDC_MASK		0x00fff000
@@ -90,6 +92,13 @@ enum omapfb_color_format {
 	OMAPFB_COLOR_CLUT_1BPP,
 	OMAPFB_COLOR_RGB444,
 	OMAPFB_COLOR_YUY422,
+
+	OMAPFB_COLOR_ARGB16,
+	OMAPFB_COLOR_RGB24U,	/* RGB24, 32-bit container */
+	OMAPFB_COLOR_RGB24P,	/* RGB24, 24-bit container */
+	OMAPFB_COLOR_ARGB32,
+	OMAPFB_COLOR_RGBA32,
+	OMAPFB_COLOR_RGBX32,
 };
 
 struct omapfb_update_window {
@@ -159,6 +168,15 @@ enum omapfb_update_mode {
 	OMAPFB_UPDATE_DISABLED = 0,
 	OMAPFB_AUTO_UPDATE,
 	OMAPFB_MANUAL_UPDATE
+};
+
+struct omapfb_memory_read {
+	__u16 x;
+	__u16 y;
+	__u16 w;
+	__u16 h;
+	size_t buffer_size;
+	void __user *buffer;
 };
 
 #ifdef __KERNEL__
@@ -375,6 +393,8 @@ extern struct lcd_ctrl omap1_lcd_ctrl;
 #else
 extern struct lcd_ctrl omap2_disp_ctrl;
 #endif
+
+extern void omapfb_set_platform_data(struct omapfb_platform_data *data);
 
 extern void omapfb_reserve_sdram(void);
 extern void omapfb_register_panel(struct lcd_panel *panel);

@@ -327,6 +327,34 @@ static inline int omap_init_fb(void)
 
 arch_initcall(omap_init_fb);
 
+#elif defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+
+static u64 omap_fb_dma_mask = ~(u32)0;
+static struct omapfb_platform_data omapfb_config;
+
+static struct platform_device omap_fb_device = {
+	.name		= "omapfb",
+	.id		= -1,
+	.dev = {
+		.dma_mask		= &omap_fb_dma_mask,
+		.coherent_dma_mask	= ~(u32)0,
+		.platform_data		= &omapfb_config,
+	},
+	.num_resources = 0,
+};
+
+void omapfb_set_platform_data(struct omapfb_platform_data *data)
+{
+	omapfb_config = *data;
+}
+
+static inline int omap_init_fb(void)
+{
+	return platform_device_register(&omap_fb_device);
+}
+
+arch_initcall(omap_init_fb);
+
 #else
 
 void omapfb_reserve_sdram(void) {}
