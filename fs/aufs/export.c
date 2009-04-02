@@ -130,7 +130,7 @@ int au_xigen_new(struct inode *inode)
 
 	err = -EFBIG;
 	pos = inode->i_ino;
-	if (unlikely(Au_LOFF_MAX / sizeof(inode->i_generation) - 1 < pos)) {
+	if (unlikely(au_loff_max / sizeof(inode->i_generation) - 1 < pos)) {
 		AuIOErr1("too large i%lld\n", pos);
 		goto out;
 	}

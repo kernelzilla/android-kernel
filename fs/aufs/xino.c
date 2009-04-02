@@ -343,8 +343,6 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 
 /* ---------------------------------------------------------------------- */
 
-static const loff_t au_loff_max = LLONG_MAX;
-
 static int au_xino_do_write(au_writef_t write, struct file *file,
 			    ino_t h_ino, ino_t ino)
 {
