@@ -46,6 +46,8 @@
 #include <asm/delay.h>
 #include <mach/control.h>
 
+#include <mach/display.h>
+
 #include "mmc-twl4030.h"
 
 #ifndef CONFIG_TWL4030_CORE
@@ -213,7 +215,7 @@ static struct omap2_mcspi_device_config zoom2_lcd_mcspi_config = {
 
 static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 	[0] = {
-		.modalias		= "zoom2_lcd",
+		.modalias		= "zoom2_disp_spi",
 		.bus_num		= 1,
 		.chip_select		= 2,
 		.max_speed_hz		= 375000,
@@ -221,7 +223,62 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 	},
 };
 
+#define LCD_PANEL_BACKLIGHT_GPIO 	(15 + OMAP_MAX_GPIO_LINES)
+#define LCD_PANEL_ENABLE_GPIO 		(7 + OMAP_MAX_GPIO_LINES)
+
+#define LCD_PANEL_RESET_GPIO		55
+#define LCD_PANEL_QVGA_GPIO		56
+
+
+#define PM_RECEIVER             TWL4030_MODULE_PM_RECEIVER
+#define ENABLE_VAUX2_DEDICATED  0x09
+#define ENABLE_VAUX2_DEV_GRP    0x20
+#define ENABLE_VAUX3_DEDICATED	0x03
+#define ENABLE_VAUX3_DEV_GRP	0x20
+
+#define ENABLE_VPLL2_DEDICATED          0x05
+#define ENABLE_VPLL2_DEV_GRP            0xE0
+#define TWL4030_VPLL2_DEV_GRP           0x33
+#define TWL4030_VPLL2_DEDICATED         0x36
+
+#define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
+
+
+static int zoom2_panel_enable_lcd(struct omap_display *display)
+{
+	return 0;
+}
+
+static void zoom2_panel_disable_lcd(struct omap_display *display)
+{
+}
+
+static struct omap_dss_display_config zoom2_display_data_lcd = {
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.name = "lcd",
+	.panel_name = "panel-zoom2",
+	.u.dpi.data_lines = 24,
+	.panel_enable = zoom2_panel_enable_lcd,
+	.panel_disable = zoom2_panel_disable_lcd,
+ };
+
+static struct omap_dss_board_info zoom2_dss_data = {
+	.num_displays = 1,
+	.displays = {
+		&zoom2_display_data_lcd,
+	}
+};
+
+static struct platform_device zoom2_dss_device = {
+	.name          = "omapdss",
+	.id            = -1,
+	.dev            = {
+		.platform_data = &zoom2_dss_data,
+	},
+};
+
 static struct platform_device *zoom2_devices[] __initdata = {
+	&zoom2_dss_device,
 	&zoom2_smc911x_device,
 #ifdef CONFIG_WL127X_POWER
 	&zoom2_wl127x_device,
