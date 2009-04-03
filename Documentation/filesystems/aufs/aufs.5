@@ -71,14 +71,14 @@ whplink-dir(\*[AUFS_WH_PLINKDIR]) if necessary
 Adds new branches.
 (cf. Branch Syntax).
 
-Aufs rejects the branch which is an ancestor or a descendant of anther
+Aufs rejects the branch which is an ancestor or a descendant of another
 branch. It is called overlapped. When the branch is loopback-mounted
 directory, aufs also checks the source fs-image file of loopback
 device. If the source file is a descendant of another branch, it will
 be rejected too.
 
 After mounting aufs or adding a branch, if you move a branch under
-another branch and make it descendant of anther branch, aufs will not
+another branch and make it descendant of another branch, aufs will not
 work correctly.
 .
 .TP
