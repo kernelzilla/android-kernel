@@ -24,6 +24,11 @@ config PANEL_N800
         help
           N8x0 LCD (hack)
 
+config PANEL_ZOOM2
+        tristate "TI Zoom2 Panel"
+        help
+          LCD Panel used in the TI Zoom2
+
 config CTRL_BLIZZARD
         tristate "Blizzard Controller"
         help
