@@ -2518,28 +2518,78 @@ static void dispc_error_worker(struct work_struct *work)
 	}
 
 	if (errors & DISPC_IRQ_SYNC_LOST) {
+		struct omap_overlay_manager *manager = NULL;
+		bool enable = false;
+
 		DSSERR("SYNC_LOST, disabling LCD\n");
+
 		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			struct omap_overlay_manager *mgr;
 			mgr = omap_dss_get_overlay_manager(i);
 
 			if (mgr->id == OMAP_DSS_CHANNEL_LCD) {
+				manager = mgr;
+				enable = mgr->display->state ==
+						OMAP_DSS_DISPLAY_ACTIVE;
 				mgr->display->disable(mgr->display);
 				break;
 			}
 		}
+
+		if (manager) {
+			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+				struct omap_overlay *ovl;
+				ovl = omap_dss_get_overlay(i);
+
+				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
+					continue;
+
+				if (ovl->id != 0 && ovl->manager == manager)
+					dispc_enable_plane(ovl->id, 0);
+			}
+
+			dispc_go(manager->id);
+			mdelay(50);
+			if (enable)
+				manager->display->enable(manager->display);
+		}
 	}
 
 	if (errors & DISPC_IRQ_SYNC_LOST_DIGIT) {
+		struct omap_overlay_manager *manager = NULL;
+		bool enable = false;
+
 		DSSERR("SYNC_LOST_DIGIT, disabling TV\n");
+
 		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			struct omap_overlay_manager *mgr;
 			mgr = omap_dss_get_overlay_manager(i);
 
 			if (mgr->id == OMAP_DSS_CHANNEL_DIGIT) {
+				manager = mgr;
+				enable = mgr->display->state ==
+						OMAP_DSS_DISPLAY_ACTIVE;
 				mgr->display->disable(mgr->display);
 				break;
 			}
+		}
+
+		if (manager) {
+			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+				struct omap_overlay *ovl;
+				ovl = omap_dss_get_overlay(i);
+
+				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
+					continue;
+
+				if (ovl->id != 0 && ovl->manager == manager)
+					dispc_enable_plane(ovl->id, 0);
+			}
+
+			dispc_go(manager->id);
+			mdelay(50);
+			if (enable)
+				manager->display->enable(manager->display);
 		}
 	}
 
