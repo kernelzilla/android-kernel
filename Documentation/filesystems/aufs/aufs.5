@@ -11,6 +11,8 @@
 .ds AUFS_WH_PLINKDIR .wh..wh.plnk
 .ds AUFS_BRANCH_MAX 127
 .ds AUFS_MFS_SECOND_DEF 30
+.ds AUFS_RDBLK_DEF 512
+.ds AUFS_RDHASH_DEF 32
 .\".so aufs.tmac
 .
 .eo
@@ -241,6 +243,36 @@ dirwh, aufs remove them in a single systemcall instead of passing
 another thread.
 This value is ignored when the branch is NFS.
 The default value is \*[AUFS_DIRWH_DEF].
+.\" .
+.\" .TP
+.\" .B rdcache=N
+.
+.TP
+.B rdblk=N
+Specifies a size of internal VDIR block which is allocated at a time in
+byte.
+The VDIR block will be allocated several times when necessary. If your
+directory has millions of files, you may want to expand this size.
+The default value is defined as \*[AUFS_RDBLK_DEF].
+The size has to be lager than NAME_MAX (usually 255) and kmalloc\-able
+(the maximum limit depends on your system. at least 128KB is available
+for every system).
+(cf. Virtual or Vertical Directory Block).
+.
+.TP
+.B rdhash=N
+Specifies a size of internal VDIR hash table which is used to compare
+the file names under the same named directory on multiple branches.
+The VDIR hash table will be allocated in readdir(3)/getdents(2),
+rmdir(2) and rename(2) for the existing target directory. If your
+directory has millions of files, you may want to expand this size.
+The default value is defined as \*[AUFS_RDHASH_DEF].
+The size has to be lager than zero, and it will be multiplied by 4 or 8
+(for 32\-bit and 64\-bit respectively, currently). The result must be
+kmalloc\-able
+(the maximum limit depends on your system. at least 128KB is available
+for every system).
+(cf. Virtual or Vertical Directory Block).
 .
 .TP
 .B plink
@@ -939,7 +971,7 @@ branch filesystem, then try this mount option.
 .
 .TP
 .B udba=inotify
-Aufs sets `inotify' to all the accessed directories on its branches
+Aufs sets \[oq]inotify\[cq] to all the accessed directories on its branches
 and receives the event about the dir and its children. It consumes
 resources, cpu and memory. And I am afraid that the performance will be
 hurt, but it is most strict test level.
@@ -1011,6 +1043,74 @@ And aufs cannot receive the events anymore. So aufs may show you
 incorrect data about the file/dir.
 
 .\" ----------------------------------------------------------------------
+.SH Virtual or Vertical Directory Block (VDIR)
+In order to provide the merged view of file listing, aufs builds
+internal direcotry block on memory. For readdir, aufs performs readdir()
+internally for each dir on branches, merges their entries with
+eliminating the whiteout\-ed ones, and sets it to the opened file (dir)
+object. So the file object has its entry list until it is closed. The
+entry list will be updated when the file position is zero (by
+rewinddir(3)) and becomes obsoleted.
+
+Some people may call it can be a security hole or invite DoS attack
+since the opened and once readdir\-ed dir (file object) holds its entry
+list and becomes a pressure for system memory. But I would say it is similar
+to files under /proc or /sys. The virtual files in them also holds a
+memory page (generally) while they are opened. When an idea to reduce
+memory for them is introduced, it will be applied to aufs too.
+
+The dynamically allocated memory block for the name of entries has a
+unit of \*[AUFS_RDBLK_DEF] bytes by default.
+During building dir blocks, aufs creates hash list (hashed and divied by
+\*[AUFS_RDHASH_DEF] by default) and judging whether
+the entry is whiteouted by its upper branch or already listed.
+
+These values are suitable for normal environments. But you may have
+millions of files or very long filenames under a single direcotry. For
+such cases, you may need to customize these values by spicifying rdblk=
+and rdhash= aufs mount options.
+
+For instance, there are 97 files under my /bin, and the total name
+length is 597 bytes.
+
+.nf
+$ \\ls -1 /bin | wc
+     97      97     597
+.fi
+
+Strictly speaking, 97 end\-of\-line codes are
+included. But it is OK since aufs VDIR also stores the name length in 1
+byte. In this case, you do not need to customize the default values. 597 bytes
+filenames will be stored in 2 VDIR memory blocks (597 <
+\*[AUFS_RDBLK_DEF] x 2).
+And 97 filenames are distributed among \*[AUFS_RDHASH_DEF] lists, so one
+list will point 4 names in average. To judge the names is whiteouted or
+not, the number of comparision will be 4. 2 memory allocations
+and 4 comparison costs low (even if the directory is opened for a long
+time). So you do not need to customize.
+
+If your directory has millions of files, the you will need to specify
+rdblk= and rdhash=.
+
+.nf
+$ ls -U /mnt/rotating-rust | wc -l
+1382438
+.fi
+
+In this case, assuming the average length of filenames is 6, in order to
+get better time performance I would
+recommend to set $((128*1024)) or $((64*1024)) for rdblk, and
+$((8*1024)) or $((4*1024)) for rdhash.
+You can change these values of the active aufs mount by "mount -o
+remount".
+
+This customization is not for
+reducing the memory space, but for reducing time for the number of memory
+allocation and the name comparison. The larger value is faster, in
+general. Of course, you will need system memory. This is a generic
+"time\-vs\-space" problem.
+
+.\" ----------------------------------------------------------------------
 .SH Copy On Write, or aufs internal copyup and copydown
 Every stackable filesystem which implements copy\-on\-write supports the
 copyup feature. The feature is to copy a file/dir from the lower branch
@@ -1022,8 +1122,8 @@ write(2) involves several logical/internal mkdir(2), creat(2), read(2),
 write(2) and close(2) systemcalls
 before the actual expected write(2) is performed. Sometimes it may take
 a long time, particulary when the file is very large.
-If CONFIG_AUFS_DEBUG is enabled, aufs produces a message saying `copying
-a large file.\[aq]
+If CONFIG_AUFS_DEBUG is enabled, aufs produces a message saying \[oq]copying
+a large file.\[cq]
 
 You may see the message when you change the xino file path or
 truncate the xino/xib files. Sometimes those files can be large and may
@@ -1501,7 +1601,7 @@ For example, the \[oq]errno\[cq] in the message \[oq]I/O Error, write failed (\-
 is 28 which means ENOSPC or \[oq]No space left on device.\[cq]
 
 When CONFIG_AUFS_BR_RAMFS is enabled, you can specify ramfs as an aufs
-branch. Since ramfs is simple, it doesn't set the maximum link count
+branch. Since ramfs is simple, it does not set the maximum link count
 originally. In aufs, it is very dangerous, particulary for
 whiteouts. Finally aufs sets the maxmimum link count for ramfs. Tha
 value is 32000 which is borrowed from ext2.
