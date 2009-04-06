@@ -113,8 +113,10 @@ struct au_sbinfo {
 	atomic_t		si_xigen_next;
 #endif
 
-	/* readdir cache time, max, in HZ */
-	unsigned long		si_rdcache;
+	/* vdir parameters */
+	unsigned long		si_rdcache;	/* max cache time in HZ */
+	unsigned int		si_rdblk;	/* deblk size */
+	unsigned int		si_rdhash;	/* hash size */
 
 	/*
 	 * If the number of whiteouts are larger than si_dirwh, leave all of

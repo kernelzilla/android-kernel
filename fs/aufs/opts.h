@@ -132,8 +132,8 @@ struct au_opt {
 		struct au_opt_mod	mod;
 		int			dirwh;
 		int			rdcache;
-		int			deblk;
-		int			nhash;
+		unsigned int		rdblk;
+		unsigned int		rdhash;
 		int			udba;
 		struct au_opt_wbr_create wbr_create;
 		int			wbr_copyup;
