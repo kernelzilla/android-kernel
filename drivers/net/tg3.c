@@ -4392,7 +4392,7 @@ static void tg3_recycle_rx(struct tg3 *tp, u32 opaque_key,
 #if TG3_VLAN_TAG_USED
 static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
 {
-	return vlan_hwaccel_receive_skb(skb, tp->vlgrp, vlan_tag);
+	return vlan_gro_receive(&tp->napi, tp->vlgrp, vlan_tag, skb);
 }
 #endif
 
@@ -4539,7 +4539,7 @@ static int tg3_rx(struct tg3 *tp, int budget)
 				    desc->err_vlan & RXD_VLAN_MASK);
 		} else
 #endif
-			netif_receive_skb(skb);
+			napi_gro_receive(&tp->napi, skb);
 
 		received++;
 		budget--;
@@ -11225,7 +11225,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		return tg3_phy_init(tp);
 
 	/* Reading the PHY ID register can conflict with ASF
-	 * firwmare access to the PHY hardware.
+	 * firmware access to the PHY hardware.
 	 */
 	err = 0;
 	if ((tp->tg3_flags & TG3_FLAG_ENABLE_ASF) ||
