@@ -1246,7 +1246,9 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 		display->get_resolution(display, &w, &h);
 
 		if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
+#ifdef DEBUG
 			int oldw = w, oldh = h;
+#endif
 
 			omap_vrfb_adjust_size(&w, &h, bytespp);
 
