@@ -811,7 +811,8 @@ struct dentry *au_wh_create(struct dentry *dentry, aufs_bindex_t bindex,
 static int del_wh_children(struct dentry *h_dentry, struct au_nhash *whlist,
 			   aufs_bindex_t bindex, struct au_branch *br)
 {
-	int err, i;
+	int err;
+	unsigned long ul, n;
 	struct qstr wh_name;
 	char *p;
 	struct hlist_head *head;
@@ -828,8 +829,9 @@ static int del_wh_children(struct dentry *h_dentry, struct au_nhash *whlist,
 	err = 0;
 	memcpy(p, AUFS_WH_PFX, AUFS_WH_PFX_LEN);
 	p += AUFS_WH_PFX_LEN;
-	head = whlist->heads;
-	for (i = 0; !err && i < AuSize_NHASH; i++, head++) {
+	n = whlist->nh_num;
+	head = whlist->nh_head;
+	for (ul = 0; !err && ul < n; ul++, head++) {
 		hlist_for_each_entry(tpos, pos, head, wh_hash) {
 			if (tpos->wh_bindex != bindex)
 				continue;
@@ -870,6 +872,35 @@ static void call_del_wh_children(void *args)
 }
 
 /* ---------------------------------------------------------------------- */
+
+struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp)
+{
+	struct au_whtmp_rmdir *whtmp;
+
+	whtmp = kmalloc(sizeof(*whtmp), gfp);
+	if (unlikely(!whtmp))
+		goto out;
+
+	whtmp->dir = NULL;
+	whtmp->wh_dentry = NULL;
+	whtmp->whlist = au_nhash_alloc(sb, /*bend*/0, gfp);
+	if (unlikely(!whtmp->whlist))
+		goto out_whtmp;
+	return whtmp; /* success */
+
+ out_whtmp:
+	kfree(whtmp);
+ out:
+	return ERR_PTR(-ENOMEM);
+}
+
+void au_whtmp_rmdir_free(struct au_whtmp_rmdir *whtmp)
+{
+	dput(whtmp->wh_dentry);
+	iput(whtmp->dir);
+	au_nhash_wh_free(whtmp->whlist, /*bend*/0);
+	kfree(whtmp);
+}
 
 /*
  * rmdir the whiteouted temporary named dir @h_dentry.
@@ -932,18 +963,10 @@ int au_whtmp_rmdir(struct inode *dir, aufs_bindex_t bindex,
 	return err;
 }
 
-static void au_whtmp_rmdir_free_args(struct au_whtmp_rmdir_args *args)
-{
-	au_nhash_fin(&args->whlist);
-	dput(args->wh_dentry);
-	iput(args->dir);
-	kfree(args);
-}
-
 static void call_rmdir_whtmp(void *args)
 {
 	int err;
-	struct au_whtmp_rmdir_args *a = args;
+	struct au_whtmp_rmdir *a = args;
 	struct super_block *sb;
 	struct dentry *h_parent;
 	struct inode *h_dir;
@@ -970,7 +993,7 @@ static void call_rmdir_whtmp(void *args)
 		err = mnt_want_write(br->br_mnt);
 		if (!err) {
 			err = au_whtmp_rmdir(a->dir, a->bindex, a->wh_dentry,
-					     &a->whlist);
+					     a->whlist);
 			mnt_drop_write(br->br_mnt);
 		}
 	}
@@ -982,14 +1005,13 @@ static void call_rmdir_whtmp(void *args)
 	/* mutex_unlock(&a->dir->i_mutex); */
 	au_nwt_done(&au_sbi(sb)->si_nowait);
 	si_read_unlock(sb);
-	au_whtmp_rmdir_free_args(a);
+	au_whtmp_rmdir_free(a);
 	if (unlikely(err))
 		AuIOErr("err %d\n", err);
 }
 
 void au_whtmp_kick_rmdir(struct inode *dir, aufs_bindex_t bindex,
-			 struct dentry *wh_dentry, struct au_nhash *whlist,
-			 struct au_whtmp_rmdir_args *args)
+			 struct dentry *wh_dentry, struct au_whtmp_rmdir *args)
 {
 	int wkq_err;
 
@@ -999,12 +1021,10 @@ void au_whtmp_kick_rmdir(struct inode *dir, aufs_bindex_t bindex,
 	args->dir = au_igrab(dir);
 	args->bindex = bindex;
 	args->wh_dentry = dget(wh_dentry);
-	au_nhash_init(&args->whlist);
-	au_nhash_move(&args->whlist, whlist);
 	wkq_err = au_wkq_nowait(call_rmdir_whtmp, args, dir->i_sb);
 	if (unlikely(wkq_err)) {
 		AuWarn("rmdir error %.*s (%d), ignored\n",
 		       AuDLNPair(wh_dentry), wkq_err);
-		au_whtmp_rmdir_free_args(args);
+		au_whtmp_rmdir_free(args);
 	}
 }
