@@ -1366,9 +1366,24 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	unsigned offset0, offset1;
 	s32 row_inc;
 	s32 pix_inc;
+	u16 frame_height = height;
 
 	if (paddr == 0)
 		return -EINVAL;
+
+	if (ilace && height >= out_height)
+		fieldmode = 1;
+
+	if (ilace) {
+		if (fieldmode)
+			height /= 2;
+		pos_y /= 2;
+		out_height /= 2;
+
+		DSSDBG("adjusting for ilace: height %d, pos_y %d, "
+				"out_height %d\n",
+				height, pos_y, out_height);
+	}
 
 	if (plane == OMAP_DSS_GFX) {
 		if (width != out_width || height != out_height)
@@ -1448,27 +1463,13 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 	}
 
-	if (ilace && height >= out_height)
-		fieldmode = 1;
-
 	calc_rotation_offset(rotation, mirror,
-			screen_width, width, height, color_mode,
+			screen_width, width, frame_height, color_mode,
 			fieldmode,
 			&offset0, &offset1, &row_inc, &pix_inc);
 
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
-
-	if (ilace) {
-		if (fieldmode)
-			height /= 2;
-		pos_y /= 2;
-		out_height /= 2;
-
-		DSSDBG("adjusting for ilace: height %d, pos_y %d, "
-				"out_height %d\n",
-				height, pos_y, out_height);
-	}
 
 	_dispc_set_channel_out(plane, channel_out);
 	_dispc_set_color_mode(plane, color_mode);
