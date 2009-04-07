@@ -281,6 +281,11 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_display *display)
 
 	info = &ovl->info;
 
+	if (info->paddr == 0) {
+		DSSDBG("check_overlay failed: paddr 0\n");
+		return -EINVAL;
+	}
+
 	display->get_resolution(display, &dw, &dh);
 
 	DSSDBG("check_overlay %d: (%d,%d %dx%d -> %dx%d) disp (%dx%d)\n",
@@ -330,9 +335,6 @@ static int dss_ovl_set_overlay_info(struct omap_overlay *ovl,
 {
 	int r;
 	struct omap_overlay_info old_info;
-
-	if (info->paddr == 0)
-		return -EINVAL;
 
 	old_info = ovl->info;
 	ovl->info = *info;
