@@ -56,6 +56,8 @@ typedef short aufs_bindex_t;
 #define AUFS_XINO_TRUNC_STEP	4  /* blocks */
 #define AUFS_DIRWH_DEF		3
 #define AUFS_RDCACHE_DEF	10 /* seconds */
+#define AUFS_RDBLK_DEF		512 /* bytes */
+#define AUFS_RDHASH_DEF		32
 #define AUFS_WKQ_NAME		AUFS_NAME "d"
 #define AUFS_NWKQ_DEF		4
 #define AUFS_MFS_SECOND_DEF	30 /* seconds */

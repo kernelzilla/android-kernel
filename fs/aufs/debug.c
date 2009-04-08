@@ -27,24 +27,26 @@ char *au_plevel = KERN_DEBUG;
 
 void au_dpri_whlist(struct au_nhash *whlist)
 {
-	int i;
+	unsigned long ul, n;
 	struct hlist_head *head;
 	struct au_vdir_wh *tpos;
 	struct hlist_node *pos;
 
-	for (i = 0; i < AuSize_NHASH; i++) {
-		head = whlist->heads + i;
+	n = whlist->nh_num;
+	head = whlist->nh_head;
+	for (ul = 0; ul < n; ul++) {
 		hlist_for_each_entry(tpos, pos, head, wh_hash)
 			dpri("b%d, %.*s, %d\n",
 			     tpos->wh_bindex,
 			     tpos->wh_str.len, tpos->wh_str.name,
 			     tpos->wh_str.len);
+		head++;
 	}
 }
 
 void au_dpri_vdir(struct au_vdir *vdir)
 {
-	int i;
+	unsigned long ul;
 	union au_vdir_deblk_p p;
 	unsigned char *o;
 
@@ -53,13 +55,13 @@ void au_dpri_vdir(struct au_vdir *vdir)
 		return;
 	}
 
-	dpri("nblk %d, deblk %p, last{%d, %p}, ver %lu\n",
-	     vdir->vd_nblk, vdir->vd_deblk,
-	     vdir->vd_last.i, vdir->vd_last.p.p, vdir->vd_version);
-	for (i = 0; i < vdir->vd_nblk; i++) {
-		p.deblk = vdir->vd_deblk[i];
-		o = p.p;
-		dpri("[%d]: %p\n", i, o);
+	dpri("deblk %u, nblk %lu, deblk %p, last{%lu, %p}, ver %lu\n",
+	     vdir->vd_deblk_sz, vdir->vd_nblk, vdir->vd_deblk,
+	     vdir->vd_last.ul, vdir->vd_last.p.deblk, vdir->vd_version);
+	for (ul = 0; ul < vdir->vd_nblk; ul++) {
+		p.deblk = vdir->vd_deblk[ul];
+		o = p.deblk;
+		dpri("[%lu]: %p\n", ul, o);
 	}
 }
 

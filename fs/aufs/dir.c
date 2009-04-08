@@ -446,7 +446,7 @@ int au_test_empty_lower(struct dentry *dentry)
 	struct test_empty_arg arg;
 	struct au_nhash *whlist;
 
-	whlist = au_nhash_new(GFP_NOFS);
+	whlist = au_nhash_alloc(dentry->d_sb, /*bend*/0, GFP_NOFS);
 	err = PTR_ERR(whlist);
 	if (IS_ERR(whlist))
 		goto out;
@@ -472,7 +472,7 @@ int au_test_empty_lower(struct dentry *dentry)
 	}
 
  out_whlist:
-	au_nhash_del(whlist);
+	au_nhash_wh_free(whlist, /*bend*/0);
  out:
 	return err;
 }
