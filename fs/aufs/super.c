@@ -192,6 +192,11 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_printf(m, "," #str "=%s", au_optstr_##str(v)); \
 } while (0)
 
+#define AuUInt(name, str, val) do { \
+	if (val != AUFS_##name##_DEF) \
+		seq_printf(m, "," #str "=%u", val); \
+} while (0)
+
 	/* lock free root dinfo */
 	sb = mnt->mnt_sb;
 	si_noflush_read_lock(sb);
@@ -224,13 +229,13 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	if (v != au_opt_test(AuOpt_Def, ALWAYS_DIROPQ))
 		seq_printf(m, ",diropq=%c", v ? 'a' : 'w');
 
-	n = sbinfo->si_dirwh;
-	if (n != AUFS_DIRWH_DEF)
-		seq_printf(m, ",dirwh=%d", n);
+	AuUInt(DIRWH, dirwh, sbinfo->si_dirwh);
 
 	n = sbinfo->si_rdcache / HZ;
-	if (n != AUFS_RDCACHE_DEF)
-		seq_printf(m, ",rdcache=%d", n);
+	AuUInt(RDCACHE, rdcache, n);
+
+	AuUInt(RDBLK, rdblk, sbinfo->si_rdblk);
+	AuUInt(RDHASH, rdhash, sbinfo->si_rdhash);
 
 	AuBool(SUM, sum);
 	/* AuBool(SUM_W, wsum); */

@@ -23,18 +23,14 @@
 
 /* need to be faster and smaller */
 
-#define AuSize_DEBLK	512
-#define AuSize_NHASH	32
-
-typedef char au_vdir_deblk_t[AuSize_DEBLK];
-
 struct au_nhash {
-	struct hlist_head heads[AuSize_NHASH];
+	unsigned int nh_num;
+	struct hlist_head *nh_head;
 };
 
 struct au_vdir_destr {
 	unsigned char	len;
-	char		name[0];
+	unsigned char	name[0];
 } __packed;
 
 struct au_vdir_dehstr {
@@ -56,16 +52,16 @@ struct au_vdir_wh {
 } __packed;
 
 union au_vdir_deblk_p {
-	unsigned char		*p;
-	au_vdir_deblk_t		*deblk;
+	unsigned char		*deblk;
 	struct au_vdir_de	*de;
 };
 
 struct au_vdir {
-	au_vdir_deblk_t	**vd_deblk;
-	int		vd_nblk;
+	unsigned char	**vd_deblk;
+	unsigned long	vd_nblk;
+	unsigned int	vd_deblk_sz;
 	struct {
-		int			i;
+		unsigned long		ul;
 		union au_vdir_deblk_p	p;
 	} vd_last;
 
@@ -83,11 +79,9 @@ int au_test_empty_lower(struct dentry *dentry);
 int au_test_empty(struct dentry *dentry, struct au_nhash *whlist);
 
 /* vdir.c */
-struct au_nhash *au_nhash_new(gfp_t gfp);
-void au_nhash_del(struct au_nhash *nhash);
-void au_nhash_init(struct au_nhash *nhash);
-void au_nhash_move(struct au_nhash *dst, struct au_nhash *src);
-void au_nhash_fin(struct au_nhash *nhash);
+struct au_nhash *au_nhash_alloc(struct super_block *sb, aufs_bindex_t bend,
+				gfp_t gfp);
+void au_nhash_wh_free(struct au_nhash *whlist, aufs_bindex_t bend);
 int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 			    int limit);
 int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int namelen);

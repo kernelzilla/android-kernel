@@ -80,6 +80,8 @@ int au_si_alloc(struct super_block *sb)
 	/* leave si_xib_last_pindex and si_xib_next_bit */
 
 	sbinfo->si_rdcache = AUFS_RDCACHE_DEF * HZ;
+	sbinfo->si_rdblk = AUFS_RDBLK_DEF;
+	sbinfo->si_rdhash = AUFS_RDHASH_DEF;
 	sbinfo->si_dirwh = AUFS_DIRWH_DEF;
 
 	au_spl_init(&sbinfo->si_plink);
