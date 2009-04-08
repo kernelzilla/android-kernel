@@ -98,7 +98,7 @@ You will be confused if the added branch has whiteouts (including
 diropq), they may or may not hide the lower entries.
 .\" It is recommended to make sure that the added branch has no whiteout.
 
-If a process have once mapped a file by mmap(2) with MAP_SHARED
+Even if a process have once mapped a file by mmap(2) with MAP_SHARED
 and the same named file exists on the lower branch,
 the process still refers the file on the lower(hidden)
 branch after adding the branch.
