@@ -48,7 +48,7 @@ Also there are many enhancements in aufs1, such as:
 - do not copyup, nor create a whiteout when it is unnecessary
 - revert a single systemcall when an error occurs in aufs
 - remount interface instead of ioctl
-- maintain /etc/mtab by an external shell script, /sbin/mount.aufs.
+- maintain /etc/mtab by an external command, /sbin/mount.aufs.
 - loopback mounted filesystem as a branch
 - kernel thread for removing the dir who has a plenty of whiteouts
 - support copyup sparse file (a file which has a 'hole' in it)
@@ -56,18 +56,11 @@ Also there are many enhancements in aufs1, such as:
 - selectable permission flags for ro branch, whether whiteout can
   exist or not
 - export via NFS.
-- support <sysfs>/fs/aufs.
+- support <sysfs>/fs/aufs and <debugfs>/aufs.
 - support multiple writable branches, some policies to select one
   among multiple writable branches.
 - a new semantics for link(2) and rename(2) to support multiple
   writable branches.
-- a delegation of the internal branch access to support task I/O
-  accounting, which also supports Linux Security Modules (LSM) mainly
-  for Suse AppArmor.
-- nested mount, i.e. aufs as readonly no-whiteout branch of another aufs.
-- copyup-on-open or copyup-on-write
-- show-whiteout mode
-- show configuration even out of kernel tree
 - no glibc changes are required.
 - pseudo hardlink (hardlink over branches)
 - allow a direct access manually to a file on branch, e.g. bypassing aufs.
@@ -79,22 +72,26 @@ See design/08plan.txt in detail.
 - test only the highest one for the directory permission (dirperm1)
 - show whiteout mode (shwh)
 - copyup on open (coo=)
-- being another aufs's readonly branch (robr)
+- nested mount, i.e. aufs as readonly no-whiteout branch of another aufs
+  (robr)
 - statistics of aufs thread (/sys/fs/aufs/stat)
 - delegation mode (dlgt)
+  a delegation of the internal branch access to support task I/O
+  accounting, which also supports Linux Security Modules (LSM) mainly
+  for Suse AppArmor.
 - intent.open/create (file open in a single lookup)
 
 Features or just an idea in the future (see also design/*.txt),
 - reorder the branch index without del/re-add.
-- permanent xino files
+- permanent xino files for NFSD
 - an option for refreshing the opened files after add/del branches
 - 'move' policy for copy-up between two writable branches, after
   checking free space.
-- remount option copy/move between two branches. (almost done)
 - O_DIRECT
 - light version, without branch manipulation. (unnecessary?)
 - copyup in userspace
 - inotify in userspace
+- readv/writev
 - xattr, acl
 
 
@@ -141,6 +138,7 @@ $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
 	aufs2-standalone.git
 $ cd aufs2-standalone.git
 $ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+				# aufs2 (no -xx) for the latest -rc version.
 - apply "aufs2-standalone.patch" to your kernel source files.
 
 o aufs2-util tree
