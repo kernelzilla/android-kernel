@@ -335,7 +335,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
 	dentry = file->f_dentry;
 	mmapped = !!au_test_mmapped(file); /* can be harmless race condition */
-	wlock = !!(file->f_mode & FMODE_WRITE);
+	wlock = !!(file->f_mode & FMODE_WRITE) && (vma->vm_flags & VM_SHARED);
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
 	err = au_reval_and_lock_fdi(file, au_reopen_nondir, wlock | !mmapped);

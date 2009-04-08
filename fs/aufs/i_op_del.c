@@ -379,8 +379,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	struct au_pin pin;
 	struct inode *inode;
 	struct dentry *parent, *wh_dentry, *h_dentry;
-	struct au_whtmp_rmdir_args *args;
-	struct au_nhash *whlist;
+	struct au_whtmp_rmdir *args;
 
 	IMustLock(dir);
 	inode = dentry->d_inode;
@@ -389,20 +388,15 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 		goto out;
 	IMustLock(inode);
 
-	whlist = au_nhash_new(GFP_NOFS);
-	err = PTR_ERR(whlist);
-	if (IS_ERR(whlist))
-		goto out;
-
 	err = -ENOMEM;
-	args = kmalloc(sizeof(*args), GFP_NOFS);
+	args = au_whtmp_rmdir_alloc(dir->i_sb, GFP_NOFS);
 	if (unlikely(!args))
-		goto out_whlist;
+		goto out;
 
 	aufs_read_lock(dentry, AuLock_DW | AuLock_FLUSH);
 	parent = dentry->d_parent; /* dir inode is locked */
 	di_write_lock_parent(parent);
-	err = au_test_empty(dentry, whlist);
+	err = au_test_empty(dentry, args->whlist);
 	if (unlikely(err))
 		goto out_args;
 
@@ -418,7 +412,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	dget(h_dentry);
 	rmdir_later = 0;
 	if (bindex == bstart) {
-		err = renwh_and_rmdir(dentry, bstart, whlist, dir);
+		err = renwh_and_rmdir(dentry, bstart, args->whlist, dir);
 		if (err > 0) {
 			rmdir_later = err;
 			err = 0;
@@ -438,8 +432,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 		epilog(dir, dentry, bindex);
 
 		if (rmdir_later) {
-			au_whtmp_kick_rmdir(dir, bstart, h_dentry, whlist,
-					    args);
+			au_whtmp_kick_rmdir(dir, bstart, h_dentry, args);
 			args = NULL;
 		}
 
@@ -463,9 +456,8 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
  out_args:
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
-	kfree(args);
- out_whlist:
-	au_nhash_del(whlist);
+	if (args)
+		au_whtmp_rmdir_free(args);
  out:
 	return err;
 }
