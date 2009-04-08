@@ -370,6 +370,21 @@ static enum omap_color_mode fb_mode_to_dss_mode(struct fb_var_screeninfo *var)
 	return -EINVAL;
 }
 
+static int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
+			       struct fb_var_screeninfo *var)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(omapfb_colormodes); ++i) {
+		struct omapfb_colormode *mode = &omapfb_colormodes[i];
+		if (dssmode == mode->dssmode) {
+			assign_colormode_to_var(var, mode);
+			return 0;
+		}
+	}
+	return -ENOENT;
+}
+
 void set_fb_fix(struct fb_info *fbi)
 {
 	struct fb_fix_screeninfo *fix = &fbi->fix;
@@ -1267,6 +1282,60 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	return omapfb_alloc_fbmem(fbi, size, paddr);
 }
 
+static enum omap_color_mode fb_format_to_dss_mode(enum omapfb_color_format format)
+{
+	enum omap_color_mode mode;
+
+	switch (format) {
+	case OMAPFB_COLOR_RGB565:
+		mode = OMAP_DSS_COLOR_RGB16;
+		break;
+	case OMAPFB_COLOR_YUV422:
+		mode = OMAP_DSS_COLOR_YUV2;
+		break;
+	case OMAPFB_COLOR_CLUT_8BPP:
+		mode = OMAP_DSS_COLOR_CLUT8;
+		break;
+	case OMAPFB_COLOR_CLUT_4BPP:
+		mode = OMAP_DSS_COLOR_CLUT4;
+		break;
+	case OMAPFB_COLOR_CLUT_2BPP:
+		mode = OMAP_DSS_COLOR_CLUT2;
+		break;
+	case OMAPFB_COLOR_CLUT_1BPP:
+		mode = OMAP_DSS_COLOR_CLUT1;
+		break;
+	case OMAPFB_COLOR_RGB444:
+		mode = OMAP_DSS_COLOR_RGB12U;
+		break;
+	case OMAPFB_COLOR_YUY422:
+		mode = OMAP_DSS_COLOR_UYVY;
+		break;
+	case OMAPFB_COLOR_ARGB16:
+		mode = OMAP_DSS_COLOR_ARGB16;
+		break;
+	case OMAPFB_COLOR_RGB24U:
+		mode = OMAP_DSS_COLOR_RGB24U;
+		break;
+	case OMAPFB_COLOR_RGB24P:
+		mode = OMAP_DSS_COLOR_RGB24P;
+		break;
+	case OMAPFB_COLOR_ARGB32:
+		mode = OMAP_DSS_COLOR_ARGB32;
+		break;
+	case OMAPFB_COLOR_RGBA32:
+		mode = OMAP_DSS_COLOR_RGBA32;
+		break;
+	case OMAPFB_COLOR_RGBX32:
+		mode = OMAP_DSS_COLOR_RGBX32;
+		break;
+	default:
+		mode = -EINVAL;
+	}
+
+	return mode;
+}
+
 static int omapfb_parse_vram_param(const char *param, int max_entries,
 		unsigned long *sizes, unsigned long *paddrs)
 {
@@ -1483,8 +1552,35 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	}
 
 	var->nonstd = 0;
+	var->bits_per_pixel = 0;
 
 	var->rotate = ofbi->rotation;
+
+	/*
+	 * Check if there is a default color format set in the board file,
+	 * and use this format instead the default deducted from the
+	 * display bpp.
+	 */
+	if (fbdev->dev->platform_data) {
+		struct omapfb_platform_data *opd;
+		int id = ofbi->id;
+
+		opd = fbdev->dev->platform_data;
+		if (opd->mem_desc.region[id].format_used) {
+			enum omap_color_mode mode;
+			enum omapfb_color_format format;
+
+			format = opd->mem_desc.region[id].format;
+			mode = fb_format_to_dss_mode(format);
+			if (mode < 0) {
+				r = mode;
+				goto err;
+			}
+			r = dss_mode_to_fb_mode(mode, var);
+			if (r < 0)
+				goto err;
+		}
+	}
 
 	if (display) {
 		u16 w, h;
@@ -1502,16 +1598,18 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		var->xres_virtual = var->xres;
 		var->yres_virtual = var->yres;
 
-		switch (display->get_recommended_bpp(display)) {
-		case 16:
-			var->bits_per_pixel = 16;
-			break;
-		case 24:
-			var->bits_per_pixel = 32;
-			break;
-		default:
-			dev_err(fbdev->dev, "illegal display bpp\n");
-			return -EINVAL;
+		if (!var->bits_per_pixel) {
+			switch (display->get_recommended_bpp(display)) {
+				case 16:
+					var->bits_per_pixel = 16;
+					break;
+				case 24:
+					var->bits_per_pixel = 32;
+					break;
+				default:
+					dev_err(fbdev->dev, "illegal display bpp\n");
+					return -EINVAL;
+			}
 		}
 	} else {
 		/* if there's no display, let's just guess some basic values */
@@ -1519,7 +1617,8 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		var->yres = 240;
 		var->xres_virtual = var->xres;
 		var->yres_virtual = var->yres;
-		var->bits_per_pixel = 16;
+		if (!var->bits_per_pixel)
+			var->bits_per_pixel = 16;
 	}
 
 	r = check_fb_var(fbi, var);
