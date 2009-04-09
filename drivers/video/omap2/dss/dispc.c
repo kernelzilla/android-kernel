@@ -994,7 +994,10 @@ static void _dispc_set_fir(enum omap_plane plane, int hinc, int vinc)
 
 	BUG_ON(plane == OMAP_DSS_GFX);
 
-	val = FLD_VAL(vinc, 27, 16) | FLD_VAL(hinc, 11, 0);
+	if (cpu_is_omap24xx())
+		val = FLD_VAL(vinc, 27, 16) | FLD_VAL(hinc, 11, 0);
+	else
+		val = FLD_VAL(vinc, 28, 16) | FLD_VAL(hinc, 12, 0);
 	dispc_write_reg(fir_reg[plane-1], val);
 }
 
