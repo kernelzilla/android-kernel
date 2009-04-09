@@ -372,7 +372,7 @@ static struct platform_device keys_gpio = {
 static int beagle_enable_dvi(struct omap_display *display)
 {
 	if (display->hw_config.panel_reset_gpio != -1)
-		gpio_direction_output(display->hw_config.panel_reset_gpio, 1);
+		gpio_set_value(display->hw_config.panel_reset_gpio, 1);
 
 	return 0;
 }
@@ -380,7 +380,7 @@ static int beagle_enable_dvi(struct omap_display *display)
 static void beagle_disable_dvi(struct omap_display *display)
 {
 	if (display->hw_config.panel_reset_gpio != -1)
-		gpio_direction_output(display->hw_config.panel_reset_gpio, 0);
+		gpio_set_value(display->hw_config.panel_reset_gpio, 0);
 }
 
 static struct omap_dss_display_config beagle_display_data_dvi = {
@@ -445,8 +445,12 @@ static void __init beagle_display_init(void)
 	int r;
 
 	r = gpio_request(beagle_display_data_dvi.panel_reset_gpio, "DVI reset");
-	if (r < 0)
+	if (r < 0) {
 		printk(KERN_ERR "Unable to get DVI reset GPIO\n");
+		return;
+	}
+
+	gpio_direction_output(beagle_display_data_dvi.panel_reset_gpio, 0);
 }
 
 static struct omap_board_config_kernel omap3_beagle_config[] __initdata = {
