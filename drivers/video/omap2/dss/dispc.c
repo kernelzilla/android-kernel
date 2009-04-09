@@ -1405,14 +1405,9 @@ static unsigned long calc_fclk_five_taps(u16 width, u16 height,
 }
 
 static unsigned long calc_fclk(u16 width, u16 height,
-		u16 out_width, u16 out_height,
-		enum omap_color_mode color_mode, bool five_taps)
+		u16 out_width, u16 out_height)
 {
 	unsigned int hf, vf;
-
-	if (five_taps)
-		return calc_fclk_five_taps(width, height,
-				out_width, out_height, color_mode);
 
 	/*
 	 * FIXME how to determine the 'A' factor
@@ -1494,7 +1489,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	} else {
 		/* video plane */
 
-		unsigned long fclk;
+		unsigned long fclk = 0;
 
 		if (out_width < width / maxdownscale ||
 		   out_width > width * 8)
@@ -1530,20 +1525,22 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		/* Must use 5-tap filter? */
 		five_taps = height > out_height * 2;
 
-		/* Try to use 5-tap filter whenever possible. */
-		if (cpu_is_omap34xx() && !five_taps &&
-		    height > out_height && width <= 1024) {
-			fclk = calc_fclk_five_taps(width, height,
-					out_width, out_height, color_mode);
-			if (fclk <= dispc_fclk_rate())
+		if (!five_taps) {
+			fclk = calc_fclk(width, height,
+					out_width, out_height);
+
+			/* Try 5-tap filter if 3-tap fclk is too high */
+			if (cpu_is_omap34xx() && height > out_height &&
+					fclk > dispc_fclk_rate())
 				five_taps = true;
 		}
 
 		if (width > (2048 >> five_taps))
 			return -EINVAL;
 
-		fclk = calc_fclk(width, height, out_width, out_height,
-				color_mode, five_taps);
+		if (five_taps)
+			fclk = calc_fclk_five_taps(width, height,
+					out_width, out_height, color_mode);
 
 		DSSDBG("required fclk rate = %lu Hz\n", fclk);
 		DSSDBG("current fclk rate = %lu Hz\n", dispc_fclk_rate());
