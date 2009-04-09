@@ -732,7 +732,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 	unsigned char skipped;
 	struct dentry *root;
 	struct au_opt *opt, *opt_tail;
-	char *opt_str, *p;
+	char *opt_str;
 	/* reduce the stack space */
 	union {
 		struct au_opt_xino_itrunc *xino_itrunc;
@@ -874,7 +874,9 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			opt->type = token;
 			break;
 		case Opt_rdblk:
-			if (unlikely(match_int(&a->args[0], &n) || !n)) {
+			if (unlikely(match_int(&a->args[0], &n)
+				     || n <= 0
+				     || n > KMALLOC_MAX_SIZE)) {
 				AuErr("bad integer in %s\n", opt_str);
 				break;
 			}
@@ -883,27 +885,16 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				      NAME_MAX);
 				break;
 			}
-			p = kmalloc(n, GFP_NOFS);
-			if (p)
-				kfree(p);
-			else {
-				AuErr("test alloc for rdblk failed\n");
-				break;
-			}
 			opt->rdblk = n;
 			err = 0;
 			opt->type = token;
 			break;
 		case Opt_rdhash:
-			if (unlikely(match_int(&a->args[0], &n) || !n)) {
+			if (unlikely(match_int(&a->args[0], &n)
+				     || n <= 0
+				     || n * sizeof(struct hlist_head)
+				     > KMALLOC_MAX_SIZE)) {
 				AuErr("bad integer in %s\n", opt_str);
-				break;
-			}
-			p = kmalloc(n * sizeof(struct hlist_head), GFP_NOFS);
-			if (p)
-				kfree(p);
-			else {
-				AuErr("test alloc for rdhash failed\n");
 				break;
 			}
 			opt->rdhash = n;
