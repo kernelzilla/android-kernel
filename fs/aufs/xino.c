@@ -144,9 +144,9 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 		goto out_dput;
 	}
 
-	file = dentry_open(dget(dentry), mntget(base_file->f_vfsmnt),
-			   O_RDWR | O_CREAT | O_EXCL | O_LARGEFILE,
-			   current_cred());
+	file = vfsub_dentry_open(dget(dentry), mntget(base_file->f_vfsmnt),
+				 O_RDWR | O_CREAT | O_EXCL | O_LARGEFILE,
+				 current_cred());
 	if (IS_ERR(file)) {
 		AuErr("%.*s open err %ld\n", AuLNPair(name), PTR_ERR(file));
 		goto out_dput;

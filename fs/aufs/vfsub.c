@@ -11,6 +11,7 @@
  * sub-routines for VFS
  */
 
+#include <linux/ima.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
 
@@ -36,6 +37,21 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
+struct file *vfsub_dentry_open(struct dentry *parent, struct vfsmount *mnt,
+			       int flags, const struct cred *cred)
+{
+	struct file *file;
+
+	file = dentry_open(parent, mnt, flags, cred);
+	if (IS_ERR(file))
+		goto out;
+
+	ima_shm_check(file);
+
+ out:
+	return file;
+}
+
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {
 	struct file *file;
@@ -46,6 +62,7 @@ struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 	if (IS_ERR(file))
 		goto out;
 	AuDebugOn(!file->f_op);
+	ima_shm_check(file);
 	vfsub_update_h_iattr(&file->f_path, /*did*/NULL); /*ignore*/
 
  out:

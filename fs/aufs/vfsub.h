@@ -52,6 +52,8 @@ static inline void vfsub_copy_inode_size(struct inode *inode,
 
 int vfsub_update_h_iattr(struct path *h_path, int *did);
 struct file *vfsub_filp_open(const char *path, int oflags, int mode);
+struct file *vfsub_dentry_open(struct dentry *parent, struct vfsmount *mnt,
+			       int flags, const struct cred *cred);
 int vfsub_kern_path(const char *name, unsigned int flags, struct path *path);
 struct dentry *vfsub_lookup_one_len(const char *name, struct dentry *parent,
 				    int len);
@@ -76,6 +78,12 @@ int vfsub_rename(struct inode *src_hdir, struct dentry *src_dentry,
 int vfsub_mkdir(struct inode *dir, struct path *path, int mode);
 int vfsub_rmdir(struct inode *dir, struct path *path);
 
+int vfsub_sio_mkdir(struct inode *dir, struct path *path, int mode);
+int vfsub_sio_rmdir(struct inode *dir, struct path *path);
+int vfsub_sio_notify_change(struct path *path, struct iattr *ia);
+int vfsub_notify_change(struct path *path, struct iattr *ia);
+int vfsub_unlink(struct inode *dir, struct path *path, int force);
+
 /* ---------------------------------------------------------------------- */
 
 ssize_t vfsub_read_u(struct file *file, char __user *ubuf, size_t count,
@@ -87,6 +95,14 @@ ssize_t vfsub_write_u(struct file *file, const char __user *ubuf, size_t count,
 ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count,
 		      loff_t *ppos);
 int vfsub_readdir(struct file *file, filldir_t filldir, void *arg);
+
+long vfsub_splice_to(struct file *in, loff_t *ppos,
+		     struct pipe_inode_info *pipe, size_t len,
+		     unsigned int flags);
+long vfsub_splice_from(struct pipe_inode_info *pipe, struct file *out,
+		       loff_t *ppos, size_t len, unsigned int flags);
+int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
+		struct file *h_file);
 
 static inline void vfsub_file_accessed(struct file *h_file)
 {
@@ -104,14 +120,6 @@ static inline void vfsub_touch_atime(struct vfsmount *h_mnt,
 	touch_atime(h_mnt, h_dentry);
 	vfsub_update_h_iattr(&h_path, /*did*/NULL); /*ignore*/
 }
-
-long vfsub_splice_to(struct file *in, loff_t *ppos,
-		     struct pipe_inode_info *pipe, size_t len,
-		     unsigned int flags);
-long vfsub_splice_from(struct pipe_inode_info *pipe, struct file *out,
-		       loff_t *ppos, size_t len, unsigned int flags);
-int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
-		struct file *h_file);
 
 /* ---------------------------------------------------------------------- */
 
@@ -152,14 +160,6 @@ static inline fmode_t vfsub_uint_to_fmode(unsigned int ui)
 
 	return u.fm;
 }
-
-/* ---------------------------------------------------------------------- */
-
-int vfsub_sio_mkdir(struct inode *dir, struct path *path, int mode);
-int vfsub_sio_rmdir(struct inode *dir, struct path *path);
-int vfsub_sio_notify_change(struct path *path, struct iattr *ia);
-int vfsub_notify_change(struct path *path, struct iattr *ia);
-int vfsub_unlink(struct inode *dir, struct path *path, int force);
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_VFSUB_H__ */
