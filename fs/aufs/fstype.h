@@ -293,6 +293,15 @@ static inline int au_test_debugfs(struct super_block *sb __maybe_unused)
 #endif
 }
 
+static inline int au_test_nilfs(struct super_block *sb __maybe_unused)
+{
+#if defined(CONFIG_NILFS) || defined(CONFIG_NILFS_MODULE)
+	return sb->s_magic == NILFS_SUPER_MAGIC;
+#else
+	return 0;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 /*
  * they can't be an aufs branch.
@@ -430,7 +439,8 @@ static inline int au_test_fs_bad_xino(struct super_block *sb)
 #endif
 		/* don't want unnecessary work for xino */
 		|| au_test_aufs(sb)
-		|| au_test_ecryptfs(sb);
+		|| au_test_ecryptfs(sb)
+		|| au_test_nilfs(sb);
 }
 
 static inline int au_test_fs_trunc_xino(struct super_block *sb)
