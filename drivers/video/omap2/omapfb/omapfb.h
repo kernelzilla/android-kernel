@@ -53,11 +53,6 @@ struct omapfb2_mem_region {
 	bool		map;		/* kernel mapped by the driver */
 };
 
-enum omapfb_rotation_type {
-	OMAPFB_ROT_DMA = 0,
-	OMAPFB_ROT_VRFB = 1,
-};
-
 /* appended to fb_info */
 struct omapfb_info {
 	int id;
@@ -66,7 +61,7 @@ struct omapfb_info {
 	int num_overlays;
 	struct omap_overlay *overlays[OMAPFB_MAX_OVL_PER_FB];
 	struct omapfb2_device *fbdev;
-	enum omapfb_rotation_type rotation_type;
+	enum omap_dss_rotation_type rotation_type;
 	u8 rotation;
 	bool mirror;
 };

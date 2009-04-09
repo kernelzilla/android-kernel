@@ -176,15 +176,9 @@ static unsigned omapfb_get_vrfb_offset(struct omapfb_info *ofbi, int rot)
 
 static u32 omapfb_get_region_rot_paddr(struct omapfb_info *ofbi)
 {
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
-		unsigned offset;
-		int rot;
-
-		rot = ofbi->rotation;
-
-		offset = omapfb_get_vrfb_offset(ofbi, rot);
-
-		return ofbi->region.vrfb.paddr[rot] + offset;
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+		return ofbi->region.vrfb.paddr[ofbi->rotation]
+			+ omapfb_get_vrfb_offset(ofbi, ofbi->rotation);
 	} else {
 		return ofbi->region.paddr;
 	}
@@ -192,7 +186,7 @@ static u32 omapfb_get_region_rot_paddr(struct omapfb_info *ofbi)
 
 u32 omapfb_get_region_paddr(struct omapfb_info *ofbi)
 {
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 		return ofbi->region.vrfb.paddr[0];
 	else
 		return ofbi->region.paddr;
@@ -200,7 +194,7 @@ u32 omapfb_get_region_paddr(struct omapfb_info *ofbi)
 
 void __iomem *omapfb_get_region_vaddr(struct omapfb_info *ofbi)
 {
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 		return ofbi->region.vrfb.vaddr[0];
 	else
 		return ofbi->region.vaddr;
@@ -398,7 +392,7 @@ void set_fb_fix(struct fb_info *fbi)
 	fbi->screen_base = (char __iomem *)omapfb_get_region_vaddr(ofbi);
 
 	/* used by mmap in fbmem.c */
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 		fix->line_length =
 			(OMAP_VRFB_LINE_LEN * var->bits_per_pixel) >> 3;
 	else
@@ -434,11 +428,14 @@ void set_fb_fix(struct fb_info *fbi)
 	fix->xpanstep = 1;
 	fix->ypanstep = 1;
 
-	if (rg->size) {
-		if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
-			omap_vrfb_setup(&rg->vrfb, rg->paddr,
-					var->xres_virtual, var->yres_virtual,
-					var->bits_per_pixel >> 3);
+	if (rg->size && ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+		enum omap_color_mode mode = 0;
+		mode = fb_mode_to_dss_mode(var);
+
+		omap_vrfb_setup(&rg->vrfb, rg->paddr,
+				var->xres_virtual,
+				var->yres_virtual,
+				mode);
 	}
 }
 
@@ -527,7 +524,7 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 	if (var->yres > var->yres_virtual)
 		var->yres = var->yres_virtual;
 
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 		line_size = OMAP_VRFB_LINE_LEN * bytespp;
 	else
 		line_size = var->xres_virtual * bytespp;
@@ -549,7 +546,7 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 
 	if (line_size * var->yres_virtual > max_frame_size) {
 		DBG("can't fit FB into memory, reducing x\n");
-		if (ofbi->rotation_type == OMAPFB_ROT_VRFB)
+		if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 			return -EINVAL;
 
 		var->xres_virtual = max_frame_size / var->yres_virtual /
@@ -672,7 +669,7 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	struct omap_overlay_info info;
 	int xres, yres;
 	int screen_width;
-	int rot, mirror;
+	int mirror;
 
 	DBG("setup_overlay %d, posx %d, posy %d, outw %d, outh %d\n", ofbi->id,
 			posx, posy, outw, outh);
@@ -688,7 +685,7 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	offset = ((var->yoffset * var->xres_virtual +
 				var->xoffset) * var->bits_per_pixel) >> 3;
 
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
 		data_start_p = omapfb_get_region_rot_paddr(ofbi);
 		data_start_v = NULL;
 	} else {
@@ -711,13 +708,10 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 
 	ovl->get_overlay_info(ovl, &info);
 
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
-		rot = 0;
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
 		mirror = 0;
-	} else {
-		rot = ofbi->rotation;
+	else
 		mirror = ofbi->mirror;
-	}
 
 	info.paddr = data_start_p;
 	info.vaddr = data_start_v;
@@ -725,7 +719,8 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	info.width = xres;
 	info.height = yres;
 	info.color_mode = mode;
-	info.rotation = rot;
+	info.rotation_type = ofbi->rotation_type;
+	info.rotation = ofbi->rotation;
 	info.mirror = mirror;
 
 	info.pos_x = posx;
@@ -1121,7 +1116,7 @@ static void omapfb_free_fbmem(struct fb_info *fbi)
 	if (rg->vaddr)
 		iounmap(rg->vaddr);
 
-	if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
 		/* unmap the 0 angle rotation */
 		if (rg->vrfb.vaddr[0]) {
 			iounmap(rg->vrfb.vaddr[0]);
@@ -1181,7 +1176,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 		return -ENOMEM;
 	}
 
-	if (ofbi->rotation_type != OMAPFB_ROT_VRFB) {
+	if (ofbi->rotation_type != OMAP_DSS_ROT_VRFB) {
 		vaddr = ioremap_wc(paddr, size);
 
 		if (!vaddr) {
@@ -1260,7 +1255,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 
 		display->get_resolution(display, &w, &h);
 
-		if (ofbi->rotation_type == OMAPFB_ROT_VRFB) {
+		if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
 #ifdef DEBUG
 			int oldw = w, oldh = h;
 #endif
@@ -1701,8 +1696,8 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 		ofbi->id = i;
 
 		/* assign these early, so that fb alloc can use them */
-		ofbi->rotation_type = def_vrfb ? OMAPFB_ROT_VRFB :
-			OMAPFB_ROT_DMA;
+		ofbi->rotation_type = def_vrfb ? OMAP_DSS_ROT_VRFB :
+			OMAP_DSS_ROT_DMA;
 		ofbi->rotation = def_rotate;
 		ofbi->mirror = def_mirror;
 

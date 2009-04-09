@@ -88,9 +88,9 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 			color_mode == OMAP_DSS_COLOR_UYVY)
 		width >>= 1;
 
-	if (bytespp == 4) {
+	if (bytespp == 4)
 		pixel_size_exp = 2;
-	} else if (bytespp == 2)
+	else if (bytespp == 2)
 		pixel_size_exp = 1;
 	else
 		BUG();
