@@ -341,6 +341,11 @@ enum omap_dss_overlay_managers {
 
 struct omap_overlay_manager;
 
+enum omap_dss_rotation_type {
+	OMAP_DSS_ROT_DMA = 0,
+	OMAP_DSS_ROT_VRFB = 1,
+};
+
 struct omap_overlay_info {
 	bool enabled;
 
@@ -351,6 +356,7 @@ struct omap_overlay_info {
 	u16 height;
 	enum omap_color_mode color_mode;
 	u8 rotation;
+	enum omap_dss_rotation_type rotation_type;
 	bool mirror;
 
 	u16 pos_x;

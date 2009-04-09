@@ -5,7 +5,6 @@
 
 #include <mach/io.h>
 #include <mach/vrfb.h>
-
 /*#define DEBUG*/
 
 #ifdef DEBUG
@@ -50,19 +49,48 @@ EXPORT_SYMBOL(omap_vrfb_adjust_size);
 
 void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 		u16 width, u16 height,
-		u8 bytespp)
+		enum omap_color_mode color_mode)
 {
 	unsigned pixel_size_exp;
 	u16 vrfb_width;
 	u16 vrfb_height;
 	u8 ctx = vrfb->context;
+	u8 bytespp;
 
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d)\n", ctx, paddr,
 			width, height, bytespp);
 
-	if (bytespp == 4)
+	switch (color_mode) {
+	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_ARGB16:
+		bytespp = 2;
+		break;
+
+	case OMAP_DSS_COLOR_RGB24P:
+		bytespp = 3;
+		break;
+
+	case OMAP_DSS_COLOR_RGB24U:
+	case OMAP_DSS_COLOR_ARGB32:
+	case OMAP_DSS_COLOR_RGBA32:
+	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_YUV2:
+	case OMAP_DSS_COLOR_UYVY:
+		bytespp = 4;
+		break;
+
+	default:
+		BUG();
+		return;
+	}
+
+	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY)
+		width >>= 1;
+
+	if (bytespp == 4) {
 		pixel_size_exp = 2;
-	else if (bytespp == 2)
+	} else if (bytespp == 2)
 		pixel_size_exp = 1;
 	else
 		BUG();

@@ -1106,7 +1106,7 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			case 0: vidrot = 0; break;
 			case 1: vidrot = 1; break;
 			case 2: vidrot = 2; break;
-			case 3: vidrot = 1; break;
+			case 3: vidrot = 3; break;
 			}
 		}
 
@@ -1134,7 +1134,92 @@ static s32 pixinc(int pixels, u8 ps)
 		BUG();
 }
 
-static void calc_rotation_offset(u8 rotation, bool mirror,
+static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
+		u16 screen_width,
+		u16 width, u16 height,
+		enum omap_color_mode color_mode, bool fieldmode,
+		unsigned *offset0, unsigned *offset1,
+		s32 *row_inc, s32 *pix_inc)
+{
+	u8 ps;
+
+	switch (color_mode) {
+	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_ARGB16:
+		ps = 2;
+		break;
+
+	case OMAP_DSS_COLOR_RGB24P:
+		ps = 3;
+		break;
+
+	case OMAP_DSS_COLOR_RGB24U:
+	case OMAP_DSS_COLOR_ARGB32:
+	case OMAP_DSS_COLOR_RGBA32:
+	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_YUV2:
+	case OMAP_DSS_COLOR_UYVY:
+		ps = 4;
+		break;
+
+	default:
+		BUG();
+		return;
+	}
+
+	DSSDBG("calc_rot(%d): scrw %d, %dx%d\n", rotation, screen_width,
+			width, height);
+	switch (rotation + mirror * 4) {
+	case 0:
+	case 2:
+		/*
+		 * If the pixel format is YUV or UYVY divide the width
+		 * of the image by 2 for 0 and 180 degree rotation.
+		 */
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY)
+			width = width >> 1;
+	case 1:
+	case 3:
+		*offset0 = 0;
+		if (fieldmode)
+			*offset1 = screen_width * ps;
+		else
+			*offset1 = 0;
+
+		*row_inc = pixinc(1 + (screen_width - width) +
+				(fieldmode ? screen_width : 0),
+				ps);
+		*pix_inc = pixinc(1, ps);
+		break;
+
+	case 4:
+	case 6:
+		/* If the pixel format is YUV or UYVY divide the width
+		 * of the image by 2  for 0 degree and 180 degree
+		 */
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY)
+			width = width >> 1;
+	case 5:
+	case 7:
+		*offset0 = 0;
+		if (fieldmode)
+			*offset1 = screen_width * ps;
+		else
+			*offset1 = 0;
+		*row_inc = pixinc(1 - (screen_width + width) -
+				(fieldmode ? screen_width : 0),
+				ps);
+		*pix_inc = pixinc(1, ps);
+		break;
+
+	default:
+		BUG();
+	}
+}
+
+static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		u16 screen_width,
 		u16 width, u16 height,
 		enum omap_color_mode color_mode, bool fieldmode,
@@ -1357,6 +1442,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		u16 out_width, u16 out_height,
 		enum omap_color_mode color_mode,
 		bool ilace,
+		enum omap_dss_rotation_type rotation_type,
 		u8 rotation, int mirror)
 {
 	const int maxdownscale = cpu_is_omap34xx() ? 4 : 2;
@@ -1463,10 +1549,16 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 	}
 
-	calc_rotation_offset(rotation, mirror,
-			screen_width, width, frame_height, color_mode,
-			fieldmode,
-			&offset0, &offset1, &row_inc, &pix_inc);
+	if (rotation_type == OMAP_DSS_ROT_DMA)
+		calc_dma_rotation_offset(rotation, mirror,
+				screen_width, width, frame_height, color_mode,
+				fieldmode,
+				&offset0, &offset1, &row_inc, &pix_inc);
+	else
+		calc_vrfb_rotation_offset(rotation, mirror,
+				screen_width, width, frame_height, color_mode,
+				fieldmode,
+				&offset0, &offset1, &row_inc, &pix_inc);
 
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
@@ -2889,6 +2981,7 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 		       u16 out_width, u16 out_height,
 		       enum omap_color_mode color_mode,
 		       bool ilace,
+		       enum omap_dss_rotation_type rotation_type,
 		       u8 rotation, bool mirror)
 {
 	int r = 0;
@@ -2909,6 +3002,7 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 			   width, height,
 			   out_width, out_height,
 			   color_mode, ilace,
+			   rotation_type,
 			   rotation, mirror);
 
 	enable_clocks(0);
@@ -3122,7 +3216,8 @@ void dispc_setup_partial_planes(struct omap_display *display,
 				pw, ph,
 				pow, poh,
 				pi->color_mode, 0,
-				pi->rotation, // XXX rotation probably wrong
+				pi->rotation_type,
+				pi->rotation,
 				pi->mirror);
 
 		dispc_enable_plane(ovl->id, 1);

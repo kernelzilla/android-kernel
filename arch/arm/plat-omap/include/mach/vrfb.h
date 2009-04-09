@@ -24,6 +24,7 @@
 #ifndef __VRFB_H
 #define __VRFB_H
 
+#include <mach/display.h>
 #define OMAP_VRFB_LINE_LEN 2048
 
 struct vrfb
@@ -42,6 +43,6 @@ extern void omap_vrfb_adjust_size(u16 *width, u16 *height,
 		u8 bytespp);
 extern void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 		u16 width, u16 height,
-		u8 bytespp);
+		enum omap_color_mode color_mode);
 
 #endif /* __VRFB_H */

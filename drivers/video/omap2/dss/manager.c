@@ -395,6 +395,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 				outh,
 				ovl->info.color_mode,
 				ilace,
+				ovl->info.rotation_type,
 				ovl->info.rotation,
 				ovl->info.mirror);
 

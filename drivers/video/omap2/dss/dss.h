@@ -272,6 +272,7 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 		      u16 out_width, u16 out_height,
 		      enum omap_color_mode color_mode,
 		      bool ilace,
+		      enum omap_dss_rotation_type rotation_type,
 		      u8 rotation, bool mirror);
 
 void dispc_go(enum omap_channel channel);
