@@ -130,6 +130,9 @@ static match_table_t options = {
 	{Opt_ignore, "delete=all"},
 	{Opt_ignore, "imap=%s"},
 
+	/* temporary workaround, due to old mount(8)? */
+	{Opt_ignore_silent, "relatime"},
+
 	{Opt_err, NULL}
 };
 
