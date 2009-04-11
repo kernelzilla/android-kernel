@@ -20,6 +20,11 @@ This version of AUFS, aufs2 has several purposes.
 - to make the source files simpler and smaller by dropping several
   original features.
 
+Note: it becomes clear that "Aufs was rejected. Let's give it up."
+According to Christoph Hellwig, linux rejects all union-type filesystems
+but UnionMount.
+<http://marc.info/?l=linux-kernel&m=123938533724484&w=2>
+
 Through this work, I found some bad things in aufs1 source code and
 fixed them. Some of the dropped features will be reverted in the future,
 but not all I'm afraid.
