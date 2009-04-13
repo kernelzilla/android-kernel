@@ -392,10 +392,19 @@ void set_fb_fix(struct fb_info *fbi)
 	fbi->screen_base = (char __iomem *)omapfb_get_region_vaddr(ofbi);
 
 	/* used by mmap in fbmem.c */
-	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB)
-		fix->line_length =
-			(OMAP_VRFB_LINE_LEN * var->bits_per_pixel) >> 3;
-	else
+	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+		switch (var->nonstd) {
+		case OMAPFB_COLOR_YUV422:
+		case OMAPFB_COLOR_YUY422:
+			fix->line_length =
+				(OMAP_VRFB_LINE_LEN * var->bits_per_pixel) >> 2;
+			break;
+		default:
+			fix->line_length =
+				(OMAP_VRFB_LINE_LEN * var->bits_per_pixel) >> 3;
+			break;
+		}
+	} else
 		fix->line_length =
 			(var->xres_virtual * var->bits_per_pixel) >> 3;
 	fix->smem_start = omapfb_get_region_paddr(ofbi);
@@ -704,7 +713,18 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 		goto err;
 	}
 
-	screen_width = fix->line_length / (var->bits_per_pixel >> 3);
+	switch (var->nonstd) {
+	case OMAPFB_COLOR_YUV422:
+	case OMAPFB_COLOR_YUY422:
+		if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+			screen_width = fix->line_length
+				/ (var->bits_per_pixel >> 2);
+			break;
+		}
+	default:
+		screen_width = fix->line_length / (var->bits_per_pixel >> 3);
+		break;
+	}
 
 	ovl->get_overlay_info(ovl, &info);
 
