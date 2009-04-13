@@ -16,8 +16,8 @@
 
 #define SMS_ROT_VIRT_BASE(context, rot) \
 	(((context >= 4) ? 0xD0000000 : 0x70000000) \
-	 | 0x4000000 * (context) \
-	 | 0x1000000 * (rot))
+	 + (0x4000000 * (context)) \
+	 + (0x1000000 * (rot)))
 
 #define OMAP_VRFB_SIZE			(2048 * 2048 * 4)
 
