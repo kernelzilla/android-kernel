@@ -346,6 +346,16 @@ static inline int au_test_fs_bad_iattr(struct super_block *sb)
 		|| au_test_vfat(sb);
 }
 
+/* they don't check i_nlink in link(2) */
+static inline int au_test_fs_no_limit_nlink(struct super_block *sb)
+{
+	return au_test_tmpfs(sb)
+#ifdef CONFIG_AUFS_BR_RAMFS
+		|| au_test_ramfs(sb)
+#endif
+		;
+}
+
 /*
  * filesystems which sets S_NOATIME and S_NOCMTIME.
  */
