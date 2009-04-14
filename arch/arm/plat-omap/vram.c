@@ -524,7 +524,10 @@ void __init omapfb_reserve_sdram(void)
 			return;
 		}
 
-		reserve_bootmem(paddr, size, BOOTMEM_DEFAULT);
+		if (reserve_bootmem(paddr, size, BOOTMEM_EXCLUSIVE) < 0) {
+			pr_err("FB: failed to reserve VRAM\n");
+			return;
+		}
 	} else {
 		if (size > sdram_size) {
 			printk(KERN_ERR "Illegal SDRAM size for VRAM\n");
