@@ -209,9 +209,22 @@ u8 omap_pm_dsp_get_opp(void)
 {
 	pr_debug("OMAP PM: DSP requests current DSP OPP ID\n");
 	return resource_get_level("vdd1_opp");
-	return 0;
 }
 EXPORT_SYMBOL(omap_pm_dsp_get_opp);
+
+u8 omap_pm_vdd1_get_opp(void)
+{
+	pr_debug("OMAP PM: User requests current VDD1 OPP\n");
+	return resource_get_level("vdd1_opp");
+}
+EXPORT_SYMBOL(omap_pm_vdd1_get_opp);
+
+u8 omap_pm_vdd2_get_opp(void)
+{
+	pr_debug("OMAP PM: User requests current VDD2 OPP\n");
+	return resource_get_level("vdd2_opp");
+}
+EXPORT_SYMBOL(omap_pm_vdd2_get_opp);
 
 /*
  * CPUFreq-originated constraint

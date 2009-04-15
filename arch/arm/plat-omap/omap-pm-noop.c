@@ -198,6 +198,28 @@ u8 omap_pm_dsp_get_opp(void)
 	return 0;
 }
 
+u8 omap_pm_vdd1_get_opp(void)
+{
+	pr_debug("OMAP PM: User requests current VDD1 OPP\n");
+
+	/*
+	 * For l-o call resource_get_level of vdd1_opp resource.
+	 */
+
+	return 0;
+}
+
+u8 omap_pm_vdd2_get_opp(void)
+{
+	pr_debug("OMAP PM: User requests current VDD2 OPP\n");
+
+	/*
+	 * For l-o call resource_get_level of vdd2_opp resource.
+	 */
+
+	return 0;
+}
+
 /*
  * CPUFreq-originated constraint
  *
