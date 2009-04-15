@@ -349,9 +349,6 @@ void omap_sram_idle(void)
 		printk(KERN_ERR "Invalid mpu state in sram_idle\n");
 		return;
 	}
-	/* Disable smartreflex before entering WFI */
-	disable_smartreflex(SR1);
-	disable_smartreflex(SR2);
 
 	pwrdm_pre_transition();
 
@@ -380,6 +377,9 @@ void omap_sram_idle(void)
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
+		/* Disable smartreflex before entering WFI */
+		disable_smartreflex(SR1);
+		disable_smartreflex(SR2);
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		if (core_next_state == PWRDM_POWER_OFF) {
@@ -444,6 +444,9 @@ void omap_sram_idle(void)
 			prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF,
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+		/* Enable smartreflex after WFI */
+		enable_smartreflex(SR1);
+		enable_smartreflex(SR2);
 	}
 
 	/* PER */
@@ -466,9 +469,6 @@ void omap_sram_idle(void)
 		omap3_disable_io_chain();
 	}
 
-	/* Enable smartreflex after WFI */
-	enable_smartreflex(SR1);
-	enable_smartreflex(SR2);
 
 	pwrdm_post_transition();
 
