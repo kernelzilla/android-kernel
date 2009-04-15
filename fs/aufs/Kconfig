@@ -99,6 +99,7 @@ config AUFS_BDEV_LOOP
 
 config AUFS_INO_T_64
 	bool
+	depends on AUFS_EXPORT
 	depends on 64BIT && !(ALPHA || S390)
 	default y
 	help
