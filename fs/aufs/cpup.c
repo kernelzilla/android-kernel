@@ -312,19 +312,21 @@ static int au_cp_regular(struct dentry *dentry, aufs_bindex_t bdst,
 		unsigned int flags;
 		struct dentry *dentry;
 		struct file *file;
-		void *label;
+		void *label, *label_file;
 	} *f, file[] = {
 		{
 			.bindex = bsrc,
 			.flags = O_RDONLY | O_NOATIME | O_LARGEFILE,
 			.file = NULL,
 			.label = &&out,
+			.label_file = &&out_src
 		},
 		{
 			.bindex = bdst,
 			.flags = O_WRONLY | O_NOATIME | O_LARGEFILE,
 			.file = NULL,
 			.label = &&out_src,
+			.label_file = &&out_dst
 		}
 	};
 	struct super_block *sb;
@@ -338,15 +340,18 @@ static int au_cp_regular(struct dentry *dentry, aufs_bindex_t bdst,
 		err = PTR_ERR(f->file);
 		if (IS_ERR(f->file))
 			goto *f->label;
+		err = -EINVAL;
+		if (unlikely(!f->file->f_op))
+			goto *f->label_file;
 	}
 
 	/* try stopping to update while we copyup */
 	IMustLock(file[SRC].dentry->d_inode);
 	err = au_copy_file(file[DST].file, file[SRC].file, len);
 
+ out_dst:
 	fput(file[DST].file);
 	au_sbr_put(sb, file[DST].bindex);
-
  out_src:
 	fput(file[SRC].file);
 	au_sbr_put(sb, file[SRC].bindex);

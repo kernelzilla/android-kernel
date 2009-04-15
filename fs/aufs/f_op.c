@@ -32,7 +32,7 @@ int aufs_flush(struct file *file, fl_owner_t id)
 	bend = au_fbend(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
 		h_file = au_h_fptr(file, bindex);
-		if (!h_file || !h_file->f_op->flush)
+		if (!h_file || !h_file->f_op || !h_file->f_op->flush)
 			continue;
 
 		err = h_file->f_op->flush(h_file, id);
@@ -423,7 +423,7 @@ static unsigned int aufs_poll(struct file *file, poll_table *wait)
 	/* it is not an error if h_file has no operation */
 	mask = DEFAULT_POLLMASK;
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (h_file->f_op->poll)
+	if (h_file->f_op && h_file->f_op->poll)
 		mask = h_file->f_op->poll(h_file, wait);
 
 	di_read_unlock(dentry, AuLock_IR);
@@ -470,7 +470,7 @@ static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 
 	err = -EINVAL;
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (h_file->f_op->fsync) {
+	if (h_file->f_op && h_file->f_op->fsync) {
 		struct dentry *h_d;
 		struct mutex *h_mtx;
 
@@ -516,7 +516,7 @@ static int aufs_fasync(int fd, struct file *file, int flag)
 		goto out;
 
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (h_file->f_op->fasync)
+	if (h_file->f_op && h_file->f_op->fasync)
 		err = h_file->f_op->fasync(fd, h_file, flag);
 
 	di_read_unlock(dentry, AuLock_IR);
