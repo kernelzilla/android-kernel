@@ -307,10 +307,15 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 	struct vm_operations_struct *vm_ops;
 	int err;
 
+	vm_ops = ERR_PTR(-ENODEV);
+	if (!h_file->f_op || !h_file->f_op->mmap)
+		goto out;
+
 	err = h_file->f_op->mmap(h_file, vma);
 	vm_ops = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
+
 	vm_ops = vma->vm_ops;
 	err = do_munmap(current->mm, vma->vm_start,
 			vma->vm_end - vma->vm_start);
