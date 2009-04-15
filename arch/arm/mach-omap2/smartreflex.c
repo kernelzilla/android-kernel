@@ -410,7 +410,7 @@ static int sr_reset_voltage(int srid)
 		if (retries_cnt > 10) {
 			pr_info("Loop count exceeded in check SR I2C"
 								"write\n");
-			return SR_FAIL;
+			return 1;
 		}
 		if (loop_cnt > 50) {
 			retries_cnt++;
@@ -420,7 +420,7 @@ static int sr_reset_voltage(int srid)
 		vc_bypass_value = prm_read_mod_reg(OMAP3430_GR_MOD,
 					OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
 	}
-	return SR_PASS;
+	return 0;
 }
 
 static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
@@ -475,7 +475,7 @@ static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
 	if (nvalue_reciprocal == 0) {
 		pr_notice("OPP%d doesn't support SmartReflex\n",
 								target_opp_no);
-		return SR_FALSE;
+		return false;
 	}
 
 	sr_write_reg(sr, NVALUERECIPROCAL, nvalue_reciprocal);
@@ -525,7 +525,7 @@ static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
 
 	/* SRCONFIG - enable SR */
 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, SRCONFIG_SRENABLE);
-	return SR_TRUE;
+	return true;
 }
 
 static void sr_disable(struct omap_sr *sr)
@@ -590,11 +590,11 @@ int sr_stop_vddautocomap(int srid)
 		sr->is_autocomp_active = 0;
 		/* Reset the volatage for current OPP */
 		sr_reset_voltage(srid);
-		return SR_TRUE;
+		return true;
 	} else {
 		pr_warning("SR%d: VDD autocomp is not active\n",
 								srid);
-		return SR_FALSE;
+		return false;
 	}
 
 }
@@ -710,7 +710,7 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 		if (retries_cnt > 10) {
 			pr_info("Loop count exceeded in check SR I2C"
 								"write\n");
-			return SR_FAIL;
+			return 1;
 		}
 		if (loop_cnt > 50) {
 			retries_cnt++;
@@ -730,7 +730,7 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 			sr_start_vddautocomap(SR2, target_opp_no);
 	}
 
-	return SR_PASS;
+	return 0;
 }
 
 /* Sysfs interface to select SR VDD1 auto compensation */
