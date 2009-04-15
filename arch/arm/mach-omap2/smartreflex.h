@@ -171,9 +171,6 @@
 /* R_DCDC_GLOBAL_CFG register, SMARTREFLEX_ENABLE values */
 #define DCDC_GLOBAL_CFG_ENABLE_SRFLX	0x08
 
-/* VDDs*/
-#define PRCM_VDD1	1
-#define PRCM_VDD2	2
 #define PRCM_MAX_SYSC_REGS 30
 
 /*
