@@ -239,6 +239,23 @@ void omap_pm_dsp_set_min_opp(u8 opp_id);
  */
 u8 omap_pm_dsp_get_opp(void);
 
+/**
+ * omap_pm_vdd1_get_opp - report the current VDD1 OPP
+ *
+ * Report the current VDD1 OPP number.
+ *
+ * Returns the current VDD1 OPP ID, or 0 upon error.
+ */
+u8 omap_pm_vdd1_get_opp(void);
+
+/**
+ * omap_pm_vdd2_get_opp - report the current VDD2 OPP
+ *
+ * Report the current VDD2 OPP number.
+ *
+ * Returns the current VDD2 OPP ID, or 0 upon error.
+ */
+u8 omap_pm_vdd2_get_opp(void);
 
 /*
  * CPUFreq-originated constraint
