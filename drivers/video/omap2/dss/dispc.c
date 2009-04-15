@@ -1826,9 +1826,9 @@ void dispc_get_trans_key(enum omap_channel ch,
 	enable_clocks(1);
 	if (type) {
 		if (ch == OMAP_DSS_CHANNEL_LCD)
-			*type = REG_GET(DISPC_CONFIG, 11, 11) >> 11;
+			*type = REG_GET(DISPC_CONFIG, 11, 11);
 		else if (ch == OMAP_DSS_CHANNEL_DIGIT)
-			*type = REG_GET(DISPC_CONFIG, 13, 13) >> 13;
+			*type = REG_GET(DISPC_CONFIG, 13, 13);
 		else
 			BUG();
 	}
