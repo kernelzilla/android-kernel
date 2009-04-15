@@ -218,7 +218,7 @@ int resource_set_opp_level(int res, u32 target_level, int flags)
 		/* Send pre notification to CPUFreq */
 		cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
 #endif
-		t_opp = ID_VDD(PRCM_VDD1) |
+		t_opp = ID_VDD(VDD1_OPP) |
 			ID_OPP_NO(mpu_opps[target_level].opp_id);
 		if (resp->curr_level > target_level) {
 			/* Scale Frequency and then voltage */
@@ -245,7 +245,7 @@ int resource_set_opp_level(int res, u32 target_level, int flags)
 			return 0;
 		l3_freq = get_freq(l3_opps + MAX_VDD2_OPP,
 					target_level);
-		t_opp = ID_VDD(PRCM_VDD2) |
+		t_opp = ID_VDD(VDD2_OPP) |
 			ID_OPP_NO(l3_opps[target_level].opp_id);
 		if (resp->curr_level > target_level) {
 			/* Scale Frequency and then voltage */
@@ -266,7 +266,7 @@ int resource_set_opp_level(int res, u32 target_level, int flags)
 			if (ret) {
 #ifdef CONFIG_OMAP_SMARTREFLEX
 				/* Setting clock failed, revert voltage */
-				t_opp = ID_VDD(PRCM_VDD2) |
+				t_opp = ID_VDD(VDD2_OPP) |
 					ID_OPP_NO(l3_opps[resp->curr_level].
 							opp_id);
 				sr_voltagescale_vcbypass(t_opp,
