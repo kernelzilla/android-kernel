@@ -2791,6 +2791,16 @@ static void _omap_dispc_initialize_irq(void)
 	omap_dispc_set_irqs();
 }
 
+void dispc_enable_sidle(void)
+{
+	REG_FLD_MOD(DISPC_SYSCONFIG, 2, 4, 3);	/* SIDLEMODE: smart idle */
+}
+
+void dispc_disable_sidle(void)
+{
+	REG_FLD_MOD(DISPC_SYSCONFIG, 1, 4, 3);	/* SIDLEMODE: no idle */
+}
+
 static void _omap_dispc_initial_config(void)
 {
 	u32 l;

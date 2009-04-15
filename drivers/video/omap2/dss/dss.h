@@ -244,6 +244,9 @@ void dispc_fake_vsync_irq(void);
 void dispc_save_context(void);
 void dispc_restore_context(void);
 
+void dispc_enable_sidle(void);
+void dispc_disable_sidle(void);
+
 void dispc_lcd_enable_signal_polarity(bool act_high);
 void dispc_lcd_enable_signal(bool enable);
 void dispc_pck_free_enable(bool enable);

@@ -2665,6 +2665,8 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 		l = FLD_MOD(l, 1, 31, 31); /* TE_START */
 	dsi_write_reg(DSI_VC_TE(1), l);
 
+	dispc_disable_sidle();
+
 	dispc_enable_lcd_out(1);
 
 	if (dsi.use_te)
@@ -2677,6 +2679,8 @@ static void framedone_callback(void *data, u32 mask)
 		DSSERR("Framedone already scheduled. Bogus FRAMEDONE IRQ?\n");
 		return;
 	}
+
+	dispc_enable_sidle();
 
 	dsi.framedone_scheduled = 1;
 
