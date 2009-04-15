@@ -77,7 +77,7 @@ static inline u32 sr_read_reg(struct omap_sr *sr, unsigned offset)
 static int sr_clk_enable(struct omap_sr *sr)
 {
 	if (clk_enable(sr->clk) != 0) {
-		printk(KERN_ERR "Could not enable %s\n", sr->clk->name);
+		pr_err("Could not enable %s\n", sr->clk->name);
 		return -1;
 	}
 
@@ -169,7 +169,7 @@ static void sr_set_clk_length(struct omap_sr *sr)
 		sr->clk_length = SRCLKLENGTH_38MHZ_SYSCLK;
 		break;
 	default :
-		printk(KERN_ERR "Invalid sysclk value: %d\n", sys_clk_speed);
+		pr_err("Invalid sysclk value: %d\n", sys_clk_speed);
 		break;
 	}
 }
@@ -408,7 +408,7 @@ static int sr_reset_voltage(int srid)
 	while ((vc_bypass_value & OMAP3430_VALID) != 0x0) {
 		loop_cnt++;
 		if (retries_cnt > 10) {
-			printk(KERN_INFO "Loop count exceeded in check SR I2C"
+			pr_info("Loop count exceeded in check SR I2C"
 								"write\n");
 			return SR_FAIL;
 		}
@@ -473,7 +473,7 @@ static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
 	}
 
 	if (nvalue_reciprocal == 0) {
-		printk(KERN_NOTICE "OPP%d doesn't support SmartReflex\n",
+		pr_notice("OPP%d doesn't support SmartReflex\n",
 								target_opp_no);
 		return SR_FALSE;
 	}
@@ -562,12 +562,12 @@ void sr_start_vddautocomap(int srid, u32 target_opp_no)
 	}
 
 	if (sr->is_autocomp_active == 1)
-		printk(KERN_WARNING "SR%d: VDD autocomp is already active\n",
+		pr_warning("SR%d: VDD autocomp is already active\n",
 									srid);
 
 	sr->is_autocomp_active = 1;
 	if (!sr_enable(sr, target_opp_no)) {
-		printk(KERN_WARNING "SR%d: VDD autocomp not activated\n", srid);
+		pr_warning("SR%d: VDD autocomp not activated\n", srid);
 		sr->is_autocomp_active = 0;
 		if (sr->is_sr_reset == 1)
 			sr_clk_disable(sr);
@@ -592,7 +592,7 @@ int sr_stop_vddautocomap(int srid)
 		sr_reset_voltage(srid);
 		return SR_TRUE;
 	} else {
-		printk(KERN_WARNING "SR%d: VDD autocomp is not active\n",
+		pr_warning("SR%d: VDD autocomp is not active\n",
 								srid);
 		return SR_FALSE;
 	}
@@ -708,7 +708,7 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 	while ((vc_bypass_value & OMAP3430_VALID) != 0x0) {
 		loop_cnt++;
 		if (retries_cnt > 10) {
-			printk(KERN_INFO "Loop count exceeded in check SR I2C"
+			pr_info("Loop count exceeded in check SR I2C"
 								"write\n");
 			return SR_FAIL;
 		}
@@ -748,7 +748,7 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
-		printk(KERN_ERR "sr_vdd1_autocomp: Invalid value\n");
+		pr_err("sr_vdd1_autocomp: Invalid value\n");
 		return -EINVAL;
 	}
 
@@ -786,7 +786,7 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
-		printk(KERN_ERR "sr_vdd2_autocomp: Invalid value\n");
+		pr_err("sr_vdd2_autocomp: Invalid value\n");
 		return -EINVAL;
 	}
 
@@ -838,15 +838,15 @@ static int __init omap3_sr_init(void)
 	sr_set_nvalues(&sr2);
 	sr_configure_vp(SR2);
 
-	printk(KERN_INFO "SmartReflex driver initialized\n");
+	pr_info("SmartReflex driver initialized\n");
 
 	ret = sysfs_create_file(power_kobj, &sr_vdd1_autocomp.attr);
 	if (ret)
-		printk(KERN_ERR "sysfs_create_file failed: %d\n", ret);
+		pr_err("sysfs_create_file failed: %d\n", ret);
 
 	ret = sysfs_create_file(power_kobj, &sr_vdd2_autocomp.attr);
 	if (ret)
-		printk(KERN_ERR "sysfs_create_file failed: %d\n", ret);
+		pr_err("sysfs_create_file failed: %d\n", ret);
 
 	return 0;
 }
