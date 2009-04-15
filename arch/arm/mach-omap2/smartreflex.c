@@ -676,7 +676,7 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 	vdd = get_vdd(target_opp);
 	target_opp_no = get_opp_no(target_opp);
 
-	if (vdd == PRCM_VDD1) {
+	if (vdd == VDD1_OPP) {
 		sr_status = sr_stop_vddautocomap(SR1);
 
 		prm_rmw_mod_reg_bits(OMAP3430_VC_CMD_ON_MASK,
@@ -685,7 +685,7 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 					OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
 		reg_addr = R_VDD1_SR_CONTROL;
 
-	} else if (vdd == PRCM_VDD2) {
+	} else if (vdd == VDD2_OPP) {
 		sr_status = sr_stop_vddautocomap(SR2);
 
 		prm_rmw_mod_reg_bits(OMAP3430_VC_CMD_ON_MASK,
@@ -724,9 +724,9 @@ int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel)
 	udelay(T2_SMPS_UPDATE_DELAY);
 
 	if (sr_status) {
-		if (vdd == PRCM_VDD1)
+		if (vdd == VDD1_OPP)
 			sr_start_vddautocomap(SR1, target_opp_no);
-		else if (vdd == PRCM_VDD2)
+		else if (vdd == VDD2_OPP)
 			sr_start_vddautocomap(SR2, target_opp_no);
 	}
 
