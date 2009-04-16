@@ -571,6 +571,9 @@ bit 6 - MMU element size = 64bit (valid only for non mixed page entries)
 
 #define DSP_MAPVMALLOCADDR         0x00000080
 
+#define DSP_MAPDONOTLOCK	   0x00000100
+
+
 #define GEM_CACHE_LINE_SIZE     128
 #define GEM_L1P_PREFETCH_SIZE   128
 

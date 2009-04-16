@@ -533,6 +533,8 @@ func_cont1:
 	mapAttrs = DSP_MAPLITTLEENDIAN;
 	mapAttrs |= DSP_MAPPHYSICALADDR;
 	mapAttrs |= DSP_MAPELEMSIZE32;
+	mapAttrs |= DSP_MAPDONOTLOCK;
+
 	while (numBytes && DSP_SUCCEEDED(status)) {
 		/* To find the max. page size with which both PA & VA are
 		 * aligned */
@@ -670,18 +672,18 @@ func_cont:
 	mapAttrs = DSP_MAPLITTLEENDIAN;
 	mapAttrs |= DSP_MAPPHYSICALADDR;
 	mapAttrs |= DSP_MAPELEMSIZE32;
+	mapAttrs |= DSP_MAPDONOTLOCK;
+
 	/* Map the L4 peripherals */
-	{
-		i = 0;
-		while (L4PeripheralTable[i].physAddr && DSP_SUCCEEDED(status)) {
-				status = hIOMgr->pIntfFxns->pfnBrdMemMap
-					(hIOMgr->hWmdContext,
-					L4PeripheralTable[i].physAddr,
-					L4PeripheralTable[i].dspVirtAddr,
-					HW_PAGE_SIZE_4KB, mapAttrs);
-				DBC_Assert(DSP_SUCCEEDED(status));
-				i++;
-		}
+	i = 0;
+	while (L4PeripheralTable[i].physAddr && DSP_SUCCEEDED(status)) {
+		status = hIOMgr->pIntfFxns->pfnBrdMemMap
+			(hIOMgr->hWmdContext, L4PeripheralTable[i].physAddr,
+			L4PeripheralTable[i].dspVirtAddr, HW_PAGE_SIZE_4KB,
+			mapAttrs);
+		if (DSP_FAILED(status))
+			break;
+		i++;
 	}
 
 	if (DSP_SUCCEEDED(status)) {

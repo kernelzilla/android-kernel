@@ -29,6 +29,8 @@
 
 /*  ----------------------------------- Host OS */
 #include <dspbridge/host_os.h>
+#include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <mach-omap2/prm.h>
 #include <mach-omap2/cm.h>
 #include <mach-omap2/prm-regbits-34xx.h>
@@ -94,6 +96,7 @@
 #define MMU_LARGE_PAGE_MASK      0xFFFF0000
 #define MMU_SMALL_PAGE_MASK      0xFFFFF000
 #define PAGES_II_LVL_TABLE   512
+#define phys_to_page(phys)      pfn_to_page((phys) >> PAGE_SHIFT)
 
 #define MMU_GFLUSH 0x60
 
@@ -1397,6 +1400,11 @@ static DSP_STATUS WMD_BRD_MemMap(struct WMD_DEV_CONTEXT *hDevContext,
 			return DSP_EINVALIDARG;
 		}
 	}
+	if (attrs & DSP_MAPDONOTLOCK)
+		hwAttrs.donotlockmpupage = 1;
+	else
+		hwAttrs.donotlockmpupage = 0;
+
 	if (attrs & DSP_MAPVMALLOCADDR) {
 		status = MemMapVmalloc(hDevContext, ulMpuAddr, ulVirtAddr,
 				       ulNumBytes, ulMapAttr);
@@ -1513,12 +1521,20 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 	u32 remBytes;
 	u32 remBytesL2;
 	u32 vaCurr;
+	struct page *pg = NULL;
 	DSP_STATUS status = DSP_SOK;
 	struct WMD_DEV_CONTEXT *pDevContext = hDevContext;
 	struct PgTableAttrs *pt = pDevContext->pPtAttrs;
+	u32 pacount = 0;
+	u32 *pPhysAddrPageTbl = NULL;
+	u32 temp;
+	u32 patemp = 0;
+	u32 pAddr;
+	u32 numof4KPages = 0;
 
 	DBG_Trace(DBG_ENTER, "> WMD_BRD_MemUnMap hDevContext %x, va %x, "
 		  "NumBytes %x\n", hDevContext, ulVirtAddr, ulNumBytes);
+	pPhysAddrPageTbl = DMM_GetPhysicalAddrTable();
 	vaCurr = ulVirtAddr;
 	remBytes = ulNumBytes;
 	remBytesL2 = 0;
@@ -1567,6 +1583,19 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 				/* vaCurr aligned to pteSize? */
 				if ((pteSize != 0) && (remBytesL2 >= pteSize) &&
 				   !(vaCurr & (pteSize - 1))) {
+					/* Collect Physical addresses from VA */
+					pAddr = (pteVal & ~(pteSize - 1));
+					if (pteSize == HW_PAGE_SIZE_64KB)
+						numof4KPages = 16;
+					else
+						numof4KPages = 1;
+					temp = 0;
+					while (temp++ < numof4KPages) {
+						pPhysAddrPageTbl[pacount++] =
+									pAddr;
+						pAddr += HW_PAGE_SIZE_4KB;
+					}
+
 					if (HW_MMU_PteClear(pteAddrL2,
 						vaCurr, pteSize) == RET_OK) {
 						status = DSP_SOK;
@@ -1627,6 +1656,20 @@ static DSP_STATUS WMD_BRD_MemUnMap(struct WMD_DEV_CONTEXT *hDevContext,
 	 * get flushed */
 EXIT_LOOP:
 	flush_all(pDevContext);
+	temp = 0;
+	while (temp < pacount) {
+		patemp = pPhysAddrPageTbl[temp];
+		if (pfn_valid(__phys_to_pfn(patemp))) {
+			pg = phys_to_page(patemp);
+			if (page_count(pg) < 1)
+				printk(KERN_INFO "DSPBRIDGE:UNMAP function: "
+					"COUNT 0 FOR PA 0x%x, size = 0x%x\n",
+					patemp, ulNumBytes);
+			SetPageDirty(pg);
+			page_cache_release(pg);
+		}
+		temp++;
+	}
 	DBG_Trace(DBG_LEVEL1, "WMD_BRD_MemUnMap vaCurr %x, pteAddrL1 %x "
 		  "pteAddrL2 %x\n", vaCurr, pteAddrL1, pteAddrL2);
 	DBG_Trace(DBG_ENTER, "< WMD_BRD_MemUnMap status %x remBytes %x, "
@@ -1658,11 +1701,20 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 	u32 temp = 0;
 	u32 numUsrPgs;
 	struct task_struct *curr_task = current;
+	struct vm_area_struct *vma;
+	u32  write = 0;
+
 
 	DBG_Trace(DBG_ENTER, "TIOMAP_VirtToPhysical: START:ulMpuAddr=%x, "
 		  "ulNumBytes=%x\n", ulMpuAddr, ulNumBytes);
 	if (physicalAddrTable == NULL)
 		return DSP_EMEMORY;
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, ulMpuAddr);
+	up_read(&mm->mmap_sem);
+
+	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
+		write = 1;
 	while (ulNumBytes) {
 		DBG_Trace(DBG_LEVEL4, "TIOMAP_VirtToPhysical:Read the next PGD "
 			  "and PMD entry\n");
@@ -1685,7 +1737,7 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 			 * page tables
 			 */
 			numUsrPgs = get_user_pages(curr_task, mm, ulMpuAddr, 1,
-							true, 0, NULL, NULL);
+							write, 1, NULL, NULL);
 			up_read(&mm->mmap_sem);
 			/* Get the first level page table entry information */
 			/* Read the pointer to first level page table entry */
@@ -1729,7 +1781,7 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 					 * the page tables */
 					if (numUsrPgs <= PAGES_II_LVL_TABLE) {
 						get_user_pages(curr_task, mm,
-						ulMpuAddr, numUsrPgs, true,  0,
+						ulMpuAddr, numUsrPgs, write,  1,
 						NULL, NULL);
 						DBG_Trace(DBG_LEVEL4,
 						"get_user_pages, numUsrPgs"
@@ -1737,7 +1789,7 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 					} else {
 						get_user_pages(curr_task, mm,
 						ulMpuAddr, PAGES_II_LVL_TABLE,
-						true, 0, NULL, NULL);
+						write, 1, NULL, NULL);
 						DBG_Trace(DBG_LEVEL4,
 						"get_user_pages, numUsrPgs"
 						"= %d\n", PAGES_II_LVL_TABLE);
@@ -1762,7 +1814,12 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 					pAddr = pteVal & MMU_LARGE_PAGE_MASK;
 					chunkSz = HW_PAGE_SIZE_64KB;
 					numEntries = 16;
-					numof4KPages = 16;
+					if (ulNumBytes >= HW_PAGE_SIZE_64KB)
+						numof4KPages = 16;
+					else {
+						numof4KPages = ulNumBytes /
+							HW_PAGE_SIZE_4KB;
+					}
 					break;
 				case HW_PAGE_SIZE_4KB:
 					pAddr = pteVal & MMU_SMALL_PAGE_MASK;
@@ -1794,7 +1851,10 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 					ulMpuAddr += chunkSz;
 					/* Update the number of bytes that
 					 * are copied */
-					ulNumBytes -= chunkSz;
+					if (chunkSz > ulNumBytes)
+						ulNumBytes = 0;
+					else
+						ulNumBytes -= chunkSz;
 					DBG_Trace(DBG_LEVEL4,
 						"TIOMAP_VirtToPhysical: mpuCurr"
 						" = %x, pagesize = %x, "
@@ -1817,10 +1877,16 @@ static DSP_STATUS TIOMAP_VirtToPhysical(struct mm_struct *mm, u32 ulMpuAddr,
 			switch (pteSize) {
 			case HW_PAGE_SIZE_16MB:
 				pAddr = pteVal & MMU_SSECTION_ADDR_MASK;
+				if (ulNumBytes >= HW_PAGE_SIZE_16MB) {
 					chunkSz = HW_PAGE_SIZE_16MB;
 					numEntries = 16;
 					numof4KPages = 4096;
-					break;
+				} else {
+					chunkSz = HW_PAGE_SIZE_1MB;
+					numEntries = 1;
+					numof4KPages = 256;
+				}
+				break;
 			case HW_PAGE_SIZE_1MB:
 				pAddr = pteVal & MMU_SECTION_ADDR_MASK;
 					chunkSz = HW_PAGE_SIZE_1MB;
@@ -1934,9 +2000,64 @@ static DSP_STATUS PteSet(struct PgTableAttrs *pt, u32 pa, u32 va,
 	u32 L2BaseVa = 0;
 	u32 L2BasePa = 0;
 	u32 L2PageNum = 0;
+	u32 num4KEntries = 0;
+	u32 temp = 0;
+	struct page *pg = NULL;
+	u32 patemp;
+
 	DSP_STATUS status = DSP_SOK;
 	DBG_Trace(DBG_ENTER, "> PteSet pPgTableAttrs %x, pa %x, va %x, "
 		 "size %x, attrs %x\n", pt, pa, va, size, attrs);
+	/* Lock the MPU pages that are getting mapped if this
+	 * attribute is set */
+	if (attrs->donotlockmpupage == 0) {
+		switch (size) {
+		case HW_PAGE_SIZE_64KB:
+			num4KEntries = 16;
+			break;
+		case HW_PAGE_SIZE_4KB:
+			num4KEntries = 1;
+			break;
+		case HW_PAGE_SIZE_16MB:
+			num4KEntries = 4096;
+			break;
+		case HW_PAGE_SIZE_1MB:
+			num4KEntries = 256;
+			break;
+		default:
+			return DSP_EFAIL;
+		}
+		patemp = pa;
+		while (temp++ < num4KEntries) {
+			/* FIXME: This is a hack to avoid getting pages for
+			 *  video overlay		*/
+			if (pfn_valid(__phys_to_pfn(patemp))) {
+				pg = phys_to_page(patemp);
+				get_page(pg);
+			}
+			if (page_count(pg) < 1) {
+				printk(KERN_EMERG "DSPBRIDGE:MAP  function: "
+					"COUNT 0 FOR PA 0x%x\n", patemp);
+				printk(KERN_EMERG "Bad page state"
+					KERN_EMERG "in process '%s'\n"
+					KERN_EMERG "page:%p flags:0x%0*lx "
+					KERN_EMERG "mapping:%p mapcount:%d "
+					KERN_EMERG "count:%d\n"
+					KERN_EMERG "Trying to fix it up, but "
+					KERN_EMERG "a reboot is needed\n"
+					KERN_EMERG "Backtrace:\n",
+					current->comm, pg,
+					(int)(2*sizeof(unsigned long)),
+					(unsigned long)pg->flags, pg->mapping,
+					page_mapcount(pg), page_count(pg));
+				dump_stack();
+				BUG_ON(1);
+			}
+
+			patemp += HW_PAGE_SIZE_4KB;
+		}
+	}
+	attrs->donotlockmpupage = 0;
 	L1BaseVa = pt->L1BaseVa;
 	pgTblVa = L1BaseVa;
 	if ((size == HW_PAGE_SIZE_64KB) || (size == HW_PAGE_SIZE_4KB)) {

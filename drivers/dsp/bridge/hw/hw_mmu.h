@@ -51,6 +51,7 @@ struct HW_MMUMapAttrs_t {
 	enum HW_Endianism_t     endianism;
 	enum HW_ElementSize_t   elementSize;
 	enum HW_MMUMixedSize_t  mixedSize;
+	bool donotlockmpupage;
 } ;
 
 extern HW_STATUS HW_MMU_Enable(const u32 baseAddress);
