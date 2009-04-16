@@ -98,10 +98,8 @@ static ssize_t manager_display_store(struct omap_overlay_manager *mgr, const cha
 static ssize_t manager_default_color_show(struct omap_overlay_manager *mgr,
 					  char *buf)
 {
-	u32 default_color;
-
-	default_color = dispc_get_default_color(mgr->id);
-	return snprintf(buf, PAGE_SIZE, "%d", default_color);
+	return snprintf(buf, PAGE_SIZE, "%d",
+			mgr->get_default_color(mgr));
 }
 
 static ssize_t manager_default_color_store(struct omap_overlay_manager *mgr,
@@ -470,6 +468,10 @@ static void omap_dss_mgr_enable_trans_key(struct omap_overlay_manager *mgr,
 {
 	dispc_enable_trans_key(mgr->id, enable);
 }
+static u32 omap_dss_mgr_get_default_color(struct omap_overlay_manager *mgr)
+{
+	return dispc_get_default_color(mgr->id);
+}
 
 static void omap_dss_add_overlay_manager(struct omap_overlay_manager *manager)
 {
@@ -512,6 +514,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->set_default_color = &omap_dss_mgr_set_def_color,
 		mgr->set_trans_key = &omap_dss_mgr_set_trans_key,
 		mgr->enable_trans_key = &omap_dss_mgr_enable_trans_key,
+		mgr->get_default_color = &omap_dss_mgr_get_default_color;
 		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC,
 
 		dss_overlay_setup_dispc_manager(mgr);
