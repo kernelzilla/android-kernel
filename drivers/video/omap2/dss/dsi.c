@@ -1935,7 +1935,7 @@ static int dsi_vc_send_short(int channel, u8 data_type, u16 data, u8 ecc)
 		return -EINVAL;
 	}
 
-	data_id = data_type | channel << 6;
+	data_id = data_type | dsi.vc[channel].dest_per << 6;
 
 	r = (data_id << 0) | (data << 8) | (ecc << 24);
 
