@@ -1847,6 +1847,32 @@ void dispc_enable_trans_key(enum omap_channel ch, bool enable)
 		REG_FLD_MOD(DISPC_CONFIG, enable, 12, 12);
 	enable_clocks(0);
 }
+void dispc_enable_alpha_blending(enum omap_channel ch, bool enable)
+{
+	enable_clocks(1);
+	if (ch == OMAP_DSS_CHANNEL_LCD)
+		REG_FLD_MOD(DISPC_CONFIG, enable, 18, 18);
+	else /* OMAP_DSS_CHANNEL_DIGIT */
+		REG_FLD_MOD(DISPC_CONFIG, enable, 19, 19);
+	enable_clocks(0);
+}
+bool dispc_alpha_blending_enabled(enum omap_channel ch)
+{
+	bool enabled;
+
+	enable_clocks(1);
+	if (ch == OMAP_DSS_CHANNEL_LCD)
+		enabled = REG_GET(DISPC_CONFIG, 18, 18);
+	else if (ch == OMAP_DSS_CHANNEL_DIGIT)
+		enabled = REG_GET(DISPC_CONFIG, 18, 18);
+	else
+		BUG();
+	enable_clocks(0);
+
+	return enabled;
+
+}
+
 
 bool dispc_trans_key_enabled(enum omap_channel ch)
 {

@@ -468,6 +468,16 @@ static void omap_dss_mgr_enable_trans_key(struct omap_overlay_manager *mgr,
 {
 	dispc_enable_trans_key(mgr->id, enable);
 }
+static void omap_dss_mgr_enable_alpha_blending(struct omap_overlay_manager *mgr,
+		bool enable)
+{
+	dispc_enable_alpha_blending(mgr->id, enable);
+}
+static bool omap_dss_mgr_get_alpha_blending_status(
+		struct omap_overlay_manager *mgr)
+{
+	return dispc_alpha_blending_enabled(mgr->id);
+}
 static u32 omap_dss_mgr_get_default_color(struct omap_overlay_manager *mgr)
 {
 	return dispc_get_default_color(mgr->id);
@@ -514,6 +524,10 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->set_default_color = &omap_dss_mgr_set_def_color,
 		mgr->set_trans_key = &omap_dss_mgr_set_trans_key,
 		mgr->enable_trans_key = &omap_dss_mgr_enable_trans_key,
+		mgr->enable_alpha_blending =
+			&omap_dss_mgr_enable_alpha_blending;
+		mgr->get_alpha_blending_status =
+			omap_dss_mgr_get_alpha_blending_status;
 		mgr->get_default_color = &omap_dss_mgr_get_default_color;
 		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC,
 
