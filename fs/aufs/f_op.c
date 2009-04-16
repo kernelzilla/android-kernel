@@ -12,6 +12,8 @@
  */
 
 #include <linux/fs_stack.h>
+#include <linux/ima.h>
+#include <linux/mman.h>
 #include <linux/poll.h>
 #include "aufs.h"
 
@@ -301,6 +303,20 @@ static struct vm_operations_struct aufs_vm_ops = {
 
 /* ---------------------------------------------------------------------- */
 
+static unsigned long au_prot_conv(unsigned long flags)
+{
+	unsigned long prot;
+
+	prot = 0;
+	if (flags & VM_READ)
+		prot |= PROT_READ;
+	if (flags & VM_WRITE)
+		prot |= PROT_WRITE;
+	if (flags & VM_EXEC)
+		prot |= PROT_EXEC;
+	return prot;
+}
+
 static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 					      struct vm_area_struct *vma)
 {
@@ -309,6 +325,11 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 
 	vm_ops = ERR_PTR(-ENODEV);
 	if (!h_file->f_op || !h_file->f_op->mmap)
+		goto out;
+
+	err = ima_file_mmap(h_file, au_prot_conv(vma->vm_flags));
+	vm_ops = ERR_PTR(err);
+	if (err)
 		goto out;
 
 	err = h_file->f_op->mmap(h_file, vma);

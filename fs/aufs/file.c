@@ -52,7 +52,8 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	struct inode *h_inode;
 	struct super_block *sb;
 	struct au_branch *br;
-	int err;
+	int err, exec_flag;
+	struct path h_path;
 
 	h_dentry = au_h_dptr(dentry, bindex);
 	h_inode = h_dentry->d_inode;
@@ -65,17 +66,22 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	sb = dentry->d_sb;
 	br = au_sbr(sb, bindex);
 	h_file = ERR_PTR(-EACCES);
-	if (file && (file->f_mode & FMODE_EXEC)
-	    && (br->br_mnt->mnt_flags & MNT_NOEXEC))
-		goto out;
+	exec_flag = 0;
+	if (file && (file->f_mode & FMODE_EXEC)) {
+		exec_flag = 1;
+		if (br->br_mnt->mnt_flags & MNT_NOEXEC)
+			goto out;
+	}
 
 	/* drop flags for writing */
 	if (au_test_ro(sb, bindex, dentry->d_inode))
 		flags = au_file_roflags(flags);
 	flags &= ~O_CREAT;
 	atomic_inc(&br->br_count);
-	h_file = vfsub_dentry_open(dget(h_dentry), mntget(br->br_mnt), flags,
-				   current_cred());
+	h_path.dentry = h_dentry;
+	h_path.mnt = br->br_mnt;
+	path_get(&h_path);
+	h_file = vfsub_dentry_open(&h_path, flags, exec_flag, current_cred());
 	if (IS_ERR(h_file))
 		goto out_br;
 
