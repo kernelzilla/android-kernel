@@ -418,7 +418,11 @@ struct omap_overlay_manager {
 	void (*set_default_color)(struct omap_overlay_manager *mgr, u32 color);
 	u32 (*get_default_color)(struct omap_overlay_manager *mgr);
 	bool (*get_alpha_blending_status)(struct omap_overlay_manager *mgr);
-	void (*set_trans_key)(struct omap_overlay_manager *mgr,
+	bool (*get_trans_key_status)(struct omap_overlay_manager *mgr);
+	void (*get_trans_key_type_and_value)(struct omap_overlay_manager *mgr,
+		enum omap_dss_color_key_type *type,
+		u32 *trans_key);
+	void (*set_trans_key_type_and_value)(struct omap_overlay_manager *mgr,
 		enum omap_dss_color_key_type type,
 		u32 trans_key);
 	void (*enable_trans_key)(struct omap_overlay_manager *mgr,
