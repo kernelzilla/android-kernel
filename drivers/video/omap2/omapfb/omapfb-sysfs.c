@@ -183,6 +183,7 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
 	struct omap_overlay *ovl;
 	int num_ovls, r, i;
 	int len;
+	bool added = false;
 
 	num_ovls = 0;
 
@@ -284,15 +285,13 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
 
 		ofbi->overlays[ofbi->num_overlays++] = ovl;
 
-		r = omapfb_apply_changes(fbi, 1);
+		added = true;
+	}
+
+	if (added) {
+		r = omapfb_apply_changes(fbi, 0);
 		if (r)
 			goto out;
-
-		if (ovl->manager) {
-			r = ovl->manager->apply(ovl->manager);
-			if (r)
-				goto out;
-		}
 	}
 
 	r = count;
