@@ -2240,7 +2240,6 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
 {
 	u32 temp;
 	DSP_STATUS status = DSP_SOK;
-	DSP_STATUS clk_status = DSP_SOK;
 	enum HW_PwrState_t    pwrState;
 
 	/* Read PM_PWSTST_IVA2 */
@@ -2255,11 +2254,7 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
 		/* Wait until the state has moved to ON */
 		HW_PWR_IVA2StateGet(prm_base, HW_PWR_DOMAIN_DSP, &pwrState);
 	}
-	clk_status = CLK_Disable(SERVICESCLK_iva2_ck);
-	if (DSP_FAILED(clk_status)) {
-		DBG_Trace(DBG_LEVEL6, "CLK_Disbale failed for clk = 0x%x \n",
-			  SERVICESCLK_iva2_ck);
-	}
+	CLK_Disable(SERVICESCLK_iva2_ck);
 	udelay(10);
 	/* Assert IVA2-RST1 and IVA2-RST2  */
 	*((REG_UWORD32 *)((u32)(prm_base) + 0x50)) = (u32)0x07;
@@ -2276,11 +2271,7 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
                temp =  (temp & 0xFFFFFC8) | 0x37;
                *((REG_UWORD32 *) ((u32) (cm_base) + 0x4)) =
                        (u32) temp;
-	clk_status = CLK_Enable(SERVICESCLK_iva2_ck);
-	if (DSP_FAILED(clk_status)) {
-		DBG_Trace(DBG_LEVEL6, "CLK_Enable failed for clk = 0x%x \n",
-			  SERVICESCLK_iva2_ck);
-	}
+	CLK_Enable(SERVICESCLK_iva2_ck);
 	udelay(20);
 	GetHWRegs(prm_base, cm_base);
 	/* Release Reset1 and Reset2 */

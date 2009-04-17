@@ -286,7 +286,7 @@ DSP_STATUS WakeDSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 #ifdef CONFIG_PM
 	struct CFG_HOSTRES resources;
 	enum HW_PwrState_t pwrState;
-       u32 temp;
+	u32 temp;
 
 	status = CFG_GetHostResources(
 		 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
@@ -307,7 +307,7 @@ DSP_STATUS WakeDSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 		 pDevContext->uDspPerClks);
 	status = DSP_PeripheralClocks_Enable(pDevContext, NULL);
 
-       /* Enablifg Dppll in lock mode*/
+	/* Enabling Dppll in lock mode */
                temp = (u32) *((REG_UWORD32 *)
                        ((u32) (resources.dwCmBase) + 0x34));
                temp = (temp & 0xFFFFFFFE) | 0x1;
@@ -547,27 +547,19 @@ DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
 				      IN void *pArgs)
 {
 	u32 clkIdx;
-	DSP_STATUS status = DSP_SOK;
+	DSP_STATUS int_clk_status = DSP_EFAIL, fun_clk_status = DSP_EFAIL;
 
 	for (clkIdx = 0; clkIdx < MBX_PM_MAX_RESOURCES; clkIdx++) {
 		if (((pDevContext->uDspPerClks) >> clkIdx) & 0x01) {
 			/* Enable the interface clock of the peripheral */
-			status = CLK_Enable(BPWR_Clks[clkIdx].intClk);
-			if (DSP_FAILED(status)) {
-				DBG_Trace(DBG_LEVEL7,
-					 "Failed to Enable the DSP Peripheral"
-					 "Clk 0x%x \n", BPWR_Clks[clkIdx]);
-			}
+			int_clk_status = CLK_Enable(BPWR_Clks[clkIdx].intClk);
 			/* Enable the functional clock of the periphearl */
-			status = CLK_Enable(BPWR_Clks[clkIdx].funClk);
-			if (DSP_FAILED(status)) {
-				DBG_Trace(DBG_LEVEL7,
-					 "Failed to Enable the DSP Peripheral"
-					 "Clk 0x%x \n", BPWR_Clks[clkIdx]);
-			}
+			fun_clk_status = CLK_Enable(BPWR_Clks[clkIdx].funClk);
 		}
 	}
-	return status;
+	if ((int_clk_status | fun_clk_status) != DSP_SOK)
+		return DSP_EFAIL;
+	return DSP_SOK;
 }
 
 void DSPClkWakeupEventCtrl(u32 ClkId, bool enable)
