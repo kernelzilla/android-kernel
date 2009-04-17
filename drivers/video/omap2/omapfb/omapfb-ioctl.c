@@ -288,7 +288,8 @@ static int _omapfb_set_color_key(struct omap_overlay_manager *mgr,
 {
 	enum omap_dss_color_key_type kt;
 
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
+	if (!mgr->set_default_color ||
+			!mgr->set_trans_key_type_and_value ||
 			!mgr->enable_trans_key)
 		return 0;
 
@@ -310,7 +311,7 @@ static int _omapfb_set_color_key(struct omap_overlay_manager *mgr,
 	}
 
 	mgr->set_default_color(mgr, ck->background);
-	mgr->set_trans_key(mgr, kt, ck->trans_key);
+	mgr->set_trans_key_type_and_value(mgr, kt, ck->trans_key);
 	mgr->enable_trans_key(mgr, 1);
 
 	omapfb_color_keys[mgr->id] = *ck;
@@ -341,7 +342,8 @@ static int omapfb_set_color_key(struct fb_info *fbi,
 		goto err;
 	}
 
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
+	if (!mgr->set_default_color ||
+			!mgr->set_trans_key_type_and_value ||
 			!mgr->enable_trans_key) {
 		r = -ENODEV;
 		goto err;
@@ -377,7 +379,8 @@ static int omapfb_get_color_key(struct fb_info *fbi,
 		goto err;
 	}
 
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
+	if (!mgr->set_default_color ||
+			!mgr->set_trans_key_type_and_value ||
 			!mgr->enable_trans_key) {
 		r = -ENODEV;
 		goto err;
