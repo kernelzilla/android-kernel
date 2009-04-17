@@ -192,6 +192,22 @@ static ssize_t manager_color_key_enabled_store(struct omap_overlay_manager *mgr,
 
 	return size;
 }
+static ssize_t manager_alpha_blending_enabled_show(
+		struct omap_overlay_manager *mgr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			mgr->get_alpha_blending_status(mgr));
+}
+static ssize_t manager_alpha_blending_enabled_store(
+		struct omap_overlay_manager *mgr,
+		const char *buf, size_t size)
+{
+	int enable;
+	if (sscanf(buf, "%d", &enable) != 1)
+		return -EINVAL;
+	mgr->enable_alpha_blending(mgr, enable);
+	return size;
+}
 
 
 struct manager_attribute {
@@ -215,6 +231,10 @@ static MANAGER_ATTR(color_key_value, S_IRUGO|S_IWUSR,
 		manager_color_key_value_show, manager_color_key_value_store);
 static MANAGER_ATTR(color_key_enabled, S_IRUGO|S_IWUSR,
 		manager_color_key_enabled_show, manager_color_key_enabled_store);
+static MANAGER_ATTR(alpha_blending_enabled, S_IRUGO|S_IWUSR,
+		manager_alpha_blending_enabled_show,
+		manager_alpha_blending_enabled_store);
+
 
 static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_name.attr,
@@ -223,6 +243,7 @@ static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_color_key_type.attr,
 	&manager_attr_color_key_value.attr,
 	&manager_attr_color_key_enabled.attr,
+	&manager_attr_alpha_blending_enabled.attr,
 	NULL
 };
 
