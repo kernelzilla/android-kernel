@@ -137,12 +137,26 @@ static ssize_t manager_color_key_type_store(struct omap_overlay_manager *mgr,
 	u32 key_value;
 
 	for (key_type = OMAP_DSS_COLOR_KEY_GFX_DST;
-	     key_type < ARRAY_SIZE(color_key_type_str); key_type++) {
+			key_type < ARRAY_SIZE(color_key_type_str); key_type++) {
 		if (sysfs_streq(buf, color_key_type_str[key_type]))
 			break;
 	}
 	if (key_type == ARRAY_SIZE(color_key_type_str))
 		return -EINVAL;
+	/* OMAP does not support destination color key and alpha blending
+	 * simultaneously.  So if alpha blending and color keying both are
+	 * enabled then refrain from setting the color key type to
+	 * gfx-destination
+	 */
+	if (!key_type) {
+		bool color_key_enabled;
+		bool alpha_blending_enabled;
+		color_key_enabled = mgr->get_trans_key_status(mgr);
+		alpha_blending_enabled = mgr->get_alpha_blending_status(mgr);
+		if (color_key_enabled && alpha_blending_enabled)
+			return -EINVAL;
+	}
+
 	mgr->get_trans_key_type_and_value(mgr, NULL, &key_value);
 	mgr->set_trans_key_type_and_value(mgr, key_type, key_value);
 
@@ -188,6 +202,23 @@ static ssize_t manager_color_key_enabled_store(struct omap_overlay_manager *mgr,
 	if (sscanf(buf, "%d", &enable) != 1)
 		return -EINVAL;
 
+	/* OMAP does not support destination color keying and
+	 * alpha blending simultaneously.  so if alpha blending
+	 * is enabled refrain from enabling destination color
+	 * keying.
+	 */
+	if (enable) {
+		bool enabled;
+		enabled = mgr->get_alpha_blending_status(mgr);
+		if (enabled) {
+			enum omap_dss_color_key_type key_type;
+			mgr->get_trans_key_type_and_value(mgr,
+					&key_type, NULL);
+			if (!key_type)
+				return -EINVAL;
+		}
+
+	}
 	mgr->enable_trans_key(mgr, enable);
 
 	return size;
@@ -205,6 +236,23 @@ static ssize_t manager_alpha_blending_enabled_store(
 	int enable;
 	if (sscanf(buf, "%d", &enable) != 1)
 		return -EINVAL;
+	/* OMAP does not support destination color keying and
+	 * alpha blending simultaneously.  so if destination
+	 * color keying is enabled refrain from enabling
+	 * alpha blending
+	 */
+	if (enable) {
+		bool enabled;
+		enabled = mgr->get_trans_key_status(mgr);
+		if (enabled) {
+			enum omap_dss_color_key_type key_type;
+			mgr->get_trans_key_type_and_value(mgr, &key_type, NULL);
+			if (!key_type)
+				return -EINVAL;
+
+		}
+
+	}
 	mgr->enable_alpha_blending(mgr, enable);
 	return size;
 }
