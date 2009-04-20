@@ -43,6 +43,46 @@ static ssize_t show_rotate_type(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", ofbi->rotation_type);
 }
 
+static ssize_t store_rotate_type(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	enum omap_dss_rotation_type rot_type;
+	int r;
+
+	rot_type = simple_strtoul(buf, NULL, 0);
+
+	if (rot_type != OMAP_DSS_ROT_DMA && rot_type != OMAP_DSS_ROT_VRFB)
+		return -EINVAL;
+
+	omapfb_lock(fbdev);
+
+	r = 0;
+	if (rot_type == ofbi->rotation_type)
+		goto out;
+
+	r = -EBUSY;
+	if (ofbi->region.size)
+		goto out;
+
+	ofbi->rotation_type = rot_type;
+
+	/*
+	 * Since the VRAM for this FB is not allocated at the moment we don't need to
+	 * do any further parameter checking at this point.
+	 */
+
+	r = count;
+out:
+	omapfb_unlock(fbdev);
+
+	return r;
+}
+
+
 static ssize_t show_mirror(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -327,7 +367,7 @@ static ssize_t show_virt(struct device *dev,
 }
 
 static struct device_attribute omapfb_attrs[] = {
-	__ATTR(rotate_type, S_IRUGO, show_rotate_type, NULL),
+	__ATTR(rotate_type, S_IRUGO | S_IWUSR, show_rotate_type, store_rotate_type),
 	__ATTR(mirror, S_IRUGO | S_IWUSR, show_mirror, store_mirror),
 	__ATTR(size, S_IRUGO | S_IWUSR, show_size, store_size),
 	__ATTR(overlays, S_IRUGO | S_IWUSR, show_overlays, store_overlays),
