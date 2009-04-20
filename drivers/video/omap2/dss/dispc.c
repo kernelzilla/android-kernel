@@ -1450,7 +1450,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (paddr == 0)
 		return -EINVAL;
 
-	if (ilace && height >= out_height)
+	if (ilace && height == out_height)
 		fieldmode = 1;
 
 	if (ilace) {
