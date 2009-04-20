@@ -1072,12 +1072,16 @@ static void _dispc_set_scaling(enum omap_plane plane,
 
 	dispc_write_reg(dispc_reg_att[plane], l);
 
+	/*
+	 * field 0 = even field = bottom field
+	 * field 1 = odd field = top field
+	 */
 	if (ilace && !fieldmode) {
-		accu0 = 0;
-		accu1 = fir_vinc / 2;
-		if (accu1 >= 1024/2) {
-			accu0 = 1024/2;
-			accu1 -= accu0;
+		accu1 = 0;
+		accu0 = fir_vinc / 2;
+		if (accu0 >= 1024/2) {
+			accu1 = 1024/2;
+			accu0 -= accu1;
 		}
 	}
 
@@ -1266,34 +1270,38 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		fbh = width;
 	}
 
+	/*
+	 * field 0 = even field = bottom field
+	 * field 1 = odd field = top field
+	 */
 	switch (rotation + mirror * 4) {
 	case 0:
-		*offset0 = 0;
+		*offset1 = 0;
 		if (fieldmode)
-			*offset1 = screen_width * ps;
+			*offset0 = screen_width * ps;
 		else
-			*offset1 = 0;
+			*offset0 = 0;
 		*row_inc = pixinc(1 + (screen_width - fbw) +
 				(fieldmode ? screen_width : 0),
 				ps);
 		*pix_inc = pixinc(1, ps);
 		break;
 	case 1:
-		*offset0 = screen_width * (fbh - 1) * ps;
+		*offset1 = screen_width * (fbh - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 + ps;
+			*offset0 = *offset1 + ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(screen_width * (fbh - 1) + 1 +
 				(fieldmode ? 1 : 0), ps);
 		*pix_inc = pixinc(-screen_width, ps);
 		break;
 	case 2:
-		*offset0 = (screen_width * (fbh - 1) + fbw - 1) * ps;
+		*offset1 = (screen_width * (fbh - 1) + fbw - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 - screen_width * ps;
+			*offset0 = *offset1 - screen_width * ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(-1 -
 				(screen_width - fbw) -
 				(fieldmode ? screen_width : 0),
@@ -1301,11 +1309,11 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		*pix_inc = pixinc(-1, ps);
 		break;
 	case 3:
-		*offset0 = (fbw - 1) * ps;
+		*offset1 = (fbw - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 - ps;
+			*offset0 = *offset1 - ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(-screen_width * (fbh - 1) - 1 -
 				(fieldmode ? 1 : 0), ps);
 		*pix_inc = pixinc(screen_width, ps);
@@ -1313,11 +1321,11 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 
 	/* mirroring */
 	case 0 + 4:
-		*offset0 = (fbw - 1) * ps;
+		*offset1 = (fbw - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 + screen_width * ps;
+			*offset0 = *offset1 + screen_width * ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(screen_width * 2 - 1 +
 				(fieldmode ? screen_width : 0),
 				ps);
@@ -1325,11 +1333,11 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		break;
 
 	case 1 + 4:
-		*offset0 = 0;
+		*offset1 = 0;
 		if (fieldmode)
-			*offset1 = *offset0 + screen_width * ps;
+			*offset0 = *offset1 + screen_width * ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(-screen_width * (fbh - 1) + 1 +
 				(fieldmode ? 1 : 0),
 				ps);
@@ -1337,11 +1345,11 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		break;
 
 	case 2 + 4:
-		*offset0 = screen_width * (fbh - 1) * ps;
+		*offset1 = screen_width * (fbh - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 + screen_width * ps;
+			*offset0 = *offset1 + screen_width * ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(1 - screen_width * 2 -
 				(fieldmode ? screen_width : 0),
 				ps);
@@ -1349,11 +1357,11 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		break;
 
 	case 3 + 4:
-		*offset0 = (screen_width * (fbh - 1) + fbw - 1) * ps;
+		*offset1 = (screen_width * (fbh - 1) + fbw - 1) * ps;
 		if (fieldmode)
-			*offset1 = *offset0 + screen_width * ps;
+			*offset0 = *offset1 + screen_width * ps;
 		else
-			*offset1 = *offset0;
+			*offset0 = *offset1;
 		*row_inc = pixinc(screen_width * (fbh - 1) - 1 -
 				(fieldmode ? 1 : 0),
 				ps);
