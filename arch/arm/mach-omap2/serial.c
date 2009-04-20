@@ -19,6 +19,9 @@
 #include <linux/serial_8250.h>
 #include <linux/serial_reg.h>
 #include <linux/clk.h>
+#ifdef CONFIG_SERIAL_OMAP
+#include <linux/platform_device.h>
+#endif
 #include <linux/io.h>
 
 #include <mach/common.h>
@@ -97,7 +100,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
 #ifdef CONFIG_MACH_OMAP_ZOOM2
 	{
 		.membase        = 0,
-                .mapbase        = 0x10000000,
+		.mapbase        = 0x10000000,
 		.irq            = OMAP_GPIO_IRQ(102),
 		.flags          = UPF_BOOT_AUTOCONF|UPF_IOREMAP|UPF_SHARE_IRQ|
 				  UPF_TRIGGER_HIGH,
@@ -110,6 +113,93 @@ static struct plat_serial8250_port serial_platform_data[] = {
 		.flags		= 0
 	}
 };
+
+#ifdef CONFIG_SERIAL_OMAP
+static struct resource omap2_uart1_resources[] = {
+	{
+		.start		= OMAP_UART1_BASE,
+		.end		= OMAP_UART1_BASE + 0x3ff,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= 72,
+                .flags		= IORESOURCE_IRQ,
+	}
+};
+
+static struct resource omap2_uart2_resources[] = {
+	{
+		.start		= OMAP_UART2_BASE,
+		.end		= OMAP_UART2_BASE + 0x3ff,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= 73,
+		.flags		= IORESOURCE_IRQ,
+	}
+};
+
+static struct resource omap2_uart3_resources[] = {
+	{
+		.start		= OMAP_UART3_BASE,
+		.end		= OMAP_UART3_BASE + 0x3ff,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= 74,
+		.flags		= IORESOURCE_IRQ,
+	}
+};
+
+#ifdef CONFIG_MACH_OMAP_ZOOM2
+static struct resource omap2_quaduart_resources[] = {
+	{
+		.start		= 0x10000000,
+		.end		= 0x10000000 + (0x16 << 1),
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= OMAP_GPIO_IRQ(102),
+		.flags		= IORESOURCE_IRQ,
+	}
+};
+#endif
+
+/* OMAP UART platform structure */
+static struct platform_device uart1_device = {
+	.name			= "omap-uart",
+	.id			= 1,
+	.num_resources		= ARRAY_SIZE(omap2_uart1_resources),
+	.resource		= omap2_uart1_resources,
+};
+static struct platform_device uart2_device = {
+	.name			= "omap-uart",
+	.id			= 2,
+	.num_resources		= ARRAY_SIZE(omap2_uart2_resources),
+	.resource		= omap2_uart2_resources,
+};
+static struct platform_device uart3_device = {
+	.name			= "omap-uart",
+	.id			= 3,
+	.num_resources		= ARRAY_SIZE(omap2_uart3_resources),
+	.resource		= omap2_uart3_resources,
+};
+
+#ifdef CONFIG_MACH_OMAP_ZOOM2
+static struct platform_device quaduart_device = {
+
+	.name			= "omap-uart",
+	.id			= 4,
+	.num_resources		= ARRAY_SIZE(omap2_quaduart_resources),
+	.resource		= omap2_quaduart_resources,
+};
+#endif
+
+static struct platform_device *uart_devices[] = {
+	&uart1_device,
+	&uart2_device,
+	&uart3_device,
+#ifdef CONFIG_MACH_OMAP_ZOOM2
+	&quaduart_device
+#endif
+};
+#endif
 
 static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
 					   int offset)
@@ -547,6 +637,7 @@ void __init omap_serial_init(void)
 	}
 }
 
+#ifdef CONFIG_SERIAL_8250
 static struct platform_device serial_device = {
 	.name			= "serial8250",
 	.id			= PLAT8250_DEV_PLATFORM,
@@ -569,3 +660,15 @@ static int __init omap_init(void)
 	return ret;
 }
 arch_initcall(omap_init);
+#endif
+
+#ifdef CONFIG_SERIAL_OMAP
+static int __init omap_hs_init(void)
+{
+	int ret = 0;
+
+	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
+	return ret;
+}
+arch_initcall(omap_hs_init);
+#endif

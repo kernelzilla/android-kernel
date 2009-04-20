@@ -164,6 +164,9 @@
 /* NWPSERIAL */
 #define PORT_NWPSERIAL	85
 
+/* TI OMAP CONSOLE */
+#define PORT_OMAP	86
+
 #ifdef __KERNEL__
 
 #include <linux/compiler.h>
