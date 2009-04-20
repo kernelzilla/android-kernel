@@ -1029,12 +1029,12 @@ static void _dispc_set_vid_accu1(enum omap_plane plane, int haccu, int vaccu)
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
-		bool ilace, bool five_taps)
+		bool ilace, bool five_taps,
+		bool fieldmode)
 {
 	int fir_hinc;
 	int fir_vinc;
 	int hscaleup, vscaleup;
-	int fieldmode = 0;
 	int accu0 = 0;
 	int accu1 = 0;
 	u32 l;
@@ -1072,17 +1072,12 @@ static void _dispc_set_scaling(enum omap_plane plane,
 
 	dispc_write_reg(dispc_reg_att[plane], l);
 
-	if (ilace) {
-		if (fieldmode) {
-			accu0 = fir_vinc / 2;
-			accu1 = 0;
-		} else {
-			accu0 = 0;
-			accu1 = fir_vinc / 2;
-			if (accu1 >= 1024/2) {
-				accu0 = 1024/2;
-				accu1 -= accu0;
-			}
+	if (ilace && !fieldmode) {
+		accu0 = 0;
+		accu1 = fir_vinc / 2;
+		if (accu1 >= 1024/2) {
+			accu0 = 1024/2;
+			accu1 -= accu0;
 		}
 	}
 
@@ -1582,7 +1577,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (plane != OMAP_DSS_GFX) {
 		_dispc_set_scaling(plane, width, height,
 				   out_width, out_height,
-				   ilace, five_taps);
+				   ilace, five_taps, fieldmode);
 		_dispc_set_vid_size(plane, out_width, out_height);
 		_dispc_set_vid_color_conv(plane, cconv);
 	}
