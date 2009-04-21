@@ -1108,8 +1108,10 @@ static void omapfb_fillrect(struct fb_info *fbi, const struct fb_fillrect *rect)
 	struct omap_display *display = fb2display(fbi);
 
         cfb_fillrect(fbi, rect);
-	display->update(display, rect->dx, rect->dy, rect->dx + rect->width,
-			rect->dy + rect->height);
+	if (display->update)
+		display->update(display, rect->dx, rect->dy,
+				rect->dx + rect->width,
+				rect->dy + rect->height);
 	/* omapfb_apply_changes(fbi, 0); */
 }
 
@@ -1118,8 +1120,10 @@ static void omapfb_copyarea(struct fb_info *fbi, const struct fb_copyarea *area)
 	struct omap_display *display = fb2display(fbi);
 
         cfb_copyarea(fbi, area);
-	display->update(display, area->dx, area->dy, area->dx + area->width,
-			area->dy + area->height);
+	if (display->update)
+		display->update(display, area->dx, area->dy,
+				area->dx + area->width,
+				area->dy + area->height);
 	/* omapfb_apply_changes(fbi, 0); */
 }
 
@@ -1128,8 +1132,10 @@ static void omapfb_imageblit(struct fb_info *fbi, const struct fb_image *image)
 	struct omap_display *display = fb2display(fbi);
 
         cfb_imageblit(fbi, image);
-	display->update(display, image->dx, image->dy, image->dx + image->width,
-			image->dy + image->height);
+	if (display->update)
+		display->update(display, image->dx, image->dy,
+				image->dx + image->width,
+				image->dy + image->height);
 	/* omapfb_apply_changes(fbi, 0); */
 }
 
