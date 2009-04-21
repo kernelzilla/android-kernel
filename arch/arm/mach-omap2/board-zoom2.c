@@ -52,6 +52,11 @@
 #error "no power companion board defined!"
 #endif
 
+
+#define ZOOM2_QUART_PHYS        0x10000000
+#define ZOOM2_QUART_VIRT        0xFB000000
+#define ZOOM2_QUART_SIZE        SZ_1M
+
 #define OMAP_SYNAPTICS_GPIO		163
 
 #define SDP3430_SMC91X_CS	3
@@ -437,15 +442,28 @@ static void __init omap_zoom2_init(void)
 #endif
 }
 
+static struct map_desc zoom2_io_desc[] __initdata = {
+	{
+		.virtual	= ZOOM2_QUART_VIRT,
+		.pfn		= __phys_to_pfn(ZOOM2_QUART_PHYS),
+		.length		= ZOOM2_QUART_SIZE,
+		.type		= MT_DEVICE
+	},
+};
+
 static void __init omap_zoom2_map_io(void)
 {
 	omap2_set_globals_343x();
+	iotable_init(zoom2_io_desc, ARRAY_SIZE(zoom2_io_desc));
 	omap2_map_common_io();
 }
 
 MACHINE_START(OMAP_ZOOM2, "OMAP ZOOM2 board")
-	.phys_io	= 0x48000000,
-	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
+	/* phys_io is only used for DEBUG_LL early printing.  The Zoom2's
+	 * console is on an external quad UART sitting at address 0x10000000
+	 */
+	.phys_io	= 0x10000000,
+	.io_pg_offst	= ((0xfb000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
 	.map_io		= omap_zoom2_map_io,
 	.init_irq	= omap_zoom2_init_irq,
