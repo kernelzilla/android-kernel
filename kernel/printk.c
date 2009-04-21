@@ -714,10 +714,6 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	printascii(printk_buf);
 #endif
 
-#ifdef	CONFIG_DEBUG_LL
-	printascii(printk_buf);
-#endif
-
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
 	 * appropriate log level tags, we insert them here
