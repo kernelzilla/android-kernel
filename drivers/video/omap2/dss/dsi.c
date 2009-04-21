@@ -3242,7 +3242,7 @@ static void dsi_push_set_mirror(struct omap_display *display, int mirror)
 
 static int dsi_wait_sync(struct omap_display *display)
 {
-	long wait = msecs_to_jiffies(60000);
+	long wait = msecs_to_jiffies(2000);
 	struct completion compl;
 
 	DSSDBGF("");
