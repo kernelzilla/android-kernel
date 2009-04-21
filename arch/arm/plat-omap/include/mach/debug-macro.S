@@ -37,6 +37,10 @@
 #endif
 
 #elif	CONFIG_ARCH_OMAP3
+#ifdef CONFIG_OMAP_LL_DEBUG_UART_EXT
+		moveq   \rx, #0x10000000        @ physical base address
+		movne   \rx, #0xfb000000        @ virtual base address
+#else
 		moveq	\rx, #0x48000000	@ physical base address
 		movne	\rx, #0xd8000000	@ virtual base
 		orr	\rx, \rx, #0x0006a000
@@ -48,20 +52,28 @@
 		add	\rx, \rx, #0x00006000
 #endif
 #endif
+#endif
 		.endm
 
 		.macro	senduart,rd,rx
 		strb	\rd, [\rx]
 		.endm
 
+#ifdef CONFIG_OMAP_LL_DEBUG_UART_EXT
+#define REGSHIFT 1
+#else
+#define REGSHIFT 2
+#endif
 		.macro	busyuart,rd,rx
-1001:		ldrb	\rd, [\rx, #(0x5 << 2)]	@ OMAP-1510 and friends
+1001:		ldrb	\rd, [\rx, #(0x5 << REGSHIFT)]	@ OMAP-1510 and friends
 		and	\rd, \rd, #0x60
 		teq	\rd, #0x60
+#ifndef CONFIG_OMAP_LL_DEBUG_UART_EXT
 		beq	1002f
 		ldrb	\rd, [\rx, #(0x5 << 0)]	@ OMAP-730 only
 		and	\rd, \rd, #0x60
 		teq	\rd, #0x60
+#endif
 		bne	1001b
 1002:
 		.endm
