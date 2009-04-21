@@ -599,22 +599,22 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 			break;
 		}
 
-		mgr->set_display = &omap_dss_set_display,
-		mgr->unset_display = &omap_dss_unset_display,
-		mgr->apply = &omap_dss_mgr_apply,
-		mgr->set_default_color = &omap_dss_mgr_set_def_color,
+		mgr->set_display = &omap_dss_set_display;
+		mgr->unset_display = &omap_dss_unset_display;
+		mgr->apply = &omap_dss_mgr_apply;
+		mgr->set_default_color = &omap_dss_mgr_set_def_color;
 		mgr->set_trans_key_type_and_value =
-			&omap_dss_mgr_set_trans_key_type_and_value,
+			&omap_dss_mgr_set_trans_key_type_and_value;
 		mgr->get_trans_key_type_and_value =
-			&omap_dss_mgr_get_trans_key_type_and_value,
-		mgr->enable_trans_key = &omap_dss_mgr_enable_trans_key,
-		mgr->get_trans_key_status = &omap_dss_mgr_get_trans_key_status,
+			&omap_dss_mgr_get_trans_key_type_and_value;
+		mgr->enable_trans_key = &omap_dss_mgr_enable_trans_key;
+		mgr->get_trans_key_status = &omap_dss_mgr_get_trans_key_status;
 		mgr->enable_alpha_blending =
 			&omap_dss_mgr_enable_alpha_blending;
 		mgr->get_alpha_blending_status =
 			omap_dss_mgr_get_alpha_blending_status;
 		mgr->get_default_color = &omap_dss_mgr_get_default_color;
-		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC,
+		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC;
 
 		dss_overlay_setup_dispc_manager(mgr);
 
