@@ -64,9 +64,10 @@ static ssize_t store_rotate_type(struct device *dev,
 	if (rot_type == ofbi->rotation_type)
 		goto out;
 
-	r = -EBUSY;
-	if (ofbi->region.size)
+	if (ofbi->region.size) {
+		r = -EBUSY;
 		goto out;
+	}
 
 	ofbi->rotation_type = rot_type;
 
@@ -74,12 +75,10 @@ static ssize_t store_rotate_type(struct device *dev,
 	 * Since the VRAM for this FB is not allocated at the moment we don't need to
 	 * do any further parameter checking at this point.
 	 */
-
-	r = count;
 out:
 	omapfb_unlock(fbdev);
 
-	return r;
+	return r ? r : count;
 }
 
 
