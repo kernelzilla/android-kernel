@@ -63,11 +63,11 @@
 #define MAX_POSTPONED_REGIONS 10
 
 static bool vram_initialized;
-static int postponed_cnt __initdata;
+static int postponed_cnt;
 static struct {
 	unsigned long paddr;
 	size_t size;
-} postponed_regions[MAX_POSTPONED_REGIONS] __initdata;
+} postponed_regions[MAX_POSTPONED_REGIONS];
 
 struct vram_alloc {
 	struct list_head list;
