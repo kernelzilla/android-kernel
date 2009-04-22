@@ -31,11 +31,13 @@
 #include <linux/seq_file.h>
 #include <linux/bootmem.h>
 #include <linux/omapfb.h>
+#include <linux/completion.h>
 
 #include <asm/setup.h>
 
 #include <mach/sram.h>
 #include <mach/vram.h>
+#include <mach/dma.h>
 
 #ifdef DEBUG
 #define DBG(format, ...) printk(KERN_DEBUG "VRAM: " format, ## __VA_ARGS__)
@@ -276,6 +278,59 @@ int omap_vram_reserve(unsigned long paddr, size_t size)
 }
 EXPORT_SYMBOL(omap_vram_reserve);
 
+static void _omap_vram_dma_cb(int lch, u16 ch_status, void *data)
+{
+	struct completion *compl = data;
+	complete(compl);
+}
+
+static int _omap_vram_clear(u32 paddr, unsigned pages)
+{
+	struct completion compl;
+        unsigned elem_count;
+        unsigned frame_count;
+	int r;
+	int lch;
+
+	init_completion(&compl);
+
+        r = omap_request_dma(OMAP_DMA_NO_DEVICE, "VRAM DMA",
+			_omap_vram_dma_cb,
+                        &compl, &lch);
+        if (r) {
+		pr_err("VRAM: request_dma failed for memory clear\n");
+		return -EBUSY;
+	}
+
+        elem_count = pages * PAGE_SIZE / 4;
+        frame_count = 1;
+
+        omap_set_dma_transfer_params(lch, OMAP_DMA_DATA_TYPE_S32,
+                        elem_count, frame_count,
+                        OMAP_DMA_SYNC_ELEMENT,
+                        0, 0);
+
+        omap_set_dma_dest_params(lch, 0, OMAP_DMA_AMODE_POST_INC,
+			paddr, 0, 0);
+
+	omap_set_dma_color_mode(lch, OMAP_DMA_CONSTANT_FILL, 0x000000);
+
+        omap_start_dma(lch);
+
+	if (wait_for_completion_timeout(&compl, msecs_to_jiffies(1000)) == 0) {
+		omap_stop_dma(lch);
+		pr_err("VRAM: dma timeout while clearing memory\n");
+		r = -EIO;
+		goto err;
+	}
+
+	r = 0;
+err:
+	omap_free_dma(lch);
+
+	return r;
+}
+
 static int _omap_vram_alloc(int mtype, unsigned pages, unsigned long *paddr)
 {
 	struct vram_region *rm;
@@ -312,6 +367,8 @@ found:
 			return -ENOMEM;
 
 		*paddr = start;
+
+		_omap_vram_clear(start, pages);
 
 		return 0;
 	}
