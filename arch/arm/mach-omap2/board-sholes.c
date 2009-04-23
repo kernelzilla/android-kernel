@@ -26,7 +26,6 @@
 #include <linux/clk.h>
 #include <linux/spi/spi.h>
 #include <linux/mm.h>
-#include <linux/i2c/twl4030.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -41,6 +40,7 @@
 #include <mach/board.h>
 #include <mach/common.h>
 #include <mach/gpmc.h>
+#include <mach/usb.h>
 
 #include <linux/qtouch_obp_ts.h>
 
@@ -575,6 +575,21 @@ arch_initcall(sholes_i2c_init);
 extern void __init sholes_flash_init(void);
 extern void __init sholes_gpio_iomux_init(void);
 
+#ifdef CONFIG_CPCAP_USB
+/* XXX: this should end up in the CPCAP driver */
+static struct platform_device cpcap_usb_device = {
+	.name           = "cpcap_usb",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
+#endif
+
+static struct platform_device *cpcap_devices[] __initdata = {
+#ifdef CONFIG_CPCAP_USB
+	&cpcap_usb_device,
+#endif
+};
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -588,7 +603,8 @@ static void __init sholes_init(void)
 	sholes_panel_init();
 	sholes_sensors_init();
 	sholes_touch_init();
-	//usb_musb_init();
+	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
+	usb_musb_init();
 	//usb_ehci_init();
 	//hsmmc_init();
 
