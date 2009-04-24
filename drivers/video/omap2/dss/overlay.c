@@ -194,6 +194,37 @@ static ssize_t overlay_enabled_store(struct omap_overlay *ovl, const char *buf, 
 	return size;
 }
 
+static ssize_t overlay_global_alpha_show(struct omap_overlay *ovl, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			ovl->info.global_alpha);
+}
+
+static ssize_t overlay_global_alpha_store(struct omap_overlay *ovl,
+		const char *buf, size_t size)
+{
+	int r;
+	struct omap_overlay_info info;
+
+	ovl->get_overlay_info(ovl, &info);
+
+	/* Video1 plane does not support global alpha
+	 * to always make it 255 completely opaque
+	 */
+	if (ovl->id == OMAP_DSS_VIDEO1)
+		info.global_alpha = 255;
+	else
+		info.global_alpha = simple_strtoul(buf, NULL, 10);
+
+	if ((r = ovl->set_overlay_info(ovl, &info)))
+		return r;
+
+	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
+		return r;
+
+	return size;
+}
+
 struct overlay_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct omap_overlay *, char *);
@@ -215,6 +246,8 @@ static OVERLAY_ATTR(output_size, S_IRUGO|S_IWUSR,
 		overlay_output_size_show, overlay_output_size_store);
 static OVERLAY_ATTR(enabled, S_IRUGO|S_IWUSR,
 		overlay_enabled_show, overlay_enabled_store);
+static OVERLAY_ATTR(global_alpha, S_IRUGO|S_IWUSR,
+		overlay_global_alpha_show, overlay_global_alpha_store);
 
 static struct attribute *overlay_sysfs_attrs[] = {
 	&overlay_attr_name.attr,
@@ -224,6 +257,7 @@ static struct attribute *overlay_sysfs_attrs[] = {
 	&overlay_attr_position.attr,
 	&overlay_attr_output_size.attr,
 	&overlay_attr_enabled.attr,
+	&overlay_attr_global_alpha.attr,
 	NULL
 };
 
@@ -444,6 +478,7 @@ void dss_init_overlays(struct platform_device *pdev, const char *def_disp_name)
 			ovl->id = OMAP_DSS_GFX;
 			ovl->supported_modes = OMAP_DSS_COLOR_GFX_OMAP3;
 			ovl->caps = OMAP_DSS_OVL_CAP_DISPC;
+			ovl->info.global_alpha = 255;
 			break;
 		case 1:
 			ovl->name = "vid1";
@@ -451,6 +486,7 @@ void dss_init_overlays(struct platform_device *pdev, const char *def_disp_name)
 			ovl->supported_modes = OMAP_DSS_COLOR_VID_OMAP3;
 			ovl->caps = OMAP_DSS_OVL_CAP_SCALE |
 				OMAP_DSS_OVL_CAP_DISPC;
+			ovl->info.global_alpha = 255;
 			break;
 		case 2:
 			ovl->name = "vid2";
@@ -458,6 +494,7 @@ void dss_init_overlays(struct platform_device *pdev, const char *def_disp_name)
 			ovl->supported_modes = OMAP_DSS_COLOR_VID_OMAP3;
 			ovl->caps = OMAP_DSS_OVL_CAP_SCALE |
 				OMAP_DSS_OVL_CAP_DISPC;
+			ovl->info.global_alpha = 255;
 			break;
 		}
 

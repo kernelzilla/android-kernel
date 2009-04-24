@@ -464,7 +464,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 				ilace,
 				ovl->info.rotation_type,
 				ovl->info.rotation,
-				ovl->info.mirror);
+				ovl->info.mirror,
+				ovl->info.global_alpha);
 
 		if (r) {
 			DSSERR("dispc_setup_plane failed for ovl %d\n",

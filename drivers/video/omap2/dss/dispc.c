@@ -778,6 +778,17 @@ static void _dispc_set_vid_size(enum omap_plane plane, int width, int height)
 	dispc_write_reg(vsi_reg[plane-1], val);
 }
 
+static void _dispc_setup_global_alpha(enum omap_plane plane, u8 global_alpha)
+{
+
+	BUG_ON(plane == OMAP_DSS_VIDEO1);
+
+	if (plane == OMAP_DSS_GFX)
+		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 7, 0);
+	else if (plane == OMAP_DSS_VIDEO2)
+		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 23, 16);
+}
+
 static void _dispc_set_pix_inc(enum omap_plane plane, s32 inc)
 {
 	const struct dispc_reg ri_reg[] = { DISPC_GFX_PIXEL_INC,
@@ -1444,7 +1455,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		enum omap_color_mode color_mode,
 		bool ilace,
 		enum omap_dss_rotation_type rotation_type,
-		u8 rotation, int mirror)
+		u8 rotation, int mirror,
+		u8 global_alpha)
 {
 	const int maxdownscale = cpu_is_omap34xx() ? 4 : 2;
 	bool five_taps = 0;
@@ -1591,6 +1603,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	}
 
 	_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode);
+
+	if (plane != OMAP_DSS_VIDEO1)
+		_dispc_setup_global_alpha(plane, global_alpha);
 
 	return 0;
 }
@@ -3011,7 +3026,7 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 		       enum omap_color_mode color_mode,
 		       bool ilace,
 		       enum omap_dss_rotation_type rotation_type,
-		       u8 rotation, bool mirror)
+		       u8 rotation, bool mirror, u8 global_alpha)
 {
 	int r = 0;
 
@@ -3032,7 +3047,8 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 			   out_width, out_height,
 			   color_mode, ilace,
 			   rotation_type,
-			   rotation, mirror);
+			   rotation, mirror,
+			   global_alpha);
 
 	enable_clocks(0);
 
@@ -3247,7 +3263,8 @@ void dispc_setup_partial_planes(struct omap_display *display,
 				pi->color_mode, 0,
 				pi->rotation_type,
 				pi->rotation,
-				pi->mirror);
+				pi->mirror,
+				pi->global_alpha);
 
 		dispc_enable_plane(ovl->id, 1);
 	}

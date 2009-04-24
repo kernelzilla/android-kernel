@@ -365,6 +365,7 @@ struct omap_overlay_info {
 	u16 pos_y;
 	u16 out_width;	/* if 0, out_width == width */
 	u16 out_height;	/* if 0, out_height == height */
+	u8 global_alpha;
 };
 
 enum omap_overlay_caps {

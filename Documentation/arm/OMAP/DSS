@@ -133,6 +133,7 @@ name
 output_size	width,height
 position	x,y
 screen_width	width
+global_alpha   	global alpha 0-255 0=transparent 255=opaque
 
 /sys/devices/platform/omapdss/manager? directory:
 display		Destination display
