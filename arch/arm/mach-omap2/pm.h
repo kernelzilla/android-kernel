@@ -30,6 +30,9 @@ extern unsigned short voltage_off_while_idle;
 extern atomic_t sleep_block;
 extern void *omap3_secure_ram_storage;
 
+extern unsigned short wakeup_timer_seconds;
+extern struct omap_dm_timer *gptimer_wakeup;
+
 extern void omap2_block_sleep(void);
 extern void omap2_allow_sleep(void);
 #ifdef CONFIG_ARCH_OMAP3
