@@ -1110,9 +1110,9 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 		if (mirroring) {
 			switch (rotation) {
 			case 0: vidrot = 2; break;
-			case 1: vidrot = 3; break;
+			case 1: vidrot = 1; break;
 			case 2: vidrot = 0; break;
-			case 3: vidrot = 1; break;
+			case 3: vidrot = 3; break;
 			}
 		} else {
 			switch (rotation) {
