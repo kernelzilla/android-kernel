@@ -46,11 +46,18 @@
 #include <asm/delay.h>
 #include <mach/control.h>
 
+#include <mach/display.h>
+
 #include "mmc-twl4030.h"
 
 #ifndef CONFIG_TWL4030_CORE
 #error "no power companion board defined!"
 #endif
+
+
+#define ZOOM2_QUART_PHYS        0x10000000
+#define ZOOM2_QUART_VIRT        0xFB000000
+#define ZOOM2_QUART_SIZE        SZ_1M
 
 #define OMAP_SYNAPTICS_GPIO		163
 
@@ -208,7 +215,7 @@ static struct omap2_mcspi_device_config zoom2_lcd_mcspi_config = {
 
 static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 	[0] = {
-		.modalias		= "zoom2_lcd",
+		.modalias		= "zoom2_disp_spi",
 		.bus_num		= 1,
 		.chip_select		= 2,
 		.max_speed_hz		= 375000,
@@ -216,7 +223,62 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 	},
 };
 
+#define LCD_PANEL_BACKLIGHT_GPIO 	(15 + OMAP_MAX_GPIO_LINES)
+#define LCD_PANEL_ENABLE_GPIO 		(7 + OMAP_MAX_GPIO_LINES)
+
+#define LCD_PANEL_RESET_GPIO		55
+#define LCD_PANEL_QVGA_GPIO		56
+
+
+#define PM_RECEIVER             TWL4030_MODULE_PM_RECEIVER
+#define ENABLE_VAUX2_DEDICATED  0x09
+#define ENABLE_VAUX2_DEV_GRP    0x20
+#define ENABLE_VAUX3_DEDICATED	0x03
+#define ENABLE_VAUX3_DEV_GRP	0x20
+
+#define ENABLE_VPLL2_DEDICATED          0x05
+#define ENABLE_VPLL2_DEV_GRP            0xE0
+#define TWL4030_VPLL2_DEV_GRP           0x33
+#define TWL4030_VPLL2_DEDICATED         0x36
+
+#define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
+
+
+static int zoom2_panel_enable_lcd(struct omap_display *display)
+{
+	return 0;
+}
+
+static void zoom2_panel_disable_lcd(struct omap_display *display)
+{
+}
+
+static struct omap_dss_display_config zoom2_display_data_lcd = {
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.name = "lcd",
+	.panel_name = "panel-zoom2",
+	.u.dpi.data_lines = 24,
+	.panel_enable = zoom2_panel_enable_lcd,
+	.panel_disable = zoom2_panel_disable_lcd,
+ };
+
+static struct omap_dss_board_info zoom2_dss_data = {
+	.num_displays = 1,
+	.displays = {
+		&zoom2_display_data_lcd,
+	}
+};
+
+static struct platform_device zoom2_dss_device = {
+	.name          = "omapdss",
+	.id            = -1,
+	.dev            = {
+		.platform_data = &zoom2_dss_data,
+	},
+};
+
 static struct platform_device *zoom2_devices[] __initdata = {
+	&zoom2_dss_device,
 	&zoom2_smc911x_device,
 #ifdef CONFIG_WL127X_POWER
 	&zoom2_wl127x_device,
@@ -437,15 +499,28 @@ static void __init omap_zoom2_init(void)
 #endif
 }
 
+static struct map_desc zoom2_io_desc[] __initdata = {
+	{
+		.virtual	= ZOOM2_QUART_VIRT,
+		.pfn		= __phys_to_pfn(ZOOM2_QUART_PHYS),
+		.length		= ZOOM2_QUART_SIZE,
+		.type		= MT_DEVICE
+	},
+};
+
 static void __init omap_zoom2_map_io(void)
 {
 	omap2_set_globals_343x();
+	iotable_init(zoom2_io_desc, ARRAY_SIZE(zoom2_io_desc));
 	omap2_map_common_io();
 }
 
 MACHINE_START(OMAP_ZOOM2, "OMAP ZOOM2 board")
-	.phys_io	= 0x48000000,
-	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
+	/* phys_io is only used for DEBUG_LL early printing.  The Zoom2's
+	 * console is on an external quad UART sitting at address 0x10000000
+	 */
+	.phys_io	= 0x10000000,
+	.io_pg_offst	= ((0xfb000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
 	.map_io		= omap_zoom2_map_io,
 	.init_irq	= omap_zoom2_init_irq,

@@ -85,9 +85,10 @@
 #define OMAP243X_SMS_SIZE	SZ_1M
 
 #define IO_OFFSET		0x90000000
-#define __IO_ADDRESS(pa)	((pa) + IO_OFFSET)	/* Works for L3 and L4 */
-#define __OMAP2_IO_ADDRESS(pa)	((pa) + IO_OFFSET)	/* Works for L3 and L4 */
-#define io_v2p(va)		((va) - IO_OFFSET)	/* Works for L3 and L4 */
+#define __IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
+#define __OMAP2_IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
+#define io_v2p(va)		((va) - IO_OFFSET) /* Works for L3 and L4 */
+#define io_p2v(pa)		((pa) + IO_OFFSET) /* Works for L3 and L4 */
 
 /* DSP */
 #define DSP_MEM_24XX_PHYS	OMAP2420_DSP_MEM_BASE	/* 0x58000000 */
@@ -142,9 +143,10 @@
 
 
 #define IO_OFFSET		0x90000000
-#define __IO_ADDRESS(pa)	((pa) + IO_OFFSET)/* Works for L3 and L4 */
-#define __OMAP2_IO_ADDRESS(pa)	((pa) + IO_OFFSET)/* Works for L3 and L4 */
-#define io_v2p(va)		((va) - IO_OFFSET)/* Works for L3 and L4 */
+#define __IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
+#define __OMAP2_IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
+#define io_v2p(va)		((va) - IO_OFFSET) /* Works for L3 and L4 */
+#define io_p2v(pa)		((pa) + IO_OFFSET) /* Works for L3 and L4 */
 
 /* DSP */
 #define DSP_MEM_34XX_PHYS	OMAP34XX_DSP_MEM_BASE	/* 0x58000000 */

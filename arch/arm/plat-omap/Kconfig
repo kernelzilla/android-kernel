@@ -250,6 +250,9 @@ config OMAP_LL_DEBUG_UART2
 config OMAP_LL_DEBUG_UART3
 	bool "UART3"
 
+config OMAP_LL_DEBUG_UART_EXT
+	bool "UART_EXT"
+
 endchoice
 
 config OMAP_SERIAL_WAKE

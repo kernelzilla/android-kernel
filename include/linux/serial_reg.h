@@ -325,5 +325,7 @@
 #define UART_OMAP_SYSS		0x16	/* System status register */
 #define UART_OMAP_WER		0x17	/* Wake-up enable register */
 
+#define UART_OMAP_UASR          0x0E    /* Autobauding status register */
+
 #endif /* _LINUX_SERIAL_REG_H */
 
