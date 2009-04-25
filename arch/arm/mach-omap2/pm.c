@@ -30,7 +30,6 @@
 #include <asm/mach/time.h>
 #include <asm/atomic.h>
 
-#include <mach/pm.h>
 #include <mach/powerdomain.h>
 #include <mach/omapdev.h>
 #include <mach/resource.h>

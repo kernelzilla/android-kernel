@@ -39,7 +39,6 @@
 #include <mach/hardware.h>
 #include <mach/board.h>
 #include <mach/irqs.h>
-#include <mach/pm.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>

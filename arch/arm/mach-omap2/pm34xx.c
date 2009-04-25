@@ -30,7 +30,6 @@
 
 #include <mach/gpio.h>
 #include <mach/sram.h>
-#include <mach/pm.h>
 #include <mach/prcm.h>
 #include <mach/clockdomain.h>
 #include <mach/powerdomain.h>
