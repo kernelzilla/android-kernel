@@ -574,6 +574,8 @@ void sr_start_vddautocomap(int srid, u32 target_opp_no)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_sr_reset == 1) {
 		sr_clk_enable(sr);
@@ -602,6 +604,8 @@ int sr_stop_vddautocomap(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return -EINVAL;
 
 	if (sr->is_autocomp_active == 1) {
 		sr_disable(sr);
@@ -628,6 +632,8 @@ void enable_smartreflex(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_autocomp_active == 1) {
 		if (sr->is_sr_reset == 1) {
@@ -660,6 +666,8 @@ void disable_smartreflex(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_autocomp_active == 1) {
 		if (sr->is_sr_reset == 0) {
