@@ -768,7 +768,6 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t n)
 {
-	u32 current_vdd1opp_no;
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
@@ -776,18 +775,14 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 		return -EINVAL;
 	}
 
-	current_vdd1opp_no = omap_pm_vdd1_get_opp();
-
-	if (!current_vdd1opp_no) {
-		pr_err("sr_vdd1_autocomp: Current VDD1 opp unknown\n");
-		return -EINVAL;
-	}
-
-	if (value == 0)
+	if (value == 0) {
 		sr_stop_vddautocomap(SR1);
-	else
+	} else {
+		u32 current_vdd1opp_no = omap_pm_vdd1_get_opp();
+		if (IS_ERR_VALUE(current_vdd1opp_no))
+			return -ENODEV;
 		sr_start_vddautocomap(SR1, current_vdd1opp_no);
-
+	}
 	return n;
 }
 
@@ -811,7 +806,6 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t n)
 {
-	u32 current_vdd2opp_no;
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
@@ -819,18 +813,14 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 		return -EINVAL;
 	}
 
-	current_vdd2opp_no = omap_pm_vdd2_get_opp();
-
-	if (!current_vdd2opp_no) {
-		pr_err("sr_vdd2_autocomp: Current VDD2 opp unknown\n");
-		return -EINVAL;
-	}
-
-	if (value == 0)
+	if (value == 0) {
 		sr_stop_vddautocomap(SR2);
-	else
+	} else {
+		u32 current_vdd2opp_no = omap_pm_vdd2_get_opp();
+		if (IS_ERR_VALUE(current_vdd2opp_no))
+			return -ENODEV;
 		sr_start_vddautocomap(SR2, current_vdd2opp_no);
-
+	}
 	return n;
 }
 
