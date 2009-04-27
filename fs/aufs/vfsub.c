@@ -105,6 +105,7 @@ struct dentry *vfsub_lookup_one_len(const char *name, struct dentry *parent,
 		.mnt = NULL
 	};
 
+	/* VFS checks it too, but by WARN_ON_ONCE() */
 	IMustLock(parent->d_inode);
 
 	path.dentry = lookup_one_len(name, parent, len);
