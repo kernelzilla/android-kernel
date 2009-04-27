@@ -289,6 +289,8 @@ static struct
 
 	bool autoupdate_setup;
 
+	u32		errors;
+	spinlock_t	errors_lock;
 #ifdef DEBUG
 	ktime_t perf_setup_time;
 	ktime_t perf_start_time;
@@ -541,6 +543,9 @@ void dsi_irq_handler(void)
 	if (irqstatus & DSI_IRQ_ERROR_MASK) {
 		DSSERR("DSI error, irqstatus %x\n", irqstatus);
 		print_irq_status(irqstatus);
+		spin_lock(&dsi.errors_lock);
+		dsi.errors |= irqstatus & DSI_IRQ_ERROR_MASK;
+		spin_unlock(&dsi.errors_lock);
 	} else if (debug_irq) {
 		print_irq_status(irqstatus);
 	}
@@ -614,6 +619,17 @@ static void _dsi_initialize_irq(void)
 	   data lines LP0 and LN0. */
 	dsi_write_reg(DSI_COMPLEXIO_IRQ_ENABLE,
 			-1 & (~DSI_CIO_IRQ_ERRCONTROL2));
+}
+
+static u32 dsi_get_errors(void)
+{
+	unsigned long flags;
+	u32 e;
+	spin_lock_irqsave(&dsi.errors_lock, flags);
+	e = dsi.errors;
+	dsi.errors = 0;
+	spin_unlock_irqrestore(&dsi.errors_lock, flags);
+	return e;
 }
 
 static void dsi_vc_enable_bta_irq(int channel)
@@ -1807,6 +1823,7 @@ static int dsi_vc_send_bta(int channel)
 static int dsi_vc_send_bta_sync(int channel)
 {
 	int r = 0;
+	u32 err;
 
 	init_completion(&dsi.bta_completion);
 
@@ -1819,6 +1836,13 @@ static int dsi_vc_send_bta_sync(int channel)
 	if (wait_for_completion_timeout(&dsi.bta_completion,
 				msecs_to_jiffies(500)) == 0) {
 		DSSERR("Failed to receive BTA\n");
+		r = -EIO;
+		goto err;
+	}
+
+	err = dsi_get_errors();
+	if (err) {
+		DSSERR("Error while sending BTA: %x\n", err);
 		r = -EIO;
 		goto err;
 	}
@@ -3745,6 +3769,9 @@ void dsi_init_display(struct omap_display *display)
 int dsi_init(void)
 {
 	u32 rev;
+
+	spin_lock_init(&dsi.errors_lock);
+	dsi.errors = 0;
 
 	spin_lock_init(&dsi.cmd_lock);
 	dsi.cmd_fifo = kfifo_alloc(
