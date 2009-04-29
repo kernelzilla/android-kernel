@@ -33,6 +33,136 @@
 
 #include "ehci-omap.h"
 
+/* These default platform_data configs are an attempt to maintain
+ * backwards compatiblity with the old driver.  These contains
+ * board specific data and should be migrated the the apropriate
+ * board files.
+ */
+
+#ifdef CONFIG_OMAP_EHCI_PHY_MODE
+/* EHCI connected to External PHY */
+
+/* External USB connectivity board: 750-2083-001
+ * Connected to OMAP3430 SDP
+ * The board has Port1 and Port2 connected to ISP1504 in 12-pin ULPI mode
+ */
+
+/* ISSUE1:
+ *      ISP1504 for input clocking mode needs special reset handling
+ *	Hold the PHY in reset by asserting RESET_N signal
+ *	Then start the 60Mhz clock input to PHY
+ *	Release the reset after a delay -
+ *		to get the PHY state machine in working state
+ */
+
+#define	EXT_PHY_RESET_GPIO_PORT1	(57)
+#define	EXT_PHY_RESET_GPIO_PORT2	(61)
+
+static int default_usb_port_startup(struct platform_device *dev, int port)
+{
+	int r;
+	int gpio;
+	const char *name;
+
+	if (port == 0) {
+		gpio = EXT_PHY_RESET_GPIO_PORT1;
+		name = "ehci port 1 reset";
+	} else if (port == 1) {
+		gpio = EXT_PHY_RESET_GPIO_PORT2;
+		name = "ehci port 2 reset";
+	} else {
+		return -EINVAL;
+	}
+
+	r = gpio_request(gpio, name);
+	if (r < 0) {
+		printk(KERN_WARNING "Could not request GPIO %d"
+		       " for port %d reset\n",
+		       gpio, port);
+		return r;
+	}
+	gpio_direction_output(gpio, 0);
+	return 0;
+}
+
+static void default_usb_port_shutdown(struct platform_device *dev, int port)
+{
+	if (port == 0)
+		gpio_free(EXT_PHY_RESET_GPIO_PORT1);
+	else if (port == 1)
+		gpio_free(EXT_PHY_RESET_GPIO_PORT2);
+}
+
+
+static void default_usb_port_reset(struct platform_device *dev,
+				   int port, int reset)
+{
+	if (port == 0)
+		gpio_set_value(EXT_PHY_RESET_GPIO_PORT1, !reset);
+	else if (port == 1)
+		gpio_set_value(EXT_PHY_RESET_GPIO_PORT2, !reset);
+}
+
+
+static struct omap_usb_port_data default_usb_port_data[] = {
+	[0] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED,
+		.mode = OMAP_USB_PORT_MODE_ULPI_PHY,
+		.reset_delay = 10,
+		.startup = default_usb_port_startup,
+		.shutdown = default_usb_port_shutdown,
+		.reset = default_usb_port_reset,
+	},
+	[1] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED,
+		.mode = OMAP_USB_PORT_MODE_ULPI_PHY,
+		.reset_delay = 10,
+		.startup = default_usb_port_startup,
+		.shutdown = default_usb_port_shutdown,
+		.reset = default_usb_port_reset,
+	},
+	[2] = { .flags = 0x0, }, /* disabled */
+
+};
+
+/* ISSUE2:
+ * USBHOST supports External charge pump PHYs only
+ * Use the VBUS from Port1 to power VBUS of Port2 externally
+ * So use Port2 as the working ULPI port
+ */
+static struct omap_usb_platform_data default_usb_platform_data = {
+	.flags =  OMAP_USB_FLAG_VBUS_INTERNAL_CHARGEPUMP,
+	.port_data = default_usb_port_data,
+	.num_ports = ARRAY_SIZE(default_usb_port_data),
+};
+
+#else /* CONFIG_OMAP_EHCI_PHY_MODE */
+
+static struct omap_usb_port_data default_usb_port_data[] = {
+	[0] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED,
+		.mode = OMAP_USB_PORT_MODE_UTMI_PHY_6PIN,
+	},
+	[1] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED,
+		.mode = OMAP_USB_PORT_MODE_ULPI_PHY,
+	},
+	[2] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED,
+		.mode = OMAP_USB_PORT_MODE_ULPI_PHY,
+	},
+};
+
+static struct omap_usb_platform_data default_usb_platform_data = {
+	.port_data = default_usb_port_data,
+	.num_ports = ARRAY_SIZE(default_usb_port_data),
+};
+
+#endif /* CONFIG_OMAP_EHCI_PHY_MODE */
+
+
+/*-------------------------------------------------------------------------*/
+
 /* Define USBHOST clocks for clock management */
 struct ehci_omap_clock_defs {
 	struct clk	*usbhost_ick_clk;
@@ -494,6 +624,9 @@ static int ehci_hcd_omap_drv_probe(struct platform_device *dev)
 		dev_dbg(&dev->dev, "resource[1] is not IORESOURCE_IRQ\n");
 		retval = -ENOMEM;
 	}
+
+	if (dev->dev.platform_data == NULL)
+		dev->dev.platform_data = &default_usb_platform_data;
 
 	hcd = usb_create_hcd(&ehci_omap_hc_driver, &dev->dev, dev->dev.bus_id);
 	if (!hcd)
