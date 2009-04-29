@@ -15,7 +15,6 @@
 #include <linux/delay.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
-#include <linux/mtd/nand_ecc.h>
 #include <linux/mtd/partitions.h>
 #include <linux/io.h>
 
@@ -280,19 +279,171 @@ static void gen_true_ecc(u8 *ecc_buf)
 	u32 tmp = ecc_buf[0] | (ecc_buf[1] << 16) |
 		((ecc_buf[2] & 0xF0) << 20) | ((ecc_buf[2] & 0x0F) << 8);
 
-#ifdef CONFIG_MTD_NAND_ECC_SMC
 	ecc_buf[0] = ~(P64o(tmp) | P64e(tmp) | P32o(tmp) | P32e(tmp) |
 			P16o(tmp) | P16e(tmp) | P8o(tmp) | P8e(tmp));
 	ecc_buf[1] = ~(P1024o(tmp) | P1024e(tmp) | P512o(tmp) | P512e(tmp) |
 			P256o(tmp) | P256e(tmp) | P128o(tmp) | P128e(tmp));
-#else
-	ecc_buf[0] = ~(P1024o(tmp) | P1024e(tmp) | P512o(tmp) | P512e(tmp) |
-			P256o(tmp) | P256e(tmp) | P128o(tmp) | P128e(tmp));
-	ecc_buf[1] = ~(P64o(tmp) | P64e(tmp) | P32o(tmp) | P32e(tmp) |
-			P16o(tmp) | P16e(tmp) | P8o(tmp) | P8e(tmp));
-#endif
 	ecc_buf[2] = ~(P4o(tmp) | P4e(tmp) | P2o(tmp) | P2e(tmp) | P1o(tmp) |
 			P1e(tmp) | P2048o(tmp) | P2048e(tmp));
+}
+
+/*
+ * omap_compare_ecc - This function compares two ECC's and indicates if there
+ * is an error. If the error can be corrected it will be corrected to the
+ * buffer
+ * @ecc_data1:  ecc code from nand spare area
+ * @ecc_data2:  ecc code from hardware register obtained from hardware ecc
+ * @page_data:  page data
+ */
+static int omap_compare_ecc(u8 *ecc_data1,	/* read from NAND memory */
+			    u8 *ecc_data2,	/* read from register */
+			    u8 *page_data)
+{
+	uint	i;
+	u8	tmp0_bit[8], tmp1_bit[8], tmp2_bit[8];
+	u8	comp0_bit[8], comp1_bit[8], comp2_bit[8];
+	u8	ecc_bit[24];
+	u8	ecc_sum = 0;
+	u8	find_bit = 0;
+	uint	find_byte = 0;
+	int	isEccFF;
+
+	isEccFF = ((*(u32 *)ecc_data1 & 0xFFFFFF) == 0xFFFFFF);
+
+	gen_true_ecc(ecc_data1);
+	gen_true_ecc(ecc_data2);
+
+	for (i = 0; i <= 2; i++) {
+		*(ecc_data1 + i) = ~(*(ecc_data1 + i));
+		*(ecc_data2 + i) = ~(*(ecc_data2 + i));
+	}
+
+	for (i = 0; i < 8; i++) {
+		tmp0_bit[i]     = *ecc_data1 % 2;
+		*ecc_data1	= *ecc_data1 / 2;
+	}
+
+	for (i = 0; i < 8; i++) {
+		tmp1_bit[i]	 = *(ecc_data1 + 1) % 2;
+		*(ecc_data1 + 1) = *(ecc_data1 + 1) / 2;
+	}
+
+	for (i = 0; i < 8; i++) {
+		tmp2_bit[i]	 = *(ecc_data1 + 2) % 2;
+		*(ecc_data1 + 2) = *(ecc_data1 + 2) / 2;
+	}
+
+	for (i = 0; i < 8; i++) {
+		comp0_bit[i]     = *ecc_data2 % 2;
+		*ecc_data2       = *ecc_data2 / 2;
+	}
+
+	for (i = 0; i < 8; i++) {
+		comp1_bit[i]     = *(ecc_data2 + 1) % 2;
+		*(ecc_data2 + 1) = *(ecc_data2 + 1) / 2;
+	}
+
+	for (i = 0; i < 8; i++) {
+		comp2_bit[i]     = *(ecc_data2 + 2) % 2;
+		*(ecc_data2 + 2) = *(ecc_data2 + 2) / 2;
+	}
+
+	for (i = 0; i < 6; i++)
+		ecc_bit[i] = tmp2_bit[i + 2] ^ comp2_bit[i + 2];
+
+	for (i = 0; i < 8; i++)
+		ecc_bit[i + 6] = tmp0_bit[i] ^ comp0_bit[i];
+
+	for (i = 0; i < 8; i++)
+		ecc_bit[i + 14] = tmp1_bit[i] ^ comp1_bit[i];
+
+	ecc_bit[22] = tmp2_bit[0] ^ comp2_bit[0];
+	ecc_bit[23] = tmp2_bit[1] ^ comp2_bit[1];
+
+	for (i = 0; i < 24; i++)
+		ecc_sum += ecc_bit[i];
+
+	switch (ecc_sum) {
+	case 0:
+		/* Not reached because this function is not called if
+		 *  ECC values are equal
+		 */
+		return 0;
+
+	case 1:
+		/* Uncorrectable error */
+		DEBUG(MTD_DEBUG_LEVEL0, "ECC UNCORRECTED_ERROR 1\n");
+		return -1;
+
+	case 11:
+		/* UN-Correctable error */
+		DEBUG(MTD_DEBUG_LEVEL0, "ECC UNCORRECTED_ERROR B\n");
+		return -1;
+
+	case 12:
+		/* Correctable error */
+		find_byte = (ecc_bit[23] << 8) +
+			    (ecc_bit[21] << 7) +
+			    (ecc_bit[19] << 6) +
+			    (ecc_bit[17] << 5) +
+			    (ecc_bit[15] << 4) +
+			    (ecc_bit[13] << 3) +
+			    (ecc_bit[11] << 2) +
+			    (ecc_bit[9]  << 1) +
+			    ecc_bit[7];
+
+		find_bit = (ecc_bit[5] << 2) + (ecc_bit[3] << 1) + ecc_bit[1];
+
+		DEBUG(MTD_DEBUG_LEVEL0, "Correcting single bit ECC error at "
+				"offset: %d, bit: %d\n", find_byte, find_bit);
+
+		page_data[find_byte] ^= (1 << find_bit);
+
+		return 0;
+	default:
+		if (isEccFF) {
+			if (ecc_data2[0] == 0 &&
+			    ecc_data2[1] == 0 &&
+			    ecc_data2[2] == 0)
+				return 0;
+		}
+		DEBUG(MTD_DEBUG_LEVEL0, "UNCORRECTED_ERROR default\n");
+		return -1;
+	}
+}
+
+/*
+ * omap_correct_data - Compares the ecc read from nand spare area with ECC
+ * registers values and corrects one bit error if it has occured
+ * @mtd: MTD device structure
+ * @dat: page data
+ * @read_ecc: ecc read from nand flash
+ * @calc_ecc: ecc read from ECC registers
+ */
+static int omap_correct_data(struct mtd_info *mtd, u_char * dat,
+				u_char * read_ecc, u_char * calc_ecc)
+{
+	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+							mtd);
+	int blockCnt = 0, i = 0, ret = 0;
+
+	/* Ex NAND_ECC_HW12_2048 */
+	if ((info->nand.ecc.mode == NAND_ECC_HW) &&
+			(info->nand.ecc.size  == 2048))
+		blockCnt = 4;
+	else
+		blockCnt = 1;
+
+	for (i = 0; i < blockCnt; i++) {
+		if (memcmp(read_ecc, calc_ecc, 3) != 0) {
+			ret = omap_compare_ecc(read_ecc, calc_ecc, dat);
+			if (ret < 0) return ret;
+		}
+		read_ecc += 3;
+		calc_ecc += 3;
+		dat      += 512;
+	}
+	return 0;
 }
 
 /*
@@ -322,7 +473,6 @@ static int omap_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
 	/* P2048o, P1024o, P512o, P256o, P2048e, P1024e, P512e, P256e */
 	*ecc_code++ = ((val >> 8) & 0x0f) | ((val >> 20) & 0xf0);
 	reg += 4;
-	gen_true_ecc(ecc_code-3);
 
 	return 0;
 }
@@ -520,14 +670,13 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 	info->nand.ecc.size		= 512;
 	info->nand.ecc.calculate	= omap_calculate_ecc;
 	info->nand.ecc.hwctl		= omap_enable_hwecc;
-	info->nand.ecc.correct		= nand_correct_data;
+	info->nand.ecc.correct		= omap_correct_data;
 	info->nand.ecc.mode		= NAND_ECC_HW;
 
 	/* init HW ECC */
 	omap_hwecc_init(&info->mtd);
 #else
 	info->nand.ecc.mode = NAND_ECC_SOFT;
-	info->nand.ecc.size		= 512;
 #endif
 
 	/* DIP switches on some boards change between 8 and 16 bit
