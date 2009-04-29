@@ -851,11 +851,15 @@ static int omapfb_set_par(struct fb_info *fbi)
 	return r;
 }
 
+int omapfb_update_window(struct fb_info *fbi,
+		u32 x, u32 y, u32 w, u32 h);
+
 static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_display *display = fb2display(fbi);
 	int r = 0;
 
 	DBG("pan_display(%d)\n", ofbi->id);
@@ -879,6 +883,8 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		}
 	}
 
+	if (display && display->update)
+		display->update(display, 0, 0, var->xres, var->yres);
 	omapfb_unlock(fbdev);
 
 	return r;
