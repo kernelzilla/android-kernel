@@ -247,13 +247,19 @@ static void sr_set_nvalues(struct omap_sr *sr)
 static void sr_configure_vp(int srid)
 {
 	u32 vpconfig;
+	u32 vsel;
 
 	if (srid == SR1) {
+		if (!omap_pm_vdd1_get_opp())
+			/* Assume Nominal OPP as current OPP unknown */
+			vsel = mpu_opps[VDD1_OPP3].vsel;
+		else
+			vsel = mpu_opps[omap_pm_vdd1_get_opp()].vsel;
+
 		vpconfig = PRM_VP1_CONFIG_ERROROFFSET |
 			PRM_VP1_CONFIG_ERRORGAIN |
 			PRM_VP1_CONFIG_TIMEOUTEN |
-			mpu_opps[omap_pm_vdd1_get_opp()].vsel <<
-			OMAP3430_INITVOLTAGE_SHIFT;
+			vsel << OMAP3430_INITVOLTAGE_SHIFT;
 
 		prm_write_mod_reg(vpconfig, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP1_CONFIG_OFFSET);
@@ -289,11 +295,16 @@ static void sr_configure_vp(int srid)
 				       OMAP3_PRM_VP1_CONFIG_OFFSET);
 
 	} else if (srid == SR2) {
+		if (!omap_pm_vdd2_get_opp())
+			/* Assume Nominal OPP */
+			vsel = l3_opps[VDD2_OPP3].vsel;
+		else
+			vsel = l3_opps[omap_pm_vdd2_get_opp()].vsel;
+
 		vpconfig = PRM_VP2_CONFIG_ERROROFFSET |
 			PRM_VP2_CONFIG_ERRORGAIN |
 			PRM_VP2_CONFIG_TIMEOUTEN |
-			l3_opps[omap_pm_vdd2_get_opp()].vsel <<
-			OMAP3430_INITVOLTAGE_SHIFT;
+			vsel << OMAP3430_INITVOLTAGE_SHIFT;
 
 		prm_write_mod_reg(vpconfig, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP2_CONFIG_OFFSET);
@@ -387,10 +398,18 @@ static int sr_reset_voltage(int srid)
 
 	if (srid == SR1) {
 		target_opp_no = omap_pm_vdd1_get_opp();
+		if (!target_opp_no) {
+			pr_info("Current OPP unknown: Cannot reset voltage\n");
+			return 1;
+		}
 		vsel = mpu_opps[target_opp_no].vsel;
 		reg_addr = R_VDD1_SR_CONTROL;
 	} else if (srid == SR2) {
 		target_opp_no = omap_pm_vdd2_get_opp();
+		if (!target_opp_no) {
+			pr_info("Current OPP unknown: Cannot reset voltage\n");
+			return 1;
+		}
 		vsel = l3_opps[target_opp_no].vsel;
 		reg_addr = R_VDD2_SR_CONTROL;
 	}
@@ -620,6 +639,11 @@ void enable_smartreflex(int srid)
 			else if (srid == SR2)
 				target_opp_no = omap_pm_vdd2_get_opp();
 
+			if (!target_opp_no) {
+				pr_info("Current OPP unknown \
+						 Cannot configure SR\n");
+			}
+
 			sr_configure(sr);
 
 			if (!sr_enable(sr, target_opp_no))
@@ -754,6 +778,11 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 
 	current_vdd1opp_no = omap_pm_vdd1_get_opp();
 
+	if (!current_vdd1opp_no) {
+		pr_err("sr_vdd1_autocomp: Current VDD1 opp unknown\n");
+		return -EINVAL;
+	}
+
 	if (value == 0)
 		sr_stop_vddautocomap(SR1);
 	else
@@ -791,6 +820,11 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 	}
 
 	current_vdd2opp_no = omap_pm_vdd2_get_opp();
+
+	if (!current_vdd2opp_no) {
+		pr_err("sr_vdd2_autocomp: Current VDD2 opp unknown\n");
+		return -EINVAL;
+	}
 
 	if (value == 0)
 		sr_stop_vddautocomap(SR2);
