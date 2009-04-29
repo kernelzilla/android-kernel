@@ -27,41 +27,11 @@
 
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/usb/omap.h>
+
 #include <mach/gpio.h>
 
 #include "ehci-omap.h"
-
-
-#ifdef CONFIG_OMAP_EHCI_PHY_MODE
-/* EHCI connected to External PHY */
-
-/* External USB connectivity board: 750-2083-001
- * Connected to OMAP3430 SDP
- * The board has Port1 and Port2 connected to ISP1504 in 12-pin ULPI mode
- */
-
-/* ISSUE1:
- *      ISP1504 for input clocking mode needs special reset handling
- *	Hold the PHY in reset by asserting RESET_N signal
- *	Then start the 60Mhz clock input to PHY
- *	Release the reset after a delay -
- *		to get the PHY state machine in working state
- */
-#define EXTERNAL_PHY_RESET
-#define	EXT_PHY_RESET_GPIO_PORT1	(57)
-#define	EXT_PHY_RESET_GPIO_PORT2	(61)
-#define	EXT_PHY_RESET_DELAY		(10)
-
-/* ISSUE2:
- * USBHOST supports External charge pump PHYs only
- * Use the VBUS from Port1 to power VBUS of Port2 externally
- * So use Port2 as the working ULPI port
- */
-#define VBUS_INTERNAL_CHARGEPUMP_HACK
-
-#endif /* CONFIG_OMAP_EHCI_PHY_MODE */
-
-/*-------------------------------------------------------------------------*/
 
 /* Define USBHOST clocks for clock management */
 struct ehci_omap_clock_defs {
@@ -80,44 +50,137 @@ struct ehci_omap_clock_defs {
 #define USBHOST_TLL_FCLK	"usbtll_fck"
 /*-------------------------------------------------------------------------*/
 
+static int omap_usb_port_ulpi_bypass(enum omap_usb_port_mode mode)
+{
+	return mode != OMAP_USB_PORT_MODE_ULPI_PHY;
+}
 
-#ifndef CONFIG_OMAP_EHCI_PHY_MODE
+static int omap_usb_port_ttl_chanel_config(enum omap_usb_port_mode mode)
+{
+	return (mode == OMAP_USB_PORT_MODE_UTMI_PHY_6PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_6PIN_ALT) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_3PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_4PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_6PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_6PIN_ALT) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_3PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_4PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_2PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_2PIN_ALT);
+}
 
-static void omap_usb_utmi_init(struct usb_hcd *hcd, u8 tll_channel_mask)
+static unsigned omap_usb_port_fslsmode(enum omap_usb_port_mode mode)
+{
+	switch (mode) {
+		/* non serial modes */
+	case OMAP_USB_PORT_MODE_ULPI_PHY:
+	case OMAP_USB_PORT_MODE_ULPI_TLL_SDR:
+	case OMAP_USB_PORT_MODE_ULPI_TLL_DDR:
+		return 0x0;
+
+		/* serial modes */
+	case OMAP_USB_PORT_MODE_UTMI_PHY_6PIN:
+		return 0x0;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_6PIN_ALT:
+		return 0x1;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_3PIN:
+		return 0x2;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_4PIN:
+		return 0x3;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_6PIN:
+		return 0x4;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_6PIN_ALT:
+		return 0x5;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_3PIN:
+		return 0x6;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_4PIN:
+		return 0x7;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_2PIN:
+		return 0xa;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_2PIN_ALT:
+		return 0xB;
+	}
+
+	return 0x0;
+}
+
+static void omap_usb_setup_ports(struct usb_hcd *hcd)
 {
 	int i;
+	struct omap_usb_platform_data *data =  (struct omap_usb_platform_data *)
+		hcd->self.controller->platform_data;
+	u32 val;
 
-	/* Use UTMI Ports of TLL */
-	omap_writel((1 << OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN_SHIFT)|
-			(0<<OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN_SHIFT),
-						OMAP_UHH_HOSTCONFIG);
-	/* Enusre bit is set */
-	while (!(omap_readl(OMAP_UHH_HOSTCONFIG)
-			& (1 << OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_SHIFT)))
+	val = (1<<OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN_SHIFT)|
+		(1<<OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN_SHIFT)|
+		(1<<OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN_SHIFT)|
+		(0<<OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN_SHIFT);
+
+
+	if ((data->num_ports > 0) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[0].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P1_ULPI_BYPASS_SHIFT);
+	if ((data->num_ports > 1) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[1].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P2_ULPI_BYPASS_SHIFT);
+	if ((data->num_ports > 2) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[2].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P3_ULPI_BYPASS_SHIFT);
+
+	omap_writel(val, OMAP_UHH_HOSTCONFIG);
+
+	/* wait for change to sync */
+	while ((omap_readl(OMAP_UHH_HOSTCONFIG) &
+		OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK) !=
+	       (val & OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK))
 		cpu_relax();
 
-	dev_dbg(hcd->self.controller, "\nEntered UTMI MODE: success\n");
+	dev_dbg(hcd->self.controller, "ULPI Byppass mode congfigured: %08x\n",
+		omap_readl(OMAP_UHH_HOSTCONFIG));
 
-	/* Program the 3 TLL channels upfront */
-
+	/* Program the 3 channels upfront */
 	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		/* AutoIdle */
+		if ((data->num_ports > i) &&
+		    (data->port_data[i].flags & OMAP_USB_PORT_FLAG_AUTOIDLE))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				    1<<OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE_SHIFT,
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+				    ~(1<<OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
 
-		/* Disable AutoIdle */
-		omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
-			    ~(1<<OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE_SHIFT),
-			    OMAP_TLL_CHANNEL_CONF(i));
-		/* Disable BitStuffing */
-		omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
-			    ~(1<<OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT),
-			    OMAP_TLL_CHANNEL_CONF(i));
-		/* SDR Mode */
-		omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
-			    ~(1<<OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE_SHIFT),
-			    OMAP_TLL_CHANNEL_CONF(i));
+		/* BitStuffing */
+		if ((data->num_ports > i) &&
+		    (data->port_data[i].flags & OMAP_USB_PORT_FLAG_NOBITSTUFF))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				    1<<OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT,
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+				    ~(1<<OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
 
+		/* SDR/DDR */
+		if ((data->num_ports > i) &&
+		    (data->port_data[i].mode == OMAP_USB_PORT_MODE_ULPI_TLL_DDR))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				    (1<<OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+				    ~(1<<OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
 	}
 
 	/* Program Common TLL register */
@@ -127,28 +190,41 @@ static void omap_usb_utmi_init(struct usb_hcd *hcd, u8 tll_channel_mask)
 			(0 << OMAP_TLL_SHARED_CONF_USB_90D_DDR_EN_SHFT),
 				OMAP_TLL_SHARED_CONF);
 
-	/* Enable channels now */
+	/* Enable channels */
 	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		u32 channel_conf;
 
-		/* Enable only the channel that is needed */
-		if (!(tll_channel_mask & 1<<i))
+		if ((data->num_ports <= i) ||
+		   !(data->port_data[i].flags & OMAP_USB_PORT_FLAG_ENABLED)) {
+			dev_dbg(hcd->self.controller,
+				"port %d disabled. skipping.\n", i);
 			continue;
+		}
 
-		omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
-			    (1<<OMAP_TLL_CHANNEL_CONF_CHANEN_SHIFT),
-			    OMAP_TLL_CHANNEL_CONF(i));
+		channel_conf = omap_readl(OMAP_TLL_CHANNEL_CONF(i));
+		channel_conf |= 1<<OMAP_TLL_CHANNEL_CONF_CHANEN_SHIFT;
+
+		if (omap_usb_port_ttl_chanel_config(data->port_data[i].mode))
+			channel_conf |= 1<<OMAP_TLL_CHANNEL_CONF_CHANMODE_SHIFT;
+		else
+			channel_conf &= ~(3<<OMAP_TLL_CHANNEL_CONF_CHANMODE_SHIFT);
+
+		channel_conf &= ~(OMAP_TLL_CHANNEL_CONF_FSLSMODE(0xf));
+		channel_conf |= OMAP_TLL_CHANNEL_CONF_FSLSMODE(
+			omap_usb_port_fslsmode(data->port_data[i].mode));
+
+
+		omap_writel(channel_conf, OMAP_TLL_CHANNEL_CONF(i));
+		dev_dbg(hcd->self.controller,
+			"port %d enabled: OMAP_TTL_CHANNEL_CONF_%d=%08x\n",
+			i, i+1, omap_readl(OMAP_TLL_CHANNEL_CONF(i)));
 
 		omap_writeb(0xBE, OMAP_TLL_ULPI_SCRATCH_REGISTER(i));
-		dev_dbg(hcd->self.controller, "\nULPI_SCRATCH_REG[ch=%d]"
+		dev_dbg(hcd->self.controller, "ULPI_SCRATCH_REG[ch=%d]"
 			"= 0x%02x\n",
 			i+1, omap_readb(OMAP_TLL_ULPI_SCRATCH_REGISTER(i)));
 	}
 }
-
-#else
-# define omap_usb_utmi_init(x, y)	0
-#endif
-
 
 /* omap_start_ehc
  *	- Start the TI USBHOST controller
@@ -156,6 +232,8 @@ static void omap_usb_utmi_init(struct usb_hcd *hcd, u8 tll_channel_mask)
 static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 {
 	struct ehci_omap_clock_defs *ehci_clocks;
+	struct omap_usb_platform_data *data = dev->dev.platform_data;
+	int i, r, reset_delay;
 
 	dev_dbg(hcd->self.controller, "starting TI EHCI USB Controller\n");
 
@@ -222,16 +300,18 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 		return PTR_ERR(ehci_clocks->usbhost1_48m_fck_clk);
 	clk_enable(ehci_clocks->usbhost1_48m_fck_clk);
 
-
-#ifdef EXTERNAL_PHY_RESET
-	/* Refer: ISSUE1 */
-	gpio_request(EXT_PHY_RESET_GPIO_PORT1, "USB1 PHY reset");
-	gpio_direction_output(EXT_PHY_RESET_GPIO_PORT1, 0);
-	gpio_request(EXT_PHY_RESET_GPIO_PORT2, "USB2 PHY reset");
-	gpio_direction_output(EXT_PHY_RESET_GPIO_PORT2, 0);
-	/* Hold the PHY in RESET for enough time till DIR is high */
-	udelay(EXT_PHY_RESET_DELAY);
-#endif
+	reset_delay = 0;
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if ((data->num_ports > i) && (data->port_data[i].startup)) {
+			reset_delay = reset_delay > data->port_data[i].reset_delay ?
+				reset_delay : data->port_data[i].reset_delay;
+			r = data->port_data[i].startup(dev, i);
+			if (r < 0)
+				return r;
+		}
+	}
+	if (reset_delay)
+		udelay(reset_delay);
 
 	/* Configure TLL for 60Mhz clk for ULPI */
 	ehci_clocks->usbtll_fck_clk = clk_get(&dev->dev, USBHOST_TLL_FCLK);
@@ -278,57 +358,39 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 			(1 << OMAP_UHH_SYSCONFIG_MIDLEMODE_SHIFT),
 			OMAP_UHH_SYSCONFIG);
 
-#ifdef CONFIG_OMAP_EHCI_PHY_MODE
-	/* Bypass the TLL module for PHY mode operation */
-	omap_writel((0 << OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN_SHIFT)|
-			(1<<OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN_SHIFT)|
-			(0<<OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN_SHIFT),
-						OMAP_UHH_HOSTCONFIG);
-	/* Ensure that BYPASS is set */
-	while (omap_readl(OMAP_UHH_HOSTCONFIG)
-			& (1 << OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_SHIFT))
-		cpu_relax();
+	omap_usb_setup_ports(hcd);
 
-	dev_dbg(hcd->self.controller, "Entered ULPI PHY MODE: success\n");
+	reset_delay = 0;
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if (data->num_ports > i)
+			reset_delay = reset_delay > data->port_data[i].reset_delay ?
+				reset_delay : data->port_data[i].reset_delay;
+	}
+	if (reset_delay)
+		udelay(reset_delay);
 
-#else
-	/* Enable UTMI mode for all 3 TLL channels */
-	omap_usb_utmi_init(hcd,
-		OMAP_TLL_CHANNEL_1_EN_MASK |
-		OMAP_TLL_CHANNEL_2_EN_MASK |
-		OMAP_TLL_CHANNEL_3_EN_MASK
-		);
-#endif
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if ((data->num_ports > i) && (data->port_data[i].reset))
+			data->port_data[i].reset(dev, i, 1);
+	}
 
-#ifdef EXTERNAL_PHY_RESET
-	/* Refer ISSUE1:
-	 * Hold the PHY in RESET for enough time till PHY is settled and ready
-	 */
-	udelay(EXT_PHY_RESET_DELAY);
-	gpio_set_value(EXT_PHY_RESET_GPIO_PORT1, 1);
-	gpio_set_value(EXT_PHY_RESET_GPIO_PORT2, 1);
-#endif
+	if (data->flags & OMAP_USB_FLAG_VBUS_INTERNAL_CHARGEPUMP) {
+		/* Refer ISSUE2: LINK assumes external charge pump */
 
-#ifdef VBUS_INTERNAL_CHARGEPUMP_HACK
-	/* Refer ISSUE2: LINK assumes external charge pump */
+		/* use Port1 VBUS to charge externally Port2:
+		 *	So for PHY mode operation use Port2 only
+		 */
+		omap_writel((0xA << EHCI_INSNREG05_ULPI_REGADD_SHIFT) |/* OTG ctrl reg*/
+			    (2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT) |/*   Write */
+			    (1 << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT) |/* Port1 */
+			    (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT) |/* Start */
+			    (0x26),
+			    EHCI_INSNREG05_ULPI);
 
-	/* use Port1 VBUS to charge externally Port2:
-	 *	So for PHY mode operation use Port2 only
-	 */
-	omap_writel((0xA << EHCI_INSNREG05_ULPI_REGADD_SHIFT) |/* OTG ctrl reg*/
-			(2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT) |/*   Write */
-			(1 << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT) |/* Port1 */
-			(1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT) |/* Start */
-			(0x26),
-			EHCI_INSNREG05_ULPI);
-
-	while (!(omap_readl(EHCI_INSNREG05_ULPI)
-			& (1<<EHCI_INSNREG05_ULPI_CONTROL_SHIFT)))
-		cpu_relax();
-
-#endif
+		while (!(omap_readl(EHCI_INSNREG05_ULPI)
+			 & (1<<EHCI_INSNREG05_ULPI_CONTROL_SHIFT)))
+			cpu_relax();
+	}
 
 	return 0;
 }
@@ -338,6 +400,8 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 static void omap_stop_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 {
 	struct ehci_omap_clock_defs *ehci_clocks;
+	struct omap_usb_platform_data *data = dev->dev.platform_data;
+	int i;
 
 	ehci_clocks = (struct ehci_omap_clock_defs *)
 			(((char *)hcd_to_ehci(hcd)) + sizeof(struct ehci_hcd));
@@ -391,11 +455,10 @@ static void omap_stop_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 		ehci_clocks->usbtll_ick_clk = NULL;
 	}
 
-
-#ifdef EXTERNAL_PHY_RESET
-	gpio_free(EXT_PHY_RESET_GPIO_PORT1);
-	gpio_free(EXT_PHY_RESET_GPIO_PORT2);
-#endif
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if ((data->num_ports > i) && (data->port_data[i].shutdown))
+			data->port_data[i].shutdown(dev, i);
+	}
 
 	dev_dbg(hcd->self.controller,
 		"Clock to USB host has been disabled\n");
