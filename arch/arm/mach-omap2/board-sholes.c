@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/mm.h>
 #include <linux/qtouch_obp_ts.h>
+#include <linux/usb/omap.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -43,6 +44,8 @@
 #include <asm/delay.h>
 #include <mach/control.h>
 
+#define SHOLES_IPC_USB_SUSP_GPIO	142
+#define SHOLES_AP_TO_BP_FLASH_EN_GPIO	157
 #define SHOLES_TOUCH_RESET_N_GPIO	164
 #define SHOLES_TOUCH_INT_GPIO		99
 
@@ -188,6 +191,143 @@ extern void __init sholes_flash_init(void);
 extern void __init sholes_gpio_iomux_init(void);
 
 
+
+#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
+
+static int sholes_usb_port_startup(struct platform_device *dev, int port)
+{
+	int r;
+
+	if (port == 2) {
+		r = gpio_request(SHOLES_IPC_USB_SUSP_GPIO, "ipc_usb_susp");
+		if (r < 0) {
+			printk(KERN_WARNING "Could not request GPIO %d"
+			       " for IPC_USB_SUSP\n",
+			       SHOLES_IPC_USB_SUSP_GPIO);
+			return r;
+		}
+		gpio_direction_output(SHOLES_IPC_USB_SUSP_GPIO, 0);
+	} else {
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static void sholes_usb_port_shutdown(struct platform_device *dev, int port)
+{
+	if (port == 2)
+		gpio_free(SHOLES_IPC_USB_SUSP_GPIO);
+}
+
+
+static void sholes_usb_port_suspend(struct platform_device *dev,
+				    int port, int suspend)
+{
+	if (port == 2)
+		gpio_set_value(SHOLES_IPC_USB_SUSP_GPIO, suspend);
+}
+
+
+static struct omap_usb_port_data usb_port_data[] = {
+	[0] = { .flags = 0x0, }, /* disabled */
+	[1] = { .flags = 0x0, }, /* disabled */
+	[2] = {
+		.flags = OMAP_USB_PORT_FLAG_ENABLED |
+			OMAP_USB_PORT_FLAG_NOBITSTUFF,
+		.mode = OMAP_USB_PORT_MODE_UTMI_PHY_4PIN,
+		.startup = sholes_usb_port_startup,
+		.shutdown = sholes_usb_port_shutdown,
+		.suspend = sholes_usb_port_suspend,
+	},
+};
+
+static struct omap_usb_platform_data usb_platform_data = {
+	.port_data = usb_port_data,
+	.num_ports = ARRAY_SIZE(usb_port_data),
+};
+
+static struct resource ehci_resources[] = {
+	[0] = {
+		.start	= OMAP34XX_HSUSB_HOST_BASE + 0x800,
+		.end	= OMAP34XX_HSUSB_HOST_BASE + 0x800 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {         /* general IRQ */
+		.start	= INT_34XX_EHCI_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	}
+};
+
+static u64 ehci_dmamask = ~(u32)0;
+static struct platform_device ehci_device = {
+	.name		= "ehci-omap",
+	.id		= 0,
+	.dev = {
+		.dma_mask		= &ehci_dmamask,
+		.coherent_dma_mask	= 0xffffffff,
+		.platform_data		= &usb_platform_data,
+	},
+	.num_resources	= ARRAY_SIZE(ehci_resources),
+	.resource	= ehci_resources,
+};
+#endif
+
+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+static struct resource ohci_resources[] = {
+	[0] = {
+		.start	= OMAP34XX_HSUSB_HOST_BASE + 0x400,
+		.end	= OMAP34XX_HSUSB_HOST_BASE + 0x400 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {         /* general IRQ */
+		.start	= INT_34XX_OHCI_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	}
+};
+
+static u64 ohci_dmamask = ~(u32)0;
+
+static struct omap_usb_config dummy_usb_config = {
+};
+
+static struct platform_device ohci_device = {
+	.name		= "ohci",
+	.id		= 0,
+	.dev = {
+		.dma_mask		= &ohci_dmamask,
+		.coherent_dma_mask	= 0xffffffff,
+		.platform_data	= &dummy_usb_config,
+	},
+	.num_resources	= ARRAY_SIZE(ohci_resources),
+	.resource	= ohci_resources,
+};
+#endif /* OHCI specific data */
+
+
+static void __init sholes_ehci_init(void)
+{
+
+	omap_cfg_reg(AF5_34XX_GPIO142);		/*  IPC_USB_SUSP      */
+	omap_cfg_reg(AA21_34XX_GPIO157);	/*  AP_TO_BP_FLASH_EN */
+	omap_cfg_reg(AD1_3430_USB3FS_PHY_MM3_RXRCV);
+	omap_cfg_reg(AD2_3430_USB3FS_PHY_MM3_TXDAT);
+	omap_cfg_reg(AC1_3430_USB3FS_PHY_MM3_TXEN_N);
+	omap_cfg_reg(AE1_3430_USB3FS_PHY_MM3_TXSE0);
+
+	if (gpio_request(SHOLES_AP_TO_BP_FLASH_EN_GPIO,
+			 "ap_to_bp_flash_en") != 0) {
+		printk(KERN_WARNING "Could not request GPIO %d"
+		       " for IPC_USB_SUSP\n",
+		       SHOLES_IPC_USB_SUSP_GPIO);
+		return;
+	}
+	gpio_direction_output(SHOLES_AP_TO_BP_FLASH_EN_GPIO, 0);
+
+	platform_device_register(&ehci_device);
+	platform_device_register(&ohci_device);
+}
+
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -199,6 +339,7 @@ static void __init sholes_init(void)
 	sholes_sensors_init();
 	sholes_touch_init();
 	usb_musb_init();
+	sholes_ehci_init();
 }
 
 
