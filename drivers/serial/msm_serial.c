@@ -484,10 +484,19 @@ static void msm_init_clock(struct uart_port *port)
 	msm_port->clk_state = MSM_CLK_ON;
 #endif
 
-	msm_write(port, 0xC0, UART_MREG);
-	msm_write(port, 0xB2, UART_NREG);
-	msm_write(port, 0x7D, UART_DREG);
-	msm_write(port, 0x1C, UART_MNDREG);
+	if (port->uartclk == 19200000) {
+		/* clock is TCXO (19.2MHz) */
+		msm_write(port, 0x06, UART_MREG);
+		msm_write(port, 0xF1, UART_NREG);
+		msm_write(port, 0x0F, UART_DREG);
+		msm_write(port, 0x1A, UART_MNDREG);
+	} else {
+		/* clock must be TCXO/4 */
+		msm_write(port, 0xC0, UART_MREG);
+		msm_write(port, 0xB2, UART_NREG);
+		msm_write(port, 0x7D, UART_DREG);
+		msm_write(port, 0x1C, UART_MNDREG);
+	}
 }
 
 static int msm_startup(struct uart_port *port)
