@@ -38,7 +38,7 @@
  */
 #if defined(CONFIG_ARCH_OMAP1)
 #define PHYS_OFFSET		UL(0x10000000)
-#elif defined(CONFIG_MACH_OMAP_SHOLES)
+#elif defined(CONFIG_MACH_SHOLES)
 #define PHYS_OFFSET		UL(0x80C00000)
 #elif defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 #define PHYS_OFFSET		UL(0x80000000)

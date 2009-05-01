@@ -258,7 +258,7 @@ static void __init sholes_map_io(void)
 	omap2_map_common_io();
 }
 
-MACHINE_START(OMAP_SHOLES, "Motorola Product - Sholes Phone")
+MACHINE_START(SHOLES, "Motorola Product - Sholes Phone")
 	/* Maintainer: Motorola, Inc. */
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
