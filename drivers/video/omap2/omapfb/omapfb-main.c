@@ -851,11 +851,15 @@ static int omapfb_set_par(struct fb_info *fbi)
 	return r;
 }
 
+int omapfb_update_window(struct fb_info *fbi,
+		u32 x, u32 y, u32 w, u32 h);
+
 static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_display *display = fb2display(fbi);
 	int r = 0;
 
 	DBG("pan_display(%d)\n", ofbi->id);
@@ -879,6 +883,8 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		}
 	}
 
+	if (display && display->update)
+		display->update(display, 0, 0, var->xres, var->yres);
 	omapfb_unlock(fbdev);
 
 	return r;
@@ -1103,50 +1109,13 @@ ssize_t omapfb_write(struct fb_info *info, const char __user *buf,
 }
 #endif
 
-static void omapfb_fillrect(struct fb_info *fbi, const struct fb_fillrect *rect)
-{
-	struct omap_display *display = fb2display(fbi);
-
-        cfb_fillrect(fbi, rect);
-	if (display->update)
-		display->update(display, rect->dx, rect->dy,
-				rect->dx + rect->width,
-				rect->dy + rect->height);
-	/* omapfb_apply_changes(fbi, 0); */
-}
-
-static void omapfb_copyarea(struct fb_info *fbi, const struct fb_copyarea *area)
-{
-	struct omap_display *display = fb2display(fbi);
-
-        cfb_copyarea(fbi, area);
-	if (display->update)
-		display->update(display, area->dx, area->dy,
-				area->dx + area->width,
-				area->dy + area->height);
-	/* omapfb_apply_changes(fbi, 0); */
-}
-
-static void omapfb_imageblit(struct fb_info *fbi, const struct fb_image *image)
-{
-	struct omap_display *display = fb2display(fbi);
-
-        cfb_imageblit(fbi, image);
-	if (display->update)
-		display->update(display, image->dx, image->dy,
-				image->dx + image->width,
-				image->dy + image->height);
-	/* omapfb_apply_changes(fbi, 0); */
-}
-
-
 static struct fb_ops omapfb_ops = {
 	.owner          = THIS_MODULE,
 	.fb_open        = omapfb_open,
 	.fb_release     = omapfb_release,
-	.fb_fillrect    = omapfb_fillrect,
-	.fb_copyarea    = omapfb_copyarea,
-	.fb_imageblit   = omapfb_imageblit,
+	.fb_fillrect    = cfb_fillrect,
+	.fb_copyarea    = cfb_copyarea,
+	.fb_imageblit   = cfb_imageblit,
 	.fb_blank       = omapfb_blank,
 	.fb_ioctl       = omapfb_ioctl,
 	.fb_check_var   = omapfb_check_var,

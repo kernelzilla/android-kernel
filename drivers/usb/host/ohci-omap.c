@@ -26,6 +26,7 @@
 
 #include <mach/mux.h>
 #include <mach/irqs.h>
+#include <mach/gpio.h>
 #include <mach/fpga.h>
 #include <mach/usb.h>
 
@@ -65,13 +66,17 @@ static inline int tps65010_set_gpio_out_value(unsigned gpio, unsigned value)
 extern int usb_disabled(void);
 extern int ocpi_enable(void);
 
+#ifndef CONFIG_ARCH_OMAP34XX
 static struct clk *usb_host_ck;
 static struct clk *usb_dc_ck;
+#endif
+
 static int host_enabled;
 static int host_initialized;
 
 static void omap_ohci_clock_power(int on)
 {
+#ifndef CONFIG_ARCH_OMAP34XX
 	if (on) {
 		clk_enable(usb_dc_ck);
 		clk_enable(usb_host_ck);
@@ -81,6 +86,7 @@ static void omap_ohci_clock_power(int on)
 		clk_disable(usb_host_ck);
 		clk_disable(usb_dc_ck);
 	}
+#endif
 }
 
 /*
@@ -252,6 +258,7 @@ static int ohci_omap_init(struct usb_hcd *hcd)
 
 			rh &= ~RH_A_NOCP;
 
+#ifndef CONFIG_ARCH_OMAP34XX
 			/* gpio9 for overcurrent detction */
 			omap_cfg_reg(W8_1610_GPIO9);
 			gpio_request(9, "OHCI overcurrent");
@@ -259,6 +266,7 @@ static int ohci_omap_init(struct usb_hcd *hcd)
 
 			/* for paranoia's sake:  disable USB.PUEN */
 			omap_cfg_reg(W4_USB_HIGHZ);
+#endif
 		}
 		ohci_writel(ohci, rh, &ohci->regs->roothub.a);
 		ohci->flags &= ~OHCI_QUIRK_HUB_POWER;
@@ -315,7 +323,8 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		return -ENODEV;
 	}
 
-	usb_host_ck = clk_get(&pdev->dev, "usb_hhc_ck");
+#ifndef CONFIG_ARCH_OMAP34XX
+	usb_host_ck = clk_get(0, "usb_hhc_ck");
 	if (IS_ERR(usb_host_ck))
 		return PTR_ERR(usb_host_ck);
 
@@ -328,6 +337,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		clk_put(usb_host_ck);
 		return PTR_ERR(usb_dc_ck);
 	}
+#endif
 
 
 	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
@@ -379,8 +389,11 @@ err2:
 err1:
 	usb_put_hcd(hcd);
 err0:
+
+#ifndef CONFIG_ARCH_OMAP34XX
 	clk_put(usb_dc_ck);
 	clk_put(usb_host_ck);
+#endif
 	return retval;
 }
 
@@ -406,13 +419,18 @@ usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
 		(void) otg_set_host(ohci->transceiver, 0);
 		put_device(ohci->transceiver->dev);
 	}
+#ifndef CONFIG_ARCH_OMAP34XX
 	if (machine_is_omap_osk())
 		gpio_free(9);
+#endif
 	iounmap(hcd->regs);
 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	usb_put_hcd(hcd);
+
+#ifndef CONFIG_ARCH_OMAP34XX
 	clk_put(usb_dc_ck);
 	clk_put(usb_host_ck);
+#endif
 }
 
 /*-------------------------------------------------------------------------*/
