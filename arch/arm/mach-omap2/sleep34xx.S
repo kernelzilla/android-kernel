@@ -672,6 +672,7 @@ wait_sdrc_ok:
         bic     r5, r5, #0x40
         str     r5, [r4]
 wait_dll_lock:
+	bx	lr /* dll lock hack */
         /* Is dll in lock mode? */
         ldr     r4, sdrc_dlla_ctrl
         ldr     r5, [r4]
