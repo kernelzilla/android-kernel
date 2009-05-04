@@ -13,21 +13,10 @@
 
 #include "aufs.h"
 
-static unsigned int calc_size(int namelen)
+static unsigned int calc_size(int nlen)
 {
-	int sz;
-	const int mask = sizeof(ino_t) - 1;
-
 	BUILD_BUG_ON(sizeof(ino_t) != sizeof(long));
-
-	sz = sizeof(struct au_vdir_de) + namelen;
-	if (sz & mask) {
-		sz += sizeof(ino_t);
-		sz &= ~mask;
-	}
-
-	AuDebugOn(sz % sizeof(ino_t));
-	return sz;
+	return ALIGN(sizeof(struct au_vdir_de) + nlen, sizeof(ino_t));
 }
 
 static int set_deblk_end(union au_vdir_deblk_p *p,
@@ -184,24 +173,24 @@ static struct hlist_head *au_name_hash(struct au_nhash *nhash,
 }
 
 /* returns found or not */
-int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int namelen)
+int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int nlen)
 {
 	struct hlist_head *head;
 	struct au_vdir_wh *tpos;
 	struct hlist_node *pos;
 	struct au_vdir_destr *str;
 
-	head = au_name_hash(whlist, name, namelen);
+	head = au_name_hash(whlist, name, nlen);
 	hlist_for_each_entry(tpos, pos, head, wh_hash) {
 		str = &tpos->wh_str;
 		AuDbg("%.*s\n", str->len, str->name);
-		if (str->len == namelen && !memcmp(str->name, name, namelen))
+		if (str->len == nlen && !memcmp(str->name, name, nlen))
 			return 1;
 	}
 	return 0;
 }
 
-int au_nhash_append_wh(struct au_nhash *whlist, char *name, int namelen,
+int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 		       aufs_bindex_t bindex)
 {
 	int err;
@@ -209,16 +198,16 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int namelen,
 	struct au_vdir_wh *wh;
 
 	err = -ENOMEM;
-	wh = kmalloc(sizeof(*wh) + namelen, GFP_NOFS);
+	wh = kmalloc(sizeof(*wh) + nlen, GFP_NOFS);
 	if (unlikely(!wh))
 		goto out;
 
 	err = 0;
 	wh->wh_bindex = bindex;
 	str = &wh->wh_str;
-	str->len = namelen;
-	memcpy(str->name, name, namelen);
-	hlist_add_head(&wh->wh_hash, au_name_hash(whlist, name, namelen));
+	str->len = nlen;
+	memcpy(str->name, name, nlen);
+	hlist_add_head(&wh->wh_hash, au_name_hash(whlist, name, nlen));
 	/* smp_mb(); */
 
  out:
@@ -323,25 +312,25 @@ static int reinit_vdir(struct au_vdir *vdir)
 /* ---------------------------------------------------------------------- */
 
 /* returns found(true) or not */
-static int test_known(struct au_nhash *delist, char *name, int namelen)
+static int test_known(struct au_nhash *delist, char *name, int nlen)
 {
 	struct hlist_head *head;
 	struct au_vdir_dehstr *tpos;
 	struct hlist_node *pos;
 	struct au_vdir_destr *str;
 
-	head = au_name_hash(delist, name, namelen);
+	head = au_name_hash(delist, name, nlen);
 	hlist_for_each_entry(tpos, pos, head, hash) {
 		str = tpos->str;
 		AuDbg("%.*s\n", str->len, str->name);
-		if (str->len == namelen && !memcmp(str->name, name, namelen))
+		if (str->len == nlen && !memcmp(str->name, name, nlen))
 			return 1;
 	}
 	return 0;
 
 }
 
-static int append_de(struct au_vdir *vdir, char *name, int namelen, ino_t ino,
+static int append_de(struct au_vdir *vdir, char *name, int nlen, ino_t ino,
 		     unsigned int d_type, struct au_nhash *delist)
 {
 	int err;
@@ -356,7 +345,7 @@ static int append_de(struct au_vdir *vdir, char *name, int namelen, ino_t ino,
 	AuDebugOn(room->deblk < p.deblk || deblk_end.deblk <= room->deblk
 		  || !is_deblk_end(room, &deblk_end));
 
-	sz = calc_size(namelen);
+	sz = calc_size(nlen);
 	if (unlikely(sz > deblk_end.deblk - room->deblk)) {
 		err = append_deblk(vdir);
 		if (unlikely(err))
@@ -374,11 +363,11 @@ static int append_de(struct au_vdir *vdir, char *name, int namelen, ino_t ino,
 		goto out;
 
 	dehstr->str = &room->de->de_str;
-	hlist_add_head(&dehstr->hash, au_name_hash(delist, name, namelen));
+	hlist_add_head(&dehstr->hash, au_name_hash(delist, name, nlen));
 	room->de->de_ino = ino;
 	room->de->de_type = d_type;
-	room->de->de_str.len = namelen;
-	memcpy(room->de->de_str.name, name, namelen);
+	room->de->de_str.len = nlen;
+	memcpy(room->de->de_str.name, name, nlen);
 
 	err = 0;
 	room->deblk += sz;
@@ -441,7 +430,7 @@ struct fillvdir_arg {
 	int			err;
 };
 
-static int fillvdir(void *__arg, const char *__name, int namelen,
+static int fillvdir(void *__arg, const char *__name, int nlen,
 		    loff_t offset __maybe_unused, u64 h_ino,
 		    unsigned int d_type)
 {
@@ -456,32 +445,32 @@ static int fillvdir(void *__arg, const char *__name, int namelen,
 	arg->err = 0;
 	au_fset_fillvdir(arg->flags, CALLED);
 	/* smp_mb(); */
-	if (namelen <= AUFS_WH_PFX_LEN
+	if (nlen <= AUFS_WH_PFX_LEN
 	    || memcmp(name, AUFS_WH_PFX, AUFS_WH_PFX_LEN)) {
 		delist = arg->delist;
 		whlist = arg->whlist;
 		for (bindex = 0; bindex < bend; bindex++)
-			if (test_known(delist++, name, namelen)
+			if (test_known(delist++, name, nlen)
 			    || au_nhash_test_known_wh(whlist + bindex, name,
-						      namelen))
+						      nlen))
 				goto out; /* already exists or whiteouted */
 
 		sb = arg->file->f_dentry->d_sb;
 		arg->err = au_ino(sb, bend, h_ino, d_type, &ino);
 		if (!arg->err)
-			arg->err = append_de(arg->vdir, name, namelen, ino,
+			arg->err = append_de(arg->vdir, name, nlen, ino,
 					     d_type, arg->delist + bend);
 	} else if (au_ftest_fillvdir(arg->flags, WHABLE)) {
 		name += AUFS_WH_PFX_LEN;
-		namelen -= AUFS_WH_PFX_LEN;
+		nlen -= AUFS_WH_PFX_LEN;
 		whlist = arg->whlist;
 		for (bindex = 0; bindex < bend; bindex++)
-			if (au_nhash_test_known_wh(whlist++, name, namelen))
+			if (au_nhash_test_known_wh(whlist++, name, nlen))
 				goto out; /* already whiteouted */
 
 		if (!arg->err)
 			arg->err = au_nhash_append_wh
-				(arg->whlist + bend, name, namelen, bend);
+				(arg->whlist + bend, name, nlen, bend);
 	}
 
  out:
