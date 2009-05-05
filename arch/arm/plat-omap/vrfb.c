@@ -87,7 +87,7 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	u32 control;
 
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d)\n", ctx, paddr,
-			width, height, bytespp);
+			width, height, color_mode);
 
 	switch (color_mode) {
 	case OMAP_DSS_COLOR_RGB16:
@@ -127,7 +127,7 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	vrfb_width = ALIGN(width * bytespp, VRFB_PAGE_WIDTH) / bytespp;
 	vrfb_height = ALIGN(height, VRFB_PAGE_HEIGHT);
 
-	DBG("vrfb w %u, h %u\n", vrfb_width, vrfb_height);
+	DBG("vrfb w %u, h %u bytespp %d\n", vrfb_width, vrfb_height, bytespp);
 
 	size  = vrfb_width << SMS_IMAGEWIDTH_OFFSET;
 	size |= vrfb_height << SMS_IMAGEHEIGHT_OFFSET;
