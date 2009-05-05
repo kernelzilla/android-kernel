@@ -38,7 +38,7 @@
 
 static struct {
 	struct platform_device *pdev;
-	unsigned	ctx_id;
+	int		ctx_id;
 
 	struct clk      *dss_ick;
 	struct clk	*dss1_fck;
@@ -63,22 +63,28 @@ module_param_named(debug, dss_debug, bool, 0644);
 #endif
 
 /* CONTEXT */
-static unsigned dss_get_ctx_id(void)
+static int dss_get_ctx_id(void)
 {
 	struct omap_dss_board_info *pdata = core.pdev->dev.platform_data;
+	int r;
 
 	if (!pdata->get_last_off_on_transaction_id)
 		return 0;
-
-	return pdata->get_last_off_on_transaction_id(&core.pdev->dev);
+	r = pdata->get_last_off_on_transaction_id(&core.pdev->dev);
+	if (r < 0) {
+		dev_err(&core.pdev->dev,
+			"getting transaction ID failed, will force context restore\n");
+		r = -1;
+	}
+	return r;
 }
 
 int dss_need_ctx_restore(void)
 {
 	int id = dss_get_ctx_id();
 
-	if (id != core.ctx_id) {
-		DSSDBG("ctx id %u -> id %u\n",
+	if (id < 0 || id != core.ctx_id) {
+		DSSDBG("ctx id %d -> id %d\n",
 				core.ctx_id, id);
 		core.ctx_id = id;
 		return 1;

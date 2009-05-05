@@ -236,7 +236,7 @@ struct device;
 
 /* Board specific data */
 struct  omap_dss_board_info {
-	unsigned (*get_last_off_on_transaction_id)(struct device *dev);
+	int (*get_last_off_on_transaction_id)(struct device *dev);
 	int (*dsi_power_up)(void);
 	void (*dsi_power_down)(void);
 	int num_displays;
