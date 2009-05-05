@@ -67,7 +67,7 @@ struct au_ren_args {
 	struct au_branch *br;
 	struct au_hinode *src_hinode;
 	struct path h_path;
-	struct au_nhash *whlist;
+	struct au_nhash whlist;
 	aufs_bindex_t btgt;
 
 	unsigned int flags;
@@ -246,17 +246,17 @@ static int au_ren_del_whtmp(struct au_ren_args *a)
 	struct inode *dir;
 
 	dir = a->dst_dir;
-	if (!au_nhash_test_longer_wh(a->whlist, a->btgt,
+	if (!au_nhash_test_longer_wh(&a->whlist, a->btgt,
 				     au_sbi(dir->i_sb)->si_dirwh)
 	    || au_test_fs_remote(a->h_dst->d_sb)) {
-		err = au_whtmp_rmdir(dir, a->btgt, a->h_dst, a->whlist);
+		err = au_whtmp_rmdir(dir, a->btgt, a->h_dst, &a->whlist);
 		if (unlikely(err))
 			AuWarn("failed removing whtmp dir %.*s (%d), "
 			       "ignored.\n", AuDLNPair(a->h_dst), err);
 	} else {
-		au_nhash_wh_free(a->thargs->whlist, /*bend*/0);
+		au_nhash_wh_free(&a->thargs->whlist);
 		a->thargs->whlist = a->whlist;
-		a->whlist = NULL;
+		a->whlist.nh_num = 0;
 		au_whtmp_kick_rmdir(dir, a->btgt, a->h_dst, a->thargs);
 		dput(a->h_dst);
 		a->thargs = NULL;
@@ -446,14 +446,14 @@ static int may_rename_srcdir(struct dentry *dentry, aufs_bindex_t btgt)
 
 	bstart = au_dbstart(dentry);
 	if (bstart != btgt) {
-		struct au_nhash *whlist;
+		struct au_nhash whlist;
 
-		whlist = au_nhash_alloc(dentry->d_sb, /*bend*/0, GFP_NOFS);
-		err = PTR_ERR(whlist);
-		if (IS_ERR(whlist))
+		err = au_nhash_alloc(&whlist, au_sbi(dentry->d_sb)->si_rdhash,
+				     GFP_NOFS);
+		if (unlikely(err))
 			goto out;
-		err = au_test_empty(dentry, whlist);
-		au_nhash_wh_free(whlist, /*bend*/0);
+		err = au_test_empty(dentry, &whlist);
+		au_nhash_wh_free(&whlist);
 		goto out;
 	}
 
@@ -477,16 +477,15 @@ static int au_ren_may_dir(struct au_ren_args *a)
 	int err;
 	struct dentry *d;
 
-	err = -ENOMEM;
 	d = a->dst_dentry;
-	a->whlist = au_nhash_alloc(d->d_sb, /*bend*/0, GFP_NOFS);
-	if (unlikely(!a->whlist))
+	err = au_nhash_alloc(&a->whlist, au_sbi(d->d_sb)->si_rdhash, GFP_NOFS);
+	if (unlikely(err))
 		goto out;
 
 	err = 0;
 	if (au_ftest_ren(a->flags, ISDIR) && a->dst_inode) {
 		au_set_dbstart(d, a->dst_bstart);
-		err = may_rename_dstdir(d, a->whlist);
+		err = may_rename_dstdir(d, &a->whlist);
 		au_set_dbstart(d, a->btgt);
 	}
 	a->dst_h_dentry = au_h_dptr(d, au_dbstart(d));
@@ -498,8 +497,8 @@ static int au_ren_may_dir(struct au_ren_args *a)
 	if (au_ftest_ren(a->flags, ISDIR)) {
 		err = may_rename_srcdir(d, a->btgt);
 		if (unlikely(err)) {
-			au_nhash_wh_free(a->whlist, /*bend*/0);
-			a->whlist = NULL;
+			au_nhash_wh_free(&a->whlist);
+			a->whlist.nh_num = 0;
 		}
 	}
  out:
@@ -911,8 +910,7 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
  out_hdir:
 	au_ren_unlock(a);
  out_children:
-	if (a->whlist)
-		au_nhash_wh_free(a->whlist, /*bend*/0);
+	au_nhash_wh_free(&a->whlist);
  out_unlock:
 	if (unlikely(err && au_ftest_ren(a->flags, ISDIR))) {
 		au_update_dbstart(a->dst_dentry);
