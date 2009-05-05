@@ -44,5 +44,6 @@ extern void omap_vrfb_adjust_size(u16 *width, u16 *height,
 extern void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 		u16 width, u16 height,
 		enum omap_color_mode color_mode);
+extern void omap_vrfb_restore_context(void);
 
 #endif /* __VRFB_H */

@@ -39,6 +39,33 @@
 /* bitmap of reserved contexts */
 static unsigned ctx_map;
 
+/*
+ * Access to this happens from client drivers or the PM core after wake-up.
+ * For the first case we require locking at the driver level, for the second
+ * we don't need locking, since no drivers will run until after the wake-up
+ * has finished.
+ */
+struct {
+	u32 physical_ba;
+	u32 control;
+	u32 size;
+} vrfb_hw_context[VRFB_NUM_CTXS];
+
+void omap_vrfb_restore_context(void)
+{
+	int i;
+
+	for (i = 0; i < VRFB_NUM_CTXS; i++) {
+		/* Restore only the active contexts */
+		if (!(ctx_map & (1 << i)))
+			continue;
+		omap_writel(vrfb_hw_context[i].control, SMS_ROT_CONTROL(i));
+		omap_writel(vrfb_hw_context[i].size, SMS_ROT_SIZE(i));
+		omap_writel(vrfb_hw_context[i].physical_ba,
+			    SMS_ROT_PHYSICAL_BA(i));
+	}
+}
+
 void omap_vrfb_adjust_size(u16 *width, u16 *height,
 		u8 bytespp)
 {
@@ -56,6 +83,8 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	u16 vrfb_height;
 	u8 ctx = vrfb->context;
 	u8 bytespp;
+	u32 size;
+	u32 control;
 
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d)\n", ctx, paddr,
 			width, height, bytespp);
@@ -100,15 +129,20 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 
 	DBG("vrfb w %u, h %u\n", vrfb_width, vrfb_height);
 
-	omap_writel(paddr, SMS_ROT_PHYSICAL_BA(ctx));
-	omap_writel((vrfb_width << SMS_IMAGEWIDTH_OFFSET) |
-			(vrfb_height << SMS_IMAGEHEIGHT_OFFSET),
-			SMS_ROT_SIZE(ctx));
+	size  = vrfb_width << SMS_IMAGEWIDTH_OFFSET;
+	size |= vrfb_height << SMS_IMAGEHEIGHT_OFFSET;
 
-	omap_writel(pixel_size_exp << SMS_PS_OFFSET |
-			VRFB_PAGE_WIDTH_EXP  << SMS_PW_OFFSET |
-			VRFB_PAGE_HEIGHT_EXP << SMS_PH_OFFSET,
-			SMS_ROT_CONTROL(ctx));
+	control  = pixel_size_exp << SMS_PS_OFFSET;
+	control |= VRFB_PAGE_WIDTH_EXP  << SMS_PW_OFFSET;
+	control |= VRFB_PAGE_HEIGHT_EXP << SMS_PH_OFFSET;
+
+	vrfb_hw_context[ctx].physical_ba = paddr;
+	vrfb_hw_context[ctx].size = size;
+	vrfb_hw_context[ctx].control = control;
+
+	omap_writel(paddr, SMS_ROT_PHYSICAL_BA(ctx));
+	omap_writel(size, SMS_ROT_SIZE(ctx));
+	omap_writel(control, SMS_ROT_CONTROL(ctx));
 
 	DBG("vrfb offset pixels %d, %d\n",
 			vrfb_width - width, vrfb_height - height);
