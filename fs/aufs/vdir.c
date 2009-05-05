@@ -11,6 +11,7 @@
  * virtual or vertical directory
  */
 
+#include <linux/hash.h>
 #include "aufs.h"
 
 static unsigned int calc_size(int nlen)
@@ -48,7 +49,7 @@ static unsigned char *last_deblk(struct au_vdir *vdir)
 
 /*
  * the allocated memory has to be freed by
- * au_nhash_wh_free() or void au_nhash_de_free().
+ * au_nhash_wh_free() or au_nhash_de_free().
  */
 int au_nhash_alloc(struct au_nhash *nhash, unsigned int num_hash, gfp_t gfp)
 {
@@ -65,6 +66,19 @@ int au_nhash_alloc(struct au_nhash *nhash, unsigned int num_hash, gfp_t gfp)
 	}
 
 	return -ENOMEM;
+}
+
+static void nhash_count(struct hlist_head *head)
+{
+#if 0
+	unsigned long n;
+	struct hlist_node *pos;
+
+	n = 0;
+	hlist_for_each(pos, head)
+		n++;
+	AuInfo("%lu\n", n);
+#endif
 }
 
 static void au_nhash_wh_do_free(struct hlist_head *head)
@@ -97,8 +111,10 @@ static void au_nhash_do_free(struct au_nhash *nhash,
 
 	n = nhash->nh_num;
 	head = nhash->nh_head;
-	for (u = 0; u < n; u++)
+	for (u = 0; u < n; u++) {
+		nhash_count(head);
 		free(head++);
+	}
 	kfree(nhash->nh_head);
 }
 
@@ -136,10 +152,24 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 }
 
 static struct hlist_head *au_name_hash(struct au_nhash *nhash,
-				       const unsigned char *name,
+				       unsigned char *name,
 				       unsigned int len)
 {
-	return nhash->nh_head + full_name_hash(name, len) % nhash->nh_num;
+	unsigned int v;
+	/* const unsigned int magic_bit = 12; */
+
+	v = 0;
+	while (len--)
+		v += *name++;
+	/* v = hash_long(v, magic_bit); */
+	v %= nhash->nh_num;
+	return nhash->nh_head + v;
+}
+
+static int au_nhash_test_name(struct au_vdir_destr *str, const char *name,
+			      int nlen)
+{
+	return str->len == nlen && !memcmp(str->name, name, nlen);
 }
 
 /* returns found or not */
@@ -154,11 +184,31 @@ int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int nlen)
 	hlist_for_each_entry(tpos, pos, head, wh_hash) {
 		str = &tpos->wh_str;
 		AuDbg("%.*s\n", str->len, str->name);
-		if (str->len == nlen && !memcmp(str->name, name, nlen))
+		if (au_nhash_test_name(str, name, nlen))
 			return 1;
 	}
 	return 0;
 }
+
+/* returns found(true) or not */
+static int test_known(struct au_nhash *delist, char *name, int nlen)
+{
+	struct hlist_head *head;
+	struct au_vdir_dehstr *tpos;
+	struct hlist_node *pos;
+	struct au_vdir_destr *str;
+
+	head = au_name_hash(delist, name, nlen);
+	hlist_for_each_entry(tpos, pos, head, hash) {
+		str = tpos->str;
+		AuDbg("%.*s\n", str->len, str->name);
+		if (au_nhash_test_name(str, name, nlen))
+			return 1;
+	}
+	return 0;
+}
+
+/* ---------------------------------------------------------------------- */
 
 int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 		       aufs_bindex_t bindex)
@@ -167,6 +217,7 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 	struct au_vdir_destr *str;
 	struct au_vdir_wh *wh;
 
+	AuDbg("%.*s\n", nlen, name);
 	err = -ENOMEM;
 	wh = kmalloc(sizeof(*wh) + nlen, GFP_NOFS);
 	if (unlikely(!wh))
@@ -182,19 +233,6 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 
  out:
 	return err;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void au_vdir_free(struct au_vdir *vdir)
-{
-	unsigned char **deblk;
-
-	deblk = vdir->vd_deblk;
-	while (vdir->vd_nblk--)
-		kfree(*deblk++);
-	kfree(vdir->vd_deblk);
-	au_cache_free_vdir(vdir);
 }
 
 static int append_deblk(struct au_vdir *vdir)
@@ -224,6 +262,68 @@ static int append_deblk(struct au_vdir *vdir)
 
  out:
 	return err;
+}
+
+static int append_de(struct au_vdir *vdir, char *name, int nlen, ino_t ino,
+		     unsigned int d_type, struct au_nhash *delist)
+{
+	int err;
+	unsigned int sz;
+	const unsigned int deblk_sz = vdir->vd_deblk_sz;
+	union au_vdir_deblk_p p, *room, deblk_end;
+	struct au_vdir_dehstr *dehstr;
+
+	p.deblk = last_deblk(vdir);
+	deblk_end.deblk = p.deblk + deblk_sz;
+	room = &vdir->vd_last.p;
+	AuDebugOn(room->deblk < p.deblk || deblk_end.deblk <= room->deblk
+		  || !is_deblk_end(room, &deblk_end));
+
+	sz = calc_size(nlen);
+	if (unlikely(sz > deblk_end.deblk - room->deblk)) {
+		err = append_deblk(vdir);
+		if (unlikely(err))
+			goto out;
+
+		p.deblk = last_deblk(vdir);
+		deblk_end.deblk = p.deblk + deblk_sz;
+		/* smp_mb(); */
+		AuDebugOn(room->deblk != p.deblk);
+	}
+
+	err = -ENOMEM;
+	dehstr = au_cache_alloc_dehstr();
+	if (unlikely(!dehstr))
+		goto out;
+
+	dehstr->str = &room->de->de_str;
+	hlist_add_head(&dehstr->hash, au_name_hash(delist, name, nlen));
+	room->de->de_ino = ino;
+	room->de->de_type = d_type;
+	room->de->de_str.len = nlen;
+	memcpy(room->de->de_str.name, name, nlen);
+
+	err = 0;
+	room->deblk += sz;
+	if (unlikely(set_deblk_end(room, &deblk_end)))
+		err = append_deblk(vdir);
+	/* smp_mb(); */
+
+ out:
+	return err;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void au_vdir_free(struct au_vdir *vdir)
+{
+	unsigned char **deblk;
+
+	deblk = vdir->vd_deblk;
+	while (vdir->vd_nblk--)
+		kfree(*deblk++);
+	kfree(vdir->vd_deblk);
+	au_cache_free_vdir(vdir);
 }
 
 static struct au_vdir *alloc_vdir(struct super_block *sb)
@@ -276,76 +376,6 @@ static int reinit_vdir(struct au_vdir *vdir)
 	vdir->vd_version = 0;
 	vdir->vd_jiffy = 0;
 	/* smp_mb(); */
-	return err;
-}
-
-/* ---------------------------------------------------------------------- */
-
-/* returns found(true) or not */
-static int test_known(struct au_nhash *delist, char *name, int nlen)
-{
-	struct hlist_head *head;
-	struct au_vdir_dehstr *tpos;
-	struct hlist_node *pos;
-	struct au_vdir_destr *str;
-
-	head = au_name_hash(delist, name, nlen);
-	hlist_for_each_entry(tpos, pos, head, hash) {
-		str = tpos->str;
-		AuDbg("%.*s\n", str->len, str->name);
-		if (str->len == nlen && !memcmp(str->name, name, nlen))
-			return 1;
-	}
-	return 0;
-
-}
-
-static int append_de(struct au_vdir *vdir, char *name, int nlen, ino_t ino,
-		     unsigned int d_type, struct au_nhash *delist)
-{
-	int err;
-	unsigned int sz;
-	const unsigned int deblk_sz = vdir->vd_deblk_sz;
-	union au_vdir_deblk_p p, *room, deblk_end;
-	struct au_vdir_dehstr *dehstr;
-
-	p.deblk = last_deblk(vdir);
-	deblk_end.deblk = p.deblk + deblk_sz;
-	room = &vdir->vd_last.p;
-	AuDebugOn(room->deblk < p.deblk || deblk_end.deblk <= room->deblk
-		  || !is_deblk_end(room, &deblk_end));
-
-	sz = calc_size(nlen);
-	if (unlikely(sz > deblk_end.deblk - room->deblk)) {
-		err = append_deblk(vdir);
-		if (unlikely(err))
-			goto out;
-
-		p.deblk = last_deblk(vdir);
-		deblk_end.deblk = p.deblk + deblk_sz;
-		/* smp_mb(); */
-		AuDebugOn(room->deblk != p.deblk);
-	}
-
-	err = -ENOMEM;
-	dehstr = au_cache_alloc_dehstr();
-	if (unlikely(!dehstr))
-		goto out;
-
-	dehstr->str = &room->de->de_str;
-	hlist_add_head(&dehstr->hash, au_name_hash(delist, name, nlen));
-	room->de->de_ino = ino;
-	room->de->de_type = d_type;
-	room->de->de_str.len = nlen;
-	memcpy(room->de->de_str.name, name, nlen);
-
-	err = 0;
-	room->deblk += sz;
-	if (unlikely(set_deblk_end(room, &deblk_end)))
-		err = append_deblk(vdir);
-	/* smp_mb(); */
-
- out:
 	return err;
 }
 
@@ -578,10 +608,9 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 
 	n = src->vd_nblk;
 	for (ul = 1; ul < n; ul++) {
-		tgt->vd_deblk[ul] = kmalloc(deblk_sz, GFP_NOFS);
-		if (tgt->vd_deblk[ul])
-			memcpy(tgt->vd_deblk[ul], src->vd_deblk[ul], deblk_sz);
-		else
+		tgt->vd_deblk[ul] = kmemdup(src->vd_deblk[ul], deblk_sz,
+					    GFP_NOFS);
+		if (unlikely(!tgt->vd_deblk[ul]))
 			goto out;
 	}
 	/* smp_mb(); */
