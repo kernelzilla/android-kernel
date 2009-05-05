@@ -39,6 +39,8 @@ struct vrfb
 
 extern int omap_vrfb_request_ctx(struct vrfb *vrfb);
 extern void omap_vrfb_release_ctx(struct vrfb *vrfb);
+extern void omap_vrfb_suspend_ctx(struct vrfb *vrfb);
+extern void omap_vrfb_resume_ctx(struct vrfb *vrfb);
 extern void omap_vrfb_adjust_size(u16 *width, u16 *height,
 		u8 bytespp);
 extern void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,

@@ -1042,6 +1042,30 @@ static int omapfb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 	return 0;
 }
 
+static void omapfb_vrfb_suspend_all(struct omapfb2_device *fbdev)
+{
+	int i;
+
+	for (i = 0; i < fbdev->num_fbs; i++) {
+		struct omapfb_info *ofbi = FB2OFB(fbdev->fbs[i]);
+
+		if (ofbi->region.vrfb.vaddr[0])
+			omap_vrfb_suspend_ctx(&ofbi->region.vrfb);
+	}
+}
+
+static void omapfb_vrfb_resume_all(struct omapfb2_device *fbdev)
+{
+	int i;
+
+	for (i = 0; i < fbdev->num_fbs; i++) {
+		struct omapfb_info *ofbi = FB2OFB(fbdev->fbs[i]);
+
+		if (ofbi->region.vrfb.vaddr[0])
+			omap_vrfb_resume_ctx(&ofbi->region.vrfb);
+	}
+}
+
 static int omapfb_blank(int blank, struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
@@ -1056,6 +1080,8 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 	case FB_BLANK_UNBLANK:
 		if (display->state != OMAP_DSS_DISPLAY_SUSPENDED)
 			goto exit;
+
+		omapfb_vrfb_resume_all(fbdev);
 
 		if (display->resume)
 			r = display->resume(display);
@@ -1078,6 +1104,8 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 
 		if (display->suspend)
 			r = display->suspend(display);
+
+		omapfb_vrfb_suspend_all(fbdev);
 
 		break;
 

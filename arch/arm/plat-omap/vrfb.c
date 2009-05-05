@@ -1,7 +1,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/ioport.h>
+
 #include <asm/io.h>
+#include <asm/bitops.h>
 
 #include <mach/io.h>
 #include <mach/vrfb.h>
@@ -37,7 +39,9 @@
 
 #define VRFB_NUM_CTXS 12
 /* bitmap of reserved contexts */
-static unsigned ctx_map;
+static unsigned long ctx_map;
+/* bitmap of contexts for which we have to keep the HW context valid */
+static unsigned long ctx_map_active;
 
 /*
  * Access to this happens from client drivers or the PM core after wake-up.
@@ -51,18 +55,23 @@ struct {
 	u32 size;
 } vrfb_hw_context[VRFB_NUM_CTXS];
 
+static void inline restore_hw_context(int ctx)
+{
+	omap_writel(vrfb_hw_context[ctx].control, SMS_ROT_CONTROL(ctx));
+	omap_writel(vrfb_hw_context[ctx].size, SMS_ROT_SIZE(ctx));
+	omap_writel(vrfb_hw_context[ctx].physical_ba, SMS_ROT_PHYSICAL_BA(ctx));
+}
+
 void omap_vrfb_restore_context(void)
 {
 	int i;
+	unsigned long map = ctx_map_active;
 
-	for (i = 0; i < VRFB_NUM_CTXS; i++) {
-		/* Restore only the active contexts */
-		if (!(ctx_map & (1 << i)))
-			continue;
-		omap_writel(vrfb_hw_context[i].control, SMS_ROT_CONTROL(i));
-		omap_writel(vrfb_hw_context[i].size, SMS_ROT_SIZE(i));
-		omap_writel(vrfb_hw_context[i].physical_ba,
-			    SMS_ROT_PHYSICAL_BA(i));
+	for (i = ffs(map); i; i = ffs(map)) {
+		/* i=1..32 */
+		i--;
+		map &= ~(1 << i);
+		restore_hw_context(i);
 	}
 }
 
@@ -156,13 +165,20 @@ EXPORT_SYMBOL(omap_vrfb_setup);
 void omap_vrfb_release_ctx(struct vrfb *vrfb)
 {
 	int rot;
+	int ctx = vrfb->context;
 
-	if (vrfb->context == 0xff)
+	if (ctx == 0xff)
 		return;
 
-	DBG("release ctx %d\n", vrfb->context);
+	DBG("release ctx %d\n", ctx);
 
-	ctx_map &= ~(1 << vrfb->context);
+	if (!(ctx_map & (1 << ctx))) {
+		BUG();
+		return;
+	}
+	WARN_ON(!(ctx_map_active & (1 << ctx)));
+	clear_bit(ctx, &ctx_map_active);
+	clear_bit(ctx, &ctx_map);
 
 	for (rot = 0; rot < 4; ++rot) {
 		if(vrfb->paddr[rot]) {
@@ -194,7 +210,9 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 
 	DBG("found free ctx %d\n", ctx);
 
-	ctx_map |= 1 << ctx;
+	set_bit(ctx, &ctx_map);
+	WARN_ON(ctx_map_active & (1 << ctx));
+	set_bit(ctx, &ctx_map_active);
 
 	memset(vrfb, 0, sizeof(*vrfb));
 
@@ -218,4 +236,35 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 	return 0;
 }
 EXPORT_SYMBOL(omap_vrfb_request_ctx);
+
+void omap_vrfb_suspend_ctx(struct vrfb *vrfb)
+{
+	DBG("suspend ctx %d\n", vrfb->context);
+	if (vrfb->context >= VRFB_NUM_CTXS ||
+	    (!(1 << vrfb->context) & ctx_map_active)) {
+		BUG();
+		return;
+	}
+	clear_bit(vrfb->context, &ctx_map_active);
+}
+EXPORT_SYMBOL(omap_vrfb_suspend_ctx);
+
+void omap_vrfb_resume_ctx(struct vrfb *vrfb)
+{
+	DBG("resume ctx %d\n", vrfb->context);
+	if (vrfb->context >= VRFB_NUM_CTXS ||
+	    ((1 << vrfb->context) & ctx_map_active)) {
+		BUG();
+		return;
+	}
+	/*
+	 * omap_vrfb_restore_context is normally called by the core domain
+	 * save / restore logic, but since this VRFB context was suspended
+	 * those calls didn't actually restore the context and now we might
+	 * have an invalid context. Do an explicit restore here.
+	 */
+	restore_hw_context(vrfb->context);
+	set_bit(vrfb->context, &ctx_map_active);
+}
+EXPORT_SYMBOL(omap_vrfb_resume_ctx);
 
