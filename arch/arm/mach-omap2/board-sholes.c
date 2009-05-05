@@ -258,11 +258,11 @@ static void __init sholes_map_io(void)
 	omap2_map_common_io();
 }
 
-MACHINE_START(SHOLES, "Motorola Product - Sholes Phone")
+MACHINE_START(SHOLES, "sholes")
 	/* Maintainer: Motorola, Inc. */
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
-#if 1
+#ifdef CONFIG_MACH_SHOLES_UMTS
 	.boot_params	= 0x80C00100,
 #else
 	.boot_params	= 0x80000100,
