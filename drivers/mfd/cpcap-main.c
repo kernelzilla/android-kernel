@@ -1,0 +1,186 @@
+/*
+ * Copyright (C) 2007-2009 Motorola, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307, USA
+ */
+
+#include <linux/fs.h>
+#include <linux/input.h>
+#include <linux/miscdevice.h>
+#include <linux/spi/spi.h>
+#include <linux/spi/cpcap.h>
+#include <asm/uaccess.h>
+#include "cpcap-main.h"
+#include "cpcap-regbits.h"
+
+static int ioctl(struct inode *inode,
+		 struct file *file, unsigned int cmd, unsigned long arg);
+static int __devinit cpcap_probe(struct spi_device *spi);
+static int __devexit cpcap_remove(struct spi_device *spi);
+static int test_ioctl(unsigned int cmd, unsigned long arg);
+
+const static struct file_operations cpcap_fops = {
+	.owner = THIS_MODULE,
+	.ioctl = ioctl,
+};
+
+static struct miscdevice cpcap_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= CPCAP_DEV_NAME,
+	.fops	= &cpcap_fops,
+};
+
+static struct spi_driver cpcap_driver = {
+	.driver = {
+		   .name = "cpcap",
+		   .bus = &spi_bus_type,
+		   .owner = THIS_MODULE,
+		   },
+	.probe = cpcap_probe,
+	.remove = __devexit_p(cpcap_remove),
+};
+
+static struct input_dev *input_dev;
+
+static struct spi_device *cpcap_spi_dev;
+
+static int cpcap_key_init(struct spi_device *spi)
+{
+	int retval = 0;
+
+	input_dev = input_allocate_device();
+
+	if (input_dev) {
+		set_bit(EV_KEY, input_dev->evbit);
+		set_bit(KEY_MEDIA, input_dev->keybit);
+		set_bit(KEY_END, input_dev->keybit);
+
+		input_dev->name = "cpcap-key";
+
+		if (input_register_device(input_dev) < 0) {
+			pr_err("cpcap: Could not register input device.\n");
+
+			input_free_device(input_dev);
+			input_dev = NULL;
+		}
+	} else {
+		retval = -EINVAL;
+		pr_err("cpcap: Could not allocate input device.\n");
+	}
+
+	return retval;
+}
+
+static __init int cpcap_init(void)
+{
+	return spi_register_driver(&cpcap_driver);
+}
+
+static int __devinit cpcap_probe(struct spi_device *spi)
+{
+	int retval = -EINVAL;
+
+	cpcap_spi_dev = spi;
+
+	retval = cpcap_regacc_init(spi);
+
+	if (retval >= 0)
+		retval = cpcap_key_init(spi);
+
+	if (retval >= 0)
+		retval = misc_register(&cpcap_dev);
+
+	return retval;
+}
+
+static int __devexit cpcap_remove(struct spi_device *spi)
+{
+	cpcap_spi_dev = NULL;
+	misc_deregister(&cpcap_dev);
+	return 0;
+}
+
+static int ioctl(struct inode *inode,
+		 struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int retval = -ENOTTY;
+	unsigned int cmd_num;
+
+	cmd_num = _IOC_NR(cmd);
+
+	if ((cmd_num > CPCAP_IOCTL_NUM_TEST__START) &&
+	    (cmd_num < CPCAP_IOCTL_NUM_TEST__END)) {
+		retval = test_ioctl(cmd, arg);
+	}
+
+	return retval;
+}
+
+static int test_ioctl(unsigned int cmd, unsigned long arg)
+{
+	int retval = -EINVAL;
+	struct cpcap_regacc read_data;
+	struct cpcap_regacc write_data;
+
+	switch (cmd) {
+	case CPCAP_IOCTL_TEST_READ_REG:
+		if (copy_from_user((void *)&read_data, (void *)arg,
+				   sizeof(read_data)))
+			return -EFAULT;
+		retval = cpcap_regacc_read(cpcap_spi_dev, read_data.reg,
+					   &read_data.value);
+		if (retval < 0)
+			return retval;
+		if (copy_to_user((void *)arg, (void *)&read_data,
+				 sizeof(read_data)))
+			return -EFAULT;
+		return 0;
+	break;
+
+	case CPCAP_IOCTL_TEST_WRITE_REG:
+		if (copy_from_user((void *) &write_data,
+				   (void *) arg,
+				   sizeof(write_data)))
+			return -EFAULT;
+		retval = cpcap_regacc_write(cpcap_spi_dev, write_data.reg,
+					    write_data.value, write_data.mask);
+	break;
+
+	default:
+		retval = -ENOTTY;
+	break;
+	}
+
+	return retval;
+}
+
+static void cpcap_shutdown(void)
+{
+	spi_unregister_driver(&cpcap_driver);
+}
+
+void cpcap_broadcast_key_event(struct spi_device *spi, unsigned int code,
+			       int value)
+{
+	if (input_dev)
+		input_report_key(input_dev, code, value);
+}
+
+module_init(cpcap_init);
+module_exit(cpcap_shutdown);
+
+MODULE_DESCRIPTION("CPCAP driver");
+MODULE_AUTHOR("Motorola");
+MODULE_LICENSE("GPL");

@@ -253,6 +253,12 @@ config PCF50633_GPIO
 	 Say yes here if you want to include support GPIO for pins on
 	 the PCF50633 chip.
 
+config MFD_CPCAP
+	tristate "Support for CPCAP"
+	depends on SPI
+	help
+	 Say yes here if you want to include drivers for the CPCAP chip.
+
 endmenu
 
 menu "Multimedia Capabilities Port drivers"
