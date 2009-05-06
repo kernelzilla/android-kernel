@@ -238,14 +238,14 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 static int append_deblk(struct au_vdir *vdir)
 {
 	int err;
-	unsigned long sz, ul;
+	unsigned long ul;
 	const unsigned int deblk_sz = vdir->vd_deblk_sz;
 	union au_vdir_deblk_p p, deblk_end;
 	unsigned char **o;
 
 	err = -ENOMEM;
-	sz = sizeof(*o) * vdir->vd_nblk;
-	o = au_kzrealloc(vdir->vd_deblk, sz, sz + sizeof(*o), GFP_NOFS);
+	o = krealloc(vdir->vd_deblk, sizeof(*o) * (vdir->vd_nblk + 1),
+		     GFP_NOFS);
 	if (unlikely(!o))
 		goto out;
 
@@ -591,8 +591,8 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 	if (tgt->vd_nblk < src->vd_nblk) {
 		unsigned char **p;
 
-		p = au_kzrealloc(tgt->vd_deblk, sizeof(*p) * tgt->vd_nblk,
-				 sizeof(*p) * src->vd_nblk, GFP_NOFS);
+		p = krealloc(tgt->vd_deblk, sizeof(*p) * src->vd_nblk,
+			     GFP_NOFS);
 		if (unlikely(!p))
 			goto out;
 		tgt->vd_deblk = p;
