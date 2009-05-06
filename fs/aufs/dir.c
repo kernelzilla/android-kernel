@@ -326,7 +326,7 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 #define au_fclr_testempty(flags, name)	{ (flags) &= ~AuTestEmpty_##name; }
 
 struct test_empty_arg {
-	struct au_nhash *whlist;
+	struct au_nhash whlist;
 	unsigned int flags;
 	int err;
 	aufs_bindex_t bindex;
@@ -349,16 +349,16 @@ static int test_empty_cb(void *__arg, const char *__name, int namelen,
 	if (namelen <= AUFS_WH_PFX_LEN
 	    || memcmp(name, AUFS_WH_PFX, AUFS_WH_PFX_LEN)) {
 		if (au_ftest_testempty(arg->flags, WHONLY)
-		    && !au_nhash_test_known_wh(arg->whlist, name, namelen))
+		    && !au_nhash_test_known_wh(&arg->whlist, name, namelen))
 			arg->err = -ENOTEMPTY;
 		goto out;
 	}
 
 	name += AUFS_WH_PFX_LEN;
 	namelen -= AUFS_WH_PFX_LEN;
-	if (!au_nhash_test_known_wh(arg->whlist, name, namelen))
+	if (!au_nhash_test_known_wh(&arg->whlist, name, namelen))
 		arg->err = au_nhash_append_wh
-			(arg->whlist, name, namelen, arg->bindex);
+			(&arg->whlist, name, namelen, arg->bindex);
 
  out:
 	/* smp_mb(); */
@@ -446,15 +446,13 @@ int au_test_empty_lower(struct dentry *dentry)
 	int err;
 	aufs_bindex_t bindex, bstart, btail;
 	struct test_empty_arg arg;
-	struct au_nhash *whlist;
 
-	whlist = au_nhash_alloc(dentry->d_sb, /*bend*/0, GFP_NOFS);
-	err = PTR_ERR(whlist);
-	if (IS_ERR(whlist))
+	err = au_nhash_alloc(&arg.whlist, au_sbi(dentry->d_sb)->si_rdhash,
+			     GFP_NOFS);
+	if (unlikely(err))
 		goto out;
 
 	bstart = au_dbstart(dentry);
-	arg.whlist = whlist;
 	arg.flags = 0;
 	arg.bindex = bstart;
 	err = do_test_empty(dentry, &arg);
@@ -474,7 +472,7 @@ int au_test_empty_lower(struct dentry *dentry)
 	}
 
  out_whlist:
-	au_nhash_wh_free(whlist, /*bend*/0);
+	au_nhash_wh_free(&arg.whlist);
  out:
 	return err;
 }
@@ -486,7 +484,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 	aufs_bindex_t bindex, btail;
 
 	err = 0;
-	arg.whlist = whlist;
+	arg.whlist = *whlist;
 	arg.flags = AuTestEmpty_WHONLY;
 	btail = au_dbtaildir(dentry);
 	for (bindex = au_dbstart(dentry); !err && bindex <= btail; bindex++) {

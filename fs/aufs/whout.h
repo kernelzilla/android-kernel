@@ -52,7 +52,7 @@ struct au_whtmp_rmdir {
 	struct inode *dir;
 	aufs_bindex_t bindex;
 	struct dentry *wh_dentry;
-	struct au_nhash *whlist;
+	struct au_nhash whlist;
 };
 
 struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp);
