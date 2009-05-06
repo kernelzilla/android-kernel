@@ -197,7 +197,7 @@ static struct GT_Mask driverTrace;
 static struct file_operations bridge_fops = {
 	.open		= bridge_open,
 	.release	= bridge_release,
-	.ioctl		= bridge_ioctl,
+	.unlocked_ioctl	= bridge_ioctl,
 	.mmap		= bridge_mmap,
 };
 
@@ -665,7 +665,7 @@ static int bridge_release(struct inode *ip, struct file *filp)
 }
 
 /* This function provides IO interface to the bridge driver. */
-static int bridge_ioctl(struct inode *ip, struct file *filp, unsigned int code,
+static int bridge_ioctl(struct file *filp, unsigned int code,
 		unsigned long args)
 {
 	int status;
