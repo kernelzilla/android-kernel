@@ -457,14 +457,12 @@ static int __init omap_i2c_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_OMAP_HS_MMC3
 static void config_wlan_gpio(void)
 {
 	/* WLAN IRQ */
 	omap_cfg_reg(B24_3430_GPIO101);
 	omap_cfg_reg(W21_3430_GPIO162);
 }
-#endif
 
 static struct twl4030_hsmmc_info mmc[] __initdata = {
         {
@@ -491,9 +489,7 @@ static void __init omap_zoom2_init(void)
 	omap_serial_init();
 	usb_musb_init();
 	twl4030_mmc_init(mmc);
-#ifdef CONFIG_OMAP_HS_MMC3
 	config_wlan_gpio();
-#endif
 #if 0
 	hsmmc_init();
 #endif
