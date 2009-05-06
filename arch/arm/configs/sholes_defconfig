@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Tue Apr 28 19:03:53 2009
+# Tue May  5 17:01:48 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -221,6 +221,7 @@ CONFIG_ARCH_OMAP3430=y
 # CONFIG_MACH_OMAP3EVM is not set
 # CONFIG_MACH_OMAP3_BEAGLE is not set
 CONFIG_MACH_SHOLES=y
+CONFIG_MACH_SHOLES_UMTS=y
 # CONFIG_MACH_OVERO is not set
 # CONFIG_MACH_OMAP3_PANDORA is not set
 
@@ -429,21 +430,30 @@ CONFIG_BT_BNEP=y
 # CONFIG_BT_BNEP_MC_FILTER is not set
 # CONFIG_BT_BNEP_PROTO_FILTER is not set
 CONFIG_BT_HIDP=y
-# CONFIG_AF_RXRPC is not set
-# CONFIG_PHONET is not set
-# CONFIG_WIRELESS is not set
-# CONFIG_WIMAX is not set
-CONFIG_RFKILL=y
-# CONFIG_NET_9P is not set
 
 #
 # Bluetooth device drivers
 #
+# CONFIG_BT_HCIBTUSB is not set
 # CONFIG_BT_HCIBTSDIO is not set
 CONFIG_BT_HCIUART=y
 CONFIG_BT_HCIUART_H4=y
 # CONFIG_BT_HCIUART_BCSP is not set
 CONFIG_BT_HCIUART_LL=y
+# CONFIG_BT_HCIBCM203X is not set
+# CONFIG_BT_HCIBPA10X is not set
+# CONFIG_BT_HCIBFUSB is not set
+# CONFIG_BT_HCIBRF6150 is not set
+# CONFIG_BT_HCIH4P is not set
+# CONFIG_BT_HCIVHCI is not set
+# CONFIG_AF_RXRPC is not set
+# CONFIG_PHONET is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_WIMAX is not set
+CONFIG_RFKILL=y
+CONFIG_RFKILL_PM=y
+# CONFIG_RFKILL_INPUT is not set
+# CONFIG_NET_9P is not set
 
 #
 # Device Drivers
@@ -680,6 +690,7 @@ CONFIG_NETDEV_10000=y
 # CONFIG_USB_PEGASUS is not set
 # CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_USBNET is not set
+# CONFIG_USB_HSO is not set
 # CONFIG_WAN is not set
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
@@ -714,9 +725,9 @@ CONFIG_INPUT_KEYBOARD=y
 # CONFIG_KEYBOARD_XTKBD is not set
 # CONFIG_KEYBOARD_NEWTON is not set
 # CONFIG_KEYBOARD_STOWAWAY is not set
+CONFIG_KEYBOARD_OMAP=y
 # CONFIG_KEYBOARD_TWL4030 is not set
 # CONFIG_KEYBOARD_GPIO is not set
-CONFIG_KEYBOARD_OMAP=y
 # CONFIG_INPUT_MOUSE is not set
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TABLET is not set
