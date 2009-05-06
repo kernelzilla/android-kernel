@@ -396,7 +396,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	aufs_read_lock(dentry, AuLock_DW | AuLock_FLUSH);
 	parent = dentry->d_parent; /* dir inode is locked */
 	di_write_lock_parent(parent);
-	err = au_test_empty(dentry, args->whlist);
+	err = au_test_empty(dentry, &args->whlist);
 	if (unlikely(err))
 		goto out_args;
 
@@ -412,7 +412,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	dget(h_dentry);
 	rmdir_later = 0;
 	if (bindex == bstart) {
-		err = renwh_and_rmdir(dentry, bstart, args->whlist, dir);
+		err = renwh_and_rmdir(dentry, bstart, &args->whlist, dir);
 		if (err > 0) {
 			rmdir_later = err;
 			err = 0;
