@@ -22,6 +22,7 @@ enum {
 	Opt_add, Opt_del, Opt_mod, Opt_reorder, Opt_append, Opt_prepend,
 	Opt_idel, Opt_imod, Opt_ireorder,
 	Opt_dirwh, Opt_rdcache, Opt_rdblk, Opt_rdhash, Opt_rendir,
+	Opt_rdblk_def, Opt_rdhash_def,
 	Opt_xino, Opt_zxino, Opt_noxino,
 	Opt_trunc_xino, Opt_trunc_xino_v, Opt_notrunc_xino,
 	Opt_trunc_xino_path, Opt_itrunc_xino,
@@ -113,7 +114,9 @@ static match_table_t options = {
 
 	{Opt_rdcache, "rdcache=%d"},
 	{Opt_rdblk, "rdblk=%d"},
+	{Opt_rdblk_def, "rdblk=def"},
 	{Opt_rdhash, "rdhash=%d"},
+	{Opt_rdhash_def, "rdhash=def"},
 
 	{Opt_wbr_create, "create=%s"},
 	{Opt_wbr_create, "create_policy=%s"},
@@ -392,8 +395,14 @@ static void dump_opts(struct au_opts *opts)
 		case Opt_rdblk:
 			AuDbg("rdblk %u\n", opt->rdblk);
 			break;
+		case Opt_rdblk_def:
+			AuDbg("rdblk_def\n");
+			break;
 		case Opt_rdhash:
 			AuDbg("rdhash %u\n", opt->rdhash);
+			break;
+		case Opt_rdhash_def:
+			AuDbg("rdhash_def\n");
 			break;
 		case Opt_xino:
 			u.xino = &opt->xino;
@@ -921,6 +930,8 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		case Opt_sum:
 		case Opt_nosum:
 		case Opt_wsum:
+		case Opt_rdblk_def:
+		case Opt_rdhash_def:
 			err = 0;
 			opt->type = token;
 			break;
@@ -1110,8 +1121,14 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 	case Opt_rdblk:
 		sbinfo->si_rdblk = opt->rdblk;
 		break;
+	case Opt_rdblk_def:
+		sbinfo->si_rdblk = AUFS_RDBLK_DEF;
+		break;
 	case Opt_rdhash:
 		sbinfo->si_rdhash = opt->rdhash;
+		break;
+	case Opt_rdhash_def:
+		sbinfo->si_rdhash = AUFS_RDHASH_DEF;
 		break;
 
 	case Opt_trunc_xino:
