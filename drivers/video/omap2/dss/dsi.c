@@ -1396,28 +1396,28 @@ static void dsi_complexio_timings(void)
 	/* 1 * DDR_CLK = 2 * UI */
 
 	/* min 40ns + 4*UI	max 85ns + 6*UI */
-	ths_prepare = ns2ddr(59) + 2;
+	ths_prepare = ns2ddr(70) + 2;
 
 	/* min 145ns + 10*UI */
-	ths_prepare_ths_zero = ns2ddr(145) + 5;
+	ths_prepare_ths_zero = ns2ddr(175) + 2;
 
 	/* min max(8*UI, 60ns+4*UI) */
-	ths_trail = max((unsigned)4, ns2ddr(60) + 2);
+	ths_trail = ns2ddr(60) + 5;
 
 	/* min 100ns */
-	ths_exit = ns2ddr(100);
+	ths_exit = ns2ddr(145);
 
 	/* tlpx min 50n */
 	tlpx_half = ns2ddr(25);
 
 	/* min 60ns */
-	tclk_trail = ns2ddr(60);
+	tclk_trail = ns2ddr(60) + 2;
 
 	/* min 38ns, max 95ns */
-	tclk_prepare = ns2ddr(38);
+	tclk_prepare = ns2ddr(65);
 
 	/* min tclk-prepare + tclk-zero = 300ns */
-	tclk_zero = ns2ddr(300 - 38);
+	tclk_zero = ns2ddr(260);
 
 	DSSDBG("ths_prepare %u (%uns), ths_prepare_ths_zero %u (%uns)\n",
 		ths_prepare, ddr2ns(ths_prepare),
@@ -2366,9 +2366,19 @@ static void dsi_proto_timings(struct omap_display *display)
 	/* min 60ns + 52*UI */
 	tclk_post = ns2ddr(60) + 26;
 
+	/* ths_eot is 2 for 2 datalanes and 4 for 1 datalane */
+	if (display->hw_config.u.dsi.data1_lane != 0 &&
+			display->hw_config.u.dsi.data2_lane != 0)
+		ths_eot = 2;
+	else
+		ths_eot = 4;
+
 	ddr_clk_pre = DIV_ROUND_UP(tclk_pre + tlpx + tclk_zero + tclk_prepare,
 			4);
-	ddr_clk_post = DIV_ROUND_UP(tclk_post + tclk_trail, 4);
+	ddr_clk_post = DIV_ROUND_UP(tclk_post + tclk_trail, 4) + ths_eot;
+
+	BUG_ON(ddr_clk_pre == 0 || ddr_clk_pre > 255);
+	BUG_ON(ddr_clk_post == 0 || ddr_clk_post > 255);
 
 	r = dsi_read_reg(DSI_CLK_TIMING);
 	r = FLD_MOD(r, ddr_clk_pre, 15, 8);
@@ -2379,14 +2389,9 @@ static void dsi_proto_timings(struct omap_display *display)
 			ddr_clk_pre,
 			ddr_clk_post);
 
-	/* ths_eot is 2 for 2 datalanes and 4 for 1 datalane */
-	if (display->hw_config.u.dsi.data1_lane != 0 &&
-			display->hw_config.u.dsi.data2_lane != 0)
-		ths_eot = 2;
-	else
-		ths_eot = 4;
-
-	enter_hs_mode_lat = DIV_ROUND_UP(tlpx + ths_prepare + ths_zero, 4) + 4;
+	enter_hs_mode_lat = 1 + DIV_ROUND_UP(tlpx, 4) +
+		DIV_ROUND_UP(ths_prepare, 4) +
+		DIV_ROUND_UP(ths_zero + 3, 4);
 	exit_hs_mode_lat = DIV_ROUND_UP(ths_trail + ths_exit, 4) + 1 + ths_eot;
 
 	r = FLD_VAL(enter_hs_mode_lat, 31, 16) |
