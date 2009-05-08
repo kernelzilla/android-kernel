@@ -254,5 +254,6 @@ config UID_STAT
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
+source "drivers/misc/ts27010mux/Kconfig"
 
 endif # MISC_DEVICES

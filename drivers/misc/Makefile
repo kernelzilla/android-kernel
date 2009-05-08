@@ -24,3 +24,4 @@ obj-$(CONFIG_HP_ILO)		+= hpilo.o
 obj-$(CONFIG_UID_STAT)		+= uid_stat.o
 obj-$(CONFIG_C2PORT)		+= c2port/
 obj-y				+= eeprom/
+obj-y				+= ts27010mux/
