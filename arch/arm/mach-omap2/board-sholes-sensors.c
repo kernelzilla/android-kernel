@@ -99,4 +99,3 @@ void __init sholes_sensors_init(void)
 
 	platform_add_devices(sholes_sensors, ARRAY_SIZE(sholes_sensors));
 }
-EXPORT_SYMBOL(sholes_sensors_init);

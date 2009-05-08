@@ -149,4 +149,3 @@ void __init sholes_panel_init(void)
 error:
 	gpio_free(SHOLES_DISPLAY_RESET_GPIO);
 }
-EXPORT_SYMBOL(sholes_panel_init);
