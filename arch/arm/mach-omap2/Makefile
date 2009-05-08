@@ -68,6 +68,7 @@ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
 obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 					   board-sholes-flash.o \
 					   board-sholes-panel.o \
+					   board-sholes-spi.o \
 					   board-sholes-sensors.o
 obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o \
 					   board-apollon-mmc.o	\

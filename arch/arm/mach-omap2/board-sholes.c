@@ -2,7 +2,7 @@
  * linux/arch/arm/mach-omap2/board-sholes.c
  *
  * Copyright (C) 2007-2009 Motorola, Inc.
- * 
+ *
  * Modified from mach-omap3/board-3430sdp.c
  *
  * Copyright (C) 2007 Texas Instruments
@@ -24,7 +24,6 @@
 #include <linux/interrupt.h>
 #include <linux/err.h>
 #include <linux/clk.h>
-#include <linux/spi/spi.h>
 #include <linux/mm.h>
 #include <linux/qtouch_obp_ts.h>
 
@@ -35,52 +34,17 @@
 
 #include <mach/board-sholes.h>
 #include <mach/hardware.h>
-#include <mach/mcspi.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
 #include <mach/board.h>
 #include <mach/common.h>
 #include <mach/gpmc.h>
 #include <mach/usb.h>
-
 #include <asm/delay.h>
 #include <mach/control.h>
 
 #define SHOLES_TOUCH_RESET_N_GPIO	164
 #define SHOLES_TOUCH_INT_GPIO		99
-
-static struct omap2_mcspi_device_config cpcap_mcspi_config = {
-	.turbo_mode	= 0,
-	.single_channel = 1,  /* 0: slave, 1: master */
-};
-
-static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
-	.turbo_mode     = 0,
-	.single_channel = 1,
-};
-
-static struct spi_board_info sholes_spi_board_info[] __initdata = {
-	[0] = {
-		.modalias	= "cpcap",
-		.bus_num	= 1,
-		.chip_select	= 0,
-		.max_speed_hz	= 20000000,
-
-
-		.controller_data= &cpcap_mcspi_config,
-		.mode           = SPI_CS_HIGH,
-	},
-	{
-		.modalias	= "tsc2005",
-		.bus_num	= 3,
-		.chip_select	= 1,
-		.max_speed_hz	= 1500000,
-		.controller_data= &tsc2005_mcspi_config,
-	}
-
-
-
-};
 
 static void __init sholes_init_irq(void)
 {
@@ -93,7 +57,7 @@ static void __init sholes_init_irq(void)
 }
 
 static struct omap_uart_config sholes_uart_config __initdata = {
-	.enabled_uarts	= ((1 << 0) | (1 << 1) | (1 << 2)),
+	.enabled_uarts = ((1 << 0) | (1 << 1) | (1 << 2)),
 };
 
 static struct omap_board_config_kernel sholes_config[] __initdata = {
@@ -216,8 +180,10 @@ static int __init sholes_i2c_init(void)
 			      ARRAY_SIZE(sholes_i2c_bus1_board_info));
 	return 0;
 }
+
 arch_initcall(sholes_i2c_init);
 
+extern void __init sholes_spi_init(void);
 extern void __init sholes_flash_init(void);
 extern void __init sholes_gpio_iomux_init(void);
 
@@ -240,8 +206,7 @@ static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
 	omap_board_config_size = ARRAY_SIZE(sholes_config);
-	spi_register_board_info(sholes_spi_board_info,
-				ARRAY_SIZE(sholes_spi_board_info));
+	sholes_spi_init();
 	sholes_flash_init();
 	omap_serial_init();
 	sholes_panel_init();
