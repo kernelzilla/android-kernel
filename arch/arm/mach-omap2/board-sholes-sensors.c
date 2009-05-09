@@ -11,7 +11,9 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/init.h>
+#include <linux/input.h>
 
+#include <mach/mux.h>
 #include <mach/keypad.h>
 
 int sholesp0b_keymap[] = {
@@ -27,17 +29,24 @@ int sholesp0b_keymap[] = {
 	0x7200001f, 0x73000019, 0x7400009e, 0x76000016, 0x77000011
 };
 
-int sholesp0b_row_gpios[] = { 34, 35, 36, 37, 38, 39, 40, 41, };
-int sholesp0b_col_gpios[] = { 43, 53, 54, 55, 56, 57, 58, 63, };
+static struct omap_kp_switchmap sholesp1_switchmap[] = {
+	{.gpio = 100, .key = SW_HEADPHONE_INSERT},  /* silence */
+	{.gpio = 177, .key = SW_LID}                /* slider */
+};
+
+int sholesp1_row_gpios[] = { 34, 35, 36, 37, 38, 39, 40, 41, };
+int sholesp1_col_gpios[] = { 43, 53, 54, 55, 56, 57, 58, 63, };
 
 static struct omap_kp_platform_data omap3430_kp_data = {
 	.rows		= 8,
 	.cols		= 8,
 	.keymap		= sholesp0b_keymap,
 	.keymapsize	= 59,
+	.switchmap	= sholesp1_switchmap,
+	.switchmapsize  = 2,
 	.rep		= 0,
-	.row_gpios	= sholesp0b_row_gpios,
-	.col_gpios	= sholesp0b_col_gpios,
+	.row_gpios	= sholesp1_row_gpios,
+	.col_gpios	= sholesp1_col_gpios,
 };
 
 static struct platform_device omap3430_kp_device = {
@@ -63,6 +72,9 @@ static struct platform_device *sholes_sensors[] __initdata = {
 
 void __init sholes_sensors_init(void)
 {
+	omap_cfg_reg(AB2_34XX_GPIO177);
+	omap_cfg_reg(AH17_34XX_GPIO100);
+
 	platform_add_devices(sholes_sensors, ARRAY_SIZE(sholes_sensors));
 }
 EXPORT_SYMBOL(sholes_sensors_init);
