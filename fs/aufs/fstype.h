@@ -327,6 +327,7 @@ static inline int au_test_fs_unsuppoted(struct super_block *sb)
 		|| au_test_debugfs(sb)
 		|| au_test_securityfs(sb)
 		|| au_test_xenfs(sb)
+		|| au_test_ecryptfs(sb)
 		/* || !strcmp(au_sbtype(sb), "unionfs") */
 		|| au_test_aufs(sb); /* will be supported in next version */
 }
