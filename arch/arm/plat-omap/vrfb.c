@@ -176,7 +176,6 @@ void omap_vrfb_release_ctx(struct vrfb *vrfb)
 		BUG();
 		return;
 	}
-	WARN_ON(!(ctx_map_active & (1 << ctx)));
 	clear_bit(ctx, &ctx_map_active);
 	clear_bit(ctx, &ctx_map);
 
