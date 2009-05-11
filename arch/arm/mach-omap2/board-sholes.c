@@ -187,20 +187,6 @@ extern void __init sholes_spi_init(void);
 extern void __init sholes_flash_init(void);
 extern void __init sholes_gpio_iomux_init(void);
 
-#ifdef CONFIG_CPCAP_USB
-/* XXX: this should end up in the CPCAP driver */
-static struct platform_device cpcap_usb_device = {
-	.name           = "cpcap_usb",
-	.id             = -1,
-	.dev.platform_data = NULL,
-};
-#endif
-
-static struct platform_device *cpcap_devices[] __initdata = {
-#ifdef CONFIG_CPCAP_USB
-	&cpcap_usb_device,
-#endif
-};
 
 static void __init sholes_init(void)
 {
@@ -212,10 +198,9 @@ static void __init sholes_init(void)
 	sholes_panel_init();
 	sholes_sensors_init();
 	sholes_touch_init();
-	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
 	usb_musb_init();
-
 }
+
 
 static void __init sholes_map_io(void)
 {
