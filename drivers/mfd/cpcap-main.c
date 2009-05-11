@@ -17,13 +17,15 @@
  */
 
 #include <linux/fs.h>
-#include <linux/input.h>
 #include <linux/miscdevice.h>
+#include <linux/platform_device.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
+#include <linux/spi/cpcap-regbits.h>
+
 #include <asm/uaccess.h>
+
 #include "cpcap-main.h"
-#include "cpcap-regbits.h"
 
 static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg);
@@ -52,36 +54,29 @@ static struct spi_driver cpcap_driver = {
 	.remove = __devexit_p(cpcap_remove),
 };
 
-static struct input_dev *input_dev;
+static struct platform_device cpcap_key_device = {
+	.name           = "cpcap_key",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
 
-static struct spi_device *cpcap_spi_dev;
+#ifdef CONFIG_CPCAP_USB
+static struct platform_device cpcap_usb_device = {
+	.name           = "cpcap_usb",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
+#endif
 
-static int cpcap_key_init(struct spi_device *spi)
-{
-	int retval = 0;
+static struct platform_device *cpcap_devices[] __initdata = {
+	&cpcap_key_device,
+#ifdef CONFIG_CPCAP_USB
+	&cpcap_usb_device,
+#endif
+};
 
-	input_dev = input_allocate_device();
+static struct cpcap_device *misc_cpcap;
 
-	if (input_dev) {
-		set_bit(EV_KEY, input_dev->evbit);
-		set_bit(KEY_MEDIA, input_dev->keybit);
-		set_bit(KEY_END, input_dev->keybit);
-
-		input_dev->name = "cpcap-key";
-
-		if (input_register_device(input_dev) < 0) {
-			pr_err("cpcap: Could not register input device.\n");
-
-			input_free_device(input_dev);
-			input_dev = NULL;
-		}
-	} else {
-		retval = -EINVAL;
-		pr_err("cpcap: Could not allocate input device.\n");
-	}
-
-	return retval;
-}
 
 static __init int cpcap_init(void)
 {
@@ -91,24 +86,34 @@ static __init int cpcap_init(void)
 static int __devinit cpcap_probe(struct spi_device *spi)
 {
 	int retval = -EINVAL;
+	struct cpcap_device *cpcap;
 
-	cpcap_spi_dev = spi;
+	cpcap = kzalloc(sizeof(*cpcap), GFP_KERNEL);
+	if (cpcap == NULL)
+		return -ENOMEM;
 
-	retval = cpcap_regacc_init(spi);
+	cpcap->spi = spi;
+	misc_cpcap = cpcap;  /* kept for misc device */
+	spi_set_drvdata(spi, cpcap);
 
-	if (retval >= 0)
-		retval = cpcap_key_init(spi);
+	retval = cpcap_regacc_init(cpcap);
+
+	cpcap_usb_device.dev.platform_data = cpcap;
+	cpcap_key_device.dev.platform_data = cpcap;
 
 	if (retval >= 0)
 		retval = misc_register(&cpcap_dev);
+
+	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
 
 	return retval;
 }
 
 static int __devexit cpcap_remove(struct spi_device *spi)
 {
-	cpcap_spi_dev = NULL;
+	struct cpca_device *cpcap = spi_get_drvdata(spi);
 	misc_deregister(&cpcap_dev);
+	kfree(cpcap);
 	return 0;
 }
 
@@ -139,7 +144,7 @@ static int test_ioctl(unsigned int cmd, unsigned long arg)
 		if (copy_from_user((void *)&read_data, (void *)arg,
 				   sizeof(read_data)))
 			return -EFAULT;
-		retval = cpcap_regacc_read(cpcap_spi_dev, read_data.reg,
+		retval = cpcap_regacc_read(misc_cpcap, read_data.reg,
 					   &read_data.value);
 		if (retval < 0)
 			return retval;
@@ -154,7 +159,7 @@ static int test_ioctl(unsigned int cmd, unsigned long arg)
 				   (void *) arg,
 				   sizeof(write_data)))
 			return -EFAULT;
-		retval = cpcap_regacc_write(cpcap_spi_dev, write_data.reg,
+		retval = cpcap_regacc_write(misc_cpcap, write_data.reg,
 					    write_data.value, write_data.mask);
 	break;
 
@@ -171,16 +176,10 @@ static void cpcap_shutdown(void)
 	spi_unregister_driver(&cpcap_driver);
 }
 
-void cpcap_broadcast_key_event(struct spi_device *spi, unsigned int code,
-			       int value)
-{
-	if (input_dev)
-		input_report_key(input_dev, code, value);
-}
-
-module_init(cpcap_init);
+subsys_initcall(cpcap_init);
 module_exit(cpcap_shutdown);
 
+MODULE_ALIAS("platform:cpcap");
 MODULE_DESCRIPTION("CPCAP driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");

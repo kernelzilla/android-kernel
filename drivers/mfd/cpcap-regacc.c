@@ -18,10 +18,11 @@
 
 #include <linux/device.h>
 #include <linux/mutex.h>
-#include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
+#include <linux/spi/cpcap.h>
+#include <linux/spi/cpcap-regbits.h>
+
 #include "cpcap-main.h"
-#include "cpcap-regbits.h"
 
 #define IS_CPCAP(reg) ((reg) >= CPCAP_REG_START && (reg) <= CPCAP_REG_END)
 #define AREG_INDEX(reg) ((reg) - CPCAP_MIN_AREG)
@@ -337,15 +338,16 @@ static int cpcap_config_for_write(struct spi_device *spi, unsigned short reg,
 	return status;
 }
 
-int cpcap_regacc_read(struct spi_device *spi, unsigned short reg,
+int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
 		      unsigned short *value_ptr)
 {
 	int retval = -EINVAL;
+	struct spi_device *spi = cpcap->spi;
 
 	if (IS_CPCAP(reg) && (value_ptr != 0)) {
 		mutex_lock(&reg_access);
 
-		cpcap_config_for_read(spi, register_info_tbl
+		retval = cpcap_config_for_read(spi, register_info_tbl
 				      [reg].address, value_ptr);
 
 		mutex_unlock(&reg_access);
@@ -354,7 +356,7 @@ int cpcap_regacc_read(struct spi_device *spi, unsigned short reg,
 	return retval;
 }
 
-int cpcap_regacc_write(struct spi_device *spi,
+int cpcap_regacc_write(struct cpcap_device *cpcap,
 		       unsigned short reg,
 		       unsigned short value,
 		       unsigned short mask)
@@ -362,6 +364,7 @@ int cpcap_regacc_write(struct spi_device *spi,
 	int retval = -EINVAL;
 	unsigned short old_value = 0;
 	struct cpcap_platform_data *data;
+	struct spi_device *spi = cpcap->spi;
 
 	data = (struct cpcap_platform_data *)spi->controller_data;
 
@@ -380,9 +383,9 @@ int cpcap_regacc_write(struct spi_device *spi,
 		old_value &= register_info_tbl[reg].rbw_mask;
 		old_value &= ~mask;
 		value |= old_value;
-		cpcap_config_for_write(spi, register_info_tbl [reg].address,
-				       value);
-
+		retval = cpcap_config_for_write(spi,
+						register_info_tbl[reg].address,
+						value);
 error:
 		mutex_unlock(&reg_access);
 	}
@@ -390,12 +393,13 @@ error:
 	return retval;
 }
 
-int cpcap_regacc_init(struct spi_device *spi)
+int cpcap_regacc_init(struct cpcap_device *cpcap)
 {
 	unsigned short i;
 	unsigned short mask;
 	int retval = 0;
 	struct cpcap_platform_data *data;
+	struct spi_device *spi = cpcap->spi;
 
 	data = (struct cpcap_platform_data *)
 		spi->controller_data;
@@ -404,7 +408,7 @@ int cpcap_regacc_init(struct spi_device *spi)
 		mask = 0xFFFF;
 		mask &= ~(register_info_tbl[data->init[i].reg].constant_mask);
 
-		retval = cpcap_regacc_write(spi, data->init[i].reg,
+		retval = cpcap_regacc_write(cpcap, data->init[i].reg,
 					    data->init[i].data,
 					    mask);
 	}
@@ -412,21 +416,21 @@ int cpcap_regacc_init(struct spi_device *spi)
 	return retval;
 }
 
-int cpcap_audio_read_reg(struct spi_device *spi, unsigned short reg,
+int cpcap_audio_read_reg(struct cpcap_device *cpcap, unsigned short reg,
 			 unsigned short *value)
 {
 	int retval = -EINVAL;
 
 	if ((reg >= CPCAP_MIN_AREG)
 	    && (reg <= CPCAP_MAX_AREG)) {
-		retval = cpcap_regacc_read(spi, reg, value);
+		retval = cpcap_regacc_read(cpcap, reg, value);
 	}
 
 	return retval;
 }
 EXPORT_SYMBOL(cpcap_audio_read_reg);
 
-int cpcap_audio_write_reg(struct spi_device *spi, unsigned short reg,
+int cpcap_audio_write_reg(struct cpcap_device *cpcap, unsigned short reg,
 			  unsigned short value, unsigned short mask)
 {
 	int retval = -EINVAL;
@@ -434,23 +438,23 @@ int cpcap_audio_write_reg(struct spi_device *spi, unsigned short reg,
 	if ((reg >= CPCAP_MIN_AREG) &&
 	    (reg <= CPCAP_MAX_AREG) &&
 	    ((mask & ~(audio_bits[AREG_INDEX(reg)])) == 0)) {
-		retval = cpcap_regacc_write(spi, reg, value, mask);
+		retval = cpcap_regacc_write(cpcap, reg, value, mask);
 	}
 
 	return retval;
 }
 EXPORT_SYMBOL(cpcap_audio_write_reg);
 
-int cpcap_lighting_read_reg(struct spi_device *spi, unsigned short reg,
+int cpcap_lighting_read_reg(struct cpcap_device *cpcap, unsigned short reg,
 			    unsigned short *value)
 {
 	int retval = -EINVAL;
 
 	if ((reg >= CPCAP_MIN_LREG)
 	    && (reg <= CPCAP_MAX_LREG)) {
-		retval = cpcap_regacc_read(spi, reg, value);
+		retval = cpcap_regacc_read(cpcap, reg, value);
 	} else if (reg == CPCAP_REG_CRM) {
-		retval = cpcap_regacc_read(spi, reg, value);
+		retval = cpcap_regacc_read(cpcap, reg, value);
 		*value &= CPCAP_BIT_CHRG_LED_EN;
 	}
 
@@ -458,7 +462,7 @@ int cpcap_lighting_read_reg(struct spi_device *spi, unsigned short reg,
 }
 EXPORT_SYMBOL(cpcap_lighting_read_reg);
 
-int cpcap_lighting_write_reg(struct spi_device *spi, unsigned short reg,
+int cpcap_lighting_write_reg(struct cpcap_device *cpcap, unsigned short reg,
 			     unsigned short value, unsigned short mask)
 {
 	int retval = -EINVAL;
@@ -468,7 +472,7 @@ int cpcap_lighting_write_reg(struct spi_device *spi, unsigned short reg,
 	     ((mask & ~(lighting_bits[LREG_INDEX(reg)])) == 0)) ||
 	    ((reg == CPCAP_REG_CRM) &&
 	     (mask == CPCAP_BIT_CHRG_LED_EN))) {
-		retval = cpcap_regacc_write(spi, reg, value, mask);
+		retval = cpcap_regacc_write(cpcap, reg, value, mask);
 	}
 
 	return retval;

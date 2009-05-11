@@ -286,6 +286,8 @@ enum {
 	= CPCAP_REG_END
 };
 
+
+
 enum {
 	CPCAP_IOCTL_NUM_TEST__START,
 	CPCAP_IOCTL_NUM_TEST_READ_REG,
@@ -325,6 +327,32 @@ struct cpcap_regacc {
 #define CPCAP_IOCTL_TEST_WRITE_REG \
 	_IOWR(0, CPCAP_IOCTL_NUM_TEST_WRITE_REG, struct cpcap_regacc*)
 
+struct cpcap_device {
+	struct spi_device	*spi;
 
+	void			*keydata;
+};
+
+
+static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
+{
+	cpcap->keydata = data;
+}
+
+static inline void *cpcap_get_keydata(struct cpcap_device *cpcap)
+{
+	return cpcap->keydata;
+}
+
+int cpcap_regacc_write(struct cpcap_device *cpcap, unsigned short reg,
+		       unsigned short value, unsigned short mask);
+
+int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
+		      unsigned short *vaue_ptr);
+
+int cpcap_regacc_init(struct cpcap_device *cpcap);
+
+void cpcap_broadcast_key_event(struct cpcap_device *cpcap,
+			       unsigned int code, int value);
 
 #endif /* CPCAP_H */

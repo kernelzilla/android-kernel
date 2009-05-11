@@ -33,9 +33,8 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/usb/otg.h>
-#include <linux/spi/spi.h>
-
-
+#include <linux/spi/cpcap.h>
+#include <linux/spi/cpcap-regbits.h>
 
 enum linkstat {
 	USB_LINK_UNKNOWN = 0,
@@ -47,6 +46,8 @@ enum linkstat {
 struct cpcap_usb {
 	struct otg_transceiver	otg;
 	struct device		*dev;
+
+	struct cpcap_device	*cpcap;
 
 	/* for vbus reporting with irqs disabled */
 	spinlock_t		lock;
@@ -96,9 +97,28 @@ static int cpcap_set_host(struct otg_transceiver *x, struct usb_bus *host)
 	return 0;
 }
 
+static int cpcap_usb_setup(struct cpcap_usb *cpcap)
+{
+	unsigned short mask;
+	int r;
+
+	mask = CPCAP_BIT_VBUSEN_SPI | CPCAP_BIT_VBUSPU_SPI |
+		CPCAP_BIT_VBUSPD_SPI | CPCAP_BIT_DMPD_SPI |
+		CPCAP_BIT_DPPD_SPI | CPCAP_BIT_SUSPEND_SPI |
+		CPCAP_BIT_PU_SPI | CPCAP_BIT_ULPI_SPI_SEL;
+
+	r = cpcap_regacc_write(cpcap->cpcap, CPCAP_REG_USBC3, 0x0, mask);
+	if (r < 0) {
+		dev_err(cpcap->dev,
+			"Can't disable SPI control of CPCAP transceiver\n");
+		return r;
+	}
+	return 0;
+}
 static int __init cpcap_usb_probe(struct platform_device *pdev)
 {
 	struct cpcap_usb	*cpcap;
+	int err;
 
 	cpcap = kzalloc(sizeof *cpcap, GFP_KERNEL);
 	if (!cpcap)
@@ -111,6 +131,7 @@ static int __init cpcap_usb_probe(struct platform_device *pdev)
 	cpcap->otg.set_peripheral	= cpcap_set_peripheral;
 	cpcap->otg.set_suspend		= cpcap_set_suspend;
 	cpcap->asleep			= 1;
+	cpcap->cpcap			= pdev->dev.platform_data;
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&cpcap->lock);
@@ -119,8 +140,17 @@ static int __init cpcap_usb_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, cpcap);
 
+	err = cpcap_usb_setup(cpcap);
+	if (err < 0)
+		goto err0;
+
 	dev_info(&pdev->dev, "Initialized CPCAP USB module\n");
 	return 0;
+
+err0:
+	otg_set_transceiver(NULL);
+	kfree(cpcap);
+	return err;
 }
 
 static int __exit cpcap_usb_remove(struct platform_device *pdev)
@@ -140,139 +170,15 @@ static struct platform_driver cpcap_usb_driver = {
 	},
 };
 
-
-/*
- * stub CPCAP driver to let us disable SPI control over
- * ULPI bits.  This will go away when the real CPCAP
- * driver is imported
- */
-
-#define CPCAP_REG_SPI_ULPI            898
-
-#define CPCAP_VBUSEN_SPI              0x00000080
-#define CPCAP_VBUSPU_SPI              0x00000040
-#define CPCAP_VBUSPD_SPI              0x00000020
-#define CPCAP_DMPD_SPI                0x00000010
-#define CPCAP_DPPD_SPI                0x00000008
-#define CPCAP_SUSPEND_SPI             0x00000004
-#define CPCAP_PU_SPI                  0x00000002
-#define CPCAP_ULPI_SPI_SEL            0x00000001
-
-static int cpcap_read(struct spi_device *spi, unsigned addr, u16 *data)
-{
-	/* force x_buf to be 32bit aligned */
-	u32 buf;
-	u8 *x_buf = (u8 *) &buf;
-	int r;
-	struct spi_message	 m;
-	struct spi_transfer  x;
-
-	x_buf[3] = (addr >> 6) & 0x000000FF;
-	x_buf[2] = (addr << 2) & 0x000000FF;
-	x_buf[1] = 0;
-	x_buf[0] = 0;
-
-	spi_message_init(&m);
-
-	memset(&x, 0, sizeof(x));
-	x.tx_buf = x_buf;
-	x.rx_buf = x_buf;
-	x.bits_per_word = 32;
-	x.len = 4;
-	spi_message_add_tail(&x, &m);
-
-	r = spi_sync(spi, &m);
-	if (r < 0)
-		return r;
-
-	*data = x_buf[0] | (x_buf[1]<<8);
-
-	return 0;
-}
-
-static int cpcap_write(struct spi_device *spi, unsigned addr, u16 data)
-{
-	/* force x_buf to be 32bit aligned */
-	u32 buf;
-	u8 *x_buf = (u8 *) &buf;
-	int r;
-	struct spi_message	 m;
-	struct spi_transfer  x;
-
-	x_buf[3] = ((addr >> 6) & 0x000000FF) | 0x80;
-	x_buf[2] = (addr << 2) & 0x000000FF;
-	x_buf[1] = (data >> 8) & 0x000000FF;
-	x_buf[0] = data & 0x000000FF;
-
-	spi_message_init(&m);
-
-	memset(&x, 0, sizeof(x));
-	x.tx_buf = x_buf;
-	x.bits_per_word = 32;
-	x.len = 4;
-	spi_message_add_tail(&x, &m);
-
-	r = spi_sync(spi, &m);
-	if (r < 0)
-		return r;
-
-	return 0;
-}
-
-
-static int cpcap_spi_probe(struct spi_device *spi)
-{
-	u16 data;
-	int r;
-
-	/* disable SPI control over ULPI bits */
-	r = cpcap_read(spi, CPCAP_REG_SPI_ULPI, &data);
-	if (r < 0) {
-		dev_err(&spi->dev,
-			"Can't disable SPI control of CPCAP transceiver\n");
-		return r;
-	}
-
-	data &= ~(CPCAP_VBUSEN_SPI | CPCAP_VBUSPU_SPI | CPCAP_VBUSPD_SPI |
-		  CPCAP_DMPD_SPI | CPCAP_DPPD_SPI | CPCAP_SUSPEND_SPI |
-		  CPCAP_PU_SPI | CPCAP_ULPI_SPI_SEL);
-
-	r = cpcap_write(spi, CPCAP_REG_SPI_ULPI, data);
-	if (r < 0) {
-		dev_err(&spi->dev,
-			"Can't disable SPI control of CPCAP transceiver\n");
-		return r;
-	}
-	return platform_driver_register(&cpcap_usb_driver);
-}
-
-static int cpcap_spi_remove(struct spi_device *spi)
-{
-	platform_driver_unregister(&cpcap_usb_driver);
-	return 0;
-}
-
-
-static struct spi_driver cpcap_spi_driver = {
-	.driver = {
-		.name	= "cpcap",
-		.bus	= &spi_bus_type,
-		.owner	= THIS_MODULE,
-	},
-	.probe	= cpcap_spi_probe,
-	.remove	= __devexit_p(cpcap_spi_remove),
-};
-
-
 static int __init cpcap_usb_init(void)
 {
-	return spi_register_driver(&cpcap_spi_driver);
+	return platform_driver_register(&cpcap_usb_driver);
 }
 subsys_initcall(cpcap_usb_init);
 
 static void __exit cpcap_usb_exit(void)
 {
-	spi_unregister_driver(&cpcap_spi_driver);
+	platform_driver_unregister(&cpcap_usb_driver);
 }
 module_exit(cpcap_usb_exit);
 

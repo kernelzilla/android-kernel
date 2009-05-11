@@ -22,15 +22,6 @@
 #define CPCAP_MIN_LREG CPCAP_REG_MDLC
 #define CPCAP_MAX_LREG CPCAP_REG_CLEDC
 
-int cpcap_regacc_write(struct spi_device *spi, unsigned short reg,
-		       unsigned short value, unsigned short mask);
 
-int cpcap_regacc_read(struct spi_device *spi, unsigned short reg,
-		      unsigned short *value_ptr);
-
-int cpcap_regacc_init(struct spi_device *spi);
-
-void cpcap_broadcast_key_event(struct spi_device *spi, unsigned int code,
-			       int value);
 
 #endif /* CPCAP_MAIN_H */
