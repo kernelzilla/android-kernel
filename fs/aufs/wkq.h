@@ -26,10 +26,11 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
 #include <linux/sched.h>
-#include <linux/workqueue.h>
+#include <linux/wait.h>
 #include <linux/aufs_type.h>
+
+struct super_block;
 
 /* ---------------------------------------------------------------------- */
 

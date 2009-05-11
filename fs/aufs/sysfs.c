@@ -21,6 +21,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/sysfs.h>
 #include "aufs.h"

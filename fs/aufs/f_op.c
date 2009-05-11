@@ -21,6 +21,7 @@
  */
 
 #include <linux/fs_stack.h>
+#include <linux/mm.h>
 #include <linux/poll.h>
 #include "aufs.h"
 

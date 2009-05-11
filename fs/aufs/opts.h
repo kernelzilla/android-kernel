@@ -25,9 +25,11 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
-#include <linux/namei.h>
+#include <linux/path.h>
 #include <linux/aufs_type.h>
+
+struct file;
+struct super_block;
 
 /* ---------------------------------------------------------------------- */
 

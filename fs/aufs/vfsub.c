@@ -20,6 +20,8 @@
  * sub-routines for VFS
  */
 
+#include <linux/namei.h>
+#include <linux/splice.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
 

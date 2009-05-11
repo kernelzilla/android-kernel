@@ -25,10 +25,13 @@
 
 #ifdef __KERNEL__
 
+#include <linux/bug.h>
+/* #include <linux/err.h> */
+/* #include <linux/init.h> */
+/* #include <linux/kernel.h> */
 #include <linux/delay.h>
-#include <linux/fs.h>
-#include <linux/kd.h>
-#include <linux/vt_kern.h>
+/* #include <linux/kd.h> */
+/* #include <linux/vt_kern.h> */
 #include <linux/sysrq.h>
 #include <linux/aufs_type.h>
 
@@ -121,12 +124,17 @@ struct au_nhash;
 void au_dpri_whlist(struct au_nhash *whlist);
 struct au_vdir;
 void au_dpri_vdir(struct au_vdir *vdir);
+struct inode;
 void au_dpri_inode(struct inode *inode);
+struct dentry;
 void au_dpri_dentry(struct dentry *dentry);
+struct file;
 void au_dpri_file(struct file *filp);
+struct super_block;
 void au_dpri_sb(struct super_block *sb);
 
 void au_dbg_sleep_jiffy(int jiffy);
+struct iattr;
 void au_dbg_iattr(struct iattr *ia);
 
 void au_dbg_verify_dir_parent(struct dentry *dentry, unsigned int sigen);

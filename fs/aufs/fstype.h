@@ -25,8 +25,8 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
 #include <linux/cramfs_fs.h>
+#include <linux/fs.h>
 #include <linux/magic.h>
 #include <linux/romfs_fs.h>
 #include <linux/aufs_type.h>
