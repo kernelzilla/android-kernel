@@ -89,19 +89,34 @@ static irqreturn_t qtouch_ts_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static int qtouch_write(struct qtouch_ts_data *ts, void *buf, int buf_sz)
+{
+	int retries = 10;
+	int ret;
+
+	do {
+		ret = i2c_master_send(ts->client, (char *)buf, buf_sz);
+	} while ((ret < buf_sz)  && (--retries > 0));
+
+	if (ret < 0)
+		pr_info("%s: Error while trying to write %d bytes\n", __func__,
+			 buf_sz);
+	else if (ret != buf_sz) {
+		pr_info("%s: Write %d bytes, expected %d\n", __func__,
+			 ret, buf_sz);
+		ret = -EIO;
+	}
+	return ret;
+}
+
 static int qtouch_set_addr(struct qtouch_ts_data *ts, uint16_t addr)
 {
 	int ret;
 
-	/* TODO: Should probably allow retries? */
-
 	/* Note: addr on the wire is LSB first */
-	ret = i2c_master_send(ts->client, (char *)&addr, sizeof(uint16_t));
+	ret = qtouch_write(ts, (char *)&addr, sizeof(uint16_t));
 	if (ret < 0)
 		pr_info("%s: Can't send obp addr 0x%4x\n", __func__, addr);
-	else if (ret != sizeof(uint16_t))
-		pr_warning("%s: Sent %d bytes, asked for %d\n", __func__,
-			   ret, sizeof(uint16_t));
 
 	return ret >= 0 ? 0 : ret;
 }
@@ -119,9 +134,11 @@ static int qtouch_read(struct qtouch_ts_data *ts, void *buf, int buf_sz)
 	if (ret < 0)
 		pr_info("%s: Error while trying to read %d bytes\n", __func__,
 			 buf_sz);
-	else if (ret != buf_sz)
+	else if (ret != buf_sz) {
 		pr_info("%s: Read %d bytes, expected %d\n", __func__,
 			 ret, buf_sz);
+		ret = -EIO;
+	}
 
 	return ret >= 0 ? 0 : ret;
 }
@@ -154,7 +171,6 @@ static struct qtm_obj_message *qtouch_read_msg(struct qtouch_ts_data *ts)
 static int qtouch_write_addr(struct qtouch_ts_data *ts, uint16_t addr,
 			     void *buf, int buf_sz)
 {
-	int retries = 10;
 	int ret;
 	uint8_t write_buf[128];
 
@@ -166,12 +182,7 @@ static int qtouch_write_addr(struct qtouch_ts_data *ts, uint16_t addr,
 	memcpy(write_buf, (void *)&addr, sizeof(addr));
 	memcpy((void *)write_buf + sizeof(addr), buf, buf_sz);
 
-	do {
-		ret = i2c_master_send(ts->client, (char *)write_buf,
-				      buf_sz + sizeof(addr));
-		if (ret < 0)
-			pr_info("%s: Can't send %d bytes\n", __func__, buf_sz);
-	} while ((ret < 0) && (--retries > 0));
+	ret = qtouch_write(ts, write_buf, buf_sz + sizeof(addr));
 
 	if (ret < 0) {
 		pr_err("%s: Could not write %d bytes.\n", __func__, buf_sz);
