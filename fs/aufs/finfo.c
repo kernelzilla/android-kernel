@@ -25,7 +25,7 @@
 
 void au_hfput(struct au_hfile *hf, struct file *file)
 {
-	if (file->f_mode & FMODE_EXEC)
+	if (file->f_flags & vfsub_fmode_to_uint(FMODE_EXEC))
 		allow_write_access(hf->hf_file);
 	fput(hf->hf_file);
 	hf->hf_file = NULL;
@@ -83,7 +83,6 @@ int au_finfo_init(struct file *file)
 {
 	struct au_finfo *finfo;
 	struct dentry *dentry;
-	unsigned long ul;
 
 	dentry = file->f_dentry;
 	finfo = au_cache_alloc_finfo();
@@ -102,10 +101,6 @@ int au_finfo_init(struct file *file)
 	atomic_set(&finfo->fi_generation, au_digen(dentry));
 	/* smp_mb(); */ /* atomic_set */
 
-	/* cf. au_store_oflag() */
-	/* suppress a warning in lp64 */
-	ul = (unsigned long)file->private_data;
-	file->f_mode |= (vfsub_uint_to_fmode(ul) & FMODE_EXEC);
 	file->private_data = finfo;
 	return 0; /* success */
 

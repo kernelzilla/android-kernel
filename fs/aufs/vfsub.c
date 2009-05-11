@@ -49,7 +49,7 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
-static int vfsub_ima_mask(int flags, int exec_flag)
+static int vfsub_ima_mask(int flags)
 {
 	int mask;
 
@@ -65,18 +65,18 @@ static int vfsub_ima_mask(int flags, int exec_flag)
 		mask = MAY_READ | MAY_WRITE;
 		break;
 	}
-	if (exec_flag)
+	if (flags & FMODE_EXEC)
 		mask |= MAY_EXEC;
 	return mask;
 }
 
-struct file *vfsub_dentry_open(struct path *path, int flags, int exec_flag,
+struct file *vfsub_dentry_open(struct path *path, int flags,
 			       const struct cred *cred)
 {
 	struct file *file;
 	int err;
 
-	err = ima_path_check(path, vfsub_ima_mask(flags, exec_flag));
+	err = ima_path_check(path, vfsub_ima_mask(flags));
 	file = ERR_PTR(err);
 	if (!err)
 		file = dentry_open(path->dentry, path->mnt, flags, cred);
