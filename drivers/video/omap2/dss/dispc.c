@@ -1182,6 +1182,11 @@ static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
 
 	DSSDBG("calc_rot(%d): scrw %d, %dx%d\n", rotation, screen_width,
 			width, height);
+
+	/*
+	 * field 0 = even field = bottom field
+	 * field 1 = odd field = top field
+	 */
 	switch (rotation + mirror * 4) {
 	case 0:
 	case 2:
@@ -1194,11 +1199,11 @@ static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
 			width = width >> 1;
 	case 1:
 	case 3:
-		*offset0 = 0;
+		*offset1 = 0;
 		if (fieldmode)
-			*offset1 = screen_width * ps;
+			*offset0 = screen_width * ps;
 		else
-			*offset1 = 0;
+			*offset0 = 0;
 
 		*row_inc = pixinc(1 + (screen_width - width) +
 				(fieldmode ? screen_width : 0),
@@ -1216,11 +1221,11 @@ static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
 			width = width >> 1;
 	case 5:
 	case 7:
-		*offset0 = 0;
+		*offset1 = 0;
 		if (fieldmode)
-			*offset1 = screen_width * ps;
+			*offset0 = screen_width * ps;
 		else
-			*offset1 = 0;
+			*offset0 = 0;
 		*row_inc = pixinc(1 - (screen_width + width) -
 				(fieldmode ? screen_width : 0),
 				ps);
