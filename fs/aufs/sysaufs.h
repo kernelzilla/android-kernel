@@ -25,10 +25,12 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
 #include <linux/sysfs.h>
 #include <linux/aufs_type.h>
 #include "module.h"
+
+struct super_block;
+struct au_sbinfo;
 
 struct sysaufs_si_attr {
 	struct attribute attr;

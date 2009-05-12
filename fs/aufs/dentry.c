@@ -20,6 +20,7 @@
  * lookup and dentry operations
  */
 
+#include <linux/namei.h>
 #include "aufs.h"
 
 static void au_h_nd(struct nameidata *h_nd, struct nameidata *nd)

@@ -20,6 +20,7 @@
  * directory operations
  */
 
+#include <linux/file.h>
 #include <linux/fs_stack.h>
 #include "aufs.h"
 

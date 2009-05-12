@@ -25,10 +25,12 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
+#include <linux/init.h>
 #include <linux/aufs_type.h>
 
+struct super_block;
 struct au_sbinfo;
+
 #ifdef CONFIG_DEBUG_FS
 /* dbgaufs.c */
 void dbgaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex);

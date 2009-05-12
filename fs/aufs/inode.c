@@ -22,6 +22,15 @@
 
 #include "aufs.h"
 
+struct inode *au_igrab(struct inode *inode)
+{
+	if (inode) {
+		AuDebugOn(!atomic_read(&inode->i_count));
+		atomic_inc(&inode->i_count);
+	}
+	return inode;
+}
+
 static void au_refresh_hinode_attr(struct inode *inode, int do_version)
 {
 	au_cpup_attr_all(inode, /*force*/0);

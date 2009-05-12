@@ -25,7 +25,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"

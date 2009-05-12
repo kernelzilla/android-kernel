@@ -22,6 +22,9 @@
 
 #include <linux/device_cgroup.h>
 #include <linux/fs_stack.h>
+#include <linux/mm.h>
+#include <linux/namei.h>
+#include <linux/security.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
 

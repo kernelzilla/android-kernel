@@ -21,6 +21,7 @@
  * todo: try new dredential scheme
  */
 
+#include <linux/module.h>
 #include "aufs.h"
 
 /* internal workqueue named AUFS_WKQ_NAME */
