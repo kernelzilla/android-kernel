@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Tue May  5 17:01:48 2009
+# Tue May 12 12:05:32 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -957,6 +957,7 @@ CONFIG_TWL4030_CORE=y
 # CONFIG_MFD_WM8400 is not set
 # CONFIG_MFD_WM8350_I2C is not set
 # CONFIG_MFD_PCF50633 is not set
+CONFIG_MFD_CPCAP=y
 
 #
 # Multimedia devices
