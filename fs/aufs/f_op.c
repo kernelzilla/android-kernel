@@ -273,6 +273,32 @@ static void au_reset_file(struct vm_area_struct *vma, struct file *file)
 	/* smp_mb(); */ /* flush vm_file */
 }
 
+static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
+{
+	int err;
+	static DECLARE_WAIT_QUEUE_HEAD(wq);
+	struct file *file, *h_file;
+	struct au_finfo *finfo;
+
+	wait_event(wq, (file = au_safe_file(vma)));
+
+	finfo = au_fi(file);
+	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
+	AuDebugOn(!h_file || !au_test_mmapped(file));
+
+	fi_write_lock(file);
+	vma->vm_file = h_file;
+	if (finfo->fi_h_vm_ops->page_mkwrite)
+		err = finfo->fi_h_vm_ops->page_mkwrite(vma, page);
+	else
+		err = 0;
+	au_reset_file(vma, file);
+	fi_write_unlock(file);
+	wake_up(&wq);
+
+	return err;
+}
+
 static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	int err;
@@ -306,7 +332,8 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 }
 
 static struct vm_operations_struct aufs_vm_ops = {
-	.fault		= aufs_fault
+	.fault		= aufs_fault,
+	.page_mkwrite	= aufs_page_mkwrite,
 };
 
 /* ---------------------------------------------------------------------- */
