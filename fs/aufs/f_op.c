@@ -23,6 +23,7 @@
 #include <linux/fs_stack.h>
 #include <linux/ima.h>
 #include <linux/mman.h>
+#include <linux/mm.h>
 #include <linux/poll.h>
 #include "aufs.h"
 

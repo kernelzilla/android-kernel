@@ -25,7 +25,8 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
+struct dentry;
+struct super_block;
 
 #ifdef CONFIG_AUFS_BDEV_LOOP
 /* loop.c */

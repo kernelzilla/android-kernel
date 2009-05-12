@@ -25,7 +25,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
+#include <linux/rwsem.h>
 
 #define au_rwsem_destroy(rw)	AuDebugOn(rwsem_is_locked(rw))
 #define AuRwMustNoWaiters(rw)	AuDebugOn(!list_empty(&(rw)->wait_list))

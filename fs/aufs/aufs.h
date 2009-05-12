@@ -25,8 +25,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/bug.h>
-
 #include "debug.h"
 
 #include "branch.h"

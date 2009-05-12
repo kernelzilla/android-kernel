@@ -27,6 +27,9 @@
 
 #include <linux/slab.h>
 
+struct path;
+struct seq_file;
+
 /* module parameters */
 extern short aufs_nwkq;
 extern int sysaufs_brs;

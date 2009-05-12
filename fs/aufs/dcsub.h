@@ -25,7 +25,9 @@
 
 #ifdef __KERNEL__
 
-#include <linux/dcache.h>
+#include <linux/types.h>
+
+struct dentry;
 
 struct au_dpage {
 	int ndentry;

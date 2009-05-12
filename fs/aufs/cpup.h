@@ -25,8 +25,12 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
+#include <linux/path.h>
+#include <linux/time.h>
 #include <linux/aufs_type.h>
+
+struct inode;
+struct file;
 
 void au_cpup_attr_flags(struct inode *dst, struct inode *src);
 void au_cpup_attr_timesizes(struct inode *inode);

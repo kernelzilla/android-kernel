@@ -25,7 +25,8 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
+#include <linux/spinlock.h>
+#include <linux/list.h>
 
 struct au_splhead {
 	spinlock_t		spin;

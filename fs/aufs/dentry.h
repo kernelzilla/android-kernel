@@ -25,8 +25,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/fs.h>
-#include <linux/namei.h>
+#include <linux/dcache.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"
 
