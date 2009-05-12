@@ -21,6 +21,7 @@
  */
 
 #include <linux/namei.h>
+#include <linux/security.h>
 #include <linux/splice.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
