@@ -20,6 +20,7 @@
  * file private data
  */
 
+#include <linux/file.h>
 #include "aufs.h"
 
 void au_hfput(struct au_hfile *hf, struct file *file)

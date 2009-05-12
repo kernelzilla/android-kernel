@@ -20,7 +20,9 @@
  * copy-up functions, see wbr_policy.c for copy-down
  */
 
+#include <linux/file.h>
 #include <linux/fs_stack.h>
+#include <linux/mm.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
 

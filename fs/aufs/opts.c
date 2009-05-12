@@ -20,6 +20,8 @@
  * mount options/flags
  */
 
+#include <linux/file.h>
+#include <linux/namei.h>
 #include <linux/types.h> /* a distribution requires */
 #include <linux/parser.h>
 #include "aufs.h"
@@ -230,7 +232,11 @@ static match_table_t au_wbr_create_policy = {
 	{-1, NULL}
 };
 
-/* cf. linux/lib/parser.c */
+/*
+ * cf. linux/lib/parser.c and cmdline.c
+ * gave up calling memparse() since it uses simple_strtoull() instead of
+ * strict_...().
+ */
 static int au_match_ull(substring_t *s, unsigned long long *result)
 {
 	int err;

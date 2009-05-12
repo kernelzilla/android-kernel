@@ -27,7 +27,6 @@
 
 #include <linux/fs.h>
 #include <linux/mount.h>
-#include <linux/sysfs.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"
 #include "super.h"

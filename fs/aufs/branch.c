@@ -20,6 +20,7 @@
  * branch management
  */
 
+#include <linux/file.h>
 #include "aufs.h"
 
 /*

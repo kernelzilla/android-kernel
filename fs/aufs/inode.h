@@ -27,9 +27,10 @@
 
 #include <linux/fs.h>
 #include <linux/inotify.h>
-#include <linux/namei.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"
+
+struct vfsmount;
 
 struct au_hinotify {
 #ifdef CONFIG_AUFS_HINOTIFY
@@ -101,6 +102,7 @@ static inline struct au_iinfo *au_ii(struct inode *inode)
 /* ---------------------------------------------------------------------- */
 
 /* inode.c */
+struct inode *au_igrab(struct inode *inode);
 int au_refresh_hinode_self(struct inode *inode, int do_attr);
 int au_refresh_hinode(struct inode *inode, struct dentry *dentry);
 struct inode *au_new_inode(struct dentry *dentry, int must_new);
@@ -278,15 +280,6 @@ static inline int au_test_higen(struct inode *inode, struct inode *h_inode)
 	iinfo = au_ii(inode);
 	return !(iinfo->ii_hsb1 == h_inode->i_sb
 		 && iinfo->ii_higen == h_inode->i_generation);
-}
-
-static inline struct inode *au_igrab(struct inode *inode)
-{
-	if (inode) {
-		AuDebugOn(!atomic_read(&inode->i_count));
-		atomic_inc(&inode->i_count);
-	}
-	return inode;
 }
 
 /* ---------------------------------------------------------------------- */
