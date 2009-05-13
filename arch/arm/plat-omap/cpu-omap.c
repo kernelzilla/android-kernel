@@ -40,7 +40,7 @@ static struct cpufreq_frequency_table *freq_table;
 #ifdef CONFIG_ARCH_OMAP1
 #define MPU_CLK		"mpu"
 #elif CONFIG_ARCH_OMAP3
-#define MPU_CLK		"virt_vdd1_prcm_set"
+#define MPU_CLK		"arm_fck"
 #else
 #define MPU_CLK		"virt_prcm_set"
 #endif
@@ -82,7 +82,9 @@ static int omap_target(struct cpufreq_policy *policy,
 		       unsigned int target_freq,
 		       unsigned int relation)
 {
+#ifdef CONFIG_ARCH_OMAP1
 	struct cpufreq_freqs freqs;
+#endif
 	int ret = 0;
 
 	/* Ensure desired rate is within allowed range.  Some govenors
@@ -92,13 +94,13 @@ static int omap_target(struct cpufreq_policy *policy,
 	if (target_freq > policy->cpuinfo.max_freq)
 		target_freq = policy->cpuinfo.max_freq;
 
+#ifdef CONFIG_ARCH_OMAP1
 	freqs.old = omap_getspeed(0);
 	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
 	freqs.cpu = 0;
 
 	if (freqs.old == freqs.new)
 		return ret;
-#ifdef CONFIG_ARCH_OMAP1
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk(KERN_DEBUG "cpufreq-omap: transition: %u --> %u\n",
@@ -110,7 +112,7 @@ static int omap_target(struct cpufreq_policy *policy,
 	if (mpu_opps) {
 		int ind;
 		for (ind = 1; ind <= MAX_VDD1_OPP; ind++) {
-			if (mpu_opps[ind].rate/1000 >= freqs.new) {
+			if (mpu_opps[ind].rate/1000 >= target_freq) {
 				omap_pm_cpu_set_freq
 					(mpu_opps[ind].rate);
 				break;

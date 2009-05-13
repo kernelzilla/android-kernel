@@ -41,7 +41,6 @@
 #include <mach/sram.h>
 #include <mach/control.h>
 #include <mach/gpio.h>
-#include <mach/pm.h>
 #include <mach/mux.h>
 #include <mach/dma.h>
 #include <mach/board.h>

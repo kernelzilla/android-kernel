@@ -26,10 +26,10 @@
 #include <linux/module.h>
 #include <linux/list.h>
 #include <linux/err.h>
+#include <linux/clk.h>
 
 #include <mach/gpio.h>
 #include <mach/sram.h>
-#include <mach/pm.h>
 #include <mach/prcm.h>
 #include <mach/clockdomain.h>
 #include <mach/powerdomain.h>
@@ -42,6 +42,8 @@
 #include <mach/dma.h>
 #include <mach/gpmc.h>
 #include <mach/dma.h>
+#include <mach/dmtimer.h>
+
 #include <asm/tlbflush.h>
 
 #include "cm.h"
@@ -553,6 +555,22 @@ out:
 static void (*saved_idle)(void);
 static suspend_state_t suspend_state;
 
+static void omap2_pm_wakeup_on_timer(u32 seconds)
+{
+	u32 tick_rate, cycles;
+
+	if (!seconds)
+		return;
+
+	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gptimer_wakeup));
+	cycles = tick_rate * seconds;
+	omap_dm_timer_stop(gptimer_wakeup);
+	omap_dm_timer_set_load_start(gptimer_wakeup, 0, 0xffffffff - cycles);
+
+	pr_info("PM: Resume timer in %d secs (%d ticks at %d ticks/sec.)\n",
+		seconds, cycles, tick_rate);
+}
+
 static int omap3_pm_prepare(void)
 {
 	saved_idle = pm_idle;
@@ -564,6 +582,9 @@ static int omap3_pm_suspend(void)
 {
 	struct power_state *pwrst;
 	int state, ret = 0;
+
+	if (wakeup_timer_seconds)
+		omap2_pm_wakeup_on_timer(wakeup_timer_seconds);
 
 	/* Read current next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
@@ -858,6 +879,24 @@ static void __init prcm_setup_regs(void)
 	 * it is selected to mpu wakeup goup */
 	prm_write_mod_reg(OMAP3430_IO_EN | OMAP3430_WKUP_EN,
 			OCP_MOD, OMAP2_PRM_IRQENABLE_MPU_OFFSET);
+
+	/* Don't attach IVA interrupts */
+	prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
+	prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
+	prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
+	prm_write_mod_reg(0, OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
+		
+	/* Clear any pending 'reset' flags */
+	prm_write_mod_reg(0xffffffff, MPU_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, CORE_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, OMAP3430_PER_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, OMAP3430_EMU_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, OMAP3430_NEON_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, OMAP3430_DSS_MOD, RM_RSTST);
+	prm_write_mod_reg(0xffffffff, OMAP3430ES2_USBHOST_MOD, RM_RSTST);
+
+	/* Clear any pending PRCM interrupts */
+	prm_write_mod_reg(0, OCP_MOD, OMAP2_PRM_IRQSTATUS_MPU_OFFSET);
 
 	omap3_iva_idle();
 }

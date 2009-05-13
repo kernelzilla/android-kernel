@@ -38,6 +38,7 @@
 
 static struct omap_dm_timer *gptimer;
 static struct clock_event_device clockevent_gpt;
+struct omap_dm_timer *gptimer_wakeup;
 
 static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
 {
@@ -101,6 +102,7 @@ static void __init omap2_gp_clockevent_init(void)
 
 	gptimer = omap_dm_timer_request_specific(CONFIG_OMAP_TICK_GPTIMER);
 	BUG_ON(gptimer == NULL);
+	gptimer_wakeup = gptimer;
 
 #if defined(CONFIG_OMAP_32K_TIMER)
 	omap_dm_timer_set_source(gptimer, OMAP_TIMER_SRC_32_KHZ);

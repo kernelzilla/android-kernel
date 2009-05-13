@@ -24,7 +24,6 @@
 
 #include <linux/sched.h>
 #include <linux/cpuidle.h>
-#include <mach/pm.h>
 #include <mach/prcm.h>
 #include <mach/powerdomain.h>
 #include <mach/clockdomain.h>

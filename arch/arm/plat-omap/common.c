@@ -11,7 +11,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/delay.h>
-#include <linux/pm.h>
 #include <linux/console.h>
 #include <linux/serial.h>
 #include <linux/tty.h>
@@ -45,6 +44,12 @@ int omap_bootloader_tag_len;
 
 struct omap_board_config_kernel *omap_board_config;
 int omap_board_config_size;
+
+#ifdef CONFIG_OMAP_PM_NONE
+struct omap_opp *mpu_opps;
+struct omap_opp *dsp_opps;
+struct omap_opp *l3_opps;
+#endif
 
 #ifdef CONFIG_OMAP_BOOT_TAG
 
