@@ -242,6 +242,25 @@ static struct qtm_object *find_object_rid(struct qtouch_ts_data *ts, int rid)
 	return NULL;
 }
 
+static int qtouch_force_calibration(struct qtouch_ts_data *ts)
+{
+	struct qtm_object *obj;
+	uint16_t addr;
+	uint8_t val;
+	int ret;
+
+	pr_info("%s: Forcing calibration\n", __func__);
+
+	obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
+
+	addr = obj->entry.addr + offsetof(struct qtm_gen_cmd_proc, calibrate);
+	val = 1;
+	ret = qtouch_write_addr(ts, addr, &val, 1);
+	if (ret)
+		pr_err("%s: Unable to send the calibrate message\n", __func__);
+	return ret;
+}
+
 #undef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 static int qtouch_power_config(struct qtouch_ts_data *ts, int on)
@@ -368,6 +387,12 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 			pr_err("%s: Can't backup nvram settings\n", __func__);
 			return ret;
 		}
+	}
+
+	ret = qtouch_force_calibration(ts);
+	if (ret != 0) {
+		pr_err("%s: Unable to recalibrate after reset\n", __func__);
+		return ret;
 	}
 
 	/* reset the address pointer */
