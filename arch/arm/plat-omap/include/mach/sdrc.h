@@ -112,6 +112,8 @@ struct omap_sdrc_params {
 	u32 mr;
 };
 
+void omap2_sms_save_context(void);
+void omap2_sms_restore_context(void);
 void __init omap2_sdrc_init(struct omap_sdrc_params *);
 struct omap_sdrc_params *omap2_sdrc_get_params(unsigned long r);
 

@@ -439,6 +439,7 @@ void omap_sram_idle(void)
 			omap3_core_restore_context();
 			omap3_prcm_restore_context();
 			omap3_sram_restore_context();
+			omap2_sms_restore_context();
 		}
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
