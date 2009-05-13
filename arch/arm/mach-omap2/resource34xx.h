@@ -28,10 +28,6 @@
 #include <mach/omap-pm.h>
 #include <mach/omap34xx.h>
 
-extern struct omap_opp *curr_vdd1_prcm_set;
-extern struct omap_opp *curr_vdd2_prcm_set;
-extern unsigned long get_freq(struct  omap_opp *, unsigned short);
-extern unsigned short get_opp(struct omap_opp *, unsigned long);
 extern int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel);
 
 /*

@@ -1,7 +1,7 @@
 /*
- * arch/arm/plat-omap/include/mach/pm.h
+ * arch/arm/mach-omap1/pm.h
  *
- * Header file for OMAP Power Management Routines
+ * Header file for OMAP1 Power Management Routines
  *
  * Author: MontaVista Software, Inc.
  *	   support@mvista.com
@@ -31,8 +31,8 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef __ASM_ARCH_OMAP_PM_H
-#define __ASM_ARCH_OMAP_PM_H
+#ifndef __ARCH_ARM_MACH_OMAP1_PM_H
+#define __ARCH_ARM_MACH_OMAP1_PM_H
 
 /*
  * ----------------------------------------------------------------------------
@@ -106,9 +106,7 @@
 
 #if     !defined(CONFIG_ARCH_OMAP730) && \
 	!defined(CONFIG_ARCH_OMAP15XX) && \
-	!defined(CONFIG_ARCH_OMAP16XX) && \
-	!defined(CONFIG_ARCH_OMAP24XX) && \
-	!defined(CONFIG_ARCH_OMAP34XX)
+	!defined(CONFIG_ARCH_OMAP16XX)
 #warning "Power management for this processor not implemented yet"
 #endif
 
@@ -121,52 +119,22 @@ extern struct kset power_subsys;
 extern void prevent_idle_sleep(void);
 extern void allow_idle_sleep(void);
 
-/**
- * clk_deny_idle - Prevents the clock from being idled during MPU idle
- * @clk: clock signal handle
- */
-void clk_deny_idle(struct clk *clk);
+extern void omap1_pm_idle(void);
+extern void omap1_pm_suspend(void);
 
-/**
- * clk_allow_idle - Counters previous clk_deny_idle
- * @clk: clock signal handle
- */
-void clk_allow_idle(struct clk *clk);
-
-extern void omap_pm_idle(void);
-extern void omap_pm_suspend(void);
-extern void omap_sram_idle(void);
-#ifdef CONFIG_PM
-extern void omap2_block_sleep(void);
-extern void omap2_allow_sleep(void);
-#else
-static inline void omap2_block_sleep(void) { }
-static inline void omap2_allow_sleep(void) { }
-#endif
-extern int omap3_can_sleep(void);
 extern void omap730_cpu_suspend(unsigned short, unsigned short);
 extern void omap1510_cpu_suspend(unsigned short, unsigned short);
 extern void omap1610_cpu_suspend(unsigned short, unsigned short);
-extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
-					void __iomem *sdrc_power);
-extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
-extern void save_secure_ram_context(u32 *addr);
 extern void omap730_idle_loop_suspend(void);
 extern void omap1510_idle_loop_suspend(void);
 extern void omap1610_idle_loop_suspend(void);
-extern void omap24xx_idle_loop_suspend(void);
 
 extern unsigned int omap730_cpu_suspend_sz;
 extern unsigned int omap1510_cpu_suspend_sz;
 extern unsigned int omap1610_cpu_suspend_sz;
-extern unsigned int omap24xx_cpu_suspend_sz;
-extern unsigned int omap34xx_cpu_suspend_sz;
 extern unsigned int omap730_idle_loop_suspend_sz;
 extern unsigned int omap1510_idle_loop_suspend_sz;
 extern unsigned int omap1610_idle_loop_suspend_sz;
-extern unsigned int omap24xx_idle_loop_suspend_sz;
-extern unsigned int omap34xx_suspend_sz;
-extern unsigned int save_secure_ram_context_sz;
 
 #ifdef CONFIG_OMAP_SERIAL_WAKE
 extern void omap_serial_wake_trigger(int enable);

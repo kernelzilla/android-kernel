@@ -25,7 +25,6 @@
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
-#include <mach/pm.h>
 #include <mach/usb.h>
 
 static struct resource ehci_resources[] = {

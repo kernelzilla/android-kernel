@@ -183,6 +183,7 @@ struct omap_i2c_dev {
 	u16			sclhstate;
 	u16			bufstate;
 	u16			syscstate;
+	u16			westate;
 };
 
 static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
@@ -242,6 +243,7 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
 		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
 		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
+		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
 	}
 	dev->idle = 0;
 	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
@@ -316,8 +318,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 			 * WFI instruction.
 			 * REVISIT: Some wkup sources might not be needed.
 			 */
-			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
-							OMAP_I2C_WE_ALL);
+			dev->westate = OMAP_I2C_WE_ALL;
+			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
 
 		}
 	}

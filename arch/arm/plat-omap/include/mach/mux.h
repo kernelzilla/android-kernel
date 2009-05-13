@@ -809,6 +809,8 @@ enum omap34xx_index {
 	AF21_3430_GPIO8,
 	B23_3430_GPIO167,
 	R21_3430_GPIO163,
+        B24_3430_GPIO101,
+        W21_3430_GPIO162,
 
 	/* McSPI */
 	AB1_3430_McSPI1_CS2,
@@ -820,6 +822,7 @@ enum omap34xx_index {
 	AH23_34XX_DSI_DY1,
 	AG24_34XX_DSI_DX2,
 	AH24_34XX_DSI_DY2,
+
 };
 
 struct omap_mux_cfg {

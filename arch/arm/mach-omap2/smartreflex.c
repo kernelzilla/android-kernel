@@ -247,13 +247,19 @@ static void sr_set_nvalues(struct omap_sr *sr)
 static void sr_configure_vp(int srid)
 {
 	u32 vpconfig;
+	u32 vsel;
 
 	if (srid == SR1) {
+		if (!omap_pm_vdd1_get_opp())
+			/* Assume Nominal OPP as current OPP unknown */
+			vsel = mpu_opps[VDD1_OPP3].vsel;
+		else
+			vsel = mpu_opps[omap_pm_vdd1_get_opp()].vsel;
+
 		vpconfig = PRM_VP1_CONFIG_ERROROFFSET |
 			PRM_VP1_CONFIG_ERRORGAIN |
 			PRM_VP1_CONFIG_TIMEOUTEN |
-			mpu_opps[omap_pm_vdd1_get_opp()].vsel <<
-			OMAP3430_INITVOLTAGE_SHIFT;
+			vsel << OMAP3430_INITVOLTAGE_SHIFT;
 
 		prm_write_mod_reg(vpconfig, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP1_CONFIG_OFFSET);
@@ -289,11 +295,16 @@ static void sr_configure_vp(int srid)
 				       OMAP3_PRM_VP1_CONFIG_OFFSET);
 
 	} else if (srid == SR2) {
+		if (!omap_pm_vdd2_get_opp())
+			/* Assume Nominal OPP */
+			vsel = l3_opps[VDD2_OPP3].vsel;
+		else
+			vsel = l3_opps[omap_pm_vdd2_get_opp()].vsel;
+
 		vpconfig = PRM_VP2_CONFIG_ERROROFFSET |
 			PRM_VP2_CONFIG_ERRORGAIN |
 			PRM_VP2_CONFIG_TIMEOUTEN |
-			l3_opps[omap_pm_vdd2_get_opp()].vsel <<
-			OMAP3430_INITVOLTAGE_SHIFT;
+			vsel << OMAP3430_INITVOLTAGE_SHIFT;
 
 		prm_write_mod_reg(vpconfig, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP2_CONFIG_OFFSET);
@@ -387,10 +398,18 @@ static int sr_reset_voltage(int srid)
 
 	if (srid == SR1) {
 		target_opp_no = omap_pm_vdd1_get_opp();
+		if (!target_opp_no) {
+			pr_info("Current OPP unknown: Cannot reset voltage\n");
+			return 1;
+		}
 		vsel = mpu_opps[target_opp_no].vsel;
 		reg_addr = R_VDD1_SR_CONTROL;
 	} else if (srid == SR2) {
 		target_opp_no = omap_pm_vdd2_get_opp();
+		if (!target_opp_no) {
+			pr_info("Current OPP unknown: Cannot reset voltage\n");
+			return 1;
+		}
 		vsel = l3_opps[target_opp_no].vsel;
 		reg_addr = R_VDD2_SR_CONTROL;
 	}
@@ -555,6 +574,8 @@ void sr_start_vddautocomap(int srid, u32 target_opp_no)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_sr_reset == 1) {
 		sr_clk_enable(sr);
@@ -583,6 +604,8 @@ int sr_stop_vddautocomap(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return -EINVAL;
 
 	if (sr->is_autocomp_active == 1) {
 		sr_disable(sr);
@@ -609,6 +632,8 @@ void enable_smartreflex(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_autocomp_active == 1) {
 		if (sr->is_sr_reset == 1) {
@@ -619,6 +644,11 @@ void enable_smartreflex(int srid)
 				target_opp_no = omap_pm_vdd1_get_opp();
 			else if (srid == SR2)
 				target_opp_no = omap_pm_vdd2_get_opp();
+
+			if (!target_opp_no) {
+				pr_info("Current OPP unknown \
+						 Cannot configure SR\n");
+			}
 
 			sr_configure(sr);
 
@@ -636,6 +666,8 @@ void disable_smartreflex(int srid)
 		sr = &sr1;
 	else if (srid == SR2)
 		sr = &sr2;
+	else
+		return;
 
 	if (sr->is_autocomp_active == 1) {
 		if (sr->is_sr_reset == 0) {
@@ -744,7 +776,6 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t n)
 {
-	u32 current_vdd1opp_no;
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
@@ -752,13 +783,14 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 		return -EINVAL;
 	}
 
-	current_vdd1opp_no = omap_pm_vdd1_get_opp();
-
-	if (value == 0)
+	if (value == 0) {
 		sr_stop_vddautocomap(SR1);
-	else
+	} else {
+		u32 current_vdd1opp_no = omap_pm_vdd1_get_opp();
+		if (IS_ERR_VALUE(current_vdd1opp_no))
+			return -ENODEV;
 		sr_start_vddautocomap(SR1, current_vdd1opp_no);
-
+	}
 	return n;
 }
 
@@ -782,7 +814,6 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t n)
 {
-	u32 current_vdd2opp_no;
 	unsigned short value;
 
 	if (sscanf(buf, "%hu", &value) != 1 || (value > 1)) {
@@ -790,13 +821,14 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 		return -EINVAL;
 	}
 
-	current_vdd2opp_no = omap_pm_vdd2_get_opp();
-
-	if (value == 0)
+	if (value == 0) {
 		sr_stop_vddautocomap(SR2);
-	else
+	} else {
+		u32 current_vdd2opp_no = omap_pm_vdd2_get_opp();
+		if (IS_ERR_VALUE(current_vdd2opp_no))
+			return -ENODEV;
 		sr_start_vddautocomap(SR2, current_vdd2opp_no);
-
+	}
 	return n;
 }
 
