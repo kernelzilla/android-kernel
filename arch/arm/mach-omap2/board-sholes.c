@@ -323,8 +323,12 @@ static void __init sholes_ehci_init(void)
 	}
 	gpio_direction_output(SHOLES_AP_TO_BP_FLASH_EN_GPIO, 0);
 
+#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
 	platform_device_register(&ehci_device);
+#endif
+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
 	platform_device_register(&ohci_device);
+#endif
 }
 
 
