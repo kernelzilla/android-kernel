@@ -66,7 +66,9 @@ struct cpcap_spi_init_data {
 
 struct cpcap_platform_data {
         struct cpcap_spi_init_data *init;
+	int init_len;
         struct cpcap_regulator_data *regulator_init;
+	int regulator_init_len;
 };
 
 /*

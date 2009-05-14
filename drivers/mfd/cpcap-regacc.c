@@ -407,7 +407,7 @@ int cpcap_regacc_init(struct cpcap_device *cpcap)
 	data = (struct cpcap_platform_data *)
 		spi->controller_data;
 
-	for (i = 0; i < (sizeof(data->init) / sizeof(data->init[0])); i++) {
+	for (i = 0; i < data->init_len; i++) {
 		mask = 0xFFFF;
 		mask &= ~(register_info_tbl[data->init[i].reg].constant_mask);
 
