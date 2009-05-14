@@ -174,11 +174,11 @@ static unsigned omapfb_get_vrfb_offset(struct omapfb_info *ofbi, int rot)
 	return offset;
 }
 
-static u32 omapfb_get_region_rot_paddr(struct omapfb_info *ofbi)
+static u32 omapfb_get_region_rot_paddr(struct omapfb_info *ofbi, int rot)
 {
 	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
-		return ofbi->region.vrfb.paddr[ofbi->rotation]
-			+ omapfb_get_vrfb_offset(ofbi, ofbi->rotation);
+		return ofbi->region.vrfb.paddr[rot]
+			+ omapfb_get_vrfb_offset(ofbi, rot);
 	} else {
 		return ofbi->region.paddr;
 	}
@@ -391,11 +391,7 @@ void set_fb_fix(struct fb_info *fbi)
 	/* used by open/write in fbmem.c */
 	fbi->screen_base = (char __iomem *)omapfb_get_region_vaddr(ofbi);
 
-	if (ofbi->rotation != var->rotate) {
-		DBG("changing rotation %d -> %d\n",
-				ofbi->rotation, var->rotate);
-		ofbi->rotation = var->rotate;
-	}
+	DBG("changing rotation to %d\n", var->rotate);
 
 	/* used by mmap in fbmem.c */
 	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
@@ -665,11 +661,21 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	int xres, yres;
 	int screen_width;
 	int mirror;
+	int rotation = var->rotate;
+	int i;
+
+	for (i = 0; i < ofbi->num_overlays; i++) {
+		if (ovl != ofbi->overlays[i])
+			continue;
+
+		rotation = (rotation + ofbi->rotation[i]) % 4;
+		break;
+	}
 
 	DBG("setup_overlay %d, posx %d, posy %d, outw %d, outh %d\n", ofbi->id,
 			posx, posy, outw, outh);
 
-	if (ofbi->rotation == FB_ROTATE_CW || ofbi->rotation == FB_ROTATE_CCW) {
+	if (rotation == FB_ROTATE_CW || rotation == FB_ROTATE_CCW) {
 		xres = var->yres;
 		yres = var->xres;
 	} else {
@@ -681,7 +687,7 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 				var->xoffset) * var->bits_per_pixel) >> 3;
 
 	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
-		data_start_p = omapfb_get_region_rot_paddr(ofbi);
+		data_start_p = omapfb_get_region_rot_paddr(ofbi, rotation);
 		data_start_v = NULL;
 	} else {
 		data_start_p = omapfb_get_region_paddr(ofbi);
@@ -726,7 +732,7 @@ static int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	info.height = yres;
 	info.color_mode = mode;
 	info.rotation_type = ofbi->rotation_type;
-	info.rotation = ofbi->rotation;
+	info.rotation = rotation;
 	info.mirror = mirror;
 
 	info.pos_x = posx;
@@ -777,8 +783,9 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		}
 
 		if (init || (ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
-			if (ofbi->rotation == FB_ROTATE_CW ||
-					ofbi->rotation == FB_ROTATE_CCW) {
+			int rotation = (var->rotate + ofbi->rotation[i]) % 4;
+			if (rotation == FB_ROTATE_CW ||
+					rotation == FB_ROTATE_CCW) {
 				outw = var->yres;
 				outh = var->xres;
 			} else {
@@ -1581,7 +1588,7 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	var->nonstd = 0;
 	var->bits_per_pixel = 0;
 
-	var->rotate = ofbi->rotation;
+	var->rotate = def_rotate;
 
 	/*
 	 * Check if there is a default color format set in the board file,
@@ -1611,10 +1618,12 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 
 	if (display) {
 		u16 w, h;
+		int rotation = (var->rotate + ofbi->rotation[0]) % 4;
+
 		display->get_resolution(display, &w, &h);
 
-		if (ofbi->rotation == FB_ROTATE_CW ||
-				ofbi->rotation == FB_ROTATE_CCW) {
+		if (rotation == FB_ROTATE_CW ||
+				rotation == FB_ROTATE_CCW) {
 			var->xres = h;
 			var->yres = w;
 		} else {
@@ -1730,7 +1739,6 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 		/* assign these early, so that fb alloc can use them */
 		ofbi->rotation_type = def_vrfb ? OMAP_DSS_ROT_VRFB :
 			OMAP_DSS_ROT_DMA;
-		ofbi->rotation = def_rotate;
 		ofbi->mirror = def_mirror;
 
 		fbdev->num_fbs++;

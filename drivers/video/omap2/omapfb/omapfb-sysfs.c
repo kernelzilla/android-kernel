@@ -259,8 +259,10 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
 		if (ovl->manager)
 			ovl->manager->apply(ovl->manager);
 
-		for (t = i + 1; t < ofbi->num_overlays; t++)
+		for (t = i + 1; t < ofbi->num_overlays; t++) {
+			ofbi->rotation[t-1] = ofbi->rotation[t];
 			ofbi->overlays[t-1] = ofbi->overlays[t];
+		}
 
 		ofbi->num_overlays--;
 		i--;
@@ -282,7 +284,7 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
 
 		if (found)
 			continue;
-
+		ofbi->rotation[ofbi->num_overlays] = 0;
 		ofbi->overlays[ofbi->num_overlays++] = ovl;
 
 		added = true;
@@ -292,6 +294,90 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
 		r = omapfb_apply_changes(fbi, 0);
 		if (r)
 			goto out;
+	}
+
+	r = count;
+out:
+	omapfb_unlock(fbdev);
+
+	return r;
+}
+
+static ssize_t show_overlays_rotate(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	ssize_t l = 0;
+	int t;
+
+	for (t = 0; t < ofbi->num_overlays; t++) {
+		l += snprintf(buf + l, PAGE_SIZE - l, "%s%d",
+				t == 0 ? "" : ",", ofbi->rotation[t]);
+	}
+
+	l += snprintf(buf + l, PAGE_SIZE - l, "\n");
+
+	return l;
+}
+
+static ssize_t store_overlays_rotate(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	int num_ovls = 0, r, i;
+	int len;
+	bool changed = false;
+	u8 rotation[OMAPFB_MAX_OVL_PER_FB];
+
+	len = strlen(buf);
+	if (buf[len - 1] == '\n')
+		len = len - 1;
+
+	omapfb_lock(fbdev);
+
+	if (len > 0) {
+		char *p = (char *)buf;
+
+		while (p < buf + len) {
+			int rot;
+
+			if (num_ovls == ofbi->num_overlays) {
+				r = -EINVAL;
+				goto out;
+			}
+
+			rot = simple_strtoul(p, &p, 0);
+			if (rot < 0 || rot > 3) {
+				r = -EINVAL;
+				goto out;
+			}
+
+			if (ofbi->rotation[num_ovls] != rot)
+				changed = true;
+
+			rotation[num_ovls++] = rot;
+
+			p++;
+		}
+	}
+
+	if (num_ovls != ofbi->num_overlays) {
+		r = -EINVAL;
+		goto out;
+	}
+
+	if (changed) {
+		for (i = 0; i < num_ovls; ++i)
+			ofbi->rotation[i] = rotation[i];
+
+		r = omapfb_apply_changes(fbi, 0);
+		if (r)
+			goto out;
+
+		/* FIXME error handling? */
 	}
 
 	r = count;
@@ -369,6 +455,7 @@ static struct device_attribute omapfb_attrs[] = {
 	__ATTR(mirror, S_IRUGO | S_IWUSR, show_mirror, store_mirror),
 	__ATTR(size, S_IRUGO | S_IWUSR, show_size, store_size),
 	__ATTR(overlays, S_IRUGO | S_IWUSR, show_overlays, store_overlays),
+	__ATTR(overlays_rotate, S_IRUGO | S_IWUSR, show_overlays_rotate, store_overlays_rotate),
 	__ATTR(phys_addr, S_IRUGO, show_phys, NULL),
 	__ATTR(virt_addr, S_IRUGO, show_virt, NULL),
 };

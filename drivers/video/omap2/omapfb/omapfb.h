@@ -62,7 +62,7 @@ struct omapfb_info {
 	struct omap_overlay *overlays[OMAPFB_MAX_OVL_PER_FB];
 	struct omapfb2_device *fbdev;
 	enum omap_dss_rotation_type rotation_type;
-	u8 rotation;
+	u8 rotation[OMAPFB_MAX_OVL_PER_FB];
 	bool mirror;
 };
 
