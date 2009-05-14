@@ -213,7 +213,7 @@ ENDPROC(__v7_setup)
 	 */
 	.type	v7_crval, #object
 v7_crval:
-	crval	clear=0x0120c302, mmuset=0x10c0387d, ucset=0x00c0187c
+	crval	clear=0x0120cd02, mmuset=0x10c0307d, ucset=0x00c0107c
 
 __v7_setup_stack:
 	.space	4 * 11				@ 11 registers
