@@ -75,7 +75,9 @@ struct cpcap_regulator_data sholes_cpcap_regulator_init[] = {
 
 static struct cpcap_platform_data sholes_cpcap_data = {
 	.init = sholes_cpcap_spi_init,
+	.init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
 	.regulator_init = sholes_cpcap_regulator_init,
+	.regulator_init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
 };
 
 static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
