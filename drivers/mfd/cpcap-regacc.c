@@ -292,6 +292,7 @@ static int cpcap_spi_access(struct spi_device *spi, u8 *buf,
 		.tx_buf = buf,
 		.len = len,
 		.rx_buf = buf,
+		.bits_per_word = 32,
 	};
 
 	spi_message_init(&m);
@@ -303,7 +304,8 @@ static int cpcap_config_for_read(struct spi_device *spi, unsigned short reg,
 				 unsigned short *data)
 {
 	int status = -ENOTTY;
-	char buf[4];
+	u32 buf32;  /* force buf to be 32bit aligned */
+	u8 *buf = (u8 *) &buf32;
 
 	if (spi != NULL) {
 		buf[3] = (reg >> 6) & 0x000000FF;
@@ -324,7 +326,8 @@ static int cpcap_config_for_write(struct spi_device *spi, unsigned short reg,
 				  unsigned short data)
 {
 	int status = -ENOTTY;
-	char buf[4];
+	u32 buf32;  /* force buf to be 32bit aligned */
+	u8 *buf = (u8 *) &buf32;
 
 	if (spi != NULL) {
 		buf[3] = ((reg >> 6) & 0x000000FF) | 0x80;
