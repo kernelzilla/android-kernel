@@ -362,7 +362,7 @@ static inline int au_test_fs_no_limit_nlink(struct super_block *sb)
 #ifdef CONFIG_AUFS_BR_RAMFS
 		|| au_test_ramfs(sb)
 #endif
-		;
+		|| au_test_ubifs(sb);
 }
 
 /*
@@ -372,8 +372,8 @@ static inline int au_test_fs_notime(struct super_block *sb)
 {
 	return au_test_nfs(sb)
 		|| au_test_fuse(sb)
+		|| au_test_ubifs(sb)
 		/* || au_test_cifs(sb) */	/* untested */
-		/* || au_test_ubifs(sb) */	/* untested */
 		;
 }
 
@@ -382,7 +382,8 @@ static inline int au_test_fs_notime(struct super_block *sb)
  */
 static inline int au_test_fs_bad_mapping(struct super_block *sb)
 {
-	return au_test_fuse(sb);
+	return au_test_fuse(sb)
+		|| au_test_ubifs(sb);
 }
 
 /* temporary support for i#1 in cramfs */
