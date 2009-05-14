@@ -45,7 +45,10 @@ struct au_finfo {
 
 	union {
 		/* non-dir only */
-		struct vm_operations_struct	*fi_h_vm_ops;
+		struct {
+			struct vm_operations_struct	*fi_h_vm_ops;
+			struct vm_operations_struct	*fi_vm_ops;
+		};
 
 		/* dir only */
 		struct {
