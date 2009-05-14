@@ -305,6 +305,14 @@ config VIDEO_TCM825X
 	  This is a driver for the Toshiba TCM825x VGA camera sensor.
 	  It is used for example in Nokia N800.
 
+config VIDEO_MT9P012
+	tristate "Micron MT9P012 raw sensor driver (5MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Micron
+	  MT9P012 camera.  It is currently working with the TI OMAP3
+	  camera controller.
+
 config VIDEO_SAA7110
 	tristate "Philips SAA7110 video decoder"
 	depends on VIDEO_V4L1 && I2C
@@ -801,6 +809,24 @@ config VIDEO_SH_MOBILE_CEU
 	select VIDEOBUF_DMA_CONTIG
 	---help---
 	  This is a v4l2 driver for the SuperH Mobile CEU Interface
+
+config VIDEO_OLDOMAP3
+        tristate "OMAP 3 Camera support"
+	select VIDEOBUF_GEN
+	select VIDEOBUF_DMA_SG
+	depends on VIDEO_V4L2 && ARCH_OMAP34XX
+	---help---
+	  Driver for an OMAP 3 camera controller.
+
+source "drivers/media/video/oldisp/Kconfig"
+
+config VIDEO_OLDOMAP3_BUFFALLOC
+	bool "OMAP3430 ISP Workaround: Allocate memory at driver init"
+	depends on VIDEO_OLDOMAP3 && ARCH_OMAP3430
+	default y
+	---help---
+	  This option is for allocating the workaround buffer at
+	  camera init time.
 
 config VIDEO_OMAP2
 	tristate "OMAP2 Camera Capture Interface driver"
