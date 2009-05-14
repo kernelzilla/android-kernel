@@ -257,9 +257,18 @@ config INPUT_PROXIMITY_SFH7743
 	tristate "SFH7743 Proximity"
 	default n
 	help
- 	  Say Y here if you wish to include the OSRAM SFH7743 proximity
+	  Say Y here if you wish to include the OSRAM SFH7743 proximity
 	  driver.
 
 	  If unsure, say N.
 	  To compile this driver a a module, choose M here.
+
+config INPUT_HALLEFFECT_BU52014HV
+	tristate "BU52014HV Hall Effect Sensor"
+	default y
+	help
+	  Say Y here if you wish to include support for the BU52014HV hall
+	  effect sensor.
+
+	  If unsure, say N.
 endif
