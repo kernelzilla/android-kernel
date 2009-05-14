@@ -391,6 +391,12 @@ void set_fb_fix(struct fb_info *fbi)
 	/* used by open/write in fbmem.c */
 	fbi->screen_base = (char __iomem *)omapfb_get_region_vaddr(ofbi);
 
+	if (ofbi->rotation != var->rotate) {
+		DBG("changing rotation %d -> %d\n",
+				ofbi->rotation, var->rotate);
+		ofbi->rotation = var->rotate;
+	}
+
 	/* used by mmap in fbmem.c */
 	if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
 		switch (var->nonstd) {
@@ -481,26 +487,6 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 
 	if (var->rotate < 0 || var->rotate > 3)
 		return -EINVAL;
-
-	if (var->rotate != fbi->var.rotate) {
-		DBG("rotation changing\n");
-
-		ofbi->rotation = var->rotate;
-
-		if (abs(var->rotate - fbi->var.rotate) != 2) {
-			int tmp;
-			DBG("rotate changing 90/270 degrees. "
-					"swapping x/y res\n");
-
-			tmp = var->yres;
-			var->yres = var->xres;
-			var->xres = tmp;
-
-			tmp = var->yres_virtual;
-			var->yres_virtual = var->xres_virtual;
-			var->xres_virtual = tmp;
-		}
-	}
 
 	xres_min = OMAPFB_PLANE_XRES_MIN;
 	xres_max = 2048;
