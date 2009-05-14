@@ -66,10 +66,13 @@ static int do_open_nondir(struct file *file, int flags)
 	aufs_bindex_t bindex;
 	struct file *h_file;
 	struct dentry *dentry;
+	struct au_finfo *finfo;
 
 	err = 0;
 	dentry = file->f_dentry;
-	au_fi(file)->fi_h_vm_ops = NULL;
+	finfo = au_fi(file);
+	finfo->fi_h_vm_ops = NULL;
+	finfo->fi_vm_ops = NULL;
 	bindex = au_dbstart(dentry);
 	/* O_TRUNC is processed already */
 	BUG_ON(au_test_ro(dentry->d_sb, bindex, dentry->d_inode)
@@ -320,10 +323,7 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 
 	fi_write_lock(file);
 	vma->vm_file = h_file;
-	if (finfo->fi_h_vm_ops->page_mkwrite)
-		err = finfo->fi_h_vm_ops->page_mkwrite(vma, page);
-	else
-		err = 0;
+	err = finfo->fi_h_vm_ops->page_mkwrite(vma, page);
 	au_reset_file(vma, file);
 	fi_write_unlock(file);
 	wake_up(&wq);
@@ -331,9 +331,29 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 	return err;
 }
 
+static void aufs_vm_close(struct vm_area_struct *vma)
+{
+	static DECLARE_WAIT_QUEUE_HEAD(wq);
+	struct file *file, *h_file;
+	struct au_finfo *finfo;
+
+	wait_event(wq, (file = au_safe_file(vma)));
+
+	finfo = au_fi(file);
+	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
+	AuDebugOn(!h_file || !au_test_mmapped(file));
+
+	fi_write_lock(file);
+	vma->vm_file = h_file;
+	finfo->fi_h_vm_ops->close(vma);
+	au_reset_file(vma, file);
+	fi_write_unlock(file);
+	wake_up(&wq);
+}
+
 static struct vm_operations_struct aufs_vm_ops = {
+	/* .close and .page_mkwrite are not set by default */
 	.fault		= aufs_fault,
-	.page_mkwrite	= aufs_page_mkwrite,
 };
 
 /* ---------------------------------------------------------------------- */
@@ -364,6 +384,35 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 
  out:
 	return vm_ops;
+}
+
+static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
+{
+	int err;
+	struct vm_operations_struct *h_ops;
+
+	err = 0;
+	h_ops = finfo->fi_h_vm_ops;
+	AuDebugOn(!h_ops);
+	if ((!h_ops->page_mkwrite && !h_ops->close)
+	    || finfo->fi_vm_ops)
+		goto out;
+
+	err = -ENOMEM;
+	finfo->fi_vm_ops = kmemdup(&aufs_vm_ops, sizeof(aufs_vm_ops), GFP_NOFS);
+	if (unlikely(!finfo->fi_vm_ops))
+		goto out;
+
+	err = 0;
+	if (h_ops->page_mkwrite)
+		finfo->fi_vm_ops->page_mkwrite = aufs_page_mkwrite;
+	if (h_ops->close)
+		finfo->fi_vm_ops->close = aufs_vm_close;
+
+	vma->vm_ops = finfo->fi_vm_ops;
+
+ out:
+	return err;
 }
 
 static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
@@ -424,10 +473,15 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 	err = generic_file_mmap(file, vma);
 	if (unlikely(err))
 		goto out_unlock;
+
 	vma->vm_ops = &aufs_vm_ops;
 	/* test again */
 	if (!au_test_mmapped(file))
 		au_fi(file)->fi_h_vm_ops = vm_ops;
+
+	err = au_custom_vm_ops(au_fi(file), vma);
+	if (unlikely(err))
+		goto out_unlock;
 
 	vfsub_file_accessed(h_file);
 	fsstack_copy_attr_atime(dentry->d_inode, h_file->f_dentry->d_inode);
