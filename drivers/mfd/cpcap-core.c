@@ -22,10 +22,8 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
+#include <linux/uaccess.h>
 
-#include <asm/uaccess.h>
-
-#include "cpcap-main.h"
 
 static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg);
@@ -87,6 +85,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 {
 	int retval = -EINVAL;
 	struct cpcap_device *cpcap;
+	int i;
 
 	cpcap = kzalloc(sizeof(*cpcap), GFP_KERNEL);
 	if (cpcap == NULL)
@@ -97,21 +96,48 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, cpcap);
 
 	retval = cpcap_regacc_init(cpcap);
+	if (retval < 0)
+		return retval;
 
 	cpcap_usb_device.dev.platform_data = cpcap;
 	cpcap_key_device.dev.platform_data = cpcap;
 
-	if (retval >= 0)
-		retval = misc_register(&cpcap_dev);
+	retval = misc_register(&cpcap_dev);
+	if (retval < 0)
+		return retval;
 
 	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
+
+	for (i = 0; i < CPCAP_NUM_REGULATORS; i++) {
+		struct platform_device *pdev;
+
+		pdev = platform_device_alloc("cpcap-regltr", i);
+		if (!pdev) {
+			dev_err(&(spi->dev), "Cannot create regulator\n");
+			continue;
+		}
+
+		pdev->dev.parent = &(spi->dev);
+		pdev->dev.driver_data = cpcap;
+		cpcap->regulator_pdev[i] = pdev;
+
+		platform_device_add(pdev);
+	}
 
 	return retval;
 }
 
 static int __devexit cpcap_remove(struct spi_device *spi)
 {
-	struct cpca_device *cpcap = spi_get_drvdata(spi);
+	struct cpcap_device *cpcap = spi_get_drvdata(spi);
+	int i;
+
+	platform_device_unregister(&cpcap_key_device);
+	platform_device_unregister(&cpcap_usb_device);
+
+	for (i = 0; i < CPCAP_NUM_REGULATORS; i++)
+		platform_device_unregister(cpcap->regulator_pdev[i]);
+
 	misc_deregister(&cpcap_dev);
 	kfree(cpcap);
 	return 0;

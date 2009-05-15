@@ -43,7 +43,7 @@ obj-$(CONFIG_MFD_PCF50633)	+= pcf50633-core.o
 obj-$(CONFIG_PCF50633_ADC)	+= pcf50633-adc.o
 obj-$(CONFIG_PCF50633_GPIO)	+= pcf50633-gpio.o
 
-cpcap-objs			:= cpcap-main.o \
+cpcap-objs			:= cpcap-core.o \
 				   cpcap-regacc.o \
 				   cpcap-key.o
 

@@ -23,52 +23,38 @@
 #define CPCAP_DEV_NAME "cpcap"
 #define CPCAP_NUM_REG_CPCAP (CPCAP_REG_END - CPCAP_REG_START + 1)
 
-enum cpcap_regulators {
-        SW5,
-        VAUDIO,
-        VCAM,
-        VCSI,
-        VDAC,
-        VDIG,
-        VFUSE,
-        VHVIO,
-        VSDIO,
-        VPLL,
-        VRF1,
-        VRF2,
-        VRFREF,
-        VWLAN1,
-        VWLAN2,
-        VSIM,
-        VSIMCARD,
-        VUSB,
-        VVIB
-};
+enum cpcap_regulator_id {
+	CPCAP_SW5,
+	CPCAP_VCAM,
+	CPCAP_VCSI,
+	CPCAP_VDAC,
+	CPCAP_VDIG,
+	CPCAP_VFUSE,
+	CPCAP_VHVIO,
+	CPCAP_VSDIO,
+	CPCAP_VPLL,
+	CPCAP_VRF1,
+	CPCAP_VRF2,
+	CPCAP_VRFREF,
+	CPCAP_VWLAN1,
+	CPCAP_VWLAN2,
+	CPCAP_VSIM,
+	CPCAP_VSIMCARD,
+	CPCAP_VVIB,
+	CPCAP_VUSB,
+	CPCAP_VAUDIO,
 
-enum cpcap_regulator_states {
-        MODE_OFF,
-        MODE_LOW_POWER,
-        MODE_AUTO,
-        MODE_ON
-};
-
-struct cpcap_regulator_data {
-        int power_source;    /*The power source of that device. */
-        int mode;            /*The default on mode of the device. */
-        int standby_mode;    /*The default on standby mode of the device. */
-        int standby_bit;     /*The default standby bit state of the device. */
+	CPCAP_NUM_REGULATORS
 };
 
 struct cpcap_spi_init_data {
-        unsigned short reg;
-        unsigned short data;
+	unsigned short reg;
+	unsigned short data;
 };
 
 struct cpcap_platform_data {
-        struct cpcap_spi_init_data *init;
+	struct cpcap_spi_init_data *init;
 	int init_len;
-        struct cpcap_regulator_data *regulator_init;
-	int regulator_init_len;
 };
 
 /*
@@ -76,7 +62,7 @@ struct cpcap_platform_data {
  * numbers on the CPCAP IC are not contiguous. The values of the enums below
  * are not the actual register numbers.
  */
-enum {
+enum cpcap_reg {
 	CPCAP_REG_START,        /* Start of CPCAP registers. */
 
 	CPCAP_REG_INT1          /* Interrupt 1 */
@@ -331,8 +317,8 @@ struct cpcap_regacc {
 
 struct cpcap_device {
 	struct spi_device	*spi;
-
 	void			*keydata;
+	struct platform_device  *regulator_pdev[CPCAP_NUM_REGULATORS];
 };
 
 

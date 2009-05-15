@@ -22,7 +22,11 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 
-#include "cpcap-main.h"
+
+#define CPCAP_MIN_AREG CPCAP_REG_VAUDIOC
+#define CPCAP_MAX_AREG CPCAP_REG_LVAB
+#define CPCAP_MIN_LREG CPCAP_REG_MDLC
+#define CPCAP_MAX_LREG CPCAP_REG_CLEDC
 
 #define IS_CPCAP(reg) ((reg) >= CPCAP_REG_START && (reg) <= CPCAP_REG_END)
 #define AREG_INDEX(reg) ((reg) - CPCAP_MIN_AREG)
