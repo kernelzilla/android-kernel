@@ -65,7 +65,7 @@ static int vfsub_ima_mask(int flags)
 		mask = MAY_READ | MAY_WRITE;
 		break;
 	}
-	if (flags & FMODE_EXEC)
+	if (flags & vfsub_fmode_to_uint(FMODE_EXEC))
 		mask |= MAY_EXEC;
 	return mask;
 }

@@ -310,7 +310,7 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return err;
 }
 
-static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
+static int aufs_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	int err;
 	static DECLARE_WAIT_QUEUE_HEAD(wq);
@@ -325,7 +325,7 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 
 	fi_write_lock(file);
 	vma->vm_file = h_file;
-	err = finfo->fi_h_vm_ops->page_mkwrite(vma, page);
+	err = finfo->fi_h_vm_ops->page_mkwrite(vma, vmf);
 	au_reset_file(vma, file);
 	fi_write_unlock(file);
 	wake_up(&wq);
