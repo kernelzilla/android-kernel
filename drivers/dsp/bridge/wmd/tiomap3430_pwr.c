@@ -79,22 +79,22 @@ DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
 {
 #ifdef CONFIG_BRIDGE_DVFS
 	u32 *pConstraintVal;
-       DSP_STATUS status = DSP_SOK;
-       struct CFG_HOSTRES resources;
-       struct dspbridge_platform_data *pdata =
-	       omap_dspbridge_dev->dev.platform_data;
-       status = CFG_GetHostResources(
-                (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
+	DSP_STATUS status = DSP_SOK;
+	struct CFG_HOSTRES resources;
+	struct dspbridge_platform_data *pdata =
+		omap_dspbridge_dev->dev.platform_data;
+	status = CFG_GetHostResources(
+		(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 
 	pConstraintVal = (u32 *)(pArgs);
 	/* Read the target value requested by DSP  */
-       DBG_Trace(DBG_LEVEL7, "handle_constraints_set:"
-               "opp requested = 0x%x\n", (u32)*(pConstraintVal+1));
-       status = HW_MBOX_saveSettings(resources.dwMboxBase);
+	DBG_Trace(DBG_LEVEL7, "handle_constraints_set:"
+		"opp requested = 0x%x\n", (u32)*(pConstraintVal+1));
+	status = HW_MBOX_saveSettings(resources.dwMboxBase);
 
 	/* Set the new opp value */
 	if (pdata->dsp_set_min_opp)
-                       (*pdata->dsp_set_min_opp)((u32)*(pConstraintVal+1));
+		(*pdata->dsp_set_min_opp)((u32)*(pConstraintVal+1));
 	return DSP_SOK;
 #endif /* #ifdef CONFIG_BRIDGE_DVFS */
 	return DSP_SOK;
@@ -230,7 +230,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 		break;
 	case BRD_HIBERNATION:
 	case BRD_DSP_HIBERNATION:
-               status = HW_MBOX_saveSettings(resources.dwMboxBase);
+		status = HW_MBOX_saveSettings(resources.dwMboxBase);
 		/* Already in Hibernation, so just return */
 		DBG_Trace(DBG_LEVEL7, "SleepDSP- DSP already in "
 			 "hibernation\n");
@@ -308,17 +308,17 @@ DSP_STATUS WakeDSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 	status = DSP_PeripheralClocks_Enable(pDevContext, NULL);
 
 	/* Enabling Dppll in lock mode */
-               temp = (u32) *((REG_UWORD32 *)
-                       ((u32) (resources.dwCmBase) + 0x34));
-               temp = (temp & 0xFFFFFFFE) | 0x1;
-               *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
-                                               (u32) temp;
-               temp = (u32) *((REG_UWORD32 *)
-                       ((u32) (resources.dwCmBase) + 0x4));
-               temp = (temp & 0xFFFFFC8) | 0x37;
+		temp = (u32) *((REG_UWORD32 *)
+			((u32) (resources.dwCmBase) + 0x34));
+		temp = (temp & 0xFFFFFFFE) | 0x1;
+		*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
+						(u32) temp;
+		temp = (u32) *((REG_UWORD32 *)
+			((u32) (resources.dwCmBase) + 0x4));
+		temp = (temp & 0xFFFFFC8) | 0x37;
 
-               *((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
-               (u32) temp;
+		*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
+						(u32) temp;
 
 	udelay(10);
 	if (DSP_SUCCEEDED(status)) {
@@ -391,7 +391,7 @@ DSP_STATUS DSPPeripheralClkCtrl(struct WMD_DEV_CONTEXT *pDevContext,
 			 "DSPPeripheralClkCtrl : Disable CLK for \n");
 		status1 = CLK_Disable(BPWR_Clks[clkIdIndex].intClk);
 		status = CLK_Disable(BPWR_Clks[clkIdIndex].funClk);
-               DSPClkWakeupEventCtrl(BPWR_Clks[clkIdIndex].clkId, false);
+		DSPClkWakeupEventCtrl(BPWR_Clks[clkIdIndex].clkId, false);
 		if ((DSP_SUCCEEDED(status)) && (DSP_SUCCEEDED(status1))) {
 			(pDevContext->uDspPerClks) &=
 				(~((u32) (1 << clkIdIndex)));
@@ -405,7 +405,7 @@ DSP_STATUS DSPPeripheralClkCtrl(struct WMD_DEV_CONTEXT *pDevContext,
 			 "DSPPeripheralClkCtrl : Enable CLK for \n");
 		status1 = CLK_Enable(BPWR_Clks[clkIdIndex].intClk);
 		status = CLK_Enable(BPWR_Clks[clkIdIndex].funClk);
-               DSPClkWakeupEventCtrl(BPWR_Clks[clkIdIndex].clkId, true);
+		DSPClkWakeupEventCtrl(BPWR_Clks[clkIdIndex].clkId, true);
 		if ((DSP_SUCCEEDED(status)) && (DSP_SUCCEEDED(status1))) {
 			(pDevContext->uDspPerClks) |= (1 << clkIdIndex);
 		} else {
@@ -439,13 +439,13 @@ DSP_STATUS PreScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 
 	DBG_Trace(DBG_LEVEL7, "PreScale_DSP: voltage_domain = %x, level = "
 		 "0x%x\n", voltage_domain, level);
-       if ((pDevContext->dwBrdState == BRD_HIBERNATION) ||
-               (pDevContext->dwBrdState == BRD_RETENTION) ||
-               (pDevContext->dwBrdState == BRD_DSP_HIBERNATION)) {
+	if ((pDevContext->dwBrdState == BRD_HIBERNATION) ||
+			(pDevContext->dwBrdState == BRD_RETENTION) ||
+			(pDevContext->dwBrdState == BRD_DSP_HIBERNATION)) {
 		DBG_Trace(DBG_LEVEL7, "PreScale_DSP: IVA in sleep. "
 			 "No notification to DSP\n");
 		return DSP_SOK;
-       } else if ((pDevContext->dwBrdState == BRD_RUNNING)) {
+	} else if ((pDevContext->dwBrdState == BRD_RUNNING)) {
 		/* Send a prenotificatio to DSP */
 		DBG_Trace(DBG_LEVEL7,
 			 "PreScale_DSP: Sent notification to DSP\n");
@@ -478,11 +478,11 @@ DSP_STATUS PostScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 	voltage_domain = *((u32 *)pArgs);
 	level = *((u32 *)pArgs + 1);
 	DBG_Trace(DBG_LEVEL7,
-               "PostScale_DSP: voltage_domain = %x, level = 0x%x\n",
-               voltage_domain, level);
-       if ((pDevContext->dwBrdState == BRD_HIBERNATION) ||
-                       (pDevContext->dwBrdState == BRD_RETENTION) ||
-                       (pDevContext->dwBrdState == BRD_DSP_HIBERNATION)) {
+		"PostScale_DSP: voltage_domain = %x, level = 0x%x\n",
+		voltage_domain, level);
+	if ((pDevContext->dwBrdState == BRD_HIBERNATION) ||
+			(pDevContext->dwBrdState == BRD_RETENTION) ||
+			(pDevContext->dwBrdState == BRD_DSP_HIBERNATION)) {
 		/* Update the OPP value in shared memory */
 		IO_SHMsetting(hIOMgr, SHM_CURROPP, &level);
 		DBG_Trace(DBG_LEVEL7,
@@ -495,12 +495,12 @@ DSP_STATUS PostScale_DSP(struct WMD_DEV_CONTEXT *pDevContext, IN void *pArgs)
 		/* Send a post notification to DSP */
 		CHNLSM_InterruptDSP2(pDevContext, MBX_PM_SETPOINT_POSTNOTIFY);
 		DBG_Trace(DBG_LEVEL7,
-                       "PostScale_DSP: Wrote to shared memory Sent post"
-                       " notification to DSP\n");
+			"PostScale_DSP: Wrote to shared memory Sent post"
+			" notification to DSP\n");
 		return DSP_SOK;
 	} else {
 		DBG_Trace(DBG_LEVEL7, "PostScale_DSP: Failed - DSP BRD state "
-                       "in wrong state");
+			"in wrong state");
 		return DSP_EFAIL;
 	}
 #endif /* #ifdef CONFIG_BRIDGE_DVFS */
@@ -564,169 +564,169 @@ DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
 
 void DSPClkWakeupEventCtrl(u32 ClkId, bool enable)
 {
-       struct CFG_HOSTRES resources;
-       DSP_STATUS status = DSP_SOK;
-       u32 iva2_grpsel;
-       u32 mpu_grpsel;
+	struct CFG_HOSTRES resources;
+	DSP_STATUS status = DSP_SOK;
+	u32 iva2_grpsel;
+	u32 mpu_grpsel;
 
-       status = CFG_GetHostResources(
-                (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
-       if (DSP_FAILED(status))
-               return;
+	status = CFG_GetHostResources(
+		(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
+	if (DSP_FAILED(status))
+		return;
 
-       switch (ClkId) {
-       case BPWR_GPTimer5:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_GPT5;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_GPT5;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_GPT5;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_GPT5;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                               = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                               = mpu_grpsel;
-       break;
-       case BPWR_GPTimer6:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_GPT6;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_GPT6;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_GPT6;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_GPT6;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_GPTimer7:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_GPT7;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_GPT7;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_GPT7;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_GPT7;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_GPTimer8:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_GPT8;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_GPT8;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_GPT8;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_GPT8;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_MCBSP1:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwCorePmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwCorePmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_MCBSP1;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_MCBSP1;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_MCBSP2:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_MCBSP2;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_MCBSP2;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_MCBSP3:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_MCBSP3;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_MCBSP3;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_MCBSP4:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwPerPmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_MCBSP4;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_MCBSP4;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       case BPWR_MCBSP5:
-               iva2_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwCorePmBase) + 0xA8));
-               mpu_grpsel = (u32) *((REG_UWORD32 *)
-                               ((u32) (resources.dwCorePmBase) + 0xA4));
-               if (enable) {
-                       iva2_grpsel |= OMAP3430_GRPSEL_MCBSP5;
-                       mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
-               } else {
-                       mpu_grpsel |= OMAP3430_GRPSEL_MCBSP5;
-                       iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
-               }
-               *((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA8))
-                                                       = iva2_grpsel;
-               *((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA4))
-                                                       = mpu_grpsel;
-       break;
-       }
+	switch (ClkId) {
+	case BPWR_GPTimer5:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT5;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT5;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT5;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT5;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+				= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+				= mpu_grpsel;
+	break;
+	case BPWR_GPTimer6:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT6;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT6;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT6;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT6;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_GPTimer7:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT7;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT7;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT7;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT7;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_GPTimer8:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT8;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT8;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT8;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT8;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_MCBSP1:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwCorePmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwCorePmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP1;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP1;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_MCBSP2:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP2;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP2;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_MCBSP3:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP3;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP3;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_MCBSP4:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwPerPmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP4;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP4;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwPerPmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	case BPWR_MCBSP5:
+		iva2_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwCorePmBase) + 0xA8));
+		mpu_grpsel = (u32) *((REG_UWORD32 *)
+				((u32) (resources.dwCorePmBase) + 0xA4));
+		if (enable) {
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP5;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
+		} else {
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP5;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
+		}
+		*((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA8))
+							= iva2_grpsel;
+		*((REG_UWORD32 *) ((u32) (resources.dwCorePmBase) + 0xA4))
+							= mpu_grpsel;
+	break;
+	}
 }
