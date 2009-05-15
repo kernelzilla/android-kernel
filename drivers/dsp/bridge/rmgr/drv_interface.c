@@ -110,6 +110,8 @@
 #define DRIVER_MINOR 0		/* Linux assigns our Major device number */
 s32 dsp_debug;
 
+struct platform_device *omap_dspbridge_dev;
+
 /* This is a test variable used by Bridge to test different sleep states */
 s32 dsp_test_sleepstate;
 struct bridge_dev {
@@ -211,9 +213,6 @@ static struct clk *clk_handle;
 s32 dsp_max_opps = VDD1_OPP3;
 #endif
 
-static int bridge_suspend(struct platform_device *pdev, pm_message_t state);
-static int bridge_resume(struct platform_device *pdev);
-
 /* Maximum Opps that can be requested by IVA*/
 /*vdd1 rate table*/
 #ifdef CONFIG_BRIDGE_DVFS
@@ -233,36 +232,7 @@ const struct omap_opp  vdd1_rate_table_bridge[] = {
 #endif
 #endif
 
-static void bridge_free(struct device *dev);
-
-static int omap34xx_bridge_probe(struct platform_device *dev);
-
-static int omap34xx_bridge_probe(struct platform_device *dev)
-{
-	return 0;
-}
-
-#ifdef CONFIG_BRIDGE_DVFS
-static struct dspbridge_platform_data dspbridge_pdata = {
-	.dsp_set_min_opp = omap_pm_dsp_set_min_opp,
-	.dsp_get_opp = omap_pm_dsp_get_opp,
-	.cpu_set_freq = omap_pm_cpu_set_freq,
-	.cpu_get_freq = omap_pm_cpu_get_freq,
-};
-#else
-static struct dspbridge_platform_data dspbridge_pdata;
-
-#endif
-struct platform_device omap_dspbridge_dev = {
-		.name = BRIDGE_NAME,
-		.id = -1,
-		.num_resources = 0,
-		.dev = {
-		.release = bridge_free,
-		.platform_data = &dspbridge_pdata,
-		},
-		.resource = NULL,
-};
+struct dspbridge_platform_data *omap_dspbridge_pdata;
 
 u32 vdd1_dsp_freq[6][4] = {
 	{0, 0, 0, 0},
@@ -292,29 +262,7 @@ static struct notifier_block iva_clk_notifier = {
 };
 #endif
 
-static struct platform_driver bridge_driver_ldm = {
-      .driver = {
-	      .owner	= THIS_MODULE,
-	      .name     = BRIDGE_NAME,
-	 },
-      .probe = omap34xx_bridge_probe,
-#ifdef CONFIG_PM
-      .suspend = bridge_suspend,
-      .resume = bridge_resume,
-#endif
-      .shutdown = NULL,
-      .remove = NULL,
-
-};
-
-struct device dspbridge_device = {
-	.driver = &bridge_driver_ldm.driver,
-};
-
-/* Initialization routine. Executed when the driver is loaded (as a kernel
- * module), or when the system is booted (when included as part of the kernel
- * image). */
-static int __init bridge_init(void)
+static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 {
 	int status;
 	u32 initStatus;
@@ -323,9 +271,10 @@ static int __init bridge_init(void)
 	int     result;
 #ifdef CONFIG_BRIDGE_DVFS
 	int i = 0;
-	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
 #endif
+	struct dspbridge_platform_data *pdata = pdev->dev.platform_data;
+
+	omap_dspbridge_dev = pdev;
 
 	/* use 2.6 device model */
 	if (driver_major) {
@@ -383,9 +332,6 @@ static int __init bridge_init(void)
 #endif
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_init\n");
-	status = platform_driver_register(&bridge_driver_ldm);
-	if (!status)
-		status = platform_device_register(&omap_dspbridge_dev);
 
 #ifdef CONFIG_PM
 	/* Initialize the wait queue */
@@ -422,10 +368,15 @@ static int __init bridge_init(void)
 		initStatus = DSP_EINVALIDARG;
 		status = -1;
 		GT_0trace(driverTrace, GT_7CLASS,
-			 "SHM size must be atleast 64 KB\n");
+			  "SHM size must be at least 64 KB\n");
 	}
 	GT_1trace(driverTrace, GT_7CLASS,
 		 "requested shm_size = 0x%x\n", shm_size);
+
+	if (pdata->phys_mempool_base && pdata->phys_mempool_size) {
+		phys_mempool_base = pdata->phys_mempool_base;
+		phys_mempool_size = pdata->phys_mempool_size;
+	}
 
 	if (phys_mempool_base > 0x0) {
 		initStatus = REG_SetValue(NULL, NULL, PHYSMEMPOOLBASE,
@@ -440,7 +391,7 @@ static int __init bridge_init(void)
 					 REG_DWORD, (u8 *)&phys_mempool_size,
 					 sizeof(phys_mempool_size));
 	}
-	GT_1trace(driverTrace, GT_7CLASS, "phys_mempool_size = 0x%x \n",
+	GT_1trace(driverTrace, GT_7CLASS, "phys_mempool_size = 0x%x\n",
 		 phys_mempool_base);
 	if ((phys_mempool_base > 0x0) && (phys_mempool_size > 0x0))
 		MEM_ExtPhysPoolInit(phys_mempool_base, phys_mempool_size);
@@ -492,9 +443,7 @@ static int __init bridge_init(void)
 	return status;
 }
 
-/*  This function is invoked during unlinking of the bridge module from the
- *  kernel. Bridge resources are freed in this function. */
-static void __exit bridge_exit(void)
+static int __devexit omap34xx_bridge_remove(struct platform_device *pdev)
 {
 	dev_t devno;
 	bool ret;
@@ -554,10 +503,6 @@ func_cont:
 	clk_handle = NULL;
 #endif /* #ifdef CONFIG_BRIDGE_DVFS */
 
-	/* unregister bridge driver */
-	platform_device_unregister(&omap_dspbridge_dev);
-	platform_driver_unregister(&bridge_driver_ldm);
-
 	if (driverContext) {
 		ret = DSP_Deinit(driverContext);
 		driverContext = 0;
@@ -579,6 +524,59 @@ func_cont:
 		class_destroy(bridge_class);
 
 	}
+	return 0;
+}
+
+
+#ifdef CONFIG_PM
+static int bridge_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	u32 status;
+	u32 command = PWR_EMERGENCYDEEPSLEEP;
+
+	status = PWR_SleepDSP(command, timeOut);
+	if (DSP_FAILED(status))
+		return -1;
+
+	bridge_suspend_data.suspended = 1;
+	return 0;
+}
+
+static int bridge_resume(struct platform_device *pdev)
+{
+	u32 status;
+
+	status = PWR_WakeDSP(timeOut);
+	if (DSP_FAILED(status))
+		return -1;
+
+	bridge_suspend_data.suspended = 0;
+	wake_up(&bridge_suspend_data.suspend_wq);
+	return 0;
+}
+#else
+#define bridge_suspend NULL
+#define bridge_resume NULL
+#endif
+
+static struct platform_driver bridge_driver_ldm = {
+	.driver = {
+		.name = BRIDGE_NAME,
+	},
+	.probe	 = omap34xx_bridge_probe,
+	.remove	 = omap34xx_bridge_remove,
+	.suspend = bridge_suspend,
+	.resume	 = bridge_resume,
+};
+
+static int __init bridge_init(void)
+{
+	return platform_driver_register(&bridge_driver_ldm);
+}
+
+static void __exit bridge_exit(void)
+{
+	platform_driver_unregister(&bridge_driver_ldm);
 }
 
 /* This function is called when an application opens handle to the
@@ -781,38 +779,6 @@ DSP_STATUS DRV_RemoveAllResources(HANDLE hPCtxt)
 		DRV_ProcUpdatestate(pCtxt, PROC_RES_FREED);
 	}
 	return status;
-}
-#endif
-
-#ifdef CONFIG_PM
-static int bridge_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	u32 status = DSP_EFAIL;
-	u32 command = PWR_EMERGENCYDEEPSLEEP;
-
-	status = PWR_SleepDSP(command, timeOut);
-	if (DSP_SUCCEEDED(status)) {
-		bridge_suspend_data.suspended = 1;
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-static int bridge_resume(struct platform_device *pdev)
-{
-	u32 status = DSP_EFAIL;
-
-	status = PWR_WakeDSP(timeOut);
-
-	if (DSP_SUCCEEDED(status)) {
-		bridge_suspend_data.suspended = 0;
-		wake_up(&bridge_suspend_data.suspend_wq);
-
-		return 0;
-	} else {
-		return -1;
-	}
 }
 #endif
 

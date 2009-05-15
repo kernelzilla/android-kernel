@@ -76,8 +76,21 @@ struct dspbridge_platform_data {
 	void 	(*cpu_set_freq)(unsigned long f);
 	unsigned long (*cpu_get_freq)(void);
 	unsigned long mpu_speed[6];
+
+	u32 phys_mempool_base;
+	u32 phys_mempool_size;
 };
 
 #define PRCM_VDD1 1
 
+extern struct platform_device *omap_dspbridge_dev;
+
+#if defined(CONFIG_MPU_BRIDGE) || defined(CONFIG_MPU_BRIDGE_MODULE)
+extern void dspbridge_reserve_sdram(void);
+#else
+static inline void dspbridge_reserve_sdram(void) {}
 #endif
+
+extern unsigned long dspbridge_get_mempool_base(void);
+#endif
+

@@ -66,8 +66,6 @@
 
 #ifdef CONFIG_PM
 #include <mach/board-3430sdp.h>
-
-extern struct platform_device omap_dspbridge_dev;
 #endif
 extern s32 dsp_test_sleepstate;
 extern struct MAILBOX_CONTEXT mboxsetting;
@@ -84,7 +82,7 @@ DSP_STATUS handle_constraints_set(struct WMD_DEV_CONTEXT *pDevContext,
        DSP_STATUS status = DSP_SOK;
        struct CFG_HOSTRES resources;
        struct dspbridge_platform_data *pdata =
-	       omap_dspbridge_dev.dev.platform_data;
+	       omap_dspbridge_dev->dev.platform_data;
        status = CFG_GetHostResources(
                 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
 
@@ -117,7 +115,7 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 	u32 opplevel;
 	struct IO_MGR *hIOMgr;
 	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
+				omap_dspbridge_dev->dev.platform_data;
 #endif
 
 	status = CFG_GetHostResources(

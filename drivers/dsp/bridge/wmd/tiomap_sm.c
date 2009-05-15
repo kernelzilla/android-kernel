@@ -26,10 +26,6 @@
 #include "_tiomap.h"
 #include "_tiomap_pwr.h"
 
-#ifdef CONFIG_BRIDGE_DVFS
-extern struct platform_device omap_dspbridge_dev;
-#endif
-
 #define MAILBOX_FIFOSTATUS(m) (0x80 + 4 * (m))
 
 static inline unsigned int fifo_full(void __iomem *mbox_base, int mbox_id)
@@ -104,7 +100,7 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 {
 #ifdef CONFIG_BRIDGE_DVFS
 	struct dspbridge_platform_data *pdata =
-		omap_dspbridge_dev.dev.platform_data;
+		omap_dspbridge_dev->dev.platform_data;
 	u32 opplevel = 0;
 #endif
 	struct CFG_HOSTRES resources;

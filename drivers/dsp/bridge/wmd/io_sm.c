@@ -183,8 +183,6 @@ static DSP_STATUS registerSHMSegs(struct IO_MGR *hIOMgr,
 extern s32 dsp_max_opps;
 /* The Vdd1 opp table information */
 extern u32 vdd1_dsp_freq[6][4] ;
-
-extern struct platform_device omap_dspbridge_dev;
 #endif
 
 #if GT_TRACE
@@ -1665,7 +1663,7 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 #ifdef CONFIG_BRIDGE_DVFS
 	u32 i;
 	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
+				omap_dspbridge_dev->dev.platform_data;
 
 	switch (desc) {
 	case SHM_CURROPP:

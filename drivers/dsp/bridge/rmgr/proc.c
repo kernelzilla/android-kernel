@@ -191,10 +191,6 @@ static u32 cRefs;
 
 struct SYNC_CSOBJECT *hProcLock;	/* For critical sections */
 
-#ifdef CONFIG_BRIDGE_DVFS
-extern struct platform_device omap_dspbridge_dev;
-#endif
-
 /*  ----------------------------------- Function Prototypes */
 static DSP_STATUS PROC_Monitor(struct PROC_OBJECT *hProcessor);
 static s32 GetEnvpCount(char **envp);
@@ -1053,7 +1049,7 @@ DSP_STATUS PROC_Load(DSP_HPROCESSOR hProcessor, IN CONST s32 iArgc,
 #endif
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
+				omap_dspbridge_dev->dev.platform_data;
 #endif
 	GT_2trace(PROC_DebugMask, GT_ENTER, "Entered PROC_Load, args:\n\t"
 		 "hProcessor:  0x%x\taArgv: 0x%x\n", hProcessor, aArgv[0]);

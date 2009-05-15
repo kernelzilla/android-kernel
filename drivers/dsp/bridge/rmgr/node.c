@@ -364,10 +364,6 @@ static struct NLDR_FXNS nldrFxns = {
 	NLDR_Unload,
 };
 
-#ifdef CONFIG_BRIDGE_DVFS
-extern struct platform_device omap_dspbridge_dev;
-#endif
-
 enum NODE_STATE NODE_GetState(HANDLE hNode)
 {
    struct NODE_OBJECT *pNode = (struct NODE_OBJECT *)hNode;
@@ -1300,7 +1296,7 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	struct PROC_OBJECT *hProcessor;
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 	struct dspbridge_platform_data *pdata =
-				omap_dspbridge_dev.dev.platform_data;
+				omap_dspbridge_dev->dev.platform_data;
 #endif
 
 	DBC_Require(cRefs > 0);
