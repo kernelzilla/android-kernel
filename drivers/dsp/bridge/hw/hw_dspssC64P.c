@@ -34,7 +34,7 @@
 #include <IPIAccInt.h>
 
 /* HW FUNCTIONS */
-HW_STATUS HW_DSPSS_BootModeSet(const u32 baseAddress,
+HW_STATUS HW_DSPSS_BootModeSet(const void __iomem *baseAddress,
 		      enum HW_DSPSYSC_BootMode_t bootMode,
 		      const u32 bootAddress)
 {

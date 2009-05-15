@@ -96,16 +96,16 @@
 		u32 dwChnlOffset;
 		u32 dwChnlBufSize;
 		u32 dwNumChnls;
-		u32 dwPrmBase;
-		u32 dwCmBase;
-		u32 dwPerBase;
-               u32 dwPerPmBase;
-               u32 dwCorePmBase;
-		u32 dwWdTimerDspBase;
-		u32 dwMboxBase;
-		u32 dwDmmuBase;
-		u32 dwDipiBase;
-		u32 dwSysCtrlBase;
+		void __iomem *dwPrmBase;
+		void __iomem *dwCmBase;
+		void __iomem *dwPerBase;
+		u32 dwPerPmBase;
+		u32 dwCorePmBase;
+		void __iomem *dwWdTimerDspBase;
+		void __iomem *dwMboxBase;
+		void __iomem *dwDmmuBase;
+		u32 *dwDipiBase;
+		void __iomem *dwSysCtrlBase;
 	} ;
 
 	struct CFG_DSPMEMDESC {

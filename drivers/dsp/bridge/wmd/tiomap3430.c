@@ -141,9 +141,9 @@ static DSP_STATUS PteSet(struct PgTableAttrs *pt, u32 pa, u32 va,
 static DSP_STATUS MemMapVmalloc(struct WMD_DEV_CONTEXT *hDevContext,
 			u32 ulMpuAddr, u32 ulVirtAddr,
 			u32 ulNumBytes, struct HW_MMUMapAttrs_t *hwAttrs);
-static DSP_STATUS run_IdleBoot(u32 prcm_base, u32 cm_base,
-			u32 sysctrl_base);
-void GetHWRegs(u32 prcm_base, u32 cm_base);
+static DSP_STATUS run_IdleBoot(void __iomem *prcm_base, void __iomem *cm_base,
+			void __iomem *sysctrl_base);
+static void GetHWRegs(void __iomem *prcm_base, void __iomem *cm_base);
 
 /*  ----------------------------------- Globals */
 
@@ -244,7 +244,7 @@ static struct WMD_DRV_INTERFACE drvInterfaceFxns = {
 	WMD_MSG_SetQueueId,
 };
 
-static inline void tlb_flush_all(const u32 base)
+static inline void tlb_flush_all(const void __iomem *base)
 {
     __raw_writeb(__raw_readb(base + MMU_GFLUSH) | 1, base + MMU_GFLUSH);
 }
@@ -550,11 +550,10 @@ static DSP_STATUS WMD_BRD_Start(struct WMD_DEV_CONTEXT *hDevContext,
 		HW_MMU_TWLEnable(resources.dwDmmuBase);
 		/* Enable the SmartIdle and AutoIdle bit for MMU_SYSCONFIG */
 
-		temp = (u32) *((REG_UWORD32 *)
-				((u32) (resources.dwDmmuBase) + 0x10));
+
+		temp = __raw_readl((resources.dwDmmuBase) + 0x10);
 		temp = (temp & 0xFFFFFFEF) | 0x11;
-		*((REG_UWORD32 *) ((u32) (resources.dwDmmuBase) + 0x10)) =
-			(u32) temp;
+		__raw_writel(temp, (resources.dwDmmuBase) + 0x10);
 
 		/* Let the DSP MMU run */
 		HW_MMU_Enable(resources.dwDmmuBase);
@@ -2027,8 +2026,8 @@ static DSP_STATUS MemMapVmalloc(struct WMD_DEV_CONTEXT *pDevContext,
 	return status;
 }
 
-static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
-			       u32 sysctrl_base)
+static DSP_STATUS run_IdleBoot(void __iomem *prm_base, void __iomem *cm_base,
+			       void __iomem *sysctrl_base)
 {
 	u32 temp;
 	DSP_STATUS status = DSP_SOK;
@@ -2049,10 +2048,10 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
 	CLK_Disable(SERVICESCLK_iva2_ck);
 	udelay(10);
 	/* Assert IVA2-RST1 and IVA2-RST2  */
-	*((REG_UWORD32 *)((u32)(prm_base) + 0x50)) = (u32)0x07;
+	__raw_writel((u32)0x07, (prm_base) + 0x50);
 	udelay(30);
 	/* set the SYSC for Idle Boot */
-	*((REG_UWORD32 *)((u32)(sysctrl_base) + 0x404)) = (u32)0x01;
+	__raw_writel((u32)0x01, (sysctrl_base) + 0x404);
                temp = (u32) *((REG_UWORD32 *)
                                ((u32) (cm_base) + 0x34));
                temp = (temp & 0xFFFFFFFE) | 0x1;
@@ -2067,36 +2066,36 @@ static DSP_STATUS run_IdleBoot(u32 prm_base, u32 cm_base,
 	udelay(20);
 	GetHWRegs(prm_base, cm_base);
 	/* Release Reset1 and Reset2 */
-	*((REG_UWORD32 *)((u32)(prm_base) + 0x50)) = (u32)0x05;
+	__raw_writel((u32)0x05, (prm_base) + 0x50);
 	udelay(20);
-	*((REG_UWORD32 *)((u32)(prm_base) + 0x50)) = (u32)0x04;
+	__raw_writel((u32)0x04, (prm_base) + 0x50);
 	udelay(30);
 	return status;
 }
 
 
-void GetHWRegs(u32 prm_base, u32 cm_base)
+static void GetHWRegs(void __iomem *prm_base, void __iomem *cm_base)
 {
 	u32 temp;
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0x00));
+       temp = __raw_readl((cm_base) + 0x00);
 	   DBG_Trace(DBG_LEVEL6, "CM_FCLKEN_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0x10));
+       temp = __raw_readl((cm_base) + 0x10);
 	   DBG_Trace(DBG_LEVEL6, "CM_ICLKEN1_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0x20));
+       temp = __raw_readl((cm_base) + 0x20);
 	   DBG_Trace(DBG_LEVEL6, "CM_IDLEST_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0x48));
+       temp = __raw_readl((cm_base) + 0x48);
 	   DBG_Trace(DBG_LEVEL6, "CM_CLKSTCTRL_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0x4c));
+       temp = __raw_readl((cm_base) + 0x4c);
 	   DBG_Trace(DBG_LEVEL6, "CM_CLKSTST_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(prm_base) + 0x50));
+       temp = __raw_readl((prm_base) + 0x50);
 	   DBG_Trace(DBG_LEVEL6, "RM_RSTCTRL_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(prm_base) + 0x58));
+       temp = __raw_readl((prm_base) + 0x58);
 	   DBG_Trace(DBG_LEVEL6, "RM_RSTST_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(prm_base) + 0xE0));
+       temp = __raw_readl((prm_base) + 0xE0);
 	   DBG_Trace(DBG_LEVEL6, "PM_PWSTCTRL_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(prm_base) + 0xE4));
+       temp = __raw_readl((prm_base) + 0xE4);
 	   DBG_Trace(DBG_LEVEL6, "PM_PWSTST_IVA2 = 0x%x \n", temp);
-       temp = (u32)*((REG_UWORD32 *)((u32)(cm_base) + 0xA10));
+       temp = __raw_readl((cm_base) + 0xA10);
 	   DBG_Trace(DBG_LEVEL6, "CM_ICLKEN1_CORE = 0x%x \n", temp);
 }
 

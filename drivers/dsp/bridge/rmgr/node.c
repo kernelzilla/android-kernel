@@ -731,7 +731,7 @@ func_cont2:
 				"0x%x\n", status);
 			}
 
-			ulGppMemBase = hostRes.dwMemBase[1];
+			ulGppMemBase = (u32)hostRes.dwMemBase[1];
 			offSet = pulValue - dynextBase;
 			ulStackSegAddr = ulGppMemBase + offSet;
 			ulStackSegVal = (u32)*((REG_UWORD32 *)

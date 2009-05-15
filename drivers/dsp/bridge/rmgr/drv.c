@@ -1653,11 +1653,11 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 			pResources->dwMemPhys[1] = 0;
 
 			if (pResources->dwPrmBase)
-				iounmap((void *)pResources->dwPrmBase);
+				iounmap(pResources->dwPrmBase);
 			if (pResources->dwCmBase)
-				iounmap((void *)pResources->dwCmBase);
+				iounmap(pResources->dwCmBase);
 			if (pResources->dwMboxBase)
-				iounmap((void *)pResources->dwMboxBase);
+				iounmap(pResources->dwMboxBase);
 			if (pResources->dwMemBase[0])
 				iounmap((void *)pResources->dwMemBase[0]);
 			if (pResources->dwMemBase[2])
@@ -1667,29 +1667,29 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 			if (pResources->dwMemBase[4])
 				iounmap((void *)pResources->dwMemBase[4]);
 			if (pResources->dwWdTimerDspBase)
-				iounmap((void *)pResources->dwWdTimerDspBase);
+				iounmap(pResources->dwWdTimerDspBase);
 			if (pResources->dwDmmuBase)
-				iounmap((void *)pResources->dwDmmuBase);
+				iounmap(pResources->dwDmmuBase);
 			if (pResources->dwPerBase)
-				iounmap((void *)pResources->dwPerBase);
+				iounmap(pResources->dwPerBase);
                        if (pResources->dwPerPmBase)
                                iounmap((void *)pResources->dwPerPmBase);
                        if (pResources->dwCorePmBase)
                                iounmap((void *)pResources->dwCorePmBase);
 			if (pResources->dwSysCtrlBase) {
-				iounmap((void *)pResources->dwSysCtrlBase);
+				iounmap(pResources->dwSysCtrlBase);
 				/* don't set pResources->dwSysCtrlBase to null
 				 * as it is used in BOARD_Stop */
 			}
-			pResources->dwPrmBase = (u32) NULL;
-			pResources->dwCmBase = (u32) NULL;
-			pResources->dwMboxBase = (u32) NULL;
+			pResources->dwPrmBase = NULL;
+			pResources->dwCmBase = NULL;
+			pResources->dwMboxBase = NULL;
 			pResources->dwMemBase[0] = (u32) NULL;
 			pResources->dwMemBase[2] = (u32) NULL;
 			pResources->dwMemBase[3] = (u32) NULL;
 			pResources->dwMemBase[4] = (u32) NULL;
-			pResources->dwWdTimerDspBase = (u32) NULL;
-			pResources->dwDmmuBase = (u32) NULL;
+			pResources->dwWdTimerDspBase = NULL;
+			pResources->dwDmmuBase = NULL;
 
 			dwBuffSize = sizeof(struct CFG_HOSTRES);
 			status = REG_SetValue(NULL, (char *)driverExt->szString,
@@ -1708,13 +1708,13 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 		pResources->wNumMemWindows = 2;
 		/* First window is for DSP internal memory */
 
-		pResources->dwPrmBase = (u32)ioremap(OMAP_IVA2_PRM_BASE,
+		pResources->dwPrmBase = ioremap(OMAP_IVA2_PRM_BASE,
 							OMAP_IVA2_PRM_SIZE);
-		pResources->dwCmBase = (u32)ioremap(OMAP_IVA2_CM_BASE,
+		pResources->dwCmBase = ioremap(OMAP_IVA2_CM_BASE,
 							OMAP_IVA2_CM_SIZE);
-		pResources->dwMboxBase = (u32)ioremap(OMAP_MBOX_BASE,
+		pResources->dwMboxBase = ioremap(OMAP_MBOX_BASE,
 							OMAP_MBOX_SIZE);
-		pResources->dwSysCtrlBase = (u32)ioremap(OMAP_SYSC_BASE,
+		pResources->dwSysCtrlBase = ioremap(OMAP_SYSC_BASE,
 							OMAP_SYSC_SIZE);
 		GT_1trace(curTrace, GT_2CLASS, "dwMemBase[0] 0x%x\n",
 			 pResources->dwMemBase[0]);
@@ -1807,15 +1807,15 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 bRequest)
 							OMAP_DSP_MEM2_SIZE);
 		pResources->dwMemBase[4] = (u32)ioremap(OMAP_DSP_MEM3_BASE,
 							OMAP_DSP_MEM3_SIZE);
-		pResources->dwPerBase = (u32)ioremap(OMAP_PER_CM_BASE,
+		pResources->dwPerBase = ioremap(OMAP_PER_CM_BASE,
 							OMAP_PER_CM_SIZE);
                pResources->dwPerPmBase = (u32)ioremap(OMAP_PER_PRM_BASE,
                                                        OMAP_PER_PRM_SIZE);
                pResources->dwCorePmBase = (u32)ioremap(OMAP_CORE_PRM_BASE,
                                                        OMAP_CORE_PRM_SIZE);
-		pResources->dwDmmuBase = (u32)ioremap(OMAP_DMMU_BASE,
+		pResources->dwDmmuBase = ioremap(OMAP_DMMU_BASE,
 							OMAP_DMMU_SIZE);
-		pResources->dwWdTimerDspBase = 0;
+		pResources->dwWdTimerDspBase = NULL;
 
 		GT_1trace(curTrace, GT_2CLASS, "dwMemBase[0] 0x%x\n",
 						pResources->dwMemBase[0]);
