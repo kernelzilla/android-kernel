@@ -787,8 +787,10 @@ static ssize_t omap_sr_vdd1_autocomp_store(struct kobject *kobj,
 		sr_stop_vddautocomap(SR1);
 	} else {
 		u32 current_vdd1opp_no = omap_pm_vdd1_get_opp();
-		if (IS_ERR_VALUE(current_vdd1opp_no))
-			return -ENODEV;
+		if (!current_vdd1opp_no) {
+			pr_err("sr_vdd1_autocomp: Current VDD1 opp unknown\n");
+			return -EINVAL;
+		}
 		sr_start_vddautocomap(SR1, current_vdd1opp_no);
 	}
 	return n;
@@ -825,8 +827,10 @@ static ssize_t omap_sr_vdd2_autocomp_store(struct kobject *kobj,
 		sr_stop_vddautocomap(SR2);
 	} else {
 		u32 current_vdd2opp_no = omap_pm_vdd2_get_opp();
-		if (IS_ERR_VALUE(current_vdd2opp_no))
-			return -ENODEV;
+		if (!current_vdd2opp_no) {
+			pr_err("sr_vdd2_autocomp: Current VDD2 opp unknown\n");
+			return -EINVAL;
+		}
 		sr_start_vddautocomap(SR2, current_vdd2opp_no);
 	}
 	return n;
