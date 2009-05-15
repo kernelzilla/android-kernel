@@ -37,10 +37,10 @@
 #define LCD_YRES		480
 #define LCD_PIXCLOCK_MAX	45871
 
+#define BOARD_VERSION_DETECT_GPIO94    94
 #define LCD_PANEL_BACKLIGHT_GPIO 	(15 + OMAP_MAX_GPIO_LINES)
 #define LCD_PANEL_ENABLE_GPIO 		(7 + OMAP_MAX_GPIO_LINES)
 
-#define LCD_PANEL_RESET_GPIO		55
 #define LCD_PANEL_QVGA_GPIO		56
 
 
@@ -232,26 +232,45 @@ static int init_nec_wvga_lcd(struct spi_device *spi)
 
 static int zoom2_spi_probe(struct spi_device *spi)
 {
+	unsigned char lcd_panel_reset_gpio;
 	omap_cfg_reg(AF21_3430_GPIO8);
 	omap_cfg_reg(B23_3430_GPIO167);
 	omap_cfg_reg(AB1_3430_McSPI1_CS2);
+	omap_cfg_reg(A18_3430_GPIO94);
 
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 32;
 	spi_setup(spi);
 
-	gpio_request(LCD_PANEL_RESET_GPIO, "lcd reset");
+	gpio_request(BOARD_VERSION_DETECT_GPIO94, "Zoom2 Board Detect");
+	gpio_direction_input(BOARD_VERSION_DETECT_GPIO94);
+
+	if (gpio_get_value(BOARD_VERSION_DETECT_GPIO94)) {
+		/* Pilot Zoom2 board
+		 * GPIO-55 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(J9_3430_GPIO55);
+		lcd_panel_reset_gpio = 55;
+	} else {
+		/* Production Zoom2 Board:
+		 * GPIO-96 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(D19_3430_GPIO96);
+		lcd_panel_reset_gpio = 96;
+	}
+
+	gpio_request(lcd_panel_reset_gpio, "lcd reset");
 	gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
 	gpio_request(LCD_PANEL_ENABLE_GPIO, "lcd panel");
 	gpio_request(LCD_PANEL_BACKLIGHT_GPIO, "lcd backlight");
 
 	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 0);
-	gpio_direction_output(LCD_PANEL_RESET_GPIO, 0);
+	gpio_direction_output(lcd_panel_reset_gpio, 0);
 	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
 	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
 
 	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 1);
-	gpio_direction_output(LCD_PANEL_RESET_GPIO, 1);
+	gpio_direction_output(lcd_panel_reset_gpio, 1);
 
 	init_nec_wvga_lcd(spi);
 

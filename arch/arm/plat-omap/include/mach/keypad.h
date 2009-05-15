@@ -10,12 +10,19 @@
 #ifndef ASMARM_ARCH_KEYPAD_H
 #define ASMARM_ARCH_KEYPAD_H
 
+struct omap_kp_switchmap {
+	unsigned int gpio;
+	unsigned int key;
+};
+
 struct omap_kp_platform_data {
 	int rows;
 	int cols;
 	int *keymap;
 	int irq;
 	unsigned int keymapsize;
+	struct omap_kp_switchmap *switchmap;
+	unsigned int switchmapsize;
 	unsigned int rep:1;
 	unsigned long delay;
 	unsigned int dbounce:1;
