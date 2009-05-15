@@ -864,8 +864,7 @@ DBAPI NODE_AllocMsgBuf(struct NODE_OBJECT *hNode, u32 uSize,
 
 	if (!MEM_IsValidHandle(pNode, NODE_SIGNATURE))
 		status = DSP_EHANDLE;
-
-	if (NODE_GetType(pNode) == NODE_DEVICE)
+	else if (NODE_GetType(pNode) == NODE_DEVICE)
 		status = DSP_ENODETYPE;
 
 	if (DSP_FAILED(status))
@@ -1337,6 +1336,10 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 	DBC_Require(cRefs > 0);
 	GT_1trace(NODE_debugMask, GT_ENTER, "NODE_Create: hNode: 0x%x\n",
 		 hNode);
+	if (!MEM_IsValidHandle(pNode, NODE_SIGNATURE)) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
 	hProcessor = hNode->hProcessor;
 	status = PROC_GetState(hProcessor, &procStatus,
 					sizeof(struct DSP_PROCESSORSTATE));
@@ -1921,9 +1924,10 @@ DSP_STATUS NODE_FreeMsgBuf(struct NODE_OBJECT *hNode, IN u8 *pBuffer,
 	DBC_Require(pNode->hXlator != NULL);
 	GT_3trace(NODE_debugMask, GT_ENTER, "NODE_FreeMsgBuf: hNode: 0x%x\t"
 		 "pBuffer: 0x%x\tpAttr: 0x%x\n", hNode, pBuffer, pAttr);
-	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE))
+	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
 		status = DSP_EHANDLE;
-
+		goto func_end;
+	}
 	status = PROC_GetProcessorId(pNode->hProcessor, &procId);
 	if (procId == DSP_UNIT) {
 		if (DSP_SUCCEEDED(status)) {
@@ -1946,6 +1950,7 @@ DSP_STATUS NODE_FreeMsgBuf(struct NODE_OBJECT *hNode, IN u8 *pBuffer,
 	} else {
 		DBC_Assert(NULL);	/* BUG */
 	}
+func_end:
 	return status;
 }
 
@@ -2063,6 +2068,10 @@ DSP_STATUS NODE_GetMessage(struct NODE_OBJECT *hNode, OUT struct DSP_MSG *pMsg,
 	GT_3trace(NODE_debugMask, GT_ENTER,
 		 "NODE_GetMessage: hNode: 0x%x\tpMsg: "
 		 "0x%x\tuTimeout: 0x%x\n", hNode, pMsg, uTimeout);
+	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
 	hProcessor = hNode->hProcessor;
 	status = PROC_GetState(hProcessor, &procStatus,
 					sizeof(struct DSP_PROCESSORSTATE));
@@ -2074,10 +2083,6 @@ DSP_STATUS NODE_GetMessage(struct NODE_OBJECT *hNode, OUT struct DSP_MSG *pMsg,
 		GT_1trace(NODE_debugMask, GT_4CLASS, "NODE_GetMessage:"
 			"		proc Status 0x%x\n", procStatus.iState);
 		status = DSP_EFAIL;
-		goto func_end;
-	}
-	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
-		status = DSP_EHANDLE;
 		goto func_end;
 	}
 	hNodeMgr = hNode->hNodeMgr;
@@ -2295,12 +2300,14 @@ DSP_STATUS NODE_Pause(struct NODE_OBJECT *hNode)
 
 	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
 		status = DSP_EHANDLE;
+		goto func_end;
 	} else {
 		nodeType = NODE_GetType(hNode);
 		if (nodeType != NODE_TASK && nodeType != NODE_DAISSOCKET)
 			status = DSP_ENODETYPE;
-
 	}
+	if (DSP_FAILED(status))
+		goto func_end;
 
 	status = PROC_GetProcessorId(pNode->hProcessor, &procId);
 
@@ -2387,6 +2394,10 @@ DSP_STATUS NODE_PutMessage(struct NODE_OBJECT *hNode,
 	GT_3trace(NODE_debugMask, GT_ENTER,
 		 "NODE_PutMessage: hNode: 0x%x\tpMsg: "
 		 "0x%x\tuTimeout: 0x%x\n", hNode, pMsg, uTimeout);
+	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
 	hProcessor = hNode->hProcessor;
 	status = PROC_GetState(hProcessor, &procStatus,
 					sizeof(struct DSP_PROCESSORSTATE));
@@ -2400,15 +2411,12 @@ DSP_STATUS NODE_PutMessage(struct NODE_OBJECT *hNode,
 		status = DSP_EFAIL;
 		goto func_end;
 	}
-	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE))
-		status = DSP_EHANDLE;
-	else {
-		hNodeMgr = hNode->hNodeMgr;
-		nodeType = NODE_GetType(hNode);
-		if (nodeType != NODE_MESSAGE && nodeType != NODE_TASK &&
-		    nodeType != NODE_DAISSOCKET)
-			status = DSP_ENODETYPE;
-	}
+	hNodeMgr = hNode->hNodeMgr;
+	nodeType = NODE_GetType(hNode);
+	if (nodeType != NODE_MESSAGE && nodeType != NODE_TASK &&
+	    nodeType != NODE_DAISSOCKET)
+		status = DSP_ENODETYPE;
+
 	if (DSP_SUCCEEDED(status)) {
 		/*  Check node state. Can't send messages to a node after
 		 *  we've sent the RMS_EXIT command. There is still the
@@ -2545,6 +2553,10 @@ DSP_STATUS NODE_Run(struct NODE_OBJECT *hNode)
 
 	DBC_Require(cRefs > 0);
 	GT_1trace(NODE_debugMask, GT_ENTER, "NODE_Run: hNode: 0x%x\n", hNode);
+	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
 	hProcessor = hNode->hProcessor;
 	status = PROC_GetState(hProcessor, &procStatus,
 					sizeof(struct DSP_PROCESSORSTATE));
@@ -2557,13 +2569,9 @@ DSP_STATUS NODE_Run(struct NODE_OBJECT *hNode)
 		status = DSP_EFAIL;
 		goto func_end;
 	}
-	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
-		status = DSP_EHANDLE;
-	} else {
-		nodeType = NODE_GetType(hNode);
-		if (nodeType == NODE_DEVICE)
-			status = DSP_ENODETYPE;
-	}
+	nodeType = NODE_GetType(hNode);
+	if (nodeType == NODE_DEVICE)
+		status = DSP_ENODETYPE;
 	if (DSP_FAILED(status))
 		goto func_end;
 
@@ -2666,7 +2674,10 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 
 	GT_1trace(NODE_debugMask, GT_ENTER,
 		 "NODE_Terminate: hNode: 0x%x\n", hNode);
-
+	if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE)) {
+		status = DSP_EHANDLE;
+		goto func_end;
+	}
 	if (pNode->hProcessor == NULL) {
 		GT_1trace(NODE_debugMask, GT_4CLASS,
 		"NODE_Terminate: pNode->hProcessor = 0x%x\n",
@@ -2677,15 +2688,10 @@ DSP_STATUS NODE_Terminate(struct NODE_OBJECT *hNode, OUT DSP_STATUS *pStatus)
 
 	if (DSP_SUCCEEDED(status)) {
 		hNodeMgr = hNode->hNodeMgr;
-
-		if (!MEM_IsValidHandle(hNode, NODE_SIGNATURE))
-			status = DSP_EHANDLE;
-		else {
-			nodeType = NODE_GetType(hNode);
-			if (nodeType != NODE_TASK && nodeType !=
+		nodeType = NODE_GetType(hNode);
+		if (nodeType != NODE_TASK && nodeType !=
 			   NODE_DAISSOCKET)
 				status = DSP_ENODETYPE;
-		}
 	}
 	if (DSP_SUCCEEDED(status)) {
 		/* Check node state */
