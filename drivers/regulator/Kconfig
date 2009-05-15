@@ -87,4 +87,10 @@ config REGULATOR_PCF50633
 	 Say Y here to support the voltage regulators and convertors
 	 on PCF50633
 
+config REGULATOR_CPCAP
+	tristate "CPCAP regulator driver"
+        depends on MFD_CPCAP
+	help
+	 Say Y here to support the voltage regulators on CPCAP
+
 endif
