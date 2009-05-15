@@ -602,6 +602,11 @@ CONFIG_ANDROID_PMEM=y
 # CONFIG_EEPROM_AT25 is not set
 # CONFIG_EEPROM_LEGACY is not set
 # CONFIG_EEPROM_93CX6 is not set
+
+#
+# Motorola TS 27.010 Mux driver
+#
+CONFIG_MOT_FEAT_TS27010MUX=y
 CONFIG_HAVE_IDE=y
 # CONFIG_IDE is not set
 
