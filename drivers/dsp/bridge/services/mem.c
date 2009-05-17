@@ -281,11 +281,11 @@ void *MEM_Alloc(u32 cBytes, enum MEM_POOLATTRS type)
 		/* If non-paged memory required, see note at top of file. */
 		case MEM_PAGED:
 #ifndef MEM_CHECK
-                                  pMem = kmalloc(cBytes,
-                                              (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
+			pMem = kmalloc(cBytes,
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
 #else
 			pMem = kmalloc(cBytes + sizeof(struct memInfo),
-                                              (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
 			if (pMem) {
 				pMem->size = cBytes;
 				pMem->caller = __builtin_return_address(0);
@@ -304,12 +304,12 @@ void *MEM_Alloc(u32 cBytes, enum MEM_POOLATTRS type)
 		case MEM_LARGEVIRTMEM:
 #ifndef MEM_CHECK
 			/* FIXME - Replace with 'vmalloc' after BP fix */
-                                  pMem = __vmalloc(cBytes,
-                                  (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
+			pMem = __vmalloc(cBytes,
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
 #else
 			/* FIXME - Replace with 'vmalloc' after BP fix */
 			pMem = __vmalloc((cBytes + sizeof(struct memInfo)),
-                                  (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
 			if (pMem) {
 				pMem->size = cBytes;
 				pMem->caller = __builtin_return_address(0);
@@ -359,7 +359,7 @@ void *MEM_AllocPhysMem(u32 cBytes, u32 ulAlign, OUT u32 *pPhysicalAddress)
 						    (u32 *)&paMem);
 		} else
 			pVaMem = dma_alloc_coherent(NULL, cBytes, &paMem,
-                                              (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
 		if (pVaMem == NULL) {
 			*pPhysicalAddress = 0;
 			GT_1trace(MEM_debugMask, GT_6CLASS,
@@ -391,14 +391,14 @@ void *MEM_Calloc(u32 cBytes, enum MEM_POOLATTRS type)
 		/* If non-paged memory required, see note at top of file. */
 		case MEM_PAGED:
 #ifndef MEM_CHECK
-                                  pMem = kmalloc(cBytes,
-                                              (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
+			pMem = kmalloc(cBytes,
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
 			if (pMem)
 				memset(pMem, 0, cBytes);
 
 #else
 			pMem = kmalloc(cBytes + sizeof(struct memInfo),
-                                              (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL);
 			if (pMem) {
 				memset((void *)((u32)pMem +
 					sizeof(struct memInfo)), 0, cBytes);
@@ -417,15 +417,15 @@ void *MEM_Calloc(u32 cBytes, enum MEM_POOLATTRS type)
 		case MEM_LARGEVIRTMEM:
 #ifndef MEM_CHECK
 			/* FIXME - Replace with 'vmalloc' after BP fix */
-                                  pMem = __vmalloc(cBytes,
-                                  (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
+			pMem = __vmalloc(cBytes,
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
 			if (pMem)
 				memset(pMem, 0, cBytes);
 
 #else
 			/* FIXME - Replace with 'vmalloc' after BP fix */
 			pMem = __vmalloc(cBytes + sizeof(struct memInfo),
-                                  (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
+				(in_atomic()) ? GFP_ATOMIC : GFP_KERNEL, PAGE_KERNEL);
 			if (pMem) {
 				memset((void *)((u32)pMem +
 					sizeof(struct memInfo)), 0, cBytes);
