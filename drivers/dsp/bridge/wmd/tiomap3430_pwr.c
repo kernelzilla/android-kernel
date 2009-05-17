@@ -57,6 +57,9 @@
 
 #include <dspbridge/pwr_sh.h>
 
+/*  ----------------------------------- Mini Driver */
+#include <dspbridge/wmddeh.h>
+
 /*  ----------------------------------- specific to this file */
 #include "_tiomap.h"
 #include "_tiomap_pwr.h"
@@ -188,6 +191,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 	DSP_STATUS status = DSP_SOK;
 #ifdef CONFIG_PM
 	struct CFG_HOSTRES resources;
+	struct DEH_MGR *hDehMgr;
 	u16 usCount = TIHELEN_ACKTIMEOUT;
 	enum HW_PwrState_t pwrState;
 	enum HW_PwrState_t targetPwrState;
@@ -257,6 +261,8 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 	if (usCount == 0) {
 		DBG_Trace(DBG_LEVEL7, "SleepDSP: Timed out Waiting for DSP"
 			 " STANDBY %x \n", pwrState);
+		DEV_GetDehMgr(pDevContext->hDevObject, &hDehMgr);
+		WMD_DEH_Notify(hDehMgr, DSP_PWRERROR, 0);
 		return WMD_E_TIMEOUT;
 	} else {
 		DBG_Trace(DBG_LEVEL7, "SleepDSP: DSP STANDBY Pwr state %x \n",

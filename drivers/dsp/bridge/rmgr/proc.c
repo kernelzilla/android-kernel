@@ -1499,7 +1499,7 @@ DSP_STATUS PROC_RegisterNotify(DSP_HPROCESSOR hProcessor, u32 uEventMask,
 	/* Check if event mask is a valid processor related event */
 	if (uEventMask & ~(DSP_PROCESSORSTATECHANGE | DSP_PROCESSORATTACH |
 	   DSP_PROCESSORDETACH | DSP_PROCESSORRESTART | DSP_MMUFAULT |
-	   DSP_SYSERROR))
+	   DSP_SYSERROR | DSP_PWRERROR))
 		status = DSP_EVALUE;
 
 	/* Check if notify type is valid */
@@ -1507,12 +1507,13 @@ DSP_STATUS PROC_RegisterNotify(DSP_HPROCESSOR hProcessor, u32 uEventMask,
 		status = DSP_EVALUE;
 
 	if (DSP_SUCCEEDED(status)) {
-		/* * If event mask is not DSP_SYSERROR or DSP_MMUFAULT,
-		 * then register event immediately.  */
-		if (uEventMask & ~(DSP_SYSERROR | DSP_MMUFAULT)) {
+		/* If event mask is not DSP_SYSERROR, DSP_MMUFAULT,
+		 * or DSP_PWRERROR then register event immediately. */
+		if (uEventMask &
+		    ~(DSP_SYSERROR | DSP_MMUFAULT | DSP_PWRERROR)) {
 			status = NTFY_Register(pProcObject->hNtfy,
 				 hNotification,	uEventMask, uNotifyType);
-			/* * Special case alert, special case alert!
+			/* Special case alert, special case alert!
 			 * If we're trying to *deregister* (i.e. uEventMask
 			 * is 0), a DSP_SYSERROR or DSP_MMUFAULT notification,
 			 * we have to deregister with the DEH manager.
