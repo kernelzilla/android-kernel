@@ -469,6 +469,14 @@ static int __devexit omap34xx_bridge_remove(struct platform_device *pdev)
 		pCtxtclosed = pTmp;
 	}
 func_cont:
+	if (driverContext) {
+		/* Put the DSP in reset state */
+		ret = DSP_Deinit(driverContext);
+		driverContext = 0;
+		DBC_Assert(ret == true);
+	}
+	SERVICES_Exit();
+	GT_exit();
 	/* unregister the clock notifier */
 #ifdef CONFIG_BRIDGE_DVFS
 	if (!clk_notifier_unregister(clk_handle, &iva_clk_notifier)) {
@@ -482,15 +490,6 @@ func_cont:
 	clk_put(clk_handle);
 	clk_handle = NULL;
 #endif /* #ifdef CONFIG_BRIDGE_DVFS */
-
-	if (driverContext) {
-		ret = DSP_Deinit(driverContext);
-		driverContext = 0;
-
-		DBC_Assert(ret == true);
-	}
-	SERVICES_Exit();
-	GT_exit();
 
 	devno = MKDEV(driver_major, driver_minor);
 	if (bridge_device) {
