@@ -263,9 +263,6 @@ void omap_uart_prepare_idle(int num)
 	struct omap_uart_state *uart;
 
 	list_for_each_entry(uart, &uart_list, node) {
-		if (!clocks_off_while_idle)
-			continue;
-
 		if (num == uart->num && uart->can_sleep) {
 			omap_uart_disable_clocks(uart);
 			return;
