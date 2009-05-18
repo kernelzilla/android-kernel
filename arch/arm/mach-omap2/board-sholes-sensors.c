@@ -20,7 +20,7 @@ int sholesp0b_keymap[] = {
 	0x0000000a, 0x01000013, 0x03000072, 0x05000073, 0x060000d9, 0x07000020, 
 	0x10000008, 0x11000032, 0x12000026, 0x13000025, 0x14000031, 0x1500002e,
 	0x1600002c, 0x20000002, 0x21000015, 0x22000017, 0x2300006b, 0x240000e5,
-	0x25000034, 0x26000022, 0x27000012, 0x31000038, 0x32000004, 0x3300006a,
+	0x25000034, 0x26000022, 0x27000012, 0x31000007, 0x32000004, 0x3300006a,
 	0x34000069, 0x3500006c, 0x36000067, 0x3700001c, 0x40000006, 0x41000024,
 	0x42000030, 0x430000d4, 0x44000014, 0x4500000b, 0x46000096, 0x4700002d,
 	0x50000009, 0x51000039, 0x520000e3, 0x5300009e, 0x540000e4, 0x550000e7,
@@ -44,6 +44,7 @@ static struct omap_kp_platform_data omap3430_kp_data = {
 	.keymapsize	= 59,
 	.switchmap	= sholesp1_switchmap,
 	.switchmapsize  = 2,
+	.delay		= 200,
 	.rep		= 0,
 	.row_gpios	= sholesp1_row_gpios,
 	.col_gpios	= sholesp1_col_gpios,
@@ -72,6 +73,27 @@ static struct platform_device *sholes_sensors[] __initdata = {
 
 void __init sholes_sensors_init(void)
 {
+	/* keypad rows */
+	omap_cfg_reg(N4_34XX_GPIO34);
+	omap_cfg_reg(M4_34XX_GPIO35);
+	omap_cfg_reg(L4_34XX_GPIO36);
+	omap_cfg_reg(K4_34XX_GPIO37);
+	omap_cfg_reg(T3_34XX_GPIO38);
+	omap_cfg_reg(R3_34XX_GPIO39);
+	omap_cfg_reg(N3_34XX_GPIO40);
+	omap_cfg_reg(M3_34XX_GPIO41);
+
+	/* keypad columns */
+	omap_cfg_reg(K3_34XX_GPIO43_OUT);
+	omap_cfg_reg(V8_34XX_GPIO53_OUT);
+	omap_cfg_reg(U8_34XX_GPIO54_OUT);
+	omap_cfg_reg(T8_34XX_GPIO55_OUT);
+	omap_cfg_reg(R8_34XX_GPIO56_OUT);
+	omap_cfg_reg(P8_34XX_GPIO57_OUT);
+	omap_cfg_reg(N8_34XX_GPIO58_OUT);
+	omap_cfg_reg(L8_34XX_GPIO63_OUT);
+
+	/* switches */
 	omap_cfg_reg(AB2_34XX_GPIO177);
 	omap_cfg_reg(AH17_34XX_GPIO100);
 
