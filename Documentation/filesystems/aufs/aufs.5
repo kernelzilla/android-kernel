@@ -334,6 +334,20 @@ may not impose a security risk.
 If you are sure that there is no problem and want to stop the warning,
 use \[oq]nowarn_perm\[cq] option.
 The default is \[oq]warn_perm\[cq] (cf. DIAGNOSTICS).
+.
+.TP
+.B shwh
+.TQ
+.B noshwh
+By default (noshwh), aufs doesn\[aq]t show the whiteouts and
+they just hide the same named entries in the lower branches. The
+whiteout itself also never be appeared.
+If you enable CONFIG_AUFS_SHWH and specify \[oq]shwh\[cq] option, aufs
+will show you the name of whiteouts
+with keeping its feature to hide the lowers.
+Honestly speaking, I am rather confused with this \[oq]visible whiteouts.\[cq]
+But a user who originally requested this feature wrote a nice how-to
+document about this feature. See Tips file in the aufs CVS tree.
 
 .\" ----------------------------------------------------------------------
 .SH Module Parameters
