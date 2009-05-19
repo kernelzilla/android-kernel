@@ -420,6 +420,7 @@ void omap_sram_idle(void)
 	 * location and restores them back.
 	 */
 	_omap_sram_idle(omap3_arm_context, save_state);
+	cpu_init();
 
 	/* Restore normal SDRAM settings */
 	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
