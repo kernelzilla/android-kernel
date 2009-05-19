@@ -166,6 +166,7 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 		attr = &vdd1_opp_attr;
 		if (vdd1_locked && value == 0) {
 			resource_unlock_opp(VDD1_OPP);
+			resource_refresh();
 			vdd1_locked = 0;
 			return n;
 		}
@@ -178,6 +179,7 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 		attr = &vdd2_opp_attr;
 		if (vdd2_locked && value == 0) {
 			resource_unlock_opp(VDD2_OPP);
+			resource_refresh();
 			vdd2_locked = 0;
 			return n;
 		}
