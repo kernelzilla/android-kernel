@@ -195,8 +195,13 @@ struct platform_device msm_device_i2c = {
 	.resource	= resources_i2c,
 };
 
+#ifdef CONFIG_ARCH_MSM7X00A
 #define GPIO_I2C_CLK 60
 #define GPIO_I2C_DAT 61
+#else
+#define GPIO_I2C_CLK 95
+#define GPIO_I2C_DAT 96
+#endif
 void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 {
 	unsigned id;
