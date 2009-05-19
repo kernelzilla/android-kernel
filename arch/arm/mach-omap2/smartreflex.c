@@ -906,6 +906,12 @@ static int __init omap3_sr_init(void)
 	int ret = 0;
 	u8 RdReg;
 
+	/* Exit if OPP tables are not defined */
+        if (!(mpu_opps && l3_opps)) {
+                pr_err("SR: OPP rate tables not defined for platform, not enabling SmartReflex\n");
+		return -ENODEV;
+        }
+
 	/* Enable SR on T2 */
 	ret = twl4030_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &RdReg,
 					R_DCDC_GLOBAL_CFG);
