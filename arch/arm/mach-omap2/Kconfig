@@ -117,6 +117,12 @@ config MACH_OMAP_ZOOM2
 	bool "OMAP3 ZOOM2 board"
 	depends on ARCH_OMAP3 && ARCH_OMAP34XX
 
+config WIFI_CONTROL_FUNC
+        bool "Enable WiFi control function abstraction"
+	depends on MACH_OMAP_ZOOM2
+        help
+          Enables Power/Reset/Carddetect function abstraction
+			  
 config MACH_OMAP2EVM 
 	bool "OMAP 2530 EVM board"
 	depends on ARCH_OMAP2 && ARCH_OMAP24XX
