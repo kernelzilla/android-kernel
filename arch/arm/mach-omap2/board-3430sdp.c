@@ -901,6 +901,10 @@ static void __init omap_3430sdp_init(void)
 	usb_musb_init();
 	usb_ehci_init();
 	sdp3430_display_init();
+
+	/* Ensure SDRC pins are mux'd for self-refresh */
+	omap_cfg_reg(H16_34XX_SDRC_CKE0);
+	omap_cfg_reg(H17_34XX_SDRC_CKE1);
 }
 
 static void __init omap_3430sdp_map_io(void)

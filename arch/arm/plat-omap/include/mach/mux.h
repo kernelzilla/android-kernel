@@ -843,6 +843,8 @@ enum omap34xx_index {
 	AG24_34XX_DSI_DX2,
 	AH24_34XX_DSI_DY2,
 
+	H16_34XX_SDRC_CKE0,
+	H17_34XX_SDRC_CKE1,
 };
 
 struct omap_mux_cfg {
