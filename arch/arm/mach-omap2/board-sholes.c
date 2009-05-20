@@ -331,6 +331,12 @@ static void __init sholes_ehci_init(void)
 #endif
 }
 
+static void __init sholes_sdrc_init(void)
+{
+	/* Ensure SDRC pins are mux'd for self-refresh */
+	omap_cfg_reg(H16_34XX_SDRC_CKE0);
+	omap_cfg_reg(H17_34XX_SDRC_CKE1);
+}
 
 static void __init sholes_init(void)
 {
@@ -344,6 +350,7 @@ static void __init sholes_init(void)
 	sholes_touch_init();
 	usb_musb_init();
 	sholes_ehci_init();
+	sholes_sdrc_init();
 }
 
 
