@@ -184,7 +184,7 @@ static u16 get_vdd2_opp(void)
 	u16 opp;
 	struct clk *clk;
 
-	clk = clk_get(NULL, "dpll3_m2_ck");
+	clk = clk_get(NULL, "l3_ick");
 
 	if (clk == NULL || IS_ERR(clk) || l3_opps == NULL)
 		return 0;
