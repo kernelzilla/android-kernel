@@ -19,9 +19,16 @@
  */
 
 #include <linux/ioctl.h>
+#include <linux/workqueue.h>
 
 #define CPCAP_DEV_NAME "cpcap"
 #define CPCAP_NUM_REG_CPCAP (CPCAP_REG_END - CPCAP_REG_START + 1)
+
+#define CPCAP_IRQ_INT1_INDEX 0
+#define CPCAP_IRQ_INT2_INDEX 16
+#define CPCAP_IRQ_INT3_INDEX 32
+#define CPCAP_IRQ_INT4_INDEX 48
+#define CPCAP_IRQ_INT5_INDEX 64
 
 enum cpcap_regulator_id {
 	CPCAP_SW5,
@@ -65,20 +72,19 @@ struct cpcap_platform_data {
 enum cpcap_reg {
 	CPCAP_REG_START,        /* Start of CPCAP registers. */
 
-	CPCAP_REG_INT1          /* Interrupt 1 */
-	    = CPCAP_REG_START,
-	CPCAP_REG_INT2,         /* Interrupt 2 */
-	CPCAP_REG_INT3,         /* Interrupt 3 */
-	CPCAP_REG_INT4,         /* Interrupt 4 */
-	CPCAP_REG_INTM1,        /* Interrupt Mask 1 */
-	CPCAP_REG_INTM2,        /* Interrupt Mask 2 */
-	CPCAP_REG_INTM3,        /* Interrupt Mask 3 */
-	CPCAP_REG_INTM4,        /* Interrupt Mask 4 */
-	CPCAP_REG_INTS1,        /* Interrupt Sense 1 */
-	CPCAP_REG_INTS2,        /* Interrupt Sense 2 */
-	CPCAP_REG_INTS3,        /* Interrupt Sense 3 */
-	CPCAP_REG_INTS4,        /* Interrupt Sense 4 */
-	CPCAP_REG_ASSIGN1,      /* Resource Assignment 1 */
+	CPCAP_REG_INT1 = CPCAP_REG_START, /* Interrupt 1 */
+	CPCAP_REG_INT2,		/* Interrupt 2 */
+	CPCAP_REG_INT3,		/* Interrupt 3 */
+	CPCAP_REG_INT4,		/* Interrupt 4 */
+	CPCAP_REG_INTM1,	/* Interrupt Mask 1 */
+	CPCAP_REG_INTM2,	/* Interrupt Mask 2 */
+	CPCAP_REG_INTM3,	/* Interrupt Mask 3 */
+	CPCAP_REG_INTM4,	/* Interrupt Mask 4 */
+	CPCAP_REG_INTS1,	/* Interrupt Sense 1 */
+	CPCAP_REG_INTS2,	/* Interrupt Sense 2 */
+	CPCAP_REG_INTS3,	/* Interrupt Sense 3 */
+	CPCAP_REG_INTS4,	/* Interrupt Sense 4 */
+	CPCAP_REG_ASSIGN1,	/* Resource Assignment 1 */
 	CPCAP_REG_ASSIGN2,	/* Resource Assignment 2 */
 	CPCAP_REG_ASSIGN3,	/* Resource Assignment 3 */
 	CPCAP_REG_ASSIGN4,	/* Resource Assignment 4 */
@@ -87,33 +93,33 @@ enum cpcap_reg {
 	CPCAP_REG_VERSC1,	/* Version Control 1 */
 	CPCAP_REG_VERSC2,	/* Version Control 2 */
 
-	CPCAP_REG_MI1,	        /* Macro Interrupt 1 */
-	CPCAP_REG_MIM1,         /* Macro Interrupt Mask 1 */
-	CPCAP_REG_MI2,	        /* Macro Interrupt 2 */
-	CPCAP_REG_MIM2,	        /* Macro Interrupt Mask 2 */
-	CPCAP_REG_UCC1,	        /* UC Control 1 */
-	CPCAP_REG_UCC2,	        /* UC Control 2 */
-	CPCAP_REG_PC1,	        /* Power Cut 1 */
-	CPCAP_REG_PC2,	        /* Power Cut 2 */
+	CPCAP_REG_MI1,		/* Macro Interrupt 1 */
+	CPCAP_REG_MIM1,		/* Macro Interrupt Mask 1 */
+	CPCAP_REG_MI2,		/* Macro Interrupt 2 */
+	CPCAP_REG_MIM2,		/* Macro Interrupt Mask 2 */
+	CPCAP_REG_UCC1,		/* UC Control 1 */
+	CPCAP_REG_UCC2,		/* UC Control 2 */
+	CPCAP_REG_PC1,		/* Power Cut 1 */
+	CPCAP_REG_PC2,		/* Power Cut 2 */
 	CPCAP_REG_BPEOL,	/* BP and EOL */
-	CPCAP_REG_PGC,	        /* Power Gate and Control */
-	CPCAP_REG_MT1,	        /* Memory Transfer 1 */
-	CPCAP_REG_MT2,	        /* Memory Transfer 2 */
-	CPCAP_REG_MT3,	        /* Memory Transfer 3 */
-	CPCAP_REG_PF,	        /* Print Format */
+	CPCAP_REG_PGC,		/* Power Gate and Control */
+	CPCAP_REG_MT1,		/* Memory Transfer 1 */
+	CPCAP_REG_MT2,		/* Memory Transfer 2 */
+	CPCAP_REG_MT3,		/* Memory Transfer 3 */
+	CPCAP_REG_PF,		/* Print Format */
 
-	CPCAP_REG_SCC,	        /* System Clock Control */
-	CPCAP_REG_SW1,	        /* Stop Watch 1 */
-	CPCAP_REG_SW2,	        /* Stop Watch 2 */
-	CPCAP_REG_UCTM,	        /* UC Turbo Mode */
-	CPCAP_REG_TOD1,	        /* Time of Day 1 */
-	CPCAP_REG_TOD2,	        /* Time of Day 2 */
+	CPCAP_REG_SCC,		/* System Clock Control */
+	CPCAP_REG_SW1,		/* Stop Watch 1 */
+	CPCAP_REG_SW2,		/* Stop Watch 2 */
+	CPCAP_REG_UCTM,		/* UC Turbo Mode */
+	CPCAP_REG_TOD1,		/* Time of Day 1 */
+	CPCAP_REG_TOD2,		/* Time of Day 2 */
 	CPCAP_REG_TODA1,	/* Time of Day Alarm 1 */
 	CPCAP_REG_TODA2,	/* Time of Day Alarm 2 */
-	CPCAP_REG_DAY,	        /* Day */
-	CPCAP_REG_DAYA,	        /* Day Alarm */
-	CPCAP_REG_VAL1,	        /* Validity 1 */
-	CPCAP_REG_VAL2,	        /* Validity 2 */
+	CPCAP_REG_DAY,		/* Day */
+	CPCAP_REG_DAYA,		/* Day Alarm */
+	CPCAP_REG_VAL1,		/* Validity 1 */
+	CPCAP_REG_VAL2,		/* Validity 2 */
 
 	CPCAP_REG_SDVSPLL,	/* Switcher DVS and PLL */
 	CPCAP_REG_SI2CC1,	/* Switcher I2C Control 1 */
@@ -145,14 +151,14 @@ enum cpcap_reg {
 	CPCAP_REG_VUSBC,	/* VUSB Control */
 	CPCAP_REG_VUSBINT1C,	/* VUSBINT1 Control */
 	CPCAP_REG_VUSBINT2C,	/* VUSBINT2 Control */
-	CPCAP_REG_URT,	        /* Useroff Regulator Trigger */
-	CPCAP_REG_URM1,	        /* Useroff Regulator Mask 1 */
-	CPCAP_REG_URM2,	        /* Useroff Regulator Mask 2 */
+	CPCAP_REG_URT,		/* Useroff Regulator Trigger */
+	CPCAP_REG_URM1,		/* Useroff Regulator Mask 1 */
+	CPCAP_REG_URM2,		/* Useroff Regulator Mask 2 */
 
 	CPCAP_REG_VAUDIOC,	/* VAUDIO Control */
-	CPCAP_REG_CC,	        /* Codec Control */
-	CPCAP_REG_CDI,	        /* Codec Digital Interface */
-	CPCAP_REG_SDAC,	        /* Stereo DAC */
+	CPCAP_REG_CC,		/* Codec Control */
+	CPCAP_REG_CDI,		/* Codec Digital Interface */
+	CPCAP_REG_SDAC,		/* Stereo DAC */
 	CPCAP_REG_SDACDI,	/* Stereo DAC Digital Interface */
 	CPCAP_REG_TXI,		/* TX Inputs */
 	CPCAP_REG_TXMP,		/* TX MIC PGA's */
@@ -267,20 +273,101 @@ enum cpcap_reg {
 	CPCAP_REG_LMISC,	/* LMR Misc Bits */
 	CPCAP_REG_LMACE,	/* LMR Mace IC Support */
 
-	CPCAP_REG_END		/* End of CPCAP registers. */
-	    = CPCAP_REG_LMACE,
+	CPCAP_REG_END = CPCAP_REG_LMACE /* End of CPCAP registers. */
 
 	CPCAP_REG_MAX		/* The largest valid register value. */
 	= CPCAP_REG_END
 };
-
-
 
 enum {
 	CPCAP_IOCTL_NUM_TEST__START,
 	CPCAP_IOCTL_NUM_TEST_READ_REG,
 	CPCAP_IOCTL_NUM_TEST_WRITE_REG,
 	CPCAP_IOCTL_NUM_TEST__END
+};
+
+
+enum cpcap_irqs {
+	CPCAP_IRQ__START,		/* 1st supported interrupt event */
+	CPCAP_IRQ_HSCLK = CPCAP_IRQ_INT1_INDEX, /* High Speed Clock */
+	CPCAP_IRQ_PRIMAC,		/* Primary Macro */
+	CPCAP_IRQ_SECMAC,		/* Secondary Macro */
+	CPCAP_IRQ_LOWBPL,		/* Low Battery Low Threshold */
+	CPCAP_IRQ_SEC2PRI,		/* 2nd Macro to Primary Processor */
+	CPCAP_IRQ_LOWBPH,		/* Low Battery High Threshold  */
+	CPCAP_IRQ_EOL,			/* End of Life */
+	CPCAP_IRQ_TS,			/* Touchscreen */
+	CPCAP_IRQ_ADCDONE,		/* ADC Conversion Complete */
+	CPCAP_IRQ_HS,			/* Headset */
+	CPCAP_IRQ_MB2,			/* Mic Bias2 */
+	CPCAP_IRQ_VBUSOV,		/* Overvoltage Detected */
+	CPCAP_IRQ_RVRS_CHRG,		/* Reverse Charge */
+	CPCAP_IRQ_CHRG_DET,		/* Charger Detected */
+	CPCAP_IRQ_IDFLOAT,		/* ID Float */
+	CPCAP_IRQ_IDGND,		/* ID Ground */
+
+	CPCAP_IRQ_SE1 = CPCAP_IRQ_INT2_INDEX, /* SE1 Detector */
+	CPCAP_IRQ_SESSEND,		/* Session End */
+	CPCAP_IRQ_SESSVLD,		/* Session Valid */
+	CPCAP_IRQ_VBUSVLD,		/* VBUS Valid */
+	CPCAP_IRQ_CHRG_CURR1,		/* Charge Current Monitor (20mA) */
+	CPCAP_IRQ_CHRG_CURR2,		/* Charge Current Monitor (250mA) */
+	CPCAP_IRQ_RVRS_MODE,		/* Reverse Current Limit */
+	CPCAP_IRQ_ON,			/* On Signal */
+	CPCAP_IRQ_ON2,			/* On 2 Signal */
+	CPCAP_IRQ_CLK,			/* 32k Clock Transition */
+	CPCAP_IRQ_1HZ,			/* 1Hz Tick */
+	CPCAP_IRQ_PTT,			/* Push To Talk */
+	CPCAP_IRQ_SE0CONN,		/* SE0 Condition */
+	CPCAP_IRQ_CHRG_SE1B,		/* CHRG_SE1B Pin */
+	CPCAP_IRQ_UART_ECHO_OVERRUN,	/* UART Buffer Overflow */
+	CPCAP_IRQ_EXTMEMHD,		/* External MEMHOLD */
+
+	CPCAP_IRQ_WARM = CPCAP_IRQ_INT3_INDEX,	/* Warm Start */
+	CPCAP_IRQ_SYSRSTR,		/* System Restart */
+	CPCAP_IRQ_SOFTRST,		/* Soft Reset */
+	CPCAP_IRQ_DIEPWRDWN,		/* Die Temperature Powerdown */
+	CPCAP_IRQ_DIETEMPH,		/* Die Temperature High */
+	CPCAP_IRQ_PC,			/* Power Cut */
+	CPCAP_IRQ_OFLOWSW,		/* Stopwatch Overflow */
+	CPCAP_IRQ_TODA,			/* TOD Alarm */
+	CPCAP_IRQ_OPT_SEL_DTCH,		/* Detach Detect */
+	CPCAP_IRQ_OPT_SEL_STATE,	/* State Change */
+	CPCAP_IRQ_ONEWIRE1,		/* Onewire 1 Block */
+	CPCAP_IRQ_ONEWIRE2,		/* Onewire 2 Block */
+	CPCAP_IRQ_ONEWIRE3,		/* Onewire 3 Block */
+	CPCAP_IRQ_UCRESET,		/* Microcontroller Reset */
+	CPCAP_IRQ_PWRGOOD,		/* BP Turn On */
+	CPCAP_IRQ_USBDPLLCLK,		/* USB DPLL Status */
+
+	CPCAP_IRQ_DPI = CPCAP_IRQ_INT4_INDEX /* DP Line */
+	CPCAP_IRQ_DMI,			/* DM Line */
+	CPCAP_IRQ_UCBUSY,		/* Microcontroller Busy */
+	CPCAP_IRQ_GCAI_CURR1,		/* Charge Current Monitor (65mA) */
+	CPCAP_IRQ_GCAI_CURR2,		/* Charge Current Monitor (600mA) */
+	CPCAP_IRQ_SB_MAX_RETRANSMIT_ERR,/* SLIMbus Retransmit Error */
+	CPCAP_IRQ_BATTDETB,		/* Battery Presence Detected */
+	CPCAP_IRQ_PRIHALT,		/* Primary Microcontroller Halt */
+	CPCAP_IRQ_SECHALT,		/* Secondary Microcontroller Halt */
+	CPCAP_IRQ_CC_CAL,		/* CC Calibration */
+
+	CPCAP_IRQ_UC_PRIROMR = CPCAP_IRQ_INT5_INDEX /* Prim ROM Rd Macro Int */
+	CPCAP_IRQ_UC_PRIRAMW,		/* Primary RAM Write Macro Int */
+	CPCAP_IRQ_UC_PRIRAMR,		/* Primary RAM Read Macro Int */
+	CPCAP_IRQ_UC_USEROFF,		/* USEROFF Macro Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_4,	/* Primary Macro 4 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_5,	/* Primary Macro 5 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_6,	/* Primary Macro 6 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_7,	/* Primary Macro 7 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_8,	/* Primary Macro 8 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_9,	/* Primary Macro 9 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_10,	/* Primary Macro 10 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_11,	/* Primary Macro 11 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_12,	/* Primary Macro 12 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_13,	/* Primary Macro 13 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_14,	/* Primary Macro 14 Interrupt */
+	CPCAP_IRQ_UC_PRIMACRO_15,	/* Primary Macro 15 Interrupt */
+	CPCAP_IRQ__NUM			/* Number of allocated events */
 };
 
 struct cpcap_regacc {
@@ -319,8 +406,8 @@ struct cpcap_device {
 	struct spi_device	*spi;
 	void			*keydata;
 	struct platform_device  *regulator_pdev[CPCAP_NUM_REGULATORS];
+	void			*irqdata;
 };
-
 
 static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
 {
@@ -343,4 +430,25 @@ int cpcap_regacc_init(struct cpcap_device *cpcap);
 void cpcap_broadcast_key_event(struct cpcap_device *cpcap,
 			       unsigned int code, int value);
 
-#endif /* CPCAP_H */
+int cpcap_irq_init(struct cpcap_device *cpcap);
+
+void cpcap_irq_shutdown(struct cpcap_device *cpcap);
+
+int cpcap_irq_register(struct cpcap_device *cpcap, enum cpcap_irqs irq,
+		       void (*cb_func) (enum cpcap_irqs, void *), void *data);
+
+int cpcap_irq_free(struct cpcap_device *cpcap, enum cpcap_irqs irq);
+
+/* removes irq handler and calls kfree on associated data */
+int cpcap_irq_free_data(struct cpcap_device *cpcap, enum cpcap_irqs irq);
+
+int cpcap_irq_clear(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
+
+int cpcap_irq_mask(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
+
+int cpcap_irq_unmask(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
+
+int cpcap_irq_sense(struct cpcap_device *cpcap, enum cpcap_irqs int_event,
+		    unsigned char clear);
+
+#endif /* _LINUX_SPI_CPCAP_H */

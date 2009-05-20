@@ -98,6 +98,9 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	retval = cpcap_regacc_init(cpcap);
 	if (retval < 0)
 		return retval;
+	retval = cpcap_irq_init(cpcap);
+	if (retval < 0)
+		return retval;
 
 	cpcap_usb_device.dev.platform_data = cpcap;
 	cpcap_key_device.dev.platform_data = cpcap;
@@ -139,6 +142,7 @@ static int __devexit cpcap_remove(struct spi_device *spi)
 		platform_device_unregister(cpcap->regulator_pdev[i]);
 
 	misc_deregister(&cpcap_dev);
+	cpcap_irq_shutdown(cpcap);
 	kfree(cpcap);
 	return 0;
 }
