@@ -234,11 +234,8 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 	if (unlikely(inode->i_ino == parent_ino(dentry)))
 		goto out;
 
-	ii_write_lock_new_child(inode);
-	if (unlikely(IS_DEADDIR(inode)))
-		goto out_unlock;
-
 	err = 0;
+	ii_write_lock_new_child(inode);
 	h_dinode = au_h_dptr(dentry, au_dbstart(dentry))->d_inode;
 	bend = au_ibend(inode);
 	for (bindex = au_ibstart(inode); bindex <= bend; bindex++) {
@@ -252,7 +249,6 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 		}
 	}
 
- out_unlock:
 	if (unlikely(err))
 		ii_write_unlock(inode);
  out:

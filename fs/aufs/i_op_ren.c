@@ -925,13 +925,8 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 		au_update_dbstart(a->dst_dentry);
 		d_drop(a->dst_dentry);
 	}
-	if (!err) {
+	if (!err)
 		d_move(a->src_dentry, a->dst_dentry);
-		if (a->dst_inode
-		    && (a->dst_inode->i_nlink <= 1
-			|| au_ftest_ren(a->flags, ISDIR)))
-			a->dst_inode->i_flags |= S_DEAD;
-	}
 	if (au_ftest_ren(a->flags, ISSAMEDIR))
 		di_write_unlock(a->dst_parent);
 	else
