@@ -227,7 +227,7 @@ void au_iinfo_fin(struct inode *inode)
 {
 	ino_t ino;
 	aufs_bindex_t bend;
-	unsigned char unlinked = !inode->i_nlink || IS_DEADDIR(inode);
+	unsigned char unlinked = !inode->i_nlink;
 	struct au_iinfo *iinfo;
 	struct au_hinode *hi;
 	struct super_block *sb;

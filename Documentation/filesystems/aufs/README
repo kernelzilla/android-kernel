@@ -160,12 +160,26 @@ For aufs2-2.6 tree,
 - set other aufs configurations if necessary.
 
 For aufs2-standalone tree,
-- enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS, you can select =m.
-- edit fs/aufs/config.mk and set other aufs configurations if necessary.
+There are two methods to build an externel kernel module.
+1.
+- apply ./aufs2-kbuild.patch too
+- copy ./{Documentation,fs,include} files to your kernel source tree
+- enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS, you can select either
+  =m or =y.
+- and build your kernel as usual.
+- install it and reboot your system
+2.
+- module only method (CONFIG_AUFS_FS=m).
+- edit ./config.mk and set other aufs configurations if necessary.
+- build the module by simple "make".
+- you can specify ${KDIR} make variable which points to your kernel
+  source tree.
+- copy the build ./aufs.ko to /lib/modules/..., and run depmod -a (or
+  reboot simply).
+- no need to apply aufs2-kbuild.patch, nor copying source files to your
+  kernel source tree, nor re-config/build your entire kernel.
 
 And then,
-- build your kernel (or a module) by "make"
-- install it and reboot your system
 - read README in aufs2-util, build and install it
 
 

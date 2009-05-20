@@ -118,6 +118,7 @@ static inline int au_debug_test(void)
 
 struct au_sbinfo;
 struct au_finfo;
+struct dentry;
 #ifdef CONFIG_AUFS_DEBUG
 extern char *au_plevel;
 struct au_nhash;
@@ -126,7 +127,6 @@ struct au_vdir;
 void au_dpri_vdir(struct au_vdir *vdir);
 struct inode;
 void au_dpri_inode(struct inode *inode);
-struct dentry;
 void au_dpri_dentry(struct dentry *dentry);
 struct file;
 void au_dpri_file(struct file *filp);
@@ -196,7 +196,7 @@ static inline void au_dbg_verify_dir_parent(struct dentry *dentry,
 	/* empty */
 }
 static inline void au_dbg_verify_nondir_parent(struct dentry *dentry,
-					   unsigned int sigen)
+					       unsigned int sigen)
 {
 	/* empty */
 }

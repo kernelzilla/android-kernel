@@ -260,13 +260,7 @@ static void epilog(struct inode *dir, struct dentry *dentry,
 {
 	struct inode *inode;
 
-	/*
-	 * even if this is not a dir,
-	 * set S_DEAD here since we need to detect the dead inode.
-	 */
 	inode = dentry->d_inode;
-	if (!inode->i_nlink)
-		inode->i_flags |= S_DEAD;
 	d_drop(dentry);
 	inode->i_ctime = dir->i_ctime;
 
