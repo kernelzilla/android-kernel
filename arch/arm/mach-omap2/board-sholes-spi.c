@@ -9,7 +9,10 @@
  */
 #include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
+#include <linux/irq.h>
 #include <mach/mcspi.h>
+#include <mach/gpio.h>
+#include <mach/mux.h>
 
 struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_ASSIGN1,   0x0101},
@@ -51,6 +54,8 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_GPIO6,     0x0000},
 };
 
+#define CPCAP_GPIO 0
+
 static struct cpcap_platform_data sholes_cpcap_data = {
 	.init = sholes_cpcap_spi_init,
 	.init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
@@ -81,6 +86,23 @@ static struct spi_board_info sholes_spi_board_info[] __initdata = {
 
 void __init sholes_spi_init(void)
 {
+	int irq;
+	int ret;
+
+	ret = gpio_request(CPCAP_GPIO, "cpcap-irq");
+	if (ret)
+		return;
+	ret = gpio_direction_input(CPCAP_GPIO);
+	if (ret) {
+		gpio_free(CPCAP_GPIO);
+		return;
+	}
+
+	irq = gpio_to_irq(CPCAP_GPIO);
+	set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
+	omap_cfg_reg(AF26_34XX_GPIO0);
+
+	sholes_spi_board_info[0].irq = irq;
 	spi_register_board_info(sholes_spi_board_info,
-				ARRAY_SIZE(sholes_spi_board_info));
+			       ARRAY_SIZE(sholes_spi_board_info));
 }
