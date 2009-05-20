@@ -720,6 +720,18 @@ config VIDEO_OMAP3
 	---help---
 	  Driver for an OMAP 3 camera controller.
 
+config VIDEO_OMAP3
+	bool "OMAP2/OMAP3 Camera and V4L2-DSS drivers"
+	select VIDEOBUF_GEN
+	select VIDEOBUF_DMA_SG
+	select OMAP2_DSS
+	depends on VIDEO_DEV && (ARCH_OMAP24XX || ARCH_OMAP34XX)
+	default y
+	---help---
+        V4L2 DSS and Camera driver support for OMAP2/3 based boards.
+
+source "drivers/media/video/omap/Kconfig"
+
 config SOC_CAMERA
 	tristate "SoC camera support"
 	depends on VIDEO_V4L2 && HAS_DMA
