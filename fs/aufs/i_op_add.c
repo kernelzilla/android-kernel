@@ -433,6 +433,10 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 	inode = src_dentry->d_inode;
 	IMustLock(inode);
 
+	err = -ENOENT;
+	if (unlikely(!inode->i_nlink))
+		goto out;
+
 	err = -ENOMEM;
 	a = kzalloc(sizeof(*a), GFP_NOFS);
 	if (unlikely(!a))
