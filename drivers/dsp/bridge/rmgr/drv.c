@@ -462,7 +462,6 @@ static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt)
 					status = NODE_Delete(pNodeRes->hNode);
 			}
 		}
-		pNodeRes->nodeAllocated = 0;
 	}
 	return status;
 }
