@@ -1742,9 +1742,6 @@ DSP_STATUS IO_SHMsetting(IN struct IO_MGR *hIOMgr, IN enum SHM_DESCTYPE desc,
 		break;
 	default:
 		break;
-
-				queue_work(bridge_workqueue,
-							 &(hIOMgr->io_workq));
 	}
 #endif
 	return DSP_SOK;
