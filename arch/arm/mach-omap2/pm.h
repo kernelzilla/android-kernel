@@ -24,14 +24,24 @@ extern int omap3_can_sleep(void);
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern int omap3_idle_init(void);
 
-truct prm_setup_times {
+struct prm_setup_vc {
 	u16 clksetup;
 	u16 voltsetup_time1;
 	u16 voltsetup_time2;
 	u16 voltoffset;
 	u16 voltsetup2;
+/* PRM_VC_CMD_VAL_0 specific bits */
+	u16 vdd0_on;
+	u16 vdd0_onlp;
+	u16 vdd0_ret;
+	u16 vdd0_off;
+/* PRM_VC_CMD_VAL_1 specific bits */
+	u16 vdd1_on;
+	u16 vdd1_onlp;
+	u16 vdd1_ret;
+	u16 vdd1_off;
 };
-extern void omap3_set_prm_setup_times(struct prm_setup_times *setup_times);
+extern void omap3_set_prm_setup_vc(struct prm_setup_vc *setup_vc);
 
 extern int resource_set_opp_level(int res, u32 target_level, int flags);
 extern int resource_access_opp_lock(int res, int delta);

@@ -83,12 +83,20 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 static struct powerdomain *cam_pwrdm;
 
-static struct prm_setup_times prm_setup = {
+static struct prm_setup_vc prm_setup = {
 	.clksetup = 0xff,
 	.voltsetup_time1 = 0xfff,
 	.voltsetup_time2 = 0xfff,
 	.voltoffset = 0xff,
 	.voltsetup2 = 0xff,
+	.vdd0_on = 0x30,
+	.vdd0_onlp = 0x1e,
+	.vdd0_ret = 0x1e,
+	.vdd0_off = 0x30,
+	.vdd1_on = 0x2c,
+	.vdd1_onlp = 0x1e,
+	.vdd1_ret = 0x1e,
+	.vdd1_off = 0x2c,
 };
 
 static inline void omap3_per_save_context(void)
@@ -1001,13 +1009,21 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
 	return -EINVAL;
 }
 
-void omap3_set_prm_setup_times(struct prm_setup_times *setup_times)
+void omap3_set_prm_setup_vc(struct prm_setup_vc *setup_vc)
 {
-	prm_setup.clksetup = setup_times->clksetup;
-	prm_setup.voltsetup_time1 = setup_times->voltsetup_time1;
-	prm_setup.voltsetup_time2 = setup_times->voltsetup_time2;
-	prm_setup.voltoffset = setup_times->voltoffset;
-	prm_setup.voltsetup2 = setup_times->voltsetup2;
+	prm_setup.clksetup = setup_vc->clksetup;
+	prm_setup.voltsetup_time1 = setup_vc->voltsetup_time1;
+	prm_setup.voltsetup_time2 = setup_vc->voltsetup_time2;
+	prm_setup.voltoffset = setup_vc->voltoffset;
+	prm_setup.voltsetup2 = setup_vc->voltsetup2;
+	prm_setup.vdd0_on = setup_vc->vdd0_on;
+	prm_setup.vdd0_onlp = setup_vc->vdd0_onlp;
+	prm_setup.vdd0_ret = setup_vc->vdd0_ret;
+	prm_setup.vdd0_off = setup_vc->vdd0_off;
+	prm_setup.vdd1_on = setup_vc->vdd1_on;
+	prm_setup.vdd1_onlp = setup_vc->vdd1_onlp;
+	prm_setup.vdd1_ret = setup_vc->vdd1_ret;
+	prm_setup.vdd1_off = setup_vc->vdd1_off;
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
@@ -1143,18 +1159,6 @@ err2:
 	return ret;
 }
 
-/* PRM_VC_CMD_VAL_0 specific bits */
-#define OMAP3430_VC_CMD_VAL0_ON		0x30
-#define OMAP3430_VC_CMD_VAL0_ONLP	0x1E
-#define OMAP3430_VC_CMD_VAL0_RET	0x1E
-#define OMAP3430_VC_CMD_VAL0_OFF	0x30
-
-/* PRM_VC_CMD_VAL_1 specific bits */
-#define OMAP3430_VC_CMD_VAL1_ON		0x2C
-#define OMAP3430_VC_CMD_VAL1_ONLP	0x1E
-#define OMAP3430_VC_CMD_VAL1_RET	0x1E
-#define OMAP3430_VC_CMD_VAL1_OFF	0x2C
-
 static void __init configure_vc(void)
 {
 
@@ -1165,18 +1169,16 @@ static void __init configure_vc(void)
 			  (R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
 			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET);
 
-	prm_write_mod_reg(
-		(OMAP3430_VC_CMD_VAL0_ON << OMAP3430_VC_CMD_ON_SHIFT) |
-		(OMAP3430_VC_CMD_VAL0_ONLP << OMAP3430_VC_CMD_ONLP_SHIFT) |
-		(OMAP3430_VC_CMD_VAL0_RET << OMAP3430_VC_CMD_RET_SHIFT) |
-		(OMAP3430_VC_CMD_VAL0_OFF << OMAP3430_VC_CMD_OFF_SHIFT),
+	prm_write_mod_reg((prm_setup.vdd0_on << OMAP3430_VC_CMD_ON_SHIFT) |
+		(prm_setup.vdd0_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(prm_setup.vdd0_ret << OMAP3430_VC_CMD_RET_SHIFT) |
+		(prm_setup.vdd0_off << OMAP3430_VC_CMD_OFF_SHIFT),
 		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
 
-	prm_write_mod_reg(
-		(OMAP3430_VC_CMD_VAL1_ON << OMAP3430_VC_CMD_ON_SHIFT) |
-		(OMAP3430_VC_CMD_VAL1_ONLP << OMAP3430_VC_CMD_ONLP_SHIFT) |
-		(OMAP3430_VC_CMD_VAL1_RET << OMAP3430_VC_CMD_RET_SHIFT) |
-		(OMAP3430_VC_CMD_VAL1_OFF << OMAP3430_VC_CMD_OFF_SHIFT),
+	prm_write_mod_reg((prm_setup.vdd1_on << OMAP3430_VC_CMD_ON_SHIFT) |
+		(prm_setup.vdd1_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(prm_setup.vdd1_ret << OMAP3430_VC_CMD_RET_SHIFT) |
+		(prm_setup.vdd1_off << OMAP3430_VC_CMD_OFF_SHIFT),
 		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
 
 	prm_write_mod_reg(OMAP3430_CMD1 | OMAP3430_RAV1, OMAP3430_GR_MOD,
