@@ -202,6 +202,7 @@ struct omap_dss_display_config {
 			u8 data1_pol;
 			u8 data2_lane;
 			u8 data2_pol;
+			unsigned long lp_clk_hz;
 			unsigned long ddr_clk_hz;
 
 			bool ext_te;

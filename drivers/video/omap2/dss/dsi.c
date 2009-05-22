@@ -763,19 +763,19 @@ static unsigned long dsi_fclk_rate(void)
 	return r;
 }
 
-static int dsi_set_lp_clk_divisor(void)
+static int dsi_set_lp_clk_divisor(struct omap_display *display)
 {
-	int n;
+	unsigned n;
 	unsigned long dsi_fclk;
-	unsigned long mhz;
-
-	/* LP_CLK_DIVISOR, DSI fclk/n, should be 20MHz - 32kHz */
+	unsigned long lp_clk, lp_clk_req;
 
 	dsi_fclk = dsi_fclk_rate();
 
+	lp_clk_req = display->hw_config.u.dsi.lp_clk_hz;
+
 	for (n = 1; n < (1 << 13) - 1; ++n) {
-		mhz = dsi_fclk / n;
-		if (mhz <= 20*1000*1000)
+		lp_clk = dsi_fclk / 2 / n;
+		if (lp_clk <= lp_clk_req)
 			break;
 	}
 
@@ -784,7 +784,7 @@ static int dsi_set_lp_clk_divisor(void)
 		return -EINVAL;
 	}
 
-	DSSDBG("LP_CLK_DIV %d, LP_CLK %ld\n", n, mhz);
+	DSSDBG("LP_CLK_DIV %u, LP_CLK %lu (req %lu)\n", n, lp_clk, lp_clk_req);
 
 	REG_FLD_MOD(DSI_CLK_CTRL, n, 12, 0);	/* LP_CLK_DIVISOR */
 	if (dsi_fclk > 30*1000*1000)
@@ -3439,7 +3439,7 @@ static int dsi_display_init_dsi(struct omap_display *display)
 	_dsi_print_reset_status();
 
 	dsi_proto_timings(display);
-	dsi_set_lp_clk_divisor();
+	dsi_set_lp_clk_divisor(display);
 
 	if (1)
 		_dsi_print_reset_status();
