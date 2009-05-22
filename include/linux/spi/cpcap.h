@@ -20,6 +20,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/workqueue.h>
+#include <linux/completion.h>
 
 #define CPCAP_DEV_NAME "cpcap"
 #define CPCAP_NUM_REG_CPCAP (CPCAP_REG_END - CPCAP_REG_START + 1)
@@ -59,9 +60,21 @@ struct cpcap_spi_init_data {
 	unsigned short data;
 };
 
+struct cpcap_adc_ato {
+	unsigned short ato_in;
+	unsigned short atox_in;
+	unsigned short adc_ps_factor_in;
+	unsigned short atox_ps_factor_in;
+	unsigned short ato_out;
+	unsigned short atox_out;
+	unsigned short adc_ps_factor_out;
+	unsigned short atox_ps_factor_out;
+};
+
 struct cpcap_platform_data {
 	struct cpcap_spi_init_data *init;
 	int init_len;
+	struct cpcap_adc_ato *adc_ato;
 };
 
 /*
@@ -283,7 +296,11 @@ enum {
 	CPCAP_IOCTL_NUM_TEST__START,
 	CPCAP_IOCTL_NUM_TEST_READ_REG,
 	CPCAP_IOCTL_NUM_TEST_WRITE_REG,
-	CPCAP_IOCTL_NUM_TEST__END
+	CPCAP_IOCTL_NUM_TEST__END,
+
+	CPCAP_IOCTL_NUM_ADC__START,
+	CPCAP_IOCTL_NUM_ADC_PHASE,
+	CPCAP_IOCTL_NUM_ADC__END,
 };
 
 
@@ -370,11 +387,86 @@ enum cpcap_irqs {
 	CPCAP_IRQ__NUM			/* Number of allocated events */
 };
 
+enum cpcap_adc_bank0 {
+	CPCAP_ADC_AD0_BATTDETB,
+	CPCAP_ADC_BATTP,
+	CPCAP_ADC_VBUS,
+	CPCAP_ADC_AD3,
+	CPCAP_ADC_BPLUS_AD4,
+	CPCAP_ADC_CHG_ISENSE,
+	CPCAP_ADC_BATTI_ADC,
+	CPCAP_ADC_USB_ID,
+
+	CPCAP_ADC_BANK0_NUM,
+};
+
+enum cpcap_adc_bank1 {
+	CPCAP_ADC_AD8,
+	CPCAP_ADC_AD9,
+	CPCAP_ADC_LICELL,
+	CPCAP_ADC_HV_BATTP,
+	CPCAP_ADC_TSX1_AD12,
+	CPCAP_ADC_TSX2_AD13,
+	CPCAP_ADC_TSY1_AD14,
+	CPCAP_ADC_TSY2_AD15,
+
+	CPCAP_ADC_BANK1_NUM,
+};
+
+enum cpcap_adc_format {
+	CPCAP_ADC_FORMAT_RAW,
+	CPCAP_ADC_FORMAT_PHASED,
+	CPCAP_ADC_FORMAT_CONVERTED,
+};
+
+enum cpcap_adc_timing {
+	CPCAP_ADC_TIMING_IMM,
+	CPCAP_ADC_TIMING_IN,
+	CPCAP_ADC_TIMING_OUT,
+};
+
+enum cpcap_adc_type {
+	CPCAP_ADC_TYPE_BANK_0,
+	CPCAP_ADC_TYPE_BANK_1,
+	CPCAP_ADC_TYPE_BATT_PI,
+};
+
+struct cpcap_device;
+
+struct cpcap_adc_request {
+	enum cpcap_adc_format format;
+	enum cpcap_adc_timing timing;
+	enum cpcap_adc_type type;
+	int status;
+	int result[CPCAP_ADC_BANK0_NUM];
+	void (*callback)(struct cpcap_device *, void *);
+	void *callback_param;
+
+	/* Used in case of sync requests */
+	struct completion completion;
+};
+
+struct cpcap_adc_phase {
+	signed char offset_batti;
+	unsigned char slope_batti;
+	signed char offset_chrgi;
+	unsigned char slope_chrgi;
+	signed char offset_battp;
+	unsigned char slope_battp;
+	signed char offset_bp;
+	unsigned char slope_bp;
+	signed char offset_battt;
+	unsigned char slope_battt;
+	signed char offset_chrgv;
+	unsigned char slope_chrgv;
+};
+
 struct cpcap_regacc {
 	unsigned short reg;
 	unsigned short value;
 	unsigned short mask;
 };
+
 
 /*
  * Gets the contents of the specified cpcap register.
@@ -402,11 +494,15 @@ struct cpcap_regacc {
 #define CPCAP_IOCTL_TEST_WRITE_REG \
 	_IOWR(0, CPCAP_IOCTL_NUM_TEST_WRITE_REG, struct cpcap_regacc*)
 
+#define CPCAP_IOCTL_ADC_PHASE \
+	_IOWR(0, CPCAP_IOCTL_NUM_ADC_PHASE, struct cpcap_adc_phase*)
+
 struct cpcap_device {
 	struct spi_device	*spi;
 	void			*keydata;
 	struct platform_device  *regulator_pdev[CPCAP_NUM_REGULATORS];
 	void			*irqdata;
+	void			*adcdata;
 };
 
 static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
@@ -423,7 +519,7 @@ int cpcap_regacc_write(struct cpcap_device *cpcap, unsigned short reg,
 		       unsigned short value, unsigned short mask);
 
 int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
-		      unsigned short *vaue_ptr);
+		      unsigned short *value_ptr);
 
 int cpcap_regacc_init(struct cpcap_device *cpcap);
 
@@ -450,5 +546,13 @@ int cpcap_irq_unmask(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
 
 int cpcap_irq_sense(struct cpcap_device *cpcap, enum cpcap_irqs int_event,
 		    unsigned char clear);
+
+int cpcap_adc_sync_read(struct cpcap_device *cpcap,
+			struct cpcap_adc_request *request);
+
+int cpcap_adc_async_read(struct cpcap_device *cpcap,
+			 struct cpcap_adc_request *request);
+
+void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
 
 #endif /* _LINUX_SPI_CPCAP_H */

@@ -29,7 +29,6 @@ static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg);
 static int __devinit cpcap_probe(struct spi_device *spi);
 static int __devexit cpcap_remove(struct spi_device *spi);
-static int test_ioctl(unsigned int cmd, unsigned long arg);
 
 const static struct file_operations cpcap_fops = {
 	.owner = THIS_MODULE,
@@ -52,6 +51,13 @@ static struct spi_driver cpcap_driver = {
 	.remove = __devexit_p(cpcap_remove),
 };
 
+static struct platform_device cpcap_adc_device = {
+	.name           = "cpcap_adc",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
+
+
 static struct platform_device cpcap_key_device = {
 	.name           = "cpcap_key",
 	.id             = -1,
@@ -73,6 +79,7 @@ static struct platform_device cpcap_usb_det_device = {
 #endif
 
 static struct platform_device *cpcap_devices[] __initdata = {
+	&cpcap_adc_device,
 	&cpcap_key_device,
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
@@ -109,6 +116,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	if (retval < 0)
 		return retval;
 
+	cpcap_adc_device.dev.platform_data = cpcap;
 	cpcap_usb_device.dev.platform_data = cpcap;
 	cpcap_usb_det_device.dev.platform_data = cpcap;
 	cpcap_key_device.dev.platform_data = cpcap;
@@ -156,21 +164,6 @@ static int __devexit cpcap_remove(struct spi_device *spi)
 	return 0;
 }
 
-static int ioctl(struct inode *inode,
-		 struct file *file, unsigned int cmd, unsigned long arg)
-{
-	int retval = -ENOTTY;
-	unsigned int cmd_num;
-
-	cmd_num = _IOC_NR(cmd);
-
-	if ((cmd_num > CPCAP_IOCTL_NUM_TEST__START) &&
-	    (cmd_num < CPCAP_IOCTL_NUM_TEST__END)) {
-		retval = test_ioctl(cmd, arg);
-	}
-
-	return retval;
-}
 
 static int test_ioctl(unsigned int cmd, unsigned long arg)
 {
@@ -205,6 +198,49 @@ static int test_ioctl(unsigned int cmd, unsigned long arg)
 	default:
 		retval = -ENOTTY;
 	break;
+	}
+
+	return retval;
+}
+
+static int adc_ioctl(unsigned int cmd, unsigned long arg)
+{
+	int retval = -EINVAL;
+	struct cpcap_adc_phase phase;
+
+	switch (cmd) {
+	case CPCAP_IOCTL_ADC_PHASE:
+		if (copy_from_user((void *) &phase, (void *) arg,
+				   sizeof(phase)))
+			return -EFAULT;
+
+		cpcap_adc_phase(misc_cpcap, &phase);
+		retval = 0;
+	break;
+
+	default:
+		retval = -ENOTTY;
+	break;
+	}
+
+	return retval;
+}
+
+static int ioctl(struct inode *inode,
+		 struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int retval = -ENOTTY;
+	unsigned int cmd_num;
+
+	cmd_num = _IOC_NR(cmd);
+
+	if ((cmd_num > CPCAP_IOCTL_NUM_TEST__START) &&
+	    (cmd_num < CPCAP_IOCTL_NUM_TEST__END)) {
+		retval = test_ioctl(cmd, arg);
+	}
+	if ((cmd_num > CPCAP_IOCTL_NUM_ADC__START) &&
+	    (cmd_num < CPCAP_IOCTL_NUM_ADC__END)) {
+		retval = adc_ioctl(cmd, arg);
 	}
 
 	return retval;
