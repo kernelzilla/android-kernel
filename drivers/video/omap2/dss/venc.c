@@ -263,26 +263,26 @@ static const struct venc_config venc_config_pal_bdghi = {
 const struct omap_video_timings omap_dss_pal_timings = {
 	.x_res = 720,
 	.y_res = 574,
-	.pixel_clock = 26181,
-	.hsw = 32,
-	.hfp = 80,
-	.hbp = 48,
-	.vsw = 7,
-	.vfp = 3,
-	.vbp = 6,
+	.pixel_clock = 13500,
+	.hsw = 64,
+	.hfp = 12,
+	.hbp = 68,
+	.vsw = 5,
+	.vfp = 5,
+	.vbp = 41,
 };
 EXPORT_SYMBOL(omap_dss_pal_timings);
 
 const struct omap_video_timings omap_dss_ntsc_timings = {
 	.x_res = 720,
 	.y_res = 482,
-	.pixel_clock = 22153,
-	.hsw = 32,
-	.hfp = 80,
-	.hbp = 48,
-	.vsw = 10,
-	.vfp = 3,
-	.vbp = 6,
+	.pixel_clock = 13500,
+	.hsw = 64,
+	.hfp = 16,
+	.hbp = 58,
+	.vsw = 6,
+	.vfp = 6,
+	.vbp = 31,
 };
 EXPORT_SYMBOL(omap_dss_ntsc_timings);
 
