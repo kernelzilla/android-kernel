@@ -14,7 +14,7 @@
 #include <linux/wifi_tiwlan.h>
 
 #define ZOOM2_WIFI_PMENA_GPIO	101
-#define ZOOM2_WIFI_IRQ		162
+#define ZOOM2_WIFI_IRQ_GPIO	162
 
 static int zoom2_wifi_cd = 0;		/* WIFI virtual 'card detect' status */
 static void (*wifi_status_cb)(int card_present, void *dev_id);
@@ -78,16 +78,16 @@ struct wifi_platform_data zoom2_wifi_control = {
 	.set_carddetect	= zoom2_wifi_set_carddetect,
 };
 
+#ifdef CONFIG_WIFI_CONTROL_FUNC
 static struct resource zoom2_wifi_resources[] = {
 	[0] = {
 		.name		= "device_wifi_irq",
-		.start		= ZOOM2_WIFI_IRQ,
-		.end		= ZOOM2_WIFI_IRQ,
+		.start		= OMAP_GPIO_IRQ(ZOOM2_WIFI_IRQ_GPIO),
+		.end		= OMAP_GPIO_IRQ(ZOOM2_WIFI_IRQ_GPIO),
 		.flags          = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
 	},
 };
 
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 static struct platform_device zoom2_wifi_device = {
         .name           = "device_wifi",
         .id             = 1,
@@ -97,11 +97,33 @@ static struct platform_device zoom2_wifi_device = {
                 .platform_data = &zoom2_wifi_control,
         },
 };
+#endif
 
 static int __init zoom2_wifi_init(void)
 {
-        return platform_device_register(&zoom2_wifi_device);
-}
-	
-device_initcall(zoom2_wifi_init);
+	int ret;
+
+	printk("%s: start\n", __func__);
+	ret = gpio_request(ZOOM2_WIFI_IRQ_GPIO, "wifi_irq");
+	if (ret < 0) {
+		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
+			ZOOM2_WIFI_IRQ_GPIO);
+		goto out;
+	}
+	ret = gpio_request(ZOOM2_WIFI_PMENA_GPIO, "wifi_pmena");
+	if (ret < 0) {
+		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
+			ZOOM2_WIFI_PMENA_GPIO);
+		gpio_free(ZOOM2_WIFI_IRQ_GPIO);
+		goto out;
+	}
+	gpio_direction_input(ZOOM2_WIFI_IRQ_GPIO);
+	gpio_direction_output(ZOOM2_WIFI_PMENA_GPIO, 0);
+#ifdef CONFIG_WIFI_CONTROL_FUNC
+	ret = platform_device_register(&zoom2_wifi_device);
 #endif
+out:
+        return ret;
+}
+
+device_initcall(zoom2_wifi_init);

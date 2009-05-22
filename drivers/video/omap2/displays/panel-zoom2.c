@@ -285,7 +285,7 @@ static int zoom2_spi_remove(struct spi_device *spi)
 	return 0;
 }
 
-static int zoom2_spi_suspend(struct spi_device *spi)
+static int zoom2_spi_suspend(struct spi_device *spi, pm_message_t mesg)
 {
 	spi_send(spi, 2, 0x01);  /* R2 = 01h */
 	mdelay(40);
