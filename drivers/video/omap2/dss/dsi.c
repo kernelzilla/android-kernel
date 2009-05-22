@@ -274,7 +274,8 @@ static struct
 	enum omap_dss_update_mode user_update_mode;
 	enum omap_dss_update_mode target_update_mode;
 	enum omap_dss_update_mode update_mode;
-	int use_te;
+	bool use_te;
+	bool use_ext_te;
 	int framedone_scheduled; /* helps to catch strange framedone bugs */
 
 	unsigned long cache_req_pck;
@@ -2760,6 +2761,9 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 
 	display->ctrl->setup_update(display, x, y, w, h);
 
+	if (dsi.use_ext_te && display->ctrl->wait_for_te)
+		display->ctrl->wait_for_te(display);
+
 	if (0)
 		dsi_vc_print_status(1);
 
@@ -3027,19 +3031,24 @@ end:
 
 static void dsi_do_cmd_set_te(struct omap_display *display, bool enable)
 {
-	dsi.use_te = enable;
+	if (!display->hw_config.u.dsi.ext_te)
+		dsi.use_te = enable;
+	else
+		dsi.use_ext_te = enable;
 
 	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
 	display->ctrl->enable_te(display, enable);
 
-	if (enable) {
-		/* disable LP_RX_TO, so that we can receive TE.
-		 * Time to wait for TE is longer than the timer allows */
-		REG_FLD_MOD(DSI_TIMING2, 0, 15, 15); /* LP_RX_TO */
-	} else {
-		REG_FLD_MOD(DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+	if (!display->hw_config.u.dsi.ext_te) {
+		if (enable) {
+			/* disable LP_RX_TO, so that we can receive TE.
+			 * Time to wait for TE is longer than the timer allows */
+			REG_FLD_MOD(DSI_TIMING2, 0, 15, 15); /* LP_RX_TO */
+		} else {
+			REG_FLD_MOD(DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+		}
 	}
 }
 
@@ -3534,7 +3543,7 @@ static int dsi_display_enable(struct omap_display *display)
 
 	display->state = OMAP_DSS_DISPLAY_ACTIVE;
 
-	if (dsi.use_te)
+	if (dsi.use_te || dsi.use_ext_te)
 		dsi_push_set_te(display, 1);
 
 	dsi_push_set_update_mode(display, dsi.user_update_mode);
@@ -3667,7 +3676,7 @@ static int dsi_display_enable_te(struct omap_display *display, bool enable)
 
 static int dsi_display_get_te(struct omap_display *display)
 {
-	return dsi.use_te;
+	return dsi.use_te | dsi.use_ext_te;
 }
 
 

@@ -203,6 +203,9 @@ struct omap_dss_display_config {
 			u8 data2_lane;
 			u8 data2_pol;
 			unsigned long ddr_clk_hz;
+
+			bool ext_te;
+			u8 ext_te_gpio;
 		} dsi;
 
 		struct {
@@ -258,6 +261,7 @@ struct omap_ctrl {
 			     u16 x, u16 y, u16 w, u16 h);
 
 	int (*enable_te)(struct omap_display *display, bool enable);
+	int (*wait_for_te)(struct omap_display *display);
 
 	u8 (*get_rotate)(struct omap_display *display);
 	int (*set_rotate)(struct omap_display *display, u8 rotate);
