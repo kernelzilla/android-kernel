@@ -273,10 +273,10 @@ enum cpcap_reg {
 	CPCAP_REG_LMISC,	/* LMR Misc Bits */
 	CPCAP_REG_LMACE,	/* LMR Mace IC Support */
 
-	CPCAP_REG_END = CPCAP_REG_LMACE /* End of CPCAP registers. */
+	CPCAP_REG_END = CPCAP_REG_LMACE, /* End of CPCAP registers. */
 
 	CPCAP_REG_MAX		/* The largest valid register value. */
-	= CPCAP_REG_END
+	= CPCAP_REG_END,
 };
 
 enum {
@@ -323,7 +323,7 @@ enum cpcap_irqs {
 	CPCAP_IRQ_UART_ECHO_OVERRUN,	/* UART Buffer Overflow */
 	CPCAP_IRQ_EXTMEMHD,		/* External MEMHOLD */
 
-	CPCAP_IRQ_WARM = CPCAP_IRQ_INT3_INDEX,	/* Warm Start */
+	CPCAP_IRQ_WARM = CPCAP_IRQ_INT3_INDEX, /* Warm Start */
 	CPCAP_IRQ_SYSRSTR,		/* System Restart */
 	CPCAP_IRQ_SOFTRST,		/* Soft Reset */
 	CPCAP_IRQ_DIEPWRDWN,		/* Die Temperature Powerdown */
@@ -340,7 +340,7 @@ enum cpcap_irqs {
 	CPCAP_IRQ_PWRGOOD,		/* BP Turn On */
 	CPCAP_IRQ_USBDPLLCLK,		/* USB DPLL Status */
 
-	CPCAP_IRQ_DPI = CPCAP_IRQ_INT4_INDEX /* DP Line */
+	CPCAP_IRQ_DPI = CPCAP_IRQ_INT4_INDEX, /* DP Line */
 	CPCAP_IRQ_DMI,			/* DM Line */
 	CPCAP_IRQ_UCBUSY,		/* Microcontroller Busy */
 	CPCAP_IRQ_GCAI_CURR1,		/* Charge Current Monitor (65mA) */
@@ -351,7 +351,7 @@ enum cpcap_irqs {
 	CPCAP_IRQ_SECHALT,		/* Secondary Microcontroller Halt */
 	CPCAP_IRQ_CC_CAL,		/* CC Calibration */
 
-	CPCAP_IRQ_UC_PRIROMR = CPCAP_IRQ_INT5_INDEX /* Prim ROM Rd Macro Int */
+	CPCAP_IRQ_UC_PRIROMR = CPCAP_IRQ_INT5_INDEX, /* Prim ROM Rd Macro Int */
 	CPCAP_IRQ_UC_PRIRAMW,		/* Primary RAM Write Macro Int */
 	CPCAP_IRQ_UC_PRIRAMR,		/* Primary RAM Read Macro Int */
 	CPCAP_IRQ_UC_USEROFF,		/* USEROFF Macro Interrupt */
