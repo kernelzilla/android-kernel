@@ -516,6 +516,9 @@ struct omap_display {
 			u16 x, u16 y, u16 w, u16 h);
 
 	void (*configure_overlay)(struct omap_overlay *overlay);
+
+	int (*set_wss)(struct omap_display *display, u32 wss);
+	u32 (*get_wss)(struct omap_display *display);
 };
 
 int omap_dss_get_num_displays(void);

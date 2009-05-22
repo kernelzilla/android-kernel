@@ -239,6 +239,39 @@ struct display_attribute {
 	ssize_t	(*store)(struct omap_display *, const char *, size_t);
 };
 
+static ssize_t display_wss_show(struct omap_display *display, char *buf)
+{
+	unsigned int wss;
+
+	if (!display->get_wss)
+		return -ENOENT;
+
+	wss = display->get_wss(display);
+
+	return snprintf(buf, PAGE_SIZE, "0x%05x\n", wss);
+}
+
+static ssize_t display_wss_store(struct omap_display *display,
+		const char *buf, size_t size)
+{
+	unsigned long wss;
+	int r;
+
+	if (!display->get_wss || !display->set_wss)
+		return -ENOENT;
+
+	if (strict_strtoul(buf, 0, &wss))
+		return -EINVAL;
+
+	if (wss > 0xfffff)
+		return -EINVAL;
+
+	if ((r = display->set_wss(display, wss)))
+		return r;
+
+	return size;
+}
+
 #define DISPLAY_ATTR(_name, _mode, _show, _store) \
 	struct display_attribute display_attr_##_name = \
 	__ATTR(_name, _mode, _show, _store)
@@ -258,6 +291,8 @@ static DISPLAY_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DISPLAY_ATTR(panel_name, S_IRUGO, display_panel_name_show, NULL);
 static DISPLAY_ATTR(ctrl_name, S_IRUGO, display_ctrl_name_show, NULL);
+static DISPLAY_ATTR(wss, S_IRUGO|S_IWUSR,
+		display_wss_show, display_wss_store);
 
 static struct attribute *display_sysfs_attrs[] = {
 	&display_attr_name.attr,
@@ -269,6 +304,7 @@ static struct attribute *display_sysfs_attrs[] = {
 	&display_attr_mirror.attr,
 	&display_attr_panel_name.attr,
 	&display_attr_ctrl_name.attr,
+	&display_attr_wss.attr,
 	NULL
 };
 

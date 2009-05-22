@@ -289,6 +289,7 @@ EXPORT_SYMBOL(omap_dss_ntsc_timings);
 static struct {
 	void __iomem *base;
 	struct mutex venc_lock;
+	u32 wss_data;
 } venc;
 
 static struct omap_panel venc_panel = {
@@ -320,7 +321,7 @@ static void venc_write_config(const struct venc_config *config)
 	venc_write_reg(VENC_BLACK_LEVEL, config->black_level);
 	venc_write_reg(VENC_BLANK_LEVEL, config->blank_level);
 	venc_write_reg(VENC_M_CONTROL, config->m_control);
-	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data);
+	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data | venc.wss_data);
 	venc_write_reg(VENC_S_CARR, config->s_carr);
 	venc_write_reg(VENC_L21__WC_CTL, config->l21__wc_ctl);
 	venc_write_reg(VENC_SAVID__EAVID, config->savid__eavid);
@@ -482,6 +483,8 @@ static int venc_enable_display(struct omap_display *display)
 		goto err;
 	}
 
+	venc.wss_data = 0;
+
 	venc_power_on(display);
 
 	display->state = OMAP_DSS_DISPLAY_ACTIVE;
@@ -589,6 +592,37 @@ static int venc_check_timings(struct omap_display *display,
 	return -EINVAL;
 }
 
+static u32 venc_get_wss(struct omap_display *display)
+{
+	/* Invert due to VENC_L21_WC_CTL:INV=1 */
+	return (venc.wss_data >> 8) ^ 0xfffff;
+}
+
+static int venc_set_wss(struct omap_display *display,
+			u32 wss)
+{
+	const struct venc_config *config;
+
+	DSSDBG("venc_set_wss\n");
+
+	mutex_lock(&venc.venc_lock);
+
+	config = venc_timings_to_config(&display->panel->timings);
+
+	/* Invert due to VENC_L21_WC_CTL:INV=1 */
+	venc.wss_data = (wss ^ 0xfffff) << 8;
+
+	venc_enable_clocks(1);
+
+	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data | venc.wss_data);
+
+	venc_enable_clocks(0);
+
+	mutex_unlock(&venc.venc_lock);
+
+	return 0;
+}
+
 void venc_init_display(struct omap_display *display)
 {
 	display->panel = &venc_panel;
@@ -599,6 +633,8 @@ void venc_init_display(struct omap_display *display)
 	display->get_timings = venc_get_timings;
 	display->set_timings = venc_set_timings;
 	display->check_timings = venc_check_timings;
+	display->get_wss = venc_get_wss;
+	display->set_wss = venc_set_wss;
 }
 
 void venc_dump_regs(struct seq_file *s)
