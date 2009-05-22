@@ -42,6 +42,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_S4C1,      0x4434},
 	{CPCAP_REG_S4C2,      0x3434},
 	{CPCAP_REG_S6C,       0x0000},
+	{CPCAP_REG_VSDIOC,    0x0023},
 	{CPCAP_REG_VRF1C,     0x002C},
 	{CPCAP_REG_VRF2C,     0x000B},
 	{CPCAP_REG_VRFREFC,   0x000B},

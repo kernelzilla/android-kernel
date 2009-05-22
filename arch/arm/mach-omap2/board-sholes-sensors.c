@@ -12,9 +12,15 @@
 #include <linux/platform_device.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/sfh7743.h>
 
 #include <mach/mux.h>
+
+#include <mach/gpio.h>
 #include <mach/keypad.h>
+#include <mach/mux.h>
+
+#define SHOLES_PROX_INT_GPIO     180
 
 int sholesp0b_keymap[] = {
 	0x0000000a, 0x01000013, 0x03000072, 0x05000073, 0x060000d9, 0x07000020, 
@@ -50,11 +56,37 @@ static struct omap_kp_platform_data omap3430_kp_data = {
 	.col_gpios	= sholesp1_col_gpios,
 };
 
+static void sholes_prox_on(void)
+{
+	printk(KERN_INFO "%s:prox on (unimplemented)\n", __func__);
+	return;
+}
+
+static void sholes_prox_off(void)
+{
+	printk(KERN_INFO "%s:prox off (unimplemented)\n", __func__);
+	return;
+}
+
+static struct sfh7743_platform_data omap3430_proximity_data = {
+	.gpio_prox_int = SHOLES_PROX_INT_GPIO,
+	.power_on = sholes_prox_on,
+	.power_off = sholes_prox_off,
+};
+
 static struct platform_device omap3430_kp_device = {
 	.name		= "omap-keypad",
 	.id		= -1,
 	.dev		= {
 		.platform_data  = &omap3430_kp_data,
+	},
+};
+
+static struct platform_device sfh7743_platform_device = {
+	.name = SFH7743_MODULE_NAME,
+	.id = -1,
+	.dev = {
+		.platform_data = &omap3430_proximity_data,
 	},
 };
 
@@ -66,9 +98,17 @@ static struct platform_device omap3430_master_sensor= {
 	},
 };
 
+static void sholes_proximity_init(void)
+{
+	gpio_request(SHOLES_PROX_INT_GPIO, "Sholes proximity sensor");
+	gpio_direction_input(SHOLES_PROX_INT_GPIO);
+	omap_cfg_reg(Y3_3430_GPIO180);
+}
+
 static struct platform_device *sholes_sensors[] __initdata = {
 	&omap3430_kp_device,
 	&omap3430_master_sensor,
+	&sfh7743_platform_device,
 };
 
 void __init sholes_sensors_init(void)
@@ -96,6 +136,8 @@ void __init sholes_sensors_init(void)
 	/* switches */
 	omap_cfg_reg(AB2_34XX_GPIO177);
 	omap_cfg_reg(AH17_34XX_GPIO100);
+
+	sholes_proximity_init();
 
 	platform_add_devices(sholes_sensors, ARRAY_SIZE(sholes_sensors));
 }
