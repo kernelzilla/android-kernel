@@ -46,6 +46,7 @@ obj-$(CONFIG_PCF50633_GPIO)	+= pcf50633-gpio.o
 cpcap-objs			:= cpcap-core.o \
 				   cpcap-irq.o \
 				   cpcap-regacc.o \
-				   cpcap-key.o
+				   cpcap-key.o \
+				   cpcap-usb-det.o
 
 obj-$(CONFIG_MFD_CPCAP)		+= cpcap.o

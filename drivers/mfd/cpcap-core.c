@@ -64,12 +64,19 @@ static struct platform_device cpcap_usb_device = {
 	.id             = -1,
 	.dev.platform_data = NULL,
 };
+
+static struct platform_device cpcap_usb_det_device = {
+	.name           = "cpcap_usb_det",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
 #endif
 
 static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_key_device,
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
+	&cpcap_usb_det_device,
 #endif
 };
 
@@ -103,6 +110,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 		return retval;
 
 	cpcap_usb_device.dev.platform_data = cpcap;
+	cpcap_usb_det_device.dev.platform_data = cpcap;
 	cpcap_key_device.dev.platform_data = cpcap;
 
 	retval = misc_register(&cpcap_dev);
@@ -137,6 +145,7 @@ static int __devexit cpcap_remove(struct spi_device *spi)
 
 	platform_device_unregister(&cpcap_key_device);
 	platform_device_unregister(&cpcap_usb_device);
+	platform_device_unregister(&cpcap_usb_det_device);
 
 	for (i = 0; i < CPCAP_NUM_REGULATORS; i++)
 		platform_device_unregister(cpcap->regulator_pdev[i]);
