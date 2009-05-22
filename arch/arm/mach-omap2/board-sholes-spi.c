@@ -57,9 +57,21 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 
 #define CPCAP_GPIO 0
 
+static struct cpcap_adc_ato sholes_cpcap_adc_ato = {
+	.ato_in = 0x0480,
+	.atox_in = 0,
+	.adc_ps_factor_in = 0x0200,
+	.atox_ps_factor_in = 0,
+	.ato_out = 0,
+	.atox_out = 0,
+	.adc_ps_factor_out = 0,
+	.atox_ps_factor_out = 0,
+};
+
 static struct cpcap_platform_data sholes_cpcap_data = {
 	.init = sholes_cpcap_spi_init,
 	.init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
+	.adc_ato = &sholes_cpcap_adc_ato,
 };
 
 static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
