@@ -173,6 +173,7 @@ static unsigned short get_opp(struct omap_opp *opp_freq_table,
  */
 void init_opp(struct shared_resource *resp)
 {
+	struct clk *l3_clk;
 	resp->no_of_users = 0;
 
 	if (!mpu_opps || !dsp_opps || !l3_opps)
@@ -191,8 +192,9 @@ void init_opp(struct shared_resource *resp)
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
 		vdd2_resp = resp;
 		dpll3_clk = clk_get(NULL, "dpll3_m2_ck");
+		l3_clk = clk_get(NULL, "l3_ick");
 		resp->curr_level = get_opp(l3_opps + MAX_VDD2_OPP,
-				dpll2_clk->rate);
+				l3_clk->rate);
 		curr_vdd2_opp = resp->curr_level;
 	}
 	return;
