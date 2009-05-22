@@ -77,6 +77,25 @@ struct cpcap_platform_data {
 	struct cpcap_adc_ato *adc_ato;
 };
 
+struct cpcap_batt_data {
+	int status;
+	int health;
+	int present;
+	int capacity;
+	int batt_volt;
+	int batt_temp;
+};
+
+struct cpcap_batt_ac_data {
+	int online;
+};
+
+struct cpcap_batt_usb_data {
+	int online;
+	int current_now;
+};
+
+
 /*
  * Enumeration of all registers in the cpcap. Note that the register
  * numbers on the CPCAP IC are not contiguous. The values of the enums below
@@ -301,6 +320,13 @@ enum {
 	CPCAP_IOCTL_NUM_ADC__START,
 	CPCAP_IOCTL_NUM_ADC_PHASE,
 	CPCAP_IOCTL_NUM_ADC__END,
+
+	CPCAP_IOCTL_NUM_BATT__START,
+	CPCAP_IOCTL_NUM_BATT_DISPLAY_UPDATE,
+	CPCAP_IOCTL_NUM_BATT_ATOD_ASYNC,
+	CPCAP_IOCTL_NUM_BATT_ATOD_SYNC,
+	CPCAP_IOCTL_NUM_BATT_ATOD_READ,
+	CPCAP_IOCTL_NUM_BATT__END,
 };
 
 
@@ -497,12 +523,25 @@ struct cpcap_regacc {
 #define CPCAP_IOCTL_ADC_PHASE \
 	_IOWR(0, CPCAP_IOCTL_NUM_ADC_PHASE, struct cpcap_adc_phase*)
 
+#define CPCAP_IOCTL_BATT_DISPLAY_UPDATE \
+	_IOW(0, CPCAP_IOCTL_NUM_BATT_DISPLAY_UPDATE, struct cpcap_batt_data*)
+
+#define CPCAP_IOCTL_BATT_ATOD_ASYNC \
+	_IOW(0, CPCAP_IOCTL_NUM_BATT_ATOD_ASYNC, struct cpcap_adc_request*)
+
+#define CPCAP_IOCTL_BATT_ATOD_SYNC \
+	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_SYNC, struct cpcap_adc_request*)
+
+#define CPCAP_IOCTL_BATT_ATOD_READ \
+	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_READ, struct cpcap_adc_request*)
+
 struct cpcap_device {
 	struct spi_device	*spi;
 	void			*keydata;
 	struct platform_device  *regulator_pdev[CPCAP_NUM_REGULATORS];
 	void			*irqdata;
 	void			*adcdata;
+	void			*battdata;
 };
 
 static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
@@ -554,5 +593,9 @@ int cpcap_adc_async_read(struct cpcap_device *cpcap,
 			 struct cpcap_adc_request *request);
 
 void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
+
+void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
+
+void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online, int curr);
 
 #endif /* _LINUX_SPI_CPCAP_H */
