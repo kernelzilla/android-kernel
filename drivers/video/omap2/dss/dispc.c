@@ -2515,6 +2515,7 @@ int dispc_get_clock_div(struct dispc_clock_info *cinfo)
 static void _omap_dispc_set_irqs(void)
 {
 	u32 mask;
+	u32 old_mask;
 	int i;
 	struct omap_dispc_isr_data *isr_data;
 
@@ -2530,6 +2531,11 @@ static void _omap_dispc_set_irqs(void)
 	}
 
 	enable_clocks(1);
+
+	old_mask = dispc_read_reg(DISPC_IRQENABLE);
+	/* clear the irqstatus for newly enabled irqs */
+	dispc_write_reg(DISPC_IRQSTATUS, (mask ^ old_mask) & mask);
+
 	dispc_write_reg(DISPC_IRQENABLE, mask);
 
 	enable_clocks(0);
