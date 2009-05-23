@@ -73,7 +73,6 @@ void au_finfo_fin(struct file *file)
 
 	finfo = au_fi(file);
 	au_dbg_verify_hf(finfo);
-	kfree(finfo->fi_vm_ops);
 	kfree(finfo->fi_hfile);
 	fi_write_unlock(file);
 	au_rwsem_destroy(&finfo->fi_rwsem);
