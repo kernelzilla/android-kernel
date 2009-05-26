@@ -27,7 +27,7 @@ static int cpcap_chgr_remove(struct platform_device *pdev);
 
 static struct platform_driver cpcap_chgr_driver = {
 	.probe		= cpcap_chgr_probe,
-	.remove		= __devexit_p(cpcap_chgr_remove),
+	.remove		= cpcap_chgr_remove,
 	.driver		= {
 		.name	= "cpcap_charger",
 		.owner	= THIS_MODULE,
