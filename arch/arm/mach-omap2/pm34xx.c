@@ -98,6 +98,15 @@ static struct prm_setup_vc prm_setup = {
 	.vdd1_onlp = 0x20,	/* 1.0v */
 	.vdd1_ret = 0x1e,	/* .975v */
 	.vdd1_off = 0x00,	/* 0.6v */
+	.i2c_slave_ra = (R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA1_SHIFT) |
+			(R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA0_SHIFT),
+	.vdd_vol_ra = (R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			(R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
+	/* vdd_vol_ra controls both cmd and vol, set the address equal */
+	.vdd_cmd_ra = (R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			(R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
+	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RAV1,
+	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | OMAP3430_SREN,
 };
 
 static inline void omap3_per_save_context(void)
@@ -1066,6 +1075,11 @@ void omap3_pm_init_vc(struct prm_setup_vc *setup_vc)
 	prm_setup.vdd1_onlp = setup_vc->vdd1_onlp;
 	prm_setup.vdd1_ret = setup_vc->vdd1_ret;
 	prm_setup.vdd1_off = setup_vc->vdd1_off;
+	prm_setup.i2c_slave_ra = setup_vc->i2c_slave_ra;
+	prm_setup.vdd_vol_ra = setup_vc->vdd_vol_ra;
+	prm_setup.vdd_cmd_ra = setup_vc->vdd_cmd_ra;
+	prm_setup.vdd_ch_conf = setup_vc->vdd_ch_conf;
+	prm_setup.vdd_i2c_cfg = setup_vc->vdd_i2c_cfg;
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
@@ -1203,13 +1217,15 @@ err2:
 
 static void __init configure_vc(void)
 {
+	prm_write_mod_reg(prm_setup.i2c_slave_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_SA_OFFSET);
+	prm_write_mod_reg(prm_setup.vdd_vol_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET);
 
-	prm_write_mod_reg((R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA1_SHIFT) |
-			  (R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA0_SHIFT),
-			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_SA_OFFSET);
-	prm_write_mod_reg((R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
-			  (R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
-			  OMAP3430_GR_MOD, OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET);
+	/* Only set if power_ic has different voltage and cmd addrs */
+	if (prm_setup.vdd_vol_ra != prm_setup.vdd_cmd_ra)
+		prm_write_mod_reg(prm_setup.vdd_cmd_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_CMD_RA_OFFSET);
 
 	prm_write_mod_reg((prm_setup.vdd0_on << OMAP3430_VC_CMD_ON_SHIFT) |
 		(prm_setup.vdd0_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
@@ -1223,12 +1239,11 @@ static void __init configure_vc(void)
 		(prm_setup.vdd1_off << OMAP3430_VC_CMD_OFF_SHIFT),
 		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
 
-	prm_write_mod_reg(OMAP3430_CMD1 | OMAP3430_RAV1, OMAP3430_GR_MOD,
-			  OMAP3_PRM_VC_CH_CONF_OFFSET);
+	prm_write_mod_reg(prm_setup.vdd_ch_conf, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CH_CONF_OFFSET);
 
-	prm_write_mod_reg(OMAP3430_MCODE_SHIFT | OMAP3430_HSEN,
-			  OMAP3430_GR_MOD,
-			  OMAP3_PRM_VC_I2C_CFG_OFFSET);
+	prm_write_mod_reg(prm_setup.vdd_i2c_cfg, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_I2C_CFG_OFFSET);
 
 	/* Write setup times */
 	prm_write_mod_reg(prm_setup.clksetup, OMAP3430_GR_MOD,
