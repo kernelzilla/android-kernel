@@ -406,6 +406,8 @@ int venc_init(void)
 
 	mutex_init(&venc.venc_lock);
 
+	venc.wss_data = 0;
+
 	venc_panel.timings = omap_dss_pal_timings;
 
 	venc.base = ioremap(VENC_BASE, SZ_1K);
@@ -482,8 +484,6 @@ static int venc_enable_display(struct omap_display *display)
 		r = -EINVAL;
 		goto err;
 	}
-
-	venc.wss_data = 0;
 
 	venc_power_on(display);
 
@@ -570,6 +570,11 @@ static void venc_set_timings(struct omap_display *display,
 			struct omap_video_timings *timings)
 {
 	DSSDBG("venc_set_timings\n");
+
+	/* Reset WSS data when the TV standard changes. */
+	if (memcmp(&display->panel->timings, timings, sizeof(*timings)))
+		venc.wss_data = 0;
+
 	display->panel->timings = *timings;
 	if (display->state == OMAP_DSS_DISPLAY_ACTIVE) {
 		/* turn the venc off and on to get new timings to use */
