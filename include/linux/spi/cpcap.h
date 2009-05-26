@@ -19,8 +19,10 @@
  */
 
 #include <linux/ioctl.h>
+#ifdef __KERNEL__
 #include <linux/workqueue.h>
 #include <linux/completion.h>
+#endif
 
 #define CPCAP_DEV_NAME "cpcap"
 #define CPCAP_NUM_REG_CPCAP (CPCAP_REG_END - CPCAP_REG_START + 1)
@@ -459,6 +461,7 @@ enum cpcap_adc_type {
 
 struct cpcap_device;
 
+#ifdef __KERNEL__
 struct cpcap_adc_request {
 	enum cpcap_adc_format format;
 	enum cpcap_adc_timing timing;
@@ -471,6 +474,16 @@ struct cpcap_adc_request {
 	/* Used in case of sync requests */
 	struct completion completion;
 };
+#endif
+
+struct cpcap_adc_us_request {
+	enum cpcap_adc_format format;
+	enum cpcap_adc_timing timing;
+	enum cpcap_adc_type type;
+	int status;
+	int result[CPCAP_ADC_BANK0_NUM];
+};
+
 
 struct cpcap_adc_phase {
 	signed char offset_batti;
@@ -527,14 +540,15 @@ struct cpcap_regacc {
 	_IOW(0, CPCAP_IOCTL_NUM_BATT_DISPLAY_UPDATE, struct cpcap_batt_data*)
 
 #define CPCAP_IOCTL_BATT_ATOD_ASYNC \
-	_IOW(0, CPCAP_IOCTL_NUM_BATT_ATOD_ASYNC, struct cpcap_adc_request*)
+	_IOW(0, CPCAP_IOCTL_NUM_BATT_ATOD_ASYNC, struct cpcap_adc_us_request*)
 
 #define CPCAP_IOCTL_BATT_ATOD_SYNC \
-	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_SYNC, struct cpcap_adc_request*)
+	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_SYNC, struct cpcap_adc_us_request*)
 
 #define CPCAP_IOCTL_BATT_ATOD_READ \
-	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_READ, struct cpcap_adc_request*)
+	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_READ, struct cpcap_adc_us_request*)
 
+#ifdef __KERNEL__
 struct cpcap_device {
 	struct spi_device	*spi;
 	void			*keydata;
@@ -597,5 +611,5 @@ void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
 void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
 
 void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online, int curr);
-
+#endif /* __KERNEL__ */
 #endif /* _LINUX_SPI_CPCAP_H */
