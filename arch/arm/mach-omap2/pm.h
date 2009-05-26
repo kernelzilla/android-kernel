@@ -40,6 +40,7 @@ struct prm_setup_vc {
 	u16 voltsetup_time2;
 	u16 voltoffset;
 	u16 voltsetup2;
+
 /* PRM_VC_CMD_VAL_0 specific bits */
 	u16 vdd0_on;
 	u16 vdd0_onlp;
@@ -50,6 +51,13 @@ struct prm_setup_vc {
 	u16 vdd1_onlp;
 	u16 vdd1_ret;
 	u16 vdd1_off;
+
+/* Values for VDD registers */
+	u32 i2c_slave_ra;
+	u32 vdd_vol_ra;
+	u32 vdd_cmd_ra;
+	u32 vdd_ch_conf;
+	u32 vdd_i2c_cfg;
 };
 
 extern void omap3_pm_off_mode_enable(int);
