@@ -595,6 +595,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
+		memset(&p.caps, 0, sizeof(p.caps));
 		p.caps.ctrl = display->caps;
 
 		if (copy_to_user((void __user *)arg, &p.caps, sizeof(p.caps)))
