@@ -201,9 +201,11 @@ static int cpcap_batt_ioctl(struct inode *inode,
 			    unsigned long arg)
 {
 	int ret = 0;
+	int i;
 	struct cpcap_batt_ps *sply = file->private_data;
 	struct cpcap_adc_request *req_async = &sply->req;
 	struct cpcap_adc_request req;
+	struct cpcap_adc_us_request req_us;
 
 	switch (cmd) {
 	case CPCAP_IOCTL_BATT_DISPLAY_UPDATE:
@@ -216,14 +218,19 @@ static int cpcap_batt_ioctl(struct inode *inode,
 	case CPCAP_IOCTL_BATT_ATOD_ASYNC:
 		mutex_lock(&sply->lock);
 		if (!sply->async_req_pending) {
-			if (copy_from_user((void *)req_async, (void *)arg,
-					   sizeof(struct cpcap_adc_request))) {
+			if (copy_from_user((void *)&req_us, (void *)arg,
+					   sizeof(struct cpcap_adc_us_request)
+					   )) {
 				mutex_unlock(&sply->lock);
 				return -EFAULT;
 			}
 
+			req_async->format = req_us.format;
+			req_async->timing = req_us.timing;
+			req_async->type = req_us.type;
 			req_async->callback = cpcap_batt_adc_hdlr;
 			req_async->callback_param = sply;
+
 			ret = cpcap_adc_async_read(sply->cpcap, req_async);
 			if (!ret)
 				sply->async_req_pending = 1;
@@ -235,22 +242,38 @@ static int cpcap_batt_ioctl(struct inode *inode,
 		break;
 
 	case CPCAP_IOCTL_BATT_ATOD_SYNC:
-		if (copy_from_user((void *)&req, (void *)arg,
-				   sizeof(struct cpcap_adc_request)))
+		if (copy_from_user((void *)&req_us, (void *)arg,
+				   sizeof(struct cpcap_adc_us_request)))
 			return -EFAULT;
+
+		req.format = req_us.format;
+		req.timing = req_us.timing;
+		req.type = req_us.type;
 
 		ret = cpcap_adc_sync_read(sply->cpcap, &req);
 
 		if (ret)
 			return ret;
-		if (copy_to_user((void *)arg, (void *)&req,
-				 sizeof(struct cpcap_adc_request)))
+
+		req_us.status = req.status;
+		for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
+			req_us.result[i] = req.result[i];
+
+		if (copy_to_user((void *)arg, (void *)&req_us,
+				 sizeof(struct cpcap_adc_us_request)))
 			return -EFAULT;
 		break;
 
 	case CPCAP_IOCTL_BATT_ATOD_READ:
-		if (copy_to_user((void *)arg, (void *)req_async,
-				 sizeof(struct cpcap_adc_request)))
+		req_us.format = req_async->format;
+		req_us.timing = req_async->timing;
+		req_us.type = req_async->type;
+		req_us.status = req_async->status;
+		for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
+			req_us.result[i] = req_async->result[i];
+
+		if (copy_to_user((void *)arg, (void *)&req_us,
+				 sizeof(struct cpcap_adc_us_request)))
 			return -EFAULT;
 		break;
 
