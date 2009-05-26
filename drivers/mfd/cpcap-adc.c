@@ -80,10 +80,10 @@ enum conv_type {
 
 struct conversion_tbl {
 	enum conv_type conv_type;
-	unsigned short align_offset;
-	unsigned short conv_offset;
-	unsigned short multiplier;
-	unsigned short divider;
+	int align_offset;
+	int conv_offset;
+	int multiplier;
+	int divider;
 };
 
 static struct conversion_tbl bank0_conversion[CPCAP_ADC_BANK0_NUM] = {
@@ -397,36 +397,46 @@ static void adc_phase(struct cpcap_adc_request *req, int index)
 {
 	struct conversion_tbl *conv_tbl = bank0_conversion;
 	struct phasing_tbl *phase_tbl = bank0_phasing;
+	int tbl_index = index;
 
 	if (req->type == CPCAP_ADC_TYPE_BANK_1) {
 		conv_tbl = bank1_conversion;
 		phase_tbl = bank1_phasing;
 	}
 
-	req->result[index] += conv_tbl[index].align_offset;
-	req->result[index] *= phase_tbl[index].multiplier;
-	req->result[index] /= phase_tbl[index].divider;
-	req->result[index] += phase_tbl[index].offset;
+	if (req->type == CPCAP_ADC_TYPE_BATT_PI)
+		tbl_index = (tbl_index % 2) ? CPCAP_ADC_BATTI_ADC :
+			    CPCAP_ADC_BATTP;
 
-	if (req->result[index] < phase_tbl[index].min)
-		req->result[index] = phase_tbl[index].min;
-	else if (req->result[index] > phase_tbl[index].max)
-		req->result[index] = phase_tbl[index].max;
+	req->result[index] += conv_tbl[tbl_index].align_offset;
+	req->result[index] *= phase_tbl[tbl_index].multiplier;
+	req->result[index] /= phase_tbl[tbl_index].divider;
+	req->result[index] += phase_tbl[tbl_index].offset;
+
+	if (req->result[index] < phase_tbl[tbl_index].min)
+		req->result[index] = phase_tbl[tbl_index].min;
+	else if (req->result[index] > phase_tbl[tbl_index].max)
+		req->result[index] = phase_tbl[tbl_index].max;
 }
 
 static void adc_convert(struct cpcap_adc_request *req, int index)
 {
 	struct conversion_tbl *conv_tbl = bank0_conversion;
+	int tbl_index = index;
 
 	if (req->type == CPCAP_ADC_TYPE_BANK_1)
 		conv_tbl = bank1_conversion;
 
-	if (conv_tbl[index].conv_type == CONV_TYPE_DIRECT) {
-		req->result[index] *= conv_tbl[index].multiplier;
-		req->result[index] /= conv_tbl[index].divider;
-		req->result[index] += conv_tbl[index].conv_offset;
-	} else if (conv_tbl[index].conv_type == CONV_TYPE_MAPPING)
-		req->result[index] = convert_to_kelvins(req->result[index]);
+	if (req->type == CPCAP_ADC_TYPE_BATT_PI)
+		tbl_index = (tbl_index % 2) ? CPCAP_ADC_BATTI_ADC :
+			    CPCAP_ADC_BATTP;
+
+	if (conv_tbl[tbl_index].conv_type == CONV_TYPE_DIRECT) {
+		req->result[index] *= conv_tbl[tbl_index].multiplier;
+		req->result[index] /= conv_tbl[tbl_index].divider;
+		req->result[index] += conv_tbl[tbl_index].conv_offset;
+	} else if (conv_tbl[tbl_index].conv_type == CONV_TYPE_MAPPING)
+		req->result[index] = convert_to_kelvins(req->result[tbl_index]);
 }
 
 static void adc_result(struct cpcap_device *cpcap,
@@ -438,6 +448,7 @@ static void adc_result(struct cpcap_device *cpcap,
 	for (i = CPCAP_REG_ADCD0; i <= CPCAP_REG_ADCD7; i++) {
 		j = i - CPCAP_REG_ADCD0;
 		cpcap_regacc_read(cpcap, i, (unsigned short *)&req->result[j]);
+		req->result[j] &= 0x3FF;
 
 		switch (req->format) {
 		case CPCAP_ADC_FORMAT_PHASED:
