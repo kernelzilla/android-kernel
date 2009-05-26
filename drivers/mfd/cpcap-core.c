@@ -65,7 +65,7 @@ static struct platform_device cpcap_key_device = {
 };
 
 static struct platform_device cpcap_batt_device = {
-	.name           = "cpcap_batt",
+	.name           = "cpcap_battery",
 	.id             = -1,
 	.dev.platform_data = NULL,
 };
