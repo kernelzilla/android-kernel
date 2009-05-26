@@ -173,6 +173,8 @@ void dss_uninit_displays(struct platform_device *pdev);
 int dss_suspend_all_displays(void);
 int dss_resume_all_displays(void);
 struct omap_display *dss_get_display(int no);
+bool dss_use_replication(struct omap_display *display,
+		enum omap_color_mode mode);
 
 /* manager */
 int dss_init_overlay_managers(struct platform_device *pdev);
@@ -280,6 +282,7 @@ void dispc_go(enum omap_channel channel);
 void dispc_enable_lcd_out(bool enable);
 void dispc_enable_digit_out(bool enable);
 int dispc_enable_plane(enum omap_plane plane, bool enable);
+void dispc_enable_replication(enum omap_plane plane, bool enable);
 
 void dispc_set_parallel_interface_mode(enum omap_parallel_interface_mode mode);
 void dispc_set_tft_data_lines(u8 data_lines);

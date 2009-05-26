@@ -908,6 +908,20 @@ static void _dispc_set_vid_color_conv(enum omap_plane plane, bool enable)
 	dispc_write_reg(dispc_reg_att[plane], val);
 }
 
+void dispc_enable_replication(enum omap_plane plane, bool enable)
+{
+	int bit;
+
+	if (plane == OMAP_DSS_GFX)
+		bit = 5;
+	else
+		bit = 10;
+
+	enable_clocks(1);
+	REG_FLD_MOD(dispc_reg_att[plane], enable, bit, bit);
+	enable_clocks(0);
+}
+
 void dispc_set_lcd_size(u16 width, u16 height)
 {
 	u32 val;
@@ -3292,6 +3306,11 @@ void dispc_setup_partial_planes(struct omap_display *display,
 				pi->rotation,
 				pi->mirror,
 				pi->global_alpha);
+
+		if (dss_use_replication(display, ovl->info.color_mode))
+			dispc_enable_replication(ovl->id, true);
+		else
+			dispc_enable_replication(ovl->id, false);
 
 		dispc_enable_plane(ovl->id, 1);
 	}

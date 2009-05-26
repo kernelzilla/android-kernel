@@ -411,6 +411,40 @@ static int default_get_recommended_bpp(struct omap_display *display)
 	}
 }
 
+/* Checks if replication logic should be used. Only use for active matrix,
+ * when overlay is in RGB12U or RGB16 mode, and LCD interface is
+ * 18bpp or 24bpp */
+bool dss_use_replication(struct omap_display *display,
+		enum omap_color_mode mode)
+{
+	int bpp;
+
+	if (mode != OMAP_DSS_COLOR_RGB12U && mode != OMAP_DSS_COLOR_RGB16)
+		return false;
+
+	if (display->type == OMAP_DISPLAY_TYPE_DPI &&
+			(display->panel->config & OMAP_DSS_LCD_TFT) == 0)
+		return false;
+
+	switch (display->type) {
+	case OMAP_DISPLAY_TYPE_DPI:
+		bpp = display->hw_config.u.dpi.data_lines;
+		break;
+	case OMAP_DISPLAY_TYPE_VENC:
+	case OMAP_DISPLAY_TYPE_SDI:
+		bpp = 24;
+		break;
+	case OMAP_DISPLAY_TYPE_DBI:
+	case OMAP_DISPLAY_TYPE_DSI:
+		bpp = display->ctrl->pixel_size;
+		break;
+	default:
+		BUG();
+	}
+
+	return bpp > 16;
+}
+
 void dss_init_displays(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;

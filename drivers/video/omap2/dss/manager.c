@@ -474,6 +474,11 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 			continue;
 		}
 
+		if (dss_use_replication(display, ovl->info.color_mode))
+			dispc_enable_replication(ovl->id, true);
+		else
+			dispc_enable_replication(ovl->id, false);
+
 		dispc_enable_plane(ovl->id, 1);
 	}
 
