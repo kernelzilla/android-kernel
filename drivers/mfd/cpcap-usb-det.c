@@ -74,32 +74,14 @@ struct cpcap_usb_det_data {
 	unsigned short prev_sense;
 	enum cpcap_det_state state;
 	enum cpcap_accy usb_accy;
+	struct platform_device *usb_dev;
 };
 
-static struct platform_device cpcap_usb_device = {
-	.name              = "cpcap_usb_dev",
-	.id                = -1,
-	.dev.platform_data = NULL,
+static const char *accy_devices[] = {
+	"cpcap_usb_dev",
+	"cpcap_factory",
+	"cpcap_charger",
 };
-
-static struct platform_device cpcap_factory_device = {
-	.name              = "cpcap_factory",
-	.id                = -1,
-	.dev.platform_data = NULL,
-};
-
-static struct platform_device cpcap_charger_device = {
-	.name              = "cpcap_charger",
-	.id                = -1,
-	.dev.platform_data = NULL,
-};
-
-static struct platform_device *accy_devices[] = {
-	&cpcap_usb_device,
-	&cpcap_factory_device,
-	&cpcap_charger_device,
-};
-
 
 static int get_sense(struct cpcap_usb_det_data *data)
 {
@@ -211,15 +193,16 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
-	if (data->usb_accy != CPCAP_ACCY_NONE)
-		platform_device_unregister(accy_devices[data->usb_accy]);
+	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
+		platform_device_del(data->usb_dev);
 
 	configure_hardware(data, accy);
 	data->usb_accy = accy;
 
 	if (accy != CPCAP_ACCY_NONE) {
-		accy_devices[accy]->dev.platform_data = data->cpcap;
-		platform_device_register(accy_devices[accy]);
+		data->usb_dev = platform_device_alloc(accy_devices[accy], -1);
+		data->usb_dev->dev.platform_data = data->cpcap;
+		platform_device_add(data->usb_dev);
 	}
 }
 
@@ -392,8 +375,8 @@ static int __exit cpcap_usb_det_remove(struct platform_device *pdev)
 	configure_hardware(data, CPCAP_ACCY_NONE);
 	cancel_delayed_work_sync(&data->work);
 
-	if (data->usb_accy != CPCAP_ACCY_NONE)
-		platform_device_unregister(accy_devices[data->usb_accy]);
+	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
+		platform_device_del(data->usb_dev);
 
 	kfree(data);
 	return 0;
