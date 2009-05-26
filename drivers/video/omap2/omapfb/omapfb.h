@@ -111,6 +111,8 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg);
 
 int omapfb_mode_to_timings(const char *mode_str,
 		struct omap_video_timings *timings, u8 *bpp);
+int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
+			struct fb_var_screeninfo *var);
 
 /* find the display connected to this fb, if any */
 static inline struct omap_display *fb2display(struct fb_info *fbi)

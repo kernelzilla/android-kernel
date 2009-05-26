@@ -434,6 +434,52 @@ static int omapfb_memory_read(struct fb_info *fbi,
 	return r;
 }
 
+int omapfb_get_ovl_colormode(struct omapfb2_device *fbdev,
+			     struct omapfb_ovl_colormode *mode)
+{
+	int ovl_idx = mode->overlay_idx;
+	int mode_idx = mode->mode_idx;
+	struct omap_overlay *ovl;
+	enum omap_color_mode supported_modes;
+	struct fb_var_screeninfo var;
+	int i;
+
+	if (ovl_idx >= fbdev->num_overlays)
+		return -ENODEV;
+	ovl = fbdev->overlays[ovl_idx];
+	supported_modes = ovl->supported_modes;
+
+	mode_idx = mode->mode_idx;
+
+	for (i = 0; i < sizeof(supported_modes) * 8; i++) {
+		if (!(supported_modes & (1 << i)))
+			continue;
+		/*
+		 * It's possible that the FB doesn't support a mode
+		 * that is supported by the overlay, so call the
+		 * following here.
+		 */
+		if (dss_mode_to_fb_mode(1 << i, &var) < 0)
+			continue;
+
+		mode_idx--;
+		if (mode_idx < 0)
+			break;
+	}
+
+	if (i == sizeof(supported_modes) * 8)
+		return -ENOENT;
+
+	mode->bits_per_pixel = var.bits_per_pixel;
+	mode->nonstd = var.nonstd;
+	mode->red = var.red;
+	mode->green = var.green;
+	mode->blue = var.blue;
+	mode->transp = var.transp;
+
+	return 0;
+}
+
 int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
@@ -447,6 +493,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		struct omapfb_caps		caps;
 		struct omapfb_mem_info          mem_info;
 		struct omapfb_color_key		color_key;
+		struct omapfb_ovl_colormode	ovl_colormode;
 		enum omapfb_update_mode		update_mode;
 		int test_num;
 		struct omapfb_memory_read	memory_read;
@@ -551,6 +598,21 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		p.caps.ctrl = display->caps;
 
 		if (copy_to_user((void __user *)arg, &p.caps, sizeof(p.caps)))
+			r = -EFAULT;
+		break;
+
+	case OMAPFB_GET_OVERLAY_COLORMODE:
+		DBG("ioctl GET_OVERLAY_COLORMODE\n");
+		if (copy_from_user(&p.ovl_colormode, (void __user *)arg,
+				   sizeof(p.ovl_colormode))) {
+			r = -EFAULT;
+			break;
+		}
+		r = omapfb_get_ovl_colormode(fbdev, &p.ovl_colormode);
+		if (r < 0)
+			break;
+		if (copy_to_user((void __user *)arg, &p.ovl_colormode,
+				 sizeof(p.ovl_colormode)))
 			r = -EFAULT;
 		break;
 

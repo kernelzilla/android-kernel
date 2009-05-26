@@ -364,8 +364,8 @@ static enum omap_color_mode fb_mode_to_dss_mode(struct fb_var_screeninfo *var)
 	return -EINVAL;
 }
 
-static int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
-			       struct fb_var_screeninfo *var)
+int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
+			struct fb_var_screeninfo *var)
 {
 	int i;
 
