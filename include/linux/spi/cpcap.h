@@ -638,6 +638,8 @@ int cpcap_irq_mask(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
 
 int cpcap_irq_unmask(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
 
+int cpcap_irq_mask_get(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
+
 int cpcap_irq_sense(struct cpcap_device *cpcap, enum cpcap_irqs int_event,
 		    unsigned char clear);
 
