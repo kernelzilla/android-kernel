@@ -480,8 +480,8 @@ static void cpcap_adc_irq(enum cpcap_irqs irq, void *data)
 	head = adc->queue_head;
 
 	req = adc->queue[head];
-	if (WARN_ON(!req)) {
-		dev_err(&(cpcap->spi->dev),
+	if (!req) {
+		dev_info(&(cpcap->spi->dev),
 			"cpcap_adc_irq: ADC queue empty!\n");
 		mutex_unlock(&adc->queue_mutex);
 		return;
@@ -517,8 +517,8 @@ static void cpcap_adc_cancel(struct work_struct *work)
 	head = adc->queue_head;
 
 	req = adc->queue[head];
-	if (WARN_ON(!req)) {
-		dev_err(&(adc->cpcap->spi->dev),
+	if (!req) {
+		dev_info(&(adc->cpcap->spi->dev),
 			"cpcap_adc_cancel: ADC queue empty!\n");
 		mutex_unlock(&adc->queue_mutex);
 		return;
