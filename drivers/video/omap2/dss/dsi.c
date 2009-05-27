@@ -365,6 +365,7 @@ static void perf_mark_start(void)
 
 static void perf_mark_start_auto(void)
 {
+	dsi.perf_measure_frames = 0;
 	dsi.perf_start_time_auto = ktime_get();
 }
 
@@ -440,7 +441,6 @@ static void perf_show(const char *name)
 				s_max_trans_us,
 				s_total_trans_us / numframes);
 
-		dsi.perf_measure_frames = 0;
 		s_total_setup_us = 0;
 		s_min_setup_us = 0xffffffff;
 		s_max_setup_us = 0;
