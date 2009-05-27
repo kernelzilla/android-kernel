@@ -171,6 +171,8 @@ int omap_rfbi_setup_te(enum omap_rfbi_te_mode mode,
 /* DSI */
 int dsi_vc_write(int channel, u8 data_type, u8 *data, int len);
 int dsi_vc_write_nosync(int channel, u8 data_type, u8 *data, int len);
+void dsi_bus_lock(void);
+void dsi_bus_unlock(void);
 int dsi_vc_dcs_write(int channel, u8 *data, int len);
 int dsi_vc_dcs_write_nosync(int channel, u8 *data, int len);
 int dsi_vc_dcs_read(int channel, u8 dcs_cmd, u8 *buf, int buflen);
