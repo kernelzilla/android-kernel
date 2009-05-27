@@ -288,6 +288,10 @@ enum {
 	CPCAP_IOCTL_NUM_BATT_ATOD_SYNC,
 	CPCAP_IOCTL_NUM_BATT_ATOD_READ,
 	CPCAP_IOCTL_NUM_BATT__END,
+
+	CPCAP_IOCTL_NUM_UC__START,
+	CPCAP_IOCTL_NUM_UC_MACRO_START,
+	CPCAP_IOCTL_NUM_UC__END,
 };
 
 enum cpcap_irqs {
@@ -415,6 +419,39 @@ enum cpcap_adc_type {
 	CPCAP_ADC_TYPE_BANK_0,
 	CPCAP_ADC_TYPE_BANK_1,
 	CPCAP_ADC_TYPE_BATT_PI,
+};
+
+enum cpcap_macro {
+	CPCAP_MACRO_ROMR,
+	CPCAP_MACRO_RAMW,
+	CPCAP_MACRO_RAMR,
+	CPCAP_MACRO_USEROFF,
+	CPCAP_MACRO_4,
+	CPCAP_MACRO_5,
+	CPCAP_MACRO_6,
+	CPCAP_MACRO_7,
+	CPCAP_MACRO_8,
+	CPCAP_MACRO_9,
+	CPCAP_MACRO_10,
+	CPCAP_MACRO_11,
+	CPCAP_MACRO_12,
+	CPCAP_MACRO_13,
+	CPCAP_MACRO_14,
+	CPCAP_MACRO_15,
+
+	CPCAP_MACRO__END,
+};
+
+enum cpcap_vendor {
+	CPCAP_VENDOR_ST,
+	CPCAP_VENDOR_TI,
+};
+
+enum cpcap_revision {
+	CPCAP_REVISION_1_0 = 0x08,
+	CPCAP_REVISION_1_1 = 0x09,
+	CPCAP_REVISION_2_0 = 0x10,
+	CPCAP_REVISION_2_1 = 0x11,
 };
 
 struct cpcap_spi_init_data {
@@ -545,14 +582,21 @@ struct cpcap_regacc {
 #define CPCAP_IOCTL_BATT_ATOD_READ \
 	_IOWR(0, CPCAP_IOCTL_NUM_BATT_ATOD_READ, struct cpcap_adc_us_request*)
 
+
+#define CPCAP_IOCTL_UC_MACRO_START \
+	_IOWR(0, CPCAP_IOCTL_NUM_UC_MACRO_START, enum cpcap_macro)
+
 #ifdef __KERNEL__
 struct cpcap_device {
 	struct spi_device	*spi;
+	enum cpcap_vendor       vendor;
+	enum cpcap_revision     revision;
 	void			*keydata;
 	struct platform_device  *regulator_pdev[CPCAP_NUM_REGULATORS];
 	void			*irqdata;
 	void			*adcdata;
 	void			*battdata;
+	void			*ucdata;
 };
 
 static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
@@ -609,5 +653,12 @@ void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
 
 void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online,
 			     unsigned int curr);
+
+int cpcap_uc_start(struct cpcap_device *cpcap, enum cpcap_macro macro);
+
+int cpcap_uc_stop(struct cpcap_device *cpcap, enum cpcap_macro macro);
+
+unsigned char cpcap_uc_status(struct cpcap_device *cpcap,
+			      enum cpcap_macro macro);
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SPI_CPCAP_H */

@@ -48,6 +48,7 @@ cpcap-objs			:= cpcap-core.o \
 				   cpcap-regacc.o \
 				   cpcap-key.o \
 				   cpcap-usb-det.o \
-				   cpcap-adc.o
+				   cpcap-adc.o \
+				   cpcap-uc.o
 
 obj-$(CONFIG_MFD_CPCAP)		+= cpcap.o
