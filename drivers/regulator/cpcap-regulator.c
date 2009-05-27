@@ -291,7 +291,7 @@ static int __init cpcap_regulator_init(void)
 {
 	return platform_driver_register(&cpcap_regulator_driver);
 }
-module_init(cpcap_regulator_init);
+subsys_initcall(cpcap_regulator_init);
 
 static void __exit cpcap_regulator_exit(void)
 {
