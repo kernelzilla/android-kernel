@@ -269,6 +269,7 @@ static struct
 
 	struct work_struct framedone_work;
 	struct work_struct process_work;
+	struct delayed_work framedone_timeout_work;
 	struct workqueue_struct *workqueue;
 
 	enum omap_dss_update_mode user_update_mode;
@@ -2782,10 +2783,32 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 
 	dispc_disable_sidle();
 
+	queue_delayed_work(dsi.workqueue, &dsi.framedone_timeout_work,
+			msecs_to_jiffies(1000));
+
 	dispc_enable_lcd_out(1);
 
 	if (dsi.use_te)
 		dsi_vc_send_bta(1);
+}
+
+static void framedone_timeout_callback(struct work_struct *work)
+{
+	DSSERR("framedone timeout\n");
+
+	dispc_enable_lcd_out(0);
+
+	/* XXX TODO: cancel the transfer properly */
+
+	/* XXX check that fifo is not full. otherwise we would sleep and never
+	 * get to process_cmd_fifo below */
+	/* We check for target_update_mode, not update_mode. No reason to push
+	 * new updates if we're turning auto update off */
+	if (dsi.target_update_mode == OMAP_DSS_UPDATE_AUTO)
+		dsi_push_autoupdate(dsi.vc[1].display);
+
+	atomic_set(&dsi.cmd_pending, 0);
+	dsi_process_cmd_fifo(NULL);
 }
 
 static void framedone_callback(void *data, u32 mask)
@@ -2794,6 +2817,8 @@ static void framedone_callback(void *data, u32 mask)
 		DSSERR("Framedone already scheduled. Bogus FRAMEDONE IRQ?\n");
 		return;
 	}
+
+	cancel_delayed_work(&dsi.framedone_timeout_work);
 
 	dispc_enable_sidle();
 
@@ -3860,6 +3885,8 @@ int dsi_init(void)
 	dsi.workqueue = create_singlethread_workqueue("dsi");
 	INIT_WORK(&dsi.framedone_work, framedone_worker);
 	INIT_WORK(&dsi.process_work, dsi_process_cmd_fifo);
+	INIT_DELAYED_WORK(&dsi.framedone_timeout_work,
+			framedone_timeout_callback);
 
 	mutex_init(&dsi.lock);
 
