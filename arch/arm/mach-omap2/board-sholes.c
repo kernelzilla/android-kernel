@@ -338,13 +338,23 @@ static void __init sholes_sdrc_init(void)
 	omap_cfg_reg(H17_34XX_SDRC_CKE1);
 }
 
+static void __init sholes_serial_init(void)
+{
+	omap_cfg_reg(AA8_3430_UART1_TX);
+	omap_cfg_reg(Y8_3430_UART1_RX);
+	omap_cfg_reg(AA9_3430_UART1_RTS);
+	omap_cfg_reg(W8_3430_UART1_CTS);
+	omap_serial_init();
+}
+
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
 	omap_board_config_size = ARRAY_SIZE(sholes_config);
 	sholes_spi_init();
 	sholes_flash_init();
-	omap_serial_init();
+	sholes_serial_init();
 	sholes_panel_init();
 	sholes_sensors_init();
 	sholes_touch_init();
