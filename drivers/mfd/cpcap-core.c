@@ -19,6 +19,7 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
@@ -106,6 +107,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 {
 	int retval = -EINVAL;
 	struct cpcap_device *cpcap;
+	struct cpcap_platform_data *data;
 	int i;
 
 	cpcap = kzalloc(sizeof(*cpcap), GFP_KERNEL);
@@ -113,6 +115,8 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	cpcap->spi = spi;
+	data = spi->controller_data;
+
 	misc_cpcap = cpcap;  /* kept for misc device */
 	spi_set_drvdata(spi, cpcap);
 
@@ -145,6 +149,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 		}
 
 		pdev->dev.parent = &(spi->dev);
+		pdev->dev.platform_data = &data->regulator_init[i];
 		pdev->dev.driver_data = cpcap;
 		cpcap->regulator_pdev[i] = pdev;
 
