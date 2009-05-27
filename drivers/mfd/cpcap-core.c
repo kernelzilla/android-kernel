@@ -103,6 +103,10 @@ static __init int cpcap_init(void)
 	return spi_register_driver(&cpcap_driver);
 }
 
+static struct regulator_consumer_supply cpcap_vusb_consumers = {
+	.supply = "vusb",
+};
+
 static int __devinit cpcap_probe(struct spi_device *spi)
 {
 	int retval = -EINVAL;
@@ -137,7 +141,10 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	if (retval < 0)
 		return retval;
 
-	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
+	cpcap_vusb_consumers.dev = &cpcap_usb_det_device.dev;
+	data->regulator_init[CPCAP_VUSB].num_consumer_supplies = 1;
+	data->regulator_init[CPCAP_VUSB].consumer_supplies =
+		&cpcap_vusb_consumers;
 
 	for (i = 0; i < CPCAP_NUM_REGULATORS; i++) {
 		struct platform_device *pdev;
@@ -155,6 +162,8 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 		platform_device_add(pdev);
 	}
+
+	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
 
 	return retval;
 }

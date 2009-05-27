@@ -17,9 +17,12 @@
  */
 
 #include <linux/errno.h>
+#include <linux/err.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
+
+#include <linux/regulator/consumer.h>
 
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
@@ -75,6 +78,7 @@ struct cpcap_usb_det_data {
 	enum cpcap_det_state state;
 	enum cpcap_accy usb_accy;
 	struct platform_device *usb_dev;
+	struct regulator *regulator;
 };
 
 static const char *accy_devices[] = {
@@ -150,7 +154,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2,
 					     CPCAP_BIT_USBXCVREN,
 					     CPCAP_BIT_USBXCVREN);
-		/* TODO: Call into the regulator framework. */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
 					     CPCAP_BIT_VUSB,
 					     CPCAP_BIT_VUSB);
@@ -166,7 +169,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_VBUSPD);
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 0,
 					     CPCAP_BIT_USBXCVREN);
-		/* TODO: Call into the regulator framework. */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
 					     CPCAP_BIT_VUSB,
 					     CPCAP_BIT_VUSB);
@@ -178,7 +180,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_VBUSPD);
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 0,
 					     CPCAP_BIT_USBXCVREN);
-		/* TODO: Call into the regulator framework. */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
 					     0,
 					     CPCAP_BIT_VUSB);
@@ -193,8 +194,9 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
-	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
+	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL)) {
 		platform_device_del(data->usb_dev);
+	}
 
 	configure_hardware(data, accy);
 	data->usb_accy = accy;
@@ -203,6 +205,8 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		data->usb_dev = platform_device_alloc(accy_devices[accy], -1);
 		data->usb_dev->dev.platform_data = data->cpcap;
 		platform_device_add(data->usb_dev);
+	} else {
+		regulator_disable(data->regulator);
 	}
 }
 
@@ -213,6 +217,7 @@ static void detection_work(struct work_struct *work)
 
 	switch (data->state) {
 	case CONFIG:
+		regulator_enable(data->regulator);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_DET);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SE1);
@@ -303,6 +308,7 @@ static void detection_work(struct work_struct *work)
 
 	default:
 		/* This shouldn't happen.  Need to reset state machine. */
+		regulator_disable(data->regulator);
 		data->state = CONFIG;
 		schedule_delayed_work(&data->work, 0);
 		break;
@@ -355,6 +361,12 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	data->regulator = regulator_get(&pdev->dev, "vusb");
+	if (IS_ERR(data->regulator)) {
+		dev_err(&pdev->dev, "Could not get regulator for cpcap_usb\n");
+		return PTR_ERR(data->regulator);
+	}
+
 	dev_info(&pdev->dev, "CPCAP USB detection device probed\n");
 
 	/* Perform initial detection */
@@ -377,6 +389,7 @@ static int __exit cpcap_usb_det_remove(struct platform_device *pdev)
 
 	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
 		platform_device_del(data->usb_dev);
+	regulator_put(data->regulator);
 
 	kfree(data);
 	return 0;
