@@ -64,8 +64,44 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 
 #define CPCAP_GPIO 0
 
-static struct regulator_consumer_supply cpcap_vusb_supply = {
-	.supply			= "vusb",
+#define REGULATOR_CONSUMER(name, device) { .supply = name, .dev = device, }
+
+struct regulator_consumer_supply cpcap_sw5_consumers[] = {
+	REGULATOR_CONSUMER("sw5", NULL),
+};
+
+struct regulator_consumer_supply cpcap_vcam_consumers[] = {
+	REGULATOR_CONSUMER("vcam", NULL /* cpcap_cam_device */),
+};
+
+struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
+	REGULATOR_CONSUMER("vhvio", NULL /* lighting_driver */),
+#if 0
+	REGULATOR_CONSUMER("vhvio", NULL /* lighting_driver */),
+	REGULATOR_CONSUMER("vhvio", NULL /* magnetometer */),
+	REGULATOR_CONSUMER("vhvio", NULL /* light sensor */),
+	REGULATOR_CONSUMER("vhvio", NULL /* accelerometer */),
+	REGULATOR_CONSUMER("vhvio", NULL /* display */),
+#endif
+};
+
+struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
+	REGULATOR_CONSUMER("vsdio", NULL /* prox sensor */),
+};
+
+struct regulator_consumer_supply cpcap_vwlan2_consumers[] = {
+	REGULATOR_CONSUMER("vwlan2", NULL /* sd slot */),
+#if 0
+	REGULATOR_CONSUMER("vwlan2", NULL /* mmc in omap */),
+#endif
+};
+
+struct regulator_consumer_supply cpcap_vvib_consumers[] = {
+	REGULATOR_CONSUMER("vvib", NULL /* vibrator */),
+};
+
+struct regulator_consumer_supply cpcap_vaudio_consumers[] = {
+	REGULATOR_CONSUMER("vaudio", NULL /* mic opamp */),
 };
 
 static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
@@ -75,8 +111,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.max_uV			= 5050000,
 			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		},
-		.num_consumer_supplies	= 1,
-		.consumer_supplies	= &cpcap_vusb_supply,
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_sw5_consumers),
+		.consumer_supplies	= cpcap_sw5_consumers,
 	},
 	[CPCAP_VCAM] = {
 		.constraints = {
@@ -85,6 +121,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
 						   REGULATOR_CHANGE_STATUS),
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vcam_consumers),
+		.consumer_supplies	= cpcap_vcam_consumers,
 	},
 	[CPCAP_VCSI] = {
 		.constraints = {
@@ -127,6 +165,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 						   REGULATOR_CHANGE_STATUS),
 			.boot_on		= 1,
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vhvio_consumers),
+		.consumer_supplies	= cpcap_vhvio_consumers,
 	},
 	[CPCAP_VSDIO] = {
 		.constraints = {
@@ -135,6 +175,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
 						   REGULATOR_CHANGE_STATUS),
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vsdio_consumers),
+		.consumer_supplies	= cpcap_vsdio_consumers,
 	},
 	[CPCAP_VPLL] = {
 		.constraints = {
@@ -186,6 +228,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
 						   REGULATOR_CHANGE_STATUS),
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vwlan2_consumers),
+		.consumer_supplies	= cpcap_vwlan2_consumers,
 	},
 	[CPCAP_VSIM] = {
 		.constraints = {
@@ -210,6 +254,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
 						   REGULATOR_CHANGE_STATUS),
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vvib_consumers),
+		.consumer_supplies	= cpcap_vvib_consumers,
 	},
 	[CPCAP_VUSB] = {
 		.constraints = {
@@ -226,6 +272,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
 						   REGULATOR_CHANGE_STATUS),
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vaudio_consumers),
+		.consumer_supplies	= cpcap_vaudio_consumers,
 	},
 };
 
