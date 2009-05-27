@@ -1,15 +1,21 @@
 /*
  * arch/arm/mach-omap2/board-sholes-spi.c
  *
- * Copyright (C) 2007-2009 Motorola, Inc.
+ * Copyright (C) 2009 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+#include <linux/kernel.h>
+#include <linux/device.h>
+#include <linux/irq.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
-#include <linux/irq.h>
 #include <mach/mcspi.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
@@ -58,6 +64,171 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 
 #define CPCAP_GPIO 0
 
+static struct regulator_consumer_supply cpcap_vusb_supply = {
+	.supply			= "vusb",
+};
+
+static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
+	[CPCAP_SW5] = {
+		.constraints = {
+			.min_uV			= 5050000,
+			.max_uV			= 5050000,
+			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		},
+		.num_consumer_supplies	= 1,
+		.consumer_supplies	= &cpcap_vusb_supply,
+	},
+	[CPCAP_VCAM] = {
+		.constraints = {
+			.min_uV			= 2600000,
+			.max_uV			= 2900000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VCSI] = {
+		.constraints = {
+			.min_uV			= 1200000,
+			.max_uV			= 1800000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+			.boot_on		= 1,
+		},
+	},
+	[CPCAP_VDAC] = {
+		.constraints = {
+			.min_uV			= 1200000,
+			.max_uV			= 2500000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VDIG] = {
+		.constraints = {
+			.min_uV			= 1200000,
+			.max_uV			= 1875000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VFUSE] = {
+		.constraints = {
+			.min_uV			= 1500000,
+			.max_uV			= 3150000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VHVIO] = {
+		.constraints = {
+			.min_uV			= 2775000,
+			.max_uV			= 2775000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+			.boot_on		= 1,
+		},
+	},
+	[CPCAP_VSDIO] = {
+		.constraints = {
+			.min_uV			= 1500000,
+			.max_uV			= 3000000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VPLL] = {
+		.constraints = {
+			.min_uV			= 1200000,
+			.max_uV			= 1800000,
+			.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
+			.always_on		= 1,
+		},
+	},
+	[CPCAP_VRF1] = {
+		.constraints = {
+			.min_uV			= 2500000,
+			.max_uV			= 2775000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+			.boot_on		= 1,
+		},
+	},
+	[CPCAP_VRF2] = {
+		.constraints = {
+			.min_uV			= 2775000,
+			.max_uV			= 2775000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+			.boot_on		= 1,
+		},
+	},
+	[CPCAP_VRFREF] = {
+		.constraints = {
+			.min_uV			= 2500000,
+			.max_uV			= 2775000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+			.boot_on		= 1,
+		},
+	},
+	[CPCAP_VWLAN1] = {
+		.constraints = {
+			.min_uV			= 1800000,
+			.max_uV			= 1900000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VWLAN2] = {
+		.constraints = {
+			.min_uV			= 2775000,
+			.max_uV			= 3300000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VSIM] = {
+		.constraints = {
+			.min_uV			= 1800000,
+			.max_uV			= 2900000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VSIMCARD] = {
+		.constraints = {
+			.min_uV			= 1800000,
+			.max_uV			= 2900000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VVIB] = {
+		.constraints = {
+			.min_uV			= 1300000,
+			.max_uV			= 3000000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VUSB] = {
+		.constraints = {
+			.min_uV			= 3300000,
+			.max_uV			= 3300000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+	[CPCAP_VAUDIO] = {
+		.constraints = {
+			.min_uV			= 2775000,
+			.max_uV			= 2775000,
+			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
+						   REGULATOR_CHANGE_STATUS),
+		},
+	},
+};
+
 static struct cpcap_adc_ato sholes_cpcap_adc_ato = {
 	.ato_in = 0x0480,
 	.atox_in = 0,
@@ -72,6 +243,7 @@ static struct cpcap_adc_ato sholes_cpcap_adc_ato = {
 static struct cpcap_platform_data sholes_cpcap_data = {
 	.init = sholes_cpcap_spi_init,
 	.init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
+	.regulator_init = cpcap_regulator,
 	.adc_ato = &sholes_cpcap_adc_ato,
 };
 
