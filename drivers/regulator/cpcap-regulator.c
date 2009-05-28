@@ -24,7 +24,9 @@
 #include <linux/platform_device.h>
 
 #include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
 
+#include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
 
 #define CPCAP_REGULATOR(_name, _id) 		\
@@ -259,13 +261,23 @@ static int __devinit cpcap_regulator_probe(struct platform_device *pdev)
 {
 	struct regulator_dev *rdev;
 	struct cpcap_device *cpcap;
+	struct regulator_init_data *data;
 
 	/* Already set by core driver */
 	cpcap = platform_get_drvdata(pdev);
+	data = cpcap->spi->controller_data;
 
 	rdev = regulator_register(&regulators[pdev->id], &pdev->dev, cpcap);
 	if (IS_ERR(rdev))
 		return PTR_ERR(rdev);
+	/* this is ok since the cpcap is still reachable from the rdev */
+	platform_set_drvdata(pdev, rdev);
+
+	if (pdev->id == CPCAP_SW5) {
+		data = cpcap->regulator_pdev[CPCAP_VUSB]->dev.platform_data;
+		data->supply_regulator_dev = rdev_get_dev(rdev);
+		platform_device_add(cpcap->regulator_pdev[CPCAP_VUSB]);
+	}
 
 	return 0;
 }
