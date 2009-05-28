@@ -186,7 +186,7 @@ And then,
 4. Usage
 ----------------------------------------
 At first, make sure aufs2-util are installed, and please read the aufs
-manual, ./Documentation/filesystems/aufs/aufs.5.
+manual, aufs.5 in aufs2-util.git tree.
 $ man -l aufs.5
 
 And then,
