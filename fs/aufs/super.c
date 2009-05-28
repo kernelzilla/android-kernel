@@ -223,6 +223,7 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 
 	AuBool(TRUNC_XINO, trunc_xino);
 	AuStr(UDBA, udba);
+	AuBool(SHWH, shwh);
 	AuBool(PLINK, plink);
 	/* AuBool(DIRPERM1, dirperm1); */
 	/* AuBool(REFROF, refrof); */

@@ -217,10 +217,20 @@ static int test_known(struct au_nhash *delist, char *name, int nlen)
 	return 0;
 }
 
+static void au_shwh_init_wh(struct au_vdir_wh *wh, ino_t ino,
+			    unsigned char d_type)
+{
+#ifdef CONFIG_AUFS_SHWH
+	wh->wh_ino = ino;
+	wh->wh_type = d_type;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 
-int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
-		       aufs_bindex_t bindex)
+int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen, ino_t ino,
+		       unsigned int d_type, aufs_bindex_t bindex,
+		       unsigned char shwh)
 {
 	int err;
 	struct au_vdir_destr *str;
@@ -234,6 +244,8 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
 
 	err = 0;
 	wh->wh_bindex = bindex;
+	if (shwh)
+		au_shwh_init_wh(wh, ino, d_type);
 	str = &wh->wh_str;
 	str->len = nlen;
 	memcpy(str->name, name, nlen);
@@ -423,11 +435,27 @@ static int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 	return err;
 }
 
+static int au_wh_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
+		     unsigned int d_type, ino_t *ino)
+{
+#ifdef CONFIG_AUFS_SHWH
+	return au_ino(sb, bindex, h_ino, d_type, ino);
+#else
+	return 0;
+#endif
+}
+
 #define AuFillVdir_CALLED	1
 #define AuFillVdir_WHABLE	(1 << 1)
+#define AuFillVdir_SHWH		(1 << 2)
 #define au_ftest_fillvdir(flags, name)	((flags) & AuFillVdir_##name)
 #define au_fset_fillvdir(flags, name)	{ (flags) |= AuFillVdir_##name; }
 #define au_fclr_fillvdir(flags, name)	{ (flags) &= ~AuFillVdir_##name; }
+
+#ifndef CONFIG_AUFS_SHWH
+#undef AuFillVdir_SHWH
+#define AuFillVdir_SHWH		0
+#endif
 
 struct fillvdir_arg {
 	struct file		*file;
@@ -447,8 +475,10 @@ static int fillvdir(void *__arg, const char *__name, int nlen,
 	char *name = (void *)__name;
 	struct super_block *sb;
 	ino_t ino;
+	const unsigned char shwh = !!au_ftest_fillvdir(arg->flags, SHWH);
 
 	arg->err = 0;
+	sb = arg->file->f_dentry->d_sb;
 	au_fset_fillvdir(arg->flags, CALLED);
 	/* smp_mb(); */
 	if (nlen <= AUFS_WH_PFX_LEN
@@ -468,9 +498,13 @@ static int fillvdir(void *__arg, const char *__name, int nlen,
 		if (au_nhash_test_known_wh(&arg->whlist, name, nlen))
 			goto out; /* already whiteouted */
 
+		if (shwh)
+			arg->err = au_wh_ino(sb, arg->bindex, h_ino, d_type,
+					     &ino);
 		if (!arg->err)
 			arg->err = au_nhash_append_wh
-				(&arg->whlist, name, nlen, arg->bindex);
+				(&arg->whlist, name, nlen, ino, d_type,
+				 arg->bindex, shwh);
 	}
 
  out:
@@ -481,12 +515,58 @@ static int fillvdir(void *__arg, const char *__name, int nlen,
 	return arg->err;
 }
 
+static int au_handle_shwh(struct super_block *sb, struct au_vdir *vdir,
+			  struct au_nhash *whlist, struct au_nhash *delist)
+{
+#ifdef CONFIG_AUFS_SHWH
+	int err;
+	unsigned int nh, u;
+	struct hlist_head *head;
+	struct au_vdir_wh *tpos;
+	struct hlist_node *pos, *n;
+	char *p, *o;
+	struct au_vdir_destr *destr;
+
+	AuDebugOn(!au_opt_test(au_mntflags(sb), SHWH));
+
+	err = -ENOMEM;
+	o = p = __getname();
+	if (unlikely(!p))
+		goto out;
+
+	err = 0;
+	nh = whlist->nh_num;
+	memcpy(p, AUFS_WH_PFX, AUFS_WH_PFX_LEN);
+	p += AUFS_WH_PFX_LEN;
+	for (u = 0; u < nh; u++) {
+		head = whlist->nh_head + u;
+		hlist_for_each_entry_safe(tpos, pos, n, head, wh_hash) {
+			destr = &tpos->wh_str;
+			memcpy(p, destr->name, destr->len);
+			err = append_de(vdir, o, destr->len + AUFS_WH_PFX_LEN,
+					tpos->wh_ino, tpos->wh_type, delist);
+			if (unlikely(err))
+				break;
+		}
+	}
+
+	__putname(o);
+
+ out:
+	AuTraceErr(err);
+	return err;
+#else
+	return 0;
+#endif
+}
+
 static int au_do_read_vdir(struct fillvdir_arg *arg)
 {
 	int err;
 	unsigned int rdhash;
 	loff_t offset;
-	aufs_bindex_t bend, bindex;
+	aufs_bindex_t bend, bindex, bstart;
+	unsigned char shwh;
 	struct file *hf, *file;
 	struct super_block *sb;
 
@@ -502,8 +582,14 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 
 	err = 0;
 	arg->flags = 0;
+	shwh = 0;
+	if (au_opt_test(au_mntflags(sb), SHWH)) {
+		shwh = 1;
+		au_fset_fillvdir(arg->flags, SHWH);
+	}
+	bstart = au_fbstart(file);
 	bend = au_fbend(file);
-	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
+	for (bindex = bstart; !err && bindex <= bend; bindex++) {
 		hf = au_h_fptr(file, bindex);
 		if (!hf)
 			continue;
@@ -515,8 +601,9 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 
 		arg->bindex = bindex;
 		au_fclr_fillvdir(arg->flags, WHABLE);
-		if (bindex != bend
-		    && au_br_whable(au_sbr_perm(sb, bindex)))
+		if (shwh
+		    || (bindex != bend
+			&& au_br_whable(au_sbr_perm(sb, bindex))))
 			au_fset_fillvdir(arg->flags, WHABLE);
 		do {
 			arg->err = 0;
@@ -527,6 +614,10 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 				err = arg->err;
 		} while (!err && au_ftest_fillvdir(arg->flags, CALLED));
 	}
+
+	if (!err && shwh)
+		err = au_handle_shwh(sb, arg->vdir, &arg->whlist, &arg->delist);
+
 	au_nhash_wh_free(&arg->whlist);
 
  out_delist:
