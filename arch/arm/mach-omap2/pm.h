@@ -34,18 +34,37 @@ extern unsigned short wakeup_timer_seconds;
 extern struct omap_dm_timer *gptimer_wakeup;
 
 #ifdef CONFIG_ARCH_OMAP3
-struct prm_setup_times {
+struct prm_setup_vc {
 	u16 clksetup;
 	u16 voltsetup_time1;
 	u16 voltsetup_time2;
 	u16 voltoffset;
 	u16 voltsetup2;
+
+/* PRM_VC_CMD_VAL_0 specific bits */
+	u16 vdd0_on;
+	u16 vdd0_onlp;
+	u16 vdd0_ret;
+	u16 vdd0_off;
+/* PRM_VC_CMD_VAL_1 specific bits */
+	u16 vdd1_on;
+	u16 vdd1_onlp;
+	u16 vdd1_ret;
+	u16 vdd1_off;
+
+/* Values for VDD registers */
+	u32 i2c_slave_ra;
+	u32 vdd_vol_ra;
+	u32 vdd_cmd_ra;
+	u32 vdd_ch_conf;
+	u32 vdd_i2c_cfg;
 };
 
 extern void omap3_pm_off_mode_enable(int);
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
 extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
-extern void omap3_set_prm_setup_times(struct prm_setup_times *setup_times);
+extern void omap3_set_prm_setup_vc(struct prm_setup_vc *setup_vc);
+extern int omap3_bypass_cmd(u8 slave_addr, u8 reg_addr, u8 cmd);
 #else
 #define omap3_pm_off_mode_enable(int) do {} while (0);
 #define omap3_pm_get_suspend_state(pwrdm) do {} while (0);
