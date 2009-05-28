@@ -434,7 +434,7 @@ static int omapfb_memory_read(struct fb_info *fbi,
 	return r;
 }
 
-int omapfb_get_ovl_colormode(struct omapfb2_device *fbdev,
+static int omapfb_get_ovl_colormode(struct omapfb2_device *fbdev,
 			     struct omapfb_ovl_colormode *mode)
 {
 	int ovl_idx = mode->overlay_idx;
