@@ -233,6 +233,17 @@ int __init musb_platform_init(struct musb *musb)
 	omap_cfg_reg(AE5_2430_USB0HS_STP);
 #endif
 
+	/* Reset controller */
+	if (musb->set_clock)
+		musb->set_clock(musb->clock, 1);
+	else
+		clk_enable(musb->clock);
+	l = omap_readl(OTG_SYSCONFIG);
+	l |= SOFTRST;
+	omap_writel(l, OTG_SYSCONFIG);
+	while (!(RESETDONE & omap_readl(OTG_SYSSTATUS)))
+		cpu_relax();
+
 	musb->xceiv = *x;
 	musb_platform_resume(musb);
 
