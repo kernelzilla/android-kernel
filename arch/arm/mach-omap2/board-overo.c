@@ -381,7 +381,7 @@ static void __init overo_display_init(void)
 	gpio_export(OVERO_GPIO_LCD_EN, 0);
 }
 
-static int overo_panel_enable_dvi(struct omap_display *display)
+static int overo_panel_enable_dvi(struct omap_dss_device *dssdev)
 {
 	if (lcd_enabled) {
 		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
@@ -394,23 +394,23 @@ static int overo_panel_enable_dvi(struct omap_display *display)
 	return 0;
 }
 
-static void overo_panel_disable_dvi(struct omap_display *display)
+static void overo_panel_disable_dvi(struct omap_dss_device *dssdev)
 {
 	gpio_set_value(OVERO_GPIO_LCD_EN, 0);
 
 	dvi_enabled = 0;
 }
 
-static struct omap_dss_display_config overo_display_data_dvi = {
+static struct omap_dss_device overo_dvi_device = {
 	.type = OMAP_DISPLAY_TYPE_DPI,
 	.name = "dvi",
-	.panel_name = "panel-generic",
-	.u.dpi.data_lines = 24,
-	.panel_enable = overo_panel_enable_dvi,
-	.panel_disable = overo_panel_disable_dvi,
+	.driver_name = "panel_generic",
+	.phy.dpi.data_lines = 24,
+	.platform_enable = overo_panel_enable_dvi,
+	.platform_disable = overo_panel_disable_dvi,
 };
 
-static int overo_panel_enable_lcd(struct omap_display *display)
+static int overo_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
 	if (dvi_enabled) {
 		printk(KERN_ERR "cannot enable LCD, DVI is enabled\n");
@@ -422,27 +422,30 @@ static int overo_panel_enable_lcd(struct omap_display *display)
 	return 0;
 }
 
-static void overo_panel_disable_lcd(struct omap_display *display)
+static void overo_panel_disable_lcd(struct omap_dss_device *dssdev)
 {
 	gpio_set_value(OVERO_GPIO_LCD_EN, 0);
 	lcd_enabled = 0;
 }
 
-static struct omap_dss_display_config overo_display_data_lcd = {
+static struct omap_dss_device overo_lcd_device = {
 	.type = OMAP_DISPLAY_TYPE_DPI,
 	.name = "lcd",
-	.panel_name = "samsung-lte430wq-f0c",
-	.u.dpi.data_lines = 24,
-	.panel_enable = overo_panel_enable_lcd,
-	.panel_disable = overo_panel_disable_lcd,
- };
+	.driver_name = "samsung-lte430wq-f0c",
+	.phy.dpi.data_lines = 24,
+	.platform_enable = overo_panel_enable_lcd,
+	.platform_disable = overo_panel_disable_lcd,
+};
+
+static struct omap_dss_device *overo_dss_devices[] = {
+	&overo_dvi_device,
+	&overo_lcd_device,
+};
 
 static struct omap_dss_board_info overo_dss_data = {
-	.num_displays = 2,
-	.displays = {
-		&overo_display_data_dvi,
-		&overo_display_data_lcd,
-	}
+	.num_devices = ARRAY_SIZE(overo_dss_devices),
+	.devices = overo_dss_devices,
+	.default_device = &overo_dvi_device,
 };
 
 static struct platform_device overo_dss_device = {
