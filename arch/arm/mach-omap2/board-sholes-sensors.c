@@ -54,6 +54,8 @@ static struct omap_kp_platform_data omap3430_kp_data = {
 	.rep		= 0,
 	.row_gpios	= sholesp1_row_gpios,
 	.col_gpios	= sholesp1_col_gpios,
+	.input_name	= "sholes-keypad",
+	.input_phys_device = "sholes-keypad/input0"
 };
 
 static struct sfh7743_platform_data omap3430_proximity_data = {
