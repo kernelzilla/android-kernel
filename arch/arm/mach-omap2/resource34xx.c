@@ -356,6 +356,9 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	int ind;
 
 	if (resp == vdd1_resp) {
+		if (target_level < 3)
+			resource_release("vdd2_opp", &vdd2_dev);
+
 		resource_set_opp_level(VDD1_OPP, target_level, 0);
 		/*
 		 * For VDD1 OPP3 and above, make sure the interconnect
@@ -364,8 +367,6 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		 */
 		if (target_level >= 3)
 			resource_request("vdd2_opp", &vdd2_dev, 400000);
-		else
-			resource_release("vdd2_opp", &vdd2_dev);
 
 	} else if (resp == vdd2_resp) {
 		tput = target_level;
