@@ -31,6 +31,7 @@
 #include <linux/seq_file.h>
 #include <linux/kfifo.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 
 #include <mach/board.h>
 #include <mach/display.h>
@@ -255,6 +256,8 @@ static struct
 	unsigned long	dsi2_pll_fclk;	/* Hz */
 	unsigned long	dsiphy;		/* Hz */
 	unsigned long	ddr_clk;	/* Hz */
+
+	struct regulator *vdds_dsi_reg;
 
 	struct {
 		struct omap_dss_device *dssdev;
@@ -1177,7 +1180,7 @@ int dsi_pll_init(bool enable_hsclk, bool enable_hsdiv)
 		goto err0;
 	}
 
-	r = dss_dsi_power_up();
+	r = regulator_enable(dsi.vdds_dsi_reg);
 	if (r)
 		goto err0;
 
@@ -1212,7 +1215,7 @@ int dsi_pll_init(bool enable_hsclk, bool enable_hsdiv)
 
 	return 0;
 err1:
-	dss_dsi_power_down();
+	regulator_disable(dsi.vdds_dsi_reg);
 err0:
 	enable_clocks(0);
 	dsi_enable_pll_clock(0);
@@ -1226,7 +1229,7 @@ void dsi_pll_uninit(void)
 
 	dsi.pll_locked = 0;
 	dsi_pll_power(DSI_PLL_POWER_OFF);
-	dss_dsi_power_down();
+	regulator_disable(dsi.vdds_dsi_reg);
 	DSSDBG("PLL uninit done\n");
 }
 
@@ -3924,6 +3927,13 @@ int dsi_init(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	dsi.vdds_dsi_reg = regulator_get(&pdev->dev, "vdds_dsi");
+	if (IS_ERR(dsi.vdds_dsi_reg)) {
+		iounmap(dsi.base);
+		DSSERR("can't get VDDS_DSI regulator\n");
+		return PTR_ERR(dsi.vdds_dsi_reg);
+	}
+
 	enable_clocks(1);
 
 	rev = dsi_read_reg(DSI_REVISION);
@@ -3939,6 +3949,8 @@ void dsi_exit(void)
 {
 	flush_workqueue(dsi.workqueue);
 	destroy_workqueue(dsi.workqueue);
+
+	regulator_put(dsi.vdds_dsi_reg);
 
 	iounmap(dsi.base);
 

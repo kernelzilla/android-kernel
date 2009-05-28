@@ -411,30 +411,6 @@ static void dss_uninitialize_debugfs(void)
 }
 #endif /* CONFIG_DEBUG_FS && CONFIG_OMAP2_DSS_DEBUG_SUPPORT */
 
-
-/* DSI powers */
-int dss_dsi_power_up(void)
-{
-	struct omap_dss_board_info *pdata = core.pdev->dev.platform_data;
-
-	if (!pdata->dsi_power_up)
-		return 0; /* presume power is always on then */
-
-	return pdata->dsi_power_up();
-}
-
-void dss_dsi_power_down(void)
-{
-	struct omap_dss_board_info *pdata = core.pdev->dev.platform_data;
-
-	if (!pdata->dsi_power_down)
-		return;
-
-	pdata->dsi_power_down();
-}
-
-
-
 /* PLATFORM DEVICE */
 static int omap_dss_probe(struct platform_device *pdev)
 {

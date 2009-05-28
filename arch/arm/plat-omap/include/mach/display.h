@@ -221,8 +221,6 @@ struct omap_dss_board_info {
 	int num_devices;
 	struct omap_dss_device **devices;
 	struct omap_dss_device *default_device;
-	int (*dsi_power_up)(void);
-	void (*dsi_power_down)(void);
 };
 
 struct omap_video_timings {
