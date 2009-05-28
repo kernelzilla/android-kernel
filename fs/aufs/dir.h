@@ -56,7 +56,14 @@ struct au_vdir_de {
 
 struct au_vdir_wh {
 	struct hlist_node	wh_hash;
+#ifdef CONFIG_AUFS_SHWH
+	ino_t			wh_ino;
 	aufs_bindex_t		wh_bindex;
+	unsigned char		wh_type;
+#else
+	aufs_bindex_t		wh_bindex;
+#endif
+	/* caution: packed */
 	struct au_vdir_destr	wh_str;
 } __packed;
 
@@ -93,8 +100,9 @@ void au_nhash_wh_free(struct au_nhash *whlist);
 int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 			    int limit);
 int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int nlen);
-int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen,
-		       aufs_bindex_t bindex);
+int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen, ino_t ino,
+		       unsigned int d_type, aufs_bindex_t bindex,
+		       unsigned char shwh);
 void au_vdir_free(struct au_vdir *vdir);
 int au_vdir_init(struct file *file);
 int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir);

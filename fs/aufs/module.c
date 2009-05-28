@@ -77,7 +77,7 @@ int au_dir_roflags;
  */
 MODULE_LICENSE("GPL");
 /* MODULE_LICENSE("GPL v2"); */
-MODULE_AUTHOR("Junjiro R. Okajima");
+MODULE_AUTHOR("Junjiro R. Okajima <aufs-users@lists.sourceforge.net>");
 MODULE_DESCRIPTION(AUFS_NAME
 	" -- Advanced multi layered unification filesystem");
 MODULE_VERSION(AUFS_VERSION);
