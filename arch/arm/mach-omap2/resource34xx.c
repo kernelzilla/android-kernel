@@ -261,6 +261,7 @@ static int program_opp_freq(int res, int target_level, int current_level)
 #ifdef CONFIG_PM
 	omap3_save_scratchpad_contents();
 #endif
+
 	*curr_opp = target_level;
 	return target_level;
 }
@@ -270,9 +271,10 @@ static int program_opp(int res, struct omap_opp *opp, int target_level,
 {
 	int i, ret = 0, raise;
 #ifdef CONFIG_OMAP_SMARTREFLEX
-	unsigned long t_opp;
+	unsigned long t_opp, c_opp;
 
 	t_opp = ID_VDD(res) | ID_OPP_NO(opp[target_level].opp_id);
+	c_opp = ID_VDD(res) | ID_OPP_NO(opp[current_level].opp_id);
 #endif
 	if (target_level > current_level)
 		raise = 1;
@@ -285,8 +287,9 @@ static int program_opp(int res, struct omap_opp *opp, int target_level,
 					current_level);
 #ifdef CONFIG_OMAP_SMARTREFLEX
 		else
-			sr_voltagescale_vcbypass(t_opp,
-					opp[target_level].vsel);
+			sr_voltagescale_vcbypass(t_opp, c_opp,
+				opp[target_level].vsel,
+				opp[current_level].vsel);
 #endif
 	}
 
