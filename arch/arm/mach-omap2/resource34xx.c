@@ -239,6 +239,7 @@ static int program_opp_freq(int res, int target_level, int current_level)
 	int ret = 0, l3_div;
 	int *curr_opp;
 
+	lock_scratchpad_sem();
 	if (res == VDD1_OPP) {
 		curr_opp = &curr_vdd1_opp;
 		clk_set_rate(dpll1_clk, mpu_opps[target_level].rate);
@@ -256,11 +257,14 @@ static int program_opp_freq(int res, int target_level, int current_level)
 		ret = clk_set_rate(dpll3_clk,
 				l3_opps[target_level].rate * l3_div);
 	}
-	if (ret)
+	if (ret) {
+		unlock_scratchpad_sem();
 		return current_level;
+	}
 #ifdef CONFIG_PM
 	omap3_save_scratchpad_contents();
 #endif
+	unlock_scratchpad_sem();
 
 	*curr_opp = target_level;
 	return target_level;
