@@ -22,73 +22,81 @@
 
 #include <mach/display.h>
 
-static int generic_panel_init(struct omap_display *display)
+static struct omap_video_timings generic_panel_timings = {
+	/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
+	.x_res		= 640,
+	.y_res		= 480,
+	.pixel_clock	= 23500,
+	.hfp		= 48,
+	.hsw		= 32,
+	.hbp		= 80,
+	.vfp		= 3,
+	.vsw		= 4,
+	.vbp		= 7,
+};
+
+static int generic_panel_probe(struct omap_dss_device *dssdev)
 {
+	dssdev->panel.config = OMAP_DSS_LCD_TFT;
+	dssdev->panel.timings = generic_panel_timings;
+
 	return 0;
 }
 
-static int generic_panel_enable(struct omap_display *display)
+static void generic_panel_remove(struct omap_dss_device *dssdev)
+{
+}
+
+static int generic_panel_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 
-	if (display->hw_config.panel_enable)
-		r = display->hw_config.panel_enable(display);
+	if (dssdev->platform_enable)
+		r = dssdev->platform_enable(dssdev);
 
 	return r;
 }
 
-static void generic_panel_disable(struct omap_display *display)
+static void generic_panel_disable(struct omap_dss_device *dssdev)
 {
-	if (display->hw_config.panel_disable)
-		display->hw_config.panel_disable(display);
+	if (dssdev->platform_disable)
+		dssdev->platform_disable(dssdev);
 }
 
-static int generic_panel_suspend(struct omap_display *display)
+static int generic_panel_suspend(struct omap_dss_device *dssdev)
 {
-	generic_panel_disable(display);
+	generic_panel_disable(dssdev);
 	return 0;
 }
 
-static int generic_panel_resume(struct omap_display *display)
+static int generic_panel_resume(struct omap_dss_device *dssdev)
 {
-	return generic_panel_enable(display);
+	return generic_panel_enable(dssdev);
 }
 
-static struct omap_panel generic_panel = {
-	.owner		= THIS_MODULE,
-	.name		= "panel-generic",
-	.init		= generic_panel_init,
+static struct omap_dss_driver generic_driver = {
+	.probe		= generic_panel_probe,
+	.remove		= generic_panel_remove,
+
 	.enable		= generic_panel_enable,
 	.disable	= generic_panel_disable,
 	.suspend	= generic_panel_suspend,
 	.resume		= generic_panel_resume,
 
-	.timings = {
-		/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
-		.x_res		= 640,
-		.y_res		= 480,
-		.pixel_clock	= 23500,
-		.hfp		= 48,
-		.hsw		= 32,
-		.hbp		= 80,
-		.vfp		= 3,
-		.vsw		= 4,
-		.vbp		= 7,
+	.driver         = {
+		.name   = "generic_panel",
+		.owner  = THIS_MODULE,
 	},
-
-	.config		= OMAP_DSS_LCD_TFT,
 };
-
 
 static int __init generic_panel_drv_init(void)
 {
-	omap_dss_register_panel(&generic_panel);
-	return 0;
+	return omap_dss_register_driver(&generic_driver);
 }
 
 static void __exit generic_panel_drv_exit(void)
 {
-	omap_dss_unregister_panel(&generic_panel);
+	omap_dss_unregister_driver(&generic_driver);
 }
 
 module_init(generic_panel_drv_init);

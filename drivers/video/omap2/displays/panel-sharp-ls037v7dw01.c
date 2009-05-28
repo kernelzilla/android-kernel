@@ -22,89 +22,92 @@
 
 #include <mach/display.h>
 
-static int sharp_ls_panel_init(struct omap_display *display)
+static struct omap_video_timings sharp_ls_timings = {
+	.x_res = 480,
+	.y_res = 640,
+
+	.pixel_clock	= 19200,
+
+	.hsw		= 2,
+	.hfp		= 1,
+	.hbp		= 28,
+
+	.vsw		= 1,
+	.vfp		= 1,
+	.vbp		= 1,
+};
+
+static int sharp_ls_panel_probe(struct omap_dss_device *dssdev)
 {
+	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
+		OMAP_DSS_LCD_IHS;
+	dssdev->panel.acb = 0x28;
+	dssdev->panel.timings = sharp_ls_timings;
+
 	return 0;
 }
 
-static void sharp_ls_panel_cleanup(struct omap_display *display)
+static void sharp_ls_panel_remove(struct omap_dss_device *dssdev)
 {
 }
 
-static int sharp_ls_panel_enable(struct omap_display *display)
+static int sharp_ls_panel_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 
 	/* wait couple of vsyncs until enabling the LCD */
 	msleep(50);
 
-	if (display->hw_config.panel_enable)
-		r = display->hw_config.panel_enable(display);
+	if (dssdev->platform_enable)
+		r = dssdev->platform_enable(dssdev);
 
 	return r;
 }
 
-static void sharp_ls_panel_disable(struct omap_display *display)
+static void sharp_ls_panel_disable(struct omap_dss_device *dssdev)
 {
-	if (display->hw_config.panel_disable)
-		display->hw_config.panel_disable(display);
+	if (dssdev->platform_disable)
+		dssdev->platform_disable(dssdev);
 
 	/* wait at least 5 vsyncs after disabling the LCD */
 
 	msleep(100);
 }
 
-static int sharp_ls_panel_suspend(struct omap_display *display)
+static int sharp_ls_panel_suspend(struct omap_dss_device *dssdev)
 {
-	sharp_ls_panel_disable(display);
+	sharp_ls_panel_disable(dssdev);
 	return 0;
 }
 
-static int sharp_ls_panel_resume(struct omap_display *display)
+static int sharp_ls_panel_resume(struct omap_dss_device *dssdev)
 {
-	return sharp_ls_panel_enable(display);
+	return sharp_ls_panel_enable(dssdev);
 }
 
-static struct omap_panel sharp_ls_panel = {
-	.owner		= THIS_MODULE,
-	.name		= "sharp-ls037v7dw01",
-	.init		= sharp_ls_panel_init,
-	.cleanup	= sharp_ls_panel_cleanup,
+static struct omap_dss_driver sharp_ls_driver = {
+	.probe		= sharp_ls_panel_probe,
+	.remove		= sharp_ls_panel_remove,
+
 	.enable		= sharp_ls_panel_enable,
 	.disable	= sharp_ls_panel_disable,
 	.suspend	= sharp_ls_panel_suspend,
 	.resume		= sharp_ls_panel_resume,
 
-	.timings = {
-		.x_res = 480,
-		.y_res = 640,
-
-		.pixel_clock	= 19200,
-
-		.hsw		= 2,
-		.hfp		= 1,
-		.hbp		= 28,
-
-		.vsw		= 1,
-		.vfp		= 1,
-		.vbp		= 1,
+	.driver         = {
+		.name   = "sharp_ls_panel",
+		.owner  = THIS_MODULE,
 	},
-
-	.acb		= 0x28,
-
-	.config	= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |	OMAP_DSS_LCD_IHS,
 };
-
 
 static int __init sharp_ls_panel_drv_init(void)
 {
-	omap_dss_register_panel(&sharp_ls_panel);
-	return 0;
+	return omap_dss_register_driver(&sharp_ls_driver);
 }
 
 static void __exit sharp_ls_panel_drv_exit(void)
 {
-	omap_dss_unregister_panel(&sharp_ls_panel);
+	omap_dss_unregister_driver(&sharp_ls_driver);
 }
 
 module_init(sharp_ls_panel_drv_init);
