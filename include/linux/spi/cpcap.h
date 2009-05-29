@@ -57,48 +57,6 @@ enum cpcap_regulator_id {
 	CPCAP_NUM_REGULATORS
 };
 
-struct cpcap_spi_init_data {
-	unsigned short reg;
-	unsigned short data;
-};
-
-struct cpcap_adc_ato {
-	unsigned short ato_in;
-	unsigned short atox_in;
-	unsigned short adc_ps_factor_in;
-	unsigned short atox_ps_factor_in;
-	unsigned short ato_out;
-	unsigned short atox_out;
-	unsigned short adc_ps_factor_out;
-	unsigned short atox_ps_factor_out;
-};
-
-struct cpcap_platform_data {
-	struct cpcap_spi_init_data *init;
-	int init_len;
-	struct regulator_init_data *regulator_init;
-	struct cpcap_adc_ato *adc_ato;
-};
-
-struct cpcap_batt_data {
-	int status;
-	int health;
-	int present;
-	int capacity;
-	int batt_volt;
-	int batt_temp;
-};
-
-struct cpcap_batt_ac_data {
-	int online;
-};
-
-struct cpcap_batt_usb_data {
-	int online;
-	int current_now;
-};
-
-
 /*
  * Enumeration of all registers in the cpcap. Note that the register
  * numbers on the CPCAP IC are not contiguous. The values of the enums below
@@ -332,7 +290,6 @@ enum {
 	CPCAP_IOCTL_NUM_BATT__END,
 };
 
-
 enum cpcap_irqs {
 	CPCAP_IRQ__START,		/* 1st supported interrupt event */
 	CPCAP_IRQ_HSCLK = CPCAP_IRQ_INT1_INDEX, /* High Speed Clock */
@@ -460,6 +417,47 @@ enum cpcap_adc_type {
 	CPCAP_ADC_TYPE_BATT_PI,
 };
 
+struct cpcap_spi_init_data {
+	enum cpcap_reg reg;
+	unsigned short data;
+};
+
+struct cpcap_adc_ato {
+	unsigned short ato_in;
+	unsigned short atox_in;
+	unsigned short adc_ps_factor_in;
+	unsigned short atox_ps_factor_in;
+	unsigned short ato_out;
+	unsigned short atox_out;
+	unsigned short adc_ps_factor_out;
+	unsigned short atox_ps_factor_out;
+};
+
+struct cpcap_platform_data {
+	struct cpcap_spi_init_data *init;
+	int init_len;
+	struct regulator_init_data *regulator_init;
+	struct cpcap_adc_ato *adc_ato;
+};
+
+struct cpcap_batt_data {
+	int status;
+	int health;
+	int present;
+	int capacity;
+	int batt_volt;
+	int batt_temp;
+};
+
+struct cpcap_batt_ac_data {
+	int online;
+};
+
+struct cpcap_batt_usb_data {
+	int online;
+	int current_now;
+};
+
 struct cpcap_device;
 
 #ifdef __KERNEL__
@@ -485,7 +483,6 @@ struct cpcap_adc_us_request {
 	int result[CPCAP_ADC_BANK0_NUM];
 };
 
-
 struct cpcap_adc_phase {
 	signed char offset_batti;
 	unsigned char slope_batti;
@@ -506,7 +503,6 @@ struct cpcap_regacc {
 	unsigned short value;
 	unsigned short mask;
 };
-
 
 /*
  * Gets the contents of the specified cpcap register.
@@ -569,10 +565,10 @@ static inline void *cpcap_get_keydata(struct cpcap_device *cpcap)
 	return cpcap->keydata;
 }
 
-int cpcap_regacc_write(struct cpcap_device *cpcap, unsigned short reg,
+int cpcap_regacc_write(struct cpcap_device *cpcap, enum cpcap_reg reg,
 		       unsigned short value, unsigned short mask);
 
-int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
+int cpcap_regacc_read(struct cpcap_device *cpcap, enum cpcap_reg reg,
 		      unsigned short *value_ptr);
 
 int cpcap_regacc_init(struct cpcap_device *cpcap);

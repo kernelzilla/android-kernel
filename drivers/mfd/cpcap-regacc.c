@@ -22,15 +22,7 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 
-
-#define CPCAP_MIN_AREG CPCAP_REG_VAUDIOC
-#define CPCAP_MAX_AREG CPCAP_REG_LVAB
-#define CPCAP_MIN_LREG CPCAP_REG_MDLC
-#define CPCAP_MAX_LREG CPCAP_REG_CLEDC
-
 #define IS_CPCAP(reg) ((reg) >= CPCAP_REG_START && (reg) <= CPCAP_REG_END)
-#define AREG_INDEX(reg) ((reg) - CPCAP_MIN_AREG)
-#define LREG_INDEX(reg) ((reg) - CPCAP_MIN_LREG)
 
 static DEFINE_MUTEX(reg_access);
 
@@ -59,233 +51,197 @@ static const struct {
 	unsigned short constant_mask;	/* Constant modifiability mask */
 	unsigned short rbw_mask;	/* Read-before-write mask */
 } register_info_tbl[CPCAP_NUM_REG_CPCAP] = {
-	{0, 0x0004, 0x0000},	/* Interrupt 1 */
-	{1, 0x0000, 0x0000},	/* Interrupt 2 */
-	{2, 0x0000, 0x0000},	/* Interrupt 3 */
-	{3, 0xFC00, 0x0000},	/* Interrupt 4 */
-	{4, 0x0004, 0xFFFF},	/* Interrupt Mask 1 */
-	{5, 0x0000, 0xFFFF},	/* Interrupt Mask 2 */
-	{6, 0x0000, 0xFFFF},	/* Interrupt Mask 3 */
-	{7, 0xFC00, 0xFFFF},	/* Interrupt Mask 4 */
-	{8, 0xFFFF, 0xFFFF},	/* Interrupt Sense 1 */
-	{9, 0xFFFF, 0xFFFF},	/* Interrupt Sense 2 */
-	{10, 0xFFFF, 0xFFFF},	/* Interrupt Sense 3 */
-	{11, 0xFFFF, 0xFFFF},	/* Interrupt Sense 4 */
-	{12, 0x80F8, 0xFFFF},	/* Resource Assignment 1 */
-	{13, 0x0000, 0xFFFF},	/* Resource Assignment 2 */
-	{14, 0x0004, 0xFFFF},	/* Resource Assignment 3 */
-	{15, 0x0068, 0xFFFF},	/* Resource Assignment 4 */
-	{16, 0x0000, 0xFFFF},	/* Resource Assignment 5 */
-	{17, 0xFC00, 0xFFFF},	/* Resource Assignment 6 */
-	{18, 0xFFFF, 0xFFFF},	/* Version Control 1 */
-	{19, 0xFFFF, 0xFFFF},	/* Version Control 2 */
-	{128, 0x0000, 0x0000},	/* Macro Interrupt */
-	{129, 0x0000, 0xFFFF},	/* Macro Interrupt Mask */
-	{130, 0x0000, 0xFFFF},	/* Macro Initiate */
-	{131, 0xFFFF, 0xFFFF},	/* Macro Interrupt Sense */
-	{132, 0xF000, 0xFFFF},	/* UC Control 1 */
-	{133, 0xFC00, 0xFFFF},	/* UC Control 2 */
-	{135, 0xFC00, 0xFFFF},	/* Power Cut 1 */
-	{136, 0xFC00, 0xFFFF},	/* Power Cut 2 */
-	{137, 0xFE00, 0xFFFF},	/* BP and EOL */
-	{138, 0xFE00, 0xFFFF},	/* Power Gate and Control */
-	{139, 0x0000, 0x0000},	/* Memory Transfer 1 */
-	{140, 0x0000, 0x0000},	/* Memory Transfer 2 */
-	{141, 0x0000, 0x0000},	/* Memory Transfer 3 */
-	{142, 0x0000, 0xFFFF},	/* Print Format */
-	{256, 0xFF00, 0xFFFF},	/* System Clock Control */
-	{257, 0xFFFF, 0xFFFF},	/* Stop Watch 1 */
-	{258, 0xFC7F, 0xFFFF},	/* Stop Watch 2 */
-	{259, 0xFFFE, 0xFFFF},	/* UC Turbo Mode */
-	{260, 0xFF00, 0xFFFF},	/* Time of Day 1 */
-	{261, 0xFE00, 0xFFFF},	/* Time of Day 2 */
-	{262, 0xFF00, 0xFFFF},	/* Time of Day Alarm 1 */
-	{263, 0xFE00, 0xFFFF},	/* Time of Day Alarm 2 */
-	{264, 0x8000, 0xFFFF},	/* Day */
-	{265, 0x8000, 0xFFFF},	/* Day Alarm */
-	{266, 0x0000, 0xFFFF},	/* Validity 1 */
-	{267, 0x0000, 0xFFFF},	/* Validity 2 */
-	{384, 0x2488, 0xFFFF},	/* Switcher DVS and PLL */
-	{385, 0x8080, 0xFFFF},	/* Switcher I2C Control 1 */
-	{386, 0xFF00, 0xFFFF},	/* Switcher I2C Control 2 */
-	{387, 0x9080, 0xFFFF},	/* Switcher 1 Control 1 */
-	{388, 0x8080, 0xFFFF},	/* Switcher 1 Control 2 */
-	{389, 0x9080, 0xFFFF},	/* Switcher 2 Control 1 */
-	{390, 0x8080, 0xFFFF},	/* Switcher 2 Control 2 */
-	{391, 0xFA84, 0xFFFF},	/* Switcher 3 Control */
-	{392, 0x9080, 0xFFFF},	/* Switcher 4 Control 1 */
-	{393, 0x8080, 0xFFFF},	/* Switcher 4 Control 2 */
-	{394, 0xFFD5, 0xFFFF},	/* Switcher 5 Control */
-	{395, 0xFFF4, 0xFFFF},	/* Switcher 6 Control */
-	{396, 0xFF48, 0xFFFF},	/* VCAM Control */
-	{397, 0xFFA8, 0xFFFF},	/* VCSI Control */
-	{398, 0xFF48, 0xFFFF},	/* VDAC Control */
-	{399, 0xFF48, 0xFFFF},	/* VDIG Control */
-	{400, 0xFF50, 0xFFFF},	/* VFUSE Control */
-	{401, 0xFFE8, 0xFFFF},	/* VHVIO Control */
-	{402, 0xFF40, 0xFFFF},	/* VSDIO Control */
-	{403, 0xFFA4, 0xFFFF},	/* VPLL Control */
-	{404, 0xFF52, 0xFFFF},	/* VRF1 Control */
-	{405, 0xFFD4, 0xFFFF},	/* VRF2 Control */
-	{406, 0xFFD4, 0xFFFF},	/* VRFREF Control */
-	{407, 0xFFA8, 0xFFFF},	/* VWLAN1 Control */
-	{408, 0xFD32, 0xFFFF},	/* VWLAN2 Control */
-	{409, 0xE154, 0xFFFF},	/* VSIM Control */
-	{410, 0xFFF2, 0xFFFF},	/* VVIB Control */
-	{411, 0xFEA2, 0xFFFF},	/* VUSB Control */
-	{412, 0xFFD4, 0xFFFF},	/* VUSBINT1 Control */
-	{413, 0xFFD4, 0xFFFF},	/* VUSBINT2 Control */
-	{414, 0xFFFE, 0xFFFF},	/* Useroff Regulator Trigger */
-	{415, 0x0000, 0xFFFF},	/* Useroff Regulator Mask 1 */
-	{416, 0xFC00, 0xFFFF},	/* Useroff Regulator Mask 2 */
-	{512, 0xFF88, 0xFFFF},	/* VAUDIO Control */
-	{513, 0x0000, 0xFEDF},	/* Codec Control */
-	{514, 0x4000, 0xFFFF},	/* Codec Digital Interface */
-	{515, 0xF000, 0xFCFF},	/* Stereo DAC */
-	{516, 0xC000, 0xFFFF},	/* Stereo DAC Digital Interface */
-	{517, 0x0000, 0xFFFF},	/* TX Inputs */
-	{518, 0xF000, 0xFFFF},	/* TX MIC PGA's */
-	{519, 0xF800, 0xFFFF},	/* RX Output Amplifiers */
-	{520, 0x00C3, 0xFFFF},	/* RX Volume Control */
-	{521, 0xF800, 0xFFFF},	/* RX Codec to Output Amps */
-	{522, 0xE000, 0xFFFF},	/* RX Stereo DAC to Output Amps */
-	{523, 0x8000, 0xFFFF},	/* RX Ext PGA to Output Amps */
-	{524, 0x0000, 0xFFFF},	/* RX Low Latency */
-	{525, 0xFF00, 0xFFFF},	/* A2 Loudspeaker Amplifier */
-	{526, 0x0000, 0xFFFF},	/* MIPI Slimbus 1 */
-	{527, 0xFF00, 0xFFFF},	/* MIPI Slimbus 2 */
-	{528, 0xFFFC, 0xFFFF},	/* MIPI Slimbus 3 */
-	{529, 0xFFFC, 0xFFFF},	/* LMR Volume and A4 Balanced */
-	{640, 0xFFF0, 0xFFFF},	/* Coulomb Counter Control 1 */
-	{641, 0xC000, 0xFFFF},	/* Charger and Reverse Mode */
-	{642, 0xFFC0, 0xFFFF},	/* Coincell & Coulomb Ctr Ctrl 2 */
-	{643, 0x0000, 0xFFFF},	/* Coulomb Counter Sample 1 */
-	{644, 0xFF00, 0xFFFF},	/* Coulomb Counter Sample 2 */
-	{645, 0x0000, 0xFFFF},	/* Coulomb Counter Accumulator 1 */
-	{646, 0x0000, 0xFFFF},	/* Coulomb Counter Accumulator 2 */
-	{647, 0xFC00, 0xFFFF},	/* Coulomb Counter Mode */
-	{648, 0xFC00, 0xFFFF},	/* Coulomb Counter Offset */
-	{649, 0xC000, 0xFFFF},	/* Coulomb Counter Integrator */
-	{768, 0x0000, 0xFFFF},	/* A/D Converter Configuration 1 */
-	{769, 0x0080, 0xFFFF},	/* A/D Converter Configuration 2 */
-	{770, 0xFFFF, 0xFFFF},	/* A/D Converter Data 0 */
-	{771, 0xFFFF, 0xFFFF},	/* A/D Converter Data 1 */
-	{772, 0xFFFF, 0xFFFF},	/* A/D Converter Data 2 */
-	{773, 0xFFFF, 0xFFFF},	/* A/D Converter Data 3 */
-	{774, 0xFFFF, 0xFFFF},	/* A/D Converter Data 4 */
-	{775, 0xFFFF, 0xFFFF},	/* A/D Converter Data 5 */
-	{776, 0xFFFF, 0xFFFF},	/* A/D Converter Data 6 */
-	{777, 0xFFFF, 0xFFFF},	/* A/D Converter Data 7 */
-	{778, 0xFFFF, 0xFFFF},	/* A/D Converter Calibration 1 */
-	{779, 0xFFFF, 0xFFFF},	/* A/D Converter Calibration 2 */
-	{896, 0x0000, 0xFFFF},	/* USB Control 1 */
-	{897, 0x0000, 0xFFFF},	/* USB Control 2 */
-	{898, 0x8200, 0xFFFF},	/* USB Control 3 */
-	{899, 0xFFFF, 0xFFFF},	/* ULPI Vendor ID Low */
-	{900, 0xFFFF, 0xFFFF},	/* ULPI Vendor ID High */
-	{901, 0xFFFF, 0xFFFF},	/* ULPI Product ID Low */
-	{902, 0xFFFF, 0xFFFF},	/* ULPI Product ID High */
-	{903, 0xFF80, 0xFFFF},	/* ULPI Function Control 1 */
-	{904, 0xFF80, 0xFFFF},	/* ULPI Function Control 2 */
-	{905, 0xFF80, 0xFFFF},	/* ULPI Function Control 3 */
-	{906, 0xFF64, 0xFFFF},	/* ULPI Interface Control 1 */
-	{907, 0xFF64, 0xFFFF},	/* ULPI Interface Control 2 */
-	{908, 0xFF64, 0xFFFF},	/* ULPI Interface Control 3 */
-	{909, 0xFFC0, 0xFFFF},	/* USB OTG Control 1 */
-	{910, 0xFFC0, 0xFFFF},	/* USB OTG Control 2 */
-	{911, 0xFFC0, 0xFFFF},	/* USB OTG Control 3 */
-	{912, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Rise 1 */
-	{913, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Rise 2 */
-	{914, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Rise 3 */
-	{915, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Fall 1 */
-	{916, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Fall 2 */
-	{917, 0xFFE0, 0xFFFF},	/* USB Interrupt Enable Fall 3 */
-	{918, 0xFFFF, 0xFFFF},	/* USB Interrupt Status */
-	{919, 0xFFFF, 0xFFFF},	/* USB Interrupt Latch */
-	{920, 0xFFFF, 0xFFFF},	/* USB Debug */
-	{921, 0xFF00, 0xFFFF},	/* Scratch 1 */
-	{922, 0xFF00, 0xFFFF},	/* Scratch 2 */
-	{923, 0xFF00, 0xFFFF},	/* Scratch 3 */
-	{939, 0xFFFE, 0xFFFF},	/* Video Mux Control */
-	{940, 0xFFFC, 0xFFFF},	/* One Wire Device Control */
-	{941, 0x0D11, 0x3FFF},	/* GPIO 0 Control */
-	{943, 0x0D11, 0x3FFF},	/* GPIO 1 Control */
-	{945, 0x0D11, 0x3FFF},	/* GPIO 2 Control */
-	{947, 0x0D11, 0x3FFF},	/* GPIO 3 Control */
-	{949, 0x0D11, 0x3FFF},	/* GPIO 4 Control */
-	{951, 0x0C11, 0x3FFF},	/* GPIO 5 Control */
-	{953, 0x0C11, 0x3FFF},	/* GPIO 6 Control */
-	{1024, 0x0000, 0xFFFF},	/* Main Display Lighting Control */
-	{1025, 0x8000, 0xFFFF},	/* Keypad Lighting Control */
-	{1026, 0x8000, 0xFFFF},	/* Aux Display Lighting Control */
-	{1027, 0xFC00, 0xFFFF},	/* Red Triode Control */
-	{1028, 0xFC00, 0xFFFF},	/* Green Triode Control */
-	{1029, 0xFC00, 0xFFFF},	/* Blue Triode Control */
-	{1030, 0xF000, 0xFFFF},	/* Camera Flash Control */
-	{1031, 0xFFC3, 0xFFFF},	/* Adaptive Boost Control */
-	{1032, 0xFC00, 0xFFFF},	/* Bluetooth LED Control */
-	{1033, 0xFC00, 0xFFFF},	/* Camera Privacy LED Control */
-	{1152, 0xFF00, 0xFFFF},	/* One Wire 1 Command */
-	{1153, 0xFF00, 0xFFFF},	/* One Wire 1 Data */
-	{1154, 0xFFFF, 0xFFFF},	/* One Wire 1 Interrupt */
-	{1155, 0xFF00, 0xFFFF},	/* One Wire 1 Interrupt Enable */
-	{1157, 0xFF00, 0xFFFF},	/* One Wire 1 Control */
-	{1160, 0xFF00, 0xFFFF},	/* One Wire 2 Command */
-	{1161, 0xFF00, 0xFFFF},	/* One Wire 2 Data */
-	{1162, 0xFFFF, 0xFFFF},	/* One Wire 2 Interrupt */
-	{1163, 0xFF00, 0xFFFF},	/* One Wire 2 Interrupt Enable */
-	{1165, 0xFF00, 0xFFFF},	/* One Wire 2 Control */
-	{1168, 0xFF00, 0xFFFF},	/* One Wire 3 Command */
-	{1169, 0xFF00, 0xFFFF},	/* One Wire 3 Data */
-	{1170, 0xFF00, 0xFFFF},	/* One Wire 3 Interrupt */
-	{1171, 0xFF00, 0xFFFF},	/* One Wire 3 Interrupt Enable */
-	{1173, 0xFF00, 0xFFFF},	/* One Wire 3 Control */
-	{1174, 0xFF00, 0xFFFF},	/* GCAI Clock Control */
-	{1175, 0xFF00, 0xFFFF},	/* GCAI GPIO Mode */
-	{1176, 0xFFE0, 0xFFFF},	/* LMR GCAI GPIO Direction */
-	{1177, 0xFFE0, 0xFFFF},	/* LMR GCAI GPIO Pull-up */
-	{1178, 0xFF00, 0xFFFF},	/* LMR GCAI GPIO Pin */
-	{1179, 0xFFE0, 0xFFFF},	/* LMR GCAI GPIO Mask */
-	{1180, 0xFF00, 0xFFFF},	/* LMR Debounce Settings */
-	{1181, 0xFF00, 0xFFFF},	/* LMR GCAI Detach Detect */
-	{1182, 0xFF07, 0xFFFF},	/* LMR Misc Bits */
-	{1183, 0xFFF8, 0xFFFF}	/* LMR Mace IC Support */
-};
-
-static const unsigned short
-    audio_bits[CPCAP_MAX_AREG - CPCAP_MIN_AREG + 1] = {
-	0x0060, /* CPCAP_REG_CPCAP_VAUDIOC */
-	0xFFFF, /* CPCAP_REG_CPCAP_CC */
-	0xBFFF, /* CPCAP_REG_CPCAP_CDI */
-	0x0FFF, /* CPCAP_REG_CPCAP_SDAC */
-	0x3FFF, /* CPCAP_REG_CPCAP_SDACDI */
-	0x0FDF, /* CPCAP_REG_CPCAP_TXI */
-	0x0FFF, /* CPCAP_REG_CPCAP_TXMP */
-	0x03FF, /* CPCAP_REG_CPCAP_RXOA */
-	0xFF3C, /* CPCAP_REG_CPCAP_RXVC */
-	0x07FF, /* CPCAP_REG_CPCAP_RXCOA */
-	0x1FFF, /* CPCAP_REG_CPCAP_RXSDOA */
-	0x7FFF, /* CPCAP_REG_CPCAP_RXEPOA */
-	0x7FFF, /* CPCAP_REG_CPCAP_RXLL */
-	0x00FF, /* CPCAP_REG_CPCAP_A2LA */
-	0xFFFF, /* CPCAP_REG_CPCAP_MIPIS1 */
-	0x00FF, /* CPCAP_REG_CPCAP_MIPIS2 */
-	0x0003, /* CPCAP_REG_CPCAP_MIPIS3 */
-	0x0003  /* CPCAP_REG_CPCAP_LVAB */
-};
-
-static const unsigned short lighting_bits[CPCAP_MAX_LREG -
-					  CPCAP_MIN_LREG + 1] = {
-	0xFFFF, /* CPCAP_REG_CPCAP_MDLC */
-	0x7FFF, /* CPCAP_REG_CPCAP_KLC */
-	0x7FFF, /* CPCAP_REG_CPCAP_ADLC */
-	0x03FF, /* CPCAP_REG_CPCAP_REDC */
-	0x03FF, /* CPCAP_REG_CPCAP_GREENC */
-	0x03FF, /* CPCAP_REG_CPCAP_BLUEC */
-	0x0FFF, /* CPCAP_REG_CPCAP_CFC */
-	0x003C, /* CPCAP_REG_CPCAP_ABC */
-	0x03FF, /* CPCAP_REG_CPCAP_BLEDC */
-	0x03FF  /* CPCAP_REG_CPCAP_CLEDC */
+	[CPCAP_REG_INT1]      = {0, 0x0004, 0x0000},
+	[CPCAP_REG_INT2]      = {1, 0x0000, 0x0000},
+	[CPCAP_REG_INT3]      = {2, 0x0000, 0x0000},
+	[CPCAP_REG_INT4]      = {3, 0xFC00, 0x0000},
+	[CPCAP_REG_INTM1]     = {4, 0x0004, 0xFFFF},
+	[CPCAP_REG_INTM2]     = {5, 0x0000, 0xFFFF},
+	[CPCAP_REG_INTM3]     = {6, 0x0000, 0xFFFF},
+	[CPCAP_REG_INTM4]     = {7, 0xFC00, 0xFFFF},
+	[CPCAP_REG_INTS1]     = {8, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_INTS2]     = {9, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_INTS3]     = {10, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_INTS4]     = {11, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ASSIGN1]   = {12, 0x80F8, 0xFFFF},
+	[CPCAP_REG_ASSIGN2]   = {13, 0x0000, 0xFFFF},
+	[CPCAP_REG_ASSIGN3]   = {14, 0x0004, 0xFFFF},
+	[CPCAP_REG_ASSIGN4]   = {15, 0x0068, 0xFFFF},
+	[CPCAP_REG_ASSIGN5]   = {16, 0x0000, 0xFFFF},
+	[CPCAP_REG_ASSIGN6]   = {17, 0xFC00, 0xFFFF},
+	[CPCAP_REG_VERSC1]    = {18, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_VERSC2]    = {19, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_MI1]       = {128, 0x0000, 0x0000},
+	[CPCAP_REG_MIM1]      = {129, 0x0000, 0xFFFF},
+	[CPCAP_REG_MI2]       = {130, 0x0000, 0xFFFF},
+	[CPCAP_REG_MIM2]      = {131, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UCC1]      = {132, 0xF000, 0xFFFF},
+	[CPCAP_REG_UCC2]      = {133, 0xFC00, 0xFFFF},
+	[CPCAP_REG_PC1]       = {135, 0xFC00, 0xFFFF},
+	[CPCAP_REG_PC2]       = {136, 0xFC00, 0xFFFF},
+	[CPCAP_REG_BPEOL]     = {137, 0xFE00, 0xFFFF},
+	[CPCAP_REG_PGC]       = {138, 0xFE00, 0xFFFF},
+	[CPCAP_REG_MT1]       = {139, 0x0000, 0x0000},
+	[CPCAP_REG_MT2]       = {140, 0x0000, 0x0000},
+	[CPCAP_REG_MT3]       = {141, 0x0000, 0x0000},
+	[CPCAP_REG_PF]        = {142, 0x0000, 0xFFFF},
+	[CPCAP_REG_SCC]       = {256, 0xFF00, 0xFFFF},
+	[CPCAP_REG_SW1]       = {257, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_SW2]       = {258, 0xFC7F, 0xFFFF},
+	[CPCAP_REG_UCTM]      = {259, 0xFFFE, 0xFFFF},
+	[CPCAP_REG_TOD1]      = {260, 0xFF00, 0xFFFF},
+	[CPCAP_REG_TOD2]      = {261, 0xFE00, 0xFFFF},
+	[CPCAP_REG_TODA1]     = {262, 0xFF00, 0xFFFF},
+	[CPCAP_REG_TODA2]     = {263, 0xFE00, 0xFFFF},
+	[CPCAP_REG_DAY]       = {264, 0x8000, 0xFFFF},
+	[CPCAP_REG_DAYA]      = {265, 0x8000, 0xFFFF},
+	[CPCAP_REG_VAL1]      = {266, 0x0000, 0xFFFF},
+	[CPCAP_REG_VAL2]      = {267, 0x0000, 0xFFFF},
+	[CPCAP_REG_SDVSPLL]   = {384, 0x2488, 0xFFFF},
+	[CPCAP_REG_SI2CC1]    = {385, 0x8080, 0xFFFF},
+	[CPCAP_REG_Si2CC2]    = {386, 0xFF00, 0xFFFF},
+	[CPCAP_REG_S1C1]      = {387, 0x9080, 0xFFFF},
+	[CPCAP_REG_S1C2]      = {388, 0x8080, 0xFFFF},
+	[CPCAP_REG_S2C1]      = {389, 0x9080, 0xFFFF},
+	[CPCAP_REG_S2C2]      = {390, 0x8080, 0xFFFF},
+	[CPCAP_REG_S3C]       = {391, 0xFA84, 0xFFFF},
+	[CPCAP_REG_S4C1]      = {392, 0x9080, 0xFFFF},
+	[CPCAP_REG_S4C2]      = {393, 0x8080, 0xFFFF},
+	[CPCAP_REG_S5C]       = {394, 0xFFD5, 0xFFFF},
+	[CPCAP_REG_S6C]       = {395, 0xFFF4, 0xFFFF},
+	[CPCAP_REG_VCAMC]     = {396, 0xFF48, 0xFFFF},
+	[CPCAP_REG_VCSIC]     = {397, 0xFFA8, 0xFFFF},
+	[CPCAP_REG_VDACC]     = {398, 0xFF48, 0xFFFF},
+	[CPCAP_REG_VDIGC]     = {399, 0xFF48, 0xFFFF},
+	[CPCAP_REG_VFUSEC]    = {400, 0xFF50, 0xFFFF},
+	[CPCAP_REG_VHVIOC]    = {401, 0xFFE8, 0xFFFF},
+	[CPCAP_REG_VSDIOC]    = {402, 0xFF40, 0xFFFF},
+	[CPCAP_REG_VPLLC]     = {403, 0xFFA4, 0xFFFF},
+	[CPCAP_REG_VRF1C]     = {404, 0xFF52, 0xFFFF},
+	[CPCAP_REG_VRF2C]     = {405, 0xFFD4, 0xFFFF},
+	[CPCAP_REG_VRFREFC]   = {406, 0xFFD4, 0xFFFF},
+	[CPCAP_REG_VWLAN1C]   = {407, 0xFFA8, 0xFFFF},
+	[CPCAP_REG_VWLAN2C]   = {408, 0xFD32, 0xFFFF},
+	[CPCAP_REG_VSIMC]     = {409, 0xE154, 0xFFFF},
+	[CPCAP_REG_VVIBC]     = {410, 0xFFF2, 0xFFFF},
+	[CPCAP_REG_VUSBC]     = {411, 0xFEA2, 0xFFFF},
+	[CPCAP_REG_VUSBINT1C] = {412, 0xFFD4, 0xFFFF},
+	[CPCAP_REG_VUSBINT2C] = {413, 0xFFD4, 0xFFFF},
+	[CPCAP_REG_URT]       = {414, 0xFFFE, 0xFFFF},
+	[CPCAP_REG_URM1]      = {415, 0x0000, 0xFFFF},
+	[CPCAP_REG_URM2]      = {416, 0xFC00, 0xFFFF},
+	[CPCAP_REG_VAUDIOC]   = {512, 0xFF88, 0xFFFF},
+	[CPCAP_REG_CC]        = {513, 0x0000, 0xFEDF},
+	[CPCAP_REG_CDI]       = {514, 0x4000, 0xFFFF},
+	[CPCAP_REG_SDAC]      = {515, 0xF000, 0xFCFF},
+	[CPCAP_REG_SDACDI]    = {516, 0xC000, 0xFFFF},
+	[CPCAP_REG_TXI]       = {517, 0x0000, 0xFFFF},
+	[CPCAP_REG_TXMP]      = {518, 0xF000, 0xFFFF},
+	[CPCAP_REG_RXOA]      = {519, 0xF800, 0xFFFF},
+	[CPCAP_REG_RXVC]      = {520, 0x00C3, 0xFFFF},
+	[CPCAP_REG_RXCOA]     = {521, 0xF800, 0xFFFF},
+	[CPCAP_REG_RXSDOA]    = {522, 0xE000, 0xFFFF},
+	[CPCAP_REG_RXEPOA]    = {523, 0x8000, 0xFFFF},
+	[CPCAP_REG_RXLL]      = {524, 0x0000, 0xFFFF},
+	[CPCAP_REG_A2LA]      = {525, 0xFF00, 0xFFFF},
+	[CPCAP_REG_MIPIS1]    = {526, 0x0000, 0xFFFF},
+	[CPCAP_REG_MIPIS2]    = {527, 0xFF00, 0xFFFF},
+	[CPCAP_REG_MIPIS3]    = {528, 0xFFFC, 0xFFFF},
+	[CPCAP_REG_LVAB]      = {529, 0xFFFC, 0xFFFF},
+	[CPCAP_REG_CCC1]      = {640, 0xFFF0, 0xFFFF},
+	[CPCAP_REG_CRM]       = {641, 0xC000, 0xFFFF},
+	[CPCAP_REG_CCCC2]     = {642, 0xFFC0, 0xFFFF},
+	[CPCAP_REG_CCS1]      = {643, 0x0000, 0xFFFF},
+	[CPCAP_REG_CCS2]      = {644, 0xFF00, 0xFFFF},
+	[CPCAP_REG_CCA1]      = {645, 0x0000, 0xFFFF},
+	[CPCAP_REG_CCA2]      = {646, 0x0000, 0xFFFF},
+	[CPCAP_REG_CCM]       = {647, 0xFC00, 0xFFFF},
+	[CPCAP_REG_CCO]       = {648, 0xFC00, 0xFFFF},
+	[CPCAP_REG_CCI]       = {649, 0xC000, 0xFFFF},
+	[CPCAP_REG_ADCC1]     = {768, 0x0000, 0xFFFF},
+	[CPCAP_REG_ADCC2]     = {769, 0x0080, 0xFFFF},
+	[CPCAP_REG_ADCD0]     = {770, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD1]     = {771, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD2]     = {772, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD3]     = {773, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD4]     = {774, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD5]     = {775, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD6]     = {776, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCD7]     = {777, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCAL1]    = {778, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_ADCAL2]    = {779, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_USBC1]     = {896, 0x0000, 0xFFFF},
+	[CPCAP_REG_USBC2]     = {897, 0x0000, 0xFFFF},
+	[CPCAP_REG_USBC3]     = {898, 0x8200, 0xFFFF},
+	[CPCAP_REG_UVIDL]     = {899, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UVIDH]     = {900, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UPIDL]     = {901, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UPIDH]     = {902, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UFC1]      = {903, 0xFF80, 0xFFFF},
+	[CPCAP_REG_UFC2]      = {904, 0xFF80, 0xFFFF},
+	[CPCAP_REG_UFC3]      = {905, 0xFF80, 0xFFFF},
+	[CPCAP_REG_UIC1]      = {906, 0xFF64, 0xFFFF},
+	[CPCAP_REG_UIC2]      = {907, 0xFF64, 0xFFFF},
+	[CPCAP_REG_UIC3]      = {908, 0xFF64, 0xFFFF},
+	[CPCAP_REG_USBOTG1]   = {909, 0xFFC0, 0xFFFF},
+	[CPCAP_REG_USBOTG2]   = {910, 0xFFC0, 0xFFFF},
+	[CPCAP_REG_USBOTG3]   = {911, 0xFFC0, 0xFFFF},
+	[CPCAP_REG_UIER1]     = {912, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIER2]     = {913, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIER3]     = {914, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIEF1]     = {915, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIEF2]     = {916, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIEF3]     = {917, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_UIS]       = {918, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_UIL]       = {919, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_USBD]      = {920, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_SCR1]      = {921, 0xFF00, 0xFFFF},
+	[CPCAP_REG_SCR2]      = {922, 0xFF00, 0xFFFF},
+	[CPCAP_REG_SCR3]      = {923, 0xFF00, 0xFFFF},
+	[CPCAP_REG_VMC]       = {939, 0xFFFE, 0xFFFF},
+	[CPCAP_REG_OWDC]      = {940, 0xFFFC, 0xFFFF},
+	[CPCAP_REG_GPIO0]     = {941, 0x0D11, 0x3FFF},
+	[CPCAP_REG_GPIO1]     = {943, 0x0D11, 0x3FFF},
+	[CPCAP_REG_GPIO2]     = {945, 0x0D11, 0x3FFF},
+	[CPCAP_REG_GPIO3]     = {947, 0x0D11, 0x3FFF},
+	[CPCAP_REG_GPIO4]     = {949, 0x0D11, 0x3FFF},
+	[CPCAP_REG_GPIO5]     = {951, 0x0C11, 0x3FFF},
+	[CPCAP_REG_GPIO6]     = {953, 0x0C11, 0x3FFF},
+	[CPCAP_REG_MDLC]      = {1024, 0x0000, 0xFFFF},
+	[CPCAP_REG_KLC]       = {1025, 0x8000, 0xFFFF},
+	[CPCAP_REG_ADLC]      = {1026, 0x8000, 0xFFFF},
+	[CPCAP_REG_REDC]      = {1027, 0xFC00, 0xFFFF},
+	[CPCAP_REG_GREENC]    = {1028, 0xFC00, 0xFFFF},
+	[CPCAP_REG_BLUEC]     = {1029, 0xFC00, 0xFFFF},
+	[CPCAP_REG_CFC]       = {1030, 0xF000, 0xFFFF},
+	[CPCAP_REG_ABC]       = {1031, 0xFFC3, 0xFFFF},
+	[CPCAP_REG_BLEDC]     = {1032, 0xFC00, 0xFFFF},
+	[CPCAP_REG_CLEDC]     = {1033, 0xFC00, 0xFFFF},
+	[CPCAP_REG_OW1C]      = {1152, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW1D]      = {1153, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW1I]      = {1154, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_OW1IE]     = {1155, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW1]       = {1157, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW2C]      = {1160, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW2D]      = {1161, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW2I]      = {1162, 0xFFFF, 0xFFFF},
+	[CPCAP_REG_OW2IE]     = {1163, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW2]       = {1165, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW3C]      = {1168, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW3D]      = {1169, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW3I]      = {1170, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW3IE]     = {1171, 0xFF00, 0xFFFF},
+	[CPCAP_REG_OW3]       = {1173, 0xFF00, 0xFFFF},
+	[CPCAP_REG_GCAIC]     = {1174, 0xFF00, 0xFFFF},
+	[CPCAP_REG_GCAIM]     = {1175, 0xFF00, 0xFFFF},
+	[CPCAP_REG_LGDIR]     = {1176, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_LGPU]      = {1177, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_LGPIN]     = {1178, 0xFF00, 0xFFFF},
+	[CPCAP_REG_LGMASK]    = {1179, 0xFFE0, 0xFFFF},
+	[CPCAP_REG_LDEB]      = {1180, 0xFF00, 0xFFFF},
+	[CPCAP_REG_LGDET]     = {1181, 0xFF00, 0xFFFF},
+	[CPCAP_REG_LMISC]     = {1182, 0xFF07, 0xFFFF},
+	[CPCAP_REG_LMACE]     = {1183, 0xFFF8, 0xFFFF},
 };
 
 static int cpcap_spi_access(struct spi_device *spi, u8 *buf,
@@ -345,7 +301,7 @@ static int cpcap_config_for_write(struct spi_device *spi, unsigned short reg,
 	return status;
 }
 
-int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
+int cpcap_regacc_read(struct cpcap_device *cpcap, enum cpcap_reg reg,
 		      unsigned short *value_ptr)
 {
 	int retval = -EINVAL;
@@ -364,7 +320,7 @@ int cpcap_regacc_read(struct cpcap_device *cpcap, unsigned short reg,
 }
 
 int cpcap_regacc_write(struct cpcap_device *cpcap,
-		       unsigned short reg,
+		       enum cpcap_reg reg,
 		       unsigned short value,
 		       unsigned short mask)
 {
@@ -375,14 +331,16 @@ int cpcap_regacc_write(struct cpcap_device *cpcap,
 
 	data = (struct cpcap_platform_data *)spi->controller_data;
 
-	if (IS_CPCAP(reg) && (mask & register_info_tbl[reg].constant_mask) == 0) {
+	if (IS_CPCAP(reg) &&
+	    (mask & register_info_tbl[reg].constant_mask) == 0) {
 		mutex_lock(&reg_access);
 
 		value &= mask;
 
 		if ((register_info_tbl[reg].rbw_mask) != 0) {
 			retval = cpcap_config_for_read(spi, register_info_tbl
-						       [reg].address, &old_value);
+						       [reg].address,
+						       &old_value);
 			if (retval != 0)
 				goto error;
 		}
@@ -422,66 +380,3 @@ int cpcap_regacc_init(struct cpcap_device *cpcap)
 
 	return retval;
 }
-
-int cpcap_audio_read_reg(struct cpcap_device *cpcap, unsigned short reg,
-			 unsigned short *value)
-{
-	int retval = -EINVAL;
-
-	if ((reg >= CPCAP_MIN_AREG)
-	    && (reg <= CPCAP_MAX_AREG)) {
-		retval = cpcap_regacc_read(cpcap, reg, value);
-	}
-
-	return retval;
-}
-EXPORT_SYMBOL(cpcap_audio_read_reg);
-
-int cpcap_audio_write_reg(struct cpcap_device *cpcap, unsigned short reg,
-			  unsigned short value, unsigned short mask)
-{
-	int retval = -EINVAL;
-
-	if ((reg >= CPCAP_MIN_AREG) &&
-	    (reg <= CPCAP_MAX_AREG) &&
-	    ((mask & ~(audio_bits[AREG_INDEX(reg)])) == 0)) {
-		retval = cpcap_regacc_write(cpcap, reg, value, mask);
-	}
-
-	return retval;
-}
-EXPORT_SYMBOL(cpcap_audio_write_reg);
-
-int cpcap_lighting_read_reg(struct cpcap_device *cpcap, unsigned short reg,
-			    unsigned short *value)
-{
-	int retval = -EINVAL;
-
-	if ((reg >= CPCAP_MIN_LREG)
-	    && (reg <= CPCAP_MAX_LREG)) {
-		retval = cpcap_regacc_read(cpcap, reg, value);
-	} else if (reg == CPCAP_REG_CRM) {
-		retval = cpcap_regacc_read(cpcap, reg, value);
-		*value &= CPCAP_BIT_CHRG_LED_EN;
-	}
-
-	return retval;
-}
-EXPORT_SYMBOL(cpcap_lighting_read_reg);
-
-int cpcap_lighting_write_reg(struct cpcap_device *cpcap, unsigned short reg,
-			     unsigned short value, unsigned short mask)
-{
-	int retval = -EINVAL;
-
-	if (((reg >= CPCAP_MIN_LREG) &&
-	     (reg <= CPCAP_MAX_LREG) &&
-	     ((mask & ~(lighting_bits[LREG_INDEX(reg)])) == 0)) ||
-	    ((reg == CPCAP_REG_CRM) &&
-	     (mask == CPCAP_BIT_CHRG_LED_EN))) {
-		retval = cpcap_regacc_write(cpcap, reg, value, mask);
-	}
-
-	return retval;
-}
-EXPORT_SYMBOL(cpcap_lighting_write_reg);
