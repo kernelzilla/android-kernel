@@ -79,6 +79,7 @@ struct cpcap_usb_det_data {
 	enum cpcap_accy usb_accy;
 	struct platform_device *usb_dev;
 	struct regulator *regulator;
+	unsigned char is_vusb_enabled;
 };
 
 static const char *accy_devices[] = {
@@ -86,6 +87,22 @@ static const char *accy_devices[] = {
 	"cpcap_factory",
 	"cpcap_charger",
 };
+
+static void vusb_enable(struct cpcap_usb_det_data *data)
+{
+	if (!data->is_vusb_enabled) {
+		regulator_enable(data->regulator);
+		data->is_vusb_enabled = 1;
+	}
+}
+
+static void vusb_disable(struct cpcap_usb_det_data *data)
+{
+	if (data->is_vusb_enabled) {
+		regulator_disable(data->regulator);
+		data->is_vusb_enabled = 0;
+	}
+}
 
 static int get_sense(struct cpcap_usb_det_data *data)
 {
@@ -154,9 +171,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2,
 					     CPCAP_BIT_USBXCVREN,
 					     CPCAP_BIT_USBXCVREN);
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
-					     CPCAP_BIT_VUSB,
-					     CPCAP_BIT_VUSB);
 		/* Give USB driver control of pull up via ULPI. */
 		retval  = cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3,
 					     0,
@@ -169,9 +183,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_VBUSPD);
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 0,
 					     CPCAP_BIT_USBXCVREN);
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
-					     CPCAP_BIT_VUSB,
-					     CPCAP_BIT_VUSB);
 		break;
 
 	case CPCAP_ACCY_NONE:
@@ -180,9 +191,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_VBUSPD);
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 0,
 					     CPCAP_BIT_USBXCVREN);
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC,
-					     0,
-					     CPCAP_BIT_VUSB);
 		break;
 	}
 
@@ -194,9 +202,8 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
-	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL)) {
+	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
 		platform_device_del(data->usb_dev);
-	}
 
 	configure_hardware(data, accy);
 	data->usb_accy = accy;
@@ -205,9 +212,8 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		data->usb_dev = platform_device_alloc(accy_devices[accy], -1);
 		data->usb_dev->dev.platform_data = data->cpcap;
 		platform_device_add(data->usb_dev);
-	} else {
-		regulator_disable(data->regulator);
-	}
+	} else
+		vusb_disable(data);
 }
 
 static void detection_work(struct work_struct *work)
@@ -217,7 +223,7 @@ static void detection_work(struct work_struct *work)
 
 	switch (data->state) {
 	case CONFIG:
-		regulator_enable(data->regulator);
+		vusb_enable(data);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_DET);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SE1);
@@ -308,7 +314,7 @@ static void detection_work(struct work_struct *work)
 
 	default:
 		/* This shouldn't happen.  Need to reset state machine. */
-		regulator_disable(data->regulator);
+		vusb_disable(data);
 		data->state = CONFIG;
 		schedule_delayed_work(&data->work, 0);
 		break;
