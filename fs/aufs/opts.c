@@ -455,10 +455,10 @@ static void dump_opts(struct au_opts *opts)
 			AuLabel(notrunc_xib);
 			break;
 		case Opt_shwh:
-			LKTRLabel(shwh);
+			AuLabel(shwh);
 			break;
 		case Opt_noshwh:
-			LKTRLabel(noshwh);
+			AuLabel(noshwh);
 			break;
 		case Opt_plink:
 			AuLabel(plink);
