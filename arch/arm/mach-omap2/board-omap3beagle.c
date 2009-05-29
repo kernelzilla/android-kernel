@@ -188,13 +188,13 @@ static struct platform_device beagle_dss_device = {
 	},
 };
 
-static struct regulator_consumer_supply beagle_vdac_supply = {
-	.supply		= "vdac",
+static struct regulator_consumer_supply beagle_vdda_dac_supply = {
+	.supply		= "vdda_dac",
 	.dev		= &beagle_dss_device.dev,
 };
 
-static struct regulator_consumer_supply beagle_vdvi_supply = {
-	.supply		= "vdvi",
+static struct regulator_consumer_supply beagle_vdds_dsi_supply = {
+	.supply		= "vdds_dsi",
 	.dev		= &beagle_dss_device.dev,
 };
 
@@ -323,7 +323,7 @@ static struct regulator_init_data beagle_vdac = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &beagle_vdac_supply,
+	.consumer_supplies	= &beagle_vdda_dac_supply,
 };
 
 /* VPLL2 for digital video outputs */
@@ -338,7 +338,7 @@ static struct regulator_init_data beagle_vpll2 = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &beagle_vdvi_supply,
+	.consumer_supplies	= &beagle_vdds_dsi_supply,
 };
 
 static const struct twl4030_resconfig beagle_resconfig[] = {
