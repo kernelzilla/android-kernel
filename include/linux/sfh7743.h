@@ -19,9 +19,14 @@
 #ifndef _LINUX_SFH7743_H_
 #define _LINUX_SFH7743_H_
 
+#include <linux/device.h>
+#include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
+
 #define SFH7743_PROXIMITY_NEAR	0
 #define SFH7743_PROXIMITY_FAR	0xFFFFFFFF
 #define SFH7743_MODULE_NAME	"sfh7743"
+#define SFH7743_NO_REGULATOR	"no_reg"
 
 #define SFH7743_DISABLED 0
 #define SFH7743_ENABLED  1
@@ -30,8 +35,7 @@
 
 struct sfh7743_platform_data {
 	u8 gpio_prox_int;
-	int (*power_on)(void);
-	int (*power_off)(void);
+	const char *regulator;
 } __attribute__ ((packed));
 
 #endif /* __KERNEL__ */

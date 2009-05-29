@@ -24,23 +24,20 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
-#include <linux/platform_device.h>
-
 #include <linux/gpio.h>
 #include <linux/uaccess.h>
-
 #include <linux/sfh7743.h>
+
 
 struct sfh7743_data {
 	int enabled;
 	int gpio_intr;
 	int irq;
+	struct regulator *regulator;
 	struct mutex lock;
 	struct work_struct wq;
 	struct workqueue_struct *working_queue;
 	struct input_dev *idev;
-	int (*power_on)(void);
-	int (*power_off)(void);
 };
 
 static irqreturn_t sfh7743_irq_handler(int irq, void *dev)
@@ -78,15 +75,18 @@ static void sfh7743_irq_bottom_half(struct work_struct *work)
 int sfh7743_input_open(struct input_dev *input)
 {
 	struct sfh7743_data *info = input_get_drvdata(input);
+	int reg_status = 0;
 
 	mutex_lock(&info->lock);
-	if (info->power_on) {
-		info->power_on();
-		info->enabled = SFH7743_ENABLED;
+	if (info->regulator) {
+		reg_status = regulator_enable(info->regulator);
+		if (!reg_status)
+			info->enabled = SFH7743_ENABLED;
 	} else
-		pr_err("%s: Power on func is NULL\n", __func__);
+		info->enabled = SFH7743_ENABLED;
 
 	mutex_unlock(&info->lock);
+
 	return 0;
 }
 
@@ -95,11 +95,10 @@ void sfh7743_input_close(struct input_dev *dev)
 	struct sfh7743_data *info = input_get_drvdata(dev);
 
 	mutex_lock(&info->lock);
-	if (info->power_off) {
-		info->power_off();
-		info->enabled = SFH7743_DISABLED;
-	} else
-		pr_err("%s: Power off func is NULL\n", __func__);
+	if (info->regulator)
+		regulator_disable(info->regulator);
+
+	info->enabled = SFH7743_DISABLED;
 
 	mutex_unlock(&info->lock);
 }
@@ -108,10 +107,12 @@ static int __devexit sfh7743_remove(struct platform_device *pdev)
 {
 	struct sfh7743_data *info = platform_get_drvdata(pdev);
 
-	if (info->power_off) {
-		info->power_off();
-		info->enabled = SFH7743_DISABLED;
+	if (info->regulator) {
+		regulator_disable(info->regulator);
+		regulator_put(info->regulator);
 	}
+
+	info->enabled = SFH7743_DISABLED;
 
 	if (info->irq != -1)
 		free_irq(info->irq, 0);
@@ -141,9 +142,20 @@ static int sfh7743_probe(struct platform_device *pdev)
 	}
 
 	info->gpio_intr = pdata->gpio_prox_int;
-	info->power_on = pdata->power_on;
-	info->power_off = pdata->power_off;
 	info->irq = gpio_to_irq(info->gpio_intr);
+
+	if (strcmp(pdata->regulator, SFH7743_NO_REGULATOR)) {
+		info->regulator = regulator_get(&pdev->dev, pdata->regulator);
+		if (IS_ERR(info->regulator)) {
+			pr_err("%s: Cannot get %s regulator\n",
+				__func__, pdata->regulator);
+			error = PTR_ERR(info->regulator);
+			goto exit_request_reg_failed;
+
+		}
+	} else {
+		info->regulator = NULL;
+	}
 
 	info->working_queue = create_singlethread_workqueue("sfh7743_wq");
 	INIT_WORK(&info->wq, sfh7743_irq_bottom_half);
@@ -182,13 +194,6 @@ static int sfh7743_probe(struct platform_device *pdev)
 		goto exit_input_register_device_failed;
 	}
 
-	if (info->power_on)
-		info->power_on();
-	info->enabled = SFH7743_ENABLED;
-
-	disable_irq_nosync(info->irq);
-	queue_work(info->working_queue, &info->wq);
-
 	return 0;
 
 exit_input_register_device_failed:
@@ -196,6 +201,7 @@ exit_input_register_device_failed:
 	info->idev = NULL;
 exit_input_dev_alloc_failed:
 	free_irq(info->irq, 0);
+exit_request_reg_failed:
 exit_request_irq_failed:
 	kfree(info);
 	return error;
