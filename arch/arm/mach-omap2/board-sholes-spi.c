@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/irq.h>
+#include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -19,6 +20,8 @@
 #include <mach/mcspi.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
+
+extern struct platform_device sfh7743_platform_device;
 
 struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_ASSIGN1,   0x0101},
@@ -87,7 +90,7 @@ struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
 };
 
 struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
-	REGULATOR_CONSUMER("vsdio", NULL /* prox sensor */),
+	REGULATOR_CONSUMER("vsdio", &sfh7743_platform_device.dev),
 };
 
 struct regulator_consumer_supply cpcap_vwlan2_consumers[] = {
