@@ -58,11 +58,23 @@ struct cpcap_usb {
 	bool			irq_enabled;
 };
 
-/* internal define on top of container_of */
-#define xceiv_to_twl(x)		container_of((x), struct cpcap_usb, otg);
+#define xceiv_to_cpcap(x) container_of((x), struct cpcap_usb, otg)
 
 static int cpcap_set_suspend(struct otg_transceiver *x, int suspend)
 {
+	return 0;
+}
+
+static int cpcap_set_power(struct otg_transceiver *x, unsigned int mA)
+{
+	struct cpcap_usb *cpcap;
+
+	if (!x)
+		return -ENODEV;
+
+	cpcap = xceiv_to_cpcap(x);
+	cpcap_batt_set_usb_prop(cpcap->cpcap, 1, mA);
+
 	return 0;
 }
 
@@ -74,7 +86,7 @@ static int cpcap_set_peripheral(struct otg_transceiver *x,
 	if (!x)
 		return -ENODEV;
 
-	cpcap = xceiv_to_twl(x);
+	cpcap = xceiv_to_cpcap(x);
 	cpcap->otg.gadget = gadget;
 	if (!gadget)
 		cpcap->otg.state = OTG_STATE_UNDEFINED;
@@ -89,7 +101,7 @@ static int cpcap_set_host(struct otg_transceiver *x, struct usb_bus *host)
 	if (!x)
 		return -ENODEV;
 
-	cpcap = xceiv_to_twl(x);
+	cpcap = xceiv_to_cpcap(x);
 	cpcap->otg.host = host;
 	if (!host)
 		cpcap->otg.state = OTG_STATE_UNDEFINED;
@@ -130,6 +142,7 @@ static int __init cpcap_usb_probe(struct platform_device *pdev)
 	cpcap->otg.set_host		= cpcap_set_host;
 	cpcap->otg.set_peripheral	= cpcap_set_peripheral;
 	cpcap->otg.set_suspend		= cpcap_set_suspend;
+	cpcap->otg.set_power		= cpcap_set_power;
 	cpcap->asleep			= 1;
 	cpcap->cpcap			= pdev->dev.platform_data;
 

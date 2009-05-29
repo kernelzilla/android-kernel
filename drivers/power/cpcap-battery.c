@@ -494,18 +494,23 @@ void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
 
-	sply->ac_state.online = online;
-	power_supply_changed(&sply->ac);
+	if (sply != NULL) {
+		sply->ac_state.online = online;
+		power_supply_changed(&sply->ac);
+	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_ac_prop);
 
-void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online, int curr)
+void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online,
+			     unsigned int curr)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
 
-	sply->usb_state.online = online;
-	sply->usb_state.current_now = curr;
-	power_supply_changed(&sply->usb);
+	if (sply != NULL) {
+		sply->usb_state.online = online;
+		sply->usb_state.current_now = curr;
+		power_supply_changed(&sply->usb);
+	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_usb_prop);
 

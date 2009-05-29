@@ -607,6 +607,7 @@ void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
 
 void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
 
-void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online, int curr);
+void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online,
+			     unsigned int curr);
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SPI_CPCAP_H */

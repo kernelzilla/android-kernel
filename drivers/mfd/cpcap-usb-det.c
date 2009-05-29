@@ -83,7 +83,7 @@ struct cpcap_usb_det_data {
 };
 
 static const char *accy_devices[] = {
-	"cpcap_usb_dev",
+	"cpcap_usb_charger",
 	"cpcap_factory",
 	"cpcap_charger",
 };
