@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/mm.h>
 #include <linux/qtouch_obp_ts.h>
+#include <linux/led-lm3530.h>
 #include <linux/usb/omap.h>
 
 #include <asm/mach-types.h>
@@ -51,6 +52,7 @@
 #define SHOLES_AP_TO_BP_FLASH_EN_GPIO	157
 #define SHOLES_TOUCH_RESET_N_GPIO	164
 #define SHOLES_TOUCH_INT_GPIO		99
+#define SHOLES_LM_3530_INT_GPIO     92
 
 static void __init sholes_init_irq(void)
 {
@@ -91,6 +93,14 @@ static void sholes_touch_init(void)
 	gpio_request(SHOLES_TOUCH_INT_GPIO, "sholes touch irq");
 	gpio_direction_input(SHOLES_TOUCH_INT_GPIO);
 	omap_cfg_reg(AG17_34XX_GPIO99);
+}
+
+static void sholes_als_init(void)
+{
+	printk(KERN_INFO "%s:Initializing\n", __func__);
+	gpio_request(SHOLES_LM_3530_INT_GPIO, "sholes als int");
+	gpio_direction_input(SHOLES_LM_3530_INT_GPIO);
+	omap_cfg_reg(AC27_34XX_GPIO92);
 }
 
 static struct qtouch_key sholes_touch_key_list[] = {
@@ -176,12 +186,41 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	},
 };
 
+static struct lm3530_platform_data omap3430_als_light_data = {
+	.gen_config = 0xB3,
+	.als_config = 0x7E,
+	.brightness_ramp = 0x2F,
+	.als_zone_info = 0x00,
+	.als_resistor_sel = 0x82,
+	.brightness_control = 0x00,
+	.zone_boundary_0 = 0x14,
+	.zone_boundary_1 = 0x33,
+	.zone_boundary_2 = 0x80,
+	.zone_boundary_3 = 0xC9,
+	.zone_target_0 = 0x19,
+	.zone_target_1 = 0x33,
+	.zone_target_2 = 0x4c,
+	.zone_target_3 = 0x66,
+	.zone_target_4 = 0x7f,
+	.zone_data_0 = 0x23,
+	.zone_data_1 = 0x27,
+	.zone_data_2 = 0x2B,
+	.zone_data_3 = 0x2F,
+	.zone_data_4 = 0x33,
+};
+
 static struct i2c_board_info __initdata sholes_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO(QTOUCH_TS_NAME, 0x11),
 		.platform_data = &sholes_ts_platform_data,
 		.irq = OMAP_GPIO_IRQ(SHOLES_TOUCH_INT_GPIO),
 	},
+	{
+		I2C_BOARD_INFO(LD_LM3530_NAME, 0x38),
+		.platform_data = &omap3430_als_light_data,
+		.irq = OMAP_GPIO_IRQ(SHOLES_LM_3530_INT_GPIO),
+	},
+
 };
 
 static int __init sholes_i2c_init(void)
@@ -456,6 +495,7 @@ static void __init sholes_init(void)
 	sholes_spi_init();
 	sholes_flash_init();
 	sholes_serial_init();
+	sholes_als_init();
 	sholes_panel_init();
 	sholes_sensors_init();
 	sholes_touch_init();
