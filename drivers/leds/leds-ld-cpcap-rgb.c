@@ -18,7 +18,7 @@
 
 #include <linux/err.h>
 #include <linux/leds.h>
-#include <linux/leds-ld-cpcap-rgb.h>
+#include <linux/leds-ld-cpcap.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/cpcap.h>
@@ -137,10 +137,10 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 	info->cpcap = pdev->dev.platform_data;
 	platform_set_drvdata(pdev, info);
 
-	info->regulator = regulator_get(&pdev->dev, LD_MSG_IND_SUPPLY);
+	info->regulator = regulator_get(&pdev->dev, LD_SUPPLY);
 	if (IS_ERR(info->regulator)) {
 		pr_err("%s: Cannot get %s regulator\n", __func__,
-		       LD_MSG_IND_SUPPLY);
+		       LD_SUPPLY);
 		ret = PTR_ERR(info->regulator);
 		goto exit_request_reg_failed;
 	} else {
@@ -203,7 +203,7 @@ static struct platform_driver ld_msg_ind_rgb_driver = {
 	.probe = msg_ind_rgb_probe,
 	.remove = msg_ind_rgb_remove,
 	.driver = {
-		   .name = LD_MSG_IND_RGB_DEV,
+		   .name = LD_MSG_IND_DEV,
 	},
 };
 

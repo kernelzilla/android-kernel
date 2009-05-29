@@ -18,7 +18,7 @@
 
 #include <linux/err.h>
 #include <linux/leds.h>
-#include <linux/leds-ld-cpcap-disp.h>
+#include <linux/leds-ld-cpcap.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/cpcap.h>
@@ -101,10 +101,10 @@ static int disp_button_probe(struct platform_device *pdev)
 	info->cpcap = pdev->dev.platform_data;
 	platform_set_drvdata(pdev, info);
 
-	info->regulator = regulator_get(&pdev->dev, LD_BUTTON_BACKLIGHT_SUPPLY);
+	info->regulator = regulator_get(&pdev->dev, LD_SUPPLY);
 	if (IS_ERR(info->regulator)) {
 			pr_err("%s: Cannot get %s regulator\n",
-				__func__, LD_BUTTON_BACKLIGHT_SUPPLY);
+				__func__, LD_SUPPLY);
 			ret = PTR_ERR(info->regulator);
 			goto exit_request_reg_failed;
 
@@ -146,7 +146,7 @@ static struct platform_driver ld_disp_button_driver = {
 	.probe = disp_button_probe,
 	.remove =  disp_button_remove,
 	.driver = {
-		   .name = LD_BUTTON_BACKLIGHT_DEV,
+		   .name = LD_DISP_BUTTON_DEV,
 		   },
 };
 
