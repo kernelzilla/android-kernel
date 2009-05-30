@@ -276,7 +276,7 @@ int __init musb_platform_init(struct musb *musb)
 
 	if (is_host_enabled(musb))
 		musb->board_set_vbus = omap_set_vbus;
-	if (is_peripheral_enabled(musb))
+	if (!musb->xceiv.set_power && is_peripheral_enabled(musb))
 		musb->xceiv.set_power = omap_set_power;
 	musb->a_wait_bcon = MUSB_TIMEOUT_A_WAIT_BCON;
 

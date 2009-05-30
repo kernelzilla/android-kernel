@@ -460,7 +460,7 @@ static int __init omap_i2c_init(void)
 static void config_wlan_gpio(void)
 {
 	/* WLAN PW_EN and IRQ */
-	omap_cfg_reg(B24_3430_GPIO101);
+	omap_cfg_reg(B24_3430_GPIO101_OUT);
 	omap_cfg_reg(W21_3430_GPIO162);
 }
 
