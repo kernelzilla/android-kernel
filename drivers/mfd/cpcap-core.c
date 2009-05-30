@@ -17,6 +17,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/leds-ld-cpcap-rgb.h>
 #include <linux/miscdevice.h>
 #include <linux/leds-ld-cpcap-disp.h>
 #include <linux/platform_device.h>
@@ -80,6 +81,13 @@ struct platform_device cpcap_disp_button_led = {
 	},
 };
 
+struct platform_device cpcap_rgb_led = {
+	.name		= LD_MSG_IND_RGB_DEV,
+	.id		= -1,
+	.dev		= {
+		.platform_data  = NULL,
+	},
+};
 
 #ifdef CONFIG_CPCAP_USB
 static struct platform_device cpcap_usb_device = {
@@ -118,6 +126,7 @@ static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_key_device,
 	&cpcap_batt_device,
 	&cpcap_disp_button_led,
+	&cpcap_rgb_led,
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
