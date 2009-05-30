@@ -23,6 +23,7 @@
 
 extern struct platform_device sfh7743_platform_device;
 extern struct platform_device cpcap_disp_button_led;
+extern struct platform_device cpcap_rgb_led;
 
 struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_ASSIGN1,   0x0101},
@@ -77,6 +78,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 
 struct regulator_consumer_supply cpcap_sw5_consumers[] = {
 	REGULATOR_CONSUMER("sw5", &cpcap_disp_button_led.dev),
+	REGULATOR_CONSUMER("sw5", &cpcap_rgb_led.dev),
 };
 
 struct regulator_consumer_supply cpcap_vcam_consumers[] = {
