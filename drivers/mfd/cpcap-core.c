@@ -18,6 +18,7 @@
 
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/leds-ld-cpcap-disp.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
@@ -71,6 +72,15 @@ static struct platform_device cpcap_batt_device = {
 	.dev.platform_data = NULL,
 };
 
+struct platform_device cpcap_disp_button_led = {
+	.name	= LD_BUTTON_BACKLIGHT_DEV,
+	.id		= -1,
+	.dev		= {
+		.platform_data  = NULL,
+	},
+};
+
+
 #ifdef CONFIG_CPCAP_USB
 static struct platform_device cpcap_usb_device = {
 	.name           = "cpcap_usb",
@@ -101,6 +111,7 @@ static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_adc_device,
 	&cpcap_key_device,
 	&cpcap_batt_device,
+	&cpcap_disp_button_led,
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
@@ -165,6 +176,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	cpcap_key_device.dev.platform_data = cpcap;
 	cpcap_batt_device.dev.platform_data = cpcap;
 	cpcap_uc_device.dev.platform_data = cpcap;
+	cpcap_disp_button_led.dev.platform_data = cpcap;
 
 	retval = misc_register(&cpcap_dev);
 	if (retval < 0)
