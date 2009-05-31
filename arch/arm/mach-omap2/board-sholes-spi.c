@@ -22,6 +22,7 @@
 #include <mach/mux.h>
 
 extern struct platform_device sfh7743_platform_device;
+extern struct platform_device cpcap_disp_button_led;
 
 struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_ASSIGN1,   0x0101},
@@ -74,7 +75,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 #define REGULATOR_CONSUMER(name, device) { .supply = name, .dev = device, }
 
 struct regulator_consumer_supply cpcap_sw5_consumers[] = {
-	REGULATOR_CONSUMER("sw5", NULL),
+	REGULATOR_CONSUMER("sw5", &cpcap_disp_button_led.dev),
 };
 
 struct regulator_consumer_supply cpcap_vcam_consumers[] = {
