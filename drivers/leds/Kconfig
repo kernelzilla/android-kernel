@@ -188,6 +188,11 @@ config LEDS_DA903X
 	help
 	  This option enables support for on-chip LED drivers found
 	  on Dialog Semiconductor DA9030/DA9034 PMICs.
+config LEDS_SHOLES
+	tristate "LED Support for Sholes device"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for LEDs on Sholes.
 
 comment "LED Triggers"
 
