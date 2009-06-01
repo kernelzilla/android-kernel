@@ -30,6 +30,7 @@
 #include <linux/mutex.h>
 #include <linux/seq_file.h>
 #include <linux/kfifo.h>
+#include <linux/platform_device.h>
 
 #include <mach/board.h>
 #include <mach/display.h>
@@ -230,7 +231,7 @@ enum dsi_cmd {
 };
 
 struct dsi_cmd_item {
-	struct omap_display *display;
+	struct omap_dss_device *dssdev;
 
 	enum dsi_cmd cmd;
 
@@ -256,7 +257,7 @@ static struct
 	unsigned long	ddr_clk;	/* Hz */
 
 	struct {
-		struct omap_display *display;
+		struct omap_dss_device *dssdev;
 		enum fifo_size fifo_size;
 		int dest_per;	/* destination peripheral 0-3 */
 	} vc[4];
@@ -317,9 +318,9 @@ module_param_named(dsi_perf, dsi_perf, bool, 0644);
 #endif
 
 static void dsi_process_cmd_fifo(struct work_struct *work);
-static void dsi_push_update(struct omap_display *display,
+static void dsi_push_update(struct omap_dss_device *dssdev,
 		int x, int y, int w, int h);
-static void dsi_push_autoupdate(struct omap_display *display);
+static void dsi_push_autoupdate(struct omap_dss_device *dssdev);
 
 static inline void dsi_write_reg(const struct dsi_reg idx, u32 val)
 {
@@ -777,7 +778,7 @@ static unsigned long dsi_fclk_rate(void)
 	return r;
 }
 
-static int dsi_set_lp_clk_divisor(struct omap_display *display)
+static int dsi_set_lp_clk_divisor(struct omap_dss_device *dssdev)
 {
 	unsigned n;
 	unsigned long dsi_fclk;
@@ -785,7 +786,7 @@ static int dsi_set_lp_clk_divisor(struct omap_display *display)
 
 	dsi_fclk = dsi_fclk_rate();
 
-	lp_clk_req = display->hw_config.u.dsi.lp_clk_hz;
+	lp_clk_req = dssdev->phy.dsi.lp_clk_hz;
 
 	for (n = 1; n < (1 << 13) - 1; ++n) {
 		lp_clk = dsi_fclk / 2 / n;
@@ -1376,16 +1377,16 @@ static int dsi_complexio_power(enum dsi_complexio_power_state state)
 	return 0;
 }
 
-static void dsi_complexio_config(struct omap_display *display)
+static void dsi_complexio_config(struct omap_dss_device *dssdev)
 {
 	u32 r;
 
-	int clk_lane   = display->hw_config.u.dsi.clk_lane;
-	int data1_lane = display->hw_config.u.dsi.data1_lane;
-	int data2_lane = display->hw_config.u.dsi.data2_lane;
-	int clk_pol    = display->hw_config.u.dsi.clk_pol;
-	int data1_pol  = display->hw_config.u.dsi.data1_pol;
-	int data2_pol  = display->hw_config.u.dsi.data2_pol;
+	int clk_lane   = dssdev->phy.dsi.clk_lane;
+	int data1_lane = dssdev->phy.dsi.data1_lane;
+	int data2_lane = dssdev->phy.dsi.data2_lane;
+	int clk_pol    = dssdev->phy.dsi.clk_pol;
+	int data1_pol  = dssdev->phy.dsi.data1_pol;
+	int data2_pol  = dssdev->phy.dsi.data2_pol;
 
 	r = dsi_read_reg(DSI_COMPLEXIO_CFG1);
 	r = FLD_MOD(r, clk_lane, 2, 0);
@@ -1497,7 +1498,7 @@ static void dsi_complexio_timings(void)
 }
 
 
-static int dsi_complexio_init(struct omap_display *display)
+static int dsi_complexio_init(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 
@@ -1517,7 +1518,7 @@ static int dsi_complexio_init(struct omap_display *display)
 		goto err;
 	}
 
-	dsi_complexio_config(display);
+	dsi_complexio_config(dssdev);
 
 	r = dsi_complexio_power(DSI_COMPLEXIO_POWER_ON);
 
@@ -2309,7 +2310,7 @@ static int dsi_set_hs_tx_timeout(int ns, int x4, int x16)
 
 	return 0;
 }
-static int dsi_proto_config(struct omap_display *display)
+static int dsi_proto_config(struct omap_dss_device *dssdev)
 {
 	u32 r;
 	int buswidth = 0;
@@ -2336,7 +2337,7 @@ static int dsi_proto_config(struct omap_display *display)
 	/* 10000ns * 4 */
 	dsi_set_hs_tx_timeout(10000, 1, 0);
 
-	switch (display->ctrl->pixel_size) {
+	switch (dssdev->ctrl.pixel_size) {
 	case 16:
 		buswidth = 0;
 		break;
@@ -2381,7 +2382,7 @@ static int dsi_proto_config(struct omap_display *display)
 	return 0;
 }
 
-static void dsi_proto_timings(struct omap_display *display)
+static void dsi_proto_timings(struct omap_dss_device *dssdev)
 {
 	unsigned tlpx, tclk_zero, tclk_prepare, tclk_trail;
 	unsigned tclk_pre, tclk_post;
@@ -2413,8 +2414,8 @@ static void dsi_proto_timings(struct omap_display *display)
 	tclk_post = ns2ddr(60) + 26;
 
 	/* ths_eot is 2 for 2 datalanes and 4 for 1 datalane */
-	if (display->hw_config.u.dsi.data1_lane != 0 &&
-			display->hw_config.u.dsi.data2_lane != 0)
+	if (dssdev->phy.dsi.data1_lane != 0 &&
+			dssdev->phy.dsi.data2_lane != 0)
 		ths_eot = 2;
 	else
 		ths_eot = 4;
@@ -2438,6 +2439,7 @@ static void dsi_proto_timings(struct omap_display *display)
 	enter_hs_mode_lat = 1 + DIV_ROUND_UP(tlpx, 4) +
 		DIV_ROUND_UP(ths_prepare, 4) +
 		DIV_ROUND_UP(ths_zero + 3, 4);
+
 	exit_hs_mode_lat = DIV_ROUND_UP(ths_trail + ths_exit, 4) + 1 + ths_eot;
 
 	r = FLD_VAL(enter_hs_mode_lat, 31, 16) |
@@ -2467,7 +2469,7 @@ static void dsi_proto_timings(struct omap_display *display)
 			DSI_FLUSH(ch); \
 	} while (0)
 
-static int dsi_update_screen_l4(struct omap_display *display,
+static int dsi_update_screen_l4(struct omap_dss_device *dssdev,
 			int x, int y, int w, int h)
 {
 	/* Note: supports only 24bit colors in 32bit container */
@@ -2490,12 +2492,12 @@ static int dsi_update_screen_l4(struct omap_display *display,
 	DSSDBG("dsi_update_screen_l4 (%d,%d %dx%d)\n",
 			x, y, w, h);
 
-	ovl = display->manager->overlays[0];
+	ovl = dssdev->manager->overlays[0];
 
 	if (ovl->info.color_mode != OMAP_DSS_COLOR_RGB24U)
 		return -EINVAL;
 
-	if (display->ctrl->pixel_size != 24)
+	if (dssdev->ctrl.pixel_size != 24)
 		return -EINVAL;
 
 	scr_width = ovl->info.screen_width;
@@ -2523,7 +2525,7 @@ static int dsi_update_screen_l4(struct omap_display *display,
 
 	dsi_bus_lock();
 
-	display->ctrl->setup_update(display, x, y, w, h);
+	dssdev->driver->setup_update(dssdev, x, y, w, h);
 
 	pixels_left = w * h;
 
@@ -2621,101 +2623,7 @@ static int dsi_update_screen_l4(struct omap_display *display,
 	return 0;
 }
 
-#if 0
-static void dsi_clear_screen_l4(struct omap_display *display,
-			int x, int y, int w, int h)
-{
-	int first = 1;
-	int fifo_stalls = 0;
-	int max_dsi_packet_size;
-	int max_data_per_packet;
-	int max_pixels_per_packet;
-	int pixels_left;
-	int bytespp = 3;
-	int pixnum;
-
-	debug_irq = 0;
-
-	DSSDBG("dsi_clear_screen_l4 (%d,%d %dx%d)\n",
-			x, y, w, h);
-
-	if (display->ctrl->bpp != 24)
-		return -EINVAL;
-
-	/* We need header(4) + DCSCMD(1) + pixels(numpix*bytespp)
-	 * bytes in fifo */
-
-	/* When using CPU, max long packet size is TX buffer size */
-	max_dsi_packet_size = dsi.vc[0].fifo_size * 32 * 4;
-
-	max_data_per_packet = max_dsi_packet_size - 4 - 1;
-
-	max_pixels_per_packet = max_data_per_packet / bytespp;
-
-	enable_clocks(1);
-
-	display->ctrl->setup_update(display, x, y, w, h);
-
-	pixels_left = w * h;
-
-	dsi.update_region.x = x;
-	dsi.update_region.y = y;
-	dsi.update_region.w = w;
-	dsi.update_region.h = h;
-	dsi.update_region.bytespp = bytespp;
-
-	start_measuring();
-
-	pixnum = 0;
-
-	while (pixels_left > 0) {
-		/* 0x2c = write_memory_start */
-		/* 0x3c = write_memory_continue */
-		u8 dcs_cmd = first ? 0x2c : 0x3c;
-		int pixels;
-		DSI_DECL_VARS;
-		first = 0;
-
-		/* TX_FIFO_NOT_EMPTY */
-		while (FLD_GET(dsi_read_reg(DSI_VC_CTRL(0)), 5, 5)) {
-			fifo_stalls++;
-			if (fifo_stalls > 0xfffff) {
-				DSSERR("fifo stalls overflow\n");
-				dsi_if_enable(0);
-				enable_clocks(0);
-				return;
-			}
-		}
-
-		pixels = min(max_pixels_per_packet, pixels_left);
-
-		pixels_left -= pixels;
-
-		dsi_vc_write_long_header(0, DSI_DT_DCS_LONG_WRITE,
-				1 + pixels * bytespp, 0);
-
-		DSI_PUSH(0, dcs_cmd);
-
-		while (pixels-- > 0) {
-			u32 pix;
-
-			pix = 0x000000;
-
-			DSI_PUSH(0, (pix >> 16) & 0xff);
-			DSI_PUSH(0, (pix >> 8) & 0xff);
-			DSI_PUSH(0, (pix >> 0) & 0xff);
-		}
-
-		DSI_FLUSH(0);
-	}
-
-	enable_clocks(0);
-
-	end_measuring("L4 CLEAR");
-}
-#endif
-
-static void dsi_setup_update_dispc(struct omap_display *display,
+static void dsi_setup_update_dispc(struct omap_dss_device *dssdev,
 			u16 x, u16 y, u16 w, u16 h)
 {
 	DSSDBG("dsi_setup_update_dispc(%d,%d %dx%d)\n",
@@ -2729,16 +2637,16 @@ static void dsi_setup_update_dispc(struct omap_display *display,
 	dsi.update_region.bytespp = 3; // XXX
 #endif
 
-	dispc_setup_partial_planes(display, &x, &y, &w, &h);
+	dispc_setup_partial_planes(dssdev, &x, &y, &w, &h);
 
 	dispc_set_lcd_size(w, h);
 }
 
-static void dsi_setup_autoupdate_dispc(struct omap_display *display)
+static void dsi_setup_autoupdate_dispc(struct omap_dss_device *dssdev)
 {
 	u16 w, h;
 
-	display->get_resolution(display, &w, &h);
+	dssdev->get_resolution(dssdev, &w, &h);
 
 #ifdef DEBUG
 	dsi.update_region.x = 0;
@@ -2750,14 +2658,14 @@ static void dsi_setup_autoupdate_dispc(struct omap_display *display)
 
 	/* the overlay settings may not have been applied, if we were in manual
 	 * mode earlier, so do it here */
-	display->manager->apply(display->manager);
+	dssdev->manager->apply(dssdev->manager);
 
 	dispc_set_lcd_size(w, h);
 
 	dsi.autoupdate_setup = 0;
 }
 
-static void dsi_update_screen_dispc(struct omap_display *display,
+static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h)
 {
 	int bytespp = 3;
@@ -2786,10 +2694,10 @@ static void dsi_update_screen_dispc(struct omap_display *display,
 
 	dsi_bus_lock();
 
-	display->ctrl->setup_update(display, x, y, w, h);
+	dssdev->driver->setup_update(dssdev, x, y, w, h);
 
-	if (dsi.use_ext_te && display->ctrl->wait_for_te)
-		display->ctrl->wait_for_te(display);
+	if (dsi.use_ext_te && dssdev->wait_for_te)
+		dssdev->wait_for_te(dssdev);
 
 	if (0)
 		dsi_vc_print_status(1);
@@ -2837,7 +2745,7 @@ static void framedone_timeout_callback(struct work_struct *work)
 	/* We check for target_update_mode, not update_mode. No reason to push
 	 * new updates if we're turning auto update off */
 	if (dsi.target_update_mode == OMAP_DSS_UPDATE_AUTO)
-		dsi_push_autoupdate(dsi.vc[1].display);
+		dsi_push_autoupdate(dsi.vc[1].dssdev);
 
 	atomic_set(&dsi.cmd_pending, 0);
 	dsi_process_cmd_fifo(NULL);
@@ -2921,19 +2829,19 @@ static void framedone_worker(struct work_struct *work)
 	/* We check for target_update_mode, not update_mode. No reason to push
 	 * new updates if we're turning auto update off */
 	if (dsi.target_update_mode == OMAP_DSS_UPDATE_AUTO)
-		dsi_push_autoupdate(dsi.vc[1].display);
+		dsi_push_autoupdate(dsi.vc[1].dssdev);
 
 	atomic_set(&dsi.cmd_pending, 0);
 	dsi_process_cmd_fifo(NULL);
 }
 
-static void dsi_start_auto_update(struct omap_display *display)
+static void dsi_start_auto_update(struct omap_dss_device *dssdev)
 {
 	DSSDBG("starting auto update\n");
 
 	dsi.autoupdate_setup = 1;
 
-	dsi_push_autoupdate(display);
+	dsi_push_autoupdate(dssdev);
 
 	perf_mark_start_auto();
 }
@@ -2962,7 +2870,7 @@ static void dsi_signal_fifo_waiters(void)
 }
 
 /* returns 1 for async op, and 0 for sync op */
-static int dsi_do_update(struct omap_display *display,
+static int dsi_do_update(struct omap_dss_device *dssdev,
 		struct dsi_cmd_update *upd)
 {
 	int r;
@@ -2972,10 +2880,10 @@ static int dsi_do_update(struct omap_display *display,
 	if (dsi.update_mode == OMAP_DSS_UPDATE_DISABLED)
 		return 0;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
 
-	display->get_resolution(display, &dw, &dh);
+	dssdev->get_resolution(dssdev, &dw, &dh);
 	if  (x > dw || y > dh)
 		return 0;
 
@@ -2989,12 +2897,12 @@ static int dsi_do_update(struct omap_display *display,
 
 	perf_mark_setup();
 
-	if (display->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
-		dsi_setup_update_dispc(display, x, y, w, h);
-		dsi_update_screen_dispc(display, x, y, w, h);
+	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
+		dsi_setup_update_dispc(dssdev, x, y, w, h);
+		dsi_update_screen_dispc(dssdev, x, y, w, h);
 		return 1;
 	} else {
-		r = dsi_update_screen_l4(display, x, y, w, h);
+		r = dsi_update_screen_l4(dssdev, x, y, w, h);
 		if (r)
 			DSSERR("L4 update failed\n");
 		return 0;
@@ -3002,7 +2910,7 @@ static int dsi_do_update(struct omap_display *display,
 }
 
 /* returns 1 for async op, and 0 for sync op */
-static int dsi_do_autoupdate(struct omap_display *display)
+static int dsi_do_autoupdate(struct omap_dss_device *dssdev)
 {
 	int r;
 	u16 w, h;
@@ -3010,34 +2918,34 @@ static int dsi_do_autoupdate(struct omap_display *display)
 	if (dsi.update_mode == OMAP_DSS_UPDATE_DISABLED)
 		return 0;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
 
-	display->get_resolution(display, &w, &h);
+	dssdev->get_resolution(dssdev, &w, &h);
 
 	perf_mark_setup();
 
-	if (display->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
+	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
 		if (dsi.autoupdate_setup)
-			dsi_setup_autoupdate_dispc(display);
-		dsi_update_screen_dispc(display, 0, 0, w, h);
+			dsi_setup_autoupdate_dispc(dssdev);
+		dsi_update_screen_dispc(dssdev, 0, 0, w, h);
 		return 1;
 	} else {
-		r = dsi_update_screen_l4(display, 0, 0, w, h);
+		r = dsi_update_screen_l4(dssdev, 0, 0, w, h);
 		if (r)
 			DSSERR("L4 update failed\n");
 		return 0;
 	}
 }
 
-static void dsi_do_cmd_mem_read(struct omap_display *display,
+static void dsi_do_cmd_mem_read(struct omap_dss_device *dssdev,
 		struct dsi_cmd_mem_read *mem_read)
 {
 	int r;
 
 	dsi_bus_lock();
 
-	r = display->ctrl->memory_read(display,
+	r = dssdev->driver->memory_read(dssdev,
 			mem_read->buf,
 			mem_read->size,
 			mem_read->x,
@@ -3051,14 +2959,14 @@ static void dsi_do_cmd_mem_read(struct omap_display *display,
 	complete(mem_read->completion);
 }
 
-static void dsi_do_cmd_test(struct omap_display *display,
+static void dsi_do_cmd_test(struct omap_dss_device *dssdev,
 		struct dsi_cmd_test *test)
 {
 	int r = 0;
 
 	DSSDBGF("");
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
 	dsi_bus_lock();
@@ -3066,14 +2974,8 @@ static void dsi_do_cmd_test(struct omap_display *display,
 	/* run test first in low speed mode */
 	dsi_vc_enable_hs(0, 0);
 
-	if (display->ctrl->run_test) {
-		r = display->ctrl->run_test(display, test->test_num);
-		if (r)
-			goto end;
-	}
-
-	if (display->panel->run_test) {
-		r = display->panel->run_test(display, test->test_num);
+	if (dssdev->driver->run_test) {
+		r = dssdev->driver->run_test(dssdev, test->test_num);
 		if (r)
 			goto end;
 	}
@@ -3081,14 +2983,11 @@ static void dsi_do_cmd_test(struct omap_display *display,
 	/* then in high speed */
 	dsi_vc_enable_hs(0, 1);
 
-	if (display->ctrl->run_test) {
-		r = display->ctrl->run_test(display, test->test_num);
+	if (dssdev->driver->run_test) {
+		r = dssdev->driver->run_test(dssdev, test->test_num);
 		if (r)
 			goto end;
 	}
-
-	if (display->panel->run_test)
-		r = display->panel->run_test(display, test->test_num);
 
 end:
 	dsi_vc_enable_hs(0, 1);
@@ -3101,21 +3000,21 @@ end:
 	DSSDBG("test end\n");
 }
 
-static void dsi_do_cmd_set_te(struct omap_display *display, bool enable)
+static void dsi_do_cmd_set_te(struct omap_dss_device *dssdev, bool enable)
 {
-	if (!display->hw_config.u.dsi.ext_te)
+	if (!dssdev->phy.dsi.ext_te)
 		dsi.use_te = enable;
 	else
 		dsi.use_ext_te = enable;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
 	dsi_bus_lock();
-	display->ctrl->enable_te(display, enable);
+	dssdev->driver->enable_te(dssdev, enable);
 	dsi_bus_unlock();
 
-	if (!display->hw_config.u.dsi.ext_te) {
+	if (!dssdev->phy.dsi.ext_te) {
 		if (enable) {
 			/* disable LP_RX_TO, so that we can receive TE.
 			 * Time to wait for TE is longer than the timer allows */
@@ -3126,16 +3025,16 @@ static void dsi_do_cmd_set_te(struct omap_display *display, bool enable)
 	}
 }
 
-static void dsi_do_cmd_set_update_mode(struct omap_display *display,
+static void dsi_do_cmd_set_update_mode(struct omap_dss_device *dssdev,
 	       enum omap_dss_update_mode mode)
 {
 	dsi.update_mode = mode;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
 	if (mode == OMAP_DSS_UPDATE_AUTO)
-		dsi_start_auto_update(display);
+		dsi_start_auto_update(dssdev);
 }
 
 static void dsi_process_cmd_fifo(struct work_struct *work)
@@ -3143,7 +3042,7 @@ static void dsi_process_cmd_fifo(struct work_struct *work)
 	int len;
 	struct dsi_cmd_item p;
 	unsigned long flags;
-	struct omap_display *display;
+	struct omap_dss_device *dssdev;
 	int exit = 0;
 
 	if (dsi.debug_process)
@@ -3172,14 +3071,14 @@ static void dsi_process_cmd_fifo(struct work_struct *work)
 
 		BUG_ON(len != sizeof(p));
 
-		display = p.display;
+		dssdev = p.dssdev;
 
 		if (dsi.debug_process)
 			DSSDBG("processing cmd %d\n", p.cmd);
 
 		switch (p.cmd) {
 		case DSI_CMD_UPDATE:
-			if (dsi_do_update(display, &p.u.r)) {
+			if (dsi_do_update(dssdev, &p.u.r)) {
 				if (dsi.debug_process)
 					DSSDBG("async update\n");
 				exit = 1;
@@ -3190,7 +3089,7 @@ static void dsi_process_cmd_fifo(struct work_struct *work)
 			break;
 
 		case DSI_CMD_AUTOUPDATE:
-			if (dsi_do_autoupdate(display)) {
+			if (dsi_do_autoupdate(dssdev)) {
 				if (dsi.debug_process)
 					DSSDBG("async autoupdate\n");
 				exit = 1;
@@ -3207,24 +3106,24 @@ static void dsi_process_cmd_fifo(struct work_struct *work)
 			break;
 
 		case DSI_CMD_MEM_READ:
-			dsi_do_cmd_mem_read(display, &p.u.mem_read);
+			dsi_do_cmd_mem_read(dssdev, &p.u.mem_read);
 			break;
 
 		case DSI_CMD_TEST:
-			dsi_do_cmd_test(display, &p.u.test);
+			dsi_do_cmd_test(dssdev, &p.u.test);
 			break;
 
 		case DSI_CMD_SET_TE:
-			dsi_do_cmd_set_te(display, p.u.te);
+			dsi_do_cmd_set_te(dssdev, p.u.te);
 			break;
 
 		case DSI_CMD_SET_UPDATE_MODE:
-			dsi_do_cmd_set_update_mode(display, p.u.update_mode);
+			dsi_do_cmd_set_update_mode(dssdev, p.u.update_mode);
 			break;
 
 		case DSI_CMD_SET_ROTATE:
 			dsi_bus_lock();
-			display->ctrl->set_rotate(display, p.u.rotate);
+			dssdev->driver->set_rotate(dssdev, p.u.rotate);
 			if (dsi.update_mode == OMAP_DSS_UPDATE_AUTO)
 				dsi.autoupdate_setup = 1;
 			dsi_bus_unlock();
@@ -3232,7 +3131,7 @@ static void dsi_process_cmd_fifo(struct work_struct *work)
 
 		case DSI_CMD_SET_MIRROR:
 			dsi_bus_lock();
-			display->ctrl->set_mirror(display, p.u.mirror);
+			dssdev->driver->set_mirror(dssdev, p.u.mirror);
 			dsi_bus_unlock();
 			break;
 
@@ -3289,12 +3188,12 @@ static void dsi_push_cmd(struct dsi_cmd_item *p)
 	queue_work(dsi.workqueue, &dsi.process_work);
 }
 
-static void dsi_push_update(struct omap_display *display,
+static void dsi_push_update(struct omap_dss_device *dssdev,
 		int x, int y, int w, int h)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_UPDATE;
 
 	p.u.r.x = x;
@@ -3307,22 +3206,22 @@ static void dsi_push_update(struct omap_display *display,
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_autoupdate(struct omap_display *display)
+static void dsi_push_autoupdate(struct omap_dss_device *dssdev)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_AUTOUPDATE;
 
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_sync(struct omap_display *display,
+static void dsi_push_sync(struct omap_dss_device *dssdev,
 		struct completion *sync_comp)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_SYNC;
 	p.u.sync = sync_comp;
 
@@ -3331,12 +3230,12 @@ static void dsi_push_sync(struct omap_display *display,
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_mem_read(struct omap_display *display,
+static void dsi_push_mem_read(struct omap_dss_device *dssdev,
 		struct dsi_cmd_mem_read *mem_read)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_MEM_READ;
 	p.u.mem_read = *mem_read;
 
@@ -3345,12 +3244,12 @@ static void dsi_push_mem_read(struct omap_display *display,
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_test(struct omap_display *display, int test_num,
+static void dsi_push_test(struct omap_dss_device *dssdev, int test_num,
 		int *result, struct completion *completion)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_TEST;
 	p.u.test.test_num = test_num;
 	p.u.test.result = result;
@@ -3361,11 +3260,11 @@ static void dsi_push_test(struct omap_display *display, int test_num,
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_set_te(struct omap_display *display, bool enable)
+static void dsi_push_set_te(struct omap_dss_device *dssdev, bool enable)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_SET_TE;
 	p.u.te = enable;
 
@@ -3374,12 +3273,12 @@ static void dsi_push_set_te(struct omap_display *display, bool enable)
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_set_update_mode(struct omap_display *display,
+static void dsi_push_set_update_mode(struct omap_dss_device *dssdev,
 		enum omap_dss_update_mode mode)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_SET_UPDATE_MODE;
 	p.u.update_mode = mode;
 
@@ -3388,11 +3287,11 @@ static void dsi_push_set_update_mode(struct omap_display *display,
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_set_rotate(struct omap_display *display, int rotate)
+static void dsi_push_set_rotate(struct omap_dss_device *dssdev, int rotate)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_SET_ROTATE;
 	p.u.rotate = rotate;
 
@@ -3401,11 +3300,11 @@ static void dsi_push_set_rotate(struct omap_display *display, int rotate)
 	dsi_push_cmd(&p);
 }
 
-static void dsi_push_set_mirror(struct omap_display *display, int mirror)
+static void dsi_push_set_mirror(struct omap_dss_device *dssdev, int mirror)
 {
 	struct dsi_cmd_item p;
 
-	p.display = display;
+	p.dssdev = dssdev;
 	p.cmd = DSI_CMD_SET_MIRROR;
 	p.u.mirror = mirror;
 
@@ -3414,7 +3313,7 @@ static void dsi_push_set_mirror(struct omap_display *display, int mirror)
 	dsi_push_cmd(&p);
 }
 
-static int dsi_wait_sync(struct omap_display *display)
+static int dsi_wait_sync(struct omap_dss_device *dssdev)
 {
 	long wait = msecs_to_jiffies(2000);
 	struct completion compl;
@@ -3422,7 +3321,7 @@ static int dsi_wait_sync(struct omap_display *display)
 	DSSDBGF("");
 
 	init_completion(&compl);
-	dsi_push_sync(display, &compl);
+	dsi_push_sync(dssdev, &compl);
 
 	DSSDBG("Waiting for SYNC to happen...\n");
 	wait = wait_for_completion_timeout(&compl, wait);
@@ -3449,7 +3348,7 @@ static int dsi_wait_sync(struct omap_display *display)
 
 /* Display funcs */
 
-static int dsi_display_init_dispc(struct omap_display *display)
+static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 {
 	int r;
 
@@ -3465,7 +3364,7 @@ static int dsi_display_init_dispc(struct omap_display *display)
 	dispc_set_parallel_interface_mode(OMAP_DSS_PARALLELMODE_DSI);
 	dispc_enable_fifohandcheck(1);
 
-	dispc_set_tft_data_lines(display->ctrl->pixel_size);
+	dispc_set_tft_data_lines(dssdev->ctrl.pixel_size);
 
 	{
 		struct omap_video_timings timings = {
@@ -3483,13 +3382,13 @@ static int dsi_display_init_dispc(struct omap_display *display)
 	return 0;
 }
 
-static void dsi_display_uninit_dispc(struct omap_display *display)
+static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 {
 	omap_dispc_unregister_isr(framedone_callback, NULL,
 			DISPC_IRQ_FRAMEDONE);
 }
 
-static int dsi_display_init_dsi(struct omap_display *display)
+static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 {
 	struct dsi_clock_info cinfo;
 	int r;
@@ -3502,7 +3401,7 @@ static int dsi_display_init_dsi(struct omap_display *display)
 	if (r)
 		goto err0;
 
-	r = dsi_pll_calc_ddrfreq(display->hw_config.u.dsi.ddr_clk_hz, &cinfo);
+	r = dsi_pll_calc_ddrfreq(dssdev->phy.dsi.ddr_clk_hz, &cinfo);
 	if (r)
 		goto err1;
 
@@ -3512,19 +3411,19 @@ static int dsi_display_init_dsi(struct omap_display *display)
 
 	DSSDBG("PLL OK\n");
 
-	r = dsi_complexio_init(display);
+	r = dsi_complexio_init(dssdev);
 	if (r)
 		goto err1;
 
 	_dsi_print_reset_status();
 
-	dsi_proto_timings(display);
-	dsi_set_lp_clk_divisor(display);
+	dsi_proto_timings(dssdev);
+	dsi_set_lp_clk_divisor(dssdev);
 
 	if (1)
 		_dsi_print_reset_status();
 
-	r = dsi_proto_config(display);
+	r = dsi_proto_config(dssdev);
 	if (r)
 		goto err2;
 
@@ -3534,16 +3433,10 @@ static int dsi_display_init_dsi(struct omap_display *display)
 	dsi_if_enable(1);
 	dsi_force_tx_stop_mode_io();
 
-	if (display->ctrl && display->ctrl->enable) {
-		r = display->ctrl->enable(display);
+	if (dssdev->driver->enable) {
+		r = dssdev->driver->enable(dssdev);
 		if (r)
 			goto err3;
-	}
-
-	if (display->panel && display->panel->enable) {
-		r = display->panel->enable(display);
-		if (r)
-			goto err4;
 	}
 
 	/* enable high-speed after initial config */
@@ -3552,9 +3445,6 @@ static int dsi_display_init_dsi(struct omap_display *display)
 	dsi_bus_unlock();
 
 	return 0;
-err4:
-	if (display->ctrl && display->ctrl->disable)
-		display->ctrl->disable(display);
 err3:
 	dsi_if_enable(0);
 err2:
@@ -3566,13 +3456,11 @@ err0:
 	return r;
 }
 
-static void dsi_display_uninit_dsi(struct omap_display *display)
+static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev)
 {
 	dsi_bus_lock();
-	if (display->panel && display->panel->disable)
-		display->panel->disable(display);
-	if (display->ctrl && display->ctrl->disable)
-		display->ctrl->disable(display);
+	if (dssdev->driver->disable)
+		dssdev->driver->disable(dssdev);
 	dsi_bus_unlock();
 
 	dsi_complexio_uninit();
@@ -3595,7 +3483,7 @@ static int dsi_core_init(void)
 	return 0;
 }
 
-static int dsi_display_enable(struct omap_display *display)
+static int dsi_display_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 
@@ -3603,8 +3491,132 @@ static int dsi_display_enable(struct omap_display *display)
 
 	mutex_lock(&dsi.lock);
 
-	if (display->state != OMAP_DSS_DISPLAY_DISABLED) {
-		DSSERR("display already enabled\n");
+	r = omap_dss_start_device(dssdev);
+	if (r) {
+		DSSERR("failed to start device\n");
+		goto err0;
+	}
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
+		DSSERR("dssdev already enabled\n");
+		r = -EINVAL;
+		goto err1;
+	}
+
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
+	r = _dsi_reset();
+	if (r)
+		goto err2;
+
+	dsi_core_init();
+
+	r = dsi_display_init_dispc(dssdev);
+	if (r)
+		goto err2;
+
+	r = dsi_display_init_dsi(dssdev);
+	if (r)
+		goto err3;
+
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+
+	if (dsi.use_te || dsi.use_ext_te)
+		dsi_push_set_te(dssdev, 1);
+
+	dsi_push_set_update_mode(dssdev, dsi.user_update_mode);
+	dsi.target_update_mode = dsi.user_update_mode;
+
+	mutex_unlock(&dsi.lock);
+
+	return dsi_wait_sync(dssdev);
+
+err3:
+	dsi_display_uninit_dispc(dssdev);
+err2:
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+err1:
+	omap_dss_stop_device(dssdev);
+err0:
+	mutex_unlock(&dsi.lock);
+	DSSDBG("dsi_display_enable FAILED\n");
+	return r;
+}
+
+static void dsi_display_disable(struct omap_dss_device *dssdev)
+{
+	DSSDBG("dsi_display_disable\n");
+
+	mutex_lock(&dsi.lock);
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
+			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		goto end;
+
+	if (dsi.target_update_mode != OMAP_DSS_UPDATE_DISABLED) {
+		dsi_push_set_update_mode(dssdev, OMAP_DSS_UPDATE_DISABLED);
+		dsi.target_update_mode = OMAP_DSS_UPDATE_DISABLED;
+	}
+
+	dsi_wait_sync(dssdev);
+
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+
+	dsi_display_uninit_dispc(dssdev);
+
+	dsi_display_uninit_dsi(dssdev);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+
+	omap_dss_stop_device(dssdev);
+end:
+	mutex_unlock(&dsi.lock);
+}
+
+static int dsi_display_suspend(struct omap_dss_device *dssdev)
+{
+	DSSDBG("dsi_display_suspend\n");
+
+	mutex_lock(&dsi.lock);
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
+			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		goto end;
+
+	if (dsi.target_update_mode != OMAP_DSS_UPDATE_DISABLED) {
+		dsi_push_set_update_mode(dssdev, OMAP_DSS_UPDATE_DISABLED);
+		dsi.target_update_mode = OMAP_DSS_UPDATE_DISABLED;
+	}
+
+	dsi_wait_sync(dssdev);
+
+	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
+
+	dsi_display_uninit_dispc(dssdev);
+
+	dsi_display_uninit_dsi(dssdev);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+end:
+	mutex_unlock(&dsi.lock);
+
+	return 0;
+}
+
+static int dsi_display_resume(struct omap_dss_device *dssdev)
+{
+	int r;
+
+	DSSDBG("dsi_display_resume\n");
+
+	mutex_lock(&dsi.lock);
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
+		DSSERR("dssdev not suspended\n");
 		r = -EINVAL;
 		goto err0;
 	}
@@ -3614,90 +3626,42 @@ static int dsi_display_enable(struct omap_display *display)
 
 	r = _dsi_reset();
 	if (r)
-		return r;
+		goto err1;
 
 	dsi_core_init();
 
-	r = dsi_display_init_dispc(display);
+	r = dsi_display_init_dispc(dssdev);
 	if (r)
 		goto err1;
 
-	r = dsi_display_init_dsi(display);
+	r = dsi_display_init_dsi(dssdev);
 	if (r)
 		goto err2;
 
-	display->state = OMAP_DSS_DISPLAY_ACTIVE;
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
 	if (dsi.use_te || dsi.use_ext_te)
-		dsi_push_set_te(display, 1);
+		dsi_push_set_te(dssdev, 1);
 
-	dsi_push_set_update_mode(display, dsi.user_update_mode);
+	dsi_push_set_update_mode(dssdev, dsi.user_update_mode);
 	dsi.target_update_mode = dsi.user_update_mode;
 
 	mutex_unlock(&dsi.lock);
 
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 
 err2:
-	dsi_display_uninit_dispc(display);
+	dsi_display_uninit_dispc(dssdev);
 err1:
 	enable_clocks(0);
 	dsi_enable_pll_clock(0);
 err0:
 	mutex_unlock(&dsi.lock);
-	DSSDBG("dsi_display_enable FAILED\n");
+	DSSDBG("dsi_display_resume FAILED\n");
 	return r;
 }
 
-static void dsi_display_disable(struct omap_display *display)
-{
-	DSSDBG("dsi_display_disable\n");
-
-	mutex_lock(&dsi.lock);
-
-	if (display->state == OMAP_DSS_DISPLAY_DISABLED ||
-			display->state == OMAP_DSS_DISPLAY_SUSPENDED)
-		goto end;
-
-	if (dsi.target_update_mode != OMAP_DSS_UPDATE_DISABLED) {
-		dsi_push_set_update_mode(display, OMAP_DSS_UPDATE_DISABLED);
-		dsi.target_update_mode = OMAP_DSS_UPDATE_DISABLED;
-	}
-
-	dsi_wait_sync(display);
-
-	display->state = OMAP_DSS_DISPLAY_DISABLED;
-
-	dsi_display_uninit_dispc(display);
-
-	dsi_display_uninit_dsi(display);
-
-	enable_clocks(0);
-	dsi_enable_pll_clock(0);
-end:
-	mutex_unlock(&dsi.lock);
-}
-
-static int dsi_display_suspend(struct omap_display *display)
-{
-	DSSDBG("dsi_display_suspend\n");
-
-	dsi_display_disable(display);
-
-	display->state = OMAP_DSS_DISPLAY_SUSPENDED;
-
-	return 0;
-}
-
-static int dsi_display_resume(struct omap_display *display)
-{
-	DSSDBG("dsi_display_resume\n");
-
-	display->state = OMAP_DSS_DISPLAY_DISABLED;
-	return dsi_display_enable(display);
-}
-
-static int dsi_display_update(struct omap_display *display,
+static int dsi_display_update(struct omap_dss_device *dssdev,
 			u16 x, u16 y, u16 w, u16 h)
 {
 	DSSDBG("dsi_display_update(%d,%d %dx%d)\n", x, y, w, h);
@@ -3708,7 +3672,7 @@ static int dsi_display_update(struct omap_display *display,
 	mutex_lock(&dsi.lock);
 
 	if (dsi.target_update_mode == OMAP_DSS_UPDATE_MANUAL)
-		dsi_push_update(display, x, y, w, h);
+		dsi_push_update(dssdev, x, y, w, h);
 	/* XXX else return error? */
 
 	mutex_unlock(&dsi.lock);
@@ -3716,13 +3680,13 @@ static int dsi_display_update(struct omap_display *display,
 	return 0;
 }
 
-static int dsi_display_sync(struct omap_display *display)
+static int dsi_display_sync(struct omap_dss_device *dssdev)
 {
 	DSSDBGF("");
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 }
 
-static int dsi_display_set_update_mode(struct omap_display *display,
+static int dsi_display_set_update_mode(struct omap_dss_device *dssdev,
 		enum omap_dss_update_mode mode)
 {
 	DSSDBGF("%d", mode);
@@ -3730,7 +3694,7 @@ static int dsi_display_set_update_mode(struct omap_display *display,
 	mutex_lock(&dsi.lock);
 
 	if (dsi.target_update_mode != mode) {
-		dsi_push_set_update_mode(display, mode);
+		dsi_push_set_update_mode(dssdev, mode);
 
 		dsi.target_update_mode = mode;
 		dsi.user_update_mode = mode;
@@ -3738,88 +3702,88 @@ static int dsi_display_set_update_mode(struct omap_display *display,
 
 	mutex_unlock(&dsi.lock);
 
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 }
 
 static enum omap_dss_update_mode dsi_display_get_update_mode(
-		struct omap_display *display)
+		struct omap_dss_device *dssdev)
 {
 	return dsi.update_mode;
 }
 
-static int dsi_display_enable_te(struct omap_display *display, bool enable)
+static int dsi_display_enable_te(struct omap_dss_device *dssdev, bool enable)
 {
 	DSSDBGF("%d", enable);
 
-	if (!display->ctrl->enable_te)
+	if (!dssdev->driver->enable_te)
 		return -ENOENT;
 
-	dsi_push_set_te(display, enable);
+	dsi_push_set_te(dssdev, enable);
 
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 }
 
-static int dsi_display_get_te(struct omap_display *display)
+static int dsi_display_get_te(struct omap_dss_device *dssdev)
 {
 	return dsi.use_te | dsi.use_ext_te;
 }
 
 
 
-static int dsi_display_set_rotate(struct omap_display *display, u8 rotate)
+static int dsi_display_set_rotate(struct omap_dss_device *dssdev, u8 rotate)
 {
 	DSSDBGF("%d", rotate);
 
-	if (!display->ctrl->set_rotate || !display->ctrl->get_rotate)
+	if (!dssdev->driver->set_rotate || !dssdev->driver->get_rotate)
 		return -EINVAL;
 
-	dsi_push_set_rotate(display, rotate);
+	dsi_push_set_rotate(dssdev, rotate);
 
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 }
 
-static u8 dsi_display_get_rotate(struct omap_display *display)
+static u8 dsi_display_get_rotate(struct omap_dss_device *dssdev)
 {
-	if (!display->ctrl->set_rotate || !display->ctrl->get_rotate)
+	if (!dssdev->driver->set_rotate || !dssdev->driver->get_rotate)
 		return 0;
 
-	return display->ctrl->get_rotate(display);
+	return dssdev->driver->get_rotate(dssdev);
 }
 
-static int dsi_display_set_mirror(struct omap_display *display, bool mirror)
+static int dsi_display_set_mirror(struct omap_dss_device *dssdev, bool mirror)
 {
 	DSSDBGF("%d", mirror);
 
-	if (!display->ctrl->set_mirror || !display->ctrl->get_mirror)
+	if (!dssdev->driver->set_mirror || !dssdev->driver->get_mirror)
 		return -EINVAL;
 
-	dsi_push_set_mirror(display, mirror);
+	dsi_push_set_mirror(dssdev, mirror);
 
-	return dsi_wait_sync(display);
+	return dsi_wait_sync(dssdev);
 }
 
-static bool dsi_display_get_mirror(struct omap_display *display)
+static bool dsi_display_get_mirror(struct omap_dss_device *dssdev)
 {
-	if (!display->ctrl->set_mirror || !display->ctrl->get_mirror)
+	if (!dssdev->driver->set_mirror || !dssdev->driver->get_mirror)
 		return 0;
 
-	return display->ctrl->get_mirror(display);
+	return dssdev->driver->get_mirror(dssdev);
 }
 
-static int dsi_display_run_test(struct omap_display *display, int test_num)
+static int dsi_display_run_test(struct omap_dss_device *dssdev, int test_num)
 {
 	long wait = msecs_to_jiffies(60000);
 	struct completion compl;
 	int result;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return -EIO;
 
 	DSSDBGF("%d", test_num);
 
 	init_completion(&compl);
 
-	dsi_push_test(display, test_num, &result, &compl);
+	dsi_push_test(dssdev, test_num, &result, &compl);
 
 	DSSDBG("Waiting for SYNC to happen...\n");
 	wait = wait_for_completion_timeout(&compl, wait);
@@ -3833,7 +3797,7 @@ static int dsi_display_run_test(struct omap_display *display, int test_num)
 	return result;
 }
 
-static int dsi_display_memory_read(struct omap_display *display,
+static int dsi_display_memory_read(struct omap_dss_device *dssdev,
 		void *buf, size_t size,
 		u16 x, u16 y, u16 w, u16 h)
 {
@@ -3844,10 +3808,10 @@ static int dsi_display_memory_read(struct omap_display *display,
 
 	DSSDBGF("");
 
-	if (!display->ctrl->memory_read)
+	if (!dssdev->driver->memory_read)
 		return -EINVAL;
 
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return -EIO;
 
 	init_completion(&compl);
@@ -3861,7 +3825,7 @@ static int dsi_display_memory_read(struct omap_display *display,
 	mem_read.ret_size = &ret_size;
 	mem_read.completion = &compl;
 
-	dsi_push_mem_read(display, &mem_read);
+	dsi_push_mem_read(dssdev, &mem_read);
 
 	DSSDBG("Waiting for SYNC to happen...\n");
 	wait = wait_for_completion_timeout(&compl, wait);
@@ -3891,39 +3855,39 @@ static void dsi_configure_overlay(struct omap_overlay *ovl)
 	dispc_setup_plane_fifo(plane, low, high);
 }
 
-void dsi_init_display(struct omap_display *display)
+void dsi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("DSI init\n");
 
-	display->enable = dsi_display_enable;
-	display->disable = dsi_display_disable;
-	display->suspend = dsi_display_suspend;
-	display->resume = dsi_display_resume;
-	display->update = dsi_display_update;
-	display->sync = dsi_display_sync;
-	display->set_update_mode = dsi_display_set_update_mode;
-	display->get_update_mode = dsi_display_get_update_mode;
-	display->enable_te = dsi_display_enable_te;
-	display->get_te = dsi_display_get_te;
+	dssdev->enable = dsi_display_enable;
+	dssdev->disable = dsi_display_disable;
+	dssdev->suspend = dsi_display_suspend;
+	dssdev->resume = dsi_display_resume;
+	dssdev->update = dsi_display_update;
+	dssdev->sync = dsi_display_sync;
+	dssdev->set_update_mode = dsi_display_set_update_mode;
+	dssdev->get_update_mode = dsi_display_get_update_mode;
+	dssdev->enable_te = dsi_display_enable_te;
+	dssdev->get_te = dsi_display_get_te;
 
-	display->get_rotate = dsi_display_get_rotate;
-	display->set_rotate = dsi_display_set_rotate;
+	dssdev->get_rotate = dsi_display_get_rotate;
+	dssdev->set_rotate = dsi_display_set_rotate;
 
-	display->get_mirror = dsi_display_get_mirror;
-	display->set_mirror = dsi_display_set_mirror;
+	dssdev->get_mirror = dsi_display_get_mirror;
+	dssdev->set_mirror = dsi_display_set_mirror;
 
-	display->run_test = dsi_display_run_test;
-	display->memory_read = dsi_display_memory_read;
+	dssdev->run_test = dsi_display_run_test;
+	dssdev->memory_read = dsi_display_memory_read;
 
-	display->configure_overlay = dsi_configure_overlay;
+	dssdev->configure_overlay = dsi_configure_overlay;
 
-	display->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
+	dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
 
-	dsi.vc[0].display = display;
-	dsi.vc[1].display = display;
+	dsi.vc[0].dssdev = dssdev;
+	dsi.vc[1].dssdev = dssdev;
 }
 
-int dsi_init(void)
+int dsi_init(struct platform_device *pdev)
 {
 	u32 rev;
 

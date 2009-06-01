@@ -30,6 +30,7 @@
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
 #include <linux/io.h>
+#include <linux/device.h>
 
 #include <mach/display.h>
 #include <mach/clock.h>
@@ -437,10 +438,15 @@ void dss_dsi_power_down(void)
 /* PLATFORM DEVICE */
 static int omap_dss_probe(struct platform_device *pdev)
 {
+	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
 	int skip_init = 0;
 	int r;
+	int i;
 
 	core.pdev = pdev;
+
+	dss_init_overlay_managers(pdev);
+	dss_init_overlays(pdev);
 
 	r = dss_get_clocks();
 	if (r)
@@ -483,7 +489,7 @@ static int omap_dss_probe(struct platform_device *pdev)
 		goto fail0;
 	}
 #ifdef CONFIG_OMAP2_DSS_VENC
-	r = venc_init();
+	r = venc_init(pdev);
 	if (r) {
 		DSSERR("Failed to initialize venc\n");
 		goto fail0;
@@ -498,7 +504,7 @@ static int omap_dss_probe(struct platform_device *pdev)
 		}
 #endif
 #ifdef CONFIG_OMAP2_DSS_DSI
-		r = dsi_init();
+		r = dsi_init(pdev);
 		if (r) {
 			DSSERR("Failed to initialize DSI\n");
 			goto fail0;
@@ -512,9 +518,16 @@ static int omap_dss_probe(struct platform_device *pdev)
 		goto fail0;
 #endif
 
-	dss_init_displays(pdev);
-	dss_init_overlay_managers(pdev);
-	dss_init_overlays(pdev, def_disp_name);
+	for (i = 0; i < pdata->num_devices; ++i) {
+		struct omap_dss_device *dssdev = pdata->devices[i];
+
+		r = omap_dss_register_device(dssdev);
+		if (r)
+			DSSERR("device reg failed %d\n", i);
+
+		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
+			pdata->default_device = dssdev;
+	}
 
 	dss_clk_disable_all();
 
@@ -527,11 +540,9 @@ fail0:
 
 static int omap_dss_remove(struct platform_device *pdev)
 {
+	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
+	int i;
 	int c;
-
-	dss_uninit_overlays(pdev);
-	dss_uninit_overlay_managers(pdev);
-	dss_uninit_displays(pdev);
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 	dss_uninitialize_debugfs();
@@ -597,6 +608,12 @@ static int omap_dss_remove(struct platform_device *pdev)
 
 	dss_put_clocks();
 
+	dss_uninit_overlays(pdev);
+	dss_uninit_overlay_managers(pdev);
+
+	for (i = 0; i < pdata->num_devices; ++i)
+		omap_dss_unregister_device(pdata->devices[i]);
+
 	return 0;
 }
 
@@ -609,14 +626,14 @@ static int omap_dss_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	DSSDBG("suspend %d\n", state.event);
 
-	return dss_suspend_all_displays();
+	return dss_suspend_all_devices();
 }
 
 static int omap_dss_resume(struct platform_device *pdev)
 {
 	DSSDBG("resume\n");
 
-	return dss_resume_all_displays();
+	return dss_resume_all_devices();
 }
 
 static struct platform_driver omap_dss_driver = {
@@ -631,19 +648,282 @@ static struct platform_driver omap_dss_driver = {
 	},
 };
 
+/* BUS */
+static int dss_bus_match(struct device *dev, struct device_driver *driver)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+	DSSDBG("bus_match. dev %s/%s, drv %s\n",
+			dev_name(dev), dssdev->driver_name, driver->name);
+
+	return strcmp(dssdev->driver_name, driver->name) == 0;
+}
+
+static ssize_t device_name_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			dssdev->name ?
+			dssdev->name : "");
+}
+
+static struct device_attribute default_dev_attrs[] = {
+	__ATTR(name, S_IRUGO, device_name_show, NULL),
+	__ATTR_NULL,
+};
+
+static ssize_t driver_name_show(struct device_driver *drv, char *buf)
+{
+	struct omap_dss_driver *dssdrv = to_dss_driver(drv);
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			dssdrv->driver.name ?
+			dssdrv->driver.name : "");
+}
+static struct driver_attribute default_drv_attrs[] = {
+	__ATTR(name, S_IRUGO, driver_name_show, NULL),
+	__ATTR_NULL,
+};
+
+static struct bus_type dss_bus_type = {
+	.name = "omapdss",
+	.match = dss_bus_match,
+	.dev_attrs = default_dev_attrs,
+	.drv_attrs = default_drv_attrs,
+};
+
+static void dss_bus_release(struct device *dev)
+{
+	DSSDBG("bus_release\n");
+}
+
+static struct device dss_bus = {
+	.release = dss_bus_release,
+};
+
+struct bus_type *dss_get_bus(void)
+{
+	return &dss_bus_type;
+}
+
+/* DRIVER */
+static int dss_driver_probe(struct device *dev)
+{
+	int r;
+	struct omap_dss_driver *dssdrv = to_dss_driver(dev->driver);
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct omap_dss_board_info *pdata = core.pdev->dev.platform_data;
+	bool force;
+
+	DSSDBG("driver_probe: dev %s/%s, drv %s\n",
+				dev_name(dev), dssdev->driver_name,
+				dssdrv->driver.name);
+
+	dss_init_device(core.pdev, dssdev);
+
+	/* skip this if the device is behind a ctrl */
+	if (!dssdev->panel.ctrl) {
+		force = pdata->default_device == dssdev;
+		dss_recheck_connections(dssdev, force);
+	}
+
+	r = dssdrv->probe(dssdev);
+
+	if (r) {
+		DSSERR("driver probe failed: %d\n", r);
+		return r;
+	}
+
+	DSSDBG("probe done for device %s\n", dev_name(dev));
+
+	dssdev->driver = dssdrv;
+
+	return 0;
+}
+
+static int dss_driver_remove(struct device *dev)
+{
+	struct omap_dss_driver *dssdrv = to_dss_driver(dev->driver);
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+	DSSDBG("driver_remove: dev %s/%s\n", dev_name(dev),
+			dssdev->driver_name);
+
+	dssdrv->remove(dssdev);
+
+	dss_uninit_device(core.pdev, dssdev);
+
+	dssdev->driver = NULL;
+
+	return 0;
+}
+
+int omap_dss_register_driver(struct omap_dss_driver *dssdriver)
+{
+	dssdriver->driver.bus = &dss_bus_type;
+	dssdriver->driver.probe = dss_driver_probe;
+	dssdriver->driver.remove = dss_driver_remove;
+	return driver_register(&dssdriver->driver);
+}
+EXPORT_SYMBOL(omap_dss_register_driver);
+
+void omap_dss_unregister_driver(struct omap_dss_driver *dssdriver)
+{
+	driver_unregister(&dssdriver->driver);
+}
+EXPORT_SYMBOL(omap_dss_unregister_driver);
+
+/* DEVICE */
+static void reset_device(struct device *dev, int check)
+{
+	u8 *dev_p = (u8 *)dev;
+	u8 *dev_end = dev_p + sizeof(*dev);
+	void *saved_pdata;
+
+	saved_pdata = dev->platform_data;
+	if (check) {
+		/*
+		 * Check if there is any other setting than platform_data
+		 * in struct device; warn that these will be reset by our
+		 * init.
+		 */
+		dev->platform_data = NULL;
+		while (dev_p < dev_end) {
+			if (*dev_p) {
+				WARN("%s: struct device fields will be discarded\n",
+				     __func__);
+				break;
+			}
+			dev_p++;
+		}
+	}
+	memset(dev, 0, sizeof(*dev));
+	dev->platform_data = saved_pdata;
+}
+
+
+static void omap_dss_dev_release(struct device *dev)
+{
+	reset_device(dev, 0);
+}
+
+int omap_dss_register_device(struct omap_dss_device *dssdev)
+{
+	static int dev_num;
+	static int panel_num;
+	int r;
+
+	WARN_ON(!dssdev->driver_name);
+
+	reset_device(&dssdev->dev, 1);
+	dssdev->dev.bus = &dss_bus_type;
+	dssdev->dev.parent = &dss_bus;
+	dssdev->dev.release = omap_dss_dev_release;
+	dev_set_name(&dssdev->dev, "display%d", dev_num++);
+	r = device_register(&dssdev->dev);
+	if (r)
+		return r;
+
+	if (dssdev->ctrl.panel) {
+		struct omap_dss_device *panel = dssdev->ctrl.panel;
+
+		panel->panel.ctrl = dssdev;
+
+		reset_device(&panel->dev, 1);
+		panel->dev.bus = &dss_bus_type;
+		panel->dev.parent = &dssdev->dev;
+		panel->dev.release = omap_dss_dev_release;
+		dev_set_name(&panel->dev, "panel%d", panel_num++);
+		r = device_register(&panel->dev);
+		if (r)
+			return r;
+	}
+
+	return 0;
+}
+
+void omap_dss_unregister_device(struct omap_dss_device *dssdev)
+{
+	device_unregister(&dssdev->dev);
+
+	if (dssdev->ctrl.panel) {
+		struct omap_dss_device *panel = dssdev->ctrl.panel;
+		device_unregister(&panel->dev);
+	}
+}
+
+/* BUS */
+static int omap_dss_bus_register(void)
+{
+	int r;
+
+	r = bus_register(&dss_bus_type);
+	if (r) {
+		DSSERR("bus register failed\n");
+		return r;
+	}
+
+	dev_set_name(&dss_bus, "omapdss");
+	r = device_register(&dss_bus);
+	if (r) {
+		DSSERR("bus driver register failed\n");
+		bus_unregister(&dss_bus_type);
+		return r;
+	}
+
+	return 0;
+}
+
+/* INIT */
+
+#ifdef CONFIG_OMAP2_DSS_MODULE
+static void omap_dss_bus_unregister(void)
+{
+	device_unregister(&dss_bus);
+
+	bus_unregister(&dss_bus_type);
+}
+
 static int __init omap_dss_init(void)
 {
-	return platform_driver_register(&omap_dss_driver);
+	int r;
+
+	r = omap_dss_bus_register();
+	if (r)
+		return r;
+
+	r = platform_driver_register(&omap_dss_driver);
+	if (r) {
+		omap_dss_bus_unregister();
+		return r;
+	}
+
+	return 0;
 }
 
 static void __exit omap_dss_exit(void)
 {
 	platform_driver_unregister(&omap_dss_driver);
+
+	omap_dss_bus_unregister();
 }
 
-subsys_initcall(omap_dss_init);
+module_init(omap_dss_init);
 module_exit(omap_dss_exit);
+#else
+static int __init omap_dss_init(void)
+{
+	return omap_dss_bus_register();
+}
 
+static int __init omap_dss_init2(void)
+{
+	return platform_driver_register(&omap_dss_driver);
+}
+
+core_initcall(omap_dss_init);
+device_initcall(omap_dss_init2);
+#endif
 
 MODULE_AUTHOR("Tomi Valkeinen <tomi.valkeinen@nokia.com>");
 MODULE_DESCRIPTION("OMAP2/3 Display Subsystem");

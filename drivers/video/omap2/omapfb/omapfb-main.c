@@ -454,7 +454,7 @@ void set_fb_fix(struct fb_info *fbi)
 int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	unsigned long max_frame_size;
 	unsigned long line_size;
 	int xres_min, yres_min;
@@ -615,7 +615,7 @@ static int omapfb_release(struct fb_info *fbi, int user)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 
 	DBG("Closing fb with plane index %d\n", ofbi->id);
 
@@ -1063,7 +1063,7 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	int do_update = 0;
 	int r = 0;
 
@@ -1269,7 +1269,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 		unsigned long paddr)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omap_display *display;
+	struct omap_dss_device *display;
 	int bytespp;
 
 	display =  fb2display(fbi);
@@ -1312,6 +1312,9 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 
 		size = w * h * bytespp;
 	}
+
+	if (!size)
+		return 0;
 
 	return omapfb_alloc_fbmem(fbi, size, paddr);
 }
@@ -1491,7 +1494,7 @@ int omapfb_realloc_fbmem(struct fb_info *fbi, unsigned long size, int type)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omapfb2_mem_region *rg = &ofbi->region;
 	unsigned long old_size = rg->size;
 	unsigned long old_paddr = rg->paddr;
@@ -1569,7 +1572,7 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 {
 	struct fb_var_screeninfo *var = &fbi->var;
 	struct fb_fix_screeninfo *fix = &fbi->fix;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	int r = 0;
 
@@ -1701,7 +1704,7 @@ static void omapfb_free_resources(struct omapfb2_device *fbdev)
 		if (fbdev->displays[i]->state != OMAP_DSS_DISPLAY_DISABLED)
 			fbdev->displays[i]->disable(fbdev->displays[i]);
 
-		omap_dss_put_display(fbdev->displays[i]);
+		omap_dss_put_device(fbdev->displays[i]);
 	}
 
 	dev_set_drvdata(fbdev->dev, NULL);
@@ -1880,7 +1883,7 @@ int omapfb_mode_to_timings(const char *mode_str,
 	}
 }
 
-static int omapfb_set_def_mode(struct omap_display *display, char *mode_str)
+static int omapfb_set_def_mode(struct omap_dss_device *display, char *mode_str)
 {
 	int r;
 	u8 bpp;
@@ -1890,7 +1893,7 @@ static int omapfb_set_def_mode(struct omap_display *display, char *mode_str)
 	if (r)
 		return r;
 
-	display->panel->recommended_bpp = bpp;
+	display->panel.recommended_bpp = bpp;
 
 	if (!display->check_timings || !display->set_timings)
 		return -EINVAL;
@@ -1915,7 +1918,7 @@ static int omapfb_parse_def_modes(struct omapfb2_device *fbdev)
 
 	while (!r && (this_opt = strsep(&options, ",")) != NULL) {
 		char *p, *display_str, *mode_str;
-		struct omap_display *display;
+		struct omap_dss_device *display;
 		int i;
 
 		p = strchr(this_opt, ':');
@@ -1956,9 +1959,10 @@ static int omapfb_probe(struct platform_device *pdev)
 {
 	struct omapfb2_device *fbdev = NULL;
 	int r = 0;
-	int i, t;
+	int i;
 	struct omap_overlay *ovl;
-	struct omap_display *def_display;
+	struct omap_dss_device *def_display;
+	struct omap_dss_device *dssdev;
 
 	DBG("omapfb_probe\n");
 
@@ -1980,17 +1984,10 @@ static int omapfb_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, fbdev);
 
 	fbdev->num_displays = 0;
-	t = omap_dss_get_num_displays();
-	for (i = 0; i < t; i++) {
-		struct omap_display *display;
-		display = omap_dss_get_display(i);
-		if (!display) {
-			dev_err(&pdev->dev, "can't get display %d\n", i);
-			r = -EINVAL;
-			goto cleanup;
-		}
-
-		fbdev->displays[fbdev->num_displays++] = display;
+	dssdev = NULL;
+	for_each_dss_dev(dssdev) {
+		omap_dss_get_device(dssdev);
+		fbdev->displays[fbdev->num_displays++] = dssdev;
 	}
 
 	if (fbdev->num_displays == 0) {
@@ -2011,8 +2008,8 @@ static int omapfb_probe(struct platform_device *pdev)
 	/* gfx overlay should be the default one. find a display
 	 * connected to that, and use it as default display */
 	ovl = omap_dss_get_overlay(0);
-	if (ovl->manager && ovl->manager->display) {
-		def_display = ovl->manager->display;
+	if (ovl->manager && ovl->manager->device) {
+		def_display = ovl->manager->device;
 	} else {
 		dev_err(&pdev->dev, "cannot find default display\n");
 		r = -EINVAL;
@@ -2069,7 +2066,7 @@ static int omapfb_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < fbdev->num_displays; i++) {
-		struct omap_display *display = fbdev->displays[i];
+		struct omap_dss_device *display = fbdev->displays[i];
 		u16 w, h;
 
 		if (!display->get_update_mode || !display->update)

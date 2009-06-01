@@ -41,58 +41,68 @@ static ssize_t manager_name_show(struct omap_overlay_manager *mgr, char *buf)
 static ssize_t manager_display_show(struct omap_overlay_manager *mgr, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-			mgr->display ? mgr->display->name : "<none>");
+			mgr->device ? mgr->device->name : "<none>");
 }
 
 static ssize_t manager_display_store(struct omap_overlay_manager *mgr, const char *buf, size_t size)
 {
-	int r, i;
-	int len = size;
-	struct omap_display *display = NULL;
+	int r = 0;
+	size_t len = size;
+	struct omap_dss_device *dssdev = NULL;
+
+	int match(struct omap_dss_device *dssdev, void *data)
+	{
+		const char *str = data;
+		return strcmp(dssdev->name, str) == 0;
+	}
 
 	if (buf[size-1] == '\n')
 		--len;
 
 	if (len > 0) {
-		for (i = 0; i < omap_dss_get_num_displays(); ++i) {
-			display = dss_get_display(i);
+		char name[64];
+		int n;
 
-			if (strncmp(buf, display->name, len) == 0)
-				break;
+		n = min(len, sizeof(name) - 1);
+		strncpy(name, buf, n);
+		name[n - 1] = 0;
 
-			display = NULL;
-		}
+		dssdev = omap_dss_find_device(name, match);
 	}
 
-	if (len > 0 && display == NULL)
+	if (len > 0 && dssdev == NULL)
 		return -EINVAL;
 
-	if (display)
-		DSSDBG("display %s found\n", display->name);
+	if (dssdev)
+		DSSDBG("display %s found\n", dssdev->name);
 
-	if (mgr->display) {
-		r = mgr->unset_display(mgr);
+	if (mgr->device) {
+		r = mgr->unset_device(mgr);
 		if (r) {
 			DSSERR("failed to unset display\n");
-			return r;
+			goto put_device;
 		}
 	}
 
-	if (display) {
-		r = mgr->set_display(mgr, display);
+	if (dssdev) {
+		r = mgr->set_device(mgr, dssdev);
 		if (r) {
 			DSSERR("failed to set manager\n");
-			return r;
+			goto put_device;
 		}
 
 		r = mgr->apply(mgr);
 		if (r) {
 			DSSERR("failed to apply dispc config\n");
-			return r;
+			goto put_device;
 		}
 	}
 
-	return size;
+put_device:
+	if (dssdev)
+		omap_dss_put_device(dssdev);
+
+	return r ? r : size;
 }
 
 static ssize_t manager_default_color_show(struct omap_overlay_manager *mgr,
@@ -334,21 +344,21 @@ static struct kobj_type manager_ktype = {
 	.default_attrs = manager_sysfs_attrs,
 };
 
-static int omap_dss_set_display(struct omap_overlay_manager *mgr,
-		struct omap_display *display)
+static int omap_dss_set_device(struct omap_overlay_manager *mgr,
+		struct omap_dss_device *dssdev)
 {
 	int i;
 	int r;
 
-	if (display->manager) {
+	if (dssdev->manager) {
 		DSSERR("display '%s' already has a manager '%s'\n",
-			       display->name, display->manager->name);
+			       dssdev->name, dssdev->manager->name);
 		return -EINVAL;
 	}
 
-	if ((mgr->supported_displays & display->type) == 0) {
+	if ((mgr->supported_displays & dssdev->type) == 0) {
 		DSSERR("display '%s' does not support manager '%s'\n",
-			       display->name, mgr->name);
+			       dssdev->name, mgr->name);
 		return -EINVAL;
 	}
 
@@ -358,26 +368,26 @@ static int omap_dss_set_display(struct omap_overlay_manager *mgr,
 		if (ovl->manager != mgr || !ovl->info.enabled)
 			continue;
 
-		r = dss_check_overlay(ovl, display);
+		r = dss_check_overlay(ovl, dssdev);
 		if (r)
 			return r;
 	}
 
-	display->manager = mgr;
-	mgr->display = display;
+	dssdev->manager = mgr;
+	mgr->device = dssdev;
 
 	return 0;
 }
 
-static int omap_dss_unset_display(struct omap_overlay_manager *mgr)
+static int omap_dss_unset_device(struct omap_overlay_manager *mgr)
 {
-	if (!mgr->display) {
+	if (!mgr->device) {
 		DSSERR("failed to unset display, display not set.\n");
 		return -EINVAL;
 	}
 
-	mgr->display->manager = NULL;
-	mgr->display = NULL;
+	mgr->device->manager = NULL;
+	mgr->device = NULL;
 
 	return 0;
 }
@@ -385,7 +395,7 @@ static int omap_dss_unset_display(struct omap_overlay_manager *mgr)
 
 static int overlay_enabled(struct omap_overlay *ovl)
 {
-	return ovl->info.enabled && ovl->manager && ovl->manager->display;
+	return ovl->info.enabled && ovl->manager && ovl->manager->device;
 }
 
 /* We apply settings to both managers here so that we can use optimizations
@@ -396,7 +406,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	int i;
 	int ret = 0;
 	enum omap_dss_update_mode mode;
-	struct omap_display *display;
+	struct omap_dss_device *dssdev;
 	struct omap_overlay *ovl;
 	bool ilace = 0;
 	int outw, outh;
@@ -419,9 +429,9 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 			continue;
 		}
 
-		display = ovl->manager->display;
+		dssdev = ovl->manager->device;
 
-		if (dss_check_overlay(ovl, display)) {
+		if (dss_check_overlay(ovl, dssdev)) {
 			dispc_enable_plane(ovl->id, 0);
 			continue;
 		}
@@ -431,14 +441,14 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		/* On a manual update display, in manual update mode, update()
 		 * handles configuring planes */
 		mode = OMAP_DSS_UPDATE_AUTO;
-		if (display->get_update_mode)
-			mode = display->get_update_mode(mgr->display);
+		if (dssdev->get_update_mode)
+			mode = dssdev->get_update_mode(dssdev);
 
-		if (display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
 				mode != OMAP_DSS_UPDATE_AUTO)
 			continue;
 
-		if (display->type == OMAP_DISPLAY_TYPE_VENC)
+		if (dssdev->type == OMAP_DISPLAY_TYPE_VENC)
 			ilace = 1;
 
 		if (ovl->info.out_width == 0)
@@ -474,7 +484,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 			continue;
 		}
 
-		if (dss_use_replication(display, ovl->info.color_mode))
+		if (dss_use_replication(dssdev, ovl->info.color_mode))
 			dispc_enable_replication(ovl->id, true);
 		else
 			dispc_enable_replication(ovl->id, false);
@@ -498,7 +508,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 			continue;
 		}
 
-		ovl->manager->display->configure_overlay(ovl);
+		ovl->manager->device->configure_overlay(ovl);
 	}
 
 	/* Issue GO for managers */
@@ -506,15 +516,15 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		if (!(mgr->caps & OMAP_DSS_OVL_MGR_CAP_DISPC))
 			continue;
 
-		display = mgr->display;
+		dssdev = mgr->device;
 
-		if (!display)
+		if (!dssdev)
 			continue;
 
 		/* We don't need GO with manual update display. LCD iface will
 		 * always be turned off after frame, and new settings will
 		 * be taken in to use at next update */
-		if (display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE)
+		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE)
 			continue;
 
 		dispc_go(mgr->id);
@@ -605,8 +615,8 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 			break;
 		}
 
-		mgr->set_display = &omap_dss_set_display;
-		mgr->unset_display = &omap_dss_unset_display;
+		mgr->set_device = &omap_dss_set_device;
+		mgr->unset_device = &omap_dss_unset_device;
 		mgr->apply = &omap_dss_mgr_apply;
 		mgr->set_default_color = &omap_dss_mgr_set_def_color;
 		mgr->set_trans_key_type_and_value =

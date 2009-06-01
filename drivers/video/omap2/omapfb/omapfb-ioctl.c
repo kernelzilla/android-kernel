@@ -37,7 +37,7 @@ static int omapfb_setup_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omap_overlay *ovl;
 	struct omap_overlay_info info;
 	int r = 0;
@@ -191,7 +191,7 @@ static int omapfb_update_window(struct fb_info *fbi,
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	u16 dw, dh;
 
 	if (!display)
@@ -217,7 +217,7 @@ static int omapfb_set_update_mode(struct fb_info *fbi,
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode um;
 	int r;
 
@@ -253,7 +253,7 @@ static int omapfb_get_update_mode(struct fb_info *fbi,
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode m;
 
 	if (!display || !display->get_update_mode)
@@ -396,7 +396,7 @@ err:
 static int omapfb_memory_read(struct fb_info *fbi,
 		struct omapfb_memory_read *mr)
 {
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	void *buf;
@@ -484,7 +484,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 
 	union {
 		struct omapfb_update_window_old	uwnd_o;

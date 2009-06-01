@@ -43,18 +43,25 @@ static void sdi_basic_init(void)
 	dispc_lcd_enable_signal_polarity(1);
 }
 
-static int sdi_display_enable(struct omap_display *display)
+static int sdi_display_enable(struct omap_dss_device *dssdev)
 {
+	struct omap_video_timings *t = &dssdev->panel.timings;
 	struct dispc_clock_info cinfo;
 	u16 lck_div, pck_div;
 	unsigned long fck;
-	struct omap_panel *panel = display->panel;
 	unsigned long pck;
 	int r;
 
-	if (display->state != OMAP_DSS_DISPLAY_DISABLED) {
-		DSSERR("display already enabled\n");
-		return -EINVAL;
+	r = omap_dss_start_device(dssdev);
+	if (r) {
+		DSSERR("failed to start device\n");
+		goto err0;
+	}
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
+		DSSERR("dssdev already enabled\n");
+		r = -EINVAL;
+		goto err1;
 	}
 
 	/* In case of skip_init sdi_init has already enabled the clocks */
@@ -64,18 +71,19 @@ static int sdi_display_enable(struct omap_display *display)
 	sdi_basic_init();
 
 	/* 15.5.9.1.2 */
-	panel->config |= OMAP_DSS_LCD_RF | OMAP_DSS_LCD_ONOFF;
+	dssdev->panel.config |= OMAP_DSS_LCD_RF | OMAP_DSS_LCD_ONOFF;
 
-	dispc_set_pol_freq(panel);
+	dispc_set_pol_freq(dssdev->panel.config, dssdev->panel.acbi,
+			dssdev->panel.acb);
 
 	if (!sdi.skip_init)
-		r = dispc_calc_clock_div(1, panel->timings.pixel_clock * 1000,
+		r = dispc_calc_clock_div(1, t->pixel_clock * 1000,
 				&cinfo);
 	else
 		r = dispc_get_clock_div(&cinfo);
 
 	if (r)
-		goto err0;
+		goto err2;
 
 	fck = cinfo.fck;
 	lck_div = cinfo.lck_div;
@@ -83,57 +91,62 @@ static int sdi_display_enable(struct omap_display *display)
 
 	pck = fck / lck_div / pck_div / 1000;
 
-	if (pck != panel->timings.pixel_clock) {
+	if (pck != t->pixel_clock) {
 		DSSWARN("Could not find exact pixel clock. Requested %d kHz, "
 				"got %lu kHz\n",
-				panel->timings.pixel_clock, pck);
+				t->pixel_clock, pck);
 
-		panel->timings.pixel_clock = pck;
+		t->pixel_clock = pck;
 	}
 
 
-	dispc_set_lcd_timings(&panel->timings);
+	dispc_set_lcd_timings(t);
 
 	r = dispc_set_clock_div(&cinfo);
 	if (r)
-		goto err1;
+		goto err2;
 
 	if (!sdi.skip_init) {
-		dss_sdi_init(display->hw_config.u.sdi.datapairs);
+		dss_sdi_init(dssdev->phy.sdi.datapairs);
 		dss_sdi_enable();
 		mdelay(2);
 	}
 
 	dispc_enable_lcd_out(1);
 
-	r = panel->enable(display);
-	if (r)
-		goto err2;
+	if (dssdev->driver->enable) {
+		r = dssdev->driver->enable(dssdev);
+		if (r)
+			goto err3;
+	}
 
-	display->state = OMAP_DSS_DISPLAY_ACTIVE;
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
 	sdi.skip_init = 0;
 
 	return 0;
-err2:
+err3:
 	dispc_enable_lcd_out(0);
-err1:
-err0:
+err2:
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+err1:
+	omap_dss_stop_device(dssdev);
+err0:
 	return r;
 }
 
-static int sdi_display_resume(struct omap_display *display);
+static int sdi_display_resume(struct omap_dss_device *dssdev);
 
-static void sdi_display_disable(struct omap_display *display)
+static void sdi_display_disable(struct omap_dss_device *dssdev)
 {
-	if (display->state == OMAP_DSS_DISPLAY_DISABLED)
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED)
 		return;
 
-	if (display->state == OMAP_DSS_DISPLAY_SUSPENDED)
-		sdi_display_resume(display);
+	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		sdi_display_resume(dssdev);
 
-	display->panel->disable(display);
+	if (dssdev->driver->disable)
+		dssdev->driver->disable(dssdev);
 
 	dispc_enable_lcd_out(0);
 
@@ -141,16 +154,18 @@ static void sdi_display_disable(struct omap_display *display)
 
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
-	display->state = OMAP_DSS_DISPLAY_DISABLED;
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+
+	omap_dss_stop_device(dssdev);
 }
 
-static int sdi_display_suspend(struct omap_display *display)
+static int sdi_display_suspend(struct omap_dss_device *dssdev)
 {
-	if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return -EINVAL;
 
-	if (display->panel->suspend)
-		display->panel->suspend(display);
+	if (dssdev->driver->suspend)
+		dssdev->driver->suspend(dssdev);
 
 	dispc_enable_lcd_out(0);
 
@@ -158,14 +173,14 @@ static int sdi_display_suspend(struct omap_display *display)
 
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
-	display->state = OMAP_DSS_DISPLAY_SUSPENDED;
+	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 
 	return 0;
 }
 
-static int sdi_display_resume(struct omap_display *display)
+static int sdi_display_resume(struct omap_dss_device *dssdev)
 {
-	if (display->state != OMAP_DSS_DISPLAY_SUSPENDED)
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
 		return -EINVAL;
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
@@ -175,15 +190,15 @@ static int sdi_display_resume(struct omap_display *display)
 
 	dispc_enable_lcd_out(1);
 
-	if (display->panel->resume)
-		display->panel->resume(display);
+	if (dssdev->driver->resume)
+		dssdev->driver->resume(dssdev);
 
-	display->state = OMAP_DSS_DISPLAY_ACTIVE;
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
 	return 0;
 }
 
-static int sdi_display_set_update_mode(struct omap_display *display,
+static int sdi_display_set_update_mode(struct omap_dss_device *dssdev,
 		enum omap_dss_update_mode mode)
 {
 	if (mode == OMAP_DSS_UPDATE_MANUAL)
@@ -201,29 +216,29 @@ static int sdi_display_set_update_mode(struct omap_display *display,
 }
 
 static enum omap_dss_update_mode sdi_display_get_update_mode(
-		struct omap_display *display)
+		struct omap_dss_device *dssdev)
 {
 	return sdi.update_enabled ? OMAP_DSS_UPDATE_AUTO :
 		OMAP_DSS_UPDATE_DISABLED;
 }
 
-static void sdi_get_timings(struct omap_display *display,
+static void sdi_get_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {
-	*timings = display->panel->timings;
+	*timings = dssdev->panel.timings;
 }
 
-void sdi_init_display(struct omap_display *display)
+void sdi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("SDI init\n");
 
-	display->enable = sdi_display_enable;
-	display->disable = sdi_display_disable;
-	display->suspend = sdi_display_suspend;
-	display->resume = sdi_display_resume;
-	display->set_update_mode = sdi_display_set_update_mode;
-	display->get_update_mode = sdi_display_get_update_mode;
-	display->get_timings = sdi_get_timings;
+	dssdev->enable = sdi_display_enable;
+	dssdev->disable = sdi_display_disable;
+	dssdev->suspend = sdi_display_suspend;
+	dssdev->resume = sdi_display_resume;
+	dssdev->set_update_mode = sdi_display_set_update_mode;
+	dssdev->get_update_mode = sdi_display_get_update_mode;
+	dssdev->get_timings = sdi_get_timings;
 }
 
 int sdi_init(bool skip_init)

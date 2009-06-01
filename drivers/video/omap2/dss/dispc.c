@@ -2319,15 +2319,15 @@ static void _dispc_set_pol_freq(bool onoff, bool rf, bool ieo, bool ipc,
 	enable_clocks(0);
 }
 
-void dispc_set_pol_freq(struct omap_panel *panel)
+void dispc_set_pol_freq(enum omap_panel_config config, u8 acbi, u8 acb)
 {
-	_dispc_set_pol_freq((panel->config & OMAP_DSS_LCD_ONOFF) != 0,
-				 (panel->config & OMAP_DSS_LCD_RF) != 0,
-				 (panel->config & OMAP_DSS_LCD_IEO) != 0,
-				 (panel->config & OMAP_DSS_LCD_IPC) != 0,
-				 (panel->config & OMAP_DSS_LCD_IHS) != 0,
-				 (panel->config & OMAP_DSS_LCD_IVS) != 0,
-				 panel->acbi, panel->acb);
+	_dispc_set_pol_freq((config & OMAP_DSS_LCD_ONOFF) != 0,
+			(config & OMAP_DSS_LCD_RF) != 0,
+			(config & OMAP_DSS_LCD_IEO) != 0,
+			(config & OMAP_DSS_LCD_IPC) != 0,
+			(config & OMAP_DSS_LCD_IHS) != 0,
+			(config & OMAP_DSS_LCD_IVS) != 0,
+			acbi, acb);
 }
 
 void find_lck_pck_divs(bool is_tft, unsigned long req_pck, unsigned long fck,
@@ -2790,9 +2790,9 @@ static void dispc_error_worker(struct work_struct *work)
 
 			if (mgr->id == OMAP_DSS_CHANNEL_LCD) {
 				manager = mgr;
-				enable = mgr->display->state ==
+				enable = mgr->device->state ==
 						OMAP_DSS_DISPLAY_ACTIVE;
-				mgr->display->disable(mgr->display);
+				mgr->device->disable(mgr->device);
 				break;
 			}
 		}
@@ -2812,7 +2812,7 @@ static void dispc_error_worker(struct work_struct *work)
 			dispc_go(manager->id);
 			mdelay(50);
 			if (enable)
-				manager->display->enable(manager->display);
+				manager->device->enable(manager->device);
 		}
 	}
 
@@ -2828,9 +2828,9 @@ static void dispc_error_worker(struct work_struct *work)
 
 			if (mgr->id == OMAP_DSS_CHANNEL_DIGIT) {
 				manager = mgr;
-				enable = mgr->display->state ==
+				enable = mgr->device->state ==
 						OMAP_DSS_DISPLAY_ACTIVE;
-				mgr->display->disable(mgr->display);
+				mgr->device->disable(mgr->device);
 				break;
 			}
 		}
@@ -2850,7 +2850,7 @@ static void dispc_error_worker(struct work_struct *work)
 			dispc_go(manager->id);
 			mdelay(50);
 			if (enable)
-				manager->display->enable(manager->display);
+				manager->device->enable(manager->device);
 		}
 	}
 
@@ -2861,7 +2861,7 @@ static void dispc_error_worker(struct work_struct *work)
 			mgr = omap_dss_get_overlay_manager(i);
 
 			if (mgr->caps & OMAP_DSS_OVL_CAP_DISPC)
-				mgr->display->disable(mgr->display);
+				mgr->device->disable(mgr->device);
 		}
 	}
 
@@ -3126,7 +3126,7 @@ static int dispc_is_overlay_scaled(struct omap_overlay_info *pi)
 }
 
 /* returns the area that needs updating */
-void dispc_setup_partial_planes(struct omap_display *display,
+void dispc_setup_partial_planes(struct omap_dss_device *dssdev,
 				    u16 *xi, u16 *yi, u16 *wi, u16 *hi)
 {
 	struct omap_overlay_manager *mgr;
@@ -3143,7 +3143,7 @@ void dispc_setup_partial_planes(struct omap_display *display,
 		*xi, *yi, *wi, *hi);
 
 
-	mgr = display->manager;
+	mgr = dssdev->manager;
 
 	if (!mgr) {
 		DSSDBG("no manager\n");
@@ -3307,7 +3307,7 @@ void dispc_setup_partial_planes(struct omap_display *display,
 				pi->mirror,
 				pi->global_alpha);
 
-		if (dss_use_replication(display, ovl->info.color_mode))
+		if (dss_use_replication(dssdev, ovl->info.color_mode))
 			dispc_enable_replication(ovl->id, true);
 		else
 			dispc_enable_replication(ovl->id, false);
