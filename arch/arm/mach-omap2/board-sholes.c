@@ -422,7 +422,6 @@ static void sholes_pm_init(void) {
 	omap3_bypass_cmd(SHOLES_R_SRI2C_SLAVE_ADDR_SA1,
 				R_SMPS_VOL_OPP2_RA1, 0x2E);
 }
->>>>>>> [ARM] omap3: sholes: Device retention support with CPCAP:arch/arm/mach-omap2/board-sholes.c
 
 static void __init sholes_init(void)
 {
