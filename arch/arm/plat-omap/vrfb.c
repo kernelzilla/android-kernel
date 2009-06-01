@@ -49,7 +49,7 @@ static unsigned long ctx_map_active;
  * we don't need locking, since no drivers will run until after the wake-up
  * has finished.
  */
-struct {
+static struct {
 	u32 physical_ba;
 	u32 control;
 	u32 size;
