@@ -1125,7 +1125,7 @@ ssize_t omapfb_write(struct fb_info *info, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
 	DBG("omapfb_write %d, %lu\n", count, (unsigned long)*ppos);
-	// XXX needed for VRFB
+	/* XXX needed for VRFB */
 	return count;
 }
 #endif
@@ -1145,7 +1145,7 @@ static struct fb_ops omapfb_ops = {
 	.fb_mmap	= omapfb_mmap,
 	.fb_setcolreg	= omapfb_setcolreg,
 	.fb_setcmap	= omapfb_setcmap,
-	//.fb_write	= omapfb_write,
+	/*.fb_write	= omapfb_write,*/
 };
 
 static void omapfb_free_fbmem(struct fb_info *fbi)
@@ -1243,7 +1243,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 		/* only ioremap the 0 angle view */
 		va = ioremap_wc(rg->vrfb.paddr[0], size);
 
-		if(!va) {
+		if (!va) {
 			printk(KERN_ERR "vrfb: ioremap failed\n");
 			omap_vrfb_release_ctx(&rg->vrfb);
 			return -ENOMEM;
@@ -1301,8 +1301,8 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 
 			omap_vrfb_adjust_size(&w, &h, bytespp);
 
-			/* Because we change the resolution of the 0 degree view,
-			 * we need to alloc max(w, h) for height */
+			/* Because we change the resolution of the 0 degree
+			 * view, we need to alloc max(w, h) for height */
 			h = max(w, h);
 			w = OMAP_VRFB_LINE_LEN;
 
@@ -1319,11 +1319,11 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	return omapfb_alloc_fbmem(fbi, size, paddr);
 }
 
-static enum omap_color_mode fb_format_to_dss_mode(enum omapfb_color_format format)
+static enum omap_color_mode fb_format_to_dss_mode(enum omapfb_color_format fmt)
 {
 	enum omap_color_mode mode;
 
-	switch (format) {
+	switch (fmt) {
 	case OMAPFB_COLOR_RGB565:
 		mode = OMAP_DSS_COLOR_RGB16;
 		break;
@@ -1639,15 +1639,16 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 
 		if (!var->bits_per_pixel) {
 			switch (display->get_recommended_bpp(display)) {
-				case 16:
-					var->bits_per_pixel = 16;
-					break;
-				case 24:
-					var->bits_per_pixel = 32;
-					break;
-				default:
-					dev_err(fbdev->dev, "illegal display bpp\n");
-					return -EINVAL;
+			case 16:
+				var->bits_per_pixel = 16;
+				break;
+			case 24:
+				var->bits_per_pixel = 32;
+				break;
+			default:
+				dev_err(fbdev->dev, "illegal display "
+						"bpp\n");
+				return -EINVAL;
 			}
 		}
 	} else {
@@ -1807,7 +1808,7 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 	if (fbdev->num_fbs > 0) {
 		struct omapfb_info *ofbi = FB2OFB(fbdev->fbs[0]);
 
-		if (ofbi->num_overlays > 0 ) {
+		if (ofbi->num_overlays > 0) {
 			struct omap_overlay *ovl = ofbi->overlays[0];
 
 			r = omapfb_overlay_enable(ovl, 1);

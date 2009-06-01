@@ -1120,17 +1120,33 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 
 		if (mirroring) {
 			switch (rotation) {
-			case 0: vidrot = 2; break;
-			case 1: vidrot = 1; break;
-			case 2: vidrot = 0; break;
-			case 3: vidrot = 3; break;
+			case 0:
+				vidrot = 2;
+				break;
+			case 1:
+				vidrot = 1;
+				break;
+			case 2:
+				vidrot = 0;
+				break;
+			case 3:
+				vidrot = 3;
+				break;
 			}
 		} else {
 			switch (rotation) {
-			case 0: vidrot = 0; break;
-			case 1: vidrot = 1; break;
-			case 2: vidrot = 2; break;
-			case 3: vidrot = 3; break;
+			case 0:
+				vidrot = 0;
+				break;
+			case 1:
+				vidrot = 1;
+				break;
+			case 2:
+				vidrot = 2;
+				break;
+			case 3:
+				vidrot = 3;
+				break;
 			}
 		}
 
@@ -1923,7 +1939,8 @@ bool dispc_trans_key_enabled(enum omap_channel ch)
 		enabled = REG_GET(DISPC_CONFIG, 10, 10);
 	else if (ch == OMAP_DSS_CHANNEL_DIGIT)
 		enabled = REG_GET(DISPC_CONFIG, 12, 12);
-	else BUG();
+	else
+		BUG();
 	enable_clocks(0);
 
 	return enabled;

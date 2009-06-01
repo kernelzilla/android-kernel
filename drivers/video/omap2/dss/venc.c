@@ -320,7 +320,8 @@ static void venc_write_config(const struct venc_config *config)
 	venc_write_reg(VENC_BLACK_LEVEL, config->black_level);
 	venc_write_reg(VENC_BLANK_LEVEL, config->blank_level);
 	venc_write_reg(VENC_M_CONTROL, config->m_control);
-	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data | venc.wss_data);
+	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data |
+			venc.wss_data);
 	venc_write_reg(VENC_S_CARR, config->s_carr);
 	venc_write_reg(VENC_L21__WC_CTL, config->l21__wc_ctl);
 	venc_write_reg(VENC_SAVID__EAVID, config->savid__eavid);
@@ -406,7 +407,6 @@ static const struct venc_config *venc_timings_to_config(
 /* driver */
 static int venc_panel_probe(struct omap_dss_device *dssdev)
 {
-	//dssdev->name = "tv-out";
 	dssdev->panel.timings = omap_dss_pal_timings;
 
 	return 0;
@@ -497,8 +497,6 @@ int venc_init(struct platform_device *pdev)
 	venc_enable_clocks(0);
 
 	return omap_dss_register_driver(&venc_driver);
-
-	//return 0;
 }
 
 void venc_exit(void)
@@ -703,7 +701,8 @@ static int venc_set_wss(struct omap_dss_device *dssdev,	u32 wss)
 
 	venc_enable_clocks(1);
 
-	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data | venc.wss_data);
+	venc_write_reg(VENC_BSTAMP_WSS_DATA, config->bstamp_wss_data |
+			venc.wss_data);
 
 	venc_enable_clocks(0);
 

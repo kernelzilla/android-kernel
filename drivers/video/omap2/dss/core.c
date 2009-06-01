@@ -73,8 +73,8 @@ static int dss_get_ctx_id(void)
 		return 0;
 	r = pdata->get_last_off_on_transaction_id(&core.pdev->dev);
 	if (r < 0) {
-		dev_err(&core.pdev->dev,
-			"getting transaction ID failed, will force context restore\n");
+		dev_err(&core.pdev->dev, "getting transaction ID failed, "
+				"will force context restore\n");
 		r = -1;
 	}
 	return r;
@@ -157,7 +157,7 @@ static int dss_get_clocks(void)
 		char *omap2_name;
 		char *omap3_name;
 	} clocks[5] = {
-		{ &core.dss_ick, "dss_ick", "dss_ick" },	/* L3 & L4 ick */
+		{ &core.dss_ick, "dss_ick", "dss_ick" }, /* L3 & L4 ick */
 		{ &core.dss1_fck, "dss1_fck", "dss1_alwon_fck" },
 		{ &core.dss2_fck, "dss2_fck", "dss2_alwon_fck" },
 		{ &core.dss_54m_fck, "dss_54m_fck", "dss_tv_fck" },
@@ -766,7 +766,8 @@ static void reset_device(struct device *dev, int check)
 		dev->platform_data = NULL;
 		while (dev_p < dev_end) {
 			if (*dev_p) {
-				WARN("%s: struct device fields will be discarded\n",
+				WARN("%s: struct device fields will be "
+						"discarded\n",
 				     __func__);
 				break;
 			}

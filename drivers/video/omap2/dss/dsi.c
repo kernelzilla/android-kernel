@@ -448,7 +448,8 @@ static void perf_show(const char *name)
 		total_time_auto = ktime_sub(t, dsi.perf_start_time_auto);
 		total_time_auto_us = (u32)ktime_to_us(total_time_auto);
 
-		printk("DSI(%s): %u fps, setup %u/%u/%u, trans %u/%u/%u\n",
+		printk(KERN_INFO "DSI(%s): %u fps, setup %u/%u/%u, "
+				"trans %u/%u/%u\n",
 				name,
 				1000 * 1000 * numframes / total_time_auto_us,
 				s_min_setup_us,
@@ -466,8 +467,8 @@ static void perf_show(const char *name)
 		s_max_trans_us = 0;
 		perf_mark_start_auto();
 	} else {
-		printk("DSI(%s): %u us + %u us = %u us (%uHz), %u bytes, "
-				"%u kbytes/sec\n",
+		printk(KERN_INFO "DSI(%s): %u us + %u us = %u us (%uHz), "
+				"%u bytes, %u kbytes/sec\n",
 				name,
 				setup_us,
 				trans_us,
@@ -844,9 +845,12 @@ int dsi_pll_calc_pck(bool is_tft, unsigned long req_pck,
 	struct dsi_clock_info cur, best;
 	int min_fck_per_pck;
 	int match = 0;
+	unsigned long dss_clk_fck2;
+
+	dss_clk_fck2 = dss_clk_get_rate(DSS_CLK_FCK2);
 
 	if (req_pck == dsi.cache_req_pck &&
-			dsi.cache_cinfo.clkin == dss_clk_get_rate(DSS_CLK_FCK2)) {
+			dsi.cache_cinfo.clkin == dss_clk_fck2) {
 		DSSDBG("DSI clock info found from cache\n");
 		*cinfo = dsi.cache_cinfo;
 		return 0;
@@ -868,7 +872,7 @@ retry:
 	memset(&best, 0, sizeof(best));
 
 	memset(&cur, 0, sizeof(cur));
-	cur.clkin = dss_clk_get_rate(DSS_CLK_FCK2);
+	cur.clkin = dss_clk_fck2;
 	cur.use_dss2_fck = 1;
 	cur.highfreq = 0;
 
@@ -973,11 +977,14 @@ static int dsi_pll_calc_ddrfreq(unsigned long clk_freq,
 	struct dsi_clock_info cur, best;
 	const bool use_dss2_fck = 1;
 	unsigned long datafreq;
+	unsigned long dss_clk_fck2;
 
 	DSSDBG("dsi_pll_calc_ddrfreq\n");
 
+	dss_clk_fck2 = dss_clk_get_rate(DSS_CLK_FCK2);
+
 	if (clk_freq == dsi.cache_clk_freq &&
-			dsi.cache_cinfo.clkin == dss_clk_get_rate(DSS_CLK_FCK2)) {
+			dsi.cache_cinfo.clkin == dss_clk_fck2) {
 		DSSDBG("DSI clock info found from cache\n");
 		*cinfo = dsi.cache_cinfo;
 		return 0;
@@ -990,7 +997,7 @@ static int dsi_pll_calc_ddrfreq(unsigned long clk_freq,
 	memset(&cur, 0, sizeof(cur));
 	cur.use_dss2_fck = use_dss2_fck;
 	if (use_dss2_fck) {
-		cur.clkin = dss_clk_get_rate(DSS_CLK_FCK2);
+		cur.clkin = dss_clk_fck2;
 		cur.highfreq = 0;
 	} else {
 		cur.clkin = dispc_pclk_rate();
@@ -2107,7 +2114,8 @@ int dsi_vc_dcs_read(int channel, u8 dcs_cmd, u8 *buf, int buflen)
 	if (r)
 		return r;
 
-	if (REG_GET(DSI_VC_CTRL(channel), 20, 20) == 0) {	/* RX_FIFO_NOT_EMPTY */
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(DSI_VC_CTRL(channel), 20, 20) == 0) {
 		DSSERR("RX fifo empty when trying to read.\n");
 		return -EIO;
 	}
@@ -2637,7 +2645,7 @@ static void dsi_setup_update_dispc(struct omap_dss_device *dssdev,
 	dsi.update_region.y = y;
 	dsi.update_region.w = w;
 	dsi.update_region.h = h;
-	dsi.update_region.bytespp = 3; // XXX
+	dsi.update_region.bytespp = 3; /* XXX */
 #endif
 
 	dispc_setup_partial_planes(dssdev, &x, &y, &w, &h);
@@ -2656,7 +2664,7 @@ static void dsi_setup_autoupdate_dispc(struct omap_dss_device *dssdev)
 	dsi.update_region.y = 0;
 	dsi.update_region.w = w;
 	dsi.update_region.h = h;
-	dsi.update_region.bytespp = 3; // XXX
+	dsi.update_region.bytespp = 3; /* XXX */
 #endif
 
 	/* the overlay settings may not have been applied, if we were in manual
@@ -3019,8 +3027,8 @@ static void dsi_do_cmd_set_te(struct omap_dss_device *dssdev, bool enable)
 
 	if (!dssdev->phy.dsi.ext_te) {
 		if (enable) {
-			/* disable LP_RX_TO, so that we can receive TE.
-			 * Time to wait for TE is longer than the timer allows */
+			/* disable LP_RX_TO, so that we can receive TE.  Time
+			 * to wait for TE is longer than the timer allows */
 			REG_FLD_MOD(DSI_TIMING2, 0, 15, 15); /* LP_RX_TO */
 		} else {
 			REG_FLD_MOD(DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */

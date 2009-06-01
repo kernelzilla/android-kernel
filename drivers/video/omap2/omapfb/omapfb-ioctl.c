@@ -299,7 +299,7 @@ static int _omapfb_set_color_key(struct omap_overlay_manager *mgr,
 		return 0;
 	}
 
-	switch(ck->key_type) {
+	switch (ck->key_type) {
 	case OMAPFB_COLOR_KEY_GFX_DST:
 		kt = OMAP_DSS_COLOR_KEY_GFX_DST;
 		break;
@@ -646,7 +646,8 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 
 	case OMAPFB_GET_COLOR_KEY:
 		DBG("ioctl GET_COLOR_KEY\n");
-		if ((r = omapfb_get_color_key(fbi, &p.color_key)) < 0)
+		r = omapfb_get_color_key(fbi, &p.color_key);
+		if (r)
 			break;
 		if (copy_to_user((void __user *)arg, &p.color_key,
 				 sizeof(p.color_key)))

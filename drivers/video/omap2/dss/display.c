@@ -85,16 +85,17 @@ static ssize_t display_upd_mode_store(struct device *dev,
 	val = simple_strtoul(buf, NULL, 10);
 
 	switch (val) {
-		case OMAP_DSS_UPDATE_DISABLED:
-		case OMAP_DSS_UPDATE_AUTO:
-		case OMAP_DSS_UPDATE_MANUAL:
-			mode = (enum omap_dss_update_mode)val;
-			break;
-		default:
-			return -EINVAL;
+	case OMAP_DSS_UPDATE_DISABLED:
+	case OMAP_DSS_UPDATE_AUTO:
+	case OMAP_DSS_UPDATE_MANUAL:
+		mode = (enum omap_dss_update_mode)val;
+		break;
+	default:
+		return -EINVAL;
 	}
 
-	if ((r = dssdev->set_update_mode(dssdev, mode)))
+	r = dssdev->set_update_mode(dssdev, mode);
+	if (r)
 		return r;
 
 	return size;
@@ -120,7 +121,8 @@ static ssize_t display_tear_store(struct device *dev,
 
 	te = simple_strtoul(buf, NULL, 0);
 
-	if ((r = dssdev->enable_te(dssdev, te)))
+	r = dssdev->enable_te(dssdev, te);
+	if (r)
 		return r;
 
 	return size;
@@ -169,7 +171,8 @@ static ssize_t display_timings_store(struct device *dev,
 				&t.y_res, &t.vfp, &t.vbp, &t.vsw) != 9)
 		return -EINVAL;
 
-	if ((r = dssdev->check_timings(dssdev, &t)))
+	r = dssdev->check_timings(dssdev, &t);
+	if (r)
 		return r;
 
 	dssdev->set_timings(dssdev, &t);
@@ -200,7 +203,8 @@ static ssize_t display_rotate_store(struct device *dev,
 
 	rot = simple_strtoul(buf, NULL, 0);
 
-	if ((r = dssdev->set_rotate(dssdev, rot)))
+	r = dssdev->set_rotate(dssdev, rot);
+	if (r)
 		return r;
 
 	return size;
@@ -229,7 +233,8 @@ static ssize_t display_mirror_store(struct device *dev,
 
 	mirror = simple_strtoul(buf, NULL, 0);
 
-	if ((r = dssdev->set_mirror(dssdev, mirror)))
+	r = dssdev->set_mirror(dssdev, mirror);
+	if (r)
 		return r;
 
 	return size;
@@ -265,7 +270,8 @@ static ssize_t display_wss_store(struct device *dev,
 	if (wss > 0xfffff)
 		return -EINVAL;
 
-	if ((r = dssdev->set_wss(dssdev, wss)))
+	r = dssdev->set_wss(dssdev, wss);
+	if (r)
 		return r;
 
 	return size;
@@ -596,8 +602,7 @@ struct omap_dss_device *omap_dss_find_device(void *data,
 {
 	struct omap_dss_device *dssdev = NULL;
 
-	while ((dssdev = omap_dss_get_next_device(dssdev)) != NULL)
-	{
+	while ((dssdev = omap_dss_get_next_device(dssdev)) != NULL) {
 		if (match(dssdev, data))
 			return dssdev;
 	}
@@ -622,13 +627,13 @@ int omap_dss_start_device(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
-	if(!try_module_get(dssdev->dev.driver->owner)) {
+	if (!try_module_get(dssdev->dev.driver->owner)) {
 		r = -ENODEV;
 		goto err0;
 	}
 
 	if (dssdev->ctrl.panel) {
-		if(!try_module_get(dssdev->ctrl.panel->dev.driver->owner)) {
+		if (!try_module_get(dssdev->ctrl.panel->dev.driver->owner)) {
 			r = -ENODEV;
 			goto err1;
 		}

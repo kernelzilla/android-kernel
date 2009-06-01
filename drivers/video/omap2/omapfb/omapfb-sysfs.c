@@ -72,8 +72,8 @@ static ssize_t store_rotate_type(struct device *dev,
 	ofbi->rotation_type = rot_type;
 
 	/*
-	 * Since the VRAM for this FB is not allocated at the moment we don't need to
-	 * do any further parameter checking at this point.
+	 * Since the VRAM for this FB is not allocated at the moment we don't
+	 * need to do any further parameter checking at this point.
 	 */
 out:
 	omapfb_unlock(fbdev);
@@ -321,8 +321,8 @@ static ssize_t show_overlays_rotate(struct device *dev,
 	return l;
 }
 
-static ssize_t store_overlays_rotate(struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t count)
+static ssize_t store_overlays_rotate(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct omapfb_info *ofbi = FB2OFB(fbi);
@@ -451,11 +451,13 @@ static ssize_t show_virt(struct device *dev,
 }
 
 static struct device_attribute omapfb_attrs[] = {
-	__ATTR(rotate_type, S_IRUGO | S_IWUSR, show_rotate_type, store_rotate_type),
+	__ATTR(rotate_type, S_IRUGO | S_IWUSR, show_rotate_type,
+			store_rotate_type),
 	__ATTR(mirror, S_IRUGO | S_IWUSR, show_mirror, store_mirror),
 	__ATTR(size, S_IRUGO | S_IWUSR, show_size, store_size),
 	__ATTR(overlays, S_IRUGO | S_IWUSR, show_overlays, store_overlays),
-	__ATTR(overlays_rotate, S_IRUGO | S_IWUSR, show_overlays_rotate, store_overlays_rotate),
+	__ATTR(overlays_rotate, S_IRUGO | S_IWUSR, show_overlays_rotate,
+			store_overlays_rotate),
 	__ATTR(phys_addr, S_IRUGO, show_phys, NULL),
 	__ATTR(virt_addr, S_IRUGO, show_virt, NULL),
 };
@@ -473,7 +475,8 @@ int omapfb_create_sysfs(struct omapfb2_device *fbdev)
 					&omapfb_attrs[t]);
 
 			if (r) {
-				dev_err(fbdev->dev, "failed to create sysfs file\n");
+				dev_err(fbdev->dev, "failed to create sysfs "
+						"file\n");
 				return r;
 			}
 		}

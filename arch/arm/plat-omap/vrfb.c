@@ -1,9 +1,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/ioport.h>
-
-#include <asm/io.h>
-#include <asm/bitops.h>
+#include <linux/io.h>
+#include <linux/bitops.h>
 
 #include <mach/io.h>
 #include <mach/vrfb.h>
@@ -55,7 +54,7 @@ static struct {
 	u32 size;
 } vrfb_hw_context[VRFB_NUM_CTXS];
 
-static void inline restore_hw_context(int ctx)
+static inline void restore_hw_context(int ctx)
 {
 	omap_writel(vrfb_hw_context[ctx].control, SMS_ROT_CONTROL(ctx));
 	omap_writel(vrfb_hw_context[ctx].size, SMS_ROT_SIZE(ctx));
@@ -180,7 +179,7 @@ void omap_vrfb_release_ctx(struct vrfb *vrfb)
 	clear_bit(ctx, &ctx_map);
 
 	for (rot = 0; rot < 4; ++rot) {
-		if(vrfb->paddr[rot]) {
+		if (vrfb->paddr[rot]) {
 			release_mem_region(vrfb->paddr[rot], OMAP_VRFB_SIZE);
 			vrfb->paddr[rot] = 0;
 		}

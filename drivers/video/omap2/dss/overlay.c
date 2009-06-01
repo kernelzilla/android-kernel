@@ -47,7 +47,8 @@ static ssize_t overlay_manager_show(struct omap_overlay *ovl, char *buf)
 			ovl->manager ? ovl->manager->name : "<none>");
 }
 
-static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf, size_t size)
+static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
+		size_t size)
 {
 	int i, r;
 	struct omap_overlay_manager *mgr = NULL;
@@ -92,8 +93,11 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf, 
 		}
 	}
 
-	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
-		return r;
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
 
 	return size;
 }
@@ -131,11 +135,15 @@ static ssize_t overlay_position_store(struct omap_overlay *ovl,
 
 	info.pos_y = simple_strtoul(last, &last, 10);
 
-	if ((r = ovl->set_overlay_info(ovl, &info)))
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
 		return r;
 
-	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
-		return r;
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
 
 	return size;
 }
@@ -162,11 +170,15 @@ static ssize_t overlay_output_size_store(struct omap_overlay *ovl,
 
 	info.out_height = simple_strtoul(last, &last, 10);
 
-	if ((r = ovl->set_overlay_info(ovl, &info)))
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
 		return r;
 
-	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
-		return r;
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
 
 	return size;
 }
@@ -176,7 +188,8 @@ static ssize_t overlay_enabled_show(struct omap_overlay *ovl, char *buf)
 	return snprintf(buf, PAGE_SIZE, "%d\n", ovl->info.enabled);
 }
 
-static ssize_t overlay_enabled_store(struct omap_overlay *ovl, const char *buf, size_t size)
+static ssize_t overlay_enabled_store(struct omap_overlay *ovl, const char *buf,
+		size_t size)
 {
 	int r;
 	struct omap_overlay_info info;
@@ -185,11 +198,15 @@ static ssize_t overlay_enabled_store(struct omap_overlay *ovl, const char *buf, 
 
 	info.enabled = simple_strtoul(buf, NULL, 10);
 
-	if ((r = ovl->set_overlay_info(ovl, &info)))
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
 		return r;
 
-	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
-		return r;
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
 
 	return size;
 }
@@ -216,11 +233,15 @@ static ssize_t overlay_global_alpha_store(struct omap_overlay *ovl,
 	else
 		info.global_alpha = simple_strtoul(buf, NULL, 10);
 
-	if ((r = ovl->set_overlay_info(ovl, &info)))
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
 		return r;
 
-	if (ovl->manager && (r = ovl->manager->apply(ovl->manager)))
-		return r;
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
 
 	return size;
 }
@@ -261,7 +282,8 @@ static struct attribute *overlay_sysfs_attrs[] = {
 	NULL
 };
 
-static ssize_t overlay_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
+static ssize_t overlay_attr_show(struct kobject *kobj, struct attribute *attr,
+		char *buf)
 {
 	struct omap_overlay *overlay;
 	struct overlay_attribute *overlay_attr;

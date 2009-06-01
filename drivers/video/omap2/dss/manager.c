@@ -44,7 +44,8 @@ static ssize_t manager_display_show(struct omap_overlay_manager *mgr, char *buf)
 			mgr->device ? mgr->device->name : "<none>");
 }
 
-static ssize_t manager_display_store(struct omap_overlay_manager *mgr, const char *buf, size_t size)
+static ssize_t manager_display_store(struct omap_overlay_manager *mgr,
+		const char *buf, size_t size)
 {
 	int r = 0;
 	size_t len = size;
@@ -288,7 +289,8 @@ static MANAGER_ATTR(color_key_type, S_IRUGO|S_IWUSR,
 static MANAGER_ATTR(color_key_value, S_IRUGO|S_IWUSR,
 		manager_color_key_value_show, manager_color_key_value_store);
 static MANAGER_ATTR(color_key_enabled, S_IRUGO|S_IWUSR,
-		manager_color_key_enabled_show, manager_color_key_enabled_store);
+		manager_color_key_enabled_show,
+		manager_color_key_enabled_store);
 static MANAGER_ATTR(alpha_blending_enabled, S_IRUGO|S_IWUSR,
 		manager_alpha_blending_enabled_show,
 		manager_alpha_blending_enabled_store);
@@ -305,7 +307,8 @@ static struct attribute *manager_sysfs_attrs[] = {
 	NULL
 };
 
-static ssize_t manager_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
+static ssize_t manager_attr_show(struct kobject *kobj, struct attribute *attr,
+		char *buf)
 {
 	struct omap_overlay_manager *manager;
 	struct manager_attribute *manager_attr;
@@ -504,9 +507,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
 			continue;
 
-		if (!overlay_enabled(ovl)) {
+		if (!overlay_enabled(ovl))
 			continue;
-		}
 
 		ovl->manager->device->configure_overlay(ovl);
 	}
