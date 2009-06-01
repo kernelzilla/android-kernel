@@ -96,15 +96,19 @@ static void sholes_touch_init(void)
 static struct qtouch_key sholes_touch_key_list[] = {
 	{
 		.channel	= 0,
+		.code		= KEY_BACK,
+	},
+	{
+		.channel	= 2,
 		.code		= KEY_MENU,
 	},
 	{
-		.channel	= 3,
+		.channel	= 4,
 		.code		= KEY_HOME,
 	},
 	{
 		.channel	= 6,
-		.code		= KEY_BACK,
+		.code		= KEY_SEARCH,
 	},
 };
 
