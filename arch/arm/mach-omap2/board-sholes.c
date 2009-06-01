@@ -402,7 +402,8 @@ static struct prm_setup_vc sholes_prm_setup = {
 #define R_SMPS_VOL_OPP2_RA1		0x03
 
 /* Sholes specific PM */
-static void sholes_pm_init(void) {
+static void sholes_pm_init(void)
+{
 	omap3_set_prm_setup_vc(&sholes_prm_setup);
 
 	/* Initialize CPCAP SW1&SW2 OPP1&OPP2 registers */
@@ -423,6 +424,13 @@ static void sholes_pm_init(void) {
 				R_SMPS_VOL_OPP2_RA1, 0x2E);
 }
 
+static void __init config_wlan_gpio(void)
+{
+	/* WLAN PE and IRQ */
+	omap_cfg_reg(AE22_3430_GPIO186_OUT);
+	omap_cfg_reg(J8_3430_GPIO65);
+}
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -437,6 +445,7 @@ static void __init sholes_init(void)
 	sholes_ehci_init();
 	sholes_sdrc_init();
 	sholes_pm_init();
+	config_wlan_gpio();
 }
 
 static void __init sholes_map_io(void)

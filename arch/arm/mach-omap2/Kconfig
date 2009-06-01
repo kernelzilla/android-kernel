@@ -119,7 +119,7 @@ config MACH_OMAP_ZOOM2
 
 config WIFI_CONTROL_FUNC
         bool "Enable WiFi control function abstraction"
-	depends on MACH_OMAP_ZOOM2
+	depends on MACH_OMAP_ZOOM2 || MACH_SHOLES
         help
           Enables Power/Reset/Carddetect function abstraction
 			  
