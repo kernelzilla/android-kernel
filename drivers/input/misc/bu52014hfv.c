@@ -108,6 +108,9 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 	info->gpio_north = pdata->docked_north_gpio;
 	info->gpio_south = pdata->docked_south_gpio;
 
+	info->irq_north = gpio_to_irq(pdata->docked_north_gpio);
+	info->irq_south = gpio_to_irq(pdata->docked_south_gpio);
+
 	if (pdata->north_is_desk) {
 		info->north_value = SW_DOCK_DESK;
 		info->south_value = SW_DOCK_CAR;
