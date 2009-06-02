@@ -110,7 +110,7 @@ enum omap_dss_load_mode {
 	OMAP_DSS_LOAD_CLUT_ONCE_FRAME	= 3,
 };
 
-enum omap_dss_color_key_type {
+enum omap_dss_trans_key_type {
 	OMAP_DSS_COLOR_KEY_GFX_DST = 0,
 	OMAP_DSS_COLOR_KEY_VID_SRC = 1,
 };
@@ -294,6 +294,16 @@ struct omap_overlay {
 			struct omap_overlay_info *info);
 };
 
+struct omap_overlay_manager_info {
+	u32 default_color;
+
+	enum omap_dss_trans_key_type trans_key_type;
+	u32 trans_key;
+	bool trans_enabled;
+
+	bool alpha_enabled;
+};
+
 struct omap_overlay_manager {
 	struct kobject kobj;
 	struct list_head list;
@@ -301,6 +311,7 @@ struct omap_overlay_manager {
 	const char *name;
 	int id;
 	enum omap_overlay_manager_caps caps;
+	struct omap_overlay_manager_info info;
 	struct omap_dss_device *device;
 	int num_overlays;
 	struct omap_overlay **overlays;
@@ -312,20 +323,10 @@ struct omap_overlay_manager {
 
 	int (*apply)(struct omap_overlay_manager *mgr);
 
-	void (*set_default_color)(struct omap_overlay_manager *mgr, u32 color);
-	u32 (*get_default_color)(struct omap_overlay_manager *mgr);
-	bool (*get_alpha_blending_status)(struct omap_overlay_manager *mgr);
-	bool (*get_trans_key_status)(struct omap_overlay_manager *mgr);
-	void (*get_trans_key_type_and_value)(struct omap_overlay_manager *mgr,
-		enum omap_dss_color_key_type *type,
-		u32 *trans_key);
-	void (*set_trans_key_type_and_value)(struct omap_overlay_manager *mgr,
-		enum omap_dss_color_key_type type,
-		u32 trans_key);
-	void (*enable_trans_key)(struct omap_overlay_manager *mgr,
-		bool enable);
-	void (*enable_alpha_blending)(struct omap_overlay_manager *mgr,
-			bool enable);
+	int (*set_manager_info)(struct omap_overlay_manager *mgr,
+			struct omap_overlay_manager_info *info);
+	void (*get_manager_info)(struct omap_overlay_manager *mgr,
+			struct omap_overlay_manager_info *info);
 };
 
 struct omap_dss_device {

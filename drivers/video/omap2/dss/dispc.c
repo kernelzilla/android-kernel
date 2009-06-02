@@ -1856,7 +1856,7 @@ u32 dispc_get_default_color(enum omap_channel channel)
 }
 
 void dispc_set_trans_key(enum omap_channel ch,
-		enum omap_dss_color_key_type type,
+		enum omap_dss_trans_key_type type,
 		u32 trans_key)
 {
 	const struct dispc_reg tr_reg[] = {
@@ -1873,7 +1873,7 @@ void dispc_set_trans_key(enum omap_channel ch,
 }
 
 void dispc_get_trans_key(enum omap_channel ch,
-		enum omap_dss_color_key_type *type,
+		enum omap_dss_trans_key_type *type,
 		u32 *trans_key)
 {
 	const struct dispc_reg tr_reg[] = {

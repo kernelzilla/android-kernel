@@ -109,165 +109,174 @@ put_device:
 static ssize_t manager_default_color_show(struct omap_overlay_manager *mgr,
 					  char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d",
-			mgr->get_default_color(mgr));
+	return snprintf(buf, PAGE_SIZE, "%d", mgr->info.default_color);
 }
 
 static ssize_t manager_default_color_store(struct omap_overlay_manager *mgr,
 					   const char *buf, size_t size)
 {
-	u32 default_color;
+	struct omap_overlay_manager_info info;
+	u32 color;
+	int r;
 
-	if (sscanf(buf, "%d", &default_color) != 1)
+	if (sscanf(buf, "%d", &color) != 1)
 		return -EINVAL;
-	dispc_set_default_color(mgr->id, default_color);
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.default_color = color;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
 
 	return size;
 }
 
-static const char *color_key_type_str[] = {
+static const char *trans_key_type_str[] = {
 	"gfx-destination",
 	"video-source",
 };
 
-static ssize_t manager_color_key_type_show(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_type_show(struct omap_overlay_manager *mgr,
 					   char *buf)
 {
-	enum omap_dss_color_key_type key_type;
+	enum omap_dss_trans_key_type key_type;
 
-	mgr->get_trans_key_type_and_value(mgr, &key_type, NULL);
-	BUG_ON(key_type >= ARRAY_SIZE(color_key_type_str));
+	key_type = mgr->info.trans_key_type;
+	BUG_ON(key_type >= ARRAY_SIZE(trans_key_type_str));
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", color_key_type_str[key_type]);
+	return snprintf(buf, PAGE_SIZE, "%s\n", trans_key_type_str[key_type]);
 }
 
-static ssize_t manager_color_key_type_store(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_type_store(struct omap_overlay_manager *mgr,
 					    const char *buf, size_t size)
 {
-	enum omap_dss_color_key_type key_type;
-	u32 key_value;
+	enum omap_dss_trans_key_type key_type;
+	struct omap_overlay_manager_info info;
+	int r;
 
 	for (key_type = OMAP_DSS_COLOR_KEY_GFX_DST;
-			key_type < ARRAY_SIZE(color_key_type_str); key_type++) {
-		if (sysfs_streq(buf, color_key_type_str[key_type]))
+			key_type < ARRAY_SIZE(trans_key_type_str); key_type++) {
+		if (sysfs_streq(buf, trans_key_type_str[key_type]))
 			break;
 	}
-	if (key_type == ARRAY_SIZE(color_key_type_str))
-		return -EINVAL;
-	/* OMAP does not support destination color key and alpha blending
-	 * simultaneously.  So if alpha blending and color keying both are
-	 * enabled then refrain from setting the color key type to
-	 * gfx-destination
-	 */
-	if (!key_type) {
-		bool color_key_enabled;
-		bool alpha_blending_enabled;
-		color_key_enabled = mgr->get_trans_key_status(mgr);
-		alpha_blending_enabled = mgr->get_alpha_blending_status(mgr);
-		if (color_key_enabled && alpha_blending_enabled)
-			return -EINVAL;
-	}
 
-	mgr->get_trans_key_type_and_value(mgr, NULL, &key_value);
-	mgr->set_trans_key_type_and_value(mgr, key_type, key_value);
+	if (key_type == ARRAY_SIZE(trans_key_type_str))
+		return -EINVAL;
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.trans_key_type = key_type;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
 
 	return size;
 }
 
-static ssize_t manager_color_key_value_show(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_value_show(struct omap_overlay_manager *mgr,
 					    char *buf)
 {
-	u32 key_value;
-
-	 mgr->get_trans_key_type_and_value(mgr, NULL, &key_value);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", key_value);
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.trans_key);
 }
 
-static ssize_t manager_color_key_value_store(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_value_store(struct omap_overlay_manager *mgr,
 					     const char *buf, size_t size)
 {
-	enum omap_dss_color_key_type key_type;
+	struct omap_overlay_manager_info info;
 	u32 key_value;
+	int r;
 
 	if (sscanf(buf, "%d", &key_value) != 1)
 		return -EINVAL;
-	mgr->get_trans_key_type_and_value(mgr, &key_type, NULL);
-	mgr->set_trans_key_type_and_value(mgr, key_type, key_value);
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.trans_key = key_value;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
 
 	return size;
 }
 
-static ssize_t manager_color_key_enabled_show(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_enabled_show(struct omap_overlay_manager *mgr,
 					      char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n",
-	mgr->get_trans_key_status(mgr));
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.trans_enabled);
 }
 
-static ssize_t manager_color_key_enabled_store(struct omap_overlay_manager *mgr,
+static ssize_t manager_trans_key_enabled_store(struct omap_overlay_manager *mgr,
 					       const char *buf, size_t size)
 {
+	struct omap_overlay_manager_info info;
 	int enable;
+	int r;
 
 	if (sscanf(buf, "%d", &enable) != 1)
 		return -EINVAL;
 
-	/* OMAP does not support destination color keying and
-	 * alpha blending simultaneously.  so if alpha blending
-	 * is enabled refrain from enabling destination color
-	 * keying.
-	 */
-	if (enable) {
-		bool enabled;
-		enabled = mgr->get_alpha_blending_status(mgr);
-		if (enabled) {
-			enum omap_dss_color_key_type key_type;
-			mgr->get_trans_key_type_and_value(mgr,
-					&key_type, NULL);
-			if (!key_type)
-				return -EINVAL;
-		}
+	mgr->get_manager_info(mgr, &info);
 
-	}
-	mgr->enable_trans_key(mgr, enable);
+	info.trans_enabled = enable ? true : false;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
 
 	return size;
 }
+
 static ssize_t manager_alpha_blending_enabled_show(
 		struct omap_overlay_manager *mgr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n",
-			mgr->get_alpha_blending_status(mgr));
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.alpha_enabled);
 }
+
 static ssize_t manager_alpha_blending_enabled_store(
 		struct omap_overlay_manager *mgr,
 		const char *buf, size_t size)
 {
+	struct omap_overlay_manager_info info;
 	int enable;
+	int r;
+
 	if (sscanf(buf, "%d", &enable) != 1)
 		return -EINVAL;
-	/* OMAP does not support destination color keying and
-	 * alpha blending simultaneously.  so if destination
-	 * color keying is enabled refrain from enabling
-	 * alpha blending
-	 */
-	if (enable) {
-		bool enabled;
-		enabled = mgr->get_trans_key_status(mgr);
-		if (enabled) {
-			enum omap_dss_color_key_type key_type;
-			mgr->get_trans_key_type_and_value(mgr, &key_type, NULL);
-			if (!key_type)
-				return -EINVAL;
 
-		}
+	mgr->get_manager_info(mgr, &info);
 
-	}
-	mgr->enable_alpha_blending(mgr, enable);
+	info.alpha_enabled = enable ? true : false;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
+
 	return size;
 }
-
 
 struct manager_attribute {
 	struct attribute attr;
@@ -284,13 +293,13 @@ static MANAGER_ATTR(display, S_IRUGO|S_IWUSR,
 		manager_display_show, manager_display_store);
 static MANAGER_ATTR(default_color, S_IRUGO|S_IWUSR,
 		manager_default_color_show, manager_default_color_store);
-static MANAGER_ATTR(color_key_type, S_IRUGO|S_IWUSR,
-		manager_color_key_type_show, manager_color_key_type_store);
-static MANAGER_ATTR(color_key_value, S_IRUGO|S_IWUSR,
-		manager_color_key_value_show, manager_color_key_value_store);
-static MANAGER_ATTR(color_key_enabled, S_IRUGO|S_IWUSR,
-		manager_color_key_enabled_show,
-		manager_color_key_enabled_store);
+static MANAGER_ATTR(trans_key_type, S_IRUGO|S_IWUSR,
+		manager_trans_key_type_show, manager_trans_key_type_store);
+static MANAGER_ATTR(trans_key_value, S_IRUGO|S_IWUSR,
+		manager_trans_key_value_show, manager_trans_key_value_store);
+static MANAGER_ATTR(trans_key_enabled, S_IRUGO|S_IWUSR,
+		manager_trans_key_enabled_show,
+		manager_trans_key_enabled_store);
 static MANAGER_ATTR(alpha_blending_enabled, S_IRUGO|S_IWUSR,
 		manager_alpha_blending_enabled_show,
 		manager_alpha_blending_enabled_store);
@@ -300,9 +309,9 @@ static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_name.attr,
 	&manager_attr_display.attr,
 	&manager_attr_default_color.attr,
-	&manager_attr_color_key_type.attr,
-	&manager_attr_color_key_value.attr,
-	&manager_attr_color_key_enabled.attr,
+	&manager_attr_trans_key_type.attr,
+	&manager_attr_trans_key_value.attr,
+	&manager_attr_trans_key_enabled.attr,
 	&manager_attr_alpha_blending_enabled.attr,
 	NULL
 };
@@ -513,7 +522,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		ovl->manager->device->configure_overlay(ovl);
 	}
 
-	/* Issue GO for managers */
+	/* Configure managers, and issue GO */
 	list_for_each_entry(mgr, &manager_list, list) {
 		if (!(mgr->caps & OMAP_DSS_OVL_MGR_CAP_DISPC))
 			continue;
@@ -522,6 +531,11 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 		if (!dssdev)
 			continue;
+
+		dispc_set_trans_key(mgr->id, mgr->info.trans_key_type,
+				mgr->info.trans_key);
+		dispc_enable_trans_key(mgr->id, mgr->info.trans_enabled);
+		dispc_enable_alpha_blending(mgr->id, mgr->info.alpha_enabled);
 
 		/* We don't need GO with manual update display. LCD iface will
 		 * always be turned off after frame, and new settings will
@@ -537,49 +551,40 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	return ret;
 }
 
-static void omap_dss_mgr_set_def_color(struct omap_overlay_manager *mgr,
-		u32 color)
+static int dss_check_manager(struct omap_overlay_manager *mgr)
 {
-	dispc_set_default_color(mgr->id, color);
+	/* OMAP does not support destination color keying and alpha blending
+	 * simultaneously. */
+
+	if (mgr->info.alpha_enabled && mgr->info.trans_enabled &&
+			mgr->info.trans_key_type == OMAP_DSS_COLOR_KEY_GFX_DST)
+		return -EINVAL;
+
+	return 0;
 }
 
-static void omap_dss_mgr_set_trans_key_type_and_value(
-		struct omap_overlay_manager *mgr,
-		enum omap_dss_color_key_type type,
-		u32 trans_key)
+static int omap_dss_mgr_set_info(struct omap_overlay_manager *mgr,
+		struct omap_overlay_manager_info *info)
 {
-	dispc_set_trans_key(mgr->id, type, trans_key);
-}
-static void omap_dss_mgr_get_trans_key_type_and_value(
-		struct omap_overlay_manager *mgr,
-		enum omap_dss_color_key_type *type,
-		u32 *trans_key)
-{
-	dispc_get_trans_key(mgr->id, type, trans_key);
+	int r;
+	struct omap_overlay_manager_info old_info;
+
+	old_info = mgr->info;
+	mgr->info = *info;
+
+	r = dss_check_manager(mgr);
+	if (r) {
+		mgr->info = old_info;
+		return r;
+	}
+
+	return 0;
 }
 
-static void omap_dss_mgr_enable_trans_key(struct omap_overlay_manager *mgr,
-		bool enable)
+static void omap_dss_mgr_get_info(struct omap_overlay_manager *mgr,
+		struct omap_overlay_manager_info *info)
 {
-	dispc_enable_trans_key(mgr->id, enable);
-}
-static void omap_dss_mgr_enable_alpha_blending(struct omap_overlay_manager *mgr,
-		bool enable)
-{
-	dispc_enable_alpha_blending(mgr->id, enable);
-}
-static bool omap_dss_mgr_get_alpha_blending_status(
-		struct omap_overlay_manager *mgr)
-{
-	return dispc_alpha_blending_enabled(mgr->id);
-}
-static u32 omap_dss_mgr_get_default_color(struct omap_overlay_manager *mgr)
-{
-	return dispc_get_default_color(mgr->id);
-}
-static bool omap_dss_mgr_get_trans_key_status(struct omap_overlay_manager *mgr)
-{
-	return dispc_trans_key_enabled(mgr->id);
+	*info = mgr->info;
 }
 
 static void omap_dss_add_overlay_manager(struct omap_overlay_manager *manager)
@@ -620,18 +625,9 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->set_device = &omap_dss_set_device;
 		mgr->unset_device = &omap_dss_unset_device;
 		mgr->apply = &omap_dss_mgr_apply;
-		mgr->set_default_color = &omap_dss_mgr_set_def_color;
-		mgr->set_trans_key_type_and_value =
-			&omap_dss_mgr_set_trans_key_type_and_value;
-		mgr->get_trans_key_type_and_value =
-			&omap_dss_mgr_get_trans_key_type_and_value;
-		mgr->enable_trans_key = &omap_dss_mgr_enable_trans_key;
-		mgr->get_trans_key_status = &omap_dss_mgr_get_trans_key_status;
-		mgr->enable_alpha_blending =
-			&omap_dss_mgr_enable_alpha_blending;
-		mgr->get_alpha_blending_status =
-			omap_dss_mgr_get_alpha_blending_status;
-		mgr->get_default_color = &omap_dss_mgr_get_default_color;
+		mgr->set_manager_info = &omap_dss_mgr_set_info;
+		mgr->get_manager_info = &omap_dss_mgr_get_info;
+
 		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC;
 
 		dss_overlay_setup_dispc_manager(mgr);
