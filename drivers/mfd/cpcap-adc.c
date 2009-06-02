@@ -288,6 +288,8 @@ static void adc_setup_calibrate(struct cpcap_device *cpcap,
 		dev_err(&(cpcap->spi->dev),
 			"Timeout waiting for calibration to complete\n");
 
+	cpcap_irq_clear(cpcap, CPCAP_IRQ_ADCDONE);
+
 	cpcap_regacc_write(cpcap, CPCAP_REG_ADCC1, 0, CPCAP_BIT_CAL_MODE);
 }
 
@@ -553,9 +555,6 @@ static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, adc);
 	adc->cpcap->adcdata = adc;
 
-	cpcap_irq_register(adc->cpcap, CPCAP_IRQ_ADCDONE,
-			   cpcap_adc_irq, adc);
-
 	mutex_init(&adc->queue_mutex);
 
 	adc_setup_calibrate(adc->cpcap, CPCAP_ADC_CHG_ISENSE);
@@ -566,6 +565,9 @@ static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 			   CPCAP_BIT_CAL_FACTOR_ENABLE);
 
 	INIT_DELAYED_WORK(&adc->work, cpcap_adc_cancel);
+
+	cpcap_irq_register(adc->cpcap, CPCAP_IRQ_ADCDONE,
+			   cpcap_adc_irq, adc);
 
 	return 0;
 }
