@@ -20,7 +20,8 @@ obj-$(CONFIG_MSM_HW3D) += hw3d.o
 obj-$(CONFIG_PM) += pm.o
 obj-$(CONFIG_MSM_CPU_FREQ) += cpufreq.o
 
-obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o board-halibut-keypad.o
+obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o board-halibut-panel.o
+obj-$(CONFIG_MACH_HALIBUT) += board-halibut-keypad.o fish_battery.o
 obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-keypad.o board-trout-panel.o
 obj-$(CONFIG_MACH_TROUT) += htc_akm_cal.o htc_wifi_nvs.o htc_acoustic.o
