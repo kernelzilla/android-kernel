@@ -54,22 +54,14 @@ static ssize_t manager_display_store(struct omap_overlay_manager *mgr,
 	int match(struct omap_dss_device *dssdev, void *data)
 	{
 		const char *str = data;
-		return strcmp(dssdev->name, str) == 0;
+		return sysfs_streq(dssdev->name, str);
 	}
 
 	if (buf[size-1] == '\n')
 		--len;
 
-	if (len > 0) {
-		char name[64];
-		int n;
-
-		n = min(len, sizeof(name) - 1);
-		strncpy(name, buf, n);
-		name[n - 1] = 0;
-
-		dssdev = omap_dss_find_device(name, match);
-	}
+	if (len > 0)
+		dssdev = omap_dss_find_device((void *)buf, match);
 
 	if (len > 0 && dssdev == NULL)
 		return -EINVAL;
