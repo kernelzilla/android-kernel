@@ -31,8 +31,8 @@
 #define NUM_INTS_PER_REG  16
 
 struct cpcap_event_handler {
-        void (*func)(enum cpcap_irqs, void *);
-        void *data;
+	void (*func)(enum cpcap_irqs, void *);
+	void *data;
 };
 
 struct cpcap_irqdata {
@@ -258,14 +258,14 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED, "cpcap-irq",
 			     &data->work);
 	if (retval) {
-		printk("cpcap_irq: Failed requesting irq.\n");
+		printk(KERN_ERR "cpcap_irq: Failed requesting irq.\n");
 		goto error;
 	}
 
 	cpcap->irqdata = data;
 	retval = pwrkey_init(cpcap);
 	if (retval) {
-		printk("cpcap_irq: Failed initializing pwrkey.\n");
+		printk(KERN_ERR "cpcap_irq: Failed initializing pwrkey.\n");
 		goto error;
 	}
 
@@ -280,7 +280,7 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 error:
 	kfree(data);
 	free_irq(spi->irq, &data->work);
-	printk("cpcap_irq: Error registering cpcap irq.\n");
+	printk(KERN_ERR "cpcap_irq: Error registering cpcap irq.\n");
 	return retval;
 }
 
@@ -410,6 +410,19 @@ int cpcap_irq_unmask(struct cpcap_device *cpcap,
 	return retval;
 }
 EXPORT_SYMBOL_GPL(cpcap_irq_unmask);
+
+int cpcap_irq_mask_get(struct cpcap_device *cpcap,
+		       enum cpcap_irqs irq)
+{
+	struct cpcap_irqdata *data = cpcap->irqdata;
+	int retval = -EINVAL;
+
+	if ((irq < CPCAP_IRQ__NUM) && (irq != CPCAP_IRQ_SECMAC))
+		return (data->enabled & (1 << irq)) ? 0 : 1;
+
+	return retval;
+}
+EXPORT_SYMBOL_GPL(cpcap_irq_mask_get);
 
 int cpcap_irq_sense(struct cpcap_device *cpcap,
 		    enum cpcap_irqs irq,

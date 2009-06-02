@@ -107,6 +107,12 @@ static struct platform_device cpcap_3mm5_device = {
 	.dev.platform_data = NULL,
 };
 
+static struct platform_device cpcap_rtc_device = {
+	.name           = "cpcap_rtc",
+	.id             = -1,
+	.dev.platform_data = NULL,
+};
+
 static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_adc_device,
 	&cpcap_key_device,
@@ -117,6 +123,7 @@ static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_usb_det_device,
 #endif
 	&cpcap_3mm5_device,
+	&cpcap_rtc_device,
 };
 
 static struct cpcap_device *misc_cpcap;
@@ -170,13 +177,8 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	cpcap_vendor_read(cpcap);
 
-	cpcap_adc_device.dev.platform_data = cpcap;
-	cpcap_usb_device.dev.platform_data = cpcap;
-	cpcap_usb_det_device.dev.platform_data = cpcap;
-	cpcap_key_device.dev.platform_data = cpcap;
-	cpcap_batt_device.dev.platform_data = cpcap;
-	cpcap_uc_device.dev.platform_data = cpcap;
-	cpcap_disp_button_led.dev.platform_data = cpcap;
+	for (i = 0; i < ARRAY_SIZE(cpcap_devices); i++)
+		cpcap_devices[i]->dev.platform_data = cpcap;
 
 	retval = misc_register(&cpcap_dev);
 	if (retval < 0)
