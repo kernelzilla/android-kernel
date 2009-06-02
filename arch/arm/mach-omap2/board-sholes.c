@@ -431,6 +431,24 @@ static void __init config_wlan_gpio(void)
 	omap_cfg_reg(J8_3430_GPIO65);
 }
 
+static void __init config_mmc2_init(void)
+{
+	u32 val;
+
+	/* MMC2 */
+	omap_cfg_reg(AE2_3430_MMC2_CLK);
+	omap_cfg_reg(AG5_3430_MMC2_CMD);
+	omap_cfg_reg(AH5_3430_MMC2_DAT0);
+	omap_cfg_reg(AH4_3430_MMC2_DAT1);
+	omap_cfg_reg(AG4_3430_MMC2_DAT2);
+	omap_cfg_reg(AF4_3430_MMC2_DAT3);
+
+	/* Set internal loopback clock */
+	val = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
+	omap_ctrl_writel((val | OMAP2_MMCSDIO2ADPCLKISEL),
+				OMAP343X_CONTROL_DEVCONF1);
+}
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -445,6 +463,7 @@ static void __init sholes_init(void)
 	sholes_ehci_init();
 	sholes_sdrc_init();
 	sholes_pm_init();
+	config_mmc2_init();
 	config_wlan_gpio();
 }
 
