@@ -1402,6 +1402,7 @@ CONFIG_RTC_INTF_ALARM=y
 # CONFIG_RTC_DRV_R9701 is not set
 # CONFIG_RTC_DRV_RS5C348 is not set
 # CONFIG_RTC_DRV_DS3234 is not set
+CONFIG_RTC_DRV_CPCAP=y
 
 #
 # Platform RTC drivers
