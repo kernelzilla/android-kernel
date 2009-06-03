@@ -659,7 +659,7 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
 				(struct DRV_OBJECT *)hDRVObject, &pPctxt,
 					 NULL, 0);
 			if (pPctxt != NULL) {
-				DRV_RemoveAllResources(pPctxt);
+				DRV_ProcFreeDMMRes(pPctxt);
 				pPctxt->hProcessor = NULL;
 			}
 		}
