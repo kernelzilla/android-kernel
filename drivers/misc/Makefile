@@ -23,6 +23,8 @@ obj-$(CONFIG_SGI_GRU)		+= sgi-gru/
 obj-$(CONFIG_HP_ILO)		+= hpilo.o
 obj-$(CONFIG_UID_STAT)		+= uid_stat.o
 obj-$(CONFIG_C2PORT)		+= c2port/
+obj-$(CONFIG_SENSORS_AKM8973)	+= akm8973.o
+
 obj-y				+= eeprom/
 obj-y				+= ts27010mux/
 obj-$(CONFIG_VIB_OMAP_PWM)	+= vib-omap-pwm.o

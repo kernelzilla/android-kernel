@@ -256,6 +256,13 @@ config VIB_OMAP_PWM
 	bool "OMAP PWM Vibrator"
 	default n
 
+config SENSORS_AKM8973
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
+	 Support for the AKM8973 tri-axis magnetometer (compass)
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/ts27010mux/Kconfig"
