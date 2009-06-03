@@ -188,11 +188,18 @@ config LEDS_DA903X
 	help
 	  This option enables support for on-chip LED drivers found
 	  on Dialog Semiconductor DA9030/DA9034 PMICs.
+
 config LEDS_SHOLES
 	tristate "LED Support for Sholes device"
 	depends on LEDS_CLASS
 	help
 	  This option enables support for LEDs on Sholes.
+
+config LEDS_LM3530
+	tristate "LM3530 ALS driver"
+	depends on LEDS_CLASS && I2C
+	help
+	  This option enables support for the LM3530 .
 
 comment "LED Triggers"
 
@@ -251,11 +258,5 @@ config LEDS_TRIGGER_SLEEP
 	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
 	help
 	  This turns LEDs on when the screen is off but the cpu still running.
-
-config LEDS_LM3530
-	tristate "LM3530 ALS driver"
-	depends on LEDS_CLASS && I2C
-	help
-	  This option enables support for the LM3530 .
 
 endif # NEW_LEDS
