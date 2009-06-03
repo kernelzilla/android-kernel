@@ -287,29 +287,8 @@ static int dpi_check_timings(struct omap_dss_device *dssdev,
 	unsigned long fck;
 	unsigned long pck;
 
-	if (cpu_is_omap24xx() || omap_rev() < OMAP3430_REV_ES3_0) {
-		if (timings->hsw < 1 || timings->hsw > 64 ||
-				timings->hfp < 1 || timings->hfp > 256 ||
-				timings->hbp < 1 || timings->hbp > 256) {
-			return -EINVAL;
-		}
-
-		if (timings->vsw < 1 || timings->vsw > 64 ||
-				timings->vfp > 255 || timings->vbp > 255) {
-			return -EINVAL;
-		}
-	} else {
-		if (timings->hsw < 1 || timings->hsw > 256 ||
-				timings->hfp < 1 || timings->hfp > 4096 ||
-				timings->hbp < 1 || timings->hbp > 4096) {
-			return -EINVAL;
-		}
-
-		if (timings->vsw < 1 || timings->vsw > 64 ||
-				timings->vfp > 4095 || timings->vbp > 4095) {
-			return -EINVAL;
-		}
-	}
+	if (!dispc_lcd_timings_ok(timings))
+		return -EINVAL;
 
 	if (timings->pixel_clock == 0)
 		return -EINVAL;

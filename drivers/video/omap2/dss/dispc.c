@@ -2015,34 +2015,49 @@ void dispc_set_parallel_interface_mode(enum omap_parallel_interface_mode mode)
 	enable_clocks(0);
 }
 
+static bool _dispc_lcd_timings_ok(int hsw, int hfp, int hbp,
+		int vsw, int vfp, int vbp)
+{
+	if (cpu_is_omap24xx() || omap_rev() < OMAP3430_REV_ES3_0) {
+		if (hsw < 1 || hsw > 64 ||
+				hfp < 1 || hfp > 256 ||
+				hbp < 1 || hbp > 256 ||
+				vsw < 1 || vsw > 64 ||
+				vfp < 0 || vfp > 255 ||
+				vbp < 0 || vbp > 255)
+			return false;
+	} else {
+		if (hsw < 1 || hsw > 256 ||
+				hfp < 1 || hfp > 4096 ||
+				hbp < 1 || hbp > 4096 ||
+				vsw < 1 || vsw > 256 ||
+				vfp < 0 || vfp > 4095 ||
+				vbp < 0 || vbp > 4095)
+			return false;
+	}
+
+	return true;
+}
+
+bool dispc_lcd_timings_ok(struct omap_video_timings *timings)
+{
+	return _dispc_lcd_timings_ok(timings->hsw, timings->hfp,
+			timings->hbp, timings->vsw,
+			timings->vfp, timings->vbp);
+}
+
 static void _dispc_set_lcd_timings(int hsw, int hfp, int hbp,
 				   int vsw, int vfp, int vbp)
 {
 	u32 timing_h, timing_v;
 
 	if (cpu_is_omap24xx() || omap_rev() < OMAP3430_REV_ES3_0) {
-		BUG_ON(hsw < 1 || hsw > 64);
-		BUG_ON(hfp < 1 || hfp > 256);
-		BUG_ON(hbp < 1 || hbp > 256);
-
-		BUG_ON(vsw < 1 || vsw > 64);
-		BUG_ON(vfp < 0 || vfp > 255);
-		BUG_ON(vbp < 0 || vbp > 255);
-
 		timing_h = FLD_VAL(hsw-1, 5, 0) | FLD_VAL(hfp-1, 15, 8) |
 			FLD_VAL(hbp-1, 27, 20);
 
 		timing_v = FLD_VAL(vsw-1, 5, 0) | FLD_VAL(vfp, 15, 8) |
 			FLD_VAL(vbp, 27, 20);
 	} else {
-		BUG_ON(hsw < 1 || hsw > 256);
-		BUG_ON(hfp < 1 || hfp > 4096);
-		BUG_ON(hbp < 1 || hbp > 4096);
-
-		BUG_ON(vsw < 1 || vsw > 256);
-		BUG_ON(vfp < 0 || vfp > 4095);
-		BUG_ON(vbp < 0 || vbp > 4095);
-
 		timing_h = FLD_VAL(hsw-1, 7, 0) | FLD_VAL(hfp-1, 19, 8) |
 			FLD_VAL(hbp-1, 31, 20);
 
@@ -2061,6 +2076,11 @@ void dispc_set_lcd_timings(struct omap_video_timings *timings)
 {
 	unsigned xtot, ytot;
 	unsigned long ht, vt;
+
+	if (!_dispc_lcd_timings_ok(timings->hsw, timings->hfp,
+				timings->hbp, timings->vsw,
+				timings->vfp, timings->vbp))
+		BUG();
 
 	_dispc_set_lcd_timings(timings->hsw, timings->hfp, timings->hbp,
 			timings->vsw, timings->vfp, timings->vbp);
