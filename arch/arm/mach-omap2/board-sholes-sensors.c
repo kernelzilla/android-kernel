@@ -67,6 +67,8 @@ static struct sfh7743_platform_data omap3430_proximity_data = {
 };
 
 static struct bu52014hfv_platform_data bu52014hfv_platform_data = {
+	.docked_north_gpio = SHOLES_HF_NORTH_GPIO,
+	.docked_south_gpio = SHOLES_HF_SOUTH_GPIO,
 	.north_is_desk = 1,
 };
 
@@ -94,7 +96,7 @@ static struct platform_device omap3430_hall_effect_dock = {
 	},
 };
 
-static struct platform_device omap3430_master_sensor= {
+static struct platform_device omap3430_master_sensor = {
 	.name		= "master_sensor",
 	.id		= -1,
 	.dev		= {
@@ -120,14 +122,10 @@ static void sholes_hall_effect_init(void)
 {
 	gpio_request(SHOLES_HF_NORTH_GPIO, "sholes dock north");
 	gpio_direction_input(SHOLES_HF_NORTH_GPIO);
-	bu52014hfv_platform_data.docked_north_gpio =
-		gpio_to_irq(SHOLES_HF_NORTH_GPIO);
 	omap_cfg_reg(AG25_34XX_GPIO10);
 
 	gpio_request(SHOLES_HF_SOUTH_GPIO, "sholes dock south");
 	gpio_direction_input(SHOLES_HF_SOUTH_GPIO);
-	bu52014hfv_platform_data.docked_south_gpio =
-		gpio_to_irq(SHOLES_HF_SOUTH_GPIO);
 	omap_cfg_reg(B26_34XX_GPIO111);
 }
 
