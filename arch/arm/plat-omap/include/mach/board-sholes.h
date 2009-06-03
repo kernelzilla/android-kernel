@@ -37,9 +37,20 @@ extern void sholes_flash_init(void);
 extern void sholes_panel_init(void);
 extern void sholes_sensors_init(void);
 extern void sholes_hsmmc_init(void);
+extern void sholes_camera_init(void);
 
+#if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
+extern struct mt9p012_platform_data sholes_mt9p012_platform_data;
+#endif
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+extern struct hplens_platform_data sholes_hplens_platform_data;
+#endif
+
+#define GPIO_MT9P012_STANDBY		58
+#define GPIO_MT9P012_RESET		98
 #define GPIO_SILENCE_KEY		100
 #define GPIO_SLIDER			177
+
 /*
 #define GPIO_SIGNAL_LCD_PANEL_RESET	92
 #define GPIO_SIGNAL_LCD_PANEL_SD	93

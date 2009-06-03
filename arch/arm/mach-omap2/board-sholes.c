@@ -50,6 +50,17 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
+#ifdef CONFIG_VIDEO_OLDOMAP3
+#include <media/v4l2-int-device.h>
+#if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
+#include <media/mt9p012.h>
+
+#endif
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+#include <../drivers/media/video/hplens.h>
+#endif
+#endif
+
 #define SHOLES_IPC_USB_SUSP_GPIO	142
 #define SHOLES_AP_TO_BP_FLASH_EN_GPIO	157
 #define SHOLES_TOUCH_RESET_N_GPIO	164
@@ -277,12 +288,29 @@ static struct i2c_board_info __initdata sholes_i2c_bus2_board_info[] = {
 	},	
 };
 
+static struct i2c_board_info __initdata sholes_i2c_bus3_board_info[] = {
+#if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
+	{
+		I2C_BOARD_INFO("mt9p012", 0x36),
+		.platform_data = &sholes_mt9p012_platform_data,
+	},
+#endif
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+	{
+		I2C_BOARD_INFO("HP_GEN_LENS", 0x04),
+		.platform_data = &sholes_hplens_platform_data,
+	},
+#endif
+};
+
 static int __init sholes_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 400, sholes_i2c_bus1_board_info,
 			      ARRAY_SIZE(sholes_i2c_bus1_board_info));
 	omap_register_i2c_bus(2, 400, sholes_i2c_bus2_board_info,
 			      ARRAY_SIZE(sholes_i2c_bus2_board_info));
+	omap_register_i2c_bus(3, 400, sholes_i2c_bus3_board_info,
+			      ARRAY_SIZE(sholes_i2c_bus3_board_info));
 	return 0;
 }
 
@@ -291,7 +319,6 @@ arch_initcall(sholes_i2c_init);
 extern void __init sholes_spi_init(void);
 extern void __init sholes_flash_init(void);
 extern void __init sholes_gpio_iomux_init(void);
-
 
 
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
@@ -591,6 +618,7 @@ static void __init sholes_init(void)
 	sholes_als_init();
 	sholes_panel_init();
 	sholes_sensors_init();
+	sholes_camera_init();
 	sholes_touch_init();
 	sholes_audio_init();
 	usb_musb_init();
