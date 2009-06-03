@@ -114,6 +114,8 @@ static int __devexit sfh7743_remove(struct platform_device *pdev)
 
 	info->enabled = SFH7743_DISABLED;
 
+	destroy_workqueue(info->working_queue);
+
 	if (info->irq != -1)
 		free_irq(info->irq, 0);
 
@@ -158,6 +160,11 @@ static int sfh7743_probe(struct platform_device *pdev)
 	}
 
 	info->working_queue = create_singlethread_workqueue("sfh7743_wq");
+	if (!info->working_queue) {
+		pr_err("%s: Cannot create work queue\n", __func__);
+		error = -ENOMEM;
+		goto error_create_wq_failed;
+	}
 	INIT_WORK(&info->wq, sfh7743_irq_bottom_half);
 
 	error = request_irq(info->irq, sfh7743_irq_handler,
@@ -188,7 +195,7 @@ static int sfh7743_probe(struct platform_device *pdev)
 	set_bit(ABS_DISTANCE, info->idev->absbit);
 
 	error = input_register_device(info->idev);
-	if (error != 0) {
+	if (error) {
 		pr_err("%s: Failed to register input device\n",
 			__func__);
 		goto exit_input_register_device_failed;
@@ -201,8 +208,12 @@ exit_input_register_device_failed:
 	info->idev = NULL;
 exit_input_dev_alloc_failed:
 	free_irq(info->irq, 0);
-exit_request_reg_failed:
 exit_request_irq_failed:
+	destroy_workqueue(info->working_queue);
+error_create_wq_failed:
+	if (info->regulator)
+		regulator_put(info->regulator);
+exit_request_reg_failed:
 	kfree(info);
 	return error;
 }
