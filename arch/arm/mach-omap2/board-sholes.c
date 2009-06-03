@@ -53,7 +53,8 @@
 #define SHOLES_AP_TO_BP_FLASH_EN_GPIO	157
 #define SHOLES_TOUCH_RESET_N_GPIO	164
 #define SHOLES_TOUCH_INT_GPIO		99
-#define SHOLES_LM_3530_INT_GPIO     92
+#define SHOLES_LM_3530_INT_GPIO		92
+#define SHOLES_AKM8973_INT_GPIO		175
 
 static void __init sholes_init_irq(void)
 {
@@ -215,13 +216,28 @@ static struct i2c_board_info __initdata sholes_i2c_bus1_board_info[] = {
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(SHOLES_LM_3530_INT_GPIO),
 	},
+};
 
+extern struct akm8973_platform_data sholes_akm8973_data;
+extern struct lis331dlh_platform_data sholes_lis331dlh_data;
+static struct i2c_board_info __initdata sholes_i2c_bus2_board_info[] = {
+	{
+		I2C_BOARD_INFO("akm8973", 0x1C),
+		.platform_data = &sholes_akm8973_data,
+		.irq = OMAP_GPIO_IRQ(SHOLES_AKM8973_INT_GPIO),
+	},
+	{
+		I2C_BOARD_INFO("lis331dlh", 0x19),
+		.platform_data = &sholes_lis331dlh_data,
+	},	
 };
 
 static int __init sholes_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 400, sholes_i2c_bus1_board_info,
 			      ARRAY_SIZE(sholes_i2c_bus1_board_info));
+	omap_register_i2c_bus(2, 400, sholes_i2c_bus2_board_info,
+			      ARRAY_SIZE(sholes_i2c_bus2_board_info));
 	return 0;
 }
 
