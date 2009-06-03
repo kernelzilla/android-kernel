@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Tue Jun  2 17:39:41 2009
+# Tue Jun  2 21:03:44 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -59,8 +59,7 @@ CONFIG_FAIR_GROUP_SCHED=y
 CONFIG_USER_SCHED=y
 # CONFIG_CGROUP_SCHED is not set
 # CONFIG_CGROUPS is not set
-CONFIG_SYSFS_DEPRECATED=y
-CONFIG_SYSFS_DEPRECATED_V2=y
+# CONFIG_SYSFS_DEPRECATED_V2 is not set
 # CONFIG_RELAY is not set
 # CONFIG_NAMESPACES is not set
 CONFIG_BLK_DEV_INITRD=y
@@ -1429,7 +1428,6 @@ CONFIG_RTC_INTF_ALARM=y
 # CONFIG_RTC_DRV_R9701 is not set
 # CONFIG_RTC_DRV_RS5C348 is not set
 # CONFIG_RTC_DRV_DS3234 is not set
-CONFIG_RTC_DRV_CPCAP=y
 
 #
 # Platform RTC drivers
@@ -1445,6 +1443,7 @@ CONFIG_RTC_DRV_CPCAP=y
 # CONFIG_RTC_DRV_M48T59 is not set
 # CONFIG_RTC_DRV_BQ4802 is not set
 # CONFIG_RTC_DRV_V3020 is not set
+CONFIG_RTC_DRV_CPCAP=y
 
 #
 # on-CPU RTC drivers
