@@ -599,6 +599,9 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 #if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3430)
 #define OMAP_HDQ_BASE	0x480B2000
 #endif
+
+#include <mach/hdq.h>
+
 static struct resource omap_hdq_resources[] = {
 	{
 		.start		= OMAP_HDQ_BASE,
@@ -610,7 +613,7 @@ static struct resource omap_hdq_resources[] = {
 		.flags		= IORESOURCE_IRQ,
 	},
 };
-static struct platform_device omap_hdq_dev = {
+struct platform_device omap_hdq_device = {
 	.name = "omap_hdq",
 	.id = 0,
 	.dev = {
@@ -619,12 +622,6 @@ static struct platform_device omap_hdq_dev = {
 	.num_resources	= ARRAY_SIZE(omap_hdq_resources),
 	.resource	= omap_hdq_resources,
 };
-static inline void omap_hdq_init(void)
-{
-	(void) platform_device_register(&omap_hdq_dev);
-}
-#else
-static inline void omap_hdq_init(void) {}
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -638,7 +635,6 @@ static int __init omap2_init_devices(void)
 	omap_init_camera();
 	omap_init_mbox();
 	omap_init_mcspi();
-	omap_hdq_init();
 	omap_init_sti();
 	omap_init_sha1_md5();
 

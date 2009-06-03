@@ -40,6 +40,7 @@
 #include <asm/io.h>
 #include <asm/delay.h>
 #include <mach/control.h>
+#include <mach/hdq.h>
 
 #include "mmc-twl4030.h"
 
@@ -310,6 +311,7 @@ static struct platform_device *ldp_devices[] __initdata = {
 	&ldp_smc911x_device,
 	&ldp_lcd_device,
 	&ldp_gpio_keys_device,
+	&omap_hdq_device,
 };
 
 static inline void __init ldp_init_smc911x(void)

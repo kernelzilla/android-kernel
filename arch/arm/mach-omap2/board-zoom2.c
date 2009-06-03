@@ -47,6 +47,7 @@
 #include <mach/control.h>
 
 #include <mach/display.h>
+#include <mach/hdq.h>
 
 #include "mmc-twl4030.h"
 
@@ -283,6 +284,7 @@ static struct platform_device *zoom2_devices[] __initdata = {
 #ifdef CONFIG_WL127X_POWER
 	&zoom2_wl127x_device,
 #endif
+	&omap_hdq_device,
 };
 
 static inline void __init zoom2_init_smc911x(void)
