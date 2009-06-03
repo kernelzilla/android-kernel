@@ -124,6 +124,7 @@ static struct platform_device *cpcap_devices[] __initdata = {
 #endif
 	&cpcap_3mm5_device,
 	&cpcap_rtc_device,
+	&cpcap_uc_device,
 };
 
 static struct cpcap_device *misc_cpcap;
