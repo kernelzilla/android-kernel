@@ -518,7 +518,7 @@ static int __init cpcap_batt_init(void)
 {
 	return platform_driver_register(&cpcap_batt_driver);
 }
-module_init(cpcap_batt_init);
+subsys_initcall(cpcap_batt_init);
 
 static void __exit cpcap_batt_exit(void)
 {
