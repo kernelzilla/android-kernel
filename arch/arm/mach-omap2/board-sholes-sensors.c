@@ -14,6 +14,7 @@
 #include <linux/input.h>
 #include <linux/sfh7743.h>
 #include <linux/bu52014hfv.h>
+#include <linux/vib-omap-pwm.h>
 
 #include <mach/mux.h>
 
@@ -111,6 +112,11 @@ static void sholes_proximity_init(void)
 	omap_cfg_reg(Y3_3430_GPIO180);
 }
 
+static void sholes_vibrator_init(void)
+{
+	omap_cfg_reg(Y4_3430_GPIO181);
+}
+
 static struct platform_device *sholes_sensors[] __initdata = {
 	&omap3430_kp_device,
 	&omap3430_master_sensor,
@@ -157,5 +163,10 @@ void __init sholes_sensors_init(void)
 
 	sholes_proximity_init();
 	sholes_hall_effect_init();
+
+	sholes_vibrator_init();
+	/* vibrate for 500ms at startup */
+	vibrator_omap_pwm_init(500);
+
 	platform_add_devices(sholes_sensors, ARRAY_SIZE(sholes_sensors));
 }
