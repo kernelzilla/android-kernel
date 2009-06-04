@@ -36,31 +36,6 @@ struct qtm_object {
 	uint8_t				report_id_max;
 };
 
-#define _BITMAP_LEN			BITS_TO_LONGS(QTM_OBP_MAX_OBJECT_NUM)
-struct qtouch_ts_data {
-	struct i2c_client		*client;
-	struct input_dev		*input_dev;
-	struct work_struct		init_work;
-	struct work_struct		work;
-	struct qtouch_ts_platform_data	*pdata;
-	struct early_suspend		early_suspend;
-
-	struct qtm_object		obj_tbl[QTM_OBP_MAX_OBJECT_NUM];
-	unsigned long			obj_map[_BITMAP_LEN];
-
-	uint32_t			keystate;
-
-	/* Note: The message buffer is reused for reading different messages.
-	 * MUST enforce that there is no concurrent access to msg_buf. */
-	uint8_t				*msg_buf;
-	int				msg_size;
-};
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void qtouch_ts_early_suspend(struct early_suspend *handler);
-static void qtouch_ts_late_resume(struct early_suspend *handler);
-#endif
-
 struct axis_map {
 	int	key;
 	int	x;
@@ -74,6 +49,34 @@ static struct axis_map axis_map[] = {
 	{ BTN_4, ABS_HAT2X, ABS_HAT2Y },
 };
 #define MAX_FINGERS			ARRAY_SIZE(axis_map)
+
+#define _BITMAP_LEN			BITS_TO_LONGS(QTM_OBP_MAX_OBJECT_NUM)
+struct qtouch_ts_data {
+	struct i2c_client		*client;
+	struct input_dev		*input_dev;
+	struct work_struct		init_work;
+	struct work_struct		work;
+	struct qtouch_ts_platform_data	*pdata;
+	struct early_suspend		early_suspend;
+
+	struct qtm_object		obj_tbl[QTM_OBP_MAX_OBJECT_NUM];
+	unsigned long			obj_map[_BITMAP_LEN];
+
+	uint32_t			last_keystate;
+
+	struct vkey			*vkey_down[MAX_FINGERS];
+	uint32_t			down_mask;
+
+	/* Note: The message buffer is reused for reading different messages.
+	 * MUST enforce that there is no concurrent access to msg_buf. */
+	uint8_t				*msg_buf;
+	int				msg_size;
+};
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void qtouch_ts_early_suspend(struct early_suspend *handler);
+static void qtouch_ts_late_resume(struct early_suspend *handler);
+#endif
 
 static struct workqueue_struct *qtouch_ts_wq;
 
@@ -331,11 +334,11 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 	obj = find_obj(ts, QTM_OBJ_TOUCH_KEYARRAY);
 	if (obj && obj->entry.num_inst > 0) {
 		struct qtm_touch_keyarray_cfg cfg;
-		memcpy(&cfg, &ts->pdata->key_array.cfg, sizeof(cfg));
-		if (ts->pdata->flags & QTOUCH_USE_KEYARRAY)
+		if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
+			memcpy(&cfg, &ts->pdata->key_array.cfg, sizeof(cfg));
 			cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
-		else
-			cfg.ctrl = 0;
+		} else
+			memset(&cfg, 0, sizeof(cfg));
 		ret = qtouch_write_addr(ts, obj->entry.addr, &cfg,
 					min(sizeof(cfg), obj->entry.size));
 		if (ret != 0) {
@@ -433,6 +436,26 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	return ret;
 }
 
+/* axis_val is the coordinate that's on the axis of the 'start' value.
+ * orth_val is on the orthogonal axis to the above. */
+static struct vkey *virt_key_find(struct virt_keys *vkeys, int axis_val,
+				  int orth_val)
+{
+	int i;
+
+	if (!vkeys || axis_val < vkeys->start)
+		return NULL;
+
+	for (i = 0; i < vkeys->count; ++i) {
+		struct vkey *key = &vkeys->keys[i];
+		if (orth_val >= key->min && orth_val <= key->max)
+			return key;
+	}
+
+	return NULL;
+}
+
+
 /* Handles a message from a multi-touch object. */
 static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			      void *_msg)
@@ -444,6 +467,7 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	int width;
 	int finger;
 	int down;
+	int was_down;
 
 	finger = msg->report_id - obj->report_id_min;
 	if (finger >= MAX_FINGERS)
@@ -463,6 +487,34 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			msg->status, finger, x, y, pressure, width);
 
 	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
+	was_down = ts->down_mask & (1 << finger);
+
+	ts->down_mask &= ~(1 << finger);
+	ts->down_mask |= (down << finger);
+
+	if (!was_down && down) {
+		struct vkey *vkey = NULL;
+
+		vkey = virt_key_find(&ts->pdata->vkeys, y, x);
+		if (vkey) {
+			WARN_ON(ts->vkey_down[finger] != NULL);
+			if (qtouch_tsdebug)
+				pr_info("%s: vkey %d down\n", __func__,
+					vkey->code);
+			ts->vkey_down[finger] = vkey;
+			input_report_key(ts->input_dev, vkey->code, 1);
+			input_sync(ts->input_dev);
+			return 0;
+		}
+	} else if (ts->vkey_down[finger] != NULL) {
+		if (qtouch_tsdebug)
+			pr_info("%s: vkey %d up\n", __func__,
+				ts->vkey_down[finger]->code);
+		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
+		input_sync(ts->input_dev);
+		ts->vkey_down[finger] = NULL;
+		return 0;
+	}
 
 	input_report_abs(ts->input_dev, axis_map[finger].x, x);
 	input_report_abs(ts->input_dev, axis_map[finger].y, y);
@@ -486,13 +538,13 @@ static int do_touch_keyarray_msg(struct qtouch_ts_data *ts,
 	int i;
 
 	/* nothing changed.. odd. */
-	if (ts->keystate == msg->keystate)
+	if (ts->last_keystate == msg->keystate)
 		return 0;
 
 	for (i = 0; i < ts->pdata->key_array.num_keys; ++i) {
 		struct qtouch_key *key = &ts->pdata->key_array.keys[i];
 		uint32_t bit = 1 << (key->channel & 0x1f);
-		if ((msg->keystate & bit) != (ts->keystate & bit))
+		if ((msg->keystate & bit) != (ts->last_keystate & bit))
 			input_report_key(ts->input_dev, key->code,
 					 msg->keystate & bit);
 	}
@@ -500,10 +552,10 @@ static int do_touch_keyarray_msg(struct qtouch_ts_data *ts,
 
 	if (qtouch_tsdebug & 2)
 		pr_info("%s: key state changed 0x%08x -> 0x%08x\n", __func__,
-			ts->keystate, msg->keystate);
+			ts->last_keystate, msg->keystate);
 
 	/* update our internal state */
-	ts->keystate = msg->keystate;
+	ts->last_keystate = msg->keystate;
 
 	return 0;
 }
@@ -778,7 +830,7 @@ static int qtouch_ts_probe(struct i2c_client *client,
 
 	set_bit(EV_SYN, ts->input_dev->evbit);
 
-	/* register the virtual keys, if any */
+	/* register the harwdare assisted virtual keys, if any */
 	obj = find_obj(ts, QTM_OBJ_TOUCH_KEYARRAY);
 	if (obj && (obj->entry.num_inst > 0) &&
 	    (pdata->flags & QTOUCH_USE_KEYARRAY)) {
@@ -786,6 +838,11 @@ static int qtouch_ts_probe(struct i2c_client *client,
 			input_set_capability(ts->input_dev, EV_KEY,
 					     pdata->key_array.keys[i].code);
 	}
+
+	/* register the software virtual keys, if any are provided */
+	for (i = 0; i < pdata->vkeys.count; ++i)
+		input_set_capability(ts->input_dev, EV_KEY,
+				     pdata->vkeys.keys[i].code);
 
 	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
 	if (obj && obj->entry.num_inst > 0) {

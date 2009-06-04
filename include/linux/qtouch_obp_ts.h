@@ -21,7 +21,6 @@
 
 #define QTOUCH_TS_NAME "qtouch-obp-ts"
 
-
 #define QTM_OBP_ID_INFO_ADDR		0
 
 enum {
@@ -226,6 +225,18 @@ struct qtm_proci_linear_tbl_cfg {
 /******** platform data ********/
 /*******************************/
 
+struct vkey {
+	int	code;
+	int	min;
+	int	max;
+};
+
+struct virt_keys {
+	struct vkey		*keys;
+	int			count;
+	int			start;
+};
+
 struct qtouch_key {
 	uint8_t				channel;
 	int				code;
@@ -263,6 +274,8 @@ struct qtouch_ts_platform_data {
 	uint32_t		fuzz_w;
 
 	int			(*hw_reset)(void);
+
+	struct virt_keys	vkeys;
 
 	/* TODO: allow multiple key arrays */
 	struct qtouch_key_array			key_array;
