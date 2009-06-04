@@ -25,3 +25,4 @@ obj-$(CONFIG_UID_STAT)		+= uid_stat.o
 obj-$(CONFIG_C2PORT)		+= c2port/
 obj-y				+= eeprom/
 obj-y				+= ts27010mux/
+obj-$(CONFIG_VIB_OMAP_PWM)	+= vib-omap-pwm.o

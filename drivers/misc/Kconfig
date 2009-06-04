@@ -252,6 +252,10 @@ config UID_STAT
 	bool "UID based statistics tracking exported to /proc/uid_stat"
 	default n
 
+config VIB_OMAP_PWM
+	bool "OMAP PWM Vibrator"
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/ts27010mux/Kconfig"
