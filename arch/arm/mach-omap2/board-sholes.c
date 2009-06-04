@@ -104,21 +104,25 @@ static void sholes_als_init(void)
 	omap_cfg_reg(AC27_34XX_GPIO92);
 }
 
-static struct qtouch_key sholes_touch_key_list[] = {
+static struct vkey sholes_touch_vkeys[] = {
 	{
-		.channel	= 0,
+		.min		= 0,
+		.max		= 255,
 		.code		= KEY_BACK,
 	},
 	{
-		.channel	= 2,
+		.min		= 256,
+		.max		= 511,
 		.code		= KEY_MENU,
 	},
 	{
-		.channel	= 4,
+		.min		= 512,
+		.max		= 767,
 		.code		= KEY_HOME,
 	},
 	{
-		.channel	= 6,
+		.min		= 768,
+		.max		= 1023,
 		.code		= KEY_SEARCH,
 	},
 };
@@ -127,12 +131,11 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.irqflags	= IRQF_TRIGGER_LOW,
 	.flags		= (QTOUCH_SWAP_XY |
 			   QTOUCH_USE_MULTITOUCH |
-			   QTOUCH_USE_KEYARRAY |
 			   QTOUCH_CFG_BACKUPNV),
 	.abs_min_x	= 0,
 	.abs_max_x	= 1024,
 	.abs_min_y	= 0,
-	.abs_max_y	= 1024,
+	.abs_max_y	= 960,
 	.abs_min_p	= 0,
 	.abs_max_p	= 255,
 	.abs_min_w	= 0,
@@ -158,7 +161,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.multi_touch_cfg	= {
 		.x_origin	= 0,
 		.y_origin	= 0,
-		.x_size		= 11,
+		.x_size		= 12,
 		.y_size		= 7,
 		.aks_cfg	= 1,
 		.burst_len	= 0x40,
@@ -171,19 +174,10 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.merge_hyst	= 0,
 		.merge_thresh	= 3,
 	},
-	.key_array		= {
-		.keys		= sholes_touch_key_list,
-		.num_keys	= ARRAY_SIZE(sholes_touch_key_list),
-		.cfg		= {
-			.x_origin	= 11,
-			.y_origin	= 0,
-			.x_size		= 1,
-			.y_size		= 7,
-			.aks_cfg	= 1,
-			.burst_len	= 0x40,
-			.tch_det_thr	= 0xf,
-			.tch_det_int	= 0x2,
-		},
+	.vkeys			= {
+		.keys		= sholes_touch_vkeys,
+		.count		= ARRAY_SIZE(sholes_touch_vkeys),
+		.start		= 961,
 	},
 };
 
