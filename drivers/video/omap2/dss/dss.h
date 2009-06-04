@@ -165,9 +165,6 @@ int dss_need_ctx_restore(void);
 void dss_dump_clocks(struct seq_file *s);
 struct bus_type *dss_get_bus(void);
 
-#define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
-#define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
-
 /* display */
 int dss_suspend_all_devices(void);
 int dss_resume_all_devices(void);

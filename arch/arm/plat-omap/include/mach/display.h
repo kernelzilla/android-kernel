@@ -520,4 +520,8 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout);
 int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 		unsigned long timeout);
+
+#define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
+#define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
+
 #endif
