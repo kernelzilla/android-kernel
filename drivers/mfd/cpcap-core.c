@@ -25,6 +25,8 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/uaccess.h>
+#include <linux/reboot.h>
+#include <linux/notifier.h>
 
 
 static int ioctl(struct inode *inode,
@@ -146,6 +148,36 @@ static struct platform_device *cpcap_devices[] __initdata = {
 
 static struct cpcap_device *misc_cpcap;
 
+static int cpcap_reboot(struct notifier_block *this, unsigned long code,
+			void *cmd)
+{
+	int ret = -1;
+
+	if ((code == SYS_RESTART) && cmd) {
+		char *mode = cmd;
+		if (!strcmp("recovery", mode)) {
+			ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				    CPCAP_BIT_FOTA_MODE, CPCAP_BIT_FOTA_MODE);
+			if (ret) {
+				dev_err(&(misc_cpcap->spi->dev),
+					"Recovery cpcap write failure.\n");
+				return NOTIFY_BAD;
+			}
+		}
+	} else {
+		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
+					CPCAP_BIT_FOTA_MODE);
+		if (ret) {
+			dev_err(&(misc_cpcap->spi->dev),
+				"Recovery cpcap write failure.\n");
+			return NOTIFY_BAD;
+		}
+	}
+	return NOTIFY_DONE;
+}
+static struct notifier_block cpcap_reboot_notifier = {
+	.notifier_call = cpcap_reboot,
+};
 
 static int __init cpcap_init(void)
 {
@@ -235,6 +267,8 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	platform_add_devices(cpcap_devices, ARRAY_SIZE(cpcap_devices));
 
+	register_reboot_notifier(&cpcap_reboot_notifier);
+
 	return retval;
 }
 
@@ -242,6 +276,8 @@ static int __devexit cpcap_remove(struct spi_device *spi)
 {
 	struct cpcap_device *cpcap = spi_get_drvdata(spi);
 	int i;
+
+	unregister_reboot_notifier(&cpcap_reboot_notifier);
 
 	for (i = ARRAY_SIZE(cpcap_devices); i > 0; i--)
 		platform_device_unregister(cpcap_devices[i-1]);
