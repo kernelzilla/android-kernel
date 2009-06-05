@@ -82,8 +82,6 @@
 
 #define NUM_CTRL_REGS 5
 
-#define LIS331DLH_DATA_DEBUG
-
 struct {
 	unsigned int cutoff;
 	unsigned char mask;
@@ -298,10 +296,6 @@ void lis331dlh_poll_handler(struct input_polled_dev *pd)
 	axis_x = xyz[AXIS_X];
 	axis_y = xyz[AXIS_Y];
 	axis_z = xyz[AXIS_Z];
-#ifdef LIS331DLH_DATA_DEBUG
-	dev_info(&info->client->dev, "x:%i  y:%i  z:%i\n",
-		 axis_x, axis_y, axis_z);
-#endif
 
 	if (info->polled_dev == NULL)
 		return;
