@@ -657,7 +657,7 @@ err3:
 	akm8973_device_power_off(akm);
 err2:
 	if (akm->pdata->exit)
-		akm->pdata->exit;
+		akm->pdata->exit();
 err1_1:
 	kfree(akm->pdata);
 err1:
@@ -676,7 +676,7 @@ static int akm8973_remove(struct i2c_client *client)
 	akm8973_input_cleanup(akm);
 	akm8973_device_power_off(akm);
 	if (akm->pdata->exit)
-		akm->pdata->exit;
+		akm->pdata->exit();
 	kfree(akm->pdata);
 	kfree(akm);
 
