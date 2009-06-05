@@ -296,20 +296,20 @@ static void akm8973_transform_values(struct akm8973_data *akm, u8 *values)
 		break;
 
 	case 90:
-		tmp = values[2];
-		values[2] = 0xff - values[1];
-		values[1] = tmp;
+		tmp = values[1];
+		values[1] = 0xff - values[2];
+		values[2] = tmp;
 		break;
 
 	case 180:
-		values[2] = 0xff - values[2];
 		values[1] = 0xff - values[1];
+		values[2] = 0xff - values[2];
 		break;
 
 	case 270:
-		tmp = values[2];
-		values[2] = values[1];
-		values[1] = 0xff - tmp;
+		tmp = values[1];
+		values[1] = values[2];
+		values[2] = 0xff - tmp;
 		break;
 
 	default:
