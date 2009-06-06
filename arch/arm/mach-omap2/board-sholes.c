@@ -554,6 +554,7 @@ static void __init sholes_init(void)
 	config_wlan_gpio();
 	omap_hdq_init();
 	sholes_bt_init();
+	sholes_hsmmc_init();
 }
 
 static void __init sholes_map_io(void)

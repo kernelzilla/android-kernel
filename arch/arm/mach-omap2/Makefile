@@ -71,6 +71,7 @@ obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 					   board-sholes-panel.o \
 					   board-sholes-spi.o \
 					   board-sholes-sensors.o \
+					   board-sholes-hsmmc.o \
 					   board-sholes-wifi.o
 obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o \
 					   board-apollon-mmc.o	\

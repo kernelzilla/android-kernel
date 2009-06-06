@@ -69,6 +69,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_GPIO4,     0x0000},
 	{CPCAP_REG_GPIO5,     0x0000},
 	{CPCAP_REG_GPIO6,     0x0000},
+	{CPCAP_REG_VWLAN2C,   0x004D},
 };
 
 #define CPCAP_GPIO 0
@@ -101,9 +102,6 @@ struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
 
 struct regulator_consumer_supply cpcap_vwlan2_consumers[] = {
 	REGULATOR_CONSUMER("vwlan2", NULL /* sd slot */),
-#if 0
-	REGULATOR_CONSUMER("vwlan2", NULL /* mmc in omap */),
-#endif
 };
 
 struct regulator_consumer_supply cpcap_vvib_consumers[] = {
