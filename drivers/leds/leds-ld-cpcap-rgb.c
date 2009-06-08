@@ -60,7 +60,7 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 	else if ((value >= 202) && (value <= 255))
 		brightness =  LD_MSG_IND_HIGH | LD_MSG_IND_CURRENT;
 
-	if (value > 0) {
+	if (value > LED_OFF) {
 		if (msg_ind_data->regulator) {
 			regulator_enable(msg_ind_data->regulator);
 			msg_ind_data->regulator_state |= color;
@@ -125,12 +125,35 @@ static void msg_ind_blue_set(struct led_classdev *led_cdev,
 }
 EXPORT_SYMBOL(msg_ind_blue_set);
 
+static void msg_ind_blink(struct device *dev, struct device_attribute *attr,
+						  char *buf)
+{
+	struct msg_ind_led_data *msg_ind_data = dev_get_drvdata(dev);
+	unsigned int led_blink = LED_OFF;
+	int ret;
+
+	ret = strict_strtoul(buf, 10, &led_blink);
+	if (ret != 0) {
+		pr_err("%s: Invalid parameter sent\n", __func__);
+		return;
+	}
+
+	if (led_blink > LED_OFF) {
+		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_6);
+		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_4);
+	} else {
+		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_6);
+		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_4);
+	}
+
+}
+static DEVICE_ATTR(blink, 0644, msg_ind_blink, msg_ind_blink);
+
 static int msg_ind_rgb_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msg_ind_led_data *info;
 
-	pr_info("%s:MSG Ind probe\n", __func__);
 	if (pdev == NULL) {
 		pr_err("%s: platform data required\n", __func__);
 		return -ENODEV;
@@ -160,6 +183,14 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 		goto err_reg_red_class_failed;
 	}
 
+	ret = device_create_file(info->msg_ind_red_class_dev.dev,
+		&dev_attr_blink);
+	if (ret < 0) {
+		pr_err("%s: File device creation failed: %d\n",
+			__func__, ret);
+		goto err_create_blink_failed;
+	}
+
 	info->msg_ind_green_class_dev.name = "green";
 	info->msg_ind_green_class_dev.brightness_set = msg_ind_green_set;
 	ret = led_classdev_register(&pdev->dev,
@@ -182,6 +213,7 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 err_reg_blue_class_failed:
 	led_classdev_unregister(&info->msg_ind_green_class_dev);
 err_reg_green_class_failed:
+err_create_blink_failed:
 	led_classdev_unregister(&info->msg_ind_red_class_dev);
 err_reg_red_class_failed:
 	if (info->regulator)
