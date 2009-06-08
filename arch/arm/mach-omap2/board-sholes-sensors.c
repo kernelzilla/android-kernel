@@ -172,20 +172,20 @@ struct akm8973_platform_data sholes_akm8973_data = {
 	.exit = sholes_akm8973_exit,
 	.power_on = sholes_akm8973_power_on,
 	.power_off = sholes_akm8973_power_off,
-	.poll_interval = 27,
+	.poll_interval = 200,
 	.i2c_retries = 5,
 	.i2c_retry_delay = 5,
 
-	.cal_min_threshold = 45,
-	.cal_max_threshold = 210,
+	.cal_min_threshold = 8,
+	.cal_max_threshold = 247,
 
-	.hxda = 0x81,
-	.hyda = 0x82,
-	.hzda = 0x01,
+	.hxda = 0x02,
+	.hyda = 0x86,
+	.hzda = 0x07,
 
-	.orientation = 180,
-	.xy_swap = 180,
-	.z_flip = 0,
+	.orientation = 270,
+	.xy_swap = 1,
+	.z_flip = 1,
 };
 
 static void __init sholes_akm8973_init(void)
