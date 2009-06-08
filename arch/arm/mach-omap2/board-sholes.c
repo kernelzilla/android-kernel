@@ -183,26 +183,24 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 };
 
 static struct lm3530_platform_data omap3430_als_light_data = {
-	.gen_config = 0xB3,
-	.als_config = 0x7E,
-	.brightness_ramp = 0x2F,
+	.gen_config = 0x33,
+	.als_config = 0x7D,
+	.brightness_ramp = 0x36,
 	.als_zone_info = 0x00,
-	.als_resistor_sel = 0x82,
+	.als_resistor_sel = 0x66,
 	.brightness_control = 0x00,
-	.zone_boundary_0 = 0x14,
-	.zone_boundary_1 = 0x33,
-	.zone_boundary_2 = 0x80,
-	.zone_boundary_3 = 0xC9,
+	.zone_boundary_0 = 0x33,
+	.zone_boundary_1 = 0x66,
+	.zone_boundary_2 = 0x99,
+	.zone_boundary_3 = 0xCC,
 	.zone_target_0 = 0x19,
 	.zone_target_1 = 0x33,
 	.zone_target_2 = 0x4c,
 	.zone_target_3 = 0x66,
 	.zone_target_4 = 0x7f,
-	.zone_data_0 = 0x23,
-	.zone_data_1 = 0x27,
-	.zone_data_2 = 0x2B,
-	.zone_data_3 = 0x2F,
-	.zone_data_4 = 0x33,
+	.manual_current = 0x33,
+	.upper_curr_sel = 5,
+	.lower_curr_sel = 2,
 };
 
 static struct i2c_board_info __initdata sholes_i2c_bus1_board_info[] = {
