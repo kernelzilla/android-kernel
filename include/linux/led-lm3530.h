@@ -20,19 +20,6 @@
 #define _LINUX_LED_LD_LM3530_H__
 
 enum {
-	LD_LM3530_OFF = 0,
-	LD_LM3530_51 = 51,
-	LD_LM3530_52,
-	LD_LM3530_103 = 103,
-	LD_LM3530_104,
-	LD_LM3530_155 = 155,
-	LD_LM3530_156,
-	LD_LM3530_201 = 201,
-	LD_LM3530_202,
-	LD_LM3530_FULL = 255,
-};
-
-enum {
 	MANUAL = 1,
 	AUTOMATIC
 };
@@ -65,13 +52,8 @@ enum {
 #define LM3530_ALS_Z3T_REG		0x73
 #define LM3530_ALS_Z4T_REG		0x74
 
-#define LM3530_ALS_ZONE0 0
-#define LM3530_ALS_ZONE1 1
-#define LM3530_ALS_ZONE2 2
-#define LM3530_ALS_ZONE3 3
-#define LM3530_ALS_ZONE4 4
-
-#define LM3530_ALS_READ_MASK 0x07
+#define LM3530_ALS_READ_MASK	0x07
+#define LM3530_MAX_LED_VALUE	0xFF
 
 struct lm3530_platform_data {
 	u8  gen_config;
@@ -94,6 +76,9 @@ struct lm3530_platform_data {
 	u8 zone_data_2;
 	u8 zone_data_3;
 	u8 zone_data_4;
+	u8 manual_current;
+	u8 upper_curr_sel;
+	u8 lower_curr_sel;
 } __attribute__ ((packed));
 
 
