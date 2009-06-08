@@ -665,7 +665,7 @@ static int bridge_release(struct inode *ip, struct file *filp)
 }
 
 /* This function provides IO interface to the bridge driver. */
-static int bridge_ioctl(struct file *filp, unsigned int code,
+static long bridge_ioctl(struct file *filp, unsigned int code,
 		unsigned long args)
 {
 	int status;
