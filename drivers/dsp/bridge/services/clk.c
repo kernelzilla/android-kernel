@@ -277,8 +277,8 @@ DSP_STATUS CLK_Disable(IN enum SERVICES_ClkId clk_id)
 				SERVICES_Clks[clk_id].clk_name,
 				SERVICES_Clks[clk_id].id);
 	} else if (clkUseCnt == 0) {
-		pr_err("CLK_Disable: CLK %s, CLK dev id= %d is already"
-				"disabled\n",
+		GT_2trace(CLK_debugMask, GT_4CLASS, "CLK_Disable: CLK %s,"
+				"CLK dev id= %d is already disabled\n",
 				SERVICES_Clks[clk_id].clk_name,
 				SERVICES_Clks[clk_id].id);
 		return status;
