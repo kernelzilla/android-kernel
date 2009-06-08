@@ -299,6 +299,11 @@ void lis331dlh_poll_handler(struct input_polled_dev *pd)
 
 	if (info->polled_dev == NULL)
 		return;
+
+	input_report_abs(info->polled_dev->input, ABS_X, axis_x);
+	input_report_abs(info->polled_dev->input, ABS_Y, axis_y);
+	input_report_abs(info->polled_dev->input, ABS_Z, axis_z);
+	input_sync(info->polled_dev->input);
 }
 
 static int lis331dlh_open(struct inode *inode, struct file *filp)
