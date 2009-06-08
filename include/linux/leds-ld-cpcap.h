@@ -35,12 +35,10 @@
 #define LD_MSG_IND_MED_HIGH		0xC0
 #define LD_MSG_IND_HIGH			0xF0
 
-enum led_color {
-  LD_LED_RED,
-  LD_LED_GREEN,
-  LD_LED_BLUE,
-  LD_DONT_CARE,
-};
+#define LD_LED_RED		0x01
+#define LD_LED_GREEN	0x02
+#define LD_LED_BLUE		0x04
+  
 
 #define LD_DISP_BUTTON_ON		0x1
 #define LD_DISP_BUTTON_CURRENT		0x4

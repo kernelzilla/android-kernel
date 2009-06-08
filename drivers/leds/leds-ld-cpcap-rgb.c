@@ -30,22 +30,23 @@ struct msg_ind_led_data {
 	struct led_classdev msg_ind_blue_class_dev;
 	struct cpcap_device *cpcap;
 	struct regulator *regulator;
+	int regulator_state;
 };
 
 void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
-				enum led_color color,
+				int color,
 				enum led_brightness value)
 {
 	unsigned short brightness = 0;
 	int cpcap_status = 0;
-	int cpcap_register = LD_DONT_CARE;
+	int cpcap_register = 0;
 
 
-	if (color == LD_LED_RED)
+	if (color & LD_LED_RED)
 		cpcap_register = CPCAP_REG_REDC;
-	else if (color == LD_LED_GREEN)
+	else if (color & LD_LED_GREEN)
 		cpcap_register = CPCAP_REG_GREENC;
-	else if (color == LD_LED_BLUE)
+	else if (color & LD_LED_BLUE)
 		cpcap_register = CPCAP_REG_BLUEC;
 
 	if ((value > 0) && (value <= 51))
@@ -60,8 +61,10 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 		brightness =  LD_MSG_IND_HIGH | LD_MSG_IND_CURRENT;
 
 	if (value > 0) {
-		if (msg_ind_data->regulator)
+		if (msg_ind_data->regulator) {
 			regulator_enable(msg_ind_data->regulator);
+			msg_ind_data->regulator_state |= color;
+		}
 
 		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
 			cpcap_register, (brightness | LD_MSG_IND_ON),
@@ -71,8 +74,12 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 			pr_err("%s: Writing to the register failed for %i\n",
 			__func__, cpcap_status);
 	} else {
-		if (msg_ind_data->regulator)
-			regulator_disable(msg_ind_data->regulator);
+		if (msg_ind_data->regulator_state & color) {
+			if (msg_ind_data->regulator) {
+				regulator_disable(msg_ind_data->regulator);
+				msg_ind_data->regulator_state &= ~color;
+			}
+		}
 
 		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
 			cpcap_register, brightness, LD_MSG_IND_CPCAP_MASK);
@@ -130,9 +137,8 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 
 	}
 	info = kzalloc(sizeof(struct msg_ind_led_data), GFP_KERNEL);
-	if (info == NULL) {
+	if (info == NULL)
 		return -ENOMEM;
-	}
 
 	info->cpcap = pdev->dev.platform_data;
 	platform_set_drvdata(pdev, info);
@@ -143,10 +149,9 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 		       LD_SUPPLY);
 		ret = PTR_ERR(info->regulator);
 		goto exit_request_reg_failed;
-	} else {
-		info->regulator = NULL;
 	}
 
+	info->regulator_state = 0;
 	info->msg_ind_red_class_dev.name = "red";
 	info->msg_ind_red_class_dev.brightness_set = msg_ind_red_set;
 	ret = led_classdev_register(&pdev->dev, &info->msg_ind_red_class_dev);
