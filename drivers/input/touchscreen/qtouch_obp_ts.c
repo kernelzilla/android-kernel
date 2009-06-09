@@ -2,6 +2,7 @@
  * drivers/input/touchscreen/qtouch_obp_ts.c - driver for Quantum touch IC
  *
  * Copyright (C) 2009 Google, Inc.
+ * Copyright (C) 2009 Motorola, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -99,14 +100,14 @@ static int qtouch_write(struct qtouch_ts_data *ts, void *buf, int buf_sz)
 
 	do {
 		ret = i2c_master_send(ts->client, (char *)buf, buf_sz);
-	} while ((ret < buf_sz)  && (--retries > 0));
+	} while ((ret < buf_sz) && (--retries > 0));
 
 	if (ret < 0)
 		pr_info("%s: Error while trying to write %d bytes\n", __func__,
-			 buf_sz);
+			buf_sz);
 	else if (ret != buf_sz) {
 		pr_info("%s: Write %d bytes, expected %d\n", __func__,
-			 ret, buf_sz);
+			ret, buf_sz);
 		ret = -EIO;
 	}
 	return ret;
@@ -136,10 +137,10 @@ static int qtouch_read(struct qtouch_ts_data *ts, void *buf, int buf_sz)
 
 	if (ret < 0)
 		pr_info("%s: Error while trying to read %d bytes\n", __func__,
-			 buf_sz);
+			buf_sz);
 	else if (ret != buf_sz) {
 		pr_info("%s: Read %d bytes, expected %d\n", __func__,
-			 ret, buf_sz);
+			ret, buf_sz);
 		ret = -EIO;
 	}
 
@@ -154,9 +155,6 @@ static int qtouch_read_addr(struct qtouch_ts_data *ts, uint16_t addr,
 	ret = qtouch_set_addr(ts, addr);
 	if (ret != 0)
 		return ret;
-
-	/* XXX: don't seem to need the sleep. */
-	/* msleep_interruptible(3); */
 
 	return qtouch_read(ts, buf, buf_sz);
 }
@@ -202,13 +200,13 @@ static uint16_t calc_csum(uint16_t curr_sum, void *_buf, int buf_sz)
 	int i;
 
 	while (buf_sz-- > 0) {
-		new_sum = (((uint32_t)curr_sum) << 8) | *(buf++);
+		new_sum = (((uint32_t) curr_sum) << 8) | *(buf++);
 		for (i = 0; i < 8; ++i) {
 			if (new_sum & 0x800000)
 				new_sum ^= 0x800500;
 			new_sum <<= 1;
 		}
-		curr_sum = ((uint32_t)new_sum >> 8) & 0xffff;
+		curr_sum = ((uint32_t) new_sum >> 8) & 0xffff;
 	}
 
 	return curr_sum;
@@ -243,6 +241,28 @@ static struct qtm_object *find_object_rid(struct qtouch_ts_data *ts, int rid)
 	}
 
 	return NULL;
+}
+
+static void qtouch_force_reset(struct qtouch_ts_data *ts, uint8_t sw_reset)
+{
+	struct qtm_object *obj;
+	uint16_t addr;
+	uint8_t val;
+	int ret;
+
+	if (ts->pdata->hw_reset && !sw_reset) {
+		pr_info("%s: Forcing HW reset\n", __func__);
+		ts->pdata->hw_reset();
+	} else if (sw_reset) {
+		pr_info("%s: Forcing SW reset\n", __func__);
+		obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
+		addr =
+		    obj->entry.addr + offsetof(struct qtm_gen_cmd_proc, reset);
+		val = 1;
+		ret = qtouch_write_addr(ts, addr, &val, 1);
+		if (ret)
+			pr_err("%s: Unable to send the reset msg\n", __func__);
+	}
 }
 
 static int qtouch_force_calibration(struct qtouch_ts_data *ts)
@@ -384,7 +404,7 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 		obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
 		addr = obj->entry.addr + offsetof(struct qtm_gen_cmd_proc,
 						  backupnv);
-		val = 1;
+		val = 0x55;
 		ret = qtouch_write_addr(ts, addr, &val, 1);
 		if (ret != 0) {
 			pr_err("%s: Can't backup nvram settings\n", __func__);
@@ -417,12 +437,20 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	int ret = 0;
 
 	if (msg->status & QTM_CMD_PROC_STATUS_RESET) {
+		if (qtouch_tsdebug)
+			pr_info("%s:EEPROM checksum is 0x%X\n",
+				__func__, msg->checksum);
+		if (msg->checksum != ts->pdata->nv_checksum) {
+			ret = qtouch_hw_init(ts);
+			if (ret != 0)
+				pr_err("%s:Cannot initialize the touch IC\n",
+				       __func__);
+		}
 		pr_info("%s: Reset done.\n", __func__);
 	}
 
-	if (msg->status & QTM_CMD_PROC_STATUS_CAL) {
+	if (msg->status & QTM_CMD_PROC_STATUS_CAL)
 		pr_info("%s: Self-calibration started.\n", __func__);
-	}
 
 	if (msg->status & QTM_CMD_PROC_STATUS_OFL)
 		pr_err("%s: Acquisition cycle length overflow\n", __func__);
@@ -451,10 +479,8 @@ static struct vkey *virt_key_find(struct virt_keys *vkeys, int axis_val,
 		if (orth_val >= key->min && orth_val <= key->max)
 			return key;
 	}
-
 	return NULL;
 }
-
 
 /* Handles a message from a multi-touch object. */
 static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
@@ -499,7 +525,7 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		if (vkey) {
 			WARN_ON(ts->vkey_down[finger] != NULL);
 			if (qtouch_tsdebug)
-				pr_info("%s: vkey %d down\n", __func__,
+				pr_info("%s: vkey 0x%X down\n", __func__,
 					vkey->code);
 			ts->vkey_down[finger] = vkey;
 			input_report_key(ts->input_dev, vkey->code, 1);
@@ -508,8 +534,8 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		}
 	} else if (ts->vkey_down[finger] != NULL) {
 		if (qtouch_tsdebug)
-			pr_info("%s: vkey %d up\n", __func__,
-				ts->vkey_down[finger]->code);
+			pr_info("%s: vkey 0x%X up\n",
+				__func__, ts->vkey_down[finger]->code);
 		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
 		input_sync(ts->input_dev);
 		ts->vkey_down[finger] = NULL;
@@ -580,7 +606,8 @@ static int qtouch_handle_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		break;
 
 	default:
-		ret = 0; /* probably not fatal? */
+		/* probably not fatal? */
+		ret = 0;
 		pr_info("%s: No handler defined for message from object "
 			"type %d, report_id %d\n", __func__, obj->entry.type,
 			msg->report_id);
@@ -592,7 +619,7 @@ static int qtouch_handle_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 static void qtouch_ts_work_func(struct work_struct *work)
 {
 	struct qtouch_ts_data *ts =
-			container_of(work, struct qtouch_ts_data, work);
+		container_of(work, struct qtouch_ts_data, work);
 	struct qtm_obj_message *msg;
 	struct qtm_object *obj;
 	int ret;
@@ -642,6 +669,7 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 	our_csum = calc_csum(our_csum, &qtm_info, sizeof(qtm_info));
 
 	/* TODO: Add a version/family/variant check? */
+	pr_info("%s: Build version is 0x%x\n", __func__, qtm_info.version);
 
 	if (qtm_info.num_objs == 0) {
 		pr_err("%s: Device (0x%x/0x%x/0x%x/0x%x) does not export any "
@@ -797,10 +825,6 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	ts->input_dev->name = "qtouch-touchscreen";
 	input_set_drvdata(ts->input_dev, ts);
 
-	/* TODO: Does the device have a reset reg? If so, maybe issue a device
-	 * reset also (or instead). */
-	pdata->hw_reset();
-
 	err = qtouch_process_info_block(ts);
 	if (err != 0)
 		goto err_process_info_block;
@@ -810,13 +834,6 @@ static int qtouch_ts_probe(struct i2c_client *client,
 		pr_err("%s: Cannot allocate msg_buf\n", __func__);
 		err = -ENOMEM;
 		goto err_alloc_msg_buf;
-	}
-
-	err = qtouch_hw_init(ts);
-	if (err != 0) {
-		pr_err("%s: Cannot initialize the touch controller\n",
-		       __func__);
-		goto err_hw_init;
 	}
 
 	/* Point the address pointer to the message processor.
@@ -880,6 +897,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 		goto err_request_irq;
 	}
 
+	qtouch_force_reset(ts, 0);
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	ts->early_suspend.suspend = qtouch_ts_early_suspend;
@@ -894,7 +913,6 @@ err_request_irq:
 
 err_input_register_dev:
 err_rst_addr_msg_proc:
-err_hw_init:
 	if (ts->msg_buf)
 		kfree(ts->msg_buf);
 
