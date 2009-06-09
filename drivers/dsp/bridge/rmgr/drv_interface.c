@@ -129,7 +129,7 @@ static s32 driver_minor = DRIVER_MINOR;
 static char *base_img;
 char *iva_img;
 static char *num_procs = "C55=1";
-static s32 shm_size = 0x400000;	/* 4 MB */
+static s32 shm_size = 0x500000;	/* 5 MB */
 static u32 phys_mempool_base;
 static u32 phys_mempool_size;
 static int tc_wordswapon;	/* Default value is always false */
