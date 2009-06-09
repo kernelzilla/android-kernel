@@ -28,6 +28,7 @@ struct disp_button_led_data {
 	struct led_classdev disp_button_class_dev;
 	struct cpcap_device *cpcap;
 	struct regulator *regulator;
+	int regulator_state;
 };
 
 static void disp_button_set(struct led_classdev *led_cdev,
@@ -38,7 +39,6 @@ static void disp_button_set(struct led_classdev *led_cdev,
 	struct disp_button_led_data *disp_button_led_data =
 	    container_of(led_cdev, struct disp_button_led_data,
 			 disp_button_class_dev);
-
 
 	if (value > 0) {
 
@@ -55,27 +55,36 @@ static void disp_button_set(struct led_classdev *led_cdev,
 
 		brightness |= LD_DISP_BUTTON_CURRENT;
 
-		if (disp_button_led_data->regulator)
+		if ((disp_button_led_data->regulator) &&
+		    (disp_button_led_data->regulator_state == 0)) {
 			regulator_enable(disp_button_led_data->regulator);
+			disp_button_led_data->regulator_state = 1;
+		}
 
 		cpcap_status = cpcap_regacc_write(disp_button_led_data->cpcap,
-			CPCAP_REG_KLC, (brightness | LD_DISP_BUTTON_ON),
-			LD_DISP_BUTTON_CPCAP_MASK);
+						  CPCAP_REG_KLC,
+						  (brightness |
+						   LD_DISP_BUTTON_ON),
+						  LD_DISP_BUTTON_CPCAP_MASK);
 
 		if (cpcap_status < 0)
 			pr_err("%s: Writing to the register failed for %i\n",
-			__func__, cpcap_status);
+			       __func__, cpcap_status);
 
 	} else {
-		if (disp_button_led_data->regulator)
+		if ((disp_button_led_data->regulator) &&
+		    (disp_button_led_data->regulator_state == 1)) {
 			regulator_disable(disp_button_led_data->regulator);
+			disp_button_led_data->regulator_state = 0;
+		}
 
 		cpcap_status = cpcap_regacc_write(disp_button_led_data->cpcap,
-			CPCAP_REG_KLC, brightness, LD_DISP_BUTTON_CPCAP_MASK);
+						  CPCAP_REG_KLC, brightness,
+						  LD_DISP_BUTTON_CPCAP_MASK);
 
 		if (cpcap_status < 0)
 			pr_err("%s: Writing to the register failed for %i\n",
-			__func__, cpcap_status);
+			       __func__, cpcap_status);
 	}
 
 }
@@ -86,7 +95,6 @@ static int disp_button_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct disp_button_led_data *info;
 
-	pr_info("%s:Display Button LED probe\n", __func__);
 	if (pdev == NULL) {
 		pr_err("%s: platform data required\n", __func__);
 		return -ENODEV;
@@ -103,19 +111,17 @@ static int disp_button_probe(struct platform_device *pdev)
 
 	info->regulator = regulator_get(&pdev->dev, LD_SUPPLY);
 	if (IS_ERR(info->regulator)) {
-			pr_err("%s: Cannot get %s regulator\n",
-				__func__, LD_SUPPLY);
-			ret = PTR_ERR(info->regulator);
-			goto exit_request_reg_failed;
+		pr_err("%s: Cannot get %s regulator\n", __func__, LD_SUPPLY);
+		ret = PTR_ERR(info->regulator);
+		goto exit_request_reg_failed;
 
-	} else {
-		info->regulator = NULL;
 	}
+
+	info->regulator_state = 0;
 
 	info->disp_button_class_dev.name = "button-backlight";
 	info->disp_button_class_dev.brightness_set = disp_button_set;
-	ret = led_classdev_register(&pdev->dev,
-		&info->disp_button_class_dev);
+	ret = led_classdev_register(&pdev->dev, &info->disp_button_class_dev);
 	if (ret < 0) {
 		pr_err("%s:Register button backlight class failed\n", __func__);
 		goto err_reg_button_class_failed;
@@ -144,7 +150,7 @@ static int disp_button_remove(struct platform_device *pdev)
 
 static struct platform_driver ld_disp_button_driver = {
 	.probe = disp_button_probe,
-	.remove =  disp_button_remove,
+	.remove = disp_button_remove,
 	.driver = {
 		   .name = LD_DISP_BUTTON_DEV,
 		   },
