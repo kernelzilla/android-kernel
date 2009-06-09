@@ -107,23 +107,23 @@ static void sholes_als_init(void)
 
 static struct vkey sholes_touch_vkeys[] = {
 	{
-		.min		= 0,
-		.max		= 255,
+		.min		= 44,
+		.max		= 152,
 		.code		= KEY_BACK,
 	},
 	{
-		.min		= 256,
-		.max		= 511,
+		.min		= 321,
+		.max		= 429,
 		.code		= KEY_MENU,
 	},
 	{
-		.min		= 512,
-		.max		= 767,
+		.min		= 606,
+		.max		= 714,
 		.code		= KEY_HOME,
 	},
 	{
-		.min		= 768,
-		.max		= 1023,
+		.min		= 886,
+		.max		= 994,
 		.code		= KEY_SEARCH,
 	},
 };
@@ -141,6 +141,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.abs_max_p	= 255,
 	.abs_min_w	= 0,
 	.abs_max_w	= 15,
+	.nv_checksum	= 0xbbaf,
 	.fuzz_x		= 0,
 	.fuzz_y		= 0,
 	.fuzz_p		= 2,
