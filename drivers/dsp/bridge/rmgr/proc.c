@@ -658,10 +658,8 @@ DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor)
 			DRV_GetProcContext(hProcess,
 				(struct DRV_OBJECT *)hDRVObject, &pPctxt,
 					 NULL, 0);
-			if (pPctxt != NULL) {
-				DRV_ProcFreeDMMRes(pPctxt);
+			if (pPctxt != NULL)
 				pPctxt->hProcessor = NULL;
-			}
 		}
 #endif
 		/* Notify the Client */
