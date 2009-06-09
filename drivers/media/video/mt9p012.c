@@ -15,6 +15,8 @@
  * kind, whether express or implied.
  */
 
+#define DEBUG
+
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <media/v4l2-int-device.h>
@@ -37,6 +39,8 @@
 
 /* The ID values we are looking for */
 #define MT9P012_MOD_ID			0x2800
+#define MT9P012_MOD_ID_REV7		0x2801
+#define MT9P013_MOD_ID			0x2803
 #define MT9P012_MFR_ID			0x0006
 
 /* FPS Capabilities */
@@ -187,6 +191,12 @@ static int debug;
 module_param(debug, bool, 0644);
 MODULE_PARM_DESC(debug, "Debug Enabled (0-1)");
 
+static inline mt9p012_ver(u16 model, u16 rev)
+{
+	return ((model & 0xffff) << 16) | (rev & 0xffff);
+}
+
+
 /**
  * struct mt9p012_sensor - main structure for storage of sensor information
  * @dev:
@@ -205,7 +215,7 @@ struct mt9p012_sensor {
 	struct v4l2_pix_format pix;
 	struct v4l2_fract timeperframe;
 	int scaler;
-	int ver;
+	u32 ver;
 	int fps;
 	int detected;
 	unsigned long xclk_current;
@@ -259,7 +269,7 @@ static struct mt9p012_reg set_analog_gain[] = {
  * Common MT9P012 register initialization for all image sizes, pixel formats,
  * and frame rates
  */
-const static struct mt9p012_reg mt9p012_common[] = {
+const static struct mt9p012_reg mt9p012_common_pre[] = {
 	{MT9P012_8BIT, REG_SOFTWARE_RESET, 0x01},
 	{MT9P012_TOK_DELAY, 0x00, 5}, /* Delay = 5ms, min 2400 xcks */
 	{MT9P012_16BIT, REG_RESET_REGISTER, 0x10C8},
@@ -272,6 +282,15 @@ const static struct mt9p012_reg mt9p012_common[] = {
 	{MT9P012_16BIT, REG_DIGITAL_GAIN_RED, 0x0100},
 	{MT9P012_16BIT, REG_DIGITAL_GAIN_BLUE, 0x0100},
 	{MT9P012_16BIT, REG_DIGITAL_GAIN_GREENB, 0x0100},
+	{MT9P012_TOK_TERM, 0, 0}
+};
+
+const static struct mt9p012_reg mt9p012_common_post[] = {
+	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00}, /* update all at once */
+	{MT9P012_TOK_TERM, 0, 0}
+};
+
+const static struct mt9p012_reg mt9p012_common_rev1[] = {
 	/* Recommended values for image quality, sensor Rev 1 */
 	{MT9P012_16BIT, 0x3088, 0x6FFB},
 	{MT9P012_16BIT, 0x308E, 0x2020},
@@ -287,9 +306,37 @@ const static struct mt9p012_reg mt9p012_common[] = {
 	{MT9P012_16BIT, 0x316E, 0x8488},
 	{MT9P012_16BIT, 0x3172, 0x0003},
 	{MT9P012_16BIT, 0x30EA, 0x3F06},
-	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00}, /* update all at once */
 	{MT9P012_TOK_TERM, 0, 0}
 };
+
+const static struct mt9p012_reg mt9p012_common_rev7[] = {
+	/* Recommended values for image quality, sensor Rev 7-8 */
+	{MT9P012_16BIT, 0x3088, 0x6FF6},
+	{MT9P012_16BIT, 0x308E, 0xE060},
+	{MT9P012_16BIT, 0x3092, 0x0A52},
+	{MT9P012_16BIT, 0x3094, 0x4656},
+	{MT9P012_16BIT, 0x3096, 0x5652},
+	{MT9P012_16BIT, 0x309A, 0xA500},
+	{MT9P012_16BIT, 0x30B0, 0x0001},
+	{MT9P012_16BIT, 0x30CA, 0x8006},
+	{MT9P012_16BIT, 0x312A, 0xDD02},
+	{MT9P012_16BIT, 0x312C, 0x00E4},
+	{MT9P012_16BIT, 0x3154, 0x0282},
+	{MT9P012_16BIT, 0x3156, 0x0381},
+	{MT9P012_16BIT, 0x3162, 0x01F1},
+	{MT9P012_16BIT, 0x3170, 0x299A},
+	{MT9P012_TOK_TERM, 0, 0}
+};
+
+const static struct mt9p012_reg mt9p013_common[] = {
+	/* Recommended values for image quality */
+	{MT9P012_16BIT, 0x3086, 0x2468},
+	{MT9P012_16BIT, 0x3088, 0x6FFF},
+	{MT9P012_16BIT, 0x316C, 0xA4F0},
+	{MT9P012_TOK_TERM, 0, 0}
+};
+
+
 
 /*
  * mt9p012 register configuration for all combinations of pixel format and
@@ -782,9 +829,12 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 	struct i2c_msg msg[1];
 	unsigned char data[6];
 	int retry = 0;
+	struct mt9p012_sensor *sensor;
 
 	if (!client->adapter)
 		return -ENODEV;
+
+	sensor = i2c_get_clientdata(client);
 
 	if (data_length != MT9P012_8BIT && data_length != MT9P012_16BIT
 					&& data_length != MT9P012_32BIT)
@@ -803,6 +853,14 @@ again:
 	if (data_length == MT9P012_8BIT)
 		data[2] = (u8) (val & 0xff);
 	else if (data_length == MT9P012_16BIT) {
+		if (reg == REG_READ_MODE && sensor->ver > mt9p012_ver(12, 6)) {
+			/* format or READ_MODE register changed at rev 7 */
+			int x_odd_inc = (val >> 5) & 0x7;
+			int y_odd_inc = (val >> 2) & 0x7;
+			val &= (0x7 << 5) | (0x7 << 2);
+			val |= x_odd_inc << 6;
+			val |= y_odd_inc;
+		}
 		data[2] = (u8) (val >> 8);
 		data[3] = (u8) (val & 0xff);
 	} else {
@@ -1122,9 +1180,28 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	isize = mt9p012_find_isize(pix->width);
 
 	/* common register initialization */
-	err = mt9p012_write_regs(client, mt9p012_common);
+	err = mt9p012_write_regs(client, mt9p012_common_pre);
 	if (err)
 		return err;
+
+	if (sensor->ver >= mt9p012_ver(13, 0))
+		err = mt9p012_write_regs(client,
+					 mt9p013_common);
+	else if (sensor->ver >= mt9p012_ver(12, 7))
+		err = mt9p012_write_regs(client,
+					 mt9p012_common_rev7);
+	else
+		err = mt9p012_write_regs(client,
+					 mt9p012_common_rev1);
+
+	if (err)
+		return err;
+
+
+	err = mt9p012_write_regs(client, mt9p012_common_post);
+	if (err)
+		return err;
+
 
 	fps_index = mt9p012_find_fps_index(sensor->fps, isize);
 
@@ -1175,7 +1252,19 @@ static int mt9p012_detect(struct i2c_client *client)
 
 	dev_info(&client->dev, "model id detected 0x%x mfr 0x%x\n", model_id,
 								mfr_id);
-	if ((model_id != MT9P012_MOD_ID) || (mfr_id != MT9P012_MFR_ID)) {
+	if ((mfr_id != MT9P012_MFR_ID)) {
+		dev_warn(&client->dev, "mfgr id mismatch 0x%x\n", mfr_id);
+
+		return -ENODEV;
+	}
+
+	if (model_id == MT9P012_MOD_ID) {
+		rev = mt9p012_ver(12, 0);
+	} else if (model_id == MT9P012_MOD_ID_REV7) {
+		rev = mt9p012_ver(12, 7);
+	} else if (model_id == MT9P013_MOD_ID) {
+		rev = mt9p012_ver(13, 0);
+	} else {
 		/* We didn't read the values we expected, so
 		 * this must not be an MT9P012.
 		 */
@@ -1184,7 +1273,7 @@ static int mt9p012_detect(struct i2c_client *client)
 
 		return -ENODEV;
 	}
-	return 0;
+	return rev;
 
 }
 
@@ -1535,7 +1624,10 @@ static int ioctl_g_priv(struct v4l2_int_device *s, void *p)
 {
 	struct mt9p012_sensor *sensor = s->priv;
 
-	return sensor->pdata->priv_data_set(p);
+	if (sensor->pdata->priv_data_set)
+		return sensor->pdata->priv_data_set(p);
+	else
+		return -EINVAL;
 }
 
 /**
@@ -1868,6 +1960,7 @@ static struct i2c_driver mt9p012_i2c_driver = {
  */
 static int __init mt9p012_init(void)
 {
+	pr_info("mt9p012 driver loading\n");
 	return i2c_add_driver(&mt9p012_i2c_driver);
 }
 module_init(mt9p012_init);
