@@ -38,6 +38,8 @@ extern void sholes_panel_init(void);
 extern void sholes_sensors_init(void);
 extern void sholes_hsmmc_init(void);
 
+#define GPIO_SILENCE_KEY		100
+#define GPIO_SLIDER			177
 /*
 #define GPIO_SIGNAL_LCD_PANEL_RESET	92
 #define GPIO_SIGNAL_LCD_PANEL_SD	93
