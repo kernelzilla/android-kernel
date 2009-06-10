@@ -58,16 +58,16 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN));
 
 		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 
 		send_key_event(data_3mm5, 0);
 
-		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_4);
+		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_5);
 		switch_set_state(&data_3mm5->sdev, 0);
 	} else {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI,
@@ -89,12 +89,13 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 			 data_3mm5->has_mic_key);
 
 		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
+		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
 		switch_set_state(&data_3mm5->sdev, 1);
 	}
@@ -104,7 +105,7 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 {
 	struct cpcap_3mm5_data *data_3mm5 = data;
 
-	if ((irq != CPCAP_IRQ_MB2) && (irq != CPCAP_IRQ_UC_PRIMACRO_4))
+	if ((irq != CPCAP_IRQ_MB2) && (irq != CPCAP_IRQ_UC_PRIMACRO_5))
 		return;
 
 	if ((cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_HS, 1) == 1) ||
@@ -118,17 +119,18 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 		send_key_event(data_3mm5, 1);
 
 		/* If macro not available, only short presses are supported */
-		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_4)) {
+		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_5)) {
 			send_key_event(data_3mm5, 0);
 
 			/* Attempt to restart the macro for next time. */
+			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
 		}
 	} else
 		send_key_event(data_3mm5, 0);
 
 	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 }
 
 static int __init cpcap_3mm5_probe(struct platform_device *pdev)
@@ -152,7 +154,7 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 
 	retval  = cpcap_irq_clear(data->cpcap, CPCAP_IRQ_HS);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_MB2);
-	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 	if (retval)
 		goto free_mem;
 
@@ -166,7 +168,7 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	if (retval)
 		goto free_hs;
 
-	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_4,
+	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5,
 				    key_handler, data);
 	if (retval)
 		goto free_mb2;
@@ -191,7 +193,7 @@ static int __exit cpcap_3mm5_remove(struct platform_device *pdev)
 
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_HS);
-	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_4);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 	switch_dev_unregister(&data->sdev);
 
