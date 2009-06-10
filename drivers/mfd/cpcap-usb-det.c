@@ -373,6 +373,8 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 		return PTR_ERR(data->regulator);
 	}
 
+	regulator_set_voltage(data->regulator, 3300000, 3300000);
+
 	dev_info(&pdev->dev, "CPCAP USB detection device probed\n");
 
 	/* Perform initial detection */

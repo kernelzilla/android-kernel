@@ -23,6 +23,8 @@
 #include <linux/platform_device.h>
 #include <linux/switch.h>
 
+#include <linux/regulator/consumer.h>
+
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/spi/spi.h>
@@ -32,6 +34,7 @@ struct cpcap_3mm5_data {
 	struct switch_dev sdev;
 	unsigned int key_state;
 	unsigned char has_mic_key;
+	struct regulator *regulator;
 };
 
 static void send_key_event(struct cpcap_3mm5_data *data, unsigned int state)
@@ -152,16 +155,25 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	switch_dev_register(&data->sdev);
 	platform_set_drvdata(pdev, data);
 
+	data->regulator = regulator_get(NULL, "vaudio");
+	if (IS_ERR(data->regulator)) {
+		dev_err(&pdev->dev, "Could not get regulator for cpcap_3mm5\n");
+		retval = PTR_ERR(data->regulator);
+		goto free_mem;
+	}
+
+	regulator_set_voltage(data->regulator, 2775000, 2775000);
+
 	retval  = cpcap_irq_clear(data->cpcap, CPCAP_IRQ_HS);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_MB2);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 	if (retval)
-		goto free_mem;
+		goto reg_put;
 
 	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_HS, hs_handler,
 				    data);
 	if (retval)
-		goto free_mem;
+		goto reg_put;
 
 	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_MB2, key_handler,
 				    data);
@@ -181,6 +193,8 @@ free_mb2:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 free_hs:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_HS);
+reg_put:
+	regulator_put(data->regulator);
 free_mem:
 	kfree(data);
 
@@ -196,6 +210,7 @@ static int __exit cpcap_3mm5_remove(struct platform_device *pdev)
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 	switch_dev_unregister(&data->sdev);
+	regulator_put(data->regulator);
 
 	kfree(data);
 	return 0;
