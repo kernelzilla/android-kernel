@@ -1,6 +1,6 @@
 /* drivers/misc/vib-omap-pwm.c
  *
- * Copyright (C) 2008 Motorola, Inc.
+ * Copyright (C) 2009 Motorola, Inc.
  * Copyright (C) 2008 HTC Corporation.
  * Copyright (C) 2007 Google, Inc.
  *
@@ -33,25 +33,17 @@ static struct hrtimer vibe_timer;
 static struct omap_dm_timer *pwm_timer;
 static spinlock_t vibe_lock;
 static int vibe_state;
+static int vibe_timer_state;
 
-static int pwm_timer_init(void)
+/* periods in microseconds, old vals: on = 700, off = 467 */
+static unsigned long on_period = 1800, off_period = 1200;
+static unsigned long load_reg, cmp_reg;
+
+static void pwm_timer_init(void)
 {
-	/* periods in microseconds, old vals: on = 700, off = 467 */
-	unsigned long load_reg, cmp_reg, on_period = 1800, off_period = 1200;
-
-	pwm_timer = omap_dm_timer_request_specific(11);
-	if (pwm_timer == NULL) {
-		pr_err(KERN_ERR "failed to request vibrator pwm timer\n");
-		return -1;
-	}
-
-	/* timer_pwm setup */
-	omap_dm_timer_enable(pwm_timer);
+	/* timer pwm setup */
 	omap_dm_timer_set_source(pwm_timer,
 		OMAP_TIMER_SRC_32_KHZ);
-
-	load_reg = 32768 * (on_period + off_period) / 1000000;
-	cmp_reg = 32768 * off_period / 1000000;
 
 	omap_dm_timer_stop(pwm_timer);
 	omap_dm_timer_set_load(pwm_timer, 1, -load_reg);
@@ -60,17 +52,26 @@ static int pwm_timer_init(void)
 	omap_dm_timer_set_pwm(pwm_timer, 0, 1,
 		OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE);
 
-	return 0;
+	omap_dm_timer_write_counter(pwm_timer, -2);
 }
 
 static void set_gptimer_pwm_vibrator(int on)
 {
-	if (pwm_timer != NULL) {
-		if (on == 1) {
-			omap_dm_timer_write_counter(pwm_timer, -2);
+	if (pwm_timer == NULL)
+		return;
+
+	if (on) {
+		if(!vibe_timer_state) {
+			omap_dm_timer_enable(pwm_timer);
+			pwm_timer_init();
 			omap_dm_timer_start(pwm_timer);
-		} else {
+			vibe_timer_state = 1;
+		}
+	} else {
+		if(vibe_timer_state) {
 			omap_dm_timer_stop(pwm_timer);
+			omap_dm_timer_disable(pwm_timer);
+			vibe_timer_state = 0;
 		}
 	}
 }
@@ -130,16 +131,29 @@ void __init vibrator_omap_pwm_init(int initial_vibrate)
 
 	spin_lock_init(&vibe_lock);
 	vibe_state = 0;
+	vibe_timer_state = 0;
 	hrtimer_init(&vibe_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	vibe_timer.function = vibrator_timer_func;
 
-	if (!pwm_timer_init()) {
-		timed_output_dev_register(&gptimer_pwm_vibrator);
-
-		vibrator_enable(NULL, 0);
-		if (initial_vibrate)
-			vibrator_enable(NULL, initial_vibrate);
+	pwm_timer = omap_dm_timer_request_specific(11);
+	if (pwm_timer == NULL) {
+		pr_err(KERN_ERR "failed to request vibrator pwm timer\n");
+		return;
 	}
+
+	/* omap_dm_timer_request_specific enables the timer */
+	omap_dm_timer_disable(pwm_timer);
+
+	timed_output_dev_register(&gptimer_pwm_vibrator);
+
+	load_reg = 32768 * (on_period + off_period) / 1000000;
+	cmp_reg = 32768 * off_period / 1000000;
+
+	vibrator_enable(NULL, 0);
+	if (initial_vibrate)
+		vibrator_enable(NULL, initial_vibrate);
+
+	pr_info("vib-omap-pwm initialized\n");
 }
 
 MODULE_DESCRIPTION("timed output gptimer pwm vibrator device");
