@@ -613,6 +613,7 @@ static int omapfb_open(struct fb_info *fbi, int user)
 
 static int omapfb_release(struct fb_info *fbi, int user)
 {
+#if 0
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_dss_device *display = fb2display(fbi);
@@ -620,7 +621,7 @@ static int omapfb_release(struct fb_info *fbi, int user)
 	DBG("Closing fb with plane index %d\n", ofbi->id);
 
 	omapfb_lock(fbdev);
-#if 1
+
 	if (display && display->get_update_mode && display->update) {
 		/* XXX this update should be removed, I think. But it's
 		 * good for debugging */
@@ -635,13 +636,12 @@ static int omapfb_release(struct fb_info *fbi, int user)
 			display->update(display, 0, 0, w, h);
 		}
 	}
-#endif
 
 	if (display && display->sync)
 		display->sync(display);
 
 	omapfb_unlock(fbdev);
-
+#endif
 	return 0;
 }
 
