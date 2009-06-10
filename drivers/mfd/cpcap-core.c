@@ -152,28 +152,59 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 			void *cmd)
 {
 	int ret = -1;
+	int result = NOTIFY_DONE;
+	char *mode = cmd;
 
-	if ((code == SYS_RESTART) && cmd) {
-		char *mode = cmd;
-		if (!strcmp("recovery", mode)) {
+	if (code == SYS_RESTART) {
+		/* Set the soft reset bit in the cpcap */
+		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				CPCAP_BIT_SOFT_RESET, CPCAP_BIT_SOFT_RESET);
+		if (ret) {
+			dev_err(&(misc_cpcap->spi->dev),
+				"SW Reset cpcap set failure.\n");
+			result = NOTIFY_BAD;
+		}
+
+		/* Check if we are starting recovery mode */
+		if (mode != NULL && !strncmp("recovery", mode, 9)) {
+			/* Set the fota (recovery mode) bit in the cpcap */
 			ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
-				    CPCAP_BIT_FOTA_MODE, CPCAP_BIT_FOTA_MODE);
+				CPCAP_BIT_FOTA_MODE, CPCAP_BIT_FOTA_MODE);
 			if (ret) {
 				dev_err(&(misc_cpcap->spi->dev),
-					"Recovery cpcap write failure.\n");
-				return NOTIFY_BAD;
+					"Recovery cpcap set failure.\n");
+				result = NOTIFY_BAD;
+			}
+		} else {
+			/* Set the fota (recovery mode) bit in the cpcap */
+			ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
+						CPCAP_BIT_FOTA_MODE);
+			if (ret) {
+				dev_err(&(misc_cpcap->spi->dev),
+					"Recovery cpcap clear failure.\n");
+				result = NOTIFY_BAD;
 			}
 		}
 	} else {
+		/* Clear the soft reset bit in the cpcap */
+		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
+					CPCAP_BIT_SOFT_RESET);
+		if (ret) {
+			dev_err(&(misc_cpcap->spi->dev),
+				"SW Reset cpcap set failure.\n");
+			result = NOTIFY_BAD;
+		}
+		/* Clear the fota (recovery mode) bit in the cpcap */
 		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
 					CPCAP_BIT_FOTA_MODE);
 		if (ret) {
 			dev_err(&(misc_cpcap->spi->dev),
-				"Recovery cpcap write failure.\n");
-			return NOTIFY_BAD;
+				"Recovery cpcap clear failure.\n");
+			result = NOTIFY_BAD;
 		}
 	}
-	return NOTIFY_DONE;
+
+	return result;
 }
 static struct notifier_block cpcap_reboot_notifier = {
 	.notifier_call = cpcap_reboot,
