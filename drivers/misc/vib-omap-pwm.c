@@ -36,8 +36,10 @@ static int vibe_state;
 static int vibe_timer_state;
 
 /* periods in microseconds, old vals: on = 700, off = 467 */
-static unsigned long on_period = 1800, off_period = 1200;
-static unsigned long load_reg, cmp_reg;
+static unsigned long on_period = 1800;
+static unsigned long off_period = 1200;
+static unsigned long load_reg;
+static unsigned long cmp_reg;
 
 static void pwm_timer_init(void)
 {
@@ -57,8 +59,10 @@ static void pwm_timer_init(void)
 
 static void set_gptimer_pwm_vibrator(int on)
 {
-	if (pwm_timer == NULL)
+	if (pwm_timer == NULL) {
+		pr_err(KERN_ERR "vibrator pwm timer is NULL\n");
 		return;
+	}
 
 	if (on) {
 		if(!vibe_timer_state) {
