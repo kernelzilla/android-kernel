@@ -109,20 +109,20 @@ static struct w1_bus_master omap_w1_master = {
 /* HDQ register I/O routines */
 static inline u8 hdq_reg_in(struct hdq_data *hdq_data, u32 offset)
 {
-	return __raw_readb(hdq_data->hdq_base + offset);
+	return (u8)(readl(hdq_data->hdq_base + offset) & 0x000000FF);
 }
 
 static inline void hdq_reg_out(struct hdq_data *hdq_data, u32 offset, u8 val)
 {
-	__raw_writeb(val, hdq_data->hdq_base + offset);
+	writel(val, hdq_data->hdq_base + offset);
 }
 
 static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
 			u8 val, u8 mask)
 {
-	u8 new_val = (__raw_readb(hdq_data->hdq_base + offset) & ~mask)
-			| (val & mask);
-	__raw_writeb(new_val, hdq_data->hdq_base + offset);
+	u8 new_val = (readl(hdq_data->hdq_base + offset) & ~mask) |
+		      (val & mask);
+	writel(new_val, hdq_data->hdq_base + offset);
 
 	return new_val;
 }
@@ -192,14 +192,15 @@ static int hdq_write(struct hdq_data *hdq_data, u8 val, u8 *status)
 	ret = wait_event_timeout(hdq_wait_queue,
 		hdq_data->hdq_irqstatus, OMAP_HDQ_TIMEOUT);
 	if (ret == 0) {
-		dev_dbg(hdq_data->dev, "TX wait elapsed\n");
+		dev_err(hdq_data->dev, "TX wait elapsed\n");
+		ret = -ETIMEDOUT;
 		goto out;
 	}
 
 	*status = hdq_data->hdq_irqstatus;
 	/* check irqstatus */
 	if (!(*status & OMAP_HDQ_INT_STATUS_TXCOMPLETE)) {
-		dev_dbg(hdq_data->dev, "timeout waiting for"
+		dev_err(hdq_data->dev, "timeout waiting for"
 			"TXCOMPLETE/RXCOMPLETE, %x", *status);
 		ret = -ETIMEDOUT;
 		goto out;
@@ -210,7 +211,7 @@ static int hdq_write(struct hdq_data *hdq_data, u8 val, u8 *status)
 			OMAP_HDQ_CTRL_STATUS_GO,
 			OMAP_HDQ_FLAG_CLEAR, &tmp_status);
 	if (ret) {
-		dev_dbg(hdq_data->dev, "timeout waiting GO bit"
+		dev_err(hdq_data->dev, "timeout waiting GO bit"
 			"return to zero, %x", tmp_status);
 	}
 
@@ -227,7 +228,7 @@ static irqreturn_t hdq_isr(int irq, void *_hdq)
 	spin_lock_irqsave(&hdq_data->hdq_spinlock, irqflags);
 	hdq_data->hdq_irqstatus = hdq_reg_in(hdq_data, OMAP_HDQ_INT_STATUS);
 	spin_unlock_irqrestore(&hdq_data->hdq_spinlock, irqflags);
-	dev_dbg(hdq_data->dev, "hdq_isr: %x", hdq_data->hdq_irqstatus);
+	dev_dbg(hdq_data->dev, "hdq_isr: 0x%08x\n", hdq_data->hdq_irqstatus);
 
 	if (hdq_data->hdq_irqstatus &
 		(OMAP_HDQ_INT_STATUS_TXCOMPLETE | OMAP_HDQ_INT_STATUS_RXCOMPLETE
@@ -289,7 +290,7 @@ static int _omap_hdq_reset(struct hdq_data *hdq_data)
 	ret = hdq_wait_for_flag(hdq_data, OMAP_HDQ_SYSSTATUS,
 		OMAP_HDQ_SYSSTATUS_RESETDONE, OMAP_HDQ_FLAG_SET, &tmp_status);
 	if (ret)
-		dev_dbg(hdq_data->dev, "timeout waiting HDQ reset, %x",
+		dev_err(hdq_data->dev, "timeout waiting HDQ reset, %x",
 				tmp_status);
 	else {
 		hdq_reg_out(hdq_data, OMAP_HDQ_CTRL_STATUS, init_val);
@@ -309,7 +310,7 @@ static int omap_hdq_break(struct hdq_data *hdq_data)
 
 	ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
 	if (ret < 0) {
-		dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+		dev_err(hdq_data->dev, "Could not acquire mutex\n");
 		ret = -EINTR;
 		goto rtn;
 	}
@@ -331,7 +332,7 @@ static int omap_hdq_break(struct hdq_data *hdq_data)
 	ret = wait_event_timeout(hdq_wait_queue,
 		hdq_data->hdq_irqstatus, OMAP_HDQ_TIMEOUT);
 	if (ret == 0) {
-		dev_dbg(hdq_data->dev, "break wait elapsed\n");
+		dev_err(hdq_data->dev, "break wait elapsed\n");
 		ret = -EINTR;
 		goto out;
 	}
@@ -339,7 +340,7 @@ static int omap_hdq_break(struct hdq_data *hdq_data)
 	tmp_status = hdq_data->hdq_irqstatus;
 	/* check irqstatus */
 	if (!(tmp_status & OMAP_HDQ_INT_STATUS_TIMEOUT)) {
-		dev_dbg(hdq_data->dev, "timeout waiting for TIMEOUT, %x",
+		dev_err(hdq_data->dev, "timeout waiting for TIMEOUT, %x",
 				tmp_status);
 		ret = -ETIMEDOUT;
 		goto out;
@@ -353,30 +354,12 @@ static int omap_hdq_break(struct hdq_data *hdq_data)
 			OMAP_HDQ_CTRL_STATUS_GO, OMAP_HDQ_FLAG_CLEAR,
 			&tmp_status);
 	if (ret)
-		dev_dbg(hdq_data->dev, "timeout waiting INIT&GO bits"
+		dev_err(hdq_data->dev, "timeout waiting INIT&GO bits"
 			"return to zero, %x", tmp_status);
 
 out:
 	mutex_unlock(&hdq_data->hdq_mutex);
 rtn:
-	return ret;
-}
-
-/* HDQ Mode: always return success */
-static u8 omap_w1_reset_bus(void *_hdq)
-{
-	struct hdq_data *hdq_data = _hdq;
-	u8 ret = 0;
-	u8 tmp_val;
-
-	/* Check for 1 Wire (SDQ) Mode */
-	if (is_sdq(hdq_data))
-		if (omap_hdq_break(hdq_data) == 0) {
-			tmp_val = hdq_reg_in(hdq_data, OMAP_HDQ_CTRL_STATUS);
-			if (!(tmp_val & OMAP_HDQ_CTRL_STATUS_PRESENCEDETECT))
-				ret = 1;
-		}
-
 	return ret;
 }
 
@@ -397,6 +380,9 @@ static int hdq_read(struct hdq_data *hdq_data, u8 *val)
 		goto out;
 	}
 
+	if (is_sdq(hdq_data))
+		hdq_data->hdq_irqstatus = 0;
+
 	if (!(hdq_data->hdq_irqstatus & OMAP_HDQ_INT_STATUS_RXCOMPLETE)) {
 		hdq_reg_merge(hdq_data, OMAP_HDQ_CTRL_STATUS,
 			OMAP_HDQ_CTRL_STATUS_DIR | OMAP_HDQ_CTRL_STATUS_GO,
@@ -416,18 +402,20 @@ static int hdq_read(struct hdq_data *hdq_data, u8 *val)
 		status = hdq_data->hdq_irqstatus;
 		/* check irqstatus */
 		if (!(status & OMAP_HDQ_INT_STATUS_RXCOMPLETE)) {
-			dev_dbg(hdq_data->dev, "timeout waiting for"
+			dev_err(hdq_data->dev, "timeout waiting for"
 				"RXCOMPLETE, %x", status);
 			ret = -ETIMEDOUT;
 			goto out;
 		}
 	}
+
 	/* the data is ready. Read it in! */
 	*val = hdq_reg_in(hdq_data, OMAP_HDQ_RX_DATA);
+
 out:
 	mutex_unlock(&hdq_data->hdq_mutex);
 rtn:
-	return 0;
+	return ret;
 
 }
 
@@ -453,12 +441,12 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
 		try_module_get(THIS_MODULE);
 		if (1 == hdq_data->hdq_usecount) {
 			if (clk_enable(hdq_data->hdq_ick)) {
-				dev_dbg(hdq_data->dev, "Can not enable ick\n");
+				dev_err(hdq_data->dev, "Can not enable ick\n");
 				ret = -ENODEV;
 				goto clk_err;
 			}
 			if (clk_enable(hdq_data->hdq_fck)) {
-				dev_dbg(hdq_data->dev, "Can not enable fck\n");
+				dev_err(hdq_data->dev, "Can not enable fck\n");
 				clk_disable(hdq_data->hdq_ick);
 				ret = -ENODEV;
 				goto clk_err;
@@ -484,6 +472,7 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
 				hdq_reg_in(hdq_data, OMAP_HDQ_INT_STATUS);
 			}
 		}
+		goto out;
 	}
 
 clk_err:
@@ -521,6 +510,30 @@ static int omap_hdq_put(struct hdq_data *hdq_data)
 	return ret;
 }
 
+/* HDQ Mode: always return success */
+static u8 omap_w1_reset_bus(void *_hdq)
+{
+	struct hdq_data *hdq_data = _hdq;
+	u8 ret = 0;
+	u8 tmp_val;
+
+	/* Check for 1 Wire (SDQ) Mode */
+	if (is_sdq(hdq_data)) {
+		omap_hdq_get(hdq_data);
+
+		ret = omap_hdq_break(hdq_data);
+		if (ret == 0) {
+			tmp_val = hdq_reg_in(hdq_data, OMAP_HDQ_CTRL_STATUS);
+			if (!(tmp_val & OMAP_HDQ_CTRL_STATUS_PRESENCEDETECT))
+				ret = 1;
+		}
+
+		omap_hdq_put(hdq_data);
+	}
+
+	return ret;
+}
+
 /* Read a byte of data from the device */
 static u8 omap_w1_read_byte(void *_hdq)
 {
@@ -537,7 +550,7 @@ static u8 omap_w1_read_byte(void *_hdq)
 	if (ret) {
 		ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
 		if (ret < 0) {
-			dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+			dev_err(hdq_data->dev, "Could not acquire mutex\n");
 			return -EINTR;
 		}
 		hdq_data->init_trans = 0;
@@ -550,7 +563,7 @@ static u8 omap_w1_read_byte(void *_hdq)
 	if ((hdq_data->init_trans) || (is_sdq(hdq_data))) {
 		ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
 		if (ret < 0) {
-			dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+			dev_err(hdq_data->dev, "Could not acquire mutex\n");
 			return -EINTR;
 		}
 		hdq_data->init_trans = 0;
@@ -574,7 +587,7 @@ static void omap_w1_write_byte(void *_hdq, u8 byte)
 
 	ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
 	if (ret < 0) {
-		dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+		dev_err(hdq_data->dev, "Could not acquire mutex\n");
 		return;
 	}
 	hdq_data->init_trans++;
@@ -583,8 +596,8 @@ static void omap_w1_write_byte(void *_hdq, u8 byte)
 	hdq_reg_merge(hdq_data, OMAP_HDQ_CTRL_STATUS, 0,
 		OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT);
 	ret = hdq_write(hdq_data, byte, &status);
-	if (ret == 0) {
-		dev_dbg(hdq_data->dev, "TX failure:Ctrl status %x\n", status);
+	if (ret) {
+		dev_err(hdq_data->dev, "TX failure:Ctrl status %x\n", status);
 		return;
 	}
 
@@ -593,7 +606,7 @@ static void omap_w1_write_byte(void *_hdq, u8 byte)
 		omap_hdq_put(hdq_data);
 		ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
 		if (ret < 0) {
-			dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+			dev_err(hdq_data->dev, "Could not acquire mutex\n");
 			return;
 		}
 		hdq_data->init_trans = 0;
@@ -619,12 +632,24 @@ static u8 omap_w1_triplet(void *_hdq, u8 bdir)
 			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT,
 			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT);
 
-		if ((hdq_read(hdq_data, &id_bit) != 0) ||
-		    (hdq_read(hdq_data, &comp_bit) != 0)) {
+		if (hdq_read(hdq_data, &id_bit) != 0) {
 			omap_hdq_put(hdq_data);
+			dev_err(hdq_data->dev, "Failed read 1 of triplet");
 			goto rtn;
 		}
 
+		hdq_reg_merge(hdq_data, OMAP_HDQ_CTRL_STATUS,
+			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT,
+			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT);
+
+		if (hdq_read(hdq_data, &comp_bit) != 0) {
+			omap_hdq_put(hdq_data);
+			dev_err(hdq_data->dev, "Failed read 2 of triplet");
+			goto rtn;
+		}
+
+		id_bit &= 0x01;
+		comp_bit &= 0x01;
 		if (id_bit && comp_bit) {
 			omap_hdq_put(hdq_data);
 			goto rtn;
@@ -638,6 +663,10 @@ static u8 omap_w1_triplet(void *_hdq, u8 bdir)
 			bdir = id_bit;
 			ret = id_bit ? 0x05 : 0x02;
 		}
+
+		hdq_reg_merge(hdq_data, OMAP_HDQ_CTRL_STATUS,
+			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT,
+			OMAP_HDQ_CTRL_STATUS_1_WIRE_SINGLE_BIT);
 
 		hdq_write(hdq_data, bdir, &status);
 
@@ -657,7 +686,7 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 
 	hdq_data = kmalloc(sizeof(*hdq_data), GFP_KERNEL);
 	if (!hdq_data) {
-		dev_dbg(&pdev->dev, "unable to allocate memory\n");
+		dev_err(&pdev->dev, "unable to allocate memory\n");
 		ret = -ENOMEM;
 		goto err_kmalloc;
 	}
@@ -667,14 +696,14 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
-		dev_dbg(&pdev->dev, "unable to get resource\n");
+		dev_err(&pdev->dev, "unable to get resource\n");
 		ret = -ENXIO;
 		goto err_resource;
 	}
 
 	hdq_data->hdq_base = ioremap(res->start, SZ_4K);
 	if (!hdq_data->hdq_base) {
-		dev_dbg(&pdev->dev, "ioremap failed\n");
+		dev_err(&pdev->dev, "ioremap failed\n");
 		ret = -EINVAL;
 		goto err_ioremap;
 	}
@@ -684,7 +713,7 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 	hdq_data->hdq_fck = clk_get(&pdev->dev, "hdq_fck");
 
 	if (IS_ERR(hdq_data->hdq_ick) || IS_ERR(hdq_data->hdq_fck)) {
-		dev_dbg(&pdev->dev, "Can't get HDQ clock objects\n");
+		dev_err(&pdev->dev, "Can't get HDQ clock objects\n");
 		if (IS_ERR(hdq_data->hdq_ick)) {
 			ret = PTR_ERR(hdq_data->hdq_ick);
 			goto err_clk;
@@ -700,13 +729,13 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 	mutex_init(&hdq_data->hdq_mutex);
 
 	if (clk_enable(hdq_data->hdq_ick)) {
-		dev_dbg(&pdev->dev, "Can not enable ick\n");
+		dev_err(&pdev->dev, "Can not enable ick\n");
 		ret = -ENODEV;
 		goto err_intfclk;
 	}
 
 	if (clk_enable(hdq_data->hdq_fck)) {
-		dev_dbg(&pdev->dev, "Can not enable fck\n");
+		dev_err(&pdev->dev, "Can not enable fck\n");
 		ret = -ENODEV;
 		goto err_fnclk;
 	}
@@ -725,7 +754,7 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 
 	ret = request_irq(irq, hdq_isr, IRQF_DISABLED, "omap_hdq", hdq_data);
 	if (ret < 0) {
-		dev_dbg(&pdev->dev, "could not request irq\n");
+		dev_err(&pdev->dev, "could not request irq\n");
 		goto err_irq;
 	}
 
@@ -739,7 +768,7 @@ static int __init omap_hdq_probe(struct platform_device *pdev)
 
 	ret = w1_add_master_device(&omap_w1_master);
 	if (ret) {
-		dev_dbg(&pdev->dev, "Failure in registering w1 master\n");
+		dev_err(&pdev->dev, "Failure in registering w1 master\n");
 		goto err_w1;
 	}
 

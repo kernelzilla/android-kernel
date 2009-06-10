@@ -343,7 +343,7 @@ static ssize_t w1_ds2502_read_uid(struct kobject *kobj,
 
 	mutex_unlock(&sl->master->mutex);
 
-	return size;
+	return retval;
 }
 
 static struct bin_attribute w1_ds2502_eeprom_attr = {
