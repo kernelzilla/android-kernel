@@ -291,6 +291,7 @@ static struct omap_usb_port_data usb_port_data[] = {
 	[1] = { .flags = 0x0, }, /* disabled */
 	[2] = {
 		.flags = OMAP_USB_PORT_FLAG_ENABLED |
+			OMAP_USB_PORT_FLAG_AUTOIDLE |
 			OMAP_USB_PORT_FLAG_NOBITSTUFF,
 		.mode = OMAP_USB_PORT_MODE_UTMI_PHY_4PIN,
 		.startup = sholes_usb_port_startup,
