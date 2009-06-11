@@ -51,6 +51,8 @@ static int hsmmc2_card_detect(int irq)
  * MMC Slot Initialization.
  */
 static struct regulator *hsmmc_regulator;
+static unsigned char hsmmc_regulator_is_on;
+DEFINE_MUTEX(regulator_lock);
 
 static int hsmmc_late_init(struct device *dev)
 {
@@ -84,7 +86,8 @@ err:
 static void hsmmc_cleanup(struct device *dev)
 {
 	gpio_free(GPIO_SIGNAL_MMC_DET);
-	regulator_put(hsmmc_regulator);
+	if (hsmmc_regulator)
+		regulator_put(hsmmc_regulator);
 }
 
 #ifdef CONFIG_PM
@@ -135,7 +138,12 @@ static int hsmmc_set_power(struct device *dev, int slot, int power_on,
 		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
 		omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
 
-		regulator_enable(hsmmc_regulator);
+		mutex_lock(&regulator_lock);
+		if (!hsmmc_regulator_is_on) {
+			hsmmc_regulator_is_on = 1;
+			regulator_enable(hsmmc_regulator);
+		}
+		mutex_unlock(&regulator_lock);
 
 		/* 100ms delay required for PBIAS configuration */
 		msleep(100);
@@ -153,7 +161,12 @@ static int hsmmc_set_power(struct device *dev, int slot, int power_on,
 		reg &= ~OMAP2_PBIASLITEPWRDNZ0;
 		omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
 
-		regulator_disable(hsmmc_regulator);
+		mutex_lock(&regulator_lock);
+		if (hsmmc_regulator_is_on) {
+			hsmmc_regulator_is_on = 0;
+			regulator_disable(hsmmc_regulator);
+		}
+		mutex_unlock(&regulator_lock);
 
 		/* 100ms delay required for PBIAS configuration */
 		msleep(100);
