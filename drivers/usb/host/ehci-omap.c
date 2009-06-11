@@ -454,8 +454,8 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 		return PTR_ERR(ehci_clocks->usbtll_ick_clk);
 	clk_enable(ehci_clocks->usbtll_ick_clk);
 
-	/* Disable Auto Idle of USBTLL */
-	cm_write_mod_reg((0 << OMAP3430ES2_AUTO_USBTLL_SHIFT),
+	/* Enable Auto Idle of USBTLL */
+	cm_write_mod_reg((1 << OMAP3430ES2_AUTO_USBTLL_SHIFT),
 				CORE_MOD, CM_AUTOIDLE3);
 
 	/* Wait for TLL to be Active */
@@ -473,19 +473,19 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 
 	dev_dbg(hcd->self.controller, "TLL RESET DONE\n");
 
-	/* (1<<3) = no idle mode only for initial debugging */
+	/* Smart Idle mode */
 	omap_writel((1 << OMAP_USBTLL_SYSCONFIG_ENAWAKEUP_SHIFT) |
-			(1 << OMAP_USBTLL_SYSCONFIG_SIDLEMODE_SHIFT) |
-			(1 << OMAP_USBTLL_SYSCONFIG_CACTIVITY_SHIFT),
+			(2 << OMAP_USBTLL_SYSCONFIG_SIDLEMODE_SHIFT) |
+			(0 << OMAP_USBTLL_SYSCONFIG_CACTIVITY_SHIFT) |
+			(1 << OMAP_USBTLL_SYSCONFIG_AUTOIDLE_SHIFT),
 			OMAP_USBTLL_SYSCONFIG);
 
-
-	/* Put UHH in NoIdle/NoStandby mode */
-	omap_writel((0 << OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT) |
+	/* Put UHH in SmartIdle/SmartStandby mode */
+	omap_writel((1 << OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT) |
 			(1 << OMAP_UHH_SYSCONFIG_ENAWAKEUP_SHIFT) |
-			(1 << OMAP_UHH_SYSCONFIG_SIDLEMODE_SHIFT) |
-			(1 << OMAP_UHH_SYSCONFIG_CACTIVITY_SHIFT) |
-			(1 << OMAP_UHH_SYSCONFIG_MIDLEMODE_SHIFT),
+			(2 << OMAP_UHH_SYSCONFIG_SIDLEMODE_SHIFT) |
+			(0 << OMAP_UHH_SYSCONFIG_CACTIVITY_SHIFT) |
+			(2 << OMAP_UHH_SYSCONFIG_MIDLEMODE_SHIFT),
 			OMAP_UHH_SYSCONFIG);
 
 	omap_usb_setup_ports(hcd);
@@ -701,20 +701,6 @@ static int ehci_hcd_omap_drv_remove(struct platform_device *dev)
 	return 0;
 }
 
-/*-------------------------------------------------------------------------*/
-#ifdef CONFIG_PM
-static int omap_ehci_bus_suspend(struct usb_hcd *hcd)
-{
-	return ehci_bus_suspend(hcd);
-}
-
-static int omap_ehci_bus_resume(struct usb_hcd *hcd)
-{
-	return ehci_bus_resume(hcd);
-}
-#endif
-/*-------------------------------------------------------------------------*/
-
 static const struct hc_driver ehci_omap_hc_driver = {
 	.description = hcd_name,
 	.product_desc = "OMAP-EHCI Host Controller",
@@ -753,10 +739,33 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	.hub_status_data = ehci_hub_status_data,
 	.hub_control = ehci_hub_control,
 #ifdef	CONFIG_PM
-	.bus_suspend = omap_ehci_bus_suspend,
-	.bus_resume = omap_ehci_bus_resume,
+	.bus_suspend = ehci_bus_suspend,
+	.bus_resume = ehci_bus_resume,
 #endif
 };
+
+/*-------------------------------------------------------------------------*/
+#ifdef CONFIG_PM
+static int ehci_omap_suspend(struct platform_device *dev, pm_message_t message)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(dev);
+	clk_disable(clk_get(NULL, "usbtll_fck"));
+	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	return 0;
+}
+
+static int ehci_omap_resume(struct platform_device *dev, pm_message_t message)
+{
+	struct usb_hcd	*hcd = platform_get_drvdata(dev);
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	return 0;
+}
+#endif
 
 /*-------------------------------------------------------------------------*/
 MODULE_ALIAS("platform:omap-ehci");
@@ -764,8 +773,8 @@ static struct platform_driver ehci_hcd_omap_driver = {
 	.probe = ehci_hcd_omap_drv_probe,
 	.remove = ehci_hcd_omap_drv_remove,
 	.shutdown = usb_hcd_platform_shutdown,
-	/*.suspend      = ehci_hcd_omap_drv_suspend, */
-	/*.resume       = ehci_hcd_omap_drv_resume, */
+	.suspend      = ehci_omap_suspend,
+	.resume       = ehci_omap_resume,
 	.driver = {
 		.name = "ehci-omap",
 		.bus = &platform_bus_type
