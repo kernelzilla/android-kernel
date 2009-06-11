@@ -28,6 +28,7 @@
 #include <linux/qtouch_obp_ts.h>
 #include <linux/led-lm3530.h>
 #include <linux/usb/omap.h>
+#include <linux/wl127x-rfkill.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -55,6 +56,7 @@
 #define SHOLES_TOUCH_INT_GPIO		99
 #define SHOLES_LM_3530_INT_GPIO		92
 #define SHOLES_AKM8973_INT_GPIO		175
+#define SHOLES_WL1271_NSHUTDOWN_GPIO	179
 
 static void __init sholes_init_irq(void)
 {
@@ -400,6 +402,10 @@ static void __init sholes_serial_init(void)
 	omap_cfg_reg(Y8_3430_UART1_RX);
 	omap_cfg_reg(AA9_3430_UART1_RTS);
 	omap_cfg_reg(W8_3430_UART1_CTS);
+	omap_cfg_reg(AD22_3430_UART2_TX);
+	omap_cfg_reg(AD21_3430_UART2_RX);
+	omap_cfg_reg(AA24_3430_UART2_RTS);
+	omap_cfg_reg(Y24_3430_UART2_CTS);
 	omap_serial_init();
 }
 
@@ -511,6 +517,24 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_device);
 }
 
+static struct wl127x_rfkill_platform_data sholes_wl1271_pdata = {
+	.nshutdown_gpio = SHOLES_WL1271_NSHUTDOWN_GPIO,
+};
+
+static struct platform_device sholes_wl1271_device = {
+	.name = "wl1271",
+	.id = 0,
+	.dev.platform_data = &sholes_wl1271_pdata,
+};
+
+static void __init sholes_bt_init(void)
+{
+	/* Mux setup for Bluetooth chip-enable */
+	omap_cfg_reg(W8_3430_MCSPI2_SIMO);
+
+	platform_device_register(&sholes_wl1271_device);
+}
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -529,6 +553,7 @@ static void __init sholes_init(void)
 	config_mmc2_init();
 	config_wlan_gpio();
 	omap_hdq_init();
+	sholes_bt_init();
 }
 
 static void __init sholes_map_io(void)

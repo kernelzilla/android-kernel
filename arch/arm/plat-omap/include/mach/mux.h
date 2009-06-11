@@ -890,6 +890,15 @@ enum omap34xx_index {
 
 	H16_34XX_SDRC_CKE0,
 	H17_34XX_SDRC_CKE1,
+
+	/* UART2 for Bluetooth */
+	AD22_3430_UART2_TX,
+	AD21_3430_UART2_RX,
+	AA24_3430_UART2_RTS,
+	Y24_3430_UART2_CTS,
+
+	/* Chip-enable for Bluetooth */
+	W8_3430_MCSPI2_SIMO,
 };
 
 struct omap_mux_cfg {
