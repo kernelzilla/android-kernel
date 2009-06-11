@@ -522,7 +522,7 @@ static struct wl127x_rfkill_platform_data sholes_wl1271_pdata = {
 };
 
 static struct platform_device sholes_wl1271_device = {
-	.name = "wl1271",
+	.name = "wl127x-rfkill",
 	.id = 0,
 	.dev.platform_data = &sholes_wl1271_pdata,
 };
