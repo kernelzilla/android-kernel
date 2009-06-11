@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl4030.h>
 #include <linux/interrupt.h>
+#include <linux/regulator/machine.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
@@ -348,6 +349,97 @@ static void __init omap_zoom2_init_irq(void)
 	zoom2_init_smc911x();
 }
 
+static struct regulator_consumer_supply zoom2_vmmc1_supply = {
+	.supply		= "vmmc",
+};
+
+static struct regulator_consumer_supply zoom2_vsim_supply = {
+	.supply		= "vmmc_aux",
+};
+
+static struct regulator_consumer_supply zoom2_vmmc2_supply = {
+	.supply		= "vmmc",
+};
+
+/* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
+static struct regulator_init_data zoom2_vmmc1 = {
+	.constraints = {
+		.min_uV			= 1850000,
+		.max_uV			= 3150000,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = 1,
+	.consumer_supplies      = &zoom2_vmmc1_supply,
+};
+
+/* VMMC2 for MMC2 card */
+static struct regulator_init_data zoom2_vmmc2 = {
+	.constraints = {
+		.min_uV			= 1850000,
+		.max_uV			= 1850000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = 1,
+	.consumer_supplies      = &zoom2_vmmc2_supply,
+};
+
+/* VSIM for OMAP VDD_MMC1A (i/o for DAT4..DAT7) */
+static struct regulator_init_data zoom2_vsim = {
+	.constraints = {
+		.min_uV			= 1800000,
+		.max_uV			= 3000000,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = 1,
+	.consumer_supplies      = &zoom2_vsim_supply,
+};
+
+static struct twl4030_hsmmc_info mmc[] __initdata = {
+	{
+		.mmc		= 1,
+		.wires		= 4,
+		.gpio_wp	= -EINVAL,
+	},
+	{
+		.mmc		= 2,
+		.wires		= 4,
+		.gpio_wp	= -EINVAL,
+	},
+	{}      /* Terminator */
+};
+
+static int zoom2_twl_gpio_setup(struct device *dev,
+		unsigned gpio, unsigned ngpio)
+{
+	/* gpio + 0 is "mmc0_cd" (input/IRQ),
+	 * gpio + 1 is "mmc1_cd" (input/IRQ)
+	 */
+	mmc[0].gpio_cd = gpio + 0;
+	mmc[1].gpio_cd = gpio + 1;
+	twl4030_mmc_init(mmc);
+
+	/* link regulators to MMC adapters ... we "know" the
+	 * regulators will be set up only *after* we return.
+	*/
+	zoom2_vmmc1_supply.dev = mmc[0].dev;
+	zoom2_vsim_supply.dev = mmc[0].dev;
+	zoom2_vmmc2_supply.dev = mmc[1].dev;
+
+	return 0;
+}
+
 static struct omap_lcd_config zoom2_lcd_config __initdata = {
         .ctrl_name      = "internal",
 };
@@ -385,6 +477,7 @@ static struct twl4030_gpio_platform_data zoom2_gpio_data = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
 	.irq_end	= TWL4030_GPIO_IRQ_END,
+	.setup		= zoom2_twl_gpio_setup,
 };
 
 static struct twl4030_madc_platform_data zoom2_madc_data = {
@@ -401,6 +494,9 @@ static struct twl4030_platform_data zoom2_twldata = {
 	.usb		= &zoom2_usb_data,
 	.gpio		= &zoom2_gpio_data,
 	.keypad		= &zoom2_kp_twl4030_data,
+	.vmmc1          = &zoom2_vmmc1,
+	.vmmc2          = &zoom2_vmmc2,
+	.vsim           = &zoom2_vsim,
 };
 
 static struct i2c_board_info __initdata zoom2_i2c_bus1_info[] = {
@@ -466,27 +562,6 @@ static void config_wlan_gpio(void)
 	omap_cfg_reg(W21_3430_GPIO162);
 }
 
-static void config_mmc3_init(void)
-{
-	/* MMC3 */
-	omap_cfg_reg(AF10_3430_MMC3_CLK);
-	omap_cfg_reg(AC3_3430_MMC3_CMD);
-	omap_cfg_reg(AE11_3430_MMC3_DAT0);
-	omap_cfg_reg(AH9_3430_MMC3_DAT1);
-	omap_cfg_reg(AF13_3430_MMC3_DAT2);
-	omap_cfg_reg(AE13_3430_MMC3_DAT3);
-}
-
-static struct twl4030_hsmmc_info mmc[] __initdata = {
-        {
-                .mmc            = 1,
-                .wires          = 4,
-                .gpio_cd        = -EINVAL,
-                .gpio_wp        = -EINVAL,
-        },
-        {}      /* Terminator */
-};
-
 static void __init omap_zoom2_init(void)
 {
 	omap_i2c_init();
@@ -501,12 +576,7 @@ static void __init omap_zoom2_init(void)
 	zoom2_init_quaduart();
 	omap_serial_init();
 	usb_musb_init();
-	twl4030_mmc_init(mmc);
-	config_mmc3_init();
 	config_wlan_gpio();
-#if 0
-	hsmmc_init();
-#endif
 }
 
 static struct map_desc zoom2_io_desc[] __initdata = {
