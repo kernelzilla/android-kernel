@@ -1878,7 +1878,7 @@ static int dsi_vc_send_bta_sync(int channel)
 	int r = 0;
 	u32 err;
 
-	init_completion(&dsi.bta_completion);
+	INIT_COMPLETION(dsi.bta_completion);
 
 	dsi_vc_enable_bta_irq(channel);
 
