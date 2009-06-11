@@ -53,7 +53,7 @@
 #define FLAG_SIZE 2
 
 #define TS0710_MAX_HDR_SIZE 5
-#define DEF_TS0710_MTU 256
+#define DEF_TS0710_MTU 512
 
 #define TS0710_BASIC_FLAG 0xF9
 
