@@ -477,6 +477,15 @@ void dss_overlay_setup_dispc_manager(struct omap_overlay_manager *mgr)
 	mgr->overlays = dispc_overlays;
 }
 
+#ifdef L4_EXAMPLE
+static struct omap_overlay *l4_overlays[1];
+void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr)
+{
+	mgr->num_overlays = 1;
+	mgr->overlays = l4_overlays;
+}
+#endif
+
 void dss_init_overlays(struct platform_device *pdev)
 {
 	int i, r;
@@ -534,6 +543,33 @@ void dss_init_overlays(struct platform_device *pdev)
 
 		dispc_overlays[i] = ovl;
 	}
+
+#ifdef L4_EXAMPLE
+	{
+		struct omap_overlay *ovl;
+		ovl = kzalloc(sizeof(*ovl), GFP_KERNEL);
+
+		BUG_ON(ovl == NULL);
+
+		ovl->name = "l4";
+		ovl->supported_modes = OMAP_DSS_COLOR_RGB24U;
+
+		ovl->set_manager = &omap_dss_set_manager;
+		ovl->unset_manager = &omap_dss_unset_manager;
+		ovl->set_overlay_info = &dss_ovl_set_overlay_info;
+		ovl->get_overlay_info = &dss_ovl_get_overlay_info;
+
+		omap_dss_add_overlay(ovl);
+
+		r = kobject_init_and_add(&ovl->kobj, &overlay_ktype,
+				&pdev->dev.kobj, "overlayl4");
+
+		if (r)
+			DSSERR("failed to create sysfs file\n");
+
+		l4_overlays[0] = ovl;
+	}
+#endif
 }
 
 /* connect overlays to the new device, if not already connected. if force
@@ -577,35 +613,6 @@ void dss_recheck_connections(struct omap_dss_device *dssdev, bool force)
 			}
 		}
 	}
-#ifdef L4_EXAMPLE
-	/* setup L4 overlay as an example */
-	{
-		static struct omap_overlay ovl = {
-			.name = "l4-ovl",
-			.supported_modes = OMAP_DSS_COLOR_RGB24U,
-			.set_manager = &omap_dss_set_manager,
-			.unset_manager = &omap_dss_unset_manager,
-			.setup_input = &omap_dss_setup_overlay_input,
-			.setup_output = &omap_dss_setup_overlay_output,
-			.enable = &omap_dss_enable_overlay,
-		};
-
-		static struct omap_overlay_manager mgr = {
-			.name = "l4",
-			.num_overlays = 1,
-			.overlays = &ovl,
-			.set_display = &omap_dss_set_display,
-			.unset_display = &omap_dss_unset_display,
-			.apply = &ovl_mgr_apply_l4,
-			.supported_displays =
-				OMAP_DISPLAY_TYPE_DBI | OMAP_DISPLAY_TYPE_DSI,
-		};
-
-		omap_dss_add_overlay(&ovl);
-		omap_dss_add_overlay_manager(&mgr);
-		omap_dss_set_manager(&ovl, &mgr);
-	}
-#endif
 }
 
 void dss_uninit_overlays(struct platform_device *pdev)
