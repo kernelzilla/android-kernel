@@ -345,6 +345,13 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		retval = -ENOMEM;
 		goto err0;
 	}
+#if defined(CONFIG_ARCH_OMAP34XX)
+	clk_enable(clk_get(NULL, "usbhost_ick"));
+	clk_enable(clk_get(NULL, "usbtll_ick"));
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+#endif
 	hcd->rsrc_start = pdev->resource[0].start;
 	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
 
@@ -526,6 +533,7 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
 
 static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
 {
+	struct usb_hcd *hcd = platform_get_drvdata(dev);
 	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
 
 	if (time_before(jiffies, ohci->next_statechange))
@@ -533,6 +541,10 @@ static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
 	ohci->next_statechange = jiffies;
 
 	omap_ohci_clock_power(0);
+	clk_disable(clk_get(NULL, "usbtll_fck"));
+	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
 	return 0;
 }
@@ -546,6 +558,10 @@ static int ohci_omap_resume(struct platform_device *dev)
 		msleep(5);
 	ohci->next_statechange = jiffies;
 
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	omap_ohci_clock_power(1);
 	ohci_finish_controller_resume(hcd);
 	return 0;
