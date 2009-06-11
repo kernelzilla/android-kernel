@@ -459,6 +459,7 @@ CONFIG_RFKILL=y
 CONFIG_RFKILL_PM=y
 # CONFIG_RFKILL_INPUT is not set
 # CONFIG_NET_9P is not set
+CONFIG_WL127X_RFKILL=y
 
 #
 # Device Drivers
