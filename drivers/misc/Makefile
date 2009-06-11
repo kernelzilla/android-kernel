@@ -29,3 +29,4 @@ obj-$(CONFIG_SENSORS_LIS331DLH)	+= lis331dlh.o
 obj-y				+= eeprom/
 obj-y				+= ts27010mux/
 obj-$(CONFIG_VIB_OMAP_PWM)	+= vib-omap-pwm.o
+obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
