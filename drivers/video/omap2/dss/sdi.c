@@ -46,7 +46,7 @@ static struct {
 } sdi;
 
 /* CONTROL_PADCONF_DSS_DATAXX */
-const u16 sdi_pads[] =
+static const u16 sdi_pads[] =
 {
 	0x0f0,		/* 10[ 7..0]:SDI_DAT1N */
 	0x0f2,		/* 10[15..0]:SDI_DAT1P */
