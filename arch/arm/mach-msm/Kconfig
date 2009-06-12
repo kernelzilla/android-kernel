@@ -62,7 +62,9 @@ config MACH_HALIBUT
 config MACH_TROUT
 	depends on ARCH_MSM
 	default y
-	bool "Trout"
+	bool "Trout (HTC Dream, T-Mobile G1, Google ADP1)"
+	help
+	 Select this to support HTC Dream, T-Mobile G1, Google ADP1.
 
 config MACH_SAPPHIRE
 	depends on ARCH_MSM
