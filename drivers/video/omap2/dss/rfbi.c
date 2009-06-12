@@ -1294,7 +1294,7 @@ static void rfbi_display_disable(struct omap_dss_device *dssdev)
 	omap_dss_stop_device(dssdev);
 }
 
-void rfbi_init_display(struct omap_dss_device *dssdev)
+int rfbi_init_display(struct omap_dss_device *dssdev)
 {
 	dssdev->enable = rfbi_display_enable;
 	dssdev->disable = rfbi_display_disable;
@@ -1305,4 +1305,6 @@ void rfbi_init_display(struct omap_dss_device *dssdev)
 	rfbi.dssdev[dssdev->phy.rfbi.channel] = dssdev;
 
 	dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
+
+	return 0;
 }

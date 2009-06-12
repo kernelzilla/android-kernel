@@ -360,7 +360,7 @@ static enum omap_dss_update_mode dpi_display_get_update_mode(
 		OMAP_DSS_UPDATE_DISABLED;
 }
 
-void dpi_init_display(struct omap_dss_device *dssdev)
+int dpi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
 
@@ -373,6 +373,8 @@ void dpi_init_display(struct omap_dss_device *dssdev)
 	dssdev->get_timings = dpi_get_timings;
 	dssdev->set_update_mode = dpi_display_set_update_mode;
 	dssdev->get_update_mode = dpi_display_get_update_mode;
+
+	return 0;
 }
 
 int dpi_init(void)

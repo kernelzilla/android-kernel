@@ -711,7 +711,7 @@ static int venc_set_wss(struct omap_dss_device *dssdev,	u32 wss)
 	return 0;
 }
 
-void venc_init_display(struct omap_dss_device *dssdev)
+int venc_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
 
@@ -724,6 +724,8 @@ void venc_init_display(struct omap_dss_device *dssdev)
 	dssdev->check_timings = venc_check_timings;
 	dssdev->get_wss = venc_get_wss;
 	dssdev->set_wss = venc_set_wss;
+
+	return 0;
 }
 
 void venc_dump_regs(struct seq_file *s)

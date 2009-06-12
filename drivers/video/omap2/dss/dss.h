@@ -212,7 +212,7 @@ void dss_set_dac_pwrdn_bgz(bool enable);
 /* SDI */
 int sdi_init(bool skip_init);
 void sdi_exit(void);
-void sdi_init_display(struct omap_dss_device *display);
+int sdi_init_display(struct omap_dss_device *display);
 
 /* DSI */
 int dsi_init(struct platform_device *pdev);
@@ -224,7 +224,7 @@ void dsi_dump_regs(struct seq_file *s);
 void dsi_save_context(void);
 void dsi_restore_context(void);
 
-void dsi_init_display(struct omap_dss_device *display);
+int dsi_init_display(struct omap_dss_device *display);
 void dsi_irq_handler(void);
 unsigned long dsi_get_dsi1_pll_rate(void);
 unsigned long dsi_get_dsi2_pll_rate(void);
@@ -237,7 +237,7 @@ void dsi_pll_uninit(void);
 /* DPI */
 int dpi_init(void);
 void dpi_exit(void);
-void dpi_init_display(struct omap_dss_device *dssdev);
+int dpi_init_display(struct omap_dss_device *dssdev);
 
 /* DISPC */
 int dispc_init(void);
@@ -329,7 +329,7 @@ void dispc_draw_partial_planes(struct omap_dss_device *dssdev);
 int venc_init(struct platform_device *pdev);
 void venc_exit(void);
 void venc_dump_regs(struct seq_file *s);
-void venc_init_display(struct omap_dss_device *display);
+int venc_init_display(struct omap_dss_device *display);
 
 /* RFBI */
 int rfbi_init(void);
@@ -342,6 +342,6 @@ void rfbi_transfer_area(u16 width, u16 height,
 			     void (callback)(void *data), void *data);
 void rfbi_set_timings(int rfbi_module, struct rfbi_timings *t);
 unsigned long rfbi_get_max_tx_rate(void);
-void rfbi_init_display(struct omap_dss_device *display);
+int rfbi_init_display(struct omap_dss_device *display);
 
 #endif

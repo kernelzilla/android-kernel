@@ -436,30 +436,35 @@ void dss_init_device(struct platform_device *pdev,
 
 	switch (dssdev->type) {
 	case OMAP_DISPLAY_TYPE_DPI:
-		dpi_init_display(dssdev);
+		r = dpi_init_display(dssdev);
 		break;
 #ifdef CONFIG_OMAP2_DSS_RFBI
 	case OMAP_DISPLAY_TYPE_DBI:
-		rfbi_init_display(dssdev);
+		r = rfbi_init_display(dssdev);
 		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	case OMAP_DISPLAY_TYPE_VENC:
-		venc_init_display(dssdev);
+		r = venc_init_display(dssdev);
 		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_SDI
 	case OMAP_DISPLAY_TYPE_SDI:
-		sdi_init_display(dssdev);
+		r = sdi_init_display(dssdev);
 		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_DSI
 	case OMAP_DISPLAY_TYPE_DSI:
-		dsi_init_display(dssdev);
+		r = dsi_init_display(dssdev);
 		break;
 #endif
 	default:
 		BUG();
+	}
+
+	if (r) {
+		DSSERR("failed to init display %s\n", dssdev->name);
+		return;
 	}
 
 	/* create device sysfs files */

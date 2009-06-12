@@ -3403,7 +3403,7 @@ static void dsi_configure_overlay(struct omap_overlay *ovl)
 	dispc_setup_plane_fifo(plane, low, high);
 }
 
-void dsi_init_display(struct omap_dss_device *dssdev)
+int dsi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("DSI init\n");
 
@@ -3433,6 +3433,8 @@ void dsi_init_display(struct omap_dss_device *dssdev)
 
 	dsi.vc[0].dssdev = dssdev;
 	dsi.vc[1].dssdev = dssdev;
+
+	return 0;
 }
 
 int dsi_init(struct platform_device *pdev)

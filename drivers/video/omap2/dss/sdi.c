@@ -228,7 +228,7 @@ static void sdi_get_timings(struct omap_dss_device *dssdev,
 	*timings = dssdev->panel.timings;
 }
 
-void sdi_init_display(struct omap_dss_device *dssdev)
+int sdi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("SDI init\n");
 
@@ -239,6 +239,8 @@ void sdi_init_display(struct omap_dss_device *dssdev)
 	dssdev->set_update_mode = sdi_display_set_update_mode;
 	dssdev->get_update_mode = sdi_display_get_update_mode;
 	dssdev->get_timings = sdi_get_timings;
+
+	return 0;
 }
 
 int sdi_init(bool skip_init)
