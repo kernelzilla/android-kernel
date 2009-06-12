@@ -412,7 +412,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	enum omap_dss_update_mode mode;
 	struct omap_dss_device *dssdev;
 	struct omap_overlay *ovl;
-	bool ilace = 0;
+	bool ilace;
 	int outw, outh;
 	int r;
 	int num_planes_enabled = 0;
@@ -452,8 +452,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 				mode != OMAP_DSS_UPDATE_AUTO)
 			continue;
 
-		if (dssdev->type == OMAP_DISPLAY_TYPE_VENC)
-			ilace = 1;
+		ilace = dssdev->type == OMAP_DISPLAY_TYPE_VENC;
 
 		if (ovl->info.out_width == 0)
 			outw = ovl->info.width;
