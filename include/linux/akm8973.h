@@ -32,6 +32,10 @@ struct akm8973_platform_data {
 #define AKM8973_MODE_POWERDOWN		0x03
 #define AKM8973_MODE_EEPROM_READ	0x02
 
+/* bit values for state flag */
+#define AKM8973_MAG			1
+#define AKM8973_TEMP			2
+
 #define AKM8973_REG_ST			0xC0
 #define AKM8973_REG_TMPS		0xC1
 #define AKM8973_REG_H1X			0xC2
@@ -51,9 +55,11 @@ struct akm8973_platform_data {
 
 #define AKM8973_IO                           0xA1
 
-#define AKM8973_IOCTL_GET_DELAY             _IOR(AKM8973_IO, 0x00, int)
-#define AKM8973_IOCTL_SET_DELAY             _IOW(AKM8973_IO, 0x01, int)
-#define AKM8973_IOCTL_GET_CALI              _IOR(AKM8973_IO, 0x02, char[5])
-#define AKM8973_IOCTL_SET_CALI              _IOW(AKM8973_IO, 0x03, char[5])
+#define AKM8973_IOCTL_GET_DELAY		_IOR(AKM8973_IO, 0x00, int)
+#define AKM8973_IOCTL_SET_DELAY		_IOW(AKM8973_IO, 0x01, int)
+#define AKM8973_IOCTL_GET_CALI		_IOR(AKM8973_IO, 0x02, char[3])
+#define AKM8973_IOCTL_SET_CALI		_IOW(AKM8973_IO, 0x03, char[3])
+#define AKM8973_IOCTL_GET_FLAG		_IOR(AKM8973_IO, 0x04, char)
+#define AKM8973_IOCTL_SET_FLAG		_IOW(AKM8973_IO, 0x05, char)
 
 #endif /* _LINUX_I2C_AKM8973_H */

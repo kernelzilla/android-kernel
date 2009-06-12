@@ -41,6 +41,8 @@ struct akm8973_data {
  */
 struct akm8973_data	*akm8973_misc_data;
 
+static u8 akm8973_state;
+
 static inline u8 akm8973_convert_dac_offset(u8 offset)
 {
 	if (offset < 0x80)
@@ -320,16 +322,18 @@ static void akm8973_transform_values(struct akm8973_data *akm, u8 *values)
 static void akm8973_report_values(struct akm8973_data *akm,
 				  u8 *values, int calibrate)
 {
-	/* TODO: check mv/t reporting flags */
-	/* TODO: add master device hack */
-	input_report_abs(akm->input_dev, ABS_HAT0X, values[1]-128);
-	input_report_abs(akm->input_dev, ABS_HAT0Y, values[2]-128);
-	input_report_abs(akm->input_dev, ABS_BRAKE, values[3]-128);
-	input_report_abs(akm->input_dev, ABS_RUDDER, calibrate);
-	input_report_abs(akm->input_dev, ABS_THROTTLE, values[0]);
+	if (akm8973_state & AKM8973_MAG) {
+		input_report_abs(akm->input_dev, ABS_HAT0X, values[1]-128);
+		input_report_abs(akm->input_dev, ABS_HAT0Y, values[2]-128);
+		input_report_abs(akm->input_dev, ABS_BRAKE, values[3]-128);
+		input_report_abs(akm->input_dev, ABS_RUDDER, calibrate);
+	}
 
-	input_sync(akm->input_dev);
+	if (akm8973_state & AKM8973_TEMP)
+		input_report_abs(akm->input_dev, ABS_THROTTLE, values[0]);
 
+	if (akm8973_state)
+		input_sync(akm->input_dev);
 }
 
 static void akm8973_irq_work_func(struct work_struct *work)
@@ -420,9 +424,27 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 	case AKM8973_IOCTL_SET_DELAY:
 		if (copy_from_user(&interval, argp, sizeof(interval)))
 			return -EFAULT;
+		if (interval < 0 || interval > 200)
+			return -EINVAL;
 
 		akm->pdata->poll_interval =
 			max(interval, AKM8973_MIN_POLL_INTERVAL);
+		break;
+
+	case AKM8973_IOCTL_SET_FLAG:
+		if (copy_from_user(&buf, argp, 1))
+			return -EFAULT;
+		if (buf[0] > 3)
+			return -EINVAL;
+
+		akm8973_state = buf[0];
+		break;
+
+	case AKM8973_IOCTL_GET_FLAG:
+		buf[0] = akm8973_state;
+		if (copy_to_user(argp, &buf, 1))
+			return -EINVAL;
+
 		break;
 
 	default:
@@ -643,6 +665,9 @@ static int akm8973_probe(struct i2c_client *client,
 
 	akm8973_device_power_off(akm);
 
+	/* As default, do not report information */
+	akm8973_state = 0;
+
 	mutex_unlock(&akm->lock);
 
 	dev_info(&client->dev, "akm8973 probed\n");
@@ -701,7 +726,7 @@ static struct i2c_driver akm8973_driver = {
 
 static int __init akm8973_init(void)
 {
-	printk(KERN_INFO "AKM8973 magnetometer driver\n");
+	pr_info(KERN_INFO "AKM8973 magnetometer driver\n");
 	return i2c_add_driver(&akm8973_driver);
 }
 
