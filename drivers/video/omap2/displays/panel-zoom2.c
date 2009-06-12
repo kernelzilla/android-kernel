@@ -233,10 +233,10 @@ static int init_nec_wvga_lcd(struct spi_device *spi)
 static int zoom2_spi_probe(struct spi_device *spi)
 {
 	unsigned char lcd_panel_reset_gpio;
-	omap_cfg_reg(AF21_3430_GPIO8);
-	omap_cfg_reg(B23_3430_GPIO167);
-	omap_cfg_reg(AB1_3430_McSPI1_CS2);
-	omap_cfg_reg(A18_3430_GPIO94);
+	omap_cfg_reg(AF21_34XX_GPIO8);
+	omap_cfg_reg(B23_34XX_GPIO167);
+	omap_cfg_reg(AB1_34XX_McSPI1_CS2);
+	omap_cfg_reg(A24_34XX_GPIO94);
 
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 32;
@@ -249,13 +249,13 @@ static int zoom2_spi_probe(struct spi_device *spi)
 		/* Pilot Zoom2 board
 		 * GPIO-55 is the LCD_RESET_GPIO
 		 */
-		omap_cfg_reg(J9_3430_GPIO55);
+		omap_cfg_reg(T8_34XX_GPIO55);
 		lcd_panel_reset_gpio = 55;
 	} else {
 		/* Production Zoom2 Board:
 		 * GPIO-96 is the LCD_RESET_GPIO
 		 */
-		omap_cfg_reg(D19_3430_GPIO96);
+		omap_cfg_reg(C25_34XX_GPIO96);
 		lcd_panel_reset_gpio = 96;
 	}
 
