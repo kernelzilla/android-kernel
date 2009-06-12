@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
+#include <linux/wakelock.h>
 
 #include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
@@ -117,6 +118,7 @@ static unsigned short get_sense_reg(enum cpcap_irqs event)
 struct pwrkey_data {
 	struct cpcap_device *cpcap;
 	enum pwrkey_states state;
+	struct wake_lock wake_lock;
 };
 
 static void pwrkey_handler(enum cpcap_irqs irq, void *data)
@@ -127,7 +129,9 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 
 	new_state = (enum pwrkey_states) cpcap_irq_sense(cpcap, irq, 0);
 
+
 	if ((new_state < PWRKEY_UNKNOWN) && (new_state != last_state)) {
+		wake_lock_timeout(&pwrkey_data->wake_lock, 20);
 		cpcap_broadcast_key_event(cpcap, KEY_END, new_state);
 		pwrkey_data->state = new_state;
 	}
@@ -147,6 +151,7 @@ static int pwrkey_init(struct cpcap_device *cpcap)
 	retval = cpcap_irq_register(cpcap, CPCAP_IRQ_ON, pwrkey_handler, data);
 	if (retval)
 		kfree(data);
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "pwrkey");
 	return retval;
 }
 
