@@ -346,6 +346,8 @@ struct omap_dss_device {
 
 		struct {
 			u8 datapairs;
+			unsigned pad_off_pe : 1; /* pull pads if disabled */
+			unsigned pad_off_pu : 1; /* pull up */
 		} sdi;
 
 		struct {
