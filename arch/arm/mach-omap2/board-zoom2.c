@@ -511,7 +511,7 @@ static struct i2c_board_info __initdata zoom2_i2c_bus1_info[] = {
 static void synaptics_dev_init(void)
 {
 	/* Set the ts_gpio pin mux */
-	omap_cfg_reg(R21_3430_GPIO163);
+	omap_cfg_reg(H18_34XX_GPIO163);
 
 	if (gpio_request(OMAP_SYNAPTICS_GPIO, "touch") < 0) {
 		printk(KERN_ERR "can't get synaptics pen down GPIO\n");
@@ -558,8 +558,8 @@ static int __init omap_i2c_init(void)
 static void config_wlan_gpio(void)
 {
 	/* WLAN PW_EN and IRQ */
-	omap_cfg_reg(B24_3430_GPIO101_OUT);
-	omap_cfg_reg(W21_3430_GPIO162);
+	omap_cfg_reg(B24_34XX_GPIO101_OUT);
+	omap_cfg_reg(W21_34XX_GPIO162);
 }
 
 static void __init omap_zoom2_init(void)
