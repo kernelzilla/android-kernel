@@ -227,12 +227,12 @@ static void sholes_proximity_init(void)
 {
 	gpio_request(SHOLES_PROX_INT_GPIO, "Sholes proximity sensor");
 	gpio_direction_input(SHOLES_PROX_INT_GPIO);
-	omap_cfg_reg(Y3_3430_GPIO180);
+	omap_cfg_reg(Y3_34XX_GPIO180);
 }
 
 static void sholes_vibrator_init(void)
 {
-	omap_cfg_reg(Y4_3430_GPIO181);
+	omap_cfg_reg(Y4_34XX_GPIO181);
 }
 
 static struct platform_device *sholes_sensors[] __initdata = {

@@ -403,10 +403,10 @@ static void __init sholes_serial_init(void)
 	omap_cfg_reg(Y8_3430_UART1_RX);
 	omap_cfg_reg(AA9_3430_UART1_RTS);
 	omap_cfg_reg(W8_3430_UART1_CTS);
-	omap_cfg_reg(AD22_3430_UART2_TX);
-	omap_cfg_reg(AD21_3430_UART2_RX);
-	omap_cfg_reg(AA24_3430_UART2_RTS);
-	omap_cfg_reg(Y24_3430_UART2_CTS);
+	omap_cfg_reg(AA25_34XX_UART2_TX);
+	omap_cfg_reg(AD25_34XX_UART2_RX);
+	omap_cfg_reg(AB25_34XX_UART2_RTS);
+	omap_cfg_reg(AB26_34XX_UART2_CTS);
 	omap_serial_init();
 }
 
@@ -483,7 +483,7 @@ static void sholes_pm_init(void)
 static void __init config_wlan_gpio(void)
 {
 	/* WLAN PE and IRQ */
-	omap_cfg_reg(AE22_3430_GPIO186_OUT);
+	omap_cfg_reg(AE22_34XX_GPIO186_OUT);
 	omap_cfg_reg(J8_3430_GPIO65);
 }
 
@@ -531,7 +531,7 @@ static struct platform_device sholes_wl1271_device = {
 static void __init sholes_bt_init(void)
 {
 	/* Mux setup for Bluetooth chip-enable */
-	omap_cfg_reg(W8_3430_MCSPI2_SIMO);
+	omap_cfg_reg(T3_34XX_GPIO_179);
 
 	platform_device_register(&sholes_wl1271_device);
 }
@@ -577,4 +577,4 @@ MACHINE_START(SHOLES, "sholes")
 	.init_irq	= sholes_init_irq,
 	.init_machine	= sholes_init,
 	.timer		= &omap_timer,
-MACHINE_END
+	MACHINE_END
