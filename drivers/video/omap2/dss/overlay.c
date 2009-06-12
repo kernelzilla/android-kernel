@@ -52,6 +52,7 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 {
 	int i, r;
 	struct omap_overlay_manager *mgr = NULL;
+	struct omap_overlay_manager *old_mgr;
 	int len = size;
 
 	if (buf[size-1] == '\n')
@@ -74,27 +75,32 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	if (mgr)
 		DSSDBG("manager %s found\n", mgr->name);
 
-	if (mgr != ovl->manager) {
-		/* detach old manager */
-		if (ovl->manager) {
-			r = ovl->unset_manager(ovl);
-			if (r) {
-				DSSERR("detach failed\n");
-				return r;
-			}
+	if (mgr == ovl->manager)
+		return size;
+
+	old_mgr = ovl->manager;
+
+	/* detach old manager */
+	if (old_mgr) {
+		r = ovl->unset_manager(ovl);
+		if (r) {
+			DSSERR("detach failed\n");
+			return r;
 		}
 
-		if (mgr) {
-			r = ovl->set_manager(ovl, mgr);
-			if (r) {
-				DSSERR("Failed to attach overlay\n");
-				return r;
-			}
-		}
+		r = old_mgr->apply(old_mgr);
+		if (r)
+			return r;
 	}
 
-	if (ovl->manager) {
-		r = ovl->manager->apply(ovl->manager);
+	if (mgr) {
+		r = ovl->set_manager(ovl, mgr);
+		if (r) {
+			DSSERR("Failed to attach overlay\n");
+			return r;
+		}
+
+		r = mgr->apply(mgr);
 		if (r)
 			return r;
 	}
@@ -403,6 +409,8 @@ static int dss_ovl_set_overlay_info(struct omap_overlay *ovl,
 		}
 	}
 
+	ovl->info_dirty = true;
+
 	return 0;
 }
 
@@ -412,21 +420,39 @@ static void dss_ovl_get_overlay_info(struct omap_overlay *ovl,
 	*info = ovl->info;
 }
 
+static int dss_ovl_wait_for_go(struct omap_overlay *ovl)
+{
+	return dss_mgr_wait_for_go_ovl(ovl);
+}
+
 static int omap_dss_set_manager(struct omap_overlay *ovl,
 		struct omap_overlay_manager *mgr)
 {
 	int r;
 
+	if (!mgr)
+		return -EINVAL;
+
 	if (ovl->manager) {
 		DSSERR("overlay '%s' already has a manager '%s'\n",
 				ovl->name, ovl->manager->name);
+		return -EINVAL;
 	}
 
-	r = dss_check_overlay(ovl, mgr->device);
+	r = ovl->wait_for_go(ovl);
 	if (r)
 		return r;
 
+	if (ovl->info.enabled) {
+		DSSERR("overlay has to be disabled to change the manager\n");
+		return -EINVAL;
+	}
+
 	ovl->manager = mgr;
+
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dispc_set_channel_out(ovl->id, mgr->id);
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	return 0;
 }
@@ -439,6 +465,7 @@ static int omap_dss_unset_manager(struct omap_overlay *ovl)
 	}
 
 	ovl->manager = NULL;
+	/* XXX disable overlay? */
 
 	return 0;
 }
@@ -530,6 +557,7 @@ void dss_init_overlays(struct platform_device *pdev)
 		ovl->unset_manager = &omap_dss_unset_manager;
 		ovl->set_overlay_info = &dss_ovl_set_overlay_info;
 		ovl->get_overlay_info = &dss_ovl_get_overlay_info;
+		ovl->wait_for_go = &dss_ovl_wait_for_go;
 
 		omap_dss_add_overlay(ovl);
 

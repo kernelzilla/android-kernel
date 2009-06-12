@@ -310,21 +310,17 @@ static void default_get_resolution(struct omap_dss_device *dssdev,
 	*yres = dssdev->panel.timings.y_res;
 }
 
-static void default_configure_overlay(struct omap_overlay *ovl)
+void default_get_overlay_fifo_thresholds(enum omap_plane plane,
+		u32 fifo_size, enum omap_burst_size *burst_size,
+		u32 *fifo_low, u32 *fifo_high)
 {
-	unsigned low, high, size;
-	enum omap_burst_size burst;
-	enum omap_plane plane = ovl->id;
+	unsigned burst_size_bytes;
 
-	burst = OMAP_DSS_BURST_16x32;
-	size = 16 * 32 / 8;
+	*burst_size = OMAP_DSS_BURST_16x32;
+	burst_size_bytes = 16 * 32 / 8;
 
-	dispc_set_burst_size(plane, burst);
-
-	high = dispc_get_plane_fifo_size(plane) - 1;
-	low = dispc_get_plane_fifo_size(plane) - size;
-
-	dispc_setup_plane_fifo(plane, low, high);
+	*fifo_high = fifo_size - 1;
+	*fifo_low = fifo_size - burst_size_bytes;
 }
 
 static int default_wait_vsync(struct omap_dss_device *dssdev)
@@ -431,7 +427,6 @@ void dss_init_device(struct platform_device *pdev,
 
 	dssdev->get_resolution = default_get_resolution;
 	dssdev->get_recommended_bpp = default_get_recommended_bpp;
-	dssdev->configure_overlay = default_configure_overlay;
 	dssdev->wait_vsync = default_wait_vsync;
 
 	switch (dssdev->type) {

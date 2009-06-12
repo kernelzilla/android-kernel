@@ -55,6 +55,7 @@
 #define OMAPFB_WAITFORVSYNC	OMAP_IO(57)
 #define OMAPFB_MEMORY_READ	OMAP_IOR(58, struct omapfb_memory_read)
 #define OMAPFB_GET_OVERLAY_COLORMODE	OMAP_IOR(59, struct omapfb_ovl_colormode)
+#define OMAPFB_WAITFORGO	OMAP_IO(60)
 
 #define OMAPFB_CAPS_GENERIC_MASK	0x00000fff
 #define OMAPFB_CAPS_LCDC_MASK		0x00fff000

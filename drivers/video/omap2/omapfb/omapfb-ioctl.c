@@ -442,6 +442,22 @@ static int omapfb_get_ovl_colormode(struct omapfb2_device *fbdev,
 	return 0;
 }
 
+static int omapfb_wait_for_go(struct fb_info *fbi)
+{
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	int r = 0;
+	int i;
+
+	for (i = 0; i < ofbi->num_overlays; ++i) {
+		struct omap_overlay *ovl = ofbi->overlays[i];
+		r = ovl->wait_for_go(ovl);
+		if (r)
+			break;
+	}
+
+	return r;
+}
+
 int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
@@ -622,6 +638,16 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		}
 
 		r = display->wait_vsync(display);
+		break;
+
+	case OMAPFB_WAITFORGO:
+		DBG("ioctl WAITFORGO\n");
+		if (!display) {
+			r = -EINVAL;
+			break;
+		}
+
+		r = omapfb_wait_for_go(fbi);
 		break;
 
 	/* LCD and CTRL tests do the same thing for backward

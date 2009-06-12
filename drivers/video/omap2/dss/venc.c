@@ -711,6 +711,15 @@ static int venc_set_wss(struct omap_dss_device *dssdev,	u32 wss)
 	return 0;
 }
 
+static enum omap_dss_update_mode venc_display_get_update_mode(
+		struct omap_dss_device *dssdev)
+{
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+		return OMAP_DSS_UPDATE_AUTO;
+	else
+		return OMAP_DSS_UPDATE_DISABLED;
+}
+
 int venc_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
@@ -724,6 +733,7 @@ int venc_init_display(struct omap_dss_device *dssdev)
 	dssdev->check_timings = venc_check_timings;
 	dssdev->get_wss = venc_get_wss;
 	dssdev->set_wss = venc_set_wss;
+	dssdev->get_update_mode = venc_display_get_update_mode;
 
 	return 0;
 }

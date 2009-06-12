@@ -158,6 +158,8 @@ static struct {
 	unsigned long	cache_prate;
 	struct dispc_clock_info cache_cinfo;
 
+	u32	fifo_size[3];
+
 	spinlock_t irq_lock;
 	u32 irq_error_mask;
 	struct omap_dispc_isr_data registered_isr[DISPC_MAX_NR_ISRS];
@@ -479,10 +481,21 @@ static inline void enable_clocks(bool enable)
 		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 }
 
+bool dispc_go_busy(enum omap_channel channel)
+{
+	int bit;
+
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		bit = 5; /* GOLCD */
+	else
+		bit = 6; /* GODIGIT */
+
+	return REG_GET(DISPC_CONTROL, bit, bit) == 1;
+}
+
 void dispc_go(enum omap_channel channel)
 {
 	int bit;
-	unsigned long tmo;
 
 	enable_clocks(1);
 
@@ -500,13 +513,9 @@ void dispc_go(enum omap_channel channel)
 	else
 		bit = 6; /* GODIGIT */
 
-	tmo = jiffies + msecs_to_jiffies(200);
-	while (REG_GET(DISPC_CONTROL, bit, bit) == 1) {
-		if (time_after(jiffies, tmo)) {
-			DSSERR("timeout waiting GO flag\n");
-			goto end;
-		}
-		cpu_relax();
+	if (REG_GET(DISPC_CONTROL, bit, bit) == 1) {
+		DSSERR("GO bit not down for channel %d\n", channel);
+		goto end;
 	}
 
 	DSSDBG("GO %s\n", channel == OMAP_DSS_CHANNEL_LCD ? "LCD" : "DIGIT");
@@ -942,31 +951,33 @@ void dispc_set_digit_size(u16 width, u16 height)
 	enable_clocks(0);
 }
 
-u32 dispc_get_plane_fifo_size(enum omap_plane plane)
+static void dispc_read_plane_fifo_sizes(void)
 {
 	const struct dispc_reg fsz_reg[] = { DISPC_GFX_FIFO_SIZE_STATUS,
 				      DISPC_VID_FIFO_SIZE_STATUS(0),
 				      DISPC_VID_FIFO_SIZE_STATUS(1) };
 	u32 size;
+	int plane;
 
 	enable_clocks(1);
 
-	if (cpu_is_omap24xx())
-		size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 8, 0);
-	else if (cpu_is_omap34xx())
-		size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 10, 0);
-	else
-		BUG();
+	for (plane = 0; plane < ARRAY_SIZE(dispc.fifo_size); ++plane) {
+		if (cpu_is_omap24xx())
+			size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 8, 0);
+		else if (cpu_is_omap34xx())
+			size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 10, 0);
+		else
+			BUG();
 
-	if (cpu_is_omap34xx()) {
-		/* FIFOMERGE */
-		if (REG_GET(DISPC_CONFIG, 14, 14))
-			size *= 3;
+		dispc.fifo_size[plane] = size;
 	}
 
 	enable_clocks(0);
+}
 
-	return size;
+u32 dispc_get_plane_fifo_size(enum omap_plane plane)
+{
+	return dispc.fifo_size[plane];
 }
 
 void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
@@ -974,16 +985,10 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 	const struct dispc_reg ftrs_reg[] = { DISPC_GFX_FIFO_THRESHOLD,
 				       DISPC_VID_FIFO_THRESHOLD(0),
 				       DISPC_VID_FIFO_THRESHOLD(1) };
-	u32 size;
-
 	enable_clocks(1);
 
-	size = dispc_get_plane_fifo_size(plane);
-
-	BUG_ON(low > size || high > size);
-
-	DSSDBG("fifo(%d) size %d, low/high old %u/%u, new %u/%u\n",
-			plane, size,
+	DSSDBG("fifo(%d) low/high old %u/%u, new %u/%u\n",
+			plane,
 			REG_GET(ftrs_reg[plane], 11, 0),
 			REG_GET(ftrs_reg[plane], 27, 16),
 			low, high);
@@ -1480,8 +1485,14 @@ static unsigned long calc_fclk(u16 width, u16 height,
 	return dispc_pclk_rate() * vf * hf;
 }
 
+void dispc_set_channel_out(enum omap_plane plane, enum omap_channel channel_out)
+{
+	enable_clocks(1);
+	_dispc_set_channel_out(plane, channel_out);
+	enable_clocks(0);
+}
+
 static int _dispc_setup_plane(enum omap_plane plane,
-		enum omap_channel channel_out,
 		u32 paddr, u16 screen_width,
 		u16 pos_x, u16 pos_y,
 		u16 width, u16 height,
@@ -1631,7 +1642,6 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
-	_dispc_set_channel_out(plane, channel_out);
 	_dispc_set_color_mode(plane, color_mode);
 
 	_dispc_set_plane_ba0(plane, paddr + offset0);
@@ -3068,6 +3078,8 @@ static void _omap_dispc_initial_config(void)
 	_dispc_setup_color_conv_coef();
 
 	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
+
+	dispc_read_plane_fifo_sizes();
 }
 
 int dispc_init(void)
@@ -3127,7 +3139,7 @@ int dispc_enable_plane(enum omap_plane plane, bool enable)
 	return 0;
 }
 
-int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
+int dispc_setup_plane(enum omap_plane plane,
 		       u32 paddr, u16 screen_width,
 		       u16 pos_x, u16 pos_y,
 		       u16 width, u16 height,
@@ -3139,9 +3151,9 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 {
 	int r = 0;
 
-	DSSDBG("dispc_setup_plane %d, ch %d, pa %x, sw %d, %d,%d, %dx%d -> "
+	DSSDBG("dispc_setup_plane %d, pa %x, sw %d, %d,%d, %dx%d -> "
 	       "%dx%d, ilace %d, cmode %x, rot %d, mir %d\n",
-	       plane, channel_out, paddr, screen_width, pos_x, pos_y,
+	       plane, paddr, screen_width, pos_x, pos_y,
 	       width, height,
 	       out_width, out_height,
 	       ilace, color_mode,
@@ -3149,7 +3161,7 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 
 	enable_clocks(1);
 
-	r = _dispc_setup_plane(plane, channel_out,
+	r = _dispc_setup_plane(plane,
 			   paddr, screen_width,
 			   pos_x, pos_y,
 			   width, height,
@@ -3163,230 +3175,3 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 
 	return r;
 }
-
-static int dispc_is_intersecting(int x1, int y1, int w1, int h1,
-				 int x2, int y2, int w2, int h2)
-{
-	if (x1 >= (x2+w2))
-		return 0;
-
-	if ((x1+w1) <= x2)
-		return 0;
-
-	if (y1 >= (y2+h2))
-		return 0;
-
-	if ((y1+h1) <= y2)
-		return 0;
-
-	return 1;
-}
-
-static int dispc_is_overlay_scaled(struct omap_overlay_info *pi)
-{
-	if (pi->width != pi->out_width)
-		return 1;
-
-	if (pi->height != pi->out_height)
-		return 1;
-
-	return 0;
-}
-
-/* returns the area that needs updating */
-void dispc_setup_partial_planes(struct omap_dss_device *dssdev,
-				    u16 *xi, u16 *yi, u16 *wi, u16 *hi)
-{
-	struct omap_overlay_manager *mgr;
-	int i;
-
-	int x, y, w, h;
-
-	x = *xi;
-	y = *yi;
-	w = *wi;
-	h = *hi;
-
-	DSSDBG("dispc_setup_partial_planes %d,%d %dx%d\n",
-		*xi, *yi, *wi, *hi);
-
-
-	mgr = dssdev->manager;
-
-	if (!mgr) {
-		DSSDBG("no manager\n");
-		return;
-	}
-
-	for (i = 0; i < mgr->num_overlays; i++) {
-		struct omap_overlay *ovl;
-		struct omap_overlay_info *pi;
-		ovl = mgr->overlays[i];
-
-		if (ovl->manager != mgr)
-			continue;
-
-		if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0)
-			continue;
-
-		pi = &ovl->info;
-
-		if (!pi->enabled)
-			continue;
-		/*
-		 * If the plane is intersecting and scaled, we
-		 * enlarge the update region to accomodate the
-		 * whole area
-		 */
-
-		if (dispc_is_intersecting(x, y, w, h,
-					  pi->pos_x, pi->pos_y,
-					  pi->out_width, pi->out_height)) {
-			if (dispc_is_overlay_scaled(pi)) {
-
-				int x1, y1, x2, y2;
-
-				if (x > pi->pos_x)
-					x1 = pi->pos_x;
-				else
-					x1 = x;
-
-				if (y > pi->pos_y)
-					y1 = pi->pos_y;
-				else
-					y1 = y;
-
-				if ((x + w) < (pi->pos_x + pi->out_width))
-					x2 = pi->pos_x + pi->out_width;
-				else
-					x2 = x + w;
-
-				if ((y + h) < (pi->pos_y + pi->out_height))
-					y2 = pi->pos_y + pi->out_height;
-				else
-					y2 = y + h;
-
-				x = x1;
-				y = y1;
-				w = x2 - x1;
-				h = y2 - y1;
-
-				DSSDBG("Update area after enlarge due to "
-					"scaling %d, %d %dx%d\n",
-					x, y, w, h);
-			}
-		}
-	}
-
-	for (i = 0; i < mgr->num_overlays; i++) {
-		struct omap_overlay *ovl = mgr->overlays[i];
-		struct omap_overlay_info *pi = &ovl->info;
-
-		int px = pi->pos_x;
-		int py = pi->pos_y;
-		int pw = pi->width;
-		int ph = pi->height;
-		int pow = pi->out_width;
-		int poh = pi->out_height;
-		u32 pa = pi->paddr;
-		int psw = pi->screen_width;
-		int bpp;
-
-		if (ovl->manager != mgr)
-			continue;
-
-		/*
-		 * If plane is not enabled or the update region
-		 * does not intersect with the plane in question,
-		 * we really disable the plane from hardware
-		 */
-
-		if (!pi->enabled ||
-		    !dispc_is_intersecting(x, y, w, h,
-					   px, py, pow, poh)) {
-			dispc_enable_plane(ovl->id, 0);
-			continue;
-		}
-
-		switch (pi->color_mode) {
-		case OMAP_DSS_COLOR_RGB16:
-		case OMAP_DSS_COLOR_ARGB16:
-		case OMAP_DSS_COLOR_YUV2:
-		case OMAP_DSS_COLOR_UYVY:
-			bpp = 16;
-			break;
-
-		case OMAP_DSS_COLOR_RGB24P:
-			bpp = 24;
-			break;
-
-		case OMAP_DSS_COLOR_RGB24U:
-		case OMAP_DSS_COLOR_ARGB32:
-		case OMAP_DSS_COLOR_RGBA32:
-		case OMAP_DSS_COLOR_RGBX32:
-			bpp = 32;
-			break;
-
-		default:
-			BUG();
-			return;
-		}
-
-		if (x > pi->pos_x) {
-			px = 0;
-			pw -= (x - pi->pos_x);
-			pa += (x - pi->pos_x) * bpp / 8;
-		} else {
-			px = pi->pos_x - x;
-		}
-
-		if (y > pi->pos_y) {
-			py = 0;
-			ph -= (y - pi->pos_y);
-			pa += (y - pi->pos_y) * psw * bpp / 8;
-		} else {
-			py = pi->pos_y - y;
-		}
-
-		if (w < (px+pw))
-			pw -= (px+pw) - (w);
-
-		if (h < (py+ph))
-			ph -= (py+ph) - (h);
-
-		/* Can't scale the GFX plane */
-		if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0 ||
-				dispc_is_overlay_scaled(pi) == 0) {
-			pow = pw;
-			poh = ph;
-		}
-
-		DSSDBG("calc  plane %d, %x, sw %d, %d,%d, %dx%d -> %dx%d\n",
-				ovl->id, pa, psw, px, py, pw, ph, pow, poh);
-
-		dispc_setup_plane(ovl->id, mgr->id,
-				pa, psw,
-				px, py,
-				pw, ph,
-				pow, poh,
-				pi->color_mode, 0,
-				pi->rotation_type,
-				pi->rotation,
-				pi->mirror,
-				pi->global_alpha);
-
-		if (dss_use_replication(dssdev, ovl->info.color_mode))
-			dispc_enable_replication(ovl->id, true);
-		else
-			dispc_enable_replication(ovl->id, false);
-
-		dispc_enable_plane(ovl->id, 1);
-	}
-
-	*xi = x;
-	*yi = y;
-	*wi = w;
-	*hi = h;
-
-}
-

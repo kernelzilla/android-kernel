@@ -2592,7 +2592,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 
 	dispc_disable_sidle();
 
-	dispc_enable_lcd_out(1);
+	dss_start_update(dssdev);
 
 	if (use_te_trigger)
 		dsi_vc_send_bta(1);
@@ -2632,12 +2632,19 @@ static void dsi_set_update_region(struct omap_dss_device *dssdev,
 static void dsi_start_auto_update(struct omap_dss_device *dssdev)
 {
 	u16 w, h;
+	int i;
 
 	DSSDBG("starting auto update\n");
 
 	/* In automatic mode the overlay settings are applied like on DPI/SDI.
-	 * The overlay settings may not have been applied, if we were in manual
-	 * mode earlier, so do it here */
+	 * Mark the overlays dirty, so that we get the overlays configured, as
+	 * manual mode has left them in bad shape after config partia planes */
+	for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+		struct omap_overlay *ovl;
+		ovl = omap_dss_get_overlay(i);
+		if (ovl->manager == dssdev->manager)
+			ovl->info_dirty = true;
+	}
 	dssdev->manager->apply(dssdev->manager);
 
 	dssdev->get_resolution(dssdev, &w, &h);
@@ -2758,7 +2765,7 @@ static int dsi_update_thread(void *data)
 		if (device->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
 
 			if (dsi.update_mode == OMAP_DSS_UPDATE_MANUAL) {
-				dispc_setup_partial_planes(device,
+				dss_setup_partial_planes(device,
 						&x, &y, &w, &h);
 #if 1
 				/* XXX there seems to be a bug in this driver
@@ -2767,12 +2774,13 @@ static int dsi_update_thread(void *data)
 				 * are always odd, so "fix" it here for now */
 				if (w & 1) {
 					u16 dw, dh;
-					device->get_resolution(device, &dw, &dh);
+					device->get_resolution(device,
+							&dw, &dh);
 					if (x + w == dw)
 						x &= ~1;
 					++w;
 
-					dispc_setup_partial_planes(device,
+					dss_setup_partial_planes(device,
 							&x, &y, &w, &h);
 				}
 #endif
@@ -3387,20 +3395,17 @@ static int dsi_display_memory_read(struct omap_dss_device *dssdev,
 	return r;
 }
 
-static void dsi_configure_overlay(struct omap_overlay *ovl)
+void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
+		u32 fifo_size, enum omap_burst_size *burst_size,
+		u32 *fifo_low, u32 *fifo_high)
 {
-	unsigned low, high, size;
-	enum omap_burst_size burst;
-	enum omap_plane plane = ovl->id;
+	unsigned burst_size_bytes;
 
-	burst = OMAP_DSS_BURST_16x32;
-	size = 16 * 32 / 8;
+	*burst_size = OMAP_DSS_BURST_16x32;
+	burst_size_bytes = 16 * 32 / 8;
 
-	dispc_set_burst_size(plane, burst);
-
-	high = dispc_get_plane_fifo_size(plane) - size;
-	low = 0;
-	dispc_setup_plane_fifo(plane, low, high);
+	*fifo_high = fifo_size - burst_size_bytes;
+	*fifo_low = 0;
 }
 
 int dsi_init_display(struct omap_dss_device *dssdev)
@@ -3426,8 +3431,6 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 
 	dssdev->run_test = dsi_display_run_test;
 	dssdev->memory_read = dsi_display_memory_read;
-
-	dssdev->configure_overlay = dsi_configure_overlay;
 
 	dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
 

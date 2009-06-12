@@ -277,12 +277,18 @@ struct omap_overlay {
 	struct kobject kobj;
 	struct list_head list;
 
+	/* static fields */
 	const char *name;
 	int id;
-	struct omap_overlay_manager *manager;
 	enum omap_color_mode supported_modes;
-	struct omap_overlay_info info;
 	enum omap_overlay_caps caps;
+
+	/* dynamic fields */
+	struct omap_overlay_manager *manager;
+	struct omap_overlay_info info;
+
+	/* if true, info has been changed, but not applied() yet */
+	bool info_dirty;
 
 	int (*set_manager)(struct omap_overlay *ovl,
 		struct omap_overlay_manager *mgr);
@@ -292,6 +298,8 @@ struct omap_overlay {
 			struct omap_overlay_info *info);
 	void (*get_overlay_info)(struct omap_overlay *ovl,
 			struct omap_overlay_info *info);
+
+	int (*wait_for_go)(struct omap_overlay *ovl);
 };
 
 struct omap_overlay_manager_info {
@@ -308,25 +316,33 @@ struct omap_overlay_manager {
 	struct kobject kobj;
 	struct list_head list;
 
+	/* static fields */
 	const char *name;
 	int id;
 	enum omap_overlay_manager_caps caps;
-	struct omap_overlay_manager_info info;
-	struct omap_dss_device *device;
 	int num_overlays;
 	struct omap_overlay **overlays;
 	enum omap_display_type supported_displays;
+
+	/* dynamic fields */
+	struct omap_dss_device *device;
+	struct omap_overlay_manager_info info;
+
+	bool device_changed;
+	/* if true, info has been changed but not applied() yet */
+	bool info_dirty;
 
 	int (*set_device)(struct omap_overlay_manager *mgr,
 		struct omap_dss_device *dssdev);
 	int (*unset_device)(struct omap_overlay_manager *mgr);
 
-	int (*apply)(struct omap_overlay_manager *mgr);
-
 	int (*set_manager_info)(struct omap_overlay_manager *mgr,
 			struct omap_overlay_manager_info *info);
 	void (*get_manager_info)(struct omap_overlay_manager *mgr,
 			struct omap_overlay_manager_info *info);
+
+	int (*apply)(struct omap_overlay_manager *mgr);
+	int (*wait_for_go)(struct omap_overlay_manager *mgr);
 };
 
 struct omap_dss_device {
@@ -451,8 +467,6 @@ struct omap_dss_device {
 	int (*memory_read)(struct omap_dss_device *dssdev,
 			void *buf, size_t size,
 			u16 x, u16 y, u16 w, u16 h);
-
-	void (*configure_overlay)(struct omap_overlay *overlay);
 
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);

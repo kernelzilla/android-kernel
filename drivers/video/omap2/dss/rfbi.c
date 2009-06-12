@@ -972,7 +972,7 @@ static int do_update(struct omap_dss_device *dssdev, struct update_region *upd)
 
 	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
 		/*dssdev->driver->enable_te(dssdev, 1); */
-		dispc_setup_partial_planes(dssdev, &x, &y, &w, &h);
+		dss_setup_partial_planes(dssdev, &x, &y, &w, &h);
 	}
 
 #ifdef MEASURE_PERF
