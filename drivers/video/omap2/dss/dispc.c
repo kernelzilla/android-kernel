@@ -2732,6 +2732,7 @@ void dispc_irq_handler(void)
 	u32 handledirqs = 0;
 	u32 unhandled_errors;
 	struct omap_dispc_isr_data *isr_data;
+	struct omap_dispc_isr_data registered_isr[DISPC_MAX_NR_ISRS];
 
 	spin_lock(&dispc.irq_lock);
 
@@ -2745,8 +2746,15 @@ void dispc_irq_handler(void)
 	 * off */
 	dispc_write_reg(DISPC_IRQSTATUS, irqstatus);
 
+	/* make a copy and unlock, so that isrs can unregister
+	 * themselves */
+	memcpy(registered_isr, dispc.registered_isr,
+			sizeof(registered_isr));
+
+	spin_unlock(&dispc.irq_lock);
+
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
-		isr_data = &dispc.registered_isr[i];
+		isr_data = &registered_isr[i];
 
 		if (!isr_data->isr)
 			continue;
@@ -2756,6 +2764,8 @@ void dispc_irq_handler(void)
 			handledirqs |= isr_data->mask;
 		}
 	}
+
+	spin_lock(&dispc.irq_lock);
 
 	unhandled_errors = irqstatus & ~handledirqs & dispc.irq_error_mask;
 
