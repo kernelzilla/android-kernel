@@ -20,16 +20,16 @@ This version of AUFS, aufs2 has several purposes.
 - to make the source files simpler and smaller by dropping several
   original features.
 
-Note: it becomes clear that "Aufs was rejected. Let's give it up."
-According to Christoph Hellwig, linux rejects all union-type filesystems
-but UnionMount.
-<http://marc.info/?l=linux-kernel&m=123938533724484&w=2>
-
 Through this work, I found some bad things in aufs1 source code and
 fixed them. Some of the dropped features will be reverted in the future,
 but not all I'm afraid.
 Aufs2 supports linux-2.6.27 and later. If you want older kernel version
 support, try aufs1 from CVS on SourceForge.
+
+Note: it becomes clear that "Aufs was rejected. Let's give it up."
+According to Christoph Hellwig, linux rejects all union-type filesystems
+but UnionMount.
+<http://marc.info/?l=linux-kernel&m=123938533724484&w=2>
 
 
 1. Features
@@ -144,7 +144,6 @@ $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
 $ cd aufs2-standalone.git
 $ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
 				# aufs2 (no -xx) for the latest -rc version.
-- apply "aufs2-standalone.patch" to your kernel source files.
 
 o aufs2-util tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-util.git \
@@ -161,15 +160,26 @@ For aufs2-2.6 tree,
 
 For aufs2-standalone tree,
 There are two methods to build an externel kernel module.
+
+You may feel why aufs2-standalone.patch needs to export so many kernel
+symbols. Because you selected aufs2-standalone tree instead of aufs2-2.6
+tree. The number of necessary symbols to export essentially is not so
+many. All other symbols are for the external module.
+If you don't like aufs2-standalone.patch, then try aufs2-2.6 tree.
+
 1.
-- apply ./aufs2-kbuild.patch too
+- apply ./aufs2-standalone.patch to your kernel source files.
+- apply ./aufs2-kbuild.patch too.
 - copy ./{Documentation,fs,include} files to your kernel source tree
 - enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS, you can select either
   =m or =y.
 - and build your kernel as usual.
-- install it and reboot your system
+- install it and reboot your system.
+
 2.
 - module only method (CONFIG_AUFS_FS=m).
+- apply ./aufs2-standalone.patch to your kernel source files.
+- build your kernel and reboot.
 - edit ./config.mk and set other aufs configurations if necessary.
 - build the module by simple "make".
 - you can specify ${KDIR} make variable which points to your kernel
@@ -177,7 +187,7 @@ There are two methods to build an externel kernel module.
 - copy the build ./aufs.ko to /lib/modules/..., and run depmod -a (or
   reboot simply).
 - no need to apply aufs2-kbuild.patch, nor copying source files to your
-  kernel source tree, nor re-config/build your entire kernel.
+  kernel source tree.
 
 And then,
 - read README in aufs2-util, build and install it
