@@ -1,6 +1,3 @@
-
-//#define DEBUG
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/clk.h>
@@ -10,6 +7,7 @@
 #include <mach/display.h>
 #include <mach/dma.h>
 
+#define DEBUG
 #ifdef DEBUG
 #define DBG(format, ...) (printk(KERN_DEBUG "Edisco: " format, ## __VA_ARGS__))
 #else
@@ -129,6 +127,7 @@ static void edisco_disable(struct omap_display *display)
 
 	data[0] = EDISCO_CMD_ENTER_SLEEP_MODE;
 	dsi_vc_dcs_write(EDISCO_CMD_VC, data, 1);
+	msleep(120);
 
 	if (display->hw_config.ctrl_disable)
 		display->hw_config.ctrl_disable(display);
@@ -182,13 +181,25 @@ static int edisco_run_test(struct omap_display *display, int test_num)
 	return 0;
 }
 
+static int edisco_suspend(struct omap_display *display)
+{
+	display->ctrl->disable(display);
+	return 0;
+}
+
+static int edisco_resume(struct omap_display *display)
+{
+	return display->ctrl->enable(display);
+}
+
 static struct omap_ctrl edisco_ctrl = {
 	.owner = THIS_MODULE,
 	.name = "ctrl-edisco",
 	.init = edisco_ctrl_init,
 	.enable = edisco_enable,
 	.disable = edisco_disable,
-	/* suspend & resume */
+	.suspend = edisco_suspend,
+	.resume = edisco_resume,
 	.setup_update = edisco_ctrl_setup_update,
 	.enable_te = edisco_ctrl_enable_te,
 	.set_rotate = edisco_ctrl_rotate,
