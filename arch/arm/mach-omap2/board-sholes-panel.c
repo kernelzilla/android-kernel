@@ -12,11 +12,12 @@
 #include <linux/platform_device.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/regulator/consumer.h>
+#include <linux/err.h>
 
 #include <mach/display.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
-
 
 #define SHOLES_DISPLAY_RESET_GPIO	136
 
@@ -68,8 +69,20 @@ static void sholes_panel_disable_lcd(struct omap_display *display)
 #endif
 }
 
+struct regulator *display_regulator;
+
+
 static int sholes_edisco_ctrl_enable(struct omap_display *display)
 {
+	if (!display_regulator) {
+		display_regulator = regulator_get(NULL, "vhvio");
+		if (IS_ERR(display_regulator)) {
+			printk(KERN_ERR "failed to get regulator for display");
+			return PTR_ERR(display_regulator);
+		}
+	}
+	regulator_enable(display_regulator);
+	msleep(1);
 	gpio_request(SHOLES_DISPLAY_RESET_GPIO, "display reset");
 	gpio_direction_output(SHOLES_DISPLAY_RESET_GPIO, 1);
 	msleep(5);
@@ -77,7 +90,6 @@ static int sholes_edisco_ctrl_enable(struct omap_display *display)
 	msleep(5);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 1);
 	msleep(10);
-
 	return 0;
 }
 
@@ -85,7 +97,8 @@ static void sholes_edisco_ctrl_disable(struct omap_display *display)
 {
 	gpio_direction_output(SHOLES_DISPLAY_RESET_GPIO, 1);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 0);
-
+	msleep(1);
+	regulator_disable(display_regulator);
 	return;
 }
 
@@ -136,6 +149,8 @@ void __init sholes_panel_init(void)
 	omap_cfg_reg(AH24_34XX_DSI_DY2);
 	/* disp reset b */
 	omap_cfg_reg(AE4_34XX_GPIO136_OUT);
+
+
 
 	ret = gpio_request(SHOLES_DISPLAY_RESET_GPIO, "display reset");
 	if (ret) {
