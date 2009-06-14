@@ -186,6 +186,7 @@ source "fs/romfs/Kconfig"
 source "fs/sysv/Kconfig"
 source "fs/ufs/Kconfig"
 source "fs/exofs/Kconfig"
+source "fs/aufs/Kconfig"
 
 config NILFS2_FS
 	tristate "NILFS2 file system support (EXPERIMENTAL)"
