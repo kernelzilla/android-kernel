@@ -214,7 +214,6 @@ config NILFS2_FS
 	  To compile this file system support as a module, choose M here: the
 	  module will be called nilfs2.  If unsure, say N.
 
-source "fs/aufs/Kconfig"
 endif # MISC_FILESYSTEMS
 
 menuconfig NETWORK_FILESYSTEMS
