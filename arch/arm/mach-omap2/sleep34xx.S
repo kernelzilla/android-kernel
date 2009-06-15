@@ -661,37 +661,37 @@ skip_l2_inval:
 
 /* Make sure SDRC accesses are ok */
 wait_sdrc_ok:
-        ldr     r4, cm_idlest1_core
-        ldr     r5, [r4]
-        and     r5, r5, #0x2
-        cmp     r5, #0
-        bne     wait_sdrc_ok
-        ldr     r4, sdrc_power
-        ldr     r5, [r4]
-        bic     r5, r5, #0x40
-        str     r5, [r4]
+	ldr	r4, cm_idlest1_core
+	ldr	r5, [r4]
+	and	r5, r5, #0x2
+	cmp	r5, #0
+	bne	wait_sdrc_ok
+	ldr	r4, sdrc_power
+	ldr	r5, [r4]
+	bic	r5, r5, #0x40
+	str	r5, [r4]
 is_dll_in_lock_mode:
-        ldr     r4, sdrc_dlla_ctrl
-        ldr     r5, [r4]
-        tst     r5, #0x4
-        bxne    lr
-        /* wait till dll locks */
+	ldr	r4, sdrc_dlla_ctrl
+	ldr	r5, [r4]
+	tst	r5, #0x4
+	bxne	lr
+	/* wait till dll locks */
 wait_dll_lock_timed:
-        ldr     r4, sdrc_dlla_status
-        mov     r6, #0x2000
+	ldr	r4, sdrc_dlla_status
+	mov	r6, #0x2000
 wait_dll_lock:
-        subs    r6, r6, #0x1
-        beq     kick_dll
-        ldr     r5, [r4]
-        and     r5, r5, #0x4
-        cmp     r5, #0x4
-        bne     wait_dll_lock
-        bx      lr
+	subs	r6, r6, #0x1
+	beq	kick_dll
+	ldr	r5, [r4]
+	and	r5, r5, #0x4
+	cmp	r5, #0x4
+	bne	wait_dll_lock
+	bx	lr
 
-        /* Kick DLL state machine if lock not started */
+	/* Kick DLL state machine if lock not started */
 kick_dll:
-	ldr     r4, sdrc_dlla_ctrl	/* get dlla addr */
-	ldr     r5, [r4]		/* grab value */
+	ldr	r4, sdrc_dlla_ctrl	/* get dlla addr */
+	ldr	r5, [r4]		/* grab value */
 	mov	r6, r5			/* save value */
 	orr	r6, r6, #0x10		/* dllidle on */
 	str	r6, [r4]
