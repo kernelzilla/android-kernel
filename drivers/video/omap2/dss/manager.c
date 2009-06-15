@@ -101,7 +101,7 @@ put_device:
 static ssize_t manager_default_color_show(struct omap_overlay_manager *mgr,
 					  char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d", mgr->info.default_color);
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.default_color);
 }
 
 static ssize_t manager_default_color_store(struct omap_overlay_manager *mgr,
