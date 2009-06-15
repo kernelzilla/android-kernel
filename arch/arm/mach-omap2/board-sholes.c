@@ -514,6 +514,7 @@ static struct omap2_hdq_platform_config sholes_hdq_data = {
 
 static int __init omap_hdq_init(void)
 {
+	omap_cfg_reg(J25_34XX_HDQ_SIO);
 	omap_hdq_device.dev.platform_data = &sholes_hdq_data;
 	return platform_device_register(&omap_hdq_device);
 }
