@@ -23,7 +23,6 @@
 #include <linux/i2c/twl4030.h>
 #include <linux/regulator/machine.h>
 #include <linux/io.h>
-#include <linux/interrupt.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
@@ -180,7 +179,6 @@ static void ads7846_dev_init(void)
 
 	omap_set_gpio_debounce(ts_gpio, 1);
 	omap_set_gpio_debounce_time(ts_gpio, 0xa);
-	enable_irq_wake(gpio_to_irq(ts_gpio));
 }
 
 static int ads7846_get_pendown_state(void)
