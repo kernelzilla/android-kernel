@@ -948,11 +948,11 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Suspending\n", __func__);
-	disable_irq(ts->client->irq);
+	disable_irq_nosync(ts->client->irq);
 	ret = cancel_work_sync(&ts->work);
 	if (ret)
 		enable_irq(ts->client->irq);
-	qtouch_power_config(ts, 0);
+	/* qtouch_power_config(ts, 0); */
 
 	return 0;
 }
@@ -963,7 +963,7 @@ static int qtouch_ts_resume(struct i2c_client *client)
 
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Resuming\n", __func__);
-	qtouch_power_config(ts, 1);
+	/* qtouch_power_config(ts, 1); */
 	enable_irq(ts->client->irq);
 
 	return 0;
