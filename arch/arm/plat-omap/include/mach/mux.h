@@ -907,6 +907,9 @@ enum omap34xx_index {
 	W21_OMAP34XX_MCBSP3_CLKX,
 	U21_OMAP34XX_MCBSP3_DR,
 	V21_OMAP34XX_MCBSP3_DX,
+
+	/* HDQ */
+	J25_34XX_HDQ_SIO,
 };
 
 struct omap_mux_cfg {
