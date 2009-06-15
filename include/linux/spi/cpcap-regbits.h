@@ -438,6 +438,89 @@
 #define CPCAP_BIT_VUSB_MODE0		0x00000004
 #define CPCAP_BIT_SPARE_411_1		0x00000002
 #define CPCAP_BIT_VBUS_SWITCH		0x00000001
+/*
+ * Register 512 - Audio Regulator and Bias Voltage
+ */
+
+#define CPCAP_BIT_AUDIO_LOW_PWR           0x00000040
+#define CPCAP_BIT_AUD_LOWPWR_SPEED        0x00000020
+#define CPCAP_BIT_VAUDIOPRISTBY           0x00000010
+#define CPCAP_BIT_VAUDIO_MODE1            0x00000004
+#define CPCAP_BIT_VAUDIO_MODE0            0x00000002
+#define CPCAP_BIT_V_AUDIO_EN              0x00000001
+
+/*
+ * Register 513 CODEC
+ */
+
+#define CPCAP_BIT_CDC_CLK2                0x00008000
+#define CPCAP_BIT_CDC_CLK1                0x00004000
+#define CPCAP_BIT_CDC_CLK0                0x00002000
+#define CPCAP_BIT_CDC_SR3                 0x00001000
+#define CPCAP_BIT_CDC_SR2                 0x00000800
+#define CPCAP_BIT_CDC_SR1                 0x00000400
+#define CPCAP_BIT_CDC_SR0                 0x00000200
+#define CPCAP_BIT_CDC_CLOCK_TREE_RESET    0x00000100
+#define CPCAP_BIT_MIC2_CDC_EN             0x00000080
+#define CPCAP_BIT_CDC_EN_RX               0x00000040
+#define CPCAP_BIT_DF_RESET                0x00000020
+#define CPCAP_BIT_MIC1_CDC_EN             0x00000010
+
+/*
+ * Register 514 CODEC Digital Audio Interface
+ */
+
+#define CPCAP_BIT_CDC_PLL_SEL             0x00008000
+#define CPCAP_BIT_CLK_IN_SEL              0x00002000
+#define CPCAP_BIT_DIG_AUD_IN              0x00001000
+#define CPCAP_BIT_CDC_CLK_EN              0x00000800
+#define CPCAP_BIT_CDC_DIG_AUD_FS1         0x00000400
+#define CPCAP_BIT_CDC_DIG_AUD_FS0         0x00000200
+#define CPCAP_BIT_MIC2_TIMESLOT2          0x00000100
+#define CPCAP_BIT_MIC2_TIMESLOT1          0x00000080
+#define CPCAP_BIT_MIC2_TIMESLOT0          0x00000040
+#define CPCAP_BIT_MIC1_RX_TIMESLOT2       0x00000020
+#define CPCAP_BIT_MIC1_RX_TIMESLOT1       0x00000010
+#define CPCAP_BIT_MIC1_RX_TIMESLOT0       0x00000008
+#define CPCAP_BIT_FS_INV                  0x00000004
+#define CPCAP_BIT_CLK_INV                 0x00000002
+#define CPCAP_BIT_SMB_CDC                 0x00000001
+
+/*
+ * Register 515 Stereo DAC
+ */
+
+#define CPCAP_BIT_FSYNC_CLK_IN_COMMON     0x00000800
+#define CPCAP_BIT_SLAVE_PLL_CLK_INPUT     0x00000400
+#define CPCAP_BIT_ST_CLOCK_TREE_RESET     0x00000200
+#define CPCAP_BIT_DF_RESET_ST_DAC         0x00000100
+#define CPCAP_BIT_ST_SR3                  0x00000080
+#define CPCAP_BIT_ST_SR2                  0x00000040
+#define CPCAP_BIT_ST_SR1                  0x00000020
+#define CPCAP_BIT_ST_SR0                  0x00000010
+#define CPCAP_BIT_ST_DAC_CLK2             0x00000008
+#define CPCAP_BIT_ST_DAC_CLK1             0x00000004
+#define CPCAP_BIT_ST_DAC_CLK0             0x00000002
+#define CPCAP_BIT_ST_DAC_EN               0x00000001
+
+/*
+ * Register 516 Stereo DAC Digital Audio Interface
+ */
+
+#define CPCAP_BIT_ST_L_TIMESLOT2          0x00002000
+#define CPCAP_BIT_ST_L_TIMESLOT1          0x00001000
+#define CPCAP_BIT_ST_L_TIMESLOT0          0x00000800
+#define CPCAP_BIT_ST_R_TIMESLOT2          0x00000400
+#define CPCAP_BIT_ST_R_TIMESLOT1          0x00000200
+#define CPCAP_BIT_ST_R_TIMESLOT0          0x00000100
+#define CPCAP_BIT_ST_DAC_CLK_IN_SEL       0x00000080
+#define CPCAP_BIT_ST_FS_INV               0x00000040
+#define CPCAP_BIT_ST_CLK_INV              0x00000020
+#define CPCAP_BIT_ST_DIG_AUD_FS1          0x00000010
+#define CPCAP_BIT_ST_DIG_AUD_FS0          0x00000008
+#define CPCAP_BIT_DIG_AUD_IN_ST_DAC       0x00000004
+#define CPCAP_BIT_ST_CLK_EN               0x00000002
+#define CPCAP_BIT_SMB_ST_DAC              0x00000001
 
 /*
  * Register 517 - CPCAP_REG_TXI bits
@@ -460,6 +543,22 @@
 #define CPCAP_BIT_DLM			0x00000001
 
 /*
+ * Register 518 MIC PGA's
+ */
+#define CPCAP_BIT_MB_BIAS_R1              0x00000800
+#define CPCAP_BIT_MB_BIAS_R0              0x00000400
+#define CPCAP_BIT_MIC2_GAIN_4             0x00000200
+#define CPCAP_BIT_MIC2_GAIN_3             0x00000100
+#define CPCAP_BIT_MIC2_GAIN_2             0x00000080
+#define CPCAP_BIT_MIC2_GAIN_1             0x00000040
+#define CPCAP_BIT_MIC2_GAIN_0             0x00000020
+#define CPCAP_BIT_MIC1_GAIN_4             0x00000010
+#define CPCAP_BIT_MIC1_GAIN_3             0x00000008
+#define CPCAP_BIT_MIC1_GAIN_2             0x00000004
+#define CPCAP_BIT_MIC1_GAIN_1             0x00000002
+#define CPCAP_BIT_MIC1_GAIN_0             0x00000001
+
+/*
  * Register 519 - CPCAP_REG_RXOA bits
  */
 #define CPCAP_BIT_UNUSED_519_15		0x00008000
@@ -478,6 +577,77 @@
 #define CPCAP_BIT_A2_LDSP_L_EN		0x00000004
 #define CPCAP_BIT_A2_LDSP_R_EN		0x00000002
 #define CPCAP_BIT_A1_EAR_EN		0x00000001
+
+/*
+ * Register 520 RX Volume Control
+ */
+#define CPCAP_BIT_VOL_EXT3                0x00008000
+#define CPCAP_BIT_VOL_EXT2                0x00004000
+#define CPCAP_BIT_VOL_EXT1                0x00002000
+#define CPCAP_BIT_VOL_EXT0                0x00001000
+#define CPCAP_BIT_VOL_DAC3                0x00000800
+#define CPCAP_BIT_VOL_DAC2                0x00000400
+#define CPCAP_BIT_VOL_DAC1                0x00000200
+#define CPCAP_BIT_VOL_DAC0                0x00000100
+#define CPCAP_BIT_VOL_DAC_LSB_1dB1        0x00000080
+#define CPCAP_BIT_VOL_DAC_LSB_1dB0        0x00000040
+#define CPCAP_BIT_VOL_CDC3                0x00000020
+#define CPCAP_BIT_VOL_CDC2                0x00000010
+#define CPCAP_BIT_VOL_CDC1                0x00000008
+#define CPCAP_BIT_VOL_CDC0                0x00000004
+#define CPCAP_BIT_VOL_CDC_LSB_1dB1        0x00000002
+#define CPCAP_BIT_VOL_CDC_LSB_1dB0        0x00000001
+
+/*
+ * Register 521 Codec to Output Amp Switches
+ */
+#define CPCAP_BIT_PGA_CDC_EN              0x00000400
+#define CPCAP_BIT_CDC_SW                  0x00000200
+#define CPCAP_BIT_PGA_OUTR_USBDP_CDC_SW   0x00000100
+#define CPCAP_BIT_PGA_OUTL_USBDN_CDC_SW   0x00000080
+#define CPCAP_BIT_ALEFT_HS_CDC_SW         0x00000040
+#define CPCAP_BIT_ARIGHT_HS_CDC_SW        0x00000020
+#define CPCAP_BIT_A4_LINEOUT_L_CDC_SW     0x00000010
+#define CPCAP_BIT_A4_LINEOUT_R_CDC_SW     0x00000008
+#define CPCAP_BIT_A2_LDSP_L_CDC_SW        0x00000004
+#define CPCAP_BIT_A2_LDSP_R_CDC_SW        0x00000002
+#define CPCAP_BIT_A1_EAR_CDC_SW           0x00000001
+
+/*
+ * Register 522 RX Stereo DAC to Output Amp Switches
+ */
+#define CPCAP_BIT_PGA_DAC_EN              0x00001000
+#define CPCAP_BIT_ST_DAC_SW               0x00000800
+#define CPCAP_BIT_MONO_DAC1               0x00000400
+#define CPCAP_BIT_MONO_DAC0               0x00000200
+#define CPCAP_BIT_PGA_OUTR_USBDP_DAC_SW   0x00000100
+#define CPCAP_BIT_PGA_OUTL_USBDN_DAC_SW   0x00000080
+#define CPCAP_BIT_ALEFT_HS_DAC_SW         0x00000040
+#define CPCAP_BIT_ARIGHT_HS_DAC_SW        0x00000020
+#define CPCAP_BIT_A4_LINEOUT_L_DAC_SW     0x00000010
+#define CPCAP_BIT_A4_LINEOUT_R_DAC_SW     0x00000008
+#define CPCAP_BIT_A2_LDSP_L_DAC_SW        0x00000004
+#define CPCAP_BIT_A2_LDSP_R_DAC_SW        0x00000002
+#define CPCAP_BIT_A1_EAR_DAC_SW           0x00000001
+
+/*
+ * Register 523 RX External PGA to Output Amp Switches
+ */
+#define CPCAP_BIT_PGA_EXT_L_EN            0x00004000
+#define CPCAP_BIT_PGA_EXT_R_EN            0x00002000
+#define CPCAP_BIT_PGA_IN_L_SW             0x00001000
+#define CPCAP_BIT_PGA_IN_R_SW             0x00000800
+#define CPCAP_BIT_MONO_EXT1               0x00000400
+#define CPCAP_BIT_MONO_EXT0               0x00000200
+#define CPCAP_BIT_PGA_OUTR_USBDP_EXT_SW   0x00000100
+#define CPCAP_BIT_PGA_OUTL_USBDN_EXT_SW   0x00000080
+#define CPCAP_BIT_ALEFT_HS_EXT_SW         0x00000040
+#define CPCAP_BIT_ARIGHT_HS_EXT_SW        0x00000020
+#define CPCAP_BIT_A4_LINEOUT_L_EXT_SW     0x00000010
+#define CPCAP_BIT_A4_LINEOUT_R_EXT_SW     0x00000008
+#define CPCAP_BIT_A2_LDSP_L_EXT_SW        0x00000004
+#define CPCAP_BIT_A2_LDSP_R_EXT_SW        0x00000002
+#define CPCAP_BIT_A1_EAR_EXT_SW           0x00000001
 
 /*
  * Register 641 - CPCAP_REG_CHRGR_1 bits

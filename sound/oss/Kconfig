@@ -567,3 +567,9 @@ config SOUND_SH_DAC_AUDIO_CHANNEL
 	int "DAC channel"
 	default "1"
 	depends on SOUND_SH_DAC_AUDIO
+
+config SOUND_CPCAP_OMAP
+	bool "Audio driver for OMAP3430 with CPCAP"
+	default n
+	help
+	Audio driver for products using OMAP3430 and CPCAP.
