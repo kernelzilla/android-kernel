@@ -670,19 +670,37 @@ wait_sdrc_ok:
         ldr     r5, [r4]
         bic     r5, r5, #0x40
         str     r5, [r4]
-wait_dll_lock:
-        /* Is dll in lock mode? */
+is_dll_in_lock_mode:
         ldr     r4, sdrc_dlla_ctrl
         ldr     r5, [r4]
         tst     r5, #0x4
         bxne    lr
         /* wait till dll locks */
+wait_dll_lock_timed:
         ldr     r4, sdrc_dlla_status
+        mov     r6, #0x2000
+wait_dll_lock:
+        subs    r6, r6, #0x1
+        beq     kick_dll
         ldr     r5, [r4]
         and     r5, r5, #0x4
         cmp     r5, #0x4
         bne     wait_dll_lock
         bx      lr
+
+        /* Kick DLL state machine if lock not started */
+kick_dll:
+	ldr     r4, sdrc_dlla_ctrl	/* get dlla addr */
+	ldr     r5, [r4]		/* grab value */
+	mov	r6, r5			/* save value */
+	orr	r6, r6, #0x10		/* dllidle on */
+	str	r6, [r4]
+	dsb
+	bic	r6, #0x10		/* dllidle off */
+	str	r6, [r4]
+	dsb
+	str	r6, [r4]		/* restore old value */
+	b wait_dll_lock_timed
 
 cm_idlest1_core:
 	.word	CM_IDLEST1_CORE_V
