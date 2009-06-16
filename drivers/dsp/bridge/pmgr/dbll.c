@@ -1313,6 +1313,7 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
 	s32 req = -1;
 	s32 count = 0;
 	u32 allocSize = 0;
+	u32 runAddrFlag = 0;
 
 	DBC_Require(this != NULL);
 	lib = pAlloc->lib;
@@ -1357,10 +1358,9 @@ static int rmmAlloc(struct Dynamic_Loader_Allocate *this,
                        if (strcmp(szSecLastToken, "DYN_SARAM") == 0) {
 				segId = 1;
 			} else {
-                               if (strcmp(szSecLastToken,
-				   "DYN_EXTERNAL") == 0) {
+				if (strcmp(szSecLastToken,
+				   "DYN_EXTERNAL") == 0)
 					segId = 2;
-				}
 			}
 		}
 		if (segId != -1) {
@@ -1381,6 +1381,11 @@ func_cont:
 		allocSize = info->size + GEM_L1P_PREFETCH_SIZE;
 	else
 		allocSize = info->size;
+	GT_2trace(DBLL_debugMask, GT_5CLASS,
+			 "Beg info->run_addr = 0x%x, info->load_addr= 0x%x\n",
+			 info->run_addr, info->load_addr);
+	if (info->load_addr != info->run_addr)
+		runAddrFlag = 1;
 	/* TODO - ideally, we can pass the alignment requirement also
 	 * from here */
 	if (lib != NULL) {
@@ -1393,12 +1398,16 @@ func_cont:
 	} else {
 		/* RMM gives word address. Need to convert to byte address */
 		info->load_addr = rmmAddr.addr * DSPWORDSIZE;
-		info->run_addr = info->load_addr;
+		if (!runAddrFlag)
+			info->run_addr = info->load_addr;
 		info->context = (u32)rmmAddr.segid;
 		GT_3trace(DBLL_debugMask, GT_5CLASS,
 			 "Remote alloc: %s  base = 0x%lx len"
 			 "= 0x%lx\n", info->name, info->load_addr / DSPWORDSIZE,
 			 info->size / DSPWORDSIZE);
+		GT_2trace(DBLL_debugMask, GT_5CLASS,
+			 "info->run_addr = 0x%x, info->load_addr= 0x%x\n",
+			 info->run_addr, info->load_addr);
 	}
 	return retVal;
 }
