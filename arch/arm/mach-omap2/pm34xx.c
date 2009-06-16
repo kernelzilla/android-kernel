@@ -89,14 +89,14 @@ static struct prm_setup_vc prm_setup = {
 	.voltsetup_time2 = 0xfff,
 	.voltoffset = 0xff,
 	.voltsetup2 = 0xff,
-	.vdd0_on = 0x30,
-	.vdd0_onlp = 0x1e,
-	.vdd0_ret = 0x1e,
-	.vdd0_off = 0x30,
-	.vdd1_on = 0x2c,
-	.vdd1_onlp = 0x1e,
-	.vdd1_ret = 0x1e,
-	.vdd1_off = 0x2c,
+	.vdd0_on = 0x30,	/* 1.2v */
+	.vdd0_onlp = 0x20,	/* 1.0v */
+	.vdd0_ret = 0x1e,	/* 0.975v */
+	.vdd0_off = 0x00,	/* 0.6v */
+	.vdd1_on = 0x2c,	/* 1.15v */
+	.vdd1_onlp = 0x20,	/* 1.0v */
+	.vdd1_ret = 0x1e,	/* .975v */
+	.vdd1_off = 0x00,	/* 0.6v */
 };
 
 static inline void omap3_per_save_context(void)
