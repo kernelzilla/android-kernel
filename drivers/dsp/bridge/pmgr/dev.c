@@ -130,7 +130,6 @@
 #include <dspbridge/ldr.h>
 #include <dspbridge/list.h>
 #include <dspbridge/mem.h>
-#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/cod.h>

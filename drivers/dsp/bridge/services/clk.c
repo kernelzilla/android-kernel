@@ -50,8 +50,6 @@
 
 /*  ----------------------------------- This */
 #include <dspbridge/clk.h>
-#include <dspbridge/util.h>
-
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 

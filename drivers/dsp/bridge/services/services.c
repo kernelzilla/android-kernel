@@ -54,7 +54,6 @@
 #include <dspbridge/reg.h>
 #include <dspbridge/sync.h>
 #include <dspbridge/clk.h>
-#include <dspbridge/util.h>
 
 /*  ----------------------------------- This */
 #include <dspbridge/services.h>
@@ -83,7 +82,6 @@ void SERVICES_Exit(void)
 	if (cRefs == 0) {
 		/* Uninitialize all SERVICES modules here */
 		NTFY_Exit();
-		UTIL_Exit();
 		SYNC_Exit();
 		CLK_Exit();
 		REG_Exit();
@@ -109,8 +107,8 @@ void SERVICES_Exit(void)
 bool SERVICES_Init(void)
 {
 	bool fInit = true;
-       bool fCFG, fCSL, fDBG, fDPC, fKFILE, fLST, fMEM;
-       bool fREG, fSYNC, fCLK, fUTIL, fNTFY;
+	bool fCFG, fCSL, fDBG, fDPC, fKFILE, fLST, fMEM;
+	bool fREG, fSYNC, fCLK, fNTFY;
 
 	DBC_Require(cRefs >= 0);
 
@@ -131,21 +129,16 @@ bool SERVICES_Init(void)
 		fDPC = DPC_Init();
 		fKFILE = KFILE_Init();
 		fLST = LST_Init();
-		/* fREG = REG_Init(); */
 		fSYNC = SYNC_Init();
 		fCLK  = CLK_Init();
-		fUTIL = UTIL_Init();
 		fNTFY = NTFY_Init();
 
-               fInit = fCFG && fCSL && fDBG && fDPC && fKFILE &&
-                       fLST && fMEM && fREG && fSYNC && fCLK && fUTIL;
+		fInit = fCFG && fCSL && fDBG && fDPC && fKFILE &&
+			fLST && fMEM && fREG && fSYNC && fCLK;
 
 		if (!fInit) {
 			if (fNTFY)
 				NTFY_Exit();
-
-			if (fUTIL)
-				UTIL_Exit();
 
 			if (fSYNC)
 				SYNC_Exit();

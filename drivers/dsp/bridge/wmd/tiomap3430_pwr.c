@@ -42,7 +42,6 @@
 
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/mem.h>
-#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/brddefs.h>

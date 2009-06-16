@@ -108,7 +108,6 @@
 #include <dspbridge/mem.h>
 #include <dspbridge/ntfy.h>
 #include <dspbridge/services.h>
-#include <dspbridge/util.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/chnl.h>

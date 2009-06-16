@@ -107,7 +107,7 @@
 #include <dspbridge/list.h>
 #include <dspbridge/mem.h>
 #include <dspbridge/sync.h>
-#include <dspbridge/util.h>
+#include <dspbridge/utildefs.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/dev.h>
