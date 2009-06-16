@@ -44,8 +44,6 @@
 #include "sdram-qimonda-hyb18m512160af-6.h"
 #include "mmc-twl4030.h"
 
-#define CONFIG_DISABLE_HFCLK 1
-
 #define SDP3430_TS_GPIO_IRQ_SDPV1	3
 #define SDP3430_TS_GPIO_IRQ_SDPV2	2
 
@@ -280,18 +278,14 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
 
 
 static struct twl4030_ins __initdata sleep_on_seq[] = {
-/*
- * Turn off VDD1 and VDD2.
- */
-	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_OFF), 4},
+	/* Turn off HFCLKOUT */
+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_OFF), 2},
+	/* Turn OFF VDD1 */
+	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_OFF), 2},
+	/* Turn OFF VDD2 */
 	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_OFF), 2},
-#ifdef CONFIG_DISABLE_HFCLK
-/*
- * And also turn off the OMAP3 PLLs and the sysclk output.
- */
-	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_OFF), 3},
-	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_OFF), 3},
-#endif
+	/* Turn OFF VPLL1 */
+	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_OFF), 2},
 };
 
 static struct twl4030_script sleep_on_script __initdata = {
@@ -300,30 +294,31 @@ static struct twl4030_script sleep_on_script __initdata = {
 	.flags	= TWL4030_SLEEP_SCRIPT,
 };
 
-static struct twl4030_ins wakeup_seq[] __initdata = {
-#ifndef CONFIG_DISABLE_HFCLK
-/*
- * Wakeup VDD1 and VDD2.
- */
-	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_ACTIVE), 4},
+static struct twl4030_ins wakeup_p12_seq[] __initdata = {
+	/* Turn on HFCLKOUT */
+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
+	/* Turn ON VDD1 */
+	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_ACTIVE), 2},
+	/* Turn ON VDD2 */
 	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_ACTIVE), 2},
-#else
-/*
- * Reenable the OMAP3 PLLs.
- * Wakeup VDD1 and VDD2.
- * Reenable sysclk output.
- */
-	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_ACTIVE), 0x30},
-	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_ACTIVE), 0x30},
-	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_ACTIVE), 0x37},
-	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 3},
-#endif /* #ifndef CONFIG_DISABLE_HFCLK */
+	/* Turn ON VPLL1 */
+	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_ACTIVE), 2},
 };
 
-static struct twl4030_script wakeup_script __initdata = {
-	.script	= wakeup_seq,
-	.size	= ARRAY_SIZE(wakeup_seq),
-	.flags	= TWL4030_WAKEUP12_SCRIPT | TWL4030_WAKEUP3_SCRIPT,
+static struct twl4030_script wakeup_p12_script __initdata = {
+	.script	= wakeup_p12_seq,
+	.size	= ARRAY_SIZE(wakeup_p12_seq),
+	.flags	= TWL4030_WAKEUP12_SCRIPT,
+};
+
+static struct twl4030_ins wakeup_p3_seq[] __initdata = {
+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
+};
+
+static struct twl4030_script wakeup_p3_script __initdata = {
+	.script = wakeup_p3_seq,
+	.size   = ARRAY_SIZE(wakeup_p3_seq),
+	.flags  = TWL4030_WAKEUP3_SCRIPT,
 };
 
 static struct twl4030_ins wrst_seq[] __initdata = {
@@ -344,19 +339,31 @@ static struct twl4030_ins wrst_seq[] __initdata = {
 };
 static struct twl4030_script wrst_script __initdata = {
 	.script = wrst_seq,
-	.size   = ARRAY_SIZE(wakeup_seq),
+	.size   = ARRAY_SIZE(wrst_seq),
 	.flags  = TWL4030_WRST_SCRIPT,
 };
 
 static struct twl4030_script *twl4030_scripts[] __initdata = {
 	&sleep_on_script,
-	&wakeup_script,
+	&wakeup_p12_script,
+	&wakeup_p3_script,
 	&wrst_script,
+};
+
+static struct twl4030_resconfig twl4030_rconfig[] = {
+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
+		.type2 = -1 },
+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
+		.type2 = -1 },
+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
+		.type2 = -1 },
+	{ 0, 0},
 };
 
 static struct twl4030_power_data sdp3430_t2scripts_data __initdata = {
 	.scripts	= twl4030_scripts,
 	.num		= ARRAY_SIZE(twl4030_scripts),
+	.resource_config = twl4030_rconfig,
 };
 
 /*
