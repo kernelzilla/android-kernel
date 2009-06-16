@@ -3,6 +3,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <linux/bitops.h>
+#include <linux/mutex.h>
 
 #include <mach/io.h>
 #include <mach/vrfb.h>
@@ -41,6 +42,8 @@
 static unsigned long ctx_map;
 /* bitmap of contexts for which we have to keep the HW context valid */
 static unsigned long ctx_map_active;
+
+static DEFINE_MUTEX(ctx_lock);
 
 /*
  * Access to this happens from client drivers or the PM core after wake-up.
@@ -171,6 +174,8 @@ void omap_vrfb_release_ctx(struct vrfb *vrfb)
 
 	DBG("release ctx %d\n", ctx);
 
+	mutex_lock(&ctx_lock);
+
 	if (!(ctx_map & (1 << ctx))) {
 		BUG();
 		return;
@@ -186,6 +191,8 @@ void omap_vrfb_release_ctx(struct vrfb *vrfb)
 	}
 
 	vrfb->context = 0xff;
+
+	mutex_unlock(&ctx_lock);
 }
 EXPORT_SYMBOL(omap_vrfb_release_ctx);
 
@@ -194,8 +201,11 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 	int rot;
 	u32 paddr;
 	u8 ctx;
+	int r;
 
 	DBG("request ctx\n");
+
+	mutex_lock(&ctx_lock);
 
 	for (ctx = 0; ctx < VRFB_NUM_CTXS; ++ctx)
 		if ((ctx_map & (1 << ctx)) == 0)
@@ -203,7 +213,8 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 
 	if (ctx == VRFB_NUM_CTXS) {
 		printk(KERN_ERR "vrfb: no free contexts\n");
-		return -EBUSY;
+		r = -EBUSY;
+		goto out;
 	}
 
 	DBG("found free ctx %d\n", ctx);
@@ -223,7 +234,8 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 					"area for ctx %d, rotation %d\n",
 					ctx, rot * 90);
 			omap_vrfb_release_ctx(vrfb);
-			return -ENOMEM;
+			r = -ENOMEM;
+			goto out;
 		}
 
 		vrfb->paddr[rot] = paddr;
@@ -231,25 +243,31 @@ int omap_vrfb_request_ctx(struct vrfb *vrfb)
 		DBG("VRFB %d/%d: %lx\n", ctx, rot*90, vrfb->paddr[rot]);
 	}
 
-	return 0;
+	r = 0;
+out:
+	mutex_unlock(&ctx_lock);
+	return r;
 }
 EXPORT_SYMBOL(omap_vrfb_request_ctx);
 
 void omap_vrfb_suspend_ctx(struct vrfb *vrfb)
 {
 	DBG("suspend ctx %d\n", vrfb->context);
+	mutex_lock(&ctx_lock);
 	if (vrfb->context >= VRFB_NUM_CTXS ||
 	    (!(1 << vrfb->context) & ctx_map_active)) {
 		BUG();
 		return;
 	}
 	clear_bit(vrfb->context, &ctx_map_active);
+	mutex_unlock(&ctx_lock);
 }
 EXPORT_SYMBOL(omap_vrfb_suspend_ctx);
 
 void omap_vrfb_resume_ctx(struct vrfb *vrfb)
 {
 	DBG("resume ctx %d\n", vrfb->context);
+	mutex_lock(&ctx_lock);
 	if (vrfb->context >= VRFB_NUM_CTXS ||
 	    ((1 << vrfb->context) & ctx_map_active)) {
 		BUG();
@@ -263,6 +281,7 @@ void omap_vrfb_resume_ctx(struct vrfb *vrfb)
 	 */
 	restore_hw_context(vrfb->context);
 	set_bit(vrfb->context, &ctx_map_active);
+	mutex_unlock(&ctx_lock);
 }
 EXPORT_SYMBOL(omap_vrfb_resume_ctx);
 
