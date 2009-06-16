@@ -1,10 +1,10 @@
-obj-y += io.o idle.o irq.o timer.o dma.o memory.o
+obj-y += io.o irq.o timer.o dma.o memory.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += sirc.o
 obj-y += devices.o
 obj-y += proc_comm.o
 obj-y += vreg.o
-obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock-arm11.o
-obj-$(CONFIG_ARCH_MSM_SCORPION) += acpuclock-scorpion.o
+obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock-arm11.o idle.o
+obj-$(CONFIG_ARCH_MSM_SCORPION) += acpuclock-scorpion.o idle-v7.o
 obj-y += clock.o
 obj-y += gpio.o generic_gpio.o
 obj-y += nand_partitions.o
