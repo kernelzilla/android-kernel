@@ -2,6 +2,7 @@
  * include/linux/qtouch_obp_ts.h - platform/protocol data for Quantum touch IC
  *
  * Copyright (C) 2009 Google, Inc.
+  * Copyright (C) 2009 Motorola, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -43,9 +44,10 @@ enum {
 	QTM_OBJ_PROCG_SIG_FILTER	= 16,
 	QTM_OBJ_PROCI_LINEAR_TBL	= 17,
 	QTM_OBJ_PROCI_GESTURES_PROC	= 18,
+	QTM_OBJ_PROCI_GRIPFACESUPPRESSION = 20,
 
 	/* Max number of objects currently defined */
-	QTM_OBP_MAX_OBJECT_NUM		= QTM_OBJ_PROCI_GESTURES_PROC + 1,
+	QTM_OBP_MAX_OBJECT_NUM = QTM_OBJ_PROCI_GRIPFACESUPPRESSION + 1,
 };
 
 /* OBP structures as defined by the wire protocol. */
@@ -219,6 +221,20 @@ struct qtm_proci_linear_tbl_cfg {
 	uint8_t			y_segment[16];
 } __attribute__ ((packed));
 
+/* PROCI_GRIPFACESUPPRESSION_T20 */
+struct qtm_proci_grip_suppression_cfg {
+	uint8_t			ctrl;
+	uint8_t			xlogrip;
+	uint8_t			xhigrip;
+	uint8_t			ylogrip;
+	uint8_t			yhigrip;
+	uint8_t			maxtchs;
+	uint8_t			reserve0;
+	uint8_t			szthr1;
+	uint8_t			szthr2;
+	uint8_t			shpthr1;
+	uint8_t			shpthr2;
+} __attribute__ ((packed));
 
 
 /*******************************/
@@ -288,6 +304,8 @@ struct qtouch_ts_platform_data {
 	struct qtm_touch_multi_cfg		multi_touch_cfg;
 	struct qtm_procg_sig_filter_cfg		sig_filter_cfg;
 	struct qtm_proci_linear_tbl_cfg		linear_tbl_cfg;
+	struct qtm_proci_grip_suppression_cfg	grip_suppression_cfg;
 };
 
 #endif /* _LINUX_QTOUCH_OBP_TS_H */
+
