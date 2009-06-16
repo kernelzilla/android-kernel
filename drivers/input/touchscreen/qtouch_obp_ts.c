@@ -948,11 +948,18 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Suspending\n", __func__);
+
 	disable_irq_nosync(ts->client->irq);
 	ret = cancel_work_sync(&ts->work);
-	if (ret)
+	if (ret) {
+		pr_info("%s: Not Suspending\n", __func__);
 		enable_irq(ts->client->irq);
-	/* qtouch_power_config(ts, 0); */
+		return -EBUSY;
+	}
+
+	ret = qtouch_power_config(ts, 0);
+	if (ret < 0)
+		pr_err("%s: Cannot write power config\n", __func__);
 
 	return 0;
 }
@@ -960,12 +967,19 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 static int qtouch_ts_resume(struct i2c_client *client)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	int ret;
 
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Resuming\n", __func__);
-	/* qtouch_power_config(ts, 1); */
-	enable_irq(ts->client->irq);
 
+	ret = qtouch_power_config(ts, 1);
+	if (ret < 0) {
+		pr_err("%s: Cannot write power config\n", __func__);
+		return -EIO;
+	}
+	qtouch_force_reset(ts, 0);
+
+	enable_irq(ts->client->irq);
 	return 0;
 }
 
