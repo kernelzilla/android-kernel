@@ -21,10 +21,14 @@
 
 #define BU52014HFV_MODULE_NAME "bu52014hfv"
 
-struct bu52014hfv_platform_data {
-  u8 docked_north_gpio;
-  u8 docked_south_gpio;
-  u8 north_is_desk;
-};
+#ifdef __KERNEL__
 
-#endif  /* _LINUX_BU52014HFV_H__ */
+struct bu52014hfv_platform_data {
+	u8 docked_north_gpio;
+	u8 docked_south_gpio;
+	u8 north_is_desk;
+} __attribute__ ((packed));
+
+#endif /* __KERNEL__ */
+
+#endif /* _LINUX_BU52014HFV_H__ */
