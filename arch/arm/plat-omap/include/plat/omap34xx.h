@@ -81,6 +81,7 @@
 #define OMAP34XX_SR2_BASE	(L4_34XX_BASE + 0xCB000)
 
 #define OMAP34XX_MAILBOX_BASE	(L4_34XX_BASE + 0x94000)
+#define OMAP34XX_CAMERA_BASE            (L4_34XX_BASE + 0xBC000)
 
 /* VDD OPP identifiers */
 #define VDD1_OPP	0x1
