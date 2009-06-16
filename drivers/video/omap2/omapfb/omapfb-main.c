@@ -28,6 +28,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
+#include <linux/earlysuspend.h>
 
 #include <mach/display.h>
 #include <mach/vram.h>
@@ -1551,6 +1552,33 @@ err:
 	return r;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+struct suspend_info {
+	struct early_suspend early_suspend;
+	struct fb_info *fbi;
+};
+
+void suspend(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	omapfb_blank(FB_BLANK_POWERDOWN, info->fbi);
+}
+
+void resume(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	omapfb_blank(FB_BLANK_UNBLANK, info->fbi);
+}
+
+struct suspend_info suspend_info = {
+	.early_suspend.suspend = suspend,
+	.early_suspend.resume = resume,
+	.early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif
+
 /* initialize fb_info, var, fix to something sane based on the display */
 int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 {
@@ -1651,6 +1679,10 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	r = fb_alloc_cmap(&fbi->cmap, 256, 0);
 	if (r)
 		dev_err(fbdev->dev, "unable to allocate color map memory\n");
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	suspend_info.fbi = fbi;
+	register_early_suspend(&suspend_info.early_suspend);
+#endif
 
 err:
 	return r;
