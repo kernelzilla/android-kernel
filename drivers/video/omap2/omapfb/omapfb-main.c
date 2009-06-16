@@ -857,8 +857,6 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 
 	DBG("pan_display(%d)\n", ofbi->id);
 
-	omapfb_lock(fbdev);
-
 	if (var->xoffset != fbi->var.xoffset ||
 	    var->yoffset != fbi->var.yoffset) {
 		struct fb_var_screeninfo new_var;

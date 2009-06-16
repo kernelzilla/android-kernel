@@ -44,8 +44,6 @@ static int omapfb_setup_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 
 	DBG("omapfb_setup_plane\n");
 
-	omapfb_lock(fbdev);
-
 	if (ofbi->num_overlays != 1) {
 		r = -EINVAL;
 		goto out;
@@ -94,7 +92,6 @@ static int omapfb_setup_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 	}
 
 out:
-	omapfb_unlock(fbdev);
 	if (r)
 		dev_err(fbdev->dev, "setup_plane failed\n");
 	return r;
@@ -103,9 +100,6 @@ out:
 static int omapfb_query_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-
-	omapfb_lock(fbdev);
 
 	if (ofbi->num_overlays != 1) {
 		memset(pi, 0, sizeof(*pi));
@@ -125,8 +119,6 @@ static int omapfb_query_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 		pi->out_height = ovli->out_height;
 	}
 
-	omapfb_unlock(fbdev);
-
 	return 0;
 }
 
@@ -145,43 +137,32 @@ static int omapfb_setup_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 
 	rg = &ofbi->region;
 
-	omapfb_lock(fbdev);
-
 	for (i = 0; i < ofbi->num_overlays; i++) {
-		if (ofbi->overlays[i]->info.enabled) {
-			r = -EBUSY;
-			goto out;
-		}
+		if (ofbi->overlays[i]->info.enabled)
+			return -EBUSY;
 	}
 
 	if (rg->size != size || rg->type != mi->type) {
 		r = omapfb_realloc_fbmem(fbi, size, mi->type);
 		if (r) {
 			dev_err(fbdev->dev, "realloc fbmem failed\n");
-			goto out;
+			return r;
 		}
 	}
 
-	r = 0;
-out:
-	omapfb_unlock(fbdev);
-
-	return r;
+	return 0;
 }
 
 static int omapfb_query_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omapfb2_mem_region *rg;
 
 	rg = &ofbi->region;
 	memset(mi, 0, sizeof(*mi));
 
-	omapfb_lock(fbdev);
 	mi->size = rg->size;
 	mi->type = rg->type;
-	omapfb_unlock(fbdev);
 
 	return 0;
 }
@@ -189,8 +170,6 @@ static int omapfb_query_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 static int omapfb_update_window(struct fb_info *fbi,
 		u32 x, u32 y, u32 w, u32 h)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_dss_device *display = fb2display(fbi);
 	u16 dw, dh;
 
@@ -205,9 +184,7 @@ static int omapfb_update_window(struct fb_info *fbi,
 	if (x + w > dw || y + h > dh)
 		return -EINVAL;
 
-	omapfb_lock(fbdev);
 	display->update(display, x, y, w, h);
-	omapfb_unlock(fbdev);
 
 	return 0;
 }
@@ -215,8 +192,6 @@ static int omapfb_update_window(struct fb_info *fbi,
 static int omapfb_set_update_mode(struct fb_info *fbi,
 				   enum omapfb_update_mode mode)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode um;
 	int r;
@@ -241,9 +216,7 @@ static int omapfb_set_update_mode(struct fb_info *fbi,
 		return -EINVAL;
 	}
 
-	omapfb_lock(fbdev);
 	r = display->set_update_mode(display, um);
-	omapfb_unlock(fbdev);
 
 	return r;
 }
@@ -251,17 +224,13 @@ static int omapfb_set_update_mode(struct fb_info *fbi,
 static int omapfb_get_update_mode(struct fb_info *fbi,
 		enum omapfb_update_mode *mode)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode m;
 
 	if (!display || !display->get_update_mode)
 		return -EINVAL;
 
-	omapfb_lock(fbdev);
 	m = display->get_update_mode(display);
-	omapfb_unlock(fbdev);
 
 	switch (m) {
 	case OMAP_DSS_UPDATE_DISABLED:
@@ -396,8 +365,6 @@ static int omapfb_memory_read(struct fb_info *fbi,
 		struct omapfb_memory_read *mr)
 {
 	struct omap_dss_device *display = fb2display(fbi);
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	void *buf;
 	int r;
 
@@ -416,8 +383,6 @@ static int omapfb_memory_read(struct fb_info *fbi,
 		return -ENOMEM;
 	}
 
-	omapfb_lock(fbdev);
-
 	r = display->memory_read(display, buf, mr->buffer_size,
 			mr->x, mr->y, mr->w, mr->h);
 
@@ -427,8 +392,6 @@ static int omapfb_memory_read(struct fb_info *fbi,
 	}
 
 	vfree(buf);
-
-	omapfb_unlock(fbdev);
 
 	return r;
 }
@@ -509,9 +472,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		omapfb_lock(fbdev);
 		r = display->sync(display);
-		omapfb_unlock(fbdev);
 		break;
 
 	case OMAPFB_UPDATE_WINDOW_OLD:
