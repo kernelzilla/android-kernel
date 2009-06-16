@@ -16,18 +16,18 @@
  * 02111-1307, USA
  */
 
+
 #include <linux/errno.h>
 #include <linux/fs.h>
-#include <linux/irq.h>
+#include <linux/gpio.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
-#include <linux/kernel.h>
+#include <linux/irq.h>
 #include <linux/module.h>
+#include <linux/platform_device.h>
 #include <linux/workqueue.h>
-#include <linux/gpio.h>
-#include <linux/uaccess.h>
-#include <linux/sfh7743.h>
 
+#include <linux/sfh7743.h>
 
 struct sfh7743_data {
 	int enabled;
@@ -80,8 +80,11 @@ int sfh7743_input_open(struct input_dev *input)
 	mutex_lock(&info->lock);
 	if (info->regulator) {
 		reg_status = regulator_enable(info->regulator);
-		if (!reg_status)
+		if (!reg_status) {
+			pr_err("%s: regulator enable failed: %d\n",
+				__func__, reg_status);
 			info->enabled = SFH7743_ENABLED;
+		}
 	} else
 		info->enabled = SFH7743_ENABLED;
 
@@ -114,33 +117,32 @@ static int __devexit sfh7743_remove(struct platform_device *pdev)
 
 	info->enabled = SFH7743_DISABLED;
 
+	free_irq(info->irq, 0);
+
+	gpio_free(info->gpio_intr);
+
 	destroy_workqueue(info->working_queue);
 
-	if (info->irq != -1)
-		free_irq(info->irq, 0);
+	input_unregister_device(info->idev);
+	input_free_device(info->idev);
 
-	if (info->gpio_intr != -1)
-		gpio_free(info->gpio_intr);
-
-	if (info->idev) {
-		input_unregister_device(info->idev);
-		input_free_device(info->idev);
-	}
-
+	kfree(info);
 	return 0;
 }
 
 static int sfh7743_probe(struct platform_device *pdev)
 {
-	int error = 0;
 	struct sfh7743_platform_data *pdata = pdev->dev.platform_data;
 	struct sfh7743_data *info;
+	int error = -1;
+	int distance;
 
 	info = kmalloc(sizeof(struct sfh7743_data), GFP_KERNEL);
 	if (!info) {
-		pr_err("%s: Could not allocate space for module data",
-		       __func__);
-		return -ENOMEM;
+		error = -ENOMEM;
+		pr_err("%s: could not allocate space for module data: %d\n",
+		       __func__, error);
+		goto error_kmalloc_failed;
 	}
 
 	info->gpio_intr = pdata->gpio_prox_int;
@@ -149,10 +151,10 @@ static int sfh7743_probe(struct platform_device *pdev)
 	if (strcmp(pdata->regulator, SFH7743_NO_REGULATOR)) {
 		info->regulator = regulator_get(&pdev->dev, pdata->regulator);
 		if (IS_ERR(info->regulator)) {
-			pr_err("%s: Cannot get %s regulator\n",
+			pr_err("%s: cannot get %s regulator\n",
 				__func__, pdata->regulator);
 			error = PTR_ERR(info->regulator);
-			goto exit_request_reg_failed;
+			goto error_request_regulator_failed;
 
 		}
 	} else {
@@ -161,8 +163,8 @@ static int sfh7743_probe(struct platform_device *pdev)
 
 	info->working_queue = create_singlethread_workqueue("sfh7743_wq");
 	if (!info->working_queue) {
-		pr_err("%s: Cannot create work queue\n", __func__);
 		error = -ENOMEM;
+		pr_err("%s: cannot create work queue: %d\n", __func__, error);
 		goto error_create_wq_failed;
 	}
 	INIT_WORK(&info->wq, sfh7743_irq_bottom_half);
@@ -171,16 +173,16 @@ static int sfh7743_probe(struct platform_device *pdev)
 			    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 			    SFH7743_MODULE_NAME, info);
 	if (error) {
-		pr_err("%s: request_irq failed: %d\n", __func__, error);
-		goto exit_request_irq_failed;
+		pr_err("%s: request irq failed: %d\n", __func__, error);
+		goto error_request_irq_failed;
 	}
 
 	info->idev = input_allocate_device();
 	if (!info->idev) {
-		pr_err("%s: Insufficient memory for input device\n",
-			__func__);
 		error = -ENOMEM;
-		goto exit_input_dev_alloc_failed;
+		pr_err("%s: input device allocate failed: %d\n",
+			__func__, error);
+		goto error_input_allocate_failed;
 	}
 
 	mutex_init(&info->lock);
@@ -196,25 +198,36 @@ static int sfh7743_probe(struct platform_device *pdev)
 
 	error = input_register_device(info->idev);
 	if (error) {
-		pr_err("%s: Failed to register input device\n",
-			__func__);
-		goto exit_input_register_device_failed;
+		pr_err("%s: input register device failed: %d\n",
+			__func__, error);
+		goto error_input_register_device_failed;
 	}
+
+	if (gpio_get_value(info->gpio_intr))
+		distance = SFH7743_PROXIMITY_NEAR;
+	else
+		distance = SFH7743_PROXIMITY_FAR;
+
+	input_report_abs(info->idev, ABS_DISTANCE, distance);
+	input_sync(info->idev);
+
+	pr_info("%s: initialized Pr[%d, %d]\n",
+		__func__, info->gpio_intr, info->irq);
 
 	return 0;
 
-exit_input_register_device_failed:
+error_input_register_device_failed:
 	input_free_device(info->idev);
-	info->idev = NULL;
-exit_input_dev_alloc_failed:
+error_input_allocate_failed:
 	free_irq(info->irq, 0);
-exit_request_irq_failed:
+error_request_irq_failed:
 	destroy_workqueue(info->working_queue);
 error_create_wq_failed:
 	if (info->regulator)
 		regulator_put(info->regulator);
-exit_request_reg_failed:
+error_request_regulator_failed:
 	kfree(info);
+error_kmalloc_failed:
 	return error;
 }
 
@@ -240,6 +253,6 @@ static void __exit sfh7743_exit(void)
 module_init(sfh7743_init);
 module_exit(sfh7743_exit);
 
-MODULE_DESCRIPTION("IR proximity device driver");
+MODULE_DESCRIPTION("OSRAM SFH7743 Proximity Driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");

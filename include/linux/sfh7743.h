@@ -19,8 +19,6 @@
 #ifndef _LINUX_SFH7743_H_
 #define _LINUX_SFH7743_H_
 
-#include <linux/device.h>
-#include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 
 #define SFH7743_PROXIMITY_NEAR	0
