@@ -4,6 +4,7 @@
  * Driver Library for CCDC module in TI's OMAP3430 Camera ISP
  *
  * Copyright (C) 2008 Texas Instruments, Inc.
+ * Copyright (C) 2009 Motorola.
  *
  * Contributors:
  *	Senthilvadivu Guruswamy <svadivu@ti.com>
@@ -279,6 +280,7 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 				ispccdc_config_lsc(&lsc_config);
 			}
 			ccdc_use_lsc = 1;
+			ispccdc_enable_lsc(1);
 		} else if ((ISP_ABS_CCDC_CONFIG_LSC & ccdc_struct->update) ==
 						ISP_ABS_CCDC_CONFIG_LSC) {
 				ispccdc_enable_lsc(0);
@@ -736,6 +738,31 @@ int ispccdc_config_datapath(enum ccdc_input input, enum ccdc_output output)
 		ispccdc_config_imgattr(colptn);
 		/* Config DC sub */
 		blkcfg.dcsubval = ispccdc_obj.dcsub;
+		ispccdc_config_black_clamp(blkcfg);
+		break;
+	case CCDC_RAW_10_BIT_PATTERN:
+		/* Slave mode */
+		syncif.ccdc_mastermode = 0;
+		/* Normal */
+		syncif.datapol = 0;
+		syncif.datsz = DAT10;
+		/* Progressive Mode */
+		syncif.fldmode = 0;
+		/* Input */
+		syncif.fldout = 0;
+		/* Positive */
+		syncif.fldpol = 0;
+		/* Odd Field */
+		syncif.fldstat = 0;
+		/* Positive */
+		syncif.hdpol = 0;
+		syncif.ipmod = RAW;
+		/* Positive */
+		syncif.vdpol = 0;
+		ispccdc_config_sync_if(syncif);
+		ispccdc_config_imgattr(colptn);
+		/* Zero out DC sub */
+		blkcfg.dcsubval = 0;
 		ispccdc_config_black_clamp(blkcfg);
 		break;
 	case CCDC_YUV_BT:

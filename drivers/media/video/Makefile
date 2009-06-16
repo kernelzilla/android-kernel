@@ -111,6 +111,8 @@ obj-y				+= isp/
 obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
 
 obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
+obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a/
+obj-$(CONFIG_VIDEO_OMAP3_HPLENS) += hplens.o
 
 obj-$(CONFIG_USB_DABUSB)        += dabusb.o
 obj-$(CONFIG_USB_OV511)         += ov511.o
@@ -159,3 +161,6 @@ EXTRA_CFLAGS += -Idrivers/media/dvb/dvb-core
 EXTRA_CFLAGS += -Idrivers/media/dvb/frontends
 EXTRA_CFLAGS += -Idrivers/media/common/tuners
 
+ifdef CONFIG_VIDEO_OMAP3_HP3A
+EXTRA_CFLAGS += -Idrivers/media/video/hp3a
+endif

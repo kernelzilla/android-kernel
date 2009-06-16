@@ -4,6 +4,7 @@
  * Driver header file for CCDC module in TI's OMAP3430 Camera ISP
  *
  * Copyright (C) 2008 Texas Instruments, Inc.
+ * Copyright (C) 2009 Motorola.
  *
  * Contributors:
  *	Senthilvadivu Guruswamy <svadivu@ti.com>
@@ -32,9 +33,9 @@
 #endif
 
 #ifdef OMAP_ISPCCDC_DEBUG
-# define is_ispccdc_debug_enabled()		1
+# define is_ispccdc_debug_enabled()     1
 #else
-# define is_ispccdc_debug_enabled()		0
+# define is_ispccdc_debug_enabled()     0
 #endif
 
 /* Enumeration constants for CCDC input output format */
@@ -43,6 +44,7 @@ enum ccdc_input {
 	CCDC_YUV_SYNC,
 	CCDC_YUV_BT,
 	CCDC_RAW_PATTERN,
+	CCDC_RAW_10_BIT_PATTERN,
 	CCDC_OTHERS
 };
 

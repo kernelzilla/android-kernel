@@ -107,6 +107,8 @@ config VIDEO_IR_I2C
 
 	  In doubt, say Y.
 
+source "drivers/media/video/hp3a/Kconfig"
+
 #
 # Encoder / Decoder module configuration
 #
@@ -312,6 +314,12 @@ config VIDEO_MT9P012
 	  This is a Video4Linux2 sensor-level driver for the Micron
 	  MT9P012 camera.  It is currently working with the TI OMAP3
 	  camera controller.
+
+config VIDEO_OMAP3_HPLENS
+	tristate "HP generic lens driver"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 generic lens driver.
 
 config VIDEO_SAA7110
 	tristate "Philips SAA7110 video decoder"

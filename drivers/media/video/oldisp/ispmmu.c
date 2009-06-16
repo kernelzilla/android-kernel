@@ -466,6 +466,81 @@ release_mem:
 }
 EXPORT_SYMBOL_GPL(ispmmu_map_sg);
 
+/*
+ * Map a physically discontiguous memory to ISP space. This call is used to
+ * map a frame buffer
+ * pages:	Address of the List of pages to be mapped.
+ * size:	Size of the page list.
+ */
+dma_addr_t ispmmu_map_pages(struct page **pages, int page_nr)
+{
+	int i, j, idx, num;
+	u32 pd, p_addr;
+	u32 *l2_table;
+	u32 page_index = 0;
+
+	DPRINTK_ISPMMU("map: pages = 0x%x, page_nr = 0x%x\n", pages, page_nr);
+
+	idx = find_free_region_index();
+	if (!idx) {
+		DPRINTK_ISPMMU("Runs out of virtual space");
+		return -EINVAL;
+	}
+	DPRINTK_ISPMMU("allocating region %d\n", idx/ISPMMU_REGION_ENTRIES_NR);
+
+	p_addr = page_to_phys(pages[0]);
+
+	/* how many second-level page tables we need */
+	num = page_nr/ISPMMU_L2D_ENTRIES_NR +
+		((page_nr%ISPMMU_L2D_ENTRIES_NR) ? 1 : 0);
+	DPRINTK_ISPMMU("need %d second-level page tables (1KB each)\n", num);
+
+	/* create second-level page tables */
+	for (i = 0; i < num; i++) {
+		l2_table = (u32 *)request_l2_page_table();
+		if (!l2_table) {
+			DPRINTK_ISPMMU("no memory\n");
+			i--;
+			goto release_mem;
+		}
+
+		/* Make the first level page descriptor */
+		l1_mapattr_obj.map_size = PAGE;
+		pd = ispmmu_set_pte(ttb+idx+i, l2_page_paddr((u32)l2_table),
+			l1_mapattr_obj);
+		DPRINTK_ISPMMU("L1 pte[%d] = 0x%x\n", idx+i, pd);
+
+		/* Make the second Level page descriptors */
+		l2_mapattr_obj.map_size = SMALLPAGE;
+		for (j = 0; j < ISPMMU_L2D_ENTRIES_NR; j++) {
+			pd = ispmmu_set_pte(l2_table + j,
+					page_to_phys(pages[page_index]),
+					l2_mapattr_obj);
+			/* DPRINTK_ISPMMU("L2 pte[%d] = 0x%x\n", j, pd); */
+			/*Contigous memory, just increment with Page size */
+			++page_index;
+			if (page_index == page_nr)
+				break;
+		}
+		/* save it so we can free this l2 table later */
+		l2p_table_addr[idx + i] = (u32)l2_table;
+	}
+
+	DPRINTK_ISPMMU("mapped to ISP virtual address 0x%x\n",
+		(u32)((idx << 20) + (p_addr & (PAGE_SIZE - 1))));
+
+	omap_writel(1, ISPMMU_GFLUSH);
+	return (dma_addr_t)((idx<<20) + (p_addr & (PAGE_SIZE - 1)));
+
+release_mem:
+	for (; i >= 0; i--) {
+		free_l2_page_table(l2p_table_addr[idx + i]);
+		l2p_table_addr[idx + i] = 0;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ispmmu_map_pages);
+
 /**
  * ispmmu_unmap - Unmap a ISP space that was mmapped before.
  * @v_addr: Virtural address to be unmapped

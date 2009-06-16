@@ -326,10 +326,7 @@ struct v4l2_pix_format {
 /* 10bit raw bayer DPCM compressed to 8 bits */
 #define V4L2_PIX_FMT_SGRBG10DPCM8 v4l2_fourcc('B', 'D', '1', '0')
 #define V4L2_PIX_FMT_SBGGR16 v4l2_fourcc('B', 'Y', 'R', '2') /* 16  BGBG.. GRGR.. */
-/* Added by MMS */
-#define V4L2_PIX_FMT_PATT     v4l2_fourcc('P', 'A', 'T', 'T') /* 10-bit raw
-							       * pattern
-							       */
+#define V4L2_PIX_FMT_W1S_PATT     v4l2_fourcc('P', 'A', 'T', '1') /* 10-bit raw walking 1's pattern */
 
 /* compressed formats */
 #define V4L2_PIX_FMT_MJPEG    v4l2_fourcc('M', 'J', 'P', 'G') /* Motion-JPEG   */
@@ -883,8 +880,10 @@ enum v4l2_power_line_frequency {
 #define V4L2_CID_BACKLIGHT_COMPENSATION 	(V4L2_CID_BASE+28)
 #define V4L2_CID_CHROMA_AGC                     (V4L2_CID_BASE+29)
 #define V4L2_CID_COLOR_KILLER                   (V4L2_CID_BASE+30)
+#define V4L2_CID_COLOR_BAR                      (V4L2_CID_BASE+31)
+#define V4L2_CID_FLASH_NEXT_FRAME               (V4L2_CID_BASE+32)
 /* last CID + 1 */
-#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+31)
+#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+33)
 
 /*  MPEG-class control IDs defined by V4L2 */
 #define V4L2_CID_MPEG_BASE 			(V4L2_CTRL_CLASS_MPEG | 0x900)

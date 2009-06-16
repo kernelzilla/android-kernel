@@ -5,12 +5,13 @@
  *
  * Copyright (C) 2008 Texas Instruments.
  * Copyright (C) 2008 Nokia.
+ * Copyright (C) 2009 Motorola.
  *
  * Contributors:
- * 	Sameer Venkatraman <sameerv@ti.com>
- * 	Mohit Jalori <mjalori@ti.com>
- * 	Sakari Ailus <sakari.ailus@nokia.com>
- * 	Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
+ *	Sameer Venkatraman <sameerv@ti.com>
+ *	Mohit Jalori <mjalori@ti.com>
+ *	Sakari Ailus <sakari.ailus@nokia.com>
+ *	Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -44,6 +45,7 @@
 #else
    #include "oldisp/isph3a.h"
    #include "oldisp/isp_af.h"
+
 #endif
 #include "oldisp/ispcsi2.h"
 
@@ -140,23 +142,27 @@ int omap34xxcam_update_vbq(struct videobuf_buffer *vb)
 	struct omap34xxcam_fh *fh = camfh_saved;
 	struct omap34xxcam_videodev *vdev = fh->vdev;
 	int rval = 0;
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	struct isph3a_aewb_xtrastats xtrastats;
 	struct isp_af_xtrastats af_xtrastats;
+#endif
 
 	do_gettimeofday(&vb->ts);
 	vb->field_count = atomic_add_return(2, &fh->field_count);
 	vb->state = VIDEOBUF_DONE;
-
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	xtrastats.field_count = vb->field_count;
 	af_xtrastats.field_count = vb->field_count;
+#endif
 
 	if (vdev->streaming)
 		rval = 1;
 
 	wake_up(&vb->done);
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isp_af_setxtrastats(&af_xtrastats, AF_UPDATEXS_FIELDCOUNT);
 	isph3a_aewb_setxtrastats(&xtrastats);
-
+#endif
 	return rval;
 }
 
@@ -396,8 +402,11 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 
 	best_ival->denominator = 0;
 	best_pix_in->width = 0;
-	/* FIXME: this isn't good... */
-	best_pix_in->pixelformat = V4L2_PIX_FMT_SGRBG10;
+
+	if (wanted_pix_out->pixelformat == V4L2_PIX_FMT_W1S_PATT)
+		best_pix_in->pixelformat = V4L2_PIX_FMT_W1S_PATT;
+	else
+		best_pix_in->pixelformat = V4L2_PIX_FMT_SGRBG10;
 
 	best_pix_out.height = INT_MAX >> 1;
 	best_pix_out.width = best_pix_out.height;
@@ -725,8 +734,10 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 	}
 
 	cam->dma_notify = 1;
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isph3a_notify(0);
 	isp_af_notify(0);
+#endif
 	isp_sgdma_init();
 
 #ifdef CONFIG_OMAP3_PM
@@ -747,6 +758,10 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 		goto out;
 	}
 
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+   /* Notify hp3a module that streaming is about to start. */
+   hp3a_stream_on();
+#endif
 
 	rval = omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON);
 	if (!rval)
@@ -778,9 +793,16 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	struct videobuf_queue *q = &ofh->vbq;
 	int rval;
 
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+	/* Notify hp3a module that streaming is about to stop. */
+	hp3a_stream_off();
+#endif
+
 	mutex_lock(&vdev->mutex);
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isph3a_notify(1);
 	isp_af_notify(1);
+#endif
 	if (vdev->streaming == file)
 		isp_stop();
 
@@ -1193,6 +1215,7 @@ static int vidioc_default(struct file *file, void *fh, int cmd, void *arg)
 		case VIDIOC_ENUM_FRAMEINTERVALS:
 			rval = vidioc_enum_frameintervals(file, fh, arg);
 			goto out;
+   #ifndef CONFIG_VIDEO_OMAP3_HP3A
 		case VIDIOC_PRIVATE_ISP_AEWB_REQ:
 		{
 			/* Need to update sensor first */
@@ -1252,6 +1275,7 @@ static int vidioc_default(struct file *file, void *fh, int cmd, void *arg)
 			}
 		}
 		break;
+   #endif
 		}
 
 		rval = isp_handle_private(cmd, arg);
@@ -1259,6 +1283,70 @@ static int vidioc_default(struct file *file, void *fh, int cmd, void *arg)
 out:
 	return rval;
 }
+
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+/**
+ * omap34xxcam_update_sensor - sensor settings update handler
+ * @dev: numeric device identifier.
+ * @settings: ptr to a sensor settings structure.
+ *
+ * This request is passed to the sensor driver based on the bit masked flags field of the
+ * settings structure. If the sensor does not support the requested operation, an error is
+ * returned.
+ *
+ * If the requested device id is not valid, -ENODEV is returned.
+ */
+int omap34xxcam_sensor_settings(int dev, struct cam_sensor_settings *settings)
+{
+	int err = -1;
+	struct omap34xxcam_videodev *vdev = NULL;
+	struct omap34xxcam_device *cam = omap34xxcam;
+	struct v4l2_control vc;
+	int i;
+
+	for (i = 0; i < OMAP34XXCAM_VIDEODEVS; i++) {
+		if (cam->vdevs[i].vfd && cam->vdevs[i].vfd->minor == dev) {
+			vdev = &cam->vdevs[i];
+			break;
+		}
+	}
+
+	if (!vdev || !vdev->vfd)
+		return -ENODEV;
+
+	mutex_lock(&vdev->mutex);
+
+	if (settings->flags & OMAP34XXCAM_SET_EXPOSURE) {
+		vc.id = V4L2_CID_EXPOSURE;
+		vc.value = settings->exposure;
+		err = vidioc_int_s_ctrl(vdev->vdev_sensor, &vc);
+		if (err)
+			goto update_sensor_exit;
+	}
+
+	if (settings->flags & OMAP34XXCAM_SET_GAIN) {
+		vc.id = V4L2_CID_GAIN;
+		vc.value = settings->gain;
+		err = vidioc_int_s_ctrl(vdev->vdev_sensor, &vc);
+	}
+
+update_sensor_exit:
+   vc.id = V4L2_CID_EXPOSURE;
+	vc.value = 0;
+	if (vidioc_int_g_ctrl(vdev->vdev_sensor, &vc) == 0)
+		settings->exposure = (u32)vc.value;
+
+	vc.id = V4L2_CID_GAIN;
+	vc.value = 0;
+	if (vidioc_int_g_ctrl(vdev->vdev_sensor, &vc) == 0)
+		settings->gain = (u16)vc.value;
+
+	mutex_unlock(&vdev->mutex);
+	return err;
+
+}
+EXPORT_SYMBOL(omap34xxcam_sensor_settings);
+#endif
 
 /*
  *
@@ -1442,8 +1530,12 @@ static int omap34xxcam_release(struct file *file)
 
 	mutex_lock(&vdev->mutex);
 	if (vdev->streaming == file) {
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+		hp3a_stream_off();
+#else
 		isph3a_notify(1);
 		isp_af_notify(1);
+#endif
 		isp_stop();
 		videobuf_streamoff(&fh->vbq);
 		omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY);

@@ -6,12 +6,13 @@
  *
  * Copyright (C) 2008 Texas Instruments.
  * Copyright (C) 2008 Nokia.
+ * Copyright (C) 2009 Motorola.
  *
  * Contributors:
- * 	Sameer Venkatraman <sameerv@ti.com>
- * 	Mohit Jalori <mjalori@ti.com>
- * 	Sakari Ailus <sakari.ailus@nokia.com>
- * 	Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
+ *	Sameer Venkatraman <sameerv@ti.com>
+ *	Mohit Jalori <mjalori@ti.com>
+ *	Sakari Ailus <sakari.ailus@nokia.com>
+ *	Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
  *	Toni Leinonen <toni.leinonen@nokia.com>
  *
  * This package is free software; you can redistribute it and/or modify
@@ -52,6 +53,9 @@
 #include "ispresizer.h"
 #include "ispcsi2.h"
 
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+#include "hp3a.h"
+#endif
 static DECLARE_MUTEX(isp_mutex);
 
 #if ISP_WORKAROUND
@@ -77,8 +81,8 @@ const static struct v4l2_fmtdesc isp_formats[] = {
 		.pixelformat = V4L2_PIX_FMT_SGRBG10,
 	},
 	{
-		.description = "Bayer10 (pattern)",
-		.pixelformat = V4L2_PIX_FMT_PATT,
+		.description = "Walking 1's pattern",
+		.pixelformat = V4L2_PIX_FMT_W1S_PATT,
 	}
 };
 
@@ -874,7 +878,7 @@ static int isp_init_csi(struct isp_interface_config *config)
 /**
  * isp_configure_interface - Configures ISP Control I/F related parameters.
  * @config: Pointer to structure containing the desired configuration for the
- * 	ISP.
+ *	ISP.
  *
  * Configures ISP control register (ISP_CTRL) with the values specified inside
  * the config structure. Controls:
@@ -1371,11 +1375,10 @@ u32 isp_calc_pipeline(struct v4l2_pix_format *pix_input,
 		ispccdc_request();
 		if (pix_input->pixelformat == V4L2_PIX_FMT_SGRBG10)
 			ispccdc_config_datapath(CCDC_RAW, CCDC_OTHERS_MEM);
-		else if (pix_input->pixelformat == V4L2_PIX_FMT_PATT) {
-			/* MMS */
-			ispccdc_config_datapath(CCDC_RAW_PATTERN,
-							CCDC_OTHERS_LSC_MEM);
-		} else if ((pix_input->pixelformat == V4L2_PIX_FMT_YUYV) ||
+		else if (pix_input->pixelformat == V4L2_PIX_FMT_W1S_PATT)
+			ispccdc_config_datapath(CCDC_RAW_10_BIT_PATTERN,
+					CCDC_OTHERS_MEM);
+		else if ((pix_input->pixelformat == V4L2_PIX_FMT_YUYV) ||
 				(pix_input->pixelformat == V4L2_PIX_FMT_UYVY)) {
 			ispccdc_config_datapath(CCDC_YUV_SYNC,
 							CCDC_OTHERS_MEM);
@@ -1443,6 +1446,9 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 	switch (status) {
 	case CCDC_VD0:
 		ispccdc_config_shadow_registers();
+   #ifdef CONFIG_VIDEO_OMAP3_HP3A
+      hp3a_ccdc_done();
+   #endif
 		if ((ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER) ||
 			(ispmodule_obj.isp_pipeline & OMAP_ISP_PREVIEW))
 			return;
@@ -1473,22 +1479,31 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 		break;
 	case PREV_DONE:
 		if (is_isppreview_enabled()) {
-		if (ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER) {
-			spin_lock(&isp_obj.isp_temp_buf_lock);
-			if (!ispmodule_obj.applyCrop &&
+			if (ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER) {
+				spin_lock(&isp_obj.isp_temp_buf_lock);
+				if (!ispmodule_obj.applyCrop &&
 					(ispmodule_obj.isp_temp_state ==
-					ISP_BUF_INIT))
-				ispresizer_enable(1);
-			spin_unlock(&isp_obj.isp_temp_buf_lock);
-			if (ispmodule_obj.applyCrop &&
-				!ispresizer_busy()) {
-				ispresizer_enable(0);
-				ispresizer_applycrop();
-				ispmodule_obj.applyCrop = 0;
+					 ISP_BUF_INIT))
+					ispresizer_enable(1);
+				spin_unlock(&isp_obj.isp_temp_buf_lock);
+				if (ispmodule_obj.applyCrop &&
+						!ispresizer_busy()) {
+					ispresizer_enable(0);
+					ispresizer_applycrop();
+					ispmodule_obj.applyCrop = 0;
+				}
 			}
-			isppreview_config_shadow_registers();
+
+			if (!isppreview_busy()) {
+				isppreview_config_shadow_registers();
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+			}
+			hp3a_frame_done();
+#else
 			isph3a_update_wb();
 		}
+#endif
+
 		if (ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER)
 			return;
 		}
@@ -1862,6 +1877,7 @@ int isp_handle_private(int cmd, void *arg)
 	case VIDIOC_PRIVATE_ISP_PRV_CFG:
 		rval = omap34xx_isp_preview_config(arg);
 		break;
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	case VIDIOC_PRIVATE_ISP_AEWB_CFG: {
 		struct isph3a_aewb_config *params;
 		params = (struct isph3a_aewb_config *) arg;
@@ -1898,6 +1914,7 @@ int isp_handle_private(int cmd, void *arg)
 		rval = isp_af_request_statistics(data);
 		}
 	break;
+#endif
 	default:
 		rval = -EINVAL;
 		break;
@@ -2271,8 +2288,10 @@ void isp_save_ctx(void)
 	isp_save_context(isp_reg_list);
 	ispccdc_save_context();
 	ispmmu_save_context();
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isphist_save_context();
 	isph3a_save_context();
+#endif
 	isppreview_save_context();
 	ispresizer_save_context();
 }
@@ -2289,8 +2308,10 @@ void isp_restore_ctx(void)
 	isp_restore_context(isp_reg_list);
 	ispccdc_restore_context();
 	ispmmu_restore_context();
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isphist_restore_context();
 	isph3a_restore_context();
+#endif
 	isppreview_restore_context();
 	ispresizer_restore_context();
 }
@@ -2463,12 +2484,16 @@ static int __init isp_init(void)
 	}
 
 	isp_ccdc_init();
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isp_hist_init();
 	isph3a_aewb_init();
+#endif
 	ispmmu_init();
 	isp_preview_init();
 	isp_resizer_init();
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isp_af_init();
+#endif
 
 	DPRINTK_ISPCTRL("-isp_init for Omap 3430 Camera ISP\n");
 	return 0;
@@ -2480,12 +2505,16 @@ EXPORT_SYMBOL(isp_sgdma_init);
  **/
 static void __exit isp_cleanup(void)
 {
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isp_af_exit();
+#endif
 	isp_resizer_cleanup();
 	isp_preview_cleanup();
 	ispmmu_cleanup();
+#ifndef CONFIG_VIDEO_OMAP3_HP3A
 	isph3a_aewb_cleanup();
 	isp_hist_cleanup();
+#endif
 	isp_ccdc_cleanup();
 	free_irq(INT_34XX_CAM_IRQ, &ispirq_obj);
 #if ISP_WORKAROUND && defined(CONFIG_VIDEO_OLDOMAP3_BUFFALLOC)
