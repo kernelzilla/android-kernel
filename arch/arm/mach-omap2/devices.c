@@ -129,6 +129,33 @@ static inline void omap_init_camera(void)
 {
 	platform_device_register(&omap3isp_device);
 }
+
+#elif defined(CONFIG_VIDEO_OLDOMAP3) || defined(CONFIG_VIDEO_OLDOMAP3_MODULE)
+
+static struct resource cam_resources[] = {
+	{
+		.start		= OMAP34XX_CAMERA_BASE,
+		.end		= OMAP34XX_CAMERA_BASE + 0x1B70,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.start		= INT_34XX_CAM_IRQ,
+		.flags		= IORESOURCE_IRQ,
+	}
+};
+
+static struct platform_device omap_cam_device = {
+	.name		= "omap34xxcam",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(cam_resources),
+	.resource	= cam_resources,
+};
+
+static inline void omap_init_camera(void)
+{
+	platform_device_register(&omap_cam_device);
+}
+
 #else
 static inline void omap_init_camera(void)
 {

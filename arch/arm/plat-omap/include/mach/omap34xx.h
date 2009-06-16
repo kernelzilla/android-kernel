@@ -85,6 +85,8 @@
 
 #define OMAP34XX_MAILBOX_BASE		(L4_34XX_BASE + 0x94000)
 
+#define OMAP34XX_CAMERA_BASE            (L4_34XX_BASE + 0xBC000)
+
 
 #if defined(CONFIG_ARCH_OMAP3430)
 
