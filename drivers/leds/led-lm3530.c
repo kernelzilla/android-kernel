@@ -252,6 +252,7 @@ irqreturn_t ld_lm3530_irq_handler(int irq, void *dev)
 void ld_lm3530_work_queue(struct work_struct *work)
 {
 	int ret;
+	int light_value;
 	struct lm3530_data *als_data =
 	    container_of(work, struct lm3530_data, wq);
 
@@ -269,7 +270,13 @@ void ld_lm3530_work_queue(struct work_struct *work)
 
 	als_data->zone = als_data->zone & LM3530_ALS_READ_MASK;
 
-	input_event(als_data->idev, EV_MSC, MSC_RAW, als_data->zone);
+	light_value = als_data->zone *  (als_data->current_divisor - 1);
+	/* Need to indicate a zone 0 but this would indicate it is off
+	so send up a low value and not a 0 */
+	if (light_value == 0)
+		light_value = 10;
+
+	input_event(als_data->idev, EV_MSC, MSC_RAW, light_value);
 	input_sync(als_data->idev);
 
 	enable_irq(als_data->client->irq);
