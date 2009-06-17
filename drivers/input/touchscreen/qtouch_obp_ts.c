@@ -500,13 +500,13 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			      void *_msg)
 {
 	struct qtm_touch_multi_msg *msg = _msg;
+	struct vkey *vkey = NULL;
 	int x;
 	int y;
 	int pressure;
 	int width;
 	int finger;
 	int down;
-	int was_down;
 
 	finger = msg->report_id - obj->report_id_min;
 	if (finger >= MAX_FINGERS)
@@ -526,33 +526,33 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			msg->status, finger, x, y, pressure, width);
 
 	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
-	was_down = ts->down_mask & (1 << finger);
 
-	ts->down_mask &= ~(1 << finger);
-	ts->down_mask |= (down << finger);
-
-	if (!was_down && down) {
-		struct vkey *vkey = NULL;
-
-		vkey = virt_key_find(&ts->pdata->vkeys, y, x);
-		if (vkey) {
-			WARN_ON(ts->vkey_down[finger] != NULL);
-			if (qtouch_tsdebug)
-				pr_info("%s: vkey 0x%X down\n", __func__,
-					vkey->code);
-			ts->vkey_down[finger] = vkey;
-			input_report_key(ts->input_dev, vkey->code, 1);
-			input_sync(ts->input_dev);
-			return 0;
-		}
-	} else if (ts->vkey_down[finger] != NULL) {
+	vkey = virt_key_find(&ts->pdata->vkeys, y, x);
+	if (vkey) {
 		if (qtouch_tsdebug)
-			pr_info("%s: vkey 0x%X up\n",
-				__func__, ts->vkey_down[finger]->code);
+			pr_info("%s: vkey 0x%X is %i\n", __func__,
+				vkey->code, down);
+
+		if (ts->down_mask & (1 << finger)) {
+			input_report_key(ts->input_dev,
+				axis_map[finger].key, 0);
+			input_sync(ts->input_dev);
+			ts->down_mask &= ~(1 << finger);
+		}
+		ts->vkey_down[finger] = vkey;
+		input_report_key(ts->input_dev,
+			ts->vkey_down[finger]->code, down);
+		input_sync(ts->input_dev);
+		if (down == 0)
+			ts->vkey_down[finger] = NULL;
+
+		return 0;
+	} else if (ts->vkey_down[finger]) {
+		/* If the finger moved from the vkey to the touch area
+		   produce a liftoff for the key. */
 		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
 		input_sync(ts->input_dev);
 		ts->vkey_down[finger] = NULL;
-		return 0;
 	}
 
 	input_report_abs(ts->input_dev, axis_map[finger].x, x);
@@ -562,6 +562,9 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		input_report_abs(ts->input_dev, ABS_PRESSURE, pressure);
 		input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, width);
 	}
+
+	ts->down_mask &= ~(1 << finger);
+	ts->down_mask |= (down << finger);
 
 	input_report_key(ts->input_dev, axis_map[finger].key, down);
 	input_sync(ts->input_dev);
