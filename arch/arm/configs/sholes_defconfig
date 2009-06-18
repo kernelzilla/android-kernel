@@ -313,7 +313,7 @@ CONFIG_CMDLINE="root=/dev/nfs nfsroot=192.168.0.1:/home/user/buildroot ip=192.16
 # CPU Power Management
 #
 # CONFIG_CPU_FREQ is not set
-# CONFIG_CPU_IDLE is not set
+CONFIG_CPU_IDLE=y
 
 #
 # Floating point emulation
