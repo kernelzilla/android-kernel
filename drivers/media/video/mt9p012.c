@@ -87,6 +87,9 @@
 #define MT9P012_TST_PAT 			0x0
 
 /* Analog gain values */
+#define MT9P012_MIN_ANALOG_GAIN	0x34
+#define MT9P013_MIN_ANALOG_GAIN	0x2D
+#define MT9P012_MAX_ANALOG_GAIN	0x1FF
 #define MT9P012_MIN_GAIN	0x08
 #define MT9P012_MAX_GAIN	0x7F
 #define MT9P012_DEF_GAIN	0x43
@@ -191,7 +194,7 @@ static int debug;
 module_param(debug, bool, 0644);
 MODULE_PARM_DESC(debug, "Debug Enabled (0-1)");
 
-static inline mt9p012_ver(u16 model, u16 rev)
+static inline u32 mt9p012_ver(u16 model, u16 rev)
 {
 	return ((model & 0xffff) << 16) | (rev & 0xffff);
 }
@@ -1299,12 +1302,13 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 
 	if ((exp_time < min_exposure_time) ||
 			(exp_time > max_exposure_time)) {
-		dev_err(&client->dev, "Exposure time not within the "
-			"legal range.\n");
-		dev_err(&client->dev, "Min time %d us Max time %d us",
+		dev_err(&client->dev, "Exposure time %d us not within the "
+			"legal range.\n", exp_time);
+		dev_err(&client->dev, "Min time %d us Max time %d us\n",
 			min_exposure_time, max_exposure_time);
 		return -EINVAL;
 	}
+
 	coarse_int_time = ((((exp_time / 10) * (pix_clk_freq / 1000)) / 1000) -
 		(all_pll_settings[current_pll_video].fine_int_tm / 10)) /
 		(all_pll_settings[current_pll_video].line_len / 10);
@@ -1337,17 +1341,55 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
  * returned.
  */
 static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
-			   struct vcontrol *lvc)
+			    struct vcontrol *lvc)
 {
 	int err;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
+	u16 reg_gain = 0, digital_gain = 1;
+	u16 shift_bits, gain_stage_2x, linear_gain_q5, digital_gain_bp;
+	u16 analog_gain_code;
+	u16 min_gain;
 
-	if ((gain < MT9P012_MIN_GAIN) || (gain > MT9P012_MAX_GAIN)) {
-		dev_err(&client->dev, "Gain not within the legal range");
-		return -EINVAL;
+	/* Convert gain from linear to register value */
+	linear_gain_q5 = (gain + (1<<2)) >> 3;
+
+	if (sensor->ver >= mt9p012_ver(12,7))
+		digital_gain_bp = 12;
+	else
+		digital_gain_bp = 9;
+
+	if (linear_gain_q5 >= 8*32) {
+		gain_stage_2x = 0x180;	/* AG2X_1, AG2X_2 */
+		shift_bits = 0x2;
+	} else if(linear_gain_q5 >= 2*32) {
+		gain_stage_2x = 0x080;	/* AG2X_1 */
+		shift_bits = 0x1;
+	} else {
+		gain_stage_2x = 0x000;
+		shift_bits = 0x0;
 	}
-	set_analog_gain[MT9P012_GAIN_INDEX].val = gain;
+
+	analog_gain_code = gain_stage_2x | (linear_gain_q5 >> shift_bits);
+
+	if (sensor->ver >= mt9p012_ver(13,0))
+		min_gain = MT9P013_MIN_ANALOG_GAIN;
+	else
+		min_gain = MT9P012_MIN_ANALOG_GAIN;
+
+	if (analog_gain_code < min_gain) {
+		analog_gain_code = min_gain;
+		dev_err(&client->dev, "Gain out of legal range.\n");
+	}
+
+	if (analog_gain_code > MT9P012_MAX_ANALOG_GAIN) {
+		analog_gain_code = MT9P012_MAX_ANALOG_GAIN;
+		dev_err(&client->dev, "Gain out of legal range.\n");
+	}
+
+	reg_gain = (digital_gain << digital_gain_bp) | analog_gain_code;
+
+	set_analog_gain[MT9P012_GAIN_INDEX].val = reg_gain;
 	err = mt9p012_write_regs(client, set_analog_gain);
 	if (err) {
 		dev_err(&client->dev, "Error setting gain.%d", err);
