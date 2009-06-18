@@ -80,14 +80,20 @@ static struct cpcap_audio_state previous_state_struct = {
 /* Define regulator to turn on the audio portion of cpcap */
 struct regulator *audio_reg;
 
+static inline int is_mic_stereo(int microphone)
+{
+	if (microphone == CPCAP_AUDIO_IN_DUAL_INTERNAL
+		|| microphone == CPCAP_AUDIO_IN_DUAL_EXTERNAL)
+		return 1;
+	return 0;
+}
+
 static inline int is_codec_changed(struct cpcap_audio_state *state,
 					struct cpcap_audio_state *prev_state)
 {
 	if (state->codec_mode != prev_state->codec_mode ||
 		state->codec_rate != prev_state->codec_rate ||
-		(state->microphone != prev_state->microphone &&
-		(prev_state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL ||
-		state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL)))
+		state->microphone != prev_state->microphone)
 		return 1;
 	return 0;
 }
@@ -552,50 +558,39 @@ static void cpcap_audio_configure_aud_mute(struct cpcap_audio_state *state,
 }
 
 static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
-				struct cpcap_audio_state *previous_state)
-{
-	static unsigned int prev_codec_data, prev_cdai_data;
-	int ret_val;
+				struct cpcap_audio_state *previous_state) {
+	const unsigned int CODEC_FREQ_MASK = CPCAP_BIT_CDC_CLK0
+		| CPCAP_BIT_CDC_CLK1 | CPCAP_BIT_CDC_CLK2;
+	const unsigned int CODEC_RESET_FREQ_MASK = CODEC_FREQ_MASK
+		| CPCAP_BIT_CDC_CLOCK_TREE_RESET;
+
+	static unsigned int prev_codec_data = 0x0, prev_cdai_data = 0x0;
 
 	if (is_codec_changed(state, previous_state)) {
 		unsigned int temp_codec_rate = state->codec_rate;
 		struct cpcap_regacc cdai_changes = { 0 };
 		struct cpcap_regacc codec_changes = { 0 };
+		int codec_freq_config = 0;
+		int ret_val;
 
-		/* We need to turn off codec before changing its settings
-		 * NOTE!!! This will cause a discontinuity in the codec
-		 * bitclock! */
+		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
+			codec_freq_config = (CPCAP_BIT_CDC_CLK0
+					| CPCAP_BIT_CDC_CLK1) ; /* 19.2Mhz */
+		else
+			codec_freq_config = CPCAP_BIT_CDC_CLK2 ; /* 26Mhz */
+
+		/* If a codec is already in use, reset codec to initial state */
 		if (previous_state->codec_mode != CPCAP_AUDIO_CODEC_OFF) {
-			codec_changes.mask = prev_codec_data |
-						CPCAP_BIT_DF_RESET;
+			codec_changes.mask = prev_codec_data
+				| CPCAP_BIT_DF_RESET
+				| CPCAP_BIT_CDC_CLOCK_TREE_RESET;
 
-			ret_val = cpcap_regacc_write(state->cpcap,
-						CPCAP_REG_CC,
-						codec_changes.value,
-						codec_changes.mask);
-
-			if (ret_val != 0)
-				CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CC "
-					"returned error, ret_val =%d\n",
-								ret_val);
+			cpcap_regacc_write(state->cpcap, CPCAP_REG_CC,
+				codec_changes.value, codec_changes.mask);
 
 			prev_codec_data = 0;
 			previous_state->codec_mode = CPCAP_AUDIO_CODEC_OFF;
 		}
-
-		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
-				cdai_changes.value |= CPCAP_BIT_CLK_IN_SEL;
-
-		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL;
-
-		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
-			/* CDMA case, 19.2Mhz */
-			codec_changes.value |= 	CPCAP_BIT_CDC_CLK0 |
-				CPCAP_BIT_CDC_CLK1 | CPCAP_BIT_DF_RESET;
-		else
-			/* For out-of-call cases, 26Mhz */
-			codec_changes.value |= CPCAP_BIT_CDC_CLK2 |
-						CPCAP_BIT_DF_RESET;
 
 		temp_codec_rate &= 0x0000000F;
 		temp_codec_rate = temp_codec_rate << 9;
@@ -603,45 +598,84 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 		switch (state->codec_mode) {
 		case CPCAP_AUDIO_CODEC_LOOPBACK:
 		case CPCAP_AUDIO_CODEC_ON:
-			codec_changes.value |= CPCAP_BIT_CDC_EN_RX |
-						CPCAP_BIT_CDC_CLOCK_TREE_RESET;
+			codec_changes.value |= CPCAP_BIT_CDC_EN_RX;
+			if (state->microphone != CPCAP_AUDIO_IN_AUX_INTERNAL &&
+				state->microphone != CPCAP_AUDIO_IN_NONE)
+				codec_changes.value |= CPCAP_BIT_MIC1_CDC_EN;
+
+			if (state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL ||
+				is_mic_stereo(state->microphone))
+				codec_changes.value |= CPCAP_BIT_MIC2_CDC_EN;
 
 		/* falling through intentionally */
 		case CPCAP_AUDIO_CODEC_CLOCK_ONLY:
-			codec_changes.value |= temp_codec_rate;
+			codec_changes.value |=
+				(codec_freq_config | temp_codec_rate |
+				CPCAP_BIT_DF_RESET);
 			cdai_changes.value |= CPCAP_BIT_CDC_CLK_EN;
 			break;
 
 		case CPCAP_AUDIO_CODEC_OFF:
+			cdai_changes.value |= CPCAP_BIT_SMB_CDC;
+			break;
+
 		default:
 			break;
 		}
 
+		/* Multimedia uses CLK_IN0, incall uses CLK_IN1 */
+		if (state->rat_type != CPCAP_AUDIO_RAT_NONE)
+			cdai_changes.value |= CPCAP_BIT_CLK_IN_SEL;
+
+		/* CDMA sholes is using Normal mode for uplink */
+		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL;
+
+		/* OK, now start paranoid codec sequence */
+		/* FIRST, make sure the frequency config is right... */
+		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_CC,
+			codec_freq_config, CODEC_FREQ_MASK);
+
+		/* Next, write the CDAI if it's changed */
+		if (prev_cdai_data != cdai_changes.value) {
+			cdai_changes.mask = cdai_changes.value
+				| prev_cdai_data;
+			prev_cdai_data = cdai_changes.value;
+
+			CPCAP_AUDIO_DEBUG_LOG("cdai_value = %#x, mask = %#x\n",
+				cdai_changes.value, cdai_changes.mask);
+
+			ret_val = cpcap_regacc_write(state->cpcap,
+				CPCAP_REG_CDI, cdai_changes.value,
+				cdai_changes.mask);
+
+			if (ret_val != 0)
+				CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CDI returned "
+					"error, ret_val = %d\n", ret_val);
+
+			/* Clock tree change -- reset and wait */
+			codec_freq_config |= CPCAP_BIT_CDC_CLOCK_TREE_RESET;
+			ret_val = cpcap_regacc_write(state->cpcap,
+					CPCAP_REG_CC,
+					codec_freq_config,
+					CODEC_RESET_FREQ_MASK);
+
+			if (ret_val != 0)
+				CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CC returned "
+					"error, ret_val = %d\n", ret_val);
+
+			/* Wait for clock tree reset to complete */
+			msleep(CLOCK_TREE_RESET_TIME);
+		}
+
+		/* Clear old settings */
 		codec_changes.mask = codec_changes.value | prev_codec_data;
-		prev_codec_data = codec_changes.value;
+		prev_codec_data    = codec_changes.value;
 
 		CPCAP_AUDIO_DEBUG_LOG("codec_value = %#x, mask = %#x\n",
 				  codec_changes.value, codec_changes.mask);
 
-		ret_val = cpcap_regacc_write(state->cpcap,
-					CPCAP_REG_CC,
-					codec_changes.value,
-					codec_changes.mask);
-
-		if (ret_val != 0)
-			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CC "
-				"returned error, ret_val = %d\n", ret_val);
-
-		msleep(CLOCK_TREE_RESET_TIME);
-
-		cdai_changes.mask = cdai_changes.value | prev_cdai_data;
-		prev_cdai_data = cdai_changes.value;
-
-		CPCAP_AUDIO_DEBUG_LOG("cdai_value = %#x, mask = %#x\n",
-				  cdai_changes.value, cdai_changes.mask);
-
-		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_CDI,
-					cdai_changes.value, cdai_changes.mask);
+		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_CC,
+			codec_changes.value, codec_changes.mask);
 
 		if (ret_val != 0)
 			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CDI "
@@ -862,83 +896,55 @@ static void cpcap_audio_configure_output(
 	}
 }
 
+#define CODEC_LOOPBACK_CHANGED() \
+	((state->codec_mode != previous_state->codec_mode) && \
+	 (state->codec_mode == CPCAP_AUDIO_CODEC_LOOPBACK || \
+	  previous_state->codec_mode == CPCAP_AUDIO_CODEC_LOOPBACK))
+
 static void cpcap_audio_configure_input(
 	struct cpcap_audio_state *state,
-	struct cpcap_audio_state *previous_state)
-{
-	static unsigned int prev_input_data = 0x0, prev_codec_data = 0x0;
+	struct cpcap_audio_state *previous_state) {
+	static unsigned int prev_input_data = 0x0;
 	struct cpcap_regacc reg_changes = { 0 };
-	struct cpcap_regacc codec_changes = { 0 };
 	int ret_val;
 
-	/* Loopback mode bit is provided in this register, enable that first */
-	if (state->codec_mode == CPCAP_AUDIO_CODEC_LOOPBACK)
-		reg_changes.value |= CPCAP_BIT_DLM;
+	if (state->microphone != previous_state->microphone ||
+		CODEC_LOOPBACK_CHANGED()) {
 
-	if (state->microphone != previous_state->microphone) {
-		if (state->microphone != CPCAP_AUDIO_IN_AUX_INTERNAL)
-			codec_changes.mask = CPCAP_BIT_MIC1_CDC_EN;
-
-		/* Previous_state needs to be checked here to switch off
-		 * the MIC2_CDC, if it was enabled before */
-		if (state->microphone == CPCAP_AUDIO_IN_DUAL_INTERNAL ||
-		    state->microphone == CPCAP_AUDIO_IN_DUAL_EXTERNAL ||
-		    state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL ||
-		    previous_state->microphone == CPCAP_AUDIO_IN_DUAL_INTERNAL
-		||  previous_state->microphone == CPCAP_AUDIO_IN_DUAL_EXTERNAL
-		||  previous_state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL)
-			codec_changes.mask |= CPCAP_BIT_MIC2_CDC_EN;
-
-		if ((state->microphone != CPCAP_AUDIO_IN_NONE) &&
-		    (state->microphone != CPCAP_AUDIO_IN_BT_MONO))
-			codec_changes.value = codec_changes.mask;
-
-		codec_changes.mask |= prev_codec_data;
-		prev_codec_data = codec_changes.value;
-
-		CPCAP_AUDIO_DEBUG_LOG("codec_value = %#x, mask = %#x\n",
-				  codec_changes.value, codec_changes.mask);
-
-		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_CC,
-				codec_changes.value, codec_changes.mask);
-
-		if (ret_val != 0)
-			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_CC "
-					"returned error, ret_val = %d\n",
-					ret_val);
+		if (state->codec_mode == CPCAP_AUDIO_CODEC_LOOPBACK)
+			reg_changes.value |= CPCAP_BIT_DLM;
 
 		switch (state->microphone) {
 		case CPCAP_AUDIO_IN_HANDSET:
-			reg_changes.value |= CPCAP_BIT_MB_ON1R |
-				CPCAP_BIT_MIC1_MUX | CPCAP_BIT_MIC1_PGA_EN;
+			reg_changes.value |= CPCAP_BIT_MB_ON1R
+				| CPCAP_BIT_MIC1_MUX | CPCAP_BIT_MIC1_PGA_EN;
 			break;
 
 		case CPCAP_AUDIO_IN_HEADSET:
-			reg_changes.value |=
-			    CPCAP_BIT_HS_MIC_MUX | CPCAP_BIT_MIC1_PGA_EN;
+			reg_changes.value |= CPCAP_BIT_HS_MIC_MUX
+				| CPCAP_BIT_MIC1_PGA_EN;
 			break;
 
 		case CPCAP_AUDIO_IN_EXT_BUS:
-			reg_changes.value |=
-			    CPCAP_BIT_EMU_MIC_MUX | CPCAP_BIT_MIC1_PGA_EN;
+			reg_changes.value |=  CPCAP_BIT_EMU_MIC_MUX
+				| CPCAP_BIT_MIC1_PGA_EN;
 			break;
 
 		case CPCAP_AUDIO_IN_AUX_INTERNAL:
-			reg_changes.value |= 	CPCAP_BIT_MB_ON1L |
-						CPCAP_BIT_MIC2_MUX |
-						CPCAP_BIT_MIC2_PGA_EN;
+			reg_changes.value |= CPCAP_BIT_MB_ON1L
+				| CPCAP_BIT_MIC2_MUX | CPCAP_BIT_MIC2_PGA_EN;
 			break;
 
 		case CPCAP_AUDIO_IN_DUAL_INTERNAL:
-			reg_changes.value |= CPCAP_BIT_MB_ON1R |
-				CPCAP_BIT_MIC1_MUX | CPCAP_BIT_MIC1_PGA_EN |
-				CPCAP_BIT_MB_ON1L | CPCAP_BIT_MIC2_MUX |
-				CPCAP_BIT_MIC2_PGA_EN;
+			reg_changes.value |= CPCAP_BIT_MB_ON1R
+				| CPCAP_BIT_MIC1_MUX | CPCAP_BIT_MIC1_PGA_EN
+				| CPCAP_BIT_MB_ON1L | CPCAP_BIT_MIC2_MUX
+				| CPCAP_BIT_MIC2_PGA_EN;
 			break;
 
 		case CPCAP_AUDIO_IN_DUAL_EXTERNAL:
-			reg_changes.value |=
-			    CPCAP_BIT_RX_R_ENCODE | CPCAP_BIT_RX_L_ENCODE;
+			reg_changes.value |= CPCAP_BIT_RX_R_ENCODE
+				| CPCAP_BIT_RX_L_ENCODE;
 			break;
 
 		case CPCAP_AUDIO_IN_BT_MONO:
@@ -952,16 +958,12 @@ static void cpcap_audio_configure_input(
 		reg_changes.mask = reg_changes.value | prev_input_data;
 		prev_input_data = reg_changes.value;
 
-		CPCAP_AUDIO_DEBUG_LOG("tx_value = %#x, tx_mask = %#x\n",
-				  reg_changes.value, reg_changes.mask);
-
 		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_TXI,
-					reg_changes.value, reg_changes.mask);
+			reg_changes.value, reg_changes.mask);
 
 		if (ret_val != 0)
 			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_TXI "
-					"returned error, ret_val = %d\n",
-					ret_val);
+				"returned error %d\n", ret_val);
 	}
 }
 
