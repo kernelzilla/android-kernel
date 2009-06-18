@@ -379,7 +379,7 @@ static void au_fsync_br(struct super_block *sb)
 		lockdep_off();
 		down_write(&h_sb->s_umount);
 		shrink_dcache_sb(h_sb);
-		fsync_super(h_sb);
+		sync_filesystem(h_sb);
 		up_write(&h_sb->s_umount);
 		lockdep_on();
 	}
