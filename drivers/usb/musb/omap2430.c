@@ -253,15 +253,13 @@ int __init musb_platform_init(struct musb *musb)
 	l |= SMARTSTDBY;	/* enable smart standby */
 	l &= ~AUTOIDLE;		/* disable auto idle */
 	l &= ~NOIDLE;		/* remove possible noidle */
+	l |= SMARTIDLE;		/* enable smart idle */
 	/*
-	 * MUSB AUTOIDLE and SMARTIDLE don't work in 3430.
+	 * MUSB AUTOIDLE don't work in 3430.
 	 * Workaround by Richard Woodruff/TI
 	 */
-	if (!cpu_is_omap3430()) {
+	if (!cpu_is_omap3430())
 		l |= AUTOIDLE;		/* enable auto idle */
-		l |= SMARTIDLE;		/* enable smart idle */
-	}
-
 	omap_writel(l, OTG_SYSCONFIG);
 
 	l = omap_readl(OTG_INTERFSEL);
