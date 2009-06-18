@@ -57,6 +57,7 @@
 #define SHOLES_LM_3530_INT_GPIO		92
 #define SHOLES_AKM8973_INT_GPIO		175
 #define SHOLES_WL1271_NSHUTDOWN_GPIO	179
+#define SHOLES_AUDIO_PATH_GPIO		143
 
 static void __init sholes_init_irq(void)
 {
@@ -66,6 +67,23 @@ static void __init sholes_init_irq(void)
 	scm_clk_init();
 #endif
 	omap_gpio_init();
+}
+
+static void sholes_audio_init(void)
+{
+	gpio_request(SHOLES_AUDIO_PATH_GPIO, "sholes audio path");
+
+	omap_cfg_reg(P21_OMAP34XX_MCBSP2_FSX);
+	omap_cfg_reg(N21_OMAP34XX_MCBSP2_CLKX);
+	omap_cfg_reg(R21_OMAP34XX_MCBSP2_DR);
+	omap_cfg_reg(M21_OMAP34XX_MCBSP2_DX);
+	omap_cfg_reg(K26_OMAP34XX_MCBSP3_FSX);
+	omap_cfg_reg(W21_OMAP34XX_MCBSP3_CLKX);
+	omap_cfg_reg(U21_OMAP34XX_MCBSP3_DR);
+	omap_cfg_reg(V21_OMAP34XX_MCBSP3_DX);
+
+	gpio_direction_output(SHOLES_AUDIO_PATH_GPIO, 1);
+	omap_cfg_reg(AE5_34XX_GPIO143);
 }
 
 static struct omap_uart_config sholes_uart_config __initdata = {
@@ -574,6 +592,7 @@ static void __init sholes_init(void)
 	sholes_panel_init();
 	sholes_sensors_init();
 	sholes_touch_init();
+	sholes_audio_init();
 	usb_musb_init();
 	sholes_ehci_init();
 	sholes_sdrc_init();
