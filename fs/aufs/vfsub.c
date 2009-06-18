@@ -73,14 +73,9 @@ static int vfsub_ima_mask(int flags)
 struct file *vfsub_dentry_open(struct path *path, int flags,
 			       const struct cred *cred)
 {
-	struct file *file;
-	int err;
-
-	err = ima_path_check(path, vfsub_ima_mask(flags));
-	file = ERR_PTR(err);
-	if (!err)
-		file = dentry_open(path->dentry, path->mnt, flags, cred);
-	return file;
+	/* meaningless return value */
+	ima_path_check(path, vfsub_ima_mask(flags), IMA_COUNT_UPDATE);
+	return dentry_open(path->dentry, path->mnt, flags, cred);
 }
 
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
