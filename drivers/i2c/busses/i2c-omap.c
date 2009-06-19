@@ -689,6 +689,15 @@ omap_i2c_isr(int this_irq, void *dev_id)
 			omap_i2c_complete_cmd(dev, err);
 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
 			u8 num_bytes = 1;
+			/* 3430 I2C Errata 1.15
+			 * RDR could be set when the bus is busy, then
+			 * ignore the interrupt, and clear the bit.
+			 */
+			u8 stat2 = 0;
+			stat2 = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+			if (stat2 & OMAP_I2C_STAT_BB)
+				return IRQ_HANDLED;
+
 			if (dev->fifo_size) {
 				if (stat & OMAP_I2C_STAT_RRDY)
 					num_bytes = dev->fifo_size;
