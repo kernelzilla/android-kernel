@@ -80,11 +80,8 @@ int sfh7743_input_open(struct input_dev *input)
 	mutex_lock(&info->lock);
 	if (info->regulator) {
 		reg_status = regulator_enable(info->regulator);
-		if (reg_status) {
-			pr_err("%s: regulator enable failed: %d\n",
-				__func__, reg_status);
+		if (!reg_status)
 			info->enabled = SFH7743_ENABLED;
-		}
 	} else
 		info->enabled = SFH7743_ENABLED;
 
