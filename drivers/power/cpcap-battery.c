@@ -34,6 +34,7 @@
 #define CPCAP_BATT_IRQ_OV      0x02
 #define CPCAP_BATT_IRQ_CC_CAL  0x04
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
+#define CPCAP_BATT_IRQ_MACRO7  0x10
 
 static int cpcap_batt_ioctl(struct inode *inode,
 			    struct file *file,
@@ -129,6 +130,9 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 		sply->irq_status |= CPCAP_BATT_IRQ_CC_CAL;
 		break;
 
+	case CPCAP_IRQ_UC_PRIMACRO_7:
+		sply->irq_status |= CPCAP_BATT_IRQ_MACRO7;
+		break;
 	default:
 		break;
 	}
@@ -454,12 +458,18 @@ static int cpcap_batt_probe(struct platform_device *pdev)
 	if (ret)
 		goto unregirq_exit;
 
+	ret = cpcap_irq_register(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_7,
+				 cpcap_batt_irq_hdlr, sply);
+	if (ret)
+		goto unregirq_exit;
+
 	goto prb_exit;
 
 unregirq_exit:
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_VBUSOV);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_BATTDETB);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_CC_CAL);
+	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_7);
 unregmisc_exit:
 	misc_deregister(&batt_dev);
 unregusb_exit:
@@ -484,6 +494,7 @@ static int cpcap_batt_remove(struct platform_device *pdev)
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_VBUSOV);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_BATTDETB);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_CC_CAL);
+	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_7);
 	kfree(sply);
 	sply->cpcap->battdata = NULL;
 

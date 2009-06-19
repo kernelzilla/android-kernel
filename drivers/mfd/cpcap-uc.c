@@ -487,9 +487,6 @@ static int fops_ioctl(struct inode *inode, struct file *file,
 
 		retval = cpcap_uc_start(data->cpcap, (enum cpcap_macro)arg);
 
-		dev_info(&data->cpcap->spi->dev,
-			 "CPCAP uC: macro %d started, status:%d\n",
-			 (int)arg, retval);
 		break;
 
 	default:
