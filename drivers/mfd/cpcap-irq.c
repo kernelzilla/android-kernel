@@ -267,6 +267,8 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 		goto error;
 	}
 
+	enable_irq_wake(spi->irq);
+
 	cpcap->irqdata = data;
 	retval = pwrkey_init(cpcap);
 	if (retval) {
