@@ -699,7 +699,7 @@ kick_dll:
 	bic	r6, #0x10		/* dllidle off */
 	str	r6, [r4]
 	dsb
-	str	r6, [r4]		/* restore old value */
+	str	r5, [r4]		/* restore old value */
 	b wait_dll_lock_timed
 
 cm_idlest1_core:
