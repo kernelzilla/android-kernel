@@ -494,7 +494,30 @@ static struct vkey *virt_key_find(struct virt_keys *vkeys, int axis_val,
 	}
 	return NULL;
 }
+static int qtouch_process_vkey(struct qtouch_ts_data *ts,
+				  struct vkey *vkey, int down, int finger)
+{
+	if (qtouch_tsdebug)
+		pr_info("%s: vkey 0x%X is %i\n", __func__,
+		vkey->code, down);
 
+	if (ts->down_mask & (1 << finger)) {
+		input_report_key(ts->input_dev,
+			axis_map[finger].key, 0);
+		input_sync(ts->input_dev);
+		ts->down_mask &= ~(1 << finger);
+	}
+	ts->vkey_down[finger] = vkey;
+
+	input_report_key(ts->input_dev,
+		ts->vkey_down[finger]->code, down);
+	input_sync(ts->input_dev);
+
+	if (down == 0)
+		ts->vkey_down[finger] = NULL;
+
+	return 0;
+}
 /* Handles a message from a multi-touch object. */
 static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			      void *_msg)
@@ -529,23 +552,7 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 
 	vkey = virt_key_find(&ts->pdata->vkeys, y, x);
 	if (vkey) {
-		if (qtouch_tsdebug)
-			pr_info("%s: vkey 0x%X is %i\n", __func__,
-				vkey->code, down);
-
-		if (ts->down_mask & (1 << finger)) {
-			input_report_key(ts->input_dev,
-				axis_map[finger].key, 0);
-			input_sync(ts->input_dev);
-			ts->down_mask &= ~(1 << finger);
-		}
-		ts->vkey_down[finger] = vkey;
-		input_report_key(ts->input_dev,
-			ts->vkey_down[finger]->code, down);
-		input_sync(ts->input_dev);
-		if (down == 0)
-			ts->vkey_down[finger] = NULL;
-
+		qtouch_process_vkey(ts, vkey, down, finger);
 		return 0;
 	} else if (ts->vkey_down[finger]) {
 		/* If the finger moved from the vkey to the touch area
@@ -553,22 +560,24 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
 		input_sync(ts->input_dev);
 		ts->vkey_down[finger] = NULL;
+		return 0;
 	}
+	/* Report only if the touch is in the touchable area */
+	if (y < ts->pdata->abs_max_y) {
+		input_report_abs(ts->input_dev, axis_map[finger].x, x);
+		input_report_abs(ts->input_dev, axis_map[finger].y, y);
 
-	input_report_abs(ts->input_dev, axis_map[finger].x, x);
-	input_report_abs(ts->input_dev, axis_map[finger].y, y);
+		if (finger == 0) {
+			input_report_abs(ts->input_dev, ABS_PRESSURE, pressure);
+			input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, width);
+		}
 
-	if (finger == 0) {
-		input_report_abs(ts->input_dev, ABS_PRESSURE, pressure);
-		input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, width);
+		ts->down_mask &= ~(1 << finger);
+		ts->down_mask |= (down << finger);
+
+		input_report_key(ts->input_dev, axis_map[finger].key, down);
+		input_sync(ts->input_dev);
 	}
-
-	ts->down_mask &= ~(1 << finger);
-	ts->down_mask |= (down << finger);
-
-	input_report_key(ts->input_dev, axis_map[finger].key, down);
-	input_sync(ts->input_dev);
-
 	return 0;
 }
 
