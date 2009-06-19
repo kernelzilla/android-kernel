@@ -17,5 +17,6 @@
 #define __VIB_OMAP_PWM_H
 
 void __init vibrator_omap_pwm_init(int initial_vibrate);
+void vibrator_haptic_fire(int value);
 
 #endif

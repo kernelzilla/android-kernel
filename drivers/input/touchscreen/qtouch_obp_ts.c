@@ -26,6 +26,7 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/vib-omap-pwm.h>
 
 #include <linux/qtouch_obp_ts.h>
 
@@ -64,7 +65,7 @@ struct qtouch_ts_data {
 	unsigned long			obj_map[_BITMAP_LEN];
 
 	uint32_t			last_keystate;
-
+	uint8_t				haptic_mask[MAX_FINGERS];
 	struct vkey			*vkey_down[MAX_FINGERS];
 	uint32_t			down_mask;
 
@@ -509,12 +510,21 @@ static int qtouch_process_vkey(struct qtouch_ts_data *ts,
 	}
 	ts->vkey_down[finger] = vkey;
 
+	/* This is a temporary solution until a more global haptics soltion is
+	 * available for haptics that need to occur in any application */
+	if ((down == 1) && (ts->haptic_mask[finger] == 0)) {
+			vibrator_haptic_fire(40);
+			ts->haptic_mask[finger] = 1;
+	}
+
 	input_report_key(ts->input_dev,
 		ts->vkey_down[finger]->code, down);
 	input_sync(ts->input_dev);
 
-	if (down == 0)
+	if (down == 0) {
 		ts->vkey_down[finger] = NULL;
+		ts->haptic_mask[finger] = 0;
+	}
 
 	return 0;
 }
@@ -560,6 +570,7 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
 		input_sync(ts->input_dev);
 		ts->vkey_down[finger] = NULL;
+		ts->haptic_mask[finger] = 0;
 		return 0;
 	}
 	/* Report only if the touch is in the touchable area */

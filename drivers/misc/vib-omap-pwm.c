@@ -65,14 +65,14 @@ static void set_gptimer_pwm_vibrator(int on)
 	}
 
 	if (on) {
-		if(!vibe_timer_state) {
+		if (!vibe_timer_state) {
 			omap_dm_timer_enable(pwm_timer);
 			pwm_timer_init();
 			omap_dm_timer_start(pwm_timer);
 			vibe_timer_state = 1;
 		}
 	} else {
-		if(vibe_timer_state) {
+		if (vibe_timer_state) {
 			omap_dm_timer_stop(pwm_timer);
 			omap_dm_timer_disable(pwm_timer);
 			vibe_timer_state = 0;
@@ -105,6 +105,13 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	spin_unlock_irqrestore(&vibe_lock, flags);
 
 	schedule_work(&vibrator_work);
+}
+
+/* This is a temporary solution until a more global haptics soltion is
+ * available for haptics that need to occur in any application */
+void vibrator_haptic_fire(int value)
+{
+	vibrator_enable(NULL, value);
 }
 
 static int vibrator_get_time(struct timed_output_dev *dev)
