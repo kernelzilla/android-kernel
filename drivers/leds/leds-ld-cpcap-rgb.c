@@ -125,19 +125,19 @@ static void msg_ind_blue_set(struct led_classdev *led_cdev,
 }
 EXPORT_SYMBOL(msg_ind_blue_set);
 
-static void msg_ind_blink(struct device *dev, struct device_attribute *attr,
-						  char *buf)
+static ssize_t
+msg_ind_blink(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
 {
 	struct msg_ind_led_data *msg_ind_data = dev_get_drvdata(dev);
-	unsigned int led_blink = LED_OFF;
+	unsigned long led_blink = LED_OFF;
 	int ret;
 
 	ret = strict_strtoul(buf, 10, &led_blink);
 	if (ret != 0) {
 		pr_err("%s: Invalid parameter sent\n", __func__);
-		return;
+		return -1;
 	}
-
 	if (led_blink > LED_OFF) {
 		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_6);
 		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_4);
@@ -146,8 +146,9 @@ static void msg_ind_blink(struct device *dev, struct device_attribute *attr,
 		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_4);
 	}
 
+	return 0;
 }
-static DEVICE_ATTR(blink, 0644, msg_ind_blink, msg_ind_blink);
+static DEVICE_ATTR(blink, 0644, NULL, msg_ind_blink);
 
 static int msg_ind_rgb_probe(struct platform_device *pdev)
 {
