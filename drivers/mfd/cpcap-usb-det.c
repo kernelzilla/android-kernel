@@ -20,6 +20,7 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
 #include <linux/regulator/consumer.h>
@@ -79,6 +80,7 @@ struct cpcap_usb_det_data {
 	enum cpcap_accy usb_accy;
 	struct platform_device *usb_dev;
 	struct regulator *regulator;
+	struct wake_lock wake_lock;
 	unsigned char is_vusb_enabled;
 };
 
@@ -91,6 +93,7 @@ static const char *accy_devices[] = {
 static void vusb_enable(struct cpcap_usb_det_data *data)
 {
 	if (!data->is_vusb_enabled) {
+		wake_lock(&data->wake_lock);
 		regulator_enable(data->regulator);
 		data->is_vusb_enabled = 1;
 	}
@@ -99,6 +102,7 @@ static void vusb_enable(struct cpcap_usb_det_data *data)
 static void vusb_disable(struct cpcap_usb_det_data *data)
 {
 	if (data->is_vusb_enabled) {
+		wake_unlock(&data->wake_lock);
 		regulator_disable(data->regulator);
 		data->is_vusb_enabled = 0;
 	}
@@ -346,6 +350,7 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, data);
 	INIT_DELAYED_WORK(&data->work, detection_work);
 	data->usb_accy = CPCAP_ACCY_NONE;
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "usb");
 
 	retval = configure_hardware(data, CPCAP_ACCY_NONE);
 
