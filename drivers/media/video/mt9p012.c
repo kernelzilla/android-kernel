@@ -176,36 +176,6 @@ static inline u32 mt9p012_ver(u16 model, u16 rev)
 }
 
 
-/**
- * struct mt9p012_sensor - main structure for storage of sensor information
- * @dev:
- * @pdata: access functions and data for platform level information
- * @v4l2_int_device: V4L2 device structure structure
- * @pix: V4L2 pixel format information structure
- * @timeperframe: time per frame expressed as V4L fraction
- * @scaler:
- * @ver: mt9p012 chip version
- * @fps: frames per second value
- */
-struct mt9p012_sensor {
-	struct device *dev;
-	struct mt9p012_platform_data *pdata;
-	struct v4l2_int_device *v4l2_int_device;
-	struct v4l2_pix_format pix;
-	struct v4l2_fract timeperframe;
-	int scaler;
-	u32 ver;
-	int fps;
-	int detected;
-
-	u32 x_clk;
-	u32 pll_clk;
-	u32 vt_pix_clk;
-	u32 op_pix_clk;
-
-	int current_iframe;
-};
-
 /* list of image formats supported by mt9p012 sensor */
 const static struct v4l2_fmtdesc mt9p012_formats[] = {
 	{
@@ -621,18 +591,17 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 	}
 };
 
-static u32 min_exposure_time;
-static u32 max_exposure_time;
-
 /**
  * struct vcontrol - Video controls
  * @v4l2_queryctrl: V4L2 VIDIOC_QUERYCTRL ioctl structure
  * @current_value: current value of this control
  */
-static struct vcontrol {
+struct vcontrol {
 	struct v4l2_queryctrl qc;
 	int current_value;
-} video_control[] = {
+};
+
+static struct vcontrol video_control[] = {
 	{
 		{
 			.id = V4L2_CID_EXPOSURE,
@@ -660,20 +629,56 @@ static struct vcontrol {
 };
 
 /**
+ * struct mt9p012_sensor - main structure for storage of sensor information
+ * @dev:
+ * @pdata: access functions and data for platform level information
+ * @v4l2_int_device: V4L2 device structure structure
+ * @pix: V4L2 pixel format information structure
+ * @timeperframe: time per frame expressed as V4L fraction
+ * @scaler:
+ * @ver: mt9p012 chip version
+ * @fps: frames per second value
+ */
+struct mt9p012_sensor {
+	struct device *dev;
+	struct mt9p012_platform_data *pdata;
+	struct v4l2_int_device *v4l2_int_device;
+	struct v4l2_pix_format pix;
+	struct v4l2_fract timeperframe;
+	int scaler;
+	u32 ver;
+	int fps;
+	int detected;
+
+	u32 x_clk;
+	u32 pll_clk;
+	u32 vt_pix_clk;
+	u32 op_pix_clk;
+
+	int current_iframe;
+
+	u32 min_exposure_time;
+	u32 max_exposure_time;
+
+	struct vcontrol *video_control;
+	int n_video_control;
+};
+
+/**
  * find_vctrl - Finds the requested ID in the video control structure array
  * @id: ID of control to search the video control array for
  *
  * Returns the index of the requested ID from the control structure array
  */
-static int find_vctrl(int id)
+static int find_vctrl(struct mt9p012_sensor *sensor, int id)
 {
 	int i;
 
 	if (id < V4L2_CID_BASE)
 		return -EDOM;
 
-	for (i = (ARRAY_SIZE(video_control) - 1); i >= 0; i--)
-		if (video_control[i].qc.id == id)
+	for (i = sensor->n_video_control - 1; i >= 0; i--)
+		if (sensor->video_control[i].qc.id == id)
 			break;
 	if (i < 0)
 		i = -EINVAL;
@@ -930,21 +935,13 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 		&sensor_settings[sensor->current_iframe];
 	u32 coarse_int_time = 0;
 
-	if ((exp_time < min_exposure_time) ||
-			(exp_time > max_exposure_time)) {
+	if ((exp_time < sensor->min_exposure_time) ||
+			(exp_time > sensor->max_exposure_time)) {
 		dev_err(&client->dev, "Exposure time %d us not within the "
 			"legal range.\n", exp_time);
 		dev_err(&client->dev, "Min time %d us Max time %d us\n",
-			min_exposure_time, max_exposure_time);
+			sensor->min_exposure_time, sensor->max_exposure_time);
 		return -EINVAL;
-	}
-
-	if (exp_time > max_exposure_time) {
-		dev_err(&client->dev, "Exposure time %d us not within "
-			"the legal range.\n", exp_time);
-		dev_err(&client->dev, "Exposure time must be "
-			"less than %d us\n", max_exposure_time);
-		exp_time = max_exposure_time;
 	}
 
 	coarse_int_time = ((((exp_time / 10) *
@@ -1084,18 +1081,18 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	ss[iframe].frame.frame_len_lines = frame_length_lines;
 
 	/* Update min/max exposure times */
-	min_exposure_time = (ss->exposure.fine_int_tm * 1000000 /
-			     (sensor->vt_pix_clk)) + 1;
-	max_exposure_time = (line_time_q8 *
-			     (frame_length_lines - 1)) >> 8;
+	sensor->min_exposure_time = (ss->exposure.fine_int_tm * 1000000 /
+				     (sensor->vt_pix_clk)) + 1;
+	sensor->max_exposure_time = (line_time_q8 *
+				     (frame_length_lines - 1)) >> 8;
 
 	/* Update Exposure Time */
-	i = find_vctrl(V4L2_CID_EXPOSURE);
+	i = find_vctrl(sensor, V4L2_CID_EXPOSURE);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		/* Update min/max for query control */
-		lvc->qc.minimum = min_exposure_time;
-		lvc->qc.maximum = max_exposure_time;
+		lvc->qc.minimum = sensor->min_exposure_time;
+		lvc->qc.maximum = sensor->max_exposure_time;
 
 		mt9p012_set_exposure_time(lvc->current_value,
 					  sensor->v4l2_int_device, lvc);
@@ -1104,7 +1101,7 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	v4l_info(client, "MT9P012 Set Framerate: fper=%d/%d, "
 		 "frame_len_lines=%d, max_expT=%dus\n",
 		 fper->numerator, fper->denominator,
-		 frame_length_lines, max_exposure_time);
+		 frame_length_lines, sensor->max_exposure_time);
 
 	return err;
 }
@@ -1349,17 +1346,17 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 
 
 	/* Set initial exposure time */
-	i = find_vctrl(V4L2_CID_EXPOSURE);
+	i = find_vctrl(sensor, V4L2_CID_EXPOSURE);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		mt9p012_set_exposure_time(lvc->current_value,
 			sensor->v4l2_int_device, lvc);
 	}
 
 	/* Set initial gain */
-	i = find_vctrl(V4L2_CID_GAIN);
+	i = find_vctrl(sensor, V4L2_CID_GAIN);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		mt9p012_set_gain(lvc->current_value,
 			sensor->v4l2_int_device, lvc);
 	}
@@ -1438,16 +1435,17 @@ static int mt9p012_detect(struct i2c_client *client)
  */
 static int ioctl_queryctrl(struct v4l2_int_device *s, struct v4l2_queryctrl *qc)
 {
+	struct mt9p012_sensor *sensor = s->priv;
 	int i;
 
-	i = find_vctrl(qc->id);
+	i = find_vctrl(sensor, qc->id);
 	if (i == -EINVAL)
 		qc->flags = V4L2_CTRL_FLAG_DISABLED;
 
 	if (i < 0)
 		return -EINVAL;
 
-	*qc = video_control[i].qc;
+	*qc = sensor->video_control[i].qc;
 	return 0;
 }
 
@@ -1462,13 +1460,14 @@ static int ioctl_queryctrl(struct v4l2_int_device *s, struct v4l2_queryctrl *qc)
  */
 static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 {
+	struct mt9p012_sensor *sensor = s->priv;
 	struct vcontrol *lvc;
 	int i;
 
-	i = find_vctrl(vc->id);
+	i = find_vctrl(sensor, vc->id);
 	if (i < 0)
 		return -EINVAL;
-	lvc = &video_control[i];
+	lvc = &sensor->video_control[i];
 
 	switch (vc->id) {
 	case  V4L2_CID_EXPOSURE:
@@ -1493,14 +1492,15 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
  */
 static int ioctl_s_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 {
+	struct mt9p012_sensor *sensor = s->priv;
 	int retval = -EINVAL;
 	int i;
 	struct vcontrol *lvc;
 
-	i = find_vctrl(vc->id);
+	i = find_vctrl(sensor, vc->id);
 	if (i < 0)
 		return -EINVAL;
-	lvc = &video_control[i];
+	lvc = &sensor->video_control[i];
 
 	switch (vc->id) {
 	case V4L2_CID_EXPOSURE:
@@ -1954,6 +1954,14 @@ static int mt9p012_probe(struct i2c_client *client,
 		goto on_err1;
 	}
 
+	sensor->video_control = kzalloc(sizeof(video_control), GFP_KERNEL);
+	if (!sensor->video_control) {
+		err = -ENOMEM;
+		goto on_err2;
+	}
+	memcpy(sensor->video_control, video_control, sizeof(video_control));
+	sensor->n_video_control = ARRAY_SIZE(video_control);
+
 	sensor->pdata->power_set = pdata->power_set;
 	sensor->pdata->set_xclk = pdata->set_xclk;
 	sensor->pdata->priv_data_set = pdata->priv_data_set;
@@ -1974,12 +1982,15 @@ static int mt9p012_probe(struct i2c_client *client,
 
 	err = v4l2_int_device_register(sensor->v4l2_int_device);
 	if (err) {
-		goto on_err2;
+		goto on_err3;
 	}
 
 	return 0;
-on_err2:
+
+on_err3:
 	i2c_set_clientdata(client, NULL);
+	kfree(sensor->video_control);
+on_err2:
 	kfree(sensor->pdata);
 on_err1:
 	kfree(sensor);
@@ -1999,6 +2010,7 @@ static int mt9p012_remove(struct i2c_client *client)
 
 	v4l2_int_device_unregister(sensor->v4l2_int_device);
 	i2c_set_clientdata(client, NULL);
+	kfree(sensor->video_control);
 	kfree(sensor->pdata);
 	kfree(sensor);
 
