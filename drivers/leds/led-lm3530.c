@@ -41,18 +41,12 @@ struct lm3530_data {
 	uint8_t current_array[8];
 };
 
-int lm3530_read_reg(struct lm3530_data *als_data, unsigned reg,
-		    unsigned int num_bytes, uint8_t *value)
+static int lm3530_read_reg(struct lm3530_data *als_data, uint8_t reg,
+		   uint8_t *value)
 {
 	int error = 0;
 	int i = 0;
 	uint8_t dest_buffer;
-
-	if (num_bytes <= 0) {
-		pr_err("%s: invalid number of bytes to read: %d\n",
-		       __func__, num_bytes);
-		return -EINVAL;
-	}
 
 	if (!value) {
 		pr_err("%s: invalid value pointer\n", __func__);
@@ -63,15 +57,16 @@ int lm3530_read_reg(struct lm3530_data *als_data, unsigned reg,
 		error = i2c_master_send(als_data->client, &dest_buffer, 1);
 		if (error == 1) {
 			error = i2c_master_recv(als_data->client,
-						&dest_buffer, num_bytes);
-
+				&dest_buffer, LD_LM3530_ALLOWED_R_BYTES);
 		}
-		if (error != num_bytes) {
+		if (error != LD_LM3530_ALLOWED_R_BYTES) {
 			pr_err("%s: read[%i] failed: %d\n", __func__, i, error);
 			msleep_interruptible(LD_LM3530_I2C_RETRY_DELAY);
 		}
-	} while ((error != num_bytes) && ((++i) < LD_LM3530_MAX_RW_RETRIES));
-	if (error == num_bytes) {
+	} while ((error != LD_LM3530_ALLOWED_R_BYTES) &&
+			((++i) < LD_LM3530_MAX_RW_RETRIES));
+
+	if (error == LD_LM3530_ALLOWED_R_BYTES) {
 		error = 0;
 		*value = dest_buffer;
 	}
@@ -79,7 +74,9 @@ int lm3530_read_reg(struct lm3530_data *als_data, unsigned reg,
 	return error;
 }
 
-int lm3530_write_reg(struct lm3530_data *als_data, unsigned reg, uint8_t value)
+static int lm3530_write_reg(struct lm3530_data *als_data,
+							uint8_t reg,
+							uint8_t value)
 {
 	uint8_t buf[LD_LM3530_ALLOWED_W_BYTES] = { reg, value };
 	int bytes;
@@ -96,14 +93,14 @@ int lm3530_write_reg(struct lm3530_data *als_data, unsigned reg, uint8_t value)
 	} while ((bytes != (LD_LM3530_ALLOWED_W_BYTES))
 		 && ((++i) < LD_LM3530_MAX_RW_RETRIES));
 
-	if (bytes < LD_LM3530_ALLOWED_W_BYTES) {
+	if (bytes != LD_LM3530_ALLOWED_W_BYTES) {
 		pr_err("%s: i2c_master_send error\n", __func__);
 		return -EINVAL;
 	}
 	return 0;
 }
 
-int ld_lm3530_init_registers(struct lm3530_data *als_data)
+static int ld_lm3530_init_registers(struct lm3530_data *als_data)
 {
 	if (lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
 			     als_data->als_pdata->als_config) ||
@@ -145,15 +142,14 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 	struct lm3530_data *als_data =
 	    container_of(led_cdev, struct lm3530_data, led_dev);
 
-	als_data->last_requested_brightness = value;
 	if (value == LED_OFF) {
 		error = lm3530_read_reg(als_data,
 					LM3530_GEN_CONFIG,
-					LD_LM3530_ALLOWED_R_BYTES,
 					&gen_config_val);
 		if (error != 0) {
 			pr_err("%s:Unable to read ALS Zone read back: %d\n",
 			       __func__, error);
+			return;
 		}
 		brightness = gen_config_val & LD_LM3530_LAST_BRIGHTNESS_MASK;
 	} else {
@@ -161,17 +157,18 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 		case AUTOMATIC:
 			error = lm3530_read_reg(als_data,
 						LM3530_GEN_CONFIG,
-						LD_LM3530_ALLOWED_R_BYTES,
 						&gen_config_val);
 			if (error != 0) {
 				pr_err("%s:Unable to read ALS Zone: %d\n",
 				       __func__, error);
+				return;
 			}
 			current_select =
 			    als_data->current_array[value /
 						    als_data->current_divisor];
+
 			/* Add one here to turn on device enable bit */
-			brightness = (((gen_config_val & 0xE3) |
+			brightness = (((gen_config_val & LM3530_GEN_CONF_MASK) |
 				       (current_select << 2)) | 1);
 			break;
 		case MANUAL:
@@ -187,12 +184,15 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 			break;
 		}
 	}
-	if (lm3530_write_reg(als_data, LM3530_GEN_CONFIG, brightness))
+	if (lm3530_write_reg(als_data, LM3530_GEN_CONFIG, brightness)) {
 		pr_err("%s:writing failed while setting brightness:%d\n",
 		       __func__, error);
+		return;
+	}
+
+	als_data->last_requested_brightness = value;
 
 }
-EXPORT_SYMBOL(ld_lm3530_brightness_set);
 
 static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 				   *attr, const char *buf, size_t size)
@@ -201,10 +201,14 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
 						 dev);
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
+	unsigned long mode_value;
 
-	als_data->mode = simple_strtoul(buf, NULL, 10);
+	error = strict_strtoul(buf, 10, &mode_value);
 
-	if (als_data->mode >= AUTOMATIC) {
+	if (error < 0)
+		return -1;
+
+	if (mode_value >= AUTOMATIC) {
 
 		ld_lm3530_init_registers(als_data);
 		error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
@@ -213,12 +217,14 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 			pr_err("%s:Initialize Gen Config Reg failed %d\n",
 			       __func__, error);
 			als_data->mode = -1;
+			return -1;
 		}
 		als_data->mode = AUTOMATIC;
 	} else {
 		als_data->mode = MANUAL;
 
-		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG, 0x00);
+		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
+			LM3530_MANUAL_VALUE);
 		if (error) {
 			pr_err("%s:Failed to set manual mode:%d\n",
 			       __func__, error);
@@ -257,8 +263,7 @@ void ld_lm3530_work_queue(struct work_struct *work)
 	    container_of(work, struct lm3530_data, wq);
 
 	ret = lm3530_read_reg(als_data,
-			      LM3530_ALS_ZONE_REG, LD_LM3530_ALLOWED_R_BYTES,
-			      &als_data->zone);
+			      LM3530_ALS_ZONE_REG, &als_data->zone);
 	if (ret != 0) {
 		pr_err("%s:Unable to read ALS Zone read back: %d\n",
 		       __func__, ret);
@@ -313,9 +318,11 @@ static int ld_lm3530_probe(struct i2c_client *client,
 	als_data->mode = AUTOMATIC;
 	als_data->zone = 3;
 
+	memset(als_data->current_array, 0, ARRAY_SIZE(als_data->current_array));
+
 	if ((pdata->upper_curr_sel > 7) ||
 	    (pdata->lower_curr_sel > pdata->upper_curr_sel)) {
-		pr_err("%s:Incorrect current select values\n", __func__);
+		pr_err("%s: Incorrect current select values\n", __func__);
 		error = -ENODEV;
 		goto error_invalid_current_select;
 	}
@@ -323,6 +330,11 @@ static int ld_lm3530_probe(struct i2c_client *client,
 	als_data->current_divisor =
 	    (LM3530_MAX_LED_VALUE /
 	     ((pdata->upper_curr_sel - pdata->lower_curr_sel) + 1)) + 1;
+	if (als_data->current_divisor <= 0) {
+		pr_err("%s: Incorrect divisor for current\n", __func__);
+		error = -ENODEV;
+		goto error_invalid_current_select;
+	}
 
 	/* Populate the table with the current select values */
 	for (i = 0; i <= (pdata->upper_curr_sel - pdata->lower_curr_sel); i++)
@@ -408,13 +420,14 @@ static int ld_lm3530_probe(struct i2c_client *client,
 err_create_file_failed:
 	led_classdev_unregister(&als_data->led_dev);
 err_class_reg_failed:
-error_input_register_failed:
 err_reg_init_failed:
+	input_unregister_device(als_data->idev);
+error_input_register_failed:
 	free_irq(als_data->client->irq, als_data);
 err_req_irq_failed:
 	destroy_workqueue(als_data->working_queue);
-	input_free_device(als_data->idev);
 error_create_wq_failed:
+	input_free_device(als_data->idev);
 error_input_allocate_failed:
 error_invalid_current_select:
 	kfree(als_data);

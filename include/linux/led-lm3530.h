@@ -19,10 +19,9 @@
 #ifndef _LINUX_LED_LD_LM3530_H__
 #define _LINUX_LED_LD_LM3530_H__
 
-enum {
-	MANUAL = 1,
-	AUTOMATIC
-};
+#define	MANUAL		0
+#define	AUTOMATIC	1
+
 
 #define LD_LM3530_LED_DEV "lcd-backlight"
 
@@ -53,8 +52,11 @@ enum {
 #define LM3530_ALS_Z4T_REG		0x74
 
 #define LM3530_ALS_READ_MASK	0x07
+#define LM3530_GEN_CONF_MASK	0xE3
 #define LM3530_MAX_LED_VALUE	0xFF
+#define LM3530_MANUAL_VALUE		0x66
 
+#ifdef __KERNEL__
 struct lm3530_platform_data {
 	u8  gen_config;
 	u8  als_config;
@@ -81,5 +83,5 @@ struct lm3530_platform_data {
 	u8 lower_curr_sel;
 } __attribute__ ((packed));
 
-
-#endif				/* _LINUX_LED_LD_LM3530_H__ */
+#endif	/* __KERNEL__ */
+#endif	/* _LINUX_LED_LD_LM3530_H__ */
