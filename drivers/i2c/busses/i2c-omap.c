@@ -302,7 +302,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 					   SYSC_AUTOIDLE_MASK);
 
 		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-			u32 v;
 
 			dev->syscstate = SYSC_AUTOIDLE_MASK;
 			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
