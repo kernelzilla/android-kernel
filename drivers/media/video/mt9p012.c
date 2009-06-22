@@ -92,8 +92,8 @@
 #define MT9P012_MAX_ANALOG_GAIN	0x1FF
 #define MT9P012_MIN_GAIN	0x08
 #define MT9P012_MAX_GAIN	0x7F
-#define MT9P012_DEF_GAIN	0x43
 #define MT9P012_GAIN_STEP   	0x1
+#define MT9P012_DEF_LINEAR_GAIN	((u16)(2 * 256))
 
 #define MT9P012_GAIN_INDEX	1
 
@@ -102,6 +102,8 @@
 #define MT9P012_DEF_MAX_EXPOSURE	0x7F
 #define MT9P012_DEF_EXPOSURE	    	0x43
 #define MT9P012_EXPOSURE_STEP       	1
+
+#define MT9P012_MAX_FRAME_LENGTH_LINES 0xFFFF
 
 /**
  * struct mt9p012_reg - mt9p012 register format
@@ -141,30 +143,6 @@ struct mt9p012_capture_size {
 	unsigned long height;
 };
 
-/**
- * struct mt9p012_pll_settings - struct for storage of sensor pll values
- * @vt_pix_clk_div: vertical pixel clock divider
- * @vt_sys_clk_div: veritcal system clock divider
- * @pre_pll_div: pre pll divider
- * @fine_int_tm: fine resolution interval time
- * @frame_lines: number of lines in frame
- * @line_len: number of pixels in line
- * @min_pll: minimum pll multiplier
- * @max_pll: maximum pll multiplier
- */
-struct mt9p012_pll_settings {
-	u16 vt_pix_clk_div;
-	u16 vt_sys_clk_div;
-	u16 pre_pll_div;
-
-	u16 fine_int_tm;
-	u16 frame_lines;
-	u16 line_len;
-
-	u16 min_pll;
-	u16 max_pll;
-};
-
 /*
  * Array of image sizes supported by MT9P012.  These must be ordered from
  * smallest image size to largest.
@@ -177,17 +155,15 @@ const static struct mt9p012_capture_size mt9p012_sizes[] = {
 	{ 2592, 1944},	/* 5 MP */
 };
 
-/* PLL settings for MT9P012 */
-enum mt9p012_pll_type {
-	MT9P012_PLL_5MP = 0,
-	MT9P012_PLL_3MP,
-	MT9P012_PLL_1296_15FPS,
-	MT9P012_PLL_1296_30FPS,
-	MT9P012_PLL_648_15FPS,
-	MT9P012_PLL_648_30FPS,
-	MT9P012_PLL_216_15FPS,
-	MT9P012_PLL_216_30FPS
+enum mt9p012_frame_type {
+	MT9P012_FRAME_5MP_10FPS = 0,
+	MT9P012_FRAME_3MP_10FPS,
+	MT9P012_FRAME_1296_30FPS,
+	MT9P012_FRAME_648_30FPS,
+	MT9P012_FRAME_648_120FPS,
+	MT9P012_FRAME_216_30FPS,
 };
+
 
 /* Debug functions */
 static int debug;
@@ -221,7 +197,13 @@ struct mt9p012_sensor {
 	u32 ver;
 	int fps;
 	int detected;
-	unsigned long xclk_current;
+
+	u32 x_clk;
+	u32 pll_clk;
+	u32 vt_pix_clk;
+	u32 op_pix_clk;
+
+	int current_iframe;
 };
 
 /* list of image formats supported by mt9p012 sensor */
@@ -339,372 +321,308 @@ const static struct mt9p012_reg mt9p013_common[] = {
 	{MT9P012_TOK_TERM, 0, 0}
 };
 
+const static struct mt9p012_reg mt9p012_648_120fps_addendum[] = {
+	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x01}, /* hold */
+	{MT9P012_16BIT, 0x3162, 0x04ce},
+	{MT9P012_16BIT, 0x308a, 0x6424},
+	{MT9P012_16BIT, 0x3092, 0x0a53},
+	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00}, /* update all at once */
+	{MT9P012_TOK_TERM, 0, 0}
+};
 
-
-/*
- * mt9p012 register configuration for all combinations of pixel format and
- * image size
+/**
+ * struct struct clk_settings - struct for storage of sensor
+ * clock settings
+ * @pre_pll_div: pre pll divider
+ * @pll_mult: pll multiplier
+ * @vt_pix_clk_div: video pixel clock divider
+ * @vt_sys_clk_div: video system clock divider
+ * @op_pix_clk_div: output pixel clock divider
+ * @op_sys_clk_div: output system clock divider
+ * @min_pll: minimum pll multiplier
+ * @max_pll: maximum pll multiplier
  */
-	/* 4X BINNING+SCALING */
-const static struct mt9p012_reg enter_video_216_15fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	 /* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 126},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064,
-		.val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_4X_BINN_SCALED},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2593},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1945},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x04FC},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 574},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 2712},
-	 /* 0x10/0x30 = 0.3333 */
-	{.length = MT9P012_16BIT, .reg = REG_SCALE_M, .val = 0x0030},
-	/* enable scaler */
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0002},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_216},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
-	};
-
-	/* Video mode, 4x binning + scaling, range 16 - 30 fps */
-const static struct mt9p012_reg enter_video_216_30fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 5},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 3},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 192},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 10},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2593},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1945},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x04FC},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 1374},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 3712},
-	/* 0x10/0x30 = 0.3333 */
-	{.length = MT9P012_16BIT, .reg = REG_SCALE_M, .val = 0x0030},
-	/* enable scaler */
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0002},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_216_30FPS},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
-	};
-
-
-	/*Video mode, 4x binning: 648 x 486, range 8 - 15 fps*/
-const static struct mt9p012_reg enter_video_648_15fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 126},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2593},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1945},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x04FC},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 574},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 2712},
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0000},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_648},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+struct mt9p012_clk_settings {
+	u16	pre_pll_div;
+	u16	pll_mult;
+	u16	vt_pix_clk_div;
+	u16	vt_sys_clk_div;
+	u16	op_pix_clk_div;
+	u16	op_sys_clk_div;
+	u16	min_pll;
+	u16	max_pll;
 };
 
-	/* Video mode, 4x binning: 648 x 486, range 16 - 30 fps */
-const static struct mt9p012_reg enter_video_648_30fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 5},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 3},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 192},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 10},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_4X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2593},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1945},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x04FC},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 1374},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 3712},
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0000},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_648_30FPS},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+/**
+ * struct struct frame_settings - struct for storage of sensor
+ * frame settings
+ * @frame_len_lines: number of lines in frame
+ * @line_len_pck: number of pixels in line
+ * @x_addr_start: horizontal start address
+ * @x_addr_end: horizontal end address
+ * @y_addr_start: vertical start address
+ * @y_addr_end: vertical end address
+ * @x_output_size: horizontal output size
+ * @y_output_size: vertical output size
+ * @x_odd_inc: X odd increment value
+ * @y_odd_inc: Y odd increment value
+ * @x_bin: X binning enable
+ * @xy_bin: XY binning enable
+ * @scale_m: scale factor = 16/M
+ * @scale_mode: image resolution scaler mode
+ */
+struct mt9p012_frame_settings {
+	u16	frame_len_lines_min;
+	u16	frame_len_lines;
+	u16	line_len_pck;
+	u16	x_addr_start;
+	u16	x_addr_end;
+	u16	y_addr_start;
+	u16	y_addr_end;
+	u16	x_output_size;
+	u16	y_output_size;
+	u16	x_odd_inc;
+	u16	y_odd_inc;
+	u16	x_bin;
+	u16	xy_bin;
+	u16	scale_m;
+	u16	scale_mode;
 };
 
-	/* Video mode, scaler off: 1296 x 972, range  11 - 21 fps*/
-const static struct mt9p012_reg enter_video_1296_15fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 5},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 2},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 3},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 134},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 10},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_2X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_2X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2597},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1949},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x046C},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 1061},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 3360},
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0000},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_1296},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+/**
+ * struct struct exposure_settings - struct for storage of sensor
+ * initial exposure settings
+ * @coarse_int_tm: coarse integration time in lines
+ * @fine_int_tm: fine integration time in pixels
+ * @fine_correction: fine correction time in pixels
+ * @analog_gain: global analog gain (smia)
+ */
+struct mt9p012_exposure_settings {
+	u16	coarse_int_tm;
+	u16	fine_int_tm;
+	u16	fine_correction;
+	u16	analog_gain;
 };
 
-	/* YUV (YCbCr) VGA */
-const static struct mt9p012_reg enter_video_1296_30fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 5},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 3},
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 134},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 10},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_WIDTH_2X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_VIDEO_HEIGHT_2X_BINN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2597},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1949},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x046C},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 1794},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 1061},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 3360},
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0000},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_1296},
-	 /* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+/**
+ * struct struct mt9p012_sensor_settings - struct for storage of
+ * sensor settings.
+ */
+struct mt9p012_sensor_settings {
+	struct mt9p012_clk_settings clk;
+	struct mt9p012_frame_settings frame;
+	struct mt9p012_exposure_settings exposure;
 };
 
-const static struct mt9p012_reg enter_image_mode_3MP_10fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 4},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 5},
-	/* 10 fps */
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 184},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_IMAGE_WIDTH_MIN},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_IMAGE_HEIGHT_MIN},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2599},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1951},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x0024},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 882},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 2056},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 5372},
-	/* 0x10/0x14 = 0.80 */
-	{.length = MT9P012_16BIT, .reg = REG_SCALE_M, .val = 0x0014},
-	/* enable scaler */
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0002},
-	{.length = MT9P012_16BIT, .reg = REG_TEST_PATTERN,
-		.val = MT9P012_TST_PAT},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_3MP},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
-};
+static struct mt9p012_sensor_settings sensor_settings[] = {
 
-/* Image mode, 5 MP @ 10 fps */
-const static struct mt9p012_reg enter_image_mode_5MP_10fps[] = {
-	/* stream off */
-	{.length = MT9P012_8BIT, .reg = REG_MODE_SELECT, .val = 0x00},
-	{.length = MT9P012_TOK_DELAY, .reg = 0x00, .val = 100},
-	/* hold */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
-	{.length = MT9P012_16BIT, .reg = REG_VT_PIX_CLK_DIV, .val = 4},
-	{.length = MT9P012_16BIT, .reg = REG_VT_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_PRE_PLL_CLK_DIV, .val = 5},
-	/* 10 fps */
-	{.length = MT9P012_16BIT, .reg = REG_PLL_MULTIPLIER, .val = 184},
-	{.length = MT9P012_16BIT, .reg = REG_OP_PIX_CLK_DIV, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_OP_SYS_CLK_DIV, .val = 1},
-	{.length = MT9P012_16BIT, .reg = REG_RESERVED_MFR_3064, .val = 0x0805},
-	{.length = MT9P012_16BIT, .reg = REG_X_OUTPUT_SIZE,
-		.val = MT9P012_IMAGE_WIDTH_MAX},
-	{.length = MT9P012_16BIT, .reg = REG_Y_OUTPUT_SIZE,
-		.val = MT9P012_IMAGE_HEIGHT_MAX},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_START, .val = 8},
-	{.length = MT9P012_16BIT, .reg = REG_X_ADDR_END, .val = 2599},
-	{.length = MT9P012_16BIT, .reg = REG_Y_ADDR_END, .val = 1951},
-	{.length = MT9P012_16BIT, .reg = REG_READ_MODE, .val = 0x0024},
-	{.length = MT9P012_16BIT, .reg = REG_FINE_INT_TIME, .val = 882},
-	{.length = MT9P012_16BIT, .reg = REG_FRAME_LEN_LINES, .val = 2056},
-	{.length = MT9P012_16BIT, .reg = REG_LINE_LEN_PCK, .val = 5372},
-	{.length = MT9P012_16BIT, .reg = REG_SCALE_M, .val = 0x0000},
-	/* disable scaler */
-	{.length = MT9P012_16BIT, .reg = REG_SCALING_MODE, .val = 0x0000},
-	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME,
-		.val = MT9P012_COARSE_INT_TIME_5MP},
-	/* update */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+	/* FRAME_5MP */
+	{
+		.clk = {
+			.pre_pll_div = 5,
+			.pll_mult = 93,
+			.vt_pix_clk_div = 4,
+			.vt_sys_clk_div = 1,
+			.op_pix_clk_div = 8,
+			.op_sys_clk_div = 1,
+		},
+		.frame = {
+			.frame_len_lines_min = 2056,
+			.line_len_pck = 5372,
+			.x_addr_start = 8,
+			.x_addr_end = 2599,
+			.y_addr_start = 8,
+			.y_addr_end = 1951,
+			.x_output_size = 2592,
+			.y_output_size = 1944,
+			.x_odd_inc = 1,
+			.y_odd_inc = 1,
+			.x_bin = 0,
+			.xy_bin = 0,
+			.scale_m = 0,
+			.scale_mode = 0,
+		},
+		.exposure = {
+			.coarse_int_tm = 1700,
+			.fine_int_tm = 882,
+			.fine_correction = 156,
+			.analog_gain = 0x10C0
+		}
+	},
+
+	/* FRAME_3MP */
+	{
+		.clk = {
+			.pre_pll_div = 5,
+			.pll_mult = 184,
+			.vt_pix_clk_div = 4,
+			.vt_sys_clk_div = 1,
+			.op_pix_clk_div = 8,
+			.op_sys_clk_div = 1,
+		},
+		.frame = {
+			.frame_len_lines_min = 2056,
+			.line_len_pck = 5372,
+			.x_addr_start = 8,
+			.x_addr_end = 2599,
+			.y_addr_start = 8,
+			.y_addr_end = 1951,
+			.x_output_size = 2592,
+			.y_output_size = 1944,
+			.x_odd_inc = 1,
+			.y_odd_inc = 1,
+			.x_bin = 0,
+			.xy_bin = 0,
+			.scale_m = 0,
+			.scale_mode = 0,
+		},
+		.exposure = {
+			.coarse_int_tm = 1700,
+			.fine_int_tm = 882,
+			.fine_correction = 156,
+			.analog_gain = 0x10C0
+		}
+	},
+
+	/* FRAME_1296_30FPS */
+	{
+		.clk = {
+			.pre_pll_div = 6,
+			.pll_mult = 134,
+			.vt_pix_clk_div = 5,
+			.vt_sys_clk_div = 1,
+			.op_pix_clk_div = 10,
+			.op_sys_clk_div = 1,
+		},
+		.frame = {
+			.frame_len_lines_min = 1061,
+			.line_len_pck = 3360,
+			.x_addr_start = 8,
+			.x_addr_end = 2597,
+			.y_addr_start = 8,
+			.y_addr_end = 1949,
+			.x_output_size = 1296,
+			.y_output_size = 972,
+			.x_odd_inc = 3,
+			.y_odd_inc = 3,
+			.x_bin = 0,
+			.xy_bin = 1,
+			.scale_m = 0,
+			.scale_mode = 0,
+		},
+		.exposure = {
+			.coarse_int_tm = 1000,
+			.fine_int_tm = 1794,
+			.fine_correction = 348,
+			.analog_gain = 0x10C0
+		}
+	},
+
+	/* FRAME_648_30FPS */
+	{
+		.clk = {
+			.pre_pll_div = 6,
+			.pll_mult = 187,
+			.vt_pix_clk_div = 5,
+			.vt_sys_clk_div = 2,
+			.op_pix_clk_div = 10,
+			.op_sys_clk_div = 2,
+		},
+		.frame = {
+			.frame_len_lines_min = 775,
+			.line_len_pck = 3200,
+			.x_addr_start = 0,
+			.x_addr_end = 2601,
+			.y_addr_start = 4,
+			.y_addr_end = 1949,
+			.x_output_size = 648,
+			.y_output_size = 486,
+			.x_odd_inc = 7,
+			.y_odd_inc = 7,
+			.x_bin = 0,
+			.xy_bin = 1,
+			.scale_m = 0,
+			.scale_mode = 0,
+		},
+		.exposure = {
+			.coarse_int_tm = 750,
+			.fine_int_tm = 1794,
+			.fine_correction = 348,
+			.analog_gain = 0x10C0
+		}
+	},
+
+	/* FRAME_648_120FPS */
+	{
+		.clk = {
+			.pre_pll_div = 4,
+			.pll_mult = 120,
+			.vt_pix_clk_div = 6,
+			.vt_sys_clk_div = 1,
+			.op_pix_clk_div = 10,
+			.op_sys_clk_div = 1,
+		},
+		.frame = {
+			.frame_len_lines_min = 565,
+			.line_len_pck = 1832,
+			.x_addr_start = 0,
+			.x_addr_end = 2601,
+			.y_addr_start = 8,
+			.y_addr_end = 1921,
+			.x_output_size = 648,
+			.y_output_size = 486,
+			.x_odd_inc = 7,
+			.y_odd_inc = 7,
+			.x_bin = 0,
+			.xy_bin = 0,
+			.scale_m = 32,
+			.scale_mode = 0,
+		},
+		.exposure = {
+			.coarse_int_tm = 568,
+			.fine_int_tm = 1016,
+			.fine_correction = 156,
+			.analog_gain = 0x11FD
+		}
+	},
+
+	/* FRAME_216_30FPS */
+	{
+		.clk = {
+			.pre_pll_div = 3,
+			.pll_mult = 94,
+			.vt_pix_clk_div = 5,
+			.vt_sys_clk_div = 2,
+			.op_pix_clk_div = 10,
+			.op_sys_clk_div = 2,
+		},
+		.frame = {
+			.frame_len_lines_min = 775,
+			.line_len_pck = 3200,
+			.x_addr_start = 0,
+			.x_addr_end = 2601,
+			.y_addr_start = 4,
+			.y_addr_end = 1949,
+			.x_output_size = 216,
+			.y_output_size = 162,
+			.x_odd_inc = 7,
+			.y_odd_inc = 7,
+			.x_bin = 0,
+			.xy_bin = 1,
+			.scale_m = 48,
+			.scale_mode = 2,
+		},
+		.exposure = {
+			.coarse_int_tm = 770,
+			.fine_int_tm = 1794,
+			.fine_correction = 348,
+			.analog_gain = 0x11FD
+		}
+	}
 };
 
 static u32 min_exposure_time;
 static u32 max_exposure_time;
-static u32 pix_clk_freq;
-
-/* Structure to set frame rate */
-static struct mt9p012_reg set_fps[2];
-
-/**
- * struct mt9p012_pll_settings - struct for storage of sensor pll values
- * @vt_pix_clk_div: vertical pixel clock divider
- * @vt_sys_clk_div: veritcal system clock divider
- * @pre_pll_div: pre pll divider
- * @fine_int_tm: fine resolution interval time
- * @frame_lines: number of lines in frame
- * @line_len: number of pixels in line
- * @min_pll: minimum pll multiplier
- * @max_pll: maximum pll multiplier
- */
-const static struct mt9p012_pll_settings all_pll_settings[] = {
-	/* PLL_5MP */
-	{.vt_pix_clk_div = 4, .vt_sys_clk_div = 1, .pre_pll_div = 5,
-	.fine_int_tm = 882, .frame_lines = 2056, .line_len = 5372,
-	.min_pll = 160, .max_pll = 200},
-	/* PLL_3MP */
-	{.vt_pix_clk_div = 4, .vt_sys_clk_div = 1, .pre_pll_div = 5,
-	.fine_int_tm = 882, .frame_lines = 2056, .line_len = 5372,
-	.min_pll = 160, .max_pll = 200},
-	/* PLL_1296_15FPS */
-	{.vt_pix_clk_div = 5, .vt_sys_clk_div = 2, .pre_pll_div = 3,
-	.fine_int_tm = 1794, .frame_lines = 1061, .line_len = 3360,
-	.min_pll = 96, .max_pll = 190},
-	/* PLL_1296_30FPS */
-	{.vt_pix_clk_div = 5, .vt_sys_clk_div = 1, .pre_pll_div = 3,
-	.fine_int_tm = 1794, .frame_lines = 1061, .line_len = 3360,
-	.min_pll = 96, .max_pll = 150},
-	/* PLL_648_15FPS */
-	{.vt_pix_clk_div = 8, .vt_sys_clk_div = 2, .pre_pll_div = 2,
-	.fine_int_tm = 1794, .frame_lines = 574, .line_len = 2712,
-	.min_pll = 92, .max_pll = 128},
-	/* PLL_648_30FPS */
-	{.vt_pix_clk_div = 5, .vt_sys_clk_div = 2, .pre_pll_div = 3,
-	.fine_int_tm = 1794, .frame_lines = 1374, .line_len = 3712,
-	.min_pll = 96, .max_pll = 192},
-	/* PLL_216_15FPS */
-	{.vt_pix_clk_div = 8, .vt_sys_clk_div = 2, .pre_pll_div = 2,
-	.fine_int_tm = 1794,  .frame_lines = 574, .line_len = 2712,
-	.min_pll = 92, .max_pll = 126},
-	/* PLL_216_30FPS */
-	{.vt_pix_clk_div = 5, .vt_sys_clk_div = 2, .pre_pll_div = 3,
-	.fine_int_tm = 1794,  .frame_lines = 1374, .line_len = 3712,
-	.min_pll = 96, .max_pll = 192}
-};
-
-static enum mt9p012_pll_type current_pll_video;
-
-const static struct mt9p012_reg
-		*mt9p012_reg_init[MT9P012_NUM_FPS][MT9P012_NUM_IMAGE_SIZES] = {
-	{
-		enter_video_216_15fps,
-		enter_video_648_15fps,
-		enter_video_1296_15fps,
-		enter_image_mode_3MP_10fps,
-		enter_image_mode_5MP_10fps
-	},
-	{
-		enter_video_216_30fps,
-		enter_video_648_30fps,
-		enter_video_1296_30fps,
-		enter_image_mode_3MP_10fps,
-		enter_image_mode_5MP_10fps
-	},
-};
 
 /**
  * struct vcontrol - Video controls
@@ -735,9 +653,9 @@ static struct vcontrol {
 			.minimum = MT9P012_MIN_GAIN,
 			.maximum = MT9P012_MAX_GAIN,
 			.step = MT9P012_GAIN_STEP,
-			.default_value = MT9P012_DEF_GAIN,
+			.default_value = MT9P012_DEF_LINEAR_GAIN,
 		},
-		.current_value = MT9P012_DEF_GAIN,
+		.current_value = MT9P012_DEF_LINEAR_GAIN,
 	}
 };
 
@@ -856,14 +774,6 @@ again:
 	if (data_length == MT9P012_8BIT)
 		data[2] = (u8) (val & 0xff);
 	else if (data_length == MT9P012_16BIT) {
-		if (reg == REG_READ_MODE && sensor->ver > mt9p012_ver(12, 6)) {
-			/* format or READ_MODE register changed at rev 7 */
-			int x_odd_inc = (val >> 5) & 0x7;
-			int y_odd_inc = (val >> 2) & 0x7;
-			val &= (0x7 << 5) | (0x7 << 2);
-			val |= x_odd_inc << 6;
-			val |= y_odd_inc;
-		}
 		data[2] = (u8) (val >> 8);
 		data[3] = (u8) (val & 0xff);
 	} else {
@@ -914,133 +824,6 @@ static int mt9p012_write_regs(struct i2c_client *client,
 			return err;
 	}
 	return 0;
-}
-
-/**
- * mt9p012_calc_pll - Calculate PLL settings based on input image size
- * @isize: enum value corresponding to image size
- * @xclk: xclk value (calculate by mt9p012sensor_calc_xclk())
- * @sensor: pointer to sensor device information structure
- *
- * Calculates sensor PLL related settings (scaler, fps, pll_multiplier,
- * pix_clk_freq, min_exposure_time, max_exposure_time) based on input
- * image size.  It then applies the fps register settings based on
- * these calculations.
- */
-static int mt9p012_calc_pll(enum mt9p012_image_size isize, unsigned long xclk,
-			    struct mt9p012_sensor *sensor)
-{
-	int err = 0, row = 1, i = 0;
-	unsigned int vt_pix_clk;
-	unsigned int pll_multiplier;
-	unsigned int exposure_factor, pix_clk_scaled;
-	struct i2c_client *client = to_i2c_client(sensor->dev);
-	struct vcontrol *lvc;
-
-	/* Greater than 1296x972
-	1. Scaler is 0
-	2. fps is 10
-	3. Apply image mode settings
-	4. Turn Streaming ON.
-	5. Exit
-	*/
-	if (isize > MT9P012_BIN2X) {
-		/* Burst Mode */
-		sensor->scaler = 0;
-		sensor->fps = 10;
-		current_pll_video = MT9P012_PLL_5MP;
-		return 0;
-	}
-
-	/* Greater than 648X486 case
-	1. Scaler is 0
-	2. If fps>21 then choose PLL for 30
-	3. If fps<21 then choose PLL for 15
-
-	Greater than 216X162 case
-	1. Scaler is 1
-	2. If fps>15 then choose PLL for 30
-	3. If fps<15 then choose PLL for 15
-
-	Greater than 0 to 216x162
-	1. Scaler is 2.
-	2. If fps>15 then choose PLL for 30
-	3. If fps<15 then choose PLL for 15
-	*/
-
-	if (isize > MT9P012_BIN4X) {
-		sensor->scaler = 0;
-		if (sensor->fps > 21)
-			current_pll_video = MT9P012_PLL_1296_30FPS;
-		else
-			current_pll_video = MT9P012_PLL_1296_15FPS;
-	} else if (isize > MT9P012_BIN4XSCALE) {
-		sensor->scaler = 1;
-		if (sensor->fps > 15)
-			current_pll_video = MT9P012_PLL_648_30FPS;
-		else
-			current_pll_video = MT9P012_PLL_648_15FPS;
-	} else {
-		sensor->scaler = 2;
-		if (sensor->fps > 15)
-			current_pll_video = MT9P012_PLL_216_30FPS;
-		else
-			current_pll_video = MT9P012_PLL_216_15FPS;
-	}
-
-	/* Row adjustment */
-	if (sensor->scaler && (sensor->fps < 16))
-		row = 2; /* Adjustment when using 4x binning and 12 MHz clk */
-
-	/* Calculate the PLL, set fps register */
-	vt_pix_clk = sensor->fps *
-		all_pll_settings[current_pll_video].frame_lines *
-		all_pll_settings[current_pll_video].line_len;
-
-	pll_multiplier =
-		(((vt_pix_clk
-		   * all_pll_settings[current_pll_video].vt_pix_clk_div
-		   * all_pll_settings[current_pll_video].vt_sys_clk_div
-		   * row) / xclk)
-		   * all_pll_settings[current_pll_video].pre_pll_div) + 1;
-
-	if (pll_multiplier < all_pll_settings[current_pll_video].min_pll)
-		pll_multiplier = all_pll_settings[current_pll_video].min_pll;
-	else if (pll_multiplier > all_pll_settings[current_pll_video].max_pll)
-		pll_multiplier = all_pll_settings[current_pll_video].max_pll;
-
-	pix_clk_freq = (xclk /
-			(all_pll_settings[current_pll_video].pre_pll_div
-			 * all_pll_settings[current_pll_video].vt_pix_clk_div
-			 * all_pll_settings[current_pll_video].vt_sys_clk_div
-			 * row)) * pll_multiplier;
-	min_exposure_time = (all_pll_settings[current_pll_video].fine_int_tm
-			     * 1000000 / pix_clk_freq) + 1;
-	exposure_factor = (all_pll_settings[current_pll_video].frame_lines - 1)
-				* all_pll_settings[current_pll_video].line_len;
-	exposure_factor += all_pll_settings[current_pll_video].fine_int_tm;
-	exposure_factor *= 100;
-	pix_clk_scaled = pix_clk_freq / 100;
-	max_exposure_time = (exposure_factor / pix_clk_scaled) * 100;
-
-	/* Apply the fps settings */
-	set_fps[0].length = MT9P012_16BIT;
-	set_fps[0].reg = REG_PLL_MULTIPLIER;
-	set_fps[0].val = pll_multiplier;
-	set_fps[1].length = MT9P012_TOK_TERM;
-	set_fps[1].reg = 0;
-	set_fps[1].val = 0;
-
-	/* Update min/max for query control */
-	i = find_vctrl(V4L2_CID_EXPOSURE);
-	if (i >= 0) {
-		lvc = &video_control[i];
-		lvc->qc.minimum = min_exposure_time;
-		lvc->qc.maximum = max_exposure_time;
-	}
-
-	err = mt9p012_write_regs(client, set_fps);
-	return err;
 }
 
 /**
@@ -1099,185 +882,30 @@ static enum mt9p012_image_size mt9p012_find_isize(unsigned int width)
 
 	return isize;
 }
-/**
- * mt9p012_find_fps_index - Find the best fps range match for a
- *  requested frame rate
- * @fps: desired frame rate
- * @isize: enum value corresponding to image size
- *
- * Find the best match for a requested frame rate.  The best match
- * is chosen between two fps ranges (11 - 15 and 16 - 30 fps) depending on
- * the image size. For image sizes larger than BIN2X, frame rate is fixed
- * at 10 fps.
- */
-static unsigned int mt9p012_find_fps_index(unsigned int fps,
-					   enum mt9p012_image_size isize)
-{
-	unsigned int index = MT9P012_FPS_LOW_RANGE;
 
-	if (isize > MT9P012_BIN4X) {
-		if (fps > 21)
-			index = MT9P012_FPS_HIGH_RANGE;
+static enum mt9p012_frame_type mt9p012_find_iframe(unsigned int fps,
+						   enum mt9p012_image_size isize)
+{
+	enum mt9p012_frame_type iframe = 0;
+
+	if (isize == MT9P012_BIN4XSCALE) {
+		iframe = MT9P012_FRAME_216_30FPS;
+	} else if (isize == MT9P012_BIN4X) {
+		if (fps <= 30)
+			iframe = MT9P012_FRAME_648_30FPS;
+		else
+			iframe = MT9P012_FRAME_648_120FPS;
+	} else if (isize == MT9P012_BIN2X) {
+		iframe = MT9P012_FRAME_1296_30FPS;
+
+	} else if (isize == MT9P012_THREE_MP) {
+		iframe = MT9P012_FRAME_3MP_10FPS;
+
 	} else {
-		if (fps > 15)
-			index = MT9P012_FPS_HIGH_RANGE;
+		iframe = MT9P012_FRAME_5MP_10FPS;
 	}
 
-	return index;
-}
-
-/**
- * mt9p012_calc_xclk - Calculate the required xclk frequency
- * @c: i2c client driver structure
- *
- * Given the image capture format in pix, the nominal frame period in
- * timeperframe, calculate and return the required xclk frequency
- */
-static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
-{
-	struct mt9p012_sensor *sensor = i2c_get_clientdata(c);
-	struct v4l2_fract *timeperframe = &sensor->timeperframe;
-	struct v4l2_pix_format *pix = &sensor->pix;
-
-	if (timeperframe->numerator == 0 ||
-	    timeperframe->denominator == 0) {
-		/* supply a default nominal_timeperframe */
-		timeperframe->numerator = 1;
-		timeperframe->denominator = MT9P012_DEF_FPS;
-	}
-
-	sensor->fps = timeperframe->denominator / timeperframe->numerator;
-	if (sensor->fps < MT9P012_MIN_FPS)
-		sensor->fps = MT9P012_MIN_FPS;
-	else if (sensor->fps > MT9P012_MAX_FPS)
-		sensor->fps = MT9P012_MAX_FPS;
-
-	timeperframe->numerator = 1;
-	timeperframe->denominator = sensor->fps;
-
-	if ((pix->width <= MT9P012_VIDEO_WIDTH_4X_BINN) && (sensor->fps > 15))
-		return MT9P012_XCLK_NOM_2;
-
-	return MT9P012_XCLK_NOM_1;
-}
-
-/**
- * mt9p012_configure - Configure the mt9p012 for the specified image mode
- * @s: pointer to standard V4L2 device structure
- *
- * Configure the mt9p012 for a specified image size, pixel format, and frame
- * period.  xclk is the frequency (in Hz) of the xclk input to the mt9p012.
- * fper is the frame period (in seconds) expressed as a fraction.
- * Returns zero if successful, or non-zero otherwise.
- * The actual frame period is returned in fper.
- */
-static int mt9p012_configure(struct v4l2_int_device *s)
-{
-	struct mt9p012_sensor *sensor = s->priv;
-	struct v4l2_pix_format *pix = &sensor->pix;
-	struct i2c_client *client = to_i2c_client(sensor->dev);
-	enum mt9p012_image_size isize;
-	unsigned int fps_index;
-	int err;
-
-	isize = mt9p012_find_isize(pix->width);
-
-	/* common register initialization */
-	err = mt9p012_write_regs(client, mt9p012_common_pre);
-	if (err)
-		return err;
-
-	if (sensor->ver >= mt9p012_ver(13, 0))
-		err = mt9p012_write_regs(client,
-					 mt9p013_common);
-	else if (sensor->ver >= mt9p012_ver(12, 7))
-		err = mt9p012_write_regs(client,
-					 mt9p012_common_rev7);
-	else
-		err = mt9p012_write_regs(client,
-					 mt9p012_common_rev1);
-
-	if (err)
-		return err;
-
-
-	err = mt9p012_write_regs(client, mt9p012_common_post);
-	if (err)
-		return err;
-
-
-	fps_index = mt9p012_find_fps_index(sensor->fps, isize);
-
-	/* configure image size and pixel format */
-	err = mt9p012_write_regs(client, mt9p012_reg_init[fps_index][isize]);
-	if (err)
-		return err;
-
-	/* configure frame rate */
-	err = mt9p012_calc_pll(isize, sensor->xclk_current, sensor);
-	if (err)
-		return err;
-
-	/* configure streaming ON */
-	err = mt9p012_write_regs(client, stream_on_list);
-
-	return err;
-}
-
-/**
- * mt9p012_detect - Detect if an mt9p012 is present, and if so which revision
- * @client: pointer to the i2c client driver structure
- *
- * Detect if an mt9p012 is present, and if so which revision.
- * A device is considered to be detected if the manufacturer ID (MIDH and MIDL)
- * and the product ID (PID) registers match the expected values.
- * Any value of the version ID (VER) register is accepted.
- * Here are the version numbers we know about:
- *	0x48 --> mt9p012 Revision 1 or mt9p012 Revision 2
- *	0x49 --> mt9p012 Revision 3
- * Returns a negative error number if no device is detected, or the
- * non-negative value of the version ID register if a device is detected.
- */
-static int mt9p012_detect(struct i2c_client *client)
-{
-	u32 model_id, mfr_id, rev;
-
-	if (!client)
-		return -ENODEV;
-
-	if (mt9p012_read_reg(client, MT9P012_16BIT, REG_MODEL_ID, &model_id))
-		return -ENODEV;
-	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_MANUFACTURER_ID,
-				&mfr_id))
-		return -ENODEV;
-	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_REVISION_NUMBER, &rev))
-		return -ENODEV;
-
-	dev_info(&client->dev, "model id detected 0x%x mfr 0x%x\n", model_id,
-								mfr_id);
-	if ((mfr_id != MT9P012_MFR_ID)) {
-		dev_warn(&client->dev, "mfgr id mismatch 0x%x\n", mfr_id);
-
-		return -ENODEV;
-	}
-
-	if (model_id == MT9P012_MOD_ID) {
-		rev = mt9p012_ver(12, 0);
-	} else if (model_id == MT9P012_MOD_ID_REV7) {
-		rev = mt9p012_ver(12, 7);
-	} else if (model_id == MT9P013_MOD_ID) {
-		rev = mt9p012_ver(13, 0);
-	} else {
-		/* We didn't read the values we expected, so
-		 * this must not be an MT9P012.
-		 */
-		dev_warn(&client->dev, "model id mismatch 0x%x mfr 0x%x\n",
-			model_id, mfr_id);
-
-		return -ENODEV;
-	}
-	return rev;
-
+	return iframe;
 }
 
 /**
@@ -1298,6 +926,8 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 	int err;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
+	struct mt9p012_sensor_settings *ss =
+		&sensor_settings[sensor->current_iframe];
 	u32 coarse_int_time = 0;
 
 	if ((exp_time < min_exposure_time) ||
@@ -1309,15 +939,30 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 		return -EINVAL;
 	}
 
-	coarse_int_time = ((((exp_time / 10) * (pix_clk_freq / 1000)) / 1000) -
-		(all_pll_settings[current_pll_video].fine_int_tm / 10)) /
-		(all_pll_settings[current_pll_video].line_len / 10);
+	if (exp_time > max_exposure_time) {
+		dev_err(&client->dev, "Exposure time %d us not within "
+			"the legal range.\n", exp_time);
+		dev_err(&client->dev, "Exposure time must be "
+			"less than %d us\n", max_exposure_time);
+		exp_time = max_exposure_time;
+	}
+
+	coarse_int_time = ((((exp_time / 10) *
+			     (sensor->vt_pix_clk / 1000)) / 1000) -
+			   (ss->exposure.fine_int_tm / 10)) /
+		(ss->frame.line_len_pck / 10);
 
 	dev_dbg(&client->dev, "coarse_int_time calculated = %d\n",
 						coarse_int_time);
 
 	set_exposure_time[MT9P012_COARSE_INT_TIME_INDEX].val = coarse_int_time;
 	err = mt9p012_write_regs(client, set_exposure_time);
+
+	if (coarse_int_time != ss->exposure.coarse_int_tm) {
+		err = mt9p012_write_reg(client, MT9P012_16BIT,
+					REG_COARSE_INT_TIME, coarse_int_time);
+		ss->exposure.coarse_int_tm = coarse_int_time;
+	}
 
 	if (err)
 		dev_err(&client->dev, "Error setting exposure time %d\n",
@@ -1398,6 +1043,388 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 		lvc->current_value = gain;
 
 	return err;
+}
+
+/**
+ * mt9p012_set_framerate - Sets framerate by adjusting frame_length_lines reg.
+ * @s: pointer to standard V4L2 device structure
+ * @fper: frame period numerator and denominator in seconds
+ * @iframe: enum value corresponding to frame type (size & fps)
+ *
+ * The maximum exposure time is also updated since it is affected by the
+ * frame rate.
+ **/
+static int mt9p012_set_framerate(struct v4l2_int_device *s,
+			struct v4l2_fract *fper, enum mt9p012_frame_type iframe)
+{
+	int err = 0, i = 0;
+	u32 frame_length_lines, line_time_q8;
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	struct mt9p012_sensor_settings *ss;
+	struct vcontrol *lvc = NULL;
+
+
+	ss = &sensor_settings[iframe];
+
+	line_time_q8 = ((u32)ss->frame.line_len_pck * 1000000) /
+		(sensor->vt_pix_clk >> 8); /* usec's */
+	frame_length_lines = (((u32)fper->numerator * 1000000 * 256 /
+			       fper->denominator)) / line_time_q8;
+
+	/* Range check frame_length_lines */
+	if (frame_length_lines > MT9P012_MAX_FRAME_LENGTH_LINES)
+		frame_length_lines = MT9P012_MAX_FRAME_LENGTH_LINES;
+	else if (frame_length_lines < ss->frame.frame_len_lines_min)
+		frame_length_lines = ss->frame.frame_len_lines_min;
+
+	mt9p012_write_reg(client, MT9P012_16BIT,
+			  REG_FRAME_LEN_LINES,	frame_length_lines);
+
+	ss[iframe].frame.frame_len_lines = frame_length_lines;
+
+	/* Update min/max exposure times */
+	min_exposure_time = (ss->exposure.fine_int_tm * 1000000 /
+			     (sensor->vt_pix_clk)) + 1;
+	max_exposure_time = (line_time_q8 *
+			     (frame_length_lines - 1)) >> 8;
+
+	/* Update Exposure Time */
+	i = find_vctrl(V4L2_CID_EXPOSURE);
+	if (i >= 0) {
+		lvc = &video_control[i];
+		/* Update min/max for query control */
+		lvc->qc.minimum = min_exposure_time;
+		lvc->qc.maximum = max_exposure_time;
+
+		mt9p012_set_exposure_time(lvc->current_value,
+					  sensor->v4l2_int_device, lvc);
+	}
+
+	v4l_info(client, "MT9P012 Set Framerate: fper=%d/%d, "
+		 "frame_len_lines=%d, max_expT=%dus\n",
+		 fper->numerator, fper->denominator,
+		 frame_length_lines, max_exposure_time);
+
+	return err;
+}
+
+/**
+ * mt9p012_calc_xclk - Calculate the required xclk frequency
+ * @c: i2c client driver structure
+ *
+ * Given the image capture format in pix, the nominal frame period in
+ * timeperframe, calculate and return the required xclk frequency
+ */
+static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
+{
+	struct mt9p012_sensor *sensor = i2c_get_clientdata(c);
+	struct v4l2_fract *timeperframe = &sensor->timeperframe;
+	struct v4l2_pix_format *pix = &sensor->pix;
+
+	if (timeperframe->numerator == 0 ||
+	    timeperframe->denominator == 0) {
+		/* supply a default nominal_timeperframe */
+		timeperframe->numerator = 1;
+		timeperframe->denominator = MT9P012_DEF_FPS;
+	}
+
+	sensor->fps = timeperframe->denominator / timeperframe->numerator;
+	if (sensor->fps < MT9P012_MIN_FPS)
+		sensor->fps = MT9P012_MIN_FPS;
+	else if (sensor->fps > MT9P012_MAX_FPS)
+		sensor->fps = MT9P012_MAX_FPS;
+
+	timeperframe->numerator = 1;
+	timeperframe->denominator = sensor->fps;
+
+	if ((pix->width <= MT9P012_VIDEO_WIDTH_4X_BINN) && (sensor->fps > 15))
+		return MT9P012_XCLK_NOM_2;
+
+	return MT9P012_XCLK_NOM_1;
+}
+
+/**
+ * mt9p012_configure_frame - Setup the frame, clock and exposure parmas in the
+ * config_frame_list array.
+ *
+ * @c: i2c client driver structure
+ *
+ * The config_frame_list is a common list used by all frame sizes & frame
+ * rates that is filled in by this routine.
+ */
+int mt9p012_configure_frame(struct v4l2_int_device *s,
+			    enum mt9p012_frame_type iframe)
+{
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	u16 data;
+	int err = 0;
+
+	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_MODE_SELECT, 0x00);
+	mdelay(100);
+	 /* hold */
+	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x01);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_VT_PIX_CLK_DIV,
+				 sensor_settings[iframe].clk.vt_pix_clk_div );
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_VT_SYS_CLK_DIV,
+				 sensor_settings[iframe].clk.vt_sys_clk_div);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_PRE_PLL_CLK_DIV,
+				 sensor_settings[iframe].clk.pre_pll_div);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_PLL_MULTIPLIER,
+				 sensor_settings[iframe].clk.pll_mult);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_OP_PIX_CLK_DIV,
+				 sensor_settings[iframe].clk.op_pix_clk_div);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_OP_SYS_CLK_DIV,
+				 sensor_settings[iframe].clk.op_sys_clk_div);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_RESERVED_MFR_3064, 0x0805);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_X_OUTPUT_SIZE,
+				 sensor_settings[iframe].frame.x_output_size);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_Y_OUTPUT_SIZE,
+				 sensor_settings[iframe].frame.y_output_size);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_X_ADDR_START,
+				 sensor_settings[iframe].frame.x_addr_start);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_Y_ADDR_START,
+				 sensor_settings[iframe].frame.y_addr_start);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_X_ADDR_END,
+				 sensor_settings[iframe].frame.x_addr_end);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_Y_ADDR_END,
+				 sensor_settings[iframe].frame.y_addr_end);
+
+	if (sensor->ver < mt9p012_ver(12, 7)) {
+		data = (sensor_settings[iframe].frame.x_bin & 1) << 11;
+		data |= (sensor_settings[iframe].frame.xy_bin & 1) << 10;
+		data |= (sensor_settings[iframe].frame.x_odd_inc & 7) << 6;
+		data |= (sensor_settings[iframe].frame.y_odd_inc & 0x3F);
+	} else {
+		data = (sensor_settings[iframe].frame.x_bin & 1) << 11;
+		data |= (sensor_settings[iframe].frame.xy_bin & 1) << 10;
+		data |= (sensor_settings[iframe].frame.x_odd_inc & 7) << 6;
+		data |= (sensor_settings[iframe].frame.y_odd_inc & 0x3F);
+	}
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_READ_MODE, data);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_FINE_INT_TIME,
+				 sensor_settings[iframe].exposure.fine_int_tm);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_FRAME_LEN_LINES,
+				 sensor_settings[iframe].frame.frame_len_lines);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_LINE_LEN_PCK,
+				 sensor_settings[iframe].frame.line_len_pck);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_SCALE_M,
+				 sensor_settings[iframe].frame.scale_m);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_SCALING_MODE,
+				 sensor_settings[iframe].frame.scale_mode);
+
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_FINE_CORRECTION,
+				 sensor_settings[iframe].exposure.fine_correction);
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_COARSE_INT_TIME,
+				 sensor_settings[iframe].exposure.coarse_int_tm);
+	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_MANUF_GAIN_GLOBAL,
+				 sensor_settings[iframe].exposure.analog_gain);
+	/* update */
+	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00);
+
+
+	if (sensor->fps == 120) {
+		err |= mt9p012_write_regs(client, mt9p012_648_120fps_addendum);
+	}
+
+	sensor->current_iframe = iframe;
+	if (err)
+		return -EIO;
+	else
+		return 0;
+}
+
+/**
+ * mt9p012_update_clocks - calcs sensor clocks based on sensor settings.
+ * @xclk: current sensor input clock (xclk)
+ * @isize: image size enum
+ */
+int mt9p012_update_clocks(struct v4l2_int_device *s, u32 xclk,
+			  enum mt9p012_frame_type iframe)
+{
+	struct mt9p012_sensor *sensor = s->priv;
+
+	sensor->x_clk = xclk;
+
+	sensor->pll_clk =
+			(xclk / sensor_settings[iframe].clk.pre_pll_div) *
+			sensor_settings[iframe].clk.pll_mult;
+
+	sensor->vt_pix_clk = sensor->pll_clk /
+			(sensor_settings[iframe].clk.vt_pix_clk_div *
+			sensor_settings[iframe].clk.vt_sys_clk_div);
+
+	sensor->op_pix_clk = sensor->pll_clk /
+			(sensor_settings[iframe].clk.op_pix_clk_div *
+			sensor_settings[iframe].clk.op_sys_clk_div);
+
+	dev_dbg(sensor->dev, "MT9P013: xclk=%u, pll_clk=%u, "
+		  "vt_pix_clk=%u, op_pix_clk=%u\n", xclk, sensor->pll_clk,
+		  sensor->vt_pix_clk, sensor->op_pix_clk);
+
+	return 0;
+}
+
+/**
+ * mt9p012_configure - Configure the mt9p012 for the specified image mode
+ * @s: pointer to standard V4L2 device structure
+ *
+ * Configure the mt9p012 for a specified image size, pixel format, and frame
+ * period.  xclk is the frequency (in Hz) of the xclk input to the mt9p012.
+ * fper is the frame period (in seconds) expressed as a fraction.
+ * Returns zero if successful, or non-zero otherwise.
+ * The actual frame period is returned in fper.
+ */
+static int mt9p012_configure(struct v4l2_int_device *s)
+{
+	struct mt9p012_sensor *sensor = s->priv;
+	struct v4l2_pix_format *pix = &sensor->pix;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	enum mt9p012_image_size isize;
+	struct vcontrol *lvc = NULL;
+	int iframe;
+	int err;
+	u32 xclk;
+	int i;
+
+	isize = mt9p012_find_isize(pix->width);
+
+	/* common register initialization */
+	err = mt9p012_write_regs(client, mt9p012_common_pre);
+	if (err)
+		return err;
+
+	if (sensor->ver >= mt9p012_ver(13, 0))
+		err = mt9p012_write_regs(client,
+					 mt9p013_common);
+	else if (sensor->ver >= mt9p012_ver(12, 7))
+		err = mt9p012_write_regs(client,
+					 mt9p012_common_rev7);
+	else
+		err = mt9p012_write_regs(client,
+					 mt9p012_common_rev1);
+
+	if (err)
+		return err;
+
+
+	err = mt9p012_write_regs(client, mt9p012_common_post);
+	if (err)
+		return err;
+
+
+	/* configure frame rate */
+	xclk = mt9p012_calc_xclk(client);
+
+	iframe = mt9p012_find_iframe(sensor->fps, isize);
+	err = mt9p012_configure_frame(s, iframe);
+	if (err)
+		return err;
+
+	mt9p012_update_clocks(s, xclk, iframe);
+
+	/* configure frame rate */
+	err = mt9p012_set_framerate(s, &sensor->timeperframe, iframe);
+	if (err)
+		return err;
+
+
+	/* Set initial exposure time */
+	i = find_vctrl(V4L2_CID_EXPOSURE);
+	if (i >= 0) {
+		lvc = &video_control[i];
+		mt9p012_set_exposure_time(lvc->current_value,
+			sensor->v4l2_int_device, lvc);
+	}
+
+	/* Set initial gain */
+	i = find_vctrl(V4L2_CID_GAIN);
+	if (i >= 0) {
+		lvc = &video_control[i];
+		mt9p012_set_gain(lvc->current_value,
+			sensor->v4l2_int_device, lvc);
+	}
+
+	/* configure streaming ON */
+	err = mt9p012_write_regs(client, stream_on_list);
+	mdelay(1);
+
+	return err;
+}
+
+/**
+ * mt9p012_detect - Detect if an mt9p012 is present, and if so which revision
+ * @client: pointer to the i2c client driver structure
+ *
+ * Detect if an mt9p012 is present, and if so which revision.
+ * A device is considered to be detected if the manufacturer ID (MIDH and MIDL)
+ * and the product ID (PID) registers match the expected values.
+ * Any value of the version ID (VER) register is accepted.
+ * Here are the version numbers we know about:
+ *	0x48 --> mt9p012 Revision 1 or mt9p012 Revision 2
+ *	0x49 --> mt9p012 Revision 3
+ * Returns a negative error number if no device is detected, or the
+ * non-negative value of the version ID register if a device is detected.
+ */
+static int mt9p012_detect(struct i2c_client *client)
+{
+	u32 model_id, mfr_id, rev;
+
+	if (!client)
+		return -ENODEV;
+
+	if (mt9p012_read_reg(client, MT9P012_16BIT, REG_MODEL_ID, &model_id))
+		return -ENODEV;
+	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_MANUFACTURER_ID,
+				&mfr_id))
+		return -ENODEV;
+	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_REVISION_NUMBER, &rev))
+		return -ENODEV;
+
+	dev_info(&client->dev, "model id detected 0x%x mfr 0x%x\n", model_id,
+								mfr_id);
+	if ((mfr_id != MT9P012_MFR_ID)) {
+		dev_warn(&client->dev, "mfgr id mismatch 0x%x\n", mfr_id);
+
+		return -ENODEV;
+	}
+
+	if (model_id == MT9P012_MOD_ID) {
+		rev = mt9p012_ver(12, 0);
+	} else if (model_id == MT9P012_MOD_ID_REV7) {
+		rev = mt9p012_ver(12, 7);
+	} else if (model_id == MT9P013_MOD_ID) {
+		rev = mt9p012_ver(13, 0);
+	} else {
+		/* We didn't read the values we expected, so
+		 * this must not be an MT9P012.
+		 */
+		dev_warn(&client->dev, "model id mismatch 0x%x mfr 0x%x\n",
+			model_id, mfr_id);
+
+		return -ENODEV;
+	}
+	return rev;
+
 }
 
 /**
@@ -1649,7 +1676,7 @@ static int ioctl_s_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 	struct v4l2_fract *timeperframe = &a->parm.capture.timeperframe;
 
 	sensor->timeperframe = *timeperframe;
-	sensor->xclk_current = mt9p012_calc_xclk(client);
+	sensor->x_clk = mt9p012_calc_xclk(client);
 	*timeperframe = sensor->timeperframe;
 
 	return 0;
@@ -1811,7 +1838,7 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power new_power)
 
 	switch (new_power) {
 	case V4L2_POWER_ON:
-		rval = sensor->pdata->set_xclk(sensor->xclk_current);
+		rval = sensor->pdata->set_xclk(sensor->x_clk);
 		if (rval == -EINVAL)
 			break;
 		rval = sensor->pdata->power_set(V4L2_POWER_ON);
@@ -1934,7 +1961,7 @@ static int mt9p012_probe(struct i2c_client *client,
 	/* Set sensor default values */
 	sensor->timeperframe.numerator = 1;
 	sensor->timeperframe.denominator = 15;
-	sensor->xclk_current = MT9P012_XCLK_NOM_1;
+	sensor->x_clk = MT9P012_XCLK_NOM_1;
 	sensor->pix.width = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED;
 	sensor->pix.height = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED;
 	sensor->pix.pixelformat = V4L2_PIX_FMT_SGRBG10;
