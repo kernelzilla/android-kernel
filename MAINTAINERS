@@ -946,7 +946,7 @@ M:	me@bobcopeland.com
 L:	linux-wireless@vger.kernel.org
 L:	ath5k-devel@lists.ath5k.org
 S:	Maintained
-F:	drivers/net/wireless/ath5k/
+F:	drivers/net/wireless/ath/ath5k/
 
 ATHEROS ATH9K WIRELESS DRIVER
 P:	Luis R. Rodriguez
@@ -962,7 +962,7 @@ M:	senthilkumar@atheros.com
 L:	linux-wireless@vger.kernel.org
 L:	ath9k-devel@lists.ath9k.org
 S:	Supported
-F:	drivers/net/wireless/ath9k/
+F:	drivers/net/wireless/ath/ath9k/
 
 ATHEROS AR9170 WIRELESS DRIVER
 P:	Christian Lamparter
@@ -970,7 +970,7 @@ M:	chunkeey@web.de
 L:	linux-wireless@vger.kernel.org
 W:	http://wireless.kernel.org/en/users/Drivers/ar9170
 S:	Maintained
-F:	drivers/net/wireless/ar9170/
+F:	drivers/net/wireless/ath/ar9170/
 
 ATI_REMOTE2 DRIVER
 P:	Ville Syrjala
@@ -1009,6 +1009,13 @@ W:	http://www.atmel.com/products/AT91/
 W:	http://www.at91.com/
 S:	Maintained
 F:	drivers/mmc/host/at91_mci.c
+
+ATMEL AT91 / AT32 MCI DRIVER
+P:	Nicolas Ferre
+M:	nicolas.ferre@atmel.com
+S:	Maintained
+F:	drivers/mmc/host/atmel-mci.c
+F:	drivers/mmc/host/atmel-mci-regs.h
 
 ATMEL AT91 / AT32 SERIAL DRIVER
 P:	Haavard Skinnemoen
@@ -1544,6 +1551,7 @@ L:	containers@lists.linux-foundation.org
 S:	Maintained
 F:	include/linux/cgroup*
 F:	kernel/cgroup*
+F:	mm/*cgroup*
 
 CORETEMP HARDWARE MONITORING DRIVER
 P:	Rudolf Marek
@@ -2052,8 +2060,8 @@ F:	drivers/edac/i5400_edac.c
 
 EDAC-I82975X
 P:	Ranganathan Desikan
-P:	Arvind R.
 M:	rdesikan@jetzbroadband.com
+P:	Arvind R.
 M:	arvind@acarlab.com
 L:	bluesmoke-devel@lists.sourceforge.net (moderated for non-subscribers)
 W:	bluesmoke.sourceforge.net
@@ -2274,11 +2282,9 @@ F:	drivers/net/wan/dlci.c
 F:	drivers/net/wan/sdla.c
 
 FRAMEBUFFER LAYER
-P:	Antonino Daplas
-M:	adaplas@gmail.com
 L:	linux-fbdev-devel@lists.sourceforge.net (moderated for non-subscribers)
 W:	http://linux-fbdev.sourceforge.net/
-S:	Maintained
+S:	Orphan
 F:	Documentation/fb/
 F:	drivers/video/fb*
 F:	include/linux/fb.h
@@ -2391,7 +2397,7 @@ FTRACE
 P:	Steven Rostedt
 M:	rostedt@goodmis.org
 S:	Maintained
-F:	Documentation/ftrace.txt
+F:	Documentation/trace/ftrace.txt
 F:	arch/*/*/*/ftrace.h
 F:	arch/*/kernel/ftrace.c
 F:	include/*/ftrace.h
@@ -2850,7 +2856,7 @@ W:	http://apps.sourceforge.net/trac/linux-zigbee
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lumag/lowpan.git
 S:	Maintained
 F:	net/ieee802154/
-F:	drivers/ieee801254/
+F:	drivers/ieee802154/
 
 INTEGRITY MEASUREMENT ARCHITECTURE (IMA)
 P:	Mimi Zohar
@@ -3407,7 +3413,7 @@ P:	Eduard - Gabriel Munteanu
 M:	eduard.munteanu@linux360.ro
 S:	Maintained
 F:	Documentation/trace/kmemtrace.txt
-F:	include/trace/kmemtrace.h
+F:	include/linux/kmemtrace.h
 F:	kernel/trace/kmemtrace.c
 
 KPROBES
@@ -4084,7 +4090,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-2.6.git
 S:	Maintained
 F:	net/wireless/
 F:	include/net/ieee80211*
-F:	include/net/wireless.h
+F:	include/linux/wireless.h
 
 NETWORKING DRIVERS
 L:	netdev@vger.kernel.org
@@ -4577,6 +4583,13 @@ M:	jchapman@katalix.com
 S:	Maintained
 F:	drivers/net/pppol2tp.c
 F:	include/linux/if_pppol2tp.h
+
+PPS SUPPORT
+P:	Rodolfo Giometti
+M:	giometti@enneenne.com
+W:	http://wiki.enneenne.com/index.php/LinuxPPS_support
+L:	linuxpps@ml.enneenne.com (subscribers-only)
+S:	Maintained
 
 PREEMPTIBLE KERNEL
 P:	Robert Love
@@ -5088,6 +5101,13 @@ L:	sdhci-devel@lists.ossman.eu
 S:	Maintained
 F:	drivers/mmc/host/sdhci.*
 
+SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) SAMSUNG DRIVER
+P:	Ben Dooks
+M:	ben-linux@fluff.org
+L:	sdhci-devel@lists.ossman.eu
+S:	Maintained
+F:	drivers/mmc/host/sdhci-s3c.c
+
 SECURITY SUBSYSTEM
 P:	James Morris
 M:	jmorris@namei.org
@@ -5473,6 +5493,7 @@ STAGING SUBSYSTEM
 P:	Greg Kroah-Hartman
 M:	gregkh@suse.de
 T:	quilt kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/
+L:	devel@driverdev.osuosl.org
 S:	Maintained
 F:	drivers/staging/
 
@@ -6208,6 +6229,14 @@ L:	linux-i2c@vger.kernel.org
 S:	Maintained
 F:	Documentation/i2c/busses/i2c-viapro
 F:	drivers/i2c/busses/i2c-viapro.c
+
+VIA SD/MMC CARD CONTROLLER DRIVER
+P:	Joseph Chan
+M:	JosephChan@via.com.tw
+P:	Harald Welte
+M:	HaraldWelte@viatech.com
+S:	Maintained
+F:	drivers/mmc/host/via-sdmmc.c
 
 VIA UNICHROME(PRO)/CHROME9 FRAMEBUFFER DRIVER
 P:	Joseph Chan
