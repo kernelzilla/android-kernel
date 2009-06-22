@@ -411,7 +411,7 @@ static void __init sholes_ehci_init(void)
 {
 
 	omap_cfg_reg(AF5_34XX_GPIO142);		/*  IPC_USB_SUSP      */
-	omap_cfg_reg(AA21_34XX_GPIO157);	/*  AP_TO_BP_FLASH_EN */
+	omap_cfg_reg(AA21_34XX_GPIO157_OUT);	/*  AP_TO_BP_FLASH_EN */
 	omap_cfg_reg(AD1_3430_USB3FS_PHY_MM3_RXRCV);
 	omap_cfg_reg(AD2_3430_USB3FS_PHY_MM3_TXDAT);
 	omap_cfg_reg(AC1_3430_USB3FS_PHY_MM3_TXEN_N);
