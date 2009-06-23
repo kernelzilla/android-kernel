@@ -143,7 +143,7 @@ static struct ts0710_con ts0710_connection;
 
 #ifdef DEBUG
 
-static int debug = DBG_DATA;
+static int debug = 0;
 
 #define ts_debug(level, format, arg...)	do {	\
 	if (debug & level)			\
