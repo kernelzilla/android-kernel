@@ -84,6 +84,8 @@ struct v4l2_int_device {
 	void *priv;
 };
 
+struct v4l2_int_device *v4l2_int_device_dummy(void);
+
 void v4l2_int_device_try_attach_all(void);
 
 int v4l2_int_device_register(struct v4l2_int_device *d);
@@ -171,11 +173,13 @@ enum v4l2_int_ioctl_num {
 	 * "Proper" V4L ioctls, as in struct video_device.
 	 *
 	 */
-	vidioc_int_enum_fmt_cap_num = 1,
+	vidioc_int_querycap_num = 1,
+	vidioc_int_enum_fmt_cap_num,
 	vidioc_int_g_fmt_cap_num,
 	vidioc_int_s_fmt_cap_num,
 	vidioc_int_try_fmt_cap_num,
 	vidioc_int_queryctrl_num,
+	vidioc_int_querymenu_num,
 	vidioc_int_g_ctrl_num,
 	vidioc_int_s_ctrl_num,
 	vidioc_int_cropcap_num,
@@ -275,11 +279,13 @@ enum v4l2_int_ioctl_num {
 		return desc;						\
 	}
 
+V4L2_INT_WRAPPER_1(querycap, struct v4l2_capability, *);
 V4L2_INT_WRAPPER_1(enum_fmt_cap, struct v4l2_fmtdesc, *);
 V4L2_INT_WRAPPER_1(g_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(s_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(try_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(queryctrl, struct v4l2_queryctrl, *);
+V4L2_INT_WRAPPER_1(querymenu, struct v4l2_querymenu, *);
 V4L2_INT_WRAPPER_1(g_ctrl, struct v4l2_control, *);
 V4L2_INT_WRAPPER_1(s_ctrl, struct v4l2_control, *);
 V4L2_INT_WRAPPER_1(cropcap, struct v4l2_cropcap, *);
