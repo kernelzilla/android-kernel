@@ -454,6 +454,12 @@ enum cpcap_revision {
 	CPCAP_REVISION_2_1 = 0x11,
 };
 
+enum cpcap_batt_usb_model {
+	CPCAP_BATT_USB_MODEL_NONE,
+	CPCAP_BATT_USB_MODEL_USB,
+	CPCAP_BATT_USB_MODEL_FACTORY,
+};
+
 struct cpcap_spi_init_data {
 	enum cpcap_reg reg;
 	unsigned short data;
@@ -494,6 +500,7 @@ struct cpcap_batt_ac_data {
 struct cpcap_batt_usb_data {
 	int online;
 	int current_now;
+	enum cpcap_batt_usb_model model;
 };
 
 struct cpcap_device;
@@ -654,8 +661,11 @@ void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
 
 void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
 
-void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online,
-			     unsigned int curr);
+void cpcap_batt_set_usb_prop_online(struct cpcap_device *cpcap, int online,
+				    enum cpcap_batt_usb_model model);
+
+void cpcap_batt_set_usb_prop_curr(struct cpcap_device *cpcap,
+				  unsigned int curr);
 
 int cpcap_uc_start(struct cpcap_device *cpcap, enum cpcap_macro macro);
 

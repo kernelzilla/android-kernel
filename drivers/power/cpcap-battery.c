@@ -95,7 +95,8 @@ static enum power_supply_property cpcap_batt_ac_props[] =
 static enum power_supply_property cpcap_batt_usb_props[] =
 {
 	POWER_SUPPLY_PROP_ONLINE,
-	POWER_SUPPLY_PROP_CURRENT_NOW
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_MODEL_NAME
 };
 
 static struct platform_driver cpcap_batt_driver = {
@@ -309,6 +310,10 @@ static int cpcap_batt_ac_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static char *cpcap_batt_usb_models[] = {
+	"none", "usb", "factory"
+};
+
 static int cpcap_batt_usb_get_property(struct power_supply *psy,
 				       enum power_supply_property psp,
 				       union power_supply_propval *val)
@@ -323,6 +328,9 @@ static int cpcap_batt_usb_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = sply->usb_state.current_now;
+		break;
+	case POWER_SUPPLY_PROP_MODEL_NAME:
+		val->strval = cpcap_batt_usb_models[sply->usb_state.model];
 		break;
 	default:
 		ret = -EINVAL;
@@ -409,6 +417,7 @@ static int cpcap_batt_probe(struct platform_device *pdev)
 
 	sply->usb_state.online = 0;
 	sply->usb_state.current_now = 0;
+	sply->usb_state.model = CPCAP_BATT_USB_MODEL_NONE;
 
 	sply->batt.properties = cpcap_batt_props;
 	sply->batt.num_properties = ARRAY_SIZE(cpcap_batt_props);
@@ -512,18 +521,29 @@ void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 }
 EXPORT_SYMBOL(cpcap_batt_set_ac_prop);
 
-void cpcap_batt_set_usb_prop(struct cpcap_device *cpcap, int online,
-			     unsigned int curr)
+void cpcap_batt_set_usb_prop_online(struct cpcap_device *cpcap, int online,
+				    enum cpcap_batt_usb_model model)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
 
 	if (sply != NULL) {
 		sply->usb_state.online = online;
+		sply->usb_state.model = model;
+		power_supply_changed(&sply->usb);
+	}
+}
+EXPORT_SYMBOL(cpcap_batt_set_usb_prop_online);
+
+void cpcap_batt_set_usb_prop_curr(struct cpcap_device *cpcap, unsigned int curr)
+{
+	struct cpcap_batt_ps *sply = cpcap->battdata;
+
+	if (sply != NULL) {
 		sply->usb_state.current_now = curr;
 		power_supply_changed(&sply->usb);
 	}
 }
-EXPORT_SYMBOL(cpcap_batt_set_usb_prop);
+EXPORT_SYMBOL(cpcap_batt_set_usb_prop_curr);
 
 static int __init cpcap_batt_init(void)
 {

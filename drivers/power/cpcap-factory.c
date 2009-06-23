@@ -22,19 +22,19 @@
 #include <linux/platform_device.h>
 #include <linux/spi/cpcap.h>
 
-static int cpcap_usb_chgr_probe(struct platform_device *pdev);
-static int cpcap_usb_chgr_remove(struct platform_device *pdev);
+static int cpcap_factory_probe(struct platform_device *pdev);
+static int cpcap_factory_remove(struct platform_device *pdev);
 
-static struct platform_driver cpcap_usb_chgr_driver = {
-	.probe		= cpcap_usb_chgr_probe,
-	.remove		= cpcap_usb_chgr_remove,
+static struct platform_driver cpcap_factory_driver = {
+	.probe		= cpcap_factory_probe,
+	.remove		= cpcap_factory_remove,
 	.driver		= {
-		.name	= "cpcap_usb_charger",
+		.name	= "cpcap_factory",
 		.owner	= THIS_MODULE,
 	},
 };
 
-static int cpcap_usb_chgr_probe(struct platform_device *pdev)
+static int cpcap_factory_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct cpcap_device *cpcap;
@@ -48,12 +48,12 @@ static int cpcap_usb_chgr_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, cpcap);
 
 	cpcap_batt_set_usb_prop_curr(cpcap, 0);
-	cpcap_batt_set_usb_prop_online(cpcap, 1, CPCAP_BATT_USB_MODEL_USB);
+	cpcap_batt_set_usb_prop_online(cpcap, 1, CPCAP_BATT_USB_MODEL_FACTORY);
 
 	return ret;
 }
 
-static int cpcap_usb_chgr_remove(struct platform_device *pdev)
+static int cpcap_factory_remove(struct platform_device *pdev)
 {
 	struct cpcap_device *cpcap = platform_get_drvdata(pdev);
 
@@ -63,19 +63,19 @@ static int cpcap_usb_chgr_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init cpcap_usb_chgr_init(void)
+static int __init cpcap_factory_init(void)
 {
-	return platform_driver_register(&cpcap_usb_chgr_driver);
+	return platform_driver_register(&cpcap_factory_driver);
 }
-module_init(cpcap_usb_chgr_init);
+module_init(cpcap_factory_init);
 
-static void __exit cpcap_usb_chgr_exit(void)
+static void __exit cpcap_factory_exit(void)
 {
-	platform_driver_unregister(&cpcap_usb_chgr_driver);
+	platform_driver_unregister(&cpcap_factory_driver);
 }
-module_exit(cpcap_usb_chgr_exit);
+module_exit(cpcap_factory_exit);
 
-MODULE_ALIAS("platform:cpcap_usb_chgr");
-MODULE_DESCRIPTION("CPCAP USB Charger Device driver");
+MODULE_ALIAS("platform:cpcap_factory");
+MODULE_DESCRIPTION("CPCAP Factory Device driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");

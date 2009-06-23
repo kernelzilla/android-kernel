@@ -71,7 +71,7 @@ static int cpcap_set_power(struct otg_transceiver *x, unsigned int mA)
 		return -ENODEV;
 
 	cpcap = dev_get_drvdata(x->dev);
-	cpcap_batt_set_usb_prop(cpcap->cpcap, 1, mA);
+	cpcap_batt_set_usb_prop_curr(cpcap->cpcap, mA);
 
 	return 0;
 }
