@@ -29,13 +29,32 @@
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/spi/spi.h>
 
+enum {
+	NO_DEVICE,
+	HEADSET_WITH_MIC,
+	HEADSET_WITHOUT_MIC,
+};
+
 struct cpcap_3mm5_data {
 	struct cpcap_device *cpcap;
 	struct switch_dev sdev;
 	unsigned int key_state;
-	unsigned char has_mic_key;
 	struct regulator *regulator;
 };
+
+static ssize_t print_name(struct switch_dev *sdev, char *buf)
+{
+	switch (switch_get_state(sdev)) {
+	case NO_DEVICE:
+		return sprintf(buf, "No Device\n");
+	case HEADSET_WITH_MIC:
+		return sprintf(buf, "Headset with mic\n");
+	case HEADSET_WITHOUT_MIC:
+		return sprintf(buf, "Headset without mic\n");
+	}
+
+	return -EINVAL;
+}
 
 static void send_key_event(struct cpcap_3mm5_data *data, unsigned int state)
 {
@@ -51,6 +70,7 @@ static void send_key_event(struct cpcap_3mm5_data *data, unsigned int state)
 static void hs_handler(enum cpcap_irqs irq, void *data)
 {
 	struct cpcap_3mm5_data *data_3mm5 = data;
+	int new_state = NO_DEVICE;
 
 	if (irq != CPCAP_IRQ_HS)
 		return;
@@ -71,7 +91,6 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		send_key_event(data_3mm5, 0);
 
 		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_5);
-		switch_set_state(&data_3mm5->sdev, 0);
 	} else {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI,
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN),
@@ -83,13 +102,9 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		if (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_PTT, 1) <= 0) {
 			/* Headset without mic and MFB is detected. (May also
 			 * be a headset with the MFB pressed.) */
-			data_3mm5->has_mic_key = 0;
+			new_state = HEADSET_WITHOUT_MIC;
 		} else
-			data_3mm5->has_mic_key = 1;
-
-		dev_info(&data_3mm5->cpcap->spi->dev,
-			 "Headset detected: has_mic_key=%d\n",
-			 data_3mm5->has_mic_key);
+			new_state = HEADSET_WITH_MIC;
 
 		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
@@ -100,8 +115,9 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 
 		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
-		switch_set_state(&data_3mm5->sdev, 1);
 	}
+
+	switch_set_state(&data_3mm5->sdev, new_state);
 }
 
 static void key_handler(enum cpcap_irqs irq, void *data)
@@ -112,7 +128,7 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 		return;
 
 	if ((cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_HS, 1) == 1) ||
-	    !data_3mm5->has_mic_key) {
+	    (switch_get_state(&data_3mm5->sdev) != HEADSET_WITH_MIC)) {
 		hs_handler(CPCAP_IRQ_HS, data_3mm5);
 		return;
 	}
@@ -152,6 +168,7 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 
 	data->cpcap = pdev->dev.platform_data;
 	data->sdev.name = "h2w";
+	data->sdev.print_name = print_name;
 	switch_dev_register(&data->sdev);
 	platform_set_drvdata(pdev, data);
 
