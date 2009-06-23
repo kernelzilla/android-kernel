@@ -354,6 +354,13 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 
 	retval = configure_hardware(data, CPCAP_ACCY_NONE);
 
+	data->regulator = regulator_get(&pdev->dev, "vusb");
+	if (IS_ERR(data->regulator)) {
+		dev_err(&pdev->dev, "Could not get regulator for cpcap_usb\n");
+		return PTR_ERR(data->regulator);
+	}
+	regulator_set_voltage(data->regulator, 3300000, 3300000);
+
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_DET,
 				     int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_CURR1,
@@ -371,14 +378,6 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Initialization Error\n");
 		return -ENODEV;
 	}
-
-	data->regulator = regulator_get(&pdev->dev, "vusb");
-	if (IS_ERR(data->regulator)) {
-		dev_err(&pdev->dev, "Could not get regulator for cpcap_usb\n");
-		return PTR_ERR(data->regulator);
-	}
-
-	regulator_set_voltage(data->regulator, 3300000, 3300000);
 
 	dev_info(&pdev->dev, "CPCAP USB detection device probed\n");
 
