@@ -52,6 +52,8 @@ struct omap_sr {
 
 #define SR_REGADDR(offs)	(sr->srbase_addr + offset)
 
+static int (*omap3_volscale_vcbypass_fun) (u32, u32, u8, u8);
+
 static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
 {
 	__raw_writel(value, SR_REGADDR(offset));
@@ -767,6 +769,11 @@ void disable_smartreflex(int srid)
 	}
 }
 
+void omap3_voltagescale_vcbypass_setup(omap3_voltagescale_vcbypass_t fun)
+{
+	omap3_volscale_vcbypass_fun = fun;
+}
+
 /* Voltage Scaling using SR VCBYPASS */
 int sr_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 					u8 target_vsel, u8 current_vsel)
@@ -778,6 +785,10 @@ int sr_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 	u32 loop_cnt = 0, retries_cnt = 0;
 	u32 t2_smps_steps = 0;
 	u32 t2_smps_delay = 0;
+
+	if (omap3_volscale_vcbypass_fun)
+		return omap3_volscale_vcbypass_fun(target_opp, current_opp,
+						target_vsel, current_vsel);
 
 	vdd = get_vdd(target_opp);
 	target_opp_no = get_opp_no(target_opp);
@@ -940,6 +951,7 @@ static int __init omap3_sr_init(void)
 		return -ENODEV;
         }
 
+#ifdef CONFIG_TWL4030_CORE
 	/* Enable SR on T2 */
 	ret = twl4030_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &RdReg,
 					R_DCDC_GLOBAL_CFG);
@@ -947,6 +959,7 @@ static int __init omap3_sr_init(void)
 	RdReg |= DCDC_GLOBAL_CFG_ENABLE_SRFLX;
 	ret |= twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, RdReg,
 					R_DCDC_GLOBAL_CFG);
+#endif
 
 	if (cpu_is_omap34xx()) {
 		sr1.clk = clk_get(NULL, "sr1_fck");
