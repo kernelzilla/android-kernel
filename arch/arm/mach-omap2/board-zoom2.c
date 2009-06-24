@@ -72,9 +72,6 @@
 #define ENABLE_VAUX3_DEV_GRP  	0x20
 #define TWL4030_MSECURE_GPIO	22
 
-#define TWL4030_VAUX4_DEV_GRP	0x23
-#define TWL4030_VAUX4_DEDICATED	0x26
-
 static struct resource zoom2_smc911x_resources[] = {
 	[0] = {
 		.start	= OMAP34XX_ETHR_START,
