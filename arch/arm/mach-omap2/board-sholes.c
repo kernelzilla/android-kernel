@@ -753,6 +753,24 @@ static int __init sholes_omap_mdm_ctrl_init(void)
 	return platform_device_register(&omap_mdm_ctrl_platform_device);
 }
 
+#ifdef CONFIG_FB_OMAP2
+static struct resource sholes_vout_resource[3 - CONFIG_FB_OMAP2_NUM_FBS] = {
+};
+#else
+static struct resource sholes_vout_resource[2] = {
+};
+#endif
+
+static struct platform_device sholes_vout_device = {
+       .name                   = "omap_vout",
+       .num_resources  = ARRAY_SIZE(sholes_vout_resource),
+       .resource               = &sholes_vout_resource[0],
+       .id             = -1,
+};
+static void __init sholes_vout_init(void)
+	platform_device_register(&sholes_vout_device);
+}
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -776,6 +794,7 @@ static void __init sholes_init(void)
 	omap_hdq_init();
 	sholes_bt_init();
 	sholes_hsmmc_init();
+	sholes_vout_init();
 }
 
 static void __init sholes_map_io(void)
