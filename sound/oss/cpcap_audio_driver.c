@@ -914,6 +914,11 @@ static void cpcap_audio_configure_input(
 		if (state->codec_mode == CPCAP_AUDIO_CODEC_LOOPBACK)
 			reg_changes.value |= CPCAP_BIT_DLM;
 
+		if (previous_state->microphone
+		    == CPCAP_AUDIO_IN_HEADSET) {
+			cpcap_regacc_write(state->cpcap, CPCAP_REG_GPIO4,
+				     0, CPCAP_BIT_GPIO4DRV);
+		}
 		switch (state->microphone) {
 		case CPCAP_AUDIO_IN_HANDSET:
 			reg_changes.value |= CPCAP_BIT_MB_ON1R
@@ -923,6 +928,9 @@ static void cpcap_audio_configure_input(
 		case CPCAP_AUDIO_IN_HEADSET:
 			reg_changes.value |= CPCAP_BIT_HS_MIC_MUX
 				| CPCAP_BIT_MIC1_PGA_EN;
+			cpcap_regacc_write(state->cpcap, CPCAP_REG_GPIO4,
+					   CPCAP_BIT_GPIO4DRV,
+					   CPCAP_BIT_GPIO4DRV);
 			break;
 
 		case CPCAP_AUDIO_IN_EXT_BUS:
@@ -1170,6 +1178,9 @@ void cpcap_audio_init(struct cpcap_audio_state *state)
 	cpcap_regacc_write(state->cpcap, CPCAP_REG_RXCOA, 0, 0x7FF);
 	cpcap_regacc_write(state->cpcap, CPCAP_REG_RXSDOA, 0, 0x1FFF);
 	cpcap_regacc_write(state->cpcap, CPCAP_REG_RXEPOA, 0, 0x7FFF);
+
+	cpcap_regacc_write(state->cpcap, CPCAP_REG_GPIO4,
+			   CPCAP_BIT_GPIO4DIR, CPCAP_BIT_GPIO4DIR);
 
 	audio_reg = regulator_get(NULL, "vaudio");
 

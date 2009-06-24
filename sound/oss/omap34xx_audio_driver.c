@@ -29,6 +29,7 @@
 #include <mach/mux.h>
 #include "omap34xx_audio_driver.h"
 #include "cpcap_audio_driver.h"
+#include <mach/gpio.h>
 
 #define AUDIO_DRIVER_NAME "cpcap_audio"
 
@@ -38,9 +39,10 @@
 #define CODEC_FIFO_SIZE 256
 #define STDAC_FIFO_SIZE 8192
 #define AUDIO_CAPTURE_SIZE 800
+#define GPIO_AUDIO_SELECT_CPCAP  143
 
 /* This is the number of total kernel buffers */
-#define AUDIO_NBFRAGS_DEFAULT 10
+#define AUDIO_NBFRAGS_DEFAULT 3
 
 /* wait for 8 Sec
  * sample rate of 8000, (1/8000) * (64000/2) sec
@@ -1175,11 +1177,12 @@ static int audio_select_speakers(int spkr)
 			if ((spkr1 == CPCAP_AUDIO_OUT_BT_MONO)
 			    && (spkr2 == CPCAP_AUDIO_OUT_NONE)) {
 				AUDIO_LEVEL1_LOG("Setting codec in "
-						 "clock only/BT mode\n");
+						 "CODEC off BT mode\n");
 				cpcap_audio_state.codec_mode =
-				    CPCAP_AUDIO_CODEC_CLOCK_ONLY;
-				cpcap_audio_state.codec_mute =
-						CPCAP_AUDIO_CODEC_MUTE;
+				    CPCAP_AUDIO_CODEC_OFF;
+				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
+						      0);
+
 			} else {
 				AUDIO_LEVEL1_LOG("Setting codec in "
 						 "normal mode\n");
@@ -1187,6 +1190,8 @@ static int audio_select_speakers(int spkr)
 							CPCAP_AUDIO_CODEC_ON;
 				cpcap_audio_state.codec_mute =
 						CPCAP_AUDIO_CODEC_UNMUTE;
+				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
+						      1);
 			}
 		}
 	}
@@ -2012,13 +2017,13 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 	if (file->f_flags & O_TRUNC) {
 		if ((primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO) ||
 		    (secondary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)) {
-			cpcap_audio_state.codec_mode =
-						CPCAP_AUDIO_CODEC_CLOCK_ONLY;
-			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
+			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 0);
 		} else {
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
 			cpcap_audio_state.codec_mute =
 						CPCAP_AUDIO_CODEC_UNMUTE;
+			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
 		}
 
 		cpcap_audio_state.ext_primary_speaker = primary_spkr_setting;
