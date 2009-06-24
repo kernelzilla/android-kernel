@@ -77,7 +77,7 @@ static inline int ts27010_ringbuf_push(struct ts27010_ringbuf *rbuf, u8 datum)
 static inline int ts27010_ringbuf_write(struct ts27010_ringbuf *rbuf,
 					const u8 *data, int len)
 {
-	int count;
+	int count = 0;
 	int i;
 
 	for (i = 0; i < len; i++)
