@@ -40,6 +40,7 @@
 
 unsigned short enable_dyn_sleep;
 unsigned short enable_off_mode;
+EXPORT_SYMBOL(enable_off_mode);
 unsigned short voltage_off_while_idle;
 unsigned short wakeup_timer_seconds;
 atomic_t sleep_block = ATOMIC_INIT(0);
