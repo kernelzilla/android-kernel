@@ -1333,6 +1333,8 @@ if ARCH_OMAP
 source "drivers/cbus/Kconfig"
 endif
 
+source "drivers/dsp/bridge/Kconfig"
+
 endmenu
 
 source "fs/Kconfig"
