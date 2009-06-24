@@ -849,7 +849,6 @@ int isp_configure_interface(struct isp_interface_config *config)
 	isp_reg_writel(ispctrl_val, OMAP3_ISP_IOMEM_MAIN, ISP_CTRL);
 
 	/* Set sensor specific fields in CCDC and Previewer module.*/
-	isppreview_set_skip(config->prev_sph, config->prev_slv);
 	ispccdc_set_wenlog(config->wenlog);
 	ispccdc_set_crop_offset(config->raw_fmt_in);
 

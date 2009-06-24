@@ -187,8 +187,6 @@ struct isp_interface_config {
 	int strobe;
 	int prestrobe;
 	int shutter;
-	u32 prev_sph;
-	u32 prev_slv;
 	u32 wenlog;
 	int wait_hs_vs;
 	enum ispccdc_raw_fmt raw_fmt_in;
