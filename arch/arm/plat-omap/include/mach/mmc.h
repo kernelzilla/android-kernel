@@ -14,6 +14,9 @@
 #include <linux/types.h>
 #include <linux/device.h>
 #include <linux/mmc/host.h>
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+#include <asm/mach/mmc.h>
+#endif
 
 #include <mach/board.h>
 
@@ -103,7 +106,10 @@ struct omap_mmc_platform_data {
 		int (* card_detect)(int irq);
 
 		unsigned int ban_openended:1;
-
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+		struct embedded_sdio_data *embedded_sdio;
+		int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
+#endif
 	} slots[OMAP_MMC_MAX_SLOTS];
 };
 

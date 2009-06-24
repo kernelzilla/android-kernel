@@ -87,6 +87,28 @@ config MMC_OMAP_HS
 
 	  If unsure, say N.
 
+config OMAP_HS_MMC2
+        bool "TI OMAP High Speed MMC2 Interface support"
+        depends on MMC_OMAP_HS
+        default n
+        help
+          This selects the TI OMAP High Speed MMC2 Interface.
+          If you have an OMAP2(2430) or OMAP3 board with a Multimedia Card slot,
+          say Y here.
+
+          If unsure, say N.
+
+config OMAP_HS_MMC3
+        bool "TI OMAP High Speed MMC3 Interface support"
+        depends on MMC_OMAP_HS
+        default n
+        help
+          This selects the TI OMAP High Speed MMC3 Interface.
+          If you have an OMAP3 board with a Multimedia Card slot,
+          say Y here.
+
+          If unsure, say N.
+
 config MMC_WBSD
 	tristate "Winbond W83L51xD SD/MMC Card Interface support"
 	depends on ISA_DMA_API

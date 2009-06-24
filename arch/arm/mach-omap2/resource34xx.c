@@ -172,6 +172,7 @@ static unsigned short get_opp(struct omap_opp *opp_freq_table,
  */
 void init_opp(struct shared_resource *resp)
 {
+	struct clk *l3_clk;
 	resp->no_of_users = 0;
 
 	if (!mpu_opps || !dsp_opps || !l3_opps)
@@ -190,8 +191,9 @@ void init_opp(struct shared_resource *resp)
 	} else if (strcmp(resp->name, "vdd2_opp") == 0) {
 		vdd2_resp = resp;
 		dpll3_clk = clk_get(NULL, "dpll3_m2_ck");
+		l3_clk = clk_get(NULL, "l3_ick");
 		resp->curr_level = get_opp(l3_opps + MAX_VDD2_OPP,
-				dpll2_clk->rate);
+				l3_clk->rate);
 		curr_vdd2_opp = resp->curr_level;
 	}
 	return;
@@ -236,6 +238,7 @@ static int program_opp_freq(int res, int target_level, int current_level)
 	int ret = 0, l3_div;
 	int *curr_opp;
 
+	lock_scratchpad_sem();
 	if (res == VDD1_OPP) {
 		curr_opp = &curr_vdd1_opp;
 		clk_set_rate(dpll1_clk, mpu_opps[target_level].rate);
@@ -253,11 +256,15 @@ static int program_opp_freq(int res, int target_level, int current_level)
 		ret = clk_set_rate(dpll3_clk,
 				l3_opps[target_level].rate * l3_div);
 	}
-	if (ret)
+	if (ret) {
+		unlock_scratchpad_sem();
 		return current_level;
+	}
 #ifdef CONFIG_PM
 	omap3_save_scratchpad_contents();
 #endif
+	unlock_scratchpad_sem();
+
 	*curr_opp = target_level;
 	return target_level;
 }
@@ -267,9 +274,10 @@ static int program_opp(int res, struct omap_opp *opp, int target_level,
 {
 	int i, ret = 0, raise;
 #ifdef CONFIG_OMAP_SMARTREFLEX
-	unsigned long t_opp;
+	unsigned long t_opp, c_opp;
 
 	t_opp = ID_VDD(res) | ID_OPP_NO(opp[target_level].opp_id);
+	c_opp = ID_VDD(res) | ID_OPP_NO(opp[current_level].opp_id);
 #endif
 	if (target_level > current_level)
 		raise = 1;
@@ -282,8 +290,9 @@ static int program_opp(int res, struct omap_opp *opp, int target_level,
 					current_level);
 #ifdef CONFIG_OMAP_SMARTREFLEX
 		else
-			sr_voltagescale_vcbypass(t_opp,
-					opp[target_level].vsel);
+			sr_voltagescale_vcbypass(t_opp, c_opp,
+				opp[target_level].vsel,
+				opp[current_level].vsel);
 #endif
 	}
 
@@ -353,6 +362,9 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 	int ind;
 
 	if (resp == vdd1_resp) {
+		if (target_level < 3)
+			resource_release("vdd2_opp", &vdd2_dev);
+
 		resource_set_opp_level(VDD1_OPP, target_level, 0);
 		/*
 		 * For VDD1 OPP3 and above, make sure the interconnect
@@ -361,8 +373,6 @@ int set_opp(struct shared_resource *resp, u32 target_level)
 		 */
 		if (target_level >= 3)
 			resource_request("vdd2_opp", &vdd2_dev, 400000);
-		else
-			resource_release("vdd2_opp", &vdd2_dev);
 
 	} else if (resp == vdd2_resp) {
 		tput = target_level;

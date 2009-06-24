@@ -33,6 +33,14 @@
 
 #define OTG_SYSCONFIG	(OMAP34XX_HSUSB_OTG_BASE + 0x404)
 
+static void __init usb_musb_pm_init(void)
+{
+	/* Ensure force-idle mode for OTG controller */
+	if (cpu_is_omap34xx())
+		omap_writel(0, OTG_SYSCONFIG);
+}
+
+#ifdef CONFIG_USB_MUSB_SOC
 static struct resource musb_resources[] = {
 	[0] = { /* start and end set dynamically */
 		.flags	= IORESOURCE_MEM,
@@ -184,7 +192,12 @@ void __init usb_musb_init(void)
 		return;
 	}
 
-	/* Enable forceidle on MUSB to improve C1 wakeup latency */
-	if (cpu_is_omap34xx())
-		omap_writel(0, OTG_SYSCONFIG);
+	usb_musb_pm_init();
 }
+
+#else
+void __init usb_musb_init(void)
+{
+	usb_musb_pm_init();
+}
+#endif /* CONFIG_USB_MUSB_SOC */

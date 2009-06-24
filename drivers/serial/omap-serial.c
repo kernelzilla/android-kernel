@@ -202,7 +202,7 @@ static unsigned int
 serial_omap_get_divisor(struct uart_port *port, unsigned int baud)
 {
 	unsigned int divisor;
-	if (baud > OMAP_MODE13X_SPEED)
+	if (baud > OMAP_MODE13X_SPEED && baud != 3000000)
 		divisor = 13;
 	else
 		divisor = 16;
@@ -353,7 +353,8 @@ static void transmit_chars(struct uart_omap_port *up)
 		return;
 	}
 
-	count = 16;
+	count = up->port.fifosize / 4;
+
 	do {
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
@@ -839,7 +840,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	(void) serial_in(up, UART_IIR);
 	(void) serial_in(up, UART_MSR);
 
-	if (baud > 230400)
+	if (baud > 230400 && baud != 3000000)
 		serial_out(up, UART_OMAP_MDR1, OMAP_MDR1_MODE13X);
 	else
 		serial_out(up, UART_OMAP_MDR1, OMAP_MDR1_MODE16X);
@@ -1154,28 +1155,29 @@ static void serial_omap_start_rxdma(struct uart_omap_port *up)
 	tmp = (serial_in(up, UART_OMAP_SYSC) & 0x7) | (1 << 3);
 	serial_out(up, UART_OMAP_SYSC, tmp); /* no-idle */
 #endif
-	if (up->uart_dma.rx_dma_channel == 0xFF)
-	omap_request_dma(uart_dma_rx[up->pdev->id-1],"UART Rx DMA",
-			(void *)uart_rx_dma_callback,up,
-			&(up->uart_dma.rx_dma_channel));
-
-	omap_set_dma_src_params(up->uart_dma.rx_dma_channel, 0,
-				OMAP_DMA_AMODE_CONSTANT,
-				UART_BASE(up->pdev->id - 1), 0, 0);
-	omap_set_dma_dest_params(up->uart_dma.rx_dma_channel, 0,
-				OMAP_DMA_AMODE_POST_INC,
-				up->uart_dma.rx_buf_dma_phys, 0, 0);
-	omap_set_dma_transfer_params(up->uart_dma.rx_dma_channel,
-				OMAP_DMA_DATA_TYPE_S8, up->uart_dma.rx_buf_size, 1,
-				OMAP_DMA_SYNC_ELEMENT,
-				uart_dma_rx[up->pdev->id-1], 0);
+	if (up->uart_dma.rx_dma_channel == 0xFF) {
+		omap_request_dma(uart_dma_rx[up->pdev->id-1],"UART Rx DMA",
+				(void *)uart_rx_dma_callback,up,
+				&(up->uart_dma.rx_dma_channel));
+		omap_set_dma_src_params(up->uart_dma.rx_dma_channel, 0,
+					OMAP_DMA_AMODE_CONSTANT,
+					UART_BASE(up->pdev->id - 1), 0, 0);
+		omap_set_dma_dest_params(up->uart_dma.rx_dma_channel, 0,
+					OMAP_DMA_AMODE_POST_INC,
+					up->uart_dma.rx_buf_dma_phys, 0, 0);
+		omap_set_dma_transfer_params(up->uart_dma.rx_dma_channel,
+					OMAP_DMA_DATA_TYPE_S8,
+					up->uart_dma.rx_buf_size, 1,
+					OMAP_DMA_SYNC_ELEMENT,
+					uart_dma_rx[up->pdev->id-1], 0);
+	}
 	up->uart_dma.prev_rx_dma_pos = up->uart_dma.rx_buf_dma_phys;
-	omap_writel(0, OMAP34XX_DMA4_BASE + OMAP_DMA4_CDAC(up->uart_dma.rx_dma_channel));
+	omap_writel(0, OMAP34XX_DMA4_BASE +
+		OMAP_DMA4_CDAC(up->uart_dma.rx_dma_channel));
 	omap_start_dma(up->uart_dma.rx_dma_channel);
 	mod_timer(&up->uart_dma.rx_timer, jiffies +
-				usecs_to_jiffies(up->uart_dma.rx_timeout));
+			usecs_to_jiffies(up->uart_dma.rx_timeout));
 	up->uart_dma.rx_dma_state = 1;
-
 }
 
 static void serial_omap_continue_tx(struct uart_omap_port *up)
@@ -1275,19 +1277,20 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.irq = irq->start;
 	up->port.fifosize = 64;
 	up->port.ops = &serial_omap_pops;
-	up->port.line = line++;
+	up->port.line = pdev->id - 1;
 #define QUART_CLK (1843200)
-       if (pdev->id == 4) {
-               up->port.membase = ioremap_nocache(mem->start, 0x16 << 1);
-               up->port.flags = UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SHARE_IRQ | UPF_TRIGGER_HIGH;
-               up->port.uartclk = QUART_CLK;
-               up->port.regshift = 1;
-       } else {
-               up->port.membase = (void *) io_p2v(mem->start);
-               up->port.flags = UPF_BOOT_AUTOCONF;
-               up->port.uartclk = 2995200 * 16;
-               up->port.regshift = 2;
-       }
+	if (pdev->id == 4) {
+		up->port.membase = ioremap_nocache(mem->start, 0x16 << 1);
+		up->port.flags = UPF_BOOT_AUTOCONF | UPF_IOREMAP |
+			UPF_SHARE_IRQ | UPF_TRIGGER_HIGH;
+		up->port.uartclk = QUART_CLK;
+		up->port.regshift = 1;
+	} else {
+		up->port.membase = (void *) io_p2v(mem->start);
+		up->port.flags = UPF_BOOT_AUTOCONF;
+		up->port.uartclk = 48000000;
+		up->port.regshift = 2;
+	}
 
 
 	if (pdev->id == (UART1+1)) {
@@ -1355,12 +1358,13 @@ do_release_region:
 
 static int serial_omap_remove(struct platform_device *dev)
 {
-	struct uart_omap_port *sport = platform_get_drvdata(dev);
+	struct uart_omap_port *up = platform_get_drvdata(dev);
 
 	platform_set_drvdata(dev, NULL);
-	if (sport)
+	if (up) {
 		uart_remove_one_port(&serial_omap_reg, &sport->port);
-
+		kfree(up);
+	}
 	return 0;
 }
 

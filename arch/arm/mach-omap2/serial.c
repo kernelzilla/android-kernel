@@ -340,7 +340,10 @@ static void omap_uart_block_sleep(struct omap_uart_state *uart)
 
 	omap_uart_smart_idle_enable(uart, 0);
 	uart->can_sleep = 0;
-	mod_timer(&uart->timer, jiffies + uart->timeout);
+	if (uart->timeout)
+		mod_timer(&uart->timer, jiffies + uart->timeout);
+	else
+		del_timer(&uart->timer);
 }
 
 static void omap_uart_allow_sleep(struct omap_uart_state *uart)
@@ -365,9 +368,6 @@ void omap_uart_prepare_idle(int num)
 	struct omap_uart_state *uart;
 
 	list_for_each_entry(uart, &uart_list, node) {
-		if (!clocks_off_while_idle)
-			continue;
-
 		if (num == uart->num && uart->can_sleep) {
 			omap_uart_disable_clocks(uart);
 			return;
@@ -570,8 +570,14 @@ static ssize_t sleep_timeout_store(struct kobject *kobj,
 		return -EINVAL;
 	}
 	sleep_timeout = value * HZ;
-	list_for_each_entry(uart, &uart_list, node)
+	list_for_each_entry(uart, &uart_list, node) {
 		uart->timeout = sleep_timeout;
+		if (uart->timeout)
+			mod_timer(&uart->timer, jiffies + uart->timeout);
+		else
+			/* A zero value means disable timeout feature */
+			omap_uart_block_sleep(uart);
+	}
 	return n;
 }
 

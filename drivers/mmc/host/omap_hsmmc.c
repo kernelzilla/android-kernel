@@ -881,6 +881,27 @@ static int omap_hsmmc_get_cd(struct mmc_host *mmc)
 	return pdata->slots[0].card_detect(pdata->slots[0].card_detect_irq);
 }
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
+{
+	struct mmc_omap_host *host = dev_id;
+	struct omap_mmc_slot_data *slot = &mmc_slot(host);
+
+        printk(KERN_DEBUG "%s: card_present %d\n", mmc_hostname(host->mmc),
+		               card_present);
+
+	host->carddetect = slot->card_detect(slot->card_detect_irq);
+
+	sysfs_notify(&host->mmc->class_dev.kobj, NULL, "cover_switch");
+	if (host->carddetect) {
+		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
+	} else {
+		mmc_omap_reset_controller_fsm(host, SRD);
+		mmc_detect_change(host->mmc, (HZ * 50) / 1000);
+	}
+}
+#endif
+
 static int omap_hsmmc_get_ro(struct mmc_host *mmc)
 {
 	struct mmc_omap_host *host = mmc_priv(mmc);
@@ -947,6 +968,14 @@ static int __init omap_mmc_probe(struct platform_device *pdev)
 	host->mapbase	= res->start;
 	host->base	= ioremap(host->mapbase, SZ_4K);
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	if (pdata->slots[0].embedded_sdio)
+		mmc_set_embedded_sdio_data(mmc,
+				&pdata->slots[0].embedded_sdio->cis,
+				&pdata->slots[0].embedded_sdio->cccr,
+				pdata->slots[0].embedded_sdio->funcs,
+				pdata->slots[0].embedded_sdio->num_funcs);
+#endif
 	platform_set_drvdata(pdev, host);
 	INIT_WORK(&host->mmc_carddetect_work, mmc_omap_detect);
 
@@ -1063,6 +1092,11 @@ static int __init omap_mmc_probe(struct platform_device *pdev)
 			goto err_irq_cd;
 		}
 	}
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	else if (mmc_slot(host).register_status_notify) {
+		mmc_slot(host).register_status_notify(omap_hsmmc_status_notify_cb, host);
+	}
+#endif
 
 	OMAP_HSMMC_WRITE(host->base, ISE, INT_EN_MASK);
 	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
