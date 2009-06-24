@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/mmc/host.h>
+#include <linux/mmc/sdio_ids.h>
 #include <linux/regulator/consumer.h>
 
 #include <mach/hardware.h>
@@ -34,16 +35,21 @@
 
 static const int mmc2_cd_gpio = OMAP_MAX_GPIO_LINES + 1;
 
-
 static int hsmmc_card_detect(int irq)
 {
 	return !gpio_get_value_cansleep(GPIO_SIGNAL_MMC_DET);
 }
 
 #ifdef CONFIG_OMAP_HS_MMC2
+extern int sholes_wifi_status(int irq);
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+extern int sholes_wifi_status_register(void (*callback)(int card_present,
+						void *dev_id), void *dev_id);
+#endif
+
 static int hsmmc2_card_detect(int irq)
 {
-	return gpio_get_value_cansleep(mmc2_cd_gpio);
+	return sholes_wifi_status(irq);
 }
 #endif
 
@@ -240,6 +246,37 @@ static struct omap_mmc_platform_data mmc1_data = {
 };
 
 #if defined(CONFIG_OMAP_HS_MMC2)
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+static struct sdio_embedded_func wifi_func_array[] = {
+	{
+		.f_class        = SDIO_CLASS_NONE,
+		.f_maxblksize   = 0,
+	},
+	{
+		.f_class        = SDIO_CLASS_WLAN,
+		.f_maxblksize   = 512,
+	},
+};
+
+static struct embedded_sdio_data sholes_wifi_emb_data = {
+	.cis    = {
+		.vendor         = 0x104c,
+		.device         = 0x9066,
+		.blksize        = 512,
+		.max_dtr        = 24000000,
+	},
+	.cccr   = {
+		.multi_block    = 1,
+		.low_speed      = 0,
+		.wide_bus       = 1,
+		.high_power     = 0,
+		.high_speed     = 0,
+	},
+	.funcs  = wifi_func_array,
+	.num_funcs = 2,
+};
+#endif
+
 static struct omap_mmc_platform_data mmc2_data = {
 	.nr_slots			= 1,
 	.init				= hsmmc2_late_init,
@@ -252,11 +289,16 @@ static struct omap_mmc_platform_data mmc2_data = {
 	.slots[0] = {
 		.wires			= 4,
 		.set_power		= hsmmc2_set_power,
-		.ocr_mask		= MMC_VDD_165_195,
+		.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34 |
+						MMC_VDD_165_195,
 		.name			= "first slot",
 
 		.card_detect_irq        = 0,
-		.card_detect            = NULL,
+		.card_detect            = hsmmc2_card_detect,
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+		.embedded_sdio		= &sholes_wifi_emb_data,
+		.register_status_notify	= &sholes_wifi_status_register,
+#endif
 	},
 };
 #endif

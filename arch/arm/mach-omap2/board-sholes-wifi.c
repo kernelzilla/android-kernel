@@ -13,6 +13,8 @@
 #include <asm/io.h>
 #include <linux/wifi_tiwlan.h>
 
+#include <linux/debugfs.h>
+
 #define SHOLES_WIFI_PMENA_GPIO	186
 #define SHOLES_WIFI_IRQ_GPIO	65
 
@@ -20,7 +22,8 @@ static int sholes_wifi_cd = 0;		/* WIFI virtual 'card detect' status */
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 
-static int sholes_wifi_status_register(void (*callback)(int card_present, void *dev_id), void *dev_id)
+int sholes_wifi_status_register(void (*callback)(int card_present,
+						void *dev_id), void *dev_id)
 {
 	if (wifi_status_cb)
 		return -EAGAIN;
@@ -29,7 +32,7 @@ static int sholes_wifi_status_register(void (*callback)(int card_present, void *
 	return 0;
 }
 
-static unsigned int sholes_wifi_status(struct device *dev)
+int sholes_wifi_status(int irq)
 {
 	return sholes_wifi_cd;
 }
@@ -127,3 +130,73 @@ out:
 }
 
 device_initcall(sholes_wifi_init);
+
+#if defined(CONFIG_DEBUG_FS)
+
+static int sholesmmc_dbg_wifi_reset_set(void *data, u64 val)
+{
+	sholes_wifi_reset((int) val);
+	return 0;
+}
+
+static int sholesmmc_dbg_wifi_reset_get(void *data, u64 *val)
+{
+	*val = sholes_wifi_reset_state;
+	return 0;
+}
+
+static int sholesmmc_dbg_wifi_cd_set(void *data, u64 val)
+{
+	sholes_wifi_set_carddetect((int) val);
+	return 0;
+}
+
+static int sholesmmc_dbg_wifi_cd_get(void *data, u64 *val)
+{
+	*val = sholes_wifi_cd;
+	return 0;
+}
+
+static int sholesmmc_dbg_wifi_pwr_set(void *data, u64 val)
+{
+	sholes_wifi_power((int) val);
+	return 0;
+}
+
+static int sholesmmc_dbg_wifi_pwr_get(void *data, u64 *val)
+{
+	*val = sholes_wifi_power_state;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(sholesmmc_dbg_wifi_reset_fops,
+			sholesmmc_dbg_wifi_reset_get,
+			sholesmmc_dbg_wifi_reset_set, "%llu\n");
+
+DEFINE_SIMPLE_ATTRIBUTE(sholesmmc_dbg_wifi_cd_fops,
+			sholesmmc_dbg_wifi_cd_get,
+			sholesmmc_dbg_wifi_cd_set, "%llu\n");
+
+DEFINE_SIMPLE_ATTRIBUTE(sholesmmc_dbg_wifi_pwr_fops,
+			sholesmmc_dbg_wifi_pwr_get,
+			sholesmmc_dbg_wifi_pwr_set, "%llu\n");
+
+static int __init sholesmmc_dbg_init(void)
+{
+	struct dentry *dent;
+
+	dent = debugfs_create_dir("sholes_mmc_dbg", 0);
+	if (IS_ERR(dent))
+		return PTR_ERR(dent);
+
+	debugfs_create_file("wifi_reset", 0644, dent, NULL,
+			    &sholesmmc_dbg_wifi_reset_fops);
+	debugfs_create_file("wifi_cd", 0644, dent, NULL,
+			    &sholesmmc_dbg_wifi_cd_fops);
+	debugfs_create_file("wifi_pwr", 0644, dent, NULL,
+			    &sholesmmc_dbg_wifi_pwr_fops);
+	return 0;
+}
+
+device_initcall(sholesmmc_dbg_init);
+#endif
