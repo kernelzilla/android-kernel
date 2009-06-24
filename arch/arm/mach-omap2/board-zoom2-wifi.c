@@ -20,7 +20,8 @@ static int zoom2_wifi_cd = 0;		/* WIFI virtual 'card detect' status */
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 
-static int zoom2_wifi_status_register(void (*callback)(int card_present, void *dev_id), void *dev_id)
+int zoom2_wifi_status_register(void (*callback)(int card_present,
+						void *dev_id), void *dev_id)
 {
 	if (wifi_status_cb)
 		return -EAGAIN;
@@ -29,7 +30,7 @@ static int zoom2_wifi_status_register(void (*callback)(int card_present, void *d
 	return 0;
 }
 
-static unsigned int zoom2_wifi_status(struct device *dev)
+int zoom2_wifi_status(int irq)
 {
 	return zoom2_wifi_cd;
 }
