@@ -71,7 +71,8 @@ obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o \
 					   mmc-twl4030.o
 obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
 					   mmc-twl4030.o \
-	                                   board-ldp-flash.o \
+					   board-ldp-flash.o \
+					   board-zoom2-camera.o \
 					   board-zoom2-wifi.o
 obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o \
 					   board-apollon-mmc.o	\
