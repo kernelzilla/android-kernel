@@ -813,9 +813,6 @@ int isp_configure_interface(struct isp_interface_config *config)
 		ispctrl_val |= ISPCTRL_PAR_SER_CLK_SEL_CSIA;
 		ispctrl_val &= ~ISPCTRL_PAR_BRIDGE_BENDIAN;
 
-		isp_csi2_ctx_config_format(0, config->u.csi.format);
-		isp_csi2_ctx_update(0, false);
-
 		if (config->u.csi.crc)
 			isp_csi2_ctrl_config_ecc_enable(true);
 
@@ -823,6 +820,9 @@ int isp_configure_interface(struct isp_interface_config *config)
 		isp_csi2_ctrl_config_vp_only_enable(true);
 		isp_csi2_ctrl_config_vp_clk_enable(true);
 		isp_csi2_ctrl_update(false);
+
+		isp_csi2_ctx_config_format(0, config->u.csi.format);
+		isp_csi2_ctx_update(0, false);
 
 		isp_csi2_irq_complexio1_set(1);
 		isp_csi2_irq_status_set(1);
