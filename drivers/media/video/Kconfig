@@ -313,6 +313,14 @@ config VIDEO_IMX046
 	  IMX046 camera.  It is currently working with the TI OMAP3
           camera controller.
 
+config VIDEO_LV8093
+	tristate "Piezo Actuator Lens driver for LV8093"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 lens driver for the Sanyo LV8093.
+	  It is currently working with the TI OMAP3 camera controller
+	  and Sony IMX046 sensor.
+
 config VIDEO_SAA7110
 	tristate "Philips SAA7110 video decoder"
 	depends on VIDEO_V4L1 && I2C
