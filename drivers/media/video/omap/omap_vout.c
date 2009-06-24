@@ -86,8 +86,12 @@
 #define MAX_PIXELS_PER_LINE     2048
 #define VRFB_TX_TIMEOUT         1000
 
-/* IRQ Bits mask of DSS */
 #define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
+
+/* IRQ Bits mask of DSS */
+#define OMAP_VOUT_IRQ_MASK (DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN | \
+			    DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_FRAMEDONE)
+
 
 static struct videobuf_queue_ops video_vbq_ops;
 
@@ -1209,11 +1213,8 @@ static int omap_vout_release(struct file *file)
 	/* Even if apply changes fails we should continue
 	   freeing allocated memeory */
 	if (vout->streaming) {
-		u32 mask = 0;
-
-		mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
-			DISPC_IRQ_EVSYNC_ODD;
-		omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
+		omap_dispc_unregister_isr(omap_vout_isr, vout,
+					  OMAP_VOUT_IRQ_MASK);
 		vout->streaming = 0;
 
 		videobuf_streamoff(q);
@@ -1838,7 +1839,6 @@ static int vidioc_streamon(struct file *file, void *fh,
 	int r = 0;
 	int t;
 	struct omapvideo_info *ovid = &(vout->vid_info);
-	u32 mask = 0;
 
 	mutex_lock(&vout->lock);
 
@@ -1879,10 +1879,7 @@ static int vidioc_streamon(struct file *file, void *fh,
 	addr = (unsigned long) vout->queued_buf_addr[vout->cur_frm->i]
 	+ vout->cropped_offset;
 
-	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
-			DISPC_IRQ_EVSYNC_ODD;
-
-	omap_dispc_register_isr(omap_vout_isr, vout, mask);
+	omap_dispc_register_isr(omap_vout_isr, vout, OMAP_VOUT_IRQ_MASK);
 
 	for (t = 0; t < ovid->num_overlays; t++) {
 		struct omap_overlay *ovl = ovid->overlays[t];
@@ -1891,8 +1888,10 @@ static int vidioc_streamon(struct file *file, void *fh,
 			ovl->get_overlay_info(ovl, &info);
 			info.enabled = 1;
 			info.paddr = addr;
-			if (ovl->set_overlay_info(ovl, &info))
+			if (ovl->set_overlay_info(ovl, &info)) {
+				mutex_unlock(&vout->lock);
 				return -EINVAL;
+			}
 		}
 	}
 
@@ -1915,16 +1914,14 @@ static int vidioc_streamoff(struct file *file, void *fh,
 	struct omap_vout_device *vout = fh;
 	int t, r = 0;
 	struct omapvideo_info *ovid = &(vout->vid_info);
-	u32 mask = 0;
 
 	if (!vout->streaming)
 		return -EINVAL;
 	if (vout->streaming) {
 		vout->streaming = 0;
-		mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
-			DISPC_IRQ_EVSYNC_ODD;
 
-		omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
+		omap_dispc_unregister_isr(omap_vout_isr, vout,
+					  OMAP_VOUT_IRQ_MASK);
 
 		for (t = 0; t < ovid->num_overlays; t++) {
 			struct omap_overlay *ovl = ovid->overlays[t];
@@ -2498,9 +2495,11 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 
 	spin_lock(&vout->vbq_lock);
 	do_gettimeofday(&timevalue);
-	if (cur_display->type == OMAP_DISPLAY_TYPE_DPI) {
-		if (!(irqstatus & DISPC_IRQ_VSYNC))
-			return;
+	if ((cur_display->type == OMAP_DISPLAY_TYPE_DSI &&
+	     irqstatus & DISPC_IRQ_FRAMEDONE) ||
+	    (cur_display->type == OMAP_DISPLAY_TYPE_DPI &&
+	     irqstatus & DISPC_IRQ_VSYNC)) {
+
 		if (!vout->first_int && (vout->cur_frm != vout->next_frm)) {
 			vout->cur_frm->ts = timevalue;
 			vout->cur_frm->state = VIDEOBUF_DONE;
@@ -2509,6 +2508,8 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		}
 		vout->first_int = 0;
 		if (list_empty(&vout->dma_queue)) {
+			/* TODO: only update on new frame */
+			omapvid_apply_changes(vout);
 			spin_unlock(&vout->vbq_lock);
 			return;
 		}
