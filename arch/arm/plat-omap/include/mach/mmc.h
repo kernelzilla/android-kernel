@@ -64,6 +64,9 @@ struct omap_mmc_platform_data {
 
 	u64 dma_mask;
 
+	/* To identify device name */
+	char * name;
+
 	struct omap_mmc_slot_data {
 
 		/* 4 wire signaling is optional, and is used for SD/SDIO/HSMMC;

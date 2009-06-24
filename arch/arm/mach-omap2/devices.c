@@ -633,7 +633,10 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 			name = "mmci-omap";
 		} else {
 			size = HSMMC_SIZE;
-			name = "mmci-omap-hs";
+			if (mmc_data[i]->name)
+				name = mmc_data[i]->name;
+			else
+				name = "mmci-omap-hs";
 		}
 		omap_mmc_add(name, i, base, size, irq, mmc_data[i]);
 	};
