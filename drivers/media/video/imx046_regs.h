@@ -207,6 +207,7 @@ struct imx046_reg {
 };
 
 enum imx046_image_size {
+	QUART_MP,
 	HALF_MP,
 	TWO_MP,
 	EIGHT_MP
@@ -295,6 +296,7 @@ struct imx046_clock_freq {
  * smallest image size to largest.
  */
 const static struct imx046_capture_size imx046_sizes[] = {
+	{ 410, 308 },	/* QUART_MP - 1/8 Vertical Elim */
 	{ 820, 616 },		/* 0.5Mp - 4X Horizontal & Vertical Elim. */
 	{ 3280, 616 },	/* 2Mp - 4X Vertical Elim. */
 	{ 3280, 2464},	/* 8MP - Full Resolution */
@@ -302,7 +304,8 @@ const static struct imx046_capture_size imx046_sizes[] = {
 
 /* PLL settings for imx046 */
 enum imx046_pll_type {
-	PLL_0_5MP = 0,
+	PLL_QUART_MP = 0,
+	PLL_0_5MP,
 	PLL_2MP,
 	PLL_8MP,
 };

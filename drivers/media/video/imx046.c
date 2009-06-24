@@ -120,6 +120,41 @@ static enum v4l2_power current_power_state;
 static struct imx046_sensor_settings sensor_settings[] = {
 	 /* NOTE: must be in same order as image_size array */
 
+	/* QUART_MP */
+	{
+		.clk = {
+			.pre_pll_div = 1,
+			.pll_mult = 18,
+			.post_pll_div = 1,
+			.vt_pix_clk_div = 10,
+			.vt_sys_clk_div = 1,
+		},
+		.mipi = {
+			.data_lanes = 1,
+			.ths_prepare = 2,
+			.ths_zero = 5,
+			.ths_settle_lower = 8,
+			.ths_settle_upper = 28,
+		},
+		.frame = {
+			.frame_len_lines_min = 629,
+			.line_len_pck = 3440,
+			.x_addr_start = 0,
+			.x_addr_end = 3279,
+			.y_addr_start = 0,
+			.y_addr_end = 2463,
+			.x_output_size = 410,
+			.y_output_size = 308,
+			.x_even_inc = 9,
+			.x_odd_inc = 7,
+			.y_even_inc = 9,
+			.y_odd_inc = 7,
+			.v_mode_add = 0,
+			.h_mode_add = 0,
+			.h_add_ave = 1,
+		},
+	},
+
 	/* HALF_MP */
 	{
 		.clk = {
@@ -466,7 +501,7 @@ static enum imx046_image_size imx046_find_size(unsigned int width,
 {
 	enum imx046_image_size isize;
 
-	for (isize = HALF_MP; isize <= EIGHT_MP; isize++) {
+	for (isize = QUART_MP; isize <= EIGHT_MP; isize++) {
 		if ((imx046_sizes[isize].height >= height) &&
 			(imx046_sizes[isize].width >= width)) {
 			break;
