@@ -1,14 +1,14 @@
 config VIDEO_OMAP_VIDEOLIB
 	tristate "OMAP Video out library"
-	depends on VIDEO_OMAP3
-	default VIDEO_OMAP3
+	depends on VIDEO_OMAP3_V4L2
+	default VIDEO_OMAP3_V4L2
 
 config VIDEO_OMAP_VIDEOOUT
 	tristate "OMAP Video out driver"
 	select VIDEOBUF_DMA_SG
 	select VIDEOBUF_GEN
-	depends on VIDEO_OMAP3
-	default VIDEO_OMAP3
+	depends on VIDEO_OMAP3_V4L2
+	default VIDEO_OMAP3_V4L2
 
 choice
         prompt "TV Mode"

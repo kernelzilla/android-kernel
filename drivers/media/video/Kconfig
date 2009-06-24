@@ -720,8 +720,8 @@ config VIDEO_OMAP3
 	---help---
 	  Driver for an OMAP 3 camera controller.
 
-config VIDEO_OMAP3
-	bool "OMAP2/OMAP3 Camera and V4L2-DSS drivers"
+config VIDEO_OMAP3_V4L2
+	bool "V4L2-DSS drivers"
 	select VIDEOBUF_GEN
 	select VIDEOBUF_DMA_SG
 	select OMAP2_DSS
