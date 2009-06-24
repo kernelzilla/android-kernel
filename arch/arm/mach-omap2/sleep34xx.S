@@ -39,6 +39,7 @@
 #define PM_PREPWSTST_MPU_V	OMAP34XX_PRM_REGADDR(MPU_MOD, \
 				OMAP3430_PM_PREPWSTST)
 #define CM_IDLEST1_CORE_V	OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
+#define SDRC_SCRATCHPAD_SEM_V	0xd800291C
 
 /*
  * This is the physical address of the register as specified
@@ -61,6 +62,37 @@
 #define SDRC_MANUAL_1_P		(OMAP343X_SDRC_BASE + SDRC_MANUAL_1)
 #define SDRC_DLLA_STATUS_V	OMAP34XX_SDRC_REGADDR(SDRC_DLLA_STATUS)
 #define SDRC_DLLA_CTRL_V	OMAP34XX_SDRC_REGADDR(SDRC_DLLA_CTRL)
+
+        .text
+/* Function to aquire the semaphore in scratchpad */
+ENTRY(lock_scratchpad_sem)
+	stmfd	sp!, {lr}	@ save registers on stack
+wait_sem:
+	mov	r0,#1
+	ldr	r1, sdrc_scratchpad_sem
+wait_loop:
+	ldr	r2, [r1]	@ load the lock value
+	cmp	r2, r0		@ is the lock free ?
+	beq	wait_loop	@ not free...
+	swp	r2, r0, [r1]	@ semaphore free so lock it and proceed
+	cmp	r2, r0		@ did we succeed ?
+	beq	wait_sem	@ no - try again
+	ldmfd	sp!, {pc}	@ restore regs and return
+sdrc_scratchpad_sem:
+        .word SDRC_SCRATCHPAD_SEM_V
+ENTRY(lock_scratchpad_sem_sz)
+        .word   . - lock_scratchpad_sem
+
+        .text
+/* Function to release the scratchpad semaphore */
+ENTRY(unlock_scratchpad_sem)
+	stmfd	sp!, {lr}	@ save registers on stack
+	ldr	r3, sdrc_scratchpad_sem
+	mov	r2,#0
+	str	r2,[r3]
+	ldmfd	sp!, {pc}	@ restore regs and return
+ENTRY(unlock_scratchpad_sem_sz)
+        .word   . - unlock_scratchpad_sem
 
 	.text
 /* Function call to get the restore pointer for resume from OFF */
@@ -335,58 +367,6 @@ logic_l1_restore:
 	/*normal memory remap register */
 	MCR p15, 0, r5, c10, c2, 1
 
-	/* Restore registers for other modes from SDRAM */
-	/* Save current mode */
-	mrs	r7, cpsr
-
-	/* FIQ mode */
-	bic	r0, r7, #0x1F
-	orr	r0, r0, #0x11
-	msr	cpsr, r0
-	ldmia	r3!, {r8-r12}
-	/* load the SP and LR from SDRAM */
-	ldmia  r3!,{r4-r6}
-	mov    sp, r4	/*update the SP */
-	mov    lr, r5	/*update the LR */
-	msr    spsr, r6	/*update the SPSR*/
-
-	/* IRQ mode */
-	bic    r0, r7, #0x1F
-	orr    r0, r0, #0x12
-	msr    cpsr, r0	/*go into IRQ mode*/
-	ldmia  r3!,{r4-r6}	/*load the SP and LR from SDRAM*/
-	mov    sp, r4	/*update the SP */
-	mov    lr, r5	/*update the LR */
-	msr    spsr, r6	/*update the SPSR */
-
-	/* ABORT mode */
-	bic    r0, r7, #0x1F
-	orr    r0, r0, #0x17
-	msr    cpsr, r0	/* go into ABORT mode */
-	ldmia  r3!,{r4-r6}	/*load the SP and LR from SDRAM */
-	mov    sp, r4		/*update the SP */
-	mov    lr, r5		/*update the LR */
-	msr    spsr, r6		/*update the SPSR */
-
-	/* UNDEEF mode */
-	bic    r0, r7, #0x1F
-	orr    r0, r0, #0x1B
-	msr    cpsr, r0		/*go into UNDEF mode */
-	ldmia  r3!,{r4-r6}	/*load the SP and LR from SDRAM */
-	mov    sp, r4		/*update the SP*/
-	mov    lr, r5		/*update the LR*/
-	msr    spsr, r6		/*update the SPSR*/
-
-	/* SYSTEM (USER) mode */
-	bic    r0, r7, #0x1F
-	orr    r0, r0, #0x1F
-	msr    cpsr, r0		/*go into USR mode */
-	ldmia  r3!,{r4-r6}	/*load the SP and LR from SDRAM*/
-	mov    sp, r4		/*update the SP */
-	mov    lr, r5		/*update the LR */
-	msr    spsr, r6		/*update the SPSR */
-	msr    cpsr, r7		/*back to original mode*/
-
 	/* Restore cpsr */
 	ldmia	r3!,{r4}	/*load CPSR from SDRAM*/
 	msr	cpsr, r4	/*store cpsr */
@@ -502,69 +482,14 @@ l1_logic_lost:
 	mrc	p15, 0, r4, c10, c2, 0
 	mrc	p15, 0, r5, c10, c2, 1
 	stmia	r8!,{r4-r5}
-	/* Store SP, LR, SPSR registers for SUP, FIQ, IRQ, ABORT and USER
-	modes into SDRAM */
-
-	/* move SDRAM address to r7 as r8 is banked in FIQ*/
-	mov	r7, r8
-
-	/* Save current mode */
-	mrs	r2, cpsr
-	/* FIQ mode */
-	bic	r0, r2, #0x1F
-	orr	r0, r0, #0x11
-	msr	cpsr, r0 /* go to FIQ mode */
-	stmia	r7!, {r8-r12}
-	mov	r4, r13 /* move SP into r4*/
-	mov	r5, r14
-	mrs	r6, spsr
-	stmia	r7!, {r4-r6}
-
-	/* IRQ mode */
-	bic	r0, r2, #0x1F
-	orr	r0, r0, #0x12
-	msr	cpsr, r0
-	mov	r4, r13
-	mov	r5, r14
-	mrs	r6, spsr
-	stmia	r7!, {r4-r6}
-
-	/* Abort mode */
-	bic	r0, r2, #0x1F
-	orr	r0, r0, #0x17
-	msr	cpsr, r0
-	mov	r4, r13
-	mov	r5, r14
-	mrs	r6, spsr
-	stmia	r7!, {r4-r6}
-
-	/* UNDEF mode */
-	bic	r0, r2, #0x1F
-	orr	r0, r0, #0x1B
-	msr	cpsr, r0
-	mov	r4, r13
-	mov	r5, r14
-	mrs	r6, spsr
-	stmia	r7!, {r4-r6}
-
-	/* System (USER mode) */
-	bic	r0, r2, #0x1F
-	orr	r0, r0, #0x1F
-	msr	cpsr, r0
-	mov	r4, r13
-	mov	r5, r14
-	mrs	r6, spsr
-	stmia	r7!, {r4-r6}
-
-	/* Back to original mode */
-	msr	cpsr, r2
 
 	/* Store current cpsr*/
-	stmia	r7!, {r2}
+	mrs	r2, cpsr
+	stmia	r8!, {r2}
 
 	mrc	p15, 0, r4, c1, c0, 0
 	/* save control register */
-	stmia	r7!, {r4}
+	stmia	r8!, {r4}
 clean_caches:
 	/* Clean Data or unified cache to POU*/
 	/* How to invalidate only L1 cache???? - #FIX_ME# */

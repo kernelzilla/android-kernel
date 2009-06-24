@@ -95,11 +95,10 @@ obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
 					   mmc-twl4030.o
 
 # Platform specific device init code
-obj-$(CONFIG_USB_MUSB_SOC)		+= usb-musb.o
+obj-y								+= usb-musb.o
 obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
 
 ifneq ($(CONFIG_USB_EHCI_HCD),)
 	obj-y				+= usb-ehci.o
 endif
-
 

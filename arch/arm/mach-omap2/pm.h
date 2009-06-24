@@ -24,7 +24,6 @@ static inline int omap3_idle_init(void) { return 0; }
 #endif
 
 extern unsigned short enable_dyn_sleep;
-extern unsigned short clocks_off_while_idle;
 extern unsigned short enable_off_mode;
 extern unsigned short voltage_off_while_idle;
 extern atomic_t sleep_block;
@@ -40,7 +39,6 @@ struct prm_setup_vc {
 	u16 voltsetup_time2;
 	u16 voltoffset;
 	u16 voltsetup2;
-
 /* PRM_VC_CMD_VAL_0 specific bits */
 	u16 vdd0_on;
 	u16 vdd0_onlp;
@@ -51,7 +49,6 @@ struct prm_setup_vc {
 	u16 vdd1_onlp;
 	u16 vdd1_ret;
 	u16 vdd1_off;
-
 /* Values for VDD registers */
 	u32 i2c_slave_ra;
 	u32 vdd_vol_ra;

@@ -28,7 +28,9 @@
 #include <mach/omap-pm.h>
 #include <mach/omap34xx.h>
 
-extern int sr_voltagescale_vcbypass(u32 target_opp, u8 vsel);
+extern int sr_voltagescale_vcbypass(u32 t_opp, u32 c_opp, u8 t_vsel, u8 c_vsel);
+extern void lock_scratchpad_sem();
+extern void unlock_scratchpad_sem();
 
 /*
  * mpu_latency/core_latency are used to control the cpuidle C state.
