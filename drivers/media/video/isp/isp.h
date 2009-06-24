@@ -139,6 +139,13 @@ enum isp_callback_type {
 	CBK_END,
 };
 
+enum ispccdc_raw_fmt {
+	ISPCCDC_INPUT_FMT_GR_BG,
+	ISPCCDC_INPUT_FMT_RG_GB,
+	ISPCCDC_INPUT_FMT_BG_GR,
+	ISPCCDC_INPUT_FMT_GB_RG,
+};
+
 /**
  * struct isp_reg - Structure for ISP register values.
  * @reg: 32-bit Register address.
@@ -184,6 +191,7 @@ struct isp_interface_config {
 	u32 prev_slv;
 	u32 wenlog;
 	int wait_hs_vs;
+	enum ispccdc_raw_fmt raw_fmt_in;
 	union {
 		struct par {
 			unsigned par_bridge:2;
