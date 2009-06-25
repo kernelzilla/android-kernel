@@ -49,6 +49,8 @@
 
 #include "pm.h"
 #include "prm-regbits-34xx.h"
+#include "smartreflex.h"
+#include "omap3-opp.h"
 
 #ifdef CONFIG_VIDEO_OLDOMAP3
 #include <media/v4l2-int-device.h>
@@ -70,9 +72,48 @@
 #define SHOLES_WL1271_NSHUTDOWN_GPIO	179
 #define SHOLES_AUDIO_PATH_GPIO		143
 
+static struct omap_opp sholes_mpu_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{S125M, VDD1_OPP1, 0x20},
+	/*OPP2*/
+	{S250M, VDD1_OPP2, 0x27},
+	/*OPP3*/
+	{S500M, VDD1_OPP3, 0x32},
+	/*OPP4*/
+	{S550M, VDD1_OPP4, 0x38},
+	/*OPP5*/
+	{S600M, VDD1_OPP5, 0x3E},
+};
+
+static struct omap_opp sholes_l3_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{0, VDD2_OPP1, 0x20},
+	/*OPP2*/
+	{S83M, VDD2_OPP2, 0x27},
+	/*OPP3*/
+	{S166M, VDD2_OPP3, 0x2E},
+};
+
+static struct omap_opp sholes_dsp_rate_table[] = {
+	{0, 0, 0},
+	/*OPP1*/
+	{S90M, VDD1_OPP1, 0x20},
+	/*OPP2*/
+	{S180M, VDD1_OPP2, 0x27},
+	/*OPP3*/
+	{S360M, VDD1_OPP3, 0x32},
+	/*OPP4*/
+	{S400M, VDD1_OPP4, 0x38},
+	/*OPP5*/
+	{S430M, VDD1_OPP5, 0x3E},
+};
+
 static void __init sholes_init_irq(void)
 {
-	omap2_init_common_hw(NULL, NULL, NULL, NULL);
+	omap2_init_common_hw(NULL, sholes_mpu_rate_table,
+			sholes_dsp_rate_table, sholes_l3_rate_table);
 	omap_init_irq();
 #ifdef CONFIG_OMAP3_PM
 	scm_clk_init();
@@ -528,10 +569,57 @@ static struct prm_setup_vc sholes_prm_setup = {
 #define R_SMPS_VOL_OPP2_RA0		0x03
 #define R_SMPS_VOL_OPP2_RA1		0x03
 
+#define CPCAP_SMPS_UPDATE_DELAY     170 /* In uSec */
+
+#ifdef CONFIG_OMAP_SMARTREFLEX
+int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
+					u8 target_vsel, u8 current_vsel)
+{
+
+	int sr_status = 0;
+	u32 vdd, target_opp_no;
+	u8 slave_addr = 0, opp_reg_addr = 0, volt_reg_addr = 0;
+
+	vdd = get_vdd(target_opp);
+	target_opp_no = get_opp_no(target_opp);
+
+	if (vdd == VDD1_OPP) {
+		sr_status = sr_stop_vddautocomap(SR1);
+		slave_addr = SHOLES_R_SRI2C_SLAVE_ADDR_SA0;
+		volt_reg_addr = SHOLES_R_VDD1_SR_CONTROL;
+		opp_reg_addr = R_SMPS_VOL_OPP2_RA0;
+
+	} else if (vdd == VDD2_OPP) {
+		sr_status = sr_stop_vddautocomap(SR2);
+		slave_addr = SHOLES_R_SRI2C_SLAVE_ADDR_SA1;
+		volt_reg_addr = SHOLES_R_VDD2_SR_CONTROL;
+		opp_reg_addr = R_SMPS_VOL_OPP2_RA1;
+	}
+
+	/* Update the CPCAP SWx OPP2 register, stores the on voltage value */
+	omap3_bypass_cmd(slave_addr, opp_reg_addr, target_vsel);
+
+	/* Update the CPCAP SWx voltage register, change the output voltage */
+	omap3_bypass_cmd(slave_addr, volt_reg_addr, target_vsel);
+
+	udelay(CPCAP_SMPS_UPDATE_DELAY);
+
+	if (sr_status) {
+		if (vdd == VDD1_OPP)
+			sr_start_vddautocomap(SR1, target_opp_no);
+		else if (vdd == VDD2_OPP)
+			sr_start_vddautocomap(SR2, target_opp_no);
+	}
+
+	return SR_PASS; 
+}
+#endif
+
 /* Sholes specific PM */
 static void sholes_pm_init(void)
 {
 	omap3_set_prm_setup_vc(&sholes_prm_setup);
+	omap3_voltagescale_vcbypass_setup(sholes_voltagescale_vcbypass);
 
 	/* Initialize CPCAP SW1&SW2 OPP1&OPP2 registers */
 	/* SW1, OPP1 for RET Voltage --- 1.0V,
