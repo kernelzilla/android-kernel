@@ -58,9 +58,8 @@ static char *def_disp_name;
 module_param_named(def_disp, def_disp_name, charp, 0);
 MODULE_PARM_DESC(def_disp_name, "default display name");
 
-#define DEBUG
 #ifdef DEBUG
-unsigned int dss_debug = 1;
+unsigned int dss_debug;
 module_param_named(debug, dss_debug, bool, 0644);
 #endif
 
