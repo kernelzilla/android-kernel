@@ -43,7 +43,7 @@ struct cpcap_adc {
 };
 
 struct phasing_tbl {
-	unsigned short offset;
+	short offset;
 	unsigned short multiplier;
 	unsigned short divider;
 	short min;
