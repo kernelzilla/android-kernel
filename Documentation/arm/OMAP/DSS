@@ -133,10 +133,16 @@ name
 output_size	width,height
 position	x,y
 screen_width	width
+global_alpha   	global alpha 0-255 0=transparent 255=opaque
 
 /sys/devices/platform/omapdss/manager? directory:
-display		Destination display
+display				Destination display
 name
+alpha_blending_enabled		0=off, 1=on
+trans_key_enabled		0=off, 1=on
+trans_key_type			gfx-destination, video-source
+trans_key_value			transparency color key (RGB24)
+default_color			default background color (RGB24)
 
 /sys/devices/platform/omapdss/display? directory:
 ctrl_name	Controller name
@@ -189,8 +195,8 @@ FB2 --- VID2 -/   TV ----- TV
 Example: Switch from LCD to DVI
 ----------------------
 
-w=`cat $dvi/horizontal | cut -d "," -f 1`
-h=`cat $dvi/vertical | cut -d "," -f 1`
+w=`cat $dvi/timings | cut -d "," -f 2 | cut -d "/" -f 1`
+h=`cat $dvi/timings | cut -d "," -f 3 | cut -d "/" -f 1`
 
 echo "0" > $lcd/enabled
 echo "" > $mgr0/display
@@ -208,8 +214,8 @@ FB2 --- VID2 -/   TV ----- TV
 Example: Clone GFX overlay to LCD and TV
 -------------------------------
 
-w=`cat $tv/horizontal | cut -d "," -f 1`
-h=`cat $tv/vertical | cut -d "," -f 1`
+w=`cat $tv/timings | cut -d "," -f 2 | cut -d "/" -f 1`
+h=`cat $tv/timings | cut -d "," -f 3 | cut -d "/" -f 1`
 
 echo "0" > $ovl0/enabled
 echo "0" > $ovl1/enabled

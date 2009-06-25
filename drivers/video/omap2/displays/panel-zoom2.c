@@ -57,13 +57,30 @@
 
 #define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
 
+static struct omap_video_timings zoom2_panel_timings = {
+	.x_res		= LCD_XRES,
+	.y_res		= LCD_YRES,
+	.pixel_clock	= LCD_PIXCLOCK_MAX,
+	.hfp		= 7,
+	.hsw		= 1,
+	.hbp		= 5,
+	.vfp		= 3,
+	.vsw		= 1,
+	.vbp		= 8,
+};
 
-static int zoom2_panel_init(struct omap_display *display)
+static int zoom2_panel_probe(struct omap_dss_device *display)
 {
+	display->panel.config = OMAP_DSS_LCD_TFT;
+	display->panel.timings = zoom2_panel_timings;
 	return 0;
 }
 
-static int zoom2_panel_enable(struct omap_display *display)
+static void zoom2_panel_remove(struct omap_dss_device *display)
+{
+}
+
+static int zoom2_panel_enable(struct omap_dss_device *display)
 {
 	int r = 0;
 
@@ -79,13 +96,10 @@ static int zoom2_panel_enable(struct omap_display *display)
 	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 1);
 	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 1);
 
-	if (display->hw_config.panel_enable)
-		r = display->hw_config.panel_enable(display);
-
 	return r;
 }
 
-static void zoom2_panel_disable(struct omap_display *display)
+static void zoom2_panel_disable(struct omap_dss_device *display)
 {
 	if (omap_rev() > OMAP3430_REV_ES1_0) {
 		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
@@ -97,31 +111,19 @@ static void zoom2_panel_disable(struct omap_display *display)
 	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
 	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
 	mdelay(4);
-	if (display->hw_config.panel_disable)
-		display->hw_config.panel_disable(display);
 }
-static struct omap_panel zoom2_panel = {
-	.owner		= THIS_MODULE,
-	.name		= "panel-zoom2",
-	.init		= zoom2_panel_init,
+
+static struct omap_dss_driver zoom2_driver = {
+	.probe		= zoom2_panel_probe,
+	.remove		= zoom2_panel_remove,
+
 	.enable		= zoom2_panel_enable,
 	.disable	= zoom2_panel_disable,
 
-	.timings = {
-		/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
-		.x_res		= LCD_XRES,
-		.y_res		= LCD_YRES,
-		.pixel_clock	= LCD_PIXCLOCK_MAX,
-		.hfp		= 7,
-		.hsw		= 1,
-		.hbp		= 5,
-		.vfp		= 3,
-		.vsw		= 1,
-		.vbp		= 8,
+	.driver = {
+		.name = "panel-zoom2",
+		.owner = THIS_MODULE,
 	},
-
-	.config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-			  OMAP_DSS_LCD_IHS,
 };
 
 static int
@@ -274,13 +276,13 @@ static int zoom2_spi_probe(struct spi_device *spi)
 
 	init_nec_wvga_lcd(spi);
 
-	omap_dss_register_panel(&zoom2_panel);
+	omap_dss_register_driver(&zoom2_driver);
 	return 0;
 }
 
 static int zoom2_spi_remove(struct spi_device *spi)
 {
-	omap_dss_unregister_panel(&zoom2_panel);
+	omap_dss_unregister_driver(&zoom2_driver);
 
 	return 0;
 }

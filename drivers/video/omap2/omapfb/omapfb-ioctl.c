@@ -37,14 +37,12 @@ static int omapfb_setup_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omap_overlay *ovl;
 	struct omap_overlay_info info;
 	int r = 0;
 
 	DBG("omapfb_setup_plane\n");
-
-	omapfb_lock(fbdev);
 
 	if (ofbi->num_overlays != 1) {
 		r = -EINVAL;
@@ -94,7 +92,6 @@ static int omapfb_setup_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 	}
 
 out:
-	omapfb_unlock(fbdev);
 	if (r)
 		dev_err(fbdev->dev, "setup_plane failed\n");
 	return r;
@@ -103,9 +100,6 @@ out:
 static int omapfb_query_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-
-	omapfb_lock(fbdev);
 
 	if (ofbi->num_overlays != 1) {
 		memset(pi, 0, sizeof(*pi));
@@ -125,8 +119,6 @@ static int omapfb_query_plane(struct fb_info *fbi, struct omapfb_plane_info *pi)
 		pi->out_height = ovli->out_height;
 	}
 
-	omapfb_unlock(fbdev);
-
 	return 0;
 }
 
@@ -145,43 +137,32 @@ static int omapfb_setup_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 
 	rg = &ofbi->region;
 
-	omapfb_lock(fbdev);
-
 	for (i = 0; i < ofbi->num_overlays; i++) {
-		if (ofbi->overlays[i]->info.enabled) {
-			r = -EBUSY;
-			goto out;
-		}
+		if (ofbi->overlays[i]->info.enabled)
+			return -EBUSY;
 	}
 
 	if (rg->size != size || rg->type != mi->type) {
 		r = omapfb_realloc_fbmem(fbi, size, mi->type);
 		if (r) {
 			dev_err(fbdev->dev, "realloc fbmem failed\n");
-			goto out;
+			return r;
 		}
 	}
 
-	r = 0;
-out:
-	omapfb_unlock(fbdev);
-
-	return r;
+	return 0;
 }
 
 static int omapfb_query_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omapfb2_mem_region *rg;
 
 	rg = &ofbi->region;
 	memset(mi, 0, sizeof(*mi));
 
-	omapfb_lock(fbdev);
 	mi->size = rg->size;
 	mi->type = rg->type;
-	omapfb_unlock(fbdev);
 
 	return 0;
 }
@@ -189,9 +170,7 @@ static int omapfb_query_mem(struct fb_info *fbi, struct omapfb_mem_info *mi)
 static int omapfb_update_window(struct fb_info *fbi,
 		u32 x, u32 y, u32 w, u32 h)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	u16 dw, dh;
 
 	if (!display)
@@ -205,9 +184,7 @@ static int omapfb_update_window(struct fb_info *fbi,
 	if (x + w > dw || y + h > dh)
 		return -EINVAL;
 
-	omapfb_lock(fbdev);
 	display->update(display, x, y, w, h);
-	omapfb_unlock(fbdev);
 
 	return 0;
 }
@@ -215,9 +192,7 @@ static int omapfb_update_window(struct fb_info *fbi,
 static int omapfb_set_update_mode(struct fb_info *fbi,
 				   enum omapfb_update_mode mode)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode um;
 	int r;
 
@@ -241,9 +216,7 @@ static int omapfb_set_update_mode(struct fb_info *fbi,
 		return -EINVAL;
 	}
 
-	omapfb_lock(fbdev);
 	r = display->set_update_mode(display, um);
-	omapfb_unlock(fbdev);
 
 	return r;
 }
@@ -251,17 +224,13 @@ static int omapfb_set_update_mode(struct fb_info *fbi,
 static int omapfb_get_update_mode(struct fb_info *fbi,
 		enum omapfb_update_mode *mode)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 	enum omap_dss_update_mode m;
 
 	if (!display || !display->get_update_mode)
 		return -EINVAL;
 
-	omapfb_lock(fbdev);
 	m = display->get_update_mode(display);
-	omapfb_unlock(fbdev);
 
 	switch (m) {
 	case OMAP_DSS_UPDATE_DISABLED:
@@ -286,19 +255,26 @@ static struct omapfb_color_key omapfb_color_keys[2];
 static int _omapfb_set_color_key(struct omap_overlay_manager *mgr,
 		struct omapfb_color_key *ck)
 {
-	enum omap_dss_color_key_type kt;
+	struct omap_overlay_manager_info info;
+	enum omap_dss_trans_key_type kt;
+	int r;
 
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
-			!mgr->enable_trans_key)
-		return 0;
+	mgr->get_manager_info(mgr, &info);
 
 	if (ck->key_type == OMAPFB_COLOR_KEY_DISABLED) {
-		mgr->enable_trans_key(mgr, 0);
+		info.trans_enabled = false;
 		omapfb_color_keys[mgr->id] = *ck;
-		return 0;
+
+		r = mgr->set_manager_info(mgr, &info);
+		if (r)
+			return r;
+
+		r = mgr->apply(mgr);
+
+		return r;
 	}
 
-	switch(ck->key_type) {
+	switch (ck->key_type) {
 	case OMAPFB_COLOR_KEY_GFX_DST:
 		kt = OMAP_DSS_COLOR_KEY_GFX_DST;
 		break;
@@ -309,13 +285,20 @@ static int _omapfb_set_color_key(struct omap_overlay_manager *mgr,
 		return -EINVAL;
 	}
 
-	mgr->set_default_color(mgr, ck->background);
-	mgr->set_trans_key(mgr, kt, ck->trans_key);
-	mgr->enable_trans_key(mgr, 1);
+	info.default_color = ck->background;
+	info.trans_key = ck->trans_key;
+	info.trans_key_type = kt;
+	info.trans_enabled = true;
 
 	omapfb_color_keys[mgr->id] = *ck;
 
-	return 0;
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+
+	return r;
 }
 
 static int omapfb_set_color_key(struct fb_info *fbi,
@@ -338,12 +321,6 @@ static int omapfb_set_color_key(struct fb_info *fbi,
 
 	if (!mgr) {
 		r = -EINVAL;
-		goto err;
-	}
-
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
-			!mgr->enable_trans_key) {
-		r = -ENODEV;
 		goto err;
 	}
 
@@ -377,12 +354,6 @@ static int omapfb_get_color_key(struct fb_info *fbi,
 		goto err;
 	}
 
-	if(!mgr->set_default_color || !mgr->set_trans_key ||
-			!mgr->enable_trans_key) {
-		r = -ENODEV;
-		goto err;
-	}
-
 	*ck = omapfb_color_keys[mgr->id];
 err:
 	omapfb_unlock(fbdev);
@@ -393,9 +364,7 @@ err:
 static int omapfb_memory_read(struct fb_info *fbi,
 		struct omapfb_memory_read *mr)
 {
-	struct omap_display *display = fb2display(fbi);
-	struct omapfb_info *ofbi = FB2OFB(fbi);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(fbi);
 	void *buf;
 	int r;
 
@@ -414,8 +383,6 @@ static int omapfb_memory_read(struct fb_info *fbi,
 		return -ENOMEM;
 	}
 
-	omapfb_lock(fbdev);
-
 	r = display->memory_read(display, buf, mr->buffer_size,
 			mr->x, mr->y, mr->w, mr->h);
 
@@ -426,7 +393,67 @@ static int omapfb_memory_read(struct fb_info *fbi,
 
 	vfree(buf);
 
-	omapfb_unlock(fbdev);
+	return r;
+}
+
+static int omapfb_get_ovl_colormode(struct omapfb2_device *fbdev,
+			     struct omapfb_ovl_colormode *mode)
+{
+	int ovl_idx = mode->overlay_idx;
+	int mode_idx = mode->mode_idx;
+	struct omap_overlay *ovl;
+	enum omap_color_mode supported_modes;
+	struct fb_var_screeninfo var;
+	int i;
+
+	if (ovl_idx >= fbdev->num_overlays)
+		return -ENODEV;
+	ovl = fbdev->overlays[ovl_idx];
+	supported_modes = ovl->supported_modes;
+
+	mode_idx = mode->mode_idx;
+
+	for (i = 0; i < sizeof(supported_modes) * 8; i++) {
+		if (!(supported_modes & (1 << i)))
+			continue;
+		/*
+		 * It's possible that the FB doesn't support a mode
+		 * that is supported by the overlay, so call the
+		 * following here.
+		 */
+		if (dss_mode_to_fb_mode(1 << i, &var) < 0)
+			continue;
+
+		mode_idx--;
+		if (mode_idx < 0)
+			break;
+	}
+
+	if (i == sizeof(supported_modes) * 8)
+		return -ENOENT;
+
+	mode->bits_per_pixel = var.bits_per_pixel;
+	mode->nonstd = var.nonstd;
+	mode->red = var.red;
+	mode->green = var.green;
+	mode->blue = var.blue;
+	mode->transp = var.transp;
+
+	return 0;
+}
+
+static int omapfb_wait_for_go(struct fb_info *fbi)
+{
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	int r = 0;
+	int i;
+
+	for (i = 0; i < ofbi->num_overlays; ++i) {
+		struct omap_overlay *ovl = ofbi->overlays[i];
+		r = ovl->wait_for_go(ovl);
+		if (r)
+			break;
+	}
 
 	return r;
 }
@@ -435,7 +462,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_display *display = fb2display(fbi);
+	struct omap_dss_device *display = fb2display(fbi);
 
 	union {
 		struct omapfb_update_window_old	uwnd_o;
@@ -444,6 +471,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		struct omapfb_caps		caps;
 		struct omapfb_mem_info          mem_info;
 		struct omapfb_color_key		color_key;
+		struct omapfb_ovl_colormode	ovl_colormode;
 		enum omapfb_update_mode		update_mode;
 		int test_num;
 		struct omapfb_memory_read	memory_read;
@@ -460,9 +488,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		omapfb_lock(fbdev);
 		r = display->sync(display);
-		omapfb_unlock(fbdev);
 		break;
 
 	case OMAPFB_UPDATE_WINDOW_OLD:
@@ -545,9 +571,25 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
+		memset(&p.caps, 0, sizeof(p.caps));
 		p.caps.ctrl = display->caps;
 
 		if (copy_to_user((void __user *)arg, &p.caps, sizeof(p.caps)))
+			r = -EFAULT;
+		break;
+
+	case OMAPFB_GET_OVERLAY_COLORMODE:
+		DBG("ioctl GET_OVERLAY_COLORMODE\n");
+		if (copy_from_user(&p.ovl_colormode, (void __user *)arg,
+				   sizeof(p.ovl_colormode))) {
+			r = -EFAULT;
+			break;
+		}
+		r = omapfb_get_ovl_colormode(fbdev, &p.ovl_colormode);
+		if (r < 0)
+			break;
+		if (copy_to_user((void __user *)arg, &p.ovl_colormode,
+				 sizeof(p.ovl_colormode)))
 			r = -EFAULT;
 		break;
 
@@ -580,7 +622,8 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 
 	case OMAPFB_GET_COLOR_KEY:
 		DBG("ioctl GET_COLOR_KEY\n");
-		if ((r = omapfb_get_color_key(fbi, &p.color_key)) < 0)
+		r = omapfb_get_color_key(fbi, &p.color_key);
+		if (r)
 			break;
 		if (copy_to_user((void __user *)arg, &p.color_key,
 				 sizeof(p.color_key)))
@@ -595,6 +638,16 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		}
 
 		r = display->wait_vsync(display);
+		break;
+
+	case OMAPFB_WAITFORGO:
+		DBG("ioctl WAITFORGO\n");
+		if (!display) {
+			r = -EINVAL;
+			break;
+		}
+
+		r = omapfb_wait_for_go(fbi);
 		break;
 
 	/* LCD and CTRL tests do the same thing for backward

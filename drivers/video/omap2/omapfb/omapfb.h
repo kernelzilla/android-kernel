@@ -62,7 +62,7 @@ struct omapfb_info {
 	struct omap_overlay *overlays[OMAPFB_MAX_OVL_PER_FB];
 	struct omapfb2_device *fbdev;
 	enum omap_dss_rotation_type rotation_type;
-	u8 rotation;
+	u8 rotation[OMAPFB_MAX_OVL_PER_FB];
 	bool mirror;
 };
 
@@ -78,7 +78,7 @@ struct omapfb2_device {
 	struct fb_info *fbs[10];
 
 	unsigned num_displays;
-	struct omap_display *displays[10];
+	struct omap_dss_device *displays[10];
 	unsigned num_overlays;
 	struct omap_overlay *overlays[10];
 	unsigned num_managers;
@@ -111,9 +111,11 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg);
 
 int omapfb_mode_to_timings(const char *mode_str,
 		struct omap_video_timings *timings, u8 *bpp);
+int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
+			struct fb_var_screeninfo *var);
 
 /* find the display connected to this fb, if any */
-static inline struct omap_display *fb2display(struct fb_info *fbi)
+static inline struct omap_dss_device *fb2display(struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	int i;
@@ -121,7 +123,7 @@ static inline struct omap_display *fb2display(struct fb_info *fbi)
 	/* XXX: returns the display connected to first attached overlay */
 	for (i = 0; i < ofbi->num_overlays; i++) {
 		if (ofbi->overlays[i]->manager)
-			return ofbi->overlays[i]->manager->display;
+			return ofbi->overlays[i]->manager->device;
 	}
 
 	return NULL;

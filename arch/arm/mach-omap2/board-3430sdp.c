@@ -61,9 +61,6 @@
 #define ENABLE_VAUX3_DEDICATED	0x03
 #define ENABLE_VAUX3_DEV_GRP	0x20
 
-#define ENABLE_VAUX3_DEDICATED	0x03
-#define ENABLE_VAUX3_DEV_GRP	0x20
-
 #define TWL4030_MSECURE_GPIO 22
 
 static struct resource sdp3430_smc91x_resources[] = {
@@ -248,79 +245,13 @@ static struct spi_board_info sdp3430_spi_board_info[] __initdata = {
 };
 
 
-#define SDP2430_LCD_PANEL_BACKLIGHT_GPIO	91
-#define SDP2430_LCD_PANEL_ENABLE_GPIO		154
-#if 0
-#define SDP3430_LCD_PANEL_BACKLIGHT_GPIO	24
-#define SDP3430_LCD_PANEL_ENABLE_GPIO		28
-#else
 #define SDP3430_LCD_PANEL_BACKLIGHT_GPIO	8
 #define SDP3430_LCD_PANEL_ENABLE_GPIO		5
-#endif
-
-#define PM_RECEIVER             TWL4030_MODULE_PM_RECEIVER
-#define ENABLE_VAUX2_DEDICATED  0x09
-#define ENABLE_VAUX2_DEV_GRP    0x20
-#define ENABLE_VAUX3_DEDICATED	0x03
-#define ENABLE_VAUX3_DEV_GRP	0x20
-
-#define ENABLE_VPLL2_DEDICATED	0x05
-#define ENABLE_VPLL2_DEV_GRP	0xE0
-#define TWL4030_VPLL2_DEV_GRP	0x33
-#define TWL4030_VPLL2_DEDICATED	0x36
-
-#define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
 
 static unsigned backlight_gpio;
 static unsigned enable_gpio;
 static int lcd_enabled;
 static int dvi_enabled;
-
-static struct platform_device sdp3430_lcd_device = {
-	.name		= "sdp2430_lcd",
-	.id		= -1,
-};
-
-static struct regulator_consumer_supply sdp3430_vdac_supply = {
-	.supply		= "vdac",
-	.dev		= &sdp3430_lcd_device.dev,
-};
-
-static struct regulator_consumer_supply sdp3430_vdvi_supply = {
-	.supply		= "vdvi",
-	.dev		= &sdp3430_lcd_device.dev,
-};
-
-static void enable_vpll2(int enable)
-{
-	u8 ded_val, grp_val;
-
-	if (enable) {
-		ded_val = ENABLE_VPLL2_DEDICATED;
-		grp_val = ENABLE_VPLL2_DEV_GRP;
-	} else {
-		ded_val = 0;
-		grp_val = 0;
-	}
-
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-			ded_val, TWL4030_VPLL2_DEDICATED);
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-			grp_val, TWL4030_VPLL2_DEV_GRP);
-}
-
-static int sdp3430_dsi_power_up(void)
-{
-	if (omap_rev() > OMAP3430_REV_ES1_0)
-		enable_vpll2(1);
-	return 0;
-}
-
-static void sdp3430_dsi_power_down(void)
-{
-	if (omap_rev() > OMAP3430_REV_ES1_0)
-		enable_vpll2(0);
-}
 
 static void __init sdp3430_display_init(void)
 {
@@ -351,125 +282,94 @@ err0:
 	return;
 }
 
-static int sdp3430_panel_enable_lcd(struct omap_display *display)
+static int sdp3430_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
-	u8 ded_val, ded_reg;
-	u8 grp_val, grp_reg;
-
 	if (dvi_enabled) {
 		printk(KERN_ERR "cannot enable LCD, DVI is enabled\n");
 		return -EINVAL;
 	}
 
-	ded_reg = TWL4030_VAUX3_DEDICATED;
-	ded_val = ENABLE_VAUX3_DEDICATED;
-	grp_reg = TWL4030_VAUX3_DEV_GRP;
-	grp_val = ENABLE_VAUX3_DEV_GRP;
-
 	gpio_direction_output(enable_gpio, 1);
 	gpio_direction_output(backlight_gpio, 1);
-
-	if (0 != t2_out(PM_RECEIVER, ded_val, ded_reg))
-		return -EIO;
-	if (0 != t2_out(PM_RECEIVER, grp_val, grp_reg))
-		return -EIO;
-
-	sdp3430_dsi_power_up();
 
 	lcd_enabled = 1;
 
 	return 0;
 }
 
-static void sdp3430_panel_disable_lcd(struct omap_display *display)
+static void sdp3430_panel_disable_lcd(struct omap_dss_device *dssdev)
 {
 	lcd_enabled = 0;
-
-	sdp3430_dsi_power_down();
 
 	gpio_direction_output(enable_gpio, 0);
 	gpio_direction_output(backlight_gpio, 0);
 }
 
-static struct omap_dss_display_config sdp3430_display_data = {
-	.type = OMAP_DISPLAY_TYPE_DPI,
-	.name = "lcd",
-	.panel_name = "sharp-ls037v7dw01",
-	.u.dpi.data_lines = 16,
-	.panel_enable = sdp3430_panel_enable_lcd,
-	.panel_disable = sdp3430_panel_disable_lcd,
-};
-
-static int sdp3430_panel_enable_dvi(struct omap_display *display)
+static int sdp3430_panel_enable_dvi(struct omap_dss_device *dssdev)
 {
 	if (lcd_enabled) {
 		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
 		return -EINVAL;
 	}
 
-	sdp3430_dsi_power_up();
-
 	dvi_enabled = 1;
 
 	return 0;
 }
 
-static void sdp3430_panel_disable_dvi(struct omap_display *display)
+static void sdp3430_panel_disable_dvi(struct omap_dss_device *dssdev)
 {
-	sdp3430_dsi_power_down();
-
 	dvi_enabled = 0;
 }
 
-
-static struct omap_dss_display_config sdp3430_display_data_dvi = {
-	.type = OMAP_DISPLAY_TYPE_DPI,
-	.name = "dvi",
-	.panel_name = "panel-generic",
-	.u.dpi.data_lines = 24,
-	.panel_enable = sdp3430_panel_enable_dvi,
-	.panel_disable = sdp3430_panel_disable_dvi,
-};
-
-static int sdp3430_panel_enable_tv(struct omap_display *display)
+static int sdp3430_panel_enable_tv(struct omap_dss_device *dssdev)
 {
-#define ENABLE_VDAC_DEDICATED           0x03
-#define ENABLE_VDAC_DEV_GRP             0x20
-
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-			ENABLE_VDAC_DEDICATED,
-			TWL4030_VDAC_DEDICATED);
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-			ENABLE_VDAC_DEV_GRP, TWL4030_VDAC_DEV_GRP);
-
 	return 0;
 }
 
-static void sdp3430_panel_disable_tv(struct omap_display *display)
+static void sdp3430_panel_disable_tv(struct omap_dss_device *dssdev)
 {
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00,
-			TWL4030_VDAC_DEDICATED);
-	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00,
-			TWL4030_VDAC_DEV_GRP);
 }
 
-static struct omap_dss_display_config sdp3430_display_data_tv = {
-	.type = OMAP_DISPLAY_TYPE_VENC,
+
+static struct omap_dss_device sdp3430_lcd_device = {
+	.name = "lcd",
+	.driver_name = "sharp_ls_panel",
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.phy.dpi.data_lines = 16,
+	.platform_enable = sdp3430_panel_enable_lcd,
+	.platform_disable = sdp3430_panel_disable_lcd,
+};
+
+static struct omap_dss_device sdp3430_dvi_device = {
+	.name = "dvi",
+	.driver_name = "generic_panel",
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.phy.dpi.data_lines = 24,
+	.platform_enable = sdp3430_panel_enable_dvi,
+	.platform_disable = sdp3430_panel_disable_dvi,
+};
+
+static struct omap_dss_device sdp3430_tv_device = {
 	.name = "tv",
-	.u.venc.type = OMAP_DSS_VENC_TYPE_SVIDEO,
-	.panel_enable = sdp3430_panel_enable_tv,
-	.panel_disable = sdp3430_panel_disable_tv,
+	.driver_name = "venc",
+	.type = OMAP_DISPLAY_TYPE_VENC,
+	.phy.venc.type = OMAP_DSS_VENC_TYPE_SVIDEO,
+	.platform_enable = sdp3430_panel_enable_tv,
+	.platform_disable = sdp3430_panel_disable_tv,
+};
+
+
+static struct omap_dss_device *sdp3430_dss_devices[] = {
+	&sdp3430_lcd_device,
+	&sdp3430_dvi_device,
+	&sdp3430_tv_device,
 };
 
 static struct omap_dss_board_info sdp3430_dss_data = {
-	.dsi_power_up = sdp3430_dsi_power_up,
-	.dsi_power_down = sdp3430_dsi_power_down,
-	.num_displays = 3,
-	.displays = {
-		&sdp3430_display_data,
-		&sdp3430_display_data_dvi,
-		&sdp3430_display_data_tv,
-	}
+	.num_devices = ARRAY_SIZE(sdp3430_dss_devices),
+	.devices = sdp3430_dss_devices,
+	.default_device = &sdp3430_lcd_device,
 };
 
 static struct platform_device sdp3430_dss_device = {
@@ -478,6 +378,11 @@ static struct platform_device sdp3430_dss_device = {
 	.dev            = {
 		.platform_data = &sdp3430_dss_data,
 	},
+};
+
+static struct regulator_consumer_supply sdp3430_vdda_dac_supply = {
+	.supply		= "vdda_dac",
+	.dev		= &sdp3430_dss_device.dev,
 };
 
 static struct platform_device *sdp3430_devices[] __initdata = {
@@ -819,22 +724,34 @@ static struct regulator_init_data sdp3430_vdac = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &sdp3430_vdac_supply,
+	.consumer_supplies	= &sdp3430_vdda_dac_supply,
 };
 
 /* VPLL2 for digital video outputs */
+static struct regulator_consumer_supply sdp3430_vpll2_supplies[] = {
+	{
+		.supply		= "vdvi",
+		.dev		= &sdp3430_lcd_device.dev,
+	},
+	{
+		.supply		= "vdds_dsi",
+		.dev		= &sdp3430_dss_device.dev,
+	}
+};
+
 static struct regulator_init_data sdp3430_vpll2 = {
 	.constraints = {
 		.name			= "VDVI",
 		.min_uV			= 1800000,
 		.max_uV			= 1800000,
+		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &sdp3430_vdvi_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(sdp3430_vpll2_supplies),
+	.consumer_supplies	= sdp3430_vpll2_supplies,
 };
 
 static struct twl4030_platform_data sdp3430_twldata = {

@@ -163,26 +163,39 @@ void dss_clk_disable(enum dss_clock clks);
 unsigned long dss_clk_get_rate(enum dss_clock clk);
 int dss_need_ctx_restore(void);
 void dss_dump_clocks(struct seq_file *s);
-
-int dss_dsi_power_up(void);
-void dss_dsi_power_down(void);
+struct bus_type *dss_get_bus(void);
 
 /* display */
-void dss_init_displays(struct platform_device *pdev);
-void dss_uninit_displays(struct platform_device *pdev);
-int dss_suspend_all_displays(void);
-int dss_resume_all_displays(void);
-struct omap_display *dss_get_display(int no);
+int dss_suspend_all_devices(void);
+int dss_resume_all_devices(void);
+
+void dss_init_device(struct platform_device *pdev,
+		struct omap_dss_device *dssdev);
+void dss_uninit_device(struct platform_device *pdev,
+		struct omap_dss_device *dssdev);
+bool dss_use_replication(struct omap_dss_device *dssdev,
+		enum omap_color_mode mode);
+void default_get_overlay_fifo_thresholds(enum omap_plane plane,
+		u32 fifo_size, enum omap_burst_size *burst_size,
+		u32 *fifo_low, u32 *fifo_high);
 
 /* manager */
 int dss_init_overlay_managers(struct platform_device *pdev);
 void dss_uninit_overlay_managers(struct platform_device *pdev);
+int dss_mgr_wait_for_go_ovl(struct omap_overlay *ovl);
+void dss_setup_partial_planes(struct omap_dss_device *dssdev,
+				u16 *x, u16 *y, u16 *w, u16 *h);
+void dss_start_update(struct omap_dss_device *dssdev);
 
 /* overlay */
-void dss_init_overlays(struct platform_device *pdev, const char *def_disp_name);
+void dss_init_overlays(struct platform_device *pdev);
 void dss_uninit_overlays(struct platform_device *pdev);
-int dss_check_overlay(struct omap_overlay *ovl, struct omap_display *display);
+int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev);
 void dss_overlay_setup_dispc_manager(struct omap_overlay_manager *mgr);
+#ifdef L4_EXAMPLE
+void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr);
+#endif
+void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
 
 /* DSS */
 int dss_init(bool skip_init);
@@ -206,10 +219,10 @@ void dss_set_dac_pwrdn_bgz(bool enable);
 /* SDI */
 int sdi_init(bool skip_init);
 void sdi_exit(void);
-void sdi_init_display(struct omap_display *display);
+int sdi_init_display(struct omap_dss_device *display);
 
 /* DSI */
-int dsi_init(void);
+int dsi_init(struct platform_device *pdev);
 void dsi_exit(void);
 
 void dsi_dump_clocks(struct seq_file *s);
@@ -218,7 +231,7 @@ void dsi_dump_regs(struct seq_file *s);
 void dsi_save_context(void);
 void dsi_restore_context(void);
 
-void dsi_init_display(struct omap_display *display);
+int dsi_init_display(struct omap_dss_device *display);
 void dsi_irq_handler(void);
 unsigned long dsi_get_dsi1_pll_rate(void);
 unsigned long dsi_get_dsi2_pll_rate(void);
@@ -227,11 +240,14 @@ int dsi_pll_calc_pck(bool is_tft, unsigned long req_pck,
 int dsi_pll_program(struct dsi_clock_info *cinfo);
 int dsi_pll_init(bool enable_hsclk, bool enable_hsdiv);
 void dsi_pll_uninit(void);
+void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
+		u32 fifo_size, enum omap_burst_size *burst_size,
+		u32 *fifo_low, u32 *fifo_high);
 
 /* DPI */
 int dpi_init(void);
 void dpi_exit(void);
-void dpi_init_display(struct omap_display *display);
+int dpi_init_display(struct omap_dss_device *dssdev);
 
 /* DISPC */
 int dispc_init(void);
@@ -264,8 +280,10 @@ void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_pos(enum omap_plane plane, u16 x, u16 y);
 void dispc_set_plane_size(enum omap_plane plane, u16 width, u16 height);
+void dispc_set_channel_out(enum omap_plane plane,
+		enum omap_channel channel_out);
 
-int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
+int dispc_setup_plane(enum omap_plane plane,
 		      u32 paddr, u16 screen_width,
 		      u16 pos_x, u16 pos_y,
 		      u16 width, u16 height,
@@ -273,12 +291,15 @@ int dispc_setup_plane(enum omap_plane plane, enum omap_channel channel_out,
 		      enum omap_color_mode color_mode,
 		      bool ilace,
 		      enum omap_dss_rotation_type rotation_type,
-		      u8 rotation, bool mirror);
+		      u8 rotation, bool mirror,
+		      u8 global_alpha);
 
+bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
 void dispc_enable_lcd_out(bool enable);
 void dispc_enable_digit_out(bool enable);
 int dispc_enable_plane(enum omap_plane plane, bool enable);
+void dispc_enable_replication(enum omap_plane plane, bool enable);
 
 void dispc_set_parallel_interface_mode(enum omap_parallel_interface_mode mode);
 void dispc_set_tft_data_lines(u8 data_lines);
@@ -288,19 +309,22 @@ void dispc_set_loadmode(enum omap_dss_load_mode mode);
 void dispc_set_default_color(enum omap_channel channel, u32 color);
 u32 dispc_get_default_color(enum omap_channel channel);
 void dispc_set_trans_key(enum omap_channel ch,
-		enum omap_dss_color_key_type type,
+		enum omap_dss_trans_key_type type,
 		u32 trans_key);
 void dispc_get_trans_key(enum omap_channel ch,
-		enum omap_dss_color_key_type *type,
+		enum omap_dss_trans_key_type *type,
 		u32 *trans_key);
 void dispc_enable_trans_key(enum omap_channel ch, bool enable);
+void dispc_enable_alpha_blending(enum omap_channel ch, bool enable);
 bool dispc_trans_key_enabled(enum omap_channel ch);
+bool dispc_alpha_blending_enabled(enum omap_channel ch);
 
+bool dispc_lcd_timings_ok(struct omap_video_timings *timings);
 void dispc_set_lcd_timings(struct omap_video_timings *timings);
 unsigned long dispc_fclk_rate(void);
 unsigned long dispc_lclk_rate(void);
 unsigned long dispc_pclk_rate(void);
-void dispc_set_pol_freq(struct omap_panel *panel);
+void dispc_set_pol_freq(enum omap_panel_config config, u8 acbi, u8 acb);
 void find_lck_pck_divs(bool is_tft, unsigned long req_pck, unsigned long fck,
 		u16 *lck_div, u16 *pck_div);
 int dispc_calc_clock_div(bool is_tft, unsigned long req_pck,
@@ -309,16 +333,12 @@ int dispc_set_clock_div(struct dispc_clock_info *cinfo);
 int dispc_get_clock_div(struct dispc_clock_info *cinfo);
 void dispc_set_lcd_divisor(u16 lck_div, u16 pck_div);
 
-void dispc_setup_partial_planes(struct omap_display *display,
-				u16 *x, u16 *y, u16 *w, u16 *h);
-void dispc_draw_partial_planes(struct omap_display *display);
-
 
 /* VENC */
-int venc_init(void);
+int venc_init(struct platform_device *pdev);
 void venc_exit(void);
 void venc_dump_regs(struct seq_file *s);
-void venc_init_display(struct omap_display *display);
+int venc_init_display(struct omap_dss_device *display);
 
 /* RFBI */
 int rfbi_init(void);
@@ -331,6 +351,6 @@ void rfbi_transfer_area(u16 width, u16 height,
 			     void (callback)(void *data), void *data);
 void rfbi_set_timings(int rfbi_module, struct rfbi_timings *t);
 unsigned long rfbi_get_max_tx_rate(void);
-void rfbi_init_display(struct omap_display *display);
+int rfbi_init_display(struct omap_dss_device *display);
 
 #endif
