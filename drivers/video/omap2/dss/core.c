@@ -58,8 +58,9 @@ static char *def_disp_name;
 module_param_named(def_disp, def_disp_name, charp, 0);
 MODULE_PARM_DESC(def_disp_name, "default display name");
 
+#define DEBUG
 #ifdef DEBUG
-unsigned int dss_debug;
+unsigned int dss_debug = 1;
 module_param_named(debug, dss_debug, bool, 0644);
 #endif
 
@@ -178,23 +179,23 @@ static int dss_get_clocks(void)
 	core.dss_54m_fck = NULL;
 	core.dss_96m_fck = NULL;
 
-	r = dss_get_clock(&core.dss_ick, "ick");
+	r = dss_get_clock(&core.dss_ick, "dss_ick");
 	if (r)
 		goto err;
 
-	r = dss_get_clock(&core.dss1_fck, "dss1_fck");
+	r = dss_get_clock(&core.dss1_fck, "dss1_alwon_fck");
 	if (r)
 		goto err;
 
-	r = dss_get_clock(&core.dss2_fck, "dss2_fck");
+	r = dss_get_clock(&core.dss2_fck, "dss2_alwon_fck");
 	if (r)
 		goto err;
 
-	r = dss_get_clock(&core.dss_54m_fck, "tv_fck");
+	r = dss_get_clock(&core.dss_54m_fck, "dss_tv_fck");
 	if (r)
 		goto err;
 
-	r = dss_get_clock(&core.dss_96m_fck, "video_fck");
+	r = dss_get_clock(&core.dss_96m_fck, "dss_96m_fck");
 	if (r)
 		goto err;
 
