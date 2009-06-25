@@ -245,30 +245,19 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 
 #define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
 
-
-static int zoom2_panel_enable_lcd(struct omap_display *display)
-{
-	return 0;
-}
-
-static void zoom2_panel_disable_lcd(struct omap_display *display)
-{
-}
-
-static struct omap_dss_display_config zoom2_display_data_lcd = {
+static struct omap_dss_device zoom2_display_data_lcd = {
 	.type = OMAP_DISPLAY_TYPE_DPI,
 	.name = "lcd",
-	.panel_name = "panel-zoom2",
-	.u.dpi.data_lines = 24,
-	.panel_enable = zoom2_panel_enable_lcd,
-	.panel_disable = zoom2_panel_disable_lcd,
+	.driver_name = "panel-zoom2",
+	.phy.dpi.data_lines = 24,
  };
 
 static struct omap_dss_board_info zoom2_dss_data = {
-	.num_displays = 1,
-	.displays = {
+	.num_devices = 1,
+	.devices = {
 		&zoom2_display_data_lcd,
-	}
+	},
+	.default_device = &zoom2_display_data_lcd,
 };
 
 static struct platform_device zoom2_dss_device = {
