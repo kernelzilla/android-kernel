@@ -105,6 +105,8 @@ struct regulator_consumer_supply cpcap_vcam_consumers[] = {
 	REGULATOR_CONSUMER("vcam", NULL /* cpcap_cam_device */),
 };
 
+extern struct platform_device sholes_dss_device;
+
 struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
 	REGULATOR_CONSUMER("vhvio", NULL /* lighting_driver */),
 #if 0
@@ -118,6 +120,10 @@ struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
 
 struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
 	REGULATOR_CONSUMER("vsdio", &sfh7743_platform_device.dev),
+};
+
+struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
+	REGULATOR_CONSUMER("vdds_dsi", &sholes_dss_device.dev),
 };
 
 struct regulator_consumer_supply cpcap_vwlan2_consumers[] = {
@@ -162,6 +168,8 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 			.boot_on		= 1,
 			.apply_uV		= 1,
 		},
+		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vcsi_consumers),
+		.consumer_supplies	= cpcap_vcsi_consumers,
 	},
 	[CPCAP_VDAC] = {
 		.constraints = {

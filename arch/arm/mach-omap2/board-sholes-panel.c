@@ -21,58 +21,9 @@
 
 #define SHOLES_DISPLAY_RESET_GPIO	136
 
-static void sholes_dsi_enable(int enable)
-{
-	/* XXX power managment to enable dsi block */
-#if 0
-	u8 ded_val, grp_val;
-
-	
-	if (omap_rev() <= OMAP3430_REV_ES1_0)
-		return;
-
-	if (enable) {
-		ded_val = ENABLE_VPLL2_DEDICATED;
-		grp_val = ENABLE_VPLL2_DEV_GRP;
-	} else {
-		ded_val = 0;
-                grp_val = 0;
-	}
-
-	twl4030_i2c_write_u8(PM_RECEIVER, ded_val, TWL4030_VPLL2_DEDICATED);
-	twl4030_i2c_write_u8(PM_RECEIVER, grp_val, TWL4030_VPLL2_DEV_GRP);
-#endif 
-}
-
-static int sholes_dsi_power_up(void)
-{
-	sholes_dsi_enable(1);
-	return 0;
-}
-
-static void sholes_dsi_power_down(void)
-{
-	sholes_dsi_enable(0);
-}
-
-static int sholes_panel_enable_lcd(struct omap_display *display)
-{
-	/* backlight enable? */
-	return 0;
-}
-
-static void sholes_panel_disable_lcd(struct omap_display *display)
-{
-#if 0
-	/* backlight disable? */
-
-#endif
-}
-
 struct regulator *display_regulator;
 
-
-static int sholes_edisco_ctrl_enable(struct omap_display *display)
+static int sholes_panel_enable(struct omap_dss_device *dssdev)
 {
 	if (!display_regulator) {
 		display_regulator = regulator_get(NULL, "vhvio");
@@ -93,43 +44,42 @@ static int sholes_edisco_ctrl_enable(struct omap_display *display)
 	return 0;
 }
 
-static void sholes_edisco_ctrl_disable(struct omap_display *display)
+static void sholes_panel_disable(struct omap_dss_device *dssdev)
 {
 	gpio_direction_output(SHOLES_DISPLAY_RESET_GPIO, 1);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 0);
 	msleep(1);
 	regulator_disable(display_regulator);
-	return;
 }
 
-static struct omap_dss_display_config sholes_display_data_lcd = {
+static struct omap_dss_device sholes_lcd_device = {
 	.type = OMAP_DISPLAY_TYPE_DSI,
 	.name = "lcd",
-	.ctrl_name = "ctrl-edisco",
-	.panel_name = "panel-sholes",
-	.u.dsi.clk_lane = 1,
-	.u.dsi.clk_pol = 0,
-	.u.dsi.data1_lane = 2,
-	.u.dsi.data1_pol = 0,
-	.u.dsi.data2_lane = 3,
-	.u.dsi.data2_pol = 0,
-	.u.dsi.ddr_clk_hz = 150000000,
-	.panel_enable = sholes_panel_enable_lcd,
-	.panel_disable = sholes_panel_disable_lcd,
-	.ctrl_enable = sholes_edisco_ctrl_enable,
-	.ctrl_disable = sholes_edisco_ctrl_disable,
+	.driver_name = "sholes-panel",
+	.phy.dsi.clk_lane = 1,
+	.phy.dsi.clk_pol = 0,
+	.phy.dsi.data1_lane = 2,
+	.phy.dsi.data1_pol = 0,
+	.phy.dsi.data2_lane = 3,
+	.phy.dsi.data2_pol = 0,
+	.phy.dsi.ddr_clk_hz = 200000000,
+	.phy.dsi.lp_clk_hz = 10000000,
+	.reset_gpio = SHOLES_DISPLAY_RESET_GPIO,
+	.platform_enable = sholes_panel_enable,
+	.platform_disable = sholes_panel_disable,
+};
+
+static struct omap_dss_device *sholes_dss_devices[] = {
+	&sholes_lcd_device,
 };
 
 static struct omap_dss_board_info sholes_dss_data = {
-	.dsi_power_up = sholes_dsi_power_up,
-	.dsi_power_down = sholes_dsi_power_down,
-	.num_displays = 1,
-	.displays = {
-		&sholes_display_data_lcd,
-	}
+	.num_devices = ARRAY_SIZE(sholes_dss_devices),
+	.devices = sholes_dss_devices,
+	.default_device = &sholes_lcd_device,
 };
 
-static struct platform_device sholes_dss_device = {
+struct platform_device sholes_dss_device = {
         .name          = "omapdss",
         .id            = -1,
         .dev            = {
