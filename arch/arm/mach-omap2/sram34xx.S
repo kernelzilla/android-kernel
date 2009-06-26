@@ -96,6 +96,8 @@ ENTRY(omap3_sram_configure_core_dpll)
 	blne	lock_dll
 	bl	sdram_in_selfrefresh	@ put SDRAM in self refresh, idle SDRC
 	bl 	configure_core_dpll	@ change the DPLL3 M2 divider
+	mov	r12, r5
+	bl	wait_clk_stable		@ wait for SDRC to stabilize
 	bl	enable_sdrc		@ take SDRC out of idle
 	cmp	r4, #SDRC_UNLOCK_DLL	@ wait for DLL status to change
 	bleq	wait_dll_unlock
@@ -103,8 +105,6 @@ ENTRY(omap3_sram_configure_core_dpll)
 	cmp	r7, #1			@ if increasing SDRC clk rate,
 	beq	return_to_sdram		@ return to SDRAM code, otherwise,
 	bl	configure_sdrc		@ reprogram SDRC regs now
-	mov	r12, r5
-	bl	wait_clk_stable		@ wait for SDRC to stabilize
 return_to_sdram:
 	isb				@ prevent speculative exec past here
 	mov 	r0, #0 			@ return value
