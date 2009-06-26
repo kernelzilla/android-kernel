@@ -21,7 +21,6 @@
 #include <mach/gpio.h>
 #include <mach/mux.h>
 
-extern struct platform_device sfh7743_platform_device;
 extern struct platform_device cpcap_disp_button_led;
 extern struct platform_device cpcap_rgb_led;
 
@@ -119,7 +118,7 @@ struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
 };
 
 struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
-	REGULATOR_CONSUMER("vsdio", &sfh7743_platform_device.dev),
+	REGULATOR_CONSUMER("vsdio", NULL),
 };
 
 struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
