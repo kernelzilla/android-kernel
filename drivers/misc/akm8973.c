@@ -2,46 +2,50 @@
  *
  */
 
-#include <linux/interrupt.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
+#include <linux/input.h>
+#include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/miscdevice.h>
-#include <linux/delay.h>
-#include <linux/input.h>
-#include <linux/workqueue.h>
 #include <linux/uaccess.h>
+#include <linux/workqueue.h>
 
 #include <linux/akm8973.h>
 
-#define AKM8973_FUZZ			4
-#define AKM8973_FLAT			4
-#define AKM8973_MIN_POLL_INTERVAL	27
+#define NAME "akm8973"
+
+#define FUZZ			4
+#define FLAT			4
+#define I2C_RETRIES		5
+#define I2C_RETRY_DELAY		5
 
 struct akm8973_data {
-	struct i2c_client		*client;
-	struct akm8973_platform_data	*pdata;
+	struct i2c_client *client;
+	struct akm8973_platform_data *pdata;
 
-	struct mutex			lock;
+	struct mutex lock;
 
-	struct work_struct		irq_work;
+	struct work_struct irq_work;
 
-	struct delayed_work		input_work;
-	struct input_dev		*input_dev;
+	struct delayed_work input_work;
+	struct input_dev *input_dev;
 
-	int				hw_initialized;
+	int hw_initialized;
+	int enabled;
 
-	u8				hxga;
-	u8				hyga;
-	u8				hzga;
+	u8 hxga;
+	u8 hyga;
+	u8 hzga;
+
+	u8 state;
 };
 
 /*
  * Because misc devices can not carry a pointer from driver register to
  * open, we keep this global.  This limits the driver to a single instance.
  */
-struct akm8973_data	*akm8973_misc_data;
-
-static u8 akm8973_state;
+struct akm8973_data *akm8973_misc_data;
 
 static inline u8 akm8973_convert_dac_offset(u8 offset)
 {
@@ -51,29 +55,30 @@ static inline u8 akm8973_convert_dac_offset(u8 offset)
 	return offset;
 }
 
-static int akm8973_i2c_read(struct akm8973_data *akm, u8 *buf, int len)
+static int akm8973_i2c_read(struct akm8973_data *akm, u8 * buf, int len)
 {
 	int err;
 	int tries = 0;
 	struct i2c_msg msgs[] = {
 		{
-			.addr = akm->client->addr,
-			.flags = 0,
-			.len = 1,
-			.buf = buf,
-		},
+		 .addr = akm->client->addr,
+		 .flags = akm->client->flags & I2C_M_TEN,
+		 .len = 1,
+		 .buf = buf,
+		 },
 		{
-			.addr = akm->client->addr,
-			.flags = I2C_M_RD,
-			.len = len,
-			.buf = buf,
-		},
+		 .addr = akm->client->addr,
+		 .flags = (akm->client->flags & I2C_M_TEN) | I2C_M_RD,
+		 .len = len,
+		 .buf = buf,
+		 },
 	};
 
 	do {
-		err = i2c_transfer(akm->client->adapter,
-				   msgs, ARRAY_SIZE(msgs));
-	} while ((err != 2) && (++tries < akm->pdata->i2c_retries));
+		err = i2c_transfer(akm->client->adapter, msgs, 2);
+		if (err != 2)
+			msleep_interruptible(I2C_RETRY_DELAY);
+	} while ((err != 2) && (++tries < I2C_RETRIES));
 
 	if (err != 2) {
 		dev_err(&akm->client->dev, "read transfer error\n");
@@ -85,23 +90,24 @@ static int akm8973_i2c_read(struct akm8973_data *akm, u8 *buf, int len)
 	return err;
 }
 
-static int akm8973_i2c_write(struct akm8973_data *akm, u8 *buf, int len)
+static int akm8973_i2c_write(struct akm8973_data *akm, u8 * buf, int len)
 {
 	int err;
 	int tries = 0;
 	struct i2c_msg msgs[] = {
 		{
-			.addr = akm->client->addr,
-			.flags = 0,
-			.len = len,
-			.buf = buf,
+		 .addr = akm->client->addr,
+		 .flags = akm->client->flags & I2C_M_TEN,
+		 .len = len + 1,
+		 .buf = buf,
 		 },
 	};
 
 	do {
-		err = i2c_transfer(akm->client->adapter,
-				   msgs, ARRAY_SIZE(msgs));
-	} while ((err != 1) && (++tries < akm->pdata->i2c_retries));
+		err = i2c_transfer(akm->client->adapter, msgs, 1);
+		if (err != 1)
+			msleep_interruptible(I2C_RETRY_DELAY);
+	} while ((err != 1) && (++tries < I2C_RETRIES));
 
 	if (err != 1) {
 		dev_err(&akm->client->dev, "write transfer error\n");
@@ -126,14 +132,13 @@ static int akm8973_clear_irq(struct akm8973_data *akm)
 	return 0;
 }
 
-
 static int akm8973_set_mode(struct akm8973_data *akm, u8 mode)
 {
 	int err;
 	u8 buf[2];
 
 	/*
-	 * the AKM8973 will not transition into meansure mode
+	 * the AKM8973 will not transition into measure mode
 	 * when an irq is pending
 	 */
 	if (mode == AKM8973_MODE_MEASURE) {
@@ -145,9 +150,8 @@ static int akm8973_set_mode(struct akm8973_data *akm, u8 mode)
 	buf[0] = AKM8973_REG_MS1;
 	buf[1] = mode;
 
-	return akm8973_i2c_write(akm, buf, 2);
+	return akm8973_i2c_write(akm, buf, 1);
 }
-
 
 static int akm8973_hw_init(struct akm8973_data *akm)
 {
@@ -181,7 +185,7 @@ static int akm8973_hw_init(struct akm8973_data *akm)
 	buf[5] = akm->hyga;
 	buf[6] = akm->hzga;
 
-	err = akm8973_i2c_write(akm, buf, 7);
+	err = akm8973_i2c_write(akm, buf, 6);
 	if (err < 0)
 		return err;
 
@@ -266,7 +270,7 @@ static int akm8973_auto_calibrate(struct akm8973_data *akm, u8 *values)
 		buf[2] = akm8973_convert_dac_offset(hyda);
 		buf[3] = akm8973_convert_dac_offset(hzda);
 
-		err = akm8973_i2c_write(akm, buf, 4);
+		err = akm8973_i2c_write(akm, buf, 3);
 		if (err < 0) {
 			dev_err(&akm->client->dev,
 				"unable to update offset dacs\n");
@@ -281,7 +285,7 @@ static int akm8973_auto_calibrate(struct akm8973_data *akm, u8 *values)
 	return calibrate;
 }
 
-static void akm8973_transform_values(struct akm8973_data *akm, u8 *values)
+static void akm8973_transform_values(struct akm8973_data *akm, u8 * values)
 {
 	u8 tmp;
 
@@ -322,24 +326,24 @@ static void akm8973_transform_values(struct akm8973_data *akm, u8 *values)
 static void akm8973_report_values(struct akm8973_data *akm,
 				  u8 *values, int calibrate)
 {
-	if (akm8973_state & AKM8973_MAG) {
-		input_report_abs(akm->input_dev, ABS_HAT0X, values[1]-128);
-		input_report_abs(akm->input_dev, ABS_HAT0Y, values[2]-128);
-		input_report_abs(akm->input_dev, ABS_BRAKE, values[3]-128);
+	if (akm->state & AKM8973_MAG) {
+		input_report_abs(akm->input_dev, ABS_HAT0X, values[1] - 128);
+		input_report_abs(akm->input_dev, ABS_HAT0Y, values[2] - 128);
+		input_report_abs(akm->input_dev, ABS_BRAKE, values[3] - 128);
 		input_report_abs(akm->input_dev, ABS_RUDDER, calibrate);
 	}
 
-	if (akm8973_state & AKM8973_TEMP)
+	if (akm->state & AKM8973_TEMP)
 		input_report_abs(akm->input_dev, ABS_THROTTLE, values[0]);
 
-	if (akm8973_state)
+	if (akm->state)
 		input_sync(akm->input_dev);
 }
 
 static void akm8973_irq_work_func(struct work_struct *work)
 {
 	struct akm8973_data *akm =
-		container_of(work, struct akm8973_data, irq_work);
+	    container_of(work, struct akm8973_data, irq_work);
 	u8 buf[4];
 	int err;
 	int calibrate;
@@ -367,6 +371,44 @@ static irqreturn_t akm8973_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static int akm8973_enable(struct akm8973_data *akm)
+{
+	int err;
+
+	if (!akm->enabled) {
+		mutex_lock(&akm->lock);
+
+		err = akm8973_device_power_on(akm);
+		if (err < 0) {
+			mutex_unlock(&akm->lock);
+			return err;
+		}
+
+		akm->enabled = 1;
+
+		schedule_delayed_work(&akm->input_work,
+				      msecs_to_jiffies(akm->pdata->
+						       poll_interval));
+
+		mutex_unlock(&akm->lock);
+	}
+
+	return 0;
+}
+
+static int akm8973_disable(struct akm8973_data *akm)
+{
+	if (akm->enabled) {
+		cancel_delayed_work_sync(&akm->input_work);
+
+		mutex_lock(&akm->lock);
+		akm->enabled = 0;
+		akm8973_device_power_off(akm);
+		mutex_unlock(&akm->lock);
+	}
+
+	return 0;
+}
 
 static int akm8973_misc_open(struct inode *inode, struct file *file)
 {
@@ -389,8 +431,6 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 	int interval;
 	struct akm8973_data *akm = file->private_data;
 
-	mutex_lock(&akm->lock);
-
 	switch (cmd) {
 	case AKM8973_IOCTL_GET_CALI:
 		buf[0] = akm->pdata->hxda;
@@ -402,11 +442,11 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 
 	case AKM8973_IOCTL_SET_CALI:
 		/* leave room for command byte */
-		if (copy_from_user(buf+1, argp, 3))
+		if (copy_from_user(buf + 1, argp, 3))
 			return -EFAULT;
 
 		buf[0] = AKM8973_REG_HXDA;
-		err = akm8973_i2c_write(akm, buf, 4);
+		err = akm8973_i2c_write(akm, buf, 3);
 		if (err < 0)
 			goto err;
 
@@ -428,7 +468,7 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 
 		akm->pdata->poll_interval =
-			max(interval, AKM8973_MIN_POLL_INTERVAL);
+		    max(interval, akm->pdata->min_interval);
 		break;
 
 	case AKM8973_IOCTL_SET_FLAG:
@@ -437,11 +477,16 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		if (buf[0] > 3)
 			return -EINVAL;
 
-		akm8973_state = buf[0];
+		akm->state = buf[0];
+		if (akm->state != 0)
+			akm8973_enable(akm);
+		else
+			akm8973_disable(akm);
+
 		break;
 
 	case AKM8973_IOCTL_GET_FLAG:
-		buf[0] = akm8973_state;
+		buf[0] = akm->state;
 		if (copy_to_user(argp, &buf, 1))
 			return -EINVAL;
 
@@ -452,11 +497,9 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		goto err;
 	}
 
-	mutex_unlock(&akm->lock);
 	return 0;
 
 err:
-	mutex_unlock(&akm->lock);
 	return err;
 }
 
@@ -468,55 +511,40 @@ static const struct file_operations akm8973_misc_fops = {
 
 static struct miscdevice akm8973_misc_device = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "akm8973",
+	.name = NAME,
 	.fops = &akm8973_misc_fops,
 };
 
 static void akm8973_input_work_func(struct work_struct *work)
 {
-	struct akm8973_data *akm =
-		container_of((struct delayed_work *) work,
-			     struct akm8973_data, input_work);
+	struct akm8973_data *akm = container_of((struct delayed_work *)work,
+						struct akm8973_data,
+						input_work);
 	mutex_lock(&akm->lock);
 	akm8973_set_mode(akm, AKM8973_MODE_MEASURE);
 	/*
 	 * leave akm->lock locked because nothing can access the device
-	 * whicn in meansure mode
+	 * which is in measure mode
 	 */
 	schedule_delayed_work(&akm->input_work,
 			      msecs_to_jiffies(akm->pdata->poll_interval));
 }
 
-
+#ifdef AKM8973_OPEN_ENABLE
 int akm8973_input_open(struct input_dev *input)
 {
 	struct akm8973_data *akm = input_get_drvdata(input);
-	int err;
 
-	mutex_lock(&akm->lock);
-
-	err = akm8973_device_power_on(akm);
-	if (err < 0) {
-		mutex_unlock(&akm->lock);
-		return err;
-	}
-
-	schedule_delayed_work(&akm->input_work,
-			      msecs_to_jiffies(akm->pdata->poll_interval));
-	mutex_unlock(&akm->lock);
-
-	return 0;
+	return akm8973_enable(akm);
 }
 
 void akm8973_input_close(struct input_dev *dev)
 {
 	struct akm8973_data *akm = input_get_drvdata(dev);
 
-	cancel_delayed_work_sync(&akm->input_work);
-	mutex_lock(&akm->lock);
-	akm8973_device_power_off(akm);
-	mutex_unlock(&akm->lock);
+	akm8973_disable(akm);
 }
+#endif
 
 static int akm8973_validate_pdata(struct akm8973_data *akm)
 {
@@ -535,7 +563,7 @@ static int akm8973_validate_pdata(struct akm8973_data *akm)
 	}
 
 	akm->pdata->poll_interval = max(akm->pdata->poll_interval,
-					AKM8973_MIN_POLL_INTERVAL);
+					akm->pdata->min_interval);
 
 	return 0;
 }
@@ -547,25 +575,30 @@ static int akm8973_input_init(struct akm8973_data *akm)
 	INIT_DELAYED_WORK(&akm->input_work, akm8973_input_work_func);
 
 	akm->input_dev = input_allocate_device();
+	if (!akm->input_dev) {
+		err = -ENOMEM;
+		dev_err(&akm->client->dev, "input device allocate failed\n");
+		goto err0;
+	}
 
+
+#ifdef AKM8973_OPEN_ENABLE
 	akm->input_dev->open = akm8973_input_open;
 	akm->input_dev->close = akm8973_input_close;
+#endif
+
 	input_set_drvdata(akm->input_dev, akm);
 
 	set_bit(EV_ABS, akm->input_dev->evbit);
 
 	/* x-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_HAT0X, -128, 127,
-			     AKM8973_FUZZ, AKM8973_FLAT);
+	input_set_abs_params(akm->input_dev, ABS_HAT0X, -128, 127, FUZZ, FLAT);
 	/* y-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_HAT0X, -128, 127,
-			     AKM8973_FUZZ, AKM8973_FLAT);
+	input_set_abs_params(akm->input_dev, ABS_HAT0Y, -128, 127, FUZZ, FLAT);
 	/* z-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_BRAKE, -128, 127,
-			     AKM8973_FUZZ, AKM8973_FLAT);
+	input_set_abs_params(akm->input_dev, ABS_BRAKE, -128, 127, FUZZ, FLAT);
 	/* temperature */
-	input_set_abs_params(akm->input_dev, ABS_THROTTLE, -30, 85,
-			     AKM8973_FUZZ, AKM8973_FLAT);
+	input_set_abs_params(akm->input_dev, ABS_THROTTLE, -30, 85, FUZZ, FLAT);
 	/* calibration occured? */
 	input_set_abs_params(akm->input_dev, ABS_RUDDER, 0, 1, 0, 0);
 
@@ -576,13 +609,14 @@ static int akm8973_input_init(struct akm8973_data *akm)
 		dev_err(&akm->client->dev,
 			"unable to register input polled device %s\n",
 			akm->input_dev->name);
-		goto err0;
+		goto err1;
 	}
 
 	return 0;
 
-err0:
+err1:
 	input_free_device(akm->input_dev);
+err0:
 	return err;
 }
 
@@ -596,7 +630,7 @@ static int akm8973_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct akm8973_data *akm;
-	int err = 0;
+	int err = -1;
 
 	if (client->dev.platform_data == NULL) {
 		dev_err(&client->dev, "platform data is NULL. exiting.\n");
@@ -612,6 +646,8 @@ static int akm8973_probe(struct i2c_client *client,
 
 	akm = kzalloc(sizeof(*akm), GFP_KERNEL);
 	if (akm == NULL) {
+		dev_err(&client->dev,
+			"failed to allocate memory for module data\n");
 		err = -ENOMEM;
 		goto err0;
 	}
@@ -627,8 +663,10 @@ static int akm8973_probe(struct i2c_client *client,
 	memcpy(akm->pdata, client->dev.platform_data, sizeof(*akm->pdata));
 
 	err = akm8973_validate_pdata(akm);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&client->dev, "failed to validate platform data\n");
 		goto err1_1;
+	}
 
 	i2c_set_clientdata(client, akm);
 
@@ -666,7 +704,8 @@ static int akm8973_probe(struct i2c_client *client,
 	akm8973_device_power_off(akm);
 
 	/* As default, do not report information */
-	akm8973_state = 0;
+	akm->state = 0;
+	akm->enabled = 0;
 
 	mutex_unlock(&akm->lock);
 
@@ -684,6 +723,7 @@ err2:
 	if (akm->pdata->exit)
 		akm->pdata->exit();
 err1_1:
+	mutex_unlock(&akm->lock);
 	kfree(akm->pdata);
 err1:
 	kfree(akm);
@@ -691,7 +731,7 @@ err0:
 	return err;
 }
 
-static int akm8973_remove(struct i2c_client *client)
+static int __devexit akm8973_remove(struct i2c_client *client)
 {
 	/* TODO: revisit ordering here once _probe order is finalized */
 	struct akm8973_data *akm = i2c_get_clientdata(client);
@@ -708,19 +748,35 @@ static int akm8973_remove(struct i2c_client *client)
 	return 0;
 }
 
+static int akm8973_resume(struct i2c_client *client)
+{
+	struct akm8973_data *akm = i2c_get_clientdata(client);
+
+	return akm8973_enable(akm);
+}
+
+static int akm8973_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	struct akm8973_data *akm = i2c_get_clientdata(client);
+
+	return akm8973_disable(akm);
+}
 
 static const struct i2c_device_id akm8973_id[] = {
-	{"akm8973", 0},
+	{NAME, 0},
 	{},
 };
+
 MODULE_DEVICE_TABLE(i2c, akm8973_id);
 
 static struct i2c_driver akm8973_driver = {
 	.driver = {
-		.name = "akm8973",
-	},
+		   .name = NAME,
+		   },
 	.probe = akm8973_probe,
 	.remove = __devexit_p(akm8973_remove),
+	.resume = akm8973_resume,
+	.suspend = akm8973_suspend,
 	.id_table = akm8973_id,
 };
 
@@ -740,4 +796,5 @@ module_init(akm8973_init);
 module_exit(akm8973_exit);
 
 MODULE_DESCRIPTION("akm8973 magnetometer driver");
+MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
