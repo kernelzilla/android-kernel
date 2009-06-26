@@ -49,21 +49,23 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 	else if (color & LD_LED_BLUE)
 		cpcap_register = CPCAP_REG_BLUEC;
 
-	if ((value > 0) && (value <= 51))
+	if (value <= 51)
 		brightness = LD_MSG_IND_LOW | LD_MSG_IND_CURRENT;
-	else if ((value > 52) && (value <= 104))
+	else if (value <= 104)
 		brightness = LD_MSG_IND_LOW_MED | LD_MSG_IND_CURRENT;
-	else if ((value > 104) && (value <= 155))
+	else if (value <= 155)
 		brightness =  LD_MSG_IND_MEDIUM | LD_MSG_IND_CURRENT;
-	else if ((value >= 156) && (value <= 201))
+	else if (value <= 201)
 		brightness =  LD_MSG_IND_MED_HIGH | LD_MSG_IND_CURRENT;
-	else if ((value >= 202) && (value <= 255))
+	else
 		brightness =  LD_MSG_IND_HIGH | LD_MSG_IND_CURRENT;
 
 	if (value > LED_OFF) {
-		if (msg_ind_data->regulator) {
-			regulator_enable(msg_ind_data->regulator);
-			msg_ind_data->regulator_state |= color;
+		if (!(msg_ind_data->regulator_state & color)) {
+			if (msg_ind_data->regulator) {
+				regulator_enable(msg_ind_data->regulator);
+				msg_ind_data->regulator_state |= color;
+			}
 		}
 
 		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
@@ -101,7 +103,6 @@ static void msg_ind_red_set(struct led_classdev *led_cdev,
 
 	msg_ind_set_rgb_brightness(msg_ind_data, LD_LED_RED, value);
 }
-EXPORT_SYMBOL(msg_ind_red_set);
 
 static void msg_ind_green_set(struct led_classdev *led_cdev,
 			      enum led_brightness value)
@@ -112,7 +113,6 @@ static void msg_ind_green_set(struct led_classdev *led_cdev,
 
 	msg_ind_set_rgb_brightness(msg_ind_data, LD_LED_GREEN, value);
 }
-EXPORT_SYMBOL(msg_ind_green_set);
 
 static void msg_ind_blue_set(struct led_classdev *led_cdev,
 			     enum led_brightness value)
@@ -123,7 +123,6 @@ static void msg_ind_blue_set(struct led_classdev *led_cdev,
 
 	msg_ind_set_rgb_brightness(msg_ind_data, LD_LED_BLUE, value);
 }
-EXPORT_SYMBOL(msg_ind_blue_set);
 
 static ssize_t
 msg_ind_blink(struct device *dev, struct device_attribute *attr,
@@ -214,6 +213,7 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 err_reg_blue_class_failed:
 	led_classdev_unregister(&info->msg_ind_green_class_dev);
 err_reg_green_class_failed:
+	device_remove_file(info->msg_ind_red_class_dev.dev, &dev_attr_blink);
 err_create_blink_failed:
 	led_classdev_unregister(&info->msg_ind_red_class_dev);
 err_reg_red_class_failed:
@@ -230,6 +230,8 @@ static int msg_ind_rgb_remove(struct platform_device *pdev)
 
 	if (info->regulator)
 		regulator_put(info->regulator);
+
+	device_remove_file(info->msg_ind_red_class_dev.dev, &dev_attr_blink);
 
 	led_classdev_unregister(&info->msg_ind_red_class_dev);
 	led_classdev_unregister(&info->msg_ind_green_class_dev);
