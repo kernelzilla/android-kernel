@@ -265,8 +265,8 @@ config SENSORS_AKM8973
 
 config SENSORS_LIS331DLH
 	tristate "LIS331DLH Accelerometer"
+	default n
 	depends on I2C
-	select INPUT_POLLDEV
 	help
 	 Say yes here if you wish to include the STI Micro
 	 LIS331DLH accelerometer driver.
