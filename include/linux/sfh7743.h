@@ -19,23 +19,24 @@
 #ifndef _LINUX_SFH7743_H_
 #define _LINUX_SFH7743_H_
 
-#include <linux/regulator/consumer.h>
-
-#define SFH7743_PROXIMITY_NEAR	0
-#define SFH7743_PROXIMITY_FAR	0xFFFFFFFF
-#define SFH7743_MODULE_NAME	"sfh7743"
-#define SFH7743_NO_REGULATOR	"no_reg"
-
-#define SFH7743_DISABLED 0
-#define SFH7743_ENABLED  1
+#include <linux/ioctl.h>
 
 #ifdef __KERNEL__
 
 struct sfh7743_platform_data {
-	u8 gpio_prox_int;
-	const char *regulator;
+	int (*init)(void);
+	void (*exit)(void);
+	int (*power_on)(void);
+	int (*power_off)(void);
+
+	int gpio;
 } __attribute__ ((packed));
 
 #endif /* __KERNEL__ */
+
+#define SFH7743_IO			0xA2
+
+#define SFH7743_IOCTL_GET_ENABLE	_IOR(SFH7743_IO, 0x00, char)
+#define SFH7743_IOCTL_SET_ENABLE	_IOW(SFH7743_IO, 0x01, char)
 
 #endif /* _LINUX_SFH7743_H__ */

@@ -16,224 +16,391 @@
  * 02111-1307, USA
  */
 
-
-#include <linux/errno.h>
-#include <linux/fs.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <linux/module.h>
+#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
+#include <linux/uaccess.h>
 #include <linux/workqueue.h>
 
 #include <linux/sfh7743.h>
 
+#define PROXIMITY_NEAR	0
+#define PROXIMITY_FAR	0xFFFFFFFF
+#define NAME		"sfh7743"
+
 struct sfh7743_data {
-	int enabled;
-	int gpio_intr;
-	int irq;
-	struct regulator *regulator;
+	struct platform_device *pdev;
+	struct sfh7743_platform_data *pdata;
+
 	struct mutex lock;
-	struct work_struct wq;
-	struct workqueue_struct *working_queue;
-	struct input_dev *idev;
+
+	struct work_struct irq_work;
+
+	struct workqueue_struct *work_queue;
+	struct input_dev *input_dev;
+
+	int enabled;
+
+	int irq;
 };
 
-static irqreturn_t sfh7743_irq_handler(int irq, void *dev)
-{
-	struct sfh7743_data *info = dev;
+struct sfh7743_data *sfh7743_misc_data;
 
+static void sfh7743_device_power_off(struct sfh7743_data *sfh)
+{
+	if (sfh->pdata->power_off) {
+		disable_irq_nosync(sfh->irq);
+		sfh->pdata->power_off();
+	}
+}
+
+static int sfh7743_device_power_on(struct sfh7743_data *sfh)
+{
+	int err;
+
+	if (sfh->pdata->power_on) {
+		err = sfh->pdata->power_on();
+		if (err < 0)
+			return err;
+		enable_irq(sfh->irq);
+	}
+
+	return 0;
+}
+
+static irqreturn_t sfh7743_isr(int irq, void *dev)
+{
+	struct sfh7743_data *sfh = dev;
+
+	mutex_lock(&sfh->lock);
 	disable_irq_nosync(irq);
-	queue_work(info->working_queue, &info->wq);
+	queue_work(sfh->work_queue, &sfh->irq_work);
 
 	return IRQ_HANDLED;
 }
 
-static void sfh7743_irq_bottom_half(struct work_struct *work)
+static void sfh7743_irq_work_func(struct work_struct *work)
 {
 	int distance;
 
-	struct sfh7743_data *info = container_of(work,
-						 struct sfh7743_data,
-						 wq);
+	struct sfh7743_data *sfh = container_of(work,
+						struct sfh7743_data, irq_work);
 
-	if (info->enabled == SFH7743_ENABLED) {
-		if (gpio_get_value(info->gpio_intr))
-			distance = SFH7743_PROXIMITY_NEAR;
-		else
-			distance = SFH7743_PROXIMITY_FAR;
+	if (gpio_get_value(sfh->pdata->gpio))
+		distance = PROXIMITY_NEAR;
+	else
+		distance = PROXIMITY_FAR;
 
-		input_report_abs(info->idev, ABS_DISTANCE, distance);
-		input_sync(info->idev);
-	} else {
-		pr_info("%s: Not enabled\n", __func__);
-	}
-	enable_irq(info->irq);
+	input_report_abs(sfh->input_dev, ABS_DISTANCE, distance);
+	input_sync(sfh->input_dev);
+
+	enable_irq(sfh->irq);
+	mutex_unlock(&sfh->lock);
 }
 
-int sfh7743_input_open(struct input_dev *input)
+int sfh7743_enable(struct sfh7743_data *sfh)
 {
-	struct sfh7743_data *info = input_get_drvdata(input);
-	int reg_status = 0;
+	int err;
 
-	mutex_lock(&info->lock);
-	if (info->regulator) {
-		reg_status = regulator_enable(info->regulator);
-		if (!reg_status)
-			info->enabled = SFH7743_ENABLED;
-	} else
-		info->enabled = SFH7743_ENABLED;
+	if (!sfh->enabled) {
+		mutex_lock(&sfh->lock);
 
-	mutex_unlock(&info->lock);
+		err = sfh7743_device_power_on(sfh);
+		if (err < 0) {
+			mutex_unlock(&sfh->lock);
+			return err;
+		}
+		sfh->enabled = 1;
+
+		mutex_unlock(&sfh->lock);
+	}
 
 	return 0;
+}
+
+int sfh7743_disable(struct sfh7743_data *sfh)
+{
+	if (sfh->enabled) {
+		mutex_lock(&sfh->lock);
+
+		sfh->enabled = 0;
+		sfh7743_device_power_off(sfh);
+
+		mutex_unlock(&sfh->lock);
+	}
+
+	return 0;
+}
+
+static int sfh7743_misc_open(struct inode *inode, struct file *file)
+{
+	int err;
+	err = nonseekable_open(inode, file);
+	if (err < 0)
+		return err;
+
+	file->private_data = sfh7743_misc_data;
+
+	return 0;
+}
+
+static int sfh7743_misc_ioctl(struct inode *inode, struct file *file,
+			      unsigned int cmd, unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+	int err;
+	u8 enable;
+	struct sfh7743_data *sfh = file->private_data;
+
+	switch (cmd) {
+	case SFH7743_IOCTL_SET_ENABLE:
+		if (copy_from_user(&enable, argp, 1))
+			return -EFAULT;
+		if (enable > 1)
+			return -EINVAL;
+
+		sfh->enabled = enable;
+		if (sfh->enabled != 0)
+			sfh7743_enable(sfh);
+		else
+			sfh7743_disable(sfh);
+
+		break;
+
+	case SFH7743_IOCTL_GET_ENABLE:
+		enable = sfh->enabled;
+		if (copy_to_user(argp, &enable, 1))
+			return -EINVAL;
+
+		break;
+
+	default:
+		err = -EINVAL;
+		goto err;
+	}
+
+	return 0;
+
+err:
+	return err;
+}
+
+static const struct file_operations sfh7743_misc_fops = {
+	.owner = THIS_MODULE,
+	.open = sfh7743_misc_open,
+	.ioctl = sfh7743_misc_ioctl,
+};
+
+static struct miscdevice sfh7743_misc_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = NAME,
+	.fops = &sfh7743_misc_fops,
+};
+
+#ifdef SFH7743_OPEN_ENABLE
+int sfh7743_input_open(struct input_dev *input)
+{
+	struct sfh7743_data *sfh = input_get_drvdata(input);
+
+	return sfh7743_enable(sfh);
 }
 
 void sfh7743_input_close(struct input_dev *dev)
 {
-	struct sfh7743_data *info = input_get_drvdata(dev);
+	struct sfh7743_data *sfh = input_get_drvdata(dev);
 
-	mutex_lock(&info->lock);
-	if (info->regulator)
-		regulator_disable(info->regulator);
-
-	info->enabled = SFH7743_DISABLED;
-
-	mutex_unlock(&info->lock);
+	sfh7743_disable(sfh);
 }
+#endif
 
-static int __devexit sfh7743_remove(struct platform_device *pdev)
+static int sfh7743_input_init(struct sfh7743_data *sfh)
 {
-	struct sfh7743_data *info = platform_get_drvdata(pdev);
+	int err;
+	int distance;
 
-	if (info->regulator) {
-		regulator_disable(info->regulator);
-		regulator_put(info->regulator);
+	sfh->input_dev = input_allocate_device();
+	if (!sfh->input_dev) {
+		err = -ENOMEM;
+		dev_err(&sfh->pdev->dev, "input device allocate failed\n");
+		goto err0;
+	}
+#ifdef SFH7743_OPEN_ENABLE
+	sfh->input_dev->open = sfh7743_input_open;
+	sfh->input_dev->close = sfh7743_input_close;
+#endif
+
+	input_set_drvdata(sfh->input_dev, sfh);
+
+	set_bit(EV_ABS, sfh->input_dev->evbit);
+	set_bit(ABS_DISTANCE, sfh->input_dev->absbit);
+
+	sfh->input_dev->name = "proximity";
+
+	err = input_register_device(sfh->input_dev);
+	if (err) {
+		dev_err(&sfh->pdev->dev,
+			"unable to register input polled device %s\n",
+			sfh->input_dev->name);
+		goto err1;
 	}
 
-	info->enabled = SFH7743_DISABLED;
+	if (gpio_get_value(sfh->pdata->gpio))
+		distance = PROXIMITY_NEAR;
+	else
+		distance = PROXIMITY_FAR;
 
-	free_irq(info->irq, 0);
+	input_report_abs(sfh->input_dev, ABS_DISTANCE, distance);
+	input_sync(sfh->input_dev);
 
-	gpio_free(info->gpio_intr);
-
-	destroy_workqueue(info->working_queue);
-
-	input_unregister_device(info->idev);
-	input_free_device(info->idev);
-
-	kfree(info);
 	return 0;
+
+err1:
+	input_free_device(sfh->input_dev);
+err0:
+	return err;
+}
+
+static void sfh7743_input_cleanup(struct sfh7743_data *sfh)
+{
+	input_unregister_device(sfh->input_dev);
+	input_free_device(sfh->input_dev);
 }
 
 static int sfh7743_probe(struct platform_device *pdev)
 {
-	struct sfh7743_platform_data *pdata = pdev->dev.platform_data;
-	struct sfh7743_data *info;
-	int error = -1;
-	int distance;
+	struct sfh7743_data *sfh;
+	int err = -1;
 
-	info = kmalloc(sizeof(struct sfh7743_data), GFP_KERNEL);
-	if (!info) {
-		error = -ENOMEM;
-		pr_err("%s: could not allocate space for module data: %d\n",
-		       __func__, error);
-		goto error_kmalloc_failed;
+	if (pdev->dev.platform_data == NULL) {
+		dev_err(&pdev->dev, "platform data is NULL. exiting.\n");
+		err = -ENODEV;
+		goto err0;
 	}
 
-	info->gpio_intr = pdata->gpio_prox_int;
-	info->irq = gpio_to_irq(info->gpio_intr);
-
-	if (strcmp(pdata->regulator, SFH7743_NO_REGULATOR)) {
-		info->regulator = regulator_get(&pdev->dev, pdata->regulator);
-		if (IS_ERR(info->regulator)) {
-			pr_err("%s: cannot get %s regulator\n",
-				__func__, pdata->regulator);
-			error = PTR_ERR(info->regulator);
-			goto error_request_regulator_failed;
-
-		}
-	} else {
-		info->regulator = NULL;
+	sfh = kmalloc(sizeof(*sfh), GFP_KERNEL);
+	if (sfh == NULL) {
+		dev_err(&pdev->dev,
+			"failed to allocate memory for module data\n");
+		err = -ENOMEM;
+		goto err0;
 	}
 
-	info->working_queue = create_singlethread_workqueue("sfh7743_wq");
-	if (!info->working_queue) {
-		error = -ENOMEM;
-		pr_err("%s: cannot create work queue: %d\n", __func__, error);
-		goto error_create_wq_failed;
-	}
-	INIT_WORK(&info->wq, sfh7743_irq_bottom_half);
+	mutex_init(&sfh->lock);
+	mutex_lock(&sfh->lock);
+	sfh->pdev = pdev;
 
-	error = request_irq(info->irq, sfh7743_irq_handler,
-			    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-			    SFH7743_MODULE_NAME, info);
-	if (error) {
-		pr_err("%s: request irq failed: %d\n", __func__, error);
-		goto error_request_irq_failed;
-	}
+	sfh->pdata = kmalloc(sizeof(*sfh->pdata), GFP_KERNEL);
+	if (sfh->pdata == NULL)
+		goto err1;
 
-	info->idev = input_allocate_device();
-	if (!info->idev) {
-		error = -ENOMEM;
-		pr_err("%s: input device allocate failed: %d\n",
-			__func__, error);
-		goto error_input_allocate_failed;
+	memcpy(sfh->pdata, pdev->dev.platform_data, sizeof(*sfh->pdata));
+
+	sfh->irq = gpio_to_irq(sfh->pdata->gpio);
+
+	INIT_WORK(&sfh->irq_work, sfh7743_irq_work_func);
+
+	sfh->work_queue = create_singlethread_workqueue("sfh7743_wq");
+	if (!sfh->work_queue) {
+		err = -ENOMEM;
+		pr_err("%s: cannot create work queue: %d\n", __func__, err);
+		goto err1_1;
 	}
 
-	mutex_init(&info->lock);
-
-	info->idev->name = SFH7743_MODULE_NAME;
-	info->idev->open = sfh7743_input_open;
-	info->idev->close = sfh7743_input_close;
-
-	input_set_drvdata(info->idev, info);
-
-	set_bit(EV_ABS, info->idev->evbit);
-	set_bit(ABS_DISTANCE, info->idev->absbit);
-
-	error = input_register_device(info->idev);
-	if (error) {
-		pr_err("%s: input register device failed: %d\n",
-			__func__, error);
-		goto error_input_register_device_failed;
+	if (sfh->pdata->init) {
+		err = sfh->pdata->init();
+		if (err < 0)
+			goto err2;
 	}
 
-	if (gpio_get_value(info->gpio_intr))
-		distance = SFH7743_PROXIMITY_NEAR;
-	else
-		distance = SFH7743_PROXIMITY_FAR;
+	err = sfh7743_input_init(sfh);
+	if (err < 0)
+		goto err3;
 
-	input_report_abs(info->idev, ABS_DISTANCE, distance);
-	input_sync(info->idev);
+	sfh7743_misc_data = sfh;
+	err = misc_register(&sfh7743_misc_device);
+	if (err < 0) {
+		dev_err(&pdev->dev, "sfhd_device register failed\n");
+		goto err4;
+	}
 
-	pr_info("%s: initialized Pr[%d, %d]\n",
-		__func__, info->gpio_intr, info->irq);
+	err = request_irq(sfh->irq, sfh7743_isr,
+			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			  "sfh7743_irq", sfh);
+	if (err < 0) {
+		pr_err("%s: request irq failed: %d\n", __func__, err);
+		goto err5;
+	}
+
+	disable_irq_nosync(sfh->irq);
+
+	sfh->enabled = 0;
+
+	mutex_unlock(&sfh->lock);
+
+	dev_info(&pdev->dev, "sfh7743 probed\n");
 
 	return 0;
 
-error_input_register_device_failed:
-	input_free_device(info->idev);
-error_input_allocate_failed:
-	free_irq(info->irq, 0);
-error_request_irq_failed:
-	destroy_workqueue(info->working_queue);
-error_create_wq_failed:
-	if (info->regulator)
-		regulator_put(info->regulator);
-error_request_regulator_failed:
-	kfree(info);
-error_kmalloc_failed:
-	return error;
+err5:
+	misc_deregister(&sfh7743_misc_device);
+err4:
+	sfh7743_input_cleanup(sfh);
+err3:
+	if (sfh->pdata->exit)
+		sfh->pdata->exit();
+err2:
+	destroy_workqueue(sfh->work_queue);
+err1_1:
+	mutex_unlock(&sfh->lock);
+	kfree(sfh->pdata);
+err1:
+	kfree(sfh);
+err0:
+	return err;
+}
+
+static int __devexit sfh7743_remove(struct platform_device *pdev)
+{
+	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
+
+	free_irq(sfh->irq, sfh);
+	gpio_free(sfh->pdata->gpio);
+	sfh7743_device_power_off(sfh);
+	input_unregister_device(sfh->input_dev);
+	input_free_device(sfh->input_dev);
+	if (sfh->pdata->exit)
+		sfh->pdata->exit();
+	destroy_workqueue(sfh->work_queue);
+	kfree(sfh->pdata);
+	kfree(sfh);
+
+	return 0;
+}
+
+static int sfh7743_resume(struct platform_device *pdev)
+{
+	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
+
+	return sfh7743_enable(sfh);
+}
+
+static int sfh7743_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
+
+	return sfh7743_disable(sfh);
 }
 
 static struct platform_driver sfh7743_driver = {
 	.probe = sfh7743_probe,
 	.remove = __devexit_p(sfh7743_remove),
+	.resume = sfh7743_resume,
+	.suspend = sfh7743_suspend,
 	.driver = {
-		   .name = SFH7743_MODULE_NAME,
-		   .owner = THIS_MODULE,
+		   .name = NAME,
 		   },
 };
 
