@@ -154,6 +154,15 @@ config ATMEL_SSC
 
 	  If unsure, say N.
 
+config OMAP_MODEM_CONTROL
+   bool "OMAP device driver to interface with a modem co-processor"
+   default y
+   ---help---
+         This option enables the omap device driver to control and
+         interface with a modem co-processor.  This module is needed to
+         monitor for modem panics, interact with the modem during master
+         clear, and allow modem power down/up support.
+
 config OMAP_STI
 	bool "Serial Trace Interface support"
 	depends on ARCH_OMAP16XX || ARCH_OMAP24XX || ARCH_OMAP34XX
