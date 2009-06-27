@@ -14,11 +14,11 @@
 #include <linux/input.h>
 #include <linux/sfh7743.h>
 #include <linux/bu52014hfv.h>
-#include <linux/vib-omap-pwm.h>
 #include <linux/lis331dlh.h>
 #include <linux/akm8973.h>
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
+#include <linux/vib-gpio.h>
 
 #include <mach/mux.h>
 #include <mach/gpio.h>
@@ -29,6 +29,56 @@
 #define SHOLES_HF_SOUTH_GPIO		111
 #define SHOLES_AKM8973_INT_GPIO		175
 #define SHOLES_AKM8973_RESET_GPIO	28
+#define SHOLES_VIBRATOR_GPIO		181
+
+static struct regulator *sholes_vibrator_regulator;
+static int sholes_vibrator_initialization(void)
+{
+	struct regulator *reg;
+	reg = regulator_get(NULL, "vvib");
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
+	sholes_vibrator_regulator = reg;
+	return 0;
+}
+
+static void sholes_vibrator_exit(void)
+{
+	regulator_put(sholes_vibrator_regulator);
+}
+
+static int sholes_vibrator_power_on(void)
+{
+	regulator_set_voltage(sholes_vibrator_regulator, 2000000, 2000000);
+	return regulator_enable(sholes_vibrator_regulator);
+}
+
+static int sholes_vibrator_power_off(void)
+{
+	if (sholes_vibrator_regulator)
+		return regulator_disable(sholes_vibrator_regulator);
+	return 0;
+}
+
+static struct vib_gpio_platform_data sholes_vib_gpio_data = {
+	.gpio = SHOLES_VIBRATOR_GPIO,
+	.max_timeout = 15000,
+	.active_low = 0,
+	.initial_vibrate = 500,
+
+	.init = sholes_vibrator_initialization,
+	.exit = sholes_vibrator_exit,
+	.power_on = sholes_vibrator_power_on,
+	.power_off = sholes_vibrator_power_off,
+};
+
+static struct platform_device sholes_vib_gpio = {
+	.name           = "vib-gpio",
+	.id             = -1,
+	.dev            = {
+		.platform_data  = &sholes_vib_gpio_data,
+	},
+};
 
 static struct regulator *sholes_sfh7743_regulator;
 static int sholes_sfh7743_initialization(void)
@@ -213,12 +263,15 @@ static struct platform_device omap3430_hall_effect_dock = {
 
 static void sholes_vibrator_init(void)
 {
+	gpio_request(SHOLES_VIBRATOR_GPIO, "vibrator");
+	gpio_direction_output(SHOLES_VIBRATOR_GPIO, 0);
 	omap_cfg_reg(Y4_34XX_GPIO181);
 }
 
 static struct platform_device *sholes_sensors[] __initdata = {
 	&sfh7743_platform_device,
 	&omap3430_hall_effect_dock,
+	&sholes_vib_gpio,
 };
 
 static void sholes_hall_effect_init(void)
