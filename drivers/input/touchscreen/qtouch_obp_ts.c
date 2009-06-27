@@ -26,8 +26,10 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#ifdef CONFIG_VIB_OMAP_PWM
+#if defined(CONFIG_VIB_OMAP_PWM)
 #include <linux/vib-omap-pwm.h>
+#elif defined(CONFIG_VIB_GPIO)
+#include <linux/vib-gpio.h>
 #endif
 
 #include <linux/qtouch_obp_ts.h>
@@ -514,7 +516,7 @@ static int qtouch_process_vkey(struct qtouch_ts_data *ts,
 
 	/* This is a temporary solution until a more global haptics soltion is
 	 * available for haptics that need to occur in any application */
-#ifdef CONFIG_VIB_OMAP_PWM
+#if defined(CONFIG_VIB_OMAP_PWM) || defined(CONFIG_VIB_GPIO)
 	if ((down == 1) && (ts->haptic_mask[finger] == 0)) {
 			vibrator_haptic_fire(40);
 			ts->haptic_mask[finger] = 1;

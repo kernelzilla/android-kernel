@@ -265,6 +265,10 @@ config VIB_OMAP_PWM
 	bool "OMAP PWM Vibrator"
 	default n
 
+config VIB_GPIO
+	bool "GPIO Vibrator"
+	default n
+
 config SENSORS_AKM8973
 	tristate "AKM8973 Magnetometer"
 	default n
