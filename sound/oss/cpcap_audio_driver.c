@@ -298,7 +298,9 @@ static unsigned short int cpcap_audio_get_stdac_output_amp_switches(
 }
 
 static unsigned short int cpcap_audio_get_ext_output_amp_switches(
-						int speaker, int balance)
+						int speaker,
+						int balance,
+						int source)
 {
 	unsigned short int value = 0;
 	CPCAP_AUDIO_DEBUG_LOG("%s() called with speaker %d\n", __func__,
@@ -306,7 +308,7 @@ static unsigned short int cpcap_audio_get_ext_output_amp_switches(
 
 	switch (speaker) {
 	case CPCAP_AUDIO_OUT_HANDSET:
-		value |= CPCAP_BIT_A1_EAR_EXT_SW | CPCAP_BIT_MONO_EXT1;
+		value |= CPCAP_BIT_A1_EAR_EXT_SW;
 		break;
 
 	case CPCAP_AUDIO_OUT_STEREO_HEADSET:
@@ -336,6 +338,13 @@ static unsigned short int cpcap_audio_get_ext_output_amp_switches(
 
 	default:
 		break;
+	}
+
+	if (source == CPCAP_AUDIO_ANALOG_SOURCE_L ||
+	    source == CPCAP_AUDIO_ANALOG_SOURCE_R) {
+		/*we're only using one side of the analog input.
+		  Send data to both side */
+		value |= CPCAP_BIT_MONO_EXT1;
 	}
 
 	value |= CPCAP_BIT_PGA_EXT_R_EN | CPCAP_BIT_PGA_EXT_L_EN;
@@ -413,11 +422,13 @@ static void cpcap_audio_set_output_amp_switches(struct cpcap_audio_state *state)
 		value1 =
 		    cpcap_audio_get_ext_output_amp_switches(state->
 					ext_primary_speaker,
-					state->ext_primary_balance);
+					state->ext_primary_balance,
+					state->analog_source);
 		value2 =
 		    cpcap_audio_get_ext_output_amp_switches(state->
 					ext_secondary_speaker,
-					state->ext_primary_balance);
+					state->ext_primary_balance,
+					state->analog_source);
 
 		reg_changes.mask = value1 | value2 | ext_prev_settings;
 		reg_changes.value = value1 | value2;
@@ -537,7 +548,10 @@ static void cpcap_audio_configure_aud_mute(struct cpcap_audio_state *state,
 		if (state->analog_source == CPCAP_AUDIO_ANALOG_SOURCE_STEREO)
 			ext_changes.value |=
 			    CPCAP_BIT_PGA_IN_R_SW | CPCAP_BIT_PGA_IN_L_SW;
-
+		else if (state->analog_source == CPCAP_AUDIO_ANALOG_SOURCE_L)
+			ext_changes.value |= CPCAP_BIT_PGA_IN_L_SW;
+		else if (state->analog_source == CPCAP_AUDIO_ANALOG_SOURCE_R)
+			ext_changes.value |= CPCAP_BIT_PGA_IN_R_SW;
 		ext_changes.mask = ext_changes.value | prev_ext_mute_data;
 
 		prev_ext_mute_data = ext_changes.value;
@@ -598,7 +612,10 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 		switch (state->codec_mode) {
 		case CPCAP_AUDIO_CODEC_LOOPBACK:
 		case CPCAP_AUDIO_CODEC_ON:
-			codec_changes.value |= CPCAP_BIT_CDC_EN_RX;
+			/* Turning on the input HPF */
+			codec_changes.value |= CPCAP_BIT_CDC_EN_RX |
+						CPCAP_BIT_AUDIHPF_0 |
+						CPCAP_BIT_AUDIHPF_1;
 			if (state->microphone != CPCAP_AUDIO_IN_AUX_INTERNAL &&
 				state->microphone != CPCAP_AUDIO_IN_NONE)
 				codec_changes.value |= CPCAP_BIT_MIC1_CDC_EN;
@@ -628,7 +645,7 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 			cdai_changes.value |= CPCAP_BIT_CLK_IN_SEL;
 
 		/* CDMA sholes is using Normal mode for uplink */
-		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL;
+		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL | CPCAP_BIT_CLK_INV;
 
 		/* OK, now start paranoid codec sequence */
 		/* FIRST, make sure the frequency config is right... */
@@ -980,6 +997,7 @@ static void cpcap_audio_configure_power(
 	struct cpcap_audio_state *previous_state,
 	int power)
 {
+	struct cpcap_regacc reg_changes = {0};
 	static int previous_power = -1;
 	int ret_val;
 
@@ -994,17 +1012,33 @@ static void cpcap_audio_configure_power(
 			return;
 		}
 
+		reg_changes.mask = CPCAP_BIT_AUDIO_LOW_PWR |
+					CPCAP_BIT_AUD_LOWPWR_SPEED ;
+		reg_changes.value = 0;
+
+		if (SLEEP_ACTIVATE_POWER == 2)
+			reg_changes.value |= CPCAP_BIT_AUD_LOWPWR_SPEED;
+
 		if (power) {
 			if (regulator_enabled == 0) {
 				regulator_enable(audio_reg);
 				regulator_enabled = 1;
 			}
-		   } else {
+		} else {
 			if (regulator_enabled == 1) {
+				reg_changes.value |= CPCAP_BIT_AUDIO_LOW_PWR;
 				regulator_disable(audio_reg);
 				regulator_enabled = 0;
 			}
-		   }
+		}
+
+		ret_val = cpcap_regacc_write(state->cpcap,
+					CPCAP_REG_VAUDIOC,
+					reg_changes.value,
+					reg_changes.mask);
+		if (ret_val != 0)
+			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_RXOA "
+				"returned error, ret_val = %d\n", ret_val);
 
 		previous_power = power;
 
@@ -1016,8 +1050,8 @@ static void cpcap_audio_configure_power(
 	 * (if enabling) or end (if disabling) of the cpcap_audio setting
 	 * sequence */
 	if (is_output_changed(previous_state, state)) {
-		struct cpcap_regacc reg_changes = {
-			CPCAP_REG_RXOA, 0, CPCAP_BIT_ST_HS_CP_EN };
+		reg_changes.value = 0;
+		reg_changes.mask = CPCAP_BIT_ST_HS_CP_EN;
 
 		if (is_output_headset(state))
 			reg_changes.value = reg_changes.mask;
@@ -1041,7 +1075,7 @@ static void cpcap_audio_configure_power(
 			reg_changes.value = reg_changes.mask;
 
 		CPCAP_AUDIO_DEBUG_LOG("512_value = %#x, 512_mask = %#x\n",
-				  reg_changes.value, reg_changes.mask);
+					reg_changes.value, reg_changes.mask);
 
 		ret_val = cpcap_regacc_write(state->cpcap,
 					CPCAP_REG_VAUDIOC,

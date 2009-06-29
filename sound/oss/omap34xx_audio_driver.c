@@ -1165,6 +1165,8 @@ static int audio_select_speakers(int spkr)
 				cpcap_audio_state.ext_primary_speaker = spkr1;
 				cpcap_audio_state.ext_secondary_speaker =
 									spkr2;
+				cpcap_audio_state.analog_source =
+					CPCAP_AUDIO_ANALOG_SOURCE_L;
 			} else {
 				cpcap_audio_state.codec_primary_speaker =
 									spkr1;
@@ -2030,7 +2032,7 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 		cpcap_audio_state.ext_secondary_speaker =
 						secondary_spkr_setting;
 		cpcap_audio_state.analog_source =
-					CPCAP_AUDIO_ANALOG_SOURCE_STEREO;
+					CPCAP_AUDIO_ANALOG_SOURCE_L;
 		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_CDMA;
 
 		phone_mode_on = 1;

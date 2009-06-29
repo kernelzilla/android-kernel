@@ -465,6 +465,10 @@
 #define CPCAP_BIT_CDC_EN_RX               0x00000040
 #define CPCAP_BIT_DF_RESET                0x00000020
 #define CPCAP_BIT_MIC1_CDC_EN             0x00000010
+#define CPCAP_BIT_AUDOHPF_1		  0x00000008
+#define CPCAP_BIT_AUDOHPF_0		  0x00000004
+#define CPCAP_BIT_AUDIHPF_1		  0x00000002
+#define CPCAP_BIT_AUDIHPF_0		  0x00000001
 
 /*
  * Register 514 CODEC Digital Audio Interface
