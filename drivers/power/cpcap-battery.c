@@ -504,8 +504,8 @@ static int cpcap_batt_remove(struct platform_device *pdev)
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_BATTDETB);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_CC_CAL);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_7);
-	kfree(sply);
 	sply->cpcap->battdata = NULL;
+	kfree(sply);
 
 	return 0;
 }
