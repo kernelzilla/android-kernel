@@ -56,6 +56,9 @@
 #error "no power companion board defined!"
 #endif
 
+#ifdef CONFIG_WL127X_RFKILL
+#include <linux/wl127x-rfkill.h>
+#endif
 
 #define ZOOM2_QUART_PHYS        0x10000000
 #define ZOOM2_QUART_VIRT        0xFB000000
@@ -95,17 +98,15 @@ static struct platform_device zoom2_smc911x_device = {
 	.resource	= zoom2_smc911x_resources,
 };
 
-#ifdef CONFIG_WL127X_POWER
-static int wl127x_gpios[] = {
-	109,    /* Bluetooth Enable GPIO */
-	161,    /* FM Enable GPIO */
-	61,     /* BT Active LED */
+#ifdef CONFIG_WL127X_RFKILL
+static struct wl127x_rfkill_platform_data wl127x_plat_data = {
+	.nshutdown_gpio = 109, 	/* Bluetooth Enable GPIO */
 };
 
 static struct platform_device zoom2_wl127x_device = {
-	.name           = "wl127x",
+	.name           = "wl127x-rfkill",
 	.id             = -1,
-	.dev.platform_data = &wl127x_gpios,
+	.dev.platform_data = &wl127x_plat_data,
 };
 #endif
 
@@ -271,7 +272,7 @@ static struct platform_device zoom2_dss_device = {
 static struct platform_device *zoom2_devices[] __initdata = {
 	&zoom2_dss_device,
 	&zoom2_smc911x_device,
-#ifdef CONFIG_WL127X_POWER
+#ifdef CONFIG_WL127X_RFKILL
 	&zoom2_wl127x_device,
 #endif
 	&omap_hdq_device,
