@@ -128,6 +128,8 @@ static int get_sense(struct cpcap_usb_det_data *data)
 				      CPCAP_BIT_ID_GROUND_I),
 				     (CPCAP_BIT_CHRG_DET_I |
 				      CPCAP_BIT_ID_GROUND_I));
+	if (retval)
+		return retval;
 
 	data->sense = value & (CPCAP_BIT_ID_FLOAT_S |
 			       CPCAP_BIT_ID_GROUND_S);
@@ -357,7 +359,8 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	data->regulator = regulator_get(&pdev->dev, "vusb");
 	if (IS_ERR(data->regulator)) {
 		dev_err(&pdev->dev, "Could not get regulator for cpcap_usb\n");
-		return PTR_ERR(data->regulator);
+		retval = PTR_ERR(data->regulator);
+		goto free_mem;
 	}
 	regulator_set_voltage(data->regulator, 3300000, 3300000);
 
@@ -376,7 +379,8 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 
 	if (retval != 0) {
 		dev_err(&pdev->dev, "Initialization Error\n");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto free_irqs;
 	}
 
 	dev_info(&pdev->dev, "CPCAP USB detection device probed\n");
@@ -385,6 +389,17 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	detection_work(&(data->work.work));
 
 	return 0;
+
+free_irqs:
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_IDGND);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_SE1);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_CHRG_DET);
+	regulator_put(data->regulator);
+free_mem:
+	kfree(data);
+
+	return retval;
 }
 
 static int __exit cpcap_usb_det_remove(struct platform_device *pdev)
@@ -401,6 +416,8 @@ static int __exit cpcap_usb_det_remove(struct platform_device *pdev)
 
 	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
 		platform_device_del(data->usb_dev);
+
+	vusb_disable(data);
 	regulator_put(data->regulator);
 
 	kfree(data);
