@@ -286,13 +286,16 @@ static struct omap_mmc_platform_data mmc2_data = {
 	.resume				= hsmmc2_resume,
 #endif
 	.dma_mask			= 0xffffffff,
+#ifndef CONFIG_MMC_EMBEDDED_SDIO
+	.name				= "TIWLAN_SDIO",
+#endif
 	.slots[0] = {
 		.wires			= 4,
 		.set_power		= hsmmc2_set_power,
 		.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34 |
 						MMC_VDD_165_195,
 		.name			= "first slot",
-
+		.internal_clock		= 1,
 		.card_detect_irq        = 0,
 		.card_detect            = hsmmc2_card_detect,
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
