@@ -45,10 +45,6 @@ static void ld_cpcap_kpad_store(struct led_classdev *led_cdev,
 			CPCAP_BIT_GPIO6DRV);
 	}
 }
-EXPORT_SYMBOL(ld_cpcap_kpad_store);
-
-static DEVICE_ATTR(keypad_led, 0644, NULL, ld_cpcap_kpad_store);
-
 static int ld_cpcap_kpad_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -72,7 +68,7 @@ static int ld_cpcap_kpad_probe(struct platform_device *pdev)
 			CPCAP_REG_GPIO6, CPCAP_BIT_GPIO6DIR,
 			CPCAP_BIT_GPIO6DIR);
 	if (ret < 0) {
-		pr_err("%s: Register led class failed: \n", __func__);
+		pr_err("%s: Writing CPCAP failed: \n", __func__);
 		kfree(info);
 		return ret;
 	}
@@ -88,15 +84,6 @@ static int ld_cpcap_kpad_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret =
-	    device_create_file(info->ld_cpcap_keypad_class_dev.dev,
-			       &dev_attr_keypad_led);
-	if (ret < 0) {
-		pr_err("%s: Creating device file failed: \n", __func__);
-		led_classdev_unregister(&info->ld_cpcap_keypad_class_dev);
-		kfree(info);
-	}
-
 	return ret;
 }
 
@@ -104,8 +91,6 @@ static int ld_cpcap_kpad_remove(struct platform_device *pdev)
 {
 	struct keypad_led_data *info = platform_get_drvdata(pdev);
 
-	device_remove_file(info->ld_cpcap_keypad_class_dev.dev,
-			   &dev_attr_keypad_led);
 	led_classdev_unregister(&info->ld_cpcap_keypad_class_dev);
 	return 0;
 }
@@ -132,6 +117,6 @@ static void __exit ld_cpcap_kpad_exit(void)
 module_init(ld_cpcap_kpad_init);
 module_exit(ld_cpcap_kpad_exit);
 
-MODULE_DESCRIPTION("Sholes Keypad Lighting driver");
+MODULE_DESCRIPTION("CPCAP Keypad Lighting driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
