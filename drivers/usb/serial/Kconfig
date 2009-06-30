@@ -135,7 +135,6 @@ config USB_SERIAL_CYPRESS_M8
 
 	  Supported microcontrollers in the CY4601 family are:
 		CY7C63741 CY7C63742 CY7C63743 CY7C64013
-	
 	  To compile this driver as a module, choose M here: the
 	  module will be called cypress_m8.
 
@@ -447,6 +446,15 @@ config USB_SERIAL_MOTOROLA
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called moto_modem.  If unsure, choose N.
+
+config USB_QSC6085_CDMA_MODEM
+	tristate "USB Motorola Phone modem driver"
+	---help---
+	  Say Y here if you want to enable the AP/BP USB IPC link
+	  driver for CDMA Phone with QSC6085 modem.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called moto_cdma_modem.  If unsure, choose N.
 
 config USB_SERIAL_NAVMAN
 	tristate "USB Navman GPS device"
