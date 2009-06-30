@@ -35,14 +35,12 @@ struct sfh7743_data {
 	struct platform_device *pdev;
 	struct sfh7743_platform_data *pdata;
 
-	struct mutex lock;
-
 	struct work_struct irq_work;
 
 	struct workqueue_struct *work_queue;
 	struct input_dev *input_dev;
 
-	int enabled;
+	atomic_t enabled;
 
 	int irq;
 };
@@ -75,7 +73,6 @@ static irqreturn_t sfh7743_isr(int irq, void *dev)
 {
 	struct sfh7743_data *sfh = dev;
 
-	mutex_lock(&sfh->lock);
 	disable_irq_nosync(irq);
 	queue_work(sfh->work_queue, &sfh->irq_work);
 
@@ -98,39 +95,26 @@ static void sfh7743_irq_work_func(struct work_struct *work)
 	input_sync(sfh->input_dev);
 
 	enable_irq(sfh->irq);
-	mutex_unlock(&sfh->lock);
 }
 
 int sfh7743_enable(struct sfh7743_data *sfh)
 {
 	int err;
 
-	if (!sfh->enabled) {
-		mutex_lock(&sfh->lock);
-
+	if (!atomic_cmpxchg(&sfh->enabled, 0, 1)) {
 		err = sfh7743_device_power_on(sfh);
-		if (err < 0) {
-			mutex_unlock(&sfh->lock);
+		if (err) {
+			atomic_set(&sfh->enabled, 0);
 			return err;
 		}
-		sfh->enabled = 1;
-
-		mutex_unlock(&sfh->lock);
 	}
-
 	return 0;
 }
 
 int sfh7743_disable(struct sfh7743_data *sfh)
 {
-	if (sfh->enabled) {
-		mutex_lock(&sfh->lock);
-
-		sfh->enabled = 0;
+	if (atomic_cmpxchg(&sfh->enabled, 1, 0))
 		sfh7743_device_power_off(sfh);
-
-		mutex_unlock(&sfh->lock);
-	}
 
 	return 0;
 }
@@ -162,8 +146,7 @@ static int sfh7743_misc_ioctl(struct inode *inode, struct file *file,
 		if (enable > 1)
 			return -EINVAL;
 
-		sfh->enabled = enable;
-		if (sfh->enabled != 0)
+		if (enable != 0)
 			sfh7743_enable(sfh);
 		else
 			sfh7743_disable(sfh);
@@ -171,7 +154,7 @@ static int sfh7743_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case SFH7743_IOCTL_GET_ENABLE:
-		enable = sfh->enabled;
+		enable = atomic_read(&sfh->enabled);
 		if (copy_to_user(argp, &enable, 1))
 			return -EINVAL;
 
@@ -288,15 +271,9 @@ static int sfh7743_probe(struct platform_device *pdev)
 		goto err0;
 	}
 
-	mutex_init(&sfh->lock);
-	mutex_lock(&sfh->lock);
+	sfh->pdata = pdev->dev.platform_data;
+
 	sfh->pdev = pdev;
-
-	sfh->pdata = kmalloc(sizeof(*sfh->pdata), GFP_KERNEL);
-	if (sfh->pdata == NULL)
-		goto err1;
-
-	memcpy(sfh->pdata, pdev->dev.platform_data, sizeof(*sfh->pdata));
 
 	sfh->irq = gpio_to_irq(sfh->pdata->gpio);
 
@@ -326,6 +303,10 @@ static int sfh7743_probe(struct platform_device *pdev)
 		goto err4;
 	}
 
+	atomic_set(&sfh->enabled, 0);
+
+	platform_set_drvdata(pdev, sfh);
+
 	err = request_irq(sfh->irq, sfh7743_isr,
 			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 			  "sfh7743_irq", sfh);
@@ -335,10 +316,6 @@ static int sfh7743_probe(struct platform_device *pdev)
 	}
 
 	disable_irq_nosync(sfh->irq);
-
-	sfh->enabled = 0;
-
-	mutex_unlock(&sfh->lock);
 
 	dev_info(&pdev->dev, "sfh7743 probed\n");
 
@@ -354,7 +331,6 @@ err3:
 err2:
 	destroy_workqueue(sfh->work_queue);
 err1_1:
-	mutex_unlock(&sfh->lock);
 	kfree(sfh->pdata);
 err1:
 	kfree(sfh);
