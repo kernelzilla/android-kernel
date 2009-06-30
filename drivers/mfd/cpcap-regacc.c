@@ -366,8 +366,7 @@ int cpcap_regacc_init(struct cpcap_device *cpcap)
 	struct cpcap_platform_data *data;
 	struct spi_device *spi = cpcap->spi;
 
-	data = (struct cpcap_platform_data *)
-		spi->controller_data;
+	data = (struct cpcap_platform_data *)spi->controller_data;
 
 	for (i = 0; i < data->init_len; i++) {
 		mask = 0xFFFF;
@@ -376,6 +375,8 @@ int cpcap_regacc_init(struct cpcap_device *cpcap)
 		retval = cpcap_regacc_write(cpcap, data->init[i].reg,
 					    data->init[i].data,
 					    mask);
+		if (retval)
+			break;
 	}
 
 	return retval;
