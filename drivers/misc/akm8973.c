@@ -32,7 +32,7 @@ struct akm8973_data {
 	struct input_dev *input_dev;
 
 	int hw_initialized;
-	int enabled;
+	atomic_t enabled;
 
 	u8 hxga;
 	u8 hyga;
@@ -375,22 +375,16 @@ static int akm8973_enable(struct akm8973_data *akm)
 {
 	int err;
 
-	if (!akm->enabled) {
-		mutex_lock(&akm->lock);
-
+	if (!atomic_cmpxchg(&akm->enabled, 0, 1)) {
 		err = akm8973_device_power_on(akm);
 		if (err < 0) {
-			mutex_unlock(&akm->lock);
+			atomic_set(&akm->enabled, 0);
 			return err;
 		}
-
-		akm->enabled = 1;
 
 		schedule_delayed_work(&akm->input_work,
 				      msecs_to_jiffies(akm->pdata->
 						       poll_interval));
-
-		mutex_unlock(&akm->lock);
 	}
 
 	return 0;
@@ -398,13 +392,10 @@ static int akm8973_enable(struct akm8973_data *akm)
 
 static int akm8973_disable(struct akm8973_data *akm)
 {
-	if (akm->enabled) {
+	if (atomic_cmpxchg(&akm->enabled, 1, 0)) {
 		cancel_delayed_work_sync(&akm->input_work);
 
-		mutex_lock(&akm->lock);
-		akm->enabled = 0;
 		akm8973_device_power_off(akm);
-		mutex_unlock(&akm->lock);
 	}
 
 	return 0;
@@ -705,7 +696,7 @@ static int akm8973_probe(struct i2c_client *client,
 
 	/* As default, do not report information */
 	akm->state = 0;
-	akm->enabled = 0;
+	atomic_set(&akm->enabled, 0);
 
 	mutex_unlock(&akm->lock);
 
