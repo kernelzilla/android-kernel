@@ -51,7 +51,7 @@ struct omap2video_device {
 	struct omap_vout_device *vouts[10];
 
 	int num_displays;
-	struct omap_display *displays[10];
+	struct omap_dss_device *displays[10];
 	int num_overlays;
 	struct omap_overlay *overlays[10];
 	int num_managers;
