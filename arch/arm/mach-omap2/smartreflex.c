@@ -36,6 +36,8 @@
 #include "smartreflex.h"
 #include "prm-regbits-34xx.h"
 
+#define MAX_TRIES 100
+
 struct omap_sr {
 	int		srid;
 	int		is_sr_reset;
@@ -620,16 +622,39 @@ static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
 
 static void sr_disable(struct omap_sr *sr)
 {
+	u32 i = 0;
+
 	sr->is_sr_reset = 1;
 
 	/* SRCONFIG - disable SR */
 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, ~SRCONFIG_SRENABLE);
 
 	if (sr->srid == SR1) {
+		/* Wait for VP idle before disabling VP */
+		while ((!prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VP1_STATUS_OFFSET))
+					&& i++ < MAX_TRIES)
+			udelay(1);
+
+		if (i >= MAX_TRIES)
+			pr_warning("VP1 not idle, still going ahead with \
+							VP1 disable\n");
+
 		/* Disable VP1 */
 		prm_clear_mod_reg_bits(PRM_VP1_CONFIG_VPENABLE, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP1_CONFIG_OFFSET);
+
 	} else if (sr->srid == SR2) {
+		/* Wait for VP idle before disabling VP */
+		while ((!prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VP2_STATUS_OFFSET))
+					&& i++ < MAX_TRIES)
+			udelay(1);
+
+		if (i >= MAX_TRIES)
+			pr_warning("VP2 not idle, still going ahead with \
+							 VP2 disable\n");
+
 		/* Disable VP2 */
 		prm_clear_mod_reg_bits(PRM_VP2_CONFIG_VPENABLE, OMAP3430_GR_MOD,
 					OMAP3_PRM_VP2_CONFIG_OFFSET);
@@ -731,6 +756,8 @@ void enable_smartreflex(int srid)
 
 void disable_smartreflex(int srid)
 {
+	u32 i = 0;
+
 	struct omap_sr *sr = NULL;
 
 	if (srid == SR1)
@@ -751,11 +778,31 @@ void disable_smartreflex(int srid)
 			/* Disable SR clk */
 			sr_clk_disable(sr);
 			if (sr->srid == SR1) {
+				/* Wait for VP idle before disabling VP */
+				while ((!prm_read_mod_reg(OMAP3430_GR_MOD,
+						OMAP3_PRM_VP1_STATUS_OFFSET))
+						&& i++ < MAX_TRIES)
+					udelay(1);
+
+				if (i >= MAX_TRIES)
+					pr_warning("VP1 not idle, still going \
+						ahead with VP1 disable\n");
+
 				/* Disable VP1 */
 				prm_clear_mod_reg_bits(PRM_VP1_CONFIG_VPENABLE,
 						OMAP3430_GR_MOD,
 						OMAP3_PRM_VP1_CONFIG_OFFSET);
 			} else if (sr->srid == SR2) {
+				/* Wait for VP idle before disabling VP */
+				while ((!prm_read_mod_reg(OMAP3430_GR_MOD,
+						OMAP3_PRM_VP2_STATUS_OFFSET))
+						&& i++ < MAX_TRIES)
+					udelay(1);
+
+				if (i >= MAX_TRIES)
+					pr_warning("VP2 not idle, still going \
+						 ahead with VP2 disable\n");
+
 				/* Disable VP2 */
 				prm_clear_mod_reg_bits(PRM_VP2_CONFIG_VPENABLE,
 						OMAP3430_GR_MOD,
