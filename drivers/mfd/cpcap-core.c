@@ -262,10 +262,10 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	retval = cpcap_regacc_init(cpcap);
 	if (retval < 0)
-		return retval;
+		goto free_mem;
 	retval = cpcap_irq_init(cpcap);
 	if (retval < 0)
-		return retval;
+		goto free_mem;
 
 	cpcap_vendor_read(cpcap);
 
@@ -274,7 +274,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	retval = misc_register(&cpcap_dev);
 	if (retval < 0)
-		return retval;
+		goto free_mem;
 
 	/* the cpcap usb_detection device is a consumer of the
 	 * vusb regulator */
@@ -311,6 +311,10 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	register_reboot_notifier(&cpcap_reboot_notifier);
 
+	return 0;
+
+free_mem:
+	kfree(cpcap);
 	return retval;
 }
 
