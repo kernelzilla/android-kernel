@@ -77,7 +77,7 @@ struct lis331dlh_data {
 	struct input_dev *input_dev;
 
 	int hw_initialized;
-	int enabled;
+	atomic_t enabled;
 
 	u8 shift_adj;
 	u8 resume_state[5];
@@ -230,7 +230,7 @@ int lis331dlh_update_g_range(struct lis331dlh_data *lis, u8 new_g_range)
 		return -EINVAL;
 	}
 
-	if (lis->enabled) {
+	if (atomic_read(&lis->enabled)) {
 		/* Set configuration register 4, which contains g range setting
 		 *  NOTE: this is a straight overwrite because this driver does
 		 *  not use any of the other configuration bits in this
@@ -271,7 +271,7 @@ int lis331dlh_update_odr(struct lis331dlh_data *lis, int poll_interval)
 
 	/* If device is currently enabled, we need to write new
 	 *  configuration out to it */
-	if (lis->enabled) {
+	if (atomic_read(&lis->enabled)) {
 		config[0] = CTRL_REG1;
 		err = lis331dlh_i2c_write(lis, config, 1);
 		if (err < 0)
@@ -326,20 +326,16 @@ static int lis331dlh_enable(struct lis331dlh_data *lis)
 {
 	int err;
 
-	if (!lis->enabled) {
-		mutex_lock(&lis->lock);
+	if (!atomic_cmpxchg(&lis->enabled, 0, 1)) {
 
 		err = lis331dlh_device_power_on(lis);
 		if (err < 0) {
-			mutex_unlock(&lis->lock);
+			atomic_set(&lis->enabled, 0);
 			return err;
 		}
-
-		lis->enabled = 1;
 		schedule_delayed_work(&lis->input_work,
 				      msecs_to_jiffies(lis->
 						       pdata->poll_interval));
-		mutex_unlock(&lis->lock);
 	}
 
 	return 0;
@@ -347,13 +343,9 @@ static int lis331dlh_enable(struct lis331dlh_data *lis)
 
 static int lis331dlh_disable(struct lis331dlh_data *lis)
 {
-	if (lis->enabled) {
+	if (atomic_cmpxchg(&lis->enabled, 1, 0)) {
 		cancel_delayed_work_sync(&lis->input_work);
-
-		mutex_lock(&lis->lock);
-		lis->enabled = 0;
 		lis331dlh_device_power_off(lis);
-		mutex_unlock(&lis->lock);
 	}
 
 	return 0;
@@ -408,8 +400,7 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 		if (buf[0] > 1)
 			return -EINVAL;
 
-		lis->enabled = buf[0];
-		if (lis->enabled)
+		if (buf[0])
 			lis331dlh_enable(lis);
 		else
 			lis331dlh_disable(lis);
@@ -417,7 +408,7 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case LIS331DLH_IOCTL_GET_ENABLE:
-		buf[0] = lis->enabled;
+		buf[0] = atomic_read(&lis->enabled);
 		if (copy_to_user(argp, &buf, 1))
 			return -EINVAL;
 
@@ -636,7 +627,7 @@ static int lis331dlh_probe(struct i2c_client *client,
 	if (err < 0)
 		goto err2;
 
-	lis->enabled = 1;
+	atomic_set(&lis->enabled, 1);
 
 	err = lis331dlh_update_g_range(lis, lis->pdata->g_range);
 	if (err < 0) {
@@ -665,7 +656,7 @@ static int lis331dlh_probe(struct i2c_client *client,
 	lis331dlh_device_power_off(lis);
 
 	/* As default, do not report information */
-	lis->enabled = 0;
+	atomic_set(&lis->enabled, 0);
 
 	mutex_unlock(&lis->lock);
 
