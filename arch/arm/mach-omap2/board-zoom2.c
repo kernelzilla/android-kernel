@@ -115,7 +115,8 @@ static struct platform_device zoom2_smc911x_device = {
 
 #ifdef CONFIG_WL127X_RFKILL
 static struct wl127x_rfkill_platform_data wl127x_plat_data = {
-	.nshutdown_gpio = 109, 	/* Bluetooth Enable GPIO */
+	.bt_nshutdown_gpio = 109, 	/* Bluetooth Enable GPIO */
+	.fm_enable_gpio = -1,		/* FM rfkill disabled */
 };
 
 static struct platform_device zoom2_wl127x_device = {
