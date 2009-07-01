@@ -20,7 +20,7 @@ static int zoom2_wifi_cd = 0;		/* WIFI virtual 'card detect' status */
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 
-int zoom2_wifi_status_register(void (*callback)(int card_present,
+int omap_wifi_status_register(void (*callback)(int card_present,
 						void *dev_id), void *dev_id)
 {
 	if (wifi_status_cb)

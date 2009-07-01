@@ -23,6 +23,10 @@
 #include <mach/control.h>
 #include <mach/mmc.h>
 #include <mach/board.h>
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+#include <asm/mach/mmc.h>
+#include <linux/mmc/sdio_ids.h>
+#endif
 
 #include "mmc-twl4030.h"
 
@@ -47,6 +51,40 @@ static struct twl_mmc_controller {
 	struct regulator		*vcc_aux;
 	char				name[HSMMC_NAME_LEN + 1];
 } hsmmc[OMAP34XX_NR_MMC];
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+int omap_wifi_status_register(void (*callback)(int card_present,
+                                                void *dev_id), void *dev_id);
+
+static struct sdio_embedded_func wifi_func_array[] = {
+	{
+		.f_class        = SDIO_CLASS_NONE,
+		.f_maxblksize   = 0,
+	},
+	{
+		.f_class        = SDIO_CLASS_WLAN,
+		.f_maxblksize   = 512,
+	},
+};
+
+static struct embedded_sdio_data omap_wifi_emb_data = {
+	.cis    = {
+		.vendor         = 0x104c,
+		.device         = 0x9066,
+		.blksize        = 512,
+		.max_dtr        = 24000000,
+	},
+	.cccr   = {
+		.multi_block    = 1,
+		.low_speed      = 0,
+		.wide_bus       = 1,
+		.high_power     = 0,
+		.high_speed     = 0,
+	},
+	.funcs  = wifi_func_array,
+	.num_funcs = 2,
+};
+#endif
 
 static int twl_mmc_card_detect(int irq)
 {
@@ -356,6 +394,18 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
 			strncpy(twl->name, c->name, HSMMC_NAME_LEN);
 		else
 			sprintf(twl->name, "mmc%islot%i", c->mmc, 1);
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+		if (c->mmc == CONFIG_TIWLAN_MMC_CONTROLLER) {
+			mmc->slots[0].embedded_sdio = &omap_wifi_emb_data;
+			mmc->slots[0].register_status_notify = &omap_wifi_status_register;
+		}
+#else
+#ifdef CONFIG_TIWLAN_SDIO
+		if (c->mmc == CONFIG_TIWLAN_MMC_CONTROLLER)
+			mmc->name = "TIWLAN_SDIO";
+#endif
+#endif
 		mmc->slots[0].name = twl->name;
 		mmc->nr_slots = 1;
 		mmc->slots[0].wires = c->wires;

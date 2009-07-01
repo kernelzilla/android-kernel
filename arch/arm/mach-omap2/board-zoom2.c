@@ -407,6 +407,11 @@ static struct twl4030_hsmmc_info mmc[] __initdata = {
 		.wires		= 4,
 		.gpio_wp	= -EINVAL,
 	},
+	{
+		.mmc		= 3,
+		.wires		= 4,
+		.gpio_wp	= -EINVAL,
+	},
 	{}      /* Terminator */
 };
 
