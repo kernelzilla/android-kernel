@@ -98,6 +98,14 @@ struct platform_device cpcap_keypad_led = {
 	},
 };
 
+struct platform_device cpcap_lm3554 = {
+	.name		= "flash-torch",
+	.id		= -1,
+	.dev		= {
+		.platform_data  = NULL,
+	},
+};
+
 #ifdef CONFIG_CPCAP_USB
 static struct platform_device cpcap_usb_device = {
 	.name           = "cpcap_usb",
@@ -145,6 +153,7 @@ static struct platform_device *cpcap_devices[] __initdata = {
 	&cpcap_disp_button_led,
 	&cpcap_rgb_led,
 	&cpcap_keypad_led,
+	&cpcap_lm3554,
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
