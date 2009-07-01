@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/mm.h>
 #include <linux/qtouch_obp_ts.h>
+#include <linux/led-cpcap-lm3554.h>
 #include <linux/led-lm3530.h>
 #include <linux/usb/omap.h>
 #include <linux/wl127x-rfkill.h>
@@ -309,6 +310,16 @@ static struct lm3530_platform_data omap3430_als_light_data = {
 	.lower_curr_sel = 2,
 };
 
+static struct lm3554_platform_data sholes_camera_flash = {
+	.torch_brightness_def = 0xa0,
+	.flash_brightness_def = 0x78,
+	.flash_duration_def = 0x48,
+	.config_reg_1_def = 0xe0,
+	.config_reg_2_def = 0xf0,
+	.vin_monitor_def = 0x07,
+	.gpio_reg_def = 0x0,
+};
+
 static struct i2c_board_info __initdata sholes_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO(QTOUCH_TS_NAME, 0x11),
@@ -337,6 +348,10 @@ static struct i2c_board_info __initdata sholes_i2c_bus2_board_info[] = {
 };
 
 static struct i2c_board_info __initdata sholes_i2c_bus3_board_info[] = {
+	{
+		I2C_BOARD_INFO("lm3554_led", 0x53),
+		.platform_data = &sholes_camera_flash,
+	},
 #if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
 	{
 		I2C_BOARD_INFO("mt9p012", 0x36),
