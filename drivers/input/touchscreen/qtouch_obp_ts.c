@@ -594,6 +594,10 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 
 		input_report_key(ts->input_dev, axis_map[finger].key, down);
 		input_sync(ts->input_dev);
+	} else if (ts->down_mask & (1 << finger)) {
+		/* If going from the touch area to a non-vkey area give a lift off */
+		input_report_key(ts->input_dev, axis_map[finger].key, 0);
+		input_sync(ts->input_dev);
 	}
 	return 0;
 }
