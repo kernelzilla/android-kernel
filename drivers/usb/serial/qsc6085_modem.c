@@ -84,6 +84,7 @@ struct modem_port {
 
 static struct usb_device_id id_table[] = {
 	{USB_DEVICE(0x22b8, 0x2a6e)}, 	/* Sholes CDMA BP modem */
+	{USB_DEVICE(0x22b8, 0x2a6f)}, 	/* Sholes CDMA BP modem */
 	{},
 };
 
