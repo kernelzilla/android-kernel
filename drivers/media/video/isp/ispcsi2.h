@@ -20,6 +20,9 @@
 #define OMAP_ISP_CSI2_API_H
 #include <linux/videodev2.h>
 
+#define ISP_CSI2_LANE_OFF 	0
+#define ISP_CSI2_LANE_ON 	1
+
 enum isp_csi2_irqevents {
 	OCP_ERR_IRQ = 0x4000,
 	SHORT_PACKET_IRQ = 0x2000,
@@ -63,6 +66,7 @@ enum isp_csi2_frame_mode {
 struct csi2_lanecfg {
 	u8 pos;
 	u8 pol;
+	u8 state; 	/*Current state - 1-Used  0-Unused */
 };
 
 struct isp_csi2_lanes_cfg {
@@ -175,6 +179,7 @@ struct isp_csi2_cfg_update {
 
 int isp_csi2_complexio_lanes_config(struct isp_csi2_lanes_cfg *reqcfg);
 int isp_csi2_complexio_lanes_update(bool force_update);
+int isp_csi2_complexio_lanes_count(int cnt);
 int isp_csi2_complexio_lanes_get(void);
 int isp_csi2_complexio_power_autoswitch(bool enable);
 int isp_csi2_complexio_power(enum isp_csi2_power_cmds power_cmd);

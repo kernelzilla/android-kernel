@@ -1554,7 +1554,7 @@ int isppreview_config_size(u32 input_w, u32 input_h, u32 output_w, u32 output_h)
 		       (ispprev_obj.previn_w - 1),
 		       OMAP3_ISP_IOMEM_PREV, ISPPRV_HORZ_INFO);
 	isp_reg_writel((ispprev_obj.slv << ISPPRV_VERT_INFO_SLV_SHIFT) |
-		       (ispprev_obj.previn_h - 2),
+		       (ispprev_obj.previn_h - 1),
 		       OMAP3_ISP_IOMEM_PREV, ISPPRV_VERT_INFO);
 
 	if (ispprev_obj.cfafmt == CFAFMT_BAYER)
