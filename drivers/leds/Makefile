@@ -39,3 +39,4 @@ obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
 obj-$(CONFIG_LEDS_TRIGGER_SLEEP)	+= ledtrig-sleep.o
 
 obj-$(CONFIG_LEDS_LM3530) += led-lm3530.o
+obj-$(CONFIG_LEDS_LM3554) += led-cpcap-lm3554.o
