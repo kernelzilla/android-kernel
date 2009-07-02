@@ -651,14 +651,26 @@ mmc_omap_start_dma_transfer(struct mmc_omap_host *host, struct mmc_request *req)
 		host->dma_dir = DMA_FROM_DEVICE;
 		if (host->id == OMAP_MMC1_DEVID)
 			sync_dev = OMAP24XX_DMA_MMC1_RX;
-		else
+		else if (host->id == OMAP_MMC2_DEVID)
 			sync_dev = OMAP24XX_DMA_MMC2_RX;
+		else
+#ifdef CONFIG_OMAP_HS_MMC3
+			sync_dev = OMAP34XX_DMA_MMC3_RX;
+#else
+			sync_dev = OMAP24XX_DMA_MMC2_RX;
+#endif
 	} else {
 		host->dma_dir = DMA_TO_DEVICE;
 		if (host->id == OMAP_MMC1_DEVID)
 			sync_dev = OMAP24XX_DMA_MMC1_TX;
-		else
+		else if(host->id == OMAP_MMC2_DEVID)
 			sync_dev = OMAP24XX_DMA_MMC2_TX;
+		else
+#ifdef CONFIG_OMAP_HS_MMC3
+			sync_dev = OMAP34XX_DMA_MMC3_TX;
+#else
+			sync_dev = OMAP24XX_DMA_MMC2_TX;
+#endif
 	}
 
 	ret = omap_request_dma(sync_dev, "MMC/SD", mmc_omap_dma_cb,

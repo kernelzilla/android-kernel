@@ -878,8 +878,6 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 	if (display && display->update)
 		display->update(display, 0, 0, var->xres, var->yres);
 
-	omapfb_unlock(fbdev);
-
 	return r;
 }
 

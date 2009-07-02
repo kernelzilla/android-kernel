@@ -52,7 +52,7 @@ struct omap_sr {
 
 #define SR_REGADDR(offs)	(sr->srbase_addr + offset)
 
-static int (*omap3_volscale_vcbypass_fun) (u32, u32, u8, u8);
+static omap3_voltagescale_vcbypass_t omap3_volscale_vcbypass_fun;
 
 static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
 {
