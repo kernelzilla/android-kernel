@@ -26,6 +26,7 @@
 #include <linux/poll.h>
 #include <linux/semaphore.h>
 #include <linux/workqueue.h>
+#include "../usb/host/ehci-omap.h" /* Temp include for writing UHH register */
 
 /* structure to keep track of gpio, irq, and irq enabled info */
 struct gpioinfo {
@@ -256,6 +257,17 @@ out:
 	return ret;
 }
 
+/* Temporary workaround to disable UHH Smart Idle in order for
+ * BP re-enumeration to work */
+static void omap_mdm_ctrl_disable_uhh_smart_idle()
+{
+	u32 sysconfig;
+
+	sysconfig = omap_readl(OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~(1 << OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT);
+	omap_writel(sysconfig, OMAP_UHH_SYSCONFIG);
+}
+
 /* Performs the appropriate action for the specified IOCTL command,
  * returning a failure code only if the IOCTL command was not recognized */
 static int omap_mdm_ctrl_ioctl(struct inode *inode, struct file *filp,
@@ -297,6 +309,11 @@ static int omap_mdm_ctrl_ioctl(struct inode *inode, struct file *filp,
 	case OMAP_MDM_CTRL_IOCTL_SET_AP_TO_BP_PSHOLD:
 		ret = get_user(highEnable, dataParam);
 		if (ret == 0) {
+
+			/* Temporary workaround so BP can re-enum */
+			if (highEnable == 1)
+				omap_mdm_ctrl_disable_uhh_smart_idle();
+
 			gpio_set_value(omap_mdm_ctrl_data.
 				       gpios[AP_TO_BP_PSHOLD].gpio, highEnable);
 		}
