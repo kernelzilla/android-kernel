@@ -829,7 +829,7 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 				pr_warning("%s: %s disable --> %d\n",
 					       __func__, name, ret);
 		}
-		if (ret >= 0)
+		if (ret >= 0 && constraints->always_on)
 			rdev->use_count = 1;
 	} else {
 		if (ops->disable) {
