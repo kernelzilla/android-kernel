@@ -768,6 +768,7 @@ static struct platform_device sholes_vout_device = {
        .id             = -1,
 };
 static void __init sholes_vout_init(void)
+{
 	platform_device_register(&sholes_vout_device);
 }
 
