@@ -187,21 +187,21 @@ static void sholes_als_init(void)
 static struct vkey sholes_touch_vkeys[] = {
 	{
 		.min		= 0,
-		.max		= 152,
+		.max		= 200,
 		.code		= KEY_BACK,
 	},
 	{
-		.min		= 321,
-		.max		= 429,
+		.min		= 330,
+		.max		= 520,
 		.code		= KEY_MENU,
 	},
 	{
-		.min		= 606,
-		.max		= 714,
+		.min		= 590,
+		.max		= 780,
 		.code		= KEY_HOME,
 	},
 	{
-		.min		= 886,
+		.min		= 880,
 		.max		= 1024,
 		.code		= KEY_SEARCH,
 	},
