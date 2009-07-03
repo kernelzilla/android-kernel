@@ -358,4 +358,6 @@ void __init sholes_spi_init(void)
 	sholes_spi_board_info[0].irq = irq;
 	spi_register_board_info(sholes_spi_board_info,
 			       ARRAY_SIZE(sholes_spi_board_info));
+
+	regulator_has_full_constraints();
 }
