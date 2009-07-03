@@ -20,11 +20,13 @@
  * file and vm operations
  */
 
+#include <linux/file.h>
 #include <linux/fs_stack.h>
 #include <linux/ima.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/poll.h>
+#include <linux/security.h>
 #include "aufs.h"
 
 /* common function to regular file and dir */
@@ -175,6 +177,95 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 	err = vfsub_write_u(h_file, buf, count, ppos);
 	au_cpup_attr_timesizes(inode);
 	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
+
+ out_unlock:
+	di_read_unlock(dentry, AuLock_IR);
+	fi_write_unlock(file);
+ out:
+	si_read_unlock(sb);
+	mutex_unlock(&inode->i_mutex);
+	return err;
+}
+
+static ssize_t aufs_aio_read(struct kiocb *kio, const struct iovec *iov,
+			     unsigned long nv, loff_t pos)
+{
+	ssize_t err;
+	struct file *file, *h_file;
+	struct dentry *dentry;
+	struct super_block *sb;
+
+	file = kio->ki_filp;
+	dentry = file->f_dentry;
+	sb = dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/0);
+	if (unlikely(err))
+		goto out;
+
+	err = -ENOSYS;
+	h_file = au_h_fptr(file, au_fbstart(file));
+	if (h_file->f_op && h_file->f_op->aio_read) {
+		fput(file);
+		get_file(h_file);
+		kio->ki_filp = h_file;
+		err = security_file_permission(h_file, MAY_READ);
+		if (!err)
+			err = h_file->f_op->aio_read(kio, iov, nv, pos);
+		/* todo: necessary? */
+		/* file->f_ra = h_file->f_ra; */
+		fsstack_copy_attr_atime(dentry->d_inode,
+					h_file->f_dentry->d_inode);
+	}
+
+	di_read_unlock(dentry, AuLock_IR);
+	fi_read_unlock(file);
+ out:
+	si_read_unlock(sb);
+	return err;
+}
+
+static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
+			      unsigned long nv, loff_t pos)
+{
+	ssize_t err;
+	aufs_bindex_t bstart;
+	struct au_pin pin;
+	struct dentry *dentry;
+	struct inode *inode;
+	struct super_block *sb;
+	struct file *file, *h_file;
+
+	file = kio->ki_filp;
+	dentry = file->f_dentry;
+	sb = dentry->d_sb;
+	inode = dentry->d_inode;
+	mutex_lock(&inode->i_mutex);
+	si_read_lock(sb, AuLock_FLUSH);
+
+	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/1);
+	if (unlikely(err))
+		goto out;
+
+	err = au_ready_to_write(file, -1, &pin);
+	di_downgrade_lock(dentry, AuLock_IR);
+	if (unlikely(err))
+		goto out_unlock;
+
+	err = -ENOSYS;
+	bstart = au_fbstart(file);
+	h_file = au_h_fptr(file, bstart);
+	au_unpin(&pin);
+	if (h_file->f_op && h_file->f_op->aio_write) {
+		fput(file);
+		get_file(h_file);
+		kio->ki_filp = h_file;
+		err = security_file_permission(h_file, MAY_WRITE);
+		if (!err)
+			err = h_file->f_op->aio_write(kio, iov, nv, pos);
+		au_cpup_attr_timesizes(inode);
+		inode->i_mode = h_file->f_dentry->d_inode->i_mode;
+	}
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
@@ -619,6 +710,68 @@ static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 	return err;
 }
 
+/* no one supports this operation, currently */
+#if 0
+static int aufs_aio_fsync_nondir(struct kiocb *kio, int datasync)
+{
+	int err;
+	struct au_pin pin;
+	struct dentry *dentry;
+	struct inode *inode;
+	struct file *file, *h_file;
+	struct super_block *sb;
+
+	file = kio->ki_filp;
+	dentry = file->f_dentry;
+	inode = dentry->d_inode;
+	mutex_lock(&inode->i_mutex);
+
+	sb = dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+
+	err = 0; /* -EBADF; */ /* posix? */
+	if (unlikely(!(file->f_mode & FMODE_WRITE)))
+		goto out;
+	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/1);
+	if (unlikely(err))
+		goto out;
+
+	err = au_ready_to_write(file, -1, &pin);
+	di_downgrade_lock(dentry, AuLock_IR);
+	if (unlikely(err))
+		goto out_unlock;
+	au_unpin(&pin);
+
+	err = -ENOSYS;
+	h_file = au_h_fptr(file, au_fbstart(file));
+	if (h_file->f_op && h_file->f_op->aio_fsync) {
+		struct dentry *h_d;
+		struct mutex *h_mtx;
+
+		h_d = h_file->f_dentry;
+		h_mtx = &h_d->d_inode->i_mutex;
+		fput(file);
+		get_file(h_file);
+		kio->ki_filp = h_file;
+		err = h_file->f_op->aio_fsync(kio, datasync);
+		mutex_lock_nested(h_mtx, AuLsc_I_CHILD);
+		if (!err)
+			vfsub_update_h_iattr(&h_file->f_path, /*did*/NULL);
+		/*ignore*/
+		au_cpup_attr_timesizes(inode);
+		mutex_unlock(h_mtx);
+	}
+
+ out_unlock:
+	di_read_unlock(dentry, AuLock_IR);
+	fi_write_unlock(file);
+ out:
+	si_read_unlock(sb);
+	mutex_unlock(&inode->i_mutex);
+	return err;
+}
+#endif
+
 static int aufs_fasync(int fd, struct file *file, int flag)
 {
 	int err;
@@ -647,6 +800,16 @@ static int aufs_fasync(int fd, struct file *file, int flag)
 
 /* ---------------------------------------------------------------------- */
 
+/* no one supports this operation, currently */
+#if 0
+static ssize_t aufs_sendpage(struct file *file, struct page *page, int offset,
+			     size_t len, loff_t *pos , int more)
+{
+}
+#endif
+
+/* ---------------------------------------------------------------------- */
+
 const struct file_operations aufs_file_fop = {
 	/*
 	 * while generic_file_llseek/_unlocked() don't use BKL,
@@ -657,13 +820,21 @@ const struct file_operations aufs_file_fop = {
 
 	.read		= aufs_read,
 	.write		= aufs_write,
+	.aio_read	= aufs_aio_read,
+	.aio_write	= aufs_aio_write,
 	.poll		= aufs_poll,
 	.mmap		= aufs_mmap,
 	.open		= aufs_open_nondir,
 	.flush		= aufs_flush,
 	.release	= aufs_release_nondir,
 	.fsync		= aufs_fsync_nondir,
+	/* .aio_fsync	= aufs_aio_fsync_nondir, */
 	.fasync		= aufs_fasync,
+	/* .sendpage	= aufs_sendpage, */
 	.splice_write	= aufs_splice_write,
-	.splice_read	= aufs_splice_read
+	.splice_read	= aufs_splice_read,
+#if 0
+	.aio_splice_write = aufs_aio_splice_write,
+	.aio_splice_read  = aufs_aio_splice_read
+#endif
 };
