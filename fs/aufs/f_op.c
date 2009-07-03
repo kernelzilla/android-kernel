@@ -204,18 +204,22 @@ static ssize_t aufs_aio_read(struct kiocb *kio, const struct iovec *iov,
 	err = -ENOSYS;
 	h_file = au_h_fptr(file, au_fbstart(file));
 	if (h_file->f_op && h_file->f_op->aio_read) {
-		fput(file);
-		get_file(h_file);
-		kio->ki_filp = h_file;
 		err = security_file_permission(h_file, MAY_READ);
-		if (!err)
-			err = h_file->f_op->aio_read(kio, iov, nv, pos);
+		if (unlikely(err))
+			goto out_unlock;
+		if (!is_sync_kiocb(kio)) {
+			get_file(h_file);
+			fput(file);
+		}
+		kio->ki_filp = h_file;
+		err = h_file->f_op->aio_read(kio, iov, nv, pos);
 		/* todo: necessary? */
 		/* file->f_ra = h_file->f_ra; */
 		fsstack_copy_attr_atime(dentry->d_inode,
 					h_file->f_dentry->d_inode);
 	}
 
+ out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
 	fi_read_unlock(file);
  out:
@@ -255,12 +259,15 @@ static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
 	h_file = au_h_fptr(file, bstart);
 	au_unpin(&pin);
 	if (h_file->f_op && h_file->f_op->aio_write) {
-		fput(file);
-		get_file(h_file);
-		kio->ki_filp = h_file;
 		err = security_file_permission(h_file, MAY_WRITE);
-		if (!err)
-			err = h_file->f_op->aio_write(kio, iov, nv, pos);
+		if (unlikely(err))
+			goto out_unlock;
+		if (!is_sync_kiocb(kio)) {
+			get_file(h_file);
+			fput(file);
+		}
+		kio->ki_filp = h_file;
+		err = h_file->f_op->aio_write(kio, iov, nv, pos);
 		au_cpup_attr_timesizes(inode);
 		inode->i_mode = h_file->f_dentry->d_inode->i_mode;
 	}
@@ -729,8 +736,10 @@ static int aufs_aio_fsync_nondir(struct kiocb *kio, int datasync)
 
 		h_d = h_file->f_dentry;
 		h_mtx = &h_d->d_inode->i_mutex;
-		fput(file);
-		get_file(h_file);
+		if (!is_sync_kiocb(kio)) {
+			get_file(h_file);
+			fput(file);
+		}
 		kio->ki_filp = h_file;
 		err = h_file->f_op->aio_fsync(kio, datasync);
 		mutex_lock_nested(h_mtx, AuLsc_I_CHILD);
