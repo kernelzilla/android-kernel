@@ -247,12 +247,14 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 #define LCD_PANEL_RESET_GPIO		55
 #define LCD_PANEL_QVGA_GPIO		56
 
+#define TV_PANEL_ENABLE_GPIO		95
 
-#define PM_RECEIVER             TWL4030_MODULE_PM_RECEIVER
-#define ENABLE_VAUX2_DEDICATED  0x09
-#define ENABLE_VAUX2_DEV_GRP    0x20
-#define ENABLE_VAUX3_DEDICATED	0x03
-#define ENABLE_VAUX3_DEV_GRP	0x20
+
+#define PM_RECEIVER			TWL4030_MODULE_PM_RECEIVER
+#define ENABLE_VAUX2_DEDICATED		0x09
+#define ENABLE_VAUX2_DEV_GRP		0x20
+#define ENABLE_VAUX3_DEDICATED		0x03
+#define ENABLE_VAUX3_DEV_GRP		0x20
 
 #define ENABLE_VPLL2_DEDICATED          0x05
 #define ENABLE_VPLL2_DEV_GRP            0xE0
@@ -261,19 +263,122 @@ static struct spi_board_info zoom2_spi_board_info[] __initdata = {
 
 #define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
 
-static struct omap_dss_device zoom2_display_data_lcd = {
-	.type = OMAP_DISPLAY_TYPE_DPI,
+static void zoom2_lcd_tv_panel_init(void)
+{
+	unsigned char lcd_panel_reset_gpio;
+
+	omap_cfg_reg(AF21_34XX_GPIO8);
+	omap_cfg_reg(B23_34XX_GPIO167);
+	omap_cfg_reg(AB1_34XX_McSPI1_CS2);
+	omap_cfg_reg(A24_34XX_GPIO94);
+
+	if (omap_rev() > OMAP3430_REV_ES3_0) {
+		/* Production Zoom2 Board:
+		 * GPIO-96 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(C25_34XX_GPIO96);
+		lcd_panel_reset_gpio = 96;
+	} else {
+		/* Pilot Zoom2 board
+		 * GPIO-55 is the LCD_RESET_GPIO
+		 */
+		omap_cfg_reg(T8_34XX_GPIO55);
+		lcd_panel_reset_gpio = 55;
+	}
+
+	gpio_request(lcd_panel_reset_gpio, "lcd reset");
+	gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
+	gpio_request(LCD_PANEL_ENABLE_GPIO, "lcd panel");
+	gpio_request(LCD_PANEL_BACKLIGHT_GPIO, "lcd backlight");
+	
+	gpio_request( TV_PANEL_ENABLE_GPIO, "tv panel");
+
+	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 0);
+	gpio_direction_output(lcd_panel_reset_gpio, 0);
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
+
+	gpio_direction_output(TV_PANEL_ENABLE_GPIO, 0);
+
+	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 1);
+	gpio_direction_output(lcd_panel_reset_gpio, 1);
+}
+static int zoom2_panel_enable_lcd(struct omap_dss_device *dssdev)
+{
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+				ENABLE_VPLL2_DEDICATED,
+				TWL4030_VPLL2_DEDICATED);
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+				ENABLE_VPLL2_DEV_GRP,
+				TWL4030_VPLL2_DEV_GRP);
+
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 1);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 1);
+
+	return 0;
+}
+
+static void zoom2_panel_disable_lcd(struct omap_dss_device *dssdev)
+{
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
+				TWL4030_VPLL2_DEDICATED);
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
+				TWL4030_VPLL2_DEV_GRP);
+
+	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
+	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
+
+}
+
+static struct omap_dss_device zoom2_lcd_device = {
 	.name = "lcd",
-	.driver_name = "panel-zoom2",
+	.driver_name = "zoom2_panel",
+	.type = OMAP_DISPLAY_TYPE_DPI,
 	.phy.dpi.data_lines = 24,
+	.platform_enable = zoom2_panel_enable_lcd,
+	.platform_disable = zoom2_panel_disable_lcd,
  };
 
+
+static int zoom2_panel_enable_tv(struct omap_dss_device *dssdev)
+{
+#define ENABLE_VDAC_DEDICATED           0x03
+#define ENABLE_VDAC_DEV_GRP             0x20
+
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+			ENABLE_VDAC_DEDICATED,
+			TWL4030_VDAC_DEDICATED);
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+			ENABLE_VDAC_DEV_GRP, TWL4030_VDAC_DEV_GRP);
+
+	return 0;
+}
+
+static void zoom2_panel_disable_tv(struct omap_dss_device *dssdev)
+{
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00,
+			TWL4030_VDAC_DEDICATED);
+	twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00,
+			TWL4030_VDAC_DEV_GRP);
+}
+static struct omap_dss_device zoom2_tv_device = {
+	.name = "tv",
+	.driver_name = "venc",
+	.type = OMAP_DISPLAY_TYPE_VENC,
+	.phy.venc.type = OMAP_DSS_VENC_TYPE_COMPOSITE,
+	.platform_enable = zoom2_panel_enable_tv,
+	.platform_disable = zoom2_panel_disable_tv,
+};
+
+static struct omap_dss_device *zoom2_dss_devices[] = {
+	&zoom2_lcd_device,
+	&zoom2_tv_device,
+};
+
 static struct omap_dss_board_info zoom2_dss_data = {
-	.num_devices = 1,
-	.devices = {
-		&zoom2_display_data_lcd,
-	},
-	.default_device = &zoom2_display_data_lcd,
+	.num_devices = ARRAY_SIZE(zoom2_dss_devices),
+	.devices = zoom2_dss_devices,
+	.default_device = &zoom2_lcd_device,
 };
 
 static struct platform_device zoom2_dss_device = {
@@ -284,6 +389,26 @@ static struct platform_device zoom2_dss_device = {
 	},
 };
 
+static struct regulator_consumer_supply zoom2_vdda_dac_supply = {
+	.supply		= "vdda_dac",
+	.dev		= &zoom2_dss_device.dev,
+};
+
+#ifdef CONFIG_FB_OMAP2
+static struct resource zoom2_vout_resource[3 - CONFIG_FB_OMAP2_NUM_FBS] = {
+};
+#else
+static struct resource zoom2_vout_resource[2] = {
+};
+#endif
+
+static struct platform_device zoom2_vout_device = {
+	.name		= "omap_vout",
+	.num_resources	= ARRAY_SIZE(zoom2_vout_resource),
+	.resource	= &zoom2_vout_resource[0],
+	.id		= -1,
+};
+
 static struct platform_device *zoom2_devices[] __initdata = {
 	&zoom2_dss_device,
 	&zoom2_smc911x_device,
@@ -291,6 +416,7 @@ static struct platform_device *zoom2_devices[] __initdata = {
 	&zoom2_wl127x_device,
 #endif
 	&omap_hdq_device,
+	&zoom2_vout_device,
 };
 
 static inline void __init zoom2_init_smc911x(void)
@@ -411,6 +537,19 @@ static struct regulator_init_data zoom2_vsim = {
 	.consumer_supplies      = &zoom2_vsim_supply,
 };
 
+static struct regulator_init_data zoom2_vdac = {
+	.constraints = {
+		.min_uV                 = 1800000,
+		.max_uV                 = 1800000,
+		.valid_modes_mask       = REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask         = REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = 1,
+	.consumer_supplies      = &zoom2_vdda_dac_supply,
+};
+
 static struct twl4030_hsmmc_info mmc[] __initdata = {
 	{
 		.mmc		= 1,
@@ -507,6 +646,7 @@ static struct twl4030_platform_data zoom2_twldata = {
 	.vmmc1          = &zoom2_vmmc1,
 	.vmmc2          = &zoom2_vmmc2,
 	.vsim           = &zoom2_vsim,
+	.vdac		= &zoom2_vdac,
 };
 
 static struct i2c_board_info __initdata zoom2_i2c_bus1_info[] = {
@@ -600,6 +740,7 @@ static void __init omap_zoom2_init(void)
 	usb_musb_init();
 	config_wlan_gpio();
 	zoom2_cam_init();
+	zoom2_lcd_tv_panel_init();
 }
 
 static struct map_desc zoom2_io_desc[] __initdata = {
