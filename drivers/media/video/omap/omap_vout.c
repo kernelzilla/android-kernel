@@ -894,7 +894,8 @@ static int omap_vout_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 		return 0;
 
 	/* Now allocated the V4L2 buffers */
-	*size = vout->buffer_size;
+	*size = vout->pix.width * vout->pix.height * vout->bpp;
+	*size = PAGE_ALIGN(*size);
 	startindex = (vout->vid == OMAP_VIDEO1) ?
 		video1_numbuffers : video2_numbuffers;
 	for (i = startindex; i < *count; i++) {
