@@ -219,7 +219,9 @@ static ssize_t aufs_aio_read(struct kiocb *kio, const struct iovec *iov,
 		/* file->f_ra = h_file->f_ra; */
 		fsstack_copy_attr_atime(dentry->d_inode,
 					h_file->f_dentry->d_inode);
-	}
+	} else
+		/* currently there is no such fs */
+		WARN_ON_ONCE(h_file->f_op && h_file->f_op->read);
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
@@ -272,7 +274,9 @@ static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
 		err = h_file->f_op->aio_write(kio, iov, nv, pos);
 		au_cpup_attr_timesizes(inode);
 		inode->i_mode = h_file->f_dentry->d_inode->i_mode;
-	}
+	} else
+		/* currently there is no such fs */
+		WARN_ON_ONCE(h_file->f_op && h_file->f_op->write);
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
