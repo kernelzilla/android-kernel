@@ -164,6 +164,18 @@ enum mt9p012_frame_type {
 	MT9P012_FRAME_216_30FPS,
 };
 
+enum mt9p012_orientation {
+	MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP = 0,
+	MT9P012_HORZ_FLIP_ONLY,
+	MT9P012_VERT_FLIP_ONLY,
+	MT9P012_HORZ_FLIP_AND_VERT_FLIP
+};
+
+/* Private IOCTLs */
+#define V4L2_CID_PRIVATE_SENSOR_ID_REQ		(V4L2_CID_PRIVATE_BASE + 22)
+#define V4L2_CID_PRIVATE_COLOR_BAR		(V4L2_CID_PRIVATE_BASE + 23)
+#define V4L2_CID_PRIVATE_FLASH_NEXT_FRAME	(V4L2_CID_PRIVATE_BASE + 24)
+#define V4L2_CID_PRIVATE_ORIENTATION		(V4L2_CID_PRIVATE_BASE + 25)
 
 /* Debug functions */
 static int debug;
@@ -382,6 +394,15 @@ struct mt9p012_sensor_settings {
 	struct mt9p012_clk_settings clk;
 	struct mt9p012_frame_settings frame;
 	struct mt9p012_exposure_settings exposure;
+};
+
+/**
+ * struct mt9p012_sensor_id
+ */
+struct mt9p012_sensor_id {
+	u16 revision;
+	u16 model;
+	u16 mfr;
 };
 
 static struct mt9p012_sensor_settings sensor_settings[] = {
@@ -625,6 +646,42 @@ static struct vcontrol video_control[] = {
 			.default_value = MT9P012_DEF_LINEAR_GAIN,
 		},
 		.current_value = MT9P012_DEF_LINEAR_GAIN,
+	},
+	{
+		{
+			.id = V4L2_CID_PRIVATE_FLASH_NEXT_FRAME,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "Flash On Next Frame",
+			.minimum = 0,
+			.maximum = 1,
+			.step = 0,
+			.default_value = 0,
+		},
+		.current_value = 0,
+	},
+	{
+		{
+			.id = V4L2_CID_PRIVATE_SENSOR_ID_REQ,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "Sensor ID",
+			.minimum = 0,
+			.maximum = -1,
+			.step = 0,
+			.default_value = 0,
+		},
+		.current_value = 0,
+	},
+	{
+		{
+			.id = V4L2_CID_PRIVATE_ORIENTATION,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "Orientation",
+			.minimum = MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP,
+			.maximum = MT9P012_HORZ_FLIP_AND_VERT_FLIP,
+			.step = 0,
+			.default_value = MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP,
+		},
+		.current_value = MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP,
 	}
 };
 
@@ -659,6 +716,8 @@ struct mt9p012_sensor {
 
 	u32 min_exposure_time;
 	u32 max_exposure_time;
+
+	struct mt9p012_sensor_id sensor_id;
 
 	struct vcontrol *video_control;
 	int n_video_control;
@@ -1043,6 +1102,78 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 }
 
 /**
+ * mt9p012_set_flash_next_frame - configures flash on for the next frame
+ * @enable: 0 = off, 1 = on
+ * @s: pointer to standard V4L2 device structure
+ * @lvc: pointer to V4L2 exposure entry in video_controls array
+ * The function returns 0 upon success.  Otherwise an error code is
+ * returned.
+ */
+int mt9p012_set_flash_next_frame(u16 enable, struct v4l2_int_device *s,
+					     struct vcontrol *lvc)
+{
+	int err = 0;
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	u16 flash;
+
+	if (enable)
+		flash = 0x0100;
+	else
+		flash = 0x0000;
+
+	err = mt9p012_write_reg(client, MT9P012_16BIT,
+				REG_FLASH, flash);
+	if (err) {
+		dev_err(&client->dev, "Error setting flash next frame.%d", err);
+		return err;
+	} else
+		lvc->current_value = enable;
+
+	return err;
+}
+
+/**
+ * Sets the sensor orientation.
+ */
+static int mt9p012_set_orientation(enum mt9p012_orientation val,
+			struct v4l2_int_device *s, struct vcontrol *lvc)
+{
+	int err = 0;
+	u8 orient;
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+
+	switch (val) {
+	case MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP:
+		orient = 0x0;
+		break;
+	case MT9P012_HORZ_FLIP_ONLY:
+		orient = 0x1;
+		break;
+	case MT9P012_VERT_FLIP_ONLY:
+		orient = 0x2;
+		break;
+	case MT9P012_HORZ_FLIP_AND_VERT_FLIP:
+		orient = 0x3;
+		break;
+	default:
+		orient = 0x0;
+		break;
+	}
+
+	err = mt9p012_write_reg(client, MT9P012_8BIT,
+				REG_IMAGE_ORIENTATION, orient);
+	if (err) {
+		dev_err(&client->dev, "Error setting orientation.%d", err);
+		return err;
+	} else
+		lvc->current_value = (u32)val;
+
+	return err;
+}
+
+/**
  * mt9p012_set_framerate - Sets framerate by adjusting frame_length_lines reg.
  * @s: pointer to standard V4L2 device structure
  * @fper: frame period numerator and denominator in seconds
@@ -1361,6 +1492,22 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 			sensor->v4l2_int_device, lvc);
 	}
 
+	/* Set initial flash mode */
+	i = find_vctrl(sensor, V4L2_CID_PRIVATE_FLASH_NEXT_FRAME);
+	if (i >= 0) {
+		lvc = &video_control[i];
+		mt9p012_set_flash_next_frame(lvc->current_value,
+			sensor->v4l2_int_device, lvc);
+	}
+
+	/* Set initial orientation */
+	i = find_vctrl(sensor, V4L2_CID_PRIVATE_ORIENTATION);
+	if (i >= 0) {
+		lvc = &video_control[i];
+		mt9p012_set_orientation(lvc->current_value,
+			sensor->v4l2_int_device, lvc);
+	}
+
 	/* configure streaming ON */
 	err = mt9p012_write_regs(client, stream_on_list);
 	mdelay(1);
@@ -1385,6 +1532,8 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 static int mt9p012_detect(struct i2c_client *client)
 {
 	u32 model_id, mfr_id, rev;
+	struct mt9p012_sensor *sensor = i2c_get_clientdata(client);
+	struct mt9p012_sensor_id *sensor_id = &(sensor->sensor_id);
 
 	if (!client)
 		return -ENODEV;
@@ -1396,6 +1545,10 @@ static int mt9p012_detect(struct i2c_client *client)
 		return -ENODEV;
 	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_REVISION_NUMBER, &rev))
 		return -ENODEV;
+
+	sensor_id->model = model_id;
+	sensor_id->mfr = mfr_id;
+	sensor_id->revision = rev;
 
 	dev_info(&client->dev, "model id detected 0x%x mfr 0x%x\n", model_id,
 								mfr_id);
@@ -1476,6 +1629,19 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 	case V4L2_CID_GAIN:
 		vc->value = lvc->current_value;
 		break;
+	case V4L2_CID_PRIVATE_FLASH_NEXT_FRAME:
+		vc->value = lvc->current_value;
+		break;
+	case V4L2_CID_PRIVATE_ORIENTATION:
+		vc->value = lvc->current_value;
+		break;
+	case V4L2_CID_PRIVATE_SENSOR_ID_REQ:
+		if (copy_to_user((void *)vc->value, &(sensor->sensor_id),
+				sizeof(sensor->sensor_id))) {
+			printk(KERN_ERR "Failed copy_to_user\n");
+			return -EINVAL;
+		}
+		break;
 	}
 
 	return 0;
@@ -1508,6 +1674,12 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 		break;
 	case V4L2_CID_GAIN:
 		retval = mt9p012_set_gain(vc->value, s, lvc);
+		break;
+	case V4L2_CID_PRIVATE_FLASH_NEXT_FRAME:
+		retval = mt9p012_set_flash_next_frame(vc->value, s, lvc);
+		break;
+	case V4L2_CID_PRIVATE_ORIENTATION:
+		retval = mt9p012_set_orientation(vc->value, s, lvc);
 		break;
 	}
 
