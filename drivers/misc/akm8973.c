@@ -1,5 +1,19 @@
 /*
+ * Copyright (C) 2009 Motorola, Inc.
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307, USA
  */
 
 #include <linux/delay.h>
@@ -38,7 +52,7 @@ struct akm8973_data {
 	u8 hyga;
 	u8 hzga;
 
-	u8 state;
+	int state;
 };
 
 /*
@@ -439,7 +453,7 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		buf[0] = AKM8973_REG_HXDA;
 		err = akm8973_i2c_write(akm, buf, 3);
 		if (err < 0)
-			goto err;
+			return err;
 
 		akm->pdata->hxda = buf[1];
 		akm->pdata->hyda = buf[2];
@@ -463,12 +477,12 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case AKM8973_IOCTL_SET_FLAG:
-		if (copy_from_user(&buf, argp, 1))
+		if (copy_from_user(&interval, argp, sizeof(interval)))
 			return -EFAULT;
-		if (buf[0] > 3)
+		if (interval > 3)
 			return -EINVAL;
 
-		akm->state = buf[0];
+		akm->state = interval;
 		if (akm->state != 0)
 			akm8973_enable(akm);
 		else
@@ -477,21 +491,17 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case AKM8973_IOCTL_GET_FLAG:
-		buf[0] = akm->state;
-		if (copy_to_user(argp, &buf, 1))
+		interval = akm->state;
+		if (copy_to_user(argp, &interval, sizeof(interval)))
 			return -EINVAL;
 
 		break;
 
 	default:
-		err = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
 	return 0;
-
-err:
-	return err;
 }
 
 static const struct file_operations akm8973_misc_fops = {
