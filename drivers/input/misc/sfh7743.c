@@ -135,7 +135,6 @@ static int sfh7743_misc_ioctl(struct inode *inode, struct file *file,
 			      unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
-	int err;
 	u8 enable;
 	struct sfh7743_data *sfh = file->private_data;
 
@@ -161,14 +160,10 @@ static int sfh7743_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	default:
-		err = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
 	return 0;
-
-err:
-	return err;
 }
 
 static const struct file_operations sfh7743_misc_fops = {
@@ -283,7 +278,7 @@ static int sfh7743_probe(struct platform_device *pdev)
 	if (!sfh->work_queue) {
 		err = -ENOMEM;
 		pr_err("%s: cannot create work queue: %d\n", __func__, err);
-		goto err1_1;
+		goto err1;
 	}
 
 	if (sfh->pdata->init) {
@@ -292,15 +287,21 @@ static int sfh7743_probe(struct platform_device *pdev)
 			goto err2;
 	}
 
+	if (sfh->pdata->power_on) {
+		err = sfh->pdata->power_on();
+		if (err < 0)
+			goto err3;
+	}
+
 	err = sfh7743_input_init(sfh);
 	if (err < 0)
-		goto err3;
+		goto err4;
 
 	sfh7743_misc_data = sfh;
 	err = misc_register(&sfh7743_misc_device);
 	if (err < 0) {
 		dev_err(&pdev->dev, "sfhd_device register failed\n");
-		goto err4;
+		goto err5;
 	}
 
 	atomic_set(&sfh->enabled, 0);
@@ -312,27 +313,33 @@ static int sfh7743_probe(struct platform_device *pdev)
 			  "sfh7743_irq", sfh);
 	if (err < 0) {
 		pr_err("%s: request irq failed: %d\n", __func__, err);
-		goto err5;
+		goto err6;
 	}
 
 	disable_irq_nosync(sfh->irq);
+
+	if (sfh->pdata->power_off)
+		sfh->pdata->power_off();
 
 	dev_info(&pdev->dev, "sfh7743 probed\n");
 
 	return 0;
 
-err5:
+err6:
 	misc_deregister(&sfh7743_misc_device);
-err4:
+err5:
 	sfh7743_input_cleanup(sfh);
+err4:
+	if (sfh->pdata->power_off)
+		sfh->pdata->power_off();
 err3:
+
 	if (sfh->pdata->exit)
 		sfh->pdata->exit();
 err2:
 	destroy_workqueue(sfh->work_queue);
-err1_1:
-	kfree(sfh->pdata);
 err1:
+	kfree(sfh->pdata);
 	kfree(sfh);
 err0:
 	return err;
