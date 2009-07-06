@@ -1,6 +1,19 @@
 /*
+ * Copyright (C) 2009 Motorola, Inc.
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307, USA
  */
 
 #include <linux/err.h>
@@ -46,7 +59,7 @@
 #define ODR400          	0x10	/* 400Hz output data rate */
 #define ODR1000         	0x18	/* 1000Hz output data rate */
 
-#define FUZZ			4
+#define FUZZ			64
 #define FLAT			4
 #define I2C_RETRY_DELAY		5
 #define I2C_RETRIES		5
@@ -57,15 +70,15 @@ struct {
 	unsigned int mask;
 } odr_table[] = {
 	{
-	3, PM_NORMAL | ODR1000}, {
-	10, PM_NORMAL | ODR400}, {
-	20, PM_NORMAL | ODR100}, {
-	100, PM_NORMAL | ODR50}, {
-	200, ODR1000 | ODR10}, {
-	500, ODR1000 | ODR5}, {
-	1000, ODR1000 | ODR2}, {
-	2000, ODR1000 | ODR1}, {
-0, ODR1000 | ODRHALF},};
+	3,	PM_NORMAL | ODR1000}, {
+	10,	PM_NORMAL | ODR400}, {
+	20,	PM_NORMAL | ODR100}, {
+	100,	PM_NORMAL | ODR50}, {
+	200,	ODR1000	| ODR10}, {
+	500,	ODR1000 | ODR5}, {
+	1000,	ODR1000 | ODR2}, {
+	2000,	ODR1000 | ODR1}, {
+	0,	ODR1000 | ODRHALF},};
 
 struct lis331dlh_data {
 	struct i2c_client *client;
@@ -296,9 +309,13 @@ static int lis331dlh_get_acceleration_data(struct lis331dlh_data *lis, int *xyz)
 	if (err < 0)
 		return err;
 
-	hw_d[0] = (s32) (((acc_data[1]) << 8) | acc_data[0]);
-	hw_d[1] = (s32) (((acc_data[3]) << 8) | acc_data[2]);
-	hw_d[2] = (s32) (((acc_data[5]) << 8) | acc_data[4]);
+	hw_d[0] = (int) (((acc_data[1]) << 8) | acc_data[0]);
+	hw_d[1] = (int) (((acc_data[3]) << 8) | acc_data[2]);
+	hw_d[2] = (int) (((acc_data[5]) << 8) | acc_data[4]);
+
+	hw_d[0] = (hw_d[0] & 0x8000) ? (hw_d[0] | 0xFFFF0000) : (hw_d[0]);
+	hw_d[1] = (hw_d[1] & 0x8000) ? (hw_d[1] | 0xFFFF0000) : (hw_d[1]);
+	hw_d[2] = (hw_d[2] & 0x8000) ? (hw_d[2] | 0xFFFF0000) : (hw_d[2]);
 
 	hw_d[0] >>= lis->shift_adj;
 	hw_d[1] >>= lis->shift_adj;
@@ -390,17 +407,17 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 		err = lis331dlh_update_odr(lis, lis->pdata->poll_interval);
 		/* TODO: if update fails poll is still set */
 		if (err < 0)
-			goto err;
+			return err;
 
 		break;
 
 	case LIS331DLH_IOCTL_SET_ENABLE:
-		if (copy_from_user(&buf, argp, 1))
+		if (copy_from_user(&interval, argp, sizeof(interval)))
 			return -EFAULT;
-		if (buf[0] > 1)
+		if (interval > 1)
 			return -EINVAL;
 
-		if (buf[0])
+		if (interval)
 			lis331dlh_enable(lis);
 		else
 			lis331dlh_disable(lis);
@@ -408,8 +425,8 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case LIS331DLH_IOCTL_GET_ENABLE:
-		buf[0] = atomic_read(&lis->enabled);
-		if (copy_to_user(argp, &buf, 1))
+		interval = atomic_read(&lis->enabled);
+		if (copy_to_user(argp, &interval, sizeof(interval)))
 			return -EINVAL;
 
 		break;
@@ -419,19 +436,15 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		err = lis331dlh_update_g_range(lis, arg);
 		if (err < 0)
-			goto err;
+			return err;
 
 		break;
 
 	default:
-		err = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
 	return 0;
-
-err:
-	return err;
 }
 
 static const struct file_operations lis331dlh_misc_fops = {
