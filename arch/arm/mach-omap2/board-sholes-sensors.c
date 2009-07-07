@@ -237,8 +237,6 @@ void __init sholes_sensors_init(void)
 	sholes_sfh7743_init();
 	sholes_hall_effect_init();
 	sholes_vibrator_init();
-	/* vibrate for 500ms at startup */
-	vibrator_omap_pwm_init(500);
 	sholes_akm8973_init();
 	platform_add_devices(sholes_sensors, ARRAY_SIZE(sholes_sensors));
 }
