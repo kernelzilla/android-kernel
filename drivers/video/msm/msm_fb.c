@@ -98,9 +98,6 @@ static int msm_fb_set_par(struct fb_info *info);
 static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			    boolean op_enable);
 static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd);
-#if defined(CONFIG_PM) || defined(CONFIG_HAS_EARLYSUSPEND)
-static int msm_fb_resume_sub(struct msm_fb_data_type *mfd);
-#endif
 static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg);
 static int msm_fb_mmap(struct fb_info *info, struct vm_area_struct * vma);
@@ -399,34 +396,7 @@ static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd)
 	return 0;
 }
 
-#if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
-static int msm_fb_resume(struct platform_device *pdev)
-{
-	/* This resume function is called when interrupt is enabled.
-	 */
-	int ret = 0;
-	struct msm_fb_data_type *mfd;
-
-	MSM_FB_DEBUG("msm_fb_resume\n");
-
-	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
-
-	if ((!mfd) || (mfd->key != MFD_KEY))
-		return 0;
-
-	acquire_console_sem();
-	ret = msm_fb_resume_sub(mfd);
-	pdev->dev.power.power_state = PMSG_ON;
-	fb_set_suspend(mfd->fbi, 1);
-	release_console_sem();
-
-	return ret;
-}
-#else
-#define msm_fb_resume NULL
-#endif
-
-#if defined(CONFIG_HAS_EARLYSUSPEND) || defined(CONFIG_PM)
+#ifdef CONFIG_PM
 static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 {
 	int ret = 0;
@@ -452,6 +422,33 @@ static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 
 	return ret;
 }
+#endif
+
+#if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
+static int msm_fb_resume(struct platform_device *pdev)
+{
+	/* This resume function is called when interrupt is enabled.
+	 */
+	int ret = 0;
+	struct msm_fb_data_type *mfd;
+
+	MSM_FB_DEBUG("msm_fb_resume\n");
+
+	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
+
+	if ((!mfd) || (mfd->key != MFD_KEY))
+		return 0;
+
+	acquire_console_sem();
+	ret = msm_fb_resume_sub(mfd);
+	pdev->dev.power.power_state = PMSG_ON;
+	fb_set_suspend(mfd->fbi, 1);
+	release_console_sem();
+
+	return ret;
+}
+#else
+#define msm_fb_resume NULL
 #endif
 
 static struct platform_driver msm_fb_driver = {

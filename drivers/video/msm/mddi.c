@@ -46,8 +46,10 @@ static int mddi_remove(struct platform_device *pdev);
 static int mddi_off(struct platform_device *pdev);
 static int mddi_on(struct platform_device *pdev);
 
+#ifdef CONFIG_PM
 static int mddi_suspend(struct platform_device *pdev, pm_message_t state);
 static int mddi_resume(struct platform_device *pdev);
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void mddi_early_suspend(struct early_suspend *h);
@@ -254,7 +256,6 @@ mddi_probe_err:
 
 static int mddi_pad_ctrl;
 static int mddi_power_locked;
-static int mddi_is_in_suspend;
 
 void mddi_disable(int lock)
 {
@@ -283,6 +284,9 @@ void mddi_disable(int lock)
 	if (mddi_pdata && mddi_pdata->mddi_power_save)
 		mddi_pdata->mddi_power_save(0);
 }
+
+#ifdef CONFIG_PM
+static int mddi_is_in_suspend;
 
 static int mddi_suspend(struct platform_device *pdev, pm_message_t state)
 {
@@ -317,6 +321,7 @@ static int mddi_resume(struct platform_device *pdev)
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void mddi_early_suspend(struct early_suspend *h)
