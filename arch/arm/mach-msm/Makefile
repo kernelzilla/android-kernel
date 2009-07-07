@@ -74,6 +74,9 @@ ifdef CONFIG_MSM_N_WAY_SMSM
 else
 	obj-$(CONFIG_PM) += pm.o
 endif
+ifndef CONFIG_PM
+	obj-y += no-pm.o
+endif
 obj-$(CONFIG_MSM_DMA_TEST) += dma_test.o
 obj-$(CONFIG_SURF_FFA_GPIO_KEYPAD) += keypad-surf-ffa.o
 

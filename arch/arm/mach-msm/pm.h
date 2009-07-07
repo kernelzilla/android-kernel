@@ -18,6 +18,8 @@
 #ifndef __ARCH_ARM_MACH_MSM_PM_H
 #define __ARCH_ARM_MACH_MSM_PM_H
 
+#include <linux/types.h>
+
 enum {
 	MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SUSPEND,
 	MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
