@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #endif
 #include <linux/io.h>
+#include <linux/wakelock.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -70,6 +71,16 @@ struct omap_uart_state {
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
 
+static struct wake_lock omap_serial_wakelock;
+static void omap_serial_pm(struct uart_port *port, unsigned int state,
+		    unsigned int old)
+{
+	if (old == 3)
+		wake_lock_timeout(&omap_serial_wakelock, 10*HZ);
+}
+
+
+
 static struct plat_serial8250_port serial_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(OMAP_UART1_BASE),
@@ -79,6 +90,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP24XX_BASE_BAUD * 16,
+		.pm		= omap_serial_pm,
 	}, {
 		.membase	= IO_ADDRESS(OMAP_UART2_BASE),
 		.mapbase	= OMAP_UART2_BASE,
@@ -87,6 +99,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP24XX_BASE_BAUD * 16,
+		.pm		= omap_serial_pm,
 	}, {
 		.membase	= IO_ADDRESS(OMAP_UART3_BASE),
 		.mapbase	= OMAP_UART3_BASE,
@@ -95,6 +108,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP24XX_BASE_BAUD * 16,
+		.pm		= omap_serial_pm,
 	},
 #define QUART_CLK (1843200)
 #ifdef CONFIG_MACH_OMAP_ZOOM2
@@ -656,6 +670,8 @@ static int __init omap_init(void)
 {
 	int ret;
 
+	wake_lock_init(&omap_serial_wakelock, WAKE_LOCK_SUSPEND,
+		       "omap-8250-serial");
 	ret = platform_device_register(&serial_device);
 
 #ifdef CONFIG_PM
