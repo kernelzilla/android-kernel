@@ -1274,7 +1274,7 @@ int mt9p012_update_clocks(struct v4l2_int_device *s, u32 xclk,
 			(sensor_settings[iframe].clk.op_pix_clk_div *
 			sensor_settings[iframe].clk.op_sys_clk_div);
 
-	dev_dbg(sensor->dev, "MT9P013: xclk=%u, pll_clk=%u, "
+	dev_dbg(sensor->dev, "MT9P012: xclk=%u, pll_clk=%u, "
 		  "vt_pix_clk=%u, op_pix_clk=%u\n", xclk, sensor->pll_clk,
 		  sensor->vt_pix_clk, sensor->op_pix_clk);
 
