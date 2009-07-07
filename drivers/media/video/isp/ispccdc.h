@@ -206,4 +206,6 @@ int omap34xx_isp_ccdc_config(void *userspace_add);
 
 void ispccdc_set_wenlog(u32 wenlog);
 
+void ispccdc_set_crop_offset(enum ispccdc_raw_fmt);
+
 #endif		/* OMAP_ISP_CCDC_H */

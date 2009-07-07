@@ -105,6 +105,11 @@ int isp_csi2_complexio_lanes_config(struct isp_csi2_lanes_cfg *reqcfg)
 			currlanes_u->data[i] = true;
 			update_complexio_cfg1 = true;
 		}
+		/* If the lane position is non zero then we can assume that
+		 * the initial lane state is on.
+		 */
+		if (currlanes->data[i].pos)
+			currlanes->data[i].state = ISP_CSI2_LANE_ON;
 	}
 
 	if (currlanes->clk.pos != reqcfg->clk.pos) {
@@ -151,9 +156,10 @@ int isp_csi2_complexio_lanes_update(bool force_update)
 									   1));
 			reg |= (currlanes->data[i].pol <<
 				ISPCSI2_COMPLEXIO_CFG1_DATA_POL_SHIFT(i + 1));
-			reg |= (currlanes->data[i].pos <<
+			if (currlanes->data[i].state == ISP_CSI2_LANE_ON)
+				reg |= (currlanes->data[i].pos <<
 				ISPCSI2_COMPLEXIO_CFG1_DATA_POSITION_SHIFT(i +
-									   1));
+					1));
 			currlanes_u->data[i] = false;
 		}
 	}
@@ -172,6 +178,29 @@ int isp_csi2_complexio_lanes_update(bool force_update)
 	update_complexio_cfg1 = false;
 	return 0;
 }
+
+/**
+ * isp_csi2_complexio_lanes_count - Turn data lanes on/off dynamically.
+ * @ cnt: Number of data lanes to enable.
+ *
+ * Always returns 0.
+ **/
+int isp_csi2_complexio_lanes_count(int cnt)
+{
+	struct isp_csi2_lanes_cfg *currlanes = &current_csi2_cfg.lanes;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		if (i < cnt)
+			currlanes->data[i].state = ISP_CSI2_LANE_ON;
+		else
+			currlanes->data[i].state = ISP_CSI2_LANE_OFF;
+	}
+
+	isp_csi2_complexio_lanes_update(true);
+	return 0;
+}
+EXPORT_SYMBOL(isp_csi2_complexio_lanes_count);
 
 /**
  * isp_csi2_complexio_lanes_get - Gets CSI2 ComplexIO lanes configuration.

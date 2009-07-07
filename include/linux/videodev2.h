@@ -886,6 +886,11 @@ enum v4l2_power_line_frequency {
 #define V4L2_CID_ROTATE                     	(V4L2_CID_BASE+32)
 #define V4L2_CID_BG_COLOR                       (V4L2_CID_BASE+33)
 #define V4L2_CID_LASTP1                         (V4L2_CID_BASE+34)
+enum v4l2_colorfx {
+	V4L2_COLORFX_NONE	= 0,
+	V4L2_COLORFX_BW		= 1,
+	V4L2_COLORFX_SEPIA	= 2,
+};
 
 /*  MPEG-class control IDs defined by V4L2 */
 #define V4L2_CID_MPEG_BASE 			(V4L2_CTRL_CLASS_MPEG | 0x900)
