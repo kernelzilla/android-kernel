@@ -1338,9 +1338,11 @@ void ts27010_mux_recv(struct ts27010_ringbuf *rbuf)
 			break;
 
 		case RECV_STATE_ADDR:
-			fcs = ts0710_crc_calc(fcs, c);
-			addr = c;
-			state = RECV_STATE_CONTROL;
+			if (c != TS0710_BASIC_FLAG) {
+				fcs = ts0710_crc_calc(fcs, c);
+				addr = c;
+				state = RECV_STATE_CONTROL;
+			}
 			break;
 
 		case RECV_STATE_CONTROL:
