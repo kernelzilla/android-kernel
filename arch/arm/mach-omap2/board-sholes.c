@@ -79,6 +79,7 @@
 #define SHOLES_BP_PWRON_GPIO		137
 #define SHOLES_AP_TO_BP_PSHOLD_GPIO	138
 #define SHOLES_AP_TO_BP_FLASH_EN_GPIO	157
+#define SHOLES_POWER_OFF_GPIO		176
 
 static struct omap_opp sholes_mpu_rate_table[] = {
 	{0, 0, 0},
@@ -772,6 +773,27 @@ static void __init sholes_vout_init(void)
 	platform_device_register(&sholes_vout_device);
 }
 
+static void sholes_pm_power_off(void)
+{
+	printk(KERN_INFO "sholes_pm_power_off start...\n");
+	local_irq_disable();
+
+	gpio_direction_output(SHOLES_POWER_OFF_GPIO, 0);
+
+	do {} while (1);
+
+	local_irq_enable();
+}
+
+static void __init sholes_power_off_init(void)
+{
+	gpio_request(SHOLES_POWER_OFF_GPIO, "sholes power off");
+	gpio_direction_output(SHOLES_POWER_OFF_GPIO, 1);
+	omap_cfg_reg(AB1_34XX_GPIO176_OUT);
+
+	pm_power_off = sholes_pm_power_off;
+}
+
 static void __init sholes_init(void)
 {
 	omap_board_config = sholes_config;
@@ -796,6 +818,7 @@ static void __init sholes_init(void)
 	sholes_bt_init();
 	sholes_hsmmc_init();
 	sholes_vout_init();
+	sholes_power_off_init();
 }
 
 static void __init sholes_map_io(void)
