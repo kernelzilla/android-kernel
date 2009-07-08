@@ -31,98 +31,80 @@
 
 #include <mach/display.h>
 
-
-
 #define LCD_XRES		800
 #define LCD_YRES		480
-#define LCD_PIXCLOCK_MAX	45871
+#define LCD_PIXCLOCK_MAX	21625
 
-#define BOARD_VERSION_DETECT_GPIO94    94
-#define LCD_PANEL_BACKLIGHT_GPIO 	(15 + OMAP_MAX_GPIO_LINES)
-#define LCD_PANEL_ENABLE_GPIO 		(7 + OMAP_MAX_GPIO_LINES)
-
-#define LCD_PANEL_QVGA_GPIO		56
-
-
-#define PM_RECEIVER             TWL4030_MODULE_PM_RECEIVER
-#define ENABLE_VAUX2_DEDICATED  0x09
-#define ENABLE_VAUX2_DEV_GRP    0x20
-#define ENABLE_VAUX3_DEDICATED	0x03
-#define ENABLE_VAUX3_DEV_GRP	0x20
-
-#define ENABLE_VPLL2_DEDICATED          0x05
-#define ENABLE_VPLL2_DEV_GRP            0xE0
-#define TWL4030_VPLL2_DEV_GRP           0x33
-#define TWL4030_VPLL2_DEDICATED         0x36
-
-#define t2_out(c, r, v) twl4030_i2c_write_u8(c, r, v)
+/*NEC NL8048HL11-01B  Manual
+ * defines HFB, HSW, HBP, VFP, VSW, VBP as shown below
+ */
 
 static struct omap_video_timings zoom2_panel_timings = {
-	.x_res		= LCD_XRES,
-	.y_res		= LCD_YRES,
-	.pixel_clock	= LCD_PIXCLOCK_MAX,
-	.hfp		= 7,
-	.hsw		= 1,
-	.hbp		= 5,
-	.vfp		= 3,
-	.vsw		= 1,
-	.vbp		= 8,
+	/* 800 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
+	.x_res          = LCD_XRES,
+	.y_res          = LCD_YRES,
+	.pixel_clock    = LCD_PIXCLOCK_MAX,
+	.hfp            = 6,
+	.hsw            = 1,
+	.hbp            = 4,
+	.vfp            = 3,
+	.vsw            = 1,
+	.vbp            = 4,
 };
 
-static int zoom2_panel_probe(struct omap_dss_device *display)
+static int zoom2_panel_probe(struct omap_dss_device *dssdev)
 {
-	display->panel.config = OMAP_DSS_LCD_TFT;
-	display->panel.timings = zoom2_panel_timings;
+	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
+				OMAP_DSS_LCD_IHS;
+	dssdev->panel.timings = zoom2_panel_timings;
+
 	return 0;
 }
 
-static void zoom2_panel_remove(struct omap_dss_device *display)
+static void zoom2_panel_remove(struct omap_dss_device *dssdev)
 {
 }
 
-static int zoom2_panel_enable(struct omap_dss_device *display)
+static int zoom2_panel_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
-
-	if (omap_rev() > OMAP3430_REV_ES1_0) {
-		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-				     ENABLE_VPLL2_DEDICATED,
-				     TWL4030_VPLL2_DEDICATED);
-		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
-				     ENABLE_VPLL2_DEV_GRP,
-				     TWL4030_VPLL2_DEV_GRP);
-	}
-
-	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 1);
-	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 1);
+	mdelay(4);
+	if (dssdev->platform_enable)
+		r = dssdev->platform_enable(dssdev);
 
 	return r;
 }
 
-static void zoom2_panel_disable(struct omap_dss_device *display)
+static void zoom2_panel_disable(struct omap_dss_device *dssdev)
 {
-	if (omap_rev() > OMAP3430_REV_ES1_0) {
-		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
-				     TWL4030_VPLL2_DEDICATED);
-		twl4030_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
-				     TWL4030_VPLL2_DEV_GRP);
-	}
-
-	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
-	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
+	if (dssdev->platform_disable)
+		dssdev->platform_disable(dssdev);
 	mdelay(4);
 }
 
+static int zoom2_panel_suspend(struct omap_dss_device *dssdev)
+{
+	zoom2_panel_disable(dssdev);
+	return 0;
+}
+
+static int zoom2_panel_resume(struct omap_dss_device *dssdev)
+{
+	return zoom2_panel_enable(dssdev);
+}
+
 static struct omap_dss_driver zoom2_driver = {
-	.probe		= zoom2_panel_probe,
-	.remove		= zoom2_panel_remove,
+	.probe          = zoom2_panel_probe,
+	.remove         = zoom2_panel_remove,
 
-	.enable		= zoom2_panel_enable,
-	.disable	= zoom2_panel_disable,
+	.enable         = zoom2_panel_enable,
+	.disable        = zoom2_panel_disable,
+	.suspend        = zoom2_panel_suspend,
+	.resume         = zoom2_panel_resume,
 
-	.driver = {
-		.name = "panel-zoom2",
-		.owner = THIS_MODULE,
+	.driver		= {
+		.name	= "zoom2_panel",
+		.owner 	= THIS_MODULE,
 	},
 };
 
@@ -234,45 +216,9 @@ static int init_nec_wvga_lcd(struct spi_device *spi)
 
 static int zoom2_spi_probe(struct spi_device *spi)
 {
-	unsigned char lcd_panel_reset_gpio;
-	omap_cfg_reg(AF21_34XX_GPIO8);
-	omap_cfg_reg(B23_34XX_GPIO167);
-	omap_cfg_reg(AB1_34XX_McSPI1_CS2);
-	omap_cfg_reg(A24_34XX_GPIO94);
-
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 32;
 	spi_setup(spi);
-
-	gpio_request(BOARD_VERSION_DETECT_GPIO94, "Zoom2 Board Detect");
-	gpio_direction_input(BOARD_VERSION_DETECT_GPIO94);
-
-	if (gpio_get_value(BOARD_VERSION_DETECT_GPIO94)) {
-		/* Pilot Zoom2 board
-		 * GPIO-55 is the LCD_RESET_GPIO
-		 */
-		omap_cfg_reg(T8_34XX_GPIO55);
-		lcd_panel_reset_gpio = 55;
-	} else {
-		/* Production Zoom2 Board:
-		 * GPIO-96 is the LCD_RESET_GPIO
-		 */
-		omap_cfg_reg(C25_34XX_GPIO96);
-		lcd_panel_reset_gpio = 96;
-	}
-
-	gpio_request(lcd_panel_reset_gpio, "lcd reset");
-	gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
-	gpio_request(LCD_PANEL_ENABLE_GPIO, "lcd panel");
-	gpio_request(LCD_PANEL_BACKLIGHT_GPIO, "lcd backlight");
-
-	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 0);
-	gpio_direction_output(lcd_panel_reset_gpio, 0);
-	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
-	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
-
-	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 1);
-	gpio_direction_output(lcd_panel_reset_gpio, 1);
 
 	init_nec_wvga_lcd(spi);
 

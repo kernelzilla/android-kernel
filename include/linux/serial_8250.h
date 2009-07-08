@@ -31,6 +31,8 @@ struct plat_serial8250_port {
 	unsigned int	type;		/* If UPF_FIXED_TYPE */
 	unsigned int	(*serial_in)(struct uart_port *, int);
 	void		(*serial_out)(struct uart_port *, int, int);
+	void		(*pm)(struct uart_port *port,
+			      unsigned int state, unsigned int old);
 };
 
 /*
