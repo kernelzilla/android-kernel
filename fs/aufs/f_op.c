@@ -23,7 +23,6 @@
 #include <linux/file.h>
 #include <linux/fs_stack.h>
 #include <linux/mm.h>
-#include <linux/poll.h>
 #include <linux/security.h>
 #include "aufs.h"
 
@@ -602,38 +601,6 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
 /* ---------------------------------------------------------------------- */
 
-static unsigned int aufs_poll(struct file *file, poll_table *wait)
-{
-	unsigned int mask;
-	int err;
-	struct file *h_file;
-	struct dentry *dentry;
-	struct super_block *sb;
-
-	/* We should pretend an error happened. */
-	mask = POLLERR /* | POLLIN | POLLOUT */;
-	dentry = file->f_dentry;
-	sb = dentry->d_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/0);
-	if (unlikely(err))
-		goto out;
-
-	/* it is not an error if h_file has no operation */
-	mask = DEFAULT_POLLMASK;
-	h_file = au_h_fptr(file, au_fbstart(file));
-	if (h_file->f_op && h_file->f_op->poll)
-		mask = h_file->f_op->poll(h_file, wait);
-
-	di_read_unlock(dentry, AuLock_IR);
-	fi_read_unlock(file);
-
- out:
-	si_read_unlock(sb);
-	AuTraceErr((int)mask);
-	return mask;
-}
-
 static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 			     int datasync)
 {
@@ -814,7 +781,6 @@ const struct file_operations aufs_file_fop = {
 	.write		= aufs_write,
 	.aio_read	= aufs_aio_read,
 	.aio_write	= aufs_aio_write,
-	.poll		= aufs_poll,
 	.mmap		= aufs_mmap,
 	.open		= aufs_open_nondir,
 	.flush		= aufs_flush,
