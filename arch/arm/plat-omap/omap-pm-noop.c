@@ -277,6 +277,8 @@ unsigned long omap_pm_cpu_get_freq(void)
 
 int omap_pm_get_dev_context_loss_count(struct device *dev)
 {
+	static u32 counter = 0;
+
 	if (!dev) {
 		WARN_ON(1);
 		return -EINVAL;
@@ -290,7 +292,10 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 	 * off counter.
 	 */
 
-	return 0;
+	/* For the noop case, we cannot know the off counter, so
+	 * return an increasing counter which will ensure that
+	 * context is always restored. */
+	return counter++;
 }
 
 

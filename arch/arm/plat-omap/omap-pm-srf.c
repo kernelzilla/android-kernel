@@ -276,6 +276,10 @@ EXPORT_SYMBOL(omap_pm_cpu_get_freq);
 
 int omap_pm_get_dev_context_loss_count(struct device *dev)
 {
+	struct platform_device *pdev;
+	struct omapdev *odev;
+	struct powerdomain *pwrdm;
+
 	if (!dev) {
 		WARN_ON(1);
 		return -EINVAL;
@@ -288,7 +292,14 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 	 * Map the device to the powerdomain.  Return the powerdomain
 	 * off counter.
 	 */
+	pdev = to_platform_device(dev);
+	odev = omapdev_find_pdev(pdev);
 
+	if (odev) {
+		pwrdm = omapdev_get_pwrdm(odev);
+		if (pwrdm)
+			return pwrdm->state_counter[0];
+	}
 	return 0;
 }
 
