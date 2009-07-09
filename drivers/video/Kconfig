@@ -9,6 +9,8 @@ source "drivers/char/agp/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
 
+source "drivers/gpu/pvr/Kconfig"
+
 config VGASTATE
        tristate
        default n

@@ -1,0 +1,23 @@
+config SGX
+	tristate "PowerVR SGX"
+	---help---
+	  Support for the PowerVR SGX 3D core.
+
+choice
+	prompt "PowerVR build type"
+	depends on SGX
+	default SGX_BUILD_RELEASE
+
+config SGX_BUILD_RELEASE
+       bool "RELEASE"
+
+config SGX_BUILD_DEBUG
+       bool "DEBUG"
+
+endchoice
+
+config PVR_OMAPLFB
+	tristate "PowerVR OMAP buffer class"
+	depends on SGX
+	---help---
+	  Support for the OMAP frame buffer in PowerVR.

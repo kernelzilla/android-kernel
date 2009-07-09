@@ -1,0 +1,358 @@
+/**********************************************************************
+ *
+ * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope it will be useful but, except 
+ * as otherwise stated in writing, without any warranty; without even the 
+ * implied warranty of merchantability or fitness for a particular purpose. 
+ * See the GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * The full GNU General Public License is included in this distribution in
+ * the file called "COPYING".
+ *
+ * Contact Information:
+ * Imagination Technologies Ltd. <gpl-support@imgtec.com>
+ * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+ *
+ ******************************************************************************/
+
+#include <linux/version.h>
+#include <linux/module.h>
+
+#include <linux/pci.h>
+#include <asm/uaccess.h>
+#include <linux/slab.h>
+#include <linux/errno.h>
+#include <linux/interrupt.h>
+
+#if defined(LDM_PLATFORM)
+#include <linux/platform_device.h>
+#endif 
+
+#include <asm/io.h>
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,26))
+#include <mach/display.h>
+#else 
+#include <asm/arch-omap/display.h>
+#endif 
+
+#include "img_defs.h"
+#include "servicesext.h"
+#include "kerneldisplay.h"
+#include "omaplfb.h"
+#include "pvrmodule.h"
+
+MODULE_SUPPORTED_DEVICE(DEVNAME);
+
+//FIXME: For now disable VSync interrupts until the support is there in the latest BSP with 2.6.29 kernel support
+#undef SYS_USING_INTERRUPTS
+
+/* MIKE_SHOLESPORT added to remove code for k29 port */
+#define MIKE_SHOLESPORT 1
+
+
+#define unref__ __attribute__ ((unused))
+
+void *OMAPLFBAllocKernelMem(unsigned long ulSize)
+{
+	return kmalloc(ulSize, GFP_KERNEL);
+}
+
+void OMAPLFBFreeKernelMem(void *pvMem)
+{
+	kfree(pvMem);
+}
+
+
+OMAP_ERROR OMAPLFBGetLibFuncAddr (char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable)
+{
+	if(strcmp("PVRGetDisplayClassJTable", szFunctionName) != 0)
+	{
+		return (OMAP_ERROR_INVALID_PARAMS);
+	}
+
+	
+	*ppfnFuncTable = PVRGetDisplayClassJTable;
+
+	return (OMAP_OK);
+}
+
+static void OMAPLFBVSyncWriteReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset, unsigned long ulValue)
+{
+	void *pvRegAddr = (void *)((char *)psSwapChain->pvRegs + ulOffset);
+
+	
+	writel(ulValue, pvRegAddr);
+}
+
+static unsigned long OMAPLFBVSyncReadReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset)
+{
+	return readl((char *)psSwapChain->pvRegs + ulOffset);
+}
+
+void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain)
+{
+#if defined(SYS_USING_INTERRUPTS)
+	
+	unsigned long ulInterruptEnable  = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_IRQENABLE);
+	ulInterruptEnable |= OMAPLCD_INTMASK_VSYNC;
+	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_IRQENABLE, ulInterruptEnable );
+#endif
+}
+
+void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain)
+{
+#if defined(SYS_USING_INTERRUPTS)
+	
+	unsigned long ulInterruptEnable = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_IRQENABLE);
+	ulInterruptEnable &= ~(OMAPLCD_INTMASK_VSYNC);
+	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_IRQENABLE, ulInterruptEnable);
+#endif
+}
+
+#if defined(SYS_USING_INTERRUPTS)
+static void
+OMAPLFBVSyncISR(void *arg, struct pt_regs unref__ *regs)
+{
+	OMAPLFB_SWAPCHAIN *psSwapChain= (OMAPLFB_SWAPCHAIN *)arg;
+	
+	(void) OMAPLFBVSyncIHandler(psSwapChain);
+}
+#endif
+
+OMAP_ERROR OMAPLFBInstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
+{
+#if defined(SYS_USING_INTERRUPTS)
+	OMAPLFBDisableVSyncInterrupt(psSwapChain);
+
+	if (omap2_disp_register_isr(OMAPLFBVSyncISR, psSwapChain,
+				    DISPC_IRQSTATUS_VSYNC))
+	{
+		printk(KERN_INFO DRIVER_PREFIX ": OMAPLFBInstallVSyncISR: Request OMAPLCD IRQ failed\n");
+		return (OMAP_ERROR_INIT_FAILURE);
+	}
+
+#endif
+	return (OMAP_OK);
+}
+
+
+OMAP_ERROR OMAPLFBUninstallVSyncISR (OMAPLFB_SWAPCHAIN *psSwapChain)
+{
+#if defined(SYS_USING_INTERRUPTS)
+	OMAPLFBDisableVSyncInterrupt(psSwapChain);
+
+	omap2_disp_unregister_isr(OMAPLFBVSyncISR);
+
+#endif
+	return (OMAP_OK);
+}
+
+void OMAPLFBEnableDisplayRegisterAccess(void)
+{
+//FIXME: Comment this out until the support is there in the latest BSP with 2.6.29 kernel support
+#if 0
+	omap2_disp_get_dss();
+#endif
+}
+
+void OMAPLFBDisableDisplayRegisterAccess(void)
+{
+//FIXME: Comment this out until the support is there in the latest BSP with 2.6.29 kernel support
+#if 0
+    omap2_disp_put_dss();
+#endif
+}
+
+#ifdef MIKE_SHOLESPORT
+static struct omap_overlay_manager* lcd_mgr = 0;
+static struct omap_overlay*         omap_gfxoverlay = 0;
+static struct omap_overlay_info     gfxoverlayinfo;
+
+void OMAPLFBSetDisplayInfo(void)
+{
+    struct omap_overlay*         overlayptr = 0;
+    unsigned int                 i = 0;
+    unsigned int                 numoverlays = 0;
+
+    // there is tv and lcd managers... we only care about lcd at this time.
+    lcd_mgr = omap_dss_get_overlay_manager(OMAP_DSS_OVL_MGR_LCD);
+    if(!lcd_mgr)
+    {
+        DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBSetDisplayInfo couldn't find lcd overlay manager\n"));
+        return;
+    }
+
+    numoverlays = omap_dss_get_num_overlays();
+    if( numoverlays == 0)
+    {
+        DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBSetDisplayInfo couldn't find any overlays\n"));
+        return;
+    }
+
+    for( i = 0; i < numoverlays; i++ )
+    {
+        overlayptr = omap_dss_get_overlay(i);
+        if( strncmp( overlayptr->name, "gfx", 3 ) == 0)
+        {
+            DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBSetDisplayInfo found GFX overlay\n"));
+            omap_gfxoverlay = overlayptr;
+            break;
+        }
+    }
+    if( omap_gfxoverlay == 0 )
+    {
+        DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBSetDisplayInfo GFX overlay no found\n"));
+        return;
+    }
+
+    omap_gfxoverlay->get_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
+
+}
+#endif /* MIKE_SHOLESPORT */
+
+
+
+void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
+{
+#ifdef MIKE_SHOLESPORT
+    printk("OMAPLFBFlip 0x%lx, 0x%lx, 0x%lx\n", lcd_mgr, lcd_mgr->device, omap_gfxoverlay);
+    if(lcd_mgr && lcd_mgr->device && omap_gfxoverlay)
+    {
+        gfxoverlayinfo.paddr = aPhyAddr;
+        omap_gfxoverlay->set_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
+        lcd_mgr->device->update( lcd_mgr->device, 0, 0, gfxoverlayinfo.width, gfxoverlayinfo.height );
+    }
+
+#else
+	unsigned long control;
+
+	
+	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_GFX_BA0, aPhyAddr);
+	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_GFX_BA1, aPhyAddr);
+
+	control = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_CONTROL);
+	control |= OMAP_CONTROL_GOLCD;
+	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_CONTROL, control);
+#endif /* MIKE_SHOLESPORT */
+}
+
+#if defined(LDM_PLATFORM)
+
+static OMAP_BOOL bDeviceSuspended;
+
+static void OMAPLFBCommonSuspend(void)
+{
+	if (bDeviceSuspended)
+	{
+		return;
+	}
+
+	OMAPLFBDriverSuspend();
+
+	bDeviceSuspended = OMAP_TRUE;
+}
+
+static int OMAPLFBDriverProbe_Entry(struct platform_device *pdev)
+{
+	dev_dbg(&pdev->dev, "probe\n");
+	if(OMAPLFBInit() != OMAP_OK)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": OMAPLFB_Init: OMAPLFBInit failed\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static int OMAPLFBDriverSuspend_Entry(struct platform_device unref__ *pDevice, pm_message_t unref__ state)
+{
+	DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBDriverSuspend_Entry\n"));
+
+	OMAPLFBCommonSuspend();
+
+	return 0;
+}
+
+static int OMAPLFBDriverResume_Entry(struct platform_device unref__ *pDevice)
+{
+	DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBDriverResume_Entry\n"));
+
+	OMAPLFBDriverResume();
+
+	bDeviceSuspended = OMAP_FALSE;
+
+	return 0;
+}
+
+static IMG_VOID OMAPLFBDriverShutdown_Entry(struct platform_device unref__ *pDevice)
+{
+	DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": OMAPLFBDriverShutdown_Entry\n"));
+
+	OMAPLFBCommonSuspend();
+}
+
+static int __exit OMAPLFBDriverRemove_Entry(struct platform_device *pdev)
+{
+	if(OMAPLFBDeinit() != OMAP_OK)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": OMAPLFB_Init: OMAPLFBDeinit failed\n");
+	}
+	return 0;
+}
+
+static struct platform_driver omaplfb_driver = {
+	.driver = {
+		.name		= DRVNAME,
+	},
+	.probe		= OMAPLFBDriverProbe_Entry,
+ 	.suspend	= OMAPLFBDriverSuspend_Entry,
+	.resume		= OMAPLFBDriverResume_Entry,
+	.shutdown	= OMAPLFBDriverShutdown_Entry,
+	.remove		= __exit_p(OMAPLFBDriverRemove_Entry),
+
+};
+#endif
+
+static int __init OMAPLFB_Init(void)
+{
+#if defined(LDM_PLATFORM)
+	int error;
+
+	if ((error = platform_driver_register(&omaplfb_driver)) != 0)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": OMAPLFB_Init: Unable to register platform driver (%d)\n", error);
+
+		return -ENODEV;
+	}
+
+#endif
+
+	return 0;
+
+}
+
+static IMG_VOID __exit OMAPLFB_Cleanup(IMG_VOID)
+{    
+#if defined (LDM_PLATFORM)
+	platform_driver_unregister(&omaplfb_driver);
+#endif
+
+	if(OMAPLFBDeinit() != OMAP_OK)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": OMAPLFB_Cleanup: OMAPLFBDeinit failed\n");
+	}
+}
+
+late_initcall(OMAPLFB_Init);
+module_exit(OMAPLFB_Cleanup);
+
