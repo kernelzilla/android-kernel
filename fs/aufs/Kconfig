@@ -83,6 +83,16 @@ config AUFS_BR_RAMFS
 	Unless you are going to use ramfs as an aufs branch fs without
 	switch_root or something, leave it N.
 
+config AUFS_BR_FUSE
+	bool "Fuse fs as an aufs branch"
+	depends on FUSE_FS
+	select AUFS_POLL
+	help
+	If you want to use fuse-based userspace filesystem as an aufs
+	branch fs, then enable this option.
+	It implements the internal poll(2) operation which is
+	implemented by fuse only (curretnly).
+
 config AUFS_DEBUG
 	bool "Debug aufs"
 	help
@@ -114,4 +124,9 @@ config AUFS_INO_T_64
 	Automatic configuration for internal use.
 	/* typedef unsigned long/int __kernel_ino_t */
 	/* alpha and s390x are int */
+
+config AUFS_POLL
+	bool
+	help
+	Automatic configuration for internal use.
 endif

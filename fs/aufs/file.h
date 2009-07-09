@@ -26,6 +26,7 @@
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
+#include <linux/poll.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"
 
@@ -71,6 +72,11 @@ struct au_pin;
 int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin);
 int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 			  int wlock);
+
+/* poll.c */
+#ifdef CONFIG_AUFS_POLL
+unsigned int aufs_poll(struct file *file, poll_table *wait);
+#endif
 
 /* f_op.c */
 extern const struct file_operations aufs_file_fop;

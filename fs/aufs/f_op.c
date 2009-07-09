@@ -802,6 +802,9 @@ const struct file_operations aufs_file_fop = {
 	.write		= aufs_write,
 	.aio_read	= aufs_aio_read,
 	.aio_write	= aufs_aio_write,
+#ifdef CONFIG_AUFS_POLL
+	.poll		= aufs_poll,
+#endif
 	.mmap		= aufs_mmap,
 	.open		= aufs_open_nondir,
 	.flush		= aufs_flush,
