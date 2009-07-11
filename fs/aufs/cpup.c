@@ -901,7 +901,7 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		h_inode = h_dentry->d_inode;
 		IMustLock(h_inode);
 		mutex_unlock(&h_inode->i_mutex);
-		mutex_lock_nested(&h_tmpdir->i_mutex, AuLsc_I_PARENT2);
+		mutex_lock_nested(&h_tmpdir->i_mutex, AuLsc_I_PARENT3);
 		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 	}
 
