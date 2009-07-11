@@ -37,6 +37,7 @@ enum {
 	AuLsc_I_Begin = I_MUTEX_QUOTA, /* 4 */
 	AuLsc_I_PARENT,		/* lower inode, parent first */
 	AuLsc_I_PARENT2,	/* copyup dirs */
+	AuLsc_I_PARENT3,	/* copyup wh */
 	AuLsc_I_CHILD,
 	AuLsc_I_CHILD2,
 	AuLsc_I_End
