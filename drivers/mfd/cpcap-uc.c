@@ -530,7 +530,7 @@ int cpcap_uc_stop(struct cpcap_device *cpcap, enum cpcap_macro macro)
 {
 	int retval = -EFAULT;
 
-	if ((macro > CPCAP_MACRO_USEROFF) &&
+	if ((macro > CPCAP_MACRO_4) &&
 	    (macro < CPCAP_MACRO__END)) {
 		retval = cpcap_regacc_write(cpcap, CPCAP_REG_MI2, 0,
 					    (1 << macro));
