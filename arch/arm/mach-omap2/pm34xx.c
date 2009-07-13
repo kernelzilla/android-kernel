@@ -275,7 +275,9 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 					       CM_FCLKEN);
 			cm_set_mod_reg_bits(wkst, OMAP3430ES2_USBHOST_MOD,
 					 CM_ICLKEN);
-			cm_set_mod_reg_bits(wkst, OMAP3430ES2_USBHOST_MOD,
+			cm_set_mod_reg_bits((1<<OMAP3430ES2_EN_USBHOST2_SHIFT)|
+					(1<<OMAP3430ES2_EN_USBHOST1_SHIFT),
+					OMAP3430ES2_USBHOST_MOD,
 					 CM_FCLKEN);
 			prm_write_mod_reg(wkst, OMAP3430ES2_USBHOST_MOD,
 					  PM_WKST);
@@ -748,6 +750,7 @@ static void __init prcm_setup_regs(void)
 	if (omap_rev() > OMAP3430_REV_ES1_0) {
 		prm_write_mod_reg(0, OMAP3430ES2_SGX_MOD, PM_WKDEP);
 		prm_write_mod_reg(0, OMAP3430ES2_USBHOST_MOD, PM_WKDEP);
+		prm_write_mod_reg(0, OMAP3430ES2_USBHOST_MOD, OMAP3430_PM_IVAGRPSEL);
 	} else
 		prm_write_mod_reg(0, GFX_MOD, PM_WKDEP);
 
