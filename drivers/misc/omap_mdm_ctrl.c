@@ -479,6 +479,7 @@ static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 		goto err_clear_gpio;
 	} else {
 		omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq_enabled = 1;
+		enable_irq_wake(omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq);
 	}
 
 	ret =
