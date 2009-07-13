@@ -142,7 +142,6 @@ msg_ind_blink(struct device *dev, struct device_attribute *attr,
 		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_4);
 	} else {
 		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_6);
-		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_4);
 	}
 
 	return 0;
