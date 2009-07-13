@@ -48,7 +48,7 @@ struct au_xino_file {
 /* members for writable branch only */
 enum {AuBrWh_BASE, AuBrWh_PLINK, AuBrWh_ORPH, AuBrWh_Last};
 struct au_wbr {
-	struct rw_semaphore	wbr_wh_rwsem;
+	struct au_rwsem		wbr_wh_rwsem;
 	struct dentry		*wbr_wh[AuBrWh_Last];
 	atomic_t 		wbr_wh_running;
 #define wbr_whbase		wbr_wh[AuBrWh_BASE]	/* whiteout base */

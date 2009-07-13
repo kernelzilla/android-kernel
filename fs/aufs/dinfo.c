@@ -42,8 +42,7 @@ int au_alloc_dinfo(struct dentry *dentry)
 
 	atomic_set(&dinfo->di_generation, au_sigen(sb));
 	/* smp_mb(); */ /* atomic_set */
-	init_rwsem(&dinfo->di_rwsem);
-	down_write_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
+	au_rw_init_wlock_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
 	dinfo->di_bstart = -1;
 	dinfo->di_bend = -1;
 	dinfo->di_bwh = -1;
@@ -133,7 +132,7 @@ static void do_ii_read_lock(struct inode *inode, unsigned int lsc)
 
 void di_read_lock(struct dentry *d, int flags, unsigned int lsc)
 {
-	down_read_nested(&au_di(d)->di_rwsem, lsc);
+	au_rw_read_lock_nested(&au_di(d)->di_rwsem, lsc);
 	if (d->d_inode) {
 		if (au_ftest_lock(flags, IW))
 			do_ii_write_lock(d->d_inode, lsc);
@@ -150,19 +149,19 @@ void di_read_unlock(struct dentry *d, int flags)
 		else if (au_ftest_lock(flags, IR))
 			ii_read_unlock(d->d_inode);
 	}
-	up_read(&au_di(d)->di_rwsem);
+	au_rw_read_unlock(&au_di(d)->di_rwsem);
 }
 
 void di_downgrade_lock(struct dentry *d, int flags)
 {
-	downgrade_write(&au_di(d)->di_rwsem);
+	au_rw_dgrade_lock(&au_di(d)->di_rwsem);
 	if (d->d_inode && au_ftest_lock(flags, IR))
 		ii_downgrade_lock(d->d_inode);
 }
 
 void di_write_lock(struct dentry *d, unsigned int lsc)
 {
-	down_write_nested(&au_di(d)->di_rwsem, lsc);
+	au_rw_write_lock_nested(&au_di(d)->di_rwsem, lsc);
 	if (d->d_inode)
 		do_ii_write_lock(d->d_inode, lsc);
 }
@@ -171,7 +170,7 @@ void di_write_unlock(struct dentry *d)
 {
 	if (d->d_inode)
 		ii_write_unlock(d->d_inode);
-	up_write(&au_di(d)->di_rwsem);
+	au_rw_write_unlock(&au_di(d)->di_rwsem);
 }
 
 void di_write_lock2_child(struct dentry *d1, struct dentry *d2, int isdir)
@@ -210,7 +209,7 @@ void di_write_unlock2(struct dentry *d1, struct dentry *d2)
 {
 	di_write_unlock(d1);
 	if (d1->d_inode == d2->d_inode)
-		up_write(&au_di(d2)->di_rwsem);
+		au_rw_write_unlock(&au_di(d2)->di_rwsem);
 	else
 		di_write_unlock(d2);
 }

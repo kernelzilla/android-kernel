@@ -55,7 +55,7 @@ struct au_iinfo {
 	atomic_t		ii_generation;
 	struct super_block	*ii_hsb1;	/* no get/put */
 
-	struct rw_semaphore	ii_rwsem;
+	struct au_rwsem		ii_rwsem;
 	aufs_bindex_t		ii_bstart, ii_bend;
 	__u32			ii_higen;
 	struct au_hinode	*ii_hinode;
@@ -232,13 +232,13 @@ enum {
 #define AuReadLockFunc(name, lsc) \
 static inline void ii_read_lock_##name(struct inode *i) \
 { \
-	down_read_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
+	au_rw_read_lock_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
 }
 
 #define AuWriteLockFunc(name, lsc) \
 static inline void ii_write_lock_##name(struct inode *i) \
 { \
-	down_write_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
+	au_rw_write_lock_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
 }
 
 #define AuRWLockFuncs(name, lsc) \

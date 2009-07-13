@@ -39,7 +39,7 @@ struct au_vdir;
 struct au_finfo {
 	atomic_t		fi_generation;
 
-	struct rw_semaphore	fi_rwsem;
+	struct au_rwsem		fi_rwsem;
 	struct au_hfile		*fi_hfile;
 	aufs_bindex_t		fi_bstart, fi_bend;
 

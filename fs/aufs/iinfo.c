@@ -178,7 +178,7 @@ int au_iinfo_init(struct inode *inode)
 
 		atomic_set(&iinfo->ii_generation, au_sigen(sb));
 		/* smp_mb(); */ /* atomic_set */
-		init_rwsem(&iinfo->ii_rwsem);
+		au_rw_init(&iinfo->ii_rwsem);
 		iinfo->ii_bstart = -1;
 		iinfo->ii_bend = -1;
 		iinfo->ii_vdir = NULL;
@@ -267,5 +267,5 @@ void au_iinfo_fin(struct inode *inode)
 	}
 
 	kfree(iinfo->ii_hinode);
-	au_rwsem_destroy(&iinfo->ii_rwsem);
+	AuRwDestroy(&iinfo->ii_rwsem);
 }

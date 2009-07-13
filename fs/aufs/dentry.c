@@ -859,7 +859,7 @@ static void aufs_d_release(struct dentry *dentry)
 		}
 	}
 	kfree(dinfo->di_hdentry);
-	au_rwsem_destroy(&dinfo->di_rwsem);
+	AuRwDestroy(&dinfo->di_rwsem);
 	au_cache_free_dinfo(dinfo);
 	au_hin_di_reinit(dentry);
 }

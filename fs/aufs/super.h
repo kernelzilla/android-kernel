@@ -75,7 +75,7 @@ struct au_sbinfo {
 	/* nowait tasks in the system-wide workqueue */
 	struct au_nowait_tasks	si_nowait;
 
-	struct rw_semaphore	si_rwsem;
+	struct au_rwsem		si_rwsem;
 
 	/* branch management */
 	unsigned int		si_generation;
