@@ -137,6 +137,8 @@ AuRWLockFuncs(parent3, PARENT3);
 #undef AuRWLockFuncs
 
 #define DiMustNoWaiters(d)	AuRwMustNoWaiters(&au_di(d)->di_rwsem)
+#define DiMustAnyLock(d)	AuRwMustAnyLock(&au_di(d)->di_rwsem)
+#define DiMustWriteLock(d)	AuRwMustWriteLock(&au_di(d)->di_rwsem)
 
 /* ---------------------------------------------------------------------- */
 

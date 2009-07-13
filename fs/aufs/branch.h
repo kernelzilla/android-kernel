@@ -211,5 +211,9 @@ static inline int au_sbr_whable(struct super_block *sb, aufs_bindex_t bindex)
  */
 AuSimpleRwsemFuncs(wbr_wh, struct au_wbr *wbr, &wbr->wbr_wh_rwsem);
 
+#define WbrWhMustNoWaiters(wbr)	AuRwMustNoWaiters(&wbr->wbr_wh_rwsem)
+#define WbrWhMustAnyLock(wbr)	AuRwMustAnyLock(&wbr->wbr_wh_rwsem)
+#define WbrWhMustWriteLock(wbr)	AuRwMustWriteLock(&wbr->wbr_wh_rwsem)
+
 #endif /* __KERNEL__ */
 #endif /* __AUFS_BRANCH_H__ */

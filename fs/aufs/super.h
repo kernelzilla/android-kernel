@@ -295,6 +295,10 @@ AuSimpleLockRwsemFuncs(si_noflush, struct super_block *sb,
 		       &au_sbi(sb)->si_rwsem);
 AuSimpleUnlockRwsemFuncs(si, struct super_block *sb, &au_sbi(sb)->si_rwsem);
 
+#define SiMustNoWaiters(sb)	AuRwMustNoWaiters(&au_sbi(sb)->si_rwsem)
+#define SiMustAnyLock(sb)	AuRwMustAnyLock(&au_sbi(sb)->si_rwsem)
+#define SiMustWriteLock(sb)	AuRwMustWriteLock(&au_sbi(sb)->si_rwsem)
+
 static inline void si_read_lock(struct super_block *sb, int flags)
 {
 	if (au_ftest_lock(flags, FLUSH))

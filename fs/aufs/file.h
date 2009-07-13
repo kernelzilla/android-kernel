@@ -104,6 +104,8 @@ static inline struct au_finfo *au_fi(struct file *file)
 AuSimpleRwsemFuncs(fi, struct file *f, &au_fi(f)->fi_rwsem);
 
 #define FiMustNoWaiters(f)	AuRwMustNoWaiters(&au_fi(f)->fi_rwsem)
+#define FiMustAnyLock(f)	AuRwMustAnyLock(&au_fi(f)->fi_rwsem)
+#define FiMustWriteLock(f)	AuRwMustWriteLock(&au_fi(f)->fi_rwsem)
 
 /* ---------------------------------------------------------------------- */
 

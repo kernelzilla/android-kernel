@@ -263,6 +263,8 @@ AuRWLockFuncs(new_child, NEW_CHILD);
 AuSimpleUnlockRwsemFuncs(ii, struct inode *i, &au_ii(i)->ii_rwsem);
 
 #define IiMustNoWaiters(i)	AuRwMustNoWaiters(&au_ii(i)->ii_rwsem)
+#define IiMustAnyLock(i)	AuRwMustAnyLock(&au_ii(i)->ii_rwsem)
+#define IiMustWriteLock(i)	AuRwMustWriteLock(&au_ii(i)->ii_rwsem)
 
 /* ---------------------------------------------------------------------- */
 
