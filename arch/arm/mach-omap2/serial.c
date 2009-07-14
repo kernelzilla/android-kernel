@@ -16,7 +16,6 @@
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/serial_8250.h>
 #include <linux/serial_reg.h>
 #include <linux/clk.h>
 #ifdef CONFIG_SERIAL_OMAP
@@ -30,6 +29,8 @@
 #include <mach/clock.h>
 #include <mach/control.h>
 #include <mach/gpio.h>
+
+#include <asm/mach/serial_omap.h>
 
 #include "prm.h"
 #include "pm.h"
@@ -52,7 +53,7 @@ struct omap_uart_state {
 	struct clk *fck;
 	int clocked;
 
-	struct plat_serial8250_port *p;
+        struct plat_serialomap_port *p;
 	struct list_head node;
 
 #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
@@ -81,54 +82,28 @@ static void omap_serial_pm(struct uart_port *port, unsigned int state,
 
 
 
-static struct plat_serial8250_port serial_platform_data[] = {
+#ifdef CONFIG_SERIAL_OMAP
+static struct plat_serialomap_port serial_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(OMAP_UART1_BASE),
-		.mapbase	= OMAP_UART1_BASE,
 		.irq		= 72,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
 		.regshift	= 2,
-		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-		.pm		= omap_serial_pm,
-	}, {
+		.flags		= UPF_BOOT_AUTOCONF,
+	},
+	{
 		.membase	= IO_ADDRESS(OMAP_UART2_BASE),
-		.mapbase	= OMAP_UART2_BASE,
 		.irq		= 73,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
 		.regshift	= 2,
-		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-		.pm		= omap_serial_pm,
-	}, {
+		.flags		= UPF_BOOT_AUTOCONF,
+	},
+	{
 		.membase	= IO_ADDRESS(OMAP_UART3_BASE),
-		.mapbase	= OMAP_UART3_BASE,
 		.irq		= 74,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
 		.regshift	= 2,
-		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-		.pm		= omap_serial_pm,
+		.flags		= UPF_BOOT_AUTOCONF,
 	},
-#define QUART_CLK (1843200)
-#ifdef CONFIG_MACH_OMAP_ZOOM2
-	{
-		.membase        = 0,
-		.mapbase        = 0x10000000,
-		.irq            = OMAP_GPIO_IRQ(102),
-		.flags          = UPF_BOOT_AUTOCONF|UPF_IOREMAP|UPF_SHARE_IRQ|
-				  UPF_TRIGGER_HIGH,
-		.iotype         = UPIO_MEM,
-		.regshift       = 1,
-		.uartclk        = QUART_CLK,
-	},
-#endif
-	{
-		.flags		= 0
-	}
 };
 
-#ifdef CONFIG_SERIAL_OMAP
 static struct resource omap2_uart1_resources[] = {
 	{
 		.start		= OMAP_UART1_BASE,
@@ -181,18 +156,21 @@ static struct platform_device uart1_device = {
 	.id			= 1,
 	.num_resources		= ARRAY_SIZE(omap2_uart1_resources),
 	.resource		= omap2_uart1_resources,
+	.dev.platform_data	= &serial_platform_data[0],
 };
 static struct platform_device uart2_device = {
 	.name			= "omap-uart",
 	.id			= 2,
 	.num_resources		= ARRAY_SIZE(omap2_uart2_resources),
 	.resource		= omap2_uart2_resources,
+	.dev.platform_data	= &serial_platform_data[1],
 };
 static struct platform_device uart3_device = {
 	.name			= "omap-uart",
 	.id			= 3,
 	.num_resources		= ARRAY_SIZE(omap2_uart3_resources),
 	.resource		= omap2_uart3_resources,
+	.dev.platform_data	= &serial_platform_data[2],
 };
 
 #ifdef CONFIG_MACH_OMAP_ZOOM2
@@ -215,14 +193,14 @@ static struct platform_device *uart_devices[] = {
 };
 #endif
 
-static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
+static inline unsigned int serial_read_reg(struct plat_serialomap_port *up,
 					   int offset)
 {
 	offset <<= up->regshift;
 	return (unsigned int)__raw_readb(up->membase + offset);
 }
 
-static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
+static inline void serial_write_reg(struct plat_serialomap_port *p, int offset,
 				    int value)
 {
 	offset <<= p->regshift;
@@ -236,7 +214,7 @@ static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
  */
 static inline void __init omap_uart_reset(struct omap_uart_state *uart)
 {
-	struct plat_serial8250_port *p = uart->p;
+	struct plat_serialomap_port *p = uart->p;
 
 	serial_write_reg(p, UART_OMAP_MDR1, 0x07);
 	serial_write_reg(p, UART_OMAP_SCR, 0x08);
@@ -260,7 +238,7 @@ static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
 static void omap_uart_save_context(struct omap_uart_state *uart)
 {
 	u16 lcr = 0;
-	struct plat_serial8250_port *p = uart->p;
+	struct plat_serialomap_port *p = uart->p;
 
 	if (!enable_off_mode)
 		return;
@@ -281,7 +259,7 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 static void omap_uart_restore_context(struct omap_uart_state *uart)
 {
 	u16 efr = 0;
-	struct plat_serial8250_port *p = uart->p;
+	struct plat_serialomap_port *p = uart->p;
 
 	if (!enable_off_mode)
 		return;
@@ -319,7 +297,7 @@ static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
 static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
 					  int enable)
 {
-	struct plat_serial8250_port *p = uart->p;
+	struct plat_serialomap_port *p = uart->p;
 	u16 sysc;
 
 	sysc = serial_read_reg(p, UART_OMAP_SYSC) & 0x7;
@@ -467,7 +445,7 @@ static u32 sleep_timeout = DEFAULT_TIMEOUT;
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
 	u32 v;
-	struct plat_serial8250_port *p = uart->p;
+	struct plat_serialomap_port *p = uart->p;
 	int ret;
 
 	uart->can_sleep = 0;
@@ -620,12 +598,11 @@ void __init omap_serial_init(void)
 		return;
 
 	for (i = 0; i < OMAP_MAX_NR_PORTS; i++) {
-		struct plat_serial8250_port *p = serial_platform_data + i;
+		struct plat_serialomap_port *p = serial_platform_data + i;
 		struct omap_uart_state *uart = &omap_uart[i];
 
 		if (!(info->enabled_uarts & (1 << i))) {
-			p->membase = NULL;
-			p->mapbase = 0;
+			p->disabled = 1;
 			continue;
 		}
 
@@ -656,33 +633,6 @@ void __init omap_serial_init(void)
 		omap_uart_idle_init(uart);
 	}
 }
-
-#ifdef CONFIG_SERIAL_8250
-static struct platform_device serial_device = {
-	.name			= "serial8250",
-	.id			= PLAT8250_DEV_PLATFORM,
-	.dev			= {
-		.platform_data	= serial_platform_data,
-	},
-};
-
-static int __init omap_init(void)
-{
-	int ret;
-
-	wake_lock_init(&omap_serial_wakelock, WAKE_LOCK_SUSPEND,
-		       "omap-8250-serial");
-	ret = platform_device_register(&serial_device);
-
-#ifdef CONFIG_PM
-	if (!ret)
-		ret = sysfs_create_file(&serial_device.dev.kobj,
-					&sleep_timeout_attr.attr);
-#endif
-	return ret;
-}
-arch_initcall(omap_init);
-#endif
 
 #ifdef CONFIG_SERIAL_OMAP
 static int __init omap_hs_init(void)
