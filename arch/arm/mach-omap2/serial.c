@@ -640,6 +640,18 @@ static int __init omap_hs_init(void)
 	int ret = 0;
 
 	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
+	if (ret) {
+		printk(KERN_ERR "Error adding uart devices (%d)\n", ret);
+		return ret;
+	}
+	ret = sysfs_create_file(&uart1_device.dev.kobj,
+				&sleep_timeout_attr.attr);
+	if (ret) {
+		printk(KERN_ERR
+		       "Error creating uart sleep_timeout sysfs file (%d)\n",
+			ret);
+		return ret;
+	}
 	return ret;
 }
 arch_initcall(omap_hs_init);
