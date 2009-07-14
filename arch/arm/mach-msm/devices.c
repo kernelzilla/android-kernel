@@ -558,6 +558,41 @@ struct platform_device msm_device_touchscreen = {
 	.resource = resources_tssc,
 };
 
+#if defined(CONFIG_ARCH_QSD8X50)
+static struct resource resources_spi[] = {
+	{
+		.start	= MSM_SPI_PHYS,
+		.end	= MSM_SPI_PHYS + MSM_SPI_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_SPI_INPUT,
+		.end	= INT_SPI_INPUT,
+		.name	= "irq_in",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= INT_SPI_OUTPUT,
+		.end	= INT_SPI_OUTPUT,
+		.name	= "irq_out",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= INT_SPI_ERROR,
+		.end	= INT_SPI_ERROR,
+		.name	= "irq_err",
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_spi = {
+	.name		= "msm_spi",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(resources_spi),
+	.resource	= resources_spi,
+};
+#endif
+
 #define CLOCK(clk_name, clk_id, clk_dev, clk_flags, clk_arch) {	\
 	.name = clk_name, \
 	.id = clk_id, \
