@@ -460,8 +460,10 @@ static int au_wbr_create_mfsrr(struct dentry *dentry, int isdir)
 	err = au_wbr_create_mfs(dentry, isdir);
 	if (err >= 0) {
 		mfs = &au_sbi(dentry->d_sb)->si_wbr_mfs;
+		mutex_lock(&mfs->mfs_lock);
 		if (mfs->mfsrr_bytes < mfs->mfsrr_watermark)
 			err = au_wbr_create_rr(dentry, isdir);
+		mutex_unlock(&mfs->mfs_lock);
 	}
 
 	AuDbg("b%d\n", err);
