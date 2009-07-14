@@ -296,14 +296,11 @@ static void xino_do_trunc(void *_args)
 	ii_read_lock_parent(dir);
 	bindex = au_br_index(sb, br->br_id);
 	err = au_xino_trunc(sb, bindex);
-	if (unlikely(err))
-		goto out;
-
-	if (br->br_xino.xi_file->f_dentry->d_inode->i_blocks
+	if (!err
+	    && br->br_xino.xi_file->f_dentry->d_inode->i_blocks
 	    >= br->br_xino_upper)
 		br->br_xino_upper += AUFS_XINO_TRUNC_STEP;
 
- out:
 	ii_read_unlock(dir);
 	if (unlikely(err))
 		AuWarn("err b%d, (%d)\n", bindex, err);
