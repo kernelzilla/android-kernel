@@ -792,6 +792,8 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	struct dentry *h_d_dst, *h_d_start;
 
 	dinfo = au_di(dentry);
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	bstart = dinfo->di_bstart;
 	h_d_dst = dinfo->di_hdentry[0 + bdst].hd_dentry;
 	dinfo->di_bstart = bdst;

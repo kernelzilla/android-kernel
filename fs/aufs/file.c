@@ -192,6 +192,8 @@ static int au_reopen_wh(struct file *file, aufs_bindex_t btgt,
 	struct dentry *h_dentry;
 
 	dinfo = au_di(file->f_dentry);
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	bstart = dinfo->di_bstart;
 	dinfo->di_bstart = btgt;
 	h_dentry = dinfo->di_hdentry[0 + btgt].hd_dentry;

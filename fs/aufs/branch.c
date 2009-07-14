@@ -368,6 +368,8 @@ static void au_br_do_add_hdp(struct au_dinfo *dinfo, aufs_bindex_t bindex,
 {
 	struct au_hdentry *hdp;
 
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	hdp = dinfo->di_hdentry + bindex;
 	memmove(hdp + 1, hdp, sizeof(*hdp) * amount);
 	au_h_dentry_init(hdp);
@@ -634,6 +636,8 @@ static void au_br_do_del_hdp(struct au_dinfo *dinfo, const aufs_bindex_t bindex,
 			     const aufs_bindex_t bend)
 {
 	struct au_hdentry *hdp, *p;
+
+	AuRwMustWriteLock(&dinfo->di_rwsem);
 
 	hdp = dinfo->di_hdentry + bindex;
 	if (bindex < bend)
