@@ -726,6 +726,8 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 	wbr = br->br_wbr;
 	do_wh = wbr && (wbr->wbr_whbase || wbr->wbr_plink || wbr->wbr_orph);
 	if (do_wh) {
+		/* instead of WbrWhMustWriteLock(wbr) */
+		SiMustWriteLock(sb);
 		for (i = 0; i < AuBrWh_Last; i++) {
 			dput(wbr->wbr_wh[i]);
 			wbr->wbr_wh[i] = NULL;

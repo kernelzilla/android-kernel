@@ -385,6 +385,8 @@ static int au_wh_init_rw(struct dentry *h_root, struct au_wbr *wbr,
 	int err;
 	struct inode *h_dir;
 
+	WbrWhMustWriteLock(wbr);
+
 	err = test_linkable(h_root);
 	if (unlikely(err)) {
 		err = 1;
@@ -474,6 +476,8 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		}
 	};
 
+	if (wbr)
+		WbrWhMustWriteLock(wbr);
 
 	h_dir = h_root->d_inode;
 	for (i = 0; i < AuBrWh_Last; i++) {
