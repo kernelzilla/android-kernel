@@ -383,6 +383,8 @@ static void au_br_do_add_hip(struct au_iinfo *iinfo, aufs_bindex_t bindex,
 {
 	struct au_hinode *hip;
 
+	AuRwMustWriteLock(&iinfo->ii_rwsem);
+
 	hip = iinfo->ii_hinode + bindex;
 	memmove(hip + 1, hip, sizeof(*hip) * amount);
 	hip->hi_inode = NULL;
@@ -654,6 +656,8 @@ static void au_br_do_del_hip(struct au_iinfo *iinfo, const aufs_bindex_t bindex,
 			     const aufs_bindex_t bend)
 {
 	struct au_hinode *hip, *p;
+
+	AuRwMustWriteLock(&iinfo->ii_rwsem);
 
 	hip = iinfo->ii_hinode + bindex;
 	if (bindex < bend)

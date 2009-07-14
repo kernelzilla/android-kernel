@@ -26,6 +26,8 @@ struct inode *au_h_iptr(struct inode *inode, aufs_bindex_t bindex)
 {
 	struct inode *h_inode;
 
+	IiMustAnyLock(inode);
+
 	h_inode = au_ii(inode)->ii_hinode[0 + bindex].hi_inode;
 	AuDebugOn(h_inode && atomic_read(&h_inode->i_count) <= 0);
 	return h_inode;
@@ -36,6 +38,8 @@ void au_set_ibstart(struct inode *inode, aufs_bindex_t bindex)
 {
 	struct au_iinfo *iinfo = au_ii(inode);
 	struct inode *h_inode;
+
+	IiMustWriteLock(inode);
 
 	iinfo->ii_bstart = bindex;
 	h_inode = iinfo->ii_hinode[bindex + 0].hi_inode;
@@ -69,6 +73,8 @@ void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
 	struct au_hinode *hinode;
 	struct inode *hi;
 	struct au_iinfo *iinfo = au_ii(inode);
+
+	IiMustWriteLock(inode);
 
 	hinode = iinfo->ii_hinode + bindex;
 	hi = hinode->hi_inode;
@@ -108,6 +114,8 @@ void au_set_hi_wh(struct inode *inode, aufs_bindex_t bindex,
 {
 	struct au_hinode *hinode;
 
+	IiMustWriteLock(inode);
+
 	hinode = au_ii(inode)->ii_hinode + bindex;
 	AuDebugOn(hinode->hi_whdentry);
 	hinode->hi_whdentry = h_wh;
@@ -127,6 +135,8 @@ void au_update_brange(struct inode *inode, int do_put_zero)
 	iinfo = au_ii(inode);
 	if (!iinfo || iinfo->ii_bstart < 0)
 		return;
+
+	IiMustWriteLock(inode);
 
 	if (do_put_zero) {
 		aufs_bindex_t bindex;
@@ -191,6 +201,8 @@ int au_ii_realloc(struct au_iinfo *iinfo, int nbr)
 {
 	int err, sz;
 	struct au_hinode *hip;
+
+	AuRwMustWriteLock(&iinfo->ii_rwsem);
 
 	err = -ENOMEM;
 	sz = sizeof(*hip) * (iinfo->ii_bend + 1);

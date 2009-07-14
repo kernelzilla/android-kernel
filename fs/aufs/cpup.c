@@ -92,6 +92,8 @@ void au_cpup_igen(struct inode *inode, struct inode *h_inode)
 {
 	struct au_iinfo *iinfo = au_ii(inode);
 
+	IiMustWriteLock(inode);
+
 	iinfo->ii_higen = h_inode->i_generation;
 	iinfo->ii_hsb1 = h_inode->i_sb;
 }

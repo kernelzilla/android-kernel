@@ -49,6 +49,8 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 	struct super_block *sb;
 	struct au_iinfo *iinfo;
 
+	IiMustWriteLock(inode);
+
 	update = 0;
 	sb = inode->i_sb;
 	iinfo = au_ii(inode);
@@ -163,6 +165,8 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	struct dentry *h_dentry;
 	struct inode *h_inode;
 	struct au_iinfo *iinfo;
+
+	IiMustWriteLock(inode);
 
 	err = 0;
 	isdir = 0;
