@@ -45,6 +45,7 @@
 #include <../arch/arm/mach-omap2/ti-compat.h>
 #include <../arch/arm/mach-omap2/prcm-regs.h>
 #endif
+#include <asm/mach/serial_omap.h>
 
 unsigned long isr8250_activity;
 
@@ -556,7 +557,7 @@ static int serial_omap_startup(struct uart_port *port)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	unsigned long flags;
-	int irq_flags = 0;
+	int irq_flags = port->flags & UPF_SHARE_IRQ ? IRQF_SHARED : 0;
 	int retval;
 
 	/* Zoom2 has GPIO_102 connected to Serial device:
@@ -569,6 +570,8 @@ static int serial_omap_startup(struct uart_port *port)
 	 */
 	retval = request_irq(up->port.irq, serial_omap_irq, irq_flags, up->name, up);
 	if (retval) {
+		printk(KERN_ERR "%s: Failed to register IRQ %d for %s (%d)\n",
+		       __func__, up->port.irq, up->name, retval);
 		return retval;
 	}
 
@@ -1240,10 +1243,21 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 
 static int serial_omap_probe(struct platform_device *pdev)
 {
+	struct plat_serialomap_port *pdata = pdev->dev.platform_data;
 	struct uart_omap_port	*up;
 	struct resource		*mem, *irq;
 	int ret = -ENOSPC;
 	char str[7];
+
+	if (!pdata) {
+		dev_err(&pdev->dev, "no platform data?\n");
+		return -ENODEV;
+	}
+	
+	if (pdata->disabled) {
+		dev_err(&pdev->dev, "device disabled\n");
+		return -ENODEV;
+	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -1287,7 +1301,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 		up->port.regshift = 1;
 	} else {
 		up->port.membase = (void *) io_p2v(mem->start);
-		up->port.flags = UPF_BOOT_AUTOCONF;
+		up->port.flags = pdata->flags;
 		up->port.uartclk = 48000000;
 		up->port.regshift = 2;
 	}
@@ -1362,7 +1376,7 @@ static int serial_omap_remove(struct platform_device *dev)
 
 	platform_set_drvdata(dev, NULL);
 	if (up) {
-		uart_remove_one_port(&serial_omap_reg, &sport->port);
+		uart_remove_one_port(&serial_omap_reg, &up->port);
 		kfree(up);
 	}
 	return 0;
