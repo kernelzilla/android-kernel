@@ -69,6 +69,8 @@ static int do_open_nondir(struct file *file, int flags)
 	struct dentry *dentry;
 	struct au_finfo *finfo;
 
+	FiMustWriteLock(file);
+
 	err = 0;
 	dentry = file->f_dentry;
 	finfo = au_fi(file);
@@ -492,6 +494,8 @@ static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
 {
 	int err;
 	struct vm_operations_struct *h_ops;
+
+	AuRwMustAnyLock(&finfo->fi_rwsem);
 
 	err = 0;
 	h_ops = finfo->fi_h_vm_ops;

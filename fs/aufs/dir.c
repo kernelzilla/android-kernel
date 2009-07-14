@@ -95,6 +95,8 @@ static int do_open_dir(struct file *file, int flags)
 	struct dentry *dentry, *h_dentry;
 	struct file *h_file;
 
+	FiMustWriteLock(file);
+
 	err = 0;
 	dentry = file->f_dentry;
 	au_set_fvdir_cache(file, NULL);

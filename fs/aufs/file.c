@@ -314,6 +314,8 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	struct inode *inode;
 	struct super_block *sb;
 
+	FiMustWriteLock(file);
+
 	err = 0;
 	finfo = au_fi(file);
 	dentry = file->f_dentry;
@@ -370,6 +372,8 @@ static void au_do_refresh_file(struct file *file)
 	struct au_hfile *p, tmp, *q;
 	struct au_finfo *finfo;
 	struct super_block *sb;
+
+	FiMustWriteLock(file);
 
 	sb = file->f_dentry->d_sb;
 	finfo = au_fi(file);

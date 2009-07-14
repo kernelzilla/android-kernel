@@ -112,37 +112,44 @@ AuSimpleRwsemFuncs(fi, struct file *f, &au_fi(f)->fi_rwsem);
 /* todo: hard/soft set? */
 static inline aufs_bindex_t au_fbstart(struct file *file)
 {
+	FiMustAnyLock(file);
 	return au_fi(file)->fi_bstart;
 }
 
 static inline aufs_bindex_t au_fbend(struct file *file)
 {
+	FiMustAnyLock(file);
 	return au_fi(file)->fi_bend;
 }
 
 static inline struct au_vdir *au_fvdir_cache(struct file *file)
 {
+	FiMustAnyLock(file);
 	return au_fi(file)->fi_vdir_cache;
 }
 
 static inline void au_set_fbstart(struct file *file, aufs_bindex_t bindex)
 {
+	FiMustWriteLock(file);
 	au_fi(file)->fi_bstart = bindex;
 }
 
 static inline void au_set_fbend(struct file *file, aufs_bindex_t bindex)
 {
+	FiMustWriteLock(file);
 	au_fi(file)->fi_bend = bindex;
 }
 
 static inline void au_set_fvdir_cache(struct file *file,
 				      struct au_vdir *vdir_cache)
 {
+	FiMustWriteLock(file);
 	au_fi(file)->fi_vdir_cache = vdir_cache;
 }
 
 static inline struct file *au_h_fptr(struct file *file, aufs_bindex_t bindex)
 {
+	FiMustAnyLock(file);
 	return au_fi(file)->fi_hfile[0 + bindex].hf_file;
 }
 
@@ -154,6 +161,7 @@ static inline unsigned int au_figen(struct file *f)
 
 static inline int au_test_mmapped(struct file *f)
 {
+	FiMustAnyLock(f);
 	return !!(au_fi(f)->fi_h_vm_ops);
 }
 
