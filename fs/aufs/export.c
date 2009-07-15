@@ -24,6 +24,7 @@
 #include <linux/file.h>
 #include <linux/mnt_namespace.h>
 #include <linux/namei.h>
+#include <linux/nsproxy.h>
 #include <linux/random.h>
 #include "aufs.h"
 
