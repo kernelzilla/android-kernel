@@ -146,7 +146,7 @@ static struct platform_device cpcap_rtc_device = {
 	.dev.platform_data = NULL,
 };
 
-static struct platform_device *cpcap_devices[] __initdata = {
+static struct platform_device *cpcap_devices[] = {
 	&cpcap_adc_device,
 	&cpcap_key_device,
 	&cpcap_batt_device,
