@@ -39,6 +39,7 @@ struct cpcap_event_handler {
 struct cpcap_irqdata {
 	struct mutex lock;
 	struct work_struct work;
+	struct workqueue_struct *workqueue;
 	struct cpcap_device *cpcap;
 	struct cpcap_event_handler event_handler[CPCAP_IRQ__NUM];
 	uint64_t registered;
@@ -53,10 +54,11 @@ enum pwrkey_states {
 	PWRKEY_UNKNOWN,	/* Unknown power key state. */
 };
 
-static irqreturn_t event_isr(int irq, void *work)
+static irqreturn_t event_isr(int irq, void *data)
 {
+	struct cpcap_irqdata *irq_data = data;
 	disable_irq_nosync(irq);
-	schedule_work(work);
+	queue_work(irq_data->workqueue, &irq_data->work);
 
 	return IRQ_HANDLED;
 }
@@ -256,12 +258,14 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	data = kzalloc(sizeof(struct cpcap_irqdata), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
+
+        data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
 	data->cpcap = cpcap;
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED, "cpcap-irq",
-			     &data->work);
+			     data);
 	if (retval) {
 		printk(KERN_ERR "cpcap_irq: Failed requesting irq.\n");
 		goto error;
