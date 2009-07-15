@@ -225,9 +225,9 @@ struct akm8973_platform_data sholes_akm8973_data = {
 	.cal_min_threshold = 8,
 	.cal_max_threshold = 247,
 
-	.hxda = 0x02,
-	.hyda = 0x86,
-	.hzda = 0x07,
+	.hxda = 132,
+	.hyda = 134,
+	.hzda = 114,
 
 	.orientation = 270,
 	.xy_swap = 1,
