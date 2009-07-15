@@ -69,6 +69,18 @@ static inline u8 akm8973_convert_dac_offset(u8 offset)
 	return offset;
 }
 
+static int akm8973_convert_adc_offset(u8 offset, u8 value)
+{
+	if (offset >= 0x80)
+		offset = offset - 0x01;
+
+	/* (((steps * 15.625(uT/step) * 1000(uT/nT))
+			- (15.625(uT/step) * 1000(uT/nT) * 127))
+				+ ((value(uT) - 128(uT)) * 1000(uT/nT))) */
+	return ((offset * 15625) - 1984375) +
+			((value - 128) * 1000);
+}
+
 static int akm8973_i2c_read(struct akm8973_data *akm, u8 * buf, int len)
 {
 	int err;
@@ -299,16 +311,22 @@ static int akm8973_auto_calibrate(struct akm8973_data *akm, u8 *values)
 	return calibrate;
 }
 
-static void akm8973_transform_values(struct akm8973_data *akm, u8 * values)
+static void akm8973_transform_values(struct akm8973_data *akm,
+		u8 *values, int *ivalues)
 {
-	u8 tmp;
+	int tmp;
+
+	ivalues[0] = values[0];
+	ivalues[1] = akm8973_convert_adc_offset(akm->pdata->hxda, values[1]);
+	ivalues[2] = akm8973_convert_adc_offset(akm->pdata->hyda, values[2]);
+	ivalues[3] = akm8973_convert_adc_offset(akm->pdata->hzda, values[3]);
 
 	/* values = {t,x,y,z} */
 	if (akm->pdata->xy_swap)
 		swap(values[1], values[2]);
 
 	if (akm->pdata->z_flip)
-		values[3] = 0xff - values[3];
+		values[3] = -values[3];
 
 	/* part orientation on the x,y plane */
 	switch (akm->pdata->orientation) {
@@ -317,19 +335,19 @@ static void akm8973_transform_values(struct akm8973_data *akm, u8 * values)
 
 	case 90:
 		tmp = values[1];
-		values[1] = 0xff - values[2];
+		values[1] = -values[2];
 		values[2] = tmp;
 		break;
 
 	case 180:
-		values[1] = 0xff - values[1];
-		values[2] = 0xff - values[2];
+		values[1] = -values[1];
+		values[2] = -values[2];
 		break;
 
 	case 270:
 		tmp = values[1];
 		values[1] = values[2];
-		values[2] = 0xff - tmp;
+		values[2] = -tmp;
 		break;
 
 	default:
@@ -338,13 +356,12 @@ static void akm8973_transform_values(struct akm8973_data *akm, u8 * values)
 }
 
 static void akm8973_report_values(struct akm8973_data *akm,
-				  u8 *values, int calibrate)
+				  int *values)
 {
 	if (akm->state & AKM8973_MAG) {
-		input_report_abs(akm->input_dev, ABS_HAT0X, values[1] - 128);
-		input_report_abs(akm->input_dev, ABS_HAT0Y, values[2] - 128);
-		input_report_abs(akm->input_dev, ABS_BRAKE, values[3] - 128);
-		input_report_abs(akm->input_dev, ABS_RUDDER, calibrate);
+		input_report_abs(akm->input_dev, ABS_HAT0X, values[1]);
+		input_report_abs(akm->input_dev, ABS_HAT0Y, values[2]);
+		input_report_abs(akm->input_dev, ABS_BRAKE, values[3]);
 	}
 
 	if (akm->state & AKM8973_TEMP)
@@ -359,8 +376,8 @@ static void akm8973_irq_work_func(struct work_struct *work)
 	struct akm8973_data *akm =
 	    container_of(work, struct akm8973_data, irq_work);
 	u8 buf[4];
+	int ibuf[4];
 	int err;
-	int calibrate;
 
 	/* akm->lock is still locked from input_work_func */
 
@@ -369,9 +386,12 @@ static void akm8973_irq_work_func(struct work_struct *work)
 	if (err < 0)
 		goto err0;
 
-	calibrate = akm8973_auto_calibrate(akm, buf);
-	akm8973_transform_values(akm, buf);
-	akm8973_report_values(akm, buf, calibrate);
+	/* don't report railed values */
+	if (!akm8973_auto_calibrate(akm, buf)) {
+		akm8973_transform_values(akm, buf, ibuf);
+		akm8973_report_values(akm, ibuf);
+	}
+
 err0:
 	mutex_unlock(&akm->lock);
 	enable_irq(akm->client->irq);
@@ -593,15 +613,17 @@ static int akm8973_input_init(struct akm8973_data *akm)
 	set_bit(EV_ABS, akm->input_dev->evbit);
 
 	/* x-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_HAT0X, -128, 127, FUZZ, FLAT);
+	input_set_abs_params(
+			akm->input_dev, ABS_HAT0X, -2000, 2000, FUZZ, FLAT);
 	/* y-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_HAT0Y, -128, 127, FUZZ, FLAT);
+	input_set_abs_params(
+			akm->input_dev, ABS_HAT0Y, -2000, 2000, FUZZ, FLAT);
 	/* z-axis of raw magnetic vector */
-	input_set_abs_params(akm->input_dev, ABS_BRAKE, -128, 127, FUZZ, FLAT);
+	input_set_abs_params(
+			akm->input_dev, ABS_BRAKE, -2000, 2000, FUZZ, FLAT);
 	/* temperature */
-	input_set_abs_params(akm->input_dev, ABS_THROTTLE, -30, 85, FUZZ, FLAT);
-	/* calibration occured? */
-	input_set_abs_params(akm->input_dev, ABS_RUDDER, 0, 1, 0, 0);
+	input_set_abs_params(
+			akm->input_dev, ABS_THROTTLE, -30, 85, FUZZ, FLAT);
 
 	akm->input_dev->name = "magnetometer";
 
