@@ -701,6 +701,8 @@ static int configure_overlay(enum omap_plane plane)
 	struct manager_cache_data *mc;
 	u16 outw, outh;
 	u16 x, y, w, h;
+	u32 dw = 0;
+	u32 dh = 0;
 	u32 paddr;
 	int r;
 
@@ -771,15 +773,25 @@ static int configure_overlay(enum omap_plane plane)
 			y = c->pos_y - mc->y;
 		}
 
-		if (mc->w < (x+w))
-			w -= (x+w) - (mc->w);
+		if (mc->w < (x+outw)) {
+			dw = (x+outw) - (mc->w);
+			outw -= dw;
+		}
 
-		if (mc->h < (y+h))
-			h -= (y+h) - (mc->h);
+		if (mc->h < (y+outh)) {
+			dh = (y+outh) - (mc->h);
+			outh -= dh;
+		}
 
 		if (!dispc_is_overlay_scaled(c)) {
-			outw = w;
-			outh = h;
+			w = outw;
+			h = outh;
+		} else {
+			if (dw)
+				w -= (u16) ((((dw << 16) / w) * outw) >> 16);
+
+			if (dh)
+				h -= (u16) ((((dh << 16) / h) * outh) >> 16);
 		}
 	}
 
