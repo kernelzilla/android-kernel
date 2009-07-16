@@ -34,13 +34,11 @@ struct msg_ind_led_data {
 };
 
 void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
-				int color,
-				enum led_brightness value)
+				int color, enum led_brightness value)
 {
-	unsigned short brightness = 0;
+	unsigned short brightness = LD_MSG_IND_CURRENT | LD_MSG_IND_ON;
 	int cpcap_status = 0;
 	int cpcap_register = 0;
-
 
 	if (color & LD_LED_RED)
 		cpcap_register = CPCAP_REG_REDC;
@@ -49,16 +47,26 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 	else if (color & LD_LED_BLUE)
 		cpcap_register = CPCAP_REG_BLUEC;
 
-	if (value <= 51)
-		brightness = LD_MSG_IND_LOW | LD_MSG_IND_CURRENT;
+	if (value == LED_OFF)
+		brightness = 0x00;
+	else if (value <= 51)
+		brightness |= LD_MSG_IND_LOW;
 	else if (value <= 104)
-		brightness = LD_MSG_IND_LOW_MED | LD_MSG_IND_CURRENT;
+		brightness |= LD_MSG_IND_LOW_MED;
 	else if (value <= 155)
-		brightness =  LD_MSG_IND_MEDIUM | LD_MSG_IND_CURRENT;
+		brightness |= LD_MSG_IND_MEDIUM;
 	else if (value <= 201)
-		brightness =  LD_MSG_IND_MED_HIGH | LD_MSG_IND_CURRENT;
+		brightness |= LD_MSG_IND_MED_HIGH;
 	else
-		brightness =  LD_MSG_IND_HIGH | LD_MSG_IND_CURRENT;
+		brightness |= LD_MSG_IND_HIGH;
+
+	cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
+					  cpcap_register, brightness,
+					  LD_MSG_IND_CPCAP_MASK);
+
+	if (cpcap_status < 0)
+		pr_err("%s: Writing to the register failed for %i\n",
+		       __func__, cpcap_status);
 
 	if (value > LED_OFF) {
 		if (!(msg_ind_data->regulator_state & color)) {
@@ -67,14 +75,6 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 				msg_ind_data->regulator_state |= color;
 			}
 		}
-
-		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
-			cpcap_register, (brightness | LD_MSG_IND_ON),
-			LD_MSG_IND_CPCAP_MASK);
-
-		if (cpcap_status < 0)
-			pr_err("%s: Writing to the register failed for %i\n",
-			__func__, cpcap_status);
 	} else {
 		if (msg_ind_data->regulator_state & color) {
 			if (msg_ind_data->regulator) {
@@ -82,13 +82,6 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 				msg_ind_data->regulator_state &= ~color;
 			}
 		}
-
-		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
-			cpcap_register, brightness, LD_MSG_IND_CPCAP_MASK);
-
-		if (cpcap_status < 0)
-			pr_err("%s: Writing to the register failed for %i\n",
-			__func__, cpcap_status);
 	}
 
 	return;
@@ -126,7 +119,7 @@ static void msg_ind_blue_set(struct led_classdev *led_cdev,
 
 static ssize_t
 msg_ind_blink(struct device *dev, struct device_attribute *attr,
-				const char *buf, size_t count)
+	      const char *buf, size_t count)
 {
 	struct msg_ind_led_data *msg_ind_data = dev_get_drvdata(dev);
 	unsigned long led_blink = LED_OFF;
@@ -146,6 +139,7 @@ msg_ind_blink(struct device *dev, struct device_attribute *attr,
 
 	return 0;
 }
+
 static DEVICE_ATTR(blink, 0644, NULL, msg_ind_blink);
 
 static int msg_ind_rgb_probe(struct platform_device *pdev)
@@ -167,8 +161,7 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 
 	info->regulator = regulator_get(&pdev->dev, LD_SUPPLY);
 	if (IS_ERR(info->regulator)) {
-		pr_err("%s: Cannot get %s regulator\n", __func__,
-		       LD_SUPPLY);
+		pr_err("%s: Cannot get %s regulator\n", __func__, LD_SUPPLY);
 		ret = PTR_ERR(info->regulator);
 		goto exit_request_reg_failed;
 	}
@@ -183,17 +176,15 @@ static int msg_ind_rgb_probe(struct platform_device *pdev)
 	}
 
 	ret = device_create_file(info->msg_ind_red_class_dev.dev,
-		&dev_attr_blink);
+				 &dev_attr_blink);
 	if (ret < 0) {
-		pr_err("%s: File device creation failed: %d\n",
-			__func__, ret);
+		pr_err("%s: File device creation failed: %d\n", __func__, ret);
 		goto err_create_blink_failed;
 	}
 
 	info->msg_ind_green_class_dev.name = "green";
 	info->msg_ind_green_class_dev.brightness_set = msg_ind_green_set;
-	ret = led_classdev_register(&pdev->dev,
-				    &info->msg_ind_green_class_dev);
+	ret = led_classdev_register(&pdev->dev, &info->msg_ind_green_class_dev);
 	if (ret < 0) {
 		pr_err("%s: Register Green LED class failed\n", __func__);
 		goto err_reg_green_class_failed;
@@ -243,7 +234,7 @@ static struct platform_driver ld_msg_ind_rgb_driver = {
 	.remove = msg_ind_rgb_remove,
 	.driver = {
 		   .name = LD_MSG_IND_DEV,
-	},
+		   },
 };
 
 static int __init ld_msg_ind_rgb_init(void)
