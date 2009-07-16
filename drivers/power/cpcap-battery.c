@@ -240,7 +240,7 @@ static int cpcap_batt_ioctl(struct inode *inode,
 			if (!ret)
 				sply->async_req_pending = 1;
 		} else {
-			return -EAGAIN;
+			ret = -EAGAIN;
 		}
 		mutex_unlock(&sply->lock);
 
