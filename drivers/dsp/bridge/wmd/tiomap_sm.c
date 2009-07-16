@@ -126,6 +126,12 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 
 	if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
+		/* Restart the IVA clock that was disabled while
+		 * the DSP initiated Hibernation. */
+			status = CLK_Enable(SERVICESCLK_iva2_ck);
+			if (DSP_FAILED(status))
+				return status;
+
 		/* Restore mailbox settings */
 		/* Restart the peripheral clocks that were disabled only
 		 * in DSP initiated Hibernation case.*/

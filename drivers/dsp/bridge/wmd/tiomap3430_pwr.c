@@ -152,6 +152,10 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 		status = DSP_PeripheralClocks_Disable(pDevContext, NULL);
 
 		if (DSP_SUCCEEDED(status)) {
+			status = CLK_Disable(SERVICESCLK_iva2_ck);
+			if (DSP_FAILED(status))
+				return status;
+
 			/* Update the Bridger Driver state */
 			pDevContext->dwBrdState = BRD_DSP_HIBERNATION;
 #ifdef CONFIG_BRIDGE_DVFS
@@ -266,15 +270,20 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 	} else {
 		DBG_Trace(DBG_LEVEL7, "SleepDSP: DSP STANDBY Pwr state %x \n",
 			 pwrState);
+		/* Turn off DSP Peripheral clocks  */
+		status = DSP_PeripheralClocks_Disable(pDevContext, NULL);
+		if (DSP_FAILED(status))
+			DBG_Trace(DBG_LEVEL7, "SleepDSP- FAILED\n");
+
+		status = CLK_Disable(SERVICESCLK_iva2_ck);
+		if (DSP_FAILED(status))
+			DBG_Trace(DBG_LEVEL7, "SleepDSP- FAILED\n");
+
 		/* Update the Bridger Driver state */
 		if (enable_off_mode)
 			pDevContext->dwBrdState = BRD_HIBERNATION;
 		else
 			pDevContext->dwBrdState = BRD_RETENTION;
-		/* Turn off DSP Peripheral clocks  */
-		status = DSP_PeripheralClocks_Disable(pDevContext, NULL);
-		if (DSP_FAILED(status))
-			DBG_Trace(DBG_LEVEL7, "SleepDSP- FAILED\n");
 	}
 #endif
 	return status;
