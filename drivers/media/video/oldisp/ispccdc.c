@@ -271,11 +271,12 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 						ispccdc_lsc_config)))
 					goto copy_from_user_err;
 				down(&ispccdc_mutex);
-				lsc_initialized = 0;
 				if (lsc_config.size <= old_size)
 					size_mismatch = 0;
-				else
+				else {
 					size_mismatch = 1;
+					lsc_initialized = 0;
+				}
 				up(&ispccdc_mutex);
 				ispccdc_config_lsc(&lsc_config);
 			}
