@@ -289,8 +289,8 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	return 0;
 
 error:
+	free_irq(spi->irq, data);
 	kfree(data);
-	free_irq(spi->irq, &data->work);
 	printk(KERN_ERR "cpcap_irq: Error registering cpcap irq.\n");
 	return retval;
 }
@@ -302,7 +302,9 @@ void cpcap_irq_shutdown(struct cpcap_device *cpcap)
 
 	cpcap_irq_free_data(cpcap, CPCAP_IRQ_ON);
 	cancel_work_sync(&data->work);
-	free_irq(spi->irq, &data->work);
+	destroy_workqueue(data->workqueue);
+	free_irq(spi->irq, data);
+	kfree(data);
 }
 
 int cpcap_irq_register(struct cpcap_device *cpcap,
