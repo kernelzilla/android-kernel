@@ -26,7 +26,7 @@ struct inode *au_igrab(struct inode *inode)
 {
 	if (inode) {
 		AuDebugOn(!atomic_read(&inode->i_count));
-		atomic_inc(&inode->i_count);
+		atomic_inc_return(&inode->i_count);
 	}
 	return inode;
 }

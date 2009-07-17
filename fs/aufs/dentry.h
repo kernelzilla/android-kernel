@@ -205,7 +205,7 @@ static inline void au_set_dbdiropq(struct dentry *dentry, aufs_bindex_t bindex)
 #ifdef CONFIG_AUFS_HINOTIFY
 static inline void au_digen_dec(struct dentry *d)
 {
-	atomic_dec(&au_di(d)->di_generation);
+	atomic_dec_return(&au_di(d)->di_generation);
 }
 
 static inline void au_hin_di_reinit(struct dentry *dentry)
