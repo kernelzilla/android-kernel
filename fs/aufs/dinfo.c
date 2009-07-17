@@ -154,9 +154,9 @@ void di_read_unlock(struct dentry *d, int flags)
 
 void di_downgrade_lock(struct dentry *d, int flags)
 {
-	au_rw_dgrade_lock(&au_di(d)->di_rwsem);
 	if (d->d_inode && au_ftest_lock(flags, IR))
 		ii_downgrade_lock(d->d_inode);
+	au_rw_dgrade_lock(&au_di(d)->di_rwsem);
 }
 
 void di_write_lock(struct dentry *d, unsigned int lsc)

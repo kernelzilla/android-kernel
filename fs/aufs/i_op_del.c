@@ -391,12 +391,12 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 		goto out;
 	IMustLock(inode);
 
+	aufs_read_lock(dentry, AuLock_DW | AuLock_FLUSH);
 	err = -ENOMEM;
 	args = au_whtmp_rmdir_alloc(dir->i_sb, GFP_NOFS);
 	if (unlikely(!args))
-		goto out;
+		goto out_unlock;
 
-	aufs_read_lock(dentry, AuLock_DW | AuLock_FLUSH);
 	parent = dentry->d_parent; /* dir inode is locked */
 	di_write_lock_parent(parent);
 	err = au_test_empty(dentry, &args->whlist);
@@ -439,7 +439,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 			args = NULL;
 		}
 
-		goto out_unlock; /* success */
+		goto out_unpin; /* success */
 	}
 
 	/* revert */
@@ -452,15 +452,16 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 			err = rerr;
 	}
 
- out_unlock:
+ out_unpin:
 	au_unpin(&pin);
 	dput(wh_dentry);
 	dput(h_dentry);
  out_args:
 	di_write_unlock(parent);
-	aufs_read_unlock(dentry, AuLock_DW);
 	if (args)
 		au_whtmp_rmdir_free(args);
+ out_unlock:
+	aufs_read_unlock(dentry, AuLock_DW);
  out:
 	return err;
 }

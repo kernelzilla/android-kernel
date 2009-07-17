@@ -190,7 +190,7 @@ struct super_block *au_sbr_sb(struct super_block *sb, aufs_bindex_t bindex)
 
 static inline void au_sbr_put(struct super_block *sb, aufs_bindex_t bindex)
 {
-	atomic_dec(&au_sbr(sb, bindex)->br_count);
+	atomic_dec_return(&au_sbr(sb, bindex)->br_count);
 }
 
 static inline int au_sbr_perm(struct super_block *sb, aufs_bindex_t bindex)
