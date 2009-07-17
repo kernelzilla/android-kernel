@@ -75,7 +75,7 @@ void au_finfo_fin(struct file *file)
 	au_dbg_verify_hf(finfo);
 	kfree(finfo->fi_hfile);
 	fi_write_unlock(file);
-	au_rwsem_destroy(&finfo->fi_rwsem);
+	AuRwDestroy(&finfo->fi_rwsem);
 	au_cache_free_finfo(finfo);
 }
 
@@ -94,8 +94,7 @@ int au_finfo_init(struct file *file)
 	if (unlikely(!finfo->fi_hfile))
 		goto out_finfo;
 
-	init_rwsem(&finfo->fi_rwsem);
-	down_write(&finfo->fi_rwsem);
+	au_rw_init_wlock(&finfo->fi_rwsem);
 	finfo->fi_bstart = -1;
 	finfo->fi_bend = -1;
 	atomic_set(&finfo->fi_generation, au_digen(dentry));

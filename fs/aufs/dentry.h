@@ -38,7 +38,7 @@ struct au_hdentry {
 struct au_dinfo {
 	atomic_t		di_generation;
 
-	struct rw_semaphore	di_rwsem;
+	struct au_rwsem		di_rwsem;
 	aufs_bindex_t		di_bstart, di_bend, di_bwh, di_bdiropq;
 	struct au_hdentry	*di_hdentry;
 };
@@ -137,6 +137,8 @@ AuRWLockFuncs(parent3, PARENT3);
 #undef AuRWLockFuncs
 
 #define DiMustNoWaiters(d)	AuRwMustNoWaiters(&au_di(d)->di_rwsem)
+#define DiMustAnyLock(d)	AuRwMustAnyLock(&au_di(d)->di_rwsem)
+#define DiMustWriteLock(d)	AuRwMustWriteLock(&au_di(d)->di_rwsem)
 
 /* ---------------------------------------------------------------------- */
 
