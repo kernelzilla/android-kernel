@@ -22,7 +22,6 @@
 #include <linux/platform_device.h>
 #endif
 #include <linux/io.h>
-#include <linux/wakelock.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -71,15 +70,6 @@ struct omap_uart_state {
 
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
-
-static struct wake_lock omap_serial_wakelock;
-static void omap_serial_pm(struct uart_port *port, unsigned int state,
-		    unsigned int old)
-{
-	if (old == 3)
-		wake_lock_timeout(&omap_serial_wakelock, 10*HZ);
-}
-
 
 
 #ifdef CONFIG_SERIAL_OMAP
