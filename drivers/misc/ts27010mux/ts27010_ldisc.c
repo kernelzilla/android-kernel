@@ -4,7 +4,6 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/poll.h>
-#include <linux/wakelock.h>
 
 #include "ts27010_mux.h"
 #include "ts27010_ringbuf.h"
@@ -18,8 +17,6 @@ struct ts27010_ldisc_data {
 
 	struct mutex			send_lock;
 };
-
-static struct wake_lock ts27010_ldisc_wakelock;
 
 static void ts27010_ldisc_recv_worker(struct work_struct *work)
 {
@@ -178,7 +175,6 @@ static void ts27010_ldisc_receive(struct tty_struct *tty,
 	if (n < count)
 		pr_err("ts27010_ldisc: buffer overrun.  dropping data.\n");
 
-	wake_lock_timeout(&ts27010_ldisc_wakelock, (HZ/2));
 	schedule_work(&ts->recv_work);
 }
 
@@ -209,12 +205,9 @@ int ts27010_ldisc_init(void)
 	int err;
 
 	err = tty_register_ldisc(N_TS2710, &ts27010_ldisc);
-	if (err < 0) {
+	if (err < 0)
 		pr_err("ts27010: unable to register line discipline\n");
-	} else {
-		wake_lock_init(&ts27010_ldisc_wakelock, WAKE_LOCK_SUSPEND, 
-		       "ts27010_ldisc");
-	}
+
 	return err;
 }
 
