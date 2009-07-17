@@ -40,7 +40,7 @@ void au_si_free(struct kobject *kobj)
 	kfree(sbinfo->si_branch);
 	mutex_destroy(&sbinfo->si_xib_mtx);
 	si_write_unlock(sb);
-	au_rwsem_destroy(&sbinfo->si_rwsem);
+	AuRwDestroy(&sbinfo->si_rwsem);
 
 	kfree(sbinfo);
 }
@@ -66,8 +66,7 @@ int au_si_alloc(struct super_block *sb)
 		goto out_br;
 
 	au_nwt_init(&sbinfo->si_nowait);
-	init_rwsem(&sbinfo->si_rwsem);
-	down_write(&sbinfo->si_rwsem);
+	au_rw_init_wlock(&sbinfo->si_rwsem);
 	sbinfo->si_generation = 0;
 	sbinfo->au_si_status = 0;
 	sbinfo->si_bend = -1;

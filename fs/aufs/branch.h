@@ -48,7 +48,7 @@ struct au_xino_file {
 /* members for writable branch only */
 enum {AuBrWh_BASE, AuBrWh_PLINK, AuBrWh_ORPH, AuBrWh_Last};
 struct au_wbr {
-	struct rw_semaphore	wbr_wh_rwsem;
+	struct au_rwsem		wbr_wh_rwsem;
 	struct dentry		*wbr_wh[AuBrWh_Last];
 	atomic_t 		wbr_wh_running;
 #define wbr_whbase		wbr_wh[AuBrWh_BASE]	/* whiteout base */
@@ -210,6 +210,10 @@ static inline int au_sbr_whable(struct super_block *sb, aufs_bindex_t bindex)
  * wbr_wh_read_unlock, wbr_wh_write_unlock, wbr_wh_downgrade_lock
  */
 AuSimpleRwsemFuncs(wbr_wh, struct au_wbr *wbr, &wbr->wbr_wh_rwsem);
+
+#define WbrWhMustNoWaiters(wbr)	AuRwMustNoWaiters(&wbr->wbr_wh_rwsem)
+#define WbrWhMustAnyLock(wbr)	AuRwMustAnyLock(&wbr->wbr_wh_rwsem)
+#define WbrWhMustWriteLock(wbr)	AuRwMustWriteLock(&wbr->wbr_wh_rwsem)
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_BRANCH_H__ */
