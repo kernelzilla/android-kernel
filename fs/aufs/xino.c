@@ -300,14 +300,11 @@ static void xino_do_trunc(void *_args)
 	ii_read_lock_parent(dir);
 	bindex = au_br_index(sb, br->br_id);
 	err = au_xino_trunc(sb, bindex);
-	if (unlikely(err))
-		goto out;
-
-	if (br->br_xino.xi_file->f_dentry->d_inode->i_blocks
+	if (!err
+	    && br->br_xino.xi_file->f_dentry->d_inode->i_blocks
 	    >= br->br_xino_upper)
 		br->br_xino_upper += AUFS_XINO_TRUNC_STEP;
 
- out:
 	ii_read_unlock(dir);
 	if (unlikely(err))
 		AuWarn("err b%d, (%d)\n", bindex, err);
@@ -337,7 +334,7 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 		goto out_args;
 	}
 
-	atomic_inc(&br->br_count);
+	atomic_inc_return(&br->br_count);
 	args->sb = sb;
 	args->br = br;
 	wkq_err = au_wkq_nowait(xino_do_trunc, args, sb);
@@ -345,12 +342,12 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 		return; /* success */
 
 	AuErr("wkq %d\n", wkq_err);
-	atomic_dec(&br->br_count);
+	atomic_dec_return(&br->br_count);
 
  out_args:
 	kfree(args);
  out:
-	atomic_dec(&br->br_xino_running);
+	atomic_dec_return(&br->br_xino_running);
 }
 
 /* ---------------------------------------------------------------------- */

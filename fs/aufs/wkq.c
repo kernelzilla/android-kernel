@@ -94,7 +94,7 @@ static void wkq_func(struct work_struct *wk)
 	struct au_wkinfo *wkinfo = container_of(wk, struct au_wkinfo, wk);
 
 	wkinfo->func(wkinfo->args);
-	atomic_dec(wkinfo->busyp);
+	atomic_dec_return(wkinfo->busyp);
 	if (au_ftest_wkq(wkinfo->flags, WAIT))
 		complete(wkinfo->comp);
 	else {
