@@ -100,13 +100,17 @@ int au_xigen_inc(struct inode *inode)
 
 	err = 0;
 	sb = inode->i_sb;
-	if (unlikely(!au_opt_test(au_mntflags(sb), XINO)))
+	sbinfo = au_sbi(sb);
+	/*
+	 * temporary workaround for escaping from SiMustAnyLock() in
+	 * au_mntflags(), since this function is called from au_iinfo_fin().
+	 */
+	if (unlikely(!au_opt_test(sbinfo->si_mntflags, XINO)))
 		goto out;
 
 	pos = inode->i_ino;
 	pos *= sizeof(igen);
 	igen = inode->i_generation + 1;
-	sbinfo = au_sbi(sb);
 	sz = xino_fwrite(sbinfo->si_xwrite, sbinfo->si_xigen, &igen,
 			 sizeof(igen), &pos);
 	if (sz == sizeof(igen))
