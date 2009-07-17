@@ -32,6 +32,7 @@
 #include <linux/serial_core.h>
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
+#include <linux/wakelock.h>
 
 #include <asm/irq.h>
 #include <asm/dma.h>
@@ -129,6 +130,8 @@ struct uart_omap_port {
 
 static struct uart_omap_port *ui[MAX_UARTS + 1];
 unsigned int fcr[MAX_UARTS];
+
+static struct wake_lock serial_omap_wakelock;
 
 /* Forward declaration of dma callback functions */
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
@@ -474,6 +477,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 		serial_omap_start_rxdma(up);
 	} else if (lsr & UART_LSR_DR) {
 		receive_chars(up, &lsr);
+		wake_lock_timeout(&serial_omap_wakelock, (HZ/2));
 	}
 	check_modem_status(up);
 	if ((lsr & UART_LSR_THRE) && (iir & 0x2))
@@ -1406,6 +1410,9 @@ int __init serial_omap_init(void)
 	ret = platform_driver_register(&serial_omap_driver);
 	if (ret != 0)
 		uart_unregister_driver(&serial_omap_reg);
+
+	wake_lock_init(&serial_omap_wakelock, WAKE_LOCK_SUSPEND,
+		       "serial_omap");
 	return ret;
 }
 
