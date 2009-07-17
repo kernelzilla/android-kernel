@@ -42,7 +42,7 @@ static void au_br_do_free(struct au_branch *br)
 		for (i = 0; i < AuBrWh_Last; i++)
 			dput(wbr->wbr_wh[i]);
 		AuDebugOn(atomic_read(&wbr->wbr_wh_running));
-		au_rwsem_destroy(&wbr->wbr_wh_rwsem);
+		AuRwDestroy(&wbr->wbr_wh_rwsem);
 	}
 
 	/* some filesystems acquire extra lock */
@@ -297,7 +297,7 @@ static int au_wbr_init(struct au_branch *br, struct super_block *sb,
 	struct au_wbr *wbr;
 
 	wbr = br->br_wbr;
-	init_rwsem(&wbr->wbr_wh_rwsem);
+	au_rw_init(&wbr->wbr_wh_rwsem);
 	memset(wbr->wbr_wh, 0, sizeof(wbr->wbr_wh));
 	atomic_set(&wbr->wbr_wh_running, 0);
 	wbr->wbr_bytes = 0;

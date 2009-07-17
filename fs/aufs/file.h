@@ -39,7 +39,7 @@ struct au_vdir;
 struct au_finfo {
 	atomic_t		fi_generation;
 
-	struct rw_semaphore	fi_rwsem;
+	struct au_rwsem		fi_rwsem;
 	struct au_hfile		*fi_hfile;
 	aufs_bindex_t		fi_bstart, fi_bend;
 
@@ -104,6 +104,8 @@ static inline struct au_finfo *au_fi(struct file *file)
 AuSimpleRwsemFuncs(fi, struct file *f, &au_fi(f)->fi_rwsem);
 
 #define FiMustNoWaiters(f)	AuRwMustNoWaiters(&au_fi(f)->fi_rwsem)
+#define FiMustAnyLock(f)	AuRwMustAnyLock(&au_fi(f)->fi_rwsem)
+#define FiMustWriteLock(f)	AuRwMustWriteLock(&au_fi(f)->fi_rwsem)
 
 /* ---------------------------------------------------------------------- */
 
