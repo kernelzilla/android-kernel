@@ -352,6 +352,8 @@ static struct au_vdir *alloc_vdir(struct super_block *sb)
 	struct au_vdir *vdir;
 	int err;
 
+	SiMustAnyLock(sb);
+
 	err = -ENOMEM;
 	vdir = au_cache_alloc_vdir();
 	if (unlikely(!vdir))
@@ -572,6 +574,8 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 
 	file = arg->file;
 	sb = file->f_dentry->d_sb;
+	SiMustAnyLock(sb);
+
 	rdhash = au_sbi(sb)->si_rdhash;
 	err = au_nhash_alloc(&arg->delist, rdhash, GFP_NOFS);
 	if (unlikely(err))
@@ -638,6 +642,8 @@ static int read_vdir(struct file *file, int may_read)
 	err = 0;
 	inode = file->f_dentry->d_inode;
 	IMustLock(inode);
+	SiMustAnyLock(inode->i_sb);
+
 	allocated = NULL;
 	do_read = 0;
 	expire = au_sbi(inode->i_sb)->si_rdcache;

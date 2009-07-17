@@ -136,6 +136,7 @@ int au_xigen_new(struct inode *inode)
 	if (inode->i_ino == AUFS_ROOT_INO)
 		goto out;
 	sb = inode->i_sb;
+	SiMustAnyLock(sb);
 	if (unlikely(!au_opt_test(au_mntflags(sb), XINO)))
 		goto out;
 
@@ -179,6 +180,8 @@ int au_xigen_set(struct super_block *sb, struct file *base)
 	struct au_sbinfo *sbinfo;
 	struct file *file;
 
+	SiMustWriteLock(sb);
+
 	sbinfo = au_sbi(sb);
 	file = au_xino_create2(base, sbinfo->si_xigen);
 	err = PTR_ERR(file);
@@ -196,6 +199,8 @@ int au_xigen_set(struct super_block *sb, struct file *base)
 void au_xigen_clr(struct super_block *sb)
 {
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	sbinfo = au_sbi(sb);
 	if (sbinfo->si_xigen) {

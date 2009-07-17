@@ -29,6 +29,9 @@
 void au_plink_block_maintain(struct super_block *sb)
 {
 	struct au_sbinfo *sbi = au_sbi(sb);
+
+	SiMustAnyLock(sb);
+
 	/* gave up wake_up_bit() */
 	wait_event(sbi->si_plink_wq, !au_ftest_si(sbi, MAINTAIN_PLINK));
 }
@@ -46,6 +49,8 @@ void au_plink_list(struct super_block *sb)
 	struct au_sbinfo *sbinfo;
 	struct list_head *plink_list;
 	struct pseudo_link *plink;
+
+	SiMustAnyLock(sb);
 
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
@@ -67,6 +72,7 @@ int au_plink_test(struct inode *inode)
 	struct pseudo_link *plink;
 
 	sbinfo = au_sbi(inode->i_sb);
+	AuRwMustAnyLock(&sbinfo->si_rwsem);
 	AuDebugOn(!au_opt_test(au_mntflags(inode->i_sb), PLINK));
 
 	found = 0;
@@ -286,6 +292,8 @@ void au_plink_put(struct super_block *sb)
 	struct list_head *plink_list;
 	struct pseudo_link *plink, *tmp;
 
+	SiMustWriteLock(sb);
+
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
@@ -305,6 +313,8 @@ void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id)
 	struct inode *inode;
 	aufs_bindex_t bstart, bend, bindex;
 	unsigned char do_put;
+
+	SiMustWriteLock(sb);
 
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));

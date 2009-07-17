@@ -255,6 +255,7 @@ static int au_ren_del_whtmp(struct au_ren_args *a)
 	struct inode *dir;
 
 	dir = a->dst_dir;
+	SiMustAnyLock(dir->i_sb);
 	if (!au_nhash_test_longer_wh(&a->whlist, a->btgt,
 				     au_sbi(dir->i_sb)->si_dirwh)
 	    || au_test_fs_remote(a->h_dst->d_sb)) {
@@ -457,6 +458,7 @@ static int may_rename_srcdir(struct dentry *dentry, aufs_bindex_t btgt)
 	if (bstart != btgt) {
 		struct au_nhash whlist;
 
+		SiMustAnyLock(dentry->d_sb);
 		err = au_nhash_alloc(&whlist, au_sbi(dentry->d_sb)->si_rdhash,
 				     GFP_NOFS);
 		if (unlikely(err))
@@ -487,6 +489,7 @@ static int au_ren_may_dir(struct au_ren_args *a)
 	struct dentry *d;
 
 	d = a->dst_dentry;
+	SiMustAnyLock(d->d_sb);
 	err = au_nhash_alloc(&a->whlist, au_sbi(d->d_sb)->si_rdhash, GFP_NOFS);
 	if (unlikely(err))
 		goto out;

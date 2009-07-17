@@ -235,6 +235,12 @@ static int dbgaufs_xigen_init(struct au_sbinfo *sbinfo)
 {
 	int err;
 
+	/*
+	 * This function is a dynamic '__init' fucntion actually,
+	 * so the tiny check for si_rwsem is unnecessary.
+	 */
+	/* AuRwMustWriteLock(&sbinfo->si_rwsem); */
+
 	err = -EIO;
 	sbinfo->si_dbgaufs_xigen = debugfs_create_file
 		("xigen", dbgaufs_mode, sbinfo->si_dbgaufs, sbinfo,
@@ -255,6 +261,12 @@ static int dbgaufs_xigen_init(struct au_sbinfo *sbinfo)
 
 void dbgaufs_si_fin(struct au_sbinfo *sbinfo)
 {
+	/*
+	 * This function is a dynamic '__init' fucntion actually,
+	 * so the tiny check for si_rwsem is unnecessary.
+	 */
+	/* AuRwMustWriteLock(&sbinfo->si_rwsem); */
+
 	debugfs_remove_recursive(sbinfo->si_dbgaufs);
 	sbinfo->si_dbgaufs = NULL;
 	kobject_put(&sbinfo->si_kobj);
@@ -264,6 +276,12 @@ int dbgaufs_si_init(struct au_sbinfo *sbinfo)
 {
 	int err;
 	char name[SysaufsSiNameLen];
+
+	/*
+	 * This function is a dynamic '__init' fucntion actually,
+	 * so the tiny check for si_rwsem is unnecessary.
+	 */
+	/* AuRwMustWriteLock(&sbinfo->si_rwsem); */
 
 	err = -ENOENT;
 	if (!dbgaufs) {
