@@ -75,7 +75,7 @@ struct au_sbinfo {
 	/* nowait tasks in the system-wide workqueue */
 	struct au_nowait_tasks	si_nowait;
 
-	struct rw_semaphore	si_rwsem;
+	struct au_rwsem		si_rwsem;
 
 	/* branch management */
 	unsigned int		si_generation;
@@ -294,6 +294,10 @@ static inline void dbgaufs_si_null(struct au_sbinfo *sbinfo)
 AuSimpleLockRwsemFuncs(si_noflush, struct super_block *sb,
 		       &au_sbi(sb)->si_rwsem);
 AuSimpleUnlockRwsemFuncs(si, struct super_block *sb, &au_sbi(sb)->si_rwsem);
+
+#define SiMustNoWaiters(sb)	AuRwMustNoWaiters(&au_sbi(sb)->si_rwsem)
+#define SiMustAnyLock(sb)	AuRwMustAnyLock(&au_sbi(sb)->si_rwsem)
+#define SiMustWriteLock(sb)	AuRwMustWriteLock(&au_sbi(sb)->si_rwsem)
 
 static inline void si_read_lock(struct super_block *sb, int flags)
 {
