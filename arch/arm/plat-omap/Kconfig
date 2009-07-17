@@ -24,6 +24,19 @@ endchoice
 
 comment "OMAP Feature Selections"
 
+choice
+	prompt "OMAP3 part type"
+	depends on ARCH_OMAP3
+	default ARCH_OMAP3_GP
+
+config ARCH_OMAP3_GP
+	bool "OMAP3 GP"
+
+config ARCH_OMAP3_HS
+	bool "OMAP3 HS/EMU"
+
+endchoice
+
 config OMAP_DEBUG_DEVICES
 	bool
 	help
