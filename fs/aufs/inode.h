@@ -398,7 +398,7 @@ void au_hin_init(struct au_hinode *hinode, struct au_hinotify *val)
 
 static inline void au_iigen_dec(struct inode *inode)
 {
-	atomic_dec(&au_ii(inode)->ii_generation);
+	atomic_dec_return(&au_ii(inode)->ii_generation);
 }
 
 #else

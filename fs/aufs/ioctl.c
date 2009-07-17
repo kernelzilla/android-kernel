@@ -53,11 +53,10 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd,
 		si_write_unlock(sb);
 		break;
 	case AUFS_CTL_PLINK_CLEAN:
-		if (au_opt_test(sbinfo->si_mntflags, PLINK)) {
-			aufs_write_lock(sb->s_root);
+		aufs_write_lock(sb->s_root);
+		if (au_opt_test(sbinfo->si_mntflags, PLINK))
 			au_plink_put(sb);
-			aufs_write_unlock(sb->s_root);
-		}
+		aufs_write_unlock(sb->s_root);
 		break;
 	default:
 		err = -EINVAL;
