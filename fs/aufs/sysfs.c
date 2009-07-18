@@ -42,6 +42,8 @@ int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
 
+	SiMustAnyLock(sb);
+
 	err = 0;
 	if (au_opt_test(au_mntflags(sb), XINO)) {
 		err = au_xino_path(seq, au_sbi(sb)->si_xib);

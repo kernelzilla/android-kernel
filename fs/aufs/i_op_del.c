@@ -222,6 +222,7 @@ static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 	struct super_block *sb;
 
 	sb = dentry->d_sb;
+	SiMustAnyLock(sb);
 	h_dentry = au_h_dptr(dentry, bindex);
 	err = au_whtmp_ren(h_dentry, au_sbr(sb, bindex));
 	if (unlikely(err))

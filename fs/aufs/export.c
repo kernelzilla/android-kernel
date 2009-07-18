@@ -101,13 +101,17 @@ int au_xigen_inc(struct inode *inode)
 
 	err = 0;
 	sb = inode->i_sb;
-	if (unlikely(!au_opt_test(au_mntflags(sb), XINO)))
+	sbinfo = au_sbi(sb);
+	/*
+	 * temporary workaround for escaping from SiMustAnyLock() in
+	 * au_mntflags(), since this function is called from au_iinfo_fin().
+	 */
+	if (unlikely(!au_opt_test(sbinfo->si_mntflags, XINO)))
 		goto out;
 
 	pos = inode->i_ino;
 	pos *= sizeof(igen);
 	igen = inode->i_generation + 1;
-	sbinfo = au_sbi(sb);
 	sz = xino_fwrite(sbinfo->si_xwrite, sbinfo->si_xigen, &igen,
 			 sizeof(igen), &pos);
 	if (sz == sizeof(igen))
@@ -137,6 +141,7 @@ int au_xigen_new(struct inode *inode)
 	if (inode->i_ino == AUFS_ROOT_INO)
 		goto out;
 	sb = inode->i_sb;
+	SiMustAnyLock(sb);
 	if (unlikely(!au_opt_test(au_mntflags(sb), XINO)))
 		goto out;
 
@@ -180,6 +185,8 @@ int au_xigen_set(struct super_block *sb, struct file *base)
 	struct au_sbinfo *sbinfo;
 	struct file *file;
 
+	SiMustWriteLock(sb);
+
 	sbinfo = au_sbi(sb);
 	file = au_xino_create2(base, sbinfo->si_xigen);
 	err = PTR_ERR(file);
@@ -197,6 +204,8 @@ int au_xigen_set(struct super_block *sb, struct file *base)
 void au_xigen_clr(struct super_block *sb)
 {
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	sbinfo = au_sbi(sb);
 	if (sbinfo->si_xigen) {

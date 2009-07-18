@@ -639,6 +639,8 @@ static int au_getattr_lock_reval(struct dentry *dentry, unsigned int sigen)
 			err = -EIO;
 	}
 	di_downgrade_lock(dentry, AuLock_IR);
+	if (unlikely(err))
+		di_read_unlock(dentry, AuLock_IR);
 
 	return err;
 }
@@ -712,14 +714,16 @@ static int aufs_getattr(struct vfsmount *mnt __maybe_unused,
 	if (!au_test_fs_bad_iattr(h_sb) && udba_none)
 		goto out_fill; /* success */
 
+	h_dentry = NULL;
 	if (au_dbstart(dentry) == bindex)
 		h_dentry = dget(au_h_dptr(dentry, bindex));
 	else if (au_opt_test(mnt_flags, PLINK) && au_plink_test(inode)) {
 		h_dentry = au_plink_lkup(inode, bindex);
 		if (IS_ERR(h_dentry))
 			goto out_fill; /* pretending success */
-	} else
-		/* illegally overlapped or something */
+	}
+	/* illegally overlapped or something */
+	if (unlikely(!h_dentry))
 		goto out_fill; /* pretending success */
 
  getattr:
