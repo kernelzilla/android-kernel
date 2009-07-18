@@ -40,7 +40,7 @@ ifeq ($(CONFIG_PXA_SHARPSL),y)
 OBJS		+= head-sharpsl.o
 endif
 
-ifeq ($(CONFIG_MACH_OMAP_PERSEUS2),y)
+ifeq ($(CONFIG_ARCH_OMAP),y)
 OBJS		+= head-omap.o
 endif
 
