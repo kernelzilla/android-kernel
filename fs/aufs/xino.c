@@ -385,6 +385,7 @@ int au_xino_write(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 
 	BUILD_BUG_ON(sizeof(long long) != sizeof(au_loff_max)
 		     || ((loff_t)-1) > 0);
+	SiMustAnyLock(sb);
 
 	mnt_flags = au_mntflags(sb);
 	if (!au_opt_test(mnt_flags, XINO))
@@ -759,6 +760,7 @@ static int do_xib_restore(struct super_block *sb, struct file *file, void *page)
 
 	err = 0;
 	sbinfo = au_sbi(sb);
+	MtxMustLock(&sbinfo->si_xib_mtx);
 	p = sbinfo->si_xib_buf;
 	func = sbinfo->si_xread;
 	pend = i_size_read(file->f_dentry->d_inode);
@@ -822,6 +824,8 @@ int au_xib_trunc(struct super_block *sb)
 	struct au_sbinfo *sbinfo;
 	unsigned long *p;
 	struct file *file;
+
+	SiMustWriteLock(sb);
 
 	err = 0;
 	sbinfo = au_sbi(sb);
@@ -899,6 +903,8 @@ static void xino_clear_xib(struct super_block *sb)
 {
 	struct au_sbinfo *sbinfo;
 
+	SiMustWriteLock(sb);
+
 	sbinfo = au_sbi(sb);
 	sbinfo->si_xread = NULL;
 	sbinfo->si_xwrite = NULL;
@@ -915,6 +921,8 @@ static int au_xino_set_xib(struct super_block *sb, struct file *base)
 	loff_t pos;
 	struct au_sbinfo *sbinfo;
 	struct file *file;
+
+	SiMustWriteLock(sb);
 
 	sbinfo = au_sbi(sb);
 	file = au_xino_create2(base, sbinfo->si_xib);
@@ -987,6 +995,8 @@ static int au_xino_set_br(struct super_block *sb, struct file *base)
 	struct au_branch *br;
 	struct inode *inode;
 	au_writef_t writef;
+
+	SiMustWriteLock(sb);
 
 	err = -ENOMEM;
 	bend = au_sbend(sb);
@@ -1062,6 +1072,8 @@ int au_xino_set(struct super_block *sb, struct au_opt_xino *xino, int remount)
 	struct file *cur_xino;
 	struct inode *dir;
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	err = 0;
 	sbinfo = au_sbi(sb);

@@ -1030,6 +1030,8 @@ static int au_opt_wbr_create(struct super_block *sb,
 	int err;
 	struct au_sbinfo *sbinfo;
 
+	SiMustWriteLock(sb);
+
 	err = 1; /* handled */
 	sbinfo = au_sbi(sb);
 	if (sbinfo->si_wbr_create_ops->fin) {
@@ -1069,6 +1071,8 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 {
 	int err;
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	err = 1; /* handled */
 	sbinfo = au_sbi(sb);
@@ -1312,6 +1316,8 @@ int au_opts_verify(struct super_block *sb, unsigned long sb_flags,
 	struct au_sbinfo *sbinfo;
 	struct au_hinode *hdir;
 
+	SiMustAnyLock(sb);
+
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!(sbinfo->si_mntflags & AuOptMask_UDBA));
 
@@ -1411,6 +1417,8 @@ int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 	struct au_opt_xino *opt_xino, xino;
 	struct au_sbinfo *sbinfo;
 
+	SiMustWriteLock(sb);
+
 	err = 0;
 	opt_xino = NULL;
 	opt = opts->opt;
@@ -1487,6 +1495,8 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts)
 	struct au_opt_xino *opt_xino;
 	struct au_opt *opt;
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	dir = sb->s_root->d_inode;
 	sbinfo = au_sbi(sb);

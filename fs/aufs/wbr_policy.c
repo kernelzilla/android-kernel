@@ -375,6 +375,7 @@ static void au_mfs(struct dentry *dentry)
 	bavail = 0;
 	sb = dentry->d_sb;
 	mfs = &au_sbi(sb)->si_wbr_mfs;
+	MtxMustLock(&mfs->mfs_lock);
 	mfs->mfs_bindex = -EROFS;
 	mfs->mfsrr_bytes = 0;
 	bend = au_sbend(sb);

@@ -114,6 +114,8 @@ int au_sbr_realloc(struct au_sbinfo *sbinfo, int nbr)
 	int err, sz;
 	struct au_branch **brp;
 
+	AuRwMustWriteLock(&sbinfo->si_rwsem);
+
 	err = -ENOMEM;
 	sz = sizeof(*brp) * (sbinfo->si_bend + 1);
 	if (unlikely(!sz))
@@ -133,6 +135,8 @@ unsigned int au_sigen_inc(struct super_block *sb)
 {
 	unsigned int gen;
 
+	SiMustWriteLock(sb);
+
 	gen = ++au_sbi(sb)->si_generation;
 	au_update_digen(sb->s_root);
 	au_update_iigen(sb->s_root->d_inode);
@@ -145,6 +149,8 @@ aufs_bindex_t au_new_br_id(struct super_block *sb)
 	aufs_bindex_t br_id;
 	int i;
 	struct au_sbinfo *sbinfo;
+
+	SiMustWriteLock(sb);
 
 	sbinfo = au_sbi(sb);
 	for (i = 0; i <= AUFS_BRANCH_MAX; i++) {
