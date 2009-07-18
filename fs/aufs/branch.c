@@ -62,6 +62,8 @@ void au_br_free(struct au_sbinfo *sbinfo)
 	aufs_bindex_t bmax;
 	struct au_branch **br;
 
+	AuRwMustWriteLock(&sbinfo->si_rwsem);
+
 	bmax = sbinfo->si_bend + 1;
 	br = sbinfo->si_branch;
 	while (bmax--)
@@ -351,6 +353,8 @@ static void au_br_do_add_brp(struct au_sbinfo *sbinfo, aufs_bindex_t bindex,
 {
 	struct au_branch **brp;
 
+	AuRwMustWriteLock(&sbinfo->si_rwsem);
+
 	brp = sbinfo->si_branch + bindex;
 	memmove(brp + 1, brp, sizeof(*brp) * amount);
 	*brp = br;
@@ -613,6 +617,8 @@ static void au_br_do_del_brp(struct au_sbinfo *sbinfo,
 {
 	struct au_branch **brp, **p;
 
+	AuRwMustWriteLock(&sbinfo->si_rwsem);
+
 	brp = sbinfo->si_branch + bindex;
 	if (bindex < bend)
 		memmove(brp, brp + 1, sizeof(*brp) * (bend - bindex));
@@ -664,6 +670,8 @@ static void au_br_do_del(struct super_block *sb, aufs_bindex_t bindex,
 	struct au_sbinfo *sbinfo;
 	struct dentry *root;
 	struct inode *inode;
+
+	SiMustWriteLock(sb);
 
 	root = sb->s_root;
 	inode = root->d_inode;

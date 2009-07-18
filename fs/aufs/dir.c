@@ -151,7 +151,8 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 		au_vdir_free(vdir_cache);
 	if (au_fi(file)->fi_maintain_plink) {
 		sbinfo = au_sbi(sb);
-		au_fclr_si(sbinfo, MAINTAIN_PLINK);
+		/* clear the flag without write-lock */
+		sbinfo->au_si_status &= ~AuSi_MAINTAIN_PLINK;
 		wake_up_all(&sbinfo->si_plink_wq);
 	}
 	fi_write_unlock(file);
@@ -461,6 +462,8 @@ int au_test_empty_lower(struct dentry *dentry)
 	int err;
 	aufs_bindex_t bindex, bstart, btail;
 	struct test_empty_arg arg;
+
+	SiMustAnyLock(dentry->d_sb);
 
 	err = au_nhash_alloc(&arg.whlist, au_sbi(dentry->d_sb)->si_rdhash,
 			     GFP_NOFS);
