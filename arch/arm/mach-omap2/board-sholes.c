@@ -724,7 +724,8 @@ static int __init omap_hdq_init(void)
 }
 
 static struct wl127x_rfkill_platform_data sholes_wl1271_pdata = {
-	.nshutdown_gpio = SHOLES_WL1271_NSHUTDOWN_GPIO,
+	.bt_nshutdown_gpio = SHOLES_WL1271_NSHUTDOWN_GPIO,
+	.fm_enable_gpio = -1,
 };
 
 static struct platform_device sholes_wl1271_device = {
