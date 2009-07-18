@@ -887,6 +887,8 @@ struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp)
 	struct au_whtmp_rmdir *whtmp;
 	int err;
 
+	SiMustAnyLock(sb);
+
 	whtmp = kmalloc(sizeof(*whtmp), gfp);
 	if (unlikely(!whtmp)) {
 		whtmp = ERR_PTR(-ENOMEM);

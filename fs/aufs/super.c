@@ -111,6 +111,8 @@ static void au_show_wbr_create(struct seq_file *m, int v,
 {
 	const char *pat;
 
+	AuRwMustAnyLock(&sbinfo->si_rwsem);
+
 	seq_printf(m, ",create=");
 	pat = au_optstr_wbr_create(v);
 	switch (v) {
@@ -152,6 +154,8 @@ static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 	struct qstr *name;
 	struct file *f;
 	struct dentry *d, *h_root;
+
+	AuRwMustAnyLock(&sbinfo->si_rwsem);
 
 	err = 0;
 	sb = mnt->mnt_sb;
