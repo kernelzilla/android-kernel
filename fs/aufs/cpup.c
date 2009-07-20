@@ -520,7 +520,7 @@ int cpup_entry(struct dentry *dentry, aufs_bindex_t bdst,
 	    /* && dentry->d_inode->i_nlink == 1 */
 	    && bdst < bsrc
 	    && !au_ftest_cpup(flags, KEEPLINO))
-		au_xino_write0(sb, bsrc, h_inode->i_ino, /*ino*/0);
+		au_xino_write(sb, bsrc, h_inode->i_ino, /*ino*/0);
 		/* ignore this error */
 
 	if (do_dt)
