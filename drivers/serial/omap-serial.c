@@ -1099,8 +1099,6 @@ static int serial_omap_resume(struct platform_device *dev)
 	return 0;
 }
 
-static int line;
-
 static void serial_omap_rx_timeout(unsigned long uart_no)
 {
 	struct uart_omap_port *up = ui[uart_no - 1];
@@ -1362,7 +1360,7 @@ static int serial_omap_remove(struct platform_device *dev)
 
 	platform_set_drvdata(dev, NULL);
 	if (up) {
-		uart_remove_one_port(&serial_omap_reg, &sport->port);
+		uart_remove_one_port(&serial_omap_reg, &up->port);
 		kfree(up);
 	}
 	return 0;
