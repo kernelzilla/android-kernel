@@ -112,8 +112,6 @@ obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
 
 obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
 
-obj-$(CONFIG_VIDEO_OMAP3) += omap/
-
 obj-$(CONFIG_VIDEO_IMX046)      += imx046.o
 obj-$(CONFIG_VIDEO_LV8093)      += lv8093.o
 obj-$(CONFIG_USB_DABUSB)        += dabusb.o
