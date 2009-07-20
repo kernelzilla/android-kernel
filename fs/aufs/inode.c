@@ -319,7 +319,7 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 	}
 
 	if (unlikely(au_test_fs_unique_ino(h_dentry->d_inode)))
-		AuWarn1("Un-notified UDBA or repeatedly renamed dir,"
+		AuWarn1("Warning: Un-notified UDBA or repeatedly renamed dir,"
 			" b%d, %s, %.*s, hi%lu, i%lu.\n",
 			bstart, au_sbtype(h_dentry->d_sb), AuDLNPair(dentry),
 			(unsigned long)h_ino, (unsigned long)ino);
