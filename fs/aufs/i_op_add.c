@@ -491,8 +491,11 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 		}
 		if (!err) {
 			h_src_dentry = au_h_dptr(src_dentry, a->bdst);
-			err = vfsub_link(h_src_dentry, au_pinned_h_dir(&a->pin),
-					 &a->h_path);
+			err = -ENOENT;
+			if (h_src_dentry && h_src_dentry->d_inode)
+				err = vfsub_link(h_src_dentry,
+						 au_pinned_h_dir(&a->pin),
+						 &a->h_path);
 		}
 	}
 	if (unlikely(err))

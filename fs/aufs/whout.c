@@ -385,6 +385,8 @@ static int au_wh_init_rw(struct dentry *h_root, struct au_wbr *wbr,
 	int err;
 	struct inode *h_dir;
 
+	WbrWhMustWriteLock(wbr);
+
 	err = test_linkable(h_root);
 	if (unlikely(err)) {
 		err = 1;
@@ -474,6 +476,8 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		}
 	};
 
+	if (wbr)
+		WbrWhMustWriteLock(wbr);
 
 	h_dir = h_root->d_inode;
 	for (i = 0; i < AuBrWh_Last; i++) {
@@ -570,8 +574,8 @@ static void reinit_br_wh(void *arg)
 	if (unlikely(bindex < 0))
 		goto out;
 
+	di_read_lock_parent(a->sb->s_root, AuLock_IR);
 	dir = a->sb->s_root->d_inode;
-	/* ii_read_lock_parent(dir); */
 	hdir = au_hi(dir, bindex);
 	h_root = au_h_dptr(a->sb->s_root, bindex);
 
@@ -597,7 +601,7 @@ static void reinit_br_wh(void *arg)
 		err = au_wh_init(h_root, a->br, a->sb);
 	wbr_wh_write_unlock(wbr);
 	au_hin_imtx_unlock(hdir);
-	/* ii_read_unlock(dir); */
+	di_read_unlock(a->sb->s_root, AuLock_IR);
 
  out:
 	if (wbr)

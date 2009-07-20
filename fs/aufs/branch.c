@@ -368,6 +368,8 @@ static void au_br_do_add_hdp(struct au_dinfo *dinfo, aufs_bindex_t bindex,
 {
 	struct au_hdentry *hdp;
 
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	hdp = dinfo->di_hdentry + bindex;
 	memmove(hdp + 1, hdp, sizeof(*hdp) * amount);
 	au_h_dentry_init(hdp);
@@ -380,6 +382,8 @@ static void au_br_do_add_hip(struct au_iinfo *iinfo, aufs_bindex_t bindex,
 			     aufs_bindex_t bend, aufs_bindex_t amount)
 {
 	struct au_hinode *hip;
+
+	AuRwMustWriteLock(&iinfo->ii_rwsem);
 
 	hip = iinfo->ii_hinode + bindex;
 	memmove(hip + 1, hip, sizeof(*hip) * amount);
@@ -635,6 +639,8 @@ static void au_br_do_del_hdp(struct au_dinfo *dinfo, const aufs_bindex_t bindex,
 {
 	struct au_hdentry *hdp, *p;
 
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	hdp = dinfo->di_hdentry + bindex;
 	if (bindex < bend)
 		memmove(hdp, hdp + 1, sizeof(*hdp) * (bend - bindex));
@@ -650,6 +656,8 @@ static void au_br_do_del_hip(struct au_iinfo *iinfo, const aufs_bindex_t bindex,
 			     const aufs_bindex_t bend)
 {
 	struct au_hinode *hip, *p;
+
+	AuRwMustWriteLock(&iinfo->ii_rwsem);
 
 	hip = iinfo->ii_hinode + bindex;
 	if (bindex < bend)
@@ -726,6 +734,8 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 	wbr = br->br_wbr;
 	do_wh = wbr && (wbr->wbr_whbase || wbr->wbr_plink || wbr->wbr_orph);
 	if (do_wh) {
+		/* instead of WbrWhMustWriteLock(wbr) */
+		SiMustWriteLock(sb);
 		for (i = 0; i < AuBrWh_Last; i++) {
 			dput(wbr->wbr_wh[i]);
 			wbr->wbr_wh[i] = NULL;

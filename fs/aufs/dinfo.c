@@ -63,6 +63,8 @@ int au_di_realloc(struct au_dinfo *dinfo, int nbr)
 	int err, sz;
 	struct au_hdentry *hdp;
 
+	AuRwMustWriteLock(&dinfo->di_rwsem);
+
 	err = -ENOMEM;
 	sz = sizeof(*hdp) * (dinfo->di_bend + 1);
 	if (!sz)
@@ -220,6 +222,8 @@ struct dentry *au_h_dptr(struct dentry *dentry, aufs_bindex_t bindex)
 {
 	struct dentry *d;
 
+	DiMustAnyLock(dentry);
+
 	if (au_dbstart(dentry) < 0 || bindex < au_dbstart(dentry))
 		return NULL;
 	AuDebugOn(bindex < 0);
@@ -263,6 +267,8 @@ void au_set_h_dptr(struct dentry *dentry, aufs_bindex_t bindex,
 {
 	struct au_hdentry *hd = au_di(dentry)->di_hdentry + bindex;
 
+	DiMustWriteLock(dentry);
+
 	if (hd->hd_dentry)
 		au_hdput(hd);
 	hd->hd_dentry = h_dentry;
@@ -278,6 +284,8 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 {
 	struct au_dinfo *dinfo;
 	struct dentry *h_d;
+
+	DiMustWriteLock(dentry);
 
 	dinfo = au_di(dentry);
 	if (!dinfo || dinfo->di_bstart < 0)

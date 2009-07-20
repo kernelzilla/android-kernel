@@ -49,6 +49,8 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 	struct super_block *sb;
 	struct au_iinfo *iinfo;
 
+	IiMustWriteLock(inode);
+
 	update = 0;
 	sb = inode->i_sb;
 	iinfo = au_ii(inode);
@@ -163,6 +165,8 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	struct dentry *h_dentry;
 	struct inode *h_inode;
 	struct au_iinfo *iinfo;
+
+	IiMustWriteLock(inode);
 
 	err = 0;
 	isdir = 0;
@@ -315,7 +319,7 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 	}
 
 	if (unlikely(au_test_fs_unique_ino(h_dentry->d_inode)))
-		AuWarn1("Un-notified UDBA or repeatedly renamed dir,"
+		AuWarn1("Warning: Un-notified UDBA or repeatedly renamed dir,"
 			" b%d, %s, %.*s, hi%lu, i%lu.\n",
 			bstart, au_sbtype(h_dentry->d_sb), AuDLNPair(dentry),
 			(unsigned long)h_ino, (unsigned long)ino);
