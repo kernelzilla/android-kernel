@@ -95,6 +95,8 @@ static int do_open_dir(struct file *file, int flags)
 	struct dentry *dentry, *h_dentry;
 	struct file *h_file;
 
+	FiMustWriteLock(file);
+
 	err = 0;
 	dentry = file->f_dentry;
 	au_set_fvdir_cache(file, NULL);
@@ -153,6 +155,7 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 		sbinfo = au_sbi(sb);
 		/* clear the flag without write-lock */
 		sbinfo->au_si_status &= ~AuSi_MAINTAIN_PLINK;
+		smp_mb();
 		wake_up_all(&sbinfo->si_plink_wq);
 	}
 	fi_write_unlock(file);
