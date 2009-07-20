@@ -552,12 +552,14 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	int err, rerr;
 	aufs_bindex_t bindex;
 	unsigned char diropq;
-	struct au_pin pin;
 	struct path h_path;
 	struct dentry *wh_dentry, *parent, *opq_dentry;
 	struct mutex *h_mtx;
 	struct super_block *sb;
-	struct au_dtime dt;
+	struct {
+		struct au_pin pin;
+		struct au_dtime dt;
+	} *a; /* reduce the stack usage */
 	struct au_wr_dir_args wr_dir_args = {
 		.force_btgt	= -1,
 		.flags		= AuWrDir_ADD_ENTRY | AuWrDir_ISDIR
@@ -565,11 +567,13 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	IMustLock(dir);
 
+	a = kmalloc(sizeof(*a), GFP_NOFS);
+
 	aufs_read_lock(dentry, AuLock_DW);
 	parent = dentry->d_parent; /* dir inode is locked */
 	di_write_lock_parent(parent);
-	wh_dentry = lock_hdir_lkup_wh(dentry, &dt, /*src_dentry*/NULL, &pin,
-				      &wr_dir_args);
+	wh_dentry = lock_hdir_lkup_wh(dentry, &a->dt, /*src_dentry*/NULL,
+				      &a->pin, &wr_dir_args);
 	err = PTR_ERR(wh_dentry);
 	if (IS_ERR(wh_dentry))
 		goto out;
@@ -578,7 +582,7 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	bindex = au_dbstart(dentry);
 	h_path.dentry = au_h_dptr(dentry, bindex);
 	h_path.mnt = au_sbr_mnt(sb, bindex);
-	err = vfsub_mkdir(au_pinned_h_dir(&pin), &h_path, mode);
+	err = vfsub_mkdir(au_pinned_h_dir(&a->pin), &h_path, mode);
 	if (unlikely(err))
 		goto out_unlock;
 
@@ -618,16 +622,16 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
  out_dir:
 	AuLabel(revert dir);
-	rerr = vfsub_rmdir(au_pinned_h_dir(&pin), &h_path);
+	rerr = vfsub_rmdir(au_pinned_h_dir(&a->pin), &h_path);
 	if (rerr) {
 		AuIOErr("%.*s reverting dir failed(%d, %d)\n",
 			AuDLNPair(dentry), err, rerr);
 		err = -EIO;
 	}
 	d_drop(dentry);
-	au_dtime_revert(&dt);
+	au_dtime_revert(&a->dt);
  out_unlock:
-	au_unpin(&pin);
+	au_unpin(&a->pin);
 	dput(wh_dentry);
  out:
 	if (unlikely(err)) {
