@@ -68,7 +68,7 @@ static inline int au_debug_test(void)
 	       __func__, __LINE__, current->comm, current->pid, ##arg)
 #define AuDbg(fmt, arg...) do { \
 	if (au_debug_test()) \
-		AuDpri(KERN_DEBUG, fmt, ##arg); \
+		AuDpri(KERN_DEBUG, "DEBUG: " fmt, ##arg); \
 } while (0)
 #define AuLabel(l) 		AuDbg(#l "\n")
 #define AuInfo(fmt, arg...)	AuDpri(KERN_INFO, fmt, ##arg)
