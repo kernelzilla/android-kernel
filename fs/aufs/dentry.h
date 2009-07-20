@@ -160,43 +160,51 @@ static inline void au_hdput(struct au_hdentry *hd)
 
 static inline aufs_bindex_t au_dbstart(struct dentry *dentry)
 {
+	DiMustAnyLock(dentry);
 	return au_di(dentry)->di_bstart;
 }
 
 static inline aufs_bindex_t au_dbend(struct dentry *dentry)
 {
+	DiMustAnyLock(dentry);
 	return au_di(dentry)->di_bend;
 }
 
 static inline aufs_bindex_t au_dbwh(struct dentry *dentry)
 {
+	DiMustAnyLock(dentry);
 	return au_di(dentry)->di_bwh;
 }
 
 static inline aufs_bindex_t au_dbdiropq(struct dentry *dentry)
 {
+	DiMustAnyLock(dentry);
 	return au_di(dentry)->di_bdiropq;
 }
 
 /* todo: hard/soft set? */
 static inline void au_set_dbstart(struct dentry *dentry, aufs_bindex_t bindex)
 {
+	DiMustWriteLock(dentry);
 	au_di(dentry)->di_bstart = bindex;
 }
 
 static inline void au_set_dbend(struct dentry *dentry, aufs_bindex_t bindex)
 {
+	DiMustWriteLock(dentry);
 	au_di(dentry)->di_bend = bindex;
 }
 
 static inline void au_set_dbwh(struct dentry *dentry, aufs_bindex_t bindex)
 {
+	DiMustWriteLock(dentry);
 	/* dbwh can be outside of bstart - bend range */
 	au_di(dentry)->di_bwh = bindex;
 }
 
 static inline void au_set_dbdiropq(struct dentry *dentry, aufs_bindex_t bindex)
 {
+	DiMustWriteLock(dentry);
 	au_di(dentry)->di_bdiropq = bindex;
 }
 

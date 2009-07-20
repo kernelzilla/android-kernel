@@ -71,6 +71,8 @@ static int do_open_nondir(struct file *file, int flags)
 	struct dentry *dentry;
 	struct au_finfo *finfo;
 
+	FiMustWriteLock(file);
+
 	err = 0;
 	dentry = file->f_dentry;
 	finfo = au_fi(file);
@@ -393,7 +395,7 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	/* do not revalidate, no si lock */
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !au_test_mmapped(file));
+	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
 	fi_write_lock(file);
 	vma->vm_file = h_file;
@@ -423,7 +425,7 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !au_test_mmapped(file));
+	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
 	fi_write_lock(file);
 	vma->vm_file = h_file;
@@ -445,7 +447,7 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !au_test_mmapped(file));
+	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
 	fi_write_lock(file);
 	vma->vm_file = h_file;
@@ -514,6 +516,8 @@ static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
 	int err;
 	struct vm_operations_struct *h_ops;
 
+	AuRwMustAnyLock(&finfo->fi_rwsem);
+
 	err = 0;
 	h_ops = finfo->fi_h_vm_ops;
 	AuDebugOn(!h_ops);
@@ -548,14 +552,14 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 	struct vm_operations_struct *vm_ops;
 
 	dentry = file->f_dentry;
-	mmapped = !!au_test_mmapped(file); /* can be harmless race condition */
 	wlock = !!(file->f_mode & FMODE_WRITE) && (vma->vm_flags & VM_SHARED);
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
-	err = au_reval_and_lock_fdi(file, au_reopen_nondir, wlock | !mmapped);
+	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/1);
 	if (unlikely(err))
 		goto out;
 
+	mmapped = !!au_test_mmapped(file);
 	if (wlock) {
 		struct au_pin pin;
 
@@ -564,11 +568,11 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		if (unlikely(err))
 			goto out_unlock;
 		au_unpin(&pin);
-	} else if (!mmapped)
+	} else
 		di_downgrade_lock(dentry, AuLock_IR);
 
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (au_test_fs_bad_mapping(h_file->f_dentry->d_sb)) {
+	if (!mmapped && au_test_fs_bad_mapping(h_file->f_dentry->d_sb)) {
 		/*
 		 * by this assignment, f_mapping will differs from aufs inode
 		 * i_mapping.
@@ -611,10 +615,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
-	if (!wlock && mmapped)
-		fi_read_unlock(file);
-	else
-		fi_write_unlock(file);
+	fi_write_unlock(file);
  out:
 	si_read_unlock(sb);
 	return err;
