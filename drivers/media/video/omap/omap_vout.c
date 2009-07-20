@@ -523,15 +523,15 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
 	int offset = 0, ctop = 0, cleft = 0, line_length = 0;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
-	struct omap_dss_device *cur_display;
+	struct omap_display *cur_display;
 	int *cropped_offset = &(vout->cropped_offset);
 
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
 	/* get the display device attached to the overlay */
-	if (!ovl->manager || !ovl->manager->device)
+	if (!ovl->manager || !ovl->manager->display)
 		return -1;
-	cur_display = ovl->manager->device;
+	cur_display = ovl->manager->display;
 
 	if ((cur_display->type == OMAP_DISPLAY_TYPE_VENC) &&
 	    ((win->w.width == crop->width)
@@ -659,10 +659,10 @@ int omapvid_init(struct omap_vout_device *vout, u32 addr)
 	rotation = vout->rotation;
 	for (i = 0; i < ovid->num_overlays; i++) {
 		ovl = ovid->overlays[i];
-		if (!ovl->manager || !ovl->manager->device)
+		if (!ovl->manager || !ovl->manager->display)
 			return -EINVAL;
 
-		timing = &ovl->manager->device->panel.timings;
+		timing = &ovl->manager->display->panel->timings;
 
 		outw = win->w.width;
 		outh = win->w.height;
@@ -718,20 +718,13 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 {
 	struct omapvideo_info *ovid = &(vout->vid_info);
 	struct omap_overlay *ovl;
-	struct omap_dss_device *device;
 	int i;
 
 	for (i = 0; i < ovid->num_overlays; i++) {
 		ovl = ovid->overlays[i];
-		if (!ovl->manager || !ovl->manager->device)
+		if (!ovl->manager || !ovl->manager->display)
 			return -EINVAL;
 		ovl->manager->apply(ovl->manager);
-		if (ovl->manager->device->update) {
-			device = ovl->manager->device;
-			device->update(device, 0, 0,
-				       device->panel.timings.x_res,
-				       device->panel.timings.y_res);
-		}
 	}
 	return 0;
 
@@ -1189,7 +1182,7 @@ static int omap_vout_release(struct file *file)
 	/* Disable all the overlay managers connected with this interface */
 	for (t = 0; t < ovid->num_overlays; t++) {
 			struct omap_overlay *ovl = ovid->overlays[t];
-			if (ovl->manager && ovl->manager->device) {
+			if (ovl->manager && ovl->manager->display) {
 				struct omap_overlay_info info;
 				ovl->get_overlay_info(ovl, &info);
 				info.enabled = 0;
@@ -1324,10 +1317,10 @@ static int vidioc_try_fmt_vid_out(struct file *file, void *fh,
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
 
-	if (!ovl->manager || !ovl->manager->device)
+	if (!ovl->manager || !ovl->manager->display)
 		return -EINVAL;
 	/* get the display device attached to the overlay */
-	timing = &ovl->manager->device->panel.timings;
+	timing = &ovl->manager->display->panel->timings;
 
 	vout->fbuf.fmt.height = timing->y_res;
 	vout->fbuf.fmt.width = timing->x_res;
@@ -1355,11 +1348,11 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	ovl = ovid->overlays[0];
 
 	/* get the display device attached to the overlay */
-	if (!ovl->manager || !ovl->manager->device) {
+	if (!ovl->manager || !ovl->manager->display) {
 		mutex_unlock(&vout->lock);
 		return -EINVAL;
 	}
-	timing = &ovl->manager->device->panel.timings;
+	timing = &ovl->manager->display->panel->timings;
 
 	/* We dont support RGB24-packed mode if vrfb rotation
 	 * is enabled*/
@@ -1473,7 +1466,7 @@ static int vidioc_g_fmt_vid_overlay(struct file *file, void *fh,
 	struct omap_overlay *ovl;
 	struct omapvideo_info *ovid;
 	struct v4l2_window *win = &f->fmt.win;
-	struct omap_overlay_manager_info info;
+	u32 key_value =  0;
 
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
@@ -1482,12 +1475,10 @@ static int vidioc_g_fmt_vid_overlay(struct file *file, void *fh,
 	win->field = vout->win.field;
 	win->global_alpha = vout->win.global_alpha;
 
-	if (!ovl->manager || !ovl->manager->get_manager_info)
-		return -EINVAL;
-
-	ovl->manager->get_manager_info(ovl->manager, &info);
-	win->chromakey = info.trans_key;
-
+	if (ovl->manager && ovl->manager->get_trans_key_type_and_value)
+		ovl->manager->get_trans_key_type_and_value(ovl->manager, NULL,
+				&key_value);
+	win->chromakey = key_value;
 	return 0;
 }
 
@@ -1539,12 +1530,12 @@ static int vidioc_s_crop(struct file *file, void *fh,
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
 
-	if (!ovl->manager || !ovl->manager->device) {
+	if (!ovl->manager || !ovl->manager->display) {
 		mutex_unlock(&vout->lock);
 		return -EINVAL;
 	}
 	/* get the display device attached to the overlay */
-	timing = &ovl->manager->device->panel.timings;
+	timing = &ovl->manager->display->panel->timings;
 
 	if (rotate_90_or_270(vout->rotation)) {
 		vout->fbuf.fmt.height = timing->x_res;
@@ -1597,16 +1588,15 @@ static int vidioc_g_ctrl(struct file *file, void *fh, struct v4l2_control *ctrl)
 	{
 		struct omapvideo_info *ovid;
 		struct omap_overlay *ovl;
-		struct omap_overlay_manager_info info;
-
+		unsigned int color;
 		ovid = &(vout->vid_info);
 		ovl = ovid->overlays[0];
 
-		if (!ovl->manager || !ovl->manager->get_manager_info)
+		if (!ovl->manager || !ovl->manager->get_default_color)
 			return -EINVAL;
 
-		ovl->manager->get_manager_info(ovl->manager, &info);
-		ctrl->value = info.default_color;
+		color = ovl->manager->get_default_color(ovl->manager);
+		ctrl->value = color;
 		return 0;
 	}
 
@@ -1647,19 +1637,17 @@ static int vidioc_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 		unsigned int  color = a->value;
 		struct omapvideo_info *ovid;
 		struct omap_overlay *ovl;
-		struct omap_overlay_manager_info info;
 		ovid = &(vout->vid_info);
 		ovl = ovid->overlays[0];
 
 		mutex_lock(&vout->lock);
-		if (!ovl->manager || !ovl->manager->get_manager_info) {
+		if (!ovl->manager || !ovl->manager->set_default_color) {
 			mutex_unlock(&vout->lock);
 			return -EINVAL;
 		}
-		ovl->manager->get_manager_info(ovl->manager, &info);
-		info.default_color = color;
-		ovl->manager->set_manager_info(ovl->manager, &info);
 
+		ovl->manager->set_default_color(ovl->manager,
+				color);
 		vout->control[1].value = color;
 		mutex_unlock(&vout->lock);
 		return 0;
@@ -1886,7 +1874,7 @@ static int vidioc_streamon(struct file *file, void *fh,
 
 	for (t = 0; t < ovid->num_overlays; t++) {
 		struct omap_overlay *ovl = ovid->overlays[t];
-		if (ovl->manager && ovl->manager->device) {
+		if (ovl->manager && ovl->manager->display) {
 			struct omap_overlay_info info;
 			ovl->get_overlay_info(ovl, &info);
 			info.enabled = 1;
@@ -1928,7 +1916,7 @@ static int vidioc_streamoff(struct file *file, void *fh,
 
 		for (t = 0; t < ovid->num_overlays; t++) {
 			struct omap_overlay *ovl = ovid->overlays[t];
-			if (ovl->manager && ovl->manager->device) {
+			if (ovl->manager && ovl->manager->display) {
 				struct omap_overlay_info info;
 
 				ovl->get_overlay_info(ovl, &info);
@@ -1955,8 +1943,7 @@ static int vidioc_s_fbuf(struct file *file, void *fh,
 	struct omap_vout_device *vout = fh;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
-	struct omap_overlay_manager_info info;
-	enum omap_dss_trans_key_type key_type = OMAP_DSS_COLOR_KEY_GFX_DST;
+	enum omap_dss_color_key_type key_type = OMAP_DSS_COLOR_KEY_GFX_DST;
 	int enable = 0;
 
 	ovid = &(vout->vid_info);
@@ -1990,15 +1977,13 @@ static int vidioc_s_fbuf(struct file *file, void *fh,
 		enable = 1;
 	else
 		enable = 0;
-
-	if (ovl->manager && ovl->manager->get_manager_info &&
-	    ovl->manager->set_manager_info) {
-		ovl->manager->get_manager_info(ovl->manager, &info);
-		info.trans_enabled = enable;
-		info.trans_key = vout->win.chromakey;
-		ovl->manager->set_manager_info(ovl->manager, &info);
+	if (ovl->manager && ovl->manager->enable_trans_key &&
+			ovl->manager->set_trans_key_type_and_value) {
+		ovl->manager->enable_trans_key(
+				ovl->manager, enable);
+		ovl->manager->set_trans_key_type_and_value(
+				ovl->manager, key_type, vout->win.chromakey);
 	}
-
 	if (a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA) {
 		vout->fbuf.flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
 		enable = 1;
@@ -2006,12 +1991,8 @@ static int vidioc_s_fbuf(struct file *file, void *fh,
 		vout->fbuf.flags &= ~V4L2_FBUF_FLAG_LOCAL_ALPHA;
 		enable = 0;
 	}
-	if (ovl->manager && ovl->manager->get_manager_info &&
-	    ovl->manager->set_manager_info) {
-		ovl->manager->get_manager_info(ovl->manager, &info);
-		info.alpha_enabled = enable;
-		ovl->manager->set_manager_info(ovl->manager, &info);
-	}
+	if (ovl->manager && ovl->manager->enable_alpha_blending)
+		ovl->manager->enable_alpha_blending(ovl->manager, enable);
 
 	return 0;
 }
@@ -2022,7 +2003,7 @@ static int vidioc_g_fbuf(struct file *file, void *fh,
 	struct omap_vout_device *vout = fh;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
-	struct omap_overlay_manager_info info;
+	enum omap_dss_color_key_type key_type;
 
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
@@ -2032,18 +2013,21 @@ static int vidioc_g_fbuf(struct file *file, void *fh,
 	a->capability = V4L2_FBUF_CAP_LOCAL_ALPHA | V4L2_FBUF_CAP_CHROMAKEY
 		| V4L2_FBUF_CAP_SRC_CHROMAKEY;
 
-	if (ovl->manager && ovl->manager->get_manager_info) {
-		ovl->manager->get_manager_info(ovl->manager, &info);
-		if (info.trans_enabled) {
-			if (info.trans_key_type == OMAP_DSS_COLOR_KEY_VID_SRC)
+	if (ovl->manager && ovl->manager->get_trans_key_status
+			&& ovl->manager->get_trans_key_type_and_value) {
+		if (ovl->manager->get_trans_key_status(ovl->manager)) {
+			ovl->manager->get_trans_key_type_and_value(
+					ovl->manager, &key_type, NULL);
+			if (key_type == OMAP_DSS_COLOR_KEY_VID_SRC)
 				a->flags |= V4L2_FBUF_FLAG_SRC_CHROMAKEY;
-			if (info.trans_key_type == OMAP_DSS_COLOR_KEY_GFX_DST)
+			if (key_type == OMAP_DSS_COLOR_KEY_GFX_DST)
 				a->flags |= V4L2_FBUF_FLAG_CHROMAKEY;
 
 		}
-		if (info.alpha_enabled)
-			a->flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
 	}
+	if (ovl->manager && ovl->manager->get_alpha_blending_status)
+		if (ovl->manager->get_alpha_blending_status(ovl->manager))
+			a->flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
 
 	return 0;
 }
@@ -2089,8 +2073,8 @@ static int __init omap_vout_setup_video_data(struct omap_vout_device *vout)
 	struct v4l2_pix_format *pix;
 	struct video_device *vfd;
 	struct v4l2_control *control;
-	struct omap_dss_device *display =
-		vout->vid_info.overlays[0]->manager->device;
+	struct omap_display *display =
+		vout->vid_info.overlays[0]->manager->display;
 
 	/* set the default pix */
 	pix = &vout->pix;
@@ -2108,8 +2092,8 @@ static int __init omap_vout_setup_video_data(struct omap_vout_device *vout)
 	pix->colorspace = V4L2_COLORSPACE_JPEG;
 
 	vout->bpp = RGB565_BPP;
-	vout->fbuf.fmt.width  =  display->panel.timings.x_res;
-	vout->fbuf.fmt.height =  display->panel.timings.y_res;
+	vout->fbuf.fmt.width  =  display->panel->timings.x_res;
+	vout->fbuf.fmt.height =  display->panel->timings.y_res;
 
 	/* Set the data structures for the overlay parameters*/
 	vout->win.global_alpha = 255;
@@ -2353,7 +2337,7 @@ static int omap_vout_remove(struct platform_device *pdev)
 		if (vid_dev->displays[k]->state != OMAP_DSS_DISPLAY_DISABLED)
 			vid_dev->displays[k]->disable(vid_dev->displays[k]);
 
-		omap_dss_put_device(vid_dev->displays[k]);
+		omap_dss_put_display(vid_dev->displays[k]);
 	}
 	kfree(vid_dev);
 	return 0;
@@ -2361,11 +2345,10 @@ static int omap_vout_remove(struct platform_device *pdev)
 
 static int __init omap_vout_probe(struct platform_device *pdev)
 {
-	int r = 0, i;
+	int r = 0, i, t;
 	struct omap2video_device *vid_dev = NULL;
 	struct omap_overlay *ovl;
-	struct omap_dss_device *def_display;
-	struct omap_dss_device *display = NULL;
+	struct omap_display *def_display;
 
 	if (pdev->num_resources == 0) {
 		dev_err(&pdev->dev, "probed for an unknown device\n");
@@ -2382,8 +2365,10 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, vid_dev);
 
 	vid_dev->num_displays = 0;
-	for_each_dss_dev(display) {
-		omap_dss_get_device(display);
+	t = omap_dss_get_num_displays();
+	for (i = 0; i < t; i++) {
+		struct omap_display *display;
+		display = omap_dss_get_display(i);
 		if (!display) {
 			dev_err(&pdev->dev, "probed for an unknown device\n");
 			r = -EINVAL;
@@ -2411,8 +2396,8 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 	 */
 	 for (i = 1; i < 3; i++) {
 		ovl = omap_dss_get_overlay(i);
-		if (ovl->manager && ovl->manager->device) {
-			def_display = ovl->manager->device;
+		if (ovl->manager && ovl->manager->display) {
+			def_display = ovl->manager->display;
 		} else {
 			dev_err(&pdev->dev, "probed for an unknown device\n");
 			r = -EINVAL;
@@ -2452,12 +2437,12 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 		goto error0;
 
 	for (i = 0; i < vid_dev->num_displays; i++) {
-		struct omap_dss_device *display = vid_dev->displays[i];
+		struct omap_display *display = vid_dev->displays[i];
 
 		if (display->update)
 			display->update(display, 0, 0,
-			display->panel.timings.x_res,
-			display->panel.timings.y_res);
+			display->panel->timings.x_res,
+			display->panel->timings.y_res);
 	}
 	printk(KERN_INFO VOUT_NAME "display->updated\n");
 	return 0;
@@ -2484,7 +2469,7 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	u32 addr, fid;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
-	struct omap_dss_device *cur_display;
+	struct omap_display *cur_display;
 
 	if (!vout->streaming)
 		return;
@@ -2492,9 +2477,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	ovid = &(vout->vid_info);
 	ovl = ovid->overlays[0];
 	/* get the display device attached to the overlay */
-	if (!ovl->manager || !ovl->manager->device)
+	if (!ovl->manager || !ovl->manager->display)
 		return;
-	cur_display = ovl->manager->device;
+	cur_display = ovl->manager->display;
 
 	spin_lock(&vout->vbq_lock);
 	do_gettimeofday(&timevalue);
