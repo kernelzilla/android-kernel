@@ -699,7 +699,7 @@ static void au_ren_refresh(struct au_ren_args *a)
 	for (bindex = a->btgt + 1; bindex <= bend; bindex++) {
 		h_i = au_h_iptr(i, bindex);
 		if (h_i) {
-			au_xino_write0(sb, bindex, h_i->i_ino, 0);
+			au_xino_write(sb, bindex, h_i->i_ino, /*ino*/0);
 			/* ignore this error */
 			au_set_h_iptr(i, bindex, NULL, 0);
 		}
