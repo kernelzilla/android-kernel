@@ -245,6 +245,44 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 
 static DEVICE_ATTR(als, 0644, NULL, ld_lm3530_als_store);
 
+static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
+				   *attr, const char *buf, size_t size)
+{
+	int error = 0;
+	unsigned long pwm_value;
+	uint8_t gen_config_val;
+	uint8_t pwm_val;
+	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
+						 dev);
+	struct lm3530_data *als_data = i2c_get_clientdata(client);
+
+	error = strict_strtoul(buf, 10, &pwm_value);
+	if (error < 0)
+		return -1;
+
+	error = lm3530_read_reg(als_data,
+		LM3530_GEN_CONFIG,
+		&gen_config_val);
+	if (error != 0) {
+		pr_err("%s:Unable to read ALS Zone: %d\n",
+		       __func__, error);
+		return -1;
+	}
+
+	if (pwm_value >= 1)
+		pwm_val = gen_config_val | 0x20;
+	else
+		pwm_val = gen_config_val & 0xdf;
+
+	if (lm3530_write_reg(als_data, LM3530_GEN_CONFIG, pwm_val)) {
+		pr_err("%s:writing failed while setting pwm mode:%d\n",
+		       __func__, error);
+		return -1;
+	}
+	return pwm_value;
+}
+static DEVICE_ATTR(pwm_mode, 0644, NULL, ld_lm3530_pwm_store);
+
 irqreturn_t ld_lm3530_irq_handler(int irq, void *dev)
 {
 	struct lm3530_data *als_data = dev;
@@ -409,7 +447,14 @@ static int ld_lm3530_probe(struct i2c_client *client,
 	if (error < 0) {
 		pr_err("%s:File device creation failed: %d\n", __func__, error);
 		error = -ENODEV;
-		goto err_create_file_failed;
+		goto err_create_file_als_failed;
+	}
+
+	error = device_create_file(als_data->led_dev.dev, &dev_attr_pwm_mode);
+	if (error < 0) {
+		pr_err("%s:File device creation failed: %d\n", __func__, error);
+		error = -ENODEV;
+		goto err_create_pwm_file_failed;
 	}
 
 	disable_irq(als_data->client->irq);
@@ -417,7 +462,9 @@ static int ld_lm3530_probe(struct i2c_client *client,
 
 	return 0;
 
-err_create_file_failed:
+err_create_pwm_file_failed:
+	device_remove_file(als_data->led_dev.dev, &dev_attr_als);
+err_create_file_als_failed:
 	led_classdev_unregister(&als_data->led_dev);
 err_class_reg_failed:
 err_reg_init_failed:
@@ -439,6 +486,8 @@ static int ld_lm3530_remove(struct i2c_client *client)
 {
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
 	device_remove_file(als_data->led_dev.dev, &dev_attr_als);
+	device_remove_file(als_data->led_dev.dev,
+		&dev_attr_pwm_mode);
 	led_classdev_unregister(&als_data->led_dev);
 	free_irq(als_data->client->irq, als_data);
 	if (als_data->working_queue)
