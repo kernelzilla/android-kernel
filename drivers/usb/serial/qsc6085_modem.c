@@ -90,7 +90,9 @@ struct modem_port {
 	struct work_struct wake_and_write;
 	atomic_t write_count;
 	atomic_t read_count;
+	atomic_t int_count;
 	atomic_t intf_count;
+	atomic_t ctrl_count;
 };
 
 static struct usb_device_id id_table[] = {
@@ -174,6 +176,8 @@ static void stop_data_traffic(struct modem_port *modem_port_ptr)
 	for (i = 0; i < modem_port_ptr->rx_buflimit; i++)
 		usb_kill_urb(modem_port_ptr->ru[i].urb);
 
+	usb_kill_urb(modem_port_ptr->port->interrupt_in_urb);
+
 	tasklet_enable(&modem_port_ptr->urb_task);
 
 	cancel_work_sync(&port->work);
@@ -192,6 +196,81 @@ static void modem_read_buffers_free(
 		usb_buffer_free(usb_dev, modem_ptr->readsize,
 				modem_ptr->rb[i].base,
 				modem_ptr->rb[i].dma);
+}
+
+static int modem_dtr_control(struct usb_serial *serial, int ctrl)
+{
+	struct modem_port *modem_port_ptr =
+		usb_get_serial_data(serial);
+	uint8_t bRequesttype =
+		(USB_TYPE_CLASS | USB_RECIP_INTERFACE | USB_DIR_OUT);
+	uint16_t wLength = 0;
+	uint8_t bRequest = 0x22;
+	uint16_t wValue = ctrl;
+	uint16_t wIndex = 0;
+	unsigned int pipe;
+	int status;
+	unsigned long flags;
+
+	spin_lock_irqsave(&modem_port_ptr->write_lock, flags);
+	if (modem_port_ptr->susp_count) {
+		status = usb_autopm_get_interface(serial->interface);
+		if (status < 0) {
+			dev_err(&serial->dev->dev, "%s %s autopm failed %d",
+				dev_driver_string
+				(&serial->interface->dev),
+				dev_name(&serial->interface->dev), status);
+			spin_unlock_irqrestore(&modem_port_ptr->write_lock,
+				flags);
+			return status;
+		}
+	}
+
+	pipe = usb_sndctrlpipe(serial->dev, 0);
+	status = usb_control_msg(serial->dev, pipe, bRequest, bRequesttype,
+				wValue, wIndex, NULL, wLength,
+				WDR_TIMEOUT);
+	atomic_set(&modem_port_ptr->ctrl_count, 1);
+	spin_unlock_irqrestore(&modem_port_ptr->write_lock, flags);
+
+	return status;
+}
+
+static int modem_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct usb_serial_port *port = tty->driver_data;
+	struct modem_port *modem_port_ptr = usb_get_serial_data(port->serial);
+
+	if (modem_port_ptr == NULL)
+		return 0;
+
+	return (int)modem_port_ptr->modem_status;
+}
+
+static int modem_tiocmset(struct tty_struct *tty, struct file *file,
+				    unsigned int set, unsigned int clear)
+{
+	struct usb_serial_port *port = tty->driver_data;
+	int status = 0;
+
+	if (cdma_modem_debug)
+		dev_info(&port->dev, "%s: Enter. clear is %d, set is %d \n",
+			 __func__, clear, set);
+
+	if (port->number == MODEM_INTERFACE_NUM) {
+
+		if (clear & TIOCM_DTR)
+			status = modem_dtr_control(port->serial, 0);
+
+		if (set & TIOCM_DTR)
+			status = modem_dtr_control(port->serial, 1);
+	}
+
+	if (cdma_modem_debug)
+		dev_info(&port->dev, "%s: Exit. Status %d \n",
+			__func__, status);
+
+	return status;
 }
 
 static void modem_read_bulk_callback(struct urb *urb)
@@ -237,6 +316,138 @@ static void modem_read_bulk_callback(struct urb *urb)
 	return;
 }
 
+static void modem_update_modem_status(struct usb_serial_port *port,
+						__u8 modem_status)
+{
+	struct modem_port *modem_port_ptr;
+
+	if (port->number == MODEM_INTERFACE_NUM) {
+		modem_port_ptr = usb_get_serial_data(port->serial);
+		if (modem_port_ptr == NULL) {
+			dev_err(&port->dev,
+				"%s: null modem port pointer. \n",
+				 __func__);
+			return;
+		}
+
+		if (modem_status & BP_CAR)
+			modem_port_ptr->modem_status |= TIOCM_CAR;
+		else
+			modem_port_ptr->modem_status &= ~TIOCM_CAR;
+
+		if (modem_status & BP_DSR)
+			modem_port_ptr->modem_status |= TIOCM_DSR;
+		else
+			modem_port_ptr->modem_status &= ~TIOCM_DSR;
+
+		if (modem_status & BP_RNG)
+			modem_port_ptr->modem_status |= TIOCM_RNG;
+		else
+			modem_port_ptr->modem_status &= ~TIOCM_RNG;
+
+		if (cdma_modem_debug)
+			dev_info(&port->dev, "%s: modem status is now %d  \n",
+				__func__,
+				modem_port_ptr->modem_status);
+	}
+}
+
+static void modem_interrupt_callback(struct urb *urb)
+{
+	int status = urb->status;
+	uint16_t request_and_type;
+	uint8_t modem_status;
+	uint8_t *data;
+	int length;
+	int retval;
+	unsigned long flags;
+
+	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
+	struct modem_port *modem_port_ptr =
+	    usb_get_serial_data(port->serial);
+
+	if (port->number != MODEM_INTERFACE_NUM) {
+		if (cdma_modem_debug)
+			dev_info(&port->dev,
+			 "%s: Not Modem port. \n", __func__);
+		goto exit;
+	}
+
+	switch (status) {
+	case 0:
+		if (cdma_modem_debug)
+			dev_info(&port->dev, "%s: usb -inter_cbk \n", __func__);
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		dev_err(&port->dev, "%s: urb shutting down, %d. \n",
+				 __func__, status);
+		return;
+	default:
+		dev_err(&port->dev, "%s: nonzero urb status, %d. \n",
+				 __func__, status);
+		goto exit;
+	}
+
+	atomic_set(&modem_port_ptr->int_count, 1);
+	spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
+	modem_port_ptr->processing++;
+	spin_unlock_irqrestore(&modem_port_ptr->read_lock, flags);
+
+	length = urb->actual_length;
+	data = (__u8 *) urb->transfer_buffer;
+
+	request_and_type = *((__u16 *) data);
+
+	if (cdma_modem_debug)
+		dev_info(&port->dev, "%s: request and type is %d \n",
+			 __func__, request_and_type);
+
+	switch (request_and_type) {
+	case BP_MODEM_STATUS:
+		modem_status = data[8];
+		if (cdma_modem_debug)
+			dev_info(&port->dev, "%s: MODEM status %d \n",
+				__func__, modem_status);
+		modem_update_modem_status(port, modem_status);
+		break;
+
+	case BP_RSP_AVAIL:
+		if (cdma_modem_debug)
+			dev_info(&port->dev, "%s: BP_RSP_AVAIL \n",
+			__func__);
+		break;
+
+	case BP_SPEED_CHANGE:
+		if (cdma_modem_debug)
+			dev_info(&port->dev, "%s: BP_SPEED_CHANGE \n",
+			__func__);
+		break;
+
+	default:
+		if (cdma_modem_debug)
+			dev_info(&port->dev,
+				 "%s: undefined BP request type %d \n",
+				__func__, request_and_type);
+		break;
+	}
+
+exit:
+	spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
+	if (!modem_port_ptr->susp_count) {
+		retval = usb_submit_urb(urb, GFP_ATOMIC);
+		if (retval) {
+			dev_err(&port->dev,
+				 "%s:  submit int usb failed. ret = %d \n",
+				__func__, retval);
+		}
+	}
+	modem_port_ptr->processing--;
+	spin_unlock_irqrestore(&modem_port_ptr->read_lock, flags);
+	return;
+}
+
 static int modem_open(struct tty_struct *tty,
 		struct usb_serial_port *port,
 		struct file *filp)
@@ -274,6 +485,8 @@ static int modem_open(struct tty_struct *tty,
 	modem_port_ptr->port = port;
 	atomic_set(&modem_port_ptr->write_count, 0);
 	atomic_set(&modem_port_ptr->read_count, 0);
+	atomic_set(&modem_port_ptr->int_count, 0);
+	atomic_set(&modem_port_ptr->ctrl_count, 0);
 
 
 	INIT_LIST_HEAD(&modem_port_ptr->spare_read_urbs);
@@ -294,11 +507,34 @@ static int modem_open(struct tty_struct *tty,
 		spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
 		tasklet_schedule(&modem_port_ptr->urb_task);
 		spin_unlock_irqrestore(&modem_port_ptr->read_lock, flags);
-	} else {
-		if (cdma_modem_debug)
-			dev_info(&port->dev,
-			 "%s: susp_count not 0 at open time? \n",
-				__func__);
+	}
+
+	if (port->number == MODEM_INTERFACE_NUM) {
+		if (modem_port_ptr->susp_count == 0) {
+			spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
+			if (port->interrupt_in_urb) {
+				/* start to read INT EP data */
+				port->interrupt_in_urb->dev = port->serial->dev;
+				retval =
+				    usb_submit_urb(port->interrupt_in_urb,
+						   GFP_KERNEL);
+				if (retval) {
+					usb_kill_urb(port->interrupt_in_urb);
+					dev_err(&port->dev,
+						 "%s: retval is %d \n",
+						 __func__, retval);
+				}
+			} else {
+				dev_err(&port->dev,
+					 "%s: no interrupt endpoint \n",
+					 __func__);
+			}
+			spin_unlock_irqrestore(&modem_port_ptr->read_lock,
+					       flags);
+		}
+
+		/* clean up the modem status data */
+		modem_port_ptr->modem_status = 0;
 	}
 
 	atomic_set(&modem_port_ptr->intf_count, 1);
@@ -541,6 +777,16 @@ static void modem_pm_put_worker(struct work_struct *work)
 			put_interface = 0;
 		}
 
+		if (atomic_read(&modem_port_ptr->int_count) == 1) {
+			atomic_set(&modem_port_ptr->int_count, 0);
+			put_interface = 0;
+		}
+
+		if (atomic_read(&modem_port_ptr->ctrl_count) == 1) {
+			atomic_set(&modem_port_ptr->ctrl_count, 0);
+			put_interface = 0;
+		}
+
 		if ((put_interface == 1) &&
 			(atomic_read(&modem_port_ptr->intf_count) == 1)) {
 			usb_autopm_put_interface(serial->interface);
@@ -731,6 +977,7 @@ static int modem_resume(struct usb_interface *intf)
 	struct usb_serial_port *port;
 	unsigned long flags1, flags2, flags;
 	int ret = 0;
+	int retval;
 
 	if (modem_port_ptr == NULL) {
 		dev_err(&intf->dev, "%s: null modem port pointer. \n",
@@ -772,6 +1019,28 @@ static int modem_resume(struct usb_interface *intf)
 	}
 
 	atomic_set(&modem_port_ptr->intf_count, 1);
+
+	if (port->number == MODEM_INTERFACE_NUM) {
+		spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
+		if (port->interrupt_in_urb) {
+			port->interrupt_in_urb->dev = port->serial->dev;
+			retval =
+				usb_submit_urb(port->interrupt_in_urb,
+						GFP_KERNEL);
+			if (retval) {
+				usb_kill_urb(port->interrupt_in_urb);
+				dev_err(&port->dev,
+					"%s: retval is %d \n",
+					__func__, retval);
+			}
+		} else {
+				dev_err(&port->dev,
+					"%s: no interrupt endpoint \n",
+					__func__);
+		}
+		spin_unlock_irqrestore(&modem_port_ptr->read_lock,
+						flags);
+	}
 
 	spin_lock_irqsave(&modem_port_ptr->read_lock, flags);
 	tasklet_schedule(&modem_port_ptr->urb_task);
@@ -979,6 +1248,9 @@ static struct usb_serial_driver modem_device = {
 	.num_ports = 1,
 	.write = modem_write,
 	.write_bulk_callback = modem_write_bulk_callback,
+	.read_int_callback = modem_interrupt_callback,
+	.tiocmset = modem_tiocmset,
+	.tiocmget = modem_tiocmget,
 	.open = modem_open,
 	.close = modem_close,
 	.attach = modem_startup,
