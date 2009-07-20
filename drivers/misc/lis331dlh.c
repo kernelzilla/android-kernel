@@ -59,8 +59,8 @@
 #define ODR400          	0x10	/* 400Hz output data rate */
 #define ODR1000         	0x18	/* 1000Hz output data rate */
 
-#define FUZZ			64
-#define FLAT			4
+#define FUZZ			32
+#define FLAT			32
 #define I2C_RETRY_DELAY		5
 #define I2C_RETRIES		5
 #define AUTO_INCREMENT		0x80
