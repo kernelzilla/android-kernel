@@ -480,14 +480,13 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 			au_unpin(&a->pin);
 			di_write_unlock(a->parent);
 			err = au_cpup_before_link(src_dentry, a);
-			if (!err) {
-				di_write_lock_parent(a->parent);
+			di_write_lock_parent(a->parent);
+			if (!err)
 				err = au_pin(&a->pin, dentry, a->bdst,
 					     au_opt_udba(sb),
 					     AuPin_DI_LOCKED | AuPin_MNT_WRITE);
-				if (unlikely(err))
-					goto out_wh;
-			}
+			if (unlikely(err))
+				goto out_wh;
 		}
 		if (!err) {
 			h_src_dentry = au_h_dptr(src_dentry, a->bdst);
