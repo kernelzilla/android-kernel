@@ -244,21 +244,21 @@ static void sholes_als_init(void)
 static struct vkey sholes_touch_vkeys[] = {
 	{
 		.min		= 0,
-		.max		= 200,
+		.max		= 193,
 		.code		= KEY_BACK,
 	},
 	{
-		.min		= 330,
-		.max		= 520,
+		.min		= 275,
+		.max		= 467,
 		.code		= KEY_MENU,
 	},
 	{
-		.min		= 590,
-		.max		= 780,
+		.min		= 556,
+		.max		= 748,
 		.code		= KEY_HOME,
 	},
 	{
-		.min		= 880,
+		.min		= 834,
 		.max		= 1024,
 		.code		= KEY_SEARCH,
 	},
@@ -285,8 +285,8 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.hw_reset	= sholes_touch_reset,
 	.power_cfg	= {
 		.idle_acq_int	= 1,
-		.active_acq_int	= 16,
-		.active_idle_to	= 25,
+		.active_acq_int	= 0xff,
+		.active_idle_to	= 0xff,
 	},
 	.acquire_cfg	= {
 		.charge_time	= 10,
@@ -297,7 +297,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.sync		= 0,
 	},
 	.multi_touch_cfg	= {
-		.ctrl		= 0x03,
+		.ctrl		= 0x0f,
 		.x_origin	= 0,
 		.y_origin	= 0,
 		.x_size		= 12,
@@ -313,19 +313,23 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.merge_hyst	= 0,
 		.merge_thresh	= 3,
 	},
-	.linear_tbl_cfg = {
-		.ctrl = 0x01,
-		.x_offset = 0x0000,
-		.x_segment = {0x5f,0x3b,0x3f,0x38,
-					  0x46,0x3c,0x39,0x3f,
-					  0x3a,0x3c,0x3e,0x3c,
-					  0x3e,0x3f,0x3e,0x3f},
-		.y_offset = 0x0000,
-		.y_segment = {0x5e,0x4c,0x3e,0x3d,
-					  0x3d,0x3b,0x3d,0x3e,
-					  0x3e,0x3c,0x38,0x3d,
-					  0x3c,0x3e,0x3c,0x3c},
-	},
+	  .linear_tbl_cfg = {
+		  .ctrl = 0x01,
+		  .x_offset = 0x0000,
+		  .x_segment = {
+			  0x4D, 0x40, 0x3E, 0x3E,
+			  0x44, 0x3c, 0x3c, 0x3d,
+			  0x3f, 0x42, 0x3f, 0x3c,
+			  0x3f, 0x3f, 0x3e, 0x44
+		  },
+		  .y_offset = 0x0000,
+		  .y_segment = {
+			  0x42, 0x38, 0x34, 0x3c,
+			  0x3c, 0x44, 0x3e, 0x3b,
+			  0x42, 0x41, 0x43, 0x45,
+			  0x43, 0x45, 0x43, 0x46
+		  },
+	  },
 	.grip_suppression_cfg = {
 		.ctrl		= 0x00,
 		.xlogrip	= 0x00,
