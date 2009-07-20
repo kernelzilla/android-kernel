@@ -31,6 +31,8 @@
 #define LM3554_ALLOWED_W_BYTES 2
 #define LM3554_MAX_RW_RETRIES 5
 #define LM3554_I2C_RETRY_DELAY 10
+#define LM3554_TORCH_STEP	32
+#define LM3554_STROBE_STEP	16
 
 #define LM3554_TORCH_BRIGHTNESS		0xA0
 #define LM3554_FLASH_BRIGHTNESS		0xB0
@@ -130,8 +132,9 @@ int lm3554_init_registers(struct lm3554_data *torch_data)
 
 	return 0;
 }
-/* This function is a place holder to set the brightness of the
-torch or flash.  For now just return the error flags */
+
+/* This is a dummy interface for the LED class this will clear
+the error flag register */
 static void lm3554_brightness_set(struct led_classdev *led_cdev,
 				  enum led_brightness value)
 {
@@ -142,11 +145,32 @@ static void lm3554_brightness_set(struct led_classdev *led_cdev,
 	    container_of(led_cdev, struct lm3554_data, led_dev);
 
 	err = lm3554_read_reg(torch_data, LM3554_FLAG_REG, &err_flags);
-	if (err != 0) {
-		pr_err("%s: Reading the status failed for %i\n", __func__, err);
+	if (err) {
+		pr_err("%s: Reading the status failed for %i\n", __func__,
+		       err);
 		return;
 	}
 	return;
+}
+
+static ssize_t lm3554_torch_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	int err;
+	uint8_t val;
+	struct i2c_client *client = container_of(dev->parent,
+						 struct i2c_client, dev);
+	struct lm3554_data *torch_data = i2c_get_clientdata(client);
+
+	err = lm3554_read_reg(torch_data, LM3554_TORCH_BRIGHTNESS, &val);
+	if (err) {
+		pr_info("%s: Failure reading brightness value\n", __func__);
+		return -EIO;
+	}
+	/* Get the value of the brightness */
+	val = ((val & 0x38) >> 3) * LM3554_TORCH_STEP;
+	sprintf(buf, "%d\n", val);
+	return sizeof(buf);
 }
 
 static ssize_t lm3554_torch_store(struct device *dev,
@@ -156,44 +180,66 @@ static ssize_t lm3554_torch_store(struct device *dev,
 	int err;
 	unsigned long torch_val = LED_OFF;
 	uint8_t val;
-	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
-						 dev);
+	struct i2c_client *client = container_of(dev->parent,
+						 struct i2c_client, dev);
 	struct lm3554_data *torch_data = i2c_get_clientdata(client);
 
 	err = strict_strtoul(buf, 10, &torch_val);
-	if (err != 0) {
+	if (err) {
 		pr_err("%s: Invalid parameter sent\n", __func__);
 		return -1;
 	}
 
-	err = lm3554_init_registers(torch_data);
-	if (err != 0) {
-		pr_err("%s: Configuring the flash light failed for %i\n",
-		       __func__, err);
+	err = lm3554_read_reg(torch_data, LM3554_TORCH_BRIGHTNESS, &val);
+	if (err)
+		return err;
+	/* Clear out the Enable and brightness bits */
+	val &= 0xc4;
+
+	if (torch_val) {
+		val |= ((torch_val / LM3554_TORCH_STEP) << 3);
+		val |= 0x02;
+	}
+
+	err = lm3554_write_reg(torch_data, LM3554_CONFIG_REG_2, 0x08);
+	if (err) {
+		pr_err("%s: Configuring the VIN Monitor failed for "
+		       "%i\n", __func__, err);
 		return -EIO;
 	}
 
-	err = lm3554_read_reg(torch_data, LM3554_TORCH_BRIGHTNESS, &val);
-	if (err == 0) {
-		if (torch_val)
-			val |= 0x02;
-		else
-			val &= 0xfc;
-
-		err = lm3554_write_reg(torch_data,
-			LM3554_TORCH_BRIGHTNESS, val);
-		if (err != 0) {
-			pr_err
-			    ("%s: Configuring the flash light failed for %i\n",
-			     __func__, err);
-			return -EIO;
-		}
+	err = lm3554_write_reg(torch_data,
+			       LM3554_TORCH_BRIGHTNESS, val);
+	if (err) {
+		pr_err("%s: Configuring the flash light failed for "
+		       "%i\n", __func__, err);
+		return -EIO;
 	}
 
 	return err;
 }
 
-static DEVICE_ATTR(flash_light, 0644, NULL, lm3554_torch_store);
+static DEVICE_ATTR(flash_light, 0644, lm3554_torch_show, lm3554_torch_store);
+
+static ssize_t lm3554_strobe_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	int err;
+	uint8_t val;
+	struct i2c_client *client = container_of(dev->parent,
+						 struct i2c_client, dev);
+	struct lm3554_data *torch_data = i2c_get_clientdata(client);
+
+	err = lm3554_read_reg(torch_data, LM3554_FLASH_BRIGHTNESS, &val);
+	if (err) {
+		pr_err("%s: Failure reading brightness value\n", __func__);
+		return -EIO;
+	}
+	/* Get the value of the brightness */
+	val = ((val & 0x78) >> 3) * LM3554_STROBE_STEP;
+	sprintf(buf, "%d\n", val);
+	return sizeof(buf);
+}
 
 static ssize_t lm3554_strobe_store(struct device *dev,
 				   struct device_attribute *attr,
@@ -203,13 +249,15 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 	unsigned long strobe_val = 0;
 	uint8_t err_flags;
 	uint8_t val;
-	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
-						 dev);
+	uint8_t strobe_brightness;
+	struct i2c_client *client = container_of(dev->parent,
+						 struct i2c_client, dev);
 	struct lm3554_data *torch_data = i2c_get_clientdata(client);
 
 	err = lm3554_read_reg(torch_data, LM3554_FLAG_REG, &err_flags);
-	if (err != 0) {
-		pr_err("%s: Reading the status failed for %i\n", __func__, err);
+	if (err) {
+		pr_err("%s: Reading the status failed for %i\n", __func__,
+		       err);
 		return -EIO;
 	}
 	if (err_flags &
@@ -221,38 +269,50 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 	}
 
 	err = strict_strtoul(buf, 10, &strobe_val);
-	if (err != 0) {
+	if (err) {
 		pr_err("%s: Invalid parameter sent\n", __func__);
 		return -1;
 	}
 
-	err = lm3554_init_registers(torch_data);
-	if (err != 0) {
+	err = lm3554_read_reg(torch_data, LM3554_CONFIG_REG_1, &val);
+
+	if (err) {
 		pr_err("%s: Configuring the flash light failed for %i\n",
-		       __func__, err);
+		     __func__, err);
 		return -EIO;
 	}
 
-	err = lm3554_read_reg(torch_data, LM3554_CONFIG_REG_1, &val);
-	if (err == 0) {
-		if (strobe_val)
-			val |= 0x04;
-		else
-			val &= 0xfb;
 
-		err = lm3554_write_reg(torch_data, LM3554_CONFIG_REG_1, val);
-		if (err != 0) {
-			pr_err
-			    ("%s: Configuring the flash light failed for %i\n",
-			     __func__, err);
+	val &= 0xfb;
+	if (strobe_val) {
+		err = lm3554_write_reg(torch_data,
+				       LM3554_TORCH_BRIGHTNESS,
+				       torch_data->
+				       pdata->torch_brightness_def);
+		if (err) {
+			pr_err("%s:Configuring torch brightness failed\n",
+			       __func__);
 			return -EIO;
 		}
+		err = lm3554_read_reg(torch_data, LM3554_FLASH_BRIGHTNESS,
+				      &strobe_brightness);
+		if (err) {
+			pr_err("%s: Configuring flash brightness failed\n",
+			       __func__);
+			return -EIO;
+		}
+		strobe_brightness &= 0x83;
+		strobe_brightness |= ((strobe_val / LM3554_STROBE_STEP) << 3);
+		err = lm3554_write_reg(torch_data, LM3554_FLASH_BRIGHTNESS,
+				       strobe_brightness);
+		val |= 0x04;
 	}
-
+	err = lm3554_write_reg(torch_data, LM3554_CONFIG_REG_1, val);
 	return 0;
 }
 
-static DEVICE_ATTR(camera_strobe, 0644, NULL, lm3554_strobe_store);
+static DEVICE_ATTR(camera_strobe, 0644, lm3554_strobe_show,
+		   lm3554_strobe_store);
 
 static int lm3554_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
@@ -300,7 +360,7 @@ static int lm3554_probe(struct i2c_client *client,
 	}
 
 	err = device_create_file(torch_data->led_dev.dev,
-		&dev_attr_flash_light);
+				 &dev_attr_flash_light);
 	if (err < 0) {
 		err = -ENODEV;
 		pr_err("%s:File device creation failed: %d\n", __func__, err);
@@ -308,7 +368,7 @@ static int lm3554_probe(struct i2c_client *client,
 	}
 
 	err = device_create_file(torch_data->led_dev.dev,
-		&dev_attr_camera_strobe);
+				 &dev_attr_camera_strobe);
 	if (err < 0) {
 		err = -ENODEV;
 		pr_err("%s:File device creation failed: %d\n", __func__, err);
@@ -375,9 +435,7 @@ static void cpcap_lm3554_power(struct cpcap_device *cpcap, int power_val)
 		gpio_state = 0;
 
 	cpcap_regacc_write(cpcap,
-					  CPCAP_REG_GPIO0,
-					  gpio_state,
-					  CPCAP_BIT_GPIO0DRV);
+			   CPCAP_REG_GPIO0, gpio_state, CPCAP_BIT_GPIO0DRV);
 }
 
 static int cpcap_lm3554_probe(struct platform_device *pdev)
