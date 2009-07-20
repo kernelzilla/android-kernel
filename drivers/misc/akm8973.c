@@ -29,8 +29,8 @@
 
 #define NAME "akm8973"
 
-#define FUZZ			4
-#define FLAT			4
+#define FUZZ			2
+#define FLAT			2
 #define I2C_RETRIES		5
 #define I2C_RETRY_DELAY		5
 
@@ -316,17 +316,18 @@ static void akm8973_transform_values(struct akm8973_data *akm,
 {
 	int tmp;
 
+	/* values = {t,x,y,z} */
 	ivalues[0] = values[0];
 	ivalues[1] = akm8973_convert_adc_offset(akm->pdata->hxda, values[1]);
 	ivalues[2] = akm8973_convert_adc_offset(akm->pdata->hyda, values[2]);
 	ivalues[3] = akm8973_convert_adc_offset(akm->pdata->hzda, values[3]);
 
-	/* values = {t,x,y,z} */
+	/* rotation over x axis */
 	if (akm->pdata->xy_swap)
-		swap(values[1], values[2]);
+		ivalues[1] = -ivalues[1];
 
 	if (akm->pdata->z_flip)
-		values[3] = -values[3];
+		ivalues[3] = -ivalues[3];
 
 	/* part orientation on the x,y plane */
 	switch (akm->pdata->orientation) {
@@ -334,20 +335,20 @@ static void akm8973_transform_values(struct akm8973_data *akm,
 		break;
 
 	case 90:
-		tmp = values[1];
-		values[1] = -values[2];
-		values[2] = tmp;
+		tmp = ivalues[1];
+		ivalues[1] = -ivalues[2];
+		ivalues[2] = tmp;
 		break;
 
 	case 180:
-		values[1] = -values[1];
-		values[2] = -values[2];
+		ivalues[1] = -ivalues[1];
+		ivalues[2] = -ivalues[2];
 		break;
 
 	case 270:
-		tmp = values[1];
-		values[1] = values[2];
-		values[2] = -tmp;
+		tmp = ivalues[1];
+		ivalues[1] = ivalues[2];
+		ivalues[2] = -tmp;
 		break;
 
 	default:
