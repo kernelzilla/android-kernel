@@ -324,7 +324,7 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 			bstart, au_sbtype(h_dentry->d_sb), AuDLNPair(dentry),
 			(unsigned long)h_ino, (unsigned long)ino);
 	ino = 0;
-	err = au_xino_write0(sb, bstart, h_ino, 0);
+	err = au_xino_write(sb, bstart, h_ino, /*ino*/0);
 	if (!err) {
 		iput(inode);
 		goto new_ino;
