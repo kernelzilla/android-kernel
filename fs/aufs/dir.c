@@ -155,6 +155,7 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 		sbinfo = au_sbi(sb);
 		/* clear the flag without write-lock */
 		sbinfo->au_si_status &= ~AuSi_MAINTAIN_PLINK;
+		smp_mb();
 		wake_up_all(&sbinfo->si_plink_wq);
 	}
 	fi_write_unlock(file);
