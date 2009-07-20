@@ -165,7 +165,7 @@ static int hin_xino(struct inode *inode, struct inode *h_inode)
 		if (!h_i)
 			continue;
 
-		err = au_xino_write0(inode->i_sb, bindex, h_i->i_ino, 0);
+		err = au_xino_write(inode->i_sb, bindex, h_i->i_ino, /*ino*/0);
 		/* ignore this error */
 		/* bad action? */
 	}
