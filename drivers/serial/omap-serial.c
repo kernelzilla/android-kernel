@@ -1106,8 +1106,6 @@ static int serial_omap_resume(struct platform_device *dev)
 	return 0;
 }
 
-static int line;
-
 static void serial_omap_rx_timeout(unsigned long uart_no)
 {
 	struct uart_omap_port *up = ui[uart_no - 1];
