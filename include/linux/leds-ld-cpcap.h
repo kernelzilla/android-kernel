@@ -25,15 +25,15 @@
 #define LD_SUPPLY "sw5"
 
 #define LD_MSG_IND_ON			0x1
-#define LD_MSG_IND_CURRENT		0x4
+#define LD_MSG_IND_CURRENT		0x2
 
 #define LD_MSG_IND_CPCAP_MASK		0x3FF
 
-#define LD_MSG_IND_LOW			0x30
-#define LD_MSG_IND_LOW_MED		0x60
-#define LD_MSG_IND_MEDIUM		0xA0
-#define LD_MSG_IND_MED_HIGH		0xC0
-#define LD_MSG_IND_HIGH			0xF0
+#define LD_MSG_IND_LOW			0x20
+#define LD_MSG_IND_LOW_MED		0x20
+#define LD_MSG_IND_MEDIUM		0x30
+#define LD_MSG_IND_MED_HIGH		0x40
+#define LD_MSG_IND_HIGH			0x50
 
 #define LD_LED_RED		0x01
 #define LD_LED_GREEN	0x02
