@@ -150,6 +150,27 @@ static struct platform_device androidusb_device = {
 	},
 };
 
+static int cpcap_usb_connected_probe(struct platform_device *pdev)
+{
+	android_usb_set_connected(1);
+	return 0;
+}
+
+static int cpcap_usb_connected_remove(struct platform_device *pdev)
+{
+	android_usb_set_connected(0);
+	return 0;
+}
+
+static struct platform_driver cpcap_usb_connected_driver = {
+	.probe		= cpcap_usb_connected_probe,
+	.remove		= cpcap_usb_connected_remove,
+	.driver		= {
+		.name	= "cpcap_usb_connected",
+		.owner	= THIS_MODULE,
+	},
+};
+
 static void sholes_gadget_init(void)
 {
 	unsigned int val[2];
@@ -161,6 +182,7 @@ static void sholes_gadget_init(void)
 
 	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X", val[1], val[0]);
 	platform_device_register(&androidusb_device);
+	platform_driver_register(&cpcap_usb_connected_driver);
 }
 
 static void sholes_audio_init(void)
