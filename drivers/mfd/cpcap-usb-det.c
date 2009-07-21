@@ -79,6 +79,7 @@ struct cpcap_usb_det_data {
 	enum cpcap_det_state state;
 	enum cpcap_accy usb_accy;
 	struct platform_device *usb_dev;
+	struct platform_device *usb_connected_dev;
 	struct regulator *regulator;
 	struct wake_lock wake_lock;
 	unsigned char is_vusb_enabled;
@@ -208,8 +209,10 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
-	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL))
+	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL)) {
 		platform_device_del(data->usb_dev);
+		data->usb_dev = NULL;
+	}
 
 	configure_hardware(data, accy);
 	data->usb_accy = accy;
@@ -220,6 +223,15 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		platform_device_add(data->usb_dev);
 	} else
 		vusb_disable(data);
+
+	if (accy == CPCAP_ACCY_USB) {
+		data->usb_connected_dev =
+			platform_device_alloc("cpcap_usb_connected", -1);
+		platform_device_add(data->usb_connected_dev);
+	} else if (data->usb_connected_dev != NULL) {
+		platform_device_del(data->usb_connected_dev);
+		data->usb_connected_dev = NULL;
+	}
 }
 
 static void detection_work(struct work_struct *work)
