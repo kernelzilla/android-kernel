@@ -159,7 +159,7 @@ static void sholes_gadget_init(void)
 	val[0] = omap_readl(reg);
 	val[1] = omap_readl(reg + 4);
 
-	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08x%08x", val[1], val[0]);
+	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X", val[1], val[0]);
 	platform_device_register(&androidusb_device);
 }
 
