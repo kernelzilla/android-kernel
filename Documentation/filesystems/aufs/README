@@ -151,6 +151,57 @@ $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-util.git \
 $ cd aufs2-util.git
 - no particular tag/branch currently.
 
+o for advanced users
+$ git clone git://git.kernel.org/.../torvalds/linux-2.6.git linux-2.6.git
+  It will take very long time.
+
+$ cd linux-2.6.git
+$ git remote add aufs2 http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-2.6.git
+$ git checkout -b aufs2-27 v2.6.27
+$ git pull aufs2 aufs2-27
+  It may take long time again.
+  Once pulling completes, you've got linux-2.6.27 and aufs2 for it in a
+  branch named aufs2-27, and you can configure and build it.
+
+Or
+
+$ git checkout -t -b aufs2 master
+$ git pull aufs2 aufs2
+  then you've got the latest linux kernel and the latest aufs2 in a
+  branch named aufs2, and you can configure and build it.
+  But aufs is released once a week, so you may meet a compilation error
+  due to mismatching between the mainline and aufs2.
+
+Or you may want build linux-2.6.xx.yy instead of linux-2.6.xx, then here
+is an approach using linux-2.6-stable GIT tree.
+
+$ cd linux-2.6.git/..
+$ git clone -q --reference ./linux-2.6.git git://git.kernel.org/.../linux-2.6-stable.git \
+	linux-2.6-stable.git
+  It will take very long time.
+
+$ cd linux-2.6-stable.git
+$ git remote add aufs2 http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-2.6.git
+$ git checkout -b aufs2-27.1 v2.6.27.1
+$ git pull aufs2 aufs2-27
+  then you've got linux-2.6.27.1 and aufs2 for 2.6.27 in a branch named
+  aufs2-27.1, and you can configure and build it.
+  But the changes made by v2.6.xx.yy may conflict with aufs2-xx, since
+  aufs2-xx is for v2.6.xx only. In this case, you may find some patchces
+  for v2.6.xx.yy in aufs2-standalone.git#aufs2-xx branch if someone else
+  have ever requested me to support v2.6.xx.yy and I did it.
+
+You can also check what was changed by pulling aufs2.
+$ git diff v2.6.27.1..aufs2-27.1
+
+If you want to check the changed files other than fs/aufs, then try this.
+$ git diff v2.6.27.1..aufs2-27.1 |
+> awk '
+> /^diff / {new=1}
+> /^diff.*aufs/ {new=0}
+> new {print}
+> '
+
 
 3. Configuration and Compilation
 ----------------------------------------
@@ -182,6 +233,8 @@ If you don't like aufs2-standalone.patch, then try aufs2-2.6 tree.
 - apply ./aufs2-standalone.patch to your kernel source files.
 - build your kernel and reboot.
 - edit ./config.mk and set other aufs configurations if necessary.
+  Note: You should read ./fs/aufs/Kconfig carefully which describes
+  every aufs configurations.
 - build the module by simple "make".
 - you can specify ${KDIR} make variable which points to your kernel
   source tree.
