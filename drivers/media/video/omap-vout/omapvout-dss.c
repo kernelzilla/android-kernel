@@ -20,13 +20,12 @@
 #include "omapvout.h"
 #include "omapvout-dss.h"
 #include "omapvout-mem.h"
+#include "omapvout-vbq.h"
 
 #define DMA_CHAN_ALLOTED	1
 #define DMA_CHAN_NOT_ALLOTED	0
 
 #define VRFB_TX_TIMEOUT		1000
-
-#define INVALID_SEQ_NUM		0
 
 /*=== Local Functions ==================================================*/
 
@@ -315,7 +314,7 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 		}
 	}
 
-	src_paddr = vout->fq[buf_idx].phy_addr;
+	src_paddr = vout->queue.bufs[buf_idx]->baddr;
 	dst_paddr = vrfb->ctx[vrfb->next].paddr[0];
 
 	omap_set_dma_transfer_params(vrfb->dma_ch, OMAP_DMA_DATA_TYPE_S32,
@@ -357,7 +356,7 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	memset(&o_info, 0, sizeof(o_info));
 	o_info.enabled = true;
 	if (rot == 0) {
-		o_info.paddr = vout->fq[buf_idx].phy_addr;
+		o_info.paddr = vout->queue.bufs[buf_idx]->baddr;
 		o_info.paddr += vout->dss->foffset;
 		o_info.vaddr = NULL;
 		o_info.screen_width = vout->pix.width;
@@ -416,116 +415,120 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	return rc;
 }
 
+static void omapvout_dss_mark_buf_done(struct omapvout_device *vout, int idx)
+{
+	/* FIXME: Should set the state to VIDEOBUF_DONE here, but since we
+	 * don't properly DQ yet, this has been hacked to allow no DQ.
+	 */
+	vout->queue.bufs[idx]->state = VIDEOBUF_IDLE;
+	wake_up_interruptible(&vout->queue.bufs[idx]->done);
+}
+
 static void omapvout_dss_perform_update(struct work_struct *work)
 {
 	struct omapvout_device *vout;
 	struct omapvout_dss *dss;
 	struct omap_dss_device *dev;
-	int i;
+	struct videobuf_buffer *buf;
 	int rc;
 	int idx = 0;
-	u32 seqn = INVALID_SEQ_NUM;
 
 	dss = container_of(work, struct omapvout_dss, work);
 	vout = dss->vout;
-
-	if (dss->exit_work)
-		return;
 
 	if (!dss->enabled)
 		return;
 
 	mutex_lock(&vout->mtx);
 
-	/* Find a frame to process */
-	for (i = vout->fq_cnt - 1; i >= 0; i--) {
-		if (vout->fq[i].seq_num != INVALID_SEQ_NUM) {
-			if (seqn == INVALID_SEQ_NUM ||
-					vout->fq[i].seq_num < seqn) {
-				seqn = vout->fq[i].seq_num;
-				idx = i;
+	dss->working = true;
+
+	while (!list_empty(&vout->q_list)) {
+
+		buf = list_entry(vout->q_list.next,
+				struct videobuf_buffer, queue);
+		list_del(&buf->queue);
+		buf->state = VIDEOBUF_ACTIVE;
+		idx = buf->i;
+
+		/*DBG("Processing frame %d\n", idx);*/
+
+		if (dss->need_cfg) {
+			rc = omapvout_dss_calc_offset(vout);
+			if (rc != 0) {
+				DBG("Offset calculation failed %d\n", rc);
+				goto failed_w_idx;
+			}
+
+			rc = omapvout_dss_config_colorkey(vout, true);
+			if (rc != 0) {
+				DBG("Alpha config failed %d\n", rc);
+				goto failed_w_idx;
 			}
 		}
-	}
 
-	if (seqn == INVALID_SEQ_NUM) {
-		DBG("No frame found to process\n");
-		goto failed;
-	}
-
-	vout->fq[idx].seq_num = INVALID_SEQ_NUM;
-
-	if (dss->need_cfg) {
-		rc = omapvout_dss_calc_offset(vout);
+		rc = omapvout_dss_perform_vrfb_dma(vout, idx, dss->need_cfg);
 		if (rc != 0) {
-			DBG("Offset calculation failed %d\n", rc);
+			DBG("VRFB rotation failed %d\n", rc);
 			goto failed_w_idx;
 		}
 
-		rc = omapvout_dss_config_colorkey(vout, true);
+		rc = omapvout_dss_update_overlay(vout, idx);
 		if (rc != 0) {
-			DBG("Alpha config failed %d\n", rc);
+			DBG("DSS update failed %d\n", rc);
 			goto failed_w_idx;
 		}
-	}
 
-	rc = omapvout_dss_perform_vrfb_dma(vout, idx, dss->need_cfg);
-	if (rc != 0) {
-		DBG("VRFB rotation failed %d\n", rc);
-		goto failed_w_idx;
-	}
+		dss->need_cfg = false;
 
-	rc = omapvout_dss_update_overlay(vout, idx);
-	if (rc != 0) {
-		DBG("DSS update failed %d\n", rc);
-		goto failed_w_idx;
-	}
+		mutex_unlock(&vout->mtx);
 
-	dss->need_cfg = false;
+		/* Wait until the new frame is being used.  There is no problem
+		 * doing this here since we are in a worker thread.  The mutex
+		 * is unlocked since the sync may take some time.
+		 */
+		dev = dss->overlay->manager->device;
+		if (dev->sync)
+			dev->sync(dev);
 
-	mutex_unlock(&vout->mtx);
+		/* Since the mutex was unlocked, it is possible that the DSS
+		 * may be disabled when we return, so check for this and exit
+		 * if so.
+		 */
+		if (!dss->enabled) {
+			/* Since the DSS is disabled, this isn't a problem */
+			dss->working = false;
 
-	/* Wait until the new frame is being used.  There is no problem
-	 * doing this here since we are in a worker thread.  The mutex
-	 * is unlocked since the sync may take some time.
-	 */
-	dev = dss->overlay->manager->device;
-	if (dev->sync)
-		dev->sync(dev);
-
-	/* Since the mutex was unlocked, it is possible that the DSS may
-	 * be exiting when we return, so check for this and exit if so.
-	 */
-	if (dss->exit_work)
-		return;
-
-	mutex_lock(&vout->mtx);
-
-	if (vout->rotation == 0) {
-		if (vout->fq_cur_idx != -1) {
-			vout->fq[vout->fq_cur_idx].flags &=
-						~(V4L2_BUF_FLAG_QUEUED);
-			vout->fq[vout->fq_cur_idx].flags |= V4L2_BUF_FLAG_DONE;
-			wake_up_interruptible(&vout->fq_wait);
+			/* Clean up the states of the final buffers */
+			omapvout_dss_mark_buf_done(vout, idx);
+			if (dss->cur_q_idx != -1)
+				omapvout_dss_mark_buf_done(vout,
+							dss->cur_q_idx);
+			return;
 		}
 
-		vout->fq_cur_idx = idx;
-	} else {
-		vout->fq[idx].flags &= ~(V4L2_BUF_FLAG_QUEUED);
-		vout->fq[idx].flags |= V4L2_BUF_FLAG_DONE;
-		wake_up_interruptible(&vout->fq_wait);
+		mutex_lock(&vout->mtx);
+
+		if (vout->rotation == 0) {
+			if (dss->cur_q_idx != -1)
+				omapvout_dss_mark_buf_done(vout,
+							dss->cur_q_idx);
+
+			dss->cur_q_idx = idx;
+		} else {
+			omapvout_dss_mark_buf_done(vout, idx);
+		}
 	}
 
+	dss->working = false;
 	mutex_unlock(&vout->mtx);
 
 	return;
 
 failed_w_idx:
 	/* Set the done flag on failures to be sure the buffer can be DQ'd */
-	vout->fq[idx].flags &= ~(V4L2_BUF_FLAG_QUEUED);
-	vout->fq[idx].flags |= V4L2_BUF_FLAG_DONE;
-	wake_up_interruptible(&vout->fq_wait);
-failed:
+	omapvout_dss_mark_buf_done(vout, idx);
+	dss->working = false;
 	mutex_unlock(&vout->mtx);
 }
 
@@ -537,6 +540,11 @@ int  omapvout_dss_init(struct omapvout_device *vout, enum omap_plane plane)
 	int rc = 0;
 	int i;
 	int cnt;
+
+	if (vout->dss) {
+		rc = -EINVAL;
+		goto failed;
+	}
 
 	vout->dss = kzalloc(sizeof(struct omapvout_dss), GFP_KERNEL);
 	if (vout->dss == NULL) {
@@ -590,6 +598,8 @@ int omapvout_dss_open(struct omapvout_device *vout, u16 *disp_w, u16 *disp_h)
 	struct omap_dss_device *dev;
 	int rc = 0;
 
+	/* It is assumed that the caller has locked the vout mutex */
+
 	if (vout->dss->overlay->manager == NULL) {
 		DBG("No manager found\n");
 		rc = -ENODEV;
@@ -612,9 +622,9 @@ int omapvout_dss_open(struct omapvout_device *vout, u16 *disp_w, u16 *disp_h)
 		rc = -ENOMEM;
 		goto failed;
 	}
+
 	INIT_WORK(&vout->dss->work, omapvout_dss_perform_update);
 
-	vout->dss->exit_work = false;
 	vout->dss->enabled = false;
 
 failed:
@@ -623,7 +633,10 @@ failed:
 
 void omapvout_dss_release(struct omapvout_device *vout)
 {
-	vout->dss->exit_work = true;
+	/* It is assumed that the caller has locked the vout mutex */
+
+	if (vout->dss->enabled)
+		omapvout_dss_disable(vout);
 
 	flush_workqueue(vout->dss->workqueue);
 	destroy_workqueue(vout->dss->workqueue);
@@ -638,6 +651,9 @@ int omapvout_dss_enable(struct omapvout_device *vout)
 {
 	/* It is assumed that the caller has locked the vout mutex */
 
+	/* Reset the current frame idx */
+	vout->dss->cur_q_idx = -1;
+
 	/* Force a reconfiguration */
 	vout->dss->need_cfg = true;
 
@@ -651,11 +667,22 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 	int rc = 0;
 	struct omap_overlay_info o_info;
 	struct omap_overlay *ovly;
+	struct omap_dss_device *dev;
 
 	/* It is assumed that the caller has locked the vout mutex */
 
 	memset(&o_info, 0, sizeof(o_info));
 	o_info.enabled = false;
+
+	vout->dss->enabled = false;
+
+	dev = vout->dss->overlay->manager->device;
+	if (vout->dss->working && dev->sync) {
+		/* Allow the current frame to finish */
+		mutex_unlock(&vout->mtx);
+		dev->sync(dev);
+		mutex_lock(&vout->mtx);
+	}
 
 	rc = omapvout_dss_config_colorkey(vout, false);
 	if (rc)
@@ -674,15 +701,21 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 				0, 0, vout->disp_width, vout->disp_height);
 	if (rc)
 		DBG("Display update failed %d\n", rc);
-
-	vout->dss->enabled = false;
 }
 
 int omapvout_dss_update(struct omapvout_device *vout)
 {
+	/* It is assumed that the caller has locked the vout mutex */
+
 	if (!vout->dss->enabled) {
 		DBG("DSS overlay is not enabled\n");
 		return -EINVAL;
+	}
+
+	if (vout->dss->working) {
+		/* Exit quitely, since still working on previous frame */
+		/*DBG("DSS busy, handle shortly\n");*/
+		return 0;
 	}
 
 	if (queue_work(vout->dss->workqueue, &vout->dss->work) == 0) {

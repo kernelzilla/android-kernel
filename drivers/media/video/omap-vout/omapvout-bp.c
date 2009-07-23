@@ -22,8 +22,8 @@ struct omapvout_bp *omapvout_bp_create(u8 num_bufs, u32 buf_size)
 	int num = num_bufs;
 	int size;
 	int i;
-	u32 paddr;
-	u32 vaddr;
+	unsigned long paddr;
+	void *vaddr;
 	u32 bsize;
 
 	if (num > OMAPVOUT_BP_MAX_BUFFERS)
@@ -109,7 +109,8 @@ void omapvout_bp_destroy(struct omapvout_device *vout)
 	}
 }
 
-bool omapvout_is_bp_buffer(struct omapvout_device *vout, u32 phy_addr)
+bool omapvout_is_bp_buffer(struct omapvout_device *vout,
+			unsigned long phy_addr)
 {
 	struct omapvout_bp *bp = vout->bp;
 	int i;
@@ -126,7 +127,7 @@ bool omapvout_is_bp_buffer(struct omapvout_device *vout, u32 phy_addr)
 }
 
 int omapvout_bp_alloc(struct omapvout_device *vout, u32 req_size,
-				u32 *phy_addr, u32 *virt_addr, u32 *size)
+			unsigned long *phy_addr, void **virt_addr, u32 *size)
 {
 	struct omapvout_bp *bp = vout->bp;
 	int i;
@@ -154,7 +155,7 @@ int omapvout_bp_alloc(struct omapvout_device *vout, u32 req_size,
 	return rc;
 }
 
-int omapvout_bp_release(struct omapvout_device *vout, u32 phy_addr)
+int omapvout_bp_release(struct omapvout_device *vout, unsigned long phy_addr)
 {
 	struct omapvout_bp *bp = vout->bp;
 	int i;

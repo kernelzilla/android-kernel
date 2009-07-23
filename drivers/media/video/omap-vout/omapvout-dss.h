@@ -18,8 +18,8 @@
 struct omapvout_dss_vrfb {
 	/* Ping-pong buffers and VRFB contexts */
 	struct vrfb ctx[2];
-	u32 phy_addr[2];
-	u32 virt_addr[2];
+	unsigned long phy_addr[2];
+	void *virt_addr[2];
 	int size;
 	int next;
 
@@ -53,7 +53,9 @@ struct omapvout_dss {
 
 	struct work_struct work;
 	struct workqueue_struct *workqueue;
-	bool exit_work;
+	bool working;
+
+	int cur_q_idx; /* The current Q frame used by DSS */
 };
 
 /* Driver init/remove time calls */
