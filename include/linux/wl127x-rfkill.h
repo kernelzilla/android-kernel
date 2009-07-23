@@ -27,9 +27,13 @@
 #include <linux/rfkill.h>
 
 struct wl127x_rfkill_platform_data {
-	int nshutdown_gpio;
-
-	struct rfkill *rfkill;  /* for driver only */
+	int bt_nshutdown_gpio;
+	int fm_enable_gpio;
+	int (*bt_hw_init)(void);
+	int (*bt_hw_release)(void);
+	int (*bt_hw_enable)(void);
+	int (*bt_hw_disable)(void);
+	struct rfkill *rfkill[WL127X_MAX_DEV];  /* for driver only */
 };
 
 #endif
