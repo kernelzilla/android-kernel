@@ -614,11 +614,11 @@ static struct prm_setup_vc sholes_prm_setup = {
 	.voltsetup2 = 0x0,
 	.vdd0_on = 0x65,
 	.vdd0_onlp = 0x45,
-	.vdd0_ret = 0x17,
+	.vdd0_ret = 0x19,
 	.vdd0_off = 0x00,
 	.vdd1_on = 0x65,
 	.vdd1_onlp = 0x45,
-	.vdd1_ret = 0x17,
+	.vdd1_ret = 0x19,
 	.vdd1_off = 0x00,
 	.i2c_slave_ra = (SHOLES_R_SRI2C_SLAVE_ADDR_SA1 <<
 			OMAP3430_SMPS_SA1_SHIFT) |
