@@ -75,6 +75,8 @@
 #define SHOLES_LM_3530_INT_GPIO		92
 #define SHOLES_AKM8973_INT_GPIO		175
 #define SHOLES_WL1271_NSHUTDOWN_GPIO	179
+#define SHOLES_WL1271_WAKE_GPIO		8
+#define SHOLES_WL1271_HOSTWAKE_GPIO	178
 #define SHOLES_AUDIO_PATH_GPIO		143
 #define SHOLES_BP_READY_AP_GPIO		141
 #define SHOLES_BP_READY2_AP_GPIO	59
@@ -765,9 +767,60 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_device);
 }
 
+static int sholes_wl1271_init(void)
+{
+	int rc = 0;
+
+	/* wl1271 BT chip init sequence */
+	gpio_direction_output(SHOLES_WL1271_NSHUTDOWN_GPIO, 0);
+	msleep(5);
+	gpio_set_value(SHOLES_WL1271_NSHUTDOWN_GPIO, 1);
+	msleep(10);
+	gpio_set_value(SHOLES_WL1271_NSHUTDOWN_GPIO, 0);
+	msleep(5);
+
+	/* Reserve BT wake and hostwake GPIOs */
+	rc = gpio_request(SHOLES_WL1271_WAKE_GPIO, "wl127x_wake_gpio");
+	if (unlikely(rc))
+		return rc;
+
+	rc = gpio_request(SHOLES_WL1271_HOSTWAKE_GPIO, "wl127x_hostwake_gpio");
+	if (unlikely(rc))
+		return rc;
+
+	gpio_direction_output(SHOLES_WL1271_WAKE_GPIO, 1);
+	gpio_direction_input(SHOLES_WL1271_HOSTWAKE_GPIO);
+
+	return 0;
+}
+
+static int sholes_wl1271_release(void)
+{
+	gpio_free(SHOLES_WL1271_WAKE_GPIO);
+	gpio_free(SHOLES_WL1271_HOSTWAKE_GPIO);
+
+	return 0;
+}
+
+static int sholes_wl1271_enable(void)
+{
+	gpio_set_value(SHOLES_WL1271_WAKE_GPIO, 0);
+	return 0;
+}
+
+static int sholes_wl1271_disable(void)
+{
+	gpio_set_value(SHOLES_WL1271_WAKE_GPIO, 1);
+	return 0;
+}
+
 static struct wl127x_rfkill_platform_data sholes_wl1271_pdata = {
 	.bt_nshutdown_gpio = SHOLES_WL1271_NSHUTDOWN_GPIO,
 	.fm_enable_gpio = -1,
+	.bt_hw_init = sholes_wl1271_init,
+	.bt_hw_release = sholes_wl1271_release,
+	.bt_hw_enable = sholes_wl1271_enable,
+	.bt_hw_disable = sholes_wl1271_disable,
 };
 
 static struct platform_device sholes_wl1271_device = {
@@ -780,6 +833,10 @@ static void __init sholes_bt_init(void)
 {
 	/* Mux setup for Bluetooth chip-enable */
 	omap_cfg_reg(T3_34XX_GPIO_179);
+
+	/* Mux setup for BT wake GPIO and hostwake GPIO */
+	omap_cfg_reg(AF21_34XX_GPIO8);
+	omap_cfg_reg(W7_34XX_GPIO178_DOWN);
 
 	platform_device_register(&sholes_wl1271_device);
 }
