@@ -205,6 +205,17 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 				result = NOTIFY_BAD;
 			}
 		}
+		/* Check if we are going into fast boot mode */
+		if (mode != NULL && !strncmp("bootloader", mode, 11)) {
+			/* Set the bootmode bit in the cpcap */
+			ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				CPCAP_BIT_BOOT_MODE, CPCAP_BIT_BOOT_MODE);
+			if (ret) {
+				dev_err(&(misc_cpcap->spi->dev),
+					"Boot mode cpcap set failure.\n");
+				result = NOTIFY_BAD;
+			}
+		}
 	} else {
 		/* Clear the soft reset bit in the cpcap */
 		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
