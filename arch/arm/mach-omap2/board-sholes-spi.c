@@ -58,7 +58,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_UIEF2,     0x001F},
 	{CPCAP_REG_OWDC,      0x0003},
 	{CPCAP_REG_GPIO0,     0x3004},
-	{CPCAP_REG_GPIO1,     0x3008},
+	{CPCAP_REG_GPIO1,     0x3000},
 	{CPCAP_REG_GPIO2,     0x3204},
 	{CPCAP_REG_GPIO3,     0x3008},
 	{CPCAP_REG_GPIO4,     0x3204},
