@@ -69,7 +69,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 };
 
 unsigned short cpcap_regulator_mode_values[CPCAP_NUM_REGULATORS] = {
-	[CPCAP_SW5]      = 0x0002,
+	[CPCAP_SW5]      = 0x0022,
 	[CPCAP_VCAM]     = 0x0003,
 	[CPCAP_VCSI]     = 0x0003,
 	[CPCAP_VDAC]     = 0x0003,
