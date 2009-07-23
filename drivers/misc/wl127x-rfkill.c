@@ -28,7 +28,30 @@
 #include <linux/platform_device.h>
 #include <linux/wl127x-rfkill.h>
 
-static int wl127x_rfkill_set_power(void *data, enum rfkill_state state)
+static int wl127x_bt_rfkill_set_power(void *data, enum rfkill_state state)
+{
+	struct wl127x_rfkill_platform_data *pdata =
+		(struct wl127x_rfkill_platform_data *) data;
+	int nshutdown_gpio = pdata->bt_nshutdown_gpio;
+
+	switch (state) {
+	case RFKILL_STATE_UNBLOCKED:
+		if (pdata->bt_hw_enable)
+			pdata->bt_hw_enable();
+		gpio_set_value(nshutdown_gpio, 1);
+		break;
+	case RFKILL_STATE_SOFT_BLOCKED:
+		gpio_set_value(nshutdown_gpio, 0);
+		if (pdata->bt_hw_disable)
+			pdata->bt_hw_disable();
+		break;
+	default:
+		printk(KERN_ERR "invalid rfkill state %d\n", state);
+	}
+	return 0;
+}
+
+static int wl127x_fm_rfkill_set_power(void *data, enum rfkill_state state)
 {
 	int nshutdown_gpio = (int)data;
 
@@ -61,8 +84,13 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		if (unlikely(rc))
 			return rc;
 
+		if (pdata->bt_hw_init)
+			rc = pdata->bt_hw_init();
+		if (unlikely(rc))
+			return rc;
+
 		rfkill_set_default(RFKILL_TYPE_BLUETOOTH, default_state);
-		wl127x_rfkill_set_power((void *)pdata->bt_nshutdown_gpio,
+		wl127x_bt_rfkill_set_power((void *)pdata,
 					default_state);
 
 		pdata->rfkill[WL127X_BLUETOOTH] =
@@ -76,9 +104,9 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		pdata->rfkill[WL127X_BLUETOOTH]->user_claim_unsupported = 1;
 		pdata->rfkill[WL127X_BLUETOOTH]->user_claim = 0;
 		pdata->rfkill[WL127X_BLUETOOTH]->data =
-		    (void *)pdata->bt_nshutdown_gpio;
+		    (void *)pdata;
 		pdata->rfkill[WL127X_BLUETOOTH]->toggle_radio =
-		    wl127x_rfkill_set_power;
+		    wl127x_bt_rfkill_set_power;
 
 		rc = rfkill_register(pdata->rfkill[WL127X_BLUETOOTH]);
 		if (unlikely(rc)) {
@@ -98,7 +126,7 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 			return rc;
 
 		rfkill_set_default(RFKILL_TYPE_FM, default_state);
-		wl127x_rfkill_set_power((void *)pdata->fm_enable_gpio,
+		wl127x_fm_rfkill_set_power((void *)pdata->fm_enable_gpio,
 					default_state);
 
 		pdata->rfkill[WL127X_FM] =
@@ -113,7 +141,7 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		pdata->rfkill[WL127X_FM]->user_claim = 0;
 		pdata->rfkill[WL127X_FM]->data = (void *)pdata->fm_enable_gpio;
 		pdata->rfkill[WL127X_FM]->toggle_radio =
-		    wl127x_rfkill_set_power;
+		    wl127x_fm_rfkill_set_power;
 
 		rc = rfkill_register(pdata->rfkill[WL127X_FM]);
 		if (unlikely(rc)) {
@@ -132,6 +160,8 @@ static int wl127x_rfkill_remove(struct platform_device *pdev)
 	if (pdata->bt_nshutdown_gpio >= 0) {
 		rfkill_unregister(pdata->rfkill[WL127X_BLUETOOTH]);
 		rfkill_free(pdata->rfkill[WL127X_BLUETOOTH]);
+		if (pdata->bt_hw_release)
+			pdata->bt_hw_release();
 		gpio_free(pdata->bt_nshutdown_gpio);
 	}
 
