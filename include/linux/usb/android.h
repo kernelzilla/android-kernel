@@ -35,6 +35,9 @@ struct android_usb_platform_data {
 
 	/* number of LUNS for mass storage function */
 	int nluns;
+
+	/* Factory Enabled Bit set on Powerup */
+	int factory_enabled;
 };
 
 extern void android_usb_set_connected(int on);

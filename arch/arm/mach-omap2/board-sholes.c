@@ -86,6 +86,8 @@
 #define DIE_ID_REG_BASE			(L4_WK_34XX_PHYS + 0xA000)
 #define DIE_ID_REG_OFFSET		0x218
 #define MAX_USB_SERIAL_NUM		17
+#define FACTORY_VENDOR_ID		0x22B8
+#define FACTORY_PRODUCT_ID		0x41E2
 
 static char device_serial[MAX_USB_SERIAL_NUM];
 
@@ -185,6 +187,13 @@ static void sholes_gadget_init(void)
 	val[1] = omap_readl(reg + 4);
 
 	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X", val[1], val[0]);
+
+	/* check powerup reason - To be added once kernel support is available*/
+	if (andusb_plat.factory_enabled) {
+		andusb_plat.vendor_id = FACTORY_VENDOR_ID;
+		andusb_plat.product_id = FACTORY_PRODUCT_ID;
+		andusb_plat.adb_product_id = FACTORY_PRODUCT_ID;
+	}
 	platform_device_register(&androidusb_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
 }
