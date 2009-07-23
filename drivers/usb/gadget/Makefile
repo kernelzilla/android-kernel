@@ -33,7 +33,7 @@ gadgetfs-objs			:= inode.o
 g_file_storage-objs		:= file_storage.o
 g_printer-objs			:= printer.o
 g_cdc-objs			:= cdc2.o
-g_android-objs			:= android.o f_adb.o f_mass_storage.o
+g_android-objs			:= android.o f_adb.o f_mass_storage.o f_usbnet.o f_acm.o u_serial.o
 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_ETH)		+= g_ether.o
