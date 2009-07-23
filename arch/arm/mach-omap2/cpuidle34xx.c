@@ -180,51 +180,51 @@ void omap_init_power_states(void)
 	/* C1 . MPU WFI + Core active */
 	omap3_power_states[OMAP3_STATE_C1].valid = 1;
 	omap3_power_states[OMAP3_STATE_C1].type = OMAP3_STATE_C1;
-	omap3_power_states[OMAP3_STATE_C1].sleep_latency = 2;
-	omap3_power_states[OMAP3_STATE_C1].wakeup_latency = 2;
-	omap3_power_states[OMAP3_STATE_C1].threshold = 5;
-	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_ON;
+	omap3_power_states[OMAP3_STATE_C1].sleep_latency = 0;
+	omap3_power_states[OMAP3_STATE_C1].wakeup_latency = 12;
+	omap3_power_states[OMAP3_STATE_C1].threshold = 15;
+	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_INACTIVE;
 	omap3_power_states[OMAP3_STATE_C1].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/* C2 . MPU WFI + Core inactive */
 	omap3_power_states[OMAP3_STATE_C2].valid = 1;
 	omap3_power_states[OMAP3_STATE_C2].type = OMAP3_STATE_C2;
-	omap3_power_states[OMAP3_STATE_C2].sleep_latency = 10;
-	omap3_power_states[OMAP3_STATE_C2].wakeup_latency = 10;
-	omap3_power_states[OMAP3_STATE_C2].threshold = 30;
-	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_ON;
+	omap3_power_states[OMAP3_STATE_C2].sleep_latency = 0;
+	omap3_power_states[OMAP3_STATE_C2].wakeup_latency = 18;
+	omap3_power_states[OMAP3_STATE_C2].threshold = 20;
+	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_INACTIVE;
 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/* C3 . MPU CSWR + Core inactive */
 	omap3_power_states[OMAP3_STATE_C3].valid = 1;
 	omap3_power_states[OMAP3_STATE_C3].type = OMAP3_STATE_C3;
-	omap3_power_states[OMAP3_STATE_C3].sleep_latency = 50;
-	omap3_power_states[OMAP3_STATE_C3].wakeup_latency = 50;
-	omap3_power_states[OMAP3_STATE_C3].threshold = 300;
+	omap3_power_states[OMAP3_STATE_C3].sleep_latency = 150;
+	omap3_power_states[OMAP3_STATE_C3].wakeup_latency = 260;
+	omap3_power_states[OMAP3_STATE_C3].threshold = 500;
 	omap3_power_states[OMAP3_STATE_C3].mpu_state = PWRDM_POWER_RET;
-	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_ON;
+	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_INACTIVE;
 	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID |
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C4 . MPU OFF + Core inactive */
 	omap3_power_states[OMAP3_STATE_C4].valid = 1;
 	omap3_power_states[OMAP3_STATE_C4].type = OMAP3_STATE_C4;
-	omap3_power_states[OMAP3_STATE_C4].sleep_latency = 1500;
-	omap3_power_states[OMAP3_STATE_C4].wakeup_latency = 1800;
+	omap3_power_states[OMAP3_STATE_C4].sleep_latency = 1600;
+	omap3_power_states[OMAP3_STATE_C4].wakeup_latency = 1850;
 	omap3_power_states[OMAP3_STATE_C4].threshold = 4000;
 	omap3_power_states[OMAP3_STATE_C4].mpu_state = PWRDM_POWER_OFF;
-	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_ON;
+	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_INACTIVE;
 	omap3_power_states[OMAP3_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID |
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C5 . MPU CSWR + Core CSWR*/
 	omap3_power_states[OMAP3_STATE_C5].valid = 1;
 	omap3_power_states[OMAP3_STATE_C5].type = OMAP3_STATE_C5;
-	omap3_power_states[OMAP3_STATE_C5].sleep_latency = 2500;
-	omap3_power_states[OMAP3_STATE_C5].wakeup_latency = 7500;
-	omap3_power_states[OMAP3_STATE_C5].threshold = 12000;
+	omap3_power_states[OMAP3_STATE_C5].sleep_latency = 310;
+	omap3_power_states[OMAP3_STATE_C5].wakeup_latency = 2850;
+	omap3_power_states[OMAP3_STATE_C5].threshold = 5000;
 	omap3_power_states[OMAP3_STATE_C5].mpu_state = PWRDM_POWER_RET;
 	omap3_power_states[OMAP3_STATE_C5].core_state = PWRDM_POWER_RET;
 	omap3_power_states[OMAP3_STATE_C5].flags = CPUIDLE_FLAG_TIME_VALID |
@@ -233,9 +233,9 @@ void omap_init_power_states(void)
 	/* C6 . MPU OFF + Core CSWR */
 	omap3_power_states[OMAP3_STATE_C6].valid = 1;
 	omap3_power_states[OMAP3_STATE_C6].type = OMAP3_STATE_C6;
-	omap3_power_states[OMAP3_STATE_C6].sleep_latency = 3000;
-	omap3_power_states[OMAP3_STATE_C6].wakeup_latency = 8500;
-	omap3_power_states[OMAP3_STATE_C6].threshold = 15000;
+	omap3_power_states[OMAP3_STATE_C6].sleep_latency = 1800;
+	omap3_power_states[OMAP3_STATE_C6].wakeup_latency = 4450;
+	omap3_power_states[OMAP3_STATE_C6].threshold = 10000;
 	omap3_power_states[OMAP3_STATE_C6].mpu_state = PWRDM_POWER_OFF;
 	omap3_power_states[OMAP3_STATE_C6].core_state = PWRDM_POWER_RET;
 	omap3_power_states[OMAP3_STATE_C6].flags = CPUIDLE_FLAG_TIME_VALID |
