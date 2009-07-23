@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #endif
 #include <linux/io.h>
+#include <linux/wakelock.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -35,7 +36,7 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
-#define DEFAULT_TIMEOUT (5 * HZ)
+#define DEFAULT_TIMEOUT (1 * HZ)
 
 struct omap_uart_state {
 	int num;
@@ -70,7 +71,7 @@ struct omap_uart_state {
 
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
-
+static struct wake_lock omap_uart_wakelock;
 
 #ifdef CONFIG_SERIAL_OMAP
 static struct plat_serialomap_port serial_platform_data[] = {
@@ -307,14 +308,36 @@ static inline void omap_uart_restore(struct omap_uart_state *uart)
 
 static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 {
+	struct plat_serialomap_port *p = uart->p;
+	unsigned char mcr;
+
 	if (!uart->clocked)
 		return;
 
 	omap_uart_save_context(uart);
+
+	/*
+	 * Force RTS inactive before disabling clocks so our peers know not
+	 * to send data to us.
+	 */
+
+	mcr = serial_read_reg(p, UART_MCR);
+	if (mcr & 0x02) {
+		mcr &= ~0x02;
+		serial_write_reg(p, UART_MCR, mcr);
+	}
+
 	uart->clocked = 0;
 	clk_disable(uart->ick);
 	clk_disable(uart->fck);
 }
+
+static void omap_uart_block_suspend(struct omap_uart_state *uart)
+{
+	/* XXX: After driver resume optimization, lower this */
+	wake_lock_timeout(&omap_uart_wakelock, (HZ * 1));
+}
+
 
 static void omap_uart_block_sleep(struct omap_uart_state *uart)
 {
@@ -369,13 +392,17 @@ void omap_uart_resume_idle(int num)
 			if (cpu_is_omap34xx() && uart->padconf) {
 				u16 p = omap_ctrl_readw(uart->padconf);
 
-				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
+				if (p & OMAP3_PADCONF_WAKEUPEVENT0) {
 					omap_uart_block_sleep(uart);
+					omap_uart_block_suspend(uart);
+				}
 			}
 
 			/* Check for normal UART wakeup */
-			if (__raw_readl(uart->wk_st) & uart->wk_mask)
+			if (__raw_readl(uart->wk_st) & uart->wk_mask) {
 				omap_uart_block_sleep(uart);
+				omap_uart_block_suspend(uart);
+			}
 
 			return;
 		}
@@ -576,6 +603,8 @@ void __init omap_serial_init(void)
 	const struct omap_uart_config *info;
 	char name[16];
 
+	wake_lock_init(&omap_uart_wakelock, WAKE_LOCK_SUSPEND,
+		       "omap_uart");
 	/*
 	 * Make sure the serial ports are muxed on at this point.
 	 * You have to mux them off in device drivers later on
