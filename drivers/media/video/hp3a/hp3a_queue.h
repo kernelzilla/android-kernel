@@ -20,6 +20,9 @@
 #ifndef	__HP3A_QUEUE_H_INCLUDED
 #define	__HP3A_QUEUE_H_INCLUDED
 
+#define	QUEUE_SIZE(q)	(q.queue_size)
+#define	QUEUE_COUNT(q)	(q.queue_count)
+
 /**
  * struct hp3a_queue - Data structure for managing a queue.
  * @queue_lock: Lock synchronizaing thread/process access.
@@ -54,4 +57,3 @@ void hp3a_flush_queue(struct hp3a_queue *queue);
 void hp3a_flush_queue_irqsave(struct hp3a_queue *queue);
 
 #endif	/* __HP3A_QUEUE_H_INCLUDED */
-

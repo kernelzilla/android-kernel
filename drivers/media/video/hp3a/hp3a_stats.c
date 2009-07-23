@@ -45,6 +45,7 @@ void initialize_hp3a_framework(struct hp3a_dev *device)
 		spin_lock_init(&g_tc.af_lock);
 		spin_lock_init(&g_tc.hardpipe_lock);
 		init_completion(&g_tc.frame_done);
+		g_tc.frame_done.done = 0;
 		init_waitqueue_head(&g_tc.stats_done);
 
 		/* Initialize default values for task related data members. */
@@ -63,6 +64,8 @@ void initialize_hp3a_framework(struct hp3a_dev *device)
 		g_tc.histogram_buffer = NULL;
 		g_tc.af_buffer  = NULL;
 		g_tc.raw_buffer  = NULL;
+		g_tc.exposure_sync = 1;
+		g_tc.gain_sync = 0;
 
 		/* Initialize task queues. */
 		hp3a_initialize_queue(&g_tc.hist_stat_queue, 8,
@@ -74,7 +77,7 @@ void initialize_hp3a_framework(struct hp3a_dev *device)
 		hp3a_initialize_queue(&g_tc.sensor_write_queue, 4,
 			sizeof(struct hp3a_sensor_param_internal));
 		hp3a_initialize_queue(&g_tc.sensor_read_queue, 8,
-			sizeof(struct hp3a_sensor_param));
+			sizeof(struct hp3a_sensor_param_internal));
 		hp3a_initialize_queue(&g_tc.hist_hw_queue, 4,
 			sizeof(struct hp3a_internal_buffer *));
 		hp3a_initialize_queue(&g_tc.ready_stats_queue, 8,
@@ -115,6 +118,7 @@ void hp3a_framework_start(struct hp3a_fh *fh)
 	fh->buffers = NULL;
 	g_tc.frame_done.done = 0;
 	g_tc.current_exposure = 0;
+	g_tc.current_gain = 0;
 	g_tc.exposure = 0;
 	g_tc.gain = 0;
 	g_tc.hist_done = 0;
@@ -180,12 +184,22 @@ int hp3a_set_sensor_param(struct hp3a_sensor_param *param, struct hp3a_fh *fh)
 	if (likely(fh->v4l2_dev > -1)) {
 		if (likely(g_tc.v4l2_streaming == 1)) {
 			sensor_param.v4l2_dev = fh->v4l2_dev;
-			sensor_param.exposure = param->exposure;
-			sensor_param.gain = param->gain;
 
-			ret = hp3a_enqueue(&g_tc.sensor_write_queue,
+			if (g_tc.current_exposure != param->exposure) {
+				sensor_param.exposure = param->exposure;
+				sensor_param.gain = 0;
+
+				ret = hp3a_enqueue(&g_tc.sensor_write_queue,
+							&sensor_param);
+			}
+
+			if (g_tc.current_gain != param->gain) {
+				sensor_param.exposure = 0;
+				sensor_param.gain = param->gain;
+
+				ret = hp3a_enqueue(&g_tc.sensor_write_queue,
 						&sensor_param);
-
+			}
 		} else {
 			struct cam_sensor_settings sensor_settings = {
 			.flags = 0,
@@ -205,6 +219,8 @@ int hp3a_set_sensor_param(struct hp3a_sensor_param *param, struct hp3a_fh *fh)
 			ret = omap34xxcam_sensor_settings(fh->v4l2_dev,
 							&sensor_settings);
 		}
+	} else {
+		dev_err(fh->device->dev, "hp3a: Invalid sensor id(%d)\n", fh->v4l2_dev);
 	}
 
 	return ret;
@@ -226,6 +242,10 @@ int hp3a_set_hardpipe_param(struct hp3a_hardpipe_param *param,
 	memcpy(&g_tc.hpipe_param, param, sizeof(struct hp3a_hardpipe_param));
 	g_tc.update_hardpipe = 1;
 	spin_unlock_irqrestore(&g_tc.hardpipe_lock, irqflags);
+
+	if (g_tc.v4l2_streaming == 0) {
+		hp3a_update_hardpipe();
+	}
 
 	return 0;
 }
@@ -262,20 +282,6 @@ int hp3a_collect_statsistics(struct hp3a_statistics *stat)
 		stat->gain = g_tc.gain;
 
 		/*
-		* Histogram.
-		*/
-		if (likely(g_tc.histogram_buffer != NULL)) {
-			stat->hist_stat_index = g_tc.histogram_buffer->index;
-			g_tc.histogram_buffer = NULL;
-		}
-		/*
-		* AF Paxel.
-		*/
-		if (likely(g_tc.af_buffer != NULL)) {
-			stat->af_stat_index = g_tc.af_buffer->index;
-			g_tc.af_buffer = NULL;
-		}
-		/*
 		* Raw bayer frame.
 		*/
 		if (g_tc.raw_buffer != NULL) {
@@ -289,9 +295,35 @@ int hp3a_collect_statsistics(struct hp3a_statistics *stat)
 
 		/* Wait for all stats tasks to be done. */
 		if (g_tc.hist_done == 0) {
-			wait_event_interruptible(g_tc.stats_done, g_tc.hist_done == 1);
-			g_tc.hist_done = 0;
+			wait_event_interruptible_timeout(g_tc.stats_done,
+				(g_tc.hist_done == 1), msecs_to_jiffies(8));
 		}
+
+		spin_lock(&g_tc.stats_lock);
+		/*
+		 * Histogram.
+		 */
+		if (g_tc.histogram_buffer != NULL) {
+			if (g_tc.hist_done  == 1) {
+				stat->hist_stat_index = g_tc.histogram_buffer->index;
+			} else {
+				hp3a_enqueue_irqsave(&g_tc.hist_stat_queue,
+					&g_tc.histogram_buffer);
+			}
+			g_tc.histogram_buffer = NULL;
+		}
+
+		/*
+		 * AF Paxel.
+		 */
+		if (g_tc.af_buffer != NULL) {
+			stat->af_stat_index = g_tc.af_buffer->index;
+			g_tc.af_buffer = NULL;
+		}
+
+		g_tc.hist_done = 0;
+
+		spin_unlock(&g_tc.stats_lock);
 	}
 
 	return 0;
@@ -306,45 +338,51 @@ void hp3a_update_statistics(void)
 {
 	int i;
 	struct hp3a_internal_buffer *ibuffer;
-	struct hp3a_sensor_param sensor_param;
+	struct hp3a_sensor_param_internal sensor_param;
 
 	if (likely(g_tc.v4l2_streaming == 1)) {
 		spin_lock(&g_tc.stats_lock);
 
-		/* process ready stats.*/
-		if (g_tc.histogram_buffer) {
-			hp3a_enqueue(&g_tc.hist_stat_queue,  &g_tc.histogram_buffer);
+		/* Reuse stats buffers. */
+		if (g_tc.histogram_buffer != NULL) {
+			g_tc.hist_done = 0;
+			hp3a_enqueue(&g_tc.hist_stat_queue,
+				 &g_tc.histogram_buffer);
 			g_tc.histogram_buffer = NULL;
 		}
 
-		if (g_tc.af_buffer) {
-			hp3a_enqueue(&g_tc.af_stat_queue,  &g_tc.af_buffer);
+		if (g_tc.af_buffer  != NULL) {
+			hp3a_enqueue(&g_tc.af_stat_queue,
+				&g_tc.af_buffer);
 			g_tc.af_buffer = NULL;
 		}
 
-		if (g_tc.raw_buffer) {
-			hp3a_enqueue(&g_tc.raw_frame_queue,  &g_tc.raw_buffer);
+		if (g_tc.raw_buffer != NULL) {
+			hp3a_enqueue(&g_tc.raw_frame_queue,
+					&g_tc.raw_buffer);
 			g_tc.raw_buffer = NULL;
 		}
 
+		/* Process ready stats. */
 		for (i = MAX_STAT_BUFFERS_PER_FRAME; i--;) {
 			ibuffer = NULL;
 			if (hp3a_dequeue(&g_tc.ready_stats_queue, &ibuffer) == 0) {
-				if (ibuffer->type == HISTOGRAM)
+				if (ibuffer->type == HISTOGRAM && g_tc.histogram_buffer == NULL)
 					g_tc.histogram_buffer = ibuffer;
-				else if (ibuffer->type == PAXEL)
+				else if (ibuffer->type == PAXEL && g_tc.af_buffer == NULL)
 					g_tc.af_buffer = ibuffer;
-				else if (ibuffer->type == BAYER)
+				else if (ibuffer->type == BAYER && g_tc.raw_buffer == NULL)
 					g_tc.raw_buffer = ibuffer;
+				else {
+					printk(KERN_ERR "hp3a: Error unknown buffer type(%d) in"
+								" ready queue\n", ibuffer->type);
+				}
+			} else {
+				break;
 			}
 		}
 
-		hp3a_enable_af();
-		hp3a_enable_histogram();
-
-		/*
-		* RAW stat buffer processing.
-		*/
+		/* RAW stat buffer processing. */
 		if (g_tc.raw_hw_configured == 1) {
 			if ((++g_tc.raw_cap_sched_count) == g_tc.raw_frequency) {
 				g_tc.raw_cap_sched_count = 0;
@@ -361,13 +399,24 @@ void hp3a_update_statistics(void)
 			}
 		}
 
-		if (hp3a_dequeue(&g_tc.sensor_read_queue, &sensor_param) == 0) {
-			g_tc.exposure = sensor_param.exposure;
-			g_tc.gain = sensor_param.gain;
-		}
+		/* Histogram buffer processing and HW configuration. */
+		hp3a_enable_histogram();
+		/* AF stat buffer processing and HW configuration. */
+		hp3a_enable_af();
 
-		if (unlikely(g_tc.histogram_buffer == NULL)) {
-			g_tc.hist_done = 1;
+		for (i = QUEUE_COUNT(g_tc.sensor_read_queue); i--;) {
+			if (hp3a_dequeue(&g_tc.sensor_read_queue, &sensor_param) == 0) {
+				if (sensor_param.frame_id == g_tc.frame_count) {
+					if (sensor_param.exposure)
+						g_tc.exposure = sensor_param.exposure;
+					if (sensor_param.gain)
+						g_tc.gain = sensor_param.gain;
+				} else if (sensor_param.frame_id > g_tc.frame_count) {
+					hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
+				}
+			} else {
+				break;
+			}
 		}
 
 		spin_unlock(&g_tc.stats_lock);
@@ -401,42 +450,51 @@ void hp3a_schedule_task(void)
 static void hp3a_task(struct work_struct *work)
 {
 	/* Place holder for deferred tasks. */
-	struct hp3a_sensor_param_internal sensor_param_int;
-	struct hp3a_sensor_param sensor_param;
+	struct hp3a_sensor_param_internal sensor_param;
 	struct cam_sensor_settings sensor_settings = {
 		.flags = 0,
 		.exposure = 0,
 		.gain = 0,
 		.regs = 0,
 		.reg_data = 0};
+	u32 frame_index = (g_tc.frame_count+1);
 
 	/**
-	* Setup exposure and gain for next frame.
-	*/
-	if (hp3a_dequeue(&g_tc.sensor_write_queue, &sensor_param_int) == 0) {
-		sensor_settings.exposure = sensor_param_int.exposure;
-		sensor_settings.gain = sensor_param_int.gain;
-		sensor_settings.flags = (OMAP34XXCAM_SET_GAIN | OMAP34XXCAM_SET_EXPOSURE);
+	 * Setup exposure and gain for next frame.
+	 */
+	if (hp3a_dequeue(&g_tc.sensor_write_queue, &sensor_param) == 0) {
+		sensor_settings.exposure = sensor_param.exposure;
+		sensor_settings.gain = sensor_param.gain;
+
+		if (sensor_param.exposure)
+			sensor_settings.flags |= OMAP34XXCAM_SET_EXPOSURE;
+		if (sensor_param.gain)
+			sensor_settings.flags |= OMAP34XXCAM_SET_GAIN;
 
 		/**
 		* Write and read sensor settings.
 		*/
-		omap34xxcam_sensor_settings(sensor_param_int.v4l2_dev, &sensor_settings);
+		omap34xxcam_sensor_settings(sensor_param.v4l2_dev, &sensor_settings);
 
-		spin_lock(&g_tc.stats_lock);
-
-		if (likely(g_tc.current_exposure != sensor_settings.exposure)) {
+		if (g_tc.current_gain != sensor_settings.gain) {
+			sensor_param.frame_id = (frame_index + g_tc.gain_sync);
 			sensor_param.exposure = 0;
-			sensor_param.gain = 0;
+			/* Save new programmed in gain value. */
+			sensor_param.gain = sensor_settings.gain;
+			/* Queue new value for stats collecton. */
 			hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
-			g_tc.current_exposure = sensor_settings.exposure;
+
+			g_tc.current_gain = sensor_settings.gain;
 		}
 
-		sensor_param.gain = sensor_settings.gain;
-		sensor_param.exposure = sensor_settings.exposure;
-		hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
-
-		spin_unlock(&g_tc.stats_lock);
+		if (g_tc.current_exposure != sensor_settings.exposure) {
+			sensor_param.frame_id = (frame_index + g_tc.exposure_sync);
+			sensor_param.exposure = sensor_settings.exposure;
+			sensor_param.gain = 0;
+			/* Save new programmed in exposure value. */
+			g_tc.current_exposure = sensor_settings.exposure;
+			/* Queue new value for stats collecton. */
+			hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
+		}
 	}
 }
-

@@ -30,6 +30,8 @@ void hp3a_ccdc_done(void);
 void hp3a_frame_done(void);
 void hp3a_stream_on(void);
 void hp3a_stream_off(void);
-
+void hp3a_isp_status(int status);
+int hp3a_hist_busy(void);
+int hp3a_af_busy(void);
+void hp3a_set_sensor_sync(unsigned char exposure, unsigned char gain);
 #endif	/* __HP3A_H_INCLUDED */
-

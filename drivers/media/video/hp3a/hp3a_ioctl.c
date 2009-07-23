@@ -58,9 +58,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		struct hp3a_statistics statistics;
 
 		ret = hp3a_collect_statsistics(&statistics);
-		if (likely(SUCCEEDED(ret))) {
-			if (unlikely(copy_to_user((struct hp3a_statistics *)arg,
-				&statistics, sizeof(struct hp3a_statistics)) != 0)) {
+		if (SUCCEEDED(ret)) {
+			if (copy_to_user((struct hp3a_statistics *)arg,
+				&statistics, sizeof(struct hp3a_statistics)) != 0) {
 				ret = -EFAULT;
 			}
 		}
@@ -72,9 +72,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_S_SENSOR_PARAM: {
 		struct hp3a_sensor_param sensor_param;
 
-		if (likely(copy_from_user(&sensor_param,
+		if (copy_from_user(&sensor_param,
 				(struct hp3a_sensor_param *)arg,
-				sizeof(struct hp3a_sensor_param)) == 0)) {
+				sizeof(struct hp3a_sensor_param)) == 0) {
 			ret = hp3a_set_sensor_param(&sensor_param, fh);
 		} else {
 			ret = -EFAULT;
@@ -88,9 +88,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_S_HARDPIPE_PARAM: {
 		struct hp3a_hardpipe_param hpipe_param;
 
-		if (likely(copy_from_user(&hpipe_param,
+		if (copy_from_user(&hpipe_param,
 				(struct hp3a_hardpipe_param *)arg,
-				sizeof(struct hp3a_hardpipe_param)) == 0)) {
+				sizeof(struct hp3a_hardpipe_param)) == 0) {
 			ret = hp3a_set_hardpipe_param(&hpipe_param, fh);
 		} else {
 			ret = -EFAULT;
@@ -130,6 +130,7 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 					return -EFAULT;
 				}
 			}
+			flush_dcache_ibuffer(ibuffer);
 			ret = hp3a_enqueue_irqsave(&g_tc.af_stat_queue, &ibuffer);
 		}
 
@@ -165,9 +166,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		struct hp3a_request_bufffers req_buf;
 		int i;
 
-		if (likely(copy_from_user(&req_buf,
+		if (copy_from_user(&req_buf,
 				(struct hp3a_request_bufffers *)arg,
-				sizeof(struct hp3a_request_bufffers)) == 0)) {
+				sizeof(struct hp3a_request_bufffers)) == 0) {
 			ret = -1;
 			if (req_buf.count > 0) {
 				fh->buffers = kzalloc(req_buf.count * \
@@ -193,9 +194,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_INSTALL_BUF: {
 		struct hp3a_buffer buffer;
 
-		if (likely(copy_from_user(&buffer,
+		if (copy_from_user(&buffer,
 				(struct hp3a_buffer *)arg,
-				sizeof(struct hp3a_buffer)) == 0)) {
+				sizeof(struct hp3a_buffer)) == 0) {
 			ret = -1;
 			if (buffer.index >= 0 && buffer.index < fh->buffer_count) {
 				if (fh->buffers[buffer.index].buffer_size == 0) {
@@ -215,9 +216,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_UNINSTALL_BUF: {
 		struct hp3a_buffer buffer;
 
-		if (likely(copy_from_user(&buffer,
+		if (copy_from_user(&buffer,
 				(struct hp3a_buffer *)arg,
-				sizeof(struct hp3a_buffer)) == 0)) {
+				sizeof(struct hp3a_buffer)) == 0) {
 			ret = -1;
 			if (buffer.index >= 0 && buffer.index < fh->buffer_count) {
 				if (fh->buffers[buffer.index].buffer_size &&
@@ -238,9 +239,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_CONFIG_HIST: {
 		struct hp3a_histogram_config config;
 
-		if (likely(copy_from_user(&config,
+		if (copy_from_user(&config,
 				(struct hp3a_histogram_config *)arg,
-				sizeof(struct hp3a_histogram_config)) == 0)) {
+				sizeof(struct hp3a_histogram_config)) == 0) {
 			ret = hp3a_config_histogram(&config, fh);
 		} else {
 			ret = -EFAULT;
@@ -254,9 +255,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
    case HP3A_CONFIG_AF: {
 		struct hp3a_af_config config;
 
-		if (likely(copy_from_user(&config,
+		if (copy_from_user(&config,
 				(struct hp3a_af_config *)arg,
-				sizeof(struct hp3a_af_config)) == 0)) {
+				sizeof(struct hp3a_af_config)) == 0) {
 			ret = hp3a_config_af(&config, fh);
 		} else {
 			ret = -EFAULT;
@@ -270,9 +271,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_CONFIG_RAW: {
 		struct hp3a_raw_config config;
 
-		if (likely(copy_from_user(&config,
+		if (copy_from_user(&config,
 				(struct hp3a_raw_config *)arg,
-				sizeof(struct hp3a_raw_config)) == 0)) {
+				sizeof(struct hp3a_raw_config)) == 0) {
 
 			ret = hp3a_configure_raw(&config);
 			if (SUCCEEDED(ret)) {

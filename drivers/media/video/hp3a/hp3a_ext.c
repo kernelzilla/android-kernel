@@ -74,8 +74,33 @@ void hp3a_stream_off(void)
 {
 	g_tc.v4l2_streaming = 0;
 	g_tc.raw_cap_sched_count = 0;
+	g_tc.update_hardpipe = 0;
 
+	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
 	hp3a_flush_queue(&g_tc.hist_hw_queue);
-	hp3a_flush_queue(&g_tc.ready_stats_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_off);
+
+/**
+ * hp3a_isp_status - Set ISP status for hp 3a system.
+ *
+ * No return value.
+ **/
+void hp3a_isp_status(int status)
+{
+	/* Place holder. */
+}
+EXPORT_SYMBOL(hp3a_isp_status);
+
+/**
+ * hp3a_set_sensor_sync - Set sync delay for exposure and gain
+ *			setting updata.
+ *
+ * Return 1 if busy, 0 otherwise.
+ **/
+void hp3a_set_sensor_sync(unsigned char exposure, unsigned char gain)
+{
+	g_tc.exposure_sync = exposure;
+	g_tc.gain_sync = gain;
+}
+EXPORT_SYMBOL(hp3a_set_sensor_sync);

@@ -48,4 +48,3 @@
 #define HP3A_REG_TOK_DELAY	0x10
 
 #endif	/* __HP3A_USER_H_INCLUDED */
-

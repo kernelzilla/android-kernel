@@ -137,6 +137,7 @@ struct hp3a_sensor_param {
  **/
 struct hp3a_sensor_param_internal {
 	int v4l2_dev;
+	u32 frame_id;
 	u32 exposure;
 	u16 gain;
 };
@@ -255,8 +256,11 @@ struct hp3a_context {
 	int raw_frequency;
 	int raw_cap_sched_count;
 	int isp_ctx_saved;
-	u32 current_exposure;
+	u8 exposure_sync;
+	u8 gain_sync;
 	u32 hist_bin_size;
+	u32 current_exposure;
+	u32 current_gain;
 	u32 exposure;
 	u16 gain;
 	u32 frame_count;
@@ -364,9 +368,9 @@ void unmap_user_memory(struct page **pages, int nr_pages);
 int map_user_to_kernel(struct hp3a_buffer *src,
 	struct hp3a_internal_buffer *dest);
 void unmap_buffer_from_kernel(struct hp3a_internal_buffer *buffers);
+void flush_dcache_ibuffer(struct hp3a_internal_buffer  *ibuffer);
 void hp3a_clear_regs(struct hp3a_reg *regs);
 void hp3a_read_ispregs(struct hp3a_reg *regs);
-void hp3a_read_ispreg(struct hp3a_reg *reg);
 void hp3a_write_ispregs(struct hp3a_reg *regs);
 int hp3a_read_ispregs_to_user(struct hp3a_reg_page *user_page);
 int hp3a_read_ispreg_to_user(struct hp3a_reg *user_reg);
@@ -378,4 +382,3 @@ extern struct hp3a_context g_tc;
 extern struct work_struct g_hp3a_work_queue;
 
 #endif	/* __HP3A_COMMON_H_INCLUDED */
-

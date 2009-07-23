@@ -200,6 +200,7 @@ int hp3a_dequeue_irqsave(struct hp3a_queue *queue, void *element)
 	}
 
 	spin_unlock_irqrestore(&queue->queue_lock, irqflags);
+
 	return ret;
 }
 

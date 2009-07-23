@@ -20,7 +20,7 @@
 
 #include "hp3a_common.h"
 #include "hp3a_user.h"
-#include "ispreg.h"
+#include "hp3a_ispreg.h"
 
 static struct hp3a_reg isp_raw_regs[] = {
 	{HP3A_REG_32BIT, ISPCCDC_SYN_MODE, 0},
@@ -119,7 +119,6 @@ int hp3a_configure_raw(struct hp3a_raw_config *raw)
 
 		/* Only configure raw capture if width and height is valid. */
 		if (likely(g_tc.raw_width != 0 && g_tc.raw_height != 0)) {
-			raw->width = g_tc.raw_width;
 			g_tc.raw_hw_configured = 1;
 			g_tc.req_raw_buffer_size = (u32)ALIGN_TO(((ALIGN_TO( \
 				g_tc.raw_width, 16)*g_tc.raw_height)<<1), 0x1000);

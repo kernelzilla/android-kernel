@@ -28,8 +28,7 @@
 #include "hp3a_user.h"
 #include "hp3a_af.h"
 #include "isp.h"
-#include "ispreg.h"
-#include "isph3a.h"
+#include "hp3a_ispreg.h"
 
 #define  AF_MEMORY_ALIGNMENT      64
 
@@ -67,20 +66,26 @@ struct hp3a_reg isp_af_regs[] = {
  **/
 void hp3a_enable_af(void)
 {
+	struct hp3a_internal_buffer *ibuffer = NULL;
+
+	if (omap_readl(ISPH3A_PCR) & AF_BUSY) {
+		g_tc.af_hw_enable = 0;
+		return;
+	}
+
 	spin_lock(&g_tc.af_lock);
 
 	if (likely(g_tc.af_hw_configured == 1)) {
-		struct hp3a_internal_buffer *ibuffer = NULL;
-
 		if (likely(hp3a_dequeue(&g_tc.af_stat_queue, &ibuffer) == 0)) {
 			if (g_tc.af_hw_enable == 0) {
 				/* Write H3A hardware registers. */
 				hp3a_write_ispregs(isp_af_regs);
 				omap_writel(IRQ0STATUS_H3A_AF_DONE_IRQ,
 					ISP_IRQ0STATUS);
+
 				/* Enable H3A AF hardware.  */
 				omap_writel(omap_readl(ISPH3A_PCR) | \
-					ISPH3A_PCR_AF_EN,  ISPH3A_PCR);
+					ISPH3A_PCR_AF_EN_MASK, ISPH3A_PCR);
 				g_tc.af_hw_enable = 1;
 			}
 
@@ -93,7 +98,7 @@ void hp3a_enable_af(void)
 		} else if (g_tc.af_hw_enable == 1) {
 			g_tc.af_hw_enable = 0;
 			omap_writel(omap_readl(ISPH3A_PCR) & \
-				~(ISPH3A_PCR_AF_EN), ISPH3A_PCR);
+				~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
 		}
 	}
 
@@ -109,7 +114,7 @@ void hp3a_disable_af(void)
 {
 	spin_lock(&g_tc.af_lock);
 	g_tc.af_hw_enable = 0;
-	omap_writel(omap_readl(ISPH3A_PCR) & ~(ISPH3A_PCR_AF_EN), ISPH3A_PCR);
+	omap_writel(omap_readl(ISPH3A_PCR) & ~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
 	spin_unlock(&g_tc.af_lock);
 }
 
@@ -121,10 +126,14 @@ void hp3a_disable_af(void)
 static void hp3a_af_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 			void *arg2)
 {
-	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE))
+	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE)) {
 		return;
+	}
 
-	omap_writel(IRQ0STATUS_H3A_AF_DONE_IRQ, ISP_IRQ0STATUS);
+	if (g_tc.af_hw_enable == 0) {
+		omap_writel(omap_readl(ISPH3A_PCR) & \
+				~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
+	}
 }
 
 /**
@@ -215,7 +224,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 			config->paxel.hz_start > 4095 ||
 			config->paxel.vt_start > 4095) {
 			dev_info(device->dev,
-				"Error : Invalid paxel start position.");
+				"Error : Invalid paxel start position. (hz=%d vt=%d)\n",
+				config->paxel.hz_start, config->paxel.vt_start);
 			goto func_exit;
 		}
 		/* Setp pxel start positions. */
@@ -305,10 +315,22 @@ func_exit:
 			/* Disabling AF hardware. */
 			g_tc.af_hw_enable = 0;
 			omap_writel(omap_readl(ISPH3A_PCR) & \
-				~(ISPH3A_PCR_AF_EN),   ISPH3A_PCR);
+				~(ISPH3A_PCR_AF_EN_MASK),   ISPH3A_PCR);
 		}
 		spin_unlock(&g_tc.af_lock);
 	}
 
 	return ret;
 }
+
+/**
+ * hp3a_af_busy - Verify if AF hardware is busy.
+ *
+ * Return 1 if busy, 0 otherwise.
+ **/
+int hp3a_af_busy(void)
+{
+	return omap_readl(ISPH3A_PCR)
+		& ISPH3A_PCR_AF_BUSY_MASK;
+}
+EXPORT_SYMBOL(hp3a_af_busy);

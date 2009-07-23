@@ -40,29 +40,30 @@ struct page **map_user_memory(unsigned long addr, u32 size)
 	if (addr && size) {
 		nr_pages =  NR_PAGES(addr, (unsigned long)size);
 
-		ppages = kzalloc(sizeof(struct page *)*nr_pages,  GFP_KERNEL);
+		ppages = kzalloc(sizeof(struct page *)*nr_pages, GFP_KERNEL);
 		if (likely(ppages != NULL)) {
 			/* initialize page array. */
 			memset(ppages, 0, sizeof(struct page *)*nr_pages);
 
 			down_read(&current->mm->mmap_sem);
 			ret = get_user_pages(current,
-						current->mm,
-						addr & PAGE_MASK,
-						nr_pages,
-						1, /* 1 = from device, 0 = to device. */
-						1, /* force */
-						ppages,
-						NULL);
+				current->mm,
+				addr & PAGE_MASK,
+				nr_pages,
+				1, /* 1 = from device, 0 = to device. */
+				1, /* force */
+				ppages,
+				NULL);
 			up_read(&current->mm->mmap_sem);
 
 			if (unlikely(ret != nr_pages)) {
 				kfree(ppages);
 				ppages = NULL;
-				printk(KERN_ERR "Mapping user pages to kernel failed!\n");
+				printk(KERN_ERR "hp3a: Mapping user pages"
+						" to kernel failed!\n");
 			}
 		} else {
-			printk(KERN_ERR "Error allocating kernel memory!\n");
+			printk(KERN_ERR "hp3a: Error allocating kernel memory!\n");
 		}
 	}
 
@@ -114,27 +115,42 @@ int map_user_to_kernel(struct hp3a_buffer *src, struct hp3a_internal_buffer *des
 /**
  * unmap_buffers_from_kernel - Maps user memory in to kernel space and then maps
  *				kernel memory to isp address space.
- * @buffers: Pointer to internal buffer array to be unmapped from kernel spcae.
- * @count: Number of buffers in the array.
+ * @ibuffer: Pointer to internal buffer to be unmapped from kernel spcae.
  *
  * No return value.
  **/
-void unmap_buffer_from_kernel(struct hp3a_internal_buffer *buffers)
+void unmap_buffer_from_kernel(struct hp3a_internal_buffer *ibuffer)
 {
-	if (buffers->isp_addr) {
-		if (unlikely(ispmmu_unmap(buffers->isp_addr) != 0)) {
+	if (ibuffer->isp_addr) {
+		if (ispmmu_unmap(ibuffer->isp_addr) != 0) {
 			printk(KERN_ERR "Error unmapping from ispmmu (0x%x)!",
-				(unsigned int)buffers->isp_addr);
+				(unsigned int)ibuffer->isp_addr);
 		}
 
-		buffers->isp_addr = 0;
+		ibuffer->isp_addr = 0;
 	}
 
-	if (buffers->pages != NULL && buffers->buffer_size > 0) {
-		unmap_user_memory(buffers->pages, NR_PAGES(buffers->user_addr,
-				buffers->buffer_size));
-		kfree(buffers->pages);
-		buffers->pages = NULL;
+	if (ibuffer->pages != NULL && ibuffer->buffer_size > 0) {
+		unmap_user_memory(ibuffer->pages, NR_PAGES(ibuffer->user_addr,
+				ibuffer->buffer_size));
+		kfree(ibuffer->pages);
+		ibuffer->pages = NULL;
+	}
+}
+
+/**
+ * flush_dcache_ibuffer - Flushes dcache corresponding to a internal buffer.
+ * @ibuffer: Pointer to internal buffer to be flushed from cache.
+ *
+ * No return value.
+ **/
+void flush_dcache_ibuffer(struct hp3a_internal_buffer  *ibuffer)
+{
+	int i;
+	int nr_pages = NR_PAGES(ibuffer->user_addr, (unsigned long)ibuffer->buffer_size);
+
+	for (i = 0; i < nr_pages; ++i) {
+		flush_dcache_page(ibuffer->pages[i]);
 	}
 }
 
@@ -166,17 +182,6 @@ void hp3a_read_ispregs(struct hp3a_reg *regs)
 	for (; iter->len != HP3A_REG_TOK_TERM; ++iter) {
 		iter->val = omap_readl(iter->reg);
 	}
-}
-
-/**
- * hp3a_read_ispreg - Read an array of ISP registers.
- * @regs: Pointer to a array of registers to read.
- *
- * No return value.
- **/
-void hp3a_read_ispreg(struct hp3a_reg *omapreg)
-{
-	omapreg->val = omap_readl(omapreg->reg);
 }
 
 /**
@@ -248,7 +253,8 @@ int hp3a_read_ispreg_to_user(struct hp3a_reg *user_reg)
 	if (copy_from_user(&omapreg,
 			(struct hp3a_reg *)user_reg,
 			sizeof(struct hp3a_reg)) == 0) {
-		hp3a_read_ispreg(&omapreg);
+
+		omapreg.val = omap_readl(omapreg.reg);
 
 		if (copy_to_user(user_reg, &omapreg,
 			sizeof(struct hp3a_reg)) == 0) {
@@ -258,4 +264,3 @@ int hp3a_read_ispreg_to_user(struct hp3a_reg *user_reg)
 
 	return ret;
 }
-

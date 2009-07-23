@@ -19,7 +19,7 @@
  */
 
 #ifndef	__HP3A_AF_H_INCLUDED
-#define  __HP3A_AF_H_INCLUDED
+#define	__HP3A_AF_H_INCLUDED
 
 /* ISP af PCR bit values */
 #define AF_ENABLE		(1<<0)
@@ -74,4 +74,3 @@ struct hp3a_af_paxel {
 };
 
 #endif /* __HP3A_AF_H_INCLUDED */
-

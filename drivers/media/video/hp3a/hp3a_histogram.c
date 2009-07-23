@@ -24,8 +24,8 @@
 #include "hp3a_common.h"
 #include "hp3a_user.h"
 #include "isp.h"
-#include "ispreg.h"
-#include "isphist.h"
+#include "hp3a_histogram.h"
+#include "hp3a_ispreg.h"
 
 static struct hp3a_reg isp_hist_regs[] = {
 	{HP3A_REG_32BIT, ISPHIST_PCR, 0},	/* 0 */
@@ -53,12 +53,12 @@ static struct hp3a_reg isp_hist_regs[] = {
  **/
 void hp3a_enable_histogram(void)
 {
+	struct hp3a_internal_buffer *ibuffer;
+
 	spin_lock(&g_tc.hist_lock);
 
 	if (likely(g_tc.hist_hw_configured == 1)) {
-		struct hp3a_internal_buffer *ibuffer;
-
-		if (likely(hp3a_dequeue(&g_tc.hist_stat_queue, &ibuffer) == 0)) {
+		if (hp3a_dequeue(&g_tc.hist_stat_queue, &ibuffer) == 0) {
 			if (g_tc.hist_hw_enable == 0) {
 				/* Write histogram hardware registers. */
 				hp3a_write_ispregs(isp_hist_regs);
@@ -123,7 +123,7 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 		return;
 	}
 
-	if (likely(hp3a_dequeue(&g_tc.hist_hw_queue,  &ibuffer) == 0)) {
+	if (hp3a_dequeue(&g_tc.hist_hw_queue,  &ibuffer) == 0) {
 		/* If there is a buffer available then fill it. */
 		hist_buffer = (u32 *)phys_to_virt(page_to_phys(ibuffer->pages[0]));
 
@@ -310,3 +310,16 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 
 	return 0;
 }
+
+/**
+ * hp3a_hist_busy - Verify if histogram hardware is busy.
+ *
+ * Return 1 if busy, 0 otherwise.
+ **/
+int hp3a_hist_busy(void)
+{
+	return omap_readl(ISPHIST_PCR) &
+		ISPHIST_PCR_BUSY_MASK;
+
+}
+EXPORT_SYMBOL(hp3a_hist_busy);

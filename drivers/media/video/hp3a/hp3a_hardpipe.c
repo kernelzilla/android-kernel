@@ -19,8 +19,7 @@
  */
 
 #include "hp3a_common.h"
-#include "ispreg.h"
-#include "isppreview.h"
+#include "hp3a_ispreg.h"
 
 /**
  * hp3a_update_hardpipe - Updates ISP hardpipe parameters.
@@ -31,7 +30,8 @@ void hp3a_update_hardpipe(void)
 {
 	spin_lock(&g_tc.hardpipe_lock);
 
-	if (!isppreview_busy() && g_tc.update_hardpipe == 1) {
+	if (!(omap_readl(ISPPRV_PCR) & ISPPRV_PCR_BUSY) &&
+		g_tc.update_hardpipe == 1) {
 		omap_writel(g_tc.hpipe_param.dgain, ISPPRV_WB_DGAIN);
 
 		omap_writel(g_tc.hpipe_param.r_gain |
@@ -95,4 +95,3 @@ void hp3a_update_hardpipe(void)
 
 	spin_unlock(&g_tc.hardpipe_lock);
 }
-

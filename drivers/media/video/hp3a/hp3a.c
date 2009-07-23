@@ -2,7 +2,7 @@
  * drivers/media/video/hp3a/hp3a.c
  *
  * HP Imaging/3A Driver : Driver implementation for OMAP ISP companion
- *										functionality.
+ *				functionality.
  *
  * Copyright (C) 2008-2009 Hewlett-Packard Co.
  *
@@ -27,7 +27,8 @@
 #include "hp3a.h"
 #include "hp3a_common.h"
 
-#define	HP3A_DRV_NAME	"hp3a-omap"
+#define	HP3A_DRV_NAME	"hp3a"
+#define	HP3A_DRV_SYSFS	"hp3a-omap"
 
 /**
  * Global variables.
@@ -183,9 +184,10 @@ static int __init hp3a_drv_init(void)
 
 	device->dev = NULL;
 
-	hp3a_major = register_chrdev(0, HP3A_DRV_NAME, &hp3a_fops);
+	hp3a_major = register_chrdev(0, HP3A_DRV_SYSFS, &hp3a_fops);
 	if (hp3a_major < 0) {
-		dev_err(device->dev , "initialization failed. could not register character device\n");
+		dev_err(device->dev , "initialization failed. could"
+				" not register character device\n");
 		ret = -ENODEV;
 		goto exit_error_1;
 	}
@@ -211,9 +213,8 @@ static int __init hp3a_drv_init(void)
 	}
 
 	/* make entry in the devfs */
-	device->dev = device_create(hp3a_class, device->dev ,
-					MKDEV(hp3a_major, 0), NULL,
-					HP3A_DRV_NAME);
+	device->dev = device_create(hp3a_class, device->dev,
+		MKDEV(hp3a_major, 0), NULL, HP3A_DRV_SYSFS);
 
 	dev_info(device->dev , "Registered hp3a driver.\n");
 
@@ -229,7 +230,7 @@ exit_error_4:
 exit_error_3:
 	platform_driver_unregister(&hp3a_driver);
 exit_error_2:
-	unregister_chrdev(hp3a_major,  HP3A_DRV_NAME);
+	unregister_chrdev(hp3a_major,  HP3A_DRV_SYSFS);
 	hp3a_major = -1;
 exit_error_1:
 	kfree(device);
