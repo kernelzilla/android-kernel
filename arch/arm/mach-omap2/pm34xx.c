@@ -64,11 +64,6 @@ static int regset_save_on_suspend;
 #define OMAP343X_TABLE_VALUE_OFFSET	   0x30
 #define OMAP343X_CONTROL_REG_VALUE_OFFSET  0x32
 
-#define DEBUG_WAKEUP 1
-
-#define PM_WKST_WKUP_ST_GPIO1 (1 << 3)
-#define PM_WKST1_CORE_ST_UART1 (1 << 13)
-
 struct power_state {
 	struct powerdomain *pwrdm;
 	u32 next_state;
@@ -112,40 +107,6 @@ static struct prm_setup_vc prm_setup = {
 	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RAV1,
 	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | OMAP3430_SREN,
 };
-
-#if DEBUG_WAKEUP
-static void dump_regs(char *title, unsigned int r, char **decoder_ring) {
-        int i;
-        printk("%s: ", title);
-        for (i = 0; i < 32; i++) {
-                if (!decoder_ring[i])
-                        break;
-                if ((r & (1 << i)) && decoder_ring[i][0] != '\0')
-                        printk("%s ", decoder_ring[i]);
-        }
-        printk("\n");
-}
-
-static char *pm_wkup_wkst_decoder[] = {
-        "GPT1", "", "", "GPIO1", "", "", "SR1", "SR2", 
-         "IO", "", "", "", "", "", "", "", "IO_CHAIN", NULL,
-};
-
-static char *pm_core_wkst1_decoder[] = {
-	"", "", "", "", "HSOTGUSB", "", "", "", "", "MCBSP1", "MCBSP5",
-	"GPT10", "GPT11", "UART1", "UART2", "I2C1", "I2C2", "I2C3",
-	"MCSPI1", "MCSPI2", "MCSPI3", "MCSPI4", "", "", "MMC1", "MMC2",
-	"", "", "", "", "MMC3", "", NULL
-};
-
-static char *pm_core_wkst3_decoder[] = { "", "", "USBTLL", NULL };
-
-static char *pm_per_wkst_decoder[] = {
-	"MCBSP2", "MCBSP3", "MCBSP4", "GPT2", "GPT3", "GPT4", "GPT5", "GPT6",
-	 "GPT7", "GPT8", "GPT9", "UART3", "", "GPIO2", "GPIO3", "GPIO4",
-	"GPIO5", "GPIO6", NULL
-};
-#endif
 
 static inline void omap3_per_save_context(void)
 {
@@ -248,23 +209,15 @@ static void omap3_save_secure_ram_context(u32 target_mpu_state)
 	}
 }
 
-
 /* PRCM Interrupt Handler for wakeups */
 static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 {
 	u32 wkst, irqstatus_mpu;
 	u32 fclk, iclk;
-	int do_uart_pm = 0;
 
 	/* WKUP */
 	wkst = prm_read_mod_reg(WKUP_MOD, PM_WKST);
 	if (wkst) {
-#if DEBUG_WAKEUP
-		dump_regs("wkup_dom wkup status", wkst, pm_wkup_wkst_decoder);
-#endif
-		if (wkst & PM_WKST_WKUP_ST_GPIO1)
-			do_uart_pm = 1;
-
 		iclk = cm_read_mod_reg(WKUP_MOD, CM_ICLKEN);
 		fclk = cm_read_mod_reg(WKUP_MOD, CM_FCLKEN);
 		cm_set_mod_reg_bits(wkst, WKUP_MOD, CM_ICLKEN);
@@ -278,12 +231,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	/* CORE */
 	wkst = prm_read_mod_reg(CORE_MOD, PM_WKST1);
 	if (wkst) {
-#if DEBUG_WAKEUP
-		dump_regs("core_dom wkup status", wkst, pm_core_wkst1_decoder);
-#endif
-		if (wkst & PM_WKST1_CORE_ST_UART1)
-			do_uart_pm = 1;
-
 		iclk = cm_read_mod_reg(CORE_MOD, CM_ICLKEN1);
 		fclk = cm_read_mod_reg(CORE_MOD, CM_FCLKEN1);
 		cm_set_mod_reg_bits(wkst, CORE_MOD, CM_ICLKEN1);
@@ -295,9 +242,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	}
 	wkst = prm_read_mod_reg(CORE_MOD, OMAP3430ES2_PM_WKST3);
 	if (wkst) {
-#if DEBUG_WAKEUP
-		dump_regs("core_dom wkup status3", wkst, pm_core_wkst3_decoder);
-#endif
 		iclk = cm_read_mod_reg(CORE_MOD, CM_ICLKEN3);
 		fclk = cm_read_mod_reg(CORE_MOD, OMAP3430ES2_CM_FCLKEN3);
 		cm_set_mod_reg_bits(wkst, CORE_MOD, CM_ICLKEN3);
@@ -311,9 +255,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	/* PER */
 	wkst = prm_read_mod_reg(OMAP3430_PER_MOD, PM_WKST);
 	if (wkst) {
-#if DEBUG_WAKEUP
-		dump_regs("per_dom wkup status", wkst, pm_per_wkst_decoder);
-#endif
 		iclk = cm_read_mod_reg(OMAP3430_PER_MOD, CM_ICLKEN);
 		fclk = cm_read_mod_reg(OMAP3430_PER_MOD, CM_FCLKEN);
 		cm_set_mod_reg_bits(wkst, OMAP3430_PER_MOD, CM_ICLKEN);
@@ -348,9 +289,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 					 CM_FCLKEN);
 		}
 	}
-
-	if (do_uart_pm)
-		omap_uart_pm_wake();
 
 	irqstatus_mpu = prm_read_mod_reg(OCP_MOD,
 					OMAP2_PRM_IRQSTATUS_MPU_OFFSET);
@@ -672,9 +610,6 @@ static int omap3_pm_suspend(void)
 			goto restore;
 	}
 
-#if DEBUG_WAKEUP
-	printk("%s(): zzzzzz....\n", __func__);
-#endif
 	omap_uart_prepare_suspend();
 
 	regset_save_on_suspend = 1;
