@@ -22,7 +22,6 @@
 #include <linux/platform_device.h>
 #endif
 #include <linux/io.h>
-#include <linux/wakelock.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -36,7 +35,7 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
-#define DEFAULT_OMAP_UART_SLEEP_TIMEOUT (HZ/10)
+#define DEFAULT_TIMEOUT (5 * HZ)
 
 struct omap_uart_state {
 	int num;
@@ -72,7 +71,6 @@ struct omap_uart_state {
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
 
-static struct wake_lock omap_uart_wakelock;
 
 #ifdef CONFIG_SERIAL_OMAP
 static struct plat_serialomap_port serial_platform_data[] = {
@@ -347,14 +345,6 @@ static void omap_uart_idle_timer(unsigned long data)
 	omap_uart_allow_sleep(uart);
 }
 
-/**
- * Called from PRCM hard IRQ context when we've woken up
- * due to a UART event
- */
-void omap_uart_pm_wake() 
-{
-	wake_lock_timeout(&omap_uart_wakelock, (HZ / 2));
-}
 void omap_uart_prepare_idle(int num)
 {
 	struct omap_uart_state *uart;
@@ -440,7 +430,7 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
 	return IRQ_NONE;
 }
 
-static u32 sleep_timeout = DEFAULT_OMAP_UART_SLEEP_TIMEOUT;
+static u32 sleep_timeout = DEFAULT_TIMEOUT;
 
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
@@ -586,8 +576,6 @@ void __init omap_serial_init(void)
 	const struct omap_uart_config *info;
 	char name[16];
 
-	wake_lock_init(&omap_uart_wakelock, WAKE_LOCK_SUSPEND,
-		       "omap_uart");
 	/*
 	 * Make sure the serial ports are muxed on at this point.
 	 * You have to mux them off in device drivers later on
