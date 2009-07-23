@@ -21,6 +21,7 @@
 #include <mach/display.h>
 #include <mach/vrfb.h>
 #include <media/v4l2-dev.h>
+#include <media/videobuf-core.h>
 
 /*#define DEBUG*/
 #ifdef DEBUG
@@ -29,17 +30,6 @@
 #else
 #define DBG(format, ...)
 #endif
-
-#define OMAPVOUT_VID_MAX_FRAMES	(10)
-
-struct omapvout_frm_q_entry {
-	u32 flags; /* same a V4L2_buffer.flags */
-	u32 size;
-	u32 phy_addr;
-	u32 virt_addr;
-	u32 offset; /* For mmap'ing purposes only */
-	u32 seq_num;
-};
 
 /* The device structure */
 
@@ -65,7 +55,6 @@ struct omapvout_device {
 	struct omapvout_dss *dss;
 
 	/* V4L2 data */
-	bool streaming;
 	int rotation;
 	u32 colorkey;
 	int colorkey_en;
@@ -74,13 +63,9 @@ struct omapvout_device {
 	struct v4l2_rect crop;
 
 	/* Frame Q */
-	int fq_cnt; /* number of frames in the queue */
-	int fq_min_size; /* smallest frame in the queue */
-	int fq_dq_idx; /* the index to begin dQing from */
-	int fq_cur_idx; /* the index of the current displayed frame */
-	u32 fq_next_seq; /* a sequence number to maintain frame Q'ing order*/
-	struct omapvout_frm_q_entry fq[OMAPVOUT_VID_MAX_FRAMES];
-	wait_queue_head_t fq_wait;
+	struct videobuf_queue queue;
+	struct omapvout_vbq *vbq;
+	struct list_head q_list;
 
 	/* Don't allow new buffers when some are still mapped */
 	int mmap_cnt;

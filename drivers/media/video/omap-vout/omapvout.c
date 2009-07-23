@@ -31,6 +31,7 @@
 #include "omapvout.h"
 #include "omapvout-dss.h"
 #include "omapvout-mem.h"
+#include "omapvout-vbq.h"
 
 #ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
 #include "omapvout-bp.h"
@@ -61,6 +62,7 @@
 #ifndef OMAPVOUT_VIDEO_BP_BUF_COUNT
 #define OMAPVOUT_VIDEO_BP_BUF_COUNT	6
 #endif
+
 #ifndef OMAPVOUT_VIDEO_BP_BUF_SIZE
 #define OMAPVOUT_VIDEO_BP_BUF_SIZE	\
 	PAGE_ALIGN(OMAPVOUT_VIDEO_MAX_WIDTH * \
@@ -218,8 +220,8 @@ static int omapvout_try_window(struct omapvout_device *vout,
  * that will fit on the display.  The default cropping rectangle is centered in
  * the image.  All dimensions and offsets are rounded down to even numbers.
  */
-void omapvout_default_crop(struct omapvout_device *vout,
-			struct v4l2_rect *crop)
+static void omapvout_default_crop(struct omapvout_device *vout,
+						struct v4l2_rect *crop)
 {
 	crop->width = (vout->pix.width < vout->disp_width) ?
 		vout->pix.width : vout->disp_width;
@@ -241,7 +243,8 @@ void omapvout_default_crop(struct omapvout_device *vout,
  * Returns zero if succesful, or -EINVAL if the requested cropping rectangle is
  * impossible and cannot reasonably be adjusted.
  */
-int omapvout_try_crop(struct omapvout_device *vout, struct v4l2_rect *crop)
+static int omapvout_try_crop(struct omapvout_device *vout,
+					struct v4l2_rect *crop)
 {
 	struct v4l2_rect try;
 
@@ -287,85 +290,6 @@ int omapvout_try_crop(struct omapvout_device *vout, struct v4l2_rect *crop)
 	return 0;
 }
 
-void omapvout_acquire_frames(struct omapvout_device *vout, int cnt, int size)
-{
-	int i;
-	int fcnt;
-	u32 paddr;
-	u32 vaddr;
-	u32 fs;
-
-	/* It is assumed that the vout->mtx is locked for this call */
-
-	vout->fq_min_size = 0x7FFFFFF; /* Some large value */
-	fcnt = 0;
-	for (i = 0; i < cnt; i++) {
-#ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
-		if (vout->bp &&	omapvout_bp_alloc(vout, size,
-					&paddr, &vaddr, &fs) == 0) {
-			DBG("Alloc'd from the pool\n");
-		} else {
-#else
-		{
-#endif
-			if (omapvout_mem_alloc(size, &paddr, &vaddr)) {
-				DBG("Alloc failed %d\n", i);
-				break;
-			}
-			fs = size;
-		}
-
-		memset((void *)vaddr, 0, fs);
-
-		vout->fq[fcnt].flags = V4L2_BUF_FLAG_DONE;
-		vout->fq[fcnt].size = fs;
-		vout->fq[fcnt].phy_addr = paddr;
-		vout->fq[fcnt].virt_addr = vaddr;
-		/* Using OMAPVOUT_VIDEO_BP_BUF_SIZE is just convenient */
-		vout->fq[fcnt].offset = OMAPVOUT_VIDEO_BP_BUF_SIZE * i;
-
-		fcnt++;
-
-		if (fs < vout->fq_min_size)
-			vout->fq_min_size = fs;
-	}
-
-	vout->fq_cnt = fcnt;
-	vout->fq_dq_idx = 0;
-}
-
-void omapvout_release_frames(struct omapvout_device *vout)
-{
-	int i;
-	u32 paddr;
-	u32 vaddr;
-	u32 size;
-
-	/* It is assumed that the vout->mtx is locked for this call */
-
-	for (i = 0; i < vout->fq_cnt; i++) {
-		paddr = vout->fq[i].phy_addr;
-		vaddr = vout->fq[i].virt_addr;
-		size = vout->fq[i].size;
-
-#ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
-		if (omapvout_is_bp_buffer(vout, paddr)) {
-			if (omapvout_bp_release(vout, paddr))
-				DBG("Error releasing to the pool\n");
-		} else {
-#else
-		{
-#endif
-			omapvout_mem_free(paddr, vaddr, size);
-		}
-	}
-
-	vout->fq_cnt = 0;
-	vout->fq_min_size = 0;
-	vout->fq_dq_idx = 0;
-	memset(vout->fq, 0, sizeof(vout->fq));
-}
-
 static void omapvout_free_resources(struct omapvout_device *vout)
 {
 	DBG("free_resources\n");
@@ -380,32 +304,6 @@ static void omapvout_free_resources(struct omapvout_device *vout)
 
 	video_set_drvdata(&vout->vdev, NULL);
 	kfree(vout);
-}
-
-static int omapvout_dqbuf(struct omapvout_device *vout, int *idx)
-{
-	int i, j;
-
-	j = vout->fq_dq_idx;
-
-	for (i = 0; i < vout->fq_cnt; i++) {
-		if (vout->fq[j].flags & V4L2_BUF_FLAG_DONE) {
-			DBG("DQ'ing Frame %d\n", j);
-			vout->fq_dq_idx = j;
-			break;
-		}
-
-		j++;
-		if (j >= vout->fq_cnt)
-			j = 0;
-	}
-
-	if (i >= vout->fq_cnt)
-		return -EINVAL;
-
-	*idx = j;
-
-	return 0;
 }
 
 /*=== V4L2 Interface Functions =========================================*/
@@ -446,6 +344,10 @@ static int omapvout_open(struct file *file)
 		goto failed;
 	}
 
+	rc = omapvout_vbq_init(vout);
+	if (rc != 0)
+		goto failed;
+
 	vout->disp_width = w;
 	vout->disp_height = h;
 	vout->opened = 1;
@@ -468,16 +370,9 @@ static int omapvout_open(struct file *file)
 	vout->crop.width = w;
 	vout->crop.height = h;
 
-	vout->streaming = 0;
 	vout->rotation = 0;
 	vout->colorkey = 0;
 	vout->colorkey_en = 0;
-
-	memset(&vout->fq, 0, sizeof(vout->fq));
-	vout->fq_cnt = 0;
-	vout->fq_min_size = 0;
-	vout->fq_dq_idx = 0;
-	vout->fq_cur_idx = 0;
 
 	vout->mmap_cnt = 0;
 
@@ -507,8 +402,10 @@ static int omapvout_release(struct file *file)
 
 	mutex_lock(&vout->mtx);
 
-	if (vout->streaming)
+	if (vout->queue.streaming) {
 		omapvout_dss_disable(vout);
+		videobuf_streamoff(&vout->queue);
+	}
 
 	if (vout->mmap_cnt) {
 		vout->mmap_cnt = 0;
@@ -517,12 +414,9 @@ static int omapvout_release(struct file *file)
 
 	omapvout_dss_release(vout);
 
-	omapvout_release_frames(vout);
+	omapvout_vbq_destroy(vout);
 
 	vout->opened = 0;
-
-	/* Force the DQ waiter (if present) to wakeup */
-	wake_up_interruptible(&vout->fq_wait);
 
 	mutex_unlock(&vout->mtx);
 
@@ -531,31 +425,10 @@ static int omapvout_release(struct file *file)
 	return 0;
 }
 
-static void omapvout_vm_open(struct vm_area_struct *vma)
-{
-	struct omapvout_device *vout = vma->vm_private_data;
-	DBG("vm_open [vma=%08lx-%08lx]\n", vma->vm_start, vma->vm_end);
-	vout->mmap_cnt++;
-}
-
-static void omapvout_vm_close(struct vm_area_struct *vma)
-{
-	struct omapvout_device *vout = vma->vm_private_data;
-	DBG("vm_close [vma=%08lx-%08lx]\n", vma->vm_start, vma->vm_end);
-	vout->mmap_cnt--;
-}
-
-static struct vm_operations_struct omapvout_vm_ops = {
-	.open = omapvout_vm_open,
-	.close = omapvout_vm_close,
-};
-
 static int omapvout_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct omapvout_device *vout;
-	int idx;
 	int rc;
-	u32 offset;
 
 	vout = video_drvdata(file);
 
@@ -566,30 +439,9 @@ static int omapvout_mmap(struct file *file, struct vm_area_struct *vma)
 
 	mutex_lock(&vout->mtx);
 
-	/* look for the buffer to map */
-	offset = (vma->vm_pgoff << PAGE_SHIFT);
-	for (idx = 0; idx < vout->fq_cnt; idx++) {
-		if (vout->fq[idx].offset == offset)
-			break;
-	}
-
-	if (idx >= vout->fq_cnt) {
-		DBG("Invalid offset 0x%lx\n", (unsigned long) offset);
-		mutex_unlock(&vout->mtx);
-		rc = -EINVAL;
+	rc = videobuf_mmap_mapper(&vout->queue, vma);
+	if (rc != 0)
 		goto failed;
-	}
-
-	DBG("omapvout_mmap %d\n", idx);
-
-	vma->vm_ops = &omapvout_vm_ops;
-	vma->vm_private_data = (void *) vout;
-
-	rc = omapvout_mem_map(vma, vout->fq[idx].phy_addr);
-	if (rc != 0) {
-		DBG("Failed mem_map %d\n", rc);
-		goto failed;
-	}
 
 	vout->mmap_cnt++;
 
@@ -783,10 +635,12 @@ static int omapvout_vidioc_s_fmt_vid_overlay(struct file *file, void *priv,
 		return -ENODEV;
 	}
 
-	if (vout->streaming)
-		return -EBUSY;
-
 	mutex_lock(&vout->mtx);
+
+	if (vout->queue.streaming) {
+		rc = -EBUSY;
+		goto failed;
+	}
 
 	rc = omapvout_try_window(vout, win);
 	if (rc != 0)
@@ -819,10 +673,12 @@ static int omapvout_vidioc_s_fmt_vid_out(struct file *file, void *priv,
 		return -ENODEV;
 	}
 
-	if (vout->streaming)
-		return -EBUSY;
-
 	mutex_lock(&vout->mtx);
+
+	if (vout->queue.streaming) {
+		rc = -EBUSY;
+		goto failed;
+	}
 
 	rc = omapvout_try_pixel_format(vout, pix);
 	if (rc != 0)
@@ -906,13 +762,15 @@ static int omapvout_vidioc_s_crop(struct file *file, void *priv,
 		return -ENODEV;
 	}
 
-	if (vout->streaming)
-		return -EBUSY;
-
 	if (crop->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
 		return -EINVAL;
 
 	mutex_lock(&vout->mtx);
+
+	if (vout->queue.streaming) {
+		rc = -EBUSY;
+		goto failed;
+	}
 
 	rc = omapvout_try_crop(vout, &rect);
 	if (rc != 0)
@@ -934,36 +792,23 @@ static int omapvout_vidioc_reqbufs(struct file *file, void *priv,
 				struct v4l2_requestbuffers *req)
 {
 	struct omapvout_device *vout = priv;
-	int rc;
+	int rc = 0;
 
 	if (vout == NULL) {
 		DBG("Invalid device\n");
 		return -ENODEV;
 	}
 
-	if (req->count > OMAPVOUT_VID_MAX_FRAMES)
-		req->count = OMAPVOUT_VID_MAX_FRAMES;
-
-	if (req->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
-		return -EINVAL;
-
+	/* A limitation of this implementation */
 	if (req->memory != V4L2_MEMORY_MMAP)
 		return -EINVAL;
 
-	/* FIXME: Really should allow if req->count is zero */
-	if (vout->streaming)
-		return -EBUSY;
-
-	/* It is assumed that the video out format is correctly configured */
-	if (vout->pix.sizeimage == 0)
-		return -EINVAL;
+	if (req->count == 0) {
+		videobuf_queue_cancel(&vout->queue);
+		return 0;
+	}
 
 	mutex_lock(&vout->mtx);
-
-	if (req->count == 0) {
-		omapvout_release_frames(vout);
-		goto success;
-	}
 
 	/* Don't allow new buffers when some are still mapped */
 	if (vout->mmap_cnt) {
@@ -972,26 +817,14 @@ static int omapvout_vidioc_reqbufs(struct file *file, void *priv,
 		goto failed;
 	}
 
-	/* Use the existing frames if possible */
-	if (req->count <= vout->fq_cnt &&
-			vout->pix.sizeimage <= vout->fq_min_size)
-		goto success;
+	INIT_LIST_HEAD(&vout->q_list);
 
-	omapvout_release_frames(vout);
-	omapvout_acquire_frames(vout, req->count, vout->pix.sizeimage);
+	videobuf_reqbufs(&vout->queue, req);
 
 	mutex_unlock(&vout->mtx);
 
-	if (vout->fq_min_size < vout->pix.sizeimage) {
-		DBG("Buffer allocation failed\n");
-		return -ENOMEM;
-	}
-
-	req->count = vout->fq_cnt;
-
 	return 0;
 
-success:
 failed:
 	mutex_unlock(&vout->mtx);
 	return rc;
@@ -1001,127 +834,43 @@ static int omapvout_vidioc_querybuf(struct file *file, void *priv,
 				struct v4l2_buffer *b)
 {
 	struct omapvout_device *vout = priv;
-	int rc;
 
 	if (vout == NULL) {
 		DBG("Invalid device\n");
 		return -ENODEV;
 	}
 
-	if (b->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
-		return -EINVAL;
-
-	mutex_lock(&vout->mtx);
-
-	if (b->index >= vout->fq_cnt) {
-		DBG("Invalid querybuf index %d\n", b->index);
-		rc = -EINVAL;
-		goto failed;
-	}
-
-	b->memory = V4L2_MEMORY_MMAP;
-	b->flags = vout->fq[b->index].flags;
-	b->length = vout->fq[b->index].size;
-	b->m.offset = vout->fq[b->index].offset;
-
-	mutex_unlock(&vout->mtx);
-
-	return 0;
-
-failed:
-	mutex_unlock(&vout->mtx);
-	return rc;
+	return videobuf_querybuf(&vout->queue, b);
 }
 
 static int omapvout_vidioc_qbuf(struct file *file, void *priv,
 				struct v4l2_buffer *b)
 {
 	struct omapvout_device *vout = priv;
-	int rc = 0;
 
 	if (vout == NULL) {
 		DBG("Invalid device\n");
 		return -ENODEV;
 	}
 
-	if (!vout->streaming)
-		return -EINVAL;
-
-	if (b->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
-		return -EINVAL;
-
-	if (b->memory != V4L2_MEMORY_MMAP)
-		return -EINVAL;
-
-	if (b->index >= vout->fq_cnt)
-		return -EINVAL;
-
 	DBG("Q'ing Frame %d\n", b->index);
 
-	mutex_lock(&vout->mtx);
-
-	vout->fq[b->index].flags |= V4L2_BUF_FLAG_QUEUED|V4L2_BUF_FLAG_MAPPED;
-	vout->fq[b->index].flags &= ~(V4L2_BUF_FLAG_DONE);
-
-	/* TODO: Deal with the wrap-around case? */
-	vout->fq[b->index].seq_num = vout->fq_next_seq++;
-
-	rc = omapvout_dss_update(vout);
-
-	mutex_unlock(&vout->mtx);
-
-	return rc;
+	return videobuf_qbuf(&vout->queue, b);
 }
 
 static int omapvout_vidioc_dqbuf(struct file *file, void *priv,
 				struct v4l2_buffer *b)
 {
 	struct omapvout_device *vout = priv;
-	int rc = 0;
-	int idx;
-	bool wait;
+	int block = 0;
+	int rc;
 
-	if (vout == NULL) {
-		DBG("Invalid device\n");
-		return -ENODEV;
-	}
+	if (file->f_flags & O_NONBLOCK)
+		block = 1;
 
-	if (b->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
-		return -EINVAL;
+	rc = videobuf_dqbuf(&vout->queue, b, block);
 
-	wait = (file->f_flags & O_NONBLOCK) ? false : true;
-
-	mutex_lock(&vout->mtx);
-
-	if (vout->opened == 0) {
-		rc = -EINVAL;
-		goto failed;
-	}
-
-	if (omapvout_dqbuf(vout, &idx) != 0) {
-		if (!wait) {
-			mutex_unlock(&vout->mtx);
-			return -EAGAIN;
-		} else {
-			wait_event_interruptible(vout->fq_wait,
-					((omapvout_dqbuf(vout, &idx) == 0) ||
-						(vout->opened == 0)));
-		}
-	}
-
-	vout->fq[idx].flags &=
-		~(V4L2_BUF_FLAG_QUEUED|V4L2_BUF_FLAG_DONE|V4L2_BUF_FLAG_MAPPED);
-
-	memset(b, 0, sizeof(b));
-	b->index = idx;
-	b->type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	b->memory = V4L2_MEMORY_MMAP;
-	b->flags = vout->fq[idx].flags;
-	b->length = vout->fq[idx].size;
-	b->bytesused = 0;
-
-failed:
-	mutex_unlock(&vout->mtx);
+	DBG("DQ'ing Frame %d\n", b->index);
 
 	return rc;
 }
@@ -1130,6 +879,7 @@ static int omapvout_vidioc_streamon(struct file *file, void *priv,
 				enum v4l2_buf_type type)
 {
 	struct omapvout_device *vout = priv;
+	int rc;
 
 	if (vout == NULL) {
 		DBG("Invalid device\n");
@@ -1138,23 +888,11 @@ static int omapvout_vidioc_streamon(struct file *file, void *priv,
 
 	mutex_lock(&vout->mtx);
 
-	if (vout->streaming) {
-		DBG("Streaming is already enabled\n");
-		mutex_unlock(&vout->mtx);
-		return -EBUSY;
-	}
-
-	/* Enable the streaming flag.
-	 * There can't be any frames queued, so when the first frame
-	 * is queued the DSS will be updated.
-	 */
-	vout->streaming = true;
-
 	omapvout_dss_enable(vout);
 
-	/* Reset the current frame idx & seq num */
-	vout->fq_cur_idx = -1;
-	vout->fq_next_seq = 1;
+	rc = videobuf_streamon(&vout->queue);
+	if (rc)
+		omapvout_dss_disable(vout);
 
 	mutex_unlock(&vout->mtx);
 
@@ -1166,7 +904,6 @@ static int omapvout_vidioc_streamoff(struct file *file, void *priv,
 {
 	struct omapvout_device *vout = priv;
 	int rc = 0;
-	int i;
 
 	if (vout == NULL) {
 		DBG("Invalid device\n");
@@ -1175,24 +912,9 @@ static int omapvout_vidioc_streamoff(struct file *file, void *priv,
 
 	mutex_lock(&vout->mtx);
 
-	if (!vout->streaming) {
-		DBG("Streaming is already disabled\n");
-		mutex_unlock(&vout->mtx);
-		return -EINVAL;
-	}
-
-	vout->streaming = false;
-
 	omapvout_dss_disable(vout);
 
-	/* Reset the queue and wakeup the DQ waiter */
-	for (i = 0; i < vout->fq_cnt; i++) {
-		if (vout->fq[i].flags & V4L2_BUF_FLAG_QUEUED) {
-			vout->fq[i].flags &= ~(V4L2_BUF_FLAG_QUEUED);
-			vout->fq[i].flags |= V4L2_BUF_FLAG_DONE;
-		}
-	}
-	wake_up_interruptible(&vout->fq_wait);
+	rc = videobuf_streamoff(&vout->queue);
 
 	mutex_unlock(&vout->mtx);
 
@@ -1251,10 +973,12 @@ static int omapvout_vidioc_s_ctrl(struct file *file, void *priv,
 		return -ENODEV;
 	}
 
-	if (vout->streaming)
-		return -EBUSY;
-
 	mutex_lock(&vout->mtx);
+
+	if (vout->queue.streaming) {
+		rc = -EBUSY;
+		goto failed;
+	}
 
 	switch (ctrl->id) {
 	case V4L2_CID_PRIV_ROTATION:
@@ -1282,6 +1006,7 @@ static int omapvout_vidioc_s_ctrl(struct file *file, void *priv,
 	 * later when streaming is enabled
 	 */
 
+failed:
 	mutex_unlock(&vout->mtx);
 
 	return rc;
@@ -1374,7 +1099,6 @@ static int __init omapvout_probe(struct platform_device *pdev,
 	}
 
 	vout->id = plane;
-	init_waitqueue_head(&vout->fq_wait);
 
 	return 0;
 

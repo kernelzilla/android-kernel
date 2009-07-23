@@ -15,8 +15,8 @@ struct omapvout_bp_entry {
 	u32 in_use;
 	u32 user;
 	u32 size;
-	u32 phy_addr;
-	u32 virt_addr;
+	unsigned long phy_addr;
+	void *virt_addr;
 };
 
 struct omapvout_bp {
@@ -29,10 +29,12 @@ struct omapvout_bp {
 extern struct omapvout_bp *omapvout_bp_create(u8 num_buffers, u32 buf_size);
 extern void omapvout_bp_init(struct omapvout_device *vout);
 extern void omapvout_bp_destroy(struct omapvout_device *vout);
-extern bool omapvout_is_bp_buffer(struct omapvout_device *vout, u32 phy_addr);
+extern bool omapvout_is_bp_buffer(struct omapvout_device *vout,
+			unsigned long phy_addr);
 extern int omapvout_bp_alloc(struct omapvout_device *vout, u32 req_size,
-				 u32 *phy_addr, u32 *virt_addr, u32 *size);
-extern int omapvout_bp_release(struct omapvout_device *vout, u32 phy_addr);
+			unsigned long *phy_addr, void **virt_addr, u32 *size);
+extern int omapvout_bp_release(struct omapvout_device *vout,
+			unsigned long phy_addr);
 
 #endif /* __OMAPVOUT_BP_H__ */
 

@@ -14,7 +14,7 @@
 
 #include <linux/io.h>
 #include <linux/kernel.h>
-#include <linux/vmalloc.h>
+#include <linux/gfp.h>
 
 #include <asm/processor.h>
 #include <asm/cacheflush.h>
@@ -23,75 +23,46 @@
 #include "omapvout.h"
 #include "omapvout-mem.h"
 
-int omapvout_mem_alloc(u32 size, u32 *phy_addr, u32 *virt_addr)
+int omapvout_mem_alloc(u32 size, unsigned long *phy_addr, void **virt_addr)
 {
-	int	order;
-	u32	dss_page_addr;
-	u32	dss_page_phy;
-	u32	dss_page_virt;
-	u32	used, alloc_end;
-	struct page	*tmp_page;
+	void *page_addr;
 
 	size = PAGE_ALIGN(size);
-	order = get_order(size);
 
-	dss_page_addr = __get_free_pages(GFP_KERNEL, order);
-	if (!dss_page_addr) {
-		printk(KERN_ERR "Failed to allocate pages !!!! \n");
+	page_addr = alloc_pages_exact(size, GFP_KERNEL);
+	if (!page_addr) {
+		printk(KERN_ERR "Failed to allocate pages!\n");
 		return -ENOMEM;
 	}
 
-	/*
-	 *'alloc_pages' allocates pages in power of 2,
-	 *so free the not needed pages
-	 */
-	split_page(virt_to_page(dss_page_addr), order);
-	alloc_end = dss_page_addr + (PAGE_SIZE<<order);
-	used = dss_page_addr + size;
+	*phy_addr = virt_to_phys(page_addr);
+	*virt_addr = ioremap_cached(*phy_addr, size);
 
-	DBG("mem_alloc: dss_page_addr=0x%x, alloc_end=0x%x, used=0x%x\n"
-		, dss_page_addr, alloc_end, used);
-	DBG("mem_alloc: physical_start=0x%lx, order=0x%x, size=0x%x\n"
-		, virt_to_phys((void *)dss_page_addr), order, size);
-
-	while (used < alloc_end) {
-		BUG_ON(!virt_addr_valid((void *)used));
-		tmp_page = virt_to_page((void *)used);
-		__free_page(tmp_page);
-		used += PAGE_SIZE;
-	}
-
-	dss_page_phy = virt_to_phys((void *)dss_page_addr);
-	dss_page_virt = (u32) ioremap_cached(dss_page_phy, size);
-
-	*phy_addr = dss_page_phy;
-	*virt_addr = dss_page_virt;
+	DBG("mem_alloc: page/%08x; phy/%08lx; virt/%08x; size/%x\n",
+		(unsigned int) page_addr, *phy_addr,
+		(unsigned int) *virt_addr, size);
 
 	return 0;
 }
 
-void omapvout_mem_free(u32 phy_addr, u32 virt_addr, u32 size)
+void omapvout_mem_free(unsigned long phy_addr, void *virt_addr, u32 size)
 {
-	u32 vaddr;
-	u32	end;
+	void *page_addr;
 
 	size = PAGE_ALIGN(size);
-	vaddr = (u32) __va((void *)phy_addr);
-	end = vaddr + size;
-	while (vaddr < end) {
-		free_page(vaddr);
-		vaddr += PAGE_SIZE;
-	}
-	iounmap((void *) virt_addr);
+	page_addr = __va((void *)phy_addr);
+
+	free_pages_exact(page_addr, size);
+
+	iounmap(virt_addr);
 }
 
-int omapvout_mem_map(struct vm_area_struct *vma, u32 phy_addr)
+int omapvout_mem_map(struct vm_area_struct *vma, unsigned long phy_addr)
 {
 	struct page *cpage;
 	void *pos;
 	u32 start;
 	u32 size;
-
 
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
