@@ -216,6 +216,7 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 				result = NOTIFY_BAD;
 			}
 		}
+		cpcap_regacc_write(misc_cpcap, CPCAP_REG_MI2, 0, 0xFFFF);
 	} else {
 		/* Clear the soft reset bit in the cpcap */
 		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
