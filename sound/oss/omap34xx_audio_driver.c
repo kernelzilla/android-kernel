@@ -1198,13 +1198,9 @@ static int audio_select_speakers(int spkr)
 		}
 	}
 
-	if ((state.dev_dsp_open_count == 1) ||
-	    (state.dev_dsp1_open_count == 1))
-		cpcap_audio_set_audio_state(&cpcap_audio_state);
-	else {
-		primary_spkr_setting = spkr1;
-		secondary_spkr_setting = spkr2;
-	}
+	cpcap_audio_set_audio_state(&cpcap_audio_state);
+	primary_spkr_setting = spkr1;
+	secondary_spkr_setting = spkr2;
 
 	return 0;
 }
@@ -2096,6 +2092,9 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 							CPCAP_AUDIO_OUT_NONE;
 		cpcap_audio_state.codec_secondary_speaker =
 							CPCAP_AUDIO_OUT_NONE;
+		cpcap_audio_state.ext_primary_speaker = CPCAP_AUDIO_OUT_NONE;
+		cpcap_audio_state.ext_secondary_speaker =
+						CPCAP_AUDIO_OUT_NONE;
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			audio_stop_ssi(inode, file);
@@ -2231,6 +2230,10 @@ err:
 
 static int audio_mixer_close(struct inode *inode, struct file *file)
 {
+	/* Reset mixer options so cpcap audio can enter low power state */
+	cpcap_audio_state.microphone = CPCAP_AUDIO_IN_NONE;
+	cpcap_audio_set_audio_state(&cpcap_audio_state);
+
 	mutex_lock(&audio_lock);
 	state.dev_mixer_open_count = 0;
 	mutex_unlock(&audio_lock);
