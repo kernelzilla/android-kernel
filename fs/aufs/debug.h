@@ -25,9 +25,10 @@
 
 #ifdef __KERNEL__
 
+#include <asm/system.h>
 #include <linux/bug.h>
 /* #include <linux/err.h> */
-/* #include <linux/init.h> */
+#include <linux/init.h>
 /* #include <linux/kernel.h> */
 #include <linux/delay.h>
 /* #include <linux/kd.h> */
