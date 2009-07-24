@@ -22,7 +22,8 @@
 #include <linux/platform_device.h>
 #endif
 #include <linux/io.h>
-#include <linux/wakelock.h>
+#include <linux/delay.h>
+#include <linux/debugfs.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -49,6 +50,10 @@ struct omap_uart_state {
 	u32 wk_mask;
 	u32 padconf;
 
+	u32 rts_padconf;
+	int rts_override;
+	u16 rts_padvalue;
+
 	struct clk *ick;
 	struct clk *fck;
 	int clocked;
@@ -71,7 +76,9 @@ struct omap_uart_state {
 
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
-static struct wake_lock omap_uart_wakelock;
+
+static struct omap_uart_state *dbg_uart = NULL;
+static int autorts_en = 1;
 
 #ifdef CONFIG_SERIAL_OMAP
 static struct plat_serialomap_port serial_platform_data[] = {
@@ -300,6 +307,76 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
 	serial_write_reg(p, UART_OMAP_SYSC, sysc);
 }
 
+static void omap_uart_set_autorts(struct omap_uart_state *uart, int set)
+{
+	struct plat_serialomap_port *p = uart->p;
+	uint32_t lcr_val = 0, mcr_val = 0, efr_val = 0;
+	uint32_t lcr_backup = 0, mcr_backup = 0, efr_backup = 0;
+
+	printk("%s: uart %d, set %d\n", __func__, uart->num, set);
+
+	lcr_val = serial_read_reg(p, UART_LCR);
+	lcr_backup = lcr_val;
+	serial_write_reg(p, UART_LCR, 0x80);
+
+	mcr_val = serial_read_reg(p, UART_MCR);
+	mcr_backup = mcr_val;
+	serial_write_reg(p, UART_MCR, mcr_val | 0x40);
+
+	serial_write_reg(p, UART_LCR, 0xbf);
+
+	efr_val = serial_read_reg(p, UART_EFR);
+	efr_backup = efr_val;
+	serial_write_reg(p, UART_EFR, efr_val | 0x10);
+
+	serial_write_reg(p, 0x06, 0x5f);
+
+	efr_val = serial_read_reg(p, UART_EFR);
+	if (set)
+		serial_write_reg(p, UART_EFR, (efr_val & (~0xc0)) | (1 << 6));
+	else
+		serial_write_reg(p, UART_EFR, efr_val & (~0xc0));
+
+	serial_write_reg(p, UART_LCR, 0x80);
+
+	mcr_val = serial_read_reg(p, UART_MCR);
+	serial_write_reg(p, UART_MCR, (mcr_val & (~0x40)) | (mcr_backup & 0x40));
+
+	serial_write_reg(p, UART_LCR, lcr_backup);
+}
+
+static inline void omap_uart_disable_autorts(struct omap_uart_state *uart)
+{
+	struct plat_serialomap_port *p = uart->p;
+	unsigned char mcr;
+
+	if (!uart->rts_padconf || uart->rts_override)
+		return;
+
+	uart->rts_padvalue = omap_ctrl_readw(uart->rts_padconf);
+	omap_ctrl_writew(0x18 | 0x7, uart->rts_padconf);
+#if 0
+	omap_uart_set_autorts(uart, 0);
+	mcr = serial_read_reg(p, UART_MCR);
+	serial_write_reg(p, UART_MCR, mcr & ~UART_MCR_RTS);
+#endif
+
+	uart->rts_override = 1;
+}
+
+static inline void omap_uart_enable_autorts(struct omap_uart_state *uart)
+{
+	if (!uart->rts_padconf || !uart->rts_override)
+		return;
+#if 0
+	omap_uart_set_autorts(uart, 1);
+#endif
+
+	omap_ctrl_writew(uart->rts_padvalue, uart->rts_padconf);
+
+	uart->rts_override = 0;
+}
+
 static inline void omap_uart_restore(struct omap_uart_state *uart)
 {
 	omap_uart_enable_clocks(uart);
@@ -308,36 +385,13 @@ static inline void omap_uart_restore(struct omap_uart_state *uart)
 
 static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 {
-	struct plat_serialomap_port *p = uart->p;
-	unsigned char mcr;
-
 	if (!uart->clocked)
 		return;
-
 	omap_uart_save_context(uart);
-
-	/*
-	 * Force RTS inactive before disabling clocks so our peers know not
-	 * to send data to us.
-	 */
-
-	mcr = serial_read_reg(p, UART_MCR);
-	if (mcr & 0x02) {
-		mcr &= ~0x02;
-		serial_write_reg(p, UART_MCR, mcr);
-	}
-
 	uart->clocked = 0;
 	clk_disable(uart->ick);
 	clk_disable(uart->fck);
 }
-
-static void omap_uart_block_suspend(struct omap_uart_state *uart)
-{
-	/* XXX: After driver resume optimization, lower this */
-	wake_lock_timeout(&omap_uart_wakelock, (HZ * 1));
-}
-
 
 static void omap_uart_block_sleep(struct omap_uart_state *uart)
 {
@@ -374,6 +428,7 @@ void omap_uart_prepare_idle(int num)
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (num == uart->num && uart->can_sleep) {
+			omap_uart_disable_autorts(uart);
 			omap_uart_disable_clocks(uart);
 			return;
 		}
@@ -387,21 +442,21 @@ void omap_uart_resume_idle(int num)
 	list_for_each_entry(uart, &uart_list, node) {
 		if (num == uart->num) {
 			omap_uart_restore(uart);
+			omap_uart_enable_autorts(uart);
 
 			/* Check for IO pad wakeup */
 			if (cpu_is_omap34xx() && uart->padconf) {
 				u16 p = omap_ctrl_readw(uart->padconf);
 
 				if (p & OMAP3_PADCONF_WAKEUPEVENT0) {
+					printk("%s: IOPAD wakeup\n", __func__);
 					omap_uart_block_sleep(uart);
-					omap_uart_block_suspend(uart);
 				}
 			}
 
 			/* Check for normal UART wakeup */
 			if (__raw_readl(uart->wk_st) & uart->wk_mask) {
 				omap_uart_block_sleep(uart);
-				omap_uart_block_suspend(uart);
 			}
 
 			return;
@@ -482,15 +537,20 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		switch (uart->num) {
 		case 0:
 			wk_mask = OMAP3430_ST_UART1_MASK;
-			padconf = 0x182;
+			padconf = 0x180;
+			uart->rts_padconf = 0x17e;
 			break;
 		case 1:
 			wk_mask = OMAP3430_ST_UART2_MASK;
 			padconf = 0x17a;
+			uart->rts_padconf = 0;
+/*			uart->rts_padconf = 0x176; */
 			break;
 		case 2:
 			wk_mask = OMAP3430_ST_UART3_MASK;
 			padconf = 0x19e;
+/*			uart->rts_padconf = 0x19c; */
+			uart->rts_padconf = 0;
 			break;
 		}
 		uart->wk_mask = wk_mask;
@@ -522,6 +582,7 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		uart->wk_st = 0;
 		uart->wk_mask = 0;
 		uart->padconf = 0;
+		uart->rts_padconf = 0;
 	}
 
 	/* Set wake-enable bit */
@@ -597,14 +658,75 @@ static struct kobj_attribute sleep_timeout_attr =
 static inline void omap_uart_idle_init(struct omap_uart_state *uart) {}
 #endif /* CONFIG_PM */
 
-void __init omap_serial_init(void)
+static int omap_uart_dbg_autorts_get(void *data, u64 *val)
 {
+	*val = autorts_en;
+	return 0;
+}
+
+static int omap_uart_dbg_autorts_set(void *data, u64 val)
+{
+	if (val)
+		omap_uart_enable_autorts(dbg_uart);
+	else
+		omap_uart_disable_autorts(dbg_uart);
+	autorts_en = val;
+	return 0;
+}
+
+static int omap_uart_dbg_rts_get(void *data, u64 *val)
+{
+	struct plat_serialomap_port *p = dbg_uart->p;
+	unsigned char mcr;
+
+	mcr = serial_read_reg(p, UART_MCR);
+	if (mcr & UART_MCR_RTS)
+		*val = 1;
+	else
+		*val = 0;
+	return 0;
+}
+
+static int omap_uart_dbg_rts_set(void *data, u64 val)
+{
+	struct plat_serialomap_port *p = dbg_uart->p;
+	unsigned char mcr;
+
+	mcr = serial_read_reg(p, UART_MCR);
+	if (val)
+		mcr |= UART_MCR_RTS;
+	else
+		mcr &= ~UART_MCR_RTS;
+	serial_write_reg(p, UART_MCR, mcr);
+	printk("%s: MCR now 0x%x\n", __func__, mcr);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(omap_uart_dbg_autorts_ops,
+			omap_uart_dbg_autorts_get,
+			omap_uart_dbg_autorts_set,
+			"%llu\n");
+
+DEFINE_SIMPLE_ATTRIBUTE(omap_uart_dbg_rts_ops,
+			omap_uart_dbg_rts_get,
+			omap_uart_dbg_rts_set,
+			"%llu\n");
+
+void __init omap_serial_init(int wake_gpio_strobe,
+			     unsigned int wake_strobe_enable_mask)
+{
+	struct dentry *dent;
 	int i;
 	const struct omap_uart_config *info;
 	char name[16];
 
-	wake_lock_init(&omap_uart_wakelock, WAKE_LOCK_SUSPEND,
-		       "omap_uart");
+	dent = debugfs_create_dir("omapuart_dbg", 0);
+	if (IS_ERR(dent)) {
+		printk("error registering debugfs\n");
+	} else {
+		debugfs_create_file("autorts", 0644, dent, NULL, &omap_uart_dbg_autorts_ops);
+		debugfs_create_file("rts", 0644, dent, NULL, &omap_uart_dbg_rts_ops);
+	}
 	/*
 	 * Make sure the serial ports are muxed on at this point.
 	 * You have to mux them off in device drivers later on
@@ -625,6 +747,9 @@ void __init omap_serial_init(void)
 			continue;
 		}
 
+		if (wake_strobe_enable_mask & (1 << i))
+			p->wake_gpio_strobe = wake_gpio_strobe;
+
 		sprintf(name, "uart%d_ick", i+1);
 		uart->ick = clk_get(NULL, name);
 		if (IS_ERR(uart->ick)) {
@@ -643,6 +768,8 @@ void __init omap_serial_init(void)
 			continue;
 
 		uart->num = i;
+		if (uart->num == 0)
+			dbg_uart = uart;
 		p->private_data = uart;
 		uart->p = p;
 		list_add(&uart->node, &uart_list);
