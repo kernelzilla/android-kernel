@@ -618,7 +618,10 @@ static int au_ren_lock(struct au_ren_args *a)
 	a->h_trap = vfsub_lock_rename(a->src_h_parent, a->src_hdir,
 				      a->dst_h_parent, a->dst_hdir);
 	udba = au_opt_udba(a->src_dentry->d_sb);
-	if (au_dbstart(a->src_dentry) == a->btgt)
+	if (unlikely(a->src_hdir->hi_inode != a->src_h_parent->d_inode
+		     || a->dst_hdir->hi_inode != a->dst_h_parent->d_inode))
+		err = au_busy_or_stale();
+	if (!err && au_dbstart(a->src_dentry) == a->btgt)
 		err = au_h_verify(a->src_h_dentry, udba,
 				  a->src_h_parent->d_inode, a->src_h_parent,
 				  a->br);
