@@ -374,6 +374,10 @@ int au_do_pin(struct au_pin *p)
 	au_igrab(h_dir);
 	au_hin_imtx_lock_nested(p->hdir, p->lsc_hi);
 
+	if (unlikely(p->hdir->hi_inode != h_parent->d_inode)) {
+		err = -EBUSY;
+		goto out_unpin;
+	}
 	if (h_dentry) {
 		err = au_h_verify(h_dentry, p->udba, h_dir, h_parent, br);
 		if (unlikely(err)) {
