@@ -185,7 +185,6 @@ wait_dll_unlock:
 	bne	wait_dll_unlock
 	bx	lr
 configure_sdrc:
-	bx	lr /* Skip ddr timing configurations, these values are bogus */
 	ldr	r11, omap3_sdrc_rfr_ctrl
 	str	r0, [r11]
 	ldr	r11, omap3_sdrc_actim_ctrla
