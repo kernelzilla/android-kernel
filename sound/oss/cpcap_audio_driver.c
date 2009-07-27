@@ -1193,8 +1193,6 @@ void cpcap_audio_set_audio_state(struct cpcap_audio_state *state)
 		cpcap_audio_configure_power(state, previous_state, 0);
 
 	previous_state_struct = *state;
-
-	cpcap_audio_register_dump(state);
 }
 
 void cpcap_audio_init(struct cpcap_audio_state *state)
