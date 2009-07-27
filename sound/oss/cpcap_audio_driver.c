@@ -647,6 +647,10 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 		/* CDMA sholes is using Normal mode for uplink */
 		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL | CPCAP_BIT_CLK_INV;
 
+		/* Setting I2S mode */
+		cdai_changes.value |= CPCAP_BIT_CDC_DIG_AUD_FS0
+			 | CPCAP_BIT_CDC_DIG_AUD_FS1;
+
 		/* OK, now start paranoid codec sequence */
 		/* FIRST, make sure the frequency config is right... */
 		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_CC,
