@@ -26,7 +26,7 @@
 #include <plat/omap-pm.h>
 #include <plat/powerdomain.h>
 #include <plat/resource.h>
-#include <plat/omapdev.h>
+#include <plat/omap_device.h>
 
 struct omap_opp *dsp_opps;
 struct omap_opp *mpu_opps;
@@ -96,7 +96,7 @@ void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
 
 void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 {
-	struct omapdev *odev;
+	struct omap_device *odev;
 	struct powerdomain *pwrdm_dev;
 	struct platform_device *pdev;
 	char *lat_res_name;
@@ -121,11 +121,11 @@ void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 		return;
 	}
 
-	odev = omapdev_find_pdev(pdev);
+	odev = to_omap_device(pdev);
 	if (odev) {
-		pwrdm_dev = omapdev_get_pwrdm(odev);
+		pwrdm_dev = omap_device_get_pwrdm(odev);
 	} else {
-		printk(KERN_ERR "OMAP-PM: Error: Could not find omapdev "
+		printk(KERN_ERR "OMAP-PM: Error: Could not find omap_device "
 						"for %s\n", pdev->name);
 		return;
 	}
@@ -277,7 +277,7 @@ EXPORT_SYMBOL(omap_pm_cpu_get_freq);
 int omap_pm_get_dev_context_loss_count(struct device *dev)
 {
 	struct platform_device *pdev;
-	struct omapdev *odev;
+	struct omap_device *odev;
 	struct powerdomain *pwrdm;
 
 	if (!dev) {
@@ -293,10 +293,10 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 	 * off counter.
 	 */
 	pdev = to_platform_device(dev);
-	odev = omapdev_find_pdev(pdev);
+	odev = to_omap_device(pdev);
 
 	if (odev) {
-		pwrdm = omapdev_get_pwrdm(odev);
+		pwrdm = omap_device_get_pwrdm(odev);
 		if (pwrdm)
 			return pwrdm->state_counter[0];
 	}
