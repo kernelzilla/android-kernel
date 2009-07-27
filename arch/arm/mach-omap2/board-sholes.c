@@ -150,6 +150,21 @@ static void __init sholes_init_irq(void)
 	omap_gpio_init();
 }
 
+#define BOOT_MODE_MAX_LEN 30
+static char boot_mode[BOOT_MODE_MAX_LEN+1];
+int __init board_boot_mode_init(char *s)
+
+{
+	strncpy(boot_mode, s, BOOT_MODE_MAX_LEN);
+
+	printk(KERN_INFO "boot_mode=%s\n", boot_mode);
+
+	return 1;
+}
+__setup("androidboot.mode=", board_boot_mode_init);
+
+
+
 static struct android_usb_platform_data andusb_plat = {
 	.manufacturer_name	= "Motorola",
 	.serial_number		= device_serial,
