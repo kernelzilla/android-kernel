@@ -564,6 +564,10 @@ static int serial_omap_startup(struct uart_port *port)
 	*/
 	if (up->port.flags & UPF_TRIGGER_HIGH)
 		irq_flags |= IRQF_TRIGGER_HIGH;
+
+	if (up->port.flags & UPF_SHARE_IRQ)
+		irq_flags |= IRQF_SHARED;
+
 	/*
 	 * Allocate the IRQ
 	 */
@@ -1286,6 +1290,9 @@ static int serial_omap_probe(struct platform_device *pdev)
 	} else {
 		up->port.membase = (void *) io_p2v(mem->start);
 		up->port.flags = UPF_BOOT_AUTOCONF;
+#ifdef CONFIG_PM
+		up->port.flags |= UPF_SHARE_IRQ;
+#endif
 		up->port.uartclk = 48000000;
 		up->port.regshift = 2;
 	}
