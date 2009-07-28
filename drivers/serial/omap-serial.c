@@ -481,8 +481,19 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 		wake_lock_timeout(&omap_serial_wakelock, (HZ * 1));
 	}
 	check_modem_status(up);
-	if ((lsr & UART_LSR_THRE) && (iir & 0x2))
+	if ((lsr & UART_LSR_THRE) && (iir & 0x2)) {
+		struct plat_serialomap_port *pd = up->pdev->dev.platform_data;
+
+		if (pd->wake_gpio_strobe) {
+			gpio_direction_output(pd->wake_gpio_strobe, 1);
+			udelay(5);
+		}
 		transmit_chars(up);
+		if (pd->wake_gpio_strobe) {
+			gpio_direction_output(pd->wake_gpio_strobe, 0);
+			udelay(5);
+		}
+	}
 	isr8250_activity = jiffies;
 
 	return IRQ_HANDLED;
@@ -1370,6 +1381,14 @@ static int serial_omap_probe(struct platform_device *pdev)
 		goto do_release_region;
 	platform_set_drvdata(pdev, up);
 
+	if (pdata->wake_gpio_strobe) {
+		if (gpio_request(pdata->wake_gpio_strobe,
+				 "UART AP -> BP wakeup strobe")) {
+			printk(KERN_ERR "Error requesting GPIO\n");
+		} else
+			gpio_direction_output(pdata->wake_gpio_strobe, 0);
+	}
+		
 	return 0;
 do_release_region:
 	release_mem_region(mem->start, (mem->end - mem->start) + 1);

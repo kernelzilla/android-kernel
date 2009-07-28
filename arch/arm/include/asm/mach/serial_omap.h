@@ -25,6 +25,7 @@ struct plat_serialomap_port {
 	void __iomem	*membase;
 	unsigned char	regshift;
 	int		irq;
+	int		wake_gpio_strobe;
 };
 
 #endif
