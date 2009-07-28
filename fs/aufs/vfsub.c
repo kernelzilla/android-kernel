@@ -48,6 +48,10 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
+#ifdef CONFIG_IMA
+#error IMA in linux-2.6.30 is not supported. Instead try 2.6.31.
+#endif
+
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {
 	struct file *file;
