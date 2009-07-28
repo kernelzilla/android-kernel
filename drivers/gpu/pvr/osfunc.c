@@ -547,7 +547,7 @@ static irqreturn_t DeviceISRWrapper(int irq, void *dev_id
 		SYS_DATA *psSysData = psDeviceNode->psSysData;
 		ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-		tasklet_schedule(&psEnvData->sMISRTasklet);
+		schedule_work(&psEnvData->sMISRWork);
 	}
 
 out:
@@ -583,7 +583,7 @@ static irqreturn_t SystemISRWrapper(int irq, void *dev_id
 	{
 		ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-		tasklet_schedule(&psEnvData->sMISRTasklet);
+		schedule_work(&psEnvData->sMISRWork);
 	}
 
 out:
@@ -703,12 +703,11 @@ PVRSRV_ERROR OSUninstallSystemLISR(IMG_VOID *pvSysData)
 }
 
 
-static void MISRWrapper(unsigned long data)
+static void MISRWrapper(struct work_struct *work)
 {
-	SYS_DATA *psSysData;
+	ENV_DATA *psEnvData = container_of(work, ENV_DATA, sMISRWork);
+	SYS_DATA *psSysData = psEnvData->sMISRSysData;;
 
-	psSysData = (SYS_DATA *)data;
-	
 	PVRSRVMISR(psSysData);
 }
 
@@ -726,7 +725,8 @@ PVRSRV_ERROR OSInstallMISR(IMG_VOID *pvSysData)
 
 	PVR_TRACE(("Installing MISR with cookie %x", pvSysData));
 
-	tasklet_init(&psEnvData->sMISRTasklet, MISRWrapper, (unsigned long)pvSysData);
+	psEnvData->sMISRSysData = pvSysData;
+	INIT_WORK(&psEnvData->sMISRWork, MISRWrapper);
 
 	psEnvData->bMISRInstalled = IMG_TRUE;
 
@@ -747,7 +747,7 @@ PVRSRV_ERROR OSUninstallMISR(IMG_VOID *pvSysData)
 
 	PVR_TRACE(("Uninstalling MISR"));
 
-	tasklet_kill(&psEnvData->sMISRTasklet);
+	cancel_work_sync(&psEnvData->sMISRWork);
 
 	psEnvData->bMISRInstalled = IMG_FALSE;
 
@@ -761,7 +761,7 @@ PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
 
 	if (psEnvData->bMISRInstalled)
 	{
-		tasklet_schedule(&psEnvData->sMISRTasklet);
+		schedule_work(&psEnvData->sMISRWork);
 	}
 
 	return PVRSRV_OK;	
