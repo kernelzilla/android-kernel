@@ -49,33 +49,17 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
-static int vfsub_ima_mask(int flags)
-{
-	int mask;
-
-	mask = 0; /* MAY_OPEN */
-	switch (flags & O_ACCMODE) {
-	case O_RDONLY:
-		mask = MAY_READ;
-		break;
-	case O_WRONLY:
-		mask = MAY_WRITE;
-		break;
-	case O_RDWR:
-		mask = MAY_READ | MAY_WRITE;
-		break;
-	}
-	if (flags & vfsub_fmode_to_uint(FMODE_EXEC))
-		mask |= MAY_EXEC;
-	return mask;
-}
-
 struct file *vfsub_dentry_open(struct path *path, int flags,
 			       const struct cred *cred)
 {
-	/* meaningless return value */
-	ima_path_check(path, vfsub_ima_mask(flags), IMA_COUNT_UPDATE);
-	return dentry_open(path->dentry, path->mnt, flags, cred);
+	struct file *file;
+
+	file = dentry_open(path->dentry, path->mnt, flags, cred);
+	if (IS_ERR(file))
+		return file;
+	/* as NFSD does, just call ima_..._get() simply after dentry_open */
+	ima_counts_get(file);
+	return file;
 }
 
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)

@@ -66,7 +66,18 @@ static int h_permission(struct inode *h_inode, int mask,
 			(h_inode, mask & (MAY_READ | MAY_WRITE | MAY_EXEC
 					  | MAY_APPEND));
 
-	/* todo: do we need to call ima_path_check()? */
+#if 0
+	if (!err) {
+		/* todo: do we need to call ima_path_check()? */
+		struct path h_path = {
+			.dentry	=
+			.mnt	= h_mnt
+		};
+		err = ima_path_check(&h_path,
+				     mask & (MAY_READ | MAY_WRITE | MAY_EXEC),
+				     IMA_COUNT_LEAVE);
+	}
+#endif
 
  out:
 	return err;
