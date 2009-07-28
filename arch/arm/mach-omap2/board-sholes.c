@@ -1011,6 +1011,22 @@ static inline void omap2_ramconsole_reserve_sdram(void) {}
 #endif
 
 
+static struct platform_device sholes_sgx_device = {
+       .name                   = "pvrsrvkm",
+       .id             = -1,
+};
+static struct platform_device sholes_omaplfb_device = {
+	.name			= "omaplfb",
+	.id			= -1,
+};
+
+
+static void __init sholes_sgx_init(void)
+{
+	platform_device_register(&sholes_sgx_device);
+	platform_device_register(&sholes_omaplfb_device);
+}
+
 static void sholes_pm_power_off(void)
 {
 	printk(KERN_INFO "sholes_pm_power_off start...\n");
@@ -1057,6 +1073,7 @@ static void __init sholes_init(void)
 	sholes_bt_init();
 	sholes_hsmmc_init();
 	sholes_vout_init();
+	sholes_sgx_init();
 	sholes_power_off_init();
 	sholes_gadget_init();
 }
