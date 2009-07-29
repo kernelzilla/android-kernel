@@ -567,7 +567,10 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	IMustLock(dir);
 
+	err = -ENOMEM;
 	a = kmalloc(sizeof(*a), GFP_NOFS);
+	if (unlikely(!a))
+		goto out;
 
 	aufs_read_lock(dentry, AuLock_DW);
 	parent = dentry->d_parent; /* dir inode is locked */
@@ -576,7 +579,7 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 				      &a->pin, &wr_dir_args);
 	err = PTR_ERR(wh_dentry);
 	if (IS_ERR(wh_dentry))
-		goto out;
+		goto out_free;
 
 	sb = dentry->d_sb;
 	bindex = au_dbstart(dentry);
@@ -633,12 +636,14 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
  out_unlock:
 	au_unpin(&a->pin);
 	dput(wh_dentry);
- out:
+ out_free:
 	if (unlikely(err)) {
 		au_update_dbstart(dentry);
 		d_drop(dentry);
 	}
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
+	kfree(a);
+ out:
 	return err;
 }
