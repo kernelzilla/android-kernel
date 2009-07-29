@@ -55,7 +55,7 @@
 #include "prm-regbits-34xx.h"
 #include "smartreflex.h"
 #include "omap3-opp.h"
-#include "sdram-toshiba-TYA000B801AXHM10.h"
+#include "sdram-toshiba-hynix-numonyx.h"
 
 #ifdef CONFIG_VIDEO_OLDOMAP3
 #include <media/v4l2-int-device.h>
@@ -138,7 +138,7 @@ static struct omap_opp sholes_dsp_rate_table[] = {
 
 static void __init sholes_init_irq(void)
 {
-	omap2_init_common_hw(TYA000B801AXHM10_sdrc_params, sholes_mpu_rate_table,
+	omap2_init_common_hw(JEDEC_JESD209A_sdrc_params, sholes_mpu_rate_table,
 			sholes_dsp_rate_table, sholes_l3_rate_table);
 	omap_init_irq();
 #ifdef CONFIG_OMAP3_PM
@@ -666,22 +666,19 @@ int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 {
 
 	int sr_status = 0;
-	u32 vdd, target_opp_no,current_opp_no;
+	u32 vdd, target_opp_no;
 	u8 slave_addr = 0, opp_reg_addr = 0, volt_reg_addr = 0;
 
 	vdd = get_vdd(target_opp);
 	target_opp_no = get_opp_no(target_opp);
-    current_opp_no = get_opp_no(current_opp);
 
 	if (vdd == VDD1_OPP) {
-        printk("VDD1_opp:%d->%d,vsel=%02x \n",current_opp_no,target_opp_no);
 		sr_status = sr_stop_vddautocomap(SR1);
 		slave_addr = SHOLES_R_SRI2C_SLAVE_ADDR_SA0;
 		volt_reg_addr = SHOLES_R_VDD1_SR_CONTROL;
 		opp_reg_addr = R_SMPS_VOL_OPP2_RA0;
 
 	} else if (vdd == VDD2_OPP) {
-        printk("VDD2_opp:%d->%d,vsel=%02x \n",current_opp_no,target_opp_no);
 		sr_status = sr_stop_vddautocomap(SR2);
 		slave_addr = SHOLES_R_SRI2C_SLAVE_ADDR_SA1;
 		volt_reg_addr = SHOLES_R_VDD2_SR_CONTROL;
