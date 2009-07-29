@@ -283,7 +283,7 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 	}
 
 
-	val &= 0xfb;
+	val |= 0x04;
 	if (strobe_val) {
 		err = lm3554_write_reg(torch_data,
 				       LM3554_TORCH_BRIGHTNESS,
@@ -305,7 +305,7 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 		strobe_brightness |= ((strobe_val / LM3554_STROBE_STEP) << 3);
 		err = lm3554_write_reg(torch_data, LM3554_FLASH_BRIGHTNESS,
 				       strobe_brightness);
-		val |= 0x04;
+		val &= 0xfb;
 	}
 	err = lm3554_write_reg(torch_data, LM3554_CONFIG_REG_1, val);
 	return 0;
