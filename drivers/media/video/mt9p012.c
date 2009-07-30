@@ -214,22 +214,17 @@ const static struct mt9p012_reg stream_on_list[] = {
 
 /* Structure which will set the exposure time */
 static struct mt9p012_reg set_exposure_time[] = {
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
 	/* less than frame_lines-1 */
 	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME, .val = 500},
-	 /* updating */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0}
+	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0},
 };
 
 /* Structure to set analog gain */
 static struct mt9p012_reg set_analog_gain[] = {
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
 	{.length = MT9P012_16BIT, .reg = REG_ANALOG_GAIN_GLOBAL,
 		.val = MT9P012_MIN_GAIN},
-	 /* updating */
-	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
 	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0},
+
 };
 
 /*
