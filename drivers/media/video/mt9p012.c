@@ -1190,8 +1190,9 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 
 	ss = &sensor_settings[iframe];
 
-	line_time_q8 = ((u32)ss->frame.line_len_pck * 1000000) /
-		(sensor->vt_pix_clk >> 8); /* usec's */
+	line_time_q8 = (((u32)ss->frame.line_len_pck * 1000 * 256) /
+			(sensor->vt_pix_clk / 1000)); /* usec's (q8) */
+
 	frame_length_lines = (((u32)fper->numerator * 1000000 * 256 /
 			       fper->denominator)) / line_time_q8;
 
