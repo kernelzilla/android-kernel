@@ -1000,7 +1000,7 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 			"legal range.\n", exp_time);
 		dev_err(&client->dev, "Min time %d us Max time %d us\n",
 			sensor->min_exposure_time, sensor->max_exposure_time);
-		return -EINVAL;
+		exp_time = sensor->min_exposure_time;
 	}
 
 	coarse_int_time = ((((exp_time / 10) *
