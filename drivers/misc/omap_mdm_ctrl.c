@@ -529,13 +529,36 @@ static int __devexit omap_mdm_ctrl_remove(struct platform_device *pdev)
 	return 0;
 }
 
-/* This function is temporary to force the BP to shutdown when using recovery
- * mode */
+/* Initiate modem power down */
 static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 {
-	gpio_set_value(omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 1);
-	/* Wait for 1 second to allow time for the BP to fully power off */
-	ssleep(1);
+	int i;
+	int pd_failure = 1;
+
+	pr_info("%s: Initiate modem power down...\n", __func__);
+	/* Press modem Power Button */
+	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 1);
+	msleep(100);
+	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 0);
+	/* Wait up to 5 seconds for the modem to properly power down */
+	for (i = 0; i < 10; i++) {
+		if (!gpio_get_value(omap_mdm_ctrl_data.gpios[BP_RESOUT].gpio)) {
+			pr_info("%s: Modem power down success.\n", __func__);
+			pd_failure = 0;
+			break;
+		} else
+			msleep(500);
+	}
+
+	if (pd_failure) {
+		/* Pull power from the modem */
+		pr_info("%s: Modem pd failure.  Pull power.\n", __func__);
+		gpio_set_value(
+			omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 1);
+		msleep(5);
+		gpio_set_value(
+			omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 0);
+	}
 }
 
 static struct platform_driver omap_mdm_ctrl_driver = {
@@ -563,5 +586,5 @@ module_exit(omap_mdm_ctrl_os_exit);
 
 MODULE_AUTHOR("Motorola");
 MODULE_DESCRIPTION("OMAP Modem Control Driver");
-MODULE_VERSION("1.1.1");
+MODULE_VERSION("1.1.2");
 MODULE_LICENSE("GPL");
