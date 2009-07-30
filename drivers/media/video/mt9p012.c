@@ -1284,8 +1284,6 @@ int mt9p012_configure_frame(struct v4l2_int_device *s,
 	u16 data;
 	int err = 0;
 
-	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_MODE_SELECT, 0x00);
-	mdelay(100);
 	 /* hold */
 	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x01);
 
