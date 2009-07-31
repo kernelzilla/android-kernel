@@ -454,7 +454,7 @@ static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 	    gpio_to_irq(omap_mdm_ctrl_data.gpios[BP_READY2_AP].gpio);
 	omap_mdm_ctrl_data.gpios[BP_RESOUT].irq =
 	    gpio_to_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].gpio);
-
+#if 0
 	ret =
 	    request_irq(omap_mdm_ctrl_data.gpios[BP_READY_AP].irq, irq_handler,
 			IRQF_DISABLED | OMAP_MDM_CTRL_IRQ_RISING |
@@ -467,6 +467,7 @@ static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 	} else {
 		omap_mdm_ctrl_data.gpios[BP_READY_AP].irq_enabled = 1;
 	}
+#endif
 
 	ret =
 	    request_irq(omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq, irq_handler,
