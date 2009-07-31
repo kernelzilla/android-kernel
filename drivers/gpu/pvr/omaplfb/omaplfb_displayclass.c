@@ -978,7 +978,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	unsigned long ulLockFlags;
 
 	
-	printk("ProcessFip called");
 	if(!hCmdCookie || !pvData)
 	{
 		return IMG_FALSE;
@@ -997,7 +996,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	
 	psBuffer = (OMAPLFB_BUFFER*)psFlipCmd->hExtBuffer;
 	psSwapChain = (OMAPLFB_SWAPCHAIN*) psFlipCmd->hExtSwapChain;
-	printk("ProcessFip before spin lock");
 
 	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
 
@@ -1014,7 +1012,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	{
 #endif
 		
-	printk("OMAPLFBFip 1 called");
 		OMAPLFBFlip(psSwapChain, (unsigned long)psBuffer->sSysAddr.uiAddr);
 
 		
@@ -1034,7 +1031,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		if(psSwapChain->ulInsertIndex == psSwapChain->ulRemoveIndex)
 		{
 			
-	printk("OMAPLFBFip 2 called");
 			OMAPLFBFlip(psSwapChain, (unsigned long)psBuffer->sSysAddr.uiAddr);
 
 			psFlipItem->bFlipped = OMAP_TRUE;
@@ -1059,7 +1055,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	}
 	
 	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
-	printk("ProcessFlip done");
 	return IMG_FALSE;
 #endif
 

@@ -231,7 +231,7 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 		res = clk_set_rate(psSysSpecData->psSGX_FCK, SYS_SGX_CLOCK_SPEED);
 		if (res < 0)
 		{
-			PVR_DPF((PVR_DBG_WARNING, "EnableSGXClocks: Couldn't set SGX Functional Clock rate (%d)", res));
+//			PVR_DPF((PVR_DBG_WARNING, "EnableSGXClocks: Couldn't set SGX Functional Clock rate (%d)", res));
 		}
 	}
 	PVR_DPF((PVR_DBG_MESSAGE, "SGX Functional Clock rate is %dMhz", HZ_TO_MHZ(clk_get_rate(psSysSpecData->psSGX_FCK))));

@@ -217,7 +217,6 @@ void OMAPLFBDisplayInit(void)
 
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 {
-    printk("OMAPLFBFlip 0x%p, 0x%p, 0x%p\n", lcd_mgr, lcd_mgr->device, omap_gfxoverlay);
     if(lcd_mgr && lcd_mgr->device && omap_gfxoverlay)
     {
         gfxoverlayinfo.paddr = aPhyAddr;
