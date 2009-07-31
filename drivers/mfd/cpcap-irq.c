@@ -171,7 +171,7 @@ static int int_read_and_clear(struct cpcap_device *cpcap,
 	ret = cpcap_regacc_read(cpcap, mask_reg, &mreg_val);
 	if (ret)
 		return ret;
-	*en = ireg_val & ~mreg_val;
+	*en |= ireg_val & ~mreg_val;
 	*en &= valid_mask;
 	ret = cpcap_regacc_write(cpcap, mask_reg, *en, *en);
 	if (ret)
@@ -204,20 +204,25 @@ static void irq_work_func(struct work_struct *work)
 		{CPCAP_REG_MI1,  CPCAP_REG_MIM1,  0xFFFF}
 	};
 
+	for (i = 0; i < NUM_INT_REGS; ++i)
+		en_ints[i] = 0;
+
 	data = container_of(work, struct cpcap_irqdata, work);
 	cpcap = data->cpcap;
 	spi = cpcap->spi;
 
-	for (i = 0; i < NUM_INT_REGS; ++i) {
-		retval = int_read_and_clear(cpcap,
-					    int_reg[i].status_reg,
-					    int_reg[i].mask_reg,
-					    int_reg[i].valid,
-					    &en_ints[i]);
-		if (retval < 0) {
-			dev_err(&cpcap->spi->dev,
-				"Error reading interrupts\n");
-			break;
+	while (gpio_get_value(irq_to_gpio(spi->irq))) {
+		for (i = 0; i < NUM_INT_REGS; ++i) {
+			retval = int_read_and_clear(cpcap,
+						int_reg[i].status_reg,
+						int_reg[i].mask_reg,
+						int_reg[i].valid,
+						&en_ints[i]);
+			if (retval < 0) {
+				dev_err(&cpcap->spi->dev,
+					"Error reading interrupts\n");
+				break;
+			}
 		}
 	}
 	enable_irq(spi->irq);
@@ -259,7 +264,7 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	if (!data)
 		return -ENOMEM;
 
-        data->workqueue = create_workqueue("cpcap_irq");
+	data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
 	data->cpcap = cpcap;
