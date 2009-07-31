@@ -29,9 +29,6 @@
 
 extern IMG_BOOL PVRGetDisplayClassJTable(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable);
 
-/* MIKE_SHOLESPORT added to remove code for k29 port */
-#define MIKE_SHOLESPORT 1
-
 #define OMAPLCD_IRQ			25
 
 #define OMAPLCD_SYSCONFIG           0x0410
@@ -272,9 +269,7 @@ void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
 void OMAPLFBEnableDisplayRegisterAccess(void);
 void OMAPLFBDisableDisplayRegisterAccess(void);
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr);
-#ifdef MIKE_SHOLESPORT
-void OMAPLFBSetDisplayInfo(void);
-#endif /* MIKE_SHOLESPORT */
+void OMAPLFBDisplayInit(void);
 
 #endif 
 

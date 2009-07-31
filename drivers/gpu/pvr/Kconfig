@@ -21,3 +21,16 @@ config PVR_OMAPLFB
 	depends on SGX
 	---help---
 	  Support for the OMAP frame buffer in PowerVR.
+
+config PVR_OMAP_DSS2
+	depends on SGX && PVR_OMAPLFB
+	tristate "PowerVR OMAP dss2"
+	depends on SGX
+	---help---
+	  Support for the OMAP dss2 frame buffer in PowerVR.
+
+config PVR_OMAP_USE_VSYNC
+	tristate "PowerVR OMAP use vsync"
+	depends on SGX
+	---help---
+	  Support for the OMAP vsync interrupt in PowerVR.

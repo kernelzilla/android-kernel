@@ -53,13 +53,6 @@
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
-//FIXME: For now disable VSync interrupts until the support is there in the latest BSP with 2.6.29 kernel support
-#undef SYS_USING_INTERRUPTS
-
-/* MIKE_SHOLESPORT added to remove code for k29 port */
-#define MIKE_SHOLESPORT 1
-
-
 #define unref__ __attribute__ ((unused))
 
 void *OMAPLFBAllocKernelMem(unsigned long ulSize)
@@ -86,52 +79,26 @@ OMAP_ERROR OMAPLFBGetLibFuncAddr (char *szFunctionName, PFN_DC_GET_PVRJTABLE *pp
 	return (OMAP_OK);
 }
 
-static void OMAPLFBVSyncWriteReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset, unsigned long ulValue)
-{
-	void *pvRegAddr = (void *)((char *)psSwapChain->pvRegs + ulOffset);
 
-	
-	writel(ulValue, pvRegAddr);
-}
-
-static unsigned long OMAPLFBVSyncReadReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset)
-{
-	return readl((char *)psSwapChain->pvRegs + ulOffset);
-}
-
+#if defined(CONFIG_PVR_OMAP_USE_VSYNC)
 void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain)
 {
-#if defined(SYS_USING_INTERRUPTS)
 	
 	unsigned long ulInterruptEnable  = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_IRQENABLE);
 	ulInterruptEnable |= OMAPLCD_INTMASK_VSYNC;
 	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_IRQENABLE, ulInterruptEnable );
-#endif
 }
 
 void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain)
 {
-#if defined(SYS_USING_INTERRUPTS)
 	
 	unsigned long ulInterruptEnable = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_IRQENABLE);
 	ulInterruptEnable &= ~(OMAPLCD_INTMASK_VSYNC);
 	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_IRQENABLE, ulInterruptEnable);
-#endif
 }
-
-#if defined(SYS_USING_INTERRUPTS)
-static void
-OMAPLFBVSyncISR(void *arg, struct pt_regs unref__ *regs)
-{
-	OMAPLFB_SWAPCHAIN *psSwapChain= (OMAPLFB_SWAPCHAIN *)arg;
-	
-	(void) OMAPLFBVSyncIHandler(psSwapChain);
-}
-#endif
 
 OMAP_ERROR OMAPLFBInstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
 {
-#if defined(SYS_USING_INTERRUPTS)
 	OMAPLFBDisableVSyncInterrupt(psSwapChain);
 
 	if (omap2_disp_register_isr(OMAPLFBVSyncISR, psSwapChain,
@@ -141,21 +108,50 @@ OMAP_ERROR OMAPLFBInstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
 		return (OMAP_ERROR_INIT_FAILURE);
 	}
 
-#endif
 	return (OMAP_OK);
 }
 
-
-OMAP_ERROR OMAPLFBUninstallVSyncISR (OMAPLFB_SWAPCHAIN *psSwapChain)
+OMAP_ERROR OMAPLFBUninstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
 {
-#if defined(SYS_USING_INTERRUPTS)
 	OMAPLFBDisableVSyncInterrupt(psSwapChain);
 
 	omap2_disp_unregister_isr(OMAPLFBVSyncISR);
 
-#endif
 	return (OMAP_OK);
 }
+
+static void OMAPLFBVSyncISR(void *arg, struct pt_regs unref__ *regs)
+{
+	OMAPLFB_SWAPCHAIN *psSwapChain= (OMAPLFB_SWAPCHAIN *)arg;
+	
+	(void) OMAPLFBVSyncIHandler(psSwapChain);
+}
+
+static unsigned long OMAPLFBVSyncReadReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset)
+{
+	return readl((char *)psSwapChain->pvRegs + ulOffset);
+}
+
+#else
+void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain) { }
+void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain) { }
+OMAP_ERROR OMAPLFBInstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
+{ return OMAP_OK; }
+OMAP_ERROR OMAPLFBUninstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain)
+{ return OMAP_OK; }
+#endif
+
+
+#if defined(CONFIG_PVR_OMAP_USE_VSYNC) || defined(CONFIG_PVR_OMAP_DSS2)
+static void OMAPLFBVSyncWriteReg(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long ulOffset, unsigned long ulValue)
+{
+	void *pvRegAddr = (void *)((char *)psSwapChain->pvRegs + ulOffset);
+
+	
+	writel(ulValue, pvRegAddr);
+}
+#endif
+
 
 void OMAPLFBEnableDisplayRegisterAccess(void)
 {
@@ -173,12 +169,12 @@ void OMAPLFBDisableDisplayRegisterAccess(void)
 #endif
 }
 
-#ifdef MIKE_SHOLESPORT
+#if defined(CONFIG_PVR_OMAP_DSS2)
 static struct omap_overlay_manager* lcd_mgr = 0;
 static struct omap_overlay*         omap_gfxoverlay = 0;
 static struct omap_overlay_info     gfxoverlayinfo;
 
-void OMAPLFBSetDisplayInfo(void)
+void OMAPLFBDisplayInit(void)
 {
     struct omap_overlay*         overlayptr = 0;
     unsigned int                 i = 0;
@@ -218,33 +214,35 @@ void OMAPLFBSetDisplayInfo(void)
     omap_gfxoverlay->get_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
 
 }
-#endif /* MIKE_SHOLESPORT */
-
-
 
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 {
-#ifdef MIKE_SHOLESPORT
-    printk("OMAPLFBFlip 0x%lx, 0x%lx, 0x%lx\n", lcd_mgr, lcd_mgr->device, omap_gfxoverlay);
+    printk("OMAPLFBFlip 0x%p, 0x%p, 0x%p\n", lcd_mgr, lcd_mgr->device, omap_gfxoverlay);
     if(lcd_mgr && lcd_mgr->device && omap_gfxoverlay)
     {
         gfxoverlayinfo.paddr = aPhyAddr;
         omap_gfxoverlay->set_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
         lcd_mgr->device->update( lcd_mgr->device, 0, 0, gfxoverlayinfo.width, gfxoverlayinfo.height );
     }
+}
 
 #else
+
+void OMAPLFBDisplayInit(void) { }
+
+void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
+{
 	unsigned long control;
 
-	
 	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_GFX_BA0, aPhyAddr);
 	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_GFX_BA1, aPhyAddr);
 
 	control = OMAPLFBVSyncReadReg(psSwapChain, OMAPLCD_CONTROL);
 	control |= OMAP_CONTROL_GOLCD;
 	OMAPLFBVSyncWriteReg(psSwapChain, OMAPLCD_CONTROL, control);
-#endif /* MIKE_SHOLESPORT */
 }
+
+#endif
 
 #if defined(LDM_PLATFORM)
 
