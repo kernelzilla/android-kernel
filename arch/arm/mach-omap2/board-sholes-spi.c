@@ -49,6 +49,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_VWLAN2C,   0x0001},
 	{CPCAP_REG_VUSBINT1C, 0x0029},
 	{CPCAP_REG_VUSBINT2C, 0x0029},
+	{CPCAP_REG_VAUDIOC,   0x0060},
 	{CPCAP_REG_TXI,       0x2000},
 	{CPCAP_REG_RXOA,      0x0400},
 	{CPCAP_REG_ADCC1,     0x9000},
@@ -296,7 +297,9 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 		.constraints = {
 			.min_uV			= 2775000,
 			.max_uV			= 2775000,
-			.valid_ops_mask		= 0,
+			.valid_modes_mask	= (REGULATOR_MODE_NORMAL |
+						   REGULATOR_MODE_STANDBY),
+			.valid_ops_mask		= REGULATOR_CHANGE_MODE,
 			.always_on		= 1,
 			.apply_uV		= 1,
 		},

@@ -28,6 +28,7 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
+#include <linux/spi/cpcap-regbits.h>
 
 #define CPCAP_REGULATOR(_name, _id) 		\
 	{					\
@@ -70,45 +71,46 @@ static struct {
 	unsigned short mode_val;
 	const int val_tbl_sz;
 	const int *val_tbl;
+	unsigned int mode_cntr;
 } cpcap_regltr_data[CPCAP_NUM_REGULATORS] = {
-	[CPCAP_SW5]      = {CPCAP_REG_S5C, 0x002A, 0x0000, 0, 0x0000,
-		ARRAY_SIZE(sw5_val_tbl), sw5_val_tbl},
+	[CPCAP_SW5]      = {CPCAP_REG_S5C, 0x000A, 0x0020, 5, 0x0000,
+		ARRAY_SIZE(sw5_val_tbl), sw5_val_tbl, 0},
 	[CPCAP_VCAM]     = {CPCAP_REG_VCAMC, 0x0087, 0x0030, 4, 0x0000,
-		ARRAY_SIZE(vcam_val_tbl), vcam_val_tbl},
+		ARRAY_SIZE(vcam_val_tbl), vcam_val_tbl, 0},
 	[CPCAP_VCSI]     = {CPCAP_REG_VCSIC, 0x0047, 0x0010, 4, 0x0000,
-		ARRAY_SIZE(vcsi_val_tbl), vcsi_val_tbl},
+		ARRAY_SIZE(vcsi_val_tbl), vcsi_val_tbl, 0},
 	[CPCAP_VDAC]     = {CPCAP_REG_VDACC, 0x0087, 0x0030, 4, 0x0000,
-		ARRAY_SIZE(vdac_val_tbl), vdac_val_tbl},
+		ARRAY_SIZE(vdac_val_tbl), vdac_val_tbl, 0},
 	[CPCAP_VDIG]     = {CPCAP_REG_VDIGC, 0x0087, 0x0030, 4, 0x0000,
-		ARRAY_SIZE(vdig_val_tbl), vdig_val_tbl},
+		ARRAY_SIZE(vdig_val_tbl), vdig_val_tbl, 0},
 	[CPCAP_VFUSE]    = {CPCAP_REG_VFUSEC, 0x0080, 0x000F, 0, 0x0000,
-		ARRAY_SIZE(vfuse_val_tbl), vfuse_val_tbl},
+		ARRAY_SIZE(vfuse_val_tbl), vfuse_val_tbl, 0},
 	[CPCAP_VHVIO]    = {CPCAP_REG_VHVIOC, 0x0017, 0x0000, 0, 0x0000,
-		ARRAY_SIZE(vhvio_val_tbl), vhvio_val_tbl},
+		ARRAY_SIZE(vhvio_val_tbl), vhvio_val_tbl, 0},
 	[CPCAP_VSDIO]    = {CPCAP_REG_VSDIOC, 0x0087, 0x0038, 3, 0x0000,
-		ARRAY_SIZE(vsdio_val_tbl), vsdio_val_tbl},
+		ARRAY_SIZE(vsdio_val_tbl), vsdio_val_tbl, 0},
 	[CPCAP_VPLL]     = {CPCAP_REG_VPLLC, 0x0043, 0x0018, 3, 0x0000,
-		ARRAY_SIZE(vpll_val_tbl), vpll_val_tbl},
+		ARRAY_SIZE(vpll_val_tbl), vpll_val_tbl, 0},
 	[CPCAP_VRF1]     = {CPCAP_REG_VRF1C, 0x008C, 0x0020, 5, 0x0000,
-		ARRAY_SIZE(vrf1_val_tbl), vrf1_val_tbl},
+		ARRAY_SIZE(vrf1_val_tbl), vrf1_val_tbl, 0},
 	[CPCAP_VRF2]     = {CPCAP_REG_VRF2C, 0x0023, 0x0008, 3, 0x0000,
-		ARRAY_SIZE(vrf2_val_tbl), vrf2_val_tbl},
+		ARRAY_SIZE(vrf2_val_tbl), vrf2_val_tbl, 0},
 	[CPCAP_VRFREF]   = {CPCAP_REG_VRFREFC, 0x0023, 0x0008, 3, 0x0000,
-		ARRAY_SIZE(vrfref_val_tbl), vrfref_val_tbl},
+		ARRAY_SIZE(vrfref_val_tbl), vrfref_val_tbl, 0},
 	[CPCAP_VWLAN1]   = {CPCAP_REG_VWLAN1C, 0x0047, 0x0010, 4, 0x0000,
-		ARRAY_SIZE(vwlan1_val_tbl), vwlan1_val_tbl},
+		ARRAY_SIZE(vwlan1_val_tbl), vwlan1_val_tbl, 0},
 	[CPCAP_VWLAN2]   = {CPCAP_REG_VWLAN2C, 0x020C, 0x00C0, 6, 0x0000,
-		ARRAY_SIZE(vwlan2_val_tbl), vwlan2_val_tbl},
+		ARRAY_SIZE(vwlan2_val_tbl), vwlan2_val_tbl, 0},
 	[CPCAP_VSIM]     = {CPCAP_REG_VSIMC, 0x0023, 0x0008, 3, 0x0000,
-		ARRAY_SIZE(vsim_val_tbl), vsim_val_tbl},
+		ARRAY_SIZE(vsim_val_tbl), vsim_val_tbl, 0},
 	[CPCAP_VSIMCARD] = {CPCAP_REG_VSIMC, 0x1E80, 0x0008, 3, 0x0000,
-		ARRAY_SIZE(vsimcard_val_tbl), vsimcard_val_tbl},
+		ARRAY_SIZE(vsimcard_val_tbl), vsimcard_val_tbl, 0},
 	[CPCAP_VVIB]     = {CPCAP_REG_VVIBC, 0x0001, 0x000C, 2, 0x0000,
-		ARRAY_SIZE(vvib_val_tbl), vvib_val_tbl},
+		ARRAY_SIZE(vvib_val_tbl), vvib_val_tbl, 0},
 	[CPCAP_VUSB]     = {CPCAP_REG_VUSBC, 0x011C, 0x0040, 6, 0x0000,
-		ARRAY_SIZE(vusb_val_tbl), vusb_val_tbl},
+		ARRAY_SIZE(vusb_val_tbl), vusb_val_tbl, 0},
 	[CPCAP_VAUDIO]   = {CPCAP_REG_VAUDIOC, 0x0016, 0x0001, 0, 0x0000,
-		ARRAY_SIZE(vaudio_val_tbl), vaudio_val_tbl},
+		ARRAY_SIZE(vaudio_val_tbl), vaudio_val_tbl, 0},
 };
 
 static int cpcap_regulator_set_voltage(struct regulator_dev *rdev,
@@ -227,12 +229,51 @@ static int cpcap_regulator_is_enabled(struct regulator_dev *rdev)
 	return (value & cpcap_regltr_data[regltr_id].mode_mask) ? 1 : 0;
 }
 
+static int cpcap_regulator_set_mode(struct regulator_dev *rdev,
+				    unsigned int mode)
+{
+	struct cpcap_device *cpcap = rdev_get_drvdata(rdev);
+	int regltr_id;
+	enum cpcap_reg regnr;
+	int ret = 0;
+
+	regltr_id = rdev_get_id(rdev);
+	if (regltr_id != CPCAP_VAUDIO)
+		return -EINVAL;
+
+	regnr = cpcap_regltr_data[regltr_id].reg;
+
+	if (mode == REGULATOR_MODE_NORMAL) {
+		if (cpcap_regltr_data[regltr_id].mode_cntr == 0) {
+			ret = cpcap_regacc_write(cpcap, regnr,
+						 0,
+						 CPCAP_BIT_AUDIO_LOW_PWR);
+		}
+		if (ret == 0)
+			cpcap_regltr_data[regltr_id].mode_cntr++;
+	} else if (mode == REGULATOR_MODE_STANDBY) {
+		if (cpcap_regltr_data[regltr_id].mode_cntr == 1) {
+			ret = cpcap_regacc_write(cpcap, regnr,
+						 CPCAP_BIT_AUDIO_LOW_PWR,
+						 CPCAP_BIT_AUDIO_LOW_PWR);
+		} else if (WARN((cpcap_regltr_data[regltr_id].mode_cntr == 0),
+				"Unbalanced modes for supply vaudio\n"))
+			ret = -EIO;
+
+		if (ret == 0)
+			cpcap_regltr_data[regltr_id].mode_cntr--;
+	}
+
+	return ret;
+}
+
 static struct regulator_ops cpcap_regulator_ops = {
 	.set_voltage = cpcap_regulator_set_voltage,
 	.get_voltage = cpcap_regulator_get_voltage,
 	.enable = cpcap_regulator_enable,
 	.disable = cpcap_regulator_disable,
 	.is_enabled = cpcap_regulator_is_enabled,
+	.set_mode = cpcap_regulator_set_mode,
 };
 
 static struct regulator_desc regulators[] = {
