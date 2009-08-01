@@ -171,7 +171,7 @@ int cpup_iattr(struct dentry *dst, aufs_bindex_t bindex, struct dentry *h_src)
 		ia.ia_mode = h_isrc->i_mode;
 	}
 	sbits = !!(h_isrc->i_mode & (S_ISUID | S_ISGID));
-	au_cpup_attr_flags(h_path.dentry->d_inode, h_isrc);
+	au_cpup_attr_flags(h_idst, h_isrc);
 	err = vfsub_notify_change(&h_path, &ia);
 
 	/* is this nfs only? */
