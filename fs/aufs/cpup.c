@@ -152,20 +152,25 @@ int cpup_iattr(struct dentry *dst, aufs_bindex_t bindex, struct dentry *h_src)
 	int err, sbits;
 	struct iattr ia;
 	struct path h_path;
-	struct inode *h_isrc;
+	struct inode *h_isrc, *h_idst;
 
 	h_path.dentry = au_h_dptr(dst, bindex);
+	h_idst = h_path.dentry->d_inode;
 	h_path.mnt = au_sbr_mnt(dst->d_sb, bindex);
 	h_isrc = h_src->d_inode;
-	ia.ia_valid = ATTR_FORCE | ATTR_MODE | ATTR_UID | ATTR_GID
+	ia.ia_valid = ATTR_FORCE | ATTR_UID | ATTR_GID
 		| ATTR_ATIME | ATTR_MTIME
 		| ATTR_ATIME_SET | ATTR_MTIME_SET;
-	ia.ia_mode = h_isrc->i_mode;
 	ia.ia_uid = h_isrc->i_uid;
 	ia.ia_gid = h_isrc->i_gid;
 	ia.ia_atime = h_isrc->i_atime;
 	ia.ia_mtime = h_isrc->i_mtime;
-	sbits = !!(ia.ia_mode & (S_ISUID | S_ISGID));
+	if (h_idst->i_mode != h_isrc->i_mode
+	    && !S_ISLNK(h_idst->i_mode)) {
+		ia.ia_valid |= ATTR_MODE;
+		ia.ia_mode = h_isrc->i_mode;
+	}
+	sbits = !!(h_isrc->i_mode & (S_ISUID | S_ISGID));
 	au_cpup_attr_flags(h_path.dentry->d_inode, h_isrc);
 	err = vfsub_notify_change(&h_path, &ia);
 
