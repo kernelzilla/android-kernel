@@ -50,7 +50,7 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 /* ---------------------------------------------------------------------- */
 
 #ifdef CONFIG_IMA
-#error IMA is not supported since it does not work well. Let's wait for their fixing.
+#error IMA is not supported since it does not work well. Wait for their fixing.
 #endif
 
 struct file *vfsub_dentry_open(struct path *path, int flags,
