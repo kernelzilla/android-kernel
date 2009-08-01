@@ -2061,8 +2061,6 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
 		}
-
-		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_NONE;
 	}
 
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
@@ -2094,6 +2092,7 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 		cpcap_audio_state.ext_primary_speaker = CPCAP_AUDIO_OUT_NONE;
 		cpcap_audio_state.ext_secondary_speaker =
 						CPCAP_AUDIO_OUT_NONE;
+		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_NONE;
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			audio_stop_ssi(inode, file);

@@ -853,12 +853,59 @@ static void cpcap_audio_configure_output_gains(
 	}
 }
 
+#define CPCAP_AUDIO_A2_CLOCK_MASK \
+	(CPCAP_BIT_A2_CLK2|CPCAP_BIT_A2_CLK1|CPCAP_BIT_A2_CLK0)
+#define CPCAP_AUDIO_A2_CLOCK_15_36 (CPCAP_BIT_A2_CLK0)
+#define CPCAP_AUDIO_A2_CLOCK_16_80 (CPCAP_BIT_A2_CLK1)
+#define CPCAP_AUDIO_A2_CLOCK_19_20 (CPCAP_BIT_A2_CLK1|CPCAP_BIT_A2_CLK0)
+#define CPCAP_AUDIO_A2_CLOCK_26_00 (CPCAP_BIT_A2_CLK2)
+#define CPCAP_AUDIO_A2_CLOCK_33_60 (CPCAP_BIT_A2_CLK2|CPCAP_BIT_A2_CLK0)
+#define CPCAP_AUDIO_A2_CLOCK_38_40 (CPCAP_BIT_A2_CLK2|CPCAP_BIT_A2_CLK1)
+
+static void cpcap_audio_configure_loudspeaker_headset(
+	struct cpcap_audio_state *previous_state,
+	struct cpcap_audio_state *state)
+{
+	if (state->rat_type != previous_state->rat_type) {
+		int ret_val = 0;
+		struct cpcap_regacc reg_changes = {
+			.value = 0,
+			.mask = CPCAP_BIT_A2_CLK_IN |
+				CPCAP_AUDIO_A2_CLOCK_MASK |
+				CPCAP_BIT_NCP_CLK_SYNC
+		};
+
+		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA) {
+			/* Use 19.2 MHz clock from baseband */
+			reg_changes.value |= CPCAP_BIT_A2_CLK_IN;
+			reg_changes.value |= CPCAP_AUDIO_A2_CLOCK_19_20;
+			/* Use headset negative charge pump */
+			reg_changes.value |= CPCAP_BIT_NCP_CLK_SYNC;
+		} else {
+			/* Use 26 MHz clock from MPU */
+			reg_changes.value |= CPCAP_AUDIO_A2_CLOCK_26_00;
+		}
+
+		CPCAP_AUDIO_DEBUG_LOG("A2LA: value=%#x, mask=%#x\n",
+			reg_changes.value, reg_changes.mask);
+
+		ret_val = cpcap_regacc_write(state->cpcap, CPCAP_REG_A2LA,
+			reg_changes.value, reg_changes.mask);
+
+		if (ret_val != 0)
+			CPCAP_AUDIO_ERROR_LOG("CPCAP_REG_A2LA "
+				"returned error, ret_val = %d\n", ret_val);
+	}
+}
+
 static void cpcap_audio_configure_output(
 	struct cpcap_audio_state *state,
 	struct cpcap_audio_state *previous_state)
 {
 	static unsigned int prev_aud_out_data;
 	int ret_val;
+
+	cpcap_audio_configure_loudspeaker_headset(previous_state, state);
 
 	if (is_output_changed(previous_state, state)) {
 		bool activate_ext_loudspeaker = false;
@@ -1059,6 +1106,10 @@ static void cpcap_audio_register_dump(struct cpcap_audio_state *state)
 	printk(KERN_INFO "0x20A = %x\n", reg_val);
 	cpcap_regacc_read(state->cpcap, CPCAP_REG_RXEPOA, &reg_val);
 	printk(KERN_INFO "0x20B = %x\n", reg_val);
+	cpcap_regacc_read(state->cpcap, CPCAP_REG_RXLL, &reg_val);
+	printk(KERN_INFO "0x20C = %x\n", reg_val);
+	cpcap_regacc_read(state->cpcap, CPCAP_REG_A2LA, &reg_val);
+	printk(KERN_INFO "0x20D = %x\n", reg_val);
 }
 
 void cpcap_audio_set_audio_state(struct cpcap_audio_state *state)

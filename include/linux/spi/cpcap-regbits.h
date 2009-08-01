@@ -654,6 +654,18 @@
 #define CPCAP_BIT_A1_EAR_EXT_SW           0x00000001
 
 /*
+ * Register 525 Loudspeaker Amplifier and Clock Configuration for Headset
+ */
+#define CPCAP_BIT_NCP_CLK_SYNC            0x00000080
+#define CPCAP_BIT_A2_CLK_SYNC             0x00000040
+#define CPCAP_BIT_A2_FREE_RUN             0x00000020
+#define CPCAP_BIT_A2_CLK2                 0x00000010
+#define CPCAP_BIT_A2_CLK1                 0x00000008
+#define CPCAP_BIT_A2_CLK0                 0x00000004
+#define CPCAP_BIT_A2_CLK_IN               0x00000002
+#define CPCAP_BIT_A2_CONFIG               0x00000001
+
+/*
  * Register 641 - CPCAP_REG_CHRGR_1 bits
  */
 #define CPCAP_BIT_UNUSED_641_15		0x00008000
