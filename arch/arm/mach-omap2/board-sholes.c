@@ -51,11 +51,14 @@
 #include <mach/hdq.h>
 #include <linux/usb/android.h>
 
+#include "cm-regbits-34xx.h"
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 #include "smartreflex.h"
 #include "omap3-opp.h"
 #include "sdram-toshiba-hynix-numonyx.h"
+#include "prcm-common.h"
+#include "cm.h"
 
 #ifdef CONFIG_VIDEO_OLDOMAP3
 #include <media/v4l2-int-device.h>
@@ -543,6 +546,17 @@ static struct platform_device ehci_device = {
 #endif
 
 #if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+static int omap_ohci_bus_check_ctrl_standby(void)
+{
+	u32 val;
+
+	val = cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD, CM_IDLEST);
+	if (val & OMAP3430ES2_ST_USBHOST_STDBY_MASK)
+		return 1;
+	else
+		return 0;
+}
+
 static struct resource ohci_resources[] = {
 	[0] = {
 		.start	= OMAP34XX_HSUSB_HOST_BASE + 0x400,
@@ -558,6 +572,7 @@ static struct resource ohci_resources[] = {
 static u64 ohci_dmamask = ~(u32)0;
 
 static struct omap_usb_config dummy_usb_config = {
+	.usbhost_standby_status	= omap_ohci_bus_check_ctrl_standby,
 };
 
 static struct platform_device ohci_device = {
