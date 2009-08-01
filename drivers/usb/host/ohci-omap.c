@@ -30,7 +30,6 @@
 #include <mach/fpga.h>
 #include <mach/usb.h>
 
-
 /* OMAP-1510 OHCI has its own MMU for DMA */
 #define OMAP1510_LB_MEMSIZE	32	/* Should be same as SDRAM size */
 #define OMAP1510_LB_CLOCK_DIV	0xfffec10c
@@ -465,6 +464,65 @@ ohci_omap_start (struct usb_hcd *hcd)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int omap_ohci_bus_suspend(struct usb_hcd *hcd)
+{
+	int res;
+	int ret = 0;
+	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+#if defined(CONFIG_ARCH_OMAP34XX)
+	struct omap_usb_config *config = hcd->self.controller->platform_data;
+#endif
+
+	ret = ohci_bus_suspend(hcd);
+	if (ret)
+		return ret;
+	mdelay(8); /* MSTANDBY assertion is delayed by ~8ms */
+
+#if defined(CONFIG_ARCH_OMAP34XX)
+	if (config->usbhost_standby_status)
+		res = config->usbhost_standby_status();
+#endif
+	if (res == 0) {
+		printk(KERN_ERR "ohci: suspend failed!\n");
+		ohci_bus_resume(hcd);
+		return -EBUSY ;
+	}
+
+	/* go ahead turn off clock */
+	clk_disable(clk_get(NULL, "usbtll_fck"));
+	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
+
+	return ret;
+}
+
+static int omap_ohci_bus_resume(struct usb_hcd *hcd)
+{
+	int ret = 0;
+
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	ohci_finish_controller_resume(hcd);
+	ret = ohci_bus_resume(hcd);
+	return ret;
+}
+#endif /* CONFIG_PM */
+
+static void omap_ohci_shutdown(struct usb_hcd *hcd)
+{
+	dev_dbg(hcd->self.controller, "%s %lu\n", __func__, jiffies);
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	ohci_shutdown(hcd);
+}
+
 /*-------------------------------------------------------------------------*/
 
 static const struct hc_driver ohci_omap_hc_driver = {
@@ -484,7 +542,7 @@ static const struct hc_driver ohci_omap_hc_driver = {
 	.reset =		ohci_omap_init,
 	.start =		ohci_omap_start,
 	.stop =			ohci_omap_stop,
-	.shutdown =		ohci_shutdown,
+	.shutdown =		omap_ohci_shutdown,
 
 	/*
 	 * managing i/o requests and associated device resources
@@ -504,8 +562,8 @@ static const struct hc_driver ohci_omap_hc_driver = {
 	.hub_status_data =	ohci_hub_status_data,
 	.hub_control =		ohci_hub_control,
 #ifdef	CONFIG_PM
-	.bus_suspend =		ohci_bus_suspend,
-	.bus_resume =		ohci_bus_resume,
+	.bus_suspend =		omap_ohci_bus_suspend,
+	.bus_resume =		omap_ohci_bus_resume,
 #endif
 	.start_port_reset =	ohci_start_port_reset,
 };
@@ -533,37 +591,11 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
 
 static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
 {
-	struct usb_hcd *hcd = platform_get_drvdata(dev);
-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
-
-	if (time_before(jiffies, ohci->next_statechange))
-		msleep(5);
-	ohci->next_statechange = jiffies;
-
-	omap_ohci_clock_power(0);
-	clk_disable(clk_get(NULL, "usbtll_fck"));
-	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
-	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
-	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
 	return 0;
 }
 
 static int ohci_omap_resume(struct platform_device *dev)
 {
-	struct usb_hcd	*hcd = platform_get_drvdata(dev);
-	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-
-	if (time_before(jiffies, ohci->next_statechange))
-		msleep(5);
-	ohci->next_statechange = jiffies;
-
-	clk_enable(clk_get(NULL, "usbtll_fck"));
-	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
-	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
-	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	omap_ohci_clock_power(1);
-	ohci_finish_controller_resume(hcd);
 	return 0;
 }
 
@@ -578,9 +610,9 @@ static struct platform_driver ohci_hcd_omap_driver = {
 	.probe		= ohci_hcd_omap_drv_probe,
 	.remove		= ohci_hcd_omap_drv_remove,
 	.shutdown	= usb_hcd_platform_shutdown,
-#ifdef	CONFIG_PM
-	.suspend	= ohci_omap_suspend,
-	.resume		= ohci_omap_resume,
+#ifdef CONFIG_PM
+	.suspend        = ohci_omap_suspend,
+	.resume         = ohci_omap_resume,
 #endif
 	.driver		= {
 		.owner	= THIS_MODULE,

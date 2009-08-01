@@ -701,6 +701,55 @@ static int ehci_hcd_omap_drv_remove(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
+{
+	int ret = 0;
+	dev_dbg(hcd->self.controller, "%s %ld %lu\n", __func__,
+		in_interrupt(), jiffies);
+	ret = ehci_bus_suspend(hcd);
+
+	if (ret)
+		return ret;
+
+	clk_disable(clk_get(NULL, "usbtll_fck"));
+	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
+	return ret;
+}
+
+static int ehci_omap_bus_resume(struct usb_hcd *hcd)
+{
+	int ret = 0;
+
+	dev_dbg(hcd->self.controller, "%s %ld %lu\n", __func__,
+	in_interrupt(), jiffies);
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
+	/* Wakeup ports by resume */
+	ret = ehci_bus_resume(hcd);
+
+	return ret;
+}
+
+static void ehci_omap_shutdown(struct usb_hcd *hcd)
+{
+	dev_dbg(hcd->self.controller, "%s %lu\n", __func__, jiffies);
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	ehci_shutdown(hcd);
+}
+
+#endif
+
+
 static const struct hc_driver ehci_omap_hc_driver = {
 	.description = hcd_name,
 	.product_desc = "OMAP-EHCI Host Controller",
@@ -719,7 +768,7 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	.reset = ehci_init,
 	.start = ehci_run,
 	.stop = ehci_stop,
-	.shutdown = ehci_shutdown,
+	.shutdown = ehci_omap_shutdown,
 
 	/*
 	 * managing i/o requests and associated device resources
@@ -739,8 +788,8 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	.hub_status_data = ehci_hub_status_data,
 	.hub_control = ehci_hub_control,
 #ifdef	CONFIG_PM
-	.bus_suspend = ehci_bus_suspend,
-	.bus_resume = ehci_bus_resume,
+	.bus_suspend = ehci_omap_bus_suspend,
+	.bus_resume = ehci_omap_bus_resume,
 #endif
 };
 
@@ -748,26 +797,16 @@ static const struct hc_driver ehci_omap_hc_driver = {
 #ifdef CONFIG_PM
 static int ehci_omap_suspend(struct platform_device *dev, pm_message_t message)
 {
-	struct usb_hcd *hcd = platform_get_drvdata(dev);
-	clk_disable(clk_get(NULL, "usbtll_fck"));
-	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
-	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
-	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	return 0;
+       return 0;
 }
 
 static int ehci_omap_resume(struct platform_device *dev, pm_message_t message)
 {
-	struct usb_hcd	*hcd = platform_get_drvdata(dev);
-	clk_enable(clk_get(NULL, "usbtll_fck"));
-	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
-	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
-	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	return 0;
+       return 0;
 }
 #endif
 
-/*-------------------------------------------------------------------------*/
+
 MODULE_ALIAS("platform:omap-ehci");
 static struct platform_driver ehci_hcd_omap_driver = {
 	.probe = ehci_hcd_omap_drv_probe,
