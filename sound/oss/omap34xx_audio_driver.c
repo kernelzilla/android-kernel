@@ -42,17 +42,9 @@
 #define GPIO_AUDIO_SELECT_CPCAP  143
 
 /* This is the number of total kernel buffers */
-#define AUDIO_NBFRAGS_DEFAULT 3
+#define AUDIO_NBFRAGS_DEFAULT 2
 
-/* wait for 8 Sec
- * sample rate of 8000, (1/8000) * (64000/2) sec
- */
-#define MAX_WAIT_TIMEOUT 90
-
-/* Wait for 1 buffer */
-#define TIMEOUT_TIME 10
-
-#define AUDIO_DMA_TIMEOUT (10*HZ)
+#define AUDIO_TIMEOUT HZ
 
 #define NUMBER_OF_RATES_SUPPORTED (sizeof(valid_sample_rates)/\
 				   sizeof(struct sample_rate_info_t))
@@ -297,9 +289,9 @@ static const struct sample_rate_info_t valid_sample_rates[] = {
 };
 
 static DEFINE_SPINLOCK(audio_write_lock);
+static DEFINE_SPINLOCK(audio_read_lock);
 static unsigned long flags;
 static int read_buf_full;
-static int phone_mode_on = -1;
 static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static unsigned int capture_mode;
@@ -1095,6 +1087,52 @@ int omap2_mcbsp_params_cfg(unsigned int id, int interface_mode,
 }
 #endif /* MCBSP_WRAPPER */
 
+static void map_audioic_speakers(void)
+{
+	if (state.dev_dsp_open_count > 0) {
+		cpcap_audio_state.stdac_primary_speaker =
+						primary_spkr_setting;
+		cpcap_audio_state.stdac_secondary_speaker =
+						secondary_spkr_setting;
+	}
+
+	if (state.dev_dsp1_open_count > 0) {
+		if (cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) {
+			cpcap_audio_state.ext_primary_speaker =
+							primary_spkr_setting;
+			cpcap_audio_state.ext_secondary_speaker =
+							secondary_spkr_setting;
+			cpcap_audio_state.analog_source =
+						CPCAP_AUDIO_ANALOG_SOURCE_L;
+		} else{
+			cpcap_audio_state.codec_primary_speaker =
+							primary_spkr_setting;
+			cpcap_audio_state.codec_secondary_speaker =
+							secondary_spkr_setting;
+		}
+
+		if ((cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) &&
+			(primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
+			 && (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
+			AUDIO_LEVEL1_LOG("Setting codec in Call BT mode\n");
+			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
+			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 0);
+		} else if ((primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
+			 && (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
+			AUDIO_LEVEL1_LOG("Setting codec Ouf-of-Call BT mode\n");
+			cpcap_audio_state.codec_mode =
+						CPCAP_AUDIO_CODEC_CLOCK_ONLY;
+			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+		} else{
+			AUDIO_LEVEL1_LOG("Setting codec in Normal mode\n");
+			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
+			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_UNMUTE;
+			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+		}
+	}
+}
+
 static int audio_select_speakers(int spkr)
 {
 	int local_spkr = -1;
@@ -1103,104 +1141,51 @@ static int audio_select_speakers(int spkr)
 
 	AUDIO_LEVEL3_LOG("[%s] enter with spkr = %d\n", __func__, spkr);
 
-	if (spkr == 0) {	/* Resetting old speaker setting */
-		cpcap_audio_state.stdac_primary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.stdac_secondary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.codec_primary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.codec_secondary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-	} else {
-		while (spkr) {
-			if ((spkr & CPCAP_AUDIO_OUT_HANDSET) ==
-						CPCAP_AUDIO_OUT_HANDSET)
-				local_spkr = CPCAP_AUDIO_OUT_HANDSET;
+	while (spkr) {
+		if ((spkr & CPCAP_AUDIO_OUT_HANDSET) == CPCAP_AUDIO_OUT_HANDSET)
+			local_spkr = CPCAP_AUDIO_OUT_HANDSET;
 
-			else if ((spkr & CPCAP_AUDIO_OUT_LOUDSPEAKER) ==
-				 CPCAP_AUDIO_OUT_LOUDSPEAKER)
-				local_spkr = CPCAP_AUDIO_OUT_LOUDSPEAKER;
+		else if ((spkr & CPCAP_AUDIO_OUT_LOUDSPEAKER) ==
+						CPCAP_AUDIO_OUT_LOUDSPEAKER)
+			local_spkr = CPCAP_AUDIO_OUT_LOUDSPEAKER;
 
-			else if ((spkr & CPCAP_AUDIO_OUT_LINEOUT) ==
-				 CPCAP_AUDIO_OUT_LINEOUT)
-				local_spkr = CPCAP_AUDIO_OUT_LINEOUT;
+		else if ((spkr & CPCAP_AUDIO_OUT_LINEOUT) ==
+							CPCAP_AUDIO_OUT_LINEOUT)
+			local_spkr = CPCAP_AUDIO_OUT_LINEOUT;
 
-			else if ((spkr & CPCAP_AUDIO_OUT_STEREO_HEADSET) ==
-				 CPCAP_AUDIO_OUT_STEREO_HEADSET)
-				local_spkr = CPCAP_AUDIO_OUT_STEREO_HEADSET;
+		else if ((spkr & CPCAP_AUDIO_OUT_STEREO_HEADSET) ==
+						 CPCAP_AUDIO_OUT_STEREO_HEADSET)
+			local_spkr = CPCAP_AUDIO_OUT_STEREO_HEADSET;
 
-			else if ((spkr & CPCAP_AUDIO_OUT_MONO_HEADSET) ==
-				 CPCAP_AUDIO_OUT_MONO_HEADSET)
-				local_spkr = CPCAP_AUDIO_OUT_MONO_HEADSET;
+		else if ((spkr & CPCAP_AUDIO_OUT_MONO_HEADSET) ==
+						 CPCAP_AUDIO_OUT_MONO_HEADSET)
+			local_spkr = CPCAP_AUDIO_OUT_MONO_HEADSET;
 
-			else if ((spkr & CPCAP_AUDIO_OUT_BT_MONO) ==
-				 CPCAP_AUDIO_OUT_BT_MONO)
-				local_spkr = CPCAP_AUDIO_OUT_BT_MONO;
+		else if ((spkr & CPCAP_AUDIO_OUT_BT_MONO) ==
+						 CPCAP_AUDIO_OUT_BT_MONO)
+			local_spkr = CPCAP_AUDIO_OUT_BT_MONO;
 
-			else if (local_spkr == -1 &&
-					spkr1 == CPCAP_AUDIO_OUT_NONE)
-				return -EINVAL;
+		else if (local_spkr == -1 && spkr1 == CPCAP_AUDIO_OUT_NONE)
+			return -EINVAL;
 
-			if (spkr1 == CPCAP_AUDIO_OUT_NONE)
-				spkr1 = local_spkr;
-			else
-				if (local_spkr != -1)
-					spkr2 = local_spkr;
+		if (spkr1 == CPCAP_AUDIO_OUT_NONE)
+			spkr1 = local_spkr;
+		else
+			if (local_spkr != -1)
+				spkr2 = local_spkr;
 
-			spkr &= ~local_spkr;
-			local_spkr = -1;
-		}
-
-		AUDIO_LEVEL1_LOG("spkr1 = %#x, spkr2 = %#x\n", spkr1, spkr2);
-
-		if (state.dev_dsp_open_count == 1) {
-			cpcap_audio_state.stdac_primary_speaker = spkr1;
-			cpcap_audio_state.stdac_secondary_speaker = spkr2;
-		}
-
-		if (state.dev_dsp1_open_count == 1) {
-			if (cpcap_audio_state.rat_type ==
-						CPCAP_AUDIO_RAT_CDMA) {
-				cpcap_audio_state.ext_primary_speaker = spkr1;
-				cpcap_audio_state.ext_secondary_speaker =
-									spkr2;
-				cpcap_audio_state.analog_source =
-					CPCAP_AUDIO_ANALOG_SOURCE_L;
-			} else {
-				cpcap_audio_state.codec_primary_speaker =
-									spkr1;
-				cpcap_audio_state.codec_secondary_speaker =
-									spkr2;
-			}
-
-			/* If the output is just BT mono then change
-			 * the codec mode */
-			if ((spkr1 == CPCAP_AUDIO_OUT_BT_MONO)
-			    && (spkr2 == CPCAP_AUDIO_OUT_NONE)) {
-				AUDIO_LEVEL1_LOG("Setting codec in "
-						 "CODEC off BT mode\n");
-				cpcap_audio_state.codec_mode =
-				    CPCAP_AUDIO_CODEC_OFF;
-				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
-						      0);
-
-			} else {
-				AUDIO_LEVEL1_LOG("Setting codec in "
-						 "normal mode\n");
-				cpcap_audio_state.codec_mode =
-							CPCAP_AUDIO_CODEC_ON;
-				cpcap_audio_state.codec_mute =
-						CPCAP_AUDIO_CODEC_UNMUTE;
-				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
-						      1);
-			}
-		}
+		spkr &= ~local_spkr;
+		local_spkr = -1;
 	}
 
-	cpcap_audio_set_audio_state(&cpcap_audio_state);
+	AUDIO_LEVEL1_LOG("spkr1 = %#x, spkr2 = %#x\n", spkr1, spkr2);
+
 	primary_spkr_setting = spkr1;
 	secondary_spkr_setting = spkr2;
+
+	map_audioic_speakers();
+
+	cpcap_audio_set_audio_state(&cpcap_audio_state);
 
 	return 0;
 }
@@ -1231,28 +1216,6 @@ static int audio_hw_transfer(struct audio_stream *str,
 
 out:
 	return ret;
-}
-
-static int audio_timed_get_sem(struct semaphore *sema)
-{
-	int counter = 0;
-
-	while (counter < MAX_WAIT_TIMEOUT) {
-		if (!down_trylock(sema))
-			return 0;
-
-		counter++;
-
-		if (signal_pending(current))
-			set_current_state(TASK_UNINTERRUPTIBLE);
-		else
-			set_current_state(TASK_INTERRUPTIBLE);
-
-		schedule_timeout(TIMEOUT_TIME);
-		set_current_state(TASK_RUNNING);
-	}
-
-	return -ETIMEDOUT;
 }
 
 static int audio_setup_buf(struct audio_stream *str, struct inode *inode)
@@ -1291,9 +1254,8 @@ static int audio_setup_buf(struct audio_stream *str, struct inode *inode)
 
 			do {
 				bufbuf =
-				    dma_alloc_coherent(NULL, bufsize,
-						       &bufphys,
-						       GFP_KERNEL | GFP_DMA);
+				    dma_alloc_coherent(NULL, bufsize, &bufphys,
+							GFP_KERNEL | GFP_DMA);
 
 				if (!bufbuf)
 					bufsize -= str->fragsize;
@@ -1358,8 +1320,7 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 		struct audio_buf *b = &str->buffers[str->buf_head];
 
 		if (str->fragsize) {
-			ret =
-			    audio_hw_transfer(str, (void *)(b->buf_addr),
+			ret = audio_hw_transfer(str, (void *)(b->buf_addr),
 					      str->fragsize, str->inode);
 
 			if (!ret) {
@@ -1595,8 +1556,7 @@ out:
 
 static int audio_stdac_open(struct inode *inode, struct file *file)
 {
-	int error;
-
+	int error = 0;
 	mutex_lock(&audio_lock);
 
 	if (state.dev_dsp_open_count == 1) {
@@ -1620,16 +1580,9 @@ static int audio_stdac_open(struct inode *inode, struct file *file)
 		cpcap_audio_state.stdac_mode = CPCAP_AUDIO_STDAC_ON;
 		cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_UNMUTE;
 
-		cpcap_audio_state.stdac_primary_speaker = primary_spkr_setting;
-		cpcap_audio_state.stdac_secondary_speaker =
-							secondary_spkr_setting;
+		map_audioic_speakers();
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	}
-
-	cpcap_audio_set_audio_state(&cpcap_audio_state);
-
-	mutex_unlock(&audio_lock);
-	return 0;
-
 out:
 	mutex_unlock(&audio_lock);
 	return error;
@@ -1653,9 +1606,10 @@ static int audio_stdac_release(struct inode *inode, struct file *file)
 		cpcap_audio_state.stdac_primary_speaker = CPCAP_AUDIO_OUT_NONE;
 		cpcap_audio_state.stdac_secondary_speaker =
 							CPCAP_AUDIO_OUT_NONE;
+
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	}
 
-	cpcap_audio_set_audio_state(&cpcap_audio_state);
 	mutex_unlock(&audio_lock);
 
 	return 0;
@@ -1665,230 +1619,218 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	int minor = MINOR(inode->i_rdev);
+	int ret = 0;
+
+	mutex_lock(&audio_lock);
 
 	switch (cmd) {
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, (int *)arg);
+		ret = put_user(SOUND_VERSION, (int *)arg);
+		break;
 
 	case SNDCTL_DSP_SPEED:
-		{
-			unsigned int samp_rate;
-			int count = 0;
-			TRY(copy_from_user
-			    (&samp_rate, (unsigned int *)arg,
+	{
+		unsigned int samp_rate;
+		int count = 0;
+		TRY(copy_from_user(&samp_rate, (unsigned int *)arg,
 			     sizeof(unsigned int)))
 
-			/* validate if rate is proper */
-			for (; count < NUMBER_OF_RATES_SUPPORTED; count++) {
-				if (valid_sample_rates[count].rate
-					== samp_rate)
-					break;
-			}
+		/* validate if rate is proper */
+		for (; count < NUMBER_OF_RATES_SUPPORTED; count++) {
+			if (valid_sample_rates[count].rate == samp_rate)
+				break;
+		}
 
-			if (count >= NUMBER_OF_RATES_SUPPORTED) {
-				AUDIO_ERROR_LOG
-				    ("[%d] Unsupported sample rate!!\n",
+		if (count >= NUMBER_OF_RATES_SUPPORTED) {
+			AUDIO_ERROR_LOG("[%d] Unsupported sample rate!!\n",
 				     (u32) samp_rate);
-				return -EPERM;
-			}
+			ret = -EINVAL;
+			goto out;
+		}
 
-			if (minor == state.dev_dsp) {
-				cpcap_audio_state.stdac_rate =
-				    valid_sample_rates[count].cpcap_audio_rate;
-			} else {
-				/* codec only supports two sampling rates */
+		if (minor == state.dev_dsp) {
+			cpcap_audio_state.stdac_rate =
+				valid_sample_rates[count].cpcap_audio_rate;
+		} else {
 				if ((file->f_mode & FMODE_WRITE) &&
 				    samp_rate != 8000 && samp_rate != 16000) {
-					AUDIO_ERROR_LOG("[%d] Unsupported "
+				AUDIO_ERROR_LOG("[%d] Unsupported "
 						"Codec sample rate!!\n",
 						(u32) samp_rate);
-					return -EINVAL;
-				}
+				ret = -EINVAL;
+				goto out;
+			}
 				cpcap_audio_state.codec_rate =
 				    valid_sample_rates[count].cpcap_audio_rate;
-			}
-
-			cpcap_audio_set_audio_state(&cpcap_audio_state);
-			return 0;
 		}
+
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
 
 	case SNDCTL_DSP_POST:
-		return 0;
+		break;
 
 	case SNDCTL_DSP_STEREO:
-		{
-			int val;
-			TRY(copy_from_user(&val, (int *)arg, sizeof(int)))
-			if (minor == state.dev_dsp) {
-				if (val != 1)
-					return -EINVAL;
-			} else {	/* Codec case */
-				if (file->f_mode & FMODE_WRITE) {
-					if (val != 0)
-						return -EINVAL;
-				} else {	/* support for stereo capture */
-
-					capture_mode = val;
-					TRY(audio_stop_ssi(inode, file))
-					TRY(audio_configure_ssi(inode, file))
-				}
+	{
+		int val;
+		TRY(copy_from_user(&val, (int *)arg, sizeof(int)))
+		if (minor == state.dev_dsp) {
+			if (val != 1) {
+				ret = -EINVAL;
+				goto out;
 			}
-			return 0;
+		} else {	/* Codec case */
+			if (file->f_mode & FMODE_WRITE) {
+				if (val != 0) {
+					ret = -EINVAL;
+					goto out;
+				}
+			} else {	/* support for stereo capture */
+				capture_mode = val;
+				TRY(audio_stop_ssi(inode, file))
+				TRY(audio_configure_ssi(inode, file))
+			}
 		}
+		break;
+	}
 
 	case SNDCTL_DSP_SYNC:
-		return 0;
+		break;
 
 	case SNDCTL_DSP_GETBLKSIZE:
-		{
-			int val = 0;
-
-			if (file->f_mode & FMODE_WRITE) {
-				val = (minor == state.dev_dsp) ?
-					STDAC_FIFO_SIZE :
-					CODEC_FIFO_SIZE;
-			} else {
-				/* McBSP/DMA driver returns blank data
-				 * if any other size other than
-				 * 800 is used for capture */
-				val = AUDIO_CAPTURE_SIZE;
-			}
-
-			put_user(val, (int *)arg);
-			return 0;
+	{
+		int val = 0;
+		if (file->f_mode & FMODE_WRITE) {
+			val = (minor == state.dev_dsp) ? STDAC_FIFO_SIZE :
+				CODEC_FIFO_SIZE;
+		} else {
+			/* McBSP/DMA driver returns blank data
+			 * if any other size other than
+			 * 800 is used for capture */
+			val = AUDIO_CAPTURE_SIZE;
 		}
+		put_user(val, (int *)arg);
+		break;
+	}
+
 	case SNDCTL_DSP_GETOSPACE:
 	case SNDCTL_DSP_GETISPACE:
-		{
-			audio_buf_info inf = { 0 };
-			struct audio_stream *str;
-			if (minor == state.dev_dsp) {
-				str = (file->f_mode & FMODE_WRITE) ?
-					state.stdac_out_stream :
-					state.stdac_in_stream;
-			} else {
-				str = (file->f_mode & FMODE_WRITE) ?
-					state.codec_out_stream :
-					state.codec_in_stream;
-			}
-
-			inf.bytes = str->fragsize;
-			inf.fragments = 1;
-			inf.fragsize = str->fragsize;
-			inf.fragstotal = str->nbfrags;
-
-			return copy_to_user((void *)arg, &inf, sizeof(inf));
+	{
+		audio_buf_info inf = { 0 };
+		struct audio_stream *str;
+		if (minor == state.dev_dsp) {
+			str = (file->f_mode & FMODE_WRITE) ?
+				state.stdac_out_stream : state.stdac_in_stream;
+		} else {
+			str = (file->f_mode & FMODE_WRITE) ?
+				state.codec_out_stream : state.codec_in_stream;
 		}
+
+		inf.bytes = str->fragsize;
+		inf.fragments = 1;
+		inf.fragsize = str->fragsize;
+		inf.fragstotal = str->nbfrags;
+		ret = copy_to_user((void *)arg, &inf, sizeof(inf));
+		break;
+	}
 
 	case SNDCTL_DSP_NONBLOCK:
 		file->f_flags |= O_NONBLOCK;
-		return 0;
+		break;
 
 	case SNDCTL_DSP_RESET:
-		{
-			struct audio_stream *str;
-			int ssi;
-			if (minor == state.dev_dsp) {
-				str = (file->f_mode & FMODE_WRITE) ?
-					state.stdac_out_stream :
-					state.stdac_in_stream;
+	{
+		struct audio_stream *str;
+		int ssi;
+		if (minor == state.dev_dsp) {
+			str = (file->f_mode & FMODE_WRITE) ?
+				state.stdac_out_stream : state.stdac_in_stream;
 				ssi = STDAC_SSI;
-			} else {
-				str = (file->f_mode & FMODE_WRITE) ?
-					state.codec_out_stream :
-					state.codec_in_stream;
-				ssi = CODEC_SSI;
-			}
-
-			TRY(omap2_mcbsp_set_xrst(ssi, OMAP_MCBSP_XRST_DISABLE))
-
-			if (file->f_mode & FMODE_READ)
-				audio_buffer_reset(str, inode);
-			if (file->f_mode & FMODE_WRITE)
-				audio_buffer_reset(str, inode);
-			return 0;
+		} else {
+			str = (file->f_mode & FMODE_WRITE) ?
+				state.codec_out_stream : state.codec_in_stream;
+			ssi = CODEC_SSI;
 		}
+
+		TRY(omap2_mcbsp_set_xrst(ssi, OMAP_MCBSP_XRST_DISABLE))
+		audio_buffer_reset(str, inode);
+		break;
+	}
 
 	case SNDCTL_DSP_GETOPTR:
-		{
-			int bytes_left_in_kernel = 0;
+	{
+		int bytes_left_in_kernel = 0;
 
-			struct audio_stream *str = (minor == state.dev_dsp) ?
-						state.stdac_out_stream :
-						state.codec_out_stream;
+		struct audio_stream *str = (minor == state.dev_dsp) ?
+			state.stdac_out_stream : state.codec_out_stream;
 
-			if ((str != NULL) && (str->nbfrags != 0)) {
-				bytes_left_in_kernel =
-					((str->nbfrags - str->buf_tail +
-					str->usr_head - 1) % str->nbfrags)
-					* str->fragsize;
-			}
-
-			TRY(put_user(bytes_left_in_kernel, (int *)arg))
-			return 0;
+		if ((str != NULL) && (str->nbfrags != 0)) {
+			bytes_left_in_kernel = ((str->nbfrags - str->buf_tail +
+			str->usr_head - 1) % str->nbfrags) * str->fragsize;
 		}
+
+		TRY(put_user(bytes_left_in_kernel, (int *)arg))
+		break;
+	}
 
 		/* MIXER ioctls */
 	case SOUND_MIXER_OUTSRC:
-		{
-			int spkr;
-			TRY(copy_from_user(&spkr, (int *)arg, sizeof(int)))
-			AUDIO_LEVEL2_LOG
-				("SOUND_MIXER_OUTSRC with spkr = %#x\n", spkr);
-			return audio_select_speakers(spkr);
-		}
+	{
+		int spkr;
+		TRY(copy_from_user(&spkr, (int *)arg, sizeof(int)))
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_OUTSRC with spkr = %#x\n", spkr);
+		ret = audio_select_speakers(spkr);
+		break;
+	}
 
 	case SOUND_MIXER_RECSRC:
-		{
-			int mic;
-			TRY(copy_from_user(&mic, (int *)arg, sizeof(int)))
-			AUDIO_LEVEL2_LOG(
-				"SOUND_MIXER_RECSRC with mic = %#x\n", mic);
-			cpcap_audio_state.microphone = mic;
-			cpcap_audio_set_audio_state(&cpcap_audio_state);
-			return 0;
-		}
+	{
+		int mic;
+		TRY(copy_from_user(&mic, (int *)arg, sizeof(int)))
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_RECSRC with mic = %#x\n", mic);
+		cpcap_audio_state.microphone = mic;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
 
 	case SOUND_MIXER_VOLUME:
-		{
-			unsigned int gain;
-			TRY(copy_from_user(&gain,
-				(unsigned int *)arg, sizeof(unsigned int)))
-			cpcap_audio_state.output_gain = gain;
-			cpcap_audio_set_audio_state(&cpcap_audio_state);
-			AUDIO_LEVEL2_LOG(
-				"SOUND_MIXER_VOLUME, output_gain = %d\n",
+	{
+		unsigned int gain;
+		TRY(copy_from_user(&gain, (unsigned int *)arg,
+					sizeof(unsigned int)))
+		cpcap_audio_state.output_gain = gain;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_VOLUME, output_gain = %d\n",
 				cpcap_audio_state.output_gain);
-			return 0;
-		}
+		break;
+	}
 
 	case SOUND_MIXER_RECLEV:
-		{
-			unsigned int gain;
-			TRY(copy_from_user(&gain, (unsigned int *)arg,
+	{
+		unsigned int gain;
+		TRY(copy_from_user(&gain, (unsigned int *)arg,
 						sizeof(unsigned int)))
-			cpcap_audio_state.input_gain = gain;
-			cpcap_audio_set_audio_state(&cpcap_audio_state);
-			AUDIO_LEVEL2_LOG(
-				"SOUND_MIXER_RECLEV, input_gain = %d\n",
+		cpcap_audio_state.input_gain = gain;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_RECLEV, input_gain = %d\n",
 				cpcap_audio_state.input_gain);
-			return 0;
-		}
+		break;
+	}
 
 	case SOUND_MIXER_READ_DEVMASK:
-		{
-			put_user(state.oss_accy_mask, (int *)arg);
-			AUDIO_LEVEL2_LOG("state.oss_accy_mask = %#x\n",
-					 state.oss_accy_mask);
-			return 0;
-		}
+		put_user(state.oss_accy_mask, (int *)arg);
+		AUDIO_LEVEL2_LOG("state.oss_accy_mask = %#x\n",
+						state.oss_accy_mask);
+		break;
 
 	default:
-		return 0;
+		break;
 	}
 
 out:
-	return -EPERM;
+	mutex_unlock(&audio_lock);
+	return ret;
 }
 
 static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
@@ -1902,45 +1844,30 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			state.stdac_out_stream : state.codec_out_stream;
 
 	mutex_lock(&audio_lock);
-	spin_lock_irqsave(&audio_write_lock, flags);
 
 	if (minor == state.dev_dsp) {
-		if (file->f_mode & FMODE_WRITE) {
-			if (!str->active) {
-				int temp_size = count % STDAC_FIFO_SIZE;
-				str->fragsize =
-				    (count - temp_size) + STDAC_FIFO_SIZE;
-				str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
-				if (audio_setup_buf(str, file->private_data)) {
-					AUDIO_ERROR_LOG
-					    ("Unable to allocate memory\n");
-					spin_unlock_irqrestore
-					    (&audio_write_lock, flags);
-					mutex_unlock(&audio_lock);
-					return -ENOMEM;
-				}
-
-				str->active = 1;
+		if (!str->active) {
+			int temp_size = count % STDAC_FIFO_SIZE;
+			str->fragsize = (count - temp_size) + STDAC_FIFO_SIZE;
+			str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
+			if (audio_setup_buf(str, file->private_data)) {
+				AUDIO_ERROR_LOG("Unable to allocate memory\n");
+				ret = -ENOMEM;
+				goto out;
 			}
+			str->active = 1;
 		}
 	} else {
-		if (file->f_mode & FMODE_WRITE) {
-			if (!str->active) {
-				int temp_size = count % CODEC_FIFO_SIZE;
-				str->fragsize =
-				    (count - temp_size) + CODEC_FIFO_SIZE;
-				str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
-				if (audio_setup_buf(str, file->private_data)) {
-					AUDIO_ERROR_LOG
-					    ("Unable to allocate memory\n");
-					spin_unlock_irqrestore
-					    (&audio_write_lock, flags);
-					mutex_unlock(&audio_lock);
-					return -ENOMEM;
-				}
-
-				str->active = 1;
+		if (!str->active) {
+			int temp_size = count % CODEC_FIFO_SIZE;
+			str->fragsize = (count - temp_size) + CODEC_FIFO_SIZE;
+			str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
+			if (audio_setup_buf(str, file->private_data)) {
+				AUDIO_ERROR_LOG("Unable to allocate memory\n");
+				ret = -ENOMEM;
+				goto out;
 			}
+			str->active = 1;
 		}
 	}
 
@@ -1953,7 +1880,9 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			if (down_trylock(&str->sem))
 				break;
 		} else {
-			ret = audio_timed_get_sem(&str->sem);
+			mutex_unlock(&audio_lock);
+			ret = down_timeout(&str->sem, AUDIO_TIMEOUT);
+			mutex_lock(&audio_lock);
 			if (ret) {
 				AUDIO_ERROR_LOG("audio_write: timedout\n");
 				break;
@@ -1969,10 +1898,11 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 				buffer, chunksize)) {
 			AUDIO_ERROR_LOG("Audio: CopyFrom User failed \n");
 			up(&str->sem);
-			spin_unlock_irqrestore(&audio_write_lock, flags);
-			mutex_unlock(&audio_lock);
-			return -EFAULT;
+			ret = -EFAULT;
+			goto out;
 		}
+
+		spin_lock_irqsave(&audio_write_lock, flags);
 
 		buffer += chunksize;
 		count -= chunksize;
@@ -1997,40 +1927,27 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 		ret = buffer - buffer0;
 
 	spin_unlock_irqrestore(&audio_write_lock, flags);
-	mutex_unlock(&audio_lock);
 
+out:
+	mutex_unlock(&audio_lock);
 	return ret;
 }
 
 static int audio_codec_open(struct inode *inode, struct file *file)
 {
+	int ret = 0;
 	mutex_lock(&audio_lock);
-	if (state.dev_dsp1_open_count == 1)
-		goto err;
+	if (state.dev_dsp1_open_count == 1) {
+		ret = -EBUSY;
+		goto out;
+	}
 
 	state.dev_dsp1_open_count = 1;
 	file->private_data = inode;
 
 	if (file->f_flags & O_TRUNC) {
-		if ((primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO) ||
-		    (secondary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)) {
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
-			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 0);
-		} else {
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
-			cpcap_audio_state.codec_mute =
-						CPCAP_AUDIO_CODEC_UNMUTE;
-			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
-		}
-
-		cpcap_audio_state.ext_primary_speaker = primary_spkr_setting;
-		cpcap_audio_state.ext_secondary_speaker =
-						secondary_spkr_setting;
-		cpcap_audio_state.analog_source =
-					CPCAP_AUDIO_ANALOG_SOURCE_L;
+		AUDIO_LEVEL1_LOG("CODEC in phone mode called \n");
 		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_CDMA;
-
-		phone_mode_on = 1;
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			state.codec_out_stream =
@@ -2041,13 +1958,6 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			audio_buffer_reset(state.codec_out_stream, inode);
 
 			TRY(audio_configure_ssi(inode, file))
-
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
-			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_UNMUTE;
-			cpcap_audio_state.codec_primary_speaker =
-							primary_spkr_setting;
-			cpcap_audio_state.codec_secondary_speaker =
-							secondary_spkr_setting;
 		}
 
 		if (file->f_mode & FMODE_READ) {
@@ -2058,22 +1968,13 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			state.codec_in_stream->inode = inode;
 
 			TRY(audio_configure_ssi(inode, file))
-
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
 		}
+		map_audioic_speakers();
 	}
-
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
-	mutex_unlock(&audio_lock);
-
-	return 0;
-
 out:
 	mutex_unlock(&audio_lock);
-	return -EPERM;
-err:
-	mutex_unlock(&audio_lock);
-	return -EBUSY;
+	return ret;
 }
 
 static int audio_codec_release(struct inode *inode, struct file *file)
@@ -2081,43 +1982,30 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 	mutex_lock(&audio_lock);
 	state.dev_dsp1_open_count = 0;
 
-	if (phone_mode_on == 1) {
-		cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
-		cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
-		phone_mode_on = 0;
-		cpcap_audio_state.codec_primary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.codec_secondary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.ext_primary_speaker = CPCAP_AUDIO_OUT_NONE;
-		cpcap_audio_state.ext_secondary_speaker =
-						CPCAP_AUDIO_OUT_NONE;
+	cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
+	cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+	cpcap_audio_state.codec_primary_speaker = CPCAP_AUDIO_OUT_NONE;
+	cpcap_audio_state.codec_secondary_speaker = CPCAP_AUDIO_OUT_NONE;
+	cpcap_audio_state.ext_primary_speaker = CPCAP_AUDIO_OUT_NONE;
+	cpcap_audio_state.ext_secondary_speaker = CPCAP_AUDIO_OUT_NONE;
+	cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_OFF;
+	cpcap_audio_state.microphone = CPCAP_AUDIO_IN_NONE;
+
+	if (cpcap_audio_state.rat_type != CPCAP_AUDIO_RAT_NONE) {
 		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_NONE;
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			audio_stop_ssi(inode, file);
-
 			audio_discard_buf(state.codec_out_stream, inode);
 			kfree(state.codec_out_stream);
 			state.codec_out_stream = NULL;
-
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
-			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
-
-			cpcap_audio_state.codec_primary_speaker =
-			  CPCAP_AUDIO_OUT_NONE;
-			cpcap_audio_state.codec_secondary_speaker =
-							CPCAP_AUDIO_OUT_NONE;
 		}
 
 		if (file->f_mode & FMODE_READ) {
 			audio_stop_ssi(inode, file);
-
 			audio_discard_buf(state.codec_in_stream, inode);
 			kfree(state.codec_in_stream);
 			state.codec_in_stream = NULL;
-
-			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
 		}
 	}
 
@@ -2145,17 +2033,15 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		goto err;
 	}
 
-	if (file->f_mode & FMODE_READ) {
-		if (str->fragsize != size) {
-			str->fragsize = size;
-			str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
-			str->input_output = FMODE_READ;
-			init_waitqueue_head(&str->wq);
-			if (audio_setup_buf(str, file->private_data)) {
-				AUDIO_ERROR_LOG("Unable to allocate memory\n");
-				ret = -ENOMEM;
-				goto err;
-			}
+	if (str->fragsize != size) {
+		str->fragsize = size;
+		str->nbfrags = AUDIO_NBFRAGS_DEFAULT;
+		str->input_output = FMODE_READ;
+		init_waitqueue_head(&str->wq);
+		if (audio_setup_buf(str, file->private_data)) {
+			AUDIO_ERROR_LOG("Unable to allocate memory\n");
+			ret = -ENOMEM;
+			goto err;
 		}
 	}
 
@@ -2186,7 +2072,9 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		}
 
 		wait_event_interruptible_timeout(str->wq, read_buf_full > 0,
-						 AUDIO_DMA_TIMEOUT);
+						 AUDIO_TIMEOUT);
+
+		spin_lock_irqsave(&audio_read_lock, flags);
 
 		read_buf_full--;
 
@@ -2196,6 +2084,7 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		if (copy_to_user(buffer, buf->data, str->fragsize)) {
 			AUDIO_ERROR_LOG("Audio: CopyTo User failed \n");
 			ret = -EFAULT;
+			spin_unlock_irqrestore(&audio_read_lock, flags);
 			goto err;
 		}
 
@@ -2203,10 +2092,12 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 			str->usr_head = 0;
 
 		size -= str->fragsize;
+
+		spin_unlock_irqrestore(&audio_read_lock, flags);
 	}
 
-	mutex_unlock(&audio_lock);
-	return local_size;
+	ret = local_size;
+
 err:
 	mutex_unlock(&audio_lock);
 	return ret;
@@ -2214,16 +2105,18 @@ err:
 
 static int audio_mixer_open(struct inode *inode, struct file *file)
 {
+	int ret = 0;
 	mutex_lock(&audio_lock);
-	if (state.dev_mixer_open_count == 1)
+	if (state.dev_mixer_open_count == 1) {
+		ret = -EBUSY;
 		goto err;
+	}
 
 	state.dev_mixer_open_count = 1;
-	mutex_unlock(&audio_lock);
-	return 0;
+
 err:
 	mutex_unlock(&audio_lock);
-	return -EBUSY;
+	return ret;
 }
 
 static int audio_mixer_close(struct inode *inode, struct file *file)
