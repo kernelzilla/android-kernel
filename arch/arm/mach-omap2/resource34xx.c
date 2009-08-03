@@ -30,6 +30,10 @@
 #include "cm.h"
 #include "cm-regbits-34xx.h"
 
+#ifndef CONFIG_CPU_IDLE
+#warning MPU latency constraints require CONFIG_CPU_IDLE to function!
+#endif
+
 /**
  * init_latency - Initializes the mpu/core latency resource.
  * @resp: Latency resource to be initalized
