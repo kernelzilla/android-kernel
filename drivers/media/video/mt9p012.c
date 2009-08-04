@@ -217,7 +217,9 @@ const static struct mt9p012_reg stream_on_list[] = {
 /* Structure which will set the exposure time */
 static struct mt9p012_reg set_exposure_time[] = {
 	/* less than frame_lines-1 */
+	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x01},
 	{.length = MT9P012_16BIT, .reg = REG_COARSE_INT_TIME, .val = 500},
+	{.length = MT9P012_8BIT, .reg = REG_GROUPED_PAR_HOLD, .val = 0x00},
 	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0},
 };
 
