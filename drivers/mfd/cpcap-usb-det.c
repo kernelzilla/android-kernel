@@ -224,10 +224,12 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		vusb_disable(data);
 
 	if (accy == CPCAP_ACCY_USB) {
-		data->usb_connected_dev =
-			platform_device_alloc("cpcap_usb_connected", -1);
-		platform_device_add(data->usb_connected_dev);
-	} else if (data->usb_connected_dev != NULL) {
+		if (!data->usb_connected_dev) {
+			data->usb_connected_dev =
+			    platform_device_alloc("cpcap_usb_connected", -1);
+			platform_device_add(data->usb_connected_dev);
+		}
+	} else if (data->usb_connected_dev) {
 		platform_device_del(data->usb_connected_dev);
 		data->usb_connected_dev = NULL;
 	}
