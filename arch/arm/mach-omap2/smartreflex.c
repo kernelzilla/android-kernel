@@ -50,9 +50,12 @@ struct omap_sr {
 	u32		senp_mod, senn_mod;
 	void __iomem	*srbase_addr;
 	void __iomem	*vpbase_addr;
+	u32		starting_ret_volt;
 };
 
 #define SR_REGADDR(offs)	(sr->srbase_addr + offset)
+
+static struct clk *dpll1_ck, *l3_ick;
 
 static omap3_voltagescale_vcbypass_t omap3_volscale_vcbypass_fun;
 
@@ -169,32 +172,14 @@ static u16 get_opp(struct omap_opp *opp_freq_table,
 	return (prcm_config+1)->opp_id;
 }
 
-static u16 get_vdd1_opp(void)
+static inline u16 get_vdd1_opp(void)
 {
-	u16 opp;
-	struct clk *clk;
-
-	clk = clk_get(NULL, "dpll1_ck");
-
-	if (clk == NULL || IS_ERR(clk) || mpu_opps == NULL)
-		return 0;
-
-	opp = get_opp(mpu_opps + MAX_VDD1_OPP, clk->rate);
-	return opp;
+	return get_opp(mpu_opps + MAX_VDD1_OPP, dpll1_ck->rate);
 }
 
-static u16 get_vdd2_opp(void)
+static inline u16 get_vdd2_opp(void)
 {
-	u16 opp;
-	struct clk *clk;
-
-	clk = clk_get(NULL, "l3_ick");
-
-	if (clk == NULL || IS_ERR(clk) || l3_opps == NULL)
-		return 0;
-
-	opp = get_opp(l3_opps + MAX_VDD2_OPP, clk->rate);
-	return opp;
+	return get_opp(l3_opps + MAX_VDD2_OPP, l3_ick->rate);
 }
 
 
@@ -576,8 +561,10 @@ static int sr_enable(struct omap_sr *sr, u32 target_opp_no)
 
 	/* Enable the interrupt */
 	sr_modify_reg(sr, ERRCONFIG,
-			(ERRCONFIG_VPBOUNDINTEN | ERRCONFIG_VPBOUNDINTST),
-			(ERRCONFIG_VPBOUNDINTEN | ERRCONFIG_VPBOUNDINTST));
+			(ERRCONFIG_VPBOUNDINTEN | ERRCONFIG_VPBOUNDINTST |
+			ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_MCUBOUNDINTST),
+			(ERRCONFIG_VPBOUNDINTEN | ERRCONFIG_VPBOUNDINTST |
+			ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_MCUBOUNDINTST));
 
 	if (sr->srid == SR1) {
 		/* set/latch init voltage */
@@ -663,6 +650,74 @@ static void sr_disable(struct omap_sr *sr)
 	}
 }
 
+static void change_ret_volt(struct omap_sr *sr, u32 val)
+{
+	u32 prm_vc_cmd_val = 0;
+	if (sr == &sr1) {
+		prm_vc_cmd_val = prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
+		prm_write_mod_reg((prm_vc_cmd_val &
+					~OMAP3430_VC_CMD_RET_MASK) |
+				(val << OMAP3430_VC_CMD_RET_SHIFT),
+				OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
+	}
+
+	if (sr == &sr2) {
+		prm_vc_cmd_val = prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
+		prm_write_mod_reg((prm_vc_cmd_val &
+					~OMAP3430_VC_CMD_RET_MASK) |
+				(val << OMAP3430_VC_CMD_RET_SHIFT),
+				OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
+	}
+
+	return;
+}
+
+static void try_change_ret_volt(struct omap_sr *sr, u32 *cmd_volt)
+{
+	u32 vp_volt = 0;
+
+	if (sr != &sr1 && sr != &sr2)
+		return;
+
+	if (sr == &sr1 && get_vdd1_opp() == 1)
+		vp_volt = prm_read_mod_reg(OMAP3430_GR_MOD,
+				OMAP3_PRM_VP1_VOLTAGE_OFFSET);
+
+	if (sr == &sr2 && get_vdd2_opp() == 2)
+		vp_volt = prm_read_mod_reg(OMAP3430_GR_MOD,
+				OMAP3_PRM_VP2_VOLTAGE_OFFSET);
+
+	if (*cmd_volt != vp_volt) {
+		change_ret_volt(sr, vp_volt);
+		*cmd_volt = prm_read_mod_reg(OMAP3430_GR_MOD,
+				(sr == &sr1) ? OMAP3_PRM_VP1_VOLTAGE_OFFSET :
+					OMAP3_PRM_VP2_VOLTAGE_OFFSET);
+	}
+
+	return;
+}
+
+static u32 get_ret_volt(struct omap_sr *sr)
+{
+	if (sr == &sr1)
+		return (prm_read_mod_reg(OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CMD_VAL_0_OFFSET) &
+				OMAP3430_VC_CMD_RET_MASK) >>
+			OMAP3430_VC_CMD_RET_SHIFT;
+
+	if (sr == &sr2)
+		return (prm_read_mod_reg(OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CMD_VAL_1_OFFSET) &
+				OMAP3430_VC_CMD_RET_MASK) >>
+			OMAP3430_VC_CMD_RET_SHIFT;
+
+	return -EINVAL;
+}
+
 
 void sr_start_vddautocomap(int srid, u32 target_opp_no)
 {
@@ -711,6 +766,7 @@ int sr_stop_vddautocomap(int srid)
 		sr->is_autocomp_active = 0;
 		/* Reset the volatage for current OPP */
 		sr_reset_voltage(srid);
+		change_ret_volt(sr, sr->starting_ret_volt);
 		return true;
 	} else {
 		pr_warning("SR%d: VDD autocomp is not active\n",
@@ -985,7 +1041,22 @@ static struct kobj_attribute sr_vdd2_autocomp = {
 	.store = omap_sr_vdd2_autocomp_store,
 };
 
+static irqreturn_t sr_omap_irq(int irq, void *dev_id)
+{
+	static u32 vp1_volt;
+	static u32 vp2_volt;
 
+	if (dev_id == &sr1)
+		try_change_ret_volt(dev_id, &vp1_volt);
+
+	if (dev_id == &sr2)
+		try_change_ret_volt(dev_id, &vp2_volt);
+
+	sr_modify_reg(dev_id, ERRCONFIG, ERRCONFIG_MCUBOUNDINTST,
+			ERRCONFIG_MCUBOUNDINTST);
+
+	return IRQ_HANDLED;
+}
 
 static int __init omap3_sr_init(void)
 {
@@ -997,6 +1068,25 @@ static int __init omap3_sr_init(void)
                 pr_err("SR: OPP rate tables not defined for platform, not enabling SmartReflex\n");
 		return -ENODEV;
         }
+
+	dpll1_ck = clk_get(NULL, "dpll1_ck");
+	if (dpll1_ck == NULL || IS_ERR(dpll1_ck))
+		return -ENODEV;
+
+	l3_ick = clk_get(NULL, "l3_ick");
+	if (l3_ick == NULL || IS_ERR(l3_ick))
+		return -ENODEV;
+
+	ret = get_ret_volt(&sr1);
+	if (ret == -EINVAL)
+		return -ENODEV;
+	sr1.starting_ret_volt = ret;
+
+	ret = get_ret_volt(&sr2);
+	if (ret == -EINVAL)
+		return -ENODEV;
+	sr2.starting_ret_volt = ret;
+
 
 #ifdef CONFIG_TWL4030_CORE
 	/* Enable SR on T2 */
@@ -1022,6 +1112,14 @@ static int __init omap3_sr_init(void)
 	sr_set_nvalues(&sr2);
 	sr_configure_vp(SR2);
 
+	ret = request_irq(SR1_IRQ, sr_omap_irq, IRQF_DISABLED, "sr1", &sr1);
+	if (ret)
+		goto out1;
+
+	ret = request_irq(SR2_IRQ, sr_omap_irq, IRQF_DISABLED, "sr2", &sr2);
+	if (ret)
+		goto out2;
+
 	pr_info("SmartReflex driver initialized\n");
 
 	ret = sysfs_create_file(power_kobj, &sr_vdd1_autocomp.attr);
@@ -1033,6 +1131,17 @@ static int __init omap3_sr_init(void)
 		pr_err("sysfs_create_file failed: %d\n", ret);
 
 	return 0;
+
+	/*
+	 * TODO: Proper cleanup routines necessary like disabling SR on T2,
+	 * etc.
+	 */
+out1:
+
+out2:
+	free_irq(SR1_IRQ, &sr1);
+
+	return ret;
 }
 
 late_initcall(omap3_sr_init);
