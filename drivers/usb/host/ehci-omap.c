@@ -371,6 +371,45 @@ static int omap_start_ehc(struct platform_device *dev, struct usb_hcd *hcd)
 				((char *)hcd_to_ehci(hcd)) +
 					sizeof(struct ehci_hcd));
 
+	/* Start DPLL5 Programming:
+	 * Clock Framework is not doing this now:
+	 * This will be done in clock framework later
+	 */
+	/* Enable DPLL 5 : Based on Input of 13Mhz*/
+	cm_write_mod_reg((12 << OMAP3430ES2_PERIPH2_DPLL_DIV_SHIFT)|
+			(120 << OMAP3430ES2_PERIPH2_DPLL_MULT_SHIFT),
+			PLL_MOD, OMAP3430ES2_CM_CLKSEL4);
+
+	cm_write_mod_reg(1 << OMAP3430ES2_DIV_120M_SHIFT,
+			PLL_MOD, OMAP3430ES2_CM_CLKSEL5);
+
+	cm_write_mod_reg((7 << OMAP3430ES2_PERIPH2_DPLL_FREQSEL_SHIFT) |
+			(7 << OMAP3430ES2_EN_PERIPH2_DPLL_SHIFT),
+			PLL_MOD, OMAP3430ES2_CM_CLKEN2);
+
+	while (!(cm_read_mod_reg(PLL_MOD, CM_IDLEST2) &
+				OMAP3430ES2_ST_PERIPH2_CLK_MASK))
+		dev_dbg(hcd->self.controller,
+			"idlest2 = 0x%x\n",
+			cm_read_mod_reg(PLL_MOD, CM_IDLEST2));
+	/* End DPLL5 programming */
+
+
+	/* PRCM settings for USBHOST:
+	 * Interface clk un-related to domain transition
+	 */
+	cm_write_mod_reg(0 << OMAP3430ES2_AUTO_USBHOST_SHIFT,
+				OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
+
+	/* Disable sleep dependency with MPU and IVA */
+	cm_write_mod_reg((0 << OMAP3430ES2_EN_MPU_SHIFT) |
+				(0 << OMAP3430ES2_EN_IVA2_SHIFT),
+				OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
+
+	/* Disable Automatic transition of clock */
+	cm_write_mod_reg(0 << OMAP3430ES2_CLKTRCTRL_USBHOST_SHIFT,
+				OMAP3430ES2_USBHOST_MOD, CM_CLKSTCTRL);
+
 	/* Enable Clocks for USBHOST */
 	ehci_clocks->usbhost_ick_clk = clk_get(&dev->dev,
 						USBHOST_ICKL);
