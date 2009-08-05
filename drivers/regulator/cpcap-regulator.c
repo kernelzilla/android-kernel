@@ -73,7 +73,7 @@ static struct {
 	const int *val_tbl;
 	unsigned int mode_cntr;
 } cpcap_regltr_data[CPCAP_NUM_REGULATORS] = {
-	[CPCAP_SW5]      = {CPCAP_REG_S5C, 0x000A, 0x0020, 5, 0x0000,
+	[CPCAP_SW5]      = {CPCAP_REG_S5C, 0x002A, 0x0000, 0, 0x0000,
 		ARRAY_SIZE(sw5_val_tbl), sw5_val_tbl, 0},
 	[CPCAP_VCAM]     = {CPCAP_REG_VCAMC, 0x0087, 0x0030, 4, 0x0000,
 		ARRAY_SIZE(vcam_val_tbl), vcam_val_tbl, 0},
