@@ -118,6 +118,38 @@ const static struct v4l2_fmtdesc omap2_formats[] = {
 
 /*=== Local Functions ==================================================*/
 
+static int omapvout_crop_to_size(struct v4l2_rect *rect, int w, int h)
+{
+	struct v4l2_rect try;
+	int t;
+
+	try = *rect;
+
+	if (try.left < 0)
+		try.left = 0;
+	if (try.top < 0)
+		try.top = 0;
+	if (try.width > w)
+		try.width = w;
+	if (try.height > h)
+		try.height = h;
+	t = ((try.left + try.width) - w);
+	if (t > 0)
+		try.width = w - t;
+	t = ((try.top + try.height) - h);
+	if (t > 0)
+		try.height = h - t;
+	try.width &= ~1;
+	try.height &= ~1;
+
+	if (try.width <= 0 || try.height <= 0)
+		return -EINVAL;
+
+	*rect = try;
+
+	return 0;
+}
+
 static int omapvout_try_pixel_format(struct omapvout_device *vout,
 				struct v4l2_pix_format *pix)
 {
@@ -165,135 +197,70 @@ static int omapvout_try_pixel_format(struct omapvout_device *vout,
 	return 0;
 }
 
-/* Given a new render window in new_win, adjust the window to the
- * nearest supported configuration.  The adjusted window parameters are
- * returned in new_win.
- * Returns zero if succesful, or -EINVAL if the requested window is
- * impossible and cannot reasonably be adjusted.
- */
 static int omapvout_try_window(struct omapvout_device *vout,
-				struct v4l2_window *win)
+					struct v4l2_window *win)
 {
-	struct v4l2_rect try_win;
+	int rc = 0;
 
-	/* make a working copy of the new_win rectangle */
-	try_win = win->w;
+	rc = omapvout_crop_to_size(&win->w, vout->disp_width,
+							vout->disp_height);
+	if (rc == 0)
+		win->field = V4L2_FIELD_NONE;
 
-	/* adjust the preview window so it fits on the display by clipping any
-	 * offscreen areas
-	 */
-	if (try_win.left < 0) {
-		try_win.width += try_win.left;
-		try_win.left = 0;
-	}
-	if (try_win.top < 0) {
-		try_win.height += try_win.top;
-		try_win.top = 0;
-	}
-
-	try_win.width = (try_win.width < vout->disp_width) ?
-	    try_win.width : vout->disp_width;
-	try_win.height = (try_win.height < vout->disp_height) ?
-	    try_win.height : vout->disp_height;
-
-	if (try_win.left + try_win.width > vout->disp_width)
-		try_win.width = vout->disp_width - try_win.left;
-	if (try_win.top + try_win.height > vout->disp_height)
-		try_win.height = vout->disp_height - try_win.top;
-
-	try_win.width &= ~1;
-	try_win.height &= ~1;
-
-	if (try_win.width <= 0 || try_win.height <= 0)
-		return -EINVAL;
-
-	/* We now have a valid preview window, so go with it */
-	win->w = try_win;
-	win->field = V4L2_FIELD_NONE;
-
-	return 0;
+	return rc;
 }
 
-/* Return the default overlay cropping rectangle in crop given the image
- * size in pix and the video display size in fbuf.  The default
- * cropping rectangle is the largest rectangle no larger than the capture size
- * that will fit on the display.  The default cropping rectangle is centered in
- * the image.  All dimensions and offsets are rounded down to even numbers.
- */
-static void omapvout_default_crop(struct omapvout_device *vout,
-						struct v4l2_rect *crop)
-{
-	crop->width = (vout->pix.width < vout->disp_width) ?
-		vout->pix.width : vout->disp_width;
-	crop->height = (vout->pix.height < vout->disp_height) ?
-		vout->pix.height : vout->disp_height;
-	crop->width &= ~1;
-	crop->height &= ~1;
-	crop->left = ((vout->pix.width - crop->width) >> 1) & ~1;
-	crop->top = ((vout->pix.height - crop->height) >> 1) & ~1;
-}
-
-/* Given a new cropping rectangle in new_crop, adjust the cropping rectangle to
- * the nearest supported configuration.  The image render window in win will
- * also be adjusted if necessary.  The preview window is adjusted such that the
- * horizontal and vertical rescaling ratios stay constant.  If the render
- * window would fall outside the display boundaries, the cropping rectangle will
- * also be adjusted to maintain the rescaling ratios.  If successful, crop
- * and win are updated.
- * Returns zero if succesful, or -EINVAL if the requested cropping rectangle is
- * impossible and cannot reasonably be adjusted.
- */
 static int omapvout_try_crop(struct omapvout_device *vout,
 					struct v4l2_rect *crop)
 {
-	struct v4l2_rect try;
+	return omapvout_crop_to_size(crop, vout->pix.width, vout->pix.height);
+}
 
-	/* make a working copy of the new_crop rectangle */
-	try = *crop;
+/* Make sure the input size, window rectangle, crop rectangle, and rotation
+ * parameters together make up a valid configuration for the hardware
+ */
+static int omapvout_validate_cfg(struct omapvout_device *vout)
+{
+	int rc = 0;
+	int win_w, win_h;
+	int crp_w, crp_h;
 
-	/* adjust the cropping rectangle so it fits in the image */
-	if (try.left < 0) {
-		try.width += try.left;
-		try.left = 0;
-	}
-	if (try.top < 0) {
-		try.height += try.top;
-		try.top = 0;
-	}
-	try.width = (try.width < vout->pix.width) ?
-		try.width : vout->pix.width;
-	try.height = (try.height < vout->pix.height) ?
-		try.height : vout->pix.height;
-	if (try.left + try.width > vout->pix.width)
-		try.width = vout->pix.width - try.left;
-	if (try.top + try.height > vout->pix.height)
-		try.height = vout->pix.height - try.top;
-	try.width &= ~1;
-	try.height &= ~1;
+	/* Is it assumed:
+	 * - The rotation value denotes 0, 90, 180, or 270
+	 * - The input size is valid based on the platform limits
+	 * - The output rectangle is within the display area
+	 * - The crop rectangle is within the input frame
+	 */
 
-	if (try.width <= 0 || try.height <= 0)
-		return -EINVAL;
+	/* Validate scaling */
+	win_w = vout->win.w.width;
+	win_h = vout->win.w.height;
+	crp_w = vout->crop.width;
+	crp_h = vout->crop.height;
 
-	/* Check for resizing constraints */
-	if (try.height / vout->win.w.height >= 16) {
-		/* The maximum vertical downsizing ratio is 16:1 */
-		try.height = vout->win.w.height * 16;
-	}
-	if (try.width / vout->win.w.width >= 16) {
-		/* The maximum vertical downsizing ratio is 16:1 */
-		try.width = vout->win.w.width * 16;
+	if ( vout->rotation == 0 || vout->rotation == 2 ) {
+		win_w = vout->win.w.width;
+		win_h = vout->win.w.height;
+	} else {
+		win_w = vout->win.w.height;
+		win_h = vout->win.w.width;
 	}
 
-	/* update our cropping rectangle and we're done */
-	*crop = try;
+	/* Down-scaling */
+	if (((win_w < crp_w) && ((win_w * 4) < crp_w)) ||
+	    ((win_h < crp_w) && ((win_h * 4) < crp_h)))
+		rc = -EINVAL;
 
-	return 0;
+	/* Up-scaling */
+	if (((win_w > crp_w) && ((crp_w * 8) < win_w)) ||
+	    ((win_h > crp_h) && ((crp_h * 8) < win_h)))
+		rc = -EINVAL;
+
+	return rc;
 }
 
 static void omapvout_free_resources(struct omapvout_device *vout)
 {
-	DBG("free_resources\n");
-
 	if (vout == NULL)
 		return;
 
@@ -686,8 +653,11 @@ static int omapvout_vidioc_s_fmt_vid_out(struct file *file, void *priv,
 
 	memcpy(&vout->pix, pix, sizeof(*pix));
 
-	/* Don't allow the crop window to be larger than the video */
-	omapvout_try_crop(vout, &vout->crop);
+	/* Default the cropping rectangle to the input frame size */
+	vout->crop.left = 0;
+	vout->crop.top = 0;
+	vout->crop.width = vout->pix.width;
+	vout->crop.height = vout->pix.height;
 
 	/* Streaming has to be disabled, so config the hardware
 	 * later when streaming is enabled
@@ -719,7 +689,10 @@ static int omapvout_vidioc_cropcap(struct file *file, void *priv,
 	ccap->type = type;
 	ccap->bounds.width = vout->pix.width & ~1;
 	ccap->bounds.height = vout->pix.height & ~1;
-	omapvout_default_crop(vout, &ccap->defrect);
+	ccap->defrect.left = 0;
+	ccap->defrect.top = 0;
+	ccap->defrect.width = ccap->bounds.width;
+	ccap->defrect.left = ccap->bounds.height;
 	ccap->pixelaspect.numerator = 1;
 	ccap->pixelaspect.denominator = 1;
 
@@ -888,15 +861,32 @@ static int omapvout_vidioc_streamon(struct file *file, void *priv,
 
 	mutex_lock(&vout->mtx);
 
-	omapvout_dss_enable(vout);
+	/* Not sure how else to do this.  We can't truly validate the
+	 * configuration until all of the pieces have been provided, like
+	 * input, output, crop sizes and rotation.  This is the only point
+	 * where we can be sure the client has provided all the data, thus
+	 * the only place to make sure we don't cause a DSS failure.
+	 */
+	rc = omapvout_validate_cfg(vout);
+	if (rc) {
+		DBG("Configuration Validation Failed\n");
+		goto failed;
+	}
+
+	rc = omapvout_dss_enable(vout);
+	if (rc) {
+		DBG("DSS Enable Failed\n");
+		goto failed;
+	}
 
 	rc = videobuf_streamon(&vout->queue);
 	if (rc)
 		omapvout_dss_disable(vout);
 
+failed:
 	mutex_unlock(&vout->mtx);
 
-	return 0;
+	return rc;
 }
 
 static int omapvout_vidioc_streamoff(struct file *file, void *priv,
