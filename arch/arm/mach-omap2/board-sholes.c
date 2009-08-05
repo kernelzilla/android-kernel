@@ -96,6 +96,8 @@
 #define FACTORY_VENDOR_ID		0x22B8
 #define FACTORY_PRODUCT_ID		0x41E2
 
+extern void sholes_panic_init(void);
+
 static char device_serial[MAX_USB_SERIAL_NUM];
 
 static struct omap_opp sholes_mpu_rate_table[] = {
@@ -1086,6 +1088,7 @@ static void __init sholes_init(void)
 	sholes_omap_mdm_ctrl_init();
 	sholes_spi_init();
 	sholes_flash_init();
+	sholes_panic_init();
 	sholes_serial_init();
 	sholes_als_init();
 	sholes_panel_init();
