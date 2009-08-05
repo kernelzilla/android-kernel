@@ -24,6 +24,7 @@
 #include <linux/regulator/consumer.h>
 #include <mach/mux.h>
 #include <mach/board-sholes.h>
+#include <mach/omap-pm.h>
 
 #ifdef CONFIG_VIDEO_OLDOMAP3
 #include <media/v4l2-int-device.h>
@@ -105,7 +106,7 @@ static struct isp_interface_config mt9p012_if_config = {
 	.u.par.par_clk_pol = 0x0,
 };
 
-static int mt9p012_sensor_power_set(enum v4l2_power power)
+static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 {
 	static enum v4l2_power previous_power = V4L2_POWER_OFF;
 	static struct regulator *regulator;
@@ -125,10 +126,17 @@ static int mt9p012_sensor_power_set(enum v4l2_power power)
 					"initialized\n", __func__);
 			return -EIO;
 		}
+
+		/* Release pm constraints */
+		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
 	break;
 	case V4L2_POWER_ON:
 		if (previous_power == V4L2_POWER_OFF) {
 			/* Power Up Sequence */
+
+			/* Set min throughput to:
+			 *  2592 x 1944 x 2bpp x 30fps x 3 L3 accesses */
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 885735);
 
 			/* Configure pixel clock divider (here?) */
 			omap_writel(0x4, 0x48004f40);
@@ -185,7 +193,7 @@ static int mt9p012_sensor_power_set(enum v4l2_power power)
 		}
 		break;
 	case V4L2_POWER_STANDBY:
-		/* stand by */
+		/* Stand By Sequence */
 		break;
 	}
 	/* Save powerstate to know what was before calling POWER_ON. */
