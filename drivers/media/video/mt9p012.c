@@ -1334,10 +1334,7 @@ static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
 	timeperframe->numerator = 1;
 	timeperframe->denominator = sensor->fps;
 
-	if ((pix->width <= MT9P012_VIDEO_WIDTH_4X_BINN) && (sensor->fps > 15))
-		return MT9P012_XCLK_NOM_2;
-
-	return MT9P012_XCLK_NOM_1;
+	return MT9P012_XCLK_NOM_2;
 }
 
 /**
