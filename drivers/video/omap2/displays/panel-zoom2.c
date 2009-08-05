@@ -33,7 +33,14 @@
 
 #define LCD_XRES		800
 #define LCD_YRES		480
-#define LCD_PIXCLOCK_MAX	21625
+
+#define LCD_PIXCLOCK_MIN      	21800 /* NEC MIN PIX Clock is 21.8MHz */
+#define LCD_PIXCLOCK_TYP      	23800 /* Typical PIX clock is 23.8MHz */
+#define LCD_PIXCLOCK_MAX      	25700 /* Maximum is 25.7MHz */
+
+/* Current Pixel clock */
+#define LCD_PIXEL_CLOCK		LCD_PIXCLOCK_MIN
+
 
 /*NEC NL8048HL11-01B  Manual
  * defines HFB, HSW, HBP, VFP, VSW, VBP as shown below
@@ -43,7 +50,7 @@ static struct omap_video_timings zoom2_panel_timings = {
 	/* 800 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
 	.x_res          = LCD_XRES,
 	.y_res          = LCD_YRES,
-	.pixel_clock    = LCD_PIXCLOCK_MAX,
+	.pixel_clock    = LCD_PIXEL_CLOCK,
 	.hfp            = 6,
 	.hsw            = 1,
 	.hbp            = 4,
