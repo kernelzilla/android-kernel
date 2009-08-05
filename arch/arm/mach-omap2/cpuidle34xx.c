@@ -193,7 +193,7 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C2].sleep_latency = 0;
 	omap3_power_states[OMAP3_STATE_C2].wakeup_latency = 18;
 	omap3_power_states[OMAP3_STATE_C2].threshold = 20;
-	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_INACTIVE;
+	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
 
