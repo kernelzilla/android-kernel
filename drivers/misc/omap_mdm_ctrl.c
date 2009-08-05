@@ -114,6 +114,11 @@ static void irq_work(struct work_struct *work)
 {
 	struct gpioinfo *gpio = container_of(work, struct gpioinfo, work);
 
+	if (gpio == &omap_mdm_ctrl_data.gpios[BP_RESOUT] &&
+	    gpio_get_value(gpio->gpio) == 0) {
+		pr_err("%s: BP panicked!\n", __func__);
+	}
+
 	if (gpio->irq_enabled && !gpio->irq_fired) {
 		/* Verify that level is what we were waiting for */
 		if (compare_irq_to_gpio
