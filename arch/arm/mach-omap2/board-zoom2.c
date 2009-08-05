@@ -418,7 +418,9 @@ static struct platform_device *zoom2_devices[] __initdata = {
 #ifdef CONFIG_WL127X_RFKILL
 	&zoom2_wl127x_device,
 #endif
+#if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
 	&omap_hdq_device,
+#endif
 	&zoom2_vout_device,
 };
 
