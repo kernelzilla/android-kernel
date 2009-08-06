@@ -768,12 +768,8 @@ int sr_stop_vddautocomap(int srid)
 		sr_reset_voltage(srid);
 		change_ret_volt(sr, sr->starting_ret_volt);
 		return true;
-	} else {
-		pr_warning("SR%d: VDD autocomp is not active\n",
-								srid);
-		return false;
 	}
-
+	return false;
 }
 EXPORT_SYMBOL(sr_stop_vddautocomap);
 
