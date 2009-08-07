@@ -526,6 +526,12 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 	int i;
 	int pd_failure = 1;
 
+	/* Check to see if the modem is already powered down */
+	if (!gpio_get_value(omap_mdm_ctrl_data.gpios[BP_RESOUT].gpio)) {
+		pr_info("%s: Modem already powered down.\n", __func__);
+		return;
+	}
+
 	pr_info("%s: Initiate modem power down...\n", __func__);
 	/* Press modem Power Button */
 	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 1);
@@ -577,5 +583,5 @@ module_exit(omap_mdm_ctrl_os_exit);
 
 MODULE_AUTHOR("Motorola");
 MODULE_DESCRIPTION("OMAP Modem Control Driver");
-MODULE_VERSION("1.1.2");
+MODULE_VERSION("1.1.3");
 MODULE_LICENSE("GPL");
