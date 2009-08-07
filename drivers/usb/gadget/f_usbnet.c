@@ -447,7 +447,7 @@ static void ether_out_complete(struct usb_ep *ep, struct usb_request *req)
 	}
 
 	/* don't bother requeuing if we just went offline */
-	if (req->status == -ENODEV) {
+	if ((req->status == -ENODEV) || (req->status == -ESHUTDOWN)) {
 		unsigned long flags;
 		spin_lock_irqsave(&context->lock, flags);
 		list_add_tail(&req->list, &context->rx_reqs);
@@ -570,7 +570,6 @@ static int __init usbnet_bind(struct usb_configuration *c,
 		spin_unlock_irqrestore(&context->lock, flags);
 	}
 
-	usb_gadget_set_selfpowered(cdev->gadget);
 	return 0;
 
 autoconf_fail:
@@ -629,6 +628,21 @@ static void do_set_config(struct usb_function *f, u16 new_config)
 		}
 
 		context->bulk_out->driver_data = context;
+
+		if (high_speed_flag)
+			result = usb_ep_enable(context->intr_out,
+						&hs_intr_out_desc);
+		else
+		result = usb_ep_enable(context->intr_out,
+					&fs_intr_out_desc);
+
+		if (result != 0) {
+			USBNETDBG(context,
+				"%s: failed to enable INTR_OUT EP ret = %d\n",
+				__func__, result);
+		}
+
+		context->intr_out->driver_data = context;
 
 		/* we're online -- get all rx requests queued */
 		while ((req = usb_get_recv_request(context))) {
