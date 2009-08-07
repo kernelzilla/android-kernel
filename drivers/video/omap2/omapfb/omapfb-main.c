@@ -2082,15 +2082,13 @@ static int omapfb_probe(struct platform_device *pdev)
 
 	/* set the update mode */
 	if (def_display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
-#ifdef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
 		if (def_display->enable_te)
 			def_display->enable_te(def_display, 1);
+#ifdef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
 		if (def_display->set_update_mode)
 			def_display->set_update_mode(def_display,
 					OMAP_DSS_UPDATE_AUTO);
 #else
-		if (def_display->enable_te)
-			def_display->enable_te(def_display, 0);
 		if (def_display->set_update_mode)
 			def_display->set_update_mode(def_display,
 					OMAP_DSS_UPDATE_MANUAL);
