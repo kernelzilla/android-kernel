@@ -874,8 +874,10 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		}
 	}
 
-	if (display && display->update)
+	if (display && display->update && display->sync) {
+		display->sync(display);
 		display->update(display, 0, 0, var->xres, var->yres);
+	}
 
 	return r;
 }
