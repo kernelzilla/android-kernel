@@ -93,8 +93,11 @@
 #define DIE_ID_REG_BASE			(L4_WK_34XX_PHYS + 0xA000)
 #define DIE_ID_REG_OFFSET		0x218
 #define MAX_USB_SERIAL_NUM		17
-#define FACTORY_VENDOR_ID		0x22B8
-#define FACTORY_PRODUCT_ID		0x41E2
+#define SHOLES_VENDOR_ID		0x22B8
+#define SHOLES_PRODUCT_ID		0x41D9
+#define SHOLES_ADB_PRODUCT_ID		0x41DB
+#define FACTORY_PRODUCT_ID		0x41E3
+#define FACTORY_ADB_PRODUCT_ID		0x41E2
 
 extern void sholes_panic_init(void);
 
@@ -169,6 +172,7 @@ __setup("androidboot.mode=", board_boot_mode_init);
 
 static struct android_usb_platform_data andusb_plat = {
 	.manufacturer_name	= "Motorola",
+	.product_name		= "Motorola A855",
 	.serial_number		= device_serial,
 };
 
@@ -212,11 +216,20 @@ static void sholes_gadget_init(void)
 
 	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X", val[1], val[0]);
 
+	if (!strcmp(boot_mode, "factorycable"))
+		andusb_plat.factory_enabled = 1;
+	else
+		andusb_plat.factory_enabled = 0;
+
+	andusb_plat.vendor_id = SHOLES_VENDOR_ID;
+
 	/* check powerup reason - To be added once kernel support is available*/
 	if (andusb_plat.factory_enabled) {
-		andusb_plat.vendor_id = FACTORY_VENDOR_ID;
 		andusb_plat.product_id = FACTORY_PRODUCT_ID;
-		andusb_plat.adb_product_id = FACTORY_PRODUCT_ID;
+		andusb_plat.adb_product_id = FACTORY_ADB_PRODUCT_ID;
+	} else {
+		andusb_plat.product_id = SHOLES_PRODUCT_ID;
+		andusb_plat.adb_product_id = SHOLES_ADB_PRODUCT_ID;
 	}
 	platform_device_register(&androidusb_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
