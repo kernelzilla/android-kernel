@@ -663,7 +663,7 @@ static struct omapdev usbhost_3xxx_omapdev = {
 
 static struct omapdev usbotg_3xxx_omapdev = {
 	.name		= "usbotg_omapdev",
-	.pwrdm		= { .name = "usbhost_pwrdm" },
+	.pwrdm		= { .name = "core_pwrdm" },
 	.pdev_name	= "musb_hdrc",
 	.pdev_id	= -1,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
