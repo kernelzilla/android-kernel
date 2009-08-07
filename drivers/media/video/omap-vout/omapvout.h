@@ -46,7 +46,7 @@ struct omapvout_device {
 
 	int max_video_width;
 	int max_video_height;
-	int max_video_bytespp;
+	int max_video_buffer_size;
 
 	/* Buffer pool */
 	struct omapvout_bp *bp;

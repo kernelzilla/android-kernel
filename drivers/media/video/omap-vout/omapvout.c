@@ -25,55 +25,16 @@
 #include <linux/vmalloc.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
-
 #include <mach/io.h>
+#include <mach/board.h>
 
 #include "omapvout.h"
 #include "omapvout-dss.h"
 #include "omapvout-mem.h"
 #include "omapvout-vbq.h"
-
-#ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
 #include "omapvout-bp.h"
-#endif
-
-/*=====================================================*/
-/* These should be defined in a platform specific file */
-#ifndef OMAPVOUT_VIDEO_1_DEVICE_ID
-#define OMAPVOUT_VIDEO_1_DEVICE_ID	1
-#endif
-
-#ifndef OMAPVOUT_VIDEO_2_DEVICE_ID
-#define OMAPVOUT_VIDEO_2_DEVICE_ID	2
-#endif
-
-#ifndef OMAPVOUT_VIDEO_MAX_WIDTH
-#define OMAPVOUT_VIDEO_MAX_WIDTH	864
-#endif
-
-#ifndef OMAPVOUT_VIDEO_MAX_HEIGHT
-#define OMAPVOUT_VIDEO_MAX_HEIGHT	648
-#endif
-
-#ifndef OMAPVOUT_VIDEO_MAX_BPP
-#define OMAPVOUT_VIDEO_MAX_BPP		2
-#endif
-
-#ifndef OMAPVOUT_VIDEO_BP_BUF_COUNT
-#define OMAPVOUT_VIDEO_BP_BUF_COUNT	6
-#endif
-
-#ifndef OMAPVOUT_VIDEO_BP_BUF_SIZE
-#define OMAPVOUT_VIDEO_BP_BUF_SIZE	\
-	PAGE_ALIGN(OMAPVOUT_VIDEO_MAX_WIDTH * \
-		   OMAPVOUT_VIDEO_MAX_HEIGHT * 2)
-#endif
-/*=====================================================*/
-
 
 #define MODULE_NAME "omapvout"
-#define VOUT1_NAME  "omapvout1"
-#define VOUT2_NAME  "omapvout2"
 
 #define V4L2_CID_PRIV_OFFSET		0x00530000 /* Arbitrary, semi-unique */
 #define V4L2_CID_PRIV_ROTATION		(V4L2_CID_PRIVATE_BASE \
@@ -156,11 +117,11 @@ static int omapvout_try_pixel_format(struct omapvout_device *vout,
 	int ifmt;
 	int bpp = 0;
 
-	if (pix->width > OMAPVOUT_VIDEO_MAX_WIDTH)
-		pix->width = OMAPVOUT_VIDEO_MAX_WIDTH;
+	if (pix->width > vout->max_video_width)
+		pix->width = vout->max_video_width;
 
-	if (pix->height > OMAPVOUT_VIDEO_MAX_HEIGHT)
-		pix->height = OMAPVOUT_VIDEO_MAX_HEIGHT;
+	if (pix->height > vout->max_video_height)
+		pix->height = vout->max_video_height;
 
 	for (ifmt = 0; ifmt < NUM_OUTPUT_FORMATS; ifmt++) {
 		if (pix->pixelformat == omap2_formats[ifmt].pixelformat)
@@ -1048,13 +1009,14 @@ static struct video_device omapvout_devdata = {
 	.minor = -1,
 };
 
-static int __init omapvout_probe(struct platform_device *pdev,
-				enum omap_plane plane, int vid)
+static int __init omapvout_probe_device(struct omap_vout_config *cfg,
+					struct omapvout_bp *bp,
+					enum omap_plane plane, int vid)
 {
 	struct omapvout_device *vout = NULL;
 	int rc = 0;
 
-	DBG("omapvout_probe %d %d\n", plane, vid);
+	DBG("omapvout_probe_device %d %d\n", plane, vid);
 
 	vout = kzalloc(sizeof(struct omapvout_device), GFP_KERNEL);
 	if (vout == NULL) {
@@ -1064,18 +1026,19 @@ static int __init omapvout_probe(struct platform_device *pdev,
 
 	mutex_init(&vout->mtx);
 
-	vout->max_video_width = OMAPVOUT_VIDEO_MAX_WIDTH;
-	vout->max_video_height = OMAPVOUT_VIDEO_MAX_HEIGHT;
-	vout->max_video_bytespp = OMAPVOUT_VIDEO_MAX_BPP;
+	vout->max_video_width = cfg->max_width;
+	vout->max_video_height = cfg->max_height;
+	vout->max_video_buffer_size = cfg->max_buffer_size;
 
 	rc = omapvout_dss_init(vout, plane);
 	if (rc != 0) {
 		printk(KERN_INFO "DSS init failed\n");
-		goto cleanup;
+		kfree(vout);
+		goto err0;
 	}
 
 #ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
-	vout->bp = dev_get_drvdata(&pdev->dev);
+	vout->bp = bp;
 	omapvout_bp_init(vout);
 #endif
 
@@ -1095,20 +1058,63 @@ static int __init omapvout_probe(struct platform_device *pdev,
 cleanup:
 	omapvout_free_resources(vout);
 err0:
-	dev_err(&pdev->dev, "failed to setup omapvout\n");
 	return rc;
 }
 
-static int __init omapvout1_probe(struct platform_device *pdev)
-{
-	return omapvout_probe(pdev, OMAP_DSS_VIDEO1,
-				OMAPVOUT_VIDEO_1_DEVICE_ID);
-}
+/* Some reasonable defaults if the platform does not supply a config */
+static struct omap_vout_config default_cfg = {
+	.max_width = 864,
+	.max_height = 648,
+	.max_buffer_size = 0x112000, /* (w * h * 2) page aligned */
+	.num_buffers = 6,
+	.num_devices = 2,
+	.device_ids = {1, 2},
+};
 
-static int __init omapvout2_probe(struct platform_device *pdev)
+static int __init omapvout_probe(struct platform_device *pdev)
 {
-	return omapvout_probe(pdev, OMAP_DSS_VIDEO2,
-				OMAPVOUT_VIDEO_2_DEVICE_ID);
+	struct omapvout_bp *bp = NULL;
+	struct omap_vout_config *cfg;
+	int i;
+	int rc = 0;
+	static const enum omap_plane planes[] = {
+		OMAP_DSS_VIDEO1,
+		OMAP_DSS_VIDEO2,
+	};
+
+	if (pdev->dev.platform_data) {
+		cfg = pdev->dev.platform_data;
+	} else {
+		DBG("omapvout_probe - using default configuration\n");
+		cfg = &default_cfg;
+	}
+
+	if (cfg->max_width > 2048) /* Hardware limitation */
+		cfg->max_width = 2048;
+	if (cfg->max_height > 2048) /* Hardware limitation */
+		cfg->max_height = 2048;
+	if (cfg->num_buffers > 16) /* Arbitrary limitation */
+		cfg->num_buffers = 16;
+	if (cfg->num_devices > 2) /* Hardware limitation */
+		cfg->num_devices = 2;
+	for (i = 0; i < cfg->num_devices; i++)
+		if (cfg->device_ids[i] > 64)
+			cfg->device_ids[i] = -1;
+
+#ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
+	bp = omapvout_bp_create(cfg->num_buffers, cfg->max_buffer_size);
+#endif
+
+	for (i = 0; i < cfg->num_devices; i++) {
+		rc = omapvout_probe_device(cfg, bp, planes[i],
+						cfg->device_ids[i]);
+		if (rc) {
+			DBG("omapvout_probe %d failed\n", (i + 1));
+			return rc;
+		}
+	}
+
+	return 0;
 }
 
 static int omapvout_remove(struct platform_device *pdev)
@@ -1123,90 +1129,32 @@ static int omapvout_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_device omapvout1_dev = {
-	.name = VOUT1_NAME,
-	.id = 11,
-};
-
-static struct platform_device omapvout2_dev = {
-	.name = VOUT2_NAME,
-	.id = 12,
-};
-
-static struct platform_driver omapvout1_driver = {
+static struct platform_driver omapvout_driver = {
 	.remove         = omapvout_remove,
 	.driver         = {
-		.name   = VOUT1_NAME,
-		.owner  = THIS_MODULE,
-	},
-};
-
-static struct platform_driver omapvout2_driver = {
-	.remove         = omapvout_remove,
-	.driver         = {
-		.name   = VOUT2_NAME,
-		.owner  = THIS_MODULE,
+		.name   = MODULE_NAME,
 	},
 };
 
 static int __init omapvout_init(void)
 {
-	struct omapvout_bp *bp;
 	int rc;
 
 	DBG("omapvout_init\n");
 
-#ifdef CONFIG_VIDEO_OMAP_VIDEOOUT_BUFPOOL
-	/* Create a buffer pool and pass it to both driver probes */
-	bp = omapvout_bp_create(OMAPVOUT_VIDEO_BP_BUF_COUNT,
-				OMAPVOUT_VIDEO_BP_BUF_SIZE);
-	omapvout1_dev.dev.driver_data = bp;
-	omapvout2_dev.dev.driver_data = bp;
-#endif
-
-	rc = platform_device_register(&omapvout1_dev);
+	rc = platform_driver_probe(&omapvout_driver, omapvout_probe);
 	if (rc != 0) {
-		printk(KERN_ERR "failed omapvout1 device register %d\n", rc);
-		goto faildev1;
-	}
-
-	rc = platform_driver_probe(&omapvout1_driver, omapvout1_probe);
-	if (rc != 0) {
-		printk(KERN_ERR "failed omapvout1 register/probe %d\n", rc);
-		goto faildrv1;
-	}
-
-	rc = platform_device_register(&omapvout2_dev);
-	if (rc != 0) {
-		printk(KERN_ERR "failed omapvout2 device register %d\n", rc);
-		goto faildev2;
-	}
-
-	rc = platform_driver_probe(&omapvout2_driver, omapvout2_probe);
-	if (rc != 0) {
-		printk(KERN_ERR "failed omapvout2 register/probe %d\n", rc);
-		goto faildrv2;
+		printk(KERN_ERR "failed omapvout register/probe %d\n", rc);
+		return -ENODEV;
 	}
 
 	return 0;
-
-faildrv2:
-	platform_device_unregister(&omapvout2_dev);
-faildev2:
-	platform_driver_unregister(&omapvout1_driver);
-faildrv1:
-	platform_device_unregister(&omapvout1_dev);
-faildev1:
-	return -ENODEV;
 }
 
 static void __exit omapvout_exit(void)
 {
 	DBG("omapvout_exit\n");
-	platform_driver_unregister(&omapvout1_driver);
-	platform_driver_unregister(&omapvout2_driver);
-	platform_device_unregister(&omapvout1_dev);
-	platform_device_unregister(&omapvout2_dev);
+	platform_driver_unregister(&omapvout_driver);
 }
 
 module_init(omapvout_init);

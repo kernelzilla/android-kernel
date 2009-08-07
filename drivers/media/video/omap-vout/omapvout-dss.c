@@ -176,7 +176,8 @@ static int omapvout_dss_acquire_vrfb(struct omapvout_device *vout)
 {
 	int rc = 0;
 	int size;
-	u16 w, h;
+	int w, h;
+	int max_pixels;
 	struct omapvout_dss_vrfb *vrfb;
 
 	/* It is assumed that the caller has locked the vout mutex */
@@ -199,10 +200,13 @@ static int omapvout_dss_acquire_vrfb(struct omapvout_device *vout)
 		goto failed_ctx1;
 	}
 
+	/* Determine the VFRB buffer size by oversizing for the VRFB */
 	w = vout->max_video_width;
 	h = vout->max_video_height;
-	omap_vrfb_adjust_size(&w, &h, vout->max_video_bytespp);
-	size = PAGE_ALIGN(w * h * vout->max_video_bytespp);
+	max_pixels = w * h;
+	w += 32; /* Oversize as typical for VRFB */
+	h += 32;
+	size = PAGE_ALIGN(w * h * (vout->max_video_buffer_size / max_pixels));
 	vrfb->size = size;
 
 	rc = omapvout_mem_alloc(size, &vrfb->phy_addr[0], &vrfb->virt_addr[0]);
