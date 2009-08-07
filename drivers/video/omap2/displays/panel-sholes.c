@@ -21,6 +21,8 @@
 #define EDISCO_CMD_SET_DISPLAY_OFF	0x28
 #define EDISCO_CMD_SET_COLUMN_ADDRESS	0x2A
 #define EDISCO_CMD_SET_PAGE_ADDRESS	0x2B
+#define EDISCO_CMD_SET_TEAR_ON		0x35
+#define EDISCO_CMD_SET_TEAR_SCANLINE	0x44
 
 #define EDISCO_CMD_VC   0
 #define EDISCO_VIDEO_VC 1
@@ -184,7 +186,27 @@ static void sholes_panel_setup_update(struct omap_dss_device *dssdev,
 
 static int sholes_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 {
+	u8 data[3];
+	int ret;
+
+	data[0] = EDISCO_CMD_SET_TEAR_ON;
+	data[1] = 0x00;
+	ret = dsi_vc_dcs_write(EDISCO_CMD_VC, data, 2);
+	if (ret)
+		goto error;
+
+	data[0] = EDISCO_CMD_SET_TEAR_SCANLINE;
+	data[1] = 0x03;
+	data[2] = 0x00;
+	ret = dsi_vc_dcs_write(EDISCO_CMD_VC, data, 3);
+	if (ret)
+		goto error;
+
+	DBG(" edisco_ctrl_enable_te \n");
 	return 0;
+
+error:
+	return -EINVAL;
 }
 
 static int sholes_panel_rotate(struct omap_dss_device *display, u8 rotate)
