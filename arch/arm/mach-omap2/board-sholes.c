@@ -1005,19 +1005,21 @@ static int __init sholes_omap_mdm_ctrl_init(void)
 	return platform_device_register(&omap_mdm_ctrl_platform_device);
 }
 
-#ifdef CONFIG_FB_OMAP2
-static struct resource sholes_vout_resource[3 - CONFIG_FB_OMAP2_NUM_FBS] = {
+static struct omap_vout_config sholes_vout_platform_data = {
+	.max_width = 864,
+	.max_height = 648,
+	.max_buffer_size = 0x112000,
+	.num_buffers = 6,
+	.num_devices = 2,
+	.device_ids = {1, 2},
 };
-#else
-static struct resource sholes_vout_resource[2] = {
-};
-#endif
 
 static struct platform_device sholes_vout_device = {
-       .name                   = "omap_vout",
-       .num_resources  = ARRAY_SIZE(sholes_vout_resource),
-       .resource               = &sholes_vout_resource[0],
-       .id             = -1,
+	.name = "omapvout",
+	.id = -1,
+	.dev = {
+		.platform_data = &sholes_vout_platform_data,
+	},
 };
 static void __init sholes_vout_init(void)
 {
