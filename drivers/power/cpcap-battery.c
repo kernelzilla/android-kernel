@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
+#include <linux/spi/spi.h>
 #include <linux/miscdevice.h>
 
 #define CPCAP_BATT_IRQ_BATTDET 0x01
@@ -217,6 +218,8 @@ static int cpcap_batt_ioctl(struct inode *inode,
 	struct cpcap_adc_request *req_async = &sply->req;
 	struct cpcap_adc_request req;
 	struct cpcap_adc_us_request req_us;
+	struct spi_device *spi = sply->cpcap->spi;
+	struct cpcap_platform_data *data = spi->controller_data;
 
 	switch (cmd) {
 	case CPCAP_IOCTL_BATT_DISPLAY_UPDATE:
@@ -224,6 +227,9 @@ static int cpcap_batt_ioctl(struct inode *inode,
 				   (void *)arg, sizeof(struct cpcap_batt_data)))
 			return -EFAULT;
 		power_supply_changed(&sply->batt);
+
+		if (data->batt_changed)
+			data->batt_changed(&sply->batt, &sply->batt_state);
 		break;
 
 	case CPCAP_IOCTL_BATT_ATOD_ASYNC:
@@ -557,10 +563,15 @@ static int cpcap_batt_remove(struct platform_device *pdev)
 void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
+	struct spi_device *spi = cpcap->spi;
+	struct cpcap_platform_data *data = spi->controller_data;
 
 	if (sply != NULL) {
 		sply->ac_state.online = online;
 		power_supply_changed(&sply->ac);
+
+		if (data->ac_changed)
+			data->ac_changed(&sply->ac, &sply->ac_state);
 	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_ac_prop);
@@ -569,11 +580,16 @@ void cpcap_batt_set_usb_prop_online(struct cpcap_device *cpcap, int online,
 				    enum cpcap_batt_usb_model model)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
+	struct spi_device *spi = cpcap->spi;
+	struct cpcap_platform_data *data = spi->controller_data;
 
 	if (sply != NULL) {
 		sply->usb_state.online = online;
 		sply->usb_state.model = model;
 		power_supply_changed(&sply->usb);
+
+		if (data->usb_changed)
+			data->usb_changed(&sply->usb, &sply->usb_state);
 	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_usb_prop_online);
@@ -581,10 +597,15 @@ EXPORT_SYMBOL(cpcap_batt_set_usb_prop_online);
 void cpcap_batt_set_usb_prop_curr(struct cpcap_device *cpcap, unsigned int curr)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
+	struct spi_device *spi = cpcap->spi;
+	struct cpcap_platform_data *data = spi->controller_data;
 
 	if (sply != NULL) {
 		sply->usb_state.current_now = curr;
 		power_supply_changed(&sply->usb);
+
+		if (data->usb_changed)
+			data->usb_changed(&sply->usb, &sply->usb_state);
 	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_usb_prop_curr);

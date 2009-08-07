@@ -22,6 +22,7 @@
 #ifdef __KERNEL__
 #include <linux/workqueue.h>
 #include <linux/completion.h>
+#include <linux/power_supply.h>
 #endif
 
 #define CPCAP_DEV_NAME "cpcap"
@@ -476,14 +477,6 @@ struct cpcap_adc_ato {
 	unsigned short atox_ps_factor_out;
 };
 
-struct cpcap_platform_data {
-	struct cpcap_spi_init_data *init;
-	int init_len;
-	unsigned short *regulator_mode_values;
-	struct regulator_init_data *regulator_init;
-	struct cpcap_adc_ato *adc_ato;
-};
-
 struct cpcap_batt_data {
 	int status;
 	int health;
@@ -506,6 +499,21 @@ struct cpcap_batt_usb_data {
 struct cpcap_device;
 
 #ifdef __KERNEL__
+struct cpcap_platform_data {
+	struct cpcap_spi_init_data *init;
+	int init_len;
+	unsigned short *regulator_mode_values;
+	struct regulator_init_data *regulator_init;
+	struct cpcap_adc_ato *adc_ato;
+
+	void (*ac_changed)(struct power_supply *,
+			   struct cpcap_batt_ac_data *);
+	void (*batt_changed)(struct power_supply *,
+			     struct cpcap_batt_data *);
+	void (*usb_changed)(struct power_supply *,
+			    struct cpcap_batt_usb_data *);
+};
+
 struct cpcap_adc_request {
 	enum cpcap_adc_format format;
 	enum cpcap_adc_timing timing;
