@@ -147,7 +147,11 @@ void omap_prcm_arch_reset(char mode)
 	} else
 		WARN_ON(1);
 
+#ifdef CONFIG_MACH_SHOLES
+	prm_set_mod_reg_bits(OMAP_RST_GS, prcm_offs, RM_RSTCTRL);
+#else
 	prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs, RM_RSTCTRL);
+#endif
 }
 
 static inline u32 __omap_prcm_read(void __iomem *base, s16 module, u16 reg)

@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
+#include <linux/reboot.h>
 #include <linux/qtouch_obp_ts.h>
 #include <linux/led-cpcap-lm3554.h>
 #include <linux/led-lm3530.h>
@@ -830,6 +831,42 @@ static struct platform_device sholes_bpwake_device = {
 	.num_resources	= 0,
 };
 
+/* Choose cold or warm reset
+ *    RST_TIME1>4ms will trigger CPCAP to trigger a system cold reset */
+static void sholes_pm_set_reset(char cold)
+{
+	if (cold) {
+		/* Configure RST_TIME1 to 6ms  */
+		prm_rmw_mod_reg_bits(OMAP_RSTTIME1_MASK,
+		0xc8<<OMAP_RSTTIME1_SHIFT,
+		OMAP3430_GR_MOD,
+		OMAP3_PRM_RSTTIME_OFFSET);
+	} else {
+		/* Configure RST_TIME1 to 30us  */
+		prm_rmw_mod_reg_bits(OMAP_RSTTIME1_MASK,
+		0x01<<OMAP_RSTTIME1_SHIFT,
+		OMAP3430_GR_MOD,
+		OMAP3_PRM_RSTTIME_OFFSET);
+	}
+}
+
+static int sholes_pm_reboot_call(struct notifier_block *this,
+			unsigned long code, void *cmd)
+{
+	int result = NOTIFY_DONE;
+
+	if (code == SYS_RESTART) {
+		/* set cold reset */
+		sholes_pm_set_reset(1);
+	}
+
+	return result;
+}
+
+static struct notifier_block sholes_pm_reboot_notifier = {
+	.notifier_call = sholes_pm_reboot_call,
+};
+
 static void sholes_pm_init(void)
 {
 	omap3_set_prm_setup_vc(&sholes_prm_setup);
@@ -858,6 +895,8 @@ static void sholes_pm_init(void)
 
 	platform_device_register(&sholes_bpwake_device);
 	platform_driver_register(&sholes_bpwake_driver);
+
+	register_reboot_notifier(&sholes_pm_reboot_notifier);
 }
 
 static void __init config_wlan_gpio(void)
