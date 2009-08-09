@@ -139,6 +139,9 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
 static void serial_omap_display_reg(struct uart_port *port);
 static void serial_omap_rx_timeout(unsigned long uart_no);
 static void serial_omap_start_rxdma(struct uart_omap_port *up);
+static void serial_omap_set_autorts(struct uart_omap_port *p, int set);
+
+#define DBG_RX_DATA 1
 
 int console_detect(char *str)
 {
@@ -281,8 +284,17 @@ static inline void receive_chars(struct uart_omap_port *up, int *status)
 	unsigned int ch, flag;
 	int max_count = 256;
 
+#if DBG_RX_DATA
+	printk("[RX]: ");
+#endif
 	do {
 		ch = serial_in(up, UART_RX);
+#if DBG_RX_DATA
+		if ((ch >= 32) && (ch < 127))
+			printk("%c", ch);
+		else
+			printk("{0x%.2x}", ch);
+#endif
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
@@ -337,9 +349,12 @@ static inline void receive_chars(struct uart_omap_port *up, int *status)
 ignore_char:
 		*status = serial_in(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
+
 	tty_flip_buffer_push(tty);
 
-
+#if DBG_RX_DATA
+	printk("\n");
+#endif
 }
 
 static void transmit_chars(struct uart_omap_port *up)
@@ -431,6 +446,10 @@ static void serial_omap_start_tx(struct uart_port *port)
 		serial_out(up, UART_IER, up->ier);
 	}
 
+	if (up->restore_autorts) {
+		serial_omap_set_autorts(up, 1);
+		up->restore_autorts = 0;
+	}
 }
 
 static unsigned int check_modem_status(struct uart_omap_port *up)
@@ -531,8 +550,15 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	unsigned char mcr = 0;
 
 	DPRINTK("serial_omap_set_mctrl+%d\n", up->pdev->id);
-	if (mctrl & TIOCM_RTS)
-		mcr |= UART_MCR_RTS;
+	if (mctrl & TIOCM_RTS) {
+		/*
+		 * We need to be careful not to cause
+		 * RTS to assert when we have a pending
+		 * auto-rts restore.
+		 */
+		if (!up->restore_autorts)
+			mcr |= UART_MCR_RTS;
+	}
 	if (mctrl & TIOCM_DTR)
 		mcr |= UART_MCR_DTR;
 	if (mctrl & TIOCM_OUT1)
@@ -580,31 +606,41 @@ static void serial_omap_set_autorts(struct uart_omap_port *p, int set)
 
         lcr_val = serial_in(p, UART_LCR);
         lcr_backup = lcr_val;
-        serial_out(p, UART_LCR, 0x80);
-
-        mcr_val = serial_in(p, UART_MCR);
-        mcr_backup = mcr_val;
-        serial_out(p, UART_MCR, mcr_val | 0x40);
-
+	/* Enter Config mode B */
         serial_out(p, UART_LCR, 0xbf);
 
         efr_val = serial_in(p, UART_EFR);
         efr_backup = efr_val;
+
+	/*
+	 * Enhanced functions write enable.
+	 * Enables writes to IER[7:4], FCR[5:4], MCR[7:5]
+	 */
         serial_out(p, UART_EFR, efr_val | 0x10);
 
-        serial_out(p, 0x06, 0x5f);
+        mcr_val = serial_in(p, UART_MCR);
+        mcr_backup = mcr_val;
+	/* Enable access to TCR_REG and TLR_REG */
+        serial_out(p, UART_MCR, mcr_val | 0x40);
+
+	/* Set RX_FIFO_TRIG levels */
+        serial_out(p, 0x18, 0x0f);
 
         efr_val = serial_in(p, UART_EFR);
         if (set)
-                serial_out(p, UART_EFR, (efr_val & ~0xc0) | (1 << 6));
+		serial_out(p, UART_EFR, efr_val | (1 << 6));
         else
-                serial_out(p, UART_EFR, efr_val & ~0xc0);
+                serial_out(p, UART_EFR, efr_val & ~(1 << 6));
 
-        serial_out(p, UART_LCR, 0x80);
 
         mcr_val = serial_in(p, UART_MCR);
+	/* Restore original state of TCR_TLR access */
         serial_out(p, UART_MCR, (mcr_val & ~0x40) | (mcr_backup & 0x40));
 
+	/* Enhanced function write disable. */
+	serial_out(p, UART_EFR, serial_in(p, UART_EFR) & ~0x10);
+
+	/* Normal operation */
         serial_out(p, UART_LCR, lcr_backup);
 }
 
@@ -648,7 +684,7 @@ static int serial_omap_startup(struct uart_port *port)
 	serial_omap_clear_fifos(up);
 	serial_out(up, UART_SCR, 0x00);
 	/* For Hardware flow control */
-	serial_out(up, UART_MCR, 0x2);
+//	serial_out(up, UART_MCR, 0x2);
 
 	/*
 	 * Clear the interrupt registers.
@@ -716,11 +752,6 @@ static int serial_omap_startup(struct uart_port *port)
 		serial_out(up, UART_IER, up->ier);
 	}
 
-	if (up->restore_autorts) {
-		serial_omap_set_autorts(up, 1);
-		up->restore_autorts = 0;
-	}
-
 	return 0;
 }
 
@@ -731,6 +762,19 @@ static void serial_omap_shutdown(struct uart_port *port)
 	u8 lcr, efr;
 
 	DPRINTK("serial_omap_shutdown+%d\n", up->pdev->id);
+	/* 
+	 * If we're using auto-rts then disable it.
+	 */
+	lcr = serial_in(up, UART_LCR);
+	serial_out(up, UART_LCR, 0xbf);
+	efr = serial_in(up, UART_EFR);
+	serial_out(up, UART_LCR, lcr);
+
+	if (efr & UART_EFR_RTS) {
+		serial_omap_set_autorts(up, 0);
+		up->restore_autorts = 1;
+	}
+
 	/*
 	 * Disable interrupts from this port
 	 */
@@ -744,7 +788,7 @@ static void serial_omap_shutdown(struct uart_port *port)
 		up->port.mctrl |= TIOCM_OUT1;
 	} else
 		up->port.mctrl &= ~TIOCM_OUT2;
-	serial_omap_set_mctrl(&up->port, up->port.mctrl);
+	serial_omap_set_mctrl(&up->port, (up->port.mctrl & ~TIOCM_RTS));
 	spin_unlock_irqrestore(&up->port.lock, flags);
 
 	/*
@@ -757,6 +801,7 @@ static void serial_omap_shutdown(struct uart_port *port)
 	 * Read data port to reset things, and then free the irq
 	 */
 	(void) serial_in(up, UART_RX);
+
 	if (up->use_dma) {
 		int tmp;
 		if (up->is_buf_dma_alloced) {
@@ -778,22 +823,6 @@ static void serial_omap_shutdown(struct uart_port *port)
 	}
 
 	free_irq(up->port.irq, up);
-
-	/* If we're using hardware flow control then ensure
-	 * we deassert our RTS line
-	 * */
-	lcr = serial_in(up, UART_LCR);
-	serial_out(up, UART_LCR, 0xbf);
-	efr = serial_in(up, UART_EFR);
-	serial_out(up, UART_LCR, lcr);
-
-	if (efr & UART_EFR_RTS) {
-		/* Ensure MCR_RTS is deasserted for when Auto-RTS is disabled */
-		serial_out(up, UART_MCR,
-			   serial_in(up, UART_MCR) & ~UART_MCR_RTS);
-		serial_omap_set_autorts(up, 0);
-		up->restore_autorts = 0;
-	}
 }
 
 static void
