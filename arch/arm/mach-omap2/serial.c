@@ -480,7 +480,8 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		switch (uart->num) {
 		case 0:
 			wk_mask = OMAP3430_ST_UART1_MASK;
-			padconf = 0x180;
+			padconf = 0;
+/*			padconf = 0x180; */
 			uart->rts_padconf = 0x17e;
 			break;
 		case 1:
