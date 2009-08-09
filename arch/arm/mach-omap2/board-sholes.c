@@ -50,6 +50,7 @@
 #include <mach/control.h>
 #include <mach/hdq.h>
 #include <linux/usb/android.h>
+#include <linux/wakelock.h>
 
 #include "cm-regbits-34xx.h"
 #include "pm.h"
@@ -752,7 +753,7 @@ int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 /* Sholes specific PM */
 
 static int bpwake_irqstate;
-
+static struct wake_lock baseband_wakeup_wakelock;
 static int sholes_bpwake_irqhandler(int irq, void *unused)
 {
 	printk("%s: Baseband wakeup\n", __func__);
@@ -761,6 +762,7 @@ static int sholes_bpwake_irqhandler(int irq, void *unused)
 	 */
 	disable_irq(irq);
 	bpwake_irqstate = 0;
+	wake_lock_timeout(&baseband_wakeup_wakelock, (HZ / 2));
 	return IRQ_HANDLED;
 }
 
@@ -781,6 +783,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	wake_lock_init(&baseband_wakeup_wakelock, WAKE_LOCK_SUSPEND, "bpwake");
 	enable_irq_wake(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
 	disable_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
 	bpwake_irqstate = 0;
@@ -804,6 +807,8 @@ static int sholes_bpwake_suspend(struct platform_device *pdev, pm_message_t stat
 
 static int sholes_bpwake_resume(struct platform_device *pdev)
 {
+	disable_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
+	bpwake_irqstate = 0;
 	return 0;
 }
 
