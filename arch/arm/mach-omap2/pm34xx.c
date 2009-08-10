@@ -84,6 +84,7 @@ static int (*_omap_save_secure_sram)(u32 *addr);
 
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
+static struct powerdomain *wkup_pwrdm;
 static struct powerdomain *cam_pwrdm;
 
 static struct prm_setup_vc prm_setup = {
@@ -1169,6 +1170,7 @@ static int __init omap3_pm_init(void)
 	per_pwrdm = pwrdm_lookup("per_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	cam_pwrdm = pwrdm_lookup("cam_pwrdm");
+	wkup_pwrdm = pwrdm_lookup("wkup_pwrdm");
 
 	omap_push_sram_idle();
 #ifdef CONFIG_SUSPEND
@@ -1186,6 +1188,14 @@ static int __init omap3_pm_init(void)
 	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
 	*/
 	pwrdm_add_wkdep(per_pwrdm, core_pwrdm);
+	/*
+	 * A part of the fix for errata 1.158.
+	 * GPIO pad spurious transition (glitch/spike) upon wakeup
+	 * from SYSTEM OFF mode. The remaining fix is in:
+	 * omap3_gpio_save_context, omap3_gpio_restore_context.
+	 */
+	if (omap_rev() <= OMAP3430_REV_ES3_1)
+		pwrdm_add_wkdep(per_pwrdm, wkup_pwrdm);
 
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 		omap3_secure_ram_storage =
