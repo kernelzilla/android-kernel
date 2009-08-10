@@ -50,6 +50,7 @@ typedef struct _ENV_DATA_TAG
 	IMG_VOID		*pvISRCookie;
 	SYS_DATA		*sMISRSysData;
 	struct work_struct	sMISRWork;
+	struct workqueue_struct *sMISRWorkQueue;
 } ENV_DATA;
 
 #endif 

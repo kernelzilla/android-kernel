@@ -726,6 +726,7 @@ PVRSRV_ERROR OSInstallMISR(IMG_VOID *pvSysData)
 	PVR_TRACE(("Installing MISR with cookie %x", pvSysData));
 
 	psEnvData->sMISRSysData = pvSysData;
+	psEnvData->sMISRWorkQueue = create_singlethread_workqueue("pvrisr");
 	INIT_WORK(&psEnvData->sMISRWork, MISRWrapper);
 
 	psEnvData->bMISRInstalled = IMG_TRUE;
@@ -748,6 +749,7 @@ PVRSRV_ERROR OSUninstallMISR(IMG_VOID *pvSysData)
 	PVR_TRACE(("Uninstalling MISR"));
 
 	cancel_work_sync(&psEnvData->sMISRWork);
+	destroy_workqueue(psEnvData->sMISRWorkQueue);
 
 	psEnvData->bMISRInstalled = IMG_FALSE;
 
@@ -761,7 +763,7 @@ PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
 
 	if (psEnvData->bMISRInstalled)
 	{
-		schedule_work(&psEnvData->sMISRWork);
+		queue_work(psEnvData->sMISRWorkQueue, &psEnvData->sMISRWork);
 	}
 
 	return PVRSRV_OK;	
