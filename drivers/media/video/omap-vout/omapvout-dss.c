@@ -282,9 +282,6 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 
 	/* It is assumed that the caller has locked the vout mutex */
 
-	if (vout->rotation == 0)
-		return 0;
-
 	if (vout->dss->vrfb.req_status != DMA_CHAN_ALLOTED)
 		return -EINVAL;
 
@@ -351,6 +348,7 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 {
 	struct omap_overlay_info o_info;
 	struct omap_overlay *ovly;
+	struct omapvout_dss_vrfb *vrfb;
 	int rc = 0;
 	int rot = vout->rotation;
 
@@ -359,22 +357,12 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	/* Populate the overlay info struct and set it */
 	memset(&o_info, 0, sizeof(o_info));
 	o_info.enabled = true;
-	if (rot == 0) {
-		o_info.paddr = vout->queue.bufs[buf_idx]->baddr;
-		o_info.paddr += vout->dss->foffset;
-		o_info.vaddr = NULL;
-		o_info.screen_width = vout->pix.width;
-	} else {
-		struct omapvout_dss_vrfb *vrfb;
-
-		vrfb = &vout->dss->vrfb;
-		o_info.paddr = vrfb->ctx[vrfb->next].paddr[rot];
-		o_info.paddr += vout->dss->foffset;
-		o_info.vaddr = NULL;
-		o_info.screen_width = OMAP_VRFB_LINE_LEN;
-
-		vrfb->next = (vrfb->next) ? 0 : 1;
-	}
+        vrfb = &vout->dss->vrfb;
+        o_info.paddr = vrfb->ctx[vrfb->next].paddr[rot];
+        o_info.paddr += vout->dss->foffset;
+        o_info.vaddr = NULL;
+        o_info.screen_width = OMAP_VRFB_LINE_LEN;
+        vrfb->next = (vrfb->next) ? 0 : 1;
 
 	if (rot == 1 || rot == 3) { /* 90 or 270 degree rotation */
 		o_info.width = vout->crop.height;
@@ -389,11 +377,7 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	o_info.out_width = vout->win.w.width;
 	o_info.out_height = vout->win.w.height;
 	o_info.color_mode = omapvout_dss_color_mode(vout->pix.pixelformat);
-	if (rot == 0)
-		o_info.rotation_type = OMAP_DSS_ROT_DMA;
-	else
-		o_info.rotation_type = OMAP_DSS_ROT_VRFB;
-
+	o_info.rotation_type = OMAP_DSS_ROT_VRFB;
 	o_info.rotation = rot;
 	o_info.mirror = false;
 
@@ -461,26 +445,28 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 			rc = omapvout_dss_calc_offset(vout);
 			if (rc != 0) {
 				DBG("Offset calculation failed %d\n", rc);
-				goto failed_w_idx;
+				goto failed_need_done;
 			}
 
 			rc = omapvout_dss_config_colorkey(vout, true);
 			if (rc != 0) {
 				DBG("Alpha config failed %d\n", rc);
-				goto failed_w_idx;
+				goto failed_need_done;
 			}
 		}
 
 		rc = omapvout_dss_perform_vrfb_dma(vout, idx, dss->need_cfg);
 		if (rc != 0) {
 			DBG("VRFB rotation failed %d\n", rc);
-			goto failed_w_idx;
+			goto failed_need_done;
 		}
+
+                omapvout_dss_mark_buf_done(vout, idx);
 
 		rc = omapvout_dss_update_overlay(vout, idx);
 		if (rc != 0) {
 			DBG("DSS update failed %d\n", rc);
-			goto failed_w_idx;
+			goto failed;
 		}
 
 		dss->need_cfg = false;
@@ -503,25 +489,12 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 			/* Since the DSS is disabled, this isn't a problem */
 			dss->working = false;
 
-			/* Clean up the states of the final buffers */
+			/* Clean up the states of the final buffer */
 			omapvout_dss_mark_buf_done(vout, idx);
-			if (dss->cur_q_idx != -1)
-				omapvout_dss_mark_buf_done(vout,
-							dss->cur_q_idx);
 			return;
 		}
 
 		mutex_lock(&vout->mtx);
-
-		if (vout->rotation == 0) {
-			if (dss->cur_q_idx != -1)
-				omapvout_dss_mark_buf_done(vout,
-							dss->cur_q_idx);
-
-			dss->cur_q_idx = idx;
-		} else {
-			omapvout_dss_mark_buf_done(vout, idx);
-		}
 	}
 
 	dss->working = false;
@@ -529,9 +502,10 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 
 	return;
 
-failed_w_idx:
+failed_need_done:
 	/* Set the done flag on failures to be sure the buffer can be DQ'd */
 	omapvout_dss_mark_buf_done(vout, idx);
+failed:
 	dss->working = false;
 	mutex_unlock(&vout->mtx);
 }
