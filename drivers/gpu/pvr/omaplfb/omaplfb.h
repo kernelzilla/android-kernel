@@ -197,7 +197,7 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	OMAP_BOOL               bDeviceSuspended;
 
 	
-	spinlock_t             *psSwapChainLock;
+	spinlock_t             sSwapChainLock;
 
 	
 	

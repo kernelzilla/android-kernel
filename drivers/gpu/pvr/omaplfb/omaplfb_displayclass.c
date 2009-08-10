@@ -149,11 +149,11 @@ static IMG_VOID SetFlushStateInternal(OMAPLFB_DEVINFO* psDevInfo,
 {
 	unsigned long ulLockFlags;
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	SetFlushStateInternalNoLock(psDevInfo, bFlushState);
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 }
 
 static void SetFlushStateExternal(OMAPLFB_DEVINFO* psDevInfo,
@@ -161,7 +161,7 @@ static void SetFlushStateExternal(OMAPLFB_DEVINFO* psDevInfo,
 {
 	unsigned long ulLockFlags;
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	
 	if (psDevInfo->bFlushCommands != bFlushState)
@@ -170,7 +170,7 @@ static void SetFlushStateExternal(OMAPLFB_DEVINFO* psDevInfo,
 		SetFlushStateInternalNoLock(psDevInfo, bFlushState);
 	}
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 }
 
 static IMG_VOID SetDCState(IMG_HANDLE hDevice, IMG_UINT32 ui32State)
@@ -578,7 +578,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 	psSwapChain->ulInsertIndex = 0;
 	psSwapChain->ulRemoveIndex = 0;
 	psSwapChain->psPVRJTable = &psDevInfo->sPVRJTable;
-	psSwapChain->psSwapChainLock = psDevInfo->psSwapChainLock;
+	psSwapChain->psSwapChainLock = &psDevInfo->sSwapChainLock;
 
 	
 	for(i=0; i<ui32BufferCount-1; i++)
@@ -625,7 +625,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		goto ErrorUnmapRegisters;
 	}
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	
 	psDevInfo->psSwapChain = psSwapChain;
@@ -643,7 +643,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		OMAPLFBEnableVSyncInterrupt(psSwapChain);
 	}
 		
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	if (EnableLFBEventNotification(psDevInfo)!= OMAP_OK)
 	{
@@ -701,7 +701,7 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": Couldn't disable framebuffer event notification\n");
 	}
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	OMAPLFBDisableVSyncInterrupt(psSwapChain);
 
@@ -714,7 +714,7 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	
 	psDevInfo->psSwapChain = NULL;
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	if(OMAPLFBUninstallVSyncISR(psSwapChain) != OMAP_OK)
 	{
@@ -869,7 +869,7 @@ static PVRSRV_ERROR SwapToDCSystem(IMG_HANDLE hDevice,
 		return (PVRSRV_ERROR_INVALID_PARAMS);
 	}
 	
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	
 	FlushInternalVSyncQueue(psSwapChain);
@@ -877,7 +877,7 @@ static PVRSRV_ERROR SwapToDCSystem(IMG_HANDLE hDevice,
 	
 	OMAPLFBFlip(psSwapChain, (unsigned long)psDevInfo->sFBInfo.sSysAddr.uiAddr);
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	return (PVRSRV_OK);
 }
@@ -889,12 +889,11 @@ OMAP_BOOL OMAPLFBVSyncIHandler(OMAPLFB_SWAPCHAIN *psSwapChain)
 	unsigned long ulMaxIndex;
 	unsigned long ulLockFlags;
 
+	spin_lock_irqsave(psSwapChain->psSwapChainLock, ulLockFlags);
+
 	psFlipItem = &psSwapChain->psVSyncFlips[psSwapChain->ulRemoveIndex];
 	ulMaxIndex = psSwapChain->ulBufferCount - 1;
 
-	spin_lock_irqsave(psSwapChain->psSwapChainLock, ulLockFlags);
-
-	
 	if (psSwapChain->bFlushCommands)
 	{
 		goto ExitUnlock;
@@ -997,9 +996,8 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	psBuffer = (OMAPLFB_BUFFER*)psFlipCmd->hExtBuffer;
 	psSwapChain = (OMAPLFB_SWAPCHAIN*) psFlipCmd->hExtSwapChain;
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
-	
 	if (psDevInfo->bDeviceSuspended)
 	{
 		psSwapChain->psPVRJTable->pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
@@ -1054,12 +1052,12 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		goto ExitTrueUnlock;
 	}
 	
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 	return IMG_FALSE;
 #endif
 
 ExitTrueUnlock:
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 	return IMG_TRUE;
 }
 
@@ -1266,8 +1264,7 @@ OMAP_ERROR OMAPLFBInit(void)
 			return (OMAP_ERROR_INIT_FAILURE);
 		}
 
-				
-		spin_lock_init(psDevInfo->psSwapChainLock);
+		spin_lock_init(&psDevInfo->sSwapChainLock);
 
 		psDevInfo->psSwapChain = 0;
 		psDevInfo->bFlushCommands = OMAP_FALSE;
@@ -1413,7 +1410,7 @@ void OMAPLFBDriverSuspend(void)
 	OMAPLFB_DEVINFO *psDevInfo = GetAnchorPtr();
 	unsigned long    ulLockFlags;
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	if (psDevInfo->bDeviceSuspended)
 	{
@@ -1424,7 +1421,7 @@ void OMAPLFBDriverSuspend(void)
 	
 	SetFlushStateInternalNoLock(psDevInfo, OMAP_TRUE);
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	
 	if (psDevInfo->psSwapChain != NULL)
@@ -1435,7 +1432,7 @@ void OMAPLFBDriverSuspend(void)
 	return;
 
 ExitUnlock:
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 }
 
 void OMAPLFBDriverResume(void)
@@ -1453,14 +1450,14 @@ void OMAPLFBDriverResume(void)
 		OMAPLFBEnableDisplayRegisterAccess();
 	}
 
-	spin_lock_irqsave(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 	
 	SetFlushStateInternalNoLock(psDevInfo, OMAP_FALSE);
 
 	psDevInfo->bDeviceSuspended = OMAP_FALSE;
 
-	spin_unlock_irqrestore(psDevInfo->psSwapChainLock, ulLockFlags);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 }
 #endif
 
