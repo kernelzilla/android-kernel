@@ -76,6 +76,8 @@ typedef enum tag_omap_bool
 
 typedef struct OMAPLFB_BUFFER_TAG
 {
+	struct list_head		list;
+
 	unsigned long                ulBufferSize;
 
 	
@@ -86,6 +88,8 @@ typedef struct OMAPLFB_BUFFER_TAG
 	PVRSRV_SYNC_DATA            *psSyncData;
 
 	struct OMAPLFB_BUFFER_TAG	*psNext;
+
+	OMAP_HANDLE			hCmdCookie;
 } OMAPLFB_BUFFER;
 
 typedef struct OMAPLFB_VSYNC_FLIP_ITEM_TAG
@@ -213,6 +217,9 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	
 	DISPLAY_DIMS            sDisplayDim;
 
+	struct list_head	active_list;
+	struct mutex		active_list_lock;
+	struct work_struct	active_work;
 }  OMAPLFB_DEVINFO;
 
 #define	OMAPLFB_PAGE_SIZE 4096
@@ -268,8 +275,8 @@ void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
 void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
 void OMAPLFBEnableDisplayRegisterAccess(void);
 void OMAPLFBDisableDisplayRegisterAccess(void);
-void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr);
+void OMAPLFBSync(void);
+void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr);
 void OMAPLFBDisplayInit(void);
 
-#endif 
-
+#endif

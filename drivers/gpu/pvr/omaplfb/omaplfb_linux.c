@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #if defined(LDM_PLATFORM)
 #include <linux/platform_device.h>
@@ -215,14 +216,31 @@ void OMAPLFBDisplayInit(void)
 
 }
 
-void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
+void OMAPLFBSync(void)
 {
-    if(lcd_mgr && lcd_mgr->device && omap_gfxoverlay)
-    {
-        gfxoverlayinfo.paddr = aPhyAddr;
-        omap_gfxoverlay->set_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
-        lcd_mgr->device->update( lcd_mgr->device, 0, 0, gfxoverlayinfo.width, gfxoverlayinfo.height );
-    }
+	if (lcd_mgr && lcd_mgr->device && omap_gfxoverlay)
+		lcd_mgr->device->sync(lcd_mgr->device);
+}
+
+void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr)
+{
+	static u8 poo;
+
+	if (lcd_mgr && lcd_mgr->device && omap_gfxoverlay) {
+		omap_gfxoverlay->get_overlay_info(omap_gfxoverlay,
+						  &gfxoverlayinfo);
+		gfxoverlayinfo.paddr = paddr;
+		/* TODO: plumb vaddr in to this function */
+		gfxoverlayinfo.vaddr = paddr - 0x81314000 + 0xd2800000;
+
+		omap_gfxoverlay->set_overlay_info(omap_gfxoverlay,
+						  &gfxoverlayinfo);
+		lcd_mgr->apply(lcd_mgr);
+
+		lcd_mgr->device->update(lcd_mgr->device, 0, 0,
+					gfxoverlayinfo.width,
+					gfxoverlayinfo.height);
+	}
 }
 
 #else

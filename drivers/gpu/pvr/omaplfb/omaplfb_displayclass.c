@@ -976,7 +976,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 #endif
 	unsigned long ulLockFlags;
 
-	
 	if(!hCmdCookie || !pvData)
 	{
 		return IMG_FALSE;
@@ -1009,11 +1008,27 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	if(psFlipCmd->ui32SwapInterval == 0 || psSwapChain->bFlushCommands == OMAP_TRUE)
 	{
 #endif
-		
-		OMAPLFBFlip(psSwapChain, (unsigned long)psBuffer->sSysAddr.uiAddr);
+		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
+		mutex_lock(&psDevInfo->active_list_lock);
+		if (list_empty(&psDevInfo->active_list)) {
+			OMAPLFBFlip(psSwapChain,
+				    (unsigned long)psBuffer->sSysAddr.uiAddr);
+			spin_lock_irqsave(&psDevInfo->sSwapChainLock,
+					  ulLockFlags);
+			psSwapChain->psPVRJTable->
+				pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
+			spin_unlock_irqrestore(&psDevInfo->sSwapChainLock,
+					       ulLockFlags);
+		}
+		psBuffer->hCmdCookie = hCmdCookie;
+		list_add_tail(&psBuffer->list, &psDevInfo->active_list);
+		schedule_work(&psDevInfo->active_work);
+		mutex_unlock(&psDevInfo->active_list_lock);
+
+
+		spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 		
-		psSwapChain->psPVRJTable->pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
 
 #if defined(CONFIG_PVR_OMAP_USE_VSYNC)
 		goto ExitTrueUnlock;
@@ -1059,6 +1074,44 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 ExitTrueUnlock:
 	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
 	return IMG_TRUE;
+}
+
+static void active_worker(struct work_struct *work)
+{
+	OMAPLFB_DEVINFO *psDevInfo =
+		container_of(work, OMAPLFB_DEVINFO, active_work);
+	OMAPLFB_SWAPCHAIN *psSwapChain = psDevInfo->psSwapChain;
+	OMAPLFB_BUFFER *psBuffer;
+	unsigned long flags;
+
+	OMAPLFBSync();
+
+	mutex_lock(&psDevInfo->active_list_lock);
+	if (list_empty(&psDevInfo->active_list)) {
+		pr_warning("omaplfb: syncing with no active buffer\n");
+		mutex_unlock(&psDevInfo->active_list_lock);
+		return;
+	}
+
+	psBuffer = list_first_entry(&psDevInfo->active_list,
+				    OMAPLFB_BUFFER, list);
+	list_del(&psBuffer->list);
+
+
+	if (!list_empty(&psDevInfo->active_list)) {
+		psBuffer = list_first_entry(&psDevInfo->active_list,
+					    OMAPLFB_BUFFER, list);
+		OMAPLFBFlip(psSwapChain,
+			    (unsigned long)psBuffer->sSysAddr.uiAddr);
+
+		spin_lock_irqsave(&psDevInfo->sSwapChainLock, flags);
+		psSwapChain->psPVRJTable->
+			pfnPVRSRVCmdComplete(psBuffer->hCmdCookie, IMG_TRUE);
+		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, flags);
+
+		schedule_work(&psDevInfo->active_work);
+	}
+	mutex_unlock(&psDevInfo->active_list_lock);
 }
 
 
@@ -1189,6 +1242,9 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo)
 	psDevInfo->sFBInfo.sSysAddr.uiAddr = psPVRFBInfo->sSysAddr.uiAddr;
 	psDevInfo->sFBInfo.sCPUVAddr = psPVRFBInfo->sCPUVAddr;
 
+	mutex_init(&psDevInfo->active_list_lock);
+	INIT_LIST_HEAD(&psDevInfo->active_list);
+	INIT_WORK(&psDevInfo->active_work, active_worker);
 	OMAPLFBDisplayInit();
 
 	eError = OMAP_OK;
