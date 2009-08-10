@@ -20,11 +20,11 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/gpio.h>
-#include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/switch.h>
 #include <linux/workqueue.h>
 
 #include <linux/bu52014hfv.h>
@@ -40,18 +40,40 @@ struct bu52014hfv_info {
 	struct work_struct irq_south_work;
 
 	struct workqueue_struct *work_queue;
-	struct input_dev *idev;
+	struct switch_dev sdev;
 
 	unsigned int north_value;
 	unsigned int south_value;
 };
+enum {
+	NO_DOCK,
+	DESK_DOCK,
+	CAR_DOCK,
+};
 
-static void bu52014hfv_update(struct bu52014hfv_info *info, int gpio, int dock)
+static ssize_t print_name(struct switch_dev *sdev, char *buf)
+{
+	switch (switch_get_state(sdev)) {
+	case NO_DOCK:
+		return sprintf(buf, "None\n");
+	case DESK_DOCK:
+		return sprintf(buf, "DESK\n");
+	case CAR_DOCK:
+		return sprintf(buf, "CAR\n");
+	}
+
+	return -EINVAL;
+}
+static int bu52014hfv_update(struct bu52014hfv_info *info, int gpio, int dock)
 {
 	int state = !gpio_get_value(gpio);
 
-	input_report_switch(info->idev, dock, state);
-	input_sync(info->idev);
+	if (state)
+		switch_set_state(&info->sdev, dock);
+	else
+		switch_set_state(&info->sdev, NO_DOCK);
+
+	return state;
 }
 
 void bu52014hfv_irq_north_work_func(struct work_struct *work)
@@ -92,7 +114,7 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 	struct bu52014hfv_info *info;
 	int ret = -1;
 
-	info = kmalloc(sizeof(struct bu52014hfv_info), GFP_KERNEL);
+	info = kzalloc(sizeof(struct bu52014hfv_info), GFP_KERNEL);
 	if (!info) {
 		ret = -ENOMEM;
 		pr_err("%s: could not allocate space for module data: %d\n",
@@ -108,11 +130,11 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 	info->irq_south = gpio_to_irq(pdata->docked_south_gpio);
 
 	if (pdata->north_is_desk) {
-		info->north_value = SW_DOCK_DESK;
-		info->south_value = SW_DOCK_CAR;
+		info->north_value = DESK_DOCK;
+		info->south_value = CAR_DOCK;
 	} else {
-		info->north_value = SW_DOCK_CAR;
-		info->south_value = SW_DOCK_DESK;
+		info->north_value = CAR_DOCK;
+		info->south_value = DESK_DOCK;
 	}
 
 	info->work_queue = create_singlethread_workqueue("bu52014hfv_wq");
@@ -141,43 +163,23 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 		goto error_request_irq_south_failed;
 	}
 
-	info->idev = input_allocate_device();
-	if (!info->idev) {
-		ret = -ENOMEM;
-		pr_err("%s: input device allocate failed: %d\n", __func__, ret);
-		goto error_input_allocate_failed;
+	info->sdev.name = "dock";
+	info->sdev.print_name = print_name;
+	ret = switch_dev_register(&info->sdev);
+	if (ret) {
+		pr_err("%s: error registering switch device %d\n",
+			__func__, ret);
+		goto error_switch_device_failed;
 	}
-
-	info->idev->name = BU52014HFV_MODULE_NAME;
-	set_bit(EV_SW, info->idev->evbit);
-	set_bit(SW_DOCK_DESK, info->idev->swbit);
-	set_bit(SW_DOCK_CAR, info->idev->swbit);
-
 	platform_set_drvdata(pdev, info);
 
-	ret = input_register_device(info->idev);
-	if (ret) {
-		pr_err("%s: input register device failed: %d\n", __func__, ret);
-		goto error_input_register_failed;
-	}
-
-	input_report_switch(info->idev,
-			    info->north_value,
-			    !gpio_get_value(info->gpio_north));
-	input_report_switch(info->idev,
-			    info->south_value,
-			    !gpio_get_value(info->gpio_south));
-	input_sync(info->idev);
-
-	pr_info("%s: initialized N[%d, %d] S[%d, %d]\n",
-		__func__, info->gpio_north, info->irq_north,
-		info->gpio_south, info->irq_south);
+	ret = bu52014hfv_update(info, info->gpio_south, info->south_value);
+	if (!ret)
+		bu52014hfv_update(info, info->gpio_north, info->north_value);
 
 	return 0;
 
-error_input_register_failed:
-	input_free_device(info->idev);
-error_input_allocate_failed:
+error_switch_device_failed:
 	free_irq(info->irq_south, info);
 error_request_irq_south_failed:
 	free_irq(info->irq_north, info);
@@ -201,8 +203,7 @@ static int __devexit bu52014hfv_remove(struct platform_device *pdev)
 
 	destroy_workqueue(info->work_queue);
 
-	input_unregister_device(info->idev);
-	input_free_device(info->idev);
+	switch_dev_unregister(&info->sdev);
 
 	kfree(info);
 	return 0;
