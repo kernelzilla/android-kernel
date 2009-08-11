@@ -12,6 +12,7 @@
 #include <linux/device.h>
 #include <linux/irq.h>
 #include <linux/platform_device.h>
+#include <linux/power_supply.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -20,6 +21,8 @@
 #include <mach/mcspi.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
+#include <mach/resource.h>
+#include <mach/omap34xx.h>
 
 extern struct platform_device cpcap_disp_button_led;
 extern struct platform_device cpcap_rgb_led;
@@ -319,12 +322,67 @@ static struct cpcap_adc_ato sholes_cpcap_adc_ato = {
 	.atox_ps_factor_out = 0,
 };
 
+static void ac_changed(struct power_supply *ac,
+		       struct cpcap_batt_ac_data *ac_state)
+{
+	static char requested;
+	int ret = 0;
+
+	if (!ac || !ac_state)
+		return;
+
+	if (ac_state->online) {
+		/* To reduce OMAP Vdd1 DC/DC converter output voltage dips as
+		 * much as possible, limit Vdd1 to OPP3-OPP5 when the phone is
+		 * connected to a charger. */
+		if (!requested)
+			ret = resource_request("vdd1_opp", ac->dev, VDD1_OPP3);
+
+		if (!ret)
+			requested = 1;
+	} else if (requested) {
+		ret = resource_release("vdd1_opp", ac->dev);
+
+		if (!ret)
+			requested = 0;
+	}
+}
+
+static void batt_changed(struct power_supply *batt,
+			 struct cpcap_batt_data *batt_state)
+{
+	static char requested;
+	int ret = 0;
+
+	if (!batt || !batt_state)
+		return;
+
+	if (batt_state->batt_temp < 0) {
+		/* To reduce OMAP Vdd1 DC/DC converter output voltage dips as
+		 * much as possible, limit Vdd1 to OPP3-OPP5 when the
+		 * temperature is below 0 degrees C. */
+		if (!requested)
+			ret = resource_request("vdd1_opp", batt->dev, VDD1_OPP3);
+
+		if (!ret)
+			requested = 1;
+	} else if (requested) {
+		ret = resource_release("vdd1_opp", batt->dev);
+
+		if (!ret)
+			requested = 0;
+	}
+}
+
 static struct cpcap_platform_data sholes_cpcap_data = {
 	.init = sholes_cpcap_spi_init,
 	.init_len = ARRAY_SIZE(sholes_cpcap_spi_init),
 	.regulator_mode_values = cpcap_regulator_mode_values,
 	.regulator_init = cpcap_regulator,
 	.adc_ato = &sholes_cpcap_adc_ato,
+	.ac_changed = ac_changed,
+	.batt_changed = batt_changed,
+	.usb_changed = NULL,
 };
 
 static struct spi_board_info sholes_spi_board_info[] __initdata = {
