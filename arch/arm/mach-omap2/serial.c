@@ -36,7 +36,7 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
-#define DEFAULT_TIMEOUT (1 * HZ)
+#define DEFAULT_TIMEOUT 0
 
 struct omap_uart_state {
 	int num;
@@ -307,7 +307,6 @@ static inline void omap_uart_disable_rtspullup(struct omap_uart_state *uart)
 {
 	if (!uart->rts_padconf || !uart->rts_override)
 		return;
-	mdelay(10);
 	omap_ctrl_writew(uart->rts_padvalue, uart->rts_padconf);
 	uart->rts_override = 0;
 }
@@ -457,6 +456,26 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
 
 static u32 sleep_timeout = DEFAULT_TIMEOUT;
 
+static void omap_uart_rtspad_init(struct omap_uart_state *uart)
+{
+	if (!cpu_is_omap34xx())
+		return;
+	switch(uart->num) {
+	case 0:
+		uart->rts_padconf = 0x17e;
+		break;
+	case 1:
+/*		uart->rts_padconf = 0x176; */
+		break;
+	case 2:
+/*		uart->rts_padconf = 0x19c; */
+		break;
+	default:
+		uart->rts_padconf = 0;
+		break;
+	}
+}
+
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
 	u32 v;
@@ -465,10 +484,14 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 
 	uart->can_sleep = 0;
 	uart->timeout = sleep_timeout;
-	setup_timer(&uart->timer, omap_uart_idle_timer,
-		    (unsigned long) uart);
-	mod_timer(&uart->timer, jiffies + uart->timeout);
-	omap_uart_smart_idle_enable(uart, 0);
+	if (!uart->timeout)
+		omap_uart_block_sleep(uart);
+	else {
+		setup_timer(&uart->timer, omap_uart_idle_timer,
+			    (unsigned long) uart);
+		mod_timer(&uart->timer, jiffies + uart->timeout);
+		omap_uart_smart_idle_enable(uart, 0);
+	}
 
 	if (cpu_is_omap34xx()) {
 		u32 mod = (uart->num == 2) ? OMAP3430_PER_MOD : CORE_MOD;
@@ -482,19 +505,14 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 			wk_mask = OMAP3430_ST_UART1_MASK;
 			padconf = 0;
 /*			padconf = 0x180; */
-			uart->rts_padconf = 0x17e;
 			break;
 		case 1:
 			wk_mask = OMAP3430_ST_UART2_MASK;
 			padconf = 0x17a;
-			uart->rts_padconf = 0;
-/*			uart->rts_padconf = 0x176; */
 			break;
 		case 2:
 			wk_mask = OMAP3430_ST_UART3_MASK;
 			padconf = 0x19e;
-/*			uart->rts_padconf = 0x19c; */
-			uart->rts_padconf = 0;
 			break;
 		}
 		uart->wk_mask = wk_mask;
@@ -526,7 +544,6 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		uart->wk_st = 0;
 		uart->wk_mask = 0;
 		uart->padconf = 0;
-		uart->rts_padconf = 0;
 	}
 
 	/* Set wake-enable bit */
@@ -656,6 +673,7 @@ void __init omap_serial_init(int wake_gpio_strobe,
 
 		omap_uart_enable_clocks(uart);
 		omap_uart_reset(uart);
+		omap_uart_rtspad_init(uart);
 		omap_uart_idle_init(uart);
 	}
 }
