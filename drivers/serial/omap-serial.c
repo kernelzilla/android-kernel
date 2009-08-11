@@ -922,8 +922,9 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 		up->ier |= UART_IER_MSI;
 	serial_out(up, UART_IER, up->ier);
 
-	if (termios->c_cflag & CRTSCTS)
-		efr |= (UART_EFR_CTS | UART_EFR_RTS);
+	if (termios->c_cflag & CRTSCTS) {
+		efr |= (UART_EFR_CTS | (up->restore_autorts ? 0 : UART_EFR_RTS));
+	}
 
 	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	serial_out(up, UART_DLL, quot & 0xff);		/* LS of divisor */
