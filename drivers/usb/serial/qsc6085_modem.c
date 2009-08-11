@@ -23,6 +23,11 @@
 #include <linux/tty_flip.h>
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
+#include <linux/irq.h>
+#include <mach/irqs.h>
+#include <mach/gpio.h>
+#include <mach/usb.h>
+#include <linux/gpio.h>
 
 #define WDR_TIMEOUT       (HZ * 5)
 #define MODEM_INTERFACE_NUM 0
@@ -66,6 +71,7 @@ struct ap_ru {
 
 struct modem_port {
 	__u16 modem_status;	/* only used for data modem port */
+	__u8  wakeup_gpio;
 	struct ap_ru ru[AP_NR];
 	struct ap_rb rb[AP_NR];
 	struct ap_wb wb[AP_NW];
@@ -78,6 +84,7 @@ struct modem_port {
 	struct usb_serial_port *port;
 	spinlock_t read_lock;
 	spinlock_t write_lock;
+	atomic_t wakeup_flag;
 	unsigned int readsize;
 	unsigned int writesize;
 	struct list_head spare_read_urbs;
@@ -86,6 +93,7 @@ struct modem_port {
 	int processing;
 	int sending;
 	struct work_struct wake_and_write;
+	struct work_struct usb_wkup_work;
 };
 
 static struct usb_device_id id_table[] = {
@@ -174,7 +182,7 @@ static void stop_data_traffic(struct modem_port *modem_port_ptr)
 	tasklet_enable(&modem_port_ptr->urb_task);
 
 	cancel_work_sync(&port->work);
-	cancel_work_sync(&modem_port_ptr->wake_and_write);
+	cancel_work_sync(&modem_port_ptr->usb_wkup_work);
 }
 
 static void modem_read_buffers_free(
@@ -533,6 +541,23 @@ static int modem_open(struct tty_struct *tty,
 	return retval;
 }
 
+#ifdef CONFIG_PM
+static void modem_usb_disable_wakeup_irq(struct usb_interface *intf)
+{
+	struct usb_serial *serial = usb_get_intfdata(intf);
+	struct modem_port *modem_port_ptr =
+		usb_get_serial_data(serial);
+	if (modem_port_ptr == NULL)
+		return;
+
+	if (modem_port_ptr->wakeup_gpio) {
+		disable_irq_wake(gpio_to_irq(modem_port_ptr->wakeup_gpio));
+		free_irq(gpio_to_irq(modem_port_ptr->wakeup_gpio),
+			 modem_port_ptr);
+	}
+}
+#endif
+
 static void modem_rx_tasklet(unsigned long _modem_port)
 {
 	struct modem_port *modem_port_ptr = (void *)_modem_port;
@@ -666,6 +691,9 @@ static void modem_close(struct tty_struct *tty,
 	usb_autopm_get_interface(port->serial->interface);
 
 	modem_port_ptr->modem_status = 0;
+#ifdef CONFIG_PM
+	modem_usb_disable_wakeup_irq(port->serial->interface);
+#endif
 
 	stop_data_traffic(modem_port_ptr);
 	cancel_work_sync(&modem_port_ptr->wake_and_write);
@@ -825,6 +853,65 @@ static int modem_write(struct tty_struct *tty,
 }
 
 #ifdef CONFIG_PM
+static void modem_usb_wkup_work(struct work_struct *work)
+{
+	struct modem_port *modem_port_ptr =
+	container_of(work, struct modem_port, usb_wkup_work);
+	struct usb_serial *serial = modem_port_ptr->port->serial;
+	int result;
+
+	if (atomic_cmpxchg(&modem_port_ptr->wakeup_flag, 0, 1)) {
+
+		result = usb_autopm_get_interface(serial->interface);
+		if (result < 0) {
+			atomic_set(&modem_port_ptr->wakeup_flag, 0);
+			dev_err(&modem_port_ptr->port->dev,
+				 "%s: autopm failed. result = %d \n",
+				__func__, result);
+			return;
+		}
+		if (cdma_modem_debug)
+			dev_info(&modem_port_ptr->port->dev,
+				 "%s: woke up interface\n", __func__);
+		usb_autopm_put_interface(serial->interface);
+	}
+}
+
+static irqreturn_t gpio_wkup_interrupt_handler (int irq, void *data_ptr)
+{
+	struct modem_port *modem_port_ptr =
+		(struct modem_port *)data_ptr;
+	schedule_work(&modem_port_ptr->usb_wkup_work);
+	return IRQ_HANDLED;
+}
+
+static int modem_usb_enable_wakeup_irq(struct usb_interface *intf)
+{
+	struct usb_serial *serial = usb_get_intfdata(intf);
+	struct modem_port *modem_port_ptr =
+		usb_get_serial_data(serial);
+	int ret = 0;
+
+	if (modem_port_ptr == NULL)
+		return  -ENODEV;
+
+	if (modem_port_ptr->wakeup_gpio) {
+		ret = request_irq(gpio_to_irq(modem_port_ptr->wakeup_gpio),
+				gpio_wkup_interrupt_handler,
+				IRQ_DISABLED | IRQ_TYPE_EDGE_RISING,
+				"gpio_wakeup", modem_port_ptr);
+
+		if (ret)
+			dev_err(&intf->dev, "%s request_irq failed \n",
+				 __func__);
+		else
+			enable_irq_wake(
+				gpio_to_irq(modem_port_ptr->wakeup_gpio));
+	}
+
+	return ret;
+}
+
 static int modem_suspend(struct usb_interface *intf,
 				   pm_message_t message)
 {
@@ -872,6 +959,11 @@ static int modem_suspend(struct usb_interface *intf,
 	atomic_inc(&modem_port_ptr->susp_count);
 
 	stop_data_traffic(modem_port_ptr);
+
+	if (port->number == MODEM_INTERFACE_NUM) {
+		modem_usb_enable_wakeup_irq(intf);
+		atomic_set(&modem_port_ptr->wakeup_flag, 0);
+	}
 
 	return 0;
 }
@@ -931,6 +1023,8 @@ static int modem_resume(struct usb_interface *intf)
 			spin_unlock_irqrestore(&modem_port_ptr->read_lock,
 					       flags);
 
+			modem_usb_disable_wakeup_irq(intf);
+
 		}
 
 		tasklet_schedule(&modem_port_ptr->urb_task);
@@ -951,6 +1045,11 @@ static int modem_startup(struct usb_serial *serial)
 	int readsize;
 	int num_rx_buf;
 	int i;
+	#if defined(CONFIG_ARCH_OMAP34XX)
+	struct omap_usb_config *config =
+			 serial->dev->bus->controller->platform_data;
+	#endif
+
 
 	interface = serial->interface;
 	iface_desc = interface->cur_altsetting;
@@ -989,6 +1088,11 @@ static int modem_startup(struct usb_serial *serial)
 		return -ENOMEM;
 	}
 
+#if defined(CONFIG_ARCH_OMAP34XX)
+		modem_port_ptr->wakeup_gpio =
+			 config->usb_remote_wake_gpio;
+#endif
+
 	/* init tasklet for rx processing */
 	tasklet_init(&modem_port_ptr->urb_task, modem_rx_tasklet,
 		     (unsigned long)modem_port_ptr);
@@ -998,6 +1102,7 @@ static int modem_startup(struct usb_serial *serial)
 	spin_lock_init(&modem_port_ptr->read_lock);
 	spin_lock_init(&modem_port_ptr->write_lock);
 
+	atomic_set(&modem_port_ptr->wakeup_flag, 0);
 	atomic_set(&modem_port_ptr->susp_count, 0);
 	modem_port_ptr->resuming = 0;
 	modem_port_ptr->port = 0;
@@ -1005,6 +1110,7 @@ static int modem_startup(struct usb_serial *serial)
 	modem_port_ptr->writesize = le16_to_cpu(epwrite->wMaxPacketSize) * 20;
 
 	INIT_WORK(&modem_port_ptr->wake_and_write, modem_wake_and_write);
+	INIT_WORK(&modem_port_ptr->usb_wkup_work, modem_usb_wkup_work);
 
 	if (modem_write_buffers_alloc(modem_port_ptr, serial) < 0) {
 		dev_err(&serial->dev->dev,
@@ -1096,6 +1202,9 @@ static void modem_shutdown(struct usb_serial *serial)
 			 "%s: Shutdown Interface %d  \n", __func__,
 			interface_num);
 
+#ifdef CONFIG_PM
+	modem_usb_disable_wakeup_irq(serial->interface);
+#endif
 	stop_data_traffic(modem_port_ptr);
 	cancel_work_sync(&modem_port_ptr->wake_and_write);
 	modem_write_buffers_free(modem_port_ptr, serial);
