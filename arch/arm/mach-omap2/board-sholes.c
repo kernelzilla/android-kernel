@@ -604,6 +604,7 @@ static u64 ohci_dmamask = ~(u32)0;
 
 static struct omap_usb_config dummy_usb_config = {
 	.usbhost_standby_status	= omap_ohci_bus_check_ctrl_standby,
+	.usb_remote_wake_gpio = SHOLES_BP_READY2_AP_GPIO,
 };
 
 static struct platform_device ohci_device = {
