@@ -475,20 +475,6 @@ static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 #endif
 
 	ret =
-	    request_irq(omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq, irq_handler,
-			IRQF_DISABLED | OMAP_MDM_CTRL_IRQ_RISING |
-			OMAP_MDM_CTRL_IRQ_FALLING, OMAP_MDM_CTRL_MODULE_NAME,
-			&omap_mdm_ctrl_data.gpios[BP_READY2_AP]);
-	if (ret < 0) {
-		pr_err("%s: Can not reqeust IRQ (%d) from kernel!\n", __func__,
-		       omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq);
-		goto err_clear_gpio;
-	} else {
-		omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq_enabled = 1;
-		enable_irq_wake(omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq);
-	}
-
-	ret =
 	    request_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq, irq_handler,
 			IRQF_DISABLED | OMAP_MDM_CTRL_IRQ_RISING |
 			OMAP_MDM_CTRL_IRQ_FALLING, OMAP_MDM_CTRL_MODULE_NAME,
