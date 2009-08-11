@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio_event.h>
+#include <linux/keyreset.h>
 
 #include <mach/mux.h>
 #include <mach/gpio.h>
@@ -148,6 +149,26 @@ static struct platform_device sholes_keypad_device = {
 	},
 };
 
+static int sholes_reset_keys_up[] = {
+	BTN_MOUSE,		/* XXX */
+        0
+};
+
+static struct keyreset_platform_data sholes_reset_keys_pdata = {
+        .keys_up = sholes_reset_keys_up,
+	.keys_down = {
+		KEY_LEFTSHIFT,
+		KEY_LEFTALT,
+		KEY_BACKSPACE,
+		0
+	},
+};
+
+struct platform_device sholes_reset_keys_device = {
+         .name = KEYRESET_NAME,
+         .dev.platform_data = &sholes_reset_keys_pdata,
+};
+
 static int __init sholes_init_keypad(void)
 {
 	/* keypad rows */
@@ -174,6 +195,7 @@ static int __init sholes_init_keypad(void)
 	omap_cfg_reg(AB2_34XX_GPIO177);
 	omap_cfg_reg(AH17_34XX_GPIO100);
 
+	platform_device_register(&sholes_reset_keys_device);
 	return platform_device_register(&sholes_keypad_device);
 }
 
