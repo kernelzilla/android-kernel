@@ -44,6 +44,7 @@ struct cpcap_irqdata {
 	struct cpcap_event_handler event_handler[CPCAP_IRQ__NUM];
 	uint64_t registered;
 	uint64_t enabled;
+	struct wake_lock wake_lock;
 };
 
 #define EVENT_MASK(event) (1 << ((event) % NUM_INTS_PER_REG))
@@ -58,6 +59,7 @@ static irqreturn_t event_isr(int irq, void *data)
 {
 	struct cpcap_irqdata *irq_data = data;
 	disable_irq_nosync(irq);
+	wake_lock(&irq_data->wake_lock);
 	queue_work(irq_data->workqueue, &irq_data->work);
 
 	return IRQ_HANDLED;
@@ -251,6 +253,7 @@ static void irq_work_func(struct work_struct *work)
 	}
 error:
 	mutex_unlock(&data->lock);
+	wake_unlock(&data->wake_lock);
 }
 
 int cpcap_irq_init(struct cpcap_device *cpcap)
@@ -267,6 +270,7 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
 	data->cpcap = cpcap;
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED, "cpcap-irq",
