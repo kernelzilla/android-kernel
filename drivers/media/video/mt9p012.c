@@ -15,8 +15,6 @@
  * kind, whether express or implied.
  */
 
-#define DEBUG
-
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <media/v4l2-int-device.h>
@@ -90,13 +88,12 @@
 #define MT9P012_MIN_ANALOG_GAIN			0x34
 #define MT9P013_MIN_ANALOG_GAIN			0x2D
 #define MT9P012_MAX_ANALOG_GAIN			0x1FF
-#define MT9P012_MIN_GAIN			0x08
-#define MT9P012_MAX_GAIN			0x7F
 #define MT9P012_GAIN_STEP   			0x1
 #define MT9P012_DEF_LINEAR_GAIN			((u16)(2 * 256))
-#define MT9P012_DEF_LINEAR_GAIN_CALIBRATION_ADJ	((u16)(1.75 * 256))
-
-#define MT9P012_GAIN_INDEX	1
+#define MT9P012_MIN_LINEAR_GAIN			((u16)(2.0 * 256))
+#define MT9P013_MIN_LINEAR_GAIN			((u16)(1.4 * 256))
+#define MT9P012_MIN_LINEAR_GAIN_CAL_ADJ		((u16)(1.75 * 256))
+#define MT9P012_MAX_LINEAR_GAIN			((u16)(15.875 * 256))
 
 /* Exposure time values */
 #define MT9P012_DEF_MIN_EXPOSURE	0x08
@@ -131,8 +128,6 @@ enum mt9p012_image_size {
 #define MT9P012_NUM_IMAGE_SIZES		5
 #define MT9P012_NUM_PIXEL_FORMATS	1
 #define MT9P012_NUM_FPS			2	/* 2 ranges */
-#define MT9P012_FPS_LOW_RANGE		0
-#define MT9P012_FPS_HIGH_RANGE		1
 
 /**
  * struct capture_size - image capture size information
@@ -161,7 +156,6 @@ enum mt9p012_frame_type {
 	MT9P012_FRAME_3MP_10FPS,
 	MT9P012_FRAME_1296_30FPS,
 	MT9P012_FRAME_648_30FPS,
-	MT9P012_FRAME_648_120FPS,
 	MT9P012_FRAME_216_30FPS,
 };
 
@@ -223,14 +217,6 @@ static struct mt9p012_reg set_exposure_time[] = {
 	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0},
 };
 
-/* Structure to set analog gain */
-static struct mt9p012_reg set_analog_gain[] = {
-	{.length = MT9P012_16BIT, .reg = REG_ANALOG_GAIN_GLOBAL,
-		.val = MT9P012_MIN_GAIN},
-	{.length = MT9P012_TOK_TERM, .reg = 0, .val = 0},
-
-};
-
 /*
  * Common MT9P012 register initialization for all image sizes, pixel formats,
  * and frame rates
@@ -240,14 +226,7 @@ const static struct mt9p012_reg mt9p012_common_pre[] = {
 	{MT9P012_TOK_DELAY, 0x00, 5}, /* Delay = 5ms, min 2400 xcks */
 	{MT9P012_16BIT, REG_RESET_REGISTER, 0x10C8},
 	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x01}, /* hold */
-	{MT9P012_16BIT, REG_ANALOG_GAIN_GREENR, 0x0020},
-	{MT9P012_16BIT, REG_ANALOG_GAIN_RED, 0x0020},
-	{MT9P012_16BIT, REG_ANALOG_GAIN_BLUE, 0x0020},
-	{MT9P012_16BIT, REG_ANALOG_GAIN_GREENB, 0x0020},
-	{MT9P012_16BIT, REG_DIGITAL_GAIN_GREENR, 0x0100},
-	{MT9P012_16BIT, REG_DIGITAL_GAIN_RED, 0x0100},
-	{MT9P012_16BIT, REG_DIGITAL_GAIN_BLUE, 0x0100},
-	{MT9P012_16BIT, REG_DIGITAL_GAIN_GREENB, 0x0100},
+	{MT9P012_16BIT, REG_RESERVED_MFR_3064, 0x0805},
 	{MT9P012_TOK_TERM, 0, 0}
 };
 
@@ -299,15 +278,6 @@ const static struct mt9p012_reg mt9p013_common[] = {
 	{MT9P012_16BIT, 0x3086, 0x2468},
 	{MT9P012_16BIT, 0x3088, 0x6FFF},
 	{MT9P012_16BIT, 0x316C, 0xA4F0},
-	{MT9P012_TOK_TERM, 0, 0}
-};
-
-const static struct mt9p012_reg mt9p012_648_120fps_addendum[] = {
-	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x01}, /* hold */
-	{MT9P012_16BIT, 0x3162, 0x04ce},
-	{MT9P012_16BIT, 0x308a, 0x6424},
-	{MT9P012_16BIT, 0x3092, 0x0a53},
-	{MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00}, /* update all at once */
 	{MT9P012_TOK_TERM, 0, 0}
 };
 
@@ -542,40 +512,6 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 		}
 	},
 
-	/* FRAME_648_120FPS */
-	{
-		.clk = {
-			.pre_pll_div = 4,
-			.pll_mult = 120,
-			.vt_pix_clk_div = 6,
-			.vt_sys_clk_div = 1,
-			.op_pix_clk_div = 10,
-			.op_sys_clk_div = 1,
-		},
-		.frame = {
-			.frame_len_lines_min = 565,
-			.line_len_pck = 1832,
-			.x_addr_start = 0,
-			.x_addr_end = 2601,
-			.y_addr_start = 8,
-			.y_addr_end = 1921,
-			.x_output_size = 648,
-			.y_output_size = 486,
-			.x_odd_inc = 7,
-			.y_odd_inc = 7,
-			.x_bin = 0,
-			.xy_bin = 0,
-			.scale_m = 32,
-			.scale_mode = 0,
-		},
-		.exposure = {
-			.coarse_int_tm = 568,
-			.fine_int_tm = 1016,
-			.fine_correction = 156,
-			.analog_gain = 0x11FD
-		}
-	},
-
 	/* FRAME_216_30FPS */
 	{
 		.clk = {
@@ -639,8 +575,8 @@ static struct vcontrol video_control[] = {
 			.id = V4L2_CID_GAIN,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Gain",
-			.minimum = MT9P012_MIN_GAIN,
-			.maximum = MT9P012_MAX_GAIN,
+			.minimum = MT9P012_MIN_LINEAR_GAIN,
+			.maximum = MT9P012_MAX_LINEAR_GAIN,
 			.step = MT9P012_GAIN_STEP,
 			.default_value = MT9P012_DEF_LINEAR_GAIN,
 		},
@@ -727,7 +663,11 @@ struct mt9p012_sensor {
 	int current_iframe;
 
 	u32 min_exposure_time;
-	u32 max_exposure_time;
+	u32 fps_max_exposure_time;
+	u32 abs_max_exposure_time;
+
+	int min_linear_gain;
+	int max_linear_gain;
 
 	struct mt9p012_sensor_id sensor_id;
 
@@ -920,16 +860,7 @@ static enum mt9p012_image_size mt9p012_calc_size(unsigned int width,
 
 	for (isize = MT9P012_BIN4XSCALE; isize <= MT9P012_FIVE_MP; isize++) {
 		if (mt9p012_sizes[isize].height *
-					mt9p012_sizes[isize].width >= pixels) {
-			/* To improve image quality in VGA */
-			if (pixels > MT9P012_CIF_PIXELS &&
-			    isize == MT9P012_BIN4X)
-				isize = MT9P012_BIN2X;
-			else {
-				if ((pixels > MT9P012_QQVGA_PIXELS) &&
-				    (isize == MT9P012_BIN4XSCALE))
-					isize = MT9P012_BIN4X;
-			}
+				mt9p012_sizes[isize].width >= pixels) {
 			return isize;
 		}
 	}
@@ -959,18 +890,16 @@ static enum mt9p012_image_size mt9p012_find_isize(unsigned int width)
 	return isize;
 }
 
-static enum mt9p012_frame_type mt9p012_find_iframe(unsigned int fps,
-						   enum mt9p012_image_size isize)
+static enum mt9p012_frame_type mt9p012_find_iframe(enum mt9p012_image_size isize)
 {
 	enum mt9p012_frame_type iframe = 0;
 
 	if (isize == MT9P012_BIN4XSCALE) {
 		iframe = MT9P012_FRAME_216_30FPS;
+
 	} else if (isize == MT9P012_BIN4X) {
-		if (fps <= 30)
-			iframe = MT9P012_FRAME_648_30FPS;
-		else
-			iframe = MT9P012_FRAME_648_120FPS;
+		iframe = MT9P012_FRAME_648_30FPS;
+
 	} else if (isize == MT9P012_BIN2X) {
 		iframe = MT9P012_FRAME_1296_30FPS;
 
@@ -999,40 +928,53 @@ static enum mt9p012_frame_type mt9p012_find_iframe(unsigned int fps,
 static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 				    struct vcontrol *lvc)
 {
+	u16 scale_factor;
+	u32 coarse_int_time = 0;
 	int err = 0;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct mt9p012_sensor_settings *ss =
 		&sensor_settings[sensor->current_iframe];
-	u32 coarse_int_time = 0;
 
-	if ((exp_time < sensor->min_exposure_time) ||
-			(exp_time > sensor->max_exposure_time)) {
-		dev_err(&client->dev, "Exposure time %d us not within the "
-			"legal range.\n", exp_time);
-		dev_err(&client->dev, "Min time %d us Max time %d us\n",
-			sensor->min_exposure_time, sensor->max_exposure_time);
+	if (exp_time < sensor->min_exposure_time) {
+		dev_err(&client->dev, "Exposure time %d us too low.\n",
+			exp_time);
+		dev_err(&client->dev, "Min time %d us\n",
+			sensor->min_exposure_time);
 		exp_time = sensor->min_exposure_time;
+	} else if (exp_time > sensor->abs_max_exposure_time) {
+		dev_err(&client->dev, "Exposure time %d too high.\n",
+			exp_time);
+		dev_err(&client->dev, "Abs Max time %d us\n",
+			sensor->abs_max_exposure_time);
+		exp_time = sensor->abs_max_exposure_time;
 	}
 
 	if (!sensor->power_on)
 		goto end;
 
-	coarse_int_time = ((((exp_time / 10) *
-			     (sensor->vt_pix_clk / 1000)) / 1000) -
-			   (ss->exposure.fine_int_tm / 10)) /
-		(ss->frame.line_len_pck / 10);
+	if (exp_time < 15000)
+		scale_factor = 1;
+	else if (exp_time < 150000)
+		scale_factor = 10;
+	else
+		scale_factor = 100;
 
-	dev_dbg(&client->dev, "coarse_int_time calculated = %d\n",
-		coarse_int_time);
-
-	set_exposure_time[MT9P012_COARSE_INT_TIME_INDEX].val = coarse_int_time;
-	err = mt9p012_write_regs(client, set_exposure_time);
+	coarse_int_time = ((((exp_time / scale_factor) *
+		(sensor->vt_pix_clk / 1000)) / 1000) -
+		(ss->exposure.fine_int_tm / scale_factor)) /
+		(ss->frame.line_len_pck / scale_factor);
 
 	if (coarse_int_time != ss->exposure.coarse_int_tm) {
-		err = mt9p012_write_reg(client, MT9P012_16BIT,
-					REG_COARSE_INT_TIME, coarse_int_time);
+		set_exposure_time[MT9P012_COARSE_INT_TIME_INDEX].val =
+			coarse_int_time;
+		err = mt9p012_write_regs(client, set_exposure_time);
+
 		ss->exposure.coarse_int_tm = coarse_int_time;
+
+		dev_dbg(&client->dev, "set_exp: expT=%dus " \
+			"coarse_int_time=%d\n", \
+			exp_time, coarse_int_time);
 	}
 
 end:
@@ -1047,7 +989,7 @@ end:
 
 /**
  * mt9p012_set_gain - sets sensor analog gain per input value
- * @gain: analog gain value to be set on device
+ * @gain: analog linear gain Q8 value to be set on device
  * @s: pointer to standard V4L2 device structure
  * @lvc: pointer to V4L2 analog gain entry in video_controls array
  *
@@ -1060,14 +1002,34 @@ end:
 static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 			    struct vcontrol *lvc)
 {
-	int err = 0;
-	struct mt9p012_sensor *sensor = s->priv;
-	struct i2c_client *client = to_i2c_client(sensor->dev);
 	u16 reg_gain = 0, digital_gain = 1;
 	u16 shift_bits, gain_stage_2x, linear_gain_q5, digital_gain_bp;
 	u16 analog_gain_code;
 	u16 min_gain;
+	int err = 0;
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	struct mt9p012_sensor_settings *ss =
+		&sensor_settings[sensor->current_iframe];
 
+	if (gain < sensor->min_linear_gain) {
+		dev_err(&client->dev, "Gain=%d out of legal range.\n",
+			gain);
+		dev_err(&client->dev, "Gain must be greater than %d \n",
+			sensor->min_linear_gain);
+		gain = sensor->min_linear_gain;
+	}
+
+	if (gain > sensor->max_linear_gain) {
+		dev_err(&client->dev, "Gain=%d out of legal range.\n",
+			gain);
+		dev_err(&client->dev, "Gain must be less than %d \n",
+			sensor->max_linear_gain);
+		gain = sensor->max_linear_gain;
+	}
+
+	if (!sensor->power_on)
+		goto end;
 
 	/* Convert gain from linear to register value */
 	linear_gain_q5 = (gain + (1<<2)) >> 3;
@@ -1097,22 +1059,25 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 
 	if (analog_gain_code < min_gain) {
 		analog_gain_code = min_gain;
-		dev_err(&client->dev, "Gain out of legal range.\n");
 	}
 
 	if (analog_gain_code > MT9P012_MAX_ANALOG_GAIN) {
 		analog_gain_code = MT9P012_MAX_ANALOG_GAIN;
-		dev_err(&client->dev, "Gain out of legal range.\n");
 	}
 
-	if (sensor->power_on) {
-		reg_gain = (digital_gain << digital_gain_bp) | analog_gain_code;
+	reg_gain = (digital_gain << digital_gain_bp) | analog_gain_code;
 
-		set_analog_gain[MT9P012_GAIN_INDEX].val = reg_gain;
+	if (reg_gain !=	ss->exposure.analog_gain) {
+		err = mt9p012_write_reg(client, MT9P012_16BIT,
+			REG_MANUF_GAIN_GLOBAL, reg_gain);
+		ss->exposure.analog_gain = reg_gain;
 
-		err = mt9p012_write_regs(client, set_analog_gain);
+		dev_dbg(&client->dev, "set_gain: lineargain=%d " \
+			"reg_gain=0x%x sensor_ver=0x%x\n", \
+			gain, reg_gain, sensor->ver);
 	}
 
+end:
 	if (err) {
 		dev_err(&client->dev, "Error setting gain.%d", err);
 		return err;
@@ -1133,7 +1098,7 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 int mt9p012_set_flash_next_frame(u16 enable, struct v4l2_int_device *s,
 					     struct vcontrol *lvc)
 {
-	int err;
+	int err = 0;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	u16 flash;
@@ -1146,13 +1111,16 @@ int mt9p012_set_flash_next_frame(u16 enable, struct v4l2_int_device *s,
 
 		err = mt9p012_write_reg(client, MT9P012_16BIT,
 					REG_FLASH, flash);
+
+		/* Register auto-resets */
+		enable = 0;
 	}
-	/* Register auto-resets */
+
 	if (err) {
 		dev_err(&client->dev, "Error setting flash next frame.%d", err);
 		return err;
 	} else
-		lvc->current_value = 0;
+		lvc->current_value = enable;
 
 	return err;
 }
@@ -1163,7 +1131,7 @@ int mt9p012_set_flash_next_frame(u16 enable, struct v4l2_int_device *s,
 static int mt9p012_set_orientation(enum mt9p012_orientation val,
 			struct v4l2_int_device *s, struct vcontrol *lvc)
 {
-	int err;
+	int err = 0;
 	u8 orient;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
@@ -1202,6 +1170,33 @@ end:
 	return err;
 }
 
+static int mt9p012_init_exposure_params(struct v4l2_int_device *s,
+					enum mt9p012_frame_type iframe)
+{
+	int i = 0;
+	struct mt9p012_sensor *sensor = s->priv;
+
+	/* flag current exp_time & gain values as invalid */
+	sensor_settings[iframe].exposure.analog_gain = 0;
+	sensor_settings[iframe].exposure.coarse_int_tm = 0;
+
+	/* init min/max gain params */
+	if (sensor->ver >= mt9p012_ver(13, 0))
+		sensor->min_linear_gain = MT9P013_MIN_LINEAR_GAIN;
+	else
+		sensor->min_linear_gain = MT9P012_MIN_LINEAR_GAIN;
+
+	sensor->max_linear_gain = MT9P012_MAX_LINEAR_GAIN;
+
+	i = find_vctrl(sensor, V4L2_CID_GAIN);
+	if (i >= 0) {
+		sensor->video_control[i].qc.minimum =
+			sensor->min_linear_gain;
+	}
+
+	return 0;
+}
+
 static int mt9p012_calibration_adjust(int val, struct v4l2_int_device *s,
 			struct vcontrol *lvc)
 {
@@ -1232,10 +1227,11 @@ static int mt9p012_calibration_adjust(int val, struct v4l2_int_device *s,
 	/* adjust minimum gain */
 	err = find_vctrl(sensor, V4L2_CID_GAIN);
 	if (err >= 0) {
-		lvc_gain = &video_control[err];
-		lvc_gain->qc.minimum = MT9P012_DEF_LINEAR_GAIN_CALIBRATION_ADJ;
+		sensor->min_linear_gain = MT9P012_MIN_LINEAR_GAIN_CAL_ADJ;
+		lvc_gain = &sensor->video_control[err];
+		lvc_gain->qc.minimum = MT9P012_MIN_LINEAR_GAIN_CAL_ADJ;
 		dev_dbg(&client->dev, "mt9p013:setting min gain=%d\n",
-			MT9P012_DEF_LINEAR_GAIN_CALIBRATION_ADJ);
+			MT9P012_MIN_LINEAR_GAIN_CAL_ADJ);
 	}
 
 	return 0;
@@ -1275,14 +1271,16 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 		frame_length_lines = ss->frame.frame_len_lines_min;
 
 	mt9p012_write_reg(client, MT9P012_16BIT,
-			  REG_FRAME_LEN_LINES,	frame_length_lines);
+			  REG_FRAME_LEN_LINES, frame_length_lines);
 
 	ss[iframe].frame.frame_len_lines = frame_length_lines;
 
 	/* Update min/max exposure times */
 	sensor->min_exposure_time = (ss->exposure.fine_int_tm * 1000000 /
 				     (sensor->vt_pix_clk)) + 1;
-	sensor->max_exposure_time = (line_time_q8 *
+	sensor->abs_max_exposure_time = (line_time_q8 *
+				     (MT9P012_MAX_FRAME_LENGTH_LINES - 1)) >> 8;
+	sensor->fps_max_exposure_time = (line_time_q8 *
 				     (frame_length_lines - 1)) >> 8;
 
 	/* Update Exposure Time */
@@ -1291,16 +1289,17 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 		lvc = &sensor->video_control[i];
 		/* Update min/max for query control */
 		lvc->qc.minimum = sensor->min_exposure_time;
-		lvc->qc.maximum = sensor->max_exposure_time;
+		lvc->qc.maximum = sensor->fps_max_exposure_time;
 
 		mt9p012_set_exposure_time(lvc->current_value,
 					  sensor->v4l2_int_device, lvc);
 	}
 
 	v4l_info(client, "MT9P012 Set Framerate: fper=%d/%d, "
-		 "frame_len_lines=%d, max_expT=%dus\n",
-		 fper->numerator, fper->denominator,
-		 frame_length_lines, sensor->max_exposure_time);
+		 "frame_len_lines=%d, fps_max_expT=%dus, "
+		 "abs_max_expT=%dus\n",
+		 fper->numerator, fper->denominator, frame_length_lines,
+		 sensor->fps_max_exposure_time, sensor->abs_max_exposure_time);
 
 	return err;
 }
@@ -1316,7 +1315,6 @@ static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
 {
 	struct mt9p012_sensor *sensor = i2c_get_clientdata(c);
 	struct v4l2_fract *timeperframe = &sensor->timeperframe;
-	struct v4l2_pix_format *pix = &sensor->pix;
 
 	if (timeperframe->numerator == 0 ||
 	    timeperframe->denominator == 0) {
@@ -1375,8 +1373,6 @@ int mt9p012_configure_frame(struct v4l2_int_device *s,
 	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_OP_SYS_CLK_DIV,
 				 sensor_settings[iframe].clk.op_sys_clk_div);
 
-	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_RESERVED_MFR_3064, 0x0805);
-
 	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_X_OUTPUT_SIZE,
 				 sensor_settings[iframe].frame.x_output_size);
 
@@ -1425,17 +1421,8 @@ int mt9p012_configure_frame(struct v4l2_int_device *s,
 
 	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_FINE_CORRECTION,
 				 sensor_settings[iframe].exposure.fine_correction);
-	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_COARSE_INT_TIME,
-				 sensor_settings[iframe].exposure.coarse_int_tm);
-	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_MANUF_GAIN_GLOBAL,
-				 sensor_settings[iframe].exposure.analog_gain);
 	/* update */
 	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00);
-
-
-	if (sensor->fps == 120) {
-		err |= mt9p012_write_regs(client, mt9p012_648_120fps_addendum);
-	}
 
 	sensor->current_iframe = iframe;
 	if (err)
@@ -1517,16 +1504,16 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	if (err)
 		return err;
 
-
 	err = mt9p012_write_regs(client, mt9p012_common_post);
 	if (err)
 		return err;
 
-
 	/* configure frame rate */
 	xclk = mt9p012_calc_xclk(client);
 
-	iframe = mt9p012_find_iframe(sensor->fps, isize);
+	iframe = mt9p012_find_iframe(isize);
+
+	mt9p012_init_exposure_params(s, iframe);
 	err = mt9p012_configure_frame(s, iframe);
 	if (err)
 		return err;
@@ -1537,7 +1524,6 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	err = mt9p012_set_framerate(s, &sensor->timeperframe, iframe);
 	if (err)
 		return err;
-
 
 	/* Set initial exposure time */
 	i = find_vctrl(sensor, V4L2_CID_EXPOSURE);
@@ -1558,7 +1544,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	/* Set initial flash mode */
 	i = find_vctrl(sensor, V4L2_CID_PRIVATE_FLASH_NEXT_FRAME);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		mt9p012_set_flash_next_frame(lvc->current_value,
 			sensor->v4l2_int_device, lvc);
 	}
@@ -1566,7 +1552,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	/* Set initial orientation */
 	i = find_vctrl(sensor, V4L2_CID_PRIVATE_ORIENTATION);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		mt9p012_set_orientation(lvc->current_value,
 			sensor->v4l2_int_device, lvc);
 	}
@@ -1574,7 +1560,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	/* Set cal adj */
 	i = find_vctrl(sensor, V4L2_CID_PRIVATE_CALIBRATION_ADJ);
 	if (i >= 0) {
-		lvc = &video_control[i];
+		lvc = &sensor->video_control[i];
 		mt9p012_calibration_adjust(lvc->current_value,
 			sensor->v4l2_int_device, lvc);
 	}
@@ -1911,18 +1897,24 @@ static int ioctl_g_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
  * @s: pointer to standard V4L2 device structure
  * @a: pointer to standard V4L2 VIDIOC_S_PARM ioctl structure
  *
- * Configures the sensor to use the input parameters, if possible.  If
- * not possible, reverts to the old parameters and returns the
- * appropriate error code.
+ * Framerate can be updated on the fly while streaming.
  */
 static int ioctl_s_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 {
+	u32 xclk;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct v4l2_fract *timeperframe = &a->parm.capture.timeperframe;
 
 	sensor->timeperframe = *timeperframe;
-	sensor->x_clk = mt9p012_calc_xclk(client);
+
+	if (sensor->power_on) {
+		xclk = mt9p012_calc_xclk(client);
+		mt9p012_update_clocks(s, xclk, sensor->current_iframe);
+		mt9p012_set_framerate(s, &sensor->timeperframe,
+			sensor->current_iframe);
+	}
+
 	*timeperframe = sensor->timeperframe;
 
 	return 0;
