@@ -991,7 +991,6 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
 	int ret;
-
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Suspending\n", __func__);
 
@@ -1014,10 +1013,23 @@ static int qtouch_ts_resume(struct i2c_client *client)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
 	int ret;
+	int i;
 
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Resuming\n", __func__);
 
+	/* If we were suspended while a touch was happening
+	we need to tell the upper layers so they do not hang
+	waiting on the liftoff that will not come. */
+	for (i = 0; i < MAX_FINGERS; i++) {
+		if (ts->down_mask & (1 << i)) {
+			if (qtouch_tsdebug & 4)
+				pr_info("%s: Producing liftoff for %i key %i\n",
+				__func__, i, axis_map[i].key);
+			input_report_key(ts->input_dev, axis_map[i].key, 0);
+			input_sync(ts->input_dev);
+		}
+	}
 	ret = qtouch_power_config(ts, 1);
 	if (ret < 0) {
 		pr_err("%s: Cannot write power config\n", __func__);
