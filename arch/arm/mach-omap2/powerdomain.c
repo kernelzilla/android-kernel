@@ -90,7 +90,7 @@ static struct powerdomain *_pwrdm_deps_lookup(struct powerdomain *pwrdm,
 	if (!pwrdm || !deps || !omap_chip_is(pwrdm->omap_chip))
 		return ERR_PTR(-EINVAL);
 
-	for (pd = deps; pd; pd++) {
+	for (pd = deps; pd->pwrdm_name; pd++) {
 
 		if (!omap_chip_is(pd->omap_chip))
 			continue;
