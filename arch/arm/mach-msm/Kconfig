@@ -13,6 +13,7 @@ config ARCH_QSD8X50
 	bool "QSD8x50"
 	select ARCH_MSM_SCORPION
 	select CPU_V7
+	select VERIFY_PERMISSION_FAULT
 
 endchoice
 
