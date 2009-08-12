@@ -904,8 +904,9 @@ found:
 	return 0;
 }
 
-static int dsi_pll_calc_ddrfreq(unsigned long clk_freq,
-		struct dsi_clock_info *cinfo)
+static int dsi_pll_calc_ddrfreq( struct omap_dss_device *dssdev,
+				 unsigned long clk_freq,
+				 struct dsi_clock_info *cinfo)
 {
 	struct dsi_clock_info cur, best;
 	const bool use_dss2_fck = 1;
@@ -920,6 +921,10 @@ static int dsi_pll_calc_ddrfreq(unsigned long clk_freq,
 			dsi.cache_cinfo.clkin == dss_clk_fck2) {
 		DSSDBG("DSI clock info found from cache\n");
 		*cinfo = dsi.cache_cinfo;
+#if CONFIG_OMAP2_DSS_USE_DSI_PLL
+		dispc_set_lcd_divisor(dsi.cache_cinfo.lck_div,
+				      dsi.cache_cinfo.pck_div);
+#endif
 		return 0;
 	}
 
@@ -974,6 +979,27 @@ static int dsi_pll_calc_ddrfreq(unsigned long clk_freq,
 		}
 	}
 found:
+
+#if CONFIG_OMAP2_DSS_USE_DSI_PLL
+	/* set dsi1_pll_fclk and dsi2_pll_fclk to 100 MHz, it gives us a lot
+	 * of options for lcd/pcd dividers */
+	best.dsi1_pll_fclk = 100000000;
+	best.dsi2_pll_fclk = 100000000;
+	best.regm3 = (best.dsiphy / best.dsi1_pll_fclk) - 1;
+	best.regm4 = (best.dsiphy / best.dsi2_pll_fclk) - 1;
+
+	datafreq = best.dsiphy / dssdev->ctrl.pixel_size;
+	best.lck_div = 1;
+	best.pck_div = (best.dsiphy / datafreq) /
+		((best.regm3 + 1) * best.lck_div);
+	if (best.pck_div > 255 || best.pck_div < 2) {
+		DSSERR("can not find lcd/pcd divisors.\n");
+		return -EINVAL;
+	}
+
+	dispc_set_lcd_divisor(best.lck_div, best.pck_div);
+	dss_select_clk_source(1, 1);
+#else
 	/* DSI1_PLL_FCLK (regm3) is not used. Set it to something sane. */
 	best.regm3 = best.dsiphy / 48000000;
 	if (best.regm3 > REGM3_MAX)
@@ -990,15 +1016,17 @@ found:
 		best.regm4 = 1;
 	best.dsi2_pll_fclk = best.dsiphy / best.regm4;
 
+#endif
+
 	if (cinfo)
 		*cinfo = best;
-
 	dsi.cache_clk_freq = clk_freq;
 	dsi.cache_req_pck = 0;
 	dsi.cache_cinfo = best;
 
 	return 0;
 }
+
 
 int dsi_pll_program(struct dsi_clock_info *cinfo)
 {
@@ -2901,11 +2929,15 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 
 	_dsi_print_reset_status();
 
+#if CONFIG_OMAP2_DSS_USE_DSI_PLL
+	r = dsi_pll_init(1, 1);
+#else
 	r = dsi_pll_init(1, 0);
+#endif
 	if (r)
 		goto err0;
 
-	r = dsi_pll_calc_ddrfreq(dssdev->phy.dsi.ddr_clk_hz, &cinfo);
+	r = dsi_pll_calc_ddrfreq(dssdev, dssdev->phy.dsi.ddr_clk_hz, &cinfo);
 	if (r)
 		goto err1;
 
