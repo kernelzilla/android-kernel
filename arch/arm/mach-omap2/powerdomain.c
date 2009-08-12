@@ -103,7 +103,7 @@ static struct powerdomain *_pwrdm_deps_lookup(struct powerdomain *pwrdm,
 
 	}
 
-	if (!pd)
+	if (!pd->pwrdm_name)
 		return ERR_PTR(-ENOENT);
 
 	return pd->pwrdm;
