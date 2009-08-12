@@ -2594,10 +2594,8 @@ static int process_backlog(struct napi_struct *napi, int quota)
 		}
 		local_irq_enable();
 
-		napi_gro_receive(napi, skb);
+		netif_receive_skb(skb);
 	} while (++work < quota && jiffies == start_time);
-
-	napi_gro_flush(napi);
 
 	return work;
 }
