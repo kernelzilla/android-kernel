@@ -274,6 +274,13 @@ config SENSORS_AKM8973
 	default n
 	depends on I2C
 	help
+	 Support for the AKM8973 tri-axis magnetometer
+
+config SENSORS_AKM8973_AKMD
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
 	 Support for the AKM8973 tri-axis magnetometer (compass)
 
 config SENSORS_LIS331DLH
