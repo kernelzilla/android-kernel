@@ -141,7 +141,7 @@ static void serial_omap_rx_timeout(unsigned long uart_no);
 static void serial_omap_start_rxdma(struct uart_omap_port *up);
 static void serial_omap_set_autorts(struct uart_omap_port *p, int set);
 
-#define DBG_RX_DATA 1
+#define DBG_RX_DATA 0
 
 int console_detect(char *str)
 {
