@@ -597,10 +597,7 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 
 static void omapvout_dss_mark_buf_done(struct omapvout_device *vout, int idx)
 {
-	/* FIXME: Should set the state to VIDEOBUF_DONE here, but since we
-	 * don't properly DQ yet, this has been hacked to allow no DQ.
-	 */
-	vout->queue.bufs[idx]->state = VIDEOBUF_IDLE;
+	vout->queue.bufs[idx]->state = VIDEOBUF_DONE;
 	wake_up_interruptible(&vout->queue.bufs[idx]->done);
 }
 
