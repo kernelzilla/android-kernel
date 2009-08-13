@@ -56,11 +56,11 @@ struct omapvout_device {
 
 	/* V4L2 data */
 	int rotation;
-	u32 colorkey;
-	int colorkey_en;
+	int bg_color;
 	struct v4l2_pix_format pix;
 	struct v4l2_window win;
 	struct v4l2_rect crop;
+	struct v4l2_framebuffer fbuf;
 
 	/* Frame Q */
 	struct videobuf_queue queue;

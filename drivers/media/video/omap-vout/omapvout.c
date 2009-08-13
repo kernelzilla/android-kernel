@@ -25,6 +25,7 @@
 #include <linux/vmalloc.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
+#include <media/v4l2-common.h>
 #include <mach/io.h>
 #include <mach/board.h>
 
@@ -35,14 +36,6 @@
 #include "omapvout-bp.h"
 
 #define MODULE_NAME "omapvout"
-
-#define V4L2_CID_PRIV_OFFSET		0x00530000 /* Arbitrary, semi-unique */
-#define V4L2_CID_PRIV_ROTATION		(V4L2_CID_PRIVATE_BASE \
-						+ V4L2_CID_PRIV_OFFSET + 0)
-#define V4L2_CID_PRIV_COLORKEY		(V4L2_CID_PRIVATE_BASE \
-						+ V4L2_CID_PRIV_OFFSET + 1)
-#define V4L2_CID_PRIV_COLORKEY_EN	(V4L2_CID_PRIVATE_BASE \
-						+ V4L2_CID_PRIV_OFFSET + 2)
 
 /* list of image formats supported by OMAP2 video pipelines */
 const static struct v4l2_fmtdesc omap2_formats[] = {
@@ -298,9 +291,10 @@ static int omapvout_open(struct file *file)
 	vout->crop.width = w;
 	vout->crop.height = h;
 
+	memset(&vout->fbuf, 0, sizeof(vout->fbuf));
+
 	vout->rotation = 0;
-	vout->colorkey = 0;
-	vout->colorkey_en = 0;
+	vout->bg_color = 0;
 
 	vout->mmap_cnt = 0;
 
@@ -873,9 +867,20 @@ static int omapvout_vidioc_streamoff(struct file *file, void *priv,
 }
 
 static int omapvout_vidioc_queryctrl(struct file *file, void *priv,
-				struct v4l2_queryctrl *a)
+				struct v4l2_queryctrl *qctrl)
 {
-	/* TODO: Add me */
+	switch (qctrl->id) {
+	case V4L2_CID_ROTATE:
+		v4l2_ctrl_query_fill(qctrl, 0, 270, 90, 0);
+		break;
+	case V4L2_CID_BG_COLOR:
+		v4l2_ctrl_query_fill(qctrl, 0, 0xFFFFFF, 1, 0);
+		break;
+	default:
+		qctrl->name[0] = '\0';
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -893,14 +898,11 @@ static int omapvout_vidioc_g_ctrl(struct file *file, void *priv,
 	mutex_lock(&vout->mtx);
 
 	switch (ctrl->id) {
-	case V4L2_CID_PRIV_ROTATION:
+	case V4L2_CID_ROTATE:
 		ctrl->value = vout->rotation * 90;
 		break;
-	case V4L2_CID_PRIV_COLORKEY:
-		ctrl->value = vout->colorkey;
-		break;
-	case V4L2_CID_PRIV_COLORKEY_EN:
-		ctrl->value = vout->colorkey_en;
+	case V4L2_CID_BG_COLOR:
+		ctrl->value = vout->bg_color;
 		break;
 	default:
 		rc = -EINVAL;
@@ -932,7 +934,7 @@ static int omapvout_vidioc_s_ctrl(struct file *file, void *priv,
 	}
 
 	switch (ctrl->id) {
-	case V4L2_CID_PRIV_ROTATION:
+	case V4L2_CID_ROTATE:
 		if (!omapvout_dss_is_rotation_supported(vout) && v != 0) {
 			rc = -EINVAL;
 		} else if (v == 0 || v == 90 || v == 180 || v == 270) {
@@ -942,11 +944,13 @@ static int omapvout_vidioc_s_ctrl(struct file *file, void *priv,
 			rc = -ERANGE;
 		}
 		break;
-	case V4L2_CID_PRIV_COLORKEY:
-		vout->colorkey = v;
-		break;
-	case V4L2_CID_PRIV_COLORKEY_EN:
-		vout->colorkey_en = (v) ? 1 : 0;
+	case V4L2_CID_BG_COLOR:
+		if (v < 0 || v > 0xFFFFFF) {
+			DBG("Invalid BG color 0x%08lx\n", (unsigned long) v);
+			rc = -ERANGE;
+		} else {
+			vout->bg_color = v;
+		}
 		break;
 	default:
 		rc = -EINVAL;
@@ -961,6 +965,66 @@ failed:
 	mutex_unlock(&vout->mtx);
 
 	return rc;
+}
+
+static int omapvout_vidioc_g_fbuf(struct file *file, void *priv,
+				struct v4l2_framebuffer *a)
+{
+	struct omapvout_device *vout = priv;
+
+	mutex_lock(&vout->mtx);
+
+	if (vout->dss->overlay->id == OMAP_DSS_VIDEO1) {
+		a->capability = V4L2_FBUF_CAP_EXTERNOVERLAY |
+				V4L2_FBUF_CAP_GLOBAL_ALPHA |
+				V4L2_FBUF_CAP_CHROMAKEY	|
+				V4L2_FBUF_CAP_SRC_CHROMAKEY;
+	} else {
+		a->capability = V4L2_FBUF_CAP_EXTERNOVERLAY |
+				V4L2_FBUF_CAP_LOCAL_ALPHA |
+				V4L2_FBUF_CAP_GLOBAL_ALPHA |
+				V4L2_FBUF_CAP_CHROMAKEY	|
+				V4L2_FBUF_CAP_SRC_CHROMAKEY;
+	}
+	a->flags = vout->fbuf.flags;
+	memset(&a->fmt, 0, sizeof(a->fmt));
+
+	mutex_unlock(&vout->mtx);
+
+	return 0;
+}
+
+static int omapvout_vidioc_s_fbuf(struct file *file, void *priv,
+				struct v4l2_framebuffer *a)
+{
+	struct omapvout_device *vout = priv;
+	int rc = 0;
+
+	/* OMAP DSS doesn't support SRC & DST colorkey together */
+	if ((a->flags & V4L2_FBUF_FLAG_CHROMAKEY) &&
+			(a->flags & V4L2_FBUF_FLAG_SRC_CHROMAKEY))
+		return -EINVAL;
+
+	/* OMAP DSS doesn't support DST colorkey and alpha blending together */
+	if ((a->flags & V4L2_FBUF_FLAG_CHROMAKEY) &&
+			(a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA))
+		return -EINVAL;
+
+	mutex_lock(&vout->mtx);
+
+	/* OMAP DSS doesn't support local alpha for video 1 */
+	if ((vout->dss->overlay->id == OMAP_DSS_VIDEO1) &&
+			(a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA)) {
+		rc = -EINVAL;
+		goto failed;
+	}
+
+	vout->fbuf.flags = a->flags;
+
+failed:
+	mutex_unlock(&vout->mtx);
+
+	return 0;
 }
 
 /*=== Driver Functions =================================================*/
@@ -998,6 +1062,8 @@ static const struct v4l2_ioctl_ops omapvout_ioctl_ops = {
 	.vidioc_queryctrl = omapvout_vidioc_queryctrl,
 	.vidioc_g_ctrl = omapvout_vidioc_g_ctrl,
 	.vidioc_s_ctrl = omapvout_vidioc_s_ctrl,
+	.vidioc_g_fbuf = omapvout_vidioc_g_fbuf,
+	.vidioc_s_fbuf = omapvout_vidioc_s_fbuf,
 };
 
 static struct video_device omapvout_devdata = {

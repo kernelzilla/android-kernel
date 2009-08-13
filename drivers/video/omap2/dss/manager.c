@@ -1324,7 +1324,7 @@ static int dss_check_manager(struct omap_overlay_manager *mgr)
 	 * simultaneously. */
 
 	if (mgr->info.alpha_enabled && mgr->info.trans_enabled &&
-			mgr->info.trans_key_type == OMAP_DSS_COLOR_KEY_GFX_DST)
+			mgr->info.trans_key_type != OMAP_DSS_COLOR_KEY_GFX_DST)
 		return -EINVAL;
 
 	return 0;
