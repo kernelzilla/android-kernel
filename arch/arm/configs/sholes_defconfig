@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Fri Aug  7 17:16:06 2009
+# Thu Aug 13 11:04:08 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1172,7 +1172,7 @@ CONFIG_OMAP2_DSS_DEBUG_SUPPORT=y
 # CONFIG_OMAP2_DSS_VENC is not set
 # CONFIG_OMAP2_DSS_SDI is not set
 CONFIG_OMAP2_DSS_DSI=y
-# CONFIG_OMAP2_DSS_USE_DSI_PLL is not set
+CONFIG_OMAP2_DSS_USE_DSI_PLL=y
 # CONFIG_OMAP2_DSS_FAKE_VSYNC is not set
 CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK=0
 
