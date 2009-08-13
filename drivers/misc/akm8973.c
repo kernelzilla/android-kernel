@@ -34,6 +34,9 @@
 #define I2C_RETRIES		5
 #define I2C_RETRY_DELAY		5
 
+#define ENABLED			0x1
+#define BUSY			0x2
+
 struct akm8973_data {
 	struct i2c_client *client;
 	struct akm8973_platform_data *pdata;
@@ -46,7 +49,7 @@ struct akm8973_data {
 	struct input_dev *input_dev;
 
 	int hw_initialized;
-	atomic_t enabled;
+	unsigned long flags;
 
 	u8 hxga;
 	u8 hyga;
@@ -223,8 +226,8 @@ static void akm8973_device_power_off(struct akm8973_data *akm)
 {
 	if (akm->pdata->power_off) {
 		disable_irq_nosync(akm->client->irq);
-		mutex_unlock(&akm->lock);
 		akm->pdata->power_off();
+		clear_bit(BUSY, &akm->flags);
 		akm->hw_initialized = 0;
 	}
 }
@@ -381,8 +384,6 @@ static void akm8973_irq_work_func(struct work_struct *work)
 	int ibuf[4];
 	int err;
 
-	/* akm->lock is still locked from input_work_func */
-
 	buf[0] = AKM8973_REG_TMPS;
 	err = akm8973_i2c_read(akm, buf, 4);
 	if (err < 0)
@@ -395,7 +396,7 @@ static void akm8973_irq_work_func(struct work_struct *work)
 	}
 
 err0:
-	mutex_unlock(&akm->lock);
+	clear_bit(BUSY, &akm->flags);
 	enable_irq(akm->client->irq);
 }
 
@@ -411,10 +412,10 @@ static int akm8973_enable(struct akm8973_data *akm)
 {
 	int err;
 
-	if (!atomic_cmpxchg(&akm->enabled, 0, 1)) {
+	if (!test_and_set_bit(ENABLED, &akm->flags)) {
 		err = akm8973_device_power_on(akm);
 		if (err < 0) {
-			atomic_set(&akm->enabled, 0);
+			clear_bit(ENABLED, &akm->flags);
 			return err;
 		}
 
@@ -428,9 +429,8 @@ static int akm8973_enable(struct akm8973_data *akm)
 
 static int akm8973_disable(struct akm8973_data *akm)
 {
-	if (atomic_cmpxchg(&akm->enabled, 1, 0)) {
+	if (test_and_clear_bit(ENABLED, &akm->flags)) {
 		cancel_delayed_work_sync(&akm->input_work);
-
 		akm8973_device_power_off(akm);
 	}
 
@@ -469,6 +469,10 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 
 	case AKM8973_IOCTL_SET_CALI:
 		/* leave room for command byte */
+		if (test_and_set_bit(BUSY, &akm->flags)) {
+			return -EBUSY;
+		}
+
 		if (copy_from_user(buf + 1, argp, 3))
 			return -EFAULT;
 
@@ -480,6 +484,7 @@ static int akm8973_misc_ioctl(struct inode *inode, struct file *file,
 		akm->pdata->hxda = buf[1];
 		akm->pdata->hyda = buf[2];
 		akm->pdata->hzda = buf[3];
+		clear_bit(BUSY, &akm->flags);
 		break;
 
 	case AKM8973_IOCTL_GET_DELAY:
@@ -543,12 +548,11 @@ static void akm8973_input_work_func(struct work_struct *work)
 	struct akm8973_data *akm = container_of((struct delayed_work *)work,
 						struct akm8973_data,
 						input_work);
-	mutex_lock(&akm->lock);
-	akm8973_set_mode(akm, AKM8973_MODE_MEASURE);
-	/*
-	 * leave akm->lock locked because nothing can access the device
-	 * which is in measure mode
-	 */
+
+	/* if we are already measuring, don't start another measurement */
+	if (!test_and_set_bit(BUSY, &akm->flags)) {
+		akm8973_set_mode(akm, AKM8973_MODE_MEASURE);
+	}
 	schedule_delayed_work(&akm->input_work,
 			      msecs_to_jiffies(akm->pdata->poll_interval));
 }
@@ -677,8 +681,6 @@ static int akm8973_probe(struct i2c_client *client,
 		goto err0;
 	}
 
-	mutex_init(&akm->lock);
-	mutex_lock(&akm->lock);
 	akm->client = client;
 
 	akm->pdata = kmalloc(sizeof(*akm->pdata), GFP_KERNEL);
@@ -730,9 +732,7 @@ static int akm8973_probe(struct i2c_client *client,
 
 	/* As default, do not report information */
 	akm->state = 0;
-	atomic_set(&akm->enabled, 0);
-
-	mutex_unlock(&akm->lock);
+	akm->flags = 0;
 
 	dev_info(&client->dev, "akm8973 probed\n");
 
@@ -748,7 +748,6 @@ err2:
 	if (akm->pdata->exit)
 		akm->pdata->exit();
 err1_1:
-	mutex_unlock(&akm->lock);
 	kfree(akm->pdata);
 err1:
 	kfree(akm);
