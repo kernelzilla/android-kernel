@@ -36,6 +36,7 @@
 
 #define ENABLED			0x1
 #define BUSY			0x2
+#define ENABLED_BEFORE_SUSPEND	0x4
 
 struct akm8973_data {
 	struct i2c_client *client;
@@ -776,12 +777,20 @@ static int akm8973_resume(struct i2c_client *client)
 {
 	struct akm8973_data *akm = i2c_get_clientdata(client);
 
-	return akm8973_enable(akm);
+	if (test_and_clear_bit(ENABLED_BEFORE_SUSPEND, &akm->flags))
+		return akm8973_enable(akm);
+
+	return 0;
 }
 
 static int akm8973_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct akm8973_data *akm = i2c_get_clientdata(client);
+	/* it's ok that this check isn't atomic since we are in a suspend
+	 * path so userspace is frozen and can't call the ioctl to disable it
+	 * in between */
+	if (akm->flags & ENABLED)
+		set_bit(ENABLED_BEFORE_SUSPEND, &akm->flags);
 
 	return akm8973_disable(akm);
 }
