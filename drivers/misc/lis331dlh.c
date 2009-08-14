@@ -91,6 +91,7 @@ struct lis331dlh_data {
 
 	int hw_initialized;
 	atomic_t enabled;
+	int on_before_suspend;
 
 	u8 shift_adj;
 	u8 resume_state[5];
@@ -713,13 +714,16 @@ static int lis331dlh_resume(struct i2c_client *client)
 {
 	struct lis331dlh_data *lis = i2c_get_clientdata(client);
 
-	return lis331dlh_enable(lis);
+	if (lis->on_before_suspend)
+		return lis331dlh_enable(lis);
+	return 0;
 }
 
 static int lis331dlh_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct lis331dlh_data *lis = i2c_get_clientdata(client);
 
+	lis->on_before_suspend = atomic_read(&lis->enabled);
 	return lis331dlh_disable(lis);
 }
 
