@@ -40,6 +40,9 @@
 #include <../drivers/media/video/hplens.h>
 #endif
 
+static void sholes_camera_lines_safe_mode(void);
+static void sholes_camera_lines_func_mode(void);
+
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
 static int hplens_power_set(enum v4l2_power power)
 {
@@ -122,6 +125,7 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 			regulator_put(regulator);
 			regulator = NULL;
 		} else {
+			sholes_camera_lines_safe_mode();
 			pr_err("%s: Regulator for vcam is not "\
 					"initialized\n", __func__);
 			return -EIO;
@@ -129,10 +133,12 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 
 		/* Release pm constraints */
 		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
+		sholes_camera_lines_safe_mode();
 	break;
 	case V4L2_POWER_ON:
 		if (previous_power == V4L2_POWER_OFF) {
 			/* Power Up Sequence */
+			sholes_camera_lines_func_mode();
 
 			/* Set min throughput to:
 			 *  2592 x 1944 x 2bpp x 30fps x 3 L3 accesses */
@@ -215,6 +221,49 @@ struct mt9p012_platform_data sholes_mt9p012_platform_data = {
 
 #endif /* #ifdef CONFIG_VIDEO_MT9P012 || CONFIG_VIDEO_MT9P012_MODULE */
 
+/* We can't change the IOMUX config after bootup
+ * with the current pad configuration architecture,
+ * the next two functions are hack to configure the
+ * camera pads at runtime to save power in standby */
+
+void sholes_camera_lines_safe_mode(void)
+{
+	omap_writew(0x0007, 0x4800210c);
+	omap_writew(0x0007, 0x4800210e);
+	omap_writew(0x0007, 0x48002110);
+	omap_writew(0x0007, 0x48002112);
+	omap_writew(0x0007, 0x48002114);
+	omap_writew(0x0007, 0x4800211a);
+	omap_writew(0x0007, 0x4800211c);
+	omap_writew(0x0007, 0x4800211e);
+	omap_writew(0x0007, 0x48002120);
+	omap_writew(0x001F, 0x48002122);
+	omap_writew(0x001F, 0x48002124);
+	omap_writew(0x001F, 0x48002126);
+	omap_writew(0x001F, 0x48002128);
+	omap_writew(0x0007, 0x4800212a);
+	omap_writew(0x0007, 0x4800212c);
+}
+
+void sholes_camera_lines_func_mode(void)
+{
+	omap_writew(0x0118, 0x4800210c);
+	omap_writew(0x0118, 0x4800210e);
+	omap_writew(0x0000, 0x48002110);
+	omap_writew(0x0118, 0x48002112);
+	omap_writew(0x0004, 0x48002114);
+	omap_writew(0x0100, 0x4800211a);
+	omap_writew(0x0100, 0x4800211c);
+	omap_writew(0x0100, 0x4800211e);
+	omap_writew(0x0100, 0x48002120);
+	omap_writew(0x0100, 0x48002122);
+	omap_writew(0x0100, 0x48002124);
+	omap_writew(0x0100, 0x48002126);
+	omap_writew(0x0100, 0x48002128);
+	omap_writew(0x0100, 0x4800212a);
+	omap_writew(0x0100, 0x4800212c);
+}
+
 void __init sholes_camera_init(void)
 {
 	omap_cfg_reg(A24_34XX_CAM_HS);
@@ -237,5 +286,7 @@ void __init sholes_camera_init(void)
 	omap_cfg_reg(B23_34XX_CAM_WEN);
 	omap_cfg_reg(D25_34XX_CAM_STROBE);
 	omap_cfg_reg(K8_34XX_GPMC_WAIT2);
+
+	sholes_camera_lines_safe_mode();
 }
 
