@@ -38,6 +38,11 @@
 #pragma message("TODO: Review use of OS_PAGEABLE vs OS_NON_PAGEABLE")
 #endif
 
+#include "lists.h"
+
+static IMPLEMENT_LIST_INSERT(PVRSRV_STUB_PBDESC)
+static IMPLEMENT_LIST_REMOVE(PVRSRV_STUB_PBDESC)
+
 static PRESMAN_ITEM psResItemCreateSharedPB = IMG_NULL;
 static PVRSRV_PER_PROCESS_DATA *psPerProcCreateSharedPB = IMG_NULL;
 
@@ -53,6 +58,7 @@ SGXFindSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 					  PVRSRV_KERNEL_MEM_INFO 	**ppsSharedPBDescKernelMemInfo,
 					  PVRSRV_KERNEL_MEM_INFO 	**ppsHWPBDescKernelMemInfo,
 					  PVRSRV_KERNEL_MEM_INFO 	**ppsBlockKernelMemInfo,
+					  PVRSRV_KERNEL_MEM_INFO 	**ppsHWBlockKernelMemInfo,
 					  PVRSRV_KERNEL_MEM_INFO 	***pppsSharedPBDescSubKernelMemInfos,
 					  IMG_UINT32				*ui32SharedPBDescSubKernelMemInfosCount)
 {
@@ -80,7 +86,8 @@ SGXFindSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 					  sizeof(PVRSRV_KERNEL_MEM_INFO *)
 						* psStubPBDesc->ui32SubKernelMemInfosCount,
 					  (IMG_VOID **)&ppsSharedPBDescSubKernelMemInfos,
-					  IMG_NULL) != PVRSRV_OK)
+					  IMG_NULL,
+					  "Array of Kernel Memory Info") != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "SGXFindSharedPBDescKM: OSAllocMem failed"));
 
@@ -111,6 +118,7 @@ SGXFindSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		*ppsSharedPBDescKernelMemInfo = psStubPBDesc->psSharedPBDescKernelMemInfo;
 		*ppsHWPBDescKernelMemInfo = psStubPBDesc->psHWPBDescKernelMemInfo;
 		*ppsBlockKernelMemInfo = psStubPBDesc->psBlockKernelMemInfo;
+		*ppsHWBlockKernelMemInfo = psStubPBDesc->psHWBlockKernelMemInfo;
 
 		*ui32SharedPBDescSubKernelMemInfosCount =
 			psStubPBDesc->ui32SubKernelMemInfosCount;
@@ -164,64 +172,52 @@ ExitNotFound:
 static PVRSRV_ERROR
 SGXCleanupSharedPBDescKM(PVRSRV_STUB_PBDESC *psStubPBDescIn)
 {
-	PVRSRV_STUB_PBDESC **ppsStubPBDesc;
+	
 	IMG_UINT32 i;
 	PVRSRV_DEVICE_NODE *psDeviceNode;
-	PVRSRV_SGXDEV_INFO *psSGXDevInfo;
 
 	psDeviceNode = (PVRSRV_DEVICE_NODE*)psStubPBDescIn->hDevCookie;
-	psSGXDevInfo = (PVRSRV_SGXDEV_INFO *)psDeviceNode->pvDevice;
 
 	
-	for(ppsStubPBDesc = (PVRSRV_STUB_PBDESC **)&psSGXDevInfo->psStubPBDescListKM;
-		*ppsStubPBDesc != IMG_NULL;
-		ppsStubPBDesc = &(*ppsStubPBDesc)->psNext)
+	
+	
+	psStubPBDescIn->ui32RefCount--;
+	if (psStubPBDescIn->ui32RefCount == 0)
 	{
-		PVRSRV_STUB_PBDESC *psStubPBDesc = *ppsStubPBDesc;
-
-		if(psStubPBDesc == psStubPBDescIn)
+		List_PVRSRV_STUB_PBDESC_Remove(psStubPBDescIn);
+		for(i=0 ; i<psStubPBDescIn->ui32SubKernelMemInfosCount; i++)
 		{
-			psStubPBDesc->ui32RefCount--;
-			PVR_ASSERT((IMG_INT32)psStubPBDesc->ui32RefCount >= 0);
-
-			if(psStubPBDesc->ui32RefCount == 0)
-			{
-				*ppsStubPBDesc = psStubPBDesc->psNext;
-
-				for(i=0 ; i<psStubPBDesc->ui32SubKernelMemInfosCount; i++)
-				{
-					
-					PVRSRVFreeDeviceMemKM(psStubPBDesc->hDevCookie,
-										  psStubPBDesc->ppsSubKernelMemInfos[i]);
-				}
-
-				OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
-						  sizeof(PVRSRV_KERNEL_MEM_INFO *)
-						  * psStubPBDesc->ui32SubKernelMemInfosCount,
-						  psStubPBDesc->ppsSubKernelMemInfos,
-						  0);
-
-				PVRSRVFreeSharedSysMemoryKM(psStubPBDesc->psBlockKernelMemInfo);
-
-				PVRSRVFreeDeviceMemKM(psStubPBDesc->hDevCookie, psStubPBDesc->psHWPBDescKernelMemInfo);
-
-				PVRSRVFreeSharedSysMemoryKM(psStubPBDesc->psSharedPBDescKernelMemInfo);
-		
-				OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
-						  sizeof(PVRSRV_STUB_PBDESC),
-						  psStubPBDesc,
-						  0);
-		
-				
-				SGXCleanupRequest(psDeviceNode,
-								  IMG_NULL,
-								  PVRSRV_USSE_EDM_RESMAN_CLEANUP_SHAREDPBDESC);
-			}
-			return PVRSRV_OK;
+			
+			PVRSRVFreeDeviceMemKM(psStubPBDescIn->hDevCookie,
+								  psStubPBDescIn->ppsSubKernelMemInfos[i]);
 		}
-	}
 
-	return PVRSRV_ERROR_INVALID_PARAMS;
+		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
+				  sizeof(PVRSRV_KERNEL_MEM_INFO *)
+				  * psStubPBDescIn->ui32SubKernelMemInfosCount,
+				  psStubPBDescIn->ppsSubKernelMemInfos,
+				  0);
+
+		PVRSRVFreeSharedSysMemoryKM(psStubPBDescIn->psBlockKernelMemInfo);
+		
+		PVRSRVFreeDeviceMemKM(psStubPBDescIn->hDevCookie, psStubPBDescIn->psHWBlockKernelMemInfo);
+
+		PVRSRVFreeDeviceMemKM(psStubPBDescIn->hDevCookie, psStubPBDescIn->psHWPBDescKernelMemInfo);
+
+		PVRSRVFreeSharedSysMemoryKM(psStubPBDescIn->psSharedPBDescKernelMemInfo);
+
+		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
+				  sizeof(PVRSRV_STUB_PBDESC),
+				  psStubPBDescIn,
+				  0);
+
+		
+		SGXCleanupRequest(psDeviceNode,
+						  IMG_NULL,
+						  PVRSRV_CLEANUPCMD_PB);
+	}
+	return PVRSRV_OK;
+	
 }
 
 static PVRSRV_ERROR SGXCleanupSharedPBDescCallback(IMG_PVOID pvParam, IMG_UINT32 ui32Param)
@@ -266,6 +262,7 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 					 PVRSRV_KERNEL_MEM_INFO		*psSharedPBDescKernelMemInfo,
 					 PVRSRV_KERNEL_MEM_INFO		*psHWPBDescKernelMemInfo,
 					 PVRSRV_KERNEL_MEM_INFO		*psBlockKernelMemInfo,
+					 PVRSRV_KERNEL_MEM_INFO		*psHWBlockKernelMemInfo,
 					 IMG_UINT32					ui32TotalPBSize,
 					 IMG_HANDLE					*phSharedPBDesc,
 					 PVRSRV_KERNEL_MEM_INFO		**ppsSharedPBDescSubKernelMemInfos,
@@ -331,7 +328,8 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 	if(OSAllocMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 				  sizeof(PVRSRV_STUB_PBDESC),
 				  (IMG_VOID **)&psStubPBDesc,
-				  0) != PVRSRV_OK)
+				  0,
+				  "Stub Parameter Buffer Description") != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "SGXAddSharedPBDescKM: Failed to alloc "
 					"StubPBDesc"));
@@ -346,7 +344,8 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 				  sizeof(PVRSRV_KERNEL_MEM_INFO *)
 				  * ui32SharedPBDescSubKernelMemInfosCount,
 				  (IMG_VOID **)&psStubPBDesc->ppsSubKernelMemInfos,
-				  0) != PVRSRV_OK)
+				  0,
+				  "Array of Kernel Memory Info") != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "SGXAddSharedPBDescKM: "
 				 "Failed to alloc "
@@ -373,11 +372,18 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		goto NoAdd;
 	}
 	
+	if(PVRSRVDissociateMemFromResmanKM(psHWBlockKernelMemInfo)
+	   != PVRSRV_OK)
+	{
+		goto NoAdd;
+	}
+		
 	psStubPBDesc->ui32RefCount = 1;
 	psStubPBDesc->ui32TotalPBSize = ui32TotalPBSize;
 	psStubPBDesc->psSharedPBDescKernelMemInfo = psSharedPBDescKernelMemInfo;
 	psStubPBDesc->psHWPBDescKernelMemInfo = psHWPBDescKernelMemInfo;
 	psStubPBDesc->psBlockKernelMemInfo = psBlockKernelMemInfo;
+	psStubPBDesc->psHWBlockKernelMemInfo = psHWBlockKernelMemInfo;
 
 	psStubPBDesc->ui32SubKernelMemInfosCount =
 		ui32SharedPBDescSubKernelMemInfosCount;
@@ -409,8 +415,8 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 	psStubPBDesc->hDevCookie = hDevCookie;
 
 	
-	psStubPBDesc->psNext = psSGXDevInfo->psStubPBDescListKM;
-	psSGXDevInfo->psStubPBDescListKM = psStubPBDesc;
+	List_PVRSRV_STUB_PBDESC_Insert(&(psSGXDevInfo->psStubPBDescListKM),
+									psStubPBDesc);
 
 	*phSharedPBDesc = (IMG_HANDLE)psResItem;
 
@@ -443,6 +449,7 @@ NoAddKeepPB:
 	PVRSRVFreeDeviceMemKM(hDevCookie, psHWPBDescKernelMemInfo);
 
 	PVRSRVFreeSharedSysMemoryKM(psBlockKernelMemInfo);
+	PVRSRVFreeDeviceMemKM(hDevCookie, psHWBlockKernelMemInfo);
 
 	return eRet;
 }

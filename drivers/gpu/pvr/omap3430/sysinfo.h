@@ -30,14 +30,6 @@
 #define MAX_HW_TIME_US				(500000)
 #define WAIT_TRY_COUNT				(10000)
 
-typedef enum _SYS_DEVICE_TYPE_
-{
-	SYS_DEVICE_SGX						= 0,
-
-	SYS_DEVICE_FORCE_I16 				= 0x7fff
-
-} SYS_DEVICE_TYPE;
-
 #define SYS_DEVICE_COUNT 3 
 
 #define PRM_REG32(offset)	  (offset)

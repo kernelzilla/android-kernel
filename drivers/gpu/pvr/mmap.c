@@ -44,6 +44,9 @@
 #include <linux/sched.h>
 #include <asm/current.h>
 #endif
+#if defined(SUPPORT_DRI_DRM)
+#include <drm/drmP.h>
+#endif
 
 #include "img_defs.h"
 #include "services.h"
@@ -60,37 +63,43 @@
 #include "perproc.h"
 #include "env_perproc.h"
 #include "bridged_support.h"
+#if defined(SUPPORT_DRI_DRM)
+#include "pvr_drm.h"
+#endif
 
 #if !defined(PVR_SECURE_HANDLES)
 #error "The mmap code requires PVR_SECURE_HANDLES"
 #endif
 
-extern PVRSRV_LINUX_MUTEX gPVRSRVLock;
+static PVRSRV_LINUX_MUTEX g_sMMapMutex;
 
 static LinuxKMemCache *g_psMemmapCache = NULL;
 static LIST_HEAD(g_sMMapAreaList);
+static LIST_HEAD(g_sMMapOffsetStructList);
 #if defined(DEBUG_LINUX_MMAP_AREAS)
 static IMG_UINT32 g_ui32RegisteredAreas = 0;
 static IMG_UINT32 g_ui32TotalByteSize = 0;
 #endif
 
 #define	FIRST_PHYSICAL_PFN	0
-#define	LAST_PHYSICAL_PFN	0x7ffffffful
+#define	LAST_PHYSICAL_PFN	0x7fffffffUL
 #define	FIRST_SPECIAL_PFN	(LAST_PHYSICAL_PFN + 1)
-#define	LAST_SPECIAL_PFN	0xfffffffful
+#define	LAST_SPECIAL_PFN	0xffffffffUL
 
-#define	MAX_MMAP_HANDLE		0x7ffffffful
+#define	MAX_MMAP_HANDLE		0x7fffffffUL
 
 static inline IMG_BOOL
 PFNIsPhysical(IMG_UINT32 pfn)
 {
-	return pfn >= FIRST_PHYSICAL_PFN && pfn <= LAST_PHYSICAL_PFN;
+	 
+	return ((pfn >= FIRST_PHYSICAL_PFN) && (pfn <= LAST_PHYSICAL_PFN)) ? IMG_TRUE : IMG_FALSE;
 }
 
 static inline IMG_BOOL
 PFNIsSpecial(IMG_UINT32 pfn)
 {
-	return pfn >= FIRST_SPECIAL_PFN && pfn <= LAST_SPECIAL_PFN;
+	 
+	return ((pfn >= FIRST_SPECIAL_PFN) && (pfn <= LAST_SPECIAL_PFN)) ? IMG_TRUE : IMG_FALSE;
 }
 
 static inline IMG_HANDLE
@@ -168,7 +177,7 @@ CreateOffsetStruct(LinuxMemArea *psLinuxMemArea, IMG_UINT32 ui32Offset, IMG_UINT
 
     psOffsetStruct->ui32PID = OSGetCurrentProcessIDKM();
 
-    psOffsetStruct->bOnPerProcList = IMG_FALSE;
+    psOffsetStruct->bOnMMapList = IMG_FALSE;
 
     psOffsetStruct->ui32RefCount = 0;
 
@@ -190,9 +199,9 @@ DestroyOffsetStruct(PKV_OFFSET_STRUCT psOffsetStruct)
 {
     list_del(&psOffsetStruct->sAreaItem);
 
-    if (psOffsetStruct->bOnPerProcList)
+    if (psOffsetStruct->bOnMMapList)
     {
-        list_del(&psOffsetStruct->sProcItem);
+        list_del(&psOffsetStruct->sMMapItem);
     }
 
     PVR_DPF((PVR_DBG_MESSAGE, "%s: Table entry: "
@@ -233,9 +242,8 @@ PVRMMapOSMemHandleToMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     PKV_OFFSET_STRUCT psOffsetStruct;
     IMG_HANDLE hOSMemHandle;
     PVRSRV_ERROR eError;
-    PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc = PVRSRVProcessPrivateData(psPerProc);
 
-    PVR_ASSERT(psEnvPerProc != IMG_NULL);
+    LinuxLockMutex(&g_sMMapMutex);
 
     PVR_ASSERT(PVRSRVGetMaxHandle(psPerProc->psHandleBase) <= MAX_MMAP_HANDLE);
 
@@ -244,7 +252,7 @@ PVRMMapOSMemHandleToMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     {
 	PVR_DPF((PVR_DBG_ERROR, "%s: Lookup of handle 0x%lx failed", __FUNCTION__, hMHandle));
 
-	return eError;
+	goto exit_unlock;
     }
 
     psLinuxMemArea = (LinuxMemArea *)hOSMemHandle;
@@ -259,14 +267,15 @@ PVRMMapOSMemHandleToMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
         if (psPerProc->ui32PID == psOffsetStruct->ui32PID)
         {
 
-	    PVR_ASSERT(*pui32RealByteSize == psOffsetStruct->ui32RealByteSize);
+	   PVR_ASSERT(*pui32RealByteSize == psOffsetStruct->ui32RealByteSize);
 	   
 	   *pui32MMapOffset = psOffsetStruct->ui32MMapOffset;
 	   *pui32UserVAddr = psOffsetStruct->ui32UserVAddr;
 	   psOffsetStruct->ui32RefCount++;
 
-	   return PVRSRV_OK;
-       }
+	   eError = PVRSRV_OK;
+	   goto exit_unlock;
+        }
     }
 
     
@@ -286,16 +295,23 @@ PVRMMapOSMemHandleToMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     psOffsetStruct = CreateOffsetStruct(psLinuxMemArea, *pui32MMapOffset, *pui32RealByteSize);
     if (psOffsetStruct == IMG_NULL)
     {
-        return PVRSRV_ERROR_OUT_OF_MEMORY;
+        eError = PVRSRV_ERROR_OUT_OF_MEMORY;
+	goto exit_unlock;
     }
 
     
-    list_add_tail(&psOffsetStruct->sProcItem, &psEnvPerProc->sMMapOffsetStructList);
-    psOffsetStruct->bOnPerProcList = IMG_TRUE;
+    list_add_tail(&psOffsetStruct->sMMapItem, &g_sMMapOffsetStructList);
+
+    psOffsetStruct->bOnMMapList = IMG_TRUE;
 
     psOffsetStruct->ui32RefCount++;
 
-    return PVRSRV_OK;
+    eError = PVRSRV_OK;
+
+exit_unlock:
+    LinuxUnLockMutex(&g_sMMapMutex);
+
+    return eError;
 }
 
 
@@ -310,6 +326,9 @@ PVRMMapReleaseMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     PKV_OFFSET_STRUCT psOffsetStruct;
     IMG_HANDLE hOSMemHandle;
     PVRSRV_ERROR eError;
+    IMG_UINT32 ui32PID = OSGetCurrentProcessIDKM();
+
+    LinuxLockMutex(&g_sMMapMutex);
 
     PVR_ASSERT(PVRSRVGetMaxHandle(psPerProc->psHandleBase) <= MAX_MMAP_HANDLE);
 
@@ -318,7 +337,7 @@ PVRMMapReleaseMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     {
 	PVR_DPF((PVR_DBG_ERROR, "%s: Lookup of handle 0x%lx failed", __FUNCTION__, hMHandle));
 
-	return eError;
+	goto exit_unlock;
     }
 
     psLinuxMemArea = (LinuxMemArea *)hOSMemHandle;
@@ -326,40 +345,48 @@ PVRMMapReleaseMMapData(PVRSRV_PER_PROCESS_DATA *psPerProc,
     
     list_for_each_entry(psOffsetStruct, &psLinuxMemArea->sMMapOffsetStructList, sAreaItem)
     {
-        if (psPerProc->ui32PID == psOffsetStruct->ui32PID)
+        if (psOffsetStruct->ui32PID == ui32PID)
         {
 	    if (psOffsetStruct->ui32RefCount == 0)
 	    {
 		PVR_DPF((PVR_DBG_ERROR, "%s: Attempt to release mmap data with zero reference count for offset struct 0x%p, memory area 0x%p", __FUNCTION__, psOffsetStruct, psLinuxMemArea));
-		return PVRSRV_ERROR_GENERIC;
+		eError = PVRSRV_ERROR_GENERIC;
+		goto exit_unlock;
 	    }
 
 	    psOffsetStruct->ui32RefCount--;
 
-	    *pbMUnmap = (psOffsetStruct->ui32RefCount == 0) && (psOffsetStruct->ui32UserVAddr != 0);
+	    *pbMUnmap = (IMG_BOOL)((psOffsetStruct->ui32RefCount == 0) && (psOffsetStruct->ui32UserVAddr != 0));
 
 	    *pui32UserVAddr = (*pbMUnmap) ? psOffsetStruct->ui32UserVAddr : 0;
 	    *pui32RealByteSize = (*pbMUnmap) ? psOffsetStruct->ui32RealByteSize : 0;
 
-	    return PVRSRV_OK;
+	    eError = PVRSRV_OK;
+	    goto exit_unlock;
         }
     }
 
     
     PVR_DPF((PVR_DBG_ERROR, "%s: Mapping data not found for handle 0x%lx (memory area 0x%p)", __FUNCTION__, hMHandle, psLinuxMemArea));
 
-    return PVRSRV_ERROR_GENERIC;
+    eError =  PVRSRV_ERROR_GENERIC;
+
+exit_unlock:
+    LinuxUnLockMutex(&g_sMMapMutex);
+
+    return eError;
 }
 
 static inline PKV_OFFSET_STRUCT
-FindOffsetStructByOffset(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc, IMG_UINT32 ui32Offset, IMG_UINT32 ui32RealByteSize)
+FindOffsetStructByOffset(IMG_UINT32 ui32Offset, IMG_UINT32 ui32RealByteSize)
 {
     PKV_OFFSET_STRUCT psOffsetStruct;
     IMG_UINT32 ui32TID = GetCurrentThreadID();
+    IMG_UINT32 ui32PID = OSGetCurrentProcessIDKM();
 
-    list_for_each_entry(psOffsetStruct, &psEnvPerProc->sMMapOffsetStructList, sProcItem)
+    list_for_each_entry(psOffsetStruct, &g_sMMapOffsetStructList, sMMapItem)
     {
-	if (ui32Offset == psOffsetStruct->ui32MMapOffset && ui32RealByteSize == psOffsetStruct->ui32RealByteSize)
+        if (ui32Offset == psOffsetStruct->ui32MMapOffset && ui32RealByteSize == psOffsetStruct->ui32RealByteSize && psOffsetStruct->ui32PID == ui32PID)
         {
 	    
 	    if (!PFNIsPhysical(ui32Offset) || psOffsetStruct->ui32TID == ui32TID)
@@ -382,7 +409,7 @@ DoMapToUser(LinuxMemArea *psLinuxMemArea,
 
     if (psLinuxMemArea->eAreaType == LINUX_MEM_AREA_SUB_ALLOC)
     {
-        return DoMapToUser(LinuxMemAreaRoot(psLinuxMemArea),
+        return DoMapToUser(LinuxMemAreaRoot(psLinuxMemArea),		 
                     ps_vma,
                     psLinuxMemArea->uData.sSubAlloc.ui32ByteOffset + ui32ByteOffset);
     }
@@ -465,7 +492,7 @@ MMapVOpenNoLock(struct vm_area_struct* ps_vma)
     PKV_OFFSET_STRUCT psOffsetStruct = (PKV_OFFSET_STRUCT)ps_vma->vm_private_data;
     PVR_ASSERT(psOffsetStruct != IMG_NULL)
     psOffsetStruct->ui32Mapped++;
-    PVR_ASSERT(!psOffsetStruct->bOnPerProcList);
+    PVR_ASSERT(!psOffsetStruct->bOnMMapList);
 
     if (psOffsetStruct->ui32Mapped > 1)
     {
@@ -493,11 +520,11 @@ MMapVOpenNoLock(struct vm_area_struct* ps_vma)
 static void
 MMapVOpen(struct vm_area_struct* ps_vma)
 {
-    LinuxLockMutex(&gPVRSRVLock);
+    LinuxLockMutex(&g_sMMapMutex);
 
     MMapVOpenNoLock(ps_vma);
 
-    LinuxUnLockMutex(&gPVRSRVLock);
+    LinuxUnLockMutex(&g_sMMapMutex);
 }
 
 
@@ -517,30 +544,15 @@ MMapVCloseNoLock(struct vm_area_struct* ps_vma)
              psOffsetStruct->ui32Mapped));
 #endif
 
-    PVR_ASSERT(!psOffsetStruct->bOnPerProcList);
+    PVR_ASSERT(!psOffsetStruct->bOnMMapList);
     psOffsetStruct->ui32Mapped--;
     if (psOffsetStruct->ui32Mapped == 0)
     {
-#if defined(DEBUG)
-
-#define	REFCOUNT_WARNING_STRING	"%s: psOffsetStruct 0x%p has non-zero reference count (ui32RefCount = %lu). User mode address of start of mapping: 0x%lx"
-
 	if (psOffsetStruct->ui32RefCount != 0)
 	{
-	    PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc = PVRSRVFindPerProcessPrivateData();
-	    PVR_ASSERT(psEnvPerProc != IMG_NULL);
-	    
-	    if (psEnvPerProc->ui32MMapRefCountWarnings < 2)
-	    {
-	        PVR_DPF((PVR_DBG_WARNING, REFCOUNT_WARNING_STRING, __FUNCTION__, psOffsetStruct, psOffsetStruct->ui32RefCount, psOffsetStruct->ui32UserVAddr));
-	    }
-	    else
-	    {
-	        PVR_DPF((PVR_DBG_MESSAGE, REFCOUNT_WARNING_STRING, __FUNCTION__, psOffsetStruct, psOffsetStruct->ui32RefCount, psOffsetStruct->ui32UserVAddr));
-	    }
-	    psEnvPerProc->ui32MMapRefCountWarnings++;
+	        PVR_DPF((PVR_DBG_MESSAGE, "%s: psOffsetStruct 0x%p has non-zero reference count (ui32RefCount = %lu). User mode address of start of mapping: 0x%lx", __FUNCTION__, psOffsetStruct, psOffsetStruct->ui32RefCount, psOffsetStruct->ui32UserVAddr));
 	}
-#endif
+
 	DestroyOffsetStruct(psOffsetStruct);
     }
 
@@ -554,18 +566,18 @@ MMapVCloseNoLock(struct vm_area_struct* ps_vma)
 static void
 MMapVClose(struct vm_area_struct* ps_vma)
 {
-    LinuxLockMutex(&gPVRSRVLock);
+    LinuxLockMutex(&g_sMMapMutex);
 
     MMapVCloseNoLock(ps_vma);
 
-    LinuxUnLockMutex(&gPVRSRVLock);
+    LinuxUnLockMutex(&g_sMMapMutex);
 }
 
 
 static struct vm_operations_struct MMapIOOps =
 {
-	open:		MMapVOpen,
-	close:		MMapVClose
+	.open=MMapVOpen,
+	.close=MMapVClose
 };
 
 
@@ -573,14 +585,12 @@ int
 PVRMMap(struct file* pFile, struct vm_area_struct* ps_vma)
 {
     IMG_UINT32 ui32ByteSize;
-    PKV_OFFSET_STRUCT psOffsetStruct = NULL;
+    PKV_OFFSET_STRUCT psOffsetStruct;
     int iRetVal = 0;
-    PVRSRV_PER_PROCESS_DATA *psPerProc;
-    PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc;
 
     PVR_UNREFERENCED_PARAMETER(pFile);
 
-    LinuxLockMutex(&gPVRSRVLock);
+    LinuxLockMutex(&g_sMMapMutex);
     
     ui32ByteSize = ps_vma->vm_end - ps_vma->vm_start;
     
@@ -590,33 +600,36 @@ PVRMMap(struct file* pFile, struct vm_area_struct* ps_vma)
             ps_vma->vm_pgoff,
             ui32ByteSize, ui32ByteSize));
    
-    psPerProc = PVRSRVFindPerProcessData();
-    PVR_ASSERT(psPerProc != IMG_NULL);
+    psOffsetStruct = FindOffsetStructByOffset(ps_vma->vm_pgoff, ui32ByteSize);
+    if (psOffsetStruct == IMG_NULL)
+    {
+#if defined(SUPPORT_DRI_DRM)
+        LinuxUnLockMutex(&g_sMMapMutex);
 
-    psEnvPerProc = PVRSRVProcessPrivateData(psPerProc);
-    PVR_ASSERT(psEnvPerProc);
+	
+        return drm_mmap(pFile, ps_vma);
+#else
+        PVR_UNREFERENCED_PARAMETER(pFile);
+
+        PVR_DPF((PVR_DBG_ERROR,
+             "%s: Attempted to mmap unregistered area at vm_pgoff %ld",
+             __FUNCTION__, ps_vma->vm_pgoff));
+        iRetVal = -EINVAL;
+#endif
+        goto unlock_and_return;
+    }
+    list_del(&psOffsetStruct->sMMapItem);
+    psOffsetStruct->bOnMMapList = IMG_FALSE;
 
     
-    if ((ps_vma->vm_flags & VM_WRITE) &&
-       !(ps_vma->vm_flags & VM_SHARED))
+    if (((ps_vma->vm_flags & VM_WRITE) != 0) &&
+        ((ps_vma->vm_flags & VM_SHARED) == 0))
     {
         PVR_DPF((PVR_DBG_ERROR, "%s: Cannot mmap non-shareable writable areas", __FUNCTION__));
         iRetVal = -EINVAL;
         goto unlock_and_return;
     }
    
-    psOffsetStruct = FindOffsetStructByOffset(psEnvPerProc, ps_vma->vm_pgoff, ui32ByteSize);
-    if (psOffsetStruct == IMG_NULL)
-    {
-        PVR_DPF((PVR_DBG_ERROR,
-             "%s: Attempted to mmap unregistered area at vm_pgoff %ld",
-             __FUNCTION__, ps_vma->vm_pgoff));
-        iRetVal = -EINVAL;
-        goto unlock_and_return;
-    }
-    list_del(&psOffsetStruct->sProcItem);
-    psOffsetStruct->bOnPerProcList = IMG_FALSE;
-
     PVR_DPF((PVR_DBG_MESSAGE, "%s: Mapped psLinuxMemArea 0x%p\n",
          __FUNCTION__, psOffsetStruct->psLinuxMemArea));
 
@@ -673,7 +686,7 @@ unlock_and_return:
 	DestroyOffsetStruct(psOffsetStruct);
     }
 
-    LinuxUnLockMutex(&gPVRSRVLock);
+    LinuxUnLockMutex(&g_sMMapMutex);
     
     return iRetVal;
 }
@@ -686,7 +699,7 @@ PrintMMapRegistrations(IMG_CHAR *buffer, size_t size, off_t off)
     LinuxMemArea *psLinuxMemArea;
     off_t Ret;
 	
-    LinuxLockMutex(&gPVRSRVLock);
+    LinuxLockMutex(&g_sMMapMutex);
 
     if(!off)
     {
@@ -726,7 +739,7 @@ PrintMMapRegistrations(IMG_CHAR *buffer, size_t size, off_t off)
     {
         PKV_OFFSET_STRUCT psOffsetStruct;
 
-	list_for_each_entry(psOffsetStruct, &psLinuxMemArea->sMMapOffsetStructList, sAreaItem)
+ 	list_for_each_entry(psOffsetStruct, &psLinuxMemArea->sMMapOffsetStructList, sAreaItem)
         {
 	    off--;
 	    if (off == 0)
@@ -776,7 +789,7 @@ PrintMMapRegistrations(IMG_CHAR *buffer, size_t size, off_t off)
     Ret = END_OF_FILE;
 
 unlock_and_return:
-    LinuxUnLockMutex(&gPVRSRVLock);
+    LinuxUnLockMutex(&g_sMMapMutex);
     return Ret;
 }
 #endif
@@ -785,9 +798,12 @@ unlock_and_return:
 PVRSRV_ERROR
 PVRMMapRegisterArea(LinuxMemArea *psLinuxMemArea)
 {
+    PVRSRV_ERROR eError;
 #if defined(DEBUG) || defined(DEBUG_LINUX_MMAP_AREAS)
     const IMG_CHAR *pszName = LinuxMemAreaTypeToString(LinuxMemAreaRootType(psLinuxMemArea));
 #endif
+
+    LinuxLockMutex(&g_sMMapMutex);
 
     PVR_DPF((PVR_DBG_MESSAGE,
              "%s(%s, psLinuxMemArea 0x%p, ui32AllocFlags 0x%8lx)",
@@ -800,7 +816,8 @@ PVRMMapRegisterArea(LinuxMemArea *psLinuxMemArea)
     {
         PVR_DPF((PVR_DBG_ERROR, "%s: psLinuxMemArea 0x%p is already registered",
                 __FUNCTION__, psLinuxMemArea));
-        return PVRSRV_ERROR_INVALID_PARAMS;
+        eError = PVRSRV_ERROR_INVALID_PARAMS;
+	goto exit_unlock;
     }
 
     list_add_tail(&psLinuxMemArea->sMMapItem, &g_sMMapAreaList);
@@ -816,14 +833,22 @@ PVRMMapRegisterArea(LinuxMemArea *psLinuxMemArea)
     }
 #endif
 
-    return PVRSRV_OK;
+    eError = PVRSRV_OK;
+
+exit_unlock:
+    LinuxUnLockMutex(&g_sMMapMutex);
+
+    return eError;
 }
 
 
 PVRSRV_ERROR
 PVRMMapRemoveRegisteredArea(LinuxMemArea *psLinuxMemArea)
 {
+    PVRSRV_ERROR eError;
     PKV_OFFSET_STRUCT psOffsetStruct, psTmpOffsetStruct;
+
+    LinuxLockMutex(&g_sMMapMutex);
 
     PVR_ASSERT(psLinuxMemArea->bMMapRegistered);
 
@@ -832,7 +857,8 @@ PVRMMapRemoveRegisteredArea(LinuxMemArea *psLinuxMemArea)
 	if (psOffsetStruct->ui32Mapped != 0)
 	{
 	     PVR_DPF((PVR_DBG_ERROR, "%s: psOffsetStruct 0x%p for memory area 0x0x%p is still mapped; psOffsetStruct->ui32Mapped %lu",  __FUNCTION__, psOffsetStruct, psLinuxMemArea, psOffsetStruct->ui32Mapped));
-		return PVRSRV_ERROR_GENERIC;
+		eError = PVRSRV_ERROR_GENERIC;
+		goto exit_unlock;
 	}
 	else
 	{
@@ -840,7 +866,7 @@ PVRMMapRemoveRegisteredArea(LinuxMemArea *psLinuxMemArea)
 	     PVR_DPF((PVR_DBG_WARNING, "%s: psOffsetStruct 0x%p was never mapped",  __FUNCTION__, psOffsetStruct));
 	}
 
-	PVR_ASSERT((psOffsetStruct->ui32Mapped == 0) && psOffsetStruct->bOnPerProcList);
+	PVR_ASSERT((psOffsetStruct->ui32Mapped == 0) && psOffsetStruct->bOnMMapList);
 
 	DestroyOffsetStruct(psOffsetStruct);
     }
@@ -857,14 +883,18 @@ PVRMMapRemoveRegisteredArea(LinuxMemArea *psLinuxMemArea)
     }
 #endif
 
-    return PVRSRV_OK;
+    eError = PVRSRV_OK;
+
+exit_unlock:
+    LinuxUnLockMutex(&g_sMMapMutex);
+    return eError;
 }
 
 
 PVRSRV_ERROR
 LinuxMMapPerProcessConnect(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc)
 {
-    INIT_LIST_HEAD(&psEnvPerProc->sMMapOffsetStructList);
+    PVR_UNREFERENCED_PARAMETER(psEnvPerProc);
 
     return PVRSRV_OK;
 }
@@ -873,25 +903,36 @@ IMG_VOID
 LinuxMMapPerProcessDisconnect(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc)
 {
     PKV_OFFSET_STRUCT psOffsetStruct, psTmpOffsetStruct;
-    
-    if (!list_empty(&psEnvPerProc->sMMapOffsetStructList))
+    IMG_BOOL bWarn = IMG_FALSE;
+    IMG_UINT32 ui32PID = OSGetCurrentProcessIDKM();
+
+    PVR_UNREFERENCED_PARAMETER(psEnvPerProc);
+
+    LinuxLockMutex(&g_sMMapMutex);
+
+    list_for_each_entry_safe(psOffsetStruct, psTmpOffsetStruct, &g_sMMapOffsetStructList, sMMapItem)
     {
-	PVR_DPF((PVR_DBG_WARNING, "%s: process has unmapped offset structures. Removing them", __FUNCTION__));
+	if (psOffsetStruct->ui32PID == ui32PID)
+	{
+	    if (!bWarn)
+	    {
+		PVR_DPF((PVR_DBG_WARNING, "%s: process has unmapped offset structures. Removing them", __FUNCTION__));
+		bWarn = IMG_TRUE;
+	    }
+	    PVR_ASSERT(psOffsetStruct->ui32Mapped == 0);
+	    PVR_ASSERT(psOffsetStruct->bOnMMapList);
+
+	    DestroyOffsetStruct(psOffsetStruct);
+	}
     }
 
-    list_for_each_entry_safe(psOffsetStruct, psTmpOffsetStruct, &psEnvPerProc->sMMapOffsetStructList, sProcItem)
-    {
-	PVR_ASSERT(psOffsetStruct->ui32Mapped == 0);
-	PVR_ASSERT(psOffsetStruct->bOnPerProcList);
-
-	DestroyOffsetStruct(psOffsetStruct);
-    }
+    LinuxUnLockMutex(&g_sMMapMutex);
 }
 
 
 PVRSRV_ERROR LinuxMMapPerProcessHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase)
 {
-    PVRSRV_ERROR eError = PVRSRV_OK;
+    PVRSRV_ERROR eError;
 
     eError = PVRSRVSetMaxHandle(psHandleBase, MAX_MMAP_HANDLE);
     if (eError != PVRSRV_OK)
@@ -907,6 +948,8 @@ PVRSRV_ERROR LinuxMMapPerProcessHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase)
 IMG_VOID
 PVRMMapInit(IMG_VOID)
 {
+    LinuxInitMutex(&g_sMMapMutex);
+
     g_psMemmapCache = KMemCacheCreateWrapper("img-mmap", sizeof(KV_OFFSET_STRUCT), 0, 0);
     if (!g_psMemmapCache)
     {
@@ -938,7 +981,7 @@ PVRMMapCleanup(IMG_VOID)
 	PVR_DPF((PVR_DBG_ERROR, "%s: Memory areas are still registered with MMap", __FUNCTION__));
 	
 	PVR_TRACE(("%s: Unregistering memory areas", __FUNCTION__));
-	list_for_each_entry_safe(psLinuxMemArea, psTmpMemArea, &g_sMMapAreaList, sMMapItem)
+ 	list_for_each_entry_safe(psLinuxMemArea, psTmpMemArea, &g_sMMapAreaList, sMMapItem)
 	{
 		eError = PVRMMapRemoveRegisteredArea(psLinuxMemArea);
 		if (eError != PVRSRV_OK)

@@ -224,8 +224,6 @@ void OMAPLFBSync(void)
 
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr)
 {
-	static u8 poo;
-
 	if (lcd_mgr && lcd_mgr->device && omap_gfxoverlay) {
 		omap_gfxoverlay->get_overlay_info(omap_gfxoverlay,
 						  &gfxoverlayinfo);

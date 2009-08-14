@@ -88,9 +88,6 @@ typedef struct _SYS_DATA_TAG_
 
     IMG_CHAR                    *pszVersionString;          
 	PVRSRV_EVENTOBJECT			*psGlobalEventObject;			
-#if defined(PDUMP)
-	IMG_BOOL					bPowerUpPDumped;			
-#endif 
 } SYS_DATA;
 
 
@@ -120,6 +117,11 @@ PVRSRV_ERROR SysDevicePrePowerState(IMG_UINT32 ui32DeviceIndex,
 PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32 ui32DeviceIndex,
 									 PVR_POWER_STATE eNewPowerState,
 									 PVR_POWER_STATE eCurrentPowerState);
+
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData);
+IMG_VOID SysPowerLockUnwrap(SYS_DATA *psSysData);
+#endif
 
 PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID, 
 								IMG_VOID	*pvIn,

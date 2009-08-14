@@ -134,7 +134,8 @@ PVRSRV_ERROR PVRSRVPerProcessDataConnect(IMG_UINT32	ui32PID)
 		eError = OSAllocMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 							sizeof(*psPerProc),
 							(IMG_PVOID *)&psPerProc,
-							&hBlockAlloc);
+							&hBlockAlloc,
+							"Per Process Data");
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "PVRSRVPerProcessDataConnect: Couldn't allocate per-process data (%d)", eError));

@@ -31,11 +31,11 @@
 extern "C" {
 #endif
 
-#define PDUMP_FLAGS_NEVER			0x08000000
-#define PDUMP_FLAGS_TOOUT2MEM		0x10000000
-#define PDUMP_FLAGS_LASTFRAME		0x20000000
-#define PDUMP_FLAGS_RESETLFBUFFER	0x40000000
-#define PDUMP_FLAGS_CONTINUOUS		0x80000000
+#define PDUMP_FLAGS_NEVER			0x08000000UL
+#define PDUMP_FLAGS_TOOUT2MEM		0x10000000UL
+#define PDUMP_FLAGS_LASTFRAME		0x20000000UL
+#define PDUMP_FLAGS_RESETLFBUFFER	0x40000000Ul
+#define PDUMP_FLAGS_CONTINUOUS		0x80000000UL
 
 #define PDUMP_PD_UNIQUETAG			(IMG_HANDLE)0
 #define PDUMP_PT_UNIQUETAG			(IMG_HANDLE)0
@@ -55,8 +55,7 @@ extern "C" {
 										  IMG_UINT32			ui32Value,
 										  IMG_UINT32			ui32Mask,
 										  PDUMP_POLL_OPERATOR	eOperator,
-										  IMG_BOOL				bLastFrame,
-										  IMG_BOOL				bOverwrite,
+										  IMG_UINT32			ui32Flags,
 										  IMG_HANDLE			hUniqueTag);
 
 	IMG_IMPORT PVRSRV_ERROR PDumpMemUM(PVRSRV_PER_PROCESS_DATA *psProcData,
@@ -215,6 +214,12 @@ extern "C" {
 								   IMG_BOOL		bLastFrame,
 																		   IMG_UINT32 *pui32Registers,
 																		   IMG_UINT32 ui32NumRegisters);
+
+	IMG_VOID PDumpVGXMemToFile(IMG_CHAR *pszFileName, 
+								IMG_UINT32 ui32FileOffset,
+								IMG_UINT32 uiAddr, 
+								IMG_UINT32 ui32Size,
+								IMG_UINT32 ui32PDumpFlags);
 
 	IMG_VOID PDump3DSignatureRegisters(IMG_UINT32 ui32DumpFrameNum,
 															IMG_BOOL bLastFrame,

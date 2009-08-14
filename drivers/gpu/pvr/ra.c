@@ -41,6 +41,32 @@
 
 #define MINIMUM_HASH_SIZE (64)
 
+#if defined(VALIDATE_ARENA_TEST)
+
+typedef enum RESOURCE_DESCRIPTOR_TAG {
+	
+	RESOURCE_SPAN_LIVE				= 10,
+	RESOURCE_SPAN_FREE, 
+	IMPORTED_RESOURCE_SPAN_START,
+	IMPORTED_RESOURCE_SPAN_LIVE,	
+	IMPORTED_RESOURCE_SPAN_FREE,	
+	IMPORTED_RESOURCE_SPAN_END,		 
+
+} RESOURCE_DESCRIPTOR;
+
+typedef enum RESOURCE_TYPE_TAG {
+
+	IMPORTED_RESOURCE_TYPE		= 20,
+	NON_IMPORTED_RESOURCE_TYPE
+
+} RESOURCE_TYPE;
+
+
+static IMG_UINT32 ui32BoundaryTagID = 0;
+
+IMG_UINT32 ValidateArena(RA_ARENA *pArena);
+#endif
+
 struct _BT_
 {
 	enum bt_type
@@ -62,6 +88,15 @@ struct _BT_
 	struct _BT_ *pPrevFree;
 	
 	BM_MAPPING *psMapping;
+
+#if defined(VALIDATE_ARENA_TEST)
+	RESOURCE_DESCRIPTOR eResourceSpan;
+	RESOURCE_TYPE		eResourceType;
+
+	
+	IMG_UINT32			ui32BoundaryTagID;
+#endif
+
 };
 typedef struct _BT_ BT;
 
@@ -72,7 +107,7 @@ struct _RA_ARENA_
 	IMG_CHAR *name;
 
 	
-	IMG_UINT32 uQuantum;
+	IMG_SIZE_T uQuantum;
 
 	
 	IMG_BOOL (*pImportAlloc)(IMG_VOID *,
@@ -84,7 +119,7 @@ struct _RA_ARENA_
 	IMG_VOID (*pImportFree) (IMG_VOID *,
 						 IMG_UINTPTR_T,
 						 BM_MAPPING *psMapping);
-	IMG_VOID (*pBackingStoreFree) (IMG_VOID *, IMG_UINT32, IMG_UINT32, IMG_HANDLE);
+	IMG_VOID (*pBackingStoreFree) (IMG_VOID *, IMG_SIZE_T, IMG_SIZE_T, IMG_HANDLE);
 
 	
 	IMG_VOID *pImportHandle;
@@ -215,16 +250,33 @@ _SegmentListInsert (RA_ARENA *pArena, BT *pBT)
 	else
 	{
 		BT *pBTScan;
-		pBTScan = pArena->pHeadSegment;
-		while (pBTScan->pNextSegment != IMG_NULL 
-			   && pBT->base >= pBTScan->pNextSegment->base)
+
+		if (pBT->base < pArena->pHeadSegment->base)
 		{
-			pBTScan = pBTScan->pNextSegment;
+			
+			pBT->pNextSegment = pArena->pHeadSegment;
+			pArena->pHeadSegment->pPrevSegment = pBT;
+			pArena->pHeadSegment = pBT;
+			pBT->pPrevSegment = IMG_NULL;
 		}
-		eError = _SegmentListInsertAfter (pArena, pBTScan, pBT);
-		if (eError != PVRSRV_OK)
+		else
 		{
-			return eError; 
+
+			
+
+
+			pBTScan = pArena->pHeadSegment;
+
+			while ((pBTScan->pNextSegment != IMG_NULL)  && (pBT->base >= pBTScan->pNextSegment->base))
+			{
+				pBTScan = pBTScan->pNextSegment;
+			}
+
+			eError = _SegmentListInsertAfter (pArena, pBTScan, pBT);
+			if (eError != PVRSRV_OK)
+			{
+				return eError; 
+			}
 		}
 	}
 	return eError;
@@ -259,10 +311,17 @@ _SegmentSplit (RA_ARENA *pArena, BT *pBT, IMG_SIZE_T uSize)
 	
 	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, 
 					sizeof(BT), 
-					(IMG_VOID **)&pNeighbour, IMG_NULL) != PVRSRV_OK)
+					(IMG_VOID **)&pNeighbour, IMG_NULL,
+					"Boundary Tag") != PVRSRV_OK)
 	{
 		return IMG_NULL;
 	}
+
+	OSMemSet(pNeighbour, 0, sizeof(BT));
+
+#if defined(VALIDATE_ARENA_TEST)
+	pNeighbour->ui32BoundaryTagID = ++ui32BoundaryTagID;
+#endif
 
 	pNeighbour->pPrevSegment = pBT;
 	pNeighbour->pNextSegment = pBT->pNextSegment;
@@ -277,6 +336,25 @@ _SegmentSplit (RA_ARENA *pArena, BT *pBT, IMG_SIZE_T uSize)
 	pNeighbour->base = pBT->base + uSize;
 	pNeighbour->psMapping = pBT->psMapping;
 	pBT->uSize = uSize;
+
+#if defined(VALIDATE_ARENA_TEST)
+	if (pNeighbour->pPrevSegment->eResourceType == IMPORTED_RESOURCE_TYPE)
+	{
+		pNeighbour->eResourceType = IMPORTED_RESOURCE_TYPE;
+		pNeighbour->eResourceSpan = IMPORTED_RESOURCE_SPAN_FREE;
+	}
+	else if (pNeighbour->pPrevSegment->eResourceType == NON_IMPORTED_RESOURCE_TYPE)
+	{
+		pNeighbour->eResourceType = NON_IMPORTED_RESOURCE_TYPE;
+		pNeighbour->eResourceSpan = RESOURCE_SPAN_FREE;
+	}
+	else
+	{
+		PVR_DPF ((PVR_DBG_ERROR,"_SegmentSplit: pNeighbour->pPrevSegment->eResourceType unrecognized"));
+		PVR_DBG_BREAK;
+	}
+#endif
+
 	return pNeighbour;
 }
 
@@ -313,10 +391,17 @@ _BuildSpanMarker (IMG_UINTPTR_T base, IMG_SIZE_T uSize)
 
 	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 					sizeof(BT),
-					(IMG_VOID **)&pBT, IMG_NULL) != PVRSRV_OK)
+					(IMG_VOID **)&pBT, IMG_NULL,
+					"Boundary Tag") != PVRSRV_OK)
 	{
 		return IMG_NULL;
 	}
+
+	OSMemSet(pBT, 0, sizeof(BT));
+	
+#if defined(VALIDATE_ARENA_TEST)
+	pBT->ui32BoundaryTagID = ++ui32BoundaryTagID;
+#endif
 
 	pBT->type = btt_span;
 	pBT->base = base;
@@ -333,10 +418,17 @@ _BuildBT (IMG_UINTPTR_T base, IMG_SIZE_T uSize)
 	
 	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, 
 					sizeof(BT), 
-					(IMG_VOID **)&pBT, IMG_NULL) != PVRSRV_OK)
+					(IMG_VOID **)&pBT, IMG_NULL,
+					"Boundary Tag") != PVRSRV_OK)
 	{
 		return IMG_NULL;
 	}
+
+	OSMemSet(pBT, 0, sizeof(BT));
+
+#if defined(VALIDATE_ARENA_TEST)
+	pBT->ui32BoundaryTagID = ++ui32BoundaryTagID;
+#endif
 
 	pBT->type = btt_free;
 	pBT->base = base;
@@ -359,6 +451,12 @@ _InsertResource (RA_ARENA *pArena, IMG_UINTPTR_T base, IMG_SIZE_T uSize)
 	pBT = _BuildBT (base, uSize);
 	if (pBT != IMG_NULL)
 	{
+
+#if defined(VALIDATE_ARENA_TEST)
+		pBT->eResourceSpan = RESOURCE_SPAN_FREE;
+		pBT->eResourceType = NON_IMPORTED_RESOURCE_TYPE;
+#endif
+
 		if (_SegmentListInsert (pArena, pBT) != PVRSRV_OK)
 		{
 			PVR_DPF ((PVR_DBG_ERROR,"_InsertResource: call to _SegmentListInsert failed"));
@@ -398,17 +496,33 @@ _InsertResourceSpan (RA_ARENA *pArena, IMG_UINTPTR_T base, IMG_SIZE_T uSize)
 	{
 		goto fail_start;
 	}
+
+#if defined(VALIDATE_ARENA_TEST)
+	pSpanStart->eResourceSpan = IMPORTED_RESOURCE_SPAN_START;
+	pSpanStart->eResourceType = IMPORTED_RESOURCE_TYPE;
+#endif
+
 	pSpanEnd = _BuildSpanMarker (base + uSize, 0);
 	if (pSpanEnd == IMG_NULL)
 	{
 		goto fail_end;
 	}
 
+#if defined(VALIDATE_ARENA_TEST)
+	pSpanEnd->eResourceSpan = IMPORTED_RESOURCE_SPAN_END;
+	pSpanEnd->eResourceType = IMPORTED_RESOURCE_TYPE;
+#endif
+
 	pBT = _BuildBT (base, uSize);
 	if (pBT == IMG_NULL)
 	{
 		goto fail_bt;
 	}
+
+#if defined(VALIDATE_ARENA_TEST)
+	pBT->eResourceSpan = IMPORTED_RESOURCE_SPAN_FREE;
+	pBT->eResourceType = IMPORTED_RESOURCE_TYPE;
+#endif
 
 	eError = _SegmentListInsert (pArena, pSpanStart);
 	if (eError != PVRSRV_OK)
@@ -667,6 +781,21 @@ _AttemptAllocAligned (RA_ARENA *pArena,
 
 						pBT->type = btt_live;
 
+#if defined(VALIDATE_ARENA_TEST)
+						if (pBT->eResourceType == IMPORTED_RESOURCE_TYPE)
+						{
+							pBT->eResourceSpan = IMPORTED_RESOURCE_SPAN_LIVE;
+						}
+						else if (pBT->eResourceType == NON_IMPORTED_RESOURCE_TYPE)
+						{
+							pBT->eResourceSpan = RESOURCE_SPAN_LIVE;
+						}
+						else
+						{
+							PVR_DPF ((PVR_DBG_ERROR,"_AttemptAllocAligned ERROR: pBT->eResourceType unrecognized"));
+							PVR_DBG_BREAK;
+						}
+#endif
 						if (!HASH_Insert (pArena->pSegmentHash, pBT->base, (IMG_UINTPTR_T) pBT))
 						{
 							_FreeBT (pArena, pBT, IMG_FALSE);
@@ -708,7 +837,7 @@ RA_Create (IMG_CHAR *name,
 		   IMG_BOOL (*imp_alloc)(IMG_VOID *, IMG_SIZE_T uSize, IMG_SIZE_T *pActualSize,
 		                     BM_MAPPING **ppsMapping, IMG_UINT32 _flags, IMG_UINTPTR_T *pBase),
 		   IMG_VOID (*imp_free) (IMG_VOID *, IMG_UINTPTR_T, BM_MAPPING *),
-		   IMG_VOID (*backingstore_free) (IMG_VOID*, IMG_UINT32, IMG_UINT32, IMG_HANDLE),
+		   IMG_VOID (*backingstore_free) (IMG_VOID*, IMG_SIZE_T, IMG_SIZE_T, IMG_HANDLE),
 		   IMG_VOID *pImportHandle)
 {
 	RA_ARENA *pArena;
@@ -722,7 +851,8 @@ RA_Create (IMG_CHAR *name,
 
 	if (OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 					 sizeof (*pArena),
-					 (IMG_VOID **)&pArena, IMG_NULL) != PVRSRV_OK)
+					 (IMG_VOID **)&pArena, IMG_NULL,
+					 "Resource Arena") != PVRSRV_OK)
 	{
 		goto arena_fail;
 	}
@@ -833,7 +963,15 @@ RA_Delete (RA_ARENA *pArena)
 	while (pArena->pHeadSegment != IMG_NULL)
 	{
 		BT *pBT = pArena->pHeadSegment;
-		PVR_ASSERT (pBT->type == btt_free);
+
+		if (pBT->type != btt_free)
+		{
+			PVR_DPF ((PVR_DBG_ERROR,"RA_Delete: allocations still exist in the arena that is being destroyed"));
+			PVR_DPF ((PVR_DBG_ERROR,"Likely Cause: client drivers haven't freed all alocations before destroying"));
+			PVR_DPF ((PVR_DBG_ERROR,"the device memory context"));
+			PVR_DBG_BREAK;
+		}
+
 		_SegmentListRemove (pArena, pBT);
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BT), pBT, IMG_NULL);
 #ifdef RA_STATS
@@ -920,6 +1058,10 @@ RA_Alloc (RA_ARENA *pArena,
 		return IMG_FALSE;
 	}
 
+#if defined(VALIDATE_ARENA_TEST)
+	ValidateArena(pArena);
+#endif	
+
 #ifdef USE_BM_FREESPACE_CHECK
 	CheckBMFreespace();
 #endif
@@ -1002,8 +1144,162 @@ RA_Alloc (RA_ARENA *pArena,
 
 	
 
+#if defined(VALIDATE_ARENA_TEST)
+	ValidateArena(pArena);
+#endif	
+
 	return bResult;
 }
+
+
+#if defined(VALIDATE_ARENA_TEST)
+
+IMG_UINT32 ValidateArena(RA_ARENA *pArena)
+{
+	BT* pSegment;
+	RESOURCE_DESCRIPTOR eNextSpan;
+
+	pSegment = pArena->pHeadSegment;
+
+	if (pSegment == IMG_NULL)
+	{
+		return 0;
+	}
+
+	if (pSegment->eResourceType == IMPORTED_RESOURCE_TYPE)
+	{
+		PVR_ASSERT(pSegment->eResourceSpan == IMPORTED_RESOURCE_SPAN_START);
+
+		while (pSegment->pNextSegment)
+		{
+			eNextSpan = pSegment->pNextSegment->eResourceSpan;
+
+			switch (pSegment->eResourceSpan)
+			{
+				case IMPORTED_RESOURCE_SPAN_LIVE:
+
+					if (!((eNextSpan == IMPORTED_RESOURCE_SPAN_LIVE) ||
+						  (eNextSpan == IMPORTED_RESOURCE_SPAN_FREE) ||
+						  (eNextSpan == IMPORTED_RESOURCE_SPAN_END)))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+				case IMPORTED_RESOURCE_SPAN_FREE:
+
+					if (!((eNextSpan == IMPORTED_RESOURCE_SPAN_LIVE) ||
+						  (eNextSpan == IMPORTED_RESOURCE_SPAN_END)))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+				case IMPORTED_RESOURCE_SPAN_END:
+
+					if ((eNextSpan == IMPORTED_RESOURCE_SPAN_LIVE) ||
+						(eNextSpan == IMPORTED_RESOURCE_SPAN_FREE) ||
+						(eNextSpan == IMPORTED_RESOURCE_SPAN_END))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+
+				case IMPORTED_RESOURCE_SPAN_START:
+
+					if (!((eNextSpan == IMPORTED_RESOURCE_SPAN_LIVE) ||
+						  (eNextSpan == IMPORTED_RESOURCE_SPAN_FREE)))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+				default:
+					PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+					PVR_DBG_BREAK;
+				break;
+			}
+			pSegment = pSegment->pNextSegment;
+		}
+	}
+	else if (pSegment->eResourceType == NON_IMPORTED_RESOURCE_TYPE)
+	{
+		PVR_ASSERT((pSegment->eResourceSpan == RESOURCE_SPAN_FREE) || (pSegment->eResourceSpan == RESOURCE_SPAN_LIVE));
+
+		while (pSegment->pNextSegment)
+		{
+			eNextSpan = pSegment->pNextSegment->eResourceSpan;
+
+			switch (pSegment->eResourceSpan)
+			{
+				case RESOURCE_SPAN_LIVE:
+
+					if (!((eNextSpan == RESOURCE_SPAN_FREE) ||
+						  (eNextSpan == RESOURCE_SPAN_LIVE)))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+				case RESOURCE_SPAN_FREE:
+
+					if (!((eNextSpan == RESOURCE_SPAN_FREE) ||
+						  (eNextSpan == RESOURCE_SPAN_LIVE)))
+					{
+						
+						PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+						PVR_DBG_BREAK;
+					}
+				break;
+
+				default:
+					PVR_DPF((PVR_DBG_ERROR, "ValidateArena ERROR: adjacent boundary tags %d (base=0x%x) and %d (base=0x%x) are incompatible (arena: %s)", 
+								pSegment->ui32BoundaryTagID, pSegment->base, pSegment->pNextSegment->ui32BoundaryTagID, pSegment->pNextSegment->base, pArena->name));
+
+					PVR_DBG_BREAK;
+				break;
+			}
+			pSegment = pSegment->pNextSegment;
+		}
+
+	}
+	else
+	{
+		PVR_DPF ((PVR_DBG_ERROR,"ValidateArena ERROR: pSegment->eResourceType unrecognized"));
+
+		PVR_DBG_BREAK;
+	}
+
+	return 0;
+}
+
+#endif
+
 
 IMG_VOID
 RA_Free (RA_ARENA *pArena, IMG_UINTPTR_T base, IMG_BOOL bFreeBackingStore)

@@ -55,6 +55,15 @@ extern "C" {
 #define PVR_DBG_CALLTRACE	DBGPRIV_CALLTRACE,__FILE__, __LINE__
 #define PVR_DBG_ALLOC		DBGPRIV_ALLOC,__FILE__, __LINE__
 
+#ifdef PVR_DISABLE_LOGGING
+#define PVR_LOG(X)
+#else
+#define PVR_LOG(X)			PVRSRVReleasePrintf X
+#endif
+
+IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVReleasePrintf(const IMG_CHAR *pszFormat,
+									...);
+
 #if defined(DEBUG)
 	#define PVR_ASSERT(EXPR) if (!(EXPR)) PVRSRVDebugAssertFail(__FILE__, __LINE__);	
 	#define PVR_DPF(X)		PVRSRVDebugPrintf X
@@ -71,7 +80,7 @@ IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVDebugPrintf(IMG_UINT32 ui32DebugLevel,
 
 IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVTrace(const IMG_CHAR* pszFormat, ... );
 
-IMG_VOID PVRSRVDebugSetLevel (IMG_UINT32 uDebugLevel);
+IMG_VOID PVRDebugSetLevel (IMG_UINT32 uDebugLevel);
 
 		#define PVR_DBG_BREAK
 

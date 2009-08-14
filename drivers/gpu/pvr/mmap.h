@@ -53,7 +53,7 @@ typedef struct KV_OFFSET_STRUCT_TAG
     IMG_UINT32			ui32PID;
 
     
-    IMG_BOOL			bOnPerProcList;
+    IMG_BOOL			bOnMMapList;
 
     
     IMG_UINT32			ui32RefCount;
@@ -67,7 +67,7 @@ typedef struct KV_OFFSET_STRUCT_TAG
 #endif
     
    
-   struct list_head		sProcItem;
+   struct list_head		sMMapItem;
 
    
    struct list_head		sAreaItem;

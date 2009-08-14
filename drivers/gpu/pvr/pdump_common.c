@@ -51,7 +51,8 @@ static IMG_VOID *GetTempBuffer(IMG_VOID)
 		PVRSRV_ERROR eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, 
 					  PDUMP_TEMP_BUFFER_SIZE,
 					  &gpvTempBuffer,
-					  &ghTempBufferBlockAlloc);
+					  &ghTempBufferBlockAlloc,
+					  "PDUMP Temporary Buffer");
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "GetTempBuffer: OSAllocMem failed: %d", eError));
@@ -191,10 +192,10 @@ static PVRSRV_ERROR _PdumpAllocMMUContext(IMG_UINT32 *pui32MMUContextID)
 	
 	for(i=0; i<MAX_PDUMP_MMU_CONTEXTS; i++)
 	{
-		if((gui16MMUContextUsage & (1UL << i)) == 0)
+		if((gui16MMUContextUsage & (1U << i)) == 0)
 		{
 			
-			gui16MMUContextUsage |= 1UL << i;
+			gui16MMUContextUsage |= 1U << i;
 			*pui32MMUContextID = i;
 			return PVRSRV_OK;
 		}
@@ -211,7 +212,7 @@ static PVRSRV_ERROR _PdumpFreeMMUContext(IMG_UINT32 ui32MMUContextID)
 	if(ui32MMUContextID < MAX_PDUMP_MMU_CONTEXTS)
 	{
 		
-		gui16MMUContextUsage &= ~(1UL << ui32MMUContextID);
+		gui16MMUContextUsage &= ~(1U << ui32MMUContextID);
 		return PVRSRV_OK;
 	}
 

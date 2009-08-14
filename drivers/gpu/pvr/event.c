@@ -57,8 +57,7 @@
 #include "env_data.h"
 #include "proc.h"
 #include "mutex.h"
-
-extern PVRSRV_LINUX_MUTEX gPVRSRVLock;
+#include "lock.h"
 
 typedef struct PVRSRV_LINUX_EVENT_OBJECT_LIST_TAG
 {
@@ -86,7 +85,8 @@ PVRSRV_ERROR LinuxEventObjectListCreate(IMG_HANDLE *phEventObjectList)
 	PVRSRV_LINUX_EVENT_OBJECT_LIST *psEvenObjectList;
 
 	if(OSAllocMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_LINUX_EVENT_OBJECT_LIST), 
-		(IMG_VOID **)&psEvenObjectList, IMG_NULL) != PVRSRV_OK)
+		(IMG_VOID **)&psEvenObjectList, IMG_NULL,
+		"Linux Event Object List") != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectCreate: failed to allocate memory for event list"));		
 		return PVRSRV_ERROR_OUT_OF_MEMORY;	
@@ -146,6 +146,8 @@ static PVRSRV_ERROR LinuxEventObjectDeleteCallback(IMG_PVOID pvParam, IMG_UINT32
 	PVRSRV_LINUX_EVENT_OBJECT *psLinuxEventObject = pvParam;
 	PVRSRV_LINUX_EVENT_OBJECT_LIST *psLinuxEventObjectList = psLinuxEventObject->psLinuxEventObjectList;
 
+	PVR_UNREFERENCED_PARAMETER(ui32Param);
+
 	write_lock_bh(&psLinuxEventObjectList->sLock);
 	list_del(&psLinuxEventObject->sList);
 	write_unlock_bh(&psLinuxEventObjectList->sLock);
@@ -174,7 +176,8 @@ PVRSRV_ERROR LinuxEventObjectAdd(IMG_HANDLE hOSEventObjectList, IMG_HANDLE *phOS
 
 	
 	if(OSAllocMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_LINUX_EVENT_OBJECT), 
-		(IMG_VOID **)&psLinuxEventObject, IMG_NULL) != PVRSRV_OK)
+		(IMG_VOID **)&psLinuxEventObject, IMG_NULL,
+		"Linux Event Object") != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectAdd: failed to allocate memory "));		
 		return PVRSRV_ERROR_OUT_OF_MEMORY;	
@@ -217,7 +220,7 @@ PVRSRV_ERROR LinuxEventObjectSignal(IMG_HANDLE hOSEventObjectList)
 	list_for_each_safe(psListEntry, psListEntryTemp, psList) 
 	{       	
 
-		psLinuxEventObject = list_entry(psListEntry, PVRSRV_LINUX_EVENT_OBJECT, sList);	
+		psLinuxEventObject = (PVRSRV_LINUX_EVENT_OBJECT *)list_entry(psListEntry, PVRSRV_LINUX_EVENT_OBJECT, sList);	
 		
 		atomic_inc(&psLinuxEventObject->sTimeStamp);	
 	 	wake_up_interruptible(&psLinuxEventObject->sWait);
@@ -229,6 +232,7 @@ PVRSRV_ERROR LinuxEventObjectSignal(IMG_HANDLE hOSEventObjectList)
 
 PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject, IMG_UINT32 ui32MSTimeout)
 {
+	IMG_UINT32 ui32TimeStamp;
 	DEFINE_WAIT(sWait);
 
 	PVRSRV_LINUX_EVENT_OBJECT *psLinuxEventObject = (PVRSRV_LINUX_EVENT_OBJECT *) hOSEventObject;
@@ -238,27 +242,28 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject, IMG_UINT32 ui32MSTi
 	do	
 	{
 		prepare_to_wait(&psLinuxEventObject->sWait, &sWait, TASK_INTERRUPTIBLE);
+		ui32TimeStamp = atomic_read(&psLinuxEventObject->sTimeStamp);
    	
-		if(psLinuxEventObject->ui32TimeStampPrevious != atomic_read(&psLinuxEventObject->sTimeStamp))
+		if(psLinuxEventObject->ui32TimeStampPrevious != ui32TimeStamp)
 		{
 			break;
 		}
 
 		LinuxUnLockMutex(&gPVRSRVLock);		
 
-		ui32TimeOutJiffies = schedule_timeout(ui32TimeOutJiffies);
+		ui32TimeOutJiffies = (IMG_UINT32)schedule_timeout((IMG_INT32)ui32TimeOutJiffies);
 		
+		LinuxLockMutex(&gPVRSRVLock);
 #if defined(DEBUG)
 		psLinuxEventObject->ui32Stats++;
 #endif			
-		LinuxLockMutex(&gPVRSRVLock);
 
 		
 	} while (ui32TimeOutJiffies);
 
 	finish_wait(&psLinuxEventObject->sWait, &sWait);	
 
-	psLinuxEventObject->ui32TimeStampPrevious = atomic_read(&psLinuxEventObject->sTimeStamp);
+	psLinuxEventObject->ui32TimeStampPrevious = ui32TimeStamp;
 
 	return ui32TimeOutJiffies ? PVRSRV_OK : PVRSRV_ERROR_TIMEOUT;
 

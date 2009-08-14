@@ -30,7 +30,8 @@
 #include <linux/version.h>
 
 #include <linux/spinlock.h>
-#include <linux/mm.h>
+#include <asm/page.h>
+#include <asm/pgtable.h>
 
 #include "img_defs.h"
 #include "pvr_debug.h"
@@ -41,9 +42,9 @@
 
 #define	PAT_X86_ENTRY_BITS	8
 
-#define	PAT_X86_BIT_PWT		1
-#define	PAT_X86_BIT_PCD		2
-#define	PAT_X86_BIT_PAT		4
+#define	PAT_X86_BIT_PWT		1U
+#define	PAT_X86_BIT_PCD		2U
+#define	PAT_X86_BIT_PAT		4U
 #define	PAT_X86_BIT_MASK	(PAT_X86_BIT_PAT | PAT_X86_BIT_PCD | PAT_X86_BIT_PWT)
 
 static IMG_BOOL g_write_combining_available = IMG_FALSE;
@@ -66,14 +67,14 @@ pvr_pat_index(pgprotval_t prot_val)
 static inline IMG_UINT
 pvr_pat_entry(u64 pat, IMG_UINT index)
 {
-	return (pat >> (index * PAT_X86_ENTRY_BITS)) & PAT_X86_BIT_MASK;
+	return (IMG_UINT)(pat >> (index * PAT_X86_ENTRY_BITS)) & PAT_X86_BIT_MASK;
 }
 
 static IMG_VOID
 PVRLinuxX86PATProbe(IMG_VOID)
 {
 	
-	if (cpu_has_pat)
+	if (cpu_has_pat)	 
 	{
 		u64 pat;
 		IMG_UINT pat_index;
@@ -115,7 +116,8 @@ pgprot_t
 pvr_pgprot_writecombine(pgprot_t prot)
 {
     
-	return (g_write_combining_available) ?
+     
+    return (g_write_combining_available) ?
 		__pgprot((pgprot_val(prot) & ~_PAGE_CACHE_MASK) | _PAGE_CACHE_WC) : pgprot_noncached(prot);
 }
 #endif	

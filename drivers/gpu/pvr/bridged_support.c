@@ -81,5 +81,5 @@ PVRSRVLookupOSMemHandle(PVRSRV_HANDLE_BASE *psHandleBase, IMG_HANDLE *phOSMemHan
 			return PVRSRV_ERROR_BAD_MAPPING;
 	}
 
-	return PVRSRV_OK;;
+	return PVRSRV_OK;
 }

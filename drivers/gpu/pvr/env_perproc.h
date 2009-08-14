@@ -36,10 +36,6 @@ typedef struct _PVRSRV_ENV_PER_PROCESS_DATA_
 {
 	IMG_HANDLE hBlockAlloc;
 	struct proc_dir_entry *psProcDir;
-	struct list_head sMMapOffsetStructList;
-#if defined(DEBUG)
-	IMG_UINT32	ui32MMapRefCountWarnings;
-#endif
 } PVRSRV_ENV_PER_PROCESS_DATA;
 
 IMG_VOID RemovePerProcessProcDir(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc);
@@ -49,6 +45,8 @@ PVRSRV_ERROR LinuxMMapPerProcessConnect(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerPro
 IMG_VOID LinuxMMapPerProcessDisconnect(PVRSRV_ENV_PER_PROCESS_DATA *psEnvPerProc);
  
 PVRSRV_ERROR LinuxMMapPerProcessHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase);
+
+IMG_HANDLE LinuxTerminatingProcessPrivateData(IMG_VOID);
 
 #endif 
 

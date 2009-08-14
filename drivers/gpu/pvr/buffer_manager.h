@@ -83,6 +83,7 @@ struct _BM_HEAP_
 	MMU_HEAP				*pMMUHeap;
 	
 	struct _BM_HEAP_ 		*psNext;
+	struct _BM_HEAP_ 		**ppsThis;
 };
 
 struct _BM_CONTEXT_
@@ -108,6 +109,7 @@ struct _BM_CONTEXT_
 	
 
 	struct _BM_CONTEXT_ *psNext;
+	struct _BM_CONTEXT_ **ppsThis;
 };
 
 
@@ -154,8 +156,8 @@ BM_Alloc (IMG_HANDLE			hDevMemHeap,
 
 IMG_BOOL
 BM_Wrap (	IMG_HANDLE hDevMemHeap,
-		    IMG_UINT32 ui32Size,
-			IMG_UINT32 ui32Offset,
+		    IMG_SIZE_T ui32Size,
+			IMG_SIZE_T ui32Offset,
 			IMG_BOOL bPhysContig,
 			IMG_SYS_PHYADDR *psSysAddr,
 			IMG_VOID *pvCPUVAddr,

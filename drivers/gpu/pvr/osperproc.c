@@ -30,6 +30,8 @@
 #include "env_perproc.h"
 #include "proc.h"
 
+extern IMG_UINT32 gui32ReleasePID;
+
 PVRSRV_ERROR OSPerProcessPrivateDataInit(IMG_HANDLE *phOsPrivateData)
 {
 	PVRSRV_ERROR eError;
@@ -39,7 +41,8 @@ PVRSRV_ERROR OSPerProcessPrivateDataInit(IMG_HANDLE *phOsPrivateData)
 	eError = OSAllocMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 				sizeof(PVRSRV_ENV_PER_PROCESS_DATA),
 				phOsPrivateData,
-				&hBlockAlloc);
+				&hBlockAlloc,
+				"Environment per Process Data");
 
 	if (eError != PVRSRV_OK)
 	{
@@ -95,3 +98,9 @@ PVRSRV_ERROR OSPerProcessSetHandleOptions(PVRSRV_HANDLE_BASE *psHandleBase)
 	return LinuxMMapPerProcessHandleOptions(psHandleBase);
 }
 
+IMG_HANDLE LinuxTerminatingProcessPrivateData(IMG_VOID)
+{
+	if(!gui32ReleasePID)
+		return NULL;
+	return PVRSRVPerProcessPrivateData(gui32ReleasePID);
+}

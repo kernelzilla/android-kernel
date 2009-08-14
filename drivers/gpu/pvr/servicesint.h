@@ -52,7 +52,7 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 	IMG_UINT32				ui32Flags;
 										 
 	
-	IMG_UINT32				ui32AllocSize;		
+	IMG_SIZE_T				ui32AllocSize;		
 
 													
 	PVRSRV_MEMBLK			sMemBlk;
@@ -63,6 +63,16 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 	
 	IMG_UINT32				ui32RefCount;
 
+
+	#if defined(ANDROID)
+	#if !defined(USE_CODE)
+	
+	IMG_UINT64				ui64Stamp;
+	#else 
+	IMG_UINT32				dummy1;
+	IMG_UINT32				dummy2;
+	#endif 
+	#endif 
 
 	
 	struct _PVRSRV_KERNEL_SYNC_INFO_	*psKernelSyncInfo;
@@ -84,6 +94,9 @@ typedef struct _PVRSRV_KERNEL_SYNC_INFO_
 	
 	PVRSRV_KERNEL_MEM_INFO	*psSyncDataMemInfoKM;
 
+	
+	IMG_HANDLE				hResItem;
+	
 } PVRSRV_KERNEL_SYNC_INFO;
 
 typedef struct _PVRSRV_DEVICE_SYNC_OBJECT_
@@ -105,14 +118,14 @@ typedef struct _PVRSRV_SYNC_OBJECT
 
 typedef struct _PVRSRV_COMMAND
 {
-	IMG_UINT32			ui32CmdSize;		
+	IMG_SIZE_T			ui32CmdSize;		
 	IMG_UINT32			ui32DevIndex;		
 	IMG_UINT32			CommandType;		
 	IMG_UINT32			ui32DstSyncCount;	
 	IMG_UINT32			ui32SrcSyncCount;	
 	PVRSRV_SYNC_OBJECT	*psDstSync;			
 	PVRSRV_SYNC_OBJECT	*psSrcSync;			
-	IMG_UINT32			ui32DataSize;		
+	IMG_SIZE_T			ui32DataSize;		
 	IMG_UINT32			ui32ProcessID;		
 	IMG_VOID			*pvData;			
 }PVRSRV_COMMAND, *PPVRSRV_COMMAND;
@@ -122,11 +135,11 @@ typedef struct _PVRSRV_QUEUE_INFO_
 {
 	IMG_VOID			*pvLinQueueKM;			
 	IMG_VOID			*pvLinQueueUM;			
-	volatile IMG_UINT32	ui32ReadOffset;			
-	volatile IMG_UINT32	ui32WriteOffset;		
+	volatile IMG_SIZE_T	ui32ReadOffset;			
+	volatile IMG_SIZE_T	ui32WriteOffset;		
 	IMG_UINT32			*pui32KickerAddrKM;		
 	IMG_UINT32			*pui32KickerAddrUM;		
-	IMG_UINT32			ui32QueueSize;			
+	IMG_SIZE_T			ui32QueueSize;			
 
 	IMG_UINT32			ui32ProcessID;			
 
@@ -222,7 +235,7 @@ PVRSRVGetMMUContextPDDevPAddr(const PVRSRV_CONNECTION *psConnection,
 IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV
 PVRSRVAllocSharedSysMem(const PVRSRV_CONNECTION *psConnection,
 						IMG_UINT32 ui32Flags,
-						IMG_UINT32 ui32Size,
+						IMG_SIZE_T ui32Size,
 						PVRSRV_CLIENT_MEM_INFO **ppsClientMemInfo);
 
 IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV

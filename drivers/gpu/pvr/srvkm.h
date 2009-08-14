@@ -37,10 +37,23 @@ IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVProcessDisconnect(IMG_UINT32	ui32PID);
 
 IMG_VOID IMG_CALLCONV PVRSRVSetDCState(IMG_UINT32 ui32State);
 
-PVRSRV_ERROR IMG_CALLCONV PVRSRVSaveRestoreLiveSegments(IMG_HANDLE hArena, IMG_PBYTE pbyBuffer, IMG_UINT32 *puiBufSize, IMG_BOOL bSave);
+PVRSRV_ERROR IMG_CALLCONV PVRSRVSaveRestoreLiveSegments(IMG_HANDLE hArena, IMG_PBYTE pbyBuffer, IMG_SIZE_T *puiBufSize, IMG_BOOL bSave);
 
 #if defined (__cplusplus)
 }
 #endif
+
+#define LOOP_UNTIL_TIMEOUT(TIMEOUT) \
+{\
+	IMG_UINT32 uiOffset, uiStart, uiCurrent; \
+	for(uiOffset = 0, uiStart = OSClockus(), uiCurrent = uiStart+1; \
+		(uiCurrent - uiStart + uiOffset) < TIMEOUT; \
+		uiCurrent = OSClockus(), \
+		uiOffset = uiCurrent < uiStart ? IMG_UINT32_MAX - uiStart : uiOffset, \
+		uiStart = uiCurrent < uiStart ? 0 : uiStart)
+
+#define END_LOOP_UNTIL_TIMEOUT() \
+}
+
 
 #endif 

@@ -56,6 +56,44 @@ IMG_UINT32 PVRSRV_BridgeDispatchKM(IMG_UINT32	Ioctl,
 								   IMG_UINT32	OutBufLen,
 								   IMG_UINT32	*pdwBytesTransferred);
 
+#if defined(DEBUG) && defined(DUMP_OMAP34xx_CLOCKS)
+
+#include <mach/clock.h>
+
+#include <../mach-omap2/clock_34xx.h>
+
+static void omap3_clk_recalc(struct clk *clk) {}
+static void omap3_followparent_recalc(struct clk *clk) {}
+static void omap3_propagate_rate(struct clk *clk) {}
+static void omap3_table_recalc(struct clk *clk) {}
+static long omap3_round_to_table_rate(struct clk *clk, unsigned long rate) { return 0; }
+static int omap3_select_table_rate(struct clk *clk, unsigned long rate) { return 0; }
+
+static void dump_omap34xx_clocks(void)
+{
+	struct vdd_prcm_config *t1 = vdd1_rate_table;
+	struct vdd_prcm_config *t2 = vdd2_rate_table;
+	struct clk **c;
+
+	t1 = t1;
+	t2 = t2;
+
+	for(c = onchip_clks; c < onchip_clks + ARRAY_SIZE(onchip_clks); c++)
+	{
+		struct clk *cp = *c, *copy;
+		copy = clk_get(NULL, cp->name);
+		if(!copy)
+			continue;
+		PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %dHz", __func__, cp->name, clk_get_rate(copy)));
+	}
+}
+
+#else  
+
+static INLINE void dump_omap34xx_clocks(void) {}
+
+#endif 
+
 static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 {
 #if defined(NO_HARDWARE)
@@ -234,6 +272,11 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS; 
 	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ; 
 #endif
+
+	
+
+	gpsSysSpecificData->ui32SrcClockDiv = 3;
+
 	
 
 
@@ -328,6 +371,8 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		return eError;
 	}
 #endif	
+
+	dump_omap34xx_clocks();
 
 	eError = PVRSRVInitialiseDevice(gui32SGXDeviceID);
 	if (eError != PVRSRV_OK)
@@ -621,6 +666,8 @@ IMG_VOID SysClearInterrupts(SYS_DATA* psSysData, IMG_UINT32 ui32ClearBits)
 	PVR_UNREFERENCED_PARAMETER(ui32ClearBits);
 
 	
+	OSReadHWReg(((PVRSRV_SGXDEV_INFO *)gpsSGXDevNode->pvDevice)->pvRegsBaseKM,
+										EUR_CR_EVENT_HOST_CLEAR);
 }
 
 
@@ -635,7 +682,16 @@ PVRSRV_ERROR SysSystemPrePowerState(PVR_POWER_STATE eNewPowerState)
 #if defined(SYS_USING_INTERRUPTS)
 		if (SYS_SPECIFIC_DATA_TEST(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_LISR))
 		{
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+			IMG_BOOL bWrapped = WrapSystemPowerChange(&gsSysSpecificData);
+#endif
 			eError = OSUninstallDeviceLISR(gpsSysData);
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+			if (bWrapped)
+			{
+				UnwrapSystemPowerChange(&gsSysSpecificData);
+			}
+#endif
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,"SysSystemPrePowerState: OSUninstallDeviceLISR failed (%d)", eError));
@@ -682,7 +738,17 @@ PVRSRV_ERROR SysSystemPostPowerState(PVR_POWER_STATE eNewPowerState)
 #if defined(SYS_USING_INTERRUPTS)
 		if (SYS_SPECIFIC_DATA_TEST(&gsSysSpecificData, SYS_SPECIFIC_DATA_PM_UNINSTALL_LISR))
 		{
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+			IMG_BOOL bWrapped = WrapSystemPowerChange(&gsSysSpecificData);
+#endif
+
 			eError = OSInstallDeviceLISR(gpsSysData, gsSGXDeviceMap.ui32IRQ, "SGX ISR", gpsSGXDevNode);
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+			if (bWrapped)
+			{
+				UnwrapSystemPowerChange(&gsSysSpecificData);
+			}
+#endif
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,"SysSystemPostPowerState: OSInstallDeviceLISR failed to install ISR (%d)", eError));

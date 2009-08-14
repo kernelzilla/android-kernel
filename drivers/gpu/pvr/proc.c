@@ -44,16 +44,11 @@
 #include "proc.h"
 #include "perproc.h"
 #include "env_perproc.h"
+#include "linkage.h"
 
-#ifdef DEBUG
-IMG_INT PVRDebugProcSetLevel(struct file *file, const IMG_CHAR *buffer, IMG_UINT32 count, IMG_VOID *data);
-IMG_INT PVRDebugProcGetLevel(IMG_CHAR *page, IMG_CHAR **start, off_t off, IMG_INT count, IMG_INT *eof, IMG_VOID *data);
+#include "lists.h"
+DECLARE_LIST_ANY_VA(PVRSRV_DEVICE_NODE);
 
-#ifdef PVR_MANUAL_POWER_CONTROL
-IMG_INT PVRProcSetPowerLevel(struct file *file, const IMG_CHAR *buffer, IMG_UINT32 count, IMG_VOID *data);
-IMG_INT PVRProcGetPowerLevel(IMG_CHAR *page, IMG_CHAR **start, off_t off, IMG_INT count, IMG_INT *eof, IMG_VOID *data);
-#endif
-#endif
 
 static struct proc_dir_entry * dir;
 
@@ -65,7 +60,7 @@ static const IMG_CHAR PVRProcDirRoot[] = "pvr";
 off_t printAppend(IMG_CHAR * buffer, size_t size, off_t off, const IMG_CHAR * format, ...)
 {
     IMG_INT n;
-    IMG_INT space = size - off;
+    size_t space = size - (size_t)off;
     va_list ap;
 
     PVR_ASSERT(space >= 0);
@@ -76,15 +71,15 @@ off_t printAppend(IMG_CHAR * buffer, size_t size, off_t off, const IMG_CHAR * fo
 
     va_end (ap);
     
-    if (n >= space || n < 0)
+    if (n >= (IMG_INT)space || n < 0)
     {
 	
         buffer[size - 1] = 0;
-        return size - 1;
+        return (off_t)(size - 1);
     }
     else
     {
-        return off + n;
+        return (off + (off_t)n);
     }
 }
 
@@ -92,9 +87,9 @@ off_t printAppend(IMG_CHAR * buffer, size_t size, off_t off, const IMG_CHAR * fo
 static IMG_INT pvr_read_proc(IMG_CHAR *page, IMG_CHAR **start, off_t off,
                          IMG_INT count, IMG_INT *eof, IMG_VOID *data)
 {
-	pvr_read_proc_t *pprn = data;
+    pvr_read_proc_t *pprn = (pvr_read_proc_t *)data;
 
-    off_t len = pprn (page, count, off);
+    off_t len = pprn (page, (size_t)count, off);
 
     if (len == END_OF_FILE)
     {
@@ -142,7 +137,9 @@ static IMG_INT CreateProcEntryInDir(struct proc_dir_entry *pdir, const IMG_CHAR 
 
     if (file)
     {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
         file->owner = THIS_MODULE;
+#endif
 		file->read_proc = rhandler;
 		file->write_proc = whandler;
 		file->data = data;
@@ -193,22 +190,22 @@ IMG_INT CreatePerProcessProcEntry(const IMG_CHAR * name, read_proc_t rhandler, w
 
         ret = snprintf(dirname, sizeof(dirname), "%lu", ui32PID);
 
-        if (ret <=0 || ret >= sizeof(dirname))
-	{
-		PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: couldn't generate per process proc directory name \"%u\"", ui32PID));
-
-                return -ENOMEM;
-	}
-	else
-        {
-            psPerProc->psProcDir = proc_mkdir(dirname, dir);
-            if (!psPerProc->psProcDir)
-	    {
-                PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: couldn't create per process proc directory /proc/%s/%u", PVRProcDirRoot, ui32PID));
-
-                return -ENOMEM;
-	    }
-        }
+		if (ret <=0 || ret >= (IMG_INT)sizeof(dirname))
+		{
+			PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: couldn't generate per process proc directory name \"%u\"", ui32PID));
+	
+					return -ENOMEM;
+		}
+		else
+		{
+			psPerProc->psProcDir = proc_mkdir(dirname, dir);
+			if (!psPerProc->psProcDir)
+			{
+			PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: couldn't create per process proc directory /proc/%s/%u", PVRProcDirRoot, ui32PID));
+	
+			return -ENOMEM;
+			}
+		}
     }
 
     return CreateProcEntryInDir(psPerProc->psProcDir, name, rhandler, whandler, data);
@@ -230,8 +227,9 @@ IMG_INT CreateProcReadEntry(const IMG_CHAR * name, pvr_read_proc_t handler)
 
     if (file)
     {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
         file->owner = THIS_MODULE;
-
+#endif
         return 0;
     }
 
@@ -295,19 +293,25 @@ IMG_VOID RemoveProcEntry(const IMG_CHAR *name)
 
 IMG_VOID RemovePerProcessProcEntry(const IMG_CHAR *name)
 {
-    PVRSRV_ENV_PER_PROCESS_DATA *psPerProc = PVRSRVFindPerProcessPrivateData();
+    PVRSRV_ENV_PER_PROCESS_DATA *psPerProc;
 
+    psPerProc = LinuxTerminatingProcessPrivateData();
     if (!psPerProc)
     {
-	PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: can't remove %s, no per process data", name));
-	return;
+        psPerProc = PVRSRVFindPerProcessPrivateData();
+        if (!psPerProc)
+        {
+            PVR_DPF((PVR_DBG_ERROR, "CreatePerProcessProcEntries: can't "
+                                    "remove %s, no per process data", name));
+            return;
+        }
     }
 
     if (psPerProc->psProcDir)
     {
-	remove_proc_entry(name, psPerProc->psProcDir);
+        remove_proc_entry(name, psPerProc->psProcDir);
 
-	PVR_DPF((PVR_DBG_MESSAGE, "Removing proc entry %s from %s", name, psPerProc->psProcDir->name));
+        PVR_DPF((PVR_DBG_MESSAGE, "Removing proc entry %s from %s", name, psPerProc->psProcDir->name));
     }
 }
 
@@ -398,7 +402,7 @@ static const IMG_CHAR *deviceTypeToString(PVRSRV_DEVICE_TYPE deviceType)
         {
             static IMG_CHAR text[10];
 
-            sprintf(text, "?%x", deviceType);
+            sprintf(text, "?%x", (IMG_UINT)deviceType);
 
             return text;
         }
@@ -426,10 +430,23 @@ static const IMG_CHAR *deviceClassToString(PVRSRV_DEVICE_CLASS deviceClass)
 	{
 	    static IMG_CHAR text[10];
 
-	    sprintf(text, "?%x", deviceClass);
+	    sprintf(text, "?%x", (IMG_UINT)deviceClass);
 	    return text;
 	}
     }
+}
+
+IMG_VOID* DecOffPsDev_AnyVaCb(PVRSRV_DEVICE_NODE *psNode, va_list va)
+{
+	off_t *pOff = va_arg(va, off_t*);
+	if (--(*pOff))
+	{
+		return IMG_NULL;
+	}
+	else
+	{
+		return psNode;
+	}
 }
 
 static
@@ -458,10 +475,10 @@ off_t procDumpSysNodes(IMG_CHAR *buf, size_t size, off_t off)
     }
 
     
-    for(psDevNode = psSysData->psDeviceNodeList;
-		--off && psDevNode;
-		psDevNode = psDevNode->psNext)
-	;
+	psDevNode = (PVRSRV_DEVICE_NODE*)
+				List_PVRSRV_DEVICE_NODE_Any_va(psSysData->psDeviceNodeList,
+													DecOffPsDev_AnyVaCb,
+													&off);
 
     if (!psDevNode)
     {

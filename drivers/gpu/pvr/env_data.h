@@ -48,9 +48,7 @@ typedef struct _ENV_DATA_TAG
 	IMG_BOOL		bMISRInstalled;
 	IMG_UINT32		ui32IRQ;
 	IMG_VOID		*pvISRCookie;
-	SYS_DATA		*sMISRSysData;
-	struct work_struct	sMISRWork;
-	struct workqueue_struct *sMISRWorkQueue;
+	struct tasklet_struct	sMISRTasklet;
 } ENV_DATA;
 
 #endif 

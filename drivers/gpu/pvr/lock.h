@@ -24,55 +24,9 @@
  *
  ******************************************************************************/
 
-#ifndef _SGXDEFS_H_
-#define	_SGXDEFS_H_
+#ifndef __LOCK_H__
+#define __LOCK_H__
 
-#include "sgxerrata.h"
-#include "sgxfeaturedefs.h"
-
-#if defined(SGX520)
-#include "sgx520defs.h"
-#else
-#if defined(SGX530)
-#include "sgx530defs.h"
-#else
-#if defined(SGX535)
-#include "sgx535defs.h"
-#else
-#if defined(SGX535_V1_1)
-#include "sgx535defs.h"
-#else
-#if defined(SGX540)
-#include "sgx540defs.h"
-#else
-#if defined(SGX541)
-#include "sgx541defs.h"
-#else
-#if defined(SGX543)
-#include "sgx543defs.h"
-#else
-#if defined(SGX545)
-#include "sgx545defs.h"
-#else
-#if defined(SGX531)
-#include "sgx531defs.h"
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-
-#if defined(SGX_FEATURE_MP)
-#if defined(SGX541)
-#include "sgx541mpdefs.h"
-#else
-#include "sgxmpdefs.h"
-#endif 
-#endif 
+extern PVRSRV_LINUX_MUTEX gPVRSRVLock;
 
 #endif 
-

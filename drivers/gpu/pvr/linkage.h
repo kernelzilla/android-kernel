@@ -24,55 +24,24 @@
  *
  ******************************************************************************/
 
-#ifndef _SGXDEFS_H_
-#define	_SGXDEFS_H_
+#ifndef __LINKAGE_H__
+#define __LINKAGE_H__
 
-#include "sgxerrata.h"
-#include "sgxfeaturedefs.h"
-
-#if defined(SGX520)
-#include "sgx520defs.h"
-#else
-#if defined(SGX530)
-#include "sgx530defs.h"
-#else
-#if defined(SGX535)
-#include "sgx535defs.h"
-#else
-#if defined(SGX535_V1_1)
-#include "sgx535defs.h"
-#else
-#if defined(SGX540)
-#include "sgx540defs.h"
-#else
-#if defined(SGX541)
-#include "sgx541defs.h"
-#else
-#if defined(SGX543)
-#include "sgx543defs.h"
-#else
-#if defined(SGX545)
-#include "sgx545defs.h"
-#else
-#if defined(SGX531)
-#include "sgx531defs.h"
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
+#if !defined(SUPPORT_DRI_DRM)
+IMG_INT32 PVRSRV_BridgeDispatchKM(struct file *file, IMG_UINT cmd, IMG_UINT32 arg);
 #endif
 
-#if defined(SGX_FEATURE_MP)
-#if defined(SGX541)
-#include "sgx541mpdefs.h"
-#else
-#include "sgxmpdefs.h"
-#endif 
-#endif 
+IMG_VOID PVRDPFInit(IMG_VOID);
+
+#ifdef DEBUG
+IMG_INT PVRDebugProcSetLevel(struct file *file, const IMG_CHAR *buffer, IMG_UINT32 count, IMG_VOID *data);
+IMG_INT PVRDebugProcGetLevel(IMG_CHAR *page, IMG_CHAR **start, off_t off, IMG_INT count, IMG_INT *eof, IMG_VOID *data);
+IMG_VOID PVRDebugSetLevel(IMG_UINT32 uDebugLevel);
+
+#ifdef PVR_MANUAL_POWER_CONTROL
+IMG_INT PVRProcSetPowerLevel(struct file *file, const IMG_CHAR *buffer, IMG_UINT32 count, IMG_VOID *data);
+IMG_INT PVRProcGetPowerLevel(IMG_CHAR *page, IMG_CHAR **start, off_t off, IMG_INT count, IMG_INT *eof, IMG_VOID *data);
+#endif
+#endif	
 
 #endif 
-

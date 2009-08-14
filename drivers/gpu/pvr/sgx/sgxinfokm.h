@@ -39,6 +39,8 @@ extern "C" {
 
 #define		SGX_HOSTPORT_PRESENT			0x00000001UL
 
+#define PVRSRV_USSE_EDM_INIT_COMPLETE			(1UL << 0)	
+
 #define PVRSRV_USSE_EDM_POWMAN_IDLE_COMPLETE				(1UL << 2)	
 #define PVRSRV_USSE_EDM_POWMAN_POWEROFF_COMPLETE			(1UL << 3)	
 #define PVRSRV_USSE_EDM_POWMAN_POWEROFF_RESTART_IMMEDIATE	(1UL << 4)	
@@ -47,16 +49,13 @@ extern "C" {
 #define PVRSRV_USSE_EDM_INTERRUPT_HWR			(1UL << 0)	
 #define PVRSRV_USSE_EDM_INTERRUPT_ACTIVE_POWER	(1UL << 1)	
 
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_RT_REQUEST 	0x01UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_RC_REQUEST 	0x02UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_TC_REQUEST 	0x04UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_2DC_REQUEST 	0x08UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_SHAREDPBDESC 0x10UL 	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_INVALPD		0x20UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_INVALPT		0x40UL	
-#define PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE 	0x80UL	
+#define PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE 	(1UL << 0)	
 
 #define PVRSRV_USSE_MISCINFO_READY		0x1UL
+#define PVRSRV_USSE_MISCINFO_GET_STRUCT_SIZES	0x2UL	
+
+typedef struct _PVRSRV_STUB_PBDESC_ PVRSRV_STUB_PBDESC;
+
 
 typedef struct _PVRSRV_SGX_CCB_INFO_ *PPVRSRV_SGX_CCB_INFO;
 
@@ -73,6 +72,14 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 	
 	IMG_PVOID				pvRegsBaseKM;
 
+#if defined(SGX_FEATURE_HOST_PORT)
+	
+	IMG_PVOID				pvHostPortBaseKM;
+	
+	IMG_UINT32				ui32HPSize;
+	
+	IMG_SYS_PHYADDR			sHPSysPAddr;
+#endif
 
 	
 	IMG_HANDLE				hRegMapping;
@@ -82,12 +89,24 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 	
 	IMG_UINT32				ui32RegSize;
 
+#if defined(SUPPORT_EXTERNAL_SYSTEM_CACHE)
+	
+	IMG_UINT32				ui32ExtSysCacheRegsSize;
+	
+	IMG_DEV_PHYADDR			sExtSysCacheRegsDevPBase;
+	
+	IMG_UINT32				*pui32ExtSystemCacheRegsPT;
+	
+	IMG_HANDLE				hExtSystemCacheRegsPTPageOSMemHandle;
+	
+	IMG_SYS_PHYADDR			sExtSystemCacheRegsPTSysPAddr;
+#endif
+
 	
 	IMG_UINT32				ui32CoreClockSpeed;
 	IMG_UINT32				ui32uKernelTimerClock;
 
-    
-	IMG_VOID		        *psStubPBDescListKM;
+	PVRSRV_STUB_PBDESC		*psStubPBDescListKM;
 
 
 	
@@ -101,9 +120,11 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 	PVRSRV_SGX_CCB_CTL		*psKernelCCBCtl;		
 	PPVRSRV_KERNEL_MEM_INFO psKernelCCBEventKickerMemInfo; 
 	IMG_UINT32				*pui32KernelCCBEventKicker; 
+#if defined(PDUMP)
+	IMG_UINT32				ui32KernelCCBEventKickerDumpVal; 
+#endif 
  	PVRSRV_KERNEL_MEM_INFO	*psKernelSGXMiscMemInfo;	
-	IMG_UINT32				ui32HostKickAddress;		
- 	IMG_UINT32				ui32GetMiscInfoAddress;		
+	IMG_UINT32				aui32HostKickAddr[SGXMKIF_CMD_MAX];		
 #if defined(SGX_SUPPORT_HWPROFILING)
 	PPVRSRV_KERNEL_MEM_INFO psKernelHWProfilingMemInfo;
 #endif
@@ -111,10 +132,12 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 	IMG_UINT32				ui32KickTARenderCounter;
 #if defined(SUPPORT_SGX_HWPERF)
 	PPVRSRV_KERNEL_MEM_INFO		psKernelHWPerfCBMemInfo;
-	PVRSRV_SGXDEV_DIFF_INFO		sDiffInfo;
 	IMG_UINT32					ui32HWGroupRequested;
 	IMG_UINT32					ui32HWReset;
 #endif
+#ifdef PVRSRV_USSE_EDM_STATUS_DEBUG
+	PPVRSRV_KERNEL_MEM_INFO	psKernelEDMStatusBufferMemInfo; 
+#endif 
 #if defined(SGX_FEATURE_OVERLAPPED_SPM)
 	PPVRSRV_KERNEL_MEM_INFO	psKernelTmpRgnHeaderMemInfo; 
 #endif 
@@ -127,6 +150,12 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 
 	
 	IMG_UINT32				ui32CacheControl;
+
+	
+	IMG_UINT32				ui32ClientBuildOptions;
+
+	
+	SGX_MISCINFO_STRUCT_SIZES	sSGXStructSizes;
 
 	
 
@@ -155,6 +184,16 @@ typedef struct _PVRSRV_SGXDEV_INFO_
 	IMG_UINT32				*pui32BIFResetPD;
 	IMG_UINT32				*pui32BIFResetPT;
 
+#if defined(FIX_HW_BRN_22997) && defined(FIX_HW_BRN_23030) && defined(SGX_FEATURE_HOST_PORT)
+	
+	IMG_HANDLE				hBRN22997PTPageOSMemHandle;
+	IMG_HANDLE				hBRN22997PDPageOSMemHandle;
+	IMG_DEV_PHYADDR 		sBRN22997PTDevPAddr;
+	IMG_DEV_PHYADDR 		sBRN22997PDDevPAddr;
+	IMG_UINT32				*pui32BRN22997PT;
+	IMG_UINT32				*pui32BRN22997PD;
+	IMG_SYS_PHYADDR 		sBRN22997SysPAddr;
+#endif 
 
 #if defined(SUPPORT_HW_RECOVERY)
 	
@@ -212,12 +251,22 @@ typedef struct _SGX_DEVICE_MAP_
 	IMG_CPU_VIRTADDR		pvRegsCpuVBase;
 	IMG_UINT32				ui32RegsSize;
 
+#if defined(SGX_FEATURE_HOST_PORT)
+	IMG_SYS_PHYADDR			sHPSysPBase;
+	IMG_CPU_PHYADDR			sHPCpuPBase;
+	IMG_UINT32				ui32HPSize;
+#endif
 
 	
 	IMG_SYS_PHYADDR			sLocalMemSysPBase;
 	IMG_DEV_PHYADDR			sLocalMemDevPBase;
 	IMG_CPU_PHYADDR			sLocalMemCpuPBase;
 	IMG_UINT32				ui32LocalMemSize;
+
+#if defined(SUPPORT_EXTERNAL_SYSTEM_CACHE)
+	IMG_UINT32				ui32ExtSysCacheRegsSize;
+	IMG_DEV_PHYADDR			sExtSysCacheRegsDevPBase;
+#endif
 
 	
 	IMG_UINT32				ui32IRQ;
@@ -229,7 +278,6 @@ typedef struct _SGX_DEVICE_MAP_
 } SGX_DEVICE_MAP;
 
 
-typedef struct _PVRSRV_STUB_PBDESC_ PVRSRV_STUB_PBDESC;
 struct _PVRSRV_STUB_PBDESC_
 {
 	IMG_UINT32		ui32RefCount;
@@ -240,7 +288,9 @@ struct _PVRSRV_STUB_PBDESC_
 	IMG_UINT32		ui32SubKernelMemInfosCount;
 	IMG_HANDLE		hDevCookie;
 	PVRSRV_KERNEL_MEM_INFO  *psBlockKernelMemInfo;
+	PVRSRV_KERNEL_MEM_INFO  *psHWBlockKernelMemInfo;
 	PVRSRV_STUB_PBDESC	*psNext;
+	PVRSRV_STUB_PBDESC	**ppsThis;
 };
 
 typedef struct _PVRSRV_SGX_CCB_INFO_
@@ -265,9 +315,6 @@ IMG_VOID SGXReset(PVRSRV_SGXDEV_INFO	*psDevInfo,
 PVRSRV_ERROR SGXInitialise(PVRSRV_SGXDEV_INFO	*psDevInfo,
 						   IMG_BOOL				bHardwareRecovery);
 PVRSRV_ERROR SGXDeinitialise(IMG_HANDLE hDevCookie);
-
-IMG_VOID SGXStartTimer(PVRSRV_SGXDEV_INFO	*psDevInfo,
-					   IMG_BOOL				bStartOSTimer);
 
 PVRSRV_ERROR SGXPrePowerStateExt(IMG_HANDLE			hDevHandle,
 								 PVR_POWER_STATE	eNewPowerState,

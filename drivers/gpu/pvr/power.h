@@ -43,6 +43,7 @@ typedef struct _PVRSRV_POWER_DEV_TAG_
 	PVR_POWER_STATE 				eDefaultPowerState;
 	PVR_POWER_STATE 				eCurrentPowerState;
 	struct _PVRSRV_POWER_DEV_TAG_	*psNext;
+	struct _PVRSRV_POWER_DEV_TAG_	**ppsThis;
 
 } PVRSRV_POWER_DEV;
 

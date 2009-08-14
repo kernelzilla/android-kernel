@@ -49,7 +49,7 @@
 #define INDEX_TO_HANDLE_PTR(psBase, i) (((psBase)->psHandleArray) + (i))
 #define	HANDLE_TO_HANDLE_PTR(psBase, h) (INDEX_TO_HANDLE_PTR(psBase, HANDLE_TO_INDEX(psBase, h)))
 
-#define	HANDLE_PTR_TO_INDEX(psBase, psHandle) ((psHandle) - ((psBase)->psHandleArray))
+#define	HANDLE_PTR_TO_INDEX(psBase, psHandle) (IMG_UINT32)((psHandle) - ((psBase)->psHandleArray))
 #define	HANDLE_PTR_TO_HANDLE(psBase, psHandle) \
 	INDEX_TO_HANDLE(psBase, HANDLE_PTR_TO_INDEX(psBase, psHandle))
 
@@ -284,6 +284,7 @@ IMG_HANDLE ParentHandle(struct sHandle *psHandle)
 static INLINE
 IMG_VOID HandleListInsertBefore(PVRSRV_HANDLE_BASE *psBase, IMG_UINT32 ui32InsIndex, struct sHandleList *psIns, IMG_SIZE_T uiParentOffset, IMG_UINT32 ui32EntryIndex, struct sHandleList *psEntry, IMG_SIZE_T uiEntryOffset, IMG_UINT32 ui32ParentIndex)
 {
+	 
 	struct sHandleList *psPrevIns = LIST_PTR_FROM_INDEX_AND_OFFSET(psBase, psIns->ui32Prev, ui32ParentIndex, uiParentOffset, uiEntryOffset);
 
 	PVR_ASSERT(psEntry->hParent == IMG_NULL);
@@ -306,7 +307,7 @@ IMG_VOID AdoptChild(PVRSRV_HANDLE_BASE *psBase, struct sHandle *psParent, struct
 {
 	IMG_UINT32 ui32Parent = HANDLE_TO_INDEX(psBase, psParent->sChildren.hParent);
 
-	PVR_ASSERT(ui32Parent == (IMG_UINT32)HANDLE_PTR_TO_INDEX(psBase, psParent));
+	PVR_ASSERT(ui32Parent == HANDLE_PTR_TO_INDEX(psBase, psParent));
 
 	HandleListInsertBefore(psBase, ui32Parent, &psParent->sChildren, offsetof(struct sHandle, sChildren), HANDLE_PTR_TO_INDEX(psBase, psChild), &psChild->sSiblings, offsetof(struct sHandle, sSiblings), ui32Parent);
 
@@ -320,6 +321,7 @@ IMG_VOID HandleListRemove(PVRSRV_HANDLE_BASE *psBase, IMG_UINT32 ui32EntryIndex,
 {
 	if (!HandleListIsEmpty(ui32EntryIndex, psEntry))
 	{
+		 
 		struct sHandleList *psPrev = LIST_PTR_FROM_INDEX_AND_OFFSET(psBase, psEntry->ui32Prev, HANDLE_TO_INDEX(psBase, psEntry->hParent), uiParentOffset, uiEntryOffset);
 		struct sHandleList *psNext = LIST_PTR_FROM_INDEX_AND_OFFSET(psBase, psEntry->ui32Next, HANDLE_TO_INDEX(psBase, psEntry->hParent), uiParentOffset, uiEntryOffset);
 
@@ -357,6 +359,7 @@ PVRSRV_ERROR HandleListIterate(PVRSRV_HANDLE_BASE *psBase, struct sHandleList *p
 	for(ui32Index = psHead->ui32Next; ui32Index != ui32Parent; )
 	{
 		struct sHandle *psHandle = INDEX_TO_HANDLE_PTR(psBase, ui32Index);
+		 
 		struct sHandleList *psEntry = LIST_PTR_FROM_INDEX_AND_OFFSET(psBase, ui32Index, ui32Parent, uiParentOffset, uiEntryOffset);
 		PVRSRV_ERROR eError;
 
@@ -651,7 +654,8 @@ static PVRSRV_ERROR ReallocMem(IMG_PVOID *ppvMem, IMG_HANDLE *phBlockAlloc, IMG_
 		eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 			ui32NewSize,
 			&pvNewMem,
-			&hNewBlockAlloc);
+			&hNewBlockAlloc,
+			"Memory Area");
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR, "ReallocMem: Couldn't allocate new memory area (%d)", eError));
@@ -1277,7 +1281,7 @@ static PVRSRV_ERROR PVRSRVHandleBatchCommitOrRelease(PVRSRV_HANDLE_BASE *psBase,
 			
 			if (!BATCHED_HANDLE_PARTIALLY_FREE(psHandle))
 			{
-				SET_UNBATCHED_HANDLE(psHandle);
+				SET_UNBATCHED_HANDLE(psHandle);  
 			}
 
 			eError = FreeHandle(psBase, psHandle);
@@ -1289,7 +1293,7 @@ static PVRSRV_ERROR PVRSRVHandleBatchCommitOrRelease(PVRSRV_HANDLE_BASE *psBase,
 		}
 		else
 		{
-			SET_UNBATCHED_HANDLE(psHandle);
+			SET_UNBATCHED_HANDLE(psHandle);  
 		}
 
 		ui32IndexPlusOne = ui32NextIndexPlusOne;
@@ -1341,7 +1345,7 @@ PVRSRV_ERROR PVRSRVSetMaxHandle(PVRSRV_HANDLE_BASE *psBase, IMG_UINT32 ui32MaxHa
 	}
 
 	
-	if (ui32MaxHandle == 0 || ui32MaxHandle > DEFAULT_MAX_HANDLE)
+	if (ui32MaxHandle == 0 || ui32MaxHandle >= DEFAULT_MAX_HANDLE)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVSetMaxHandle: Limit must be between %u and %u, inclusive", 0, DEFAULT_MAX_HANDLE));
 
@@ -1446,7 +1450,8 @@ PVRSRV_ERROR PVRSRVAllocHandleBase(PVRSRV_HANDLE_BASE **ppsBase)
 	eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 		sizeof(*psBase),
 		(IMG_PVOID *)&psBase,
-		&hBlockAlloc);
+		&hBlockAlloc,
+		"Handle Base");
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVAllocHandleBase: Couldn't allocate handle base (%d)", eError));

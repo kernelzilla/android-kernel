@@ -231,6 +231,7 @@ typedef struct _PVRSRV_DEVICE_NODE_
 	IMG_UINT32				ui32Flags;
 	
 	struct _PVRSRV_DEVICE_NODE_	*psNext;
+	struct _PVRSRV_DEVICE_NODE_	**ppsThis;
 } PVRSRV_DEVICE_NODE;
 
 PVRSRV_ERROR IMG_CALLCONV PVRSRVRegisterDevice(PSYS_DATA psSysData,

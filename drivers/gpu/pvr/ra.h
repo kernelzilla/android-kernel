@@ -42,37 +42,37 @@ typedef struct _BM_MAPPING_ BM_MAPPING;
 struct _RA_STATISTICS_
 {
     
-    IMG_UINT32 uSpanCount;
+    IMG_SIZE_T uSpanCount;
 
     
-    IMG_UINT32 uLiveSegmentCount;
+    IMG_SIZE_T uLiveSegmentCount;
 
     
-    IMG_UINT32 uFreeSegmentCount;
+    IMG_SIZE_T uFreeSegmentCount;
 
     
-    IMG_UINT32 uTotalResourceCount;
+    IMG_SIZE_T uTotalResourceCount;
     
     
-    IMG_UINT32 uFreeResourceCount;
+    IMG_SIZE_T uFreeResourceCount;
 
     
-    IMG_UINT32 uCumulativeAllocs;
+    IMG_SIZE_T uCumulativeAllocs;
 
     
-    IMG_UINT32 uCumulativeFrees;
+    IMG_SIZE_T uCumulativeFrees;
 
     
-    IMG_UINT32 uImportCount;
+    IMG_SIZE_T uImportCount;
 
     
-    IMG_UINT32 uExportCount;
+    IMG_SIZE_T uExportCount;
 };
 typedef struct _RA_STATISTICS_ RA_STATISTICS;
 
 struct _RA_SEGMENT_DETAILS_
 {
-	IMG_UINT32      uiSize;
+	IMG_SIZE_T      uiSize;
 	IMG_CPU_PHYADDR sCpuPhyAddr;
 	IMG_HANDLE      hSegment;
 };
@@ -94,8 +94,8 @@ RA_Create (IMG_CHAR *name,
                                 IMG_UINTPTR_T,
                                 BM_MAPPING *),
            IMG_VOID (*backingstore_free) (IMG_VOID *,
-                                          IMG_UINT32,
-                                          IMG_UINT32,
+                                          IMG_SIZE_T,
+                                          IMG_SIZE_T,
                                           IMG_HANDLE),
            IMG_VOID *import_handle);
 

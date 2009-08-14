@@ -31,6 +31,8 @@
 
 #include <linux/version.h>
 #include <linux/clk.h>
+#include <linux/spinlock.h>
+#include <asm/atomic.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,26))
 #include <linux/semaphore.h>
@@ -82,9 +84,19 @@ typedef struct _SYS_SPECIFIC_DATA_TAG_
 	IMG_UINT32	ui32SysSpecificData;
 	PVRSRV_DEVICE_NODE *psSGXDevNode;
 	IMG_BOOL	bSGXInitComplete;
+#if !defined(__linux__)
 	IMG_BOOL	bSGXClocksEnabled;
+#endif
+	IMG_UINT32	ui32SrcClockDiv;
 #if defined(__linux__)
 	IMG_BOOL	bSysClocksOneTimeInit;
+	IMG_BOOL	bConstraintNotificationsEnabled;
+	atomic_t	sSGXClocksEnabled;
+	spinlock_t	sPowerLock;
+	atomic_t	sPowerLockCPU;
+	spinlock_t	sNotifyLock;
+	atomic_t	sNotifyLockCPU;
+	IMG_BOOL	bCallVDD2PostFunc;
 
 	struct clk	*psCORE_CK;
 	struct clk	*psSGX_FCK;
@@ -101,6 +113,11 @@ typedef struct _SYS_SPECIFIC_DATA_TAG_
 } SYS_SPECIFIC_DATA;
 
 extern SYS_SPECIFIC_DATA *gpsSysSpecificData;
+
+#if defined(SYS_CUSTOM_POWERLOCK_WRAP)
+IMG_BOOL WrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData);
+IMG_VOID UnwrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData);
+#endif
 
 #if defined(__cplusplus)
 }

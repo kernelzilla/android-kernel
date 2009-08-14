@@ -59,6 +59,11 @@ typedef union _SGX_INIT_COMMAND
 		IMG_UINT32 ui32Value;
 	} sPDumpHWReg;
 #endif
+#if defined(FIX_HW_BRN_22997) && defined(FIX_HW_BRN_23030) && defined(SGX_FEATURE_HOST_PORT)			
+	struct {
+		SGX_INIT_OPERATION eOp;
+	} sWorkaroundBRN22997;
+#endif	
 } SGX_INIT_COMMAND;
 
 typedef struct _SGX_INIT_SCRIPTS_

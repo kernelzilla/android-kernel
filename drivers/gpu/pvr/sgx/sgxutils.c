@@ -48,11 +48,38 @@
 
 
 #if defined(SYS_CUSTOM_POWERDOWN)
-PVRSRV_ERROR SysPowerDownMISR(IMG_UINT32 ui32DeviceIndex, IMG_UINT32 ui32CallerID);
+PVRSRV_ERROR SysPowerDownMISR(PVRSRV_DEVICE_NODE	* psDeviceNode, IMG_UINT32 ui32CallerID);
 #endif
 
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
+
+IMG_VOID SGXPostActivePowerEvent(PVRSRV_DEVICE_NODE	* psDeviceNode,
+                                 IMG_UINT32           ui32CallerID)
+{
+	PVRSRV_SGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
+	SGXMKIF_HOST_CTL	*psSGXHostCtl = psDevInfo->psSGXHostCtl;
+	
+	
+	psSGXHostCtl->ui32NumActivePowerEvents++;
+			
+	if ((psSGXHostCtl->ui32PowerStatus & PVRSRV_USSE_EDM_POWMAN_POWEROFF_RESTART_IMMEDIATE) != 0)
+	{
+		
+
+
+		if (ui32CallerID == ISR_ID)
+		{
+			psDeviceNode->bReProcessDeviceCommandComplete = IMG_TRUE;
+		}
+		else
+		{
+			SGXScheduleProcessQueuesKM(psDeviceNode);
+		}
+	}	
+}
+
+
 IMG_VOID SGXTestActivePowerEvent (PVRSRV_DEVICE_NODE	*psDeviceNode,
 								  IMG_UINT32			ui32CallerID)
 {
@@ -73,30 +100,14 @@ IMG_VOID SGXTestActivePowerEvent (PVRSRV_DEVICE_NODE	*psDeviceNode,
 		
 
 
-		eError = SysPowerDownMISR(psDeviceNode->sDevId.ui32DeviceIndex, ui32CallerID);
+		eError = SysPowerDownMISR(psDeviceNode, ui32CallerID);
 #else
 		eError = PVRSRVSetDevicePowerStateKM(psDeviceNode->sDevId.ui32DeviceIndex,
 											 PVRSRV_POWER_STATE_D3,
 											 ui32CallerID, IMG_FALSE);
 		if (eError == PVRSRV_OK)
 		{
-			
-			psSGXHostCtl->ui32NumActivePowerEvents++;
-			
-			if ((psSGXHostCtl->ui32PowerStatus & PVRSRV_USSE_EDM_POWMAN_POWEROFF_RESTART_IMMEDIATE) != 0)
-			{
-				
-
-
-				if (ui32CallerID == ISR_ID)
-				{
-					psDeviceNode->bReProcessDeviceCommandComplete = IMG_TRUE;
-				}
-				else
-				{
-					SGXScheduleProcessQueuesKM(psDeviceNode);
-				}
-			}
+			SGXPostActivePowerEvent(psDeviceNode, ui32CallerID);		
 		}
 #endif
 		if (eError == PVRSRV_ERROR_RETRY)
@@ -124,31 +135,22 @@ IMG_VOID SGXTestActivePowerEvent (PVRSRV_DEVICE_NODE	*psDeviceNode,
 #endif
 static INLINE SGXMKIF_COMMAND * SGXAcquireKernelCCBSlot(PVRSRV_SGX_CCB_INFO *psCCB)
 {
-	IMG_BOOL	bStart = IMG_FALSE;
-	IMG_UINT32	uiStart = 0;
-
-	
-	do
+	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
 	{
 		if(((*psCCB->pui32WriteOffset + 1) & 255) != *psCCB->pui32ReadOffset)
 		{
 			return &psCCB->psCommands[*psCCB->pui32WriteOffset];
 		}
 
-		if (bStart == IMG_FALSE)
-		{
-			bStart = IMG_TRUE;
-			uiStart = OSClockus();
-		}
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-	} while ((OSClockus() - uiStart) < MAX_HW_TIME_US);
+	} END_LOOP_UNTIL_TIMEOUT();
 
 	
 	return IMG_NULL;
 }
 
 PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
-								   SGXMKIF_COMMAND_TYPE	eCommandType,
+								   SGXMKIF_CMD_TYPE		eCmdType,
 								   SGXMKIF_COMMAND		*psCommandData,
 								   IMG_UINT32			ui32CallerID,
 								   IMG_UINT32			ui32PDumpFlags)
@@ -175,7 +177,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	}
 
 	
-	psCommandData->ui32Data[2] = psDevInfo->ui32CacheControl;
+	psCommandData->ui32CacheControl = psDevInfo->ui32CacheControl;
 
 #if defined(PDUMP)
 	
@@ -188,27 +190,27 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	
 	*psSGXCommand = *psCommandData;
 
-	switch(eCommandType)	
+	if (eCmdType >= SGXMKIF_CMD_MAX)
 	{
-		case SGXMKIF_COMMAND_EDM_KICK:
-			psSGXCommand->ui32ServiceAddress = psDevInfo->ui32HostKickAddress;
-			break;
- 		case SGXMKIF_COMMAND_REQUEST_SGXMISCINFO:
- 			psSGXCommand->ui32ServiceAddress = psDevInfo->ui32GetMiscInfoAddress;
- 			break;
-		case SGXMKIF_COMMAND_VIDEO_KICK:
-		default:
-			PVR_DPF((PVR_DBG_ERROR,"SGXScheduleCCBCommandKM: Unknown command type: %d", eCommandType)) ;
-			eError = PVRSRV_ERROR_GENERIC;
-			goto Exit;
+		PVR_DPF((PVR_DBG_ERROR,"SGXScheduleCCBCommandKM: Unknown command type: %d", eCmdType)) ;
+		eError = PVRSRV_ERROR_GENERIC;
+		goto Exit;		
 	}
+
+	psSGXCommand->ui32ServiceAddress = psDevInfo->aui32HostKickAddr[eCmdType];	 
 
 #if defined(PDUMP)
 	if (ui32CallerID != ISR_ID)
 	{
 		
-		PDUMPCOMMENTWITHFLAGS(0, "Poll for space in the Kernel CCB\r\n");
-		PDUMPMEMPOL(psKernelCCB->psCCBCtlMemInfo, offsetof(PVRSRV_SGX_CCB_CTL, ui32ReadOffset), (psKernelCCB->ui32CCBDumpWOff + 1) & 0xff, 0xff, PDUMP_POLL_OPERATOR_NOTEQUAL, IMG_FALSE, IMG_FALSE, MAKEUNIQUETAG(psKernelCCB->psCCBCtlMemInfo));
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Poll for space in the Kernel CCB\r\n");
+		PDUMPMEMPOL(psKernelCCB->psCCBCtlMemInfo,
+					offsetof(PVRSRV_SGX_CCB_CTL, ui32ReadOffset),
+					(psKernelCCB->ui32CCBDumpWOff + 1) & 0xff,
+					0xff,
+					PDUMP_POLL_OPERATOR_NOTEQUAL,
+					ui32PDumpFlags,
+					MAKEUNIQUETAG(psKernelCCB->psCCBCtlMemInfo));
 
 		PDUMPCOMMENTWITHFLAGS(0, "Kernel CCB command\r\n");
 		pvDumpCommand = (IMG_VOID *)((IMG_UINT8 *)psKernelCCB->psCCBMemInfo->pvLinAddrKM + (*psKernelCCB->pui32WriteOffset * sizeof(SGXMKIF_COMMAND)));
@@ -224,7 +226,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 		PDUMPMEM(&psDevInfo->sPDContext.ui32CacheControl,
 					psKernelCCB->psCCBMemInfo,
 					psKernelCCB->ui32CCBDumpWOff * sizeof(SGXMKIF_COMMAND) +
-					offsetof(SGXMKIF_COMMAND, ui32Data[2]),
+					offsetof(SGXMKIF_COMMAND, ui32CacheControl),
 					sizeof(IMG_UINT32),
 					ui32PDumpFlags,
 					MAKEUNIQUETAG(psKernelCCB->psCCBMemInfo));
@@ -238,6 +240,20 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	}
 #endif
 
+#if defined(FIX_HW_BRN_26620) && defined(SGX_FEATURE_SYSTEM_CACHE) && !defined(SGX_BYPASS_SYSTEM_CACHE)
+	
+	eError = PollForValueKM (psKernelCCB->pui32ReadOffset,
+								*psKernelCCB->pui32WriteOffset,
+								0xFF,
+								MAX_HW_TIME_US/WAIT_TRY_COUNT,
+								WAIT_TRY_COUNT);
+	if (eError != PVRSRV_OK)
+	{
+		eError = PVRSRV_ERROR_TIMEOUT;
+		goto Exit;
+	}
+#endif
+
 	
 
 	*psKernelCCB->pui32WriteOffset = (*psKernelCCB->pui32WriteOffset + 1) & 255;
@@ -245,35 +261,57 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 #if defined(PDUMP)
 	if (ui32CallerID != ISR_ID)
 	{
+	#if defined(FIX_HW_BRN_26620) && defined(SGX_FEATURE_SYSTEM_CACHE) && !defined(SGX_BYPASS_SYSTEM_CACHE)
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Poll for previous Kernel CCB CMD to be read\r\n");
+		PDUMPMEMPOL(psKernelCCB->psCCBCtlMemInfo,
+					offsetof(PVRSRV_SGX_CCB_CTL, ui32ReadOffset),
+					(psKernelCCB->ui32CCBDumpWOff),
+					0xFF,
+					PDUMP_POLL_OPERATOR_EQUAL,
+					ui32PDumpFlags,
+					MAKEUNIQUETAG(psKernelCCB->psCCBCtlMemInfo));
+	#endif
+
 		if (PDumpIsCaptureFrameKM()
 		|| ((ui32PDumpFlags & PDUMP_FLAGS_CONTINUOUS) != 0))
 		{
 			psKernelCCB->ui32CCBDumpWOff = (psKernelCCB->ui32CCBDumpWOff + 1) & 0xFF;
+			psDevInfo->ui32KernelCCBEventKickerDumpVal = (psDevInfo->ui32KernelCCBEventKickerDumpVal + 1) & 0xFF;
 		}
 
-		PDUMPCOMMENTWITHFLAGS(0, "Kernel CCB write offset\r\n");
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Kernel CCB write offset\r\n");
 		PDUMPMEM(&psKernelCCB->ui32CCBDumpWOff,
 				 psKernelCCB->psCCBCtlMemInfo,
 				 offsetof(PVRSRV_SGX_CCB_CTL, ui32WriteOffset),
 				 sizeof(IMG_UINT32),
 				 ui32PDumpFlags,
 				 MAKEUNIQUETAG(psKernelCCB->psCCBCtlMemInfo));
-		PDUMPCOMMENTWITHFLAGS(0, "Kernel CCB event kicker\r\n");
-		PDUMPMEM(&psKernelCCB->ui32CCBDumpWOff,
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Kernel CCB event kicker\r\n");
+		PDUMPMEM(&psDevInfo->ui32KernelCCBEventKickerDumpVal,
 				 psDevInfo->psKernelCCBEventKickerMemInfo,
 				 0,
 				 sizeof(IMG_UINT32),
 				 ui32PDumpFlags,
 				 MAKEUNIQUETAG(psDevInfo->psKernelCCBEventKickerMemInfo));
-		PDUMPCOMMENTWITHFLAGS(0, "Event kick\r\n");
-		PDUMPREGWITHFLAGS(SGX_MP_CORE_SELECT(EUR_CR_EVENT_KICK, 0), EUR_CR_EVENT_KICK_NOW_MASK, 0);
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Kick the SGX microkernel\r\n");
+	#if defined(FIX_HW_BRN_26620) && defined(SGX_FEATURE_SYSTEM_CACHE) && !defined(SGX_BYPASS_SYSTEM_CACHE)
+		PDUMPREGWITHFLAGS(SGX_MP_CORE_SELECT(EUR_CR_EVENT_KICK2, 0), EUR_CR_EVENT_KICK2_NOW_MASK, ui32PDumpFlags);
+	#else
+		PDUMPREGWITHFLAGS(SGX_MP_CORE_SELECT(EUR_CR_EVENT_KICK, 0), EUR_CR_EVENT_KICK_NOW_MASK, ui32PDumpFlags);
+	#endif
 	}
 #endif
 
 	*psDevInfo->pui32KernelCCBEventKicker = (*psDevInfo->pui32KernelCCBEventKicker + 1) & 0xFF;
+#if defined(FIX_HW_BRN_26620) && defined(SGX_FEATURE_SYSTEM_CACHE) && !defined(SGX_BYPASS_SYSTEM_CACHE)
+	OSWriteHWReg(psDevInfo->pvRegsBaseKM,
+				SGX_MP_CORE_SELECT(EUR_CR_EVENT_KICK2, 0),
+				EUR_CR_EVENT_KICK2_NOW_MASK);
+#else
 	OSWriteHWReg(psDevInfo->pvRegsBaseKM,
 				SGX_MP_CORE_SELECT(EUR_CR_EVENT_KICK, 0),
 				EUR_CR_EVENT_KICK_NOW_MASK);
+#endif
 
 #if defined(NO_HARDWARE)
 	
@@ -286,7 +324,7 @@ Exit:
 
 
 PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
-									 SGXMKIF_COMMAND_TYPE	eCommandType,
+									 SGXMKIF_CMD_TYPE		eCmdType,
 									 SGXMKIF_COMMAND		*psCommandData,
 									 IMG_UINT32				ui32CallerID,
 									 IMG_UINT32				ui32PDumpFlags)
@@ -336,7 +374,7 @@ PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
 		return eError;
 	}
 
-	eError = SGXScheduleCCBCommand(psDevInfo, eCommandType, psCommandData, ui32CallerID, ui32PDumpFlags);
+	eError = SGXScheduleCCBCommand(psDevInfo, eCmdType, psCommandData, ui32CallerID, ui32PDumpFlags);
 
 	PVRSRVPowerUnlock(ui32CallerID);
 
@@ -359,7 +397,7 @@ PVRSRV_ERROR SGXScheduleProcessQueuesKM(PVRSRV_DEVICE_NODE *psDeviceNode)
 	PVRSRV_ERROR 		eError;
 	PVRSRV_SGXDEV_INFO 	*psDevInfo = psDeviceNode->pvDevice;
 	SGXMKIF_HOST_CTL	*psHostCtl = psDevInfo->psKernelSGXHostCtlMemInfo->pvLinAddrKM;
-	IMG_UINT32			ui32PowerStatus;
+	IMG_UINT32		ui32PowerStatus;
 	SGXMKIF_COMMAND		sCommand = {0};
 
 	ui32PowerStatus = psHostCtl->ui32PowerStatus;
@@ -369,8 +407,7 @@ PVRSRV_ERROR SGXScheduleProcessQueuesKM(PVRSRV_DEVICE_NODE *psDeviceNode)
 		return PVRSRV_OK;
 	}
 
-	sCommand.ui32Data[0] = PVRSRV_CCBFLAGS_PROCESS_QUEUESCMD;
-	eError = SGXScheduleCCBCommandKM(psDeviceNode, SGXMKIF_COMMAND_EDM_KICK, &sCommand, ISR_ID, 0);
+	eError = SGXScheduleCCBCommandKM(psDeviceNode, SGXMKIF_CMD_PROCESS_QUEUES, &sCommand, ISR_ID, 0);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SGXScheduleProcessQueuesKM failed to schedule CCB command: %lu", eError));
@@ -403,20 +440,14 @@ PVRSRV_ERROR SGXGetInternalDevInfoKM(IMG_HANDLE hDevCookie,
 }
 
 
-#if defined (PDUMP) && !defined(EDM_USSE_HWDEBUG) 
-#define PDUMP_SGX_CLEANUP
-#endif
-
 IMG_VOID SGXCleanupRequest(PVRSRV_DEVICE_NODE	*psDeviceNode,
-								  IMG_DEV_VIRTADDR		*psHWDataDevVAddr,
-								  IMG_UINT32			ui32ResManRequestFlag)
+						   IMG_DEV_VIRTADDR		*psHWDataDevVAddr,
+						   IMG_UINT32			ui32CleanupType)
 {
-	PVRSRV_SGXDEV_INFO		*psSGXDevInfo = (PVRSRV_SGXDEV_INFO *)psDeviceNode->pvDevice;
+	PVRSRV_ERROR			eError;
+	PVRSRV_SGXDEV_INFO		*psSGXDevInfo = psDeviceNode->pvDevice;
 	PVRSRV_KERNEL_MEM_INFO	*psSGXHostCtlMemInfo = psSGXDevInfo->psKernelSGXHostCtlMemInfo;
-	SGXMKIF_HOST_CTL		*psSGXHostCtl = (SGXMKIF_HOST_CTL *)psSGXHostCtlMemInfo->pvLinAddrKM;
-#if defined(PDUMP_SGX_CLEANUP)
-	IMG_HANDLE hUniqueTag = MAKEUNIQUETAG(psSGXHostCtlMemInfo);
-#endif
+	SGXMKIF_HOST_CTL		*psSGXHostCtl = psSGXHostCtlMemInfo->pvLinAddrKM;
 
 	if ((psSGXHostCtl->ui32PowerStatus & PVRSRV_USSE_EDM_POWMAN_NO_WORK) != 0)
 	{
@@ -424,75 +455,49 @@ IMG_VOID SGXCleanupRequest(PVRSRV_DEVICE_NODE	*psDeviceNode,
 	}
 	else
 	{
+		SGXMKIF_COMMAND		sCommand = {0};
 		
-		if (psSGXDevInfo->ui32CacheControl & SGX_BIF_INVALIDATE_PDCACHE)
-		{
-			psSGXHostCtl->ui32ResManFlags |= PVRSRV_USSE_EDM_RESMAN_CLEANUP_INVALPD;
-			psSGXDevInfo->ui32CacheControl ^= SGX_BIF_INVALIDATE_PDCACHE;
-		}
-		if (psSGXDevInfo->ui32CacheControl & SGX_BIF_INVALIDATE_PTCACHE)
-		{
-			psSGXHostCtl->ui32ResManFlags |= PVRSRV_USSE_EDM_RESMAN_CLEANUP_INVALPT;
-			psSGXDevInfo->ui32CacheControl ^= SGX_BIF_INVALIDATE_PTCACHE;
-		}
-
-		if(psHWDataDevVAddr == IMG_NULL)
-		{
-			psSGXHostCtl->sResManCleanupData.uiAddr = 0;
-		}
-		else
-		{
-			
-			psSGXHostCtl->sResManCleanupData.uiAddr = psHWDataDevVAddr->uiAddr;
-		}
-
+		PDUMPCOMMENTWITHFLAGS(0, "Request ukernel resouce clean-up");
+		sCommand.ui32Data[0] = ui32CleanupType;
+		sCommand.ui32Data[1] = (psHWDataDevVAddr == IMG_NULL) ? 0 : psHWDataDevVAddr->uiAddr;
 		
-		psSGXHostCtl->ui32ResManFlags |= ui32ResManRequestFlag;
-
-#if defined(PDUMP_SGX_CLEANUP)
-		
-		PDUMPCOMMENTWITHFLAGS(0, "TA/3D CCB Control - Request clean-up event on uKernel...");
-		PDUMPMEM(IMG_NULL, psSGXHostCtlMemInfo, offsetof(SGXMKIF_HOST_CTL, sResManCleanupData.uiAddr), sizeof(IMG_UINT32), 0, hUniqueTag);
-		PDUMPMEM(IMG_NULL, psSGXHostCtlMemInfo, offsetof(SGXMKIF_HOST_CTL, ui32ResManFlags), sizeof(IMG_UINT32), 0, hUniqueTag);
-#else
-		PDUMPCOMMENTWITHFLAGS(0, "Clean-up event on uKernel disabled");
-#endif 
-
-		
-		SGXScheduleProcessQueuesKM(psDeviceNode);
+		eError = SGXScheduleCCBCommandKM(psDeviceNode, SGXMKIF_CMD_CLEANUP, &sCommand, KERNEL_ID, 0);
+		if (eError != PVRSRV_OK)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"SGXCleanupRequest: Failed to submit clean-up command"));
+			PVR_DBG_BREAK;
+		}
 
 		
 		#if !defined(NO_HARDWARE)
-		if(PollForValueKM ((volatile IMG_UINT32 *)(&psSGXHostCtl->ui32ResManFlags),
-					PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE,
-					PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE,
-					MAX_HW_TIME_US/WAIT_TRY_COUNT,
-					WAIT_TRY_COUNT) != PVRSRV_OK)
+		if(PollForValueKM(&psSGXHostCtl->ui32CleanupStatus,
+						  PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
+						  PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
+						  MAX_HW_TIME_US/WAIT_TRY_COUNT,
+						  WAIT_TRY_COUNT) != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"SGXCleanupRequest: Wait for uKernel to clean up failed"));
 			PVR_DBG_BREAK;
 		}
 		#endif
 
-		#if defined(PDUMP_SGX_CLEANUP)
+		#if defined(PDUMP)
 		
-		PDUMPCOMMENTWITHFLAGS(0, "TA/3D CCB Control - Wait for clean-up request to complete...");
+		PDUMPCOMMENTWITHFLAGS(0, "Host Control - Poll for clean-up request to complete");
 		PDUMPMEMPOL(psSGXHostCtlMemInfo,
-					   offsetof(SGXMKIF_HOST_CTL, ui32ResManFlags),
-					   PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE,
-					   PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE,
-					   PDUMP_POLL_OPERATOR_EQUAL,
-					   IMG_FALSE, IMG_FALSE,
-					   hUniqueTag);
+					offsetof(SGXMKIF_HOST_CTL, ui32CleanupStatus),
+					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
+					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
+					PDUMP_POLL_OPERATOR_EQUAL,
+					0,
+					MAKEUNIQUETAG(psSGXHostCtlMemInfo));
 		#endif 
 
-		psSGXHostCtl->ui32ResManFlags &= ~(ui32ResManRequestFlag);
-		psSGXHostCtl->ui32ResManFlags &= ~(PVRSRV_USSE_EDM_RESMAN_CLEANUP_COMPLETE);
-#if defined(PDUMP_SGX_CLEANUP)
-		PDUMPMEM(IMG_NULL, psSGXHostCtlMemInfo, offsetof(SGXMKIF_HOST_CTL, ui32ResManFlags), sizeof(IMG_UINT32), 0, hUniqueTag);
-#endif 
+		psSGXHostCtl->ui32CleanupStatus &= ~(PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE);
+		PDUMPMEM(IMG_NULL, psSGXHostCtlMemInfo, offsetof(SGXMKIF_HOST_CTL, ui32CleanupStatus), sizeof(IMG_UINT32), 0, MAKEUNIQUETAG(psSGXHostCtlMemInfo));
 	}
 }
+
 
 typedef struct _SGX_HW_RENDER_CONTEXT_CLEANUP_
 {
@@ -512,7 +517,7 @@ static PVRSRV_ERROR SGXCleanupHWRenderContextCallback(IMG_PVOID		pvParam,
 
 	SGXCleanupRequest(psCleanup->psDeviceNode,
 					  &psCleanup->sHWRenderContextDevVAddr,
-					  PVRSRV_USSE_EDM_RESMAN_CLEANUP_RC_REQUEST);
+					  PVRSRV_CLEANUPCMD_RC);
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 			  sizeof(SGX_HW_RENDER_CONTEXT_CLEANUP),
@@ -539,7 +544,8 @@ static PVRSRV_ERROR SGXCleanupHWTransferContextCallback(IMG_PVOID	pvParam,
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
 
 	SGXCleanupRequest(psCleanup->psDeviceNode,
-							&psCleanup->sHWTransferContextDevVAddr, PVRSRV_USSE_EDM_RESMAN_CLEANUP_TC_REQUEST);
+					  &psCleanup->sHWTransferContextDevVAddr,
+					  PVRSRV_CLEANUPCMD_TC);
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 			  sizeof(SGX_HW_TRANSFER_CONTEXT_CLEANUP),
@@ -562,7 +568,8 @@ IMG_HANDLE SGXRegisterHWRenderContextKM(IMG_HANDLE				psDeviceNode,
 	eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 						sizeof(SGX_HW_RENDER_CONTEXT_CLEANUP),
 						(IMG_VOID **)&psCleanup,
-						&hBlockAlloc);
+						&hBlockAlloc,
+						"SGX Hardware Render Context Cleanup");
 
 	if (eError != PVRSRV_OK)
 	{
@@ -631,7 +638,8 @@ IMG_HANDLE SGXRegisterHWTransferContextKM(IMG_HANDLE				psDeviceNode,
 	eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 						sizeof(SGX_HW_TRANSFER_CONTEXT_CLEANUP),
 						(IMG_VOID **)&psCleanup,
-						&hBlockAlloc);
+						&hBlockAlloc,
+						"SGX Hardware Transfer Context Cleanup");
 
 	if (eError != PVRSRV_OK)
 	{
@@ -702,7 +710,8 @@ static PVRSRV_ERROR SGXCleanupHW2DContextCallback(IMG_PVOID pvParam, IMG_UINT32 
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
 
 	SGXCleanupRequest(psCleanup->psDeviceNode,
-							&psCleanup->sHW2DContextDevVAddr, PVRSRV_USSE_EDM_RESMAN_CLEANUP_2DC_REQUEST);
+					  &psCleanup->sHW2DContextDevVAddr,
+					  PVRSRV_CLEANUPCMD_2DC);
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 			  sizeof(SGX_HW_2D_CONTEXT_CLEANUP),
@@ -725,7 +734,8 @@ IMG_HANDLE SGXRegisterHW2DContextKM(IMG_HANDLE				psDeviceNode,
 	eError = OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 						sizeof(SGX_HW_2D_CONTEXT_CLEANUP),
 						(IMG_VOID **)&psCleanup,
-						&hBlockAlloc);
+						&hBlockAlloc,
+						"SGX Hardware 2D Context Cleanup");
 
 	if (eError != PVRSRV_OK)
 	{
@@ -801,8 +811,6 @@ PVRSRV_ERROR SGX2DQueryBlitsCompleteKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 									   PVRSRV_KERNEL_SYNC_INFO *psSyncInfo,
 									   IMG_BOOL bWaitForComplete)
 {
-	IMG_BOOL	bStart = IMG_FALSE;
-	IMG_UINT32	uiStart = 0;
 	IMG_UINT32	ui32ReadOpsPending, ui32WriteOpsPending;
 
 	PVR_UNREFERENCED_PARAMETER(psDevInfo);
@@ -829,7 +837,8 @@ PVRSRV_ERROR SGX2DQueryBlitsCompleteKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 
 	
 	PVR_DPF((PVR_DBG_MESSAGE, "SGX2DQueryBlitsCompleteKM: Ops pending. Start polling."));
-	do
+
+	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
 	{
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
 
@@ -840,14 +849,8 @@ PVRSRV_ERROR SGX2DQueryBlitsCompleteKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 			return PVRSRV_OK;
 		}
 
-		if (bStart == IMG_FALSE)
-		{
-			uiStart = OSClockus();
-			bStart = IMG_TRUE;
-		}
-
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-	} while ((OSClockus() - uiStart) < MAX_HW_TIME_US);
+	} END_LOOP_UNTIL_TIMEOUT();
 
 	
 	PVR_DPF((PVR_DBG_ERROR,"SGX2DQueryBlitsCompleteKM: Timed out. Ops pending."));
@@ -873,7 +876,9 @@ IMG_VOID SGXFlushHWRenderTargetKM(IMG_HANDLE psDeviceNode, IMG_DEV_VIRTADDR sHWR
 {
 	PVR_ASSERT(sHWRTDataSetDevVAddr.uiAddr != IMG_NULL);
 
-	SGXCleanupRequest((PVRSRV_DEVICE_NODE *)psDeviceNode, &sHWRTDataSetDevVAddr, PVRSRV_USSE_EDM_RESMAN_CLEANUP_RT_REQUEST);
+	SGXCleanupRequest(psDeviceNode,
+					  &sHWRTDataSetDevVAddr,
+					  PVRSRV_CLEANUPCMD_RT);
 }
 
 
@@ -881,6 +886,11 @@ IMG_UINT32 SGXConvertTimeStamp(PVRSRV_SGXDEV_INFO	*psDevInfo,
 							   IMG_UINT32			ui32TimeWraps,
 							   IMG_UINT32			ui32Time)
 {
+#if defined(EUR_CR_TIMER)
+	PVR_UNREFERENCED_PARAMETER(psDevInfo);
+	PVR_UNREFERENCED_PARAMETER(ui32TimeWraps);
+	return ui32Time;
+#else
 	IMG_UINT64	ui64Clocks;
 	IMG_UINT32	ui32Clocksx16;
 
@@ -889,6 +899,7 @@ IMG_UINT32 SGXConvertTimeStamp(PVRSRV_SGXDEV_INFO	*psDevInfo,
 	ui32Clocksx16 = (IMG_UINT32)(ui64Clocks / 16);
 
 	return ui32Clocksx16;
+#endif 
 }
 
 

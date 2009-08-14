@@ -60,7 +60,7 @@ QueuePrintQueues (IMG_CHAR * buffer, size_t size, off_t off);
 
 
 IMG_IMPORT
-PVRSRV_ERROR IMG_CALLCONV PVRSRVCreateCommandQueueKM(IMG_UINT32 ui32QueueSize,
+PVRSRV_ERROR IMG_CALLCONV PVRSRVCreateCommandQueueKM(IMG_SIZE_T ui32QueueSize,
 													 PVRSRV_QUEUE_INFO **ppsQueueInfo);
 IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVDestroyCommandQueueKM(PVRSRV_QUEUE_INFO *psQueueInfo);
@@ -74,11 +74,11 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVInsertCommandKM(PVRSRV_QUEUE_INFO	*psQueue,
 												PVRSRV_KERNEL_SYNC_INFO	*apsDstSync[],
 												IMG_UINT32			ui32SrcSyncCount,
 												PVRSRV_KERNEL_SYNC_INFO	*apsSrcSync[],
-												IMG_UINT32			ui32DataByteSize );
+												IMG_SIZE_T			ui32DataByteSize );
 
 IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetQueueSpaceKM(PVRSRV_QUEUE_INFO *psQueue,
-												IMG_UINT32 ui32ParamSize,
+												IMG_SIZE_T ui32ParamSize,
 												IMG_VOID **ppvSpace);
 
 IMG_IMPORT

@@ -210,14 +210,13 @@ IMG_EXPORT PVRSRV_ERROR SGXSubmitTransferKM(IMG_HANDLE hDevHandle, PVRSRV_TRANSF
 	}		
 #endif
 
-	sCommand.ui32Data[0] = PVRSRV_CCBFLAGS_TRANSFERCMD;
 	sCommand.ui32Data[1] = psKick->sHWTransferContextDevVAddr.uiAddr;
 	
-	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_COMMAND_EDM_KICK, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);
+	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_CMD_TRANSFER, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);
 
 
 #if defined(NO_HARDWARE)
-	if (! (psKick->ui32Flags & SGXMKIF_TQFLAGS_NOSYNCUPDATE))
+	if ((psKick->ui32Flags & SGXMKIF_TQFLAGS_NOSYNCUPDATE) == 0)
 	{
 		IMG_UINT32 i;
 
@@ -407,10 +406,9 @@ IMG_EXPORT PVRSRV_ERROR SGXSubmit2DKM(IMG_HANDLE hDevHandle, PVRSRV_2D_SGX_KICK 
 	}		
 #endif
 
-	sCommand.ui32Data[0] = PVRSRV_CCBFLAGS_2DCMD;
 	sCommand.ui32Data[1] = psKick->sHW2DContextDevVAddr.uiAddr;
 	
-	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_COMMAND_EDM_KICK, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);	
+	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_CMD_2D, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);	
 
 
 #if defined(NO_HARDWARE)
