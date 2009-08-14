@@ -32,6 +32,7 @@
 #include <linux/led-lm3530.h>
 #include <linux/usb/omap.h>
 #include <linux/wl127x-rfkill.h>
+#include <linux/wl127x-test.h>
 #include <linux/omap_mdm_ctrl.h>
 
 #include <asm/mach-types.h>
@@ -1000,6 +1001,17 @@ static struct platform_device sholes_wl1271_device = {
 	.dev.platform_data = &sholes_wl1271_pdata,
 };
 
+static struct wl127x_test_platform_data sholes_wl1271_test_pdata = {
+	.btwake_gpio = SHOLES_WL1271_WAKE_GPIO,
+	.hostwake_gpio = SHOLES_WL1271_HOSTWAKE_GPIO,
+};
+
+static struct platform_device sholes_wl1271_test_device = {
+	.name = "wl127x-test",
+	.id = 0,
+	.dev.platform_data = &sholes_wl1271_test_pdata,
+};
+
 static void __init sholes_bt_init(void)
 {
 	/* Mux setup for Bluetooth chip-enable */
@@ -1010,6 +1022,7 @@ static void __init sholes_bt_init(void)
 	omap_cfg_reg(W7_34XX_GPIO178_DOWN);
 
 	platform_device_register(&sholes_wl1271_device);
+	platform_device_register(&sholes_wl1271_test_device);
 }
 
 static struct omap_mdm_ctrl_platform_data omap_mdm_ctrl_platform_data = {
