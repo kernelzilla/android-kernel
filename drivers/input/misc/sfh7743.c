@@ -41,6 +41,7 @@ struct sfh7743_data {
 	struct input_dev *input_dev;
 
 	atomic_t enabled;
+	int on_before_suspend;
 
 	int irq;
 };
@@ -367,12 +368,15 @@ static int sfh7743_resume(struct platform_device *pdev)
 {
 	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
 
-	return sfh7743_enable(sfh);
+	if (sfh->on_before_suspend)
+		return sfh7743_enable(sfh);
+	return 0;
 }
 
 static int sfh7743_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
+	sfh->on_before_suspend = atomic_read(&sfh->enabled);
 
 	return sfh7743_disable(sfh);
 }
