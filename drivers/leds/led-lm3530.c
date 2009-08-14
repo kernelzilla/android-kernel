@@ -541,11 +541,20 @@ static int lm3530_suspend(struct i2c_client *client, pm_message_t mesg)
 
 static int lm3530_resume(struct i2c_client *client)
 {
+	uint8_t zone_dump;
+	int ret;
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
 
 	if (lm3530_debug)
 		pr_info("%s: Resuming\n", __func__);
 
+	ret = lm3530_read_reg(als_data,
+			      LM3530_ALS_ZONE_REG, &zone_dump);
+	if (ret)
+		pr_info("%s: Could not read out of suspend\n", __func__);
+
+	if (lm3530_debug)
+		pr_info("%s: Dumping zone value %i\n", __func__, zone_dump);
 	enable_irq(als_data->client->irq);
 
 	return 0;
