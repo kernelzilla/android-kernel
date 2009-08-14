@@ -264,6 +264,7 @@ int resource_register(struct shared_resource *resp)
 		return -EEXIST;
 
 	INIT_LIST_HEAD(&resp->users_list);
+	mutex_init(&resp->resource_mutex);
 
 	down(&res_mutex);
 	/* Add the resource to the resource list */
@@ -326,14 +327,13 @@ int resource_request(const char *name, struct device *dev,
 	struct  users_list *user;
 	int 	found = 0, ret = 0;
 
-	down(&res_mutex);
-	resp = _resource_lookup(name);
+	resp = resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_request: Invalid resource name\n");
-		ret = -EINVAL;
-		goto res_unlock;
+		return -EINVAL;
 	}
 
+	mutex_lock(&resp->resource_mutex);
 	/* Call the resource specific validate function */
 	if (resp->ops->validate_level) {
 		ret = resp->ops->validate_level(resp, level);
@@ -362,7 +362,7 @@ int resource_request(const char *name, struct device *dev,
 	user->level = level;
 
 res_unlock:
-	up(&res_mutex);
+	mutex_unlock(&resp->resource_mutex);
 	/*
 	 * Recompute and set the current level for the resource.
 	 * NOTE: update_resource level moved out of spin_lock, as it may call
@@ -393,14 +393,13 @@ int resource_release(const char *name, struct device *dev)
 	struct users_list *user;
 	int found = 0, ret = 0;
 
-	down(&res_mutex);
-	resp = _resource_lookup(name);
+	resp = resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_release: Invalid resource name\n");
-		ret = -EINVAL;
-		goto res_unlock;
+		return -EINVAL;
 	}
 
+	mutex_lock(&resp->resource_mutex);
 	list_for_each_entry(user, &resp->users_list, node) {
 		if (user->dev == dev) {
 			found = 1;
@@ -421,7 +420,7 @@ int resource_release(const char *name, struct device *dev)
 	/* Recompute and set the current level for the resource */
 	ret = update_resource_level(resp);
 res_unlock:
-	up(&res_mutex);
+	mutex_unlock(&resp->resource_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(resource_release);
@@ -438,15 +437,14 @@ int resource_get_level(const char *name)
 	struct shared_resource *resp;
 	u32 ret;
 
-	down(&res_mutex);
-	resp = _resource_lookup(name);
+	resp = resource_lookup(name);
 	if (!resp) {
 		printk(KERN_ERR "resource_release: Invalid resource name\n");
-		up(&res_mutex);
 		return -EINVAL;
 	}
+	mutex_lock(&resp->resource_mutex);
 	ret = resp->curr_level;
-	up(&res_mutex);
+	mutex_unlock(&resp->resource_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(resource_get_level);
