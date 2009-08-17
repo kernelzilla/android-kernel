@@ -414,6 +414,20 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 		}
 	}
 
+	/* configure the noise suppression table */
+	obj = find_obj(ts, QTM_OBJ_NOISESUPPRESSION_1);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->noise1_suppression_cfg,
+					min(sizeof(ts->pdata->noise1_suppression_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the noise suppression config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
 	/* Write the settings into nvram, if needed */
 	if (ts->pdata->flags & QTOUCH_CFG_BACKUPNV) {
 		uint8_t val;
@@ -595,7 +609,8 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		input_report_key(ts->input_dev, axis_map[finger].key, down);
 		input_sync(ts->input_dev);
 	} else if (ts->down_mask & (1 << finger)) {
-		/* If going from the touch area to a non-vkey area give a lift off */
+		/* If going from the touch area
+		to a non-vkey area give a lift off */
 		input_report_key(ts->input_dev, axis_map[finger].key, 0);
 		input_sync(ts->input_dev);
 	}

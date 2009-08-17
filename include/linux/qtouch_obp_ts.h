@@ -45,9 +45,10 @@ enum {
 	QTM_OBJ_PROCI_LINEAR_TBL	= 17,
 	QTM_OBJ_PROCI_GESTURES_PROC	= 18,
 	QTM_OBJ_PROCI_GRIPFACESUPPRESSION = 20,
+	QTM_OBJ_NOISESUPPRESSION_1 = 36,
 
 	/* Max number of objects currently defined */
-	QTM_OBP_MAX_OBJECT_NUM = QTM_OBJ_PROCI_GRIPFACESUPPRESSION + 1,
+	QTM_OBP_MAX_OBJECT_NUM = QTM_OBJ_NOISESUPPRESSION_1 + 1,
 };
 
 /* OBP structures as defined by the wire protocol. */
@@ -236,6 +237,13 @@ struct qtm_proci_grip_suppression_cfg {
 	uint8_t			shpthr2;
 } __attribute__ ((packed));
 
+/* QTM_OBJ_NOISESUPPRESSION_1 */
+struct qtm_proci_noise1_suppression_cfg {
+	uint8_t			ctrl;
+	uint8_t			reserved;
+	uint8_t			atchthr;
+	uint8_t			duty_cycle;
+} __attribute__ ((packed));
 
 /*******************************/
 /******** platform data ********/
@@ -305,6 +313,7 @@ struct qtouch_ts_platform_data {
 	struct qtm_procg_sig_filter_cfg		sig_filter_cfg;
 	struct qtm_proci_linear_tbl_cfg		linear_tbl_cfg;
 	struct qtm_proci_grip_suppression_cfg	grip_suppression_cfg;
+	struct qtm_proci_noise1_suppression_cfg noise1_suppression_cfg;
 };
 
 #endif /* _LINUX_QTOUCH_OBP_TS_H */
