@@ -49,7 +49,7 @@ static void sholes_vibrator_exit(void)
 
 static int sholes_vibrator_power_on(void)
 {
-	regulator_set_voltage(sholes_vibrator_regulator, 2000000, 2000000);
+	regulator_set_voltage(sholes_vibrator_regulator, 3000000, 3000000);
 	return regulator_enable(sholes_vibrator_regulator);
 }
 
