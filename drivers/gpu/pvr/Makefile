@@ -16,7 +16,6 @@ ccflags-y = -DLINUX -D__linux__ -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap3430 \
 	-DTRANSFER_QUEUE \
 	-DSYS_USING_INTERRUPTS \
 	-DSUPPORT_HW_RECOVERY \
-	-DSUPPORT_ACTIVE_POWER_MANAGEMENT \
 	-DPVR_SECURE_HANDLES \
 	-DPVR_SECURE_FD_EXPORT \
 	-DUSE_PTHREADS \
@@ -29,6 +28,9 @@ ccflags-y = -DLINUX -D__linux__ -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap3430 \
 	-DSGX530 \
 	-DSUPPORT_SGX530 \
 	-DSGX_CORE_REV=121 
+
+#	-DSUPPORT_ACTIVE_POWER_MANAGEMENT \
+
 
 ccflags-$(CONFIG_SGX_BUILD_RELEASE) += \
 	-DPVR_BUILD_TYPE="\"release\""  -DRELEASE
