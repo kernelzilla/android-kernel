@@ -185,6 +185,16 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 			result = NOTIFY_BAD;
 		}
 
+		/* Clear kernel panic bit in cpcap */
+		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				0, CPCAP_BIT_AP_KERNEL_PANIC);
+
+		if (ret) {
+			dev_err(&(misc_cpcap->spi->dev),
+			"Clear kernel panic bit failure.\n");
+			result = NOTIFY_BAD;
+		}
+
 		/* Check if we are starting recovery mode */
 		if (mode != NULL && !strncmp("recovery", mode, 9)) {
 			/* Set the fota (recovery mode) bit in the cpcap */
@@ -287,6 +297,10 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	retval = cpcap_irq_init(cpcap);
 	if (retval < 0)
 		goto free_mem;
+
+	/* Set Kpanic bit, which will be cleared at normal reboot */
+	cpcap_regacc_write(cpcap, CPCAP_REG_VAL1,
+			CPCAP_BIT_AP_KERNEL_PANIC, CPCAP_BIT_AP_KERNEL_PANIC);
 
 	cpcap_vendor_read(cpcap);
 
