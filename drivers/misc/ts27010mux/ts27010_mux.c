@@ -1342,6 +1342,10 @@ void ts27010_mux_recv(struct ts27010_ringbuf *rbuf)
 				fcs = ts0710_crc_calc(fcs, c);
 				addr = c;
 				state = RECV_STATE_CONTROL;
+			} else {
+				pr_warning(
+					"ts27010: RX wrong data. Drop msg.\n");
+				consume_idx = i;
 			}
 			break;
 
@@ -1366,6 +1370,12 @@ void ts27010_mux_recv(struct ts27010_ringbuf *rbuf)
 			fcs = ts0710_crc_calc(fcs, c);
 			len |= c<<7;
 			data_idx = i+1;
+			if (len + data_idx >= LDISC_BUFFER_SIZE) {
+				pr_warning(
+					"ts27010: wrong length, Drop msg.\n");
+				state = RECV_STATE_IDLE;
+				consume_idx = i;
+			}
 			state = RECV_STATE_DATA;
 			break;
 
@@ -1391,6 +1401,7 @@ void ts27010_mux_recv(struct ts27010_ringbuf *rbuf)
 	}
 
 	ts27010_ringbuf_consume(rbuf, consume_idx+1);
+
 }
 
 static int __init mux_init(void)

@@ -8,8 +8,6 @@
 #include "ts27010_mux.h"
 #include "ts27010_ringbuf.h"
 
-#define LDISC_BUFFER_SIZE (2048 - sizeof(struct ts27010_ringbuf))
-
 struct ts27010_ldisc_data {
 	struct ts27010_ringbuf		*rbuf;
 	struct work_struct		recv_work;
