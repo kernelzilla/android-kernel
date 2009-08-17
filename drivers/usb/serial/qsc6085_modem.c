@@ -690,17 +690,12 @@ static void modem_close(struct tty_struct *tty,
 
 	usb_autopm_get_interface(port->serial->interface);
 
-	modem_port_ptr->modem_status = 0;
-#ifdef CONFIG_PM
-	modem_usb_disable_wakeup_irq(port->serial->interface);
-#endif
-
 	stop_data_traffic(modem_port_ptr);
 	cancel_work_sync(&modem_port_ptr->wake_and_write);
+	modem_port_ptr->port = 0;
+	modem_port_ptr->modem_status = 0;
 	if (modem_port_ptr->delayed_wb)
 		modem_port_ptr->delayed_wb->use = 0;
-
-	modem_port_ptr->port = 0;
 
 	usb_autopm_put_interface(port->serial->interface);
 
@@ -857,11 +852,15 @@ static void modem_usb_wkup_work(struct work_struct *work)
 {
 	struct modem_port *modem_port_ptr =
 	container_of(work, struct modem_port, usb_wkup_work);
-	struct usb_serial *serial = modem_port_ptr->port->serial;
+	struct usb_serial *serial;
 	int result;
 
-	if (atomic_cmpxchg(&modem_port_ptr->wakeup_flag, 0, 1)) {
+	if (modem_port_ptr->port == 0)
+		return;
 
+	serial = modem_port_ptr->port->serial;
+	if ((modem_port_ptr->port != 0) &&
+	    (atomic_cmpxchg(&modem_port_ptr->wakeup_flag, 0, 1))) {
 		result = usb_autopm_get_interface(serial->interface);
 		if (result < 0) {
 			atomic_set(&modem_port_ptr->wakeup_flag, 0);
@@ -881,7 +880,8 @@ static irqreturn_t gpio_wkup_interrupt_handler (int irq, void *data_ptr)
 {
 	struct modem_port *modem_port_ptr =
 		(struct modem_port *)data_ptr;
-	schedule_work(&modem_port_ptr->usb_wkup_work);
+	if (modem_port_ptr->port != 0)
+		schedule_work(&modem_port_ptr->usb_wkup_work);
 	return IRQ_HANDLED;
 }
 
@@ -1202,9 +1202,6 @@ static void modem_shutdown(struct usb_serial *serial)
 			 "%s: Shutdown Interface %d  \n", __func__,
 			interface_num);
 
-#ifdef CONFIG_PM
-	modem_usb_disable_wakeup_irq(serial->interface);
-#endif
 	stop_data_traffic(modem_port_ptr);
 	cancel_work_sync(&modem_port_ptr->wake_and_write);
 	modem_write_buffers_free(modem_port_ptr, serial);
