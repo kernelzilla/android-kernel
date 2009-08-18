@@ -17,10 +17,17 @@
 #define OMAP_MCBSP_REG_WKUPEN 0xA8
 #endif
 
+#define MCBSP_WKUP_XRDYEN		0x400
+
 #define OMAP_MCBSP_BIT(ARG) ((0x01)<<(ARG))
 
 #define MCBSP2_SYSCONFIG_LVL1 1
 #define MCBSP2_SYSCONFIG_LVL2 2
+
+#define MCBSP_FIFO_SIZE 64
+#define MCBSP2_FIFO_SIZE 1024
+#define OMAP_MCBSP_REG_THRSH1 0x94
+#define OMAP_MCBSP_REG_THRSH2 0x90
 
 /********************** McBSP SYSCONFIG bit definitions ********************/
 #define FORCE_IDLE 0x0
@@ -137,6 +144,7 @@ struct omap_mcbsp_wrapper {
 	int tx_dma_chain_state;
 	int interface_mode;	/* Master / Slave */
 	struct omap_dma_channel_params rx_params;	/* Used For Rx FIFO */
+	int rx_config_done;
 };
 #endif /* MCBSP_WRAPPER */
 #ifdef MCBSP_WRAPPER
