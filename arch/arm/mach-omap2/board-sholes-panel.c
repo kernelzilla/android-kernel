@@ -31,6 +31,7 @@ static int sholes_panel_enable(struct omap_dss_device *dssdev)
 			printk(KERN_ERR "failed to get regulator for display");
 			return PTR_ERR(display_regulator);
 		}
+		return 0;
 	}
 	regulator_enable(display_regulator);
 	msleep(1);
