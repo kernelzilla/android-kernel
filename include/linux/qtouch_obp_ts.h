@@ -181,14 +181,13 @@ struct qtm_touch_multi_cfg {
 	uint8_t			num_touch;
 	uint8_t			merge_hyst;
 	uint8_t			merge_thresh;
-#if 0
 	uint16_t		x_res;
 	uint16_t		y_res;
 	uint8_t			x_low_clip;
 	uint8_t			x_high_clip;
 	uint8_t			y_low_clip;
 	uint8_t			y_high_clip;
-#endif
+
 } __attribute__ ((packed));
 
 /* TOUCH_KEYARRAY_T15 */
@@ -278,6 +277,7 @@ struct qtouch_key_array {
 #define QTOUCH_USE_MULTITOUCH	(1 << 3)
 #define QTOUCH_USE_KEYARRAY	(1 << 4)
 #define QTOUCH_CFG_BACKUPNV	(1 << 5)
+#define QTOUCH_EEPROM_CHECKSUM  (1 << 6)
 
 struct qtouch_ts_platform_data {
 	uint32_t		flags;
@@ -310,6 +310,7 @@ struct qtouch_ts_platform_data {
 	struct qtm_gen_power_cfg		power_cfg;
 	struct qtm_gen_acquire_cfg		acquire_cfg;
 	struct qtm_touch_multi_cfg		multi_touch_cfg;
+	struct qtm_touch_keyarray_cfg   key_array_cfg;
 	struct qtm_procg_sig_filter_cfg		sig_filter_cfg;
 	struct qtm_proci_linear_tbl_cfg		linear_tbl_cfg;
 	struct qtm_proci_grip_suppression_cfg	grip_suppression_cfg;

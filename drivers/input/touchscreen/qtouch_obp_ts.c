@@ -442,6 +442,11 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 			pr_err("%s: Can't backup nvram settings\n", __func__);
 			return ret;
 		}
+		/* Since the IC does not indicate that has completed the
+		backup place a hard wait here.  If we communicate with the
+		IC during backup the EEPROM may be corrupted */
+
+		msleep(500);
 	}
 
 	ret = qtouch_force_calibration(ts);
@@ -490,9 +495,29 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	if (msg->status & QTM_CMD_PROC_STATUS_SIGERR)
 		pr_err("%s: Acquisition error\n", __func__);
 
-	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR)
-		pr_err("%s: Configuration error\n", __func__);
+	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR){
+		ret = qtouch_hw_init(ts);
+		if (ret != 0)
+			pr_err("%s:Cannot initialize the touch IC\n",
+			       __func__);
 
+		pr_err("%s: Configuration error\n", __func__);
+	}
+	/* Check the EEPROM checksum.  An ESD event may cause
+	the checksum to change during operation so we need to
+	reprogram the EEPROM and reset the IC */
+	if (ts->pdata->flags & QTOUCH_EEPROM_CHECKSUM) {
+		if (msg->checksum != ts->pdata->nv_checksum) {
+			if (qtouch_tsdebug)
+				pr_info("%s:EEPROM checksum is 0x%X\n",
+					__func__, msg->checksum);
+			ret = qtouch_hw_init(ts);
+			if (ret != 0)
+				pr_err("%s:Cannot initialize the touch IC\n",
+					   __func__);
+			qtouch_force_reset(ts, 0);
+		}
+	}
 	return ret;
 }
 
