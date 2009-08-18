@@ -296,7 +296,7 @@ static void sholes_als_init(void)
 
 static struct vkey sholes_touch_vkeys[] = {
 	{
-		.min		= 0,
+		.min		= 20,
 		.max		= 193,
 		.code		= KEY_BACK,
 	},
@@ -312,13 +312,13 @@ static struct vkey sholes_touch_vkeys[] = {
 	},
 	{
 		.min		= 834,
-		.max		= 1024,
+		.max		= 1004,
 		.code		= KEY_SEARCH,
 	},
 };
 
 static struct qtouch_ts_platform_data sholes_ts_platform_data = {
-	.irqflags	= IRQF_TRIGGER_LOW,
+	.irqflags	= (IRQF_TRIGGER_FALLING |IRQF_TRIGGER_LOW),
 	.flags		= (QTOUCH_SWAP_XY |
 			   QTOUCH_USE_MULTITOUCH |
 			   QTOUCH_CFG_BACKUPNV),
@@ -330,16 +330,16 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.abs_max_p	= 255,
 	.abs_min_w	= 0,
 	.abs_max_w	= 15,
-	.nv_checksum	= 0xf429,
+	.nv_checksum	= 0xb834,
 	.fuzz_x		= 0,
 	.fuzz_y		= 0,
 	.fuzz_p		= 2,
 	.fuzz_w		= 2,
 	.hw_reset	= sholes_touch_reset,
 	.power_cfg	= {
-		.idle_acq_int	= 1,
+		.idle_acq_int	= 0xff,
 		.active_acq_int	= 0xff,
-		.active_idle_to	= 0xff,
+		.active_idle_to	= 0x01,
 	},
 	.acquire_cfg	= {
 		.charge_time	= 10,
@@ -365,7 +365,27 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.num_touch	= 4,
 		.merge_hyst	= 0,
 		.merge_thresh	= 3,
+		 .x_res = 0x0000,
+		 .y_res = 0x0000,
+		 .x_low_clip = 0x00,
+		 .x_high_clip = 0x00,
+		 .y_low_clip = 0x00,
+		 .y_high_clip = 0x00,
 	},
+	.key_array_cfg = {
+		.ctrl = 0,
+		.x_origin = 0,
+		.y_origin = 0,
+		.x_size = 0,
+		.y_size = 0,
+		.aks_cfg = 0,
+		.burst_len = 0,
+		.tch_det_thr = 0,
+		.tch_det_int = 0,
+		.rsvd1 = 0,
+		.rsvd2 = 0,
+		},
+
 	  .linear_tbl_cfg = {
 		  .ctrl = 0x01,
 		  .x_offset = 0x0000,
@@ -390,6 +410,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.ylogrip	= 0x00,
 		.yhigrip	= 0x00,
 		.maxtchs	= 0x00,
+		.reserve0   = 0x00,
 		.szthr1	= 0x00,
 		.szthr2	= 0x00,
 		.shpthr1	= 0x00,
