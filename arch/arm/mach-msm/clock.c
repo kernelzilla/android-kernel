@@ -22,6 +22,8 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/spinlock.h>
+#include <linux/fs.h>
+#include <linux/debugfs.h>
 
 #include "clock.h"
 #include "proc_comm.h"
@@ -207,6 +209,51 @@ void __init msm_clock_init(void)
 	mutex_unlock(&clocks_mutex);
 }
 
+#if defined(CONFIG_MSM_CLOCK_CTRL_DEBUG)
+static int clk_debug_set(void *data, u64 val)
+{
+	struct clk *clk = data;
+	int ret;
+
+	ret = clk_set_rate(clk, val);
+	if (ret != 0)
+		pr_err("%s: can't set rate of '%s' to %llu (%d)\n",
+		       __func__, clk->name, val, ret);
+	return ret;
+}
+
+static int clk_debug_get(void *data, u64 *val)
+{
+	*val = clk_get_rate((struct clk *) data);
+	return *val == 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(clk_debug_fops, clk_debug_get, clk_debug_set, "%llu\n");
+
+static void __init clock_debug_init(void)
+{
+	struct dentry *dent;
+	struct clk *clk;
+
+	dent = debugfs_create_dir("clk", 0);
+	if (IS_ERR(dent)) {
+		pr_err("%s: Unable to create debugfs dir (%ld)\n", __func__,
+		       PTR_ERR(dent));
+		return;
+	}
+
+	mutex_lock(&clocks_mutex);
+	list_for_each_entry(clk, &clocks, list) {
+		debugfs_create_file(clk->name, 0644, dent, clk,
+				    &clk_debug_fops);
+	}
+	mutex_unlock(&clocks_mutex);
+}
+#else
+static inline void __init clock_debug_init(void) {}
+#endif
+
+
 /* The bootloader and/or AMSS may have left various clocks enabled.
  * Disable any clocks that belong to us (CLKFLAG_AUTO_OFF) but have
  * not been explicitly enabled by a clk_enable() call.
@@ -231,6 +278,8 @@ static int __init clock_late_init(void)
 	}
 	mutex_unlock(&clocks_mutex);
 	pr_info("clock_late_init() disabled %d unused clocks\n", count);
+
+	clock_debug_init();
 	return 0;
 }
 

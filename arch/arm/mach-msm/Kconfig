@@ -363,6 +363,14 @@ config MSM_ADSP_REPORT_EVENTS
 	  Normally, only messages from the aDSP are reported to userspace.
 	  With this option, we report events from the aDSP as well.
 
+config MSM_CLOCK_CTRL_DEBUG
+	bool "Enable debugfs interface for clock control"
+	default n
+	depends on DEBUG_FS
+	help
+	  When this option is enabled, the clock rate control interface
+	  is exported through debugfs. Use this at your own risk!
+
 config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
 	help
