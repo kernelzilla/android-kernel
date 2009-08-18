@@ -42,8 +42,6 @@ struct akm8973_data {
 	struct i2c_client *client;
 	struct akm8973_platform_data *pdata;
 
-	struct mutex lock;
-
 	struct work_struct irq_work;
 
 	struct delayed_work input_work;

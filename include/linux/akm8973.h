@@ -6,9 +6,6 @@
 #ifdef __KERNEL__
 
 struct akm8973_platform_data {
-	int	i2c_retry_delay;
-	int	i2c_retries;
-
 	int	cal_min_threshold;
 	int	cal_max_threshold;
 
