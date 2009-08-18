@@ -9,24 +9,6 @@
 #ifdef __KERNEL__
 
 struct akm8973_platform_data {
-	int     i2c_retry_delay;
-	int     i2c_retries;
-
-	int     cal_min_threshold;
-	int     cal_max_threshold;
-
-	int     xy_swap;
-	int     z_flip;
-	int     orientation; /* 0, 90, 180, or 270 */
-
-	int     poll_interval;
-	int     min_interval;
-
-	/* offset dac calibration bytes */
-	u8      hxda;
-	u8      hyda;
-	u8      hzda;
-
 	int (*init)(void);
 	void (*exit)(void);
 	int (*power_on)(void);
