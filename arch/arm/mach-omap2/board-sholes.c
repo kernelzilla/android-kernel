@@ -672,9 +672,9 @@ static void __init sholes_serial_init(void)
 #define SHOLES_R_SMPS_VOL_CNTL_CMDRA1		0x01
 
 static struct prm_setup_vc sholes_prm_setup = {
-	.clksetup = 0x52,
-	.voltsetup_time1 = 0x229,
-	.voltsetup_time2 = 0x229,
+	.clksetup = 0x4c,
+	.voltsetup_time1 = 0x94,
+	.voltsetup_time2 = 0x94,
 	.voltoffset = 0x0,
 	.voltsetup2 = 0x0,
 	.vdd0_on = 0x65,
