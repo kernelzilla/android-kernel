@@ -446,12 +446,10 @@ static struct i2c_board_info __initdata sholes_i2c_bus1_board_info[] = {
 	},
 };
 
-extern struct akm8973_platform_data sholes_akm8973_data;
 extern struct lis331dlh_platform_data sholes_lis331dlh_data;
 static struct i2c_board_info __initdata sholes_i2c_bus2_board_info[] = {
 	{
 		I2C_BOARD_INFO("akm8973", 0x1C),
-		.platform_data = &sholes_akm8973_data,
 		.irq = OMAP_GPIO_IRQ(SHOLES_AKM8973_INT_GPIO),
 	},
 	{
