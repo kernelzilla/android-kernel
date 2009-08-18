@@ -662,7 +662,9 @@ ErrorUninstallVSyncInterrupt:
 		printk(KERN_WARNING DRIVER_PREFIX ": Couldn't uninstall VSync ISR\n");
 	}
 ErrorUnmapRegisters:
+#if !defined(CONFIG_PVR_OMAP_DSS2)
 	iounmap(psSwapChain->pvRegs);
+#endif
 ErrorDisableDisplayRegisters:
 	OMAPLFBDisableDisplayRegisterAccess();
 	OMAPLFBFreeKernelMem(psVSyncFlips);
@@ -723,8 +725,9 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	}
 
 	
+#if !defined(CONFIG_PVR_OMAP_DSS2)
 	iounmap(psSwapChain->pvRegs);
-
+#endif
 	OMAPLFBDisableDisplayRegisterAccess();
 
 	
