@@ -213,7 +213,7 @@ static int lis331dlh_device_power_on(struct lis331dlh_data *lis)
 	}
 
 	if (!lis->hw_initialized) {
-		mdelay(100);
+		udelay(600);
 		err = lis331dlh_hw_init(lis);
 		if (err < 0) {
 			lis331dlh_device_power_off(lis);
@@ -511,8 +511,8 @@ static int lis331dlh_validate_pdata(struct lis331dlh_data *lis)
 	}
 
 	/* Only allow 0 and 1 for negation boolean flag */
-	if (lis->pdata->negate_x > 1 || lis->pdata->negate_x > 1 ||
-	    lis->pdata->negate_x > 1) {
+	if (lis->pdata->negate_x > 1 || lis->pdata->negate_y > 1 ||
+	    lis->pdata->negate_z > 1) {
 		dev_err(&lis->client->dev,
 			"invalid negate value x:%u y:%u z:%u\n",
 			lis->pdata->negate_x, lis->pdata->negate_y,
