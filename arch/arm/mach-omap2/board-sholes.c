@@ -187,6 +187,20 @@ static struct platform_device androidusb_device = {
 	},
 };
 
+static struct usb_mass_storage_platform_data usbms_plat = {
+	.vendor			= "Motorola",
+	.product		= "A855",
+	.release		= 1,
+};
+
+static struct platform_device usb_mass_storage_device = {
+	.name	= "usb_mass_storage",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &usbms_plat,
+	},
+};
+
 static int cpcap_usb_connected_probe(struct platform_device *pdev)
 {
 	android_usb_set_connected(1);
@@ -235,6 +249,7 @@ static void sholes_gadget_init(void)
 		andusb_plat.adb_product_id = SHOLES_ADB_PRODUCT_ID;
 	}
 	platform_device_register(&androidusb_device);
+	platform_device_register(&usb_mass_storage_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
 }
 
