@@ -2596,7 +2596,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	/* XXX: one packet could be longer, I think? Line buffer is
 	 * 1024 x 24bits, but we have to put DCS cmd there also.
 	 * 1023 * 3 should work, but causes strange color effects. */
-	packet_payload = min(w, (u16)1020) * bytespp;
+	packet_payload = ((u16)1020 / w) * w * bytespp;
 
 	packet_len = packet_payload + 1;	/* 1 byte for DCS cmd */
 	total_len = (len / packet_payload) * packet_len;
