@@ -950,9 +950,9 @@ static int dsi_pll_calc_ddrfreq( struct omap_dss_device *dssdev,
 	/* To reduce PLL lock time, keep Fint high (around 2 MHz) */
 	for (cur.regn = 1; cur.regn < REGN_MAX; ++cur.regn) {
 		if (cur.highfreq == 0)
-			cur.fint = cur.clkin / cur.regn;
+			cur.fint = cur.clkin / (cur.regn + 1);
 		else
-			cur.fint = cur.clkin / (2 * cur.regn);
+			cur.fint = cur.clkin / (2 * (cur.regn + 1));
 
 		if (cur.fint > FINT_MAX || cur.fint < FINT_MIN)
 			continue;
@@ -962,7 +962,7 @@ static int dsi_pll_calc_ddrfreq( struct omap_dss_device *dssdev,
 			unsigned long a, b;
 
 			a = 2 * cur.regm * (cur.clkin/1000);
-			b = cur.regn * (cur.highfreq + 1);
+			b = (cur.regn + 1) * (cur.highfreq + 1);
 			cur.dsiphy = a / b * 1000;
 
 			if (cur.dsiphy > 1800 * 1000 * 1000)
