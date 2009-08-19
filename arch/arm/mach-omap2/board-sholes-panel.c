@@ -14,6 +14,7 @@
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
+#include <linux/omapfb.h>
 
 #include <mach/display.h>
 #include <mach/gpio.h>
@@ -52,6 +53,18 @@ static void sholes_panel_disable(struct omap_dss_device *dssdev)
 	msleep(1);
 	regulator_disable(display_regulator);
 }
+
+static struct omapfb_platform_data sholes_fb_data = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			{
+				.format = OMAPFB_COLOR_RGB565,
+				.format_used = 1,
+			},
+		},
+	},
+};
 
 static struct omap_dss_device sholes_lcd_device = {
 	.type = OMAP_DISPLAY_TYPE_DSI,
@@ -101,7 +114,7 @@ void __init sholes_panel_init(void)
 	/* disp reset b */
 	omap_cfg_reg(AE4_34XX_GPIO136_OUT);
 
-
+	omapfb_set_platform_data(&sholes_fb_data);
 
 	ret = gpio_request(SHOLES_DISPLAY_RESET_GPIO, "display reset");
 	if (ret) {
