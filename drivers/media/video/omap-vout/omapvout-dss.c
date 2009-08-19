@@ -103,7 +103,7 @@ static int omapvout_dss_calc_offset(struct omapvout_device *vout)
 	dss = vout->dss;
 
 	switch (vout->rotation)	{
-	case 1: /* 90 degrees */
+	case 3: /* 270 degrees */
 		dss->foffset = (cx * OMAP_VRFB_LINE_LEN * bpp * bpp_mult)
 				+ ((oh + (ih - cy - ch)) * bpp * bpp_mult);
 		break;
@@ -112,7 +112,7 @@ static int omapvout_dss_calc_offset(struct omapvout_device *vout)
 							* bpp * bpp_mult)
 				+ ((ow + (iw - cx - cw)) * bpp * bpp_mult);
 		break;
-	case 3: /* 270 degrees */
+	case 1: /* 90 degrees */
 		dss->foffset = ((ow + (iw - cx - cw)) * OMAP_VRFB_LINE_LEN
 							* bpp * bpp_mult)
 				+ (cy * bpp * bpp_mult);
@@ -455,6 +455,7 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 					int buf_idx, bool vrfb_cfg)
 {
 	int rc = 0;
+	int rot = 0;
 	struct omapvout_dss_vrfb *vrfb;
 	u32 src_paddr;
 	u32 dst_paddr;
@@ -477,9 +478,9 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 
 		dss_fmt = omapvout_dss_color_mode(vout->pix.pixelformat);
 		omap_vrfb_setup(&vrfb->ctx[0], vrfb->phy_addr[0],
-							w, h, dss_fmt);
+				w, h, dss_fmt, vout->rotation);
 		omap_vrfb_setup(&vrfb->ctx[1], vrfb->phy_addr[1],
-							w, h, dss_fmt);
+				w, h, dss_fmt, vout->rotation);
 
 		bytespp = omapvout_dss_format_bytespp(vout->pix.pixelformat);
 		vrfb->en = (w * bytespp) / 4; /* 32 bit ES */
@@ -494,8 +495,20 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 		}
 	}
 
+	switch (vout->rotation) {
+	case 1:
+		rot = 3;
+		break;
+	case 3:
+		rot = 1;
+		break;
+	default:
+		rot = vout->rotation;
+		break;
+	}
+
 	src_paddr = vout->queue.bufs[buf_idx]->baddr;
-	dst_paddr = vrfb->ctx[vrfb->next].paddr[0];
+	dst_paddr = vrfb->ctx[vrfb->next].paddr[rot];
 
 	omap_set_dma_transfer_params(vrfb->dma_ch, OMAP_DMA_DATA_TYPE_S32,
 				vrfb->en, vrfb->fn, OMAP_DMA_SYNC_ELEMENT,
@@ -537,12 +550,12 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	ovly = vout->dss->overlay;
 	ovly->get_overlay_info(ovly, &o_info);
 	o_info.enabled = true;
-        vrfb = &vout->dss->vrfb;
-        o_info.paddr = vrfb->ctx[vrfb->next].paddr[rot];
-        o_info.paddr += vout->dss->foffset;
-        o_info.vaddr = NULL;
-        o_info.screen_width = OMAP_VRFB_LINE_LEN;
-        vrfb->next = (vrfb->next) ? 0 : 1;
+	vrfb = &vout->dss->vrfb;
+	o_info.paddr = vrfb->ctx[vrfb->next].paddr[0];
+	o_info.paddr += vout->dss->foffset;
+	o_info.vaddr = NULL;
+	o_info.screen_width = OMAP_VRFB_LINE_LEN;
+	vrfb->next = (vrfb->next) ? 0 : 1;
 
 	if (rot == 1 || rot == 3) { /* 90 or 270 degree rotation */
 		o_info.width = vout->crop.height;
