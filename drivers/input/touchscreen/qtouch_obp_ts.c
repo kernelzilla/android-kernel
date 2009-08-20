@@ -26,12 +26,6 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#if defined(CONFIG_VIB_OMAP_PWM)
-#include <linux/vib-omap-pwm.h>
-#elif defined(CONFIG_VIB_GPIO)
-#include <linux/vib-gpio.h>
-#endif
-
 #include <linux/qtouch_obp_ts.h>
 
 #define IGNORE_CHECKSUM_MISMATCH
@@ -521,64 +515,11 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	return ret;
 }
 
-/* axis_val is the coordinate that's on the axis of the 'start' value.
- * orth_val is on the orthogonal axis to the above. */
-static struct vkey *virt_key_find(struct virt_keys *vkeys, int axis_val,
-				  int orth_val)
-{
-	int i;
-
-	if (!vkeys || axis_val < vkeys->start)
-		return NULL;
-
-	for (i = 0; i < vkeys->count; ++i) {
-		struct vkey *key = &vkeys->keys[i];
-		if (orth_val >= key->min && orth_val <= key->max)
-			return key;
-	}
-	return NULL;
-}
-static int qtouch_process_vkey(struct qtouch_ts_data *ts,
-				  struct vkey *vkey, int down, int finger)
-{
-	if (qtouch_tsdebug)
-		pr_info("%s: vkey 0x%X is %i\n", __func__,
-		vkey->code, down);
-
-	if (ts->down_mask & (1 << finger)) {
-		input_report_key(ts->input_dev,
-			axis_map[finger].key, 0);
-		input_sync(ts->input_dev);
-		ts->down_mask &= ~(1 << finger);
-	}
-	ts->vkey_down[finger] = vkey;
-
-	/* This is a temporary solution until a more global haptics soltion is
-	 * available for haptics that need to occur in any application */
-#if defined(CONFIG_VIB_OMAP_PWM) || defined(CONFIG_VIB_GPIO)
-	if ((down == 1) && (ts->haptic_mask[finger] == 0)) {
-			vibrator_haptic_fire(40);
-			ts->haptic_mask[finger] = 1;
-	}
-#endif
-
-	input_report_key(ts->input_dev,
-		ts->vkey_down[finger]->code, down);
-	input_sync(ts->input_dev);
-
-	if (down == 0) {
-		ts->vkey_down[finger] = NULL;
-		ts->haptic_mask[finger] = 0;
-	}
-
-	return 0;
-}
 /* Handles a message from a multi-touch object. */
 static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			      void *_msg)
 {
 	struct qtm_touch_multi_msg *msg = _msg;
-	struct vkey *vkey = NULL;
 	int x;
 	int y;
 	int pressure;
@@ -605,40 +546,20 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 
 	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
 
-	vkey = virt_key_find(&ts->pdata->vkeys, y, x);
-	if (vkey) {
-		qtouch_process_vkey(ts, vkey, down, finger);
-		return 0;
-	} else if (ts->vkey_down[finger]) {
-		/* If the finger moved from the vkey to the touch area
-		   produce a liftoff for the key. */
-		input_report_key(ts->input_dev, ts->vkey_down[finger]->code, 0);
-		input_sync(ts->input_dev);
-		ts->vkey_down[finger] = NULL;
-		ts->haptic_mask[finger] = 0;
-		return 0;
+	input_report_abs(ts->input_dev, axis_map[finger].x, x);
+	input_report_abs(ts->input_dev, axis_map[finger].y, y);
+
+	if (finger == 0) {
+		input_report_abs(ts->input_dev, ABS_PRESSURE, pressure);
+		input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, width);
 	}
-	/* Report only if the touch is in the touchable area */
-	if (y < ts->pdata->abs_max_y) {
-		input_report_abs(ts->input_dev, axis_map[finger].x, x);
-		input_report_abs(ts->input_dev, axis_map[finger].y, y);
 
-		if (finger == 0) {
-			input_report_abs(ts->input_dev, ABS_PRESSURE, pressure);
-			input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, width);
-		}
+	ts->down_mask &= ~(1 << finger);
+	ts->down_mask |= (down << finger);
 
-		ts->down_mask &= ~(1 << finger);
-		ts->down_mask |= (down << finger);
+	input_report_key(ts->input_dev, axis_map[finger].key, down);
+	input_sync(ts->input_dev);
 
-		input_report_key(ts->input_dev, axis_map[finger].key, down);
-		input_sync(ts->input_dev);
-	} else if (ts->down_mask & (1 << finger)) {
-		/* If going from the touch area
-		to a non-vkey area give a lift off */
-		input_report_key(ts->input_dev, axis_map[finger].key, 0);
-		input_sync(ts->input_dev);
-	}
 	return 0;
 }
 
@@ -943,11 +864,6 @@ static int qtouch_ts_probe(struct i2c_client *client,
 			input_set_capability(ts->input_dev, EV_KEY,
 					     pdata->key_array.keys[i].code);
 	}
-
-	/* register the software virtual keys, if any are provided */
-	for (i = 0; i < pdata->vkeys.count; ++i)
-		input_set_capability(ts->input_dev, EV_KEY,
-				     pdata->vkeys.keys[i].code);
 
 	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
 	if (obj && obj->entry.num_inst > 0) {
