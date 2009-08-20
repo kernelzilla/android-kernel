@@ -1127,7 +1127,6 @@ static void map_audioic_speakers(void)
 		} else{
 			AUDIO_LEVEL1_LOG("Setting codec in Normal mode\n");
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
-			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_UNMUTE;
 			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
 		}
 	}
@@ -1578,7 +1577,7 @@ static int audio_stdac_open(struct inode *inode, struct file *file)
 		TRY(error = audio_configure_ssi(inode, file))
 
 		cpcap_audio_state.stdac_mode = CPCAP_AUDIO_STDAC_ON;
-		cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_UNMUTE;
+
 
 		map_audioic_speakers();
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
@@ -1799,7 +1798,20 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		unsigned int gain;
 		TRY(copy_from_user(&gain, (unsigned int *)arg,
 					sizeof(unsigned int)))
-		cpcap_audio_state.output_gain = gain;
+		if (gain == 0) {
+			cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_MUTE;
+			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+		} else {
+			/* unmute codec or stereo DAC */
+			if (cpcap_audio_state.stdac_mode == CPCAP_AUDIO_STDAC_ON)
+				cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_UNMUTE;
+
+			if (cpcap_audio_state.codec_mode == CPCAP_AUDIO_CODEC_ON)
+				cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_UNMUTE;
+
+			cpcap_audio_state.output_gain = gain;
+		}
+
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 		AUDIO_LEVEL2_LOG("SOUND_MIXER_VOLUME, output_gain = %d\n",
 				cpcap_audio_state.output_gain);
