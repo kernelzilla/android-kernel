@@ -108,8 +108,8 @@ enum {
 
 /* borrowed from linux/include/linux/kernel.h */
 #ifndef ALIGN
-#define ALIGN(x,a)		__ALIGN_MASK(x,(typeof(x))(a)-1)
-#define __ALIGN_MASK(x,mask)	(((x)+(mask))&~(mask))
+#define ALIGN(x, a)		__ALIGN_MASK(x, (typeof(x))(a)-1)
+#define __ALIGN_MASK(x, mask)	(((x)+(mask))&~(mask))
 #endif
 
 /* borrowed from linux/include/linux/compiler-gcc3.h */
