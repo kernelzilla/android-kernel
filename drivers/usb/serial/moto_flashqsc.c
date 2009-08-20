@@ -16,6 +16,9 @@
 #include <linux/module.h>
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
+#include <linux/io.h>
+#include <mach/io.h>
+#include "../host/ehci-omap.h"
 
 static struct usb_device_id id_table[] = {
 	{USB_DEVICE_AND_INTERFACE_INFO(0x22b8, 0x2a63, 0x0a, 0, 0)},
@@ -25,6 +28,19 @@ static struct usb_device_id id_table[] = {
 MODULE_DEVICE_TABLE(usb, id_table);
 
 #define MOTO_FLASHQSC_BULKOUT_SIZE	8192
+
+/* disable the uhh_sysconfig auto idle bit,
+ * so that, host iclk will not be disabled and BP
+ * can re-enumerated on AP
+ */
+static void omap_flashqsc_disable_uhh_smart_idle()
+{
+	u32 sysconfig;
+
+	sysconfig = omap_readl(OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~(1 << OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT);
+	omap_writel(sysconfig, OMAP_UHH_SYSCONFIG);
+}
 
 static int moto_flashqsc_attach(struct usb_serial *serial)
 {
@@ -49,6 +65,10 @@ static int moto_flashqsc_attach(struct usb_serial *serial)
 					  port->bulk_out_endpointAddress),
 			  port->bulk_out_buffer, port->bulk_out_size,
 			  usb_serial_generic_write_bulk_callback, port);
+
+	/* need to disable the AUTO IDLE for the usb iclk */
+	omap_flashqsc_disable_uhh_smart_idle();
+
 	return 0;
 }
 
@@ -58,6 +78,7 @@ static struct usb_driver moto_flashqsc_driver = {
 	.disconnect = usb_serial_disconnect,
 	.id_table = id_table,
 	.no_dynamic_id = 1,
+
 };
 
 static struct usb_serial_driver moto_flashqsc_device = {
