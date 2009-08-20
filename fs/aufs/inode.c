@@ -265,6 +265,39 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 	return err;
 }
 
+int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
+	   unsigned int d_type, ino_t *ino)
+{
+	int err;
+	struct mutex *mtx;
+	const int isdir = (d_type == DT_DIR);
+
+	/* prevent hardlinks from race condition */
+	mtx = NULL;
+	if (!isdir) {
+		mtx = &au_sbr(sb, bindex)->br_xino.xi_nondir_mtx;
+		mutex_lock(mtx);
+	}
+	err = au_xino_read(sb, bindex, h_ino, ino);
+	if (unlikely(err))
+		goto out;
+
+	if (!*ino) {
+		err = -EIO;
+		*ino = au_xino_new_ino(sb);
+		if (unlikely(!*ino))
+			goto out;
+		err = au_xino_write(sb, bindex, h_ino, *ino);
+		if (unlikely(err))
+			goto out;
+	}
+
+ out:
+	if (!isdir)
+		mutex_unlock(mtx);
+	return err;
+}
+
 /* successful returns with iinfo write_locked */
 /* todo: return with unlocked? */
 struct inode *au_new_inode(struct dentry *dentry, int must_new)
