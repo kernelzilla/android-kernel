@@ -20,6 +20,7 @@
 #define _LINUX_LED_CPCAP_LM3554_H__
 
 #define LM3554_LED_DEV "torch-flash"
+#define LM3554_LED_SPOTLIGHT "spotlight"
 
 #define LM3554_NAME "lm3554_led"
 

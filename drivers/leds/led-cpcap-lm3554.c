@@ -53,6 +53,7 @@ struct lm3554_data {
 	struct i2c_client *client;
 	struct lm3554_platform_data *pdata;
 	struct led_classdev led_dev;
+	struct led_classdev spotlight_dev;
 	int camera_strobe_brightness;
 	int flash_light_brightness;
 };
@@ -239,6 +240,45 @@ static ssize_t lm3554_torch_store(struct device *dev,
 
 static DEVICE_ATTR(flash_light, 0644, lm3554_torch_show, lm3554_torch_store);
 
+static void lm3554_spot_light_brightness_set(struct led_classdev *led_cdev,
+				  enum led_brightness value)
+{
+	int err;
+	uint8_t val;
+	unsigned long torch_val = value;
+
+	struct lm3554_data *torch_data =
+	    container_of(led_cdev, struct lm3554_data, spotlight_dev);
+
+	err = lm3554_read_reg(torch_data, LM3554_TORCH_BRIGHTNESS, &val);
+	if (err)
+		return;
+	/* Clear out the Enable and brightness bits */
+	val &= 0xc4;
+
+	if (torch_val) {
+		val |= ((torch_val / LM3554_TORCH_STEP) << 3);
+		val |= 0x02;
+	}
+
+	err = lm3554_write_reg(torch_data, LM3554_CONFIG_REG_2, 0x08);
+	if (err) {
+		pr_err("%s: Configuring the VIN Monitor failed for "
+		       "%i\n", __func__, err);
+		return;
+	}
+
+	err = lm3554_write_reg(torch_data,
+			       LM3554_TORCH_BRIGHTNESS, val);
+	if (err) {
+		pr_err("%s: Configuring the flash light failed for "
+		       "%i\n", __func__, err);
+		return;
+	}
+
+	return;
+}
+
 static ssize_t lm3554_strobe_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
@@ -400,9 +440,20 @@ static int lm3554_probe(struct i2c_client *client,
 		goto error6;
 	}
 
+	torch_data->spotlight_dev.name = LM3554_LED_SPOTLIGHT;
+	torch_data->spotlight_dev.brightness_set =
+		lm3554_spot_light_brightness_set;
+	err = led_classdev_register((struct device *)
+				    &client->dev, &torch_data->spotlight_dev);
+	if (err < 0) {
+		err = -ENODEV;
+		pr_err("%s: Register led class failed: %d\n", __func__, err);
+		goto error6;
+	}
 	pr_info("LM3554 torch initialized\n");
 
 	return 0;
+
 error6:
 	device_remove_file(torch_data->led_dev.dev, &dev_attr_camera_strobe);
 error5:
@@ -425,6 +476,7 @@ static int lm3554_remove(struct i2c_client *client)
 	device_remove_file(torch_data->led_dev.dev, &dev_attr_strobe_err);
 
 	led_classdev_unregister(&torch_data->led_dev);
+	led_classdev_unregister(&torch_data->spotlight_dev);
 
 	kfree(torch_data->pdata);
 	kfree(torch_data);
