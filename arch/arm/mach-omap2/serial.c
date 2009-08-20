@@ -23,6 +23,7 @@
 #endif
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
 
 #include <mach/common.h>
 #include <mach/board.h>
@@ -75,6 +76,8 @@ struct omap_uart_state {
 
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
+static unsigned int rxfifo_idleblks = 0;
+static unsigned int txfifo_idleblks = 0;
 
 #ifdef CONFIG_SERIAL_OMAP
 static struct plat_serialomap_port serial_platform_data[] = {
@@ -366,12 +369,38 @@ static void omap_uart_idle_timer(unsigned long data)
 	omap_uart_allow_sleep(uart);
 }
 
+#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
+static int omap_uart_fifos_not_empty(struct omap_uart_state *uart)
+{
+	struct plat_serialomap_port *p = uart->p;
+	u8 lsr;
+
+	lsr = serial_read_reg(p, UART_LSR);
+	if ((lsr & BOTH_EMPTY) != BOTH_EMPTY)
+		return 1;
+	if (lsr & UART_LSR_DR)
+		return 2;
+	return 0;
+}
+
 void omap_uart_prepare_idle(int num)
 {
 	struct omap_uart_state *uart;
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (num == uart->num && uart->can_sleep) {
+			int fne = omap_uart_fifos_not_empty(uart);
+
+			if (fne) {
+				if (num == 0) {
+					if (fne == 1)
+						txfifo_idleblks++;
+					else
+						rxfifo_idleblks++;
+				}
+				omap_uart_block_sleep(uart);
+				return;
+			}
 			omap_uart_enable_rtspullup(uart);
 			omap_uart_disable_clocks(uart);
 			return;
@@ -619,6 +648,32 @@ static struct kobj_attribute sleep_timeout_attr =
 static inline void omap_uart_idle_init(struct omap_uart_state *uart) {}
 #endif /* CONFIG_PM */
 
+static int rxfifo_idleblk_get(void *data, u64 *val)
+{
+	*val = rxfifo_idleblks;
+	return 0;
+}
+
+static int rxfifo_idleblk_set(void *data, u64 val)
+{
+	rxfifo_idleblks = 0;
+	return 0;
+}
+static int txfifo_idleblk_get(void *data, u64 *val)
+{
+	*val = txfifo_idleblks;
+	return 0;
+}
+
+static int txfifo_idleblk_set(void *data, u64 val)
+{
+	txfifo_idleblks = 0;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(txfifo_idleblk_fops, txfifo_idleblk_get, txfifo_idleblk_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(rxfifo_idleblk_fops, rxfifo_idleblk_get, rxfifo_idleblk_set, "%llu\n");
+
 void __init omap_serial_init(int wake_gpio_strobe,
 			     unsigned int wake_strobe_enable_mask)
 {
@@ -626,6 +681,8 @@ void __init omap_serial_init(int wake_gpio_strobe,
 	const struct omap_uart_config *info;
 	char name[16];
 
+	debugfs_create_file("txfifo_idle_block_count", 0644, NULL, NULL, &txfifo_idleblk_fops);
+	debugfs_create_file("rxfifo_idle_block_count", 0644, NULL, NULL, &rxfifo_idleblk_fops);
 	/*
 	 * Make sure the serial ports are muxed on at this point.
 	 * You have to mux them off in device drivers later on
