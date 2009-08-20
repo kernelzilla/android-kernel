@@ -87,7 +87,8 @@ EXPORT_SYMBOL(omap_vrfb_adjust_size);
 
 void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 		u16 width, u16 height,
-		enum omap_color_mode color_mode)
+		enum omap_color_mode color_mode,
+		int rotation)
 {
 	unsigned pixel_size_exp;
 	u16 vrfb_width;
@@ -96,6 +97,7 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	u8 bytespp;
 	u32 size;
 	u32 control;
+	u16 temp;
 
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d)\n", ctx, paddr,
 			width, height, color_mode);
@@ -126,6 +128,12 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
 			color_mode == OMAP_DSS_COLOR_UYVY)
 		width >>= 1;
+
+	if (rotation == 1 || rotation == 3) {
+		temp = width;
+		width = height;
+		height = temp;
+	}
 
 	if (bytespp == 4)
 		pixel_size_exp = 2;

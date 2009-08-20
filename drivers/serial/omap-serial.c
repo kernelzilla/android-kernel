@@ -656,6 +656,10 @@ static int serial_omap_startup(struct uart_port *port)
 	*/
 	if (up->port.flags & UPF_TRIGGER_HIGH)
 		irq_flags |= IRQF_TRIGGER_HIGH;
+
+	if (up->port.flags & UPF_SHARE_IRQ)
+		irq_flags |= IRQF_SHARED;
+
 	/*
 	 * Allocate the IRQ
 	 */
