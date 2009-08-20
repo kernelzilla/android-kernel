@@ -774,16 +774,9 @@ int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 
 /* Sholes specific PM */
 
-static int bpwake_irqstate;
 static struct wake_lock baseband_wakeup_wakelock;
 static int sholes_bpwake_irqhandler(int irq, void *unused)
 {
-	printk("%s: Baseband wakeup\n", __func__);
-	/*
-	 * Ignore the BP pokes while we're awake
-	 */
-	disable_irq(irq);
-	bpwake_irqstate = 0;
 	wake_lock_timeout(&baseband_wakeup_wakelock, (HZ / 2));
 	return IRQ_HANDLED;
 }
@@ -792,8 +785,10 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 {
 	int rc;
 
-	gpio_request(SHOLES_APWAKE_TRIGGER_GPIO, "BP -> AP wakeup trigger");
+	gpio_request(SHOLES_APWAKE_TRIGGER_GPIO, "BP -> AP IPC trigger");
 	gpio_direction_input(SHOLES_APWAKE_TRIGGER_GPIO);
+
+	wake_lock_init(&baseband_wakeup_wakelock, WAKE_LOCK_IDLE, "bpwake");
 
 	rc = request_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO),
 			 sholes_bpwake_irqhandler,
@@ -805,10 +800,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	wake_lock_init(&baseband_wakeup_wakelock, WAKE_LOCK_SUSPEND, "bpwake");
 	enable_irq_wake(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
-	disable_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
-	bpwake_irqstate = 0;
 	return 0;
 }
 
@@ -820,17 +812,11 @@ static int sholes_bpwake_remove(struct platform_device *pdev)
 
 static int sholes_bpwake_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	if (!bpwake_irqstate) {
-		enable_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
-		bpwake_irqstate = 1;
-	}
 	return 0;
 }
 
 static int sholes_bpwake_resume(struct platform_device *pdev)
 {
-	disable_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO));
-	bpwake_irqstate = 0;
 	return 0;
 }
 
