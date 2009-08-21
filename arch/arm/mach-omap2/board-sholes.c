@@ -922,6 +922,9 @@ static void sholes_pm_init(void)
 	platform_device_register(&sholes_bpwake_device);
 	platform_driver_register(&sholes_bpwake_driver);
 
+	/* set cold reset, will move to warm reset once ready */
+	sholes_pm_set_reset(1);
+
 	register_reboot_notifier(&sholes_pm_reboot_notifier);
 }
 
