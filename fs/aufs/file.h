@@ -161,7 +161,7 @@ static inline unsigned int au_figen(struct file *f)
 
 static inline int au_test_mmapped(struct file *f)
 {
-	FiMustAnyLock(f);
+	/* FiMustAnyLock(f); */
 	return !!(au_fi(f)->fi_h_vm_ops);
 }
 
