@@ -901,6 +901,7 @@ struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp)
 
 	whtmp->dir = NULL;
 	whtmp->wh_dentry = NULL;
+	/* no estimation for dir size */
 	err = au_nhash_alloc(&whtmp->whlist, au_sbi(sb)->si_rdhash, gfp);
 	if (!err)
 		return whtmp; /* success */

@@ -91,10 +91,12 @@ struct au_vdir {
 extern struct file_operations aufs_dir_fop;
 void au_add_nlink(struct inode *dir, struct inode *h_dir);
 void au_sub_nlink(struct inode *dir, struct inode *h_dir);
+loff_t au_dir_size(struct file *file, struct dentry *dentry);
 int au_test_empty_lower(struct dentry *dentry);
 int au_test_empty(struct dentry *dentry, struct au_nhash *whlist);
 
 /* vdir.c */
+unsigned int au_rdhash_est(loff_t sz);
 int au_nhash_alloc(struct au_nhash *nhash, unsigned int num_hash, gfp_t gfp);
 void au_nhash_wh_free(struct au_nhash *whlist);
 int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
