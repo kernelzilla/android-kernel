@@ -475,11 +475,6 @@ static int modem_open(struct tty_struct *tty,
 		return -ENODEV;
 	}
 
-
-	retval = usb_autopm_get_interface(port->serial->interface);
-	if (retval < 0)
-		return retval;
-
 	port->serial->interface->needs_remote_wakeup = 1;
 
 	modem_port_ptr->port = port;
@@ -532,6 +527,9 @@ static int modem_open(struct tty_struct *tty,
 		modem_port_ptr->modem_status = 0;
 	}
 
+	/*  need to put the pm interface back which is taken at
+	 *  serial_open() at usb-serial.c
+	 */
 	usb_autopm_put_interface(port->serial->interface);
 
 	if (cdma_modem_debug)
@@ -680,6 +678,9 @@ static void modem_close(struct tty_struct *tty,
 		dev_info(&port->dev, "%s: Enter. Close Port %d  \n",
 			 __func__, port->number);
 
+	/*  Get the pm interface here and will put it back
+	 *  at serialr_close() of usb-serial.c
+	 */
 	modem_port_ptr = usb_get_serial_data(port->serial);
 	if (!modem_port_ptr) {
 		dev_err(&port->dev,
@@ -696,8 +697,6 @@ static void modem_close(struct tty_struct *tty,
 	modem_port_ptr->modem_status = 0;
 	if (modem_port_ptr->delayed_wb)
 		modem_port_ptr->delayed_wb->use = 0;
-
-	usb_autopm_put_interface(port->serial->interface);
 
 	if (cdma_modem_debug)
 		dev_info(&port->dev, "%s: Exit. \n", __func__);
@@ -860,7 +859,7 @@ static void modem_usb_wkup_work(struct work_struct *work)
 
 	serial = modem_port_ptr->port->serial;
 	if ((modem_port_ptr->port != 0) &&
-	    (atomic_cmpxchg(&modem_port_ptr->wakeup_flag, 0, 1))) {
+	    !(atomic_cmpxchg(&modem_port_ptr->wakeup_flag, 0, 1))) {
 		result = usb_autopm_get_interface(serial->interface);
 		if (result < 0) {
 			atomic_set(&modem_port_ptr->wakeup_flag, 0);
