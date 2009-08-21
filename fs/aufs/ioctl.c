@@ -18,14 +18,12 @@
 
 /*
  * ioctl
- * currently plink-management only.
+ * plink-management and readdir in userspace.
  */
 
-#include <linux/uaccess.h>
 #include "aufs.h"
 
-long aufs_ioctl_dir(struct file *file, unsigned int cmd,
-		    unsigned long arg __maybe_unused)
+long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long err;
 
@@ -34,9 +32,16 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd,
 	case AUFS_CTL_PLINK_CLEAN:
 		err = au_plink_ioctl(file, cmd);
 		break;
+
+	case AUFS_CTL_RDU:
+	case AUFS_CTL_RDU_INO:
+		err = au_rdu_ioctl(file, cmd, arg);
+		break;
+
 	default:
 		err = -EINVAL;
 	}
 
+	AuTraceErr(err);
 	return err;
 }

@@ -112,5 +112,16 @@ int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir);
 /* ioctl.c */
 long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg);
 
+#ifdef CONFIG_AUFS_RDU
+/* rdu.c */
+long au_rdu_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+#else
+static inline long au_rdu_ioctl(struct file *file, unsigned int cmd,
+				unsigned long arg)
+{
+	return -EINVAL;
+}
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DIR_H__ */

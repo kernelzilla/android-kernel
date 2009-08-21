@@ -44,6 +44,7 @@ but UnionMount.
 - etc...
 
 Also there are many enhancements in aufs1, such as:
+- readdir(3) in userspace.
 - keep inode number by external inode number table
 - keep the timestamps of file/dir in internal copyup operation
 - seekable directory, supporting NFS readdir.
@@ -245,6 +246,8 @@ If you don't like aufs2-standalone.patch, then try aufs2-2.6 tree.
 
 And then,
 - read README in aufs2-util, build and install it
+- if you want to use readdir(3) in userspace, then run
+  "make install_ulib" too. And refer to the aufs manual in detail.
 
 
 4. Usage

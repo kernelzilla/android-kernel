@@ -62,6 +62,14 @@ config AUFS_EXPORT
 	option. There are several requirements for this configuration.
 	See detail in aufs.5.
 
+config AUFS_RDU
+	bool "Readdir in userspace"
+	help
+	If you have millions of files under a single aufs directory, and
+	meet the out of memory, then enable this option and set
+	environment variables for your readdir(3).
+	See detail in aufs.5.
+
 config AUFS_SHWH
 	bool "Show whiteouts"
 	help
