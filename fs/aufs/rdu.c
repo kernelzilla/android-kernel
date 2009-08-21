@@ -242,7 +242,8 @@ static int au_rdu_ino(struct file *file, struct aufs_rdu *rdu)
 		if (!ent.wh)
 			err = au_ino(sb, ent.bindex, ent.ino, ent.type, &ino);
 		else
-			err = au_wh_ino(sb, ent.bindex, ent.ino, ent.type, &ino);
+			err = au_wh_ino(sb, ent.bindex, ent.ino, ent.type,
+					&ino);
 		if (unlikely(err)) {
 			AuTraceErr(err);
 			break;
