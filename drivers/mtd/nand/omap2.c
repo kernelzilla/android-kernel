@@ -578,6 +578,33 @@ static int omap_nand_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int omap_nand_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct mtd_info *info = platform_get_drvdata(pdev);
+	int ret = 0;
+
+	if (info && info->suspend)
+		ret = info->suspend(info);
+
+	return ret;
+}
+static int omap_nand_resume(struct platform_device *pdev)
+{
+	struct mtd_info *info = platform_get_drvdata(pdev);
+	int ret = 0;
+
+	if (info)
+		info->resume(info);
+
+	return ret;
+}
+
+#else
+# define omap_nand_suspend   NULL
+# define omap_nand_resume    NULL
+#endif                          /* CONFIG_PM */
+
 static struct platform_driver omap_nand_driver = {
 	.probe		= omap_nand_probe,
 	.remove		= omap_nand_remove,
@@ -585,6 +612,8 @@ static struct platform_driver omap_nand_driver = {
 		.name	= DRIVER_NAME,
 		.owner	= THIS_MODULE,
 	},
+	.suspend	= omap_nand_suspend,
+	.resume		= omap_nand_resume,
 };
 MODULE_ALIAS(DRIVER_NAME);
 
