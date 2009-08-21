@@ -278,9 +278,9 @@ static int au_rdu_verify(struct aufs_rdu *rdu)
 	    && rdu->verify[AufsCtlRduV_SZ_PTR] == sizeof(rdu))
 		return 0;
 
-	AuDbg("%u:%lu, %u:%lu\n",
-	      rdu->verify[AufsCtlRduV_SZ], sizeof(*rdu),
-	      rdu->verify[AufsCtlRduV_SZ_PTR], sizeof(rdu));
+	AuDbg("%u:%u, %u:%u\n",
+	      rdu->verify[AufsCtlRduV_SZ], (unsigned int)sizeof(*rdu),
+	      rdu->verify[AufsCtlRduV_SZ_PTR], (unsigned int)sizeof(rdu));
 	return -EINVAL;
 }
 
