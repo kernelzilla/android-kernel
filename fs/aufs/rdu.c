@@ -130,6 +130,8 @@ static int au_rdu(struct file *file, struct aufs_rdu *rdu)
 		goto out;
 	}
 	rdu->rent = 0;
+	rdu->tail = rdu->ent;
+	rdu->full = 0;
 	arg.rdu = rdu;
 	arg.ent = rdu->ent;
 	arg.end = arg.ent.ul;
