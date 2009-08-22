@@ -83,7 +83,7 @@ static enum power_supply_property cpcap_batt_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_CAPACITY,
-	POWER_SUPPLY_PROP_VOLTAGE_AVG,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_TEMP
 };
 
@@ -369,7 +369,7 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 		val->intval = sply->batt_state.capacity;
 		break;
 
-	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = sply->batt_state.batt_volt;
 		break;
 
