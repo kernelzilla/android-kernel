@@ -1023,26 +1023,44 @@ void omap_push_sram_idle(void)
 }
 
 #ifdef CONFIG_OMAP_PM_SRF
+static void set_opps_max(void)
+{
+	resource_set_opp_level(VDD2_OPP, MAX_VDD2_OPP, OPP_IGNORE_LOCK);
+	resource_set_opp_level(VDD1_OPP, MAX_VDD1_OPP, OPP_IGNORE_LOCK);
+	return;
+}
+#else
+static void set_opps_max(void)
+{
+	return;
+}
+#endif
+
 static int prcm_prepare_reboot(struct notifier_block *this, unsigned long code,
 					void *x)
 {
 	if ((code == SYS_DOWN) || (code == SYS_HALT) ||
 		(code == SYS_POWER_OFF)) {
-		resource_set_opp_level(VDD2_OPP, MAX_VDD2_OPP, OPP_IGNORE_LOCK);
-		resource_set_opp_level(VDD1_OPP, MAX_VDD1_OPP, OPP_IGNORE_LOCK);
+		set_opps_max();
 	}
 	return NOTIFY_DONE;
 }
-#else
-static int prcm_prepare_reboot(struct notifier_block *this, unsigned long code,
-					void *x)
-{
-	return NOTIFY_DONE;
-}
-#endif
 
 static struct notifier_block prcm_notifier = {
 	.notifier_call	= prcm_prepare_reboot,
+	.next		= NULL,
+	.priority	= INT_MAX,
+};
+
+static int panic_prepare_reboot(struct notifier_block *this,
+					unsigned long code, void *x)
+{
+	set_opps_max();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block prcm_panic_notifier = {
+	.notifier_call	= panic_prepare_reboot,
 	.next		= NULL,
 	.priority	= INT_MAX,
 };
@@ -1134,6 +1152,8 @@ int __init omap3_pm_init(void)
 
 	omap3_save_scratchpad_contents();
 	register_reboot_notifier(&prcm_notifier);
+	atomic_notifier_chain_register(&panic_notifier_list,
+					&prcm_panic_notifier);
 err1:
 	return ret;
 err2:
