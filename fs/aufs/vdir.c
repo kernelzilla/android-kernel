@@ -56,6 +56,21 @@ static unsigned char *last_deblk(struct au_vdir *vdir)
 
 /* ---------------------------------------------------------------------- */
 
+/* estimate the apropriate size for name hash table */
+unsigned int au_rdhash_est(loff_t sz)
+{
+	unsigned int n;
+
+	n = UINT_MAX;
+	sz >>= 10;
+	if (sz < n)
+		n = sz;
+	if (sz < AUFS_RDHASH_DEF)
+		n = AUFS_RDHASH_DEF;
+	/* AuInfo("n %u\n", n); */
+	return n;
+}
+
 /*
  * the allocated memory has to be freed by
  * au_nhash_wh_free() or au_nhash_de_free().
@@ -347,11 +362,13 @@ void au_vdir_free(struct au_vdir *vdir)
 	au_cache_free_vdir(vdir);
 }
 
-static struct au_vdir *alloc_vdir(struct super_block *sb)
+static struct au_vdir *alloc_vdir(struct file *file)
 {
 	struct au_vdir *vdir;
+	struct super_block *sb;
 	int err;
 
+	sb = file->f_dentry->d_sb;
 	SiMustAnyLock(sb);
 
 	err = -ENOMEM;
@@ -364,6 +381,11 @@ static struct au_vdir *alloc_vdir(struct super_block *sb)
 		goto out_free;
 
 	vdir->vd_deblk_sz = au_sbi(sb)->si_rdblk;
+	if (!vdir->vd_deblk_sz) {
+		/* estimate the apropriate size for deblk */
+		vdir->vd_deblk_sz = au_dir_size(file, /*dentry*/NULL);
+		/* AuInfo("vd_deblk_sz %u\n", vdir->vd_deblk_sz); */
+	}
 	vdir->vd_nblk = 0;
 	vdir->vd_version = 0;
 	vdir->vd_jiffy = 0;
@@ -534,6 +556,8 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 	SiMustAnyLock(sb);
 
 	rdhash = au_sbi(sb)->si_rdhash;
+	if (!rdhash)
+		rdhash = au_rdhash_est(au_dir_size(file, /*dentry*/NULL));
 	err = au_nhash_alloc(&arg->delist, rdhash, GFP_NOFS);
 	if (unlikely(err))
 		goto out;
@@ -607,7 +631,7 @@ static int read_vdir(struct file *file, int may_read)
 	vdir = au_ivdir(inode);
 	if (!vdir) {
 		do_read = 1;
-		vdir = alloc_vdir(inode->i_sb);
+		vdir = alloc_vdir(file);
 		err = PTR_ERR(vdir);
 		if (IS_ERR(vdir))
 			goto out;
@@ -698,7 +722,7 @@ int au_vdir_init(struct file *file)
 	allocated = NULL;
 	vdir_cache = au_fvdir_cache(file);
 	if (!vdir_cache) {
-		vdir_cache = alloc_vdir(file->f_dentry->d_sb);
+		vdir_cache = alloc_vdir(file);
 		err = PTR_ERR(vdir_cache);
 		if (IS_ERR(vdir_cache))
 			goto out;
