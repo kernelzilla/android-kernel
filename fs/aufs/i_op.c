@@ -86,14 +86,16 @@ static int aufs_permission(struct inode *inode, int mask)
 
 	if (!isdir || write_mask) {
 		h_inode = au_h_iptr(inode, au_ibstart(inode));
-		AuDebugOn(!h_inode
-			  || ((h_inode->i_mode & S_IFMT)
-			      != (inode->i_mode & S_IFMT)));
+		err = au_busy_or_stale();
+		if (unlikely(!h_inode
+			     || (h_inode->i_mode & S_IFMT)
+			     != (inode->i_mode & S_IFMT)))
+			goto out;
+
 		err = 0;
 		bindex = au_ibstart(inode);
 		br = au_sbr(sb, bindex);
 		err = h_permission(h_inode, mask, br->br_mnt, br->br_perm);
-
 		if (write_mask && !err) {
 			/* test whether the upper writable branch exists */
 			err = -EROFS;
@@ -112,7 +114,10 @@ static int aufs_permission(struct inode *inode, int mask)
 	for (bindex = au_ibstart(inode); !err && bindex <= bend; bindex++) {
 		h_inode = au_h_iptr(inode, bindex);
 		if (h_inode) {
-			AuDebugOn(!S_ISDIR(h_inode->i_mode));
+			err = au_busy_or_stale();
+			if (unlikely(!S_ISDIR(h_inode->i_mode)))
+				break;
+
 			br = au_sbr(sb, bindex);
 			err = h_permission(h_inode, mask, br->br_mnt,
 					   br->br_perm);
