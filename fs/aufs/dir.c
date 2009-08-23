@@ -42,6 +42,48 @@ void au_sub_nlink(struct inode *dir, struct inode *h_dir)
 		dir->i_nlink -= 2;
 }
 
+loff_t au_dir_size(struct file *file, struct dentry *dentry)
+{
+	loff_t sz;
+	aufs_bindex_t bindex, bend;
+	struct file *h_file;
+	struct dentry *h_dentry;
+
+	sz = 0;
+	if (file) {
+		AuDebugOn(!file->f_dentry);
+		AuDebugOn(!file->f_dentry->d_inode);
+		AuDebugOn(!S_ISDIR(file->f_dentry->d_inode->i_mode));
+
+		bend = au_fbend(file);
+		for (bindex = 0; bindex <= bend && sz < KMALLOC_MAX_SIZE;
+		     bindex++) {
+			h_file = au_h_fptr(file, bindex);
+			if (h_file
+			    && h_file->f_dentry
+			    && h_file->f_dentry->d_inode)
+				sz += i_size_read(h_file->f_dentry->d_inode);
+		}
+	} else {
+		AuDebugOn(!dentry);
+		AuDebugOn(!dentry->d_inode);
+		AuDebugOn(!S_ISDIR(dentry->d_inode->i_mode));
+
+		bend = au_dbtaildir(dentry);
+		for (bindex = 0; bindex <= bend && sz < KMALLOC_MAX_SIZE;
+		     bindex++) {
+			h_dentry = au_h_dptr(dentry, bindex);
+			if (h_dentry && h_dentry->d_inode)
+				sz += i_size_read(h_dentry->d_inode);
+		}
+	}
+	if (sz < KMALLOC_MAX_SIZE)
+		sz = roundup_pow_of_two(sz);
+	if (sz > KMALLOC_MAX_SIZE)
+		sz = KMALLOC_MAX_SIZE;
+	return sz;
+}
+
 /* ---------------------------------------------------------------------- */
 
 static int reopen_dir(struct file *file)
@@ -465,13 +507,16 @@ static int sio_test_empty(struct dentry *dentry, struct test_empty_arg *arg)
 int au_test_empty_lower(struct dentry *dentry)
 {
 	int err;
+	unsigned int rdhash;
 	aufs_bindex_t bindex, bstart, btail;
 	struct test_empty_arg arg;
 
 	SiMustAnyLock(dentry->d_sb);
 
-	err = au_nhash_alloc(&arg.whlist, au_sbi(dentry->d_sb)->si_rdhash,
-			     GFP_NOFS);
+	rdhash = au_sbi(dentry->d_sb)->si_rdhash;
+	if (!rdhash)
+		rdhash = au_rdhash_est(au_dir_size(/*file*/NULL, dentry));
+	err = au_nhash_alloc(&arg.whlist, rdhash, GFP_NOFS);
 	if (unlikely(err))
 		goto out;
 

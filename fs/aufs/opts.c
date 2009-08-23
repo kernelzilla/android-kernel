@@ -913,12 +913,12 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			break;
 		case Opt_rdblk:
 			if (unlikely(match_int(&a->args[0], &n)
-				     || n <= 0
+				     || n < 0
 				     || n > KMALLOC_MAX_SIZE)) {
 				AuErr("bad integer in %s\n", opt_str);
 				break;
 			}
-			if (unlikely(n < NAME_MAX)) {
+			if (unlikely(n && n < NAME_MAX)) {
 				AuErr("rdblk must be larger than %d\n",
 				      NAME_MAX);
 				break;
@@ -929,7 +929,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			break;
 		case Opt_rdhash:
 			if (unlikely(match_int(&a->args[0], &n)
-				     || n <= 0
+				     || n < 0
 				     || n * sizeof(struct hlist_head)
 				     > KMALLOC_MAX_SIZE)) {
 				AuErr("bad integer in %s\n", opt_str);
