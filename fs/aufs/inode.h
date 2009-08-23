@@ -218,6 +218,7 @@ void au_plink_append(struct inode *inode, aufs_bindex_t bindex,
 		     struct dentry *h_dentry);
 void au_plink_put(struct super_block *sb);
 void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id);
+long au_plink_ioctl(struct file *file, unsigned int cmd);
 
 /* ---------------------------------------------------------------------- */
 

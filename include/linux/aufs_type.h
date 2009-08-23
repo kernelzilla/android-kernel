@@ -169,8 +169,8 @@ struct aufs_rdu {
 	union au_rdu_ent_ul	tail;
 	/* number of entries which were added in a single call */
 	__u64			rent;
-	__u8			shwh;
 	__u8			full;
+	__u8			shwh;
 
 	struct au_rdu_cookie	cookie;
 } __aligned(8);
