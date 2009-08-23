@@ -452,6 +452,7 @@ static int may_rename_dstdir(struct dentry *dentry, struct au_nhash *whlist)
 static int may_rename_srcdir(struct dentry *dentry, aufs_bindex_t btgt)
 {
 	int err;
+	unsigned int rdhash;
 	aufs_bindex_t bstart;
 
 	bstart = au_dbstart(dentry);
@@ -459,8 +460,11 @@ static int may_rename_srcdir(struct dentry *dentry, aufs_bindex_t btgt)
 		struct au_nhash whlist;
 
 		SiMustAnyLock(dentry->d_sb);
-		err = au_nhash_alloc(&whlist, au_sbi(dentry->d_sb)->si_rdhash,
-				     GFP_NOFS);
+		rdhash = au_sbi(dentry->d_sb)->si_rdhash;
+		if (!rdhash)
+			rdhash = au_rdhash_est(au_dir_size(/*file*/NULL,
+							   dentry));
+		err = au_nhash_alloc(&whlist, rdhash, GFP_NOFS);
 		if (unlikely(err))
 			goto out;
 		err = au_test_empty(dentry, &whlist);
@@ -486,11 +490,16 @@ static int may_rename_srcdir(struct dentry *dentry, aufs_bindex_t btgt)
 static int au_ren_may_dir(struct au_ren_args *a)
 {
 	int err;
+	unsigned int rdhash;
 	struct dentry *d;
 
 	d = a->dst_dentry;
 	SiMustAnyLock(d->d_sb);
-	err = au_nhash_alloc(&a->whlist, au_sbi(d->d_sb)->si_rdhash, GFP_NOFS);
+
+	rdhash = au_sbi(d->d_sb)->si_rdhash;
+	if (!rdhash)
+		rdhash = au_rdhash_est(au_dir_size(/*file*/NULL, d));
+	err = au_nhash_alloc(&a->whlist, rdhash, GFP_NOFS);
 	if (unlikely(err))
 		goto out;
 
