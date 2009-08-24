@@ -310,7 +310,9 @@ static int qtouch_power_config(struct qtouch_ts_data *ts, int on)
 static int qtouch_hw_init(struct qtouch_ts_data *ts)
 {
 	struct qtm_object *obj;
+	int i;
 	int ret;
+	uint16_t adj_addr;
 
 	pr_info("%s: Doing hw init\n", __func__);
 
@@ -353,17 +355,26 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 	obj = find_obj(ts, QTM_OBJ_TOUCH_KEYARRAY);
 	if (obj && obj->entry.num_inst > 0) {
 		struct qtm_touch_keyarray_cfg cfg;
-		if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
-			memcpy(&cfg, &ts->pdata->key_array.cfg, sizeof(cfg));
-			cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
-		} else
-			memset(&cfg, 0, sizeof(cfg));
-		ret = qtouch_write_addr(ts, obj->entry.addr, &cfg,
-					min(sizeof(cfg), obj->entry.size));
-		if (ret != 0) {
-			pr_err("%s: Can't write touch keyarray config\n",
-			       __func__);
-			return ret;
+		for (i = 0; i < obj->entry.num_inst; i++) {
+			if (i > (ts->pdata->key_array.num_keys - 1)) {
+				pr_info("%s: No entry key instance.\n",
+					__func__);
+				memset(&cfg, 0, sizeof(cfg));
+			} else if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
+				memcpy(&cfg, &ts->pdata->key_array.cfg[i], sizeof(cfg));
+				cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
+			} else
+				memset(&cfg, 0, sizeof(cfg));
+
+			adj_addr = obj->entry.addr +
+				((obj->entry.size + 1) * i);
+			ret = qtouch_write_addr(ts, adj_addr, &cfg,
+				min(sizeof(cfg), obj->entry.size));
+			if (ret != 0) {
+				pr_err("%s: Can't write keyarray config\n",
+					   __func__);
+				return ret;
+			}
 		}
 	}
 
@@ -489,7 +500,7 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	if (msg->status & QTM_CMD_PROC_STATUS_SIGERR)
 		pr_err("%s: Acquisition error\n", __func__);
 
-	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR){
+	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR) {
 		ret = qtouch_hw_init(ts);
 		if (ret != 0)
 			pr_err("%s:Cannot initialize the touch IC\n",

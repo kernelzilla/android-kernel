@@ -266,7 +266,7 @@ struct qtouch_key {
 };
 
 struct qtouch_key_array {
-	struct qtm_touch_keyarray_cfg	cfg;
+	struct qtm_touch_keyarray_cfg	*cfg;
 	struct qtouch_key		*keys;
 	int				num_keys;
 };
