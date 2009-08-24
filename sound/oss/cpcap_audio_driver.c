@@ -773,7 +773,12 @@ static void cpcap_audio_configure_loudspeaker_headset(
 	struct cpcap_audio_state *previous_state,
 	struct cpcap_audio_state *state)
 {
-	if (state->rat_type != previous_state->rat_type) {
+	if (state->codec_primary_speaker == CPCAP_AUDIO_OUT_MONO_HEADSET ||
+		state->codec_primary_speaker == CPCAP_AUDIO_OUT_STEREO_HEADSET ||
+		state->codec_primary_speaker == CPCAP_AUDIO_OUT_LOUDSPEAKER ||
+		state->stdac_primary_speaker == CPCAP_AUDIO_OUT_MONO_HEADSET ||
+		state->stdac_primary_speaker == CPCAP_AUDIO_OUT_STEREO_HEADSET ||
+		state->stdac_primary_speaker == CPCAP_AUDIO_OUT_LOUDSPEAKER){
 		int ret_val = 0;
 		struct cpcap_regacc reg_changes = {
 			.value = 0,
@@ -1092,7 +1097,7 @@ void cpcap_audio_init(struct cpcap_audio_state *state)
 	logged_cpcap_write(state->cpcap, CPCAP_REG_SDACDI, 0, 0x3FFF);
 	logged_cpcap_write(state->cpcap, CPCAP_REG_TXI, 0, 0xFDF);
 	logged_cpcap_write(state->cpcap, CPCAP_REG_TXMP, 0, 0xFFF);
-	logged_cpcap_write(state->cpcap, CPCAP_REG_RXOA, 0, 0x3FF);
+	logged_cpcap_write(state->cpcap, CPCAP_REG_RXOA, 0, 0x1FF);
 	/* logged_cpcap_write(state->cpcap, CPCAP_REG_RXVC, 0, 0xFFF); */
 	logged_cpcap_write(state->cpcap, CPCAP_REG_RXCOA, 0, 0x7FF);
 	logged_cpcap_write(state->cpcap, CPCAP_REG_RXSDOA, 0, 0x1FFF);
