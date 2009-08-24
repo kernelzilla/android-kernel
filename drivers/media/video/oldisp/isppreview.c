@@ -595,6 +595,13 @@ void isppreview_config_shadow_registers()
 	u8 current_brightness_contrast;
 	int ctr, prv_disabled;
 
+	isppreview_enable(0);
+
+	if (isppreview_busy())
+		return;
+
+	prv_disabled = 1;
+
 	isppreview_query_brightness(&current_brightness_contrast);
 	if (current_brightness_contrast != ((ispprev_obj.brightness) *
 							ISPPRV_BRIGHT_UNITS)) {
@@ -616,10 +623,6 @@ void isppreview_config_shadow_registers()
 		isppreview_config_rgb_to_ycbcr(flr_prev_csc[ispprev_obj.
 								color]);
 		update_color_matrix = 0;
-	}
-	if (GG_update || RG_update || BG_update || NF_update || CSC_update) {
-		isppreview_enable(0);
-		prv_disabled = 1;
 	}
 
 	if (CSC_update) {
@@ -654,12 +657,12 @@ void isppreview_config_shadow_registers()
 	}
 
 	if (NF_update && NF_enable) {
+		isppreview_enable_noisefilter(0);
 		omap_writel(0xC00, ISPPRV_SET_TBL_ADDR);
 		omap_writel(prev_nf_t.spread, ISPPRV_NF);
 		for (ctr = 0; ctr < 64; ctr++)
 			omap_writel(prev_nf_t.table[ctr],
 							ISPPRV_SET_TBL_DATA);
-		isppreview_enable_noisefilter(1);
 		NF_update = 0;
 	}
 
