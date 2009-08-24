@@ -1030,6 +1030,34 @@ static int modem_resume(struct usb_interface *intf)
 	}
 	return 0;
 }
+
+static int modem_reset_resume(struct usb_interface *intf)
+{
+	int ret = 0;
+
+	if (cdma_modem_debug)
+		dev_info(&intf->dev,
+		"%s: Enter \n", __func__);
+
+	ret = modem_resume(intf);
+
+	if (cdma_modem_debug)
+		dev_info(&intf->dev,
+		"%s: Exit ret is %d \n", __func__, ret);
+
+	return ret;
+}
+
+static int modem_pre_reset(struct usb_interface *intf)
+{
+	return 0;
+}
+
+static int modem_post_reset(struct usb_interface *intf)
+{
+	return 0;
+}
+
 #endif /* CONFIG_PM */
 
 static int modem_startup(struct usb_serial *serial)
@@ -1229,6 +1257,9 @@ static struct usb_driver modem_driver = {
 	.supports_autosuspend = 1,
 	.suspend = modem_suspend,
 	.resume = modem_resume,
+	.reset_resume = modem_reset_resume,
+	.pre_reset = modem_pre_reset,
+	.post_reset = modem_post_reset,
 #endif
 };
 
