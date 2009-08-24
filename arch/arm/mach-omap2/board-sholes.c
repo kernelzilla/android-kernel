@@ -341,6 +341,34 @@ static void sholes_als_init(void)
 	gpio_direction_input(SHOLES_LM_3530_INT_GPIO);
 	omap_cfg_reg(AC27_34XX_GPIO92);
 }
+static struct qtm_touch_keyarray_cfg sholes_key_array_data[] = {
+	{
+		.ctrl = 0,
+		.x_origin = 0,
+		.y_origin = 0,
+		.x_size = 0,
+		.y_size = 0,
+		.aks_cfg = 0,
+		.burst_len = 0,
+		.tch_det_thr = 0,
+		.tch_det_int = 0,
+		.rsvd1 = 0,
+		.rsvd2 = 0,
+	},
+	{
+		.ctrl = 0,
+		.x_origin = 0,
+		.y_origin = 0,
+		.x_size = 0,
+		.y_size = 0,
+		.aks_cfg = 0,
+		.burst_len = 0,
+		.tch_det_thr = 0,
+		.tch_det_int = 0,
+		.rsvd1 = 0,
+		.rsvd2 = 0,
+	},
+};
 
 static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.irqflags	= (IRQF_TRIGGER_FALLING |IRQF_TRIGGER_LOW),
@@ -397,21 +425,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		 .y_low_clip = 0x00,
 		 .y_high_clip = 0x00,
 	},
-	.key_array_cfg = {
-		.ctrl = 0,
-		.x_origin = 0,
-		.y_origin = 0,
-		.x_size = 0,
-		.y_size = 0,
-		.aks_cfg = 0,
-		.burst_len = 0,
-		.tch_det_thr = 0,
-		.tch_det_int = 0,
-		.rsvd1 = 0,
-		.rsvd2 = 0,
-		},
-
-	  .linear_tbl_cfg = {
+    .linear_tbl_cfg = {
 		  .ctrl = 0x01,
 		  .x_offset = 0x0000,
 		  .x_segment = {
@@ -440,6 +454,16 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.szthr2	= 0x00,
 		.shpthr1	= 0x00,
 		.shpthr2	= 0x00,
+	},
+	.noise1_suppression_cfg = {
+		.ctrl = 0x01,
+		.reserved = 0x01,
+		.atchthr = 0x6f,
+		.duty_cycle = 0x08,
+	},
+	.key_array      = {
+		.cfg		= sholes_key_array_data,
+		.num_keys   = ARRAY_SIZE(sholes_key_array_data),
 	},
 };
 
