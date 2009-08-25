@@ -50,6 +50,7 @@
 
 #define MT9P012_XCLK_NOM_1 12000000
 #define MT9P012_XCLK_NOM_2 24000000
+#define MT9P012_XCLK_NOM_4 48000000
 
 /* Still capture 5 MP */
 #define MT9P012_IMAGE_WIDTH_MAX		2592
@@ -95,13 +96,19 @@
 #define MT9P012_MIN_LINEAR_GAIN_CAL_ADJ		((u16)(1.75 * 256))
 #define MT9P012_MAX_LINEAR_GAIN			((u16)(15.875 * 256))
 
-/* Exposure time values */
-#define MT9P012_DEF_MIN_EXPOSURE	0x08
-#define MT9P012_DEF_MAX_EXPOSURE	0x7F
-#define MT9P012_DEF_EXPOSURE	    	0x43
+/* Exposure time values (usecs)*/
+#define MT9P012_DEF_MIN_EXPOSURE	100
+#define MT9P012_DEF_MAX_EXPOSURE	1000000
+#define MT9P012_DEF_EXPOSURE	    	20000
 #define MT9P012_EXPOSURE_STEP       	1
 
+/* Frame Delays */
+#define MT9P012_GAIN_FRAME_DELAY 1
+#define MT9P012_EXP_TIME_FRAME_DELAY 2
+
 #define MT9P012_MAX_FRAME_LENGTH_LINES 0xFFFF
+
+#define RESET_REG_PLL_OFF_BP		5
 
 /**
  * struct mt9p012_reg - mt9p012 register format
@@ -172,6 +179,7 @@ enum mt9p012_orientation {
 #define V4L2_CID_PRIVATE_FLASH_NEXT_FRAME	(V4L2_CID_PRIVATE_BASE + 24)
 #define V4L2_CID_PRIVATE_ORIENTATION		(V4L2_CID_PRIVATE_BASE + 25)
 #define V4L2_CID_PRIVATE_CALIBRATION_ADJ	(V4L2_CID_PRIVATE_BASE + 26)
+#define V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ	(V4L2_CID_PRIVATE_BASE + 27)
 
 /* Debug functions */
 static int debug;
@@ -374,12 +382,21 @@ struct mt9p012_sensor_id {
 	u16 mfr;
 };
 
+/**
+ * struct mt9p012_sensor_params
+ */
+struct mt9p012_sensor_params {
+	u32 line_time;  /* usec, q8 */
+	u16 gain_frame_delay;
+	u16 exp_time_frame_delay;
+};
+
 static struct mt9p012_sensor_settings sensor_settings[] = {
 
 	/* FRAME_5MP */
 	{
 		.clk = {
-			.pre_pll_div = 5,
+			.pre_pll_div = 10,
 			.pll_mult = 93,
 			.vt_pix_clk_div = 4,
 			.vt_sys_clk_div = 1,
@@ -413,7 +430,7 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 	/* FRAME_3MP */
 	{
 		.clk = {
-			.pre_pll_div = 5,
+			.pre_pll_div = 10,
 			.pll_mult = 184,
 			.vt_pix_clk_div = 4,
 			.vt_sys_clk_div = 1,
@@ -447,7 +464,7 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 	/* FRAME_1296_30FPS */
 	{
 		.clk = {
-			.pre_pll_div = 6,
+			.pre_pll_div = 12,
 			.pll_mult = 134,
 			.vt_pix_clk_div = 5,
 			.vt_sys_clk_div = 1,
@@ -481,7 +498,7 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 	/* FRAME_648_30FPS */
 	{
 		.clk = {
-			.pre_pll_div = 6,
+			.pre_pll_div = 12,
 			.pll_mult = 187,
 			.vt_pix_clk_div = 5,
 			.vt_sys_clk_div = 2,
@@ -515,7 +532,7 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 	/* FRAME_216_30FPS */
 	{
 		.clk = {
-			.pre_pll_div = 3,
+			.pre_pll_div = 6,
 			.pll_mult = 94,
 			.vt_pix_clk_div = 5,
 			.vt_sys_clk_div = 2,
@@ -629,7 +646,19 @@ static struct vcontrol video_control[] = {
 			.default_value = 0,
 		},
 		.current_value = MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP,
-	}
+	},
+	{
+		{
+			.id = V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "Sensor Params",
+			.minimum = 0,
+			.maximum = -1,
+			.step = 0,
+			.default_value = 0,
+		},
+		.current_value = 0,
+	},
 };
 
 /**
@@ -670,6 +699,7 @@ struct mt9p012_sensor {
 	int max_linear_gain;
 
 	struct mt9p012_sensor_id sensor_id;
+	struct mt9p012_sensor_params sensor_params;
 
 	struct vcontrol *video_control;
 	int n_video_control;
@@ -811,6 +841,7 @@ again:
 		mdelay(20);
 		goto again;
 	}
+
 	return err;
 }
 
@@ -1264,6 +1295,8 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	frame_length_lines = (((u32)fper->numerator * 1000000 * 256 /
 			       fper->denominator)) / line_time_q8;
 
+	sensor->sensor_params.line_time = line_time_q8;
+
 	/* Range check frame_length_lines */
 	if (frame_length_lines > MT9P012_MAX_FRAME_LENGTH_LINES)
 		frame_length_lines = MT9P012_MAX_FRAME_LENGTH_LINES;
@@ -1332,7 +1365,7 @@ static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
 	timeperframe->numerator = 1;
 	timeperframe->denominator = sensor->fps;
 
-	return MT9P012_XCLK_NOM_2;
+	return MT9P012_XCLK_NOM_4;
 }
 
 /**
@@ -1588,7 +1621,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
  */
 static int mt9p012_detect(struct i2c_client *client)
 {
-	u32 model_id, mfr_id, rev;
+	u32 model_id, mfr_id, rev, reset_data, data;
 	struct mt9p012_sensor *sensor = i2c_get_clientdata(client);
 	struct mt9p012_sensor_id *sensor_id = &(sensor->sensor_id);
 
@@ -1600,7 +1633,23 @@ static int mt9p012_detect(struct i2c_client *client)
 	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_MANUFACTURER_ID,
 				&mfr_id))
 		return -ENODEV;
-	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_REVISION_NUMBER, &rev))
+
+	/* Get sensor rev (reg 0x0002 is not valid) */
+	if (mt9p012_read_reg(client, MT9P012_16BIT, REG_RESET_REGISTER,
+				&reset_data))
+		return -ENODEV;
+
+	if (mt9p012_write_reg(client, MT9P012_16BIT, REG_RESET_REGISTER,
+				reset_data | (1 << RESET_REG_PLL_OFF_BP)))
+		return -ENODEV;
+
+	if (mt9p012_read_reg(client, MT9P012_16BIT, REG_SENSOR_REVISION,
+				&data))
+		return -ENODEV;
+
+	rev = data & 0xf;
+	if (mt9p012_write_reg(client, MT9P012_16BIT, REG_RESET_REGISTER,
+				reset_data))
 		return -ENODEV;
 
 	sensor_id->model = model_id;
@@ -1695,6 +1744,13 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 	case V4L2_CID_PRIVATE_SENSOR_ID_REQ:
 		if (copy_to_user((void *)vc->value, &(sensor->sensor_id),
 				sizeof(sensor->sensor_id))) {
+			printk(KERN_ERR "Failed copy_to_user\n");
+			return -EINVAL;
+		}
+		break;
+	case V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ:
+		if (copy_to_user((void *)vc->value, &(sensor->sensor_params),
+				sizeof(sensor->sensor_params))) {
 			printk(KERN_ERR "Failed copy_to_user\n");
 			return -EINVAL;
 		}
@@ -2209,11 +2265,23 @@ static int mt9p012_probe(struct i2c_client *client,
 	/* Set sensor default values */
 	sensor->timeperframe.numerator = 1;
 	sensor->timeperframe.denominator = 15;
-	sensor->x_clk = MT9P012_XCLK_NOM_1;
+	sensor->x_clk = MT9P012_XCLK_NOM_4;
 	sensor->pix.width = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED;
 	sensor->pix.height = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED;
 	sensor->pix.pixelformat = V4L2_PIX_FMT_SGRBG10;
 	sensor->power_on = false;
+
+	/* Set min/max limits */
+	sensor->min_exposure_time = MT9P012_DEF_MIN_EXPOSURE;
+	sensor->fps_max_exposure_time = 33333;
+	sensor->abs_max_exposure_time = MT9P012_DEF_MAX_EXPOSURE;
+	sensor->min_linear_gain = MT9P012_MIN_LINEAR_GAIN;
+	sensor->max_linear_gain = MT9P012_MAX_LINEAR_GAIN;
+
+	/* Set Frame Delays */
+	sensor->sensor_params.gain_frame_delay = MT9P012_GAIN_FRAME_DELAY;
+	sensor->sensor_params.exp_time_frame_delay =
+		MT9P012_EXP_TIME_FRAME_DELAY;
 
 	sensor->v4l2_int_device = &mt9p012_int_device;
 	sensor->v4l2_int_device->priv = sensor;
