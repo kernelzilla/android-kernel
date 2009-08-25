@@ -637,8 +637,8 @@ int cpcap_irq_register(struct cpcap_device *cpcap, enum cpcap_irqs irq,
 
 int cpcap_irq_free(struct cpcap_device *cpcap, enum cpcap_irqs irq);
 
-/* removes irq handler and calls kfree on associated data */
-int cpcap_irq_free_data(struct cpcap_device *cpcap, enum cpcap_irqs irq);
+int cpcap_irq_get_data(struct cpcap_device *cpcap, enum cpcap_irqs irq,
+		       void **data);
 
 int cpcap_irq_clear(struct cpcap_device *cpcap, enum cpcap_irqs int_event);
 

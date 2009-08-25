@@ -159,6 +159,18 @@ static int pwrkey_init(struct cpcap_device *cpcap)
 	return retval;
 }
 
+static void pwrkey_remove(struct cpcap_device *cpcap)
+{
+	struct pwrkey_data *data;
+
+	cpcap_irq_get_data(cpcap, CPCAP_IRQ_ON, (void **)&data);
+	if (!data)
+		return;
+	cpcap_irq_free(cpcap, CPCAP_IRQ_ON);
+	wake_lock_destroy(&data->wake_lock);
+	kfree(data);
+}
+
 static int int_read_and_clear(struct cpcap_device *cpcap,
 			      unsigned short status_reg,
 			      unsigned short mask_reg,
@@ -309,7 +321,7 @@ void cpcap_irq_shutdown(struct cpcap_device *cpcap)
 	struct spi_device *spi = cpcap->spi;
 	struct cpcap_irqdata *data = cpcap->irqdata;
 
-	cpcap_irq_free_data(cpcap, CPCAP_IRQ_ON);
+	pwrkey_remove(cpcap);
 	cancel_work_sync(&data->work);
 	destroy_workqueue(data->workqueue);
 	free_irq(spi->irq, data);
@@ -362,24 +374,22 @@ int cpcap_irq_free(struct cpcap_device *cpcap, enum cpcap_irqs irq)
 }
 EXPORT_SYMBOL_GPL(cpcap_irq_free);
 
-int cpcap_irq_free_data(struct cpcap_device *cpcap, enum cpcap_irqs irq)
+int cpcap_irq_get_data(struct cpcap_device *cpcap,
+			enum cpcap_irqs irq,
+			void **data)
 {
-	struct cpcap_irqdata *data = cpcap->irqdata;
-	int retval;
+	struct cpcap_irqdata *irqdata = cpcap->irqdata;
 
 	if (irq >= CPCAP_IRQ__NUM)
 		return -EINVAL;
 
-	mutex_lock(&data->lock);
-	retval = cpcap_irq_mask(cpcap, irq);
-	data->event_handler[irq].func = NULL;
-	kfree(data->event_handler[irq].data);
-	data->event_handler[irq].data = NULL;
-	mutex_unlock(&data->lock);
+	mutex_lock(&irqdata->lock);
+	*data = irqdata->event_handler[irq].data;
+	mutex_unlock(&irqdata->lock);
 
-	return retval;
+	return 0;
 }
-EXPORT_SYMBOL_GPL(cpcap_irq_free_data);
+EXPORT_SYMBOL_GPL(cpcap_irq_get_data);
 
 int cpcap_irq_clear(struct cpcap_device *cpcap,
 		    enum cpcap_irqs irq)

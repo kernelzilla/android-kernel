@@ -296,7 +296,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 		goto free_mem;
 	retval = cpcap_irq_init(cpcap);
 	if (retval < 0)
-		goto free_mem;
+		goto free_cpcap_irq;
 
 	/* Set Kpanic bit, which will be cleared at normal reboot */
 	cpcap_regacc_write(cpcap, CPCAP_REG_VAL1,
@@ -309,7 +309,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	retval = misc_register(&cpcap_dev);
 	if (retval < 0)
-		goto free_mem;
+		goto free_cpcap_irq;
 
 	/* the cpcap usb_detection device is a consumer of the
 	 * vusb regulator */
@@ -348,6 +348,8 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 	return 0;
 
+free_cpcap_irq:
+	cpcap_irq_shutdown(cpcap);
 free_mem:
 	kfree(cpcap);
 	return retval;
