@@ -815,6 +815,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 			 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 			 "Remote Wakeup", NULL);
 	if (rc) {
+		wake_lock_destroy(&baseband_wakeup_wakelock);
 		printk(KERN_ERR
 		       "Failed requesting APWAKE_TRIGGER irq (%d)\n", rc);
 		return rc;
@@ -826,6 +827,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 
 static int sholes_bpwake_remove(struct platform_device *pdev)
 {
+	wake_lock_destroy(&baseband_wakeup_wakelock);
 	free_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO), NULL);
 	return 0;
 }
