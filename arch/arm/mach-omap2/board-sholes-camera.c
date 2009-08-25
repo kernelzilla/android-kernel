@@ -145,7 +145,7 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 885735);
 
 			/* Configure pixel clock divider (here?) */
-			omap_writel(0x4, 0x48004f40);
+			omap_writel(0x2, 0x48004f40);
 			isp_configure_interface(&mt9p012_if_config);
 
 			/* Request and configure gpio pins */
