@@ -172,9 +172,9 @@ int hplens_reg_read(u8 dev_addr, u8 *value, u16 len)
 
 	err = i2c_transfer(client->adapter, msg, 1);
 
-	if (err >= 0) {
+	if (err >= 0)
 		return 0;
-	}
+
 	return err;
 }
 EXPORT_SYMBOL(hplens_reg_read);
@@ -190,17 +190,14 @@ int hplens_reg_write(u8 dev_addr, u8 *write_buf, u16 len)
 {
 	struct hplens_device *lens = &hplens;
 	struct i2c_client *client = lens->i2c_client;
-
 	int err;
 	struct i2c_msg msg[1];
-	int retry = 0;
 
 	if (!client->adapter)
 		return -ENODEV;
 
 	client->addr = dev_addr;  /* set slave address */
 
-again:
 	msg->addr = client->addr;
 	msg->flags = 0;
 	msg->len = len;
@@ -211,13 +208,6 @@ again:
 	if (err >= 0)
 		return 0;
 
-	if (retry <= HPLENS_I2C_RETRY_COUNT) {
-		dev_dbg(&client->dev, "retry ... %d", retry);
-		retry++;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(20));
-		goto again;
-	}
 	return err;
 }
 EXPORT_SYMBOL(hplens_reg_write);
@@ -298,7 +288,7 @@ static int hplens_ioctl_s_ctrl(struct v4l2_int_device *s,
 {
 	int ret = -EINVAL;
 	struct hplens_reg reg;
-	struct hplens_eeprom eeprom;
+	struct hplens_eeprom *eeprom = NULL;
 	u8 write_buffer[16];
 	u8 fdb = 0;
 	int idx;
@@ -342,19 +332,30 @@ static int hplens_ioctl_s_ctrl(struct v4l2_int_device *s,
 	}
 	break;
 	case V4L2_CID_HPLENS_CMD_CAL_READ: {
-		ret = copy_from_user(&eeprom, (void *)vc->value,  sizeof(struct hplens_eeprom));
+
+		/* Using dynamic memory. */
+		eeprom = kmalloc(sizeof(struct hplens_eeprom), GFP_KERNEL);
+		if(eeprom == NULL){
+			return -EINVAL;
+		}
+
+		ret = copy_from_user(eeprom, (void *)vc->value,  sizeof(struct hplens_eeprom));
 		if (ret == 0) {
-			if (eeprom.addr[0] != 0xff) {   /* valid register address */
+			if (eeprom->addr[0] != 0xff) {   /* valid register address */
 				/* write the register address to read */
-				ret = hplens_reg_write(eeprom.dev_addr, eeprom.addr, eeprom.len_addr);
+				ret = hplens_reg_write(eeprom->dev_addr, eeprom->addr, eeprom->len_addr);
 			}
 
 			/* Read the register */
-			ret = hplens_reg_read(eeprom.dev_addr, eeprom.data, eeprom.len_data);
+			ret = hplens_reg_read(eeprom->dev_addr, eeprom->data, eeprom->len_data);
 			if (ret == 0) {
-				ret = copy_to_user((void *)vc->value, &eeprom, sizeof(struct hplens_eeprom));
+				ret = copy_to_user((void *)vc->value, eeprom, sizeof(struct hplens_eeprom));
 			}
 		}
+
+		/* clean up. */
+		if (eeprom != NULL)
+			kfree(eeprom);
 	}
 	break;
 	case V4L2_CID_HPLENS_CMD_READ_PAGE:

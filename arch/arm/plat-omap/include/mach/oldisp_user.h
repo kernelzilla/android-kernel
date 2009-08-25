@@ -37,6 +37,14 @@
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct af_configuration)
 #define VIDIOC_PRIVATE_ISP_AF_REQ \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 9, struct isp_af_data)
+#define VIDIOC_PRIVATE_ISP_RUN_RESIZER \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, struct ispprv_run_resizer)
+#define VIDIOC_PRIVATE_ISP_RUN_HARDPIPE \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, struct ispprv_run_hardpipe)
+#define VIDIOC_PRIVATE_ISP_RSZ_REQ \
+   _IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct isprsz_coef)
+#define VIDIOC_PRIVATE_ISP_RSZ_CFG \
+   _IOWR('V', BASE_VIDIOC_PRIVATE + 13, struct isprsz_coef)
 
 /* AE/AWB related structures and flags*/
 
@@ -664,5 +672,32 @@ struct ispprv_update_config {
 	__u32 *green_gamma;
 	__u32 *blue_gamma;
 };
+
+struct ispprv_run_resizer {
+	__u32 input_width;
+	__u32 input_height;
+	__u32 output_width;
+	__u32 output_height;
+	unsigned long datain;
+	unsigned long dataout;
+	__u32 left;
+	__u32 top;
+	__u32 crop_width;
+	__u32 crop_height;
+};
+
+struct ispprv_run_hardpipe {
+	__u32 input_width;
+	__u32 input_height;
+	__u32 output_width;
+	__u32 output_height;
+	unsigned long datain;
+	unsigned long dataout;
+	__u32 left;
+	__u32 top;
+	__u32 crop_width;
+	__u32 crop_height;
+};
+
 
 #endif /* OMAP_ISP_USER_H */

@@ -39,12 +39,10 @@ struct page **map_user_memory(unsigned long addr, u32 size)
 
 	if (addr && size) {
 		nr_pages =  NR_PAGES(addr, (unsigned long)size);
-
 		ppages = kzalloc(sizeof(struct page *)*nr_pages, GFP_KERNEL);
+
 		if (likely(ppages != NULL)) {
 			/* initialize page array. */
-			memset(ppages, 0, sizeof(struct page *)*nr_pages);
-
 			down_read(&current->mm->mmap_sem);
 			ret = get_user_pages(current,
 				current->mm,

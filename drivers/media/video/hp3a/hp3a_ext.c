@@ -27,7 +27,7 @@
 #include "hp3a_common.h"
 
 /**
- * hp3a_ccdc_done - End of ccdc readout 3A task dispatcher .
+ * hp3a_ccdc_done - End of ccdc readout specific 3A tasks.
  *
  * No return value.
  **/
@@ -39,6 +39,18 @@ void hp3a_ccdc_done(void)
 EXPORT_SYMBOL(hp3a_ccdc_done);
 
 /**
+ * hp3a_ccdc_start - Start of ccdc readout specific 3A tasks.
+ *
+ * No return value.
+ **/
+void hp3a_ccdc_start(void)
+{
+	/* Place holder. */
+	hp3a_schedule_task();
+}
+EXPORT_SYMBOL(hp3a_ccdc_start);
+
+/**
  * hp3a_frame_done - End of frame 3A task dispatcher .
  *
  * No return value.
@@ -46,7 +58,6 @@ EXPORT_SYMBOL(hp3a_ccdc_done);
 void hp3a_frame_done(void)
 {
 	hp3a_update_hardpipe();
-	hp3a_schedule_task();
 }
 EXPORT_SYMBOL(hp3a_frame_done);
 
@@ -80,17 +91,6 @@ void hp3a_stream_off(void)
 	hp3a_flush_queue(&g_tc.hist_hw_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_off);
-
-/**
- * hp3a_isp_status - Set ISP status for hp 3a system.
- *
- * No return value.
- **/
-void hp3a_isp_status(int status)
-{
-	/* Place holder. */
-}
-EXPORT_SYMBOL(hp3a_isp_status);
 
 /**
  * hp3a_set_sensor_sync - Set sync delay for exposure and gain

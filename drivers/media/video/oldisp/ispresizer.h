@@ -40,7 +40,7 @@
 #define MAX_7TAP_VRSZ_OUTWIDTH_ES2	1650
 
 #define DEFAULTSTPIXEL			0
-#define DEFAULTSTPHASE			1
+#define DEFAULTSTPHASE			0
 #define DEFAULTHSTPIXEL4TAPMODE		3
 #define FOURPHASE			4
 #define EIGHTPHASE			8
@@ -72,7 +72,7 @@ enum ispresizer_input {
 };
 
 /**
- * struct isprsz_coef - Structure for resizer filter coeffcients.
+ * struct isprsz_coef - Structure for resizer filter coefficients.
  * @h_filter_coef_4tap: Horizontal filter coefficients for 8-phase/4-tap
  *			mode (.5x-4x)
  * @v_filter_coef_4tap: Vertical filter coefficients for 8-phase/4-tap
@@ -118,6 +118,10 @@ void ispresizer_config_ycpos(u8 yc);
 void ispresizer_config_startphase(u8 hstartphase, u8 vstartphase);
 
 void ispresizer_config_filter_coef(struct isprsz_coef *coef);
+
+void ispresizer_get_filter_coef(struct isprsz_coef *coef);
+
+void ispresizer_write_filter_coef(void);
 
 void ispresizer_config_luma_enhance(struct isprsz_yenh *yenh);
 

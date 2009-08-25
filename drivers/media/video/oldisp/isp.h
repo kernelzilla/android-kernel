@@ -109,7 +109,7 @@ enum isp_irqevents {
 };
 
 enum isp_callback_type {
-	CBK_CCDC_VD0,
+	CBK_CCDC_VD0 = 0,
 	CBK_CCDC_VD1,
 	CBK_PREV_DONE,
 	CBK_RESZ_DONE,
@@ -119,9 +119,10 @@ enum isp_callback_type {
 	CBK_HS_VS,
 	CBK_LSC_ISR,
 	CBK_H3A_AF_DONE,
-	CBK_CATCHALL,
 	CBK_CSIA,
 	CBK_CSIB,
+	CBK_SBL_OVF,
+	CBK_CATCHALL,
 	CBK_END,
 };
 
@@ -354,5 +355,8 @@ void __exit isp_preview_cleanup(void);
 void __exit isp_hist_cleanup(void);
 void __exit isp_resizer_cleanup(void);
 void __exit isp_af_exit(void);
+
+int isp_run_resizer(void *userdata);
+int isp_run_preview(void *userdata);
 
 #endif	/* OMAP_ISP_TOP_H */

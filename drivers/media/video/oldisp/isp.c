@@ -39,6 +39,14 @@
 #include <linux/device.h>
 #include <linux/videodev2.h>
 #include <linux/vmalloc.h>
+#include <linux/types.h>
+#include <linux/mm.h>
+#include <asm/page.h>
+#include <asm/pgtable.h>
+#include <linux/pagemap.h>
+#include <linux/dma-mapping.h>
+#include <linux/vmalloc.h>
+#include <linux/pagemap.h>
 
 #include <mach/control.h>
 
@@ -53,6 +61,11 @@
 #include "ispresizer.h"
 #include "ispcsi2.h"
 
+#define  NR_PAGES(x, y)		((((y + x - 1) & PAGE_MASK) >> PAGE_SHIFT) - \
+					((x & PAGE_MASK) >> PAGE_SHIFT) + 1)
+
+#define  ALIGN_TO(x, b)		(((unsigned long)x + (b - 1)) & ~(b - 1))
+
 #ifdef CONFIG_VIDEO_OMAP3_HP3A
 #include "hp3a.h"
 #endif
@@ -65,6 +78,8 @@ struct scatterlist *sglist_alloc;
 static int alloc_done, num_sc;
 unsigned long offset_value;
 #endif
+
+struct completion isp_wfc;
 
 /* List of image formats supported via OMAP ISP */
 const static struct v4l2_fmtdesc isp_formats[] = {
@@ -153,6 +168,7 @@ static struct vcontrol {
  * CBK_LSC_ISR).
  */
 static struct ispirq {
+	enum isp_irqevents irq_events[CBK_END];
 	isp_callback_t isp_callbk[CBK_END];
 	isp_vbq_callback_ptr isp_callbk_arg1[CBK_END];
 	void *isp_callbk_arg2[CBK_END];
@@ -332,10 +348,33 @@ void isp_release_resources(void)
 		ispresizer_free();
 	return;
 }
-EXPORT_SYMBOL(omapisp_unset_callback);
 
 /* Flag to check first time of isp_get */
 static int off_mode;
+
+static void isp_lsc_isr(unsigned long status, isp_vbq_callback_ptr arg1,
+			void *arg2)
+{
+	(void) arg1;
+	(void) arg2;
+
+	if (status & LSC_PRE_ERR) {
+		/* printk(KERN_ERR "isp_sr: LSC_PRE_ERR \n"); */
+		ispccdc_enable_lsc(0);
+		ispccdc_enable_lsc(1);
+	}
+}
+
+static void isp_csia_isr(unsigned long status, isp_vbq_callback_ptr arg1,
+			void *arg2)
+{
+	(void) arg1;
+	(void) arg2;
+
+	if (status & CSIA) {
+		isp_csi2_isr();
+	}
+}
 
 /**
  * isp_set_sgdma_callback - Set Scatter-Gather DMA Callback.
@@ -362,7 +401,8 @@ static int isp_set_sgdma_callback(struct isp_sgdma_state *sgdma_state,
 							sgdma_state->arg);
 		isp_set_callback(CBK_CCDC_VD1, sgdma_state->callback, func_ptr,
 							sgdma_state->arg);
-		isp_set_callback(CBK_LSC_ISR, NULL, NULL, NULL);
+		isp_set_callback(CBK_LSC_ISR, isp_lsc_isr, NULL, NULL);
+		/* isp_set_callback(CBK_SBL_OVF, NULL, NULL, NULL); */
 	}
 
 	isp_set_callback(CBK_HS_VS, sgdma_state->callback, func_ptr,
@@ -456,9 +496,15 @@ int isp_set_callback(enum isp_callback_type type, isp_callback_t callback,
 					IRQ0ENABLE_CCDC_LSC_PREF_ERR_IRQ,
 					ISP_IRQ0ENABLE);
 		break;
+	case CBK_SBL_OVF:
+		omap_writel(IRQ0ENABLE_OVF_IRQ, ISP_IRQ0STATUS);
+		omap_writel(omap_readl(ISP_IRQ0ENABLE) | IRQ0ENABLE_OVF_IRQ,
+							ISP_IRQ0ENABLE);
+		break;
 	default:
 		break;
 	}
+
 	spin_unlock_irqrestore(&isp_obj.lock, irqflags);
 	return 0;
 }
@@ -543,6 +589,10 @@ int isp_unset_callback(enum isp_callback_type type)
 		omap_writel(IRQ0ENABLE_CSIB_IRQ, ISP_IRQ0STATUS);
 		omap_writel(omap_readl(ISP_IRQ0ENABLE)|IRQ0ENABLE_CSIB_IRQ,
 					ISP_IRQ0ENABLE);
+		break;
+	case CBK_SBL_OVF:
+		omap_writel((omap_readl(ISP_IRQ0ENABLE)) &
+						~IRQ0ENABLE_OVF_IRQ, ISP_IRQ0ENABLE);
 		break;
 	default:
 		break;
@@ -924,6 +974,8 @@ int isp_configure_interface(struct isp_interface_config *config)
 		isp_csi2_ctrl_config_vp_clk_enable(true);
 		isp_csi2_ctrl_update(false);
 
+		isp_set_callback(CBK_CSIA, isp_csia_isr, NULL, NULL);
+
 		isp_csi2_irq_complexio1_set(1);
 		isp_csi2_irq_status_set(1);
 		isp_csi2_irq_set(1);
@@ -1022,124 +1074,34 @@ void isp_CCDC_VD01_disable(void)
  **/
 static irqreturn_t omap34xx_isp_isr(int irq, void *ispirq_disp)
 {
+	int i;
 	struct ispirq *irqdis = (struct ispirq *)ispirq_disp;
-	u32 irqstatus = 0;
-	unsigned long irqflags = 0;
-	u8 is_irqhandled = 0;
+
+	u32 irqstatus = omap_readl(ISP_IRQ0STATUS);
+	omap_writel(irqstatus, ISP_IRQ0STATUS);
+
+	spin_lock(&isp_obj.lock);
+
+	for (i = 0; i < CBK_END; ++i) {
+		if ((irqstatus & irqdis->irq_events[i]) == irqdis->irq_events[i]) {
+			if (irqdis->isp_callbk[i]) {
+				irqdis->isp_callbk[i](irqdis->irq_events[i],
+				irqdis->isp_callbk_arg1[i],
+				irqdis->isp_callbk_arg2[i]);
+			}
+		}
+	}
+
+	spin_unlock(&isp_obj.lock);
 
 	irqstatus = omap_readl(ISP_IRQ0STATUS);
-
-	spin_lock_irqsave(&isp_obj.lock, irqflags);
-
-	if (irqdis->isp_callbk[CBK_CATCHALL])
-		irqdis->isp_callbk[CBK_CATCHALL](
-			irqstatus,
-			irqdis->isp_callbk_arg1[CBK_CATCHALL],
-			irqdis->isp_callbk_arg2[CBK_CATCHALL]);
-
-	if ((irqstatus & MMU_ERR) == MMU_ERR) {
-		if (irqdis->isp_callbk[CBK_MMU_ERR])
-			irqdis->isp_callbk[CBK_MMU_ERR](irqstatus,
-				irqdis->isp_callbk_arg1[CBK_MMU_ERR],
-				irqdis->isp_callbk_arg2[CBK_MMU_ERR]);
-		is_irqhandled = 1;
-		goto out;
-	}
-
-	if ((irqstatus & HS_VS) == HS_VS) {
-		if (irqdis->isp_callbk[CBK_HS_VS])
-			irqdis->isp_callbk[CBK_HS_VS](HS_VS,
-				irqdis->isp_callbk_arg1[CBK_HS_VS],
-				irqdis->isp_callbk_arg2[CBK_HS_VS]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & CCDC_VD1) == CCDC_VD1) {
-		if (irqdis->isp_callbk[CBK_CCDC_VD1])
-				irqdis->isp_callbk[CBK_CCDC_VD1](CCDC_VD1,
-				irqdis->isp_callbk_arg1[CBK_CCDC_VD1],
-				irqdis->isp_callbk_arg2[CBK_CCDC_VD1]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & CCDC_VD0) == CCDC_VD0) {
-		if (irqdis->isp_callbk[CBK_CCDC_VD0])
-			irqdis->isp_callbk[CBK_CCDC_VD0](CCDC_VD0,
-				irqdis->isp_callbk_arg1[CBK_CCDC_VD0],
-				irqdis->isp_callbk_arg2[CBK_CCDC_VD0]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & PREV_DONE) == PREV_DONE) {
-		if (irqdis->isp_callbk[CBK_PREV_DONE])
-			irqdis->isp_callbk[CBK_PREV_DONE](PREV_DONE,
-				irqdis->isp_callbk_arg1[CBK_PREV_DONE],
-				irqdis->isp_callbk_arg2[CBK_PREV_DONE]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & RESZ_DONE) == RESZ_DONE) {
-		if (irqdis->isp_callbk[CBK_RESZ_DONE])
-			irqdis->isp_callbk[CBK_RESZ_DONE](RESZ_DONE,
-				irqdis->isp_callbk_arg1[CBK_RESZ_DONE],
-				irqdis->isp_callbk_arg2[CBK_RESZ_DONE]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & H3A_AWB_DONE) == H3A_AWB_DONE) {
-		if (irqdis->isp_callbk[CBK_H3A_AWB_DONE])
-			irqdis->isp_callbk[CBK_H3A_AWB_DONE](H3A_AWB_DONE,
-				irqdis->isp_callbk_arg1[CBK_H3A_AWB_DONE],
-				irqdis->isp_callbk_arg2[CBK_H3A_AWB_DONE]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & HIST_DONE) == HIST_DONE) {
-		if (irqdis->isp_callbk[CBK_HIST_DONE])
-			irqdis->isp_callbk[CBK_HIST_DONE](HIST_DONE,
-				irqdis->isp_callbk_arg1[CBK_HIST_DONE],
-				irqdis->isp_callbk_arg2[CBK_HIST_DONE]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & H3A_AF_DONE) == H3A_AF_DONE) {
-		if (irqdis->isp_callbk[CBK_H3A_AF_DONE])
-			irqdis->isp_callbk[CBK_H3A_AF_DONE](H3A_AF_DONE,
-				irqdis->isp_callbk_arg1[CBK_H3A_AF_DONE],
-				irqdis->isp_callbk_arg2[CBK_H3A_AF_DONE]);
-		is_irqhandled = 1;
-	}
-
-	if ((irqstatus & CSIA) == CSIA) {
-		isp_csi2_isr();
-		is_irqhandled = 1;
-	}
-
-	if (irqstatus & LSC_PRE_ERR) {
-		printk(KERN_ERR "isp_sr: LSC_PRE_ERR \n");
-		omap_writel(irqstatus, ISP_IRQ0STATUS);
-		ispccdc_enable_lsc(0);
-		ispccdc_enable_lsc(1);
-		spin_unlock_irqrestore(&isp_obj.lock, irqflags);
-		return IRQ_HANDLED;
-	}
-
-	if (irqstatus & IRQ0STATUS_CSIB_IRQ) {
-		u32 ispcsi1_irqstatus;
-
-		ispcsi1_irqstatus = omap_readl(ISPCSI1_LC01_IRQSTATUS);
-		DPRINTK_ISPCTRL("%x\n", ispcsi1_irqstatus);
-	}
-
-out:
-	omap_writel(irqstatus, ISP_IRQ0STATUS);
-	spin_unlock_irqrestore(&isp_obj.lock, irqflags);
-
-	if (is_irqhandled)
-		return IRQ_HANDLED;
-	else
+	if (irqstatus) {
 		return IRQ_NONE;
+	}
+
+	return IRQ_HANDLED;
 }
+
 /* Device name, needed for resource tracking layer */
 struct device_driver camera_drv = {
 	.name = "camera"
@@ -1168,9 +1130,16 @@ void omapisp_unset_callback()
 		isp_unset_callback(CBK_CCDC_VD0);
 		isp_unset_callback(CBK_CCDC_VD1);
 		isp_unset_callback(CBK_LSC_ISR);
+		/* isp_unset_callback(CBK_SBL_OVF); */
 	}
+
+	if (isp_obj.if_status & ISP_CSIA) {
+		isp_unset_callback(CBK_CSIA);
+	}
+
 	omap_writel(omap_readl(ISP_IRQ0STATUS) | ISP_INT_CLR, ISP_IRQ0STATUS);
 }
+EXPORT_SYMBOL(omapisp_unset_callback);
 
 #if ISP_WORKAROUND
 /**
@@ -1309,6 +1278,9 @@ void isp_stop()
 		}
 		msleep(1);
 	}
+
+	/* omap_writel(omap_readl(ISP_IRQ0STATUS) | ISP_INT_CLR, ISP_IRQ0STATUS); */
+
 	isp_restore_ctx();
 }
 
@@ -1374,7 +1346,11 @@ u32 isp_calc_pipeline(struct v4l2_pix_format *pix_input,
 		ispmodule_obj.isp_pipeline = OMAP_ISP_CCDC;
 		ispccdc_request();
 		if (pix_input->pixelformat == V4L2_PIX_FMT_SGRBG10)
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+			ispccdc_config_datapath(CCDC_RAW, CCDC_OTHERS_LSC_MEM);
+#else
 			ispccdc_config_datapath(CCDC_RAW, CCDC_OTHERS_MEM);
+#endif
 		else if (pix_input->pixelformat == V4L2_PIX_FMT_W1S_PATT)
 			ispccdc_config_datapath(CCDC_RAW_10_BIT_PATTERN,
 					CCDC_OTHERS_MEM);
@@ -1445,9 +1421,10 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 
 	switch (status) {
 	case CCDC_VD0:
-		ispccdc_config_shadow_registers();
    #ifdef CONFIG_VIDEO_OMAP3_HP3A
       hp3a_ccdc_done();
+   #else
+	  ispccdc_config_shadow_registers();
    #endif
 		if ((ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER) ||
 			(ispmodule_obj.isp_pipeline & OMAP_ISP_PREVIEW))
@@ -1522,13 +1499,13 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 	case HS_VS:
 		spin_lock(&isp_obj.isp_temp_buf_lock);
 		if (ispmodule_obj.isp_temp_state == ISP_BUF_TRAN) {
-#ifdef CONFIG_VIDEO_OMAP3_HP3A
-			hp3a_isp_status(1);
-#endif
 			isp_CCDC_VD01_enable();
 			ispmodule_obj.isp_temp_state = ISP_BUF_INIT;
 		}
 		spin_unlock(&isp_obj.isp_temp_buf_lock);
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+		hp3a_ccdc_start();
+#endif
 		return;
 	default:
 		return;
@@ -1658,9 +1635,6 @@ void isp_sgdma_process(struct isp_sgdma *sgdma, int irq, int *dma_notify,
 		spin_lock(&isp_obj.isp_temp_buf_lock);
 		isp_CCDC_VD01_disable();
 		ispresizer_enable(0);
-#ifdef CONFIG_VIDEO_OMAP3_HP3A
-		hp3a_isp_status(0);
-#endif
 		ispmodule_obj.isp_temp_state = ISP_FREE_RUNNING;
 		spin_unlock(&isp_obj.isp_temp_buf_lock);
 	}
@@ -1876,6 +1850,8 @@ int isp_handle_private(int cmd, void *arg)
 {
 	int rval = 0;
 
+	mutex_lock(&(isp_obj.isp_mutex));
+
 	switch (cmd) {
 	case VIDIOC_PRIVATE_ISP_CCDC_CFG:
 		rval = omap34xx_isp_ccdc_config(arg);
@@ -1921,10 +1897,35 @@ int isp_handle_private(int cmd, void *arg)
 		}
 	break;
 #endif
+	case VIDIOC_PRIVATE_ISP_RUN_RESIZER:
+		{
+			rval = isp_run_resizer(arg);
+		}
+	break;
+	case VIDIOC_PRIVATE_ISP_RUN_HARDPIPE:
+		{
+			rval = isp_run_preview(arg);
+		}
+	break;
+  case VIDIOC_PRIVATE_ISP_RSZ_REQ: {
+      struct isprsz_coef *resizer_coef;
+      resizer_coef = (struct isprsz_coef *) arg;
+      ispresizer_get_filter_coef(resizer_coef);
+      }
+   break;
+   case VIDIOC_PRIVATE_ISP_RSZ_CFG: {
+      struct isprsz_coef *resizer_coef;
+      resizer_coef = (struct isprsz_coef *) arg;
+      ispresizer_config_filter_coef(resizer_coef);
+      }
+   break;
 	default:
 		rval = -EINVAL;
 		break;
 	}
+
+	mutex_unlock(&(isp_obj.isp_mutex));
+
 	return rval;
 }
 EXPORT_SYMBOL(isp_handle_private);
@@ -2498,6 +2499,9 @@ static int __init isp_init(void)
 	spin_lock_init(&isp_obj.isp_temp_buf_lock);
 	spin_lock_init(&isp_obj.lock);
 
+	init_completion(&isp_wfc);
+	isp_wfc.done = 0;
+
 #if ISP_WORKAROUND && defined(CONFIG_VIDEO_OLDOMAP3_BUFFALLOC)
 	if (alloc_done == 0) {
 		rval = isp_buf_allocation();
@@ -2506,8 +2510,23 @@ static int __init isp_init(void)
 	}
 #endif
 
+	ispirq_obj.irq_events[CBK_CCDC_VD0] = CCDC_VD0;
+	ispirq_obj.irq_events[CBK_CCDC_VD1] = CCDC_VD1;
+	ispirq_obj.irq_events[CBK_PREV_DONE] = PREV_DONE;
+	ispirq_obj.irq_events[CBK_RESZ_DONE] = RESZ_DONE;
+	ispirq_obj.irq_events[CBK_MMU_ERR] = MMU_ERR;
+	ispirq_obj.irq_events[CBK_H3A_AWB_DONE] = H3A_AWB_DONE;
+	ispirq_obj.irq_events[CBK_HIST_DONE] = HIST_DONE;
+	ispirq_obj.irq_events[CBK_HS_VS] = HS_VS;
+	ispirq_obj.irq_events[CBK_LSC_ISR] = LSC_PRE_ERR;
+	ispirq_obj.irq_events[CBK_H3A_AF_DONE] = H3A_AF_DONE;
+	ispirq_obj.irq_events[CBK_CATCHALL] = 0;
+	ispirq_obj.irq_events[CBK_CSIA] = CSIA;
+	ispirq_obj.irq_events[CBK_CSIB] = CSIB;
+	ispirq_obj.irq_events[CBK_SBL_OVF] = SBL_OVF;
+
 	if (request_irq(INT_34XX_CAM_IRQ, omap34xx_isp_isr, IRQF_SHARED,
-				"Omap 34xx Camera ISP", &ispirq_obj)) {
+					"Omap 34xx Camera ISP", &ispirq_obj)) {
 		DPRINTK_ISPCTRL("Could not install ISR\n");
 		return -EINVAL;
 	}
@@ -2550,6 +2569,453 @@ static void __exit isp_cleanup(void)
 	isp_buf_free();
 #endif
 }
+
+/**
+ * rsz_isr - Interrupt Service Routine for Resizer wrapper
+ * @status: ISP IRQ0STATUS register value
+ * @arg1: Currently not used
+ * @arg2: Currently not used
+ *
+ * Interrupt Service Routine for Resizer wrapper
+ **/
+static void rsz_isr(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
+{
+	ispresizer_enable(0);
+	complete(&isp_wfc);
+}
+
+/**
+ * preview_isr - Interrupt Service Routine for Preview wrapper
+ * @status: ISP IRQ0STATUS register value
+ * @arg1: Currently not used
+ * @arg2: Currently not used
+ *
+ * Interrupt Service Routine for Preview wrapper
+ **/
+static void preview_isr(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
+{
+	isppreview_enable(0);
+	ispresizer_enable(1);
+}
+
+/**
+ * map_user_memory_to_kernel - Map user memory to kernel
+ * @addr: address to be mapped
+ * @size: Size of memory
+ * @nr_pages_mapped: Variable to store number of pages mapped.
+ *
+ * Return a pointer to a page array.
+ **/
+struct page **map_user_memory_to_kernel(unsigned long addr, u32 size, u32 *nr_pages_mapped)
+{
+	struct page **ppages = NULL;
+	int nr_pages;
+	int ret;
+
+	if (addr && size) {
+		nr_pages =  NR_PAGES(addr, (unsigned long)size);
+
+		ppages = kzalloc(sizeof(struct page *)*nr_pages, GFP_KERNEL);
+		if (likely(ppages != NULL)) {
+			down_read(&current->mm->mmap_sem);
+			ret = get_user_pages(current,
+				current->mm,
+				addr & PAGE_MASK,
+				nr_pages,
+				1, /* 1 = from device, 0 = to device. */
+				1, /* force */
+				ppages,
+				NULL);
+			up_read(&current->mm->mmap_sem);
+
+			if (unlikely(ret != nr_pages)) {
+				kfree(ppages);
+				ppages = NULL;
+				printk(KERN_ERR "isp: Mapping user pages"
+						" to kernel failed!\n");
+			}
+			if (nr_pages_mapped) {
+				*nr_pages_mapped = nr_pages;
+			}
+		} else {
+			printk(KERN_ERR "isp: Error allocating kernel memory!\n");
+		}
+	}
+
+	return ppages;
+}
+
+/**
+ * unmap_user_memory_from_kernel - Unmaps user memory from kernel
+ * @pages: Array of pages to be unmapped.
+ * @nr_pages: Number of pages in the page array.
+ **/
+void unmap_user_memory_from_kernel(struct page **pages, int nr_pages)
+{
+	u32 i;
+
+	if (pages != NULL) {
+		for (i = 0; i < nr_pages; ++i) {
+			page_cache_release(pages[i]);
+		}
+	}
+}
+
+/**
+ * isp_run_resizer - Run the resizer on memory based input
+ *									and output.
+ * @userdata: address to the passed in data structure.
+ *
+ * Returns 0 on success, < 0 otherwise.
+ **/
+int isp_run_resizer(void *userdata)
+{
+	int i;
+	int ret = -1;
+	struct ispprv_run_resizer *presizer_user = \
+							(struct ispprv_run_resizer *)userdata;
+	u32 input_buffer_size, output_buffer_size;
+	u32 input_nr_pages, output_nr_pages;
+	struct page **input_pages = NULL;
+	struct page **output_pages = NULL;
+	unsigned long isp_addr_in = 0;
+	unsigned long  isp_addr_out = 0;
+	struct ispprv_run_resizer resizer_param;
+
+	if (presizer_user == NULL) {
+		printk(KERN_ERR "isp_run_resizer: Invalid user data!\n");
+		return -EINVAL;
+	}
+
+	memcpy(&resizer_param, presizer_user, sizeof(struct ispprv_run_resizer));
+
+	DPRINTK_ISPCTRL("\nisp_run_resizer: input(%d-%d) - output(%d-%d)\n",
+										resizer_param.input_width,
+										resizer_param.input_height,
+										resizer_param.output_width,
+										resizer_param.output_height);
+
+	DPRINTK_ISPCTRL("isp_run_resizer: start(%d-%d) - end(%d-%d)\n",
+										resizer_param.left,
+										resizer_param.top,
+										resizer_param.crop_width,
+										resizer_param.crop_height);
+
+	if (presizer_user->datain == 0 || presizer_user->dataout == 0)
+		return -EINVAL;
+
+	ispresizer_save_context();
+
+	input_buffer_size = ALIGN_TO(presizer_user->input_width* \
+										presizer_user->input_height*2 , 0x100);
+	input_pages = map_user_memory_to_kernel(presizer_user->datain,
+									input_buffer_size, &input_nr_pages);
+	if (input_pages == NULL) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_resizer: memory allocation failed!\n");
+		goto exit_cleanup;
+	}
+
+	output_buffer_size = ALIGN_TO(presizer_user->output_width* \
+											presizer_user->output_height*2, 0x1000);
+	output_pages = map_user_memory_to_kernel(presizer_user->dataout,
+									output_buffer_size, &output_nr_pages);
+	if (output_pages == NULL) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_resizer: memory allocation failed!\n");
+		goto exit_cleanup;
+	}
+	for (i = 0; i < output_nr_pages; ++i) {
+		flush_dcache_page(output_pages[i]);
+	}
+
+	isp_addr_in = ispmmu_map_pages(input_pages, input_nr_pages);
+	if (isp_addr_in == 0) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_resizer: isp mmu map failed!\n");
+		goto exit_cleanup;
+	}
+	isp_addr_out = ispmmu_map_pages(output_pages, output_nr_pages);
+	if (isp_addr_out == 0) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_resizer: isp mmu map failed!\n");
+		goto exit_cleanup;
+	}
+
+	if (resizer_param.left == 0) {
+		ret = ispresizer_try_size(&resizer_param.input_width,
+												&resizer_param.input_height,
+												&resizer_param.output_width,
+												&resizer_param.output_height);
+
+		ret = ispresizer_config_size(resizer_param.input_width,
+													resizer_param.input_height,
+													resizer_param.output_width,
+													resizer_param.output_height);
+
+		ispresizer_set_inaddr(isp_addr_in);
+	} else {
+		ispresizer_trycrop(resizer_param.left,
+										resizer_param.top,
+										resizer_param.crop_width,
+										resizer_param.crop_height,
+										resizer_param.output_width,
+										resizer_param.output_height);
+
+		ispresizer_applycrop();
+
+		/*pixel alignment in 32bit space, vertical must be 0 per TRM */
+		omap_writel(((resizer_param.left%16) <<
+				ISPRSZ_IN_START_HORZ_ST_SHIFT) |
+				(0 <<
+				ISPRSZ_IN_START_VERT_ST_SHIFT),
+				ISPRSZ_IN_START);
+
+	/* Align input address for cropping, per TRM  */
+		ispresizer_set_inaddr(isp_addr_in +
+			(resizer_param.top*resizer_param.input_width*2)
+			+ ((resizer_param.left/16)*32));
+	}
+
+	ispresizer_set_inaddr(isp_addr_in);
+	ispresizer_set_outaddr(isp_addr_out);
+	ispresizer_config_ycpos(0);
+	ispresizer_config_inlineoffset(presizer_user->input_width*2);
+
+	isp_set_callback(CBK_RESZ_DONE, rsz_isr, (void *) NULL, (void *)NULL);
+	omap_writel(RESZ_DONE, ISP_IRQ0STATUS);
+	isp_wfc.done = 0;
+	/* start resizer engine. */
+	ispresizer_enable(1);
+
+	wait_for_completion_interruptible(&isp_wfc);
+	omap_writel(RESZ_DONE, ISP_IRQ0STATUS);
+	isp_unset_callback(CBK_RESZ_DONE);
+	ret = 0;
+
+exit_cleanup:
+	ispresizer_restore_context();
+
+	if (isp_addr_in != 0) {
+		ispmmu_unmap(isp_addr_in);
+	}
+	if (isp_addr_out != 0) {
+		ispmmu_unmap(isp_addr_out);
+	}
+	if (input_pages != NULL) {
+		unmap_user_memory_from_kernel(input_pages, input_nr_pages);
+		kfree(input_pages);
+	}
+	if (output_pages != NULL) {
+		unmap_user_memory_from_kernel(output_pages, output_nr_pages);
+		kfree(output_pages);
+	}
+
+	DPRINTK_ISPCTRL("isp_run_resizer: exit.\n");
+	return ret;
+}
+EXPORT_SYMBOL(isp_run_resizer);
+
+/**
+ * isp_run_preview - Run the preview on memory based input
+ *									and output.
+ * @userdata: address to the passed in data structure.
+ *
+ * Returns 0 on success, < 0 otherwise.
+ **/
+int isp_run_preview(void *userdata)
+{
+	int i;
+	int ret = -1;
+	struct ispprv_run_hardpipe *ppreview_user = (struct ispprv_run_hardpipe *)userdata;
+	struct ispprv_run_hardpipe preview_param;
+	u32 input_buffer_size, output_buffer_size;
+	u32 input_nr_pages, output_nr_pages;
+	struct page **input_pages = NULL;
+	struct page **output_pages = NULL;
+	unsigned long isp_addr_in = 0;
+	unsigned long  isp_addr_out = 0;
+	u32 isppreview_pcr;
+	struct ispprv_run_resizer resizer_param;
+
+	if (ppreview_user == NULL) {
+		printk(KERN_ERR "isp_run_preview: Invalid user data!\n");
+		return -EINVAL;
+	}
+
+	memcpy(&preview_param, ppreview_user, sizeof(struct ispprv_run_hardpipe));
+
+	DPRINTK_ISPCTRL("\nnisp_run_preview: input(%d-%d) - output(%d-%d)\n",
+										preview_param.input_width,
+										preview_param.input_height,
+										preview_param.output_width,
+										preview_param.output_height);
+
+	DPRINTK_ISPCTRL("isp_run_preview: start(%d-%d) - end(%d-%d)\n",
+										preview_param.left,
+										preview_param.top,
+										preview_param.crop_width,
+										preview_param.crop_height);
+
+	if (ppreview_user->datain == 0 || ppreview_user->dataout == 0)
+		return -EINVAL;
+
+	isppreview_save_context();
+	ispresizer_save_context();
+
+	ret = isppreview_try_size(preview_param.input_width,
+											preview_param.input_height,
+											&preview_param.output_width,
+											&preview_param.output_height);
+	if (ret < 0) {
+		goto exit_cleanup;
+	}
+	ret = isppreview_config_size(preview_param.input_width,
+													preview_param.input_height,
+													preview_param.output_width,
+													preview_param.output_height);
+	if (ret < 0) {
+		goto exit_cleanup;
+	}
+
+	input_buffer_size = ALIGN_TO(ppreview_user->input_width* \
+										ppreview_user->input_height*2 , 0x100);
+	input_pages = map_user_memory_to_kernel(preview_param.datain,
+									input_buffer_size, &input_nr_pages);
+	if (input_pages == NULL) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_preview: memory allocation failed!\n");
+		goto exit_cleanup;
+	}
+
+	output_buffer_size = ALIGN_TO(ppreview_user->output_width* \
+											ppreview_user->output_height*2, 0x1000);
+	output_pages = map_user_memory_to_kernel(preview_param.dataout,
+									output_buffer_size, &output_nr_pages);
+	if (output_pages == NULL) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_preview: memory allocation failed!\n");
+		goto exit_cleanup;
+	}
+	for (i = 0; i < output_nr_pages; ++i) {
+		flush_dcache_page(output_pages[i]);
+	}
+
+	isp_addr_in = ispmmu_map_pages(input_pages, input_nr_pages);
+	if (isp_addr_in == 0) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_preview: isp mmu map failed!\n");
+		goto exit_cleanup;
+	}
+	isp_addr_out = ispmmu_map_pages(output_pages, output_nr_pages);
+	if (isp_addr_out == 0) {
+		ret = -EINVAL;
+		printk(KERN_ERR "isp_run_preview: isp mmu map failed!\n");
+		goto exit_cleanup;
+	}
+
+	/* This buffer must be allocated and mapped to
+	 *	the ISP MMU previously.
+	 */
+	if (buff_addr_mapped == 0) {
+		ret = -EINVAL;
+		goto exit_cleanup;
+	}
+
+	isppreview_pcr = omap_readl(ISPPRV_PCR);
+	isppreview_pcr |= ISPPRV_PCR_SOURCE;
+	isppreview_pcr |= ISPPRV_PCR_ONESHOT;
+	isppreview_pcr &= ~ISPPRV_PCR_RSZPORT;
+	isppreview_pcr |= ISPPRV_PCR_SDRPORT;
+	omap_writel(isppreview_pcr, ISPPRV_PCR);
+
+	isppreview_config_inlineoffset(ppreview_user->input_width * 2);
+	isppreview_set_inaddr(isp_addr_in);
+	isppreview_set_outaddr(buff_addr_mapped);
+
+	resizer_param.input_width = preview_param.output_width;
+	resizer_param.input_height = preview_param.output_height;
+	resizer_param.output_width = ppreview_user->output_width;
+	resizer_param.output_height = ppreview_user->output_height;
+
+	if (preview_param.left == 0) {
+		ret = ispresizer_try_size(&resizer_param.input_width,
+												&resizer_param.input_height,
+												&resizer_param.output_width,
+												&resizer_param.output_height);
+		if (ret < 0) {
+			goto exit_cleanup;
+		}
+		ret = ispresizer_config_size(resizer_param.input_width,
+													resizer_param.input_height,
+													resizer_param.output_width,
+													resizer_param.output_height);
+		if (ret < 0) {
+			goto exit_cleanup;
+		}
+		ispresizer_set_inaddr(buff_addr_mapped);
+	} else {
+		ispresizer_trycrop(preview_param.left,
+										preview_param.top,
+										preview_param.crop_width,
+										preview_param.crop_height,
+										resizer_param.output_width,
+										resizer_param.output_height);
+
+		ispresizer_applycrop();
+
+		/*pixel alignment in 32bit space, vertical must be 0 per TRM */
+		omap_writel(((preview_param.left%16) <<
+							ISPRSZ_IN_START_HORZ_ST_SHIFT) |
+							(0 <<
+							ISPRSZ_IN_START_VERT_ST_SHIFT),
+							ISPRSZ_IN_START);
+
+		/* Align input address for cropping, per TRM  */
+		ispresizer_set_inaddr(buff_addr_mapped +
+							(preview_param.top*resizer_param.input_width*2)
+							+ ((preview_param.left/16)*32));
+	}
+
+	ispresizer_set_outaddr(isp_addr_out);
+	ispresizer_config_inlineoffset(resizer_param.input_width*2);
+	isp_set_callback(CBK_PREV_DONE, preview_isr, (void *) NULL, (void *)NULL);
+	isp_set_callback(CBK_RESZ_DONE, rsz_isr, (void *) NULL, (void *)NULL);
+
+	omap_writel(RESZ_DONE|PREV_DONE, ISP_IRQ0STATUS);
+	isp_wfc.done = 0;
+	/* Start preview engine. */
+	isppreview_enable(1);
+
+	wait_for_completion_interruptible(&isp_wfc);
+	omap_writel(RESZ_DONE|PREV_DONE, ISP_IRQ0STATUS);
+	isp_unset_callback(CBK_PREV_DONE);
+	isp_unset_callback(CBK_RESZ_DONE);
+	ret = 0;
+
+exit_cleanup:
+	isppreview_restore_context();
+	ispresizer_restore_context();
+
+	if (isp_addr_in != 0) {
+		ispmmu_unmap(isp_addr_in);
+	}
+	if (isp_addr_out != 0) {
+		ispmmu_unmap(isp_addr_out);
+	}
+	if (input_pages != NULL) {
+		unmap_user_memory_from_kernel(input_pages, input_nr_pages);
+		kfree(input_pages);
+	}
+	if (output_pages != NULL) {
+		unmap_user_memory_from_kernel(output_pages, output_nr_pages);
+		kfree(output_pages);
+	}
+
+	DPRINTK_ISPCTRL("isp_run_preview: exit.\n");
+	return ret;
+}
+EXPORT_SYMBOL(isp_run_preview);
 
 /**
  * isp_print_status - Prints the values of the ISP Control Module registers

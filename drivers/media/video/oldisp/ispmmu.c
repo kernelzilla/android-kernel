@@ -479,7 +479,7 @@ dma_addr_t ispmmu_map_pages(struct page **pages, int page_nr)
 	u32 *l2_table;
 	u32 page_index = 0;
 
-	DPRINTK_ISPMMU("map: pages = 0x%x, page_nr = 0x%x\n", pages, page_nr);
+	DPRINTK_ISPMMU("map_pages: page_nr (number of pages) = %d\n", page_nr);
 
 	idx = find_free_region_index();
 	if (!idx) {

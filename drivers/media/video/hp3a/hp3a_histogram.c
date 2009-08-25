@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 
+#include "hp3a.h"
 #include "hp3a_common.h"
 #include "hp3a_user.h"
 #include "isp.h"
@@ -57,29 +58,32 @@ void hp3a_enable_histogram(void)
 
 	spin_lock(&g_tc.hist_lock);
 
-	if (likely(g_tc.hist_hw_configured == 1)) {
-		if (hp3a_dequeue(&g_tc.hist_stat_queue, &ibuffer) == 0) {
-			if (g_tc.hist_hw_enable == 0) {
-				/* Write histogram hardware registers. */
-				hp3a_write_ispregs(isp_hist_regs);
-				omap_writel(IRQ0STATUS_HIST_DONE_IRQ,
-					ISP_IRQ0STATUS);
-				/* Enable histogram hardware. */
-				omap_writel(omap_readl(ISPHIST_PCR) | \
-					(ISPHIST_PCR_EN), ISPHIST_PCR);
+	if (unlikely(g_tc.hist_hw_configured == 0)) {
+		spin_unlock(&g_tc.hist_lock);
+		return;
+	}
 
-				g_tc.hist_hw_enable = 1;
-				g_tc.hist_done = 0;
-			}
+	if (hp3a_dequeue(&g_tc.hist_stat_queue, &ibuffer) == 0) {
+		if (g_tc.hist_hw_enable == 0) {
+			/* Write histogram hardware registers. */
+			hp3a_write_ispregs(isp_hist_regs);
+			omap_writel(IRQ0STATUS_HIST_DONE_IRQ,
+				ISP_IRQ0STATUS);
+			/* Enable histogram hardware. */
+			omap_writel(omap_readl(ISPHIST_PCR) | \
+				(ISPHIST_PCR_EN), ISPHIST_PCR);
 
-			ibuffer->type = HISTOGRAM;
-			hp3a_enqueue(&g_tc.hist_hw_queue, &ibuffer);
-			hp3a_enqueue(&g_tc.ready_stats_queue, &ibuffer);
-		} else if (g_tc.hist_hw_enable == 1) {
-			g_tc.hist_hw_enable = 0;
-			omap_writel(omap_readl(ISPHIST_PCR) & \
-				~(ISPHIST_PCR_EN), ISPHIST_PCR);
+			g_tc.hist_hw_enable = 1;
+			g_tc.hist_done = 0;
 		}
+
+		ibuffer->type = HISTOGRAM;
+		hp3a_enqueue(&g_tc.hist_hw_queue, &ibuffer);
+		hp3a_enqueue(&g_tc.ready_stats_queue, &ibuffer);
+	} else if (g_tc.hist_hw_enable == 1) {
+		g_tc.hist_hw_enable = 0;
+		omap_writel(omap_readl(ISPHIST_PCR) & \
+			~(ISPHIST_PCR_EN), ISPHIST_PCR);
 	}
 
 	spin_unlock(&g_tc.hist_lock);
@@ -93,10 +97,8 @@ void hp3a_enable_histogram(void)
 void hp3a_disable_histogram(void)
 {
 	spin_lock(&g_tc.hist_lock);
-
 	g_tc.hist_hw_enable = 0;
 	omap_writel(omap_readl(ISPHIST_PCR) & ~(ISPHIST_PCR_EN), ISPHIST_PCR);
-
 	spin_unlock(&g_tc.hist_lock);
 }
 
@@ -181,7 +183,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 			return ret;
 		}
 
-		if (omap_readl(ISPHIST_PCR) & ISPHIST_PCR_BUSY_MASK) {
+		if (hp3a_hist_busy()) {
 			dev_info(device->dev, "Error: Histogram engine is busy!\n");
 			return -EINVAL;
 		}

@@ -34,43 +34,44 @@ dma_addr_t buff_addr_lsc_wa;
 #endif
 
 static DECLARE_MUTEX(ispresizer_mutex);
+static u8 need_to_write_filter_coefs = {0};
 
 /* Default configuration of resizer,filter coefficients,yenh for camera isp */
 static struct isprsz_yenh ispreszdefaultyenh = {0, 0, 0, 0};
 static struct isprsz_coef ispreszdefcoef = {
-	{
-		0,    256,  0,    0,
-		-12, 247, 23,   -2,
-		-18, 222, 58,   -6,
-		-19, 186, 100, -11,
-		-16, 144, 144, -16,
-		-11, 100, 186, -19,
-		-6,   58,   222, -18,
-		-2,   23,   247, -12,
+		{
+			0,    256,  0,    0,
+			-12, 247, 23,   -2,
+			-18, 222, 58,   -6,
+			-19, 186, 100, -11,
+			-16, 144, 144, -16,
+			-11, 100, 186, -19,
+			-6,   58,   222, -18,
+			-2,   23,   247, -12,
+			},
+			{
+			0,    256,  0,    0,
+			-12, 247, 23,   -2,
+			-18, 222, 58,   -6,
+			-19, 186, 100, -11,
+			-16, 144, 144, -16,
+			-11, 100, 186, -19,
+			-6,   58,   222, -18,
+			-2,   23,   247, -12,
 		},
 		{
-		0,    256,  0,    0,
-		-12, 247, 23,   -2,
-		-18, 222, 58,   -6,
-		-19, 186, 100, -11,
-		-16, 144, 144, -16,
-		-11, 100, 186, -19,
-		-6,   58,   222, -18,
-		-2,   23,   247, -12,
-	},
-	{
-		0,	64, 128, 64, 0, 0, 0,
-		-9,	39, 124, 92, 13, -3, 0,
-		-8,	24, 112, 112, 24, -8, 0,
-		-3, 13, 92, 124, 39, -9, 0,
-	},
-	{
-		0,	64, 128, 64, 0, 0, 0,
-		-9,	39, 124, 92, 13, -3, 0,
-		-8,	24, 112, 112, 24, -8, 0,
-		-3, 13, 92, 124, 39, -9, 0,
-	}
-};
+			0,	64, 128, 64, 0, 0, 0,
+			-9,	39, 124, 92, 13, -3, 0,
+			-8,	24, 112, 112, 24, -8, 0,
+			-3, 13, 92, 124, 39, -9, 0,
+		},
+		{
+			0,	64, 128, 64, 0, 0, 0,
+			-9,	39, 124, 92, 13, -3, 0,
+			-8,	24, 112, 112, 24, -8, 0,
+			-3, 13, 92, 124, 39, -9, 0,
+		}
+	};
 
 /**
  * struct isp_res - Structure for the resizer module to store its information.
@@ -165,7 +166,8 @@ static struct isp_reg isprsz_reg_list[] = {
  **/
 void ispresizer_config_shadow_registers()
 {
-	return;
+	if (need_to_write_filter_coefs)
+		ispresizer_write_filter_coef();
 }
 EXPORT_SYMBOL(ispresizer_config_shadow_registers);
 
@@ -475,8 +477,8 @@ EXPORT_SYMBOL(ispresizer_try_size);
 int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 								u32 output_h)
 {
-	int i, j;
 	u32 res;
+
 	DPRINTK_ISPRESZ("ispresizer_config_size()+, input_w = %d,input_h ="
 						" %d, output_w = %d, output_h"
 						" = %d,hresz = %d,vresz = %d,"
@@ -511,13 +513,16 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 #endif
 
 	down(&ispresizer_mutex);
+
 	res = omap_readl(ISPRSZ_CNT) & (~(ISPRSZ_CNT_HSTPH_MASK |
 					ISPRSZ_CNT_VSTPH_MASK));
 	omap_writel(res | (ispres_obj.h_startphase << ISPRSZ_CNT_HSTPH_SHIFT) |
 						(ispres_obj.v_startphase <<
 						ISPRSZ_CNT_VSTPH_SHIFT),
 						ISPRSZ_CNT);
-	up(&ispresizer_mutex);
+
+	/* up(&ispresizer_mutex); */
+
 #if ISP_WORKAROUND
 	omap_writel((0x00 <<	ISPRSZ_IN_START_HORZ_ST_SHIFT) |
 					(0x00 <<
@@ -548,84 +553,21 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 						ISPRSZ_OUT_SIZE);
 	}
 
-	down(&ispresizer_mutex);
+	/* down(&ispresizer_mutex); */
 	res = omap_readl(ISPRSZ_CNT) & (~(ISPRSZ_CNT_HRSZ_MASK |
 						ISPRSZ_CNT_VRSZ_MASK));
 	omap_writel(res | ((ispres_obj.h_resz - 1) << ISPRSZ_CNT_HRSZ_SHIFT) |
 						((ispres_obj.v_resz - 1) <<
 						ISPRSZ_CNT_VRSZ_SHIFT),
 						ISPRSZ_CNT);
-	up(&ispresizer_mutex);
-	if (ispres_obj.h_resz <= MID_RESIZE_VALUE) {
-		j = 0;
-		for (i = 0; i < 16; i++) {
-			omap_writel((ispres_obj.coeflist.
-						h_filter_coef_4tap[j] <<
-						ISPRSZ_HFILT10_COEF0_SHIFT) |
-						(ispres_obj.coeflist.
-						h_filter_coef_4tap[j + 1] <<
-						ISPRSZ_HFILT10_COEF1_SHIFT),
-						ISPRSZ_HFILT10 + (i * 0x04));
-			j += 2;
-		}
-	} else {
-		j = 0;
-		for (i = 0; i < 16; i++) {
-			if ((i + 1) % 4 == 0) {
-				omap_writel((ispres_obj.coeflist.
-						h_filter_coef_7tap[j] <<
-						ISPRSZ_HFILT10_COEF0_SHIFT),
-						ISPRSZ_HFILT10 + (i * 0x04));
-				j += 1;
-			} else {
-				omap_writel((ispres_obj.coeflist.
-						h_filter_coef_7tap[j] <<
-						ISPRSZ_HFILT10_COEF0_SHIFT) |
-						(ispres_obj.coeflist.
-						h_filter_coef_7tap[j+1] <<
-						ISPRSZ_HFILT10_COEF1_SHIFT),
-						ISPRSZ_HFILT10 + (i * 0x04));
-				j += 2;
-			}
-		}
-	}
-	if (ispres_obj.v_resz <= MID_RESIZE_VALUE) {
-		j = 0;
-		for (i = 0; i < 16; i++) {
-			omap_writel((ispres_obj.coeflist.
-						v_filter_coef_4tap[j] <<
-						ISPRSZ_VFILT10_COEF0_SHIFT) |
-						(ispres_obj.coeflist.
-						v_filter_coef_4tap[j + 1] <<
-						ISPRSZ_VFILT10_COEF1_SHIFT),
-						ISPRSZ_VFILT10 + (i * 0x04));
-			j += 2;
-		}
-	} else {
-		j = 0;
-		for (i = 0; i < 16; i++) {
-			if ((i + 1) % 4 == 0) {
-				omap_writel((ispres_obj.coeflist.
-						v_filter_coef_7tap[j] <<
-						ISPRSZ_VFILT10_COEF0_SHIFT),
-						ISPRSZ_VFILT10 + (i * 0x04));
-				j += 1;
-			} else {
-				omap_writel((ispres_obj.coeflist.
-						v_filter_coef_7tap[j] <<
-						ISPRSZ_VFILT10_COEF0_SHIFT) |
-						(ispres_obj.coeflist.
-						v_filter_coef_7tap[j+1] <<
-						ISPRSZ_VFILT10_COEF1_SHIFT),
-						ISPRSZ_VFILT10 + (i * 0x04));
-				j += 2;
-			}
-		}
-	}
 
-	ispresizer_config_outlineoffset(output_w*2);
-	DPRINTK_ISPRESZ("ispresizer_config_size()-\n");
-	return 0;
+	up(&ispresizer_mutex);
+
+    ispresizer_write_filter_coef();
+
+    ispresizer_config_outlineoffset(output_w*2);
+    DPRINTK_ISPRESZ("ispresizer_config_size()-\n");
+    return 0;
 }
 EXPORT_SYMBOL(ispresizer_config_size);
 
@@ -682,7 +624,6 @@ EXPORT_SYMBOL(ispresizer_config_startphase);
  **/
 void ispresizer_config_ycpos(u8 yc)
 {
-	down(&ispresizer_mutex);
 	DPRINTK_ISPRESZ("ispresizer_config_ycpos()+\n");
 	if (yc)
 		omap_writel((omap_readl(ISPRSZ_CNT)) |
@@ -691,7 +632,6 @@ void ispresizer_config_ycpos(u8 yc)
 		omap_writel((omap_readl(ISPRSZ_CNT)) &
 			(~ISPRSZ_CNT_YCPOS), ISPRSZ_CNT);
 	DPRINTK_ISPRESZ("ispresizer_config_ycpos()-\n");
-	up(&ispresizer_mutex);
 }
 EXPORT_SYMBOL(ispresizer_config_ycpos);
 
@@ -745,6 +685,9 @@ void ispresizer_config_filter_coef(struct isprsz_coef *coef)
 {
 	int i;
 	DPRINTK_ISPRESZ("ispresizer_config_filter_coef()+\n");
+
+	need_to_write_filter_coefs = 0;
+
 	for (i = 0; i < 32; i++) {
 		ispres_obj.coeflist.h_filter_coef_4tap[i] =
 						coef->h_filter_coef_4tap[i];
@@ -757,9 +700,109 @@ void ispresizer_config_filter_coef(struct isprsz_coef *coef)
 		ispres_obj.coeflist.v_filter_coef_7tap[i] =
 						coef->v_filter_coef_7tap[i];
 	}
+
+	need_to_write_filter_coefs = 1;
+
 	DPRINTK_ISPRESZ("ispresizer_config_filter_coef()-\n");
 }
 EXPORT_SYMBOL(ispresizer_config_filter_coef);
+
+/**
+* ispresizer_get_filter_coef - Get the resizer filter coefficients.
+* @coef: Structure containing horizontal and vertical filter coefficients for
+*        both 4-tap and 7-tap mode.
+**/
+void ispresizer_get_filter_coef(struct isprsz_coef *coef)
+{
+	down(&ispresizer_mutex);
+	memcpy(coef, &ispres_obj.coeflist, sizeof(struct isprsz_coef));
+	up(&ispresizer_mutex);
+}
+EXPORT_SYMBOL(ispresizer_get_filter_coef);
+
+/**
+* ispresizer_set_filter_coef - Writes the resizer filter coefficients to the
+* resizer registers.
+**/
+void ispresizer_write_filter_coef(void)
+{
+	int i, j;
+	DPRINTK_ISPRESZ("ispresizer_write_filter_coef\n");
+
+	if (ispresizer_busy() == 0) {
+		if (ispres_obj.h_resz <= MID_RESIZE_VALUE) {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				omap_writel((ispres_obj.coeflist.
+						h_filter_coef_4tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						h_filter_coef_4tap[j + 1] <<
+						ISPRSZ_HFILT10_COEF1_SHIFT),
+						ISPRSZ_HFILT10 + (i * 0x04));
+				j += 2;
+			}
+		} else {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				if ((i + 1) % 4 == 0) {
+					omap_writel((ispres_obj.coeflist.
+							h_filter_coef_7tap[j] <<
+							ISPRSZ_HFILT10_COEF0_SHIFT),
+							ISPRSZ_HFILT10 + (i * 0x04));
+					j += 1;
+				} else {
+					omap_writel((ispres_obj.coeflist.
+							h_filter_coef_7tap[j] <<
+							ISPRSZ_HFILT10_COEF0_SHIFT) |
+							(ispres_obj.coeflist.
+							h_filter_coef_7tap[j+1] <<
+							ISPRSZ_HFILT10_COEF1_SHIFT),
+							ISPRSZ_HFILT10 + (i * 0x04));
+					j += 2;
+				}
+			}
+		}
+		if (ispres_obj.v_resz <= MID_RESIZE_VALUE) {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				omap_writel((ispres_obj.coeflist.
+						v_filter_coef_4tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						v_filter_coef_4tap[j + 1] <<
+						ISPRSZ_VFILT10_COEF1_SHIFT),
+						ISPRSZ_VFILT10 + (i * 0x04));
+				j += 2;
+			}
+		} else {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				if ((i + 1) % 4 == 0) {
+					omap_writel((ispres_obj.coeflist.
+							v_filter_coef_7tap[j] <<
+							ISPRSZ_VFILT10_COEF0_SHIFT),
+							ISPRSZ_VFILT10 + (i * 0x04));
+					j += 1;
+				} else {
+					omap_writel((ispres_obj.coeflist.
+							v_filter_coef_7tap[j] <<
+							ISPRSZ_VFILT10_COEF0_SHIFT) |
+							(ispres_obj.coeflist.
+							v_filter_coef_7tap[j+1] <<
+							ISPRSZ_VFILT10_COEF1_SHIFT),
+							ISPRSZ_VFILT10 + (i * 0x04));
+					j += 2;
+				}
+			}
+		}
+
+		need_to_write_filter_coefs = 0;
+	} else {
+		DPRINTK_ISPRESZ("Resizer busy when programming filter coefs\n");
+	}
+}
+EXPORT_SYMBOL(ispresizer_write_filter_coef);
 
 /**
  * ispresizer_config_inlineoffset - Configures the read address line offset.
@@ -889,6 +932,7 @@ EXPORT_SYMBOL(ispresizer_print_status);
 int __init isp_resizer_init(void)
 {
 	mutex_init(&ispres_obj.ispres_mutex);
+
 	return 0;
 }
 
