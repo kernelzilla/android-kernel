@@ -654,7 +654,7 @@ urbs:
 			modem_port_ptr->processing = 0;
 			dev_err(&port->dev, "%s: submit bulk in  urb failed.\n",
 				 __func__);
-			spin_unlock_irqrestore(modem_port_ptr->read_lock,
+			spin_unlock_irqrestore(&modem_port_ptr->read_lock,
 					       flags);
 			return;
 		} else {
