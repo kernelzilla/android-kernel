@@ -722,10 +722,11 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 	 * any case on any machine. */
 	ndelay(100);
 
-	if ((state == FL_ERASING) && (chip->options & NAND_IS_AND))
-		chip->cmdfunc(mtd, NAND_CMD_STATUS_MULTI, -1, -1);
-	else
-		chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
+	if (!(chip->dev_ready))
+		if ((state == FL_ERASING) && (chip->options & NAND_IS_AND))
+			chip->cmdfunc(mtd, NAND_CMD_STATUS_MULTI, -1, -1);
+		else
+			chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
 
 	while (time_before(jiffies, timeo)) {
 		if (chip->dev_ready) {
@@ -738,6 +739,11 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 		cond_resched();
 	}
 	led_trigger_event(nand_led_trigger, LED_OFF);
+
+	if ((state == FL_ERASING) && (chip->options & NAND_IS_AND))
+		chip->cmdfunc(mtd, NAND_CMD_STATUS_MULTI, -1, -1);
+	else
+		chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
 
 	status = (int)chip->read_byte(mtd);
 	return status;
