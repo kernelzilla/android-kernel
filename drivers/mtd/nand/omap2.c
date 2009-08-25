@@ -855,26 +855,23 @@ static int omap_wait(struct mtd_info *mtd, struct nand_chip *chip)
  */
 static int omap_dev_ready(struct mtd_info *mtd)
 {
-	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
-							mtd);
-	unsigned int val = __raw_readl(info->gpmc_baseaddr + GPMC_IRQ_STATUS);
+	unsigned int val = 0;
+	struct omap_nand_info *info;
+	unsigned int cnt = 0;
+	int ret = 1;
 
-	if ((val & 0x100) == 0x100) {
-		/* Clear IRQ Interrupt */
-		val |= 0x100;
-		val &= ~(0x0);
-		__raw_writel(val, info->gpmc_baseaddr + GPMC_IRQ_STATUS);
-	} else {
-		unsigned int cnt = 0;
-		while (cnt++ < 0x1FF) {
-			if  ((val & 0x100) == 0x100)
-				return 0;
-			val = __raw_readl(info->gpmc_baseaddr +
-							GPMC_IRQ_STATUS);
+	info = container_of(mtd, struct omap_nand_info, mtd);
+
+	/* the loop is 80us in worst case(500MHZ cpu) */
+	while (!(val & 0x100)) {
+		if (cnt++ > 0x1FF) {
+			ret = 0;
+			break;
 		}
+		val = __raw_readl(info->gpmc_baseaddr + GPMC_STATUS);
 	}
 
-	return 1;
+	return ret;
 }
 
 static int __devinit omap_nand_probe(struct platform_device *pdev)
