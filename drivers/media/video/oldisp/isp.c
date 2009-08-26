@@ -2498,6 +2498,7 @@ static int __init isp_init(void)
 	mutex_init(&(isp_obj.isp_mutex));
 	spin_lock_init(&isp_obj.isp_temp_buf_lock);
 	spin_lock_init(&isp_obj.lock);
+	spin_lock_init(&ispsg.lock);
 
 	init_completion(&isp_wfc);
 	isp_wfc.done = 0;
