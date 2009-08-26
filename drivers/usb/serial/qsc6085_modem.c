@@ -286,6 +286,9 @@ static void modem_read_bulk_callback(struct urb *urb)
 	if (modem_port_ptr == NULL)
 		return;
 
+	if (modem_port_ptr->port == NULL)
+		return;
+
 	usb_mark_last_busy(modem_port_ptr->port->serial->dev);
 
 	buf = rcv->buffer;
@@ -362,6 +365,9 @@ static void modem_interrupt_callback(struct urb *urb)
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct modem_port *modem_port_ptr =
 	    usb_get_serial_data(port->serial);
+
+	if (modem_port_ptr->port == NULL)
+		return;
 
 	if (port->number != MODEM_INTERFACE_NUM) {
 		if (cdma_modem_debug)
@@ -450,7 +456,7 @@ static int modem_open(struct tty_struct *tty,
 {
 	struct modem_port *modem_port_ptr =
 	    usb_get_serial_data(port->serial);
-	int retval;
+	int retval = 0;
 	int i;
 	unsigned long flags;
 
@@ -713,9 +719,12 @@ static void modem_write_done(struct modem_port *modem_port_ptr,
 static int modem_start_wb(struct modem_port *modem_port_ptr,
 				struct ap_wb *wb)
 {
-	int result;
+	int result = 0;
 	struct usb_serial_port *port =  modem_port_ptr->port;
 	unsigned long flags;
+
+	if (port == NULL)
+		return -ENODEV;
 
 	spin_lock_irqsave(&modem_port_ptr->write_lock, flags);
 	modem_port_ptr->sending++;
@@ -741,9 +750,14 @@ static void modem_wake_and_write(struct work_struct *work)
 {
 	struct modem_port *modem_port_ptr =
 		container_of(work, struct modem_port, wake_and_write);
-	struct usb_serial *serial = modem_port_ptr->port->serial;
+	struct usb_serial *serial;
 	struct usb_serial_port *port =  modem_port_ptr->port;
 	int result;
+
+	if (modem_port_ptr->port == NULL)
+		return;
+
+	serial = modem_port_ptr->port->serial;
 
 	result = usb_autopm_get_interface(serial->interface);
 	if (result < 0) {
@@ -766,6 +780,9 @@ static void modem_write_bulk_callback(struct urb *urb)
 	struct modem_port *modem_port_ptr = wb->instance;
 	struct usb_serial_port *port = modem_port_ptr->port;
 	unsigned long flags;
+
+	if (port == NULL)
+		return;
 
 	spin_lock_irqsave(&modem_port_ptr->write_lock, flags);
 	modem_write_done(modem_port_ptr, wb);
