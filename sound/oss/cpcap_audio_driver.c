@@ -622,7 +622,7 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 				codec_freq_config, CODEC_RESET_FREQ_MASK);
 
 			/* Wait for clock tree reset to complete */
-			msleep(CLOCK_TREE_RESET_TIME);
+			mdelay(CLOCK_TREE_RESET_TIME);
 		}
 
 		/* Clear old settings */
@@ -712,7 +712,7 @@ static void cpcap_audio_configure_stdac(struct cpcap_audio_state *state,
 				stdac_freq_config, SDAC_RESET_FREQ_MASK);
 
 			/* Wait for clock tree reset to complete */
-			msleep(CLOCK_TREE_RESET_TIME);
+			mdelay(CLOCK_TREE_RESET_TIME);
 		}
 
 		/* Clear old settings */
@@ -966,7 +966,7 @@ static void cpcap_audio_configure_power(int power)
 		previous_power = power;
 
 		if (power)
-			msleep(SLEEP_ACTIVATE_POWER);
+			mdelay(SLEEP_ACTIVATE_POWER);
 	}
 }
 
@@ -1065,11 +1065,7 @@ void cpcap_audio_set_audio_state(struct cpcap_audio_state *state)
 
 	cpcap_audio_configure_output_gains(state, previous_state);
 
-	msleep(SLEEP_CODEC_STDAC_PGA_SWITCH);
-
 	cpcap_audio_configure_aud_mute(state, previous_state);
-
-	msleep(SLEEP_OUTPUT_AMPS_ENABLE);
 
 	cpcap_audio_configure_output(state, previous_state);
 
