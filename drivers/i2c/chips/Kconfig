@@ -32,6 +32,12 @@ config SENSORS_AKM8976
 	help
 	 AKM8976 Compass Driver implemented by HTC.
 
+config SENSORS_AKM8973
+	tristate "AKM8973 Compass Driver"
+	depends on I2C
+	help
+	 AKM8973 Compass Driver implemented by HTC.
+
 config SENSORS_PCA963X
 	tristate "Philips PCA963X 4-bit I2C-bus LED"
 	depends on I2C && EXPERIMENTAL
