@@ -1510,8 +1510,11 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 
 	rval = arg1(vb);
 
-	if (rval)
+	if (rval) {
+		spin_unlock(&isp_obj.lock);
 		isp_sgdma_process(&ispsg, 1, &notify, arg1);
+		spin_lock(&isp_obj.lock);
+	}
 
 	return;
 }
