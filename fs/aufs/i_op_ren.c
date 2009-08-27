@@ -869,7 +869,7 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 	/* are they available to be renamed */
 	err = au_ren_may_dir(a);
 	if (unlikely(err))
-		goto out_unlock;
+		goto out_children;
 
 	/* prepare the writable parent dir on the same branch */
 	if (a->dst_bstart == a->btgt) {
