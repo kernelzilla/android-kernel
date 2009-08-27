@@ -907,11 +907,10 @@ struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp)
 	if (!rdhash)
 		rdhash = AUFS_RDHASH_DEF;
 	err = au_nhash_alloc(&whtmp->whlist, rdhash, gfp);
-	if (!err)
-		return whtmp; /* success */
-
-	kfree(whtmp);
-	whtmp = ERR_PTR(err);
+	if (unlikely(err)) {
+		kfree(whtmp);
+		whtmp = ERR_PTR(err);
+	}
 
  out:
 	return whtmp;
