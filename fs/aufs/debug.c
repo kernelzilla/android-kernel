@@ -402,6 +402,10 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo __maybe_unused)
 #ifdef AuForceHinotify
 	au_opt_set_udba(sbinfo->si_mntflags, UDBA_HINOTIFY);
 #endif
+#ifdef AuForceRd0
+	sbinfo->si_rdblk = 0;
+	sbinfo->si_rdhash = 0;
+#endif
 }
 
 int __init au_debug_init(void)
