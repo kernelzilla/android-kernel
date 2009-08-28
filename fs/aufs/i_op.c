@@ -86,8 +86,8 @@ static int aufs_permission(struct inode *inode, int mask)
 	ii_read_lock_child(inode);
 
 	if (!isdir || write_mask) {
-		h_inode = au_h_iptr(inode, au_ibstart(inode));
 		err = au_busy_or_stale();
+		h_inode = au_h_iptr(inode, au_ibstart(inode));
 		if (unlikely(!h_inode
 			     || (h_inode->i_mode & S_IFMT)
 			     != (inode->i_mode & S_IFMT)))
