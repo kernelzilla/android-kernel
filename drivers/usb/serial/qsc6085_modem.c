@@ -529,10 +529,15 @@ static int modem_open(struct tty_struct *tty,
 		modem_port_ptr->modem_status = 0;
 	}
 
-	/*  need to put the pm interface back which is taken at
-	 *  serial_open() at usb-serial.c
+	/*  pm interface is taken at
+	 *  serial_open() at usb-serial.c.
+	 *  For data modem port: the pm count needs to be put back here
+	 *  to support the auto-suspend/auto-resume.
+	 *  For other test command port: the pm count will be put back at
+	 *  the time when port is closed.
 	 */
-	usb_autopm_put_interface(port->serial->interface);
+	if (port->number == MODEM_INTERFACE_NUM)
+		usb_autopm_put_interface(port->serial->interface);
 
 	if (cdma_modem_debug)
 		dev_info(&port->dev, "%s: Exit. retval = %d\n",
@@ -680,9 +685,6 @@ static void modem_close(struct tty_struct *tty,
 		dev_info(&port->dev, "%s: Enter. Close Port %d  \n",
 			 __func__, port->number);
 
-	/*  Get the pm interface here and will put it back
-	 *  at serialr_close() of usb-serial.c
-	 */
 	modem_port_ptr = usb_get_serial_data(port->serial);
 	if (!modem_port_ptr) {
 		dev_err(&port->dev,
@@ -691,7 +693,12 @@ static void modem_close(struct tty_struct *tty,
 		return;
 	}
 
-	usb_autopm_get_interface(port->serial->interface);
+	/*  For the data modem port, the pm interface needs to be get here
+	 *  and will be put back at serial_close() of usb-serial.c
+	 */
+
+	if (port->number == MODEM_INTERFACE_NUM)
+		usb_autopm_get_interface(port->serial->interface);
 
 	stop_data_traffic(modem_port_ptr);
 	cancel_work_sync(&modem_port_ptr->wake_and_write);
