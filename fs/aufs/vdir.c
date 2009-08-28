@@ -169,12 +169,10 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 	num = 0;
 	n = whlist->nh_num;
 	head = whlist->nh_head;
-	for (u = 0; u < n; u++) {
+	for (u = 0; u < n; u++, head++)
 		hlist_for_each_entry(tpos, pos, head, wh_hash)
 			if (tpos->wh_bindex == btgt && ++num > limit)
 				return 1;
-		head++;
-	}
 	return 0;
 }
 
@@ -184,6 +182,8 @@ static struct hlist_head *au_name_hash(struct au_nhash *nhash,
 {
 	unsigned int v;
 	/* const unsigned int magic_bit = 12; */
+
+	AuDebugOn(!nhash->nh_num || !nhash->nh_head);
 
 	v = 0;
 	while (len--)
@@ -255,6 +255,8 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen, ino_t ino,
 	struct au_vdir_wh *wh;
 
 	AuDbg("%.*s\n", nlen, name);
+	AuDebugOn(!whlist->nh_num || !whlist->nh_head);
+
 	err = -ENOMEM;
 	wh = kmalloc(sizeof(*wh) + nlen, GFP_NOFS);
 	if (unlikely(!wh))
