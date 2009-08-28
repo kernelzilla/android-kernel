@@ -149,12 +149,12 @@ static int vib_gpio_probe(struct platform_device *pdev)
 	gpio_data->dev.enable = vib_gpio_enable;
 	ret = timed_output_dev_register(&gpio_data->dev);
 	if (ret < 0)
-		goto err2;
+		goto err1;
 
 	if (gpio_data->pdata->init)
 		ret = gpio_data->pdata->init();
 	if (ret < 0)
-		goto err3;
+		goto err2;
 
 	gpio_direction_output(gpio_data->pdata->gpio,
 			      gpio_data->pdata->active_low);
@@ -166,11 +166,10 @@ static int vib_gpio_probe(struct platform_device *pdev)
 
 	return 0;
 
-err3:
-	timed_output_dev_unregister(&gpio_data->dev);
 err2:
-	kfree(gpio_data->pdata);
+	timed_output_dev_unregister(&gpio_data->dev);
 err1:
+	kfree(gpio_data->pdata);
 	kfree(gpio_data);
 err0:
 	return ret;
