@@ -19,6 +19,7 @@
 #include <mach/display.h>
 #include <mach/gpio.h>
 #include <mach/mux.h>
+#include <mach/resource.h>
 
 #define SHOLES_DISPLAY_RESET_GPIO	136
 
@@ -26,6 +27,13 @@ struct regulator *display_regulator;
 
 static int sholes_panel_enable(struct omap_dss_device *dssdev)
 {
+	int ret;
+
+	/* pin the memory bus bw to the highest value */
+	ret = resource_request("vdd2_opp", &dssdev->dev, 400000);
+	if (ret)
+		printk("%s: resource request failed\n", __func__);
+
 	if (!display_regulator) {
 		display_regulator = regulator_get(NULL, "vhvio");
 		if (IS_ERR(display_regulator)) {
@@ -45,11 +53,19 @@ static int sholes_panel_enable(struct omap_dss_device *dssdev)
 	msleep(5);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 1);
 	msleep(10);
+
 	return 0;
 }
 
 static void sholes_panel_disable(struct omap_dss_device *dssdev)
 {
+	int ret;
+
+	/* unpin the memory bus */
+	ret = resource_release("vdd2_opp", &dssdev->dev);
+	if (ret)
+		printk("%s: resource request failed\n", __func__);
+
 	gpio_direction_output(SHOLES_DISPLAY_RESET_GPIO, 1);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 0);
 	msleep(1);
