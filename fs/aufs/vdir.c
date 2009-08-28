@@ -688,8 +688,15 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 		tgt->vd_deblk = p;
 	}
 
-	tgt->vd_nblk = src->vd_nblk;
-	tgt->vd_deblk_sz = deblk_sz;
+	if (tgt->vd_deblk_sz != deblk_sz) {
+		unsigned char *p;
+
+		tgt->vd_deblk_sz = deblk_sz;
+		p = krealloc(tgt->vd_deblk[0], deblk_sz, GFP_NOFS);
+		if (unlikely(!p))
+			goto out;
+		tgt->vd_deblk[0] = p;
+	}
 	memcpy(tgt->vd_deblk[0], src->vd_deblk[0], deblk_sz);
 	/* tgt->vd_last.i = 0; */
 	/* tgt->vd_last.p.deblk = tgt->vd_deblk[0]; */
@@ -702,6 +709,7 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 					    GFP_NOFS);
 		if (unlikely(!tgt->vd_deblk[ul]))
 			goto out;
+		tgt->vd_nblk++;
 	}
 	/* smp_mb(); */
 	return 0; /* success */
