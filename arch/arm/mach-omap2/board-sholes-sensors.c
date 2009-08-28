@@ -63,7 +63,7 @@ static struct vib_gpio_platform_data sholes_vib_gpio_data = {
 	.gpio = SHOLES_VIBRATOR_GPIO,
 	.max_timeout = 15000,
 	.active_low = 0,
-	.initial_vibrate = 500,
+	.initial_vibrate = 0,
 
 	.init = sholes_vibrator_initialization,
 	.exit = sholes_vibrator_exit,
