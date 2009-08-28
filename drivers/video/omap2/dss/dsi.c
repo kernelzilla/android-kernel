@@ -38,6 +38,13 @@
 
 #include "dss.h"
 
+#define PRINT_FPS 1
+#ifdef PRINT_FPS
+static int dsi_fps;
+module_param_named(dsi_fps, dsi_fps, bool, S_IRUGO | S_IWUSR | S_IWGRP);
+#endif
+
+
 /*#define VERBOSE_IRQ*/
 #define DSI_CATCH_MISSING_TE
 
@@ -3368,6 +3375,13 @@ static int dsi_display_update(struct omap_dss_device *dssdev,
 {
 	int r = 0;
 	u16 dw, dh;
+#if PRINT_FPS
+        int64_t dt;
+        ktime_t now;
+        static int64_t frame_count;
+        static ktime_t last_sec;
+#endif
+
 
 	DSSDBG("dsi_display_update(%d,%d %dx%d)\n", x, y, w, h);
 
@@ -3405,6 +3419,20 @@ static int dsi_display_update(struct omap_dss_device *dssdev,
 end:
 	mutex_unlock(&dsi.lock);
 
+#if PRINT_FPS
+	if (dsi_fps) {
+		now = ktime_get();
+		dt = ktime_to_ns(ktime_sub(now, last_sec));
+		frame_count++;
+		if (dt > NSEC_PER_SEC) {
+			int64_t fps = frame_count * NSEC_PER_SEC * 100;
+			frame_count = 0;
+			last_sec = ktime_get();
+			do_div(fps, dt);
+			printk(KERN_INFO "fps * 100: %llu\n", fps);
+		}
+	}
+#endif
 	return r;
 }
 
