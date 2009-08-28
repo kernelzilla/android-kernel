@@ -1025,15 +1025,17 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		}
 		psBuffer->hCmdCookie = hCmdCookie;
 		list_add_tail(&psBuffer->list, &psDevInfo->active_list);
-		schedule_work(&psDevInfo->active_work);
+		queue_work(psDevInfo->workq, &psDevInfo->active_work);
 		mutex_unlock(&psDevInfo->active_list_lock);
 
 
+#if !defined(CONFIG_PVR_OMAP_USE_VSYNC)
+	return IMG_TRUE;
+#else
 		spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
 
 		
 
-#if defined(CONFIG_PVR_OMAP_USE_VSYNC)
 		goto ExitTrueUnlock;
 	}
 
@@ -1112,7 +1114,7 @@ static void active_worker(struct work_struct *work)
 			pfnPVRSRVCmdComplete(psBuffer->hCmdCookie, IMG_TRUE);
 		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, flags);
 
-		schedule_work(&psDevInfo->active_work);
+		queue_work(psDevInfo->workq, &psDevInfo->active_work);
 	}
 	mutex_unlock(&psDevInfo->active_list_lock);
 }
@@ -1248,6 +1250,7 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo)
 	mutex_init(&psDevInfo->active_list_lock);
 	INIT_LIST_HEAD(&psDevInfo->active_list);
 	INIT_WORK(&psDevInfo->active_work, active_worker);
+	psDevInfo->workq = create_workqueue("pvrflip");
 	OMAPLFBDisplayInit();
 
 	eError = OMAP_OK;

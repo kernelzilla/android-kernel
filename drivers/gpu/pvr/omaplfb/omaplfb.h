@@ -220,6 +220,7 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	struct list_head	active_list;
 	struct mutex		active_list_lock;
 	struct work_struct	active_work;
+	struct workqueue_struct *workq;
 }  OMAPLFB_DEVINFO;
 
 #define	OMAPLFB_PAGE_SIZE 4096
