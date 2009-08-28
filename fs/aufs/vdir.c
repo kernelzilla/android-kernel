@@ -130,12 +130,15 @@ static void au_nhash_de_do_free(struct hlist_head *head)
 static void au_nhash_do_free(struct au_nhash *nhash,
 			     void (*free)(struct hlist_head *head))
 {
-	unsigned int u, n;
+	unsigned int n;
 	struct hlist_head *head;
 
 	n = nhash->nh_num;
+	if (!n)
+		return;
+
 	head = nhash->nh_head;
-	for (u = 0; u < n; u++) {
+	while (n-- > 0) {
 		nhash_count(head);
 		free(head++);
 	}
