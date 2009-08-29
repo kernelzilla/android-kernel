@@ -487,6 +487,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 };
 
 static struct lm3530_platform_data omap3430_als_light_data = {
+	.power_up_gen_config = 0x0b,
 	.gen_config = 0x19,
 	.als_config = 0x7c,
 	.brightness_ramp = 0x36,
