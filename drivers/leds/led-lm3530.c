@@ -521,7 +521,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 	}
 
 	error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
-				 pdata->gen_config);
+				 pdata->power_up_gen_config);
 	if (error) {
 		pr_err("%s:Initialize Gen Config Reg failed %d\n",
 		       __func__, error);

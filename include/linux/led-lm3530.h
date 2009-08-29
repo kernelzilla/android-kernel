@@ -58,6 +58,7 @@
 
 #ifdef __KERNEL__
 struct lm3530_platform_data {
+	u8  power_up_gen_config;
 	u8  gen_config;
 	u8  als_config;
 	u8  brightness_ramp;
