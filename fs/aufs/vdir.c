@@ -130,12 +130,15 @@ static void au_nhash_de_do_free(struct hlist_head *head)
 static void au_nhash_do_free(struct au_nhash *nhash,
 			     void (*free)(struct hlist_head *head))
 {
-	unsigned int u, n;
+	unsigned int n;
 	struct hlist_head *head;
 
 	n = nhash->nh_num;
+	if (!n)
+		return;
+
 	head = nhash->nh_head;
-	for (u = 0; u < n; u++) {
+	while (n-- > 0) {
 		nhash_count(head);
 		free(head++);
 	}
@@ -166,12 +169,10 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 	num = 0;
 	n = whlist->nh_num;
 	head = whlist->nh_head;
-	for (u = 0; u < n; u++) {
+	for (u = 0; u < n; u++, head++)
 		hlist_for_each_entry(tpos, pos, head, wh_hash)
 			if (tpos->wh_bindex == btgt && ++num > limit)
 				return 1;
-		head++;
-	}
 	return 0;
 }
 
@@ -181,6 +182,8 @@ static struct hlist_head *au_name_hash(struct au_nhash *nhash,
 {
 	unsigned int v;
 	/* const unsigned int magic_bit = 12; */
+
+	AuDebugOn(!nhash->nh_num || !nhash->nh_head);
 
 	v = 0;
 	while (len--)
@@ -252,6 +255,8 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int nlen, ino_t ino,
 	struct au_vdir_wh *wh;
 
 	AuDbg("%.*s\n", nlen, name);
+	AuDebugOn(!whlist->nh_num || !whlist->nh_head);
+
 	err = -ENOMEM;
 	wh = kmalloc(sizeof(*wh) + nlen, GFP_NOFS);
 	if (unlikely(!wh))
@@ -685,8 +690,15 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 		tgt->vd_deblk = p;
 	}
 
-	tgt->vd_nblk = src->vd_nblk;
-	tgt->vd_deblk_sz = deblk_sz;
+	if (tgt->vd_deblk_sz != deblk_sz) {
+		unsigned char *p;
+
+		tgt->vd_deblk_sz = deblk_sz;
+		p = krealloc(tgt->vd_deblk[0], deblk_sz, GFP_NOFS);
+		if (unlikely(!p))
+			goto out;
+		tgt->vd_deblk[0] = p;
+	}
 	memcpy(tgt->vd_deblk[0], src->vd_deblk[0], deblk_sz);
 	/* tgt->vd_last.i = 0; */
 	/* tgt->vd_last.p.deblk = tgt->vd_deblk[0]; */
@@ -699,6 +711,7 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 					    GFP_NOFS);
 		if (unlikely(!tgt->vd_deblk[ul]))
 			goto out;
+		tgt->vd_nblk++;
 	}
 	/* smp_mb(); */
 	return 0; /* success */
