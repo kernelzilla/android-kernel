@@ -290,6 +290,22 @@ static int sholes_touch_reset(void)
 	return 0;
 }
 
+/* These are for test event-injection purposes only */
+static struct vkey sholes_touch_vkeys[] = {
+	{
+		.code		= KEY_BACK,
+	},
+	{
+		.code		= KEY_MENU,
+	},
+	{
+		.code		= KEY_HOME,
+	},
+	{
+		.code		= KEY_SEARCH,
+	},
+};
+
 static ssize_t sholes_virtual_keys_show(struct kobject *kobj,
 					struct kobj_attribute *attr, char *buf)
 {
@@ -464,6 +480,11 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.key_array      = {
 		.cfg		= sholes_key_array_data,
 		.num_keys   = ARRAY_SIZE(sholes_key_array_data),
+	},
+	.vkeys			= { 
+		.keys		= sholes_touch_vkeys,
+		.count		= ARRAY_SIZE(sholes_touch_vkeys),
+		.start		= 961,
 	},
 };
 
