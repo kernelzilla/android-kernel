@@ -505,6 +505,7 @@ static struct lm3530_platform_data omap3430_als_light_data = {
 	.manual_current = 0x33,
 	.upper_curr_sel = 6,
 	.lower_curr_sel = 3,
+	.lens_loss_coeff = 6,
 };
 
 static struct lm3554_platform_data sholes_camera_flash = {
