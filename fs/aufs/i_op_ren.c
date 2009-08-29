@@ -496,15 +496,15 @@ static int au_ren_may_dir(struct au_ren_args *a)
 	d = a->dst_dentry;
 	SiMustAnyLock(d->d_sb);
 
-	rdhash = au_sbi(d->d_sb)->si_rdhash;
-	if (!rdhash)
-		rdhash = au_rdhash_est(au_dir_size(/*file*/NULL, d));
-	err = au_nhash_alloc(&a->whlist, rdhash, GFP_NOFS);
-	if (unlikely(err))
-		goto out;
-
 	err = 0;
 	if (au_ftest_ren(a->flags, ISDIR) && a->dst_inode) {
+		rdhash = au_sbi(d->d_sb)->si_rdhash;
+		if (!rdhash)
+			rdhash = au_rdhash_est(au_dir_size(/*file*/NULL, d));
+		err = au_nhash_alloc(&a->whlist, rdhash, GFP_NOFS);
+		if (unlikely(err))
+			goto out;
+
 		au_set_dbstart(d, a->dst_bstart);
 		err = may_rename_dstdir(d, &a->whlist);
 		au_set_dbstart(d, a->btgt);
@@ -869,7 +869,7 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 	/* are they available to be renamed */
 	err = au_ren_may_dir(a);
 	if (unlikely(err))
-		goto out_unlock;
+		goto out_children;
 
 	/* prepare the writable parent dir on the same branch */
 	if (a->dst_bstart == a->btgt) {
