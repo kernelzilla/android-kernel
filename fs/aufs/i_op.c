@@ -98,8 +98,8 @@ static int aufs_permission(struct inode *inode, int mask)
 	ii_read_lock_child(inode);
 
 	if (!isdir || write_mask) {
-		h_inode = au_h_iptr(inode, au_ibstart(inode));
 		err = au_busy_or_stale();
+		h_inode = au_h_iptr(inode, au_ibstart(inode));
 		if (unlikely(!h_inode
 			     || (h_inode->i_mode & S_IFMT)
 			     != (inode->i_mode & S_IFMT)))
@@ -712,7 +712,14 @@ static int aufs_getattr(struct vfsmount *mnt __maybe_unused,
 		if (au_digen(dentry) == sigen && au_iigen(inode) == sigen)
 			di_read_lock_child(dentry, AuLock_IR);
 		else {
-			AuDebugOn(!IS_ROOT(dentry));
+			/* NFSD may skip the revalidation */
+			if (!au_test_nfsd(current))
+				AuDebugOn(!IS_ROOT(dentry));
+			else {
+				err = au_busy_or_stale();
+				if (unlikely(!IS_ROOT(dentry)))
+					goto out;
+			}
 			err = au_getattr_lock_reval(dentry, sigen);
 			if (unlikely(err))
 				goto out;

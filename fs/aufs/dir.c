@@ -56,7 +56,8 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		AuDebugOn(!S_ISDIR(file->f_dentry->d_inode->i_mode));
 
 		bend = au_fbend(file);
-		for (bindex = 0; bindex <= bend && sz < KMALLOC_MAX_SIZE;
+		for (bindex = au_fbstart(file);
+		     bindex <= bend && sz < KMALLOC_MAX_SIZE;
 		     bindex++) {
 			h_file = au_h_fptr(file, bindex);
 			if (h_file
@@ -70,7 +71,8 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		AuDebugOn(!S_ISDIR(dentry->d_inode->i_mode));
 
 		bend = au_dbtaildir(dentry);
-		for (bindex = 0; bindex <= bend && sz < KMALLOC_MAX_SIZE;
+		for (bindex = au_dbstart(dentry);
+		     bindex <= bend && sz < KMALLOC_MAX_SIZE;
 		     bindex++) {
 			h_dentry = au_h_dptr(dentry, bindex);
 			if (h_dentry && h_dentry->d_inode)
@@ -81,6 +83,10 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		sz = roundup_pow_of_two(sz);
 	if (sz > KMALLOC_MAX_SIZE)
 		sz = KMALLOC_MAX_SIZE;
+	else if (sz < NAME_MAX) {
+		BUILD_BUG_ON(AUFS_RDBLK_DEF < NAME_MAX);
+		sz = AUFS_RDBLK_DEF;
+	}
 	return sz;
 }
 
@@ -388,7 +394,7 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 #endif
 
 struct test_empty_arg {
-	struct au_nhash whlist;
+	struct au_nhash *whlist;
 	unsigned int flags;
 	int err;
 	aufs_bindex_t bindex;
@@ -411,16 +417,16 @@ static int test_empty_cb(void *__arg, const char *__name, int namelen,
 	if (namelen <= AUFS_WH_PFX_LEN
 	    || memcmp(name, AUFS_WH_PFX, AUFS_WH_PFX_LEN)) {
 		if (au_ftest_testempty(arg->flags, WHONLY)
-		    && !au_nhash_test_known_wh(&arg->whlist, name, namelen))
+		    && !au_nhash_test_known_wh(arg->whlist, name, namelen))
 			arg->err = -ENOTEMPTY;
 		goto out;
 	}
 
 	name += AUFS_WH_PFX_LEN;
 	namelen -= AUFS_WH_PFX_LEN;
-	if (!au_nhash_test_known_wh(&arg->whlist, name, namelen))
+	if (!au_nhash_test_known_wh(arg->whlist, name, namelen))
 		arg->err = au_nhash_append_wh
-			(&arg->whlist, name, namelen, ino, d_type, arg->bindex,
+			(arg->whlist, name, namelen, ino, d_type, arg->bindex,
 			 au_ftest_testempty(arg->flags, SHWH));
 
  out:
@@ -509,6 +515,7 @@ int au_test_empty_lower(struct dentry *dentry)
 	int err;
 	unsigned int rdhash;
 	aufs_bindex_t bindex, bstart, btail;
+	struct au_nhash whlist;
 	struct test_empty_arg arg;
 
 	SiMustAnyLock(dentry->d_sb);
@@ -516,12 +523,13 @@ int au_test_empty_lower(struct dentry *dentry)
 	rdhash = au_sbi(dentry->d_sb)->si_rdhash;
 	if (!rdhash)
 		rdhash = au_rdhash_est(au_dir_size(/*file*/NULL, dentry));
-	err = au_nhash_alloc(&arg.whlist, rdhash, GFP_NOFS);
+	err = au_nhash_alloc(&whlist, rdhash, GFP_NOFS);
 	if (unlikely(err))
 		goto out;
 
-	bstart = au_dbstart(dentry);
 	arg.flags = 0;
+	arg.whlist = &whlist;
+	bstart = au_dbstart(dentry);
 	if (au_opt_test(au_mntflags(dentry->d_sb), SHWH))
 		au_fset_testempty(arg.flags, SHWH);
 	arg.bindex = bstart;
@@ -542,7 +550,7 @@ int au_test_empty_lower(struct dentry *dentry)
 	}
 
  out_whlist:
-	au_nhash_wh_free(&arg.whlist);
+	au_nhash_wh_free(&whlist);
  out:
 	return err;
 }
@@ -554,7 +562,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 	aufs_bindex_t bindex, btail;
 
 	err = 0;
-	arg.whlist = *whlist;
+	arg.whlist = whlist;
 	arg.flags = AuTestEmpty_WHONLY;
 	if (au_opt_test(au_mntflags(dentry->d_sb), SHWH))
 		au_fset_testempty(arg.flags, SHWH);
