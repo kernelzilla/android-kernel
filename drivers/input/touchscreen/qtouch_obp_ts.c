@@ -63,8 +63,6 @@ struct qtouch_ts_data {
 	unsigned long			obj_map[_BITMAP_LEN];
 
 	uint32_t			last_keystate;
-	uint8_t				haptic_mask[MAX_FINGERS];
-	struct vkey			*vkey_down[MAX_FINGERS];
 	uint32_t			down_mask;
 
 	/* Note: The message buffer is reused for reading different messages.
@@ -875,6 +873,11 @@ static int qtouch_ts_probe(struct i2c_client *client,
 			input_set_capability(ts->input_dev, EV_KEY,
 					     pdata->key_array.keys[i].code);
 	}
+
+	/* register the software virtual keys, if any are provided */
+	for (i = 0; i < pdata->vkeys.count; ++i)
+		input_set_capability(ts->input_dev, EV_KEY,
+				     pdata->vkeys.keys[i].code);
 
 	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
 	if (obj && obj->entry.num_inst > 0) {
