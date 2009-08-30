@@ -700,8 +700,6 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 		tgt->vd_deblk[0] = p;
 	}
 	memcpy(tgt->vd_deblk[0], src->vd_deblk[0], deblk_sz);
-	/* tgt->vd_last.i = 0; */
-	/* tgt->vd_last.p.deblk = tgt->vd_deblk[0]; */
 	tgt->vd_version = src->vd_version;
 	tgt->vd_jiffy = src->vd_jiffy;
 
@@ -713,6 +711,11 @@ static int copy_vdir(struct au_vdir *tgt, struct au_vdir *src)
 			goto out;
 		tgt->vd_nblk++;
 	}
+	tgt->vd_nblk = n;
+	tgt->vd_last.ul = tgt->vd_last.ul;
+	tgt->vd_last.p.deblk = tgt->vd_deblk[tgt->vd_last.ul];
+	tgt->vd_last.p.deblk += src->vd_last.p.deblk
+		- src->vd_deblk[src->vd_last.ul];
 	/* smp_mb(); */
 	return 0; /* success */
 
