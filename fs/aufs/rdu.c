@@ -175,6 +175,9 @@ static int au_rdu(struct file *file, struct aufs_rdu *rdu)
 		if (!rdu->blk)
 			rdu->blk = au_dir_size(file, /*dentry*/NULL);
 	}
+	bend = au_fbstart(file);
+	if (cookie->bindex < bend)
+		cookie->bindex = bend;
 	bend = au_fbend(file);
 	/* AuDbg("b%d, b%d\n", cookie->bindex, bend); */
 	for (; !err && cookie->bindex <= bend;
