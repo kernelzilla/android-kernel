@@ -155,7 +155,8 @@ static int sholes_reset_keys_up[] = {
 };
 
 static struct keyreset_platform_data sholes_reset_keys_pdata = {
-        .keys_up = sholes_reset_keys_up,
+	.crash_key = KEY_RIGHTSHIFT,
+	.keys_up = sholes_reset_keys_up,
 	.keys_down = {
 		KEY_LEFTSHIFT,
 		KEY_LEFTALT,
