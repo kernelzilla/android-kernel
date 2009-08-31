@@ -1094,11 +1094,6 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *ispirq_disp)
 
 	spin_unlock(&isp_obj.lock);
 
-	irqstatus = omap_readl(ISP_IRQ0STATUS);
-	if (irqstatus) {
-		return IRQ_NONE;
-	}
-
 	return IRQ_HANDLED;
 }
 
