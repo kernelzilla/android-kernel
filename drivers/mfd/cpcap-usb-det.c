@@ -71,6 +71,9 @@ enum cpcap_accy {
 	CPCAP_ACCY_FACTORY,
 	CPCAP_ACCY_CHARGER,
 	CPCAP_ACCY_NONE,
+
+	/* Used while debouncing the accessory. */
+	CPCAP_ACCY_UNKNOWN,
 };
 
 struct cpcap_usb_det_data {
@@ -185,7 +188,7 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_USBXCVREN,
 					     CPCAP_BIT_USBXCVREN);
 		/* Give USB driver control of pull up via ULPI. */
-		retval  = cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3,
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3,
 					     0,
 					     CPCAP_BIT_PU_SPI);
 		break;
@@ -198,9 +201,15 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_USBXCVREN);
 		break;
 
+	case CPCAP_ACCY_UNKNOWN:
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
+					     CPCAP_BIT_VBUSPD);
+		break;
+
 	case CPCAP_ACCY_NONE:
 	default:
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
+					     CPCAP_BIT_VBUSPD,
 					     CPCAP_BIT_VBUSPD);
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 0,
 					     CPCAP_BIT_USBXCVREN);
@@ -258,7 +267,7 @@ static void detection_work(struct work_struct *work)
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_IDGND);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_VBUSVLD);
 
-		configure_hardware(data, CPCAP_ACCY_NONE);
+		configure_hardware(data, CPCAP_ACCY_UNKNOWN);
 
 		data->state = SAMPLE_1;
 		schedule_delayed_work(&data->work, msecs_to_jiffies(11));
@@ -352,6 +361,14 @@ static void detection_work(struct work_struct *work)
 		if ((data->sense & CPCAP_BIT_SE1_S) ||
 		    (data->sense & CPCAP_BIT_ID_GROUND_S) ||
 		    (!(data->sense & CPCAP_BIT_VBUSVLD_S))) {
+			if (data->sense & CPCAP_BIT_SE1_S) {
+				/* A partially inserted charger is now fully
+				 * seated in the jack. The USB transceiver must
+				 * be off in order to detect the charger. */
+				cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2,
+						   0, CPCAP_BIT_USBXCVREN);
+			}
+
 			data->state = CONFIG;
 			schedule_delayed_work(&data->work, 0);
 		} else {
@@ -435,8 +452,6 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	data->usb_accy = CPCAP_ACCY_NONE;
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "usb");
 
-	retval = configure_hardware(data, CPCAP_ACCY_NONE);
-
 	data->regulator = regulator_get(&pdev->dev, "vusb");
 	if (IS_ERR(data->regulator)) {
 		dev_err(&pdev->dev, "Could not get regulator for cpcap_usb\n");
@@ -445,8 +460,8 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	}
 	regulator_set_voltage(data->regulator, 3300000, 3300000);
 
-	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_DET,
-				     int_handler, data);
+	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_DET,
+				    int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_CURR1,
 				     int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_SE1,
@@ -546,7 +561,9 @@ static int __init cpcap_usb_det_init(void)
 {
 	return platform_driver_register(&cpcap_usb_det_driver);
 }
-module_init(cpcap_usb_det_init);
+/* The CPCAP USB detection driver must be started later to give the MUSB
+ * driver time to complete its initialization. */
+late_initcall(cpcap_usb_det_init);
 
 static void __exit cpcap_usb_det_exit(void)
 {
