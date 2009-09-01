@@ -31,6 +31,9 @@
 #define PROXIMITY_FAR	0xFFFFFFFF
 #define NAME		"sfh7743"
 
+/* Suspend and resume is disabled so the sensor can wake the processor */
+#undef ENABLE_SUSPEND
+
 struct sfh7743_data {
 	struct platform_device *pdev;
 	struct sfh7743_platform_data *pdata;
@@ -51,6 +54,7 @@ struct sfh7743_data *sfh7743_misc_data;
 static void sfh7743_device_power_off(struct sfh7743_data *sfh)
 {
 	if (sfh->pdata->power_off) {
+		disable_irq_wake(sfh->irq);
 		disable_irq_nosync(sfh->irq);
 		sfh->pdata->power_off();
 	}
@@ -65,6 +69,7 @@ static int sfh7743_device_power_on(struct sfh7743_data *sfh)
 		if (err < 0)
 			return err;
 		enable_irq(sfh->irq);
+		enable_irq_wake(sfh->irq);
 	}
 
 	return 0;
@@ -74,6 +79,7 @@ static irqreturn_t sfh7743_isr(int irq, void *dev)
 {
 	struct sfh7743_data *sfh = dev;
 
+	disable_irq_wake(sfh->irq);
 	disable_irq_nosync(irq);
 	queue_work(sfh->work_queue, &sfh->irq_work);
 
@@ -96,6 +102,7 @@ static void sfh7743_irq_work_func(struct work_struct *work)
 	input_sync(sfh->input_dev);
 
 	enable_irq(sfh->irq);
+	enable_irq_wake(sfh->irq);
 }
 
 int sfh7743_enable(struct sfh7743_data *sfh)
@@ -350,6 +357,7 @@ static int __devexit sfh7743_remove(struct platform_device *pdev)
 {
 	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
 
+	disable_irq_wake(sfh->irq);
 	free_irq(sfh->irq, sfh);
 	gpio_free(sfh->pdata->gpio);
 	sfh7743_device_power_off(sfh);
@@ -364,6 +372,7 @@ static int __devexit sfh7743_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef ENABLE_SUSPEND
 static int sfh7743_resume(struct platform_device *pdev)
 {
 	struct sfh7743_data *sfh = platform_get_drvdata(pdev);
@@ -380,12 +389,15 @@ static int sfh7743_suspend(struct platform_device *pdev, pm_message_t mesg)
 
 	return sfh7743_disable(sfh);
 }
+#endif
 
 static struct platform_driver sfh7743_driver = {
 	.probe = sfh7743_probe,
 	.remove = __devexit_p(sfh7743_remove),
+#ifdef ENABLE_SUSPEND
 	.resume = sfh7743_resume,
 	.suspend = sfh7743_suspend,
+#endif
 	.driver = {
 		   .name = NAME,
 		   },
