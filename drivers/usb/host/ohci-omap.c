@@ -494,6 +494,13 @@ static int omap_ohci_bus_suspend(struct usb_hcd *hcd)
 	clk_disable(clk_get(NULL, "usbtll_fck"));
 	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+
+	/* the omap usb host auto-idle is not fully functional,
+	 * manually enable/disable usbtll_ick during
+	 * the suspend/resume time.
+	 */
+	clk_disable(clk_get(NULL, "usbtll_ick"));
+
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
 
@@ -504,11 +511,16 @@ static int omap_ohci_bus_resume(struct usb_hcd *hcd)
 {
 	int ret = 0;
 
+	/* the omap usb host auto-idle is not fully functional,
+	 * manually enable/disable usbtll_ick during
+	 * the suspend/resume time.
+	 */
+	clk_enable(clk_get(NULL, "usbtll_ick"));
 	clk_enable(clk_get(NULL, "usbtll_fck"));
 	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
-
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
 	ohci_finish_controller_resume(hcd);
 	ret = ohci_bus_resume(hcd);
 	return ret;

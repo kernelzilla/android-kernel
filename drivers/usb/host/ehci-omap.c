@@ -715,6 +715,12 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 	clk_disable(clk_get(NULL, "usbtll_fck"));
 	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_disable(clk_get(NULL, "usbhost_48m_fck"));
+
+	/* the omap usb host auto-idle is not fully functional,
+	 * manually enable/disable usbtll_ick during
+	 * the suspend/resume time.
+	 */
+	clk_disable(clk_get(NULL, "usbtll_ick"));
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 
 	return ret;
@@ -726,6 +732,12 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 
 	dev_dbg(hcd->self.controller, "%s %ld %lu\n", __func__,
 	in_interrupt(), jiffies);
+
+	/* the omap usb host auto-idle is not fully functional,
+	 * manually enable/disable usbtll_ick during
+	 * the suspend/resume time.
+	 */
+	clk_enable(clk_get(NULL, "usbtll_ick"));
 	clk_enable(clk_get(NULL, "usbtll_fck"));
 	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
