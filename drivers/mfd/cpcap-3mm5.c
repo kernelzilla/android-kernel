@@ -109,8 +109,6 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 
 		send_key_event(data_3mm5, 0);
-
-		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_5);
 	} else {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI,
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN),
@@ -136,9 +134,6 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
-
-		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
-		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
 	}
 
 	switch_set_state(&data_3mm5->sdev, new_state);
@@ -164,11 +159,10 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 		send_key_event(data_3mm5, 1);
 
 		/* If macro not available, only short presses are supported */
-		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_5)) {
+		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_4)) {
 			send_key_event(data_3mm5, 0);
 
 			/* Attempt to restart the macro for next time. */
-			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
 		}
 	} else

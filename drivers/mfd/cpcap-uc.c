@@ -267,6 +267,8 @@ static void ram_write_state_machine(enum cpcap_irqs irq, void *data)
 
 static void reset_handler(enum cpcap_irqs irq, void *data)
 {
+	int i;
+	unsigned short regval;
 	struct cpcap_uc_data *uc_data = data;
 
 	if (irq != CPCAP_IRQ_UCRESET)
@@ -286,6 +288,14 @@ static void reset_handler(enum cpcap_irqs irq, void *data)
 	cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_MIM1, 0xFFFF, 0xFFFF);
 	cpcap_irq_mask(uc_data->cpcap, CPCAP_IRQ_PRIMAC);
 	cpcap_irq_unmask(uc_data->cpcap, CPCAP_IRQ_UCRESET);
+
+	for (i = 0; i <= CPCAP_REG_END; i++) {
+		cpcap_regacc_read(uc_data->cpcap, i, &regval);
+		dev_err(&uc_data->cpcap->spi->dev,
+			"cpcap reg %d = 0x%04X\n", i, regval);
+	}
+
+	BUG();
 }
 
 static void primac_handler(enum cpcap_irqs irq, void *data)
@@ -616,10 +626,8 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 
 		data->is_supported = 1;
 
-		/* cpcap_irq_register() unmasks the interrupts, need
-		 * to re-mask them. */
-		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
-		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_UC_PRIRAMW);
+		cpcap_regacc_write(data->cpcap, CPCAP_REG_MIM1, 0xFFFF,
+				   0xFFFF);
 	} else {
 		retval = -ENODEV;
 	}

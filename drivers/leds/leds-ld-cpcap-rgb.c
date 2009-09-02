@@ -130,12 +130,10 @@ msg_ind_blink(struct device *dev, struct device_attribute *attr,
 		pr_err("%s: Invalid parameter sent\n", __func__);
 		return -1;
 	}
-	if (led_blink > LED_OFF) {
-		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_6);
-		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_4);
-	} else {
-		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_6);
-	}
+	if (led_blink > LED_OFF)
+		cpcap_irq_unmask(msg_ind_data->cpcap, CPCAP_IRQ_UC_PRIMACRO_6);
+	else
+		cpcap_irq_mask(msg_ind_data->cpcap, CPCAP_IRQ_UC_PRIMACRO_6);
 
 	return 0;
 }
