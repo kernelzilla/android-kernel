@@ -36,7 +36,7 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_PC2,       0x0150},
 	{CPCAP_REG_PGC,       0x0000},
 	{CPCAP_REG_SDVSPLL,   0xDB14},
-	{CPCAP_REG_SI2CC1,    0x0201},
+	{CPCAP_REG_SI2CC1,    0x0281},
 	{CPCAP_REG_Si2CC2,    0x00C4},
 	{CPCAP_REG_S1C1,      0x6438},
 	{CPCAP_REG_S1C2,      0x3838},
