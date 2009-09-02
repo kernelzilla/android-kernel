@@ -31,6 +31,9 @@
 /* Time out Values in uSeconds*/
 #define TIHELEN_ACKTIMEOUT  10000
 
+/* Time out for power state transition (in msecs) */
+#define PWRSTST_TIMEOUT		1500
+
 /*  Time delay for HOM->SAM transition. */
 #define  WAIT_SAM   1000000	/* in usec (1000 millisec) */
 

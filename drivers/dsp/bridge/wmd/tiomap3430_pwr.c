@@ -110,7 +110,7 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 {
 	DSP_STATUS status = DSP_SOK;
 #ifdef CONFIG_PM
-	u16 usCount = TIHELEN_ACKTIMEOUT;
+	u16 usCount = PWRSTST_TIMEOUT / 10;
 	struct CFG_HOSTRES resources;
 	enum HW_PwrState_t pwrState;
 #ifdef CONFIG_BRIDGE_DVFS
@@ -127,10 +127,12 @@ DSP_STATUS handle_hibernation_fromDSP(struct WMD_DEV_CONTEXT *pDevContext)
 
 	HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 			    &pwrState);
-	/* Wait for DSP to move into Off state,  how much time should
-	 * we wait? */
+	/* Wait for DSP to move into OFF state */
 	while ((pwrState != HW_PWR_STATE_OFF) && --usCount) {
-		udelay(500);
+		if (msleep_interruptible(10)) {
+			pr_err("Waiting for DSP OFF mode interrupted\n");
+			return DSP_EFAIL;
+		}
 		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 				    &pwrState);
 	}
@@ -195,7 +197,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 #ifdef CONFIG_PM
 	struct CFG_HOSTRES resources;
 	struct DEH_MGR *hDehMgr;
-	u16 usCount = TIHELEN_ACKTIMEOUT;
+	u16 usCount = PWRSTST_TIMEOUT / 10;
 	enum HW_PwrState_t pwrState;
 	enum HW_PwrState_t targetPwrState;
 
@@ -254,10 +256,12 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 	/* Get the PRCM DSP power domain status */
 	HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 			    &pwrState);
-	/* Wait for DSP to move into Standby state,  how much time
-	 * should we wait?*/
+	/* Wait for DSP to move into target power state */
 	while ((pwrState != targetPwrState) && --usCount) {
-		udelay(500);
+		if (msleep_interruptible(10)) {
+			pr_err("Waiting for DSP to Suspend interrupted\n");
+			return DSP_EFAIL;
+		}
 		HW_PWR_IVA2StateGet(resources.dwPrmBase, HW_PWR_DOMAIN_DSP,
 				    &pwrState);
 	}

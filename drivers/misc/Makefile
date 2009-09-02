@@ -34,3 +34,4 @@ obj-$(CONFIG_OMAP_MODEM_CONTROL)       += omap_mdm_ctrl.o
 obj-$(CONFIG_VIB_GPIO)		+= vib-gpio.o
 obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
 obj-$(CONFIG_WL127X_TEST)	+= wl127x-test.o
+obj-$(CONFIG_APANIC)		+= apanic.o
