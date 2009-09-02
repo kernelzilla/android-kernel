@@ -431,6 +431,12 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 		}
 	}
 
+	ret = qtouch_force_calibration(ts);
+	if (ret != 0) {
+		pr_err("%s: Unable to recalibrate after reset\n", __func__);
+		return ret;
+	}
+
 	/* Write the settings into nvram, if needed */
 	if (ts->pdata->flags & QTOUCH_CFG_BACKUPNV) {
 		uint8_t val;
@@ -450,12 +456,6 @@ static int qtouch_hw_init(struct qtouch_ts_data *ts)
 		IC during backup the EEPROM may be corrupted */
 
 		msleep(500);
-	}
-
-	ret = qtouch_force_calibration(ts);
-	if (ret != 0) {
-		pr_err("%s: Unable to recalibrate after reset\n", __func__);
-		return ret;
 	}
 
 	/* reset the address pointer */
