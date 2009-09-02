@@ -98,7 +98,7 @@ static const struct {
 	[CPCAP_REG_VAL1]      = {266, 0x0000, 0xFFFF},
 	[CPCAP_REG_VAL2]      = {267, 0x0000, 0xFFFF},
 	[CPCAP_REG_SDVSPLL]   = {384, 0x2488, 0xFFFF},
-	[CPCAP_REG_SI2CC1]    = {385, 0x8080, 0xFFFF},
+	[CPCAP_REG_SI2CC1]    = {385, 0x8000, 0xFFFF},
 	[CPCAP_REG_Si2CC2]    = {386, 0xFF00, 0xFFFF},
 	[CPCAP_REG_S1C1]      = {387, 0x9080, 0xFFFF},
 	[CPCAP_REG_S1C2]      = {388, 0x8080, 0xFFFF},
