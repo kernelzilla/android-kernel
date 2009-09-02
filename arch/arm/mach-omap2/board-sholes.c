@@ -313,13 +313,13 @@ static ssize_t sholes_virtual_keys_show(struct kobject *kobj,
 	/* keys are specified by setting the x,y of the center, the width,
 	 * and the height, as such keycode:center_x:center_y:width:height */
 	return sprintf(buf, __stringify(EV_KEY) ":"
-		       __stringify(KEY_BACK) ":35:906:55:55"
+		       __stringify(KEY_BACK) ":32:906:63:57"
 		       ":" __stringify(EV_KEY) ":"
-		       __stringify(KEY_MENU) ":168:906:75:55"
+		       __stringify(KEY_MENU) ":162:906:89:57"
 		       ":" __stringify(EV_KEY) ":"
-		       __stringify(KEY_HOME) ":308:906:75:55"
+		       __stringify(KEY_HOME) ":292:906:89:57"
 		       ":" __stringify(EV_KEY) ":"
-		       __stringify(KEY_SEARCH) ":440:906:55:55"
+		       __stringify(KEY_SEARCH) ":439:906:63:57"
 		       "\n");
 }
 static struct kobj_attribute sholes_virtual_keys_attr = {
@@ -474,7 +474,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.noise1_suppression_cfg = {
 		.ctrl = 0x01,
 		.reserved = 0x01,
-		.atchthr = 0x6f,
+		.atchthr = 0x64,
 		.duty_cycle = 0x08,
 	},
 	.key_array      = {
