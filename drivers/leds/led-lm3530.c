@@ -154,13 +154,20 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				     enum led_brightness value)
 {
 	int brightness = 0;
-	int current_select = 0;
 	int error = 0;
 	uint8_t gen_config_val;
+	uint8_t ramp_rate_val;
 	struct lm3530_data *als_data =
 	    container_of(led_cdev, struct lm3530_data, led_dev);
 
 	if (value == LED_OFF) {
+
+		error = lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE,
+			     0x00);
+		if (error != 0)
+			pr_err("%s:Unable to set the ramp rate: %d\n",
+			       __func__, error);
+
 		error = lm3530_read_reg(als_data,
 					LM3530_GEN_CONFIG,
 					&gen_config_val);
@@ -181,13 +188,7 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				       __func__, error);
 				return;
 			}
-			current_select =
-			    als_data->current_array[value /
-						    als_data->current_divisor];
-
-			/* Add one here to turn on device enable bit */
-			brightness = (((gen_config_val & LM3530_GEN_CONF_MASK) |
-				       (current_select << 2)) | 1);
+			brightness = gen_config_val | 0x01;
 			break;
 		case MANUAL:
 			error = lm3530_write_reg(als_data,
@@ -206,6 +207,23 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 		pr_err("%s:writing failed while setting brightness:%d\n",
 		       __func__, error);
 		return;
+	}
+	if (value > LED_OFF) {
+		error = lm3530_read_reg(als_data,
+					LM3530_BRIGHTNESS_RAMP_RATE,
+					&ramp_rate_val);
+		if ((error == 0) &&
+			(ramp_rate_val != als_data->als_pdata->brightness_ramp)) {
+			/* Wait until the IC has a chance to turn on
+			and set the brightness level */
+			msleep(5);
+			error = lm3530_write_reg(als_data,
+				LM3530_BRIGHTNESS_RAMP_RATE,
+				als_data->als_pdata->brightness_ramp);
+				if (error != 0)
+					pr_err("%s:Unable to set the ramp rate: %d\n",
+					__func__, error);
+		}
 	}
 
 	als_data->last_requested_brightness = value;
