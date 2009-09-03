@@ -361,16 +361,11 @@ int resource_request(const char *name, struct device *dev,
 	}
 	user->level = level;
 
+	/* Recompute and set the current level for the resource */
+	ret = update_resource_level(resp);
+
 res_unlock:
 	mutex_unlock(&resp->resource_mutex);
-	/*
-	 * Recompute and set the current level for the resource.
-	 * NOTE: update_resource level moved out of spin_lock, as it may call
-	 * pm_qos_add_requirement, which does a kzmalloc. This won't be allowed
-	 * in iterrupt context. The spin_lock still protects add/remove users.
-	 */
-	if (!ret)
-		ret = update_resource_level(resp);
 	return ret;
 }
 EXPORT_SYMBOL(resource_request);
