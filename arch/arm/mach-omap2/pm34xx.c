@@ -27,6 +27,7 @@
 #include <linux/list.h>
 #include <linux/err.h>
 #include <linux/clk.h>
+#include <linux/reboot.h>
 
 #include <mach/gpio.h>
 #include <mach/sram.h>
@@ -81,6 +82,7 @@ static int (*_omap_save_secure_sram)(u32 *addr);
 
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
+static struct powerdomain *wkup_pwrdm;
 static struct powerdomain *cam_pwrdm;
 
 static struct prm_setup_vc prm_setup = {
@@ -1021,6 +1023,31 @@ void omap_push_sram_idle(void)
 				save_secure_ram_context_sz);
 }
 
+#ifdef CONFIG_OMAP_PM_SRF
+static int prcm_prepare_reboot(struct notifier_block *this, unsigned long code,
+					void *x)
+{
+	if ((code == SYS_DOWN) || (code == SYS_HALT) ||
+		(code == SYS_POWER_OFF)) {
+		resource_set_opp_level(VDD2_OPP, MAX_VDD2_OPP, OPP_IGNORE_LOCK);
+		resource_set_opp_level(VDD1_OPP, MAX_VDD1_OPP, OPP_IGNORE_LOCK);
+	}
+	return NOTIFY_DONE;
+}
+#else
+static int prcm_prepare_reboot(struct notifier_block *this, unsigned long code,
+					void *x)
+{
+	return NOTIFY_DONE;
+}
+#endif
+
+static struct notifier_block prcm_notifier = {
+	.notifier_call	= prcm_prepare_reboot,
+	.next		= NULL,
+	.priority	= INT_MAX,
+};
+
 int __init omap3_pm_init(void)
 {
 	struct power_state *pwrst, *tmp;
@@ -1059,6 +1086,7 @@ int __init omap3_pm_init(void)
 	per_pwrdm = pwrdm_lookup("per_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	cam_pwrdm = pwrdm_lookup("cam_pwrdm");
+	wkup_pwrdm = pwrdm_lookup("wkup_pwrdm");
 
 	omap_push_sram_idle();
 
@@ -1078,6 +1106,14 @@ int __init omap3_pm_init(void)
 	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
 	*/
 	pwrdm_add_wkdep(per_pwrdm, core_pwrdm);
+	/*
+	 * A part of the fix for errata 1.158.
+	 * GPIO pad spurious transition (glitch/spike) upon wakeup
+	 * from SYSTEM OFF mode. The remaining fix is in:
+	 * omap3_gpio_save_context, omap3_gpio_restore_context.
+	 */
+	if (omap_rev() <= OMAP3430_REV_ES3_1)
+		pwrdm_add_wkdep(per_pwrdm, wkup_pwrdm);
 
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 		omap3_secure_ram_storage =
@@ -1098,6 +1134,7 @@ int __init omap3_pm_init(void)
 	}
 
 	omap3_save_scratchpad_contents();
+	register_reboot_notifier(&prcm_notifier);
 err1:
 	return ret;
 err2:
