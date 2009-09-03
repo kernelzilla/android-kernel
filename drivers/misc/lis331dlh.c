@@ -217,7 +217,6 @@ static int lis331dlh_device_power_on(struct lis331dlh_data *lis)
 	}
 
 	if (!lis->hw_initialized) {
-		udelay(600);
 		err = lis331dlh_hw_init(lis);
 		if (err < 0) {
 			lis331dlh_device_power_off(lis);
