@@ -234,11 +234,13 @@ int resource_refresh(void)
 	struct shared_resource *resp = NULL;
 	int ret = 0;
 
+	down(&res_mutex);
 	list_for_each_entry(resp, &res_list, node) {
 		ret = update_resource_level(resp);
 		if (ret)
 			break;
 	}
+	up(&res_mutex);
 	return ret;
 }
 
