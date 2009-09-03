@@ -46,6 +46,8 @@ struct shared_resource {
 	/* Shared resource operations */
 	struct shared_resource_ops *ops;
 	struct list_head node;
+	/* Protect each resource */
+	struct mutex resource_mutex;
 };
 
 struct shared_resource_ops {
