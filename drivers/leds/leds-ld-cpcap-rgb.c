@@ -47,9 +47,16 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 	else if (color & LD_LED_BLUE)
 		cpcap_register = CPCAP_REG_BLUEC;
 
-	if (value == LED_OFF)
+	if (value == LED_OFF) {
+		/* Due to a HW issue turn off the current then
+		turn off the duty cycle */
+		brightness = 0x01;
+		cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
+					  cpcap_register, brightness,
+					  LD_MSG_IND_CPCAP_MASK);
+
 		brightness = 0x00;
-	else if (value <= 51)
+	} else if (value <= 51)
 		brightness |= LD_MSG_IND_LOW;
 	else if (value <= 104)
 		brightness |= LD_MSG_IND_LOW_MED;
