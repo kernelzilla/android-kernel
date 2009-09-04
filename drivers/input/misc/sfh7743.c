@@ -51,6 +51,19 @@ struct sfh7743_data {
 
 struct sfh7743_data *sfh7743_misc_data;
 
+static void sfh7743_report_input(struct sfh7743_data *sfh)
+{
+	int distance;
+
+	if (gpio_get_value(sfh->pdata->gpio))
+		distance = PROXIMITY_NEAR;
+	else
+		distance = PROXIMITY_FAR;
+
+	input_report_abs(sfh->input_dev, ABS_DISTANCE, distance);
+	input_sync(sfh->input_dev);
+}
+
 static void sfh7743_device_power_off(struct sfh7743_data *sfh)
 {
 	if (sfh->pdata->power_off) {
@@ -70,6 +83,7 @@ static int sfh7743_device_power_on(struct sfh7743_data *sfh)
 			return err;
 		enable_irq(sfh->irq);
 		enable_irq_wake(sfh->irq);
+		sfh7743_report_input(sfh);
 	}
 
 	return 0;
@@ -88,19 +102,10 @@ static irqreturn_t sfh7743_isr(int irq, void *dev)
 
 static void sfh7743_irq_work_func(struct work_struct *work)
 {
-	int distance;
-
 	struct sfh7743_data *sfh = container_of(work,
 						struct sfh7743_data, irq_work);
 
-	if (gpio_get_value(sfh->pdata->gpio))
-		distance = PROXIMITY_NEAR;
-	else
-		distance = PROXIMITY_FAR;
-
-	input_report_abs(sfh->input_dev, ABS_DISTANCE, distance);
-	input_sync(sfh->input_dev);
-
+	sfh7743_report_input(sfh);
 	enable_irq(sfh->irq);
 	enable_irq_wake(sfh->irq);
 }
@@ -205,7 +210,6 @@ void sfh7743_input_close(struct input_dev *dev)
 static int sfh7743_input_init(struct sfh7743_data *sfh)
 {
 	int err;
-	int distance;
 
 	sfh->input_dev = input_allocate_device();
 	if (!sfh->input_dev) {
@@ -233,13 +237,7 @@ static int sfh7743_input_init(struct sfh7743_data *sfh)
 		goto err1;
 	}
 
-	if (gpio_get_value(sfh->pdata->gpio))
-		distance = PROXIMITY_NEAR;
-	else
-		distance = PROXIMITY_FAR;
-
-	input_report_abs(sfh->input_dev, ABS_DISTANCE, distance);
-	input_sync(sfh->input_dev);
+	sfh7743_report_input(sfh);
 
 	return 0;
 
