@@ -213,7 +213,6 @@ static int modem_dtr_control(struct usb_serial *serial, int ctrl)
 	int status;
 	unsigned long flags;
 
-	spin_lock_irqsave(&modem_port_ptr->write_lock, flags);
 
 	status = usb_autopm_get_interface(serial->interface);
 	if (status < 0) {
@@ -221,8 +220,6 @@ static int modem_dtr_control(struct usb_serial *serial, int ctrl)
 			dev_driver_string
 			(&serial->interface->dev),
 			dev_name(&serial->interface->dev), status);
-		spin_unlock_irqrestore(&modem_port_ptr->write_lock,
-				       flags);
 		return status;
 	}
 
@@ -233,7 +230,6 @@ static int modem_dtr_control(struct usb_serial *serial, int ctrl)
 				 WDR_TIMEOUT);
 	usb_autopm_put_interface(serial->interface);
 
-	spin_unlock_irqrestore(&modem_port_ptr->write_lock, flags);
 
 	return status;
 }
