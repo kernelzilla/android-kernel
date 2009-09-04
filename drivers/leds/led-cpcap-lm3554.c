@@ -172,8 +172,13 @@ static ssize_t lm3554_strobe_err_show(struct device *dev,
 			__func__, err);
 		return -EIO;
 	}
-
-	sprintf(buf, "%d\n", (err_flags & TX1_INTERRUPT_FAULT));
+	err = lm3554_write_reg(torch_data, LM3554_FLAG_REG, 0x00);
+	if (err) {
+		pr_err("%s: Clearing the err flags failed %i\n",
+			__func__, err);
+		return -EIO;
+	}
+	sprintf(buf, "%d\n", (err_flags & 0xbf));
 
 	return sizeof(buf);
 }
@@ -304,19 +309,7 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 						 struct i2c_client, dev);
 	struct lm3554_data *torch_data = i2c_get_clientdata(client);
 
-	err = lm3554_read_reg(torch_data, LM3554_FLAG_REG, &err_flags);
-	if (err) {
-		pr_err("%s: Reading the status failed for %i\n", __func__,
-		       err);
-		return -EIO;
-	}
-	if (err_flags &
-	    (VOLTAGE_MONITOR_FAULT | THERMAL_MONITOR_FAULT | LED_FAULT |
-	     THERMAL_SHUTDOWN)) {
-		pr_err("%s: Error indicated by the chip 0x%X\n", __func__,
-		       err_flags);
-		return err_flags;
-	}
+
 
 	err = strict_strtoul(buf, 10, &strobe_val);
 	if (err) {
