@@ -511,10 +511,10 @@ static struct lm3530_platform_data omap3430_als_light_data = {
 static struct lm3554_platform_data sholes_camera_flash = {
 	.torch_brightness_def = 0xa0,
 	.flash_brightness_def = 0x78,
-	.flash_duration_def = 0x48,
+	.flash_duration_def = 0x28,
 	.config_reg_1_def = 0xe0,
 	.config_reg_2_def = 0xf0,
-	.vin_monitor_def = 0x07,
+	.vin_monitor_def = 0x03,
 	.gpio_reg_def = 0x0,
 };
 
