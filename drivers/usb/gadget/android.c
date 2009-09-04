@@ -36,7 +36,6 @@
 #include "f_mass_storage.h"
 #include "f_adb.h"
 #include "f_usbnet.h"
-#include "f_acm.h"
 
 #include "gadget_chips.h"
 
@@ -132,12 +131,8 @@ static int __init android_bind_config(struct usb_configuration *c)
 	printk(KERN_DEBUG "android_bind_config\n");
 
 	if (dev->factory_enabled) {
-		ret = acm_function_add(dev->cdev, c);
-		if (ret)
-			return ret;
 		ret = usbnet_function_add(dev->cdev, c);
-		if (ret)
-			return ret;
+		return ret;
 	}
 
 	ret = mass_storage_function_add(dev->cdev, c, dev->nluns);
@@ -245,7 +240,7 @@ static struct usb_composite_driver android_usb_driver = {
 
 static void enable_adb(struct android_dev *dev, int enable)
 {
-	if (enable != dev->adb_enabled) {
+	if (!(dev->factory_enabled) && enable != dev->adb_enabled) {
 		dev->adb_enabled = enable;
 		adb_function_enable(enable);
 
@@ -334,9 +329,9 @@ static int __init android_probe(struct platform_device *pdev)
 
 		if (pdata->factory_enabled) {
 			dev->factory_enabled = pdata->factory_enabled;
-			device_desc.bDeviceClass = USB_CLASS_VENDOR_SPEC;
-			device_desc.bDeviceSubClass = USB_CLASS_VENDOR_SPEC;
-			device_desc.bDeviceProtocol = USB_CLASS_VENDOR_SPEC;
+			device_desc.bDeviceClass = USB_CLASS_COMM;
+			device_desc.bDeviceSubClass = USB_CLASS_COMM;
+			device_desc.bDeviceProtocol = USB_CLASS_PER_INTERFACE;
 		}
 	}
 
