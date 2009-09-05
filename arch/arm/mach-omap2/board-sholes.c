@@ -791,7 +791,6 @@ static struct prm_setup_vc sholes_prm_setup = {
 #define R_SMPS_VOL_OPP2_RA0		0x03
 #define R_SMPS_VOL_OPP2_RA1		0x03
 
-#define CPCAP_SMPS_UPDATE_DELAY     170 /* In uSec */
 
 #ifdef CONFIG_OMAP_SMARTREFLEX
 int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
@@ -824,7 +823,8 @@ int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 	/* Update the CPCAP SWx voltage register, change the output voltage */
 	omap3_bypass_cmd(slave_addr, volt_reg_addr, target_vsel);
 
-	udelay(CPCAP_SMPS_UPDATE_DELAY);
+	if (target_vsel > current_vsel)
+		udelay(target_vsel - current_vsel + 4);
 
 	if (sr_status) {
 		if (vdd == VDD1_OPP)
