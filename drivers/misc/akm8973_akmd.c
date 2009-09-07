@@ -317,10 +317,10 @@ static void AKECS_CloseDone(void)
 #if DEBUG
 	pr_info("%s\n", __func__);
 #endif
-	atomic_set(&m_flag, 1);
-	atomic_set(&a_flag, 1);
-	atomic_set(&t_flag, 1);
-	atomic_set(&mv_flag, 1);
+	atomic_set(&m_flag, 0);
+	atomic_set(&a_flag, 0);
+	atomic_set(&t_flag, 0);
+	atomic_set(&mv_flag, 0);
 }
 
 static int akm_aot_open(struct inode *inode, struct file *file)
@@ -656,11 +656,11 @@ static int akm8973_init_client(struct i2c_client *client)
 
 	init_waitqueue_head(&open_wq);
 
-	/* As default, report all information */
-	atomic_set(&m_flag, 1);
-	atomic_set(&a_flag, 1);
-	atomic_set(&t_flag, 1);
-	atomic_set(&mv_flag, 1);
+	/* As default, report no information */
+	atomic_set(&m_flag, 0);
+	atomic_set(&a_flag, 0);
+	atomic_set(&t_flag, 0);
+	atomic_set(&mv_flag, 0);
 
 	return 0;
 }
