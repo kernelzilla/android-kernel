@@ -31,11 +31,19 @@
 struct gpioinfo {
 	unsigned gpio;
 	int irq;
-	int irq_enabled;
-	int irq_fired;
-	int gpio_irq_level;
+	int irq_enabled;	/* Mask for each client */
+	int irq_fired;		/* Mask for each client */
+	int irq_level_rising;	/* Mask for each client */
+	int irq_level_falling;	/* Mask for each client */
 	struct work_struct work;
 };
+
+struct clientinfo {
+	int open;
+	int mask;
+	wait_queue_head_t wq;
+};
+#define MAX_CLIENTS 4
 
 /* BP Interface GPIO List*/
 enum bpgpio {
@@ -50,11 +58,10 @@ enum bpgpio {
 
 /* Internal representation of the omap_mdm_ctrl driver. */
 struct omap_mdm_ctrl_info {
-	unsigned char openflag;
 	struct gpioinfo gpios[GPIO_COUNT];
+	struct clientinfo clients[MAX_CLIENTS];
 	struct semaphore sem;
 	struct workqueue_struct *working_queue;
-	wait_queue_head_t waitQueue;
 };
 
 /* Driver operational structure */
@@ -90,21 +97,24 @@ void clear_gpio_data(void)
 	}
 }
 
-/* Compares the requested IRQ level to the passed in GPIO level */
-int compare_irq_to_gpio(int irq_level, int gpio_value)
+/* Checks to see if the client should be notified of this irq */
+int should_notify_client(struct gpioinfo *gpio, int ci)
 {
 	int ret = 0;
+	int gpio_value = gpio_get_value(gpio->gpio);
+	int mask = omap_mdm_ctrl_data.clients[ci].mask;
 
-	switch (gpio_value) {
-	case OMAP_MDM_CTRL_GPIO_HIGH:
-		if (irq_level == OMAP_MDM_CTRL_IRQ_RISING)
-			ret = 1;
-		break;
-	case OMAP_MDM_CTRL_GPIO_LOW:
-		if (irq_level == OMAP_MDM_CTRL_IRQ_FALLING)
-			ret = 1;
-		break;
-	}
+	if (gpio->irq_enabled & mask)
+		switch (gpio_value) {
+		case OMAP_MDM_CTRL_GPIO_HIGH:
+			if (gpio->irq_level_rising & mask)
+				ret = 1;
+			break;
+		case OMAP_MDM_CTRL_GPIO_LOW:
+			if (gpio->irq_level_falling & mask)
+				ret = 1;
+			break;
+		}
 
 	return ret;
 }
@@ -112,20 +122,25 @@ int compare_irq_to_gpio(int irq_level, int gpio_value)
 static void irq_work(struct work_struct *work)
 {
 	struct gpioinfo *gpio = container_of(work, struct gpioinfo, work);
+	int i;
+	int mask;
 
 	if (gpio == &omap_mdm_ctrl_data.gpios[BP_RESOUT] &&
 	    gpio_get_value(gpio->gpio) == 0) {
-		pr_err("%s: BP panicked!\n", __func__);
+		pr_err("%s: BP powered off!\n", __func__);
 	}
 
-	if (gpio->irq_enabled && !gpio->irq_fired) {
-		/* Verify that level is what we were waiting for */
-		if (compare_irq_to_gpio
-		    (gpio->gpio_irq_level, gpio_get_value(gpio->gpio))) {
-			gpio->irq_fired = 1;
-			wake_up_interruptible(&omap_mdm_ctrl_data.waitQueue);
+	/* Search through clients, waking those that are waiting on this irq */
+	for (i = 0; i < MAX_CLIENTS; i++)
+		if (omap_mdm_ctrl_data.clients[i].open) {
+			mask = omap_mdm_ctrl_data.clients[i].mask;
+			if (!(gpio->irq_fired & mask) &&
+			    (should_notify_client(gpio, i))) {
+				gpio->irq_fired |= mask;
+				wake_up_interruptible(
+					&omap_mdm_ctrl_data.clients[i].wq);
+			}
 		}
-	}
 
 	enable_irq(gpio->irq);
 }
@@ -147,21 +162,29 @@ irqreturn_t irq_handler(int irq, void *data)
  * device are allowed. */
 static int omap_mdm_ctrl_open(struct inode *inode, struct file *filp)
 {
+	int ci = 0;
+
 	/* Hold the semaphore */
 	if (down_interruptible(&omap_mdm_ctrl_data.sem)) {
 		pr_err("%s: Unable to open device.\n", __func__);
 		return -ERESTARTSYS;
 	}
 
-	/* Checks if device is already opened */
-	if (omap_mdm_ctrl_data.openflag) {
+	/* Check for an open client */
+	for (ci = 0; ci < MAX_CLIENTS; ci++)
+		if (!omap_mdm_ctrl_data.clients[ci].open) {
+			omap_mdm_ctrl_data.clients[ci].open = 1;
+			break;
+		}
+
+	if (ci >= MAX_CLIENTS) {
 		up(&omap_mdm_ctrl_data.sem);
 		pr_info("%s: Device is busy.\n", __func__);
 		return -EBUSY;
 	}
 
-	/* Sets the flag to open */
-	omap_mdm_ctrl_data.openflag = 1;
+	/* Store client structure on filp */
+	filp->private_data = &omap_mdm_ctrl_data.clients[ci];
 
 	/* Release the semaphore and return */
 	up(&omap_mdm_ctrl_data.sem);
@@ -173,14 +196,17 @@ static int omap_mdm_ctrl_open(struct inode *inode, struct file *filp)
  * this device. */
 static int omap_mdm_ctrl_release(struct inode *inode, struct file *filp)
 {
+	struct clientinfo *cinfo = (struct clientinfo *)filp->private_data;
+
 	/* Hold the semaphore */
 	if (down_interruptible(&omap_mdm_ctrl_data.sem)) {
 		pr_err("%s: Unable to release device.\n", __func__);
 		return -ERESTARTSYS;
 	}
 
-	/* Clears open flag */
-	omap_mdm_ctrl_data.openflag = 0;
+	/* Release the client structure */
+	cinfo->open = 0;
+	filp->private_data = 0;
 
 	/* Release the semaphore and return */
 	up(&omap_mdm_ctrl_data.sem);
@@ -189,11 +215,12 @@ static int omap_mdm_ctrl_release(struct inode *inode, struct file *filp)
 
 /* Set the user on the wait queue and tell the user that data may be
  * available soon. */
-static unsigned int omap_mdm_ctrl_poll(struct file *filp, poll_table * wait)
+static unsigned int omap_mdm_ctrl_poll(struct file *filp, poll_table *wait)
 {
 	unsigned int mask = 0;
+	struct clientinfo *cinfo = (struct clientinfo *)filp->private_data;
 
-	poll_wait(filp, &omap_mdm_ctrl_data.waitQueue, wait);
+	poll_wait(filp, &(cinfo->wq), wait);
 
 	if (wait_condition() == 0)
 		mask |= POLLIN | POLLRDNORM;
@@ -212,6 +239,8 @@ static ssize_t omap_mdm_ctrl_read(struct file *filp, char __user * buff,
 	ssize_t ret = -EINVAL;
 	char gpioData[GPIO_BYTE_COUNT];
 	int i;
+	struct clientinfo *cinfo;
+	int mask;
 
 	/* Hold the semaphore */
 	if (down_interruptible(&omap_mdm_ctrl_data.sem)) {
@@ -219,11 +248,17 @@ static ssize_t omap_mdm_ctrl_read(struct file *filp, char __user * buff,
 		return -ERESTARTSYS;
 	}
 
-	if (omap_mdm_ctrl_data.openflag) {
+	cinfo = (struct clientinfo *)filp->private_data;
+	if (!cinfo) {
+		pr_info("%s: File pointer invalid.\n", __func__);
+		return -EBADF;
+	}
+	mask = cinfo->mask;
+
+	if (cinfo->open) {
 		/* Inform calling process to sleep until the interrupt for
 		 * any GPIO is fired */
-		wait_event_interruptible(omap_mdm_ctrl_data.waitQueue,
-					 (wait_condition() == 0));
+		wait_event_interruptible(cinfo->wq, (wait_condition() == 0));
 
 		ret = 0;
 		if (*f_pos >= GPIO_BYTE_COUNT)
@@ -235,9 +270,9 @@ static ssize_t omap_mdm_ctrl_read(struct file *filp, char __user * buff,
 		 * that have fired */
 		for (i = 0; i < GPIO_INTERRUPT_COUNT; i++) {
 			/* GPIO interrupt was enabled and fired */
-			if (omap_mdm_ctrl_data.gpios[i].irq_enabled
-			    && omap_mdm_ctrl_data.gpios[i].irq_fired) {
-				omap_mdm_ctrl_data.gpios[i].irq_fired = 0;
+			if (omap_mdm_ctrl_data.gpios[i].irq_enabled & mask
+			    && omap_mdm_ctrl_data.gpios[i].irq_fired & mask) {
+				omap_mdm_ctrl_data.gpios[i].irq_fired &= ~mask;
 				gpioData[0] |= 1 << i;
 			}
 		}
@@ -261,6 +296,24 @@ out:
 	return ret;
 }
 
+/* Modify the client information for enabling / disabling an irq */
+void set_interrupt(struct gpioinfo *gpio, struct clientinfo *cinfo, int enable)
+{
+	int mask = cinfo->mask;
+	if (enable == 0) {
+		gpio->irq_enabled &= ~mask;
+		gpio->irq_fired &= ~mask;
+		gpio->irq_level_rising &= ~mask;
+		gpio->irq_level_falling &= ~mask;
+	} else {
+		gpio->irq_enabled |= mask;
+		if (enable == OMAP_MDM_CTRL_IRQ_RISING)
+			gpio->irq_level_rising |= mask;
+		else if (enable == OMAP_MDM_CTRL_IRQ_FALLING)
+			gpio->irq_level_falling |= mask;
+	}
+}
+
 /* Performs the appropriate action for the specified IOCTL command,
  * returning a failure code only if the IOCTL command was not recognized */
 static int omap_mdm_ctrl_ioctl(struct inode *inode, struct file *filp,
@@ -270,6 +323,12 @@ static int omap_mdm_ctrl_ioctl(struct inode *inode, struct file *filp,
 	int *dataParam = (int *)data;
 	int highEnable = -1;
 	int intParam = -1;
+	struct clientinfo *cinfo = (struct clientinfo *)filp->private_data;
+
+	if (!cinfo) {
+		pr_info("%s: File pointer invalid.\n", __func__);
+		return -EBADF;
+	}
 
 	switch (cmd) {
 	/* Command handling to read BP GPIO information */
@@ -319,55 +378,22 @@ static int omap_mdm_ctrl_ioctl(struct inode *inode, struct file *filp,
 	case OMAP_MDM_CTRL_IOCTL_SET_INT_BP_READY_AP:
 		ret = get_user(intParam, dataParam);
 		if (ret == 0) {
-			if (intParam == 0) {
-				omap_mdm_ctrl_data.gpios[BP_READY_AP].
-				    irq_enabled = 0;
-				omap_mdm_ctrl_data.gpios[BP_READY_AP].
-				    irq_fired = 0;
-				omap_mdm_ctrl_data.gpios[BP_READY_AP].
-				    gpio_irq_level = -1;
-			} else {
-				omap_mdm_ctrl_data.gpios[BP_READY_AP].
-				    irq_enabled = 1;
-				omap_mdm_ctrl_data.gpios[BP_READY_AP].
-				    gpio_irq_level = intParam;
-			}
+			set_interrupt(&omap_mdm_ctrl_data.gpios[BP_READY_AP],
+					cinfo, intParam);
 		}
 		break;
 	case OMAP_MDM_CTRL_IOCTL_SET_INT_BP_READY2_AP:
 		ret = get_user(intParam, dataParam);
 		if (ret == 0) {
-			if (intParam == 0) {
-				omap_mdm_ctrl_data.gpios[BP_READY2_AP].
-				    irq_enabled = 0;
-				omap_mdm_ctrl_data.gpios[BP_READY2_AP].
-				    irq_fired = 0;
-				omap_mdm_ctrl_data.gpios[BP_READY2_AP].
-				    gpio_irq_level = -1;
-			} else {
-				omap_mdm_ctrl_data.gpios[BP_READY2_AP].
-				    irq_enabled = 1;
-				omap_mdm_ctrl_data.gpios[BP_READY2_AP].
-				    gpio_irq_level = intParam;
-			}
+			set_interrupt(&omap_mdm_ctrl_data.gpios[BP_READY2_AP],
+					cinfo, intParam);
 		}
 		break;
 	case OMAP_MDM_CTRL_IOCTL_SET_INT_BP_RESOUT:
 		ret = get_user(intParam, dataParam);
 		if (ret == 0) {
-			if (intParam == 0) {
-				omap_mdm_ctrl_data.gpios[BP_RESOUT].
-				    irq_enabled = 0;
-				omap_mdm_ctrl_data.gpios[BP_RESOUT].irq_fired =
-				    0;
-				omap_mdm_ctrl_data.gpios[BP_RESOUT].
-				    gpio_irq_level = -1;
-			} else {
-				omap_mdm_ctrl_data.gpios[BP_RESOUT].
-				    irq_enabled = 1;
-				omap_mdm_ctrl_data.gpios[BP_RESOUT].
-				    gpio_irq_level = intParam;
-			}
+			set_interrupt(&omap_mdm_ctrl_data.gpios[BP_RESOUT],
+					cinfo, intParam);
 		}
 		break;
 
@@ -401,14 +427,19 @@ static struct miscdevice omap_mdm_ctrl_misc_device = {
 static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+	int i;
 	struct omap_mdm_ctrl_platform_data *pdata = pdev->dev.platform_data;
 
 	/* Initialize internal structures */
 	init_MUTEX(&omap_mdm_ctrl_data.sem);
 
-	omap_mdm_ctrl_data.openflag = 0;
-	/* Initialize the wait queue */
-	init_waitqueue_head(&omap_mdm_ctrl_data.waitQueue);
+	/* Initialize the client information */
+	memset(&omap_mdm_ctrl_data.clients, 0,
+		sizeof(omap_mdm_ctrl_data.clients));
+	for (i = 0; i < MAX_CLIENTS; i++) {
+		init_waitqueue_head(&omap_mdm_ctrl_data.clients[i].wq);
+		omap_mdm_ctrl_data.clients[i].mask = 1 << i;
+	}
 
 	/* Init working queue */
 	omap_mdm_ctrl_data.working_queue =
@@ -437,32 +468,15 @@ static int __devinit omap_mdm_ctrl_probe(struct platform_device *pdev)
 	INIT_WORK(&omap_mdm_ctrl_data.gpios[AP_TO_BP_FLASH_EN].work, irq_work);
 
 	/* Setup all interrupts */
-	omap_mdm_ctrl_data.gpios[BP_READY_AP].irq =
-	    gpio_to_irq(omap_mdm_ctrl_data.gpios[BP_READY_AP].gpio);
-	omap_mdm_ctrl_data.gpios[BP_READY2_AP].irq =
-	    gpio_to_irq(omap_mdm_ctrl_data.gpios[BP_READY2_AP].gpio);
 	omap_mdm_ctrl_data.gpios[BP_RESOUT].irq =
 	    gpio_to_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].gpio);
-#if 0
-	ret =
-	    request_irq(omap_mdm_ctrl_data.gpios[BP_READY_AP].irq, irq_handler,
-			IRQF_DISABLED | OMAP_MDM_CTRL_IRQ_RISING |
-			OMAP_MDM_CTRL_IRQ_FALLING, OMAP_MDM_CTRL_MODULE_NAME,
-			&omap_mdm_ctrl_data.gpios[BP_READY_AP]);
-	if (ret < 0) {
-		pr_err("%s: Can not reqeust IRQ (%d) from kernel!\n", __func__,
-		       omap_mdm_ctrl_data.gpios[BP_READY_AP].irq);
-		goto err_clear_gpio;
-	} else {
-		omap_mdm_ctrl_data.gpios[BP_READY_AP].irq_enabled = 1;
-	}
-#endif
 
 	ret =
 	    request_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq, irq_handler,
 			IRQF_DISABLED | OMAP_MDM_CTRL_IRQ_RISING |
 			OMAP_MDM_CTRL_IRQ_FALLING, OMAP_MDM_CTRL_MODULE_NAME,
 			&omap_mdm_ctrl_data.gpios[BP_RESOUT]);
+	enable_irq_wake(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq);
 	if (ret < 0) {
 		pr_err("%s: Can not reqeust IRQ (%d) from kernel!\n", __func__,
 		       omap_mdm_ctrl_data.gpios[BP_RESOUT].irq);
