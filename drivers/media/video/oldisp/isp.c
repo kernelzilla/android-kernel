@@ -61,15 +61,10 @@
 #include "ispresizer.h"
 #include "ispcsi2.h"
 
-#define  NR_PAGES(x, y)		((((y + x - 1) & PAGE_MASK) >> PAGE_SHIFT) - \
-					((x & PAGE_MASK) >> PAGE_SHIFT) + 1)
-
-#define  ALIGN_TO(x, b)		(((unsigned long)x + (b - 1)) & ~(b - 1))
-
 #ifdef CONFIG_VIDEO_OMAP3_HP3A
 #include "hp3a.h"
 #endif
-static DECLARE_MUTEX(isp_mutex);
+
 
 #if ISP_WORKAROUND
 void *buff_addr;
@@ -402,8 +397,9 @@ static int isp_set_sgdma_callback(struct isp_sgdma_state *sgdma_state,
 		isp_set_callback(CBK_CCDC_VD1, sgdma_state->callback, func_ptr,
 							sgdma_state->arg);
 		isp_set_callback(CBK_LSC_ISR, isp_lsc_isr, NULL, NULL);
-		/* isp_set_callback(CBK_SBL_OVF, NULL, NULL, NULL); */
 	}
+
+	/* isp_set_callback(CBK_SBL_OVF, NULL, NULL, NULL); */
 
 	isp_set_callback(CBK_HS_VS, sgdma_state->callback, func_ptr,
 							sgdma_state->arg);
@@ -597,6 +593,7 @@ int isp_unset_callback(enum isp_callback_type type)
 	default:
 		break;
 	}
+
 	spin_unlock_irqrestore(&isp_obj.lock, irqflags);
 	return 0;
 }
@@ -1076,11 +1073,12 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *ispirq_disp)
 {
 	int i;
 	struct ispirq *irqdis = (struct ispirq *)ispirq_disp;
+	u32 irqstatus;
 
-	u32 irqstatus = omap_readl(ISP_IRQ0STATUS);
+	irqstatus = omap_readl(ISP_IRQ0STATUS);
 	omap_writel(irqstatus, ISP_IRQ0STATUS);
-
-	spin_lock(&isp_obj.lock);
+	/* The following register read is for write sync. */
+	omap_readl(ISP_IRQ0STATUS);
 
 	for (i = 0; i < CBK_END; ++i) {
 		if ((irqstatus & irqdis->irq_events[i]) == irqdis->irq_events[i]) {
@@ -1091,8 +1089,6 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *ispirq_disp)
 			}
 		}
 	}
-
-	spin_unlock(&isp_obj.lock);
 
 	return IRQ_HANDLED;
 }
@@ -2135,26 +2131,31 @@ int isp_try_fmt_cap(struct v4l2_pix_format *pix_input,
 					struct v4l2_pix_format *pix_output)
 {
 	int rval = 0;
+	u32 in_aspect_ratio = 0;
 	u32 out_aspect_ratio = 0;
 	u32 adjusted_height = 0;
 
 	if (pix_output->width > pix_output->height) {
+		in_aspect_ratio = (pix_input->width * 256)/pix_input->height;
 		out_aspect_ratio = (pix_output->width * 256)/pix_output->height;
 	}
 
-	if (out_aspect_ratio > 409 && out_aspect_ratio < 512) {
-		/* Adjusted for 16:9 aspect ratio. */
-		adjusted_height = (pix_input->width*9)/16;
+	if ((out_aspect_ratio - in_aspect_ratio) > 25 &&  (out_aspect_ratio - in_aspect_ratio) < 180) {
+		/* Adjusted for output aspect ratio. */
+		adjusted_height = ALIGN_TO(((pix_input->width*256)/out_aspect_ratio), 2);
+
 		ispccdc_config_crop(0,
-		(pix_input->height-adjusted_height)/2,
-		adjusted_height + (pix_input->height-adjusted_height)/2,
-		pix_input->width);
+			((pix_input->height-adjusted_height)/2),
+			(adjusted_height + (pix_input->height-adjusted_height)/2),
+			pix_input->width);
 	} else {
 		ispccdc_config_crop(0, 0, 0, 0);
 	}
 
-	DPRINTK_ISPCTRL("Aspect ratio:%d setting - adjusted height=%d!\n",
-		out_aspect_ratio, adjusted_height);
+	DPRINTK_ISPCTRL("Aspect ratio:%d-%d setting - adjusted height=%d!\n",
+		in_aspect_ratio,
+		out_aspect_ratio,
+		adjusted_height);
 
 	isp_calc_pipeline(pix_input, pix_output);
 
@@ -2487,6 +2488,8 @@ static int __init isp_init(void)
 #if ISP_WORKAROUND && defined(CONFIG_VIDEO_OLDOMAP3_BUFFALLOC)
 	int rval;
 #endif
+	int i;
+
 	DPRINTK_ISPCTRL("+isp_init for Omap 3430 Camera ISP\n");
 	isp_obj.ref_count = 0;
 
@@ -2506,6 +2509,13 @@ static int __init isp_init(void)
 	}
 #endif
 
+	for (i = 0; i < CBK_END; ++i) {
+		ispirq_obj.irq_events[i] = 0;
+		ispirq_obj.isp_callbk[i] = NULL;
+		ispirq_obj.isp_callbk_arg1[i] = NULL;
+		ispirq_obj.isp_callbk_arg2[i] = NULL;
+	}
+
 	ispirq_obj.irq_events[CBK_CCDC_VD0] = CCDC_VD0;
 	ispirq_obj.irq_events[CBK_CCDC_VD1] = CCDC_VD1;
 	ispirq_obj.irq_events[CBK_PREV_DONE] = PREV_DONE;
@@ -2516,10 +2526,10 @@ static int __init isp_init(void)
 	ispirq_obj.irq_events[CBK_HS_VS] = HS_VS;
 	ispirq_obj.irq_events[CBK_LSC_ISR] = LSC_PRE_ERR;
 	ispirq_obj.irq_events[CBK_H3A_AF_DONE] = H3A_AF_DONE;
-	ispirq_obj.irq_events[CBK_CATCHALL] = 0;
 	ispirq_obj.irq_events[CBK_CSIA] = CSIA;
 	ispirq_obj.irq_events[CBK_CSIB] = CSIB;
 	ispirq_obj.irq_events[CBK_SBL_OVF] = SBL_OVF;
+	ispirq_obj.irq_events[CBK_CATCHALL] = 0;
 
 	if (request_irq(INT_34XX_CAM_IRQ, omap34xx_isp_isr, IRQF_SHARED,
 					"Omap 34xx Camera ISP", &ispirq_obj)) {
@@ -2738,7 +2748,7 @@ int isp_run_resizer(void *userdata)
 		goto exit_cleanup;
 	}
 
-	if (resizer_param.left == 0) {
+	if ((resizer_param.left == 0) && (resizer_param.top == 0)) {
 		ret = ispresizer_try_size(&resizer_param.input_width,
 												&resizer_param.input_height,
 												&resizer_param.output_width,
@@ -2859,6 +2869,8 @@ int isp_run_preview(void *userdata)
 	isppreview_save_context();
 	ispresizer_save_context();
 
+	ispccdc_config_crop(0, 0, 0, 0);
+
 	ret = isppreview_try_size(preview_param.input_width,
 											preview_param.input_height,
 											&preview_param.output_width,
@@ -2934,7 +2946,7 @@ int isp_run_preview(void *userdata)
 	resizer_param.output_width = ppreview_user->output_width;
 	resizer_param.output_height = ppreview_user->output_height;
 
-	if (preview_param.left == 0) {
+	if ((preview_param.left == 0) && (preview_param.top == 0)) {
 		ret = ispresizer_try_size(&resizer_param.input_width,
 												&resizer_param.input_height,
 												&resizer_param.output_width,

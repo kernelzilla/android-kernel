@@ -33,7 +33,6 @@
 dma_addr_t buff_addr_lsc_wa;
 #endif
 
-static DECLARE_MUTEX(ispresizer_mutex);
 static u8 need_to_write_filter_coefs = {0};
 
 /* Default configuration of resizer,filter coefficients,yenh for camera isp */
@@ -282,9 +281,11 @@ int ispresizer_config_datapath(enum ispresizer_input input)
 		printk(KERN_ERR "ISP_ERR : Wrong Input\n");
 		return -EINVAL;
 	}
-	down(&ispresizer_mutex);
+
+	mutex_lock(&ispres_obj.ispres_mutex);
 	omap_writel(omap_readl(ISPRSZ_CNT) | cnt, ISPRSZ_CNT);
-	up(&ispresizer_mutex);
+	mutex_unlock(&ispres_obj.ispres_mutex);
+
 	ispresizer_config_ycpos(0);
 	ispresizer_config_filter_coef(&ispreszdefcoef);
 	ispresizer_enable_cbilin(0);
@@ -512,7 +513,7 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 	}
 #endif
 
-	down(&ispresizer_mutex);
+	/* mutex_lock(&ispres_obj.ispres_mutex); */
 
 	res = omap_readl(ISPRSZ_CNT) & (~(ISPRSZ_CNT_HSTPH_MASK |
 					ISPRSZ_CNT_VSTPH_MASK));
@@ -520,8 +521,6 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 						(ispres_obj.v_startphase <<
 						ISPRSZ_CNT_VSTPH_SHIFT),
 						ISPRSZ_CNT);
-
-	/* up(&ispresizer_mutex); */
 
 #if ISP_WORKAROUND
 	omap_writel((0x00 <<	ISPRSZ_IN_START_HORZ_ST_SHIFT) |
@@ -553,7 +552,6 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 						ISPRSZ_OUT_SIZE);
 	}
 
-	/* down(&ispresizer_mutex); */
 	res = omap_readl(ISPRSZ_CNT) & (~(ISPRSZ_CNT_HRSZ_MASK |
 						ISPRSZ_CNT_VRSZ_MASK));
 	omap_writel(res | ((ispres_obj.h_resz - 1) << ISPRSZ_CNT_HRSZ_SHIFT) |
@@ -561,7 +559,7 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 						ISPRSZ_CNT_VRSZ_SHIFT),
 						ISPRSZ_CNT);
 
-	up(&ispresizer_mutex);
+	/* mutex_unlock(&ispres_obj.ispres_mutex); */
 
     ispresizer_write_filter_coef();
 
@@ -642,7 +640,7 @@ EXPORT_SYMBOL(ispresizer_config_ycpos);
  **/
 void ispresizer_enable_cbilin(u8 enable)
 {
-	down(&ispresizer_mutex);
+	mutex_lock(&ispres_obj.ispres_mutex);
 	DPRINTK_ISPRESZ("ispresizer_enable_cbilin()+\n");
 	if (enable) {
 		omap_writel(omap_readl(ISPRSZ_CNT) | ISPRSZ_CNT_CBILIN,
@@ -652,7 +650,7 @@ void ispresizer_enable_cbilin(u8 enable)
 								ISPRSZ_CNT);
 	}
 	DPRINTK_ISPRESZ("ispresizer_enable_cbilin()-\n");
-	up(&ispresizer_mutex);
+	mutex_unlock(&ispres_obj.ispres_mutex);
 }
 EXPORT_SYMBOL(ispresizer_enable_cbilin);
 
@@ -714,9 +712,9 @@ EXPORT_SYMBOL(ispresizer_config_filter_coef);
 **/
 void ispresizer_get_filter_coef(struct isprsz_coef *coef)
 {
-	down(&ispresizer_mutex);
+	mutex_lock(&ispres_obj.ispres_mutex);
 	memcpy(coef, &ispres_obj.coeflist, sizeof(struct isprsz_coef));
-	up(&ispresizer_mutex);
+	mutex_unlock(&ispres_obj.ispres_mutex);
 }
 EXPORT_SYMBOL(ispresizer_get_filter_coef);
 

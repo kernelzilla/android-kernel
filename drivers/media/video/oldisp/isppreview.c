@@ -29,7 +29,6 @@
 #include "ispreg.h"
 #include "isppreview.h"
 
-static DECLARE_MUTEX(isppreview_mutex);
 
 static struct ispprev_nf prev_nf_t;
 static struct ispprev_csc prev_csc_t;
@@ -376,16 +375,17 @@ int omap34xx_isp_preview_config(void *userspace_add)
 
 	if ((ISP_ABS_PREV_COLOR_CONV & preview_struct->update) ==
 						ISP_ABS_PREV_COLOR_CONV) {
-		down(&isppreview_mutex);
+		mutex_lock(&ispprev_obj.ispprev_mutex);
 		if (copy_from_user(&prev_csc_t, (struct ispprev_csc *)
 						(preview_struct->prev_csc),
 						sizeof(struct ispprev_csc))) {
-			up(&isppreview_mutex);
+			mutex_unlock(&ispprev_obj.ispprev_mutex);
 			goto err_copy_from_user;
 		}
-		up(&isppreview_mutex);
 
+		mutex_unlock(&ispprev_obj.ispprev_mutex);
 		spin_lock(&ispprev_obj.ispprev_lock);
+
 		if (ispprev_obj.stream_on == 0) {
 			isppreview_config_rgb_to_ycbcr(prev_csc_t);
 			CSC_update = 0;
@@ -465,14 +465,15 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 		params->features |= (PREV_NOISE_FILTER);
 		if ((ISP_ABS_TBL_NF & isptables_struct->update) ==
 							ISP_ABS_TBL_NF) {
-			down(&isppreview_mutex);
+			mutex_lock(&ispprev_obj.ispprev_mutex);
 			if (copy_from_user(&prev_nf_t, (struct ispprev_nf *)
 						(isptables_struct->prev_nf),
 						sizeof(struct ispprev_nf))) {
-				up(&isppreview_mutex);
+				mutex_unlock(&ispprev_obj.ispprev_mutex);
 				goto err_copy_from_user;
 			}
-			up(&isppreview_mutex);
+
+			mutex_unlock(&ispprev_obj.ispprev_mutex);
 
 			spin_lock(&ispprev_obj.ispprev_lock);
 			if (ispprev_obj.stream_on == 0) {
@@ -497,14 +498,14 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 	if ((ISP_ABS_TBL_REDGAMMA & isptables_struct->update) ==
 							ISP_ABS_TBL_REDGAMMA) {
-		down(&isppreview_mutex);
+		mutex_lock(&ispprev_obj.ispprev_mutex);
 		if (copy_from_user(redgamma_table, isptables_struct->red_gamma,
 						sizeof(redgamma_table))) {
 			RG_update = 0;
-			up(&isppreview_mutex);
+			mutex_unlock(&ispprev_obj.ispprev_mutex);
 			goto err_copy_from_user;
 		}
-		up(&isppreview_mutex);
+		mutex_unlock(&ispprev_obj.ispprev_mutex);
 		spin_lock(&ispprev_obj.ispprev_lock);
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_RED_G_START,
@@ -524,15 +525,15 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 	if ((ISP_ABS_TBL_GREENGAMMA & isptables_struct->update) ==
 						ISP_ABS_TBL_GREENGAMMA) {
-		down(&isppreview_mutex);
+		mutex_lock(&ispprev_obj.ispprev_mutex);
 		if (copy_from_user(greengamma_table,
 						isptables_struct->green_gamma,
 						sizeof(greengamma_table))) {
 			GG_update = 0;
-			up(&isppreview_mutex);
+			mutex_unlock(&ispprev_obj.ispprev_mutex);
 			goto err_copy_from_user;
 		}
-		up(&isppreview_mutex);
+		mutex_unlock(&ispprev_obj.ispprev_mutex);
 		spin_lock(&ispprev_obj.ispprev_lock);
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_GREEN_G_START,
@@ -552,15 +553,15 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 	if ((ISP_ABS_TBL_BLUEGAMMA & isptables_struct->update) ==
 					ISP_ABS_TBL_BLUEGAMMA) {
-		down(&isppreview_mutex);
+		mutex_lock(&ispprev_obj.ispprev_mutex);
 		if (copy_from_user(bluegamma_table, (isptables_struct->
 						blue_gamma),
 						sizeof(bluegamma_table))) {
 			BG_update = 0;
-			up(&isppreview_mutex);
+			mutex_unlock(&ispprev_obj.ispprev_mutex);
 			goto err_copy_from_user;
 		}
-		up(&isppreview_mutex);
+		mutex_unlock(&ispprev_obj.ispprev_mutex);
 		spin_lock(&ispprev_obj.ispprev_lock);
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_BLUE_G_START,
@@ -1039,7 +1040,7 @@ EXPORT_SYMBOL(isppreview_config_noisefilter);
  **/
 void isppreview_config_dcor(struct ispprev_dcor prev_dcor)
 {
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	if (prev_dcor.couplet_mode_en) {
 		omap_writel(prev_dcor.detect_correct[0], ISPPRV_CDC_THR0);
 		omap_writel(prev_dcor.detect_correct[1], ISPPRV_CDC_THR1);
@@ -1051,7 +1052,7 @@ void isppreview_config_dcor(struct ispprev_dcor prev_dcor)
 		omap_writel((omap_readl(ISPPRV_PCR)) & ~ISPPRV_PCR_DCCOUP,
 								ISPPRV_PCR);
 	}
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_dcor);
 
@@ -1063,7 +1064,7 @@ EXPORT_SYMBOL(isppreview_config_dcor);
 void isppreview_config_cfa(struct ispprev_cfa prev_cfa)
 {
 	int i = 0;
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	ispprev_obj.cfafmt = prev_cfa.cfafmt;
 
 	omap_writel((omap_readl(ISPPRV_PCR)) | (prev_cfa.cfafmt <<
@@ -1079,7 +1080,7 @@ void isppreview_config_cfa(struct ispprev_cfa prev_cfa)
 
 	for (i = 0; i < 576; i++)
 		omap_writel(prev_cfa.cfa_table[i], ISPPRV_SET_TBL_DATA);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_cfa);
 
@@ -1091,7 +1092,7 @@ void isppreview_config_gammacorrn(struct ispprev_gtable gtable)
 {
 	int i = 0;
 
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	omap_writel(ISPPRV_REDGAMMA_TABLE_ADDR, ISPPRV_SET_TBL_ADDR);
 	for (i = 0; i < 1024; i++)
 		omap_writel(gtable.redtable[i], ISPPRV_SET_TBL_DATA);
@@ -1103,7 +1104,7 @@ void isppreview_config_gammacorrn(struct ispprev_gtable gtable)
 	omap_writel(ISPPRV_BLUEGAMMA_TABLE_ADDR, ISPPRV_SET_TBL_ADDR);
 	for (i = 0; i < 1024; i++)
 		omap_writel(gtable.bluetable[i], ISPPRV_SET_TBL_DATA);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_gammacorrn);
 
@@ -1114,11 +1115,12 @@ EXPORT_SYMBOL(isppreview_config_gammacorrn);
 void isppreview_config_luma_enhancement(u32 *ytable)
 {
 	int i = 0;
-	down(&isppreview_mutex);
+
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	omap_writel(ISPPRV_YENH_TABLE_ADDR, ISPPRV_SET_TBL_ADDR);
 	for (i = 0; i < 128; i++)
 		omap_writel(ytable[i], ISPPRV_SET_TBL_DATA);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_luma_enhancement);
 
@@ -1282,7 +1284,7 @@ EXPORT_SYMBOL(isppreview_set_whitebalance);
  **/
 void isppreview_config_whitebalance(struct ispprev_wbal prev_wbal)
 {
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	omap_writel(prev_wbal.dgain, ISPPRV_WB_DGAIN);
 	omap_writel(prev_wbal.coef0 |
 				prev_wbal.coef1 << ISPPRV_WBGAIN_COEF1_SHIFT |
@@ -1307,7 +1309,7 @@ void isppreview_config_whitebalance(struct ispprev_wbal prev_wbal)
 			(ISPPRV_WBSEL_COEF2 << ISPPRV_WBSEL_N3_2_SHIFT) |
 			(ISPPRV_WBSEL_COEF3 << ISPPRV_WBSEL_N3_3_SHIFT),
 			ISPPRV_WBSEL);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_whitebalance);
 
@@ -1320,7 +1322,7 @@ EXPORT_SYMBOL(isppreview_config_whitebalance);
  **/
 void isppreview_config_whitebalance2(struct prev_white_balance prev_wbal)
 {
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	omap_writel(prev_wbal.wb_dgain, ISPPRV_WB_DGAIN);
 	omap_writel(prev_wbal.wb_gain[0] |
 		(prev_wbal.wb_gain[1] << ISPPRV_WBGAIN_COEF1_SHIFT) |
@@ -1345,7 +1347,7 @@ void isppreview_config_whitebalance2(struct prev_white_balance prev_wbal)
 		prev_wbal.wb_coefmatrix[3][2] << ISPPRV_WBSEL_N3_2_SHIFT |
 		prev_wbal.wb_coefmatrix[3][3] << ISPPRV_WBSEL_N3_3_SHIFT,
 		ISPPRV_WBSEL);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_whitebalance2);
 
@@ -1373,7 +1375,7 @@ EXPORT_SYMBOL(isppreview_config_blkadj);
  **/
 void isppreview_config_rgb_blending(struct ispprev_rgbtorgb rgb2rgb)
 {
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	omap_writel(((rgb2rgb.matrix[0][0]  & 0xfff)
 				<< ISPPRV_RGB_MAT1_MTX_RR_SHIFT) |
 				((rgb2rgb.matrix[0][1]  & 0xfff) <<
@@ -1410,7 +1412,7 @@ void isppreview_config_rgb_blending(struct ispprev_rgbtorgb rgb2rgb)
 	omap_writel((rgb2rgb.offset[2]  & 0xfff)
 				<< ISPPRV_RGB_OFF2_MTX_OFFB_SHIFT,
 				ISPPRV_RGB_OFF2);
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 }
 EXPORT_SYMBOL(isppreview_config_rgb_blending);
 
@@ -1645,7 +1647,7 @@ int isppreview_try_size(u32 input_w, u32 input_h, u32 *output_w, u32 *output_h)
 		}
 	}
 
-	down(&isppreview_mutex);
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	if (ispprev_obj.hmed_en)
 		prevout_w -= 4;
 	if (ispprev_obj.nf_en) {
@@ -1670,7 +1672,7 @@ int isppreview_try_size(u32 input_w, u32 input_h, u32 *output_w, u32 *output_h)
 	if ((ispprev_obj.yenh_en) || (ispprev_obj.csup_en))
 		prevout_w -= 2;
 
-	up(&isppreview_mutex);
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 
 	/* Start at the correct row/column by skipping
 	 * a Sensor specific amount.

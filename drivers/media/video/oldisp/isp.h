@@ -74,8 +74,13 @@
 #define NUM_ISP_CAPTURE_FORMATS 	(sizeof(isp_formats) /\
 							sizeof(isp_formats[0]))
 #define ISP_WORKAROUND 1
-#define ISP_BUFFER_MAX_SIZE (1024 * 1024 * 16)
+#define ISP_BUFFER_MAX_SIZE (1024 * 1024 * 10)
 #define ISP_BUFFER_MAX_PAGES (ISP_BUFFER_MAX_SIZE / ISPMMU_PAGE_SIZE)
+
+#define  NR_PAGES(x, y)		((((y + x - 1) & PAGE_MASK) >> PAGE_SHIFT) - \
+					((x & PAGE_MASK) >> PAGE_SHIFT) + 1)
+
+#define  ALIGN_TO(x, b)		(((unsigned long)x + (b - 1)) & ~(b - 1))
 
 typedef int (*isp_vbq_callback_ptr) (struct videobuf_buffer *vb);
 typedef void (*isp_callback_t) (unsigned long status,
@@ -113,14 +118,14 @@ enum isp_callback_type {
 	CBK_CCDC_VD1,
 	CBK_PREV_DONE,
 	CBK_RESZ_DONE,
-	CBK_MMU_ERR,
-	CBK_H3A_AWB_DONE,
-	CBK_HIST_DONE,
 	CBK_HS_VS,
-	CBK_LSC_ISR,
 	CBK_H3A_AF_DONE,
+	CBK_HIST_DONE,
+	CBK_LSC_ISR,
 	CBK_CSIA,
 	CBK_CSIB,
+	CBK_MMU_ERR,
+	CBK_H3A_AWB_DONE,
 	CBK_SBL_OVF,
 	CBK_CATCHALL,
 	CBK_END,
@@ -355,6 +360,9 @@ void __exit isp_preview_cleanup(void);
 void __exit isp_hist_cleanup(void);
 void __exit isp_resizer_cleanup(void);
 void __exit isp_af_exit(void);
+
+struct page **map_user_memory_to_kernel(unsigned long addr, u32 size, u32 *nr_pages_mapped);
+void unmap_user_memory_from_kernel(struct page **pages, int nr_pages);
 
 int isp_run_resizer(void *userdata);
 int isp_run_preview(void *userdata);

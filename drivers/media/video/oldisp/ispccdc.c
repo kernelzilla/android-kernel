@@ -37,8 +37,6 @@
 
 #define LSC_TABLE_INIT_SIZE	50052
 
-static DECLARE_MUTEX(ispccdc_mutex);
-
 static u32 *fpc_table_add;
 static unsigned long fpc_table_add_m;
 
@@ -84,7 +82,7 @@ static struct isp_ccdc {
 	u8 syncif_ipmod;
 	u8 obclamp_en;
 	u8 lsc_en;
-	struct mutex mutexlock; /* For checking/modifying ccdc_inuse */
+	struct mutex ispccdc_mutex; /* For checking/modifying ccdc_inuse */
 	spinlock_t ispccdc_lock; /* spinlock to protect for pre-emption*/
 	u32 wenlog;
 	u32 dcsub;
@@ -221,13 +219,13 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 							(ccdc_struct->fpc),
 							sizeof(fpc_t)))
 				goto copy_from_user_err;
-			down(&ispccdc_mutex);
+			mutex_lock(&ispccdc_obj.ispccdc_mutex);
 			fpc_table_add = kmalloc((64 + (fpc_t.fpnum * 4)),
 							GFP_KERNEL | GFP_DMA);
 			if (!fpc_table_add) {
 				printk(KERN_ERR "Cannot allocate memory for"
 								" FPC table");
-				up(&ispccdc_mutex);
+				mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 				return -ENOMEM;
 			}
 			while (((int)fpc_table_add & 0xFFFFFFC0) !=
@@ -237,7 +235,7 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 			fpc_table_add_m = ispmmu_map(virt_to_phys
 							(fpc_table_add),
 							(fpc_t.fpnum) * 4);
-			up(&ispccdc_mutex);
+			mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 			if (copy_from_user(fpc_table_add, (u32 *)fpc_t.fpcaddr,
 							fpc_t.fpnum * 4))
 				goto copy_from_user_err;
@@ -270,14 +268,14 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 						sizeof(struct
 						ispccdc_lsc_config)))
 					goto copy_from_user_err;
-				down(&ispccdc_mutex);
+				mutex_lock(&ispccdc_obj.ispccdc_mutex);
 				if (lsc_config.size <= old_size)
 					size_mismatch = 0;
 				else {
 					size_mismatch = 1;
 					lsc_initialized = 0;
 				}
-				up(&ispccdc_mutex);
+				mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 				ispccdc_config_lsc(&lsc_config);
 			}
 			ccdc_use_lsc = 1;
@@ -287,38 +285,38 @@ int omap34xx_isp_ccdc_config(void *userspace_add)
 				ispccdc_enable_lsc(0);
 				ccdc_use_lsc = 0;
 		}
-		down(&ispccdc_mutex);
+		mutex_lock(&ispccdc_obj.ispccdc_mutex);
 		if ((ISP_ABS_TBL_LSC & ccdc_struct->update)
 			== ISP_ABS_TBL_LSC) {
 			if (size_mismatch) {
 				ispmmu_unmap(lsc_ispmmu_addr);
 				kfree(lsc_gain_table);
 				lsc_gain_table = kmalloc(
-					lsc_config.size,
+					(lsc_config.size + 0x1000),
 					GFP_KERNEL | GFP_DMA);
 				if (!lsc_gain_table) {
 					printk(KERN_ERR
 						"Cannot allocate\
 						memory for \
 						gain tables \n");
-					up(&ispccdc_mutex);
+					mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 					return -ENOMEM;
 				}
 				lsc_ispmmu_addr = ispmmu_map(
-					virt_to_phys(lsc_gain_table),
+					virt_to_phys((u8 *)ALIGN_TO(lsc_gain_table, 0x1000)),
 					lsc_config.size);
 				omap_writel(lsc_ispmmu_addr,
 					ISPCCDC_LSC_TABLE_BASE);
 				lsc_initialized = 1;
 				size_mismatch = 0;
 			}
-			if (copy_from_user(lsc_gain_table,
+			if (copy_from_user((u8 *)ALIGN_TO(lsc_gain_table, 0x1000),
 				(ccdc_struct->lsc), lsc_config.size)) {
-				up(&ispccdc_mutex);
+				mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 				goto copy_from_user_err;
 			}
 		}
-		up(&ispccdc_mutex);
+		mutex_unlock(&ispccdc_obj.ispccdc_mutex);
 	}
 
 	if ((ISP_ABS_CCDC_COLPTN & ccdc_struct->update) == ISP_ABS_CCDC_COLPTN)
@@ -979,6 +977,8 @@ void ispccdc_enable_fpc(u8 enable)
 {
 	spin_lock(&ispccdc_obj.ispccdc_lock);
 	if (enable) {
+		omap_writel(omap_readl(ISP_CTRL) | ISPCTRL_SBL_SHARED_RPORTB |
+					ISPCTRL_SBL_RD_RAM_EN, ISP_CTRL);
 		omap_writel(omap_readl(ISPCCDC_FPC) | ISPCCDC_FPC_FPCEN,
 								ISPCCDC_FPC);
 	} else {
@@ -1186,9 +1186,9 @@ EXPORT_SYMBOL(ispccdc_enable_lpf);
  **/
 void ispccdc_config_alaw(enum alaw_ipwidth ipwidth)
 {
-	down(&ispccdc_mutex);
+	mutex_lock(&ispccdc_obj.ispccdc_mutex);
 	omap_writel(ipwidth << ISPCCDC_ALAW_GWDI_SHIFT, ISPCCDC_ALAW);
-	up(&ispccdc_mutex);
+	mutex_lock(&ispccdc_obj.ispccdc_mutex);
 }
 EXPORT_SYMBOL(ispccdc_config_alaw);
 
@@ -1707,7 +1707,7 @@ int __init isp_ccdc_init(void)
 	ispccdc_obj.ccdc_inuse = 0;
 	ispccdc_obj.dcsub = 0;
 	ispccdc_config_crop(0, 0, 0, 0);
-	mutex_init(&ispccdc_obj.mutexlock);
+	mutex_init(&ispccdc_obj.ispccdc_mutex);
 	spin_lock_init(&ispccdc_obj.ispccdc_lock);
 
 	if (is_isplsc_activated()) {
