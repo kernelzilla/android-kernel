@@ -68,15 +68,11 @@ void hp3a_enable_af(void)
 {
 	struct hp3a_internal_buffer *ibuffer = NULL;
 
-	if (unlikely(omap_readl(ISPH3A_PCR) & ISPH3A_PCR_AF_BUSY_MASK)) {
-		g_tc.af_hw_enable = 0;
+	if (unlikely(g_tc.af_hw_configured == 0))
 		return;
-	}
 
-	spin_lock(&g_tc.af_lock);
-
-	if (unlikely(g_tc.af_hw_configured == 0)) {
-		spin_unlock(&g_tc.af_lock);
+	if (omap_readl(ISPH3A_PCR) & ISPH3A_PCR_AF_BUSY_MASK) {
+		g_tc.af_hw_enable = 0;
 		return;
 	}
 
@@ -96,6 +92,7 @@ void hp3a_enable_af(void)
 		/* Set memory address to store paxels. */
 		omap_writel(ALIGN_TO(ibuffer->isp_addr,
 			AF_MEMORY_ALIGNMENT), ISPH3A_AFBUFST);
+		omap_readl(ISPH3A_AFBUFST);
 
 		ibuffer->type = PAXEL;
 		hp3a_enqueue(&g_tc.ready_stats_queue, &ibuffer);
@@ -104,8 +101,6 @@ void hp3a_enable_af(void)
 		omap_writel(omap_readl(ISPH3A_PCR) & \
 			~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
 	}
-
-	spin_unlock(&g_tc.af_lock);
 }
 
 /**
@@ -115,11 +110,9 @@ void hp3a_enable_af(void)
  **/
 void hp3a_disable_af(void)
 {
-	spin_lock(&g_tc.af_lock);
 	g_tc.af_hw_enable = 0;
 	omap_writel(omap_readl(ISPH3A_PCR) & \
 		~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
-	spin_unlock(&g_tc.af_lock);
 }
 
 /**
@@ -135,9 +128,10 @@ static void hp3a_af_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 	}
 
 	/* clear IRQ status bit.*/
+	/*
 	omap_writel(IRQ0STATUS_H3A_AF_DONE_IRQ,
 					ISP_IRQ0STATUS);
-
+	*/
 	if (g_tc.af_hw_enable == 0) {
 		omap_writel(omap_readl(ISPH3A_PCR) & \
 				~(ISPH3A_PCR_AF_EN_MASK), ISPH3A_PCR);
@@ -154,6 +148,7 @@ static void hp3a_af_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 {
 	int ret = 0;
+	unsigned long irqflags = 0;
 	struct hp3a_dev *device = fh->device;
 	int index;
 	int coeff0_index = 6; /* index into isp_af_regs array. */
@@ -172,10 +167,10 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 			return -EINVAL;
 		}
 
+		spin_lock_irqsave(&g_tc.af_lock, irqflags);
+
 		/* Set return value to error, it is set to 0 on success. */
 		ret = -EINVAL;
-
-		spin_lock(&g_tc.af_lock);
 
 		/* clear af registers. */
 		hp3a_clear_regs(isp_af_regs);
@@ -310,12 +305,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 				(config->paxel.vt_cnt+1) * AF_PAXEL_SIZE;
 		g_tc.af_hw_configured = 1;
 		ret = 0;
-
-func_exit:
-		/* Give up synchronize lock. */
-		spin_unlock(&g_tc.af_lock);
 	} else {
-		spin_lock(&g_tc.af_lock);
+		spin_lock_irqsave(&g_tc.af_lock, irqflags);
 		isp_unset_callback(CBK_H3A_AF_DONE);
 		g_tc.af_hw_configured = 0;
 
@@ -325,8 +316,11 @@ func_exit:
 			omap_writel(omap_readl(ISPH3A_PCR) & \
 				~(ISPH3A_PCR_AF_EN_MASK),   ISPH3A_PCR);
 		}
-		spin_unlock(&g_tc.af_lock);
 	}
+
+func_exit:
+	/* Give up synchronize lock. */
+	spin_unlock_irqrestore(&g_tc.af_lock, irqflags);
 
 	return ret;
 }

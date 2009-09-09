@@ -56,12 +56,8 @@ void hp3a_enable_histogram(void)
 {
 	struct hp3a_internal_buffer *ibuffer;
 
-	spin_lock(&g_tc.hist_lock);
-
-	if (unlikely(g_tc.hist_hw_configured == 0)) {
-		spin_unlock(&g_tc.hist_lock);
+	if (unlikely(g_tc.hist_hw_configured == 0))
 		return;
-	}
 
 	if (hp3a_dequeue(&g_tc.hist_stat_queue, &ibuffer) == 0) {
 		if (g_tc.hist_hw_enable == 0) {
@@ -85,8 +81,6 @@ void hp3a_enable_histogram(void)
 		omap_writel(omap_readl(ISPHIST_PCR) & \
 			~(ISPHIST_PCR_EN), ISPHIST_PCR);
 	}
-
-	spin_unlock(&g_tc.hist_lock);
 }
 
 /**
@@ -96,10 +90,8 @@ void hp3a_enable_histogram(void)
  **/
 void hp3a_disable_histogram(void)
 {
-	spin_lock(&g_tc.hist_lock);
 	g_tc.hist_hw_enable = 0;
 	omap_writel(omap_readl(ISPHIST_PCR) & ~(ISPHIST_PCR_EN), ISPHIST_PCR);
-	spin_unlock(&g_tc.hist_lock);
 }
 
 /**
@@ -119,7 +111,6 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 	}
 
 	omap_writel(omap_readl(ISPHIST_PCR) & ~(ISPHIST_PCR_EN), ISPHIST_PCR);
-	omap_writel(IRQ0STATUS_HIST_DONE_IRQ, ISP_IRQ0STATUS);
 
 	if (unlikely(g_tc.v4l2_streaming == 0)) {
 		return;
@@ -147,13 +138,11 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 	/* Set memory HW memory address and enable. */
 	omap_writel(0, ISPHIST_ADDR);
 
-	spin_lock(&g_tc.hist_lock);
 	if (g_tc.hist_hw_enable == 1) {
 		/* Enable histogram. */
 		omap_writel(omap_readl(ISPHIST_PCR) | (ISPHIST_PCR_EN),
 			ISPHIST_PCR);
 	}
-	spin_unlock(&g_tc.hist_lock);
 
 	g_tc.hist_done = 1;
 
@@ -171,8 +160,9 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 int hp3a_config_histogram(struct hp3a_histogram_config *config,
 				struct hp3a_fh *fh)
 {
-	struct hp3a_dev *device = fh->device;
 	int ret = 0;
+	unsigned long irqflags = 0;
+	struct hp3a_dev *device = fh->device;
 	int bit_shift = 0;
 
 	if (config->enable) {
@@ -188,7 +178,11 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 			return -EINVAL;
 		}
 
-		spin_lock(&g_tc.hist_lock);
+		spin_lock_irqsave(&g_tc.hist_lock, irqflags);
+
+		/* Set return value to error, it is set to 0 on success. */
+		ret = -EINVAL;
+
 		/* clear histogram registers. */
 		hp3a_clear_regs(isp_hist_regs);
 
@@ -202,14 +196,14 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 				WRITE_RADD(isp_hist_regs[12].val, config->hist_radd);
 			} else {
 				dev_info(device->dev, "Error: Address should be in 32 byte boundary\n");
-				return -EINVAL;
+				goto func_exit;
 			}
 
 			if ((config->hist_radd_off & ISP_32B_BOUNDARY_OFFSET) == config->hist_radd_off) {
 				WRITE_RADD_OFF(isp_hist_regs[13].val, config->hist_radd_off);
 			} else {
 				dev_info(device->dev, "Error: Offset should be in 32 byte boundary\n");
-				return -EINVAL;
+				goto func_exit;
 			}
 		}
 
@@ -224,7 +218,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		|| (config->wb_gain_B > MAX_WB_GAIN)
 		|| (config->wb_gain_BG > MAX_WB_GAIN))) {
 			dev_info(device->dev, "Error: Invalid WB gain\n");
-			return -EINVAL;
+			goto func_exit;
 		} else {
 			WRITE_WB_R(isp_hist_regs[2].val, config->wb_gain_R);
 			WRITE_WB_RG(isp_hist_regs[2].val,  config->wb_gain_RG);
@@ -233,8 +227,9 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		}
 
 		/* Regions size and position */
-		if (config->num_regions > MAX_REGIONS)
-			return -EINVAL;
+		if (config->num_regions > MAX_REGIONS) {
+			goto func_exit;
+		}
 
 		/* Region 0. */
 		WRITE_REG_HORIZ(isp_hist_regs[3].val, config->reg0_hor);
@@ -261,7 +256,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 			dev_info(device->dev,
 				"Error: Invalid Bins Number: %d\n",
 				config->hist_bins);
-			return -EINVAL;
+			goto func_exit;
 		} else {
 			WRITE_NUM_BINS(isp_hist_regs[1].val, config->hist_bins);
 		}
@@ -271,7 +266,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 			dev_info(device->dev,
 				"Error: Invalid Bit Width: %d\n",
 				config->input_bit_width);
-			return -EINVAL;
+			goto func_exit;
 		} else {
 			if (config->hist_bins == BINS_256) {
 				bit_shift = config->input_bit_width - 8;
@@ -286,17 +281,16 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 				bit_shift = config->input_bit_width - 5;
 				g_tc.hist_bin_size = (HIST_MEM_SIZE>>(3-config->num_regions));
 			} else {
-				return -EINVAL;
+				goto func_exit;
 			}
 
 			WRITE_BIT_SHIFT(isp_hist_regs[1].val, bit_shift);
 		}
 
 		g_tc.hist_hw_configured = 1;
-		spin_unlock(&g_tc.hist_lock);
+		ret = 0;
 	} else {
-		spin_lock(&g_tc.hist_lock);
-
+		spin_lock_irqsave(&g_tc.hist_lock, irqflags);
 		isp_unset_callback(CBK_HIST_DONE);
 		g_tc.hist_hw_configured = 0;
 
@@ -306,11 +300,13 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 			omap_writel(omap_readl(ISPHIST_PCR) & ~(ISPHIST_PCR_EN),
 				ISPHIST_PCR);
 		}
-
-		spin_unlock(&g_tc.hist_lock);
 	}
 
-	return 0;
+func_exit:
+	/* Give up synchronize lock. */
+	spin_unlock_irqrestore(&g_tc.hist_lock, irqflags);
+
+	return ret;
 }
 
 /**

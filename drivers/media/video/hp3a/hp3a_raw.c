@@ -98,8 +98,10 @@ void hp3a_disable_raw(void)
  **/
 int hp3a_configure_raw(struct hp3a_raw_config *raw)
 {
+	unsigned long irqflags = 0;
+
 	/* Synchronize with stats collection. */
-	spin_lock(&g_tc.stats_lock);
+	spin_lock_irqsave(&g_tc.stats_lock, irqflags);
 
 	if (raw->enable) {
 		/* Configure raw frame size based on ccdc configuration. */
@@ -127,7 +129,7 @@ int hp3a_configure_raw(struct hp3a_raw_config *raw)
 			g_tc.req_raw_buffer_size = -1;
 
 			/* Give up synchronize lock. */
-			spin_unlock(&g_tc.stats_lock);
+			spin_unlock_irqrestore(&g_tc.stats_lock, irqflags);
 
 			return  -1;
 		}
@@ -136,7 +138,7 @@ int hp3a_configure_raw(struct hp3a_raw_config *raw)
 	}
 
 	/* Give up synchronize lock. */
-	spin_unlock(&g_tc.stats_lock);
+	spin_unlock_irqrestore(&g_tc.stats_lock, irqflags);
 
 	return 0;
 }

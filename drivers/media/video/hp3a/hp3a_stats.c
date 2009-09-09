@@ -25,6 +25,7 @@
 #include "hp3a_common.h"
 #include "hp3a_queue.h"
 #include "../oldomap34xxcam.h"
+#include "ispccdc.h"
 
 struct hp3a_context g_tc;
 static void hp3a_task(struct work_struct *);
@@ -40,7 +41,6 @@ void initialize_hp3a_framework(struct hp3a_dev *device)
 {
 	if (g_tc.initialized == 0) {
 		spin_lock_init(&g_tc.stats_lock);
-		spin_lock_init(&g_tc.sensor_lock);
 		spin_lock_init(&g_tc.hist_lock);
 		spin_lock_init(&g_tc.af_lock);
 		spin_lock_init(&g_tc.hardpipe_lock);
@@ -135,8 +135,9 @@ void hp3a_framework_start(struct hp3a_fh *fh)
 void hp3a_framework_stop(struct hp3a_fh *fh)
 {
 	int i;
+	unsigned long irqflags = 0;
 
-	spin_lock(&g_tc.stats_lock);
+	spin_lock_irqsave(&g_tc.stats_lock, irqflags);
 
 	/* Need to flush queue. */
 	hp3a_flush_queue(&g_tc.sensor_write_queue);
@@ -161,7 +162,7 @@ void hp3a_framework_stop(struct hp3a_fh *fh)
 	g_tc.af_buffer  = NULL;
 	g_tc.raw_buffer  = NULL;
 
-	spin_unlock(&g_tc.stats_lock);
+	spin_unlock_irqrestore(&g_tc.stats_lock, irqflags);
 
 	/* Release any task waiting for stats. */
 	complete(&g_tc.frame_done);
@@ -257,8 +258,10 @@ int hp3a_set_hardpipe_param(struct hp3a_hardpipe_param *param,
  *
  * No return value.
  **/
-int hp3a_collect_statsistics(struct hp3a_statistics *stat)
+int hp3a_collect_statistics(struct hp3a_statistics *stat)
 {
+	unsigned long irqflags = 0;
+
 	if (unlikely(g_tc.v4l2_streaming == 0)) {
 		return -1;
 	}
@@ -280,7 +283,7 @@ int hp3a_collect_statsistics(struct hp3a_statistics *stat)
 				(g_tc.hist_done == 1), msecs_to_jiffies(8));
 		}
 
-		spin_lock(&g_tc.stats_lock);
+		spin_lock_irqsave(&g_tc.stats_lock, irqflags);
 
 		/* Frame meta data. */
 		stat->frame_id = g_tc.frame_count;
@@ -306,15 +309,14 @@ int hp3a_collect_statsistics(struct hp3a_statistics *stat)
 			if (g_tc.hist_done  == 1) {
 				stat->hist_stat_index = g_tc.histogram_buffer->index;
 			} else {
-				hp3a_enqueue_irqsave(&g_tc.hist_stat_queue,
-					&g_tc.histogram_buffer);
+				hp3a_enqueue(&g_tc.hist_stat_queue, &g_tc.histogram_buffer);
 			}
 			g_tc.histogram_buffer = NULL;
 		}
 
 		g_tc.hist_done = 0;
 
-		spin_unlock(&g_tc.stats_lock);
+		spin_unlock_irqrestore(&g_tc.stats_lock, irqflags);
 	}
 
 	return 0;
@@ -325,7 +327,7 @@ int hp3a_collect_statsistics(struct hp3a_statistics *stat)
  *
  * No return value.
  **/
-void hp3a_update_statistics(void)
+void hp3a_update_stats_readout_done(void)
 {
 	int i;
 	struct hp3a_internal_buffer *ibuffer;
@@ -337,8 +339,6 @@ void hp3a_update_statistics(void)
 		hp3a_disable_raw();
 		return;
 	}
-
-	spin_lock(&g_tc.stats_lock);
 
 	/* Reuse stats buffers. */
 	if (g_tc.histogram_buffer != NULL) {
@@ -379,6 +379,39 @@ void hp3a_update_statistics(void)
 		}
 	}
 
+	for (i = QUEUE_COUNT(g_tc.sensor_read_queue); i--;) {
+		if (hp3a_dequeue(&g_tc.sensor_read_queue, &sensor_param) == 0) {
+			if (sensor_param.frame_id == g_tc.frame_count) {
+				if (sensor_param.exposure)
+					g_tc.exposure = sensor_param.exposure;
+				if (sensor_param.gain)
+					g_tc.gain = sensor_param.gain;
+			} else if (sensor_param.frame_id > g_tc.frame_count) {
+				hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
+			}
+		} else {
+			break;
+		}
+	}
+
+	/* Histogram buffer processing and HW configuration. */
+	hp3a_enable_histogram();
+	/* AF stat buffer processing and HW configuration. */
+	hp3a_enable_af();
+
+	/* Notify threads waiting for stats. */
+	complete(&g_tc.frame_done);
+}
+
+/**
+ * hp3a_update_framework- execute tasks between frames.
+ *
+ * No return value.
+ **/
+void hp3a_update_stats_pipe_done(void)
+{
+	struct hp3a_internal_buffer *ibuffer;
+
 	/* RAW stat buffer processing. */
 	if (g_tc.raw_hw_configured == 1) {
 		if ((++g_tc.raw_cap_sched_count) == g_tc.raw_frequency) {
@@ -395,31 +428,6 @@ void hp3a_update_statistics(void)
 			hp3a_disable_raw();
 		}
 	}
-
-	/* Histogram buffer processing and HW configuration. */
-	hp3a_enable_histogram();
-	/* AF stat buffer processing and HW configuration. */
-	hp3a_enable_af();
-
-	for (i = QUEUE_COUNT(g_tc.sensor_read_queue); i--;) {
-		if (hp3a_dequeue(&g_tc.sensor_read_queue, &sensor_param) == 0) {
-			if (sensor_param.frame_id == g_tc.frame_count) {
-				if (sensor_param.exposure)
-					g_tc.exposure = sensor_param.exposure;
-				if (sensor_param.gain)
-					g_tc.gain = sensor_param.gain;
-			} else if (sensor_param.frame_id > g_tc.frame_count) {
-				hp3a_enqueue(&g_tc.sensor_read_queue, &sensor_param);
-			}
-		} else {
-			break;
-		}
-	}
-
-	spin_unlock(&g_tc.stats_lock);
-
-	/* Notify threads waiting for stats. */
-	complete(&g_tc.frame_done);
 }
 
 /**

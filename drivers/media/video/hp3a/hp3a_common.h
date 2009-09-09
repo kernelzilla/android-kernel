@@ -269,7 +269,6 @@ struct hp3a_context {
 	u16 raw_width;
 	u16 raw_height;
 	spinlock_t stats_lock;
-	spinlock_t sensor_lock;
 	spinlock_t hist_lock;
 	spinlock_t af_lock;
 	spinlock_t hardpipe_lock;
@@ -329,8 +328,9 @@ int hp3a_set_sensor_param(struct hp3a_sensor_param *param,
 	struct hp3a_fh *fh);
 int hp3a_set_hardpipe_param(struct hp3a_hardpipe_param *param,
 	struct hp3a_fh *fh);
-int hp3a_collect_statsistics(struct hp3a_statistics *stat);
-void hp3a_update_statistics(void);
+int hp3a_collect_statistics(struct hp3a_statistics *stat);
+void hp3a_update_stats_readout_done(void);
+void hp3a_update_stats_pipe_done(void);
 void hp3a_schedule_task(void);
 
 /**

@@ -163,11 +163,11 @@ int hp3a_dequeue(struct hp3a_queue *queue, void *element)
 		memcpy(element, item, queue->element_size);
 
 		ret = 0;
-   }
+	}
 
-   spin_unlock(&queue->queue_lock);
+	spin_unlock(&queue->queue_lock);
 
-   return ret;
+	return ret;
 }
 
 /**

@@ -28,8 +28,6 @@
  **/
 void hp3a_update_hardpipe(void)
 {
-	spin_lock(&g_tc.hardpipe_lock);
-
 	if (!(omap_readl(ISPPRV_PCR) & ISPPRV_PCR_BUSY) &&
 		g_tc.update_hardpipe == 1) {
 		omap_writel(g_tc.hpipe_param.dgain, ISPPRV_WB_DGAIN);
@@ -92,6 +90,4 @@ void hp3a_update_hardpipe(void)
 
 		g_tc.update_hardpipe = 0;
 	}
-
-	spin_unlock(&g_tc.hardpipe_lock);
 }

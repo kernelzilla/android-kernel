@@ -34,7 +34,7 @@
 void hp3a_ccdc_done(void)
 {
 	++g_tc.frame_count;
-	hp3a_update_statistics();
+	hp3a_update_stats_readout_done();
 }
 EXPORT_SYMBOL(hp3a_ccdc_done);
 
@@ -57,6 +57,7 @@ EXPORT_SYMBOL(hp3a_ccdc_start);
  **/
 void hp3a_frame_done(void)
 {
+	hp3a_update_stats_pipe_done();
 	hp3a_update_hardpipe();
 }
 EXPORT_SYMBOL(hp3a_frame_done);
@@ -70,6 +71,7 @@ void hp3a_stream_on(void)
 {
 	g_tc.frame_count = 0;
 	g_tc.v4l2_streaming = 1;
+	g_tc.raw_cap_sched_count = 0;
 
 	hp3a_enable_histogram();
 	hp3a_update_hardpipe();

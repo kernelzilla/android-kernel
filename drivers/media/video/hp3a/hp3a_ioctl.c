@@ -57,7 +57,7 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case HP3A_G_STATISTICS: {
 		struct hp3a_statistics statistics;
 
-		ret = hp3a_collect_statsistics(&statistics);
+		ret = hp3a_collect_statistics(&statistics);
 		if (SUCCEEDED(ret)) {
 			if (copy_to_user((struct hp3a_statistics *)arg,
 				&statistics, sizeof(struct hp3a_statistics)) != 0) {
