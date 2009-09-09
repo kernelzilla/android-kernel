@@ -1019,12 +1019,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		if (list_empty(&psDevInfo->active_list)) {
 			OMAPLFBFlip(psSwapChain,
 				    (unsigned long)psBuffer->sSysAddr.uiAddr);
-			spin_lock_irqsave(&psDevInfo->sSwapChainLock,
-					  ulLockFlags);
-			psSwapChain->psPVRJTable->
-				pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
-			spin_unlock_irqrestore(&psDevInfo->sSwapChainLock,
-					       ulLockFlags);
 		}
 		psBuffer->hCmdCookie = hCmdCookie;
 		list_add_tail(&psBuffer->list, &psDevInfo->active_list);
@@ -1103,6 +1097,12 @@ static void active_worker(struct work_struct *work)
 
 	psBuffer = list_first_entry(&psDevInfo->active_list,
 				    OMAPLFB_BUFFER, list);
+
+	spin_lock_irqsave(&psDevInfo->sSwapChainLock, flags);
+	psSwapChain->psPVRJTable->
+		pfnPVRSRVCmdComplete(psBuffer->hCmdCookie, IMG_TRUE);
+	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, flags);
+
 	list_del(&psBuffer->list);
 
 
@@ -1111,11 +1111,6 @@ static void active_worker(struct work_struct *work)
 					    OMAPLFB_BUFFER, list);
 		OMAPLFBFlip(psSwapChain,
 			    (unsigned long)psBuffer->sSysAddr.uiAddr);
-
-		spin_lock_irqsave(&psDevInfo->sSwapChainLock, flags);
-		psSwapChain->psPVRJTable->
-			pfnPVRSRVCmdComplete(psBuffer->hCmdCookie, IMG_TRUE);
-		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, flags);
 
 		queue_work(psDevInfo->workq, &psDevInfo->active_work);
 	}
