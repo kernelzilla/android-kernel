@@ -838,10 +838,16 @@ int sholes_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 
 /* Sholes specific PM */
 
+extern void omap_uart_block_sleep(int num);
 static struct wake_lock baseband_wakeup_wakelock;
 static int sholes_bpwake_irqhandler(int irq, void *unused)
 {
-	wake_lock_timeout(&baseband_wakeup_wakelock, (HZ / 2));
+	omap_uart_block_sleep(1);
+	/*
+	 * uart_block_sleep keeps uart clock active for 500 ms,
+	 * prevent suspend for 1 sec to be safe
+	 */
+	wake_lock_timeout(&baseband_wakeup_wakelock, HZ);
 	return IRQ_HANDLED;
 }
 
@@ -852,7 +858,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 	gpio_request(SHOLES_APWAKE_TRIGGER_GPIO, "BP -> AP IPC trigger");
 	gpio_direction_input(SHOLES_APWAKE_TRIGGER_GPIO);
 
-	wake_lock_init(&baseband_wakeup_wakelock, WAKE_LOCK_IDLE, "bpwake");
+	wake_lock_init(&baseband_wakeup_wakelock, WAKE_LOCK_SUSPEND, "bpwake");
 
 	rc = request_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO),
 			 sholes_bpwake_irqhandler,

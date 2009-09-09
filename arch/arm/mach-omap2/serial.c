@@ -37,7 +37,7 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
-#define DEFAULT_TIMEOUT HZ
+#define DEFAULT_TIMEOUT (HZ / 2)
 
 struct omap_uart_state {
 	int num;
@@ -340,7 +340,7 @@ static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 	clk_disable(uart->fck);
 }
 
-static void omap_uart_block_sleep(struct omap_uart_state *uart)
+static void _omap_uart_block_sleep(struct omap_uart_state *uart)
 {
 	omap_uart_restore(uart);
 
@@ -351,6 +351,18 @@ static void omap_uart_block_sleep(struct omap_uart_state *uart)
 	else
 		del_timer(&uart->timer);
 }
+
+void omap_uart_block_sleep(int num)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (num == uart->num)
+			_omap_uart_block_sleep(uart);
+		return;
+	}
+}
+EXPORT_SYMBOL(omap_uart_block_sleep);
 
 static void omap_uart_allow_sleep(struct omap_uart_state *uart)
 {
@@ -398,7 +410,7 @@ void omap_uart_prepare_idle(int num)
 					else
 						rxfifo_idleblks++;
 				}
-				omap_uart_block_sleep(uart);
+				_omap_uart_block_sleep(uart);
 				return;
 			}
 			omap_uart_enable_rtspullup(uart);
@@ -422,12 +434,12 @@ void omap_uart_resume_idle(int num)
 				u16 p = omap_ctrl_readw(uart->padconf);
 
 				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
-					omap_uart_block_sleep(uart);
+					_omap_uart_block_sleep(uart);
 			}
 
 			/* Check for normal UART wakeup */
 			if (__raw_readl(uart->wk_st) & uart->wk_mask) {
-				omap_uart_block_sleep(uart);
+				_omap_uart_block_sleep(uart);
 			}
 
 			return;
@@ -478,7 +490,7 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
 {
 	struct omap_uart_state *uart = dev_id;
 
-	omap_uart_block_sleep(uart);
+	_omap_uart_block_sleep(uart);
 
 	return IRQ_NONE;
 }
@@ -514,7 +526,7 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	uart->can_sleep = 0;
 	uart->timeout = sleep_timeout;
 	if (!uart->timeout)
-		omap_uart_block_sleep(uart);
+		_omap_uart_block_sleep(uart);
 	else {
 		setup_timer(&uart->timer, omap_uart_idle_timer,
 			    (unsigned long) uart);
@@ -636,7 +648,7 @@ static ssize_t sleep_timeout_store(struct kobject *kobj,
 			mod_timer(&uart->timer, jiffies + uart->timeout);
 		else
 			/* A zero value means disable timeout feature */
-			omap_uart_block_sleep(uart);
+			_omap_uart_block_sleep(uart);
 	}
 	return n;
 }
