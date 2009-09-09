@@ -255,6 +255,15 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 		result = NOTIFY_BAD;
 	}
 
+	/* Always clear the power cut bit on SW Shutdown*/
+	ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_PC1,
+		0, CPCAP_BIT_PC1_PCEN);
+	if (ret) {
+		dev_err(&(misc_cpcap->spi->dev),
+			"Clear Power Cut bit failure.\n");
+		result = NOTIFY_BAD;
+	}
+
 	return result;
 }
 static struct notifier_block cpcap_reboot_notifier = {
