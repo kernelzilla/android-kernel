@@ -34,3 +34,9 @@ config PVR_OMAP_USE_VSYNC
 	depends on SGX
 	---help---
 	  Support for the OMAP vsync interrupt in PowerVR.
+
+config PVR_APM
+	tristate "Enable PowerVR Active Power Managemt"
+	depends on SGX
+	---help---
+	   Enable PowerVR Active Power Managemt

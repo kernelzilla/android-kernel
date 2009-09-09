@@ -29,7 +29,7 @@ ccflags-y = -DLINUX -D__linux__ -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap3430 \
 	-DSUPPORT_SGX530 \
 	-DSGX_CORE_REV=121 
 
-#	-DSUPPORT_ACTIVE_POWER_MANAGEMENT \
+ccflags-$(CONFIG_PVR_APM) += -DSUPPORT_ACTIVE_POWER_MANAGEMENT
 
 
 ccflags-$(CONFIG_SGX_BUILD_RELEASE) += \
