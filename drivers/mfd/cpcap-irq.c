@@ -285,8 +285,8 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
 	data->cpcap = cpcap;
 
-	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED, "cpcap-irq",
-			     data);
+	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |
+				IRQF_TRIGGER_RISING, "cpcap-irq", data);
 	if (retval) {
 		printk(KERN_ERR "cpcap_irq: Failed requesting irq.\n");
 		goto error;
