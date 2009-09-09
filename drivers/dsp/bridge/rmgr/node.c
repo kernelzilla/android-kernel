@@ -790,7 +790,7 @@ func_cont2:
 #ifndef RES_CLEANUP_DISABLE
 	if (DSP_SUCCEEDED(status)) {
                /* Return PID instead of process handle */
-               hProcess = current->pid;
+               hProcess = current->group_leader->pid;
 
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					  REG_DRV_OBJECT);
@@ -814,7 +814,7 @@ func_cont2:
 	}
 	if (DSP_SUCCEEDED(status)) {
                /* Return PID instead of process handle */
-               hProcess = current->pid;
+               hProcess = current->group_leader->pid;
 		res_status = CFG_GetObject((u32 *)&hDrvObject,
 					REG_DRV_OBJECT);
 		if (DSP_SUCCEEDED(res_status)) {

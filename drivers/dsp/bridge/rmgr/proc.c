@@ -386,7 +386,7 @@ func_end:
 		goto func_cont;
 
        /* Return PID instead of process handle */
-       hProcess = current->pid;
+       hProcess = current->group_leader->pid;
 
 	res_status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(res_status))

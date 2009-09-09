@@ -257,6 +257,9 @@ static struct notifier_block iva_clk_notifier = {
 };
 #endif
 
+static struct delayed_work bridge_kill_work;
+static void bridge_kill(struct work_struct *work);
+
 static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 {
 	int status;
@@ -432,6 +435,8 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 		}
 	}
 
+	INIT_DELAYED_WORK(&bridge_kill_work, bridge_kill);
+
 	DBC_Assert(status == 0);
 	DBC_Assert(DSP_SUCCEEDED(initStatus));
 	GT_0trace(driverTrace, GT_ENTER, " <- driver_init\n");
@@ -553,21 +558,158 @@ static void __exit bridge_exit(void)
 	platform_driver_unregister(&bridge_driver);
 }
 
+static unsigned int event_mask = DSP_SYSERROR | DSP_MMUFAULT | DSP_PWRERROR;
+module_param(event_mask, uint, 0644);
+static char *firmware_file = "/system/lib/dsp/baseimage.dof";
+module_param(firmware_file, charp, 0644);
+
+static void bridge_cleanup(struct PROCESS_CONTEXT *ctxt)
+{
+	DSP_STATUS dsp_status = DSP_SOK;
+	HANDLE hDrvObject;
+	struct PROCESS_CONTEXT *pCtxttraverse;
+
+	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
+	if (DSP_FAILED(dsp_status))
+		return;
+
+	if (ctxt->task) {
+		put_task_struct(ctxt->task);
+		ctxt->task = 0;
+	}
+
+	if (ctxt->resState == PROC_RES_ALLOCATED)
+		DRV_RemoveAllResources(ctxt);
+	if (ctxt->hProcessor != NULL) {
+		DRV_GetProcCtxtList(&pCtxttraverse,
+				    (struct DRV_OBJECT *)hDrvObject);
+		pCtxttraverse = pCtxttraverse->next;
+		while (pCtxttraverse) {
+			if (ctxt->hProcessor == pCtxttraverse->hProcessor &&
+			    ctxt->pid != pCtxttraverse->pid)
+				break;
+			pCtxttraverse = pCtxttraverse->next;
+		}
+		if (!pCtxttraverse) {
+			PROC_Detach(ctxt->hProcessor);
+		}
+	}
+	DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject, ctxt,
+			      (void *)ctxt->pid);
+}
+
+static void bridge_load_firmware(void)
+{
+	DSP_HPROCESSOR hProcessor;
+	DSP_STATUS status;
+	const char* argv[2];
+	argv[0] = firmware_file;
+	argv[1] = NULL;
+
+	printk(KERN_INFO "%s: loading bridge firmware from %s\n", __func__,
+	       firmware_file);
+
+	status = PROC_Attach(0, NULL, &hProcessor);
+	if (DSP_FAILED(status))
+		printk(KERN_ERR "%s: error attaching to processor\n", __func__);
+
+	status = PROC_Stop(hProcessor);
+	if (DSP_FAILED(status))
+		printk(KERN_ERR "%s: error stopping processor\n", __func__);
+
+	status = PROC_Load(hProcessor, 1, argv, NULL);
+	if (DSP_FAILED(status))
+		printk(KERN_ERR "%s: error reloading firmware\n", __func__);
+
+	status = PROC_Start(hProcessor);
+	if (DSP_FAILED(status))
+		printk(KERN_ERR "%s: error starting processor\n", __func__);
+
+	PROC_Detach(hProcessor);
+}
+
+static bool bridge_all_closed(void)
+{
+	struct PROCESS_CONTEXT *ctxt;
+	struct PROCESS_CONTEXT *ctxt_next;
+	HANDLE hDrvObject;
+	DSP_STATUS status;
+
+	status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
+	if (DSP_FAILED(status))
+		return false;
+
+	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
+
+	while (ctxt != NULL) {
+		ctxt_next = ctxt->next;
+		if (ctxt->task && ctxt->task->exit_state != EXIT_ZOMBIE &&
+		    ctxt->task->exit_state != EXIT_DEAD)
+			return false;
+		ctxt = ctxt_next;
+	}
+	return true;
+}
+
+static void bridge_kill(struct work_struct *work)
+{
+	struct PROCESS_CONTEXT *ctxt, *next_ctxt;
+	HANDLE hDrvObject;
+	DSP_STATUS status;
+
+	status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
+	if (DSP_FAILED(status))
+		return;
+
+	printk(KERN_ERR "DSPBRIDGE: dsp fatal error -- attempting to reset\n");
+	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
+
+	while (ctxt) {
+		if (ctxt->task && !ctxt->task->exit_state) {
+			force_sig(SIGKILL, ctxt->task);
+		}
+		ctxt = ctxt->next;
+	}
+
+	while (!bridge_all_closed())
+		cpu_relax();
+
+	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
+	while (ctxt) {
+		next_ctxt = ctxt->next;
+		if (ctxt->task &&
+		    (ctxt->task->exit_state == EXIT_ZOMBIE
+		    || ctxt->task->exit_state == EXIT_DEAD))
+			bridge_cleanup(ctxt);
+		ctxt = next_ctxt;
+	}
+
+	bridge_load_firmware();
+}
+
+void bridge_notify_kill(u32 event)
+{
+	if (!(event & event_mask))
+		return;
+
+	schedule_delayed_work(&bridge_kill_work, 0);
+}
+
+
 /* This function is called when an application opens handle to the
  * bridge driver. */
 
 static int bridge_open(struct inode *ip, struct file *filp)
 {
-	int status = 0;
 #ifndef RES_CLEANUP_DISABLE
-       u32     hProcess;
+	u32 hProcess;
 	DSP_STATUS dsp_status = DSP_SOK;
-	HANDLE	     hDrvObject = NULL;
-	struct PROCESS_CONTEXT    *pPctxt = NULL;
-	struct PROCESS_CONTEXT	*next_node = NULL;
-	struct PROCESS_CONTEXT    *pCtxtclosed = NULL;
-	struct PROCESS_CONTEXT    *pCtxttraverse = NULL;
+	HANDLE hDrvObject = NULL;
+	struct PROCESS_CONTEXT *pPctxt = NULL;
+	struct PROCESS_CONTEXT *next_node = NULL;
+	struct PROCESS_CONTEXT *pCtxtclosed = NULL;
 	struct task_struct *tsk = NULL;
+
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_open\n");
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 
@@ -578,68 +720,36 @@ static int bridge_open(struct inode *ip, struct file *filp)
 
 	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
 	while (pCtxtclosed != NULL) {
-		tsk = find_task_by_vpid(pCtxtclosed->pid);
+		tsk = pCtxtclosed->task;
 		next_node = pCtxtclosed->next;
 
-		if ((tsk == NULL) || (tsk->exit_state == EXIT_ZOMBIE)) {
-
-			GT_1trace(driverTrace, GT_5CLASS,
-				 "***Task structure not existing for "
-				 "process***%d\n", pCtxtclosed->pid);
-			DRV_RemoveAllResources(pCtxtclosed);
-			if (pCtxtclosed->hProcessor != NULL) {
-				DRV_GetProcCtxtList(&pCtxttraverse,
-					    (struct DRV_OBJECT *)hDrvObject);
-				if (pCtxttraverse->next == NULL) {
-					PROC_Detach(pCtxtclosed->hProcessor);
-				} else {
-					if ((pCtxtclosed->pid ==
-					  pCtxttraverse->pid) &&
-					  (pCtxttraverse->next != NULL)) {
-						pCtxttraverse =
-							pCtxttraverse->next;
-					}
-					while ((pCtxttraverse != NULL) &&
-					     (pCtxtclosed->hProcessor
-					     != pCtxttraverse->hProcessor)) {
-						pCtxttraverse =
-							pCtxttraverse->next;
-						if ((pCtxttraverse != NULL) &&
-						  (pCtxtclosed->pid ==
-						  pCtxttraverse->pid)) {
-							pCtxttraverse =
-							   pCtxttraverse->next;
-						}
-					}
-					if (pCtxttraverse == NULL) {
-						PROC_Detach
-						     (pCtxtclosed->hProcessor);
-					}
-				}
-			}
-			DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject,
-					     pCtxtclosed,
-					     (void *)pCtxtclosed->pid);
+		if ((tsk) && (tsk->exit_state == EXIT_ZOMBIE ||
+		    tsk->exit_state == EXIT_DEAD)) {
+			bridge_cleanup(pCtxtclosed);
 		}
 		pCtxtclosed = next_node;
 	}
 func_cont:
+# endif
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_SUCCEEDED(dsp_status))
-		dsp_status = DRV_InsertProcContext(
-				(struct DRV_OBJECT *)hDrvObject, &pPctxt);
+		dsp_status = DRV_InsertProcContext((struct DRV_OBJECT *)hDrvObject,
+						   &pPctxt);
 
 	if (pPctxt != NULL) {
-			/* Return PID instead of process handle */
-			hProcess = current->pid;
+		/* Return PID instead of process handle */
+		if (!pPctxt->task) {
+			get_task_struct(current->group_leader);
+			pPctxt->task = current->group_leader;
+		}
 
+		hProcess = current->group_leader->pid;
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
-			DRV_ProcSetPID(pPctxt, hProcess);
+		DRV_ProcSetPID(pPctxt, hProcess);
 	}
-#endif
 
 	GT_0trace(driverTrace, GT_ENTER, " <- driver_open\n");
-	return status;
+	return !DSP_SUCCEEDED(dsp_status);
 }
 
 /* This function is called when an application closes handle to the bridge
@@ -647,15 +757,14 @@ func_cont:
 static int bridge_release(struct inode *ip, struct file *filp)
 {
 	int status;
-       u32 pid;
+	u32 pid;
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_release\n");
 
-       /* Return PID instead of process handle */
-       pid = current->pid;
+	/* Return PID instead of process handle */
+	pid = current->pid;
 
-       status = DSP_Close(pid);
-
+	status = DSP_Close(pid);
 
 	(status == true) ? (status = 0) : (status = -1);
 

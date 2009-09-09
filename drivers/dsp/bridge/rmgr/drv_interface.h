@@ -37,4 +37,5 @@ static int bridge_release(struct inode *, struct file *);	/* Release */
 static long bridge_ioctl(struct file *, unsigned int,
 			unsigned long);
 static int bridge_mmap(struct file *filp, struct vm_area_struct *vma);
+void bridge_notify_kill(u32);
 #endif				/* ifndef _DRV_INTERFACE_H_ */

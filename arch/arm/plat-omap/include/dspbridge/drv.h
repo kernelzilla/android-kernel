@@ -176,6 +176,9 @@ struct PROCESS_CONTEXT{
 	/* Process ID (Same as UNIX process ID) */
 	u32 pid;
 
+	/* Reference to the task struct associated with this context */
+	struct task_struct *task;
+
 	/* Pointer to next process context
 	* (To maintain a linked list of process contexts) */
 	struct PROCESS_CONTEXT *next;
