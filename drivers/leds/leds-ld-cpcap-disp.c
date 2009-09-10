@@ -77,7 +77,14 @@ static void disp_button_set(struct led_classdev *led_cdev,
 			regulator_disable(disp_button_led_data->regulator);
 			disp_button_led_data->regulator_state = 0;
 		}
+		/* Due to a HW issue turn off the current then
+		turn off the duty cycle */
+		brightness = 0x01;
+		cpcap_status = cpcap_regacc_write(disp_button_led_data->cpcap,
+					  CPCAP_REG_KLC, brightness,
+					  LD_DISP_BUTTON_CPCAP_MASK);
 
+		brightness = 0x00;
 		cpcap_status = cpcap_regacc_write(disp_button_led_data->cpcap,
 						  CPCAP_REG_KLC, brightness,
 						  LD_DISP_BUTTON_CPCAP_MASK);
