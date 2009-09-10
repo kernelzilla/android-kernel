@@ -181,6 +181,7 @@ struct qtm_touch_multi_cfg {
 	uint8_t			num_touch;
 	uint8_t			merge_hyst;
 	uint8_t			merge_thresh;
+	uint8_t         amp_hyst;
 	uint16_t		x_res;
 	uint16_t		y_res;
 	uint8_t			x_low_clip;
