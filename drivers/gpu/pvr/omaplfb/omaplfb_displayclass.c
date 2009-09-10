@@ -1001,8 +1001,9 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	psBuffer = (OMAPLFB_BUFFER*)psFlipCmd->hExtBuffer;
 	psSwapChain = (OMAPLFB_SWAPCHAIN*) psFlipCmd->hExtSwapChain;
 
+#if defined(CONFIG_PVR_OMAP_USE_VSYNC)
 	spin_lock_irqsave(&psDevInfo->sSwapChainLock, ulLockFlags);
-
+#endif
 	if (psDevInfo->bDeviceSuspended)
 	{
 		psSwapChain->psPVRJTable->pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
@@ -1019,12 +1020,8 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		if (list_empty(&psDevInfo->active_list)) {
 			OMAPLFBFlip(psSwapChain,
 				    (unsigned long)psBuffer->sSysAddr.uiAddr);
-			spin_lock_irqsave(&psDevInfo->sSwapChainLock,
-					  ulLockFlags);
 			psSwapChain->psPVRJTable->
 				pfnPVRSRVCmdComplete(hCmdCookie, IMG_TRUE);
-			spin_unlock_irqrestore(&psDevInfo->sSwapChainLock,
-					       ulLockFlags);
 		}
 		psBuffer->hCmdCookie = hCmdCookie;
 		list_add_tail(&psBuffer->list, &psDevInfo->active_list);
@@ -1112,10 +1109,8 @@ static void active_worker(struct work_struct *work)
 		OMAPLFBFlip(psSwapChain,
 			    (unsigned long)psBuffer->sSysAddr.uiAddr);
 
-		spin_lock_irqsave(&psDevInfo->sSwapChainLock, flags);
 		psSwapChain->psPVRJTable->
 			pfnPVRSRVCmdComplete(psBuffer->hCmdCookie, IMG_TRUE);
-		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, flags);
 
 		queue_work(psDevInfo->workq, &psDevInfo->active_work);
 	}
