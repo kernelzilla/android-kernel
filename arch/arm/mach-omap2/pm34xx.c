@@ -450,6 +450,9 @@ void omap_sram_idle(void)
 	_omap_sram_idle(omap3_arm_context, save_state);
 	cpu_init();
 
+	if (regset_save_on_suspend)
+		pm_dbg_regset_save(2);
+
 	/* Restore normal SDRC POWER settings */
 	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
 	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
@@ -1211,6 +1214,7 @@ static void __init configure_vc(void)
 			OMAP3_PRM_VOLTSETUP2_OFFSET);
 
 	pm_dbg_regset_init(1);
+	pm_dbg_regset_init(2);
 }
 
 static int __init omap3_pm_early_init(void)
