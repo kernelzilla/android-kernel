@@ -191,6 +191,7 @@ DSP_STATUS WMD_DEH_RegisterNotify(struct DEH_MGR *hDehMgr, u32 uEventMask,
 	return status;
 }
 
+extern void bridge_notify_kill(u32 ulEventMask);
 
 /*
  *  ======== WMD_DEH_Notify ========
@@ -318,10 +319,10 @@ DBG_Trace(DBG_LEVEL6, "WMD_DEH_Notify: DSP_MMUFAULT, "
 		PrintDspTraceBuffer(hDehMgr->hWmdContext);
 
 		if (DSP_SUCCEEDED(status1)) {
+			bridge_notify_kill(ulEventMask);
 			/* Signal DSP error/exception event. */
 			NTFY_Notify(pDehMgr->hNtfy, ulEventMask);
 		}
-
 	}
 	DBG_Trace(DBG_LEVEL1, "Exiting WMD_DEH_Notify\n");
 
