@@ -417,7 +417,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.sync		= 0,
 	},
 	.multi_touch_cfg	= {
-		.ctrl		= 0x0f,
+		.ctrl		= 0x0b,
 		.x_origin	= 0,
 		.y_origin	= 0,
 		.x_size		= 12,
@@ -432,6 +432,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.num_touch	= 4,
 		.merge_hyst	= 0,
 		.merge_thresh	= 3,
+		.amp_hyst = 2,
 		 .x_res = 0x0000,
 		 .y_res = 0x0000,
 		 .x_low_clip = 0x00,
