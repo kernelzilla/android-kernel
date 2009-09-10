@@ -336,7 +336,6 @@ void hp3a_update_stats_readout_done(void)
 	if (unlikely(g_tc.v4l2_streaming == 0)) {
 		hp3a_disable_histogram();
 		hp3a_disable_af();
-		hp3a_disable_raw();
 		return;
 	}
 
@@ -411,6 +410,11 @@ void hp3a_update_stats_readout_done(void)
 void hp3a_update_stats_pipe_done(void)
 {
 	struct hp3a_internal_buffer *ibuffer;
+
+	if (unlikely(g_tc.v4l2_streaming == 0)) {
+		hp3a_disable_raw();
+		return;
+	}
 
 	/* RAW stat buffer processing. */
 	if (g_tc.raw_hw_configured == 1) {

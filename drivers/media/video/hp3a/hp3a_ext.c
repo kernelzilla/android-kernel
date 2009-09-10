@@ -45,7 +45,6 @@ EXPORT_SYMBOL(hp3a_ccdc_done);
  **/
 void hp3a_ccdc_start(void)
 {
-	/* Place holder. */
 	hp3a_schedule_task();
 }
 EXPORT_SYMBOL(hp3a_ccdc_start);
@@ -75,6 +74,9 @@ void hp3a_stream_on(void)
 
 	hp3a_enable_histogram();
 	hp3a_update_hardpipe();
+
+	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
+	hp3a_flush_queue_irqsave(&g_tc.hist_hw_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_on);
 
@@ -88,9 +90,6 @@ void hp3a_stream_off(void)
 	g_tc.v4l2_streaming = 0;
 	g_tc.raw_cap_sched_count = 0;
 	g_tc.update_hardpipe = 0;
-
-	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
-	hp3a_flush_queue(&g_tc.hist_hw_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_off);
 
