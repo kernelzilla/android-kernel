@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/fb.h>
 
 #if defined(LDM_PLATFORM)
 #include <linux/platform_device.h>
@@ -174,6 +175,7 @@ void OMAPLFBDisableDisplayRegisterAccess(void)
 static struct omap_overlay_manager* lcd_mgr = 0;
 static struct omap_overlay*         omap_gfxoverlay = 0;
 static struct omap_overlay_info     gfxoverlayinfo;
+struct fb_info *fb_info;
 
 void OMAPLFBDisplayInit(void)
 {
@@ -213,6 +215,7 @@ void OMAPLFBDisplayInit(void)
     }
 
     omap_gfxoverlay->get_overlay_info( omap_gfxoverlay, &gfxoverlayinfo );
+    fb_info =  registered_fb[0];
 
 }
 
@@ -224,6 +227,9 @@ void OMAPLFBSync(void)
 
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr)
 {
+	u32 bpp;
+	u32 pixels;
+
 	if (lcd_mgr && lcd_mgr->device && omap_gfxoverlay) {
 		omap_gfxoverlay->get_overlay_info(omap_gfxoverlay,
 						  &gfxoverlayinfo);
@@ -238,6 +244,11 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr)
 		lcd_mgr->device->update(lcd_mgr->device, 0, 0,
 					gfxoverlayinfo.width,
 					gfxoverlayinfo.height);
+
+		pixels = (paddr - fb_info->fix.smem_start) /
+			(fb_info->var.bits_per_pixel / 8);
+		fb_info->var.yoffset = pixels / fb_info->var.xres;
+		fb_info->var.xoffset = pixels % fb_info->var.xres;
 	}
 }
 
