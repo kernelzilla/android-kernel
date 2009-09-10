@@ -441,8 +441,7 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 	}
 
 	lNewRate = clk_round_rate(psSysSpecData->psSGX_FCK, SYS_SGX_CLOCK_SPEED + ONE_MHZ);
-	//lNewRate = clk_get_rate(psSysSpecData->psSGX_FCK);
-	printk("SGX clock speed %ul\n",lNewRate);
+
 	if (lNewRate <= 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "EnableSGXClocks: Couldn't round SGX functional clock rate"));
