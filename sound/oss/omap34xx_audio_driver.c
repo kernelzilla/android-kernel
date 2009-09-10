@@ -26,6 +26,11 @@
 #include <linux/dma-mapping.h>
 #include <linux/sound.h>
 #include <linux/poll.h>
+
+#ifdef CONFIG_WAKELOCK
+#include <linux/wakelock.h>
+#endif
+
 #include <mach/mux.h>
 #include <mach/control.h>
 #include "omap34xx_audio_driver.h"
@@ -301,6 +306,9 @@ static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static unsigned int capture_mode;
 static struct omap_mcbsp_wrapper *mcbsp_wrapper;
+#ifdef CONFIG_WAKELOCK
+static struct wake_lock mcbsp_wakelock;
+#endif
 
 #ifdef MCBSP_WRAPPER
 
@@ -1516,6 +1524,9 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 
 	TRY(omap_mcbsp_set_io_type(ssi, 0))
 
+#ifdef CONFIG_WAKELOCK
+	wake_lock(&mcbsp_wakelock);
+#endif
 	TRY(omap_mcbsp_request(ssi))
 
 	TRY(omap2_mcbsp_reset(ssi))
@@ -1533,6 +1544,9 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 
 out:
 	omap_mcbsp_free(ssi);
+#ifdef CONFIG_WAKELOCK
+	wake_unlock(&mcbsp_wakelock);
+#endif
 	return -EPERM ;
 }
 
@@ -1559,6 +1573,9 @@ int audio_stop_ssi(struct inode *inode, struct file *file)
 
 	(void)omap2_mcbsp_reset(ssi);
 	(void)omap_mcbsp_free(ssi);
+#ifdef CONFIG_WAKELOCK
+	wake_unlock(&mcbsp_wakelock);
+#endif
 
 	return 0;
 
@@ -2163,12 +2180,17 @@ static int __init audio_init(void)
 	if (err)
 		return err;
 
+#ifdef CONFIG_WAKELOCK
+	wake_lock_init(&mcbsp_wakelock, WAKE_LOCK_SUSPEND, "mcbsp");
+#endif
+
 	return 0;
 }
 
 static void __exit audio_exit(void)
 {
 	platform_driver_unregister(&audio_driver);
+	wake_lock_destroy(&mcbsp_wakelock);
 }
 
 static int audio_probe(struct platform_device *dev)
