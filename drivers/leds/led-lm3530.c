@@ -121,7 +121,7 @@ static int lm3530_write_reg(struct lm3530_data *als_data,
 static int ld_lm3530_init_registers(struct lm3530_data *als_data)
 {
 	if (lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
-			     als_data->als_pdata->als_config) ||
+			     LM3530_MANUAL_ALS_CONFIG) ||
 	    lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE,
 			     als_data->als_pdata->brightness_ramp) ||
 	    lm3530_write_reg(als_data, LM3530_ALS_RESISTOR_SELECT,
@@ -245,8 +245,13 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 		return -1;
 
 	if (mode_value >= AUTOMATIC) {
-
-		ld_lm3530_init_registers(als_data);
+		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
+			als_data->als_pdata->als_config);
+		if (error) {
+			pr_err("%s:Failed to set manual mode:%d\n",
+			       __func__, error);
+			return -1;
+		}
 		error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
 					 als_data->als_pdata->gen_config);
 		if (error) {
@@ -260,7 +265,14 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 		als_data->mode = MANUAL;
 
 		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
-			LM3530_MANUAL_VALUE);
+			LM3530_MANUAL_ALS_CONFIG);
+		if (error) {
+			pr_err("%s:Failed to set manual mode:%d\n",
+			       __func__, error);
+			return -1;
+		}
+		error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
+			LM3530_MANUAL_GEN_CONFIG);
 		if (error) {
 			pr_err("%s:Failed to set manual mode:%d\n",
 			       __func__, error);
@@ -444,7 +456,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 
 	als_data->client = client;
 	als_data->als_pdata = pdata;
-	als_data->mode = AUTOMATIC;
+	als_data->mode = MANUAL;
 	als_data->zone = 3;
 
 	memset(als_data->current_array, 0, ARRAY_SIZE(als_data->current_array));
@@ -521,7 +533,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 	}
 
 	error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
-				 pdata->gen_config);
+				 LM3530_MANUAL_GEN_CONFIG);
 	if (error) {
 		pr_err("%s:Initialize Gen Config Reg failed %d\n",
 		       __func__, error);
