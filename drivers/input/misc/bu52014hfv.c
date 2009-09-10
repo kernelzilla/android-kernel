@@ -163,6 +163,9 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 		goto error_request_irq_south_failed;
 	}
 
+	enable_irq_wake(info->irq_north);
+	enable_irq_wake(info->irq_south);
+
 	info->sdev.name = "dock";
 	info->sdev.print_name = print_name;
 	ret = switch_dev_register(&info->sdev);
@@ -194,6 +197,9 @@ error_kmalloc_failed:
 static int __devexit bu52014hfv_remove(struct platform_device *pdev)
 {
 	struct bu52014hfv_info *info = platform_get_drvdata(pdev);
+
+	disable_irq_wake(info->irq_north);
+	disable_irq_wake(info->irq_south);
 
 	free_irq(info->irq_north, 0);
 	free_irq(info->irq_south, 0);
