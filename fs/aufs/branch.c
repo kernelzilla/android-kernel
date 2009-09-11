@@ -417,7 +417,6 @@ static void au_br_do_add(struct super_block *sb, struct dentry *h_dentry,
 int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
 {
 	int err;
-	unsigned long long maxb;
 	aufs_bindex_t bend, add_bindex;
 	struct dentry *root, *h_dentry;
 	struct inode *root_inode;
@@ -456,13 +455,11 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
 		sysaufs_brs_add(sb, add_bindex);
 	}
 
-	if (!add_bindex)
+	if (!add_bindex) {
 		au_cpup_attr_all(root_inode, /*force*/1);
-	else
+		sb->s_maxbytes = h_dentry->d_sb->s_maxbytes;
+	} else
 		au_add_nlink(root_inode, h_dentry->d_inode);
-	maxb = h_dentry->d_sb->s_maxbytes;
-	if (sb->s_maxbytes < maxb)
-		sb->s_maxbytes = maxb;
 
 	/*
 	 * this test/set prevents aufs from handling unnecesary inotify events
@@ -759,24 +756,13 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 		sysaufs_brs_add(sb, bindex);
 	}
 
-	if (!bindex)
+	if (!bindex) {
 		au_cpup_attr_all(sb->s_root->d_inode, /*force*/1);
-	else
+		sb->s_maxbytes = au_sbr_sb(sb, 0)->s_maxbytes;
+	} else
 		au_sub_nlink(sb->s_root->d_inode, del->h_path.dentry->d_inode);
 	if (au_opt_test(mnt_flags, PLINK))
 		au_plink_half_refresh(sb, br_id);
-
-	if (sb->s_maxbytes == del->h_path.dentry->d_sb->s_maxbytes) {
-		bend--;
-		sb->s_maxbytes = 0;
-		for (bindex = 0; bindex <= bend; bindex++) {
-			unsigned long long maxb;
-
-			maxb = au_sbr_sb(sb, bindex)->s_maxbytes;
-			if (sb->s_maxbytes < maxb)
-				sb->s_maxbytes = maxb;
-		}
-	}
 
 	if (au_xino_brid(sb) == br->br_id)
 		au_xino_brid_set(sb, -1);
