@@ -54,7 +54,7 @@
 #define LM3530_ALS_READ_MASK	0x07
 #define LM3530_GEN_CONF_MASK	0xE3
 #define LM3530_MAX_LED_VALUE	0xFF
-#define LM3530_MANUAL_VALUE		0x66
+#define LM3530_MANUAL_VALUE		0x6C
 
 #ifdef __KERNEL__
 struct lm3530_platform_data {

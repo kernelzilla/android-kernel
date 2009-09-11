@@ -444,7 +444,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 
 	als_data->client = client;
 	als_data->als_pdata = pdata;
-	als_data->mode = AUTOMATIC;
+	als_data->mode = MANUAL;
 	als_data->zone = 3;
 
 	memset(als_data->current_array, 0, ARRAY_SIZE(als_data->current_array));
