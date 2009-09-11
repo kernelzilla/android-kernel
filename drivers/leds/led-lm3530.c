@@ -532,15 +532,6 @@ static int ld_lm3530_probe(struct i2c_client *client,
 		goto err_reg_init_failed;
 	}
 
-	error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
-				 LM3530_MANUAL_GEN_CONFIG);
-	if (error) {
-		pr_err("%s:Initialize Gen Config Reg failed %d\n",
-		       __func__, error);
-		error = -ENODEV;
-		goto err_reg_init_failed;
-	}
-
 	error = led_classdev_register((struct device *)
 				      &client->dev, &als_data->led_dev);
 	if (error < 0) {
