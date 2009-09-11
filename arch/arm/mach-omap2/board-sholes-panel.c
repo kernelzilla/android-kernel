@@ -67,7 +67,7 @@ static struct omapfb_platform_data sholes_fb_data = {
 		.region_cnt = 1,
 		.region = {
 			{
-				.format = OMAPFB_COLOR_RGB565,
+				.format = OMAPFB_COLOR_ARGB32,
 				.format_used = 1,
 			},
 		},
