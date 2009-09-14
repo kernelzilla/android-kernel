@@ -29,11 +29,13 @@
 #include <linux/err.h>
 #include <linux/hardirq.h>
 #include <linux/spinlock.h>
+#include <linux/platform_device.h>
 #include <asm/bug.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,26))
 #include <linux/semaphore.h>
 #include <mach/resource.h>
+#include <mach/omap-pm.h>
 #else 
 #include <asm/semaphore.h>
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22))
@@ -61,6 +63,9 @@
 #else
 #define SGX_PARENT_CLOCK "core_ck"
 #endif
+
+
+extern struct platform_device *gpsPVRLDMDev;
 
 #if !defined(PDUMP) && !defined(NO_HARDWARE)
 static IMG_BOOL PowerLockWrappedOnCPU(SYS_SPECIFIC_DATA *psSysSpecData)
@@ -471,7 +476,9 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 	}
 #endif
 
-	
+	/* pin the memory bus bw to the highest value */
+	omap_pm_set_min_bus_tput(&gpsPVRLDMDev->dev, OCP_INITIATOR_AGENT, 400000);
+
 	atomic_set(&psSysSpecData->sSGXClocksEnabled, 1);
 
 #else	
@@ -485,8 +492,11 @@ IMG_VOID DisableSGXClocks(SYS_DATA *psSysData)
 {
 #if !defined(NO_HARDWARE)
 	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
+	int res;
 
-	
+	/* unpin the memory bus */
+	omap_pm_set_min_bus_tput(&gpsPVRLDMDev->dev, OCP_INITIATOR_AGENT, 0);
+
 	if (atomic_read(&psSysSpecData->sSGXClocksEnabled) == 0)
 	{
 		return;
