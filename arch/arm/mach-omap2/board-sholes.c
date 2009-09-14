@@ -388,7 +388,8 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.irqflags	= (IRQF_TRIGGER_FALLING |IRQF_TRIGGER_LOW),
 	.flags		= (QTOUCH_SWAP_XY |
 			   QTOUCH_USE_MULTITOUCH |
-			   QTOUCH_CFG_BACKUPNV),
+			   QTOUCH_CFG_BACKUPNV |
+			   QTOUCH_EEPROM_CHECKSUM),
 	.abs_min_x	= 20,
 	.abs_max_x	= 1004,
 	.abs_min_y	= 0,
@@ -397,7 +398,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 	.abs_max_p	= 255,
 	.abs_min_w	= 0,
 	.abs_max_w	= 15,
-	.nv_checksum	= 0xb834,
+	.nv_checksum	= 0x6da8,
 	.fuzz_x		= 0,
 	.fuzz_y		= 0,
 	.fuzz_p		= 2,
