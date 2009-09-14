@@ -64,6 +64,8 @@ struct qtouch_ts_data {
 	unsigned long			obj_map[_BITMAP_LEN];
 
 	uint32_t			last_keystate;
+	uint16_t			eeprom_checksum;
+	uint8_t			    checksum_cnt;
 
 	/* Note: The message buffer is reused for reading different messages.
 	 * MUST enforce that there is no concurrent access to msg_buf. */
@@ -475,16 +477,26 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 {
 	struct qtm_cmd_proc_msg *msg = _msg;
 	int ret = 0;
+	int hw_reset = 0;
 
 	if (msg->status & QTM_CMD_PROC_STATUS_RESET) {
 		if (qtouch_tsdebug)
-			pr_info("%s:EEPROM checksum is 0x%X\n",
-				__func__, msg->checksum);
-		if (msg->checksum != ts->pdata->nv_checksum) {
-			ret = qtouch_hw_init(ts);
-			if (ret != 0)
-				pr_err("%s:Cannot initialize the touch IC\n",
-				       __func__);
+			pr_info("%s:EEPROM checksum is 0x%X cnt %i\n",
+				__func__, msg->checksum, ts->checksum_cnt);
+		if (msg->checksum != ts->eeprom_checksum) {
+			if (ts->checksum_cnt > 2) {
+				/* Assume the checksum is what it is, cannot
+				disable the touch screen so set the checksum*/
+				ts->eeprom_checksum = msg->checksum;
+				ts->checksum_cnt = 0;
+			} else {
+				ret = qtouch_hw_init(ts);
+				if (ret != 0)
+					pr_err("%s:Cannot init the touch IC\n",
+						   __func__);
+				hw_reset = 1;
+				ts->checksum_cnt++;
+			}
 		}
 		pr_info("%s: Reset done.\n", __func__);
 	}
@@ -501,7 +513,7 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR) {
 		ret = qtouch_hw_init(ts);
 		if (ret != 0)
-			pr_err("%s:Cannot initialize the touch IC\n",
+			pr_err("%s:Cannot init the touch IC\n",
 			       __func__);
 
 		pr_err("%s: Configuration error\n", __func__);
@@ -510,15 +522,27 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	the checksum to change during operation so we need to
 	reprogram the EEPROM and reset the IC */
 	if (ts->pdata->flags & QTOUCH_EEPROM_CHECKSUM) {
-		if (msg->checksum != ts->pdata->nv_checksum) {
+		if (msg->checksum != ts->eeprom_checksum) {
 			if (qtouch_tsdebug)
-				pr_info("%s:EEPROM checksum is 0x%X\n",
-					__func__, msg->checksum);
-			ret = qtouch_hw_init(ts);
-			if (ret != 0)
-				pr_err("%s:Cannot initialize the touch IC\n",
-					   __func__);
-			qtouch_force_reset(ts, 0);
+				pr_info("%s:EEPROM checksum is 0x%X cnt %i \
+						hw_reset %i\n",
+					__func__, msg->checksum,
+					ts->checksum_cnt, hw_reset);
+			if (ts->checksum_cnt > 2) {
+				/* Assume the checksum is what it is, cannot
+				disable the touch screen so set the checksum*/
+				ts->eeprom_checksum = msg->checksum;
+				ts->checksum_cnt = 0;
+			} else {
+				if (!hw_reset) {
+					ret = qtouch_hw_init(ts);
+					if (ret != 0)
+						pr_err("%s:Cannot init the touch IC\n",
+						__func__);
+					qtouch_force_reset(ts, 0);
+					ts->checksum_cnt++;
+				}
+			}
 		}
 	}
 	return ret;
@@ -804,6 +828,8 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 		qtm_info.version, qtm_info.build, qtm_info.matrix_x_size,
 		qtm_info.matrix_y_size, qtm_info.num_objs);
 
+	ts->eeprom_checksum = ts->pdata->nv_checksum;
+
 	return 0;
 
 err_no_checksum:
@@ -851,6 +877,7 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	ts->pdata = pdata;
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
+	ts->checksum_cnt = 0;
 
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {
