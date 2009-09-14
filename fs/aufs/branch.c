@@ -787,6 +787,7 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 static void au_warn_ima(void)
 {
 #ifdef CONFIG_IMA
+	/* since it doesn't support mark_files_ro() */
 	AuWarn("RW -> RO makes IMA to produce wrong message");
 #endif
 }
