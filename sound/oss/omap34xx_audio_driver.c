@@ -257,7 +257,6 @@ static struct {
 	unsigned int accy_client_id;
 	unsigned long int connected_accy_mask;
 	unsigned long int interested_accy_mask;
-	int oss_accy_mask;	/* Mask of OSS connected accessories */
 	wait_queue_head_t accy_wait_queue;
 } state;
 
@@ -304,6 +303,7 @@ static unsigned long flags;
 static int read_buf_full;
 static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
+static int mic_setting = CPCAP_AUDIO_IN_NONE;
 static unsigned int capture_mode;
 static struct omap_mcbsp_wrapper *mcbsp_wrapper;
 #ifdef CONFIG_WAKELOCK
@@ -1102,31 +1102,27 @@ int omap2_mcbsp_params_cfg(unsigned int id, int interface_mode,
 
 static void map_audioic_speakers(void)
 {
-	if (state.dev_dsp_open_count > 0) {
-		cpcap_audio_state.stdac_primary_speaker =
-						primary_spkr_setting;
+	if (state.stdac_out_stream != NULL) {
+		cpcap_audio_state.stdac_primary_speaker = primary_spkr_setting;
 		cpcap_audio_state.stdac_secondary_speaker =
 						secondary_spkr_setting;
 	}
 
-	if (state.dev_dsp1_open_count > 0) {
-		if (cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) {
-			cpcap_audio_state.ext_primary_speaker =
-							primary_spkr_setting;
-			cpcap_audio_state.ext_secondary_speaker =
+	if (cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) {
+		cpcap_audio_state.ext_primary_speaker = primary_spkr_setting;
+		cpcap_audio_state.ext_secondary_speaker =
 							secondary_spkr_setting;
-			cpcap_audio_state.analog_source =
-						CPCAP_AUDIO_ANALOG_SOURCE_L;
-		} else{
-			cpcap_audio_state.codec_primary_speaker =
-							primary_spkr_setting;
+		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
+	} else if (state.codec_out_stream != NULL) {
+		cpcap_audio_state.codec_primary_speaker = primary_spkr_setting;
 			cpcap_audio_state.codec_secondary_speaker =
 							secondary_spkr_setting;
-		}
+	}
 
+	if (state.dev_dsp1_open_count > 0) {
 		if ((cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) &&
 			(primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
-			 && (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
+			&& (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
 			AUDIO_LEVEL1_LOG("Setting codec in Call BT mode\n");
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
 			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 0);
@@ -1137,7 +1133,7 @@ static void map_audioic_speakers(void)
 						CPCAP_AUDIO_CODEC_CLOCK_ONLY;
 			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
 			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
-		} else{
+		} else {
 			AUDIO_LEVEL1_LOG("Setting codec in Normal mode\n");
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
 			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
@@ -1154,18 +1150,7 @@ static int audio_select_speakers(int spkr)
 	AUDIO_LEVEL3_LOG("[%s] enter with spkr = %d\n", __func__, spkr);
 
 	while (spkr) {
-		if ((spkr & CPCAP_AUDIO_OUT_HANDSET) == CPCAP_AUDIO_OUT_HANDSET)
-			local_spkr = CPCAP_AUDIO_OUT_HANDSET;
-
-		else if ((spkr & CPCAP_AUDIO_OUT_LOUDSPEAKER) ==
-						CPCAP_AUDIO_OUT_LOUDSPEAKER)
-			local_spkr = CPCAP_AUDIO_OUT_LOUDSPEAKER;
-
-		else if ((spkr & CPCAP_AUDIO_OUT_LINEOUT) ==
-							CPCAP_AUDIO_OUT_LINEOUT)
-			local_spkr = CPCAP_AUDIO_OUT_LINEOUT;
-
-		else if ((spkr & CPCAP_AUDIO_OUT_STEREO_HEADSET) ==
+		if ((spkr & CPCAP_AUDIO_OUT_STEREO_HEADSET) ==
 						 CPCAP_AUDIO_OUT_STEREO_HEADSET)
 			local_spkr = CPCAP_AUDIO_OUT_STEREO_HEADSET;
 
@@ -1176,6 +1161,18 @@ static int audio_select_speakers(int spkr)
 		else if ((spkr & CPCAP_AUDIO_OUT_BT_MONO) ==
 						 CPCAP_AUDIO_OUT_BT_MONO)
 			local_spkr = CPCAP_AUDIO_OUT_BT_MONO;
+
+		else if ((spkr & CPCAP_AUDIO_OUT_HANDSET) ==
+							CPCAP_AUDIO_OUT_HANDSET)
+			local_spkr = CPCAP_AUDIO_OUT_HANDSET;
+
+		else if ((spkr & CPCAP_AUDIO_OUT_LOUDSPEAKER) ==
+						CPCAP_AUDIO_OUT_LOUDSPEAKER)
+			local_spkr = CPCAP_AUDIO_OUT_LOUDSPEAKER;
+
+		else if ((spkr & CPCAP_AUDIO_OUT_LINEOUT) ==
+							CPCAP_AUDIO_OUT_LINEOUT)
+			local_spkr = CPCAP_AUDIO_OUT_LINEOUT;
 
 		else if (local_spkr == -1 && spkr1 == CPCAP_AUDIO_OUT_NONE)
 			return -EINVAL;
@@ -1192,12 +1189,13 @@ static int audio_select_speakers(int spkr)
 
 	AUDIO_LEVEL1_LOG("spkr1 = %#x, spkr2 = %#x\n", spkr1, spkr2);
 
-	primary_spkr_setting = spkr1;
-	secondary_spkr_setting = spkr2;
-
-	map_audioic_speakers();
-
-	cpcap_audio_set_audio_state(&cpcap_audio_state);
+	if (spkr1 != primary_spkr_setting || spkr2 != secondary_spkr_setting) {
+		primary_spkr_setting = spkr1;
+		secondary_spkr_setting = spkr2;
+		map_audioic_speakers();
+		cpcap_audio_state.output_gain = 0;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+	}
 
 	return 0;
 }
@@ -1603,12 +1601,8 @@ static int audio_stdac_open(struct inode *inode, struct file *file)
 		       sizeof(struct audio_stream));
 		state.stdac_out_stream->inode = inode;
 		audio_buffer_reset(state.stdac_out_stream, inode);
-
 		TRY(error = audio_configure_ssi(inode, file))
-
 		cpcap_audio_state.stdac_mode = CPCAP_AUDIO_STDAC_ON;
-
-
 		map_audioic_speakers();
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	}
@@ -1624,18 +1618,15 @@ static int audio_stdac_release(struct inode *inode, struct file *file)
 
 	if (file->f_mode & FMODE_WRITE) {
 		audio_stop_ssi(inode, file);
-
 		audio_discard_buf(state.stdac_out_stream, inode);
 		kfree(state.stdac_out_stream);
 		state.stdac_out_stream = NULL;
 
 		cpcap_audio_state.stdac_mode = CPCAP_AUDIO_STDAC_OFF;
 		cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_MUTE;
-
 		cpcap_audio_state.stdac_primary_speaker = CPCAP_AUDIO_OUT_NONE;
 		cpcap_audio_state.stdac_secondary_speaker =
 							CPCAP_AUDIO_OUT_NONE;
-
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	}
 
@@ -1678,22 +1669,27 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		}
 
 		if (minor == state.dev_dsp) {
-			cpcap_audio_state.stdac_rate =
+			if (samp_rate != cpcap_audio_state.stdac_rate) {
+				cpcap_audio_state.stdac_rate =
 				valid_sample_rates[count].cpcap_audio_rate;
-		} else {
-				if ((file->f_mode & FMODE_WRITE) &&
-				    samp_rate != 8000 && samp_rate != 16000) {
-				AUDIO_ERROR_LOG("[%d] Unsupported "
-						"Codec sample rate!!\n",
-						(u32) samp_rate);
-				ret = -EINVAL;
-				goto out;
+				cpcap_audio_set_audio_state(&cpcap_audio_state);
 			}
+		} else {
+			if (samp_rate != cpcap_audio_state.codec_rate) {
+				if ((file->f_mode & FMODE_WRITE) &&
+				    (samp_rate != 8000 && samp_rate != 16000)) {
+					AUDIO_ERROR_LOG("[%d] Unsupported "
+						"Codec sample rate!!\n",
+							(u32) samp_rate);
+					ret = -EINVAL;
+					goto out;
+				}
 				cpcap_audio_state.codec_rate =
 				    valid_sample_rates[count].cpcap_audio_rate;
-		}
 
-		cpcap_audio_set_audio_state(&cpcap_audio_state);
+				cpcap_audio_set_audio_state(&cpcap_audio_state);
+			}
+		}
 		break;
 	}
 
@@ -1818,8 +1814,14 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		int mic;
 		TRY(copy_from_user(&mic, (int *)arg, sizeof(int)))
 		AUDIO_LEVEL2_LOG("SOUND_MIXER_RECSRC with mic = %#x\n", mic);
-		cpcap_audio_state.microphone = mic;
-		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		if (mic != mic_setting) {
+			if (state.dev_dsp1_open_count == 1) {
+				cpcap_audio_state.microphone = mic;
+				cpcap_audio_state.input_gain = 0;
+				cpcap_audio_set_audio_state(&cpcap_audio_state);
+			}
+			mic_setting = mic;
+		}
 		break;
 	}
 
@@ -1828,20 +1830,25 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		unsigned int gain;
 		TRY(copy_from_user(&gain, (unsigned int *)arg,
 					sizeof(unsigned int)))
+
 		if (gain == 0) {
 			cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_MUTE;
 			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
 		} else {
 			/* unmute codec or stereo DAC */
 			if (cpcap_audio_state.stdac_mode == CPCAP_AUDIO_STDAC_ON)
-				cpcap_audio_state.stdac_mute = CPCAP_AUDIO_STDAC_UNMUTE;
+				cpcap_audio_state.stdac_mute =
+						CPCAP_AUDIO_STDAC_UNMUTE;
 
-			if (cpcap_audio_state.codec_mode == CPCAP_AUDIO_CODEC_ON)
-				cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_UNMUTE;
-
-			cpcap_audio_state.output_gain = gain;
+			if (cpcap_audio_state.codec_mode ==
+							CPCAP_AUDIO_CODEC_ON &&
+				cpcap_audio_state.rat_type !=
+							CPCAP_AUDIO_RAT_CDMA)
+				cpcap_audio_state.codec_mute =
+						CPCAP_AUDIO_CODEC_UNMUTE;
 		}
 
+		cpcap_audio_state.output_gain = gain;
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 		AUDIO_LEVEL2_LOG("SOUND_MIXER_VOLUME, output_gain = %d\n",
 				cpcap_audio_state.output_gain);
@@ -1860,16 +1867,10 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	case SOUND_MIXER_READ_DEVMASK:
-		put_user(state.oss_accy_mask, (int *)arg);
-		AUDIO_LEVEL2_LOG("state.oss_accy_mask = %#x\n",
-						state.oss_accy_mask);
-		break;
-
 	default:
 		break;
-	}
 
+	}
 out:
 	mutex_unlock(&audio_lock);
 	return ret;
@@ -1987,9 +1988,27 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 	state.dev_dsp1_open_count = 1;
 	file->private_data = inode;
 
+	cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
+
 	if (file->f_flags & O_TRUNC) {
 		AUDIO_LEVEL1_LOG("CODEC in phone mode called \n");
 		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_CDMA;
+		cpcap_audio_state.output_gain = 0;
+		cpcap_audio_state.codec_rate = CPCAP_AUDIO_CODEC_RATE_8000_HZ;
+		cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+		if (primary_spkr_setting == CPCAP_AUDIO_OUT_LOUDSPEAKER) {
+			cpcap_audio_state.ext_primary_speaker =
+							CPCAP_AUDIO_OUT_HANDSET;
+			cpcap_audio_state.microphone =
+						CPCAP_AUDIO_IN_DUAL_INTERNAL;
+			primary_spkr_setting = CPCAP_AUDIO_OUT_HANDSET;
+			mic_setting = CPCAP_AUDIO_IN_DUAL_INTERNAL;
+		} else {
+			cpcap_audio_state.ext_primary_speaker =
+							primary_spkr_setting;
+			cpcap_audio_state.microphone = mic_setting;
+		}
+		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			state.codec_out_stream =
@@ -2000,6 +2019,7 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			audio_buffer_reset(state.codec_out_stream, inode);
 
 			TRY(audio_configure_ssi(inode, file))
+			map_audioic_speakers();
 		}
 
 		if (file->f_mode & FMODE_READ) {
@@ -2010,8 +2030,8 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			state.codec_in_stream->inode = inode;
 
 			TRY(audio_configure_ssi(inode, file))
+			cpcap_audio_state.microphone = mic_setting;
 		}
-		map_audioic_speakers();
 	}
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
 out:
@@ -2113,10 +2133,14 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 			}
 		}
 
+		mutex_unlock(&audio_lock);
+
 		wait_event_interruptible_timeout(str->wq, read_buf_full > 0,
 						 AUDIO_TIMEOUT);
 
-		mutex_lock(&audio_read_lock);
+		mutex_lock(&audio_lock);
+
+		spin_lock_irqsave(&audio_read_lock, flags);
 
 		read_buf_full--;
 
