@@ -27,8 +27,9 @@
 
 #include <linux/sfh7743.h>
 
-#define PROXIMITY_NEAR	0
-#define PROXIMITY_FAR	0xFFFFFFFF
+/* unit = millimeter */
+#define PROXIMITY_NEAR	30		/* prox close threshold is 22-70mm */
+#define PROXIMITY_FAR	2147483647	/* (2^31)-1 */
 #define NAME		"sfh7743"
 
 /* Suspend and resume is disabled so the sensor can wake the processor */
