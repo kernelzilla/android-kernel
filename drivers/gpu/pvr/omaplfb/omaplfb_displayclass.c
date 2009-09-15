@@ -1014,8 +1014,9 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	
 	if(psFlipCmd->ui32SwapInterval == 0 || psSwapChain->bFlushCommands == OMAP_TRUE)
 	{
-#endif
 		spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
+#endif
+
 		mutex_lock(&psDevInfo->active_list_lock);
 		if (list_empty(&psDevInfo->active_list)) {
 			OMAPLFBFlip(psSwapChain,
@@ -1077,7 +1078,9 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 #endif
 
 ExitTrueUnlock:
+#if defined(CONFIG_PVR_OMAP_USE_VSYNC)
 	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
+#endif
 	return IMG_TRUE;
 }
 
