@@ -259,7 +259,7 @@ static void serial_omap_stop_tx(struct uart_port *port)
 		up->ier &= ~UART_IER_THRI;
 		serial_out(up, UART_IER, up->ier);
 	}
-#ifdef CONFIG_OMAP3_PM
+#ifdef CONFIG_PM
 	if (!up->uart_dma.rx_dma_state) {
 		unsigned int tmp;
 		tmp = (serial_in(up, UART_OMAP_SYSC) & 0x7) | (2 << 3);
@@ -393,7 +393,7 @@ static void transmit_chars(struct uart_omap_port *up)
 static void serial_omap_start_tx(struct uart_port *port)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
-#ifdef CONFIG_OMAP3_PM
+#ifdef CONFIG_PM
 		/* Disallow OCP bus idle. UART TX irqs are not seen during
 		 * bus idle. Alternative is to set kernel timer at fifo
 		 * drain rate.
@@ -1260,7 +1260,7 @@ static void uart_rx_dma_callback(int lch, u16 ch_status, void *data)
 
 static void serial_omap_start_rxdma(struct uart_omap_port *up)
 {
-#ifdef CONFIG_OMAP3_PM
+#ifdef CONFIG_PM
 	/* Disallow OCP bus idle. UART TX irqs are not seen during
 	 * bus idle. Alternative is to set kernel timer at fifo
 	 * drain rate.
@@ -1623,71 +1623,65 @@ int omap24xx_uart_cts_wakeup(int uart_no, int state)
 	return 0;
 }
 EXPORT_SYMBOL(omap24xx_uart_cts_wakeup);
+#endif
+
+#ifdef CONFIG_PM
 /**
  * are_driver8250_uarts_active() - Check if any ports managed by this
  * driver are currently busy.  This should be called with interrupts
  * disabled.
  */
-int are_driveromap_uarts_active(int *driver8250_managed)
+int are_driveromap_uarts_active(int num)
 {
 	struct circ_buf *xmit;
 	unsigned int status;
-	int j;
-	*driver8250_managed = 0x7; /* OMAP has 3 UART instances */
-	for (j = 0; j < 3; j++) {
-		struct uart_omap_port *up = ui[j];
+	struct uart_omap_port *up = ui[num];
 
-		/* check ownership of port */
-		/* Check only ports managed by this driver and open */
-		if ((up->port.dev == NULL) || (up->port.type == PORT_UNKNOWN)) {
-			*driver8250_managed &= ~(1 << j);
-			continue;
-		}
+	/* check ownership of port */
+	/* Check only ports managed by this driver and open */
+	if ((up->port.dev == NULL) || (up->port.type == PORT_UNKNOWN))
+		return 0;
 
-		/* driver owns this port but its closed */
-		if (up->port.info == NULL)
-			continue;
+	/* driver owns this port but it's closed */
+	if (up->port.info == NULL)
+		return 0;
 
-		/* check for recent driver activity */
-		/* if from now to last activty < 5 second keep clocks on */
-		if ((jiffies_to_msecs(jiffies - isr8250_activity) < 5000))
-			return 1;
+	/* check for any current pending activity */
+	/* Any queued work in ring buffer which can be handled still? */
+	xmit = &up->port.info->xmit;
+	if (!(uart_circ_empty(xmit) || uart_tx_stopped(&up->port)))
+		return 1;
+	status = serial_in(up, UART_LSR);
 
-		/* check for any current pending activity */
-		/* Any queued work in ring buffer which can be handled still? */
-		xmit = &up->port.info->xmit;
-		if (!(uart_circ_empty(xmit) || uart_tx_stopped(&up->port)))
-			return 1;
-		status = serial_in(up, UART_LSR);
+	/* TX hardware not empty */
+	if (!(status & (UART_LSR_TEMT | UART_LSR_THRE)))
+		return 1;
 
-		/* TX hardware not empty/ */
-		if (!(status & (UART_LSR_TEMT | UART_LSR_THRE)))
-			return 1;
+	/* Any rx activity? */
+	if (status & UART_LSR_DR)
+		return 1;
 
-		/* Any rx activity? */
-		if (status & UART_LSR_DR)
-			return 1;
-
-		/* Any modem activity */
-		status = serial_in(up, UART_MSR);
-		if (!((status & UART_MSR_ANY_DELTA) == 0))
-			return 1;
-		if (up->use_dma) {
-			/*
-			 * Silicon Errata i291 workaround.
-			 * UART Module has to be put in force idle if it is
-			 * configured in DMA mode and when there is no activity
-			 * expected.
-			 */
-			unsigned int tmp;
-			tmp = (serial_in(up, UART_OMAP_SYSC) & 0x7);
-			serial_out(up, UART_OMAP_SYSC, tmp); /* force-idle */
-		}
+	/* Any modem activity? */
+	status = serial_in(up, UART_MSR);
+	if (!((status & UART_MSR_ANY_DELTA) == 0))
+		return 1;
+	if (up->use_dma) {
+		/*
+		 * Silicon Errata i291 workaround.
+		 * UART Module has to be put in force idle if it is
+		 * configured in DMA mode and when there is no activity
+		 * expected.
+		 */
+		unsigned int tmp;
+		del_timer(&up->uart_dma.rx_timer);
+		serial_omap_stop_rxdma(up);
+		up->ier |= UART_IER_RDI;
+		serial_out(up, UART_IER, up->ier);
+		tmp = (serial_in(up, UART_OMAP_SYSC) & 0x7);
+		serial_out(up, UART_OMAP_SYSC, tmp); /* force-idle */
 	}
 
-	if (*driver8250_managed)
-		return 0;
-	return 1;
+	return 0;
 }
 EXPORT_SYMBOL(are_driveromap_uarts_active);
 
