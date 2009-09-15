@@ -167,6 +167,7 @@ static void sholes_panel_disable(struct omap_dss_device *dssdev)
 	u8 data[1];
 
 	DBG("sholes_panel_ctrl_disable\n");
+	cancel_work_sync(&((struct sholes_data *)dssdev->data)->work);
 
 	data[0] = EDISCO_CMD_SET_DISPLAY_OFF;
 	dsi_vc_dcs_write(EDISCO_CMD_VC, data, 1);
