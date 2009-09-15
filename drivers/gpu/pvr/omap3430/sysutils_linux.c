@@ -68,54 +68,18 @@
 extern struct platform_device *gpsPVRLDMDev;
 
 #if !defined(PDUMP) && !defined(NO_HARDWARE)
-static IMG_BOOL PowerLockWrappedOnCPU(SYS_SPECIFIC_DATA *psSysSpecData)
-{
-	IMG_INT iCPU;
-	IMG_BOOL bLocked = IMG_FALSE;
-
-	if (!in_interrupt())
-	{
-		iCPU = get_cpu();
-		bLocked = (iCPU == atomic_read(&psSysSpecData->sPowerLockCPU));
-
-		put_cpu();
-	}
-
-	return bLocked;
-}
 
 static IMG_VOID PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
-	IMG_INT iCPU;
-
-	if (!in_interrupt())
-	{
-		
-		iCPU = get_cpu();
-
-		
-		PVR_ASSERT(iCPU != -1);
-
-		PVR_ASSERT(!PowerLockWrappedOnCPU(psSysSpecData));
-
-		spin_lock(&psSysSpecData->sPowerLock);
-
-		atomic_set(&psSysSpecData->sPowerLockCPU, iCPU);
-	}
+	BUG_ON(in_atomic());
+	mutex_lock(&psSysSpecData->sPowerLock);
 }
 
 static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
-	if (!in_interrupt())
-	{
-		PVR_ASSERT(PowerLockWrappedOnCPU(psSysSpecData));
+	BUG_ON(in_atomic());
+	mutex_unlock(&psSysSpecData->sPowerLock);
 
-		atomic_set(&psSysSpecData->sPowerLockCPU, -1);
-
-		spin_unlock(&psSysSpecData->sPowerLock);
-
-		put_cpu();
-	}
 }
 
 PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData)
@@ -133,6 +97,7 @@ IMG_VOID SysPowerLockUnwrap(SYS_DATA *psSysData)
 
 	PowerLockUnwrap(psSysSpecData);
 }
+
 #else	
 static IMG_BOOL PowerLockWrappedOnCPU(SYS_SPECIFIC_DATA unref__ *psSysSpecData)
 {
@@ -159,14 +124,9 @@ IMG_VOID SysPowerLockUnwrap(SYS_DATA unref__ *psSysData)
 
 IMG_BOOL WrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData)
 {
-	IMG_BOOL bPowerLock = PowerLockWrappedOnCPU(psSysSpecData);
+	PowerLockUnwrap(psSysSpecData);
 
-	if (bPowerLock)
-	{
-		PowerLockUnwrap(psSysSpecData);
-	}
-
-	return bPowerLock;
+	return IMG_TRUE;
 }
 
 IMG_VOID UnwrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData)
@@ -545,8 +505,7 @@ PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData)
 	{
 		bPowerLock = IMG_FALSE;
 
-		spin_lock_init(&psSysSpecData->sPowerLock);
-		atomic_set(&psSysSpecData->sPowerLockCPU, -1);
+		mutex_init(&psSysSpecData->sPowerLock);
 		spin_lock_init(&psSysSpecData->sNotifyLock);
 		atomic_set(&psSysSpecData->sNotifyLockCPU, -1);
 
@@ -596,12 +555,8 @@ PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData)
 	}
 	else
 	{
-		
-		bPowerLock = PowerLockWrappedOnCPU(psSysSpecData);
-		if (bPowerLock)
-		{
-			PowerLockUnwrap(psSysSpecData);
-		}
+		bPowerLock = IMG_TRUE;
+		PowerLockUnwrap(psSysSpecData);
 	}
 
 #if defined(CONSTRAINT_NOTIFICATIONS)
@@ -767,7 +722,6 @@ Exit:
 IMG_VOID DisableSystemClocks(SYS_DATA *psSysData)
 {
 	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
-	IMG_BOOL bPowerLock;
 #if defined(DEBUG) || defined(TIMING)
 	IMG_CPU_PHYADDR TimerRegPhysBase;
 	IMG_HANDLE hTimerDisable;
@@ -779,12 +733,7 @@ IMG_VOID DisableSystemClocks(SYS_DATA *psSysData)
 	
 	DisableSGXClocks(psSysData);
 
-	bPowerLock = PowerLockWrappedOnCPU(psSysSpecData);
-	if (bPowerLock)
-	{
-		
-		PowerLockUnwrap(psSysSpecData);
-	}
+	PowerLockUnwrap(psSysSpecData);
 
 #if defined(PDUMP) && !defined(NO_HARDWARE) && defined(CONSTRAINT_NOTIFICATIONS)
 	{
@@ -835,8 +784,5 @@ IMG_VOID DisableSystemClocks(SYS_DATA *psSysData)
 #if defined(CONSTRAINT_NOTIFICATIONS)
 	constraint_put(psSysSpecData->pVdd2Handle);
 #endif	
-	if (bPowerLock)
-	{
-		PowerLockWrap(psSysSpecData);
-	}
+	PowerLockWrap(psSysSpecData);
 }
