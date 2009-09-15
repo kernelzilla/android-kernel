@@ -1012,12 +1012,9 @@ static int omapvout_vidioc_s_fbuf(struct file *file, void *priv,
 
 	mutex_lock(&vout->mtx);
 
-	/* OMAP DSS doesn't support local alpha for video 1 */
-	if ((vout->dss->overlay->id == OMAP_DSS_VIDEO1) &&
-			(a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA)) {
-		rc = -EINVAL;
-		goto failed;
-	}
+	/* HACK: OMAP DSS doesn't support local alpha for video 1 --
+	 * so if it requests it assume this is meant to be local alpha
+	 * for gfx*/
 
 	vout->fbuf.flags = a->flags;
 
