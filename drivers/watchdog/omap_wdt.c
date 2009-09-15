@@ -42,6 +42,9 @@
 #include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+#include <linux/timer.h>
+#endif
 #include <mach/hardware.h>
 #include <mach/prcm.h>
 
@@ -65,6 +68,9 @@ struct omap_wdt_dev {
 	struct clk      *mpu_wdt_fck;
 	struct resource *mem;
 	struct miscdevice omap_wdt_miscdev;
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+	struct timer_list autopet_timer;
+#endif
 };
 
 static void omap_wdt_ping(struct omap_wdt_dev *wdev)
@@ -135,16 +141,9 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 		cpu_relax();
 }
 
-/*
- *	Allow only one task to hold it open
- */
-static int omap_wdt_open(struct inode *inode, struct file *file)
+static void omap_wdt_startclocks(struct omap_wdt_dev *wdev)
 {
-	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 	void __iomem *base = wdev->base;
-
-	if (test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users)))
-		return -EBUSY;
 
 	if (cpu_is_omap16xx())
 		clk_enable(wdev->armwdt_ck);	/* Enable the clock */
@@ -161,6 +160,19 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 	__raw_writel((1 << 5) | (PTV << 2), base + OMAP_WATCHDOG_CNTRL);
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x01)
 		cpu_relax();
+}
+
+/*
+ *	Allow only one task to hold it open
+ */
+static int omap_wdt_open(struct inode *inode, struct file *file)
+{
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
+
+	if (test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users)))
+		return -EBUSY;
+
+	omap_wdt_startclocks(wdev);
 
 	file->private_data = (void *) wdev;
 
@@ -269,6 +281,18 @@ static const struct file_operations omap_wdt_fops = {
 	.release = omap_wdt_release,
 };
 
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+static void autopet_handler(unsigned long data)
+{
+	struct omap_wdt_dev *wdev = (struct omap_wdt_dev *) data;
+
+	spin_lock(&wdt_lock);
+	omap_wdt_ping(wdev);
+	spin_unlock(&wdt_lock);
+	mod_timer(&wdev->autopet_timer, jiffies + (HZ * TIMER_AUTOPET_FREQ));
+}
+#endif
+
 static int __init omap_wdt_probe(struct platform_device *pdev)
 {
 	struct resource *res, *mem;
@@ -370,6 +394,17 @@ static int __init omap_wdt_probe(struct platform_device *pdev)
 
 	omap_wdt_dev = pdev;
 
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+	setup_timer(&wdev->autopet_timer, autopet_handler,
+		    (unsigned long) wdev);
+	test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users));
+	omap_wdt_startclocks(wdev);
+	omap_wdt_set_timeout(wdev);
+	mod_timer(&wdev->autopet_timer, jiffies + (HZ * TIMER_AUTOPET_FREQ));
+	omap_wdt_enable(wdev);
+	pr_info("Watchdog auto-pet enabled at %d sec intervals\n",
+		TIMER_AUTOPET_FREQ);
+#endif
 	return 0;
 
 err_misc:
