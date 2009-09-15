@@ -69,13 +69,12 @@ static IMG_BOOL PowerLockWrappedOnCPU(SYS_SPECIFIC_DATA *psSysSpecData)
 	IMG_INT iCPU;
 	IMG_BOOL bLocked = IMG_FALSE;
 
-	if (!in_interrupt())
-	{
-		iCPU = get_cpu();
-		bLocked = (iCPU == atomic_read(&psSysSpecData->sPowerLockCPU));
+	BUG_ON(irqs_disabled());
 
-		put_cpu();
-	}
+	iCPU = get_cpu();
+	bLocked = (iCPU == atomic_read(&psSysSpecData->sPowerLockCPU));
+
+	put_cpu();
 
 	return bLocked;
 }
@@ -84,34 +83,29 @@ static IMG_VOID PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
 	IMG_INT iCPU;
 
-	if (!in_interrupt())
-	{
-		
-		iCPU = get_cpu();
+	BUG_ON(irqs_disabled());
 
-		
-		PVR_ASSERT(iCPU != -1);
+	iCPU = get_cpu();
 
-		PVR_ASSERT(!PowerLockWrappedOnCPU(psSysSpecData));
+	PVR_ASSERT(iCPU != -1);
+	PVR_ASSERT(!PowerLockWrappedOnCPU(psSysSpecData));
 
-		spin_lock(&psSysSpecData->sPowerLock);
+	mutex_lock(&psSysSpecData->sPowerLock);
 
-		atomic_set(&psSysSpecData->sPowerLockCPU, iCPU);
-	}
+	atomic_set(&psSysSpecData->sPowerLockCPU, iCPU);
 }
 
 static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
-	if (!in_interrupt())
-	{
-		PVR_ASSERT(PowerLockWrappedOnCPU(psSysSpecData));
+	BUG_ON(irqs_disabled());
 
-		atomic_set(&psSysSpecData->sPowerLockCPU, -1);
+	PVR_ASSERT(PowerLockWrappedOnCPU(psSysSpecData));
 
-		spin_unlock(&psSysSpecData->sPowerLock);
+	atomic_set(&psSysSpecData->sPowerLockCPU, -1);
 
-		put_cpu();
-	}
+	mutex_unlock(&psSysSpecData->sPowerLock);
+
+	put_cpu();
 }
 
 PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData)
@@ -539,7 +533,7 @@ PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData)
 	{
 		bPowerLock = IMG_FALSE;
 
-		spin_lock_init(&psSysSpecData->sPowerLock);
+		mutex_init(&psSysSpecData->sPowerLock);
 		atomic_set(&psSysSpecData->sPowerLockCPU, -1);
 		spin_lock_init(&psSysSpecData->sNotifyLock);
 		atomic_set(&psSysSpecData->sNotifyLockCPU, -1);
