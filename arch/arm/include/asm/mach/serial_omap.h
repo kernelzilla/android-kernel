@@ -28,4 +28,8 @@ struct plat_serialomap_port {
 	int		wake_gpio_strobe;
 };
 
+#ifdef CONFIG_PM
+int are_driveromap_uarts_active(int num);
+#endif
+
 #endif

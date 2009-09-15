@@ -30,6 +30,7 @@
 #include <mach/clock.h>
 #include <mach/control.h>
 #include <mach/gpio.h>
+#include <mach/omap-serial.h>
 
 #include <asm/mach/serial_omap.h>
 
@@ -272,12 +273,16 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	serial_write_reg(p, UART_EFR, UART_EFR_ECB);
 	serial_write_reg(p, UART_LCR, 0x0); /* Operational mode */
 	serial_write_reg(p, UART_IER, 0x0);
+#ifdef CONFIG_SERIAL_OMAP
+	serial_write_reg(p, UART_FCR, fcr[uart->num]);
+#else
+	serial_write_reg(p, UART_FCR, 0xA1);
+#endif
 	serial_write_reg(p, UART_LCR, 0xBF); /* Config B mode */
 	serial_write_reg(p, UART_DLL, uart->dll);
 	serial_write_reg(p, UART_DLM, uart->dlh);
 	serial_write_reg(p, UART_LCR, 0x0); /* Operational mode */
 	serial_write_reg(p, UART_IER, uart->ier);
-	serial_write_reg(p, UART_FCR, 0xA1);
 	serial_write_reg(p, UART_LCR, 0xBF); /* Config B mode */
 	serial_write_reg(p, UART_EFR, efr);
 	serial_write_reg(p, UART_LCR, UART_LCR_WLEN8);
@@ -413,6 +418,11 @@ void omap_uart_prepare_idle(int num)
 				_omap_uart_block_sleep(uart);
 				return;
 			}
+
+#ifdef CONFIG_SERIAL_OMAP
+			if (are_driveromap_uarts_active(num))
+				return;
+#endif
 			omap_uart_enable_rtspullup(uart);
 			omap_uart_disable_clocks(uart);
 			return;
@@ -469,6 +479,13 @@ int omap_uart_can_sleep(void)
 			can_sleep = 0;
 			continue;
 		}
+
+#ifdef CONFIG_SERIAL_OMAP
+		if (are_driveromap_uarts_active(uart->num)) {
+			can_sleep = 0;
+			continue;
+		}
+#endif
 
 		/* This UART can now safely sleep. */
 		omap_uart_allow_sleep(uart);
