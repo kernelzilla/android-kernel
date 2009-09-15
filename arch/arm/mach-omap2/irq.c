@@ -169,8 +169,11 @@ static void __init omap_irq_bank_init_one(struct omap_irq_bank *bank)
 	while (!(intc_bank_read_reg(bank, INTC_SYSSTATUS) & 0x1))
 		/* Wait for reset to complete */;
 
-	/* Enable autoidle */
-	intc_bank_write_reg(1 << 0, bank, INTC_SYSCONFIG);
+	/*
+	 * Disable autoidle, intc appears to lockup when hammered (from cpuidle)
+	 * with PER-RET & CORE-ON state.
+	 */
+	intc_bank_write_reg(0, bank, INTC_SYSCONFIG);
 }
 
 int omap_irq_pending(void)
