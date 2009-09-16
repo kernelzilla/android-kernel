@@ -876,9 +876,9 @@ static void __init prcm_setup_regs(void)
 
 	/* setup wakup source */
 	prm_write_mod_reg(OMAP3430_EN_IO | OMAP3430_EN_GPIO1 |
-			  OMAP3430_EN_GPIO2 |
 			  OMAP3430_EN_GPT1 | OMAP3430_EN_GPT12,
 			  WKUP_MOD, PM_WKEN);
+
 	/* No need to write EN_IO, that is always enabled */
 	prm_write_mod_reg(OMAP3430_EN_GPIO1 | OMAP3430_EN_GPT1 |
 			  OMAP3430_EN_GPT12,
