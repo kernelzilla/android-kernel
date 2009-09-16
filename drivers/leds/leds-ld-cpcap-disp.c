@@ -41,19 +41,8 @@ static void disp_button_set(struct led_classdev *led_cdev,
 			 disp_button_class_dev);
 
 	if (value > 0) {
-
-		if (value <= 51)
-			brightness = LD_DISP_BUTTON_LOW;
-		else if (value <= 104)
-			brightness = LD_DISP_BUTTON_LOW_MED;
-		else if (value <= 155)
-			brightness = LD_DISP_BUTTON_MEDIUM;
-		else if (value <= 201)
-			brightness = LD_DISP_BUTTON_MED_HIGH;
-		else
-			brightness = LD_DISP_BUTTON_HIGH;
-
-		brightness |= LD_DISP_BUTTON_CURRENT;
+		brightness = (LD_DISP_BUTTON_DUTY_CYCLE |
+			LD_DISP_BUTTON_CURRENT | LD_DISP_BUTTON_ON);
 
 		if ((disp_button_led_data->regulator) &&
 		    (disp_button_led_data->regulator_state == 0)) {
@@ -63,8 +52,7 @@ static void disp_button_set(struct led_classdev *led_cdev,
 
 		cpcap_status = cpcap_regacc_write(disp_button_led_data->cpcap,
 						  CPCAP_REG_KLC,
-						  (brightness |
-						   LD_DISP_BUTTON_ON),
+						  brightness,
 						  LD_DISP_BUTTON_CPCAP_MASK);
 
 		if (cpcap_status < 0)
