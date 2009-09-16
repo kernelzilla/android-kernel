@@ -701,14 +701,7 @@ static int aufs_getattr(struct vfsmount *mnt __maybe_unused,
 		if (au_digen(dentry) == sigen && au_iigen(inode) == sigen)
 			di_read_lock_child(dentry, AuLock_IR);
 		else {
-			/* NFSD may skip the revalidation */
-			if (!au_test_nfsd(current))
-				AuDebugOn(!IS_ROOT(dentry));
-			else {
-				err = au_busy_or_stale();
-				if (unlikely(!IS_ROOT(dentry)))
-					goto out;
-			}
+			AuDebugOn(!IS_ROOT(dentry));
 			err = au_getattr_lock_reval(dentry, sigen);
 			if (unlikely(err))
 				goto out;
