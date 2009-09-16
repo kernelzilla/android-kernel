@@ -32,6 +32,7 @@
 #include <linux/version.h>
 #include <linux/clk.h>
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <asm/atomic.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,26))
