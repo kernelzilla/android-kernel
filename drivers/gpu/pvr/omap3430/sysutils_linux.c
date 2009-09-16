@@ -67,21 +67,13 @@ extern struct platform_device *gpsPVRLDMDev;
 
 static IMG_VOID PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
-	IMG_INT iCPU;
-
-
 	BUG_ON(in_atomic());
 	mutex_lock(&psSysSpecData->sPowerLock);
-
-	atomic_set(&psSysSpecData->sPowerLockCPU, iCPU);
 }
 
 static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
 {
 	BUG_ON(in_atomic());
-
-	atomic_set(&psSysSpecData->sPowerLockCPU, -1);
-
 	mutex_unlock(&psSysSpecData->sPowerLock);
 
 }
@@ -507,7 +499,6 @@ PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData)
 		bPowerLock = IMG_FALSE;
 
 		mutex_init(&psSysSpecData->sPowerLock);
-		atomic_set(&psSysSpecData->sPowerLockCPU, -1);
 		spin_lock_init(&psSysSpecData->sNotifyLock);
 		atomic_set(&psSysSpecData->sNotifyLockCPU, -1);
 
@@ -557,6 +548,7 @@ PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData)
 	}
 	else
 	{
+		bPowerLock = IMG_TRUE;
 		PowerLockUnwrap(psSysSpecData);
 	}
 //FIXME: Comment this out until the support is there in the latest BSP with 2.6.29 kernel support
@@ -725,7 +717,6 @@ Exit:
 IMG_VOID DisableSystemClocks(SYS_DATA *psSysData)
 {
 	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
-	IMG_BOOL bPowerLock;
 #if defined(DEBUG) || defined(TIMING)
 	IMG_CPU_PHYADDR TimerRegPhysBase;
 	IMG_HANDLE hTimerDisable;
@@ -793,8 +784,5 @@ IMG_VOID DisableSystemClocks(SYS_DATA *psSysData)
 	constraint_put(psSysSpecData->pVdd2Handle);
 
 #endif	
-	if (bPowerLock)
-	{
-		PowerLockWrap(psSysSpecData);
-	}
+	PowerLockWrap(psSysSpecData);
 }
