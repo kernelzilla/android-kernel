@@ -254,6 +254,7 @@ int resource_refresh(void)
  */
 int resource_register(struct shared_resource *resp)
 {
+	int ret = 0;
 	if (!resp)
 		return -EINVAL;
 
@@ -261,12 +262,14 @@ int resource_register(struct shared_resource *resp)
 		return -EINVAL;
 
 	/* Verify that the resource is not already registered */
-	if (resource_lookup(resp->name))
-		return -EEXIST;
+	down(&res_mutex);
+	if (_resource_lookup(resp->name)) {
+		ret = -EEXIST;
+		goto out;
+	}
 
 	INIT_LIST_HEAD(&resp->users_list);
 
-	down(&res_mutex);
 	/* Add the resource to the resource list */
 	list_add(&resp->node, &res_list);
 
@@ -274,10 +277,11 @@ int resource_register(struct shared_resource *resp)
 	if (resp->ops->init)
 		resp->ops->init(resp);
 
-	up(&res_mutex);
 	pr_debug("resource: registered %s\n", resp->name);
 
-	return 0;
+out:
+	up(&res_mutex);
+	return ret;
 }
 EXPORT_SYMBOL(resource_register);
 
