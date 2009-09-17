@@ -233,16 +233,16 @@ void sholes_camera_lines_safe_mode(void)
 	omap_writew(0x0007, 0x48002110);
 	omap_writew(0x0007, 0x48002112);
 	omap_writew(0x0007, 0x48002114);
-	omap_writew(0x0007, 0x4800211a);
-	omap_writew(0x0007, 0x4800211c);
-	omap_writew(0x0007, 0x4800211e);
-	omap_writew(0x0007, 0x48002120);
+	omap_writew(0x011F, 0x4800211a);
+	omap_writew(0x011F, 0x4800211c);
+	omap_writew(0x011F, 0x4800211e);
+	omap_writew(0x011F, 0x48002120);
 	omap_writew(0x001F, 0x48002122);
 	omap_writew(0x001F, 0x48002124);
 	omap_writew(0x001F, 0x48002126);
 	omap_writew(0x001F, 0x48002128);
-	omap_writew(0x0007, 0x4800212a);
-	omap_writew(0x0007, 0x4800212c);
+	omap_writew(0x011F, 0x4800212a);
+	omap_writew(0x011F, 0x4800212c);
 }
 
 void sholes_camera_lines_func_mode(void)
