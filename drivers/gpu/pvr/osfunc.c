@@ -1488,24 +1488,30 @@ typedef struct TIMER_CALLBACK_DATA_TAG
 	struct timer_list	sTimer;
 	IMG_UINT32		ui32Delay;
 	IMG_BOOL		bActive;
+	struct work_struct	work;
 }TIMER_CALLBACK_DATA;
 
 static TIMER_CALLBACK_DATA sTimers[OS_MAX_TIMERS];
 
 static spinlock_t sTimerStructLock = SPIN_LOCK_UNLOCKED;
 
-static IMG_VOID OSTimerCallbackWrapper(IMG_UINT32 ui32Data)
+static void timer_worker(struct work_struct *work)
 {
-	TIMER_CALLBACK_DATA	*psTimerCBData = (TIMER_CALLBACK_DATA*)ui32Data;
-	
+	TIMER_CALLBACK_DATA *psTimerCBData = container_of(work, TIMER_CALLBACK_DATA, work);
+
 	if (!psTimerCBData->bActive)
 		return;
 
-	
 	psTimerCBData->pfnTimerFunc(psTimerCBData->pvData);
-	
-	
+
 	mod_timer(&psTimerCBData->sTimer, psTimerCBData->ui32Delay + jiffies);
+}
+
+static IMG_VOID OSTimerCallbackWrapper(IMG_UINT32 ui32Data)
+{
+	TIMER_CALLBACK_DATA	*psTimerCBData = (TIMER_CALLBACK_DATA*)ui32Data;
+
+	schedule_work(&psTimerCBData->work);
 }
 
 
@@ -1546,7 +1552,7 @@ IMG_HANDLE OSAddTimer(PFN_TIMER_FUNC pfnTimerFunc, IMG_VOID *pvData, IMG_UINT32 
 	psTimerCBData->bActive = IMG_FALSE;
 	
 	
-
+	INIT_WORK(&psTimerCBData->work, timer_worker);
 
 	psTimerCBData->ui32Delay = ((HZ * ui32MsTimeout) < 1000)
 								?	1
@@ -1593,7 +1599,6 @@ PVRSRV_ERROR OSEnableTimer (IMG_HANDLE hTimer)
 	PVR_ASSERT(psTimerCBData->bInUse);
 	PVR_ASSERT(!psTimerCBData->bActive);
 
-	
 	psTimerCBData->bActive = IMG_TRUE;
 
 	
@@ -1615,6 +1620,7 @@ PVRSRV_ERROR OSDisableTimer (IMG_HANDLE hTimer)
 
 	
 	del_timer_sync(&psTimerCBData->sTimer);	
+	cancel_work_sync(&psTimerCBData->work);
 	
 	return PVRSRV_OK;
 }
