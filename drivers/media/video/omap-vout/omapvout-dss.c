@@ -69,61 +69,51 @@ static enum omap_color_mode omapvout_dss_color_mode(u32 pixelformat)
 	return mode;
 }
 
-static int omapvout_dss_calc_offset(struct omapvout_device *vout)
+static void omapvout_dss_calc_offset(struct omapvout_device *vout,
+				int bpp, int ow, int oh)
 {
 	struct omapvout_dss *dss;
-	int rc = 0;
-	u32 fmt;
-	int bpp;
-	int bpp_mult = 1;
-	u16 ow, oh;
 	int iw, ih;
 	int cx, cy, cw, ch;
 
 	/* It is assumed that the caller has locked the vout mutex */
 
-	fmt = vout->pix.pixelformat;
-	bpp = omapvout_dss_format_bytespp(fmt);
-	if (fmt == V4L2_PIX_FMT_YUYV || fmt == V4L2_PIX_FMT_UYVY)
-		bpp_mult = 2;
-
-	iw = vout->pix.width;
-	ih = vout->pix.height;
-	cx = vout->crop.left;
-	cy = vout->crop.top;
-	cw = vout->crop.width;
-	ch = vout->crop.height;
-
-	ow = iw;
-	oh = ih;
-	omap_vrfb_adjust_size(&ow, &oh, bpp);
-	ow = ow - iw;
-	oh = oh - ih;
-
 	dss = vout->dss;
 
-	switch (vout->rotation)	{
-	case 3: /* 270 degrees */
-		dss->foffset = (cx * OMAP_VRFB_LINE_LEN * bpp * bpp_mult)
-				+ ((oh + (ih - cy - ch)) * bpp * bpp_mult);
+	if (dss->rotation == 1 || dss->rotation == 3) {
+		iw = vout->pix.height;
+		ih = vout->pix.width;
+		cw = vout->crop.height;
+		ch = vout->crop.width;
+	} else {
+		iw = vout->pix.width;
+		ih = vout->pix.height;
+		cw = vout->crop.width;
+		ch = vout->crop.height;
+	}
+	cx = vout->crop.left;
+	cy = vout->crop.top;
+
+	switch (dss->rotation)	{
+	case 1: /* 90 degrees */
+		dss->foffset = (cx * OMAP_VRFB_LINE_LEN * bpp)
+				+ ((oh + (ih - cy - ch)) * bpp);
 		break;
 	case 2: /* 180 degrees */
 		dss->foffset = ((oh + (ih - cy - ch)) * OMAP_VRFB_LINE_LEN
-							* bpp * bpp_mult)
-				+ ((ow + (iw - cx - cw)) * bpp * bpp_mult);
+							* bpp)
+				+ ((ow + (iw - cx - cw)) * bpp);
 		break;
-	case 1: /* 90 degrees */
+	case 3: /* 270 degrees */
 		dss->foffset = ((ow + (iw - cx - cw)) * OMAP_VRFB_LINE_LEN
-							* bpp * bpp_mult)
-				+ (cy * bpp * bpp_mult);
+							* bpp)
+				+ (cy * bpp);
 		break;
 	default:
 	case 0: /* 0 degrees */
 		dss->foffset = ((cy * iw) + (cx)) * bpp;
 		break;
 	}
-
-	return rc;
 }
 
 static int omapvout_dss_get_overlays(struct omap_overlay **gfx,
@@ -455,7 +445,7 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 					int buf_idx, bool vrfb_cfg)
 {
 	int rc = 0;
-	int rot = 0;
+	int rot = vout->dss->rotation;
 	struct omapvout_dss_vrfb *vrfb;
 	u32 src_paddr;
 	u32 dst_paddr;
@@ -478,9 +468,12 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 
 		dss_fmt = omapvout_dss_color_mode(vout->pix.pixelformat);
 		omap_vrfb_setup(&vrfb->ctx[0], vrfb->phy_addr[0],
-				w, h, dss_fmt, vout->rotation);
+				w, h, dss_fmt, rot);
 		omap_vrfb_setup(&vrfb->ctx[1], vrfb->phy_addr[1],
-				w, h, dss_fmt, vout->rotation);
+				w, h, dss_fmt, rot);
+
+		omapvout_dss_calc_offset(vout, vrfb->ctx[0].bytespp,
+				vrfb->ctx[0].xoffset, vrfb->ctx[0].yoffset);
 
 		bytespp = omapvout_dss_format_bytespp(vout->pix.pixelformat);
 		vrfb->en = (w * bytespp) / 4; /* 32 bit ES */
@@ -495,20 +488,8 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 		}
 	}
 
-	switch (vout->rotation) {
-	case 1:
-		rot = 3;
-		break;
-	case 3:
-		rot = 1;
-		break;
-	default:
-		rot = vout->rotation;
-		break;
-	}
-
 	src_paddr = vout->queue.bufs[buf_idx]->baddr;
-	dst_paddr = vrfb->ctx[vrfb->next].paddr[rot];
+	dst_paddr = vrfb->ctx[vrfb->next].paddr[rot] + vout->dss->foffset;
 
 	omap_set_dma_transfer_params(vrfb->dma_ch, OMAP_DMA_DATA_TYPE_S32,
 				vrfb->en, vrfb->fn, OMAP_DMA_SYNC_ELEMENT,
@@ -542,9 +523,10 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	struct omap_overlay *ovly;
 	struct omapvout_dss_vrfb *vrfb;
 	int rc = 0;
-	int rot = vout->rotation;
+	int rot = vout->dss->rotation;
 
 	/* It is assumed that the caller has locked the vout mutex */
+
 
 	/* Populate the overlay info struct and set it */
 	ovly = vout->dss->overlay;
@@ -552,7 +534,6 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	o_info.enabled = true;
 	vrfb = &vout->dss->vrfb;
 	o_info.paddr = vrfb->ctx[vrfb->next].paddr[0];
-	o_info.paddr += vout->dss->foffset;
 	o_info.vaddr = NULL;
 	o_info.screen_width = OMAP_VRFB_LINE_LEN;
 	vrfb->next = (vrfb->next) ? 0 : 1;
@@ -571,7 +552,7 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 	o_info.out_height = vout->win.w.height;
 	o_info.color_mode = omapvout_dss_color_mode(vout->pix.pixelformat);
 	o_info.rotation_type = OMAP_DSS_ROT_VRFB;
-	o_info.rotation = rot;
+	o_info.rotation = vout->rotation; // Rotation value, not buffer index
 	o_info.mirror = false;
 
 	rc = ovly->set_overlay_info(ovly, &o_info);
@@ -630,16 +611,22 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 		/*DBG("Processing frame %d\n", idx);*/
 
 		if (dss->need_cfg) {
-			rc = omapvout_dss_calc_offset(vout);
-			if (rc != 0) {
-				DBG("Offset calculation failed %d\n", rc);
-				goto failed_need_done;
-			}
-
 			rc = omapvout_dss_enable_transparency(vout);
 			if (rc != 0) {
 				DBG("Alpha config failed %d\n", rc);
 				goto failed_need_done;
+			}
+
+			switch (vout->rotation) {
+			case 1:
+				dss->rotation = 3;
+				break;
+			case 3:
+				dss->rotation = 1;
+				break;
+			default:
+				dss->rotation = vout->rotation;
+				break;
 			}
 		}
 

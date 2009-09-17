@@ -48,6 +48,8 @@ struct omapvout_dss {
 	bool enabled;
 	bool need_cfg;
 
+	int rotation;
+
 	struct omapvout_dss_vrfb vrfb;
 	int foffset; /* per frame address offset */
 
