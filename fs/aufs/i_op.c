@@ -640,12 +640,10 @@ static int au_getattr_lock_reval(struct dentry *dentry, unsigned int sigen)
 		di_read_lock_parent(parent, AuLock_IR);
 		/* returns a number of positive dentries */
 		err = au_refresh_hdentry(dentry, inode->i_mode & S_IFMT);
-		if (err > 0)
+		if (err >= 0)
 			err = au_refresh_hinode(inode, dentry);
 		di_read_unlock(parent, AuLock_IR);
 		dput(parent);
-		if (unlikely(!err))
-			err = -EIO;
 	}
 	di_downgrade_lock(dentry, AuLock_IR);
 	if (unlikely(err))
