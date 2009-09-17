@@ -310,6 +310,12 @@ static void default_get_resolution(struct omap_dss_device *dssdev,
 	*yres = dssdev->panel.timings.y_res;
 }
 
+static void default_get_size(struct omap_dss_device *dssdev, u16 *w, u16* h)
+{
+	*w = dssdev->panel.timings.w;
+	*h = dssdev->panel.timings.h;
+}
+
 void default_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high)
@@ -426,6 +432,7 @@ void dss_init_device(struct platform_device *pdev,
 	}
 
 	dssdev->get_resolution = default_get_resolution;
+	dssdev->get_size = default_get_size;
 	dssdev->get_recommended_bpp = default_get_recommended_bpp;
 	dssdev->wait_vsync = default_wait_vsync;
 
