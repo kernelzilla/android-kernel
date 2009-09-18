@@ -61,6 +61,7 @@
 
 /*  ----------------------------------- This */
 #include <dspbridge/dpc.h>
+#include <linux/workqueue.h>
 
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
 #define SIGNATURE       0x5f435044	/* "DPC_" (in reverse). */
@@ -72,7 +73,7 @@ struct DPC_OBJECT {
 	DPC_PROC pfnDPC;	/* Client's DPC.                 */
 	u32 numRequested;	/* Number of requested DPC's.      */
 	u32 numScheduled;	/* Number of executed DPC's.      */
-	struct tasklet_struct dpc_tasklet;
+	struct work_struct dpc_work;
 
 #ifdef DEBUG
 	u32 cEntryCount;	/* Number of times DPC reentered. */
@@ -88,7 +89,7 @@ static struct GT_Mask DPC_DebugMask = { NULL, NULL };	/* DPC Debug Mask */
 #endif
 
 /*  ----------------------------------- Function Prototypes */
-static void DPC_DeferredProcedure(IN unsigned long pDeferredContext);
+static void DPC_DeferredProcedure(struct work_struct *work);
 
 /*
  *  ======== DPC_Create ========
@@ -109,9 +110,7 @@ DSP_STATUS DPC_Create(OUT struct DPC_OBJECT **phDPC, DPC_PROC pfnDPC,
 		 */
 		MEM_AllocObject(pDPCObject, struct DPC_OBJECT, SIGNATURE);
 		if (pDPCObject != NULL) {
-			tasklet_init(&pDPCObject->dpc_tasklet,
-				     DPC_DeferredProcedure,
-				     (u32) pDPCObject);
+			INIT_WORK(&pDPCObject->dpc_work, DPC_DeferredProcedure);
 			/* Fill out our DPC Object: */
 			pDPCObject->pRefData = pRefData;
 			pDPCObject->pfnDPC = pfnDPC;
@@ -154,7 +153,7 @@ DSP_STATUS DPC_Destroy(struct DPC_OBJECT *hDPC)
 
 		/* Free our DPC object: */
 		if (DSP_SUCCEEDED(status)) {
-			tasklet_kill(&pDPCObject->dpc_tasklet);
+			cancel_work_sync(&pDPCObject->dpc_work);
 			MEM_FreeObject(pDPCObject);
 			pDPCObject = NULL;
 			GT_0trace(DPC_DebugMask, GT_2CLASS,
@@ -214,7 +213,7 @@ DSP_STATUS DPC_Schedule(struct DPC_OBJECT *hDPC)
 		spin_lock_irqsave(&hDPC->dpc_lock, flags);
 		pDPCObject->numRequested++;
 		spin_unlock_irqrestore(&hDPC->dpc_lock, flags);
-		tasklet_schedule(&(hDPC->dpc_tasklet));
+		schedule_work(&hDPC->dpc_work);
 #ifdef DEBUG
 		if (pDPCObject->numRequested > pDPCObject->numScheduled +
 						pDPCObject->numRequestedMax) {
@@ -242,9 +241,10 @@ DSP_STATUS DPC_Schedule(struct DPC_OBJECT *hDPC)
  *      Main DPC routine.  This is called by host OS DPC callback
  *      mechanism with interrupts enabled.
  */
-static void DPC_DeferredProcedure(IN unsigned long pDeferredContext)
+static void DPC_DeferredProcedure(struct work_struct *work)
 {
-	struct DPC_OBJECT *pDPCObject = (struct DPC_OBJECT *)pDeferredContext;
+	struct DPC_OBJECT *pDPCObject = container_of(work, struct DPC_OBJECT,
+						     dpc_work);
 	/* read numRequested in local variable */
 	u32 requested;
 	u32 serviced;
