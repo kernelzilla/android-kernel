@@ -298,8 +298,8 @@ static const struct sample_rate_info_t valid_sample_rates[] = {
 	{.rate = 48000, .cpcap_audio_rate = CPCAP_AUDIO_STDAC_RATE_48000_HZ},
 };
 
-static DEFINE_SPINLOCK(audio_write_lock);
-static DEFINE_SPINLOCK(audio_read_lock);
+static DEFINE_MUTEX(audio_write_lock);
+static DEFINE_MUTEX(audio_read_lock);
 static unsigned long flags;
 static int read_buf_full;
 static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
@@ -1944,7 +1944,7 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			goto out;
 		}
 
-		spin_lock_irqsave(&audio_write_lock, flags);
+		mutex_lock(&audio_write_lock);
 
 		buffer += chunksize;
 		count -= chunksize;
@@ -1968,7 +1968,7 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 	if (buffer - buffer0)
 		ret = buffer - buffer0;
 
-	spin_unlock_irqrestore(&audio_write_lock, flags);
+	mutex_unlock(&audio_write_lock);
 
 out:
 	mutex_unlock(&audio_lock);
@@ -2116,7 +2116,7 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		wait_event_interruptible_timeout(str->wq, read_buf_full > 0,
 						 AUDIO_TIMEOUT);
 
-		spin_lock_irqsave(&audio_read_lock, flags);
+		mutex_lock(&audio_read_lock);
 
 		read_buf_full--;
 
@@ -2126,7 +2126,7 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		if (copy_to_user(buffer, buf->data, str->fragsize)) {
 			AUDIO_ERROR_LOG("Audio: CopyTo User failed \n");
 			ret = -EFAULT;
-			spin_unlock_irqrestore(&audio_read_lock, flags);
+			mutex_unlock(&audio_read_lock);
 			goto err;
 		}
 
@@ -2135,7 +2135,7 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 
 		size -= str->fragsize;
 
-		spin_unlock_irqrestore(&audio_read_lock, flags);
+		mutex_unlock(&audio_read_lock);
 	}
 
 	ret = local_size;
