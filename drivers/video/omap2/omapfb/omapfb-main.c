@@ -1583,14 +1583,30 @@ void suspend(struct early_suspend *h)
 {
 	struct suspend_info *info = container_of(h, struct suspend_info,
 						early_suspend);
-	omapfb_blank(FB_BLANK_POWERDOWN, info->fbi);
+	struct fb_info *fbi = info->fbi;
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(fbi);
+
+	if (display->suspend)
+		display->suspend(display);
+
+	omapfb_vrfb_suspend_all(fbdev);
 }
 
 void resume(struct early_suspend *h)
 {
 	struct suspend_info *info = container_of(h, struct suspend_info,
 						early_suspend);
-	omapfb_blank(FB_BLANK_UNBLANK, info->fbi);
+	struct fb_info *fbi = info->fbi;
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(fbi);
+
+	omapfb_vrfb_resume_all(fbdev);
+
+	if (display->resume)
+		display->resume(display);
 }
 
 struct suspend_info suspend_info = {
