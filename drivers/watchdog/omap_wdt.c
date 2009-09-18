@@ -90,6 +90,23 @@ static void omap_wdt_ping(struct omap_wdt_dev *wdev)
 	/* reloaded WCRR from WLDR */
 }
 
+static int omap_wdt_panic(struct notifier_block *this, unsigned long event,
+				void *ptr)
+{
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
+	unsigned long flags;
+
+	spin_lock_irqsave(&wdt_lock, flags);
+
+	if (wdev && wdev->omap_wdt_users > 0)
+		omap_wdt_ping(wdev);
+
+	spin_unlock_irqrestore(&wdt_lock, flags);
+
+	return NOTIFY_DONE;
+}
+
+
 static void omap_wdt_enable(struct omap_wdt_dev *wdev)
 {
 	void __iomem *base = wdev->base;
@@ -521,6 +538,10 @@ static struct platform_driver omap_wdt_driver = {
 	},
 };
 
+static struct notifier_block panic_blk = {
+	.notifier_call  = omap_wdt_panic,
+};
+
 static int __init omap_wdt_init(void)
 {
 	spin_lock_init(&wdt_lock);
@@ -534,6 +555,13 @@ static void __exit omap_wdt_exit(void)
 
 module_init(omap_wdt_init);
 module_exit(omap_wdt_exit);
+
+static int __init omap_wdt_panic_init(void)
+{
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
+}
+
+arch_initcall(omap_wdt_panic_init);
 
 MODULE_AUTHOR("George G. Davis");
 MODULE_LICENSE("GPL");
