@@ -27,8 +27,8 @@
 
 #define NR_MUXS 16
 
-#define NUM_MUX_CMD_FILES 8
-#define NUM_MUX_DATA_FILES 8
+#define NUM_MUX_CMD_FILES 16
+#define NUM_MUX_DATA_FILES 0
 #define NUM_MUX_FILES (NUM_MUX_CMD_FILES  +  NUM_MUX_DATA_FILES)
 
 #define LDISC_BUFFER_SIZE (2048 - sizeof(struct ts27010_ringbuf))

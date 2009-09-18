@@ -95,9 +95,9 @@
 #define DATATAG 0xAA
 
 static const u8 tty2dlci[NR_MUXS] =
-    { 1, 2, 3, 4, 5, 6, 7, 8, 6, 7, 8, 9, 10, 11, 12, 13 };
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 static const u8 iscmdtty[NR_MUXS] =
-    { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
+    { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 struct dlci_tty {
 	const u8 cmdtty;
@@ -111,15 +111,18 @@ static const struct dlci_tty dlci2tty[] = {
 	{2, 2},				/* DLCI 3 */
 	{3, 3},				/* DLCI 4 */
 	{4, 4},				/* DLCI 5 */
-	{5, 8},				/* DLCI 6 */
-	{6, 9},				/* DLCI 7 */
-	{7, 10},			/* DLCI 8 */
-	{11, 11},			/* DLCI 9 */
-	{12, 12},			/* DLCI 10 */
-	{13, 13},			/* DLCI 11 */
-	{14, 14},			/* DLCI 12 */
-	{15, 15}
-};				/* DLCI 13 */
+	{5, 5},				/* DLCI 6 */
+	{6, 6},				/* DLCI 7 */
+	{7, 7},				/* DLCI 8 */
+	{8, 8},				/* DLCI 9 */
+	{9, 9},				/* DLCI 10 */
+	{10, 10},			/* DLCI 11 */
+	{11, 11},			/* DLCI 12 */
+	{12, 12},			/* DLCI 13 */
+	{13, 13},			/* DLCI 14 */
+	{14, 14},			/* DLCI 15 */
+	{15, 15},			/* DLCI 16 */
+};
 
 enum recv_state {
 	RECV_STATE_IDLE,

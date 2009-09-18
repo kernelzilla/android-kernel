@@ -40,7 +40,7 @@
  *
  */
 
-#define TS0710_MAX_CHN 14
+#define TS0710_MAX_CHN 17
 
 #define SET_PF(ctr) ((ctr) | (1 << 4))
 #define CLR_PF(ctr) ((ctr) & 0xef)
