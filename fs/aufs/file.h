@@ -48,6 +48,7 @@ struct au_finfo {
 		struct {
 			struct vm_operations_struct	*fi_h_vm_ops;
 			struct vm_operations_struct	*fi_vm_ops;
+			struct mutex			fi_vm_mtx;
 		};
 
 		/* dir only */
