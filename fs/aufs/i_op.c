@@ -649,6 +649,7 @@ static int au_getattr_lock_reval(struct dentry *dentry, unsigned int sigen)
 	if (unlikely(err))
 		di_read_unlock(dentry, AuLock_IR);
 
+	AuTraceErr(err);
 	return err;
 }
 
