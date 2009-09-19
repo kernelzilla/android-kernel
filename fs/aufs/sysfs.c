@@ -99,7 +99,7 @@ static struct seq_file *au_seq(char *p, ssize_t len)
 
 /* todo: file size may exceed PAGE_SIZE */
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
-			 char *buf)
+			char *buf)
 {
 	ssize_t err;
 	long l;
@@ -112,12 +112,25 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 
 	sbinfo = container_of(kobj, struct au_sbinfo, si_kobj);
 	sb = sbinfo->si_sb;
-	si_noflush_read_lock(sb);
+
+	/*
+	 * prevent a race condition between sysfs and aufs.
+	 * for instance, sysfs_file_read() calls sysfs_get_active_two() which
+	 * prohibits maintaining the sysfs entries.
+	 * hew we acquire read lock after sysfs_get_active_two().
+	 * on the other hand, the remount process may maintain the sysfs/aufs
+	 * entries after acquiring write lock.
+	 * it can cause a deadlock.
+	 * simply we gave up processing read here.
+	 */
+	err = -EBUSY;
+	if (unlikely(!si_noflush_read_trylock(sb)))
+		goto out;
 
 	seq = au_seq(buf, PAGE_SIZE);
 	err = PTR_ERR(seq);
 	if (IS_ERR(seq))
-		goto out;
+		goto out_unlock;
 
 	name = (void *)attr->name;
 	cattr = sysaufs_si_attrs;
@@ -152,8 +165,9 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			err = -EFBIG;
 	}
 	kfree(seq);
- out:
+ out_unlock:
 	si_read_unlock(sb);
+ out:
 	return err;
 }
 
