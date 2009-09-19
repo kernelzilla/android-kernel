@@ -152,6 +152,7 @@ int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 	au_refresh_hinode_attr(inode, update && isdir);
 
  out:
+	AuTraceErr(err);
 	return err;
 }
 
