@@ -361,9 +361,9 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 
 		di_read_unlock(dentry, AuLock_IR);
 		si_read_unlock(sb);
-		lockdep_off();
+		/* lockdep_off(); */
 		err = au_vdir_fill_de(file, dirent, filldir);
-		lockdep_on();
+		/* lockdep_on(); */
 		fsstack_copy_attr_atime(inode, h_inode);
 		fi_write_unlock(file);
 

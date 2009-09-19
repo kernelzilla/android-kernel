@@ -681,9 +681,9 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	 * inotify_mutex is already acquired and kmalloc/prune_icache may lock
 	 * iprune_mutex. strange.
 	 */
-	lockdep_off();
+	/* lockdep_off(); */
 	args = kmalloc(sizeof(*args) + len + 1, GFP_NOFS);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (unlikely(!args)) {
 		AuErr1("no memory\n");
 		iput(dir);
@@ -704,9 +704,9 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 		memcpy(p, h_child_name, len + 1);
 	}
 
-	lockdep_off();
+	/* lockdep_off(); */
 	wkq_err = au_wkq_nowait(postproc, args, dir->i_sb);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (unlikely(wkq_err))
 		AuErr("wkq %d\n", wkq_err);
 }

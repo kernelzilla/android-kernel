@@ -66,9 +66,9 @@ struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {
 	struct file *file;
 
-	lockdep_off();
+	/* lockdep_off(); */
 	file = filp_open(path, oflags, mode);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (IS_ERR(file))
 		goto out;
 	vfsub_update_h_iattr(&file->f_path, /*did*/NULL); /*ignore*/
@@ -291,9 +291,9 @@ int vfsub_link(struct dentry *src_dentry, struct inode *dir, struct path *path)
 	if (unlikely(err))
 		goto out;
 
-	lockdep_off();
+	/* lockdep_off(); */
 	err = vfs_link(src_dentry, dir, path->dentry);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (!err) {
 		struct path tmp = *path;
 		int did;
@@ -485,9 +485,9 @@ long vfsub_splice_to(struct file *in, loff_t *ppos,
 {
 	long err;
 
-	lockdep_off();
+	/* lockdep_off(); */
 	err = do_splice_to(in, ppos, pipe, len, flags);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (err >= 0)
 		vfsub_update_h_iattr(&in->f_path, /*did*/NULL); /*ignore*/
 	return err;
@@ -498,9 +498,9 @@ long vfsub_splice_from(struct pipe_inode_info *pipe, struct file *out,
 {
 	long err;
 
-	lockdep_off();
+	/* lockdep_off(); */
 	err = do_splice_from(pipe, out, ppos, len, flags);
-	lockdep_on();
+	/* lockdep_on(); */
 	if (err >= 0)
 		vfsub_update_h_iattr(&out->f_path, /*did*/NULL); /*ignore*/
 	return err;
