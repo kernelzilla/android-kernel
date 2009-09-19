@@ -651,17 +651,16 @@ static int au_getattr_lock_reval(struct dentry *dentry, unsigned int sigen)
 		di_read_lock_parent(parent, AuLock_IR);
 		/* returns a number of positive dentries */
 		err = au_refresh_hdentry(dentry, inode->i_mode & S_IFMT);
-		if (err > 0)
+		if (err >= 0)
 			err = au_refresh_hinode(inode, dentry);
 		di_read_unlock(parent, AuLock_IR);
 		dput(parent);
-		if (unlikely(!err))
-			err = -EIO;
 	}
 	di_downgrade_lock(dentry, AuLock_IR);
 	if (unlikely(err))
 		di_read_unlock(dentry, AuLock_IR);
 
+	AuTraceErr(err);
 	return err;
 }
 
@@ -712,14 +711,7 @@ static int aufs_getattr(struct vfsmount *mnt __maybe_unused,
 		if (au_digen(dentry) == sigen && au_iigen(inode) == sigen)
 			di_read_lock_child(dentry, AuLock_IR);
 		else {
-			/* NFSD may skip the revalidation */
-			if (!au_test_nfsd(current))
-				AuDebugOn(!IS_ROOT(dentry));
-			else {
-				err = au_busy_or_stale();
-				if (unlikely(!IS_ROOT(dentry)))
-					goto out;
-			}
+			AuDebugOn(IS_ROOT(dentry));
 			err = au_getattr_lock_reval(dentry, sigen);
 			if (unlikely(err))
 				goto out;

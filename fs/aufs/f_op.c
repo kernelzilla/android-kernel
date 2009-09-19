@@ -397,13 +397,13 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
-	fi_write_lock(file);
+	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
 	err = finfo->fi_h_vm_ops->fault(vma, vmf);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
 	au_reset_file(vma, file);
-	fi_write_unlock(file);
+	mutex_unlock(&finfo->fi_vm_mtx);
 #if 0 /* def CONFIG_SMP */
 	/* wake_up_nr(&wq, online_cpu - 1); */
 	wake_up_all(&wq);
@@ -427,11 +427,11 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
-	fi_write_lock(file);
+	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
 	err = finfo->fi_h_vm_ops->page_mkwrite(vma, vmf);
 	au_reset_file(vma, file);
-	fi_write_unlock(file);
+	mutex_unlock(&finfo->fi_vm_mtx);
 	wake_up(&wq);
 
 	return err;
@@ -449,11 +449,11 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
 
-	fi_write_lock(file);
+	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
 	finfo->fi_h_vm_ops->close(vma);
 	au_reset_file(vma, file);
-	fi_write_unlock(file);
+	mutex_unlock(&finfo->fi_vm_mtx);
 	wake_up(&wq);
 }
 
@@ -602,9 +602,12 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		goto out_unlock;
 
 	vma->vm_ops = &aufs_vm_ops;
-	/* test again */
-	if (!au_test_mmapped(file))
-		au_fi(file)->fi_h_vm_ops = vm_ops;
+	if (!mmapped) {
+		struct au_finfo *finfo = au_fi(file);
+
+		finfo->fi_h_vm_ops = vm_ops;
+		mutex_init(&finfo->fi_vm_mtx);
+	}
 
 	err = au_custom_vm_ops(au_fi(file), vma);
 	if (unlikely(err))
