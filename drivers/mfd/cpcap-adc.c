@@ -239,7 +239,7 @@ static void adc_setup(struct cpcap_device *cpcap,
 	}
 
 	schedule_delayed_work(&((struct cpcap_adc *)(cpcap->adcdata))->work,
-			      msecs_to_jiffies(50));
+			      msecs_to_jiffies(500));
 
 	cpcap_irq_unmask(cpcap, CPCAP_IRQ_ADCDONE);
 }
@@ -477,6 +477,10 @@ static void cpcap_adc_irq(enum cpcap_irqs irq, void *data)
 	int head;
 
 	cancel_delayed_work_sync(&adc->work);
+
+	cpcap_regacc_write(cpcap, CPCAP_REG_ADCC2,
+			   CPCAP_BIT_ADTRIG_DIS,
+			   CPCAP_BIT_ADTRIG_DIS);
 
 	mutex_lock(&adc->queue_mutex);
 	head = adc->queue_head;
