@@ -1674,26 +1674,16 @@ PVRSRV_ERROR SGXGetMiscInfoUkernel(PVRSRV_SGXDEV_INFO	*psDevInfo,
 
 	
 #if !defined(NO_HARDWARE)
+	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
 	{
-		IMG_BOOL bExit;
+		if ((psSGXMiscInfoInt->ui32MiscInfoFlags & PVRSRV_USSE_MISCINFO_READY) != 0)
+			break;
+	} END_LOOP_UNTIL_TIMEOUT();
 
-		bExit = IMG_FALSE;
-		LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
-		{
-			if ((psSGXMiscInfoInt->ui32MiscInfoFlags & PVRSRV_USSE_MISCINFO_READY) != 0)
-			{
-				bExit = IMG_TRUE;
-				break;
-			}
-		} END_LOOP_UNTIL_TIMEOUT();
 
-		
-		if (!bExit)
-		{
-			return PVRSRV_ERROR_TIMEOUT;
-		}
-	}
-#endif 
+	if (!(psSGXMiscInfoInt->ui32MiscInfoFlags & PVRSRV_USSE_MISCINFO_READY))
+		return PVRSRV_ERROR_TIMEOUT;
+#endif
 
 	return PVRSRV_OK;
 }
