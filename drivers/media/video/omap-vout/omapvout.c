@@ -774,6 +774,7 @@ static int omapvout_vidioc_querybuf(struct file *file, void *priv,
 static int omapvout_vidioc_qbuf(struct file *file, void *priv,
 				struct v4l2_buffer *b)
 {
+	int rc;
 	struct omapvout_device *vout = priv;
 
 	if (vout == NULL) {
@@ -783,7 +784,11 @@ static int omapvout_vidioc_qbuf(struct file *file, void *priv,
 
 	DBG("Q'ing Frame %d\n", b->index);
 
-	return videobuf_qbuf(&vout->queue, b);
+	mutex_lock(&vout->mtx);
+        rc = videobuf_qbuf(&vout->queue, b);
+	mutex_unlock(&vout->mtx);
+
+	return rc;
 }
 
 static int omapvout_vidioc_dqbuf(struct file *file, void *priv,

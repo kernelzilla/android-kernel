@@ -821,6 +821,7 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 	struct omap_overlay_info o_info;
 	struct omap_overlay *ovly;
 	struct omap_dss_device *dev;
+	struct videobuf_buffer *buf, *tmp;
 
 	/* It is assumed that the caller has locked the vout mutex */
 
@@ -836,6 +837,11 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 		dev->sync(dev);
 		mutex_lock(&vout->mtx);
 	}
+
+	list_for_each_entry_safe(buf, tmp, &vout->q_list, queue) {
+		list_del(&buf->queue);
+                omapvout_dss_mark_buf_done(vout, buf->i);
+        }
 
 	rc = omapvout_dss_disable_transparency(vout);
 	if (rc)
