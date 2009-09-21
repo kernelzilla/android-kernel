@@ -818,6 +818,13 @@ static void cpcap_audio_configure_output(
 
 		prev_aud_out_data = reg_changes.value;
 
+		/* Sleep for 300ms if we are getting into a call to allow the switch to settle
+		 * If we don't do this, it cause a loud pop at the beginning of the call */
+		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA &&
+			state->ext_primary_speaker != CPCAP_AUDIO_OUT_NONE &&
+			previous_state->ext_primary_speaker == CPCAP_AUDIO_OUT_NONE)
+			msleep(300);
+
 		logged_cpcap_write(state->cpcap, CPCAP_REG_RXOA,
 					reg_changes.value, reg_changes.mask);
 	}
