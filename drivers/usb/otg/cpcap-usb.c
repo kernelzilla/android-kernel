@@ -110,19 +110,12 @@ static int cpcap_set_host(struct otg_transceiver *x, struct usb_bus *host)
 static int cpcap_usb_setup(struct cpcap_usb *cpcap)
 {
 	unsigned short mask;
-	unsigned short value;
 	int r;
 
-	r = cpcap_regacc_read(cpcap->cpcap, CPCAP_REG_INTS2, &value);
-
-	if (value & CPCAP_BIT_SE1_S)
-		mask = CPCAP_BIT_VBUSEN_SPI | CPCAP_BIT_VBUSPU_SPI |
-			CPCAP_BIT_SUSPEND_SPI | CPCAP_BIT_ULPI_SPI_SEL;
-	else
-		mask = CPCAP_BIT_VBUSEN_SPI | CPCAP_BIT_VBUSPU_SPI |
-			CPCAP_BIT_DMPD_SPI | CPCAP_BIT_DPPD_SPI |
-			CPCAP_BIT_SUSPEND_SPI | CPCAP_BIT_PU_SPI |
-			CPCAP_BIT_ULPI_SPI_SEL;
+	mask = CPCAP_BIT_VBUSEN_SPI | CPCAP_BIT_VBUSPU_SPI |
+		CPCAP_BIT_DMPD_SPI | CPCAP_BIT_DPPD_SPI |
+		CPCAP_BIT_SUSPEND_SPI | CPCAP_BIT_PU_SPI |
+		CPCAP_BIT_ULPI_SPI_SEL;
 
 	r = cpcap_regacc_write(cpcap->cpcap, CPCAP_REG_USBC3, 0x0, mask);
 	if (r < 0) {
