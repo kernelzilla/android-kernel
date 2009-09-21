@@ -1371,6 +1371,11 @@ u32 NODEWRAP_RegisterNotify(union Trapped_Args *args)
 	notification.psName = NULL;
 	notification.handle = NULL;
 
+	if (!args->ARGS_PROC_REGISTER_NOTIFY.uEventMask)
+		cp_fm_usr(&notification,
+			args->ARGS_PROC_REGISTER_NOTIFY.hNotification,
+			status, 1);
+
 	status = NODE_RegisterNotify(args->ARGS_NODE_REGISTERNOTIFY.hNode,
 				    args->ARGS_NODE_REGISTERNOTIFY.uEventMask,
 				    args->ARGS_NODE_REGISTERNOTIFY.uNotifyType,
