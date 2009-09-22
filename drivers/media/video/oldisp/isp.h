@@ -77,10 +77,11 @@
 #define ISP_BUFFER_MAX_SIZE (1024 * 1024 * 10)
 #define ISP_BUFFER_MAX_PAGES (ISP_BUFFER_MAX_SIZE / ISPMMU_PAGE_SIZE)
 
-#define  NR_PAGES(x, y)		((((y + x - 1) & PAGE_MASK) >> PAGE_SHIFT) - \
+#define NR_PAGES(x, y)		((((y + x - 1) & PAGE_MASK) >> PAGE_SHIFT) - \
 					((x & PAGE_MASK) >> PAGE_SHIFT) + 1)
 
-#define  ALIGN_TO(x, b)		(((unsigned long)x + (b - 1)) & ~(b - 1))
+#define ALIGN_TO(x, b)		(((unsigned long)x + (b - 1)) & ~(b - 1))
+#define ALIGN_NEAR(x, b)	((unsigned long)x & ~(b-1))
 
 typedef int (*isp_vbq_callback_ptr) (struct videobuf_buffer *vb);
 typedef void (*isp_callback_t) (unsigned long status,

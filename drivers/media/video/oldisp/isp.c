@@ -1511,9 +1511,7 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 	rval = arg1(vb);
 
 	if (rval) {
-		spin_unlock(&isp_obj.lock);
 		isp_sgdma_process(&ispsg, 1, &notify, arg1);
-		spin_lock(&isp_obj.lock);
 	}
 
 	return;
@@ -2026,7 +2024,7 @@ void isp_config_crop(struct v4l2_pix_format *croppix)
 	u8 crop_scaling_w;
 	u8 crop_scaling_h;
 #if ISP_WORKAROUND
-	unsigned long org_left, num_pix, new_top;
+	unsigned long org_left, num_pix, new_top, new_height;
 #endif
 
 	struct v4l2_pix_format *pix = croppix;
@@ -2043,17 +2041,20 @@ void isp_config_crop(struct v4l2_pix_format *croppix)
 
 #if ISP_WORKAROUND
 	org_left = cur_rect.left;
-	while (((int)cur_rect.left & 0xFFFFFFF0) != (int)cur_rect.left)
-		(int)cur_rect.left--;
+	cur_rect.left = ALIGN_NEAR(cur_rect.left, 16);
 
 	num_pix = org_left - cur_rect.left;
 	new_top = (int)(num_pix * 3) / 4;
-	cur_rect.top = cur_rect.top - new_top;
-	cur_rect.height = (2 * new_top) + cur_rect.height;
+	cur_rect.top = (cur_rect.top - new_top);
+	if ((int)cur_rect.top < 0)
+			cur_rect.top = 0;
+
+	new_height = (2 * new_top) + cur_rect.height;
+	if (new_height < cur_rect.height)
+		cur_rect.height = new_height;
 
 	cur_rect.width = cur_rect.width + (2 * num_pix);
-	while (((int)cur_rect.width & 0xFFFFFFF0) != (int)cur_rect.width)
-		(int)cur_rect.width--;
+	cur_rect.width = ALIGN_NEAR(cur_rect.width, 16);
 
 	offset_value = ((cur_rect.left * 2) + \
 		((ispmodule_obj.preview_output_width) * 2 * cur_rect.top));
