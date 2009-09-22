@@ -70,6 +70,8 @@ struct omap_wdt_dev {
 	struct miscdevice omap_wdt_miscdev;
 #ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
 	struct timer_list autopet_timer;
+	unsigned long  jiffies_start;
+	unsigned long  jiffies_exp;
 #endif
 };
 
@@ -306,7 +308,9 @@ static void autopet_handler(unsigned long data)
 	spin_lock(&wdt_lock);
 	omap_wdt_ping(wdev);
 	spin_unlock(&wdt_lock);
-	mod_timer(&wdev->autopet_timer, jiffies + (HZ * TIMER_AUTOPET_FREQ));
+	wdev->jiffies_start = jiffies;
+	wdev->jiffies_exp = (HZ * TIMER_AUTOPET_FREQ);
+	mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
 }
 #endif
 
@@ -417,7 +421,9 @@ static int __init omap_wdt_probe(struct platform_device *pdev)
 	test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users));
 	omap_wdt_startclocks(wdev);
 	omap_wdt_set_timeout(wdev);
-	mod_timer(&wdev->autopet_timer, jiffies + (HZ * TIMER_AUTOPET_FREQ));
+	wdev->jiffies_start = jiffies;
+	wdev->jiffies_exp = (HZ * TIMER_AUTOPET_FREQ);
+	mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
 	omap_wdt_enable(wdev);
 	pr_info("Watchdog auto-pet enabled at %d sec intervals\n",
 		TIMER_AUTOPET_FREQ);
@@ -503,8 +509,11 @@ static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
-	if (wdev->omap_wdt_users)
+	if (wdev->omap_wdt_users) {
+		wdev->jiffies_exp -= jiffies - wdev->jiffies_start;
+		del_timer(&wdev->autopet_timer);
 		omap_wdt_disable(wdev);
+	}
 
 	return 0;
 }
@@ -514,8 +523,8 @@ static int omap_wdt_resume(struct platform_device *pdev)
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
 	if (wdev->omap_wdt_users) {
+		mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
 		omap_wdt_enable(wdev);
-		omap_wdt_ping(wdev);
 	}
 
 	return 0;
