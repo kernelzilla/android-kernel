@@ -28,6 +28,8 @@
 
 #include <stddef.h>
 
+#include <asm/cacheflush.h>
+
 #include "img_defs.h"
 #include "services.h"
 #include "pvr_bridge_km.h"
@@ -3087,6 +3089,11 @@ PVRSRVModifyCompleteSyncOpsBW(IMG_UINT32							ui32BridgeID,
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVModifyCompleteSyncOpsBW: ResManFreeResByPtr failed"));
 		return 0;
 	}
+
+	/* since this op is only called on buffer unlock we flush cache here */
+	flush_cache_all();
+
+	psKernelSyncInfo->hResItem = IMG_NULL;
 
 	return 0;
 }
