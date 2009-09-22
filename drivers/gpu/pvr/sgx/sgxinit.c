@@ -1171,7 +1171,7 @@ PVRSRV_ERROR SGXRegisterDevice (PVRSRV_DEVICE_NODE *psDeviceNode)
 	psDeviceMemoryHeap->ui32HeapID = HEAP_ID( PVRSRV_DEVICE_TYPE_SGX, SGX_GENERAL_HEAP_ID);
 	psDeviceMemoryHeap->sDevVAddrBase.uiAddr = SGX_GENERAL_HEAP_BASE;
 	psDeviceMemoryHeap->ui32HeapSize = SGX_GENERAL_HEAP_SIZE;
-	psDeviceMemoryHeap->ui32Attribs = PVRSRV_HAP_WRITECOMBINE
+	psDeviceMemoryHeap->ui32Attribs = PVRSRV_HAP_CACHED
 														| PVRSRV_MEM_RAM_BACKED_ALLOCATION
 														| PVRSRV_HAP_SINGLE_PROCESS;
 	psDeviceMemoryHeap->pszName = "General";
