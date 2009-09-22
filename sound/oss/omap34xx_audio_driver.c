@@ -1945,6 +1945,21 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			goto out;
 		}
 
+		/* Workaround for CPCAP channel inversion issue */
+		if (minor == state.dev_dsp &&
+			(cpcap_audio_state.stdac_primary_speaker ==
+					CPCAP_AUDIO_OUT_STEREO_HEADSET ||
+			cpcap_audio_state.stdac_secondary_speaker ==
+					CPCAP_AUDIO_OUT_STEREO_HEADSET)) {
+			int lc;
+			short *ptr = (short *)(buf->data + buf->offset);
+			for (lc = 0; lc < chunksize / 2; lc += 2) {
+				ptr[lc] = -ptr[lc];
+				if (ptr[lc] == 0x8000)
+					ptr[lc] = 0x7FFF;
+			}
+		}
+
 		mutex_lock(&audio_write_lock);
 
 		buffer += chunksize;

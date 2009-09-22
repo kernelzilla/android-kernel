@@ -376,6 +376,15 @@ static void cpcap_audio_set_output_amp_switches(struct cpcap_audio_state *state)
 
 	reg_changes.mask = value1 | value2 | stdac_prev_settings;
 	reg_changes.value = value1 | value2;
+
+	if ((state->stdac_primary_speaker == CPCAP_AUDIO_OUT_STEREO_HEADSET &&
+		state->stdac_secondary_speaker == CPCAP_AUDIO_OUT_LOUDSPEAKER)
+		|| (state->stdac_primary_speaker == CPCAP_AUDIO_OUT_LOUDSPEAKER
+		&& state->stdac_secondary_speaker ==
+						CPCAP_AUDIO_OUT_STEREO_HEADSET))
+		reg_changes.value &= ~(CPCAP_BIT_MONO_DAC0 |
+					CPCAP_BIT_MONO_DAC1);
+
 	stdac_prev_settings = reg_changes.value;
 
 	logged_cpcap_write(state->cpcap, CPCAP_REG_RXSDOA, reg_changes.value,
