@@ -95,9 +95,9 @@ struct au_ren_args {
  * harmless.
  */
 
-#define RevertFailure(fmt, args...) do { \
+#define RevertFailure(fmt, ...) do { \
 	AuIOErr("revert failure: " fmt " (%d, %d)\n", \
-		##args, err, rerr); \
+		##__VA_ARGS__, err, rerr); \
 	err = -EIO; \
 } while (0)
 
