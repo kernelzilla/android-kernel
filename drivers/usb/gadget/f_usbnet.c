@@ -32,6 +32,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/composite.h>
+#include <asm/cacheflush.h>
 #include "f_usbnet.h"
 
 
@@ -183,7 +184,8 @@ static struct usb_descriptor_header *hs_function[] = {
 #define STOP_QUEUE 1
 
 #define USBNETDBG(context, fmt, args...)				\
-	dev_dbg(&(context->gadget->dev) , fmt , ## args)
+	if (context && context->gadget)					\
+		dev_dbg(&(context->gadget->dev) , fmt , ## args)
 
 
 static inline struct usbnet_device *func_to_dev(struct usb_function *f)
@@ -436,6 +438,8 @@ static void ether_out_complete(struct usb_ep *ep, struct usb_request *req)
 	struct usbnet_context *context = ep->driver_data;
 
 	if (req->status == 0) {
+		dmac_inv_range((void *)req->buf, (void *)(req->buf +
+					req->actual));
 		skb_put(skb, req->actual);
 		skb->protocol = eth_type_trans(skb, context->dev);
 		context->stats.rx_packets++;
