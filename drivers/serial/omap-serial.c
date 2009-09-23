@@ -1451,10 +1451,8 @@ static int serial_omap_probe(struct platform_device *pdev)
 		up->uart_dma.tx_dma_channel = 0xFF;
 		up->uart_dma.rx_dma_channel = 0xFF;
 	}
-	if (console_detect(str)) {
+	if (console_detect(str))
 		printk("Invalid console paramter. UART Library Init Failed!\n");
-		return -EPERM;
-	}
 	up->use_console = 0;
 	fcr[pdev->id - 1] = 0;
 	if (!strcmp(str, "ttyS0"))
@@ -1636,6 +1634,9 @@ int are_driveromap_uarts_active(int num)
 	struct circ_buf *xmit;
 	unsigned int status;
 	struct uart_omap_port *up = ui[num];
+
+	if (!up)
+		return 0;
 
 	/* check ownership of port */
 	/* Check only ports managed by this driver and open */
