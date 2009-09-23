@@ -29,49 +29,10 @@
 #include "sgxdefs.h"
 #include "services_headers.h"
 #include "sgxapi_km.h"
-#include "sgxinfokm.h"
+#include "sgx_mkif_km.h"
 #include "sgxutils.h"
 #include "pdump_km.h"
 
-
-typedef enum _PVR_DEVICE_POWER_STATE_
-{
-	
-	PVR_DEVICE_POWER_STATE_ON		= 0,
-	PVR_DEVICE_POWER_STATE_IDLE		= 1,
-	PVR_DEVICE_POWER_STATE_OFF		= 2,
-
-	PVR_DEVICE_POWER_STATE_FORCE_I32 = 0x7fffffff
-
-} PVR_DEVICE_POWER_STATE, *PPVR_DEVICE_POWER_STATE;	
-
-
-static PVR_DEVICE_POWER_STATE MapDevicePowerState(PVR_POWER_STATE	ePowerState)
-{
-	PVR_DEVICE_POWER_STATE eDevicePowerState;
-	
-	switch (ePowerState)
-	{
-		case PVRSRV_POWER_STATE_D0:
-		{
-			eDevicePowerState = PVR_DEVICE_POWER_STATE_ON;
-			break;
-		}
-		case PVRSRV_POWER_STATE_D3:
-		{
-			eDevicePowerState = PVR_DEVICE_POWER_STATE_OFF;
-			break;
-		}
-		default:
-		{
-			PVR_DPF((PVR_DBG_ERROR,"MapDevicePowerState: Invalid state: %ld", ePowerState));
-			eDevicePowerState = PVR_DEVICE_POWER_STATE_FORCE_I32;
-			PVR_DBG_BREAK;
-		}
-	}
-
-	return eDevicePowerState;
-}
 
 
 static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
@@ -148,9 +109,11 @@ static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 			 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
 #endif 
 
-	ui32ActivePowManSampleRate =
-		psSGXTimingInfo->ui32uKernelFreq * psSGXTimingInfo->ui32ActivePowManLatencyms / 1000;
-	
+	if (psSGXTimingInfo->bEnableActivePM)
+	{
+		ui32ActivePowManSampleRate =
+			psSGXTimingInfo->ui32uKernelFreq * psSGXTimingInfo->ui32ActivePowManLatencyms / 1000;
+		
 
 
 
@@ -158,7 +121,12 @@ static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 
 
 	
-	ui32ActivePowManSampleRate += 1;
+		ui32ActivePowManSampleRate += 1;
+	}
+	else
+	{
+		ui32ActivePowManSampleRate = 0;	
+	}
 	
 	psDevInfo->psSGXHostCtl->ui32ActivePowManSampleRate = ui32ActivePowManSampleRate;
 #if defined(PDUMP)
@@ -215,12 +183,12 @@ static IMG_VOID SGXPollForClockGating (PVRSRV_SGXDEV_INFO	*psDevInfo,
 }
 
 
-static PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle, 
-									  PVR_DEVICE_POWER_STATE	eNewPowerState, 
-									  PVR_DEVICE_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle, 
+							   PVRSRV_DEV_POWER_STATE	eNewPowerState, 
+							   PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	if ((eNewPowerState != eCurrentPowerState) &&
-		(eNewPowerState != PVR_DEVICE_POWER_STATE_ON))
+		(eNewPowerState != PVRSRV_DEV_POWER_STATE_ON))
 	{
 		PVRSRV_ERROR		eError;
 		PVRSRV_DEVICE_NODE	*psDeviceNode = hDevHandle;
@@ -239,7 +207,7 @@ static PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 		}
 		#endif 
 
-		if (eNewPowerState == PVR_DEVICE_POWER_STATE_OFF)
+		if (eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
 			
 			ui32PowerCmd = PVRSRV_POWERCMD_POWEROFF;
@@ -304,7 +272,7 @@ static PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 							  "Wait for SGX master clock gating");
 		#endif 
 				
-		if (eNewPowerState == PVR_DEVICE_POWER_STATE_OFF)
+		if (eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
 			
 			eError = SGXDeinitialise(psDevInfo);
@@ -320,12 +288,12 @@ static PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 }
 
 
-static PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle, 
-									   PVR_DEVICE_POWER_STATE	eNewPowerState, 
-									   PVR_DEVICE_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle, 
+								PVRSRV_DEV_POWER_STATE	eNewPowerState, 
+								PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	if ((eNewPowerState != eCurrentPowerState) &&
-		(eCurrentPowerState != PVR_DEVICE_POWER_STATE_ON))
+		(eCurrentPowerState != PVRSRV_DEV_POWER_STATE_ON))
 	{
 		PVRSRV_ERROR		eError;
 		PVRSRV_DEVICE_NODE	*psDeviceNode = hDevHandle;
@@ -342,7 +310,7 @@ static PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 				 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
 		#endif 
 
-		if (eCurrentPowerState == PVR_DEVICE_POWER_STATE_OFF)
+		if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
 			
 
@@ -353,7 +321,7 @@ static PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 
 			
 
-			eError = SGXInitialise(psDevInfo, IMG_FALSE);
+			eError = SGXInitialise(psDevInfo);
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,"SGXPostPowerState: SGXInitialise failed"));
@@ -382,42 +350,9 @@ static PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 }
 
 
-PVRSRV_ERROR SGXPrePowerStateExt (IMG_HANDLE		hDevHandle, 
-								  PVR_POWER_STATE	eNewPowerState, 
-								  PVR_POWER_STATE	eCurrentPowerState)
-{
-	PVR_DEVICE_POWER_STATE	eNewDevicePowerState = MapDevicePowerState(eNewPowerState);
-	PVR_DEVICE_POWER_STATE	eCurrentDevicePowerState = MapDevicePowerState(eCurrentPowerState);
-	
-	return SGXPrePowerState(hDevHandle, eNewDevicePowerState, eCurrentDevicePowerState);
-}
-
-
-PVRSRV_ERROR SGXPostPowerStateExt (IMG_HANDLE		hDevHandle, 
-								   PVR_POWER_STATE	eNewPowerState, 
-								   PVR_POWER_STATE	eCurrentPowerState)
-{
-	PVRSRV_ERROR			eError;
-	PVR_DEVICE_POWER_STATE	eNewDevicePowerState = MapDevicePowerState(eNewPowerState);
-	PVR_DEVICE_POWER_STATE	eCurrentDevicePowerState = MapDevicePowerState(eCurrentPowerState);
-	
-	eError = SGXPostPowerState(hDevHandle, eNewDevicePowerState, eCurrentDevicePowerState);
-	if (eError != PVRSRV_OK)
-	{
-		return eError;
-	}
-	
-	PVR_DPF((PVR_DBG_MESSAGE,
-			"SGXPostPowerState : SGX Power Transition from %d to %d OK",
-			eCurrentPowerState, eNewPowerState));
-	
-	return eError;		
-}
-
-
-PVRSRV_ERROR SGXPreClockSpeedChange (IMG_HANDLE			hDevHandle,
-									 IMG_BOOL			bIdleDevice,
-									 PVR_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPreClockSpeedChange (IMG_HANDLE				hDevHandle,
+									 IMG_BOOL				bIdleDevice,
+									 PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	PVRSRV_ERROR		eError;
 	PVRSRV_DEVICE_NODE	*psDeviceNode = hDevHandle;
@@ -425,15 +360,15 @@ PVRSRV_ERROR SGXPreClockSpeedChange (IMG_HANDLE			hDevHandle,
 
 	PVR_UNREFERENCED_PARAMETER(psDevInfo);
 
-	if (eCurrentPowerState == PVRSRV_POWER_STATE_D0)
+	if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON)
 	{
 		if (bIdleDevice)
 		{
 			
 			PDUMPSUSPEND();
 			
-			eError = SGXPrePowerState(hDevHandle, PVR_DEVICE_POWER_STATE_IDLE,
-									  PVR_DEVICE_POWER_STATE_ON);
+			eError = SGXPrePowerState(hDevHandle, PVRSRV_DEV_POWER_STATE_IDLE,
+									  PVRSRV_DEV_POWER_STATE_ON);
 
 			if (eError != PVRSRV_OK)
 			{
@@ -450,9 +385,9 @@ PVRSRV_ERROR SGXPreClockSpeedChange (IMG_HANDLE			hDevHandle,
 }
 
 
-PVRSRV_ERROR SGXPostClockSpeedChange (IMG_HANDLE		hDevHandle,
-									  IMG_BOOL			bIdleDevice,
-									  PVR_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPostClockSpeedChange (IMG_HANDLE				hDevHandle,
+									  IMG_BOOL					bIdleDevice,
+									  PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	PVRSRV_DEVICE_NODE	*psDeviceNode = hDevHandle;
 	PVRSRV_SGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
@@ -460,7 +395,7 @@ PVRSRV_ERROR SGXPostClockSpeedChange (IMG_HANDLE		hDevHandle,
 
 	PVR_UNREFERENCED_PARAMETER(ui32OldClockSpeed);
 
-	if (eCurrentPowerState == PVRSRV_POWER_STATE_D0)
+	if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON)
 	{
 		
 
@@ -470,8 +405,8 @@ PVRSRV_ERROR SGXPostClockSpeedChange (IMG_HANDLE		hDevHandle,
 		{
 			PVRSRV_ERROR eError;
 			
-			eError = SGXPostPowerState(hDevHandle, PVR_DEVICE_POWER_STATE_ON,
-									   PVR_DEVICE_POWER_STATE_IDLE);
+			eError = SGXPostPowerState(hDevHandle, PVRSRV_DEV_POWER_STATE_ON,
+									   PVRSRV_DEV_POWER_STATE_IDLE);
 
 			PDUMPRESUME();
 			

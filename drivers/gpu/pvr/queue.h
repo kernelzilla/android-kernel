@@ -44,6 +44,7 @@ extern "C" {
 	IMG_UINT32			ui32SrcSyncCount;	
 	PVRSRV_SYNC_OBJECT	*psDstSync;			
 	PVRSRV_SYNC_OBJECT	*psSrcSync;			
+	IMG_UINT32	ui32AllocSize;				
  }COMMAND_COMPLETE_DATA, *PCOMMAND_COMPLETE_DATA;
 
 #if !defined(USE_CODE)
@@ -54,8 +55,15 @@ PVRSRV_ERROR PVRSRVProcessQueues (IMG_UINT32	ui32CallerID,
 
 #if defined(__linux__) && defined(__KERNEL__) 
 #include <linux/types.h>
+#include <linux/seq_file.h>
 off_t
 QueuePrintQueues (IMG_CHAR * buffer, size_t size, off_t off);
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+void* ProcSeqOff2ElementQueue(struct seq_file * sfile, loff_t off);
+void ProcSeqShowQueue(struct seq_file *sfile,void* el);
+#endif
+
 #endif
 
 

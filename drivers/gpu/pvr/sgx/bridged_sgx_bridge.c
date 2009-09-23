@@ -428,7 +428,9 @@ PVRSRV_BRIDGE_SGX_DOKICK_RETURN_RESULT:
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 				  ui32NumDstSyncs * sizeof(IMG_HANDLE),
-				  (IMG_VOID *)phKernelSyncInfoHandles, 0);
+				  (IMG_VOID *)phKernelSyncInfoHandles,
+				  0);
+		
 	}
 
 	return ret;
@@ -676,6 +678,7 @@ SGXGetMiscInfoBW(IMG_UINT32 ui32BridgeID,
 				 PVRSRV_PER_PROCESS_DATA *psPerProc)
 {
 	IMG_HANDLE hDevCookieInt;
+	IMG_HANDLE hDevMemContextInt = 0;
 	PVRSRV_SGXDEV_INFO *psDevInfo;
 	SGX_MISC_INFO        sMiscInfo;
  	PVRSRV_DEVICE_NODE *psDeviceNode;
@@ -693,6 +696,21 @@ SGXGetMiscInfoBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
+#if defined(SUPPORT_SGX_EDM_MEMORY_DEBUG)
+	
+	if (psSGXGetMiscInfoIN->psMiscInfo->eRequest == SGX_MISC_INFO_REQUEST_MEMREAD)
+	{
+		psRetOUT->eError = PVRSRVLookupHandle(psPerProc->psHandleBase,
+								&hDevMemContextInt,
+								psSGXGetMiscInfoIN->psMiscInfo->hDevMemContext,
+								PVRSRV_HANDLE_TYPE_DEV_MEM_CONTEXT);
+
+		if(psRetOUT->eError != PVRSRV_OK)
+		{
+			return 0;
+		}
+	}
+#endif
 	
 	psDeviceNode = hDevCookieInt;
 	PVR_ASSERT(psDeviceNode != IMG_NULL);
@@ -736,13 +754,14 @@ SGXGetMiscInfoBW(IMG_UINT32 ui32BridgeID,
 		psTmpUserData = sMiscInfo.uData.sRetrieveCB.psHWPerfData;
 		sMiscInfo.uData.sRetrieveCB.psHWPerfData = pAllocated;
 
-		psRetOUT->eError = SGXGetMiscInfoKM(psDevInfo, &sMiscInfo, psDeviceNode);
+		psRetOUT->eError = SGXGetMiscInfoKM(psDevInfo, &sMiscInfo, psDeviceNode, 0);
 		if (psRetOUT->eError != PVRSRV_OK)
 		{
 			OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 					  allocatedSize,
 					  pAllocated,
 					  hAllocatedHandle);
+			
 			return 0;
 		}
 
@@ -759,7 +778,7 @@ SGXGetMiscInfoBW(IMG_UINT32 ui32BridgeID,
 				  allocatedSize,
 				  pAllocated,
 			      hAllocatedHandle);
-
+		
 		if (psRetOUT->eError != PVRSRV_OK)
 		{
 			return -EFAULT;
@@ -768,7 +787,7 @@ SGXGetMiscInfoBW(IMG_UINT32 ui32BridgeID,
 	else
 #endif 
 	{
-		psRetOUT->eError = SGXGetMiscInfoKM(psDevInfo, &sMiscInfo, psDeviceNode);
+		psRetOUT->eError = SGXGetMiscInfoKM(psDevInfo, &sMiscInfo, psDeviceNode, hDevMemContextInt);
 
 		if (psRetOUT->eError != PVRSRV_OK)
 		{
@@ -877,6 +896,7 @@ SGXReadHWPerfCBBW(IMG_UINT32							ui32BridgeID,
 			  ui32AllocatedSize, 
 			  psAllocated,
 			  hAllocatedHandle);
+	
 
 	return 0;
 }
@@ -1613,8 +1633,7 @@ PVRSRV_BRIDGE_SGX_FINDSHAREDPBDESC_EXIT:
 	if (ppsSharedPBDescSubKernelMemInfos != IMG_NULL)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
-				  sizeof(PVRSRV_KERNEL_MEM_INFO *)
-				  * ui32SharedPBDescSubKernelMemInfosCount,
+				  sizeof(PVRSRV_KERNEL_MEM_INFO *) * ui32SharedPBDescSubKernelMemInfosCount,
 				  ppsSharedPBDescSubKernelMemInfos,
 				  IMG_NULL);
 	}
@@ -1861,16 +1880,16 @@ PVRSRV_BRIDGE_SGX_ADDSHAREDPBDESC_RETURN_RESULT:
 	if(phKernelMemInfoHandles)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
-				  psSGXAddSharedPBDescIN->ui32KernelMemInfoHandlesCount
-				  * sizeof(IMG_HANDLE),
-				  (IMG_VOID *)phKernelMemInfoHandles, 0);
+				  psSGXAddSharedPBDescIN->ui32KernelMemInfoHandlesCount * sizeof(IMG_HANDLE),
+				  (IMG_VOID *)phKernelMemInfoHandles,
+				  0);
 	}
 	if(ppsKernelMemInfos)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
-				  psSGXAddSharedPBDescIN->ui32KernelMemInfoHandlesCount
-				  * sizeof(PVRSRV_KERNEL_MEM_INFO *),
-				  (IMG_VOID *)ppsKernelMemInfos, 0);
+				  psSGXAddSharedPBDescIN->ui32KernelMemInfoHandlesCount * sizeof(PVRSRV_KERNEL_MEM_INFO *),
+				  (IMG_VOID *)ppsKernelMemInfos,
+				  0);
 	}
 
 	if(ret == 0 && eError == PVRSRV_OK)
@@ -2095,6 +2114,7 @@ SGXPDumpBufferArrayBW(IMG_UINT32 ui32BridgeID,
 						   ui32BufferArraySize) != PVRSRV_OK)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, ui32BufferArraySize, psKickTADumpBuffer, 0);
+		
 		return -EFAULT;
 	}
 
@@ -2140,6 +2160,7 @@ SGXPDumpBufferArrayBW(IMG_UINT32 ui32BridgeID,
 	}
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, ui32BufferArraySize, psKickTADumpBuffer, 0);
+	
 
 	return 0;
 }

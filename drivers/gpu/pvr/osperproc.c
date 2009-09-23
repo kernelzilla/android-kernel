@@ -85,6 +85,8 @@ PVRSRV_ERROR OSPerProcessPrivateDataDeInit(IMG_HANDLE hOsPrivateData)
 				sizeof(PVRSRV_ENV_PER_PROCESS_DATA),
 				hOsPrivateData,
 				psEnvPerProc->hBlockAlloc);
+	
+
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: OSFreeMem failed (%d)", __FUNCTION__, eError));

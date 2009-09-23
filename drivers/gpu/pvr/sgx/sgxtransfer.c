@@ -214,6 +214,29 @@ IMG_EXPORT PVRSRV_ERROR SGXSubmitTransferKM(IMG_HANDLE hDevHandle, PVRSRV_TRANSF
 	
 	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_CMD_TRANSFER, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);
 
+	if (eError == PVRSRV_ERROR_RETRY)
+	{
+		
+		if ((psKick->ui32Flags & SGXMKIF_TQFLAGS_KEEPPENDING) == 0UL)
+		{
+			if (psKick->ui32NumSrcSync > 0)
+			{
+				psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->ahSrcSyncInfo[0];
+				psSyncInfo->psSyncData->ui32ReadOpsPending--;
+			}
+			if (psKick->ui32NumDstSync > 0)
+			{
+				psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->ahDstSyncInfo[0];
+				psSyncInfo->psSyncData->ui32WriteOpsPending--;
+			}
+		}
+	}
+	else if (PVRSRV_OK != eError)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "SGXSubmitTransferKM: SGXScheduleCCBCommandKM failed."));
+		return eError;
+	}
+	
 
 #if defined(NO_HARDWARE)
 	if ((psKick->ui32Flags & SGXMKIF_TQFLAGS_NOSYNCUPDATE) == 0)

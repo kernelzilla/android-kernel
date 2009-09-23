@@ -173,6 +173,7 @@ IMG_VOID ResManDeInit(IMG_VOID)
 	{
 		
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(*gpsResList), gpsResList, IMG_NULL);
+		gpsResList = IMG_NULL;
 	}
 }
 
@@ -286,6 +287,7 @@ IMG_VOID PVRSRVResManDisconnect(PRESMAN_CONTEXT psResManContext,
 
 	
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(RESMAN_CONTEXT), psResManContext, IMG_NULL);
+	
 
 
 	

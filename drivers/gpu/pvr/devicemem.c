@@ -329,6 +329,7 @@ static PVRSRV_ERROR AllocDeviceMem(IMG_HANDLE		hDevCookie,
 	{
 		PVR_DPF((PVR_DBG_ERROR,"AllocDeviceMem: BM_Alloc Failed"));
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_MEM_INFO), psMemInfo, IMG_NULL);
+		
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -376,9 +377,11 @@ static PVRSRV_ERROR FreeDeviceMem(PVRSRV_KERNEL_MEM_INFO *psMemInfo)
 	{
 		
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, psMemInfo->ui32AllocSize, psMemInfo->pvSysBackupBuffer, IMG_NULL);
+		psMemInfo->pvSysBackupBuffer = IMG_NULL;
 	}
 
 	OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_MEM_INFO), psMemInfo, IMG_NULL);
+	
 
 	return(PVRSRV_OK);
 }
@@ -428,6 +431,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVAllocSyncInfoKM: Failed to alloc memory"));
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_SYNC_INFO), psKernelSyncInfo, IMG_NULL);
+		
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -458,6 +462,9 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 	psKernelSyncInfo->psSyncDataMemInfoKM->psKernelSyncInfo = IMG_NULL;
 
 	
+	psKernelSyncInfo->hResItem = IMG_NULL;
+
+	
 	*ppsKernelSyncInfo = psKernelSyncInfo;
 
 	return PVRSRV_OK;
@@ -467,10 +474,13 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 IMG_EXPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVFreeSyncInfoKM(PVRSRV_KERNEL_SYNC_INFO	*psKernelSyncInfo)
 {
-	FreeDeviceMem(psKernelSyncInfo->psSyncDataMemInfoKM);
-	OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_SYNC_INFO), psKernelSyncInfo, IMG_NULL);
+	PVRSRV_ERROR eError;
+	
+	eError = FreeDeviceMem(psKernelSyncInfo->psSyncDataMemInfoKM);
+	(IMG_VOID)OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_SYNC_INFO), psKernelSyncInfo, IMG_NULL);
+	
 
-	return PVRSRV_OK;
+	return eError;
 }
 
 
@@ -555,7 +565,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVFreeDeviceMemKM(IMG_HANDLE				hDevCookie,
 	else
 	{
 		
-		FreeDeviceMemCallBack(psMemInfo, 0);
+		eError = FreeDeviceMemCallBack(psMemInfo, 0);
 	}
 
 	return eError;
@@ -723,6 +733,7 @@ static PVRSRV_ERROR UnwrapExtMemoryCallBack(IMG_PVOID	pvParam,
 	if(psMemInfo->sMemBlk.psIntSysPAddr)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(IMG_SYS_PHYADDR), psMemInfo->sMemBlk.psIntSysPAddr, IMG_NULL);
+		psMemInfo->sMemBlk.psIntSysPAddr = IMG_NULL;
 	}	
 
 	if (eError == PVRSRV_OK)
@@ -939,6 +950,7 @@ ErrorExitPhase3:
 	if(psMemInfo)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(PVRSRV_KERNEL_MEM_INFO), psMemInfo, IMG_NULL);
+		
 	}
 
 ErrorExitPhase2:
@@ -951,6 +963,7 @@ ErrorExitPhase1:
 	if(psIntSysPAddr)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, ui32PageCount * sizeof(IMG_SYS_PHYADDR), psIntSysPAddr, IMG_NULL);
+		
 	}
 
 	return eError;
@@ -980,6 +993,7 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 	if(psMapData->psMemInfo->sMemBlk.psIntSysPAddr)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(IMG_SYS_PHYADDR), psMapData->psMemInfo->sMemBlk.psIntSysPAddr, IMG_NULL);
+		psMapData->psMemInfo->sMemBlk.psIntSysPAddr = IMG_NULL;
 	}
 	
 	eError = FreeDeviceMem(psMapData->psMemInfo);
@@ -992,21 +1006,8 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 	
 	psMapData->psSrcMemInfo->ui32RefCount--;
 	
-	if(psMapData->psSrcMemInfo->ui32RefCount == 0)
-	{
-		
-
-
-
-		eError = FreeDeviceMem(psMapData->psSrcMemInfo);
-		if(eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR,"UnmapDeviceMemoryCallBack: Failed to free SRC meminfo"));
-			return eError;
-		}	
-	}
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(RESMAN_MAP_DEVICE_MEM_DATA), psMapData, IMG_NULL);
 	
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0, psMapData, IMG_NULL);
 	
 	return eError;
 }
@@ -1174,18 +1175,21 @@ ErrorExit:
 	{
 		
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(IMG_SYS_PHYADDR), psSysPAddr, IMG_NULL);
+		
 	}
 
 	if(psMemInfo)
 	{
 		
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_MEM_INFO), psMemInfo, IMG_NULL);
+		
 	}
 
 	if(psMapData)
 	{
 		
-		OSFreeMem(PVRSRV_PAGEABLE_SELECT, 0, psMapData, IMG_NULL);
+		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(RESMAN_MAP_DEVICE_MEM_DATA), psMapData, IMG_NULL);
+		
 	}
 
 	return eError;
@@ -1337,6 +1341,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceClassMemoryKM(PVRSRV_PER_PROCESS_DATA	*
 	{
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVMapDeviceClassMemoryKM: BM_Wrap Failed"));
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_MEM_INFO), psMemInfo, IMG_NULL);
+		
 		return PVRSRV_ERROR_BAD_MAPPING;
 	}
 

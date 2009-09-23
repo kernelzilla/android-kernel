@@ -25,6 +25,7 @@
  ******************************************************************************/
 
 #include "perproc.h"
+#include "sgxinfokm.h"
 
 #define CCB_OFFSET_IS_VALID(type, psCCBMemInfo, psCCBKick, offset) \
 	((sizeof(type) <= (psCCBMemInfo)->ui32AllocSize) && \
@@ -35,11 +36,9 @@
 		(psCCBKick)->offset))
 
 
-#if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 IMG_IMPORT
 IMG_VOID SGXTestActivePowerEvent(PVRSRV_DEVICE_NODE	*psDeviceNode,
 								 IMG_UINT32			ui32CallerID);
-#endif 
 
 IMG_IMPORT
 PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,

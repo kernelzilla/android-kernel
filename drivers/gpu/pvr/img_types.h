@@ -27,6 +27,14 @@
 #ifndef __IMG_TYPES_H__
 #define __IMG_TYPES_H__
 
+#if !defined(IMG_ADDRSPACE_CPUVADDR_BITS)
+#define IMG_ADDRSPACE_CPUVADDR_BITS		32
+#endif
+
+#if !defined(IMG_ADDRSPACE_PHYSADDR_BITS)
+#define IMG_ADDRSPACE_PHYSADDR_BITS		32
+#endif
+
 typedef unsigned int	IMG_UINT,	*IMG_PUINT;
 typedef signed int		IMG_INT,	*IMG_PINT;
 
@@ -100,8 +108,13 @@ typedef struct _IMG_CPU_PHYADDR
 
 typedef struct _IMG_DEV_PHYADDR
 {
+#if IMG_ADDRSPACE_PHYSADDR_BITS == 32
 	
 	IMG_UINTPTR_T uiAddr;
+#else
+	IMG_UINT32 uiAddr;
+	IMG_UINT32 uiHighAddr;
+#endif
 } IMG_DEV_PHYADDR;
 
 typedef struct _IMG_SYS_PHYADDR

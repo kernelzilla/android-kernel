@@ -50,6 +50,9 @@
 #include <linux/capability.h>
 #include <asm/uaccess.h>
 #include <linux/spinlock.h>
+#if defined(PVR_LINUX_MISR_USING_WORKQUEUE) || defined(PVR_LINUX_MISR_USING_PRIVATE_WORKQUEUE)
+#include <linux/workqueue.h>
+#endif
 
 #include "img_types.h"
 #include "services_headers.h"
@@ -67,9 +70,9 @@
 #define HOST_ALLOC_MEM_USING_VMALLOC ((IMG_HANDLE)1)
 
 #if !defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *ppvCpuVAddr, IMG_HANDLE *phBlockAlloc)
+PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *ppvCpuVAddr, IMG_HANDLE *phBlockAlloc)
 #else
-PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *ppvCpuVAddr, IMG_HANDLE *phBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line)
+PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *ppvCpuVAddr, IMG_HANDLE *phBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line)
 #endif
 {
     PVR_UNREFERENCED_PARAMETER(ui32Flags);
@@ -81,32 +84,32 @@ PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *p
 #endif
     if(*ppvCpuVAddr)
     {
-	if (phBlockAlloc)
-	{
-		
-		*phBlockAlloc = HOST_ALLOC_MEM_USING_KMALLOC;
-	}
+    if (phBlockAlloc)
+    {
+        
+        *phBlockAlloc = HOST_ALLOC_MEM_USING_KMALLOC;
+    }
     }
     else
     {
-	if (!phBlockAlloc)
-	{
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+    if (!phBlockAlloc)
+    {
+        return PVRSRV_ERROR_OUT_OF_MEMORY;
+    }
 
-	
+    
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-	*ppvCpuVAddr = _VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED, pszFilename, ui32Line);
+    *ppvCpuVAddr = _VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED, pszFilename, ui32Line);
 #else
-	*ppvCpuVAddr = VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED);
+    *ppvCpuVAddr = VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED);
 #endif
-	if (!*ppvCpuVAddr)
-	{
-		 return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
+    if (!*ppvCpuVAddr)
+    {
+         return PVRSRV_ERROR_OUT_OF_MEMORY;
+    }
 
-	
-	*phBlockAlloc = HOST_ALLOC_MEM_USING_VMALLOC;
+    
+    *phBlockAlloc = HOST_ALLOC_MEM_USING_VMALLOC;
     }
 
     return PVRSRV_OK;
@@ -114,9 +117,9 @@ PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *p
 
 
 #if !defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-PVRSRV_ERROR OSFreeMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvCpuVAddr, IMG_HANDLE hBlockAlloc)
+PVRSRV_ERROR OSFreeMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvCpuVAddr, IMG_HANDLE hBlockAlloc)
 #else
-PVRSRV_ERROR _OSFreeMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvCpuVAddr, IMG_HANDLE hBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line)
+PVRSRV_ERROR OSFreeMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvCpuVAddr, IMG_HANDLE hBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line)
 #endif
 {	
     PVR_UNREFERENCED_PARAMETER(ui32Flags);
@@ -125,15 +128,15 @@ PVRSRV_ERROR _OSFreeMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvC
     if (hBlockAlloc == HOST_ALLOC_MEM_USING_VMALLOC)
     {
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-	_VFreeWrapper(pvCpuVAddr, pszFilename, ui32Line);
+    _VFreeWrapper(pvCpuVAddr, pszFilename, ui32Line);
 #else
-	VFreeWrapper(pvCpuVAddr);
+    VFreeWrapper(pvCpuVAddr);
 #endif
     }
     else
     {
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-	_KFreeWrapper(pvCpuVAddr, pszFilename, ui32Line);
+    _KFreeWrapper(pvCpuVAddr, pszFilename, ui32Line);
 #else
         KFreeWrapper(pvCpuVAddr);
 #endif
@@ -144,13 +147,13 @@ PVRSRV_ERROR _OSFreeMem(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvC
 
 
 PVRSRV_ERROR
-_OSAllocPages(IMG_UINT32 ui32AllocFlags,
-				IMG_UINT32 ui32Size,
-				IMG_UINT32 ui32PageSize,
-				IMG_VOID **ppvCpuVAddr,
-				IMG_HANDLE *phOSMemHandle)
+OSAllocPages_Impl(IMG_UINT32 ui32AllocFlags,
+                IMG_UINT32 ui32Size,
+                IMG_UINT32 ui32PageSize,
+                IMG_VOID **ppvCpuVAddr,
+                IMG_HANDLE *phOSMemHandle)
 {
-	LinuxMemArea *psLinuxMemArea;
+    LinuxMemArea *psLinuxMemArea;
 
     PVR_UNREFERENCED_PARAMETER(ui32PageSize);
 
@@ -164,7 +167,7 @@ _OSAllocPages(IMG_UINT32 ui32AllocFlags,
 #endif
 
     switch(ui32AllocFlags & PVRSRV_HAP_MAPTYPE_MASK)
-	{
+    {
         case PVRSRV_HAP_KERNEL_ONLY:
         {
             psLinuxMemArea = NewVMallocLinuxMemArea(ui32Size, ui32AllocFlags);
@@ -183,12 +186,12 @@ _OSAllocPages(IMG_UINT32 ui32AllocFlags,
             {
                 return PVRSRV_ERROR_OUT_OF_MEMORY;
             }
-			PVRMMapRegisterArea(psLinuxMemArea);
+            PVRMMapRegisterArea(psLinuxMemArea);
             break;
         }
 
-		case PVRSRV_HAP_MULTI_PROCESS:
-		{
+        case PVRSRV_HAP_MULTI_PROCESS:
+        {
             
 #if defined(VIVT_CACHE) || defined(__sh__)
             
@@ -199,14 +202,14 @@ _OSAllocPages(IMG_UINT32 ui32AllocFlags,
             {
                 return PVRSRV_ERROR_OUT_OF_MEMORY;
             }
-			PVRMMapRegisterArea(psLinuxMemArea);
+            PVRMMapRegisterArea(psLinuxMemArea);
             break;
         }
         default:
-			PVR_DPF((PVR_DBG_ERROR, "OSAllocPages: invalid flags 0x%x\n", ui32AllocFlags));
+            PVR_DPF((PVR_DBG_ERROR, "OSAllocPages: invalid flags 0x%x\n", ui32AllocFlags));
             *ppvCpuVAddr = NULL;
             *phOSMemHandle = (IMG_HANDLE)0;
-			return PVRSRV_ERROR_INVALID_PARAMS;
+            return PVRSRV_ERROR_INVALID_PARAMS;
     }
 
     *ppvCpuVAddr = LinuxMemAreaToCpuVAddr(psLinuxMemArea);
@@ -214,7 +217,7 @@ _OSAllocPages(IMG_UINT32 ui32AllocFlags,
     
     LinuxMemAreaRegister(psLinuxMemArea);
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
@@ -243,14 +246,14 @@ OSFreePages(IMG_UINT32 ui32AllocFlags, IMG_UINT32 ui32Bytes, IMG_VOID *pvCpuVAdd
             }
             break;
         default:
-			PVR_DPF((PVR_DBG_ERROR,"%s: invalid flags 0x%x\n",
+            PVR_DPF((PVR_DBG_ERROR,"%s: invalid flags 0x%x\n",
                     __FUNCTION__, ui32AllocFlags));
             return PVRSRV_ERROR_INVALID_PARAMS;
     }
 
     LinuxMemAreaDeepFree(psLinuxMemArea);
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
@@ -340,7 +343,7 @@ IMG_VOID OSMemCopy(IMG_VOID *pvDst, IMG_VOID *pvSrc, IMG_UINT32 ui32Size)
         Dst[i]=Src[i];
     }
 #else
-	memcpy(pvDst, pvSrc, ui32Size);
+    memcpy(pvDst, pvSrc, ui32Size);
 #endif
 }
 
@@ -357,14 +360,14 @@ IMG_VOID OSMemSet(IMG_VOID *pvDest, IMG_UINT8 ui8Value, IMG_UINT32 ui32Size)
         Buff[i]=ui8Value;
     }
 #else
-	memset(pvDest, (IMG_INT) ui8Value, (size_t) ui32Size);
+    memset(pvDest, (IMG_INT) ui8Value, (size_t) ui32Size);
 #endif
 }
 
 
 IMG_CHAR *OSStringCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc)
 {
-	return (strcpy(pszDest, pszSrc));
+    return (strcpy(pszDest, pszSrc));
 }
 
 IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, IMG_UINT32 ui32Size, const IMG_CHAR *pszFormat, ...)
@@ -381,129 +384,132 @@ IMG_INT32 OSSNPrintf(IMG_CHAR *pStr, IMG_UINT32 ui32Size, const IMG_CHAR *pszFor
 
 IMG_VOID OSBreakResourceLock (PVRSRV_RESOURCE *psResource, IMG_UINT32 ui32ID)
 {
-	volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
+    volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
 
-	if(*pui32Access)
-	{
-		if(psResource->ui32ID == ui32ID)
-		{
-			psResource->ui32ID = 0;
-			*pui32Access = 0;
-		}
-		else
-		{
-			PVR_DPF((PVR_DBG_MESSAGE,"OSBreakResourceLock: Resource is not locked for this process.")); 
-		}
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_MESSAGE,"OSBreakResourceLock: Resource is not locked"));
-	}
+    if(*pui32Access)
+    {
+        if(psResource->ui32ID == ui32ID)
+        {
+            psResource->ui32ID = 0;
+            *pui32Access = 0;
+        }
+        else
+        {
+            PVR_DPF((PVR_DBG_MESSAGE,"OSBreakResourceLock: Resource is not locked for this process.")); 
+        }
+    }
+    else
+    {
+        PVR_DPF((PVR_DBG_MESSAGE,"OSBreakResourceLock: Resource is not locked"));
+    }
 }
 
 
 PVRSRV_ERROR OSCreateResource(PVRSRV_RESOURCE *psResource)
 {
-	psResource->ui32ID = 0;
-	psResource->ui32Lock = 0;
+    psResource->ui32ID = 0;
+    psResource->ui32Lock = 0;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSDestroyResource (PVRSRV_RESOURCE *psResource)
 {
-	OSBreakResourceLock (psResource, psResource->ui32ID);
+    OSBreakResourceLock (psResource, psResource->ui32ID);
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSInitEnvData(IMG_PVOID *ppvEnvSpecificData)
 {
-	ENV_DATA		*psEnvData;
-	
-	
-	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), (IMG_VOID *)&psEnvData, IMG_NULL,
-		"Environment Data") != PVRSRV_OK)
-	{
-		return PVRSRV_ERROR_GENERIC;
-	}
+    ENV_DATA		*psEnvData;
+    
+    
+    if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), (IMG_VOID **)&psEnvData, IMG_NULL,
+        "Environment Data") != PVRSRV_OK)
+    {
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, PVRSRV_MAX_BRIDGE_IN_SIZE + PVRSRV_MAX_BRIDGE_OUT_SIZE, 
-					&psEnvData->pvBridgeData, IMG_NULL,
-					"Bridge Data") != PVRSRV_OK)
-	{
-		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), psEnvData, IMG_NULL);
-		return PVRSRV_ERROR_GENERIC;
-	}
+    if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, PVRSRV_MAX_BRIDGE_IN_SIZE + PVRSRV_MAX_BRIDGE_OUT_SIZE, 
+                    &psEnvData->pvBridgeData, IMG_NULL,
+                    "Bridge Data") != PVRSRV_OK)
+    {
+        OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), psEnvData, IMG_NULL);
+		
+        return PVRSRV_ERROR_GENERIC;
+    }
 
 
-	
-	psEnvData->bMISRInstalled = IMG_FALSE;
-	psEnvData->bLISRInstalled = IMG_FALSE;
+    
+    psEnvData->bMISRInstalled = IMG_FALSE;
+    psEnvData->bLISRInstalled = IMG_FALSE;
 
-	
-	*ppvEnvSpecificData = psEnvData;
+    
+    *ppvEnvSpecificData = psEnvData;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSDeInitEnvData(IMG_PVOID pvEnvSpecificData)
 {
-	ENV_DATA		*psEnvData = (ENV_DATA*)pvEnvSpecificData;
+    ENV_DATA		*psEnvData = (ENV_DATA*)pvEnvSpecificData;
 
-	PVR_ASSERT(!psEnvData->bMISRInstalled);
-	PVR_ASSERT(!psEnvData->bLISRInstalled);
+    PVR_ASSERT(!psEnvData->bMISRInstalled);
+    PVR_ASSERT(!psEnvData->bLISRInstalled);
 
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0x1000, psEnvData->pvBridgeData, IMG_NULL);
+    OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, PVRSRV_MAX_BRIDGE_IN_SIZE + PVRSRV_MAX_BRIDGE_OUT_SIZE, psEnvData->pvBridgeData, IMG_NULL);
+    psEnvData->pvBridgeData = IMG_NULL;
 
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), pvEnvSpecificData, IMG_NULL);
+    OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(ENV_DATA), pvEnvSpecificData, IMG_NULL);
+	
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
  
 IMG_VOID OSReleaseThreadQuanta(IMG_VOID)
 {
-	schedule();
+    schedule();
 }
 
 
  
 IMG_UINT32 OSClockus(IMG_VOID)
 {
-	IMG_UINT32 time, j = jiffies;
+    IMG_UINT32 time, j = jiffies;
 
-	time = j * (1000000 / HZ);
+    time = j * (1000000 / HZ);
 
-	return time;
+    return time;
 }
 
 
  
 IMG_VOID OSWaitus(IMG_UINT32 ui32Timeus)
 {
-	udelay(ui32Timeus);
+    udelay(ui32Timeus);
 }
 
 
 IMG_UINT32 OSGetCurrentProcessIDKM(IMG_VOID)
 {
-	if (in_interrupt())
-	{
-		return KERNEL_ID;
-	}
+    if (in_interrupt())
+    {
+        return KERNEL_ID;
+    }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
-	return (IMG_UINT32)current->pgrp;
+    return (IMG_UINT32)current->pgrp;
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
-	return (IMG_UINT32)task_tgid_nr(current);
+    return (IMG_UINT32)task_tgid_nr(current);
 #else
-	return (IMG_UINT32)current->tgid;
+    return (IMG_UINT32)current->tgid;
 #endif
 #endif
 }
@@ -512,49 +518,46 @@ IMG_UINT32 OSGetCurrentProcessIDKM(IMG_VOID)
 IMG_UINT32 OSGetPageSize(IMG_VOID)
 {
 #if defined(__sh__)
-	IMG_UINT32 ui32ReturnValue = PAGE_SIZE;
+    IMG_UINT32 ui32ReturnValue = PAGE_SIZE;
 
-	return (ui32ReturnValue);
+    return (ui32ReturnValue);
 #else
-	return PAGE_SIZE;
+    return PAGE_SIZE;
 #endif
 }
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0))
 static irqreturn_t DeviceISRWrapper(int irq, void *dev_id
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-		, struct pt_regs *regs
+        , struct pt_regs *regs
 #endif
-		)
+        )
 {
-	PVRSRV_DEVICE_NODE *psDeviceNode;
-	IMG_BOOL bStatus = IMG_FALSE;
+    PVRSRV_DEVICE_NODE *psDeviceNode;
+    IMG_BOOL bStatus = IMG_FALSE;
 
-	PVR_UNREFERENCED_PARAMETER(irq);
+    PVR_UNREFERENCED_PARAMETER(irq);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-	PVR_UNREFERENCED_PARAMETER(regs);
+    PVR_UNREFERENCED_PARAMETER(regs);
 #endif	
-	psDeviceNode = (PVRSRV_DEVICE_NODE*)dev_id;
-	if(!psDeviceNode)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "DeviceISRWrapper: invalid params\n"));
-		goto out;
-	}
+    psDeviceNode = (PVRSRV_DEVICE_NODE*)dev_id;
+    if(!psDeviceNode)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "DeviceISRWrapper: invalid params\n"));
+        goto out;
+    }
 
-	bStatus = PVRSRVDeviceLISR(psDeviceNode);
+    bStatus = PVRSRVDeviceLISR(psDeviceNode);
 
-	if (bStatus)
-	{
-		SYS_DATA *psSysData = psDeviceNode->psSysData;
-		ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
-
-		queue_work(psEnvData->sMISRWorkQueue, &psEnvData->sMISRWork);
-	}
+    if (bStatus)
+    {
+		OSScheduleMISR((IMG_VOID *)psDeviceNode->psSysData);
+    }
 
 out:
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-	return bStatus ? IRQ_HANDLED : IRQ_NONE;
+    return bStatus ? IRQ_HANDLED : IRQ_NONE;
 #endif
 }
 
@@ -562,155 +565,159 @@ out:
 
 static irqreturn_t SystemISRWrapper(int irq, void *dev_id
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-		, struct pt_regs *regs
+        , struct pt_regs *regs
 #endif
-		)
+        )
 {
-	SYS_DATA *psSysData;
-	IMG_BOOL bStatus = IMG_FALSE;
+    SYS_DATA *psSysData;
+    IMG_BOOL bStatus = IMG_FALSE;
 
-	PVR_UNREFERENCED_PARAMETER(irq);
+    PVR_UNREFERENCED_PARAMETER(irq);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-	PVR_UNREFERENCED_PARAMETER(regs);
+    PVR_UNREFERENCED_PARAMETER(regs);
 #endif
-	psSysData = (SYS_DATA *)dev_id;
-	if(!psSysData)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "SystemISRWrapper: invalid params\n"));
-		goto out;
-	}
+    psSysData = (SYS_DATA *)dev_id;
+    if(!psSysData)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "SystemISRWrapper: invalid params\n"));
+        goto out;
+    }
 
-	bStatus = PVRSRVSystemLISR(psSysData);
+    bStatus = PVRSRVSystemLISR(psSysData);
 
-	if (bStatus)
-	{
-		ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
-
-		queue_work(psEnvData->sMISRWorkQueue, &psEnvData->sMISRWork);
-	}
+    if (bStatus)
+    {
+        OSScheduleMISR((IMG_VOID *)psSysData);
+    }
 
 out:
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-	return bStatus ? IRQ_HANDLED : IRQ_NONE;
+    return bStatus ? IRQ_HANDLED : IRQ_NONE;
 #endif
 }
 PVRSRV_ERROR OSInstallDeviceLISR(IMG_VOID *pvSysData,
-									IMG_UINT32 ui32Irq,
-									IMG_CHAR *pszISRName,
-									IMG_VOID *pvDeviceNode)
+                                    IMG_UINT32 ui32Irq,
+                                    IMG_CHAR *pszISRName,
+                                    IMG_VOID *pvDeviceNode)
 {
-	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
-	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-	if (psEnvData->bLISRInstalled)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSInstallDeviceLISR: An ISR has already been installed: IRQ %d cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    if (psEnvData->bLISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSInstallDeviceLISR: An ISR has already been installed: IRQ %d cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	PVR_TRACE(("Installing device LISR %s on IRQ %d with cookie %x", pszISRName, ui32Irq, pvDeviceNode));
+    PVR_TRACE(("Installing device LISR %s on IRQ %d with cookie %x", pszISRName, ui32Irq, pvDeviceNode));
 
-	if(request_irq(ui32Irq, DeviceISRWrapper,
+    if(request_irq(ui32Irq, DeviceISRWrapper,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
-		SA_SHIRQ
+        SA_SHIRQ
 #else
-		IRQF_SHARED
+        IRQF_SHARED
 #endif
-		, pszISRName, pvDeviceNode))
-	{
-		PVR_DPF((PVR_DBG_ERROR,"OSInstallDeviceLISR: Couldn't install device LISR on IRQ %d", ui32Irq));
+        , pszISRName, pvDeviceNode))
+    {
+        PVR_DPF((PVR_DBG_ERROR,"OSInstallDeviceLISR: Couldn't install device LISR on IRQ %d", ui32Irq));
 
-		return PVRSRV_ERROR_GENERIC;
-	}
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	psEnvData->ui32IRQ = ui32Irq;
-	psEnvData->pvISRCookie = pvDeviceNode;
-	psEnvData->bLISRInstalled = IMG_TRUE;
+    psEnvData->ui32IRQ = ui32Irq;
+    psEnvData->pvISRCookie = pvDeviceNode;
+    psEnvData->bLISRInstalled = IMG_TRUE;
 
-	return PVRSRV_OK;	
+    return PVRSRV_OK;	
 }
 
 PVRSRV_ERROR OSUninstallDeviceLISR(IMG_VOID *pvSysData)
 {
-	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
-	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-	if (!psEnvData->bLISRInstalled)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSUninstallDeviceLISR: No LISR has been installed"));
-		return PVRSRV_ERROR_GENERIC;
-	}
-		
-	PVR_TRACE(("Uninstalling device LISR on IRQ %d with cookie %x", psEnvData->ui32IRQ,  psEnvData->pvISRCookie));
+    if (!psEnvData->bLISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSUninstallDeviceLISR: No LISR has been installed"));
+        return PVRSRV_ERROR_GENERIC;
+    }
+        
+    PVR_TRACE(("Uninstalling device LISR on IRQ %d with cookie %x", psEnvData->ui32IRQ,  psEnvData->pvISRCookie));
 
-	free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
+    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
 
-	psEnvData->bLISRInstalled = IMG_FALSE;
+    psEnvData->bLISRInstalled = IMG_FALSE;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSInstallSystemLISR(IMG_VOID *pvSysData, IMG_UINT32 ui32Irq)
 {
-	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
-	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-	if (psEnvData->bLISRInstalled)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSInstallSystemLISR: An LISR has already been installed: IRQ %d cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    if (psEnvData->bLISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSInstallSystemLISR: An LISR has already been installed: IRQ %d cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	PVR_TRACE(("Installing system LISR on IRQ %d with cookie %x", ui32Irq, pvSysData));
+    PVR_TRACE(("Installing system LISR on IRQ %d with cookie %x", ui32Irq, pvSysData));
 
-	if(request_irq(ui32Irq, SystemISRWrapper,
+    if(request_irq(ui32Irq, SystemISRWrapper,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
-		SA_SHIRQ
+        SA_SHIRQ
 #else
-		IRQF_SHARED
+        IRQF_SHARED
 #endif
-		, "PowerVR", pvSysData))
-	{
-		PVR_DPF((PVR_DBG_ERROR,"OSInstallSystemLISR: Couldn't install system LISR on IRQ %d", ui32Irq));
+        , "PowerVR", pvSysData))
+    {
+        PVR_DPF((PVR_DBG_ERROR,"OSInstallSystemLISR: Couldn't install system LISR on IRQ %d", ui32Irq));
 
-		return PVRSRV_ERROR_GENERIC;
-	}
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	psEnvData->ui32IRQ = ui32Irq;
-	psEnvData->pvISRCookie = pvSysData;
-	psEnvData->bLISRInstalled = IMG_TRUE;
+    psEnvData->ui32IRQ = ui32Irq;
+    psEnvData->pvISRCookie = pvSysData;
+    psEnvData->bLISRInstalled = IMG_TRUE;
 
-	return PVRSRV_OK;	
+    return PVRSRV_OK;	
 }
 
 
 PVRSRV_ERROR OSUninstallSystemLISR(IMG_VOID *pvSysData)
 {
-	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
-	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
 
-	if (!psEnvData->bLISRInstalled)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSUninstallSystemLISR: No LISR has been installed"));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    if (!psEnvData->bLISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSUninstallSystemLISR: No LISR has been installed"));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	PVR_TRACE(("Uninstalling system LISR on IRQ %d with cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
+    PVR_TRACE(("Uninstalling system LISR on IRQ %d with cookie %x", psEnvData->ui32IRQ, psEnvData->pvISRCookie));
 
-	free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
+    free_irq(psEnvData->ui32IRQ, psEnvData->pvISRCookie);
 
-	psEnvData->bLISRInstalled = IMG_FALSE;
+    psEnvData->bLISRInstalled = IMG_FALSE;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
-
-static void MISRWrapper(struct work_struct *work)
+#if defined(PVR_LINUX_MISR_USING_PRIVATE_WORKQUEUE)
+static void MISRWrapper(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
+			void *data
+#else
+			struct work_struct *data
+#endif
+)
 {
-	ENV_DATA *psEnvData = container_of(work, ENV_DATA, sMISRWork);
-	SYS_DATA *psSysData = psEnvData->sMISRSysData;;
+	ENV_DATA *psEnvData = container_of(data, ENV_DATA, sMISRWork);
+	SYS_DATA *psSysData  = (SYS_DATA *)psEnvData->pvMISRData;
 
 	PVRSRVMISR(psSysData);
 }
@@ -729,10 +736,21 @@ PVRSRV_ERROR OSInstallMISR(IMG_VOID *pvSysData)
 
 	PVR_TRACE(("Installing MISR with cookie %x", pvSysData));
 
-	psEnvData->sMISRSysData = pvSysData;
-	psEnvData->sMISRWorkQueue = create_rt_workqueue("pvrisr");
-	INIT_WORK(&psEnvData->sMISRWork, MISRWrapper);
+	psEnvData->psWorkQueue = create_singlethread_workqueue("pvr_workqueue");
 
+	if (psEnvData->psWorkQueue == IMG_NULL)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "OSInstallMISR: create_singlethreaded_workqueue failed"));
+		return PVRSRV_ERROR_GENERIC;
+	}
+
+	INIT_WORK(&psEnvData->sMISRWork, MISRWrapper
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
+		, (void *)&psEnvData->sMISRWork
+#endif
+				);
+
+	psEnvData->pvMISRData = pvSysData;
 	psEnvData->bMISRInstalled = IMG_TRUE;
 
 	return PVRSRV_OK;
@@ -752,13 +770,15 @@ PVRSRV_ERROR OSUninstallMISR(IMG_VOID *pvSysData)
 
 	PVR_TRACE(("Uninstalling MISR"));
 
-	cancel_work_sync(&psEnvData->sMISRWork);
-	destroy_workqueue(psEnvData->sMISRWorkQueue);
+	flush_workqueue(psEnvData->psWorkQueue);
+
+	destroy_workqueue(psEnvData->psWorkQueue);
 
 	psEnvData->bMISRInstalled = IMG_FALSE;
 
 	return PVRSRV_OK;
 }
+
 
 PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
 {
@@ -767,12 +787,157 @@ PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
 
 	if (psEnvData->bMISRInstalled)
 	{
-		queue_work(psEnvData->sMISRWorkQueue, &psEnvData->sMISRWork);
+		queue_work(psEnvData->psWorkQueue, &psEnvData->sMISRWork);
+	}
+
+	return PVRSRV_OK;	
+}
+#else	
+#if defined(PVR_LINUX_MISR_USING_WORKQUEUE)
+static void MISRWrapper(
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
+			void *data
+#else
+			struct work_struct *data
+#endif
+)
+{
+	ENV_DATA *psEnvData = container_of(data, ENV_DATA, sMISRWork);
+	SYS_DATA *psSysData  = (SYS_DATA *)psEnvData->pvMISRData;
+
+	PVRSRVMISR(psSysData);
+}
+
+
+PVRSRV_ERROR OSInstallMISR(IMG_VOID *pvSysData)
+{
+	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+
+	if (psEnvData->bMISRInstalled)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "OSInstallMISR: An MISR has already been installed"));
+		return PVRSRV_ERROR_GENERIC;
+	}
+
+	PVR_TRACE(("Installing MISR with cookie %x", pvSysData));
+
+	INIT_WORK(&psEnvData->sMISRWork, MISRWrapper
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
+		, (void *)&psEnvData->sMISRWork
+#endif
+				);
+
+	psEnvData->pvMISRData = pvSysData;
+	psEnvData->bMISRInstalled = IMG_TRUE;
+
+	return PVRSRV_OK;
+}
+
+
+PVRSRV_ERROR OSUninstallMISR(IMG_VOID *pvSysData)
+{
+	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+	ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+
+	if (!psEnvData->bMISRInstalled)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "OSUninstallMISR: No MISR has been installed"));
+		return PVRSRV_ERROR_GENERIC;
+	}
+
+	PVR_TRACE(("Uninstalling MISR"));
+
+	flush_scheduled_work();
+
+	psEnvData->bMISRInstalled = IMG_FALSE;
+
+	return PVRSRV_OK;
+}
+
+
+PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
+{
+	SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+	ENV_DATA *psEnvData = (ENV_DATA*)psSysData->pvEnvSpecificData;
+
+	if (psEnvData->bMISRInstalled)
+	{
+		schedule_work(&psEnvData->sMISRWork);
 	}
 
 	return PVRSRV_OK;	
 }
 
+#else	
+
+
+static void MISRWrapper(unsigned long data)
+{
+    SYS_DATA *psSysData;
+
+    psSysData = (SYS_DATA *)data;
+    
+    PVRSRVMISR(psSysData);
+}
+
+
+PVRSRV_ERROR OSInstallMISR(IMG_VOID *pvSysData)
+{
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+
+    if (psEnvData->bMISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSInstallMISR: An MISR has already been installed"));
+        return PVRSRV_ERROR_GENERIC;
+    }
+
+    PVR_TRACE(("Installing MISR with cookie %x", pvSysData));
+
+    tasklet_init(&psEnvData->sMISRTasklet, MISRWrapper, (unsigned long)pvSysData);
+
+    psEnvData->bMISRInstalled = IMG_TRUE;
+
+    return PVRSRV_OK;
+}
+
+
+PVRSRV_ERROR OSUninstallMISR(IMG_VOID *pvSysData)
+{
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA *)psSysData->pvEnvSpecificData;
+
+    if (!psEnvData->bMISRInstalled)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSUninstallMISR: No MISR has been installed"));
+        return PVRSRV_ERROR_GENERIC;
+    }
+
+    PVR_TRACE(("Uninstalling MISR"));
+
+    tasklet_kill(&psEnvData->sMISRTasklet);
+
+    psEnvData->bMISRInstalled = IMG_FALSE;
+
+    return PVRSRV_OK;
+}
+
+PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
+{
+    SYS_DATA *psSysData = (SYS_DATA*)pvSysData;
+    ENV_DATA *psEnvData = (ENV_DATA*)psSysData->pvEnvSpecificData;
+
+    if (psEnvData->bMISRInstalled)
+    {
+        tasklet_schedule(&psEnvData->sMISRTasklet);
+    }
+
+    return PVRSRV_OK;	
+}
+
+#endif 
+#endif 
 
 #endif 
 
@@ -782,56 +947,56 @@ PVRSRV_ERROR OSScheduleMISR(IMG_VOID *pvSysData)
 #define	OS_TAS(p)	tas(p)
 #endif
 PVRSRV_ERROR OSLockResource ( PVRSRV_RESOURCE 	*psResource,
-								IMG_UINT32 			ui32ID)
+                                IMG_UINT32 			ui32ID)
 
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
+    PVRSRV_ERROR eError = PVRSRV_OK;
 
-	if(!OS_TAS(&psResource->ui32Lock))
-		psResource->ui32ID = ui32ID;
-	else
-		eError = PVRSRV_ERROR_GENERIC;
+    if(!OS_TAS(&psResource->ui32Lock))
+        psResource->ui32ID = ui32ID;
+    else
+        eError = PVRSRV_ERROR_GENERIC;
 
-	return eError;
+    return eError;
 }
 
 
 PVRSRV_ERROR OSUnlockResource (PVRSRV_RESOURCE *psResource, IMG_UINT32 ui32ID)
 {
-	volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
-	PVRSRV_ERROR eError = PVRSRV_OK;
+    volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
+    PVRSRV_ERROR eError = PVRSRV_OK;
 
-	if(*pui32Access)
-	{
-		if(psResource->ui32ID == ui32ID)
-		{
-			psResource->ui32ID = 0;
-			*pui32Access = 0;
-		}
-		else
-		{
-			PVR_DPF((PVR_DBG_ERROR,"OSUnlockResource: Resource %p is not locked with expected value.", psResource)); 
-			PVR_DPF((PVR_DBG_MESSAGE,"Should be %x is actually %x", ui32ID, psResource->ui32ID));
-			eError = PVRSRV_ERROR_GENERIC;
-		}
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR,"OSUnlockResource: Resource %p is not locked", psResource));
-		eError = PVRSRV_ERROR_GENERIC;
-	}
-	
-	return eError;
+    if(*pui32Access)
+    {
+        if(psResource->ui32ID == ui32ID)
+        {
+            psResource->ui32ID = 0;
+            *pui32Access = 0;
+        }
+        else
+        {
+            PVR_DPF((PVR_DBG_ERROR,"OSUnlockResource: Resource %p is not locked with expected value.", psResource)); 
+            PVR_DPF((PVR_DBG_MESSAGE,"Should be %x is actually %x", ui32ID, psResource->ui32ID));
+            eError = PVRSRV_ERROR_GENERIC;
+        }
+    }
+    else
+    {
+        PVR_DPF((PVR_DBG_ERROR,"OSUnlockResource: Resource %p is not locked", psResource));
+        eError = PVRSRV_ERROR_GENERIC;
+    }
+    
+    return eError;
 }
 
 
 IMG_BOOL OSIsResourceLocked (PVRSRV_RESOURCE *psResource, IMG_UINT32 ui32ID)
 {
-	volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
+    volatile IMG_UINT32 *pui32Access = (volatile IMG_UINT32 *)&psResource->ui32Lock;
 
-	return 	(*(volatile IMG_UINT32 *)pui32Access == 1) && (psResource->ui32ID == ui32ID)
-			?	IMG_TRUE
-			:	IMG_FALSE;
+    return 	(*(volatile IMG_UINT32 *)pui32Access == 1) && (psResource->ui32ID == ui32ID)
+            ?	IMG_TRUE
+            :	IMG_FALSE;
 }
 
 
@@ -899,9 +1064,9 @@ OSUnMapPhysToLin(IMG_VOID *pvLinAddr, IMG_UINT32 ui32Bytes, IMG_UINT32 ui32Mappi
 
 static PVRSRV_ERROR
 RegisterExternalMem(IMG_SYS_PHYADDR *pBasePAddr,
-	      IMG_VOID *pvCPUVAddr,
+          IMG_VOID *pvCPUVAddr,
               IMG_UINT32 ui32Bytes,
-	      IMG_BOOL bPhysContig,
+          IMG_BOOL bPhysContig,
               IMG_UINT32 ui32MappingFlags,
               IMG_HANDLE *phOSMemHandle)
 {
@@ -911,8 +1076,8 @@ RegisterExternalMem(IMG_SYS_PHYADDR *pBasePAddr,
     {
         case PVRSRV_HAP_KERNEL_ONLY:
         {
-	    psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
-		
+        psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
+        
             if(!psLinuxMemArea)
             {
                 return PVRSRV_ERROR_GENERIC;
@@ -921,7 +1086,7 @@ RegisterExternalMem(IMG_SYS_PHYADDR *pBasePAddr,
         }
         case PVRSRV_HAP_SINGLE_PROCESS:
         {
-	    psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
+        psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
 
             if(!psLinuxMemArea)
             {
@@ -937,7 +1102,7 @@ RegisterExternalMem(IMG_SYS_PHYADDR *pBasePAddr,
             
             ui32MappingFlags &= ~PVRSRV_HAP_CACHED;
 #endif
-	    psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
+        psLinuxMemArea = NewExternalKVLinuxMemArea(pBasePAddr, pvCPUVAddr, ui32Bytes, bPhysContig, ui32MappingFlags);
 
             if(!psLinuxMemArea)
             {
@@ -962,20 +1127,20 @@ RegisterExternalMem(IMG_SYS_PHYADDR *pBasePAddr,
 
 PVRSRV_ERROR
 OSRegisterMem(IMG_CPU_PHYADDR BasePAddr,
-			  IMG_VOID *pvCPUVAddr,
+              IMG_VOID *pvCPUVAddr,
               IMG_UINT32 ui32Bytes,
               IMG_UINT32 ui32MappingFlags,
               IMG_HANDLE *phOSMemHandle)
 {
-	IMG_SYS_PHYADDR SysPAddr = SysCpuPAddrToSysPAddr(BasePAddr);
+    IMG_SYS_PHYADDR SysPAddr = SysCpuPAddrToSysPAddr(BasePAddr);
 
-	return RegisterExternalMem(&SysPAddr, pvCPUVAddr, ui32Bytes, IMG_TRUE, ui32MappingFlags, phOSMemHandle);
+    return RegisterExternalMem(&SysPAddr, pvCPUVAddr, ui32Bytes, IMG_TRUE, ui32MappingFlags, phOSMemHandle);
 }
 
 
 PVRSRV_ERROR OSRegisterDiscontigMem(IMG_SYS_PHYADDR *pBasePAddr, IMG_VOID *pvCPUVAddr, IMG_UINT32 ui32Bytes, IMG_UINT32 ui32MappingFlags, IMG_HANDLE *phOSMemHandle)
 {
-	return RegisterExternalMem(pBasePAddr, pvCPUVAddr, ui32Bytes, IMG_FALSE, ui32MappingFlags, phOSMemHandle);
+    return RegisterExternalMem(pBasePAddr, pvCPUVAddr, ui32Bytes, IMG_FALSE, ui32MappingFlags, phOSMemHandle);
 }
 
 
@@ -1020,7 +1185,7 @@ OSUnRegisterMem (IMG_VOID *pvCpuVAddr,
 
 PVRSRV_ERROR OSUnRegisterDiscontigMem(IMG_VOID *pvCpuVAddr, IMG_UINT32 ui32Bytes, IMG_UINT32 ui32Flags, IMG_HANDLE hOSMemHandle)
 {
-	return OSUnRegisterMem(pvCpuVAddr, ui32Bytes, ui32Flags, hOSMemHandle);
+    return OSUnRegisterMem(pvCpuVAddr, ui32Bytes, ui32Flags, hOSMemHandle);
 }
 
 PVRSRV_ERROR
@@ -1050,17 +1215,17 @@ OSReservePhys(IMG_CPU_PHYADDR BasePAddr,
             if(!psLinuxMemArea)
             {
                 return PVRSRV_ERROR_GENERIC;
-			}
+            }
             break;
         }
         case PVRSRV_HAP_SINGLE_PROCESS:
-		{
+        {
             
             psLinuxMemArea = NewIOLinuxMemArea(BasePAddr, ui32Bytes, ui32MappingFlags);
             if(!psLinuxMemArea)
             {
                 return PVRSRV_ERROR_GENERIC;
-			}
+            }
             PVRMMapRegisterArea(psLinuxMemArea);
             break;
         }
@@ -1084,7 +1249,7 @@ OSReservePhys(IMG_CPU_PHYADDR BasePAddr,
             *ppvCpuVAddr = NULL;
             *phOSMemHandle = (IMG_HANDLE)0;
             return PVRSRV_ERROR_GENERIC;
-	}
+    }
 
     *phOSMemHandle = (IMG_HANDLE)psLinuxMemArea;
     *ppvCpuVAddr = LinuxMemAreaToCpuVAddr(psLinuxMemArea);
@@ -1155,7 +1320,7 @@ PVRSRV_ERROR OSBaseAllocContigMemory(IMG_UINT32 ui32Size, IMG_CPU_VIRTADDR *pvLi
 #endif
     if (!pvKernLinAddr)
     {
-	return PVRSRV_ERROR_OUT_OF_MEMORY;
+    return PVRSRV_ERROR_OUT_OF_MEMORY;
     }
 
     *pvLinAddr = pvKernLinAddr;
@@ -1187,18 +1352,18 @@ PVRSRV_ERROR OSBaseFreeContigMemory(IMG_UINT32 ui32Size, IMG_CPU_VIRTADDR pvLinA
 IMG_UINT32 OSReadHWReg(IMG_PVOID pvLinRegBaseAddr, IMG_UINT32 ui32Offset)
 {
 #if !defined(NO_HARDWARE)
-	return (IMG_UINT32) readl((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
+    return (IMG_UINT32) readl((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
 #else
-	return *(IMG_UINT32 *)((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
+    return *(IMG_UINT32 *)((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
 #endif
 }
 
 IMG_VOID OSWriteHWReg(IMG_PVOID pvLinRegBaseAddr, IMG_UINT32 ui32Offset, IMG_UINT32 ui32Value)
 {
 #if !defined(NO_HARDWARE)
-	writel(ui32Value, (IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
+    writel(ui32Value, (IMG_PBYTE)pvLinRegBaseAddr+ui32Offset);
 #else
-	*(IMG_UINT32 *)((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset) = ui32Value;
+    *(IMG_UINT32 *)((IMG_PBYTE)pvLinRegBaseAddr+ui32Offset) = ui32Value;
 #endif
 }
 
@@ -1206,274 +1371,304 @@ IMG_VOID OSWriteHWReg(IMG_PVOID pvLinRegBaseAddr, IMG_UINT32 ui32Offset, IMG_UIN
 
 PVRSRV_PCI_DEV_HANDLE OSPCISetDev(IMG_VOID *pvPCICookie, HOST_PCI_INIT_FLAGS eFlags)
 {
-	int err;
-	IMG_UINT32 i;
-	PVR_PCI_DEV *psPVRPCI;
+    int err;
+    IMG_UINT32 i;
+    PVR_PCI_DEV *psPVRPCI;
 
-	PVR_TRACE(("OSPCISetDev"));
+    PVR_TRACE(("OSPCISetDev"));
 
-	if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(*psPVRPCI), (IMG_VOID *)&psPVRPCI, IMG_NULL,
-		"PCI Device") != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCISetDev: Couldn't allocate PVR PCI structure"));
-		return IMG_NULL;
-	}
+    if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(*psPVRPCI), (IMG_VOID **)&psPVRPCI, IMG_NULL,
+        "PCI Device") != PVRSRV_OK)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCISetDev: Couldn't allocate PVR PCI structure"));
+        return IMG_NULL;
+    }
 
-	psPVRPCI->psPCIDev = (struct pci_dev *)pvPCICookie;
-	psPVRPCI->ePCIFlags = eFlags;
+    psPVRPCI->psPCIDev = (struct pci_dev *)pvPCICookie;
+    psPVRPCI->ePCIFlags = eFlags;
 
-	err = pci_enable_device(psPVRPCI->psPCIDev);
-	if (err != 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCISetDev: Couldn't enable device (%d)", err));
-		return IMG_NULL;
-	}
+    err = pci_enable_device(psPVRPCI->psPCIDev);
+    if (err != 0)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCISetDev: Couldn't enable device (%d)", err));
+        return IMG_NULL;
+    }
 
-	if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_BUS_MASTER)	 
-		pci_set_master(psPVRPCI->psPCIDev);
+    if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_BUS_MASTER)	 
+    {
+        pci_set_master(psPVRPCI->psPCIDev);
+    }
 
-	
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
-	{
-		psPVRPCI->abPCIResourceInUse[i] = IMG_FALSE;
-	}
+    if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_MSI)		 
+    {
+#if defined(CONFIG_PCI_MSI)
+        err = pci_enable_msi(psPVRPCI->psPCIDev);
+        if (err != 0)
+        {
+            PVR_DPF((PVR_DBG_WARNING, "OSPCISetDev: Couldn't enable MSI (%d)", err));
+            psPVRPCI->ePCIFlags &= ~HOST_PCI_INIT_FLAG_MSI;	 
+        }
+#else
+        PVR_DPF((PVR_DBG_WARNING, "OSPCISetDev: MSI support not enabled in the kernel"));
+#endif
+    }
 
-	return (PVRSRV_PCI_DEV_HANDLE)psPVRPCI;
+    
+    for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
+    {
+        psPVRPCI->abPCIResourceInUse[i] = IMG_FALSE;
+    }
+
+    return (PVRSRV_PCI_DEV_HANDLE)psPVRPCI;
 }
 
 PVRSRV_PCI_DEV_HANDLE OSPCIAcquireDev(IMG_UINT16 ui16VendorID, IMG_UINT16 ui16DeviceID, HOST_PCI_INIT_FLAGS eFlags)
 {
-	struct pci_dev *psPCIDev;
+    struct pci_dev *psPCIDev;
 
-	psPCIDev = pci_get_device(ui16VendorID, ui16DeviceID, NULL);
-	if (psPCIDev == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCIAcquireDev: Couldn't acquire device"));
-		return IMG_NULL;
-	}
+    psPCIDev = pci_get_device(ui16VendorID, ui16DeviceID, NULL);
+    if (psPCIDev == NULL)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCIAcquireDev: Couldn't acquire device"));
+        return IMG_NULL;
+    }
 
-	return OSPCISetDev((IMG_VOID *)psPCIDev, eFlags);
+    return OSPCISetDev((IMG_VOID *)psPCIDev, eFlags);
 }
 
 PVRSRV_ERROR OSPCIIRQ(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 *pui32IRQ)
 {
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+    PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
 
-	*pui32IRQ = psPVRPCI->psPCIDev->irq;
+    *pui32IRQ = psPVRPCI->psPCIDev->irq;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 enum HOST_PCI_ADDR_RANGE_FUNC
 {
-	HOST_PCI_ADDR_RANGE_FUNC_LEN,
-	HOST_PCI_ADDR_RANGE_FUNC_START,
-	HOST_PCI_ADDR_RANGE_FUNC_END,
-	HOST_PCI_ADDR_RANGE_FUNC_REQUEST,
-	HOST_PCI_ADDR_RANGE_FUNC_RELEASE
+    HOST_PCI_ADDR_RANGE_FUNC_LEN,
+    HOST_PCI_ADDR_RANGE_FUNC_START,
+    HOST_PCI_ADDR_RANGE_FUNC_END,
+    HOST_PCI_ADDR_RANGE_FUNC_REQUEST,
+    HOST_PCI_ADDR_RANGE_FUNC_RELEASE
 };
 
 static IMG_UINT32 OSPCIAddrRangeFunc(enum HOST_PCI_ADDR_RANGE_FUNC eFunc,
-									 PVRSRV_PCI_DEV_HANDLE hPVRPCI,
-									 IMG_UINT32 ui32Index)
+                                     PVRSRV_PCI_DEV_HANDLE hPVRPCI,
+                                     IMG_UINT32 ui32Index)
 {
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+    PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
 
-	if (ui32Index >= DEVICE_COUNT_RESOURCE)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: Index out of range"));
-		return 0;
+    if (ui32Index >= DEVICE_COUNT_RESOURCE)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: Index out of range"));
+        return 0;
 
-	}
+    }
 
-	switch (eFunc)
-	{
-		case HOST_PCI_ADDR_RANGE_FUNC_LEN:
-			return pci_resource_len(psPVRPCI->psPCIDev, ui32Index);
-		case HOST_PCI_ADDR_RANGE_FUNC_START:
-			return pci_resource_start(psPVRPCI->psPCIDev, ui32Index);
-		case HOST_PCI_ADDR_RANGE_FUNC_END:
-			return pci_resource_end(psPVRPCI->psPCIDev, ui32Index);
-		case HOST_PCI_ADDR_RANGE_FUNC_REQUEST:
-		{
-			int err;
+    switch (eFunc)
+    {
+        case HOST_PCI_ADDR_RANGE_FUNC_LEN:
+            return pci_resource_len(psPVRPCI->psPCIDev, ui32Index);
+        case HOST_PCI_ADDR_RANGE_FUNC_START:
+            return pci_resource_start(psPVRPCI->psPCIDev, ui32Index);
+        case HOST_PCI_ADDR_RANGE_FUNC_END:
+            return pci_resource_end(psPVRPCI->psPCIDev, ui32Index);
+        case HOST_PCI_ADDR_RANGE_FUNC_REQUEST:
+        {
+            int err;
 
-			err = pci_request_region(psPVRPCI->psPCIDev, (IMG_INT)ui32Index, "PowerVR");
-			if (err != 0)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: pci_request_region_failed (%d)", err));
-				return 0;
-			}
-			psPVRPCI->abPCIResourceInUse[ui32Index] = IMG_TRUE;
-			return 1;
-		}
-		case HOST_PCI_ADDR_RANGE_FUNC_RELEASE:
-			if (psPVRPCI->abPCIResourceInUse[ui32Index])
-			{
-				pci_release_region(psPVRPCI->psPCIDev, (IMG_INT)ui32Index);
-				psPVRPCI->abPCIResourceInUse[ui32Index] = IMG_FALSE;
-			}
-			return 1;
-		default:
-			PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: Unknown function"));
-			break;
-	}
+            err = pci_request_region(psPVRPCI->psPCIDev, (IMG_INT)ui32Index, "PowerVR");
+            if (err != 0)
+            {
+                PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: pci_request_region_failed (%d)", err));
+                return 0;
+            }
+            psPVRPCI->abPCIResourceInUse[ui32Index] = IMG_TRUE;
+            return 1;
+        }
+        case HOST_PCI_ADDR_RANGE_FUNC_RELEASE:
+            if (psPVRPCI->abPCIResourceInUse[ui32Index])
+            {
+                pci_release_region(psPVRPCI->psPCIDev, (IMG_INT)ui32Index);
+                psPVRPCI->abPCIResourceInUse[ui32Index] = IMG_FALSE;
+            }
+            return 1;
+        default:
+            PVR_DPF((PVR_DBG_ERROR, "OSPCIAddrRangeFunc: Unknown function"));
+            break;
+    }
 
-	return 0;
+    return 0;
 }
 
 IMG_UINT32 OSPCIAddrRangeLen(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_LEN, hPVRPCI, ui32Index); 
+    return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_LEN, hPVRPCI, ui32Index); 
 }
 
 IMG_UINT32 OSPCIAddrRangeStart(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_START, hPVRPCI, ui32Index); 
+    return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_START, hPVRPCI, ui32Index); 
 }
 
 IMG_UINT32 OSPCIAddrRangeEnd(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_END, hPVRPCI, ui32Index); 
+    return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_END, hPVRPCI, ui32Index); 
 }
 
 PVRSRV_ERROR OSPCIRequestAddrRange(PVRSRV_PCI_DEV_HANDLE hPVRPCI,
-								   IMG_UINT32 ui32Index)
+                                   IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_REQUEST, hPVRPCI, ui32Index) == 0 ? PVRSRV_ERROR_GENERIC : PVRSRV_OK;
+    return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_REQUEST, hPVRPCI, ui32Index) == 0 ? PVRSRV_ERROR_GENERIC : PVRSRV_OK;
 }
 
 PVRSRV_ERROR OSPCIReleaseAddrRange(PVRSRV_PCI_DEV_HANDLE hPVRPCI, IMG_UINT32 ui32Index)
 {
-	return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_RELEASE, hPVRPCI, ui32Index) == 0 ? PVRSRV_ERROR_GENERIC : PVRSRV_OK;
+    return OSPCIAddrRangeFunc(HOST_PCI_ADDR_RANGE_FUNC_RELEASE, hPVRPCI, ui32Index) == 0 ? PVRSRV_ERROR_GENERIC : PVRSRV_OK;
 }
 
 PVRSRV_ERROR OSPCIReleaseDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 {
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
-	int i;
+    PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+    int i;
 
-	PVR_TRACE(("OSPCIReleaseDev"));
+    PVR_TRACE(("OSPCIReleaseDev"));
 
+    
+    for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
+    {
+        if (psPVRPCI->abPCIResourceInUse[i])
+        {
+            PVR_TRACE(("OSPCIReleaseDev: Releasing Address range %d", i));
+            pci_release_region(psPVRPCI->psPCIDev, i);
+            psPVRPCI->abPCIResourceInUse[i] = IMG_FALSE;
+        }
+    }
+
+#if defined(CONFIG_PCI_MSI)
+    if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_MSI)		 
+    {
+        pci_disable_msi(psPVRPCI->psPCIDev);
+    }
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+    if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_BUS_MASTER)	 
+    {
+        pci_clear_master(psPVRPCI->psPCIDev);
+    }
+#endif
+    pci_disable_device(psPVRPCI->psPCIDev);
+
+    OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(*psPVRPCI), (IMG_VOID *)psPVRPCI, IMG_NULL);
 	
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
-	{
-		if (psPVRPCI->abPCIResourceInUse[i])
-		{
-			PVR_TRACE(("OSPCIReleaseDev: Releasing Address range %d", i));
-			pci_release_region(psPVRPCI->psPCIDev, i);
-			psPVRPCI->abPCIResourceInUse[i] = IMG_FALSE;
-		}
-	}
 
-	pci_disable_device(psPVRPCI->psPCIDev);
-
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(*psPVRPCI), (IMG_VOID *)psPVRPCI, IMG_NULL);
-
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 PVRSRV_ERROR OSPCISuspendDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 {
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
-	int i;
-	int err;
+    PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+    int i;
+    int err;
 
-	PVR_TRACE(("OSPCISuspendDev"));
+    PVR_TRACE(("OSPCISuspendDev"));
 
-	
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
-	{
-		if (psPVRPCI->abPCIResourceInUse[i])
-		{
-			pci_release_region(psPVRPCI->psPCIDev, i);
-		}
-	}
+    
+    for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
+    {
+        if (psPVRPCI->abPCIResourceInUse[i])
+        {
+            pci_release_region(psPVRPCI->psPCIDev, i);
+        }
+    }
 
-	err = pci_save_state(psPVRPCI->psPCIDev);
-	if (err != 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: pci_save_state_failed (%d)", err));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    err = pci_save_state(psPVRPCI->psPCIDev);
+    if (err != 0)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: pci_save_state_failed (%d)", err));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	pci_disable_device(psPVRPCI->psPCIDev);
+    pci_disable_device(psPVRPCI->psPCIDev);
 
-	err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_SUSPEND));
-	switch(err)
-	{
-		case 0:
-			break;
-		case -EIO:
-			PVR_DPF((PVR_DBG_WARNING, "OSPCISuspendDev: device doesn't support PCI PM"));
-			break;
-		case -EINVAL:
-			PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: can't enter requested power state"));
-			break;
-		default:
-			PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: pci_set_power_state failed (%d)", err));
-			break;
-	}
+    err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_SUSPEND));
+    switch(err)
+    {
+        case 0:
+            break;
+        case -EIO:
+            PVR_DPF((PVR_DBG_WARNING, "OSPCISuspendDev: device doesn't support PCI PM"));
+            break;
+        case -EINVAL:
+            PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: can't enter requested power state"));
+            break;
+        default:
+            PVR_DPF((PVR_DBG_ERROR, "OSPCISuspendDev: pci_set_power_state failed (%d)", err));
+            break;
+    }
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 PVRSRV_ERROR OSPCIResumeDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 {
-	PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
-	int err;
-	int i;
+    PVR_PCI_DEV *psPVRPCI = (PVR_PCI_DEV *)hPVRPCI;
+    int err;
+    int i;
 
-	PVR_TRACE(("OSPCIResumeDev"));
+    PVR_TRACE(("OSPCIResumeDev"));
 
-	err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_ON));
-	switch(err)
-	{
-		case 0:
-			break;
-		case -EIO:
-			PVR_DPF((PVR_DBG_WARNING, "OSPCIResumeDev: device doesn't support PCI PM"));
-			break;
-		case -EINVAL:
-			PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: can't enter requested power state"));
-			return PVRSRV_ERROR_GENERIC;
-		default:
-			PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_set_power_state failed (%d)", err));
-			return PVRSRV_ERROR_GENERIC;
-	}
+    err = pci_set_power_state(psPVRPCI->psPCIDev, pci_choose_state(psPVRPCI->psPCIDev, PMSG_ON));
+    switch(err)
+    {
+        case 0:
+            break;
+        case -EIO:
+            PVR_DPF((PVR_DBG_WARNING, "OSPCIResumeDev: device doesn't support PCI PM"));
+            break;
+        case -EINVAL:
+            PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: can't enter requested power state"));
+            return PVRSRV_ERROR_GENERIC;
+        default:
+            PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_set_power_state failed (%d)", err));
+            return PVRSRV_ERROR_GENERIC;
+    }
 
-	err = pci_restore_state(psPVRPCI->psPCIDev);
-	if (err != 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_restore_state failed (%d)", err));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    err = pci_restore_state(psPVRPCI->psPCIDev);
+    if (err != 0)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_restore_state failed (%d)", err));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	err = pci_enable_device(psPVRPCI->psPCIDev);
-	if (err != 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: Couldn't enable device (%d)", err));
-		return PVRSRV_ERROR_GENERIC;
-	}
+    err = pci_enable_device(psPVRPCI->psPCIDev);
+    if (err != 0)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: Couldn't enable device (%d)", err));
+        return PVRSRV_ERROR_GENERIC;
+    }
 
-	if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_BUS_MASTER)	 
-		pci_set_master(psPVRPCI->psPCIDev);
+    if (psPVRPCI->ePCIFlags & HOST_PCI_INIT_FLAG_BUS_MASTER)	 
+        pci_set_master(psPVRPCI->psPCIDev);
 
-	
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
-	{
-		if (psPVRPCI->abPCIResourceInUse[i])
-		{
-			err = pci_request_region(psPVRPCI->psPCIDev, i, "PowerVR");
-			if (err != 0)
-			{
-				PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_request_region_failed (region %d, error %d)", i, err));
-			}
-		}
+    
+    for (i = 0; i < DEVICE_COUNT_RESOURCE; i++)
+    {
+        if (psPVRPCI->abPCIResourceInUse[i])
+        {
+            err = pci_request_region(psPVRPCI->psPCIDev, i, "PowerVR");
+            if (err != 0)
+            {
+                PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_request_region_failed (region %d, error %d)", i, err));
+            }
+        }
 
-	}
+    }
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 #endif 
@@ -1482,295 +1677,289 @@ PVRSRV_ERROR OSPCIResumeDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
 
 typedef struct TIMER_CALLBACK_DATA_TAG
 {
-	IMG_BOOL		bInUse;
-	PFN_TIMER_FUNC		pfnTimerFunc;
-	IMG_VOID 		*pvData;	
-	struct timer_list	sTimer;
-	IMG_UINT32		ui32Delay;
-	IMG_BOOL		bActive;
-	struct work_struct	work;
+    IMG_BOOL		bInUse;
+    PFN_TIMER_FUNC		pfnTimerFunc;
+    IMG_VOID 		*pvData;	
+    struct timer_list	sTimer;
+    IMG_UINT32		ui32Delay;
+    IMG_BOOL		bActive;
 }TIMER_CALLBACK_DATA;
 
 static TIMER_CALLBACK_DATA sTimers[OS_MAX_TIMERS];
 
 static spinlock_t sTimerStructLock = SPIN_LOCK_UNLOCKED;
 
-static void timer_worker(struct work_struct *work)
-{
-	TIMER_CALLBACK_DATA *psTimerCBData = container_of(work, TIMER_CALLBACK_DATA, work);
-
-	if (!psTimerCBData->bActive)
-		return;
-
-	psTimerCBData->pfnTimerFunc(psTimerCBData->pvData);
-
-	mod_timer(&psTimerCBData->sTimer, psTimerCBData->ui32Delay + jiffies);
-}
-
 static IMG_VOID OSTimerCallbackWrapper(IMG_UINT32 ui32Data)
 {
-	TIMER_CALLBACK_DATA	*psTimerCBData = (TIMER_CALLBACK_DATA*)ui32Data;
+    TIMER_CALLBACK_DATA	*psTimerCBData = (TIMER_CALLBACK_DATA*)ui32Data;
+    
+    if (!psTimerCBData->bActive)
+        return;
 
-	schedule_work(&psTimerCBData->work);
+    
+    psTimerCBData->pfnTimerFunc(psTimerCBData->pvData);
+    
+    
+    mod_timer(&psTimerCBData->sTimer, psTimerCBData->ui32Delay + jiffies);
 }
 
 
 IMG_HANDLE OSAddTimer(PFN_TIMER_FUNC pfnTimerFunc, IMG_VOID *pvData, IMG_UINT32 ui32MsTimeout)
 {
-	TIMER_CALLBACK_DATA	*psTimerCBData;
-	IMG_UINT32		ui32i;
-	unsigned long		ulLockFlags;
+    TIMER_CALLBACK_DATA	*psTimerCBData;
+    IMG_UINT32		ui32i;
+    unsigned long		ulLockFlags;
 
-	
-	if(!pfnTimerFunc)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSAddTimer: passed invalid callback"));		
-		return IMG_NULL;		
-	}
-	
-	
-	spin_lock_irqsave(&sTimerStructLock, ulLockFlags);
-	for (ui32i = 0; ui32i < OS_MAX_TIMERS; ui32i++)
-	{
-		psTimerCBData = &sTimers[ui32i];
-		if (!psTimerCBData->bInUse)
-		{
-			psTimerCBData->bInUse = IMG_TRUE;
-			break;
-		}
-	}
-	spin_unlock_irqrestore(&sTimerStructLock, ulLockFlags);
+    
+    if(!pfnTimerFunc)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSAddTimer: passed invalid callback"));		
+        return IMG_NULL;		
+    }
+    
+    
+    spin_lock_irqsave(&sTimerStructLock, ulLockFlags);
+    for (ui32i = 0; ui32i < OS_MAX_TIMERS; ui32i++)
+    {
+        psTimerCBData = &sTimers[ui32i];
+        if (!psTimerCBData->bInUse)
+        {
+            psTimerCBData->bInUse = IMG_TRUE;
+            break;
+        }
+    }
+    spin_unlock_irqrestore(&sTimerStructLock, ulLockFlags);
 
-	if (ui32i >= OS_MAX_TIMERS)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSAddTimer: all timers are in use"));		
-		return IMG_NULL;	
-	}
+    if (ui32i >= OS_MAX_TIMERS)
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSAddTimer: all timers are in use"));		
+        return IMG_NULL;	
+    }
 
-	psTimerCBData->pfnTimerFunc = pfnTimerFunc;
-	psTimerCBData->pvData = pvData;
-	psTimerCBData->bActive = IMG_FALSE;
-	
-	
-	INIT_WORK(&psTimerCBData->work, timer_worker);
+    psTimerCBData->pfnTimerFunc = pfnTimerFunc;
+    psTimerCBData->pvData = pvData;
+    psTimerCBData->bActive = IMG_FALSE;
+    
+    
 
-	psTimerCBData->ui32Delay = ((HZ * ui32MsTimeout) < 1000)
-								?	1
-								:	((HZ * ui32MsTimeout) / 1000);
-	
-	init_timer(&psTimerCBData->sTimer);
-	
-	
-	psTimerCBData->sTimer.function = OSTimerCallbackWrapper;
-	psTimerCBData->sTimer.data = (IMG_UINT32)psTimerCBData;
-	psTimerCBData->sTimer.expires = psTimerCBData->ui32Delay + jiffies;
-	
-	return (IMG_HANDLE)(ui32i + 1);
+
+    psTimerCBData->ui32Delay = ((HZ * ui32MsTimeout) < 1000)
+                                ?	1
+                                :	((HZ * ui32MsTimeout) / 1000);
+    
+    init_timer(&psTimerCBData->sTimer);
+    
+    
+    psTimerCBData->sTimer.function = OSTimerCallbackWrapper;
+    psTimerCBData->sTimer.data = (IMG_UINT32)psTimerCBData;
+    psTimerCBData->sTimer.expires = psTimerCBData->ui32Delay + jiffies;
+    
+    return (IMG_HANDLE)(ui32i + 1);
 }
 
 
 static inline TIMER_CALLBACK_DATA *GetTimerStructure(IMG_HANDLE hTimer)
 {
-	IMG_UINT32 ui32i = ((IMG_UINT32)hTimer) - 1;
+    IMG_UINT32 ui32i = ((IMG_UINT32)hTimer) - 1;
 
-	PVR_ASSERT(ui32i < OS_MAX_TIMERS);
+    PVR_ASSERT(ui32i < OS_MAX_TIMERS);
 
-	return &sTimers[ui32i];
+    return &sTimers[ui32i];
 }
 
 PVRSRV_ERROR OSRemoveTimer (IMG_HANDLE hTimer)
 {
-	TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
+    TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
 
-	PVR_ASSERT(psTimerCBData->bInUse);
-	PVR_ASSERT(!psTimerCBData->bActive);
+    PVR_ASSERT(psTimerCBData->bInUse);
+    PVR_ASSERT(!psTimerCBData->bActive);
 
-	
-	psTimerCBData->bInUse = IMG_FALSE;
-	
-	return PVRSRV_OK;
+    
+    psTimerCBData->bInUse = IMG_FALSE;
+    
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSEnableTimer (IMG_HANDLE hTimer)
 {
-	TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
+    TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
 
-	PVR_ASSERT(psTimerCBData->bInUse);
-	PVR_ASSERT(!psTimerCBData->bActive);
+    PVR_ASSERT(psTimerCBData->bInUse);
+    PVR_ASSERT(!psTimerCBData->bActive);
 
-	psTimerCBData->bActive = IMG_TRUE;
+    
+    psTimerCBData->bActive = IMG_TRUE;
 
-	
-	add_timer(&psTimerCBData->sTimer);
-	
-	return PVRSRV_OK;
+    
+    add_timer(&psTimerCBData->sTimer);
+    
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSDisableTimer (IMG_HANDLE hTimer)
 {
-	TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
+    TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
 
-	PVR_ASSERT(psTimerCBData->bInUse);
-	PVR_ASSERT(psTimerCBData->bActive);
+    PVR_ASSERT(psTimerCBData->bInUse);
+    PVR_ASSERT(psTimerCBData->bActive);
 
-	
-	psTimerCBData->bActive = IMG_FALSE;
+    
+    psTimerCBData->bActive = IMG_FALSE;
 
-	
-	del_timer_sync(&psTimerCBData->sTimer);	
-	cancel_work_sync(&psTimerCBData->work);
-	
-	return PVRSRV_OK;
+    
+    del_timer_sync(&psTimerCBData->sTimer);	
+    
+    return PVRSRV_OK;
 }
 
 
 PVRSRV_ERROR OSEventObjectCreate(const IMG_CHAR *pszName, PVRSRV_EVENTOBJECT *psEventObject)
 {
 
-	PVRSRV_ERROR eError = PVRSRV_OK;
-	
-	if(psEventObject)
-	{
-		if(pszName)
-		{
-			
-			strncpy(psEventObject->szName, pszName, EVENTOBJNAME_MAXLENGTH);
-		}
-		else
-		{
-				
-			static IMG_UINT16 ui16NameIndex = 0;			
-			snprintf(psEventObject->szName, EVENTOBJNAME_MAXLENGTH, "PVRSRV_EVENTOBJECT_%d", ui16NameIndex++);
-		}
-		
-		if(LinuxEventObjectListCreate(&psEventObject->hOSEventKM) != PVRSRV_OK)
-		{
-			 eError = PVRSRV_ERROR_OUT_OF_MEMORY;	
-		}
+    PVRSRV_ERROR eError = PVRSRV_OK;
+    
+    if(psEventObject)
+    {
+        if(pszName)
+        {
+            
+            strncpy(psEventObject->szName, pszName, EVENTOBJNAME_MAXLENGTH);
+        }
+        else
+        {
+            	
+            static IMG_UINT16 ui16NameIndex = 0;			
+            snprintf(psEventObject->szName, EVENTOBJNAME_MAXLENGTH, "PVRSRV_EVENTOBJECT_%d", ui16NameIndex++);
+        }
+        
+        if(LinuxEventObjectListCreate(&psEventObject->hOSEventKM) != PVRSRV_OK)
+        {
+             eError = PVRSRV_ERROR_OUT_OF_MEMORY;	
+        }
 
-	}
-	else
-	{
+    }
+    else
+    {
         PVR_DPF((PVR_DBG_ERROR, "OSEventObjectCreate: psEventObject is not a valid pointer"));
-		eError = PVRSRV_ERROR_GENERIC;	
-	}
-	
-	return eError;
+        eError = PVRSRV_ERROR_GENERIC;	
+    }
+    
+    return eError;
 
 }
 
 
 PVRSRV_ERROR OSEventObjectDestroy(PVRSRV_EVENTOBJECT *psEventObject)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
+    PVRSRV_ERROR eError = PVRSRV_OK;
 
-	if(psEventObject)
-	{
-		if(psEventObject->hOSEventKM)
-		{
-			LinuxEventObjectListDestroy(psEventObject->hOSEventKM);
-		}
-		else
-		{
-    	    PVR_DPF((PVR_DBG_ERROR, "OSEventObjectDestroy: hOSEventKM is not a valid pointer"));
-        	eError = PVRSRV_ERROR_INVALID_PARAMS;
-		}
-	}
-	else
-	{
+    if(psEventObject)
+    {
+        if(psEventObject->hOSEventKM)
+        {
+            LinuxEventObjectListDestroy(psEventObject->hOSEventKM);
+        }
+        else
+        {
+            PVR_DPF((PVR_DBG_ERROR, "OSEventObjectDestroy: hOSEventKM is not a valid pointer"));
+            eError = PVRSRV_ERROR_INVALID_PARAMS;
+        }
+    }
+    else
+    {
         PVR_DPF((PVR_DBG_ERROR, "OSEventObjectDestroy: psEventObject is not a valid pointer"));
         eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-	
-	return eError;
+    }
+    
+    return eError;
 }
 
 PVRSRV_ERROR OSEventObjectWait(IMG_HANDLE hOSEventKM)
 {
-	PVRSRV_ERROR eError;
-	
-	if(hOSEventKM)
-	{
-		eError = LinuxEventObjectWait(hOSEventKM, EVENT_OBJECT_TIMEOUT_MS);
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSEventObjectWait: hOSEventKM is not a valid handle"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-	
-	return eError;
+    PVRSRV_ERROR eError;
+    
+    if(hOSEventKM)
+    {
+        eError = LinuxEventObjectWait(hOSEventKM, EVENT_OBJECT_TIMEOUT_MS);
+    }
+    else
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSEventObjectWait: hOSEventKM is not a valid handle"));
+        eError = PVRSRV_ERROR_INVALID_PARAMS;
+    }
+    
+    return eError;
 }
 
 PVRSRV_ERROR OSEventObjectOpen(PVRSRV_EVENTOBJECT *psEventObject,
-											IMG_HANDLE *phOSEvent)
+                                            IMG_HANDLE *phOSEvent)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
-	
-	if(psEventObject)
-	{
-		if(LinuxEventObjectAdd(psEventObject->hOSEventKM, phOSEvent) != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectAdd: failed"));
-	        eError = PVRSRV_ERROR_INVALID_PARAMS;
-		}
+    PVRSRV_ERROR eError = PVRSRV_OK;
+    
+    if(psEventObject)
+    {
+        if(LinuxEventObjectAdd(psEventObject->hOSEventKM, phOSEvent) != PVRSRV_OK)
+        {
+            PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectAdd: failed"));
+            eError = PVRSRV_ERROR_INVALID_PARAMS;
+        }
 
-	}
-	else
-	{
+    }
+    else
+    {
         PVR_DPF((PVR_DBG_ERROR, "OSEventObjectCreate: psEventObject is not a valid pointer"));
         eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-	
-	return eError;
+    }
+    
+    return eError;
 }
 
 PVRSRV_ERROR OSEventObjectClose(PVRSRV_EVENTOBJECT *psEventObject,
-											IMG_HANDLE hOSEventKM)
+                                            IMG_HANDLE hOSEventKM)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
+    PVRSRV_ERROR eError = PVRSRV_OK;
 
-	if(psEventObject)
-	{
-		if(LinuxEventObjectDelete(psEventObject->hOSEventKM, hOSEventKM) != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectDelete: failed"));
-	        eError = PVRSRV_ERROR_INVALID_PARAMS;
-		}
+    if(psEventObject)
+    {
+        if(LinuxEventObjectDelete(psEventObject->hOSEventKM, hOSEventKM) != PVRSRV_OK)
+        {
+            PVR_DPF((PVR_DBG_ERROR, "LinuxEventObjectDelete: failed"));
+            eError = PVRSRV_ERROR_INVALID_PARAMS;
+        }
 
-	}
-	else
-	{
+    }
+    else
+    {
         PVR_DPF((PVR_DBG_ERROR, "OSEventObjectDestroy: psEventObject is not a valid pointer"));
         eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-	
-	return eError;
-	
+    }
+    
+    return eError;
+    
 }
 
 PVRSRV_ERROR OSEventObjectSignal(IMG_HANDLE hOSEventKM)
 {
-	PVRSRV_ERROR eError;
-	
-	if(hOSEventKM)
-	{
-		eError = LinuxEventObjectSignal(hOSEventKM);
-	}
-	else
-	{
-		PVR_DPF((PVR_DBG_ERROR, "OSEventObjectSignal: hOSEventKM is not a valid handle"));
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-	}
-	
-	return eError;
+    PVRSRV_ERROR eError;
+    
+    if(hOSEventKM)
+    {
+        eError = LinuxEventObjectSignal(hOSEventKM);
+    }
+    else
+    {
+        PVR_DPF((PVR_DBG_ERROR, "OSEventObjectSignal: hOSEventKM is not a valid handle"));
+        eError = PVRSRV_ERROR_INVALID_PARAMS;
+    }
+    
+    return eError;
 }
 
 IMG_BOOL OSProcHasPrivSrvInit(IMG_VOID)
 {
-	return (capable(CAP_SYS_MODULE) != 0) ? IMG_TRUE : IMG_FALSE;
+    return (capable(CAP_SYS_MODULE) != 0) ? IMG_TRUE : IMG_FALSE;
 }
 
 PVRSRV_ERROR OSCopyToUser(IMG_PVOID pvProcess, 
@@ -1778,12 +1967,12 @@ PVRSRV_ERROR OSCopyToUser(IMG_PVOID pvProcess,
                           IMG_VOID *pvSrc, 
                           IMG_UINT32 ui32Bytes)
 {
-	PVR_UNREFERENCED_PARAMETER(pvProcess);
+    PVR_UNREFERENCED_PARAMETER(pvProcess);
 
-	if(copy_to_user(pvDest, pvSrc, ui32Bytes)==0)
-		return PVRSRV_OK;
-	else
-		return PVRSRV_ERROR_GENERIC;
+    if(copy_to_user(pvDest, pvSrc, ui32Bytes)==0)
+        return PVRSRV_OK;
+    else
+        return PVRSRV_ERROR_GENERIC;
 }
 
 PVRSRV_ERROR OSCopyFromUser( IMG_PVOID pvProcess, 
@@ -1791,419 +1980,419 @@ PVRSRV_ERROR OSCopyFromUser( IMG_PVOID pvProcess,
                              IMG_VOID *pvSrc, 
                              IMG_UINT32 ui32Bytes)
 {
-	PVR_UNREFERENCED_PARAMETER(pvProcess);
+    PVR_UNREFERENCED_PARAMETER(pvProcess);
 
-	if(copy_from_user(pvDest, pvSrc, ui32Bytes)==0)
-		return PVRSRV_OK;
-	else
-		return PVRSRV_ERROR_GENERIC;
+    if(copy_from_user(pvDest, pvSrc, ui32Bytes)==0)
+        return PVRSRV_OK;
+    else
+        return PVRSRV_ERROR_GENERIC;
 }
 
 IMG_BOOL OSAccessOK(IMG_VERIFY_TEST eVerification, IMG_VOID *pvUserPtr, IMG_UINT32 ui32Bytes)
 {
-	IMG_INT linuxType;
+    IMG_INT linuxType;
 
-	if (eVerification == PVR_VERIFY_READ)
-	{
-		linuxType = VERIFY_READ;
-	}
-	else
-	{
-		PVR_ASSERT(eVerification == PVR_VERIFY_WRITE);
-		linuxType = VERIFY_WRITE;
-	}
+    if (eVerification == PVR_VERIFY_READ)
+    {
+        linuxType = VERIFY_READ;
+    }
+    else
+    {
+        PVR_ASSERT(eVerification == PVR_VERIFY_WRITE);
+        linuxType = VERIFY_WRITE;
+    }
 
-	return access_ok(linuxType, pvUserPtr, ui32Bytes);
+    return access_ok(linuxType, pvUserPtr, ui32Bytes);
 }
 
 typedef enum _eWrapMemType_
 {
-	WRAP_TYPE_CLEANUP,
-	WRAP_TYPE_GET_USER_PAGES,
-	WRAP_TYPE_FIND_VMA_PAGES,
-	WRAP_TYPE_FIND_VMA_PFN
+    WRAP_TYPE_CLEANUP,
+    WRAP_TYPE_GET_USER_PAGES,
+    WRAP_TYPE_FIND_VMA_PAGES,
+    WRAP_TYPE_FIND_VMA_PFN
 } eWrapMemType;
 
 typedef struct _sWrapMemInfo_
 {
-	eWrapMemType eType;
-	IMG_INT iNumPages;
-	struct page **ppsPages;
-	IMG_SYS_PHYADDR *psPhysAddr;
-	IMG_INT iPageOffset;
-	IMG_INT iContiguous;
+    eWrapMemType eType;
+    IMG_INT iNumPages;
+    struct page **ppsPages;
+    IMG_SYS_PHYADDR *psPhysAddr;
+    IMG_INT iPageOffset;
+    IMG_INT iContiguous;
 #if defined(DEBUG)
-	IMG_UINT32 ulStartAddr;
-	IMG_UINT32 ulBeyondEndAddr;
-	struct vm_area_struct *psVMArea;
+    IMG_UINT32 ulStartAddr;
+    IMG_UINT32 ulBeyondEndAddr;
+    struct vm_area_struct *psVMArea;
 #endif
 } sWrapMemInfo;
 
 static IMG_VOID CheckPagesContiguous(sWrapMemInfo *psInfo)
 {
-	IMG_INT i;
-	IMG_UINT32 ui32AddrChk;
+    IMG_INT i;
+    IMG_UINT32 ui32AddrChk;
 
-	BUG_ON(psInfo == IMG_NULL);
+    BUG_ON(psInfo == IMG_NULL);
 
-	psInfo->iContiguous = 1;
+    psInfo->iContiguous = 1;
 
-	for (i = 0, ui32AddrChk = psInfo->psPhysAddr[0].uiAddr;
-		i < psInfo->iNumPages;
-		i++, ui32AddrChk += PAGE_SIZE)
-	{
-		if (psInfo->psPhysAddr[i].uiAddr != ui32AddrChk)
-		{
-			psInfo->iContiguous = 0;
-			break;
-		}
-	}
+    for (i = 0, ui32AddrChk = psInfo->psPhysAddr[0].uiAddr;
+        i < psInfo->iNumPages;
+        i++, ui32AddrChk += PAGE_SIZE)
+    {
+        if (psInfo->psPhysAddr[i].uiAddr != ui32AddrChk)
+        {
+            psInfo->iContiguous = 0;
+            break;
+        }
+    }
 }
 
 static struct page *CPUVAddrToPage(struct vm_area_struct *psVMArea, IMG_UINT32 ulCPUVAddr)
 {
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,10))
-	pgd_t *psPGD;
-	pud_t *psPUD;
-	pmd_t *psPMD;
-	pte_t *psPTE;
-	struct mm_struct *psMM = psVMArea->vm_mm;
-	IMG_UINT32 ulPFN;
-	spinlock_t *psPTLock;
-	struct page *psPage;
+    pgd_t *psPGD;
+    pud_t *psPUD;
+    pmd_t *psPMD;
+    pte_t *psPTE;
+    struct mm_struct *psMM = psVMArea->vm_mm;
+    IMG_UINT32 ulPFN;
+    spinlock_t *psPTLock;
+    struct page *psPage;
 
-	psPGD = pgd_offset(psMM, ulCPUVAddr);
-	if (pgd_none(*psPGD) || pgd_bad(*psPGD))
-		return NULL;
+    psPGD = pgd_offset(psMM, ulCPUVAddr);
+    if (pgd_none(*psPGD) || pgd_bad(*psPGD))
+        return NULL;
 
-	psPUD = pud_offset(psPGD, ulCPUVAddr);
-	if (pud_none(*psPUD) || pud_bad(*psPUD))
-		return NULL;
+    psPUD = pud_offset(psPGD, ulCPUVAddr);
+    if (pud_none(*psPUD) || pud_bad(*psPUD))
+        return NULL;
 
-	psPMD = pmd_offset(psPUD, ulCPUVAddr);
-	if (pmd_none(*psPMD) || pmd_bad(*psPMD))
-		return NULL;
+    psPMD = pmd_offset(psPUD, ulCPUVAddr);
+    if (pmd_none(*psPMD) || pmd_bad(*psPMD))
+        return NULL;
 
-	psPage = NULL;
+    psPage = NULL;
 
-	psPTE = (pte_t *)pte_offset_map_lock(psMM, psPMD, ulCPUVAddr, &psPTLock);
-	if ((pte_none(*psPTE) != 0) || (pte_present(*psPTE) == 0) || (pte_write(*psPTE) == 0))
-		goto exit_unlock;
+    psPTE = (pte_t *)pte_offset_map_lock(psMM, psPMD, ulCPUVAddr, &psPTLock);
+    if ((pte_none(*psPTE) != 0) || (pte_present(*psPTE) == 0) || (pte_write(*psPTE) == 0))
+        goto exit_unlock;
 
-	ulPFN = pte_pfn(*psPTE);
-	if (!pfn_valid(ulPFN))
-		goto exit_unlock;
+    ulPFN = pte_pfn(*psPTE);
+    if (!pfn_valid(ulPFN))
+        goto exit_unlock;
 
-	psPage = pfn_to_page(ulPFN);
+    psPage = pfn_to_page(ulPFN);
 
-	get_page(psPage);
+    get_page(psPage);
 
 exit_unlock:
-	pte_unmap_unlock(psPTE, psPTLock);	 
+    pte_unmap_unlock(psPTE, psPTLock);	 
 
-	return psPage;
+    return psPage;
 #else
-	return NULL;
+    return NULL;
 #endif
 }
 PVRSRV_ERROR OSReleasePhysPageAddr(IMG_HANDLE hOSWrapMem)
 {
-	sWrapMemInfo *psInfo = (sWrapMemInfo *)hOSWrapMem;
-	IMG_INT i;
+    sWrapMemInfo *psInfo = (sWrapMemInfo *)hOSWrapMem;
+    IMG_INT i;
 
-	BUG_ON(psInfo == IMG_NULL);
+    BUG_ON(psInfo == IMG_NULL);
 
-	switch (psInfo->eType)
-	{
-		case WRAP_TYPE_CLEANUP:
-			break;
-		case WRAP_TYPE_FIND_VMA_PFN:
-			break;
-		case WRAP_TYPE_GET_USER_PAGES:
-		{
-			for (i = 0; i < psInfo->iNumPages; i++)
-			{
-				struct page *psPage = psInfo->ppsPages[i];
+    switch (psInfo->eType)
+    {
+        case WRAP_TYPE_CLEANUP:
+            break;
+        case WRAP_TYPE_FIND_VMA_PFN:
+            break;
+        case WRAP_TYPE_GET_USER_PAGES:
+        {
+            for (i = 0; i < psInfo->iNumPages; i++)
+            {
+                struct page *psPage = psInfo->ppsPages[i];
 
-				
-				if (!PageReserved(psPage));
-				{
-					SetPageDirty(psPage);
-				}
-				page_cache_release(psPage);
-			}
-			break;
-		}
-		case WRAP_TYPE_FIND_VMA_PAGES:
-		{
-			for (i = 0; i < psInfo->iNumPages; i++)
-			{
-				put_page_testzero(psInfo->ppsPages[i]);
-			}
-			break;
-		}
-		default:
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-				"OSReleasePhysPageAddr: Unknown wrap type (%d)", psInfo->eType));
-			return PVRSRV_ERROR_GENERIC;
-		}
-	}
+                
+                if (!PageReserved(psPage));
+                {
+                    SetPageDirty(psPage);
+                }
+                page_cache_release(psPage);
+            }
+            break;
+        }
+        case WRAP_TYPE_FIND_VMA_PAGES:
+        {
+            for (i = 0; i < psInfo->iNumPages; i++)
+            {
+                put_page_testzero(psInfo->ppsPages[i]);
+            }
+            break;
+        }
+        default:
+        {
+            PVR_DPF((PVR_DBG_ERROR,
+                "OSReleasePhysPageAddr: Unknown wrap type (%d)", psInfo->eType));
+            return PVRSRV_ERROR_GENERIC;
+        }
+    }
 
-	if (psInfo->ppsPages != IMG_NULL)
-	{
-		kfree(psInfo->ppsPages);
-	}
+    if (psInfo->ppsPages != IMG_NULL)
+    {
+        kfree(psInfo->ppsPages);
+    }
 
-	if (psInfo->psPhysAddr != IMG_NULL)
-	{
-		kfree(psInfo->psPhysAddr);
-	}
+    if (psInfo->psPhysAddr != IMG_NULL)
+    {
+        kfree(psInfo->psPhysAddr);
+    }
 
-	kfree(psInfo);
+    kfree(psInfo);
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 }
 
 PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr, 
-									IMG_UINT32 ui32Bytes, 
-									IMG_SYS_PHYADDR *psSysPAddr,
-									IMG_HANDLE *phOSWrapMem)
+                                    IMG_UINT32 ui32Bytes, 
+                                    IMG_SYS_PHYADDR *psSysPAddr,
+                                    IMG_HANDLE *phOSWrapMem)
 {
-	IMG_UINT32 ulStartAddrOrig = (IMG_UINT32) pvCPUVAddr;
-	IMG_UINT32 ulAddrRangeOrig = (IMG_UINT32) ui32Bytes;
-	IMG_UINT32 ulBeyondEndAddrOrig = ulStartAddrOrig + ulAddrRangeOrig;
-	IMG_UINT32 ulStartAddr;
-	IMG_UINT32 ulAddrRange;
-	IMG_UINT32 ulBeyondEndAddr;
-	IMG_UINT32 ulAddr;
-	IMG_INT iNumPagesMapped;
-	IMG_INT i;
-	struct vm_area_struct *psVMArea;
-	sWrapMemInfo *psInfo;
+    IMG_UINT32 ulStartAddrOrig = (IMG_UINT32) pvCPUVAddr;
+    IMG_UINT32 ulAddrRangeOrig = (IMG_UINT32) ui32Bytes;
+    IMG_UINT32 ulBeyondEndAddrOrig = ulStartAddrOrig + ulAddrRangeOrig;
+    IMG_UINT32 ulStartAddr;
+    IMG_UINT32 ulAddrRange;
+    IMG_UINT32 ulBeyondEndAddr;
+    IMG_UINT32 ulAddr;
+    IMG_INT iNumPagesMapped;
+    IMG_INT i;
+    struct vm_area_struct *psVMArea;
+    sWrapMemInfo *psInfo;
 
-	
-	ulStartAddr = ulStartAddrOrig & PAGE_MASK;
-	ulBeyondEndAddr = PAGE_ALIGN(ulBeyondEndAddrOrig);
-	ulAddrRange = ulBeyondEndAddr - ulStartAddr;
+    
+    ulStartAddr = ulStartAddrOrig & PAGE_MASK;
+    ulBeyondEndAddr = PAGE_ALIGN(ulBeyondEndAddrOrig);
+    ulAddrRange = ulBeyondEndAddr - ulStartAddr;
 
-	
-	psInfo = kmalloc(sizeof(*psInfo), GFP_KERNEL);
-	if (psInfo == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Couldn't allocate information structure"));
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
-	memset(psInfo, 0, sizeof(*psInfo));
+    
+    psInfo = kmalloc(sizeof(*psInfo), GFP_KERNEL);
+    if (psInfo == NULL)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Couldn't allocate information structure"));
+        return PVRSRV_ERROR_OUT_OF_MEMORY;
+    }
+    memset(psInfo, 0, sizeof(*psInfo));
 
 #if defined(DEBUG)
-	psInfo->ulStartAddr = ulStartAddrOrig;
-	psInfo->ulBeyondEndAddr = ulBeyondEndAddrOrig;
+    psInfo->ulStartAddr = ulStartAddrOrig;
+    psInfo->ulBeyondEndAddr = ulBeyondEndAddrOrig;
 #endif
 
-	psInfo->iNumPages = (IMG_INT)(ulAddrRange >> PAGE_SHIFT);
-	psInfo->iPageOffset = (IMG_INT)(ulStartAddrOrig & ~PAGE_MASK);
+    psInfo->iNumPages = (IMG_INT)(ulAddrRange >> PAGE_SHIFT);
+    psInfo->iPageOffset = (IMG_INT)(ulStartAddrOrig & ~PAGE_MASK);
 
-	
-	psInfo->psPhysAddr = kmalloc((size_t)psInfo->iNumPages * sizeof(*psInfo->psPhysAddr), GFP_KERNEL);
-	if (psInfo->psPhysAddr == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Couldn't allocate page array"));		
-		goto error_free;
-	}
+    
+    psInfo->psPhysAddr = kmalloc((size_t)psInfo->iNumPages * sizeof(*psInfo->psPhysAddr), GFP_KERNEL);
+    if (psInfo->psPhysAddr == NULL)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Couldn't allocate page array"));		
+        goto error_free;
+    }
 
-	
-	psInfo->ppsPages = kmalloc((size_t)psInfo->iNumPages * sizeof(*psInfo->ppsPages),  GFP_KERNEL);
-	if (psInfo->ppsPages == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Couldn't allocate page array"));		
-		goto error_free;
-	}
+    
+    psInfo->ppsPages = kmalloc((size_t)psInfo->iNumPages * sizeof(*psInfo->ppsPages),  GFP_KERNEL);
+    if (psInfo->ppsPages == NULL)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Couldn't allocate page array"));		
+        goto error_free;
+    }
 
-	
-	down_read(&current->mm->mmap_sem);
-	iNumPagesMapped = get_user_pages(current, current->mm, ulStartAddr, psInfo->iNumPages, 1, 0, psInfo->ppsPages, NULL);
-	up_read(&current->mm->mmap_sem);
+    
+    down_read(&current->mm->mmap_sem);
+    iNumPagesMapped = get_user_pages(current, current->mm, ulStartAddr, psInfo->iNumPages, 1, 0, psInfo->ppsPages, NULL);
+    up_read(&current->mm->mmap_sem);
 
-	if (iNumPagesMapped >= 0)
-	{
-		
-		if (iNumPagesMapped != psInfo->iNumPages)
-		{
-			PVR_TRACE(("OSAcquirePhysPageAddr: Couldn't map all the pages needed (wanted: %d, got %d)", psInfo->iNumPages, iNumPagesMapped));
+    if (iNumPagesMapped >= 0)
+    {
+        
+        if (iNumPagesMapped != psInfo->iNumPages)
+        {
+            PVR_TRACE(("OSAcquirePhysPageAddr: Couldn't map all the pages needed (wanted: %d, got %d)", psInfo->iNumPages, iNumPagesMapped));
 
-			
-			for (i = 0; i < iNumPagesMapped; i++)
-			{
-				page_cache_release(psInfo->ppsPages[i]);
-					
-			}
-			goto error_free;
-		}
+            
+            for (i = 0; i < iNumPagesMapped; i++)
+            {
+                page_cache_release(psInfo->ppsPages[i]);
+                    
+            }
+            goto error_free;
+        }
 
-		
-		for (i = 0; i < psInfo->iNumPages; i++)
-		{
-			IMG_CPU_PHYADDR CPUPhysAddr;
+        
+        for (i = 0; i < psInfo->iNumPages; i++)
+        {
+            IMG_CPU_PHYADDR CPUPhysAddr;
 
-			CPUPhysAddr.uiAddr = page_to_pfn(psInfo->ppsPages[i]) << PAGE_SHIFT;
-			psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
-			psSysPAddr[i] = psInfo->psPhysAddr[i];
-			
-		}
+            CPUPhysAddr.uiAddr = page_to_pfn(psInfo->ppsPages[i]) << PAGE_SHIFT;
+            psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
+            psSysPAddr[i] = psInfo->psPhysAddr[i];
+            
+        }
 
-		psInfo->eType = WRAP_TYPE_GET_USER_PAGES;
+        psInfo->eType = WRAP_TYPE_GET_USER_PAGES;
 
-		goto exit_check;
-	}
+        goto exit_check;
+    }
 
-	PVR_TRACE(("OSAcquirePhysPageAddr: get_user_pages failed (%d), trying something else", iNumPagesMapped));
-	
-	
-	down_read(&current->mm->mmap_sem);
+    PVR_TRACE(("OSAcquirePhysPageAddr: get_user_pages failed (%d), trying something else", iNumPagesMapped));
+    
+    
+    down_read(&current->mm->mmap_sem);
 
-	psVMArea = find_vma(current->mm, ulStartAddrOrig);
-	if (psVMArea == NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Couldn't find memory region containing start address %lx", ulStartAddrOrig));
-		
-		goto error_release_mmap_sem;
-	}
+    psVMArea = find_vma(current->mm, ulStartAddrOrig);
+    if (psVMArea == NULL)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Couldn't find memory region containing start address %lx", ulStartAddrOrig));
+        
+        goto error_release_mmap_sem;
+    }
 #if defined(DEBUG)
-	psInfo->psVMArea = psVMArea;
+    psInfo->psVMArea = psVMArea;
 #endif
 
-	
-	if (ulStartAddrOrig < psVMArea->vm_start)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Start address %lx is outside of the region returned by find_vma", ulStartAddrOrig));
-		goto error_release_mmap_sem;
-	}
+    
+    if (ulStartAddrOrig < psVMArea->vm_start)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Start address %lx is outside of the region returned by find_vma", ulStartAddrOrig));
+        goto error_release_mmap_sem;
+    }
 
-	
-	if (ulBeyondEndAddrOrig > psVMArea->vm_end)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: End address %lx is outside of the region returned by find_vma", ulBeyondEndAddrOrig));
-		goto error_release_mmap_sem;
-	}
+    
+    if (ulBeyondEndAddrOrig > psVMArea->vm_end)
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: End address %lx is outside of the region returned by find_vma", ulBeyondEndAddrOrig));
+        goto error_release_mmap_sem;
+    }
 
-	
-	if ((psVMArea->vm_flags & (VM_IO | VM_RESERVED)) != (VM_IO | VM_RESERVED))
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: Memory region does not represent memory mapped I/O (VMA flags: 0x%lx)", psVMArea->vm_flags));
-		goto error_release_mmap_sem;
-	}
+    
+    if ((psVMArea->vm_flags & (VM_IO | VM_RESERVED)) != (VM_IO | VM_RESERVED))
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: Memory region does not represent memory mapped I/O (VMA flags: 0x%lx)", psVMArea->vm_flags));
+        goto error_release_mmap_sem;
+    }
 
-	
-	if ((psVMArea->vm_flags & (VM_READ | VM_WRITE)) != (VM_READ | VM_WRITE))
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"OSAcquirePhysPageAddr: No read/write access to memory region (VMA flags: 0x%lx)", psVMArea->vm_flags));
-		goto error_release_mmap_sem;
-	}
+    
+    if ((psVMArea->vm_flags & (VM_READ | VM_WRITE)) != (VM_READ | VM_WRITE))
+    {
+        PVR_DPF((PVR_DBG_ERROR,
+            "OSAcquirePhysPageAddr: No read/write access to memory region (VMA flags: 0x%lx)", psVMArea->vm_flags));
+        goto error_release_mmap_sem;
+    }
 
-	
-	for (ulAddr = ulStartAddrOrig, i = 0; ulAddr < ulBeyondEndAddrOrig; ulAddr += PAGE_SIZE, i++)
-	{
-		struct page *psPage;
+    
+    for (ulAddr = ulStartAddrOrig, i = 0; ulAddr < ulBeyondEndAddrOrig; ulAddr += PAGE_SIZE, i++)
+    {
+        struct page *psPage;
 
-		BUG_ON(i >= psInfo->iNumPages);
+        BUG_ON(i >= psInfo->iNumPages);
 
-		psPage = CPUVAddrToPage(psVMArea, ulAddr);
-		if (psPage == NULL)
-		{
-			IMG_INT j;
+        psPage = CPUVAddrToPage(psVMArea, ulAddr);
+        if (psPage == NULL)
+        {
+            IMG_INT j;
 
-		PVR_TRACE(("OSAcquirePhysPageAddr: Couldn't lookup page structure for address 0x%lx, trying something else", ulAddr));
+        PVR_TRACE(("OSAcquirePhysPageAddr: Couldn't lookup page structure for address 0x%lx, trying something else", ulAddr));
 
-			
-			for (j = 0; j < i; j++)
-			{
-				put_page_testzero(psInfo->ppsPages[j]);
-			}
-			break;
-		}
+            
+            for (j = 0; j < i; j++)
+            {
+                put_page_testzero(psInfo->ppsPages[j]);
+            }
+            break;
+        }
 
-		psInfo->ppsPages[i] = psPage;
-	}
+        psInfo->ppsPages[i] = psPage;
+    }
 
-	BUG_ON(i > psInfo->iNumPages);
-	if (i == psInfo->iNumPages)
-	{
-		
-		for (i = 0; i < psInfo->iNumPages; i++)
-		{
-			struct page *psPage = psInfo->ppsPages[i];
-			IMG_CPU_PHYADDR CPUPhysAddr;
+    BUG_ON(i > psInfo->iNumPages);
+    if (i == psInfo->iNumPages)
+    {
+        
+        for (i = 0; i < psInfo->iNumPages; i++)
+        {
+            struct page *psPage = psInfo->ppsPages[i];
+            IMG_CPU_PHYADDR CPUPhysAddr;
 
-			
-			CPUPhysAddr.uiAddr = page_to_pfn(psPage) << PAGE_SHIFT;
+            
+            CPUPhysAddr.uiAddr = page_to_pfn(psPage) << PAGE_SHIFT;
 
-			psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
-			psSysPAddr[i] = psInfo->psPhysAddr[i];
-		}
+            psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
+            psSysPAddr[i] = psInfo->psPhysAddr[i];
+        }
 
-		psInfo->eType = WRAP_TYPE_FIND_VMA_PAGES;
-	}
-	else
-	{
+        psInfo->eType = WRAP_TYPE_FIND_VMA_PAGES;
+    }
+    else
+    {
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,10)) && defined(PVR_SECURE_HANDLES)
-		
+        
 
-		
-		if ((psVMArea->vm_flags & VM_PFNMAP) == 0)
-		{
-		PVR_DPF((PVR_DBG_WARNING,
-			"OSAcquirePhysPageAddr: Region isn't a raw PFN mapping.  Giving up."));
-			goto error_release_mmap_sem;
-		}
-		
-		for (ulAddr = ulStartAddrOrig, i = 0; ulAddr < ulBeyondEndAddrOrig; ulAddr += PAGE_SIZE, i++)
-		{
-			IMG_CPU_PHYADDR CPUPhysAddr;
+        
+        if ((psVMArea->vm_flags & VM_PFNMAP) == 0)
+        {
+        PVR_DPF((PVR_DBG_WARNING,
+            "OSAcquirePhysPageAddr: Region isn't a raw PFN mapping.  Giving up."));
+            goto error_release_mmap_sem;
+        }
+        
+        for (ulAddr = ulStartAddrOrig, i = 0; ulAddr < ulBeyondEndAddrOrig; ulAddr += PAGE_SIZE, i++)
+        {
+            IMG_CPU_PHYADDR CPUPhysAddr;
 
-			CPUPhysAddr.uiAddr = ((ulAddr - psVMArea->vm_start) + (psVMArea->vm_pgoff << PAGE_SHIFT)) & PAGE_MASK;
+            CPUPhysAddr.uiAddr = ((ulAddr - psVMArea->vm_start) + (psVMArea->vm_pgoff << PAGE_SHIFT)) & PAGE_MASK;
 
-			psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
-			psSysPAddr[i] = psInfo->psPhysAddr[i];
-		}
-		BUG_ON(i != psInfo->iNumPages);
+            psInfo->psPhysAddr[i] = SysCpuPAddrToSysPAddr(CPUPhysAddr);
+            psSysPAddr[i] = psInfo->psPhysAddr[i];
+        }
+        BUG_ON(i != psInfo->iNumPages);
 
-		psInfo->eType = WRAP_TYPE_FIND_VMA_PFN;
+        psInfo->eType = WRAP_TYPE_FIND_VMA_PFN;
 
-		
-		PVR_DPF((PVR_DBG_WARNING,
-			"OSAcquirePhysPageAddr: Region can't be locked down"));
+        
+        PVR_DPF((PVR_DBG_WARNING,
+            "OSAcquirePhysPageAddr: Region can't be locked down"));
 #else
-		PVR_DPF((PVR_DBG_WARNING,
-			"OSAcquirePhysPageAddr: Raw PFN mappings not supported.  Giving up."));
-		goto error_release_mmap_sem;
+        PVR_DPF((PVR_DBG_WARNING,
+            "OSAcquirePhysPageAddr: Raw PFN mappings not supported.  Giving up."));
+        goto error_release_mmap_sem;
 #endif	
-	}
+    }
 
-	up_read(&current->mm->mmap_sem);
+    up_read(&current->mm->mmap_sem);
 
 exit_check:
-	CheckPagesContiguous(psInfo);
+    CheckPagesContiguous(psInfo);
 
 
-	
-	*phOSWrapMem = (IMG_HANDLE)psInfo;
+    
+    *phOSWrapMem = (IMG_HANDLE)psInfo;
 
-	return PVRSRV_OK;
+    return PVRSRV_OK;
 
 error_release_mmap_sem:
-	up_read(&current->mm->mmap_sem);
+    up_read(&current->mm->mmap_sem);
 error_free:
-	psInfo->eType = WRAP_TYPE_CLEANUP;
-	OSReleasePhysPageAddr((IMG_HANDLE)psInfo);
-	return PVRSRV_ERROR_GENERIC;
+    psInfo->eType = WRAP_TYPE_CLEANUP;
+    OSReleasePhysPageAddr((IMG_HANDLE)psInfo);
+    return PVRSRV_ERROR_GENERIC;
 }
 

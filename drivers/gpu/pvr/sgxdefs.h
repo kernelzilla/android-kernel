@@ -68,7 +68,11 @@
 
 #if defined(SGX_FEATURE_MP)
 #if defined(SGX541)
+#if SGX_CORE_REV == 100
+#include "sgx541_100mpdefs.h"
+#else
 #include "sgx541mpdefs.h"
+#endif 
 #else
 #include "sgxmpdefs.h"
 #endif 

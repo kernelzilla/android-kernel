@@ -68,7 +68,8 @@ PVRSRV_ERROR SGXGetClientInfoKM(IMG_HANDLE				hDevCookie,
 IMG_IMPORT
 PVRSRV_ERROR SGXGetMiscInfoKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 							  SGX_MISC_INFO			*psMiscInfo,
-							  PVRSRV_DEVICE_NODE 	*psDeviceNode);
+							  PVRSRV_DEVICE_NODE 	*psDeviceNode,
+							  IMG_HANDLE 			 hDevMemContext);
 
 #if defined(SUPPORT_SGX_HWPERF)
 IMG_IMPORT

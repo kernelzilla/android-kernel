@@ -27,6 +27,8 @@
 #ifndef __SGXCONFIG_H__
 #define __SGXCONFIG_H__
 
+#include "sgxdefs.h"
+
 #define DEV_DEVICE_TYPE			PVRSRV_DEVICE_TYPE_SGX
 #define DEV_DEVICE_CLASS		PVRSRV_DEVICE_CLASS_3D
 

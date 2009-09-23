@@ -45,6 +45,7 @@ FreeSharedSysMemCallBack(IMG_PVOID	pvParam,
 			  sizeof(PVRSRV_KERNEL_MEM_INFO),
 			  psKernelMemInfo,
 			  IMG_NULL);
+	
 
 	return PVRSRV_OK;
 }

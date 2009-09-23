@@ -166,7 +166,6 @@ IMG_EXPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVEnumerateDevicesKM(IMG_UINT32 *pui32NumDevices,
 											 	   PVRSRV_DEVICE_IDENTIFIER *psDevIdList)
 {
-	PVRSRV_ERROR		eError;
 	SYS_DATA			*psSysData;
 	IMG_UINT32 			i;
 	
@@ -176,12 +175,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVEnumerateDevicesKM(IMG_UINT32 *pui32NumDevices,
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVEnumerateDevicesKM: Failed to get SysData"));
-		return eError;
-	}
+	SysAcquireData(&psSysData);
 
 	
 
@@ -239,8 +233,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVInit(PSYS_DATA psSysData)
 	}
 
 	
-	psSysData->eCurrentPowerState = PVRSRV_POWER_STATE_D0;
-	psSysData->eFailedPowerState = PVRSRV_POWER_Unspecified;
+	psSysData->eCurrentPowerState = PVRSRV_SYS_POWER_STATE_D0;
+	psSysData->eFailedPowerState = PVRSRV_SYS_POWER_STATE_Unspecified;
 
 	
 	if(OSAllocMem( PVRSRV_PAGEABLE_SELECT, 
@@ -282,9 +276,11 @@ IMG_VOID IMG_CALLCONV PVRSRVDeInit(PSYS_DATA psSysData)
 	if(psSysData->psGlobalEventObject)
 	{
 		OSEventObjectDestroy(psSysData->psGlobalEventObject);
-		OSFreeMem( PVRSRV_PAGEABLE_SELECT, 
-						 sizeof(PVRSRV_EVENTOBJECT) , 
-						 psSysData->psGlobalEventObject, 0);
+		OSFreeMem( PVRSRV_PAGEABLE_SELECT,
+						 sizeof(PVRSRV_EVENTOBJECT),
+						 psSysData->psGlobalEventObject,
+						 0);
+		psSysData->psGlobalEventObject = IMG_NULL;
 	}
 
 	eError = PVRSRVHandleDeInit();
@@ -327,6 +323,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVRegisterDevice(PSYS_DATA psSysData,
 	{
 		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 					sizeof(PVRSRV_DEVICE_NODE), psDeviceNode, IMG_NULL);
+		
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVRegisterDevice : Failed to register device"));
 		return (PVRSRV_ERROR_DEVICE_REGISTER_FAILED);
 	}
@@ -361,12 +358,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVInitialiseDevice (IMG_UINT32 ui32DevIndex)
 
 	PVR_DPF((PVR_DBG_MESSAGE, "PVRSRVInitialiseDevice"));
 
-	eError = SysAcquireData(&psSysData);
-	if(eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVInitialiseDevice: Failed to get SysData"));
-		return(eError);
-	}
+	SysAcquireData(&psSysData);
 
 	
 	psDeviceNode = (PVRSRV_DEVICE_NODE*)
@@ -410,8 +402,8 @@ PVRSRV_ERROR PVRSRVFinaliseSystem_SetPowerState_AnyCb(PVRSRV_DEVICE_NODE *psDevi
 {
 	PVRSRV_ERROR eError;
 	eError = PVRSRVSetDevicePowerStateKM(psDeviceNode->sDevId.ui32DeviceIndex,
-													 PVRSRV_POWER_Unspecified,
-													 KERNEL_ID, IMG_FALSE);
+										 PVRSRV_DEV_POWER_STATE_DEFAULT,
+										 KERNEL_ID, IMG_FALSE);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVFinaliseSystem: Failed PVRSRVSetDevicePowerStateKM call (device index: %d)", psDeviceNode->sDevId.ui32DeviceIndex));
@@ -438,12 +430,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVFinaliseSystem(IMG_BOOL bInitSuccessful)
 
 	PVR_DPF((PVR_DBG_MESSAGE, "PVRSRVFinaliseSystem"));
 
-	eError = SysAcquireData(&psSysData);
-	if(eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVFinaliseSystem: Failed to get SysData"));
-		return(eError);
-	}
+	SysAcquireData(&psSysData);
 
 	if (bInitSuccessful)
 	{
@@ -475,7 +462,12 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVFinaliseSystem(IMG_BOOL bInitSuccessful)
 
 
 
+
+
+
+#if !defined(SUPPORT_DRI_DRM)
 	PDUMPENDINITPHASE();
+#endif
 
 	return PVRSRV_OK;
 }
@@ -518,16 +510,10 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAcquireDeviceDataKM (IMG_UINT32			ui32DevIndex,
 {
 	PVRSRV_DEVICE_NODE	*psDeviceNode;
 	SYS_DATA			*psSysData;
-	PVRSRV_ERROR		eError;
 
 	PVR_DPF((PVR_DBG_MESSAGE, "PVRSRVAcquireDeviceDataKM"));
 
-	eError = SysAcquireData(&psSysData);
-	if(eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVAcquireDeviceDataKM: Failed to get SysData"));
-		return(eError);
-	}
+	SysAcquireData(&psSysData);
 
 	
 	psDeviceNode = List_PVRSRV_DEVICE_NODE_Any_va(psSysData->psDeviceNodeList,
@@ -561,12 +547,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDeinitialiseDevice(IMG_UINT32 ui32DevIndex)
 	SYS_DATA			*psSysData;
 	PVRSRV_ERROR		eError;
 
-	eError = SysAcquireData(&psSysData);
-	if(eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVDeinitialiseDevice: Failed to get SysData"));
-		return(eError);
-	}
+	SysAcquireData(&psSysData);
 
 	psDeviceNode = (PVRSRV_DEVICE_NODE*)
 					 List_PVRSRV_DEVICE_NODE_Any_va(psSysData->psDeviceNodeList,
@@ -583,7 +564,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDeinitialiseDevice(IMG_UINT32 ui32DevIndex)
 	
 
 	eError = PVRSRVSetDevicePowerStateKM(ui32DevIndex,
-										 PVRSRV_POWER_STATE_D3,
+										 PVRSRV_DEV_POWER_STATE_OFF,
 										 KERNEL_ID,
 										 IMG_FALSE);
 	if (eError != PVRSRV_OK)
@@ -625,9 +606,10 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDeinitialiseDevice(IMG_UINT32 ui32DevIndex)
 	List_PVRSRV_DEVICE_NODE_Remove(psDeviceNode);
 
 		
-	FreeDeviceID(psSysData, ui32DevIndex);	
+	(IMG_VOID)FreeDeviceID(psSysData, ui32DevIndex);	
 	OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 				sizeof(PVRSRV_DEVICE_NODE), psDeviceNode, IMG_NULL);
+	
 	
 	return (PVRSRV_OK);
 }
@@ -774,7 +756,6 @@ IMG_EXPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 {
 	SYS_DATA *psSysData;
-	PVRSRV_ERROR eError;
 	
 	if(!psMiscInfo)
 	{
@@ -795,12 +776,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 		return PVRSRV_ERROR_INVALID_PARAMS;			
 	}
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"PVRSRVGetMiscInfoKM: Failed to get SysData"));		
-		return eError;	
-	}
+	SysAcquireData(&psSysData);
 
 	
 	if(((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_TIMER_PRESENT) != 0UL) &&

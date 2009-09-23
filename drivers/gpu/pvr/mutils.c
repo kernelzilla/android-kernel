@@ -30,6 +30,7 @@
 #include <linux/version.h>
 
 #include <linux/spinlock.h>
+#include <linux/mm.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 

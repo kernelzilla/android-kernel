@@ -114,6 +114,7 @@ PVRSRV_ERROR LinuxEventObjectListDestroy(IMG_HANDLE hEventObjectList)
 			 return PVRSRV_ERROR_GENERIC;
 		}
 		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_LINUX_EVENT_OBJECT_LIST), psEvenObjectList, IMG_NULL);
+		
 	}
 	return PVRSRV_OK;
 }
@@ -157,6 +158,7 @@ static PVRSRV_ERROR LinuxEventObjectDeleteCallback(IMG_PVOID pvParam, IMG_UINT32
 #endif	
 
 	OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP, sizeof(PVRSRV_LINUX_EVENT_OBJECT), psLinuxEventObject, IMG_NULL);
+	
 
 	return PVRSRV_OK;
 }

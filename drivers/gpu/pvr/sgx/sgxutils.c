@@ -31,7 +31,7 @@
 #include "buffer_manager.h"
 #include "sgxapi_km.h"
 #include "sgxinfo.h"
-#include "sgxinfokm.h"
+#include "sgx_mkif_km.h"
 #include "sysconfig.h"
 #include "pdump_km.h"
 #include "mmu.h"
@@ -52,7 +52,6 @@ PVRSRV_ERROR SysPowerDownMISR(PVRSRV_DEVICE_NODE	* psDeviceNode, IMG_UINT32 ui32
 #endif
 
 
-#if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 
 IMG_VOID SGXPostActivePowerEvent(PVRSRV_DEVICE_NODE	* psDeviceNode,
                                  IMG_UINT32           ui32CallerID)
@@ -103,7 +102,7 @@ IMG_VOID SGXTestActivePowerEvent (PVRSRV_DEVICE_NODE	*psDeviceNode,
 		eError = SysPowerDownMISR(psDeviceNode, ui32CallerID);
 #else
 		eError = PVRSRVSetDevicePowerStateKM(psDeviceNode->sDevId.ui32DeviceIndex,
-											 PVRSRV_POWER_STATE_D3,
+											 PVRSRV_DEV_POWER_STATE_OFF,
 											 ui32CallerID, IMG_FALSE);
 		if (eError == PVRSRV_OK)
 		{
@@ -127,7 +126,6 @@ IMG_VOID SGXTestActivePowerEvent (PVRSRV_DEVICE_NODE	*psDeviceNode,
 		PVR_DPF((PVR_DBG_ERROR, "SGXTestActivePowerEvent error:%lu", eError));
 	}
 }
-#endif 
 
 
 #ifdef INLINE_IS_PRAGMA
@@ -212,7 +210,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 					ui32PDumpFlags,
 					MAKEUNIQUETAG(psKernelCCB->psCCBCtlMemInfo));
 
-		PDUMPCOMMENTWITHFLAGS(0, "Kernel CCB command\r\n");
+		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Kernel CCB command\r\n");
 		pvDumpCommand = (IMG_VOID *)((IMG_UINT8 *)psKernelCCB->psCCBMemInfo->pvLinAddrKM + (*psKernelCCB->pui32WriteOffset * sizeof(SGXMKIF_COMMAND)));
 
 		PDUMPMEM(pvDumpCommand,
@@ -337,7 +335,7 @@ PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
 
 	
 	eError = PVRSRVSetDevicePowerStateKM(psDeviceNode->sDevId.ui32DeviceIndex,
-										 PVRSRV_POWER_STATE_D0,
+										 PVRSRV_DEV_POWER_STATE_ON,
 										 ui32CallerID,
 										 IMG_TRUE);
 
@@ -378,7 +376,6 @@ PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
 
 	PVRSRVPowerUnlock(ui32CallerID);
 
-#if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	if (ui32CallerID != ISR_ID)
 	{
 		
@@ -386,7 +383,6 @@ PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
 
 		SGXTestActivePowerEvent(psDeviceNode, ui32CallerID);
 	}
-#endif 
 
 	return eError;
 }
@@ -523,6 +519,7 @@ static PVRSRV_ERROR SGXCleanupHWRenderContextCallback(IMG_PVOID		pvParam,
 			  sizeof(SGX_HW_RENDER_CONTEXT_CLEANUP),
 			  psCleanup,
 			  psCleanup->hBlockAlloc);
+	
 
 	return PVRSRV_OK;
 }
@@ -551,6 +548,7 @@ static PVRSRV_ERROR SGXCleanupHWTransferContextCallback(IMG_PVOID	pvParam,
 			  sizeof(SGX_HW_TRANSFER_CONTEXT_CLEANUP),
 			  psCleanup,
 			  psCleanup->hBlockAlloc);
+	
 
 	return PVRSRV_OK;
 }
@@ -594,6 +592,7 @@ IMG_HANDLE SGXRegisterHWRenderContextKM(IMG_HANDLE				psDeviceNode,
 				  sizeof(SGX_HW_RENDER_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
+		
 
 		return IMG_NULL;
 	}
@@ -664,6 +663,7 @@ IMG_HANDLE SGXRegisterHWTransferContextKM(IMG_HANDLE				psDeviceNode,
 				  sizeof(SGX_HW_TRANSFER_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
+		
 
 		return IMG_NULL;
 	}
@@ -717,6 +717,7 @@ static PVRSRV_ERROR SGXCleanupHW2DContextCallback(IMG_PVOID pvParam, IMG_UINT32 
 			  sizeof(SGX_HW_2D_CONTEXT_CLEANUP),
 			  psCleanup,
 			  psCleanup->hBlockAlloc);
+	
 
 	return PVRSRV_OK;
 }
@@ -760,6 +761,7 @@ IMG_HANDLE SGXRegisterHW2DContextKM(IMG_HANDLE				psDeviceNode,
 				  sizeof(SGX_HW_2D_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
+		
 
 		return IMG_NULL;
 	}

@@ -371,11 +371,7 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 	SYS_DATA *psSysData;
 	MMU_PT_INFO **ppsPTInfoList;
 
-	if (SysAcquireData(&psSysData) != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "_DeferredFreePageTables: ERROR call to SysAcquireData failed"));
-		return;
-	}
+	SysAcquireData(&psSysData);
 
 	
 	ui32PDIndex = pMMUHeap->psDevArena->BaseDevVAddr.uiAddr >> pMMUHeap->ui32PDShift;
@@ -534,10 +530,7 @@ _DeferredAllocPagetables(MMU_HEAP *pMMUHeap, IMG_DEV_VIRTADDR DevVAddr, IMG_UINT
 #endif
 
 	
-	if (SysAcquireData(&psSysData) != PVRSRV_OK)
-	{
-		return IMG_FALSE;
-	}
+	SysAcquireData(&psSysData);
 
 	
 	ui32PDIndex = DevVAddr.uiAddr >> pMMUHeap->ui32PDShift;
@@ -691,11 +684,7 @@ MMU_Initialise (PVRSRV_DEVICE_NODE *psDeviceNode, MMU_CONTEXT **ppsMMUContext, I
 
 	PVR_DPF ((PVR_DBG_MESSAGE, "MMU_Initialise"));
 
-	if (SysAcquireData(&psSysData) != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "MMU_Initialise: ERROR call to SysAcquireData failed"));
-		return PVRSRV_ERROR_GENERIC;
-	}
+	SysAcquireData(&psSysData);
 
 	OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
 				 sizeof (MMU_CONTEXT),
@@ -1001,11 +990,7 @@ MMU_Finalise (MMU_CONTEXT *psMMUContext)
 	MMU_CONTEXT *psMMUContextList = (MMU_CONTEXT*)psDevInfo->pvMMUContextList;
 #endif
 
-	if (SysAcquireData(&psSysData) != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "MMU_Finalise: ERROR call to SysAcquireData failed"));
-		return;
-	}
+	SysAcquireData(&psSysData);
 
 	
 	PDUMPCLEARMMUCONTEXT(PVRSRV_DEVICE_TYPE_SGX, "SGXMEM", psMMUContext->ui32PDumpMMUContextID, 2);
@@ -1120,6 +1105,7 @@ MMU_Finalise (MMU_CONTEXT *psMMUContext)
 
 	
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(MMU_CONTEXT), psMMUContext, IMG_NULL);
+	
 }
 
 
@@ -1469,6 +1455,7 @@ ErrorFreePagetables:
 
 ErrorFreeHeap:
 	OSFreeMem (PVRSRV_OS_PAGEABLE_HEAP, sizeof(MMU_HEAP), pMMUHeap, IMG_NULL);
+	
 
 	return IMG_NULL;
 }
@@ -1494,6 +1481,7 @@ MMU_Delete (MMU_HEAP *pMMUHeap)
 #endif
 
 		OSFreeMem (PVRSRV_OS_PAGEABLE_HEAP, sizeof(MMU_HEAP), pMMUHeap, IMG_NULL);
+		
 	}
 }
 
@@ -1728,6 +1716,8 @@ MMU_MapPage (MMU_HEAP *pMMUHeap,
 								DevVAddr.uiAddr,
 								DevVAddr.uiAddr >> pMMUHeap->ui32PDShift,
 								ui32Index ));
+		PVR_DPF((PVR_DBG_ERROR, "MMU_MapPage: Page table entry value: 0x%08lX", pui32Tmp[ui32Index]));
+		PVR_DPF((PVR_DBG_ERROR, "MMU_MapPage: Physical page to map: 0x%08lX", DevPAddr.uiAddr));
 	}
 
 	PVR_ASSERT((pui32Tmp[ui32Index] & SGX_MMU_PTE_VALID) == 0);
@@ -2012,6 +2002,7 @@ MMU_UnmapPages (MMU_HEAP *psMMUHeap,
 									i,
 									ui32PDIndex,
 									ui32PTIndex));
+			PVR_DPF((PVR_DBG_ERROR, "MMU_UnmapPages: Page table entry value: 0x%08lX", pui32Tmp[ui32PTIndex]));
 		}
 
 		
@@ -2129,12 +2120,7 @@ PVRSRV_ERROR MMU_BIFResetPDAlloc(PVRSRV_SGXDEV_INFO *psDevInfo)
 	IMG_SYS_PHYADDR sMemBlockSysPAddr;
 	IMG_CPU_PHYADDR sMemBlockCpuPAddr;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "MMU_BIFResetPDAlloc: ERROR call to SysAcquireData failed"));
-		return eError;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 
@@ -2214,17 +2200,11 @@ PVRSRV_ERROR MMU_BIFResetPDAlloc(PVRSRV_SGXDEV_INFO *psDevInfo)
 
 IMG_VOID MMU_BIFResetPDFree(PVRSRV_SGXDEV_INFO *psDevInfo)
 {
-	PVRSRV_ERROR eError;
 	SYS_DATA *psSysData;
 	RA_ARENA *psLocalDevMemArena;
 	IMG_SYS_PHYADDR sPDSysPAddr;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "MMU_BIFResetPDFree: ERROR call to SysAcquireData failed"));
-		return;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 
@@ -2263,12 +2243,7 @@ PVRSRV_ERROR WorkaroundBRN22997Alloc(PVRSRV_SGXDEV_INFO *psDevInfo)
 	IMG_DEV_PHYADDR sPTDevPAddr;
 	IMG_DEV_PHYADDR sPDDevPAddr;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "WorkaroundBRN22997: ERROR call to SysAcquireData failed"));
-		return eError;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 
@@ -2460,16 +2435,10 @@ IMG_VOID WorkaroundBRN22997ReadHostPort(PVRSRV_SGXDEV_INFO *psDevInfo)
 
 IMG_VOID WorkaroundBRN22997Free(PVRSRV_SGXDEV_INFO *psDevInfo)
 {
-	PVRSRV_ERROR eError;
 	SYS_DATA *psSysData;
 	RA_ARENA *psLocalDevMemArena;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "WorkaroundBRN22997Free: ERROR call to SysAcquireData failed"));
-		return;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 
@@ -2530,12 +2499,7 @@ PVRSRV_ERROR MMU_MapExtSystemCacheRegs(PVRSRV_DEVICE_NODE *psDeviceNode)
 	psDevInfo = (PVRSRV_SGXDEV_INFO*)psDeviceNode->pvDevice;
 	pui32PD = (IMG_UINT32*)psDeviceNode->sDevMemoryInfo.pBMKernelContext->psMMUContext->pvPDCpuVAddr;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "MMU_MapExtSystemCacheRegs: ERROR call to SysAcquireData failed"));
-		return eError;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 
@@ -2630,7 +2594,6 @@ PVRSRV_ERROR MMU_MapExtSystemCacheRegs(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 PVRSRV_ERROR MMU_UnmapExtSystemCacheRegs(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
-	PVRSRV_ERROR eError;
 	SYS_DATA *psSysData;
 	RA_ARENA *psLocalDevMemArena;
 	PVRSRV_SGXDEV_INFO *psDevInfo;
@@ -2640,12 +2603,7 @@ PVRSRV_ERROR MMU_UnmapExtSystemCacheRegs(PVRSRV_DEVICE_NODE *psDeviceNode)
 	psDevInfo = (PVRSRV_SGXDEV_INFO*)psDeviceNode->pvDevice;
 	pui32PD = (IMG_UINT32*)psDeviceNode->sDevMemoryInfo.pBMKernelContext->psMMUContext->pvPDCpuVAddr;
 
-	eError = SysAcquireData(&psSysData);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "WorkaroundBRN22997Free: ERROR call to SysAcquireData failed"));
-		return eError;
-	}
+	SysAcquireData(&psSysData);
 
 	psLocalDevMemArena = psSysData->apsLocalDevMemArena[0];
 

@@ -461,6 +461,7 @@ fail_cleanup:
 	}
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_MAPPING), pMapping, IMG_NULL);
+	
 
 	return IMG_FALSE;
 }
@@ -564,6 +565,7 @@ FreeBuf (BM_BUF *pBuf, IMG_UINT32 ui32Flags)
 		{
 			
 			OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_MAPPING), pMapping, IMG_NULL);
+			pBuf->pMapping = IMG_NULL; 
 		}
 	}
 	else
@@ -604,10 +606,12 @@ FreeBuf (BM_BUF *pBuf, IMG_UINT32 ui32Flags)
 
 			
 			OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_MAPPING), pMapping, IMG_NULL);
+			pBuf->pMapping = IMG_NULL; 
 		}
 	}
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_BUF), pBuf, IMG_NULL);
+	
 }
 
 PVRSRV_ERROR BM_DestroyContext_AnyCb(BM_HEAP *psBMHeap)
@@ -619,9 +623,9 @@ PVRSRV_ERROR BM_DestroyContext_AnyCb(BM_HEAP *psBMHeap)
 		if (psBMHeap->pImportArena)
 		{
 			IMG_BOOL bTestDelete = RA_TestDelete(psBMHeap->pImportArena);
-			PVR_ASSERT(bTestDelete);
 			if (!bTestDelete)
 			{
+				PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext_AnyCb: RA_TestDelete failed"));
 				return PVRSRV_ERROR_GENERIC;
 			}
 		}
@@ -636,6 +640,7 @@ BM_DestroyContext(IMG_HANDLE	hBMContext,
 {
 	PVRSRV_ERROR eError;
 	BM_CONTEXT *pBMContext = (BM_CONTEXT*)hBMContext;
+
 	PVR_DPF ((PVR_DBG_MESSAGE, "BM_DestroyContext"));
 
 	if (pbDestroyed != IMG_NULL)
@@ -663,24 +668,40 @@ BM_DestroyContext(IMG_HANDLE	hBMContext,
 
 
 	eError = List_BM_HEAP_PVRSRV_ERROR_Any(pBMContext->psBMHeap, BM_DestroyContext_AnyCb);
-	if (eError != PVRSRV_OK)
+	if(eError != PVRSRV_OK)
 	{
-		return eError;
-	}
+		PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: List_BM_HEAP_PVRSRV_ERROR_Any failed"));
+#if 0
 		
-	eError = ResManFreeResByPtr(pBMContext->hResItem);
-
-	if (eError != PVRSRV_OK)
+		
+		
+		
+		PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: Cleaning up with ResManFreeSpecial"));
+		if(ResManFreeSpecial() != PVRSRV_OK)
+		{
+			PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: ResManFreeSpecial failed %d",eError));
+		}
+		
+#endif
+		return eError;	
+	}
+	else
 	{
-		PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: ResManFreeResByPtr failed %d",eError));
-		return eError;
+		
+		eError = ResManFreeResByPtr(pBMContext->hResItem);
+		if(eError != PVRSRV_OK)
+		{
+			PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: ResManFreeResByPtr failed %d",eError));
+			return eError;		
+		}
+	
+		
+		if (pbDestroyed != IMG_NULL)
+		{
+			*pbDestroyed = IMG_TRUE;
+		}
 	}
 	
-	if (pbDestroyed != IMG_NULL)
-	{
-		*pbDestroyed = IMG_TRUE;
-	}
-
 	return PVRSRV_OK;
 }
 
@@ -710,7 +731,8 @@ PVRSRV_ERROR BM_DestroyContextCallBack_AnyVaCb(BM_HEAP *psBMHeap, va_list va)
 	psDeviceNode->pfnMMUDelete(psBMHeap->pMMUHeap);
 
 	
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0, psBMHeap, IMG_NULL);
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_HEAP), psBMHeap, IMG_NULL);
+	
 
 	return PVRSRV_OK;
 }
@@ -760,7 +782,8 @@ static PVRSRV_ERROR BM_DestroyContextCallBack(IMG_PVOID		pvParam,
 		List_BM_CONTEXT_Remove(pBMContext);
 	}
 
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0, pBMContext, IMG_NULL);
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_CONTEXT), pBMContext, IMG_NULL);
+	
 
 	return PVRSRV_OK;
 }
@@ -934,7 +957,7 @@ BM_CreateContext(PVRSRV_DEVICE_NODE			*psDeviceNode,
 	return (IMG_HANDLE)pBMContext;
 
 cleanup:
-	BM_DestroyContextCallBack(pBMContext, 0);
+	(IMG_VOID)BM_DestroyContextCallBack(pBMContext, 0);
 
 	return IMG_NULL;
 }
@@ -1064,7 +1087,8 @@ ErrorExit:
 	}
 
 	
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0, psBMHeap, IMG_NULL);
+	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_HEAP), psBMHeap, IMG_NULL);
+	
 
 	return IMG_NULL;
 }
@@ -1078,9 +1102,7 @@ BM_DestroyHeap (IMG_HANDLE hDevMemHeap)
 	PVR_DPF((PVR_DBG_MESSAGE, "BM_DestroyHeap"));
 
 	if(psBMHeap)
-	{
-	
-		
+	{	
 		
 		if(psBMHeap->ui32Attribs 
 		&	(PVRSRV_BACKINGSTORE_SYSMEM_NONCONTIG
@@ -1103,11 +1125,12 @@ BM_DestroyHeap (IMG_HANDLE hDevMemHeap)
 		
 		List_BM_HEAP_Remove(psBMHeap);
 		
-		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, 0, psBMHeap, IMG_NULL);
+		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_HEAP), psBMHeap, IMG_NULL);
+		
 	}
 	else
 	{
-		PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyHeap: invalid heap handle"));	
+		PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyHeap: invalid heap handle"));
 	}
 }
 
@@ -1150,10 +1173,7 @@ BM_Alloc (  IMG_HANDLE			hDevMemHeap,
 		  "BM_Alloc (uSize=0x%x, uFlags=0x%x, uDevVAddrAlignment=0x%x)",
 			uSize, uFlags, uDevVAddrAlignment));
 
-	if (SysAcquireData(&psSysData) != PVRSRV_OK)
-	{
-		return IMG_FALSE;
-	}
+	SysAcquireData(&psSysData);
 
 	psBMHeap = (BM_HEAP*)hDevMemHeap;
 	pBMContext = psBMHeap->pBMContext;
@@ -1184,6 +1204,7 @@ BM_Alloc (  IMG_HANDLE			hDevMemHeap,
 					pBuf) != IMG_TRUE)
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof (BM_BUF), pBuf, IMG_NULL);
+		
 		PVR_DPF((PVR_DBG_ERROR, "BM_Alloc: AllocMemory FAILED"));
 		return IMG_FALSE;
 	}
@@ -1285,8 +1306,7 @@ BM_Wrap (	IMG_HANDLE hDevMemHeap,
 		  "BM_Wrap (uSize=0x%x, uOffset=0x%x, bPhysContig=0x%x, pvCPUVAddr=0x%x, uFlags=0x%x)",
 			ui32Size, ui32Offset, bPhysContig, pvCPUVAddr, uFlags));
 
-	if(SysAcquireData (&psSysData) != PVRSRV_OK)
-		return IMG_FALSE;
+	SysAcquireData(&psSysData);
 
 #if defined(PVR_LMA)
 	if (bPhysContig)
@@ -1354,6 +1374,7 @@ BM_Wrap (	IMG_HANDLE hDevMemHeap,
 	{
 		PVR_DPF((PVR_DBG_ERROR, "BM_Wrap: WrapMemory FAILED"));
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof (BM_BUF), pBuf, IMG_NULL);
+		
 		return IMG_FALSE;
 	}
 
@@ -1405,8 +1426,7 @@ BM_Free (BM_HANDLE hBuf,
 		return;
 	}
 
-	if(SysAcquireData (&psSysData) != PVRSRV_OK)
-		return;
+	SysAcquireData(&psSysData);
 
 	pBuf->ui32RefCount--;
 
@@ -1837,6 +1857,7 @@ fail_dev_mem_alloc:
 	}
 fail_mapping_alloc:
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_MAPPING), pMapping, IMG_NULL);
+	
 fail_exit:
 	return IMG_FALSE;
 }
@@ -1901,6 +1922,7 @@ BM_FreeMemory (IMG_VOID *h, IMG_UINTPTR_T _base, BM_MAPPING *psMapping)
 	}
 
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(BM_MAPPING), psMapping, IMG_NULL);
+	
 
 	PVR_DPF((PVR_DBG_MESSAGE,
 			"..BM_FreeMemory (h=%08X, base=0x%x, psMapping=0x%x)",

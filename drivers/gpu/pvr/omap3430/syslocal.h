@@ -32,7 +32,6 @@
 #include <linux/version.h>
 #include <linux/clk.h>
 #include <linux/spinlock.h>
-#include <linux/mutex.h>
 #include <asm/atomic.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,26))
@@ -93,7 +92,7 @@ typedef struct _SYS_SPECIFIC_DATA_TAG_
 	IMG_BOOL	bSysClocksOneTimeInit;
 	IMG_BOOL	bConstraintNotificationsEnabled;
 	atomic_t	sSGXClocksEnabled;
-	struct mutex	sPowerLock;
+	spinlock_t	sPowerLock;
 	atomic_t	sPowerLockCPU;
 	spinlock_t	sNotifyLock;
 	atomic_t	sNotifyLockCPU;

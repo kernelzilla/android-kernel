@@ -199,7 +199,8 @@ _Resize (HASH_TABLE *pHash, IMG_UINT32 uNewSize)
 			return IMG_FALSE;
 		}
 
-        OSFreeMem (PVRSRV_PAGEABLE_SELECT, 0, pHash->ppBucketTable, IMG_NULL);
+        OSFreeMem (PVRSRV_PAGEABLE_SELECT, sizeof(BUCKET *)*pHash->uSize, pHash->ppBucketTable, IMG_NULL);
+        
         pHash->ppBucketTable = ppNewTable;
         pHash->uSize = uNewSize;
     }
@@ -237,6 +238,7 @@ HASH_TABLE * HASH_Create_Extended (IMG_UINT32 uInitialLen, IMG_SIZE_T uKeySize, 
 	if (pHash->ppBucketTable == IMG_NULL)
     {
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(HASH_TABLE), pHash, IMG_NULL);
+		
 		return IMG_NULL;
     }
 
@@ -259,8 +261,15 @@ HASH_Delete (HASH_TABLE *pHash)
 		PVR_DPF ((PVR_DBG_MESSAGE, "HASH_Delete"));
 		
 		PVR_ASSERT (pHash->uCount==0);
-		OSFreeMem(PVRSRV_PAGEABLE_SELECT, 0, pHash->ppBucketTable, IMG_NULL);
+		if(pHash->uCount != 0)
+		{
+			PVR_DPF ((PVR_DBG_ERROR, "HASH_Delete: leak detected in hash table!"));
+			PVR_DPF ((PVR_DBG_ERROR, "Likely Cause: client drivers not freeing alocations before destroying devmemcontext"));
+		}
+		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(BUCKET *)*pHash->uSize, pHash->ppBucketTable, IMG_NULL);
+		pHash->ppBucketTable = IMG_NULL;
 		OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(HASH_TABLE), pHash, IMG_NULL);
+		
     }
 }
 
@@ -347,6 +356,7 @@ HASH_Remove_Extended(HASH_TABLE *pHash, IMG_VOID *pKey)
 			(*ppBucket) = pBucket->pNext;
 
 			OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(BUCKET) + pHash->uKeySize, pBucket, IMG_NULL);
+			
 
 			pHash->uCount--;
 

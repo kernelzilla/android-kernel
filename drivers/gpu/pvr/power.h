@@ -31,6 +31,7 @@
 extern "C" {
 #endif
 
+
  
 typedef struct _PVRSRV_POWER_DEV_TAG_
 {
@@ -40,8 +41,8 @@ typedef struct _PVRSRV_POWER_DEV_TAG_
 	PFN_POST_CLOCKSPEED_CHANGE		pfnPostClockSpeedChange;
 	IMG_HANDLE						hDevCookie;
 	IMG_UINT32						ui32DeviceIndex;
-	PVR_POWER_STATE 				eDefaultPowerState;
-	PVR_POWER_STATE 				eCurrentPowerState;
+	PVRSRV_DEV_POWER_STATE 			eDefaultPowerState;
+	PVRSRV_DEV_POWER_STATE 			eCurrentPowerState;
 	struct _PVRSRV_POWER_DEV_TAG_	*psNext;
 	struct _PVRSRV_POWER_DEV_TAG_	**ppsThis;
 
@@ -73,18 +74,18 @@ IMG_IMPORT
 IMG_VOID PVRSRVPowerUnlock(IMG_UINT32	ui32CallerID);
 
 IMG_IMPORT
-PVRSRV_ERROR PVRSRVSetDevicePowerStateKM(IMG_UINT32			ui32DeviceIndex,
-										 PVR_POWER_STATE	eNewPowerState,
-										 IMG_UINT32			ui32CallerID,
-										 IMG_BOOL			bRetainMutex);
+PVRSRV_ERROR PVRSRVSetDevicePowerStateKM(IMG_UINT32				ui32DeviceIndex,
+										 PVRSRV_DEV_POWER_STATE	eNewPowerState,
+										 IMG_UINT32				ui32CallerID,
+										 IMG_BOOL				bRetainMutex);
 
 IMG_IMPORT
-PVRSRV_ERROR PVRSRVSystemPrePowerStateKM(PVR_POWER_STATE eNewPowerState);
+PVRSRV_ERROR PVRSRVSystemPrePowerStateKM(PVRSRV_SYS_POWER_STATE eNewPowerState);
 IMG_IMPORT
-PVRSRV_ERROR PVRSRVSystemPostPowerStateKM(PVR_POWER_STATE eNewPowerState);
+PVRSRV_ERROR PVRSRVSystemPostPowerStateKM(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
 IMG_IMPORT
-PVRSRV_ERROR PVRSRVSetPowerStateKM (PVR_POWER_STATE ePVRState);
+PVRSRV_ERROR PVRSRVSetPowerStateKM (PVRSRV_SYS_POWER_STATE ePVRState);
 
 IMG_IMPORT
 PVRSRV_ERROR PVRSRVRegisterPowerDevice(IMG_UINT32					ui32DeviceIndex,
@@ -93,8 +94,8 @@ PVRSRV_ERROR PVRSRVRegisterPowerDevice(IMG_UINT32					ui32DeviceIndex,
 									   PFN_PRE_CLOCKSPEED_CHANGE	pfnPreClockSpeedChange,
 									   PFN_POST_CLOCKSPEED_CHANGE	pfnPostClockSpeedChange,
 									   IMG_HANDLE					hDevCookie,
-									   PVR_POWER_STATE				eCurrentPowerState,
-									   PVR_POWER_STATE				eDefaultPowerState);
+									   PVRSRV_DEV_POWER_STATE		eCurrentPowerState,
+									   PVRSRV_DEV_POWER_STATE		eDefaultPowerState);
 
 IMG_IMPORT
 PVRSRV_ERROR PVRSRVRemovePowerDevice (IMG_UINT32 ui32DeviceIndex);

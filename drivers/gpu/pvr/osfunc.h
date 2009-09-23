@@ -231,31 +231,86 @@ IMG_UINT32 OSGetCurrentProcessIDKM(IMG_VOID);
 IMG_UINT32 OSGetCurrentThreadID( IMG_VOID );
 IMG_VOID OSMemSet(IMG_VOID *pvDest, IMG_UINT8 ui8Value, IMG_SIZE_T ui32Size);
 
-#if defined(__linux__) && defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-	PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line);
-	#define __OSAllocMem(ui32Flags, ui32Size, ppvLinAddr, phBlockAlloc) _OSAllocMem(ui32Flags, ui32Size, ppvLinAddr, phBlockAlloc, __FILE__, __LINE__)
-	PVRSRV_ERROR _OSFreeMem(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID pvLinAddr, IMG_HANDLE hBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line);
-#define OSFreeMem(ui32Flags, ui32Size, pvLinAddr, phBlockAlloc) _OSFreeMem(ui32Flags, ui32Size, pvLinAddr, phBlockAlloc, __FILE__, __LINE__)
-#else
-	PVRSRV_ERROR _OSAllocMem(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phBlockAlloc);
-	#define __OSAllocMem _OSAllocMem
-	PVRSRV_ERROR OSFreeMem(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID pvLinAddr, IMG_HANDLE hBlockAlloc);
-#endif
-
-PVRSRV_ERROR _OSAllocPages(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_UINT32 ui32PageSize, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phPageAlloc);
+PVRSRV_ERROR OSAllocPages_Impl(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_UINT32 ui32PageSize, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phPageAlloc);
 PVRSRV_ERROR OSFreePages(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID pvLinAddr, IMG_HANDLE hPageAlloc);
 
-#if defined(PVRSRV_LOG_MEMORY_ALLOCS)
+
+#ifdef PVRSRV_LOG_MEMORY_ALLOCS
 	#define OSAllocMem(flags, size, linAddr, blockAlloc, logStr) \
 		(PVR_TRACE(("OSAllocMem(" #flags ", " #size ", " #linAddr ", " #blockAlloc "): " logStr " (size = 0x%lx)", size)), \
-			__OSAllocMem(flags, size, linAddr, blockAlloc))
+			OSAllocMem_Debug_Wrapper(flags, size, linAddr, blockAlloc, __FILE__, __LINE__))
+
 	#define OSAllocPages(flags, size, pageSize, linAddr, pageAlloc) \
 		(PVR_TRACE(("OSAllocPages(" #flags ", " #size ", " #pageSize ", " #linAddr ", " #pageAlloc "): (size = 0x%lx)", size)), \
-			_OSAllocPages(flags, size, pageSize, linAddr, pageAlloc))
+			OSAllocPages_Impl(flags, size, pageSize, linAddr, pageAlloc))
+		
+	#define OSFreeMem(flags, size, linAddr, blockAlloc) \
+		(PVR_TRACE(("OSFreeMem(" #flags ", " #size ", " #linAddr ", " #blockAlloc "): (pointer = 0x%X)", linAddr)), \
+			OSFreeMem_Debug_Wrapper(flags, size, linAddr, blockAlloc, __FILE__, __LINE__))
 #else
-	#define OSAllocMem(flags, size, linAddr, blockAlloc, logString) __OSAllocMem(flags, size, linAddr, blockAlloc)
-	#define OSAllocPages(flags, size, pageSize, linAddr, pageAlloc) _OSAllocPages(flags, size, pageSize, linAddr, pageAlloc)
+	#define OSAllocMem(flags, size, linAddr, blockAlloc, logString) \
+		OSAllocMem_Debug_Wrapper(flags, size, linAddr, blockAlloc, __FILE__, __LINE__)
+	
+	#define OSAllocPages OSAllocPages_Impl
+	
+	#define OSFreeMem(flags, size, linAddr, blockAlloc) \
+			OSFreeMem_Debug_Wrapper(flags, size, linAddr, blockAlloc, __FILE__, __LINE__)
 #endif
+ 
+#ifdef PVRSRV_DEBUG_OS_MEMORY
+
+	PVRSRV_ERROR OSAllocMem_Debug_Wrapper(IMG_UINT32 ui32Flags,
+										IMG_UINT32 ui32Size,
+										IMG_PVOID *ppvCpuVAddr,
+										IMG_HANDLE *phBlockAlloc,
+										IMG_CHAR *pszFilename,
+										IMG_UINT32 ui32Line);
+	
+	PVRSRV_ERROR OSFreeMem_Debug_Wrapper(IMG_UINT32 ui32Flags,
+									 IMG_UINT32 ui32Size,
+									 IMG_PVOID pvCpuVAddr,
+									 IMG_HANDLE hBlockAlloc,
+									 IMG_CHAR *pszFilename,
+									 IMG_UINT32 ui32Line);
+
+
+	typedef struct
+	{	
+		IMG_UINT8 sGuardRegionBefore[8];
+		IMG_CHAR sFileName[128];
+		IMG_UINT32 uLineNo;
+		IMG_SIZE_T uSize;
+		IMG_SIZE_T uSizeParityCheck;
+		enum valid_tag
+		{	isFree = 0x277260FF,
+			isAllocated = 0x260511AA
+		} eValid;
+	} OSMEM_DEBUG_INFO;
+	
+	#define TEST_BUFFER_PADDING_STATUS (sizeof(OSMEM_DEBUG_INFO)) 
+	#define TEST_BUFFER_PADDING_AFTER  (8) 
+	#define TEST_BUFFER_PADDING (TEST_BUFFER_PADDING_STATUS + TEST_BUFFER_PADDING_AFTER)
+#else
+	#define OSAllocMem_Debug_Wrapper OSAllocMem_Debug_Linux_Memory_Allocations
+	#define OSFreeMem_Debug_Wrapper OSFreeMem_Debug_Linux_Memory_Allocations
+#endif
+ 
+#if defined(__linux__) && defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
+	PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line);
+	PVRSRV_ERROR OSFreeMem_Impl(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID pvLinAddr, IMG_HANDLE hBlockAlloc, IMG_CHAR *pszFilename, IMG_UINT32 ui32Line);
+	
+	#define OSAllocMem_Debug_Linux_Memory_Allocations OSAllocMem_Impl
+	#define OSFreeMem_Debug_Linux_Memory_Allocations OSFreeMem_Impl
+#else
+	PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID *ppvLinAddr, IMG_HANDLE *phBlockAlloc);
+	PVRSRV_ERROR OSFreeMem_Impl(IMG_UINT32 ui32Flags, IMG_SIZE_T ui32Size, IMG_PVOID pvLinAddr, IMG_HANDLE hBlockAlloc);
+	
+	#define OSAllocMem_Debug_Linux_Memory_Allocations(flags, size, addr, blockAlloc, file, line) \
+		OSAllocMem_Impl(flags, size, addr, blockAlloc)
+	#define OSFreeMem_Debug_Linux_Memory_Allocations(flags, size, addr, blockAlloc, file, line) \
+		OSFreeMem_Impl(flags, size, addr, blockAlloc)
+#endif
+
 
 
 #if defined(__linux__)
@@ -339,8 +394,9 @@ PVRSRV_ERROR OSGetSysMemSize(IMG_SIZE_T *pui32Bytes);
 
 typedef enum _HOST_PCI_INIT_FLAGS_
 {
-	HOST_PCI_INIT_FLAG_BUS_MASTER = 0x1,
-	HOST_PCI_INIT_FLAG_FORCE_I32 = 0x7fffffff
+	HOST_PCI_INIT_FLAG_BUS_MASTER	= 0x00000001,
+	HOST_PCI_INIT_FLAG_MSI		= 0x00000002,
+	HOST_PCI_INIT_FLAG_FORCE_I32 	= 0x7fffffff
 } HOST_PCI_INIT_FLAGS;
 
 struct _PVRSRV_PCI_DEV_OPAQUE_STRUCT_;

@@ -115,7 +115,17 @@ static IMG_VOID DebugMemAllocRecordRemove(DEBUG_MEM_ALLOC_TYPE eAllocType, IMG_V
 
 static IMG_CHAR *DebugMemAllocRecordTypeToString(DEBUG_MEM_ALLOC_TYPE eAllocType);
 
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+static struct proc_dir_entry *g_SeqFileMemoryRecords =0;
+static void* ProcSeqNextMemoryRecords(struct seq_file *sfile,void* el,loff_t off);
+static void ProcSeqShowMemoryRecords(struct seq_file *sfile,void* el);
+static void* ProcSeqOff2ElementMemoryRecords(struct seq_file * sfile, loff_t off);
+
+#else 
 static off_t printMemoryRecords(IMG_CHAR * buffer, size_t size, off_t off);
+#endif 
+
 #endif
 
 
@@ -147,7 +157,24 @@ static IMG_UINT32 g_LinuxMemAreaCount;
 static IMG_UINT32 g_LinuxMemAreaWaterMark;
 static IMG_UINT32 g_LinuxMemAreaHighWaterMark;
 
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+static struct proc_dir_entry *g_SeqFileMemArea=0;
+
+static void* ProcSeqNextMemArea(struct seq_file *sfile,void* el,loff_t off);
+static void ProcSeqShowMemArea(struct seq_file *sfile,void* el);
+static void* ProcSeqOff2ElementMemArea(struct seq_file *sfile, loff_t off);
+
+#else 
 static off_t printLinuxMemAreaRecords(IMG_CHAR * buffer, size_t size, off_t off);
+#endif 
+
+#endif
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+#if (defined(DEBUG_LINUX_MEM_AREAS) || defined(DEBUG_LINUX_MEMORY_ALLOCATIONS))
+static void ProcSeqStartstopDebugMutex(struct seq_file *sfile,IMG_BOOL start);
+#endif
 #endif
 
 static LinuxKMemCache *psLinuxMemAreaCache;
@@ -176,7 +203,19 @@ LinuxMMInit(IMG_VOID)
 #if defined(DEBUG_LINUX_MEM_AREAS)
     {
         IMG_INT iStatus;
-        iStatus = CreateProcReadEntry("mem_areas", printLinuxMemAreaRecords);
+#ifdef PVR_PROC_USE_SEQ_FILE
+		g_SeqFileMemArea = CreateProcReadEntrySeq(
+									"mem_areas", 
+									NULL, 
+									ProcSeqNextMemArea,
+									ProcSeqShowMemArea,
+									ProcSeqOff2ElementMemArea,
+									ProcSeqStartstopDebugMutex
+								   );
+		iStatus = !g_SeqFileMemArea ? -1 : 0;
+#else  
+   iStatus = CreateProcReadEntry("mem_areas", printLinuxMemAreaRecords);
+#endif    
         if(iStatus!=0)
         {
             return PVRSRV_ERROR_OUT_OF_MEMORY;
@@ -188,7 +227,20 @@ LinuxMMInit(IMG_VOID)
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
     {
         IMG_INT iStatus;
+#ifdef PVR_PROC_USE_SEQ_FILE
+		g_SeqFileMemoryRecords =CreateProcReadEntrySeq(
+									"meminfo", 
+									NULL, 
+									ProcSeqNextMemoryRecords,
+									ProcSeqShowMemoryRecords, 
+									ProcSeqOff2ElementMemoryRecords,
+									ProcSeqStartstopDebugMutex
+								   );
+
+		iStatus = !g_SeqFileMemoryRecords ? -1 : 0;
+#else 
         iStatus = CreateProcReadEntry("meminfo", printMemoryRecords);
+#endif 
         if(iStatus!=0)
         {
             return PVRSRV_ERROR_OUT_OF_MEMORY;
@@ -281,7 +333,12 @@ LinuxMMCleanup(IMG_VOID)
 		
 		List_DEBUG_LINUX_MEM_AREA_REC_ForEach(g_LinuxMemAreaRecords,
 											LinuxMMCleanup_MemAreas_ForEachCb);
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+		RemoveProcEntrySeq( g_SeqFileMemArea );
+#else 
         RemoveProcEntry("mem_areas");
+#endif 
     }
 #endif
 
@@ -292,7 +349,13 @@ LinuxMMCleanup(IMG_VOID)
         
 		List_DEBUG_MEM_ALLOC_REC_ForEach(g_MemoryRecords,
 										LinuxMMCleanup_MemRecords_ForEachVa);
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+		RemoveProcEntrySeq( g_SeqFileMemoryRecords );
+#else 
         RemoveProcEntry("meminfo");
+#endif 
+
     }
 #endif
 
@@ -962,6 +1025,7 @@ failed_alloc_pages:
         __free_pages(pvPageList[i], 0);
     }
     (IMG_VOID) OSFreeMem(0, sizeof(*pvPageList) * ui32PageCount, pvPageList, hBlockPageList);
+	psLinuxMemArea->uData.sPageList.pvPageList = IMG_NULL; 
 failed_page_list_alloc:
     LinuxMemAreaStructFree(psLinuxMemArea);
 failed_area_alloc:
@@ -1007,6 +1071,7 @@ FreeAllocPagesLinuxMemArea(LinuxMemArea *psLinuxMemArea)
     }
 
     (IMG_VOID) OSFreeMem(0, sizeof(*pvPageList) * ui32PageCount, pvPageList, hBlockPageList);
+	psLinuxMemArea->uData.sPageList.pvPageList = IMG_NULL; 
 
     LinuxMemAreaStructFree(psLinuxMemArea);
 }
@@ -1508,6 +1573,21 @@ LinuxMemAreaTypeToString(LINUX_MEM_AREA_TYPE eMemAreaType)
 }
 
 
+#ifdef PVR_PROC_USE_SEQ_FILE
+#if defined(DEBUG_LINUX_MEM_AREAS) || defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
+static void ProcSeqStartstopDebugMutex(struct seq_file *sfile, IMG_BOOL start) 
+{
+	if(start) 
+	{
+	    LinuxLockMutex(&g_sDebugMutex);		
+	}
+	else
+	{
+	    LinuxUnLockMutex(&g_sDebugMutex);
+	}
+}
+#endif 
+#endif 
 
 #if defined(DEBUG_LINUX_MEM_AREAS)
 
@@ -1523,6 +1603,102 @@ IMG_VOID* DecOffMemAreaRec_AnyVaCb(DEBUG_LINUX_MEM_AREA_REC *psNode, va_list va)
 		return psNode;
 	}
 }
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+ 
+static void* ProcSeqNextMemArea(struct seq_file *sfile,void* el,loff_t off) 
+{
+    DEBUG_LINUX_MEM_AREA_REC *psRecord;
+	psRecord = (DEBUG_LINUX_MEM_AREA_REC*)
+				List_DEBUG_LINUX_MEM_AREA_REC_Any_va(g_LinuxMemAreaRecords,
+													DecOffMemAreaRec_AnyVaCb,
+													&off);
+	return (void*)psRecord;
+}
+
+static void* ProcSeqOff2ElementMemArea(struct seq_file * sfile, loff_t off)
+{
+    DEBUG_LINUX_MEM_AREA_REC *psRecord;
+	if(!off) 
+	{
+		return PVR_PROC_SEQ_START_TOKEN;
+	}
+
+	psRecord = (DEBUG_LINUX_MEM_AREA_REC*)
+				List_DEBUG_LINUX_MEM_AREA_REC_Any_va(g_LinuxMemAreaRecords,
+													DecOffMemAreaRec_AnyVaCb,
+													&off);
+	return (void*)psRecord;
+}
+
+
+static void ProcSeqShowMemArea(struct seq_file *sfile,void* el)
+{
+    DEBUG_LINUX_MEM_AREA_REC *psRecord = (DEBUG_LINUX_MEM_AREA_REC*)el; 
+	if(el == PVR_PROC_SEQ_START_TOKEN) 
+	{
+
+#if !defined(DEBUG_LINUX_XML_PROC_FILES)
+        seq_printf( sfile,
+              			  "Number of Linux Memory Areas: %lu\n"
+                          "At the current water mark these areas correspond to %lu bytes (excluding SUB areas)\n"
+                          "At the highest water mark these areas corresponded to %lu bytes (excluding SUB areas)\n"
+                          "\nDetails for all Linux Memory Areas:\n"
+                          "%s %-24s %s %s %-8s %-5s %s\n",
+                          g_LinuxMemAreaCount,
+                          g_LinuxMemAreaWaterMark,
+                          g_LinuxMemAreaHighWaterMark,
+                          "psLinuxMemArea",
+                          "LinuxMemType",
+                          "CpuVAddr",
+                          "CpuPAddr",
+                          "Bytes",
+                          "Pid",
+                          "Flags"
+                         );
+#else
+        seq_printf( sfile,
+                          "<mem_areas_header>\n"
+                          "\t<count>%lu</count>\n"
+                          "\t<watermark key=\"mar0\" description=\"current\" bytes=\"%lu\"/>\n" 
+                          "\t<watermark key=\"mar1\" description=\"high\" bytes=\"%lu\"/>\n" 
+                          "</mem_areas_header>\n",
+                          g_LinuxMemAreaCount,
+                          g_LinuxMemAreaWaterMark,
+                          g_LinuxMemAreaHighWaterMark
+                         );
+#endif
+		return;
+	}
+
+        seq_printf( sfile,
+#if !defined(DEBUG_LINUX_XML_PROC_FILES)
+                       "%8p       %-24s %8p %08lx %-8ld %-5u %08lx=(%s)\n",
+#else
+                       "<linux_mem_area>\n"
+                       "\t<pointer>%8p</pointer>\n"
+                       "\t<type>%s</type>\n"
+                       "\t<cpu_virtual>%8p</cpu_virtual>\n"
+                       "\t<cpu_physical>%08lx</cpu_physical>\n"
+                       "\t<bytes>%ld</bytes>\n"
+                       "\t<pid>%u</pid>\n"
+                       "\t<flags>%08lx</flags>\n"
+                       "\t<flags_string>%s</flags_string>\n"
+                       "</linux_mem_area>\n",
+#endif
+                       psRecord->psLinuxMemArea,
+                       LinuxMemAreaTypeToString(psRecord->psLinuxMemArea->eAreaType),
+                       LinuxMemAreaToCpuVAddr(psRecord->psLinuxMemArea),
+                       LinuxMemAreaToCpuPAddr(psRecord->psLinuxMemArea,0).uiAddr,
+                       psRecord->psLinuxMemArea->ui32ByteSize,
+                       psRecord->pid,
+                       psRecord->ui32Flags,
+                       HAPFlagsToString(psRecord->ui32Flags)
+                      );
+
+}
+
+#else  
 
 static off_t
 printLinuxMemAreaRecords(IMG_CHAR * buffer, size_t count, off_t off)
@@ -1620,6 +1796,8 @@ unlock_and_return:
 }
 #endif 
 
+#endif 
+
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
 
@@ -1635,6 +1813,238 @@ IMG_VOID* DecOffMemAllocRec_AnyVaCb(DEBUG_MEM_ALLOC_REC *psNode, va_list va)
 		return psNode;
 	}
 }
+
+
+#ifdef PVR_PROC_USE_SEQ_FILE
+ 
+static void* ProcSeqNextMemoryRecords(struct seq_file *sfile,void* el,loff_t off) 
+{
+    DEBUG_MEM_ALLOC_REC *psRecord;
+	psRecord = (DEBUG_MEM_ALLOC_REC*)
+		List_DEBUG_MEM_ALLOC_REC_Any_va(g_MemoryRecords,
+										DecOffMemAllocRec_AnyVaCb,
+										&off);
+#if defined(DEBUG_LINUX_XML_PROC_FILES)
+	if(!psRecord) 
+	{
+		seq_printf( sfile, "</meminfo>\n");
+	}
+#endif
+
+	return (void*)psRecord;
+}
+
+static void* ProcSeqOff2ElementMemoryRecords(struct seq_file *sfile, loff_t off)
+{
+    DEBUG_MEM_ALLOC_REC *psRecord;
+	if(!off) 
+	{
+		return PVR_PROC_SEQ_START_TOKEN;
+	}
+
+	psRecord = (DEBUG_MEM_ALLOC_REC*)
+		List_DEBUG_MEM_ALLOC_REC_Any_va(g_MemoryRecords,
+										DecOffMemAllocRec_AnyVaCb,
+										&off);
+
+#if defined(DEBUG_LINUX_XML_PROC_FILES)
+	if(!psRecord) 
+	{
+		seq_printf( sfile, "</meminfo>\n");
+	}
+#endif
+
+	return (void*)psRecord;
+}
+
+static void ProcSeqShowMemoryRecords(struct seq_file *sfile,void* el)
+{
+    DEBUG_MEM_ALLOC_REC *psRecord = (DEBUG_MEM_ALLOC_REC*)el;
+	if(el == PVR_PROC_SEQ_START_TOKEN) 
+	{
+#if !defined(DEBUG_LINUX_XML_PROC_FILES)
+        
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes allocated via kmalloc",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMALLOC]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated via kmalloc",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMALLOC]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes allocated via vmalloc",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_VMALLOC]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated via vmalloc",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_VMALLOC]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes allocated via alloc_pages",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_ALLOC_PAGES]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated via alloc_pages",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_ALLOC_PAGES]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes allocated via ioremap",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_IOREMAP]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated via ioremap",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_IOREMAP]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes reserved for \"IO\" memory areas",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_IO]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated for \"IO\" memory areas",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_IO]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Current Water Mark of bytes allocated via kmem_cache_alloc",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMEM_CACHE]);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "Highest Water Mark of bytes allocated via kmem_cache_alloc",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMEM_CACHE]);
+        seq_printf( sfile, "\n");
+
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "The Current Water Mark for memory allocated from system RAM",
+                           g_SysRAMWaterMark);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "The Highest Water Mark for memory allocated from system RAM",
+                           g_SysRAMHighWaterMark);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "The Current Water Mark for memory allocated from IO memory",
+                           g_IOMemWaterMark);
+        seq_printf( sfile, "%-60s: %ld bytes\n",
+                           "The Highest Water Mark for memory allocated from IO memory",
+                           g_IOMemHighWaterMark);
+
+        seq_printf( sfile, "\n");
+
+		seq_printf( sfile, "Details for all known allocations:\n"
+                           "%-16s %-8s %-8s %-10s %-5s %-10s %s\n",
+                           "Type",
+                           "CpuVAddr",
+                           "CpuPAddr",
+                           "Bytes",
+                           "PID",
+                           "PrivateData",
+                           "Filename:Line");
+
+#else 
+		
+		
+		seq_printf( sfile, "<meminfo>\n<meminfo_header>\n");
+		seq_printf( sfile,
+                           "<watermark key=\"mr0\" description=\"kmalloc_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMALLOC]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr1\" description=\"kmalloc_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMALLOC]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr2\" description=\"vmalloc_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_VMALLOC]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr3\" description=\"vmalloc_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_VMALLOC]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr4\" description=\"alloc_pages_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_ALLOC_PAGES]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr5\" description=\"alloc_pages_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_ALLOC_PAGES]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr6\" description=\"ioremap_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_IOREMAP]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr7\" description=\"ioremap_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_IOREMAP]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr8\" description=\"io_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_IO]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr9\" description=\"io_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_IO]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr10\" description=\"kmem_cache_current\" bytes=\"%ld\"/>\n",
+                           g_WaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMEM_CACHE]);
+		seq_printf( sfile,
+                           "<watermark key=\"mr11\" description=\"kmem_cache_high\" bytes=\"%ld\"/>\n",
+                           g_HighWaterMarkData[DEBUG_MEM_ALLOC_TYPE_KMEM_CACHE]);
+		seq_printf( sfile,"\n" );
+
+		seq_printf( sfile,
+                           "<watermark key=\"mr14\" description=\"system_ram_current\" bytes=\"%ld\"/>\n",
+                           g_SysRAMWaterMark);
+		seq_printf( sfile,
+                           "<watermark key=\"mr15\" description=\"system_ram_high\" bytes=\"%ld\"/>\n",
+                           g_SysRAMHighWaterMark);
+		seq_printf( sfile,
+                           "<watermark key=\"mr16\" description=\"system_io_current\" bytes=\"%ld\"/>\n",
+                           g_IOMemWaterMark);
+		seq_printf( sfile,
+                           "<watermark key=\"mr17\" description=\"system_io_high\" bytes=\"%ld\"/>\n",
+                           g_IOMemHighWaterMark);
+
+		seq_printf( sfile, "</meminfo_header>\n");
+
+#endif 
+		return;
+	}
+
+    if(psRecord->eAllocType != DEBUG_MEM_ALLOC_TYPE_KMEM_CACHE)
+    {
+		seq_printf( sfile,
+#if !defined(DEBUG_LINUX_XML_PROC_FILES)
+                           "%-16s %-8p %08lx %-10ld %-5d %-10s %s:%ld\n",
+#else
+                           "<allocation>\n"
+                           "\t<type>%s</type>\n"
+                           "\t<cpu_virtual>%-8p</cpu_virtual>\n"
+                           "\t<cpu_physical>%08lx</cpu_physical>\n"
+                           "\t<bytes>%ld</bytes>\n"
+                           "\t<pid>%d</pid>\n"
+                           "\t<private>%s</private>\n"
+                           "\t<filename>%s</filename>\n"
+                           "\t<line>%ld</line>\n"
+                           "</allocation>\n",
+#endif
+                           DebugMemAllocRecordTypeToString(psRecord->eAllocType),
+                           psRecord->pvCpuVAddr,
+                           psRecord->ulCpuPAddr,
+                           psRecord->ui32Bytes,
+                           psRecord->pid,
+                           "NULL",
+                           psRecord->pszFileName,
+                           psRecord->ui32Line);
+    }
+    else
+    {
+		seq_printf( sfile,
+#if !defined(DEBUG_LINUX_XML_PROC_FILES)
+                           "%-16s %-8p %08lx %-10ld %-5d %-10s %s:%ld\n",
+#else
+                           "<allocation>\n"
+                           "\t<type>%s</type>\n"
+                           "\t<cpu_virtual>%-8p</cpu_virtual>\n"
+                           "\t<cpu_physical>%08lx</cpu_physical>\n"
+                           "\t<bytes>%ld</bytes>\n"
+                           "\t<pid>%d</pid>\n"
+                           "\t<private>%s</private>\n"
+                           "\t<filename>%s</filename>\n"
+                           "\t<line>%ld</line>\n"
+                           "</allocation>\n",
+#endif
+                           DebugMemAllocRecordTypeToString(psRecord->eAllocType),
+                           psRecord->pvCpuVAddr,
+                           psRecord->ulCpuPAddr,
+                           psRecord->ui32Bytes,
+                           psRecord->pid,
+                           KMemCacheNameWrapper(psRecord->pvPrivateData),
+                           psRecord->pszFileName,
+                           psRecord->ui32Line);
+    }
+}
+
+
+
+#else 
 
 static off_t
 printMemoryRecords(IMG_CHAR * buffer, size_t count, off_t off)
@@ -1860,6 +2270,7 @@ unlock_and_return:
     return Ret; 
 }
 #endif 
+#endif 
 
 
 #if defined(DEBUG_LINUX_MEM_AREAS) || defined(DEBUG_LINUX_MMAP_AREAS)
@@ -1929,5 +2340,4 @@ HAPFlagsToString(IMG_UINT32 ui32Flags)
     return szFlags;
 }
 #endif
-
 

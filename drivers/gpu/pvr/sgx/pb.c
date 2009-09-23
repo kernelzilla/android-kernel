@@ -104,10 +104,10 @@ SGXFindSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 		if (psResItem == IMG_NULL)
 		{
 			OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
-					  sizeof(PVRSRV_KERNEL_MEM_INFO *)
-						* psStubPBDesc->ui32SubKernelMemInfosCount,
+					  sizeof(PVRSRV_KERNEL_MEM_INFO *) * psStubPBDesc->ui32SubKernelMemInfosCount,
 					  ppsSharedPBDescSubKernelMemInfos,
 					  0);
+			
 
 			PVR_DPF((PVR_DBG_ERROR, "SGXFindSharedPBDescKM: ResManRegisterRes failed"));
 
@@ -193,10 +193,10 @@ SGXCleanupSharedPBDescKM(PVRSRV_STUB_PBDESC *psStubPBDescIn)
 		}
 
 		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
-				  sizeof(PVRSRV_KERNEL_MEM_INFO *)
-				  * psStubPBDescIn->ui32SubKernelMemInfosCount,
+				  sizeof(PVRSRV_KERNEL_MEM_INFO *) * psStubPBDescIn->ui32SubKernelMemInfosCount,
 				  psStubPBDescIn->ppsSubKernelMemInfos,
 				  0);
+		psStubPBDescIn->ppsSubKernelMemInfos = IMG_NULL;
 
 		PVRSRVFreeSharedSysMemoryKM(psStubPBDescIn->psBlockKernelMemInfo);
 		
@@ -210,6 +210,7 @@ SGXCleanupSharedPBDescKM(PVRSRV_STUB_PBDESC *psStubPBDescIn)
 				  sizeof(PVRSRV_STUB_PBDESC),
 				  psStubPBDescIn,
 				  0);
+		
 
 		
 		SGXCleanupRequest(psDeviceNode,
@@ -428,15 +429,16 @@ NoAdd:
 		if(psStubPBDesc->ppsSubKernelMemInfos)
 		{
 			OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
-					  sizeof(PVRSRV_KERNEL_MEM_INFO *)
-					  * ui32SharedPBDescSubKernelMemInfosCount,
+					  sizeof(PVRSRV_KERNEL_MEM_INFO *) * ui32SharedPBDescSubKernelMemInfosCount,
 					  psStubPBDesc->ppsSubKernelMemInfos,
 					  0);
+			psStubPBDesc->ppsSubKernelMemInfos = IMG_NULL;
 		}
 		OSFreeMem(PVRSRV_OS_NON_PAGEABLE_HEAP,
 				  sizeof(PVRSRV_STUB_PBDESC),
 				  psStubPBDesc,
 				  0);
+		
 	}
 
 NoAddKeepPB:

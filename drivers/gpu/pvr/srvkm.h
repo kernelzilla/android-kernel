@@ -32,12 +32,22 @@
 extern "C" {
 #endif
 
-IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV PVRSRVProcessConnect(IMG_UINT32	ui32PID);
-IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVProcessDisconnect(IMG_UINT32	ui32PID);
+	
+	#ifdef PVR_DISABLE_LOGGING
+	#define PVR_LOG(X)
+	#else
+	#define PVR_LOG(X)			PVRSRVReleasePrintf X
+	#endif
 
-IMG_VOID IMG_CALLCONV PVRSRVSetDCState(IMG_UINT32 ui32State);
+	IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVReleasePrintf(const IMG_CHAR *pszFormat,
+										...);
 
-PVRSRV_ERROR IMG_CALLCONV PVRSRVSaveRestoreLiveSegments(IMG_HANDLE hArena, IMG_PBYTE pbyBuffer, IMG_SIZE_T *puiBufSize, IMG_BOOL bSave);
+	IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV PVRSRVProcessConnect(IMG_UINT32	ui32PID);
+	IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVProcessDisconnect(IMG_UINT32	ui32PID);
+
+	IMG_VOID IMG_CALLCONV PVRSRVSetDCState(IMG_UINT32 ui32State);
+
+	PVRSRV_ERROR IMG_CALLCONV PVRSRVSaveRestoreLiveSegments(IMG_HANDLE hArena, IMG_PBYTE pbyBuffer, IMG_SIZE_T *puiBufSize, IMG_BOOL bSave);
 
 #if defined (__cplusplus)
 }
@@ -46,9 +56,6 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVSaveRestoreLiveSegments(IMG_HANDLE hArena, IMG_P
 #define LOOP_UNTIL_TIMEOUT(TIMEOUT) \
 {\
 	IMG_UINT32 uiOffset, uiStart, uiCurrent; \
-	if (irqs_disabled()) \
-		pr_err("pvr: BUG: LOOP_UNTIL_TIMEOUT called with irqs disabled\n"); \
-	BUG_ON(irqs_disabled()); \
 	for(uiOffset = 0, uiStart = OSClockus(), uiCurrent = uiStart+1; \
 		(uiCurrent - uiStart + uiOffset) < TIMEOUT; \
 		uiCurrent = OSClockus(), \

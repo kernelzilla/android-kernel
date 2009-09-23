@@ -311,6 +311,11 @@ PVRSRV_ERROR SGXDoKickKM(IMG_HANDLE hDevHandle, SGX_CCB_KICK *psCCBKick)
 			}
 		}
 	}
+	
+	
+
+
+	psTACmd->ui32CtrlFlags |= SGXMKIF_CMDTA_CTRLFLAGS_READY;
 
 #if defined(PDUMP)
 	if (PDumpIsCaptureFrameKM())

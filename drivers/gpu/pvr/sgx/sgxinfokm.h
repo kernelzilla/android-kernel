@@ -29,6 +29,7 @@
 
 #include "sgxdefs.h"
 #include "device.h"
+#include "power.h"
 #include "sysconfig.h"
 #include "sgxscript.h"
 #include "sgxinfo.h"
@@ -39,20 +40,6 @@ extern "C" {
 
 #define		SGX_HOSTPORT_PRESENT			0x00000001UL
 
-#define PVRSRV_USSE_EDM_INIT_COMPLETE			(1UL << 0)	
-
-#define PVRSRV_USSE_EDM_POWMAN_IDLE_COMPLETE				(1UL << 2)	
-#define PVRSRV_USSE_EDM_POWMAN_POWEROFF_COMPLETE			(1UL << 3)	
-#define PVRSRV_USSE_EDM_POWMAN_POWEROFF_RESTART_IMMEDIATE	(1UL << 4)	
-#define PVRSRV_USSE_EDM_POWMAN_NO_WORK						(1UL << 5)	
-
-#define PVRSRV_USSE_EDM_INTERRUPT_HWR			(1UL << 0)	
-#define PVRSRV_USSE_EDM_INTERRUPT_ACTIVE_POWER	(1UL << 1)	
-
-#define PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE 	(1UL << 0)	
-
-#define PVRSRV_USSE_MISCINFO_READY		0x1UL
-#define PVRSRV_USSE_MISCINFO_GET_STRUCT_SIZES	0x2UL	
 
 typedef struct _PVRSRV_STUB_PBDESC_ PVRSRV_STUB_PBDESC;
 
@@ -237,6 +224,7 @@ typedef struct _SGX_TIMING_INFORMATION_
 {
 	IMG_UINT32			ui32CoreClockSpeed;
 	IMG_UINT32			ui32HWRecoveryFreq;
+	IMG_BOOL			bEnableActivePM;
 	IMG_UINT32			ui32ActivePowManLatencyms;
 	IMG_UINT32			ui32uKernelFreq;
 } SGX_TIMING_INFORMATION;
@@ -312,25 +300,24 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData);
 IMG_VOID SGXReset(PVRSRV_SGXDEV_INFO	*psDevInfo,
 				  IMG_UINT32			 ui32PDUMPFlags);
 
-PVRSRV_ERROR SGXInitialise(PVRSRV_SGXDEV_INFO	*psDevInfo,
-						   IMG_BOOL				bHardwareRecovery);
+PVRSRV_ERROR SGXInitialise(PVRSRV_SGXDEV_INFO	*psDevInfo);
 PVRSRV_ERROR SGXDeinitialise(IMG_HANDLE hDevCookie);
 
-PVRSRV_ERROR SGXPrePowerStateExt(IMG_HANDLE			hDevHandle,
-								 PVR_POWER_STATE	eNewPowerState,
-								 PVR_POWER_STATE	eCurrentPowerState);
+PVRSRV_ERROR SGXPrePowerState(IMG_HANDLE				hDevHandle, 
+							  PVRSRV_DEV_POWER_STATE	eNewPowerState, 
+							  PVRSRV_DEV_POWER_STATE	eCurrentPowerState);
 
-PVRSRV_ERROR SGXPostPowerStateExt(IMG_HANDLE		hDevHandle,
-								  PVR_POWER_STATE	eNewPowerState,
-								  PVR_POWER_STATE	eCurrentPowerState);
+PVRSRV_ERROR SGXPostPowerState(IMG_HANDLE				hDevHandle, 
+							   PVRSRV_DEV_POWER_STATE	eNewPowerState, 
+							   PVRSRV_DEV_POWER_STATE	eCurrentPowerState);
 
-PVRSRV_ERROR SGXPreClockSpeedChange(IMG_HANDLE		hDevHandle,
-									IMG_BOOL		bIdleDevice,
-									PVR_POWER_STATE	eCurrentPowerState);
+PVRSRV_ERROR SGXPreClockSpeedChange(IMG_HANDLE				hDevHandle,
+									IMG_BOOL				bIdleDevice,
+									PVRSRV_DEV_POWER_STATE	eCurrentPowerState);
 
-PVRSRV_ERROR SGXPostClockSpeedChange(IMG_HANDLE			hDevHandle,
-									 IMG_BOOL			bIdleDevice,
-									 PVR_POWER_STATE	eCurrentPowerState);
+PVRSRV_ERROR SGXPostClockSpeedChange(IMG_HANDLE				hDevHandle,
+									 IMG_BOOL				bIdleDevice,
+									 PVRSRV_DEV_POWER_STATE	eCurrentPowerState);
 
 PVRSRV_ERROR SGXDevInitCompatCheck(PVRSRV_DEVICE_NODE *psDeviceNode);
 

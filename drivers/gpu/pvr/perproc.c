@@ -95,6 +95,7 @@ static PVRSRV_ERROR FreePerProcessData(PVRSRV_PER_PROCESS_DATA *psPerProc)
 		sizeof(*psPerProc),
 		psPerProc,
 		psPerProc->hBlockAlloc);
+	
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "FreePerProcessData: Couldn't free per-process data (%d)", eError));

@@ -62,8 +62,8 @@ typedef struct _SYS_DATA_TAG_
     PVRSRV_DEVICE_NODE			*psDeviceNodeList;			
     PVRSRV_POWER_DEV			*psPowerDeviceList;			
 	PVRSRV_RESOURCE				sPowerStateChangeResource;	
-   	PVR_POWER_STATE 			eCurrentPowerState;			
-   	PVR_POWER_STATE 			eFailedPowerState;			
+   	PVRSRV_SYS_POWER_STATE		eCurrentPowerState;			
+   	PVRSRV_SYS_POWER_STATE		eFailedPowerState;			
    	IMG_UINT32		 			ui32CurrentOSPowerState;	
     PVRSRV_QUEUE_INFO           *psQueueList;           	
    	PVRSRV_KERNEL_SYNC_INFO 	*psSharedSyncInfoList;		
@@ -109,14 +109,14 @@ IMG_VOID SysClearInterrupts(SYS_DATA* psSysData, IMG_UINT32 ui32ClearBits);
 
 PVRSRV_ERROR SysResetDevice(IMG_UINT32 ui32DeviceIndex);
 
-PVRSRV_ERROR SysSystemPrePowerState(PVR_POWER_STATE eNewPowerState);
-PVRSRV_ERROR SysSystemPostPowerState(PVR_POWER_STATE eNewPowerState);
+PVRSRV_ERROR SysSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
+PVRSRV_ERROR SysSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 PVRSRV_ERROR SysDevicePrePowerState(IMG_UINT32 ui32DeviceIndex,
-									PVR_POWER_STATE eNewPowerState,
-									PVR_POWER_STATE eCurrentPowerState);
+									PVRSRV_DEV_POWER_STATE eNewPowerState,
+									PVRSRV_DEV_POWER_STATE eCurrentPowerState);
 PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32 ui32DeviceIndex,
-									 PVR_POWER_STATE eNewPowerState,
-									 PVR_POWER_STATE eCurrentPowerState);
+									 PVRSRV_DEV_POWER_STATE eNewPowerState,
+									 PVRSRV_DEV_POWER_STATE eCurrentPowerState);
 
 #if defined(SYS_CUSTOM_POWERLOCK_WRAP)
 PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData);
