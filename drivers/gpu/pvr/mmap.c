@@ -150,7 +150,8 @@ static PKV_OFFSET_STRUCT
 CreateOffsetStruct(LinuxMemArea *psLinuxMemArea, IMG_UINT32 ui32Offset, IMG_UINT32 ui32RealByteSize)
 {
     PKV_OFFSET_STRUCT psOffsetStruct;
-#if defined(DEBUG) || defined(DEBUG_LINUX_MMAP_AREAS)
+#if defined(CONFIG_SGX_RELEASE_LOGGING) || defined(DEBUG) || \
+    defined(DEBUG_LINUX_MMAP_AREAS)
     const IMG_CHAR *pszName = LinuxMemAreaTypeToString(LinuxMemAreaRootType(psLinuxMemArea));
 #endif
 
@@ -924,7 +925,8 @@ PVRSRV_ERROR
 PVRMMapRegisterArea(LinuxMemArea *psLinuxMemArea)
 {
     PVRSRV_ERROR eError;
-#if defined(DEBUG) || defined(DEBUG_LINUX_MMAP_AREAS)
+#if defined(CONFIG_SGX_RELEASE_LOGGING) || defined(DEBUG) || \
+	defined(DEBUG_LINUX_MMAP_AREAS)
     const IMG_CHAR *pszName = LinuxMemAreaTypeToString(LinuxMemAreaRootType(psLinuxMemArea));
 #endif
 

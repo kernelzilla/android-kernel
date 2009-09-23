@@ -91,9 +91,17 @@ IMG_VOID PVRDebugSetLevel (IMG_UINT32 uDebugLevel);
 IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVTrace(const IMG_CHAR* pszFormat, ... );
 
 #else
-	
+IMG_IMPORT IMG_VOID IMG_CALLCONV PVRSRVDebugPrintf(IMG_UINT32 ui32DebugLevel,
+						   const IMG_CHAR *pszFileName,
+						   IMG_UINT32 ui32Line,
+						   const IMG_CHAR *pszFormat,
+						   ...);
 	#define PVR_ASSERT(EXPR)	
+#ifdef CONFIG_SGX_RELEASE_LOGGING
+	#define PVR_DPF(X) PVRSRVDebugPrintf X
+#else
 	#define PVR_DPF(X)
+#endif
 	#define PVR_TRACE(X)
 	#define PVR_DBG_BREAK
 

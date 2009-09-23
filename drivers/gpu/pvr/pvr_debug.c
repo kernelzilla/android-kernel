@@ -118,7 +118,7 @@ static IMG_BOOL VBAppend(IMG_CHAR *pszBuf, IMG_UINT32 ui32BufSiz, const IMG_CHAR
 	return (i32Len < 0 || i32Len >= ui32Space);
 }
 
-#if defined(DEBUG) || defined(TIMING)
+#if defined(CONFIG_SGX_RELEASE_LOGGING) || defined(DEBUG) || defined(TIMING)
 static IMG_BOOL BAppend(IMG_CHAR *pszBuf, IMG_UINT32 ui32BufSiz, const IMG_CHAR *pszFormat, ...)
 {
 		va_list VArgs;
@@ -164,7 +164,7 @@ IMG_VOID PVRSRVReleasePrintf(
 
 }
 
-#if defined(DEBUG) || defined(TIMING)
+#if defined(CONFIG_SGX_RELEASE_LOGGING) || defined(DEBUG) || defined(TIMING)
 IMG_VOID PVRSRVDebugPrintf	(
 						IMG_UINT32	ui32DebugLevel,
 						const IMG_CHAR*	pszFullFileName,

@@ -16,6 +16,11 @@ config SGX_BUILD_DEBUG
 
 endchoice
 
+config SGX_RELEASE_LOGGING
+       bool "Error logging in release build"
+       ---help---
+          Includes error logging in release build
+
 config PVR_OMAPLFB
 	tristate "PowerVR OMAP buffer class"
 	depends on SGX
