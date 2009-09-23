@@ -64,40 +64,40 @@ static inline int au_debug_test(void)
 
 /* debug print */
 
-#define AuDpri(lvl, fmt, arg...) \
+#define AuDpri(lvl, fmt, ...) \
 	printk(lvl AUFS_NAME " %s:%d:%s[%d]: " fmt, \
-	       __func__, __LINE__, current->comm, current->pid, ##arg)
-#define AuDbg(fmt, arg...) do { \
+	       __func__, __LINE__, current->comm, current->pid, ##__VA_ARGS__)
+#define AuDbg(fmt, ...) do { \
 	if (au_debug_test()) \
-		AuDpri(KERN_DEBUG, "DEBUG: " fmt, ##arg); \
+		AuDpri(KERN_DEBUG, "DEBUG: " fmt, ##__VA_ARGS__); \
 } while (0)
 #define AuLabel(l) 		AuDbg(#l "\n")
-#define AuInfo(fmt, arg...)	AuDpri(KERN_INFO, fmt, ##arg)
-#define AuWarn(fmt, arg...)	AuDpri(KERN_WARNING, fmt, ##arg)
-#define AuErr(fmt, arg...)	AuDpri(KERN_ERR, fmt, ##arg)
-#define AuIOErr(fmt, arg...)	AuErr("I/O Error, " fmt, ##arg)
-#define AuWarn1(fmt, arg...) do { \
+#define AuInfo(fmt, ...)	AuDpri(KERN_INFO, fmt, ##__VA_ARGS__)
+#define AuWarn(fmt, ...)	AuDpri(KERN_WARNING, fmt, ##__VA_ARGS__)
+#define AuErr(fmt, ...)		AuDpri(KERN_ERR, fmt, ##__VA_ARGS__)
+#define AuIOErr(fmt, ...)	AuErr("I/O Error, " fmt, ##__VA_ARGS__)
+#define AuWarn1(fmt, ...) do { \
 	static unsigned char _c; \
 	if (!_c++) \
-		AuWarn(fmt, ##arg); \
+		AuWarn(fmt, ##__VA_ARGS__); \
 } while (0)
 
-#define AuErr1(fmt, arg...) do { \
+#define AuErr1(fmt, ...) do { \
 	static unsigned char _c; \
 	if (!_c++) \
-		AuErr(fmt, ##arg); \
+		AuErr(fmt, ##__VA_ARGS__); \
 } while (0)
 
-#define AuIOErr1(fmt, arg...) do { \
+#define AuIOErr1(fmt, ...) do { \
 	static unsigned char _c; \
 	if (!_c++) \
-		AuIOErr(fmt, ##arg); \
+		AuIOErr(fmt, ##__VA_ARGS__); \
 } while (0)
 
 #define AuUnsupportMsg	"This operation is not supported." \
 			" Please report this application to aufs-users ML."
-#define AuUnsupport(fmt, args...) do { \
-	AuErr(AuUnsupportMsg "\n" fmt, ##args); \
+#define AuUnsupport(fmt, ...) do { \
+	AuErr(AuUnsupportMsg "\n" fmt, ##__VA_ARGS__); \
 	dump_stack(); \
 } while (0)
 
