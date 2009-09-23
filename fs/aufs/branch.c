@@ -484,9 +484,9 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
  */
 
 /* to show the line number, do not make it inlined function */
-#define AuVerbose(do_info, fmt, args...) do { \
+#define AuVerbose(do_info, fmt, ...) do { \
 	if (do_info) \
-		AuInfo(fmt, ##args); \
+		AuInfo(fmt, ##__VA_ARGS__); \
 } while (0)
 
 /*
