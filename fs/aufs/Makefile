@@ -1,6 +1,12 @@
 
 include ${srctree}/${src}/magic.mk
 
+# cf. include/linux/kernel.h
+# enable pr_debug
+ccflags-y += -DDEBUG
+ccflags-y += -D'pr_fmt(fmt)="aufs %s:%d:%s[%d]: " fmt, \
+	__func__, __LINE__, current->comm, current->pid'
+
 obj-$(CONFIG_AUFS_FS) += aufs.o
 aufs-y := module.o sbinfo.o super.o branch.o xino.o sysaufs.o opts.o \
 	wkq.o vfsub.o dcsub.o \
