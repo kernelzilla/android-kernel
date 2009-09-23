@@ -31,6 +31,8 @@
 #include "pdump_km.h"
 #include "pvr_bridge_km.h"
 
+#include <asm/cacheflush.h>
+
 static PVRSRV_ERROR AllocDeviceMem(IMG_HANDLE		hDevCookie,
 									IMG_HANDLE		hDevMemHeap,
 									IMG_UINT32		ui32Flags,
@@ -585,6 +587,8 @@ PVRSRV_ERROR IMG_CALLCONV _PVRSRVAllocDeviceMemKM(IMG_HANDLE					hDevCookie,
 	PVRSRV_ERROR 			eError;
 	BM_HEAP					*psBMHeap;
 	IMG_HANDLE				hDevMemContext;
+
+	flush_cache_all();
 
 	if (!hDevMemHeap ||
 		(ui32Size == 0))

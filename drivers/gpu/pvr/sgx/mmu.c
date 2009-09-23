@@ -37,6 +37,8 @@
 #include "mmu.h"
 #include "sgxconfig.h"
 
+#include <asm/cacheflush.h>
+
 #define UINT32_MAX_VALUE	0xFFFFFFFFUL
 
 #define SGX_MAX_PD_ENTRIES	(1<<(SGX_FEATURE_ADDRESS_SPACE_SIZE - SGX_MMU_PT_SHIFT - SGX_MMU_PAGE_SHIFT))
@@ -1499,7 +1501,7 @@ MMU_Alloc (MMU_HEAP *pMMUHeap,
 		"MMU_Alloc: uSize=0x%x, flags=0x%x, align=0x%x",
 		uSize, uFlags, uDevVAddrAlignment));
 
-	
+	flush_cache_all();
 
 	if((uFlags & PVRSRV_MEM_USER_SUPPLIED_DEVVADDR) == 0)
 	{
