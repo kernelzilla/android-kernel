@@ -67,7 +67,7 @@ unsigned int au_rdhash_est(loff_t sz)
 		n = sz;
 	if (sz < AUFS_RDHASH_DEF)
 		n = AUFS_RDHASH_DEF;
-	/* AuInfo("n %u\n", n); */
+	/* pr_info("n %u\n", n); */
 	return n;
 }
 
@@ -101,7 +101,7 @@ static void nhash_count(struct hlist_head *head)
 	n = 0;
 	hlist_for_each(pos, head)
 		n++;
-	AuInfo("%lu\n", n);
+	pr_info("%lu\n", n);
 #endif
 }
 
@@ -389,7 +389,7 @@ static struct au_vdir *alloc_vdir(struct file *file)
 	if (!vdir->vd_deblk_sz) {
 		/* estimate the apropriate size for deblk */
 		vdir->vd_deblk_sz = au_dir_size(file, /*dentry*/NULL);
-		/* AuInfo("vd_deblk_sz %u\n", vdir->vd_deblk_sz); */
+		/* pr_info("vd_deblk_sz %u\n", vdir->vd_deblk_sz); */
 	}
 	vdir->vd_nblk = 0;
 	vdir->vd_version = 0;

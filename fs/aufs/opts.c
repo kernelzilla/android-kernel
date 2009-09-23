@@ -271,7 +271,7 @@ static int au_wbr_mfs_wmark(substring_t *arg, char *str,
 	if (!au_match_ull(arg, &ull))
 		create->mfsrr_watermark = ull;
 	else {
-		AuErr("bad integer in %s\n", str);
+		pr_err("bad integer in %s\n", str);
 		err = -EINVAL;
 	}
 
@@ -287,7 +287,7 @@ static int au_wbr_mfs_sec(substring_t *arg, char *str,
 	if (!match_int(arg, &n) && 0 <= n)
 		create->mfs_second = n;
 	else {
-		AuErr("bad integer in %s\n", str);
+		pr_err("bad integer in %s\n", str);
 		err = -EINVAL;
 	}
 
@@ -595,7 +595,7 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 		opt->type = Opt_add;
 		goto out;
 	}
-	AuErr("lookup failed %s (%d)\n", add->pathname, err);
+	pr_err("lookup failed %s (%d)\n", add->pathname, err);
 	err = -EINVAL;
 
  out:
@@ -611,7 +611,7 @@ static int au_opts_parse_del(struct au_opt_del *del, substring_t args[])
 
 	err = vfsub_kern_path(del->pathname, lkup_dirflags, &del->h_path);
 	if (unlikely(err))
-		AuErr("lookup failed %s (%d)\n", del->pathname, err);
+		pr_err("lookup failed %s (%d)\n", del->pathname, err);
 
 	return err;
 }
@@ -627,7 +627,7 @@ static int au_opts_parse_idel(struct super_block *sb, aufs_bindex_t bindex,
 	root = sb->s_root;
 	aufs_read_lock(root, AuLock_FLUSH);
 	if (bindex < 0 || au_sbend(sb) < bindex) {
-		AuErr("out of bounds, %d\n", bindex);
+		pr_err("out of bounds, %d\n", bindex);
 		goto out;
 	}
 
@@ -651,14 +651,14 @@ static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[])
 	mod->path = args[0].from;
 	p = strchr(mod->path, '=');
 	if (unlikely(!p)) {
-		AuErr("no permssion %s\n", args[0].from);
+		pr_err("no permssion %s\n", args[0].from);
 		goto out;
 	}
 
 	*p++ = 0;
 	err = vfsub_kern_path(mod->path, lkup_dirflags, &path);
 	if (unlikely(err)) {
-		AuErr("lookup failed %s (%d)\n", mod->path, err);
+		pr_err("lookup failed %s (%d)\n", mod->path, err);
 		goto out;
 	}
 
@@ -682,7 +682,7 @@ static int au_opts_parse_imod(struct super_block *sb, aufs_bindex_t bindex,
 	root = sb->s_root;
 	aufs_read_lock(root, AuLock_FLUSH);
 	if (bindex < 0 || au_sbend(sb) < bindex) {
-		AuErr("out of bounds, %d\n", bindex);
+		pr_err("out of bounds, %d\n", bindex);
 		goto out;
 	}
 
@@ -712,7 +712,7 @@ static int au_opts_parse_xino(struct super_block *sb, struct au_opt_xino *xino,
 	err = -EINVAL;
 	if (unlikely(file->f_dentry->d_sb == sb)) {
 		fput(file);
-		AuErr("%s must be outside\n", args[0].from);
+		pr_err("%s must be outside\n", args[0].from);
 		goto out;
 	}
 
@@ -736,7 +736,7 @@ int au_opts_parse_xino_itrunc_path(struct super_block *sb,
 
 	err = vfsub_kern_path(args[0].from, lkup_dirflags, &path);
 	if (unlikely(err)) {
-		AuErr("lookup failed %s (%d)\n", args[0].from, err);
+		pr_err("lookup failed %s (%d)\n", args[0].from, err);
 		goto out;
 	}
 
@@ -754,7 +754,7 @@ int au_opts_parse_xino_itrunc_path(struct super_block *sb,
 	path_put(&path);
 
 	if (unlikely(xino_itrunc->bindex < 0)) {
-		AuErr("no such branch %s\n", args[0].from);
+		pr_err("no such branch %s\n", args[0].from);
 		err = -EINVAL;
 	}
 
@@ -812,7 +812,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			break;
 		case Opt_add:
 			if (unlikely(match_int(&a->args[0], &n))) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			bindex = n;
@@ -842,7 +842,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		case Opt_idel:
 			del->pathname = "(indexed)";
 			if (unlikely(match_int(&args[0], &n))) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			err = au_opts_parse_idel(sb, n, &opt->del, a->args);
@@ -859,7 +859,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		case Opt_imod:
 			u.mod->path = "(indexed)";
 			if (unlikely(match_int(&a->args[0], &n))) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			err = au_opts_parse_imod(sb, n, &opt->mod, a->args);
@@ -883,13 +883,13 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		case Opt_itrunc_xino:
 			u.xino_itrunc = &opt->xino_itrunc;
 			if (unlikely(match_int(&a->args[0], &n))) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			u.xino_itrunc->bindex = n;
 			aufs_read_lock(root, AuLock_FLUSH);
 			if (n < 0 || au_sbend(sb) < n) {
-				AuErr("out of bounds, %d\n", n);
+				pr_err("out of bounds, %d\n", n);
 				aufs_read_unlock(root, !AuLock_IR);
 				break;
 			}
@@ -915,12 +915,12 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			if (unlikely(match_int(&a->args[0], &n)
 				     || n < 0
 				     || n > KMALLOC_MAX_SIZE)) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			if (unlikely(n && n < NAME_MAX)) {
-				AuErr("rdblk must be larger than %d\n",
-				      NAME_MAX);
+				pr_err("rdblk must be larger than %d\n",
+				       NAME_MAX);
 				break;
 			}
 			opt->rdblk = n;
@@ -932,7 +932,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				     || n < 0
 				     || n * sizeof(struct hlist_head)
 				     > KMALLOC_MAX_SIZE)) {
-				AuErr("bad integer in %s\n", opt_str);
+				pr_err("bad integer in %s\n", opt_str);
 				break;
 			}
 			opt->rdhash = n;
@@ -973,7 +973,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				err = 0;
 				opt->type = token;
 			} else
-				AuErr("wrong value, %s\n", opt_str);
+				pr_err("wrong value, %s\n", opt_str);
 			break;
 
 		case Opt_wbr_create:
@@ -984,7 +984,7 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				err = 0;
 				opt->type = token;
 			} else
-				AuErr("wrong value, %s\n", opt_str);
+				pr_err("wrong value, %s\n", opt_str);
 			break;
 		case Opt_wbr_copyup:
 			opt->wbr_copyup = au_wbr_copyup_val(a->args[0].from);
@@ -992,18 +992,18 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				err = 0;
 				opt->type = token;
 			} else
-				AuErr("wrong value, %s\n", opt_str);
+				pr_err("wrong value, %s\n", opt_str);
 			break;
 
 		case Opt_ignore:
-			AuWarn("ignored %s\n", opt_str);
+			pr_warning("ignored %s\n", opt_str);
 			/*FALLTHROUGH*/
 		case Opt_ignore_silent:
 			skipped = 1;
 			err = 0;
 			break;
 		case Opt_err:
-			AuErr("unknown option %s\n", opt_str);
+			pr_err("unknown option %s\n", opt_str);
 			break;
 		}
 
@@ -1326,14 +1326,14 @@ int au_opts_verify(struct super_block *sb, unsigned long sb_flags,
 
 	if (!(sb_flags & MS_RDONLY)) {
 		if (unlikely(!au_br_writable(au_sbr_perm(sb, 0))))
-			AuWarn("first branch should be rw\n");
+			pr_warning("first branch should be rw\n");
 		if (unlikely(au_opt_test(sbinfo->si_mntflags, SHWH)))
-			AuWarn("shwh should be used with ro\n");
+			pr_warning("shwh should be used with ro\n");
 	}
 
 	if (au_opt_test((sbinfo->si_mntflags | pending), UDBA_HINOTIFY)
 	    && !au_opt_test(sbinfo->si_mntflags, XINO))
-		AuWarn("udba=inotify requires xino\n");
+		pr_warning("udba=inotify requires xino\n");
 
 	err = 0;
 	root = sb->s_root;
@@ -1449,7 +1449,7 @@ int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 	bend = au_sbend(sb);
 	if (unlikely(bend < 0)) {
 		err = -EINVAL;
-		AuErr("no branches\n");
+		pr_err("no branches\n");
 		goto out;
 	}
 
