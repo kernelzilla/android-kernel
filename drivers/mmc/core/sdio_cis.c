@@ -140,7 +140,7 @@ static int cistpl_funce_func(struct sdio_func *func,
 		return -EILSEQ;
 
 	vsn = func->card->cccr.sdio_vsn;
-	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 42;
+	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 34;
 
 	if (size < min_size || buf[0] != 1)
 		return -EINVAL;
