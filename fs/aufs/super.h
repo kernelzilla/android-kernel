@@ -175,10 +175,10 @@ static inline unsigned char au_do_ftest_si(struct au_sbinfo *sbi,
 /* ---------------------------------------------------------------------- */
 
 /* policy to select one among writable branches */
-#define AuWbrCopyup(sbinfo, args...) \
-	((sbinfo)->si_wbr_copyup_ops->copyup(args))
-#define AuWbrCreate(sbinfo, args...) \
-	((sbinfo)->si_wbr_create_ops->create(args))
+#define AuWbrCopyup(sbinfo, ...) \
+	((sbinfo)->si_wbr_copyup_ops->copyup(__VA_ARGS__))
+#define AuWbrCreate(sbinfo, ...) \
+	((sbinfo)->si_wbr_create_ops->create(__VA_ARGS__))
 
 /* flags for si_read_lock()/aufs_read_lock()/di_read_lock() */
 #define AuLock_DW		1		/* write-lock dentry */
