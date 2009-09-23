@@ -415,7 +415,7 @@ int au_do_pin(struct au_pin *p)
  out_unpin:
 	au_unpin(p);
  out_err:
-	AuErr("err %d\n", err);
+	pr_err("err %d\n", err);
 	err = au_busy_or_stale();
  out:
 	return err;

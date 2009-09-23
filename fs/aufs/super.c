@@ -448,7 +448,8 @@ static int do_refresh(struct dentry *dentry, mode_t type,
 			au_reset_hinotify(inode, dir_flags);
 	}
 	if (unlikely(err))
-		AuErr("unrecoverable error %d, %.*s\n", err, AuDLNPair(dentry));
+		pr_err("unrecoverable error %d, %.*s\n",
+		       err, AuDLNPair(dentry));
 
 	di_read_unlock(parent, AuLock_IR);
 	dput(parent);
@@ -616,14 +617,15 @@ static void au_remount_refresh(struct super_block *sb, unsigned int flags)
 	err = refresh_dir(root, sigen);
 	if (unlikely(err)) {
 		au_fset_si(sbinfo, FAILED_REFRESH_DIRS);
-		AuWarn("Refreshing directories failed, ignored (%d)\n", err);
+		pr_warning("Refreshing directories failed, ignored (%d)\n",
+			   err);
 	}
 
 	if (au_ftest_opts(flags, REFRESH_NONDIR)) {
 		err = refresh_nondir(root, sigen, !err);
 		if (unlikely(err))
-			AuWarn("Refreshing non-directories failed, ignored"
-			       "(%d)\n", err);
+			pr_warning("Refreshing non-directories failed, ignored"
+				   "(%d)\n", err);
 	}
 
 	/* aufs_write_lock() calls ..._child() */
@@ -768,7 +770,7 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data,
 
 	if (unlikely(!arg || !*arg)) {
 		err = -EINVAL;
-		AuErr("no arg\n");
+		pr_err("no arg\n");
 		goto out;
 	}
 
