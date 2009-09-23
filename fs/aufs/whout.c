@@ -157,7 +157,7 @@ struct dentry *au_whtmp_lkup(struct dentry *h_parent, struct au_branch *br,
 			goto out_name;
 		dput(dentry);
 	}
-	/* AuWarn("could not get random name\n"); */
+	/* pr_warning("could not get random name\n"); */
 	dentry = ERR_PTR(-EEXIST);
 	AuDbg("%.*s\n", AuLNPair(&qs));
 	BUG();
@@ -274,8 +274,8 @@ static void au_wh_clean(struct inode *h_dir, struct path *whpath,
 		mnt_drop_write(whpath->mnt);
 	}
 	if (unlikely(err))
-		AuWarn("failed removing %.*s (%d), ignored.\n",
-		       AuDLNPair(whpath->dentry), err);
+		pr_warning("failed removing %.*s (%d), ignored.\n",
+			   AuDLNPair(whpath->dentry), err);
 }
 
 static int test_linkable(struct dentry *h_root)
@@ -285,8 +285,8 @@ static int test_linkable(struct dentry *h_root)
 	if (h_dir->i_op->link)
 		return 0;
 
-	AuErr("%.*s (%s) doesn't support link(2), use noplink and rw+nolwh\n",
-	      AuDLNPair(h_root), au_sbtype(h_root->d_sb));
+	pr_err("%.*s (%s) doesn't support link(2), use noplink and rw+nolwh\n",
+	       AuDLNPair(h_root), au_sbtype(h_root->d_sb));
 	return -ENOSYS;
 }
 
@@ -309,7 +309,7 @@ static int au_whdir(struct inode *h_dir, struct path *path)
 	} else if (S_ISDIR(path->dentry->d_inode->i_mode))
 		err = 0;
 	else
-		AuErr("unknown %.*s exists\n", AuDLNPair(path->dentry));
+		pr_err("unknown %.*s exists\n", AuDLNPair(path->dentry));
 
 	return err;
 }
@@ -408,8 +408,8 @@ static int au_wh_init_rw(struct dentry *h_root, struct au_wbr *wbr,
 	} else if (S_ISREG(base[AuBrWh_BASE].dentry->d_inode->i_mode))
 		err = 0;
 	else
-		AuErr("unknown %.*s/%.*s exists\n",
-		      AuDLNPair(h_root), AuDLNPair(base[AuBrWh_BASE].dentry));
+		pr_err("unknown %.*s/%.*s exists\n",
+		       AuDLNPair(h_root), AuDLNPair(base[AuBrWh_BASE].dentry));
 	if (unlikely(err))
 		goto out;
 
@@ -533,8 +533,8 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	goto out; /* success */
 
  out_err:
-	AuErr("an error(%d) on the writable branch %.*s(%s)\n",
-	      err, AuDLNPair(h_root), au_sbtype(h_root->d_sb));
+	pr_err("an error(%d) on the writable branch %.*s(%s)\n",
+	       err, AuDLNPair(h_root), au_sbtype(h_root->d_sb));
  out:
 	for (i = 0; i < AuBrWh_Last; i++)
 		dput(base[i].dentry);
@@ -592,7 +592,8 @@ static void reinit_br_wh(void *arg)
 			mnt_drop_write(a->br->br_mnt);
 		}
 	} else {
-		AuWarn("%.*s is moved, ignored\n", AuDLNPair(wbr->wbr_whbase));
+		pr_warning("%.*s is moved, ignored\n",
+			   AuDLNPair(wbr->wbr_whbase));
 		err = 0;
 	}
 	dput(wbr->wbr_whbase);
@@ -980,8 +981,8 @@ int au_whtmp_rmdir(struct inode *dir, aufs_bindex_t bindex,
 		return 0; /* success */
 	}
 
-	AuWarn("failed removing %.*s(%d), ignored\n",
-	       AuDLNPair(wh_dentry), err);
+	pr_warning("failed removing %.*s(%d), ignored\n",
+		   AuDLNPair(wh_dentry), err);
 	return err;
 }
 
@@ -1045,8 +1046,8 @@ void au_whtmp_kick_rmdir(struct inode *dir, aufs_bindex_t bindex,
 	args->wh_dentry = dget(wh_dentry);
 	wkq_err = au_wkq_nowait(call_rmdir_whtmp, args, dir->i_sb);
 	if (unlikely(wkq_err)) {
-		AuWarn("rmdir error %.*s (%d), ignored\n",
-		       AuDLNPair(wh_dentry), wkq_err);
+		pr_warning("rmdir error %.*s (%d), ignored\n",
+			   AuDLNPair(wh_dentry), wkq_err);
 		au_whtmp_rmdir_free(args);
 	}
 }

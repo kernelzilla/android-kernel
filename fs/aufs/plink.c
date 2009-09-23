@@ -279,7 +279,7 @@ void au_plink_append(struct inode *inode, aufs_bindex_t bindex,
 	if (unlikely(cnt > AUFS_PLINK_WARN))
 		AuWarn1("unexpectedly many pseudo links, %d\n", cnt);
 	if (unlikely(err)) {
-		AuWarn("err %d, damaged pseudo link.\n", err);
+		pr_warning("err %d, damaged pseudo link.\n", err);
 		if (!found && plink)
 			do_put_plink(plink, /*do_del*/1);
 	}
