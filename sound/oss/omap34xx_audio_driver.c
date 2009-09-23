@@ -2140,7 +2140,7 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 
 		mutex_lock(&audio_lock);
 
-		spin_lock_irqsave(&audio_read_lock, flags);
+		mutex_lock(&audio_read_lock);
 
 		read_buf_full--;
 
