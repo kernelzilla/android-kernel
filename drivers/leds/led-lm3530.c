@@ -263,6 +263,8 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 				__func__, error);
 
 		als_data->mode = AUTOMATIC;
+		disable_irq(als_data->client->irq);
+		queue_work(als_data->working_queue, &als_data->wq);
 
 	} else {
 		als_data->mode = MANUAL;
