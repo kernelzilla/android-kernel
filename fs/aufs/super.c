@@ -380,12 +380,12 @@ static void au_fsync_br(struct super_block *sb)
 		if (bdev_read_only(h_sb->s_bdev))
 			continue;
 
-		lockdep_off();
+		/* lockdep_off(); */
 		down_write(&h_sb->s_umount);
 		shrink_dcache_sb(h_sb);
 		sync_filesystem(h_sb);
 		up_write(&h_sb->s_umount);
-		lockdep_on();
+		/* lockdep_on(); */
 	}
 }
 
