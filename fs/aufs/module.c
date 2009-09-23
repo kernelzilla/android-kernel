@@ -142,7 +142,8 @@ static int __init aufs_init(void)
 	err = register_filesystem(&aufs_fs_type);
 	if (unlikely(err))
 		goto out_cache;
-	pr_info(AUFS_NAME " " AUFS_VERSION "\n");
+	/* since we define pr_fmt, call printk directly */
+	printk(KERN_INFO AUFS_NAME " " AUFS_VERSION "\n");
 	goto out; /* success */
 
  out_cache:

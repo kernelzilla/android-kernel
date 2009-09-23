@@ -142,7 +142,8 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 	dentry = vfsub_lookup_one_len(name->name, parent, name->len);
 	if (IS_ERR(dentry)) {
 		file = (void *)dentry;
-		AuErr("%.*s lookup err %ld\n", AuLNPair(name), PTR_ERR(dentry));
+		pr_err("%.*s lookup err %ld\n",
+		       AuLNPair(name), PTR_ERR(dentry));
 		goto out;
 	}
 
@@ -150,20 +151,20 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 	err = vfs_create(dir, dentry, S_IRUGO | S_IWUGO, NULL);
 	if (unlikely(err)) {
 		file = ERR_PTR(err);
-		AuErr("%.*s create err %d\n", AuLNPair(name), err);
+		pr_err("%.*s create err %d\n", AuLNPair(name), err);
 		goto out_dput;
 	}
 
 	file = dentry_open(dget(dentry), mntget(base_file->f_vfsmnt),
 			   O_RDWR | O_CREAT | O_EXCL | O_LARGEFILE);
 	if (IS_ERR(file)) {
-		AuErr("%.*s open err %ld\n", AuLNPair(name), PTR_ERR(file));
+		pr_err("%.*s open err %ld\n", AuLNPair(name), PTR_ERR(file));
 		goto out_dput;
 	}
 
 	err = vfsub_unlink(dir, &file->f_path, /*force*/0);
 	if (unlikely(err)) {
-		AuErr("%.*s unlink err %d\n", AuLNPair(name), err);
+		pr_err("%.*s unlink err %d\n", AuLNPair(name), err);
 		goto out_fput;
 	}
 
@@ -172,7 +173,7 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 		err = au_copy_file(file, copy_src,
 				   i_size_read(copy_src->f_dentry->d_inode));
 		if (unlikely(err)) {
-			AuErr("%.*s copy err %d\n", AuLNPair(name), err);
+			pr_err("%.*s copy err %d\n", AuLNPair(name), err);
 			goto out_fput;
 		}
 	}
@@ -303,7 +304,7 @@ static void xino_do_trunc(void *_args)
 
 	ii_read_unlock(dir);
 	if (unlikely(err))
-		AuWarn("err b%d, (%d)\n", bindex, err);
+		pr_warning("err b%d, (%d)\n", bindex, err);
 	atomic_dec(&br->br_xino_running);
 	atomic_dec(&br->br_count);
 	au_nwt_done(&au_sbi(sb)->si_nowait);
@@ -337,7 +338,7 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 	if (!wkq_err)
 		return; /* success */
 
-	AuErr("wkq %d\n", wkq_err);
+	pr_err("wkq %d\n", wkq_err);
 	atomic_dec_return(&br->br_count);
 
  out_args:
@@ -625,7 +626,7 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 			       S_IRUGO | S_IWUGO);
 	if (IS_ERR(file)) {
 		if (!silent)
-			AuErr("open %s(%ld)\n", fname, PTR_ERR(file));
+			pr_err("open %s(%ld)\n", fname, PTR_ERR(file));
 		return file;
 	}
 
@@ -639,7 +640,7 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 	dput(h_parent);
 	if (unlikely(err)) {
 		if (!silent)
-			AuErr("unlink %s(%d)\n", fname, err);
+			pr_err("unlink %s(%d)\n", fname, err);
 		goto out;
 	}
 
@@ -647,13 +648,13 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 	d = file->f_dentry;
 	if (unlikely(sb == d->d_sb)) {
 		if (!silent)
-			AuErr("%s must be outside\n", fname);
+			pr_err("%s must be outside\n", fname);
 		goto out;
 	}
 	if (unlikely(au_test_fs_bad_xino(d->d_sb))) {
 		if (!silent)
-			AuErr("xino doesn't support %s(%s)\n",
-			      fname, au_sbtype(d->d_sb));
+			pr_err("xino doesn't support %s(%s)\n",
+			       fname, au_sbtype(d->d_sb));
 		goto out;
 	}
 	return file; /* success */
@@ -1164,8 +1165,8 @@ struct file *au_xino_def(struct super_block *sb)
 			goto out;
 		h_sb = file->f_dentry->d_sb;
 		if (unlikely(au_test_fs_bad_xino(h_sb))) {
-			AuErr("xino doesn't support %s(%s)\n",
-			      AUFS_XINO_DEFPATH, au_sbtype(h_sb));
+			pr_err("xino doesn't support %s(%s)\n",
+			       AUFS_XINO_DEFPATH, au_sbtype(h_sb));
 			fput(file);
 			file = ERR_PTR(-EINVAL);
 		}
