@@ -64,9 +64,6 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 	IMG_UINT32				ui32RefCount;
 
 
-	IMG_BOOL				bPendingFree;
-
-
 	#if defined(ANDROID)
 	#if !defined(USE_CODE)
 	

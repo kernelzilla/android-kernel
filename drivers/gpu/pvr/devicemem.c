@@ -1009,25 +1009,7 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 
 	
 	psMapData->psSrcMemInfo->ui32RefCount--;
-
-	if (psMapData->psSrcMemInfo->ui32RefCount == 1 &&
-		psMapData->psSrcMemInfo->bPendingFree == IMG_TRUE)
-	{
-		if (psMapData->psSrcMemInfo->sMemBlk.hResItem != IMG_NULL)
-		{
-			eError = ResManFreeResByPtr(psMapData->psSrcMemInfo->sMemBlk.hResItem);
-			if (eError != PVRSRV_OK)
-			{
-				PVR_DPF((PVR_DBG_ERROR,"UnmapDeviceMemoryCallBack: Failed to free SRC meminfo"));
-				PVR_DBG_BREAK;
-			}
-		}
-		else
-		{
-			eError = FreeDeviceMemCallBack(psMapData->psSrcMemInfo, 0);
-		}
-	}
-
+	
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(RESMAN_MAP_DEVICE_MEM_DATA), psMapData, IMG_NULL);
 	
 	
