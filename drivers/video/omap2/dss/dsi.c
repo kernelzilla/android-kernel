@@ -257,6 +257,13 @@ static struct
 #endif
 	int debug_read;
 	int debug_write;
+
+	struct {
+		struct work_struct work;
+		struct omap_dss_device *dssdev;
+		bool enabled;
+		bool recovering;
+	} error_recovery;
 } dsi;
 
 #ifdef DEBUG
@@ -519,6 +526,12 @@ static void print_irq_status_cio(u32 status)
 
 static int debug_irq;
 
+static void schedule_error_recovery(void)
+{
+	if (dsi.error_recovery.enabled && !dsi.error_recovery.recovering)
+		schedule_work(&dsi.error_recovery.work);
+}
+
 /* called from dss */
 void dsi_irq_handler(void)
 {
@@ -533,6 +546,10 @@ void dsi_irq_handler(void)
 		spin_lock(&dsi.errors_lock);
 		dsi.errors |= irqstatus & DSI_IRQ_ERROR_MASK;
 		spin_unlock(&dsi.errors_lock);
+		if (irqstatus & DSI_IRQ_TA_TIMEOUT)
+		{
+			schedule_error_recovery();
+		}
 	} else if (debug_irq) {
 		print_irq_status(irqstatus);
 	}
@@ -549,6 +566,11 @@ void dsi_irq_handler(void)
 		if (vcstatus & DSI_VC_IRQ_ERROR_MASK) {
 			DSSERR("DSI VC(%d) error, vc irqstatus %x\n",
 				       i, vcstatus);
+			if (vcstatus & DSI_VC_IRQ_BTA)
+			{
+				schedule_error_recovery();
+			}
+
 			print_irq_status_vc(i, vcstatus);
 		} else if (debug_irq) {
 			print_irq_status_vc(i, vcstatus);
@@ -1801,6 +1823,7 @@ static u16 dsi_vc_flush_receive_data(int channel)
 		if (dt == DSI_DT_RX_ACK_WITH_ERR) {
 			u16 err = FLD_GET(val, 23, 8);
 			dsi_show_rx_ack_with_err(err);
+			schedule_error_recovery();
 		} else if (dt == DSI_DT_RX_SHORT_READ_1) {
 			DSSDBG("\tDCS short response, 1 byte: %#x\n",
 					FLD_GET(val, 23, 8));
@@ -1835,6 +1858,7 @@ static int dsi_vc_send_bta(int channel)
 	while (REG_GET(DSI_VC_CTRL(channel), 6, 6) == 1) {
 		if (time_after(jiffies, tmo)) {
 			DSSERR("Failed to send BTA\n");
+			schedule_error_recovery();
 			return -EIO;
 		}
 	}
@@ -3094,6 +3118,7 @@ static int dsi_display_enable(struct omap_dss_device *dssdev)
 
 	enable_clocks(0);
 	dsi_enable_pll_clock(0);
+	dsi.error_recovery.enabled = true;
 
 	dsi_bus_unlock();
 	mutex_unlock(&dsi.lock);
@@ -3120,6 +3145,8 @@ static void dsi_display_disable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&dsi.lock);
 	dsi_bus_lock();
+
+	dsi.error_recovery.enabled = false;
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
 			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
@@ -3150,6 +3177,8 @@ static int dsi_display_suspend(struct omap_dss_device *dssdev)
 
 	mutex_lock(&dsi.lock);
 	dsi_bus_lock();
+
+	dsi.error_recovery.enabled = false;
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
 			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
@@ -3216,6 +3245,7 @@ static int dsi_display_resume(struct omap_dss_device *dssdev)
 
 	enable_clocks(0);
 	dsi_enable_pll_clock(0);
+	dsi.error_recovery.enabled = true;
 
 	dsi_bus_unlock();
 	mutex_unlock(&dsi.lock);
@@ -3539,7 +3569,50 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	dsi.vc[0].dssdev = dssdev;
 	dsi.vc[1].dssdev = dssdev;
 
+	dsi.error_recovery.dssdev = dssdev;
+
 	return 0;
+}
+
+static void dsi_error_recovery_worker(struct work_struct *work)
+{
+	u32 r;
+	DSSERR("DSI error, ESD detected\n");
+
+	mutex_lock(&dsi.lock);
+
+	if (!dsi.error_recovery.enabled)
+               goto end;
+
+	dsi_bus_lock();
+
+	dsi.error_recovery.recovering = true;
+
+	dsi_force_tx_stop_mode_io();
+
+	r = dsi_read_reg(DSI_TIMING1);
+	r = FLD_MOD(r, 0, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
+	dsi_write_reg(DSI_TIMING1, r);
+
+	dsi_vc_enable(0, 0);
+	dsi_vc_enable(1, 0);
+	dsi_if_enable(0);
+
+	dsi_vc_enable(0, 1);
+	dsi_vc_enable(1, 1);
+	dsi_if_enable(1);
+
+	dsi_force_tx_stop_mode_io();
+
+	dsi.error_recovery.recovering = false;
+
+	if (dsi.update_mode == OMAP_DSS_UPDATE_AUTO)
+		dsi_start_auto_update(dsi.error_recovery.dssdev);
+
+	dsi_bus_unlock();
+
+end:
+	mutex_unlock(&dsi.lock);
 }
 
 int dsi_init(struct platform_device *pdev)
@@ -3564,6 +3637,11 @@ int dsi_init(struct platform_device *pdev)
 
 	mutex_init(&dsi.lock);
 	mutex_init(&dsi.bus_lock);
+
+	dsi.error_recovery.dssdev = 0;
+	dsi.error_recovery.enabled = false;
+	dsi.error_recovery.recovering = false;
+	INIT_WORK(&dsi.error_recovery.work, dsi_error_recovery_worker);
 
 	dsi.update_mode = OMAP_DSS_UPDATE_DISABLED;
 	dsi.user_update_mode = OMAP_DSS_UPDATE_DISABLED;
