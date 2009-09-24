@@ -52,7 +52,7 @@
 
 /* This is the number of total kernel buffers */
 #define AUDIO_NBFRAGS_WRITE 2
-#define AUDIO_NBFRAGS_READ 10
+#define AUDIO_NBFRAGS_READ 15
 
 #define AUDIO_TIMEOUT HZ
 
@@ -395,6 +395,10 @@ static void omap2_mcbsp_set_recv_param(unsigned int id,
 		mcbsp_cfg->pcr0 = mcbsp_cfg->pcr0 | CLKRP;
 	if (rp->fs_polarity == OMAP_MCBSP_FS_ACTIVE_LOW)
 		mcbsp_cfg->pcr0 = mcbsp_cfg->pcr0 | FSRP;
+
+#ifdef CONFIG_USE_MCBSP_FIFO
+	mcbsp_cfg->wken = mcbsp_cfg->wken | RRDYEN;
+#endif
 	return;
 }
 
