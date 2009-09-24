@@ -173,7 +173,12 @@ int nandmtd2_ReadChunkWithTagsFromNAND(yaffs_Device *dev, int chunkInNAND,
 	if (localData)
 		yaffs_ReleaseTempBuffer(dev, data, __LINE__);
 
-	if (tags && retval == -EBADMSG && tags->eccResult == YAFFS_ECC_RESULT_NO_ERROR) {
+	if (tags->eccResult == YAFFS_ECC_RESULT_FIXED)
+		dev->tagsEccFixed++;
+	if (tags->eccResult == YAFFS_ECC_RESULT_UNFIXED)
+		dev->tagsEccUnfixed++;
+
+	if (tags && retval == -EBADMSG && tags->eccResult != YAFFS_ECC_RESULT_UNFIXED) {
 		tags->eccResult = YAFFS_ECC_RESULT_UNFIXED;
 		dev->eccUnfixed++;
 	}
