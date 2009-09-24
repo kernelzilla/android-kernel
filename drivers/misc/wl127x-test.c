@@ -25,6 +25,7 @@
 #include <linux/platform_device.h>
 #include <linux/wl127x-test.h>
 #include <net/bluetooth/bluetooth.h>
+#include <mach/resource.h>
 
 static int wl127x_btwake_gpio;
 static int wl127x_hostwake_gpio;
@@ -83,11 +84,15 @@ static int wl127x_test_probe(struct platform_device *pdev)
 		return -1;
 	}
 
+	resource_request("mpu_latency", &pdev->dev, 150+260-1);
+
 	return 0;
 }
 
 static int wl127x_test_remove(struct platform_device *pdev)
 {
+	resource_release("mpu_latency", &pdev->dev);
+
 	class_remove_file(bt_class, &class_attr_btwake);
 	class_remove_file(bt_class, &class_attr_hostwake);
 
