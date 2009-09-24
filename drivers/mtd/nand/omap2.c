@@ -608,7 +608,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 	/* Enable RD PIN Monitoring Reg */
 	if (pdata->dev_ready) {
 		val  = gpmc_cs_read_reg(info->gpmc_cs, GPMC_CS_CONFIG1);
-		val |= WR_RD_PIN_MONITORING;
+		val &= ~WR_RD_PIN_MONITORING;
 		gpmc_cs_write_reg(info->gpmc_cs, GPMC_CS_CONFIG1, val);
 	}
 

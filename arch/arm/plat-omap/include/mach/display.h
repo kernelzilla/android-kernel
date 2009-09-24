@@ -228,6 +228,10 @@ struct omap_video_timings {
 	u16 x_res;
 	/* Unit: pixels */
 	u16 y_res;
+	/* width of display in mm */
+	u16 w;
+	/* hieght of display in mm */
+	u16 h;
 	/* Unit: KHz */
 	u32 pixel_clock;
 	/* Unit: pixel clocks */
@@ -435,6 +439,8 @@ struct omap_dss_device {
 
 	void (*get_resolution)(struct omap_dss_device *dssdev,
 			u16 *xres, u16 *yres);
+	void (*get_size)(struct omap_dss_device *dssdev,
+			u16 *w, u16 *h);
 	int (*get_recommended_bpp)(struct omap_dss_device *dssdev);
 
 	int (*check_timings)(struct omap_dss_device *dssdev,

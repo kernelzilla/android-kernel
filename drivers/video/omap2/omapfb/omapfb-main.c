@@ -567,8 +567,6 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 			var->xres, var->yres,
 			var->xres_virtual, var->yres_virtual);
 
-	var->height             = -1;
-	var->width              = -1;
 	var->grayscale          = 0;
 
 	if (display && display->get_timings) {
@@ -1667,6 +1665,10 @@ int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	if (display) {
 		u16 w, h;
 		int rotation = (var->rotate + ofbi->rotation[0]) % 4;
+
+		display->get_size(display, &w, &h);
+		var->width = w;
+		var->height = h;
 
 		display->get_resolution(display, &w, &h);
 
