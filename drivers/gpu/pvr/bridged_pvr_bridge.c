@@ -3112,6 +3112,8 @@ PVRSRVModifyCompleteSyncOpsBW(IMG_UINT32							ui32BridgeID,
 		return 0;
 	}
 
+	psKernelSyncInfo->hResItem = IMG_NULL;
+
 	return 0;
 }
 
