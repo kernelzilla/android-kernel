@@ -284,6 +284,11 @@ static int program_opp(int res, struct omap_opp *opp, int target_level,
 	t_opp = ID_VDD(res) | ID_OPP_NO(opp[target_level].opp_id);
 	c_opp = ID_VDD(res) | ID_OPP_NO(opp[current_level].opp_id);
 #endif
+
+	/* Sanity check of the OPP params before attempting to set */
+	if (!opp[target_level].rate || !opp[target_level].vsel)
+		return -EINVAL;
+
 	if (target_level > current_level)
 		raise = 1;
 	else
