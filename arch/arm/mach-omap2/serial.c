@@ -406,7 +406,11 @@ void omap_uart_prepare_idle(int num)
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (num == uart->num && uart->can_sleep) {
-			int fne = omap_uart_fifos_not_empty(uart);
+			int fne = 0;
+
+			omap_uart_enable_rtspullup(uart);
+
+			fne = omap_uart_fifos_not_empty(uart);
 
 			if (fne) {
 				if (num == 0) {
@@ -416,14 +420,16 @@ void omap_uart_prepare_idle(int num)
 						rxfifo_idleblks++;
 				}
 				_omap_uart_block_sleep(uart);
+				omap_uart_disable_rtspullup(uart);
 				return;
 			}
 
 #ifdef CONFIG_SERIAL_OMAP
-			if (are_driveromap_uarts_active(num))
+			if (are_driveromap_uarts_active(num)) {
+				omap_uart_disable_rtspullup(uart);
 				return;
+			}
 #endif
-			omap_uart_enable_rtspullup(uart);
 			omap_uart_disable_clocks(uart);
 			return;
 		}
