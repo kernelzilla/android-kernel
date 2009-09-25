@@ -507,6 +507,7 @@ acc_check:
 
 	return -EPERM;
 }
+EXPORT_SYMBOL(devcgroup_inode_permission);
 
 int devcgroup_inode_mknod(int mode, dev_t dev)
 {

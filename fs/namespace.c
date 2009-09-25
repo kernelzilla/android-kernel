@@ -37,6 +37,7 @@
 
 /* spinlock for vfsmount related operations, inplace of dcache_lock */
 __cacheline_aligned_in_smp DEFINE_SPINLOCK(vfsmount_lock);
+EXPORT_SYMBOL(vfsmount_lock);
 
 static int event;
 static DEFINE_IDA(mnt_id_ida);

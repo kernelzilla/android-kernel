@@ -231,6 +231,7 @@ source "fs/qnx4/Kconfig"
 source "fs/romfs/Kconfig"
 source "fs/sysv/Kconfig"
 source "fs/ufs/Kconfig"
+source "fs/aufs/Kconfig"
 
 endif # MISC_FILESYSTEMS
 
