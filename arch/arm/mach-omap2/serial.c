@@ -426,6 +426,7 @@ void omap_uart_prepare_idle(int num)
 
 #ifdef CONFIG_SERIAL_OMAP
 			if (are_driveromap_uarts_active(num)) {
+				_omap_uart_block_sleep(uart);
 				omap_uart_disable_rtspullup(uart);
 				return;
 			}
