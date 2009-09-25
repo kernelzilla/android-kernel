@@ -1314,8 +1314,8 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 		}
 
 #ifdef CONFIG_PVR_OMAP_DSS2
-		/* pvr drivers require double buffered fb */
-		size = w * h * bytespp * 2 + 8192;
+		/* pvr drivers require multi-buffered fb */
+		size = (w * h * bytespp + PAGE_SIZE) * 3;
 #else
 		size = w * h * bytespp;
 #endif
