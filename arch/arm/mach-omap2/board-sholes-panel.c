@@ -27,8 +27,6 @@ struct regulator *display_regulator;
 
 static int sholes_panel_enable(struct omap_dss_device *dssdev)
 {
-	int ret;
-
 	if (!display_regulator) {
 		display_regulator = regulator_get(NULL, "vhvio");
 		if (IS_ERR(display_regulator)) {
@@ -54,8 +52,6 @@ static int sholes_panel_enable(struct omap_dss_device *dssdev)
 
 static void sholes_panel_disable(struct omap_dss_device *dssdev)
 {
-	int ret;
-
 	gpio_direction_output(SHOLES_DISPLAY_RESET_GPIO, 1);
 	gpio_set_value(SHOLES_DISPLAY_RESET_GPIO, 0);
 	msleep(1);
