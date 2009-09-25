@@ -277,6 +277,9 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 			return -1;
 		}
 
+		lm3530_write_reg(als_data, LM3530_ALS_RESISTOR_SELECT,
+			0x00);
+
 		error = lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE,
 			     0x00);
 		if (error != 0)
