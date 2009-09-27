@@ -845,7 +845,7 @@ extern void omap_uart_block_sleep(int num);
 static struct wake_lock baseband_wakeup_wakelock;
 static int sholes_bpwake_irqhandler(int irq, void *unused)
 {
-	omap_uart_block_sleep(1);
+	omap_uart_block_sleep(0);
 	/*
 	 * uart_block_sleep keeps uart clock active for 500 ms,
 	 * prevent suspend for 1 sec to be safe
