@@ -62,6 +62,16 @@ config AUFS_EXPORT
 	option. There are several requirements for this configuration.
 	See detail in aufs.5.
 
+config AUFS_INO_T_64
+	bool
+	depends on AUFS_EXPORT
+	depends on 64BIT && !(ALPHA || S390)
+	default y
+	help
+	Automatic configuration for internal use.
+	/* typedef unsigned long/int __kernel_ino_t */
+	/* alpha and s390x are int */
+
 config AUFS_RDU
 	bool "Readdir in userspace"
 	help
@@ -91,6 +101,14 @@ config AUFS_BR_RAMFS
 	Unless you are going to use ramfs as an aufs branch fs without
 	switch_root or something, leave it N.
 
+config AUFS_BDEV_LOOP
+	bool
+	depends on BLK_DEV_LOOP
+	default y
+	help
+	Automatic configuration for internal use.
+	Convert =[ym] into =y.
+
 config AUFS_DEBUG
 	bool "Debug aufs"
 	help
@@ -104,22 +122,4 @@ config AUFS_MAGIC_SYSRQ
 	help
 	Automatic configuration for internal use.
 	When aufs supports Magic SysRq, enabled automatically.
-
-config AUFS_BDEV_LOOP
-	bool
-	depends on BLK_DEV_LOOP
-	default y
-	help
-	Automatic configuration for internal use.
-	Convert =[ym] into =y.
-
-config AUFS_INO_T_64
-	bool
-	depends on AUFS_EXPORT
-	depends on 64BIT && !(ALPHA || S390)
-	default y
-	help
-	Automatic configuration for internal use.
-	/* typedef unsigned long/int __kernel_ino_t */
-	/* alpha and s390x are int */
 endif
