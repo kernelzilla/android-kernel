@@ -498,7 +498,8 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 	if (unlikely(err))
 		goto out;
 
-	vm_ops = vma->vm_ops;
+	/* oops, it became 'const' */
+	vm_ops = (struct vm_operations_struct *)vma->vm_ops;
 	err = do_munmap(current->mm, vma->vm_start,
 			vma->vm_end - vma->vm_start);
 	if (unlikely(err)) {
