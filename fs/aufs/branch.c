@@ -788,7 +788,7 @@ static void au_warn_ima(void)
 {
 #ifdef CONFIG_IMA
 	/* since it doesn't support mark_files_ro() */
-	AuWarn("RW -> RO makes IMA to produce wrong message");
+	pr_warning("RW -> RO makes IMA to produce wrong message");
 #endif
 }
 
