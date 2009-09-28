@@ -17,10 +17,6 @@ ifdef CONFIG_OCFS2_FS_O2CB
 ccflags-y += -DDLMFS_MAGIC=0x76a9f425
 endif
 
-# defined in ${srctree}/fs/ramfs/inode.c
-# always true
-ccflags-y += -DRAMFS_MAGIC=0x858458f6
-
 # defined in ${srctree}/fs/cifs/cifsfs.c
 # tristate
 ifdef CONFIG_CIFS_FS
