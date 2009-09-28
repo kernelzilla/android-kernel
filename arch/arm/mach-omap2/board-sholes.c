@@ -865,7 +865,7 @@ static int sholes_bpwake_probe(struct platform_device *pdev)
 
 	rc = request_irq(gpio_to_irq(SHOLES_APWAKE_TRIGGER_GPIO),
 			 sholes_bpwake_irqhandler,
-			 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			 IRQF_TRIGGER_FALLING,
 			 "Remote Wakeup", NULL);
 	if (rc) {
 		wake_lock_destroy(&baseband_wakeup_wakelock);
