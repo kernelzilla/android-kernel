@@ -10,7 +10,7 @@
 
 int					nr_counters;
 
-struct perf_counter_attr		attrs[MAX_COUNTERS];
+struct perf_event_attr		attrs[MAX_COUNTERS];
 
 struct event_symbol {
 	u8		type;
@@ -48,13 +48,13 @@ static struct event_symbol event_symbols[] = {
   { CSW(CPU_MIGRATIONS),	"cpu-migrations",	"migrations"	},
 };
 
-#define __PERF_COUNTER_FIELD(config, name) \
-	((config & PERF_COUNTER_##name##_MASK) >> PERF_COUNTER_##name##_SHIFT)
+#define __PERF_EVENT_FIELD(config, name) \
+	((config & PERF_EVENT_##name##_MASK) >> PERF_EVENT_##name##_SHIFT)
 
-#define PERF_COUNTER_RAW(config)	__PERF_COUNTER_FIELD(config, RAW)
-#define PERF_COUNTER_CONFIG(config)	__PERF_COUNTER_FIELD(config, CONFIG)
-#define PERF_COUNTER_TYPE(config)	__PERF_COUNTER_FIELD(config, TYPE)
-#define PERF_COUNTER_ID(config)		__PERF_COUNTER_FIELD(config, EVENT)
+#define PERF_EVENT_RAW(config)	__PERF_EVENT_FIELD(config, RAW)
+#define PERF_EVENT_CONFIG(config)	__PERF_EVENT_FIELD(config, CONFIG)
+#define PERF_EVENT_TYPE(config)	__PERF_EVENT_FIELD(config, TYPE)
+#define PERF_EVENT_ID(config)		__PERF_EVENT_FIELD(config, EVENT)
 
 static const char *hw_event_names[] = {
 	"cycles",
@@ -165,33 +165,31 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 	DIR *sys_dir, *evt_dir;
 	struct dirent *sys_next, *evt_next, sys_dirent, evt_dirent;
 	char id_buf[4];
-	int sys_dir_fd, fd;
+	int fd;
 	u64 id;
 	char evt_path[MAXPATHLEN];
+	char dir_path[MAXPATHLEN];
 
 	if (valid_debugfs_mount(debugfs_path))
 		return NULL;
 
 	sys_dir = opendir(debugfs_path);
 	if (!sys_dir)
-		goto cleanup;
-	sys_dir_fd = dirfd(sys_dir);
+		return NULL;
 
 	for_each_subsystem(sys_dir, sys_dirent, sys_next) {
-		int dfd = openat(sys_dir_fd, sys_dirent.d_name,
-				 O_RDONLY|O_DIRECTORY), evt_dir_fd;
-		if (dfd == -1)
+
+		snprintf(dir_path, MAXPATHLEN, "%s/%s", debugfs_path,
+			 sys_dirent.d_name);
+		evt_dir = opendir(dir_path);
+		if (!evt_dir)
 			continue;
-		evt_dir = fdopendir(dfd);
-		if (!evt_dir) {
-			close(dfd);
-			continue;
-		}
-		evt_dir_fd = dirfd(evt_dir);
+
 		for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next) {
-			snprintf(evt_path, MAXPATHLEN, "%s/id",
+
+			snprintf(evt_path, MAXPATHLEN, "%s/%s/id", dir_path,
 				 evt_dirent.d_name);
-			fd = openat(evt_dir_fd, evt_path, O_RDONLY);
+			fd = open(evt_path, O_RDONLY);
 			if (fd < 0)
 				continue;
 			if (read(fd, id_buf, sizeof(id_buf)) < 0) {
@@ -225,7 +223,6 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 		closedir(evt_dir);
 	}
 
-cleanup:
 	closedir(sys_dir);
 	return NULL;
 }
@@ -352,7 +349,7 @@ static int parse_aliases(const char **str, const char *names[][MAX_ALIASES], int
 }
 
 static enum event_result
-parse_generic_hw_event(const char **str, struct perf_counter_attr *attr)
+parse_generic_hw_event(const char **str, struct perf_event_attr *attr)
 {
 	const char *s = *str;
 	int cache_type = -1, cache_op = -1, cache_result = -1;
@@ -417,7 +414,7 @@ parse_single_tracepoint_event(char *sys_name,
 			      const char *evt_name,
 			      unsigned int evt_length,
 			      char *flags,
-			      struct perf_counter_attr *attr,
+			      struct perf_event_attr *attr,
 			      const char **strp)
 {
 	char evt_path[MAXPATHLEN];
@@ -505,7 +502,7 @@ parse_subsystem_tracepoint_event(char *sys_name, char *flags)
 
 
 static enum event_result parse_tracepoint_event(const char **strp,
-				    struct perf_counter_attr *attr)
+				    struct perf_event_attr *attr)
 {
 	const char *evt_name;
 	char *flags;
@@ -563,7 +560,7 @@ static int check_events(const char *str, unsigned int i)
 }
 
 static enum event_result
-parse_symbolic_event(const char **strp, struct perf_counter_attr *attr)
+parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
 {
 	const char *str = *strp;
 	unsigned int i;
@@ -582,7 +579,7 @@ parse_symbolic_event(const char **strp, struct perf_counter_attr *attr)
 }
 
 static enum event_result
-parse_raw_event(const char **strp, struct perf_counter_attr *attr)
+parse_raw_event(const char **strp, struct perf_event_attr *attr)
 {
 	const char *str = *strp;
 	u64 config;
@@ -601,7 +598,7 @@ parse_raw_event(const char **strp, struct perf_counter_attr *attr)
 }
 
 static enum event_result
-parse_numeric_event(const char **strp, struct perf_counter_attr *attr)
+parse_numeric_event(const char **strp, struct perf_event_attr *attr)
 {
 	const char *str = *strp;
 	char *endp;
@@ -623,7 +620,7 @@ parse_numeric_event(const char **strp, struct perf_counter_attr *attr)
 }
 
 static enum event_result
-parse_event_modifier(const char **strp, struct perf_counter_attr *attr)
+parse_event_modifier(const char **strp, struct perf_event_attr *attr)
 {
 	const char *str = *strp;
 	int eu = 1, ek = 1, eh = 1;
@@ -656,7 +653,7 @@ parse_event_modifier(const char **strp, struct perf_counter_attr *attr)
  * Symbolic names are (almost) exactly matched.
  */
 static enum event_result
-parse_event_symbols(const char **str, struct perf_counter_attr *attr)
+parse_event_symbols(const char **str, struct perf_event_attr *attr)
 {
 	enum event_result ret;
 
@@ -711,7 +708,7 @@ static void store_event_type(const char *orgname)
 
 int parse_events(const struct option *opt __used, const char *str, int unset __used)
 {
-	struct perf_counter_attr attr;
+	struct perf_event_attr attr;
 	enum event_result ret;
 
 	if (strchr(str, ':'))
@@ -761,28 +758,24 @@ static void print_tracepoint_events(void)
 {
 	DIR *sys_dir, *evt_dir;
 	struct dirent *sys_next, *evt_next, sys_dirent, evt_dirent;
-	int sys_dir_fd;
 	char evt_path[MAXPATHLEN];
+	char dir_path[MAXPATHLEN];
 
 	if (valid_debugfs_mount(debugfs_path))
 		return;
 
 	sys_dir = opendir(debugfs_path);
 	if (!sys_dir)
-		goto cleanup;
-	sys_dir_fd = dirfd(sys_dir);
+		return;
 
 	for_each_subsystem(sys_dir, sys_dirent, sys_next) {
-		int dfd = openat(sys_dir_fd, sys_dirent.d_name,
-				 O_RDONLY|O_DIRECTORY), evt_dir_fd;
-		if (dfd == -1)
+
+		snprintf(dir_path, MAXPATHLEN, "%s/%s", debugfs_path,
+			 sys_dirent.d_name);
+		evt_dir = opendir(dir_path);
+		if (!evt_dir)
 			continue;
-		evt_dir = fdopendir(dfd);
-		if (!evt_dir) {
-			close(dfd);
-			continue;
-		}
-		evt_dir_fd = dirfd(evt_dir);
+
 		for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next) {
 			snprintf(evt_path, MAXPATHLEN, "%s:%s",
 				 sys_dirent.d_name, evt_dirent.d_name);
@@ -791,8 +784,6 @@ static void print_tracepoint_events(void)
 		}
 		closedir(evt_dir);
 	}
-
-cleanup:
 	closedir(sys_dir);
 }
 
