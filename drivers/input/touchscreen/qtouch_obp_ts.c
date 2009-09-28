@@ -594,7 +594,7 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	}
 
 	for (i = 0; i < ts->pdata->multi_touch_cfg.num_touch; i++) {
-		if (ts->finger_data[finger].down == 0)
+		if (ts->finger_data[i].down == 0)
 			continue;
 		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
 				 ts->finger_data[i].z_data);
