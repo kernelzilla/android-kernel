@@ -900,10 +900,14 @@ static PVRSRV_ERROR AllocHandle(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE *phHandle
 	psNewHandle->ui32Index = ui32NewIndex;
 
 	InitParentList(psBase, psNewHandle);
+#if defined(DEBUG)
 	PVR_ASSERT(NoChildren(psBase, psNewHandle));
+#endif
 
 	InitChildEntry(psBase, psNewHandle);
+#if defined(DEBUG)
 	PVR_ASSERT(NoParent(psBase, psNewHandle));
+#endif
 
 	if (HANDLES_BATCHED(psBase))
 	{
