@@ -21,6 +21,11 @@ config SGX_RELEASE_LOGGING
        ---help---
           Includes error logging in release build
 
+config SGX_EDM_TRACING
+       bool "EDM Status Tracing"
+       ---help---
+         Enable EDM status trace dumping on HW Recovery
+
 config PVR_OMAPLFB
 	tristate "PowerVR OMAP buffer class"
 	depends on SGX

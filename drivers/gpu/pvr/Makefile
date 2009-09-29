@@ -34,6 +34,7 @@ ccflags-y = -DLINUX -D__linux__ -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap3430 \
 
 ccflags-$(CONFIG_PVR_APM) += -DSUPPORT_ACTIVE_POWER_MANAGEMENT
 
+ccflags-$(CONFIG_SGX_EDM_TRACING) += -DPVRSRV_USSE_EDM_STATUS_DEBUG -DPVRSRV_DUMP_MK_TRACE
 
 ccflags-$(CONFIG_SGX_BUILD_RELEASE) += \
 	-DPVR_BUILD_TYPE="\"release\""  -DRELEASE
