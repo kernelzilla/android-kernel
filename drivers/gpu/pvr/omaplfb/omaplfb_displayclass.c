@@ -704,6 +704,7 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": Couldn't disable framebuffer event notification\n");
 	}
 
+	OMAPLFBFlip(psSwapChain, (unsigned long)psDevInfo->sFBInfo.sSysAddr.uiAddr);
 	cancel_work_sync(&psDevInfo->active_work);
 	INIT_LIST_HEAD(&psDevInfo->active_list);
 
@@ -714,10 +715,6 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	
 	FlushInternalVSyncQueue(psSwapChain);
 
-	
-	OMAPLFBFlip(psSwapChain, (unsigned long)psDevInfo->sFBInfo.sSysAddr.uiAddr);
-
-	
 	psDevInfo->psSwapChain = NULL;
 
 	spin_unlock_irqrestore(&psDevInfo->sSwapChainLock, ulLockFlags);
