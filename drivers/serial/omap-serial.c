@@ -877,7 +877,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	if (up->use_dma)
 		fcr[up->pdev->id - 1] = UART_FCR_ENABLE_FIFO | 0x1 << 6 | 0x1 << 4 | UART_FCR_DMA_SELECT;
 	else
-		fcr[up->pdev->id - 1] = UART_FCR_ENABLE_FIFO | 0x1 << 6 | 0x1 << 4;
+		fcr[up->pdev->id - 1] = UART_FCR_ENABLE_FIFO;
 
 	/*
 	 * Ok, we're now changing the port state.  Do it with
