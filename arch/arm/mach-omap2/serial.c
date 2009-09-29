@@ -530,7 +530,7 @@ static void omap_uart_rtspad_init(struct omap_uart_state *uart)
 		uart->rts_padconf = 0x17e;
 		break;
 	case 1:
-/*		uart->rts_padconf = 0x176; */
+		uart->rts_padconf = 0x176;
 		break;
 	case 2:
 /*		uart->rts_padconf = 0x19c; */
