@@ -44,7 +44,7 @@ static void omap_flashqsc_disable_uhh_smart_idle()
 
 static int moto_flashqsc_attach(struct usb_serial *serial)
 {
-	struct usb_serial_port *port = port = serial->port[0];
+	struct usb_serial_port *port = serial->port[0];
 
 	if (port->bulk_out_size >= MOTO_FLASHQSC_BULKOUT_SIZE) {
 		dev_info(&serial->dev->dev,
