@@ -559,16 +559,17 @@ PVRSRVFreeDeviceMemBW(IMG_UINT32 ui32BridgeID,
 
 	
 	psKernelMemInfo = (PVRSRV_KERNEL_MEM_INFO*)pvKernelMemInfo;
-	if (psKernelMemInfo->ui32RefCount != 1)
+	if (psKernelMemInfo->ui32RefCount == 1)
+	{
+		psRetOUT->eError =
+			PVRSRVFreeDeviceMemKM(hDevCookieInt, pvKernelMemInfo);
+	}
+	else
 	{
 		PVR_DPF((PVR_DBG_WARNING, "PVRSRVFreeDeviceMemBW: mappings are open in other processes, deferring free!"));
 		psKernelMemInfo->bPendingFree = IMG_TRUE;
 		psRetOUT->eError = PVRSRV_OK;
-		return 0;
 	}
-
-	psRetOUT->eError =
-		PVRSRVFreeDeviceMemKM(hDevCookieInt, pvKernelMemInfo);
 
 	if(psRetOUT->eError != PVRSRV_OK)
 	{
