@@ -37,10 +37,6 @@
 #define EXTRA_OBJECT_TYPE_SHIFT (28)
 #define EXTRA_OBJECT_TYPE_MASK  ((0x0F) << EXTRA_OBJECT_TYPE_SHIFT)
 
-#ifndef CONFIG_YAFFS_DOES_ECC
-#define YAFFS_IGNORE_TAGS_ECC 1
-#endif
-
 static void yaffs_DumpPackedTags2TagsPart(const yaffs_PackedTags2TagsPart *ptt)
 {
 	T(YAFFS_TRACE_MTD,
@@ -99,17 +95,16 @@ void yaffs_PackTags2TagsPart(yaffs_PackedTags2TagsPart *ptt,
 }
 
 
-void yaffs_PackTags2(yaffs_PackedTags2 *pt, const yaffs_ExtendedTags *t)
+void yaffs_PackTags2(yaffs_Device *dev, yaffs_PackedTags2 *pt,
+		const yaffs_ExtendedTags *t)
 {
 	yaffs_PackTags2TagsPart(&pt->t, t);
 
-#ifndef YAFFS_IGNORE_TAGS_ECC
-	{
+	if (dev->doesTagsEcc) {
 		yaffs_ECCCalculateOther((unsigned char *)&pt->t,
 					sizeof(yaffs_PackedTags2TagsPart),
 					&pt->ecc);
 	}
-#endif
 }
 
 
@@ -161,15 +156,14 @@ void yaffs_UnpackTags2TagsPart(yaffs_ExtendedTags *t,
 }
 
 
-void yaffs_UnpackTags2(yaffs_ExtendedTags *t, yaffs_PackedTags2 *pt)
+void yaffs_UnpackTags2(yaffs_Device *dev, yaffs_ExtendedTags *t, yaffs_PackedTags2 *pt)
 {
 
 	yaffs_ECCResult eccResult = YAFFS_ECC_RESULT_NO_ERROR;
 
 	if (pt->t.sequenceNumber != 0xFFFFFFFF) {
 		/* Page is in use */
-#ifndef YAFFS_IGNORE_TAGS_ECC
-		{
+		if (dev->doesTagsEcc) {
 			yaffs_ECCOther ecc;
 			int result;
 			yaffs_ECCCalculateOther((unsigned char *)&pt->t,
@@ -195,7 +189,6 @@ void yaffs_UnpackTags2(yaffs_ExtendedTags *t, yaffs_PackedTags2 *pt)
 				eccResult = YAFFS_ECC_RESULT_UNKNOWN;
 			}
 		}
-#endif
 	}
 
 	yaffs_UnpackTags2TagsPart(t, &pt->t);

@@ -163,7 +163,6 @@ static struct inode *yaffs_iget(struct super_block *sb, unsigned long ino);
 #define yaffs_SuperToDevice(sb)	((yaffs_Device *)sb->u.generic_sbp)
 #endif
 
-
 #define update_dir_time(dir) do {\
 			(dir)->i_ctime = (dir)->i_mtime = CURRENT_TIME; \
 		} while(0)
@@ -1796,6 +1795,8 @@ typedef struct {
 	int skip_checkpoint_read;
 	int skip_checkpoint_write;
 	int no_cache;
+	int tags_ecc_on;
+	int tags_ecc_off;
 } yaffs_options;
 
 #define MAX_OPT_LEN 20
@@ -1810,6 +1811,9 @@ static int yaffs_parse_options(yaffs_options *options, const char *options_str)
 	while (options_str && *options_str && !error) {
 		memset(cur_opt, 0, MAX_OPT_LEN + 1);
 		p = 0;
+
+		if (*options_str == ',')
+			options_str++;
 
 		while (*options_str && *options_str != ',') {
 			if (p < MAX_OPT_LEN) {
@@ -1830,6 +1834,10 @@ static int yaffs_parse_options(yaffs_options *options, const char *options_str)
 		else if (!strcmp(cur_opt, "no-checkpoint")) {
 			options->skip_checkpoint_read = 1;
 			options->skip_checkpoint_write = 1;
+		} else if (!strcmp(cur_opt, "tags-ecc-on")) {
+			options->tags_ecc_on = 1;
+		} else if (!strcmp(cur_opt, "tags-ecc-off")) {
+			options->tags_ecc_off = 1;
 		} else {
 			printk(KERN_INFO "yaffs: Bad mount option \"%s\"\n",
 					cur_opt);
@@ -2036,6 +2044,11 @@ static struct super_block *yaffs_internal_read_super(int yaffsVersion,
 	dev->nReservedBlocks = 5;
 	dev->nShortOpCaches = (options.no_cache) ? 0 : 10;
 	dev->inbandTags = options.inband_tags;
+#ifdef CONFIG_YAFFS_DOES_TAGS_ECC
+	dev->doesTagsEcc = !options.tags_ecc_off;
+#else
+	dev->doesTagsEcc = options.tags_ecc_on;
+#endif
 
 	/* ... and the functions. */
 	if (yaffsVersion == 2) {
@@ -2275,6 +2288,7 @@ static char *yaffs_dump_dev(char *buf, yaffs_Device * dev)
 	buf += sprintf(buf, "useNANDECC......... %d\n", dev->useNANDECC);
 	buf += sprintf(buf, "isYaffs2........... %d\n", dev->isYaffs2);
 	buf += sprintf(buf, "inbandTags......... %d\n", dev->inbandTags);
+	buf += sprintf(buf, "doesTagsEcc........ %d\n", dev->doesTagsEcc);
 
 	return buf;
 }

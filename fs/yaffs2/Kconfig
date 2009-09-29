@@ -58,6 +58,16 @@ config YAFFS_DOES_ECC
 
 	  If unsure, say N.
 
+config YAFFS_DOES_TAGS_ECC
+	bool "Lets Yaffs do its own ECC on tags"
+	depends on YAFFS_FS && YAFFS_YAFFS2
+	default n
+	help
+	  This enables Yaffs to use its own ECC functions on tags instead of
+	  relying on the mtd to do ECC on the tags bytes.
+
+	  If unsure, say Y.
+
 config YAFFS_ECC_WRONG_ORDER
 	bool "Use the same ecc byte order as Steven Hill's nand_ecc.c"
 	depends on YAFFS_FS && YAFFS_DOES_ECC && !YAFFS_9BYTE_TAGS

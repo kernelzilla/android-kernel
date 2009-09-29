@@ -42,10 +42,12 @@ int nandmtd2_WriteChunkWithTagsToNAND(yaffs_Device *dev, int chunkInNAND,
 	size_t dummy;
 #endif
 	int retval = 0;
+	int packed_tags_size;
 
 	loff_t addr;
 
 	yaffs_PackedTags2 pt;
+	packed_tags_size = dev->doesTagsEcc ? sizeof(pt) : sizeof(pt.t);
 
 	T(YAFFS_TRACE_MTD,
 	  (TSTR
@@ -65,11 +67,11 @@ int nandmtd2_WriteChunkWithTagsToNAND(yaffs_Device *dev, int chunkInNAND,
 		pt2tp = (yaffs_PackedTags2TagsPart *)(data + dev->nDataBytesPerChunk);
 		yaffs_PackTags2TagsPart(pt2tp, tags);
 	} else
-		yaffs_PackTags2(&pt, tags);
+		yaffs_PackTags2(dev, &pt, tags);
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 17))
 	ops.mode = MTD_OOB_AUTO;
-	ops.ooblen = (dev->inbandTags) ? 0 : sizeof(pt);
+	ops.ooblen = (dev->inbandTags) ? 0 : packed_tags_size;
 	ops.len = dev->totalBytesPerChunk;
 	ops.ooboffs = 0;
 	ops.datbuf = (__u8 *)data;
@@ -104,10 +106,13 @@ int nandmtd2_ReadChunkWithTagsFromNAND(yaffs_Device *dev, int chunkInNAND,
 	size_t dummy;
 	int retval = 0;
 	int localData = 0;
+	int packed_tags_size;
 
 	loff_t addr = ((loff_t) chunkInNAND) * dev->totalBytesPerChunk;
 
 	yaffs_PackedTags2 pt;
+
+	packed_tags_size = dev->doesTagsEcc ? sizeof(pt) : sizeof(pt.t);
 
 	T(YAFFS_TRACE_MTD,
 	  (TSTR
@@ -131,8 +136,8 @@ int nandmtd2_ReadChunkWithTagsFromNAND(yaffs_Device *dev, int chunkInNAND,
 				&dummy, data);
 	else if (tags) {
 		ops.mode = MTD_OOB_AUTO;
-		ops.ooblen = sizeof(pt);
-		ops.len = data ? dev->nDataBytesPerChunk : sizeof(pt);
+		ops.ooblen = packed_tags_size;
+		ops.len = data ? dev->nDataBytesPerChunk : packed_tags_size;
 		ops.ooboffs = 0;
 		ops.datbuf = data;
 		ops.oobbuf = dev->spareBuffer;
@@ -166,7 +171,7 @@ int nandmtd2_ReadChunkWithTagsFromNAND(yaffs_Device *dev, int chunkInNAND,
 	} else {
 		if (tags) {
 			memcpy(&pt, dev->spareBuffer, sizeof(pt));
-			yaffs_UnpackTags2(tags, &pt);
+			yaffs_UnpackTags2(dev, tags, &pt);
 		}
 	}
 
