@@ -27,14 +27,12 @@
 #include <linux/gpio.h>
 #include <linux/uaccess.h>
 #include <linux/delay.h>
+#include <linux/earlysuspend.h>
 #include <linux/input.h>
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
 #include <linux/akm8973_akmd.h>
 
-#ifdef CONFIG_ANDROID_POWER
-#include <linux/android_power.h>
-#endif
 
 #define DEBUG 0
 #define MAX_FAILURE_COUNT 10
@@ -48,8 +46,8 @@ static struct i2c_client *this_client;
 struct akm8973_data {
 	struct akm8973_platform_data *pdata;
 	struct input_dev *input_dev;
-#ifdef CONFIG_ANDROID_POWER
-	android_early_suspend_t early_suspend;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
 #endif
 };
 
@@ -66,7 +64,7 @@ static atomic_t mv_flag;
 
 static short akmd_delay;
 
-#ifdef CONFIG_ANDROID_POWER
+#ifdef CONFIG_HAS_EARLYSUSPEND
 static atomic_t suspend_flag = ATOMIC_INIT(0);
 #endif
 
@@ -621,8 +619,8 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	return 0;
 }
 
-#ifdef CONFIG_ANDROID_POWER
-static void akm8973_early_suspend(android_early_suspend_t *handler)
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void akm8973_early_suspend(struct early_suspend *handler)
 {
 #if DEBUG
 	pr_info("%s\n", __func__);
@@ -636,7 +634,7 @@ static void akm8973_early_suspend(android_early_suspend_t *handler)
 	wake_up(&open_wq);
 }
 
-static void akm8973_early_resume(android_early_suspend_t *handler)
+static void akm8973_late_resume(struct early_suspend *handler)
 {
 #if DEBUG
 	pr_info("%s\n", __func__);
@@ -778,10 +776,11 @@ int akm8973_probe(struct i2c_client *client, const struct i2c_device_id *devid)
 
 	err = device_create_file(&client->dev, &dev_attr_ms1);
 
-#ifdef CONFIG_ANDROID_POWER
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	akm->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	akm->early_suspend.suspend = akm8973_early_suspend;
-	akm->early_suspend.resume = akm8973_early_resume;
-	android_register_early_suspend(&akm->early_suspend);
+	akm->early_suspend.resume = akm8973_late_resume;
+	register_early_suspend(&akm->early_suspend);
 #endif
 	return 0;
 
