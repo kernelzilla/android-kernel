@@ -183,7 +183,7 @@ static match_table_t brperms = {
 	{AuBrPerm_RO, NULL}
 };
 
-static int br_perm_val(char *perm)
+static int noinline_for_stack br_perm_val(char *perm)
 {
 	int val;
 	substring_t args[MAX_OPT_ARGS];
@@ -208,7 +208,7 @@ static match_table_t udbalevel = {
 	{-1, NULL}
 };
 
-static int udba_val(char *str)
+static int noinline_for_stack udba_val(char *str)
 {
 	substring_t args[MAX_OPT_ARGS];
 
@@ -245,7 +245,8 @@ static match_table_t au_wbr_create_policy = {
  * gave up calling memparse() since it uses simple_strtoull() instead of
  * strict_...().
  */
-static int au_match_ull(substring_t *s, unsigned long long *result)
+static int noinline_for_stack
+au_match_ull(substring_t *s, unsigned long long *result)
 {
 	int err;
 	unsigned int len;
@@ -294,7 +295,8 @@ static int au_wbr_mfs_sec(substring_t *arg, char *str,
 	return err;
 }
 
-static int au_wbr_create_val(char *str, struct au_opt_wbr_create *create)
+static int noinline_for_stack
+au_wbr_create_val(char *str, struct au_opt_wbr_create *create)
 {
 	int err, e;
 	substring_t args[MAX_OPT_ARGS];
@@ -346,7 +348,7 @@ static match_table_t au_wbr_copyup_policy = {
 	{-1, NULL}
 };
 
-static int au_wbr_copyup_val(char *str)
+static int noinline_for_stack au_wbr_copyup_val(char *str)
 {
 	substring_t args[MAX_OPT_ARGS];
 
@@ -641,7 +643,8 @@ static int au_opts_parse_idel(struct super_block *sb, aufs_bindex_t bindex,
 }
 #endif
 
-static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[])
+static int noinline_for_stack
+au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[])
 {
 	int err;
 	struct path path;
@@ -724,10 +727,10 @@ static int au_opts_parse_xino(struct super_block *sb, struct au_opt_xino *xino,
 	return err;
 }
 
-static
-int au_opts_parse_xino_itrunc_path(struct super_block *sb,
-				   struct au_opt_xino_itrunc *xino_itrunc,
-				   substring_t args[])
+static int noinline_for_stack
+au_opts_parse_xino_itrunc_path(struct super_block *sb,
+			       struct au_opt_xino_itrunc *xino_itrunc,
+			       substring_t args[])
 {
 	int err;
 	aufs_bindex_t bend, bindex;
