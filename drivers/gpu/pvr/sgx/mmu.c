@@ -127,7 +127,47 @@ struct _MMU_HEAP_
 	DEV_ARENA_DESCRIPTOR *psDevArena;
 };
 
+#if defined(EXTRA_DEBUG)
 
+static IMG_VOID dumpPT(MMU_PT_INFO *psPTInfoList)
+{
+	IMG_UINT32 *p = (IMG_UINT32*) psPTInfoList->PTPageCpuVAddr;
+	IMG_UINT32 i;
+
+	for(i = 0; i < 1024; i++)
+	{
+		printk("%.8lx ", p[i]);
+		if((i % 10) == 9)
+			printk("\n");
+	}
+
+	printk("\n");
+}
+
+static IMG_VOID checkPT(MMU_PT_INFO *psPTInfoList, const char *file, int line)
+{
+	IMG_UINT32 *p = (IMG_UINT32*) psPTInfoList->PTPageCpuVAddr;
+	IMG_UINT32 i, count = 0;
+
+	for(i = 0; i < 1024; i++)
+		if(p[i] & 0x1)
+			count++;
+
+	if(psPTInfoList->ui32ValidPTECount != count)
+	{
+		printk("%s:%d: ui32ValidPTECount: %lu count: %lu\n",
+			   file, line, psPTInfoList->ui32ValidPTECount, count);
+		dumpPT(psPTInfoList);
+		BUG();
+	}
+}
+
+#else /* defined(EXTRA_DEBUG) */
+
+static inline IMG_VOID dumpPT(MMU_PT_INFO *psPTInfoList) { }
+static inline IMG_VOID checkPT(MMU_PT_INFO *psPTInfoList, const char *file, int line) { }
+
+#endif /* defined(EXTRA_DEBUG) */
 
 #if defined (SUPPORT_SGX_MMU_DUMMY_PAGE)
 #define DUMMY_DATA_PAGE_SIGNATURE	0xDEADBEEF
@@ -363,6 +403,7 @@ _FreePageTableMemory (MMU_HEAP *pMMUHeap, MMU_PT_INFO *psPTInfoList)
 }
 
 
+static IMG_BOOL bReallyFree = IMG_FALSE;
 
 static IMG_VOID
 _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
@@ -381,11 +422,17 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 	
 	ppsPTInfoList = &pMMUHeap->psMMUContext->apsPTInfoList[ui32PDIndex];
 
+#if defined(EXTRA_DEBUG)
 	{
-		
+		if(ppsPTInfoList[ui32PTIndex] && ppsPTInfoList[ui32PTIndex]->ui32ValidPTECount > 0)
+		{
+			PVR_DPF((PVR_DBG_ERROR, "ppsPTInfoList[ui32PTIndex]->ui32ValidPTECount was %lu", ppsPTInfoList[ui32PTIndex]->ui32ValidPTECount));
+			dumpPT(ppsPTInfoList[ui32PTIndex]);
+		}
+
 		PVR_ASSERT(ppsPTInfoList[ui32PTIndex] == IMG_NULL || ppsPTInfoList[ui32PTIndex]->ui32ValidPTECount == 0);
 	}
-
+#endif
 	
 	PDUMPCOMMENT("Free page table (page count == %08X)", pMMUHeap->ui32PageTableCount);
 	if(ppsPTInfoList[ui32PTIndex] && ppsPTInfoList[ui32PTIndex]->PTPageCpuVAddr)
@@ -414,8 +461,8 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 											| SGX_MMU_PDE_PAGE_SIZE_4K
 											| SGX_MMU_PDE_VALID;
 #else
-				
-				pui32PDEntry[ui32PTIndex] = 0;
+				if(bReallyFree)			
+					pui32PDEntry[ui32PTIndex] = 0;
 #endif
 
 				
@@ -440,8 +487,8 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 										| SGX_MMU_PDE_PAGE_SIZE_4K
 										| SGX_MMU_PDE_VALID;
 #else
-			
-			pui32PDEntry[ui32PTIndex] = 0;
+			if(bReallyFree)
+				pui32PDEntry[ui32PTIndex] = 0;
 #endif
 
 			
@@ -473,9 +520,8 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 			}
 
 			
-
-			_FreePageTableMemory(pMMUHeap, ppsPTInfoList[ui32PTIndex]);
-			
+			if(bReallyFree)
+				_FreePageTableMemory(pMMUHeap, ppsPTInfoList[ui32PTIndex]);
 
 
 			pMMUHeap->ui32PTETotal -= i;
@@ -486,12 +532,14 @@ _DeferredFreePageTable (MMU_HEAP *pMMUHeap, IMG_UINT32 ui32PTIndex)
 			pMMUHeap->ui32PTETotal -= pMMUHeap->ui32PTECount;
 		}
 
-		
-		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
-					sizeof(MMU_PT_INFO),
-					ppsPTInfoList[ui32PTIndex],
-					IMG_NULL);
-		ppsPTInfoList[ui32PTIndex] = IMG_NULL;
+		if(bReallyFree)
+		{
+			OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
+						sizeof(MMU_PT_INFO),
+						ppsPTInfoList[ui32PTIndex],
+						IMG_NULL);
+			ppsPTInfoList[ui32PTIndex] = IMG_NULL;
+		}
 	}
 	else
 	{
@@ -509,7 +557,9 @@ _DeferredFreePageTables (MMU_HEAP *pMMUHeap)
 
 	for(i=0; i<pMMUHeap->ui32PageTableCount; i++)
 	{
+		bReallyFree = IMG_TRUE;
 		_DeferredFreePageTable(pMMUHeap, i);
+		bReallyFree = IMG_FALSE;
 	}
 	MMU_InvalidateDirectoryCache(pMMUHeap->psMMUContext->psDevInfo);
 }
@@ -1223,7 +1273,8 @@ MMU_UnmapPagesAndFreePTs (MMU_HEAP *psMMUHeap,
 				continue;
 			}
 
-			
+			checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
+
 			if (pui32Tmp[ui32PTIndex] & SGX_MMU_PTE_VALID)
 			{
 				ppsPTInfoList[0]->ui32ValidPTECount--;
@@ -1244,6 +1295,7 @@ MMU_UnmapPagesAndFreePTs (MMU_HEAP *psMMUHeap,
 			
 			pui32Tmp[ui32PTIndex] = 0;
 #endif
+			checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
 		}
 
 		
@@ -1703,6 +1755,7 @@ MMU_MapPage (MMU_HEAP *pMMUHeap,
 
 	
 	ppsPTInfoList = &pMMUHeap->psMMUContext->apsPTInfoList[ui32Index];
+	checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
 
 	
 	ui32Index = (DevVAddr.uiAddr & pMMUHeap->ui32PTMask) >> pMMUHeap->ui32PTShift;
@@ -1733,6 +1786,8 @@ MMU_MapPage (MMU_HEAP *pMMUHeap,
 						& ((~pMMUHeap->ui32DataPageMask)>>SGX_MMU_PTE_ADDR_ALIGNSHIFT))
 						| SGX_MMU_PTE_VALID
 						| ui32MMUFlags;
+
+	checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
 }
 
 
@@ -1991,7 +2046,8 @@ MMU_UnmapPages (MMU_HEAP *psMMUHeap,
 		
 		pui32Tmp = (IMG_UINT32*)ppsPTInfoList[0]->PTPageCpuVAddr;
 
-		
+		checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
+
 		if (pui32Tmp[ui32PTIndex] & SGX_MMU_PTE_VALID)
 		{
 			ppsPTInfoList[0]->ui32ValidPTECount--;
@@ -2019,7 +2075,8 @@ MMU_UnmapPages (MMU_HEAP *psMMUHeap,
 		pui32Tmp[ui32PTIndex] = 0;
 #endif
 
-		
+		checkPT(ppsPTInfoList[0], __FILE__, __LINE__);
+
 		sTmpDevVAddr.uiAddr += uPageSize;
 	}
 
