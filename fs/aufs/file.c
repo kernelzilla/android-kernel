@@ -551,18 +551,37 @@ static ssize_t aufs_direct_IO(int rw, struct kiocb *iocb,
 			      const struct iovec *iov, loff_t offset,
 			      unsigned long nr_segs)
 { AuUnsupport(); return 0; }
+static int aufs_get_xip_mem(struct address_space *mapping, pgoff_t pgoff,
+			    int create, void **kmem, unsigned long *pfn)
+{ AuUnsupport(); return 0; }
+static int aufs_migratepage(struct address_space *mapping, struct page *newpage,
+			    struct page *page)
+{ AuUnsupport(); return 0; }
+static int aufs_launder_page(struct page *page)
+{ AuUnsupport(); return 0; }
+static int aufs_is_partially_uptodate(struct page *page,
+				      read_descriptor_t *desc,
+				      unsigned long from)
+{ AuUnsupport(); return 0; }
 #endif /* CONFIG_AUFS_DEBUG */
 
 struct address_space_operations aufs_aop = {
-	.readpage	= aufs_readpage,
+	.readpage		= aufs_readpage,
 #ifdef CONFIG_AUFS_DEBUG
-	.writepage	= aufs_writepage,
-	.sync_page	= aufs_sync_page,
-	.set_page_dirty	= aufs_set_page_dirty,
-	.write_begin	= aufs_write_begin,
-	.write_end	= aufs_write_end,
-	.invalidatepage	= aufs_invalidatepage,
-	.releasepage	= aufs_releasepage,
-	.direct_IO	= aufs_direct_IO,
+	.writepage		= aufs_writepage,
+	.sync_page		= aufs_sync_page,
+	/* no writepages, because of writepage */
+	.set_page_dirty		= aufs_set_page_dirty,
+	/* no readpages, because of readpage */
+	.write_begin		= aufs_write_begin,
+	.write_end		= aufs_write_end,
+	/* no bmap, no block device */
+	.invalidatepage		= aufs_invalidatepage,
+	.releasepage		= aufs_releasepage,
+	.direct_IO		= aufs_direct_IO,	/* todo */
+	.get_xip_mem		= aufs_get_xip_mem,	/* todo */
+	.migratepage		= aufs_migratepage,
+	.launder_page		= aufs_launder_page,
+	.is_partially_uptodate	= aufs_is_partially_uptodate
 #endif /* CONFIG_AUFS_DEBUG */
 };
