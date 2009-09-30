@@ -441,8 +441,10 @@ void hp3a_update_stats_pipe_done(void)
  **/
 void hp3a_schedule_task(void)
 {
-	/* Schedule delayed task. */
-	schedule_work(&g_hp3a_work_queue);
+	if (likely(g_tc.v4l2_streaming == 1)) {
+		/* Schedule delayed task. */
+		schedule_work(&g_hp3a_work_queue);
+	}
 }
 
 /**
