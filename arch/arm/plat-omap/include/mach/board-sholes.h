@@ -38,6 +38,7 @@ extern void sholes_panel_init(void);
 extern void sholes_sensors_init(void);
 extern void sholes_hsmmc_init(void);
 extern void sholes_camera_init(void);
+extern void sholes_mmcprobe_init(void);
 
 #if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
 extern struct mt9p012_platform_data sholes_mt9p012_platform_data;

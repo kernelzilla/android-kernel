@@ -102,6 +102,8 @@
 #define FACTORY_PRODUCT_ID		0x41D4
 #define FACTORY_ADB_PRODUCT_ID		0x41D4
 
+#define SHOLES_MMCPROBE_ENABLED 0
+
 static char device_serial[MAX_USB_SERIAL_NUM];
 
 static struct omap_opp sholes_mpu_rate_table[] = {
@@ -1275,7 +1277,11 @@ static void __init sholes_init(void)
 	config_wlan_gpio();
 	omap_hdq_init();
 	sholes_bt_init();
+#if SHOLES_MMCPROBE_ENABLED
+	sholes_mmcprobe_init();
+#else
 	sholes_hsmmc_init();
+#endif
 	sholes_vout_init();
 	sholes_sgx_init();
 	sholes_power_off_init();
