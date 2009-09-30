@@ -1793,6 +1793,7 @@ PVRSRV_ERROR OSRemoveTimer (IMG_HANDLE hTimer)
 PVRSRV_ERROR OSEnableTimer (IMG_HANDLE hTimer)
 {
     TIMER_CALLBACK_DATA *psTimerCBData = GetTimerStructure(hTimer);
+    int ret;
 
     PVR_ASSERT(psTimerCBData->bInUse);
     PVR_ASSERT(!psTimerCBData->bActive);
@@ -1801,7 +1802,9 @@ PVRSRV_ERROR OSEnableTimer (IMG_HANDLE hTimer)
     psTimerCBData->bActive = IMG_TRUE;
 
     
-    add_timer(&psTimerCBData->sTimer);
+    ret = mod_timer(&psTimerCBData->sTimer, psTimerCBData->ui32Delay + jiffies);
+    if (ret == 1)
+        PVR_DPF((PVR_DBG_WARNING, "OSEnableTimer: enabling active timer"));
     
     return PVRSRV_OK;
 }
@@ -1818,8 +1821,8 @@ PVRSRV_ERROR OSDisableTimer (IMG_HANDLE hTimer)
     psTimerCBData->bActive = IMG_FALSE;
 
     
-    del_timer_sync(&psTimerCBData->sTimer);	
     cancel_work_sync(&psTimerCBData->work);
+    del_timer_sync(&psTimerCBData->sTimer);	
     
     return PVRSRV_OK;
 }
