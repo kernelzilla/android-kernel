@@ -51,6 +51,7 @@
 #include <linux/delay.h>
 #include <mach/control.h>
 #include <mach/hdq.h>
+#include <mach/system.h>
 #include <linux/usb/android.h>
 #include <linux/wakelock.h>
 
@@ -1231,6 +1232,32 @@ static void sholes_pm_power_off(void)
 	local_irq_enable();
 }
 
+static void sholes_pm_reset(void)
+{
+	arch_reset('h');
+}
+
+static int cpcap_charger_connected_probe(struct platform_device *pdev)
+{
+	pm_power_off = sholes_pm_reset;
+	return 0;
+}
+
+static int cpcap_charger_connected_remove(struct platform_device *pdev)
+{
+	pm_power_off = sholes_pm_power_off;
+	return 0;
+}
+
+static struct platform_driver cpcap_charger_connected_driver = {
+	.probe		= cpcap_charger_connected_probe,
+	.remove		= cpcap_charger_connected_remove,
+	.driver		= {
+		.name	= "cpcap_charger_connected",
+		.owner	= THIS_MODULE,
+	},
+};
+
 static void __init sholes_power_off_init(void)
 {
 	gpio_request(SHOLES_POWER_OFF_GPIO, "sholes power off");
@@ -1241,6 +1268,8 @@ static void __init sholes_power_off_init(void)
 	 * glitch at reboot */
 	omap_writew(0x1F, 0x480021D2);
 	pm_power_off = sholes_pm_power_off;
+
+	platform_driver_register(&cpcap_charger_connected_driver);
 }
 
 static void __init sholes_init(void)
