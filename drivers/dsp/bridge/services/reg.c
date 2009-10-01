@@ -48,6 +48,7 @@
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/csl.h>
 #include <dspbridge/mem.h>
+#include <dspbridge/sync.h>
 
 /*  ----------------------------------- Others */
 #include <dspbridge/dbreg.h>
@@ -59,6 +60,10 @@
 #if GT_TRACE
 struct GT_Mask REG_debugMask = { NULL, NULL };	/* GT trace var. */
 #endif
+
+struct SYNC_CSOBJECT *reglock;		/* For critical sections */
+
+static unsigned int crefs;		/* module counter */
 
 /*
  *  ======== REG_DeleteValue ========
@@ -76,12 +81,14 @@ DSP_STATUS REG_DeleteValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_DeleteValue: entered\n");
 
+	SYNC_EnterCS(reglock);
 	/*  Note that we don't use phKey */
 	if (regsupDeleteValue(pstrSubkey, pstrValue) == DSP_SOK)
 		status = DSP_SOK;
 	else
 		status = DSP_EFAIL;
 
+	SYNC_LeaveCS(reglock);
 	return status;
 }
 
@@ -106,8 +113,10 @@ DSP_STATUS REG_EnumValue(IN HANDLE *phKey, IN u32 dwIndex,
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_EnumValue: entered\n");
 
+	SYNC_EnterCS(reglock);
 	status = regsupEnumValue(dwIndex, pstrKey, pstrValue, pdwValueSize,
 				 pstrData, pdwDataSize);
+	SYNC_LeaveCS(reglock);
 
 	return status;
 }
@@ -119,6 +128,11 @@ DSP_STATUS REG_EnumValue(IN HANDLE *phKey, IN u32 dwIndex,
 void REG_Exit(void)
 {
 	GT_0trace(REG_debugMask, GT_5CLASS, "REG_Exit\n");
+
+	if (reglock)
+		SYNC_DeleteCS(reglock);
+
+	crefs--;
 
 	regsupExit();
 }
@@ -140,6 +154,7 @@ DSP_STATUS REG_GetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_GetValue: entered\n");
 
+	SYNC_EnterCS(reglock);
 	/*  We need to use regsup calls...  */
 	/*  ...for now we don't need the key handle or  */
 	/*  the subkey, all we need is the value to lookup.  */
@@ -148,6 +163,7 @@ DSP_STATUS REG_GetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 	else
 		status = DSP_EFAIL;
 
+	SYNC_LeaveCS(reglock);
 	return status;
 }
 
@@ -162,6 +178,10 @@ bool REG_Init(void)
 	GT_create(&REG_debugMask, "RG");	/* RG for ReG */
 
 	fInit = regsupInit();
+
+	if (crefs == 0)
+		SYNC_InitializeCS(&reglock);
+	crefs++;
 
 	GT_0trace(REG_debugMask, GT_5CLASS, "REG_Init\n");
 
@@ -183,6 +203,7 @@ DSP_STATUS REG_SetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 	DBC_Require(dwDataSize > 0);
        DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
+	SYNC_EnterCS(reglock);
 	/*  We need to use regsup calls...  */
 	/*  ...for now we don't need the key handle or  */
 	/*  the subkey, all we need is the value to lookup.  */
@@ -191,6 +212,7 @@ DSP_STATUS REG_SetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
 	else
 		status = DSP_EFAIL;
 
+	SYNC_LeaveCS(reglock);
 	return status;
 }
 
