@@ -271,6 +271,7 @@ error:
 int cpcap_irq_init(struct cpcap_device *cpcap)
 {
 	int retval;
+	int irq_pending;
 	struct spi_device *spi = cpcap->spi;
 	struct cpcap_irqdata *data;
 	struct dentry *debug_dir;
@@ -284,6 +285,8 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	mutex_init(&data->lock);
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
 	data->cpcap = cpcap;
+
+	irq_pending = gpio_get_value(irq_to_gpio(spi->irq));
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |
 				IRQF_TRIGGER_RISING, "cpcap-irq", data);
@@ -306,6 +309,12 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 			   &data->registered);
 	debugfs_create_u64("enabled", S_IRUGO, debug_dir,
 			   &data->enabled);
+
+	/* Force the IRQ handler to run in case an interrupt is already
+	 * pending.
+	 */
+	if (irq_pending != 0)
+		event_isr(spi->irq, data);
 
 	return 0;
 
