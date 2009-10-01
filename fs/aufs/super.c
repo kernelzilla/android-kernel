@@ -706,7 +706,7 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 	return err;
 }
 
-static struct super_operations aufs_sop = {
+static const struct super_operations aufs_sop = {
 	.alloc_inode	= aufs_alloc_inode,
 	.destroy_inode	= aufs_destroy_inode,
 	.drop_inode	= generic_delete_inode,
