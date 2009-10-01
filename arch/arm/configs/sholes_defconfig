@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Tue Sep 29 09:48:57 2009
+# Thu Oct  1 00:57:01 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1678,6 +1678,7 @@ CONFIG_YAFFS_FS=y
 CONFIG_YAFFS_YAFFS1=y
 # CONFIG_YAFFS_9BYTE_TAGS is not set
 # CONFIG_YAFFS_DOES_ECC is not set
+CONFIG_YAFFS_DOES_TAGS_ECC=y
 CONFIG_YAFFS_YAFFS2=y
 CONFIG_YAFFS_AUTO_YAFFS2=y
 # CONFIG_YAFFS_DISABLE_LAZY_LOAD is not set
