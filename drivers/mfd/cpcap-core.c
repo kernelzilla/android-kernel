@@ -27,7 +27,7 @@
 #include <linux/uaccess.h>
 #include <linux/reboot.h>
 #include <linux/notifier.h>
-
+#include <linux/delay.h>
 
 static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg);
@@ -263,6 +263,14 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 			"Clear Power Cut bit failure.\n");
 		result = NOTIFY_BAD;
 	}
+
+	/* Clear the charger and charge path settings to avoid a false turn on
+	 * event in caused by CPCAP. After clearing these settings, 100ms is
+	 * needed to before SYSRSTRTB is pulled low to avoid the false turn on
+	 * event.
+	 */
+	cpcap_regacc_write(misc_cpcap, CPCAP_REG_CRM, 0, 0x3FFF);
+	mdelay(100);
 
 	return result;
 }
