@@ -563,6 +563,9 @@ static int aufs_is_partially_uptodate(struct page *page,
 				      read_descriptor_t *desc,
 				      unsigned long from)
 { AuUnsupport(); return 0; }
+static int aufs_error_remove_page(struct address_space *mapping,
+				  struct page *page)
+{ AuUnsupport(); return 0; }
 #endif /* CONFIG_AUFS_DEBUG */
 
 struct address_space_operations aufs_aop = {
@@ -582,6 +585,7 @@ struct address_space_operations aufs_aop = {
 	.get_xip_mem		= aufs_get_xip_mem,	/* todo */
 	.migratepage		= aufs_migratepage,
 	.launder_page		= aufs_launder_page,
-	.is_partially_uptodate	= aufs_is_partially_uptodate
+	.is_partially_uptodate	= aufs_is_partially_uptodate,
+	.error_remove_page	= aufs_error_remove_page
 #endif /* CONFIG_AUFS_DEBUG */
 };
