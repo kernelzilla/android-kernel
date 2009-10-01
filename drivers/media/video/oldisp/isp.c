@@ -1535,6 +1535,28 @@ void isp_sgdma_init()
 EXPORT_SYMBOL(isp_stop);
 
 /**
+ * isp_sgdma_cancel - Cancels queued buffers.
+ **/
+void isp_sgdma_cancel()
+{
+	int sg;
+	unsigned long flags;
+	struct videobuf_buffer *vb;
+
+	spin_lock_irqsave(&ispsg.lock, flags);
+	for (sg = 0; sg < NUM_SG_DMA; sg++) {
+		if (ispsg.sg_state[sg].arg) {
+			vb = ispsg.sg_state[sg].arg;
+			vb->state = VIDEOBUF_ERROR;
+			wake_up_all(&vb->done);
+			ispsg.sg_state[sg].arg = NULL;
+		}
+	}
+	spin_unlock_irqrestore(&ispsg.lock, flags);
+}
+EXPORT_SYMBOL(isp_sgdma_cancel);
+
+/**
  * isp_vbq_sync - Walks the pages table and flushes the cache for
  *                each page.
  **/

@@ -254,6 +254,8 @@ void isp_stop(void);
 
 void isp_sgdma_init(void);
 
+void isp_sgdma_cancel(void);
+
 void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2);
 
 void isp_sgdma_process(struct isp_sgdma *sgdma, int irq, int *dma_notify,

@@ -806,6 +806,8 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	if (vdev->streaming == file)
 		isp_stop();
 
+	isp_sgdma_cancel();
+
 	rval = videobuf_streamoff(q);
 	if (!rval)
 		vdev->streaming = NULL;
@@ -1037,10 +1039,6 @@ static int vidioc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 		return -EINVAL;
 
 	mutex_lock(&vdev->mutex);
-	if (vdev->streaming) {
-		rval = -EBUSY;
-		goto out;
-	}
 
 	vdev->want_timeperframe = a->parm.capture.timeperframe;
 
@@ -1049,7 +1047,6 @@ static int vidioc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	rval = s_pix_parm(vdev, &pix_tmp_sensor, &pix_tmp,
 			  &a->parm.capture.timeperframe);
 
-out:
 	mutex_unlock(&vdev->mutex);
 
 	return rval;
