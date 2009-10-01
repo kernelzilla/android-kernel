@@ -53,8 +53,6 @@ struct cpcap_spi_init_data sholes_cpcap_spi_init[] = {
 	{CPCAP_REG_VUSBINT1C, 0x0029},
 	{CPCAP_REG_VUSBINT2C, 0x0029},
 	{CPCAP_REG_VAUDIOC,   0x0060},
-	{CPCAP_REG_TXI,       0x2000},
-	{CPCAP_REG_RXOA,      0x0400},
 	{CPCAP_REG_ADCC1,     0x9000},
 	{CPCAP_REG_USBC1,     0x1201},
 	{CPCAP_REG_USBC3,     0x7DFB},
