@@ -52,6 +52,28 @@ struct lm3530_data {
 	uint8_t led_on;
 };
 
+struct lm3530_reg {
+	const char *name;
+	uint8_t reg;
+} lm3530_regs[] = {
+	{ "GEN_CONFIG",           LM3530_GEN_CONFIG },
+	{ "ALS_CONFIG",           LM3530_ALS_CONFIG },
+	{ "VERSION_REG",          LM3530_VERSION_REG },
+	{ "BRIGHTNESS_RAMP_RATE", LM3530_BRIGHTNESS_RAMP_RATE },
+	{ "ALS_ZONE_REG",         LM3530_ALS_ZONE_REG },
+	{ "ALS_RESISTOR_SELECT",  LM3530_ALS_RESISTOR_SELECT },
+	{ "BRIGHTNESS_CTRL_REG",  LM3530_BRIGHTNESS_CTRL_REG },
+	{ "ALS_ZB0_REG",          LM3530_ALS_ZB0_REG },
+	{ "ALS_ZB1_REG",          LM3530_ALS_ZB1_REG },
+	{ "ALS_ZB2_REG",          LM3530_ALS_ZB2_REG },
+	{ "ALS_ZB3_REG",          LM3530_ALS_ZB3_REG },
+	{ "ALS_Z0T_REG",          LM3530_ALS_Z0T_REG },
+	{ "ALS_Z1T_REG",          LM3530_ALS_Z1T_REG },
+	{ "ALS_Z2T_REG",          LM3530_ALS_Z2T_REG },
+	{ "ALS_Z3T_REG",          LM3530_ALS_Z3T_REG },
+	{ "ALS_Z4T_REG",          LM3530_ALS_Z4T_REG },
+};
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void lm3530_early_suspend(struct early_suspend *handler);
 static void lm3530_late_resume(struct early_suspend *handler);
@@ -346,6 +368,70 @@ irqreturn_t ld_lm3530_irq_handler(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
+static ssize_t show_registers(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
+						 dev);
+	struct lm3530_data *als_data = i2c_get_clientdata(client);
+	unsigned i, n, reg_count;
+	uint8_t value;
+
+	reg_count = sizeof(lm3530_regs) / sizeof(lm3530_regs[0]);
+	for (i = 0, n = 0; i < reg_count; i++) {
+		lm3530_read_reg(als_data, lm3530_regs[i].reg, &value);
+		n += scnprintf(buf + n, PAGE_SIZE - n,
+			       "%-20s = 0x%02X\n",
+			       lm3530_regs[i].name,
+			       value);
+	}
+
+	return n;
+}
+
+static ssize_t store_registers(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
+						 dev);
+	struct lm3530_data *als_data = i2c_get_clientdata(client);
+	unsigned i, reg_count, value;
+	int error;
+	char name[30];
+
+	if (count >= 30) {
+		pr_err("%s:input too long\n", __func__);
+		return -1;
+	}
+
+	if (sscanf(buf, "%s %x", name, &value) != 2) {
+		pr_err("%s:unable to parse input\n", __func__);
+		return -1;
+	}
+
+	reg_count = sizeof(lm3530_regs) / sizeof(lm3530_regs[0]);
+	for (i = 0; i < reg_count; i++) {
+		if (!strcmp(name, lm3530_regs[i].name)) {
+			error = lm3530_write_reg(als_data,
+				lm3530_regs[i].reg,
+				value);
+			if (error) {
+				pr_err("%s:Failed to write register %s\n",
+					__func__, name);
+				return -1;
+			}
+			return count;
+		}
+	}
+
+	pr_err("%s:no such register %s\n", __func__, name);
+	return -1;
+}
+
+static DEVICE_ATTR(registers, S_IRUSR | S_IWUSR,
+		   show_registers, store_registers);
+
 void ld_lm3530_work_queue(struct work_struct *work)
 {
 	int ret;
@@ -577,6 +663,13 @@ static int ld_lm3530_probe(struct i2c_client *client,
 		goto err_create_pwm_file_failed;
 	}
 
+	error = device_create_file(als_data->led_dev.dev, &dev_attr_registers);
+	if (error < 0) {
+		pr_err("%s:File device creation failed: %d\n", __func__, error);
+		error = -ENODEV;
+		goto err_create_registers_file_failed;
+	}
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	als_data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	als_data->early_suspend.suspend = lm3530_early_suspend;
@@ -588,6 +681,8 @@ static int ld_lm3530_probe(struct i2c_client *client,
 
 	return 0;
 
+err_create_registers_file_failed:
+	device_remove_file(als_data->led_dev.dev, &dev_attr_pwm_mode);
 err_create_pwm_file_failed:
 	device_remove_file(als_data->led_dev.dev, &dev_attr_als);
 err_create_file_als_failed:
@@ -612,8 +707,8 @@ static int ld_lm3530_remove(struct i2c_client *client)
 {
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
 	device_remove_file(als_data->led_dev.dev, &dev_attr_als);
-	device_remove_file(als_data->led_dev.dev,
-		&dev_attr_pwm_mode);
+	device_remove_file(als_data->led_dev.dev, &dev_attr_pwm_mode);
+	device_remove_file(als_data->led_dev.dev, &dev_attr_registers);
 	led_classdev_unregister(&als_data->led_dev);
 	free_irq(als_data->client->irq, als_data);
 	if (als_data->working_queue)
