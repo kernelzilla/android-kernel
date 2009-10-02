@@ -519,7 +519,7 @@ static struct lm3554_platform_data sholes_camera_flash = {
 	.flash_duration_def = 0x28,
 	.config_reg_1_def = 0xe0,
 	.config_reg_2_def = 0xf0,
-	.vin_monitor_def = 0x03,
+	.vin_monitor_def = 0x01,
 	.gpio_reg_def = 0x0,
 };
 
