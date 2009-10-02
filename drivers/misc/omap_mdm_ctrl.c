@@ -89,11 +89,12 @@ void clear_gpio_data(void)
 {
 	int i;
 	for (i = 0; i < GPIO_COUNT; i++) {
-		free_irq(omap_mdm_ctrl_data.gpios[i].irq,
-			 &(omap_mdm_ctrl_data.gpios[i].gpio));
+		if (omap_mdm_ctrl_data.gpios[i].irq != 0)
+			free_irq(omap_mdm_ctrl_data.gpios[i].irq, NULL);
 		omap_mdm_ctrl_data.gpios[i].irq_enabled = 0;
 		omap_mdm_ctrl_data.gpios[i].irq_fired = 0;
-		gpio_free(omap_mdm_ctrl_data.gpios[i].gpio);
+		if (omap_mdm_ctrl_data.gpios[i].gpio != 0)
+			gpio_free(omap_mdm_ctrl_data.gpios[i].gpio);
 	}
 }
 
@@ -530,6 +531,9 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 		return;
 	}
 
+	/* Disable ability to notify clients of bp reset activity */
+	disable_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq);
+
 	pr_info("%s: Initiate modem power down...\n", __func__);
 	/* Press modem Power Button */
 	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 1);
@@ -554,6 +558,9 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 		gpio_set_value(
 			omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 0);
 	}
+
+	/* Re-enable ability to notify clients of bp reset activity */
+	enable_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq);
 }
 
 static struct platform_driver omap_mdm_ctrl_driver = {
