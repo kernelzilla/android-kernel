@@ -22,6 +22,7 @@
 
 #include <linux/soundcard.h>
 #include <linux/spi/cpcap-regbits.h>
+#include <linux/spi/cpcap.h>
 
 enum {
 	CPCAP_AUDIO_MODE_NORMAL,	/* mode of normal audio operation */

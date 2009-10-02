@@ -2236,6 +2236,47 @@ static void __exit audio_exit(void)
 	wake_lock_destroy(&mcbsp_wakelock);
 }
 
+static void audio_callback(int status)
+{
+	mutex_lock(&audio_lock);
+	if (status == 1 || status == 2) {
+		if (cpcap_audio_state.stdac_primary_speaker ==
+					CPCAP_AUDIO_OUT_STEREO_HEADSET) {
+			cpcap_audio_state.stdac_primary_speaker =
+							CPCAP_AUDIO_OUT_NONE;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+			cpcap_audio_state.stdac_primary_speaker =
+						CPCAP_AUDIO_OUT_STEREO_HEADSET;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+		}
+		if (cpcap_audio_state.codec_primary_speaker ==
+					CPCAP_AUDIO_OUT_STEREO_HEADSET) {
+			cpcap_audio_state.codec_primary_speaker =
+							CPCAP_AUDIO_OUT_NONE;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+			cpcap_audio_state.codec_primary_speaker =
+					CPCAP_AUDIO_OUT_STEREO_HEADSET;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+		}
+		if (cpcap_audio_state.ext_primary_speaker ==
+					CPCAP_AUDIO_OUT_STEREO_HEADSET) {
+			cpcap_audio_state.ext_primary_speaker =
+							CPCAP_AUDIO_OUT_NONE;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+			cpcap_audio_state.ext_primary_speaker =
+					CPCAP_AUDIO_OUT_STEREO_HEADSET;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+		}
+		if (cpcap_audio_state.microphone == CPCAP_AUDIO_IN_HEADSET) {
+			cpcap_audio_state.microphone = CPCAP_AUDIO_IN_NONE;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+			cpcap_audio_state.microphone = CPCAP_AUDIO_IN_HEADSET;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
+		}
+	}
+	mutex_unlock(&audio_lock);
+}
+
 static int audio_probe(struct platform_device *dev)
 {
 	mcbsp_wrapper =
@@ -2260,6 +2301,7 @@ static int audio_probe(struct platform_device *dev)
 	cpcap_audio_state.cpcap = dev->dev.platform_data;
 	cpcap_audio_init(&cpcap_audio_state);
 
+	cpcap_audio_state.cpcap->h2w_new_state = &audio_callback;
 	return 0;
 }
 
