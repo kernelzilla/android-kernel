@@ -318,6 +318,9 @@ static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
 	if (error < 0)
 		return -1;
 
+	if (als_data->mode == MANUAL)
+		return pwm_value;
+
 	if (pwm_value >= 1)
 		pwm_val = als_data->als_pdata->gen_config | 0x20;
 	else
@@ -328,6 +331,7 @@ static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
 		       __func__, error);
 		return -1;
 	}
+
 	return pwm_value;
 }
 static DEVICE_ATTR(pwm_mode, 0644, NULL, ld_lm3530_pwm_store);
