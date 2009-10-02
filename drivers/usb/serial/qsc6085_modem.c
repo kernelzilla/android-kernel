@@ -480,6 +480,7 @@ static int modem_open(struct tty_struct *tty,
 	int i;
 	unsigned long flags;
 
+	printk("%s\n",__func__);
 	if (cdma_modem_debug)
 		dev_info(&port->dev, "%s: Enter. Open Port %d\n",
 				 __func__, port->number);
@@ -724,6 +725,7 @@ static void modem_close(struct tty_struct *tty,
 {
 	struct modem_port *modem_port_ptr;
 
+	printk("%s\n",__func__);
 	if (cdma_modem_debug)
 		dev_info(&port->dev, "%s: Enter. Close Port %d  \n",
 			 __func__, port->number);
