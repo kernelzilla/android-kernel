@@ -332,6 +332,7 @@ static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
 	int error = 0;
 	unsigned long pwm_value;
 	uint8_t pwm_val;
+	uint8_t temp_gen_config;
 	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
 						 dev);
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
@@ -341,12 +342,14 @@ static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
 		return -1;
 
 	if (als_data->mode == MANUAL)
-		return pwm_value;
+		temp_gen_config = als_data->als_pdata->manual_current;
+	else
+		temp_gen_config = als_data->als_pdata->gen_config;
 
 	if (pwm_value >= 1)
-		pwm_val = als_data->als_pdata->gen_config | 0x20;
+		pwm_val = temp_gen_config | 0x20;
 	else
-		pwm_val = als_data->als_pdata->gen_config & 0xdf;
+		pwm_val = temp_gen_config & 0xdf;
 
 	if (lm3530_write_reg(als_data, LM3530_GEN_CONFIG, pwm_val)) {
 		pr_err("%s:writing failed while setting pwm mode:%d\n",
