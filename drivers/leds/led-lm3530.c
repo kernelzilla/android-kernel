@@ -256,6 +256,16 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 	}
 }
 
+static ssize_t ld_lm3530_als_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
+						 dev);
+	struct lm3530_data *als_data = i2c_get_clientdata(client);
+
+	return sprintf(buf, "%u\n", als_data->mode);
+}
+
 static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 				   *attr, const char *buf, size_t size)
 {
@@ -324,7 +334,7 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 	return als_data->mode;
 }
 
-static DEVICE_ATTR(als, 0644, NULL, ld_lm3530_als_store);
+static DEVICE_ATTR(als, 0644, ld_lm3530_als_show, ld_lm3530_als_store);
 
 static ssize_t ld_lm3530_pwm_store(struct device *dev, struct device_attribute
 				   *attr, const char *buf, size_t size)
@@ -371,7 +381,7 @@ irqreturn_t ld_lm3530_irq_handler(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
-static ssize_t show_registers(struct device *dev,
+static ssize_t ld_lm3530_registers_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
@@ -392,7 +402,7 @@ static ssize_t show_registers(struct device *dev,
 	return n;
 }
 
-static ssize_t store_registers(struct device *dev,
+static ssize_t ld_lm3530_registers_store(struct device *dev,
 			       struct device_attribute *attr,
 			       const char *buf, size_t count)
 {
@@ -432,8 +442,8 @@ static ssize_t store_registers(struct device *dev,
 	return -1;
 }
 
-static DEVICE_ATTR(registers, S_IRUSR | S_IWUSR,
-		   show_registers, store_registers);
+static DEVICE_ATTR(registers, 0644, ld_lm3530_registers_show,
+		ld_lm3530_registers_store);
 
 void ld_lm3530_work_queue(struct work_struct *work)
 {
