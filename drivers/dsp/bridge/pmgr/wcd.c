@@ -558,20 +558,8 @@ func_end:
  */
 u32 MGRWRAP_UnregisterObject(union Trapped_Args *args)
 {
-	DSP_STATUS status = DSP_SOK;
-	struct DSP_UUID pUuid;
-
-	cp_fm_usr(&pUuid, args->ARGS_MGR_REGISTEROBJECT.pUuid, status, 1);
-	if (DSP_FAILED(status))
-		goto func_end;
-
-	GT_1trace(WCD_debugMask, GT_ENTER,
-		 "MGRWRAP_UnregisterObject: entered pg2hMsg"
-		 " 0x%x\n", args->ARGS_MGR_UNREGISTEROBJECT.pUuid);
-	status = DCD_UnregisterObject(&pUuid,
-			args->ARGS_MGR_UNREGISTEROBJECT.objType);
-func_end:
-	return status;
+	/* This API is deprecated */
+	return DSP_SOK;
 
 }
 
