@@ -30,7 +30,7 @@ enable_btb_flush:
 
 		b enable_btb_flush_done
 aux_control_params:
-	.word   0x1, 0x42
+	.word   0x1, 0xe2
 enable_btb_flush_done:
 
 
