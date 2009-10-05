@@ -861,7 +861,8 @@ static void cpcap_audio_configure_input(
 		case CPCAP_AUDIO_IN_HEADSET:
 			reg_changes.value |= CPCAP_BIT_HS_MIC_MUX
 				| CPCAP_BIT_MIC1_PGA_EN;
-			logged_cpcap_write(state->cpcap, CPCAP_REG_GPIO4,
+			if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
+				logged_cpcap_write(state->cpcap, CPCAP_REG_GPIO4,
 					CPCAP_BIT_GPIO4DRV, CPCAP_BIT_GPIO4DRV);
 			break;
 
