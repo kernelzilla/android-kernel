@@ -1895,7 +1895,10 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 	if (minor == state.dev_dsp) {
 		if (!str->active) {
 			int temp_size = count % STDAC_FIFO_SIZE;
-			str->fragsize = (count - temp_size) + STDAC_FIFO_SIZE;
+			if (temp_size != 0)
+				str->fragsize = (count - temp_size) + STDAC_FIFO_SIZE;
+			else
+				str->fragsize = count;
 			str->nbfrags = AUDIO_NBFRAGS_WRITE;
 			if (audio_setup_buf(str, file->private_data)) {
 				AUDIO_ERROR_LOG("Unable to allocate memory\n");
@@ -1907,7 +1910,10 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 	} else {
 		if (!str->active) {
 			int temp_size = count % CODEC_FIFO_SIZE;
-			str->fragsize = (count - temp_size) + CODEC_FIFO_SIZE;
+			if (temp_size != 0)
+				str->fragsize = (count - temp_size) + CODEC_FIFO_SIZE;
+			else
+				str->fragsize = count;
 			str->nbfrags = AUDIO_NBFRAGS_WRITE;
 			if (audio_setup_buf(str, file->private_data)) {
 				AUDIO_ERROR_LOG("Unable to allocate memory\n");
