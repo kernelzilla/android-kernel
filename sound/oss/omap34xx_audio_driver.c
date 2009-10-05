@@ -2034,6 +2034,7 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			cpcap_audio_state.microphone = mic_setting;
 		}
 		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
 			state.codec_out_stream =
@@ -2045,20 +2046,21 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 
 			TRY(audio_configure_ssi(inode, file))
 			map_audioic_speakers();
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
 		}
 
 		if (file->f_mode & FMODE_READ) {
+			cpcap_audio_state.microphone = mic_setting;
+			cpcap_audio_set_audio_state(&cpcap_audio_state);
 			state.codec_in_stream =
 			    kmalloc(sizeof(struct audio_stream), GFP_KERNEL);
 			memset(state.codec_in_stream, 0,
 			       sizeof(struct audio_stream));
 			state.codec_in_stream->inode = inode;
-
+			msleep(8);
 			TRY(audio_configure_ssi(inode, file))
-			cpcap_audio_state.microphone = mic_setting;
 		}
 	}
-	cpcap_audio_set_audio_state(&cpcap_audio_state);
 out:
 	mutex_unlock(&audio_lock);
 	return ret;
