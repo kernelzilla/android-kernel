@@ -14,6 +14,7 @@
 #include <linux/scatterlist.h>
 #include <linux/usb/quirks.h>
 #include <asm/byteorder.h>
+#include <asm/cacheflush.h>
 
 #include "hcd.h"	/* for usbcore internals */
 #include "usb.h"
@@ -151,6 +152,8 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 
 	kfree(dr);
 
+	if (ret > 0)
+		dmac_inv_range(data, data + size);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(usb_control_msg);
