@@ -14,7 +14,6 @@
 #include <linux/scatterlist.h>
 #include <linux/usb/quirks.h>
 #include <asm/byteorder.h>
-#include <asm/cacheflush.h>
 
 #include "hcd.h"	/* for usbcore internals */
 #include "usb.h"
@@ -659,7 +658,6 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type,
 		}
 		break;
 	}
-	dmac_inv_range(buf, buf + size);
 	return result;
 }
 EXPORT_SYMBOL_GPL(usb_get_descriptor);
@@ -948,7 +946,6 @@ int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, status,
 		sizeof(*status), USB_CTRL_GET_TIMEOUT);
 
-	dmac_inv_range(status, status + sizeof(*status));
 	*(u16 *)data = *status;
 	kfree(status);
 	return ret;
