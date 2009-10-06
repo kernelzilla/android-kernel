@@ -26,7 +26,12 @@
 
 #include <plat/cpu.h>
 
-#define RES_DEFAULTLEVEL	0x0
+#define RES_PERFORMANCE_DEFAULTLEVEL	0
+#define RES_LATENCY_DEFAULTLEVEL	-1
+
+/* Types of resources */
+#define RES_TYPE_PERFORMANCE	0x1
+#define RES_TYPE_LATENCY	0x2
 
 struct shared_resource_ops; /* forward declaration */
 
@@ -36,6 +41,8 @@ struct shared_resource {
 	char *name;
 	/* Used to represent the OMAP chip types containing this res */
 	const struct omap_chip_id omap_chip;
+	/* Resource type flags */
+	const u8 flags;
 	/* Total no of users at any point of this resource */
 	u8 no_of_users;
 	/* Current level of this resource */

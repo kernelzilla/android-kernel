@@ -43,7 +43,7 @@
 void init_latency(struct shared_resource *resp)
 {
 	resp->no_of_users = 0;
-	resp->curr_level = RES_DEFAULTLEVEL;
+	resp->curr_level = RES_LATENCY_DEFAULTLEVEL;
 	*((u8 *)resp->resource_data) = 0;
 	return;
 }
@@ -67,7 +67,7 @@ int set_latency(struct shared_resource *resp, u32 latency)
 		resp->curr_level = latency;
 
 	pm_qos_req_added = resp->resource_data;
-	if (latency == RES_DEFAULTLEVEL)
+	if (latency == RES_LATENCY_DEFAULTLEVEL)
 		/* No more users left, remove the pm_qos_req if present */
 		if (*pm_qos_req_added) {
 			pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY,

@@ -107,10 +107,20 @@ static int update_resource_level(struct shared_resource *resp)
 	int ret;
 
 	/* Regenerate the target_value for the resource */
-	target_level = RES_DEFAULTLEVEL;
-	list_for_each_entry(user, &resp->users_list, node)
-		if (user->level > target_level)
-			target_level = user->level;
+	if (resp->flags & RES_TYPE_PERFORMANCE) {
+		target_level = RES_PERFORMANCE_DEFAULTLEVEL;
+		list_for_each_entry(user, &resp->users_list, node)
+			if (user->level > target_level)
+				target_level = user->level;
+	} else if (resp->flags & RES_TYPE_LATENCY) {
+		target_level = RES_LATENCY_DEFAULTLEVEL;
+		list_for_each_entry(user, &resp->users_list, node)
+			if (user->level < target_level)
+				target_level = user->level;
+	} else {
+		pr_debug("SRF: Unknown resource type\n");
+		return -EINVAL;
+	}
 
 	pr_debug("SRF: Changing Level for resource %s to %ld\n",
 				resp->name, target_level);
@@ -183,7 +193,6 @@ void free_user(struct users_list *user)
 		kfree(user);
 	} else {
 		user->usage = UNUSED;
-		user->level = RES_DEFAULTLEVEL;
 		user->dev = NULL;
 	}
 }
@@ -214,7 +223,6 @@ void resource_init(struct shared_resource **resources)
 	for (ind = 0; ind < MAX_USERS; ind++) {
 		usr_list[ind].usage = UNUSED;
 		usr_list[ind].dev = NULL;
-		usr_list[ind].level = RES_DEFAULTLEVEL;
 	}
 
 	if (resources)
