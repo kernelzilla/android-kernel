@@ -230,13 +230,14 @@ static int omap_wdt_release(struct inode *inode, struct file *file)
 static ssize_t omap_wdt_write(struct file *file, const char __user *data,
 		size_t len, loff_t *ppos)
 {
+	unsigned long flags;
 	struct omap_wdt_dev *wdev = file->private_data;
 
 	/* Refresh LOAD_TIME. */
 	if (len) {
-		spin_lock(&wdt_lock);
+		spin_lock_irqsave(&wdt_lock, flags);
 		omap_wdt_ping(wdev);
-		spin_unlock(&wdt_lock);
+		spin_unlock_irqrestore(&wdt_lock, flags);
 	}
 	return len;
 }
@@ -246,6 +247,7 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
 {
 	struct omap_wdt_dev *wdev;
 	int new_margin;
+	unsigned long flags;
 	static const struct watchdog_info ident = {
 		.identity = "OMAP Watchdog",
 		.options = WDIOF_SETTIMEOUT,
@@ -268,22 +270,22 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
 			return put_user(omap_prcm_get_reset_sources(),
 					(int __user *)arg);
 	case WDIOC_KEEPALIVE:
-		spin_lock(&wdt_lock);
+		spin_lock_irqsave(&wdt_lock, flags);
 		omap_wdt_ping(wdev);
-		spin_unlock(&wdt_lock);
+		spin_unlock_irqrestore(&wdt_lock, flags);
 		return 0;
 	case WDIOC_SETTIMEOUT:
 		if (get_user(new_margin, (int __user *)arg))
 			return -EFAULT;
 		omap_wdt_adjust_timeout(new_margin);
 
-		spin_lock(&wdt_lock);
+		spin_lock_irqsave(&wdt_lock, flags);
 		omap_wdt_disable(wdev);
 		omap_wdt_set_timeout(wdev);
 		omap_wdt_enable(wdev);
 
 		omap_wdt_ping(wdev);
-		spin_unlock(&wdt_lock);
+		spin_unlock_irqrestore(&wdt_lock, flags);
 		/* Fall */
 	case WDIOC_GETTIMEOUT:
 		return put_user(timer_margin, (int __user *)arg);
@@ -303,11 +305,12 @@ static const struct file_operations omap_wdt_fops = {
 #ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
 static void autopet_handler(unsigned long data)
 {
+	unsigned long flags;
 	struct omap_wdt_dev *wdev = (struct omap_wdt_dev *) data;
 
-	spin_lock(&wdt_lock);
+	spin_lock_irqsave(&wdt_lock, flags);
 	omap_wdt_ping(wdev);
-	spin_unlock(&wdt_lock);
+	spin_unlock_irqrestore(&wdt_lock, flags);
 	wdev->jiffies_start = jiffies;
 	wdev->jiffies_exp = (HZ * TIMER_AUTOPET_FREQ);
 	mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
