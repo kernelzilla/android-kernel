@@ -1,0 +1,14 @@
+menuconfig HAPTIC
+	bool "Haptic support"
+	help
+	  Say Y to enable haptic support. It enables the haptic and controls
+	  from userspace.
+
+if HAPTIC
+
+config HAPTIC_CLASS
+	tristate "Haptic Class Support"
+	help
+	  This option enables the haptic sysfs class in /sys/class/haptic.
+
+endif	# HAPTIC
