@@ -155,7 +155,8 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
 	policy->cur = omap_getspeed(0);
 
 	/* FIXME: what's the actual transition time? */
-	policy->cpuinfo.transition_latency = 100000;
+	/* 50 uS chosen to improve cpufreq governor response time */
+	policy->cpuinfo.transition_latency = 50000;
 	return 0;
 }
 
