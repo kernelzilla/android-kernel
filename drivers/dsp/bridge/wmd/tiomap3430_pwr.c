@@ -748,3 +748,32 @@ void DSPClkWakeupEventCtrl(u32 ClkId, bool enable)
 	break;
 	}
 }
+
+/*
+ *  ======== tiomap3430_bump_dsp_opp_level ========
+ *  	This function bumps DSP OPP level if it is OPP1
+ */
+DSP_STATUS tiomap3430_bump_dsp_opp_level(void)
+{
+#ifndef CONFIG_BRIDGE_DVFS
+	u32 opplevel;
+
+	struct dspbridge_platform_data *pdata =
+			omap_dspbridge_dev->dev.platform_data;
+
+	if (pdata->dsp_get_opp)
+		opplevel = (*pdata->dsp_get_opp)();
+
+		/*
+		 * If OPP is at minimum level, increase it before waking
+		 * up the DSP.
+		 */
+		if (opplevel == 1 && pdata->dsp_set_min_opp) {
+			(*pdata->dsp_set_min_opp)(VDD1_OPP2);
+			DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP: Setting "
+				"the vdd1 constraint level to %d before "
+				"waking DSP \n", VDD1_OPP2);
+		}
+#endif
+	return DSP_SOK;
+}

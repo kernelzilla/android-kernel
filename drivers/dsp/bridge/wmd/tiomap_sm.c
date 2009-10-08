@@ -98,11 +98,6 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 				u16 wMbVal)
 {
-#ifdef CONFIG_BRIDGE_DVFS
-	struct dspbridge_platform_data *pdata =
-		omap_dspbridge_dev->dev.platform_data;
-	u32 opplevel = 0;
-#endif
 	struct CFG_HOSTRES resources;
 	DSP_STATUS status = DSP_SOK;
 	unsigned long timeout;
@@ -115,12 +110,8 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 #ifdef CONFIG_BRIDGE_DVFS
 	if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
-		if (pdata->dsp_get_opp)
-			opplevel = (*pdata->dsp_get_opp)();
-		if (opplevel == 1) {
-			if (pdata->dsp_set_min_opp)
-				(*pdata->dsp_set_min_opp)(opplevel+1);
-		}
+		if (!in_atomic())
+			tiomap3430_bump_dsp_opp_level();
 	}
 #endif
 

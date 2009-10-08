@@ -98,5 +98,11 @@ DSP_STATUS DSP_PeripheralClocks_Enable(struct WMD_DEV_CONTEXT *pDevContext,
  */
 void DSPClkWakeupEventCtrl(u32 ClkId, bool enable);
 
+/*
+ *  ======== tiomap3430_bump_dsp_opp_level ========
+ *  	This function bumps DSP OPP level if it is OPP1
+ */
+DSP_STATUS tiomap3430_bump_dsp_opp_level(void);
+
 #endif				/* _TIOMAP_PWR_ */
 
