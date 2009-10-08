@@ -1468,6 +1468,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 		       "!!!!!!!! Unable to recongnize Console UART........\n");
 	ui[pdev->id - 1] = up;
 	serial_omap_add_console_port(up);
+	serial_omap_clear_fifos(up);
 
 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
 	if (ret != 0)
