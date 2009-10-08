@@ -572,7 +572,8 @@ _VMallocWrapper(IMG_UINT32 ui32Bytes,
     }
 
     pvRet = __vmalloc(ui32Bytes, GFP_KERNEL | __GFP_HIGHMEM, PGProtFlags);
-    if (PGProtFlags == PVRSRV_HAP_WRITECOMBINE || PGProtFlags == PVRSRV_HAP_UNCACHED)
+    if ((ui32AllocFlags & PVRSRV_HAP_CACHETYPE_MASK) == PVRSRV_HAP_WRITECOMBINE ||
+	(ui32AllocFlags & PVRSRV_HAP_CACHETYPE_MASK) == PVRSRV_HAP_UNCACHED)
 	    flush_cache_all();
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
