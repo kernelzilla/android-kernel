@@ -17,6 +17,7 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 #include <linux/io.h>
+#include <linux/sched.h>
 
 #include <asm/dma.h>
 
@@ -124,6 +125,7 @@ struct omap_nand_info {
 	unsigned long			phys_base;
 	void __iomem			*gpmc_cs_baseaddr;
 	void __iomem			*gpmc_baseaddr;
+	bool				wait_for_rb;
 };
 
 /*
@@ -145,6 +147,23 @@ static void omap_nand_wp(struct mtd_info *mtd, int mode)
 		config |= (NAND_WP_BIT);	/* WP is OFF */
 
 	__raw_writel(config, (info->gpmc_baseaddr + GPMC_CONFIG));
+}
+
+static void omap_new_command(struct omap_nand_info *info, int cmd)
+{
+	if (__raw_readl(info->gpmc_baseaddr + GPMC_IRQSTATUS) & 0x100)
+		printk(KERN_ERR "%s: irqstatus set on cmd entry %x\n",
+		       DRIVER_NAME, cmd);
+
+	switch (cmd) {
+	case NAND_CMD_STATUS:
+	case NAND_CMD_STATUS_MULTI:
+	case NAND_CMD_READID:
+		break;
+	default:
+		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
+		info->wait_for_rb = true;
+	}
 }
 
 /*
@@ -184,7 +203,8 @@ static void omap_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 	}
 
 	if (cmd != NAND_CMD_NONE) {
-		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
+		if (ctrl & NAND_CLE)
+			omap_new_command(info, cmd);
 		__raw_writeb(cmd, info->nand.IO_ADDR_W);
 	}
 }
@@ -551,22 +571,29 @@ static int omap_wait(struct mtd_info *mtd, struct nand_chip *chip)
  */
 static int omap_dev_ready(struct mtd_info *mtd)
 {
-	unsigned int val = 0;
 	struct omap_nand_info *info;
-	unsigned int cnt = 0;
-	int ret = 1;
+	unsigned long now, timeout = jiffies;
+	int ret;
+	timeout += (HZ * 400) / 1000 + 1;
 
 	info = container_of(mtd, struct omap_nand_info, mtd);
 
-	/* the loop is 80us in worst case(500MHZ cpu) */
-	while (!(val & 0x100)) {
-		if (cnt++ > 0x1FF) {
-			ret = 0;
-			break;
-		}
-		val = __raw_readl(info->gpmc_baseaddr + GPMC_IRQSTATUS);
-	}
-	return ret;
+	if (!info->wait_for_rb)
+		return !!(__raw_readl(info->gpmc_baseaddr + GPMC_STATUS) &
+			  0x100);
+
+	do {
+		now = jiffies;
+		ret = __raw_readl(info->gpmc_baseaddr + GPMC_IRQSTATUS) & 0x100;
+	} while(!ret && time_before_eq(now, timeout));
+
+	if (ret) {
+		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
+		info->wait_for_rb = false;
+	} else
+		printk(KERN_ERR "%s: timeout in dev ready cmd\n", DRIVER_NAME);
+
+	return !!ret;
 }
 
 static int __devinit omap_nand_probe(struct platform_device *pdev)
