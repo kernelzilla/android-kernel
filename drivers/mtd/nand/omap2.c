@@ -184,13 +184,7 @@ static void omap_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 	}
 
 	if (cmd != NAND_CMD_NONE) {
-		switch (cmd) {
-		case NAND_CMD_STATUS:
-		case NAND_CMD_STATUS_MULTI:
-			break;
-		default:
-			__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
-		}
+		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
 		__raw_writeb(cmd, info->nand.IO_ADDR_W);
 	}
 }
