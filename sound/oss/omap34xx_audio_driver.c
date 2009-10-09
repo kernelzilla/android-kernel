@@ -2070,7 +2070,7 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 {
 	mutex_lock(&audio_lock);
 	state.dev_dsp1_open_count = 0;
-
+	read_buf_full = 0;
 	cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
 	cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
 	cpcap_audio_state.codec_primary_speaker = CPCAP_AUDIO_OUT_NONE;
