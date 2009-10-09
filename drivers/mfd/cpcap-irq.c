@@ -31,6 +31,12 @@
 #define NUM_INT_REGS      5
 #define NUM_INTS_PER_REG  16
 
+#define CPCAP_INT1_VALID_BITS 0xFFFB
+#define CPCAP_INT2_VALID_BITS 0xFFFF
+#define CPCAP_INT3_VALID_BITS 0xFFFF
+#define CPCAP_INT4_VALID_BITS 0x03FF
+#define CPCAP_INT5_VALID_BITS 0xFFFF
+
 struct cpcap_event_handler {
 	void (*func)(enum cpcap_irqs, void *);
 	void *data;
@@ -117,6 +123,28 @@ static unsigned short get_sense_reg(enum cpcap_irqs event)
 		ret = CPCAP_REG_INTS1;
 
 	return ret;
+}
+
+void cpcap_irq_mask_all(struct cpcap_device *cpcap)
+{
+	int i;
+
+	static const struct {
+		unsigned short mask_reg;
+		unsigned short valid;
+	} int_reg[NUM_INT_REGS] = {
+		{CPCAP_REG_INTM1, CPCAP_INT1_VALID_BITS},
+		{CPCAP_REG_INTM2, CPCAP_INT2_VALID_BITS},
+		{CPCAP_REG_INTM3, CPCAP_INT3_VALID_BITS},
+		{CPCAP_REG_INTM4, CPCAP_INT4_VALID_BITS},
+		{CPCAP_REG_MIM1,  CPCAP_INT5_VALID_BITS}
+	};
+
+	for (i = 0; i < NUM_INT_REGS; i++) {
+		cpcap_regacc_write(cpcap, int_reg[i].mask_reg,
+				   int_reg[i].valid,
+				   int_reg[i].valid);
+	}
 }
 
 struct pwrkey_data {
@@ -211,11 +239,11 @@ static void irq_work_func(struct work_struct *work)
 		unsigned short mask_reg;
 		unsigned short valid;
 	} int_reg[NUM_INT_REGS] = {
-		{CPCAP_REG_INT1, CPCAP_REG_INTM1, 0xFFFB},
-		{CPCAP_REG_INT2, CPCAP_REG_INTM2, 0xFFFF},
-		{CPCAP_REG_INT3, CPCAP_REG_INTM3, 0xFFFF},
-		{CPCAP_REG_INT4, CPCAP_REG_INTM4, 0x03FF},
-		{CPCAP_REG_MI1,  CPCAP_REG_MIM1,  0xFFFF}
+		{CPCAP_REG_INT1, CPCAP_REG_INTM1, CPCAP_INT1_VALID_BITS},
+		{CPCAP_REG_INT2, CPCAP_REG_INTM2, CPCAP_INT2_VALID_BITS},
+		{CPCAP_REG_INT3, CPCAP_REG_INTM3, CPCAP_INT3_VALID_BITS},
+		{CPCAP_REG_INT4, CPCAP_REG_INTM4, CPCAP_INT4_VALID_BITS},
+		{CPCAP_REG_MI1,  CPCAP_REG_MIM1,  CPCAP_INT5_VALID_BITS}
 	};
 
 	for (i = 0; i < NUM_INT_REGS; ++i)
@@ -271,7 +299,6 @@ error:
 int cpcap_irq_init(struct cpcap_device *cpcap)
 {
 	int retval;
-	int irq_pending;
 	struct spi_device *spi = cpcap->spi;
 	struct cpcap_irqdata *data;
 	struct dentry *debug_dir;
@@ -280,13 +307,13 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	if (!data)
 		return -ENOMEM;
 
+	cpcap_irq_mask_all(cpcap);
+
 	data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
 	data->cpcap = cpcap;
-
-	irq_pending = gpio_get_value(irq_to_gpio(spi->irq));
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |
 				IRQF_TRIGGER_RISING, "cpcap-irq", data);
@@ -309,12 +336,6 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 			   &data->registered);
 	debugfs_create_u64("enabled", S_IRUGO, debug_dir,
 			   &data->enabled);
-
-	/* Force the IRQ handler to run in case an interrupt is already
-	 * pending.
-	 */
-	if (irq_pending != 0)
-		event_isr(spi->irq, data);
 
 	return 0;
 
