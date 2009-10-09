@@ -35,6 +35,15 @@
 
 #define OTG_SYSCONFIG	   0x404
 #define OTG_SYSC_SOFTRESET BIT(1)
+#define  MIDLEMODE       12      /* bit position */
+#define  FORCESTDBY      (0 << MIDLEMODE)
+#define  NOSTDBY         (1 << MIDLEMODE)
+#define  SMARTSTDBY      (2 << MIDLEMODE)
+#define  SIDLEMODE       3       /* bit position */
+#define  FORCEIDLE       (0 << SIDLEMODE)
+#define  NOIDLE          (1 << SIDLEMODE)
+#define  SMARTIDLE       (2 << SIDLEMODE)
+
 
 static void __init usb_musb_pm_init(void)
 {
@@ -52,6 +61,29 @@ static void __init usb_musb_pm_init(void)
 	__raw_writel(OTG_SYSC_SOFTRESET, otg_base + OTG_SYSCONFIG);
 
 	iounmap(otg_base);
+}
+
+
+void musb_disable_idle(int on)
+{
+	u32 reg;
+
+	if (!cpu_is_omap34xx())
+		return;
+
+	reg = omap_readl(OMAP34XX_HSUSB_OTG_BASE + OTG_SYSCONFIG);
+
+	if (on) {
+		reg &= ~SMARTSTDBY;    /* remove possible smartstdby */
+		reg |= NOSTDBY;        /* enable no standby */
+		reg |= NOIDLE;        /* enable no idle */
+	} else {
+		reg &= ~NOSTDBY;          /* remove possible nostdby */
+		reg &= ~NOIDLE;          /* remove possible noidle */
+		reg |= SMARTSTDBY;        /* enable smart standby */
+	}
+
+	omap_writel(reg, OMAP34XX_HSUSB_OTG_BASE + OTG_SYSCONFIG);
 }
 
 #ifdef CONFIG_USB_MUSB_SOC
