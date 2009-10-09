@@ -499,11 +499,11 @@ static void cpcap_adc_irq(enum cpcap_irqs irq, void *data)
 
 	adc_result(cpcap, req);
 
+	trigger_next_adc_job_if_any(cpcap);
+
 	req->status = 0;
 
 	req->callback(cpcap, req->callback_param);
-
-	trigger_next_adc_job_if_any(cpcap);
 }
 
 static void cpcap_adc_cancel(struct work_struct *work)
