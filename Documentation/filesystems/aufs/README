@@ -206,6 +206,8 @@ $ git diff v2.6.27.1..aufs2-27.1 |
 
 3. Configuration and Compilation
 ----------------------------------------
+Make sure you have git-checkout'ed the correct branch.
+
 For aufs2-2.6 tree,
 - enable CONFIG_EXPERIMENTAL and CONFIG_AUFS_FS.
 - set other aufs configurations if necessary.
