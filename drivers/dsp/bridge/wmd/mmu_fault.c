@@ -90,24 +90,14 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
 {
 	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)pRefData;
 	struct WMD_DEV_CONTEXT *pDevContext;
-	struct CFG_HOSTRES resources;
-	DSP_STATUS status = DSP_SOK;
-
 
 	DBG_Trace(DBG_LEVEL1, "Entering DEH_DspMmuIsr: 0x%x\n", pRefData);
        DBC_Require(irq == INT_DSP_MMU_IRQ);
 	DBC_Require(MEM_IsValidHandle(pDehMgr, SIGNATURE));
 
 	if (MEM_IsValidHandle(pDehMgr, SIGNATURE)) {
-
 		pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->hWmdContext;
-		status = CFG_GetHostResources(
-			 (struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-			 &resources);
-		if (DSP_FAILED(status))
-			DBG_Trace(DBG_LEVEL7,
-				 "**Failed to get Host Resources "
-				 "in MMU ISR **\n");
+
 		if (MMU_CheckIfFault(pDevContext)) {
 			printk(KERN_INFO "***** DSPMMU FAULT ***** IRQStatus "
 				"0x%x\n", dmmuEventMask);
@@ -128,13 +118,13 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
 			pDehMgr->errInfo.dwVal3 = 0L;
 			/* Disable the MMU events, else once we clear it will
 			 * start to raise INTs again */
-			HW_MMU_EventDisable(resources.dwDmmuBase,
+			HW_MMU_EventDisable(pDevContext->dwDSPMmuBase,
 					    HW_MMU_TRANSLATION_FAULT);
 		} else {
 			DBG_Trace(DBG_LEVEL7,
 				 "***** MMU FAULT ***** faultcode 0x%x\n",
 				 dmmuEventMask);
-			HW_MMU_EventDisable(resources.dwDmmuBase,
+			HW_MMU_EventDisable(pDevContext->dwDSPMmuBase,
 					    HW_MMU_ALL_INTERRUPTS);
 		}
 	}
@@ -149,21 +139,12 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
  */
 static bool MMU_CheckIfFault(struct WMD_DEV_CONTEXT *pDevContext)
 {
-
-
 	bool retVal = false;
-	DSP_STATUS status = DSP_SOK;
 	HW_STATUS hwStatus;
-	struct CFG_HOSTRES resources;
-	status = CFG_GetHostResources(
-		(struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
-	if (DSP_FAILED(status))
-		DBG_Trace(DBG_LEVEL7, "**Failed to get Host Resources in "
-			 "MMU_CheckIfFault **\n");
 
-	hwStatus = HW_MMU_EventStatus(resources.dwDmmuBase, &dmmuEventMask);
+	hwStatus = HW_MMU_EventStatus(pDevContext->dwDSPMmuBase, &dmmuEventMask);
 	if (dmmuEventMask  ==  HW_MMU_TRANSLATION_FAULT) {
-		HW_MMU_FaultAddrRead(resources.dwDmmuBase, &faultAddr);
+		HW_MMU_FaultAddrRead(pDevContext->dwDSPMmuBase, &faultAddr);
 		DBG_Trace(DBG_LEVEL1, "WMD_DEH_Notify: DSP_MMUFAULT, fault "
 			 "address = 0x%x\n", faultAddr);
 		retVal = true;

@@ -340,8 +340,10 @@ struct WMD_DEV_CONTEXT {
 	 */
 	u32 dwDspExtBaseAddr;	/* See the comment above        */
 	u32 dwAPIRegBase;	/* API memory mapped registers  */
-	void __iomem *dwDSPMmuBase;	/* DSP MMU Mapped registers     */
-	u32 dwMailBoxBase;	/* Mail box mapped registers    */
+	void __iomem *dwDSPMmuBase;	/* DSP MMU Mapped registers	*/
+	void __iomem *dwMailBoxBase;	/* Mail box mapped registers	*/
+	void __iomem *cmbase;			/* CM mapped registers		*/
+	void __iomem *sysctrlbase;		/* SysCtrl mapped registers		*/
 	u32 dwAPIClkBase;	/* CLK Registers                */
 	u32 dwDSPClkM2Base;	/* DSP Clock Module m2          */
 	u32 dwPublicRhea;	/* Pub Rhea                     */

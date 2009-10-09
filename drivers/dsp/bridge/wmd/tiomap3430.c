@@ -1125,9 +1125,12 @@ static DSP_STATUS WMD_DEV_Create(OUT struct WMD_DEV_CONTEXT **ppDevContext,
 				 "enable the clock Fail\n");
 		}
 		udelay(5);
-		/* 24xx-Linux MMU address is obtained from the host
+		/* 34xx-Linux Base addresses are obtained from the host
 		 * resources struct */
 		pDevContext->dwDSPMmuBase = resources.dwDmmuBase;
+		pDevContext->dwMailBoxBase = resources.dwMboxBase;
+		pDevContext->cmbase = resources.dwCmBase;
+		pDevContext->sysctrlbase = resources.dwSysCtrlBase;
 	}
 	if (DSP_SUCCEEDED(status)) {
 		pDevContext->hDevObject = hDevObject;

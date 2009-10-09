@@ -151,15 +151,11 @@ DSP_STATUS DPC_Destroy(struct DPC_OBJECT *hDPC)
 	struct DPC_OBJECT *pDPCObject = (struct DPC_OBJECT *)hDPC;
 
 	if (MEM_IsValidHandle(hDPC, SIGNATURE)) {
-
 		/* Free our DPC object: */
-		if (DSP_SUCCEEDED(status)) {
-			tasklet_kill(&pDPCObject->dpc_tasklet);
-			MEM_FreeObject(pDPCObject);
-			pDPCObject = NULL;
-			GT_0trace(DPC_DebugMask, GT_2CLASS,
-				  "DPC_Destroy: SUCCESS\n");
-		}
+		tasklet_kill(&pDPCObject->dpc_tasklet);
+		MEM_FreeObject(pDPCObject);
+		pDPCObject = NULL;
+		GT_0trace(DPC_DebugMask, GT_2CLASS, "DPC_Destroy: SUCCESS\n");
 	} else {
 		GT_0trace(DPC_DebugMask, GT_6CLASS,
 			  "DPC_Destroy: DSP_EHANDLE\n");

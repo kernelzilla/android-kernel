@@ -98,15 +98,10 @@ DSP_STATUS CHNLSM_DisableInterrupt(struct WMD_DEV_CONTEXT *pDevContext)
 DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 				u16 wMbVal)
 {
-	struct CFG_HOSTRES resources;
 	DSP_STATUS status = DSP_SOK;
 	unsigned long timeout;
 	u32 temp;
 
-	status = CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(),
-				      &resources);
-	if (DSP_FAILED(status))
-		return DSP_EFAIL;
 #ifdef CONFIG_BRIDGE_DVFS
 	if (pDevContext->dwBrdState == BRD_DSP_HIBERNATION ||
 	    pDevContext->dwBrdState == BRD_HIBERNATION) {
@@ -130,22 +125,22 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 			DSP_PeripheralClocks_Enable(pDevContext, NULL);
 			/* Enabling Dpll in lock mode*/
 			temp = (u32) *((REG_UWORD32 *)
-				       ((u32) (resources.dwCmBase) + 0x34));
+				       ((u32) (pDevContext->cmbase) + 0x34));
 			temp = (temp & 0xFFFFFFFE) | 0x1;
-			*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x34)) =
+			*((REG_UWORD32 *) ((u32)(pDevContext->cmbase) + 0x34)) =
 				(u32) temp;
 			temp = (u32) *((REG_UWORD32 *)
-				       ((u32) (resources.dwCmBase) + 0x4));
+				       ((u32) (pDevContext->cmbase) + 0x4));
 			temp = (temp & 0xFFFFFC8) | 0x37;
 
-			*((REG_UWORD32 *) ((u32) (resources.dwCmBase) + 0x4)) =
+			*((REG_UWORD32 *) ((u32) (pDevContext->cmbase) + 0x4)) =
 				(u32) temp;
 		}
-		HW_MBOX_restoreSettings(resources.dwMboxBase);
+		HW_MBOX_restoreSettings(pDevContext->dwMailBoxBase);
 
 		/*  Access MMU SYS CONFIG register to generate a short wakeup */
 		temp = (u32) *((REG_UWORD32 *) ((u32)
-						(resources.dwDmmuBase) + 0x10));
+					(pDevContext->dwDSPMmuBase) + 0x10));
 
 		pDevContext->dwBrdState = BRD_RUNNING;
 	} else if (pDevContext->dwBrdState == BRD_RETENTION) {
@@ -155,7 +150,7 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 	}
 
 	timeout = jiffies + msecs_to_jiffies(1);
-	while (fifo_full((void __iomem *) resources.dwMboxBase, 0)) {
+	while (fifo_full((void __iomem *)pDevContext->dwMailBoxBase, 0)) {
 		if (time_after(jiffies, timeout)) {
 			printk(KERN_ERR "dspbridge: timed out waiting for mailbox\n");
 			return WMD_E_TIMEOUT;
@@ -164,7 +159,7 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 	DBG_Trace(DBG_LEVEL3, "writing %x to Mailbox\n",
 		  wMbVal);
 
-	HW_MBOX_MsgWrite(resources.dwMboxBase, MBOX_ARM2DSP,
+	HW_MBOX_MsgWrite(pDevContext->dwMailBoxBase, MBOX_ARM2DSP,
 			 wMbVal);
 	return DSP_SOK;
 }
@@ -172,20 +167,18 @@ DSP_STATUS CHNLSM_InterruptDSP2(struct WMD_DEV_CONTEXT *pDevContext,
 bool CHNLSM_ISR(struct WMD_DEV_CONTEXT *pDevContext, bool *pfSchedDPC,
 		u16 *pwIntrVal)
 {
-	struct CFG_HOSTRES resources;
 	u32 numMbxMsg;
 	u32 mbxValue;
 
 	DBG_Trace(DBG_ENTER, "CHNLSM_ISR(0x%x)\n", pDevContext);
 
-	CFG_GetHostResources((struct CFG_DEVNODE *)DRV_GetFirstDevExtension(), &resources);
-
-	HW_MBOX_NumMsgGet(resources.dwMboxBase, MBOX_DSP2ARM, &numMbxMsg);
+	HW_MBOX_NumMsgGet(pDevContext->dwMailBoxBase, MBOX_DSP2ARM, &numMbxMsg);
 
 	if (numMbxMsg > 0) {
-		HW_MBOX_MsgRead(resources.dwMboxBase, MBOX_DSP2ARM, &mbxValue);
+		HW_MBOX_MsgRead(pDevContext->dwMailBoxBase, MBOX_DSP2ARM,
+				&mbxValue);
 
-		HW_MBOX_EventAck(resources.dwMboxBase, MBOX_DSP2ARM,
+		HW_MBOX_EventAck(pDevContext->dwMailBoxBase, MBOX_DSP2ARM,
 				 HW_MBOX_U0_ARM, HW_MBOX_INT_NEW_MSG);
 
 		DBG_Trace(DBG_LEVEL3, "Read %x from Mailbox\n", mbxValue);
