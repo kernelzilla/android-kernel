@@ -121,6 +121,7 @@ bool SERVICES_Init(void)
 			 "SERVICES_Init: entered\n");
 
 		/* Perform required initialization of SERVICES modules. */
+		fSYNC = SYNC_Init();
 		fMEM = MEM_Init();
 		fREG = REG_Init();
 		fCFG = CFG_Init();
@@ -129,7 +130,6 @@ bool SERVICES_Init(void)
 		fDPC = DPC_Init();
 		fKFILE = KFILE_Init();
 		fLST = LST_Init();
-		fSYNC = SYNC_Init();
 		fCLK  = CLK_Init();
 		fNTFY = NTFY_Init();
 

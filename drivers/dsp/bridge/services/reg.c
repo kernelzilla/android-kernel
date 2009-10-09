@@ -129,8 +129,10 @@ void REG_Exit(void)
 {
 	GT_0trace(REG_debugMask, GT_5CLASS, "REG_Exit\n");
 
-	if (reglock)
+	if (reglock) {
 		SYNC_DeleteCS(reglock);
+		reglock = NULL;
+	}
 
 	crefs--;
 
