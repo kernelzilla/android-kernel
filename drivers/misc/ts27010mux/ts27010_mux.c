@@ -1378,7 +1378,6 @@ void ts27010_mux_recv(struct ts27010_ringbuf *rbuf)
 					"ts27010: wrong length, Drop msg.\n");
 				state = RECV_STATE_IDLE;
 				consume_idx = i;
-				break;
 			}
 			state = RECV_STATE_DATA;
 			break;
