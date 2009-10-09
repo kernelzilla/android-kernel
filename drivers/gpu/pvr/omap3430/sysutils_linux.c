@@ -414,20 +414,6 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 		return PVRSRV_ERROR_GENERIC;
 	}
 
-	lNewRate = clk_round_rate(psSysSpecData->psSGX_FCK, SYS_SGX_CLOCK_SPEED + ONE_MHZ);
-	if (lNewRate <= 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "EnableSGXClocks: Couldn't round SGX functional clock rate"));
-		return PVRSRV_ERROR_GENERIC;
-	}
-
-	res = clk_set_rate(psSysSpecData->psSGX_FCK, lNewRate);
-	if (res < 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "EnableSGXClocks: Couldn't set SGX function clock rate (%d)", res));
-		return PVRSRV_ERROR_GENERIC;
-	}
-
 #if defined(DEBUG)
 	{
 		
