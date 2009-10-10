@@ -503,10 +503,9 @@ static int convert_to_lux(struct lm3530_data *als_data, int zone_value)
 	int mv_conv;
 	int current_conv;
 	int divisor;
-	int lux_val;
 
 	if (zone_value == 0)
-		return 10;
+		return 0x40;
 
 	divisor = als_data->als_pdata->lens_loss_coeff;
 	if (divisor == 0)
@@ -515,28 +514,20 @@ static int convert_to_lux(struct lm3530_data *als_data, int zone_value)
 	mv_conv = ((zone_value * 1000) / 255);
 	current_conv = (mv_conv * 1000) /
 		als_resistor_val[(als_data->als_pdata->als_resistor_sel & 0xF0) >> 4];
-	lux_val = (current_conv * 100) / divisor;
-
-	if (lux_val == 0)
-		return 10;
-
-	return lux_val;
+	return (current_conv * 100) / divisor;
 }
 
 static void ld_lm3530_lux_conv(struct lm3530_data *als_data)
 {
 	int zone_boundary;
 
-	zone_boundary = als_data->als_pdata->zone_boundary_0;
-	als_data->lux_passed_value[0].lux_value =
-		convert_to_lux(als_data, zone_boundary);
+	als_data->lux_passed_value[0].lux_value = 10;
 
-	zone_boundary = als_data->als_pdata->zone_boundary_1;
+	zone_boundary = als_data->als_pdata->zone_boundary_0;
 	als_data->lux_passed_value[1].lux_value =
 		convert_to_lux(als_data, zone_boundary);
 
-	zone_boundary = (als_data->als_pdata->zone_boundary_1 +
-		als_data->als_pdata->zone_boundary_2) / 2;
+	zone_boundary = als_data->als_pdata->zone_boundary_1;
 	als_data->lux_passed_value[2].lux_value =
 		convert_to_lux(als_data, zone_boundary);
 
