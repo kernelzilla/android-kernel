@@ -609,7 +609,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 
 	als_data->led_dev.name = LD_LM3530_LED_DEV;
 	als_data->led_dev.brightness_set = ld_lm3530_brightness_set;
-	als_data->led_on = 0;
+	als_data->led_on = 1;
 
 	als_data->working_queue = create_singlethread_workqueue("als_wq");
 	if (!als_data->working_queue) {
