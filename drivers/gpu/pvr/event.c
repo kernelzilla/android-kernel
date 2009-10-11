@@ -240,6 +240,7 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject, IMG_UINT32 ui32MSTi
 	PVRSRV_LINUX_EVENT_OBJECT *psLinuxEventObject = (PVRSRV_LINUX_EVENT_OBJECT *) hOSEventObject;
 
 	IMG_UINT32 ui32TimeOutJiffies = msecs_to_jiffies(ui32MSTimeout);
+	PVRSRV_ERROR ret = PVRSRV_ERROR_TIMEOUT;
 	
 	do	
 	{
@@ -248,6 +249,7 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject, IMG_UINT32 ui32MSTi
    	
 		if(psLinuxEventObject->ui32TimeStampPrevious != ui32TimeStamp)
 		{
+			ret = PVRSRV_OK;
 			break;
 		}
 
@@ -260,14 +262,17 @@ PVRSRV_ERROR LinuxEventObjectWait(IMG_HANDLE hOSEventObject, IMG_UINT32 ui32MSTi
 		psLinuxEventObject->ui32Stats++;
 #endif			
 
-		
 	} while (ui32TimeOutJiffies);
 
-	finish_wait(&psLinuxEventObject->sWait, &sWait);	
+	finish_wait(&psLinuxEventObject->sWait, &sWait);
+
+	ui32TimeStamp = atomic_read(&psLinuxEventObject->sTimeStamp);
+	if(psLinuxEventObject->ui32TimeStampPrevious != ui32TimeStamp)
+		ret = PVRSRV_OK;
 
 	psLinuxEventObject->ui32TimeStampPrevious = ui32TimeStamp;
 
-	return ui32TimeOutJiffies ? PVRSRV_OK : PVRSRV_ERROR_TIMEOUT;
+	return ret;
 
 }
 
