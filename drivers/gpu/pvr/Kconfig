@@ -26,6 +26,11 @@ config SGX_EDM_TRACING
        ---help---
          Enable EDM status trace dumping on HW Recovery
 
+config CONFIG_SGX_MK_TRACE
+       bool "MK Trace"
+       ---help---
+         Enable suppport for dumping EDM status tracing from userspace
+	
 config PVR_OMAPLFB
 	tristate "PowerVR OMAP buffer class"
 	depends on SGX

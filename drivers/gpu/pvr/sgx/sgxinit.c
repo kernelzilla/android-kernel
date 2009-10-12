@@ -815,6 +815,44 @@ static PVRSRV_ERROR DevDeInitSGX (IMG_VOID *pvDeviceNode)
 	return PVRSRV_OK;
 }
 
+#if defined(PVRSRV_DUMP_MK_TRACE)
+
+static IMG_VOID SGXDumpMKTrace (PVRSRV_SGXDEV_INFO *psDevInfo)
+{
+       IMG_UINT32 *pui32MKTraceBuffer = psDevInfo->psKernelEDMStatusBufferMemInfo->pvLinAddrKM;
+       IMG_UINT32 ui32WriteOffset, ui32LoopCounter;
+
+#if defined(PVRSRV_USSE_EDM_STATUS_DEBUG)
+       PVR_LOG(("Last SGX microkernel status code: 0x%x", *pui32MKTraceBuffer));
+#endif
+       pui32MKTraceBuffer++;
+
+       ui32WriteOffset = *pui32MKTraceBuffer;
+       pui32MKTraceBuffer++;
+
+       /*
+               Dump the raw microkernel trace buffer to the log.
+       */
+       for (ui32LoopCounter = 0;
+                ui32LoopCounter < SGXMK_TRACE_BUFFER_SIZE;
+                ui32LoopCounter++)
+       {
+               IMG_UINT32      *pui32BufPtr;
+               pui32BufPtr = pui32MKTraceBuffer +
+                                               (((ui32WriteOffset + ui32LoopCounter) % SGXMK_TRACE_BUFFER_SIZE) * 4);
+               PVR_LOG(("%8.8lX %8.8lX %8.8lX %8.8lX",
+                                pui32BufPtr[2], pui32BufPtr[3], pui32BufPtr[1], pui32BufPtr[0]));
+       }
+}
+
+#else /* defined(PVRSRV_DUMP_MK_TRACE) */
+
+static INLINE IMG_VOID SGXDumpMKTrace (PVRSRV_SGXDEV_INFO *psDevInfo)
+{
+       PVR_UNREFERENCED_PARAMETER(psDevInfo);
+}
+
+#endif /* defined(PVRSRV_DUMP_MK_TRACE) */
 
 IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO *psDevInfo)
 {
@@ -861,40 +899,7 @@ IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO *psDevInfo)
 	PVR_LOG(("EUR_CR_PDS_PC_BASE:      %x", ui32RegVal));
 #endif
 
-	
-
-#if defined(PVRSRV_USSE_EDM_STATUS_DEBUG)
-	{
-		IMG_UINT32	*pui32MKTraceBuffer = psDevInfo->psKernelEDMStatusBufferMemInfo->pvLinAddrKM;
-		IMG_UINT32	ui32LastStatusCode, ui32WriteOffset;
-
-		ui32LastStatusCode = *pui32MKTraceBuffer;
-		pui32MKTraceBuffer++;
-		ui32WriteOffset = *pui32MKTraceBuffer;
-		pui32MKTraceBuffer++;
-
-		PVR_LOG(("Last SGX microkernel status code: 0x%x", ui32LastStatusCode));
-		
-		#if defined(PVRSRV_DUMP_MK_TRACE)
-		
-
-		{
-			IMG_UINT32	ui32LoopCounter;
-			
-			for (ui32LoopCounter = 0;
-				 ui32LoopCounter < SGXMK_TRACE_BUFFER_SIZE;
-				 ui32LoopCounter++)
-			{
-				IMG_UINT32	*pui32BufPtr;
-				pui32BufPtr = pui32MKTraceBuffer +
-								(((ui32WriteOffset + ui32LoopCounter) % SGXMK_TRACE_BUFFER_SIZE) * 4);
-				PVR_LOG(("%8.8lX %8.8lX %8.8lX %8.8lX",
-						 pui32BufPtr[2], pui32BufPtr[3], pui32BufPtr[1], pui32BufPtr[0]));
-			}
-		}
-		#endif 
-	}
-#endif 
+	SGXDumpMKTrace(psDevInfo);
 }
 
 
@@ -1962,6 +1967,14 @@ PVRSRV_ERROR SGXGetMiscInfoKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 			return PVRSRV_OK;
 		}
 #endif 
+#if defined(PVRSRV_DUMP_MK_TRACE)
+	case SGX_MISC_INFO_DUMP_MK_TRACE:
+	{
+		SGXDumpMKTrace(psDevInfo);
+		return PVRSRV_OK;
+	}
+#endif /* PVRSRV_DUMP_MK_TRACE */
+
 		default:
 		{
 			
