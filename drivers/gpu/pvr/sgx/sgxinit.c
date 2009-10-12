@@ -843,6 +843,8 @@ static IMG_VOID SGXDumpMKTrace (PVRSRV_SGXDEV_INFO *psDevInfo)
                PVR_LOG(("%8.8lX %8.8lX %8.8lX %8.8lX",
                                 pui32BufPtr[2], pui32BufPtr[3], pui32BufPtr[1], pui32BufPtr[0]));
        }
+
+       BUG_ON(1);
 }
 
 #else /* defined(PVRSRV_DUMP_MK_TRACE) */
