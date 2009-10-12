@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Thu Oct  8 20:54:03 2009
+# Mon Oct 12 14:13:15 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -666,7 +666,7 @@ CONFIG_SENSORS_AKM8973_AKMD=y
 CONFIG_SENSORS_LIS331DLH=y
 CONFIG_WL127X_RFKILL=y
 CONFIG_WL127X_TEST=m
-# CONFIG_APANIC is not set
+CONFIG_APANIC=y
 CONFIG_APANIC_PLABEL="kpanic"
 # CONFIG_C2PORT is not set
 
