@@ -43,6 +43,7 @@ struct omap_sr {
 	int		is_sr_reset;
 	int		is_autocomp_active;
 	struct clk	*clk;
+	struct clk	*vdd_opp_clk;
 	u32		clk_length;
 	u32		req_opp_no;
 	u32		opp1_nvalue, opp2_nvalue, opp3_nvalue, opp4_nvalue;
@@ -170,28 +171,24 @@ static u16 get_opp(struct omap_opp *opp_freq_table,
 static u16 get_vdd1_opp(void)
 {
 	u16 opp;
-	struct clk *clk;
 
-	clk = clk_get(NULL, "dpll1_ck");
-
-	if (clk == NULL || IS_ERR(clk) || mpu_opps == NULL)
+	if (sr1.vdd_opp_clk == NULL || IS_ERR(sr1.vdd_opp_clk) ||
+							mpu_opps == NULL)
 		return 0;
 
-	opp = get_opp(mpu_opps + MAX_VDD1_OPP, clk->rate);
+	opp = get_opp(mpu_opps + MAX_VDD1_OPP, sr1.vdd_opp_clk->rate);
 	return opp;
 }
 
 static u16 get_vdd2_opp(void)
 {
 	u16 opp;
-	struct clk *clk;
 
-	clk = clk_get(NULL, "l3_ick");
-
-	if (clk == NULL || IS_ERR(clk) || l3_opps == NULL)
+	if (sr2.vdd_opp_clk == NULL || IS_ERR(sr2.vdd_opp_clk) ||
+							l3_opps == NULL)
 		return 0;
 
-	opp = get_opp(l3_opps + MAX_VDD2_OPP, clk->rate);
+	opp = get_opp(l3_opps + MAX_VDD2_OPP, sr2.vdd_opp_clk->rate);
 	return opp;
 }
 
@@ -999,6 +996,8 @@ static int __init omap3_sr_init(void)
 		sr1.clk = clk_get(NULL, "sr1_fck");
 		sr2.clk = clk_get(NULL, "sr2_fck");
 	}
+	sr1.vdd_opp_clk = clk_get(NULL, "dpll1_ck");
+	sr2.vdd_opp_clk = clk_get(NULL, "l3_ick");
 	sr_set_clk_length(&sr1);
 	sr_set_clk_length(&sr2);
 
