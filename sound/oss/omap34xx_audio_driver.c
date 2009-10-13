@@ -2061,6 +2061,24 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			TRY(audio_configure_ssi(inode, file))
 		}
 	}
+
+	if ((cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) &&
+		(primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
+		&& (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
+		AUDIO_LEVEL1_LOG("Setting codec in Call BT mode\n");
+		cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
+		gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 0);
+	} else if ((primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
+		&& (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
+		AUDIO_LEVEL1_LOG("Setting codec Ouf-of-Call BT mode\n");
+		cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_CLOCK_ONLY;
+		cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;;
+		gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+	} else {
+		AUDIO_LEVEL1_LOG("Setting codec in Normal mode\n");
+		cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
+		gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+	}
 out:
 	mutex_unlock(&audio_lock);
 	return ret;
@@ -2098,6 +2116,9 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 		}
 	}
 
+	/* Set GPIO to normal */
+	AUDIO_LEVEL1_LOG("GPIO 143 HIGH\n");
+	gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
 	mutex_unlock(&audio_lock);
 
