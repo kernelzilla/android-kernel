@@ -3589,6 +3589,7 @@ static void dsi_error_recovery_worker(struct work_struct *work)
 	dsi.error_recovery.recovering = true;
 
 	enable_clocks(1);
+	dsi_enable_pll_clock(1);
 	dsi_force_tx_stop_mode_io();
 
 	r = dsi_read_reg(DSI_TIMING1);
@@ -3610,6 +3611,7 @@ static void dsi_error_recovery_worker(struct work_struct *work)
 	if (dsi.update_mode == OMAP_DSS_UPDATE_AUTO)
 		dsi_start_auto_update(dsi.error_recovery.dssdev);
 	enable_clocks(0);
+	dsi_enable_pll_clock(0);
 
 	dsi_bus_unlock();
 
