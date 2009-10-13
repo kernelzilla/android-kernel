@@ -106,7 +106,7 @@ static struct omap_sr sr1 = {
 	.is_sr_reset		= 1,
 	.is_autocomp_active	= 0,
 	.clk_length		= 0,
-	.srbase_addr		= OMAP2_IO_ADDRESS(OMAP34XX_SR1_BASE),
+	.srbase_addr		= OMAP2_L4_IO_ADDRESS(OMAP34XX_SR1_BASE),
 };
 
 static struct omap_sr sr2 = {
@@ -114,7 +114,7 @@ static struct omap_sr sr2 = {
 	.is_sr_reset		= 1,
 	.is_autocomp_active	= 0,
 	.clk_length		= 0,
-	.srbase_addr		= OMAP2_IO_ADDRESS(OMAP34XX_SR2_BASE),
+	.srbase_addr		= OMAP2_L4_IO_ADDRESS(OMAP34XX_SR2_BASE),
 };
 
 static void cal_reciprocal(u32 sensor, u32 *sengain, u32 *rnsen)
