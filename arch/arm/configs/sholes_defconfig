@@ -373,7 +373,7 @@ CONFIG_BINFMT_MISC=y
 # Power management options
 #
 CONFIG_PM=y
-CONFIG_PM_DEBUG=y
+# CONFIG_PM_DEBUG is not set
 # CONFIG_PM_VERBOSE is not set
 CONFIG_CAN_PM_TRACE=y
 CONFIG_PM_SLEEP=y
