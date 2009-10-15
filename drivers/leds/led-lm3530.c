@@ -768,29 +768,14 @@ static int lm3530_suspend(struct i2c_client *client, pm_message_t mesg)
 
 static int lm3530_resume(struct i2c_client *client)
 {
-	uint8_t zone_dump;
-	int ret;
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
 
 	if (lm3530_debug)
 		pr_info("%s: Resuming\n", __func__);
 
-	ret = lm3530_read_reg(als_data,
-			      LM3530_ALS_ZONE_REG, &zone_dump);
-	if (ret)
-		pr_info("%s: Could not read out of suspend\n", __func__);
-
 	/* Work around a HW issue that the HW will not generate an
 	interrupt when enabled */
-	if ((zone_dump & LM3530_ALS_READ_MASK) == 0) {
-		input_event(als_data->idev, EV_MSC, MSC_RAW, 10);
-		input_event(als_data->idev, EV_LED, LED_MISC,
-			als_data->lux_passed_value[0].lux_value);
-		input_sync(als_data->idev);
-		als_data->zone = 0;
-	}
-
-	enable_irq(als_data->client->irq);
+	queue_work(als_data->working_queue, &als_data->wq);
 
 	return 0;
 }
