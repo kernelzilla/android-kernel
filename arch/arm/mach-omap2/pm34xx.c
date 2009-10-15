@@ -1020,8 +1020,11 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
 	return -EINVAL;
 }
 
-void omap3_set_prm_setup_vc(struct prm_setup_vc *setup_vc)
+void omap3_pm_init_vc(struct prm_setup_vc *setup_vc)
 {
+	if (!setup_vc)
+		return;
+
 	prm_setup.clksetup = setup_vc->clksetup;
 	prm_setup.voltsetup_time1 = setup_vc->voltsetup_time1;
 	prm_setup.voltsetup_time2 = setup_vc->voltsetup_time2;
