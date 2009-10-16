@@ -73,6 +73,24 @@ static struct prm_setup_vc omap3_setuptime_table = {
 	.vdd1_off = 0x00,
 };
 
+/* FIXME: These values need to be updated based on more profiling on 3430sdp*/
+static struct cpuidle_params omap3_cpuidle_params_table[] = {
+	/* C1 */
+	{2, 2, 5},
+	/* C2 */
+	{10, 10, 30},
+	/* C3 */
+	{50, 50, 300},
+	/* C4 */
+	{1500, 1800, 4000},
+	/* C5 */
+	{2500, 7500, 12000},
+	/* C6 */
+	{3000, 8500, 15000},
+	/* C7 */
+	{10000, 30000, 300000},
+};
+
 static int board_keymap[] = {
 	KEY(0, 0, KEY_LEFT),
 	KEY(0, 1, KEY_RIGHT),
@@ -203,6 +221,7 @@ static void __init omap_3430sdp_init_irq(void)
 	omap_board_config = sdp3430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
 	omap3_pm_init_vc(&omap3_setuptime_table);
+	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
 	omap2_init_common_hw(hyb18m512160af6_sdrc_params, NULL, omap3_mpu_rate_table,
 			     omap3_dsp_rate_table, omap3_l3_rate_table);
 	omap_init_irq();

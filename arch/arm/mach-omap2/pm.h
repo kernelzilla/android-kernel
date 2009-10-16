@@ -41,7 +41,15 @@ struct prm_setup_vc {
 	u16 vdd1_ret;
 	u16 vdd1_off;
 };
+
+struct cpuidle_params {
+	u32 sleep_latency;
+	u32 wake_latency;
+	u32 threshold;
+};
+
 extern void omap3_pm_init_vc(struct prm_setup_vc *setup_vc);
+extern void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params);
 
 extern int resource_set_opp_level(int res, u32 target_level, int flags);
 extern int resource_access_opp_lock(int res, int delta);
