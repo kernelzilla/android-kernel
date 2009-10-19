@@ -657,6 +657,7 @@ struct clk msm_clocks[] = {
 	CLK_8X50("lcdc_pclk_clk", LCDC_PCLK, &msm_device_mdp.dev, 0),
 	CLK_8X50("lcdc_pad_pclk_clk", LCDC_PAD_PCLK, &msm_device_mdp.dev, 0),
 	CLK_8X50("mdp_vsync_clk", MDP_VSYNC_CLK, &msm_device_mdp.dev, 0),
+	CLK_8X50("spi_clk", SPI_CLK, &msm_device_spi.dev, 0),
 #endif
 	CLOCK(NULL, 0, NULL, 0, 0),
 };
