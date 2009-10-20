@@ -212,6 +212,29 @@ OSAllocPages_Impl(IMG_UINT32 ui32AllocFlags,
             return PVRSRV_ERROR_INVALID_PARAMS;
     }
 
+    /* This works around a problem where Linux will not flush or invalidate
+     * the cache for physical memory it frees that is direct mapped.
+     *
+     * As a result, cache entries remain that may be subsequently flushed
+     * to these physical pages after they have been allocated for another
+     * purpose. For a subsequent cached use of this memory, that is not a
+     * problem, but if we are allocating uncached or write-combined memory,
+     * and bypassing the cache, it can cause subsequent uncached writes to
+     * the memory to be replaced with junk from the cache.
+     *
+     * This workaround is undoubtedly required on other systems/builds too
+     * but we need to be sure, as flushing the whole CPU cache is costly,
+     * especially when caches are large and determining ranges is cheaper.
+     *
+     * As some allocations from here won't have a kernel virtual address,
+     * determining a flush range would have to be done in the caller of
+     * OSAllocPages().
+     */
+    if (ui32AllocFlags & (PVRSRV_HAP_WRITECOMBINE | PVRSRV_HAP_UNCACHED))
+    {
+	    flush_cache_all();
+    }
+
     *ppvCpuVAddr = LinuxMemAreaToCpuVAddr(psLinuxMemArea);
     *phOSMemHandle = psLinuxMemArea;
     
