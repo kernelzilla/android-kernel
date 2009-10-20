@@ -66,6 +66,8 @@ struct qtouch_ts_data {
 	uint32_t			last_keystate;
 	uint16_t			eeprom_checksum;
 	uint8_t			    checksum_cnt;
+	int					x_delta;
+	int					y_delta;
 
 	/* Note: The message buffer is reused for reading different messages.
 	 * MUST enforce that there is no concurrent access to msg_buf. */
@@ -580,9 +582,23 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 
 	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
 
-	ts->finger_data[finger].x_data = x;
-	ts->finger_data[finger].y_data = y;
-	ts->finger_data[finger].w_data = width;
+	/* The chip may report erroneous points way
+	beyond what a user could possibly perform so we filter
+	these out */
+	if (ts->finger_data[finger].down &&
+			(abs(ts->finger_data[finger].x_data - x) > ts->x_delta ||
+			abs(ts->finger_data[finger].y_data - y) > ts->y_delta)) {
+				down = 0;
+				if (qtouch_tsdebug & 2)
+					pr_info("%s: x0 %i x1 %i y0 %i y1 %i\n",
+						__func__,
+						ts->finger_data[finger].x_data, x,
+						ts->finger_data[finger].y_data, y);
+	} else {
+		ts->finger_data[finger].x_data = x;
+		ts->finger_data[finger].y_data = y;
+		ts->finger_data[finger].w_data = width;
+	}
 
 	/* The touch IC will not give back a pressure of zero
 	   so send a 0 when a liftoff is produced */
@@ -878,6 +894,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
 	ts->checksum_cnt = 0;
+	ts->x_delta = ts->pdata->x_delta;
+	ts->y_delta = ts->pdata->y_delta;
 
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {

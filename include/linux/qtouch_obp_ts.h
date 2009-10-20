@@ -293,6 +293,9 @@ struct qtouch_ts_platform_data {
 	uint32_t		abs_min_w;
 	uint32_t		abs_max_w;
 
+	uint32_t		x_delta;
+	uint32_t		y_delta;
+
 	uint16_t		nv_checksum;
 
 	uint32_t		fuzz_x;
