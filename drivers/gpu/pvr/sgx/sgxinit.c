@@ -815,93 +815,106 @@ static PVRSRV_ERROR DevDeInitSGX (IMG_VOID *pvDeviceNode)
 	return PVRSRV_OK;
 }
 
-#if defined(PVRSRV_DUMP_MK_TRACE)
-
-static IMG_VOID SGXDumpMKTrace (PVRSRV_SGXDEV_INFO *psDevInfo)
+IMG_VOID SGXDumpDebugInfo (PVRSRV_DEVICE_NODE *psDeviceNode,
+						   IMG_BOOL			  bDumpSGXRegs)
 {
-       IMG_UINT32 *pui32MKTraceBuffer = psDevInfo->psKernelEDMStatusBufferMemInfo->pvLinAddrKM;
-       IMG_UINT32 ui32WriteOffset, ui32LoopCounter;
+	IMG_UINT			ui32RegVal;
+	PVRSRV_SGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
 
-#if defined(PVRSRV_USSE_EDM_STATUS_DEBUG)
-       PVR_LOG(("Last SGX microkernel status code: 0x%x", *pui32MKTraceBuffer));
-#endif
-       pui32MKTraceBuffer++;
-
-       ui32WriteOffset = *pui32MKTraceBuffer;
-       pui32MKTraceBuffer++;
-
-       /*
-               Dump the raw microkernel trace buffer to the log.
-       */
-       for (ui32LoopCounter = 0;
-                ui32LoopCounter < SGXMK_TRACE_BUFFER_SIZE;
-                ui32LoopCounter++)
-       {
-               IMG_UINT32      *pui32BufPtr;
-               pui32BufPtr = pui32MKTraceBuffer +
-                                               (((ui32WriteOffset + ui32LoopCounter) % SGXMK_TRACE_BUFFER_SIZE) * 4);
-               PVR_LOG(("%8.8lX %8.8lX %8.8lX %8.8lX",
-                                pui32BufPtr[2], pui32BufPtr[3], pui32BufPtr[1], pui32BufPtr[0]));
-       }
-}
-
-#else /* defined(PVRSRV_DUMP_MK_TRACE) */
-
-static INLINE IMG_VOID SGXDumpMKTrace (PVRSRV_SGXDEV_INFO *psDevInfo)
-{
-       PVR_UNREFERENCED_PARAMETER(psDevInfo);
-}
-
-#endif /* defined(PVRSRV_DUMP_MK_TRACE) */
-
-IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO *psDevInfo)
-{
-	IMG_UINT		ui32RegVal;
-
-	PVR_DPF((PVR_DBG_ERROR,"SGX Register Base Address (Linear):   0x%08X", psDevInfo->pvRegsBaseKM));
-	PVR_DPF((PVR_DBG_ERROR,"SGX Register Base Address (Physical): 0x%08X", psDevInfo->sRegsPhysBase));
-
-	
-	
-	
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_EVENT_STATUS);
-	if (ui32RegVal & (EUR_CR_EVENT_STATUS_DPM_OUT_OF_MEMORY_GBL_MASK | EUR_CR_EVENT_STATUS_DPM_OUT_OF_MEMORY_MT_MASK))
+	if (bDumpSGXRegs)
 	{
-		PVR_LOG(("DPM out of memory!!"));
+		PVR_DPF((PVR_DBG_ERROR,"SGX Register Base Address (Linear):   0x%08X", psDevInfo->pvRegsBaseKM));
+		PVR_DPF((PVR_DBG_ERROR,"SGX Register Base Address (Physical): 0x%08X", psDevInfo->sRegsPhysBase));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_EVENT_STATUS);
+		if (ui32RegVal & (EUR_CR_EVENT_STATUS_DPM_OUT_OF_MEMORY_GBL_MASK | EUR_CR_EVENT_STATUS_DPM_OUT_OF_MEMORY_MT_MASK))
+		{
+			PVR_LOG(("DPM out of memory!!"));
+		}
+		PVR_LOG(("EUR_CR_EVENT_STATUS:     %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_EVENT_STATUS2);
+		PVR_LOG(("EUR_CR_EVENT_STATUS2:    %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_CTRL);
+		PVR_LOG(("EUR_CR_BIF_CTRL:         %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_INT_STAT);
+		PVR_LOG(("EUR_CR_BIF_INT_STAT:     %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_FAULT);
+		PVR_LOG(("EUR_CR_BIF_FAULT:        %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_MEM_REQ_STAT);
+		PVR_LOG(("EUR_CR_BIF_MEM_REQ_STAT: %x", ui32RegVal));
+
+		ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_CLKGATECTL);
+		PVR_LOG(("EUR_CR_CLKGATECTL:       %x", ui32RegVal));
 	}
-	PVR_LOG(("EUR_CR_EVENT_STATUS:     %x", ui32RegVal));
+			
+	#if defined(PVRSRV_USSE_EDM_STATUS_DEBUG)
+	{
+		IMG_UINT32	*pui32MKTraceBuffer = psDevInfo->psKernelEDMStatusBufferMemInfo->pvLinAddrKM;
+		IMG_UINT32	ui32LastStatusCode, ui32WriteOffset;
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_EVENT_STATUS2);
-	PVR_LOG(("EUR_CR_EVENT_STATUS2:    %x", ui32RegVal));
+		ui32LastStatusCode = *pui32MKTraceBuffer;
+		pui32MKTraceBuffer++;
+		ui32WriteOffset = *pui32MKTraceBuffer;
+		pui32MKTraceBuffer++;
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_CTRL);
-	PVR_LOG(("EUR_CR_BIF_CTRL:         %x", ui32RegVal));
+		PVR_LOG(("Last SGX microkernel status code: 0x%x", ui32LastStatusCode));
+		
+		#if defined(PVRSRV_DUMP_MK_TRACE)
+		{
+			IMG_UINT32	ui32LoopCounter;
+			
+			for (ui32LoopCounter = 0;
+				 ui32LoopCounter < SGXMK_TRACE_BUFFER_SIZE;
+				 ui32LoopCounter++)
+			{
+				IMG_UINT32	*pui32BufPtr;
+				pui32BufPtr = pui32MKTraceBuffer +
+								(((ui32WriteOffset + ui32LoopCounter) % SGXMK_TRACE_BUFFER_SIZE) * 4);
+				PVR_LOG(("%8.8lX %8.8lX %8.8lX %8.8lX",
+						 pui32BufPtr[2], pui32BufPtr[3], pui32BufPtr[1], pui32BufPtr[0]));
+			}
+		}
+		#endif
+	}
+	#endif
 
-#if defined(EUR_CR_BIF_BANK0)
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_BANK0);
-	PVR_LOG(("EUR_CR_BIF_BANK0:        %x", ui32RegVal));
-#endif
+	{
+		IMG_UINT32	*pui32HostCtlBuffer = (IMG_UINT32 *)psDevInfo->psSGXHostCtl;
+		IMG_UINT32	ui32LoopCounter;
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_INT_STAT);
-	PVR_LOG(("EUR_CR_BIF_INT_STAT:     %x", ui32RegVal));
+		PVR_LOG(("SGX Host control:"));
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_FAULT);
-	PVR_LOG(("EUR_CR_BIF_FAULT:        %x", ui32RegVal));
+		for (ui32LoopCounter = 0;
+			 ui32LoopCounter < sizeof(*psDevInfo->psSGXHostCtl) / sizeof(*pui32HostCtlBuffer);
+			 ui32LoopCounter += 4)
+		{
+			PVR_LOG(("\t0x%lX: 0x%8.8lX 0x%8.8lX 0x%8.8lX 0x%8.8lX", ui32LoopCounter * sizeof(*pui32HostCtlBuffer),
+					pui32HostCtlBuffer[ui32LoopCounter + 0], pui32HostCtlBuffer[ui32LoopCounter + 1],
+					pui32HostCtlBuffer[ui32LoopCounter + 2], pui32HostCtlBuffer[ui32LoopCounter + 3]));
+		}
+	}
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_BIF_MEM_REQ_STAT);
-	PVR_LOG(("EUR_CR_BIF_MEM_REQ_STAT: %x", ui32RegVal));
+	{
+		IMG_UINT32	*pui32TA3DCtlBuffer = psDevInfo->psKernelSGXTA3DCtlMemInfo->pvLinAddrKM;
+		IMG_UINT32	ui32LoopCounter;
 
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_CLKGATECTL);
-	PVR_LOG(("EUR_CR_CLKGATECTL:       %x", ui32RegVal));
+		PVR_LOG(("SGX TA/3D control:"));
 
-#if defined(EUR_CR_PDS_PC_BASE)
-	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, EUR_CR_PDS_PC_BASE);
-	PVR_LOG(("EUR_CR_PDS_PC_BASE:      %x", ui32RegVal));
-#endif
-
-	SGXDumpMKTrace(psDevInfo);
+		for (ui32LoopCounter = 0;
+			 ui32LoopCounter < psDevInfo->psKernelSGXTA3DCtlMemInfo->ui32AllocSize / sizeof(*pui32TA3DCtlBuffer);
+			 ui32LoopCounter += 4)
+		{
+			PVR_LOG(("\t0x%lX: 0x%8.8lX 0x%8.8lX 0x%8.8lX 0x%8.8lX", ui32LoopCounter * sizeof(*pui32TA3DCtlBuffer),
+					pui32TA3DCtlBuffer[ui32LoopCounter + 0], pui32TA3DCtlBuffer[ui32LoopCounter + 1],
+					pui32TA3DCtlBuffer[ui32LoopCounter + 2], pui32TA3DCtlBuffer[ui32LoopCounter + 3]));
+		}
+	}
 }
-
 
 #if defined(SYS_USING_INTERRUPTS) || defined(SUPPORT_HW_RECOVERY)
 static
@@ -931,7 +944,7 @@ IMG_VOID HWRecoveryResetSGX (PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	PVR_LOG(("HWRecoveryResetSGX: SGX Hardware Recovery triggered"));
 
-	SGXDumpDebugInfo(psDevInfo);
+	SGXDumpDebugInfo(psDeviceNode, IMG_TRUE);
 
 	
 	PDUMPSUSPEND();
@@ -1970,7 +1983,7 @@ PVRSRV_ERROR SGXGetMiscInfoKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 #if defined(PVRSRV_DUMP_MK_TRACE)
 	case SGX_MISC_INFO_DUMP_MK_TRACE:
 	{
-		SGXDumpMKTrace(psDevInfo);
+		SGXDumpDebugInfo(psDeviceNode, IMG_FALSE);
 		BUG();
 		return PVRSRV_OK;
 	}

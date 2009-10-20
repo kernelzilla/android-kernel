@@ -1013,6 +1013,18 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 	if (psMapData->psSrcMemInfo->ui32RefCount == 1 &&
 		psMapData->psSrcMemInfo->bPendingFree == IMG_TRUE)
 	{
+		if ((psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32WriteOpsPending !=
+			 psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32WriteOpsComplete))
+		{
+			PVR_DPF((PVR_DBG_ERROR, "UnmapDeviceMemoryCallBack: Unflushed pending write operations!"));
+		}
+
+		if ((psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32ReadOpsPending !=
+			 psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32ReadOpsComplete))
+		{
+			PVR_DPF((PVR_DBG_ERROR, "UnmapDeviceMemoryCallBack: Unflushed pending read operations!"));
+		}
+
 		if (psMapData->psSrcMemInfo->sMemBlk.hResItem != IMG_NULL)
 		{
 			eError = ResManFreeResByPtr(psMapData->psSrcMemInfo->sMemBlk.hResItem);
