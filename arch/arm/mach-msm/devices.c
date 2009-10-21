@@ -609,7 +609,7 @@ struct platform_device msm_device_spi = {
 
 #define OFF CLKFLAG_AUTO_OFF
 #define MINMAX (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_USE_MAX_TO_SET)
-#define USE_MIN CLKFLAG_USE_MIN_TO_SET
+#define USE_MIN (CLKFLAG_USE_MIN_TO_SET | CLKFLAG_SHARED)
 
 struct clk msm_clocks[] = {
 	CLK_ALL("adm_clk", ADM_CLK, NULL, 0),
