@@ -203,9 +203,9 @@ void __init msm_clock_init(void)
 
 	spin_lock_init(&clocks_lock);
 	mutex_lock(&clocks_mutex);
-	for (clk = msm_clocks; clk && clk->name; clk++)
+	for (clk = msm_clocks; clk && clk->name; clk++) {
 		hlist_add_head(&clk->list, &clocks);
-
+	}
 	mutex_unlock(&clocks_mutex);
 }
 
@@ -234,6 +234,7 @@ static void __init clock_debug_init(void)
 {
 	struct dentry *dent;
 	struct clk *clk;
+	struct hlist_node *pos;
 
 	dent = debugfs_create_dir("clk", 0);
 	if (IS_ERR(dent)) {
@@ -243,7 +244,7 @@ static void __init clock_debug_init(void)
 	}
 
 	mutex_lock(&clocks_mutex);
-	list_for_each_entry(clk, &clocks, list) {
+	hlist_for_each_entry(clk, pos, &clocks, list) {
 		debugfs_create_file(clk->name, 0644, dent, clk,
 				    &clk_debug_fops);
 	}
