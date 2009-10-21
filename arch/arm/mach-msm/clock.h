@@ -31,7 +31,7 @@ struct clk {
 	uint32_t count;
 	uint32_t flags;
 	const char *name;
-	struct list_head list;
+	struct hlist_node list;
 	struct device *dev;
 };
 
