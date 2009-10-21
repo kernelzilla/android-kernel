@@ -22,6 +22,8 @@
 #define CLKFLAG_USE_MAX_TO_SET		(0x00000001)
 #define CLKFLAG_AUTO_OFF		(0x00000002)
 #define CLKFLAG_USE_MIN_TO_SET		(0x00000004)
+#define CLKFLAG_SHARED			(0x00000008)
+#define CLKFLAG_HANDLE			(0x00000010)
 
 #define CLKFLAG_ARCH_MSM7X00A		(0x00010000)
 #define CLKFLAG_ARCH_QSD8X50		(0x00020000)
@@ -34,6 +36,13 @@ struct clk {
 	const char *name;
 	struct hlist_node list;
 	struct device *dev;
+	struct hlist_head handles;
+};
+
+struct clk_handle {
+	struct clk clk;
+	struct clk *source;
+	unsigned long rate;
 };
 
 #define A11S_CLK_CNTL_ADDR		(MSM_CSR_BASE + 0x100)
