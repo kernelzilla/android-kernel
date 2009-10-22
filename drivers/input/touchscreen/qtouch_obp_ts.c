@@ -1053,12 +1053,7 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 		pr_info("%s: Suspending\n", __func__);
 
 	disable_irq_nosync(ts->client->irq);
-	ret = cancel_work_sync(&ts->work);
-	if (ret) {
-		pr_info("%s: Not Suspending\n", __func__);
-		enable_irq(ts->client->irq);
-		return -EBUSY;
-	}
+	cancel_work_sync(&ts->work);
 
 	ret = qtouch_power_config(ts, 0);
 	if (ret < 0)
