@@ -422,7 +422,7 @@ static int omap_compare_ecc(u8 *ecc_data1,	/* read from NAND memory */
 
 		page_data[find_byte] ^= (1 << find_bit);
 
-		return 0;
+		return 1;
 	default:
 		if (isEccFF) {
 			if (ecc_data2[0] == 0 &&
@@ -448,7 +448,7 @@ static int omap_correct_data(struct mtd_info *mtd, u_char * dat,
 {
 	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
 							mtd);
-	int blockCnt = 0, i = 0, ret = 0;
+	int blockCnt = 0, i = 0, corrected = 0, ret = 0;
 
 	/* Ex NAND_ECC_HW12_2048 */
 	if ((info->nand.ecc.mode == NAND_ECC_HW) &&
@@ -461,12 +461,15 @@ static int omap_correct_data(struct mtd_info *mtd, u_char * dat,
 		if (memcmp(read_ecc, calc_ecc, 3) != 0) {
 			ret = omap_compare_ecc(read_ecc, calc_ecc, dat);
 			if (ret < 0) return ret;
+			if (ret > 0)
+				corrected = 1;
 		}
 		read_ecc += 3;
 		calc_ecc += 3;
 		dat      += 512;
 	}
-	return 0;
+
+	return corrected;
 }
 
 /*
