@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
-# Tue Oct 20 13:15:45 2009
+# Fri Oct 23 20:03:54 2009
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -293,7 +293,7 @@ CONFIG_PAGE_OFFSET=0xC0000000
 CONFIG_PREEMPT=y
 CONFIG_HZ=128
 CONFIG_AEABI=y
-CONFIG_OABI_COMPAT=y
+# CONFIG_OABI_COMPAT is not set
 CONFIG_ARCH_FLATMEM_HAS_HOLES=y
 # CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
 # CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
@@ -353,9 +353,6 @@ CONFIG_CPU_IDLE_GOV_MENU=y
 #
 # At least one emulation must be selected
 #
-CONFIG_FPE_NWFPE=y
-# CONFIG_FPE_NWFPE_XP is not set
-# CONFIG_FPE_FASTFPE is not set
 CONFIG_VFP=y
 CONFIG_VFPv3=y
 CONFIG_NEON=y
