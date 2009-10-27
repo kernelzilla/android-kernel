@@ -157,7 +157,6 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 
 	return NULL;
 }
-EXPORT_SYMBOL(omap_pm_dsp_get_opp_table);
 
 void omap_pm_dsp_set_min_opp(u8 opp_id)
 {
@@ -182,7 +181,6 @@ void omap_pm_dsp_set_min_opp(u8 opp_id)
 	 *
 	 */
 }
-EXPORT_SYMBOL(omap_pm_dsp_set_min_opp);
 
 u8 omap_pm_dsp_get_opp(void)
 {
@@ -198,7 +196,6 @@ u8 omap_pm_dsp_get_opp(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(omap_pm_dsp_get_opp);
 
 u8 omap_pm_vdd1_get_opp(void)
 {
@@ -210,7 +207,6 @@ u8 omap_pm_vdd1_get_opp(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(omap_pm_vdd1_get_opp);
 
 u8 omap_pm_vdd2_get_opp(void)
 {
@@ -222,7 +218,6 @@ u8 omap_pm_vdd2_get_opp(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(omap_pm_vdd2_get_opp);
 
 /*
  * CPUFreq-originated constraint
@@ -263,7 +258,6 @@ void omap_pm_cpu_set_freq(unsigned long f)
 	 * CDP should just be able to set the VDD1 OPP clock rate here.
 	 */
 }
-EXPORT_SYMBOL(omap_pm_cpu_set_freq);
 
 unsigned long omap_pm_cpu_get_freq(void)
 {
@@ -275,7 +269,6 @@ unsigned long omap_pm_cpu_get_freq(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(omap_pm_cpu_get_freq);
 
 /*
  * Device context loss tracking

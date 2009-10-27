@@ -185,7 +185,6 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 
 	return NULL;
 }
-EXPORT_SYMBOL(omap_pm_dsp_get_opp_table);
 
 void omap_pm_dsp_set_min_opp(u8 opp_id)
 {
@@ -203,28 +202,24 @@ void omap_pm_dsp_set_min_opp(u8 opp_id)
 	resource_request("vdd1_opp", &dummy_dsp_dev, opp_id);
 	return;
 }
-EXPORT_SYMBOL(omap_pm_dsp_set_min_opp);
 
 u8 omap_pm_dsp_get_opp(void)
 {
 	pr_debug("OMAP PM: DSP requests current DSP OPP ID\n");
 	return resource_get_level("vdd1_opp");
 }
-EXPORT_SYMBOL(omap_pm_dsp_get_opp);
 
 u8 omap_pm_vdd1_get_opp(void)
 {
 	pr_debug("OMAP PM: User requests current VDD1 OPP\n");
 	return resource_get_level("vdd1_opp");
 }
-EXPORT_SYMBOL(omap_pm_vdd1_get_opp);
 
 u8 omap_pm_vdd2_get_opp(void)
 {
 	pr_debug("OMAP PM: User requests current VDD2 OPP\n");
 	return resource_get_level("vdd2_opp");
 }
-EXPORT_SYMBOL(omap_pm_vdd2_get_opp);
 
 /*
  * CPUFreq-originated constraint
@@ -261,14 +256,12 @@ void omap_pm_cpu_set_freq(unsigned long f)
 	resource_request("mpu_freq", &dummy_cpufreq_dev, f);
 	return;
 }
-EXPORT_SYMBOL(omap_pm_cpu_set_freq);
 
 unsigned long omap_pm_cpu_get_freq(void)
 {
 	pr_debug("OMAP PM: CPUFreq requests current CPU frequency\n");
 	return resource_get_level("mpu_freq");
 }
-EXPORT_SYMBOL(omap_pm_cpu_get_freq);
 
 /*
  * Device context loss tracking
