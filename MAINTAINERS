@@ -2315,6 +2315,13 @@ F:	Documentation/isdn/README.gigaset
 F:	drivers/isdn/gigaset/
 F:	include/linux/gigaset_dev.h
 
+HAPTIC SUBSYSTEM
+M:	Kyungmin Park <kyungmin.park@samsung.com>
+L:	linux-input@vger.kernel.org
+S:	Maintained
+F:	drivers/haptic/
+F:	include/linux/haptic.h
+
 HARD DRIVE ACTIVE PROTECTION SYSTEM (HDAPS) DRIVER
 M:	Frank Seidel <frank@f-seidel.de>
 L:	lm-sensors@lm-sensors.org
