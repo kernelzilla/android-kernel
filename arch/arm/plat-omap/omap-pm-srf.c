@@ -2,14 +2,11 @@
  * omap-pm-srf.c - OMAP power management interface implemented
  * using Shared resource framework
  *
- * This code implements the OMAP power management interface to
- * drivers, CPUIdle, CPUFreq, and DSP Bridge.  It is strictly for
- * debug/demonstration use, as it does nothing but printk() whenever a
- * function is called (when DEBUG is defined, below)
+ * Copyright (C) 2008-2009 Texas Instruments, Inc.
+ * Copyright (C) 2008-2009 Nokia Corporation
+ * Rajendra Nayak
  *
- * Copyright (C) 2008 Texas Instruments, Inc.
- * Copyright (C) 2008 Nokia Corporation
- * Paul Walmsley
+ * This code is based on plat-omap/omap-pm-noop.c.
  *
  * Interface developed by (in alphabetical order):
  * Karthik Dasu, Tony Lindgren, Rajendra Nayak, Sakari Poussa, Veeramanikandan
