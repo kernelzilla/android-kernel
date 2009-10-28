@@ -1663,10 +1663,6 @@ int are_driveromap_uarts_active(int num)
 	if (status & UART_LSR_DR)
 		return 1;
 
-	/* Any modem activity? */
-	status = serial_in(up, UART_MSR);
-	if (!((status & UART_MSR_ANY_DELTA) == 0))
-		return 1;
 	if (up->use_dma) {
 		/*
 		 * Silicon Errata i291 workaround.
