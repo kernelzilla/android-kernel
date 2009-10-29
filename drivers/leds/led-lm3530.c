@@ -182,24 +182,13 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 	struct lm3530_data *als_data =
 	    container_of(led_cdev, struct lm3530_data, led_dev);
 
-	/* Get the number of steps to zero brightness */
-	if (als_data->zone == 0)
-		step = als_data->als_pdata->zone_target_0;
-	else if (als_data->zone == 1)
-		step = als_data->als_pdata->zone_target_1;
-	else if (als_data->zone == 2)
-		step = als_data->als_pdata->zone_target_2;
-	else if (als_data->zone == 3)
-		step = als_data->als_pdata->zone_target_3;
-	else if (als_data->zone == 4)
-		step = als_data->als_pdata->zone_target_4;
-
 	if (value == LED_OFF) {
-		error = lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE,
-			     0x03);
-		if (error != 0)
-			pr_err("%s:Unable to set the ramp rate: %d\n",
-			       __func__, error);
+		if (als_data->mode == AUTOMATIC) {
+			error = lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE, 0x03);
+			if (error != 0)
+				pr_err("%s:Unable to set the ramp rate: %d\n",
+			    	   __func__, error);
+		}
 
 		als_data->led_on = 0;
 		brightness = als_data->als_pdata->gen_config &
@@ -210,9 +199,24 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				__func__, error);
 			return;
 		}
-		if (als_data->mode == AUTOMATIC)
+		if (als_data->mode == AUTOMATIC) {
+			/* Get the number of steps to zero brightness */
+			if (als_data->zone == 0)
+				step = als_data->als_pdata->zone_target_0;
+			else if (als_data->zone == 1)
+				step = als_data->als_pdata->zone_target_1;
+			else if (als_data->zone == 2)
+				step = als_data->als_pdata->zone_target_2;
+			else if (als_data->zone == 3)
+				step = als_data->als_pdata->zone_target_3;
+			else if (als_data->zone == 4)
+				step = als_data->als_pdata->zone_target_4;
 			msleep(step * 4);
+		}
 	} else {
+		int old_led_on = als_data->led_on;
+		als_data->led_on = 1;
+
 		switch (als_data->mode) {
 		case AUTOMATIC:
 			if (als_data->led_on == 0) {
@@ -230,12 +234,10 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				if (error != 0)
 					pr_err("%s:Unable to set the ramp rate: %d\n",
 						__func__, error);
-
-				als_data->led_on = 1;
-
 			}
 			break;
 		case MANUAL:
+		case MANUAL_SENSOR:
 			error = lm3530_write_reg(als_data,
 						 LM3530_BRIGHTNESS_CTRL_REG,
 						 value / 2);
@@ -251,6 +253,10 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				return;
 			}
 			als_data->last_requested_brightness = value;
+			if (als_data->mode == MANUAL_SENSOR && old_led_on == 0) {
+				disable_irq(als_data->client->irq);
+				queue_work(als_data->working_queue, &als_data->wq);
+			}
 			break;
 		}
 	}
@@ -273,15 +279,19 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 	struct i2c_client *client = container_of(dev->parent, struct i2c_client,
 						 dev);
 	struct lm3530_data *als_data = i2c_get_clientdata(client);
+	int config;
 	unsigned long mode_value;
 
 	error = strict_strtoul(buf, 10, &mode_value);
 
 	if (error < 0)
 		return -1;
+	if (mode_value != MANUAL
+		    && mode_value != AUTOMATIC
+		    && mode_value != MANUAL_SENSOR)
+		return -1;
 
-	if (mode_value >= AUTOMATIC) {
-
+	if (mode_value == AUTOMATIC) {
 		ld_lm3530_init_registers(als_data);
 		error = lm3530_write_reg(als_data, LM3530_GEN_CONFIG,
 					 als_data->als_pdata->gen_config);
@@ -299,22 +309,21 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 				__func__, error);
 
 		als_data->mode = AUTOMATIC;
-		disable_irq(als_data->client->irq);
-		queue_work(als_data->working_queue, &als_data->wq);
-
 	} else {
-		als_data->mode = MANUAL;
-
-		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG,
-			LM3530_MANUAL_VALUE);
+		als_data->mode = mode_value;
+		config = LM3530_MANUAL_VALUE;
+		if (mode_value == MANUAL_SENSOR)
+			config |= LM3530_SENSOR_ENABLE;
+		error = lm3530_write_reg(als_data, LM3530_ALS_CONFIG, config);
 		if (error) {
 			pr_err("%s:Failed to set manual mode:%d\n",
 			       __func__, error);
 			return -1;
 		}
 
-		lm3530_write_reg(als_data, LM3530_ALS_RESISTOR_SELECT,
-			0x00);
+		config = (mode_value == MANUAL ? 0 : als_data->als_pdata->als_resistor_sel);
+		lm3530_write_reg(als_data, LM3530_ALS_RESISTOR_SELECT, config);
+
 		error = lm3530_write_reg(als_data, LM3530_BRIGHTNESS_RAMP_RATE,
 			     0x00);
 		if (error != 0)
@@ -331,6 +340,12 @@ static ssize_t ld_lm3530_als_store(struct device *dev, struct device_attribute
 			return -1;
 		}
 	}
+
+	if (mode_value != MANUAL) {
+		disable_irq(als_data->client->irq);
+		queue_work(als_data->working_queue, &als_data->wq);
+	}
+
 	return als_data->mode;
 }
 

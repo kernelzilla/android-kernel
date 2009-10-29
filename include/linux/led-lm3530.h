@@ -21,6 +21,7 @@
 
 #define	MANUAL		0
 #define	AUTOMATIC	1
+#define	MANUAL_SENSOR	2
 
 
 #define LD_LM3530_LED_DEV "lcd-backlight"
@@ -55,6 +56,7 @@
 #define LM3530_GEN_CONF_MASK	0xE3
 #define LM3530_MAX_LED_VALUE	0xFF
 #define LM3530_MANUAL_VALUE		0x64
+#define LM3530_SENSOR_ENABLE	0x08
 
 #ifdef __KERNEL__
 struct lm3530_platform_data {
