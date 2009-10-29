@@ -19,6 +19,9 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 #include <linux/fs.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
@@ -93,9 +96,18 @@ struct lis331dlh_data {
 	atomic_t enabled;
 	int on_before_suspend;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+#endif
+
 	u8 shift_adj;
 	u8 resume_state[5];
 };
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void lis331dlh_early_suspend(struct early_suspend *handler);
+static void lis331dlh_late_resume(struct early_suspend *handler);
+#endif
 
 /*
  * Because misc devices can not carry a pointer from driver register to
@@ -671,6 +683,13 @@ static int lis331dlh_probe(struct i2c_client *client,
 	/* As default, do not report information */
 	atomic_set(&lis->enabled, 0);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	lis->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	lis->early_suspend.suspend = lis331dlh_early_suspend;
+	lis->early_suspend.resume = lis331dlh_late_resume;
+	register_early_suspend(&lis->early_suspend);
+#endif
+
 	mutex_unlock(&lis->lock);
 
 	dev_info(&client->dev, "lis331dlh probed\n");
@@ -726,6 +745,24 @@ static int lis331dlh_suspend(struct i2c_client *client, pm_message_t mesg)
 	return lis331dlh_disable(lis);
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void lis331dlh_early_suspend(struct early_suspend *handler)
+{
+	struct lis331dlh_data *lis;
+
+	lis = container_of(handler, struct lis331dlh_data, early_suspend);
+	lis331dlh_suspend(lis->client, PMSG_SUSPEND);
+}
+
+static void lis331dlh_late_resume(struct early_suspend *handler)
+{
+	struct lis331dlh_data *lis;
+
+	lis = container_of(handler, struct lis331dlh_data, early_suspend);
+	lis331dlh_resume(lis->client);
+}
+#endif
+
 static const struct i2c_device_id lis331dlh_id[] = {
 	{NAME, 0},
 	{},
@@ -739,8 +776,10 @@ static struct i2c_driver lis331dlh_driver = {
 		   },
 	.probe = lis331dlh_probe,
 	.remove = __devexit_p(lis331dlh_remove),
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.resume = lis331dlh_resume,
 	.suspend = lis331dlh_suspend,
+#endif
 	.id_table = lis331dlh_id,
 };
 
