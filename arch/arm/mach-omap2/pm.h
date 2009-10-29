@@ -43,6 +43,7 @@ struct prm_setup_vc {
 };
 
 struct cpuidle_params {
+	u8  valid;
 	u32 sleep_latency;
 	u32 wake_latency;
 	u32 threshold;
