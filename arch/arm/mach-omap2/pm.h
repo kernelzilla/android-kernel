@@ -49,7 +49,14 @@ struct cpuidle_params {
 };
 
 extern void omap3_pm_init_vc(struct prm_setup_vc *setup_vc);
+#ifdef CONFIG_CPU_IDLE
 extern void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params);
+#else
+static inline void omap3_pm_init_cpuidle(
+			struct cpuidle_params *cpuidle_board_params)
+{
+}
+#endif
 
 extern int resource_set_opp_level(int res, u32 target_level, int flags);
 extern int resource_access_opp_lock(int res, int delta);
