@@ -179,6 +179,7 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 	int brightness = 0;
 	int error = 0;
 	int step = 0;
+	int old_led_on;
 	struct lm3530_data *als_data =
 	    container_of(led_cdev, struct lm3530_data, led_dev);
 
@@ -214,9 +215,6 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 			msleep(step * 4);
 		}
 	} else {
-		int old_led_on = als_data->led_on;
-		als_data->led_on = 1;
-
 		switch (als_data->mode) {
 		case AUTOMATIC:
 			if (als_data->led_on == 0) {
@@ -234,6 +232,7 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				if (error != 0)
 					pr_err("%s:Unable to set the ramp rate: %d\n",
 						__func__, error);
+				als_data->led_on = 1;
 			}
 			break;
 		case MANUAL:
@@ -253,6 +252,9 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 				return;
 			}
 			als_data->last_requested_brightness = value;
+			old_led_on = als_data->led_on;
+			/* als_data->led_on must be set before calling queue_work() */
+			als_data->led_on = 1;
 			if (als_data->mode == MANUAL_SENSOR && old_led_on == 0) {
 				disable_irq(als_data->client->irq);
 				queue_work(als_data->working_queue, &als_data->wq);
