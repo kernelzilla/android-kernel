@@ -795,7 +795,7 @@ void flush_pmem_file(struct file *file, unsigned long offset, unsigned long len)
 
 	id = get_id(file);
 	data = (struct pmem_data *)file->private_data;
-	if (!pmem[id].cached)
+	if (!pmem[id].cached || file->f_flags & O_SYNC)
 		return;
 
 	down_read(&data->sem);
