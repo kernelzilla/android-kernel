@@ -30,7 +30,10 @@
 
 /* ---------------------------------------------------------------------- */
 
-/* need to be faster and smaller */
+/*
+ * If you think VDIR too big or slow,
+ * then try RDU since aufs stopped 'packing' these structures.
+ */
 
 struct au_nhash {
 	unsigned int		nh_num;
@@ -50,9 +53,8 @@ struct au_vdir_dehstr {
 struct au_vdir_de {
 	ino_t			de_ino;
 	unsigned char		de_type;
-	/* caution: packed */
 	struct au_vdir_destr	de_str;
-} __packed;
+};
 
 struct au_vdir_wh {
 	struct hlist_node	wh_hash;
@@ -63,9 +65,8 @@ struct au_vdir_wh {
 #else
 	aufs_bindex_t		wh_bindex;
 #endif
-	/* caution: packed */
 	struct au_vdir_destr	wh_str;
-} __packed;
+};
 
 union au_vdir_deblk_p {
 	unsigned char		*deblk;
