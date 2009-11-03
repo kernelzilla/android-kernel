@@ -25,6 +25,7 @@
 
 static unsigned int calc_size(int nlen)
 {
+	BUILD_BUG_ON(sizeof(ino_t) != sizeof(long));
 	return ALIGN(sizeof(struct au_vdir_de) + nlen, sizeof(ino_t));
 }
 
