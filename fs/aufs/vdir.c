@@ -25,8 +25,8 @@
 
 static unsigned int calc_size(int nlen)
 {
-	return ALIGN(sizeof(struct au_vdir_de) + nlen,
-		     sizeof(struct au_vdir_de));
+	BUILD_BUG_ON(sizeof(ino_t) != sizeof(long));
+	return ALIGN(sizeof(struct au_vdir_de) + nlen, sizeof(ino_t));
 }
 
 static int set_deblk_end(union au_vdir_deblk_p *p,
