@@ -125,10 +125,9 @@ struct mt9p012_reg {
 };
 
 enum mt9p012_image_size {
-	MT9P012_BIN4XSCALE,
+	MT9P012_BIN4XSCALE = 0,
 	MT9P012_BIN4X,
 	MT9P012_BIN2X,
-	MT9P012_THREE_MP,
 	MT9P012_FIVE_MP
 };
 
@@ -154,13 +153,11 @@ const static struct mt9p012_capture_size mt9p012_sizes[] = {
 	{  216, 162 },	/* 4X BINNING+SCALING */
 	{  648, 486 },	/* 4X BINNING */
 	{ 1296, 972 },	/* 2X BINNING */
-	{ 2048, 1536},	/* 3 MP */
 	{ 2592, 1944},	/* 5 MP */
 };
 
 enum mt9p012_frame_type {
 	MT9P012_FRAME_5MP_10FPS = 0,
-	MT9P012_FRAME_3MP_10FPS,
 	MT9P012_FRAME_1296_30FPS,
 	MT9P012_FRAME_648_30FPS,
 	MT9P012_FRAME_216_30FPS,
@@ -285,6 +282,7 @@ const static struct mt9p012_reg mt9p013_common[] = {
 	/* Recommended values for image quality */
 	{MT9P012_16BIT, 0x3086, 0x2468},
 	{MT9P012_16BIT, 0x3088, 0x6FFF},
+	{MT9P012_16BIT, 0x309E, 0x5D00},
 	{MT9P012_16BIT, 0x316C, 0xA4F0},
 	{MT9P012_TOK_TERM, 0, 0}
 };
@@ -398,40 +396,6 @@ static struct mt9p012_sensor_settings sensor_settings[] = {
 		.clk = {
 			.pre_pll_div = 10,
 			.pll_mult = 93,
-			.vt_pix_clk_div = 4,
-			.vt_sys_clk_div = 1,
-			.op_pix_clk_div = 8,
-			.op_sys_clk_div = 1,
-		},
-		.frame = {
-			.frame_len_lines_min = 2056,
-			.line_len_pck = 5372,
-			.x_addr_start = 8,
-			.x_addr_end = 2599,
-			.y_addr_start = 8,
-			.y_addr_end = 1951,
-			.x_output_size = 2592,
-			.y_output_size = 1944,
-			.x_odd_inc = 1,
-			.y_odd_inc = 1,
-			.x_bin = 0,
-			.xy_bin = 0,
-			.scale_m = 0,
-			.scale_mode = 0,
-		},
-		.exposure = {
-			.coarse_int_tm = 1700,
-			.fine_int_tm = 882,
-			.fine_correction = 156,
-			.analog_gain = 0x10C0
-		}
-	},
-
-	/* FRAME_3MP */
-	{
-		.clk = {
-			.pre_pll_div = 10,
-			.pll_mult = 184,
 			.vt_pix_clk_div = 4,
 			.vt_sys_clk_div = 1,
 			.op_pix_clk_div = 8,
@@ -933,9 +897,6 @@ static enum mt9p012_frame_type mt9p012_find_iframe(enum mt9p012_image_size isize
 
 	} else if (isize == MT9P012_BIN2X) {
 		iframe = MT9P012_FRAME_1296_30FPS;
-
-	} else if (isize == MT9P012_THREE_MP) {
-		iframe = MT9P012_FRAME_3MP_10FPS;
 
 	} else {
 		iframe = MT9P012_FRAME_5MP_10FPS;
@@ -2061,7 +2022,7 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 		return -EINVAL;
 
 	/* Do we already reached all discrete framesizes? */
-	if (frms->index >= 5)
+	if (frms->index > MT9P012_FIVE_MP)
 		return -EINVAL;
 
 	frms->type = V4L2_FRMSIZE_TYPE_DISCRETE;
@@ -2094,11 +2055,9 @@ static int ioctl_enum_frameintervals(struct v4l2_int_device *s,
 
 	/* Do we already reached all discrete framesizes? */
 
-	if (((frmi->width == mt9p012_sizes[4].width) &&
-				(frmi->height == mt9p012_sizes[4].height)) ||
-				((frmi->width == mt9p012_sizes[3].width) &&
-				(frmi->height == mt9p012_sizes[3].height))) {
-		/* FIXME: The only frameinterval supported by 5MP and 3MP
+	if ((frmi->width == mt9p012_sizes[3].width) &&
+				(frmi->height == mt9p012_sizes[3].height)) {
+		/* FIXME: The only frameinterval supported by 5MP
 		 * capture sizes is 1/11 fps
 		 */
 		if (frmi->index != 0)
