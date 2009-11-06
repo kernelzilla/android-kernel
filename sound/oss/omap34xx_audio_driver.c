@@ -1964,9 +1964,12 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			int lc;
 			short *ptr = (short *)(buf->data + buf->offset);
 			for (lc = 0; lc < chunksize / 2; lc += 2) {
-				ptr[lc] = -ptr[lc];
-				if (ptr[lc] == 0x8000)
-					ptr[lc] = 0x7FFF;
+				/* since -(SHORT_MIN) is not a valid short
+				 * if -(SHORT_MIN) set to SHORT_MAX */
+				if (ptr[lc] == SHORT_MIN)
+					ptr[lc] = SHORT_MAX;
+				else
+					ptr[lc] = -ptr[lc];
 			}
 		}
 
