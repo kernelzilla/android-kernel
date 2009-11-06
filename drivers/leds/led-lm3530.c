@@ -245,7 +245,11 @@ static void ld_lm3530_brightness_set(struct led_classdev *led_cdev,
 					__func__, error);
 				return;
 			}
-			brightness = als_data->als_pdata->manual_current;
+			if (als_data->mode == MANUAL_SENSOR)
+				brightness = als_data->als_pdata->gen_config;
+			else
+				brightness = als_data->als_pdata->manual_current;
+
 			if (lm3530_write_reg(als_data, LM3530_GEN_CONFIG, brightness)) {
 				pr_err("%s:writing failed while setting brightness:%d\n",
 					__func__, error);
