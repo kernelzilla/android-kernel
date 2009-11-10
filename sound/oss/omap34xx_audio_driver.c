@@ -297,9 +297,6 @@ static const struct sample_rate_info_t valid_sample_rates[] = {
 	{.rate = 48000, .cpcap_audio_rate = CPCAP_AUDIO_STDAC_RATE_48000_HZ},
 };
 
-static DEFINE_MUTEX(audio_write_lock);
-static DEFINE_MUTEX(audio_read_lock);
-static unsigned long flags;
 static int read_buf_full;
 static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
@@ -1973,8 +1970,6 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 			}
 		}
 
-		mutex_lock(&audio_write_lock);
-
 		buffer += chunksize;
 		count -= chunksize;
 		buf->offset += chunksize;
@@ -1996,8 +1991,6 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 
 	if (buffer - buffer0)
 		ret = buffer - buffer0;
-
-	mutex_unlock(&audio_write_lock);
 
 out:
 	mutex_unlock(&audio_lock);
@@ -2191,8 +2184,6 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 
 		mutex_lock(&audio_lock);
 
-		mutex_lock(&audio_read_lock);
-
 		read_buf_full--;
 
 		if (read_buf_full < 0)
@@ -2201,7 +2192,6 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 		if (copy_to_user(buffer, buf->data, str->fragsize)) {
 			AUDIO_ERROR_LOG("Audio: CopyTo User failed \n");
 			ret = -EFAULT;
-			mutex_unlock(&audio_read_lock);
 			goto err;
 		}
 
@@ -2209,8 +2199,6 @@ static ssize_t audio_codec_read(struct file *file, char *buffer, size_t size,
 			str->usr_head = 0;
 
 		size -= str->fragsize;
-
-		mutex_unlock(&audio_read_lock);
 	}
 
 	ret = local_size;
@@ -2238,11 +2226,11 @@ err:
 
 static int audio_mixer_close(struct inode *inode, struct file *file)
 {
+	mutex_lock(&audio_lock);
 	/* Reset mixer options so cpcap audio can enter low power state */
 	cpcap_audio_state.microphone = CPCAP_AUDIO_IN_NONE;
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
 
-	mutex_lock(&audio_lock);
 	state.dev_mixer_open_count = 0;
 	mutex_unlock(&audio_lock);
 	return 0;
