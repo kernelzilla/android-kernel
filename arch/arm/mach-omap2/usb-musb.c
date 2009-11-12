@@ -44,10 +44,11 @@ static struct platform_device dummy_pdev = {
 	},
 };
 
+static void __iomem *otg_base;
+static struct clk *otg_clk;
+
 static void __init usb_musb_pm_init(void)
 {
-	void __iomem *otg_base;
-	struct clk *otg_clk;
 	struct device *dev = &dummy_pdev.dev;
 
 	if (!cpu_is_omap34xx())
@@ -74,12 +75,13 @@ static void __init usb_musb_pm_init(void)
 			cpu_relax();
 	}
 
-	if (otg_clk) {
+	if (otg_clk)
 		clk_disable(otg_clk);
-		clk_put(otg_clk);
-	}
+}
 
-	iounmap(otg_base);
+void usb_musb_disable_autoidle(void)
+{
+	__raw_writel(0, otg_base + OTG_SYSCONFIG);
 }
 
 #ifdef CONFIG_USB_MUSB_SOC
