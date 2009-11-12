@@ -918,6 +918,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		break;
 
 	case IOCTL_KGSL_SHAREDMEM_FROM_VMALLOC:
+		kgsl_yamato_runpending(&kgsl_driver.yamato_device);
 		result = kgsl_ioctl_sharedmem_from_vmalloc(private,
 							   (void __user *)arg);
 		break;
@@ -928,6 +929,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 						       (void __user *)arg);
 		break;
 	case IOCTL_KGSL_SHAREDMEM_FROM_PMEM:
+		kgsl_yamato_runpending(&kgsl_driver.yamato_device);
 		result = kgsl_ioctl_sharedmem_from_pmem(private,
 							(void __user *)arg);
 		break;
