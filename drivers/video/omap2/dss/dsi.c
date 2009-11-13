@@ -2948,6 +2948,8 @@ static int dsi_update_thread(void *data)
 			} else {
 				dsi_handle_framedone();
 				dsi_perf_show("DISPC");
+				if (device->driver->framedone)
+					device->driver->framedone(device);
 			}
 		} else {
 			dsi_update_screen_l4(device, x, y, w, h);

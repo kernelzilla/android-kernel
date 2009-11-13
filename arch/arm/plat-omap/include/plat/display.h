@@ -517,6 +517,7 @@ struct omap_dss_driver {
 	void (*remove)(struct omap_dss_device *);
 
 	int (*enable)(struct omap_dss_device *display);
+	int (*framedone)(struct omap_dss_device *dssdev);
 	void (*disable)(struct omap_dss_device *display);
 	int (*suspend)(struct omap_dss_device *display);
 	int (*resume)(struct omap_dss_device *display);
