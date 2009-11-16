@@ -25,6 +25,7 @@ unsigned long acpuclk_get_rate(void);
 uint32_t acpuclk_get_switch_time(void);
 unsigned long acpuclk_wait_for_irq(void);
 unsigned long acpuclk_power_collapse(void);
+unsigned long acpuclk_get_wfi_rate(void);
 
 
 #endif
