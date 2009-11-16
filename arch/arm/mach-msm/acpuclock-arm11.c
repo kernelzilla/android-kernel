@@ -182,6 +182,11 @@ unsigned long acpuclk_power_collapse(void) {
 	return ret;
 }
 
+unsigned long acpuclk_get_wfi_rate(void)
+{
+	return drv_state.wait_for_irq_khz;
+}
+
 unsigned long acpuclk_wait_for_irq(void) {
 	int ret = acpuclk_get_rate();
 	ret *= 1000;
