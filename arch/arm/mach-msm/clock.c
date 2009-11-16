@@ -186,6 +186,13 @@ int clk_set_flags(struct clk *clk, unsigned long flags)
 }
 EXPORT_SYMBOL(clk_set_flags);
 
+void clk_enter_sleep(int from_idle)
+{
+}
+
+void clk_exit_sleep(void)
+{
+}
 
 void __init msm_clock_init(void)
 {
