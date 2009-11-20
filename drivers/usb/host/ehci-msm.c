@@ -568,6 +568,8 @@ static struct hc_driver msm_hc_driver = {
 	.bus_suspend		= ehci_msm_bus_suspend,
 	.bus_resume		= ehci_msm_bus_resume,
 	.relinquish_port	= ehci_relinquish_port,
+
+	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 };
 
 static void msm_hsusb_request_host(void *handle, int request)
