@@ -197,6 +197,7 @@ int au_whtmp_ren(struct dentry *h_dentry, struct au_branch *br)
 	dput(h_path.dentry);
 
  out:
+	AuTraceErr(err);
 	return err;
 }
 
