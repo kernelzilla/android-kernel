@@ -20,6 +20,7 @@
 #define __AUFS_TYPE_H__
 
 #include <linux/ioctl.h>
+#include <linux/limits.h>
 #include <linux/types.h>
 
 #define AUFS_VERSION	"2-29"
@@ -59,6 +60,12 @@ typedef __s16 aufs_bindex_t;
 
 #define AUFS_WH_PFX		".wh."
 #define AUFS_WH_PFX_LEN		((int)sizeof(AUFS_WH_PFX) - 1)
+#define AUFS_WH_TMP_LEN		4
+/* a limit for rmdir/rename a dir */
+#define AUFS_MAX_NAMELEN	(NAME_MAX \
+				- AUFS_WH_PFX_LEN * 2	/* doubly whiteouted */\
+				- 1			/* dot */\
+				- AUFS_WH_TMP_LEN)	/* hex */
 #define AUFS_XINO_FNAME		"." AUFS_NAME ".xino"
 #define AUFS_XINO_DEFPATH	"/tmp/" AUFS_XINO_FNAME
 #define AUFS_XINO_TRUNC_INIT	64 /* blocks */
