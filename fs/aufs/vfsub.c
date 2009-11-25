@@ -95,6 +95,7 @@ struct dentry *vfsub_lookup_one_len(const char *name, struct dentry *parent,
 		vfsub_update_h_iattr(&path, /*did*/NULL); /*ignore*/
 
  out:
+	AuTraceErrPtr(path.dentry);
 	return path.dentry;
 }
 
@@ -110,6 +111,7 @@ struct dentry *vfsub_lookup_hash(struct nameidata *nd)
 	if (!IS_ERR(path.dentry) && path.dentry->d_inode)
 		vfsub_update_h_iattr(&path, /*did*/NULL); /*ignore*/
 
+	AuTraceErrPtr(path.dentry);
 	return path.dentry;
 }
 

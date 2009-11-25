@@ -249,6 +249,7 @@ static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 	}
 
  out:
+	AuTraceErr(err);
 	return err;
 }
 
@@ -464,5 +465,6 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
  out_unlock:
 	aufs_read_unlock(dentry, AuLock_DW);
  out:
+	AuTraceErr(err);
 	return err;
 }
