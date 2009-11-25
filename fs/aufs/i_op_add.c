@@ -93,6 +93,10 @@ int au_may_add(struct dentry *dentry, aufs_bindex_t bindex,
 	struct dentry *h_dentry;
 	struct inode *h_inode;
 
+	err = -ENAMETOOLONG;
+	if (unlikely(dentry->d_name.len > AUFS_MAX_NAMELEN))
+		goto out;
+
 	h_dentry = au_h_dptr(dentry, bindex);
 	h_inode = h_dentry->d_inode;
 	if (!dentry->d_inode) {

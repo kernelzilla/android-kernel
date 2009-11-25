@@ -21,6 +21,7 @@
  */
 
 #include <linux/file.h>
+#include <linux/statfs.h>
 #include "aufs.h"
 
 /*
@@ -296,7 +297,9 @@ static int au_wbr_init(struct au_branch *br, struct super_block *sb,
 		       int perm, struct path *path)
 {
 	int err;
+	struct kstatfs kst;
 	struct au_wbr *wbr;
+	struct dentry *h_dentry;
 
 	wbr = br->br_wbr;
 	au_rw_init(&wbr->wbr_wh_rwsem);
@@ -304,8 +307,23 @@ static int au_wbr_init(struct au_branch *br, struct super_block *sb,
 	atomic_set(&wbr->wbr_wh_running, 0);
 	wbr->wbr_bytes = 0;
 
-	err = au_br_init_wh(sb, br, perm, path->dentry);
+	/*
+	 * a limit for rmdir/rename a dir
+	 * cf. AUFS_MAX_NAMELEN in include/linux/aufs_type.h
+	 */
+	h_dentry = path->dentry;
+	err = vfs_statfs(h_dentry, &kst);
+	if (unlikely(err))
+		goto out;
+	err = -EINVAL;
+	if (kst.f_namelen >= NAME_MAX)
+		err = au_br_init_wh(sb, br, perm, h_dentry);
+	else
+		AuErr("%.*s(%s), unsupported namelen %ld\n",
+		      AuDLNPair(h_dentry), au_sbtype(h_dentry->d_sb),
+		      kst.f_namelen);
 
+ out:
 	return err;
 }
 
