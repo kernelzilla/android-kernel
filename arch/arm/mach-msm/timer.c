@@ -36,7 +36,6 @@ static int msm_timer_debug_mask;
 module_param_named(debug_mask, msm_timer_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #define MSM_DGT_BASE (MSM_GPT_BASE + 0x10)
-#define MSM_DGT_SHIFT (5)
 
 #define TIMER_MATCH_VAL         0x0000
 #define TIMER_COUNT_VAL         0x0004
@@ -49,7 +48,14 @@ module_param_named(debug_mask, msm_timer_debug_mask, int, S_IRUGO | S_IWUSR | S_
 #define CSR_PROTECTION_EN               1
 
 #define GPT_HZ 32768
+
+#ifdef CONFIG_ARCH_MSM_SCORPION
+#define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
+#define MSM_DGT_SHIFT (0)
+#else
 #define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
+#define MSM_DGT_SHIFT (5)
+#endif
 
 enum {
 	MSM_CLOCK_FLAGS_UNSTABLE_COUNT = 1U << 0,
