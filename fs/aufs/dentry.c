@@ -70,6 +70,7 @@ struct dentry *au_lkup_one(struct qstr *name, struct dentry *h_parent,
 		path_put(&h_nd.path);
 	}
 
+	AuTraceErrPtr(h_dentry);
 	return h_dentry;
 }
 
