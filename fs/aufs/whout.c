@@ -121,19 +121,21 @@ int au_diropq_test(struct dentry *h_dentry, struct au_branch *br)
 struct dentry *au_whtmp_lkup(struct dentry *h_parent, struct au_branch *br,
 			     struct qstr *prefix)
 {
-#define HEX_LEN	4
 	struct dentry *dentry;
 	int i;
+	/* cf. AUFS_MAX_NAMELEN in include/linux/aufs_type.h */
 	char defname[AUFS_WH_PFX_LEN * 2 + DNAME_INLINE_LEN_MIN + 1
-		     + HEX_LEN + 1], *name, *p;
+		     + AUFS_WH_TMP_LEN + 1], *name, *p;
 	static unsigned short cnt;
 	struct qstr qs;
+
+	BUILD_BUG_ON(sizeof(cnt) * 2 > AUFS_WH_TMP_LEN);
 
 	name = defname;
 	qs.len = sizeof(defname) - DNAME_INLINE_LEN_MIN + prefix->len - 1;
 	if (unlikely(prefix->len > DNAME_INLINE_LEN_MIN)) {
 		dentry = ERR_PTR(-ENAMETOOLONG);
-		if (unlikely(qs.len >= PATH_MAX))
+		if (unlikely(qs.len > NAME_MAX))
 			goto out;
 		dentry = ERR_PTR(-ENOMEM);
 		name = kmalloc(qs.len + 1, GFP_NOFS);
@@ -147,11 +149,11 @@ struct dentry *au_whtmp_lkup(struct dentry *h_parent, struct au_branch *br,
 	memcpy(p, prefix->name, prefix->len);
 	p += prefix->len;
 	*p++ = '.';
-	AuDebugOn(name + qs.len + 1 - p <= HEX_LEN);
+	AuDebugOn(name + qs.len + 1 - p <= AUFS_WH_TMP_LEN);
 
 	qs.name = name;
 	for (i = 0; i < 3; i++) {
-		sprintf(p, "%.*d", HEX_LEN, cnt++);
+		sprintf(p, "%.*d", AUFS_WH_TMP_LEN, cnt++);
 		dentry = au_sio_lkup_one(&qs, h_parent, br);
 		if (IS_ERR(dentry) || !dentry->d_inode)
 			goto out_name;
@@ -166,8 +168,8 @@ struct dentry *au_whtmp_lkup(struct dentry *h_parent, struct au_branch *br,
 	if (name != defname)
 		kfree(name);
  out:
+	AuTraceErrPtr(dentry);
 	return dentry;
-#undef HEX_LEN
 }
 
 /*

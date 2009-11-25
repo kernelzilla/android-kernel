@@ -351,7 +351,7 @@ static int aufs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 	if (!err) {
 		buf->f_type = AUFS_SUPER_MAGIC;
-		buf->f_namelen -= AUFS_WH_PFX_LEN;
+		buf->f_namelen = AUFS_MAX_NAMELEN;
 		memset(&buf->f_fsid, 0, sizeof(buf->f_fsid));
 	}
 	/* buf->f_bsize = buf->f_blocks = buf->f_bfree = buf->f_bavail = -1; */
