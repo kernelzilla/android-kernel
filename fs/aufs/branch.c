@@ -319,9 +319,9 @@ static int au_wbr_init(struct au_branch *br, struct super_block *sb,
 	if (kst.f_namelen >= NAME_MAX)
 		err = au_br_init_wh(sb, br, perm, h_dentry);
 	else
-		AuErr("%.*s(%s), unsupported namelen %ld\n",
-		      AuDLNPair(h_dentry), au_sbtype(h_dentry->d_sb),
-		      kst.f_namelen);
+		pr_err("%.*s(%s), unsupported namelen %ld\n",
+		       AuDLNPair(h_dentry), au_sbtype(h_dentry->d_sb),
+		       kst.f_namelen);
 
  out:
 	return err;
