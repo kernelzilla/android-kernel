@@ -252,6 +252,15 @@ config LEDS_MSM_PMIC
           (Power Management IC) chip on Qualcomm reference boards,
           for example SURF and FFAs.
 
+config LEDS_PMIC8058
+	tristate "LED Support for Qualcomm PMIC8058"
+	default n
+	depends on LEDS_CLASS && PMIC8058
+	help
+	  This option enables support for LEDs connected over PMIC8058
+	  (Power Management IC) chip on Qualcomm reference boards,
+	  for example SURF and FFAs.
+
 comment "LED Triggers"
 
 config LEDS_TRIGGERS
