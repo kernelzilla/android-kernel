@@ -127,6 +127,7 @@ int au_may_add(struct dentry *dentry, aufs_bindex_t bindex,
 	err = 0;
 
  out:
+	AuTraceErr(err);
 	return err;
 }
 
@@ -147,6 +148,8 @@ lock_hdir_lkup_wh(struct dentry *dentry, struct au_dtime *dt,
 	unsigned int udba;
 	aufs_bindex_t bcpup;
 
+	AuDbg("%.*s\n", AuDLNPair(dentry));
+
 	err = au_wr_dir(dentry, src_dentry, wr_dir_args);
 	bcpup = err;
 	wh_dentry = ERR_PTR(err);
@@ -163,13 +166,14 @@ lock_hdir_lkup_wh(struct dentry *dentry, struct au_dtime *dt,
 
 	h_parent = au_pinned_h_parent(pin);
 	if (udba != AuOpt_UDBA_NONE
-	    && au_dbstart(dentry) == bcpup) {
+	    && au_dbstart(dentry) == bcpup)
 		err = au_may_add(dentry, bcpup, h_parent,
 				 au_ftest_wrdir(wr_dir_args->flags, ISDIR));
-		wh_dentry = ERR_PTR(err);
-		if (unlikely(err))
-			goto out_unpin;
-	}
+	else if (unlikely(dentry->d_name.len > AUFS_MAX_NAMELEN))
+		err = -ENAMETOOLONG;
+	wh_dentry = ERR_PTR(err);
+	if (unlikely(err))
+		goto out_unpin;
 
 	br = au_sbr(sb, bcpup);
 	if (dt) {
@@ -229,6 +233,7 @@ static int add_simple(struct inode *dir, struct dentry *dentry,
 		.flags		= AuWrDir_ADD_ENTRY
 	};
 
+	AuDbg("%.*s\n", AuDLNPair(dentry));
 	IMustLock(dir);
 
 	parent = dentry->d_parent; /* dir inode is locked */
