@@ -575,6 +575,7 @@ static int au_may_ren(struct au_ren_args *a)
  out:
 	if (unlikely(err == -ENOENT || err == -EEXIST))
 		err = -EIO;
+	AuTraceErr(err);
 	return err;
 }
 
@@ -823,6 +824,7 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 	/* reduce stack space */
 	struct au_ren_args *a;
 
+	AuDbg("%.*s, %.*s\n", AuDLNPair(_src_dentry), AuDLNPair(_dst_dentry));
 	IMustLock(_src_dir);
 	IMustLock(_dst_dir);
 
@@ -907,11 +909,12 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 	if (unlikely(err))
 		goto out_children;
 
-	if (!au_opt_test(au_mntflags(a->dst_dir->i_sb), UDBA_NONE)) {
+	if (!au_opt_test(au_mntflags(a->dst_dir->i_sb), UDBA_NONE))
 		err = au_may_ren(a);
-		if (unlikely(err))
-			goto out_hdir;
-	}
+	else if (unlikely(a->dst_dentry->d_name.len > AUFS_MAX_NAMELEN))
+		err = -ENAMETOOLONG;
+	if (unlikely(err))
+		goto out_hdir;
 
 	/* store timestamps to be revertible */
 	au_ren_dt(a);
@@ -953,5 +956,6 @@ int aufs_rename(struct inode *_src_dir, struct dentry *_src_dentry,
 		au_whtmp_rmdir_free(a->thargs);
 	kfree(a);
  out:
+	AuTraceErr(err);
 	return err;
 }
