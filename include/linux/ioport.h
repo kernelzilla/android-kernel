@@ -111,6 +111,8 @@ extern struct resource ioport_resource;
 extern struct resource iomem_resource;
 
 extern int request_resource(struct resource *root, struct resource *new);
+extern struct resource *locate_resource(struct resource *root,
+	struct resource *search);
 extern int release_resource(struct resource *new);
 extern void reserve_region_with_split(struct resource *root,
 			     resource_size_t start, resource_size_t end,
