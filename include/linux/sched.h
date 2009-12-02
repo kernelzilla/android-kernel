@@ -1732,7 +1732,6 @@ extern cputime_t task_utime(struct task_struct *p);
 extern cputime_t task_stime(struct task_struct *p);
 extern cputime_t task_gtime(struct task_struct *p);
 extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
-
 extern int task_free_register(struct notifier_block *n);
 extern int task_free_unregister(struct notifier_block *n);
 
