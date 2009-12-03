@@ -244,6 +244,36 @@ config ISL29003
 	  This driver can also be built as a module.  If so, the module
 	  will be called isl29003.
 
+config SENSORS_AKM8973
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
+	 Support for the AKM8973 tri-axis magnetometer
+
+config SENSORS_AKM8973_AKMD
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
+	 Support for the AKM8973 tri-axis magnetometer (compass)
+
+config SENSORS_LIS331DLH
+	tristate "LIS331DLH Accelerometer"
+	default n
+	depends on I2C
+	help
+	 Say yes here if you wish to include the STI Micro
+	 LIS331DLH accelerometer driver.
+
+config WL127X_RFKILL
+	tristate "Bluetooth power control driver for TI wl127x"
+	depends on RFKILL
+	default n
+	---help---
+	 Creates an rfkill entry in sysfs for power control of Bluetooth
+	 TI wl127x chips.
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
