@@ -51,6 +51,8 @@ static struct kset_uevent_ops memory_uevent_ops = {
 
 static BLOCKING_NOTIFIER_HEAD(memory_chain);
 
+unsigned long movable_reserved_start, movable_reserved_size;
+
 int register_memory_notifier(struct notifier_block *nb)
 {
         return blocking_notifier_chain_register(&memory_chain, nb);
@@ -303,6 +305,34 @@ static int block_size_init(void)
 				&class_attr_block_size_bytes.attr);
 }
 
+static ssize_t
+print_movable_size(struct class *class, char *buf)
+{
+	return sprintf(buf, "%lx\n", movable_reserved_size);
+}
+
+static CLASS_ATTR(movable_size_bytes, 0444, print_movable_size, NULL);
+
+static int movable_size_init(void)
+{
+	return sysfs_create_file(&memory_sysdev_class.kset.kobj,
+				&class_attr_movable_size_bytes.attr);
+}
+
+static ssize_t
+print_movable_start(struct class *class, char *buf)
+{
+	return sprintf(buf, "%lx\n", movable_reserved_start);
+}
+
+static CLASS_ATTR(movable_start_bytes, 0444, print_movable_start, NULL);
+
+static int movable_start_init(void)
+{
+	return sysfs_create_file(&memory_sysdev_class.kset.kobj,
+				&class_attr_movable_start_bytes.attr);
+}
+
 /*
  * Some architectures will have custom drivers to do this, and
  * will not need to do it from userspace.  The fake hot-add code
@@ -390,6 +420,14 @@ static int memory_low_power_init(void)
 				&class_attr_low_power.attr);
 }
 #else
+static inline int memory_remove_init(void)
+{
+	return 0;
+}
+static inline int memory_active_init(void)
+{
+	return 0;
+}
 static inline int memory_low_power_init(void)
 {
 	return 0;
@@ -534,6 +572,12 @@ int __init memory_dev_init(void)
 	if (!ret)
 		ret = err;
 	err = block_size_init();
+	if (!ret)
+		ret = err;
+	err = movable_size_init();
+	if (!ret)
+		ret = err;
+	err = movable_start_init();
 	if (!ret)
 		ret = err;
 out:
