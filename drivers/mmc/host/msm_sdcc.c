@@ -854,8 +854,6 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		return;
 	}
 
-	host->curr.mrq = mrq;
-
 	/* Need to drop the host lock here in case
 	 * the busclk wd fires 
 	 */
@@ -863,6 +861,8 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	if (!host->clks_on)
 		msmsdcc_enable_clocks(host);
 	spin_lock_irqsave(&host->lock, flags);
+
+	host->curr.mrq = mrq;
 
 	if (mrq->data && mrq->data->flags & MMC_DATA_READ)
 		/* Queue/read data, daisy-chain command when data starts */
