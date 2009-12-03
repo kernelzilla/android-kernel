@@ -17,6 +17,9 @@
 #include <linux/initrd.h>
 #include <linux/sort.h>
 #include <linux/highmem.h>
+#ifdef CONFIG_MEMORY_HOTPLUG
+#include <linux/memory_hotplug.h>
+#endif
 
 #include <asm/mach-types.h>
 #include <asm/sections.h>
@@ -431,6 +434,20 @@ static int __init meminfo_cmp(const void *_a, const void *_b)
 	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
 }
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+static void map_reserved_memory(void)
+{
+	struct map_desc map;
+
+	map.pfn = (movable_reserved_start >> PAGE_SHIFT);
+	map.virtual = __phys_to_virt(movable_reserved_start);
+	map.length = movable_reserved_size;
+	map.type = MT_MEMORY;
+
+	create_mapping(&map);
+}
+#endif
+
 void __init bootmem_init(void)
 {
 	struct meminfo *mi = &meminfo;
@@ -500,6 +517,13 @@ void __init bootmem_init(void)
 	for_each_node(node)
 		bootmem_free_node(node, mi);
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+	if (movable_reserved_size) {
+		max_low = (movable_reserved_start + movable_reserved_size)
+			>> PAGE_SHIFT;
+		map_reserved_memory();
+	}
+#endif
 	high_memory = __va((max_low << PAGE_SHIFT) - 1) + 1;
 
 	/*

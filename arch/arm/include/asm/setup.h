@@ -37,6 +37,10 @@ struct tag_core {
 
 /* it is allowed to have multiple ATAG_MEM nodes */
 #define ATAG_MEM	0x54410002
+/* it is allowed to have multiple ATAG_MEM_RESERVED nodes */
+/* these indicate places where hotpluggable memory is present */
+/* which are not active during boot */
+#define ATAG_MEM_RESERVED	0x5441000A
 
 struct tag_mem32 {
 	__u32	size;

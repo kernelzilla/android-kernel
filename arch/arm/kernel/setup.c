@@ -24,6 +24,9 @@
 #include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <linux/fs.h>
+#ifdef CONFIG_MEMORY_HOTPLUG
+#include <linux/memory_hotplug.h>
+#endif
 
 #include <asm/unified.h>
 #include <asm/cpu.h>
@@ -441,6 +444,34 @@ static void __init early_mem(char **p)
 }
 __early_param("mem=", early_mem);
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+static void __init early_mem_reserved(char **p)
+{
+	unsigned int start;
+	unsigned int size;
+	unsigned int end;
+	unsigned int h_end;
+
+	start = PHYS_OFFSET;
+	size  = memparse(*p, p);
+	if (**p == '@')
+		start = memparse(*p + 1, p);
+
+	if (movable_reserved_start) {
+		end = start + size;
+		h_end = movable_reserved_start + movable_reserved_size;
+		end = max(end, h_end);
+		movable_reserved_start = min(movable_reserved_start,
+			(unsigned long)start);
+		movable_reserved_size = end - movable_reserved_start;
+	} else {
+		movable_reserved_start = start;
+		movable_reserved_size = size;
+	}
+}
+__early_param("mem_reserved=", early_mem_reserved);
+#endif
+
 /*
  * Initial parsing of the command line.
  */
@@ -572,6 +603,37 @@ static int __init parse_tag_mem32(const struct tag *tag)
 }
 
 __tagtable(ATAG_MEM, parse_tag_mem32);
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+static int __init parse_tag_mem32_reserved(const struct tag *tag)
+{
+	unsigned int start;
+	unsigned int size;
+	unsigned int end;
+	unsigned int h_end;
+
+	start = tag->u.mem.start;
+	size = tag->u.mem.size;
+
+	if (movable_reserved_start) {
+		end = start + size;
+		h_end = movable_reserved_start + movable_reserved_size;
+		end = max(end, h_end);
+		movable_reserved_start = min(movable_reserved_start,
+			(unsigned long)start);
+		movable_reserved_size = end - movable_reserved_start;
+	} else {
+		movable_reserved_start = tag->u.mem.start;
+		movable_reserved_size = tag->u.mem.size;
+	}
+	printk(KERN_ALERT "reserved %lx at %lx for hotplug\n",
+		movable_reserved_size, movable_reserved_start);
+
+	return 0;
+}
+
+__tagtable(ATAG_MEM_RESERVED, parse_tag_mem32_reserved);
+#endif
 
 #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
 struct screen_info screen_info = {
