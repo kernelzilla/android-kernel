@@ -46,8 +46,8 @@
 #define N_GIGASET_M101	16	/* Siemens Gigaset M101 serial DECT adapter */
 #define N_SLCAN		17	/* Serial / USB serial CAN Adaptors */
 #define N_PPS		18	/* Pulse per Second */
-
 #define N_V253		19	/* Codec control over voice modem */
+#define N_TS2710	20	/* 3GPP TS 27.010 MUX */
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as
