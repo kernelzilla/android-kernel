@@ -32,6 +32,11 @@ obj-$(CONFIG_LEDS_PWM)			+= leds-pwm.o
 
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
+obj-$(CONFIG_LEDS_SHOLES)		+= leds-ld-cpcap-disp.o \
+					   leds-ld-cpcap-rgb.o \
+					   leds-ld-cpcap-kpad.o
+obj-$(CONFIG_LEDS_LM3530)		+= led-lm3530.o
+obj-$(CONFIG_LEDS_LM3554)		+= led-cpcap-lm3554.o
 
 # LED Triggers
 obj-$(CONFIG_LEDS_TRIGGER_TIMER)	+= ledtrig-timer.o

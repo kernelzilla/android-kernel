@@ -311,6 +311,12 @@ config EZX_PCAP
 	  This enables the PCAP ASIC present on EZX Phones. This is
 	  needed for MMC, TouchScreen, Sound, USB, etc..
 
+config MFD_CPCAP
+	tristate "Support for CPCAP"
+	depends on SPI
+	help
+	 Say yes here if you want to include drivers for the CPCAP chip.
+
 endmenu
 
 menu "Multimedia Capabilities Port drivers"

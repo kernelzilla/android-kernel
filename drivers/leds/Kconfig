@@ -236,6 +236,30 @@ config LEDS_BD2802
 	  This option enables support for BD2802GU RGB LED driver chips
 	  accessed via the I2C bus.
 
+config LEDS_SHOLES
+	tristate "LED Support for Sholes device"
+	depends on LEDS_CLASS && MFD_CPCAP
+	help
+	  This option enables support for LEDs on Sholes.
+
+config LEDS_LM3554
+	tristate "LM3554 driver"
+	depends on LEDS_CLASS && I2C && MFD_CPCAP
+	help
+	  This option enables support for the LM3554 .
+
+config LEDS_LM3530
+	tristate "LM3530 ALS driver"
+	depends on LEDS_CLASS && I2C
+	help
+	  This option enables support for the LM3530 .
+
+config LEDS_LM3554
+	tristate "LM3554 driver"
+	depends on LEDS_CLASS && I2C
+	help
+	  This option enables support for the LM3554 .
+
 comment "LED Triggers"
 
 config LEDS_TRIGGERS
