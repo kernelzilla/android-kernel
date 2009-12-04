@@ -340,4 +340,14 @@ config INPUT_HALLEFFECT_BU52014HV
 	  effect sensor.
 
 	  If unsure, say N.
+
+config INPUT_PROXIMITY_SFH7743
+	tristate "SFH7743 Proximity"
+	default n
+	help
+ 	  Say Y here if you wish to include the OSRAM SFH7743 proximity
+	  driver.
+
+	  If unsure, say N.
+	  To compile this driver a a module, choose M here.
 endif

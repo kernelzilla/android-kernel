@@ -35,3 +35,4 @@ obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
 obj-$(CONFIG_INPUT_GPIO)		+= gpio_event.o gpio_matrix.o gpio_input.o gpio_output.o gpio_axis.o
 obj-$(CONFIG_INPUT_KEYCHORD)		+= keychord.o
 obj-$(CONFIG_INPUT_HALLEFFECT_BU52014HV) += bu52014hfv.o
+obj-$(CONFIG_INPUT_PROXIMITY_SFH7743)	+= sfh7743.o
