@@ -35,3 +35,4 @@ obj-$(CONFIG_SENSORS_LIS331DLH)	+= lis331dlh.o
 obj-$(CONFIG_OMAP_MODEM_CONTROL)	+= omap_mdm_ctrl.o
 obj-y				+= ts27010mux/
 obj-$(CONFIG_VIB_GPIO)		+= vib-gpio.o
+obj-$(CONFIG_VIB_OMAP_PWM)	+= vib-omap-pwm.o
