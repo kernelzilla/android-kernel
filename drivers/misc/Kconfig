@@ -267,6 +267,10 @@ config ISL29003
 	  This driver can also be built as a module.  If so, the module
 	  will be called isl29003.
 
+config VIB_GPIO
+	bool "GPIO Vibrator"
+	default n
+
 config SENSORS_AKM8973
 	tristate "AKM8973 Magnetometer"
 	default n
