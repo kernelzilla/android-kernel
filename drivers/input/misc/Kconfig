@@ -333,4 +333,11 @@ config INPUT_PCAP
 	  To compile this driver as a module, choose M here: the
 	  module will be called pcap_keys.
 
+config INPUT_HALLEFFECT_BU52014HV
+	tristate "BU52014HV Hall Effect Sensor"
+	help
+	  Say Y here if you wish to include support for the BU52014HV hall
+	  effect sensor.
+
+	  If unsure, say N.
 endif
