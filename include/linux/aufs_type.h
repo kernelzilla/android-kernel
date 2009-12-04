@@ -110,7 +110,10 @@ enum {
 
 	/* readdir in userspace */
 	AuCtl_RDU,
-	AuCtl_RDU_INO
+	AuCtl_RDU_INO,
+
+	/* pathconf wrapper */
+	AuCtl_WBR_FD
 };
 
 /* borrowed from linux/include/linux/kernel.h */
@@ -187,5 +190,6 @@ struct aufs_rdu {
 #define AUFS_CTL_PLINK_CLEAN	_IO(AuCtlType, AuCtl_PLINK_CLEAN)
 #define AUFS_CTL_RDU		_IOWR(AuCtlType, AuCtl_RDU, struct aufs_rdu)
 #define AUFS_CTL_RDU_INO	_IOWR(AuCtlType, AuCtl_RDU_INO, struct aufs_rdu)
+#define AUFS_CTL_WBR_FD		_IO(AuCtlType, AuCtl_WBR_FD)
 
 #endif /* __AUFS_TYPE_H__ */
