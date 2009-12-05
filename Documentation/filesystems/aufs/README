@@ -71,6 +71,7 @@ Also there are many enhancements in aufs1, such as:
 - pseudo hardlink (hardlink over branches)
 - allow a direct access manually to a file on branch, e.g. bypassing aufs.
   including NFS or remote filesystem branch.
+- userspace wrapper for pathconf(3)/fpathconf(3) with _PC_LINK_MAX.
 - and more...
 
 Currently these features are dropped temporary from this version, aufs2.
@@ -250,8 +251,9 @@ If you don't like aufs2-standalone.patch, then try aufs2-2.6 tree.
 
 And then,
 - read README in aufs2-util, build and install it
-- if you want to use readdir(3) in userspace, then run
-  "make install_ulib" too. And refer to the aufs manual in detail.
+- if you want to use readdir(3) in userspace or pathconf(3) wrapper,
+  then run "make install_ulib" too. And refer to the aufs manual in
+  detail.
 
 
 4. Usage
