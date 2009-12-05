@@ -28,6 +28,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
+#include <linux/earlysuspend.h>
 
 #include <plat/display.h>
 #include <plat/vram.h>
@@ -1692,6 +1693,49 @@ err:
 	return r;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+struct suspend_info {
+	struct early_suspend early_suspend;
+	struct fb_info *fbi;
+};
+
+void suspend(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	struct fb_info *fbi = info->fbi;
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(fbi);
+
+	if (display->suspend)
+		display->suspend(display);
+
+	omapfb_vrfb_suspend_all(fbdev);
+}
+
+void resume(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	struct fb_info *fbi = info->fbi;
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(fbi);
+
+	omapfb_vrfb_resume_all(fbdev);
+
+	if (display->resume)
+		display->resume(display);
+}
+
+struct suspend_info suspend_info = {
+	.early_suspend.suspend = suspend,
+	.early_suspend.resume = resume,
+	.early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif
+
 /* initialize fb_info, var, fix to something sane based on the display */
 static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 {
@@ -1794,6 +1838,10 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	r = fb_alloc_cmap(&fbi->cmap, 256, 0);
 	if (r)
 		dev_err(fbdev->dev, "unable to allocate color map memory\n");
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	suspend_info.fbi = fbi;
+	register_early_suspend(&suspend_info.early_suspend);
+#endif
 
 err:
 	return r;
