@@ -194,15 +194,11 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 	struct super_block *sb;
 
 	sb = file->f_dentry->d_sb;
-	si_noflush_read_lock(sb);
-	fi_write_lock(file);
-	vdir_cache = au_fvdir_cache(file);
+	vdir_cache = au_fi(file)->fi_vdir_cache;
 	if (vdir_cache)
 		au_vdir_free(vdir_cache);
 	au_plink_maint_leave(file);
-	fi_write_unlock(file);
 	au_finfo_fin(file);
-	si_read_unlock(sb);
 	return 0;
 }
 

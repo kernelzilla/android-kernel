@@ -106,12 +106,8 @@ static int aufs_open_nondir(struct inode *inode __maybe_unused,
 static int aufs_release_nondir(struct inode *inode __maybe_unused,
 			       struct file *file)
 {
-	struct super_block *sb = file->f_dentry->d_sb;
-
-	si_noflush_read_lock(sb);
 	kfree(au_fi(file)->fi_vm_ops);
 	au_finfo_fin(file);
-	si_read_unlock(sb);
 	return 0;
 }
 
