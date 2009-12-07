@@ -60,21 +60,20 @@ void au_finfo_fin(struct file *file)
 	struct au_finfo *finfo;
 	aufs_bindex_t bindex, bend;
 
-	fi_write_lock(file);
-	bend = au_fbend(file);
-	bindex = au_fbstart(file);
-	if (bindex >= 0)
+	finfo = au_fi(file);
+	bindex = finfo->fi_bstart;
+	if (bindex >= 0) {
 		/*
 		 * calls fput() instead of filp_close(),
 		 * since no dnotify or lock for the lower file.
 		 */
+		bend = finfo->fi_bend;
 		for (; bindex <= bend; bindex++)
 			au_set_h_fptr(file, bindex, NULL);
+	}
 
-	finfo = au_fi(file);
 	au_dbg_verify_hf(finfo);
 	kfree(finfo->fi_hfile);
-	fi_write_unlock(file);
 	AuRwDestroy(&finfo->fi_rwsem);
 	au_cache_free_finfo(finfo);
 }
