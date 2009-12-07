@@ -148,7 +148,6 @@ static int do_open_dir(struct file *file, int flags)
 	err = 0;
 	dentry = file->f_dentry;
 	au_set_fvdir_cache(file, NULL);
-	au_fi(file)->fi_maintain_plink = 0;
 	file->f_version = dentry->d_inode->i_version;
 	bindex = au_dbstart(dentry);
 	au_set_fbstart(file, bindex);
@@ -191,7 +190,6 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 {
 	struct au_vdir *vdir_cache;
 	struct super_block *sb;
-	struct au_sbinfo *sbinfo;
 
 	sb = file->f_dentry->d_sb;
 	si_noflush_read_lock(sb);
@@ -199,13 +197,7 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 	vdir_cache = au_fvdir_cache(file);
 	if (vdir_cache)
 		au_vdir_free(vdir_cache);
-	if (au_fi(file)->fi_maintain_plink) {
-		sbinfo = au_sbi(sb);
-		/* clear the flag without write-lock */
-		sbinfo->au_si_status &= ~AuSi_MAINTAIN_PLINK;
-		smp_mb();
-		wake_up_all(&sbinfo->si_plink_wq);
-	}
+	au_plink_maint_leave(file);
 	fi_write_unlock(file);
 	au_finfo_fin(file);
 	si_read_unlock(sb);
