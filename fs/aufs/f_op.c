@@ -468,6 +468,8 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 	struct vm_operations_struct *vm_ops;
 	int err;
 
+	/* todo: call security_file_mmap() here */
+
 	vm_ops = ERR_PTR(-ENODEV);
 	if (!h_file->f_op || !h_file->f_op->mmap)
 		goto out;
