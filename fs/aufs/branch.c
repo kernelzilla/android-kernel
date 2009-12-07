@@ -421,7 +421,7 @@ static void au_br_do_add(struct super_block *sb, struct dentry *h_dentry,
 
 	root = sb->s_root;
 	root_inode = root->d_inode;
-	au_plink_block_maintain(sb);
+	au_plink_maint_block(sb);
 	bend = au_sbend(sb);
 	amount = bend + 1 - bindex;
 	au_br_do_add_brp(au_sbi(sb), bindex, br, bend, amount);
@@ -698,7 +698,7 @@ static void au_br_do_del(struct super_block *sb, aufs_bindex_t bindex,
 
 	root = sb->s_root;
 	inode = root->d_inode;
-	au_plink_block_maintain(sb);
+	au_plink_maint_block(sb);
 	sbinfo = au_sbi(sb);
 	bend = sbinfo->si_bend;
 
@@ -912,7 +912,7 @@ int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
 	struct au_branch *br;
 
 	root = sb->s_root;
-	au_plink_block_maintain(sb);
+	au_plink_maint_block(sb);
 	bindex = au_find_dbindex(root, mod->h_root);
 	if (bindex < 0) {
 		if (remount)
