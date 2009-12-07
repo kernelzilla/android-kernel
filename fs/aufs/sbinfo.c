@@ -32,6 +32,7 @@ void au_si_free(struct kobject *kobj)
 
 	sbinfo = container_of(kobj, struct au_sbinfo, si_kobj);
 	AuDebugOn(!list_empty(&sbinfo->si_plink.head));
+	AuDebugOn(sbinfo->si_plink_maint);
 
 	sb = sbinfo->si_sb;
 	si_write_lock(sb);
@@ -94,6 +95,8 @@ int au_si_alloc(struct super_block *sb)
 
 	au_spl_init(&sbinfo->si_plink);
 	init_waitqueue_head(&sbinfo->si_plink_wq);
+	spin_lock_init(&sbinfo->si_plink_maint_lock);
+	sbinfo->si_plink_maint = NULL;
 
 	/* leave other members for sysaufs and si_mnt. */
 	sbinfo->si_sb = sb;

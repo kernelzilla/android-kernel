@@ -54,7 +54,6 @@ struct au_finfo {
 		/* dir only */
 		struct {
 			struct au_vdir		*fi_vdir_cache;
-			int			fi_maintain_plink;
 		};
 	};
 };
