@@ -56,21 +56,21 @@ enum {
 	AuCache_Last
 };
 
-#define AuCache(type)	KMEM_CACHE(type, SLAB_RECLAIM_ACCOUNT)
+#define AuCache(type)	KMEM_CACHE(type, SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD)
 
 extern struct kmem_cache *au_cachep[];
 
 #define AuCacheFuncs(name, index) \
-static inline void *au_cache_alloc_##name(void) \
+static inline struct au_##name *au_cache_alloc_##name(void) \
 { return kmem_cache_alloc(au_cachep[AuCache_##index], GFP_NOFS); } \
-static inline void au_cache_free_##name(void *p) \
+static inline void au_cache_free_##name(struct au_##name *p) \
 { kmem_cache_free(au_cachep[AuCache_##index], p); }
 
 AuCacheFuncs(dinfo, DINFO);
 AuCacheFuncs(icntnr, ICNTNR);
 AuCacheFuncs(finfo, FINFO);
 AuCacheFuncs(vdir, VDIR);
-AuCacheFuncs(dehstr, DEHSTR);
+AuCacheFuncs(vdir_dehstr, DEHSTR);
 
 /*  ---------------------------------------------------------------------- */
 
