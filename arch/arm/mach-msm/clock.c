@@ -198,11 +198,10 @@ void clk_exit_sleep(void)
 void __init msm_clock_init(void)
 {
 	struct clk *clk;
-	struct hlist_node *pos;
 
 	spin_lock_init(&clocks_lock);
 	mutex_lock(&clocks_mutex);
-	hlist_for_each_entry(clk, pos, &clocks, list)
+	for (clk = msm_clocks; clk && clk->name; clk++)
 		hlist_add_head(&clk->list, &clocks);
 
 	mutex_unlock(&clocks_mutex);
