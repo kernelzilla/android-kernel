@@ -303,6 +303,7 @@ static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int mic_setting = CPCAP_AUDIO_IN_NONE;
 static unsigned int capture_mode;
 static struct omap_mcbsp_wrapper *mcbsp_wrapper;
+static DEFINE_SPINLOCK(audio_write_lock);
 #ifdef CONFIG_WAKELOCK
 static struct wake_lock mcbsp_wakelock;
 #endif
@@ -1320,6 +1321,7 @@ static void audio_discard_buf(struct audio_stream *str, struct inode *inode)
 static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 {
 	int ret = 0;
+	unsigned long flags;
 
 	if (str == NULL) {
 		AUDIO_ERROR_LOG("Invalid stream parameter\n");
@@ -1345,6 +1347,14 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 		if (++str->buf_head >= str->nbfrags)
 			str->buf_head = 0;
 	} else {
+                spin_lock_irqsave(&audio_write_lock, flags);
+                if (str->in_use) {
+                        spin_unlock_irqrestore(&audio_write_lock, flags);
+                        return ret;
+                }
+                str->in_use = 1;
+                spin_unlock_irqrestore(&audio_write_lock, flags);
+
 		while (str->pending_frags) {
 			struct audio_buf *b = &str->buffers[str->buf_head];
 			u32 buf_size = str->fragsize - b->offset;
@@ -1362,8 +1372,6 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 			/* Do not continue and move the frags forward..
 			 * the completion of the next transfer will
 			 * put it thru. */
-			if (ret == -EBUSY)
-				return ret;
 
 			if (ret)
 				goto out;
@@ -1377,13 +1385,14 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 					str->buf_head = 0;
 			}
 		}
-	}
-
-	return ret;
-
 out:
-	str->in_use = 0;
-	return ret;
+                spin_lock_irqsave(&audio_write_lock, flags);
+                str->in_use = 0;
+                spin_unlock_irqrestore(&audio_write_lock, flags);
+        }
+
+        return ret;
+
 }
 
 static void audio_buffer_reset(struct audio_stream *str, struct inode *inode)
@@ -1406,6 +1415,7 @@ static void audio_buffer_reset(struct audio_stream *str, struct inode *inode)
 	str->buf_head = 0;
 	str->usr_head = 0;
 	str->fragsize = 0;
+        str->in_use = 0;
 }
 
 static void mcbsp_dma_tx_cb(u32 ch_status, void *arg)
@@ -1443,7 +1453,6 @@ static void mcbsp_dma_tx_cb(u32 ch_status, void *arg)
 			str->buf_tail = 0;
 
 		up(&str->sem);
-
 		audio_process_buf(str, str->inode);
 	}
 }
@@ -1886,10 +1895,8 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 	int minor = MINOR(inode->i_rdev);
 	struct audio_stream *str = (minor == state.dev_dsp) ?
 			state.stdac_out_stream : state.codec_out_stream;
-	unsigned long flags;
 
 	mutex_lock(&audio_lock);
-
 	if (minor == state.dev_dsp) {
 		if (!str->active) {
 			int temp_size = count % STDAC_FIFO_SIZE;
@@ -1982,23 +1989,12 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 
 		buf->offset = 0;
 
-		/*
-		 * HACKHACKHACK
-		 *
-		 * Disabling IRQs works around a race accessing str between the
-		 * following code and the interrupt handler.  This should be
-		 * replaced with propper locking around access to any
-		 * audio_stream throughout the dirver.
-		 */
-
-		local_irq_save(flags);
 		if (++str->usr_head >= str->nbfrags)
 			str->usr_head = 0;
 
 		str->pending_frags++;
 
 		ret = audio_process_buf(str, inode);
-		local_irq_restore(flags);
 	}
 
 	if (buffer - buffer0)
