@@ -360,9 +360,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 
 		pdev->dev.parent = &(spi->dev);
 		pdev->dev.platform_data = &data->regulator_init[i];
-/* XXX
-		pdev->dev.driver_data = cpcap;
-*/
+		platform_set_drvdata(pdev, cpcap);
 		cpcap->regulator_pdev[i] = pdev;
 	}
 

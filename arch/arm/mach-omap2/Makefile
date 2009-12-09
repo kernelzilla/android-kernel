@@ -80,6 +80,22 @@ obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
 obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o \
 					   mmc-twl4030.o
 obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
+obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
+					   mmc-twl4030.o \
+					   board-ldp-flash.o \
+					   board-zoom2-camera.o \
+					   board-zoom2-wifi.o
+obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
+					   board-sholes-camera.o \
+					   board-sholes-flash.o \
+					   board-sholes-panel.o \
+					   board-sholes-spi.o \
+					   board-sholes-sensors.o \
+					   board-sholes-hsmmc.o \
+					   board-sholes-keypad.o \
+					   board-sholes-usbnet.o \
+					   board-sholes-wifi.o \
+					   board-sholes-mmcprobe.o 
 obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
 					   board-rx51-sdram.o \
 					   board-rx51-peripherals.o \
