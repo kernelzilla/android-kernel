@@ -20,6 +20,7 @@
 #define KEYRESET_NAME "keyreset"
 
 struct keyreset_platform_data {
+	int crash_key;   /* if this key is also down, crash rather than reset */
 	int *keys_up;
 	int keys_down[]; /* 0 terminated */
 };
