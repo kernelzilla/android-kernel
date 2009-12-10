@@ -388,6 +388,7 @@ void au_dbg_verify_kthread(void)
 
 /* ---------------------------------------------------------------------- */
 
+#ifdef CONFIG_AUFS_SP_IATTR
 void au_dbg_sp_fop(struct file *file)
 {
 	struct file *h_file = au_h_fptr(file, au_fbstart(file));
@@ -423,6 +424,7 @@ void au_dbg_sp_fop(struct file *file)
 	Compare(setlease);
 #undef Compare
 }
+#endif
 
 /* ---------------------------------------------------------------------- */
 

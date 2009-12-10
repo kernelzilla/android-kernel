@@ -92,6 +92,7 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	if (!au_special_file(h_inode->i_mode))
 		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags);
 	else {
+		/* this block depends upon the configuration */
 		di_read_unlock(dentry, AuLock_IR);
 		fi_write_unlock(file);
 		si_read_unlock(sb);
