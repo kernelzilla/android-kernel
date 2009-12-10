@@ -89,8 +89,20 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 		flags = au_file_roflags(flags);
 	flags &= ~O_CREAT;
 	atomic_inc(&br->br_count);
-	h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags,
-			     current_cred());
+	if (!au_special_file(h_inode->i_mode))
+		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags,
+				     current_cred());
+	else {
+		/* this block depends upon the configuration */
+		di_read_unlock(dentry, AuLock_IR);
+		fi_write_unlock(file);
+		si_read_unlock(sb);
+		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags,
+				     current_cred());
+		si_noflush_read_lock(sb);
+		fi_write_lock(file);
+		di_read_lock_child(dentry, AuLock_IR);
+	}
 	if (IS_ERR(h_file))
 		goto out_br;
 
@@ -145,6 +157,7 @@ int au_reopen_nondir(struct file *file)
 	struct file *h_file, *h_file_tmp;
 
 	dentry = file->f_dentry;
+	AuDebugOn(au_special_file(dentry->d_inode->i_mode));
 	bstart = au_dbstart(dentry);
 	h_file_tmp = NULL;
 	if (au_fbstart(file) == bstart) {
@@ -245,6 +258,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	sb = dentry->d_sb;
 	bstart = au_fbstart(file);
 	inode = dentry->d_inode;
+	AuDebugOn(au_special_file(inode->i_mode));
 	err = au_test_ro(sb, bstart, inode);
 	if (!err && (au_h_fptr(file, bstart)->f_mode & FMODE_WRITE)) {
 		err = au_pin(pin, dentry, bstart, AuOpt_UDBA_NONE, /*flags*/0);
@@ -484,15 +498,18 @@ int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 	aufs_bindex_t bstart;
 	unsigned char pseudo_link;
 	struct dentry *dentry;
+	struct inode *inode;
 
 	err = 0;
 	dentry = file->f_dentry;
+	inode = dentry->d_inode;
+	AuDebugOn(au_special_file(inode->i_mode));
 	sigen = au_sigen(dentry->d_sb);
 	fi_write_lock(file);
 	figen = au_figen(file);
 	di_write_lock_child(dentry);
 	bstart = au_dbstart(dentry);
-	pseudo_link = (bstart != au_ibstart(dentry->d_inode));
+	pseudo_link = (bstart != au_ibstart(inode));
 	if (sigen == figen && !pseudo_link && au_fbstart(file) == bstart) {
 		if (!wlock) {
 			di_downgrade_lock(dentry, AuLock_IR);
@@ -503,12 +520,12 @@ int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 
 	AuDbg("sigen %d, figen %d\n", sigen, figen);
 	if (sigen != au_digen(dentry)
-	    || sigen != au_iigen(dentry->d_inode)) {
+	    || sigen != au_iigen(inode)) {
 		err = au_reval_dpath(dentry, sigen);
 		if (unlikely(err < 0))
 			goto out;
 		AuDebugOn(au_digen(dentry) != sigen
-			  || au_iigen(dentry->d_inode) != sigen);
+			  || au_iigen(inode) != sigen);
 	}
 
 	err = refresh_file(file, reopen);
