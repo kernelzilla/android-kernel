@@ -194,7 +194,7 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 	struct super_block *sb;
 
 	sb = file->f_dentry->d_sb;
-	vdir_cache = au_fi(file)->fi_vdir_cache;
+	vdir_cache = au_fi(file)->fi_vdir_cache; /* lock-free */
 	if (vdir_cache)
 		au_vdir_free(vdir_cache);
 	au_plink_maint_leave(file);
