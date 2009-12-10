@@ -132,6 +132,15 @@ void au_dbg_sleep_jiffy(int jiffy);
 struct iattr;
 void au_dbg_iattr(struct iattr *ia);
 
+#ifdef CONFIG_AUFS_SP_IATTR
+void au_dbg_sp_fop(struct file *file);
+#else
+static inline void au_dbg_sp_fop(struct file *file)
+{
+	/* empty */
+}
+#endif
+
 void au_dbg_verify_dir_parent(struct dentry *dentry, unsigned int sigen);
 void au_dbg_verify_nondir_parent(struct dentry *dentry, unsigned int sigen);
 void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen);
@@ -185,6 +194,11 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	au_dbg_iattr(ia); \
 } while (0)
 #else
+static inline void au_dbg_sp_fop(struct file *file)
+{
+	/* empty */
+}
+
 static inline void au_dbg_verify_dir_parent(struct dentry *dentry,
 					    unsigned int sigen)
 {

@@ -81,6 +81,26 @@ unsigned int aufs_poll(struct file *file, poll_table *wait);
 /* f_op.c */
 extern const struct file_operations aufs_file_fop;
 int aufs_flush(struct file *file, fl_owner_t id);
+int au_do_open_nondir(struct file *file, int flags);
+int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file);
+ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
+		  const struct iovec *iov, unsigned long nv, loff_t pos);
+
+#ifdef CONFIG_AUFS_SP_IATTR
+/* f_op_sp.c */
+int au_special_file(umode_t mode);
+void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev);
+#else
+static inline int au_special_file(umode_t mode)
+{
+	return 0;
+}
+static inline void au_init_special_fop(struct inode *inode, umode_t mode,
+				       dev_t rdev)
+{
+	init_special_inode(inode, mode, rdev);
+}
+#endif
 
 /* finfo.c */
 void au_hfput(struct au_hfile *hf, struct file *file);
