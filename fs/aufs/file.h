@@ -81,6 +81,10 @@ int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file);
 ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
 		  const struct iovec *iov, unsigned long nv, loff_t pos);
 
+/* f_op_sp.c */
+int au_special_file(umode_t mode);
+void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev);
+
 /* finfo.c */
 void au_hfput(struct au_hfile *hf, struct file *file);
 void au_set_h_fptr(struct file *file, aufs_bindex_t bindex,
