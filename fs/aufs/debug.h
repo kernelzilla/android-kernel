@@ -52,11 +52,8 @@ static inline int au_debug_test(void)
 }
 #else
 #define AuDebugOn(a)		do {} while (0)
-#define au_debug()		do {} while (0)
-static inline int au_debug_test(void)
-{
-	return 0;
-}
+AuStubVoid(au_debug, int n)
+AuStubInt0(au_debug_test, void)
 #endif /* CONFIG_AUFS_DEBUG */
 
 /* ---------------------------------------------------------------------- */
@@ -140,10 +137,7 @@ void au_dbg_iattr(struct iattr *ia);
 #ifdef CONFIG_AUFS_SP_IATTR
 void au_dbg_sp_fop(struct file *file);
 #else
-static inline void au_dbg_sp_fop(struct file *file)
-{
-	/* empty */
-}
+AuStubVoid(au_dbg_sp_fop, struct file *file)
 #endif
 
 void au_dbg_verify_dir_parent(struct dentry *dentry, unsigned int sigen);
@@ -199,42 +193,15 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	au_dbg_iattr(ia); \
 } while (0)
 #else
-static inline void au_dbg_sp_fop(struct file *file)
-{
-	/* empty */
-}
+AuStubVoid(au_dbg_verify_dir_parent, struct dentry *dentry, unsigned int sigen)
+AuStubVoid(au_dbg_verify_nondir_parent, struct dentry *dentry,
+	   unsigned int sigen)
+AuStubVoid(au_dbg_verify_gen, struct dentry *parent, unsigned int sigen)
+AuStubVoid(au_dbg_verify_hf, struct au_finfo *finfo)
+AuStubVoid(au_dbg_verify_kthread, void)
+AuStubInt0(__init au_debug_init, void)
+AuStubVoid(au_debug_sbinfo_init, struct au_sbinfo *sbinfo)
 
-static inline void au_dbg_verify_dir_parent(struct dentry *dentry,
-					    unsigned int sigen)
-{
-	/* empty */
-}
-static inline void au_dbg_verify_nondir_parent(struct dentry *dentry,
-					       unsigned int sigen)
-{
-	/* empty */
-}
-static inline void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen)
-{
-	/* empty */
-}
-static inline void au_dbg_verify_hf(struct au_finfo *finfo)
-{
-	/* empty */
-}
-static inline void au_dbg_verify_kthread(void)
-{
-	/* empty */
-}
-
-static inline int au_debug_init(void)
-{
-	return 0;
-}
-static inline void au_debug_sbinfo_init(struct au_sbinfo *sbinfo)
-{
-	/* empty */
-}
 #define AuDbgWhlist(w)		do {} while (0)
 #define AuDbgVdir(v)		do {} while (0)
 #define AuDbgInode(i)		do {} while (0)
@@ -258,16 +225,13 @@ void au_sysrq_fin(void);
 	handle_sysrq('w', vc_cons[fg_console].d->vc_tty); \
 } while (0)
 #else
-#define au_dbg_blocked()	do {} while (0)
+AuStubVoid(au_dbg_blocked, void)
 #endif
 
 #else
-static inline int au_sysrq_init(void)
-{
-	return 0;
-}
-#define au_sysrq_fin()		do {} while (0)
-#define au_dbg_blocked()	do {} while (0)
+AuStubInt0(__init au_sysrq_init, void)
+AuStubVoid(au_sysrq_fin, void)
+AuStubVoid(au_dbg_blocked, void)
 #endif /* CONFIG_AUFS_MAGIC_SYSRQ */
 
 #endif /* __KERNEL__ */
