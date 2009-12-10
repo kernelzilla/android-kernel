@@ -24,7 +24,6 @@
 #include <asm/mach/flash.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
-#include <asm/mach/mmc.h>
 
 #include "devices.h"
 #include "clock.h"
