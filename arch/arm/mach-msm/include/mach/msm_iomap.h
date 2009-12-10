@@ -171,4 +171,10 @@
 #define MSM_SPI_SIZE          SZ_4K
 #endif
 
+#if defined(CONFIG_ARCH_MSM_SCORPION)
+#define MSM_TCSR_BASE  IOMEM(0xF8008000)
+#define MSM_TCSR_PHYS  0xA8700000
+#define MSM_TCSR_SIZE  SZ_4K
+#endif
+
 #endif
