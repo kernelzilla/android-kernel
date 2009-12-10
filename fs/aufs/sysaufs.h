@@ -81,11 +81,7 @@ void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex);
 #else
 #define sysaufs_attr_group	NULL
 
-static inline
-int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
-{
-	return 0;
-}
+AuStubInt0(sysaufs_si_xi_path, struct seq_file *seq, struct super_block *sb)
 
 static inline
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
@@ -94,20 +90,9 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 	return 0;
 }
 
-static inline void sysaufs_br_init(struct au_branch *br)
-{
-	/* empty */
-}
-
-static inline void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
-{
-	/* nothing */
-}
-
-static inline void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex)
-{
-	/* nothing */
-}
+AuStubVoid(sysaufs_br_init, struct au_branch *br)
+AuStubVoid(sysaufs_brs_add, struct super_block *sb, aufs_bindex_t bindex)
+AuStubVoid(sysaufs_brs_del, struct super_block *sb, aufs_bindex_t bindex)
 
 static inline void sysaufs_brs_init(void)
 {
