@@ -91,10 +91,7 @@ ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
 int au_special_file(umode_t mode);
 void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev);
 #else
-static inline int au_special_file(umode_t mode)
-{
-	return 0;
-}
+AuStubInt0(au_special_file, umode_t mode)
 static inline void au_init_special_fop(struct inode *inode, umode_t mode,
 				       dev_t rdev)
 {

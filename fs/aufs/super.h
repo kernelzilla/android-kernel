@@ -246,36 +246,12 @@ static inline int au_busy_or_stale(void)
 	return -ESTALE;
 }
 #else
-static inline void au_export_init(struct super_block *sb)
-{
-	/* nothing */
-}
-
-static inline int au_test_nfsd(struct task_struct *tsk)
-{
-	return 0;
-}
-
-static inline int au_xigen_inc(struct inode *inode)
-{
-	return 0;
-}
-
-static inline int au_xigen_new(struct inode *inode)
-{
-	return 0;
-}
-
-static inline int au_xigen_set(struct super_block *sb, struct file *base)
-{
-	return 0;
-}
-
-static inline void au_xigen_clr(struct super_block *sb)
-{
-	/* empty */
-}
-
+AuStubVoid(au_export_init, struct super_block *sb)
+AuStubInt0(au_test_nfsd, struct task_struct *tsk)
+AuStubInt0(au_xigen_inc, struct inode *inode)
+AuStubInt0(au_xigen_new, struct inode *inode)
+AuStubInt0(au_xigen_set, struct super_block *sb, struct file *base)
+AuStubVoid(au_xigen_clr, struct super_block *sb)
 static inline int au_busy_or_stale(void)
 {
 	return -EBUSY;

@@ -221,10 +221,7 @@ static inline void au_hin_di_reinit(struct dentry *dentry)
 	dentry->d_fsdata = NULL;
 }
 #else
-static inline void au_hin_di_reinit(struct dentry *dentry __maybe_unused)
-{
-	/* empty */
-}
+AuStubVoid(au_hin_di_reinit, struct dentry *dentry __maybe_unused)
 #endif /* CONFIG_AUFS_HINOTIFY */
 
 #endif /* __KERNEL__ */
