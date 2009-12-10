@@ -76,6 +76,10 @@ int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 /* f_op.c */
 extern struct file_operations aufs_file_fop;
 int aufs_flush(struct file *file, fl_owner_t id);
+int au_do_open_nondir(struct file *file, int flags);
+int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file);
+ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
+		  const struct iovec *iov, unsigned long nv, loff_t pos);
 
 /* finfo.c */
 void au_hfput(struct au_hfile *hf, struct file *file);
