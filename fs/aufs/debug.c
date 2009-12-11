@@ -417,7 +417,6 @@ void au_dbg_sp_fop(struct file *file)
 	Compare(sendpage);
 	Compare(get_unmapped_area);
 	Compare(check_flags);
-	Compare(dir_notify);
 	Compare(flock);
 	Compare(splice_write);
 	Compare(splice_read);
