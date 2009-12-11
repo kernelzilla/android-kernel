@@ -83,6 +83,12 @@ void __init msm_map_common_io(void)
 		      "mcr p15, 0, %0, c15, c15, 2"
 		      : "=&r" (unused));
 #endif
+#ifdef CONFIG_ARCH_MSM_SCORPION
+	/* clear out EFSR and ADFSR on boot */
+	asm volatile ("mcr p15, 7, %0, c15, c0, 1\n\t"
+		      "mcr p15, 0, %0, c5, c1, 0"
+		      : : "r" (0));
+#endif
 
 	iotable_init(msm_io_desc, ARRAY_SIZE(msm_io_desc));
 }
