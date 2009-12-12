@@ -100,6 +100,7 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		AuDbg("0x%x\n", cmd);
 		err = -EINVAL;
 	}
 
@@ -117,6 +118,7 @@ long aufs_ioctl_nondir(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		AuDbg("0x%x\n", cmd);
 		err = -EINVAL;
 	}
 

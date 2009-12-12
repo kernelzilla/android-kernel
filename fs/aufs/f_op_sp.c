@@ -65,6 +65,44 @@ void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev)
 	}
 }
 
+static void au_dbg_sp_fop(struct file *file)
+{
+#ifdef CONFIG_AUFS_DEBUG
+	struct file *h_file = au_h_fptr(file, au_fbstart(file));
+	const struct file_operations *fop1 = h_file->f_op,
+		*fop2 = file->f_op;
+
+#define Compare(name)	AuDebugOn(!!fop1->name != !!fop2->name)
+	Compare(llseek);
+	Compare(read);
+	Compare(write);
+	Compare(aio_read);
+	Compare(aio_write);
+	Compare(readdir);
+	Compare(poll);
+	Compare(ioctl);
+	Compare(unlocked_ioctl);
+	Compare(compat_ioctl);
+	Compare(mmap);
+	Compare(open);
+	Compare(flush);
+	Compare(release);
+	Compare(fsync);
+	Compare(aio_fsync);
+	Compare(fasync);
+	Compare(lock);
+	Compare(sendpage);
+	Compare(get_unmapped_area);
+	Compare(check_flags);
+	Compare(dir_notify);
+	Compare(flock);
+	Compare(splice_write);
+	Compare(splice_read);
+	Compare(setlease);
+#undef Compare
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 
 static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
@@ -72,6 +110,8 @@ static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
 	int err;
 	struct au_pin pin;
 	struct dentry *parent;
+
+	AuDbg("%.*s\n", AuDLNPair(dentry));
 
 	err = 0;
 	parent = dget_parent(dentry);
@@ -105,28 +145,28 @@ static int au_do_open_sp(struct file *file, int flags)
 	dentry = file->f_dentry;
 	AuDbg("%.*s\n", AuDLNPair(dentry));
 
-	/* force copyup, always */
-	err = -EIO;
-	bcpup = -1;
-	sb = dentry->d_sb;
-	bend = au_sbend(sb);
-	for (bindex = 0; bindex <= bend; bindex++)
-		if (!au_br_rdonly(au_sbr(sb, bindex))) {
-			bcpup = bindex;
-			break;
-		}
-	if (unlikely(bcpup < 0))
-		goto out;
-
 	err = 0;
-	if (bcpup < au_dbstart(dentry)) {
-		/* need to copyup */
-		di_read_unlock(dentry, AuLock_IR);
-		di_write_lock_child(dentry);
-		if (bcpup < au_dbstart(dentry))
-			err = au_cpup_sp(dentry, bcpup);
-		di_downgrade_lock(dentry, AuLock_IR);
+	sb = dentry->d_sb;
+	bend = au_dbstart(dentry);
+	if (au_br_rdonly(au_sbr(sb, bend))) {
+		/* copyup first */
+		bcpup = -1;
+		for (bindex = 0; bindex < bend; bindex++)
+			if (!au_br_rdonly(au_sbr(sb, bindex))) {
+				bcpup = bindex;
+				break;
+			}
+		if (bcpup >= 0) {
+			/* need to copyup */
+			di_read_unlock(dentry, AuLock_IR);
+			di_write_lock_child(dentry);
+			if (bcpup < au_dbstart(dentry))
+				err = au_cpup_sp(dentry, bcpup);
+			di_downgrade_lock(dentry, AuLock_IR);
+		} else
+			err = -EIO;
 	}
+
 	if (!err)
 		err = au_do_open_nondir(file, file->f_flags);
 	if (!err) {
@@ -146,7 +186,6 @@ static int au_do_open_sp(struct file *file, int flags)
 		au_dbg_sp_fop(file);
 	}
 
- out:
 	return err;
 }
 
