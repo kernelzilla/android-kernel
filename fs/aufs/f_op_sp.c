@@ -73,6 +73,8 @@ static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
 	struct au_pin pin;
 	struct dentry *parent;
 
+	AuDbg("%.*s\n", AuDLNPair(dentry));
+
 	err = 0;
 	parent = dget_parent(dentry);
 	di_write_lock_parent(parent);
@@ -105,28 +107,28 @@ static int au_do_open_sp(struct file *file, int flags)
 	dentry = file->f_dentry;
 	AuDbg("%.*s\n", AuDLNPair(dentry));
 
-	/* force copyup, always */
-	err = -EIO;
-	bcpup = -1;
-	sb = dentry->d_sb;
-	bend = au_sbend(sb);
-	for (bindex = 0; bindex <= bend; bindex++)
-		if (!au_br_rdonly(au_sbr(sb, bindex))) {
-			bcpup = bindex;
-			break;
-		}
-	if (unlikely(bcpup < 0))
-		goto out;
-
 	err = 0;
-	if (bcpup < au_dbstart(dentry)) {
-		/* need to copyup */
-		di_read_unlock(dentry, AuLock_IR);
-		di_write_lock_child(dentry);
-		if (bcpup < au_dbstart(dentry))
-			err = au_cpup_sp(dentry, bcpup);
-		di_downgrade_lock(dentry, AuLock_IR);
+	sb = dentry->d_sb;
+	bend = au_dbstart(dentry);
+	if (au_br_rdonly(au_sbr(sb, bend))) {
+		/* copyup first */
+		bcpup = -1;
+		for (bindex = 0; bindex < bend; bindex++)
+			if (!au_br_rdonly(au_sbr(sb, bindex))) {
+				bcpup = bindex;
+				break;
+			}
+		if (bcpup >= 0) {
+			/* need to copyup */
+			di_read_unlock(dentry, AuLock_IR);
+			di_write_lock_child(dentry);
+			if (bcpup < au_dbstart(dentry))
+				err = au_cpup_sp(dentry, bcpup);
+			di_downgrade_lock(dentry, AuLock_IR);
+		} else
+			err = -EIO;
 	}
+
 	if (!err)
 		err = au_do_open_nondir(file, file->f_flags);
 	if (!err) {
@@ -146,7 +148,6 @@ static int au_do_open_sp(struct file *file, int flags)
 		au_dbg_sp_fop(file);
 	}
 
- out:
 	return err;
 }
 
