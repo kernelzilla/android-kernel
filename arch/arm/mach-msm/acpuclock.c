@@ -160,16 +160,18 @@ static int pc_pll_request(unsigned id, unsigned on)
 
 unsigned long acpuclk_power_collapse(void) {
 	int ret = acpuclk_get_rate();
+	ret *= 1000;
 	if (ret > drv_state.power_collapse_khz)
 		acpuclk_set_rate(drv_state.power_collapse_khz, 1);
-	return ret * 1000;
+	return ret;
 }
 
 unsigned long acpuclk_wait_for_irq(void) {
 	int ret = acpuclk_get_rate();
+	ret *= 1000;
 	if (ret > drv_state.wait_for_irq_khz)
 		acpuclk_set_rate(drv_state.wait_for_irq_khz, 1);
-	return ret * 1000;
+	return ret;
 }
 
 static int acpuclk_set_vdd_level(int vdd)
