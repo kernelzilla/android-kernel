@@ -65,6 +65,44 @@ void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev)
 	}
 }
 
+static void au_dbg_sp_fop(struct file *file)
+{
+#ifdef CONFIG_AUFS_DEBUG
+	struct file *h_file = au_h_fptr(file, au_fbstart(file));
+	const struct file_operations *fop1 = h_file->f_op,
+		*fop2 = file->f_op;
+
+#define Compare(name)	AuDebugOn(!!fop1->name != !!fop2->name)
+	Compare(llseek);
+	Compare(read);
+	Compare(write);
+	Compare(aio_read);
+	Compare(aio_write);
+	Compare(readdir);
+	Compare(poll);
+	Compare(ioctl);
+	Compare(unlocked_ioctl);
+	Compare(compat_ioctl);
+	Compare(mmap);
+	Compare(open);
+	Compare(flush);
+	Compare(release);
+	Compare(fsync);
+	Compare(aio_fsync);
+	Compare(fasync);
+	Compare(lock);
+	Compare(sendpage);
+	Compare(get_unmapped_area);
+	Compare(check_flags);
+	Compare(dir_notify);
+	Compare(flock);
+	Compare(splice_write);
+	Compare(splice_read);
+	Compare(setlease);
+#undef Compare
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 
 static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
