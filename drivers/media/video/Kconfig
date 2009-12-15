@@ -107,6 +107,8 @@ config VIDEO_IR_I2C
 
 	  In doubt, say Y.
 
+source "drivers/media/video/hp3a/Kconfig"
+
 #
 # Encoder / Decoder module configuration
 #
@@ -335,6 +337,28 @@ config VIDEO_TCM825X
 	---help---
 	  This is a driver for the Toshiba TCM825x VGA camera sensor.
 	  It is used for example in Nokia N800.
+
+config VIDEO_OMAP3_HPLENS
+	tristate "HP generic lens driver"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 generic lens driver.
+
+config VIDEO_IMX046
+	tristate "Sony IMX046 sensor driver (8MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Sony
+	  IMX046 camera.  It is currently working with the TI OMAP3
+          camera controller.
+
+config VIDEO_LV8093
+	tristate "Piezo Actuator Lens driver for LV8093"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 lens driver for the Sanyo LV8093.
+	  It is currently working with the TI OMAP3 camera controller
+	  and Sony IMX046 sensor.
 
 config VIDEO_SAA7110
 	tristate "Philips SAA7110 video decoder"
@@ -901,6 +925,24 @@ config VIDEO_SH_MOBILE_CEU
 	select VIDEOBUF_DMA_CONTIG
 	---help---
 	  This is a v4l2 driver for the SuperH Mobile CEU Interface
+
+config VIDEO_OLDOMAP3
+        tristate "OMAP 3 Camera support"
+	select VIDEOBUF_GEN
+	select VIDEOBUF_DMA_SG
+	depends on VIDEO_V4L2 && ARCH_OMAP34XX
+	---help---
+	  Driver for an OMAP 3 camera controller.
+
+source "drivers/media/video/oldisp/Kconfig"
+
+config VIDEO_OLDOMAP3_BUFFALLOC
+	bool "OMAP3430 ISP Workaround: Allocate memory at driver init"
+	depends on VIDEO_OLDOMAP3 && ARCH_OMAP3430
+	default y
+	---help---
+	  This option is for allocating the workaround buffer at
+	  camera init time.
 
 config VIDEO_OMAP2
 	tristate "OMAP2 Camera Capture Interface driver"

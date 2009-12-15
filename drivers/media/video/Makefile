@@ -118,6 +118,14 @@ obj-$(CONFIG_VIDEO_CX2341X) += cx2341x.o
 
 obj-$(CONFIG_VIDEO_CAFE_CCIC) += cafe_ccic.o
 
+obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
+
+obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
+obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a/
+obj-$(CONFIG_VIDEO_OMAP3_HPLENS) += hplens.o
+
+obj-$(CONFIG_VIDEO_IMX046)      += imx046.o
+obj-$(CONFIG_VIDEO_LV8093)      += lv8093.o
 obj-$(CONFIG_USB_DABUSB)        += dabusb.o
 obj-$(CONFIG_USB_OV511)         += ov511.o
 obj-$(CONFIG_USB_SE401)         += se401.o
@@ -148,6 +156,14 @@ obj-$(CONFIG_VIDEO_CX23885) += cx23885/
 
 obj-$(CONFIG_VIDEO_OMAP2)		+= omap2cam.o
 obj-$(CONFIG_SOC_CAMERA)		+= soc_camera.o
+obj-$(CONFIG_VIDEO_OLDOMAP3) += oldomap34xxcam.o oldisp/
+obj-$(CONFIG_VIDEO_OMAP_VIDEOOUT) += omap-vout/
+obj-$(CONFIG_SOC_CAMERA)	+= soc_camera.o
+obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
+obj-$(CONFIG_SOC_CAMERA_MT9M111)	+= mt9m111.o
+obj-$(CONFIG_SOC_CAMERA_MT9T031)	+= mt9t031.o
+obj-$(CONFIG_SOC_CAMERA_MT9V022)	+= mt9v022.o
+obj-$(CONFIG_SOC_CAMERA_OV772X)		+= ov772x.o
 obj-$(CONFIG_SOC_CAMERA_PLATFORM)	+= soc_camera_platform.o
 # soc-camera host drivers have to be linked after camera drivers
 obj-$(CONFIG_VIDEO_MX1)			+= mx1_camera.o
@@ -169,3 +185,7 @@ obj-$(CONFIG_ARCH_DAVINCI)	+= davinci/
 EXTRA_CFLAGS += -Idrivers/media/dvb/dvb-core
 EXTRA_CFLAGS += -Idrivers/media/dvb/frontends
 EXTRA_CFLAGS += -Idrivers/media/common/tuners
+
+ifdef CONFIG_VIDEO_OMAP3_HP3A
+EXTRA_CFLAGS += -Idrivers/media/video/hp3a
+endif
