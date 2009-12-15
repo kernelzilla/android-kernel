@@ -344,6 +344,14 @@ config VIDEO_OMAP3_HPLENS
 	---help---
 	  This is a Video4Linux2 generic lens driver.
 
+config VIDEO_MT9P012
+	tristate "Micron MT9P012 raw sensor driver (5MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Micron
+	  MT9P012 camera.  It is currently working with the TI OMAP3
+	  camera controller.
+
 config VIDEO_IMX046
 	tristate "Sony IMX046 sensor driver (8MP)"
 	depends on I2C && VIDEO_V4L2

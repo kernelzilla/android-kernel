@@ -121,6 +121,7 @@ obj-$(CONFIG_VIDEO_CAFE_CCIC) += cafe_ccic.o
 obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
 
 obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
+obj-$(CONFIG_VIDEO_MT9P012)     += mt9p012.o
 obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a/
 obj-$(CONFIG_VIDEO_OMAP3_HPLENS) += hplens.o
 
