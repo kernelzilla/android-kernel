@@ -22,7 +22,8 @@
 #include <plat/gpmc.h>
 #include <plat/nand.h>
 
-#define GPMC_IRQ_STATUS		0x18
+#define GPMC_IRQSTATUS		0x18
+#define GPMC_IRQENABLE		0x1C
 #define GPMC_ECC_CONFIG		0x1F4
 #define GPMC_ECC_CONTROL	0x1F8
 #define GPMC_ECC_SIZE_CONFIG	0x1FC
@@ -207,8 +208,10 @@ static void omap_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 		break;
 	}
 
-	if (cmd != NAND_CMD_NONE)
+	if (cmd != NAND_CMD_NONE) {
+		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQSTATUS);
 		__raw_writeb(cmd, info->nand.IO_ADDR_W);
+	}
 }
 
 /**
@@ -868,9 +871,8 @@ static int omap_dev_ready(struct mtd_info *mtd)
 			ret = 0;
 			break;
 		}
-		val = __raw_readl(info->gpmc_baseaddr + GPMC_STATUS);
+		val = __raw_readl(info->gpmc_baseaddr + GPMC_IRQSTATUS);
 	}
-
 	return ret;
 }
 
@@ -918,6 +920,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 		val  = gpmc_cs_read_reg(info->gpmc_cs, GPMC_CS_CONFIG1);
 		val |= WR_RD_PIN_MONITORING;
 		gpmc_cs_write_reg(info->gpmc_cs, GPMC_CS_CONFIG1, val);
+		__raw_writel(0x100, info->gpmc_baseaddr + GPMC_IRQENABLE);
 	}
 
 	val  = gpmc_cs_read_reg(info->gpmc_cs, GPMC_CS_CONFIG7);
