@@ -17,92 +17,159 @@
  */
 
 /*
- * file operations for special files
+ * file operations for special files.
+ * while they exist in aufs virtually,
+ * their file I/O is handled out of aufs.
  */
 
 #include <linux/fs_stack.h>
-#include <linux/poll.h>
 #include "aufs.h"
+
+static ssize_t aufs_aio_read_sp(struct kiocb *kio, const struct iovec *iov,
+				unsigned long nv, loff_t pos)
+{
+	ssize_t err;
+	aufs_bindex_t bstart;
+	unsigned char wbr;
+	struct file *file, *h_file;
+	struct super_block *sb;
+
+	file = kio->ki_filp;
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	fi_read_lock(file);
+	bstart = au_fbstart(file);
+	h_file = au_h_fptr(file, bstart);
+	fi_read_unlock(file);
+	wbr = !!au_br_writable(au_sbr(sb, bstart)->br_perm);
+	si_read_unlock(sb);
+
+	/* do not change the file in kio */
+	AuDebugOn(!h_file->f_op || !h_file->f_op->aio_read);
+	err = h_file->f_op->aio_read(kio, iov, nv, pos);
+	if (err > 0 && wbr)
+		file_accessed(h_file);
+
+	return err;
+}
+
+static ssize_t aufs_aio_write_sp(struct kiocb *kio, const struct iovec *iov,
+				 unsigned long nv, loff_t pos)
+{
+	ssize_t err;
+	aufs_bindex_t bstart;
+	unsigned char wbr;
+	struct super_block *sb;
+	struct file *file, *h_file;
+
+	file = kio->ki_filp;
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	fi_read_lock(file);
+	bstart = au_fbstart(file);
+	h_file = au_h_fptr(file, bstart);
+	fi_read_unlock(file);
+	wbr = !!au_br_writable(au_sbr(sb, bstart)->br_perm);
+	si_read_unlock(sb);
+
+	/* do not change the file in kio */
+	AuDebugOn(!h_file->f_op || !h_file->f_op->aio_write);
+	err = h_file->f_op->aio_write(kio, iov, nv, pos);
+	if (err > 0 && wbr)
+		file_update_time(h_file);
+
+	return err;
+}
+
+/* ---------------------------------------------------------------------- */
+
+static int aufs_release_sp(struct inode *inode __maybe_unused, struct file *file)
+{
+	int err;
+	struct file *h_file;
+
+	fi_read_lock(file);
+	h_file = au_h_fptr(file, au_fbstart(file));
+	fi_read_unlock(file);
+	/* close this fifo in aufs */
+	err = h_file->f_op->release(inode, file); /* ignore */
+	aufs_release_nondir(inode, file); /* ignore */
+	return err;
+}
+
+/* ---------------------------------------------------------------------- */
 
 /* currently, support only FIFO */
 enum {AuSp_FIFO, AuSp_FIFO_R, AuSp_FIFO_W, AuSp_FIFO_RW,
       /* AuSp_SOCK, AuSp_CHR, AuSp_BLK, */
       AuSp_Last};
-static const struct file_operations aufs_sp_fop[];
+static int aufs_open_sp(struct inode *inode, struct file *file);
+static struct au_sp_fop {
+	volatile int		done;
+	struct file_operations	fop;	/* not 'const' */
+	spinlock_t		spin;
+} au_sp_fop[AuSp_Last] = {
+	[AuSp_FIFO] = {
+		.fop	= {
+			.open	= aufs_open_sp
+		}
+	}
+};
 
-int au_special_file(umode_t mode)
+static void au_init_fop_sp(struct file *file)
 {
-	int ret;
+	struct au_sp_fop *p;
+	int i;
+	struct file *h_file;
 
-	ret = 0;
-	switch (mode & S_IFMT) {
-	case S_IFIFO:
-#if 0
-	case S_IFCHR:
-	case S_IFBLK:
-	case S_IFSOCK:
-#endif
-		ret = 1;
+	p = au_sp_fop;
+	if (unlikely(!p->done)) {
+		/* initialize first time only */
+		static DEFINE_SPINLOCK(spin);
+
+		spin_lock(&spin);
+		if (!p->done) {
+			BUILD_BUG_ON(sizeof(au_sp_fop)/sizeof(*au_sp_fop)
+				     != AuSp_Last);
+			for (i = 0; i < AuSp_Last; i++)
+				spin_lock_init(&p[i].spin);
+			p->done = 1;
+		}
+		spin_unlock(&spin);
 	}
 
-	return ret;
-}
-
-void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev)
-{
-	init_special_inode(inode, mode, rdev);
-
-	switch (mode & S_IFMT) {
-	case S_IFIFO:
-		inode->i_fop = aufs_sp_fop + AuSp_FIFO;
-		/*FALLTHROUGH*/
-	case S_IFCHR:
-	case S_IFBLK:
-	case S_IFSOCK:
-		break;
-	default:
-		AuDebugOn(1);
+	switch (file->f_mode & (FMODE_READ | FMODE_WRITE)) {
+		case FMODE_READ:
+			i = AuSp_FIFO_R;
+			break;
+		case FMODE_WRITE:
+			i = AuSp_FIFO_W;
+			break;
+		case FMODE_READ | FMODE_WRITE:
+			i = AuSp_FIFO_RW;
+			break;
+		default:
+			BUG();
 	}
+
+	p += i;
+	if (unlikely(!p->done)) {
+		/* initialize first time only */
+		h_file = au_h_fptr(file, au_fbstart(file));
+		spin_lock(&p->spin);
+		if (!p->done) {
+			p->fop = *h_file->f_op;
+			if (p->fop.aio_read)
+				p->fop.aio_read = aufs_aio_read_sp;
+			if (p->fop.aio_write)
+				p->fop.aio_write = aufs_aio_write_sp;
+			p->fop.release = aufs_release_sp;
+			p->done = 1;
+		}
+		spin_unlock(&p->spin);
+	}
+	file->f_op = &p->fop;
 }
-
-static void au_dbg_sp_fop(struct file *file)
-{
-#ifdef CONFIG_AUFS_DEBUG
-	struct file *h_file = au_h_fptr(file, au_fbstart(file));
-	const struct file_operations *fop1 = h_file->f_op,
-		*fop2 = file->f_op;
-
-#define Compare(name)	AuDebugOn(!!fop1->name != !!fop2->name)
-	Compare(llseek);
-	Compare(read);
-	Compare(write);
-	Compare(aio_read);
-	Compare(aio_write);
-	Compare(readdir);
-	Compare(poll);
-	Compare(ioctl);
-	Compare(unlocked_ioctl);
-	Compare(compat_ioctl);
-	Compare(mmap);
-	Compare(open);
-	Compare(flush);
-	Compare(release);
-	Compare(fsync);
-	Compare(aio_fsync);
-	Compare(fasync);
-	Compare(lock);
-	Compare(sendpage);
-	Compare(get_unmapped_area);
-	Compare(check_flags);
-	Compare(flock);
-	Compare(splice_write);
-	Compare(splice_read);
-	Compare(setlease);
-#undef Compare
-#endif
-}
-
-/* ---------------------------------------------------------------------- */
 
 static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
 {
@@ -140,6 +207,8 @@ static int au_do_open_sp(struct file *file, int flags)
 	aufs_bindex_t bcpup, bindex, bend;
 	struct dentry *dentry;
 	struct super_block *sb;
+	struct file *h_file;
+	struct inode *h_inode;
 
 	dentry = file->f_dentry;
 	AuDbg("%.*s\n", AuDLNPair(dentry));
@@ -163,28 +232,34 @@ static int au_do_open_sp(struct file *file, int flags)
 				err = au_cpup_sp(dentry, bcpup);
 			di_downgrade_lock(dentry, AuLock_IR);
 		} else
-			err = -EIO;
+			err = -EROFS;
 	}
+	if (unlikely(err))
+		goto out;
 
-	if (!err)
-		err = au_do_open_nondir(file, file->f_flags);
+	/* prepare h_file */
+	err = au_do_open_nondir(file, file->f_flags);
+	if (unlikely(err))
+		goto out;
+
+	h_file = au_h_fptr(file, au_fbstart(file));
+	h_inode = h_file->f_dentry->d_inode;
+	di_read_unlock(dentry, AuLock_IR);
+	fi_write_unlock(file);
+	si_read_unlock(sb);
+	/* open this fifo in aufs */
+	err = h_inode->i_fop->open(file->f_dentry->d_inode, file);
+	si_noflush_read_lock(sb);
+	fi_write_lock(file);
+	di_read_lock_child(dentry, AuLock_IR);
 	if (!err) {
-		switch (file->f_mode & (FMODE_READ | FMODE_WRITE)) {
-		case FMODE_READ:
-			file->f_op = aufs_sp_fop + AuSp_FIFO_R;
-			break;
-		case FMODE_WRITE:
-			file->f_op = aufs_sp_fop + AuSp_FIFO_W;
-			break;
-		case FMODE_READ | FMODE_WRITE:
-			file->f_op = aufs_sp_fop + AuSp_FIFO_RW;
-			break;
-		default:
-			BUG();
-		}
-		au_dbg_sp_fop(file);
+		au_init_fop_sp(file);
+		goto out; /* success */
 	}
 
+	au_finfo_fin(file);
+
+ out:
 	return err;
 }
 
@@ -195,217 +270,37 @@ static int aufs_open_sp(struct inode *inode, struct file *file)
 
 /* ---------------------------------------------------------------------- */
 
-static ssize_t aufs_read_sp(struct file *file, char __user *buf, size_t count,
-			    loff_t *ppos)
+void au_init_special_fop(struct inode *inode, umode_t mode, dev_t rdev)
 {
-	ssize_t err;
-	struct inode *inode;
-	struct super_block *sb;
-	struct file *h_file;
+	init_special_inode(inode, mode, rdev);
 
-	inode = file->f_dentry->d_inode;
-	sb = inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	err = vfsub_read_u(h_file, buf, count, ppos);
-
-	si_noflush_read_lock(sb);
-	/* todo: necessary? */
-	/* file->f_ra = h_file->f_ra; */
-	ii_read_lock_child(inode);
-	fsstack_copy_attr_atime(inode, h_file->f_dentry->d_inode);
-	ii_read_unlock(inode);
-	si_read_unlock(sb);
-
-	return err;
-}
-
-static ssize_t aufs_write_sp(struct file *file, const char __user *ubuf,
-			     size_t count, loff_t *ppos)
-{
-	ssize_t err;
-	struct inode *inode;
-	struct super_block *sb;
-	struct file *h_file;
-	char __user *buf = (char __user *)ubuf;
-
-	inode = file->f_dentry->d_inode;
-	sb = inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	err = vfsub_write_u(h_file, buf, count, ppos);
-
-	si_noflush_read_lock(sb);
-	ii_write_lock_child(inode);
-	au_cpup_attr_timesizes(inode);
-	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
-	ii_write_unlock(inode);
-	si_read_unlock(sb);
-
-	return err;
-}
-
-static ssize_t aufs_aio_read_sp(struct kiocb *kio, const struct iovec *iov,
-				unsigned long nv, loff_t pos)
-{
-	ssize_t err;
-	struct file *file, *h_file;
-	struct inode *inode;
-	struct super_block *sb;
-
-	file = kio->ki_filp;
-	inode = file->f_dentry->d_inode;
-	sb = inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	AuDebugOn(!h_file->f_op || !h_file->f_op->aio_read);
-	err = au_do_aio(h_file, MAY_READ, kio, iov, nv, pos);
-
-	si_noflush_read_lock(sb);
-	/* todo: necessary? */
-	/* file->f_ra = h_file->f_ra; */
-	ii_read_lock_child(inode);
-	fsstack_copy_attr_atime(inode, h_file->f_dentry->d_inode);
-	ii_read_unlock(inode);
-	si_read_unlock(sb);
-
-	return err;
-}
-
-static ssize_t aufs_aio_write_sp(struct kiocb *kio, const struct iovec *iov,
-				 unsigned long nv, loff_t pos)
-{
-	ssize_t err;
-	struct inode *inode;
-	struct super_block *sb;
-	struct file *file, *h_file;
-
-	file = kio->ki_filp;
-	inode = file->f_dentry->d_inode;
-	sb = inode->i_sb;
-	/* mutex_lock(&inode->i_mutex); */
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	AuDebugOn(!h_file->f_op || !h_file->f_op->aio_write);
-	err = au_do_aio(h_file, MAY_WRITE, kio, iov, nv, pos);
-
-	si_noflush_read_lock(sb);
-	ii_write_lock_child(inode);
-	au_cpup_attr_timesizes(inode);
-	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
-	ii_write_unlock(inode);
-	si_read_unlock(sb);
-	/* mutex_unlock(&inode->i_mutex); */
-
-	return err;
-}
-
-/* ---------------------------------------------------------------------- */
-
-static unsigned int aufs_poll_sp(struct file *file, poll_table *wait)
-{
-	struct super_block *sb;
-	struct file *h_file;
-
-	sb = file->f_dentry->d_inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	AuDebugOn(!h_file->f_op || !h_file->f_op->poll);
-	return h_file->f_op->poll(h_file, wait);
-}
-
-static long aufs_unlocked_ioctl_sp(struct file *file, unsigned int cmd,
-				   unsigned long arg)
-{
-	struct super_block *sb;
-	struct file *h_file;
-
-	sb = file->f_dentry->d_inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	AuDebugOn(!h_file->f_op || !h_file->f_op->unlocked_ioctl);
-	return h_file->f_op->unlocked_ioctl(h_file, cmd, arg);
-}
-
-static int aufs_fasync_sp(int fd, struct file *file, int on)
-{
-	struct super_block *sb;
-	struct file *h_file;
-
-	sb = file->f_dentry->d_inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
-	fi_read_unlock(file);
-	si_read_unlock(sb);
-
-	AuDebugOn(!h_file->f_op || !h_file->f_op->fasync);
-	return h_file->f_op->fasync(fd, h_file, on);
-}
-
-/* ---------------------------------------------------------------------- */
-
-/* cf. linux/fs/pipe.c */
-static const struct file_operations aufs_sp_fop[] = {
-	[AuSp_FIFO] = {
-		.open		= aufs_open_sp
-	},
-	[AuSp_FIFO_R] = {
-		.llseek		= no_llseek,
-		.read		= aufs_read_sp,
-		.write		= aufs_write_sp,
-		.aio_read	= aufs_aio_read_sp,
-		.poll		= aufs_poll_sp,
-		.unlocked_ioctl	= aufs_unlocked_ioctl_sp,
-		.open		= aufs_open_sp,
-		.release	= aufs_release_nondir,
-		.fasync		= aufs_fasync_sp
-	},
-	[AuSp_FIFO_W] = {
-		.llseek		= no_llseek,
-		.read		= aufs_read_sp,
-		.write		= aufs_write_sp,
-		.aio_write	= aufs_aio_write_sp,
-		.poll		= aufs_poll_sp,
-		.unlocked_ioctl	= aufs_unlocked_ioctl_sp,
-		.open		= aufs_open_sp,
-		.release	= aufs_release_nondir,
-		.fasync		= aufs_fasync_sp
-	},
-	[AuSp_FIFO_RW] = {
-		.llseek		= no_llseek,
-		.read		= aufs_read_sp,
-		.write		= aufs_write_sp,
-		.aio_read	= aufs_aio_read_sp,
-		.aio_write	= aufs_aio_write_sp,
-		.poll		= aufs_poll_sp,
-		.unlocked_ioctl	= aufs_unlocked_ioctl_sp,
-		.open		= aufs_open_sp,
-		.release	= aufs_release_nondir,
-		.fasync		= aufs_fasync_sp
+	switch (mode & S_IFMT) {
+	case S_IFIFO:
+		inode->i_fop = &au_sp_fop[AuSp_FIFO].fop;
+		/*FALLTHROUGH*/
+	case S_IFCHR:
+	case S_IFBLK:
+	case S_IFSOCK:
+		break;
+	default:
+		AuDebugOn(1);
 	}
-};
+}
+
+int au_special_file(umode_t mode)
+{
+	int ret;
+
+	ret = 0;
+	switch (mode & S_IFMT) {
+	case S_IFIFO:
+#if 0
+	case S_IFCHR:
+	case S_IFBLK:
+	case S_IFSOCK:
+#endif
+		ret = 1;
+	}
+
+	return ret;
+}
