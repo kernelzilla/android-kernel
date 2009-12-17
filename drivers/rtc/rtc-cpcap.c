@@ -207,16 +207,13 @@ static int cpcap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct cpcap_rtc *rtc;
 	struct cpcap_time cpcap_tm;
-	int alarm_masked;
 	int ret;
 
 	rtc = dev_get_drvdata(dev);
 
 	rtc2cpcap_time(&cpcap_tm, &alrm->time);
 
-	alarm_masked = cpcap_irq_mask_get(rtc->cpcap, CPCAP_IRQ_TODA);
-
-	if (!alarm_masked)
+	if (rtc->alarm_enabled)
 		cpcap_irq_mask(rtc->cpcap, CPCAP_IRQ_TODA);
 
 	ret = cpcap_regacc_write(rtc->cpcap, CPCAP_REG_DAYA, cpcap_tm.day,
@@ -226,8 +223,7 @@ static int cpcap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TODA1, cpcap_tm.tod1,
 				  TOD1_MASK);
 
-	if (!alarm_masked)
-		cpcap_irq_unmask(rtc->cpcap, CPCAP_IRQ_TODA);
+	ret |= cpcap_rtc_alarm_irq_enable(dev, alrm->enabled);
 
 	return ret;
 }
