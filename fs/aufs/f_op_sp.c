@@ -83,7 +83,7 @@ static ssize_t aufs_aio_write_sp(struct kiocb *kio, const struct iovec *iov,
 
 /* ---------------------------------------------------------------------- */
 
-static int aufs_release_sp(struct inode *inode __maybe_unused, struct file *file)
+static int aufs_release_sp(struct inode *inode, struct file *file)
 {
 	int err;
 	struct file *h_file;
@@ -105,7 +105,7 @@ enum {AuSp_FIFO, AuSp_FIFO_R, AuSp_FIFO_W, AuSp_FIFO_RW,
       AuSp_Last};
 static int aufs_open_sp(struct inode *inode, struct file *file);
 static struct au_sp_fop {
-	volatile int		done;
+	int			done;
 	struct file_operations	fop;	/* not 'const' */
 	spinlock_t		spin;
 } au_sp_fop[AuSp_Last] = {
@@ -139,17 +139,17 @@ static void au_init_fop_sp(struct file *file)
 	}
 
 	switch (file->f_mode & (FMODE_READ | FMODE_WRITE)) {
-		case FMODE_READ:
-			i = AuSp_FIFO_R;
-			break;
-		case FMODE_WRITE:
-			i = AuSp_FIFO_W;
-			break;
-		case FMODE_READ | FMODE_WRITE:
-			i = AuSp_FIFO_RW;
-			break;
-		default:
-			BUG();
+	case FMODE_READ:
+		i = AuSp_FIFO_R;
+		break;
+	case FMODE_WRITE:
+		i = AuSp_FIFO_W;
+		break;
+	case FMODE_READ | FMODE_WRITE:
+		i = AuSp_FIFO_RW;
+		break;
+	default:
+		BUG();
 	}
 
 	p += i;
