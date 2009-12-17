@@ -83,8 +83,6 @@ extern const struct file_operations aufs_file_fop;
 int aufs_flush(struct file *file, fl_owner_t id);
 int au_do_open_nondir(struct file *file, int flags);
 int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file);
-ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
-		  const struct iovec *iov, unsigned long nv, loff_t pos);
 
 #ifdef CONFIG_AUFS_SP_IATTR
 /* f_op_sp.c */

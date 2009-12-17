@@ -824,7 +824,6 @@ static int need_sigen_inc(int old, int new)
 static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 {
 	int err;
-	umode_t mode;
 	unsigned long n, ul, bytes, files;
 	aufs_bindex_t bstart;
 	struct file *file, *hf, **a;
@@ -841,25 +840,20 @@ static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 
 	/* no need file_list_lock() since sbinfo is locked? defered? */
 	list_for_each_entry(file, &sb->s_files, f_u.fu_list) {
-		err = -EBUSY;
-		mode = file->f_dentry->d_inode->i_mode;
-		if (special_file(mode) && !au_special_file(mode))
+		if (special_file(file->f_dentry->d_inode->i_mode))
 			continue;
 
 		AuDbg("%.*s\n", AuDLNPair(file->f_dentry));
-		if (au_special_file(mode)
-		    && (file->f_mode & (FMODE_WRITE | FMODE_PWRITE)))
-			goto out_free;
-
 		fi_read_lock(file);
 		if (unlikely(au_test_mmapped(file))) {
+			err = -EBUSY;
 			FiMustNoWaiters(file);
 			fi_read_unlock(file);
 			goto out_free;
 		}
 
 		bstart = au_fbstart(file);
-		if (!S_ISREG(mode)
+		if (!S_ISREG(file->f_dentry->d_inode->i_mode)
 		    || !(file->f_mode & FMODE_WRITE)
 		    || bstart != bindex) {
 			FiMustNoWaiters(file);
