@@ -183,8 +183,8 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 	return err;
 }
 
-ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
-		  const struct iovec *iov, unsigned long nv, loff_t pos)
+static ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
+			 const struct iovec *iov, unsigned long nv, loff_t pos)
 {
 	ssize_t err;
 	struct file *file;
