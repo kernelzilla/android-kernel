@@ -565,14 +565,23 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 
 		/* Multimedia uses CLK_IN0, incall uses CLK_IN1 */
 		if (state->rat_type != CPCAP_AUDIO_RAT_NONE)
-			cdai_changes.value |= CPCAP_BIT_CLK_IN_SEL;
+			cdai_changes.value |= CPCAP_BIT_CLK_IN_SEL
+						| CPCAP_BIT_CLK_INV;
 
 		/* CDMA sholes is using Normal mode for uplink */
-		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL | CPCAP_BIT_CLK_INV;
+		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL;
 
 		/* Setting I2S mode */
-		cdai_changes.value |= CPCAP_BIT_CDC_DIG_AUD_FS0
+		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
+			cdai_changes.value |= CPCAP_BIT_CDC_DIG_AUD_FS0
 			 | CPCAP_BIT_CDC_DIG_AUD_FS1;
+
+		if ((state->rat_type == CPCAP_AUDIO_RAT_NONE) &&
+			(state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL))
+			cdai_changes.value |= CPCAP_BIT_MIC1_RX_TIMESLOT0
+						| CPCAP_BIT_CDC_DIG_AUD_FS0;
+		else
+			cdai_changes.value |= CPCAP_BIT_MIC2_TIMESLOT0;
 
 		/* OK, now start paranoid codec sequence */
 		/* FIRST, make sure the frequency config is right... */
@@ -1000,23 +1009,30 @@ void cpcap_audio_set_audio_state(struct cpcap_audio_state *state)
 	if (is_speaker_turning_off(state, previous_state))
 		cpcap_audio_configure_output(state, previous_state);
 
-	if (is_codec_changed(state, previous_state) ||
-		is_stdac_changed(state, previous_state)) {
+	if (is_codec_changed(state, previous_state)) {
 		int codec_mute = state->codec_mute;
-		int stdac_mute = state->stdac_mute;
 
 		state->codec_mute = CPCAP_AUDIO_CODEC_MUTE;
-		state->stdac_mute = CPCAP_AUDIO_STDAC_MUTE;
 
 		cpcap_audio_configure_aud_mute(state, previous_state);
 
 		previous_state->codec_mute = state->codec_mute;
-		previous_state->stdac_mute = state->stdac_mute;
 
 		state->codec_mute = codec_mute;
-		state->stdac_mute = stdac_mute;
 
 		cpcap_audio_configure_codec(state, previous_state);
+	}
+	if (is_stdac_changed(state, previous_state)) {
+		int stdac_mute = state->stdac_mute;
+
+		state->stdac_mute = CPCAP_AUDIO_STDAC_MUTE;
+
+		cpcap_audio_configure_aud_mute(state, previous_state);
+
+		previous_state->stdac_mute = state->stdac_mute;
+
+		state->stdac_mute = stdac_mute;
+
 		cpcap_audio_configure_stdac(state, previous_state);
 	}
 
