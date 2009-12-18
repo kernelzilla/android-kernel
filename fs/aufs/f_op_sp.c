@@ -171,40 +171,43 @@ static void au_init_fop_sp(struct file *file)
 	file->f_op = &p->fop;
 }
 
-static int au_cpup_sp(struct dentry *dentry, aufs_bindex_t bcpup)
+static int au_cpup_sp(struct dentry *dentry)
 {
 	int err;
+	aufs_bindex_t bcpup;
 	struct au_pin pin;
-	struct dentry *parent;
+	struct au_wr_dir_args wr_dir_args = {
+		.force_btgt	= -1,
+		.flags		= 0
+	};
 
 	AuDbg("%.*s\n", AuDLNPair(dentry));
 
+	di_read_unlock(dentry, AuLock_IR);
+	di_write_lock_child(dentry);
+	err = au_wr_dir(dentry, /*src_dentry*/NULL, &wr_dir_args);
+	if (unlikely(err < 0))
+		goto out;
+	bcpup = err;
 	err = 0;
-	parent = dget_parent(dentry);
-	di_write_lock_parent(parent);
-	if (!au_h_dptr(parent, bcpup)) {
-		err = au_cpup_dirs(dentry, bcpup);
-		if (unlikely(err))
-			goto out;
-	}
+	if (bcpup == au_dbstart(dentry))
+		goto out; /* success */
 
-	err = au_pin(&pin, dentry, bcpup, AuOpt_UDBA_NONE,
-		     AuPin_DI_LOCKED | AuPin_MNT_WRITE);
+	err = au_pin(&pin, dentry, bcpup, au_opt_udba(dentry->d_sb),
+		     AuPin_MNT_WRITE);
 	if (!err) {
 		err = au_sio_cpup_simple(dentry, bcpup, -1, AuCpup_DTIME);
 		au_unpin(&pin);
 	}
 
  out:
-	di_write_unlock(parent);
-	dput(parent);
+	di_downgrade_lock(dentry, AuLock_IR);
 	return err;
 }
 
 static int au_do_open_sp(struct file *file, int flags)
 {
 	int err;
-	aufs_bindex_t bcpup, bindex, bend;
 	struct dentry *dentry;
 	struct super_block *sb;
 	struct file *h_file;
@@ -213,35 +216,18 @@ static int au_do_open_sp(struct file *file, int flags)
 	dentry = file->f_dentry;
 	AuDbg("%.*s\n", AuDLNPair(dentry));
 
-	err = 0;
-	sb = dentry->d_sb;
-	bend = au_dbstart(dentry);
-	if (au_br_rdonly(au_sbr(sb, bend))) {
-		/* copyup first */
-		bcpup = -1;
-		for (bindex = 0; bindex < bend; bindex++)
-			if (!au_br_rdonly(au_sbr(sb, bindex))) {
-				bcpup = bindex;
-				break;
-			}
-		if (bcpup >= 0) {
-			/* need to copyup */
-			di_read_unlock(dentry, AuLock_IR);
-			di_write_lock_child(dentry);
-			if (bcpup < au_dbstart(dentry))
-				err = au_cpup_sp(dentry, bcpup);
-			di_downgrade_lock(dentry, AuLock_IR);
-		} else
-			err = -EROFS;
-	}
-	if (unlikely(err))
-		goto out;
+	/*
+	 * try copying-up.
+	 * operate on the ro branch is not an error.
+	 */
+	au_cpup_sp(dentry); /* ignore */
 
 	/* prepare h_file */
 	err = au_do_open_nondir(file, file->f_flags);
 	if (unlikely(err))
 		goto out;
 
+	sb = dentry->d_sb;
 	h_file = au_h_fptr(file, au_fbstart(file));
 	h_inode = h_file->f_dentry->d_inode;
 	di_read_unlock(dentry, AuLock_IR);
@@ -252,12 +238,10 @@ static int au_do_open_sp(struct file *file, int flags)
 	si_noflush_read_lock(sb);
 	fi_write_lock(file);
 	di_read_lock_child(dentry, AuLock_IR);
-	if (!err) {
+	if (!err)
 		au_init_fop_sp(file);
-		goto out; /* success */
-	}
-
-	au_finfo_fin(file);
+	else
+		au_finfo_fin(file);
 
  out:
 	return err;
