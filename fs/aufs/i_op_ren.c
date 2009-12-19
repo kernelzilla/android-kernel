@@ -238,11 +238,15 @@ static int au_ren_or_cpup(struct au_ren_args *a)
 		au_set_h_dptr(d, a->btgt, dget(a->dst_h_dentry));
 		err = au_sio_cpup_single(d, a->btgt, a->src_bstart, -1,
 					 !AuCpup_DTIME, a->dst_parent);
-		if (unlikely(err)) {
+		mutex_unlock(h_mtx);
+		if (!err) {
+			d = a->dst_dentry;
+			au_set_h_dptr(d, a->btgt, NULL);
+			au_update_dbstart(d);
+		} else {
 			au_set_h_dptr(d, a->btgt, NULL);
 			au_set_dbstart(d, a->src_bstart);
 		}
-		mutex_unlock(h_mtx);
 	}
 
 	return err;
