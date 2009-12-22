@@ -79,10 +79,6 @@ int au_do_open_nondir(struct file *file, int flags)
 	finfo->fi_h_vm_ops = NULL;
 	finfo->fi_vm_ops = NULL;
 	bindex = au_dbstart(dentry);
-	/* O_TRUNC is processed already */
-	BUG_ON(au_test_ro(dentry->d_sb, bindex, dentry->d_inode)
-	       && (flags & O_TRUNC));
-
 	h_file = au_h_open(dentry, bindex, flags, file);
 	if (IS_ERR(h_file))
 		err = PTR_ERR(h_file);
