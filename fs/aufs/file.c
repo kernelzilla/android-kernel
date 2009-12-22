@@ -226,6 +226,7 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 	struct super_block *sb;
 
 	dentry = file->f_dentry;
+	au_update_dbstart(dentry);
 	inode = dentry->d_inode;
 	hi_wh = au_hi_wh(inode, bcpup);
 	if (!hi_wh)
