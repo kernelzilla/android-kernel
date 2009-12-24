@@ -524,7 +524,7 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 
 	err = ima_file_mmap(h_file, prot);
 	vm_ops = ERR_PTR(err);
-	if (err)
+	if (unlikely(err))
 		goto out;
 
 	err = h_file->f_op->mmap(h_file, vma);
