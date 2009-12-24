@@ -469,33 +469,60 @@ static struct vm_operations_struct aufs_vm_ops = {
 
 /* ---------------------------------------------------------------------- */
 
+/* cf. linux/include/linux/mman.h: calc_vm_prot_bits() */
+#define AuConv_VM_PROT(f, b)	_calc_vm_trans(f, VM_##b, PROT_##b)
+
+static unsigned long au_arch_prot_conv(unsigned long flags)
+{
+	/* currently ppc64 only */
+#ifdef CONFIG_PPC64
+	/* cf. linux/arch/powerpc/include/asm/mman.h */
+	AuDebugOn(arch_calc_vm_prot_bits(-1) != VM_SAO);
+	return AuConv_VM_PROT(flags, SAO);
+#else
+	AuDebugOn(arch_calc_vm_prot_bits(-1));
+	return 0;
+#endif
+}
+
 static unsigned long au_prot_conv(unsigned long flags)
 {
-	unsigned long prot;
+	return AuConv_VM_PROT(flags, READ)
+		| AuConv_VM_PROT(flags, WRITE)
+		| AuConv_VM_PROT(flags, EXEC)
+		| au_arch_prot_conv(flags);
+}
 
-	prot = 0;
-	if (flags & VM_READ)
-		prot |= PROT_READ;
-	if (flags & VM_WRITE)
-		prot |= PROT_WRITE;
-	if (flags & VM_EXEC)
-		prot |= PROT_EXEC;
-	return prot;
+/* cf. linux/include/linux/mman.h: calc_vm_flag_bits() */
+#define AuConv_VM_MAP(f, b)	_calc_vm_trans(f, VM_##b, MAP_##b)
+
+static unsigned long au_flag_conv(unsigned long flags)
+{
+	return AuConv_VM_MAP(flags, GROWSDOWN)
+		| AuConv_VM_MAP(flags, DENYWRITE)
+		| AuConv_VM_MAP(flags, EXECUTABLE)
+		| AuConv_VM_MAP(flags, LOCKED);
 }
 
 static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 					      struct vm_area_struct *vma)
 {
 	struct vm_operations_struct *vm_ops;
+	unsigned long prot;
 	int err;
-
-	/* todo: call security_file_mmap() here */
 
 	vm_ops = ERR_PTR(-ENODEV);
 	if (!h_file->f_op || !h_file->f_op->mmap)
 		goto out;
 
-	err = ima_file_mmap(h_file, au_prot_conv(vma->vm_flags));
+	prot = au_prot_conv(vma->vm_flags);
+	err = security_file_mmap(h_file, /*reqprot*/prot, prot,
+				 au_flag_conv(vma->vm_flags), vma->vm_start, 0);
+	vm_ops = ERR_PTR(err);
+	if (unlikely(err))
+		goto out;
+
+	err = ima_file_mmap(h_file, prot);
 	vm_ops = ERR_PTR(err);
 	if (err)
 		goto out;
