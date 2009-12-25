@@ -22,7 +22,6 @@
 
 #include <linux/file.h>
 #include <linux/fs_stack.h>
-#include <linux/ima.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/security.h>
@@ -514,11 +513,6 @@ static struct vm_operations_struct *au_vm_ops(struct file *h_file,
 	prot = au_prot_conv(vma->vm_flags);
 	err = security_file_mmap(h_file, /*reqprot*/prot, prot,
 				 au_flag_conv(vma->vm_flags), vma->vm_start, 0);
-	vm_ops = ERR_PTR(err);
-	if (unlikely(err))
-		goto out;
-
-	err = ima_file_mmap(h_file, prot);
 	vm_ops = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
