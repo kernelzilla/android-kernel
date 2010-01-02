@@ -63,6 +63,7 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	struct inode *h_inode;
 	struct super_block *sb;
 	struct au_branch *br;
+	struct path h_path;
 	int err;
 
 	/* a race condition can happen between open and unlink/rmdir */
@@ -89,14 +90,16 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 		flags = au_file_roflags(flags);
 	flags &= ~O_CREAT;
 	atomic_inc(&br->br_count);
+	h_path.dentry = h_dentry;
+	h_path.mnt = br->br_mnt;
 	if (!au_special_file(h_inode->i_mode))
-		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags);
+		h_file = vfsub_dentry_open(&h_path, flags);
 	else {
 		/* this block depends upon the configuration */
 		di_read_unlock(dentry, AuLock_IR);
 		fi_write_unlock(file);
 		si_read_unlock(sb);
-		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags);
+		h_file = vfsub_dentry_open(&h_path, flags);
 		si_noflush_read_lock(sb);
 		fi_write_lock(file);
 		di_read_lock_child(dentry, AuLock_IR);
