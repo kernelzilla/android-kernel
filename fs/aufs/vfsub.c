@@ -48,17 +48,6 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
-struct file *vfsub_dentry_open(struct path *path, int flags)
-{
-	struct file *file;
-
-	path_get(path);
-	file = dentry_open(path->dentry, path->mnt, flags, current_cred());
-	if (IS_ERR(file))
-		return file;
-	return file;
-}
-
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {
 	struct file *file;
