@@ -347,8 +347,7 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino,
 	parent = path->dentry;
 	if (nsi_lock)
 		si_read_unlock(parent->d_sb);
-	path_get(path);
-	file = vfsub_dentry_open(path, au_dir_roflags, current_cred());
+	file = vfsub_dentry_open(path, au_dir_roflags);
 	dentry = (void *)file;
 	if (IS_ERR(file))
 		goto out;
