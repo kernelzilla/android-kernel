@@ -73,7 +73,6 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	h_path.dentry = h_dentry;
 	h_path.mnt = br->br_mnt;
 	path_get(&h_path);
-	h_file = vfsub_dentry_open(&h_path, flags, current_cred());
 	if (!au_special_file(h_inode->i_mode))
 		h_file = vfsub_dentry_open(&h_path, flags, current_cred());
 	else {
