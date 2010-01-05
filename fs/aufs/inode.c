@@ -337,13 +337,14 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 	if (inode->i_state & I_NEW) {
 		ii_write_lock_new_child(inode);
 		err = set_inode(inode, dentry);
-		unlock_new_inode(inode);
-		if (!err)
+		if (!err) {
+			unlock_new_inode(inode);
 			goto out; /* success */
+		}
 
-		iget_failed(inode);
 		ii_write_unlock(inode);
-		goto out_iput;
+		iget_failed(inode);
+		goto out_err;
 	} else if (!must_new) {
 		err = reval_inode(inode, dentry, &match);
 		if (!err)
@@ -366,6 +367,7 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 
  out_iput:
 	iput(inode);
+ out_err:
 	inode = ERR_PTR(err);
  out:
 	return inode;
