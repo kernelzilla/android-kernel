@@ -77,7 +77,8 @@ static void __init omap_sdp_init_irq(void)
 	omap_board_config = sdp_config;
 	omap_board_config_size = ARRAY_SIZE(sdp_config);
 	omap2_init_common_hw(h8mbx00u0mer0em_sdrc_params,
-			h8mbx00u0mer0em_sdrc_params);
+			     h8mbx00u0mer0em_sdrc_params,
+                             NULL, NULL, NULL);
 	omap_init_irq();
 	omap_gpio_init();
 }

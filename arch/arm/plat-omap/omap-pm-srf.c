@@ -1,14 +1,12 @@
 /*
- * omap-pm-noop.c - OMAP power management interface - dummy version
- *
- * This code implements the OMAP power management interface to
- * drivers, CPUIdle, CPUFreq, and DSP Bridge.  It is strictly for
- * debug/demonstration use, as it does nothing but printk() whenever a
- * function is called (when DEBUG is defined, below)
+ * omap-pm-srf.c - OMAP power management interface implemented
+ * using Shared resource framework
  *
  * Copyright (C) 2008-2009 Texas Instruments, Inc.
  * Copyright (C) 2008-2009 Nokia Corporation
- * Paul Walmsley
+ * Rajendra Nayak
+ *
+ * This code is based on plat-omap/omap-pm-noop.c.
  *
  * Interface developed by (in alphabetical order):
  * Karthik Dasu, Tony Lindgren, Rajendra Nayak, Sakari Poussa, Veeramanikandan
@@ -20,15 +18,36 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/device.h>
+#include <linux/module.h>
 
-/* Interface documentation is in mach/omap-pm.h */
 #include <plat/omap-pm.h>
-
 #include <plat/powerdomain.h>
+#include <plat/resource.h>
+#include <plat/omap_device.h>
 
 struct omap_opp *dsp_opps;
 struct omap_opp *mpu_opps;
 struct omap_opp *l3_opps;
+
+#define LAT_RES_POSTAMBLE "_latency"
+#define MAX_LATENCY_RES_NAME 30
+
+/**
+ * get_lat_res_name - gets the latency resource name given a power domain name
+ * @pwrdm_name: Name of the power domain.
+ * @lat_name: Buffer in which latency resource name is populated
+ * @size: Max size of the latency resource name
+ *
+ * Returns the latency resource name populated in lat_name.
+ */
+void get_lat_res_name(const char *pwrdm_name, char **lat_name, int size)
+{
+	strcpy(*lat_name, "");
+	WARN_ON(strlen(pwrdm_name) + strlen(LAT_RES_POSTAMBLE) > size);
+	strcpy(*lat_name, pwrdm_name);
+	strcat(*lat_name, LAT_RES_POSTAMBLE);
+	return;
+}
 
 /*
  * Device-driver-originated constraints (via board-*.c files)
@@ -41,23 +60,15 @@ void omap_pm_set_max_mpu_wakeup_lat(struct device *dev, long t)
 		return;
 	};
 
-	if (t == -1)
+	if (t == -1) {
 		pr_debug("OMAP PM: remove max MPU wakeup latency constraint: "
 			 "dev %s\n", dev_name(dev));
-	else
+		resource_release("mpu_latency", dev);
+	} else {
 		pr_debug("OMAP PM: add max MPU wakeup latency constraint: "
 			 "dev %s, t = %ld usec\n", dev_name(dev), t);
-
-	/*
-	 * For current Linux, this needs to map the MPU to a
-	 * powerdomain, then go through the list of current max lat
-	 * constraints on the MPU and find the smallest.  If
-	 * the latency constraint has changed, the code should
-	 * recompute the state to enter for the next powerdomain
-	 * state.
-	 *
-	 * TI CDP code can call constraint_set here.
-	 */
+		resource_request("mpu_latency", dev, t);
+	}
 }
 
 void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
@@ -68,49 +79,73 @@ void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
 		return;
 	};
 
-	if (r == 0)
+	if (r == 0) {
 		pr_debug("OMAP PM: remove min bus tput constraint: "
 			 "dev %s for agent_id %d\n", dev_name(dev), agent_id);
-	else
+		resource_release("vdd2_opp", dev);
+	} else {
 		pr_debug("OMAP PM: add min bus tput constraint: "
 			 "dev %s for agent_id %d: rate %ld KiB\n",
 			 dev_name(dev), agent_id, r);
-
-	/*
-	 * This code should model the interconnect and compute the
-	 * required clock frequency, convert that to a VDD2 OPP ID, then
-	 * set the VDD2 OPP appropriately.
-	 *
-	 * TI CDP code can call constraint_set here on the VDD2 OPP.
-	 */
+		resource_request("vdd2_opp", dev, r);
+	}
 }
 
 void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 {
+	struct omap_device *odev;
+	struct powerdomain *pwrdm_dev;
+	struct platform_device *pdev;
+	char *lat_res_name;
+
 	if (!dev || t < -1) {
 		WARN_ON(1);
 		return;
 	};
+	/* Look for the devices Power Domain */
+	/*
+	 * WARNING! If device is not a platform device, container_of will
+	 * return a pointer to unknown memory!
+	 * TODO: Either change omap-pm interface to support only platform
+	 * devices, or change the underlying omapdev implementation to
+	 * support normal devices.
+	 */
+	pdev = container_of(dev, struct platform_device, dev);
 
-	if (t == -1)
+	/* Try to catch non platform devices. */
+	if (pdev->name == NULL) {
+		printk(KERN_ERR "OMAP-PM: Error: platform device not valid\n");
+		return;
+	}
+
+	odev = to_omap_device(pdev);
+	if (odev) {
+		pwrdm_dev = omap_device_get_pwrdm(odev);
+	} else {
+		printk(KERN_ERR "OMAP-PM: Error: Could not find omap_device "
+						"for %s\n", pdev->name);
+		return;
+	}
+
+	lat_res_name = kmalloc(MAX_LATENCY_RES_NAME, GFP_KERNEL);
+	if (!lat_res_name) {
+		printk(KERN_ERR "OMAP-PM: FATAL ERROR: kmalloc failed\n");
+		return;
+	}
+	get_lat_res_name(pwrdm_dev->name, &lat_res_name, MAX_LATENCY_RES_NAME);
+
+	if (t == -1) {
 		pr_debug("OMAP PM: remove max device latency constraint: "
 			 "dev %s\n", dev_name(dev));
-	else
+		resource_release(lat_res_name, dev);
+	} else {
 		pr_debug("OMAP PM: add max device latency constraint: "
 			 "dev %s, t = %ld usec\n", dev_name(dev), t);
+		resource_request(lat_res_name, dev, t);
+	}
 
-	/*
-	 * For current Linux, this needs to map the device to a
-	 * powerdomain, then go through the list of current max lat
-	 * constraints on that powerdomain and find the smallest.  If
-	 * the latency constraint has changed, the code should
-	 * recompute the state to enter for the next powerdomain
-	 * state.  Conceivably, this code should also determine
-	 * whether to actually disable the device clocks or not,
-	 * depending on how long it takes to re-enable the clocks.
-	 *
-	 * TI CDP code can call constraint_set here.
-	 */
+	kfree(lat_res_name);
+	return;
 }
 
 void omap_pm_set_max_sdma_lat(struct device *dev, long t)
@@ -120,32 +155,22 @@ void omap_pm_set_max_sdma_lat(struct device *dev, long t)
 		return;
 	};
 
-	if (t == -1)
+	if (t == -1) {
 		pr_debug("OMAP PM: remove max DMA latency constraint: "
 			 "dev %s\n", dev_name(dev));
-	else
+		resource_release("core_latency", dev);
+	} else {
 		pr_debug("OMAP PM: add max DMA latency constraint: "
 			 "dev %s, t = %ld usec\n", dev_name(dev), t);
-
-	/*
-	 * For current Linux PM QOS params, this code should scan the
-	 * list of maximum CPU and DMA latencies and select the
-	 * smallest, then set cpu_dma_latency pm_qos_param
-	 * accordingly.
-	 *
-	 * For future Linux PM QOS params, with separate CPU and DMA
-	 * latency params, this code should just set the dma_latency param.
-	 *
-	 * TI CDP code can call constraint_set here.
-	 */
-
+		resource_request("core_latency", dev, t);
+	}
 }
 
+static struct device dummy_dsp_dev;
 
 /*
  * DSP Bridge-specific constraints
  */
-
 const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 {
 	pr_debug("OMAP PM: DSP request for OPP table\n");
@@ -168,55 +193,29 @@ void omap_pm_dsp_set_min_opp(u8 opp_id)
 	pr_debug("OMAP PM: DSP requests minimum VDD1 OPP to be %d\n", opp_id);
 
 	/*
-	 *
-	 * For l-o dev tree, our VDD1 clk is keyed on OPP ID, so we
-	 * can just test to see which is higher, the CPU's desired OPP
-	 * ID or the DSP's desired OPP ID, and use whichever is
-	 * highest.
-	 *
-	 * In CDP12.14+, the VDD1 OPP custom clock that controls the DSP
-	 * rate is keyed on MPU speed, not the OPP ID.  So we need to
-	 * map the OPP ID to the MPU speed for use with clk_set_rate()
-	 * if it is higher than the current OPP clock rate.
-	 *
+	 * For now pass a dummy_dev struct for SRF to identify the caller.
+	 * Maybe its good to have DSP pass this as an argument
 	 */
+	resource_request("vdd1_opp", &dummy_dsp_dev, opp_id);
+	return;
 }
 
 u8 omap_pm_dsp_get_opp(void)
 {
 	pr_debug("OMAP PM: DSP requests current DSP OPP ID\n");
-
-	/*
-	 * For l-o dev tree, call clk_get_rate() on VDD1 OPP clock
-	 *
-	 * CDP12.14+:
-	 * Call clk_get_rate() on the OPP custom clock, map that to an
-	 * OPP ID using the tables defined in board-*.c/chip-*.c files.
-	 */
-
-	return 0;
+	return resource_get_level("vdd1_opp");
 }
 
 u8 omap_pm_vdd1_get_opp(void)
 {
 	pr_debug("OMAP PM: User requests current VDD1 OPP\n");
-
-	/*
-	 * For l-o call resource_get_level of vdd1_opp resource.
-	 */
-
-	return 0;
+	return resource_get_level("vdd1_opp");
 }
 
 u8 omap_pm_vdd2_get_opp(void)
 {
 	pr_debug("OMAP PM: User requests current VDD2 OPP\n");
-
-	/*
-	 * For l-o call resource_get_level of vdd2_opp resource.
-	 */
-
-	return 0;
+	return resource_get_level("vdd2_opp");
 }
 
 /*
@@ -239,6 +238,8 @@ struct cpufreq_frequency_table **omap_pm_cpu_get_freq_table(void)
 	return NULL;
 }
 
+static struct device dummy_cpufreq_dev;
+
 void omap_pm_cpu_set_freq(unsigned long f)
 {
 	if (f == 0) {
@@ -249,25 +250,14 @@ void omap_pm_cpu_set_freq(unsigned long f)
 	pr_debug("OMAP PM: CPUFreq requests CPU frequency to be set to %lu\n",
 		 f);
 
-	/*
-	 * For l-o dev tree, determine whether MPU freq or DSP OPP id
-	 * freq is higher.  Find the OPP ID corresponding to the
-	 * higher frequency.  Call clk_round_rate() and clk_set_rate()
-	 * on the OPP custom clock.
-	 *
-	 * CDP should just be able to set the VDD1 OPP clock rate here.
-	 */
+	resource_request("mpu_freq", &dummy_cpufreq_dev, f);
+	return;
 }
 
 unsigned long omap_pm_cpu_get_freq(void)
 {
 	pr_debug("OMAP PM: CPUFreq requests current CPU frequency\n");
-
-	/*
-	 * Call clk_get_rate() on the mpu_ck.
-	 */
-
-	return 0;
+	return resource_get_level("mpu_freq");
 }
 
 /*
@@ -276,7 +266,9 @@ unsigned long omap_pm_cpu_get_freq(void)
 
 int omap_pm_get_dev_context_loss_count(struct device *dev)
 {
-	static u32 counter = 0;
+	struct platform_device *pdev;
+	struct omap_device *odev;
+	struct powerdomain *pwrdm;
 
 	if (!dev) {
 		WARN_ON(1);
@@ -290,15 +282,20 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 	 * Map the device to the powerdomain.  Return the powerdomain
 	 * off counter.
 	 */
+	pdev = to_platform_device(dev);
+	odev = to_omap_device(pdev);
 
-	/* For the noop case, we cannot know the off counter, so
-	 * return an increasing counter which will ensure that
-	 * context is always restored. */
-	return counter++;
+	if (odev) {
+		pwrdm = omap_device_get_pwrdm(odev);
+		if (pwrdm)
+			return pwrdm->state_counter[0];
+	}
+	return 0;
 }
 
-
-/* Should be called before clk framework init */
+/*
+ * Must be called before clk framework init
+ */
 int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
 				 struct omap_opp *dsp_opp_table,
 				 struct omap_opp *l3_opp_table)
@@ -312,6 +309,7 @@ int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
 /* Must be called after clock framework is initialized */
 int __init omap_pm_if_init(void)
 {
+	resource_init(resources_omap);
 	return 0;
 }
 
@@ -319,4 +317,3 @@ void omap_pm_if_exit(void)
 {
 	/* Deallocate CPUFreq frequency table here */
 }
-

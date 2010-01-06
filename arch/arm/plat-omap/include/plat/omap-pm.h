@@ -30,7 +30,7 @@
 struct omap_opp {
 	unsigned long rate;
 	u8 opp_id;
-	u16 min_vdd;
+	u16 vsel;
 };
 
 extern struct omap_opp *mpu_opps;
@@ -58,9 +58,13 @@ extern struct omap_opp *l3_opps;
  * framework starts.  The "_if_" is to avoid name collisions with the
  * PM idle-loop code.
  */
+#ifdef CONFIG_OMAP_PM_NONE
+#define omap_pm_if_early_init(a, b, c) 0
+#else
 int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
 				 struct omap_opp *dsp_opp_table,
 				 struct omap_opp *l3_opp_table);
+#endif
 
 /**
  * omap_pm_if_init - OMAP PM init code called after clock fw init
@@ -68,7 +72,11 @@ int __init omap_pm_if_early_init(struct omap_opp *mpu_opp_table,
  * The main initialization code.  OPP tables are passed in here.  The
  * "_if_" is to avoid name collisions with the PM idle-loop code.
  */
+#ifdef CONFIG_OMAP_PM_NONE
+#define omap_pm_if_init() 0
+#else
 int __init omap_pm_if_init(void);
+#endif
 
 /**
  * omap_pm_if_exit - OMAP PM exit code
@@ -239,6 +247,23 @@ void omap_pm_dsp_set_min_opp(u8 opp_id);
  */
 u8 omap_pm_dsp_get_opp(void);
 
+/**
+ * omap_pm_vdd1_get_opp - report the current VDD1 OPP
+ *
+ * Report the current VDD1 OPP number.
+ *
+ * Returns the current VDD1 OPP ID, or 0 upon error.
+ */
+u8 omap_pm_vdd1_get_opp(void);
+
+/**
+ * omap_pm_vdd2_get_opp - report the current VDD2 OPP
+ *
+ * Report the current VDD2 OPP number.
+ *
+ * Returns the current VDD2 OPP ID, or 0 upon error.
+ */
+u8 omap_pm_vdd2_get_opp(void);
 
 /*
  * CPUFreq-originated constraint

@@ -386,7 +386,8 @@ static void __init omap3pandora_init_irq(void)
 	omap_board_config = omap3pandora_config;
 	omap_board_config_size = ARRAY_SIZE(omap3pandora_config);
 	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
-			     mt46h32m32lf6_sdrc_params);
+			     mt46h32m32lf6_sdrc_params,
+			     NULL, NULL, NULL);
 	omap_init_irq();
 	omap_gpio_init();
 }

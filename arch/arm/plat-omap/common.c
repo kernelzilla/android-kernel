@@ -52,6 +52,12 @@ int omap_board_config_size;
 /* used by omap-smp.c and board-4430sdp.c */
 void __iomem *gic_cpu_base_addr;
 
+#ifdef CONFIG_OMAP_PM_NONE
+struct omap_opp *mpu_opps;
+struct omap_opp *dsp_opps;
+struct omap_opp *l3_opps;
+#endif
+
 static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
 {
 	struct omap_board_config_kernel *kinfo = NULL;
@@ -170,6 +176,37 @@ unsigned long long sched_clock(void)
 {
 	return clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
 				  clocksource_32k.mult, clocksource_32k.shift);
+}
+
+/**
+ * read_persistent_clock -  Return time from a persistent clock.
+ *
+ * Reads the time from a source which isn't disabled during PM: 32k sync
+ * Convert the cycles elapsed since last read into nsecs and adds to
+ * a monotonically increasing timespec.
+ *
+ */
+static struct timespec persistent_ts;
+static cycles_t cycles, last_cycles;
+void read_persistent_clock(struct timespec *ts)
+{
+	unsigned long long nsecs;
+	cycles_t delta;
+	struct timespec *tsp = &persistent_ts;
+
+	last_cycles = cycles;
+	cycles = clocksource_32k.read(&clocksource_32k);
+	delta = cycles - last_cycles;
+	if (unlikely(cycles < last_cycles)) {
+		pr_warning("%s: WRAP\n", __func__);
+		delta = last_cycles - cycles;
+	}
+
+	nsecs = clocksource_cyc2ns(delta,
+				   clocksource_32k.mult, clocksource_32k.shift);
+		
+	timespec_add_ns(tsp, nsecs);
+	*ts = *tsp;
 }
 
 static int __init omap_init_clocksource_32k(void)
