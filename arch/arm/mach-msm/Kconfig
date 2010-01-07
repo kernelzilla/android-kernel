@@ -237,6 +237,14 @@ config MACH_MSM8X60_RUMI3
 	help
 	  Support for the Qualcomm MSM8x60 RUMI3 emulator.
 
+config MACH_MSM8X60_SIM
+	depends on ARCH_MSM8X60
+	default n
+	bool "MSM8x60 Simulator"
+	select SMP_PARALLEL_START
+	help
+	  Support for the Qualcomm MSM8x60 simulator.
+
 endmenu
 
 config MSM_STACKED_MEMORY
