@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,8 +16,10 @@
  * 02110-1301, USA.
  */
 
-#ifdef CONFIG_MSM_VIC
+#if defined(CONFIG_MSM_VIC)
 #include <mach/entry-macro-vic.S>
+#elif defined(CONFIG_ARM_GIC)
+#include <mach/entry-macro-qgic.S>
 #else
 #error "No interrupt controller selected!"
 #endif
