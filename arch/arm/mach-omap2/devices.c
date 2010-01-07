@@ -622,27 +622,27 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 
 	if (cpu_is_omap34xx()) {
 		if (controller_nr == 0) {
-			omap_cfg_reg(N28_3430_MMC1_CLK);
-			omap_cfg_reg(M27_3430_MMC1_CMD);
-			omap_cfg_reg(N27_3430_MMC1_DAT0);
+			omap_cfg_reg(N28_34XX_MMC1_CLK);
+			omap_cfg_reg(M27_34XX_MMC1_CMD);
+			omap_cfg_reg(N27_34XX_MMC1_DAT0);
 			if (mmc_controller->slots[0].wires == 4 ||
 				mmc_controller->slots[0].wires == 8) {
-				omap_cfg_reg(N26_3430_MMC1_DAT1);
-				omap_cfg_reg(N25_3430_MMC1_DAT2);
-				omap_cfg_reg(P28_3430_MMC1_DAT3);
+				omap_cfg_reg(N26_34XX_MMC1_DAT1);
+				omap_cfg_reg(N25_34XX_MMC1_DAT2);
+				omap_cfg_reg(P28_34XX_MMC1_DAT3);
 			}
 			if (mmc_controller->slots[0].wires == 8) {
-				omap_cfg_reg(P27_3430_MMC1_DAT4);
-				omap_cfg_reg(P26_3430_MMC1_DAT5);
-				omap_cfg_reg(R27_3430_MMC1_DAT6);
-				omap_cfg_reg(R25_3430_MMC1_DAT7);
+				omap_cfg_reg(P27_34XX_MMC1_DAT4);
+				omap_cfg_reg(P26_34XX_MMC1_DAT5);
+				omap_cfg_reg(R27_34XX_MMC1_DAT6);
+				omap_cfg_reg(R25_34XX_MMC1_DAT7);
 			}
 		}
 		if (controller_nr == 1) {
 			/* MMC2 */
-			omap_cfg_reg(AE2_3430_MMC2_CLK);
-			omap_cfg_reg(AG5_3430_MMC2_CMD);
-			omap_cfg_reg(AH5_3430_MMC2_DAT0);
+			omap_cfg_reg(AE2_34XX_MMC2_CLK);
+			omap_cfg_reg(AG5_34XX_MMC2_CMD);
+			omap_cfg_reg(AH5_34XX_MMC2_DAT0);
 
 			/*
 			 * For 8 wire configurations, Lines DAT4, 5, 6 and 7 need to be muxed
@@ -650,15 +650,15 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 			 */
 			if (mmc_controller->slots[0].wires == 4 ||
 				mmc_controller->slots[0].wires == 8) {
-				omap_cfg_reg(AH4_3430_MMC2_DAT1);
-				omap_cfg_reg(AG4_3430_MMC2_DAT2);
-				omap_cfg_reg(AF4_3430_MMC2_DAT3);
+				omap_cfg_reg(AH4_34XX_MMC2_DAT1);
+				omap_cfg_reg(AG4_34XX_MMC2_DAT2);
+				omap_cfg_reg(AF4_34XX_MMC2_DAT3);
 			}
 			if (mmc_controller->slots[0].wires == 8) {
-				omap_cfg_reg(AE4_3430_MMC2_DAT4);
-				omap_cfg_reg(AH3_3430_MMC2_DAT5);
-				omap_cfg_reg(AF3_3430_MMC2_DAT6);
-				omap_cfg_reg(AE3_3430_MMC2_DAT7);
+				omap_cfg_reg(AE4_34XX_MMC2_DAT4);
+				omap_cfg_reg(AH3_34XX_MMC2_DAT5);
+				omap_cfg_reg(AF3_34XX_MMC2_DAT6);
+				omap_cfg_reg(AE3_34XX_MMC2_DAT7);
 			}
 		}
 
