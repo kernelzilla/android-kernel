@@ -603,6 +603,7 @@ config ARCH_MSM
 	bool "Qualcomm MSM/QSD"
 	select ARCH_HAS_CPUFREQ
 	select GENERIC_GPIO
+	select ARCH_REQUIRE_GPIOLIB
 	select GENERIC_TIME
 	select GENERIC_CLOCKEVENTS
 	help
