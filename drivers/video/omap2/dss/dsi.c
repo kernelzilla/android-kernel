@@ -1738,8 +1738,7 @@ static void dsi_vc_config_vp(int channel)
 	dsi.vc[channel].mode = DSI_VC_MODE_VP;
 }
 
-
-static void dsi_vc_enable_hs(int channel, bool enable)
+void dsi_vc_enable_hs(int channel, bool enable)
 {
 	DSSDBG("dsi_vc_enable_hs(%d, %d)\n", channel, enable);
 
@@ -2015,25 +2014,51 @@ int dsi_vc_send_null(int channel)
 }
 EXPORT_SYMBOL(dsi_vc_send_null);
 
-int dsi_vc_dcs_write_nosync(int channel, u8 *data, int len)
+int dsi_vc_write_nosync(int channel, u8 data_type, u8 *data, int len)
+{
+	int r;
+	BUG_ON(len == 0);
+
+	if (len == 1)
+		r = dsi_vc_send_short(channel, data_type, data[0], 0);
+	else if (len == 2)
+		r = dsi_vc_send_short(channel, data_type,
+				data[0] | (data[1] << 8), 0);
+	else
+		r = dsi_vc_send_long(channel, data_type, data, len, 0);
+
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_write_nosync);
+
+int dsi_vc_write(int channel, u8 data_type, u8 *data, int len)
 {
 	int r;
 
-	BUG_ON(len == 0);
-
-	if (len == 1) {
-		r = dsi_vc_send_short(channel, DSI_DT_DCS_SHORT_WRITE_0,
-				data[0], 0);
-	} else if (len == 2) {
-		r = dsi_vc_send_short(channel, DSI_DT_DCS_SHORT_WRITE_1,
-				data[0] | (data[1] << 8), 0);
-	} else {
-		/* 0x39 = DCS Long Write */
-		r = dsi_vc_send_long(channel, DSI_DT_DCS_LONG_WRITE,
-				data, len, 0);
-	}
+	r = dsi_vc_write_nosync(channel, data_type, data, len);
+	if (r)
+		return r;
+	r = dsi_vc_send_bta_sync(channel);
 
 	return r;
+
+}
+EXPORT_SYMBOL(dsi_vc_write);
+
+int dsi_vc_dcs_write_nosync(int channel, u8 *data, int len)
+{
+	u8 data_type;
+
+	BUG_ON(len == 0);
+
+	if (len == 1)
+		data_type = DSI_DT_DCS_SHORT_WRITE_0;
+	else if (len == 2)
+		data_type = DSI_DT_DCS_SHORT_WRITE_1;
+	else
+		data_type = DSI_DT_DCS_LONG_WRITE;
+
+	return dsi_vc_write_nosync(channel, data_type, data, len);
 }
 EXPORT_SYMBOL(dsi_vc_dcs_write_nosync);
 
