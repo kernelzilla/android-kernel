@@ -194,6 +194,7 @@ void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg *config)
 	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
 		OMAP_MCBSP_WRITE(io_base, XCCR, config->xccr);
 		OMAP_MCBSP_WRITE(io_base, RCCR, config->rccr);
+		OMAP_MCBSP_WRITE(io_base, WAKEUPEN, config->wken);
 	}
 }
 EXPORT_SYMBOL(omap_mcbsp_config);
