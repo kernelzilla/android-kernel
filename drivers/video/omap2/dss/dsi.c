@@ -1158,6 +1158,9 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 	if (r)
 		goto err1;
 
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+
 	DSSDBG("PLL init done\n");
 
 	return 0;
@@ -1171,11 +1174,9 @@ err0:
 
 void dsi_pll_uninit(void)
 {
-	enable_clocks(0);
-	dsi_enable_pll_clock(0);
-
 	dsi.pll_locked = 0;
 	dsi_pll_power(DSI_PLL_POWER_OFF);
+
 	regulator_disable(dsi.vdds_dsi_reg);
 	DSSDBG("PLL uninit done\n");
 }
@@ -1864,6 +1865,9 @@ int dsi_vc_send_bta_sync(int channel)
 
 	INIT_COMPLETION(dsi.bta_completion);
 
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
 	dsi_vc_enable_bta_irq(channel);
 
 	r = dsi_vc_send_bta(channel);
@@ -1885,6 +1889,9 @@ int dsi_vc_send_bta_sync(int channel)
 	}
 err:
 	dsi_vc_disable_bta_irq(channel);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
 
 	return r;
 }
@@ -1938,6 +1945,9 @@ static int dsi_vc_send_long(int channel, u8 data_type, u8 *data, u16 len,
 		return -EINVAL;
 	}
 
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
 	dsi_vc_config_l4(channel);
 
 	dsi_vc_write_long_header(channel, data_type, len, ecc);
@@ -1983,6 +1993,9 @@ static int dsi_vc_send_long(int channel, u8 data_type, u8 *data, u16 len,
 		dsi_vc_write_long_payload(channel, b1, b2, b3, 0);
 	}
 
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+
 	return r;
 }
 
@@ -1998,6 +2011,9 @@ static int dsi_vc_send_short(int channel, u8 data_type, u16 data, u8 ecc)
 				channel,
 				data_type, data & 0xff, (data >> 8) & 0xff);
 
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
 	dsi_vc_config_l4(channel);
 
 	if (FLD_GET(dsi_read_reg(DSI_VC_CTRL(channel)), 16, 16)) {
@@ -2010,6 +2026,9 @@ static int dsi_vc_send_short(int channel, u8 data_type, u16 data, u8 ecc)
 	r = (data_id << 0) | (data << 8) | (ecc << 24);
 
 	dsi_write_reg(DSI_VC_SHORT_PACKET_HEADER(channel), r);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
 
 	return 0;
 }
@@ -2911,12 +2930,14 @@ static int dsi_update_thread(void *data)
 			break;
 
 		dsi_bus_lock();
-
 		if (dsi.update_mode == OMAP_DSS_UPDATE_DISABLED ||
 				kthread_should_stop()) {
 			dsi_bus_unlock();
 			break;
 		}
+
+		enable_clocks(1);
+		dsi_enable_pll_clock(1);
 
 		dsi_perf_mark_setup();
 
@@ -2991,6 +3012,9 @@ static int dsi_update_thread(void *data)
 		sched = atomic_read(&dsi.bus_lock.count) < 0;
 
 		complete_all(&dsi.update_completion);
+
+		enable_clocks(0);
+		dsi_enable_pll_clock(0);
 
 		dsi_bus_unlock();
 
@@ -3237,6 +3261,9 @@ static int dsi_display_enable(struct omap_dss_device *dssdev)
 
 	dsi_set_update_mode(dssdev, dsi.user_update_mode);
 
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+
 	dsi_bus_unlock();
 	mutex_unlock(&dsi.lock);
 
@@ -3273,6 +3300,9 @@ static void dsi_display_disable(struct omap_dss_device *dssdev)
 	dsi.update_mode = OMAP_DSS_UPDATE_DISABLED;
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
 	dsi_display_uninit_dispc(dssdev);
 
 	dsi_display_uninit_dsi(dssdev);
@@ -3299,6 +3329,9 @@ static int dsi_display_suspend(struct omap_dss_device *dssdev)
 
 	dsi.update_mode = OMAP_DSS_UPDATE_DISABLED;
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
+
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
 
 	dsi_display_uninit_dispc(dssdev);
 
@@ -3352,6 +3385,9 @@ static int dsi_display_resume(struct omap_dss_device *dssdev)
 		goto err2;
 
 	dsi_set_update_mode(dssdev, dsi.user_update_mode);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
 
 	dsi_bus_unlock();
 	mutex_unlock(&dsi.lock);
@@ -3500,6 +3536,9 @@ static int dsi_display_enable_te(struct omap_dss_device *dssdev, bool enable)
 
 	dsi_bus_lock();
 
+	enable_clocks(1);
+	dsi_enable_pll_clock(1);
+
 	dsi.te_enabled = enable;
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
@@ -3507,6 +3546,9 @@ static int dsi_display_enable_te(struct omap_dss_device *dssdev, bool enable)
 
 	r = dsi_set_te(dssdev, enable);
 end:
+	enable_clocks(0);
+	dsi_enable_pll_clock(0);
+
 	dsi_bus_unlock();
 
 	return r;
