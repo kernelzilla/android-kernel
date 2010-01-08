@@ -3794,8 +3794,6 @@ static void dsi_error_recovery_worker(struct work_struct *work)
 
 	dsi.error_recovery.recovering = false;
 
-	if (dsi.update_mode == OMAP_DSS_UPDATE_AUTO)
-		dsi_start_auto_update(dsi.error_recovery.dssdev);
 	enable_clocks(0);
 	dsi_enable_pll_clock(0);
 
