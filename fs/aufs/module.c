@@ -61,6 +61,8 @@ static int __init au_cache_init(void)
 static void au_cache_fin(void)
 {
 	int i;
+
+	/* including AuCache_HINOTIFY */
 	for (i = 0; i < AuCache_Last; i++)
 		if (au_cachep[i]) {
 			kmem_cache_destroy(au_cachep[i]);
