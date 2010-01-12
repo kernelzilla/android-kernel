@@ -85,6 +85,7 @@ struct omap_usb_config {
 	 *  6 == 6 wire unidirectional (or TLL)
 	 */
 	u8		pins[3];
+	u8		usb_remote_wake_gpio;
 };
 
 struct omap_lcd_config {
