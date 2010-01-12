@@ -633,6 +633,9 @@ struct yaffs_DeviceStruct {
 	int inbandTags;
 	__u32 totalBytesPerChunk;
 
+	/* Mount time yaffs does tags ecc option */
+	int doesTagsEcc;
+
 #ifdef __KERNEL__
 
 	struct semaphore sem;	/* Semaphore for waiting on erasure.*/
