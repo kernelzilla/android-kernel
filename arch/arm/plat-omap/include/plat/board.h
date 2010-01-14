@@ -154,6 +154,16 @@ struct omap_board_config_kernel {
 	const void *data;
 };
 
+struct omap_vout_config {
+	u16 max_width;
+	u16 max_height;
+	u32 max_buffer_size;
+	u8  num_buffers;
+	u8  num_devices;
+	int device_ids[2]; /* -1 for any videoX */
+};
+
+
 extern const void *__omap_get_config(u16 tag, size_t len, int nr);
 
 #define omap_get_config(tag, type) \
