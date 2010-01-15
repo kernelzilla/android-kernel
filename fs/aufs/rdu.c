@@ -20,6 +20,7 @@
  * readdir in userspace.
  */
 
+#include <linux/fs_stack.h>
 #include <linux/security.h>
 #include <linux/uaccess.h>
 #include <linux/aufs_type.h>

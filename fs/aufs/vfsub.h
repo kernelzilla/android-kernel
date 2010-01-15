@@ -26,7 +26,6 @@
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
-#include <linux/fs_stack.h>
 
 /* ---------------------------------------------------------------------- */
 
@@ -48,14 +47,6 @@ enum {
 #define IMustLock(i)		MtxMustLock(&(i)->i_mutex)
 
 /* ---------------------------------------------------------------------- */
-
-static inline void vfsub_copy_inode_size(struct inode *inode,
-					 struct inode *h_inode)
-{
-	spin_lock(&inode->i_lock);
-	fsstack_copy_inode_size(inode, h_inode);
-	spin_unlock(&inode->i_lock);
-}
 
 static inline struct file *vfsub_dentry_open(struct path *path, int flags)
 {

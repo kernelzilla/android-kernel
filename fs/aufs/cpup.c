@@ -42,7 +42,7 @@ void au_cpup_attr_timesizes(struct inode *inode)
 
 	h_inode = au_h_iptr(inode, au_ibstart(inode));
 	fsstack_copy_attr_times(inode, h_inode);
-	vfsub_copy_inode_size(inode, h_inode);
+	fsstack_copy_inode_size(inode, h_inode);
 }
 
 void au_cpup_attr_nlink(struct inode *inode, int force)
