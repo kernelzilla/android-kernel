@@ -52,7 +52,7 @@ int au_si_alloc(struct super_block *sb)
 	struct au_sbinfo *sbinfo;
 
 	err = -ENOMEM;
-	sbinfo = kmalloc(sizeof(*sbinfo), GFP_NOFS);
+	sbinfo = kzalloc(sizeof(*sbinfo), GFP_NOFS);
 	if (unlikely(!sbinfo))
 		goto out;
 
@@ -61,30 +61,22 @@ int au_si_alloc(struct super_block *sb)
 	if (unlikely(!sbinfo->si_branch))
 		goto out_sbinfo;
 
-	memset(&sbinfo->si_kobj, 0, sizeof(sbinfo->si_kobj));
 	err = sysaufs_si_init(sbinfo);
 	if (unlikely(err))
 		goto out_br;
 
 	au_nwt_init(&sbinfo->si_nowait);
 	au_rw_init_wlock(&sbinfo->si_rwsem);
-	sbinfo->si_generation = 0;
-	sbinfo->au_si_status = 0;
 	sbinfo->si_bend = -1;
-	sbinfo->si_last_br_id = 0;
 
 	sbinfo->si_wbr_copyup = AuWbrCopyup_Def;
 	sbinfo->si_wbr_create = AuWbrCreate_Def;
-	sbinfo->si_wbr_copyup_ops = au_wbr_copyup_ops + AuWbrCopyup_Def;
-	sbinfo->si_wbr_create_ops = au_wbr_create_ops + AuWbrCreate_Def;
+	sbinfo->si_wbr_copyup_ops = au_wbr_copyup_ops + sbinfo->si_wbr_copyup;
+	sbinfo->si_wbr_create_ops = au_wbr_create_ops + sbinfo->si_wbr_create;
 
 	sbinfo->si_mntflags = AuOpt_Def;
 
-	sbinfo->si_xread = NULL;
-	sbinfo->si_xwrite = NULL;
-	sbinfo->si_xib = NULL;
 	mutex_init(&sbinfo->si_xib_mtx);
-	sbinfo->si_xib_buf = NULL;
 	sbinfo->si_xino_brid = -1;
 	/* leave si_xib_last_pindex and si_xib_next_bit */
 
@@ -96,7 +88,6 @@ int au_si_alloc(struct super_block *sb)
 	au_spl_init(&sbinfo->si_plink);
 	init_waitqueue_head(&sbinfo->si_plink_wq);
 	spin_lock_init(&sbinfo->si_plink_maint_lock);
-	sbinfo->si_plink_maint = NULL;
 
 	/* leave other members for sysaufs and si_mnt. */
 	sbinfo->si_sb = sb;

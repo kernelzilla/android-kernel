@@ -750,6 +750,7 @@ int __init au_hinotify_init(void)
 void au_hinotify_fin(void)
 {
 	inotify_destroy(au_hin_handle);
+	/* cf. au_cache_fin() */
 	if (au_cachep[AuCache_HINOTIFY])
 		au_hin_destroy_cache();
 }
