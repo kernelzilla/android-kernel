@@ -84,12 +84,6 @@ int vfsub_rename(struct inode *src_hdir, struct dentry *src_dentry,
 int vfsub_mkdir(struct inode *dir, struct path *path, int mode);
 int vfsub_rmdir(struct inode *dir, struct path *path);
 
-int vfsub_sio_mkdir(struct inode *dir, struct path *path, int mode);
-int vfsub_sio_rmdir(struct inode *dir, struct path *path);
-int vfsub_sio_notify_change(struct path *path, struct iattr *ia);
-int vfsub_notify_change(struct path *path, struct iattr *ia);
-int vfsub_unlink(struct inode *dir, struct path *path, int force);
-
 /* ---------------------------------------------------------------------- */
 
 ssize_t vfsub_read_u(struct file *file, char __user *ubuf, size_t count,
@@ -177,6 +171,14 @@ static inline fmode_t vfsub_uint_to_fmode(unsigned int ui)
 
 	return u.fm;
 }
+
+/* ---------------------------------------------------------------------- */
+
+int vfsub_sio_mkdir(struct inode *dir, struct path *path, int mode);
+int vfsub_sio_rmdir(struct inode *dir, struct path *path);
+int vfsub_sio_notify_change(struct path *path, struct iattr *ia);
+int vfsub_notify_change(struct path *path, struct iattr *ia);
+int vfsub_unlink(struct inode *dir, struct path *path, int force);
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_VFSUB_H__ */
