@@ -223,7 +223,7 @@ static int au_do_open_sp(struct file *file, int flags)
 	au_cpup_sp(dentry); /* ignore */
 
 	/* prepare h_file */
-	err = au_do_open_nondir(file, file->f_flags);
+	err = au_do_open_nondir(file, vfsub_file_flags(file));
 	if (unlikely(err))
 		goto out;
 
