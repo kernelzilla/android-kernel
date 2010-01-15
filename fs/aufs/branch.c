@@ -111,7 +111,9 @@ static struct au_branch *au_br_alloc(struct super_block *sb, int new_nbranch,
 {
 	struct au_branch *add_branch;
 	struct dentry *root;
+	int err;
 
+	err = -ENOMEM;
 	root = sb->s_root;
 	add_branch = kmalloc(sizeof(*add_branch), GFP_NOFS);
 	if (unlikely(!add_branch))
@@ -126,18 +128,20 @@ static struct au_branch *au_br_alloc(struct super_block *sb, int new_nbranch,
 			goto out_br;
 	}
 
-	if (unlikely(au_sbr_realloc(au_sbi(sb), new_nbranch)
-		     || au_di_realloc(au_di(root), new_nbranch)
-		     || au_ii_realloc(au_ii(root->d_inode), new_nbranch)))
-		goto out_wbr;
-	return add_branch; /* success */
+	err = au_sbr_realloc(au_sbi(sb), new_nbranch);
+	if (!err)
+		err = au_di_realloc(au_di(root), new_nbranch);
+	if (!err)
+		err = au_ii_realloc(au_ii(root->d_inode), new_nbranch);
+	if (!err)
+		return add_branch; /* success */
 
- out_wbr:
 	kfree(add_branch->br_wbr);
+
  out_br:
 	kfree(add_branch);
  out:
-	return ERR_PTR(-ENOMEM);
+	return ERR_PTR(err);
 }
 
 /*
@@ -147,13 +151,14 @@ static int test_br(struct inode *inode, int brperm, char *path)
 {
 	int err;
 
-	err = 0;
-	if (unlikely(au_br_writable(brperm) && IS_RDONLY(inode))) {
-		pr_err("write permission for readonly mount or inode, %s\n",
-		       path);
-		err = -EINVAL;
-	}
+	err = (au_br_writable(brperm) && IS_RDONLY(inode));
+	if (!err)
+		goto out;
 
+	err = -EINVAL;
+	pr_err("write permission for readonly mount or inode, %s\n", path);
+
+ out:
 	return err;
 }
 
@@ -647,6 +652,7 @@ static void au_br_do_del_brp(struct au_sbinfo *sbinfo,
 	p = krealloc(sbinfo->si_branch, sizeof(*p) * bend, GFP_NOFS);
 	if (p)
 		sbinfo->si_branch = p;
+	/* harmless error */
 }
 
 static void au_br_do_del_hdp(struct au_dinfo *dinfo, const aufs_bindex_t bindex,
@@ -665,6 +671,7 @@ static void au_br_do_del_hdp(struct au_dinfo *dinfo, const aufs_bindex_t bindex,
 	p = krealloc(dinfo->di_hdentry, sizeof(*p) * bend, GFP_NOFS);
 	if (p)
 		dinfo->di_hdentry = p;
+	/* harmless error */
 }
 
 static void au_br_do_del_hip(struct au_iinfo *iinfo, const aufs_bindex_t bindex,
@@ -684,6 +691,7 @@ static void au_br_do_del_hip(struct au_iinfo *iinfo, const aufs_bindex_t bindex,
 	p = krealloc(iinfo->ii_hinode, sizeof(*p) * bend, GFP_NOFS);
 	if (p)
 		iinfo->ii_hinode = p;
+	/* harmless error */
 }
 
 static void au_br_do_del(struct super_block *sb, aufs_bindex_t bindex,
