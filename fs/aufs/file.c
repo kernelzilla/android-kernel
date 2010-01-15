@@ -139,7 +139,7 @@ int au_do_open(struct file *file, int (*open)(struct file *file, int flags))
 		goto out;
 
 	di_read_lock_child(dentry, AuLock_IR);
-	err = open(file, file->f_flags);
+	err = open(file, vfsub_file_flags(file));
 	di_read_unlock(dentry, AuLock_IR);
 
 	fi_write_unlock(file);
@@ -172,7 +172,8 @@ int au_reopen_nondir(struct file *file)
 	AuDebugOn(au_fbstart(file) < bstart
 		  || au_fi(file)->fi_hfile[0 + bstart].hf_file);
 
-	h_file = au_h_open(dentry, bstart, file->f_flags & ~O_TRUNC, file);
+	h_file = au_h_open(dentry, bstart, vfsub_file_flags(file) & ~O_TRUNC,
+			   file);
 	err = PTR_ERR(h_file);
 	if (IS_ERR(h_file))
 		goto out; /* todo: close all? */

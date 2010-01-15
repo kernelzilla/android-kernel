@@ -101,6 +101,17 @@ ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count,
 		      loff_t *ppos);
 int vfsub_readdir(struct file *file, filldir_t filldir, void *arg);
 
+static inline unsigned int vfsub_file_flags(struct file *file)
+{
+	unsigned int flags;
+
+	spin_lock(&file->f_lock);
+	flags = file->f_flags;
+	spin_unlock(&file->f_lock);
+
+	return flags;
+}
+
 static inline void vfsub_file_accessed(struct file *h_file)
 {
 	file_accessed(h_file);
