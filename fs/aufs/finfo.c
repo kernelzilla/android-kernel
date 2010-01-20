@@ -42,6 +42,7 @@ void au_set_h_fptr(struct file *file, aufs_bindex_t bindex, struct file *val)
 	if (hf->hf_file)
 		au_hfput(hf, file);
 	if (val) {
+		FiMustWriteLock(file);
 		hf->hf_file = val;
 		hf->hf_br = au_sbr(file->f_dentry->d_sb, bindex);
 	}
