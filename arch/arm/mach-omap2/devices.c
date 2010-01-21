@@ -621,6 +621,7 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 	}
 
 	if (cpu_is_omap34xx()) {
+		u32 dev_conf = 0, v_shift = 0;
 		if (controller_nr == 0) {
 			omap_cfg_reg(N28_34XX_MMC1_CLK);
 			omap_cfg_reg(M27_34XX_MMC1_CMD);
@@ -637,6 +638,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_cfg_reg(R27_34XX_MMC1_DAT6);
 				omap_cfg_reg(R25_34XX_MMC1_DAT7);
 			}
+			dev_conf = OMAP2_CONTROL_DEVCONF0;
+			v_shift = OMAP2_MMCSDIO1ADPCLKISEL;
 		}
 		if (controller_nr == 1) {
 			/* MMC2 */
@@ -660,11 +663,23 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_cfg_reg(AF3_34XX_MMC2_DAT6);
 				omap_cfg_reg(AE3_34XX_MMC2_DAT7);
 			}
+			dev_conf = OMAP343X_CONTROL_DEVCONF1;
+			v_shift = OMAP2_MMCSDIO2ADPCLKISEL;
 		}
 
 		/*
 		 * For MMC3 the pins need to be muxed in the board-*.c files
 		 */
+
+		/*
+		 * Use internal loop-back in MMC/SDIO Module Input Clock
+		 * selection
+		 */
+		if (mmc_controller->slots[0].internal_clock && dev_conf) {
+			u32 v = omap_ctrl_readl(dev_conf);
+			v |= (1 << v_shift);
+			omap_ctrl_writel(v, dev_conf);
+		}
 	}
 }
 
@@ -726,8 +741,12 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 			name = "mmci-omap-hs";
 		} else {
 			size = OMAP3_HSMMC_SIZE;
-			name = "mmci-omap-hs";
+			if (mmc_data[i]->name)
+				name = mmc_data[i]->name;
+			else
+				name = "mmci-omap-hs";
 		}
+
 		omap_mmc_add(name, i, base, size, irq, mmc_data[i]);
 	};
 }
