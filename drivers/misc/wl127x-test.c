@@ -25,7 +25,7 @@
 #include <linux/platform_device.h>
 #include <linux/wl127x-test.h>
 #include <net/bluetooth/bluetooth.h>
-#include <mach/resource.h>
+#include <plat/resource.h>
 
 static int wl127x_btwake_gpio;
 static int wl127x_hostwake_gpio;
