@@ -28,51 +28,51 @@
 #include <linux/platform_device.h>
 #include <linux/wl127x-rfkill.h>
 
-static int wl127x_bt_rfkill_set_power(void *data, enum rfkill_state state)
+
+static int wl127x_bt_rfkill_set_power(void *data, bool blocked)
 {
 	struct wl127x_rfkill_platform_data *pdata =
 		(struct wl127x_rfkill_platform_data *) data;
 	int nshutdown_gpio = pdata->bt_nshutdown_gpio;
 
-	switch (state) {
-	case RFKILL_STATE_UNBLOCKED:
-		if (pdata->bt_hw_enable)
-			pdata->bt_hw_enable();
-		gpio_set_value(nshutdown_gpio, 1);
-		break;
-	case RFKILL_STATE_SOFT_BLOCKED:
+	if (blocked) {
 		gpio_set_value(nshutdown_gpio, 0);
 		if (pdata->bt_hw_disable)
 			pdata->bt_hw_disable();
-		break;
-	default:
-		printk(KERN_ERR "invalid rfkill state %d\n", state);
+	}
+	else {
+		if (pdata->bt_hw_enable)
+			pdata->bt_hw_enable();
+		gpio_set_value(nshutdown_gpio, 1);
 	}
 	return 0;
 }
 
-static int wl127x_fm_rfkill_set_power(void *data, enum rfkill_state state)
+static int wl127x_fm_rfkill_set_power(void *data, bool blocked)
 {
 	int nshutdown_gpio = (int) data;
 
-	switch (state) {
-	case RFKILL_STATE_UNBLOCKED:
-		gpio_set_value(nshutdown_gpio, 1);
-		break;
-	case RFKILL_STATE_SOFT_BLOCKED:
+	if (blocked) {
 		gpio_set_value(nshutdown_gpio, 0);
-		break;
-	default:
-		printk(KERN_ERR "invalid bluetooth rfkill state %d\n", state);
+	}
+	else {
+		gpio_set_value(nshutdown_gpio, 1);
 	}
 	return 0;
 }
+
+static const struct rfkill_ops wl127x_bt_rfkill_ops = {
+	.set_block = wl127x_bt_rfkill_set_power,
+};
+
+static const struct rfkill_ops wl127x_fm_rfkill_ops = {
+	.set_block = wl127x_fm_rfkill_set_power,
+};
 
 static int wl127x_rfkill_probe(struct platform_device *pdev)
 {
 	int rc = 0;
 	struct wl127x_rfkill_platform_data *pdata = pdev->dev.platform_data;
-	enum rfkill_state default_state = RFKILL_STATE_SOFT_BLOCKED;  /* off */
 
 	if (pdata->bt_nshutdown_gpio >= 0) {
 		rc = gpio_request(pdata->bt_nshutdown_gpio,
@@ -89,28 +89,18 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		if (unlikely(rc))
 			return rc;
 
-		rfkill_set_default(RFKILL_TYPE_BLUETOOTH, default_state);
-		wl127x_bt_rfkill_set_power((void *)pdata,
-					default_state);
+		wl127x_bt_rfkill_set_power((void *)pdata, 1);
 
 		pdata->rfkill[WL127X_BLUETOOTH] =
-		    rfkill_allocate(&pdev->dev, RFKILL_TYPE_BLUETOOTH);
+			rfkill_alloc("wl127x Bluetooth", &pdev->dev,
+				RFKILL_TYPE_BLUETOOTH, &wl127x_bt_rfkill_ops, (void *)pdata);
+
 		if (unlikely(!pdata->rfkill[WL127X_BLUETOOTH]))
 			return -ENOMEM;
 
-		pdata->rfkill[WL127X_BLUETOOTH]->name = "wl127x Bluetooth";
-		pdata->rfkill[WL127X_BLUETOOTH]->state = default_state;
-		/* userspace cannot take exclusive control */
-		pdata->rfkill[WL127X_BLUETOOTH]->user_claim_unsupported = 1;
-		pdata->rfkill[WL127X_BLUETOOTH]->user_claim = 0;
-		pdata->rfkill[WL127X_BLUETOOTH]->data =
-		    (void *)pdata;
-		pdata->rfkill[WL127X_BLUETOOTH]->toggle_radio =
-		    wl127x_bt_rfkill_set_power;
-
 		rc = rfkill_register(pdata->rfkill[WL127X_BLUETOOTH]);
 		if (unlikely(rc)) {
-			rfkill_free(pdata->rfkill[WL127X_BLUETOOTH]);
+			rfkill_destroy(pdata->rfkill[WL127X_BLUETOOTH]);
 			return rc;
 		}
 	}
@@ -125,27 +115,17 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		if (unlikely(rc))
 			return rc;
 
-		rfkill_set_default(RFKILL_TYPE_FM, default_state);
-		wl127x_fm_rfkill_set_power((void *)pdata->fm_enable_gpio,
-					default_state);
+		wl127x_fm_rfkill_set_power((void *)pdata->fm_enable_gpio, 1);
 
 		pdata->rfkill[WL127X_FM] =
-		    rfkill_allocate(&pdev->dev, RFKILL_TYPE_FM);
+			rfkill_alloc("wl127x FM Radio", &pdev->dev,
+				RFKILL_TYPE_FM, &wl127x_fm_rfkill_ops, (void *)pdata->fm_enable_gpio);
 		if (unlikely(!pdata->rfkill[WL127X_FM]))
 			return -ENOMEM;
 
-		pdata->rfkill[WL127X_FM]->name = "wl127x FM Radio";
-		pdata->rfkill[WL127X_FM]->state = default_state;
-		/* userspace cannot take exclusive control */
-		pdata->rfkill[WL127X_FM]->user_claim_unsupported = 1;
-		pdata->rfkill[WL127X_FM]->user_claim = 0;
-		pdata->rfkill[WL127X_FM]->data = (void *)pdata->fm_enable_gpio;
-		pdata->rfkill[WL127X_FM]->toggle_radio =
-		    wl127x_fm_rfkill_set_power;
-
 		rc = rfkill_register(pdata->rfkill[WL127X_FM]);
 		if (unlikely(rc)) {
-			rfkill_free(pdata->rfkill[WL127X_FM]);
+			rfkill_destroy(pdata->rfkill[WL127X_FM]);
 			return rc;
 		}
 	}
@@ -159,7 +139,7 @@ static int wl127x_rfkill_remove(struct platform_device *pdev)
 
 	if (pdata->bt_nshutdown_gpio >= 0) {
 		rfkill_unregister(pdata->rfkill[WL127X_BLUETOOTH]);
-		rfkill_free(pdata->rfkill[WL127X_BLUETOOTH]);
+		rfkill_destroy(pdata->rfkill[WL127X_BLUETOOTH]);
 		if (pdata->bt_hw_release)
 			pdata->bt_hw_release();
 		gpio_free(pdata->bt_nshutdown_gpio);
@@ -167,7 +147,7 @@ static int wl127x_rfkill_remove(struct platform_device *pdev)
 
 	if (pdata->fm_enable_gpio >= 0) {
 		rfkill_unregister(pdata->rfkill[WL127X_FM]);
-		rfkill_free(pdata->rfkill[WL127X_FM]);
+		rfkill_destroy(pdata->rfkill[WL127X_FM]);
 		gpio_free(pdata->fm_enable_gpio);
 	}
 
