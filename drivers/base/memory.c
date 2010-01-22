@@ -341,6 +341,60 @@ static inline int memory_probe_init(void)
 }
 #endif
 
+#ifdef CONFIG_ARCH_MEMORY_REMOVE
+static ssize_t
+memory_remove_store(struct class *class, const char *buf, size_t count)
+{
+	u64 phys_addr;
+	int ret;
+
+	phys_addr = simple_strtoull(buf, NULL, 0);
+
+	ret = physical_remove_memory(phys_addr,
+		PAGES_PER_SECTION << PAGE_SHIFT);
+
+	if (ret)
+		count = ret;
+
+	return count;
+}
+static CLASS_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
+
+static int memory_remove_init(void)
+{
+	return sysfs_create_file(&memory_sysdev_class.kset.kobj,
+				&class_attr_remove.attr);
+}
+
+static ssize_t
+memory_low_power_store(struct class *class, const char *buf, size_t count)
+{
+	u64 phys_addr;
+	int ret;
+
+	phys_addr = simple_strtoull(buf, NULL, 0);
+
+	ret = physical_low_power_memory(phys_addr,
+		PAGES_PER_SECTION << PAGE_SHIFT);
+
+	if (ret)
+		count = ret;
+
+	return count;
+}
+static CLASS_ATTR(low_power, S_IWUSR, NULL, memory_low_power_store);
+
+static int memory_low_power_init(void)
+{
+	return sysfs_create_file(&memory_sysdev_class.kset.kobj,
+				&class_attr_low_power.attr);
+}
+#else
+static inline int memory_low_power_init(void)
+{
+	return 0;
+}
+#endif
 /*
  * Note that phys_device is optional.  It is here to allow for
  * differentiation between which *physical* devices each
@@ -471,6 +525,12 @@ int __init memory_dev_init(void)
 	}
 
 	err = memory_probe_init();
+	if (!ret)
+		ret = err;
+	err = memory_remove_init();
+	if (!ret)
+		ret = err;
+	err = memory_low_power_init();
 	if (!ret)
 		ret = err;
 	err = block_size_init();
