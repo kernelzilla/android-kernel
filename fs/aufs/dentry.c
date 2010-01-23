@@ -338,6 +338,80 @@ int au_lkup_neg(struct dentry *dentry, aufs_bindex_t bindex)
 
 /* ---------------------------------------------------------------------- */
 
+/* subset of struct inode */
+struct au_iattr {
+	unsigned long		i_ino;
+	/* unsigned int		i_nlink; */
+	uid_t			i_uid;
+	gid_t			i_gid;
+	u64			i_version;
+/*
+	loff_t			i_size;
+	blkcnt_t		i_blocks;
+*/
+	umode_t			i_mode;
+};
+
+static void au_iattr_save(struct au_iattr *ia, struct inode *h_inode)
+{
+	ia->i_ino = h_inode->i_ino;
+	/* ia->i_nlink = h_inode->i_nlink; */
+	ia->i_uid = h_inode->i_uid;
+	ia->i_gid = h_inode->i_gid;
+	ia->i_version = h_inode->i_version;
+/*
+	ia->i_size = h_inode->i_size;
+	ia->i_blocks = h_inode->i_blocks;
+*/
+	ia->i_mode = (h_inode->i_mode & S_IFMT);
+}
+
+static int au_iattr_test(struct au_iattr *ia, struct inode *h_inode)
+{
+	return ia->i_ino != h_inode->i_ino
+		/* || ia->i_nlink != h_inode->i_nlink */
+		|| ia->i_uid != h_inode->i_uid
+		|| ia->i_gid != h_inode->i_gid
+		|| ia->i_version != h_inode->i_version
+/*
+		|| ia->i_size != h_inode->i_size
+		|| ia->i_blocks != h_inode->i_blocks
+*/
+		|| ia->i_mode != (h_inode->i_mode & S_IFMT);
+}
+
+static int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
+			      struct au_branch *br)
+{
+	int err;
+	struct au_iattr ia;
+	struct inode *h_inode;
+	struct dentry *h_d;
+
+	memset(&ia, -1, sizeof(ia));
+	h_inode = h_dentry->d_inode;
+	if (h_inode)
+		au_iattr_save(&ia, h_inode);
+
+	/* main purpose is namei.c:cached_lookup() and d_revalidate */
+	h_d = au_lkup_one(&h_dentry->d_name, h_parent, br, /*nd*/NULL);
+	err = PTR_ERR(h_d);
+	if (IS_ERR(h_d))
+		goto out;
+
+	/* fuse d_revalidate always return 0 for negative dentries */
+	err = 0;
+	if (unlikely((h_d != h_dentry
+		     || h_d->d_inode != h_inode
+		     || (h_inode && au_iattr_test(&ia, h_inode)))
+		     && !au_test_fuse(h_parent->d_sb)))
+		err = au_busy_or_stale();
+	dput(h_d);
+
+ out:
+	return err;
+}
+
 int au_h_verify(struct dentry *h_dentry, unsigned int udba, struct inode *h_dir,
 		struct dentry *h_parent, struct au_branch *br)
 {

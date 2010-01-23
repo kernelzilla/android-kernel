@@ -406,8 +406,6 @@ int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 void au_hin_free(struct au_hinode *hinode);
 void au_hin_ctl(struct au_hinode *hinode, int do_set);
 void au_reset_hinotify(struct inode *inode, unsigned int flags);
-int au_h_verify_dentry(struct dentry *h_dentry, struct dentry *h_parent,
-		       struct au_branch *br);
 
 int __init au_hinotify_init(void);
 void au_hinotify_fin(void);
@@ -437,8 +435,6 @@ AuStubVoid(au_hin_ctl, struct au_hinode *hinode __maybe_unused,
 	   int do_set __maybe_unused)
 AuStubVoid(au_reset_hinotify, struct inode *inode __maybe_unused,
 	   unsigned int flags __maybe_unused)
-AuStubInt0(au_h_verify_dentry, struct dentry *h_dentry, struct dentry *h_parent,
-	   struct au_branch *br);
 AuStubInt0(__init au_hinotify_init, void)
 AuStubVoid(au_hinotify_fin, void)
 AuStubVoid(au_hin_init, struct au_hinode *hinode __maybe_unused,
