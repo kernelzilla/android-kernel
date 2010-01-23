@@ -63,7 +63,9 @@ void au_wkq_fin(void);
 
 static inline int au_test_wkq(struct task_struct *tsk)
 {
-	return !tsk->mm && !strcmp(tsk->comm, AUFS_WKQ_NAME);
+	return !tsk->mm
+		&& !strncmp(tsk->comm, AUFS_WKQ_NAME "/",
+			    sizeof(AUFS_WKQ_NAME));
 }
 
 static inline void au_nwt_done(struct au_nowait_tasks *nwt)

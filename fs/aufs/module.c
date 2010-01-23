@@ -84,11 +84,6 @@ MODULE_DESCRIPTION(AUFS_NAME
 	" -- Advanced multi layered unification filesystem");
 MODULE_VERSION(AUFS_VERSION);
 
-/* it should be 'byte', but param_set_byte() prints it by "%c" */
-short aufs_nwkq = AUFS_NWKQ_DEF;
-MODULE_PARM_DESC(nwkq, "the number of workqueue thread, " AUFS_WKQ_NAME);
-module_param_named(nwkq, aufs_nwkq, short, S_IRUGO);
-
 /* this module parameter has no meaning when SYSFS is disabled */
 int sysaufs_brs = 1;
 MODULE_PARM_DESC(brs, "use <sysfs>/fs/aufs/si_*/brN");
@@ -121,11 +116,6 @@ static int __init aufs_init(void)
 
 	sysaufs_brs_init();
 	au_debug_init();
-
-	err = -EINVAL;
-	if (unlikely(aufs_nwkq <= 0))
-		goto out;
-
 	err = sysaufs_init();
 	if (unlikely(err))
 		goto out;
