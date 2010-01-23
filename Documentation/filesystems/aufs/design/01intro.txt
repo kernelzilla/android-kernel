@@ -91,7 +91,7 @@ Aufs has several characters or aspects.
 3. a virtual filesystem which maintains persistent inode number
 4. reader/writer of files on branches such like an application
 
-1. Caller of VFS Helper
+1. Callee of VFS Helper
 As an ordinary linux filesystem, aufs is a callee of VFS. For instance,
 unlink(2) from an application reaches sys_unlink() kernel function and
 then vfs_unlink() is called. vfs_unlink() is one of VFS helper and it
