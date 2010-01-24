@@ -1104,6 +1104,7 @@ long do_splice_to(struct file *in, loff_t *ppos,
 
 	return splice_read(in, ppos, pipe, len, flags);
 }
+EXPORT_SYMBOL(do_splice_to);
 
 /**
  * splice_direct_to_actor - splices data directly between two non-pipes
