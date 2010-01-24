@@ -1078,6 +1078,7 @@ long do_splice_from(struct pipe_inode_info *pipe, struct file *out,
 
 	return splice_write(pipe, out, ppos, len, flags);
 }
+EXPORT_SYMBOL(do_splice_from);
 
 /*
  * Attempt to initiate a splice from a file to a pipe.
