@@ -847,6 +847,8 @@ CONFIG_SSB_POSSIBLE=y
 # Multimedia devices
 #
 
+CONFIG_MEDIA_SUPPORT=y
+
 #
 # Multimedia core support
 #
