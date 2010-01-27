@@ -376,7 +376,13 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
 static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
 		size_t size, enum dma_data_direction dir)
 {
-	dma_unmap_single(dev, handle, size, dir);
+	BUG_ON(!valid_dma_direction(dir));
+
+	if (arch_has_speculative_dfetch() && !arch_is_coherent() &&
+	    dir != DMA_TO_DEVICE)
+		dma_cache_maint_page(dma_to_page(dev, handle),
+				     handle & ~PAGE_MASK, size,
+				     DMA_FROM_DEVICE);
 }
 
 /**
