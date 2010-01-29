@@ -609,14 +609,13 @@ static int h_d_revalidate(struct dentry *dentry, struct inode *inode,
 	umode_t mode, h_mode;
 	aufs_bindex_t bindex, btail, bstart, ibs, ibe;
 	unsigned char plus, unhashed, is_root, h_plus;
-	struct inode *first, *h_inode, *h_cached_inode;
+	struct inode *h_inode, *h_cached_inode;
 	struct dentry *h_dentry;
 	struct qstr *name, *h_name;
 
 	err = 0;
 	plus = 0;
 	mode = 0;
-	first = NULL;
 	ibs = -1;
 	ibe = -1;
 	unhashed = !!d_unhashed(dentry);
@@ -633,7 +632,6 @@ static int h_d_revalidate(struct dentry *dentry, struct inode *inode,
 	if (do_udba && inode) {
 		mode = (inode->i_mode & S_IFMT);
 		plus = (inode->i_nlink > 0);
-		first = au_h_iptr(inode, au_ibstart(inode));
 		ibs = au_ibstart(inode);
 		ibe = au_ibend(inode);
 	}
