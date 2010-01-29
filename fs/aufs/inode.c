@@ -44,7 +44,6 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 	int err;
 	aufs_bindex_t bindex, new_bindex;
 	unsigned char update;
-	struct inode *first;
 	struct au_hinode *p, *q, tmp;
 	struct super_block *sb;
 	struct au_iinfo *iinfo;
@@ -59,7 +58,6 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 		goto out;
 
 	p = iinfo->ii_hinode + iinfo->ii_bstart;
-	first = p->hi_inode;
 	err = 0;
 	for (bindex = iinfo->ii_bstart; bindex <= iinfo->ii_bend;
 	     bindex++, p++) {
@@ -71,7 +69,7 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 			continue;
 
 		if (new_bindex < 0) {
-			update++;
+			update = 1;
 			au_hiput(p);
 			p->hi_inode = NULL;
 			continue;
@@ -101,11 +99,10 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 
 int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 {
-	int err, update;
+	int err;
 	unsigned int flags;
 	aufs_bindex_t bindex, bend;
-	unsigned char isdir;
-	struct inode *first;
+	unsigned char isdir, update;
 	struct au_hinode *p;
 	struct au_iinfo *iinfo;
 
@@ -116,7 +113,6 @@ int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 	update = 0;
 	iinfo = au_ii(inode);
 	p = iinfo->ii_hinode + iinfo->ii_bstart;
-	first = p->hi_inode;
 	isdir = S_ISDIR(inode->i_mode);
 	flags = au_hi_flags(inode, isdir);
 	bend = au_dbend(dentry);
