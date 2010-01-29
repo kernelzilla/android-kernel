@@ -1140,6 +1140,13 @@ config HIGHPTE
 	depends on HIGHMEM
 	depends on !OUTER_CACHE
 
+config VMALLOC_RESERVE
+	hex "Reserved vmalloc space"
+	default 0x08000000
+	depends on MMU
+	help
+	  Reserved vmalloc space if not specified on the kernel commandline.
+
 source "mm/Kconfig"
 
 config LEDS
