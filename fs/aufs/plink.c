@@ -422,6 +422,7 @@ long au_plink_ioctl(struct file *file, unsigned int cmd)
 		aufs_write_unlock(sb->s_root);
 		break;
 	default:
+		/* err = -ENOTTY; */
 		err = -EINVAL;
 	}
  out:
