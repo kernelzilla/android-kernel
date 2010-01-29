@@ -324,6 +324,7 @@ long au_rdu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		/* err = -ENOTTY; */
 		err = -EINVAL;
 	}
 
