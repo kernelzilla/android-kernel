@@ -100,8 +100,9 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		/* do not call the lower */
 		AuDbg("0x%x\n", cmd);
-		err = -EINVAL;
+		err = -ENOTTY;
 	}
 
 	AuTraceErr(err);
@@ -118,8 +119,9 @@ long aufs_ioctl_nondir(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		/* do not call the lower */
 		AuDbg("0x%x\n", cmd);
-		err = -EINVAL;
+		err = -ENOTTY;
 	}
 
 	AuTraceErr(err);
