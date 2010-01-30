@@ -3,21 +3,51 @@
 #ifndef	__ASM_ARCH_OMAP_USB_H
 #define	__ASM_ARCH_OMAP_USB_H
 
+#include <linux/platform_device.h>
 #include <plat/board.h>
 
 #define OMAP3_HS_USB_PORTS	3
+
 enum ehci_hcd_omap_mode {
-	EHCI_HCD_OMAP_MODE_UNKNOWN,
-	EHCI_HCD_OMAP_MODE_PHY,
-	EHCI_HCD_OMAP_MODE_TLL,
+	/* ULPI_BYPASS = 0 */
+	EHCI_HCD_OMAP_MODE_ULPI_PHY,
+
+	/* ULPI_BYPASS = 1, CHANMODE = 1 */
+	EHCI_HCD_OMAP_MODE_UTMI_PHY_6PIN,       /* FSLSMODE = 0x0 */
+	EHCI_HCD_OMAP_MODE_UTMI_PHY_6PIN_ALT,   /* FSLSMODE = 0x1 */
+	EHCI_HCD_OMAP_MODE_UTMI_PHY_3PIN,       /* FSLSMODE = 0x2 */
+	EHCI_HCD_OMAP_MODE_UTMI_PHY_4PIN,       /* FSLSMODE = 0x3 */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_6PIN,       /* FSLSMODE = 0x4 */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_6PIN_ALT,   /* FSLSMODE = 0x5 */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_3PIN,       /* FSLSMODE = 0x6 */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_4PIN,       /* FSLSMODE = 0x7 */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_2PIN,       /* FSLSMODE = 0xA */
+	EHCI_HCD_OMAP_MODE_UTMI_TLL_2PIN_ALT,   /* FSLbSMODE = 0xB */
+
+	/* ULPI_BYPASS = 1, CHANMODE = 0 */
+	EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR,        /* ULPIDDRMODE = 0 */
+	EHCI_HCD_OMAP_MODE_ULPI_TLL_DDR,        /* ULPIDDRMODE = 1 */
+};
+
+#define EHCI_HCD_OMAP_FLAG_ENABLED	(1<<0)
+#define EHCI_HCD_OMAP_FLAG_NOBITSTUFF	(1<<1)
+#define EHCI_HCD_OMAP_FLAG_AUTOIDLE	(1<<2)
+
+struct ehci_hcd_omap_port_data {
+	enum ehci_hcd_omap_mode		mode;
+
+	u32				flags;
+
+	int				reset_delay;
+
+	int	(*startup)(struct platform_device *dev, int port);
+	void	(*shutdown)(struct platform_device *dev, int port);
+	void	(*reset)(struct platform_device *dev, int port, int reset);
+	void	(*suspend)(struct platform_device *dev, int port, int suspend);
 };
 
 struct ehci_hcd_omap_platform_data {
-	enum ehci_hcd_omap_mode		port_mode[OMAP3_HS_USB_PORTS];
-	unsigned			phy_reset:1;
-
-	/* have to be valid if phy_reset is true and portx is in phy mode */
-	int	reset_gpio_port[OMAP3_HS_USB_PORTS];
+	struct ehci_hcd_omap_port_data	port_data[OMAP3_HS_USB_PORTS];
 };
 
 /*-------------------------------------------------------------------------*/
