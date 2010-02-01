@@ -12,6 +12,7 @@
 #include <linux/cpumask.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/cacheflush.h>
@@ -103,6 +104,9 @@ void platform_secondary_init(unsigned int cpu)
 	printk(KERN_DEBUG "%s: cpu:%d\n", __func__, cpu);
 
 	trace_hardirqs_off();
+
+	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
+	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
 
 	/*
 	 * setup GIC (GIC number NOT CPU number and the base address of the
