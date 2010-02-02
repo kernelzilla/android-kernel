@@ -25,8 +25,11 @@
 
 #include <asm/mach/time.h>
 #include <mach/msm_iomap.h>
+#include <mach/irqs.h>
 
+#if defined(CONFIG_MSM_SMD)
 #include "smd_private.h"
+#endif
 #include "timer.h"
 
 enum {
@@ -208,7 +211,6 @@ static int msm_timer_set_next_event(unsigned long cycles,
 static void msm_timer_set_mode(enum clock_event_mode mode,
 			      struct clock_event_device *evt)
 {
-	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
 	struct msm_clock *clock;
 	unsigned long irq_flags;
 
@@ -225,9 +227,12 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 				clock->stopped_tick;
 		msm_active_clock = clock;
 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
-		if (clock != gpt_clk)
+#if defined(CONFIG_MSM_SMD)
+		if (clock != &msm_clocks[MSM_CLOCK_GPT])
 			writel(TIMER_ENABLE_EN,
-				gpt_clk->regbase + TIMER_ENABLE);
+				msm_clocks[MSM_CLOCK_GPT].regbase +
+			       TIMER_ENABLE);
+#endif
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
@@ -237,10 +242,13 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		clock->stopped_tick = msm_read_timer_count(clock) +
 					clock->sleep_offset;
 		writel(0, clock->regbase + TIMER_ENABLE);
-		if (clock != gpt_clk) {
-			gpt_clk->in_sync = 0;
-			writel(0, gpt_clk->regbase + TIMER_ENABLE);
+#if defined(CONFIG_MSM_SMD)
+		if (clock != &msm_clocks[MSM_CLOCK_GPT]) {
+			msm_clocks[MSM_CLOCK_GPT].in_sync = 0;
+			writel(0, msm_clocks[MSM_CLOCK_GPT].regbase +
+			       TIMER_ENABLE);
 		}
+#endif
 		break;
 	}
 	local_irq_restore(irq_flags);
@@ -261,6 +269,7 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
  *      0: the operation failed
  *      >0: the slow clock value after time-sync
  */
+#if defined(CONFIG_MSM_SMD)
 #if defined(CONFIG_MSM_N_WAY_SMSM)
 static uint32_t msm_timer_do_sync_to_sclk(
 	void (*time_start)(struct msm_timer_sync_data_t *data),
@@ -740,6 +749,7 @@ unsigned long long sched_clock(void)
 	local_irq_restore(irq_flags);
 	return result; 
 }
+#endif /* CONFIG_MSM_SMD */
 
 #ifdef CONFIG_MSM7X00A_USE_GP_TIMER
 	#define DG_TIMER_RATING 100
