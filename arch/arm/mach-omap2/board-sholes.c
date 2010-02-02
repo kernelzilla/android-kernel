@@ -321,9 +321,7 @@ static struct omap_uart_config sholes_uart_config __initdata = {
 };
 
 static struct omap_board_config_kernel sholes_config[] __initdata = {
-/* XXX
 	{OMAP_TAG_UART,		&sholes_uart_config },
-*/
 };
 
 static int sholes_touch_reset(void)
@@ -800,10 +798,8 @@ static void __init sholes_serial_init(void)
 	omap_cfg_reg(AB25_34XX_UART2_RTS);
 	omap_cfg_reg(AB26_34XX_UART2_CTS);
 
-/* XXX
 	omap_serial_init(SHOLES_BPWAKE_STROBE_GPIO, 0x01);
-*/
-	omap_serial_init();
+
 }
 
 /* SMPS I2C voltage control register Address for VDD1 */
