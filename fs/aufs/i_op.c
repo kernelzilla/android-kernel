@@ -61,10 +61,10 @@ static int h_permission(struct inode *h_inode, int mask,
 
 	if (!err)
 		err = devcgroup_inode_permission(h_inode, mask);
-	if (!err)
-		err = security_inode_permission
-			(h_inode, mask & (MAY_READ | MAY_WRITE | MAY_EXEC
-					  | MAY_APPEND));
+	if (!err) {
+		mask &= (MAY_READ | MAY_WRITE | MAY_EXEC | MAY_APPEND);
+		err = security_inode_permission(h_inode, mask);
+	}
 
 #if 0
 	if (!err) {
@@ -87,8 +87,8 @@ static int aufs_permission(struct inode *inode, int mask)
 {
 	int err;
 	aufs_bindex_t bindex, bend;
-	const unsigned char isdir = !!S_ISDIR(inode->i_mode);
-	const unsigned char write_mask = !!(mask & (MAY_WRITE | MAY_APPEND));
+	const unsigned char isdir = !!S_ISDIR(inode->i_mode),
+		write_mask = !!(mask & (MAY_WRITE | MAY_APPEND));
 	struct inode *h_inode;
 	struct super_block *sb;
 	struct au_branch *br;
@@ -109,7 +109,9 @@ static int aufs_permission(struct inode *inode, int mask)
 		bindex = au_ibstart(inode);
 		br = au_sbr(sb, bindex);
 		err = h_permission(h_inode, mask, br->br_mnt, br->br_perm);
-		if (write_mask && !err && !special_file(h_inode->i_mode)) {
+		if (write_mask
+		    && !err
+		    && !special_file(h_inode->i_mode)) {
 			/* test whether the upper writable branch exists */
 			err = -EROFS;
 			for (; bindex >= 0; bindex--)
@@ -771,10 +773,7 @@ static int h_readlink(struct dentry *dentry, int bindex, char __user *buf,
 
 	err = -EINVAL;
 	h_dentry = au_h_dptr(dentry, bindex);
-	if (unlikely(/* !h_dentry
-		     || !h_dentry->d_inode
-		     || !h_dentry->d_inode->i_op
-		     || */ !h_dentry->d_inode->i_op->readlink))
+	if (unlikely(!h_dentry->d_inode->i_op->readlink))
 		goto out;
 
 	err = security_inode_readlink(h_dentry);
