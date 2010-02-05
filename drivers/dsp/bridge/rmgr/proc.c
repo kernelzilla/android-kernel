@@ -680,11 +680,12 @@ static int memory_sync_page(struct vm_area_struct *vma, unsigned long start,
 		}
 
 		offset = start & ~PAGE_MASK;
-		kaddr = page_address(page) + offset;
+		kaddr = kmap(page) + offset;
 		rest = min_t(ssize_t, PAGE_SIZE - offset, len);
 
 		MEM_FlushCache(kaddr, rest, ftype);
 
+		kunmap(page);
 		put_page(page);
 		len -= rest;
 		start += rest;
