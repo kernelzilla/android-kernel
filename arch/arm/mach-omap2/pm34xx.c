@@ -44,6 +44,8 @@
 
 #include <asm/tlbflush.h>
 
+#include <linux/delay.h>
+
 #include "cm.h"
 #include "cm-regbits-34xx.h"
 #include "prm-regbits-34xx.h"
@@ -1213,6 +1215,40 @@ err2:
 		kfree(pwrst);
 	}
 	return ret;
+}
+
+/* Program Power IC via bypass interface */
+int omap3_bypass_cmd(u8 slave_addr, u8 reg_addr, u8 cmd) {
+	u32 vc_bypass_value;
+	u32 loop_cnt = 0, retries_cnt = 0;
+
+	vc_bypass_value = (cmd << OMAP3430_DATA_SHIFT) |
+			(reg_addr << OMAP3430_REGADDR_SHIFT) |
+			(slave_addr << OMAP3430_SLAVEADDR_SHIFT);
+
+	prm_write_mod_reg(vc_bypass_value, OMAP3430_GR_MOD,
+			OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+
+	vc_bypass_value = prm_set_mod_reg_bits(OMAP3430_VALID, OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+
+	while ((vc_bypass_value & OMAP3430_VALID) != 0x0) {
+		loop_cnt++;
+		if (retries_cnt > 10) {
+			printk(KERN_ERR"Loop count exceeded in check SR I2C"
+								"write\n");
+			return 1;
+		}
+		if (loop_cnt > 50) {
+			retries_cnt++;
+			loop_cnt = 0;
+			udelay(10);
+		}
+		vc_bypass_value = prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+	}
+
+	return 0;
 }
 
 static void __init configure_vc(void)

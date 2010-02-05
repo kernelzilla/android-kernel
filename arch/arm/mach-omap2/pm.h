@@ -60,6 +60,7 @@ struct cpuidle_params {
 extern void omap3_pm_init_vc(struct prm_setup_vc *setup_vc);
 #ifdef CONFIG_CPU_IDLE
 extern void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params);
+extern int omap3_bypass_cmd(u8 slave_addr, u8 reg_addr, u8 cmd);
 #else
 static inline void omap3_pm_init_cpuidle(
 			struct cpuidle_params *cpuidle_board_params)
