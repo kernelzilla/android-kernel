@@ -3,6 +3,7 @@ obj-y += devices.o
 obj-y += proc_comm.o
 obj-y += vreg.o
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock-arm11.o
+obj-$(CONFIG_ARCH_MSM_SCORPION) += acpuclock-scorpion.o
 obj-y += clock.o
 obj-y += gpio.o generic_gpio.o
 obj-y += nand_partitions.o
