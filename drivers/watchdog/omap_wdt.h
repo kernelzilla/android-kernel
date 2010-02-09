@@ -48,6 +48,10 @@
 #define TIMER_MARGIN_DEFAULT	60	/* 60 secs */
 #define TIMER_MARGIN_MIN	1
 
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+#define TIMER_AUTOPET_FREQ	45
+#endif
+
 #define PTV			0	/* prescale */
 #define GET_WLDR_VAL(secs)	(0xffffffff - ((secs) * (32768/(1<<PTV))) + 1)
 
