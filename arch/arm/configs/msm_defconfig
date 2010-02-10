@@ -801,6 +801,8 @@ CONFIG_SSB_POSSIBLE=y
 #
 
 # CONFIG_MSM_CAMERA is not set
+# CONFIG_MSM_CAMERA_DEBUG is not set
+# CONFIG_MSM_CAMERA_FLASH is not set
 # CONFIG_MT9P012 is not set
 # CONFIG_MT9T013 is not set
 # CONFIG_MT9D112 is not set
