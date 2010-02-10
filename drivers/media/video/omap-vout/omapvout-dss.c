@@ -580,7 +580,9 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 
 static void omapvout_dss_mark_buf_done(struct omapvout_device *vout, int idx)
 {
-	vout->queue.bufs[idx]->state = VIDEOBUF_DONE;
+	if ((vout->queue.bufs[idx]->state == VIDEOBUF_QUEUED) ||
+		(vout->queue.bufs[idx]->state == VIDEOBUF_ACTIVE))
+		vout->queue.bufs[idx]->state = VIDEOBUF_DONE;
 	wake_up_interruptible(&vout->queue.bufs[idx]->done);
 }
 
@@ -667,8 +669,6 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 			/* Since the DSS is disabled, this isn't a problem */
 			dss->working = false;
 
-			/* Clean up the states of the final buffer */
-			omapvout_dss_mark_buf_done(vout, idx);
 			return;
 		}
 
