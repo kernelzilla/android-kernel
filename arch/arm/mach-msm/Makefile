@@ -16,6 +16,7 @@ obj-y += internal_power_rail.o
 
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock.o timer.o gpio.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += timer.o gpio.o
+obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += timer.o
 
 obj-$(CONFIG_MSM_VIC) += irq-vic.o
 
