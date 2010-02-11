@@ -16,6 +16,7 @@
 
 #include <asm/hardware/gic.h>
 #include <asm/cacheflush.h>
+#include <asm/mach-types.h>
 
 #include <mach/smp.h>
 #include <mach/hardware.h>
@@ -107,6 +108,12 @@ void platform_secondary_init(unsigned int cpu)
 
 	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
 	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+
+	/* RUMI does not adhere to GIC spec by enabling STIs by default.
+	 * Enable/clear is supposed to be RO for STIs, but is RW on RUMI.
+	 */
+	if (machine_is_msm8x60_rumi3())
+		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
 
 	/*
 	 * setup GIC (GIC number NOT CPU number and the base address of the
