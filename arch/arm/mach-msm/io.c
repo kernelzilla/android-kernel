@@ -130,6 +130,7 @@ static struct map_desc msm8x60_io_desc[] __initdata = {
 	MSM_DEVICE(TMR),
 	MSM_DEVICE(ACC),
 	MSM_DEVICE(GCC),
+	MSM_DEVICE(TLMM),
 };
 
 void __init msm_map_msm8x60_io(void)
