@@ -915,6 +915,7 @@ DSP_STATUS PROC_GetState(DSP_HPROCESSOR hProcessor,
 			case BRD_STOPPED:
 				pProcStatus->iState = PROC_STOPPED;
 				break;
+			case BRD_SLEEP_TRANSITION:
 			case BRD_DSP_HIBERNATION:
 				/* Fall through */
 			case BRD_RUNNING:
