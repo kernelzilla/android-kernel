@@ -41,6 +41,10 @@ int msm_adsp_enable(struct msm_adsp_module *module);
 int msm_adsp_disable(struct msm_adsp_module *module);
 int adsp_set_clkrate(struct msm_adsp_module *module, unsigned long clk_rate);
 int msm_adsp_disable_event_rsp(struct msm_adsp_module *module);
+int32_t get_adsp_resource(unsigned short client_idx,
+				void *cmd_buf, size_t cmd_size);
+int32_t put_adsp_resource(unsigned short client_idx,
+				void *cmd_buf, size_t cmd_size);
 
 /* Write is safe to call from interrupt context.
  */
@@ -91,6 +95,7 @@ int msm_adsp_write(struct msm_adsp_module *module,
 #define QDSP_uPAudRec0CmdQueue            37
 #define QDSP_uPAudRec1BitStreamQueue      38
 #define QDSP_uPAudRec1CmdQueue            39
-#define QDSP_MAX_NUM_QUEUES               40
+#define QDSP_apuRmtQueue                  40
+#define QDSP_MAX_NUM_QUEUES               41
 
 #endif

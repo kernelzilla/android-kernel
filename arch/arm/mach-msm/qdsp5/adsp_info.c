@@ -65,6 +65,7 @@
 #define QDSP_MODULE_VDEC_LP_MODE_TURBO      0x01089f7a
 #define QDSP_MODULE_AUDREC0TASK             0x0109696f
 #define QDSP_MODULE_AUDREC1TASK             0x01096970
+#define QDSP_MODULE_RMTASK                  0x01090f8e
 #define QDSP_MODULE_MAX                     0x7fffffff
 
    /* DO NOT USE: Force this enum to be a 32bit type to improve speed */
@@ -85,6 +86,7 @@ static struct adsp_module_info module_info[] = {
 	QDSP_MODULE(AUDPLAY3TASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDPPTASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDPREPROCTASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(RMTASK, NULL, 0, NULL, NULL),
 #if !defined(CONFIG_ARCH_MSM7X30)
 	QDSP_MODULE(AUDRECTASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(VFETASK, "vfe_clk", 0, adsp_vfe_verify_cmd,
