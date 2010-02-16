@@ -128,7 +128,6 @@
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/mem.h>
 #include <dspbridge/cfg.h>
-#include <dspbridge/csl.h>
 #include <dspbridge/sync.h>
 
 /*  ----------------------------------- Mini-Driver */
@@ -934,7 +933,7 @@ DSP_STATUS WMD_CHNL_Open(OUT struct CHNL_OBJECT **phChnl,
 			pChnl->hUserEvent = hSyncEvent;	/* for Linux */
 			pChnl->hSyncEvent = hSyncEvent;
                        /* get the process handle */
-                       pChnl->hProcess = current->pid;
+			pChnl->hProcess = current->tgid;
 			pChnl->pCBArg = 0;
 			pChnl->cBytesMoved = 0;
 			/* Default to proc-copy */

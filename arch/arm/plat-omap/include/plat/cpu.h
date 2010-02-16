@@ -44,7 +44,7 @@
 int omap_type(void);
 
 struct omap_chip_id {
-	u8 oc;
+	u16 oc;
 	u8 type;
 };
 
@@ -57,6 +57,7 @@ struct omap_chip_id {
  * CPU class bits (15xx, 16xx, 24xx, 34xx...)	[07:00]
  */
 unsigned int omap_rev(void);
+unsigned int omap_rev_id(void);
 
 /*
  * Define CPU revision bits
@@ -243,6 +244,7 @@ IS_OMAP_SUBCLASS(363x, 0x363)
 #  undef  cpu_is_omap343x
 #  define cpu_is_omap34xx()		is_omap34xx()
 #  define cpu_is_omap343x()		is_omap343x()
+#  define cpu_is_omap3630()		is_omap363x()
 # endif
 #else
 # if defined(CONFIG_ARCH_OMAP24XX)
@@ -426,12 +428,14 @@ IS_OMAP_TYPE(3517, 0x3517)
 #define OMAP243X_CLASS		0x24300024
 #define OMAP2430_REV_ES1_0	0x24300024
 
-#define OMAP343X_CLASS		0x34300034
-#define OMAP3430_REV_ES1_0	0x34300034
-#define OMAP3430_REV_ES2_0	0x34301034
-#define OMAP3430_REV_ES2_1	0x34302034
-#define OMAP3430_REV_ES3_0	0x34303034
-#define OMAP3430_REV_ES3_1	0x34304034
+#define OMAP343X_CLASS			0x34300034
+#define OMAP3430_REV_ES1_0		0x34300034
+#define OMAP3430_REV_ES2_0		0x34301034
+#define OMAP3430_REV_ES2_1		0x34302034
+#define OMAP3430_REV_ES3_0		0x34303034
+#define OMAP3430_REV_ES3_1		0x34304034
+#define OMAP3430_REV_ES3_1_1	0x34305034
+#define OMAP3630_REV_ES1_0		0x36300034
 
 #define OMAP3630_REV_ES1_0	0x36300034
 

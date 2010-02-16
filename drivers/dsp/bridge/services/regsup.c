@@ -35,7 +35,6 @@
 #include <dspbridge/std.h>
 #include <dspbridge/dbdefs.h>
 #include <dspbridge/errbase.h>
-#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- Trace & Debug */
 #include <dspbridge/dbc.h>
@@ -43,7 +42,6 @@
 
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/mem.h>
-#include <dspbridge/csl.h>
 
 /*  ----------------------------------- This */
 #include <regsup.h>
@@ -67,26 +65,6 @@ static struct RegKeyStruct *pRegKey;
 
 #if GT_TRACE
 extern struct GT_Mask REG_debugMask;	/* GT trace var. */
-/*
- *  ======== printS ========
- *  Purpose:
- *      Displays printable characters in pBuf, if any.
- */
-static inline void printS(void *pBuf)
-{
-	int pos = 0;
-	if (*(REG_debugMask).flags & (GT_2CLASS)) {
-		while (*(u8 *)((pBuf)+pos) >= ' ' &&
-		       *(u8 *)((pBuf)+pos) <= '~') {
-			GT_1trace(REG_debugMask, GT_2CLASS, "%c",
-					*(u8 *)((pBuf) + pos++));
-		}
-
-		GT_0trace(REG_debugMask, GT_2CLASS, "\n");
-	}
-}
-#else
-#define printS(pBuf)
 #endif
 
 /*
@@ -135,7 +113,6 @@ void regsupExit(void)
 					  "E %d\t %s DATA %x ", i,
 					  pRegKey->values[i].name,
 					  *(u32 *)pRegKey->values[i].pData);
-				printS((u8 *)(pRegKey->values[i].pData));
 				MEM_Free(pRegKey->values[i].pData);
 			}
 			pRegKey->values[i].pData = NULL;
@@ -183,7 +160,6 @@ DSP_STATUS regsupGetValue(char *valName, void *pBuf, u32 *dataSize)
 	if (DSP_SUCCEEDED(retVal)) {
 		GT_2trace(REG_debugMask, GT_2CLASS, "G %s DATA %x ", valName,
 			  *(u32 *)pBuf);
-		printS((u8 *)pBuf);
 	} else {
 		GT_1trace(REG_debugMask, GT_3CLASS, "G %s FAILED\n", valName);
 	}
@@ -203,7 +179,6 @@ DSP_STATUS regsupSetValue(char *valName, void *pBuf, u32 dataSize)
 
 	GT_2trace(REG_debugMask, GT_2CLASS, "S %s DATA %x ", valName,
 		  *(u32 *)pBuf);
-	printS((u8 *)pBuf);
 
 	/*  Need to search through the entries looking for the right one.  */
 	for (i = 0; i < pRegKey->numValueEntries; i++) {
@@ -299,7 +274,6 @@ DSP_STATUS regsupEnumValue(IN u32 dwIndex, IN CONST char *pstrKey,
 			GT_3trace(REG_debugMask, GT_2CLASS,
 				  "E Key %s, Value %s, Data %x ",
 				  pstrKey, pstrValue, *(u32 *)pstrData);
-			printS((u8 *)pstrData);
 			/*  Set our status to good and exit.  */
 			retVal = DSP_SOK;
 			break;
@@ -315,8 +289,7 @@ DSP_STATUS regsupEnumValue(IN u32 dwIndex, IN CONST char *pstrKey,
 /*
  *  ======== regsupDeleteValue ========
  */
-DSP_STATUS regsupDeleteValue(IN CONST char *pstrSubkey,
-			    IN CONST char *pstrValue)
+DSP_STATUS regsupDeleteValue(IN CONST char *pstrValue)
 {
 	DSP_STATUS retVal = DSP_EFAIL;
 	u32 i;

@@ -344,6 +344,8 @@ struct WMD_DEV_CONTEXT {
 	void __iomem *dwMailBoxBase;	/* Mail box mapped registers	*/
 	void __iomem *cmbase;			/* CM mapped registers		*/
 	void __iomem *sysctrlbase;		/* SysCtrl mapped registers		*/
+	void __iomem *prmbase;			/* PRM mapped registers		*/
+	void __iomem *perbase;			/* PER mapped registers		*/
 	u32 dwAPIClkBase;	/* CLK Registers                */
 	u32 dwDSPClkM2Base;	/* DSP Clock Module m2          */
 	u32 dwPublicRhea;	/* Pub Rhea                     */

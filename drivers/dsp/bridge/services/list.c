@@ -95,11 +95,10 @@ struct LST_LIST *LST_Create(void)
  */
 void LST_Delete(struct LST_LIST *pList)
 {
-	DBC_Require(pList != NULL);
-
 	GT_1trace(LST_debugMask, GT_ENTER, "LST_Delete: pList 0x%x\n", pList);
 
-	MEM_Free(pList);
+	if (pList != NULL)
+		MEM_Free(pList);
 }
 
 /*
@@ -122,11 +121,9 @@ struct LST_ELEM *LST_First(struct LST_LIST *pList)
 {
 	struct LST_ELEM *pElem = NULL;
 
-	DBC_Require(pList != NULL);
-
 	GT_1trace(LST_debugMask, GT_ENTER, "LST_First: pList 0x%x\n", pList);
 
-	if (!LST_IsEmpty(pList))
+	if (pList && !LST_IsEmpty(pList))
 		pElem = pList->head.next;
 
 	return pElem;
@@ -141,11 +138,9 @@ struct LST_ELEM *LST_GetHead(struct LST_LIST *pList)
 {
 	struct LST_ELEM *pElem;
 
-	DBC_Require(pList != NULL);
-
 	GT_1trace(LST_debugMask, GT_ENTER, "LST_GetHead: pList 0x%x\n", pList);
 
-	if (LST_IsEmpty(pList))
+	if (!pList || LST_IsEmpty(pList))
 		return NULL;
 
 	/* pElem is always valid because the list cannot be empty
@@ -197,13 +192,12 @@ void LST_InitElem(struct LST_ELEM *pElem)
 void LST_InsertBefore(struct LST_LIST *pList, struct LST_ELEM *pElem,
 		      struct LST_ELEM *pElemExisting)
 {
-	DBC_Require(pList != NULL);
-	DBC_Require(pElem != NULL);
-	DBC_Require(pElemExisting != NULL);
-
 	GT_3trace(LST_debugMask, GT_ENTER, "LST_InsertBefore: pList 0x%x, "
 		  "pElem 0x%x pElemExisting 0x%x\n", pList, pElem,
 		  pElemExisting);
+
+	if (!pList || !pElem || !pElemExisting)
+		return;
 
 	pElemExisting->prev->next = pElem;
 	pElem->prev = pElemExisting->prev;
@@ -221,8 +215,8 @@ struct LST_ELEM *LST_Next(struct LST_LIST *pList, struct LST_ELEM *pCurElem)
 {
 	struct LST_ELEM *pNextElem = NULL;
 
-	DBC_Require(pList != NULL);
-	DBC_Require(pCurElem != NULL);
+	if (!pList || !pCurElem)
+		return NULL;
 
 	GT_2trace(LST_debugMask, GT_ENTER,
 		  "LST_Next: pList 0x%x, pCurElem 0x%x\n",
@@ -243,12 +237,12 @@ struct LST_ELEM *LST_Next(struct LST_LIST *pList, struct LST_ELEM *pCurElem)
  */
 void LST_PutTail(struct LST_LIST *pList, struct LST_ELEM *pElem)
 {
-	DBC_Require(pList != NULL);
-	DBC_Require(pElem != NULL);
-
 	GT_2trace(LST_debugMask, GT_ENTER,
 		  "LST_PutTail: pList 0x%x, pElem 0x%x\n",
 		  pList, pElem);
+
+	if (!pList || !pElem)
+		return;
 
 	pElem->prev = pList->head.prev;
 	pElem->next = &pList->head;
@@ -266,8 +260,8 @@ void LST_PutTail(struct LST_LIST *pList, struct LST_ELEM *pElem)
  */
 void LST_RemoveElem(struct LST_LIST *pList, struct LST_ELEM *pCurElem)
 {
-	DBC_Require(pList != NULL);
-	DBC_Require(pCurElem != NULL);
+	if (!pList || !pCurElem)
+		return;
 
 	GT_2trace(LST_debugMask, GT_ENTER,
 		  "LST_RemoveElem: pList 0x%x, pCurElem "

@@ -33,7 +33,19 @@
 /* width in bits of MBOX Id */
 #define HW_MBOX_ID_WIDTH	   2
 
-struct MAILBOX_CONTEXT mboxsetting = {0x4, 0x1, 0x1};
+/* SYSCONFIG: register bit definition */
+#define AUTOIDLE	(1 << 0)
+#define SMARTIDLE	(2 << 3)
+
+struct MAILBOX_CONTEXT mboxsetting = {
+	.sysconfig = SMARTIDLE | AUTOIDLE,
+};
+
+HW_STATUS HW_MBOX_initSettings(void __iomem *baseAddress)
+{
+	MLBMAILBOX_SYSCONFIGWriteRegister32(baseAddress, SMARTIDLE | AUTOIDLE);
+	return RET_OK;
+}
 
 /* Saves the mailbox context */
 HW_STATUS HW_MBOX_saveSettings(void __iomem *baseAddress)

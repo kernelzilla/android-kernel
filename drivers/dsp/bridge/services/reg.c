@@ -46,12 +46,8 @@
 #include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <dspbridge/csl.h>
 #include <dspbridge/mem.h>
 #include <dspbridge/sync.h>
-
-/*  ----------------------------------- Others */
-#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- This */
 #include <dspbridge/reg.h>
@@ -70,20 +66,15 @@ static unsigned int crefs;		/* module counter */
  *  Deletes a registry entry value.  NOTE:  A registry entry value is not the
  *  same as *  a registry key.
  */
-DSP_STATUS REG_DeleteValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
-			   IN CONST char *pstrValue)
+DSP_STATUS REG_DeleteValue(IN CONST char *pstrValue)
 {
 	DSP_STATUS status;
-	DBC_Require(pstrSubkey && pstrValue);
-	DBC_Require(phKey == NULL);
-       DBC_Require(strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
        DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_DeleteValue: entered\n");
 
 	SYNC_EnterCS(reglock);
-	/*  Note that we don't use phKey */
-	if (regsupDeleteValue(pstrSubkey, pstrValue) == DSP_SOK)
+	if (regsupDeleteValue(pstrValue) == DSP_SOK)
 		status = DSP_SOK;
 	else
 		status = DSP_EFAIL;
@@ -98,7 +89,7 @@ DSP_STATUS REG_DeleteValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
  *  We will assume the input pdwValueSize is smaller than
  *  REG_MAXREGPATHLENGTH for implementation purposes.
  */
-DSP_STATUS REG_EnumValue(IN HANDLE *phKey, IN u32 dwIndex,
+DSP_STATUS REG_EnumValue(IN u32 dwIndex,
 			 IN CONST char *pstrKey, IN OUT char *pstrValue,
 			 IN OUT u32 *pdwValueSize, IN OUT char *pstrData,
 			 IN OUT u32 *pdwDataSize)
@@ -108,7 +99,6 @@ DSP_STATUS REG_EnumValue(IN HANDLE *phKey, IN u32 dwIndex,
 	DBC_Require(pstrKey && pstrValue && pdwValueSize && pstrData &&
 		    pdwDataSize);
 	DBC_Require(*pdwValueSize <= REG_MAXREGPATHLENGTH);
-	DBC_Require(phKey == NULL);
        DBC_Require(strlen(pstrKey) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_EnumValue: entered\n");
@@ -129,10 +119,8 @@ void REG_Exit(void)
 {
 	GT_0trace(REG_debugMask, GT_5CLASS, "REG_Exit\n");
 
-	if (reglock) {
+	if (reglock)
 		SYNC_DeleteCS(reglock);
-		reglock = NULL;
-	}
 
 	crefs--;
 
@@ -143,15 +131,12 @@ void REG_Exit(void)
  *  ======== REG_GetValue ========
  *  Retrieve a value from the registry.
  */
-DSP_STATUS REG_GetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
-			IN CONST char *pstrValue, OUT u8 *pbData,
+DSP_STATUS REG_GetValue(IN CONST char *pstrValue, OUT u8 *pbData,
 			IN OUT u32 *pdwDataSize)
 {
 	DSP_STATUS status;
 
-	DBC_Require(pstrSubkey && pstrValue && pbData);
-	DBC_Require(phKey == NULL);
-       DBC_Require(strlen(pstrSubkey) < REG_MAXREGPATHLENGTH);
+	DBC_Require(pstrValue && pbData);
        DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 
 	GT_0trace(REG_debugMask, GT_ENTER, "REG_GetValue: entered\n");
@@ -194,14 +179,12 @@ bool REG_Init(void)
  *  ======== REG_SetValue ========
  *  Set a value in the registry.
  */
-DSP_STATUS REG_SetValue(OPTIONAL IN HANDLE *phKey, IN CONST char *pstrSubkey,
-			IN CONST char *pstrValue, IN CONST u32 dwType,
-			IN u8 *pbData, IN u32 dwDataSize)
+DSP_STATUS REG_SetValue(IN CONST char *pstrValue, IN u8 *pbData,
+			IN u32 dwDataSize)
 {
 	DSP_STATUS status;
 
 	DBC_Require(pstrValue && pbData);
-	DBC_Require(phKey == NULL);
 	DBC_Require(dwDataSize > 0);
        DBC_Require(strlen(pstrValue) < REG_MAXREGPATHLENGTH);
 

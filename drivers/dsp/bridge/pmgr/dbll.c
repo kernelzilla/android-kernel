@@ -48,7 +48,6 @@
 #include <dspbridge/gh.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <dspbridge/csl.h>
 #include <dspbridge/mem.h>
 
 /* Dynamic loader library interface */
@@ -339,7 +338,6 @@ void DBLL_exit(void)
 
 	if (cRefs == 0) {
 		MEM_Exit();
-		CSL_Exit();
 		GH_exit();
 #if GT_TRACE
 		DBLL_debugMask.flags = NULL;
@@ -459,6 +457,8 @@ DSP_STATUS DBLL_getSect(struct DBLL_LibraryObj *lib, char *name, u32 *pAddr,
 			(*(zlLib->pTarget->attrs.fseek))(zlLib->fp,
 			 zlLib->ulPos, SEEK_SET);
 		}
+	} else {
+		status = DSP_EHANDLE;
 	}
 	if (DSP_SUCCEEDED(status)) {
 		uByteSize = 1;
@@ -496,7 +496,6 @@ bool DBLL_init(void)
 		DBC_Assert(!DBLL_debugMask.flags);
 		GT_create(&DBLL_debugMask, "DL"); 	/* "DL" for dbDL */
 		GH_init();
-		CSL_Init();
 		retVal = MEM_Init();
 		if (!retVal)
 			MEM_Exit();
@@ -834,8 +833,9 @@ DSP_STATUS DBLL_readSect(struct DBLL_LibraryObj *lib, char *name,
 			(*(zlLib->pTarget->attrs.fseek))(zlLib->fp,
 				zlLib->ulPos, SEEK_SET);
 		}
+	} else {
+		status = DSP_EHANDLE;
 	}
-
 	if (DSP_FAILED(status))
 		goto func_cont;
 
@@ -906,26 +906,23 @@ void DBLL_unload(struct DBLL_LibraryObj *lib, struct DBLL_Attrs *attrs)
 		goto func_end;
 
 	zlLib->pTarget->attrs = *attrs;
-	if (zlLib != NULL) {
-		if (zlLib->mHandle) {
-			err = Dynamic_Unload_Module(zlLib->mHandle,
-				&zlLib->symbol.dlSymbol,
-				&zlLib->allocate.dlAlloc, &zlLib->init.dlInit);
-			if (err != 0) {
-				GT_1trace(DBLL_debugMask, GT_5CLASS,
-					 "Dynamic_Unload_Module "
-					 "failed: 0x%x\n", err);
-			}
+	if (zlLib->mHandle) {
+		err = Dynamic_Unload_Module(zlLib->mHandle,
+			&zlLib->symbol.dlSymbol,
+			&zlLib->allocate.dlAlloc, &zlLib->init.dlInit);
+		if (err != 0) {
+			GT_1trace(DBLL_debugMask, GT_5CLASS,
+				 "Dynamic_Unload_Module failed: 0x%x\n", err);
 		}
-		/* remove symbols from symbol table */
-		if (zlLib->symTab != NULL) {
-			GH_delete(zlLib->symTab);
-			zlLib->symTab = NULL;
-		}
-		/* delete DOFF desc since it holds *lots* of host OS
-		 * resources */
-		dofClose(zlLib);
 	}
+	/* remove symbols from symbol table */
+	if (zlLib->symTab != NULL) {
+		GH_delete(zlLib->symTab);
+		zlLib->symTab = NULL;
+	}
+	/* delete DOFF desc since it holds *lots* of host OS
+	 * resources */
+	dofClose(zlLib);
 func_end:
 	DBC_Ensure(zlLib->loadRef >= 0);
 }
@@ -1487,6 +1484,7 @@ static int writeMem(struct Dynamic_Loader_Initialize *this, void *buf,
 {
 	struct DBLLInit *pInit = (struct DBLLInit *)this;
 	struct DBLL_LibraryObj *lib;
+	struct DBLL_TarObj *pTarget;
 	struct DBLL_SectInfo sectInfo;
 	u32 memType;
 	bool retVal = true;
@@ -1497,20 +1495,24 @@ static int writeMem(struct Dynamic_Loader_Initialize *this, void *buf,
 
 	memType = (DLOAD_SECTION_TYPE(info->type) == DLOAD_TEXT) ? DBLL_CODE :
 		  DBLL_DATA;
-	if (lib != NULL) {
-		retVal = (*lib->pTarget->attrs.write)(lib->pTarget->
-			attrs.wHandle, addr, buf, nBytes, memType);
-	}
-	if (lib->pTarget->attrs.logWrite) {
-		sectInfo.name = info->name;
-		sectInfo.runAddr = info->run_addr;
-		sectInfo.loadAddr = info->load_addr;
-		sectInfo.size = info->size;
-		sectInfo.type = memType;
-		/* Pass the information about what we've written to
-		 * another module */
-		(*lib->pTarget->attrs.logWrite)(lib->pTarget->
-			attrs.logWriteHandle, &sectInfo, addr, nBytes);
+	if ((lib != NULL) &&
+	    ((pTarget = lib->pTarget) != NULL) &&
+	    (pTarget->attrs.write != NULL)) {
+		retVal = (*pTarget->attrs.write)(pTarget->attrs.wHandle,
+						 addr, buf, nBytes, memType);
+
+		if (pTarget->attrs.logWrite) {
+			sectInfo.name = info->name;
+			sectInfo.runAddr = info->run_addr;
+			sectInfo.loadAddr = info->load_addr;
+			sectInfo.size = info->size;
+			sectInfo.type = memType;
+			/* Pass the information about what we've written to
+			 * another module */
+			(*pTarget->attrs.logWrite)(
+				pTarget->attrs.logWriteHandle,
+				&sectInfo, addr, nBytes);
+		}
 	}
 	return retVal;
 }

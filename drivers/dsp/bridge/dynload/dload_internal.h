@@ -120,7 +120,103 @@ struct Local_Symbol {
 	s32 delta;	/* Original value in input file */
 	s16 secnn;		/* section number */
 	s16 sclass;		/* symbol class */
-} ;
+};
+
+
+/*
+ * Trampoline data structures
+ */
+#define TRAMP_NO_GEN_AVAIL              65535
+#define TRAMP_SYM_PREFIX                "__$dbTR__"
+#define TRAMP_SECT_NAME                 ".dbTR"
+#define TRAMP_SYM_PREFIX_LEN            9  /*  MUST MATCH THE LENGTH ABOVE!! */
+#define TRAMP_SYM_HEX_ASCII_LEN         9  /*  Includes NULL termination  */
+
+#define GET_CONTAINER(ptr, type, field) ((type *)((unsigned long)ptr -\
+				(unsigned long)(&((type *)0)->field)))
+#ifndef FIELD_OFFSET
+#define FIELD_OFFSET(type, field)       ((unsigned long)(&((type *)0)->field))
+#endif
+
+
+/*
+    The trampoline code for the target is located in a table called
+    "tramp_gen_info" with is indexed by looking up the index in the table
+    "tramp_map".  The tramp_map index is acquired using the target
+    HASH_FUNC on the relocation type that caused the trampoline.  Each
+    trampoline code table entry MUST follow this format:
+
+    |----------------------------------------------|
+    |  tramp_gen_code_hdr                          |
+    |----------------------------------------------|
+    |  Trampoline image code                       |
+    |  (the raw instruction code for the target)   |
+    |----------------------------------------------|
+    |  Relocation entries for the image code       |
+    |----------------------------------------------|
+
+    This is very similar to how image data is laid out in the DOFF file
+    itself.
+*/
+struct tramp_gen_code_hdr {
+	u32		tramp_code_size;    /*  in BYTES  */
+	u32		num_relos;
+	u32		relo_offset;   /*  in BYTES  */
+};
+
+struct tramp_img_pkt {
+	struct tramp_img_pkt	*next;    /*  MUST BE FIRST  */
+	u32		base;
+	struct tramp_gen_code_hdr	hdr;
+	u8		payload[VARIABLE_SIZE];
+};
+
+struct tramp_img_dup_relo {
+	struct tramp_img_dup_relo	*next;
+	struct reloc_record_t	relo;
+};
+
+struct tramp_img_dup_pkt {
+	struct tramp_img_dup_pkt  *next;    /*  MUST BE FIRST  */
+	s16		secnn;
+	u32		offset;
+	struct image_packet_t                img_pkt;
+	struct tramp_img_dup_relo            *relo_chain;
+
+	/*  PAYLOAD OF IMG PKT FOLLOWS  */
+};
+
+struct tramp_sym {
+	struct tramp_sym	*next;    /*  MUST BE FIRST  */
+	u32		index;
+	u32		str_index;
+	struct Local_Symbol sym_info;
+};
+
+struct tramp_string {
+	struct tramp_string	*next;    /*  MUST BE FIRST  */
+	u32	index;
+	char    str[VARIABLE_SIZE];    /*  NULL terminated  */
+};
+
+struct tramp_info {
+	u32		tramp_sect_next_addr;
+	struct LDR_SECTION_INFO	sect_info;
+
+	struct tramp_sym		*symbol_head;
+	struct tramp_sym		*symbol_tail;
+	u32		tramp_sym_next_index;
+	struct	Local_Symbol		*final_sym_table;
+
+	struct tramp_string                *string_head;
+	struct tramp_string                *string_tail;
+	u32		tramp_string_next_index;
+	u32		tramp_string_size;
+	char		*final_string_table;
+
+	struct tramp_img_pkt		*tramp_pkts;
+	struct tramp_img_dup_pkt	*dup_pkts;
+};
 
 /*
  * States of the .cinit state machine
@@ -187,6 +283,8 @@ struct dload_state {
 	struct doff_filehdr_t dfile_hdr;	/* DOFF file header structure */
 	struct doff_verify_rec_t verify;	/* Verify record */
 
+	struct tramp_info tramp;	/* Trampoline data, if needed  */
+
 	int relstkidx;		/* index into relocation value stack */
 	/* relocation value stack used in relexp.c */
 	RVALUE relstk[STATIC_EXPR_STK_SIZE];
@@ -206,7 +304,7 @@ extern void dload_error(struct dload_state *dlthis, const char *errtxt, ...);
 extern void dload_syms_error(struct Dynamic_Loader_Sym *syms,
 			     const char *errtxt, ...);
 extern void dload_headers(struct dload_state *dlthis);
-extern void dload_strings(struct dload_state *dlthis, boolean sec_names_only);
+extern void dload_strings(struct dload_state *dlthis, bool sec_names_only);
 extern void dload_sections(struct dload_state *dlthis);
 extern void dload_reorder(void *data, int dsiz, u32 map);
 extern u32 dload_checksum(void *data, unsigned siz);
@@ -226,12 +324,33 @@ extern uint32_t dload_reverse_checksum_16(void *data, unsigned siz);
  * exported by reloc.c
  */
 extern void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
-			   struct reloc_record_t *rp);
+			struct reloc_record_t *rp, bool *tramps_generated,
+			bool second_pass);
 
 extern RVALUE dload_unpack(struct dload_state *dlthis, TgtAU_t *data,
 			   int fieldsz, int offset, unsigned sgn);
 
 extern int dload_repack(struct dload_state *dlthis, RVALUE val, TgtAU_t *data,
 			int fieldsz, int offset, unsigned sgn);
+
+
+/*
+ * exported by tramp.c
+ */
+extern bool dload_tramp_avail(struct dload_state *dlthis,
+			struct reloc_record_t *rp);
+
+int dload_tramp_generate(struct dload_state *dlthis, s16 secnn,
+			u32 image_offset, struct image_packet_t *ipacket,
+			struct reloc_record_t *rp);
+
+extern int dload_tramp_pkt_udpate(struct dload_state *dlthis,
+			s16 secnn, u32 image_offset,
+			struct image_packet_t *ipacket);
+
+extern int dload_tramp_finalize(struct dload_state *dlthis);
+
+extern void dload_tramp_cleanup(struct dload_state *dlthis);
+
 
 #endif				/* __DLOAD_INTERNAL__ */

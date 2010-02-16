@@ -185,7 +185,7 @@
  *  Ensures:
  *      Cache is synchronized
  */
-	extern void MEM_FlushCache(void *pMemBuf, u32 cBytes, s32 FlushType);
+	extern void MEM_FlushCache(void *pMemBuf, u32 cBytes, u32 FlushType);
 
 /*
  *  ======== MEM_Free ========
@@ -201,6 +201,23 @@
  *      pMemBuf is no longer a valid pointer to memory.
  */
 	extern void MEM_Free(IN void *pMemBuf);
+
+/*
+ *  ======== MEM_VFree ========
+ *  Purpose:
+ *      Free the given block of system memory in virtual space.
+ *  Parameters:
+ *      pMemBuf:    Pointer to memory allocated by MEM_Calloc/Alloc()
+ *		    using vmalloc.
+ *  Returns:
+ *  Requires:
+ *      MEM initialized.
+ *      pMemBuf is a valid memory address returned by MEM_Calloc/Alloc()
+ *	using vmalloc.
+ *  Ensures:
+ *      pMemBuf is no longer a valid pointer to memory.
+ */
+	extern void MEM_VFree(IN void *pMemBuf);
 
 /*
  *  ======== MEM_FreePhysMem ========
@@ -336,5 +353,10 @@
  */
 	extern void MEM_ExtPhysPoolInit(IN u32 poolPhysBase,
 					IN u32 poolSize);
+
+/*
+ *  ======== MEM_ExtPhysPoolRelease ========
+ */
+	extern void MEM_ExtPhysPoolRelease(void);
 
 #endif				/* MEM_ */

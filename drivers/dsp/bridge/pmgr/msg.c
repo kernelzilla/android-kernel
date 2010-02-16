@@ -134,7 +134,9 @@ void MSG_Delete(struct MSG_MGR *hMsgMgr)
 	/* Let WMD message module destroy the MSG_MGR: */
 	(*pIntfFxns->pfnMsgDelete)(hMsgMgr);
 
-	DBC_Ensure(!MEM_IsValidHandle(pMsgMgr, MSGMGR_SIGNATURE));
+	if (MEM_IsValidHandle(pMsgMgr, MSGMGR_SIGNATURE))
+		GT_1trace(MSG_debugMask, GT_7CLASS, "MSG_Delete: Error hMsgMgr "
+					"Valid Handle: 0x%x\n", hMsgMgr);
 }
 
 /*

@@ -58,6 +58,9 @@
 #include <linux/init.h>
 #include <linux/moduleparam.h>
 #include <linux/cdev.h>
+#include <linux/kobject.h>
+#include <linux/mutex.h>
+#include <linux/workqueue.h>
 
 /* XXX 
 #include <mach/board-3430sdp.h>
@@ -67,6 +70,7 @@
 #include <dspbridge/std.h>
 #include <dspbridge/dbdefs.h>
 #include <dspbridge/errbase.h>
+#include <_tiomap.h>
 
 /*  ----------------------------------- Trace & Debug */
 #include <dspbridge/gt.h>
@@ -76,13 +80,11 @@
 #include <dspbridge/services.h>
 #include <dspbridge/sync.h>
 #include <dspbridge/reg.h>
-#include <dspbridge/csl.h>
 
 /*  ----------------------------------- Platform Manager */
 #include <dspbridge/wcdioctl.h>
 #include <dspbridge/_dcd.h>
 #include <dspbridge/dspdrv.h>
-#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- Resource Manager */
 #include <dspbridge/pwr.h>
@@ -95,11 +97,9 @@
 #include <dspbridge/resourcecleanup.h>
 #include <dspbridge/chnl.h>
 #include <dspbridge/proc.h>
-#include <dspbridge/cfg.h>
 #include <dspbridge/dev.h>
 #include <dspbridge/drvdefs.h>
 #include <dspbridge/drv.h>
-#include <dspbridge/dbreg.h>
 #endif
 
 #include <plat/omap-pm.h>
@@ -108,8 +108,6 @@
 #define BRIDGE_NAME "C6410"
 /*  ----------------------------------- Globals */
 #define DRIVER_NAME  "DspBridge"
-#define DRIVER_MAJOR 0		/* Linux assigns our Major device number */
-#define DRIVER_MINOR 0		/* Linux assigns our Major device number */
 s32 dsp_debug;
 
 struct platform_device *omap_dspbridge_dev;
@@ -126,15 +124,17 @@ static u32 driverContext;
 #ifdef CONFIG_BRIDGE_DEBUG
 static char *GT_str;
 #endif /* CONFIG_BRIDGE_DEBUG */
-static s32 driver_major = DRIVER_MAJOR;
-static s32 driver_minor = DRIVER_MINOR;
+static s32 driver_major;
+static s32 driver_minor;
 static char *base_img;
 char *iva_img;
-static char *num_procs = "C55=1";
 static s32 shm_size = 0x500000;	/* 5 MB */
 static u32 phys_mempool_base;
 static u32 phys_mempool_size;
 static int tc_wordswapon;	/* Default value is always false */
+
+/* Minimum ACTIVE VDD1 OPP level for reliable DSP operation */
+unsigned short min_active_opp = 1;
 
 #ifdef CONFIG_PM
 struct omap34xx_bridge_suspend_data {
@@ -143,6 +143,9 @@ struct omap34xx_bridge_suspend_data {
 };
 
 static struct omap34xx_bridge_suspend_data bridge_suspend_data;
+
+static void bridge_create_sysfs(void);
+static void bridge_destroy_sysfs(void);
 
 static int omap34xxbridge_suspend_lockout(
 		struct omap34xx_bridge_suspend_data *s, struct file *f)
@@ -165,12 +168,6 @@ module_param(dsp_debug, int, 0);
 MODULE_PARM_DESC(dsp_debug, "Wait after loading DSP image. default = false");
 #endif
 
-module_param(driver_major, int, 0);	/* Driver's major number */
-MODULE_PARM_DESC(driver_major, "Major device number, default = 0 (auto)");
-
-module_param(driver_minor, int, 0);	/* Driver's major number */
-MODULE_PARM_DESC(driver_minor, "Minor device number, default = 0 (auto)");
-
 module_param(base_img, charp, 0);
 MODULE_PARM_DESC(base_img, "DSP base image, default = NULL");
 
@@ -186,6 +183,9 @@ MODULE_PARM_DESC(phys_mempool_size,
 		"Physical memory pool size passed to driver");
 module_param(tc_wordswapon, int, 0);
 MODULE_PARM_DESC(tc_wordswapon, "TC Word Swap Option. default = 0");
+
+module_param(min_active_opp, ushort, S_IRUSR | S_IWUSR);
+MODULE_PARM_DESC(min_active_opp, "Minimum ACTIVE VDD1 OPP Level, default = 1");
 
 MODULE_AUTHOR("Texas Instruments");
 MODULE_LICENSE("GPL");
@@ -207,43 +207,14 @@ static struct file_operations bridge_fops = {
 static u32 timeOut = 1000;
 #ifdef CONFIG_BRIDGE_DVFS
 static struct clk *clk_handle;
-s32 dsp_max_opps = VDD1_OPP5;
-#endif
-
-/* Maximum Opps that can be requested by IVA*/
-/*vdd1 rate table*/
-#ifdef CONFIG_BRIDGE_DVFS
-const struct omap_opp  vdd1_rate_table_bridge[] = {
-	{0, 0, 0},
-	/*OPP1*/
-	{S125M, VDD1_OPP1, 0},
-	/*OPP2*/
-	{S250M, VDD1_OPP2, 0},
-	/*OPP3*/
-	{S500M, VDD1_OPP3, 0},
-	/*OPP4*/
-	{S550M, VDD1_OPP4, 0},
-	/*OPP5*/
-	{S600M, VDD1_OPP5, 0},
-};
 #endif
 #endif
 
 struct dspbridge_platform_data *omap_dspbridge_pdata;
 
-u32 vdd1_dsp_freq[6][4] = {
-	{0, 0, 0, 0},
-	/*OPP1*/
-	{0, 90000, 0, 86000},
-	/*OPP2*/
-	{0, 180000, 80000, 170000},
-	/*OPP3*/
-	{0, 360000, 160000, 340000},
-	/*OPP4*/
-	{0, 396000, 325000, 376000},
-	/*OPP5*/
-	{0, 430000, 355000, 430000},
-};
+#ifdef CONFIG_BRIDGE_RECOVERY
+static struct workqueue_struct *bridge_recovery_workq;
+#endif
 
 #ifdef CONFIG_BRIDGE_DVFS
 static int dspbridge_post_scale(struct notifier_block *op, unsigned long val,
@@ -262,9 +233,6 @@ static struct notifier_block iva_clk_notifier = {
 };
 #endif
 
-static struct delayed_work bridge_kill_work;
-static void bridge_kill(struct work_struct *work);
-
 static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 {
 	int status;
@@ -272,36 +240,28 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
-#ifdef CONFIG_BRIDGE_DVFS
-	int i = 0;
-#endif
+
 	struct dspbridge_platform_data *pdata = pdev->dev.platform_data;
 
 	omap_dspbridge_dev = pdev;
 
 	/* use 2.6 device model */
-	if (driver_major) {
-		dev = MKDEV(driver_major, driver_minor);
-		result = register_chrdev_region(dev, 1, driver_name);
-	} else {
-		result = alloc_chrdev_region(&dev, driver_minor, 1,
-					    driver_name);
-		driver_major = MAJOR(dev);
-	}
+	result = alloc_chrdev_region(&dev, driver_minor, 1, driver_name);
 
 	if (result < 0) {
 		GT_1trace(driverTrace, GT_7CLASS, "bridge_init: "
 				"Can't get Major %d \n", driver_major);
-		return result;
+		goto err1;
 	}
 
-	bridge_device = kmalloc(sizeof(struct bridge_dev), GFP_KERNEL);
+	driver_major = MAJOR(dev);
+
+	bridge_device = kzalloc(sizeof(struct bridge_dev), GFP_KERNEL);
 	if (!bridge_device) {
 		result = -ENOMEM;
-		unregister_chrdev_region(dev, 1);
-		return result;
+		goto err2;
 	}
-	memset(bridge_device, 0, sizeof(struct bridge_dev));
+
 	cdev_init(&bridge_device->cdev, &bridge_fops);
 	bridge_device->cdev.owner = THIS_MODULE;
 
@@ -310,7 +270,7 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 	if (status) {
 		GT_0trace(driverTrace, GT_7CLASS,
 				"Failed to add the bridge device \n");
-		return status;
+		goto err3;
 	}
 
 	/* udev support */
@@ -322,6 +282,8 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 
 	device_create(bridge_class, NULL, MKDEV(driver_major, driver_minor),
 			NULL, "DspBridge");
+
+	bridge_create_sysfs();
 
 	GT_init();
 	GT_create(&driverTrace, "LD");
@@ -350,22 +312,17 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 
 	if (base_img) {
 		temp = true;
-		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
-			    sizeof(temp));
-		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *)base_img,
-						strlen(base_img) + 1);
+		REG_SetValue(AUTOSTART, (u8 *)&temp, sizeof(temp));
+		REG_SetValue(DEFEXEC, (u8 *)base_img, strlen(base_img) + 1);
 	} else {
 		temp = false;
-		REG_SetValue(NULL, NULL, AUTOSTART, REG_DWORD, (u8 *)&temp,
-			    sizeof(temp));
-		REG_SetValue(NULL, NULL, DEFEXEC, REG_SZ, (u8 *) "\0", (u32)2);
+		REG_SetValue(AUTOSTART, (u8 *)&temp, sizeof(temp));
+		REG_SetValue(DEFEXEC, (u8 *) "\0", (u32)2);
 	}
-	REG_SetValue(NULL, NULL, NUMPROCS, REG_SZ, (u8 *) num_procs,
-						strlen(num_procs) + 1);
 
 	if (shm_size >= 0x10000) {	/* 64 KB */
-		initStatus = REG_SetValue(NULL, NULL, SHMSIZE, REG_DWORD,
-					  (u8 *)&shm_size, sizeof(shm_size));
+		initStatus = REG_SetValue(SHMSIZE, (u8 *)&shm_size,
+				sizeof(shm_size));
 	} else {
 		initStatus = DSP_EINVALIDARG;
 		status = -1;
@@ -380,37 +337,33 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 		phys_mempool_size = pdata->phys_mempool_size;
 	}
 
-	if (phys_mempool_base > 0x0) {
-		initStatus = REG_SetValue(NULL, NULL, PHYSMEMPOOLBASE,
-					 REG_DWORD, (u8 *)&phys_mempool_base,
-					 sizeof(phys_mempool_base));
-	}
 	GT_1trace(driverTrace, GT_7CLASS, "phys_mempool_base = 0x%x \n",
 		 phys_mempool_base);
 
-	if (phys_mempool_size > 0x0) {
-		initStatus = REG_SetValue(NULL, NULL, PHYSMEMPOOLSIZE,
-					 REG_DWORD, (u8 *)&phys_mempool_size,
-					 sizeof(phys_mempool_size));
-	}
 	GT_1trace(driverTrace, GT_7CLASS, "phys_mempool_size = 0x%x\n",
 		 phys_mempool_base);
+
 	if ((phys_mempool_base > 0x0) && (phys_mempool_size > 0x0))
 		MEM_ExtPhysPoolInit(phys_mempool_base, phys_mempool_size);
 	if (tc_wordswapon) {
 		GT_0trace(driverTrace, GT_7CLASS, "TC Word Swap is enabled\n");
-		REG_SetValue(NULL, NULL, TCWORDSWAP, REG_DWORD,
-			    (u8 *)&tc_wordswapon, sizeof(tc_wordswapon));
+		REG_SetValue(TCWORDSWAP, (u8 *)&tc_wordswapon,
+				sizeof(tc_wordswapon));
 	} else {
 		GT_0trace(driverTrace, GT_7CLASS, "TC Word Swap is disabled\n");
-		REG_SetValue(NULL, NULL, TCWORDSWAP,
-			    REG_DWORD, (u8 *)&tc_wordswapon,
-			    sizeof(tc_wordswapon));
+		REG_SetValue(TCWORDSWAP, (u8 *)&tc_wordswapon,
+				sizeof(tc_wordswapon));
 	}
 	if (DSP_SUCCEEDED(initStatus)) {
 #ifdef CONFIG_BRIDGE_DVFS
-		for (i = 0; i < 6; i++)
-			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].rate;
+		if (pdata->mpu_get_rate_table)
+			pdata->mpu_rate_table = (*pdata->mpu_get_rate_table)();
+		else {
+			GT_0trace(driverTrace, GT_7CLASS, "dspbridge failed to"
+				"get mpu opp table\n");
+			return -EFAULT;
+			goto err3;
+		}
 
 		clk_handle = clk_get(NULL, "iva2_ck");
 		if (!clk_handle) {
@@ -440,12 +393,24 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 		}
 	}
 
-	INIT_DELAYED_WORK(&bridge_kill_work, bridge_kill);
-
 	DBC_Assert(status == 0);
 	DBC_Assert(DSP_SUCCEEDED(initStatus));
 	GT_0trace(driverTrace, GT_ENTER, " <- driver_init\n");
-	return status;
+
+#ifdef CONFIG_BRIDGE_RECOVERY
+	bridge_recovery_workq = create_singlethread_workqueue("bridge_recovery");
+#endif
+
+	return 0;
+
+err3:
+	kfree(bridge_device);
+
+err2:
+	unregister_chrdev_region(dev, 1);
+
+err1:
+	return result;
 }
 
 static int __devexit omap34xx_bridge_remove(struct platform_device *pdev)
@@ -454,35 +419,13 @@ static int __devexit omap34xx_bridge_remove(struct platform_device *pdev)
 	bool ret;
 	DSP_STATUS dsp_status = DSP_SOK;
 	HANDLE	     hDrvObject = NULL;
-	struct PROCESS_CONTEXT	*pTmp = NULL;
-	struct PROCESS_CONTEXT    *pCtxtclosed = NULL;
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_exit\n");
 
 	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 	if (DSP_FAILED(dsp_status))
 		goto func_cont;
-	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
-	while (pCtxtclosed != NULL) {
-		GT_1trace(driverTrace, GT_5CLASS, "***Cleanup of "
-			 "process***%d\n", pCtxtclosed->pid);
-		DRV_RemoveAllResources(pCtxtclosed);
-		PROC_Detach(pCtxtclosed->hProcessor);
-		pTmp = pCtxtclosed->next;
-		DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject,
-				     pCtxtclosed, (void *)pCtxtclosed->pid);
-		pCtxtclosed = pTmp;
-	}
-func_cont:
-	if (driverContext) {
-		/* Put the DSP in reset state */
-		ret = DSP_Deinit(driverContext);
-		driverContext = 0;
-		DBC_Assert(ret == true);
-	}
-	SERVICES_Exit();
-	GT_exit();
-	/* unregister the clock notifier */
+
 #ifdef CONFIG_BRIDGE_DVFS
 	if (!cpufreq_unregister_notifier(&iva_clk_notifier,
 					 CPUFREQ_TRANSITION_NOTIFIER)) {
@@ -491,12 +434,30 @@ func_cont:
 		"clk_notifier_unregister PASS for iva2_ck \n");
 	} else {
 		GT_0trace(driverTrace, GT_7CLASS,
-		"clk_notifier_unregister PASS for iva2_ck \n");
+		"clk_notifier_unregister FAILED for iva2_ck \n");
+	}
+#endif /* #ifdef CONFIG_BRIDGE_DVFS */
+
+	if (driverContext) {
+		/* Put the DSP in reset state */
+		ret = DSP_Deinit(driverContext);
+		driverContext = 0;
+		DBC_Assert(ret == true);
 	}
 
+#ifdef CONFIG_BRIDGE_DVFS
 	clk_put(clk_handle);
 	clk_handle = NULL;
 #endif /* #ifdef CONFIG_BRIDGE_DVFS */
+
+func_cont:
+	MEM_ExtPhysPoolRelease();
+
+	SERVICES_Exit();
+	GT_exit();
+
+	/* Remove driver sysfs entries */
+	bridge_destroy_sysfs();
 
 	devno = MKDEV(driver_major, driver_minor);
 	if (bridge_device) {
@@ -565,49 +526,20 @@ static void __exit bridge_exit(void)
 	platform_driver_unregister(&bridge_driver);
 }
 
+#ifdef CONFIG_BRIDGE_RECOVERY
 static unsigned int event_mask = DSP_SYSERROR | DSP_MMUFAULT | DSP_PWRERROR;
 module_param(event_mask, uint, 0644);
 static char *firmware_file = "/system/lib/dsp/baseimage.dof";
 module_param(firmware_file, charp, 0644);
-
-static void bridge_cleanup(struct PROCESS_CONTEXT *ctxt)
-{
-	DSP_STATUS dsp_status = DSP_SOK;
-	HANDLE hDrvObject;
-	struct PROCESS_CONTEXT *pCtxttraverse;
-
-	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	if (DSP_FAILED(dsp_status))
-		return;
-
-	if (ctxt->task) {
-		put_task_struct(ctxt->task);
-		ctxt->task = 0;
-	}
-
-	if (ctxt->resState == PROC_RES_ALLOCATED)
-		DRV_RemoveAllResources(ctxt);
-	if (ctxt->hProcessor != NULL) {
-		DRV_GetProcCtxtList(&pCtxttraverse,
-				    (struct DRV_OBJECT *)hDrvObject);
-		pCtxttraverse = pCtxttraverse->next;
-		while (pCtxttraverse) {
-			if (ctxt->hProcessor == pCtxttraverse->hProcessor &&
-			    ctxt->pid != pCtxttraverse->pid)
-				break;
-			pCtxttraverse = pCtxttraverse->next;
-		}
-		if (!pCtxttraverse) {
-			PROC_Detach(ctxt->hProcessor);
-		}
-	}
-	DRV_RemoveProcContext((struct DRV_OBJECT *)hDrvObject, ctxt,
-			      (void *)ctxt->pid);
-}
+int bridge_force_recovery(const char *val, struct kernel_param *kp);
+module_param_call(recovery, bridge_force_recovery, NULL, NULL, 0600);
+static LIST_HEAD(bridge_pctxt_list);
+static DEFINE_MUTEX(bridge_pctxt_list_lock);
 
 static void bridge_load_firmware(void)
 {
-	DSP_HPROCESSOR hProcessor;
+	DSP_HPROCESSOR hProcessor = NULL;
+	struct PROCESS_CONTEXT pctxt = {0};
 	DSP_STATUS status;
 	const char* argv[2];
 	argv[0] = firmware_file;
@@ -616,7 +548,9 @@ static void bridge_load_firmware(void)
 	printk(KERN_INFO "%s: loading bridge firmware from %s\n", __func__,
 	       firmware_file);
 
-	status = PROC_Attach(0, NULL, &hProcessor);
+	DRV_ProcUpdatestate(&pctxt, PROC_RES_ALLOCATED);
+
+	status = PROC_Attach(0, NULL, &hProcessor, &pctxt);
 	if (DSP_FAILED(status))
 		printk(KERN_ERR "%s: error attaching to processor\n", __func__);
 
@@ -632,131 +566,102 @@ static void bridge_load_firmware(void)
 	if (DSP_FAILED(status))
 		printk(KERN_ERR "%s: error starting processor\n", __func__);
 
-	PROC_Detach(hProcessor);
+	DRV_RemoveAllResources(&pctxt);
+	PROC_Detach(&pctxt);
 }
 
 static bool bridge_all_closed(void)
 {
-	struct PROCESS_CONTEXT *ctxt;
-	struct PROCESS_CONTEXT *ctxt_next;
-	HANDLE hDrvObject;
-	DSP_STATUS status;
+	int ret;
 
-	status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	if (DSP_FAILED(status))
-		return false;
-
-	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
-
-	while (ctxt != NULL) {
-		ctxt_next = ctxt->next;
-		if (ctxt->task && ctxt->task->exit_state != EXIT_ZOMBIE &&
-		    ctxt->task->exit_state != EXIT_DEAD)
-			return false;
-		ctxt = ctxt_next;
-	}
-	return true;
+	mutex_lock(&bridge_pctxt_list_lock);
+	ret = list_empty(&bridge_pctxt_list);
+	mutex_unlock(&bridge_pctxt_list_lock);
+	return ret;
 }
 
-static void bridge_kill(struct work_struct *work)
+static void bridge_kill_all_users(struct work_struct *work)
 {
-	struct PROCESS_CONTEXT *ctxt, *next_ctxt;
-	HANDLE hDrvObject;
-	DSP_STATUS status;
+	struct PROCESS_CONTEXT *pctxt;
 
-	status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	if (DSP_FAILED(status))
-		return;
+	printk(KERN_INFO "dspbridge: delivering sigkill to all bridge users\n");
+	mutex_lock(&bridge_pctxt_list_lock);
+	list_for_each_entry(pctxt, &bridge_pctxt_list, list)
+		force_sig(SIGKILL, pctxt->task);
+	mutex_unlock(&bridge_pctxt_list_lock);
 
-	printk(KERN_ERR "DSPBRIDGE: dsp fatal error -- attempting to reset\n");
-	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
-
-	while (ctxt) {
-		if (ctxt->task && !ctxt->task->exit_state) {
-			force_sig(SIGKILL, ctxt->task);
-		}
-		ctxt = ctxt->next;
-	}
-
+	printk(KERN_INFO "dspbridge: waiting for bridge users to exit\n");
 	while (!bridge_all_closed())
 		cpu_relax();
-
-	DRV_GetProcCtxtList(&ctxt, (struct DRV_OBJECT *)hDrvObject);
-	while (ctxt) {
-		next_ctxt = ctxt->next;
-		if (ctxt->task &&
-		    (ctxt->task->exit_state == EXIT_ZOMBIE
-		    || ctxt->task->exit_state == EXIT_DEAD))
-			bridge_cleanup(ctxt);
-		ctxt = next_ctxt;
-	}
+	printk(KERN_INFO "dspbridge: all bridge users exited\n");
 
 	bridge_load_firmware();
 }
 
-void bridge_notify_kill(u32 event)
+DECLARE_WORK(bridge_recovery_work, bridge_kill_all_users);
+
+void bridge_recovery_notify(u32 event)
 {
 	if (!(event & event_mask))
 		return;
+	printk(KERN_INFO "dspbridge fatal error occured, attempting to "
+	       "recover\n");
 
-	schedule_delayed_work(&bridge_kill_work, 0);
+	queue_work(bridge_recovery_workq, &bridge_recovery_work);
 }
 
+int bridge_force_recovery(const char *val, struct kernel_param *kp)
+{
+	printk(KERN_INFO "dspbridge forcing recovery from userspace.\n");
+	bridge_recovery_notify(event_mask);
+	return 0;
+}
+
+static void bridge_recovery_add(struct PROCESS_CONTEXT *pctxt)
+{
+	get_task_struct(current->group_leader);
+	pctxt->task = current->group_leader;
+
+	mutex_lock(&bridge_pctxt_list_lock);
+	list_add(&pctxt->list, &bridge_pctxt_list);
+	mutex_unlock(&bridge_pctxt_list_lock);
+}
+
+static void bridge_recovery_remove(struct PROCESS_CONTEXT *pctxt)
+{
+	mutex_lock(&bridge_pctxt_list_lock);
+	list_del(&pctxt->list);
+	mutex_unlock(&bridge_pctxt_list_lock);
+	if (pctxt->task)
+		put_task_struct(pctxt->task);
+	pctxt->task = NULL;
+}
+#endif
 
 /* This function is called when an application opens handle to the
  * bridge driver. */
-
 static int bridge_open(struct inode *ip, struct file *filp)
 {
+	int status = 0;
 #ifndef RES_CLEANUP_DISABLE
-	u32 hProcess;
-	DSP_STATUS dsp_status = DSP_SOK;
-	HANDLE hDrvObject = NULL;
 	struct PROCESS_CONTEXT *pPctxt = NULL;
-	struct PROCESS_CONTEXT *next_node = NULL;
-	struct PROCESS_CONTEXT *pCtxtclosed = NULL;
-	struct task_struct *tsk = NULL;
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_open\n");
-	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 
-	/* Checking weather task structure for all process existing
-	 * in the process context list If not removing those processes*/
-	if (DSP_FAILED(dsp_status))
-		goto func_cont;
-
-	DRV_GetProcCtxtList(&pCtxtclosed, (struct DRV_OBJECT *)hDrvObject);
-	while (pCtxtclosed != NULL) {
-		tsk = pCtxtclosed->task;
-		next_node = pCtxtclosed->next;
-
-		if ((tsk) && (tsk->exit_state == EXIT_ZOMBIE ||
-		    tsk->exit_state == EXIT_DEAD)) {
-			bridge_cleanup(pCtxtclosed);
-		}
-		pCtxtclosed = next_node;
-	}
-func_cont:
-# endif
-	dsp_status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	if (DSP_SUCCEEDED(dsp_status))
-		dsp_status = DRV_InsertProcContext((struct DRV_OBJECT *)hDrvObject,
-						   &pPctxt);
+	pPctxt = MEM_Calloc(sizeof(struct PROCESS_CONTEXT), MEM_PAGED);
 
 	if (pPctxt != NULL) {
-		/* Return PID instead of process handle */
-		if (!pPctxt->task) {
-			get_task_struct(current->group_leader);
-			pPctxt->task = current->group_leader;
-		}
-
-		hProcess = current->group_leader->pid;
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
-		DRV_ProcSetPID(pPctxt, hProcess);
+		filp->private_data = pPctxt;
 	}
 
+#ifdef CONFIG_BRIDGE_RECOVERY
+	bridge_recovery_add(pPctxt);
+#endif
+#endif
+
 	GT_0trace(driverTrace, GT_ENTER, " <- driver_open\n");
-	return !DSP_SUCCEEDED(dsp_status);
+	return status;
 }
 
 /* This function is called when an application closes handle to the bridge
@@ -764,15 +669,32 @@ func_cont:
 static int bridge_release(struct inode *ip, struct file *filp)
 {
 	int status;
-	u32 pid;
+	HANDLE hDrvObject = NULL;
+	struct PROCESS_CONTEXT *pr_ctxt;
 
 	GT_0trace(driverTrace, GT_ENTER, "-> driver_release\n");
 
-	/* Return PID instead of process handle */
-	pid = current->pid;
+	status = CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
 
-	status = DSP_Close(pid);
+	/* Checking weather task structure for all process existing
+	 * in the process context list If not removing those recovery*/
+	if (DSP_FAILED(status))
+		goto func_end;
 
+	pr_ctxt = filp->private_data;
+
+	if (pr_ctxt) {
+		flush_signals(current);
+		DRV_RemoveAllResources(pr_ctxt);
+		if (pr_ctxt->hProcessor)
+			PROC_Detach(pr_ctxt);
+#ifdef CONFIG_BRIDGE_RECOVERY
+		bridge_recovery_remove(pr_ctxt);
+#endif
+		MEM_Free(pr_ctxt);
+		filp->private_data = NULL;
+	}
+func_end:
 	(status == true) ? (status = 0) : (status = -1);
 
 	GT_0trace(driverTrace, GT_ENTER, " <- driver_release\n");
@@ -805,7 +727,8 @@ static long bridge_ioctl(struct file *filp, unsigned int code,
 
 
 	if (status >= 0) {
-		status = WCD_CallDevIOCtl(code, &pBufIn, &retval);
+		status = WCD_CallDevIOCtl(code, &pBufIn, &retval,
+				filp->private_data);
 
 		if (DSP_SUCCEEDED(status)) {
 			status = retval;
@@ -821,7 +744,11 @@ static long bridge_ioctl(struct file *filp, unsigned int code,
 
 	return status;
 }
-
+/*
+#ifdef CONFIG_BRIDGE_DVFS
+	int i = 0;
+#endif
+*/
 /* This function maps kernel space memory to user space memory. */
 static int bridge_mmap(struct file *filp, struct vm_area_struct *vma)
 {
@@ -864,6 +791,56 @@ DSP_STATUS DRV_RemoveAllResources(HANDLE hPCtxt)
 	return status;
 }
 #endif
+
+/*
+ * sysfs
+ */
+static ssize_t drv_state_show(struct kobject *kobj, struct kobj_attribute *attr,
+                        char *buf)
+{
+	struct WMD_DEV_CONTEXT *dwContext;
+	struct DEV_OBJECT *hDevObject = NULL;
+	int drv_state = 0;
+
+	for (hDevObject = (struct DEV_OBJECT *)DRV_GetFirstDevObject();
+		hDevObject != NULL;
+		hDevObject = (struct DEV_OBJECT *)DRV_GetNextDevObject
+							((u32)hDevObject)) {
+		if (DSP_FAILED(DEV_GetWMDContext(hDevObject,
+		   (struct WMD_DEV_CONTEXT **)&dwContext))) {
+			continue;
+		}
+		drv_state = dwContext->dwBrdState;
+	}
+
+        return sprintf(buf, "%d\n", drv_state);
+}
+
+static struct kobj_attribute drv_state_attr = __ATTR_RO(drv_state);
+
+static struct attribute *attrs[] = {
+        &drv_state_attr.attr,
+        NULL,
+};
+
+static struct attribute_group attr_group = {
+        .attrs = attrs,
+};
+
+static void bridge_create_sysfs(void)
+{
+	int error;
+
+	error = sysfs_create_group(&omap_dspbridge_dev->dev.kobj, &attr_group);
+
+	if (error)
+		kobject_put(&omap_dspbridge_dev->dev.kobj);
+}
+
+static void bridge_destroy_sysfs(void)
+{
+	sysfs_remove_group(&omap_dspbridge_dev->dev.kobj, &attr_group);
+}
 
 /* Bridge driver initialization and de-initialization functions */
 module_init(bridge_init);

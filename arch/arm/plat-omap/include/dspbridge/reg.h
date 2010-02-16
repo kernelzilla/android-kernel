@@ -22,7 +22,6 @@
  *
  *  Public Functions:
  *      REG_DeleteValue
- *      REG_EnumKey
  *      REG_EnumValue
  *      REG_Exit
  *      REG_GetValue
@@ -53,23 +52,6 @@
 
 #include <linux/types.h>
 
-/*  ------------------------- Defines, Data Structures, Typedefs for Linux */
-#ifndef UNDER_CE
-
-#ifndef REG_SZ
-#define REG_SZ          1
-#endif
-
-#ifndef REG_BINARY
-#define REG_BINARY      3
-#endif
-
-#ifndef REG_DWORD
-#define REG_DWORD       4
-#endif
-
-#endif				/* UNDER_CE */
-
 #define REG_MAXREGPATHLENGTH    255
 
 /*
@@ -78,57 +60,18 @@
  *      Deletes a registry entry. NOTE: A registry entry is not the same as
  *      a registry key.
  *  Parameters:
- *      phKey:      Currently reserved; must be NULL.
- *      pstrSubkey: Path to key to open.
  *      pstrValue:  Name of entry to delete.
  *  Returns:
  *      DSP_SOK:    Success.
  *      DSP_EFAIL:  General failure.
  *  Requires:
  *      - REG initialized.
- *      - pstrSubkey & pstrValue are non-NULL values.
- *      - phKey is NULL.
- *      - length of pstrSubkey < REG_MAXREGPATHLENGTH.
+ *      - pstrValue is non-NULL value.
  *      - length of pstrValue < REG_MAXREGPATHLENGTH.
  *  Ensures:
  *  Details:
  */
-	extern DSP_STATUS REG_DeleteValue(OPTIONAL IN HANDLE *phKey,
-					  IN CONST char *pstrSubkey,
-					  IN CONST char *pstrValue);
-
-/*
- *  ======== REG_EnumKey ========
- *  Purpose:
- *      Enumerates subkeys of the specified path to the  registry key
- *      Retrieves the  name of the subkey(given the index) and
- *      appends with the orignal path to form the full path.
- *  Parameters:
- *      phKey:      Currently reserved; must be NULL.
- *      pstrKey     The name of the registry key to be enumerated.
- *      dwIndex     Specifies the index of the subkey to retrieve.
- *      pstrSubkey: Pointer to buffer that receives full path name of the
- *                  specified key + the sub-key
- *      pdwValueSize:   Specifies bytes of memory pstrSubkey points to on input,
- *                      on output, specifies actual memory bytes written into.
- *                      If there is no sub key,pdwValueSize returns NULL.
- *  Returns:
- *      DSP_SOK:    Success.
- *      DSP_EFAIL:  General failure.
- *  Requires:
- *      - REG initialized.
- *      - pstrKey is non-NULL value.
- *      - pdwValueSize is a valid pointer.
- *      - phKey is NULL.
- *      - length of pstrKey < REG_MAXREGPATHLENGTH.
- *  Ensures:
- *      - strlen(pstrSubkey) is > strlen(pstrKey) &&
- *      - strlen(pstrSubkey) is < REG_MAXREGPATHLENGTH
- */
-	extern DSP_STATUS REG_EnumKey(OPTIONAL IN HANDLE *phKey,
-				      IN u32 dwIndex, IN CONST char *pstrKey,
-				      IN OUT char *pstrSubkey,
-				      IN OUT u32 *pdwValueSize);
+extern DSP_STATUS REG_DeleteValue(IN CONST char *pstrValue);
 
 /*
  *  ======== REG_EnumValue ========
@@ -136,7 +79,6 @@
  *      Enumerates values of a specified key. Retrieves each value name and
  *      the data associated with the value.
  *  Parameters:
- *      phKey:          Currently reserved; must be NULL.
  *      dwIndex:        Specifies the index of the value to retrieve.
  *      pstrKey:        The name of the registry key to be enumerated.
  *      pstrValue:      Pointer to buffer that receives the name of the value.
@@ -152,19 +94,16 @@
  *      DSP_EFAIL:      General failure.
  *  Requires:
  *      REG initialized.
- *      phKey is NULL.
  *      pstrKey is a non-NULL value.
  *      pstrValue, pstrData, pdwValueSize and pdwDataSize are valid pointers.
  *      Length of pstrKey is less than REG_MAXREGPATHLENGTH.
  *  Ensures:
  */
-	extern DSP_STATUS REG_EnumValue(IN HANDLE *phKey,
-					IN u32 dwIndex,
-					IN CONST char *pstrKey,
-					IN OUT char *pstrValue,
-					IN OUT u32 *pdwValueSize,
-					IN OUT char *pstrData,
-					IN OUT u32 *pdwDataSize);
+extern DSP_STATUS REG_EnumValue(IN u32 dwIndex, IN CONST char *pstrKey,
+				IN OUT char *pstrValue,
+				IN OUT u32 *pdwValueSize,
+				IN OUT char *pstrData,
+				IN OUT u32 *pdwDataSize);
 
 /*
  *  ======== REG_Exit ========
@@ -185,8 +124,6 @@
  *  Purpose:
  *      Retrieve a value from the registry.
  *  Parameters:
- *      phKey:          Currently reserved; must be NULL.
- *      pstrSubkey:     Path to key to open.
  *      pstrEntry:      Name of entry to retrieve.
  *      pbValue:        Upon return, points to retrieved value.
  *      pdwValueSize:   Specifies bytes of memory pbValue points to on input,
@@ -198,18 +135,13 @@
  *      DSP_EFAIL:      General failure.
  *  Requires:
  *      - REG initialized.
- *      - pstrSubkey & pstrEntry are non-NULL values.
+ *      - pstrEntry is non-NULL value.
  *      - pbValue is a valid pointer.
- *      - phKey is NULL.
- *      - length of pstrSubkey < REG_MAXREGPATHLENGTH.
  *      - length of pstrEntry < REG_MAXREGPATHLENGTH.
  *  Ensures:
  */
-	extern DSP_STATUS REG_GetValue(OPTIONAL IN HANDLE *phKey,
-				       IN CONST char *pstrSubkey,
-				       IN CONST char *pstrEntry,
-				       OUT u8 *pbValue,
-				       IN OUT u32 *pdwValueSize);
+extern DSP_STATUS REG_GetValue(IN CONST char *pstrEntry, OUT u8 *pbValue,
+				IN OUT u32 *pdwValueSize);
 
 /*
  *  ======== REG_Init ========
@@ -229,10 +161,7 @@
  *  Purpose:
  *      Set a value in the registry.
  *  Parameters:
- *      phKey:          Handle to open reg key, or NULL if pSubkey is full path.
- *      pstrSubkey:     Path to key to open, could be based on phKey.
  *      pstrEntry:      Name of entry to set.
- *      dwType:         Data type of new registry value.
  *      pbValue:        Points to buffer containing new data.
  *      dwValueSize:    Specifies bytes of memory bValue points to.
  *  Returns:
@@ -240,18 +169,13 @@
  *      DSP_EFAIL:      General failure.
  *  Requires:
  *      - REG initialized.
- *      - pstrSubkey & pstrEntry are non-NULL values.
+ *      - pstrEntry is non-NULL value.
  *      - pbValue is a valid pointer.
- *      - phKey is NULL.
  *      - dwValuSize > 0.
- *      - length of pstrSubkey < REG_MAXREGPATHLENGTH.
  *      - length of pstrEntry < REG_MAXREGPATHLENGTH.
  *  Ensures:
  */
-	extern DSP_STATUS REG_SetValue(OPTIONAL IN HANDLE *phKey,
-				       IN CONST char *pstrSubKey,
-				       IN CONST char *pstrEntry,
-				       IN CONST u32 dwType,
-				       IN u8 *pbValue, IN u32 dwValueSize);
+extern DSP_STATUS REG_SetValue(IN CONST char *pstrEntry, IN u8 *pbValue,
+				IN u32 dwValueSize);
 
 #endif				/* _REG_H */

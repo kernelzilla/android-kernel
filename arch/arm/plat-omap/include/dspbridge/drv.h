@@ -173,17 +173,7 @@ struct PROCESS_CONTEXT{
 	/* Process State */
 	enum GPP_PROC_RES_STATE resState;
 
-	/* Process ID (Same as UNIX process ID) */
-	u32 pid;
-
-	/* Reference to the task struct associated with this context */
-	struct task_struct *task;
-
-	/* Pointer to next process context
-	* (To maintain a linked list of process contexts) */
-	struct PROCESS_CONTEXT *next;
-
-	/* Processor info to which the process is related */
+	/* Handle to Processor */
 	DSP_HPROCESSOR hProcessor;
 
 	/* DSP Node resources */
@@ -197,6 +187,10 @@ struct PROCESS_CONTEXT{
 
 	/* Stream resources */
 	struct STRM_RES_OBJECT *pSTRMList;
+#ifdef CONFIG_BRIDGE_RECOVERY
+	struct task_struct *task;
+	struct list_head list;
+#endif
 } ;
 #endif
 

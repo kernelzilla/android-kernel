@@ -90,14 +90,20 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
 {
 	struct DEH_MGR *pDehMgr = (struct DEH_MGR *)pRefData;
 	struct WMD_DEV_CONTEXT *pDevContext;
+	DSP_STATUS status = DSP_SOK;
+
 
 	DBG_Trace(DBG_LEVEL1, "Entering DEH_DspMmuIsr: 0x%x\n", pRefData);
        DBC_Require(irq == INT_DSP_MMU_IRQ);
 	DBC_Require(MEM_IsValidHandle(pDehMgr, SIGNATURE));
 
 	if (MEM_IsValidHandle(pDehMgr, SIGNATURE)) {
-		pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->hWmdContext;
 
+		pDevContext = (struct WMD_DEV_CONTEXT *)pDehMgr->hWmdContext;
+		if (DSP_FAILED(status))
+			DBG_Trace(DBG_LEVEL7,
+				 "**Failed to get Host Resources "
+				 "in MMU ISR **\n");
 		if (MMU_CheckIfFault(pDevContext)) {
 			printk(KERN_INFO "***** DSPMMU FAULT ***** IRQStatus "
 				"0x%x\n", dmmuEventMask);
@@ -139,8 +145,15 @@ irqreturn_t  MMU_FaultIsr(int irq, IN void *pRefData)
  */
 static bool MMU_CheckIfFault(struct WMD_DEV_CONTEXT *pDevContext)
 {
+
+
 	bool retVal = false;
+	DSP_STATUS status = DSP_SOK;
 	HW_STATUS hwStatus;
+
+	if (DSP_FAILED(status))
+		DBG_Trace(DBG_LEVEL7, "**Failed to get Host Resources in "
+			 "MMU_CheckIfFault **\n");
 
 	hwStatus = HW_MMU_EventStatus(pDevContext->dwDSPMmuBase, &dmmuEventMask);
 	if (dmmuEventMask  ==  HW_MMU_TRANSLATION_FAULT) {

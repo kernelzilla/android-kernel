@@ -105,7 +105,6 @@
 
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/cfg.h>
-#include <dspbridge/csl.h>
 #include <dspbridge/mem.h>
 #include <dspbridge/reg.h>
 
@@ -116,9 +115,6 @@
 
 /*  ----------------------------------- Resource Manager */
 #include <dspbridge/mgr.h>
-
-/*  ----------------------------------- Others */
-#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- This */
 #include <dspbridge/dspdrv.h>
@@ -245,32 +241,6 @@ bool DSP_Deinit(u32 deviceContext)
 		(void)MGR_Destroy(mgrObject);
 
 	WCD_Exit();
-
-	return retVal;
-}
-
-/*
- *  ======== DSP_Close ========
- *  	The Calling Process handle is passed to DEV_CleanupProcesState
- *      for cleaning up of any resources used by the application
- */
-bool DSP_Close(u32 dwOpenContext)
-{
-	bool retVal = false;
-
-	DBC_Require(dwOpenContext != 0);
-
-	GT_0trace(curTrace, GT_ENTER, "Entering DSP_Close\n");
-
-#ifdef RES_CLEANUP_DISABLE
-
-	if (DSP_SUCCEEDED(DEV_CleanupProcessState((HANDLE) dwOpenContext))) {
-		GT_0trace(curTrace, GT_1CLASS, "DSP_Close Succeeded \r\n");
-		retVal = true;
-	} else {
-		GT_0trace(curTrace, GT_7CLASS, "DSP_Close failed \r\n");
-	}
-#endif
 
 	return retVal;
 }

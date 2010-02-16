@@ -40,6 +40,7 @@
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/usb.h>
+#include <plat/omap-pm.h>
 
 #include <plat/resource.h>
 

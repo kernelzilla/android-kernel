@@ -57,6 +57,8 @@
 
 /*  ----------------------------------- Host OS */
 #include <dspbridge/host_os.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
 
 /*  ----------------------------------- DSP/BIOS Bridge */
 #include <dspbridge/std.h>
@@ -68,8 +70,6 @@
 #include <dspbridge/gt.h>
 
 /*  ----------------------------------- OS Adaptation Layer */
-#include <dspbridge/csl.h>
-#include <dspbridge/kfile.h>
 #include <dspbridge/ldr.h>
 #include <dspbridge/mem.h>
 
@@ -137,6 +137,101 @@ static struct DBLL_Fxns dbllFxns = {
 static bool NoOp(void);
 
 /*
+ * File operations (originally were under kfile.c)
+ */
+static s32 COD_fClose(struct file *hFile)
+{
+	/* Check for valid handle */
+	if (!hFile)
+		return DSP_EHANDLE;
+
+	filp_close(hFile, NULL);
+
+	/* we can't use DSP_SOK here */
+	return 0;
+}
+
+static struct file *COD_fOpen(CONST char *pszFileName, CONST char *pszMode)
+{
+	mm_segment_t fs;
+	struct file *hFile;
+
+	fs = get_fs();
+	set_fs(get_ds());
+
+	/* ignore given mode and open file as read-only */
+	hFile = filp_open(pszFileName, O_RDONLY, 0);
+
+	if (IS_ERR(hFile))
+		hFile = NULL;
+
+	set_fs(fs);
+
+	return hFile;
+}
+
+static s32 COD_fRead(void __user *pBuffer, s32 cSize, s32 cCount,
+		     struct file *hFile)
+{
+	/* check for valid file handle */
+	if (!hFile)
+		return DSP_EHANDLE;
+
+	if ((cSize > 0) && (cCount > 0) && pBuffer) {
+		u32 dwBytesRead;
+		mm_segment_t fs;
+
+		/* read from file */
+		fs = get_fs();
+		set_fs(get_ds());
+		dwBytesRead = hFile->f_op->read(hFile, pBuffer, cSize * cCount,
+						&(hFile->f_pos));
+		set_fs(fs);
+
+		if (!dwBytesRead)
+			return DSP_EFREAD;
+
+		return dwBytesRead / cSize;
+	}
+
+	return DSP_EINVALIDARG;
+}
+
+static s32 COD_fSeek(struct file *hFile, s32 lOffset, s32 cOrigin)
+{
+	u32 dwCurPos;
+
+	/* check for valid file handle */
+	if (!hFile)
+		return DSP_EHANDLE;
+
+	/* based on the origin flag, move the internal pointer */
+	dwCurPos = hFile->f_op->llseek(hFile, lOffset, cOrigin);
+
+	if ((s32)dwCurPos < 0)
+		return DSP_EFAIL;
+
+	/* we can't use DSP_SOK here */
+	return 0;
+}
+
+static s32 COD_fTell(struct file *hFile)
+{
+	u32 dwCurPos;
+
+	if (!hFile)
+		return DSP_EHANDLE;
+
+	/* Get current position */
+	dwCurPos = hFile->f_op->llseek(hFile, 0, SEEK_CUR);
+
+	if ((s32)dwCurPos < 0)
+		return DSP_EFAIL;
+
+	return dwCurPos;
+}
+
+/*
  *  ======== COD_Close ========
  */
 void COD_Close(struct COD_LIBRARYOBJ *lib)
@@ -200,11 +295,11 @@ DSP_STATUS COD_Create(OUT struct COD_MANAGER **phMgr, char *pstrDummyFile,
 
 	zlAttrs.alloc = (DBLL_AllocFxn)NoOp;
 	zlAttrs.free = (DBLL_FreeFxn)NoOp;
-	zlAttrs.fread = (DBLL_ReadFxn)KFILE_Read;
-	zlAttrs.fseek = (DBLL_SeekFxn)KFILE_Seek;
-	zlAttrs.ftell = (DBLL_TellFxn)KFILE_Tell;
-	zlAttrs.fclose = (DBLL_FCloseFxn)KFILE_Close;
-	zlAttrs.fopen = (DBLL_FOpenFxn)KFILE_Open;
+	zlAttrs.fread = (DBLL_ReadFxn)COD_fRead;
+	zlAttrs.fseek = (DBLL_SeekFxn)COD_fSeek;
+	zlAttrs.ftell = (DBLL_TellFxn)COD_fTell;
+	zlAttrs.fclose = (DBLL_FCloseFxn)COD_fClose;
+	zlAttrs.fopen = (DBLL_FOpenFxn)COD_fOpen;
 	zlAttrs.symLookup = NULL;
 	zlAttrs.baseImage = true;
 	zlAttrs.logWrite = NULL;

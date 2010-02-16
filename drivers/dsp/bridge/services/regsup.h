@@ -38,8 +38,7 @@ extern void regsupExit(void);
 /*
  *  ======== regsupDeleteValue ========
  */
-extern DSP_STATUS regsupDeleteValue(IN CONST char *pstrSubkey,
-				    IN CONST char *pstrValue);
+extern DSP_STATUS regsupDeleteValue(IN CONST char *pstrValue);
 /*  Get the value of the entry having the given name.  Returns DSP_SOK  */
 /*  if an entry was found and the value retrieved.  Returns DSP_EFAIL
  *  otherwise.*/

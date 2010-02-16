@@ -273,6 +273,63 @@ u8 omap_pm_vdd2_get_opp(void);
  */
 
 /**
+ * omap_pm_get_max_vdd1_opp - get the maximum supported VDD1 OPP number
+ *
+ * Report the maximum  VDD1 OPP number.
+ *
+ * Returns the maximum supported VDD1 OPP number.
+ */
+u8 omap_pm_get_max_vdd1_opp(void);
+
+
+/**
+ * omap_pm_get_min_vdd1_opp - get the minimum supported VDD1 OPP number
+ *
+ * Report the minimum  VDD1 OPP number.
+ *
+ * Returns the minimum supported VDD1 OPP number.
+ */
+u8 omap_pm_get_min_vdd1_opp(void);
+
+
+/**
+ * omap_pm_get_max_vdd2_opp - get the maximum supported VDD2 OPP number
+ *
+ * Report the maximum  VDD2 OPP number.
+ *
+ * Returns the maximum supported VDD2 OPP number.
+ */
+u8 omap_pm_get_max_vdd2_opp(void);
+
+
+/**
+ * omap_pm_get_min_vdd2_opp - get the minimum supported VDD2 OPP number
+ *
+ * Report the minimum  VDD2 OPP number.
+ *
+ * Returns the minimum supported VDD2 OPP number.
+ */
+u8 omap_pm_get_min_vdd2_opp(void);
+
+/**
+ * omap_get_mpu_rate_table - get the mpu OPP table
+ *
+ * returns mpu rate table.
+ *
+ * Returns the pointer to rate table
+ */
+struct omap_opp *omap_get_mpu_rate_table(void);
+
+/**
+ * omap_get_dsp_rate_table - get the dsp OPP table
+ *
+ * returns dsp rate table.
+ *
+ * Returns the pointer to rate table
+ */
+struct omap_opp *omap_get_dsp_rate_table(void);
+
+/**
  * omap_pm_cpu_get_freq_table - return a cpufreq_frequency_table array ptr
  *
  * Provide a frequency table usable by CPUFreq for the current chip/board.
@@ -293,12 +350,23 @@ struct cpufreq_frequency_table **omap_pm_cpu_get_freq_table(void);
 void omap_pm_cpu_set_freq(unsigned long f);
 
 /**
+ * omap_pm_set_min_mpu_freq - set the current minimum MPU frequency
+ * @f: MPU frequency in Hz
+ * @dev: struct device *
+ *
+ * Set the current minimum CPU frequency.  The actual CPU frequency
+ * used could end up higher if the DSP requested a higher OPP.
+ * Intended to be called by all Kernel components.  No
+ * return value.
+ */
+void omap_pm_set_min_mpu_freq(struct device *dev, unsigned long f);
+
+/**
  * omap_pm_cpu_get_freq - report the current CPU frequency
  *
  * Returns the current MPU frequency, or 0 upon error.
  */
 unsigned long omap_pm_cpu_get_freq(void);
-
 
 /*
  * Device context loss tracking

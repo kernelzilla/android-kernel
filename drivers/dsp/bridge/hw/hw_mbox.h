@@ -277,6 +277,28 @@ extern HW_STATUS HW_MBOX_EventAck(
 		  );
 
 /*
+* FUNCTION      : HW_MBOX_initSettings
+*
+* INPUTS:
+*
+*   Identifier  : baseAddress
+*   Type	: const u32
+*   Description : Base Address of instance of Mailbox module
+*
+*
+* RETURNS:
+*
+*   Type	: ReturnCode_t
+*   Description : RET_OK	      No errors occured
+*		 RET_BAD_NULL_PARAM  Address/pointer Paramater was set to 0/NULL
+*		 RET_INVALID_ID      Invalid Id used
+*		 RET_EMPTY	   Mailbox empty
+*
+* PURPOSE:      : This function initialize the mailbox configuration.
+*/
+extern HW_STATUS HW_MBOX_initSettings(void __iomem *baseAddres);
+
+/*
 * FUNCTION      : HW_MBOX_saveSettings
 *
 * INPUTS:

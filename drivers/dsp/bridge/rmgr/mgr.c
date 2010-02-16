@@ -56,7 +56,6 @@
 
 /*  ----------------------------------- Others */
 #include <dspbridge/dbdcd.h>
-#include <dspbridge/dbreg.h>
 #include <dspbridge/drv.h>
 #include <dspbridge/dev.h>
 

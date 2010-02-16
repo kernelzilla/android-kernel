@@ -177,24 +177,22 @@ int Dynamic_Load_Module(struct Dynamic_Loader_Stream *module,
 
 		init_module_handle(&dl_state);
 
+		/* dl_state.myio is init or 0 at this point. */
 		if (dl_state.myio) {
 			if ((!dl_state.dload_errcount) &&
-			   (dl_state.dfile_hdr.df_entry_secn != DN_UNDEF)) {
-				if (init != NULL) {
-					if (!init->execute(init,
-					   dl_state.dfile_hdr.df_entrypt))
-						dload_error(&dl_state,
-						    "Init->Execute Failed");
-				} else {
-					dload_error(&dl_state, "init is NULL");
-				}
-			}
+			    (dl_state.dfile_hdr.df_entry_secn != DN_UNDEF) &&
+			    (!init->execute(init,
+					    dl_state.dfile_hdr.df_entrypt)))
+				dload_error(&dl_state,
+					    "Init->Execute Failed");
 			init->release(init);
 		}
 
 		symbol_table_free(&dl_state);
 		section_table_free(&dl_state);
 		string_table_free(&dl_state);
+		dload_tramp_cleanup(&dl_state);
+
 
 		if (dl_state.dload_errcount) {
 			Dynamic_Unload_Module(dl_state.myhandle, syms, alloc,
@@ -287,12 +285,13 @@ Dynamic_Open_Module(struct Dynamic_Loader_Stream *module,
 
 		init_module_handle(&dl_state);
 
+		/* dl_state.myio is either 0 or init at this point. */
 		if (dl_state.myio) {
-			if ((!dl_state.dload_errcount)
-			    && (dl_state.dfile_hdr.df_entry_secn != DN_UNDEF))
-				if (!init->execute(init,
-				   dl_state.dfile_hdr.df_entrypt))
-					dload_error(&dl_state,
+			if ((!dl_state.dload_errcount) &&
+			    (dl_state.dfile_hdr.df_entry_secn != DN_UNDEF) &&
+			    (!init->execute(init,
+					    dl_state.dfile_hdr.df_entrypt)))
+				dload_error(&dl_state,
 					    "Init->Execute Failed");
 			init->release(init);
 		}
@@ -492,10 +491,14 @@ static void allocate_sections(struct dload_state *dlthis)
 		DL_ERROR("Arg 3 (alloc) required but NULL", 0);
 		return;
 	}
-	/* allocate space for the module handle, which we will
-	 *	keep for unload purposes */
-	siz = dlthis->dfile_hdr.df_target_scns *
-	      sizeof(struct LDR_SECTION_INFO) + MY_HANDLE_SIZE;
+	/*
+	 * allocate space for the module handle, which we will keep for unload
+	 * purposes include an additional section store for an auto-generated
+	 * trampoline section in case we need it.
+	 */
+	siz = (dlthis->dfile_hdr.df_target_scns + 1) *
+		sizeof(struct LDR_SECTION_INFO) + MY_HANDLE_SIZE;
+
 	hndl = (struct my_handle *)dlthis->mysym->Allocate(dlthis->mysym, siz);
 	if (!hndl) {		/* not enough storage */
 		DL_ERROR(E_ALLOC, siz);
@@ -590,7 +593,7 @@ static void section_table_free(struct dload_state *dlthis)
  * big unsorted array.  We just read that array into memory in bulk.
  ************************************************************************/
 static const char S_STRINGTBL[] = { "string table" };
-void dload_strings(struct dload_state *dlthis, boolean sec_names_only)
+void dload_strings(struct dload_state *dlthis, bool sec_names_only)
 {
 	u32 ssiz;
 	char *strbuf;
@@ -710,11 +713,16 @@ static void dload_symbols(struct dload_state *dlthis)
 	if (s_count == 0)
 		return;
 
-	/* We keep a local symbol table for all of the symbols in the input.
+	/*
+	 * We keep a local symbol table for all of the symbols in the input.
 	 * This table contains only section & value info, as we do not have
 	 * to do any name processing for locals.  We reuse this storage
 	 * as a temporary for .dllview record construction.
-	 * Allocate storage for the whole table.*/
+	 * Allocate storage for the whole table.  Add 1 to the section count
+	 * in case a trampoline section is auto-generated as well as the
+	 * size of the trampoline section name so DLLView doens't get lost.
+	 */
+
 	siz = s_count * sizeof(struct Local_Symbol);
 	dsiz = DBG_HDR_SIZE +
 		(sizeof(struct dll_sect) * dlthis->allocated_secn_count) +
@@ -793,6 +801,12 @@ static void dload_symbols(struct dload_state *dlthis)
 					goto loop_cont;
 				}
 				val = delta = symp->value;
+#ifdef ENABLE_TRAMP_DEBUG
+				dload_syms_error(dlthis->mysym,
+						"===> ext sym [%s] at %x",
+						sname, val);
+#endif
+
 				goto loop_cont;
 			}
 			/* symbol defined by this module */
@@ -1048,9 +1062,11 @@ loopexit:
 #define MY_RELOC_BUF_SIZ 8
 /* careful! exists at the same time as the image buffer*/
 static int relocate_packet(struct dload_state *dlthis,
-			   struct image_packet_t *ipacket, u32 *checks)
+				struct image_packet_t *ipacket,
+				u32 *checks, bool *tramps_generated)
 {
 	u32 rnum;
+	*tramps_generated = false;
 
 	rnum = ipacket->i_num_relocs;
 	do {			/* all relocs */
@@ -1071,11 +1087,21 @@ static int relocate_packet(struct dload_state *dlthis,
 		*checks += dload_checksum(rp, siz);
 		do {
 			/* perform the relocation operation */
-			dload_relocate(dlthis, (TgtAU_t *) ipacket->i_bits, rp);
+			dload_relocate(dlthis, (TgtAU_t *) ipacket->i_bits, rp,
+					tramps_generated, false);
 			rp += 1;
 			rnum -= 1;
 		} while ((rinbuf -= 1) > 0);
 	} while (rnum > 0);	/* all relocs */
+	/* If trampoline(s) were generated, we need to do an update of the
+	 * trampoline copy of the packet since a 2nd phase relo will be done
+	 * later.  */
+	if (*tramps_generated == true) {
+		dload_tramp_pkt_udpate(dlthis,
+				(dlthis->image_secn - dlthis->ldr_sections),
+				dlthis->image_offset, ipacket);
+	}
+
 	return 1;
 }				/* dload_read_reloc */
 
@@ -1100,7 +1126,7 @@ static void dload_data(struct dload_state *dlthis)
 	struct doff_scnhdr_t *sptr = dlthis->sect_hdrs;
 	struct LDR_SECTION_INFO *lptr = dlthis->ldr_sections;
 #ifdef OPT_ZERO_COPY_LOADER
-	boolean bZeroCopy = false;
+	bool bZeroCopy = false;
 #endif
 	u8 *pDest;
 
@@ -1110,7 +1136,7 @@ static void dload_data(struct dload_state *dlthis)
 	} ibuf;
 
 	/* Indicates whether CINIT processing has occurred */
-	boolean cinit_processed = false;
+	bool cinit_processed = false;
 
 	/* Loop through the sections and load them one at a time.
 	 */
@@ -1135,6 +1161,8 @@ static void dload_data(struct dload_state *dlthis)
 
 				s32 ipsize;
 				u32 checks;
+				bool  tramp_generated = false;
+
 				/* get the fixed header bits */
 				if (dlthis->strm->read_buffer(dlthis->strm,
 				    &ibuf.ipacket, IPH_SIZE) != IPH_SIZE) {
@@ -1206,33 +1234,44 @@ static void dload_data(struct dload_state *dlthis)
 				if (ibuf.ipacket.i_num_relocs) {
 					dlthis->image_offset = image_offset;
 					if (!relocate_packet(dlthis,
-					    &ibuf.ipacket, &checks))
+					    &ibuf.ipacket, &checks,
+					    &tramp_generated))
 						return;	/* serious error */
 				}
 				if (~checks)
 					DL_ERROR(E_CHECKSUM, IMAGEPAK);
-				/* stuff the result into target memory */
-				if (DLOAD_SECT_TYPE(sptr) == DLOAD_CINIT) {
-					cload_cinit(dlthis, &ibuf.ipacket);
-					cinit_processed = true;
-				} else {
-#ifdef OPT_ZERO_COPY_LOADER
-				    if (!bZeroCopy) {
-#endif
+				/* Only write the result to the target if no
+				  * trampoline was generated.  Otherwise it
+				  *will be done during trampoline finalize.  */
 
-					if (!dlthis->myio->writemem
-					   (dlthis->myio, ibuf.bufr,
-					   lptr->load_addr + image_offset, lptr,
-					   BYTE_TO_HOST
-					   (ibuf.ipacket.i_packet_size))) {
-						DL_ERROR(
-						"Write to " FMT_UI32 " failed",
-						lptr->load_addr + image_offset);
+				if (tramp_generated == false) {
+
+					/* stuff the result into target
+					 * memory */
+					if (DLOAD_SECT_TYPE(sptr) ==
+					    DLOAD_CINIT) {
+						cload_cinit(dlthis,
+							&ibuf.ipacket);
+						cinit_processed = true;
+					} else {
+#ifdef OPT_ZERO_COPY_LOADER
+						if (!bZeroCopy) {
+#endif
+						if (!dlthis->myio->writemem
+						(dlthis->myio, ibuf.bufr,
+						lptr->load_addr + image_offset,
+						lptr, BYTE_TO_HOST
+						(ibuf.ipacket.i_packet_size))) {
+							DL_ERROR(
+							"Write to " FMT_UI32
+							" failed",
+							lptr->load_addr +
+							image_offset);
+						}
+#ifdef OPT_ZERO_COPY_LOADER
 					}
-#ifdef OPT_ZERO_COPY_LOADER
-				}
 #endif
-
+					}
 				}
 				image_offset +=
 				      BYTE_TO_TADDR(ibuf.ipacket.i_packet_size);
@@ -1284,6 +1323,12 @@ loop_cont:
 		sptr += 1;
 		lptr += 1;
 	}			/* load sections */
+
+	/*  Finalize any trampolines that were created during the load  */
+	if (dload_tramp_finalize(dlthis) == 0) {
+		DL_ERROR("Finalization of auto-trampolines (size = " FMT_UI32
+			") failed", dlthis->tramp.tramp_sect_next_addr);
+    }
 }				/* dload_data */
 
 /*************************************************************************
@@ -1529,6 +1574,16 @@ static void init_module_handle(struct dload_state *dlthis)
 	hndl = dlthis->myhandle;
 	if (!hndl)
 		return;		/* must be errors detected, so forget it */
+
+	/*  Store the section count  */
+	hndl->secn_count = dlthis->allocated_secn_count;
+
+	/*  If a trampoline section was created, add it in  */
+	if (dlthis->tramp.tramp_sect_next_addr != 0)
+		hndl->secn_count += 1;
+
+	hndl->secn_count = hndl->secn_count << 1;
+
 	hndl->secn_count = dlthis->allocated_secn_count << 1;
 #ifndef TARGET_ENDIANNESS
 	if (dlthis->big_e_target)
@@ -1606,9 +1661,29 @@ static void init_module_handle(struct dload_state *dlthis)
 		dbsec += 1;
 		asecs += 1;
 	}
+
+	/*  If a trampoline section was created go ahead and add its info  */
+	if (dlthis->tramp.tramp_sect_next_addr != 0) {
+		dbmod->num_sects++;
+		dbsec->sect_load_adr = asecs->load_addr;
+		dbsec->sect_run_adr = asecs->run_addr;
+		dbsec++;
+		asecs++;
+	}
+
 	/* now cram in the names */
 	cp = copy_tgt_strings(dbsec, dlthis->str_head,
 			      dlthis->debug_string_size);
+
+
+	/* If a trampoline section was created, add its name so DLLView
+	 * can show the user the section info.  */
+	if (dlthis->tramp.tramp_sect_next_addr != 0) {
+		cp = copy_tgt_strings(cp,
+			dlthis->tramp.final_string_table,
+			strlen(dlthis->tramp.final_string_table) + 1);
+	}
+
 
 	/* round off the size of the debug record, and remember same */
 	hndl->dm.dbsiz = HOST_TO_TDATA_ROUND(cp - (char *)dbmod);
@@ -1716,7 +1791,9 @@ int Dynamic_Unload_Module(DLOAD_mhandle mhandle,
 	if (!syms)
 		return 1;
 	syms->Purge_Symbol_Table(syms, (unsigned) hndl);
-	 /* Deallocate target memory for sections */
+	 /* Deallocate target memory for sections
+	  * NOTE: The trampoline section, if created, gets deleted here, too */
+
 	asecs = hndl->secns;
 	if (alloc)
 		for (curr_sect = (hndl->secn_count >> 1); curr_sect > 0;

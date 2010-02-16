@@ -24,6 +24,7 @@
 #include <plat/powerdomain.h>
 #include <plat/resource.h>
 #include <plat/omap_device.h>
+#include <plat/omap34xx.h>
 
 struct omap_opp *dsp_opps;
 struct omap_opp *mpu_opps;
@@ -90,6 +91,7 @@ void omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, unsigned long r)
 		resource_request("vdd2_opp", dev, r);
 	}
 }
+EXPORT_SYMBOL(omap_pm_set_min_bus_tput);
 
 void omap_pm_set_max_dev_wakeup_lat(struct device *dev, long t)
 {
@@ -180,7 +182,7 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 	 * array should have .rate = .opp_id = 0.
 	 */
 
-	return NULL;
+	return dsp_opps;
 }
 
 void omap_pm_dsp_set_min_opp(u8 opp_id)
@@ -254,6 +256,21 @@ void omap_pm_cpu_set_freq(unsigned long f)
 	return;
 }
 
+void omap_pm_set_min_mpu_freq(struct device *dev, unsigned long f)
+{
+	if (f == 0) {
+		WARN_ON(1);
+		return;
+	}
+
+	pr_debug("OMAP PM: CPUFreq requests CPU frequency to be set to %lu\n",
+		 f);
+
+	resource_request("mpu_freq", dev, f);
+	return;
+}
+EXPORT_SYMBOL(omap_pm_set_min_mpu_freq);
+
 unsigned long omap_pm_cpu_get_freq(void)
 {
 	pr_debug("OMAP PM: CPUFreq requests current CPU frequency\n");
@@ -317,3 +334,50 @@ void omap_pm_if_exit(void)
 {
 	/* Deallocate CPUFreq frequency table here */
 }
+
+u8 omap_pm_get_max_vdd1_opp()
+{
+	if (cpu_is_omap3630()) {
+		return VDD1_OPP2;
+	} else {
+		return VDD1_OPP5;
+	}
+}
+EXPORT_SYMBOL(omap_pm_get_max_vdd1_opp);
+
+u8 omap_pm_get_min_vdd1_opp(void)
+{
+	return VDD1_OPP1;
+}
+EXPORT_SYMBOL(omap_pm_get_min_vdd1_opp);
+
+
+u8 omap_pm_get_max_vdd2_opp(void)
+{
+	if (cpu_is_omap3630())
+		return VDD2_OPP2;
+	else
+		return VDD2_OPP3;
+}
+EXPORT_SYMBOL(omap_pm_get_max_vdd2_opp);
+
+u8 omap_pm_get_min_vdd2_opp(void)
+{
+	if (cpu_is_omap3630())
+		return VDD2_OPP1;
+	else
+		return VDD2_OPP2;
+}
+EXPORT_SYMBOL(omap_pm_get_min_vdd2_opp);
+
+struct omap_opp *omap_get_mpu_rate_table()
+{
+	return mpu_opps;
+}
+EXPORT_SYMBOL(omap_get_mpu_rate_table);
+
+struct omap_opp *omap_get_dsp_rate_table()
+{
+	return dsp_opps;
+}
+EXPORT_SYMBOL(omap_get_dsp_rate_table);

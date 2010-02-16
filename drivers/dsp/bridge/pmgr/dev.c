@@ -142,7 +142,6 @@
 #include <dspbridge/node.h>
 
 /*  ----------------------------------- Others */
-#include <dspbridge/dbreg.h>
 #include <dspbridge/wcd.h>		/* WCD version info. */
 
 #include <dspbridge/chnl.h>
@@ -496,11 +495,15 @@ DSP_STATUS DEV_DestroyDevice(struct DEV_OBJECT *hDevObject)
 	GT_1trace(debugMask, GT_ENTER, "Entered DEV_DestroyDevice, hDevObject: "
 		 "0x%x\n", hDevObject);
 	if (IsValidHandle(hDevObject)) {
-		if (pDevObject->hCodMgr)
+		if (pDevObject->hCodMgr) {
 			COD_Delete(pDevObject->hCodMgr);
+			pDevObject->hCodMgr = NULL;
+		}
 
-		if (pDevObject->hNodeMgr)
+		if (pDevObject->hNodeMgr) {
 			NODE_DeleteMgr(pDevObject->hNodeMgr);
+			pDevObject->hNodeMgr = NULL;
+		}
 
 		/* Free the io, channel, and message managers for this board: */
 		if (pDevObject->hIOMgr) {
@@ -511,28 +514,40 @@ DSP_STATUS DEV_DestroyDevice(struct DEV_OBJECT *hDevObject)
 			CHNL_Destroy(pDevObject->hChnlMgr);
 			pDevObject->hChnlMgr = NULL;
 		}
-		if (pDevObject->hMsgMgr)
+		if (pDevObject->hMsgMgr) {
 			MSG_Delete(pDevObject->hMsgMgr);
+			pDevObject->hMsgMgr = NULL;
+		}
 
 		if (pDevObject->hDehMgr) {
 			/* Uninitialize DEH module. */
 			(*pDevObject->intfFxns.pfnDehDestroy)
 			(pDevObject->hDehMgr);
+			pDevObject->hDehMgr = NULL;
 		}
-		if (pDevObject->hCmmMgr)
+		if (pDevObject->hCmmMgr) {
 			CMM_Destroy(pDevObject->hCmmMgr, true);
+			pDevObject->hCmmMgr = NULL;
+		}
 
-		if (pDevObject->hDmmMgr)
+		if (pDevObject->hDmmMgr) {
 			DMM_Destroy(pDevObject->hDmmMgr);
+			pDevObject->hDmmMgr = NULL;
+		}
 
 		/* Call the driver's WMD_DEV_Destroy() function: */
 		/* Require of DevDestroy */
-		DBC_Assert(pDevObject->hWmdContext != NULL);
-		status = (*pDevObject->intfFxns.pfnDevDestroy)
-			 (pDevObject->hWmdContext);
+		if(pDevObject->hWmdContext) {
+			status = (*pDevObject->intfFxns.pfnDevDestroy)
+				(pDevObject->hWmdContext);
+			pDevObject->hWmdContext = NULL;
+		} else
+			status = DSP_EFAIL;
 		if (DSP_SUCCEEDED(status)) {
-			if (pDevObject->procList)
+			if (pDevObject->procList) {
 				LST_Delete(pDevObject->procList);
+				pDevObject->procList = NULL;
+			}
 
 			/* Remove this DEV_Object from the global list: */
 			DRV_RemoveDevObject(pDevObject->hDrvObject, pDevObject);
@@ -540,6 +555,7 @@ DSP_STATUS DEV_DestroyDevice(struct DEV_OBJECT *hDevObject)
 			 * (pDevObject->hModule);*/
 			/* Free this dev object: */
 			MEM_FreeObject(pDevObject);
+			pDevObject = NULL;
 		}
 	} else {
 		GT_0trace(debugMask, GT_7CLASS, "DEV_Destroy: Invlaid handle");

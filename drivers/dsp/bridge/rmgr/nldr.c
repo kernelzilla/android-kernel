@@ -63,7 +63,6 @@
 #endif
 
 /* OS adaptation layer */
-#include <dspbridge/csl.h>
 #include <dspbridge/mem.h>
 
 /* Platform manager */
@@ -1560,6 +1559,12 @@ static DSP_STATUS LoadOvly(struct NLDR_NODEOBJECT *hNldrNode,
 	}
 
 	DBC_Assert(i < hNldr->nOvlyNodes);
+
+	if (!pONode) {
+		status = DSP_ENOTFOUND;
+		goto func_end;
+	}
+
 	switch (phase) {
 	case NLDR_CREATE:
 		pRefCount = &(pONode->createRef);
@@ -1877,6 +1882,11 @@ static void UnloadOvly(struct NLDR_NODEOBJECT *hNldrNode, enum NLDR_PHASE phase)
 	}
 
 	DBC_Assert(i < hNldr->nOvlyNodes);
+
+	if (!pONode)
+		/* TODO: Should we print warning here? */
+		return;
+
 	switch (phase) {
 	case NLDR_CREATE:
 		pRefCount = &(pONode->createRef);
@@ -1917,7 +1927,6 @@ static void UnloadOvly(struct NLDR_NODEOBJECT *hNldrNode, enum NLDR_PHASE phase)
 	}
 	if (pOtherRef && *pOtherRef == 0)
 		FreeSects(hNldr, pOtherSects, nOtherAlloc);
-
 }
 
 /*

@@ -64,6 +64,7 @@
 
 #include <dspbridge/cfgdefs.h>
 #include <dspbridge/devdefs.h>
+#include <dspbridge/drv.h>
 
 /*
  *  ======== PROC_Attach ========
@@ -94,7 +95,8 @@
 	extern DSP_STATUS PROC_Attach(u32 uProcessor,
 				      OPTIONAL CONST struct DSP_PROCESSORATTRIN
 				      *pAttrIn,
-				      OUT DSP_HPROCESSOR *phProcessor);
+				      OUT DSP_HPROCESSOR *phProcessor,
+				      struct PROCESS_CONTEXT *pr_ctxt);
 
 /*
  *  ======== PROC_AutoStart =========
@@ -151,7 +153,7 @@
  *      Close a DSP processor and de-allocate all (GPP) resources reserved
  *      for it. The Processor Object is deleted.
  *  Parameters:
- *      hProcessor  :   The processor handle.
+ *      pr_ctxt     :   The processor handle.
  *  Returns:
  *      DSP_SOK     :   Success.
  *      DSP_EHANDLE :   InValid Handle.
@@ -161,7 +163,7 @@
  *  Ensures:
  *      PROC Object is destroyed.
  */
-	extern DSP_STATUS PROC_Detach(DSP_HPROCESSOR hProcessor);
+	extern DSP_STATUS PROC_Detach(struct PROCESS_CONTEXT *pr_ctxt);
 
 /*
  *  ======== PROC_EnumNodes ========
@@ -578,7 +580,8 @@
 				   void *pMpuAddr,
 				   u32 ulSize,
 				   void *pReqAddr,
-				   void **ppMapAddr, u32 ulMapAttr);
+				   void **ppMapAddr, u32 ulMapAttr,
+				   struct PROCESS_CONTEXT *pr_ctxt);
 
 /*
  *  ======== PROC_ReserveMemory ========
@@ -621,7 +624,8 @@
  *  Ensures:
  *  Details:
  */
-	extern DSP_STATUS PROC_UnMap(DSP_HPROCESSOR hProcessor, void *pMapAddr);
+	extern DSP_STATUS PROC_UnMap(DSP_HPROCESSOR hProcessor, void *pMapAddr,
+			struct PROCESS_CONTEXT *pr_ctxt);
 
 /*
  *  ======== PROC_UnReserveMemory ========

@@ -163,10 +163,10 @@ static const u8 C60_Scale[SCALE_MASK+1] = {
  *	Performs the specified relocation operation
  **************************************************************************/
 void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
-		    struct reloc_record_t *rp)
+			struct reloc_record_t *rp, bool *tramps_genereted,
+			bool second_pass)
 {
-	RVALUE val = 0;
-	RVALUE reloc_amt = 0;
+	RVALUE val, reloc_amt, orig_val = 0;
 	unsigned int fieldsz = 0;
 	unsigned int offset = 0;
 	unsigned int reloc_info = 0;
@@ -178,6 +178,17 @@ void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
 #ifdef RFV_SCALE
 	unsigned int scale = 0;
 #endif
+	struct image_packet_t *img_pkt = NULL;
+
+	/* The image packet data struct is only used during first pass
+	  * relocation in the event that a trampoline is needed.  2nd pass
+	  * relocation doesn't guarantee that data is coming from an
+	  * image_packet_t structure. See cload.c, dload_data for how i_bits is
+	  * set. If that changes this needs to be updated!!!  */
+	if (second_pass == false)
+		img_pkt = (struct image_packet_t *)((u8 *)data -
+				sizeof(struct image_packet_t));
+
 
 	rx = HASH_FUNC(rp->r_type);
 	while (rop_map1[rx] != rp->r_type) {
@@ -211,16 +222,22 @@ void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
 	/* Compute the relocation amount for the referenced symbol, if any */
 	reloc_amt = rp->r_uval;
 	if (RFV_SYM(reloc_info)) {	/* relocation uses a symbol reference */
-		if ((u32)rp->r_symndx < dlthis->dfile_hdr.df_no_syms) {
-			/* real symbol reference */
-			svp = &dlthis->local_symtab[rp->r_symndx];
-			reloc_amt = (RFV_SYM(reloc_info) == ROP_SYMD) ?
-				    svp->delta : svp->value;
+		/* If this is first pass, use the module local symbol table,
+		  * else use the trampoline symbol table.  */
+	       if (second_pass == false) {
+			if ((u32)rp->r_symndx < dlthis->dfile_hdr.df_no_syms) {
+				/* real symbol reference */
+				svp = &dlthis->local_symtab[rp->r_symndx];
+				reloc_amt = (RFV_SYM(reloc_info) == ROP_SYMD) ?
+					    svp->delta : svp->value;
+			}
+			/* reloc references current section */
+			else if (rp->r_symndx == -1) {
+				reloc_amt = (RFV_SYM(reloc_info) == ROP_SYMD) ?
+				dlthis->delta_runaddr :
+				dlthis->image_secn->run_addr;
+			}
 		}
-		/* reloc references current section */
-		else if (rp->r_symndx == -1)
-			reloc_amt = (RFV_SYM(reloc_info) == ROP_SYMD) ?
-			  dlthis->delta_runaddr : dlthis->image_secn->run_addr;
 	}	/* relocation uses a symbol reference */
 	/* Handle stack adjustment */
 	val = 0;
@@ -277,6 +294,10 @@ void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
 	if (reloc_info & ROP_R) {    /* relocation reads current image value */
 		val = dload_unpack(dlthis, data, fieldsz, offset,
 		      RFV_SIGN(reloc_info));
+	/* Save off the original value in case the relo overflows and
+	  * we can trampoline it.  */
+	orig_val = val;
+
 #ifdef RFV_SCALE
 		val <<= scale;
 #endif
@@ -414,10 +435,38 @@ void dload_relocate(struct dload_state *dlthis, TgtAU_t *data,
 #endif
 		if (dload_repack(dlthis, val, data, fieldsz, offset,
 		   RFV_SIGN(reloc_info))) {
-			dload_error(dlthis, "Relocation value " FMT_UI32
-			    " overflows %d bits in %s offset " FMT_UI32, val,
-			    fieldsz, dlthis->image_secn->name,
-			    dlthis->image_offset + rp->r_vaddr);
+			/* Check to see if this relo can be trampolined,
+			  * but only in first phase relocation.  2nd phase
+			  * relocation cannot trampoline.  */
+			if ((second_pass == false) &&
+				(dload_tramp_avail(dlthis, rp) == true)) {
+
+				/* Before generating the trampoline, restore
+				  * the value to its original so the 2nd pass
+				  *  relo will work.  */
+				dload_repack(dlthis, orig_val, data, fieldsz,
+					offset, RFV_SIGN(reloc_info));
+				if (!dload_tramp_generate(dlthis,
+					(dlthis->image_secn - dlthis->
+					ldr_sections), dlthis->image_offset,
+					img_pkt, rp)) {
+					dload_error(dlthis, "Failed to "
+					     "generate trampoline for bit "
+					     "overflow");
+					dload_error(dlthis, "Relocation value "
+					   FMT_UI32 " overflows %d bits in %s "
+					   "offset " FMT_UI32, val, fieldsz,
+					   dlthis->image_secn->name,
+					   dlthis->image_offset + rp->r_vaddr);
+				} else
+					*tramps_genereted = true;
+			} else {
+				dload_error(dlthis, "Relocation value "
+					FMT_UI32 " overflows %d bits in %s"
+					" offset " FMT_UI32, val, fieldsz,
+					dlthis->image_secn->name,
+					dlthis->image_offset + rp->r_vaddr);
+			}
 		}
 	} else if (top)
 		*stackp = val;

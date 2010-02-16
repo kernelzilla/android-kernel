@@ -1712,29 +1712,6 @@ static int __init omap3_gpio_pads_init(void)
 		}
 	}
 	gpio_pads[gpio_amt].gpio = -1;
-
-	/* Configure gpio pad wakeups on late init */
-	for (i = 0; i < gpio_bank_count; i++) {
-		struct gpio_bank *bank = &gpio_bank[i];
-		if (bank->method == METHOD_GPIO_24XX) {
-			int j;
-			for (j = 0; j < 32; j++) {
-				int offset = gpio_pad_map[j + i * 32];
-				u16 v;
-
-				if (!offset)
-					continue;
-
-				v = omap_ctrl_readw(offset);
-				if (bank->suspend_wakeup & (1 << j))
-					v |= OMAP3_PADCONF_WAKEUPENABLE0;
-				else
-					v &= ~OMAP3_PADCONF_WAKEUPENABLE0;
-				omap_ctrl_writew(v, offset);
-			}
-		}
-	}
-
 	return 0;
 }
 late_initcall(omap3_gpio_pads_init);
@@ -1921,7 +1898,6 @@ static int __init _omap_gpio_init(void)
 			__raw_writel(0x00000000, bank->base + OMAP24XX_GPIO_IRQENABLE1);
 			__raw_writel(0xffffffff, bank->base + OMAP24XX_GPIO_IRQSTATUS1);
 			__raw_writew(0x0015, bank->base + OMAP24XX_GPIO_SYSCONFIG);
-			__raw_writel(0x00000000, bank->base + OMAP24XX_GPIO_DEBOUNCE_EN);
 
 			/* Initialize interface clock ungated, module enabled */
 			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);

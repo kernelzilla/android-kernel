@@ -104,13 +104,9 @@
 
 /*  ----------------------------------- OS Adaptation Layer */
 #include <dspbridge/cfg.h>
-#include <dspbridge/csl.h>
 #include <dspbridge/list.h>
 #include <dspbridge/mem.h>
 #include <dspbridge/reg.h>
-
-/*  ----------------------------------- Others */
-#include <dspbridge/dbreg.h>
 
 /*  ----------------------------------- This */
 #include <dspbridge/drv.h>
@@ -132,9 +128,6 @@ struct DRV_OBJECT {
 	u32 dwSignature;
 	struct LST_LIST *devList;
 	struct LST_LIST *devNodeString;
-#ifndef RES_CLEANUP_DISABLE
-	struct PROCESS_CONTEXT  *procCtxtList;
-#endif
 };
 
 /*
@@ -160,187 +153,9 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 fRequest);
 #ifndef RES_CLEANUP_DISABLE
 /* GPP PROCESS CLEANUP CODE */
 
-static DSP_STATUS PrintProcessInformation(void);
 static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt);
 static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt);
 extern enum NODE_STATE NODE_GetState(HANDLE hNode);
-
-/* Get the process context list from driver object */
-
-/* Set the Process ID */
-DSP_STATUS DRV_ProcSetPID(HANDLE hPCtxt, s32 hProcess)
-{
-	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
-	DSP_STATUS status = DSP_SOK;
-
-	DBC_Assert(hPCtxt != NULL);
-
-	pCtxt->pid = hProcess;
-	return status;
-}
-
-
-/* Getting the head of the process context list */
-DSP_STATUS DRV_GetProcCtxtList(struct PROCESS_CONTEXT **pPctxt,
-				struct DRV_OBJECT *hDrvObject)
-{
-	DSP_STATUS status = DSP_SOK;
-	struct DRV_OBJECT *pDrvObject = (struct DRV_OBJECT *)hDrvObject;
-
-	DBC_Assert(hDrvObject != NULL);
-	GT_2trace(curTrace, GT_ENTER,
-		"DRV_GetProcCtxtList: 2 *pPctxt:%x, pDrvObject"
-		":%x", *pPctxt, pDrvObject);
-	*pPctxt = pDrvObject->procCtxtList;
-	GT_2trace(curTrace, GT_ENTER,
-		"DRV_GetProcCtxtList: 3 *pPctxt:%x, pDrvObject"
-		":%x", *pPctxt, pDrvObject);
-	return status;
-}
-
-
-
-/* Get a particular process context based on process handle (phProcess) */
-DSP_STATUS DRV_GetProcContext(u32 phProcess,
-				struct DRV_OBJECT *hDrvObject,
-				HANDLE hPCtxt, DSP_HNODE hNode,
-				u32 pMapAddr)
-{
-	struct PROCESS_CONTEXT **pCtxt = (struct PROCESS_CONTEXT **)hPCtxt;
-	DSP_STATUS status = DSP_SOK;
-	struct PROCESS_CONTEXT *pCtxtList = NULL;
-	struct DRV_OBJECT *pDrvObject = (struct DRV_OBJECT *)hDrvObject;
-	struct NODE_RES_OBJECT *pTempNode2 = NULL;
-	struct NODE_RES_OBJECT *pTempNode = NULL;
-	struct DMM_RES_OBJECT *pTempDMM2 = NULL;
-	struct DMM_RES_OBJECT *pTempDMM = NULL;
-	s32 pCtxtFound = 0;
-
-	DBC_Assert(pDrvObject != NULL);
-	pCtxtList = pDrvObject->procCtxtList;
-	GT_0trace(curTrace, GT_ENTER, "2DRV_GetProcContext: 2");
-	while ((pCtxtList != NULL) && (pCtxtList->pid != phProcess)) {
-		pCtxtList = pCtxtList->next;
-		GT_0trace(curTrace, GT_ENTER, "2DRV_GetProcContext: 3");
-	}
-	if (pCtxtList == NULL) {
-		if (hNode != NULL) {
-			pCtxtList = pDrvObject->procCtxtList;
-			while ((pCtxtList != NULL) && (pCtxtFound == 0)) {
-				pTempNode = pCtxtList->pNodeList;
-				while ((pTempNode != NULL) &&
-				      (pTempNode->hNode != hNode)) {
-					pTempNode2 = pTempNode;
-					pTempNode = pTempNode->next;
-				}
-				if (pTempNode != NULL) {
-					pCtxtFound = 1;
-					status = DSP_SOK;
-				} else {
-					pCtxtList = pCtxtList->next;
-				}
-			}
-		} else if ((pMapAddr != 0) && (pCtxtFound == 0)) {
-			pCtxtList = pDrvObject->procCtxtList;
-			while ((pCtxtList != NULL) && (pCtxtFound == 0)) {
-				pTempDMM = pCtxtList->pDMMList;
-				while ((pTempDMM != NULL) &&
-				     (pTempDMM->ulDSPAddr != pMapAddr)) {
-					pTempDMM2 = pTempDMM;
-					pTempDMM = pTempDMM->next;
-				}
-				if (pTempDMM != NULL) {
-					pCtxtFound = 1;
-					status = DSP_SOK;
-				} else {
-					pCtxtList = pCtxtList->next;
-				}
-			}
-			if (pCtxtList == NULL)
-				status = DSP_ENOTFOUND;
-
-		}
-	} else{
-		status = DSP_SOK;
-	}
-	GT_0trace(curTrace, GT_ENTER, "2DRV_GetProcContext: 4");
-	*pCtxt = pCtxtList;
-	return status;
-}
-
-
-/* Add a new process context to process context list */
-DSP_STATUS DRV_InsertProcContext(struct DRV_OBJECT *hDrVObject, HANDLE hPCtxt)
-{
-	struct PROCESS_CONTEXT **pCtxt = (struct PROCESS_CONTEXT **)hPCtxt;
-	DSP_STATUS status = DSP_SOK;
-	struct PROCESS_CONTEXT *pCtxtList = NULL;
-	struct DRV_OBJECT	     *hDRVObject;
-
-	GT_0trace(curTrace, GT_ENTER, "\n In DRV_InsertProcContext\n");
-	status = CFG_GetObject((u32 *)&hDRVObject, REG_DRV_OBJECT);
-	DBC_Assert(hDRVObject != NULL);
-	*pCtxt = MEM_Calloc(1 * sizeof(struct PROCESS_CONTEXT), MEM_PAGED);
-	GT_0trace(curTrace, GT_ENTER,
-		 "\n In DRV_InsertProcContext Calling "
-		 "DRV_GetProcCtxtList\n");
-	DRV_GetProcCtxtList(&pCtxtList, hDRVObject);
-	GT_0trace(curTrace, GT_ENTER,
-		 "\n In DRV_InsertProcContext After Calling "
-		 "DRV_GetProcCtxtList\n");
-	if (pCtxtList != NULL) {
-		GT_0trace(curTrace, GT_ENTER,
-			 "\n In DRV_InsertProcContext and pCtxt is "
-			 "not Null\n");
-		while (pCtxtList->next != NULL)
-			pCtxtList = pCtxtList->next;
-
-		pCtxtList->next = *pCtxt;
-	} else {
-		GT_0trace(curTrace, GT_ENTER,
-			 "\n In DRV_InsertProcContext and "
-			 "pCtxt is Null\n");
-		hDRVObject->procCtxtList = *pCtxt;
-	}
-	return status;
-}
-
-/* Delete a process context from process resource context list */
-DSP_STATUS DRV_RemoveProcContext(struct DRV_OBJECT *hDRVObject,
-				     HANDLE hPCtxt, HANDLE hProcess)
-{
-	DSP_STATUS status = DSP_SOK;
-	struct PROCESS_CONTEXT    *pCtxt2 = NULL;
-	struct PROCESS_CONTEXT    *pTmp = NULL;
-	struct PROCESS_CONTEXT    *pCtxtList = NULL;
-
-	DBC_Assert(hDRVObject != NULL);
-	DRV_GetProcContext((u32)hProcess, hDRVObject, &pCtxt2, NULL, 0);
-
-	GT_0trace(curTrace, GT_ENTER, "DRV_RemoveProcContext: 12");
-	DRV_GetProcCtxtList(&pCtxtList, hDRVObject);
-	GT_0trace(curTrace, GT_ENTER, "DRV_RemoveProcContext: 13");
-	pTmp = pCtxtList;
-	while ((pCtxtList != NULL) && (pCtxtList != pCtxt2)) {
-		pTmp = pCtxtList;
-		pCtxtList = pCtxtList->next;
-		GT_0trace(curTrace, GT_ENTER,
-			 "DRV_RemoveProcContext: 2");
-	}
-	GT_0trace(curTrace, GT_ENTER, "DRV_RemoveProcContext: 3");
-	if (hDRVObject->procCtxtList == pCtxt2)
-		hDRVObject->procCtxtList = pCtxt2->next;
-
-	if (pCtxtList == NULL)
-		return DSP_ENOTFOUND;
-	else if (pTmp->next != NULL)
-		pTmp->next = pTmp->next->next;
-
-	MEM_Free(pCtxt2);
-	GT_0trace(curTrace, GT_ENTER, "DRV_RemoveProcContext: 7");
-
-	return status;
-}
 
 /* Update the state of process context */
 DSP_STATUS DRV_ProcUpdatestate(HANDLE hPCtxt, enum GPP_PROC_RES_STATE status)
@@ -453,13 +268,15 @@ static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt)
 					GT_1trace(curTrace, GT_5CLASS,
 						 "Calling Node_Delete for Node:"
 						 " 0x%x\n", pNodeRes->hNode);
-					status = NODE_Delete(pNodeRes->hNode);
+					status = NODE_Delete(pNodeRes->hNode,
+							pCtxt);
 					GT_1trace(curTrace, GT_5CLASS,
 					"the status after the NodeDelete %x\n",
 					status);
 				} else if ((nState == NODE_ALLOCATED)
 					|| (nState == NODE_CREATED))
-					status = NODE_Delete(pNodeRes->hNode);
+					status = NODE_Delete(pNodeRes->hNode,
+							pCtxt);
 			}
 		}
 	}
@@ -501,8 +318,6 @@ DSP_STATUS DRV_InsertDMMResElement(HANDLE hDMMRes, HANDLE hPCtxt)
 	GT_0trace(curTrace, GT_ENTER, "DRV_InsertDMMResElement: 5");
 	return status;
 }
-
-
 
 /* Release DMM resource element context
 * This is called from Proc_UnMap. after the actual resource is freed */
@@ -571,7 +386,7 @@ DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
 		pDMMList = pDMMList->next;
 		if (pDMMRes->dmmAllocated) {
 			status = PROC_UnMap(pDMMRes->hProcessor,
-				 (void *)pDMMRes->ulDSPResAddr);
+				 (void *)pDMMRes->ulDSPResAddr, pCtxt);
 			status = PROC_UnReserveMemory(pDMMRes->hProcessor,
 				 (void *)pDMMRes->ulDSPResAddr);
 			pDMMRes->dmmAllocated = 0;
@@ -579,7 +394,6 @@ DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
 	}
 	return status;
 }
-
 
 /* Release all DMM resources and its context
 * This is called from .bridge_release. */
@@ -668,7 +482,6 @@ DSP_STATUS 	DRV_RemoveAllNodeResElements(HANDLE hPCtxt)
 }
 
 /* Getting the node resource element */
-
 DSP_STATUS DRV_GetNodeResElement(HANDLE hNode, HANDLE hNodeRes, HANDLE hPCtxt)
 {
 	struct NODE_RES_OBJECT **nodeRes = (struct NODE_RES_OBJECT **)hNodeRes;
@@ -691,8 +504,6 @@ DSP_STATUS DRV_GetNodeResElement(HANDLE hNode, HANDLE hNodeRes, HANDLE hPCtxt)
 
 	return status;
 }
-
-
 
 /* Allocate the STRM resource element
 * This is called after the actual resource is allocated
@@ -731,8 +542,6 @@ DSP_STATUS DRV_ProcInsertSTRMResElement(HANDLE hStreamHandle, HANDLE hSTRMRes,
 	return status;
 }
 
-
-
 /* Release Stream resource element context
 * This function called after the actual resource is freed
 */
@@ -761,7 +570,6 @@ DSP_STATUS 	DRV_ProcRemoveSTRMResElement(HANDLE hSTRMRes, HANDLE hPCtxt)
 	return status;
 }
 
-
 /* Actual Stream De-Allocation */
 static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
 {
@@ -786,17 +594,18 @@ static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
 			apBuffer = MEM_Alloc((pSTRMRes->uNumBufs *
 					    sizeof(u8 *)), MEM_NONPAGED);
 			status = STRM_FreeBuffer(pSTRMRes->hStream, apBuffer,
-						pSTRMRes->uNumBufs);
+						pSTRMRes->uNumBufs, pCtxt);
 			MEM_Free(apBuffer);
 		}
-		status = STRM_Close(pSTRMRes->hStream);
+		status = STRM_Close(pSTRMRes->hStream, pCtxt);
 		if (DSP_FAILED(status)) {
 			if (status == DSP_EPENDING) {
 				status = STRM_Reclaim(pSTRMRes->hStream,
 						     &pBufPtr, &ulBytes,
 						     (u32 *)&ulBufSize, &dwArg);
 				if (DSP_SUCCEEDED(status))
-					status = STRM_Close(pSTRMRes->hStream);
+					status = STRM_Close(pSTRMRes->hStream,
+							pCtxt);
 
 			}
 		}
@@ -825,7 +634,6 @@ DSP_STATUS	DRV_RemoveAllSTRMResElements(HANDLE hPCtxt)
 	pCtxt->pSTRMList = NULL;
 	return status;
 }
-
 
 /* Getting the stream resource element */
 DSP_STATUS DRV_GetSTRMResElement(HANDLE hStrm, HANDLE hSTRMRes, HANDLE hPCtxt)
@@ -861,267 +669,6 @@ DSP_STATUS DRV_ProcUpdateSTRMRes(u32 uNumBufs, HANDLE hSTRMRes, HANDLE hPCtxt)
 
 	DBC_Assert(hPCtxt != NULL);
 	(*STRMRes)->uNumBufs = uNumBufs;
-	return status;
-}
-
-/* Displaying the resources allocated by a process */
-DSP_STATUS DRV_ProcDisplayResInfo(u8 *pBuf1, u32 *pSize)
-{
-	struct PROCESS_CONTEXT *pCtxt = NULL;
-	struct NODE_RES_OBJECT *pNodeRes = NULL;
-	struct DMM_RES_OBJECT *pDMMRes = NULL;
-	struct STRM_RES_OBJECT *pSTRMRes = NULL;
-	struct DSPHEAP_RES_OBJECT *pDSPHEAPRes = NULL;
-	u32 tempCount = 1;
-	HANDLE hDrvObject = NULL;
-	void *pBuf = pBuf1;
-	u8 pTempBuf[250];
-	u32 tempStrLen = 0, tempStrLen2 = 0;
-	DSP_STATUS status = DSP_SOK;
-
-	CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	DRV_GetProcCtxtList(&pCtxt, (struct DRV_OBJECT *)hDrvObject);
-	GT_0trace(curTrace, GT_ENTER, "*********************"
-		 "DRV_ProcDisplayResourceInfo:*\n");
-	while (pCtxt != NULL) {
-		tempStrLen2 = sprintf((char *)pTempBuf,
-				     "-------------------------------------"
-				     "-----------------------------------\n");
-		tempStrLen2 += 2;
-		memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-		tempStrLen += tempStrLen2;
-		if (pCtxt->resState == PROC_RES_ALLOCATED) {
-			tempStrLen2 = sprintf((char *)pTempBuf,
-					"GPP Process Resource State: "
-					"pCtxt->resState = PROC_RES_ALLOCATED, "
-					" Process ID: %d\n", pCtxt->pid);
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-		} else {
-			tempStrLen2 = sprintf((char *)pTempBuf,
-				"GPP Resource State: pCtxt->resState"
-				" = PROC_RES_DEALLOCATED, Process ID:%d\n",
-				pCtxt->pid);
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-		}
-		pNodeRes = pCtxt->pNodeList;
-		tempCount = 1;
-		while (pNodeRes != NULL) {
-			GT_2trace(curTrace, GT_ENTER,
-				 "DRV_ProcDisplayResourceInfo: #:%d "
-				 "pCtxt->pNodeList->hNode:%x\n",
-				 tempCount, pNodeRes->hNode);
-			tempStrLen2 = sprintf((char *)pTempBuf,
-					"Node Resource Information: Node #"
-					" %d Node Handle hNode:0X%x\n",
-					tempCount, (u32)pNodeRes->hNode);
-			pNodeRes = pNodeRes->next;
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-			tempCount++;
-		}
-		tempCount = 1;
-		pDSPHEAPRes = pCtxt->pDSPHEAPList;
-		while (pDSPHEAPRes != NULL) {
-			GT_2trace(curTrace, GT_ENTER,
-				 "DRV_ProcDisplayResourceInfo: #:%d "
-				 "pCtxt->pDSPHEAPRList->ulMpuAddr:%x\n",
-				 tempCount, pDSPHEAPRes->ulMpuAddr);
-			tempStrLen2 = sprintf((char *)pTempBuf,
-				 "DSP Heap Resource Info: HEAP # %d"
-				 " Mapped GPP Address: 0x%x, size: 0x%x\n",
-				 tempCount, (u32)pDSPHEAPRes->ulMpuAddr,
-				 (u32)pDSPHEAPRes->heapSize);
-			pDSPHEAPRes = pDSPHEAPRes->next;
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-			tempCount++;
-		}
-		tempCount = 1;
-		pDMMRes = pCtxt->pDMMList;
-		while (pDMMRes != NULL) {
-			GT_2trace(curTrace, GT_ENTER,
-					"DRV_ProcDisplayResourceInfo: #:%d "
-					" pCtxt->pDMMList->ulMpuAddr:%x\n",
-					tempCount,
-					pDMMRes->ulMpuAddr);
-			tempStrLen2 = sprintf((char *)pTempBuf,
-					 "DMM Resource Info: DMM # %d Mapped"
-					 " GPP Address: 0x%x, size: 0x%x\n",
-					 tempCount, (u32)pDMMRes->ulMpuAddr,
-					 (u32)pDMMRes->dmmSize);
-			pDMMRes = pDMMRes->next;
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-			tempCount++;
-		}
-		tempCount = 1;
-		pSTRMRes = pCtxt->pSTRMList;
-		while (pSTRMRes != NULL) {
-			GT_2trace(curTrace, GT_ENTER,
-				 "DRV_ProcDisplayResourceInfo: #:%d "
-				 "pCtxt->pSTRMList->hStream:%x\n", tempCount,
-				 pSTRMRes->hStream);
-			tempStrLen2 = sprintf((char *)pTempBuf,
-					     "Stream Resource info: STRM # %d "
-					     "Stream Handle: 0x%x \n",
-					     tempCount, (u32)pSTRMRes->hStream);
-			pSTRMRes = pSTRMRes->next;
-			tempStrLen2 += 2;
-			memmove(pBuf+tempStrLen, pTempBuf, tempStrLen2);
-			tempStrLen += tempStrLen2;
-			tempCount++;
-		}
-		pCtxt = pCtxt->next;
-	}
-	*pSize = tempStrLen;
-	status = PrintProcessInformation();
-	GT_0trace(curTrace, GT_ENTER, "*********************"
-		"DRV_ProcDisplayResourceInfo:**\n");
-	return status;
-}
-
-/*
- *  ======== PrintProcessInformation ========
- *  Purpose:
- *      This function prints the Process's information stored in
- *      the process context list. Some of the information that
- *      it displays is Process's state, Node, Stream, DMM, and
- *      Heap information.
- */
-static DSP_STATUS PrintProcessInformation(void)
-{
-	struct DRV_OBJECT *hDrvObject = NULL;
-	struct PROCESS_CONTEXT *pCtxtList = NULL;
-	struct NODE_RES_OBJECT *pNodeRes = NULL;
-	struct DMM_RES_OBJECT *pDMMRes = NULL;
-	struct STRM_RES_OBJECT *pSTRMRes = NULL;
-	struct DSPHEAP_RES_OBJECT *pDSPHEAPRes = NULL;
-	DSP_STATUS status = DSP_SOK;
-	u32 tempCount;
-	u32  procID;
-
-	/* Get the Process context list */
-	CFG_GetObject((u32 *)&hDrvObject, REG_DRV_OBJECT);
-	DRV_GetProcCtxtList(&pCtxtList, hDrvObject);
-	GT_0trace(curTrace, GT_4CLASS, "\n### Debug information"
-			" for DSP bridge ##\n");
-	GT_0trace(curTrace, GT_4CLASS, " \n ###The  processes"
-			" information is as follows ### \n") ;
-	GT_0trace(curTrace, GT_4CLASS, "  ====================="
-			"============ \n");
-	/* Go through the entries in the Process context list */
-	while (pCtxtList  != NULL) {
-		GT_1trace(curTrace, GT_4CLASS, "\nThe process"
-				" id is %d\n", pCtxtList->pid);
-		GT_0trace(curTrace, GT_4CLASS, " -------------------"
-				"---------\n");
-		if (pCtxtList->resState == PROC_RES_ALLOCATED) {
-			GT_0trace(curTrace, GT_4CLASS, " \nThe Process"
-					" is in Allocated state\n");
-		} else {
-			GT_0trace(curTrace, GT_4CLASS, "\nThe Process"
-					" is in DeAllocated state\n");
-		}
-		GT_1trace(curTrace, GT_4CLASS, "\nThe  hProcessor"
-				" handle is: 0X%x\n",
-				(u32)pCtxtList->hProcessor);
-		if (pCtxtList->hProcessor != NULL) {
-			PROC_GetProcessorId(pCtxtList->hProcessor, &procID);
-			if (procID == DSP_UNIT) {
-				GT_0trace(curTrace, GT_4CLASS,
-					"\nProcess connected to"
-					" DSP Processor\n");
-			} else if (procID == IVA_UNIT) {
-				GT_0trace(curTrace, GT_4CLASS,
-					"\nProcess connected to"
-					" IVA Processor\n");
-			} else {
-				GT_0trace(curTrace, GT_7CLASS,
-					"\n***ERROR:Invalid Processor Id***\n");
-			}
-		}
-		pNodeRes = pCtxtList->pNodeList;
-		tempCount = 1;
-		while (pNodeRes != NULL) {
-			if (tempCount == 1)
-				GT_0trace(curTrace, GT_4CLASS,
-					"\n***The Nodes allocated by"
-					" this Process are***\n");
-			GT_2trace(curTrace, GT_4CLASS,
-					"Node # %d Node Handle hNode:0x%x\n",
-					tempCount, (u32)pNodeRes->hNode);
-			pNodeRes = pNodeRes->next;
-			tempCount++;
-		}
-		if (tempCount == 1)
-			GT_0trace(curTrace, GT_4CLASS,
-					"\n ***There are no Nodes"
-					" allocated by this Process***\n");
-		tempCount = 1;
-		pDSPHEAPRes = pCtxtList->pDSPHEAPList;
-		while (pDSPHEAPRes != NULL) {
-			if (tempCount == 1)
-				GT_0trace(curTrace, GT_4CLASS,
-						"\n***The Heaps allocated by"
-						" this Process are***\n");
-			GT_3trace(curTrace, GT_4CLASS,
-				"DSP Heap Resource Info: HEAP # %d "
-				"Mapped GPP Address:0x%x, Size: 0x%lx\n",
-				tempCount, (u32)pDSPHEAPRes->ulMpuAddr,
-				pDSPHEAPRes->heapSize);
-			pDSPHEAPRes = pDSPHEAPRes->next;
-			tempCount++;
-		}
-		if (tempCount == 1)
-			GT_0trace(curTrace, GT_4CLASS,
-				"\n ***There are no Heaps allocated"
-				" by this Process***\n");
-		tempCount = 1;
-		pDMMRes = pCtxtList->pDMMList;
-		while (pDMMRes != NULL) {
-			if (tempCount == 1)
-				GT_0trace(curTrace, GT_4CLASS,
-					"\n ***The DMM resources allocated by"
-					" this Process are***\n");
-			GT_3trace(curTrace, GT_4CLASS,
-				"DMM Resource Info: DMM # %d "
-				"Mapped GPP Address:0X%lx, Size: 0X%lx\n",
-				tempCount, pDMMRes->ulMpuAddr,
-				pDMMRes->dmmSize);
-			pDMMRes = pDMMRes->next;
-			tempCount++;
-		}
-		if (tempCount == 1)
-			GT_0trace(curTrace, GT_4CLASS,
-				"\n ***There are no DMM resources"
-				" allocated by this Process***\n");
-		tempCount = 1;
-		pSTRMRes = pCtxtList->pSTRMList;
-		while (pSTRMRes != NULL) {
-			if (tempCount == 1)
-				GT_0trace(curTrace, GT_4CLASS,
-					"\n***The Stream resources allocated by"
-					" this Process are***\n");
-			GT_2trace(curTrace, GT_4CLASS,
-				"Stream Resource info: STRM # %d"
-				"Stream Handle:0X%x\n",	tempCount,
-				(u32)pSTRMRes->hStream);
-			pSTRMRes = pSTRMRes->next;
-			tempCount++;
-		}
-		if (tempCount == 1)
-			GT_0trace(curTrace, GT_4CLASS,
-				"\n ***There are no Stream resources"
-				"allocated by this Process***\n");
-		pCtxtList = pCtxtList->next;
-	}
 	return status;
 }
 
@@ -1582,6 +1129,10 @@ DSP_STATUS DRV_ReleaseResources(u32 dwContext, struct DRV_OBJECT *hDrvObject)
 	for (pszdevNode = (struct DRV_EXT *)DRV_GetFirstDevExtension();
 	    pszdevNode != NULL; pszdevNode = (struct DRV_EXT *)
 	    DRV_GetNextDevExtension((u32)pszdevNode)) {
+		if (!pDRVObject->devNodeString) {
+			/* When this could happen? */
+			continue;
+		}
 		if ((u32)pszdevNode == dwContext) {
 			/* Found it */
 			/* Delete from the Driver object list */
@@ -1622,20 +1173,20 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 		/* Releasing resources by deleting the registry key  */
 		dwBuffSize = sizeof(struct CFG_HOSTRES);
 		pResources = MEM_Calloc(dwBuffSize, MEM_NONPAGED);
-		if (DSP_FAILED(REG_GetValue(NULL, (char *)driverExt->szString,
-		   CURRENTCONFIG, (u8 *)pResources, &dwBuffSize))) {
-			status = CFG_E_RESOURCENOTAVAIL;
-			GT_0trace(curTrace, GT_1CLASS,
-				 "REG_GetValue Failed \n");
-		} else {
-			GT_0trace(curTrace, GT_1CLASS,
-				 "REG_GetValue Succeeded \n");
-		}
-
 		if (pResources != NULL) {
+			if (DSP_FAILED(REG_GetValue(CURRENTCONFIG,
+					(u8 *)pResources, &dwBuffSize))) {
+				status = CFG_E_RESOURCENOTAVAIL;
+				GT_0trace(curTrace, GT_1CLASS,
+					 "REG_GetValue Failed \n");
+			} else {
+				GT_0trace(curTrace, GT_1CLASS,
+					 "REG_GetValue Succeeded \n");
+			}
+
 			dwBuffSize = sizeof(shm_size);
-			status = REG_GetValue(NULL, CURRENTCONFIG, SHMSIZE,
-				(u8 *)&shm_size, &dwBuffSize);
+			status = REG_GetValue(SHMSIZE, (u8 *)&shm_size,
+					      &dwBuffSize);
 			if (DSP_SUCCEEDED(status)) {
 				if ((pResources->dwMemBase[1]) &&
 				   (pResources->dwMemPhys[1])) {
@@ -1692,11 +1243,12 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 			pResources->dwDmmuBase = NULL;
 
 			dwBuffSize = sizeof(struct CFG_HOSTRES);
-			status = REG_SetValue(NULL, (char *)driverExt->szString,
-				 CURRENTCONFIG, REG_BINARY, (u8 *)pResources,
+			status = REG_SetValue(CURRENTCONFIG, (u8 *)pResources,
 				 (u32)dwBuffSize);
 			/*  Set all the other entries to NULL */
 			MEM_Free(pResources);
+		} else {
+			status = DSP_EMEMORY;
 		}
 		GT_0trace(curTrace, GT_ENTER, " <- RequestBridgeResources \n");
 		return status;
@@ -1744,10 +1296,8 @@ static DSP_STATUS RequestBridgeResources(u32 dwContext, s32 bRequest)
 			pResources->dwNumChnls = CHNL_MAXCHANNELS;
 			pResources->dwChnlBufSize = 0x400;
 			dwBuffSize = sizeof(struct CFG_HOSTRES);
-			status = REG_SetValue(NULL, (char *) dwContext,
-					     CURRENTCONFIG, REG_BINARY,
-					     (u8 *)pResources,
-					     sizeof(struct CFG_HOSTRES));
+			status = REG_SetValue(CURRENTCONFIG, (u8 *)pResources,
+						sizeof(struct CFG_HOSTRES));
 			if (DSP_SUCCEEDED(status)) {
 				GT_0trace(curTrace, GT_1CLASS,
 					 " Successfully set the registry "
@@ -1808,7 +1358,7 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 bRequest)
 							OMAP_DSP_MEM3_SIZE);
 		pResources->dwPerBase = ioremap(OMAP_PER_CM_BASE,
 							OMAP_PER_CM_SIZE);
-               pResources->dwPerPmBase = (u32)ioremap(OMAP_PER_PRM_BASE,
+               pResources->dwPerPmBase = ioremap(OMAP_PER_PRM_BASE,
                                                        OMAP_PER_PRM_SIZE);
                pResources->dwCorePmBase = (u32)ioremap(OMAP_CORE_PRM_BASE,
                                                        OMAP_CORE_PRM_SIZE);
@@ -1837,8 +1387,7 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 bRequest)
 		GT_1trace(curTrace, GT_2CLASS, "dwDmmuBase 0x%x\n",
 						pResources->dwDmmuBase);
 		dwBuffSize = sizeof(shm_size);
-		status = REG_GetValue(NULL, CURRENTCONFIG, SHMSIZE,
-				     (u8 *)&shm_size, &dwBuffSize);
+		status = REG_GetValue(SHMSIZE, (u8 *)&shm_size, &dwBuffSize);
 		if (DSP_SUCCEEDED(status)) {
 			/* Allocate Physically contiguous,
 			 * non-cacheable  memory */
@@ -1870,9 +1419,7 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 bRequest)
 			pResources->dwNumChnls = CHNL_MAXCHANNELS;
 			pResources->dwChnlBufSize = 0x400;
 			dwBuffSize = sizeof(struct CFG_HOSTRES);
-			status = REG_SetValue(NULL, (char *)dwContext,
-					     CURRENTCONFIG, REG_BINARY,
-					     (u8 *)pResources,
+			status = REG_SetValue(CURRENTCONFIG, (u8 *)pResources,
 					     sizeof(struct CFG_HOSTRES));
 			if (DSP_SUCCEEDED(status)) {
 				GT_0trace(curTrace, GT_1CLASS,
