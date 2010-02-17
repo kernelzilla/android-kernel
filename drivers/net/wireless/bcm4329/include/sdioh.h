@@ -2,7 +2,7 @@
  * SDIO Host Controller Spec header file
  * Register map and definitions for the Standard Host Controller
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: sdioh.h,v 13.13.18.1.16.2 2009/07/28 17:54:46 Exp $
+ * $Id: sdioh.h,v 13.13.18.1.16.3 2009/12/08 22:34:21 Exp $
  */
 
 #ifndef	_SDIOH_H
@@ -64,6 +64,7 @@
 #define SD_Capabilities_Reserved	0x044
 #define SD_MaxCurCap			0x048
 #define SD_MaxCurCap_Reserved		0x04C
+#define SD_ADMA_SysAddr			0x58
 #define SD_SlotInterruptStatus		0x0FC
 #define SD_HostControllerVersion 	0x0FE
 
@@ -81,6 +82,8 @@
 #define CAP_MAXBLOCK_S		16
 #define CAP_ADMA2_M		BITFIELD_MASK(1)
 #define CAP_ADMA2_S		19
+#define CAP_ADMA1_M		BITFIELD_MASK(1)
+#define CAP_ADMA1_S		20
 #define CAP_HIGHSPEED_M		BITFIELD_MASK(1)
 #define CAP_HIGHSPEED_S		21
 #define CAP_DMA_M		BITFIELD_MASK(1)
@@ -191,6 +194,8 @@
 #define HOST_DATA_WIDTH_M	BITFIELD_MASK(1)	/* Bit 1	4 bit enable */
 #define HOST_DATA_WIDTH_S	1
 #define HOST_HI_SPEED_EN_M	BITFIELD_MASK(1)	/* Bit 2	High speed vs low speed */
+#define HOST_DMA_SEL_S		3
+#define HOST_DMA_SEL_M		BITFIELD_MASK(2)	/* Bit 4:3	DMA Select */
 #define HOST_HI_SPEED_EN_S	2
 
 /* misc defines */

@@ -2,7 +2,7 @@
  * Misc utility routines for accessing chip-specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils.c,v 1.662.4.4.4.16.4.25 2009/09/22 13:32:03 Exp $
+ * $Id: siutils.c,v 1.662.4.4.4.16.4.26 2010/02/01 05:51:56 Exp $
  */
 
 #include <typedefs.h>
@@ -1036,7 +1036,7 @@ si_sdio_init(si_t *sih)
 			sdpregs = (sdpcmd_regs_t *)si_setcore(sih, SDIOD_CORE_ID, 0);
 		ASSERT(sdpregs);
 
-		SI_MSG(("si_sdio_init: For PCMCIA/SDIO Corerev %d, enable ints from core %d " \
+		SI_MSG(("si_sdio_init: For PCMCIA/SDIO Corerev %d, enable ints from core %d "
 		        "through SD core %d (%p)\n",
 		        sih->buscorerev, idx, sii->curidx, sdpregs));
 

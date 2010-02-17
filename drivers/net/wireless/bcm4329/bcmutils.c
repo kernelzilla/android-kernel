@@ -1,7 +1,7 @@
 /*
  * Driver O/S-independent utility routines
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -20,7 +20,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmutils.c,v 1.210.4.5.2.4.6.16 2009/10/28 18:25:42 Exp $
+ * $Id: bcmutils.c,v 1.210.4.5.2.4.6.17 2009/11/17 02:20:12 Exp $
  */
 
 #include <typedefs.h>
@@ -33,6 +33,11 @@
 #else
 #include <stdio.h>
 #include <string.h>
+/* This case for external supplicant use */
+#if defined(BCMEXTSUP)
+#include <bcm_osl.h>
+#endif
+
 #endif /* BCMDRIVER */
 #include <bcmendian.h>
 #include <bcmdevs.h>

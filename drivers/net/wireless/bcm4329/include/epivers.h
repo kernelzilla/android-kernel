@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -31,18 +31,18 @@
 
 #define	EPI_MINOR_VERSION	218
 
-#define	EPI_RC_NUMBER		161
+#define	EPI_RC_NUMBER		198
 
 #define	EPI_INCREMENTAL_NUMBER	0
 
 #define	EPI_BUILD_NUMBER	0
 
-#define	EPI_VERSION		4, 218, 161, 0
+#define	EPI_VERSION		4, 218, 198, 0
 
-#define	EPI_VERSION_NUM		0x04daa100
+#define	EPI_VERSION_NUM		0x04dac600
 
 
-#define	EPI_VERSION_STR		"4.218.161.0"
-#define	EPI_ROUTER_VERSION_STR	"4.219.161.0"
+#define	EPI_VERSION_STR		"4.218.198.0"
+#define	EPI_ROUTER_VERSION_STR	"4.219.198.0"
 
 #endif 

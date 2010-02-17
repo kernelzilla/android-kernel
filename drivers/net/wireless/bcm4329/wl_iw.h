@@ -1,7 +1,7 @@
 /*
  * Linux Wireless Extensions support
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.h,v 1.5.34.1.6.9 2009/10/14 04:27:31 Exp $
+ * $Id: wl_iw.h,v 1.5.34.1.6.11 2010/01/19 02:15:09 Exp $
  */
 
 
@@ -58,6 +58,11 @@
 #define          G_WLAN_SET_ON	0
 #define          G_WLAN_SET_OFF	1
 
+#define CHECK_EXTRA_FOR_NULL(extra) \
+if (!extra) { \
+	WL_ERROR(("%s: error : extra is null pointer\n", __FUNCTION__)); \
+	return -EINVAL; \
+}
 
 typedef struct wl_iw {
 	char nickname[IW_ESSID_MAX_SIZE];
@@ -106,6 +111,12 @@ typedef struct wl_iw_ss_cache_ctrl {
 	uint m_cons_br_scan_cnt;	
 	struct timer_list *m_timer;	
 } wl_iw_ss_cache_ctrl_t;
+typedef enum broadcast_first_scan {
+	BROADCAST_SCAN_FIRST_IDLE = 0,
+	BROADCAST_SCAN_FIRST_STARTED,
+	BROADCAST_SCAN_FIRST_RESULT_READY,
+	BROADCAST_SCAN_FIRST_RESULT_CONSUMED
+} broadcast_first_scan_t;
 
 
 #if WIRELESS_EXT > 12

@@ -3,7 +3,7 @@
  * This header file housing the define and function prototype use by
  * both the wl driver, tools & Apps.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmwifi.h,v 1.15.30.1 2009/08/15 00:51:27 Exp $
+ * $Id: bcmwifi.h,v 1.15.30.3 2010/02/09 13:23:22 Exp $
  */
 
 
@@ -39,6 +39,7 @@ typedef uint16 chanspec_t;
 #define CH_EWA_VALID			0x04
 #define CH_20MHZ_APART			4
 #define CH_10MHZ_APART			2
+#define CH_5MHZ_APART			1
 #define CH_MAX_2G_CHANNEL		14	
 #define WLC_MAX_2G_CHANNEL		CH_MAX_2G_CHANNEL 
 #define	MAXCHANNEL		224	
@@ -113,7 +114,9 @@ typedef uint16 chanspec_t;
 #define CHSPEC_SB_NONE(chspec)	((chspec & WL_CHANSPEC_CTL_SB_MASK) == WL_CHANSPEC_CTL_SB_NONE)
 #define CHSPEC_SB_UPPER(chspec)	((chspec & WL_CHANSPEC_CTL_SB_MASK) == WL_CHANSPEC_CTL_SB_UPPER)
 #define CHSPEC_SB_LOWER(chspec)	((chspec & WL_CHANSPEC_CTL_SB_MASK) == WL_CHANSPEC_CTL_SB_LOWER)
-
+#define CHSPEC_CTL_CHAN(chspec)  ((CHSPEC_SB_LOWER(chspec)) ? \
+				  (LOWER_20_SB(((chspec) & WL_CHANSPEC_CHAN_MASK))) : \
+				  (UPPER_20_SB(((chspec) & WL_CHANSPEC_CHAN_MASK))))
 #define CHANSPEC_STR_LEN    8
 
 

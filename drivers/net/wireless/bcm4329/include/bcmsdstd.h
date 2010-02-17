@@ -1,7 +1,7 @@
 /*
  *  'Standard' SDIO HOST CONTROLLER driver
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,17 +21,18 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdstd.h,v 13.16.18.1.16.2 2008/09/30 17:14:16 Exp $
+ * $Id: bcmsdstd.h,v 13.16.18.1.16.3 2009/12/10 01:09:23 Exp $
  */
 
 /* global msglevel for debug messages - bitvals come from sdiovar.h */
 
-#define sd_err(x)
+#define sd_err(x)	do { if (sd_msglevel & SDH_ERROR_VAL) printf x; } while (0)
 #define sd_trace(x)
 #define sd_info(x)
 #define sd_debug(x)
 #define sd_data(x)
 #define sd_ctrl(x)
+#define sd_dma(x)
 
 #define sd_sync_dma(sd, read, nbytes)
 #define sd_init_dma(sd)
@@ -78,8 +79,6 @@ extern void sdstd_osfree(sdioh_info_t *sd);
 #define RETRIES_LARGE 100000
 #define RETRIES_SMALL 100
 
-#define USE_PIO			0x0	/* DMA or PIO */
-#define USE_DMA			0x1
 
 #define USE_BLOCKMODE		0x2	/* Block mode can be single block or multi */
 #define USE_MULTIBLOCK		0x4
@@ -115,7 +114,6 @@ struct sdioh_info {
 	bool 		card_init_done;		/* Client SDIO interface initted */
 	bool 		polled_mode;		/* polling for command completion */
 
-	bool		sd_use_dma;		/* DMA on CMD53 */
 	bool 		sd_blockmode;		/* sd_blockmode == FALSE => 64 Byte Cmd 53s. */
 						/*  Must be on for sd_multiblock to be effective */
 	bool 		use_client_ints;	/* If this is false, make sure to restore */
@@ -125,16 +123,63 @@ struct sdioh_info {
 	int 		client_block_size[SDIOD_MAX_IOFUNCS];		/* Blocksize */
 	uint32 		data_xfer_count;	/* Current transfer */
 	uint16 		card_rca;		/* Current Address */
+	int8		sd_dma_mode;		/* DMA Mode (PIO, SDMA, ... ADMA2) on CMD53 */
 	uint8 		num_funcs;		/* Supported funcs on client */
 	uint32 		com_cis_ptr;
 	uint32 		func_cis_ptr[SDIOD_MAX_IOFUNCS];
-	void		*dma_buf;
-	ulong		dma_phys;
+	void		*dma_buf;		/* DMA Buffer virtual address */
+	ulong		dma_phys;		/* DMA Buffer physical address */
+	void		*adma2_dscr_buf;	/* ADMA2 Descriptor Buffer virtual address */
+	ulong		adma2_dscr_phys;	/* ADMA2 Descriptor Buffer physical address */
+
+	/* adjustments needed to make the dma align properly */
+	void		*dma_start_buf;
+	ulong		dma_start_phys;
+	uint		alloced_dma_size;
+	void		*adma2_dscr_start_buf;
+	ulong		adma2_dscr_start_phys;
+	uint		alloced_adma2_dscr_size;
+
 	int 		r_cnt;			/* rx count */
 	int 		t_cnt;			/* tx_count */
 	bool		got_hcint;		/* local interrupt flag */
 	uint16		last_intrstatus;	/* to cache intrstatus */
 };
+
+#define DMA_MODE_NONE	0
+#define DMA_MODE_SDMA	1
+#define DMA_MODE_ADMA1	2
+#define DMA_MODE_ADMA2	3
+#define DMA_MODE_ADMA2_64 4
+#define DMA_MODE_AUTO	-1
+
+#define USE_DMA(sd)		((bool)((sd->sd_dma_mode > 0) ? TRUE : FALSE))
+
+/* SDIO Host Control Register DMA Mode Definitions */
+#define SDIOH_SDMA_MODE			0
+#define SDIOH_ADMA1_MODE		1
+#define SDIOH_ADMA2_MODE		2
+#define SDIOH_ADMA2_64_MODE		3
+
+#define ADMA2_ATTRIBUTE_VALID		(1 << 0)	/* ADMA Descriptor line valid */
+#define ADMA2_ATTRIBUTE_END			(1 << 1)	/* End of Descriptor */
+#define ADMA2_ATTRIBUTE_INT			(1 << 2)	/* Interrupt when line is done */
+#define ADMA2_ATTRIBUTE_ACT_NOP		(0 << 4)	/* Skip current line, go to next. */
+#define ADMA2_ATTRIBUTE_ACT_RSV		(1 << 4)	/* Same as NOP */
+#define ADMA1_ATTRIBUTE_ACT_SET		(1 << 4)	/* ADMA1 Only - set transfer length */
+#define ADMA2_ATTRIBUTE_ACT_TRAN	(2 << 4)	/* Transfer Data of one descriptor line. */
+#define ADMA2_ATTRIBUTE_ACT_LINK	(3 << 4)	/* Link Descriptor */
+
+/* ADMA2 Descriptor Table Entry for 32-bit Address */
+typedef struct adma2_dscr_32b {
+	uint32 len_attr;
+	uint32 phys_addr;
+} adma2_dscr_32b_t;
+
+/* ADMA1 Descriptor Table Entry */
+typedef struct adma1_dscr {
+	uint32 phys_addr_attr;
+} adma1_dscr_t;
 
 /************************************************************
  * Internal interfaces: per-port references into bcmsdstd.c

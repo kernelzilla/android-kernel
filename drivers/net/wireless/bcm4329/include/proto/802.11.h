@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  *
  * Fundamental types and constants relating to 802.11
  *
- * $Id: 802.11.h,v 9.219.4.1.4.5.6.10 2009/07/09 10:15:09 Exp $
+ * $Id: 802.11.h,v 9.219.4.1.4.5.6.11 2010/02/09 13:23:26 Exp $
  */
 
 
@@ -361,14 +361,24 @@ BWL_PRE_PACKED_STRUCT struct dot11_action_switch_channel {
 	dot11_brcm_extch_ie_t extch_ie;		
 } BWL_POST_PACKED_STRUCT;
 
-
-BWL_PRE_PACKED_STRUCT struct dot11_ext_csa {
-	uint8 id;	
-	uint8 len;	
+BWL_PRE_PACKED_STRUCT struct dot11_csa_body {
 	uint8 mode;	
 	uint8 reg;	
 	uint8 channel;	
 	uint8 count;	
+} BWL_POST_PACKED_STRUCT;
+
+
+BWL_PRE_PACKED_STRUCT struct dot11_ext_csa {
+	uint8 id;	
+	uint8 len;	
+	struct dot11_csa_body b; 
+} BWL_POST_PACKED_STRUCT;
+
+BWL_PRE_PACKED_STRUCT struct dot11y_action_ext_csa {
+	uint8	category;
+	uint8	action;
+	struct dot11_csa_body b;	
 } BWL_POST_PACKED_STRUCT;
 typedef struct dot11_ext_csa dot11_ext_csa_ie_t;
 #define DOT11_EXT_CSA_IE_LEN	4	
@@ -1025,7 +1035,8 @@ BWL_PRE_PACKED_STRUCT struct dot11_management_notification {
 #define DOT11_ACTION_ID_HT_MIMO_PS	1	
 
 
-#define DOT11_ACTION_ID_BSS_COEX_MNG	0	
+#define DOT11_PUB_ACTION_BSS_COEX_MNG	0	
+#define DOT11_PUB_ACTION_CHANNEL_SWITCH	4	
 
 
 #define DOT11_BA_ACTION_ADDBA_REQ	0	

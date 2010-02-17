@@ -1,7 +1,7 @@
 /*
  * DHD Protocol Module for CDC and BDC.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_cdc.c,v 1.22.4.2.4.7.2.30 2009/10/28 21:38:04 Exp $
+ * $Id: dhd_cdc.c,v 1.22.4.2.4.7.2.34 2010/01/21 22:08:34 Exp $
  *
  * BDC is like CDC, except it includes a header for data packets to convey
  * packet priority over the bus, and flags (e.g. to indicate checksum status
@@ -141,9 +141,9 @@ dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len)
 
 	msg->cmd = htol32(cmd);
 	msg->len = htol32(len);
-	flags = (++prot->reqid << CDCF_IOC_ID_SHIFT);
-	msg->flags = htol32(flags);
+	msg->flags = (++prot->reqid << CDCF_IOC_ID_SHIFT);
 	CDC_SET_IF_IDX(msg, ifidx);
+	msg->flags = htol32(msg->flags);
 
 	if (buf)
 		memcpy(prot->buf, buf, len);
@@ -208,9 +208,9 @@ dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len)
 
 	msg->cmd = htol32(cmd);
 	msg->len = htol32(len);
-	flags = (++prot->reqid << CDCF_IOC_ID_SHIFT) | CDCF_IOC_SET;
-	msg->flags |= htol32(flags);
+	msg->flags = (++prot->reqid << CDCF_IOC_ID_SHIFT) | CDCF_IOC_SET;
 	CDC_SET_IF_IDX(msg, ifidx);
+	msg->flags |= htol32(msg->flags);
 
 	if (buf)
 		memcpy(prot->buf, buf, len);
@@ -288,7 +288,6 @@ dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 		ret = 0;
 	else {
 		cdc_ioctl_t *msg = &prot->msg;
-		CDC_SET_IF_IDX(msg, ifidx);
 		ioc->needed = ltoh32(msg->len); /* len == needed when set/query fails from dongle */
 	}
 
@@ -634,7 +633,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	if ((ret = dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
 		DHD_ERROR(("%s: can't get MAC address , error=%d\n", __FUNCTION__, ret));
 		dhd_os_proto_unblock(dhd);
-		return -BCME_NOTUP;
+		return BCME_NOTUP;
 	}
 	memcpy(dhd->mac.octet, iovbuf, ETHER_ADDR_LEN);
 
@@ -737,7 +736,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		(char *) &pkt_filterp->u.pattern.mask_and_pattern[mask_size]));
 
 	if (mask_size != pattern_size) {
-		printk("Mask and pattern not the same size\n");
+		DHD_ERROR(("Mask and pattern not the same size\n"));
 		dhd_os_proto_unblock(dhd);
 		return -EINVAL;
 	}

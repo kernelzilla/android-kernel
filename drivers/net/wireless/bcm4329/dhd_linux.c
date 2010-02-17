@@ -2,7 +2,7 @@
  * Broadcom Dongle Host Driver (DHD), Linux-specific network interface
  * Basically selected code segments from usb-cdc.c and usb-rndis.c
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.46 2009/10/28 10:35:11 Exp $
+ * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.57 2010/02/02 03:31:53 Exp $
  */
 
 #ifdef CONFIG_WIFI_CONTROL_FUNC
@@ -314,6 +314,10 @@ module_param(dhd_dpc_prio, int, 0);
 /* DPC thread priority, -1 to use tasklet */
 extern int dhd_dongle_memsize;
 module_param(dhd_dongle_memsize, int, 0);
+
+/* Network inteface name */
+char iface_name[IFNAMSIZ];
+module_param_string(iface_name, iface_name, IFNAMSIZ, 0);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
 #define DAEMONIZE(a) daemonize(a); \
@@ -1744,6 +1748,18 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	memcpy(netdev_priv(net), &dhd, sizeof(dhd));
 	dhd->pub.osh = osh;
 
+	/* Set network interface name if it was provided as module parameter */
+	if (iface_name[0]) {
+		int len;
+		char ch;
+		strncpy(net->name, iface_name, IFNAMSIZ);
+		net->name[IFNAMSIZ - 1] = 0;
+		len = strlen(net->name);
+		ch = net->name[len - 1];
+		if ((ch > '9' || ch < '0') && (len < IFNAMSIZ - 2))
+			strcat(net->name, "%d");
+	}
+
 	if (dhd_add_if(dhd, 0, (void *)net, net->name, NULL, 0, 0) == DHD_BAD_IF)
 		goto fail;
 
@@ -2034,8 +2050,9 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 	printf("%s: Broadcom Dongle Host Driver mac=%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", net->name,
 	       dhd->pub.mac.octet[0], dhd->pub.mac.octet[1], dhd->pub.mac.octet[2],
 	       dhd->pub.mac.octet[3], dhd->pub.mac.octet[4], dhd->pub.mac.octet[5]);
+	wl_iw_iscan_set_scan_broadcast_prep(net, 1);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && 1
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
 	up(&dhd_registration_sem);
 #endif 
 	return 0;
@@ -2331,17 +2348,8 @@ dhd_os_wd_timer(void *bus, uint wdtick)
 {
 	dhd_pub_t *pub = bus;
 	dhd_info_t *dhd = (dhd_info_t *)pub->info;
-
-#if !defined(CONTINUOUS_WATCHDOG)
 	static uint save_dhd_watchdog_ms = 0;
-#endif /* !defined(CONTINUOUS_WATCHDOG) */
 
-#if defined(CONTINUOUS_WATCHDOG)
-	dhd_watchdog_ms = (uint)wdtick;
-	mod_timer(&dhd->timer, jiffies + dhd_watchdog_ms * HZ / 1000);
-
-	dhd->wd_timer_valid = TRUE;
-#else
 	/* Totally stop the timer */
 	if (!wdtick && dhd->wd_timer_valid == TRUE) {
 		del_timer_sync(&dhd->timer);
@@ -2359,7 +2367,6 @@ dhd_os_wd_timer(void *bus, uint wdtick)
 		dhd->wd_timer_valid = TRUE;
 		save_dhd_watchdog_ms = wdtick;
 	}
-#endif /* defined(CONTINUTOUS_WATCHDOG) */
 }
 
 void *

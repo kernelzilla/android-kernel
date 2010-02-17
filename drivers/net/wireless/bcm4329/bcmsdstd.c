@@ -1,7 +1,7 @@
 /*
  *  'Standard' SDIO HOST CONTROLLER driver
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdstd.c,v 1.64.4.1.4.4.2.14 2009/10/08 20:05:30 Exp $
+ * $Id: bcmsdstd.c,v 1.64.4.1.4.4.2.16 2010/01/15 01:44:34 Exp $
  */
 
 #include <typedefs.h>
@@ -38,7 +38,8 @@
 #include <pcicfg.h>
 
 
-#define SD_PAGE 4096
+#define SD_PAGE_BITS	12
+#define SD_PAGE 	(1 << SD_PAGE_BITS)
 
 #include <bcmsdstd.h>
 
@@ -58,16 +59,21 @@ uint sd_divisor = 2;			/* Default 48MHz/2 = 24MHz */
 
 uint sd_power = 1;		/* Default to SD Slot powered ON */
 uint sd_clock = 1;		/* Default to SD Clock turned ON */
+uint8 sd_dma_mode = DMA_MODE_SDMA; /* Default to SDMA for now */
+uint sd_pci_slot = 0xFFFFffff; /* Used to force selection of a particular PCI slot */
 
 uint sd_toctl = 7;
 
 static bool trap_errs = FALSE;
+
+static const char *dma_mode_description[] = { "PIO", "SDMA", "ADMA1", "32b ADMA2", "64b ADMA2" };
 
 /* Prototypes */
 static bool sdstd_start_clock(sdioh_info_t *sd, uint16 divisor);
 static bool sdstd_start_power(sdioh_info_t *sd);
 static bool sdstd_bus_width(sdioh_info_t *sd, int width);
 static int sdstd_set_highspeed_mode(sdioh_info_t *sd, bool HSMode);
+static int sdstd_set_dma_mode(sdioh_info_t *sd, int8 dma_mode);
 static int sdstd_card_enablefuncs(sdioh_info_t *sd);
 static void sdstd_cmd_getrsp(sdioh_info_t *sd, uint32 *rsp_buffer, int count);
 static int sdstd_cmd_issue(sdioh_info_t *sd, bool use_dma, uint32 cmd, uint32 arg);
@@ -84,6 +90,14 @@ static int sdstd_check_errs(sdioh_info_t *sdioh_info, uint32 cmd, uint32 arg);
 static int set_client_block_size(sdioh_info_t *sd, int func, int blocksize);
 static void sd_map_dma(sdioh_info_t * sd);
 static void sd_unmap_dma(sdioh_info_t * sd);
+static void sd_clear_adma_dscr_buf(sdioh_info_t *sd);
+static void sd_fill_dma_data_buf(sdioh_info_t *sd, uint8 data);
+static void sd_create_adma_descriptor(sdioh_info_t *sd,
+                                      uint32 index, uint32 addr_phys,
+                                      uint16 length, uint16 flags);
+static void sd_dump_adma_dscr(sdioh_info_t *sd);
+static void sdstd_dumpregs(sdioh_info_t *sd);
+
 
 /*
  * Private register access routines.
@@ -205,15 +219,10 @@ sdioh_attach(osl_t *osh, void *bar0, uint irq)
 	/* Set defaults */
 	sd->sd_blockmode = TRUE;
 	sd->use_client_ints = TRUE;
-	sd->sd_use_dma = TRUE;
+	sd->sd_dma_mode = sd_dma_mode;
 
 	if (!sd->sd_blockmode)
-		sd->sd_use_dma = 0;
-
-	if (sd->sd_use_dma) {
-		OSL_DMADDRWIDTH(osh, 32);
-		sd_map_dma(sd);
-	}
+		sd->sd_dma_mode = DMA_MODE_NONE;
 
 	if (sdstd_driver_init(sd) != SUCCESS) {
 		/* If host CPU was reset without resetting SD bus or
@@ -233,6 +242,11 @@ sdioh_attach(osl_t *osh, void *bar0, uint irq)
 			return (NULL);
 		}
 	}
+
+	OSL_DMADDRWIDTH(osh, 32);
+
+	/* Always map DMA buffers, so we can switch between DMA modes. */
+	sd_map_dma(sd);
 
 	if (sdstd_register_irq(sd, irq) != SUCCESS) {
 		sd_err(("%s: sdstd_register_irq() failed for irq = %d\n", __FUNCTION__, irq));
@@ -344,7 +358,7 @@ const bcm_iovar_t sdioh_iovars[] = {
 	{"sd_msglevel",	IOV_MSGLEVEL, 	0,	IOVT_UINT32,	0 },
 	{"sd_blockmode", IOV_BLOCKMODE,	0,	IOVT_BOOL,	0 },
 	{"sd_blocksize", IOV_BLOCKSIZE, 0,	IOVT_UINT32,	0 }, /* ((fn << 16) | size) */
-	{"sd_dma",	IOV_DMA,	0,	IOVT_BOOL,	0 },
+	{"sd_dma",	IOV_DMA,	0,	IOVT_UINT32,	0 },
 #ifdef BCMSDYIELD
 	{"sd_yieldcpu",	IOV_YIELDCPU,	0,	IOVT_BOOL,	0 },
 	{"sd_minyield",	IOV_MINYIELD,	0,	IOVT_UINT32,	0 },
@@ -429,7 +443,7 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		si->sd_blockmode = (bool)int_val;
 		/* Haven't figured out how to make non-block mode with DMA */
 		if (!si->sd_blockmode)
-			si->sd_use_dma = 0;
+			si->sd_dma_mode = DMA_MODE_NONE;
 		break;
 
 #ifdef BCMSDYIELD
@@ -503,12 +517,13 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 	}
 
 	case IOV_GVAL(IOV_DMA):
-		int_val = (int32)si->sd_use_dma;
+		int_val = (int32)si->sd_dma_mode;
 		bcopy(&int_val, arg, val_size);
 		break;
 
 	case IOV_SVAL(IOV_DMA):
-		si->sd_use_dma = (bool)int_val;
+		si->sd_dma_mode = (char)int_val;
+		sdstd_set_dma_mode(si, si->sd_dma_mode);
 		break;
 
 	case IOV_GVAL(IOV_USEINTS):
@@ -764,7 +779,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 	cmd_arg = SFIELD(cmd_arg, CMD52_RAW, 0);
 	cmd_arg = SFIELD(cmd_arg, CMD52_DATA, rw == SDIOH_READ ? 0 : *byte);
 
-	if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_52, cmd_arg)) != SUCCESS) {
+	if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_52, cmd_arg)) != SUCCESS) {
 		sdstd_unlock(sd);
 		return status;
 	}
@@ -821,6 +836,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint rw, uint
 	bool fifo = (fix_inc == SDIOH_DATA_FIX);
 	uint8 *localbuf = NULL, *tmpbuf = NULL;
 	uint tmplen = 0;
+	bool local_blockmode = sd->sd_blockmode;
 
 	sdstd_lock(sd);
 
@@ -838,7 +854,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint rw, uint
 	 * Both: leftovers are handled last (will be sent via bytemode).
 	 */
 	while (buflen > 0) {
-		if (sd->sd_blockmode) {
+		if (local_blockmode) {
 			/* Max xfer is Page size */
 			len = MIN(SD_PAGE, buflen);
 
@@ -870,7 +886,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint rw, uint
 			return SDIOH_API_RC_FAIL;
 		}
 
-		if (sd->sd_blockmode) {
+		if (local_blockmode) {
 			if ((func == SDIO_FUNC_1) && ((tmplen % 4) == 3) && (rw == SDIOH_WRITE)) {
 				if (localbuf)
 					MFREE(sd->osh, localbuf, len);
@@ -951,6 +967,11 @@ int sdstd_abort(sdioh_info_t *sd, uint func)
 		sd_err(("abort: intstatus 0x%04x\n", plain_intstatus));
 		if (GFIELD(plain_intstatus, INTSTAT_CMD_COMPLETE)) {
 			sd_err(("SDSTD_ABORT: CMD COMPLETE SET BEFORE COMMAND GIVEN!!!\n"));
+		}
+		if (GFIELD(plain_intstatus, INTSTAT_CARD_REMOVAL)) {
+			sd_err(("SDSTD_ABORT: INTSTAT_CARD_REMOVAL\n"));
+			err = BCME_NODEVICE;
+			goto done;
 		}
 	}
 
@@ -1060,6 +1081,9 @@ int sdstd_abort(sdioh_info_t *sd, uint func)
 	}
 
 done:
+	if (err == BCME_NODEVICE)
+		return err;
+
 	sdstd_wreg8(sd, SD_SoftwareReset,
 	            SFIELD(SFIELD(0, SW_RESET_DAT, 1), SW_RESET_CMD, 1));
 
@@ -1200,6 +1224,7 @@ sdstd_reset(sdioh_info_t *sd, bool host_reset, bool client_reset)
 
 		/* A reset should reset bus back to 1 bit mode */
 		sd->sd_mode = SDIOH_MODE_SD1;
+		sdstd_set_dma_mode(sd, sd->sd_dma_mode);
 	}
 	sdstd_unlock(sd);
 	return TRUE;
@@ -1324,7 +1349,8 @@ sdstd_host_init(sdioh_info_t *sd)
 		num_slots = 1;
 		first_bar = 0;
 
-		sd->sd_blockmode = FALSE;
+		/* Controller supports ADMA2, so turn it on here. */
+		sd->sd_dma_mode = DMA_MODE_ADMA2;
 	}
 
 	/* Map in each slot on the board and query it to see if a
@@ -1401,22 +1427,17 @@ sdstd_host_init(sdioh_info_t *sd)
 	sd->caps = sdstd_rreg(sd, SD_Capabilities);	/* Cache this for later use */
 	sd->curr_caps = sdstd_rreg(sd, SD_MaxCurCap);
 
-	if (!GFIELD(sd->caps, CAP_DMA)) {
-		sd_err(("SD HOST CAPS: No SDMA Support! Disabling DMA\n"));
-		sd->sd_use_dma = FALSE;
-		sd->sd_blockmode = FALSE;
-	}
+	sdstd_set_dma_mode(sd, sd->sd_dma_mode);
 
 
 	sdstd_reset(sd, 1, 0);
 
 	/* Read SD4/SD1 mode */
 	if ((reg8 = sdstd_rreg8(sd, SD_HostCntrl))) {
-		if (reg8 & SD4_MODE)
+		if (reg8 & SD4_MODE) {
 			sd_err(("%s: Host cntrlr already in 4 bit mode: 0x%x\n",
 			        __FUNCTION__,  reg8));
-		else
-			sd_err(("%s: Error! reg 0x28 should be 0 = 0x%x\n", __FUNCTION__, reg8));
+		}
 	}
 
 	/* Default power on mode is SD1 */
@@ -1440,7 +1461,7 @@ get_ocr(sdioh_info_t *sd, uint32 *cmd_arg, uint32 *cmd_rsp)
 	retries = CMD5_RETRIES;
 	do {
 		*cmd_rsp = 0;
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_5, *cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_5, *cmd_arg))
 		    != SUCCESS) {
 			sd_err(("%s: CMD5 failed\n", __FUNCTION__));
 			return status;
@@ -1496,7 +1517,7 @@ sdstd_client_init(sdioh_info_t *sd)
 	/* In SPI mode, issue CMD0 first */
 	if (sd->sd_mode == SDIOH_MODE_SPI) {
 		cmd_arg = 0;
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_0, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_0, cmd_arg))
 		    != SUCCESS) {
 			sd_err(("BCMSDIOH: cardinit: CMD0 failed!\n"));
 			return status;
@@ -1508,7 +1529,7 @@ sdstd_client_init(sdioh_info_t *sd)
 
 		/* Card is operational. Ask it to send an RCA */
 		cmd_arg = 0;
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_3, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_3, cmd_arg))
 		    != SUCCESS) {
 			sd_err(("%s: CMD3 failed!\n", __FUNCTION__));
 			return status;
@@ -1534,7 +1555,7 @@ sdstd_client_init(sdioh_info_t *sd)
 
 		/* Select the card */
 		cmd_arg = SFIELD(0, CMD7_RCA, sd->card_rca);
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_7, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_7, cmd_arg))
 		    != SUCCESS) {
 			sd_err(("%s: CMD7 failed!\n", __FUNCTION__));
 			return status;
@@ -1652,6 +1673,86 @@ sdstd_set_highspeed_mode(sdioh_info_t *sd, bool HSMode)
 	}
 
 	sdstd_wreg8(sd, SD_HostCntrl, reg8);
+
+	return BCME_OK;
+}
+
+/* Select DMA Mode:
+ * If dma_mode == DMA_MODE_AUTO, pick the "best" mode.
+ * Otherwise, pick the selected mode if supported.
+ * If not supported, use PIO mode.
+ */
+static int
+sdstd_set_dma_mode(sdioh_info_t *sd, int8 dma_mode)
+{
+	uint8 reg8, dma_sel_bits = SDIOH_SDMA_MODE;
+	int8 prev_dma_mode = sd->sd_dma_mode;
+
+	switch (prev_dma_mode) {
+		case DMA_MODE_AUTO:
+			sd_dma(("%s: Selecting best DMA mode supported by controller.\n",
+			          __FUNCTION__));
+			if (GFIELD(sd->caps, CAP_ADMA2)) {
+				sd->sd_dma_mode = DMA_MODE_ADMA2;
+				dma_sel_bits = SDIOH_ADMA2_MODE;
+			} else if (GFIELD(sd->caps, CAP_ADMA1)) {
+				sd->sd_dma_mode = DMA_MODE_ADMA1;
+				dma_sel_bits = SDIOH_ADMA1_MODE;
+			} else if (GFIELD(sd->caps, CAP_DMA)) {
+				sd->sd_dma_mode = DMA_MODE_SDMA;
+			} else {
+				sd->sd_dma_mode = DMA_MODE_NONE;
+			}
+			break;
+		case DMA_MODE_NONE:
+			sd->sd_dma_mode = DMA_MODE_NONE;
+			break;
+		case DMA_MODE_SDMA:
+			if (GFIELD(sd->caps, CAP_DMA)) {
+				sd->sd_dma_mode = DMA_MODE_SDMA;
+			} else {
+				sd_err(("%s: SDMA not supported by controller.\n", __FUNCTION__));
+				sd->sd_dma_mode = DMA_MODE_NONE;
+			}
+			break;
+		case DMA_MODE_ADMA1:
+			if (GFIELD(sd->caps, CAP_ADMA1)) {
+				sd->sd_dma_mode = DMA_MODE_ADMA1;
+				dma_sel_bits = SDIOH_ADMA1_MODE;
+			} else {
+				sd_err(("%s: ADMA1 not supported by controller.\n", __FUNCTION__));
+				sd->sd_dma_mode = DMA_MODE_NONE;
+			}
+			break;
+		case DMA_MODE_ADMA2:
+			if (GFIELD(sd->caps, CAP_ADMA2)) {
+				sd->sd_dma_mode = DMA_MODE_ADMA2;
+				dma_sel_bits = SDIOH_ADMA2_MODE;
+			} else {
+				sd_err(("%s: ADMA2 not supported by controller.\n", __FUNCTION__));
+				sd->sd_dma_mode = DMA_MODE_NONE;
+			}
+			break;
+		case DMA_MODE_ADMA2_64:
+			sd_err(("%s: 64b ADMA2 not supported by driver.\n", __FUNCTION__));
+			sd->sd_dma_mode = DMA_MODE_NONE;
+			break;
+		default:
+			sd_err(("%s: Unsupported DMA Mode %d requested.\n", __FUNCTION__,
+			        prev_dma_mode));
+			sd->sd_dma_mode = DMA_MODE_NONE;
+			break;
+	}
+
+	/* clear SysAddr, only used for SDMA */
+	sdstd_wreg(sd, SD_SysAddr, 0);
+
+	sd_err(("%s: %s mode selected.\n", __FUNCTION__, dma_mode_description[sd->sd_dma_mode]));
+
+	reg8 = sdstd_rreg8(sd, SD_HostCntrl);
+	reg8 = SFIELD(reg8, HOST_DMA_SEL, dma_sel_bits);
+	sdstd_wreg8(sd, SD_HostCntrl, reg8);
+	sd_dma(("%s: SD_HostCntrl=0x%02x\n", __FUNCTION__, reg8));
 
 	return BCME_OK;
 }
@@ -1942,7 +2043,7 @@ sdstd_card_regread(sdioh_info_t *sd, int func, uint32 regaddr, int regsize, uint
 		cmd_arg = SFIELD(cmd_arg, CMD52_RAW, 0);
 		cmd_arg = SFIELD(cmd_arg, CMD52_DATA, 0);
 
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_52, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_52, cmd_arg))
 		    != SUCCESS)
 			return status;
 
@@ -1973,7 +2074,7 @@ sdstd_card_regread(sdioh_info_t *sd, int func, uint32 regaddr, int regsize, uint
 		/* sdstd_cmd_issue() returns with the command complete bit
 		 * in the ISR already cleared
 		 */
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_53, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_53, cmd_arg))
 		    != SUCCESS)
 			return status;
 
@@ -2115,7 +2216,7 @@ sdstd_card_regwrite(sdioh_info_t *sd, int func, uint32 regaddr, int regsize, uin
 		cmd_arg = SFIELD(cmd_arg, CMD52_RW_FLAG, SDIOH_XFER_TYPE_WRITE);
 		cmd_arg = SFIELD(cmd_arg, CMD52_RAW, 0);
 		cmd_arg = SFIELD(cmd_arg, CMD52_DATA, data & 0xff);
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_52, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_52, cmd_arg))
 		    != SUCCESS)
 			return status;
 
@@ -2138,7 +2239,7 @@ sdstd_card_regwrite(sdioh_info_t *sd, int func, uint32 regaddr, int regsize, uin
 		/* sdstd_cmd_issue() returns with the command complete bit
 		 * in the ISR already cleared
 		 */
-		if ((status = sdstd_cmd_issue(sd, sd->sd_use_dma, SDIOH_CMD_53, cmd_arg))
+		if ((status = sdstd_cmd_issue(sd, USE_DMA(sd), SDIOH_CMD_53, cmd_arg))
 		    != SUCCESS)
 			return status;
 
@@ -2338,7 +2439,7 @@ sdstd_cmd_issue(sdioh_info_t *sdioh_info, bool use_dma, uint32 cmd, uint32 arg)
 		cmd_reg = SFIELD(cmd_reg, CMD_TYPE, CMD_TYPE_NORMAL);
 		cmd_reg = SFIELD(cmd_reg, CMD_INDEX, cmd);
 
-		use_dma = sdioh_info->sd_use_dma && GFIELD(cmd_arg, CMD53_BLK_MODE);
+		use_dma = USE_DMA(sdioh_info) && GFIELD(cmd_arg, CMD53_BLK_MODE);
 
 		if (GFIELD(cmd_arg, CMD53_BLK_MODE)) {
 			uint16 blocksize;
@@ -2347,22 +2448,46 @@ sdstd_cmd_issue(sdioh_info_t *sdioh_info, bool use_dma, uint32 cmd, uint32 arg)
 
 			ASSERT(sdioh_info->sd_blockmode);
 
-			/* data_xfer_cnt is already setup so that for multiblock mode,
-			 * it is the entire buffer length.  For non-block or single block,
-			 * it is < 64 bytes
-			 */
-			if (use_dma) {
-				sd_info(("%s: Previous SysAddr reg was 0x%x now 0x%x\n",
-				         __FUNCTION__, sdstd_rreg(sdioh_info, SD_SysAddr),
-				         (uint32)sdioh_info->dma_phys));
-				sdstd_wreg(sdioh_info, SD_SysAddr, sdioh_info->dma_phys);
-			}
 			func = GFIELD(cmd_arg, CMD53_FUNCTION);
 			blocksize = MIN((int)sdioh_info->data_xfer_count,
 			                sdioh_info->client_block_size[func]);
 			blockcount = GFIELD(cmd_arg, CMD53_BYTE_BLK_CNT);
 
-			sd_trace(("%s: Writing Block count %d, block size %d bytes\n",
+			/* data_xfer_cnt is already setup so that for multiblock mode,
+			 * it is the entire buffer length.  For non-block or single block,
+			 * it is < 64 bytes
+			 */
+			if (use_dma) {
+				switch (sdioh_info->sd_dma_mode) {
+				case DMA_MODE_SDMA:
+					sd_dma(("%s: SDMA: SysAddr reg was 0x%x now 0x%x\n",
+					      __FUNCTION__, sdstd_rreg(sdioh_info, SD_SysAddr),
+					     (uint32)sdioh_info->dma_phys));
+				sdstd_wreg(sdioh_info, SD_SysAddr, sdioh_info->dma_phys);
+					break;
+				case DMA_MODE_ADMA1:
+				case DMA_MODE_ADMA2:
+					sd_dma(("%s: ADMA: Using ADMA\n", __FUNCTION__));
+						sd_create_adma_descriptor(sdioh_info, 0,
+						sdioh_info->dma_phys, blockcount*blocksize,
+						ADMA2_ATTRIBUTE_VALID | ADMA2_ATTRIBUTE_END |
+						ADMA2_ATTRIBUTE_INT | ADMA2_ATTRIBUTE_ACT_TRAN);
+					/* Dump descriptor if DMA debugging is enabled. */
+					if (sd_msglevel & SDH_DMA_VAL) {
+						sd_dump_adma_dscr(sdioh_info);
+					}
+
+					sdstd_wreg(sdioh_info, SD_ADMA_SysAddr,
+					           sdioh_info->adma2_dscr_phys);
+					break;
+				default:
+					sd_err(("%s: unsupported DMA mode %d.\n",
+						__FUNCTION__, sdioh_info->sd_dma_mode));
+					break;
+				}
+			}
+
+			sd_trace(("%s: Setting block count %d, block size %d bytes\n",
 			          __FUNCTION__, blockcount, blocksize));
 			sdstd_wreg16(sdioh_info, SD_BlockSize, blocksize);
 			sdstd_wreg16(sdioh_info, SD_BlockCount, blockcount);
@@ -2464,6 +2589,7 @@ sdstd_cmd_issue(sdioh_info_t *sdioh_info, bool use_dma, uint32 cmd, uint32 arg)
 	if (sdioh_info->polled_mode) {
 		uint16 int_reg = 0;
 		int retries = RETRIES_LARGE;
+
 		do {
 			int_reg = sdstd_rreg16(sdioh_info, SD_IntrStatus);
 		} while (--retries &&
@@ -2532,7 +2658,7 @@ sdstd_card_buf(sdioh_info_t *sd, int rw, int func, bool fifo, uint32 addr, int n
 	if (read) sd->r_cnt++; else sd->t_cnt++;
 
 	local_blockmode = sd->sd_blockmode;
-	local_dma = sd->sd_use_dma;
+	local_dma = USE_DMA(sd);
 
 	/* Don't bother with block mode on small xfers */
 	if (nbytes < sd->client_block_size[func]) {
@@ -2635,6 +2761,7 @@ sdstd_card_buf(sdioh_info_t *sd, int rw, int func, bool fifo, uint32 addr, int n
 				        __FUNCTION__, read ? "Read" : "Write", int_reg,
 				        sdstd_rreg16(sd, SD_ErrorIntrStatus),
 				        sdstd_rreg(sd, SD_PresentState)));
+				sdstd_dumpregs(sd);
 				sdstd_check_errs(sd, SDIOH_CMD_53, cmd_arg);
 				return (ERROR);
 			}
@@ -2723,6 +2850,7 @@ sdstd_card_buf(sdioh_info_t *sd, int rw, int func, bool fifo, uint32 addr, int n
 		        sdstd_rreg(sd, SD_PresentState), int_reg,
 		        sdstd_rreg16(sd, SD_ErrorIntrStatus), nbytes,
 		        sd->r_cnt, sd->t_cnt));
+		sdstd_dumpregs(sd);
 		return ERROR;
 	}
 
@@ -2793,18 +2921,210 @@ int sdioh_sdio_reset(sdioh_info_t *si)
 static void
 sd_map_dma(sdioh_info_t * sd)
 {
-	if (sd->sd_use_dma == FALSE)
-		return;
-	if ((sd->dma_buf = DMA_ALLOC_CONSISTENT(sd->osh, SD_PAGE, &sd->dma_phys,
-	0x12, 12)) == NULL) {
+
+	void *va;
+
+	if ((va = DMA_ALLOC_CONSISTENT(sd->osh, SD_PAGE,
+		&sd->dma_start_phys, 0x12, 12)) == NULL) {
+		sd->sd_dma_mode = DMA_MODE_NONE;
+		sd->dma_start_buf = 0;
+		sd->dma_buf = (void *)0;
+		sd->dma_phys = 0;
+		sd->alloced_dma_size = SD_PAGE;
 		sd_err(("%s: DMA_ALLOC failed. Disabling DMA support.\n", __FUNCTION__));
-		sd->sd_use_dma = FALSE;
+	} else {
+		sd->dma_start_buf = va;
+		sd->dma_buf = (void *)ROUNDUP((uintptr)va, SD_PAGE);
+		sd->dma_phys = ROUNDUP((sd->dma_start_phys), SD_PAGE);
+		sd->alloced_dma_size = SD_PAGE;
+		sd_err(("%s: Mapped DMA Buffer %dbytes @virt/phys: %p/0x%lx\n",
+		        __FUNCTION__, sd->alloced_dma_size, sd->dma_buf, sd->dma_phys));
+		sd_fill_dma_data_buf(sd, 0xA5);
 	}
+
+	if ((va = DMA_ALLOC_CONSISTENT(sd->osh, SD_PAGE,
+		&sd->adma2_dscr_start_phys, 0x12, 12)) == NULL) {
+		sd->sd_dma_mode = DMA_MODE_NONE;
+		sd->adma2_dscr_start_buf = 0;
+		sd->adma2_dscr_buf = (void *)0;
+		sd->adma2_dscr_phys = 0;
+		sd->alloced_adma2_dscr_size = 0;
+		sd_err(("%s: DMA_ALLOC failed for descriptor buffer. "
+		        "Disabling DMA support.\n", __FUNCTION__));
+	} else {
+		sd->adma2_dscr_start_buf = va;
+		sd->adma2_dscr_buf = (void *)ROUNDUP((uintptr)va, SD_PAGE);
+		sd->adma2_dscr_phys = ROUNDUP((sd->adma2_dscr_start_phys), SD_PAGE);
+		sd->alloced_adma2_dscr_size = SD_PAGE;
+	}
+
+	sd_err(("%s: Mapped ADMA2 Descriptor Buffer %dbytes @virt/phys: %p/0x%lx\n",
+	        __FUNCTION__, sd->alloced_adma2_dscr_size, sd->adma2_dscr_buf,
+	        sd->adma2_dscr_phys));
+	sd_clear_adma_dscr_buf(sd);
 }
+
 static void
 sd_unmap_dma(sdioh_info_t * sd)
 {
-	if (sd->sd_use_dma == FALSE)
-		return;
-	DMA_FREE_CONSISTENT(sd->osh, sd->dma_buf, SD_PAGE, sd->dma_phys, 0x12);
+	if (sd->dma_start_buf) {
+		DMA_FREE_CONSISTENT(sd->osh, sd->dma_start_buf, sd->alloced_dma_size,
+			sd->dma_start_phys, 0x12);
+	}
+
+	if (sd->adma2_dscr_start_buf) {
+		DMA_FREE_CONSISTENT(sd->osh, sd->adma2_dscr_start_buf, sd->alloced_adma2_dscr_size,
+		                    sd->adma2_dscr_start_phys, 0x12);
+	}
+}
+
+static void sd_clear_adma_dscr_buf(sdioh_info_t *sd)
+{
+	bzero((char *)sd->adma2_dscr_buf, SD_PAGE);
+	sd_dump_adma_dscr(sd);
+}
+
+static void sd_fill_dma_data_buf(sdioh_info_t *sd, uint8 data)
+{
+	memset((char *)sd->dma_buf, data, SD_PAGE);
+}
+
+
+static void sd_create_adma_descriptor(sdioh_info_t *sd, uint32 index,
+                                      uint32 addr_phys, uint16 length, uint16 flags)
+{
+	adma2_dscr_32b_t *adma2_dscr_table;
+	adma1_dscr_t *adma1_dscr_table;
+
+	adma2_dscr_table = sd->adma2_dscr_buf;
+	adma1_dscr_table = sd->adma2_dscr_buf;
+
+	switch (sd->sd_dma_mode) {
+		case DMA_MODE_ADMA2:
+			sd_dma(("%s: creating ADMA2 descriptor for index %d\n",
+				__FUNCTION__, index));
+
+			adma2_dscr_table[index].phys_addr = addr_phys;
+			adma2_dscr_table[index].len_attr = length << 16;
+			adma2_dscr_table[index].len_attr |= flags;
+			break;
+		case DMA_MODE_ADMA1:
+			/* ADMA1 requires two descriptors, one for len
+			 * and the other for data transfer
+			 */
+			index <<= 1;
+
+			sd_dma(("%s: creating ADMA1 descriptor for index %d\n",
+				__FUNCTION__, index));
+
+			adma1_dscr_table[index].phys_addr_attr = length << 12;
+			adma1_dscr_table[index].phys_addr_attr |= (ADMA1_ATTRIBUTE_ACT_SET |
+			                                           ADMA2_ATTRIBUTE_VALID);
+			adma1_dscr_table[index+1].phys_addr_attr = addr_phys & 0xFFFFF000;
+			adma1_dscr_table[index+1].phys_addr_attr |= (flags & 0x3f);
+			break;
+		default:
+			sd_err(("%s: cannot create ADMA descriptor for DMA mode %d\n",
+				__FUNCTION__, sd->sd_dma_mode));
+			break;
+	}
+}
+
+
+static void sd_dump_adma_dscr(sdioh_info_t *sd)
+{
+	adma2_dscr_32b_t *adma2_dscr_table;
+	adma1_dscr_t *adma1_dscr_table;
+	uint32 i = 0;
+	uint16 flags;
+	char flags_str[32];
+
+	ASSERT(sd->adma2_dscr_buf != NULL);
+
+	adma2_dscr_table = sd->adma2_dscr_buf;
+	adma1_dscr_table = sd->adma2_dscr_buf;
+
+	switch (sd->sd_dma_mode) {
+		case DMA_MODE_ADMA2:
+			sd_err(("ADMA2 Descriptor Table (%dbytes) @virt/phys: %p/0x%lx\n",
+				SD_PAGE, sd->adma2_dscr_buf, sd->adma2_dscr_phys));
+			sd_err((" #[Descr VA  ]  Buffer PA  | Len    | Flags  (5:4  2   1   0)"
+			        "     |\n"));
+			while (adma2_dscr_table->len_attr & ADMA2_ATTRIBUTE_VALID) {
+				flags = adma2_dscr_table->len_attr & 0xFFFF;
+				sprintf(flags_str, "%s%s%s%s",
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_LINK) ? "LINK " :
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_TRAN) ? "TRAN " :
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_NOP) ? "NOP  " : "RSV  ",
+					(flags & ADMA2_ATTRIBUTE_INT ? "INT " : "    "),
+					(flags & ADMA2_ATTRIBUTE_END ? "END " : "    "),
+					(flags & ADMA2_ATTRIBUTE_VALID ? "VALID" : ""));
+				sd_err(("%2d[0x%p]: 0x%08x | 0x%04x | 0x%04x (%s) |\n",
+				        i, adma2_dscr_table, adma2_dscr_table->phys_addr,
+				        adma2_dscr_table->len_attr >> 16, flags, flags_str));
+				i++;
+
+				/* Follow LINK descriptors or skip to next. */
+				if ((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+				     ADMA2_ATTRIBUTE_ACT_LINK) {
+					adma2_dscr_table = phys_to_virt(
+					    adma2_dscr_table->phys_addr);
+				} else {
+					adma2_dscr_table++;
+				}
+
+			}
+			break;
+		case DMA_MODE_ADMA1:
+			sd_err(("ADMA1 Descriptor Table (%dbytes) @virt/phys: %p/0x%lx\n",
+			         SD_PAGE, sd->adma2_dscr_buf, sd->adma2_dscr_phys));
+			sd_err((" #[Descr VA  ]  Buffer PA  | Flags  (5:4  2   1   0)     |\n"));
+
+			for (i = 0; adma1_dscr_table->phys_addr_attr & ADMA2_ATTRIBUTE_VALID; i++) {
+				flags = adma1_dscr_table->phys_addr_attr & 0x3F;
+				sprintf(flags_str, "%s%s%s%s",
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_LINK) ? "LINK " :
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_TRAN) ? "TRAN " :
+					((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+					ADMA2_ATTRIBUTE_ACT_NOP) ? "NOP  " : "SET  ",
+					(flags & ADMA2_ATTRIBUTE_INT ? "INT " : "    "),
+					(flags & ADMA2_ATTRIBUTE_END ? "END " : "    "),
+					(flags & ADMA2_ATTRIBUTE_VALID ? "VALID" : ""));
+				sd_err(("%2d[0x%p]: 0x%08x | 0x%04x | (%s) |\n",
+				        i, adma1_dscr_table,
+				        adma1_dscr_table->phys_addr_attr & 0xFFFFF000,
+				        flags, flags_str));
+
+				/* Follow LINK descriptors or skip to next. */
+				if ((flags & ADMA2_ATTRIBUTE_ACT_LINK) ==
+				     ADMA2_ATTRIBUTE_ACT_LINK) {
+					adma1_dscr_table = phys_to_virt(
+						adma1_dscr_table->phys_addr_attr & 0xFFFFF000);
+				} else {
+					adma1_dscr_table++;
+				}
+			}
+			break;
+		default:
+			sd_err(("Unknown DMA Descriptor Table Format.\n"));
+			break;
+	}
+}
+
+static void sdstd_dumpregs(sdioh_info_t *sd)
+{
+	sd_err(("IntrStatus:       0x%04x ErrorIntrStatus       0x%04x\n",
+	            sdstd_rreg16(sd, SD_IntrStatus),
+	            sdstd_rreg16(sd, SD_ErrorIntrStatus)));
+	sd_err(("IntrStatusEnable: 0x%04x ErrorIntrStatusEnable 0x%04x\n",
+	            sdstd_rreg16(sd, SD_IntrStatusEnable),
+	            sdstd_rreg16(sd, SD_ErrorIntrStatusEnable)));
+	sd_err(("IntrSignalEnable: 0x%04x ErrorIntrSignalEnable 0x%04x\n",
+	            sdstd_rreg16(sd, SD_IntrSignalEnable),
+	            sdstd_rreg16(sd, SD_ErrorIntrSignalEnable)));
 }

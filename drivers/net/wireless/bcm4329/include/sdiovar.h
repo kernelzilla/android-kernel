@@ -2,7 +2,7 @@
  * Structure used by apps whose drivers access SDIO drivers.
  * Pulled out separately so dhdu and wlu can both use it.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: sdiovar.h,v 13.5.14.2.16.1 2008/11/20 00:51:32 Exp $
+ * $Id: sdiovar.h,v 13.5.14.2.16.2 2009/12/08 22:34:21 Exp $
  */
 
 #ifndef _sdiovar_h_
@@ -48,6 +48,7 @@ typedef struct sdreg {
 #define SDH_DATA_VAL		0x0010	/* Data */
 #define SDH_CTRL_VAL		0x0020	/* Control Regs */
 #define SDH_LOG_VAL		0x0040	/* Enable bcmlog */
+#define SDH_DMA_VAL		0x0080	/* DMA */
 
 #define NUM_PREV_TRANSACTIONS	16
 

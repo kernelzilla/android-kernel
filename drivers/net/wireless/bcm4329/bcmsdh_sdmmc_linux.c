@@ -1,7 +1,7 @@
 /*
  * BCMSDH Function Driver for the native SDIO/MMC driver in the Linux Kernel
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.10 2009/10/14 04:32:13 Exp $
+ * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.11 2009/11/04 20:36:52 Exp $
  */
 
 #include <typedefs.h>
@@ -50,7 +50,6 @@
 #include <bcmsdh_sdmmc.h>
 
 #include <dhd_dbg.h>
-
 
 extern void sdioh_sdmmc_devintr_off(sdioh_info_t *sd);
 extern void sdioh_sdmmc_devintr_on(sdioh_info_t *sd);
@@ -81,6 +80,7 @@ static int bcmsdh_sdmmc_probe(struct sdio_func *func,
                               const struct sdio_device_id *id)
 {
 	int ret = 0;
+	static struct sdio_func sdio_func_0;
 	sd_trace(("bcmsdh_sdmmc: %s Enter\n", __FUNCTION__));
 	sd_trace(("sdio_bcmsdh: func->class=%x\n", func->class));
 	sd_trace(("sdio_vendor: 0x%04x\n", func->vendor));
@@ -88,8 +88,9 @@ static int bcmsdh_sdmmc_probe(struct sdio_func *func,
 	sd_trace(("Function#: 0x%04x\n", func->num));
 
 	if (func->num == 1) {
-		/* Keep a copy of F1's 'func' in F0, just in case... */
-		gInstance->func[0] = func;
+		sdio_func_0.num = 0;
+		sdio_func_0.card = func->card;
+		gInstance->func[0] = &sdio_func_0;
 		if(func->device == 0x4) { /* 4318 */
 			gInstance->func[2] = NULL;
 			sd_trace(("NIC found, calling bcmsdh_probe...\n"));
@@ -120,7 +121,6 @@ static void bcmsdh_sdmmc_remove(struct sdio_func *func)
 		bcmsdh_remove(&sdmmc_dev);
 	}
 }
-
 
 /* devices we support, null terminated */
 static const struct sdio_device_id bcmsdh_sdmmc_ids[] = {
@@ -169,13 +169,6 @@ sdioh_sdmmc_osfree(sdioh_info_t *sd)
 	sdos = (struct sdos_info *)sd->sdos_info;
 	MFREE(sd->osh, sdos, sizeof(struct sdos_info));
 }
-#if defined(OOB_INTR_ONLY)
-int
-sdioh_mmc_irq(int irq)
-{
-	return (MSM_GPIO_TO_INT(irq));
-}
-#endif /* defined(OOB_INTR_ONLY) */
 
 /* Interrupt enable/disable */
 SDIOH_API_RC

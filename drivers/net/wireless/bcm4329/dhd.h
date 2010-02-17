@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h,v 1.32.4.7.2.4.14.25 2009/10/27 04:41:56 Exp $
+ * $Id: dhd.h,v 1.32.4.7.2.4.14.27 2010/01/19 06:42:55 Exp $
  */
 
 /****************
@@ -50,19 +50,19 @@
 /* The kernel threading is sdio-specific */
 #else /* LINUX */
 #define ENOMEM		1
-#define EFAULT		2
+#define EFAULT      2
 #define EINVAL		3
-#define EIO		4
+#define EIO			4
 #define ETIMEDOUT	5
-#define ERESTARTSYS	6
+#define ERESTARTSYS 6
 #endif /* LINUX */
 
 #include <wlioctl.h>
 
-#ifdef NDIS60
+#if defined(NDIS60)
 #include <wdf.h>
 #include <WdfMiniport.h>
-#endif /* NDIS60 */
+#endif 
 
 /* Forward decls */
 struct dhd_bus;
@@ -149,7 +149,7 @@ typedef struct dhd_pub {
 	uint8 country_code[WLC_CNTRY_BUF_SZ];
 } dhd_pub_t;
 
-#ifdef NDIS60
+#if defined(NDIS60)
 
 typedef struct _wdf_device_info {
 	dhd_pub_t *dhd;
@@ -158,7 +158,7 @@ typedef struct _wdf_device_info {
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(wdf_device_info_t, dhd_get_wdf_device_info)
 
 
-#endif /* NDIS60 */
+#endif /* NDIS60 && !UNDERC_CE */
 
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 
@@ -275,6 +275,8 @@ extern void dhd_os_sdunlock_rxq(dhd_pub_t * pub);
 extern void dhd_os_sdlock_sndup_rxq(dhd_pub_t * pub);
 extern void dhd_customer_gpio_wlan_ctrl(int onoff);
 extern void dhd_os_sdunlock_sndup_rxq(dhd_pub_t * pub);
+extern void dhd_os_sdlock_eventq(dhd_pub_t * pub);
+extern void dhd_os_sdunlock_eventq(dhd_pub_t * pub);
 #if defined(OOB_INTR_ONLY)
 extern int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr);
 #endif /* defined(OOB_INTR_ONLY) */
@@ -329,6 +331,7 @@ typedef enum cust_gpio_modes {
 	WLAN_POWER_ON,
 	WLAN_POWER_OFF
 } cust_gpio_modes_t;
+extern int wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag);
 /*
  * Insmod parameters for debug/test
  */
@@ -336,6 +339,10 @@ typedef enum cust_gpio_modes {
 /* Watchdog timer interval */
 extern uint dhd_watchdog_ms;
 
+
+#if defined(DHD_DEBUG)
+extern uint wl_msg_level;
+#endif /* DHD_DEBUG */
 
 /* Use interrupts */
 extern uint dhd_intr;
