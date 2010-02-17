@@ -906,20 +906,21 @@ void __cpuinit local_timer_setup(struct clock_event_device *evt)
 	writel(0, clock->regbase  + TIMER_ENABLE);
 	writel(~0, clock->regbase + TIMER_MATCH_VAL);
 
-	evt->irq = INT_GP_TIMER_EXP;
+	evt->irq = clock->irq.irq;
 	evt->name = "local_timer";
 	evt->features = CLOCK_EVT_FEAT_ONESHOT;
-	evt->rating = 200;
+	evt->rating = clock->clockevent.rating;
 	evt->set_mode = msm_timer_set_mode;
 	evt->set_next_event = msm_timer_set_next_event;
-	evt->shift = 32;
-	evt->mult = div_sc(GPT_HZ, NSEC_PER_SEC, evt->shift);
-	evt->max_delta_ns = clockevent_delta2ns(0xf0000000, evt);
-	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
+	evt->shift = clock->clockevent.shift;
+	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
+	evt->max_delta_ns =
+		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
+	evt->min_delta_ns = clockevent_delta2ns(clock->write_delay + 4, evt);
 	evt->cpumask = cpumask_of(smp_processor_id());
 
 	local_irq_save(flags);
-	get_irq_chip(evt->irq)->unmask(evt->irq);
+	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
 	local_irq_restore(flags);
 
 	clockevents_register_device(evt);
