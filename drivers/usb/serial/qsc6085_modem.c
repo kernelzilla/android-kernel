@@ -486,12 +486,6 @@ static int modem_open(struct tty_struct *tty,
 		dev_info(&port->dev, "%s: Enter. Open Port %d\n",
 				 __func__, port->number);
 
-	/*
-	 * Force low_latency on
-	 */
-	if (tty)
-		tty->low_latency = 1;
-
 	/* clear the throttle flags */
 	port->throttled = 0;
 	port->throttle_req = 0;
