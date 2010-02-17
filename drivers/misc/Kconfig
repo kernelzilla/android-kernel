@@ -336,6 +336,13 @@ config HAPTIC_ISA1200
 	help
 	  The ISA1200 is a high performance enhanced haptic driver.
 
+config PMIC8058_VIBRATOR
+	tristate "Qualcomm PM8058 vibrator support"
+	depends on PMIC8058 && ANDROID_TIMED_OUTPUT
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on Qualcomm PM8058 chip.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
