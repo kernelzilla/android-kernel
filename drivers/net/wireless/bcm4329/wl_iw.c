@@ -724,18 +724,23 @@ wl_iw_get_rssi(
 	static char ssidbuf[SSID_FMT_BUF_LEN];
 	scb_val_t scb_val;
 
-	scb_val.val = 0;
+	bzero(&scb_val, sizeof(scb_val_t));
 
 	if (g_onoff == G_WLAN_SET_ON) {
 		error = dev_wlc_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t));
+		if (error) {
+			WL_ERROR(("%s: Fails %d\n", __FUNCTION__, error));
+			return error;
+		}
 		rssi = dtoh32(scb_val.val);
 
 		error = dev_wlc_ioctl(dev, WLC_GET_SSID, &ssid, sizeof(ssid));
-
-		ssid.SSID_len = dtoh32(ssid.SSID_len);
+		if (!error) {
+			ssid.SSID_len = dtoh32(ssid.SSID_len);
+			wl_format_ssid(ssidbuf, ssid.SSID, dtoh32(ssid.SSID_len));
+		}
 	}
 
-	wl_format_ssid(ssidbuf, ssid.SSID, dtoh32(ssid.SSID_len));
 	p += snprintf(p, MAX_WX_STRING, "%s rssi %d ", ssidbuf, rssi);
 	wrqu->data.length = p - extra + 1;
 
@@ -4668,7 +4673,7 @@ int wl_iw_get_wireless_stats(struct net_device *dev, struct iw_statistics *wstat
 	phy_noise = dtoh32(phy_noise);
 	WL_TRACE(("wl_iw_get_wireless_stats phy noise=%d\n", phy_noise));
 
-	scb_val.val = 0;
+	bzero(&scb_val, sizeof(scb_val_t));
 	if ((res = dev_wlc_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t))))
 		goto done;
 
