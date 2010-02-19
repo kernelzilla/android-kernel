@@ -298,6 +298,7 @@ static const struct sample_rate_info_t valid_sample_rates[] = {
 };
 
 static int read_buf_full;
+static int read_buf_outstanding;
 static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int mic_setting = CPCAP_AUDIO_IN_NONE;
@@ -1489,8 +1490,12 @@ static void mcbsp_dma_rx_cb(u32 ch_status, void *arg)
 		if (++str->buf_tail >= str->nbfrags)
 			str->buf_tail = 0;
 
-		if (++read_buf_full >= str->nbfrags)
+		if (++read_buf_full >= str->nbfrags) {
 			read_buf_full = 0;
+			read_buf_outstanding += str->nbfrags;
+			AUDIO_LEVEL2_LOG("%d %s read buf overwrite read_buf_outstanding=%d\n",
+					__LINE__, __FUNCTION__, read_buf_outstanding);
+		}
 
 		audio_process_buf(str, str->inode);
 
@@ -1877,6 +1882,40 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	case SOUND_MIXER_PRIVATE3:
+	{
+		/* This operation returns the number of outstanding read buffers.
+		 It clears the number by assuming that the user monitors how
+		 many buffers have lost since the last check.
+		 If the user doesn't grab the current input buffer before
+		 the driver fills all the buffers, read_buf_outstanding is
+		 incremented by AUDIO_NBFRAGS_READ to indicate the number of buffers lost.
+		 a) before overwrite (read_buf_outstanding = 0)
+		    v user_head
+		 |1+++++|2-----|3-----|...|15-----|
+		 ^ tail ^ head
+		 b) after overwrite (buf3-15 and 1 are lost, user can read only 2,
+		    read_buf_outstanding = 15)
+		    v user_head
+		 |1+++++|2+++++|3-----|...|15-----|
+		    ^ tail ^ head
+		*/
+		unsigned int val = 0;
+		if (file->f_mode & FMODE_WRITE || minor == state.dev_dsp) {
+			val = 0;
+		} else {
+			val = read_buf_outstanding;
+			/* outstanding number read. */
+			AUDIO_LEVEL2_LOG("%d %s resetting read_buf_outstanding\n",
+					__LINE__, __FUNCTION__);
+			read_buf_outstanding = 0;
+		}
+		AUDIO_LEVEL2_LOG("%d %s read_buf_outstanding=%d\n",
+				__LINE__, __FUNCTION__, read_buf_outstanding);
+		put_user(val, (int *)arg);
+		break;
+	}
+
 	default:
 		break;
 
@@ -2093,6 +2132,7 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 	mutex_lock(&audio_lock);
 	state.dev_dsp1_open_count = 0;
 	read_buf_full = 0;
+	read_buf_outstanding = 0;
 	cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
 	cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
 	cpcap_audio_state.codec_primary_speaker = CPCAP_AUDIO_OUT_NONE;
