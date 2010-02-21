@@ -20,6 +20,8 @@
  * sub-routines for VFS
  */
 
+#include <linux/file.h>
+#include <linux/ima.h>
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/splice.h>
@@ -47,6 +49,54 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 }
 
 /* ---------------------------------------------------------------------- */
+
+static int au_conv_oflags(int flags)
+{
+	int mask = 0;
+
+#ifdef CONFIG_IMA
+	fmode_t fmode;
+
+	/* mask = MAY_OPEN; */
+	fmode = OPEN_FMODE(flags);
+	if (fmode & FMODE_READ)
+		mask |= MAY_READ;
+	if (fmode & FMODE_WRITE)
+		mask |= MAY_WRITE;
+
+	if (flags & O_TRUNC)
+		mask |= MAY_WRITE;
+	/*
+         * if (flags & O_APPEND)
+	 * 	mask |= MAY_APPEND;
+         */
+	if (flags & vfsub_fmode_to_uint(FMODE_EXEC))
+		mask |= MAY_EXEC;
+
+	AuDbg("flags 0x%x, mask 0x%x\n", flags, mask);
+#endif
+
+	return mask;
+}
+
+struct file *vfsub_dentry_open(struct path *path, int flags)
+{
+	struct file *file;
+	int err;
+
+	path_get(path);
+	file = dentry_open(path->dentry, path->mnt, flags, current_cred());
+	if (IS_ERR(file))
+		goto out;
+
+	err = ima_file_check(file, au_conv_oflags(flags));
+	if (unlikely(err)) {
+		fput(file);
+		file = ERR_PTR(err);
+	}
+out:
+	return file;
+}
 
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {

@@ -48,13 +48,8 @@ enum {
 
 /* ---------------------------------------------------------------------- */
 
-static inline struct file *vfsub_dentry_open(struct path *path, int flags)
-{
-	path_get(path);
-	return dentry_open(path->dentry, path->mnt, flags, current_cred());
-}
-
 int vfsub_update_h_iattr(struct path *h_path, int *did);
+struct file *vfsub_dentry_open(struct path *path, int flags);
 struct file *vfsub_filp_open(const char *path, int oflags, int mode);
 int vfsub_kern_path(const char *name, unsigned int flags, struct path *path);
 struct dentry *vfsub_lookup_one_len(const char *name, struct dentry *parent,
