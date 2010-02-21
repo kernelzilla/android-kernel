@@ -61,10 +61,8 @@ static int au_conv_oflags(int flags)
 	fmode = OPEN_FMODE(flags);
 	if (fmode & FMODE_READ)
 		mask |= MAY_READ;
-	if (fmode & FMODE_WRITE)
-		mask |= MAY_WRITE;
-
-	if (flags & O_TRUNC)
+	if ((fmode & FMODE_WRITE)
+	    || (flags & O_TRUNC))
 		mask |= MAY_WRITE;
 	/*
          * if (flags & O_APPEND)
