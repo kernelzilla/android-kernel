@@ -120,11 +120,10 @@ int au_may_add(struct dentry *dentry, aufs_bindex_t bindex,
 		}
 	}
 
-	err = -EIO;
+	err = 0;
 	/* expected parent dir is locked */
 	if (unlikely(h_parent != h_dentry->d_parent))
-		goto out;
-	err = 0;
+		err = -EIO;
 
  out:
 	AuTraceErr(err);
