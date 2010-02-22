@@ -65,9 +65,9 @@ static int au_conv_oflags(int flags)
 	    || (flags & O_TRUNC))
 		mask |= MAY_WRITE;
 	/*
-         * if (flags & O_APPEND)
-	 * 	mask |= MAY_APPEND;
-         */
+	 * if (flags & O_APPEND)
+	 *	mask |= MAY_APPEND;
+	 */
 	if (flags & vfsub_fmode_to_uint(FMODE_EXEC))
 		mask |= MAY_EXEC;
 
