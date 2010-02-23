@@ -143,10 +143,13 @@ enum {
 #define EDR_ESCO_MASK  (ESCO_2EV3 | ESCO_3EV3 | ESCO_2EV5 | ESCO_3EV5)
 
 /* ACL flags */
+#define ACL_START		0x00
 #define ACL_CONT		0x01
-#define ACL_START		0x02
+#define ACL_START_FLUSHABLE	0x02
 #define ACL_ACTIVE_BCAST	0x04
 #define ACL_PICO_BCAST		0x08
+
+#define ACL_PB_MASK	(ACL_CONT | ACL_START | ACL_START_FLUSHABLE)
 
 /* Baseband links */
 #define SCO_LINK	0x00
@@ -991,6 +994,9 @@ struct hci_conn_info {
 	__u8     out;
 	__u16    state;
 	__u32    link_mode;
+	__u32    mtu;
+	__u32    cnt;
+	__u32    pkts;
 };
 
 struct hci_dev_req {
