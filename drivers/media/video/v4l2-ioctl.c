@@ -1832,7 +1832,7 @@ static unsigned long cmd_input_size(unsigned int cmd)
 		CMDINSIZE(G_PARM,		streamparm,	type);
 		CMDINSIZE(ENUMSTD,		standard,	index);
 		CMDINSIZE(ENUMINPUT,		input,		index);
-		CMDINSIZE(G_CTRL,		control,	id);
+		CMDINSIZE(G_CTRL,		control,	value);
 		CMDINSIZE(G_TUNER,		tuner,		index);
 		CMDINSIZE(QUERYCTRL,		queryctrl,	id);
 		CMDINSIZE(QUERYMENU,		querymenu,	index);
