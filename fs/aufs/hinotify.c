@@ -151,12 +151,11 @@ static int hin_xino(struct inode *inode, struct inode *h_inode)
 		goto out;
 	}
 #endif
-	for (bindex = bstart; bindex <= bend; bindex++) {
+	for (bindex = bstart; bindex <= bend; bindex++)
 		if (au_h_iptr(inode, bindex) == h_inode) {
 			bfound = bindex;
 			break;
 		}
-	}
 	if (bfound < 0)
 		goto out;
 
@@ -640,20 +639,16 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	flags[CHILD] = 0;
 	if (isdir)
 		flags[CHILD] = AuHinJob_ISDIR;
+	au_fset_hinjob(flags[PARENT], DIRENT);
+	au_fset_hinjob(flags[CHILD], GEN);
 	switch (mask & IN_ALL_EVENTS) {
 	case IN_MOVED_FROM:
 	case IN_MOVED_TO:
-		AuDebugOn(!h_child_name || !h_child_inode);
-		au_fset_hinjob(flags[CHILD], GEN);
 		au_fset_hinjob(flags[CHILD], XINO0);
 		au_fset_hinjob(flags[CHILD], MNTPNT);
-		au_fset_hinjob(flags[PARENT], DIRENT);
-		break;
-
+		/*FALLTHROUGH*/
 	case IN_CREATE:
 		AuDebugOn(!h_child_name || !h_child_inode);
-		au_fset_hinjob(flags[PARENT], DIRENT);
-		au_fset_hinjob(flags[CHILD], GEN);
 		break;
 
 	case IN_DELETE:
@@ -663,8 +658,6 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 		 * by checking i_nlink, i_generation or d_unhashed().
 		 */
 		AuDebugOn(!h_child_name);
-		au_fset_hinjob(flags[PARENT], DIRENT);
-		au_fset_hinjob(flags[CHILD], GEN);
 		au_fset_hinjob(flags[CHILD], TRYXINO0);
 		au_fset_hinjob(flags[CHILD], MNTPNT);
 		break;
