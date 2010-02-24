@@ -112,7 +112,6 @@ static void au_ren_rev_diropq(int err, struct au_ren_args *a)
 		RevertFailure("remove diropq %.*s", AuDLNPair(a->src_dentry));
 }
 
-
 static void au_ren_rev_rename(int err, struct au_ren_args *a)
 {
 	int rerr;
@@ -146,7 +145,6 @@ static void au_ren_rev_cpup(int err, struct au_ren_args *a)
 	if (rerr)
 		RevertFailure("unlink %.*s", AuDLNPair(a->dst_h_dentry));
 }
-
 
 static void au_ren_rev_whtmp(int err, struct au_ren_args *a)
 {
