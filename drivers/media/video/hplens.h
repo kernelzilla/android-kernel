@@ -29,6 +29,21 @@
 #define LENS_DETECTED		1
 #define LENS_NOT_DETECTED	0
 
+/* #define DEBUG_I2C_TIME */
+
+#define OMAP3_HPLENS_MAGIC	'L'
+#define OMAP3_HPLENS_IOCTL_BASE	0xF
+#define OMAP3_HPLENS_CMD_READ	\
+		_IOWR(OMAP3_HPLENS_MAGIC, OMAP3_HPLENS_IOCTL_BASE+0, struct hplens_reg)
+#define OMAP3_HPLENS_CMD_WRITE		\
+		_IOWR(OMAP3_HPLENS_MAGIC, OMAP3_HPLENS_IOCTL_BASE+1, struct hplens_reg)
+#define OMAP3_HPLENS_CMD_READ_PAGE	\
+		_IOWR(OMAP3_HPLENS_MAGIC, OMAP3_HPLENS_IOCTL_BASE+2, struct hplens_reg_page)
+#define OMAP3_HPLENS_CMD_WRITE_PAGE		\
+		_IOWR(OMAP3_HPLENS_MAGIC, OMAP3_HPLENS_IOCTL_BASE+3, struct hplens_reg_page)
+#define OMAP3_HPLENS_CMD_READ_CAL	\
+		_IOWR(OMAP3_HPLENS_MAGIC, OMAP3_HPLENS_IOCTL_BASE+4, struct hplens_eeprom)
+
 #define HPLENS_CID_BASE			(V4L2_CID_PRIVATE_BASE + 30)
 #define V4L2_CID_HPLENS_CMD_READ	(HPLENS_CID_BASE+0)
 #define V4L2_CID_HPLENS_CMD_WRITE	(HPLENS_CID_BASE+1)
@@ -42,6 +57,7 @@ struct hplens_reg {
    u32 len_addr;
    u8  data[16];
    u32 len_data;
+   struct timespec ts_end;
 };
 
 struct hplens_reg_page {
@@ -55,6 +71,7 @@ struct hplens_eeprom {
    u32 len_addr;
    u8  data[4096];
    u32 len_data;
+   struct timespec ts_end;
 };
 
 /**
@@ -92,5 +109,9 @@ struct hplens_platform_data {
 #define CAMAF_LV8093_INIT_OFF       0x01
 #define CAMAF_LV8093_INIT_ON        0x00
 #define CAMAF_LV8093_BUSY           0x80
+
+void hplens_lock(void);
+void hplens_unlock(void);
+
 #endif /* __HPLENS_H_INCLUDED */
 

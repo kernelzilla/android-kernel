@@ -120,11 +120,14 @@ int map_user_to_kernel(struct hp3a_buffer *src, struct hp3a_internal_buffer *des
 void unmap_buffer_from_kernel(struct hp3a_internal_buffer *ibuffer)
 {
 	if (ibuffer->isp_addr) {
+#if defined(CONFIG_VIDEO_OLDOMAP3)
 		if (ispmmu_unmap(ibuffer->isp_addr) != 0) {
 			printk(KERN_ERR "Error unmapping from ispmmu (0x%x)!",
 				(unsigned int)ibuffer->isp_addr);
 		}
-
+#else
+		ispmmu_vunmap(ibuffer->isp_addr);
+#endif
 		ibuffer->isp_addr = 0;
 	}
 

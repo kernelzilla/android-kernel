@@ -48,7 +48,7 @@
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
 
-#include <plat/control.h>
+#include <mach/control.h>
 
 #include "isp.h"
 #include "ispmmu.h"
@@ -1074,11 +1074,14 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *ispirq_disp)
 	int i;
 	struct ispirq *irqdis = (struct ispirq *)ispirq_disp;
 	u32 irqstatus;
+	unsigned long irqflags = 0;
 
+	spin_lock_irqsave(&isp_obj.lock, irqflags);
 	irqstatus = omap_readl(ISP_IRQ0STATUS);
 	omap_writel(irqstatus, ISP_IRQ0STATUS);
 	/* The following register read is for write sync. */
 	omap_readl(ISP_IRQ0STATUS);
+	spin_unlock_irqrestore(&isp_obj.lock, irqflags);
 
 	for (i = 0; i < CBK_END; ++i) {
 		if ((irqstatus & irqdis->irq_events[i]) == irqdis->irq_events[i]) {
@@ -1446,6 +1449,9 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 		return;
 		break;
 	case PREV_DONE:
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+		hp3a_frame_done();
+#endif		
 		if (is_isppreview_enabled()) {
 			if (ispmodule_obj.isp_pipeline & OMAP_ISP_RESIZER) {
 				spin_lock(&isp_obj.isp_temp_buf_lock);
@@ -1466,7 +1472,7 @@ void isp_vbq_done(unsigned long status, isp_vbq_callback_ptr arg1, void *arg2)
 				isppreview_config_shadow_registers();
 #ifdef CONFIG_VIDEO_OMAP3_HP3A
 			}
-			hp3a_frame_done();
+			hp3a_update_wb();
 #else
 			isph3a_update_wb();
 		}

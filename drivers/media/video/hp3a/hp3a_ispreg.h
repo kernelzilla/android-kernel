@@ -110,6 +110,7 @@
 #define ISPCCDC_PRGODD0                 0x480BC68C
 #define ISPCCDC_PRGODD1                 0x480BC690
 #define ISPCCDC_VP_OUT                  0x480BC694
+#define ISPCCDC_CFG_RESV_MASK           0x0000B9E0
 
 #define ISPCCDC_LSC_CONFIG              0x480BC698
 #define ISPCCDC_LSC_INITIAL             0x480BC69C

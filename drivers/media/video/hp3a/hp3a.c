@@ -1,7 +1,7 @@
 /*
  * drivers/media/video/hp3a/hp3a.c
  *
- * HP Imaging/3A Driver : Driver implementation for OMAP ISP companion
+ * HP Imaging/3A Driver : Driver implementation for OMAP ISP 3A
  *				functionality.
  *
  * Copyright (C) 2008-2009 Hewlett-Packard Co.
@@ -38,8 +38,8 @@ static struct hp3a_dev *g_device;
 
 /**
  * hp3a_open - Initializes and opens the hp3a device
- * @inode: Inode structure associated with the Resizer Wrapper
- * @filp: File structure associated with the Resizer Wrapper
+ * @inode: Inode structure associated with the hp3a driver
+ * @filp: File structure associated with the hp3a driver
  *
  * Returns 0 if successful, -EBUSY if its already opened or the ISP module is
  * not available, or -ENOMEM if its unable to allocate the device in kernel
@@ -49,7 +49,7 @@ static int hp3a_open(struct inode *inode, struct file *file)
 {
 	struct hp3a_fh *fh;
 
-	dev_info(g_device->dev , "hp3a_open()\n");
+	dev_info(g_device->dev , "open\n");
 
 	fh = kzalloc(sizeof(struct hp3a_fh), GFP_KERNEL);
 	if (unlikely(fh == NULL))
@@ -68,8 +68,8 @@ static int hp3a_open(struct inode *inode, struct file *file)
 
 /**
  * hp3a_release - Releases hp3a device and frees up allocated memory
- * @inode: Inode structure associated with the Resizer Wrapper
- * @filp: File structure associated with the Resizer Wrapper
+ * @inode: Inode structure associated with the hp3a driver
+ * @filp: File structure associated with the hp3a driver
  *
  * Returns 0 if successful, or -EBUSY if channel is being used.
  **/
@@ -77,7 +77,7 @@ static int hp3a_release(struct inode *inode, struct file *file)
 {
 	struct hp3a_fh *fh = file->private_data;
 
-	dev_info(g_device->dev , "hp3a_release()\n");
+	dev_info(g_device->dev , "release\n");
 
 	/* Stop framework. */
 	hp3a_framework_stop(fh);
@@ -135,12 +135,12 @@ static int __init hp3a_probe(struct platform_device *device)
 }
 
 /**
- * resizer_remove - Handles the removal of the driver
- * @omap_resizer_device: Structure containing details of the current device.
+ * hp3a_remove - Handles the removal of the driver
+ * @device: Structure containing details of the current device.
  *
  * Always returns 0.
  **/
-static int hp3a_remove(struct platform_device *omap_resizer_device)
+static int hp3a_remove(struct platform_device *device)
 {
 	/* Deinitialize 3A task, this is a blocking call. */
 	deinitialize_hp3a_framework();

@@ -84,6 +84,8 @@ struct v4l2_int_device {
 	void *priv;
 };
 
+struct v4l2_int_device *v4l2_int_device_dummy(void);
+
 void v4l2_int_device_try_attach_all(void);
 
 int v4l2_int_device_register(struct v4l2_int_device *d);
@@ -171,11 +173,13 @@ enum v4l2_int_ioctl_num {
 	 * "Proper" V4L ioctls, as in struct video_device.
 	 *
 	 */
-	vidioc_int_enum_fmt_cap_num = 1,
+	vidioc_int_querycap_num = 1,
+	vidioc_int_enum_fmt_cap_num,
 	vidioc_int_g_fmt_cap_num,
 	vidioc_int_s_fmt_cap_num,
 	vidioc_int_try_fmt_cap_num,
 	vidioc_int_queryctrl_num,
+	vidioc_int_querymenu_num,
 	vidioc_int_g_ctrl_num,
 	vidioc_int_s_ctrl_num,
 	vidioc_int_cropcap_num,
@@ -228,6 +232,12 @@ enum v4l2_int_ioctl_num {
 	 *
 	 */
 	vidioc_int_priv_start_num = 2000,
+	/* VIDIOC_INT_PRIV_G_PIXCLK */
+	vidioc_int_priv_g_pixclk_num,
+	/* VIDIOC_INT_PRIV_G_ACTIVESIZE */
+	vidioc_int_priv_g_activesize_num,
+	/* VIDIOC_INT_PRIV_G_FULLSIZE */
+	vidioc_int_priv_g_fullsize_num,
 };
 
 /*
@@ -275,11 +285,13 @@ enum v4l2_int_ioctl_num {
 		return desc;						\
 	}
 
+V4L2_INT_WRAPPER_1(querycap, struct v4l2_capability, *);
 V4L2_INT_WRAPPER_1(enum_fmt_cap, struct v4l2_fmtdesc, *);
 V4L2_INT_WRAPPER_1(g_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(s_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(try_fmt_cap, struct v4l2_format, *);
 V4L2_INT_WRAPPER_1(queryctrl, struct v4l2_queryctrl, *);
+V4L2_INT_WRAPPER_1(querymenu, struct v4l2_querymenu, *);
 V4L2_INT_WRAPPER_1(g_ctrl, struct v4l2_control, *);
 V4L2_INT_WRAPPER_1(s_ctrl, struct v4l2_control, *);
 V4L2_INT_WRAPPER_1(cropcap, struct v4l2_cropcap, *);
@@ -304,4 +316,7 @@ V4L2_INT_WRAPPER_0(reset);
 V4L2_INT_WRAPPER_0(init);
 V4L2_INT_WRAPPER_1(g_chip_ident, int, *);
 
+V4L2_INT_WRAPPER_1(priv_g_pixclk, u32, *);
+V4L2_INT_WRAPPER_1(priv_g_activesize, struct v4l2_pix_format, *);
+V4L2_INT_WRAPPER_1(priv_g_fullsize, struct v4l2_pix_format, *);
 #endif

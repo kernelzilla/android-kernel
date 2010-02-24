@@ -157,6 +157,7 @@ obj-$(CONFIG_VIDEO_CX23885) += cx23885/
 
 obj-$(CONFIG_VIDEO_OMAP2)		+= omap2cam.o
 obj-$(CONFIG_SOC_CAMERA)		+= soc_camera.o
+obj-$(CONFIG_VIDEO_OMAP3)		+= isp/
 obj-$(CONFIG_VIDEO_OLDOMAP3) += oldomap34xxcam.o oldisp/
 obj-$(CONFIG_VIDEO_OMAP_VIDEOOUT) += omap-vout/
 obj-$(CONFIG_SOC_CAMERA)	+= soc_camera.o

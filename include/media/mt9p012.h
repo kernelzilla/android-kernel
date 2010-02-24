@@ -27,9 +27,23 @@
  * @priv_data_set: device private data (pointer) access function
  */
 struct mt9p012_platform_data {
+#if defined(CONFIG_VIDEO_OLDOMAP3)
 	int (*power_set)(struct device* dev, enum v4l2_power power);
 	u32 (*set_xclk)(u32 xclkfreq);
 	int (*priv_data_set)(void *);
+#else	
+	int (*power_set)(struct device*, enum v4l2_power power);
+	int (*ifparm)(struct v4l2_ifparm *p);
+	int (*priv_data_set)(void *);
+	u32 (*set_xclk)(u32 xclk, u8 xclksel);
+	int (*cfg_interface_bridge)(u32);
+	int (*csi2_lane_count)(int count);
+	int (*csi2_cfg_vp_out_ctrl)(u8 vp_out_ctrl);
+	int (*csi2_ctrl_update)(bool);
+	int (*csi2_cfg_virtual_id)(u8 ctx, u8 id);
+	int (*csi2_ctx_update)(u8 ctx, bool);
+	int (*csi2_calc_phy_cfg0)(u32, u32, u32);
+#endif
 };
 
 #endif /* ifndef MT9P012_H */

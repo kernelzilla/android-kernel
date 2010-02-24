@@ -518,9 +518,9 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
 	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		RG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
+		//~ spin_lock(&ispprev_obj.ispprev_lock);
+		//~ RG_update = 0;
+		//~ spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
 	if ((ISP_ABS_TBL_GREENGAMMA & isptables_struct->update) ==
@@ -546,9 +546,9 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
 	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		GG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
+		//~ spin_lock(&ispprev_obj.ispprev_lock);
+		//~ GG_update = 0;
+		//~ spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
 	if ((ISP_ABS_TBL_BLUEGAMMA & isptables_struct->update) ==
@@ -574,9 +574,9 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
 	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		BG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
+		//~ spin_lock(&ispprev_obj.ispprev_lock);
+		//~ BG_update = 0;
+		//~ spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
 	return 0;

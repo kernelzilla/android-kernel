@@ -33,7 +33,6 @@
  **/
 void hp3a_ccdc_done(void)
 {
-	++g_tc.frame_count;
 	hp3a_update_stats_readout_done();
 }
 EXPORT_SYMBOL(hp3a_ccdc_done);
@@ -45,6 +44,7 @@ EXPORT_SYMBOL(hp3a_ccdc_done);
  **/
 void hp3a_ccdc_start(void)
 {
+	++g_tc.frame_count;
 	hp3a_schedule_task();
 }
 EXPORT_SYMBOL(hp3a_ccdc_start);
@@ -57,9 +57,19 @@ EXPORT_SYMBOL(hp3a_ccdc_start);
 void hp3a_frame_done(void)
 {
 	hp3a_update_stats_pipe_done();
-	hp3a_update_hardpipe();
 }
 EXPORT_SYMBOL(hp3a_frame_done);
+
+/**
+ * hp3a_update_wb - Update WB related hw settings.
+ *
+ * No return value.
+ **/
+void hp3a_update_wb(void)
+{
+	hp3a_update_hardpipe();
+}
+EXPORT_SYMBOL(hp3a_update_wb);
 
 /**
  * hp3a_stream_on - Perform stream on specific tasks.
@@ -69,14 +79,16 @@ EXPORT_SYMBOL(hp3a_frame_done);
 void hp3a_stream_on(void)
 {
 	g_tc.frame_count = 0;
-	g_tc.v4l2_streaming = 1;
+	memset(&g_tc.sensor_current, 0, sizeof(struct hp3a_sensor_param));
+	memset(&g_tc.sensor_requested, 0, sizeof(struct hp3a_sensor_param));
+	memset(&g_tc.sensor_stats, 0, sizeof(struct hp3a_sensor_param));
+	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
+	hp3a_flush_queue_irqsave(&g_tc.hist_hw_queue);
 	g_tc.raw_cap_sched_count = 0;
+	g_tc.v4l2_streaming = 1;
 
 	hp3a_enable_histogram();
 	hp3a_update_hardpipe();
-
-	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
-	hp3a_flush_queue_irqsave(&g_tc.hist_hw_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_on);
 
@@ -90,9 +102,6 @@ void hp3a_stream_off(void)
 	g_tc.v4l2_streaming = 0;
 	g_tc.raw_cap_sched_count = 0;
 	g_tc.update_hardpipe = 0;
-
-	hp3a_flush_queue_irqsave(&g_tc.ready_stats_queue);
-	hp3a_flush_queue_irqsave(&g_tc.hist_hw_queue);
 }
 EXPORT_SYMBOL(hp3a_stream_off);
 

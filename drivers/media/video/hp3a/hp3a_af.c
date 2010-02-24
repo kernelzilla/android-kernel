@@ -34,27 +34,27 @@
 
 struct hp3a_reg isp_af_regs[] = {
 	{HP3A_REG_32BIT, ISPH3A_PCR, 0}, /* 0 */
-	{HP3A_REG_32BIT, ISPH3A_AFPAX1, 0}, /* 1 */
-	{HP3A_REG_32BIT, ISPH3A_AFPAX2, 0}, /* 2 */
-	{HP3A_REG_32BIT, ISPH3A_AFPAXSTART, 0}, /* 3 */
-	{HP3A_REG_32BIT, ISPH3A_AFIIRSH, 0}, /* 4 */
+	{HP3A_REG_32BIT, ISPH3A_AFPAX1, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFPAX2, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFPAXSTART, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFIIRSH, 0},
 	{HP3A_REG_32BIT, ISPH3A_AFBUFST, 0}, /* 5 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF010, 0}, /* 6 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF032, 0}, /* 7 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF054, 0}, /* 8 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF076, 0}, /* 9 */
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF010, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF032, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF054, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF076, 0},
 	{HP3A_REG_32BIT, ISPH3A_AFCOEF098, 0}, /* 10 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF0010, 0}, /* 11 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF110, 0}, /* 12 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF132, 0}, /* 13 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF154, 0}, /* 15 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF176, 0}, /* 16 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF198, 0}, /* 17 */
-	{HP3A_REG_32BIT, ISPH3A_AFCOEF1010, 0}, /* 18 */
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF0010, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF110, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF132, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF154, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF176, 0}, /* 15 */
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF198, 0},
+	{HP3A_REG_32BIT, ISPH3A_AFCOEF1010, 0},
 	{HP3A_REG_32BIT, ISPH3A_AEWWIN1, 0},
 	{HP3A_REG_32BIT, ISPH3A_AEWINSTART, 0},
 	{HP3A_REG_32BIT, ISPH3A_AEWINBLK, 0},
-	{HP3A_REG_32BIT, ISPH3A_AEWSUBWIN, 0},
+	{HP3A_REG_32BIT, ISPH3A_AEWSUBWIN, 0}, /* 20 */
 	{HP3A_REG_32BIT, ISPH3A_AEWBUFST, 0},
 	{HP3A_REG_TOK_TERM, 0, 0}
 	};
@@ -123,9 +123,8 @@ void hp3a_disable_af(void)
 static void hp3a_af_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 			void *arg2)
 {
-	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE)) {
+	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE))
 		return;
-	}
 
 	/* clear IRQ status bit.*/
 	/*
@@ -158,9 +157,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		/* Install AF callback. */
 		ret = isp_set_callback(CBK_H3A_AF_DONE, hp3a_af_isr,
 					(void *)NULL, (void *)NULL);
-		if (ret) {
+		if (ret)
 			return ret;
-		}
 
 		if (hp3a_af_busy()) {
 			dev_info(device->dev, "Error: AF engine is busy!\n");
@@ -206,7 +204,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 
 		/* Validate paxel dimessions. */
 		if (config->paxel.width < 16 || config->paxel.width > 256 ||
-			config->paxel.height < 2 ||  config->paxel.height > 256) {
+			config->paxel.height < 2 ||
+			config->paxel.height > 256) {
 			dev_info(device->dev,
 				"Error: Invalid paxel dimention %d-%d\n",
 				config->paxel.width, config->paxel.height);
@@ -222,12 +221,13 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		/* IIR filter hz start setup. */
 		WRITE_REG(isp_af_regs[4].val, config->iir.hz_start_pos);
 
-		/* Setup paxel start position after IIR filter hz start setup. */
+		/* Setup paxel start position after */
+		/* IIR filter hz start setup. */
 		if (config->paxel.hz_start < (config->iir.hz_start_pos + 1) ||
 			config->paxel.hz_start > 4095 ||
 			config->paxel.vt_start > 4095) {
 			dev_info(device->dev,
-				"Error : Invalid paxel start position. (hz=%d vt=%d)\n",
+				"Error : Invalid paxel start. (hz=%d vt=%d)\n",
 				config->paxel.hz_start, config->paxel.vt_start);
 			goto func_exit;
 		}
@@ -250,7 +250,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 			goto func_exit;
 		}
 
-		if (config->paxel.line_incr > 8 || config->paxel.line_incr < 2) {
+		if (config->paxel.line_incr > 8 ||
+			config->paxel.line_incr < 2) {
 			dev_info(device->dev,
 				"Error: Invalid paxel line increment %d\n",
 				config->paxel.line_incr);
@@ -262,18 +263,23 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		OR_REG(isp_af_regs[2].val,
 			(config->paxel.vt_cnt - 1) << AF_VT_COUNT_SHIFT);
 		OR_REG(isp_af_regs[2].val,
-			((config->paxel.line_incr >> 1) - 1) << AF_LINE_INCR_SHIFT);
+			((config->paxel.line_incr >> 1) - 1) <<
+			AF_LINE_INCR_SHIFT);
 
 		/* Validate IIR filter coefficients. */
 		for (index = 0; index < AF_NUMBER_OF_COEF; ++index) {
 			if ((config->iir.coeff_set0[index]) > AF_COEF_MAX) {
 				dev_info(device->dev,
-					"Error : Coefficient(%d) for set 0 is incorrect\n", index);
+					"Err : Coefficient %d for set 0 "
+					" is incorrect\n",
+					index);
 				goto func_exit;
 			}
 			if ((config->iir.coeff_set1[index]) > AF_COEF_MAX) {
 				dev_info(device->dev,
-					"Error : Coefficient for(%d) set 1 is incorrect\n", index);
+					"Err : Coefficient %d for set 1 "
+					"wrong\n",
+					index);
 				goto func_exit;
 			}
 		}

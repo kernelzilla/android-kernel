@@ -1,24 +1,34 @@
 /*
- * drivers/media/video/omap34xxcam.h
+ * omap34xxcam.h
  *
- * Video-for-Linux (Version 2) Camera capture driver for OMAP34xx ISP.
+ * Copyright (C) 2006--2009 Nokia Corporation
+ * Copyright (C) 2007--2009 Texas Instruments
  *
- * Copyright (C) 2008 Texas Instruments.
- * Copyright (C) 2008 Nokia.
+ * Contact: Sakari Ailus <sakari.ailus@nokia.com>
+ *          Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
  *
- * Contributors:
- *	Sameer Venkatraman <sameerv@ti.com>
- *	Mohit Jalori <mjalori@ti.com>
- *	Sakari Ailus <sakari.ailus@nokia.com>
- *	Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
+ * Originally based on the OMAP 2 camera driver.
  *
- * This package is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Written by Sakari Ailus <sakari.ailus@nokia.com>
+ *            Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
+ *            Sergio Aguirre <saaguirre@ti.com>
+ *            Mohit Jalori
+ *            Sameer Venkatraman
+ *            Leonides Martinez
  *
- * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA
  *
  */
 
@@ -26,12 +36,13 @@
 #define OMAP34XXCAM_H
 
 #include <media/v4l2-int-device.h>
-#include "oldisp/isp.h"
+#include "isp/isp.h"
 
-#define CAM_NAME "omap34xxcam"
+#define CAM_NAME			"omap34xxcam"
+#define CAM_SHORT_NAME			"omap3"
 
-#define OMAP_ISP_AF		(1 << 4)
-#define OMAP_ISP_HIST		(1 << 5)
+#define OMAP_ISP_AF     	(1 << 4)
+#define OMAP_ISP_HIST   	(1 << 5)
 #define OMAP34XXCAM_XCLK_NONE	-1
 #define OMAP34XXCAM_XCLK_A	0
 #define OMAP34XXCAM_XCLK_B	1
@@ -40,38 +51,26 @@
 #define OMAP34XXCAM_SLAVE_LENS		1
 #define OMAP34XXCAM_SLAVE_FLASH		2 /* This is the last slave! */
 
+/* mask for omap34xxcam_slave_power_set */
+#define OMAP34XXCAM_SLAVE_POWER_SENSOR	(1 << OMAP34XXCAM_SLAVE_SENSOR)
+#define OMAP34XXCAM_SLAVE_POWER_LENS	(1 << OMAP34XXCAM_SLAVE_LENS)
+#define OMAP34XXCAM_SLAVE_POWER_SENSOR_LENS \
+	(OMAP34XXCAM_SLAVE_POWER_SENSOR | OMAP34XXCAM_SLAVE_POWER_LENS)
+#define OMAP34XXCAM_SLAVE_POWER_FLASH	(1 << OMAP34XXCAM_SLAVE_FLASH)
+#define OMAP34XXCAM_SLAVE_POWER_ALL	-1
+
 #define OMAP34XXCAM_VIDEODEVS		4
+
+/* #define OMAP34XXCAM_POWEROFF_DELAY (2 * HZ) */
 
 struct omap34xxcam_device;
 struct omap34xxcam_videodev;
-
-struct omap34xxcam_hw_csi2_lanes_data {
-	unsigned polarity:1;
-	unsigned position:3;
-};
-
-struct omap34xxcam_hw_csi2_lanes {
-	struct omap34xxcam_hw_csi2_lanes_data data[4];
-	struct omap34xxcam_hw_csi2_lanes_data clock;
-};
-
-struct omap34xxcam_hw_csi2_phy {
-	u8 ths_term;
-	u8 ths_settle;
-	u8 tclk_term;
-	unsigned tclk_miss:1;
-	u8 tclk_settle;
-};
-
-struct omap34xxcam_hw_csi2 {
-	struct omap34xxcam_hw_csi2_lanes lanes;
-	struct omap34xxcam_hw_csi2_phy phy;
-};
 
 struct omap34xxcam_sensor_config {
 	int xclk;
 	int sensor_isp;
 	u32 capture_mem;
+	struct v4l2_fract ival_default;
 };
 
 struct omap34xxcam_lens_config {
@@ -91,15 +90,11 @@ struct omap34xxcam_hw_config {
 	int dev_index; /* Index in omap34xxcam_sensors */
 	int dev_minor; /* Video device minor number */
 	int dev_type; /* OMAP34XXCAM_SLAVE_* */
-	int interface_type; /* Interface type */
 	union {
 		struct omap34xxcam_sensor_config sensor;
 		struct omap34xxcam_lens_config lens;
 		struct omap34xxcam_flash_config flash;
 	} u;
-	union {
-		struct omap34xxcam_hw_csi2 hw_csi2;
-	} csi2;
 };
 
 /**
@@ -116,13 +111,21 @@ struct omap34xxcam_hw_config {
  * @if_u: sensor interface stuff
  * @index: index of this structure in cam->vdevs
  * @users: how many users we have
+ * @power_state: Current power state
+ * @power_state_wish: New power state when poweroff_timer expires
+ * @power_state_mask: Bitmask of devices to set the new power state
+ * @poweroff_timer: Timer for dispatching poweroff_work
+ * @poweroff_work: Work for slave power state change
  * @sensor_config: ISP-speicific sensor configuration
  * @lens_config: ISP-speicific lens configuration
  * @flash_config: ISP-speicific flash configuration
+ * @want_timeperframe: Desired timeperframe
+ * @want_pix: Desired pix
+ * @pix: Current pix
  * @streaming: streaming file handle, if streaming is enabled
  */
 struct omap34xxcam_videodev {
-	struct mutex mutex; /* For serializing access to this structure */
+	struct mutex mutex; /* serialises access to this structure */
 
 	struct omap34xxcam_device *cam;
 	struct v4l2_int_device master;
@@ -140,14 +143,15 @@ struct omap34xxcam_videodev {
 	int capture_mem;
 
 	/*** general driver state information ***/
-	/*
-	 * Sensor interface parameters: interface type, CC_CTRL
-	 * register value and interface specific data.
-	 */
-	u32 xclk;
-	/* index to omap34xxcam_videodevs of this structure */
 	int index;
 	atomic_t users;
+	enum v4l2_power power_state[OMAP34XXCAM_SLAVE_FLASH + 1];
+#ifdef OMAP34XXCAM_POWEROFF_DELAY
+	enum v4l2_power power_state_wish;
+	int power_state_mask;
+	struct timer_list poweroff_timer;
+	struct work_struct poweroff_work;
+#endif /* OMAP34XXCAM_POWEROFF_DELAY */
 
 #define vdev_sensor_config slave_config[OMAP34XXCAM_SLAVE_SENSOR].u.sensor
 #define vdev_lens_config slave_config[OMAP34XXCAM_SLAVE_LENS].u.lens
@@ -155,10 +159,11 @@ struct omap34xxcam_videodev {
 	struct omap34xxcam_hw_config slave_config[OMAP34XXCAM_SLAVE_FLASH + 1];
 
 	/*** capture data ***/
+	struct file *streaming;
 	struct v4l2_fract want_timeperframe;
 	struct v4l2_pix_format want_pix;
-	/* file handle, if streaming is on */
-	struct file *streaming;
+	spinlock_t pix_lock;
+	struct v4l2_pix_format pix;
 };
 
 /**
@@ -168,29 +173,15 @@ struct omap34xxcam_videodev {
  * protected by the lock above.
  * @sgdma: ISP sgdma subsystem information structure
  * @dma_notify: DMA notify flag
- * @irq: irq number platform HW resource
- * @mmio_base: register map memory base (platform HW resource)
- * @mmio_base_phys: register map memory base physical address
- * @mmio_size: register map memory size
  * @dev: device structure
  * @vdevs: /dev/video specific structures
  * @fck: camera module fck clock information
  * @ick: camera module ick clock information
  */
 struct omap34xxcam_device {
-	struct mutex mutex; /* For serializing access to this structure */
-	int sgdma_in_queue;
-	struct isp_sgdma sgdma;
-	int dma_notify;
-
-	/*** platform HW resource ***/
-	unsigned int irq;
-	unsigned long mmio_base;
-	unsigned long mmio_base_phys;
-	unsigned long mmio_size;
+	struct mutex mutex; /* serialises access to this structure */
 
 	/*** interfaces and device ***/
-	struct device *dev;
 	struct omap34xxcam_videodev vdevs[OMAP34XXCAM_VIDEODEVS];
 
 	/*** camera module clocks ***/
@@ -203,16 +194,13 @@ struct omap34xxcam_device {
  * struct omap34xxcam_fh - per-filehandle data structure
  * @vbq_lock: spinlock for the videobuf queue
  * @vbq: V4L2 video buffer queue structure
- * @pix: V4L2 pixel format structure (serialise pix by vbq->lock)
  * @field_count: field counter for videobuf_buffer
  * @vdev: our /dev/video specific structure
  */
 struct omap34xxcam_fh {
-	spinlock_t vbq_lock; /* For the videobuf queue */
+	spinlock_t vbq_lock; /* spinlock for the videobuf queue */
 	struct videobuf_queue vbq;
-	struct v4l2_pix_format pix;
 	atomic_t field_count;
-	/* accessing cam here doesn't need serialisation: it's constant */
 	struct omap34xxcam_videodev *vdev;
 };
 
@@ -241,21 +229,21 @@ struct cam_sensor_settings{
 	u32 flags;
 	u32 exposure;
 	u16 gain;
-        u16 fps;
+	u16 fps;
 	u16 regs;
 	void *reg_data;
 };
 
-#define	OMAP34XXCAM_SET_EXPOSURE		0x1
-#define	OMAP34XXCAM_SET_GAIN			         0x2
-#define	OMAP34XXCAM_READ_REGS			   0x4
-#define	OMAP34XXCAM_WRITE_REGS			   0x8
+#define	OMAP34XXCAM_SET_EXPOSURE         0x1
+#define	OMAP34XXCAM_SET_GAIN                 0x2
+#define	OMAP34XXCAM_READ_REGS              0x4
+#define	OMAP34XXCAM_WRITE_REGS             0x8
 #define	OMAP34XXCAM_SET_FPS                   0x10
 
-#define	OMAP34XXCAM_REG_8BIT			         0x1
-#define	OMAP34XXCAM_REG_16BIT			      0x2
-#define	OMAP34XXCAM_REG_32BIT			      0x4
-#define	OMAP34XXCAM_REG_END			         0xFF
+#define	OMAP34XXCAM_REG_8BIT                  0x1
+#define	OMAP34XXCAM_REG_16BIT                0x2
+#define	OMAP34XXCAM_REG_32BIT                0x4
+#define	OMAP34XXCAM_REG_END                  0xFF
 
 #define V4L2_CID_PRIVATE_SENSOR_READ_REG	(V4L2_CID_PRIVATE_BASE + 20)
 #define V4L2_CID_PRIVATE_SENSOR_WRITE_REG	(V4L2_CID_PRIVATE_BASE + 21)

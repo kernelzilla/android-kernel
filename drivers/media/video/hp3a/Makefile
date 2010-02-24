@@ -11,4 +11,4 @@ obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a_raw.o
 obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a_hardpipe.o
 obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a_ioctl.o
 
-EXTRA_CFLAGS += -Idrivers/media/video/oldisp
+EXTRA_CFLAGS += -Idrivers/media/video/isp
