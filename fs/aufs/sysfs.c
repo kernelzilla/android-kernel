@@ -99,7 +99,7 @@ static struct seq_file *au_seq(char *p, ssize_t len)
 
 /* todo: file size may exceed PAGE_SIZE */
 ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
-			 char *buf)
+			char *buf)
 {
 	ssize_t err;
 	long l;
