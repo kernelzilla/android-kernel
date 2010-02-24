@@ -2632,7 +2632,7 @@ int dhd_os_wake_lock_timeout(dhd_pub_t *pub)
 		ret = dhd->wl_packet;
 #ifdef CONFIG_HAS_WAKELOCK
 		if (dhd->wl_packet)
-			wake_lock_timeout(&dhd->wl_rxwake, (HZ >> 1));
+			wake_lock_timeout(&dhd->wl_rxwake, HZ);
 #endif
 		dhd->wl_packet = 0;
 		spin_unlock_irqrestore(&dhd->wl_lock, flags);
