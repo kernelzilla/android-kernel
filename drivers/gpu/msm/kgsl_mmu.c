@@ -458,6 +458,10 @@ int kgsl_mmu_init(struct kgsl_device *device)
 			kgsl_mmu_close(device);
 			return status;
 		}
+
+		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
+				   mmu->dummyspace.size);
+
 		kgsl_regwrite(device, mmu_reg[device->id-1].tran_error,
 						mmu->dummyspace.physaddr);
 
