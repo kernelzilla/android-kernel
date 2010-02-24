@@ -23,6 +23,7 @@
 #include <mach/dma.h>
 
 #include <asm/mach/flash.h>
+#include <asm/mach/mmc.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 
