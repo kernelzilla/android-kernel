@@ -18,6 +18,7 @@
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
 #include <linux/irq.h>
 #include <linux/io.h>
 
@@ -26,30 +27,31 @@
 #include <asm/hardware/gic.h>
 
 #include <mach/board.h>
+#include <mach/irqs.h>
 #include <mach/msm_iomap.h>
 
 #include "timer.h"
 
 void __iomem *gic_cpu_base_addr;
 
+/*
+ * The smc91x configuration varies depending on platform.
+ * The resources data structure is filled in at runtime.
+ */
 static struct resource smc91x_resources[] = {
 	[0] = {
-		.start = 0x1d000300,
-		.end    = 0x1d0003ff,
-		.flags  = IORESOURCE_MEM,
+		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
-		.start  = 36,
-		.end    = 36,
-		.flags  = IORESOURCE_IRQ,
+		.flags = IORESOURCE_IRQ,
 	},
 };
 
 static struct platform_device smc91x_device = {
-	.name           = "smc91x",
-	.id             = 0,
-	.num_resources  = ARRAY_SIZE(smc91x_resources),
-	.resource       = smc91x_resources,
+	.name          = "smc91x",
+	.id            = 0,
+	.num_resources = ARRAY_SIZE(smc91x_resources),
+	.resource      = smc91x_resources,
 };
 
 static struct platform_device *devices[] __initdata = {
@@ -98,8 +100,59 @@ static void __init msm8x60_init_irq(void)
 	}
 }
 
+/*
+ * Most segments of the EBI2 bus are disabled by default.
+ */
+static void __init msm8x60_init_ebi2(void)
+{
+	uint32_t ebi2_cfg;
+	void *ebi2_cfg_ptr;
+
+	ebi2_cfg_ptr = ioremap_nocache(0x1a100000, sizeof(uint32_t));
+	if (ebi2_cfg_ptr != 0) {
+		ebi2_cfg = readl(ebi2_cfg_ptr);
+
+		if (machine_is_msm8x60_sim())
+			ebi2_cfg |= (1 << 4); /* CS2_CFG */
+		else if (machine_is_msm8x60_rumi3())
+			ebi2_cfg |= (1 << 5); /* CS3_CFG */
+
+		writel(ebi2_cfg, ebi2_cfg_ptr);
+		iounmap(ebi2_cfg_ptr);
+	}
+}
+
+static void __init msm8x60_configure_smc91x(void)
+{
+	if (machine_is_msm8x60_sim()) {
+
+		smc91x_resources[0].start = 0x1b800300;
+		smc91x_resources[0].end   = 0x1b8003ff;
+
+		smc91x_resources[1].start = (NR_MSM_IRQS + 40);
+		smc91x_resources[1].end   = (NR_MSM_IRQS + 40);
+
+	} else if (machine_is_msm8x60_rumi3()) {
+
+		smc91x_resources[0].start = 0x1d000300;
+		smc91x_resources[0].end   = 0x1d0003ff;
+
+		smc91x_resources[1].start = TLMM_SCSS_DIR_CONN_IRQ_0;
+		smc91x_resources[1].end   = TLMM_SCSS_DIR_CONN_IRQ_0;
+	}
+}
+
+static void __init msm8x60_init_tlmm(void)
+{
+	if (machine_is_msm8x60_rumi3())
+		msm_gpio_install_direct_irq(NR_MSM_IRQS + 40, 0);
+}
+
 static void __init msm8x60_init(void)
 {
+	msm8x60_init_ebi2();
+	msm8x60_init_tlmm();
+	msm8x60_configure_smc91x();
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
