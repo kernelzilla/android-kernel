@@ -666,8 +666,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 
 	BUG_ON(range <= 0);
 
-	gen_pool_free(pagetable->pool, gpuaddr, range);
-
 	numpages = (range >> KGSL_PAGESIZE_SHIFT);
 	if (range & (KGSL_PAGESIZE - 1))
 		numpages++;
@@ -693,6 +691,8 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 	}
 
 	mb();
+
+	gen_pool_free(pagetable->pool, gpuaddr, range);
 
 	KGSL_MEM_VDBG("return %d\n", 0);
 
