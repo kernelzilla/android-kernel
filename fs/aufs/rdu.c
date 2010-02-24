@@ -232,14 +232,9 @@ static int au_rdu_ino(struct file *file, struct aufs_rdu *rdu)
 	sb = file->f_dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
 	while (nent-- > 0) {
-		err = !access_ok(VERIFY_WRITE, u->e, sizeof(ent));
-		if (unlikely(err)) {
-			err = -EFAULT;
-			AuTraceErr(err);
-			break;
-		}
-
 		err = copy_from_user(&ent, u->e, sizeof(ent));
+		if (!err)
+			err = !access_ok(VERIFY_WRITE, &u->e->ino, sizeof(ino));
 		if (unlikely(err)) {
 			err = -EFAULT;
 			AuTraceErr(err);

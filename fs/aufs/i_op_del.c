@@ -195,9 +195,11 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 		goto out; /* success, no need to create whiteout */
 
 	wh_dentry = au_wh_create(dentry, bcpup, h_path.dentry);
-	if (!IS_ERR(wh_dentry))
-		goto out; /* success */
+	if (IS_ERR(wh_dentry))
+		goto out_unpin;
+
 	/* returns with the parent is locked and wh_dentry is dget-ed */
+	goto out; /* success */
 
  out_unpin:
 	au_unpin(pin);
