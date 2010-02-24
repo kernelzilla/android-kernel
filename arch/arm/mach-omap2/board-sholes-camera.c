@@ -26,14 +26,21 @@
 #include <plat/board-sholes.h>
 #include <plat/omap-pm.h>
 
-#ifdef CONFIG_VIDEO_OLDOMAP3
+#if defined(CONFIG_VIDEO_OMAP3)
+#include <media/v4l2-int-device.h>
+#include <../drivers/media/video/omap34xxcam.h>
+#include <../drivers/media/video/isp/ispreg.h>
+#include <../drivers/media/video/isp/isp.h>
+#include <../drivers/media/video/isp/ispcsi2.h>
+#elif defined(CONFIG_VIDEO_OLDOMAP3)
 #include <media/v4l2-int-device.h>
 #include <../drivers/media/video/oldomap34xxcam.h>
 #include <../drivers/media/video/oldisp/ispreg.h>
 #include <../drivers/media/video/oldisp/isp.h>
+#endif
+
 #if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
 #include <media/mt9p012.h>
-#endif
 #endif
 
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
@@ -78,7 +85,7 @@ static struct omap34xxcam_sensor_config mt9p012_cam_hwc = {
 static int mt9p012_sensor_set_prv_data(void *priv)
 {
 	struct omap34xxcam_hw_config *hwc = priv;
-
+#if defined(CONFIG_VIDEO_OLDOMAP3)
 	hwc->u.sensor.xclk = mt9p012_cam_hwc.xclk;
 	hwc->u.sensor.sensor_isp = mt9p012_cam_hwc.sensor_isp;
 	hwc->u.sensor.capture_mem = mt9p012_cam_hwc.capture_mem;
@@ -86,10 +93,18 @@ static int mt9p012_sensor_set_prv_data(void *priv)
 	hwc->dev_minor = 0;
 	hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
 	hwc->interface_type = ISP_PARLL;
+#else
+	hwc->u.sensor.xclk = mt9p012_cam_hwc.xclk;
+	hwc->u.sensor.sensor_isp = mt9p012_cam_hwc.sensor_isp;
+	hwc->dev_index = 0;
+	hwc->dev_minor = 0;
+	hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
+#endif
 	return 0;
 }
 
 static struct isp_interface_config mt9p012_if_config = {
+#if defined(CONFIG_VIDEO_OLDOMAP3)
 	.ccdc_par_ser = ISP_PARLL,
 	.dataline_shift = 0x1,
 	.hsvs_syncdetect = ISPCTRL_SYNC_DETECT_VSRISE,
@@ -107,9 +122,22 @@ static struct isp_interface_config mt9p012_if_config = {
 	.wbal.coef3 = 0x30,
 	.u.par.par_bridge = 0x0,
 	.u.par.par_clk_pol = 0x0,
+#else
+	.ccdc_par_ser = ISP_PARLL,
+	.dataline_shift 	= 0x1,
+	.hsvs_syncdetect 	= ISPCTRL_SYNC_DETECT_VSRISE,
+	.strobe 		= 0x0,
+	.prestrobe 		= 0x0,
+	.shutter 		= 0x0,
+	.wenlog = ISPCCDC_CFG_WENLOG_OR,
+	.wait_hs_vs = 1,
+	.raw_fmt_in = ISPCCDC_INPUT_FMT_GR_BG,
+	.u.par.par_bridge = 0x0,
+	.u.par.par_clk_pol = 0x0,
+#endif
 };
 
-static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
+static int mt9p012_sensor_power_set(struct device *dev, enum v4l2_power power)
 {
 	static enum v4l2_power previous_power = V4L2_POWER_OFF;
 	static struct regulator *regulator;
@@ -214,9 +242,21 @@ u32 mt9p012_set_xclk(u32 xclkfreq)
 
 
 struct mt9p012_platform_data sholes_mt9p012_platform_data = {
+#if defined(CONFIG_VIDEO_OLDOMAP3)
 	.power_set      = mt9p012_sensor_power_set,
-	.set_xclk	= mt9p012_set_xclk,
+	.set_xclk          = mt9p012_set_xclk,
+	.priv_data_set = mt9p012_sensor_set_prv_data,
+#else
+	.power_set       = mt9p012_sensor_power_set,
 	.priv_data_set  = mt9p012_sensor_set_prv_data,
+	.set_xclk           = isp_set_xclk,
+	.csi2_lane_count        = isp_csi2_complexio_lanes_count,
+	.csi2_cfg_vp_out_ctrl = isp_csi2_ctrl_config_vp_out_ctrl,
+	.csi2_ctrl_update       = isp_csi2_ctrl_update,
+	.csi2_cfg_virtual_id    = isp_csi2_ctx_config_virtual_id,
+	.csi2_ctx_update       = isp_csi2_ctx_update,
+	.csi2_calc_phy_cfg0  = isp_csi2_calc_phy_cfg0,
+#endif
 };
 
 #endif /* #ifdef CONFIG_VIDEO_MT9P012 || CONFIG_VIDEO_MT9P012_MODULE */
