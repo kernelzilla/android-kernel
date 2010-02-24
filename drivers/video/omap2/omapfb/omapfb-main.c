@@ -2227,7 +2227,9 @@ static int omapfb_probe(struct platform_device *pdev)
 						OMAP_DSS_UPDATE_MANUAL);
 
 			def_display->get_resolution(def_display, &w, &h);
+#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
 			def_display->update(def_display, 0, 0, w, h);
+#endif
 #endif
 		} else {
 			if (def_display->set_update_mode)
