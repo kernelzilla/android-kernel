@@ -101,4 +101,7 @@ struct q6audio_analog_ops {
 
 void q6audio_register_analog_ops(struct q6audio_analog_ops *ops);
 
+/* signal non-recoverable DSP error so we can log and/or panic */
+void q6audio_dsp_not_responding(void);
+
 #endif
