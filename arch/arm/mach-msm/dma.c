@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-msm/dma.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -23,7 +23,33 @@
 #include <mach/dma.h>
 
 #define MODULE_NAME "msm_dmov"
+
 #define MSM_DMOV_CHANNEL_COUNT 16
+
+struct msm_dmov_conf {
+	void *base;
+	int channel_active;
+	struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
+	struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
+	spinlock_t lock;
+	unsigned int irq;
+};
+
+static struct msm_dmov_conf dmov_conf[] = {
+	{
+		.base = MSM_DMOV_BASE,
+		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
+		.irq = INT_ADM_AARM
+	}
+};
+
+#define MSM_DMOV_ID_COUNT (MSM_DMOV_CHANNEL_COUNT * ARRAY_SIZE(dmov_conf))
+#define DMOV_REG(name, adm)    ((name) + (dmov_conf[adm].base))
+#define DMOV_ID_TO_ADM(id)   ((id) / MSM_DMOV_CHANNEL_COUNT)
+#define DMOV_ID_TO_CHAN(id)   ((id) % MSM_DMOV_CHANNEL_COUNT)
+#define DMOV_CHAN_ADM_TO_ID(ch, adm) ((ch) + (adm) * MSM_DMOV_CHANNEL_COUNT)
+
+#define DMOV_IRQ_TO_ADM(irq) 0
 
 enum {
 	MSM_DMOV_PRINT_ERRORS = 1,
@@ -31,19 +57,7 @@ enum {
 	MSM_DMOV_PRINT_FLOW = 4
 };
 
-enum {
-	CLK_DIS,
-	CLK_TO_BE_DIS,
-	CLK_EN
-};
-
-static DEFINE_SPINLOCK(msm_dmov_lock);
-static struct clk *msm_dmov_clk;
-static unsigned int channel_active;
-static struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
-static struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
 unsigned int msm_dmov_print_mask = MSM_DMOV_PRINT_ERRORS;
-unsigned int clk_ctl = CLK_DIS;
 
 #define MSM_DMOV_DPRINTF(mask, format, args...) \
 	do { \
@@ -57,67 +71,80 @@ unsigned int clk_ctl = CLK_DIS;
 #define PRINT_FLOW(format, args...) \
 	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_FLOW, format, args);
 
-void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
-{
-	writel((graceful << 31), DMOV_FLUSH0(id));
-}
-EXPORT_SYMBOL(msm_dmov_stop_cmd);
+enum {
+	CLK_DIS,
+	CLK_TO_BE_DIS,
+	CLK_EN
+};
+
+static struct clk *msm_dmov_clk;
+static unsigned int clk_ctl = CLK_DIS;
 
 static void timer_func(unsigned long func_paramter)
 {
-	unsigned long irq_flags;
-
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+	unsigned long irq_flags[ARRAY_SIZE(dmov_conf)];
+	int i;
+	for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+		spin_lock_irqsave(&dmov_conf[i].lock, irq_flags[i]);
 	if (clk_ctl == CLK_TO_BE_DIS) {
-		BUG_ON(channel_active);
+		for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+			BUG_ON(dmov_conf[i].channel_active);
 		clk_disable(msm_dmov_clk);
 		clk_ctl = CLK_DIS;
 	}
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+	for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+		spin_unlock_irqrestore(&dmov_conf[i].lock, irq_flags[i]);
 }
 DEFINE_TIMER(timer, timer_func, 0, 0);
+
+void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
+{
+	int adm = DMOV_ID_TO_ADM(id);
+	int ch = DMOV_ID_TO_CHAN(id);
+	writel((graceful << 31), DMOV_REG(DMOV_FLUSH0(ch), adm));
+}
+EXPORT_SYMBOL(msm_dmov_stop_cmd);
 
 void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 {
 	unsigned long irq_flags;
 	unsigned int status;
+	int adm = DMOV_ID_TO_ADM(id);
+	int ch = DMOV_ID_TO_CHAN(id);
 
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+	spin_lock_irqsave(&dmov_conf[adm].lock, irq_flags);
 	if (clk_ctl == CLK_DIS)
 		clk_enable(msm_dmov_clk);
 	else if (clk_ctl == CLK_TO_BE_DIS)
 		del_timer(&timer);
 	clk_ctl = CLK_EN;
 
-	status = readl(DMOV_STATUS(id));
-	if (list_empty(&ready_commands[id]) &&
+	status = readl(DMOV_REG(DMOV_STATUS(ch), adm));
+	if (list_empty(&dmov_conf[adm].ready_commands[ch]) &&
 		(status & DMOV_STATUS_CMD_PTR_RDY)) {
+		PRINT_IO("msm_dmov_enqueue_cmd(%d), start command, status %x\n",
+			id, status);
 		if (cmd->exec_func)
 			cmd->exec_func(cmd);
-		PRINT_IO(
-		 "msm_dmov_enqueue_cmd_ext(%d), start command, status %x\n",
-		 id, status);
-		list_add_tail(&cmd->list, &active_commands[id]);
-		if (!channel_active)
-			enable_irq(INT_ADM_AARM);
-		channel_active |= 1U << id;
-		writel(cmd->cmdptr, DMOV_CMD_PTR(id));
+		list_add_tail(&cmd->list, &dmov_conf[adm].active_commands[ch]);
+		if (!dmov_conf[adm].channel_active)
+			enable_irq(dmov_conf[adm].irq);
+		dmov_conf[adm].channel_active |= 1U << ch;
+		PRINT_IO("Writing %x exactly to register", cmd->cmdptr);
+		writel(cmd->cmdptr, DMOV_REG(DMOV_CMD_PTR(ch), adm));
 	} else {
-		if (!channel_active) {
+		if (!dmov_conf[adm].channel_active) {
 			clk_ctl = CLK_TO_BE_DIS;
 			mod_timer(&timer, jiffies + HZ);
 		}
-		if (list_empty(&active_commands[id]))
-			PRINT_ERROR(
-			 "msm_dmov_enqueue_cmd_ext(%d), stalled, status %x\n",
-			 id, status);
-
-		PRINT_IO(
-		 "msm_dmov_enqueue_cmd_ext(%d), enqueue command, status %x\n",
-		 id, status);
-		list_add_tail(&cmd->list, &ready_commands[id]);
+		if (list_empty(&dmov_conf[adm].active_commands[ch]))
+			PRINT_ERROR("msm_dmov_enqueue_cmd_ext(%d), stalled, "
+				"status %x\n", id, status);
+		PRINT_IO("msm_dmov_enqueue_cmd(%d), enqueue command, status "
+		    "%x\n", id, status);
+		list_add_tail(&cmd->list, &dmov_conf[adm].ready_commands[ch]);
 	}
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+	spin_unlock_irqrestore(&dmov_conf[adm].lock, irq_flags);
 }
 EXPORT_SYMBOL(msm_dmov_enqueue_cmd_ext);
 
@@ -133,13 +160,15 @@ EXPORT_SYMBOL(msm_dmov_enqueue_cmd);
 void msm_dmov_flush(unsigned int id)
 {
 	unsigned long irq_flags;
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+	int ch = DMOV_ID_TO_CHAN(id);
+	int adm = DMOV_ID_TO_ADM(id);
+	spin_lock_irqsave(&dmov_conf[adm].lock, irq_flags);
 	/* XXX not checking if flush cmd sent already */
-	if (!list_empty(&active_commands[id])) {
+	if (!list_empty(&dmov_conf[adm].active_commands[ch])) {
 		PRINT_IO("msm_dmov_flush(%d), send flush cmd\n", id);
-		writel(DMOV_FLUSH_TYPE, DMOV_FLUSH0(id));
+		writel(DMOV_FLUSH_TYPE, DMOV_REG(DMOV_FLUSH0(ch), adm));
 	}
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+	spin_unlock_irqrestore(&dmov_conf[adm].lock, irq_flags);
 }
 EXPORT_SYMBOL(msm_dmov_flush);
 
@@ -191,39 +220,57 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr)
 }
 EXPORT_SYMBOL(msm_dmov_exec_cmd);
 
+static void fill_errdata(struct msm_dmov_errdata *errdata, int ch, int adm)
+{
+	errdata->flush[0] = readl(DMOV_REG(DMOV_FLUSH0(ch), adm));
+	errdata->flush[1] = readl(DMOV_REG(DMOV_FLUSH1(ch), adm));
+	errdata->flush[2] = readl(DMOV_REG(DMOV_FLUSH2(ch), adm));
+	errdata->flush[3] = readl(DMOV_REG(DMOV_FLUSH3(ch), adm));
+	errdata->flush[4] = readl(DMOV_REG(DMOV_FLUSH4(ch), adm));
+	errdata->flush[5] = readl(DMOV_REG(DMOV_FLUSH5(ch), adm));
+}
 
 static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 {
-	unsigned int int_status, mask, id;
+	unsigned int int_status;
+	unsigned int mask;
+	unsigned int id;
+	unsigned int ch;
 	unsigned long irq_flags;
 	unsigned int ch_status;
 	unsigned int ch_result;
 	struct msm_dmov_cmd *cmd;
+	int adm = DMOV_IRQ_TO_ADM(irq);
 
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+	spin_lock_irqsave(&dmov_conf[adm].lock, irq_flags);
 
-	int_status = readl(DMOV_ISR); /* read and clear interrupt */
+	int_status = readl(DMOV_REG(DMOV_ISR, adm)); /* read and clear isr */
 	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
 
 	while (int_status) {
 		mask = int_status & -int_status;
-		id = fls(mask) - 1;
+		ch = fls(mask) - 1;
+		id = DMOV_CHAN_ADM_TO_ID(ch, adm);
 		PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, mask, id);
 		int_status &= ~mask;
-		ch_status = readl(DMOV_STATUS(id));
+		ch_status = readl(DMOV_REG(DMOV_STATUS(ch), adm));
 		if (!(ch_status & DMOV_STATUS_RSLT_VALID)) {
-			PRINT_FLOW("msm_datamover_irq_handler id %d, result not valid %x\n", id, ch_status);
+			PRINT_FLOW("msm_datamover_irq_handler id %d, "
+				"result not valid %x\n", id, ch_status);
 			continue;
 		}
 		do {
-			ch_result = readl(DMOV_RSLT(id));
-			if (list_empty(&active_commands[id])) {
+			ch_result = readl(DMOV_REG(DMOV_RSLT(ch), adm));
+			if (list_empty(&dmov_conf[adm].active_commands[ch])) {
 				PRINT_ERROR("msm_datamover_irq_handler id %d, got result "
 					"with no active command, status %x, result %x\n",
 					id, ch_status, ch_result);
 				cmd = NULL;
-			} else
-				cmd = list_entry(active_commands[id].next, typeof(*cmd), list);
+			} else {
+				cmd = list_entry(dmov_conf[adm].
+					active_commands[ch].next, typeof(*cmd),
+					list);
+			}
 			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x, result %x\n", id, ch_status, ch_result);
 			if (ch_result & DMOV_RSLT_DONE) {
 				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n",
@@ -238,12 +285,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 			if (ch_result & DMOV_RSLT_FLUSH) {
 				struct msm_dmov_errdata errdata;
 
-				errdata.flush[0] = readl(DMOV_FLUSH0(id));
-				errdata.flush[1] = readl(DMOV_FLUSH1(id));
-				errdata.flush[2] = readl(DMOV_FLUSH2(id));
-				errdata.flush[3] = readl(DMOV_FLUSH3(id));
-				errdata.flush[4] = readl(DMOV_FLUSH4(id));
-				errdata.flush[5] = readl(DMOV_FLUSH5(id));
+				fill_errdata(&errdata, ch, adm);
 				PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
 				PRINT_FLOW("msm_datamover_irq_handler id %d, flush, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
 				if (cmd) {
@@ -254,12 +296,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 			if (ch_result & DMOV_RSLT_ERROR) {
 				struct msm_dmov_errdata errdata;
 
-				errdata.flush[0] = readl(DMOV_FLUSH0(id));
-				errdata.flush[1] = readl(DMOV_FLUSH1(id));
-				errdata.flush[2] = readl(DMOV_FLUSH2(id));
-				errdata.flush[3] = readl(DMOV_FLUSH3(id));
-				errdata.flush[4] = readl(DMOV_FLUSH4(id));
-				errdata.flush[5] = readl(DMOV_FLUSH5(id));
+				fill_errdata(&errdata, ch, adm);
 
 				PRINT_ERROR("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
 				PRINT_ERROR("msm_datamover_irq_handler id %d, error, result %x, flush0 %x\n", id, ch_result, errdata.flush[0]);
@@ -269,48 +306,57 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 				}
 				/* this does not seem to work, once we get an error */
 				/* the datamover will no longer accept commands */
-				writel(0, DMOV_FLUSH0(id));
+				writel(0, DMOV_REG(DMOV_FLUSH0(ch), adm));
 			}
-			ch_status = readl(DMOV_STATUS(id));
+			ch_status = readl(DMOV_REG(DMOV_STATUS(ch), adm));
 			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
-			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) && !list_empty(&ready_commands[id])) {
-				cmd = list_entry(ready_commands[id].next, typeof(*cmd), list);
+			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) &&
+			    !list_empty(&dmov_conf[adm].ready_commands[ch])) {
+				cmd = list_entry(dmov_conf[adm].
+					ready_commands[ch].next, typeof(*cmd),
+					list);
 				list_del(&cmd->list);
-				list_add_tail(&cmd->list, &active_commands[id]);
 				if (cmd->exec_func)
 					cmd->exec_func(cmd);
+				list_add_tail(&cmd->list,
+					&dmov_conf[adm].active_commands[ch]);
 				PRINT_FLOW("msm_datamover_irq_handler id %d, start command\n", id);
-				writel(cmd->cmdptr, DMOV_CMD_PTR(id));
+				writel(cmd->cmdptr, DMOV_REG(DMOV_CMD_PTR(ch),
+					adm));
 			}
 		} while (ch_status & DMOV_STATUS_RSLT_VALID);
-		if (list_empty(&active_commands[id]) && list_empty(&ready_commands[id]))
-			channel_active &= ~(1U << id);
+		if (list_empty(&dmov_conf[adm].active_commands[ch]) &&
+				list_empty(&dmov_conf[adm].ready_commands[ch]))
+			dmov_conf[adm].channel_active &= ~(1U << ch);
 		PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
 	}
 
-	if (!channel_active) {
-		disable_irq_nosync(INT_ADM_AARM);
+	if (!dmov_conf[adm].channel_active) {
+		disable_irq_nosync(dmov_conf[adm].irq);
 		clk_ctl = CLK_TO_BE_DIS;
 		mod_timer(&timer, jiffies + HZ);
 	}
 
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+	spin_unlock_irqrestore(&dmov_conf[adm].lock, irq_flags);
 	return IRQ_HANDLED;
 }
 
 static int msm_dmov_suspend_late(struct platform_device *pdev,
 			    pm_message_t state)
 {
-	unsigned long irq_flags;
-
-	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+	int i;
+	unsigned long irq_flags[ARRAY_SIZE(dmov_conf)];
+	for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+		spin_lock_irqsave(&dmov_conf[i].lock, irq_flags[i]);
 	if (clk_ctl == CLK_TO_BE_DIS) {
-		BUG_ON(channel_active);
+		for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+			BUG_ON(dmov_conf[i].channel_active);
 		del_timer(&timer);
 		clk_disable(msm_dmov_clk);
 		clk_ctl = CLK_DIS;
 	}
-	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+	for (i = 0; i < ARRAY_SIZE(dmov_conf); i++)
+		spin_unlock_irqrestore(&dmov_conf[i].lock, irq_flags[i]);
 	return 0;
 }
 
@@ -322,27 +368,37 @@ static struct platform_driver msm_dmov_driver = {
 	},
 };
 
+/* static int __init */
 static int __init msm_init_datamover(void)
 {
 	int i;
+	int j;
 	int ret;
-
-	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
-		INIT_LIST_HEAD(&ready_commands[i]);
-		INIT_LIST_HEAD(&active_commands[i]);
-		writel(DMOV_CONFIG_IRQ_EN | DMOV_CONFIG_FORCE_TOP_PTR_RSLT | DMOV_CONFIG_FORCE_FLUSH_RSLT, DMOV_CONFIG(i));
+	for (j = 0; j < ARRAY_SIZE(dmov_conf); j++) {
+		for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+			INIT_LIST_HEAD(&dmov_conf[j].ready_commands[i]);
+			INIT_LIST_HEAD(&dmov_conf[j].active_commands[i]);
+		}
+		for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+			writel(DMOV_RSLT_CONF_IRQ_EN
+			     | DMOV_RSLT_CONF_FORCE_FLUSH_RSLT,
+			       DMOV_REG(DMOV_RSLT_CONF(i), j));
+		}
+		ret = request_irq(dmov_conf[j].irq, msm_datamover_irq_handler,
+			0, "msmdatamover", NULL);
+		if (ret) {
+			PRINT_ERROR("Requesting ADM%d irq %d failed\n", j,
+				dmov_conf[j].irq);
+			return ret;
+		}
+		disable_irq(dmov_conf[j].irq);
 	}
 	msm_dmov_clk = clk_get(NULL, "adm_clk");
 	if (IS_ERR(msm_dmov_clk))
 		return PTR_ERR(msm_dmov_clk);
-	ret = request_irq(INT_ADM_AARM, msm_datamover_irq_handler, 0, "msmdatamover", NULL);
-	if (ret)
-		return ret;
-	disable_irq(INT_ADM_AARM);
 	ret = platform_driver_register(&msm_dmov_driver);
 	if (ret)
 		return ret;
 	return 0;
 }
-
 arch_initcall(msm_init_datamover);

@@ -1,7 +1,7 @@
 /* linux/include/asm-arm/arch-msm/dma.h
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -41,50 +41,60 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 
 
-#define DMOV_SD0(off, ch) (MSM_DMOV_BASE + 0x0000 + (off) + ((ch) << 2))
-#define DMOV_SD1(off, ch) (MSM_DMOV_BASE + 0x0400 + (off) + ((ch) << 2))
-#define DMOV_SD2(off, ch) (MSM_DMOV_BASE + 0x0800 + (off) + ((ch) << 2))
-#define DMOV_SD3(off, ch) (MSM_DMOV_BASE + 0x0C00 + (off) + ((ch) << 2))
+#define DMOV_ADDR(off, ch, sd) ((DMOV_SD_SIZE*(sd)) + (off) + ((ch) << 2))
+#define DMOV_SD0(off, ch) DMOV_ADDR(off, ch, 0)
+#define DMOV_SD1(off, ch) DMOV_ADDR(off, ch, 1)
+#define DMOV_SD2(off, ch) DMOV_ADDR(off, ch, 2)
+#define DMOV_SD3(off, ch) DMOV_ADDR(off, ch, 3)
 
 #if defined(CONFIG_ARCH_MSM7X30)
-#define DMOV_SD_AARM DMOV_SD2
+#define DMOV_SD_SIZE 0x400
+#define DMOV_SD_AARM 2
+#define DMOV_SD_AARM_ADDR DMOV_SD2
 #else
-#define DMOV_SD_AARM DMOV_SD3
+#define DMOV_SD_SIZE 0x400
+#define DMOV_SD_AARM 3
+#define DMOV_SD_AARM_ADDR DMOV_SD3
 #endif
 
-#define DMOV_CMD_PTR(ch)      DMOV_SD_AARM(0x000, ch)
+#define DMOV_CMD_PTR(ch)      DMOV_SD_AARM_ADDR(0x000, ch)
 #define DMOV_CMD_LIST         (0 << 29) /* does not work */
 #define DMOV_CMD_PTR_LIST     (1 << 29) /* works */
 #define DMOV_CMD_INPUT_CFG    (2 << 29) /* untested */
 #define DMOV_CMD_OUTPUT_CFG   (3 << 29) /* untested */
 #define DMOV_CMD_ADDR(addr)   ((addr) >> 3)
 
-#define DMOV_RSLT(ch)         DMOV_SD_AARM(0x040, ch)
+#define DMOV_RSLT(ch)         DMOV_SD_AARM_ADDR(0x040, ch)
 #define DMOV_RSLT_VALID       (1 << 31) /* 0 == host has empties result fifo */
 #define DMOV_RSLT_ERROR       (1 << 3)
 #define DMOV_RSLT_FLUSH       (1 << 2)
 #define DMOV_RSLT_DONE        (1 << 1)  /* top pointer done */
 #define DMOV_RSLT_USER        (1 << 0)  /* command with FR force result */
 
-#define DMOV_FLUSH0(ch)       DMOV_SD_AARM(0x080, ch)
-#define DMOV_FLUSH1(ch)       DMOV_SD_AARM(0x0C0, ch)
-#define DMOV_FLUSH2(ch)       DMOV_SD_AARM(0x100, ch)
-#define DMOV_FLUSH3(ch)       DMOV_SD_AARM(0x140, ch)
-#define DMOV_FLUSH4(ch)       DMOV_SD_AARM(0x180, ch)
-#define DMOV_FLUSH5(ch)       DMOV_SD_AARM(0x1C0, ch)
+#define DMOV_FLUSH0(ch)       DMOV_SD_AARM_ADDR(0x080, ch)
+#define DMOV_FLUSH1(ch)       DMOV_SD_AARM_ADDR(0x0C0, ch)
+#define DMOV_FLUSH2(ch)       DMOV_SD_AARM_ADDR(0x100, ch)
+#define DMOV_FLUSH3(ch)       DMOV_SD_AARM_ADDR(0x140, ch)
+#define DMOV_FLUSH4(ch)       DMOV_SD_AARM_ADDR(0x180, ch)
+#define DMOV_FLUSH5(ch)       DMOV_SD_AARM_ADDR(0x1C0, ch)
 #define DMOV_FLUSH_TYPE       (1 << 31)
 
-#define DMOV_STATUS(ch)       DMOV_SD_AARM(0x200, ch)
+#define DMOV_STATUS(ch)       DMOV_SD_AARM_ADDR(0x200, ch)
 #define DMOV_STATUS_RSLT_COUNT(n)    (((n) >> 29))
 #define DMOV_STATUS_CMD_COUNT(n)     (((n) >> 27) & 3)
 #define DMOV_STATUS_RSLT_VALID       (1 << 1)
 #define DMOV_STATUS_CMD_PTR_RDY      (1 << 0)
-#define DMOV_ISR              DMOV_SD_AARM(0x380, 0)
 
-#define DMOV_CONFIG(ch)       DMOV_SD_AARM(0x300, ch)
-#define DMOV_CONFIG_FORCE_TOP_PTR_RSLT (1 << 2)
-#define DMOV_CONFIG_FORCE_FLUSH_RSLT   (1 << 1)
-#define DMOV_CONFIG_IRQ_EN             (1 << 0)
+#define DMOV_RSLT_CONF(ch)    DMOV_SD_AARM_ADDR(0x300, ch)
+#define DMOV_RSLT_CONF_FORCE_TOP_PTR_RSLT (1 << 2)
+#define DMOV_RSLT_CONF_FORCE_FLUSH_RSLT   (1 << 1)
+#define DMOV_RSLT_CONF_IRQ_EN             (1 << 0)
+
+#define DMOV_ISR              DMOV_SD_AARM_ADDR(0x380, 0)
+
+#define DMOV_CRCI_CTL(crci)   DMOV_SD_AARM_ADDR(0x400, crci)
+#define DMOV_CRCI_CTL_BLK_SZ(n)        ((n) << 0)
+#define DMOV_CRCI_CTL_RST              (1 << 17)
 
 /* channel assignments */
 
