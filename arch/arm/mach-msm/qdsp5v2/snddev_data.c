@@ -17,10 +17,12 @@
  */
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
+#include <linux/mfd/marimba-codec.h>
 #include <mach/qdsp5v2/snddev_icodec.h>
 #include <mach/qdsp5v2/marimba_profile.h>
 #include <mach/qdsp5v2/aux_pcm.h>
 #include <mach/qdsp5v2/snddev_ecodec.h>
+#include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/board.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
@@ -417,6 +419,7 @@ static struct snddev_icodec_data snddev_ifmradio_handset_data = {
 	.default_sample_rate = 8000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
+	.dev_vol_type = SNDDEV_DEV_VOL_DIGITAL,
 };
 
 static struct platform_device msm_ifmradio_handset_device = {
@@ -497,6 +500,7 @@ static struct snddev_icodec_data snddev_ifmradio_speaker_data = {
 	.default_sample_rate = 8000,
 	.pamp_on = &msm_snddev_poweramp_on,
 	.pamp_off = &msm_snddev_poweramp_off,
+	.dev_vol_type = SNDDEV_DEV_VOL_DIGITAL,
 };
 
 static struct platform_device msm_ifmradio_speaker_device = {
@@ -533,6 +537,7 @@ static struct snddev_icodec_data snddev_ifmradio_headset_data = {
 	.default_sample_rate = 8000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
+	.dev_vol_type = SNDDEV_DEV_VOL_DIGITAL,
 };
 
 static struct platform_device msm_ifmradio_headset_device = {
@@ -570,6 +575,7 @@ static struct snddev_icodec_data snddev_ifmradio_ffa_headset_data = {
 	.default_sample_rate = 8000,
 	.pamp_on = msm_snddev_hsed_pamp_on,
 	.pamp_off = msm_snddev_hsed_pamp_off,
+	.dev_vol_type = SNDDEV_DEV_VOL_DIGITAL,
 };
 
 static struct platform_device msm_ifmradio_ffa_headset_device = {

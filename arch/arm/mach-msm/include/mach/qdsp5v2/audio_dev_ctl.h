@@ -45,6 +45,7 @@ struct msm_snddev_info {
 		int (*close)(struct msm_snddev_info *);
 		int (*set_freq)(struct msm_snddev_info *, u32);
 		int (*enable_sidetone)(struct msm_snddev_info *, u32);
+		int (*set_device_volume)(struct msm_snddev_info *, u32);
 	} dev_ops;
 	u8 opened;
 	void *private_data;

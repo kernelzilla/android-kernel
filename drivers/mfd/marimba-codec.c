@@ -17,14 +17,19 @@
  */
 #include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/mfd/marimba-codec.h>
 #include <linux/mfd/marimba.h>
-#include <linux/err.h>
 
 #define MARIMBA_CDC_RX_CTL 0x81
 #define MARIMBA_CDC_RX_CTL_ST_EN_MASK 0x20
 #define MARIMBA_CDC_RX_CTL_ST_EN_SHFT 0x5
+#define MARIMBA_CODEC_CDC_LRXG     0x84
+#define MARIMBA_CODEC_CDC_RRXG     0x85
+#define MARIMBA_CODEC_CDC_LTXG     0x86
+#define MARIMBA_CODEC_CDC_RTXG     0x87
+
 #define MAX_MDELAY_US 2000
 #define MIN_MDELAY_US 1000
 
@@ -50,8 +55,6 @@ static struct adie_codec_register adie_codec_tx_regs[] =
 	{ 0x89, 0xFF, 0xFF },
 	{ 0x8A, 0xF0, 0x30 }
 };
-
-
 
 static struct adie_codec_register adie_codec_rx_regs[] =
 {
@@ -117,6 +120,120 @@ struct adie_codec_state {
 
 static struct adie_codec_state adie_codec;
 
+/* Array containing write details of Tx and RX Digital Volume
+   Tx and Rx and both the left and right channel use the same data
+*/
+u8 adie_codec_rx_tx_dig_vol_data[] = {
+	0x81, 0x82, 0x83, 0x84,
+	0x85, 0x86, 0x87, 0x88,
+	0x89, 0x8a, 0x8b, 0x8c,
+	0x8d, 0x8e, 0x8f, 0x90,
+	0x91, 0x92, 0x93, 0x94,
+	0x95, 0x96, 0x97, 0x98,
+	0x99, 0x9a, 0x9b, 0x9c,
+	0x9d, 0x9e, 0x9f, 0xa0,
+	0xa1, 0xa2, 0xa3, 0xa4,
+	0xa5, 0xa6, 0xa7, 0xa8,
+	0xa9, 0xaa, 0xab, 0xac,
+	0xad, 0xae, 0xaf, 0xb0,
+	0xb1, 0xb2, 0xb3, 0xb4,
+	0xb5, 0xb6, 0xb7, 0xb8,
+	0xb9, 0xba, 0xbb, 0xbc,
+	0xbd, 0xbe, 0xbf, 0xc0,
+	0xc1, 0xc2, 0xc3, 0xc4,
+	0xc5, 0xc6, 0xc7, 0xc8,
+	0xc9, 0xca, 0xcb, 0xcc,
+	0xcd, 0xce, 0xcf, 0xd0,
+	0xd1, 0xd2, 0xd3, 0xd4,
+	0xd5, 0xd6, 0xd7, 0xd8,
+	0xd9, 0xda, 0xdb, 0xdc,
+	0xdd, 0xde, 0xdf, 0xe0,
+	0xe1, 0xe2, 0xe3, 0xe4,
+	0xe5, 0xe6, 0xe7, 0xe8,
+	0xe9, 0xea, 0xeb, 0xec,
+	0xed, 0xee, 0xf0, 0xf1,
+	0xf2, 0xf3, 0xf4, 0xf5,
+	0xf6, 0xf7, 0xf8, 0xf9,
+	0xfa, 0xfb, 0xfc, 0xfd,
+	0xfe, 0xff, 0x00, 0x01,
+	0x02, 0x03, 0x04, 0x05,
+	0x06, 0x07, 0x08, 0x09,
+	0x0a, 0x0b, 0x0c, 0x0d,
+	0x0e, 0x0f, 0x10, 0x11,
+	0x12, 0x13, 0x14, 0x15,
+	0x16, 0x17, 0x18, 0x19,
+	0x1a, 0x1b, 0x1c, 0x1d,
+	0x1e, 0x1f, 0x20, 0x21,
+	0x22, 0x23, 0x24, 0x25,
+	0x26, 0x27, 0x28, 0x29,
+	0x2a, 0x2b, 0x2c, 0x2d,
+	0x2e, 0x2f, 0x30, 0x31,
+	0x32, 0x33, 0x34, 0x35,
+	0x36, 0x37, 0x38, 0x39,
+	0x3a, 0x3b, 0x3c, 0x3d,
+	0x3e, 0x3f, 0x40, 0x41,
+	0x42, 0x43, 0x44, 0x45,
+	0x46, 0x47, 0x48, 0x49,
+	0x4a, 0x4b, 0x4c, 0x4d,
+	0x4e, 0x4f, 0x50, 0x51,
+	0x52, 0x53, 0x54, 0x55,
+	0x56, 0x57, 0x58, 0x59,
+	0x5a, 0x5b, 0x5c, 0x5d,
+	0x5e, 0x5f, 0x60, 0x61,
+	0x62, 0x63, 0x64, 0x65,
+	0x66, 0x67, 0x68, 0x69,
+	0x6a, 0x6b, 0x6c, 0x6d,
+	0x6e, 0x6f, 0x70, 0x71,
+	0x72, 0x73, 0x74, 0x75,
+	0x76, 0x77, 0x78, 0x79,
+	0x7a, 0x7b, 0x7c, 0x7d,
+	0x7e, 0x7f
+};
+
+enum adie_vol_type {
+	ADIE_CODEC_RX_DIG_VOL,
+	ADIE_CODEC_TX_DIG_VOL,
+	ADIE_CODEC_VOL_TYPE_MAX
+};
+
+struct adie_codec_ch_vol_cntrl {
+	u8 codec_reg;
+	u8 codec_mask;
+	u8 *vol_cntrl_data;
+};
+
+struct adie_codec_vol_cntrl_data {
+
+	enum adie_vol_type vol_type;
+
+	/* Jump length used while doing writes in incremental fashion */
+	u32 jump_length;
+	s32 min_mb;		/* Min Db applicable to the vol control */
+	s32 max_mb;		/* Max Db applicable to the vol control */
+	u32 step_in_mb;
+	u32 steps;		/* No of steps allowed for this vol type */
+
+	struct adie_codec_ch_vol_cntrl *ch_vol_cntrl_info;
+};
+
+static struct adie_codec_ch_vol_cntrl adie_codec_rx_vol_cntrl[] = {
+	{MARIMBA_CODEC_CDC_LRXG, 0xff, adie_codec_rx_tx_dig_vol_data},
+	{MARIMBA_CODEC_CDC_RRXG, 0xff, adie_codec_rx_tx_dig_vol_data}
+};
+
+static struct adie_codec_ch_vol_cntrl adie_codec_tx_vol_cntrl[] = {
+	{MARIMBA_CODEC_CDC_LTXG, 0xff, adie_codec_rx_tx_dig_vol_data},
+	{MARIMBA_CODEC_CDC_RTXG, 0xff, adie_codec_rx_tx_dig_vol_data}
+};
+
+static struct adie_codec_vol_cntrl_data adie_codec_vol_cntrl[] = {
+	{ADIE_CODEC_RX_DIG_VOL, 5100, -12700, 12700, 100, 255,
+	 adie_codec_rx_vol_cntrl},
+
+	{ADIE_CODEC_TX_DIG_VOL, 5100, -12700, 12700, 100, 255,
+	 adie_codec_tx_vol_cntrl}
+};
+
 static int adie_codec_write(u8 reg, u8 mask, u8 val)
 {
 	int rc;
@@ -131,6 +248,234 @@ static int adie_codec_write(u8 reg, u8 mask, u8 val)
 
 	return 0;
 }
+
+static int adie_codec_read_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
+				   u32 *cur_index)
+{
+	u32 counter;
+	u32 size;
+	u8 reg, mask, cur_val;
+	int rc;
+
+	reg =
+	    adie_codec_vol_cntrl[vol_type].
+	    ch_vol_cntrl_info[chan_index].codec_reg;
+
+	mask =
+	    adie_codec_vol_cntrl[vol_type].
+	    ch_vol_cntrl_info[chan_index].codec_mask;
+
+	rc = marimba_read(adie_codec.pdrv_ptr, reg, &cur_val, 1);
+
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("%s: fail to read reg %x\n", __func__, reg);
+		return -EIO;
+	}
+
+	cur_val = cur_val & mask;
+
+	pr_debug("%s: reg 0x%x  mask 0x%x  reg_value = 0x%x"
+		"vol_type = %d\n", __func__, reg, mask, cur_val, vol_type);
+
+	size = adie_codec_vol_cntrl[vol_type].steps;
+
+	for (counter = 0; counter <= size; counter++) {
+
+		if (adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+		    [chan_index].vol_cntrl_data[counter] == cur_val) {
+			*cur_index = counter;
+			return 0;
+		}
+	}
+
+	pr_err("%s: could not find 0x%x in reg 0x%x values array\n",
+			__func__, cur_val, reg);
+
+	return -EINVAL;;
+}
+
+static int adie_codec_set_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
+				  u32 cur_index, u32 target_index)
+{
+	u32 count;
+	u8 reg, mask, val;
+	u32 i;
+	u32 index;
+	u32 index_jump;
+
+	int rc;
+
+	index_jump = adie_codec_vol_cntrl[vol_type].jump_length;
+
+	reg =
+	    adie_codec_vol_cntrl[vol_type].
+	    ch_vol_cntrl_info[chan_index].codec_reg;
+
+	mask =
+	    adie_codec_vol_cntrl[vol_type].
+	    ch_vol_cntrl_info[chan_index].codec_mask;
+
+	/* compare the target index with current index */
+	if (cur_index < target_index) {
+
+		/* Volume is being increased loop and increase it in 4-5 steps
+		 */
+		count = ((target_index - cur_index) * 100 / index_jump);
+		index = cur_index;
+
+		for (i = 1; i <= count; i++) {
+			index = index + (int)(index_jump / 100);
+
+			val =
+			    adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+			    [chan_index].vol_cntrl_data[index];
+
+			pr_debug("%s: write reg %x val 0x%x\n",
+					__func__, reg, val);
+
+			rc = adie_codec_write(reg, mask, val);
+			if (rc < 0) {
+				pr_err("%s: write reg %x val 0x%x failed\n",
+					__func__, reg, val);
+				return rc;
+			}
+		}
+
+		/*do one final write to take it to the target index level */
+		val =
+		    adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+		    [chan_index].vol_cntrl_data[target_index];
+
+		pr_debug("%s: write reg %x val 0x%x\n", __func__, reg, val);
+
+		rc = adie_codec_write(reg, mask, val);
+
+		if (rc < 0) {
+			pr_err("%s: write reg %x val 0x%x failed\n",
+					__func__, reg, val);
+			return rc;
+		}
+
+	} else {
+
+		/* Volume is being decreased from the current setting */
+		index = cur_index;
+		/* loop and decrease it in 4-5 steps */
+		count = ((cur_index - target_index) * 100 / index_jump);
+
+		for (i = 1; i <= count; i++) {
+			index = index - (int)(index_jump / 100);
+
+			val =
+			    adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+			    [chan_index].vol_cntrl_data[index];
+
+			pr_debug("%s: write reg %x val 0x%x\n",
+					__func__, reg, val);
+
+			rc = adie_codec_write(reg, mask, val);
+			if (rc < 0) {
+				pr_err("%s: write reg %x val 0x%x failed\n",
+					__func__, reg, val);
+				return rc;
+			}
+		}
+
+		/* do one final write to take it to the target index level */
+		val =
+		    adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+		    [chan_index].vol_cntrl_data[target_index];
+
+		pr_debug("%s: write reg %x val 0x%x\n", __func__, reg, val);
+
+		rc = adie_codec_write(reg, mask, val);
+
+		if (rc < 0) {
+			pr_err("%s: write reg %x val 0x%x failed\n",
+					__func__, reg, val);
+			return rc;
+		}
+	}
+	return 0;
+}
+
+int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
+		u32 num_channels, u32 vol_percentage /* in percentage */)
+{
+	enum adie_vol_type vol_type;
+	s32 milli_bel;
+	u32 chan_index;
+	u32 step_index;
+	u32 cur_step_index = 0;
+
+	if (path_ptr->curr_stage != ADIE_CODEC_DIGITAL_ANALOG_READY) {
+		pr_info("%s: Marimba codec not ready for volume control \n",
+		       __func__);
+		return  -EPERM;
+	}
+
+	if (num_channels > 2) {
+		pr_err("%s: Marimba codec only supports max two channels\n",
+		       __func__);
+		return -EINVAL;
+	}
+
+	if (path_ptr->profile->path_type == ADIE_CODEC_RX)
+		vol_type = ADIE_CODEC_RX_DIG_VOL;
+	else if (path_ptr->profile->path_type == ADIE_CODEC_TX)
+		vol_type = ADIE_CODEC_TX_DIG_VOL;
+	else {
+		pr_err("%s: invalid device data neither RX nor TX\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	milli_bel = ((adie_codec_vol_cntrl[vol_type].max_mb -
+			adie_codec_vol_cntrl[vol_type].min_mb) *
+			vol_percentage) / 100;
+
+	milli_bel = adie_codec_vol_cntrl[vol_type].min_mb + milli_bel;
+
+	pr_debug("%s: milli bell = %d vol_type = %d vol_percentage = %d"
+		 " num_cha =  %d \n",
+		 __func__, milli_bel, vol_type, vol_percentage, num_channels);
+
+
+	step_index = ((milli_bel
+		       - adie_codec_vol_cntrl[vol_type].min_mb
+		       + (adie_codec_vol_cntrl[vol_type].step_in_mb / 2))
+		      / adie_codec_vol_cntrl[vol_type].step_in_mb);
+
+
+	for (chan_index = 0; chan_index < num_channels; chan_index++) {
+		adie_codec_read_dig_vol(vol_type, chan_index, &cur_step_index);
+
+		pr_debug("%s: cur_step_index = %u  current vol = 0x%x\n",
+				__func__, cur_step_index,
+			adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+			[chan_index].vol_cntrl_data[cur_step_index]);
+
+		pr_debug("%s: step index = %u  new volume = 0x%x\n",
+		 __func__, step_index,
+		 adie_codec_vol_cntrl[vol_type].ch_vol_cntrl_info
+		 [chan_index].vol_cntrl_data[step_index]);
+
+		adie_codec_set_dig_vol(vol_type, chan_index, cur_step_index,
+				       step_index);
+
+	}
+	return 0;
+}
+EXPORT_SYMBOL(adie_codec_set_device_digital_volume);
+
+int adie_codec_set_device_analog_volume(struct adie_codec_path *path_ptr,
+		u32 num_channels, u32 volume /* in percentage */)
+{
+	pr_err("%s: analog device volume not supported\n", __func__);
+
+	return -EPERM;
+}
+EXPORT_SYMBOL(adie_codec_set_device_analog_volume);
 
 int adie_codec_setpath(struct adie_codec_path *path_ptr, u32 freq_plan, u32 osr)
 {

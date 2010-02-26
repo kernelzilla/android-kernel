@@ -60,4 +60,9 @@ u32 adie_codec_freq_supported(struct adie_codec_dev_profile *profile,
 							u32 requested_freq);
 int adie_codec_enable_sidetone(struct adie_codec_path *rx_path_ptr, u32 enable);
 
+int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
+		u32 num_channels, u32 vol_percentage /* in percentage */);
+
+int adie_codec_set_device_analog_volume(struct adie_codec_path *path_ptr,
+		u32 num_channels, u32 volume /* in percentage */);
 #endif
