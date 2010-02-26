@@ -99,6 +99,8 @@
 #define SHOLES_VENDOR_ID		0x22B8
 #define SHOLES_PRODUCT_ID		0x41D9
 #define SHOLES_ADB_PRODUCT_ID		0x41DB
+#define SHOLES_RNDIS_PRODUCT_ID		0x41E4
+#define SHOLES_RNDIS_ADB_PRODUCT_ID		0x41E5
 #define FACTORY_PRODUCT_ID		0x41D4
 #define FACTORY_ADB_PRODUCT_ID		0x41D4
 
@@ -172,22 +174,65 @@ int __init board_boot_mode_init(char *s)
 }
 __setup("androidboot.mode=", board_boot_mode_init);
 
-static char *usb_functions[] = { "usb_mass_storage" };
-static char *usb_functions_adb[] = { "usb_mass_storage", "adb" };
-static char *factory_usb_functions[] = { "usbnet" };
-static char *factory_usb_functions_adb[] = { "usbnet", "adb" };
+static char *usb_functions_ums[] = {
+	"usb_mass_storage",
+};
+
+static char *usb_functions_ums_adb[] = {
+	"usb_mass_storage",
+	"adb",
+};
+
+static char *usb_functions_rndis[] = {
+	"rndis",
+};
+
+static char *usb_functions_rndis_adb[] = {
+	"rndis",
+	"adb",
+};
+
+static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+	"usb_mass_storage",
+	"adb",
+#ifdef CONFIG_USB_ANDROID_ACM
+	"acm",
+#endif
+};
 
 static struct android_usb_product usb_products[] = {
 	{
 		.product_id	= SHOLES_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(usb_functions),
-		.functions	= usb_functions,
+		.num_functions	= ARRAY_SIZE(usb_functions_ums),
+		.functions	= usb_functions_ums,
 	},
 	{
 		.product_id	= SHOLES_ADB_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(usb_functions_adb),
-		.functions	= usb_functions_adb,
+		.num_functions	= ARRAY_SIZE(usb_functions_ums_adb),
+		.functions	= usb_functions_ums_adb,
 	},
+	{
+		.product_id	= SHOLES_RNDIS_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
+		.functions	= usb_functions_rndis,
+	},
+	{
+		.product_id	= SHOLES_RNDIS_ADB_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_rndis_adb),
+		.functions	= usb_functions_rndis_adb,
+	},
+};
+
+static char *factory_usb_functions[] = {
+	"usbnet"
+};
+
+static char *factory_usb_functions_adb[] = {
+	"usbnet",
+	"adb"
 };
 
 static struct android_usb_product factory_usb_products[] = {
@@ -212,8 +257,8 @@ static struct android_usb_platform_data andusb_plat = {
 	.serial_number		= device_serial,
 	.num_products = ARRAY_SIZE(usb_products),
 	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_adb),
-	.functions = usb_functions_adb,
+	.num_functions = ARRAY_SIZE(usb_functions_all),
+	.functions = usb_functions_all,
 };
 
 /* android USB platform data for factory test mode*/
