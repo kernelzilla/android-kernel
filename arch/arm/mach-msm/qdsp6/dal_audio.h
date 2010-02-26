@@ -566,6 +566,9 @@ struct adsp_buffer_event {
 #define ADSP_AUDIO_DEVICE_ID_TTY_HEADSET_MIC	0x108151b
 #define ADSP_AUDIO_DEVICE_ID_I2S_MIC		0x1089bf3
 
+#define ADSP_AUDIO_DEVICE_ID_SPKR_PHONE_DUAL_MIC	0x108f9c5
+#define ADSP_AUDIO_DEVICE_ID_HANDSET_DUAL_MIC		0x108f9c3
+
 /* Special loopback pseudo device to be paired with an RX device */
 /* with usage ADSP_AUDIO_DEVICE_USAGE_MIXED_PCM_LOOPBACK */
 #define ADSP_AUDIO_DEVICE_ID_MIXED_PCM_LOOPBACK_TX	0x1089bf2
