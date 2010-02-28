@@ -390,11 +390,11 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino,
 	fput(file);
  out:
 	if (unlikely(nsi_lock
-		     && si_nfsd_read_lock(parent->d_sb, nsi_lock) < 0
-		     && !IS_ERR(dentry))) {
-		dput(dentry);
-		dentry = ERR_PTR(-ESTALE);
-	}
+		     && si_nfsd_read_lock(parent->d_sb, nsi_lock) < 0))
+		if (!IS_ERR(dentry)) {
+			dput(dentry);
+			dentry = ERR_PTR(-ESTALE);
+		}
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
@@ -533,11 +533,11 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
  out_path:
 	path_put(&path);
  out_relock:
-	if (unlikely(si_nfsd_read_lock(sb, nsi_lock) < 0
-		     && !IS_ERR(dentry))) {
-		dput(dentry);
-		dentry = ERR_PTR(-ESTALE);
-	}
+	if (unlikely(si_nfsd_read_lock(sb, nsi_lock) < 0))
+		if (!IS_ERR(dentry)) {
+			dput(dentry);
+			dentry = ERR_PTR(-ESTALE);
+		}
  out_pathname:
 	free_page((unsigned long)pathname);
  out_h_parent:
