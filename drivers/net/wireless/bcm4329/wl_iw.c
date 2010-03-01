@@ -2209,7 +2209,7 @@ wl_iw_set_scan(
 	
 	if ((error = dev_wlc_ioctl(dev, WLC_SCAN, &g_specific_ssid, sizeof(g_specific_ssid)))) {
 		WL_TRACE(("#### Set SCAN for %s failed with %d\n", g_specific_ssid.SSID, error));
-		
+		g_scan_specified_ssid = 0; /* Clean to allow future ISCAN */
 		return -EBUSY;
 	}
 
