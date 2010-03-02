@@ -329,7 +329,6 @@ extern struct list_head smd_ch_list_dsp;
 
 extern spinlock_t smd_lock;
 extern spinlock_t smem_lock;
-extern bool smd_print_stats_on_suspend;
 
 void *smem_find(unsigned id, unsigned size);
 void *smem_item(unsigned id, unsigned *size);

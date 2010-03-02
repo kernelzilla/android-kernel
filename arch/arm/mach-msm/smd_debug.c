@@ -16,99 +16,10 @@
 
 #include <linux/debugfs.h>
 #include <linux/list.h>
-#include <linux/io.h>
-#include <linux/earlysuspend.h>
-#include <linux/rtc.h>
-#include <linux/suspend.h>
 
 #include <mach/msm_iomap.h>
 
 #include "smd_private.h"
-
-
-#if CONFIG_SMD_OFFSET_TCXO_STAT
-enum {
-	F_SCREEN_OFF = 0,
-	F_SUSPEND,
-	F_RESUME,
-	F_SCREEN_ON,
-};
-
-struct smem_sleep_stat {
-	uint32_t tcxo_time;
-	uint32_t tcxo_cnt;
-	uint32_t suspend_tcxo_time;
-	uint32_t suspend_tcxo_cnt;
-	uint32_t garbage_pkt_cnt;
-	uint32_t zone_based_reg_cnt;
-	uint32_t idle_hand_off_cnt;
-	uint32_t reserved[7];
-};
-static struct smem_sleep_stat *sleep_stat;
-
-static struct smem_sleep_stat *get_smem_sleep_stat(void)
-{
-	return (struct smem_sleep_stat *)
-		(MSM_SHARED_RAM_BASE + CONFIG_SMD_OFFSET_TCXO_STAT);
-}
-
-static void print_sleep_stat(int flag)
-{
-	struct timespec ts;
-	struct rtc_time tm;
-
-	if (!smd_print_stats_on_suspend || !sleep_stat)
-		return;
-
-	getnstimeofday(&ts);
-	rtc_time_to_tm(ts.tv_sec, &tm);
-
-	pr_info("sleep_stat.%d: %ds %d %ds %d %d %d %d "
-		"(%d-%02d-%02d %02d:%02d:%02d.%09lu UTC)\n",
-		flag, sleep_stat->tcxo_time >> 15, sleep_stat->tcxo_cnt,
-		sleep_stat->suspend_tcxo_time >> 15,
-		sleep_stat->suspend_tcxo_cnt, sleep_stat->garbage_pkt_cnt,
-		sleep_stat->zone_based_reg_cnt, sleep_stat->idle_hand_off_cnt,
-		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-		tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
-}
-
-static int sleep_stat_suspend_notifier(struct notifier_block *nb,
-	unsigned long event, void *dummy)
-{
-	switch (event) {
-	/* enter suspend */
-	case PM_SUSPEND_PREPARE:
-		print_sleep_stat(F_SUSPEND);
-		return NOTIFY_OK;
-	/* exit suspend */
-	case PM_POST_SUSPEND:
-		print_sleep_stat(F_RESUME);
-		return NOTIFY_OK;
-	default:
-		return NOTIFY_DONE;
-	}
-}
-
-static struct notifier_block sleep_stat_notif_block = {
-	.notifier_call = sleep_stat_suspend_notifier,
-};
-
-static void sleep_stat_early_suspend(struct early_suspend *handler)
-{
-	print_sleep_stat(F_SCREEN_OFF);
-}
-
-static void sleep_stat_late_resume(struct early_suspend *handler)
-{
-	print_sleep_stat(F_SCREEN_ON);
-}
-
-static struct early_suspend sleep_stat_screen_hdl = {
-	.suspend = sleep_stat_early_suspend,
-	.resume = sleep_stat_late_resume,
-};
-#endif
 
 #if defined(CONFIG_DEBUG_FS)
 
@@ -192,25 +103,6 @@ static int debug_read_stat(char *buf, int max)
 		msg[SZ_DIAG_ERR_MSG - 1] = 0;
 		i += scnprintf(buf + i, max - i, "diag: '%s'\n", msg);
 	}
-
-#if CONFIG_SMD_OFFSET_TCXO_STAT
-	if (sleep_stat) {
-		i += scnprintf(buf + i, max - i,
-			"tcxo_time: 0x%x (%ds) tcxo_cnt: %d\n"
-			"suspend_tcxo_time: 0x%x (%ds) suspend_tcxo_cnt: %d\n"
-			"garbage_pkt_cnt: %d "
-			"zone_based_reg_cnt: %d "
-			"idle_hand_off_cnt: %d\n",
-			sleep_stat->tcxo_time, sleep_stat->tcxo_time >> 15,
-			sleep_stat->tcxo_cnt, sleep_stat->suspend_tcxo_time,
-			sleep_stat->suspend_tcxo_time >> 15,
-			sleep_stat->suspend_tcxo_cnt,
-			sleep_stat->garbage_pkt_cnt,
-			sleep_stat->zone_based_reg_cnt,
-			sleep_stat->idle_hand_off_cnt);
-	}
-#endif
-
 	return i;
 }
 
@@ -329,13 +221,13 @@ static void debug_create(const char *name, mode_t mode,
 	debugfs_create_file(name, mode, dent, fill, &debug_ops);
 }
 
-static int smd_debugfs_init(void)
+static void smd_debugfs_init(void)
 {
 	struct dentry *dent;
 
 	dent = debugfs_create_dir("smd", 0);
 	if (IS_ERR(dent))
-		return -EIO;
+		return;
 
 	debug_create("ch", 0444, dent, debug_read_ch);
 	debug_create("stat", 0444, dent, debug_read_stat);
@@ -343,14 +235,6 @@ static int smd_debugfs_init(void)
 	debug_create("version", 0444, dent, debug_read_version);
 	debug_create("tbl", 0444, dent, debug_read_alloc_tbl);
 	debug_create("build", 0444, dent, debug_read_build_id);
-#if CONFIG_SMD_OFFSET_TCXO_STAT
-	sleep_stat = get_smem_sleep_stat();
-	register_early_suspend(&sleep_stat_screen_hdl);
-	register_pm_notifier(&sleep_stat_notif_block);
-#else
-	pr_info("%s: no sleep statistics\n", __func__);
-#endif
-	return 0;
 }
 
 late_initcall(smd_debugfs_init);
@@ -383,10 +267,9 @@ void smsm_print_sleep_info(void)
 {
 	unsigned long flags;
 	uint32_t *ptr;
-#ifndef CONFIG_ARCH_MSM_SCORPION
 	struct tramp_gpio_smem *gpio;
 	struct smsm_interrupt_info *int_info;
-#endif
+
 
 	spin_lock_irqsave(&smem_lock, flags);
 
@@ -423,6 +306,7 @@ void smsm_print_sleep_info(void)
 				i, gpio->num_fired[i], gpio->fired[i][0],
 				gpio->fired[i][1]);
 	}
+#else
 #endif
 	spin_unlock_irqrestore(&smem_lock, flags);
 }

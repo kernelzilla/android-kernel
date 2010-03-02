@@ -432,11 +432,5 @@ config VIRTUAL_KPANIC_SRC
 	default "cache"
 	help
 	  Sets the partition to steal from to make the virtual one.
-
-config SMD_OFFSET_TCXO_STAT
-	depends on MSM_SMD
-	hex "SMD offset of total TCXO-off time"
-	default 0x0
-	help
-	  TCXO off time is in ticks of sleep clock, 1/32768.
+	
 endif
