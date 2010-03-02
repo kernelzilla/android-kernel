@@ -64,10 +64,6 @@ static struct shared_info smd_info = {
 module_param_named(debug_mask, msm_smd_debug_mask,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
 
-bool smd_print_stats_on_suspend;
-module_param_named(print_stats_on_suspend, smd_print_stats_on_suspend,
-		   bool, S_IRUGO | S_IWUSR | S_IWGRP);
-
 void *smem_item(unsigned id, unsigned *size);
 static void smd_diag(void);
 
