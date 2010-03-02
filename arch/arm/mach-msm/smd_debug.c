@@ -221,13 +221,13 @@ static void debug_create(const char *name, mode_t mode,
 	debugfs_create_file(name, mode, dent, fill, &debug_ops);
 }
 
-static void smd_debugfs_init(void)
+static int smd_debugfs_init(void)
 {
 	struct dentry *dent;
 
 	dent = debugfs_create_dir("smd", 0);
 	if (IS_ERR(dent))
-		return;
+		return PTR_ERR(dent);
 
 	debug_create("ch", 0444, dent, debug_read_ch);
 	debug_create("stat", 0444, dent, debug_read_stat);
@@ -235,6 +235,8 @@ static void smd_debugfs_init(void)
 	debug_create("version", 0444, dent, debug_read_version);
 	debug_create("tbl", 0444, dent, debug_read_alloc_tbl);
 	debug_create("build", 0444, dent, debug_read_build_id);
+
+	return 0;
 }
 
 late_initcall(smd_debugfs_init);
@@ -267,9 +269,10 @@ void smsm_print_sleep_info(void)
 {
 	unsigned long flags;
 	uint32_t *ptr;
+#ifndef CONFIG_ARCH_MSM_SCORPION
 	struct tramp_gpio_smem *gpio;
 	struct smsm_interrupt_info *int_info;
-
+#endif
 
 	spin_lock_irqsave(&smem_lock, flags);
 
