@@ -333,11 +333,11 @@ static inline int au_test_fs_refresh_iattr(struct super_block *sb)
 static inline int au_test_fs_bad_iattr_size(struct super_block *sb)
 {
 	return au_test_xfs(sb)
+		|| au_test_ubifs(sb)
 		/* || au_test_ext4(sb) */	/* untested */
 		/* || au_test_ocfs2(sb) */	/* untested */
 		/* || au_test_ocfs2_dlmfs(sb) */ /* untested */
 		/* || au_test_sysv(sb) */	/* untested */
-		|| au_test_ubifs(sb)		/* untested */
 		/* || au_test_minix(sb) */	/* untested */
 		;
 }
