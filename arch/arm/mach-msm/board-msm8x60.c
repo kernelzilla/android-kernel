@@ -22,6 +22,8 @@
 #include <linux/irq.h>
 #include <linux/io.h>
 
+#include <linux/i2c.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/hardware/gic.h>
@@ -55,13 +57,62 @@ static struct platform_device smc91x_device = {
 	.resource      = smc91x_resources,
 };
 
+#ifdef CONFIG_I2C_QUP
+static void gsbi3_qup_i2c_gpio_config(int adap_id, int config_type)
+{
+}
+
+static void gsbi4_qup_i2c_gpio_config(int adap_id, int config_type)
+{
+}
+
+static void gsbi9_qup_i2c_gpio_config(int adap_id, int config_type)
+{
+}
+
+static struct msm_i2c_platform_data msm_gsbi3_qup_i2c_pdata = {
+	.clk_freq = 100000,
+	.clk = "gsbi_qup_clk",
+	.pclk = "gsbi_pclk",
+	.msm_i2c_config_gpio = gsbi3_qup_i2c_gpio_config,
+};
+
+static struct msm_i2c_platform_data msm_gsbi4_qup_i2c_pdata = {
+	.clk_freq = 100000,
+	.clk = "gsbi_qup_clk",
+	.pclk = "gsbi_pclk",
+	.msm_i2c_config_gpio = gsbi4_qup_i2c_gpio_config,
+};
+
+static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
+	.clk_freq = 100000,
+	.clk = "gsbi_qup_clk",
+	.pclk = "gsbi_pclk",
+	.msm_i2c_config_gpio = gsbi9_qup_i2c_gpio_config,
+};
+#endif
+
 static struct platform_device *devices[] __initdata = {
 	&smc91x_device,
+#ifdef CONFIG_I2C_QUP
+	&msm_gsbi3_qup_i2c_device,
+	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi9_qup_i2c_device,
+#endif
 };
 
 unsigned long clk_get_max_axi_khz(void)
 {
 	return 0;
+}
+
+static void __init msm8x60_init_buses(void)
+{
+#ifdef CONFIG_I2C_QUP
+	msm_gsbi3_qup_i2c_device.dev.platform_data = &msm_gsbi3_qup_i2c_pdata;
+	msm_gsbi4_qup_i2c_device.dev.platform_data = &msm_gsbi4_qup_i2c_pdata;
+	msm_gsbi9_qup_i2c_device.dev.platform_data = &msm_gsbi9_qup_i2c_pdata;
+#endif
 }
 
 static void __init msm8x60_map_io(void)
@@ -150,6 +201,7 @@ static void __init msm8x60_init(void)
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
 	msm8x60_configure_smc91x();
+	msm8x60_init_buses();
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
