@@ -1033,24 +1033,23 @@ static int omapfb_set_par(struct fb_info *fbi)
 static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		struct fb_info *fbi)
 {
-	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omap_dss_device *display = fb2display(fbi);
 	struct fb_var_screeninfo new_var;
-	int r;
+	int r = 0;
 
 	DBG("pan_display(%d)\n", FB2OFB(fbi)->id);
 
-	if (var->xoffset == fbi->var.xoffset &&
-	    var->yoffset == fbi->var.yoffset)
-		return 0;
+	if (var->xoffset != fbi->var.xoffset ||
+	    var->yoffset != fbi->var.yoffset) {
 
-	new_var = fbi->var;
-	new_var.xoffset = var->xoffset;
-	new_var.yoffset = var->yoffset;
+		new_var = fbi->var;
+		new_var.xoffset = var->xoffset;
+		new_var.yoffset = var->yoffset;
 
-	fbi->var = new_var;
+		fbi->var = new_var;
 
-	r = omapfb_apply_changes(fbi, 0);
+		r = omapfb_apply_changes(fbi, 0);
+	}
 
 	if (display && display->update && display->sync) {
 		display->sync(display);
