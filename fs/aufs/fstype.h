@@ -343,6 +343,7 @@ static inline int au_test_fs_bad_iattr_size(struct super_block *sb)
 {
 	return au_test_xfs(sb)
 		|| au_test_ubifs(sb)
+		|| au_test_hfsplus(sb)	/* maintained, but incorrect */
 		/* || au_test_ext4(sb) */	/* untested */
 		/* || au_test_ocfs2(sb) */	/* untested */
 		/* || au_test_ocfs2_dlmfs(sb) */ /* untested */
