@@ -275,6 +275,15 @@ static inline int au_test_debugfs(struct super_block *sb __maybe_unused)
 #endif
 }
 
+static inline int au_test_hfsplus(struct super_block *sb __maybe_unused)
+{
+#if defined(CONFIG_HFSPLUS_FS) || defined(CONFIG_HFSPLUS_FS_MODULE)
+	return sb->s_magic == HFSPLUS_SUPER_MAGIC;
+#else
+	return 0;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 /*
  * they can't be an aufs branch.
@@ -343,11 +352,12 @@ static inline int au_test_fs_refresh_iattr(struct super_block *sb)
 static inline int au_test_fs_bad_iattr_size(struct super_block *sb)
 {
 	return au_test_xfs(sb)
+		|| au_test_ubifs(sb)
+		|| au_test_hfsplus(sb)	/* maintained, but incorrect */
 		/* || au_test_ext4(sb) */	/* untested */
 		/* || au_test_ocfs2(sb) */	/* untested */
 		/* || au_test_ocfs2_dlmfs(sb) */ /* untested */
 		/* || au_test_sysv(sb) */	/* untested */
-		/* || au_test_ubifs(sb) */	/* untested */
 		/* || au_test_minix(sb) */	/* untested */
 		;
 }
@@ -372,7 +382,8 @@ static inline int au_test_fs_no_limit_nlink(struct super_block *sb)
 #ifdef CONFIG_AUFS_BR_RAMFS
 		|| au_test_ramfs(sb)
 #endif
-		|| au_test_ubifs(sb);
+		|| au_test_ubifs(sb)
+		|| au_test_hfsplus(sb);
 }
 
 /*

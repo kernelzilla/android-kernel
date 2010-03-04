@@ -112,6 +112,15 @@ config AUFS_BR_RAMFS
 	Unless you are going to use ramfs as an aufs branch fs without
 	switch_root or something, leave it N.
 
+config AUFS_BR_HFSPLUS
+	bool "Hfsplus as an aufs branch"
+	depends on HFSPLUS_FS
+	default y
+	help
+	If you want to use hfsplus fs as an aufs branch fs, then enable
+	this option. This option introduces a small overhead at
+	copying-up a file on hfsplus.
+
 config AUFS_BDEV_LOOP
 	bool
 	depends on BLK_DEV_LOOP

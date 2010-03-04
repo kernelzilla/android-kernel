@@ -340,6 +340,7 @@ static int au_cpup_before_link(struct dentry *src_dentry,
 	int err;
 	struct dentry *h_src_dentry;
 	struct mutex *h_mtx;
+	struct file *h_file;
 
 	di_read_lock_parent(a->src_parent, AuLock_IR);
 	err = au_test_and_cpup_dirs(src_dentry, a->bdst);
@@ -354,9 +355,15 @@ static int au_cpup_before_link(struct dentry *src_dentry,
 	if (unlikely(err))
 		goto out;
 	mutex_lock_nested(h_mtx, AuLsc_I_CHILD);
-	err = au_sio_cpup_simple(src_dentry, a->bdst, -1,
-				 AuCpup_DTIME /* | AuCpup_KEEPLINO */);
+	h_file = au_h_open_pre(src_dentry, a->bsrc);
+	if (IS_ERR(h_file)) {
+		err = PTR_ERR(h_file);
+		h_file = NULL;
+	} else
+		err = au_sio_cpup_simple(src_dentry, a->bdst, a->bsrc,
+					 AuCpup_DTIME /* | AuCpup_KEEPLINO */);
 	mutex_unlock(h_mtx);
+	au_h_open_post(src_dentry, a->bsrc, h_file);
 	au_unpin(&a->pin);
 
  out:
@@ -371,6 +378,7 @@ static int au_cpup_or_link(struct dentry *src_dentry, struct au_link_args *a)
 	struct inode *h_inode, *inode;
 	struct dentry *h_src_dentry;
 	struct super_block *sb;
+	struct file *h_file;
 
 	plink = 0;
 	h_inode = NULL;
@@ -384,9 +392,16 @@ static int au_cpup_or_link(struct dentry *src_dentry, struct au_link_args *a)
 		au_set_h_dptr(src_dentry, a->bdst, dget(a->h_path.dentry));
 		h_inode = au_h_dptr(src_dentry, a->bsrc)->d_inode;
 		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
-		err = au_sio_cpup_single(src_dentry, a->bdst, a->bsrc, -1,
-					 AuCpup_KEEPLINO, a->parent);
+		h_file = au_h_open_pre(src_dentry, a->bsrc);
+		if (IS_ERR(h_file)) {
+			err = PTR_ERR(h_file);
+			h_file = NULL;
+		} else
+			err = au_sio_cpup_single(src_dentry, a->bdst, a->bsrc,
+						 -1, AuCpup_KEEPLINO,
+						 a->parent);
 		mutex_unlock(&h_inode->i_mutex);
+		au_h_open_post(src_dentry, a->bsrc, h_file);
 		au_set_h_dptr(src_dentry, a->bdst, NULL);
 		au_set_dbstart(src_dentry, a->bsrc);
 	} else {

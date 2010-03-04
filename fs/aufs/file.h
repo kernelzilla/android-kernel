@@ -73,6 +73,22 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin);
 int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 			  int wlock);
 
+#ifdef CONFIG_AUFS_BR_HFSPLUS
+/* hfsplus.c */
+struct file *au_h_open_pre(struct dentry *dentry, aufs_bindex_t bindex);
+void au_h_open_post(struct dentry *dentry, aufs_bindex_t bindex,
+		    struct file *h_file);
+#else
+static inline
+struct file *au_h_open_pre(struct dentry *dentry, aufs_bindex_t bindex)
+{
+	return NULL;
+}
+
+AuStubVoid(au_h_open_post, struct dentry *dentry, aufs_bindex_t bindex,
+	   struct file *h_file);
+#endif
+
 /* f_op.c */
 extern struct file_operations aufs_file_fop;
 int aufs_flush(struct file *file, fl_owner_t id);
