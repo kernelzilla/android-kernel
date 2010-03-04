@@ -235,6 +235,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	struct dentry *dentry, *parent, *h_dentry;
 	struct inode *h_inode, *inode;
 	struct super_block *sb;
+	struct file *h_file;
 
 	dentry = file->f_dentry;
 	sb = dentry->d_sb;
@@ -270,7 +271,11 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	h_dentry = au_h_fptr(file, bstart)->f_dentry;
 	h_inode = h_dentry->d_inode;
 	mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
-	if (d_unhashed(dentry) /* || d_unhashed(h_dentry) */
+	h_file = au_h_open_pre(dentry, bstart);
+	if (IS_ERR(h_file)) {
+		err = PTR_ERR(h_file);
+		h_file = NULL;
+	} else if (d_unhashed(dentry) /* || d_unhashed(h_dentry) */
 	    /* || !h_inode->i_nlink */) {
 		err = au_ready_to_write_wh(file, len, bcpup);
 		di_downgrade_lock(parent, AuLock_IR);
@@ -283,6 +288,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 			err = au_reopen_nondir(file);
 	}
 	mutex_unlock(&h_inode->i_mutex);
+	au_h_open_post(dentry, bstart, h_file);
 
 	if (!err) {
 		au_pin_set_parent_lflag(pin, /*lflag*/0);
