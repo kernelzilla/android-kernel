@@ -64,3 +64,9 @@ endif
 ifdef CONFIG_DEBUG_FS
 ccflags-y += -DDEBUGFS_MAGIC=0x64626720
 endif
+
+# defined in ${srctree}/fs/hfsplus/hfsplus_raw.h
+# tristate
+ifdef CONFIG_HFSPLUS_FS
+ccflags-y += -DHFSPLUS_SUPER_MAGIC=0x482b
+endif
