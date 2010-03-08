@@ -263,27 +263,41 @@ static struct dentry *decode_by_ino(struct super_block *sb, ino_t ino,
 
 /* todo: dirty? */
 /* if exportfs_decode_fh() passed vfsmount*, we could be happy */
+
+struct au_compare_mnt_args {
+	/* input */
+	struct super_block *sb;
+
+	/* output */
+	struct vfsmount *mnt;
+};
+
+static int au_compare_mnt(struct vfsmount *mnt, void *arg)
+{
+	struct au_compare_mnt_args *a = arg;
+
+	if (mnt->mnt_sb != a->sb)
+		return 0;
+	a->mnt = mntget(mnt);
+	return 1;
+}
+
 static struct vfsmount *au_mnt_get(struct super_block *sb)
 {
+	int err;
+	struct au_compare_mnt_args args = {
+		.sb = sb
+	};
 	struct mnt_namespace *ns;
-	struct vfsmount *pos, *mnt;
 
-	spin_lock(&vfsmount_lock);
 	/* no get/put ?? */
 	AuDebugOn(!current->nsproxy);
 	ns = current->nsproxy->mnt_ns;
 	AuDebugOn(!ns);
-	mnt = NULL;
-	/* the order (reverse) will not be a problem */
-	list_for_each_entry(pos, &ns->list, mnt_list)
-		if (pos->mnt_sb == sb) {
-			mnt = mntget(pos);
-			break;
-		}
-	spin_unlock(&vfsmount_lock);
-	AuDebugOn(!mnt);
-
-	return mnt;
+	err = iterate_mounts(au_compare_mnt, &args, ns->root);
+	AuDebugOn(!err);
+	AuDebugOn(!args.mnt);
+	return args.mnt;
 }
 
 struct au_nfsd_si_lock {
