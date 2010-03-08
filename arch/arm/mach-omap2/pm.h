@@ -75,6 +75,7 @@ extern int resource_access_opp_lock(int res, int delta);
 #define resource_get_opp_lock(res) resource_access_opp_lock(res, 0)
 
 #define OPP_IGNORE_LOCK 0x1
+#define OPP_IGNORE_NOTIFIER 0x2
 
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
 extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);

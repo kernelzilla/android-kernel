@@ -1133,14 +1133,19 @@ void omap_push_sram_idle(void)
 }
 
 #ifdef CONFIG_OMAP_PM_SRF
-static void set_opps_max(void)
+static void set_opps_max(bool panic)
 {
-	resource_set_opp_level(VDD2_OPP, MAX_VDD2_OPP, OPP_IGNORE_LOCK);
-	resource_set_opp_level(VDD1_OPP, MAX_VDD1_OPP, OPP_IGNORE_LOCK);
+	int flags = OPP_IGNORE_LOCK;
+
+	if (panic)
+		flags |= OPP_IGNORE_NOTIFIER;
+
+	resource_set_opp_level(VDD2_OPP, MAX_VDD2_OPP, flags);
+	resource_set_opp_level(VDD1_OPP, MAX_VDD1_OPP, flags);
 	return;
 }
 #else
-static void set_opps_max(void)
+static void set_opps_max(bool panic)
 {
 	return;
 }
@@ -1151,7 +1156,7 @@ static int prcm_prepare_reboot(struct notifier_block *this, unsigned long code,
 {
 	if ((code == SYS_DOWN) || (code == SYS_HALT) ||
 		(code == SYS_POWER_OFF)) {
-		set_opps_max();
+		set_opps_max(false);
 	}
 	return NOTIFY_DONE;
 }
@@ -1165,7 +1170,7 @@ static struct notifier_block prcm_notifier = {
 static int panic_prepare_reboot(struct notifier_block *this,
 					unsigned long code, void *x)
 {
-	set_opps_max();
+	set_opps_max(true);
 	return NOTIFY_DONE;
 }
 

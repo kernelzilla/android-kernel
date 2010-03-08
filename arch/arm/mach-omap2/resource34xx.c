@@ -333,7 +333,7 @@ int resource_set_opp_level(int res, u32 target_level, int flags)
 	mutex_lock(&dvfs_mutex);
 
 	if (res == VDD1_OPP) {
-		if (flags != OPP_IGNORE_LOCK && vdd1_lock) {
+		if (!(flags & OPP_IGNORE_LOCK) && vdd1_lock) {
 			mutex_unlock(&dvfs_mutex);
 			return 0;
 		}
@@ -341,17 +341,23 @@ int resource_set_opp_level(int res, u32 target_level, int flags)
 		mpu_freq = mpu_opps[target_level].rate;
 
 #ifdef CONFIG_CPU_FREQ
-		freqs_notify.old = mpu_old_freq/1000;
-		freqs_notify.new = mpu_freq/1000;
-		freqs_notify.cpu = 0;
-		/* Send pre notification to CPUFreq */
-		cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+		if (!(flags & OPP_IGNORE_NOTIFIER)) {
+			freqs_notify.old = mpu_old_freq/1000;
+			freqs_notify.new = mpu_freq/1000;
+			freqs_notify.cpu = 0;
+			/* Send pre notification to CPUFreq */
+			cpufreq_notify_transition(&freqs_notify,
+						  CPUFREQ_PRECHANGE);
+		}
 #endif
 		resp->curr_level = program_opp(res, mpu_opps, target_level,
 			resp->curr_level);
 #ifdef CONFIG_CPU_FREQ
+		if (!(flags & OPP_IGNORE_NOTIFIER)) {
 		/* Send a post notification to CPUFreq */
-		cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+			cpufreq_notify_transition(&freqs_notify,
+						  CPUFREQ_POSTCHANGE);
+		}
 #endif
 	} else {
 		if (!(flags & OPP_IGNORE_LOCK) && vdd2_lock) {
