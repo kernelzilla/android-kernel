@@ -68,6 +68,8 @@ enum {
 	SRC_PLL3 = 3, /* Multimedia/Peripheral PLL or Backup PLL1 */
 	SRC_PLL4 = 2, /* Display PLL */
 	SRC_LPXO = 6, /* Low power XO. */
+	SRC_TCXO = 0, /* Used for sources that always source from tcxo */
+	SRC_AXI  = 100, /* Used for rates that sync to AXI */
 	SRC_MAX       /* Used for sources that can't be turned on/off. */
 };
 
@@ -117,7 +119,12 @@ static struct clk_freq_tbl clk_tbl_csi[] = {
 };
 
 static struct clk_freq_tbl clk_tbl_tcxo[] = {
-	F_RAW(19200000, SRC_MAX, 0, 0, 0, NOMINAL),
+	F_RAW(19200000, SRC_TCXO, 0, 0, 0, NOMINAL),
+	F_END,
+};
+
+static struct clk_freq_tbl clk_tbl_axi[] = {
+	F_RAW(1, SRC_AXI, 0, 0, 0, NOMINAL),
 	F_END,
 };
 
@@ -162,7 +169,7 @@ static struct clk_freq_tbl clk_tbl_grp[] = {
 	F_BASIC(192000000, SRC_PLL1,  4, NOMINAL),
 	F_BASIC(245760000, SRC_PLL3,  3, HIGH),
 	/* Sync to AXI. Hence this "rate" is not fixed. */
-	F_RAW(1, SRC_MAX, 0, B(14), 0, NOMINAL),
+	F_RAW(1, SRC_AXI, 0, B(14), 0, NOMINAL),
 	F_END,
 };
 
@@ -516,7 +523,7 @@ static struct clk_local clk_local_tbl[] = {
 	CLK_MND8(CSI0, CSI_NS, 24, 17, B(9), B(11), clk_tbl_csi, NULL),
 
 	/* For global clocks to be on we must have GLBL_ROOT_ENA set */
-	CLK_NORATE(GLBL_ROOT,	GLBL_CLK_ENA_SC, 0,	B(29)),
+	CLK_1RATE(GLBL_ROOT,	GLBL_CLK_ENA_SC, 0,	B(29), clk_tbl_axi),
 
 	/* Peripheral bus clocks. */
 	CLK_GLBL(ADM,	 	GLBL_CLK_ENA_SC,	B(5)),
@@ -565,6 +572,52 @@ static struct clk_local clk_local_tbl[] = {
 static DEFINE_SPINLOCK(clock_reg_lock);
 static DEFINE_SPINLOCK(pll_vote_lock);
 
+enum {
+	TCXO,
+	LPXO,
+	NUM_XO
+};
+static unsigned xo_votes[NUM_XO]; /* Tracks the number of users for each XO */
+
+/* Map PLLs to which XO they use */
+static unsigned pll_to_xo[] = {
+	[PLL_0] = TCXO,
+	[PLL_1] = TCXO,
+	[PLL_2] = TCXO,
+	[PLL_3] = LPXO,
+	[PLL_4] = LPXO,
+	[PLL_5] = TCXO,
+	[PLL_6] = TCXO,
+};
+
+static void vote_for_xo(unsigned xo)
+{
+	BUG_ON(xo >= NUM_XO);
+
+	if (!xo_votes[xo]) {
+		int enable = 1;
+		msm_proc_comm(PCOM_CLKCTL_RPC_SRC_REQUEST, &xo, &enable);
+	}
+	xo_votes[xo]++;
+}
+
+static void unvote_for_xo(unsigned xo)
+{
+	BUG_ON(xo >= NUM_XO);
+
+	if (xo_votes[xo]) {
+		xo_votes[xo]--;
+	} else {
+		pr_warning("%s: Reference count mismatch!\n", __func__);
+		return;
+	}
+
+	if (xo_votes[xo] == 0) {
+		int enable = 0;
+		msm_proc_comm(PCOM_CLKCTL_RPC_SRC_REQUEST, &xo, &enable);
+	}
+}
+
 #define PLL_ACTIVE_MASK	B(16)
 void pll_enable(uint32_t pll)
 {
@@ -575,6 +628,7 @@ void pll_enable(uint32_t pll)
 
 	spin_lock_irqsave(&pll_vote_lock, flags);
 	if (!pll_count[pll]) {
+		vote_for_xo(pll_to_xo[pll]);
 		reg_val = readl(REG(PLL_ENA_REG));
 		reg_val |= (1 << pll);
 		writel(reg_val, REG(PLL_ENA_REG));
@@ -589,12 +643,31 @@ void pll_enable(uint32_t pll)
 
 static void src_enable(uint32_t src)
 {
-	/* SRC_MAX is used as a placeholder for some freqencies that don't
-	 * have any direct PLL dependency. */
-	if (src == SRC_MAX || src == SRC_LPXO)
-		return;
-
-	pll_enable(src_pll_tbl[src]);
+	switch (src) {
+	case SRC_MAX:
+		/*
+		 * SRC_MAX is used as a placeholder for some freqencies that
+		 * don't have any direct PLL dependency. Instead they source
+		 * off an external/internal clock which takes care of any
+		 * PLL or XO dependency.
+		 */
+		break;
+	case SRC_TCXO:
+		vote_for_xo(TCXO);
+		break;
+	case SRC_AXI:
+	case SRC_LPXO:
+		/*
+		 * AXI could use LPXO or TCXO. Map it to LPXO to make sure
+		 * there is at least once XO available for the AXI (LPXO is
+		 * the lower powered one so just use that).
+		 */
+		vote_for_xo(LPXO);
+		break;
+	default:
+		pll_enable(src_pll_tbl[src]);
+		break;
+	}
 }
 
 void pll_disable(uint32_t pll)
@@ -605,28 +678,50 @@ void pll_disable(uint32_t pll)
 	BUG_ON(pll >= NUM_PLL);
 
 	spin_lock_irqsave(&pll_vote_lock, flags);
-	if (pll_count[pll])
+	if (pll_count[pll]) {
 		pll_count[pll]--;
-	else
+	} else {
 		pr_warning("Reference count mismatch in PLL disable!\n");
+		goto out;
+	}
 
 	if (pll_count[pll] == 0) {
 		reg_val = readl(REG(PLL_ENA_REG));
 		reg_val &= ~(1 << pll);
 		writel(reg_val, REG(PLL_ENA_REG));
+		unvote_for_xo(pll_to_xo[pll]);
 	}
+out:
 	spin_unlock_irqrestore(&pll_vote_lock, flags);
 }
 
 static void src_disable(uint32_t src)
 {
-	/* SRC_MAX is used as a placeholder for some freqencies that don't
-	 * have any direct PLL dependency. */
-	if (src == SRC_MAX || src == SRC_LPXO)
-		return;
-
-	pll_disable(src_pll_tbl[src]);
-
+	switch (src) {
+	case SRC_MAX:
+		/*
+		 * SRC_MAX is used as a placeholder for some freqencies that
+		 * don't have any direct PLL dependency. Instead they source
+		 * off an external/internal clock which takes care of any
+		 * PLL or XO dependency.
+		 */
+		break;
+	case SRC_TCXO:
+		unvote_for_xo(TCXO);
+		break;
+	case SRC_AXI:
+	case SRC_LPXO:
+		/*
+		 * AXI could use LPXO or TCXO. Map it to LPXO to make sure
+		 * there is at least once XO available for the AXI (LPXO is
+		 * the lower powered one so just use that).
+		 */
+		unvote_for_xo(LPXO);
+		break;
+	default:
+		pll_disable(src_pll_tbl[src]);
+		break;
+	}
 }
 
 static unsigned msmc1_votes[MSMC1_END];
@@ -1271,6 +1366,7 @@ __init int clk_7x30_init(void)
 	set_1rate(UART1);
 	set_1rate(UART2);
 	set_1rate(LPA_CODEC);
+	set_1rate(GLBL_ROOT);
 
 	return 0;
 }
