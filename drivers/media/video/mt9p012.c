@@ -4,9 +4,9 @@
  * Copyright (C) 2009 Texas Instruments.
  *
  * Contributors:
- * 	Sameer Venkatraman <sameerv@ti.com>
- * 	Sergio Aguirre <saaguirre@ti.com>
- * 	Martinez Leonides
+ *	Sameer Venkatraman <sameerv@ti.com>
+ *	Sergio Aguirre <saaguirre@ti.com>
+ *	Martinez Leonides
  *
  * Leverage OV9640.c
  *
@@ -33,7 +33,7 @@
 #define MT9P012_32BIT			4
 
 /* terminating token for reg list */
-#define MT9P012_TOK_TERM 		0xFF
+#define MT9P012_TOK_TERM		0xFF
 
 /* delay token for reg list */
 #define MT9P012_TOK_DELAY		100
@@ -74,25 +74,25 @@
 #define MT9P012_QQVGA_PIXELS		(160 * 120)
 
 /* Video mode, for QCIF, SQCIF */
-#define MT9P012_VIDEO_WIDTH_4X_BINN_SCALED      216
-#define MT9P012_VIDEO_HEIGHT_4X_BINN_SCALED     162
+#define MT9P012_VIDEO_WIDTH_4X_BINN_SCALED	216
+#define MT9P012_VIDEO_HEIGHT_4X_BINN_SCALED	162
 
 /* Default coarse integration times to get a good exposure */
-#define MT9P012_COARSE_INT_TIME_216	         550
-#define MT9P012_COARSE_INT_TIME_648	         550
+#define MT9P012_COARSE_INT_TIME_216		 550
+#define MT9P012_COARSE_INT_TIME_648		 550
 #define MT9P012_COARSE_INT_TIME_216_30FPS	1350
 #define MT9P012_COARSE_INT_TIME_648_30FPS	1350
 #define MT9P012_COARSE_INT_TIME_1296		1000
 #define MT9P012_COARSE_INT_TIME_3MP		1700
 #define MT9P012_COARSE_INT_TIME_5MP		1700
-#define MT9P012_COARSE_INT_TIME_INDEX	    	1
-#define MT9P012_TST_PAT 			0x0
+#define MT9P012_COARSE_INT_TIME_INDEX		1
+#define MT9P012_TST_PAT				0x0
 
 /* Analog gain values */
 #define MT9P012_MIN_ANALOG_GAIN			0x34
 #define MT9P013_MIN_ANALOG_GAIN			0x2D
 #define MT9P012_MAX_ANALOG_GAIN			0x1FF
-#define MT9P012_GAIN_STEP   			0x1
+#define MT9P012_GAIN_STEP			0x1
 #define MT9P012_DEF_LINEAR_GAIN			((u16)(2 * 256))
 #define MT9P012_MIN_LINEAR_GAIN			((u16)(2.0 * 256))
 #define MT9P013_MIN_LINEAR_GAIN			((u16)(1.4 * 256))
@@ -102,8 +102,8 @@
 /* Exposure time values (usecs)*/
 #define MT9P012_DEF_MIN_EXPOSURE	100
 #define MT9P012_DEF_MAX_EXPOSURE	1000000
-#define MT9P012_DEF_EXPOSURE	    	20000
-#define MT9P012_EXPOSURE_STEP       	1
+#define MT9P012_DEF_EXPOSURE		20000
+#define MT9P012_EXPOSURE_STEP		1
 
 /* Frame Delays */
 #define MT9P012_GAIN_FRAME_DELAY 1
@@ -174,15 +174,34 @@ enum mt9p012_orientation {
 	MT9P012_VERT_FLIP_ONLY,
 	MT9P012_HORZ_FLIP_AND_VERT_FLIP
 };
+enum ioctl_op {
+	IOCTL_RD = 0,
+	IOCTL_WR
+};
+
+enum sensor_op {
+	SENSOR_REG_REQ = (V4L2_CID_BASE+100),
+	CALIBRATION_ADJ,
+	SENSOR_ID_REQ,
+	COLOR_BAR,
+	FLASH_NEXT_FRAME,
+	ORIENTATION,
+	LENS_CORRECTION,
+	SENSOR_PARAMS_REQ,
+	START_MECH_SHUTTER_CAPTURE,
+	SET_SHUTTER_PARAMS,
+};
+
+struct camera_params_control {
+	enum ioctl_op xaction;
+	enum sensor_op op;
+	u32 data_in;
+	u32 data_out;
+};
 
 /* Private IOCTLs */
-#define V4L2_CID_PRIVATE_CALIBRATION_ADJ	(V4L2_CID_PRIVATE_BASE + 21)
-#define V4L2_CID_PRIVATE_SENSOR_ID_REQ		(V4L2_CID_PRIVATE_BASE + 22)
-#define V4L2_CID_PRIVATE_COLOR_BAR		(V4L2_CID_PRIVATE_BASE + 23)
-#define V4L2_CID_PRIVATE_FLASH_NEXT_FRAME	(V4L2_CID_PRIVATE_BASE + 24)
-#define V4L2_CID_PRIVATE_ORIENTATION		(V4L2_CID_PRIVATE_BASE + 25)
-#define V4L2_CID_PRIVATE_LENS_CORRECTION	(V4L2_CID_PRIVATE_BASE + 26)
-#define V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ	(V4L2_CID_PRIVATE_BASE + 27)
+
+#define V4L2_CID_PRIVATE_CAMERA_PARAMS	(V4L2_CID_PRIVATE_BASE + 19)
 
 /* Debug functions */
 static int debug;
@@ -198,8 +217,8 @@ static inline u32 mt9p012_ver(u16 model, u16 rev)
 /* list of image formats supported by mt9p012 sensor */
 const static struct v4l2_fmtdesc mt9p012_formats[] = {
 	{
-		.description    = "Bayer10 (GrR/BGb)",
-		.pixelformat    = V4L2_PIX_FMT_SGRBG10,
+		.description	= "Bayer10 (GrR/BGb)",
+		.pixelformat	= V4L2_PIX_FMT_SGRBG10,
 	}
 };
 
@@ -390,7 +409,7 @@ struct mt9p012_sensor_id {
  * struct mt9p012_sensor_params
  */
 struct mt9p012_sensor_params {
-	u32 line_time;  /* usec, q8 */
+	u32 line_time;	/* usec, q8 */
 	u16 gain_frame_delay;
 	u16 exp_time_frame_delay;
 	u16 frame_length_lines;
@@ -592,7 +611,7 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_FLASH_NEXT_FRAME,
+			.id = FLASH_NEXT_FRAME,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Flash On Next Frame",
 			.minimum = 0,
@@ -604,7 +623,7 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_SENSOR_ID_REQ,
+			.id = SENSOR_ID_REQ,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Sensor ID",
 			.minimum = 0,
@@ -616,7 +635,7 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_ORIENTATION,
+			.id = ORIENTATION,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Orientation",
 			.minimum = MT9P012_NO_HORZ_FLIP_OR_VERT_FLIP,
@@ -628,7 +647,7 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_LENS_CORRECTION,
+			.id = LENS_CORRECTION,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Lens Correction",
 			.minimum = 0,
@@ -640,7 +659,7 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_CALIBRATION_ADJ,
+			.id = CALIBRATION_ADJ,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Calibration Adjust",
 			.minimum = 0,
@@ -652,9 +671,21 @@ static struct vcontrol video_control[] = {
 	},
 	{
 		{
-			.id = V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ,
+			.id = SENSOR_PARAMS_REQ,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "Sensor Params",
+			.minimum = 0,
+			.maximum = -1,
+			.step = 0,
+			.default_value = 0,
+		},
+		.current_value = 0,
+	},
+	{
+		{
+			.id = V4L2_CID_PRIVATE_CAMERA_PARAMS,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "Camera Params",
 			.minimum = 0,
 			.maximum = -1,
 			.step = 0,
@@ -1429,6 +1460,116 @@ static int mt9p012_set_lens_correction(struct mt9p012_lsc_params *lsc,
 	return err;
 }
 
+static int mt9p012_param_handler(u32 ctrlval,
+			struct v4l2_int_device *s)
+{
+	int err = 0;
+	struct mt9p012_sensor *sensor = s->priv;
+	struct i2c_client *client = to_i2c_client(sensor->dev);
+	struct mt9p012_sensor_settings *ss =
+		&sensor_settings[sensor->current_iframe];
+	struct camera_params_control camctl;
+	struct vcontrol *lvc;
+	int i;
+
+	if (!ctrlval)
+		return -EINVAL;
+
+	if (copy_from_user(&camctl, (void *)ctrlval,
+			   sizeof(struct camera_params_control))) {
+		printk(KERN_ERR "mt9p012: Failed copy_from_user\n");
+		return -EINVAL;
+	}
+
+	i = find_vctrl(sensor, camctl.op);
+	if (i < 0)
+		return -EINVAL;
+	lvc = &sensor->video_control[i];
+
+	if (camctl.xaction == IOCTL_RD) {
+		switch (camctl.op) {
+		case FLASH_NEXT_FRAME:
+			camctl.data_in = lvc->current_value;
+			break;
+		case ORIENTATION:
+			camctl.data_in = lvc->current_value;
+			break;
+		case LENS_CORRECTION:
+			if (copy_to_user((void *)camctl.data_in,
+					 &(sensor->lsc),
+					 sizeof(sensor->lsc))) {
+				printk(KERN_ERR "mt9p012: Copy_to_user err\n");
+				err = -EINVAL;
+			}
+			break;
+		case SENSOR_ID_REQ:
+			if (copy_to_user((void *)camctl.data_in,
+					 &(sensor->sensor_id),
+					 sizeof(sensor->sensor_id))) {
+				printk(KERN_ERR "mt9p012: Copy_to_user err\n");
+				err = -EINVAL;
+			}
+			break;
+		case SENSOR_PARAMS_REQ:
+			sensor->sensor_params.frame_length_lines =
+				ss->frame.frame_len_lines;
+			sensor->sensor_params.line_length_clocks =
+				ss->frame.line_len_pck;
+			sensor->sensor_params.x_output_size =
+				ss->frame.x_output_size;
+			sensor->sensor_params.y_output_size =
+				ss->frame.y_output_size;
+
+			if (copy_to_user((void *)camctl.data_in,
+					 &(sensor->sensor_params),
+					 sizeof(sensor->sensor_params))) {
+				printk(KERN_ERR "mt9p012: Copy_to_user err\n");
+				err = -EINVAL;
+			}
+			break;
+		default:
+			dev_err(&client->dev, "Unrecognized op %d\n",
+				camctl.op);
+			break;
+		}
+	} else if (camctl.xaction == IOCTL_WR) {
+		switch (camctl.op) {
+		case FLASH_NEXT_FRAME:
+			err = mt9p012_set_flash_next_frame(camctl.data_out,
+							   s, lvc);
+			break;
+		case ORIENTATION:
+			err = mt9p012_set_orientation(camctl.data_out,
+						      s, lvc);
+			break;
+		case LENS_CORRECTION:
+			err = copy_from_user(&(sensor->lsc),
+				(struct mt9p012_lsc_params *)camctl.data_out,
+				sizeof(struct mt9p012_lsc_params));
+			err = mt9p012_set_lens_correction(&(sensor->lsc), s);
+			dev_dbg(&client->dev, "LENS CORRECTION IOCTL write-"
+					"enable=%d, size=%d\n",
+					sensor->lsc.enable_lens_correction,
+					sensor->lsc.num_elements);
+			break;
+		case CALIBRATION_ADJ:
+			err = mt9p012_calibration_adjust(camctl.data_out,
+							 s, lvc);
+			break;
+		default:
+			dev_err(&client->dev, "Unrecognized op %d\n",
+				camctl.op);
+			break;
+		}
+	} else {
+		dev_err(&client->dev, "Unrecognized action %d\n",
+			camctl.xaction);
+		err = -EINVAL;
+	}
+
+	return err;
+}
+
 /**
  * mt9p012_configure_frame - Setup the frame, clock and exposure parmas in the
  * config_frame_list array.
@@ -1638,7 +1779,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	}
 
 	/* Set initial flash mode */
-	i = find_vctrl(sensor, V4L2_CID_PRIVATE_FLASH_NEXT_FRAME);
+	i = find_vctrl(sensor, FLASH_NEXT_FRAME);
 	if (i >= 0) {
 		lvc = &sensor->video_control[i];
 		mt9p012_set_flash_next_frame(lvc->current_value,
@@ -1646,7 +1787,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	}
 
 	/* Set initial orientation */
-	i = find_vctrl(sensor, V4L2_CID_PRIVATE_ORIENTATION);
+	i = find_vctrl(sensor, ORIENTATION);
 	if (i >= 0) {
 		lvc = &sensor->video_control[i];
 		mt9p012_set_orientation(lvc->current_value,
@@ -1654,7 +1795,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	}
 
 	/* Set cal adj */
-	i = find_vctrl(sensor, V4L2_CID_PRIVATE_CALIBRATION_ADJ);
+	i = find_vctrl(sensor, CALIBRATION_ADJ);
 	if (i >= 0) {
 		lvc = &sensor->video_control[i];
 		mt9p012_calibration_adjust(lvc->current_value,
@@ -1662,7 +1803,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	}
 
 	/* Set LSC */
-	i = find_vctrl(sensor, V4L2_CID_PRIVATE_LENS_CORRECTION);
+	i = find_vctrl(sensor, LENS_CORRECTION);
 	if (i >= 0) {
 		lvc = &sensor->video_control[i];
 		mt9p012_set_lens_correction(&(sensor->lsc),
@@ -1791,8 +1932,8 @@ static int ioctl_queryctrl(struct v4l2_int_device *s, struct v4l2_queryctrl *qc)
 static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-	struct mt9p012_sensor_settings *ss =
-		&sensor_settings[sensor->current_iframe];
+	/*struct mt9p012_sensor_settings *ss =
+		&sensor_settings[sensor->current_iframe];  */
 	struct vcontrol *lvc;
 	int i;
 
@@ -1802,46 +1943,11 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 	lvc = &sensor->video_control[i];
 
 	switch (vc->id) {
-	case  V4L2_CID_EXPOSURE:
+	case V4L2_CID_EXPOSURE:
 		vc->value = lvc->current_value;
 		break;
 	case V4L2_CID_GAIN:
 		vc->value = lvc->current_value;
-		break;
-	case V4L2_CID_PRIVATE_FLASH_NEXT_FRAME:
-		vc->value = lvc->current_value;
-		break;
-	case V4L2_CID_PRIVATE_ORIENTATION:
-		vc->value = lvc->current_value;
-		break;
-	case V4L2_CID_PRIVATE_LENS_CORRECTION:
-		if (copy_to_user((void *)vc->value, &(sensor->lsc),
-				sizeof(sensor->lsc))) {
-			printk(KERN_ERR "Failed copy_to_user\n");
-			return -EINVAL;
-		}
-		break;
-	case V4L2_CID_PRIVATE_SENSOR_ID_REQ:
-		if (copy_to_user((void *)vc->value, &(sensor->sensor_id),
-				sizeof(sensor->sensor_id))) {
-			printk(KERN_ERR "Failed copy_to_user\n");
-			return -EINVAL;
-		}
-		break;
-	case V4L2_CID_PRIVATE_SENSOR_PARAMS_REQ:
-		sensor->sensor_params.frame_length_lines =
-			ss->frame.frame_len_lines;
-		sensor->sensor_params.line_length_clocks =
-			ss->frame.line_len_pck;
-		sensor->sensor_params.x_output_size =
-			ss->frame.x_output_size;
-		sensor->sensor_params.y_output_size =
-			ss->frame.y_output_size;
-		if (copy_to_user((void *)vc->value, &(sensor->sensor_params),
-				sizeof(sensor->sensor_params))) {
-			printk(KERN_ERR "Failed copy_to_user\n");
-			return -EINVAL;
-		}
 		break;
 	}
 
@@ -1860,10 +1966,9 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 static int ioctl_s_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-	struct i2c_client *client = to_i2c_client(sensor->dev);
-	int retval = -EINVAL;
-	int i;
 	struct vcontrol *lvc;
+	int err = -EINVAL;
+	int i;
 
 	i = find_vctrl(sensor, vc->id);
 	if (i < 0)
@@ -1872,33 +1977,17 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 
 	switch (vc->id) {
 	case V4L2_CID_EXPOSURE:
-		retval = mt9p012_set_exposure_time(vc->value, s, lvc);
+		err = mt9p012_set_exposure_time(vc->value, s, lvc);
 		break;
 	case V4L2_CID_GAIN:
-		retval = mt9p012_set_gain(vc->value, s, lvc);
+		err = mt9p012_set_gain(vc->value, s, lvc);
 		break;
-	case V4L2_CID_PRIVATE_FLASH_NEXT_FRAME:
-		retval = mt9p012_set_flash_next_frame(vc->value, s, lvc);
-		break;
-	case V4L2_CID_PRIVATE_ORIENTATION:
-		retval = mt9p012_set_orientation(vc->value, s, lvc);
-		break;
-	case V4L2_CID_PRIVATE_LENS_CORRECTION:
-		retval = copy_from_user(&(sensor->lsc),
-				(struct mt9p012_lsc_params *)vc->value,
-				sizeof(struct mt9p012_lsc_params));
-		retval = mt9p012_set_lens_correction(&(sensor->lsc), s);
-		dev_dbg(&client->dev, "LENS CORRECTION IOCTL write-" \
-			"enable=%d, size=%d\n",
-			sensor->lsc.enable_lens_correction,
-			sensor->lsc.num_elements);
-		break;
-	case V4L2_CID_PRIVATE_CALIBRATION_ADJ:
-		retval = mt9p012_calibration_adjust(vc->value, s, lvc);
+	case V4L2_CID_PRIVATE_CAMERA_PARAMS:
+		err = mt9p012_param_handler(vc->value, s);
 		break;
 	}
 
-	return retval;
+	return err;
 }
 
 /**

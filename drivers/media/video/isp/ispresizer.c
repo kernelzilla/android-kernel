@@ -521,10 +521,12 @@ int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
 	isp_reg_writel(ispres_obj.tmp_buf + isp_get_buf_offset(),
 		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INADD);
 
+	/*
 	isp_reg_writel(
 		((ispres_obj.ipwd_crop & 15) << ISPRSZ_IN_START_HORZ_ST_SHIFT) |
 		(0x00 << ISPRSZ_IN_START_VERT_ST_SHIFT),
 		OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_START);
+	*/
 
 	isp_reg_writel((0x00 << ISPRSZ_IN_START_HORZ_ST_SHIFT) |
 		       (0x00 << ISPRSZ_IN_START_VERT_ST_SHIFT),

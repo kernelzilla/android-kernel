@@ -27,7 +27,7 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 
-#include "oldomap34xxcam.h"
+#include "omap34xxcam.h"
 #include "hplens.h"
 
 #define DRIVER_NAME  "hplens"
@@ -317,9 +317,9 @@ static int __hplens_ioctl(unsigned int cmd, void *arg)
 	int err = -1;
 	struct hplens_reg reg;
 	struct hplens_eeprom *eeprom = NULL;
-	u8 write_buffer[16];
-	u8 fdb = 0;
-	int idx;
+	u8 write_buffer[20];
+	u32 i;
+	u16 write_len;
 
 	switch (cmd) {
 	case OMAP3_HPLENS_CMD_READ:
@@ -352,16 +352,29 @@ static int __hplens_ioctl(unsigned int cmd, void *arg)
 		err = copy_from_user(&reg, arg,  sizeof(struct hplens_reg));
 		if (err == 0) {
 			mutex_lock(&hplens_mutex);
-			if (reg.addr[0] != 0xff) { /* valid register address */
-				while (fdb < reg.len_addr) {
-					/* put the register address to write in the buffer first */
-					write_buffer[fdb] = reg.addr[fdb];
-					fdb++;
+			if ((reg.len_addr + reg.len_data) > sizeof(write_buffer)) {
+				err = -EINVAL;
+				mutex_unlock(&hplens_mutex);
+				break;
+			}
+
+			/* Initialize length of write buffer. */
+			write_len = 0;
+
+			 /* The following check is a temporary HACK to allow not
+					writing address for certain parts. */
+			if (reg.addr[0] != 0xff) {
+				write_len = reg.len_addr;
+				for (i = 0; i < reg.len_addr; ++i) {
+					write_buffer[i] = reg.addr[i];
 				}
 			}
-			for (idx = fdb; idx <= reg.len_data; idx++)
-				write_buffer[idx] = reg.data[idx-fdb];
-			err = hplens_reg_write(reg.dev_addr, write_buffer, reg.len_data + fdb);
+			for (i = 0; i < reg.len_data; ++i) {
+				write_buffer[i + write_len] = reg.data[i];
+			}
+			write_len += reg.len_data;
+			err = hplens_reg_write(reg.dev_addr, write_buffer, write_len);
+
 			/* Save time stamp */
 			ktime_get_ts(&reg.ts_end);
 			mutex_unlock(&hplens_mutex);
