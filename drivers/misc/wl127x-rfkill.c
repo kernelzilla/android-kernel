@@ -75,6 +75,7 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 	struct wl127x_rfkill_platform_data *pdata = pdev->dev.platform_data;
 
 	if (pdata->bt_nshutdown_gpio >= 0) {
+		bool default_blocked = true;  /* power off */
 		rc = gpio_request(pdata->bt_nshutdown_gpio,
 				  "wl127x_bt_nshutdown_gpio");
 		if (unlikely(rc))
@@ -89,14 +90,17 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		if (unlikely(rc))
 			return rc;
 
-		wl127x_bt_rfkill_set_power((void *)pdata, 1);
+		wl127x_bt_rfkill_set_power((void *)pdata, default_blocked);
 
-		pdata->rfkill[WL127X_BLUETOOTH] =
-			rfkill_alloc("wl127x Bluetooth", &pdev->dev,
-				RFKILL_TYPE_BLUETOOTH, &wl127x_bt_rfkill_ops, (void *)pdata);
-
+		pdata->rfkill[WL127X_BLUETOOTH] = rfkill_alloc(
+				"wl127x Bluetooth", &pdev->dev,
+				RFKILL_TYPE_BLUETOOTH, &wl127x_bt_rfkill_ops,
+				(void *)pdata);
 		if (unlikely(!pdata->rfkill[WL127X_BLUETOOTH]))
 			return -ENOMEM;
+
+		rfkill_set_states(pdata->rfkill[WL127X_BLUETOOTH],
+				default_blocked, false);
 
 		rc = rfkill_register(pdata->rfkill[WL127X_BLUETOOTH]);
 		if (unlikely(rc)) {
@@ -106,6 +110,7 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 	}
 
 	if (pdata->fm_enable_gpio >= 0) {
+		bool default_blocked = true;  /* power off */
 		rc = gpio_request(pdata->fm_enable_gpio,
 				  "wl127x_fm_enable_gpio");
 		if (unlikely(rc))
@@ -115,13 +120,18 @@ static int wl127x_rfkill_probe(struct platform_device *pdev)
 		if (unlikely(rc))
 			return rc;
 
-		wl127x_fm_rfkill_set_power((void *)pdata->fm_enable_gpio, 1);
+		wl127x_fm_rfkill_set_power((void *)pdata->fm_enable_gpio,
+				default_blocked);
 
-		pdata->rfkill[WL127X_FM] =
-			rfkill_alloc("wl127x FM Radio", &pdev->dev,
-				RFKILL_TYPE_FM, &wl127x_fm_rfkill_ops, (void *)pdata->fm_enable_gpio);
+		pdata->rfkill[WL127X_FM] = rfkill_alloc("wl127x FM Radio",
+				&pdev->dev, RFKILL_TYPE_FM,
+				&wl127x_fm_rfkill_ops,
+				(void *)pdata->fm_enable_gpio);
 		if (unlikely(!pdata->rfkill[WL127X_FM]))
 			return -ENOMEM;
+
+		rfkill_set_states(pdata->rfkill[WL127X_FM], default_blocked,
+				false);
 
 		rc = rfkill_register(pdata->rfkill[WL127X_FM]);
 		if (unlikely(rc)) {
