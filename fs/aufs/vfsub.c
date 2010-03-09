@@ -563,7 +563,7 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 		err = get_write_access(h_inode);
 		if (err)
 			goto out_mnt;
-		err = break_lease(h_inode, vfsub_fmode_to_uint(FMODE_WRITE));
+		err = break_lease(h_inode, O_WRONLY);
 		if (err)
 			goto out_inode;
 	}
