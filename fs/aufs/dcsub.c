@@ -185,39 +185,16 @@ int au_dcsub_pages_rev(struct au_dcsub_pages *dpages, struct dentry *dentry,
 	return err;
 }
 
-struct dentry *au_test_subdir(struct dentry *d1, struct dentry *d2)
+int au_test_subdir(struct dentry *d1, struct dentry *d2)
 {
-	struct dentry *trap, **dentries;
-	int err, i, j;
-	struct au_dcsub_pages dpages;
-	struct au_dpage *dpage;
-
-	trap = ERR_PTR(-ENOMEM);
-	err = au_dpages_init(&dpages, GFP_NOFS);
-	if (unlikely(err))
-		goto out;
-	err = au_dcsub_pages_rev(&dpages, d1, /*do_include*/1, NULL, NULL);
-	if (unlikely(err))
-		goto out_dpages;
-
-	trap = d1;
-	for (i = 0; !err && i < dpages.ndpage; i++) {
-		dpage = dpages.dpages + i;
-		dentries = dpage->dentries;
-		for (j = 0; !err && j < dpage->ndentry; j++) {
-			struct dentry *d;
-
-			d = dentries[j];
-			err = (d == d2);
-			if (!err)
-				trap = d;
+	struct path path[2] = {
+		{
+			.dentry = d1
+		},
+		{
+			.dentry = d2
 		}
-	}
-	if (!err)
-		trap = NULL;
+	};
 
- out_dpages:
-	au_dpages_free(&dpages);
- out:
-	return trap;
+	return path_is_under(path + 0, path + 1);
 }

@@ -48,7 +48,7 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 		   au_dpages_test test, void *arg);
 int au_dcsub_pages_rev(struct au_dcsub_pages *dpages, struct dentry *dentry,
 		       int do_include, au_dpages_test test, void *arg);
-struct dentry *au_test_subdir(struct dentry *d1, struct dentry *d2);
+int au_test_subdir(struct dentry *d1, struct dentry *d2);
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DCSUB_H__ */

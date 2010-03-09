@@ -41,7 +41,7 @@ int au_test_loopback_overlap(struct super_block *sb, struct dentry *h_d1,
 	/* h_d1 can be local NFS. in this case aufs cannot detect the loop */
 	if (unlikely(h_d1->d_sb == sb))
 		return 1;
-	return !!au_test_subdir(h_d1, h_d2);
+	return au_test_subdir(h_d1, h_d2);
 }
 
 /* true if a kernel thread named 'loop[0-9].*' accesses a file */

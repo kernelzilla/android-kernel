@@ -96,8 +96,8 @@ static int test_overlap(struct super_block *sb, struct dentry *h_d1,
 {
 	if (unlikely(h_d1 == h_d2))
 		return 1;
-	return !!au_test_subdir(h_d1, h_d2)
-		|| !!au_test_subdir(h_d2, h_d1)
+	return au_test_subdir(h_d1, h_d2)
+		|| au_test_subdir(h_d2, h_d1)
 		|| au_test_loopback_overlap(sb, h_d1, h_d2)
 		|| au_test_loopback_overlap(sb, h_d2, h_d1);
 }
