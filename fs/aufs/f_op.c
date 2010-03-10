@@ -708,6 +708,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		goto out_unlock;
 
 	vfsub_file_accessed(args.h_file);
+	/* update without lock, I don't think it a problem */
 	fsstack_copy_attr_atime(file->f_dentry->d_inode, h_dentry->d_inode);
 
  out_unlock:
