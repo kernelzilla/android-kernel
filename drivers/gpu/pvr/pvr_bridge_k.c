@@ -34,9 +34,11 @@
 #include "proc.h"
 #include "private_data.h"
 #include "linkage.h"
+#include "pvr_bridge_km.h"
 
 #if defined(SUPPORT_DRI_DRM)
 #include <drm/drmP.h>
+#include "pvr_drm.h"
 #endif
 
 #if defined(SUPPORT_VGX)

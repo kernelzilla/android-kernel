@@ -1319,11 +1319,7 @@ MMU_UnmapPagesAndFreePTs (MMU_HEAP *psMMUHeap,
 
 		if (ppsPTInfoList[0] && ppsPTInfoList[0]->ui32ValidPTECount == 0)
 		{
-#if defined(ANDROID)
-			_DeferredFreePageTable(psMMUHeap, ui32PDIndex - psMMUHeap->ui32PDBaseIndex, IMG_FALSE);
-#else
 			_DeferredFreePageTable(psMMUHeap, ui32PDIndex - psMMUHeap->ui32PDBaseIndex, IMG_TRUE);
-#endif
 			bInvalidateDirectoryCache = IMG_TRUE;
 		}
 

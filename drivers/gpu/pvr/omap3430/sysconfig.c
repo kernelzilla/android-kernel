@@ -33,6 +33,14 @@
 #include "syslocal.h"
 #include "sysconfig.h"
 
+#include "ocpdefs.h"
+
+#if !defined(NO_HARDWARE) && \
+     defined(SYS_USING_INTERRUPTS) && \
+     defined(SGX530) && (SGX_CORE_REV == 125)
+#define SGX_OCP_REGS_ENABLED
+#endif
+
 SYS_DATA* gpsSysData = (SYS_DATA*)IMG_NULL;
 SYS_DATA  gsSysData;
 
@@ -58,6 +66,7 @@ IMG_UINT32 PVRSRV_BridgeDispatchKM(IMG_UINT32	Ioctl,
 
 #if defined(DEBUG) && defined(DUMP_OMAP34xx_CLOCKS) && defined(__linux__)
 
+#pragma GCC diagnostic ignored "-Wstrict-prototypes"
 #include <mach/clock.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
@@ -131,11 +140,11 @@ static void dump_omap34xx_clocks(void)
 		rate = clk_get_rate(copy);
 		if (rate < 1000000)
 		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %u KHz (%u Hz)", __func__, cp->name, rate/1000, rate));
+			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %lu KHz (%lu Hz)", __func__, cp->name, rate/1000, rate));
 		}
 		else
 		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %u MHz (%u Hz)", __func__, cp->name, rate/1000000, rate));
+			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %lu MHz (%lu Hz)", __func__, cp->name, rate/1000000, rate));
 		}
 	}
 }
@@ -145,6 +154,51 @@ static void dump_omap34xx_clocks(void)
 static INLINE void dump_omap34xx_clocks(void) {}
 
 #endif 
+
+#if defined(SGX_OCP_REGS_ENABLED)
+
+#define SYS_OMAP3430_OCP_REGS_SYS_PHYS_BASE		(SYS_OMAP3430_SGX_REGS_SYS_PHYS_BASE + EUR_CR_OCP_REVISION)
+#define SYS_OMAP3430_OCP_REGS_SIZE				0x110
+
+static IMG_CPU_VIRTADDR gpvOCPRegsLinAddr;
+
+static PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
+{
+	PVRSRV_ERROR eError = EnableSGXClocks(psSysData);
+
+	if(eError == PVRSRV_OK)
+	{
+		OSWriteHWReg(gpvOCPRegsLinAddr,
+					 EUR_CR_OCP_DEBUG_CONFIG - EUR_CR_OCP_REVISION,
+					 EUR_CR_OCP_DEBUG_CONFIG_THALIA_INT_BYPASS_MASK);
+	}
+
+	return eError;
+}
+
+#else 
+
+static INLINE PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
+{
+	return EnableSGXClocks(psSysData);
+}
+
+#endif 
+
+static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
+{
+	PVRSRV_ERROR eError = EnableSystemClocks(psSysData);
+
+#if !defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
+	if(eError == PVRSRV_OK)
+	{
+		
+		EnableSGXClocksWrap(psSysData);
+	}
+#endif
+
+	return eError;
+}
 
 static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 {
@@ -345,6 +399,27 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_LOCATEDEV);
 
+#if defined(SGX_OCP_REGS_ENABLED)
+	{
+		IMG_SYS_PHYADDR sOCPRegsSysPBase;
+		IMG_CPU_PHYADDR sOCPRegsCpuPBase;
+
+		sOCPRegsSysPBase.uiAddr	= SYS_OMAP3430_OCP_REGS_SYS_PHYS_BASE;
+		sOCPRegsCpuPBase		= SysSysPAddrToCpuPAddr(sOCPRegsSysPBase);
+
+		gpvOCPRegsLinAddr		= OSMapPhysToLin(sOCPRegsCpuPBase,
+												 SYS_OMAP3430_OCP_REGS_SIZE,
+												 PVRSRV_HAP_UNCACHED|PVRSRV_HAP_KERNEL_ONLY,
+												 IMG_NULL);
+
+		if (gpvOCPRegsLinAddr == IMG_NULL)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to map OCP registers"));
+			return PVRSRV_ERROR_BAD_MAPPING;
+		}
+	}
+#endif
+
 	
 
 
@@ -406,7 +481,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	PDUMPINIT();
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_PDUMPINIT);
 
-	eError = EnableSystemClocks(gpsSysData);
+	eError = EnableSystemClocksWrap(gpsSysData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to Enable system clocks (%d)", eError));
@@ -416,7 +491,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS);
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-	eError = EnableSGXClocks(gpsSysData);
+	eError = EnableSGXClocksWrap(gpsSysData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to Enable SGX clocks (%d)", eError));
@@ -452,7 +527,7 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-	eError = EnableSGXClocks(gpsSysData);
+	eError = EnableSGXClocksWrap(gpsSysData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to Enable SGX clocks (%d)", eError));
@@ -536,12 +611,19 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 #endif 
 
+#if defined(SGX_OCP_REGS_ENABLED)
+	OSUnMapPhysToLin(gpvOCPRegsLinAddr,
+					 SYS_OMAP3430_OCP_REGS_SIZE,
+					 PVRSRV_HAP_UNCACHED|PVRSRV_HAP_KERNEL_ONLY,
+					 IMG_NULL);
+#endif
+
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_INITDEV))
 	{
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 		PVR_ASSERT(SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS));
 		
-		eError = EnableSGXClocks(gpsSysData);
+		eError = EnableSGXClocksWrap(gpsSysData);
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"SysDeinitialise: EnableSGXClocks failed"));
@@ -779,10 +861,10 @@ PVRSRV_ERROR SysSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState)
 
 		if (SYS_SPECIFIC_DATA_TEST(&gsSysSpecificData, SYS_SPECIFIC_DATA_PM_DISABLE_SYSCLOCKS))
 		{
-			eError = EnableSystemClocks(gpsSysData);
+			eError = EnableSystemClocksWrap(gpsSysData);
 			if (eError != PVRSRV_OK)
 			{
-				PVR_DPF((PVR_DBG_ERROR,"SysSystemPostPowerState: EnableSystemClocks failed (%d)", eError));
+				PVR_DPF((PVR_DBG_ERROR,"SysSystemPostPowerState: EnableSystemClocksWrap failed (%d)", eError));
 				return eError;
 			}
 			SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS);
@@ -858,7 +940,7 @@ PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32				ui32DeviceIndex,
 	if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 	{
 		PVR_DPF((PVR_DBG_MESSAGE, "SysDevicePostPowerState: SGX Leaving state D3"));
-		eError = EnableSGXClocks(gpsSysData);
+		eError = EnableSGXClocksWrap(gpsSysData);
 	}
 #else	
 	PVR_UNREFERENCED_PARAMETER(eCurrentPowerState);

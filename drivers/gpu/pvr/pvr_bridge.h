@@ -789,6 +789,7 @@ typedef struct PVRSRV_BRIDGE_IN_WRAP_EXT_MEMORY_TAG
 	IMG_BOOL                bPhysContig;
 	IMG_UINT32				ui32NumPageTableEntries;
 	IMG_SYS_PHYADDR         *psSysPAddr;
+	IMG_UINT32				ui32Flags;
 
 }PVRSRV_BRIDGE_IN_WRAP_EXT_MEMORY;
 

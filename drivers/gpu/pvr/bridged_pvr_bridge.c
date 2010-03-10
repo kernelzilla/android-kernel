@@ -1020,6 +1020,7 @@ PVRSRVWrapExtMemoryBW(IMG_UINT32 ui32BridgeID,
 							  psWrapExtMemIN->bPhysContig,
 							  psSysPAddr,
 							  psWrapExtMemIN->pvLinAddr,
+							  psWrapExtMemIN->ui32Flags,
 							  &psMemInfo);
 	if(psWrapExtMemIN->ui32NumPageTableEntries)
 	{
@@ -1879,6 +1880,7 @@ PVRSRVGetDCSystemBufferBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
+	 
 	PVRSRVAllocSubHandleNR(psPerProc->psHandleBase,
 						 &psGetDispClassSysBufferOUT->hBuffer,
 						 hBufferInt,
@@ -2211,6 +2213,7 @@ PVRSRVGetDCBuffersBW(IMG_UINT32 ui32BridgeID,
 	{
 		IMG_HANDLE hBufferExt;
 
+		 
 		PVRSRVAllocSubHandleNR(psPerProc->psHandleBase,
 							 &hBufferExt,
 							 psGetDispClassBuffersOUT->ahBuffer[i],
@@ -2445,6 +2448,7 @@ PVRSRVGetBCBufferBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
+	 
 	PVRSRVAllocSubHandleNR(psPerProc->psHandleBase,
 						 &psGetBufferClassBufferOUT->hBuffer,
 						 hBufferInt,
@@ -2824,7 +2828,9 @@ PVRSRVInitSrvDisconnectBW(IMG_UINT32 ui32BridgeID,
 
 	psRetOUT->eError = PVRSRVFinaliseSystem(psInitSrvDisconnectIN->bInitSuccesful);
 
-	PVRSRVSetInitServerState( PVRSRV_INIT_SERVER_SUCCESSFUL ,(IMG_BOOL)(((psRetOUT->eError == PVRSRV_OK) && (psInitSrvDisconnectIN->bInitSuccesful))));
+	PVRSRVSetInitServerState( PVRSRV_INIT_SERVER_SUCCESSFUL,
+				(((psRetOUT->eError == PVRSRV_OK) && (psInitSrvDisconnectIN->bInitSuccesful)))
+				? IMG_TRUE : IMG_FALSE);
 
 	return 0;
 }

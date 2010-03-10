@@ -103,4 +103,6 @@ typedef char				TCHAR, *PTCHAR, *PTSTR;
 
 #define IMG_CONST const
 
+#define IMG_FORMAT_PRINTF(x,y)
+
 #endif 

@@ -529,21 +529,24 @@ typedef struct DISPLAY_MODE_INFO_TAG
 
 typedef struct DISPLAY_INFO_TAG
 {
+	
 	IMG_UINT32 ui32MaxSwapChains;
 	
 	IMG_UINT32 ui32MaxSwapChainBuffers;
-
+	
 	IMG_UINT32 ui32MinSwapInterval;
-
+	
 	IMG_UINT32 ui32MaxSwapInterval;
-
+	
+	IMG_UINT32 ui32PhysicalWidthmm;
+	IMG_UINT32 ui32PhysicalHeightmm;
+	
 	IMG_CHAR	szDisplayName[MAX_DISPLAY_NAME_SIZE];
-
 #if defined(SUPPORT_HW_CURSOR)
+	
 	IMG_UINT16	ui32CursorWidth;
 	IMG_UINT16	ui32CursorHeight;
 #endif
-	
 } DISPLAY_INFO;
 
 typedef struct ACCESS_INFO_TAG
@@ -620,6 +623,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWriteRegistryString (PPVRSRV_REGISTRY_INFO psReg
 #define PVRSRV_BC_FLAGS_YUVCSC_BT601			(0 << 1)
 #define PVRSRV_BC_FLAGS_YUVCSC_BT709			(1 << 1)
 
+#define MAX_BUFFER_DEVICE_NAME_SIZE	(50) 
+
 typedef struct BUFFER_INFO_TAG
 {
 	IMG_UINT32 			ui32BufferCount;
@@ -629,6 +634,7 @@ typedef struct BUFFER_INFO_TAG
 	IMG_UINT32			ui32Width;
 	IMG_UINT32			ui32Height;
 	IMG_UINT32			ui32Flags;
+	IMG_CHAR			szDeviceName[MAX_BUFFER_DEVICE_NAME_SIZE];
 } BUFFER_INFO;
 
 typedef enum _OVERLAY_DEINTERLACE_MODE_

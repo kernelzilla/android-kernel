@@ -219,7 +219,7 @@ OSAllocPages_Impl(IMG_UINT32 ui32AllocFlags,
     
     if(ui32AllocFlags & (PVRSRV_HAP_WRITECOMBINE | PVRSRV_HAP_UNCACHED))
     {
-        OSFlushCPUCache();
+        OSFlushCPUCacheKM();
     }
 #endif 
 
@@ -2058,6 +2058,7 @@ typedef struct _sWrapMemInfo_
     IMG_UINT32 ulBeyondEndAddr;
     struct vm_area_struct *psVMArea;
 #endif
+	IMG_BOOL bWrapWorkaround;
 } sWrapMemInfo;
 
 static IMG_VOID CheckPagesContiguous(sWrapMemInfo *psInfo)
@@ -2159,7 +2160,10 @@ PVRSRV_ERROR OSReleasePhysPageAddr(IMG_HANDLE hOSWrapMem)
         {
             for (i = 0; i < psInfo->iNumPages; i++)
             {
-                put_page_testzero(psInfo->ppsPages[i]);
+                if(psInfo->bWrapWorkaround)
+                    put_page(psInfo->ppsPages[i]);
+                else
+                    put_page_testzero(psInfo->ppsPages[i]);
             }
             break;
         }
@@ -2189,7 +2193,8 @@ PVRSRV_ERROR OSReleasePhysPageAddr(IMG_HANDLE hOSWrapMem)
 PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr, 
                                     IMG_UINT32 ui32Bytes, 
                                     IMG_SYS_PHYADDR *psSysPAddr,
-                                    IMG_HANDLE *phOSWrapMem)
+                                    IMG_HANDLE *phOSWrapMem,
+                                    IMG_BOOL bWrapWorkaround)
 {
     IMG_UINT32 ulStartAddrOrig = (IMG_UINT32) pvCPUVAddr;
     IMG_UINT32 ulAddrRangeOrig = (IMG_UINT32) ui32Bytes;
@@ -2217,6 +2222,7 @@ PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr,
         return PVRSRV_ERROR_OUT_OF_MEMORY;
     }
     memset(psInfo, 0, sizeof(*psInfo));
+    psInfo->bWrapWorkaround = bWrapWorkaround;
 
 #if defined(DEBUG)
     psInfo->ulStartAddr = ulStartAddrOrig;
@@ -2281,7 +2287,7 @@ PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr,
         goto exit_check;
     }
 
-    PVR_TRACE(("OSAcquirePhysPageAddr: get_user_pages failed (%d), trying something else", iNumPagesMapped));
+    PVR_DPF((PVR_DBG_MESSAGE, "OSAcquirePhysPageAddr: get_user_pages failed (%d), trying something else", iNumPagesMapped));
     
     
     down_read(&current->mm->mmap_sem);
@@ -2347,7 +2353,10 @@ PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr,
             
             for (j = 0; j < i; j++)
             {
-                put_page_testzero(psInfo->ppsPages[j]);
+                if(psInfo->bWrapWorkaround)
+                    put_page(psInfo->ppsPages[j]);
+                else
+                    put_page_testzero(psInfo->ppsPages[j]);
             }
             break;
         }
@@ -2428,6 +2437,8 @@ error_free:
     return PVRSRV_ERROR_GENERIC;
 }
 
+
+
 #if defined(SUPPORT_CPU_CACHED_BUFFERS)
 
 #if defined(__i386__)
@@ -2438,7 +2449,8 @@ static void per_cpu_cache_flush(void *arg)
 }
 #endif 
 
-IMG_VOID OSFlushCPUCache(IMG_VOID)
+
+IMG_VOID OSFlushCPUCacheKM()
 {
 #if defined(__arm__)
     flush_cache_all();
@@ -2450,4 +2462,25 @@ IMG_VOID OSFlushCPUCache(IMG_VOID)
 #endif
 }
 
+
+IMG_VOID OSFlushCPUCacheRangeKM(IMG_VOID *pvRangeAddrStart,
+						 IMG_VOID *pvRangeAddrEnd)
+{
+	PVR_UNREFERENCED_PARAMETER(pvRangeAddrStart);
+	PVR_UNREFERENCED_PARAMETER(pvRangeAddrEnd);
+
+	
+	
+#if defined(__arm__)
+    flush_cache_all();
+#elif defined(__i386__)
+    
+    on_each_cpu(per_cpu_cache_flush, NULL, 1);
+#else
+#error "Implement full CPU cache flush for this CPU!"
+#endif
+}
+
+
 #endif 
+

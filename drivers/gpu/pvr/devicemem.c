@@ -549,7 +549,7 @@ IMG_EXPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVFreeDeviceMemKM(IMG_HANDLE				hDevCookie,
 												PVRSRV_KERNEL_MEM_INFO	*psMemInfo)
 {
-	PVRSRV_ERROR eError = PVRSRV_OK;
+	PVRSRV_ERROR eError;
 
 	PVR_UNREFERENCED_PARAMETER(hDevCookie);
 
@@ -772,6 +772,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWrapExtMemoryKM(IMG_HANDLE				hDevCookie,
 												IMG_BOOL				bPhysContig,
 												IMG_SYS_PHYADDR	 		*psExtSysPAddr,
 												IMG_VOID 				*pvLinAddr,
+												IMG_UINT32				ui32Flags,
 												PVRSRV_KERNEL_MEM_INFO	**ppsMemInfo)
 {
 	PVRSRV_KERNEL_MEM_INFO *psMemInfo = IMG_NULL;
@@ -822,7 +823,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWrapExtMemoryKM(IMG_HANDLE				hDevCookie,
 		eError = OSAcquirePhysPageAddr(pvPageAlignedCPUVAddr,
 										ui32PageCount * ui32HostPageSize,
 										psIntSysPAddr,
-										&hOSWrapMem);
+										&hOSWrapMem,
+										(ui32Flags != 0) ? IMG_TRUE : IMG_FALSE);
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"PVRSRVWrapExtMemoryKM: Failed to alloc memory for block"));
@@ -880,6 +882,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWrapExtMemoryKM(IMG_HANDLE				hDevCookie,
 	}
 
 	OSMemSet(psMemInfo, 0, sizeof(*psMemInfo));
+	psMemInfo->ui32Flags = ui32Flags;
 
 	psMemBlock = &(psMemInfo->sMemBlk);
 

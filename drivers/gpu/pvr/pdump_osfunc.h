@@ -24,6 +24,9 @@
  *
  ******************************************************************************/
 
+#ifndef __PDUMP_OSFUNC_H__
+#define __PDUMP_OSFUNC_H__
+
 #include <stdarg.h>
 
 #if defined(__cplusplus)
@@ -129,3 +132,6 @@ IMG_VOID PDumpOSCPUVAddrToPhysPages(IMG_HANDLE hOSMemHandle,
 #if defined (__cplusplus)
 }
 #endif
+
+#endif 
+

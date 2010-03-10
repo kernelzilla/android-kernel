@@ -27,13 +27,18 @@
 #ifndef _PDUMP_KM_H_
 #define _PDUMP_KM_H_
 
-#if (defined(LINUX) && (defined(SUPPORT_SGX) || defined(SUPPORT_MSVDX)))
+#if defined(LINUX)
+#define COMMON_PDUMP_OS_SUPPORT
+#endif 
 
+#if defined(COMMON_PDUMP_OS_SUPPORT)
+#if defined(SUPPORT_SGX) || defined(SUPPORT_MSVDX)
 #define SGX_SUPPORT_COMMON_PDUMP
-
 #if defined(SGX_SUPPORT_COMMON_PDUMP)
 #include <pdump_osfunc.h>
-#endif
+#endif 
+
+#endif 
 #endif 
 
 #if defined(__cplusplus)
@@ -139,6 +144,8 @@ extern "C" {
 										   IMG_UINT32 ui32Size,
 										   IMG_UINT32 ui32PDumpFlags);
 
+	IMG_BOOL PDumpIsSuspended(IMG_VOID);
+
 #if defined(SGX_SUPPORT_COMMON_PDUMP) || !defined(SUPPORT_VGX)
 	
 	PVRSRV_ERROR PDumpRegKM(IMG_UINT32		dwReg,
@@ -219,10 +226,6 @@ extern "C" {
 
 	IMG_BOOL PDumpTestNextFrame(IMG_UINT32 ui32CurrentFrame);
 
-
-#if defined(LINUX)
-#define COMMON_PDUMP_OS_SUPPORT
-#endif
 
 #if defined (COMMON_PDUMP_OS_SUPPORT) && !defined(SUPPORT_VGX)
 	

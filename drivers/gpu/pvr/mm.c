@@ -825,19 +825,37 @@ FreeIORemapLinuxMemArea(LinuxMemArea *psLinuxMemArea)
 
 
 static IMG_BOOL
-PagesAreContiguous(IMG_SYS_PHYADDR *psSysPhysAddr, IMG_UINT32 ui32Bytes)
+TreatExternalPagesAsContiguous(IMG_SYS_PHYADDR *psSysPhysAddr, IMG_UINT32 ui32Bytes, IMG_BOOL bPhysContig)
 {
 	IMG_UINT32 ui32;
 	IMG_UINT32 ui32AddrChk;
 	IMG_UINT32 ui32NumPages = RANGE_TO_PAGES(ui32Bytes);
 
+	
 	for (ui32 = 0, ui32AddrChk = psSysPhysAddr[0].uiAddr;
 		ui32 < ui32NumPages;
-		ui32++, ui32AddrChk += PAGE_SIZE)
+		ui32++, ui32AddrChk = (bPhysContig) ? (ui32AddrChk + PAGE_SIZE) : psSysPhysAddr[ui32].uiAddr)
 	{
-		if (psSysPhysAddr[ui32].uiAddr != ui32AddrChk)
+		if (!pfn_valid(PHYS_TO_PFN(ui32AddrChk)))
 		{
-			return IMG_FALSE;
+			break;
+		}
+	}
+	if (ui32 == ui32NumPages)
+	{
+		return IMG_FALSE;
+	}
+
+	if (!bPhysContig)
+	{
+		for (ui32 = 0, ui32AddrChk = psSysPhysAddr[0].uiAddr;
+			ui32 < ui32NumPages;
+			ui32++, ui32AddrChk += PAGE_SIZE)
+		{
+			if (psSysPhysAddr[ui32].uiAddr != ui32AddrChk)
+			{
+				return IMG_FALSE;
+			}
 		}
 	}
 
@@ -856,7 +874,7 @@ LinuxMemArea *NewExternalKVLinuxMemArea(IMG_SYS_PHYADDR *pBasePAddr, IMG_VOID *p
 
     psLinuxMemArea->eAreaType = LINUX_MEM_AREA_EXTERNAL_KV;
     psLinuxMemArea->uData.sExternalKV.pvExternalKV = pvCPUVAddr;
-    psLinuxMemArea->uData.sExternalKV.bPhysContig = (IMG_BOOL)(bPhysContig || PagesAreContiguous(pBasePAddr, ui32Bytes));
+    psLinuxMemArea->uData.sExternalKV.bPhysContig = (IMG_BOOL)(bPhysContig || TreatExternalPagesAsContiguous(pBasePAddr, ui32Bytes, bPhysContig));
 
     if (psLinuxMemArea->uData.sExternalKV.bPhysContig)
     {
@@ -1103,7 +1121,7 @@ LinuxMemAreaOffsetToPage(LinuxMemArea *psLinuxMemArea,
         default:
             PVR_DPF((PVR_DBG_ERROR,
                     "%s: Unsupported request for struct page from LinuxMemArea with type=%s",
-                    LinuxMemAreaTypeToString(psLinuxMemArea->eAreaType)));
+                    __FUNCTION__, LinuxMemAreaTypeToString(psLinuxMemArea->eAreaType)));
             return NULL;
     }
 }

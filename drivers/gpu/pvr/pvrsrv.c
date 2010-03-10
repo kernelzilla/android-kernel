@@ -35,6 +35,7 @@
 
 #include "lists.h"
 
+
 DECLARE_LIST_ANY_VA_2(BM_CONTEXT, PVRSRV_ERROR, PVRSRV_OK);
 
 DECLARE_LIST_FOR_EACH_VA(BM_HEAP);
@@ -465,7 +466,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVFinaliseSystem(IMG_BOOL bInitSuccessful)
 
 
 
-#if !defined(SUPPORT_DRI_DRM)
+#if !defined(SUPPORT_PDUMP_DELAYED_INITPHASE_TERMINATION)
 	PDUMPENDINITPHASE();
 #endif
 
@@ -766,11 +767,13 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 	psMiscInfo->ui32StatePresent = 0;
 
 	
-	if(psMiscInfo->ui32StateRequest & ~(PVRSRV_MISC_INFO_TIMER_PRESENT
+	if(psMiscInfo->ui32StateRequest & ~( PVRSRV_MISC_INFO_TIMER_PRESENT
 										|PVRSRV_MISC_INFO_CLOCKGATE_PRESENT
 										|PVRSRV_MISC_INFO_MEMSTATS_PRESENT
 										|PVRSRV_MISC_INFO_GLOBALEVENTOBJECT_PRESENT
-										|PVRSRV_MISC_INFO_DDKVERSION_PRESENT))
+										|PVRSRV_MISC_INFO_DDKVERSION_PRESENT
+										|PVRSRV_MISC_INFO_CPUCACHEFLUSH_PRESENT
+										|PVRSRV_MISC_INFO_RESET_PRESENT))
 	{
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVGetMiscInfoKM: invalid state request flags"));
 		return PVRSRV_ERROR_INVALID_PARAMS;			
@@ -888,6 +891,50 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 			}
 		}
 	}
+
+#if defined(SUPPORT_CPU_CACHED_BUFFERS)
+	if((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_CPUCACHEFLUSH_PRESENT) != 0UL)
+	{
+		if(psMiscInfo->bDeferCPUCacheFlush)
+		{
+			
+			if(!psMiscInfo->bCPUCacheFlushAll)
+			{
+				
+
+
+				PVR_DPF((PVR_DBG_MESSAGE,"PVRSRVGetMiscInfoKM: don't support deferred range flushes"));
+				PVR_DPF((PVR_DBG_MESSAGE,"                     using deferred flush all instead"));
+			}
+			
+			psSysData->bFlushAll = IMG_TRUE;
+		}
+		else
+		{
+			
+			if(psMiscInfo->bCPUCacheFlushAll)
+			{
+				
+				OSFlushCPUCacheKM();
+				
+				psSysData->bFlushAll = IMG_FALSE;
+			}
+			else
+			{
+				
+				OSFlushCPUCacheRangeKM(psMiscInfo->pvRangeAddrStart, psMiscInfo->pvRangeAddrEnd);
+			}
+		}
+	}
+#endif 
+
+#if defined(PVRSRV_RESET_ON_HWTIMEOUT)
+	if((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_RESET_PRESENT) != 0UL)
+	{
+		PVR_LOG(("User requested OS reset"));
+		OSPanic();
+	}
+#endif 
 
 	return PVRSRV_OK;
 }

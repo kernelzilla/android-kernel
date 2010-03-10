@@ -456,12 +456,6 @@ Exit:
 		PowerLockWrap(psSysSpecData);
 	}
 
-#if !defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-	if (eError == PVRSRV_OK)
-	{
-		eError = EnableSGXClocks(psSysData);
-	}
-#endif
 	return eError;
 }
 

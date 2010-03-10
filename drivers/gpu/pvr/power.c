@@ -650,7 +650,8 @@ IMG_BOOL PVRSRVIsDevicePowered(IMG_UINT32 ui32DeviceIndex)
 					List_PVRSRV_POWER_DEV_Any_va(psSysData->psPowerDeviceList,
 												 MatchPowerDeviceIndex_AnyVaCb,
 												 ui32DeviceIndex);
-	return (IMG_BOOL)(psPowerDevice && (psPowerDevice->eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON));
+	return (psPowerDevice && (psPowerDevice->eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON))
+			? IMG_TRUE : IMG_FALSE;
 }
 
 

@@ -117,6 +117,11 @@ IMG_VOID PDumpDeInitCommon(IMG_VOID)
 
 #if defined(SGX_SUPPORT_COMMON_PDUMP)
 
+IMG_BOOL PDumpIsSuspended(IMG_VOID)
+{
+	return PDumpOSIsSuspended();
+}
+
 PVRSRV_ERROR PDumpRegWithFlagsKM(IMG_UINT32 ui32Reg, IMG_UINT32 ui32Data, IMG_UINT32 ui32Flags)
 {
 	PVRSRV_ERROR eErr;
@@ -353,13 +358,14 @@ PVRSRV_ERROR PDumpFreePages	(BM_HEAP 			*psBMHeap,
 		if (!bInterleaved || (ui32PageCounter % 2) == 0)
 		{
 			sDevPAddr = psDeviceNode->pfnMMUGetPhysPageAddr(psBMHeap->pMMUHeap, sDevVAddr);
-
-			eErr = PDumpOSBufprintf(hScript, ui32MaxLen, "FREE :SGXMEM:PA_%8.8lX%8.8lX\r\n", (IMG_UINT32) hUniqueTag, sDevPAddr.uiAddr);
-			if(eErr != PVRSRV_OK)
 			{
-				return eErr;
+				eErr = PDumpOSBufprintf(hScript, ui32MaxLen, "FREE :SGXMEM:PA_%8.8lX%8.8lX\r\n", (IMG_UINT32) hUniqueTag, sDevPAddr.uiAddr);
+				if(eErr != PVRSRV_OK)
+				{
+					return eErr;
+				}
+				PDumpOSWriteString2(hScript, PDUMP_FLAGS_CONTINUOUS);
 			}
-			PDumpOSWriteString2(hScript, PDUMP_FLAGS_CONTINUOUS);
 		}
 		else
 		{
@@ -416,12 +422,14 @@ PVRSRV_ERROR PDumpFreePageTable	(PVRSRV_DEVICE_TYPE eDeviceType,
 				&sDevPAddr);
 		ui32Page = sDevPAddr.uiAddr >> SGX_MMU_PAGE_SHIFT;
 
-		eErr = PDumpOSBufprintf(hScript, ui32MaxLen, "FREE :SGXMEM:PA_%8.8lX%8.8lX\r\n", (IMG_UINT32) hUniqueTag, ui32Page * SGX_MMU_PAGE_SIZE);
-		if(eErr != PVRSRV_OK)
 		{
-			return eErr;
+			eErr = PDumpOSBufprintf(hScript, ui32MaxLen, "FREE :SGXMEM:PA_%8.8lX%8.8lX\r\n", (IMG_UINT32) hUniqueTag, ui32Page * SGX_MMU_PAGE_SIZE);
+			if(eErr != PVRSRV_OK)
+			{
+				return eErr;
+			}
+			PDumpOSWriteString2(hScript, PDUMP_FLAGS_CONTINUOUS);
 		}
-		PDumpOSWriteString2(hScript, PDUMP_FLAGS_CONTINUOUS);
 	}
 	return PVRSRV_OK;
 }

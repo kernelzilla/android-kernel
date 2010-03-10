@@ -67,7 +67,7 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 	IMG_BOOL				bPendingFree;
 
 
-	#if defined(ANDROID)
+	#if defined(SUPPORT_MEMINFO_IDS)
 	#if !defined(USE_CODE)
 	
 	IMG_UINT64				ui64Stamp;

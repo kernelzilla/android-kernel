@@ -152,7 +152,7 @@ IMG_VOID PVRSRVEnumerateDCKM_ForEachVaCb(PVRSRV_DEVICE_NODE *psDeviceNode, va_li
 		(*pui32DevCount)++;
 		if(*ppui32DevID)
 		{
-			*(*ppui32DevID++) = psDeviceNode->sDevId.ui32DeviceIndex;	 
+			*(*ppui32DevID)++ = psDeviceNode->sDevId.ui32DeviceIndex;
 		}
 	}
 }

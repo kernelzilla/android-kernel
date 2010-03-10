@@ -141,6 +141,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWrapExtMemoryKM(IMG_HANDLE				hDevCookie,
 												IMG_BOOL				bPhysContig,
 												IMG_SYS_PHYADDR	 		*psSysAddr,
 												IMG_VOID 				*pvLinAddr,
+												IMG_UINT32				ui32Flags,
 												PVRSRV_KERNEL_MEM_INFO **ppsMemInfo);
 
 IMG_IMPORT

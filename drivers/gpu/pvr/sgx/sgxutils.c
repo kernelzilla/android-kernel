@@ -158,6 +158,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	SGXMKIF_COMMAND *psSGXCommand;
 #if defined(PDUMP)
 	IMG_VOID *pvDumpCommand;
+	IMG_BOOL bPDumpIsSuspended = PDumpIsSuspended();
 #else
 	PVR_UNREFERENCED_PARAMETER(ui32CallerID);
 	PVR_UNREFERENCED_PARAMETER(ui32PDumpFlags);
@@ -201,10 +202,11 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 
 		SysAcquireData(&psSysData);
 
-		if (psSysData->bFlushCPUCache)
+		if (psSysData->bFlushAll)
 		{
-			OSFlushCPUCache();
-			psSysData->bFlushCPUCache = IMG_FALSE;
+			OSFlushCPUCacheKM();
+			
+			psSysData->bFlushAll = IMG_FALSE;
 		}
 	}
 #endif 
@@ -212,7 +214,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	psSGXCommand->ui32ServiceAddress = psDevInfo->aui32HostKickAddr[eCmdType];	 
 
 #if defined(PDUMP)
-	if (ui32CallerID != ISR_ID)
+	if ((ui32CallerID != ISR_ID) && (bPDumpIsSuspended == IMG_FALSE))
 	{
 		
 		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Poll for space in the Kernel CCB\r\n");
@@ -271,7 +273,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO 	*psDevInfo,
 	*psKernelCCB->pui32WriteOffset = (*psKernelCCB->pui32WriteOffset + 1) & 255;
 
 #if defined(PDUMP)
-	if (ui32CallerID != ISR_ID)
+	if ((ui32CallerID != ISR_ID) && (bPDumpIsSuspended == IMG_FALSE))
 	{
 	#if defined(FIX_HW_BRN_26620) && defined(SGX_FEATURE_SYSTEM_CACHE) && !defined(SGX_BYPASS_SYSTEM_CACHE)
 		PDUMPCOMMENTWITHFLAGS(ui32PDumpFlags, "Poll for previous Kernel CCB CMD to be read\r\n");
