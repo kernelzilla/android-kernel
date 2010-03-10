@@ -706,6 +706,15 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 				pr_info("ONFI probe : Found an ONFI "
 					"compliant device %s\n",
 					onfi_param_page_ptr->device_model);
+
+				/* Temporary hack for MT29F4G08ABC device.
+				 * Since the device is not properly adhering
+				 * to ONFi specification it is reporting
+				 * as 16 bit device though it is 8 bit device!!!
+				 */
+				if (!strcmp(onfi_param_page_ptr->device_model,
+					"MT29F4G08ABC"))
+					supported_flash[0].widebus  = 0;
 			}
 		}
 	}
