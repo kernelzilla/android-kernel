@@ -95,6 +95,7 @@ int sysfs_setattr(struct dentry * dentry, struct iattr * iattr)
 			return -ENOMEM;
 		sd->s_iattr = sd_attrs;
 	}
+	/* attributes were changed at least once in past */
 	iattrs = &sd_attrs->ia_iattr;
 
 	if (ia_valid & ATTR_UID)
@@ -103,13 +104,13 @@ int sysfs_setattr(struct dentry * dentry, struct iattr * iattr)
 		iattrs->ia_gid = iattr->ia_gid;
 	if (ia_valid & ATTR_ATIME)
 		iattrs->ia_atime = timespec_trunc(iattr->ia_atime,
-				inode->i_sb->s_time_gran);
+			inode->i_sb->s_time_gran);
 	if (ia_valid & ATTR_MTIME)
 		iattrs->ia_mtime = timespec_trunc(iattr->ia_mtime,
-				inode->i_sb->s_time_gran);
+			inode->i_sb->s_time_gran);
 	if (ia_valid & ATTR_CTIME)
 		iattrs->ia_ctime = timespec_trunc(iattr->ia_ctime,
-				inode->i_sb->s_time_gran);
+			inode->i_sb->s_time_gran);
 	if (ia_valid & ATTR_MODE) {
 		umode_t mode = iattr->ia_mode;
 
