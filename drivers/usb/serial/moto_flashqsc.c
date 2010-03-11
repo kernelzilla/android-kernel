@@ -32,7 +32,7 @@ MODULE_DEVICE_TABLE(usb, id_table);
  * so that, host iclk will not be disabled and BP
  * can re-enumerated on AP
  */
-#define OMAP_UHH_SYSCONFIG                              (0x10)
+#define OMAP_UHH_SYSCONFIG                              (0x48064010)
 #define OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT    0
 
 static void omap_flashqsc_disable_uhh_smart_idle(void)
