@@ -583,7 +583,7 @@ static int aufs_error_remove_page(struct address_space *mapping,
 { AuUnsupport(); return 0; }
 #endif /* CONFIG_AUFS_DEBUG */
 
-struct address_space_operations aufs_aop = {
+const struct address_space_operations aufs_aop = {
 	.readpage		= aufs_readpage,
 #ifdef CONFIG_AUFS_DEBUG
 	.writepage		= aufs_writepage,
