@@ -1,6 +1,6 @@
 /*
 * Customer code to add GPIO control during WLAN start/stop
-* Copyright (C) 1999-2009, Broadcom Corporation
+* Copyright (C) 1999-2010, Broadcom Corporation
 * 
 *      Unless you and Broadcom execute a separate written software license
 * agreement governing use of this software, this software is licensed to you
@@ -20,7 +20,7 @@
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
 *
-* $Id: dhd_custom_gpio.c,v 1.1.4.3 2009/10/14 04:29:34 Exp $
+* $Id: dhd_custom_gpio.c,v 1.1.4.6 2010/02/19 22:56:49 Exp $
 */
 
 
@@ -74,15 +74,14 @@ int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 #endif
 	*irq_flags_ptr = IRQF_TRIGGER_FALLING;
 	if (dhd_oob_gpio_num < 0) {
-		WL_ERROR(("%s: ERROR customer specific Host GPIO is NOT defined \n", \
+		WL_ERROR(("%s: ERROR customer specific Host GPIO is NOT defined \n",
 			             __FUNCTION__));
 		return (dhd_oob_gpio_num);
 	}
 
-	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n", \
+	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n",
 	         __FUNCTION__, dhd_oob_gpio_num));
 
-	/* TODO : move it mmc specific code */
 	host_oob_irq = sdioh_mmc_irq(dhd_oob_gpio_num);
 #endif
 	return (host_oob_irq);

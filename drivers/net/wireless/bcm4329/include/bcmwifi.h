@@ -22,7 +22,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmwifi.h,v 1.15.30.3 2010/02/09 13:23:22 Exp $
+ * $Id: bcmwifi.h,v 1.15.30.4 2010/03/10 20:10:52 Exp $
  */
 
 
@@ -42,7 +42,7 @@ typedef uint16 chanspec_t;
 #define CH_5MHZ_APART			1
 #define CH_MAX_2G_CHANNEL		14	
 #define WLC_MAX_2G_CHANNEL		CH_MAX_2G_CHANNEL 
-#define	MAXCHANNEL		224	
+#define	MAXCHANNEL			224
 
 #define WL_CHANSPEC_CHAN_MASK		0x00ff
 #define WL_CHANSPEC_CHAN_SHIFT		0
@@ -117,6 +117,9 @@ typedef uint16 chanspec_t;
 #define CHSPEC_CTL_CHAN(chspec)  ((CHSPEC_SB_LOWER(chspec)) ? \
 				  (LOWER_20_SB(((chspec) & WL_CHANSPEC_CHAN_MASK))) : \
 				  (UPPER_20_SB(((chspec) & WL_CHANSPEC_CHAN_MASK))))
+
+#define CHSPEC2WLC_BAND(chspec) (CHSPEC_IS5G((chspec)) ? WLC_BAND_5G : WLC_BAND_2G)
+
 #define CHANSPEC_STR_LEN    8
 
 

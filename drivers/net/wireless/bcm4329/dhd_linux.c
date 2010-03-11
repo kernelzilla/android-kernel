@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.57 2010/02/02 03:31:53 Exp $
+ * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.60 2010/02/23 00:18:36 Exp $
  */
 
 #ifdef CONFIG_WIFI_CONTROL_FUNC
@@ -716,11 +716,15 @@ _dhd_set_mac_address(dhd_info_t *dhd, int ifidx, struct ether_addr *addr)
 	return ret;
 }
 
+#ifdef SOFTAP
+extern struct net_device *ap_net_dev;
+#endif
+
 static void
 dhd_op_if(dhd_if_t *ifp)
 {
 	dhd_info_t	*dhd;
-	int			ret = 0;
+	int			ret = 0, err = 0;
 
 	ASSERT(ifp && ifp->info && ifp->idx);	/* Virtual interfaces only */
 
@@ -747,15 +751,29 @@ dhd_op_if(dhd_if_t *ifp)
 		if (ret == 0) {
 			strcpy(ifp->net->name, ifp->name);
 			memcpy(netdev_priv(ifp->net), &dhd, sizeof(dhd));
-			if (dhd_net_attach(&dhd->pub, ifp->idx) != 0) {
-				DHD_ERROR(("%s: dhd_net_attach failed\n", __FUNCTION__));
+			if ((err = dhd_net_attach(&dhd->pub, ifp->idx)) != 0) {
+				DHD_ERROR(("%s: dhd_net_attach failed, err %d\n",
+					__FUNCTION__, err));
 				ret = -EOPNOTSUPP;
-			} else
+			} else {
+#ifdef SOFTAP
+				 /* semaphore that the soft AP CODE waits on */
+				extern struct semaphore  ap_eth_sema;
+
+				/* save ptr to wl0.1 netdev for use in wl_iw.c  */
+				ap_net_dev = ifp->net;
+				 /* signal to the SOFTAP 'sleeper' thread, wl0.1 is ready */
+				up(&ap_eth_sema);
+#endif
+				DHD_TRACE(("\n ==== pid:%x, net_device for if:%s created ===\n\n",
+					current->pid, ifp->net->name));
 				ifp->state = 0;
+			}
 		}
 		break;
 	case WLC_E_IF_DEL:
 		if (ifp->net != NULL) {
+			DHD_TRACE(("\n%s: got 'WLC_E_IF_DEL' state\n", __FUNCTION__));
 			netif_stop_queue(ifp->net);
 			unregister_netdev(ifp->net);
 			ret = DHD_DEL_IF;	/* Make sure the free_netdev() is called */
@@ -1477,6 +1495,7 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 
 	ifidx = dhd_net2idx(dhd, net);
 	DHD_TRACE(("%s: ifidx %d, cmd 0x%04x\n", __FUNCTION__, ifidx, cmd));
+
 	if (ifidx == DHD_BAD_IF)
 		return -1;
 
@@ -2547,7 +2566,7 @@ dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data)
 
 void dhd_wait_for_event(dhd_pub_t *dhd, bool *lockvar)
 {
-#if 1 && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
 	struct dhd_info *dhdinfo =  dhd->info;
 	dhd_os_sdunlock(dhd);
 	wait_event_interruptible_timeout(dhdinfo->ctrl_wait, (*lockvar == FALSE), HZ * 2);
@@ -2558,27 +2577,28 @@ void dhd_wait_for_event(dhd_pub_t *dhd, bool *lockvar)
 
 void dhd_wait_event_wakeup(dhd_pub_t *dhd)
 {
-#if 1 && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
 	struct dhd_info *dhdinfo =  dhd->info;
 	if (waitqueue_active(&dhdinfo->ctrl_wait))
 		wake_up_interruptible(&dhdinfo->ctrl_wait);
 #endif
 	return;
 }
+
 int
 dhd_dev_reset(struct net_device *dev, uint8 flag)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
 
-        /* Turning off watchdog */
-        if (flag)
-                dhd_os_wd_timer(&dhd->pub, 0);
+	/* Turning off watchdog */
+	if (flag)
+		dhd_os_wd_timer(&dhd->pub, 0);
 
 	dhd_bus_devreset(&dhd->pub, flag);
 
-        /* Turning on watchdog back */
-        if (!flag)
-                dhd_os_wd_timer(&dhd->pub, dhd_watchdog_ms);
+	/* Turning on watchdog back */
+	if (!flag)
+		dhd_os_wd_timer(&dhd->pub, dhd_watchdog_ms);
 
 	DHD_ERROR(("%s:  WLAN OFF DONE\n", __FUNCTION__));
 

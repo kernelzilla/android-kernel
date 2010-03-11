@@ -1,7 +1,7 @@
 /*
  * SDIO access interface for drivers - linux specific (pci only)
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_linux.c,v 1.42.10.10.2.8 2009/10/15 22:48:28 Exp $
+ * $Id: bcmsdh_linux.c,v 1.42.10.10.2.12 2010/03/10 03:09:48 Exp $
  */
 
 /**
@@ -331,7 +331,19 @@ static struct pci_driver bcmsdh_pci_driver = {
 #endif
 	suspend:	NULL,
 	resume:		NULL,
-	};
+};
+
+
+extern uint sd_pci_slot;	/* Force detection to a particular PCI */
+				/* slot only . Allows for having multiple */
+				/* WL devices at once in a PC */
+				/* Only one instance of dhd will be */
+				/* useable at a time */
+				/* Upper word is bus number, */
+				/* lower word is slot number */
+				/* Default value of 0xFFFFffff turns this */
+				/* off */
+module_param(sd_pci_slot, uint, 0);
 
 
 /**
@@ -348,6 +360,26 @@ bcmsdh_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ulong regs;
 	bcmsdh_info_t *sdh = NULL;
 	int rc;
+
+	if (sd_pci_slot != 0xFFFFffff) {
+		if (pdev->bus->number != (sd_pci_slot>>16) ||
+			PCI_SLOT(pdev->devfn) != (sd_pci_slot&0xffff)) {
+			SDLX_MSG(("%s: %s: bus %X, slot %X, vend %X, dev %X\n",
+				__FUNCTION__,
+				bcmsdh_chipmatch(pdev->vendor, pdev->device)
+				? "Found compatible SDIOHC"
+				: "Probing unknown device",
+				pdev->bus->number, PCI_SLOT(pdev->devfn), pdev->vendor,
+				pdev->device));
+			return -ENODEV;
+		}
+		SDLX_MSG(("%s: %s: bus %X, slot %X, vendor %X, device %X (good PCI location)\n",
+			__FUNCTION__,
+			bcmsdh_chipmatch(pdev->vendor, pdev->device)
+			? "Using compatible SDIOHC"
+			: "WARNING, forced use of unkown device",
+			pdev->bus->number, PCI_SLOT(pdev->devfn), pdev->vendor, pdev->device));
+	}
 
 	if ((pdev->vendor == VENDOR_TI) && ((pdev->device == PCIXX21_FLASHMEDIA_ID) ||
 	    (pdev->device == PCIXX21_FLASHMEDIA0_ID))) {

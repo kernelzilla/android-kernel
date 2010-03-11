@@ -1,7 +1,7 @@
 /*
  * Broadcom BCMSDH to SPI Protocol Conversion Layer
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdspi.c,v 1.14.4.2.4.4.6.4 2009/04/13 19:18:36 Exp $
+ * $Id: bcmsdspi.c,v 1.14.4.2.4.4.6.5 2010/03/10 03:09:48 Exp $
  */
 
 #include <typedefs.h>
@@ -57,6 +57,7 @@ uint sd_divisor = 2;		/* Default 33MHz/2 = 16MHz for dongle */
 uint sd_power = 1;		/* Default to SD Slot powered ON */
 uint sd_clock = 1;		/* Default to SD Clock turned ON */
 uint sd_crc = 0;		/* Default to SPI CRC Check turned OFF */
+uint sd_pci_slot = 0xFFFFffff; /* Used to force selection of a particular PCI slot */
 
 uint sd_toctl = 7;
 

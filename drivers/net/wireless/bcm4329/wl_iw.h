@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.h,v 1.5.34.1.6.11 2010/01/19 02:15:09 Exp $
+ * $Id: wl_iw.h,v 1.5.34.1.6.13 2010/03/10 03:55:02 Exp $
  */
 
 
@@ -35,28 +35,38 @@
 #include <wlioctl.h>
 
 
-#define	WL_IW_RSSI_MINVAL		-200	
-#define	WL_IW_RSSI_NO_SIGNAL	-91	
-#define	WL_IW_RSSI_VERY_LOW	-80	
-#define	WL_IW_RSSI_LOW		-70	
-#define	WL_IW_RSSI_GOOD		-68	
-#define	WL_IW_RSSI_VERY_GOOD	-58	
-#define	WL_IW_RSSI_EXCELLENT	-57	
-#define	WL_IW_RSSI_INVALID	 0	
-#define MAX_WX_STRING 80
-#define isprint(c) bcm_isprint(c)
+#define	WL_IW_RSSI_MINVAL	-200
+#define	WL_IW_RSSI_NO_SIGNAL	-91
+#define	WL_IW_RSSI_VERY_LOW	-80
+#define	WL_IW_RSSI_LOW		-70
+#define	WL_IW_RSSI_GOOD		-68
+#define	WL_IW_RSSI_VERY_GOOD	-58
+#define	WL_IW_RSSI_EXCELLENT	-57
+#define	WL_IW_RSSI_INVALID	 0
+#define MAX_WX_STRING		80
+#define isprint(c)		bcm_isprint(c)
 #define WL_IW_SET_ACTIVE_SCAN	(SIOCIWFIRSTPRIV+1)
-#define WL_IW_GET_RSSI			(SIOCIWFIRSTPRIV+3)
+#define WL_IW_GET_RSSI		(SIOCIWFIRSTPRIV+3)
 #define WL_IW_SET_PASSIVE_SCAN	(SIOCIWFIRSTPRIV+5)
 #define WL_IW_GET_LINK_SPEED	(SIOCIWFIRSTPRIV+7)
 #define WL_IW_GET_CURR_MACADDR	(SIOCIWFIRSTPRIV+9)
-#define WL_IW_SET_STOP				(SIOCIWFIRSTPRIV+11)
-#define WL_IW_SET_START			(SIOCIWFIRSTPRIV+13)
+#define WL_IW_SET_STOP		(SIOCIWFIRSTPRIV+11)
+#define WL_IW_SET_START		(SIOCIWFIRSTPRIV+13)
 
-#define 		G_SCAN_RESULTS 8*1024
-#define 		WE_ADD_EVENT_FIX	0x80
-#define          G_WLAN_SET_ON	0
-#define          G_WLAN_SET_OFF	1
+
+#define WL_SET_AP_CFG           (SIOCIWFIRSTPRIV+15)
+#define WL_AP_STA_LIST          (SIOCIWFIRSTPRIV+17)
+#define WL_AP_MAC_FLTR	        (SIOCIWFIRSTPRIV+19)
+#define WL_AP_BSS_START         (SIOCIWFIRSTPRIV+21)
+#define AP_LPB_CMD              (SIOCIWFIRSTPRIV+23)
+#define WL_AP_STOP              (SIOCIWFIRSTPRIV+25)
+#define WL_FW_RELOAD            (SIOCIWFIRSTPRIV+27)
+#define WL_AP_SPARE2            (SIOCIWFIRSTPRIV+29)
+#define WL_AP_SPARE3            (SIOCIWFIRSTPRIV+31)
+#define G_SCAN_RESULTS		(8*1024)
+#define WE_ADD_EVENT_FIX	0x80
+#define G_WLAN_SET_ON		0
+#define G_WLAN_SET_OFF		1
 
 #define CHECK_EXTRA_FOR_NULL(extra) \
 if (!extra) { \
@@ -70,8 +80,8 @@ typedef struct wl_iw {
 	struct iw_statistics wstats;
 
 	int spy_num;
-	uint32 pwsec;			
-	uint32 gwsec;			
+	uint32 pwsec;
+	uint32 gwsec;
 
 	struct ether_addr spy_addr[IW_MAX_SPY];
 	struct iw_quality spy_qual[IW_MAX_SPY];
@@ -87,7 +97,7 @@ struct wl_ctrl {
 	struct completion sysioc_exited;
 };
 
-#define WLC_IW_SS_CACHE_MAXLEN				512
+#define WLC_IW_SS_CACHE_MAXLEN			512
 #define WLC_IW_SS_CACHE_CTRL_FIELD_MAXLEN	32
 #define WLC_IW_BSS_INFO_MAXLEN 				\
 	(WLC_IW_SS_CACHE_MAXLEN - WLC_IW_SS_CACHE_CTRL_FIELD_MAXLEN)
@@ -117,12 +127,40 @@ typedef enum broadcast_first_scan {
 	BROADCAST_SCAN_FIRST_RESULT_READY,
 	BROADCAST_SCAN_FIRST_RESULT_CONSUMED
 } broadcast_first_scan_t;
+#ifdef SOFTAP
+#define SSID_LEN	33
+#define SEC_LEN		16
+#define KEY_LEN		65
+#define PROFILE_OFFSET	32
+struct ap_profile {
+	uint8	ssid[SSID_LEN];
+	uint8	sec[SEC_LEN];
+	uint8	key[KEY_LEN];
+	uint32	channel;
+	uint32	preamble;
+	uint32	max_scb;
+};
 
+
+#define MACLIST_MODE_DISABLED	0
+#define MACLIST_MODE_ENABLED	1
+#define MACLIST_MODE_ALLOW	2
+struct mflist {
+	uint count;
+	struct ether_addr ea[16];
+};
+
+struct mac_list_set {
+	uint32	mode;
+	struct mflist white_list;
+	struct mflist black_list;
+};
+#endif
 
 #if WIRELESS_EXT > 12
 #include <net/iw_handler.h>
 extern const struct iw_handler_def wl_iw_handler_def;
-#endif 
+#endif
 
 extern int wl_iw_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 extern void wl_iw_event(struct net_device *dev, wl_event_msg_t *e, void* data);
@@ -152,4 +190,4 @@ extern int net_os_wake_lock_timeout_enable(struct net_device *dev);
 	iwe_stream_add_point(stream, ends, iwe, extra)
 #endif
 
-#endif 
+#endif

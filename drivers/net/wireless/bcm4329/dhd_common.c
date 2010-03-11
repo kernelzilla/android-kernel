@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), common DHD core.
  *
- * Copyright (C) 1999-2009, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c,v 1.5.6.8.2.6.6.37 2009/10/22 14:47:18 Exp $
+ * $Id: dhd_common.c,v 1.5.6.8.2.6.6.41 2010/02/24 01:52:41 Exp $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -79,7 +79,7 @@ const bcm_iovar_t dhd_iovars[] = {
 	{"version", 	IOV_VERSION,	0,	IOVT_BUFFER,	sizeof(dhd_version) },
 #ifdef DHD_DEBUG
 	{"msglevel",	IOV_MSGLEVEL,	0,	IOVT_UINT32,	0 },
-#endif
+#endif /* DHD_DEBUG */
 	{"bcmerrorstr", IOV_BCMERRORSTR, 0, IOVT_BUFFER,	BCME_STRLEN },
 	{"bcmerror",	IOV_BCMERROR,	0,	IOVT_INT8,	0 },
 	{"wdtick",	IOV_WDTICK, 0,	IOVT_UINT32,	0 },
@@ -552,6 +552,8 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 		if (event_names[i].event == event_type)
 			event_name = event_names[i].event_name;
 	}
+
+	DHD_EVENT(("EVENT: %s, event ID = %d\n", event_name, event_type));
 
 	if (flags & WLC_EVENT_MSG_LINK)
 		link = TRUE;

@@ -798,8 +798,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 				* depending upon MMC driver change.
 				* As of this time, this is temporaray one
 				*/
-				sdio_f0_writeb(gInstance->func[func], *byte,
-					regaddr, &err_ret);
+				sdio_writeb(gInstance->func[func], *byte, regaddr, &err_ret);
 				sdio_release_host(gInstance->func[func]);
 			}
 #endif /* MMC_SDIO_ABORT */
