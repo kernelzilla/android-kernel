@@ -868,7 +868,7 @@ static void aufs_d_release(struct dentry *dentry)
 	au_hin_di_reinit(dentry);
 }
 
-struct dentry_operations aufs_dop = {
+const struct dentry_operations aufs_dop = {
 	.d_revalidate	= aufs_d_revalidate,
 	.d_release	= aufs_d_release
 };

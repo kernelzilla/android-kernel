@@ -580,7 +580,7 @@ static int aufs_is_partially_uptodate(struct page *page,
 { AuUnsupport(); return 0; }
 #endif /* CONFIG_AUFS_DEBUG */
 
-struct address_space_operations aufs_aop = {
+const struct address_space_operations aufs_aop = {
 	.readpage		= aufs_readpage,
 #ifdef CONFIG_AUFS_DEBUG
 	.writepage		= aufs_writepage,
