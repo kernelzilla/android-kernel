@@ -40,7 +40,12 @@ struct attribute *sysaufs_si_attrs[] = {
 	NULL,
 };
 
-static struct sysfs_ops au_sbi_ops = {
+/*
+ * checkpatch.pl warns it should be const, but linux/include/kobject.h doesn't
+ * declare it as const. It is not wrong to delcare au_sbi_ops as const, but I'd
+ * like to postpone it until kobject.h delcares.
+ */
+static /* const */ struct sysfs_ops au_sbi_ops = {
 	.show   = sysaufs_si_show
 };
 
