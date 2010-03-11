@@ -146,7 +146,6 @@ error:
 static void sholes_panel_disable(struct omap_dss_device *dssdev)
 {
 	u8 data[1];
-	struct sholes_data *sholes_data = dssdev->data;
 
 	DBG("sholes_panel_ctrl_disable\n");
 
