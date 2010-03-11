@@ -46,7 +46,7 @@ struct au_dinfo {
 /* ---------------------------------------------------------------------- */
 
 /* dentry.c */
-extern struct dentry_operations aufs_dop;
+extern const struct dentry_operations aufs_dop;
 struct au_branch;
 struct dentry *au_lkup_one(struct qstr *name, struct dentry *h_parent,
 			   struct au_branch *br, struct nameidata *nd);
