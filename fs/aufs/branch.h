@@ -50,7 +50,7 @@ enum {AuBrWh_BASE, AuBrWh_PLINK, AuBrWh_ORPH, AuBrWh_Last};
 struct au_wbr {
 	struct au_rwsem		wbr_wh_rwsem;
 	struct dentry		*wbr_wh[AuBrWh_Last];
-	atomic_t 		wbr_wh_running;
+	atomic_t		wbr_wh_running;
 #define wbr_whbase		wbr_wh[AuBrWh_BASE]	/* whiteout base */
 #define wbr_plink		wbr_wh[AuBrWh_PLINK]	/* pseudo-link dir */
 #define wbr_orph		wbr_wh[AuBrWh_ORPH]	/* dir for orphans */

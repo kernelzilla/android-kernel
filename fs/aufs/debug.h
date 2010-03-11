@@ -67,7 +67,7 @@ AuStubInt0(au_debug_test, void)
 	if (au_debug_test()) \
 		AuDpri(KERN_DEBUG, "DEBUG: " fmt, ##__VA_ARGS__); \
 } while (0)
-#define AuLabel(l) 		AuDbg(#l "\n")
+#define AuLabel(l)		AuDbg(#l "\n")
 #define AuInfo(fmt, ...)	AuDpri(KERN_INFO, fmt, ##__VA_ARGS__)
 #define AuWarn(fmt, ...)	AuDpri(KERN_WARNING, fmt, ##__VA_ARGS__)
 #define AuErr(fmt, ...)		AuDpri(KERN_ERR, fmt, ##__VA_ARGS__)
