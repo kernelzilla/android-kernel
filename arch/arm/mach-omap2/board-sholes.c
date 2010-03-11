@@ -296,6 +296,22 @@ static struct platform_device usb_mass_storage_device = {
 	},
 };
 
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data rndis_pdata = {
+	/* ethaddr is filled by board_serialno_setup */
+	.vendorID	= SHOLES_VENDOR_ID,
+	.vendorDescr	= "Motorola",
+};
+
+static struct platform_device rndis_device = {
+	.name	= "rndis",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &rndis_pdata,
+	},
+};
+#endif
+
 extern void musb_disable_idle(int on);
 
 static int cpcap_usb_connected_probe(struct platform_device *pdev)
@@ -327,19 +343,37 @@ static void sholes_gadget_init(void)
 {
 	unsigned int val[2];
 	unsigned int reg;
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	int i;
+	char *src;
+#endif
 
 	reg = DIE_ID_REG_BASE + DIE_ID_REG_OFFSET;
 	val[0] = omap_readl(reg);
 	val[1] = omap_readl(reg + 4);
 
 	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X", val[1], val[0]);
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	/* create a fake MAC address from our serial number.
+	 * first byte is 0x02 to signify locally administered.
+	 */
+	rndis_pdata.ethaddr[0] = 0x02;
+	src = device_serial;
+	for (i = 0; *src; i++) {
+		/* XOR the USB serial across the remaining bytes */
+		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
+	}
+#endif
 
 	/* use different USB configuration when in factory test mode */
 	if (!strcmp(boot_mode, "factorycable"))
 		androidusb_device.dev.platform_data = &andusb_plat_factory;
 
-	platform_device_register(&androidusb_device);
 	platform_device_register(&usb_mass_storage_device);
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	platform_device_register(&rndis_device);
+#endif
+	platform_device_register(&androidusb_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
 }
 
