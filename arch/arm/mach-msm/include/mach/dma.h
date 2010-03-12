@@ -26,6 +26,7 @@ struct msm_dmov_errdata {
 struct msm_dmov_cmd {
 	struct list_head list;
 	unsigned int cmdptr;
+	unsigned int crci_mask;
 	void (*complete_func)(struct msm_dmov_cmd *cmd,
 			      unsigned int result,
 			      struct msm_dmov_errdata *err);
@@ -37,9 +38,16 @@ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
 void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd);
 void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
 void msm_dmov_flush(unsigned int id);
-int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
+int msm_dmov_exec_cmd(unsigned id, unsigned int crci_mask, unsigned int cmdptr);
+unsigned int msm_dmov_build_crci_mask(int n, ...);
 
+#ifdef CONFIG_ARCH_MSM8X60
+#define DMOV_BASE_ADDR MSM_DMOV_ADM0_BASE
+#else
+#define DMOV_BASE_ADDR MSM_DMOV_BASE
+#endif
 
+#define DMOV_CRCIS_PER_CONF 10
 
 #define DMOV_ADDR(off, ch, sd) ((DMOV_SD_SIZE*(sd)) + (off) + ((ch) << 2))
 #define DMOV_SD0(off, ch) DMOV_ADDR(off, ch, 0)
@@ -51,6 +59,12 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_SD_SIZE 0x400
 #define DMOV_SD_AARM 2
 #define DMOV_SD_AARM_ADDR DMOV_SD2
+#elif defined(CONFIG_ARCH_MSM8X60)
+#define DMOV_SD_SIZE 0x800
+#define DMOV_SD_MASTER 0
+#define DMOV_SD_AARM 0
+#define DMOV_SD_MASTER_ADDR(off, ch) DMOV_ADDR(off, ch, DMOV_SD_MASTER)
+#define DMOV_SD_AARM_ADDR(off, ch) DMOV_ADDR(off, ch, DMOV_SD_AARM)
 #else
 #define DMOV_SD_SIZE 0x400
 #define DMOV_SD_AARM 3
@@ -85,6 +99,16 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_STATUS_RSLT_VALID       (1 << 1)
 #define DMOV_STATUS_CMD_PTR_RDY      (1 << 0)
 
+#define DMOV_CONF(ch)         DMOV_SD_MASTER_ADDR(0x240, ch)
+#define DMOV_CONF_SD(sd)      (((sd & 4) << 11) | ((sd & 3) << 4))
+#define DMOV_CONF_IRQ_EN             (1 << 6)
+#define DMOV_CONF_FORCE_RSLT_EN      (1 << 7)
+#define DMOV_CONF_SHADOW_EN          (1 << 12)
+#define DMOV_CONF_MPU_DISABLE        (1 << 11)
+#define DMOV_CONF_PRIORITY(n)        (n << 0)
+
+#define DMOV_DBG_ERR(ci)      DMOV_SD_MASTER_ADDR(0x280, ci)
+
 #define DMOV_RSLT_CONF(ch)    DMOV_SD_AARM_ADDR(0x300, ch)
 #define DMOV_RSLT_CONF_FORCE_TOP_PTR_RSLT (1 << 2)
 #define DMOV_RSLT_CONF_FORCE_FLUSH_RSLT   (1 << 1)
@@ -92,13 +116,72 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 #define DMOV_ISR              DMOV_SD_AARM_ADDR(0x380, 0)
 
+#define DMOV_CI_CONF(ci)      DMOV_SD_MASTER_ADDR(0x390, ci)
+#define DMOV_CI_CONF_RANGE_END(n)      ((n) << 24)
+#define DMOV_CI_CONF_RANGE_START(n)    ((n) << 16)
+#define DMOV_CI_CONF_MAX_BURST(n)      ((n) << 0)
+
+#define DMOV_CI_DBG_ERR(ci)   DMOV_SD_MASTER_ADDR(0x3B0, ci)
+
+#define DMOV_CRCI_CONF0       DMOV_SD_MASTER_ADDR(0x3D0, 0)
+#define DMOV_CRCI_CONF1       DMOV_SD_MASTER_ADDR(0x3D4, 0)
+#define DMOV_CRCI_CONF0_SD(crci, sd) (sd << (crci*3))
+#define DMOV_CRCI_CONF1_SD(crci, sd) (sd << ((crci-DMOV_CRCIS_PER_CONF)*3))
+
 #define DMOV_CRCI_CTL(crci)   DMOV_SD_AARM_ADDR(0x400, crci)
 #define DMOV_CRCI_CTL_BLK_SZ(n)        ((n) << 0)
 #define DMOV_CRCI_CTL_RST              (1 << 17)
+#define DMOV_CRCI_MUX                  (1 << 18)
 
 /* channel assignments */
 
-#define DMOV_GP_CHAN	      4
+/*
+ * Format of CRCI numbers: crci number + (muxsel << 4)
+ */
+
+#ifdef CONFIG_ARCH_MSM8X60
+#define DMOV_GP_CHAN          16
+
+#define DMOV_NAND_CHAN        7
+#define DMOV_NAND_CRCI_CMD    15
+#define DMOV_NAND_CRCI_DATA   3
+
+#define DMOV_CE_IN_CHAN       5
+#define DMOV_CE_IN_CRCI       1
+
+#define DMOV_CE_OUT_CHAN      6
+#define DMOV_CE_OUT_CRCI      2
+
+#define DMOV_SDC1_CHAN        8
+#define DMOV_SDC1_CRCI        1
+
+#define DMOV_SDC2_CHAN        8
+#define DMOV_SDC2_CRCI        4
+
+#define DMOV_SDC3_CHAN        8
+#define DMOV_SDC3_CRCI        12
+
+#define DMOV_SDC4_CHAN        8
+#define DMOV_SDC4_CRCI        13
+
+#define DMOV_TSIF_CHAN        10
+#define DMOV_TSIF_CRCI        6
+
+#define DMOV_USB_CHAN         11
+
+#define DMOV_HSUART1_TX_CHAN   4
+#define DMOV_HSUART1_TX_CRCI   8
+
+#define DMOV_HSUART1_RX_CHAN   9
+#define DMOV_HSUART1_RX_CRCI   9
+
+#define DMOV_HSUART2_TX_CHAN   4
+#define DMOV_HSUART2_TX_CRCI   14
+
+#define DMOV_HSUART2_RX_CHAN   11
+#define DMOV_HSUART2_RX_CRCI   15
+#else
+#define DMOV_GP_CHAN          4
 
 #define DMOV_CE_IN_CHAN       5
 #define DMOV_CE_IN_CRCI       1
@@ -116,6 +199,12 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_SDC2_CHAN        8
 #define DMOV_SDC2_CRCI        7
 
+#define DMOV_SDC3_CHAN        8
+#define DMOV_SDC3_CRCI        12
+
+#define DMOV_SDC4_CHAN        8
+#define DMOV_SDC4_CRCI        13
+
 #define DMOV_TSIF_CHAN        10
 #define DMOV_TSIF_CRCI        10
 
@@ -132,6 +221,7 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 #define DMOV_HSUART2_RX_CHAN   11
 #define DMOV_HSUART2_RX_CRCI   15
+#endif
 
 
 /* no client rate control ifc (eg, ram) */

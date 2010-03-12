@@ -20,28 +20,198 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/spinlock.h>
 #include <mach/dma.h>
 
 #define MODULE_NAME "msm_dmov"
 
 #define MSM_DMOV_CHANNEL_COUNT 16
+#define MSM_DMOV_CRCI_COUNT 16
+
+struct msm_dmov_ci_conf {
+	int start;
+	int end;
+	int burst;
+};
+
+struct msm_dmov_crci_conf {
+	int sd;
+	int blk_size;
+};
+
+struct msm_dmov_chan_conf {
+	int sd;
+	int block;
+	int priority;
+};
 
 struct msm_dmov_conf {
 	void *base;
+	int ci_count;
+	struct msm_dmov_ci_conf *ci_conf;
+	struct msm_dmov_crci_conf *crci_conf;
+	struct msm_dmov_chan_conf *chan_conf;
 	int channel_active;
 	struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
 	struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
+	unsigned int crci_mask;
 	spinlock_t lock;
 	unsigned int irq;
 };
 
+#ifdef CONFIG_ARCH_MSM8X60
+
+#define DMOV_CHANNEL_DEFAULT_CONF { .sd = 0, .block = 0, .priority = 0 }
+#define DMOV_CHANNEL_CONF(secd, blk, pri) \
+	{ .sd = secd, .block = blk, .priority = pri }
+
+static struct msm_dmov_chan_conf adm0_chan_conf[] = {
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+};
+
+static struct msm_dmov_chan_conf adm1_chan_conf[] = {
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_DEFAULT_CONF,
+};
+
+static struct msm_dmov_ci_conf adm0_ci_conf[] = {
+	{
+		.start = 0x40,
+		.end = 0xC0,
+		.burst = 8
+	}, {
+		.start = 0x2C,
+		.end = 0x2E,
+		.burst = 8
+	}, {
+		.start = 0x08,
+		.end = 0x2C,
+		.burst = 8
+	}
+};
+
+static struct msm_dmov_ci_conf adm1_ci_conf[] = {
+	{
+		.start = 0x40,
+		.end = 0xC0,
+		.burst = 8
+	}, {
+		.start = 0x28,
+		.end = 0x29,
+		.burst = 8
+	}, {
+		.start = 0x38,
+		.end = 0x40,
+		.burst = 8
+	}, {
+		.start = 0x08,
+		.end = 0x25,
+		.burst = 8
+	}
+};
+
+#define DMOV_CRCI_DEFAULT_CONF { .sd = 0, .blk_size = 0 }
+#define DMOV_CRCI_CONF(secd, blk) { .sd = secd, .blk_size = blk }
+
+static struct msm_dmov_crci_conf adm0_crci_conf[] = {
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_CONF(0, 1),
+	DMOV_CRCI_CONF(0, 1),
+	DMOV_CRCI_CONF(0, 0x101),
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+};
+
+static struct msm_dmov_crci_conf adm1_crci_conf[] = {
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_CONF(0, 1),
+	DMOV_CRCI_CONF(0, 1),
+	DMOV_CRCI_CONF(0, 0x101),
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_DEFAULT_CONF,
+	DMOV_CRCI_CONF(0, 1),
+	DMOV_CRCI_DEFAULT_CONF,
+};
+
+static struct msm_dmov_conf dmov_conf[] = {
+	{
+		.base = MSM_DMOV_ADM0_BASE,
+		.ci_count = 3,
+		.ci_conf = adm0_ci_conf,
+		.crci_conf = adm0_crci_conf,
+		.chan_conf = adm0_chan_conf,
+		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
+		.irq = INT_ADM0_MASTER
+	}, {
+		.base = MSM_DMOV_ADM1_BASE,
+		.ci_count = 4,
+		.ci_conf = adm1_ci_conf,
+		.crci_conf = adm1_crci_conf,
+		.chan_conf = adm1_chan_conf,
+		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
+		.irq = INT_ADM1_MASTER
+	}
+};
+#else
 static struct msm_dmov_conf dmov_conf[] = {
 	{
 		.base = MSM_DMOV_BASE,
+		.ci_count = 0,
+		.ci_conf = NULL,
+		.crci_conf = NULL,
+		.chan_conf = NULL,
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
 		.irq = INT_ADM_AARM
 	}
 };
+#endif
 
 #define MSM_DMOV_ID_COUNT (MSM_DMOV_CHANNEL_COUNT * ARRAY_SIZE(dmov_conf))
 #define DMOV_REG(name, adm)    ((name) + (dmov_conf[adm].base))
@@ -49,7 +219,15 @@ static struct msm_dmov_conf dmov_conf[] = {
 #define DMOV_ID_TO_CHAN(id)   ((id) % MSM_DMOV_CHANNEL_COUNT)
 #define DMOV_CHAN_ADM_TO_ID(ch, adm) ((ch) + (adm) * MSM_DMOV_CHANNEL_COUNT)
 
+#ifdef CONFIG_MSM_ADM3
+#define DMOV_IRQ_TO_ADM(irq)   \
+({ \
+	typeof(irq) _irq = irq; \
+	((_irq == INT_ADM1_MASTER) || (_irq == INT_ADM1_AARM)); \
+})
+#else
 #define DMOV_IRQ_TO_ADM(irq) 0
+#endif
 
 enum {
 	MSM_DMOV_PRINT_ERRORS = 1,
@@ -71,6 +249,7 @@ unsigned int msm_dmov_print_mask = MSM_DMOV_PRINT_ERRORS;
 #define PRINT_FLOW(format, args...) \
 	MSM_DMOV_DPRINTF(MSM_DMOV_PRINT_FLOW, format, args);
 
+#ifndef CONFIG_MSM_ADM3
 enum {
 	CLK_DIS,
 	CLK_TO_BE_DIS,
@@ -96,6 +275,7 @@ static void timer_func(unsigned long func_paramter)
 		spin_unlock_irqrestore(&dmov_conf[i].lock, irq_flags[i]);
 }
 DEFINE_TIMER(timer, timer_func, 0, 0);
+#endif
 
 void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
 {
@@ -105,6 +285,125 @@ void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
 }
 EXPORT_SYMBOL(msm_dmov_stop_cmd);
 
+#define	CRCI_UNUSED   0
+#define	CRCI_CONFLICT 1
+#define	CRCI_MUX_OFF  2
+#define	CRCI_MUX_ON   3
+
+#ifdef CONFIG_MSM_ADM3
+static int crci_mask_compare(unsigned int x, unsigned int y)
+{
+	unsigned int mask;
+	int i;
+	for (i = 0; i < MSM_DMOV_CRCI_COUNT; i++) {
+		mask = (x ^ y) >> (2*i);
+		if ((mask & 3) == CRCI_CONFLICT)
+			return 1;
+	}
+	return 0;
+}
+#endif
+
+static int check_crci_conflict(struct msm_dmov_cmd *cmd, int adm)
+{
+#ifdef CONFIG_MSM_ADM3
+	int i;
+	struct msm_dmov_cmd *iter;
+	struct list_head *cmd_list;
+	unsigned int active_crci_mask = 0;
+
+	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+		cmd_list = &dmov_conf[adm].active_commands[i];
+		list_for_each_entry(iter, cmd_list, list) {
+			active_crci_mask |= iter->crci_mask;
+		}
+	}
+	return crci_mask_compare(cmd->crci_mask, active_crci_mask);
+#endif
+	return 0;
+}
+
+#define CRCI_MUXSEL(n) (((n) >> 4) & 1)
+#define CRCI_NUM(n)    ((n) & 0xF)
+
+unsigned int msm_dmov_build_crci_mask(int n, ...)
+{
+	unsigned int mask = 0;
+#ifdef CONFIG_MSM_ADM3
+	int i;
+	int crci;
+	int crci_num;
+	unsigned int crci_muxsel;
+	va_list crcis;
+	va_start(crcis, n);
+	for (i = 0; i < n; i++) {
+		crci = va_arg(crcis, int);
+		crci_muxsel = CRCI_MUXSEL(crci);
+		crci_num = CRCI_NUM(crci);
+		mask |= (1 << (2*crci_num + 1));
+		mask |= (crci_muxsel << (2*crci_num));
+	}
+	va_end(crcis);
+#endif
+	return mask;
+}
+EXPORT_SYMBOL(msm_dmov_build_crci_mask);
+
+
+static void set_crci_mask(int crci_mask, int adm)
+{
+#ifdef CONFIG_MSM_ADM3
+	int i;
+	int blk_size;
+	unsigned int crci_ctl;
+	unsigned int tmp_crci_mask;
+	unsigned int blank_mask;
+
+	for (i = 0; i < MSM_DMOV_CRCI_COUNT; i++) {
+		tmp_crci_mask = (crci_mask >> (2*i)) & 3;
+		if (crci_mask_compare(dmov_conf[adm].crci_mask,
+				      tmp_crci_mask << (2*i))) {
+			blank_mask = ~(3 << (2*i));
+			blk_size = dmov_conf[adm].crci_conf[i].blk_size;
+			crci_ctl =  DMOV_CRCI_CTL_BLK_SZ(blk_size);
+			if (tmp_crci_mask == CRCI_MUX_ON)
+				crci_ctl |= DMOV_CRCI_MUX;
+
+			writel(crci_ctl, DMOV_REG(DMOV_CRCI_CTL(i), adm));
+			dmov_conf[adm].crci_mask &= blank_mask;
+			dmov_conf[adm].crci_mask |= (tmp_crci_mask << (2*i));
+		}
+	}
+#endif
+}
+
+static void start_ready_cmds(int adm)
+{
+#ifdef CONFIG_MSM_ADM3
+	int i;
+	unsigned int status;
+	struct list_head *rdy;
+	struct list_head *act;
+	struct msm_dmov_cmd *cmd;
+	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+		rdy = &dmov_conf[adm].ready_commands[i];
+		act = &dmov_conf[adm].active_commands[i];
+		cmd = list_entry(rdy->next, typeof(*cmd), list);
+		if (!list_empty(rdy) && !check_crci_conflict(cmd, adm)) {
+			status = readl(DMOV_REG(DMOV_STATUS(i), adm));
+			if (status & DMOV_STATUS_CMD_PTR_RDY) {
+				list_del(&cmd->list);
+				list_add_tail(&cmd->list, act);
+				dmov_conf[adm].channel_active |= (1 << i);
+				set_crci_mask(cmd->crci_mask, adm);
+				writel(cmd->cmdptr,
+				       DMOV_REG(DMOV_CMD_PTR(i), adm));
+			}
+		}
+	}
+#endif
+}
+
 void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 {
 	unsigned long irq_flags;
@@ -113,15 +412,16 @@ void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 	int ch = DMOV_ID_TO_CHAN(id);
 
 	spin_lock_irqsave(&dmov_conf[adm].lock, irq_flags);
+#ifndef CONFIG_MSM_ADM3
 	if (clk_ctl == CLK_DIS)
 		clk_enable(msm_dmov_clk);
 	else if (clk_ctl == CLK_TO_BE_DIS)
 		del_timer(&timer);
 	clk_ctl = CLK_EN;
-
+#endif
 	status = readl(DMOV_REG(DMOV_STATUS(ch), adm));
-	if (list_empty(&dmov_conf[adm].ready_commands[ch]) &&
-		(status & DMOV_STATUS_CMD_PTR_RDY)) {
+	if ((status & DMOV_STATUS_CMD_PTR_RDY) &&
+	    (!check_crci_conflict(cmd, adm))) {
 		PRINT_IO("msm_dmov_enqueue_cmd(%d), start command, status %x\n",
 			id, status);
 		if (cmd->exec_func)
@@ -131,8 +431,10 @@ void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 			enable_irq(dmov_conf[adm].irq);
 		dmov_conf[adm].channel_active |= 1U << ch;
 		PRINT_IO("Writing %x exactly to register", cmd->cmdptr);
+		set_crci_mask(cmd->crci_mask, adm);
 		writel(cmd->cmdptr, DMOV_REG(DMOV_CMD_PTR(ch), adm));
 	} else {
+#ifndef CONFIG_MSM_ADM3
 		if (!dmov_conf[adm].channel_active) {
 			clk_ctl = CLK_TO_BE_DIS;
 			mod_timer(&timer, jiffies + HZ);
@@ -140,6 +442,7 @@ void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 		if (list_empty(&dmov_conf[adm].active_commands[ch]))
 			PRINT_ERROR("msm_dmov_enqueue_cmd_ext(%d), stalled, "
 				"status %x\n", id, status);
+#endif
 		PRINT_IO("msm_dmov_enqueue_cmd(%d), enqueue command, status "
 		    "%x\n", id, status);
 		list_add_tail(&cmd->list, &dmov_conf[adm].ready_commands[ch]);
@@ -193,13 +496,14 @@ dmov_exec_cmdptr_complete_func(struct msm_dmov_cmd *_cmd,
 	complete(&cmd->complete);
 }
 
-int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr)
+int msm_dmov_exec_cmd(unsigned id, unsigned int crci_mask, unsigned int cmdptr)
 {
 	struct msm_dmov_exec_cmdptr_cmd cmd;
 
 	PRINT_FLOW("dmov_exec_cmdptr(%d, %x)\n", id, cmdptr);
 
 	cmd.dmov_cmd.cmdptr = cmdptr;
+	cmd.dmov_cmd.crci_mask = crci_mask;
 	cmd.dmov_cmd.complete_func = dmov_exec_cmdptr_complete_func;
 	cmd.dmov_cmd.exec_func = NULL;
 	cmd.id = id;
@@ -309,6 +613,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 				writel(0, DMOV_REG(DMOV_FLUSH0(ch), adm));
 			}
 			ch_status = readl(DMOV_REG(DMOV_STATUS(ch), adm));
+#ifndef CONFIG_MSM_ADM3
 			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
 			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) &&
 			    !list_empty(&dmov_conf[adm].ready_commands[ch])) {
@@ -324,6 +629,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 				writel(cmd->cmdptr, DMOV_REG(DMOV_CMD_PTR(ch),
 					adm));
 			}
+#endif
 		} while (ch_status & DMOV_STATUS_RSLT_VALID);
 		if (list_empty(&dmov_conf[adm].active_commands[ch]) &&
 				list_empty(&dmov_conf[adm].ready_commands[ch]))
@@ -331,16 +637,20 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 		PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
 	}
 
+	start_ready_cmds(adm);
 	if (!dmov_conf[adm].channel_active) {
 		disable_irq_nosync(dmov_conf[adm].irq);
+#ifndef CONFIG_MSM_ADM3
 		clk_ctl = CLK_TO_BE_DIS;
 		mod_timer(&timer, jiffies + HZ);
+#endif
 	}
 
 	spin_unlock_irqrestore(&dmov_conf[adm].lock, irq_flags);
 	return IRQ_HANDLED;
 }
 
+#ifndef CONFIG_MSM_ADM3
 static int msm_dmov_suspend_late(struct platform_device *pdev,
 			    pm_message_t state)
 {
@@ -367,6 +677,45 @@ static struct platform_driver msm_dmov_driver = {
 		.owner = THIS_MODULE,
 	},
 };
+#endif
+
+
+static void config_datamover(int adm)
+{
+#ifdef CONFIG_MSM_ADM3
+	int conf0 = 0;
+	int conf1 = 0;
+	int i;
+
+	PRINT_FLOW("Starting DMA engine %d\n", adm);
+	for (i = 0; i < dmov_conf[adm].ci_count; i++) {
+		struct msm_dmov_ci_conf *ci_conf = dmov_conf[adm].ci_conf;
+		writel(DMOV_CI_CONF_RANGE_START(ci_conf[i].start)
+		     | DMOV_CI_CONF_RANGE_END(ci_conf[i].end)
+		     | DMOV_CI_CONF_MAX_BURST(ci_conf[i].burst),
+		       DMOV_REG(DMOV_CI_CONF(i), adm));
+	}
+	for (i = 0; i < MSM_DMOV_CRCI_COUNT; i++) {
+		struct msm_dmov_crci_conf *crci_conf =
+		  dmov_conf[adm].crci_conf;
+		if (i < DMOV_CRCIS_PER_CONF)
+			conf0 |= DMOV_CRCI_CONF0_SD(i, crci_conf[i].sd);
+		else
+			conf1 |= DMOV_CRCI_CONF1_SD(i, crci_conf[i].sd);
+
+		writel(DMOV_CRCI_CTL_BLK_SZ(crci_conf[i].blk_size),
+		       DMOV_REG(DMOV_CRCI_CTL(i), adm));
+	}
+	writel(conf0, DMOV_REG(DMOV_CRCI_CONF0, adm));
+	writel(conf1, DMOV_REG(DMOV_CRCI_CONF1, adm));
+	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+		struct msm_dmov_chan_conf *chan_conf =
+			dmov_conf[adm].chan_conf;
+		writel(DMOV_CONF_SD(chan_conf[i].sd)
+		     | DMOV_CONF_SHADOW_EN, DMOV_REG(DMOV_CONF(i), adm));
+	}
+#endif
+}
 
 /* static int __init */
 static int __init msm_init_datamover(void)
@@ -375,6 +724,7 @@ static int __init msm_init_datamover(void)
 	int j;
 	int ret;
 	for (j = 0; j < ARRAY_SIZE(dmov_conf); j++) {
+		config_datamover(j);
 		for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
 			INIT_LIST_HEAD(&dmov_conf[j].ready_commands[i]);
 			INIT_LIST_HEAD(&dmov_conf[j].active_commands[i]);
@@ -393,12 +743,14 @@ static int __init msm_init_datamover(void)
 		}
 		disable_irq(dmov_conf[j].irq);
 	}
+#ifndef CONFIG_MSM_ADM3
 	msm_dmov_clk = clk_get(NULL, "adm_clk");
 	if (IS_ERR(msm_dmov_clk))
 		return PTR_ERR(msm_dmov_clk);
 	ret = platform_driver_register(&msm_dmov_driver);
 	if (ret)
 		return ret;
+#endif
 	return 0;
 }
 arch_initcall(msm_init_datamover);
