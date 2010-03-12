@@ -62,8 +62,15 @@ extern struct platform_device msm_rotator_device;
 extern struct platform_device msm_device_tsif;
 
 #ifdef CONFIG_I2C_SSBI
+#if defined(CONFIG_ARCH_MSM7X30)
 extern struct platform_device msm_device_ssbi6;
 extern struct platform_device msm_device_ssbi7;
+#endif
+#if defined(CONFIG_ARCH_MSM8X60)
+extern struct platform_device msm_device_ssbi1;
+extern struct platform_device msm_device_ssbi2;
+extern struct platform_device msm_device_ssbi3;
+#endif
 #endif
 
 #if defined(CONFIG_ARCH_MSM7X30)

@@ -133,6 +133,23 @@ static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 };
 #endif
 
+#ifdef CONFIG_I2C_SSBI
+/* PMIC SSBI */
+static struct msm_ssbi_platform_data msm_ssbi1_pdata = {
+	.controller_type = MSM_SBI_CTRL_PMIC_ARBITER,
+};
+
+/* PMIC SSBI */
+static struct msm_ssbi_platform_data msm_ssbi2_pdata = {
+	.controller_type = MSM_SBI_CTRL_PMIC_ARBITER,
+};
+
+/* CODEC/TSSC SSBI */
+static struct msm_ssbi_platform_data msm_ssbi3_pdata = {
+	.controller_type = MSM_SBI_CTRL_SSBI,
+};
+#endif
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 #ifdef CONFIG_I2C_QUP
@@ -140,6 +157,11 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_gsbi4_qup_i2c_device,
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
+#endif
+#ifdef CONFIG_I2C_SSBI
+	&msm_device_ssbi1,
+	&msm_device_ssbi2,
+	&msm_device_ssbi3,
 #endif
 };
 
@@ -150,6 +172,11 @@ static struct platform_device *surf_devices[] __initdata = {
 	&msm_gsbi4_qup_i2c_device,
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
+#endif
+#ifdef CONFIG_I2C_SSBI
+	&msm_device_ssbi1,
+	&msm_device_ssbi2,
+	&msm_device_ssbi3,
 #endif
 };
 
@@ -170,6 +197,11 @@ static void __init msm8x60_init_buses(void)
 	msm_gsbi4_qup_i2c_device.dev.platform_data = &msm_gsbi4_qup_i2c_pdata;
 	msm_gsbi8_qup_i2c_device.dev.platform_data = &msm_gsbi8_qup_i2c_pdata;
 	msm_gsbi9_qup_i2c_device.dev.platform_data = &msm_gsbi9_qup_i2c_pdata;
+#endif
+#ifdef CONFIG_I2C_SSBI
+	msm_device_ssbi1.dev.platform_data = &msm_ssbi1_pdata;
+	msm_device_ssbi2.dev.platform_data = &msm_ssbi2_pdata;
+	msm_device_ssbi3.dev.platform_data = &msm_ssbi3_pdata;
 #endif
 }
 
