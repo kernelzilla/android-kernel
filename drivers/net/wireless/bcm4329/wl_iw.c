@@ -1118,6 +1118,28 @@ static int iwpriv_set_ap_config(struct net_device *dev,
 
 
 #ifdef SOFTAP
+void print_buf(void *pbuf, int len, int bytes_per_line)
+{
+	int i, j = 0;
+	unsigned char *buf = pbuf;
+
+	if (bytes_per_line == 0) {
+		bytes_per_line = len;
+	}
+
+	for (i = 0; i < len; i++) {
+		WL_SOFTAP(("%2.2x", *buf++));
+		j++;
+		if (j == bytes_per_line) {
+			WL_SOFTAP(("\n"));
+			j = 0;
+		} else {
+			WL_SOFTAP((":"));
+		}
+	}
+	WL_SOFTAP(("\n"));
+}
+
 static int iwpriv_get_assoc_list(struct net_device *dev,
 		struct iw_request_info *info,
 		union iwreq_data *p_iwrq,
