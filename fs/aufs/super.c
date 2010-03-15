@@ -361,34 +361,6 @@ static int aufs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 /* ---------------------------------------------------------------------- */
 
-/* try flushing the lower fs at aufs remount/unmount time */
-
-static void au_fsync_br(struct super_block *sb)
-{
-	aufs_bindex_t bend, bindex;
-	int brperm;
-	struct au_branch *br;
-	struct super_block *h_sb;
-
-	bend = au_sbend(sb);
-	for (bindex = 0; bindex < bend; bindex++) {
-		br = au_sbr(sb, bindex);
-		brperm = br->br_perm;
-		if (brperm == AuBrPerm_RR || brperm == AuBrPerm_RRWH)
-			continue;
-		h_sb = br->br_mnt->mnt_sb;
-		if (bdev_read_only(h_sb->s_bdev))
-			continue;
-
-		/* lockdep_off(); */
-		down_write(&h_sb->s_umount);
-		shrink_dcache_sb(h_sb);
-		sync_filesystem(h_sb);
-		up_write(&h_sb->s_umount);
-		/* lockdep_on(); */
-	}
-}
-
 /*
  * this IS NOT for super_operations.
  * I guess it will be reverted someday.
@@ -402,7 +374,6 @@ static void aufs_umount_begin(struct super_block *sb)
 		return;
 
 	si_write_lock(sb);
-	au_fsync_br(sb);
 	if (au_opt_test(au_mntflags(sb), PLINK))
 		au_plink_put(sb);
 	if (sbinfo->si_wbr_create_ops->fin)
@@ -661,8 +632,6 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 	if (!data || !*data) {
 		aufs_write_lock(root);
 		err = au_opts_verify(sb, *flags, /*pending*/0);
-		if (!err)
-			au_fsync_br(sb);
 		aufs_write_unlock(root);
 		goto out;
 	}
@@ -685,7 +654,6 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 	inode = root->d_inode;
 	mutex_lock(&inode->i_mutex);
 	aufs_write_lock(root);
-	au_fsync_br(sb);
 
 	/* au_opts_remount() may return an error */
 	err = au_opts_remount(sb, &opts);
