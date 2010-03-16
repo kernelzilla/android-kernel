@@ -16,6 +16,7 @@
  * 02111-1307, USA
  */
 
+#include <asm/div64.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -25,10 +26,12 @@
 #include <linux/poll.h>
 #include <linux/power_supply.h>
 #include <linux/types.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/spi/spi.h>
+#include <linux/time.h>
 #include <linux/miscdevice.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -49,6 +52,7 @@ static ssize_t cpcap_batt_read(struct file *file, char *buf, size_t count,
 			       loff_t *ppos);
 static int cpcap_batt_probe(struct platform_device *pdev);
 static int cpcap_batt_remove(struct platform_device *pdev);
+static int cpcap_batt_resume(struct platform_device *pdev);
 
 struct cpcap_batt_ps {
 	struct power_supply batt;
@@ -64,6 +68,7 @@ struct cpcap_batt_ps {
 	char data_pending;
 	wait_queue_head_t wait;
 	char async_req_pending;
+	unsigned long last_run_time;
 };
 
 static const struct file_operations batt_fops = {
@@ -105,6 +110,7 @@ static enum power_supply_property cpcap_batt_usb_props[] =
 static struct platform_driver cpcap_batt_driver = {
 	.probe		= cpcap_batt_probe,
 	.remove		= cpcap_batt_remove,
+	.resume		= cpcap_batt_resume,
 	.driver		= {
 		.name	= "cpcap_battery",
 		.owner	= THIS_MODULE,
@@ -118,7 +124,6 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 	struct cpcap_batt_ps *sply = data;
 
 	mutex_lock(&sply->lock);
-
 	sply->data_pending = 1;
 
 	switch (irq) {
@@ -193,6 +198,7 @@ static ssize_t cpcap_batt_read(struct file *file,
 {
 	struct cpcap_batt_ps *sply = file->private_data;
 	int ret = -EFBIG;
+	unsigned long long temp;
 
 	if (count >= sizeof(char)) {
 		mutex_lock(&sply->lock);
@@ -202,6 +208,10 @@ static ssize_t cpcap_batt_read(struct file *file,
 		else
 			ret = -EFAULT;
 		sply->data_pending = 0;
+		temp = sched_clock();
+		do_div(temp, NSEC_PER_SEC);
+		sply->last_run_time = (unsigned long)temp;
+
 		sply->irq_status = 0;
 		mutex_unlock(&sply->lock);
 	}
@@ -558,6 +568,31 @@ static int cpcap_batt_remove(struct platform_device *pdev)
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_11);
 	sply->cpcap->battdata = NULL;
 	kfree(sply);
+
+	return 0;
+}
+
+static int cpcap_batt_resume(struct platform_device *pdev)
+{
+	struct cpcap_batt_ps *sply = platform_get_drvdata(pdev);
+	unsigned long cur_time;
+	unsigned long long temp;
+
+	temp = sched_clock();
+	do_div(temp, NSEC_PER_SEC);
+	cur_time = ((unsigned long)temp);
+	if ((cur_time - sply->last_run_time) < 0)
+		sply->last_run_time = 0;
+
+	if ((cur_time - sply->last_run_time) > 50) {
+		mutex_lock(&sply->lock);
+		sply->data_pending = 1;
+		sply->irq_status |= CPCAP_BATT_IRQ_MACRO;
+
+		mutex_unlock(&sply->lock);
+
+		wake_up_interruptible(&sply->wait);
+	}
 
 	return 0;
 }

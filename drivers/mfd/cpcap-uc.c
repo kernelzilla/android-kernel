@@ -18,7 +18,9 @@
 
 #include <linux/completion.h>
 #include <linux/errno.h>
+#include <linux/firmware.h>
 #include <linux/fs.h>
+#include <linux/ihex.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
@@ -567,6 +569,62 @@ unsigned char cpcap_uc_status(struct cpcap_device *cpcap,
 }
 EXPORT_SYMBOL_GPL(cpcap_uc_status);
 
+static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
+{
+	int err;
+	const struct ihex_binrec *rec;
+	const struct firmware *fw;
+	unsigned short *buf;
+	int i;
+	unsigned short num_words;
+
+	if (!uc_data || !dev)
+		return -EINVAL;
+
+	err = request_ihex_firmware(&fw, "cpcap/firmware_1_2x.fw", dev);
+	if (err) {
+		dev_err(dev, "Failed to load \"cpcap/firmware_1_2x.fw\": %d\n",
+		       err);
+		return err;
+	}
+
+	for (rec = (void *)fw->data; rec; rec = ihex_next_binrec(rec)) {
+		num_words = be16_to_cpu(rec->len) >> 1;
+		dev_info(dev, "Loading %d word(s) at 0x%04x\n",
+			 num_words, be32_to_cpu(rec->addr));
+
+		buf = kmalloc(be16_to_cpu(rec->len), GFP_KERNEL);
+		if (buf) {
+			for (i = 0; i < num_words; i++)
+				buf[i] = be16_to_cpu(((uint16_t *)rec->data)[i]);
+
+			err = ram_write(uc_data, be32_to_cpu(rec->addr),
+					num_words, buf);
+			kfree(buf);
+
+			if (err) {
+				dev_err(dev, "RAM write failed: %d\n", err);
+				break;
+			}
+		} else {
+			err = -ENOMEM;
+			dev_err(dev, "RAM write failed: %d\n", err);
+			break;
+		}
+	}
+
+	release_firmware(fw);
+
+	if (!err) {
+		uc_data->is_ready = 1;
+
+		err = cpcap_uc_start(uc_data->cpcap, CPCAP_MACRO_4);
+		dev_info(dev, "Started macro 4: %d\n", err);
+	}
+
+	return err;
+}
+
 static int cpcap_uc_probe(struct platform_device *pdev)
 {
 	int retval = 0;
@@ -628,12 +686,17 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 
 		cpcap_regacc_write(data->cpcap, CPCAP_REG_MIM1, 0xFFFF,
 				   0xFFFF);
-	} else {
+
+		retval = fw_load(data, &pdev->dev);
+		if (retval)
+			goto err_fw;
+	} else
 		retval = -ENODEV;
-	}
 
 	return retval;
 
+err_fw:
+	misc_deregister(&uc_dev);
 err_priramw:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIRAMW);
 err_priramr:
@@ -677,7 +740,7 @@ static int __init cpcap_uc_init(void)
 {
 	return platform_driver_register(&cpcap_uc_driver);
 }
-module_init(cpcap_uc_init);
+subsys_initcall(cpcap_uc_init);
 
 static void __exit cpcap_uc_exit(void)
 {
@@ -689,3 +752,4 @@ MODULE_ALIAS("platform:cpcap_uc");
 MODULE_DESCRIPTION("CPCAP uC driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
+MODULE_FIRMWARE("cpcap/firmware_1_2x.fw");
