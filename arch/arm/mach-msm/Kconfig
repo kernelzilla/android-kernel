@@ -7,6 +7,7 @@ choice
 config ARCH_MSM7X00A
 	bool "MSM7x00A / MSM7x01A"
 	select ARCH_MSM_ARM11
+	select MSM_SMD_PKG3
 	select CPU_V6
 
 config ARCH_QSD8X50
@@ -324,6 +325,9 @@ config MSM_SERIAL_DEBUGGER_CONSOLE
 	help
 	  Enables a console so that printk messages are displayed on
 	  the debugger serial port as the occur.
+
+config MSM_SMD_PKG3
+	bool
 
 config MSM_SMD
 	default y

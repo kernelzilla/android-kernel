@@ -61,7 +61,7 @@ struct smem_shared {
 #define SMSM_V1_SIZE		(sizeof(unsigned) * 8)
 #define SMSM_V2_SIZE		(sizeof(unsigned) * 4)
 
-#ifndef CONFIG_ARCH_MSM_SCORPION
+#ifdef CONFIG_MSM_SMD_PKG3
 struct smsm_interrupt_info {
 	uint32_t interrupt_mask;
 	uint32_t pending_interrupts;
@@ -265,6 +265,7 @@ struct smd_half_channel {
 	unsigned head;
 } __attribute__(( aligned(4), packed ));
 
+/* Only used on SMD package v3 on msm7201a */
 struct smd_shared_v1 {
 	struct smd_half_channel ch0;
 	unsigned char data0[SMD_BUF_SIZE];
@@ -272,6 +273,7 @@ struct smd_shared_v1 {
 	unsigned char data1[SMD_BUF_SIZE];
 };
 
+/* Used on SMD package v4 */
 struct smd_shared_v2 {
 	struct smd_half_channel ch0;
 	struct smd_half_channel ch1;
@@ -330,4 +332,4 @@ uint32_t raw_smsm_get_state(enum smsm_state_item item);
 
 extern void msm_init_last_radio_log(struct module *);
 
-#endif
+#endif /* CONFIG_ARCH_MSM7X00A */
