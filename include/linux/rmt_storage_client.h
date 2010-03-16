@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,7 +36,7 @@
 #define RMT_STORAGE_OPEN              0
 #define RMT_STORAGE_WRITE             1
 #define RMT_STORAGE_CLOSE             2
-#define RMT_STORAGE_REGISTER_CB       3
+#define RMT_STORAGE_SEND_USER_DATA    3
 
 #define RMT_STORAGE_MAX_IOVEC_XFR_CNT 5
 #define MAX_NUM_CLIENTS 10
@@ -63,12 +63,10 @@ struct rmt_storage_event {
 	char path[MAX_PATH_NAME];
 	struct rmt_storage_iovec_desc xfer_desc[RMT_STORAGE_MAX_IOVEC_XFR_CNT];
 	uint32_t xfer_cnt;
-	uint32_t cb_id;
-	uint32_t cb_data;
+	uint32_t usr_data;
 };
 
-struct rmt_storage_cb {
-	uint32_t cb_id;
+struct rmt_storage_send_sts {
 	uint32_t err_code;
 	uint32_t data;
 	uint32_t handle;
@@ -79,14 +77,14 @@ struct rmt_shrd_mem_param {
 	uint32_t size;
 };
 
-#define RMT_STORAGE_SERVER_IOCTL_MAGIC (0xC2)
+#define RMT_STORAGE_IOCTL_MAGIC (0xC2)
 
 #define RMT_STORAGE_SHRD_MEM_PARAM \
-	_IOR(RMT_STORAGE_SERVER_IOCTL_MAGIC, 0, struct rmt_shrd_mem_param)
+	_IOR(RMT_STORAGE_IOCTL_MAGIC, 0, struct rmt_shrd_mem_param)
 
 #define RMT_STORAGE_WAIT_FOR_REQ \
-	_IOR(RMT_STORAGE_SERVER_IOCTL_MAGIC, 1, struct rmt_storage_event)
+	_IOR(RMT_STORAGE_IOCTL_MAGIC, 1, struct rmt_storage_event)
 
 #define RMT_STORAGE_SEND_STATUS \
-	_IOW(RMT_STORAGE_SERVER_IOCTL_MAGIC, 2, struct rmt_storage_cb)
+	_IOW(RMT_STORAGE_IOCTL_MAGIC, 2, struct rmt_storage_send_sts)
 #endif
