@@ -521,7 +521,7 @@ static int au_handle_shwh(struct super_block *sb, struct au_vdir *vdir,
 	AuDebugOn(!au_opt_test(au_mntflags(sb), SHWH));
 
 	err = -ENOMEM;
-	o = p = __getname();
+	o = p = au_getname();
 	if (unlikely(!p))
 		goto out;
 

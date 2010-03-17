@@ -416,7 +416,7 @@ static int au_do_cpup_symlink(struct path *h_path, struct dentry *h_src,
 		goto out;
 
 	err = -ENOMEM;
-	sym = __getname();
+	sym = au_getname();
 	if (unlikely(!sym))
 		goto out;
 
