@@ -28,9 +28,6 @@
 #include <linux/fs.h>
 #include <linux/fs_stack.h>
 
-/* cf. __getname() in linux/include/linux/fs.h */
-#define au_getname()	kmem_cache_alloc(names_cachep, GFP_NOFS)
-
 /* ---------------------------------------------------------------------- */
 
 /* lock subclass for lower inode */
