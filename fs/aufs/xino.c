@@ -1146,7 +1146,7 @@ struct file *au_xino_def(struct super_block *sb)
 
 	if (bwr >= 0) {
 		file = ERR_PTR(-ENOMEM);
-		page = __getname();
+		page = __getname_gfp(GFP_NOFS);
 		if (unlikely(!page))
 			goto out;
 		path.mnt = br->br_mnt;
