@@ -111,6 +111,7 @@ struct adie_codec_state {
 	struct adie_codec_path path[ADIE_CODEC_MAX];
 	u32 ref_cnt;
 	struct marimba *pdrv_ptr;
+	struct marimba_codec_platform_data *codec_pdata;
 	struct mutex lock;
 };
 
@@ -287,18 +288,31 @@ int adie_codec_open(struct adie_codec_dev_profile *profile,
 {
 	int rc = 0;
 
+	mutex_lock(&adie_codec.lock);
+
 	if (!profile || !path_pptr) {
 		rc = -EINVAL;
 		goto error;
 	}
 
-	mutex_lock(&adie_codec.lock);
 	if (adie_codec.path[profile->path_type].profile) {
 		rc = -EBUSY;
 		goto error;
 	}
 
 	if (!adie_codec.ref_cnt) {
+
+		if (adie_codec.codec_pdata &&
+				adie_codec.codec_pdata->marimba_codec_power) {
+
+			rc = adie_codec.codec_pdata->marimba_codec_power(1);
+			if (rc) {
+				pr_err("%s: could not power up marimba "
+						"codec\n", __func__);
+				goto error;
+			}
+		}
+
 		/* bring up sequence for Marimba codec core
 		 * ensure RESET_N = 0 and GDFS_CLAMP_EN=1 -
 		 * set GDFS_EN_FEW=1 then GDFS_EN_REST=1 then
@@ -337,9 +351,10 @@ int adie_codec_open(struct adie_codec_dev_profile *profile,
 	adie_codec.path[profile->path_type].curr_stage = ADIE_CODEC_FLASH_IMAGE;
 	adie_codec.path[profile->path_type].stage_idx = 0;
 
-	mutex_unlock(&adie_codec.lock);
 
 error:
+
+	mutex_unlock(&adie_codec.lock);
 	return rc;
 }
 EXPORT_SYMBOL(adie_codec_open);
@@ -348,6 +363,7 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 {
 	int rc = 0;
 
+	mutex_lock(&adie_codec.lock);
 
 	if (!path_ptr) {
 		rc = -EINVAL;
@@ -355,8 +371,6 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 	}
 	if (path_ptr->curr_stage != ADIE_CODEC_DIGITAL_OFF)
 		adie_codec_proceed_stage(path_ptr, ADIE_CODEC_DIGITAL_OFF);
-
-	mutex_lock(&adie_codec.lock);
 
 	BUG_ON(!adie_codec.ref_cnt);
 
@@ -370,9 +384,21 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 		adie_codec_write(0xFF, 0xFF, 0x0e);
 		adie_codec_write(0xFF, 0xFF, 0x08);
 		adie_codec_write(0x03, 0xFF, 0x00);
+
+		if (adie_codec.codec_pdata &&
+				adie_codec.codec_pdata->marimba_codec_power) {
+
+			rc = adie_codec.codec_pdata->marimba_codec_power(0);
+			if (rc) {
+				pr_err("%s: could not power down marimba "
+						"codec\n", __func__);
+				goto error;
+			}
+		}
 	}
-	mutex_unlock(&adie_codec.lock);
+
 error:
+	mutex_unlock(&adie_codec.lock);
 	return rc;
 }
 EXPORT_SYMBOL(adie_codec_close);
@@ -380,6 +406,7 @@ EXPORT_SYMBOL(adie_codec_close);
 static int marimba_codec_probe(struct platform_device *pdev)
 {
 	adie_codec.pdrv_ptr = platform_get_drvdata(pdev);
+	adie_codec.codec_pdata = pdev->dev.platform_data;
 
 	return 0;
 }

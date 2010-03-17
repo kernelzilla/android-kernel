@@ -71,7 +71,7 @@ struct marimba_fm_platform_data{
 };
 
 struct marimba_codec_platform_data{
-	int codec_tx;	/*  Member added for eg. */
+	int (*marimba_codec_power)(int vreg_on);
 };
 
 struct marimba_tsadc_setup_params {

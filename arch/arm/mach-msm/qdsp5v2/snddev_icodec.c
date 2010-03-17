@@ -235,9 +235,6 @@ struct snddev_icodec_drv_state {
 	struct clk *lpa_codec_clk;
 	struct clk *lpa_core_clk;
 	struct clk *lpa_p_clk;
-	struct vreg *vreg_gp16;
-	struct vreg *vreg_msme;
-	struct vreg *vreg_rf2;
 	struct lpa_drv *lpa;
 
 	struct wake_lock rx_idlelock;
@@ -254,13 +251,6 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	struct lpa_codec_config lpa_config;
 
 	wake_lock(&drv->rx_idlelock);
-
-	/* Voltage regulator voting
-	 * Vote GP16, MSME, RF2
-	 */
-	vreg_enable(drv->vreg_gp16);
-	vreg_enable(drv->vreg_msme);
-	vreg_enable(drv->vreg_rf2);
 
 	/* enable MI2S RX master block */
 	/* enable MI2S RX bit clock */
@@ -334,9 +324,6 @@ error_lpa:
 	clk_disable(drv->rx_sclk);
 	clk_disable(drv->rx_mclk);
 error_invalid_freq:
-	vreg_disable(drv->vreg_gp16);
-	vreg_disable(drv->vreg_msme);
-	vreg_disable(drv->vreg_rf2);
 
 	pr_err("%s: encounter error\n", __func__);
 
@@ -361,12 +348,6 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 		pmic_hsed_enable(icodec->data->pmctl_id[i],
 			 PM_HSED_ENABLE_PWM_TCXO);
 	}
-	/* Voltage regulator voting
-	 * Vote GP16, MSME, RF2
-	 */
-	vreg_enable(drv->vreg_gp16);
-	vreg_enable(drv->vreg_msme);
-	vreg_enable(drv->vreg_rf2);
 
 	/* enable MI2S TX master block */
 	/* enable MI2S TX bit clock */
@@ -411,9 +392,6 @@ error_adie:
 	clk_disable(drv->tx_sclk);
 	clk_disable(drv->tx_mclk);
 error_invalid_freq:
-	vreg_disable(drv->vreg_gp16);
-	vreg_disable(drv->vreg_msme);
-	vreg_disable(drv->vreg_rf2);
 
 	/* Disable mic bias */
 	for (i = 0; i < icodec->data->pmctl_id_sz; i++) {
@@ -461,10 +439,6 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	clk_disable(drv->rx_sclk);
 	clk_disable(drv->rx_mclk);
 
-	vreg_disable(drv->vreg_gp16);
-	vreg_disable(drv->vreg_msme);
-	vreg_disable(drv->vreg_rf2);
-
 	icodec->enabled = 0;
 
 	wake_unlock(&drv->rx_idlelock);
@@ -494,9 +468,6 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 		pmic_hsed_enable(icodec->data->pmctl_id[i],
 			 PM_HSED_ENABLE_OFF);
 	}
-	vreg_disable(drv->vreg_gp16);
-	vreg_disable(drv->vreg_msme);
-	vreg_disable(drv->vreg_rf2);
 
 	/* Reuse pamp_off for TX platform-specific setup  */
 	if (icodec->data->pamp_off)
@@ -764,9 +735,6 @@ static void debugfs_adie_loopback(u32 loop)
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
 	if (loop) {
-		vreg_enable(drv->vreg_gp16);
-		vreg_enable(drv->vreg_msme);
-		vreg_enable(drv->vreg_rf2);
 
 		/* enable MI2S RX master block */
 		/* enable MI2S RX bit clock */
@@ -808,10 +776,6 @@ static void debugfs_adie_loopback(u32 loop)
 
 		pmic_hsed_enable(PM_HSED_CONTROLLER_0, PM_HSED_ENABLE_OFF);
 
-		vreg_disable(drv->vreg_gp16);
-		vreg_disable(drv->vreg_msme);
-		vreg_disable(drv->vreg_rf2);
-
 		/* Disable MI2S RX master block */
 		/* Disable MI2S RX bit clock */
 		clk_disable(drv->rx_sclk);
@@ -831,9 +795,6 @@ static void debugfs_afe_loopback(u32 loop)
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
 	if (loop) {
-		vreg_enable(drv->vreg_gp16);
-		vreg_enable(drv->vreg_msme);
-		vreg_enable(drv->vreg_rf2);
 
 		/* enable MI2S RX master block */
 		/* enable MI2S RX bit clock */
@@ -897,10 +858,6 @@ static void debugfs_afe_loopback(u32 loop)
 		adie_codec_close(debugfs_tx_adie);
 
 		pmic_hsed_enable(PM_HSED_CONTROLLER_0, PM_HSED_ENABLE_OFF);
-
-		vreg_disable(drv->vreg_gp16);
-		vreg_disable(drv->vreg_msme);
-		vreg_disable(drv->vreg_rf2);
 
 		/* Disable MI2S RX master block */
 		/* Disable MI2S RX bit clock */
@@ -983,15 +940,6 @@ static int __init snddev_icodec_init(void)
 	icodec_drv->lpa_p_clk = clk_get(NULL, "lpa_pclk");
 	if (IS_ERR(icodec_drv->lpa_p_clk))
 		goto error_lpa_p_clk;
-	icodec_drv->vreg_gp16 = vreg_get(NULL, "gp16");
-	if (IS_ERR(icodec_drv->vreg_gp16))
-		goto error_vreg_gp16;
-	icodec_drv->vreg_msme = vreg_get(NULL, "s2");
-	if (IS_ERR(icodec_drv->vreg_msme))
-		goto error_vreg_msme;
-	icodec_drv->vreg_rf2 = vreg_get(NULL, "s4");
-	if (IS_ERR(icodec_drv->vreg_rf2))
-		goto error_vreg_rf2;
 
 #ifdef CONFIG_DEBUG_FS
 	debugfs_sdev_dent = debugfs_create_dir("snddev_icodec", 0);
@@ -1015,12 +963,6 @@ static int __init snddev_icodec_init(void)
 			"snddev_rx_idle");
 	return 0;
 
-error_vreg_rf2:
-	vreg_put(icodec_drv->vreg_msme);
-error_vreg_msme:
-	vreg_put(icodec_drv->vreg_gp16);
-error_vreg_gp16:
-	clk_put(icodec_drv->lpa_p_clk);
 error_lpa_p_clk:
 	clk_put(icodec_drv->lpa_core_clk);
 error_lpa_core_clk:
@@ -1051,10 +993,6 @@ static void __exit snddev_icodec_exit(void)
 	debugfs_remove(debugfs_sdev_dent);
 #endif
 	platform_driver_unregister(&snddev_icodec_driver);
-
-	vreg_put(icodec_drv->vreg_gp16);
-	vreg_put(icodec_drv->vreg_msme);
-	vreg_put(icodec_drv->vreg_rf2);
 
 	clk_put(icodec_drv->rx_sclk);
 	clk_put(icodec_drv->rx_mclk);
