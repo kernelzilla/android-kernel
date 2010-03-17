@@ -811,7 +811,7 @@ static void *aufs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	mm_segment_t old_fs;
 
 	err = -ENOMEM;
-	buf = __getname();
+	buf = au_getname();
 	if (unlikely(!buf))
 		goto out;
 
