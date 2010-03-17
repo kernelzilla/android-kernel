@@ -94,10 +94,8 @@ obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 					   board-sholes-hsmmc.o \
 					   board-sholes-keypad.o \
 					   board-sholes-wifi.o \
-					   board-sholes-mmcprobe.o 
-
-# usbnet temporarily disabled
-#					   board-sholes-usbnet.o \
+					   board-sholes-mmcprobe.o \
+					   board-sholes-usbnet.o \
 
 obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
 					   board-rx51-sdram.o \
