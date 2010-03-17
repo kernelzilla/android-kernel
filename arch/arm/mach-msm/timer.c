@@ -221,7 +221,7 @@ static struct msm_clock msm_clocks[] = {
 	}
 };
 
-struct clock_event_device *local_clock_event;
+static struct clock_event_device *local_clock_event;
 
 static DEFINE_PER_CPU(struct msm_clock_percpu_data[NR_TIMERS],
     msm_clocks_percpu);
@@ -229,6 +229,8 @@ static DEFINE_PER_CPU(struct msm_clock_percpu_data[NR_TIMERS],
 static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = dev_id;
+	if (smp_processor_id() != 0)
+		evt = local_clock_event;
 	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
@@ -983,6 +985,8 @@ void __cpuinit local_timer_setup(struct clock_event_device *evt)
 		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
 	evt->min_delta_ns = clockevent_delta2ns(clock->write_delay + 4, evt);
 	evt->cpumask = cpumask_of(smp_processor_id());
+
+	local_clock_event = evt;
 
 	local_irq_save(flags);
 	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
