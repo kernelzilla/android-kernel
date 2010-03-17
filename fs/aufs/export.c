@@ -352,7 +352,7 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino,
 		goto out;
 
 	dentry = ERR_PTR(-ENOMEM);
-	arg.name = __getname();
+	arg.name = au_getname();
 	if (unlikely(!arg.name))
 		goto out_file;
 	arg.ino = ino;
