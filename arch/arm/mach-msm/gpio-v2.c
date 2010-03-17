@@ -80,7 +80,7 @@
  * we avoid having to do readl calls on the INTR_STATUS registers of those
  * GPIOs which are not in use as interrupts.
  */
-static DECLARE_BITMAP(enabled_irqs, ARCH_NR_GPIOS);
+static DECLARE_BITMAP(enabled_irqs, NR_MSM_GPIOS);
 static DEFINE_SPINLOCK(gpio_lock);
 
 /*
@@ -123,7 +123,7 @@ int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq)
 	int rc = -EINVAL;
 	unsigned long irq_flags;
 
-	if (gpio < ARCH_NR_GPIOS && irq < NR_TLMM_SCSS_DIR_CONN_IRQ) {
+	if (gpio < NR_MSM_GPIOS && irq < NR_TLMM_SCSS_DIR_CONN_IRQ) {
 		spin_lock_irqsave(&gpio_lock, irq_flags);
 
 		set_gpio_bit(gpio, GPIO_OE_CLR(gpio));
@@ -150,7 +150,7 @@ void msm_gpio_write_cfg(unsigned gpio, uint32_t flags)
 	uint32_t      prev;
 	uint32_t      next;
 
-	if (gpio < ARCH_NR_GPIOS) {
+	if (gpio < NR_MSM_GPIOS) {
 		spin_lock_irqsave(&gpio_lock, irq_flags);
 
 		prev  = readl(GPIO_CFG(gpio));
@@ -167,7 +167,7 @@ int msm_gpio_read_cfg(unsigned gpio, uint32_t *flags)
 {
 	int rc = -EINVAL;
 
-	if (gpio < ARCH_NR_GPIOS && flags != NULL) {
+	if (gpio < NR_MSM_GPIOS && flags != NULL) {
 		*flags  = readl(GPIO_CFG(gpio));
 		*flags &= PUBLIC_CFG_MASK;
 		rc = 0;
@@ -181,7 +181,7 @@ static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	int i = 0;
 
-	if (offset < ARCH_NR_GPIOS)
+	if (offset < NR_MSM_GPIOS)
 		i = (readl(GPIO_IN_OUT(offset)) & 0x03);
 
 	return i;
@@ -189,14 +189,14 @@ static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 
 static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 {
-	if (offset < ARCH_NR_GPIOS)
+	if (offset < NR_MSM_GPIOS)
 		writel((val ? 0x02 : 0x00), GPIO_IN_OUT(offset));
 }
 
 static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
 {
 	int i = -EINVAL;
-	if (offset < ARCH_NR_GPIOS) {
+	if (offset < NR_MSM_GPIOS) {
 		set_gpio_bit(offset, GPIO_OE_CLR(offset));
 		i = 0;
 	}
@@ -208,7 +208,7 @@ static int msm_gpio_direction_output(struct gpio_chip *chip,
 				int val)
 {
 	int i = -EINVAL;
-	if (offset < ARCH_NR_GPIOS) {
+	if (offset < NR_MSM_GPIOS) {
 		msm_gpio_set(chip, offset, val);
 		set_gpio_bit(offset, GPIO_OE_SET(offset));
 		i = 0;
@@ -223,7 +223,7 @@ static struct gpio_chip msm_gpios = {
 	.get              = msm_gpio_get,
 	.set              = msm_gpio_set,
 	.base             = 0,
-	.ngpio            = ARCH_NR_GPIOS
+	.ngpio            = NR_MSM_GPIOS
 };
 
 static void msm_gpio_irq_enable(unsigned int irq)
@@ -310,9 +310,9 @@ static void msm_summary_irq_handler(unsigned int irq,
 {
 	unsigned long i;
 
-	for (i = find_first_bit(enabled_irqs, ARCH_NR_GPIOS);
-	     i < ARCH_NR_GPIOS;
-	     i = find_next_bit(enabled_irqs, ARCH_NR_GPIOS, i + 1)) {
+	for (i = find_first_bit(enabled_irqs, NR_MSM_GPIOS);
+	     i < NR_MSM_GPIOS;
+	     i = find_next_bit(enabled_irqs, NR_MSM_GPIOS, i + 1)) {
 		if (readl(GPIO_INTR_STATUS(i)) & 0x01) {
 			writel(0x01, GPIO_INTR_STATUS(i));
 			generic_handle_irq(gpio_to_irq(i));
@@ -335,9 +335,9 @@ static int __init msm_gpio_init(void)
 {
 	int i;
 
-	bitmap_zero(enabled_irqs, ARCH_NR_GPIOS);
+	bitmap_zero(enabled_irqs, NR_MSM_GPIOS);
 	gpiochip_add(&msm_gpios);
-	for (i = 0; i < ARCH_NR_GPIOS; ++i) {
+	for (i = 0; i < NR_MSM_GPIOS; ++i) {
 		set_irq_chip(gpio_to_irq(i), &msm_summary_irq_chip);
 		set_irq_handler(gpio_to_irq(i), handle_edge_irq);
 		set_irq_flags(gpio_to_irq(i), IRQF_VALID);

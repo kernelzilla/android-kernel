@@ -30,7 +30,7 @@
 #ifndef __ASM_ARCH_MSM_GPIO_V2_8X60_H
 #define __ASM_ARCH_MSM_GPIO_V2_8X60_H
 
-#define ARCH_NR_GPIOS 173
+#define NR_MSM_GPIOS 173
 
 #define MSM_GPIO_DRV_2MA  (0 << 6)
 #define MSM_GPIO_DRV_4MA  (1 << 6)
