@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84 2010/03/11 02:45:54 Exp $
+ * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.3 2010/03/16 22:09:45 Exp $
  */
 
 
@@ -66,6 +66,7 @@ typedef const struct si_pub  si_t;
 #define WL_SOFTAP(x) printk x
 static struct net_device *priv_dev;
 static bool ap_cfg_running = FALSE;
+static bool ap_fw_loaded = FALSE;
 static int ap_mode = 0;
 #endif
 
@@ -896,6 +897,11 @@ wl_iw_control_wl_off(
 #endif
 	WL_TRACE(("Enter %s\n", __FUNCTION__));
 
+#ifdef SOFTAP
+	ap_mode = 0;
+	ap_cfg_running = FALSE;
+#endif
+
 #ifdef WL_IW_USE_THREAD_WL_OFF
 	ctl.timer = &timer;
 	ctl.dev = dev;
@@ -960,7 +966,15 @@ wl_iw_control_wl_on(
 	ret = wl_control_wl_start(dev);
 
 	wl_iw_send_priv_event(dev, "START");
+
+#ifdef SOFTAP
+	if (!ap_fw_loaded) {
+		wl_iw_iscan_set_scan_broadcast_prep(dev, 0);
+	}
+#else
 	wl_iw_iscan_set_scan_broadcast_prep(dev, 0);
+#endif
+
 	net_os_wake_lock_timeout_enable(dev);
 
 	WL_TRACE(("Exited %s \n", __FUNCTION__));
@@ -1076,11 +1090,6 @@ static int iwpriv_set_ap_config(struct net_device *dev,
 	WL_TRACE(("> Got IWPRIV SET_AP IOCTL: info->cmd:%x, info->flags:%x, u.data:%p, u.len:%d\n",
 		info->cmd, info->flags,
 		wrqu->data.pointer, wrqu->data.length));
-
-	if (ap_cfg_running)  {
-		WL_ERROR(("\n: EEROR, SOFTAP is already loaded \n"));
-		return -1;
-	}
 
 	if (wrqu->data.length != 0) {
 
@@ -2166,6 +2175,7 @@ static void wl_iw_send_scan_complete(iscan_info_t *iscan)
 	WL_TRACE(("Send Event ISCAN complete\n"));
 #endif 
 }
+
 static int
 _iscan_sysioc_thread(void *data)
 {
@@ -2178,6 +2188,12 @@ _iscan_sysioc_thread(void *data)
 	status = WL_SCAN_RESULTS_PARTIAL;
 	while (down_interruptible(&iscan->sysioc_sem) == 0) {
 
+#ifdef SOFTAP
+		if (ap_cfg_running) {
+			WL_TRACE(("%s skipping SCAN ops in AP mode !!!\n", __FUNCTION__));
+			continue;
+		}
+#endif
 		net_os_wake_lock(iscan->dev);
 
 		if (iscan->timer_on) {
@@ -4580,6 +4596,7 @@ static int thr_wait_for_2nd_eth_dev(void *data)
 		__FUNCTION__, ap_net_dev->name));
 
 	ap_mode = 1;
+	ap_cfg_running = TRUE;
 
 	bcm_mdelay(500);
 
@@ -4608,6 +4625,8 @@ static int set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 	int bsscfg_index = 1;
 	char buf[WLC_IOCTL_SMLEN];
 
+	ap_mode = 0;
+
 	memset(&null_ssid, 0, sizeof(wlc_ssid_t));
 	WL_SOFTAP(("wl_iw: set ap profile:\n"));
 	WL_SOFTAP(("	ssid = '%s'\n", ap->ssid));
@@ -4617,33 +4636,40 @@ static int set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 	WL_SOFTAP(("	channel = %d\n", ap->channel));
 	WL_SOFTAP(("	max scb = %d\n", ap->max_scb));
 
-	sema_init(&ap_eth_sema, 0);
+	if (!ap_cfg_running) {
 
-	mpc = 0;
-	dev_wlc_intvar_set(dev, "mpc", mpc);
+		sema_init(&ap_eth_sema, 0);
 
-	updown = 0;
-	dev_wlc_ioctl(dev, WLC_DOWN, &updown, sizeof(updown));
+		mpc = 0;
+		res |= dev_wlc_intvar_set(dev, "mpc", mpc);
+
+		updown = 0;
+		res |= dev_wlc_ioctl(dev, WLC_DOWN, &updown, sizeof(updown));
 
 #ifdef AP_ONLY
-	apsta_var = 0;
-	dev_wlc_ioctl(dev, WLC_SET_AP, &apsta_var, sizeof(apsta_var));
+		apsta_var = 0;
+		res | = dev_wlc_ioctl(dev, WLC_SET_AP, &apsta_var, sizeof(apsta_var));
 
-	apsta_var = 1;
-	dev_wlc_ioctl(dev, WLC_SET_AP, &apsta_var, sizeof(apsta_var));
-	dev_wlc_ioctl(dev, WLC_GET_AP, &apsta_var, sizeof(apsta_var));
+		apsta_var = 1;
+		res |= dev_wlc_ioctl(dev, WLC_SET_AP, &apsta_var, sizeof(apsta_var));
+		res |= dev_wlc_ioctl(dev, WLC_GET_AP, &apsta_var, sizeof(apsta_var));
 #else
-	apsta_var = 1;
-	iolen = wl_bssiovar_mkbuf("apsta",
-		bsscfg_index,  &apsta_var, sizeof(apsta_var)+4, buf, sizeof(buf), &mkvar_err);
-	ASSERT(iolen);
-	res = dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
-	WL_TRACE(("\n>in %s: apsta set result: %d \n", __FUNCTION__, res));
-#endif 
+		apsta_var = 1;
+		iolen = wl_bssiovar_mkbuf("apsta", bsscfg_index, &apsta_var,
+				sizeof(apsta_var)+4, buf, sizeof(buf), &mkvar_err);
+		ASSERT(iolen);
+		res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
+		WL_TRACE(("\n>in %s: apsta set result: %d \n", __FUNCTION__, res));
+#endif
 
-	updown = 1;
-	dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
-	WL_TRACE(("\n:%s >>>> dev_wlc_ioctl(WLC_UP) updown:%d, \n", __FUNCTION__, updown));
+		updown = 1;
+		res |= dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
+		WL_TRACE(("\n:%s >>>> dev_wlc_ioctl(WLC_UP) updown:%d, \n", __FUNCTION__, updown));
+
+	} else {
+
+		res |= dev_iw_write_cfg1_bss_var(dev, 0);
+	}
 
 	if (ap->channel == 0) {
 		int chosen = 0;
@@ -4652,8 +4678,8 @@ static int set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 		int retry = 0;
 		int ret = 0;
 
-		dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
-		dev_wlc_ioctl(dev, WLC_SET_SSID, &null_ssid, sizeof(null_ssid));
+		res |= dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
+		res |= dev_wlc_ioctl(dev, WLC_SET_SSID, &null_ssid, sizeof(null_ssid));
 
 auto_channel_retry:
 		request.count = htod32(0);
@@ -4684,13 +4710,15 @@ get_channel_retry:
 	}
 
 	channel = ap->channel;
-	dev_wlc_ioctl(dev, WLC_SET_CHANNEL, &channel, sizeof(channel));
+	res |= dev_wlc_ioctl(dev, WLC_SET_CHANNEL, &channel, sizeof(channel));
 
-	updown = 0;
-	dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
+	if (!ap_cfg_running) {
+		updown = 0;
+		res |= dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown));
+	}
 
 	max_assoc = ap->max_scb;
-	dev_wlc_intvar_set(dev, "maxassoc", max_assoc);
+	res |= dev_wlc_intvar_set(dev, "maxassoc", max_assoc);
 
 	ap_ssid.SSID_len = strlen(ap->ssid);
 	strncpy(ap_ssid.SSID, ap->ssid, ap_ssid.SSID_len);
@@ -4698,10 +4726,15 @@ get_channel_retry:
 	iolen = wl_bssiovar_mkbuf("ssid", bsscfg_index, (char *)(&ap_ssid),
 		ap_ssid.SSID_len+4, buf, sizeof(buf), &mkvar_err);
 	ASSERT(iolen);
-	res = dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
+	res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
 
-	kernel_thread(thr_wait_for_2nd_eth_dev, 0, 0);
-
+	if (!ap_cfg_running) {
+		kernel_thread(thr_wait_for_2nd_eth_dev, 0, 0);
+	} else {
+		WL_TRACE(("%s: Configure security & restart AP bss \n", __FUNCTION__));
+		res |= wl_iw_set_ap_security(dev, &my_ap);
+		res |= dev_iw_write_cfg1_bss_var(dev, 1);
+	}
 	return res;
 }
 
@@ -4986,6 +5019,14 @@ static int iwpriv_fw_reload(struct net_device *dev,
 			goto exit_proc;
 		}
 
+		if (strstr(fwstr, "apsta") != NULL) {
+			WL_SOFTAP(("GOT APSTA FIRMWARE\n"));
+			ap_fw_loaded = TRUE;
+		} else {
+			WL_SOFTAP(("GOT STA FIRMWARE\n"));
+			ap_fw_loaded = FALSE;
+		}
+
 		WL_SOFTAP(("SET firmware_path[]=%s , str_p:%p\n", fwstr, fwstr));
 		ret = 0;
 	} else {
@@ -5167,7 +5208,6 @@ int wl_iw_process_private_ascii_cmd(
 		WL_SOFTAP((" AP_CFG \n"));
 
 		ap_mode = 0;
-		ap_cfg_running = TRUE;
 
 		if (init_ap_profile_from_string(cmd_str+PROFILE_OFFSET, &my_ap) != 0) {
 			WL_ERROR(("ERROR: SoftAP CFG prams !\n"));

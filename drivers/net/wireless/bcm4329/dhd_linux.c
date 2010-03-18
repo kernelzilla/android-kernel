@@ -786,10 +786,15 @@ dhd_op_if(dhd_if_t *ifp)
 	}
 
 	if (ret < 0) {
-		if (ifp->net)
+		if (ifp->net) {
 			free_netdev(ifp->net);
+		}
 		dhd->iflist[ifp->idx] = NULL;
 		MFREE(dhd->pub.osh, ifp, sizeof(*ifp));
+#ifdef SOFTAP
+		if (ifp->net == ap_net_dev)
+			ap_net_dev = NULL;     /* NULL SOFTAP global as well */
+#endif /*  SOFTAP */
 	}
 }
 
