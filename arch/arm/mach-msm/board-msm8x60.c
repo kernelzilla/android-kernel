@@ -23,6 +23,7 @@
 #include <linux/io.h>
 
 #include <linux/i2c.h>
+#include <linux/smsc911x.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -55,6 +56,35 @@ static struct platform_device smc91x_device = {
 	.id            = 0,
 	.num_resources = ARRAY_SIZE(smc91x_resources),
 	.resource      = smc91x_resources,
+};
+
+static struct resource smsc911x_resources[] = {
+	[0] = {
+		.flags = IORESOURCE_MEM,
+		.start = 0x1b800000,
+		.end   = 0x1b8000ff
+	},
+	[1] = {
+		.flags = IORESOURCE_IRQ,
+		.start = TLMM_SCSS_DIR_CONN_IRQ_0,
+		.end   = TLMM_SCSS_DIR_CONN_IRQ_0
+	},
+};
+
+static struct smsc911x_platform_config smsc911x_config = {
+	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+	.irq_type     = SMSC911X_IRQ_TYPE_PUSH_PULL,
+	.flags        = SMSC911X_USE_16BIT
+};
+
+static struct platform_device smsc911x_device = {
+	.name          = "smsc911x",
+	.id            = 0,
+	.num_resources = ARRAY_SIZE(smsc911x_resources),
+	.resource      = smsc911x_resources,
+	.dev           = {
+		.platform_data = &smsc911x_config
+	}
 };
 
 #ifdef CONFIG_I2C_QUP
@@ -92,8 +122,17 @@ static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 };
 #endif
 
-static struct platform_device *devices[] __initdata = {
+static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
+#ifdef CONFIG_I2C_QUP
+	&msm_gsbi3_qup_i2c_device,
+	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi9_qup_i2c_device,
+#endif
+};
+
+static struct platform_device *surf_devices[] __initdata = {
+	&smsc911x_device,
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
@@ -168,6 +207,15 @@ static void __init msm8x60_init_ebi2(void)
 		writel(ebi2_cfg, ebi2_cfg_ptr);
 		iounmap(ebi2_cfg_ptr);
 	}
+
+	if (machine_is_msm8x60_surf()) {
+		ebi2_cfg_ptr = ioremap_nocache(0x1a110000, sizeof(uint32_t));
+		if (ebi2_cfg_ptr != 0) {
+			/* EBI2_XMEM_CFG:PWRSAVE_MODE off */
+			writel(0UL, ebi2_cfg_ptr);
+			iounmap(ebi2_cfg_ptr);
+		}
+	}
 }
 
 static void __init msm8x60_configure_smc91x(void)
@@ -190,19 +238,69 @@ static void __init msm8x60_configure_smc91x(void)
 	}
 }
 
+struct msm8x60_tlmm_cfg_struct {
+	unsigned gpio;
+	u32      flags;
+};
+
+static struct msm8x60_tlmm_cfg_struct msm8x60_tlmm_cfgs[] = {
+	{ 40, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(2) | MSM_GPIO_PULL_PULL_UP},
+	{123, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{124, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{125, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{126, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{127, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{128, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{129, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{130, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{135, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{136, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{137, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{138, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{139, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{140, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{141, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{142, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{143, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{144, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{145, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{146, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{147, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{148, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{149, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{150, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{151, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	{157, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+};
+
 static void __init msm8x60_init_tlmm(void)
 {
+	unsigned n;
+
 	if (machine_is_msm8x60_rumi3())
-		msm_gpio_install_direct_irq(NR_MSM_IRQS + 40, 0);
+		msm_gpio_install_direct_irq(40, 0);
+	else if (machine_is_msm8x60_surf()) {
+		msm_gpio_install_direct_irq(62, 0);
+
+		for (n = 0; n < ARRAY_SIZE(msm8x60_tlmm_cfgs); ++n)
+			msm_gpio_write_cfg(msm8x60_tlmm_cfgs[n].gpio,
+					   msm8x60_tlmm_cfgs[n].flags);
+	}
 }
 
 static void __init msm8x60_init(void)
 {
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
-	msm8x60_configure_smc91x();
 	msm8x60_init_buses();
-	platform_add_devices(devices, ARRAY_SIZE(devices));
+	if (machine_is_msm8x60_surf())
+		platform_add_devices(surf_devices,
+				     ARRAY_SIZE(surf_devices));
+	else {
+		msm8x60_configure_smc91x();
+		platform_add_devices(rumi_sim_devices,
+				     ARRAY_SIZE(rumi_sim_devices));
+	}
 }
 
 MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
