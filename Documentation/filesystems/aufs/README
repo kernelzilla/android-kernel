@@ -127,7 +127,7 @@ words, the aufs2-standalone tree is generated from aufs2-2.6 tree by,
 - generate a ChangeLog file from git-log.
 - commit the files newly and no log messages. this is not git-pull.
 
-Both of aufs2-2.6 and aufs2-standalone trees have a branch whose name is
+Both of aufs2-2.6 and aufs2-standalone trees have branches whose name is
 in form of "aufs2-xx" where "xx" represents the linux kernel version,
 "linux-2.6.xx".
 
@@ -137,14 +137,14 @@ $ git clone --reference /your/linux-2.6/git/tree \
 	aufs2-2.6.git
 - if you don't have linux-2.6 GIT tree, then remove "--reference ..."
 $ cd aufs2-2.6.git
-$ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+$ git checkout origin/aufs2	# for instance, aufs2-27 for linux-2.6.27,
 				# aufs2 (no -xx) for the latest -rc version.
 
 o aufs2-standalone tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
 	aufs2-standalone.git
 $ cd aufs2-standalone.git
-$ git checkout origin/aufs2-xx	# for instance, aufs2-27 for linux-2.6.27
+$ git checkout origin/aufs2	# for instance, aufs2-27 for linux-2.6.27,
 				# aufs2 (no -xx) for the latest -rc version.
 
 o aufs2-util tree
@@ -279,6 +279,9 @@ not affected, instead the same named file will be newly created under
 the one under /tmp/rw. This is called the file based Copy on Write
 (COW) method.
 Aufs mount options are described in aufs.5.
+If you run chroot or something and make your aufs as a root directory,
+then you need to customize the shutdown script. See the aufs manual in
+detail.
 
 Additionally, there are some sample usages of aufs which are a
 diskless system with network booting, and LiveCD over NFS.
