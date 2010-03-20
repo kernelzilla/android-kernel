@@ -189,7 +189,15 @@ static inline void __raw_remote_dek_spin_unlock(raw_remote_spinlock_t *lock)
 	lock->dek.self_lock = DEK_LOCK_YIELD;
 }
 
+#ifdef CONFIG_MSM_SMD
 int _remote_spin_lock_init(remote_spinlock_id_t, _remote_spinlock_t *lock);
+#else
+static inline
+int _remote_spin_lock_init(remote_spinlock_id_t id, _remote_spinlock_t *lock)
+{
+	return -EINVAL;
+}
+#endif
 
 #if defined(CONFIG_MSM_REMOTE_SPINLOCK_DEKKERS)
 /* Use Dekker's algorithm when LDREX/STREX and SWP are unavailable for
@@ -221,9 +229,23 @@ struct remote_mutex_id {
 	uint32_t		delay_us;
 };
 
+#ifdef CONFIG_MSM_SMD
 int _remote_mutex_init(struct remote_mutex_id *id, _remote_mutex_t *lock);
 void _remote_mutex_lock(_remote_mutex_t *lock);
 void _remote_mutex_unlock(_remote_mutex_t *lock);
 int _remote_mutex_trylock(_remote_mutex_t *lock);
+#else
+static inline
+int _remote_mutex_init(struct remote_mutex_id *id, _remote_mutex_t *lock)
+{
+	return -EINVAL;
+}
+static inline void _remote_mutex_lock(_remote_mutex_t *lock) {}
+static inline void _remote_mutex_unlock(_remote_mutex_t *lock) {}
+static inline int _remote_mutex_trylock(_remote_mutex_t *lock)
+{
+	return 0;
+}
+#endif
 
 #endif /* __ASM__ARCH_QC_REMOTE_SPINLOCK_H */
