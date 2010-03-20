@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,18 +29,12 @@
 #include <mach/board.h>
 
 /* SSBI 2.0 controller registers */
-#define SSBI2_CTL			0x0000
-#define SSBI2_RESET			0x0004
 #define SSBI2_CMD			0x0008
 #define SSBI2_RD			0x0010
 #define SSBI2_STATUS			0x0014
-#define SSBI2_PRIORITIES		0x0018
 #define SSBI2_MODE2			0x001C
 
 /* SSBI_CMD fields */
-#define SSBI_CMD_SEND_TERM_SYM		(0x01 << 27)
-#define SSBI_CMD_WAKEUP_SLAVE		(0x01 << 26)
-#define SSBI_CMD_USE_ENABLE		(0x01 << 25)
 #define SSBI_CMD_RDWRN			(0x01 << 24)
 #define SSBI_CMD_REG_ADDR_SHFT		(0x10)
 #define SSBI_CMD_REG_ADDR_MASK		(0xFF << SSBI_CMD_REG_ADDR_SHFT)
@@ -55,7 +49,6 @@
 #define SSBI_STATUS_MCHN_BUSY		0x01
 
 /* SSBI_RD fields */
-#define SSBI_RD_USE_ENABLE		0x02000000
 #define SSBI_RD_RDWRN			0x01000000
 #define SSBI_RD_REG_ADDR_SHFT		0x10
 #define SSBI_RD_REG_ADDR_MASK		(0xFF << SSBI_RD_REG_ADDR_SHFT)
@@ -85,10 +78,38 @@
 	((((AD) & 0xFF) << SSBI_CMD_REG_ADDR_SHFT) | \
 	 (((DT) & 0xFF) << SSBI_CMD_REG_DATA_SHFT))
 
+/* SSBI PMIC Arbiter command registers */
+#define SSBI_PA_CMD			0x0000
+#define SSBI_PA_RD_STATUS		0x0004
+
+/* SSBI_PA_CMD fields */
+#define SSBI_PA_CMD_RDWRN		(0x01 << 24)
+#define SSBI_PA_CMD_REG_ADDR_14_8_SHFT	(0x10)
+#define SSBI_PA_CMD_REG_ADDR_14_8_MASK	(0x7F << SSBI_PA_CMD_REG_ADDR_14_8_SHFT)
+#define SSBI_PA_CMD_REG_ADDR_7_0_SHFT	(0x08)
+#define SSBI_PA_CMD_REG_ADDR_7_0_MASK	(0xFF << SSBI_PA_CMD_REG_ADDR_7_0_SHFT)
+#define SSBI_PA_CMD_REG_DATA_SHFT	(0x00)
+#define SSBI_PA_CMD_REG_DATA_MASK	(0xFF << SSBI_PA_CMD_REG_DATA_SHFT)
+
+#define SSBI_PA_CMD_REG_DATA(DT) \
+	(((DT) << SSBI_PA_CMD_REG_DATA_SHFT) & SSBI_PA_CMD_REG_DATA_MASK)
+
+#define SSBI_PA_CMD_REG_ADDR(AD) \
+	(((AD) << SSBI_PA_CMD_REG_ADDR_7_0_SHFT) & \
+	(SSBI_PA_CMD_REG_ADDR_14_8_MASK|SSBI_PA_CMD_REG_ADDR_7_0_MASK))
+
+/* SSBI_PA_RD_STATUS fields */
+#define SSBI_PA_RD_STATUS_TRANS_DONE	(0x01 << 27)
+#define SSBI_PA_RD_STATUS_TRANS_DENIED	(0x01 << 26)
+#define SSBI_PA_RD_STATUS_REG_DATA_SHFT	(0x00)
+#define SSBI_PA_RD_STATUS_REG_DATA_MASK	(0xFF << SSBI_PA_CMD_REG_DATA_SHFT)
+#define SSBI_PA_RD_STATUS_TRANS_COMPLETE \
+	(SSBI_PA_RD_STATUS_TRANS_DONE|SSBI_PA_RD_STATUS_TRANS_DENIED)
+
 #define SSBI_MSM_NAME			"i2c_ssbi"
 
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("0.2");
+MODULE_VERSION("2.0");
 MODULE_ALIAS("platform:i2c_ssbi");
 
 struct i2c_ssbi_dev {
@@ -98,7 +119,11 @@ struct i2c_ssbi_dev {
 	unsigned long		 mem_phys_addr;
 	size_t			 mem_size;
 	bool                     suspended;
+	bool			 use_rlock;
 	remote_spinlock_t	 rspin_lock;
+	enum msm_ssbi_controller_type controller_type;
+	int (*read)(struct i2c_ssbi_dev *, struct i2c_msg *);
+	int (*write)(struct i2c_ssbi_dev *, struct i2c_msg *);
 };
 
 static inline int
@@ -160,11 +185,12 @@ i2c_ssbi_read_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
 	u16 len = msg->len;
 	u16 addr = msg->addr;
 	u32 read_cmd = SSBI_CMD_READ(addr);
-	u32 mode2 = readl(ssbi->base + SSBI2_MODE2);
 
-	if (mode2 & SSBI_MODE2_SSBI2_MODE)
+	if (ssbi->controller_type == MSM_SBI_CTRL_SSBI2) {
+		u32 mode2 = readl(ssbi->base + SSBI2_MODE2);
 		writel(SSBI_MODE2_REG_ADDR_15_8(mode2, addr),
 				ssbi->base + SSBI2_MODE2);
+	}
 
 	while (len) {
 		ret = i2c_ssbi_poll_for_device_ready(ssbi);
@@ -181,7 +207,6 @@ i2c_ssbi_read_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
 		len--;
 	}
 
-
 read_failed:
 	return ret;
 }
@@ -193,11 +218,12 @@ i2c_ssbi_write_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
 	u8 *buf = msg->buf;
 	u16 len = msg->len;
 	u16 addr = msg->addr;
-	u32 mode2 = readl(ssbi->base + SSBI2_MODE2);
 
-	if (mode2 & SSBI_MODE2_SSBI2_MODE)
+	if (ssbi->controller_type == MSM_SBI_CTRL_SSBI2) {
+		u32 mode2 = readl(ssbi->base + SSBI2_MODE2);
 		writel(SSBI_MODE2_REG_ADDR_15_8(mode2, addr),
 				ssbi->base + SSBI2_MODE2);
+	}
 
 	while (len) {
 		ret = i2c_ssbi_poll_for_device_ready(ssbi);
@@ -213,6 +239,82 @@ i2c_ssbi_write_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
 		len--;
 	}
 
+write_failed:
+	return ret;
+}
+
+static inline int
+i2c_ssbi_pa_transfer(struct i2c_ssbi_dev *ssbi, u32 cmd, u8 *data)
+{
+	u32 rd_status;
+	u32 timeout = SSBI_TIMEOUT_US;
+
+	writel(cmd, ssbi->base + SSBI_PA_CMD);
+	rd_status = readl(ssbi->base + SSBI_PA_RD_STATUS);
+
+	while ((rd_status & (SSBI_PA_RD_STATUS_TRANS_COMPLETE)) == 0) {
+
+		if (--timeout == 0) {
+			dev_err(ssbi->dev, "%s: timeout, status %x\n",
+					__func__, rd_status);
+			return -ETIMEDOUT;
+		}
+		udelay(1);
+		rd_status = readl(ssbi->base + SSBI_PA_RD_STATUS);
+	}
+
+	if (rd_status & SSBI_PA_RD_STATUS_TRANS_DENIED) {
+		dev_err(ssbi->dev, "%s: transaction denied, status %x\n",
+				__func__, rd_status);
+		return -EPERM;
+	}
+
+	if (data)
+		*data = (rd_status & SSBI_PA_RD_STATUS_REG_DATA_MASK) >>
+					SSBI_PA_CMD_REG_DATA_SHFT;
+	return 0;
+}
+
+static int
+i2c_ssbi_pa_read_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
+{
+	int ret = 0;
+	u8  data;
+	u8 *buf = msg->buf;
+	u16 len = msg->len;
+	u32 read_cmd = (SSBI_PA_CMD_RDWRN | SSBI_PA_CMD_REG_ADDR(msg->addr));
+
+	while (len) {
+
+		ret = i2c_ssbi_pa_transfer(ssbi, read_cmd, &data);
+		if (ret)
+			goto read_failed;
+
+		*buf++ = data;
+		len--;
+	}
+
+read_failed:
+	return ret;
+}
+
+static int
+i2c_ssbi_pa_write_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
+{
+	int ret = 0;
+	u8 *buf = msg->buf;
+	u16 len = msg->len;
+	u32 write_cmd = SSBI_PA_CMD_REG_ADDR(msg->addr);
+
+	while (len) {
+
+		write_cmd |= (*buf++ & SSBI_PA_CMD_REG_DATA_MASK);
+
+		ret = i2c_ssbi_pa_transfer(ssbi, write_cmd, NULL);
+		if (ret)
+			goto write_failed;
+		len--;
+	}
 
 write_failed:
 	return ret;
@@ -223,20 +325,22 @@ i2c_ssbi_transfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
 	int ret = 0;
 	int rem = num;
-	unsigned long flags;
+	unsigned long flags = 0;
 	struct i2c_ssbi_dev *ssbi = i2c_get_adapdata(adap);
 
 	if (ssbi->suspended)
 		return -EBUSY;
 
-	remote_spin_lock_irqsave(&ssbi->rspin_lock, flags);
+	if (ssbi->use_rlock)
+		remote_spin_lock_irqsave(&ssbi->rspin_lock, flags);
+
 	while (rem) {
 		if (msgs->flags & I2C_M_RD) {
-			ret = i2c_ssbi_read_bytes(ssbi, msgs);
+			ret = ssbi->read(ssbi, msgs);
 			if (ret)
 				goto transfer_failed;
 		} else {
-			ret = i2c_ssbi_write_bytes(ssbi, msgs);
+			ret = ssbi->write(ssbi, msgs);
 			if (ret)
 				goto transfer_failed;
 		}
@@ -244,12 +348,15 @@ i2c_ssbi_transfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		msgs++;
 		rem--;
 	}
-	remote_spin_unlock_irqrestore(&ssbi->rspin_lock, flags);
+
+	if (ssbi->use_rlock)
+		remote_spin_unlock_irqrestore(&ssbi->rspin_lock, flags);
 
 	return num;
 
 transfer_failed:
-	remote_spin_unlock_irqrestore(&ssbi->rspin_lock, flags);
+	if (ssbi->use_rlock)
+		remote_spin_unlock_irqrestore(&ssbi->rspin_lock, flags);
 	return ret;
 }
 
@@ -268,7 +375,7 @@ static int __init i2c_ssbi_probe(struct platform_device *pdev)
 	int			 ret = 0;
 	struct resource		*ssbi_res;
 	struct i2c_ssbi_dev	*ssbi;
-	struct msm_i2c_platform_data *pdata;
+	struct msm_ssbi_platform_data *pdata;
 
 	pdata = pdev->dev.platform_data;
 	if (!pdata) {
@@ -293,7 +400,7 @@ static int __init i2c_ssbi_probe(struct platform_device *pdev)
 	}
 
 	ssbi->mem_phys_addr = ssbi_res->start;
-	ssbi->mem_size = resource_size(ssbi_res);;
+	ssbi->mem_size = resource_size(ssbi_res);
 	if (!request_mem_region(ssbi->mem_phys_addr, ssbi->mem_size,
 				SSBI_MSM_NAME)) {
 		ret = -ENXIO;
@@ -311,16 +418,28 @@ static int __init i2c_ssbi_probe(struct platform_device *pdev)
 	ssbi->suspended = 0;
 	platform_set_drvdata(pdev, ssbi);
 
+	ssbi->controller_type = pdata->controller_type;
+	if (ssbi->controller_type == MSM_SBI_CTRL_PMIC_ARBITER) {
+		ssbi->read = i2c_ssbi_pa_read_bytes;
+		ssbi->write = i2c_ssbi_pa_write_bytes;
+	} else {
+		ssbi->read = i2c_ssbi_read_bytes;
+		ssbi->write = i2c_ssbi_write_bytes;
+	}
+
 	i2c_set_adapdata(&ssbi->adapter, ssbi);
 	ssbi->adapter.algo = &msm_i2c_algo;
 	strlcpy(ssbi->adapter.name,
 		"MSM SSBI adapter",
 		sizeof(ssbi->adapter.name));
 
-	ret = remote_spin_lock_init(&ssbi->rspin_lock, pdata->rsl_id);
-	if (ret) {
-		dev_err(&pdev->dev, "remote spinlock init failed\n");
-		goto err_remote_spinlock_init_failed;
+	if (pdata->rsl_id) {
+		ret = remote_spin_lock_init(&ssbi->rspin_lock, pdata->rsl_id);
+		if (ret) {
+			dev_err(&pdev->dev, "remote spinlock init failed\n");
+			goto err_remote_spinlock_init_failed;
+		}
+		ssbi->use_rlock = 1;
 	}
 
 	ssbi->adapter.nr = pdev->id;
