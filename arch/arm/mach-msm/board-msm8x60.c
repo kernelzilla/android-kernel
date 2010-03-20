@@ -135,7 +135,7 @@ static void __init msm8x60_init_irq(void)
 	/* RUMI does not adhere to GIC spec by enabling STIs by default.
 	 * Enable/clear is supposed to be RO for STIs, but is RW on RUMI.
 	 */
-	if (machine_is_msm8x60_rumi3())
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_rumi3())
 		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
 
 	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
@@ -219,6 +219,17 @@ MACHINE_END
 MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
 #ifdef CONFIG_MSM_DEBUG_UART
 	.phys_io  = MSM_DEBUG_UART_PHYS,
+	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+#endif
+	.map_io = msm8x60_map_io,
+	.init_irq = msm8x60_init_irq,
+	.init_machine = msm8x60_init,
+	.timer = &msm_timer,
+MACHINE_END
+
+MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+#ifdef CONFIG_MSM_DEBUG_UART
+	.phys_io = MSM_DEBUG_UART_PHYS
 	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
 	.map_io = msm8x60_map_io,
