@@ -140,46 +140,51 @@ unsigned int msm_dmov_build_crci_mask(int n, ...);
  */
 
 #ifdef CONFIG_ARCH_MSM8X60
-#define DMOV_GP_CHAN          16
+#define DMOV_GP_CHAN           15
 
-#define DMOV_NAND_CHAN        7
-#define DMOV_NAND_CRCI_CMD    15
-#define DMOV_NAND_CRCI_DATA   3
+#define DMOV_NAND_CHAN         17
+#define DMOV_NAND_CHAN_MODEM   26
+#define DMOV_NAND_CHAN_Q6      27
+#define DMOV_NAND_CRCI_CMD     15
+#define DMOV_NAND_CRCI_DATA    3
 
-#define DMOV_CE_IN_CHAN       5
-#define DMOV_CE_IN_CRCI       1
+#define DMOV_CE_IN_CHAN        5
+#define DMOV_CE_IN_CHAN_TZ     11
+#define DMOV_CE_IN_CRCI        1
 
-#define DMOV_CE_OUT_CHAN      6
-#define DMOV_CE_OUT_CRCI      2
+#define DMOV_CE_OUT_CHAN       6
+#define DMOV_CE_OUT_CHAN_TZ    12
+#define DMOV_CE_OUT_CRCI       2
 
-#define DMOV_SDC1_CHAN        8
-#define DMOV_SDC1_CRCI        1
+#define DMOV_SDC1_CHAN         18
+#define DMOV_SDC1_CRCI         1
 
-#define DMOV_SDC2_CHAN        8
-#define DMOV_SDC2_CRCI        4
+#define DMOV_SDC2_CHAN         19
+#define DMOV_SDC2_CRCI         4
 
-#define DMOV_SDC3_CHAN        8
-#define DMOV_SDC3_CRCI        12
+#define DMOV_SDC3_CHAN         20
+#define DMOV_SDC3_CRCI         2
 
-#define DMOV_SDC4_CHAN        8
-#define DMOV_SDC4_CRCI        13
+#define DMOV_SDC4_CHAN         21
+#define DMOV_SDC4_CRCI         5
 
-#define DMOV_TSIF_CHAN        10
-#define DMOV_TSIF_CRCI        6
+#define DMOV_SDC5_CHAN         21
+#define DMOV_SDC5_CRCI         14
 
-#define DMOV_USB_CHAN         11
+#define DMOV_TSIF_CHAN         4
+#define DMOV_TSIF_CRCI         6
 
-#define DMOV_HSUART1_TX_CHAN   4
-#define DMOV_HSUART1_TX_CRCI   8
+#define DMOV_HSUART1_TX_CHAN   7
+#define DMOV_HSUART1_TX_CRCI   11
 
-#define DMOV_HSUART1_RX_CHAN   9
-#define DMOV_HSUART1_RX_CRCI   9
+#define DMOV_HSUART1_RX_CHAN   7
+#define DMOV_HSUART1_RX_CRCI   12
 
-#define DMOV_HSUART2_TX_CHAN   4
-#define DMOV_HSUART2_TX_CRCI   14
+#define DMOV_HSUART2_TX_CHAN   8
+#define DMOV_HSUART2_TX_CRCI   13
 
-#define DMOV_HSUART2_RX_CHAN   11
-#define DMOV_HSUART2_RX_CRCI   15
+#define DMOV_HSUART2_RX_CHAN   8
+#define DMOV_HSUART2_RX_CRCI   14
 #else
 #define DMOV_GP_CHAN          4
 
