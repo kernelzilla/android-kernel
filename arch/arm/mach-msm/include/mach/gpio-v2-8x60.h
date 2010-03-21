@@ -32,6 +32,8 @@
 
 #define NR_MSM_GPIOS 173
 
+#define MSM_GPIO_OE       (1 << 9)
+
 #define MSM_GPIO_DRV_2MA  (0 << 6)
 #define MSM_GPIO_DRV_4MA  (1 << 6)
 #define MSM_GPIO_DRV_6MA  (2 << 6)
