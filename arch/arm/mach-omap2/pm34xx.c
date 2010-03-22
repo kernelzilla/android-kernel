@@ -78,6 +78,8 @@ struct power_state {
 	struct list_head node;
 };
 
+static suspend_state_t suspend_state;
+
 static LIST_HEAD(pwrst_list);
 
 static void (*_omap_sram_idle)(u32 *addr, int save_state);
@@ -365,6 +367,9 @@ static void restore_table_entry(void)
 	restore_control_register(control_reg_value);
 }
 
+extern int omap_wdt_suspend(void);
+extern int omap_wdt_resume(void);
+
 void omap_sram_idle(void)
 {
 	/* Variable to tell what needs to be saved and restored
@@ -383,6 +388,10 @@ void omap_sram_idle(void)
 
 	if (!_omap_sram_idle)
 		return;
+
+	/* Disable watchdog when going into suspend */
+	if (regset_save_on_suspend)
+		omap_wdt_suspend();
 
 	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
 	pwrdm_clear_all_prev_pwrst(neon_pwrdm);
@@ -566,6 +575,9 @@ void omap_sram_idle(void)
 
 	pwrdm_post_transition();
 
+	if (regset_save_on_suspend)
+		omap_wdt_resume();
+
 	omap2_clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
 }
 
@@ -642,7 +654,6 @@ out:
 }
 
 #ifdef CONFIG_SUSPEND
-static suspend_state_t suspend_state;
 
 static void omap2_pm_wakeup_on_timer(u32 seconds)
 {

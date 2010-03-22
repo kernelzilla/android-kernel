@@ -468,9 +468,9 @@ static int __devexit omap_wdt_remove(struct platform_device *pdev)
  * may not play well enough with NOWAYOUT...
  */
 
-static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
+int omap_wdt_suspend(void)
 {
-	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 
 	if (wdev->omap_wdt_users) {
 		wdev->jiffies_exp -= jiffies - wdev->jiffies_start;
@@ -481,9 +481,9 @@ static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
 	return 0;
 }
 
-static int omap_wdt_resume(struct platform_device *pdev)
+int omap_wdt_resume(void)
 {
-	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 
 	if (wdev->omap_wdt_users) {
 		mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
@@ -502,8 +502,8 @@ static struct platform_driver omap_wdt_driver = {
 	.probe		= omap_wdt_probe,
 	.remove		= __devexit_p(omap_wdt_remove),
 	.shutdown	= omap_wdt_shutdown,
-	.suspend	= omap_wdt_suspend,
-	.resume		= omap_wdt_resume,
+//	.suspend	= omap_wdt_suspend,
+//	.resume		= omap_wdt_resume,
 	.driver		= {
 		.owner	= THIS_MODULE,
 		.name	= "omap_wdt",
