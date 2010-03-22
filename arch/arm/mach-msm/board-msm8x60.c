@@ -278,7 +278,7 @@ static void __init msm8x60_init_tlmm(void)
 	unsigned n;
 
 	if (machine_is_msm8x60_rumi3())
-		msm_gpio_install_direct_irq(40, 0);
+		msm_gpio_install_direct_irq(0, 0);
 	else if (machine_is_msm8x60_surf()) {
 		msm_gpio_install_direct_irq(62, 0);
 
