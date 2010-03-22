@@ -128,8 +128,9 @@ words, the aufs2-standalone tree is generated from aufs2-2.6 tree by,
 - commit the files newly and no log messages. this is not git-pull.
 
 Both of aufs2-2.6 and aufs2-standalone trees have branches whose name is
-in form of "aufs2-xx" where "xx" represents the linux kernel version,
-"linux-2.6.xx".
+in form of "aufs2" or "aufs2-xx" where "xx" represents the linux kernel
+version, "linux-2.6.xx". For instance, "aufs2" (no -xx) for the latest
+-rc version, and "aufs2-27" for linux-2.6.27,
 
 o aufs2-2.6 tree
 $ git clone --reference /your/linux-2.6/git/tree \
@@ -137,15 +138,13 @@ $ git clone --reference /your/linux-2.6/git/tree \
 	aufs2-2.6.git
 - if you don't have linux-2.6 GIT tree, then remove "--reference ..."
 $ cd aufs2-2.6.git
-$ git checkout origin/aufs2	# for instance, aufs2-27 for linux-2.6.27,
-				# aufs2 (no -xx) for the latest -rc version.
+$ git checkout origin/aufs2-27
 
 o aufs2-standalone tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-standalone.git \
 	aufs2-standalone.git
 $ cd aufs2-standalone.git
-$ git checkout origin/aufs2	# for instance, aufs2-27 for linux-2.6.27,
-				# aufs2 (no -xx) for the latest -rc version.
+$ git checkout origin/aufs2-27
 
 o aufs2-util tree
 $ git clone http://git.c3sl.ufpr.br/pub/scm/aufs/aufs2-util.git \
