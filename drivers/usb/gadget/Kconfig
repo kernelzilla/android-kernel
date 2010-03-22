@@ -799,52 +799,92 @@ config USB_G_PRINTER
 	  which includes sample code for accessing the device file.
 
 config USB_ANDROID
-	boolean "Android Gadget"
-	depends on SWITCH
+	tristate "Android Gadget"
 	help
-	  The Android gadget driver supports multiple USB functions.
-	  The functions can be configured via a board file and may be
-	  enabled and disabled dynamically.
+	  The Android gadget provides mass storage and adb transport.
 
-config USB_ANDROID_ACM
-	boolean "Android gadget ACM serial function"
-	depends on USB_ANDROID
-	help
-	  Provides ACM serial function for android gadget driver.
-
-config USB_ANDROID_ADB
-	boolean "Android gadget adb function"
-	depends on USB_ANDROID
-	help
-	  Provides adb function for android gadget driver.
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_android".
 
 config USB_ANDROID_DIAG
-	boolean "USB MSM7K Diag Function"
+	tristate "diag function driver"
 	depends on USB_ANDROID
+	default n
 	help
-	  Qualcomm diagnostics interface support.
+	  Say "y" to link the driver statically, or "m" to build
+	  as a part of "g_android"
 
-config USB_ANDROID_MASS_STORAGE
-	boolean "Android gadget mass storage function"
-	depends on USB_ANDROID && SWITCH
+config USB_ANDROID_CDC_ECM
+	tristate "cdc ecm function driver"
+	depends on USB_ANDROID
+	default n
 	help
-	  Provides USB mass storage function for android gadget driver.
+	  enabling this option adds CDC-ECM support to the
+	  android gadget.
+	  Say "y" to link the CDC-ECM as a part of android gadget
 
 config USB_ANDROID_RNDIS
-	boolean "Android gadget RNDIS ethernet function"
+	bool "RNDIS function driver"
+	depends on USB_ANDROID
+	default n
+	help
+	  enabling this option adds RNDIS support to the
+	  android gadget.
+
+config USB_ANDROID_RMNET
+	bool "RmNet function driver"
+	depends on USB_ANDROID
+	default n
+	help
+	  Enabling this option adds rmnet support to the
+	  android gadget. Rmnet is an alternative to CDC-ECM
+	  and Windows RNDIS. It uses QUALCOMM MSM Interface
+	  for control transfers. It acts like a bridge between
+	  Host and modem found in MSM chipsets.
+
+config RMNET_SMD_CTL_CHANNEL
+	string "control SMD channel name"
+	depends on USB_ANDROID_RMNET
+	default ""
+	help
+	  Control SMD channel for transferring QMI messages
+
+config RMNET_SMD_DATA_CHANNEL
+	string "Data SMD channel name"
+	depends on USB_ANDROID_RMNET
+	default ""
+	help
+	  Data SMD channel for transferring network data
+
+config USB_F_SERIAL
+	tristate "generic serial function driver"
+	depends on USB_ANDROID
+	default n
+	help
+	  Say "y" to link the driver statically, or "m" to build
+	  as a part of "g_android"
+
+config MODEM_SUPPORT
+	tristate "modem support in generic serial function driver"
+	depends on USB_F_SERIAL
+	default n
+	help
+          This feature enables the modem functionality in the
+	  generic serial.
+	  adds interrupt endpoint support to send modem notifications
+	  to host.
+	  adds CDC descriptors to enumerate the generic serial as MODEM.
+	  adds CDC class requests to configure MODEM line settings.
+	  Say "y" to enable MODEM support in the generic serial driver.
+
+config USB_CSW_HACK
+	boolean "USB Mass storage csw hack Feature"
 	depends on USB_ANDROID
 	help
-	  Provides RNDIS ethernet function for android gadget driver.
+	 This csw hack feature is for increasing the performance of the mass
+	 storage
 
-config USB_ANDROID_RNDIS_WCEIS
-        boolean "Use Windows Internet Sharing Class/SubClass/Protocol"
-        depends on USB_ANDROID_RNDIS
-        help
-         Causes the driver to look like a Windows-compatible Internet
-         Sharing device, so Windows auto-detects it.
-
-         If you enable this option, the device is no longer CDC ethernet
-         compatible.
+	default y
 
 config USB_CDC_COMPOSITE
 	tristate "CDC Composite Device (Ethernet and ACM)"

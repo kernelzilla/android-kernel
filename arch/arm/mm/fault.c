@@ -484,7 +484,7 @@ do_imprecise_ext(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 		      : : "r" (0));
 #endif
 #ifdef CONFIG_ARCH_MSM_SCORPION
-	pr_info("%s: TCSR_SPARE2 = 0x%.8x\n", __func__, readl(MSM_TCSR_SPARE2));
+	/* pr_info("%s: TCSR_SPARE2 = 0x%.8x\n", __func__, readl(MSM_TCSR_SPARE2)); */
 #endif
 	return 1;
 }

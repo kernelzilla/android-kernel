@@ -594,6 +594,13 @@ config RTC_DRV_AB3100
 
 comment "on-CPU RTC drivers"
 
+config RTC_DRV_MSM
+	tristate "RTC on Qualcomm Chipsets"
+	depends on ARCH_MSM
+	default y
+	help
+	  RTC driver for Qualcomm chipsets
+
 config RTC_DRV_MSM7X00A
 	tristate "MSM7X00A"
 	depends on ARCH_MSM

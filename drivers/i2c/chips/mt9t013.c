@@ -34,6 +34,7 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/vreg.h>
 #include <mach/board.h>
+#include <mach/clk.h>
 #include <linux/mt9t013.h> /* define ioctls */
 
 
@@ -440,7 +441,6 @@ static int clk_select(int internal)
 	printk(KERN_INFO "mt9t013: clk select %d\n", internal);
 	CLK_GET(vfe_clk);
 	if (vfe_clk != NULL) {
-		extern int clk_set_flags(struct clk *clk, unsigned long flags);
 		rc = clk_set_flags(vfe_clk, 0x00000100 << internal);
 		if (!rc && internal) rc = msm_camio_vfe_clk_enable();
 	}
@@ -456,9 +456,9 @@ static void mt9t013_sensor_init(void)
 
 	/*pull hi reset*/
 	printk(KERN_INFO "mt9t013: mt9t013_register_init\n");
-	ret = gpio_request(cam->sensor_reset, "mt9t013");
+	ret = qcom_gpio_request(cam->sensor_reset, "mt9t013");
 	if (!ret) {
-		gpio_direction_output(cam->sensor_reset, 1);
+		qcom_gpio_direction_output(cam->sensor_reset, 1);
 		printk(KERN_INFO "mt9t013: camera sensor_reset set as 1\n");
 	} else
 		printk(KERN_ERR "mt9t013 error: request gpio %d failed: "
@@ -466,12 +466,12 @@ static void mt9t013_sensor_init(void)
 	mdelay(2);
 
 	/* pull down power down */
-	ret = gpio_request(cam->sensor_pwd, "mt9t013");
+	ret = qcom_gpio_request(cam->sensor_pwd, "mt9t013");
 	if (!ret || ret == -EBUSY)
-		gpio_direction_output(cam->sensor_pwd, 0);
+		qcom_gpio_direction_output(cam->sensor_pwd, 0);
 	else printk(KERN_ERR "mt913t013 error: request gpio %d failed: "
 			"%d\n", cam->sensor_pwd, ret);
-	gpio_free(cam->sensor_pwd);
+	qcom_gpio_free(cam->sensor_pwd);
 
 	/* enable clk */
 	msm_camio_clk_enable(CAMIO_VFE_MDC_CLK);
@@ -492,10 +492,10 @@ static void mt9t013_sensor_init(void)
 	mdelay(2);
 
 	/* reset sensor sequency */
-	gpio_direction_output(cam->sensor_reset, 0);
+	qcom_gpio_direction_output(cam->sensor_reset, 0);
 	mdelay(2);
-	gpio_direction_output(cam->sensor_reset, 1);
-	gpio_free(cam->sensor_reset);
+	qcom_gpio_direction_output(cam->sensor_reset, 1);
+	qcom_gpio_free(cam->sensor_reset);
 	mdelay(2);
 
 	printk(KERN_INFO "mt9t013: camera sensor init sequence done\n");
@@ -818,12 +818,12 @@ static int mt9t013_lens_power(int on)
 {
 	int rc;
 	printk(KERN_INFO "mt9t013: lens power %d\n", on);
-	rc = gpio_request(cam->vcm_pwd, "mt9t013");
+	rc = qcom_gpio_request(cam->vcm_pwd, "mt9t013");
 	if (!rc)
-		gpio_direction_output(cam->vcm_pwd, !on);
+		qcom_gpio_direction_output(cam->vcm_pwd, !on);
 	else printk(KERN_ERR "mt9t013 error: request gpio %d failed:"
 		" %d\n", cam->vcm_pwd, rc);
-	gpio_free(cam->vcm_pwd);
+	qcom_gpio_free(cam->vcm_pwd);
 	return rc;
 }
 

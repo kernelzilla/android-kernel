@@ -23,7 +23,6 @@ struct h2w_platform_data {
 	int h2w_clk;
 	int h2w_data;
 	int debug_uart;
-	int headset_mic_35mm;
 	void (*config_cpld)(int);
 	void (*init_cpld)(void);
 	void (*set_dat)(int);
@@ -39,15 +38,13 @@ struct h2w_platform_data {
 #define BIT_TTY			(1 << 2)
 #define BIT_FM_HEADSET 		(1 << 3)
 #define BIT_FM_SPEAKER		(1 << 4)
-#define BIT_TTY_VCO             (1 << 5)
-#define BIT_TTY_HCO             (1 << 6)
-#define BIT_35MM_HEADSET        (1 << 7)
 
 enum {
 	H2W_NO_DEVICE	= 0,
 	H2W_HTC_HEADSET	= 1,
+/*	H2W_TTY_DEVICE	= 2,*/
 	NORMAL_HEARPHONE= 2,
-	H2W_DEVICE	= 3,
+	H2W_DEVICE		= 3,
 	H2W_USB_CRADLE	= 4,
 	H2W_UART_DEBUG	= 5,
 };
@@ -173,7 +170,4 @@ typedef enum {
 	H2W_KEY_HOLD	 = 8,
 	H2W_NUM_KEYFUNC	 = 9,
 } KEYFUNC;
-
-extern int turn_mic_bias_on(int on);
-
 #endif

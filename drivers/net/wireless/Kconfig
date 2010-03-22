@@ -476,6 +476,14 @@ config MWL8K
 	  To compile this driver as a module, choose M here: the module
 	  will be called mwl8k.  If unsure, say N.
 
+config LIBRA_SDIOIF
+	tristate "Qualcomm libra wlan SDIO driver"
+	depends on MMC_MSM
+	default m
+	---help---
+	  A driver for Qualcomm WLAN SDIO Libra chipset.
+
+
 source "drivers/net/wireless/p54/Kconfig"
 source "drivers/net/wireless/ath/Kconfig"
 source "drivers/net/wireless/ipw2x00/Kconfig"

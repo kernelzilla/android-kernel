@@ -84,6 +84,22 @@ config TPS65010
 	  This driver can also be built as a module.  If so, the module
 	  will be called tps65010.
 
+config PMIC8058
+	tristate "PMIC8058 Power Management chip"
+	depends on I2C && ARCH_MSM7X30
+	default y if I2C && ARCH_MSM7X30
+	select MFD_CORE
+	help
+	  Say yes here for Qualcomm PM8058 chip.
+
+config MARIMBA_TSADC
+	tristate "Support for Marimba Touchscreen ADC"
+	depends on MARIMBA_CORE
+	default y if MARIMBA_CORE
+	help
+	  Say yes here if you want to include support for TSADC in the
+	  Qualcomm Marimba chip.
+
 config MENELAUS
 	bool "Texas Instruments TWL92330/Menelaus PM chip"
 	depends on I2C=y && ARCH_OMAP24XX
@@ -107,6 +123,23 @@ config TWL4030_CORE
 	  boards, providing power management, RTC, GPIO, keypad, a
 	  high speed USB OTG transceiver, an audio codec (on most
 	  versions) and many other features.
+
+config MARIMBA_CORE
+	tristate "Marimba Core"
+	depends on I2C && ARCH_MSM7X30
+	default n
+	help
+	  Enables the Marimba Core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  marimba core.
+
+config MARIMBA_CODEC
+	tristate "Marimba Codec"
+	depends on MARIMBA_CORE
+	default n
+	help
+	 This driver programs Marimba Wideband Codec for input/output of
+	 audio signal.
 
 config TWL4030_POWER
 	bool "Support power resources on TWL4030 family chips"

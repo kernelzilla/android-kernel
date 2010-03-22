@@ -22,6 +22,8 @@
 #include <linux/types.h>
 #include <mach/camera.h>
 
+extern struct mt9d112_reg mt9d112_regs;
+
 enum mt9d112_width {
 	WORD_LEN,
 	BYTE_LEN
@@ -46,7 +48,5 @@ struct mt9d112_reg {
 	const struct mt9d112_i2c_reg_conf *rftbl;
 	uint16_t rftbl_size;
 };
-
-extern struct mt9d112_reg mt9d112_regs;
 
 #endif /* MT9D112_H */

@@ -25,7 +25,6 @@
 #include <linux/delay.h>
 
 #include <mach/msm_smd.h>
-#include <mach/msm_qdsp6_audio.h>
 
 #include "dal.h"
 
@@ -290,15 +289,9 @@ done:
 static LIST_HEAD(dal_channel_list);
 static DEFINE_MUTEX(dal_channel_list_lock);
 
-static struct dal_channel *dal_open_channel(const char *name)
+static struct dal_channel *dal_open_channel(const char *name, uint32_t cpu)
 {
 	struct dal_channel *dch;
-
-	/* quick sanity check to avoid trying to talk to
-	 * some non-DAL channel...
-	 */
-	if (strncmp(name, "DSP_DAL", 7) && strncmp(name, "SMD_DAL", 7))
-		return 0;
 
 	mutex_lock(&dal_channel_list_lock);
 
@@ -320,8 +313,11 @@ static struct dal_channel *dal_open_channel(const char *name)
 
 found_it:
 	if (!dch->sch) {
-		if (smd_open(name, &dch->sch, dch, dal_channel_notify))
+		if (smd_named_open_on_edge(name, cpu, &dch->sch,
+					dch, dal_channel_notify)) {
+			pr_err("smd open failed\n");
 			dch = NULL;
+		}
 		/* FIXME: wait for channel to open before returning */
 		msleep(100);
 	}
@@ -365,7 +361,7 @@ int dal_call_raw(struct dal_client *client,
 		dal_trace_dump(client);
 		pr_err("dal: call timed out. dsp is probably dead.\n");
 		dal_trace_print(hdr, data, data_len, 0);
-		q6audio_dsp_not_responding();
+		BUG();
 	}
 
 	return client->status;
@@ -395,13 +391,7 @@ int dal_call(struct dal_client *client,
 	mutex_lock(&client->write_lock);
 	r = dal_call_raw(client, &hdr, data, data_len, reply, reply_max);
 	mutex_unlock(&client->write_lock);
-#if 0
-	if ((r > 3) && (((uint32_t*) reply)[0] == 0)) {
-		pr_info("dal call OK\n");
-	} else {
-		pr_info("dal call ERROR\n");
-	}
-#endif
+
 	return r;
 }
 
@@ -417,7 +407,7 @@ struct dal_reply_attach {
 };
 
 struct dal_client *dal_attach(uint32_t device_id, const char *name,
-			      dal_event_func_t func, void *cookie)
+			      uint32_t cpu, dal_event_func_t func, void *cookie)
 {
 	struct dal_hdr hdr;
 	struct dal_msg_attach msg;
@@ -427,7 +417,7 @@ struct dal_client *dal_attach(uint32_t device_id, const char *name,
 	unsigned long flags;
 	int r;
 
-	dch = dal_open_channel(name);
+	dch = dal_open_channel(name, cpu);
 	if (!dch)
 		return 0;
 
@@ -530,7 +520,8 @@ int dal_call_f0(struct dal_client *client, uint32_t ddi, uint32_t arg1)
 	return res;
 }
 
-int dal_call_f1(struct dal_client *client, uint32_t ddi, uint32_t arg1, uint32_t arg2)
+int dal_call_f1(struct dal_client *client, uint32_t ddi, uint32_t arg1,
+		uint32_t arg2)
 {
 	uint32_t tmp[2];
 	int res;
@@ -564,6 +555,30 @@ int dal_call_f5(struct dal_client *client, uint32_t ddi, void *ibuf, uint32_t il
 	return res;
 }
 
+int dal_call_f9(struct dal_client *client, uint32_t ddi, void *obuf,
+		uint32_t olen)
+{
+	uint32_t tmp[128];
+	int res;
+
+	if (olen > sizeof(tmp) - 8)
+		return -EINVAL;
+	tmp[0] = olen;
+
+	res = dal_call(client, ddi, 9, tmp, sizeof(uint32_t), tmp,
+		sizeof(tmp));
+
+	if (res >= 4)
+		res = (int)tmp[0];
+
+	if (!res) {
+		if (tmp[1] > olen)
+			return -EIO;
+		memcpy(obuf, &tmp[2], tmp[1]);
+	}
+	return res;
+}
+
 int dal_call_f13(struct dal_client *client, uint32_t ddi, void *ibuf1,
 		 uint32_t ilen1, void *ibuf2, uint32_t ilen2, void *obuf,
 		 uint32_t olen)
@@ -586,7 +601,8 @@ int dal_call_f13(struct dal_client *client, uint32_t ddi, void *ibuf1,
 	param_idx += DIV_ROUND_UP(ilen2, 4);
 
 	tmp[param_idx++] = olen;
-	res = dal_call(client, ddi, 13, tmp, param_idx * 4, tmp, sizeof(tmp));
+	res = dal_call(client, ddi, 13, tmp, param_idx * 4, tmp,
+			sizeof(tmp));
 
 	if (res >= 4)
 		res = (int)tmp[0];
@@ -595,6 +611,44 @@ int dal_call_f13(struct dal_client *client, uint32_t ddi, void *ibuf1,
 		if (tmp[1] > olen)
 			return -EIO;
 		memcpy(obuf, &tmp[2], tmp[1]);
+	}
+	return res;
+}
+int dal_call_f14(struct dal_client *client, uint32_t ddi, void *ibuf,
+		 uint32_t ilen, void *obuf1, uint32_t olen1, void *obuf2,
+		 uint32_t olen2, uint32_t *oalen2)
+{
+	uint32_t tmp[128];
+	int res;
+	int param_idx = 0;
+
+	if (olen1 + olen2 + 8 > DAL_DATA_MAX ||
+		ilen + 12 > DAL_DATA_MAX)
+		return -EINVAL;
+
+	tmp[param_idx] = ilen;
+	param_idx++;
+
+	memcpy(&tmp[param_idx], ibuf, ilen);
+	param_idx += DIV_ROUND_UP(ilen, 4);
+
+	tmp[param_idx++] = olen1;
+	tmp[param_idx++] = olen2;
+	res = dal_call(client, ddi, 14, tmp, param_idx * 4, tmp, sizeof(tmp));
+
+	if (res >= 4)
+		res = (int)tmp[0];
+
+	if (!res) {
+		if (tmp[1] > olen1)
+			return -EIO;
+		param_idx = DIV_ROUND_UP(tmp[1], 4) + 2;
+		if (tmp[param_idx] > olen2)
+			return -EIO;
+
+		memcpy(obuf1, &tmp[2], tmp[1]);
+		memcpy(obuf2, &tmp[param_idx+1], tmp[param_idx]);
+		*oalen2 = tmp[param_idx];
 	}
 	return res;
 }

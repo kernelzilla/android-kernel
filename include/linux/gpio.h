@@ -28,12 +28,12 @@ static inline int gpio_is_valid(int number)
 	return 0;
 }
 
-static inline int gpio_request(unsigned gpio, const char *label)
+static inline int _gpio_request(unsigned gpio, const char *label)
 {
 	return -ENOSYS;
 }
 
-static inline void gpio_free(unsigned gpio)
+static inline void _gpio_free(unsigned gpio)
 {
 	might_sleep();
 
@@ -41,12 +41,12 @@ static inline void gpio_free(unsigned gpio)
 	WARN_ON(1);
 }
 
-static inline int gpio_direction_input(unsigned gpio)
+static inline int _gpio_direction_input(unsigned gpio)
 {
 	return -ENOSYS;
 }
 
-static inline int gpio_direction_output(unsigned gpio, int value)
+static inline int _gpio_direction_output(unsigned gpio, int value)
 {
 	return -ENOSYS;
 }

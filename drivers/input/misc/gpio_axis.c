@@ -1,3 +1,5 @@
+#warning compile out
+#if 0
 /* drivers/input/misc/gpio_axis.c
  *
  * Copyright (C) 2007 Google, Inc.
@@ -189,3 +191,4 @@ err_bad_device_index:
 err_alloc_axis_state_failed:
 	return ret;
 }
+#endif

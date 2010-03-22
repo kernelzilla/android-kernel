@@ -6,7 +6,7 @@
     A U D I O   P R E   P R O C E S S I N G  M E S S A G E S
 
 GENERAL DESCRIPTION
-  This file contains defintions of format blocks of messages
+  This file contains defintions of format blocks of messages 
   that are rcvd by AUDPREPROC Task
 
 REFERENCES
@@ -15,12 +15,12 @@ REFERENCES
 EXTERNALIZED FUNCTIONS
   None
 
-Copyright(c) 1992 - 2008 by QUALCOMM, Incorporated.
+Copyright (c) 1992-2009, Code Aurora Forum. All rights reserved.
 
 This software is licensed under the terms of the GNU General Public
 License version 2, as published by the Free Software Foundation, and
 may be copied, distributed, and modified under those terms.
-
+ 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -50,7 +50,7 @@ Notice that changes are listed in reverse chronological order.
  */
 
 
-#define	AUDPREPROC_MSG_CMD_CFG_DONE_MSG	0x0000
+#define	AUDPREPROC_MSG_CMD_CFG_DONE_MSG	0x0001
 #define	AUDPREPROC_MSG_CMD_CFG_DONE_MSG_LEN	\
 	sizeof(audpreproc_msg_cmd_cfg_done_msg)
 
@@ -72,7 +72,7 @@ typedef struct {
  * Message to indicate particular feature has selected for wrong samp freq
  */
 
-#define	AUDPREPROC_MSG_ERROR_MSG_ID		0x0001
+#define	AUDPREPROC_MSG_ERROR_MSG_ID		0x0002
 #define	AUDPREPROC_MSG_ERROR_MSG_ID_LEN	\
 	sizeof(audpreproc_msg_error_msg_id)
 

@@ -1,28 +1,29 @@
 /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * modification, are permitted provided that the following conditions are
+ * met:
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Code Aurora nor
- *       the names of its contributors may be used to endorse or promote
- *       products derived from this software without specific prior written
- *       permission.
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -45,6 +46,7 @@
 #define VDEC_IOCTL_FREEBUFFERS  _IOW(VDEC_IOCTL_MAGIC, 9, struct vdec_buf_info)
 #define VDEC_IOCTL_GETDECATTRIBUTES   _IOR(VDEC_IOCTL_MAGIC, 10, \
 						struct vdec_dec_attributes)
+#define VDEC_IOCTL_GETVERSION   _IOR(VDEC_IOCTL_MAGIC, 11, struct vdec_version)
 
 enum {
 	VDEC_FRAME_DECODE_OK,
@@ -76,6 +78,11 @@ enum {
 	VDEC_QUEUE_FAILED,
 	VDEC_QUEUE_BADSTATE,
 };
+
+enum {
+	VDEC_COLOR_FORMAT_NV21 = 0x01,
+	VDEC_COLOR_FORMAT_NV21_YAMOTO = 0x02
+   };
 
 struct vdec_input_buf_info {
 	u32 offset;
@@ -118,7 +125,7 @@ struct vdec_config {
 	u32 h264_nal_len_size;
 	u32 postproc_flag;
 	u32 fruc_enable;
-	u32 reserved;
+	u32 color_format;           /* used to set YUV color format */
 };
 
 struct vdec_vc1_panscan_regions {
@@ -161,7 +168,7 @@ struct vdec_frame_info {
 	u32 concealed_macblk_num;	/* number of concealed macro blk */
 	u32 flags;		/* input flags */
 	u32 performance_stats;	/* performance statistics returned by decoder */
-	u32 data3;		/* user data field 3 */
+	u32 data3;              /* user data field 3 */
 };
 
 struct vdec_buf_info {
@@ -225,6 +232,11 @@ struct vdec_dec_attributes {
 	struct vdec_buf_desc output;
 	struct vdec_buf_desc dec_req1;
 	struct vdec_buf_desc dec_req2;
+};
+
+struct vdec_version {
+	u32 major;
+	u32 minor;
 };
 
 #endif /* _MSM_VDEC_H_ */

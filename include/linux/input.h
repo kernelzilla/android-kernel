@@ -597,6 +597,11 @@ struct input_absinfo {
 
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE
+
+/* REVISIT: keys for camera related functions */
+#define KEY_CAMERA_FOCUS	0x210
+#define KEY_CAMERA_SNAPSHOT	0x2fe
+
 #define KEY_MAX			0x2ff
 #define KEY_CNT			(KEY_MAX+1)
 

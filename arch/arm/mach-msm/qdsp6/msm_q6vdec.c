@@ -1,28 +1,18 @@
 /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Code Aurora Forum nor
- *       the names of its contributors may be used to endorse or promote
- *       products derived from this software without specific prior written
- *       permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  *
  */
 
@@ -51,7 +41,7 @@
 #include "dal.h"
 
 #define DALDEVICEID_VDEC_DEVICE		0x02000026
-#define DALDEVICEID_VDEC_PORTNAME	"DSP_DAL_AQ_VID"
+#define DALDEVICEID_VDEC_PORTNAME	"DAL_AQ_VID"
 
 #define VDEC_INTERFACE_VERSION		0x00020000
 
@@ -69,32 +59,7 @@
 #define TRACE(fmt,x...)		do { } while (0)
 #endif
 
-
-static DEFINE_MUTEX(idlecount_lock);
-static int idlecount;
-static struct wake_lock wakelock;
-static struct wake_lock idlelock;
-
-static void prevent_sleep(void)
-{
-	mutex_lock(&idlecount_lock);
-	if (++idlecount == 1) {
-		wake_lock(&idlelock);
-		wake_lock(&wakelock);
-	}
-	mutex_unlock(&idlecount_lock);
-}
-
-static void allow_sleep(void)
-{
-	mutex_lock(&idlecount_lock);
-	if (--idlecount == 0) {
-		wake_unlock(&idlelock);
-		wake_unlock(&wakelock);
-	}
-	mutex_unlock(&idlecount_lock);
-}
-
+#define MAX_SUPPORTED_INSTANCES 2
 
 enum {
 	VDEC_DALRPC_INITIALIZE = DAL_OP_FIRST_DEVICE_API,
@@ -161,6 +126,31 @@ static dev_t vdec_device_no;
 static struct cdev vdec_cdev;
 static int ref_cnt;
 static DEFINE_MUTEX(vdec_ref_lock);
+
+static DEFINE_MUTEX(idlecount_lock);
+static int idlecount;
+static struct wake_lock wakelock;
+static struct wake_lock idlelock;
+
+static void prevent_sleep(void)
+{
+	mutex_lock(&idlecount_lock);
+	if (++idlecount == 1) {
+		wake_lock(&idlelock);
+		wake_lock(&wakelock);
+	}
+	mutex_unlock(&idlecount_lock);
+}
+
+static void allow_sleep(void)
+{
+	mutex_lock(&idlecount_lock);
+	if (--idlecount == 0) {
+		wake_unlock(&idlelock);
+		wake_unlock(&wakelock);
+	}
+	mutex_unlock(&idlecount_lock);
+}
 
 static inline int vdec_check_version(u32 client, u32 server)
 {
@@ -447,6 +437,8 @@ static int vdec_queue(struct vdec_data *vd, void *argp)
 	rpc.size = sizeof(struct vdec_input_buf_info);
 	rpc.osize = sizeof(struct vdec_queue_status);
 
+	/* complete the writes to the buffer */
+	wmb();
 	ret = dal_call(vd->vdec_handle, VDEC_DALRPC_QUEUE, 8,
 		       &rpc, sizeof(rpc), &rpc_res, sizeof(rpc_res));
 	if (ret < 4) {
@@ -504,13 +496,14 @@ static int vdec_close(struct vdec_data *vd, void *argp)
 	pr_info("q6vdec_close()\n");
 	vd->close_decode = 1;
 	wake_up(&vd->vdec_msg_evt);
+
 	ret = dal_call_f0(vd->vdec_handle, DAL_OP_CLOSE, 0);
 	if (ret)
 		pr_err("%s: failed to close daldevice (%d)\n", __func__, ret);
 
 	if (vd->mem_initialized) {
 		list_for_each_entry(l, &vd->vdec_mem_list_head, list)
-		    put_pmem_file(l->mem.file);
+			put_pmem_file(l->mem.file);
 	}
 
 	return ret;
@@ -587,6 +580,22 @@ static int vdec_freebuffers(struct vdec_data *vd, void *argp)
 
 	return ret;
 }
+
+static int vdec_getversion(struct vdec_data *vd, void *argp)
+{
+	struct vdec_version ver_info;
+	int ret = 0;
+
+	ver_info.major = VDEC_GET_MAJOR_VERSION(VDEC_INTERFACE_VERSION);
+	ver_info.minor = VDEC_GET_MINOR_VERSION(VDEC_INTERFACE_VERSION);
+
+	ret = copy_to_user(((struct vdec_version *)argp),
+				&ver_info, sizeof(ver_info));
+
+	return ret;
+
+}
+
 static long vdec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct vdec_data *vd = file->private_data;
@@ -638,6 +647,9 @@ static long vdec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		if (vd->close_decode)
 			ret = -EINTR;
+		else
+			/* order the reads from the buffer */
+			rmb();
 		break;
 
 	case VDEC_IOCTL_CLOSE:
@@ -663,7 +675,15 @@ static long vdec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			pr_err("%s: remote function failed (%d)\n",
 			       __func__, ret);
 		break;
+	case VDEC_IOCTL_GETVERSION:
+		TRACE("VDEC_IOCTL_GETVERSION (pid=%d tid=%d)\n",
+			current->group_leader->pid, current->pid);
+		ret = vdec_getversion(vd, argp);
 
+		if (ret)
+			pr_err("%s: remote function failed (%d)\n",
+				__func__, ret);
+		break;
 	default:
 		pr_err("%s: invalid ioctl!\n", __func__);
 		ret = -EINVAL;
@@ -768,16 +788,18 @@ static int vdec_open(struct inode *inode, struct file *file)
 	int i;
 	struct vdec_msg_list *l;
 	struct vdec_data *vd;
+	struct dal_info version_info;
 
 	pr_info("q6vdec_open()\n");
 	mutex_lock(&vdec_ref_lock);
-	if (ref_cnt > 0) {
-		pr_err("%s: Instance alredy running\n", __func__);
+	if (ref_cnt >= MAX_SUPPORTED_INSTANCES) {
+		pr_err("%s: Max allowed instances exceeded \n", __func__);
 		mutex_unlock(&vdec_ref_lock);
-		return -ENOMEM;
+		return -EBUSY;
 	}
 	ref_cnt++;
 	mutex_unlock(&vdec_ref_lock);
+
 	vd = kmalloc(sizeof(struct vdec_data), GFP_KERNEL);
 	if (!vd) {
 		pr_err("%s: kmalloc failed\n", __func__);
@@ -806,18 +828,34 @@ static int vdec_open(struct inode *inode, struct file *file)
 
 	vd->vdec_handle = dal_attach(DALDEVICEID_VDEC_DEVICE,
 				     DALDEVICEID_VDEC_PORTNAME,
-				     callback, vd);
+				     1, callback, vd);
 
 	if (!vd->vdec_handle) {
 		pr_err("%s: failed to attach \n", __func__);
 		ret = -EIO;
 		goto vdec_open_err_handle_list;
 	}
+	ret = dal_call_f9(vd->vdec_handle, DAL_OP_INFO,
+				&version_info, sizeof(struct dal_info));
+
+	if (ret) {
+		pr_err("%s: failed to get version \n", __func__);
+		goto vdec_open_err_handle_version;
+	}
+
+	TRACE("q6vdec_open() interface version 0x%x\n", version_info.version);
+	if (vdec_check_version(VDEC_INTERFACE_VERSION,
+			version_info.version)) {
+		pr_err("%s: driver version mismatch !\n", __func__);
+		goto vdec_open_err_handle_version;
+	}
 
 	vd->running = 1;
 	prevent_sleep();
-	return 0;
 
+	return 0;
+vdec_open_err_handle_version:
+	dal_detach(vd->vdec_handle);
 vdec_open_err_handle_list:
 	{
 		struct vdec_msg_list *l, *n;
@@ -827,6 +865,9 @@ vdec_open_err_handle_list:
 		}
 	}
 vdec_open_err_handle_vd:
+	mutex_lock(&vdec_ref_lock);
+	ref_cnt--;
+	mutex_unlock(&vdec_ref_lock);
 	kfree(vd);
 	return ret;
 }
@@ -866,6 +907,7 @@ static int vdec_release(struct inode *inode, struct file *file)
 	BUG_ON(ref_cnt <= 0);
 	ref_cnt--;
 	mutex_unlock(&vdec_ref_lock);
+
 	kfree(vd);
 	allow_sleep();
 	return 0;

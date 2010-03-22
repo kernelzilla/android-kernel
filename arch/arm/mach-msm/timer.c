@@ -1,6 +1,7 @@
 /* linux/arch/arm/mach-msm/timer.c
  *
  * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -26,35 +27,54 @@
 #include <mach/msm_iomap.h>
 
 #include "smd_private.h"
+#include "timer.h"
 
 enum {
-	MSM_TIMER_DEBUG_SYNC_STATE = 1U << 0,
-	MSM_TIMER_DEBUG_SYNC_UPDATE = 1U << 1,
-	MSM_TIMER_DEBUG_SYNC = 1U << 2,
+	MSM_TIMER_DEBUG_SYNC = 1U << 0,
 };
 static int msm_timer_debug_mask;
 module_param_named(debug_mask, msm_timer_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
-#define MSM_DGT_BASE (MSM_GPT_BASE + 0x10)
+#if defined(CONFIG_ARCH_MSM7X30)
+#define MSM_GPT_BASE (MSM_TMR_BASE + 0x4)
+#define MSM_DGT_BASE (MSM_TMR_BASE + 0x24)
+#else
+#define MSM_GPT_BASE MSM_TMR_BASE
+#define MSM_DGT_BASE (MSM_TMR_BASE + 0x10)
+#endif
+
+#if defined(CONFIG_ARCH_MSM_ARM11)
+#define MSM_DGT_SHIFT (5)
+#else
+#define MSM_DGT_SHIFT (0)
+#endif
 
 #define TIMER_MATCH_VAL         0x0000
 #define TIMER_COUNT_VAL         0x0004
 #define TIMER_ENABLE            0x0008
-#define TIMER_ENABLE_CLR_ON_MATCH_EN    2
-#define TIMER_ENABLE_EN                 1
-#define TIMER_CLEAR             0x000C
+#define TIMER_ENABLE_EN		1
 
-#define CSR_PROTECTION          0x0020
-#define CSR_PROTECTION_EN               1
+#if defined(CONFIG_ARCH_QSD8X50)
+#define DGT_HZ 4800000	/* Uses TCXO/4 (19.2 MHz / 4) */
+#elif defined(CONFIG_ARCH_MSM7X30)
+#define DGT_HZ 6144000	/* Uses LPXO/4 (24.576 MHz / 4) */
+#else
+#define DGT_HZ 19200000	/* Uses TCXO (19.2 MHz) */
+#endif
 
 #define GPT_HZ 32768
+#define SCLK_HZ 32768
 
-#ifdef CONFIG_ARCH_MSM_SCORPION
-#define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
-#define MSM_DGT_SHIFT (0)
-#else
-#define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
-#define MSM_DGT_SHIFT (5)
+#if defined(CONFIG_MSM_N_WAY_SMSM)
+/* Time Master State Bits */
+#define MASTER_BITS_PER_CPU        1
+#define MASTER_TIME_PENDING \
+	(0x01UL << (MASTER_BITS_PER_CPU * SMSM_APPS_STATE))
+
+/* Time Slave State Bits */
+#define SLAVE_TIME_REQUEST         0x0400
+#define SLAVE_TIME_POLL            0x0800
+#define SLAVE_TIME_INIT            0x1000
 #endif
 
 enum {
@@ -73,12 +93,15 @@ struct msm_clock {
 	uint32_t                    flags;
 	uint32_t                    write_delay;
 	uint32_t                    last_set;
-	uint32_t                    offset;
+	uint32_t                    sleep_offset;
 	uint32_t                    alarm_vtime;
-	uint32_t                    smem_offset;
-	uint32_t                    smem_in_sync;
+	uint32_t                    non_sleep_offset;
+	uint32_t                    in_sync;
 	cycle_t                     stopped_tick;
 	int                         stopped;
+	uint32_t                    rollover_offset;
+	uint32_t                    last_sync_gpt;
+	u64                         last_sync_jiffies;
 };
 enum {
 	MSM_CLOCK_GPT,
@@ -86,14 +109,18 @@ enum {
 };
 static struct msm_clock msm_clocks[];
 static struct msm_clock *msm_active_clock;
-static DEFINE_SPINLOCK(msm_fast_timer_lock);
-static int msm_fast_timer_enabled;
+static void (*msm_timer_sync_timeout)(void);
+
+struct msm_timer_sync_data_t {
+	struct msm_clock *clock;
+	uint32_t         timeout;
+	int              exit_sleep;
+};
 
 static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = dev_id;
-	if (evt->event_handler)
-		evt->event_handler(evt);
+	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
 
@@ -125,15 +152,16 @@ static cycle_t msm_gpt_read(struct clocksource *cs)
 	if (clock->stopped)
 		return clock->stopped_tick;
 	else
-		return msm_read_timer_count(clock) + clock->offset;
+		return msm_read_timer_count(clock) + clock->sleep_offset;
 }
 
 static cycle_t msm_dgt_read(struct clocksource *cs)
 {
 	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_DGT];
 	if (clock->stopped)
-		return clock->stopped_tick;
-	return (msm_read_timer_count(clock) + clock->offset) >> MSM_DGT_SHIFT;
+		return clock->stopped_tick >> MSM_DGT_SHIFT;
+	return (msm_read_timer_count(clock) + clock->sleep_offset)
+		>> MSM_DGT_SHIFT;
 }
 
 static int msm_timer_set_next_event(unsigned long cycles,
@@ -160,7 +188,7 @@ static int msm_timer_set_next_event(unsigned long cycles,
 	}
 	now = msm_read_timer_count(clock);
 	clock->last_set = now;
-	clock->alarm_vtime = alarm + clock->offset;
+	clock->alarm_vtime = alarm + clock->sleep_offset;
 	late = now - alarm;
 	if (late >= (int)(-clock->write_delay << clock->shift) && late < DGT_HZ*5) {
 		static int print_limit = 10;
@@ -180,6 +208,7 @@ static int msm_timer_set_next_event(unsigned long cycles,
 static void msm_timer_set_mode(enum clock_event_mode mode,
 			      struct clock_event_device *evt)
 {
+	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
 	struct msm_clock *clock;
 	unsigned long irq_flags;
 
@@ -192,151 +221,131 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		clock->stopped = 0;
-		clock->offset = -msm_read_timer_count(clock) + clock->stopped_tick;
+		clock->sleep_offset = -msm_read_timer_count(clock) +
+				clock->stopped_tick;
 		msm_active_clock = clock;
 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
+		if (clock != gpt_clk)
+			writel(TIMER_ENABLE_EN,
+				gpt_clk->regbase + TIMER_ENABLE);
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
 		msm_active_clock = NULL;
-		clock->smem_in_sync = 0;
+		clock->in_sync = 0;
 		clock->stopped = 1;
-		clock->stopped_tick = (msm_read_timer_count(clock) +
-					clock->offset) >> clock->shift;
+		clock->stopped_tick = msm_read_timer_count(clock) +
+					clock->sleep_offset;
 		writel(0, clock->regbase + TIMER_ENABLE);
+		if (clock != gpt_clk) {
+			gpt_clk->in_sync = 0;
+			writel(0, gpt_clk->regbase + TIMER_ENABLE);
+		}
 		break;
 	}
 	local_irq_restore(irq_flags);
 }
 
-static inline int check_timeout(struct msm_clock *clock, uint32_t timeout)
+/*
+ * Retrieve the cycle count from sclk and optionally synchronize local clock
+ * with the sclk value.
+ *
+ * time_start and time_expired are callbacks that must be specified.  The
+ * protocol uses them to detect timeout.  The update callback is optional.
+ * If not NULL, update will be called so that it can update local clock.
+ *
+ * The function does not use the argument data directly; it passes data to
+ * the callbacks.
+ *
+ * Return value:
+ *      0: the operation failed
+ *      >0: the slow clock value after time-sync
+ */
+#if defined(CONFIG_MSM_N_WAY_SMSM)
+static uint32_t msm_timer_do_sync_to_sclk(
+	void (*time_start)(struct msm_timer_sync_data_t *data),
+	bool (*time_expired)(struct msm_timer_sync_data_t *data),
+	void (*update)(struct msm_timer_sync_data_t *, uint32_t, uint32_t),
+	struct msm_timer_sync_data_t *data)
 {
-	return (int32_t)(msm_read_timer_count(clock) - timeout) <= 0;
-}
-
-#ifndef CONFIG_ARCH_MSM_SCORPION
-
-static uint32_t msm_timer_sync_smem_clock(int exit_sleep)
-{
-	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_GPT];
 	uint32_t *smem_clock;
 	uint32_t smem_clock_val;
-	uint32_t timeout;
-	uint32_t entry_time;
-	uint32_t timeout_delta;
-	uint32_t last_state;
 	uint32_t state;
-	uint32_t new_offset;
 
-	smem_clock = smem_alloc(SMEM_SMEM_SLOW_CLOCK_VALUE,
-				sizeof(uint32_t));
-
+	smem_clock = smem_alloc(SMEM_SMEM_SLOW_CLOCK_VALUE, sizeof(uint32_t));
 	if (smem_clock == NULL) {
 		printk(KERN_ERR "no smem clock\n");
 		return 0;
 	}
 
-	if (!exit_sleep && clock->smem_in_sync)
+	state = smsm_get_state(SMSM_MODEM_STATE);
+	if ((state & SMSM_INIT) == 0) {
+		printk(KERN_ERR "smsm not initialized\n");
 		return 0;
+	}
 
-	timeout_delta = (clock->freq >> (7 - clock->shift)); /* 7.8ms */
-
-	last_state = state = smsm_get_state(SMSM_STATE_MODEM);
-	if (*smem_clock) {
-		printk(KERN_INFO "get_smem_clock: invalid start state %x "
-		       "clock %u\n", state, *smem_clock);
-		smsm_change_state(SMSM_STATE_APPS, SMSM_TIMEWAIT, SMSM_TIMEINIT);
-		entry_time = msm_read_timer_count(clock);
-		timeout = entry_time + timeout_delta;
-		while (*smem_clock != 0 && check_timeout(clock, timeout))
-			;
-		if (*smem_clock) {
-			printk(KERN_INFO "get_smem_clock: timeout still "
-			       "invalid state %x clock %u in %d ticks\n",
-			       state, *smem_clock,
-			       msm_read_timer_count(clock) - entry_time);
-			return 0;
+	time_start(data);
+	while ((state = smsm_get_state(SMSM_TIME_MASTER_DEM)) &
+		MASTER_TIME_PENDING) {
+		if (time_expired(data)) {
+			printk(KERN_EMERG "get_smem_clock: timeout 1 still "
+				"invalid state %x\n", state);
+			msm_timer_sync_timeout();
 		}
 	}
-	entry_time = msm_read_timer_count(clock);
-	timeout = entry_time + timeout_delta;
-	smsm_change_state(SMSM_STATE_APPS, SMSM_TIMEINIT, SMSM_TIMEWAIT);
+
+	smsm_change_state(SMSM_APPS_DEM, SLAVE_TIME_POLL | SLAVE_TIME_INIT,
+		SLAVE_TIME_REQUEST);
+
+	time_start(data);
+	while (!((state = smsm_get_state(SMSM_TIME_MASTER_DEM)) &
+		MASTER_TIME_PENDING)) {
+		if (time_expired(data)) {
+			printk(KERN_EMERG "get_smem_clock: timeout 2 still "
+				"invalid state %x\n", state);
+			msm_timer_sync_timeout();
+		}
+	}
+
+	smsm_change_state(SMSM_APPS_DEM, SLAVE_TIME_REQUEST, SLAVE_TIME_POLL);
+
+	time_start(data);
 	do {
 		smem_clock_val = *smem_clock;
-		state = smsm_get_state(SMSM_STATE_MODEM);
-		if (state != last_state) {
-			last_state = state;
-			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC_STATE)
-				pr_info("get_smem_clock: state %x clock %u\n",
-					state, smem_clock_val);
-		}
-	} while (smem_clock_val == 0 && check_timeout(clock, timeout));
+	} while (smem_clock_val == 0 && !time_expired(data));
+
+	state = smsm_get_state(SMSM_TIME_MASTER_DEM);
+
 	if (smem_clock_val) {
-		new_offset = smem_clock_val - msm_read_timer_count(clock);
-		if (clock->offset + clock->smem_offset != new_offset) {
-			if (exit_sleep)
-				clock->offset = new_offset - clock->smem_offset;
-			else
-				clock->smem_offset = new_offset - clock->offset;
-			clock->smem_in_sync = 1;
-			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC_UPDATE)
-				printk(KERN_INFO "get_smem_clock: state %x "
-				       "clock %u new offset %u+%u\n",
-				       state, smem_clock_val,
-				       clock->offset, clock->smem_offset);
-		} else if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC) {
-			printk(KERN_INFO "get_smem_clock: state %x "
-			       "clock %u offset %u+%u\n",
-			       state, smem_clock_val,
-			       clock->offset, clock->smem_offset);
-		}
+		if (update != NULL)
+			update(data, smem_clock_val, SCLK_HZ);
+
+		if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC)
+			printk(KERN_INFO
+				"get_smem_clock: state %x clock %u\n",
+				state, smem_clock_val);
 	} else {
-		printk(KERN_INFO "get_smem_clock: timeout state %x clock %u "
-		       "in %d ticks\n", state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
+		printk(KERN_EMERG
+			"get_smem_clock: timeout state %x clock %u\n",
+			state, smem_clock_val);
+		msm_timer_sync_timeout();
 	}
-	smsm_change_state(SMSM_STATE_APPS, SMSM_TIMEWAIT, SMSM_TIMEINIT);
-	entry_time = msm_read_timer_count(clock);
-	timeout = entry_time + timeout_delta;
-	while (*smem_clock != 0 && check_timeout(clock, timeout)) {
-		uint32_t astate = smsm_get_state(SMSM_STATE_APPS);
-		if ((astate & SMSM_TIMEWAIT) || !(astate & SMSM_TIMEINIT)) {
-			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC_STATE)
-				pr_info("get_smem_clock: modem overwrote "
-					"apps state %x\n", astate);
-			smsm_change_state(SMSM_STATE_APPS,
-					  SMSM_TIMEWAIT, SMSM_TIMEINIT);
-		}
-	}
-	if (*smem_clock)
-		printk(KERN_INFO "get_smem_clock: exit timeout state %x "
-		       "clock %u in %d ticks\n", state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
+
+	smsm_change_state(SMSM_APPS_DEM, SLAVE_TIME_REQUEST | SLAVE_TIME_POLL,
+		SLAVE_TIME_INIT);
 	return smem_clock_val;
 }
-
-#else
-
-/* Time Master State Bits */
-#define DEM_TIME_MASTER_TIME_PENDING_APPS	BIT(0)
-
-/* Time Slave State Bits */
-#define DEM_TIME_SLAVE_TIME_REQUEST         0x0400
-#define DEM_TIME_SLAVE_TIME_POLL            0x0800
-#define DEM_TIME_SLAVE_TIME_INIT            0x1000
-
-static uint32_t msm_timer_sync_smem_clock(int exit_sleep)
+#else /* CONFIG_MSM_N_WAY_SMSM */
+static uint32_t msm_timer_do_sync_to_sclk(
+	void (*time_start)(struct msm_timer_sync_data_t *data),
+	bool (*time_expired)(struct msm_timer_sync_data_t *data),
+	void (*update)(struct msm_timer_sync_data_t *, uint32_t, uint32_t),
+	struct msm_timer_sync_data_t *data)
 {
-	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_GPT];
 	uint32_t *smem_clock;
 	uint32_t smem_clock_val;
-	uint32_t bad_clock = 0;
-	uint32_t timeout;
-	uint32_t entry_time;
-	uint32_t timeout_delta;
 	uint32_t last_state;
 	uint32_t state;
-	uint32_t new_offset;
 
 	smem_clock = smem_alloc(SMEM_SMEM_SLOW_CLOCK_VALUE,
 				sizeof(uint32_t));
@@ -346,103 +355,184 @@ static uint32_t msm_timer_sync_smem_clock(int exit_sleep)
 		return 0;
 	}
 
-	if (!exit_sleep && clock->smem_in_sync)
-		return 0;
-
-	timeout_delta = (clock->freq >> (7 - clock->shift)); /* 7.8ms */
-
-	entry_time = msm_read_timer_count(clock);
-	last_state = state = smsm_get_state(SMSM_STATE_TIME_MASTER_DEM);
-	timeout = entry_time + timeout_delta;
-	while ((smsm_get_state(SMSM_STATE_TIME_MASTER_DEM)
-		& DEM_TIME_MASTER_TIME_PENDING_APPS)
-		&& check_timeout(clock, timeout))
-		;
-	if ((smsm_get_state(SMSM_STATE_TIME_MASTER_DEM) &
-				DEM_TIME_MASTER_TIME_PENDING_APPS)) {
+	last_state = state = smsm_get_state(SMSM_MODEM_STATE);
+	smem_clock_val = *smem_clock;
+	if (smem_clock_val) {
 		printk(KERN_INFO "get_smem_clock: invalid start state %x "
-		       "clock %u in %d ticks\n",
-		       state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
-		bad_clock = *smem_clock;
+			"clock %u\n", state, smem_clock_val);
+		smsm_change_state(SMSM_APPS_STATE,
+				  SMSM_TIMEWAIT, SMSM_TIMEINIT);
+
+		time_start(data);
+		while (*smem_clock != 0 && !time_expired(data))
+			;
+
+		smem_clock_val = *smem_clock;
+		if (smem_clock_val) {
+			printk(KERN_EMERG "get_smem_clock: timeout still "
+				"invalid state %x clock %u\n",
+				state, smem_clock_val);
+			msm_timer_sync_timeout();
+		}
 	}
-	entry_time = msm_read_timer_count(clock);
-	timeout = entry_time + timeout_delta;
-	smsm_change_state(SMSM_STATE_APPS_DEM,
-			DEM_TIME_SLAVE_TIME_INIT, DEM_TIME_SLAVE_TIME_REQUEST);
-	while (!(smsm_get_state(SMSM_STATE_TIME_MASTER_DEM)
-		& DEM_TIME_MASTER_TIME_PENDING_APPS)
-		&& check_timeout(clock, timeout))
-		;
-	if (!(smsm_get_state(SMSM_STATE_TIME_MASTER_DEM) &
-					DEM_TIME_MASTER_TIME_PENDING_APPS)) {
-		printk(KERN_INFO "get_smem_clock: invalid start state %x "
-		       "clock %u in %d ticks\n",
-		       state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
-		bad_clock = *smem_clock;
-	}
-	smsm_change_state(SMSM_STATE_APPS_DEM,
-		DEM_TIME_SLAVE_TIME_REQUEST, DEM_TIME_SLAVE_TIME_POLL);
+
+	time_start(data);
+	smsm_change_state(SMSM_APPS_STATE, SMSM_TIMEINIT, SMSM_TIMEWAIT);
 	do {
 		smem_clock_val = *smem_clock;
-		state = smsm_get_state(SMSM_STATE_TIME_MASTER_DEM);
+		state = smsm_get_state(SMSM_MODEM_STATE);
 		if (state != last_state) {
 			last_state = state;
-			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC_STATE)
-				pr_info("get_smem_clock: state %x clock %u\n",
+			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC)
+				printk(KERN_INFO
+					"get_smem_clock: state %x clock %u\n",
 					state, smem_clock_val);
 		}
-	} while ((!smem_clock_val || smem_clock_val == bad_clock)
-		 && check_timeout(clock, timeout));
-	if (smem_clock_val && smem_clock_val != bad_clock) {
-		new_offset = smem_clock_val - msm_read_timer_count(clock);
-		if (clock->offset + clock->smem_offset != new_offset) {
-			if (exit_sleep)
-				clock->offset = new_offset - clock->smem_offset;
-			else
-				clock->smem_offset = new_offset - clock->offset;
-			clock->smem_in_sync = 1;
-			if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC_UPDATE)
-				printk(KERN_INFO "get_smem_clock: state %x "
-				       "clock %u new offset %u+%u\n",
-				       state, smem_clock_val,
-				       clock->offset, clock->smem_offset);
-		} else if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC) {
-			printk(KERN_INFO "get_smem_clock: state %x "
-			       "clock %u offset %u+%u\n",
-			       state, smem_clock_val,
-			       clock->offset, clock->smem_offset);
-		}
+	} while (smem_clock_val == 0 && !time_expired(data));
+
+	if (smem_clock_val) {
+		if (update != NULL)
+			update(data, smem_clock_val, SCLK_HZ);
 	} else {
-		printk(KERN_INFO "get_smem_clock: timeout state %x clock %u "
-		       "in %d ticks\n", state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
+		printk(KERN_EMERG
+			"get_smem_clock: timeout state %x clock %u\n",
+			state, smem_clock_val);
+		msm_timer_sync_timeout();
 	}
-	smsm_change_state(SMSM_STATE_APPS_DEM,
-		DEM_TIME_SLAVE_TIME_POLL, DEM_TIME_SLAVE_TIME_INIT);
-#if 1 /* debug */
-	entry_time = msm_read_timer_count(clock);
-	timeout = entry_time + timeout_delta;
-	while ((smsm_get_state(SMSM_STATE_TIME_MASTER_DEM)
-		& DEM_TIME_MASTER_TIME_PENDING_APPS)
-		&& check_timeout(clock, timeout))
-		;
-	if (smsm_get_state(SMSM_STATE_TIME_MASTER_DEM) &
-					DEM_TIME_MASTER_TIME_PENDING_APPS)
-		printk(KERN_INFO "get_smem_clock: exit timeout state %x "
-		       "clock %u in %d ticks\n", state, *smem_clock,
-		       msm_read_timer_count(clock) - entry_time);
-#endif
+
+	smsm_change_state(SMSM_APPS_STATE, SMSM_TIMEWAIT, SMSM_TIMEINIT);
 	return smem_clock_val;
 }
+#endif /* CONFIG_MSM_N_WAY_SMSM */
 
-#endif
+/*
+ * Callback function that initializes the timeout value.
+ */
+static void msm_timer_sync_to_sclk_time_start(
+	struct msm_timer_sync_data_t *data)
+{
+	/* approx 2 seconds */
+	uint32_t delta = data->clock->freq << data->clock->shift << 1;
+	data->timeout = msm_read_timer_count(data->clock) + delta;
+}
+
+/*
+ * Callback function that checks the timeout.
+ */
+static bool msm_timer_sync_to_sclk_time_expired(
+	struct msm_timer_sync_data_t *data)
+{
+	uint32_t delta = msm_read_timer_count(data->clock) - data->timeout;
+	return ((int32_t) delta) > 0;
+}
+
+/*
+ * Callback function that updates local clock from the specified source clock
+ * value and frequency.
+ */
+static void msm_timer_sync_update(struct msm_timer_sync_data_t *data,
+	uint32_t src_clk_val, uint32_t src_clk_freq)
+{
+	struct msm_clock *dst_clk = data->clock;
+	uint32_t dst_clk_val = msm_read_timer_count(dst_clk);
+	uint32_t new_offset;
+
+	if ((dst_clk->freq << dst_clk->shift) == src_clk_freq) {
+		new_offset = src_clk_val - dst_clk_val;
+	} else {
+		uint64_t temp;
+
+		/* separate multiplication and division steps to reduce
+		   rounding error */
+		temp = src_clk_val;
+		temp *= dst_clk->freq << dst_clk->shift;
+		do_div(temp, src_clk_freq);
+
+		new_offset = (uint32_t)(temp) - dst_clk_val;
+	}
+
+	if (dst_clk->sleep_offset + dst_clk->non_sleep_offset != new_offset) {
+		if (data->exit_sleep)
+			dst_clk->sleep_offset =
+				new_offset - dst_clk->non_sleep_offset;
+		else
+			dst_clk->non_sleep_offset =
+				new_offset - dst_clk->sleep_offset;
+
+		if (msm_timer_debug_mask & MSM_TIMER_DEBUG_SYNC)
+			printk(KERN_INFO "sync clock %s: "
+				"src %u, new offset %u + %u\n",
+				dst_clk->clocksource.name, src_clk_val,
+				dst_clk->sleep_offset,
+				dst_clk->non_sleep_offset);
+	}
+}
+
+/*
+ * Synchronize GPT clock with sclk.
+ */
+static void msm_timer_sync_gpt_to_sclk(int exit_sleep)
+{
+	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
+	struct msm_timer_sync_data_t data;
+	uint32_t ret;
+
+	if (gpt_clk->in_sync)
+		return;
+
+	data.clock = gpt_clk;
+	data.timeout = 0;
+	data.exit_sleep = exit_sleep;
+
+	ret = msm_timer_do_sync_to_sclk(
+		msm_timer_sync_to_sclk_time_start,
+		msm_timer_sync_to_sclk_time_expired,
+		msm_timer_sync_update,
+		&data);
+
+	if (ret)
+		gpt_clk->in_sync = 1;
+}
+
+/*
+ * Synchronize clock with GPT clock.
+ */
+static void msm_timer_sync_to_gpt(struct msm_clock *clock, int exit_sleep)
+{
+	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
+	struct msm_timer_sync_data_t data;
+	uint32_t gpt_clk_val;
+	u64 gpt_period = (1ULL << 32) * HZ / GPT_HZ;
+	u64 now = get_jiffies_64();
+
+	BUG_ON(clock == gpt_clk);
+
+	if (clock->in_sync &&
+		(now - clock->last_sync_jiffies < (gpt_period >> 1)))
+		return;
+
+	gpt_clk_val = msm_read_timer_count(gpt_clk)
+		+ gpt_clk->sleep_offset + gpt_clk->non_sleep_offset;
+
+	if (exit_sleep && gpt_clk_val < clock->last_sync_gpt)
+		clock->non_sleep_offset -= clock->rollover_offset;
+
+	data.clock = clock;
+	data.timeout = 0;
+	data.exit_sleep = exit_sleep;
+
+	msm_timer_sync_update(&data, gpt_clk_val, GPT_HZ);
+
+	clock->in_sync = 1;
+	clock->last_sync_gpt = gpt_clk_val;
+	clock->last_sync_jiffies = now;
+}
 
 static void msm_timer_reactivate_alarm(struct msm_clock *clock)
 {
-	long alarm_delta = clock->alarm_vtime - clock->offset -
+	long alarm_delta = clock->alarm_vtime - clock->sleep_offset -
 		msm_read_timer_count(clock);
+	alarm_delta >>= clock->shift;
 	if (alarm_delta < (long)clock->write_delay + 4)
 		alarm_delta = clock->write_delay + 4;
 	while (msm_timer_set_next_event(alarm_delta, &clock->clockevent))
@@ -451,20 +541,23 @@ static void msm_timer_reactivate_alarm(struct msm_clock *clock)
 
 int64_t msm_timer_enter_idle(void)
 {
+	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
 	struct msm_clock *clock = msm_active_clock;
 	uint32_t alarm;
 	uint32_t count;
 	int32_t delta;
 
-	if (clock != &msm_clocks[MSM_CLOCK_GPT] || msm_fast_timer_enabled)
-		return 0;
+	BUG_ON(clock != &msm_clocks[MSM_CLOCK_GPT] &&
+		clock != &msm_clocks[MSM_CLOCK_DGT]);
 
-	msm_timer_sync_smem_clock(0);
+	msm_timer_sync_gpt_to_sclk(0);
+	if (clock != gpt_clk)
+		msm_timer_sync_to_gpt(clock, 0);
 
 	count = msm_read_timer_count(clock);
 	if (clock->stopped++ == 0)
-		clock->stopped_tick = (count + clock->offset) >> clock->shift;
-	alarm = clock->alarm_vtime - clock->offset;
+		clock->stopped_tick = count + clock->sleep_offset;
+	alarm = readl(clock->regbase + TIMER_MATCH_VAL);
 	delta = alarm - count;
 	if (delta <= -(int32_t)((clock->freq << clock->shift) >> 10)) {
 		/* timer should have triggered 1ms ago */
@@ -474,26 +567,131 @@ int64_t msm_timer_enter_idle(void)
 	}
 	if (delta <= 0)
 		return 0;
-	return clocksource_cyc2ns((alarm - count) >> clock->shift,
-			clock->clocksource.mult, clock->clocksource.shift);
+	return clocksource_cyc2ns((alarm - count) >> clock->clocksource.shift,
+		      clock->clocksource.mult,
+		      clock->clocksource.shift);
 }
 
 void msm_timer_exit_idle(int low_power)
 {
+	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
 	struct msm_clock *clock = msm_active_clock;
-	uint32_t smem_clock;
+	uint32_t enabled;
 
-	if (clock != &msm_clocks[MSM_CLOCK_GPT])
-		return;
+	BUG_ON(clock != &msm_clocks[MSM_CLOCK_GPT] &&
+		clock != &msm_clocks[MSM_CLOCK_DGT]);
 
-	if (low_power) {
-		if (!(readl(clock->regbase + TIMER_ENABLE) & TIMER_ENABLE_EN)) {
-			writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
-			smem_clock = msm_timer_sync_smem_clock(1);
-		}
-		msm_timer_reactivate_alarm(clock);
-	}
+	if (!low_power)
+		goto exit_idle_exit;
+
+	enabled = readl(gpt_clk->regbase + TIMER_ENABLE) & TIMER_ENABLE_EN;
+	if (!enabled)
+		writel(TIMER_ENABLE_EN, gpt_clk->regbase + TIMER_ENABLE);
+
+#if defined(CONFIG_ARCH_MSM_SCORPION)
+	gpt_clk->in_sync = 0;
+#else
+	gpt_clk->in_sync = gpt_clk->in_sync && enabled;
+#endif
+	msm_timer_sync_gpt_to_sclk(1);
+
+	if (clock == gpt_clk)
+		goto exit_idle_alarm;
+
+	enabled = readl(clock->regbase + TIMER_ENABLE) & TIMER_ENABLE_EN;
+	if (!enabled)
+		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
+
+#if defined(CONFIG_ARCH_MSM_SCORPION)
+	clock->in_sync = 0;
+#else
+	clock->in_sync = clock->in_sync && enabled;
+#endif
+	msm_timer_sync_to_gpt(clock, 1);
+
+exit_idle_alarm:
+	msm_timer_reactivate_alarm(clock);
+
+exit_idle_exit:
 	clock->stopped--;
+}
+
+/*
+ * Callback function that initializes the timeout value.
+ */
+static void msm_timer_get_sclk_time_start(
+	struct msm_timer_sync_data_t *data)
+{
+	data->timeout = 1000000;
+}
+
+/*
+ * Callback function that checks the timeout.
+ */
+static bool msm_timer_get_sclk_time_expired(
+	struct msm_timer_sync_data_t *data)
+{
+	return --data->timeout <= 0;
+}
+
+/*
+ * Retrieve the cycle count from the sclk and convert it into
+ * nanoseconds.
+ *
+ * On exit, if period is not NULL, it contains the period of the
+ * sclk in nanoseconds, i.e. how long the cycle count wraps around.
+ *
+ * Return value:
+ *      0: the operation failed; period is not set either
+ *      >0: time in nanoseconds
+ */
+int64_t msm_timer_get_sclk_time(int64_t *period)
+{
+	struct msm_timer_sync_data_t data;
+	uint32_t clock_value;
+	int64_t tmp;
+
+	memset(&data, 0, sizeof(data));
+
+	clock_value = msm_timer_do_sync_to_sclk(
+		msm_timer_get_sclk_time_start,
+		msm_timer_get_sclk_time_expired,
+		NULL,
+		&data);
+
+	if (!clock_value)
+		return 0;
+
+	if (period) {
+		tmp = 1LL << 32;
+		tmp = tmp * NSEC_PER_SEC / SCLK_HZ;
+		*period = tmp;
+	}
+
+	tmp = (int64_t)clock_value;
+	tmp = tmp * NSEC_PER_SEC / SCLK_HZ;
+	return tmp;
+}
+
+int __init msm_timer_init_time_sync(void (*timeout)(void))
+{
+#if defined(CONFIG_MSM_N_WAY_SMSM)
+	int ret = smsm_change_intr_mask(SMSM_TIME_MASTER_DEM, 0xFFFFFFFF, 0);
+
+	if (ret) {
+		printk(KERN_ERR	"%s: failed to clear interrupt mask, %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	smsm_change_state(SMSM_APPS_DEM,
+		SLAVE_TIME_REQUEST | SLAVE_TIME_POLL, SLAVE_TIME_INIT);
+#endif
+
+	BUG_ON(timeout == NULL);
+	msm_timer_sync_timeout = timeout;
+
+	return 0;
 }
 
 unsigned long long sched_clock(void)
@@ -519,15 +717,22 @@ unsigned long long sched_clock(void)
 		if (!saved_ticks_valid) {
 			saved_ticks_valid = 1;
 			last_ticks = ticks;
-			base -= clocksource_cyc2ns(ticks, cs->mult, cs->shift);
+
+			base -=  clocksource_cyc2ns(ticks,
+						    cs->mult,
+						    cs->shift);
 		}
 		if (ticks < last_ticks) {
 			base += clocksource_cyc2ns(cs->mask,
-						   cs->mult, cs->shift);
-			base += clocksource_cyc2ns(1, cs->mult, cs->shift);
+						   cs->mult,
+						   cs->shift);
+			base += clocksource_cyc2ns(1,
+						   cs->mult,
+						   cs->shift);
 		}
-		last_result = result =
-			clocksource_cyc2ns(ticks, cs->mult, cs->shift) + base;
+		last_result = result = clocksource_cyc2ns(ticks,
+						    cs->mult,
+						    cs->shift) + base;
 	} else {
 		base = result = last_result;
 		saved_ticks_valid = 0;
@@ -608,65 +813,6 @@ static struct msm_clock msm_clocks[] = {
 	}
 };
 
-/**
- * msm_enable_fast_timer - Enable fast timer
- *
- * Prevents low power idle, but the caller must call msm_disable_fast_timer
- * before suspend completes.
- * Reference counted.
- */
-void msm_enable_fast_timer(void)
-{
-	u32 max;
-	unsigned long irq_flags;
-	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_DGT];
-
-	spin_lock_irqsave(&msm_fast_timer_lock, irq_flags);
-	if (msm_fast_timer_enabled++)
-		goto done;
-	if (msm_active_clock == &msm_clocks[MSM_CLOCK_DGT]) {
-		pr_warning("msm_enable_fast_timer: timer already in use, "
-			"returned time will jump when hardware timer wraps\n");
-		goto done;
-	}
-	max = (clock->clockevent.mult >> (clock->clockevent.shift - 32)) - 1;
-	writel(max, clock->regbase + TIMER_MATCH_VAL);
-	writel(TIMER_ENABLE_EN | TIMER_ENABLE_CLR_ON_MATCH_EN,
-		clock->regbase + TIMER_ENABLE);
-done:
-	spin_unlock_irqrestore(&msm_fast_timer_lock, irq_flags);
-}
-
-/**
- * msm_enable_fast_timer - Disable fast timer
- */
-void msm_disable_fast_timer(void)
-{
-	unsigned long irq_flags;
-	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_DGT];
-
-	spin_lock_irqsave(&msm_fast_timer_lock, irq_flags);
-	if (!WARN(!msm_fast_timer_enabled, "msm_disable_fast_timer undeflow")
-	    && !--msm_fast_timer_enabled
-	    && msm_active_clock != &msm_clocks[MSM_CLOCK_DGT])
-		writel(0, clock->regbase + TIMER_ENABLE);
-	spin_unlock_irqrestore(&msm_fast_timer_lock, irq_flags);
-}
-
-/**
- * msm_enable_fast_timer - Read fast timer
- *
- * Returns 32bit nanosecond time value.
- */
-u32 msm_read_fast_timer(void)
-{
-	cycle_t ticks;
-	struct msm_clock *clock = &msm_clocks[MSM_CLOCK_DGT];
-	ticks = msm_read_timer_count(clock) >> MSM_DGT_SHIFT;
-	return clocksource_cyc2ns(ticks, clock->clocksource.mult,
-					clock->clocksource.shift);
-}
-
 static void __init msm_timer_init(void)
 {
 	int i;
@@ -677,9 +823,19 @@ static void __init msm_timer_init(void)
 		struct clock_event_device *ce = &clock->clockevent;
 		struct clocksource *cs = &clock->clocksource;
 		writel(0, clock->regbase + TIMER_ENABLE);
-		writel(0, clock->regbase + TIMER_CLEAR);
 		writel(~0, clock->regbase + TIMER_MATCH_VAL);
-		while (msm_read_timer_count(clock)) ; /* wait for clock to clear */
+
+		if ((clock->freq << clock->shift) == GPT_HZ) {
+			clock->rollover_offset = 0;
+		} else {
+			uint64_t temp;
+
+			temp = clock->freq << clock->shift;
+			temp <<= 32;
+			temp /= GPT_HZ;
+
+			clock->rollover_offset = (uint32_t) temp;
+		}
 
 		ce->mult = div_sc(clock->freq, NSEC_PER_SEC, ce->shift);
 		/* allow at least 10 seconds to notice that the timer wrapped */

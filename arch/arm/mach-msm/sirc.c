@@ -1,16 +1,18 @@
-/* linux/arch/arm/mach-msm/irq.c
+/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
- * Copyright (c) 2009 QUALCOMM Incorporated.
- * Copyright (C) 2009 Google, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  *
  */
 
@@ -18,39 +20,6 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <asm/irq.h>
-#include <mach/fiq.h>
-#include <mach/msm_iomap.h>
-
-#include "sirc.h"
-
-#define SIRC_MASK                     0x007FFFFF
-#define SPSS_SIRC_INT_SELECT          (MSM_SIRC_BASE + 0x00)
-#define SPSS_SIRC_INT_ENABLE          (MSM_SIRC_BASE + 0x04)
-#define SPSS_SIRC_INT_ENABLE_CLEAR    (MSM_SIRC_BASE + 0x08)
-#define SPSS_SIRC_INT_ENABLE_SET      (MSM_SIRC_BASE + 0x0C)
-#define SPSS_SIRC_INT_TYPE            (MSM_SIRC_BASE + 0x10)
-#define SPSS_SIRC_INT_POLARITY        (MSM_SIRC_BASE + 0x14)
-#define SPSS_SIRC_SECURITY            (MSM_SIRC_BASE + 0x18)
-#define SPSS_SIRC_IRQ_STATUS          (MSM_SIRC_BASE + 0x1C)
-#define SPSS_SIRC_IRQ1_STATUS         (MSM_SIRC_BASE + 0x20)
-#define SPSS_SIRC_RAW_STATUS          (MSM_SIRC_BASE + 0x24)
-#define SPSS_SIRC_INT_CLEAR           (MSM_SIRC_BASE + 0x28)
-#define SPSS_SIRC_SOFT_INT            (MSM_SIRC_BASE + 0x2C)
-
-struct sirc_regs_t {
-	void    *int_enable;
-	void    *int_enable_clear;
-	void    *int_enable_set;
-	void    *int_type;
-	void    *int_polarity;
-	void    *int_clear;
-};
-
-struct sirc_cascade_regs {
-	void    *int_status;
-	unsigned int    cascade_irq;
-	unsigned int    cascade_fiq;
-};
 
 static void sirc_irq_mask(unsigned int irq);
 static void sirc_irq_unmask(unsigned int irq);
@@ -75,7 +44,6 @@ static struct sirc_cascade_regs sirc_reg_table[] = {
 	{
 		.int_status  = SPSS_SIRC_IRQ_STATUS,
 		.cascade_irq = INT_SIRC_0,
-		.cascade_fiq = INT_SIRC_1,
 	}
 };
 
@@ -159,24 +127,6 @@ static int sirc_irq_set_type(unsigned int irq, unsigned int flow_type)
 	return 0;
 }
 
-#if defined(CONFIG_MSM_FIQ_SUPPORT)
-void sirc_fiq_select(int irq, bool enable)
-{
-	uint32_t mask = 1 << (irq - FIRST_SIRC_IRQ);
-	uint32_t val;
-	unsigned long flags;
-
-	local_irq_save(flags);
-	val = readl(SPSS_SIRC_INT_SELECT);
-	if (enable)
-		val |= mask;
-	else
-		val &= ~mask;
-	writel(val, SPSS_SIRC_INT_SELECT);
-	local_irq_restore(flags);
-}
-#endif
-
 /* Finds the pending interrupt on the passed cascade irq and redrives it */
 static void sirc_irq_handler(unsigned int irq, struct irq_desc *desc)
 {
@@ -234,7 +184,7 @@ void __init msm_init_sirc(void)
 	int_enable = 0;
 	wake_enable = 0;
 
-	for (i = FIRST_SIRC_IRQ; i < FIRST_SIRC_IRQ + NR_SIRC_IRQS; i++) {
+	for (i = FIRST_SIRC_IRQ; i < LAST_SIRC_IRQ; i++) {
 		set_irq_chip(i, &sirc_irq_chip);
 		set_irq_handler(i, handle_edge_irq);
 		set_irq_flags(i, IRQF_VALID);
@@ -244,10 +194,6 @@ void __init msm_init_sirc(void)
 		set_irq_chained_handler(sirc_reg_table[i].cascade_irq,
 					sirc_irq_handler);
 		set_irq_wake(sirc_reg_table[i].cascade_irq, 1);
-#if defined(CONFIG_MSM_FIQ_SUPPORT)
-		msm_fiq_select(sirc_reg_table[i].cascade_fiq);
-		msm_fiq_enable(sirc_reg_table[i].cascade_fiq);
-#endif
 	}
 	return;
 }

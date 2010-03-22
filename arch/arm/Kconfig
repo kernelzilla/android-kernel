@@ -1099,6 +1099,20 @@ config OABI_COMPAT
 config ARCH_HAS_HOLES_MEMORYMODEL
 	bool
 
+config HOLES_IN_ZONE
+	bool "Memory map has holes ending within MAX_ORDER_NR_PAGES"
+	default n
+	depends on FLATMEM
+	help
+	  Say 'y' here if you have multiple memory banks where the bank
+	  end addresses coresponding to the holes are not MAX_ORDER_NR_PAGES
+	  aligned. Failure to enable this in those circumstances will result
+	  in the VM code assuming ownership of pages with no memmap memory
+	  allocated for them. This option could impact performance as it
+	  performs extra checks in the VM code. As alternative, consider
+	  aligning end addresses to MAX_ORDER_NR_PAGES or changing MAX_ORDER
+	  to compensate for your alignment requirements.
+
 # Discontigmem is deprecated
 config ARCH_DISCONTIGMEM_ENABLE
 	bool

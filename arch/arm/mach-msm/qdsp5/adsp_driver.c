@@ -1,6 +1,7 @@
 /* arch/arm/mach-msm/qdsp5/adsp_driver.c
  *
  * Copyright (C) 2008 Google, Inc.
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  * Author: Iliyan Malchev <ibm@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -14,6 +15,7 @@
  *
  */
 
+#include <mach/debug_adsp_mm.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/list.h>
@@ -25,6 +27,11 @@
 
 #include <linux/msm_adsp.h>
 #include <linux/android_pmem.h>
+
+struct adsp_pmem_info {
+	int fd;
+	void *vaddr;
+};
 
 struct adsp_pmem_region {
 	struct hlist_node list;
@@ -91,7 +98,7 @@ static int adsp_pmem_check(struct msm_adsp_module *module,
 	hlist_for_each_entry(region_elt, node, &module->pmem_regions, list) {
 		if (CONTAINS(region_elt, &t) || CONTAINS(&t, region_elt) ||
 		    OVERLAPS(region_elt, &t)) {
-			printk(KERN_ERR "adsp: module %s:"
+			MM_ERR("module %s:"
 				" region (vaddr %p len %ld)"
 				" clashes with registered region"
 				" (vaddr %p paddr %p len %ld)\n",
@@ -173,7 +180,7 @@ static int adsp_pmem_lookup_vaddr(struct msm_adsp_module *module, void **addr,
 	}
 
 	if (match_count > 1) {
-		printk(KERN_ERR "adsp: module %s: "
+		MM_ERR("module %s: "
 			"multiple hits for vaddr %p, len %ld\n",
 			module->name, vaddr, len);
 		hlist_for_each_entry(region_elt, node,
@@ -181,7 +188,7 @@ static int adsp_pmem_lookup_vaddr(struct msm_adsp_module *module, void **addr,
 			if (vaddr >= region_elt->vaddr &&
 			    vaddr < region_elt->vaddr + region_elt->len &&
 			    vaddr + len <= region_elt->vaddr + region_elt->len)
-				printk(KERN_ERR "\t%p, %ld --> %p\n",
+				MM_ERR("%p, %ld --> %p\n",
 					region_elt->vaddr,
 					region_elt->len,
 					(void *)region_elt->paddr);
@@ -192,7 +199,8 @@ static int adsp_pmem_lookup_vaddr(struct msm_adsp_module *module, void **addr,
 }
 
 int adsp_pmem_fixup_kvaddr(struct msm_adsp_module *module, void **addr,
-			   unsigned long *kvaddr, unsigned long len)
+			   unsigned long *kvaddr, unsigned long len,
+			   struct file **filp, unsigned long *offset)
 {
 	struct adsp_pmem_region *region;
 	void *vaddr = *addr;
@@ -201,13 +209,17 @@ int adsp_pmem_fixup_kvaddr(struct msm_adsp_module *module, void **addr,
 
 	ret = adsp_pmem_lookup_vaddr(module, addr, len, &region);
 	if (ret) {
-		printk(KERN_ERR "adsp: not patching %s (paddr & kvaddr),"
+		MM_ERR("not patching %s (paddr & kvaddr),"
 			" lookup (%p, %ld) failed\n",
 			module->name, vaddr, len);
 		return ret;
 	}
 	*paddr = region->paddr + (vaddr - region->vaddr);
 	*kvaddr = region->kvaddr + (vaddr - region->vaddr);
+	if (filp)
+		*filp = region->file;
+	if (offset)
+		*offset = vaddr - region->vaddr;
 	return 0;
 }
 
@@ -221,7 +233,7 @@ int adsp_pmem_fixup(struct msm_adsp_module *module, void **addr,
 
 	ret = adsp_pmem_lookup_vaddr(module, addr, len, &region);
 	if (ret) {
-		printk(KERN_ERR "adsp: not patching %s, lookup (%p, %ld) failed\n",
+		MM_ERR("not patching %s, lookup (%p, %ld) failed\n",
 			module->name, vaddr, len);
 		return ret;
 	}
@@ -239,7 +251,7 @@ static int adsp_verify_cmd(struct msm_adsp_module *module,
 		return module->verify_cmd(module, queue_id, cmd_data,
 					     cmd_size);
 	else
-		printk(KERN_INFO "adsp: no packet verifying function "
+		MM_INFO("no packet verifying function "
 				 "for task %s\n", module->name);
 	return 0;
 }
@@ -269,11 +281,12 @@ static long adsp_write_cmd(struct adsp_device *adev, void __user *arg)
 
 	mutex_lock(&adev->module->pmem_regions_lock);
 	if (adsp_verify_cmd(adev->module, cmd.queue, cmd_data, cmd.len)) {
-		printk(KERN_ERR "module %s: verify failed.\n",
-			adev->module->name);
+		MM_ERR("module %s: verify failed.\n", adev->module->name);
 		rc = -EINVAL;
 		goto end;
 	}
+	/* complete the writes to the buffer */
+	wmb();
 	rc = msm_adsp_write(adev->module, cmd.queue, cmd_data, cmd.len);
 end:
 	mutex_unlock(&adev->module->pmem_regions_lock);
@@ -320,7 +333,7 @@ int adsp_pmem_paddr_fixup(struct msm_adsp_module *module, void **addr)
 
 	ret = adsp_pmem_lookup_paddr(module, addr, &region);
 	if (ret) {
-		printk(KERN_ERR "adsp: not patching %s, paddr %p lookup failed\n",
+		MM_ERR("not patching %s, paddr %p lookup failed\n",
 			module->name, vaddr);
 		return ret;
 	}
@@ -387,6 +400,8 @@ static long adsp_get_event(struct adsp_device *adev, void __user *arg)
 		rc = -ETOOSMALL;
 		goto end;
 	}
+	/* order the reads to the buffer */
+	rmb();
 	if (data->msg_id != EVENT_MSG_ID) {
 		if (copy_to_user((void *)(evt.data), data->data.msg16,
 					data->size)) {
@@ -412,6 +427,24 @@ end:
 	return rc;
 }
 
+static int adsp_pmem_del(struct msm_adsp_module *module)
+{
+	struct hlist_node *node, *tmp;
+	struct adsp_pmem_region *region;
+
+	mutex_lock(&module->pmem_regions_lock);
+	hlist_for_each_safe(node, tmp, &module->pmem_regions) {
+		region = hlist_entry(node, struct adsp_pmem_region, list);
+		hlist_del(node);
+		put_pmem_file(region->file);
+		kfree(region);
+	}
+	mutex_unlock(&module->pmem_regions_lock);
+	BUG_ON(!hlist_empty(&module->pmem_regions));
+
+	return 0;
+}
+
 static long adsp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct adsp_device *adev = filp->private_data;
@@ -424,10 +457,10 @@ static long adsp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return msm_adsp_disable(adev->module);
 
 	case ADSP_IOCTL_DISABLE_EVENT_RSP:
-		return 0;
+		return msm_adsp_disable_event_rsp(adev->module);
 
 	case ADSP_IOCTL_DISABLE_ACK:
-		pr_err("adsp: ADSP_IOCTL_DISABLE_ACK is not implemented.\n");
+		MM_ERR("ADSP_IOCTL_DISABLE_ACK is not implemented\n");
 		break;
 
 	case ADSP_IOCTL_WRITE_COMMAND:
@@ -437,12 +470,10 @@ static long adsp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return adsp_get_event(adev, (void __user *) arg);
 
 	case ADSP_IOCTL_SET_CLKRATE: {
-#if CONFIG_MSM_AMSS_VERSION==6350
 		unsigned long clk_rate;
 		if (copy_from_user(&clk_rate, (void *) arg, sizeof(clk_rate)))
 			return -EFAULT;
 		return adsp_set_clkrate(adev->module, clk_rate);
-#endif
 	}
 
 	case ADSP_IOCTL_REGISTER_PMEM: {
@@ -457,6 +488,9 @@ static long adsp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		wake_up(&adev->event_wait);
 		break;
 
+	case ADSP_IOCTL_UNREGISTER_PMEM:
+		return adsp_pmem_del(adev->module);
+
 	default:
 		break;
 	}
@@ -467,26 +501,17 @@ static int adsp_release(struct inode *inode, struct file *filp)
 {
 	struct adsp_device *adev = filp->private_data;
 	struct msm_adsp_module *module = adev->module;
-	struct hlist_node *node, *tmp;
-	struct adsp_pmem_region *region;
+	int rc = 0;
 
-	pr_info("adsp_release() '%s'\n", adev->name);
+	MM_INFO("release '%s'\n", adev->name);
 
 	/* clear module before putting it to avoid race with open() */
 	adev->module = NULL;
 
-	mutex_lock(&module->pmem_regions_lock);
-	hlist_for_each_safe(node, tmp, &module->pmem_regions) {
-		region = hlist_entry(node, struct adsp_pmem_region, list);
-		hlist_del(node);
-		put_pmem_file(region->file);
-		kfree(region);
-	}
-	mutex_unlock(&module->pmem_regions_lock);
-	BUG_ON(!hlist_empty(&module->pmem_regions));
+	rc = adsp_pmem_del(module);
 
 	msm_adsp_put(module);
-	return 0;
+	return rc;
 }
 
 static void adsp_event(void *driver_data, unsigned id, size_t len,
@@ -497,13 +522,13 @@ static void adsp_event(void *driver_data, unsigned id, size_t len,
 	unsigned long flags;
 
 	if (len > ADSP_EVENT_MAX_SIZE) {
-		pr_err("adsp_event: event too large (%d bytes)\n", len);
+		MM_ERR("event too large (%d bytes)\n", len);
 		return;
 	}
 
 	event = kmalloc(sizeof(*event), GFP_ATOMIC);
 	if (!event) {
-		pr_err("adsp_event: cannot allocate buffer\n");
+		MM_ERR("cannot allocate buffer\n");
 		return;
 	}
 
@@ -545,13 +570,13 @@ static int adsp_open(struct inode *inode, struct file *filp)
 	if (!adev)
 		return -ENODEV;
 
-	pr_info("adsp_open() name = '%s'\n", adev->name);
+	MM_INFO("open '%s'\n", adev->name);
 
 	rc = msm_adsp_get(adev->name, &adev->module, &adsp_ops, adev);
 	if (rc)
 		return rc;
 
-	pr_info("adsp_open() module '%s' adev %p\n", adev->name, adev);
+	MM_INFO("opened module '%s' adev %p\n", adev->name, adev);
 	filp->private_data = adev;
 	adev->abort = 0;
 	INIT_HLIST_HEAD(&adev->module->pmem_regions);

@@ -3,7 +3,7 @@
  * MSM architecture cpufreq driver
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007 QUALCOMM Incorporated
+ * Copyright (c) 2007-2009, Code Aurora Forum. All rights reserved.
  * Author: Mike A. Chan <mikechan@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -17,39 +17,45 @@
  *
  */
 
-#include <linux/cpufreq.h>
 #include <linux/earlysuspend.h>
 #include <linux/init.h>
+#include <linux/cpufreq.h>
 #include "acpuclock.h"
 
+#define dprintk(msg...) \
+		cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
+
 #ifdef CONFIG_MSM_CPU_FREQ_SCREEN
-static void msm_early_suspend(struct early_suspend *handler) {
-	acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_OFF * 1000, 0);
+static void msm_early_suspend(struct early_suspend *handler)
+{
+       acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_OFF, SETRATE_CPUFREQ);
 }
 
-static void msm_late_resume(struct early_suspend *handler) {
-	acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_ON * 1000, 0);
+static void msm_late_resume(struct early_suspend *handler)
+{
+       acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_ON, SETRATE_CPUFREQ);
 }
 
 static struct early_suspend msm_power_suspend = {
-	.suspend = msm_early_suspend,
-	.resume = msm_late_resume,
+       .suspend = msm_early_suspend,
+       .resume = msm_late_resume,
 };
 
 static int __init clock_late_init(void)
 {
-	register_early_suspend(&msm_power_suspend);
-	return 0;
+       register_early_suspend(&msm_power_suspend);
+       return 0;
 }
 
 late_initcall(clock_late_init);
-#else
+#elif defined(CONFIG_CPU_FREQ_MSM)
 
 static int msm_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
 				unsigned int relation)
 {
 	int index;
+	int ret = 0;
 	struct cpufreq_freqs freqs;
 	struct cpufreq_frequency_table *table =
 		cpufreq_frequency_get_table(smp_processor_id());
@@ -60,20 +66,18 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 		return -EINVAL;
 	}
 
-	if (policy->cur == table[index].frequency)
-		return 0;
-
 #ifdef CONFIG_CPU_FREQ_DEBUG
-	printk("msm_cpufreq_target %d r %d (%d-%d) selected %d\n", target_freq,
+	dprintk("target %d r %d (%d-%d) selected %d\n", target_freq,
 		relation, policy->min, policy->max, table[index].frequency);
 #endif
 	freqs.old = policy->cur;
 	freqs.new = table[index].frequency;
 	freqs.cpu = smp_processor_id();
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	acpuclk_set_rate(table[index].frequency * 1000, 0);
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	return 0;
+	ret = acpuclk_set_rate(table[index].frequency, SETRATE_CPUFREQ);
+	if (!ret)
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	return ret;
 }
 
 static int msm_cpufreq_verify(struct cpufreq_policy *policy)
@@ -88,17 +92,22 @@ static int __init msm_cpufreq_init(struct cpufreq_policy *policy)
 	struct cpufreq_frequency_table *table =
 		cpufreq_frequency_get_table(smp_processor_id());
 
-	BUG_ON(cpufreq_frequency_table_cpuinfo(policy, table));
 	policy->cur = acpuclk_get_rate();
+	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
+		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
+#endif
+	}
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+#endif
+
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
 	return 0;
 }
-
-static struct freq_attr *msm_cpufreq_attr[] = {
-	&cpufreq_freq_attr_scaling_available_freqs,
-	NULL,
-};
 
 static struct cpufreq_driver msm_cpufreq_driver = {
 	/* lps calculations are handled here. */
@@ -107,7 +116,6 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 	.verify		= msm_cpufreq_verify,
 	.target		= msm_cpufreq_target,
 	.name		= "msm",
-	.attr		= msm_cpufreq_attr,
 };
 
 static int __init msm_cpufreq_register(void)
@@ -115,5 +123,5 @@ static int __init msm_cpufreq_register(void)
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
 
-device_initcall(msm_cpufreq_register);
+late_initcall(msm_cpufreq_register);
 #endif

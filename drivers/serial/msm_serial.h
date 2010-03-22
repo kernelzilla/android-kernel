@@ -47,11 +47,14 @@
 #define UART_CSR_19200	0xBB
 #define UART_CSR_14400	0xAA
 #define UART_CSR_9600	0x99
+#define UART_CSR_7200	0x88
 #define UART_CSR_4800	0x77
 #define UART_CSR_2400	0x55
 #define UART_CSR_1200	0x44
 #define UART_CSR_600	0x33
 #define UART_CSR_300	0x22
+#define UART_CSR_150	0x11
+#define UART_CSR_75	0x00
 
 #define UART_TF		0x000C
 

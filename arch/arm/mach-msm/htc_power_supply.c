@@ -63,9 +63,9 @@ static struct dock_state ds = {
 
 #define _GPIO_DOCK MAHIMAHI_GPIO_DOCK
 
-#define dock_out(n) gpio_direction_output(_GPIO_DOCK, n)
+#define dock_out(n) qcom_gpio_direction_output(_GPIO_DOCK, n)
 #define dock_out2(n) gpio_set_value(_GPIO_DOCK, n)
-#define dock_in() gpio_direction_input(_GPIO_DOCK)
+#define dock_in() qcom_gpio_direction_input(_GPIO_DOCK)
 #define dock_read() gpio_get_value(_GPIO_DOCK)
 
 #define MFM_DELAY_NS 10000
@@ -596,7 +596,7 @@ static struct msm_rpc_server battery_server = {
 static int __init htc_battery_init(void)
 {
 	int ret;
-	gpio_request(_GPIO_DOCK, "dock");
+	qcom_gpio_request(_GPIO_DOCK, "dock");
 	dock_in();
 	wake_lock_init(&dock_work_wake_lock, WAKE_LOCK_SUSPEND, "dock");
 	platform_driver_register(&htc_battery_driver);

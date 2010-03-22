@@ -51,6 +51,15 @@ config TWL4030_USB
 	  This transceiver supports high and full speed devices plus,
 	  in host mode, low speed.
 
+config USB_MSM_OTG_72K
+	bool "OTG support for Qualcomm on-chip USB controller"
+	depends on ARCH_MSM
+	select USB_OTG_UTILS
+	default USB_MSM_72K
+	help
+	  Minimal tranceiver driver which would start/stop the host/gadget
+	  depending on ID and VBUS interrupts.
+
 config NOP_USB_XCEIV
 	tristate "NOP USB Transceiver Driver"
 	select USB_OTG_UTILS

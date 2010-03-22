@@ -1,3 +1,5 @@
+#warning compile out
+#if 0
 /* drivers/input/misc/gpio_output.c
  *
  * Copyright (C) 2007 Google, Inc.
@@ -95,3 +97,4 @@ err_bad_keymap:
 	return ret;
 }
 
+#endif

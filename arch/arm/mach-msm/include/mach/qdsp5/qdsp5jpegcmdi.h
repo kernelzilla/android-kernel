@@ -6,7 +6,7 @@
     J P E G  I N T E R N A L  C O M M A N D S
 
 GENERAL DESCRIPTION
-  This file contains defintions of format blocks of commands
+  This file contains defintions of format blocks of commands 
   that are accepted by JPEG Task
 
 REFERENCES
@@ -15,12 +15,12 @@ REFERENCES
 EXTERNALIZED FUNCTIONS
   None
 
-Copyright(c) 1992 - 2008 by QUALCOMM, Incorporated.
+Copyright (c) 1992-2009, Code Aurora Forum. All rights reserved.
 
 This software is licensed under the terms of the GNU General Public
 License version 2, as published by the Free Software Foundation, and
 may be copied, distributed, and modified under those terms.
-
+ 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -33,9 +33,10 @@ GNU General Public License for more details.
 
 This section contains comments describing changes made to this file.
 Notice that changes are listed in reverse chronological order.
-
-$Header: //source/qcom/qct/multimedia2/AdspSvc/7XXX/qdsp5cmd/video/qdsp5jpegcmdi.h#2 $ $DateTime: 2008/07/30 10:50:23 $ $Author: pavanr $
-Revision History:
+   
+ 
+$Header: //source/qcom/qct/multimedia2/AdspSvc/7XXX/qdsp5cmd/video/qdsp5jpegcmdi.h#2 $ $DateTime: 2008/07/30 10:50:23 $ $Author: pavanr $                     
+Revision History:                                            
 when       who     what, where, why
 --------   ---     ----------------------------------------------------------
 06/09/08   sv      initial version
@@ -275,7 +276,7 @@ typedef struct {
  * Command to start the encode process
  */
 
-#define	JPEG_CMD_ENC_ENCODE		0x0000
+#define	JPEG_CMD_ENC_ENCODE		0x0001
 #define	JPEG_CMD_ENC_ENCODE_LEN		sizeof(jpeg_cmd_enc_encode)
 
 
@@ -288,7 +289,7 @@ typedef struct {
  * Command to transition from current state of encoder to IDLE state
  */
 
-#define	JPEG_CMD_ENC_IDLE		0x0001
+#define	JPEG_CMD_ENC_IDLE		0x0006
 #define	JPEG_CMD_ENC_IDLE_LEN		sizeof(jpeg_cmd_enc_idle)
 
 
@@ -329,7 +330,7 @@ typedef struct {
  * Command to transition from the current state of decoder to IDLE
  */
 
-#define	JPEG_CMD_DEC_IDLE	0x0004
+#define	JPEG_CMD_DEC_IDLE	0x0007
 #define	JPEG_CMD_DEC_IDLE_LEN	sizeof(jpeg_cmd_dec_idle)
 
 
@@ -342,7 +343,7 @@ typedef struct {
  * Command to inform that an op buffer is ready for use
  */
 
-#define	JPEG_CMD_DEC_OP_CONSUMED	0x0005
+#define	JPEG_CMD_DEC_OP_CONSUMED	0x0004
 #define	JPEG_CMD_DEC_OP_CONSUMED_LEN	sizeof(jpeg_cmd_dec_op_consumed)
 
 
@@ -358,7 +359,7 @@ typedef struct {
  * Command to pass a new ip buffer to the jpeg decoder
  */
 
-#define	JPEG_CMD_DEC_IP	0x0006
+#define	JPEG_CMD_DEC_IP	0x0005
 #define	JPEG_CMD_DEC_IP_LEN	sizeof(jpeg_cmd_dec_ip_len)
 
 #define	JPEG_CMD_EOI_INDICATOR_NOT_END	0x0000

@@ -37,3 +37,5 @@ obj-$(CONFIG_KEYBOARD_TOSA)		+= tosakbd.o
 obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
 obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
 obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
+obj-$(CONFIG_KEYBOARD_I2C_MSM)		+= msm-i2ckbd.o
+obj-$(CONFIG_KEYBOARD_PMIC8058)		+= pmic8058-keypad.o

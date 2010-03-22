@@ -7,6 +7,11 @@
 #
 FONTMAPFILE = cp437.uni
 
+ifeq ($(CONFIG_ARM),y)
+# This warning will never go away until a keyboard is defined for this target.
+CFLAGS_REMOVE_keyboard.o = -Werror
+endif
+
 obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o tty_buffer.o tty_port.o
 
 obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
@@ -70,6 +75,8 @@ obj-$(CONFIG_PRINTER)		+= lp.o
 
 obj-$(CONFIG_APM_EMULATION)	+= apm-emulation.o
 
+obj-$(CONFIG_DIAG_CHAR)         += diag/
+
 obj-$(CONFIG_DTLK)		+= dtlk.o
 obj-$(CONFIG_R3964)		+= n_r3964.o
 obj-$(CONFIG_APPLICOM)		+= applicom.o
@@ -112,6 +119,9 @@ obj-$(CONFIG_PS3_FLASH)		+= ps3flash.o
 
 obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
+
+obj-$(CONFIG_MSM_KGSL)          += msm_kgsl/
+obj-$(CONFIG_MSM_ROTATOR)	+= msm_rotator.o
 
 # Files generated that shall be removed upon make clean
 clean-files := consolemap_deftbl.c defkeymap.c

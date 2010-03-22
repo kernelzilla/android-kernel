@@ -1012,7 +1012,7 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
  * on each other, and help provide better diagnostics in debugfs.
  * They're called even less than the "set direction" calls.
  */
-int gpio_request(unsigned gpio, const char *label)
+int _gpio_request(unsigned gpio, const char *label)
 {
 	struct gpio_desc	*desc;
 	struct gpio_chip	*chip;
@@ -1064,9 +1064,9 @@ done:
 	spin_unlock_irqrestore(&gpio_lock, flags);
 	return status;
 }
-EXPORT_SYMBOL_GPL(gpio_request);
+EXPORT_SYMBOL_GPL(_gpio_request);
 
-void gpio_free(unsigned gpio)
+void _gpio_free(unsigned gpio)
 {
 	unsigned long		flags;
 	struct gpio_desc	*desc;
@@ -1100,7 +1100,7 @@ void gpio_free(unsigned gpio)
 
 	spin_unlock_irqrestore(&gpio_lock, flags);
 }
-EXPORT_SYMBOL_GPL(gpio_free);
+EXPORT_SYMBOL_GPL(_gpio_free);
 
 
 /**
@@ -1142,7 +1142,7 @@ EXPORT_SYMBOL_GPL(gpiochip_is_requested);
  * rely on gpio_request() having been called beforehand.
  */
 
-int gpio_direction_input(unsigned gpio)
+int _gpio_direction_input(unsigned gpio)
 {
 	unsigned long		flags;
 	struct gpio_chip	*chip;
@@ -1193,9 +1193,9 @@ fail:
 			__func__, gpio, status);
 	return status;
 }
-EXPORT_SYMBOL_GPL(gpio_direction_input);
+EXPORT_SYMBOL_GPL(_gpio_direction_input);
 
-int gpio_direction_output(unsigned gpio, int value)
+int _gpio_direction_output(unsigned gpio, int value)
 {
 	unsigned long		flags;
 	struct gpio_chip	*chip;
@@ -1246,7 +1246,7 @@ fail:
 			__func__, gpio, status);
 	return status;
 }
-EXPORT_SYMBOL_GPL(gpio_direction_output);
+EXPORT_SYMBOL_GPL(_gpio_direction_output);
 
 
 /* I/O calls are only valid after configuration completed; the relevant

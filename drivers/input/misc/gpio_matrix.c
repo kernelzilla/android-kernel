@@ -19,6 +19,7 @@
 #include <linux/hrtimer.h>
 #include <linux/interrupt.h>
 #include <linux/wakelock.h>
+#include <mach/gpio.h>
 
 struct gpio_kp {
 	struct gpio_event_input_devs *input_devs;
@@ -161,7 +162,7 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		if (gpio_keypad_flags & GPIOKPF_DRIVE_INACTIVE)
 			gpio_set_value(gpio, !polarity);
 		else
-			gpio_direction_input(gpio);
+			qcom_gpio_direction_input(gpio);
 		out++;
 	}
 	kp->current_output = out;
@@ -170,7 +171,7 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		if (gpio_keypad_flags & GPIOKPF_DRIVE_INACTIVE)
 			gpio_set_value(gpio, polarity);
 		else
-			gpio_direction_output(gpio, polarity);
+			qcom_gpio_direction_output(gpio, polarity);
 		hrtimer_start(timer, mi->settle_time, HRTIMER_MODE_REL);
 		return HRTIMER_NORESTART;
 	}
@@ -200,7 +201,7 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		if (gpio_keypad_flags & GPIOKPF_DRIVE_INACTIVE)
 			gpio_set_value(mi->output_gpios[out], polarity);
 		else
-			gpio_direction_output(mi->output_gpios[out], polarity);
+			qcom_gpio_direction_output(mi->output_gpios[out], polarity);
 	}
 	for (in = 0; in < mi->ninputs; in++)
 		enable_irq(gpio_to_irq(mi->input_gpios[in]));
@@ -225,7 +226,7 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 			gpio_set_value(mi->output_gpios[i],
 				!(gpio_keypad_flags & GPIOKPF_ACTIVE_HIGH));
 		else
-			gpio_direction_input(mi->output_gpios[i]);
+			qcom_gpio_direction_input(mi->output_gpios[i]);
 	}
 	wake_lock(&kp->wake_lock);
 	hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
@@ -341,17 +342,17 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 				err = -EINVAL;
 				goto err_request_output_gpio_failed;
 			}
-			err = gpio_request(mi->output_gpios[i], "gpio_kp_out");
+			err = qcom_gpio_request(mi->output_gpios[i], "gpio_kp_out");
 			if (err) {
-				pr_err("gpiomatrix: gpio_request failed for "
+				pr_err("gpiomatrix: qcom_gpio_request failed for "
 					"output %d\n", mi->output_gpios[i]);
 				goto err_request_output_gpio_failed;
 			}
 			if (mi->flags & GPIOKPF_DRIVE_INACTIVE)
-				err = gpio_direction_output(mi->output_gpios[i],
+				err = qcom_gpio_direction_output(mi->output_gpios[i],
 					!(mi->flags & GPIOKPF_ACTIVE_HIGH));
 			else
-				err = gpio_direction_input(mi->output_gpios[i]);
+				err = qcom_gpio_direction_input(mi->output_gpios[i]);
 			if (err) {
 				pr_err("gpiomatrix: gpio_configure failed for "
 					"output %d\n", mi->output_gpios[i]);
@@ -359,17 +360,17 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 			}
 		}
 		for (i = 0; i < mi->ninputs; i++) {
-			err = gpio_request(mi->input_gpios[i], "gpio_kp_in");
+			err = qcom_gpio_request(mi->input_gpios[i], "gpio_kp_in");
 			if (err) {
-				pr_err("gpiomatrix: gpio_request failed for "
+				pr_err("gpiomatrix: qcom_gpio_request failed for "
 					"input %d\n", mi->input_gpios[i]);
 				goto err_request_input_gpio_failed;
 			}
-			err = gpio_direction_input(mi->input_gpios[i]);
+			err = qcom_gpio_direction_input(mi->input_gpios[i]);
 			if (err) {
-				pr_err("gpiomatrix: gpio_direction_input failed"
+				pr_err("gpiomatrix: qcom_gpio_direction_input failed"
 					" for input %d\n", mi->input_gpios[i]);
-				goto err_gpio_direction_input_failed;
+				goto err_qcom_gpio_direction_input_failed;
 			}
 		}
 		kp->current_output = mi->noutputs;
@@ -403,14 +404,14 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 	hrtimer_cancel(&kp->timer);
 	wake_lock_destroy(&kp->wake_lock);
 	for (i = mi->noutputs - 1; i >= 0; i--) {
-err_gpio_direction_input_failed:
-		gpio_free(mi->input_gpios[i]);
+err_qcom_gpio_direction_input_failed:
+		qcom_gpio_free(mi->input_gpios[i]);
 err_request_input_gpio_failed:
 		;
 	}
 	for (i = mi->noutputs - 1; i >= 0; i--) {
 err_output_gpio_configure_failed:
-		gpio_free(mi->output_gpios[i]);
+		qcom_gpio_free(mi->output_gpios[i]);
 err_request_output_gpio_failed:
 		;
 	}

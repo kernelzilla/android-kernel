@@ -29,13 +29,13 @@
 void audio_client_dump(struct audio_client *ac);
 
 #define BUFSZ (3072)
+#define DMASZ (BUFSZ * 2)
 
 struct pcm {
 	struct mutex lock;
 	struct audio_client *ac;
 	uint32_t sample_rate;
 	uint32_t channel_count;
-	size_t buffer_size;
 };
 
 static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -74,7 +74,7 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (pcm->ac) {
 			rc = -EBUSY;
 		} else {
-			pcm->ac = q6audio_open_pcm(pcm->buffer_size, pcm->sample_rate,
+			pcm->ac = q6audio_open_pcm(BUFSZ, pcm->sample_rate,
 						   pcm->channel_count,
 						   AUDIO_FLAG_WRITE, acdb_id);
 			if (!pcm->ac)
@@ -100,22 +100,13 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EINVAL;
 			break;
 		}
-		if (config.sample_rate < 8000 || config.sample_rate > 48000) {
-			rc = -EINVAL;
-			break;
-		}
-		if (config.buffer_size < 128 || config.buffer_size > 8192) {
-			rc = -EINVAL;
-			break;
-		}
 		pcm->sample_rate = config.sample_rate;
 		pcm->channel_count = config.channel_count;
-		pcm->buffer_size = config.buffer_size;
 		break;
 	}
 	case AUDIO_GET_CONFIG: {
 		struct msm_audio_config config;
-		config.buffer_size = pcm->buffer_size;
+		config.buffer_size = BUFSZ;
 		config.buffer_count = 2;
 		config.sample_rate = pcm->sample_rate;
 		config.channel_count = pcm->channel_count;
@@ -127,10 +118,20 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
+	case AUDIO_SET_EQ: {
+		struct msm_audio_eq_stream_config eq_config;
+		if (copy_from_user(&eq_config, (void *) arg,
+						sizeof(eq_config))) {
+			rc = -EFAULT;
+			break;
+		}
+		rc = q6audio_set_stream_eq_pcm(pcm->ac, (void *) &eq_config);
+		break;
+	}
 	default:
 		rc = -EINVAL;
 	}
-		mutex_unlock(&pcm->lock);
+	mutex_unlock(&pcm->lock);
 	return rc;
 }
 
@@ -147,7 +148,6 @@ static int pcm_open(struct inode *inode, struct file *file)
 	mutex_init(&pcm->lock);
 	pcm->channel_count = 2;
 	pcm->sample_rate = 44100;
-	pcm->buffer_size = BUFSZ;
 
 	file->private_data = pcm;
 	return 0;
@@ -176,7 +176,7 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 			if (!wait_event_timeout(ac->wait, (ab->used == 0), 5*HZ)) {
 				audio_client_dump(ac);
 				pr_err("pcm_write: timeout. dsp dead?\n");
-				q6audio_dsp_not_responding();
+				BUG();
 			}
 
 		xfer = count;
@@ -189,7 +189,8 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 		buf += xfer;
 		count -= xfer;
 
-		ab->used = xfer;
+		ab->used = 1;
+		ab->actual_size = xfer;
 		q6audio_write(ac, ab);
 		ac->cpu_buf ^= 1;
 	}
@@ -203,7 +204,6 @@ static int pcm_release(struct inode *inode, struct file *file)
 	if (pcm->ac)
 		q6audio_close(pcm->ac);
 	kfree(pcm);
-	pr_info("pcm_out: release\n");
 	return 0;
 }
 

@@ -55,10 +55,10 @@
 
 #include "gpio_chip.h"
 #include "board-sapphire.h"
+#include "pm.h"
 
 #include <mach/board.h>
 #include <mach/board_htc.h>
-#include <mach/msm_serial_debugger.h>
 #include <mach/msm_serial_hs.h>
 #include <mach/htc_pwrsink.h>
 
@@ -169,6 +169,7 @@ static struct sapphire_axis_info sapphire_y_axis = {
 
 static struct gpio_event_direct_entry sapphire_nav_buttons[] = {
 	{ SAPPHIRE_GPIO_NAVI_ACT_N, BTN_MOUSE },
+	{ SAPPHIRE_GPIO_SEARCH_ACT_N, KEY_COMPOSE }, /* CPLD Key Search */
 };
 
 static struct gpio_event_input_info sapphire_nav_button_info = {
@@ -541,20 +542,16 @@ static void h2w_config_cpld(int route)
 
 static void h2w_init_cpld(void)
 {
-	h2w_config_cpld(H2W_UART3);
+	h2w_config_cpld(H2W_GPIO);
 }
 
-static int h2w_dat_value;
 static void set_h2w_dat(int n)
 {
-	h2w_dat_value = n;
 	gpio_set_value(SAPPHIRE_GPIO_H2W_DATA, n);
 }
 
-static int h2w_clk_value;
 static void set_h2w_clk(int n)
 {
-	h2w_clk_value = n;
 	gpio_set_value(SAPPHIRE_GPIO_H2W_CLK, n);
 }
 
@@ -563,7 +560,7 @@ static void set_h2w_dat_dir(int n)
 	if (n == 0) /* input */
 		gpio_direction_input(SAPPHIRE_GPIO_H2W_DATA);
 	else
-		gpio_direction_output(SAPPHIRE_GPIO_H2W_DATA, h2w_dat_value);
+		gpio_configure(SAPPHIRE_GPIO_H2W_DATA, GPIOF_DRIVE_OUTPUT);
 
 	gpio_set_value(SAPPHIRE_GPIO_H2W_DAT_DIR, n);
 
@@ -574,7 +571,7 @@ static void set_h2w_clk_dir(int n)
 	if (n == 0) /* input */
 		gpio_direction_input(SAPPHIRE_GPIO_H2W_CLK);
 	else
-		gpio_direction_output(SAPPHIRE_GPIO_H2W_CLK, h2w_clk_value);
+		gpio_configure(SAPPHIRE_GPIO_H2W_CLK, GPIOF_DRIVE_OUTPUT);
 
 	gpio_set_value(SAPPHIRE_GPIO_H2W_CLK_DIR, n);
 }
@@ -621,7 +618,6 @@ static struct h2w_platform_data sapphire_h2w_data = {
 	.cable_in2		= SAPPHIRE_GPIO_CABLE_IN2,
 	.h2w_clk		= SAPPHIRE_GPIO_H2W_CLK,
 	.h2w_data		= SAPPHIRE_GPIO_H2W_DATA,
-	.headset_mic_35mm	= SAPPHIRE_GPIO_AUD_HSMIC_DET_N,
 	.debug_uart 		= H2W_UART3,
 	.config_cpld 		= h2w_config_cpld,
 	.init_cpld 		= h2w_init_cpld,
@@ -723,10 +719,10 @@ static int sapphire_pwrsink_suspend_late(struct platform_device *pdev, pm_messag
 static struct pwr_sink_platform_data sapphire_pwrsink_data = {
 	.num_sinks	= ARRAY_SIZE(sapphire_pwrsink_table),
 	.sinks		= sapphire_pwrsink_table,
-	.suspend_late	= sapphire_pwrsink_suspend_late,
-	.resume_early	= sapphire_pwrsink_resume_early,
-	.suspend_early	= sapphire_pwrsink_suspend_early,
-	.resume_late	= sapphire_pwrsink_resume_late,
+	.suspend_late	= NULL,
+	.resume_early	= NULL,
+	.suspend_early	= NULL,
+	.resume_late	= NULL,
 };
 
 static struct platform_device sapphire_pwr_sink = {
@@ -863,6 +859,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_mt9t013_data = {
 	.sensor_pwd     = 85,
 	.vcm_pwd        = SAPPHIRE_GPIO_VCM_PWDN,
 	.pdata          = &msm_camera_device_data,
+	.flash_type     = MSM_CAMERA_FLASH_NONE
 };
 
 static struct platform_device msm_camera_sensor_mt9t013 = {
@@ -880,6 +877,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_mt9p012_data = {
 	.sensor_pwd	= 85,
 	.vcm_pwd        = SAPPHIRE_GPIO_VCM_PWDN,
 	.pdata		= &msm_camera_device_data,
+	.flash_type     = MSM_CAMERA_FLASH_NONE
 };
 
 static struct platform_device msm_camera_sensor_mt9p012 = {
@@ -910,6 +908,7 @@ static struct platform_device sapphire_camera = {
 
 static struct platform_device *devices[] __initdata = {
 	&msm_device_smd,
+	&msm_device_dmov,
 	&msm_device_nand,
 	&msm_device_i2c,
 	&msm_device_uart1,
@@ -920,7 +919,6 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_uart_dm1,
 #endif
 	&sapphire_nav_device,
-	&sapphire_search_button_device,
 	&sapphire_reset_keys_device,
 	&android_leds,
 #ifdef CONFIG_LEDS_CPLD
@@ -1106,26 +1104,34 @@ static void __init config_gpios(void)
 	config_sapphire_camera_off_gpios();
 }
 
+void msm_serial_debug_init(unsigned int base, int irq,
+			   struct device *clk_device, int signal_irq);
+
 static struct msm_acpu_clock_platform_data sapphire_clock_data = {
 	.acpu_switch_time_us = 20,
 	.max_speed_delta_khz = 256000,
 	.vdd_switch_time_us = 62,
-	.power_collapse_khz = 19200000,
-	.wait_for_irq_khz = 128000000,
 };
 
 #ifdef CONFIG_SERIAL_MSM_HS
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.rx_wakeup_irq = MSM_GPIO_TO_INT(45),
+	.wakeup_irq = MSM_GPIO_TO_INT(45),
 	.inject_rx_on_wakeup = 1,
 	.rx_to_inject = 0x32,
 };
 #endif
 
+static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR] = {
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].latency = 16000,
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].latency = 12000,
+	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency = 2000,
+};
+
 static void __init sapphire_init(void)
 {
 	int rc;
-	printk("sapphire_init() revision = 0x%X\n", system_rev);
+	int i;
+	printk("sapphire_init() revision=%d\n", system_rev);
 
 	/*
 	 * Setup common MSM GPIOS
@@ -1143,8 +1149,7 @@ static void __init sapphire_init(void)
 #if defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	if (!opt_disable_uart3)
 		msm_serial_debug_init(MSM_UART3_PHYS, INT_UART3,
-				      &msm_device_uart3.dev, 1,
-				      MSM_GPIO_TO_INT(86));
+				      &msm_device_uart3.dev, 1);
 #endif
 
 	/* gpio_configure(108, IRQF_TRIGGER_LOW); */
@@ -1159,9 +1164,6 @@ static void __init sapphire_init(void)
 		sapphire_gpio_write(NULL, SAPPHIRE_GPIO_VCM_PWDN, 1);
 	mdelay(100);
 
-	printk(KERN_DEBUG "sapphire_is_5M_camera=%d\n",
-	       sapphire_is_5M_camera());
-	printk(KERN_DEBUG "is_12pin_camera=%d\n", is_12pin_camera());
 #ifdef CONFIG_SERIAL_MSM_HS
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 #endif
@@ -1189,6 +1191,7 @@ static void __init sapphire_init(void)
 		sapphire_search_button_info.keymap = sapphire_search_button_v1;
 
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
+	msm_pm_set_platform_data(msm_pm_data);
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
@@ -1204,16 +1207,22 @@ static struct map_desc sapphire_io_desc[] __initdata = {
 
 unsigned int sapphire_get_hwid(void)
 {
+	printk(KERN_DEBUG "sapphire_get_hwid=0x%x\r\n", hwid);
+
 	return hwid;
 }
 
 unsigned int sapphire_get_skuid(void)
 {
+	printk(KERN_DEBUG "sapphire_get_skuid=0x%x\r\n", skuid);
+
 	return skuid;
 }
 
 unsigned sapphire_engineerid(void)
 {
+	printk(KERN_DEBUG "sapphire_engineerid=0x%x\r\n", engineerid);
+
 	return engineerid;
 }
 
@@ -1224,6 +1233,7 @@ int sapphire_is_5M_camera(void)
 		ret = 1;
 	else if (sapphire_get_skuid() == 0x20100 && !(sapphire_engineerid() & 0x02))
 		ret = 1;
+	printk(KERN_DEBUG "sapphire_is_5M_camera=%d\n", ret);
 	return ret;
 }
 
@@ -1236,12 +1246,13 @@ unsigned int is_12pin_camera(void)
 		ret = 1;
 	else
 		ret = 0;
+	printk(KERN_DEBUG "is_12pin_camera=%d\r\n", ret);
 	return ret;
 }
 
 int sapphire_get_smi_size(void)
 {
-	printk(KERN_DEBUG "get_smi_size=%d\n", smi_sz);
+	printk(KERN_DEBUG "get_smi_size=%d\r\n", smi_sz);
 	return smi_sz;
 }
 
@@ -1287,7 +1298,7 @@ MACHINE_START(SAPPHIRE, "sapphire")
 	.phys_io        = MSM_DEBUG_UART_PHYS,
 	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
-	.boot_params    = 0x10000100,
+	.boot_params    = PHYS_OFFSET + 0x100,
 	.fixup          = sapphire_fixup,
 	.map_io         = sapphire_map_io,
 	.init_irq       = sapphire_init_irq,

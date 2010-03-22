@@ -1,3 +1,5 @@
+#warning compile out
+#if 0
 /* drivers/misc/timed_gpio.c
  *
  * Copyright (C) 2008 Google, Inc.
@@ -173,3 +175,4 @@ module_exit(timed_gpio_exit);
 MODULE_AUTHOR("Mike Lockwood <lockwood@android.com>");
 MODULE_DESCRIPTION("timed gpio driver");
 MODULE_LICENSE("GPL");
+#endif

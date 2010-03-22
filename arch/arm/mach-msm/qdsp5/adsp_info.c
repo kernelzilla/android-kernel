@@ -1,7 +1,6 @@
 /* arch/arm/mach-msm/adsp_info.c
  *
- * Copyright (c) 2008 QUALCOMM Incorporated.
- * Copyright (c) 2008 QUALCOMM USA, INC.
+ * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -60,6 +59,12 @@
 #define QDSP_MODULE_MIDI                    0x0106dd95
 #define QDSP_MODULE_GAUDIO                  0x0106dd96
 #define QDSP_MODULE_VDEC_LP_MODE            0x0106dd97
+#define QDSP_MODULE_VIDEO_AAC_VOC_TURBO     0x01089f77
+#define QDSP_MODULE_VIDEO_AMR_TURBO         0x01089f78
+#define QDSP_MODULE_WM_TURBO_MODE           0x01089f79
+#define QDSP_MODULE_VDEC_LP_MODE_TURBO      0x01089f7a
+#define QDSP_MODULE_AUDREC0TASK             0x0109696f
+#define QDSP_MODULE_AUDREC1TASK             0x01096970
 #define QDSP_MODULE_MAX                     0x7fffffff
 
    /* DO NOT USE: Force this enum to be a 32bit type to improve speed */
@@ -75,9 +80,13 @@ static uint32_t	*qdsp_queue_offset_table[IMG_MAX];
 
 static struct adsp_module_info module_info[] = {
 	QDSP_MODULE(AUDPLAY0TASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDPLAY1TASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDPLAY2TASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDPLAY3TASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDPPTASK, NULL, 0, NULL, NULL),
-	QDSP_MODULE(AUDRECTASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDPREPROCTASK, NULL, 0, NULL, NULL),
+#if !defined(CONFIG_ARCH_MSM7X30)
+	QDSP_MODULE(AUDRECTASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(VFETASK, "vfe_clk", 0, adsp_vfe_verify_cmd,
 		adsp_vfe_patch_event),
 	QDSP_MODULE(QCAMTASK, NULL, 0, NULL, NULL),
@@ -89,6 +98,15 @@ static struct adsp_module_info module_info[] = {
 	QDSP_MODULE(VDEC_LP_MODE, NULL, 0, NULL, NULL),
 	QDSP_MODULE(VIDEOENCTASK, "vdc_clk", 96000000,
 		adsp_videoenc_verify_cmd, NULL),
+	QDSP_MODULE(VIDEO_AAC_VOC_TURBO, NULL, 0, NULL, NULL),
+	QDSP_MODULE(VIDEO_AMR_TURBO, NULL, 0, NULL, NULL),
+	QDSP_MODULE(WM_TURBO_MODE, NULL, 0, NULL, NULL),
+	QDSP_MODULE(VDEC_LP_MODE_TURBO, NULL, 0, NULL, NULL),
+#else
+	QDSP_MODULE(AFETASK , NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDREC0TASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDREC1TASK, NULL, 0, NULL, NULL),
+#endif
 };
 
 int adsp_init_info(struct adsp_info *info)

@@ -2,8 +2,8 @@
  *
  * Verification code for aDSP VFE packets from userspace.
  *
- * Copyright (c) 2008 QUALCOMM Incorporated
  * Copyright (C) 2008 Google, Inc.
+ * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -16,6 +16,7 @@
  *
  */
 
+#include <mach/debug_adsp_mm.h>
 #include <mach/qdsp5/qdsp5vfecmdi.h>
 #include "adsp.h"
 
@@ -123,7 +124,8 @@ static int verify_vfe_command(struct msm_adsp_module *module,
 		return verify_cmd_stats_wb_exp_ack(module, cmd_data, cmd_size);
 	default:
 		if (cmd_id > 29) {
-			printk(KERN_ERR "adsp: module %s: invalid VFE command id %d\n", module->name, cmd_id);
+			MM_ERR("module %s: invalid VFE command id %d\n",
+					module->name, cmd_id);
 			return -1;
 		}
 	}
@@ -136,7 +138,8 @@ static int verify_vfe_command_scale(struct msm_adsp_module *module,
 	uint32_t cmd_id = ((uint32_t *)cmd_data)[0];
 	// FIXME: check the size
 	if (cmd_id > 1) {
-		printk(KERN_ERR "adsp: module %s: invalid VFE SCALE command id %d\n", module->name, cmd_id);
+		MM_ERR("module %s: invalid VFE SCALE command id %d\n",
+				module->name, cmd_id);
 		return -1;
 	}
 	return 0;
@@ -166,7 +169,8 @@ static int verify_vfe_command_table(struct msm_adsp_module *module,
 		vfe_cmd_axi_ip_cfg *cmd = (vfe_cmd_axi_ip_cfg *)cmd_data;
 		uint32_t size;
 		if (cmd_size != sizeof(vfe_cmd_axi_ip_cfg)) {
-			printk(KERN_ERR "adsp: module %s: invalid VFE TABLE (VFE_CMD_AXI_IP_CFG) command size %d\n",
+			MM_ERR("module %s: invalid VFE TABLE \
+				(VFE_CMD_AXI_IP_CFG) command size %d\n",
 				module->name, cmd_size);
 			return -1;
 		}
@@ -185,7 +189,8 @@ static int verify_vfe_command_table(struct msm_adsp_module *module,
 		void **addr1_y, **addr2_y, **addr1_cbcr, **addr2_cbcr;
 
 		if (cmd_size != sizeof(vfe_cmd_axi_op_cfg)) { 
-			printk(KERN_ERR "adsp: module %s: invalid VFE TABLE (VFE_CMD_AXI_OP_CFG) command size %d\n",
+			MM_ERR("module %s: invalid VFE TABLE \
+				(VFE_CMD_AXI_OP_CFG) command size %d\n",
 				module->name, cmd_size);
 			return -1;
 		}
@@ -212,8 +217,8 @@ static int verify_vfe_command_table(struct msm_adsp_module *module,
 	}
 	default:
 		if (cmd_id > 4) {
-			printk(KERN_ERR "adsp: module %s: invalid VFE TABLE command id %d\n",
-				module->name, cmd_id);
+			MM_ERR("module %s: invalid VFE TABLE command \
+				id %d\n", module->name, cmd_id);
 			return -1;
 		}
 	}
@@ -232,8 +237,8 @@ int adsp_vfe_verify_cmd(struct msm_adsp_module *module,
 	case QDSP_vfeCommandTableQueue:
 		return verify_vfe_command_table(module, cmd_data, cmd_size);
 	default:
-		printk(KERN_ERR "adsp: module %s: unknown queue id %d\n",
-			module->name, queue_id);
+		MM_ERR("module %s: unknown queue id %d\n",
+			 module->name, queue_id);
 		return -1;
 	}
 }

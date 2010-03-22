@@ -2,8 +2,8 @@
  *
  * Verificion code for aDSP VENC packets from userspace.
  *
- * Copyright (c) 2008 QUALCOMM Incorporated
  * Copyright (C) 2008 Google, Inc.
+ * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -15,17 +15,9 @@
  * GNU General Public License for more details.
  *
  */
-#include <linux/io.h>
 
-#define ADSP_DEBUG_MSGS 0
-#if ADSP_DEBUG_MSGS
-#define DLOG(fmt,args...) \
-	do { printk(KERN_INFO "[%s:%s:%d] "fmt, __FILE__, __func__, __LINE__, \
-	     ##args); } \
-	while (0)
-#else
-#define DLOG(x...) do {} while (0)
-#endif
+#include <mach/debug_adsp_mm.h>
+#include <linux/io.h>
 
 #include <mach/qdsp5/qdsp5venccmdi.h>
 #include "adsp.h"
@@ -59,14 +51,19 @@ static int pmem_fixup_high_low(unsigned short *high,
 
 	phys_addr = high_low_short_to_ptr(*high, *low);
 	phys_size = (unsigned long)high_low_short_to_ptr(size_high, size_low);
-	DLOG("virt %x %x\n", phys_addr, phys_size);
-	if (adsp_pmem_fixup_kvaddr(module, &phys_addr, &kvaddr, phys_size)) {
-		DLOG("ah%x al%x sh%x sl%x addr %x size %x\n",
-			*high, *low, size_high, size_low, phys_addr, phys_size);
+	MM_DBG("virt %x %x\n", (unsigned int)phys_addr,
+			(unsigned int)phys_size);
+	if (adsp_pmem_fixup_kvaddr(module, &phys_addr, &kvaddr, phys_size,
+				NULL, NULL)) {
+		MM_ERR("ah%x al%x sh%x sl%x addr %x size %x\n",
+			*high, *low, size_high,
+			size_low, (unsigned int)phys_addr,
+			(unsigned int) phys_size);
 		return -1;
 	}
 	ptr_to_high_low_short(phys_addr, high, low);
-	DLOG("phys %x %x\n", phys_addr, phys_size);
+	MM_DBG("phys %x %x\n", (unsigned int)phys_addr,
+			(unsigned int)phys_size);
 	if (addr)
 		*addr = kvaddr;
 	if (size)
@@ -86,7 +83,8 @@ static int verify_venc_cmd(struct msm_adsp_module *module,
 	videnc_cmd_frame_start *frame_cmd;
 	videnc_cmd_dis *dis_cmd;
 
-	DLOG("cmd_size %d cmd_id %d cmd_data %x\n", cmd_size, cmd_id, cmd_data);
+	MM_DBG("cmd_size %d cmd_id %d cmd_data %x\n",
+		cmd_size, cmd_id, (unsigned int)cmd_data);
 	switch (cmd_id) {
 	case VIDENC_CMD_ACTIVE:
 		if (cmd_size < sizeof(videnc_cmd_active))
@@ -210,8 +208,7 @@ static int verify_venc_cmd(struct msm_adsp_module *module,
 			return -1;
 		break;
 	default:
-		printk(KERN_INFO "adsp_video:unknown encoder video command %u\n",
-			cmd_id);
+		MM_INFO("adsp_video:unknown encoder video cmd %u\n", cmd_id);
 		return 0;
 	}
 
@@ -225,10 +222,9 @@ int adsp_videoenc_verify_cmd(struct msm_adsp_module *module,
 {
 	switch (queue_id) {
 	case QDSP_mpuVEncCmdQueue:
-		DLOG("\n");
 		return verify_venc_cmd(module, cmd_data, cmd_size);
 	default:
-		printk(KERN_INFO "unknown video queue %u\n", queue_id);
+		MM_INFO("unknown video queue %u\n", queue_id);
 		return 0;
 	}
 }

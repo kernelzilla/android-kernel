@@ -544,7 +544,7 @@ KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
 
 ifdef CONFIG_DEBUG_INFO
-KBUILD_CFLAGS	+= -g
+KBUILD_CFLAGS	+= -gstabs
 KBUILD_AFLAGS	+= -gdwarf-2
 endif
 

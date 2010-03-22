@@ -22,6 +22,7 @@
 #include <mach/gpio.h>
 #include <mach/board.h>
 #include <mach/camera.h>
+#include <mach/clk.h>
 
 #define CAMIF_CFG_RMSK 0x1fffff
 #define CAM_SEL_BMSK 0x2
@@ -41,7 +42,7 @@
 #define EXT_CAM_HSYNC_POL_SEL_SHFT 0x10
 #define EXT_CAM_VSYNC_POL_SEL_SHFT 0xF
 #define MDDI_CLK_CHICKEN_BIT_SHFT  0x7
-#define APPS_RESET_OFFSET 0x00000210
+#define APPS_RESET_OFFSET 0x00000214
 
 static struct clk *camio_vfe_mdc_clk;
 static struct clk *camio_mdc_clk;
@@ -49,9 +50,9 @@ static struct clk *camio_vfe_clk;
 static struct clk *camio_vfe_axi_clk;
 static struct msm_camera_io_ext camio_ext;
 static struct resource *appio, *mdcio;
+
 void __iomem *appbase, *mdcbase;
 
-int clk_set_flags(struct clk *clk, unsigned long flags);
 
 int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 {
@@ -79,15 +80,8 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		break;
 	}
 
-	if (!IS_ERR(clk)) {
-		/* Set rate here *before* enabling the block to prevent
-		 * unstable clock from source.
-		 */
-		if (clktype == CAMIO_VFE_CLK && camio_vfe_clk) {
-			clk_set_rate(camio_vfe_clk, 96000000);
-		}
+	if (!IS_ERR(clk))
 		clk_enable(clk);
-	}
 	else
 		rc = -1;
 
@@ -146,7 +140,7 @@ int msm_camio_enable(struct platform_device *pdev)
 	camio_ext = camdev->ioext;
 
 	appio = request_mem_region(camio_ext.appphy,
-				   camio_ext.appsz, pdev->name);
+		camio_ext.appsz, pdev->name);
 	if (!appio) {
 		rc = -EBUSY;
 		goto enable_fail;
@@ -159,7 +153,7 @@ int msm_camio_enable(struct platform_device *pdev)
 	}
 
 	mdcio = request_mem_region(camio_ext.mdcphy,
-				   camio_ext.mdcsz, pdev->name);
+		camio_ext.mdcsz, pdev->name);
 	if (!mdcio) {
 		rc = -EBUSY;
 		goto mdc_busy;
@@ -177,7 +171,6 @@ int msm_camio_enable(struct platform_device *pdev)
 	msm_camio_clk_enable(CAMIO_MDC_CLK);
 	msm_camio_clk_enable(CAMIO_VFE_MDC_CLK);
 	msm_camio_clk_enable(CAMIO_VFE_AXI_CLK);
-
 	return 0;
 
 mdc_no_mem:
@@ -208,6 +201,11 @@ void msm_camio_disable(struct platform_device *pdev)
 	msm_camio_clk_disable(CAMIO_VFE_AXI_CLK);
 }
 
+void msm_disable_io_gpio_clk(struct platform_device *pdev)
+{
+	return;
+}
+
 void msm_camio_camif_pad_reg_reset(void)
 {
 	uint32_t reg;
@@ -219,51 +217,53 @@ void msm_camio_camif_pad_reg_reset(void)
 	reg = (readl(mdcbase)) & CAMIF_CFG_RMSK;
 
 	mask = CAM_SEL_BMSK |
-	    CAM_PCLK_SRC_SEL_BMSK |
-	    CAM_PCLK_INVERT_BMSK |
-	    EXT_CAM_HSYNC_POL_SEL_BMSK |
+		CAM_PCLK_SRC_SEL_BMSK |
+		CAM_PCLK_INVERT_BMSK |
+		EXT_CAM_HSYNC_POL_SEL_BMSK |
 	    EXT_CAM_VSYNC_POL_SEL_BMSK | MDDI_CLK_CHICKEN_BIT_BMSK;
 
 	value = 1 << CAM_SEL_SHFT |
-	    3 << CAM_PCLK_SRC_SEL_SHFT |
-	    0 << CAM_PCLK_INVERT_SHFT |
-	    0 << EXT_CAM_HSYNC_POL_SEL_SHFT |
+		3 << CAM_PCLK_SRC_SEL_SHFT |
+		0 << CAM_PCLK_INVERT_SHFT |
+		0 << EXT_CAM_HSYNC_POL_SEL_SHFT |
 	    0 << EXT_CAM_VSYNC_POL_SEL_SHFT | 0 << MDDI_CLK_CHICKEN_BIT_SHFT;
 	writel((reg & (~mask)) | (value & mask), mdcbase);
-	mdelay(10);
+	msleep(10);
 
 	reg = (readl(mdcbase)) & CAMIF_CFG_RMSK;
 	mask = CAM_PAD_REG_SW_RESET_BMSK;
 	value = 1 << CAM_PAD_REG_SW_RESET_SHFT;
 	writel((reg & (~mask)) | (value & mask), mdcbase);
-	mdelay(10);
+	msleep(10);
 
 	reg = (readl(mdcbase)) & CAMIF_CFG_RMSK;
 	mask = CAM_PAD_REG_SW_RESET_BMSK;
 	value = 0 << CAM_PAD_REG_SW_RESET_SHFT;
 	writel((reg & (~mask)) | (value & mask), mdcbase);
-	mdelay(10);
+	msleep(10);
 
 	msm_camio_clk_sel(MSM_CAMIO_CLK_SRC_EXTERNAL);
 
-	mdelay(10);
+	msleep(10);
+
+	/* todo: check return */
+	if (camio_vfe_clk)
+		clk_set_rate(camio_vfe_clk, 96000000);
 }
 
 void msm_camio_vfe_blk_reset(void)
 {
-#if 0
 	uint32_t val;
 
-	val = readl(appbase + 0x00000210);
+	val = readl(appbase + APPS_RESET_OFFSET);
 	val |= 0x1;
-	writel(val, appbase + 0x00000210);
+	writel(val, appbase + APPS_RESET_OFFSET);
 	mdelay(10);
 
-	val = readl(appbase + 0x00000210);
+	val = readl(appbase + APPS_RESET_OFFSET);
 	val &= ~0x1;
-	writel(val, appbase + 0x00000210);
+	writel(val, appbase + APPS_RESET_OFFSET);
 	mdelay(10);
-#endif
 }
 
 void msm_camio_camif_pad_reg_reset_2(void)

@@ -36,6 +36,15 @@ struct q6_device_info {
 #define Q6_RX		2
 #define Q6_TX_RX	3
 
+#define Q6_HW_HANDSET	0
+#define Q6_HW_HEADSET	1
+#define Q6_HW_SPEAKER	2
+#define Q6_HW_TTY	3
+#define Q6_HW_BT_SCO	4
+#define Q6_HW_BT_A2DP	5
+
+#define Q6_HW_COUNT	6
+
 #define CAD_HW_DEVICE_ID_HANDSET_MIC		0x01
 #define CAD_HW_DEVICE_ID_HANDSET_SPKR		0x02
 #define CAD_HW_DEVICE_ID_HEADSET_MIC		0x03

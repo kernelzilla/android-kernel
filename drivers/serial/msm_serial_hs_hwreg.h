@@ -1,7 +1,6 @@
 /* drivers/serial/msm_serial_hs_hwreg.h
  *
- * Copyright (c) 2007-2008 QUALCOMM Incorporated.
- * Copyright (c) 2008 QUALCOMM USA, INC.
+ * Copyright (c) 2007-2009, Code Aurora Forum. All rights reserved.
  * 
  * All source code in this file is licensed under the following license
  * except where indicated.

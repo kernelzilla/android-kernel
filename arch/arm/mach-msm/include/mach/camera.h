@@ -1,5 +1,19 @@
-/*
- * Copyright (C) 2008-2009 QUALCOMM Incorporated.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ *
  */
 
 #ifndef __ASM__ARCH_CAMERA_H
@@ -26,6 +40,7 @@
 #define NUM_WB_EXP_NEUTRAL_REGION_LINES 4
 #define NUM_WB_EXP_STAT_OUTPUT_BUFFERS  3
 #define NUM_AUTOFOCUS_MULTI_WINDOW_GRIDS 16
+#define NUM_STAT_OUTPUT_BUFFERS      3
 #define NUM_AF_STAT_OUTPUT_BUFFERS      3
 
 enum msm_queue {
@@ -39,16 +54,29 @@ enum vfe_resp_msg {
 	VFE_EVENT,
 	VFE_MSG_GENERAL,
 	VFE_MSG_SNAPSHOT,
-	VFE_MSG_OUTPUT1,
-	VFE_MSG_OUTPUT2,
+	VFE_MSG_OUTPUT_P,   /* preview (continuous mode ) */
+	VFE_MSG_OUTPUT_T,   /* thumbnail (snapshot mode )*/
+	VFE_MSG_OUTPUT_S,   /* main image (snapshot mode )*/
+	VFE_MSG_OUTPUT_V,   /* video   (continuous mode ) */
+	VFE_MSG_STATS_AEC,
 	VFE_MSG_STATS_AF,
-	VFE_MSG_STATS_WE,
+	VFE_MSG_STATS_AWB,
+	VFE_MSG_STATS_RS,
+	VFE_MSG_STATS_CS,
+	VFE_MSG_STATS_IHIST,
+	VFE_MSG_STATS_SKIN,
+	VFE_MSG_STATS_WE, /* AEC + AWB */
 };
+
+#define VFE31_OUTPUT_MODE_PT (0x1 << 0)
+#define VFE31_OUTPUT_MODE_S (0x1 << 1)
+#define VFE31_OUTPUT_MODE_V (0x1 << 2)
 
 struct msm_vfe_phy_info {
 	uint32_t sbuf_phy;
 	uint32_t y_phy;
 	uint32_t cbcr_phy;
+	uint8_t  output_id; /* VFE31_OUTPUT_MODE_PT/S/V */
 };
 
 struct msm_vfe_resp {
@@ -65,7 +93,6 @@ struct msm_vfe_callback {
 		gfp_t gfp);
 	void* (*vfe_alloc)(int, void *syncdata, gfp_t gfp);
 	void (*vfe_free)(void *ptr);
-	int (*flash_ctrl)(void *syncdata, int level);
 };
 
 struct msm_camvfe_fn {
@@ -104,10 +131,10 @@ struct msm_device_queue {
 };
 
 struct msm_sync {
-	/* These two queues are accessed from a process context only.  They contain
-	 * pmem descriptors for the preview frames and the stats coming from the
-	 * camera sensor.
-	 */
+	/* These two queues are accessed from a process context only
+	 * They contain pmem descriptors for the preview frames and the stats
+	 * coming from the camera sensor.
+	*/
 	struct hlist_head pmem_frames;
 	struct hlist_head pmem_stats;
 
@@ -128,6 +155,7 @@ struct msm_sync {
 	 * interrupt context, and by the control thread.
 	 */
 	struct msm_device_queue pict_q;
+	int get_pic_abort;
 
 	struct msm_camera_sensor_info *sdata;
 	struct msm_camvfe_fn vfefn;
@@ -141,11 +169,6 @@ struct msm_sync {
 	uint32_t pp_mask;
 	struct msm_queue_cmd *pp_prev;
 	struct msm_queue_cmd *pp_snap;
-
-	/* When this flag is set, we send preview-frame notifications to config
-	 * as well as to the frame queue.  By default, the flag is cleared.
-	 */
-	uint32_t report_preview_to_config;
 
 	const char *apps_id;
 
@@ -188,7 +211,6 @@ struct register_address_value_pair {
 struct msm_pmem_region {
 	struct hlist_node list;
 	unsigned long paddr;
-	unsigned long kvaddr;
 	unsigned long len;
 	struct file *file;
 	struct msm_pmem_info info;
@@ -197,8 +219,22 @@ struct msm_pmem_region {
 struct axidata {
 	uint32_t bufnum1;
 	uint32_t bufnum2;
+	uint32_t bufnum3;
 	struct msm_pmem_region *region;
 };
+
+#ifdef CONFIG_MSM_CAMERA_FLASH
+	int msm_camera_flash_set_led_state(
+		struct msm_camera_sensor_flash_data *fdata,
+		unsigned led_state);
+#else
+	static inline int msm_camera_flash_set_led_state(
+		struct msm_camera_sensor_flash_data *fdata,
+		unsigned led_state)
+	{
+		return -ENOTSUPP;
+	}
+#endif
 
 /* Below functions are added for V4L2 kernel APIs */
 struct msm_v4l2_driver {
@@ -230,6 +266,13 @@ enum msm_camio_clk_type {
 	CAMIO_VFE_CLK,
 	CAMIO_VFE_AXI_CLK,
 
+	CAMIO_VFE_CAMIF_CLK,
+	CAMIO_VFE_PBDG_CLK,
+	CAMIO_CAM_MCLK_CLK,
+	CAMIO_CAMIF_PAD_PBDG_CLK,
+	CAMIO_CSI_CLK,
+	CAMIO_CSI_VFE_CLK,
+	CAMIO_CSI_PCLK,
 	CAMIO_MAX_CLK
 };
 
@@ -274,7 +317,9 @@ int  msm_camio_clk_enable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_disable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_config(uint32_t freq);
 void msm_camio_clk_rate_set(int rate);
+void msm_camio_clk_rate_set_2(struct clk *clk, int rate);
 void msm_camio_clk_axi_rate_set(int rate);
+void msm_disable_io_gpio_clk(struct platform_device *);
 
 void msm_camio_camif_pad_reg_reset(void);
 void msm_camio_camif_pad_reg_reset_2(void);
@@ -285,4 +330,17 @@ void msm_camio_clk_sel(enum msm_camio_clk_src_type);
 void msm_camio_disable(struct platform_device *);
 int msm_camio_probe_on(struct platform_device *);
 int msm_camio_probe_off(struct platform_device *);
+int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
+int request_axi_qos(uint32_t freq);
+int update_axi_qos(uint32_t freq);
+void release_axi_qos(void);
+int msm_camio_read_camif_status(void);
+
+void msm_io_w(u32 data, void __iomem *addr);
+void msm_io_w_mb(u32 data, void __iomem *addr);
+u32 msm_io_r(void __iomem *addr);
+u32 msm_io_r_mb(void __iomem *addr);
+void msm_io_dump(void __iomem *addr, int size);
+void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len);
+
 #endif
