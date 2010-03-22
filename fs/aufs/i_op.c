@@ -52,7 +52,8 @@ static int h_permission(struct inode *h_inode, int mask,
 		&& write_mask && !(mask & MAY_READ))
 	    || !h_inode->i_op->permission) {
 		/* AuLabel(generic_permission); */
-		err = generic_permission(h_inode, mask, NULL);
+		err = generic_permission(h_inode, mask,
+					 h_inode->i_op->check_acl);
 	} else {
 		/* AuLabel(h_inode->permission); */
 		err = h_inode->i_op->permission(h_inode, mask);
