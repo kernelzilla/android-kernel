@@ -1505,10 +1505,12 @@ msmsdcc_probe(struct platform_device *pdev)
 	if (ret)
 		goto sdiowakeup_irq_free;
 
-	ret = request_irq(irqres->end, msmsdcc_pio_irq, IRQF_SHARED,
-			  DRIVER_NAME " (pio)", host);
-	if (ret)
-		goto irq_free;
+	if (irqres->end != irqres->start) {
+		ret = request_irq(irqres->end, msmsdcc_pio_irq, IRQF_SHARED,
+			DRIVER_NAME " (pio)", host);
+		if (ret)
+			goto irq_free;
+	}
 
 	mmc_set_drvdata(pdev, mmc);
 	mmc_add_host(mmc);
@@ -1553,9 +1555,12 @@ msmsdcc_probe(struct platform_device *pdev)
 	if (!plat->status_irq) {
 		ret = sysfs_create_group(&pdev->dev.kobj, &dev_attr_grp);
 		if (ret)
-			goto irq_free;
+			goto pio_irq_free;
 	}
 	return 0;
+ pio_irq_free:
+	if (irqres->end != irqres->start)
+		free_irq(irqres->end, host);
  irq_free:
 	free_irq(irqres->start, host);
  sdiowakeup_irq_free:
