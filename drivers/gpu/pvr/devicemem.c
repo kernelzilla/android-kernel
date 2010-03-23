@@ -409,7 +409,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
 
-	
+	psKernelSyncInfo->ui32RefCount = 0;
+
 	pBMContext = (BM_CONTEXT*)hDevMemContext;
 	psDevMemoryInfo = &pBMContext->psDeviceNode->sDevMemoryInfo;
 
@@ -476,6 +477,13 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVFreeSyncInfoKM(PVRSRV_KERNEL_SYNC_INFO	*psKernel
 {
 	PVRSRV_ERROR eError;
 	
+	if (psKernelSyncInfo->ui32RefCount != 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "oops: sync info ref count not zero at destruction"));
+
+		return PVRSRV_ERROR_OUT_OF_MEMORY;
+	}
+
 	eError = FreeDeviceMem(psKernelSyncInfo->psSyncDataMemInfoKM);
 	(IMG_VOID)OSFreeMem(PVRSRV_PAGEABLE_SELECT, sizeof(PVRSRV_KERNEL_SYNC_INFO), psKernelSyncInfo, IMG_NULL);
 	
@@ -533,7 +541,12 @@ static PVRSRV_ERROR FreeDeviceMemCallBack(IMG_PVOID		pvParam,
 
 	if (psMemInfo->psKernelSyncInfo)
 	{
-		eError = PVRSRVFreeSyncInfoKM(psMemInfo->psKernelSyncInfo);
+		psMemInfo->psKernelSyncInfo->ui32RefCount--;
+
+		if (psMemInfo->psKernelSyncInfo->ui32RefCount == 0)
+		{
+			eError = PVRSRVFreeSyncInfoKM(psMemInfo->psKernelSyncInfo);
+		}
 	}
 
 	if (eError == PVRSRV_OK)
@@ -632,6 +645,7 @@ PVRSRV_ERROR IMG_CALLCONV _PVRSRVAllocDeviceMemKM(IMG_HANDLE					hDevCookie,
 		{
 			goto free_mainalloc;
 		}
+		psMemInfo->psKernelSyncInfo->ui32RefCount++;
 	}
 
 	
@@ -736,7 +750,11 @@ static PVRSRV_ERROR UnwrapExtMemoryCallBack(IMG_PVOID	pvParam,
 
 	if (psMemInfo->psKernelSyncInfo)
 	{
-		eError = PVRSRVFreeSyncInfoKM(psMemInfo->psKernelSyncInfo);
+		psMemInfo->psKernelSyncInfo->ui32RefCount--;
+		if (psMemInfo->psKernelSyncInfo->ui32RefCount == 0)
+		{
+			eError = PVRSRVFreeSyncInfoKM(psMemInfo->psKernelSyncInfo);
+		}
 	}
 
 	
@@ -932,6 +950,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVWrapExtMemoryKM(IMG_HANDLE				hDevCookie,
 		goto ErrorExitPhase4;
 	}
 
+	psMemInfo->psKernelSyncInfo->ui32RefCount++;
+
 	
 	psMemInfo->ui32RefCount++;
 
@@ -1007,6 +1027,17 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 	{
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(IMG_SYS_PHYADDR), psMapData->psMemInfo->sMemBlk.psIntSysPAddr, IMG_NULL);
 		psMapData->psMemInfo->sMemBlk.psIntSysPAddr = IMG_NULL;
+	}
+
+	psMapData->psMemInfo->psKernelSyncInfo->ui32RefCount--;
+	if (psMapData->psMemInfo->psKernelSyncInfo->ui32RefCount == 0)
+	{
+		eError = PVRSRVFreeSyncInfoKM(psMapData->psMemInfo->psKernelSyncInfo);
+		if(eError != PVRSRV_OK)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"UnmapDeviceMemoryCallBack: Failed to free sync info"));
+			return eError;
+		}
 	}
 	
 	eError = FreeDeviceMem(psMapData->psMemInfo);
@@ -1178,6 +1209,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPer
 	psMemInfo->ui32AllocSize = psSrcMemInfo->ui32AllocSize;
 	psMemInfo->psKernelSyncInfo = psSrcMemInfo->psKernelSyncInfo;
 
+
+	psMemInfo->psKernelSyncInfo->ui32RefCount++;
 	
 
 	psMemInfo->pvSysBackupBuffer = IMG_NULL;
