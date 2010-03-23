@@ -99,11 +99,13 @@ static void au_wkq_comp_free(struct completion *comp __maybe_unused)
 static void au_wkq_run(struct au_wkinfo *wkinfo, int do_wait)
 {
 	au_dbg_verify_kthread();
-	INIT_WORK(&wkinfo->wk, wkq_func);
-	if (do_wait)
+	if (do_wait) {
+		INIT_WORK_ON_STACK(&wkinfo->wk, wkq_func);
 		queue_work(au_wkq, &wkinfo->wk);
-	else
+	} else {
+		INIT_WORK(&wkinfo->wk, wkq_func);
 		schedule_work(&wkinfo->wk);
+	}
 }
 
 int au_wkq_wait(au_wkq_func_t func, void *args)
@@ -122,6 +124,7 @@ int au_wkq_wait(au_wkq_func_t func, void *args)
 		/* no timeout, no interrupt */
 		wait_for_completion(wkinfo.comp);
 		au_wkq_comp_free(comp);
+		destroy_work_on_stack(&wkinfo.wk);
 	}
 
 	return err;
