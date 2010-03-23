@@ -659,8 +659,43 @@ DSP_STATUS PROC_EnumNodes(DSP_HPROCESSOR hProcessor, OUT DSP_HNODE *aNodeTab,
 	return status;
 }
 
+/* Cache operation against kernel address instead of users */
+static int memory_sync_page(struct vm_area_struct *vma, unsigned long start,
+			    ssize_t len, enum DSP_FLUSHTYPE ftype)
+{
+	struct page *page;
+	void *kaddr;
+	unsigned long offset;
+	ssize_t rest;
+
+	while (len) {
+		page = follow_page(vma, start, FOLL_GET);
+		if (!page) {
+			pr_err("%s: no page for %08lx\n", __func__, start);
+			return -EINVAL;
+		} else if (IS_ERR(page)) {
+			pr_err("%s: err page for %08lx(%lu)\n", __func__, start,
+			       IS_ERR(page));
+			return IS_ERR(page);
+		}
+
+		offset = start & ~PAGE_MASK;
+		kaddr = page_address(page) + offset;
+		rest = min_t(ssize_t, PAGE_SIZE - offset, len);
+
+		MEM_FlushCache(kaddr, rest, ftype);
+
+		put_page(page);
+		len -= rest;
+		start += rest;
+	}
+
+	return 0;
+}
+
 /* Check if the given area blongs to process virtul memory address space */
-static int memory_check_vma(unsigned long start, u32 len)
+static int memory_sync_vma(unsigned long start, u32 len,
+			   enum DSP_FLUSHTYPE ftype)
 {
 	int err = 0;
 	unsigned long end;
@@ -670,14 +705,19 @@ static int memory_check_vma(unsigned long start, u32 len)
 	if (end <= start)
 		return -EINVAL;
 
-	down_read(&current->mm->mmap_sem);
-
 	while ((vma = find_vma(current->mm, start)) != NULL) {
+		ssize_t size;
 
-		if (vma->vm_start > start) {
-			err = -EINVAL;
+		if (vma->vm_flags & (VM_IO | VM_PFNMAP))
+			return -EINVAL;
+
+		if (vma->vm_start > start)
+			return -EINVAL;
+
+		size = min_t(ssize_t, vma->vm_end - start, len);
+		err = memory_sync_page(vma, start, size, ftype);
+		if (err)
 			break;
-		}
 
 		if (end <= vma->vm_end)
 			break;
@@ -687,8 +727,6 @@ static int memory_check_vma(unsigned long start, u32 len)
 
 	if (!vma)
 		err = -EINVAL;
-
-	up_read(&current->mm->mmap_sem);
 
 	return err;
 }
@@ -716,27 +754,18 @@ static DSP_STATUS proc_memory_sync(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 #endif /* CONFIG_BRIDGE_CHECK_ALIGN_128 */
 
 	if (!MEM_IsValidHandle(pProcObject, PROC_SIGNATURE)) {
-		GT_1trace(PROC_DebugMask, GT_7CLASS,
-			  "%s: InValid Processor Handle\n", __func__);
 		status = DSP_EHANDLE;
-		goto err_out;
 	}
 
-	if (memory_check_vma((u32)pMpuAddr, ulSize)) {
-		GT_3trace(PROC_DebugMask, GT_7CLASS,
-			  "%s: InValid address parameters\n",
-			  __func__, pMpuAddr, ulSize);
+	down_read(&current->mm->mmap_sem);
+
+	if (memory_sync_vma((u32)pMpuAddr, ulSize, ulFlags)) {
+		pr_err("%s: InValid address parameters %p %x\n",
+		       __func__, pMpuAddr, ulSize);
 		status = DSP_EHANDLE;
-		goto err_out;
 	}
 
-	(void)SYNC_EnterCS(hProcLock);
-	MEM_FlushCache(pMpuAddr, ulSize, ulFlags);
-	(void)SYNC_LeaveCS(hProcLock);
-
-err_out:
-	GT_2trace(PROC_DebugMask, GT_ENTER,
-		  "Leaving %s [0x%x]", __func__, status);
+	up_read(&current->mm->mmap_sem);
 
 	return status;
 }
