@@ -3314,11 +3314,12 @@ static void dsi_display_disable(struct omap_dss_device *dssdev)
 {
 	DSSDBG("dsi_display_disable\n");
 
-	mutex_lock(&dsi.lock);
-	dsi_bus_lock();
 
 	dsi.error_recovery.enabled = false;
 	cancel_work_sync(&dsi.error_recovery.work);
+
+	mutex_lock(&dsi.lock);
+	dsi_bus_lock();
 
 	complete_all(&dsi.update_completion);
 
@@ -3349,11 +3350,12 @@ static int dsi_display_suspend(struct omap_dss_device *dssdev)
 {
 	DSSDBG("dsi_display_suspend\n");
 
-	mutex_lock(&dsi.lock);
-	dsi_bus_lock();
 
 	dsi.error_recovery.enabled = false;
 	cancel_work_sync(&dsi.error_recovery.work);
+
+	mutex_lock(&dsi.lock);
+	dsi_bus_lock();
 
 	complete_all(&dsi.update_completion);
 
