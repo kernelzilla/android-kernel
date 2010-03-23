@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -113,12 +113,17 @@ static int lcdc_on(struct platform_device *pdev)
 	if (lcdc_pdata && lcdc_pdata->lcdc_gpio_config)
 		ret = lcdc_pdata->lcdc_gpio_config(1);
 
-	clk_set_rate(mdp_lcdc_pclk_clk, mfd->fbi->var.pixclock);
-	clk_set_rate(mdp_lcdc_pad_pclk_clk, mfd->fbi->var.pixclock);
+	ret = clk_set_rate(mdp_lcdc_pclk_clk, mfd->fbi->var.pixclock);
+	if (ret) {
+		pr_err("%s: Can't set MDP LCDC pixel clock rate to %u\n",
+		       __func__, mfd->fbi->var.pixclock);
+		goto out;
+	}
 	mdp_lcdc_pclk_clk_rate = clk_get_rate(mdp_lcdc_pclk_clk);
 	mdp_lcdc_pad_pclk_clk_rate = clk_get_rate(mdp_lcdc_pad_pclk_clk);
 
 	ret = panel_next_on(pdev);
+out:
 	return ret;
 }
 
