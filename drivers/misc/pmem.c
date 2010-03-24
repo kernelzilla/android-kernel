@@ -774,14 +774,14 @@ static int pmem_open(struct inode *inode, struct file *file)
 #endif
 
 	if (pmem[id].memory_state == MEMORY_UNSTABLE_NO_MEMORY_ALLOCATED)
-		return -1;
+		return -ENODEV;
 	DLOG("pid %u(%s) file %p(%ld) dev %s(id: %d)\n",
 		current->pid, get_task_comm(currtask_name, current),
 		file, file_count(file), get_name(file), id);
 	/* setup file->private_data to indicate its unmapped */
 	/*  you can only open a pmem device one time */
 	if (file->private_data != NULL)
-		return -1;
+		return -EINVAL;
 	data = kmalloc(sizeof(struct pmem_data), GFP_KERNEL);
 	if (!data) {
 		printk(KERN_ALERT "pmem: %s: unable to allocate memory for "
@@ -1386,7 +1386,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 
 	/* either no space was available or an error occured */
 	if (!has_allocation(file)) {
-		ret = -EINVAL;
+		ret = -ENOMEM;
 		printk(KERN_ALERT
 			"pmem: could not find allocation for map.\n");
 		goto error;
@@ -2270,6 +2270,7 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 	case PMEM_ALLOCATE:
 		{
+			int ret = 0;
 			DLOG("allocate, id %d\n", id);
 			down_write(&data->sem);
 			if (has_allocation(file)) {
@@ -2282,9 +2283,10 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					arg,
 					PMEM_ALIGN_4K);
 			mutex_unlock(&pmem[id].arena_mutex);
-
+			ret = data->index == -1 ? -ENOMEM :
+				data->index;
 			up_write(&data->sem);
-			break;
+			return ret;
 		}
 	case PMEM_CONNECT:
 		DLOG("connect\n");
