@@ -32,6 +32,7 @@
 #include <mach/board.h>
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
+#include <asm/mach/mmc.h>
 
 #include "devices.h"
 #include "timer.h"
@@ -345,6 +346,30 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(133, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_8MA),
 	/* ADV */
 	GPIO_CFG(153, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_8MA),
+
+	/*
+	 * SD/MMC Slot-1 (CLK, CMD, D0-D7)
+	 */
+	GPIO_CFG(167, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA),
+	GPIO_CFG(168, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(159, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(160, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(161, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(162, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(163, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(164, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(165, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(166, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+
+	/*
+	 * SD/MMC Slot-5 (CLK, CMD, D0-D3)
+	 */
+	GPIO_CFG(97,  2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA),
+	GPIO_CFG(95,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(100, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(99,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(98,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+	GPIO_CFG(96,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 };
 
 static void __init msm8x60_init_tlmm(void)
@@ -361,10 +386,89 @@ static void __init msm8x60_init_tlmm(void)
 	}
 }
 
+#if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC5_SUPPORT))
+
+static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
+{
+	int rc = 0;
+	struct platform_device *pdev;
+
+	pdev = container_of(dv, struct platform_device, dev);
+
+	/* Handle VREGs here once VREG support is available */
+
+	return rc;
+}
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
+static struct mmc_platform_data msm8x60_sdc1_data = {
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+	.translate_vdd  = msm_sdcc_setup_power,
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+static struct mmc_platform_data msm8x60_sdc2_data = {
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+	.translate_vdd  = msm_sdcc_setup_power,
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+static struct mmc_platform_data msm8x60_sdc3_data = {
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+	.translate_vdd  = msm_sdcc_setup_power,
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+static struct mmc_platform_data msm8x60_sdc4_data = {
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+	.translate_vdd  = msm_sdcc_setup_power,
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
+static struct mmc_platform_data msm8x60_sdc5_data = {
+	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
+	.translate_vdd  = msm_sdcc_setup_power,
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+};
+#endif
+
+static void __init msm8x60_init_mmc(void)
+{
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
+	msm_add_sdcc(1, &msm8x60_sdc1_data);
+#endif
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+	msm_add_sdcc(2, &msm8x60_sdc2_data);
+#endif
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+	msm_add_sdcc(3, &msm8x60_sdc3_data);
+#endif
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+	msm_add_sdcc(4, &msm8x60_sdc4_data);
+#endif
+#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
+	msm_add_sdcc(5, &msm8x60_sdc5_data);
+#endif
+}
+
 static void __init msm8x60_init(void)
 {
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
+	msm8x60_init_mmc();
 	msm8x60_init_buses();
 	if (machine_is_msm8x60_surf())
 		platform_add_devices(surf_devices,
