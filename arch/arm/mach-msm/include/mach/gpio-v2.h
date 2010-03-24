@@ -30,6 +30,7 @@
 #ifndef __ASM_ARCH_MSM_GPIO_V2_H
 #define __ASM_ARCH_MSM_GPIO_V2_H
 
+#include <mach/gpio-tlmm-v1.h>
 #if defined(CONFIG_ARCH_MSM8X60)
 #include <mach/gpio-v2-8x60.h>
 #endif
@@ -70,15 +71,5 @@ static inline int irq_to_gpio(unsigned irq)
  * interrupt TLMM_SCSS_DIR_CONN_IRQ_0.
  */
 int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq);
-
-
-/*
- * The MSM allows for configuration of gpio hardware specifics
- * (drive strengths, hardware interface selections, &c) which can not be
- * provided via the gpiolib interfaces.  An msm-specific extension API
- * fills in the gap.  See the board-specific gpio header file for flags.
- */
-void msm_gpio_write_cfg(unsigned gpio, uint32_t flags);
-int  msm_gpio_read_cfg(unsigned gpio, uint32_t *flags);
 
 #endif /* __ASM_ARCH_MSM_GPIO_V2_H */
