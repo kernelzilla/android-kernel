@@ -370,7 +370,9 @@ static int ts0710_pkt_send(struct ts0710_con *ts0710, u8 *data)
 	ts27010_debughex(DBG_VERBOSE, "ts27010: > ",
 			 data, TS0710_FRAME_SIZE(len));
 
-	res = ts27010_ldisc_send(ts27010mux_tty, data, TS0710_FRAME_SIZE(len));
+	if (ts27010mux_tty)
+		res = ts27010_ldisc_send(ts27010mux_tty, data,
+					 TS0710_FRAME_SIZE(len));
 
 	if (res < 0) {
 		pr_err("ts27010: pkt write error %d\n", res);
