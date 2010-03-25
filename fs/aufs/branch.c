@@ -272,7 +272,7 @@ static int au_br_init_wh(struct super_block *sb, struct au_branch *br,
 	bindex = au_br_index(sb, br->br_id);
 	if (0 <= bindex) {
 		hdir = au_hi(sb->s_root->d_inode, bindex);
-		au_hin_imtx_lock_nested(hdir, AuLsc_I_PARENT);
+		au_hn_imtx_lock_nested(hdir, AuLsc_I_PARENT);
 	} else {
 		h_mtx = &h_root->d_inode->i_mutex;
 		mutex_lock_nested(h_mtx, AuLsc_I_PARENT);
@@ -285,7 +285,7 @@ static int au_br_init_wh(struct super_block *sb, struct au_branch *br,
 		wbr_wh_write_unlock(wbr);
 	}
 	if (hdir)
-		au_hin_imtx_unlock(hdir);
+		au_hn_imtx_unlock(hdir);
 	else
 		mutex_unlock(h_mtx);
 	br->br_perm = old_perm;
@@ -411,7 +411,7 @@ static void au_br_do_add_hip(struct au_iinfo *iinfo, aufs_bindex_t bindex,
 	hip = iinfo->ii_hinode + bindex;
 	memmove(hip + 1, hip, sizeof(*hip) * amount);
 	hip->hi_inode = NULL;
-	au_hin_init(hip, NULL);
+	au_hn_init(hip);
 	iinfo->ii_bend++;
 	if (unlikely(bend < 0))
 		iinfo->ii_bstart = 0;
@@ -485,7 +485,7 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
 		au_add_nlink(root_inode, h_dentry->d_inode);
 
 	/*
-	 * this test/set prevents aufs from handling unnecesary inotify events
+	 * this test/set prevents aufs from handling unnecesary notify events
 	 * of xino files, in a case of re-adding a writable branch which was
 	 * once detached from aufs.
 	 */
@@ -685,7 +685,7 @@ static void au_br_do_del_hip(struct au_iinfo *iinfo, const aufs_bindex_t bindex,
 	if (bindex < bend)
 		memmove(hip, hip + 1, sizeof(*hip) * (bend - bindex));
 	iinfo->ii_hinode[0 + bend].hi_inode = NULL;
-	au_hin_init(iinfo->ii_hinode + bend, NULL);
+	au_hn_init(iinfo->ii_hinode + bend);
 	iinfo->ii_bend--;
 
 	p = krealloc(iinfo->ii_hinode, sizeof(*p) * bend, GFP_NOFS);

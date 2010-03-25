@@ -231,7 +231,7 @@ static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 		goto out;
 
 	/* stop monitoring */
-	au_hin_free(au_hi(dentry->d_inode, bindex));
+	au_hn_free(au_hi(dentry->d_inode, bindex));
 
 	if (!au_test_fs_remote(h_dentry->d_sb)) {
 		dirwh = au_sbi(sb)->si_dirwh;
@@ -426,7 +426,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 		}
 	} else {
 		/* stop monitoring */
-		au_hin_free(au_hi(inode, bstart));
+		au_hn_free(au_hi(inode, bstart));
 
 		/* dir inode is locked */
 		IMustLock(wh_dentry->d_parent->d_inode);

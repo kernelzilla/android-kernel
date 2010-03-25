@@ -32,18 +32,18 @@
 
 struct vfsmount;
 
-struct au_hinotify {
-#ifdef CONFIG_AUFS_HINOTIFY
-	struct inotify_watch	hin_watch;
-	struct inode		*hin_aufs_inode;	/* no get/put */
+struct au_hnotify {
+#ifdef CONFIG_AUFS_HNOTIFY
+	struct inotify_watch	hn_watch;
+	struct inode		*hn_aufs_inode;	/* no get/put */
 #endif
 };
 
 struct au_hinode {
 	struct inode		*hi_inode;
 	aufs_bindex_t		hi_id;
-#ifdef CONFIG_AUFS_HINOTIFY
-	struct au_hinotify	*hi_notify;
+#ifdef CONFIG_AUFS_HNOTIFY
+	struct au_hnotify	*hi_notify;
 #endif
 
 	/* reference to the copied-up whiteout with get/put */
@@ -182,14 +182,14 @@ unsigned int au_hi_flags(struct inode *inode, int isdir);
 
 /* hinode flags */
 #define AuHi_XINO	1
-#define AuHi_HINOTIFY	(1 << 1)
+#define AuHi_HNOTIFY	(1 << 1)
 #define au_ftest_hi(flags, name)	((flags) & AuHi_##name)
 #define au_fset_hi(flags, name)		{ (flags) |= AuHi_##name; }
 #define au_fclr_hi(flags, name)		{ (flags) &= ~AuHi_##name; }
 
-#ifndef CONFIG_AUFS_HINOTIFY
-#undef AuHi_HINOTIFY
-#define AuHi_HINOTIFY	0
+#ifndef CONFIG_AUFS_HNOTIFY
+#undef AuHi_HNOTIFY
+#define AuHi_HNOTIFY	0
 #endif
 
 void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
@@ -223,7 +223,7 @@ long au_plink_ioctl(struct file *file, unsigned int cmd);
 /* lock subclass for iinfo */
 enum {
 	AuLsc_II_CHILD,		/* child first */
-	AuLsc_II_CHILD2,	/* rename(2), link(2), and cpup at hinotify */
+	AuLsc_II_CHILD2,	/* rename(2), link(2), and cpup at hnotify */
 	AuLsc_II_CHILD3,	/* copyup dirs */
 	AuLsc_II_PARENT,	/* see AuLsc_I_PARENT in vfsub.h */
 	AuLsc_II_PARENT2,
@@ -294,6 +294,13 @@ static inline int au_test_higen(struct inode *inode, struct inode *h_inode)
 	AuRwMustAnyLock(&iinfo->ii_rwsem);
 	return !(iinfo->ii_hsb1 == h_inode->i_sb
 		 && iinfo->ii_higen == h_inode->i_generation);
+}
+
+static inline void au_iigen_dec(struct inode *inode)
+{
+#ifdef CONFIG_AUFS_HNOTIFY
+	atomic_dec_return(&au_ii(inode)->ii_generation);
+#endif
 }
 
 /* ---------------------------------------------------------------------- */
@@ -399,74 +406,81 @@ static inline void au_pin_set_parent(struct au_pin *pin, struct dentry *parent)
 
 /* ---------------------------------------------------------------------- */
 
-#ifdef CONFIG_AUFS_HINOTIFY
-/* hinotify.c */
-int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
-		 struct inode *h_inode);
-void au_hin_free(struct au_hinode *hinode);
-void au_hin_ctl(struct au_hinode *hinode, int do_set);
-void au_reset_hinotify(struct inode *inode, unsigned int flags);
+#ifdef CONFIG_AUFS_HNOTIFY
+struct au_hnotify_op {
+	void (*ctl)(struct au_hinode *hinode, int do_set);
+	int (*alloc)(struct au_hnotify *hn, struct inode *h_inode);
+	void (*free)(struct au_hnotify *hn);
 
-int __init au_hinotify_init(void);
-void au_hinotify_fin(void);
+	void (*fin)(void);
+	int (*init)(void);
+};
+
+/* hnotify.c */
+int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
+		struct inode *h_inode);
+void au_hn_free(struct au_hinode *hinode);
+void au_hn_ctl(struct au_hinode *hinode, int do_set);
+void au_hn_reset(struct inode *inode, unsigned int flags);
+int au_hnotify(struct inode *h_dir, struct au_hnotify *hnotify, u32 mask,
+	       struct qstr *h_child_qstr, struct inode *h_child_inode);
+int __init au_hnotify_init(void);
+void au_hnotify_fin(void);
+
+/* hinotify.c */
+extern const struct au_hnotify_op au_hnotify_op;
 
 static inline
-void au_hin_init(struct au_hinode *hinode, struct au_hinotify *val)
+void au_hn_init(struct au_hinode *hinode)
 {
-	hinode->hi_notify = val;
-}
-
-static inline void au_iigen_dec(struct inode *inode)
-{
-	atomic_dec_return(&au_ii(inode)->ii_generation);
+	hinode->hi_notify = NULL;
 }
 
 #else
 static inline
-int au_hin_alloc(struct au_hinode *hinode __maybe_unused,
-		 struct inode *inode __maybe_unused,
-		 struct inode *h_inode __maybe_unused)
+int au_hn_alloc(struct au_hinode *hinode __maybe_unused,
+		struct inode *inode __maybe_unused,
+		struct inode *h_inode __maybe_unused)
 {
 	return -EOPNOTSUPP;
 }
 
-AuStubVoid(au_hin_free, struct au_hinode *hinode __maybe_unused)
-AuStubVoid(au_hin_ctl, struct au_hinode *hinode __maybe_unused,
+AuStubVoid(au_hn_free, struct au_hinode *hinode __maybe_unused)
+AuStubVoid(au_hn_ctl, struct au_hinode *hinode __maybe_unused,
 	   int do_set __maybe_unused)
-AuStubVoid(au_reset_hinotify, struct inode *inode __maybe_unused,
+AuStubVoid(au_hn_reset, struct inode *inode __maybe_unused,
 	   unsigned int flags __maybe_unused)
-AuStubInt0(__init au_hinotify_init, void)
-AuStubVoid(au_hinotify_fin, void)
-AuStubVoid(au_hin_init, struct au_hinode *hinode __maybe_unused,
-	   struct au_hinotify *val __maybe_unused)
-#endif /* CONFIG_AUFS_HINOTIFY */
+AuStubInt0(__init au_hnotify_init, void)
+AuStubVoid(au_hnotify_fin, void)
+AuStubVoid(au_hn_init, struct au_hinode *hinode __maybe_unused)
+#endif /* CONFIG_AUFS_HNOTIFY */
 
-static inline void au_hin_suspend(struct au_hinode *hdir)
+static inline void au_hn_suspend(struct au_hinode *hdir)
 {
-	au_hin_ctl(hdir, /*do_set*/0);
+	au_hn_ctl(hdir, /*do_set*/0);
 }
 
-static inline void au_hin_resume(struct au_hinode *hdir)
+static inline void au_hn_resume(struct au_hinode *hdir)
 {
-	au_hin_ctl(hdir, /*do_set*/1);
+	au_hn_ctl(hdir, /*do_set*/1);
 }
 
-static inline void au_hin_imtx_lock(struct au_hinode *hdir)
+static inline void au_hn_imtx_lock(struct au_hinode *hdir)
 {
 	mutex_lock(&hdir->hi_inode->i_mutex);
-	au_hin_suspend(hdir);
+	au_hn_suspend(hdir);
 }
 
-static inline void au_hin_imtx_lock_nested(struct au_hinode *hdir,
-					   unsigned int sc __maybe_unused)
+static inline void au_hn_imtx_lock_nested(struct au_hinode *hdir,
+					  unsigned int sc __maybe_unused)
 {
 	mutex_lock_nested(&hdir->hi_inode->i_mutex, sc);
-	au_hin_suspend(hdir);
+	au_hn_suspend(hdir);
 }
 
-static inline void au_hin_imtx_unlock(struct au_hinode *hdir)
+static inline void au_hn_imtx_unlock(struct au_hinode *hdir)
 {
-	au_hin_resume(hdir);
+	au_hn_resume(hdir);
 	mutex_unlock(&hdir->hi_inode->i_mutex);
 }
 

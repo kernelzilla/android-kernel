@@ -49,7 +49,7 @@ void au_set_ibstart(struct inode *inode, aufs_bindex_t bindex)
 
 void au_hiput(struct au_hinode *hinode)
 {
-	au_hin_free(hinode);
+	au_hn_free(hinode);
 	dput(hinode->hi_whdentry);
 	iput(hinode->hi_inode);
 }
@@ -62,8 +62,8 @@ unsigned int au_hi_flags(struct inode *inode, int isdir)
 	flags = 0;
 	if (au_opt_test(mnt_flags, XINO))
 		au_fset_hi(flags, XINO);
-	if (isdir && au_opt_test(mnt_flags, UDBA_HINOTIFY))
-		au_fset_hi(flags, HINOTIFY);
+	if (isdir && au_opt_test(mnt_flags, UDBA_HNOTIFY))
+		au_fset_hi(flags, HNOTIFY);
 	return flags;
 }
 
@@ -100,11 +100,11 @@ void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
 				AuIOErr1("failed au_xino_write() %d\n", err);
 		}
 
-		if (au_ftest_hi(flags, HINOTIFY)
-		    && au_br_hinotifyable(br->br_perm)) {
-			err = au_hin_alloc(hinode, inode, h_inode);
+		if (au_ftest_hi(flags, HNOTIFY)
+		    && au_br_hnotifyable(br->br_perm)) {
+			err = au_hn_alloc(hinode, inode, h_inode);
 			if (unlikely(err))
-				AuIOErr1("au_hin_alloc() %d\n", err);
+				AuIOErr1("au_hn_alloc() %d\n", err);
 		}
 	}
 }
