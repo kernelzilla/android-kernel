@@ -70,8 +70,9 @@ AuCacheFuncs(icntnr, ICNTNR);
 AuCacheFuncs(finfo, FINFO);
 AuCacheFuncs(vdir, VDIR);
 AuCacheFuncs(vdir_dehstr, DEHSTR);
-
-/*  ---------------------------------------------------------------------- */
+#ifdef CONFIG_AUFS_HINOTIFY
+AuCacheFuncs(hinotify, HINOTIFY);
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_MODULE_H__ */

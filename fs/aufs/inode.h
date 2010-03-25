@@ -400,15 +400,42 @@ static inline void au_pin_set_parent(struct au_pin *pin, struct dentry *parent)
 /* ---------------------------------------------------------------------- */
 
 #ifdef CONFIG_AUFS_HINOTIFY
-/* hinotify.c */
+/* hnotify.c */
 int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 		 struct inode *h_inode);
 void au_hin_free(struct au_hinode *hinode);
 void au_hin_ctl(struct au_hinode *hinode, int do_set);
 void au_reset_hinotify(struct inode *inode, unsigned int flags);
 
+/* hinotify job flags */
+#define AuHinJob_XINO0		1
+#define AuHinJob_GEN		(1 << 1)
+#define AuHinJob_DIRENT		(1 << 2)
+#define AuHinJob_ISDIR		(1 << 3)
+#define AuHinJob_TRYXINO0	(1 << 4)
+#define AuHinJob_MNTPNT		(1 << 5)
+#define au_ftest_hinjob(flags, name)	((flags) & AuHinJob_##name)
+#define au_fset_hinjob(flags, name)	{ (flags) |= AuHinJob_##name; }
+#define au_fclr_hinjob(flags, name)	{ (flags) &= ~AuHinJob_##name; }
+
+enum { CHILD, PARENT };
+struct au_postproc_args {
+	struct inode *h_dir, *dir, *h_child_inode;
+	u32 mask;
+	unsigned int flags[2];
+	unsigned int h_child_nlen;
+	char h_child_name[];
+};
+
+void au_postproc(void *_args);
+
 int __init au_hinotify_init(void);
 void au_hinotify_fin(void);
+
+/* hinotify.c */
+static const __u32 AuHinMask = (IN_MOVE | IN_DELETE | IN_CREATE);
+extern struct inotify_handle *au_hin_handle;
+extern const struct inotify_operations aufs_inotify_ops;
 
 static inline
 void au_hin_init(struct au_hinode *hinode, struct au_hinotify *val)
