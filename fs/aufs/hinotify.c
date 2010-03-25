@@ -17,7 +17,7 @@
  */
 
 /*
- * inotify for the lower directories
+ * inotify for the lower directories (deprecated)
  */
 
 #include "aufs.h"
@@ -121,6 +121,36 @@ static char *in_name(u32 mask)
 }
 #endif
 
+static u32 au_hin_conv_mask(u32 mask)
+{
+	u32 conv;
+
+	conv = 0;
+#define do_conv(flag)	conv |= (mask & IN_ ## flag) ? FS_ ## flag : 0
+	do_conv(ACCESS);
+	do_conv(MODIFY);
+	do_conv(ATTRIB);
+	do_conv(CLOSE_WRITE);
+	do_conv(CLOSE_NOWRITE);
+	do_conv(OPEN);
+	do_conv(MOVED_FROM);
+	do_conv(MOVED_TO);
+	do_conv(CREATE);
+	do_conv(DELETE);
+	do_conv(DELETE_SELF);
+	do_conv(MOVE_SELF);
+	do_conv(UNMOUNT);
+	do_conv(Q_OVERFLOW);
+#undef do_conv
+#define do_conv(flag)	conv |= (mask & IN_ ## flag) ? FS_IN_ ## flag : 0
+	do_conv(IGNORED);
+	//do_conv(ISDIR);
+	//do_conv(ONESHOT);
+#undef do_conv
+
+	return conv;
+}
+
 static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 			 u32 mask, u32 cookie __maybe_unused,
 			 const char *h_child_name, struct inode *h_child_inode)
@@ -153,6 +183,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	if (h_child_name)
 		h_child_qstr.len = strlen(h_child_name);
 	hnotify = container_of(watch, struct au_hnotify, hn_watch);
+	mask = au_hin_conv_mask(mask);
 	au_hnotify(watch->inode, hnotify, mask, &h_child_qstr, h_child_inode);
 }
 
