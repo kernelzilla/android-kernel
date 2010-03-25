@@ -55,8 +55,8 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 			 u32 mask, u32 cookie __maybe_unused,
 			 const char *h_child_name, struct inode *h_child_inode)
 {
-	struct au_hinotify *hinotify;
-	struct au_postproc_args *args;
+	struct au_hnotify *hnotify;
+	struct au_hnotify_args *args;
 	int len, wkq_err;
 	unsigned char isdir, isroot, wh;
 	char *p;
@@ -69,7 +69,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 		put_inotify_watch(watch);
 		return;
 	}
-#ifdef AuDbgHinotify
+#ifdef AuDbgHnotify
 	au_debug(1);
 	if (1 || !h_child_name || strcmp(h_child_name, AUFS_XINO_FNAME)) {
 		AuDbg("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s,"
@@ -82,9 +82,9 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	au_debug(0);
 #endif
 
-	hinotify = container_of(watch, struct au_hinotify, hin_watch);
-	AuDebugOn(!hinotify || !hinotify->hin_aufs_inode);
-	dir = igrab(hinotify->hin_aufs_inode);
+	hnotify = container_of(watch, struct au_hnotify, hn_watch);
+	AuDebugOn(!hnotify || !hnotify->hn_aufs_inode);
+	dir = igrab(hnotify->hn_aufs_inode);
 	if (!dir)
 		return;
 
@@ -103,17 +103,17 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	isdir = 0;
 	if (h_child_inode)
 		isdir = !!S_ISDIR(h_child_inode->i_mode);
-	flags[PARENT] = AuHinJob_ISDIR;
+	flags[PARENT] = AuHnJob_ISDIR;
 	flags[CHILD] = 0;
 	if (isdir)
-		flags[CHILD] = AuHinJob_ISDIR;
-	au_fset_hinjob(flags[PARENT], DIRENT);
-	au_fset_hinjob(flags[CHILD], GEN);
+		flags[CHILD] = AuHnJob_ISDIR;
+	au_fset_hnjob(flags[PARENT], DIRENT);
+	au_fset_hnjob(flags[CHILD], GEN);
 	switch (mask & IN_ALL_EVENTS) {
 	case IN_MOVED_FROM:
 	case IN_MOVED_TO:
-		au_fset_hinjob(flags[CHILD], XINO0);
-		au_fset_hinjob(flags[CHILD], MNTPNT);
+		au_fset_hnjob(flags[CHILD], XINO0);
+		au_fset_hnjob(flags[CHILD], MNTPNT);
 		/*FALLTHROUGH*/
 	case IN_CREATE:
 		AuDebugOn(!h_child_name || !h_child_inode);
@@ -126,8 +126,8 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 		 * by checking i_nlink, i_generation or d_unhashed().
 		 */
 		AuDebugOn(!h_child_name);
-		au_fset_hinjob(flags[CHILD], TRYXINO0);
-		au_fset_hinjob(flags[CHILD], MNTPNT);
+		au_fset_hnjob(flags[CHILD], TRYXINO0);
+		au_fset_hnjob(flags[CHILD], MNTPNT);
 		break;
 
 	default:
@@ -137,7 +137,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	if (wh)
 		h_child_inode = NULL;
 
-	/* iput() and kfree() will be called in postproc() */
+	/* iput() and kfree() will be called in au_hnotify() */
 	/*
 	 * inotify_mutex is already acquired and kmalloc/prune_icache may lock
 	 * iprune_mutex. strange.
@@ -166,7 +166,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	}
 
 	lockdep_off();
-	wkq_err = au_wkq_nowait(au_postproc, args, dir->i_sb);
+	wkq_err = au_wkq_nowait(au_hnotify, args, dir->i_sb);
 	lockdep_on();
 	if (unlikely(wkq_err))
 		AuErr("wkq %d\n", wkq_err);
