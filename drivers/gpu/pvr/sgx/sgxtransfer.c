@@ -229,39 +229,8 @@ IMG_EXPORT PVRSRV_ERROR SGXSubmitTransferKM(IMG_HANDLE hDevHandle, PVRSRV_TRANSF
 				psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->ahDstSyncInfo[0];
 				psSyncInfo->psSyncData->ui32WriteOpsPending--;
 			}
-#if defined(PDUMP)
-			if (PDumpIsCaptureFrameKM()
-			|| ((psKick->ui32PDumpFlags & PDUMP_FLAGS_CONTINUOUS) != 0))
-			{
-				if (psKick->ui32NumSrcSync > 0)
-				{
-					psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->ahSrcSyncInfo[0];
-					psSyncInfo->psSyncData->ui32LastReadOpDumpVal--;
-				}
-				if (psKick->ui32NumDstSync > 0)
-				{
-					psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->ahDstSyncInfo[0];
-					psSyncInfo->psSyncData->ui32LastOpDumpVal--;
-				}
-			}
-#endif
-		}
-
-		
-		if (psKick->hTASyncInfo != IMG_NULL)
-		{
-			psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->hTASyncInfo;
-			psSyncInfo->psSyncData->ui32WriteOpsPending--;
-		}
-
-		
-		if (psKick->h3DSyncInfo != IMG_NULL)
-		{
-			psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->h3DSyncInfo;
-			psSyncInfo->psSyncData->ui32WriteOpsPending--;
 		}
 	}
-
 	else if (PVRSRV_OK != eError)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "SGXSubmitTransferKM: SGXScheduleCCBCommandKM failed."));
@@ -463,58 +432,6 @@ IMG_EXPORT PVRSRV_ERROR SGXSubmit2DKM(IMG_HANDLE hDevHandle, PVRSRV_2D_SGX_KICK 
 	sCommand.ui32Data[1] = psKick->sHW2DContextDevVAddr.uiAddr;
 	
 	eError = SGXScheduleCCBCommandKM(hDevHandle, SGXMKIF_CMD_2D, &sCommand, KERNEL_ID, psKick->ui32PDumpFlags);	
-
-	if (eError == PVRSRV_ERROR_RETRY)
-	{
-		
-
-#if defined(PDUMP)
-		if (PDumpIsCaptureFrameKM())
-		{
-			for (i = 0; i < psKick->ui32NumSrcSync; i++)
-			{
-				psSyncInfo = psKick->ahSrcSyncInfo[i];
-				psSyncInfo->psSyncData->ui32LastReadOpDumpVal--;
-			}
-
-			if (psKick->hDstSyncInfo != IMG_NULL)
-			{
-				psSyncInfo = psKick->hDstSyncInfo;
-				psSyncInfo->psSyncData->ui32LastOpDumpVal--;
-			}
-		}
-#endif
-
-		for (i = 0; i < psKick->ui32NumSrcSync; i++)
-		{
-			psSyncInfo = psKick->ahSrcSyncInfo[i];
-			psSyncInfo->psSyncData->ui32ReadOpsPending--;
-		}
-
-		if (psKick->hDstSyncInfo != IMG_NULL)
-		{
-			psSyncInfo = psKick->hDstSyncInfo;
-			psSyncInfo->psSyncData->ui32WriteOpsPending--;
-		}
-
-		
-		if (psKick->hTASyncInfo != IMG_NULL)
-		{
-			psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->hTASyncInfo;
-
-			psSyncInfo->psSyncData->ui32WriteOpsPending--;
-		}
-
-		
-		if (psKick->h3DSyncInfo != IMG_NULL)
-		{
-			psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)psKick->h3DSyncInfo;
-
-			psSyncInfo->psSyncData->ui32WriteOpsPending--;
-		}
-	}
-
-	
 
 
 #if defined(NO_HARDWARE)

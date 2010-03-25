@@ -80,9 +80,7 @@ PVRSRV_ERROR OSReservePhys(IMG_CPU_PHYADDR BasePAddr, IMG_SIZE_T ui32Bytes, IMG_
 PVRSRV_ERROR OSUnReservePhys(IMG_VOID *pvCpuVAddr, IMG_SIZE_T ui32Bytes, IMG_UINT32 ui32Flags, IMG_HANDLE hOSMemHandle);
 
 #if defined(SUPPORT_CPU_CACHED_BUFFERS)
-IMG_VOID OSFlushCPUCacheKM(IMG_VOID);
-IMG_VOID OSFlushCPUCacheRangeKM(IMG_VOID *pvRangeAddrStart,
-						 	IMG_VOID *pvRangeAddrEnd);
+IMG_VOID OSFlushCPUCache(IMG_VOID);
 #endif
 
 #if defined(__linux__)
@@ -441,8 +439,7 @@ PVRSRV_ERROR OSCopyFromUser(IMG_PVOID pvProcess, IMG_VOID *pvDest, IMG_VOID *pvS
 PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr, 
 									IMG_SIZE_T ui32Bytes, 
 									IMG_SYS_PHYADDR *psSysPAddr,
-									IMG_HANDLE *phOSWrapMem,
-									IMG_BOOL bWrapWorkaround);
+									IMG_HANDLE *phOSWrapMem);
 PVRSRV_ERROR OSReleasePhysPageAddr(IMG_HANDLE hOSWrapMem);
 #else
 #ifdef INLINE_IS_PRAGMA
@@ -451,14 +448,12 @@ PVRSRV_ERROR OSReleasePhysPageAddr(IMG_HANDLE hOSWrapMem);
 static INLINE PVRSRV_ERROR OSAcquirePhysPageAddr(IMG_VOID* pvCPUVAddr, 
 												IMG_SIZE_T ui32Bytes, 
 												IMG_SYS_PHYADDR *psSysPAddr,
-												IMG_HANDLE *phOSWrapMem,
-												IMG_BOOL bWrapWorkaround)
+												IMG_HANDLE *phOSWrapMem)
 {
 	PVR_UNREFERENCED_PARAMETER(pvCPUVAddr);
 	PVR_UNREFERENCED_PARAMETER(ui32Bytes);
 	PVR_UNREFERENCED_PARAMETER(psSysPAddr);
 	PVR_UNREFERENCED_PARAMETER(phOSWrapMem);
-	PVR_UNREFERENCED_PARAMETER(bWrapWorkaround);
 	return PVRSRV_OK;	
 }
 #ifdef INLINE_IS_PRAGMA

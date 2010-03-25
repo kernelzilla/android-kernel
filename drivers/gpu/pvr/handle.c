@@ -504,7 +504,6 @@ static PVRSRV_ERROR FreeHandle(PVRSRV_HANDLE_BASE *psBase, struct sHandle *psHan
 
 	if (BATCHED_HANDLE(psHandle) && !BATCHED_HANDLE_PARTIALLY_FREE(psHandle))
 	{
-		 
 		SET_BATCHED_HANDLE_PARTIALLY_FREE(psHandle);
 		
 		return PVRSRV_OK;
@@ -917,7 +916,6 @@ static PVRSRV_ERROR AllocHandle(PVRSRV_HANDLE_BASE *psBase, IMG_HANDLE *phHandle
 
 		psBase->ui32FirstBatchIndexPlusOne = ui32NewIndex + 1;
 
-		 
 		SET_BATCHED_HANDLE(psNewHandle);
 	}
 	else

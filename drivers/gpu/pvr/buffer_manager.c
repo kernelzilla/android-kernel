@@ -983,7 +983,7 @@ BM_CreateHeap (IMG_HANDLE hBMContext,
 			   DEVICE_MEMORY_HEAP_INFO *psDevMemHeapInfo)
 {
 	BM_CONTEXT *pBMContext = (BM_CONTEXT*)hBMContext;
-	PVRSRV_DEVICE_NODE *psDeviceNode;
+	PVRSRV_DEVICE_NODE *psDeviceNode = pBMContext->psDeviceNode;
 	BM_HEAP *psBMHeap;
 
 	PVR_DPF((PVR_DBG_MESSAGE, "BM_CreateHeap"));
@@ -992,8 +992,6 @@ BM_CreateHeap (IMG_HANDLE hBMContext,
 	{
 		return IMG_NULL;
 	}
-
-	psDeviceNode = pBMContext->psDeviceNode;
 
 	
 
@@ -1308,7 +1306,7 @@ BM_Wrap (	IMG_HANDLE hDevMemHeap,
 
 	uFlags = psBMHeap->ui32Attribs & (PVRSRV_HAP_CACHETYPE_MASK | PVRSRV_HAP_MAPTYPE_MASK);
 
-	if ((pui32Flags != IMG_NULL) && ((*pui32Flags & PVRSRV_HAP_CACHETYPE_MASK) != 0))
+	if (pui32Flags && (*pui32Flags & PVRSRV_HAP_CACHETYPE_MASK))
 	{
 		uFlags &= ~PVRSRV_HAP_CACHETYPE_MASK;
 		uFlags |= *pui32Flags & PVRSRV_HAP_CACHETYPE_MASK;
@@ -1668,7 +1666,7 @@ DevMemoryFree (BM_MAPPING *pMapping)
                     ui32PSize, 
                     pMapping->pBMHeap->sDevArena.ui32DataPageSize,
                     (IMG_HANDLE)pMapping,
-                    (pMapping->ui32Flags & PVRSRV_MEM_INTERLEAVED) ? IMG_TRUE : IMG_FALSE);
+                    (IMG_BOOL)(pMapping->ui32Flags & PVRSRV_MEM_INTERLEAVED));
 #endif
 
 	psDeviceNode = pMapping->pBMHeap->pBMContext->psDeviceNode;

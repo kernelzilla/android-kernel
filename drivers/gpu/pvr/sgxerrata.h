@@ -27,6 +27,7 @@
 #ifndef _SGXERRATA_KM_H_
 #define _SGXERRATA_KM_H_
 
+
 #if defined(SGX520) && !defined(SGX_CORE_DEFINED)
 	
 	#define SGX_CORE_REV_HEAD	0
@@ -71,7 +72,6 @@
 		#define FIX_HW_BRN_22934	
 	#else
 	#if SGX_CORE_REV == 125
-		#define FIX_HW_BRN_22934	
 	#else
 	#if SGX_CORE_REV == SGX_CORE_REV_HEAD
 		
@@ -301,6 +301,7 @@
 	#pragma message("sgxerrata.h: SGX Core Version unspecified")
 #endif
 #endif
+
 
 #endif 
 

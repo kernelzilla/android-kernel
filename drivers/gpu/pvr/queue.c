@@ -407,7 +407,6 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDestroyCommandQueueKM(PVRSRV_QUEUE_INFO *psQueue
 					sizeof(PVRSRV_QUEUE_INFO),
 					psQueueInfo,
 					psQueueInfo->hMemBlock[0]);
-		 
 		psQueueInfo = IMG_NULL; 
 	}
 	else
@@ -427,7 +426,6 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDestroyCommandQueueKM(PVRSRV_QUEUE_INFO *psQueue
 							sizeof(PVRSRV_QUEUE_INFO),
 							psQueueInfo,
 							psQueueInfo->hMemBlock[0]);
-				 
 				psQueueInfo = IMG_NULL; 
 				break;
 			}

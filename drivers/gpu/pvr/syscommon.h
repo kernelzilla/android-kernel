@@ -89,8 +89,15 @@ typedef struct _SYS_DATA_TAG_
     IMG_CHAR                    *pszVersionString;          
 	PVRSRV_EVENTOBJECT			*psGlobalEventObject;			
 
-	IMG_BOOL					bFlushAll;					
+#if defined(SGX_OCP_REGS_ENABLED) && defined(SGX530) && (SGX_CORE_REV == 125)
+	IMG_SYS_PHYADDR				sOCPRegsSysPBase;
+	IMG_CPU_PHYADDR				sOCPRegsCpuPBase;
+	IMG_CPU_VIRTADDR			pvOCPRegsLinAddr;
+#endif
 
+#if defined(SUPPORT_CPU_CACHED_BUFFERS)
+	IMG_BOOL					bFlushCPUCache;				
+#endif
 } SYS_DATA;
 
 

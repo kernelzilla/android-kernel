@@ -432,6 +432,7 @@ PVRSRV_BRIDGE_SGX_DOKICK_RETURN_RESULT:
 				  0);
 		
 	}
+
 	return ret;
 }
 
@@ -935,8 +936,6 @@ SGXDevInitPart2BW(IMG_UINT32 ui32BridgeID,
 	}
 
 	
-	
-	
 	eError = PVRSRVLookupHandle(psPerProc->psHandleBase,
 						   &hDummy,
 						   psSGXDevInitPart2IN->sInitInfo.hKernelCCBMemInfo,
@@ -1175,8 +1174,6 @@ SGXDevInitPart2BW(IMG_UINT32 ui32BridgeID,
 		eError = PVRSRVDissociateDeviceMemKM(hDevCookieInt, hHandle);
 		bDissociateFailed |= (IMG_BOOL)(eError != PVRSRV_OK);
 	}
-
-	 
 
 	
 	if(bDissociateFailed)

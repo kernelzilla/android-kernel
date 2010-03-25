@@ -34,28 +34,8 @@
 #include "pdump_km.h"
 
 
-#if defined(SUPPORT_HW_RECOVERY)
-static PVRSRV_ERROR SGXAddTimer(PVRSRV_DEVICE_NODE		*psDeviceNode,
-								SGX_TIMING_INFORMATION	*psSGXTimingInfo,
-								IMG_HANDLE				*phTimer)
-{
-	
 
-
-	*phTimer = OSAddTimer(SGXOSTimer, psDeviceNode,
-						  1000 * 50 / psSGXTimingInfo->ui32uKernelFreq);
-	if(*phTimer == IMG_NULL)
-	{
-		PVR_DPF((PVR_DBG_ERROR,"SGXAddTimer : Failed to register timer callback function"));
-		return PVRSRV_ERROR_OUT_OF_MEMORY;
-	}
-
-	return PVRSRV_OK;
-}
-#endif 
-
-
-static PVRSRV_ERROR SGXUpdateTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
+static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 {
 	PVRSRV_SGXDEV_INFO	*psDevInfo = psDeviceNode->pvDevice;
 #if defined(SGX_DYNAMIC_TIMING_INFO)
@@ -88,30 +68,25 @@ static PVRSRV_ERROR SGXUpdateTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 			{
 				
 
-				IMG_HANDLE hNewTimer;
-				
-				eError = SGXAddTimer(psDeviceNode, psSGXTimingInfo, &hNewTimer);
-				if (eError == PVRSRV_OK)
+				eError = OSRemoveTimer(psDevInfo->hTimer);
+				if (eError != PVRSRV_OK)
 				{
-					eError = OSRemoveTimer(psDevInfo->hTimer);
-					if (eError != PVRSRV_OK)
-					{
-						PVR_DPF((PVR_DBG_ERROR,"SGXUpdateTimingInfo: Failed to remove timer"));
-					}
-					psDevInfo->hTimer = hNewTimer;
+					PVR_DPF((PVR_DBG_ERROR,"SGXGetTimingInfo: Failed to remove timer"));
 				}
-				else
-				{
-					
-				}
+				psDevInfo->hTimer = IMG_NULL;
 			}
 		}
-		else
+		
+		if (psDevInfo->hTimer == IMG_NULL)
 		{
-			eError = SGXAddTimer(psDeviceNode, psSGXTimingInfo, &psDevInfo->hTimer);
-			if (eError != PVRSRV_OK)
+			
+
+
+			psDevInfo->hTimer = OSAddTimer(SGXOSTimer, psDeviceNode,
+										   1000 * 50 / psSGXTimingInfo->ui32uKernelFreq);
+			if(psDevInfo->hTimer == IMG_NULL)
 			{
-				return eError;
+				PVR_DPF((PVR_DBG_ERROR,"SGXGetTimingInfo : Failed to register timer callback function"));
 			}
 		}
 
@@ -160,12 +135,10 @@ static PVRSRV_ERROR SGXUpdateTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 			 sizeof(IMG_UINT32), PDUMP_FLAGS_CONTINUOUS,
 			 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
 #endif 
-
-	return PVRSRV_OK;
 }
 
 
-static IMG_VOID SGXStartTimer(PVRSRV_SGXDEV_INFO	*psDevInfo)
+IMG_VOID SGXStartTimer(PVRSRV_SGXDEV_INFO	*psDevInfo)
 {
 	#if defined(SUPPORT_HW_RECOVERY)
 	PVRSRV_ERROR	eError;
@@ -344,12 +317,7 @@ PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 			
 			
 
-			eError = SGXUpdateTimingInfo(psDeviceNode);
-			if (eError != PVRSRV_OK)
-			{
-				PVR_DPF((PVR_DBG_ERROR,"SGXPostPowerState: SGXUpdateTimingInfo failed"));
-				return eError;
-			}
+			SGXGetTimingInfo(psDeviceNode);
 
 			
 
@@ -429,19 +397,13 @@ PVRSRV_ERROR SGXPostClockSpeedChange (IMG_HANDLE				hDevHandle,
 
 	if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON)
 	{
-		PVRSRV_ERROR eError;
-
 		
 
-		eError = SGXUpdateTimingInfo(psDeviceNode);
-		if (eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR,"SGXPostPowerState: SGXUpdateTimingInfo failed"));
-			return eError;
-		}
+		SGXGetTimingInfo(psDeviceNode);
 
 		if (bIdleDevice)
 		{
+			PVRSRV_ERROR eError;
 			
 			eError = SGXPostPowerState(hDevHandle, PVRSRV_DEV_POWER_STATE_ON,
 									   PVRSRV_DEV_POWER_STATE_IDLE);
