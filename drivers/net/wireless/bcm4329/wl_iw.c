@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.8 2010/03/23 02:06:52 Exp $
+ * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.10 2010/03/25 07:22:21 Exp $
  */
 
 
@@ -5021,9 +5021,19 @@ static int iwpriv_softap_stop(struct net_device *dev,
 	union iwreq_data *wrqu,
 	char *ext)
 {
-	int res;
+	int res = 0;
+	char buf[128];
 
 	WL_SOFTAP(("got iwpriv AP_BSS_STOP\n"));
+
+	if ((!dev) && (!ap_net_dev)) {
+		WL_ERROR(("%s: dev is null\n", __FUNCTION__));
+		return res;
+	}
+
+	/* Make sure that interface is UP */
+	strcpy(buf, "cur_etheraddr");
+	dev_wlc_ioctl(dev, WLC_GET_VAR, buf, sizeof(buf));
 
 	res = wl_iw_softap_deassoc_stations(ap_net_dev);
 
