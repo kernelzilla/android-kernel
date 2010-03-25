@@ -31,6 +31,14 @@ static int au_hin_alloc(struct au_hnotify *hn, struct inode *h_inode)
 {
 	int err;
 	s32 wd;
+	struct inotify_watch *watch;
+
+	err = -EEXIST;
+	wd = inotify_find_watch(au_hin_handle, h_inode, &watch);
+	if (wd >= 0) {
+		put_inotify_watch(watch);
+		goto out;
+	}
 
 	err = 0;
 	inotify_init_watch(&hn->hn_watch);
@@ -41,6 +49,7 @@ static int au_hin_alloc(struct au_hnotify *hn, struct inode *h_inode)
 		put_inotify_watch(&hn->hn_watch);
 	}
 
+out:
 	return err;
 }
 

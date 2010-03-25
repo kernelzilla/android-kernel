@@ -31,13 +31,20 @@ int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
 	err = -ENOMEM;
 	hn = au_cache_alloc_hnotify();
 	if (hn) {
-		AuDebugOn(hinode->hi_notify);
-		hinode->hi_notify = hn;
 		hn->hn_aufs_inode = inode;
 		err = au_hnotify_op.alloc(hn, h_inode);
-		if (unlikely(err)) {
+		if (!err)
+			hinode->hi_notify = hn;
+		else {
 			au_cache_free_hnotify(hn);
-			hinode->hi_notify = NULL;
+			/*
+			 * The upper dir was removed by udba, but the same named
+			 * dir left. In this case, aufs assignes a new inode
+			 * number and set the monitor again.
+			 * For the lower dir, the old monitnor is still left.
+			 */
+			if (err == -EEXIST)
+				err = 0;
 		}
 	}
 
