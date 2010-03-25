@@ -208,7 +208,7 @@ static void au_xino_lock_dir(struct super_block *sb, struct file *xino,
 		bindex = au_br_index(sb, brid);
 	if (bindex >= 0) {
 		ldir->hdir = au_hi(sb->s_root->d_inode, bindex);
-		au_hin_imtx_lock_nested(ldir->hdir, AuLsc_I_PARENT);
+		au_hn_imtx_lock_nested(ldir->hdir, AuLsc_I_PARENT);
 	} else {
 		ldir->parent = dget_parent(xino->f_dentry);
 		ldir->mtx = &ldir->parent->d_inode->i_mutex;
@@ -219,7 +219,7 @@ static void au_xino_lock_dir(struct super_block *sb, struct file *xino,
 static void au_xino_unlock_dir(struct au_xino_lock_dir *ldir)
 {
 	if (ldir->hdir)
-		au_hin_imtx_unlock(ldir->hdir);
+		au_hn_imtx_unlock(ldir->hdir);
 	else {
 		mutex_unlock(ldir->mtx);
 		dput(ldir->parent);
@@ -621,7 +621,7 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 
 	/*
 	 * at mount-time, and the xino file is the default path,
-	 * hinotify is disabled so we have no inotify events to ignore.
+	 * hnotify is disabled so we have no notify events to ignore.
 	 * when a user specified the xino, we cannot get au_hdir to be ignored.
 	 */
 	file = vfsub_filp_open(fname, O_RDWR | O_CREAT | O_EXCL | O_LARGEFILE,
