@@ -204,16 +204,32 @@ static match_table_t udbalevel = {
 	{AuOpt_UDBA_NONE, "none"},
 #ifdef CONFIG_AUFS_HNOTIFY
 	{AuOpt_UDBA_HNOTIFY, "notify"}, /* abstraction */
+#ifdef CONFIG_AUFS_HFSNOTIFY
+	{AuOpt_UDBA_HNOTIFY, "fsnotify"},
+#else
 	{AuOpt_UDBA_HNOTIFY, "inotify"},
+#endif
 #endif
 	{-1, NULL}
 };
 
+static void au_warn_inotify(int val, char *str)
+{
+#ifdef CONFIG_AUFS_HINOTIFY
+	if (val == AuOpt_UDBA_HNOTIFY
+	    && !strcmp(str, "inotify"))
+		AuWarn1("udba=inotify is deprecated, use udba=notify\n");
+#endif
+}
+
 static int noinline_for_stack udba_val(char *str)
 {
+	int val;
 	substring_t args[MAX_OPT_ARGS];
 
-	return match_token(str, udbalevel, args);
+	val = match_token(str, udbalevel, args);
+	au_warn_inotify(val, str);
+	return val;
 }
 
 const char *au_optstr_udba(int udba)

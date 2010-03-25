@@ -26,7 +26,7 @@
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
-#include <linux/inotify.h>
+#include <linux/fsnotify.h>
 #include <linux/aufs_type.h>
 #include "rwsem.h"
 
@@ -34,8 +34,12 @@ struct vfsmount;
 
 struct au_hnotify {
 #ifdef CONFIG_AUFS_HNOTIFY
-	struct inotify_watch	hn_watch;
-	struct inode		*hn_aufs_inode;	/* no get/put */
+#ifdef CONFIG_AUFS_HFSNOTIFY
+	struct fsnotify_mark_entry	hn_entry;
+#else
+	struct inotify_watch		hn_watch;
+#endif
+	struct inode			*hn_aufs_inode;	/* no get/put */
 #endif
 };
 

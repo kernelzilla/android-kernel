@@ -568,17 +568,17 @@ int au_hnotify(struct inode *h_dir, struct au_hnotify *hnotify, u32 mask,
 		flags[AuHn_CHILD] = AuHnJob_ISDIR;
 	au_fset_hnjob(flags[AuHn_PARENT], DIRENT);
 	au_fset_hnjob(flags[AuHn_CHILD], GEN);
-	switch (mask & IN_ALL_EVENTS) {
-	case IN_MOVED_FROM:
-	case IN_MOVED_TO:
+	switch (mask & FS_EVENTS_POSS_ON_CHILD) {
+	case FS_MOVED_FROM:
+	case FS_MOVED_TO:
 		au_fset_hnjob(flags[AuHn_CHILD], XINO0);
 		au_fset_hnjob(flags[AuHn_CHILD], MNTPNT);
 		/*FALLTHROUGH*/
-	case IN_CREATE:
+	case FS_CREATE:
 		AuDebugOn(!h_child_name || !h_child_inode);
 		break;
 
-	case IN_DELETE:
+	case FS_DELETE:
 		/*
 		 * aufs never be able to get this child inode.
 		 * revalidation should be in d_revalidate()
