@@ -39,7 +39,7 @@ struct super_block;
 #define AuOpt_TRUNC_XINO	(1 << 1)	/* truncate xino files */
 #define AuOpt_UDBA_NONE		(1 << 2)	/* users direct branch access */
 #define AuOpt_UDBA_REVAL	(1 << 3)
-#define AuOpt_UDBA_HINOTIFY	(1 << 4)
+#define AuOpt_UDBA_HNOTIFY	(1 << 4)
 #define AuOpt_SHWH		(1 << 5)	/* show whiteout */
 #define AuOpt_PLINK		(1 << 6)	/* pseudo-link */
 #define AuOpt_DIRPERM1		(1 << 7)	/* unimplemented */
@@ -50,9 +50,9 @@ struct super_block;
 #define AuOpt_WARN_PERM		(1 << 12)	/* warn when add-branch */
 #define AuOpt_VERBOSE		(1 << 13)	/* busy inode when del-branch */
 
-#ifndef CONFIG_AUFS_HINOTIFY
-#undef AuOpt_UDBA_HINOTIFY
-#define AuOpt_UDBA_HINOTIFY	0
+#ifndef CONFIG_AUFS_HNOTIFY
+#undef AuOpt_UDBA_HNOTIFY
+#define AuOpt_UDBA_HNOTIFY	0
 #endif
 #ifndef CONFIG_AUFS_SHWH
 #undef AuOpt_SHWH
@@ -66,7 +66,7 @@ struct super_block;
 			 | AuOpt_WARN_PERM)
 #define AuOptMask_UDBA	(AuOpt_UDBA_NONE \
 			 | AuOpt_UDBA_REVAL \
-			 | AuOpt_UDBA_HINOTIFY)
+			 | AuOpt_UDBA_HNOTIFY)
 
 #define au_opt_test(flags, name)	(flags & AuOpt_##name)
 #define au_opt_set(flags, name) do { \
