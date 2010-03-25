@@ -296,6 +296,13 @@ static inline int au_test_higen(struct inode *inode, struct inode *h_inode)
 		 && iinfo->ii_higen == h_inode->i_generation);
 }
 
+static inline void au_iigen_dec(struct inode *inode)
+{
+#ifdef CONFIG_AUFS_HNOTIFY
+	atomic_dec_return(&au_ii(inode)->ii_generation);
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 
 static inline aufs_bindex_t au_ii_br_id(struct inode *inode,
@@ -400,52 +407,33 @@ static inline void au_pin_set_parent(struct au_pin *pin, struct dentry *parent)
 /* ---------------------------------------------------------------------- */
 
 #ifdef CONFIG_AUFS_HNOTIFY
+struct au_hnotify_op {
+	void (*ctl)(struct au_hinode *hinode, int do_set);
+	int (*alloc)(struct au_hnotify *hn, struct inode *h_inode);
+	void (*free)(struct au_hnotify *hn);
+
+	void (*fin)(void);
+	int (*init)(void);
+};
+
 /* hnotify.c */
 int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
 		struct inode *h_inode);
 void au_hn_free(struct au_hinode *hinode);
 void au_hn_ctl(struct au_hinode *hinode, int do_set);
 void au_hn_reset(struct inode *inode, unsigned int flags);
-
-/* hnotify job flags */
-#define AuHnJob_XINO0		1
-#define AuHnJob_GEN		(1 << 1)
-#define AuHnJob_DIRENT		(1 << 2)
-#define AuHnJob_ISDIR		(1 << 3)
-#define AuHnJob_TRYXINO0	(1 << 4)
-#define AuHnJob_MNTPNT		(1 << 5)
-#define au_ftest_hnjob(flags, name)	((flags) & AuHnJob_##name)
-#define au_fset_hnjob(flags, name)	{ (flags) |= AuHnJob_##name; }
-#define au_fclr_hnjob(flags, name)	{ (flags) &= ~AuHnJob_##name; }
-
-enum { CHILD, PARENT };
-struct au_hnotify_args {
-	struct inode *h_dir, *dir, *h_child_inode;
-	u32 mask;
-	unsigned int flags[2];
-	unsigned int h_child_nlen;
-	char h_child_name[];
-};
-
-void au_hnotify(void *_args);
-
+int au_hnotify(struct inode *h_dir, struct au_hnotify *hnotify, u32 mask,
+	       struct qstr *h_child_qstr, struct inode *h_child_inode);
 int __init au_hnotify_init(void);
 void au_hnotify_fin(void);
 
 /* hinotify.c */
-static const __u32 AuHinMask = (IN_MOVE | IN_DELETE | IN_CREATE);
-extern struct inotify_handle *au_hin_handle;
-extern const struct inotify_operations aufs_inotify_ops;
+extern const struct au_hnotify_op au_hnotify_op;
 
 static inline
 void au_hn_init(struct au_hinode *hinode, struct au_hnotify *val)
 {
 	hinode->hi_notify = val;
-}
-
-static inline void au_iigen_dec(struct inode *inode)
-{
-	atomic_dec_return(&au_ii(inode)->ii_generation);
 }
 
 #else

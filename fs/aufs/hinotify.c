@@ -22,8 +22,68 @@
 
 #include "aufs.h"
 
-struct inotify_handle *au_hin_handle;
+static const __u32 AuHinMask = (IN_MOVE | IN_DELETE | IN_CREATE);
+static struct inotify_handle *au_hin_handle;
 
+/* ---------------------------------------------------------------------- */
+
+static int au_hin_alloc(struct au_hnotify *hn, struct inode *h_inode)
+{
+	int err;
+	s32 wd;
+
+	err = 0;
+	inotify_init_watch(&hn->hn_watch);
+	wd = inotify_add_watch(au_hin_handle, &hn->hn_watch, h_inode,
+			       AuHinMask);
+	if (unlikely(wd < 0)) {
+		err = wd;
+		put_inotify_watch(&hn->hn_watch);
+	}
+
+	return err;
+}
+
+static void au_hin_free(struct au_hnotify *hn)
+{
+	int err;
+
+	err = 0;
+	if (atomic_read(&hn->hn_watch.count))
+		err = inotify_rm_watch(au_hin_handle, &hn->hn_watch);
+	if (unlikely(err))
+		/* it means the watch is already removed */
+		AuWarn("failed inotify_rm_watch() %d\n", err);
+}
+
+/* ---------------------------------------------------------------------- */
+
+static void au_hin_ctl(struct au_hinode *hinode, int do_set)
+{
+	struct inode *h_inode;
+	struct inotify_watch *watch;
+
+	h_inode = hinode->hi_inode;
+	IMustLock(h_inode);
+
+	/* todo: try inotify_find_update_watch()? */
+	watch = &hinode->hi_notify->hn_watch;
+	mutex_lock(&h_inode->inotify_mutex);
+	/* mutex_lock(&watch->ih->mutex); */
+	if (do_set) {
+		AuDebugOn(watch->mask & AuHinMask);
+		watch->mask |= AuHinMask;
+	} else {
+		AuDebugOn(!(watch->mask & AuHinMask));
+		watch->mask &= ~AuHinMask;
+	}
+	/* mutex_unlock(&watch->ih->mutex); */
+	mutex_unlock(&h_inode->inotify_mutex);
+}
+
+/* ---------------------------------------------------------------------- */
+
+#ifdef AuDbgHnotify
 static char *in_name(u32 mask)
 {
 #ifdef CONFIG_AUFS_DEBUG
@@ -50,18 +110,16 @@ static char *in_name(u32 mask)
 	return "??";
 #endif
 }
+#endif
 
 static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 			 u32 mask, u32 cookie __maybe_unused,
 			 const char *h_child_name, struct inode *h_child_inode)
 {
 	struct au_hnotify *hnotify;
-	struct au_hnotify_args *args;
-	int len, wkq_err;
-	unsigned char isdir, isroot, wh;
-	char *p;
-	struct inode *dir;
-	unsigned int flags[2];
+	struct qstr h_child_qstr = {
+		.name = h_child_name
+	};
 
 	/* if IN_UNMOUNT happens, there must be another bug */
 	AuDebugOn(mask & IN_UNMOUNT);
@@ -69,6 +127,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 		put_inotify_watch(watch);
 		return;
 	}
+
 #ifdef AuDbgHnotify
 	au_debug(1);
 	if (1 || !h_child_name || strcmp(h_child_name, AUFS_XINO_FNAME)) {
@@ -82,94 +141,10 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
 	au_debug(0);
 #endif
 
+	if (h_child_name)
+		h_child_qstr.len = strlen(h_child_name);
 	hnotify = container_of(watch, struct au_hnotify, hn_watch);
-	AuDebugOn(!hnotify || !hnotify->hn_aufs_inode);
-	dir = igrab(hnotify->hn_aufs_inode);
-	if (!dir)
-		return;
-
-	isroot = (dir->i_ino == AUFS_ROOT_INO);
-	len = 0;
-	wh = 0;
-	if (h_child_name) {
-		len = strlen(h_child_name);
-		if (!memcmp(h_child_name, AUFS_WH_PFX, AUFS_WH_PFX_LEN)) {
-			h_child_name += AUFS_WH_PFX_LEN;
-			len -= AUFS_WH_PFX_LEN;
-			wh = 1;
-		}
-	}
-
-	isdir = 0;
-	if (h_child_inode)
-		isdir = !!S_ISDIR(h_child_inode->i_mode);
-	flags[PARENT] = AuHnJob_ISDIR;
-	flags[CHILD] = 0;
-	if (isdir)
-		flags[CHILD] = AuHnJob_ISDIR;
-	au_fset_hnjob(flags[PARENT], DIRENT);
-	au_fset_hnjob(flags[CHILD], GEN);
-	switch (mask & IN_ALL_EVENTS) {
-	case IN_MOVED_FROM:
-	case IN_MOVED_TO:
-		au_fset_hnjob(flags[CHILD], XINO0);
-		au_fset_hnjob(flags[CHILD], MNTPNT);
-		/*FALLTHROUGH*/
-	case IN_CREATE:
-		AuDebugOn(!h_child_name || !h_child_inode);
-		break;
-
-	case IN_DELETE:
-		/*
-		 * aufs never be able to get this child inode.
-		 * revalidation should be in d_revalidate()
-		 * by checking i_nlink, i_generation or d_unhashed().
-		 */
-		AuDebugOn(!h_child_name);
-		au_fset_hnjob(flags[CHILD], TRYXINO0);
-		au_fset_hnjob(flags[CHILD], MNTPNT);
-		break;
-
-	default:
-		AuDebugOn(1);
-	}
-
-	if (wh)
-		h_child_inode = NULL;
-
-	/* iput() and kfree() will be called in au_hnotify() */
-	/*
-	 * inotify_mutex is already acquired and kmalloc/prune_icache may lock
-	 * iprune_mutex. strange.
-	 */
-	lockdep_off();
-	args = kmalloc(sizeof(*args) + len + 1, GFP_NOFS);
-	lockdep_on();
-	if (unlikely(!args)) {
-		AuErr1("no memory\n");
-		iput(dir);
-		return;
-	}
-	args->flags[PARENT] = flags[PARENT];
-	args->flags[CHILD] = flags[CHILD];
-	args->mask = mask;
-	args->dir = dir;
-	args->h_dir = igrab(watch->inode);
-	if (h_child_inode)
-		h_child_inode = igrab(h_child_inode); /* can be NULL */
-	args->h_child_inode = h_child_inode;
-	args->h_child_nlen = len;
-	if (len) {
-		p = (void *)args;
-		p += sizeof(*args);
-		memcpy(p, h_child_name, len + 1);
-	}
-
-	lockdep_off();
-	wkq_err = au_wkq_nowait(au_hnotify, args, dir->i_sb);
-	lockdep_on();
-	if (unlikely(wkq_err))
-		AuErr("wkq %d\n", wkq_err);
+	au_hnotify(watch->inode, hnotify, mask, &h_child_qstr, h_child_inode);
 }
 
 static void aufs_inotify_destroy(struct inotify_watch *watch __maybe_unused)
@@ -177,7 +152,36 @@ static void aufs_inotify_destroy(struct inotify_watch *watch __maybe_unused)
 	return;
 }
 
-const struct inotify_operations aufs_inotify_ops = {
+static struct inotify_operations aufs_inotify_ops = {
 	.handle_event	= aufs_inotify,
 	.destroy_watch	= aufs_inotify_destroy
+};
+
+/* ---------------------------------------------------------------------- */
+
+static int __init au_hin_init(void)
+{
+	int err;
+
+	err = 0;
+	au_hin_handle = inotify_init(&aufs_inotify_ops);
+	if (IS_ERR(au_hin_handle))
+		err = PTR_ERR(au_hin_handle);
+
+	AuTraceErr(err);
+	return err;
+}
+
+static void au_hin_fin(void)
+{
+	inotify_destroy(au_hin_handle);
+}
+
+const struct au_hnotify_op au_hnotify_op = {
+	.ctl		= au_hin_ctl,
+	.alloc		= au_hin_alloc,
+	.free		= au_hin_free,
+
+	.fin		= au_hin_fin,
+	.init		= au_hin_init
 };
