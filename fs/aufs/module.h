@@ -49,8 +49,8 @@ enum {
 	AuCache_FINFO,
 	AuCache_VDIR,
 	AuCache_DEHSTR,
-#ifdef CONFIG_AUFS_HINOTIFY
-	AuCache_HINOTIFY,
+#ifdef CONFIG_AUFS_HNOTIFY
+	AuCache_HNOTIFY,
 #endif
 	AuCache_Last
 };
@@ -70,8 +70,9 @@ AuCacheFuncs(icntnr, ICNTNR);
 AuCacheFuncs(finfo, FINFO);
 AuCacheFuncs(vdir, VDIR);
 AuCacheFuncs(vdir_dehstr, DEHSTR);
-
-/*  ---------------------------------------------------------------------- */
+#ifdef CONFIG_AUFS_HNOTIFY
+AuCacheFuncs(hnotify, HNOTIFY);
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_MODULE_H__ */
