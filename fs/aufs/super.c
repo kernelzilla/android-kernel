@@ -416,7 +416,7 @@ static int do_refresh(struct dentry *dentry, mode_t type,
 		struct inode *inode = dentry->d_inode;
 		err = au_refresh_hinode(inode, dentry);
 		if (!err && type == S_IFDIR)
-			au_reset_hinotify(inode, dir_flags);
+			au_hn_reset(inode, dir_flags);
 	}
 	if (unlikely(err))
 		pr_err("unrecoverable error %d, %.*s\n",
@@ -582,7 +582,7 @@ static void au_remount_refresh(struct super_block *sb, unsigned int flags)
 	DiMustNoWaiters(root);
 	inode = root->d_inode;
 	IiMustNoWaiters(inode);
-	au_reset_hinotify(inode, au_hi_flags(inode, /*isdir*/1));
+	au_hn_reset(inode, au_hi_flags(inode, /*isdir*/1));
 	di_write_unlock(root);
 
 	err = refresh_dir(root, sigen);

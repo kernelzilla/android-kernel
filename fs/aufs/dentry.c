@@ -427,7 +427,7 @@ int au_h_verify(struct dentry *h_dentry, unsigned int udba, struct inode *h_dir,
 	if (udba == AuOpt_UDBA_REVAL) {
 		IMustLock(h_dir);
 		err = (h_dentry->d_parent->d_inode != h_dir);
-	} else if (udba == AuOpt_UDBA_HINOTIFY)
+	} else if (udba == AuOpt_UDBA_HNOTIFY)
 		err = au_h_verify_dentry(h_dentry, h_parent, br);
 
 	return err;
@@ -865,7 +865,7 @@ static void aufs_d_release(struct dentry *dentry)
 	kfree(dinfo->di_hdentry);
 	AuRwDestroy(&dinfo->di_rwsem);
 	au_cache_free_dinfo(dinfo);
-	au_hin_di_reinit(dentry);
+	au_hn_di_reinit(dentry);
 }
 
 const struct dentry_operations aufs_dop = {

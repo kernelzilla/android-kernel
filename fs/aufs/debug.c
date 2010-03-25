@@ -400,8 +400,8 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo __maybe_unused)
 #ifdef AuForceNoRefrof
 	au_opt_clr(sbinfo->si_mntflags, REFROF);
 #endif
-#ifdef AuForceHinotify
-	au_opt_set_udba(sbinfo->si_mntflags, UDBA_HINOTIFY);
+#ifdef AuForceHnotify
+	au_opt_set_udba(sbinfo->si_mntflags, UDBA_HNOTIFY);
 #endif
 #ifdef AuForceRd0
 	sbinfo->si_rdblk = 0;
