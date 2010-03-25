@@ -578,7 +578,7 @@ static void reinit_br_wh(void *arg)
 	hdir = au_hi(dir, bindex);
 	h_root = au_h_dptr(a->sb->s_root, bindex);
 
-	au_hin_imtx_lock_nested(hdir, AuLsc_I_PARENT);
+	au_hn_imtx_lock_nested(hdir, AuLsc_I_PARENT);
 	wbr_wh_write_lock(wbr);
 	err = au_h_verify(wbr->wbr_whbase, au_opt_udba(a->sb), hdir->hi_inode,
 			  h_root, a->br);
@@ -600,7 +600,7 @@ static void reinit_br_wh(void *arg)
 	if (!err)
 		err = au_wh_init(h_root, a->br, a->sb);
 	wbr_wh_write_unlock(wbr);
-	au_hin_imtx_unlock(hdir);
+	au_hn_imtx_unlock(hdir);
 	di_read_unlock(a->sb->s_root, AuLock_IR);
 
  out:
@@ -1009,7 +1009,7 @@ static void call_rmdir_whtmp(void *args)
 	h_parent = dget_parent(a->wh_dentry);
 	h_dir = h_parent->d_inode;
 	hdir = au_hi(a->dir, a->bindex);
-	au_hin_imtx_lock_nested(hdir, AuLsc_I_PARENT);
+	au_hn_imtx_lock_nested(hdir, AuLsc_I_PARENT);
 	err = au_h_verify(a->wh_dentry, au_opt_udba(sb), h_dir, h_parent, br);
 	if (!err) {
 		err = mnt_want_write(br->br_mnt);
@@ -1019,7 +1019,7 @@ static void call_rmdir_whtmp(void *args)
 			mnt_drop_write(br->br_mnt);
 		}
 	}
-	au_hin_imtx_unlock(hdir);
+	au_hn_imtx_unlock(hdir);
 	dput(h_parent);
 	ii_write_unlock(a->dir);
 

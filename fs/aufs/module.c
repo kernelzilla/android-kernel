@@ -62,7 +62,7 @@ static void au_cache_fin(void)
 {
 	int i;
 
-	/* including AuCache_HINOTIFY */
+	/* including AuCache_HNOTIFY */
 	for (i = 0; i < AuCache_Last; i++)
 		if (au_cachep[i]) {
 			kmem_cache_destroy(au_cachep[i]);
@@ -122,7 +122,7 @@ static int __init aufs_init(void)
 	err = au_wkq_init();
 	if (unlikely(err))
 		goto out_sysaufs;
-	err = au_hinotify_init();
+	err = au_hnotify_init();
 	if (unlikely(err))
 		goto out_wkq;
 	err = au_sysrq_init();
@@ -143,7 +143,7 @@ static int __init aufs_init(void)
  out_sysrq:
 	au_sysrq_fin();
  out_hin:
-	au_hinotify_fin();
+	au_hnotify_fin();
  out_wkq:
 	au_wkq_fin();
  out_sysaufs:
@@ -157,7 +157,7 @@ static void __exit aufs_exit(void)
 	unregister_filesystem(&aufs_fs_type);
 	au_cache_fin();
 	au_sysrq_fin();
-	au_hinotify_fin();
+	au_hnotify_fin();
 	au_wkq_fin();
 	sysaufs_fin();
 }

@@ -336,7 +336,7 @@ void au_unpin(struct au_pin *p)
 	if (!p->hdir)
 		return;
 
-	au_hin_imtx_unlock(p->hdir);
+	au_hn_imtx_unlock(p->hdir);
 	if (!au_ftest_pin(p->flags, DI_LOCKED))
 		di_read_unlock(p->parent, AuLock_IR);
 	iput(p->hdir->hi_inode);
@@ -393,7 +393,7 @@ int au_do_pin(struct au_pin *p)
 	}
 
 	au_igrab(h_dir);
-	au_hin_imtx_lock_nested(p->hdir, p->lsc_hi);
+	au_hn_imtx_lock_nested(p->hdir, p->lsc_hi);
 
 	if (unlikely(p->hdir->hi_inode != h_parent->d_inode)) {
 		err = -EBUSY;

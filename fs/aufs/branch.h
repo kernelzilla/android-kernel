@@ -117,9 +117,9 @@ static inline int au_br_rdonly(struct au_branch *br)
 		? -EROFS : 0;
 }
 
-static inline int au_br_hinotifyable(int brperm __maybe_unused)
+static inline int au_br_hnotifyable(int brperm __maybe_unused)
 {
-#ifdef CONFIG_AUFS_HINOTIFY
+#ifdef CONFIG_AUFS_HNOTIFY
 	return brperm != AuBrPerm_RR && brperm != AuBrPerm_RRWH;
 #else
 	return 0;
