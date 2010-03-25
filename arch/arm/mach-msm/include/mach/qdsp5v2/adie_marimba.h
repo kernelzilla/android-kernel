@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -65,6 +65,10 @@
  *
  */
 #define ADIE_CODEC_DIGITAL_OFF                                     0x0600
+
+/* State to which client asks the drv to write the default values
+ * to the registers */
+#define ADIE_CODEC_FLASH_IMAGE 					   0x0001
 
 /* Path type */
 #define ADIE_CODEC_RX 0

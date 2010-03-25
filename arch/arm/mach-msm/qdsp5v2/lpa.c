@@ -483,7 +483,7 @@ static void lpa_clear_llb(struct lpa_drv *lpa)
 	lpa_enable_obuf(lpa, LPA_BUF_ID_LLB, 0);
 
 	while (!lpa_check_llb_clear(lpa))
-		msleep(1);
+		udelay(100);
 	LPA_REG_WRITEL(lpa, val, LPA_OBUF_CONTROL);
 }
 

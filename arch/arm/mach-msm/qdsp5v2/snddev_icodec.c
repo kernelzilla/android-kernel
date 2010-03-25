@@ -31,6 +31,7 @@
 #include <mach/vreg.h>
 #include <mach/pmic.h>
 #include <mach/debug_audio_mm.h>
+#include <linux/wakelock.h>
 
 #define SNDDEV_ICODEC_PCM_SZ 32 /* 16 bit / sample stereo mode */
 #define SNDDEV_ICODEC_MUL_FACTOR 3 /* Multi by 8 Shift by 3  */
@@ -238,6 +239,9 @@ struct snddev_icodec_drv_state {
 	struct vreg *vreg_msme;
 	struct vreg *vreg_rf2;
 	struct lpa_drv *lpa;
+
+	struct wake_lock rx_idlelock;
+	struct wake_lock tx_idlelock;
 };
 
 static struct snddev_icodec_drv_state snddev_icodec_drv;
@@ -248,6 +252,8 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	struct msm_afe_config afe_config;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	struct lpa_codec_config lpa_config;
+
+	wake_lock(&drv->rx_idlelock);
 
 	/* Voltage regulator voting
 	 * Vote GP16, MSME, RF2
@@ -305,13 +311,15 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	/* Enable ADIE */
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_READY);
 	adie_codec_proceed_stage(icodec->adie_path,
-	ADIE_CODEC_DIGITAL_ANALOG_READY);
+					ADIE_CODEC_DIGITAL_ANALOG_READY);
 
 	/* Enable power amplifier */
 	if (icodec->data->pamp_on)
 		icodec->data->pamp_on();
 
 	icodec->enabled = 1;
+
+	wake_unlock(&drv->rx_idlelock);
 	return 0;
 
 error_afe:
@@ -331,6 +339,8 @@ error_invalid_freq:
 	vreg_disable(drv->vreg_rf2);
 
 	pr_err("%s: encounter error\n", __func__);
+
+	wake_unlock(&drv->rx_idlelock);
 	return -ENODEV;
 }
 
@@ -340,6 +350,8 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	int i;
 	struct msm_afe_config afe_config;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;;
+
+	wake_lock(&drv->tx_idlelock);
 
 	/* Reuse pamp_on for TX platform-specific setup  */
 	if (icodec->data->pamp_on)
@@ -388,6 +400,8 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 
 
 	icodec->enabled = 1;
+
+	wake_unlock(&drv->tx_idlelock);
 	return 0;
 
 error_afe:
@@ -411,12 +425,16 @@ error_invalid_freq:
 		icodec->data->pamp_off();
 
 	pr_err("%s: encounter error\n", __func__);
+
+	wake_unlock(&drv->tx_idlelock);
 	return -ENODEV;
 }
 
 static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 {
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
+
+	wake_lock(&drv->rx_idlelock);
 
 	/* Disable power amplifier */
 	if (icodec->data->pamp_off)
@@ -448,6 +466,8 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	vreg_disable(drv->vreg_rf2);
 
 	icodec->enabled = 0;
+
+	wake_unlock(&drv->rx_idlelock);
 	return 0;
 }
 
@@ -456,6 +476,8 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	int i;
 	afe_disable(AFE_HW_PATH_CODEC_TX);
+
+	wake_lock(&drv->tx_idlelock);
 
 	/* Disable ADIE */
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_OFF);
@@ -481,6 +503,8 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 		icodec->data->pamp_off();
 
 	icodec->enabled = 0;
+
+	wake_unlock(&drv->tx_idlelock);
 	return 0;
 }
 
@@ -985,6 +1009,10 @@ static int __init snddev_icodec_init(void)
 	icodec_drv->rx_active = 0;
 	icodec_drv->tx_active = 0;
 	icodec_drv->lpa = NULL;
+	wake_lock_init(&icodec_drv->tx_idlelock, WAKE_LOCK_IDLE,
+			"snddev_tx_idle");
+	wake_lock_init(&icodec_drv->rx_idlelock, WAKE_LOCK_IDLE,
+			"snddev_rx_idle");
 	return 0;
 
 error_vreg_rf2:

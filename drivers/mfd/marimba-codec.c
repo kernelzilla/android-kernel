@@ -25,6 +25,8 @@
 #define MARIMBA_CDC_RX_CTL 0x81
 #define MARIMBA_CDC_RX_CTL_ST_EN_MASK 0x20
 #define MARIMBA_CDC_RX_CTL_ST_EN_SHFT 0x5
+#define MAX_MDELAY_US 2000
+#define MIN_MDELAY_US 1000
 
 static struct adie_codec_register adie_codec_tx_regs[] =
 {
@@ -117,21 +119,14 @@ static struct adie_codec_state adie_codec;
 static int adie_codec_write(u8 reg, u8 mask, u8 val)
 {
 	int rc;
-	u8 cur_val;
 
-	rc = marimba_read(adie_codec.pdrv_ptr, reg, &cur_val, 1);
-	if (IS_ERR_VALUE(rc)) {
-		pr_err("%s: fail to read reg %x\n", __func__, reg);
-		return -EIO;
-	}
-	cur_val = (cur_val & ~mask) | (val & mask);
-	rc = marimba_write(adie_codec.pdrv_ptr, reg,  &cur_val, 1);
+	rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg,  &val, 1, mask);
 	if (IS_ERR_VALUE(rc)) {
 		pr_err("%s: fail to write reg %x\n", __func__, reg);
 		return -EIO;
 	}
 
-	pr_debug("%s: write reg %x val %x\n", __func__, reg, cur_val);
+	pr_debug("%s: write reg %x val %x\n", __func__, reg, val);
 
 	return 0;
 }
@@ -231,7 +226,7 @@ static void adie_codec_reach_stage_action(struct adie_codec_path *path_ptr,
 	u32 iter;
 	struct adie_codec_register *reg_info;
 
-	if (stage == ADIE_CODEC_DIGITAL_OFF) {
+	if (stage == ADIE_CODEC_FLASH_IMAGE) {
 		/* perform reimage */
 		for (iter = 0; iter < path_ptr->img.img_sz; iter++) {
 			reg_info = &path_ptr->img.regs[iter];
@@ -259,7 +254,12 @@ int adie_codec_proceed_stage(struct adie_codec_path *path_ptr, u32 state)
 			adie_codec_write(reg, mask, val);
 			break;
 		case ADIE_CODEC_ACTION_DELAY_WAIT:
-			udelay(curr_action->action);
+			if (curr_action->action > MAX_MDELAY_US)
+				msleep(curr_action->action/1000);
+			else if (curr_action->action < MIN_MDELAY_US)
+				udelay(curr_action->action);
+			else
+				mdelay(curr_action->action/1000);
 			break;
 		case ADIE_CODEC_ACTION_STAGE_REACHED:
 			adie_codec_reach_stage_action(path_ptr,
@@ -334,7 +334,7 @@ int adie_codec_open(struct adie_codec_dev_profile *profile,
 	*path_pptr = (void *) &adie_codec.path[profile->path_type];
 	adie_codec.ref_cnt++;
 	adie_codec.path[profile->path_type].hwsetting_idx = 0;
-	adie_codec.path[profile->path_type].curr_stage = ADIE_CODEC_DIGITAL_OFF;
+	adie_codec.path[profile->path_type].curr_stage = ADIE_CODEC_FLASH_IMAGE;
 	adie_codec.path[profile->path_type].stage_idx = 0;
 
 	mutex_unlock(&adie_codec.lock);
@@ -353,7 +353,8 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 		rc = -EINVAL;
 		goto error;
 	}
-	adie_codec_proceed_stage(path_ptr, ADIE_CODEC_DIGITAL_OFF);
+	if (path_ptr->curr_stage != ADIE_CODEC_DIGITAL_OFF)
+		adie_codec_proceed_stage(path_ptr, ADIE_CODEC_DIGITAL_OFF);
 
 	mutex_lock(&adie_codec.lock);
 
