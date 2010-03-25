@@ -431,9 +431,9 @@ void au_hnotify_fin(void);
 extern const struct au_hnotify_op au_hnotify_op;
 
 static inline
-void au_hn_init(struct au_hinode *hinode, struct au_hnotify *val)
+void au_hn_init(struct au_hinode *hinode)
 {
-	hinode->hi_notify = val;
+	hinode->hi_notify = NULL;
 }
 
 #else
@@ -452,8 +452,7 @@ AuStubVoid(au_hn_reset, struct inode *inode __maybe_unused,
 	   unsigned int flags __maybe_unused)
 AuStubInt0(__init au_hnotify_init, void)
 AuStubVoid(au_hnotify_fin, void)
-AuStubVoid(au_hn_init, struct au_hinode *hinode __maybe_unused,
-	   struct au_hnotify *val __maybe_unused)
+AuStubVoid(au_hn_init, struct au_hinode *hinode __maybe_unused)
 #endif /* CONFIG_AUFS_HNOTIFY */
 
 static inline void au_hn_suspend(struct au_hinode *hdir)
