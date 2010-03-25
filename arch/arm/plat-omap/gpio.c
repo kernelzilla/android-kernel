@@ -2118,41 +2118,10 @@ void omap2_gpio_prepare_for_idle(int power_state)
 
 	for (i = min; i < gpio_bank_count; i++) {
 		struct gpio_bank *bank = &gpio_bank[i];
-		void __iomem *wake_status;
-		void __iomem *wake_clear;
-		void __iomem *wake_set;
-
 		u32 l1, l2;
 
 		if (cpu_is_omap34xx() && bank->dbck_enable_mask)
 			clk_disable(bank->dbck);
-
-		/* Setup GPIO wakeups when going into suspend and idle */
-		wake_status = bank->base + OMAP24XX_GPIO_WAKE_EN;
-		wake_clear = bank->base + OMAP24XX_GPIO_CLEARWKUENA;
-		wake_set = bank->base + OMAP24XX_GPIO_SETWKUENA;
-
-		bank->saved_wakeup = __raw_readl(wake_status);
-		__raw_writel(0xffffffff, wake_clear);
-		__raw_writel(bank->suspend_wakeup, wake_set);
-
-		if (bank->method == METHOD_GPIO_24XX) {
-			int j;
-			for (j = 0; j < 32; j++) {
-				int offset = gpio_pad_map[j + i * 32];
-				u16 v;
-
-				if (!offset)
-					continue;
-
-				v = omap_ctrl_readw(offset);
-				if (bank->suspend_wakeup & (1 << j))
-					v |= OMAP3_PADCONF_WAKEUPENABLE0;
-				else
-					v &= ~OMAP3_PADCONF_WAKEUPENABLE0;
-				omap_ctrl_writew(v, offset);
-			}
-		}
 
 		if (power_state > PWRDM_POWER_OFF)
 			continue;
@@ -2202,18 +2171,9 @@ void omap2_gpio_resume_after_idle(void)
 	for (i = min; i < gpio_bank_count; i++) {
 		struct gpio_bank *bank = &gpio_bank[i];
 		u32 l, gen, gen0, gen1;
-		void __iomem *wake_clear;
-		void __iomem *wake_set;
 
 		if (cpu_is_omap34xx() && bank->dbck_enable_mask)
 			clk_enable(bank->dbck);
-
-		/* Restore GPIO wakeup registers */
-		wake_clear = bank->base + OMAP24XX_GPIO_CLEARWKUENA;
-		wake_set = bank->base + OMAP24XX_GPIO_SETWKUENA;
-
-		__raw_writel(0xffffffff, wake_clear);
-		__raw_writel(bank->saved_wakeup, wake_set);
 
 		if (!workaround_enabled)
 			continue;
