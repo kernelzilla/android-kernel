@@ -144,8 +144,8 @@ static u32 au_hin_conv_mask(u32 mask)
 #undef do_conv
 #define do_conv(flag)	conv |= (mask & IN_ ## flag) ? FS_IN_ ## flag : 0
 	do_conv(IGNORED);
-	//do_conv(ISDIR);
-	//do_conv(ONESHOT);
+	/* do_conv(ISDIR); */
+	/* do_conv(ONESHOT); */
 #undef do_conv
 
 	return conv;
