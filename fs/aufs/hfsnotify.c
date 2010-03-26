@@ -143,7 +143,7 @@ static int au_hfsn_handle_event(struct fsnotify_group *group,
 		AuDbg("i%lu, mask 0x%x %s, hcname %.*s, hi%lu\n",
 		      h_dir->i_ino, mask, au_hfsn_name(mask),
 		      AuLNPair(&h_child_qstr), h_inode ? h_inode->i_ino : 0);
-		//WARN_ON(1);
+		/* WARN_ON(1); */
 	}
 	au_debug(0);
 #endif
