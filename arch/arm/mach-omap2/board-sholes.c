@@ -312,6 +312,10 @@ static struct platform_device rndis_device = {
 };
 #endif
 
+static struct platform_device usbnet_device = {
+	.name	= "usbnet",
+};
+
 extern void musb_disable_idle(int on);
 
 static int cpcap_usb_connected_probe(struct platform_device *pdev)
@@ -347,6 +351,7 @@ static void sholes_gadget_init(void)
 	int i;
 	char *src;
 #endif
+	int factory_test = !strcmp(boot_mode, "factorycable");
 
 	reg = DIE_ID_REG_BASE + DIE_ID_REG_OFFSET;
 	val[0] = omap_readl(reg);
@@ -366,12 +371,18 @@ static void sholes_gadget_init(void)
 #endif
 
 	/* use different USB configuration when in factory test mode */
-	if (!strcmp(boot_mode, "factorycable"))
+	if (factory_test) {
 		androidusb_device.dev.platform_data = &andusb_plat_factory;
+		platform_device_register(&usbnet_device);
+	}
 
 	platform_device_register(&usb_mass_storage_device);
 #ifdef CONFIG_USB_ANDROID_RNDIS
-	platform_device_register(&rndis_device);
+	/* Don't include RNDIS in factory test mode
+	 * to avoid interference with the usbnet driver.
+	 */
+	if (!factory_test)
+		platform_device_register(&rndis_device);
 #endif
 	platform_device_register(&androidusb_device);
 	platform_driver_register(&cpcap_usb_connected_driver);

@@ -23,6 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/platform_device.h>
 #include <linux/skbuff.h>
 #include <linux/if.h>
 #include <linux/inetdevice.h>
@@ -822,10 +823,23 @@ static struct android_usb_function usbnet_function = {
 	.bind_config = usbnet_bind_config,
 };
 
+static int __init usbnet_probe(struct platform_device *pdev)
+{
+	pr_info("usbnet_probe\n");
+	/* do not register our function unless our platform device was registered */
+	android_register_function(&usbnet_function);
+	return 0;
+}
+
+static struct platform_driver usbnet_platform_driver = {
+	.driver = { .name = "usbnet", },
+	.probe = usbnet_probe,
+};
+
 static int __init init(void)
 {
-	printk(KERN_INFO "usbnet init\n");
-	android_register_function(&usbnet_function);
+	pr_info("usbnet init\n");
+	platform_driver_register(&usbnet_platform_driver);
 	return 0;
 }
 module_init(init);
