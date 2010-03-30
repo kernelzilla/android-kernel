@@ -652,6 +652,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 
 	if (pPctxt != NULL) {
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
+		mutex_init(pPctxt->lock);
 		filp->private_data = pPctxt;
 	}
 
@@ -709,8 +710,10 @@ static long bridge_ioctl(struct file *filp, unsigned int code,
 	int status;
 	u32 retval = DSP_SOK;
 	union Trapped_Args pBufIn;
+	struct PROCESS_CONTEXT *pCtxt;
 
 	DBC_Require(filp != NULL);
+	pCtxt = filp->private_data;
 #ifdef CONFIG_PM
 	status = omap34xxbridge_suspend_lockout(&bridge_suspend_data, filp);
 	if (status != 0)
@@ -727,8 +730,9 @@ static long bridge_ioctl(struct file *filp, unsigned int code,
 
 
 	if (status >= 0) {
-		status = WCD_CallDevIOCtl(code, &pBufIn, &retval,
-				filp->private_data);
+		mutex_lock(&pCtxt->lock);
+		status = WCD_CallDevIOCtl(code, &pBufIn, &retval, pCtxt);
+		mutex_unlock(&pCtxt->lock);
 
 		if (DSP_SUCCEEDED(status)) {
 			status = retval;
