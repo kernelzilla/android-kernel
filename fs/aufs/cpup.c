@@ -896,10 +896,8 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		h_orph = wbr->wbr_orph;
 
 		h_parent = dget(au_h_dptr(parent, bdst));
-		au_set_h_dptr(parent, bdst, NULL);
 		au_set_h_dptr(parent, bdst, dget(h_orph));
 		h_tmpdir = h_orph->d_inode;
-		au_set_h_iptr(dir, bdst, NULL, 0);
 		au_set_h_iptr(dir, bdst, au_igrab(h_tmpdir), /*flags*/0);
 
 		/* this temporary unlock is safe */
@@ -933,9 +931,7 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 	if (h_orph) {
 		mutex_unlock(&h_tmpdir->i_mutex);
 		/* todo: au_h_open_post()? */
-		au_set_h_iptr(dir, bdst, NULL, 0);
 		au_set_h_iptr(dir, bdst, au_igrab(h_dir), /*flags*/0);
-		au_set_h_dptr(parent, bdst, NULL);
 		au_set_h_dptr(parent, bdst, h_parent);
 	}
 	iput(h_dir);
