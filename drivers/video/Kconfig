@@ -2209,10 +2209,6 @@ config FB_MSM_DTV
 	bool
 	default n
 
-config FB_MSM_MDDI_2
-	bool "MDDI TYPE 2 support"
-	default n
-
 config FB_MSM_EXTMDDI
 	bool
 	default n
@@ -2232,7 +2228,6 @@ config FB_MSM_MDDI_TOSHIBA_COMMON_VGA
 	default n
 
 config FB_MSM_MDDI_ORISE
-	depends on FB_MSM_MDDI_2
 	bool
 	select FB_MSM_MDDI
 	default n

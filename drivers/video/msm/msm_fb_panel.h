@@ -76,6 +76,7 @@ struct lcd_panel_info {
 	__u32 v_pulse_width;
 	__u32 hw_vsync_mode;
 	__u32 vsync_notifier_period;
+	__u32 rev;
 };
 
 struct lcdc_panel_info {
