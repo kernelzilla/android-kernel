@@ -33,6 +33,7 @@
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
 #include <linux/wakelock.h>
+#include <linux/workqueue.h>
 
 #include <asm/irq.h>
 #include <asm/dma.h>
@@ -127,12 +128,14 @@ struct uart_omap_port {
 	int			use_console;
 	spinlock_t		uart_lock;
 	char			dev_name[50];
+	struct work_struct	tty_work;
 };
 
 static struct uart_omap_port *ui[MAX_UARTS + 1];
 unsigned int fcr[MAX_UARTS];
 
 static struct wake_lock omap_serial_wakelock;
+static struct workqueue_struct *omap_serial_workqueue;
 
 /* Forward declaration of dma callback functions */
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
@@ -280,7 +283,6 @@ static void serial_omap_stop_rx(struct uart_port *port)
 
 static inline void receive_chars(struct uart_omap_port *up, int *status)
 {
-	struct tty_struct *tty = up->port.state->port.tty;
 	unsigned int ch, flag;
 	int max_count = 256;
 
@@ -350,11 +352,20 @@ ignore_char:
 		*status = serial_in(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
 
-	tty_flip_buffer_push(tty);
+	queue_work(omap_serial_workqueue, &up->tty_work);
 
 #if DBG_RX_DATA
 	printk("\n");
 #endif
+}
+
+static void tty_flip_buffer_work(struct work_struct *work)
+{
+	struct uart_omap_port *up =
+			container_of(work, struct uart_omap_port, tty_work);
+	struct tty_struct *tty = up->port.state->port.tty;
+
+	tty_flip_buffer_push(tty);
 }
 
 static void transmit_chars(struct uart_omap_port *up)
@@ -672,6 +683,11 @@ static int serial_omap_startup(struct uart_port *port)
 		return retval;
 	}
 
+
+	/* do not let tty layer execute RX in global workqueue, use a
+	 * dedicated workqueue managed by this driver */
+	port->state->port.tty->low_latency = 1;
+
 	/*
 	 * Stop the baud clock and disable the UART. UART will be enabled
 	 * back in set_termios. This is essential for DMA mode operations.
@@ -828,6 +844,9 @@ static void serial_omap_shutdown(struct uart_port *port)
 	}
 
 	free_irq(up->port.irq, up);
+
+	if (cancel_work_sync(&up->tty_work))
+		tty_flip_buffer_work(&up->tty_work);
 }
 
 static void
@@ -1243,7 +1262,7 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
 		unsigned int curr_transmitted_size = curr_dma_pos - up->uart_dma.prev_rx_dma_pos;
 		up->port.icount.rx += curr_transmitted_size;
 		tty_insert_flip_string(up->port.state->port.tty, up->uart_dma.rx_buf + (up->uart_dma.prev_rx_dma_pos - up->uart_dma.rx_buf_dma_phys), curr_transmitted_size);
-		tty_flip_buffer_push(up->port.state->port.tty);
+		queue_work(omap_serial_workqueue, &up->tty_work);
 		up->uart_dma.prev_rx_dma_pos = curr_dma_pos;
 		if (up->uart_dma.rx_buf_size + up->uart_dma.rx_buf_dma_phys == curr_dma_pos) {
 			serial_omap_start_rxdma(up);
@@ -1483,6 +1502,8 @@ static int serial_omap_probe(struct platform_device *pdev)
 		} else
 			gpio_direction_output(pdata->wake_gpio_strobe, 0);
 	}
+
+	INIT_WORK(&up->tty_work, tty_flip_buffer_work);
 		
 	return 0;
 do_release_region:
@@ -1519,6 +1540,7 @@ int __init serial_omap_init(void)
 
 	wake_lock_init(&omap_serial_wakelock, WAKE_LOCK_SUSPEND,
 		       "omap_serial");
+	omap_serial_workqueue = create_singlethread_workqueue("omap_serial");
 	ret = uart_register_driver(&serial_omap_reg);
 	if (ret != 0)
 		return ret;
@@ -1531,6 +1553,7 @@ int __init serial_omap_init(void)
 void __exit serial_omap_exit(void)
 {
 	wake_lock_destroy(&omap_serial_wakelock);
+	destroy_workqueue(omap_serial_workqueue);
 	platform_driver_unregister(&serial_omap_driver);
 	uart_unregister_driver(&serial_omap_reg);
 }
