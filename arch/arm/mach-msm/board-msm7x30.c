@@ -626,6 +626,20 @@ static uint32_t camera_on_gpio_table[] = {
 	GPIO_CFG(15, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* MCLK */
 };
 
+static uint32_t camera_off_gpio_fluid_table[] = {
+	/* FLUID: CAM_VGA_RST_N */
+	GPIO_CFG(31, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA),
+	/* FLUID: Disable CAMIF_STANDBY */
+	GPIO_CFG(143, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA)
+};
+
+static uint32_t camera_on_gpio_fluid_table[] = {
+	/* FLUID: CAM_VGA_RST_N */
+	GPIO_CFG(31, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA),
+	/* FLUID: Disable CAMIF_STANDBY */
+	GPIO_CFG(143, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA)
+};
+
 static void config_gpio_table(uint32_t *table, int len)
 {
 	int n, rc;
@@ -642,12 +656,18 @@ static void config_camera_on_gpios(void)
 {
 	config_gpio_table(camera_on_gpio_table,
 		ARRAY_SIZE(camera_on_gpio_table));
+	if (machine_is_msm7x30_fluid())
+		config_gpio_table(camera_on_gpio_fluid_table,
+			ARRAY_SIZE(camera_on_gpio_fluid_table));
 }
 
 static void config_camera_off_gpios(void)
 {
 	config_gpio_table(camera_off_gpio_table,
 		ARRAY_SIZE(camera_off_gpio_table));
+	if (machine_is_msm7x30_fluid())
+		config_gpio_table(camera_off_gpio_fluid_table,
+			ARRAY_SIZE(camera_off_gpio_fluid_table));
 }
 
 struct resource msm_camera_resources[] = {
