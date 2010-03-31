@@ -356,10 +356,12 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(160, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(161, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(162, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+#ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
 	GPIO_CFG(163, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(164, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(165, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(166, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+#endif
 
 	/*
 	 * SD/MMC Slot-5 (CLK, CMD, D0-D3)
@@ -409,7 +411,11 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 static struct mmc_platform_data msm8x60_sdc1_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
+#ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
+	.mmc_bus_width  = MMC_CAP_8_BIT_DATA,
+#else
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+#endif
 };
 #endif
 
