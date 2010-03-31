@@ -89,19 +89,7 @@ static struct platform_device smsc911x_device = {
 };
 
 #ifdef CONFIG_I2C_QUP
-static void gsbi3_qup_i2c_gpio_config(int adap_id, int config_type)
-{
-}
-
-static void gsbi4_qup_i2c_gpio_config(int adap_id, int config_type)
-{
-}
-
-static void gsbi8_qup_i2c_gpio_config(int adap_id, int config_type)
-{
-}
-
-static void gsbi9_qup_i2c_gpio_config(int adap_id, int config_type)
+static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 {
 }
 
@@ -109,28 +97,35 @@ static struct msm_i2c_platform_data msm_gsbi3_qup_i2c_pdata = {
 	.clk_freq = 100000,
 	.clk = "gsbi_qup_clk",
 	.pclk = "gsbi_pclk",
-	.msm_i2c_config_gpio = gsbi3_qup_i2c_gpio_config,
+	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
 };
 
 static struct msm_i2c_platform_data msm_gsbi4_qup_i2c_pdata = {
 	.clk_freq = 100000,
 	.clk = "gsbi_qup_clk",
 	.pclk = "gsbi_pclk",
-	.msm_i2c_config_gpio = gsbi4_qup_i2c_gpio_config,
+	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
+};
+
+static struct msm_i2c_platform_data msm_gsbi7_qup_i2c_pdata = {
+	.clk_freq = 100000,
+	.clk = "gsbi_qup_clk",
+	.pclk = "gsbi_pclk",
+	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
 };
 
 static struct msm_i2c_platform_data msm_gsbi8_qup_i2c_pdata = {
 	.clk_freq = 100000,
 	.clk = "gsbi_qup_clk",
 	.pclk = "gsbi_pclk",
-	.msm_i2c_config_gpio = gsbi8_qup_i2c_gpio_config,
+	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
 };
 
 static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 	.clk_freq = 100000,
 	.clk = "gsbi_qup_clk",
 	.pclk = "gsbi_pclk",
-	.msm_i2c_config_gpio = gsbi9_qup_i2c_gpio_config,
+	.msm_i2c_config_gpio = gsbi_qup_i2c_gpio_config,
 };
 #endif
 
@@ -156,6 +151,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi7_qup_i2c_device,
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
 #endif
@@ -171,6 +167,7 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi7_qup_i2c_device,
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
 #endif
@@ -196,6 +193,7 @@ static void __init msm8x60_init_buses(void)
 #ifdef CONFIG_I2C_QUP
 	msm_gsbi3_qup_i2c_device.dev.platform_data = &msm_gsbi3_qup_i2c_pdata;
 	msm_gsbi4_qup_i2c_device.dev.platform_data = &msm_gsbi4_qup_i2c_pdata;
+	msm_gsbi7_qup_i2c_device.dev.platform_data = &msm_gsbi7_qup_i2c_pdata;
 	msm_gsbi8_qup_i2c_device.dev.platform_data = &msm_gsbi8_qup_i2c_pdata;
 	msm_gsbi9_qup_i2c_device.dev.platform_data = &msm_gsbi9_qup_i2c_pdata;
 #endif
@@ -372,6 +370,12 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(99,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(98,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(96,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+
+#ifdef CONFIG_I2C_QUP
+	/* GSBI7 QUP I2C (Marimba) */
+	GPIO_CFG(59, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(60, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+#endif
 };
 
 static void __init msm8x60_init_tlmm(void)

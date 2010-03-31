@@ -94,6 +94,27 @@ static struct resource gsbi4_qup_i2c_resources[] = {
 	},
 };
 
+static struct resource gsbi7_qup_i2c_resources[] = {
+	{
+		.name	= "qup_phys_addr",
+		.start	= MSM_GSBI7_QUP_I2C_PHYS,
+		.end	= MSM_GSBI7_QUP_I2C_PHYS + SZ_4K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI7_PHYS,
+		.end	= MSM_GSBI7_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_err_intr",
+		.start	= GSBI7_QUP_IRQ,
+		.end	= GSBI7_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
 static struct resource gsbi8_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
@@ -166,6 +187,14 @@ struct platform_device msm_gsbi9_qup_i2c_device = {
 	.id		= 2,
 	.num_resources	= ARRAY_SIZE(gsbi9_qup_i2c_resources),
 	.resource	= gsbi9_qup_i2c_resources,
+};
+
+/* Use GSBI7 QUP for /dev/i2c-4 (Marimba) */
+struct platform_device msm_gsbi7_qup_i2c_device = {
+	.name		= "qup_i2c",
+	.id		= 4,
+	.num_resources	= ARRAY_SIZE(gsbi7_qup_i2c_resources),
+	.resource	= gsbi7_qup_i2c_resources,
 };
 
 #ifdef CONFIG_I2C_SSBI
@@ -412,7 +441,8 @@ struct clk msm_clocks_8x60[] = {
 					&msm_gsbi4_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI5_QUP_CLK,		NULL, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI6_QUP_CLK,		NULL, 0),
-	CLK_8X60("gsbi_qup_clk",	GSBI7_QUP_CLK,		NULL, 0),
+	CLK_8X60("gsbi_qup_clk",	GSBI7_QUP_CLK,
+					&msm_gsbi7_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI8_QUP_CLK,
 					&msm_gsbi8_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI9_QUP_CLK,
@@ -464,7 +494,8 @@ struct clk msm_clocks_8x60[] = {
 					&msm_gsbi4_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_pclk",		GSBI5_P_CLK,		NULL, 0),
 	CLK_8X60("gsbi_pclk",		GSBI6_P_CLK,		NULL, 0),
-	CLK_8X60("gsbi_pclk",		GSBI7_P_CLK,		NULL, 0),
+	CLK_8X60("gsbi_pclk",		GSBI7_P_CLK,
+					&msm_gsbi7_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_pclk",		GSBI8_P_CLK,
 					&msm_gsbi8_qup_i2c_device.dev, 0),
 	CLK_8X60("gsbi_pclk",		GSBI9_P_CLK,
