@@ -847,7 +847,10 @@ static int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 
 	dget(wh_dentry);
 	h_path.dentry = wh_dentry;
-	err = vfsub_unlink(h_parent->d_inode, &h_path, /*force*/0);
+	if (!S_ISDIR(wh_dentry->d_inode->i_mode))
+		err = vfsub_unlink(h_parent->d_inode, &h_path, /*force*/0);
+	else
+		err = vfsub_rmdir(h_parent->d_inode, &h_path);
 	if (unlikely(err)) {
 		AuIOErr("failed remove copied-up tmp file %.*s(%d)\n",
 			AuDLNPair(wh_dentry), err);
