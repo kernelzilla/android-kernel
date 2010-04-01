@@ -652,7 +652,7 @@ static int bridge_open(struct inode *ip, struct file *filp)
 
 	if (pPctxt != NULL) {
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
-		mutex_init(pPctxt->lock);
+		mutex_init(&pPctxt->lock);
 		filp->private_data = pPctxt;
 	}
 
