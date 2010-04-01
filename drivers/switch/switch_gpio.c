@@ -1,4 +1,4 @@
-#warning compile out
+/* #warning compile out */
 #if 0
 /*
  *  drivers/switch/switch_gpio.c

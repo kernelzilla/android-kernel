@@ -1,4 +1,4 @@
-#warning compile out
+/* #warning compile out */
 #if 0
 /*
  * soc-jack.c  --  ALSA SoC jack handling
