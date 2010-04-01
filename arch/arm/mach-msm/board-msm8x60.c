@@ -266,6 +266,12 @@ static void __init msm8x60_init_ebi2(void)
 			/* EBI2_XMEM_CFG:PWRSAVE_MODE off */
 			writel(0UL, ebi2_cfg_ptr);
 
+			/* CS2: Delay 9 cycles (140ns@64MHz) between SMSC
+			 * LAN9221 Ethernet controller reads and writes.
+			 * The lowest 4 bits are the read delay, the next
+			 * 4 are the write delay. */
+			writel(0x031F1C99, ebi2_cfg_ptr + 0x10);
+
 			/* EBI2 CS3 muxed address/data,
 			 * two cyc addr enable */
 			writel(0xA3030020, ebi2_cfg_ptr + 0x34);
