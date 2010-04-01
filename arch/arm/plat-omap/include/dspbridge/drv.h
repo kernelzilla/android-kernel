@@ -187,8 +187,6 @@ struct PROCESS_CONTEXT{
 
 	/* Stream resources */
 	struct STRM_RES_OBJECT *pSTRMList;
-
-	struct mutex lock;
 #ifdef CONFIG_BRIDGE_RECOVERY
 	struct task_struct *task;
 	struct list_head list;
