@@ -1766,9 +1766,16 @@ static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_power_save   = lcdc_panel_power,
 };
 
+static struct msm_panel_common_pdata mdp_pdata = {
+	.mdp_core_clk_rate = 59080000,
+};
+
 static void __init msm_fb_add_devices(void)
 {
-	msm_fb_register_device("mdp", NULL);
+	if (machine_is_msm8x60_rumi3())
+		msm_fb_register_device("mdp", NULL);
+	else
+		msm_fb_register_device("mdp", &mdp_pdata);
 
 	msm_fb_register_device("lcdc", &lcdc_pdata);
 }

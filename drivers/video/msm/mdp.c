@@ -824,6 +824,12 @@ static int mdp_on(struct platform_device *pdev)
 	return ret;
 }
 
+
+static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
+static int pdev_list_cnt;
+static int mdp_resource_initialized;
+static struct msm_panel_common_pdata *mdp_pdata;
+
 static int mdp_irq_clk_setup(void)
 {
 	int ret;
@@ -855,18 +861,13 @@ static int mdp_irq_clk_setup(void)
 	/*
 	 * mdp_clk should greater than mdp_pclk always
 	 */
-	clk_set_rate(mdp_clk, 122880000); /* 122.88 Mhz */
-	printk(KERN_INFO "mdp_clk: mdp_clk=%d\n",
-				(int)clk_get_rate(mdp_clk));
+	if (mdp_pdata && mdp_pdata->mdp_core_clk_rate)
+		clk_set_rate(mdp_clk, mdp_pdata->mdp_core_clk_rate);
+	printk(KERN_INFO "mdp_clk: mdp_clk=%d\n", (int)clk_get_rate(mdp_clk));
 #endif
 
 	return 0;
 }
-
-static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
-static int pdev_list_cnt;
-static int mdp_resource_initialized;
-static struct msm_panel_common_pdata *mdp_pdata;
 
 static int mdp_probe(struct platform_device *pdev)
 {

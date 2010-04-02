@@ -2885,6 +2885,7 @@ static struct mddi_platform_data mddi_pdata = {
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 30,
+	.mdp_core_clk_rate = 122880000,
 };
 
 static int lcd_panel_spi_gpio_num[] = {
