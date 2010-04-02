@@ -351,6 +351,7 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	/* ADV */
 	GPIO_CFG(153, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_8MA),
 
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 	/*
 	 * SD/MMC Slot-1 (CLK, CMD, D0-D7)
 	 */
@@ -366,7 +367,9 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(165, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(166, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 #endif
+#endif
 
+#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
 	/*
 	 * SD/MMC Slot-5 (CLK, CMD, D0-D3)
 	 */
@@ -376,6 +379,7 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(99,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(98,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
 	GPIO_CFG(96,  2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_10MA),
+#endif
 
 #ifdef CONFIG_I2C_QUP
 	/* GSBI7 QUP I2C (Marimba) */
