@@ -1062,7 +1062,7 @@ qup_i2c_init_driver(void)
 {
 	return platform_driver_register(&qup_i2c_driver);
 }
-subsys_initcall(qup_i2c_init_driver);
+arch_initcall(qup_i2c_init_driver);
 
 static void __exit qup_i2c_exit_driver(void)
 {
