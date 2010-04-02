@@ -68,8 +68,10 @@ static struct snddev_icodec_data snddev_iearpiece_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
-	.max_voice_rx_vol = -200,
-	.min_voice_rx_vol = -1700,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -200,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1700,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -200,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1700
 };
 
 static struct platform_device msm_iearpiece_device = {
@@ -164,8 +166,10 @@ static struct snddev_icodec_data snddev_ihs_stereo_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
-	.max_voice_rx_vol = -700,
-	.min_voice_rx_vol = -2200,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2400
 };
 
 static struct platform_device msm_ihs_stereo_rx_device = {
@@ -202,8 +206,11 @@ static struct snddev_icodec_data snddev_ihs_mono_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
-	.max_voice_rx_vol = -700,
-	.min_voice_rx_vol = -2200,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2400,
+
 };
 
 static struct platform_device msm_ihs_mono_rx_device = {
@@ -274,8 +281,10 @@ static struct snddev_icodec_data snddev_ihs_ffa_stereo_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = msm_snddev_hsed_pamp_on,
 	.pamp_off = msm_snddev_hsed_pamp_off,
-	.max_voice_rx_vol = -700,
-	.min_voice_rx_vol = -2200,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2400,
 };
 
 static struct platform_device msm_ihs_ffa_stereo_rx_device = {
@@ -312,8 +321,10 @@ static struct snddev_icodec_data snddev_ihs_ffa_mono_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = msm_snddev_hsed_pamp_on,
 	.pamp_off = msm_snddev_hsed_pamp_off,
-	.max_voice_rx_vol = -700,
-	.min_voice_rx_vol = -2200,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2400,
 };
 
 static struct platform_device msm_ihs_ffa_mono_rx_device = {
@@ -445,8 +456,10 @@ static struct snddev_icodec_data snddev_ispeaker_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = &msm_snddev_poweramp_on,
 	.pamp_off = &msm_snddev_poweramp_off,
-	.max_voice_rx_vol = 500,
-	.min_voice_rx_vol = -1000,
+	.max_voice_rx_vol[VOC_NB_INDEX] = 1000,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -500,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 1000,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -500,
 };
 
 static struct platform_device msm_ispeaker_rx_device = {
@@ -574,8 +587,10 @@ static struct snddev_ecodec_data snddev_bt_sco_earpiece_data = {
 	.conf_pcm_ctl_val = BT_SCO_PCM_CTL_VAL,
 	.conf_aux_codec_intf = BT_SCO_AUX_CODEC_INTF,
 	.conf_data_format_padding_val = BT_SCO_DATA_FORMAT_PADDING,
-	.max_voice_rx_vol = 400,
-	.min_voice_rx_vol = -1100,
+	.max_voice_rx_vol[VOC_NB_INDEX] = 400,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1100,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 400,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1100,
 };
 
 static struct snddev_ecodec_data snddev_bt_sco_mic_data = {
@@ -903,8 +918,10 @@ static struct snddev_icodec_data snddev_itty_hs_mono_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
-	.max_voice_rx_vol = 0,
-	.min_voice_rx_vol = 0,
+	.max_voice_rx_vol[VOC_NB_INDEX] = 0,
+	.min_voice_rx_vol[VOC_NB_INDEX] = 0,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 0,
+	.min_voice_rx_vol[VOC_WB_INDEX] = 0,
 };
 
 static struct platform_device msm_itty_hs_mono_rx_device = {
@@ -998,8 +1015,10 @@ static struct snddev_icodec_data snddev_iearpiece_ffa_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = NULL,
 	.pamp_off = NULL,
-	.max_voice_rx_vol = -700,
-	.min_voice_rx_vol = -2200,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -1400,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2900,
 };
 
 static struct platform_device msm_iearpiece_ffa_device = {
@@ -1109,8 +1128,10 @@ static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data = {
 	.default_sample_rate = 48000,
 	.pamp_on = msm_snddev_hsed_speaker_pamp_on,
 	.pamp_off = msm_snddev_hsed_speaker_pamp_off,
-	.max_voice_rx_vol = -500,
-	.min_voice_rx_vol = -2000,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -500,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -2000,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -500,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2000,
 };
 
 static struct platform_device msm_ihs_stereo_speaker_stereo_rx_device = {

@@ -58,8 +58,8 @@ struct voice_data {
 	uint32_t default_sample_val;
 	/* call status */
 	int v_call_status; /* Start or End */
-	s32 max_rx_vol;
-	s32 min_rx_vol;
+	s32 max_rx_vol[VOC_RX_VOL_ARRAY_NUM]; /* [0] is for NB, [1] for WB */
+	s32 min_rx_vol[VOC_RX_VOL_ARRAY_NUM];
 };
 
 static struct voice_data voice;
@@ -95,8 +95,7 @@ static void voice_auddev_cb_function(u32 evt_id,
 			void *private_data)
 {
 	struct voice_data *v = &voice;
-	int rc = 0;
-	int vol;
+	int rc = 0, i;
 
 	MM_INFO("auddev_cb_function, evt_id=%d, dev_state=%d\n",
 		evt_id, v->dev_state);
@@ -151,6 +150,14 @@ static void voice_auddev_cb_function(u32 evt_id,
 		break;
 	case AUDDEV_EVT_DEV_RDY:
 		/* update the dev info */
+		if (evt_payload->voc_devinfo.dev_type == DIR_RX) {
+			for (i = 0; i < VOC_RX_VOL_ARRAY_NUM; i++) {
+				v->max_rx_vol[i] =
+					evt_payload->voc_devinfo.max_rx_vol[i];
+				v->min_rx_vol[i] =
+					evt_payload->voc_devinfo.min_rx_vol[i];
+			}
+		}
 		if (v->dev_state == DEV_CHANGE) {
 			if (evt_payload->voc_devinfo.dev_type == DIR_RX) {
 				v->dev_rx.dev_acdb_id =
@@ -160,10 +167,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 				v->dev_rx.dev_id =
 				evt_payload->voc_devinfo.dev_id;
 				v->dev_rx.enabled = VOICE_DEV_ENABLED;
-				v->max_rx_vol =
-					evt_payload->voc_devinfo.max_rx_vol;
-				v->min_rx_vol =
-					evt_payload->voc_devinfo.min_rx_vol;
 			} else {
 				v->dev_tx.dev_acdb_id =
 					evt_payload->voc_devinfo.acdb_dev_id;
@@ -191,10 +194,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 				v->dev_rx.dev_id =
 				evt_payload->voc_devinfo.dev_id;
 				v->dev_rx.enabled = VOICE_DEV_ENABLED;
-				v->max_rx_vol =
-					evt_payload->voc_devinfo.max_rx_vol;
-				v->min_rx_vol =
-					evt_payload->voc_devinfo.min_rx_vol;
 			} else {
 				v->dev_tx.dev_acdb_id =
 					evt_payload->voc_devinfo.acdb_dev_id;
@@ -225,16 +224,9 @@ static void voice_auddev_cb_function(u32 evt_id,
 		if (evt_payload->voc_devinfo.dev_type == DIR_TX)
 			v->dev_tx.mute =
 				evt_payload->voc_vm_info.dev_vm_val.mute;
-		else {
-			/* convert the vol from percentage to db */
-			vol = v->min_rx_vol + ((v->max_rx_vol - v->min_rx_vol) *
-				evt_payload->voc_vm_info.dev_vm_val.vol)/100;
-			MM_DBG("vol=%d, after convert vol2=%d \n",
-				evt_payload->voc_vm_info.dev_vm_val.vol, vol);
-			MM_DBG(" min vol=%d, max vol=%d\n",
-				v->min_rx_vol, v->max_rx_vol);
-			v->dev_rx.volume = (u32)vol;
-		}
+		else
+			v->dev_rx.volume = evt_payload->
+						voc_vm_info.dev_vm_val.vol;
 		/* send device info */
 		voice_cmd_device_info(v);
 		break;
@@ -463,23 +455,32 @@ static int voice_cmd_acquire_done(struct voice_data *v)
 static int voice_cmd_device_info(struct voice_data *v)
 {
 	struct voice_device cmd;
-	int err;
+	int err, vol;
 
 	MM_INFO("%s(), tx_dev=%d, rx_dev=%d, tx_sample=%d, rx_sample=%d \n",
 	__func__, v->dev_tx.dev_acdb_id, v->dev_rx.dev_acdb_id,
 	v->dev_tx.sample, v->dev_rx.sample);
-	MM_INFO("rx_vol=%d, tx_mute=%d\n", v->dev_rx.volume, v->dev_tx.mute);
 
 	cmd.hdr.id = CMD_DEVICE_INFO;
 	cmd.hdr.data_len = sizeof(struct voice_device) -
 			sizeof(struct voice_header);
 	cmd.tx_device = v->dev_tx.dev_acdb_id;
 	cmd.rx_device = v->dev_rx.dev_acdb_id;
-	cmd.rx_volume = v->dev_rx.volume;
+	if (v->network == NETWORK_WCDMA_WB)
+		vol = v->min_rx_vol[VOC_WB_INDEX] +
+			((v->max_rx_vol[VOC_WB_INDEX] -
+			v->min_rx_vol[VOC_WB_INDEX]) * v->dev_rx.volume)/100;
+	else
+		vol = v->min_rx_vol[VOC_NB_INDEX] +
+			((v->max_rx_vol[VOC_NB_INDEX] -
+			v->min_rx_vol[VOC_NB_INDEX]) * v->dev_rx.volume)/100;
+	cmd.rx_volume = (u32)vol; /* in mb */
 	cmd.rx_mute = 0;
 	cmd.tx_mute = v->dev_tx.mute;
 	cmd.rx_sample = v->dev_rx.sample/1000;
 	cmd.tx_sample = v->dev_tx.sample/1000;
+
+	MM_INFO("rx_vol=%d, tx_mute=%d\n", cmd.rx_volume, v->dev_tx.mute);
 
 	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &cmd,
 			 sizeof(struct voice_device));
@@ -619,7 +620,7 @@ static int voice_thread(void *data)
 
 static int __init voice_init(void)
 {
-	int rc;
+	int rc, i;
 	struct voice_data *v = &voice;
 	MM_INFO("%s\n", __func__);
 
@@ -631,8 +632,11 @@ static int __init voice_init(void)
 	v->default_mute_val = 1;  /* default is mute */
 	v->default_vol_val = 0;
 	v->default_sample_val = 8000;
-	v->max_rx_vol = 0;
-	v->min_rx_vol = 0;
+	for (i = 0; i < VOC_RX_VOL_ARRAY_NUM; i++) {
+		v->max_rx_vol[i] = 0;
+		v->min_rx_vol[i] = 0;
+	}
+	v->network = NETWORK_GSM;
 
 	/* initialize dev_rx and dev_tx */
 	memset(&v->dev_tx, 0, sizeof(struct device_data));

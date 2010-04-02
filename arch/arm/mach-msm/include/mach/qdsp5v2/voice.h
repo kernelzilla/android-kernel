@@ -123,7 +123,7 @@ struct voice_network {
 
 struct device_data {
 	uint32_t dev_acdb_id;
-	uint32_t volume;
+	uint32_t volume; /* in percentage */
 	uint32_t mute;
 	uint32_t sample;
 	uint32_t enabled;

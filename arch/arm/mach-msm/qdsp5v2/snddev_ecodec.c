@@ -308,7 +308,7 @@ error:
 
 static int snddev_ecodec_probe(struct platform_device *pdev)
 {
-	int rc = 0;
+	int rc = 0, i;
 	struct snddev_ecodec_data *pdata;
 	struct msm_snddev_info *dev_info;
 	struct snddev_ecodec_state *ecodec;
@@ -348,8 +348,12 @@ static int snddev_ecodec_probe(struct platform_device *pdev)
 	ecodec->data = pdata;
 	ecodec->sample_rate = 8000; /* Default to 8KHz */
 	 if (pdata->capability & SNDDEV_CAP_RX) {
-		dev_info->max_voc_rx_vol = pdata->max_voice_rx_vol;
-		dev_info->min_voc_rx_vol = pdata->min_voice_rx_vol;
+		for (i = 0; i < VOC_RX_VOL_ARRAY_NUM; i++) {
+			dev_info->max_voc_rx_vol[i] =
+				pdata->max_voice_rx_vol[i];
+			dev_info->min_voc_rx_vol[i] =
+				pdata->min_voice_rx_vol[i];
+		}
 	}
 error:
 	return rc;
