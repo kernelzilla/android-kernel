@@ -87,9 +87,7 @@ static struct resource smsc911x_resources[] = {
 		.end   = 0x1b8000ff
 	},
 	[1] = {
-		.flags = IORESOURCE_IRQ,
-		.start = TLMM_SCSS_DIR_CONN_IRQ_0,
-		.end   = TLMM_SCSS_DIR_CONN_IRQ_0
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
 	},
 };
 
@@ -336,6 +334,37 @@ static struct i2c_board_info __initdata msm8x60_i2c_gsbi8_info[] = {
 
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
+	int i;
+	int rc;
+	struct pm8058_gpio_cfg {
+		int                gpio;
+		struct pm8058_gpio cfg;
+	};
+
+	struct pm8058_gpio_cfg gpio_cfgs[] = {
+		{ /* FFA ethernet */
+			6,
+			{
+				.direction      = PM_GPIO_DIR_IN,
+				.pull           = PM_GPIO_PULL_DN,
+				.vin_sel        = 2,
+				.function       = PM_GPIO_FUNC_NORMAL,
+				.inv_int_pol    = 0,
+			},
+		},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
+		rc = pm8058_gpio_config_h(pm_chip,
+					  gpio_cfgs[i].gpio,
+					  &gpio_cfgs[i].cfg);
+		if (rc < 0) {
+			pr_err("%s pmic gpio config failed\n",
+				__func__);
+			return rc;
+		}
+	}
+
 	return 0;
 }
 
@@ -839,6 +868,19 @@ static void __init msm8x60_init_mmc(void)
 #endif
 }
 
+static void __init msm8x60_cfg_smsc911x(void)
+{
+	if (machine_is_msm8x60_ffa()) {
+		smsc911x_resources[1].start =
+			PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
+		smsc911x_resources[1].end =
+			PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
+	} else {
+		smsc911x_resources[1].start = TLMM_SCSS_DIR_CONN_IRQ_0;
+		smsc911x_resources[1].end = TLMM_SCSS_DIR_CONN_IRQ_0;
+	}
+}
+
 static void __init msm8x60_init(void)
 {
 	/* CPU frequency control is not supported on simulated targets. */
@@ -849,10 +891,11 @@ static void __init msm8x60_init(void)
 	msm8x60_init_tlmm();
 	msm8x60_init_mmc();
 	msm8x60_init_buses();
-	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa())
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
+		msm8x60_cfg_smsc911x();
 		platform_add_devices(surf_devices,
 				     ARRAY_SIZE(surf_devices));
-	else {
+	} else {
 		msm8x60_configure_smc91x();
 		platform_add_devices(rumi_sim_devices,
 				     ARRAY_SIZE(rumi_sim_devices));
