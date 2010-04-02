@@ -491,6 +491,51 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	return platform_device_register(pdev);
 }
 
+#define MDP_HW_BASE 0x05100000
+static struct resource msm_mdp_resources[] = {
+	{
+		.name   = "mdp",
+		.start  = MDP_HW_BASE,
+		.end    = MDP_HW_BASE + 0x000F0000 - 1,
+		.flags  = IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device msm_mdp_device = {
+	.name   = "mdp",
+	.id     = 0,
+	.num_resources  = ARRAY_SIZE(msm_mdp_resources),
+	.resource       = msm_mdp_resources,
+};
+
+static void __init msm_register_device(struct platform_device *pdev, void *data)
+{
+	int ret;
+
+	pdev->dev.platform_data = data;
+
+	ret = platform_device_register(pdev);
+	if (ret)
+		dev_err(&pdev->dev,
+			  "%s: platform_device_register() failed = %d\n",
+			  __func__, ret);
+}
+
+static struct platform_device msm_lcdc_device = {
+	.name   = "lcdc",
+	.id     = 0,
+};
+
+void __init msm_fb_register_device(char *name, void *data)
+{
+	if (!strncmp(name, "mdp", 3))
+		msm_register_device(&msm_mdp_device, data);
+	else if (!strncmp(name, "lcdc", 4))
+		msm_register_device(&msm_lcdc_device, data);
+	else
+		printk(KERN_ERR "%s: unknown device! %s\n", __func__, name);
+}
+
 static struct resource resources_otg[] = {
 	{
 		.start	= 0x12500000,

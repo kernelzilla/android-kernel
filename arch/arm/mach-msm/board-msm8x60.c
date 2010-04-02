@@ -29,6 +29,7 @@
 #include <linux/pmic8058-othc.h>
 #include <linux/mfd/pmic8901.h>
 #include <linux/regulator/pmic8901-regulator.h>
+#include <linux/bootmem.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -37,9 +38,14 @@
 #include <linux/regulator/consumer.h>
 #include <linux/input/tdisc_shinetsu.h>
 
+#ifdef CONFIG_ANDROID_PMEM
+#include <linux/android_pmem.h>
+#endif
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/hardware/gic.h>
+#include <asm/setup.h>
 
 #include <mach/board.h>
 #include <mach/irqs.h>
@@ -316,6 +322,75 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
+#define MSM_FB_SIZE 0x500000;
+#define MSM_PMEM_SF_SIZE 0x1000000;
+static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
+static void __init pmem_sf_size_setup(char **p)
+{
+	pmem_sf_size = memparse(*p, p);
+}
+__early_param("pmem_sf_size=", pmem_sf_size_setup);
+
+static unsigned fb_size = MSM_FB_SIZE;
+static void __init fb_size_setup(char **p)
+{
+	fb_size = memparse(*p, p);
+}
+__early_param("fb_size=", fb_size_setup);
+
+static struct resource msm_fb_resources[] = {
+	{
+		.flags  = IORESOURCE_DMA,
+	}
+};
+
+static struct platform_device msm_fb_device = {
+	.name   = "msm_fb",
+	.id     = 0,
+	.num_resources  = ARRAY_SIZE(msm_fb_resources),
+	.resource       = msm_fb_resources,
+};
+
+#ifdef CONFIG_ANDROID_PMEM
+static struct android_pmem_platform_data android_pmem_pdata = {
+	.name = "pmem",
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
+
+static struct platform_device android_pmem_device = {
+	.name = "android_pmem",
+	.id = 0,
+	.dev = {.platform_data = &android_pmem_pdata},
+};
+#endif
+
+static void __init msm8x60_allocate_memory_regions(void)
+{
+	void *addr;
+	unsigned long size;
+
+
+#ifdef CONFIG_ANDROID_PMEM
+	size = pmem_sf_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_pdata.start = __pa(addr);
+		android_pmem_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
+
+#endif
+
+	size = MSM_FB_SIZE;
+	addr = alloc_bootmem(size);
+	msm_fb_resources[0].start = __pa(addr);
+	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
+	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
+		size, addr, __pa(addr));
+}
+
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 
 #define GPIO_LEFT_LED_1		(GPIO_EXPANDER_GPIO_BASE + (16 * 3))
@@ -434,6 +509,10 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_device_ssbi2,
 	&msm_device_ssbi3,
 #endif
+#ifdef CONFIG_ANDROID_PMEM
+	&android_pmem_device,
+#endif
+	&msm_fb_device,
 };
 
 static struct platform_device *surf_devices[] __initdata = {
@@ -470,6 +549,10 @@ static struct platform_device *surf_devices[] __initdata = {
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 	&gpio_leds,
 #endif
+#ifdef CONFIG_ANDROID_PMEM
+	&android_pmem_device,
+#endif
+	&msm_fb_device,
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -1170,6 +1253,7 @@ static void __init msm8x60_map_io(void)
 {
 	msm_shared_ram_phys = MSM_SHARED_RAM_PHYS;
 	msm_map_msm8x60_io();
+	msm8x60_allocate_memory_regions();
 	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
 }
 
@@ -1563,6 +1647,132 @@ static void __init msm8x60_init_mmc(void)
 #endif
 }
 
+#if !defined(CONFIG_GPIO_SX150X) && !defined(CONFIG_GPIO_SX150X_MODULE)
+static inline void display_common_power(int on) {}
+#else
+/* the LVDS reset line is on the first expander pin 2 */
+#define GPIO_LVDS_STDN_OUT_N (GPIO_EXPANDER_GPIO_BASE + 2)
+/* the backlight control line is on the first expander pin 12 */
+#define GPIO_BACKLIGHT_EN (GPIO_EXPANDER_GPIO_BASE + 12)
+
+static void display_common_power(int on)
+{
+	static int rc = -EINVAL; /* remember if the gpio_requests succeeded */
+
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
+		if (on) {
+			/* LVDS */
+			rc = gpio_request(GPIO_LVDS_STDN_OUT_N,
+				"LVDS_STDN_OUT_N");
+			if (rc) {
+				printk(KERN_ERR "%s: LVDS gpio %d request"
+					"failed\n", __func__,
+					 GPIO_LVDS_STDN_OUT_N);
+				return;
+			}
+
+			/* BACKLIGHT */
+			rc = gpio_request(GPIO_BACKLIGHT_EN, "BACKLIGHT_EN");
+			if (rc) {
+				printk(KERN_ERR "%s: BACKLIGHT gpio %d request"
+					"failed\n", __func__,
+					 GPIO_BACKLIGHT_EN);
+				gpio_free(GPIO_LVDS_STDN_OUT_N);
+				return;
+			}
+
+			gpio_direction_output(GPIO_LVDS_STDN_OUT_N, 0);
+			gpio_direction_output(GPIO_BACKLIGHT_EN, 0);
+			mdelay(20);
+			gpio_set_value(GPIO_LVDS_STDN_OUT_N, 1);
+			gpio_set_value(GPIO_BACKLIGHT_EN, 1);
+
+		} else {
+			if (!rc) {
+				/* BACKLIGHT */
+				gpio_set_value(GPIO_BACKLIGHT_EN, 0);
+				/* LVDS */
+				gpio_set_value(GPIO_LVDS_STDN_OUT_N, 0);
+				mdelay(20);
+				gpio_free(GPIO_BACKLIGHT_EN);
+				gpio_free(GPIO_LVDS_STDN_OUT_N);
+			}
+		}
+
+	}
+}
+#endif
+
+static uint32_t lcd_panel_gpios[] = {
+	GPIO_CFG(0,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_pclk */
+	GPIO_CFG(1,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_hsync*/
+	GPIO_CFG(2,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_vsync*/
+	GPIO_CFG(3,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_den */
+	GPIO_CFG(4,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red7 */
+	GPIO_CFG(5,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red6 */
+	GPIO_CFG(6,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red5 */
+	GPIO_CFG(7,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red4 */
+	GPIO_CFG(8,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red3 */
+	GPIO_CFG(9,  1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red2 */
+	GPIO_CFG(10, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red1 */
+	GPIO_CFG(11, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_red0 */
+	GPIO_CFG(12, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn7 */
+	GPIO_CFG(13, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn6 */
+	GPIO_CFG(14, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn5 */
+	GPIO_CFG(15, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn4 */
+	GPIO_CFG(16, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn3 */
+	GPIO_CFG(17, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn2 */
+	GPIO_CFG(18, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn1 */
+	GPIO_CFG(19, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_grn0 */
+	GPIO_CFG(20, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu7 */
+	GPIO_CFG(21, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu6 */
+	GPIO_CFG(22, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu5 */
+	GPIO_CFG(23, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu4 */
+	GPIO_CFG(24, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu3 */
+	GPIO_CFG(25, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu2 */
+	GPIO_CFG(26, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu1 */
+	GPIO_CFG(27, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_16MA), /* lcdc_blu0 */
+};
+
+
+static void lcdc_samsung_panel_power(int on)
+{
+	int n;
+
+	display_common_power(on);
+
+	/*TODO if on = 0 free the gpio's */
+	for (n = 0; n < ARRAY_SIZE(lcd_panel_gpios); ++n)
+		gpio_tlmm_config(lcd_panel_gpios[n], 0);
+}
+
+
+static int lcdc_panel_power(int on)
+{
+	int flag_on = !!on;
+	static int lcdc_power_save_on;
+
+	if (lcdc_power_save_on == flag_on)
+		return 0;
+
+	lcdc_power_save_on = flag_on;
+
+	lcdc_samsung_panel_power(on);
+
+	return 0;
+}
+
+static struct lcdc_platform_data lcdc_pdata = {
+	.lcdc_power_save   = lcdc_panel_power,
+};
+
+static void __init msm_fb_add_devices(void)
+{
+	msm_fb_register_device("mdp", NULL);
+
+	msm_fb_register_device("lcdc", &lcdc_pdata);
+}
+
 static void __init msm8x60_cfg_smsc911x(void)
 {
 	if (machine_is_msm8x60_ffa()) {
@@ -1596,6 +1806,8 @@ static void __init msm8x60_init(void)
 		platform_add_devices(rumi_sim_devices,
 				     ARRAY_SIZE(rumi_sim_devices));
 	}
+	if (!machine_is_msm8x60_sim())
+		msm_fb_add_devices();
 	fixup_i2c_configs();
 	register_i2c_devices();
 }
