@@ -304,11 +304,11 @@ i2c_ssbi_pa_write_bytes(struct i2c_ssbi_dev *ssbi, struct i2c_msg *msg)
 	int ret = 0;
 	u8 *buf = msg->buf;
 	u16 len = msg->len;
-	u32 write_cmd = SSBI_PA_CMD_REG_ADDR(msg->addr);
+	u32 addr = SSBI_PA_CMD_REG_ADDR(msg->addr);
 
 	while (len) {
 
-		write_cmd |= (*buf++ & SSBI_PA_CMD_REG_DATA_MASK);
+		u32 write_cmd = addr | (*buf++ & SSBI_PA_CMD_REG_DATA_MASK);
 
 		ret = i2c_ssbi_pa_transfer(ssbi, write_cmd, NULL);
 		if (ret)
