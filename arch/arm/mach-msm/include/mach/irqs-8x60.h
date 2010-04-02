@@ -129,7 +129,7 @@
 #define SMMU_GFX2D0_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 72)
 #define ROT_IRQ					(GIC_SPI_START + 73)
 #define MMSS_FABRIC_IRQ				(GIC_SPI_START + 74)
-#define MDP_IRQ					(GIC_SPI_START + 75)
+#define INT_MDP					(GIC_SPI_START + 75)
 #define JPEGD_IRQ				(GIC_SPI_START + 76)
 #define JPEG_IRQ				(GIC_SPI_START + 77)
 #define MMSS_IMEM_IRQ				(GIC_SPI_START + 78)
