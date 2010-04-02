@@ -2249,6 +2249,11 @@ config FB_MSM_LCDC_PRISM_WVGA
 	select FB_MSM_LCDC_PANEL
 	default n
 
+config FB_MSM_LCDC_SAMSUNG_WSVGA
+	bool
+	select FB_MSM_LCDC_PANEL
+	default n
+
 config FB_MSM_LCDC_GORDON_VGA
 	bool
 	select FB_MSM_LCDC_PANEL
@@ -2279,6 +2284,13 @@ config FB_MSM_LCDC_PRISM_WVGA_PANEL
 	select FB_MSM_LCDC_PRISM_WVGA
 	---help---
 	  Support for LCDC Prism WVGA (800x480) panel
+
+config FB_MSM_LCDC_SAMSUNG_WSVGA_PANEL
+	depends on FB_MSM_LCDC_HW
+	bool "LCDC Samsung WSVGA Panel"
+	select FB_MSM_LCDC_SAMSUNG_WSVGA
+	---help---
+	  Support for LCDC Samsung WSVGA (1024x600) panel
 
 config FB_MSM_LCDC_GORDON_VGA_PANEL
 	depends on FB_MSM_LCDC_HW
