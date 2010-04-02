@@ -1765,6 +1765,7 @@ static int microp_function_initialize(struct i2c_client *client)
 	uint16_t stat, interrupts = 0;
 	int i;
 	int ret;
+	struct led_classdev *led_cdev;
 
 	cdata = i2c_get_clientdata(client);
 
@@ -1830,6 +1831,12 @@ static int microp_function_initialize(struct i2c_client *client)
 
 	/* SD Card */
 	interrupts |= IRQ_SDCARD;
+
+	/* set LED initial state */
+	for (i = 0; i < BLUE_LED; i++) {
+		led_cdev = &cdata->leds[i].ldev;
+		microp_i2c_write_led_mode(client, led_cdev, 0, 0xffff);
+	}
 
 	/* enable the interrupts */
 	ret = microp_interrupt_enable(client, interrupts);
