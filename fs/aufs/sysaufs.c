@@ -86,7 +86,10 @@ int __init sysaufs_init(void)
 		get_random_bytes(&sysaufs_si_mask, sizeof(sysaufs_si_mask));
 	} while (!sysaufs_si_mask);
 
+	err = -EINVAL;
 	sysaufs_ket = kset_create_and_add(AUFS_NAME, NULL, fs_kobj);
+	if (unlikely(!sysaufs_ket))
+		goto out;
 	err = PTR_ERR(sysaufs_ket);
 	if (IS_ERR(sysaufs_ket))
 		goto out;
