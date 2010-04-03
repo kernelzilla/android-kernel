@@ -20,6 +20,7 @@
 #define __AUFS_TYPE_H__
 
 #include <linux/ioctl.h>
+#include <linux/kernel.h>
 #include <linux/limits.h>
 #include <linux/types.h>
 
