@@ -33,6 +33,7 @@
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
+#include <mach/tlmm.h>
 
 #include "devices.h"
 #include "timer.h"
@@ -388,6 +389,30 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 #endif
 };
 
+static uint32_t msm8x60_hdrive_cfgs[][2] = {
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+	{TLMM_HDRV_SDC3_CLK, GPIO_8MA},
+	{TLMM_HDRV_SDC3_CMD, GPIO_8MA},
+	{TLMM_HDRV_SDC3_DATA, GPIO_8MA},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+	{TLMM_HDRV_SDC4_CLK, GPIO_8MA},
+	{TLMM_HDRV_SDC4_CMD, GPIO_8MA},
+	{TLMM_HDRV_SDC4_DATA, GPIO_8MA},
+#endif
+};
+
+static uint32_t msm8x60_pull_cfgs[][2] = {
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+	{TLMM_PULL_SDC3_CMD, GPIO_PULL_UP},
+	{TLMM_PULL_SDC3_DATA, GPIO_PULL_UP},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+	{TLMM_PULL_SDC4_CMD, GPIO_PULL_UP},
+	{TLMM_PULL_SDC4_DATA, GPIO_PULL_UP},
+#endif
+};
+
 static void __init msm8x60_init_tlmm(void)
 {
 	unsigned n;
@@ -399,6 +424,12 @@ static void __init msm8x60_init_tlmm(void)
 
 		for (n = 0; n < ARRAY_SIZE(msm8x60_tlmm_cfgs); ++n)
 			gpio_tlmm_config(msm8x60_tlmm_cfgs[n], 0);
+		for (n = 0; n < ARRAY_SIZE(msm8x60_hdrive_cfgs); ++n)
+			msm_tlmm_set_hdrive(msm8x60_hdrive_cfgs[n][0],
+					msm8x60_hdrive_cfgs[n][1]);
+		for (n = 0; n < ARRAY_SIZE(msm8x60_pull_cfgs); ++n)
+			msm_tlmm_set_pull(msm8x60_pull_cfgs[n][0],
+					msm8x60_pull_cfgs[n][1]);
 	}
 }
 
