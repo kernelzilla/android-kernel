@@ -166,10 +166,9 @@ static void au_ren_rev_whtmp(int err, struct au_ren_args *a)
 	rerr = vfsub_rename(a->dst_h_dir, a->h_dst, a->dst_h_dir, &a->h_path);
 	d_drop(a->h_path.dentry);
 	dput(a->h_path.dentry);
-	if (!rerr) {
-		au_set_h_dptr(a->dst_dentry, a->btgt, NULL);
+	if (!rerr)
 		au_set_h_dptr(a->dst_dentry, a->btgt, dget(a->h_dst));
-	} else
+	else
 		RevertFailure("rename %.*s", AuDLNPair(a->h_dst));
 }
 

@@ -509,13 +509,9 @@ static int au_lock_and_icpup(struct dentry *dentry, struct iattr *ia,
 	if (d_unhashed(dentry) || (ia->ia_valid & ATTR_FILE))
 		udba = AuOpt_UDBA_NONE;
 	err = au_pin(&a->pin, dentry, a->btgt, udba, a->pin_flags);
-	if (unlikely(err)) {
-		if (parent) {
-			di_write_unlock(parent);
-			dput(parent);
-		}
-		goto out_dentry;
-	}
+	if (unlikely(err))
+		goto out_parent;
+
 	a->h_path.dentry = au_h_dptr(dentry, bstart);
 	a->h_inode = a->h_path.dentry->d_inode;
 	mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
@@ -540,6 +536,7 @@ static int au_lock_and_icpup(struct dentry *dentry, struct iattr *ia,
 		au_pin_set_parent_lflag(&a->pin, /*lflag*/0);
 		di_downgrade_lock(parent, AuLock_IR);
 		dput(parent);
+		parent = NULL;
 	}
 	if (!au_ftest_icpup(a->flags, DID_CPUP))
 		goto out; /* success */
@@ -569,7 +566,11 @@ static int au_lock_and_icpup(struct dentry *dentry, struct iattr *ia,
 	}
 
 	au_unpin(&a->pin);
-
+ out_parent:
+	if (parent) {
+		di_write_unlock(parent);
+		dput(parent);
+	}
  out_dentry:
 	di_write_unlock(dentry);
  out:

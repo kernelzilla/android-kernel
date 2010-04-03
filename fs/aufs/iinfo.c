@@ -79,7 +79,6 @@ void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
 	hinode = iinfo->ii_hinode + bindex;
 	hi = hinode->hi_inode;
 	AuDebugOn(h_inode && atomic_read(&h_inode->i_count) <= 0);
-	AuDebugOn(h_inode && hi);
 
 	if (hi)
 		au_hiput(hinode);
