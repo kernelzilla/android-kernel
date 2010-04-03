@@ -847,7 +847,10 @@ static int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 
 	dget(wh_dentry);
 	h_path.dentry = wh_dentry;
-	err = vfsub_unlink(h_parent->d_inode, &h_path, /*force*/0);
+	if (!S_ISDIR(wh_dentry->d_inode->i_mode))
+		err = vfsub_unlink(h_parent->d_inode, &h_path, /*force*/0);
+	else
+		err = vfsub_rmdir(h_parent->d_inode, &h_path);
 	if (unlikely(err)) {
 		AuIOErr("failed remove copied-up tmp file %.*s(%d)\n",
 			AuDLNPair(wh_dentry), err);
@@ -896,10 +899,8 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		h_orph = wbr->wbr_orph;
 
 		h_parent = dget(au_h_dptr(parent, bdst));
-		au_set_h_dptr(parent, bdst, NULL);
 		au_set_h_dptr(parent, bdst, dget(h_orph));
 		h_tmpdir = h_orph->d_inode;
-		au_set_h_iptr(dir, bdst, NULL, 0);
 		au_set_h_iptr(dir, bdst, au_igrab(h_tmpdir), /*flags*/0);
 
 		/* this temporary unlock is safe */
@@ -933,9 +934,7 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 	if (h_orph) {
 		mutex_unlock(&h_tmpdir->i_mutex);
 		/* todo: au_h_open_post()? */
-		au_set_h_iptr(dir, bdst, NULL, 0);
 		au_set_h_iptr(dir, bdst, au_igrab(h_dir), /*flags*/0);
-		au_set_h_dptr(parent, bdst, NULL);
 		au_set_h_dptr(parent, bdst, h_parent);
 	}
 	iput(h_dir);
