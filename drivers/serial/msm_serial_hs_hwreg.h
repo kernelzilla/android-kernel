@@ -25,7 +25,23 @@
 #define UARTDM_MR2_ADDR 0x4
 
 /* write only register */
-#define UARTDM_CSR_ADDR 0x8
+#define UARTDM_CSR_ADDR    0x8
+#define UARTDM_CSR_115200 0xFF
+#define UARTDM_CSR_57600  0xEE
+#define UARTDM_CSR_38400  0xDD
+#define UARTDM_CSR_28800  0xCC
+#define UARTDM_CSR_19200  0xBB
+#define UARTDM_CSR_14400  0xAA
+#define UARTDM_CSR_9600   0x99
+#define UARTDM_CSR_7200   0x88
+#define UARTDM_CSR_4800   0x77
+#define UARTDM_CSR_3600   0x66
+#define UARTDM_CSR_2400   0x55
+#define UARTDM_CSR_1200   0x44
+#define UARTDM_CSR_600    0x33
+#define UARTDM_CSR_300    0x22
+#define UARTDM_CSR_150    0x11
+#define UARTDM_CSR_75     0x00
 
 /* write only register */
 #define UARTDM_TF_ADDR 0x70
@@ -72,6 +88,7 @@
 #define UARTDM_RXFS_ADDR 0x50
 
 /* Register field Mask Mapping */
+#define UARTDM_SR_RX_BREAK_BMSK	        BIT(6)
 #define UARTDM_SR_PAR_FRAME_BMSK	BIT(5)
 #define UARTDM_SR_OVERRUN_BMSK		BIT(4)
 #define UARTDM_SR_TXEMT_BMSK		BIT(3)
@@ -107,8 +124,11 @@
 #define UARTDM_MR1_CTS_CTL_BMSK 0x40
 #define UARTDM_MR1_RX_RDY_CTL_BMSK 0x80
 
-#define UARTDM_MR2_ERROR_MODE_BMSK 0x40
-#define UARTDM_MR2_BITS_PER_CHAR_BMSK 0x30
+#define UARTDM_MR2_LOOP_MODE_BMSK        0x80
+#define UARTDM_MR2_ERROR_MODE_BMSK       0x40
+#define UARTDM_MR2_BITS_PER_CHAR_BMSK    0x30
+
+#define UARTDM_MR2_BITS_PER_CHAR_8	(0x3 << 4)
 
 /* bits per character configuration */
 #define FIVE_BPC  (0 << 4)
