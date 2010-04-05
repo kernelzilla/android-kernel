@@ -66,7 +66,8 @@ static void mdp_dma_s_update_lcd(struct msm_fb_data_type *mfd)
 		return;
 	}
 
-	if (mfd->panel_info.type == MDDI_PANEL) {
+	if (mfd->panel_info.type == MDDI_PANEL ||
+		mfd->panel_info.type == EXT_MDDI_PANEL) {
 		dma_s_cfg_reg |= DMA_OUT_SEL_MDDI;
 		mddi_dest = TRUE;
 	} else {
@@ -83,9 +84,19 @@ static void mdp_dma_s_update_lcd(struct msm_fb_data_type *mfd)
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	/* PIXELSIZE */
-	MDP_OUTP(MDP_BASE + 0xa0004, (iBuf->dma_h << 16 | iBuf->dma_w));
-	MDP_OUTP(MDP_BASE + 0xa0008, src);	/* ibuf address */
-	MDP_OUTP(MDP_BASE + 0xa000c, iBuf->ibuf_width * outBpp);/* ystride */
+	if (mfd->panel_info.type == MDDI_PANEL) {
+		MDP_OUTP(MDP_BASE + 0xa0004,
+			(iBuf->dma_h << 16 | iBuf->dma_w));
+		MDP_OUTP(MDP_BASE + 0xa0008, src);	/* ibuf address */
+		MDP_OUTP(MDP_BASE + 0xa000c,
+			iBuf->ibuf_width * outBpp);/* ystride */
+	} else {
+		MDP_OUTP(MDP_BASE + 0xb0004,
+			(iBuf->dma_h << 16 | iBuf->dma_w));
+		MDP_OUTP(MDP_BASE + 0xb0008, src);	/* ibuf address */
+		MDP_OUTP(MDP_BASE + 0xb000c,
+			iBuf->ibuf_width * outBpp);/* ystride */
+	}
 
 	if (mfd->panel_info.bpp == 18) {
 		dma_s_cfg_reg |= DMA_DSTC0G_6BITS |	/* 666 18BPP */
@@ -96,8 +107,15 @@ static void mdp_dma_s_update_lcd(struct msm_fb_data_type *mfd)
 	}
 
 	if (mddi_dest) {
-		MDP_OUTP(MDP_BASE + 0xa0010, (iBuf->dma_y << 16) | iBuf->dma_x);
-		MDP_OUTP(MDP_BASE + 0x00090, 1);
+		if (mfd->panel_info.type == MDDI_PANEL) {
+			MDP_OUTP(MDP_BASE + 0xa0010,
+				(iBuf->dma_y << 16) | iBuf->dma_x);
+			MDP_OUTP(MDP_BASE + 0x00090, 1);
+		} else {
+			MDP_OUTP(MDP_BASE + 0xb0010,
+				(iBuf->dma_y << 16) | iBuf->dma_x);
+			MDP_OUTP(MDP_BASE + 0x00090, 2);
+		}
 		MDP_OUTP(MDP_BASE + 0x00094,
 				(MDDI_VDO_PACKET_DESC << 16) |
 				mfd->panel_info.mddi.vdopkt);
@@ -107,11 +125,19 @@ static void mdp_dma_s_update_lcd(struct msm_fb_data_type *mfd)
 				iBuf->dma_h);
 	}
 
-	MDP_OUTP(MDP_BASE + 0xa0000, dma_s_cfg_reg);
+	if (mfd->panel_info.type == MDDI_PANEL)
+		MDP_OUTP(MDP_BASE + 0xa0000, dma_s_cfg_reg);
+	else
+		MDP_OUTP(MDP_BASE + 0xb0000, dma_s_cfg_reg);
+
 
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-	mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
+	if (mfd->panel_info.type == MDDI_PANEL)
+		mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
+	else
+		mdp_pipe_kickoff(MDP_DMA_E_TERM, mfd);
+
 }
 
 void mdp_dma_s_update(struct msm_fb_data_type *mfd)
@@ -120,6 +146,10 @@ void mdp_dma_s_update(struct msm_fb_data_type *mfd)
 	if ((mfd) && (!mfd->dma->busy) && (mfd->panel_power_on)) {
 		down(&mfd->sem);
 		mdp_enable_irq(MDP_DMA_S_TERM);
+		if (mfd->panel_info.type == MDDI_PANEL)
+			mdp_enable_irq(MDP_DMA_S_TERM);
+		else
+			mdp_enable_irq(MDP_DMA_E_TERM);
 		mfd->dma->busy = TRUE;
 		INIT_COMPLETION(mfd->dma->comp);
 		mfd->ibuf_flushed = TRUE;
@@ -128,7 +158,10 @@ void mdp_dma_s_update(struct msm_fb_data_type *mfd)
 
 		/* wait until DMA finishes the current job */
 		wait_for_completion_killable(&mfd->dma->comp);
-		mdp_disable_irq(MDP_DMA_S_TERM);
+		if (mfd->panel_info.type == MDDI_PANEL)
+			mdp_disable_irq(MDP_DMA_S_TERM);
+		else
+			mdp_disable_irq(MDP_DMA_E_TERM);
 
 	/* signal if pan function is waiting for the update completion */
 		if (mfd->pan_waiting) {
