@@ -38,6 +38,7 @@ extern struct completion mdp_hist_comp;
 extern boolean mdp_is_in_isr;
 extern uint32 mdp_intr_mask;
 extern spinlock_t mdp_spin_lock;
+extern struct mdp4_statistic mdp4_stat;
 
 #define MDP4_OVERLAYPROC0_BASE	0x10000
 #define MDP4_OVERLAYPROC1_BASE	0x18000
@@ -117,12 +118,14 @@ enum {
 
 enum {
 	OVERLAY_PIPE_RGB1,
-	OVERLAY_PIPE_RGB2
+	OVERLAY_PIPE_RGB2,
+	OVERLAY_PIPE_RGB_MAX
 };
 
 enum {
 	OVERLAY_PIPE_VG1,	/* video/graphic */
-	OVERLAY_PIPE_VG2
+	OVERLAY_PIPE_VG2,
+	OVERLAY_PIPE_VG_MAX
 };
 
 enum {
@@ -132,7 +135,8 @@ enum {
 
 enum {
 	MDP4_MIXER0,
-	MDP4_MIXER1
+	MDP4_MIXER1,
+	MDP4_MIXER_MAX
 };
 
 #define MDP4_MAX_MIXER	2
@@ -276,6 +280,31 @@ struct mdp4_overlay_pipe {
 	uint32 element0; /* 0 = C0, 1 = C1, 2 = C2, 3 = C3 */
 	struct completion comp;
 	struct mdp_overlay req_data;
+};
+
+struct mdp4_statistic {
+	ulong intr_tot;
+	ulong intr_dma_p;
+	ulong intr_dma_s;
+	ulong intr_dma_e;
+	ulong intr_overlay0;
+	ulong intr_overlay1;
+	ulong intr_underrun_p;	/* Primary interface */
+	ulong intr_underrun_e;	/* external interface */
+	ulong kickoff_mddi;
+	ulong kickoff_mddi_skip;
+	ulong kickoff_lcdc;
+	ulong kickoff_dtv;
+	ulong overlay_set[MDP4_MIXER_MAX];
+	ulong overlay_unset[MDP4_MIXER_MAX];
+	ulong overlay_play[MDP4_MIXER_MAX];
+	ulong pipe_rgb[OVERLAY_PIPE_RGB_MAX];
+	ulong pipe_vg[OVERLAY_PIPE_VG_MAX];
+	ulong err_mixer;
+	ulong err_zorder;
+	ulong err_size;
+	ulong err_scale;
+	ulong err_format;
 };
 
 void mdp4_sw_reset(unsigned long bits);

@@ -296,5 +296,7 @@ void mdp4_dtv_overlay(struct msm_fb_data_type *mfd)
 	wait_for_completion_killable(&dtv_pipe->comp);
 	mdp_disable_irq(MDP_OVERLAY1_TERM);
 
+	mdp4_stat.kickoff_dtv++;
+
 	mutex_unlock(&mfd->dma->ov_mutex);
 }

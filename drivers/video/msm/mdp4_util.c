@@ -284,12 +284,6 @@ void mdp4_clear_lcdc(void)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }
 
-static int intr_dma_p;
-static int intr_dma_s;
-static int intr_dma_e;
-static int intr_overlay0;
-static int intr_overlay1;
-
 irqreturn_t mdp4_isr(int irq, void *ptr)
 {
 	uint32 isr, mask, lcdc;
@@ -302,8 +296,16 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 		if (isr == 0)
 			break;
 
+		mdp4_stat.intr_tot++;
+
 		mask = inpdw(MDP_INTR_ENABLE);
 		outpdw(MDP_INTR_CLEAR, isr);
+
+		if (isr & INTR_PRIMARY_INTF_UDERRUN)
+			mdp4_stat.intr_underrun_p++;
+
+		if (isr & INTR_EXTERNAL_INTF_UDERRUN)
+			mdp4_stat.intr_underrun_e++;
 
 		isr &= mask;
 
@@ -311,7 +313,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			break;
 
 		if (isr & INTR_DMA_P_DONE) {
-			intr_dma_p++;
+			mdp4_stat.intr_dma_p++;
 			lcdc = inpdw(MDP_BASE + 0xc0000);
 			dma = &dma2_data;
 			if (lcdc & 0x01) {	/* LCDC enable */
@@ -327,7 +329,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			complete(&dma->comp);
 		}
 		if (isr & INTR_DMA_S_DONE) {
-			intr_dma_s++;
+			mdp4_stat.intr_dma_s++;
 			dma = &dma_s_data;
 			dma->busy = FALSE;
 			mdp_pipe_ctrl(MDP_DMA_S_BLOCK,
@@ -335,7 +337,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			complete(&dma->comp);
 		}
 		if (isr & INTR_DMA_E_DONE) {
-			intr_dma_e++;
+			mdp4_stat.intr_dma_e++;
 			dma = &dma_e_data;
 			mdp_intr_mask &= ~INTR_DMA_E_DONE;
 			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
@@ -347,7 +349,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			}
 		}
 		if (isr & INTR_OVERLAY0_DONE) {
-			intr_overlay0++;
+			mdp4_stat.intr_overlay0++;
 			lcdc = inpdw(MDP_BASE + 0xc0000);
 			dma = &dma2_data;
 			if (lcdc & 0x01) {	/* LCDC enable */
@@ -371,7 +373,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			}
 		}
 		if (isr & INTR_OVERLAY1_DONE) {
-			intr_overlay1++;
+			mdp4_stat.intr_overlay1++;
 			/* disable DTV interrupt */
 			dma = &dma_e_data;
 			mdp_intr_mask &= ~INTR_OVERLAY1_DONE;
