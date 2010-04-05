@@ -84,11 +84,11 @@ selectable by user.
    branch in the "actual operation" (step 4). When this validation
    fails, aufs returns EBUSY. ->d_revalidate() (step 3) in aufs still
    checks the validation of the dentry on branches.
-2. Monitor Changes Internally by Inotify
+2. Monitor Changes Internally by Inotify/Fsnotify
    Addition to above, in the "actual operation" (step 4) aufs re-lookup
    the dentry on the branch, and returns EBUSY if it finds different
    dentry.
-   Additionally, aufs sets the inotify watch for every dir on branches
+   Additionally, aufs sets the inotify/fsnotify watch for every dir on branches
    during it is in cache. When the event is notified, aufs registers a
    function to kernel 'events' thread by schedule_work(). And the
    function sets some special status to the cached aufs dentry and inode
