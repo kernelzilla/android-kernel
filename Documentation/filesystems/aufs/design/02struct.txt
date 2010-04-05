@@ -127,7 +127,7 @@ Aufs implements a feature to truncate/refresh both of xino and xib to
 reduce the number of consumed disk blocks for these files.
 
 
-Virtual or Vertical Dir
+Virtual or Vertical Dir, and Readdir in Userspace
 ----------------------------------------------------------------------
 In order to support multiple layers (branches), aufs readdir operation
 constructs a virtual dir block on memory. For readdir, aufs calls
@@ -174,11 +174,10 @@ simply.
 If aufs didn't adopt the workqueue and changed the privilege of the
 process, and if the mkdir/write call arises SIGXFSZ or other signal,
 then the user process might gain a privilege or the generated core file
-was owned by a superuser. But I have a plan to switch to a new
-credential approach which will be introduced in linux-2.6.29.
+was owned by a superuser.
 
 Also aufs uses the system global workqueue ("events" kernel thread) too
-for asynchronous tasks, such like handling inotify, re-creating a
+for asynchronous tasks, such like handling inotify/fsnotify, re-creating a
 whiteout base and etc. This is unrelated to a privilege.
 Most of aufs operation tries acquiring a rw_semaphore for aufs
 superblock at the beginning, at the same time waits for the completion

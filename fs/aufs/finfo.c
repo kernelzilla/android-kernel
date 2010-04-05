@@ -97,6 +97,13 @@ void au_finfo_fin(struct file *file)
 	au_cache_free_finfo(finfo);
 }
 
+void au_fi_init_once(void *_fi)
+{
+	struct au_finfo *fi = _fi;
+
+	au_rw_init(&fi->fi_rwsem);
+}
+
 int au_finfo_init(struct file *file)
 {
 	struct au_finfo *finfo;
@@ -112,7 +119,7 @@ int au_finfo_init(struct file *file)
 	if (unlikely(!finfo->fi_hfile))
 		goto out_finfo;
 
-	au_rw_init_wlock(&finfo->fi_rwsem);
+	au_rw_write_lock(&finfo->fi_rwsem);
 	finfo->fi_bstart = -1;
 	finfo->fi_bend = -1;
 	atomic_set(&finfo->fi_generation, au_digen(dentry));
