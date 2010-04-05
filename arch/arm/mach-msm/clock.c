@@ -372,15 +372,25 @@ static int clock_debug_enable_get(void *data, u64 *val)
 	return 0;
 }
 
+static int clock_debug_local_get(void *data, u64 *val)
+{
+	struct clk *clock = data;
+
+	*val = clock->ops != &clk_ops_pcom;
+
+	return 0;
+}
+
 DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
 			clock_debug_rate_set, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
 			clock_debug_enable_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
+			NULL, "%llu\n");
 
 static int __init clock_debug_init(void)
 {
-	struct dentry *dent_rate;
-	struct dentry *dent_enable;
+	struct dentry *dent_rate, *dent_enable, *dent_local;
 	struct clk *clock;
 	unsigned n = 0;
 	char temp[50], *ptr;
@@ -393,6 +403,10 @@ static int __init clock_debug_init(void)
 	if (IS_ERR(dent_enable))
 		return PTR_ERR(dent_enable);
 
+	dent_local = debugfs_create_dir("clk_local", NULL);
+	if (IS_ERR(dent_local))
+		return PTR_ERR(dent_local);
+
 	while ((clock = msm_clock_get_nth(n++)) != 0) {
 		strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
 		for (ptr = temp; *ptr; ptr++)
@@ -401,6 +415,8 @@ static int __init clock_debug_init(void)
 				    clock, &clock_rate_fops);
 		debugfs_create_file(temp, 0644, dent_enable,
 				    clock, &clock_enable_fops);
+		debugfs_create_file(temp, S_IRUGO, dent_local,
+				    clock, &clock_local_fops);
 	}
 	return 0;
 }
