@@ -2945,6 +2945,13 @@ static int bluetooth_power(int on)
 	const char *id = "BTPW";
 
 	if (on) {
+		rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 1300);
+		if (rc < 0) {
+			printk(KERN_ERR "%s: vreg level on failed (%d)\n",
+				__func__, rc);
+			return rc;
+		}
+
 		rc = bluetooth_power_regulators(on);
 		if (rc < 0)
 			return -EIO;
@@ -2988,14 +2995,15 @@ static int bluetooth_power(int on)
 		if (rc < 0)
 			return -EIO;
 
-		rc = pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO,
-					  PMAPP_CLOCK_VOTE_OFF);
-		if (rc < 0)
-			return -EIO;
-
 		rc = bluetooth_power_regulators(on);
 		if (rc < 0)
 			return -EIO;
+
+		rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 0);
+		if (rc < 0) {
+			printk(KERN_INFO "%s: vreg level off failed (%d)\n",
+				__func__, rc);
+		}
 	}
 
 out:
