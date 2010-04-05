@@ -22,7 +22,14 @@
 
 #include "aufs.h"
 
-int au_alloc_dinfo(struct dentry *dentry)
+void au_di_init_once(void *_di)
+{
+	struct au_dinfo *di = _di;
+
+	au_rw_init(&di->di_rwsem);
+}
+
+int au_di_init(struct dentry *dentry)
 {
 	struct au_dinfo *dinfo;
 	struct super_block *sb;
@@ -42,7 +49,7 @@ int au_alloc_dinfo(struct dentry *dentry)
 
 	atomic_set(&dinfo->di_generation, au_sigen(sb));
 	/* smp_mb(); */ /* atomic_set */
-	au_rw_init_wlock_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
+	au_rw_write_lock_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
 	dinfo->di_bstart = -1;
 	dinfo->di_bend = -1;
 	dinfo->di_bwh = -1;
@@ -56,6 +63,29 @@ int au_alloc_dinfo(struct dentry *dentry)
 	au_cache_free_dinfo(dinfo);
  out:
 	return -ENOMEM;
+}
+
+void au_di_fin(struct dentry *dentry)
+{
+	struct au_dinfo *di;
+	struct au_hdentry *p;
+	aufs_bindex_t bend, bindex;
+
+	/* dentry may not be revalidated */
+	di = dentry->d_fsdata;
+	bindex = di->di_bstart;
+	if (bindex >= 0) {
+		bend = di->di_bend;
+		p = di->di_hdentry + bindex;
+		while (bindex++ <= bend) {
+			if (p->hd_dentry)
+				au_hdput(p);
+			p++;
+		}
+	}
+	kfree(di->di_hdentry);
+	AuRwDestroy(&di->di_rwsem);
+	au_cache_free_dinfo(di);
 }
 
 int au_di_realloc(struct au_dinfo *dinfo, int nbr)

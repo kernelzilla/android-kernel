@@ -35,7 +35,6 @@ static struct inode *aufs_alloc_inode(struct super_block *sb __maybe_unused)
 
 	c = au_cache_alloc_icntnr();
 	if (c) {
-		inode_init_once(&c->vfs_inode);
 		c->vfs_inode.i_version = 1; /* sigen(sb); */
 		c->iinfo.ii_hinode = NULL;
 		return &c->vfs_inode;
@@ -711,7 +710,7 @@ static int alloc_root(struct super_block *sb)
 	if (IS_ERR(root))
 		goto out_iput;
 
-	err = au_alloc_dinfo(root);
+	err = au_di_init(root);
 	if (!err) {
 		sb->s_root = root;
 		return 0; /* success */

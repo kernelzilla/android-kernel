@@ -37,7 +37,7 @@ struct au_hnotify {
 	struct inotify_watch	hn_watch;
 	struct inode		*hn_aufs_inode;	/* no get/put */
 #endif
-};
+} ____cacheline_aligned_in_smp;
 
 struct au_hinode {
 	struct inode		*hi_inode;
@@ -65,7 +65,7 @@ struct au_iinfo {
 struct au_icntnr {
 	struct au_iinfo iinfo;
 	struct inode vfs_inode;
-};
+} ____cacheline_aligned_in_smp;
 
 /* au_pin flags */
 #define AuPin_DI_LOCKED		1
@@ -198,6 +198,7 @@ void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
 void au_update_iigen(struct inode *inode);
 void au_update_brange(struct inode *inode, int do_put_zero);
 
+void au_icntnr_init_once(void *_c);
 int au_iinfo_init(struct inode *inode);
 void au_iinfo_fin(struct inode *inode);
 int au_ii_realloc(struct au_iinfo *iinfo, int nbr);
