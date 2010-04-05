@@ -169,6 +169,15 @@ void au_update_brange(struct inode *inode, int do_put_zero)
 
 /* ---------------------------------------------------------------------- */
 
+void au_icntnr_init_once(void *_c)
+{
+	struct au_icntnr *c = _c;
+	struct au_iinfo *iinfo = &c->iinfo;
+
+	au_rw_init(&iinfo->ii_rwsem);
+	inode_init_once(&c->vfs_inode);
+}
+
 int au_iinfo_init(struct inode *inode)
 {
 	struct au_iinfo *iinfo;
@@ -187,7 +196,6 @@ int au_iinfo_init(struct inode *inode)
 
 		atomic_set(&iinfo->ii_generation, au_sigen(sb));
 		/* smp_mb(); */ /* atomic_set */
-		au_rw_init(&iinfo->ii_rwsem);
 		iinfo->ii_bstart = -1;
 		iinfo->ii_bend = -1;
 		iinfo->ii_vdir = NULL;
