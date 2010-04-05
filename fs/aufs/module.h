@@ -55,7 +55,11 @@ enum {
 	AuCache_Last
 };
 
-#define AuCache(type)	KMEM_CACHE(type, SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD)
+#define AuCacheFlags		(SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD)
+#define AuCache(type)		KMEM_CACHE(type, AuCacheFlags)
+#define AuCacheCtor(type, ctor)	\
+	kmem_cache_create(#type, sizeof(struct type), \
+			  __alignof__(struct type), AuCacheFlags, ctor)
 
 extern struct kmem_cache *au_cachep[];
 

@@ -22,6 +22,13 @@
 
 #include "aufs.h"
 
+void au_di_init_once(void *_di)
+{
+	struct au_dinfo *di = _di;
+
+	au_rw_init(&di->di_rwsem);
+}
+
 int au_alloc_dinfo(struct dentry *dentry)
 {
 	struct au_dinfo *dinfo;
@@ -42,7 +49,7 @@ int au_alloc_dinfo(struct dentry *dentry)
 
 	atomic_set(&dinfo->di_generation, au_sigen(sb));
 	/* smp_mb(); */ /* atomic_set */
-	au_rw_init_wlock_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
+	au_rw_write_lock_nested(&dinfo->di_rwsem, AuLsc_DI_CHILD);
 	dinfo->di_bstart = -1;
 	dinfo->di_bend = -1;
 	dinfo->di_bwh = -1;

@@ -43,7 +43,7 @@ void *au_kzrealloc(void *p, unsigned int nused, unsigned int new_sz, gfp_t gfp)
 struct kmem_cache *au_cachep[AuCache_Last];
 static int __init au_cache_init(void)
 {
-	au_cachep[AuCache_DINFO] = AuCache(au_dinfo);
+	au_cachep[AuCache_DINFO] = AuCacheCtor(au_dinfo, au_di_init_once);
 	if (au_cachep[AuCache_DINFO])
 		au_cachep[AuCache_ICNTNR] = AuCache(au_icntnr);
 	if (au_cachep[AuCache_ICNTNR])
