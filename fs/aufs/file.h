@@ -58,7 +58,7 @@ struct au_finfo {
 			struct au_vdir		*fi_vdir_cache;
 		};
 	};
-};
+} ____cacheline_aligned_in_smp;
 
 /* ---------------------------------------------------------------------- */
 
@@ -123,6 +123,7 @@ void au_update_figen(struct file *file);
 void au_fi_mmap_lock(struct file *file);
 void au_fi_mmap_unlock(struct file *file);
 
+void au_fi_init_once(void *_fi);
 void au_finfo_fin(struct file *file);
 int au_finfo_init(struct file *file);
 int au_fi_realloc(struct au_finfo *finfo, int nbr);
