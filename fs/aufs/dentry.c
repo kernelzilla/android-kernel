@@ -843,30 +843,10 @@ static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 
 static void aufs_d_release(struct dentry *dentry)
 {
-	struct au_dinfo *dinfo;
-	aufs_bindex_t bend, bindex;
-
-	dinfo = dentry->d_fsdata;
-	if (!dinfo)
-		return;
-
-	/* dentry may not be revalidated */
-	bindex = dinfo->di_bstart;
-	if (bindex >= 0) {
-		struct au_hdentry *p;
-
-		bend = dinfo->di_bend;
-		p = dinfo->di_hdentry + bindex;
-		while (bindex++ <= bend) {
-			if (p->hd_dentry)
-				au_hdput(p);
-			p++;
-		}
+	if (dentry->d_fsdata) {
+		au_di_fin(dentry);
+		au_hn_di_reinit(dentry);
 	}
-	kfree(dinfo->di_hdentry);
-	AuRwDestroy(&dinfo->di_rwsem);
-	au_cache_free_dinfo(dinfo);
-	au_hn_di_reinit(dentry);
 }
 
 struct dentry_operations aufs_dop = {

@@ -41,7 +41,7 @@ struct au_dinfo {
 	struct au_rwsem		di_rwsem;
 	aufs_bindex_t		di_bstart, di_bend, di_bwh, di_bdiropq;
 	struct au_hdentry	*di_hdentry;
-};
+} ____cacheline_aligned_in_smp;
 
 /* ---------------------------------------------------------------------- */
 
@@ -62,7 +62,9 @@ int au_refresh_hdentry(struct dentry *dentry, mode_t type);
 int au_reval_dpath(struct dentry *dentry, unsigned int sigen);
 
 /* dinfo.c */
-int au_alloc_dinfo(struct dentry *dentry);
+void au_di_init_once(void *_di);
+int au_di_init(struct dentry *dentry);
+void au_di_fin(struct dentry *dentry);
 int au_di_realloc(struct au_dinfo *dinfo, int nbr);
 
 void di_read_lock(struct dentry *d, int flags, unsigned int lsc);
