@@ -57,7 +57,7 @@ struct au_finfo {
 			struct au_vdir		*fi_vdir_cache;
 		};
 	};
-};
+} ____cacheline_aligned_in_smp;
 
 /* ---------------------------------------------------------------------- */
 
