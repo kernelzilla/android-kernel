@@ -303,6 +303,7 @@ static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int mic_setting = CPCAP_AUDIO_IN_NONE;
 static unsigned int capture_mode;
+static u8 enable_tx;
 static struct omap_mcbsp_wrapper *mcbsp_wrapper;
 static DEFINE_SPINLOCK(audio_write_lock);
 #ifdef CONFIG_WAKELOCK
@@ -357,15 +358,6 @@ static void omap2_mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data)
 		return;
 	}
 	io_base = mcbsp_dma_tx->io_base;
-
-	/* If we are at the last transfer, Shut down the Transmitter */
-	if ((mcbsp_wrapper[id].auto_reset & OMAP_MCBSP_AUTO_XRST)
-	    && (omap_dma_chain_status(mcbsp_dma_tx->dma_tx_lch) ==
-		OMAP_DMA_CHAIN_INACTIVE))
-		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
-				 omap_mcbsp_read(io_base,
-						 OMAP_MCBSP_REG_SPCR2) &
-				 (~XRST));
 
 	if (mcbsp_wrapper[id].tx_callback != NULL)
 		mcbsp_wrapper[id].tx_callback(ch_status,
@@ -1012,7 +1004,6 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 {
 	struct omap_mcbsp *mcbsp;
 	void __iomem *io_base;
-	u8 enable_tx = 0;
 	int e_count = 0;
 	int f_count = 0;
 	int ret = 0;
@@ -1021,16 +1012,6 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 	io_base = mcbsp->io_base;
 	mcbsp_wrapper[id].tx_cb_arg = cbdata;
 
-	/* Auto RRST handling logic - disable the Reciever before 1st dma */
-	if ((mcbsp_wrapper[id].auto_reset & OMAP_MCBSP_AUTO_XRST) &&
-	    (omap_dma_chain_status(mcbsp->dma_tx_lch)
-	     == OMAP_DMA_CHAIN_INACTIVE)) {
-		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
-				 omap_mcbsp_read(io_base,
-						 OMAP_MCBSP_REG_SPCR2) &
-				 (~XRST));
-		enable_tx = 1;
-	}
 	/*
 	 * for skip_first and second, we need to set e_count =2, and
 	 * f_count = number of frames = number of elements/e_count
@@ -1073,11 +1054,13 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 	}
 
 	/* Auto XRST handling logic - Enable the Reciever after 1st dma */
-	if (enable_tx && (omap_dma_chain_status(mcbsp->dma_tx_lch)
-			  == OMAP_DMA_CHAIN_ACTIVE))
+	if ((enable_tx == 0) && (omap_dma_chain_status(mcbsp->dma_tx_lch)
+			  == OMAP_DMA_CHAIN_ACTIVE)) {
 		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
 				 omap_mcbsp_read(io_base,
 						 OMAP_MCBSP_REG_SPCR2) | XRST);
+		enable_tx = 1;
+	}
 
 	return 0;
 }
@@ -1326,8 +1309,7 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 
 	if (str == NULL) {
 		AUDIO_ERROR_LOG("Invalid stream parameter\n");
-		ret = -EPERM;
-		goto out;
+		return -EPERM;
 	}
 
 	if (str->input_output == FMODE_READ) {
@@ -1509,12 +1491,13 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
 	unsigned int ssi;
+	int mode =  file->f_flags & O_ACCMODE;
 
 	if (minor == state.dev_dsp) {	/* STDAC setting */
 		tx_cfg_params.word_length1 = OMAP_MCBSP_WORD_32;
 		tx_params.word_length1 = OMAP_MCBSP_WORD_32;
 		ssi = STDAC_SSI;
-
+		tx_cfg_params.fs_polarity  = OMAP_MCBSP_FS_ACTIVE_HIGH;
 		omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) |
 					(1 << OMAP2_CONTROL_DEVCONF0_BIT6),
 						OMAP2_CONTROL_DEVCONF0);
@@ -1522,16 +1505,17 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 		tx_cfg_params.word_length1 = OMAP_MCBSP_WORD_16;
 		tx_params.word_length1 = OMAP_MCBSP_WORD_16;
 		ssi = CODEC_SSI;
-
-		/* support for stereo capture */
-		if (file->f_mode & FMODE_READ) {
-			if (capture_mode == 0) {	/* mono capture */
+		tx_cfg_params.fs_polarity  = OMAP_MCBSP_FS_ACTIVE_HIGH;
+		/*RX (capture) config*/
+		if (mode == O_RDONLY || mode == O_RDWR) {
+			if (capture_mode == 0) { /* mono capture */
 				rx_cfg_params.word_length1 = OMAP_MCBSP_WORD_16;
 				rx_params.word_length1 = OMAP_MCBSP_WORD_16;
 			} else {
 				rx_cfg_params.word_length1 = OMAP_MCBSP_WORD_32;
 				rx_params.word_length1 = OMAP_MCBSP_WORD_32;
 			}
+			rx_cfg_params.phase = OMAP_MCBSP_FRAME_SINGLEPHASE;
 		}
 	}
 
@@ -1547,10 +1531,10 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 	TRY(omap2_mcbsp_params_cfg(ssi, OMAP_MCBSP_SLAVE, &rx_cfg_params,
 				&tx_cfg_params, &srg_fsg_params))
 
-	if (file->f_mode & FMODE_WRITE)
+	if (mode == O_WRONLY || mode == O_RDWR)
 		TRY(omap2_mcbsp_dma_trans_params(ssi, &tx_params))
 
-	if (file->f_mode & FMODE_READ)
+	if (mode == O_RDONLY || mode == O_RDWR)
 		omap2_mcbsp_dma_recv_params(ssi, &rx_params);
 
 	return 0 ;
@@ -1567,19 +1551,21 @@ int audio_stop_ssi(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
 	int ssi;
+	int mode = file->f_flags & O_ACCMODE;
 
 	ssi = (minor == state.dev_dsp) ? STDAC_SSI : CODEC_SSI;
 
-	if (file->f_mode & FMODE_WRITE) {
+	if (mode == O_WRONLY || mode == O_RDWR) {
 		TRY(omap2_mcbsp_set_xrst(ssi, OMAP_MCBSP_XRST_DISABLE))
 		TRY(omap2_mcbsp_stop_datatx(ssi))
+		enable_tx = 0;
 		omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) &
 					~(1 << OMAP2_CONTROL_DEVCONF0_BIT6),
 						OMAP2_CONTROL_DEVCONF0);
 
 	}
 
-	if (file->f_mode & FMODE_READ) {
+	if (mode == O_RDONLY || mode == O_RDWR) {
 		TRY(omap2_mcbsp_set_rrst(ssi, OMAP_MCBSP_RRST_DISABLE))
 		TRY(omap2_mcbsp_stop_datarx(ssi))
 	}
@@ -1599,6 +1585,7 @@ out:
 static int audio_stdac_open(struct inode *inode, struct file *file)
 {
 	int error = 0;
+	int mode = file->f_flags & O_ACCMODE;
 	mutex_lock(&audio_lock);
 
 	if (state.dev_dsp_open_count == 1) {
@@ -1609,7 +1596,7 @@ static int audio_stdac_open(struct inode *inode, struct file *file)
 	state.dev_dsp_open_count = 1;
 	file->private_data = inode;
 
-	if (file->f_mode & FMODE_WRITE) {
+	if (mode == O_WRONLY || mode == O_RDWR) {
 		state.stdac_out_stream =
 		    kmalloc(sizeof(struct audio_stream), GFP_KERNEL);
 		memset(state.stdac_out_stream, 0,
@@ -1628,10 +1615,11 @@ out:
 
 static int audio_stdac_release(struct inode *inode, struct file *file)
 {
+	int mode = file->f_flags & O_ACCMODE;
 	mutex_lock(&audio_lock);
 	state.dev_dsp_open_count = 0;
 
-	if (file->f_mode & FMODE_WRITE) {
+	if (mode == O_WRONLY || mode == O_RDWR) {
 		audio_stop_ssi(inode, file);
 		audio_discard_buf(state.stdac_out_stream, inode);
 		kfree(state.stdac_out_stream);
@@ -1655,6 +1643,7 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 {
 	int minor = MINOR(inode->i_rdev);
 	int ret = 0;
+	int mode = file->f_flags & O_ACCMODE;
 
 	mutex_lock(&audio_lock);
 
@@ -1689,10 +1678,9 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 				valid_sample_rates[count].cpcap_audio_rate;
 				cpcap_audio_set_audio_state(&cpcap_audio_state);
 			}
-		} else {
-			if (samp_rate != cpcap_audio_state.codec_rate) {
-				if ((file->f_mode & FMODE_WRITE) &&
-				    (samp_rate != 8000 && samp_rate != 16000)) {
+		} else if (samp_rate != cpcap_audio_state.codec_rate) {
+			if ((mode == O_WRONLY || mode == O_RDWR) &&
+					(samp_rate != 8000 && samp_rate != 16000)) {
 					AUDIO_ERROR_LOG("[%d] Unsupported "
 						"Codec sample rate!!\n",
 							(u32) samp_rate);
@@ -1704,7 +1692,6 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 
 				cpcap_audio_set_audio_state(&cpcap_audio_state);
 			}
-		}
 		break;
 	}
 
@@ -1721,8 +1708,9 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 				goto out;
 			}
 		} else {	/* Codec case */
-			if (file->f_mode & FMODE_WRITE) {
-				if (val != 0) {
+			if (mode == O_WRONLY ||  mode == O_RDWR) {
+				/*only mono output can be used on McBSP3*/
+				if (val > 0) {
 					ret = -EINVAL;
 					goto out;
 				}
@@ -1741,7 +1729,7 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_GETBLKSIZE:
 	{
 		int val = 0;
-		if (file->f_mode & FMODE_WRITE) {
+		if (mode == O_WRONLY) {
 			val = (minor == state.dev_dsp) ? STDAC_FIFO_SIZE :
 				CODEC_FIFO_SIZE;
 		} else {
@@ -1755,22 +1743,40 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 	}
 
 	case SNDCTL_DSP_GETOSPACE:
+	{
+		audio_buf_info inf = { 0 };
+		struct audio_stream *str;
+		if (minor == state.dev_dsp)
+			str = state.stdac_out_stream;
+		else
+			str = state.codec_out_stream;
+
+		if  (str != NULL) {
+			inf.bytes = str->fragsize;
+			inf.fragments = 1;
+			inf.fragsize = str->fragsize;
+			inf.fragstotal = str->nbfrags;
+		}
+		ret = copy_to_user((void *)arg, &inf, sizeof(inf));
+		break;
+	}
+
 	case SNDCTL_DSP_GETISPACE:
 	{
 		audio_buf_info inf = { 0 };
 		struct audio_stream *str;
 		if (minor == state.dev_dsp) {
-			str = (file->f_mode & FMODE_WRITE) ?
-				state.stdac_out_stream : state.stdac_in_stream;
+			str = state.stdac_in_stream;
 		} else {
-			str = (file->f_mode & FMODE_WRITE) ?
-				state.codec_out_stream : state.codec_in_stream;
+			str = state.codec_in_stream;
 		}
 
+		if (str != NULL) {
 		inf.bytes = str->fragsize;
 		inf.fragments = 1;
 		inf.fragsize = str->fragsize;
 		inf.fragstotal = str->nbfrags;
+		}
 		ret = copy_to_user((void *)arg, &inf, sizeof(inf));
 		break;
 	}
@@ -1781,20 +1787,37 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 
 	case SNDCTL_DSP_RESET:
 	{
-		struct audio_stream *str;
+		struct audio_stream *str1 = NULL, *str2 = NULL;
 		int ssi;
 		if (minor == state.dev_dsp) {
-			str = (file->f_mode & FMODE_WRITE) ?
-				state.stdac_out_stream : state.stdac_in_stream;
+			if (mode == O_WRONLY) {
+				str1 = state.stdac_out_stream;
+			} else if (mode == O_RDONLY) {
+				str2 = state.stdac_in_stream;
+			} else {
+				str1 = state.stdac_in_stream;
+				str2 = state.stdac_out_stream;
+			}
 				ssi = STDAC_SSI;
 		} else {
-			str = (file->f_mode & FMODE_WRITE) ?
-				state.codec_out_stream : state.codec_in_stream;
+			if (mode == O_WRONLY) {
+				str1 = state.codec_out_stream;
+			} else if (mode == O_RDONLY) {
+				str2 = state.codec_in_stream;
+			} else {
+				str1 = state.codec_in_stream;
+				str2 = state.codec_out_stream;
+			}
 			ssi = CODEC_SSI;
 		}
-
+		if (mode == O_WRONLY || mode == O_RDWR)
 		TRY(omap2_mcbsp_set_xrst(ssi, OMAP_MCBSP_XRST_DISABLE))
-		audio_buffer_reset(str, inode);
+		if (mode == O_RDONLY || mode == O_RDWR)
+			TRY(omap2_mcbsp_set_rrst(ssi, OMAP_MCBSP_RRST_DISABLE))
+		if (str1 != NULL)
+			audio_buffer_reset(str1, inode);
+		if (str2 != NULL)
+			audio_buffer_reset(str2, inode);
 		break;
 	}
 
@@ -1830,7 +1853,9 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		TRY(copy_from_user(&mic, (int *)arg, sizeof(int)))
 		AUDIO_LEVEL2_LOG("SOUND_MIXER_RECSRC with mic = %#x\n", mic);
 		if (mic != mic_setting) {
-			if (state.dev_dsp1_open_count == 1) {
+			if (state.dev_dsp1_open_count == 1 &&
+			    (cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA ||
+			     state.codec_in_stream != NULL)) {
 				cpcap_audio_state.microphone = mic;
 				cpcap_audio_state.input_gain = 0;
 				cpcap_audio_set_audio_state(&cpcap_audio_state);
@@ -1901,7 +1926,7 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		    ^ tail ^ head
 		*/
 		unsigned int val = 0;
-		if (file->f_mode & FMODE_WRITE || minor == state.dev_dsp) {
+		if (mode == O_WRONLY || minor == state.dev_dsp) {
 			val = 0;
 		} else {
 			val = read_buf_outstanding;
@@ -2047,6 +2072,7 @@ out:
 static int audio_codec_open(struct inode *inode, struct file *file)
 {
 	int ret = 0;
+	int mode =  file->f_flags & O_ACCMODE;
 	mutex_lock(&audio_lock);
 	if (state.dev_dsp1_open_count == 1) {
 		ret = -EBUSY;
@@ -2079,7 +2105,7 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	} else {
-		if (file->f_mode & FMODE_WRITE) {
+		if (mode == O_WRONLY || mode == O_RDWR) {
 			state.codec_out_stream =
 			    kmalloc(sizeof(struct audio_stream), GFP_KERNEL);
 			memset(state.codec_out_stream, 0,
@@ -2092,7 +2118,7 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			cpcap_audio_set_audio_state(&cpcap_audio_state);
 		}
 
-		if (file->f_mode & FMODE_READ) {
+		if (mode == O_RDONLY || mode == O_RDWR) {
 			cpcap_audio_state.microphone = mic_setting;
 			cpcap_audio_set_audio_state(&cpcap_audio_state);
 			state.codec_in_stream =
@@ -2100,9 +2126,11 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 			memset(state.codec_in_stream, 0,
 			       sizeof(struct audio_stream));
 			state.codec_in_stream->inode = inode;
+			if (mode == O_RDONLY) {
 			msleep(8);
 			TRY(audio_configure_ssi(inode, file))
 		}
+	}
 	}
 
 	if ((cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) &&
@@ -2129,8 +2157,10 @@ out:
 
 static int audio_codec_release(struct inode *inode, struct file *file)
 {
+	int mode =  file->f_flags & O_ACCMODE;
 	mutex_lock(&audio_lock);
 	state.dev_dsp1_open_count = 0;
+	capture_mode = 0;
 	read_buf_full = 0;
 	read_buf_outstanding = 0;
 	cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_OFF;
@@ -2145,14 +2175,15 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 	if (cpcap_audio_state.rat_type != CPCAP_AUDIO_RAT_NONE) {
 		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_NONE;
 	} else {
-		if (file->f_mode & FMODE_WRITE) {
+		if (mode == O_WRONLY || mode == O_RDWR) {
 			audio_stop_ssi(inode, file);
 			audio_discard_buf(state.codec_out_stream, inode);
 			kfree(state.codec_out_stream);
 			state.codec_out_stream = NULL;
 		}
 
-		if (file->f_mode & FMODE_READ) {
+		if (mode == O_RDONLY || mode == O_RDWR) {
+			if (mode == O_RDONLY)
 			audio_stop_ssi(inode, file);
 			audio_discard_buf(state.codec_in_stream, inode);
 			kfree(state.codec_in_stream);
@@ -2366,6 +2397,7 @@ static int audio_probe(struct platform_device *dev)
 	state.codec_out_stream = NULL;
 	state.codec_in_stream = NULL;
 
+	enable_tx = 0;
 	cpcap_audio_state.cpcap = dev->dev.platform_data;
 	cpcap_audio_init(&cpcap_audio_state);
 

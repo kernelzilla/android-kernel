@@ -569,17 +569,15 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 						| CPCAP_BIT_CLK_INV;
 
 		/* CDMA sholes is using Normal mode for uplink */
-		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL;
+		cdai_changes.value |= CPCAP_BIT_CDC_PLL_SEL | CPCAP_BIT_CDC_DIG_AUD_FS0;
 
 		/* Setting I2S mode */
 		if (state->rat_type == CPCAP_AUDIO_RAT_CDMA)
-			cdai_changes.value |= CPCAP_BIT_CDC_DIG_AUD_FS0
-			 | CPCAP_BIT_CDC_DIG_AUD_FS1;
+			cdai_changes.value |= CPCAP_BIT_CDC_DIG_AUD_FS1;
 
 		if ((state->rat_type == CPCAP_AUDIO_RAT_NONE) &&
 			(state->microphone == CPCAP_AUDIO_IN_AUX_INTERNAL))
-			cdai_changes.value |= CPCAP_BIT_MIC1_RX_TIMESLOT0
-						| CPCAP_BIT_CDC_DIG_AUD_FS0;
+			cdai_changes.value |= CPCAP_BIT_MIC1_RX_TIMESLOT0;
 		else
 			cdai_changes.value |= CPCAP_BIT_MIC2_TIMESLOT0;
 
