@@ -102,7 +102,6 @@
 #define SHOLES_RNDIS_PRODUCT_ID		0x41E4
 #define SHOLES_RNDIS_ADB_PRODUCT_ID		0x41E5
 #define FACTORY_PRODUCT_ID		0x41D4
-#define FACTORY_ADB_PRODUCT_ID		0x41D4
 
 #define SHOLES_MMCPROBE_ENABLED 0
 
@@ -230,21 +229,11 @@ static char *factory_usb_functions[] = {
 	"usbnet"
 };
 
-static char *factory_usb_functions_adb[] = {
-	"usbnet",
-	"adb"
-};
-
 static struct android_usb_product factory_usb_products[] = {
 	{
 		.product_id	= FACTORY_PRODUCT_ID,
 		.num_functions	= ARRAY_SIZE(factory_usb_functions),
 		.functions	= factory_usb_functions,
-	},
-	{
-		.product_id	= FACTORY_ADB_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(factory_usb_functions_adb),
-		.functions	= factory_usb_functions_adb,
 	},
 };
 
@@ -270,8 +259,8 @@ static struct android_usb_platform_data andusb_plat_factory = {
 	.serial_number		= device_serial,
 	.num_products = ARRAY_SIZE(factory_usb_products),
 	.products = factory_usb_products,
-	.num_functions = ARRAY_SIZE(factory_usb_functions_adb),
-	.functions = factory_usb_functions_adb,
+	.num_functions = ARRAY_SIZE(factory_usb_functions),
+	.functions = factory_usb_functions,
 };
 
 static struct platform_device androidusb_device = {
