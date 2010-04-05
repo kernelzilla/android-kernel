@@ -709,7 +709,7 @@ static int alloc_root(struct super_block *sb)
 	if (IS_ERR(root))
 		goto out_iput;
 
-	err = au_alloc_dinfo(root);
+	err = au_di_init(root);
 	if (!err) {
 		sb->s_root = root;
 		return 0; /* success */

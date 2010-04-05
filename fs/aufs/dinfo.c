@@ -29,7 +29,7 @@ void au_di_init_once(void *_di)
 	au_rw_init(&di->di_rwsem);
 }
 
-int au_alloc_dinfo(struct dentry *dentry)
+int au_di_init(struct dentry *dentry)
 {
 	struct au_dinfo *dinfo;
 	struct super_block *sb;
@@ -63,6 +63,29 @@ int au_alloc_dinfo(struct dentry *dentry)
 	au_cache_free_dinfo(dinfo);
  out:
 	return -ENOMEM;
+}
+
+void au_di_fin(struct dentry *dentry)
+{
+	struct au_dinfo *di;
+	struct au_hdentry *p;
+	aufs_bindex_t bend, bindex;
+
+	/* dentry may not be revalidated */
+	di = dentry->d_fsdata;
+	bindex = di->di_bstart;
+	if (bindex >= 0) {
+		bend = di->di_bend;
+		p = di->di_hdentry + bindex;
+		while (bindex++ <= bend) {
+			if (p->hd_dentry)
+				au_hdput(p);
+			p++;
+		}
+	}
+	kfree(di->di_hdentry);
+	AuRwDestroy(&di->di_rwsem);
+	au_cache_free_dinfo(di);
 }
 
 int au_di_realloc(struct au_dinfo *dinfo, int nbr)

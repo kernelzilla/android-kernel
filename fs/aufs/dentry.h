@@ -63,7 +63,8 @@ int au_reval_dpath(struct dentry *dentry, unsigned int sigen);
 
 /* dinfo.c */
 void au_di_init_once(void *_di);
-int au_alloc_dinfo(struct dentry *dentry);
+int au_di_init(struct dentry *dentry);
+void au_di_fin(struct dentry *dentry);
 int au_di_realloc(struct au_dinfo *dinfo, int nbr);
 
 void di_read_lock(struct dentry *d, int flags, unsigned int lsc);
