@@ -97,6 +97,7 @@ obj-$(CONFIG_ARCH_MSM8X60) += devices-msm8x60.o clock-8x60.o
 obj-$(CONFIG_MACH_MSM8X60_RUMI3) += board-msm8x60.o
 obj-$(CONFIG_MACH_MSM8X60_SIM) += board-msm8x60.o
 obj-$(CONFIG_MACH_MSM8X60_SURF) += board-msm8x60.o
+obj-$(CONFIG_MACH_MSM8X60_FFA) += board-msm8x60.o
 obj-$(CONFIG_TROUT_H2W) += board-trout-h2w.o
 obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
 obj-$(CONFIG_TROUT_PWRSINK) += htc_pwrsink.o

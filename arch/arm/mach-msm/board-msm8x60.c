@@ -225,7 +225,9 @@ static void __init msm8x60_init_irq(void)
 	/* RUMI does not adhere to GIC spec by enabling STIs by default.
 	 * Enable/clear is supposed to be RO for STIs, but is RW on RUMI.
 	 */
-	if (machine_is_msm8x60_surf() || machine_is_msm8x60_rumi3())
+	if (machine_is_msm8x60_surf() ||
+	    machine_is_msm8x60_ffa()  ||
+	    machine_is_msm8x60_rumi3())
 		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
 
 	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
@@ -250,7 +252,7 @@ static void __init msm8x60_init_ebi2(void)
 	if (ebi2_cfg_ptr != 0) {
 		ebi2_cfg = readl(ebi2_cfg_ptr);
 
-		if (machine_is_msm8x60_surf())
+		if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa())
 			ebi2_cfg |= (1 << 4) | (1 << 5); /* CS2, CS3 */
 		else if (machine_is_msm8x60_sim())
 			ebi2_cfg |= (1 << 4); /* CS2 */
@@ -261,7 +263,7 @@ static void __init msm8x60_init_ebi2(void)
 		iounmap(ebi2_cfg_ptr);
 	}
 
-	if (machine_is_msm8x60_surf()) {
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
 		ebi2_cfg_ptr = ioremap_nocache(0x1a110000, SZ_4K);
 		if (ebi2_cfg_ptr != 0) {
 			/* EBI2_XMEM_CFG:PWRSAVE_MODE off */
@@ -419,7 +421,7 @@ static void __init msm8x60_init_tlmm(void)
 
 	if (machine_is_msm8x60_rumi3())
 		msm_gpio_install_direct_irq(0, 0);
-	else if (machine_is_msm8x60_surf()) {
+	else if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
 		msm_gpio_install_direct_irq(62, 0);
 
 		for (n = 0; n < ARRAY_SIZE(msm8x60_tlmm_cfgs); ++n)
@@ -521,7 +523,7 @@ static void __init msm8x60_init(void)
 	msm8x60_init_tlmm();
 	msm8x60_init_mmc();
 	msm8x60_init_buses();
-	if (machine_is_msm8x60_surf())
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa())
 		platform_add_devices(surf_devices,
 				     ARRAY_SIZE(surf_devices));
 	else {
@@ -559,6 +561,17 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
 MACHINE_END
 
 MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+#ifdef CONFIG_MSM_DEBUG_UART
+	.phys_io = MSM_DEBUG_UART_PHYS
+	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+#endif
+	.map_io = msm8x60_map_io,
+	.init_irq = msm8x60_init_irq,
+	.init_machine = msm8x60_init,
+	.timer = &msm_timer,
+MACHINE_END
+
+MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
 #ifdef CONFIG_MSM_DEBUG_UART
 	.phys_io = MSM_DEBUG_UART_PHYS
 	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
