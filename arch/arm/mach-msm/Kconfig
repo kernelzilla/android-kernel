@@ -693,6 +693,14 @@ config MSM_RMT_STORAGE_SERVER
 	  Provide RPC mechanism for remote processors to access storage
 	  device on apps processor.
 
+config MSM_RMT_STORAGE_SERVER_STATS
+	depends on (MSM_RMT_STORAGE_SERVER && DEBUG_FS)
+	default n
+	bool "Remote storage RPC server performance statistics"
+	help
+	  Collects performance statistics and shows this information
+	  through a debugfs file rmt_storage_stats.
+
 config MSM_DALRPC
 	bool "DAL RPC support"
 	depends on ARCH_MSM_SCORPION
