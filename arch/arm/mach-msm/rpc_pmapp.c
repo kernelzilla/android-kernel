@@ -23,14 +23,25 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/vreg.h>
 
-#define PM_APP_USB_PROG				0x30000060
-#define PM_APP_USB_VERS_1_1			0x00010001
-#define PM_APP_USB_VERS_1_2			0x00010002
-#define PM_APP_USB_VERS_2_1			0x00020001
+#define PMAPP_RPC_PROG			0x30000060
+#define PMAPP_RPC_VER_1_1		0x00010001
+#define PMAPP_RPC_VER_1_2		0x00010002
+#define PMAPP_RPC_VER_2_1		0x00020001
+#define PMAPP_RPC_VER_3_1		0x00030001
 
 #define VBUS_SESS_VALID_CB_PROC			1
 #define PM_VOTE_USB_PWR_SEL_SWITCH_APP__HSUSB 	(1 << 2)
 #define PM_USB_PWR_SEL_SWITCH_ID 		0
+
+#define PMAPP_RPC_TIMEOUT (5*HZ)
+
+#define PMAPP_DISPLAY_CLOCK_CONFIG_PROC		21
+#define PMAPP_VREG_LEVEL_VOTE_PROC		23
+#define PMAPP_SMPS_CLOCK_VOTE_PROC		26
+#define PMAPP_CLOCK_VOTE_PROC			27
+
+/* Clock voter name max length */
+#define PMAPP_CLOCK_VOTER_ID_LEN		4
 
 struct rpc_pmapp_ids {
 	unsigned long	reg_for_vbus_valid;
@@ -44,13 +55,13 @@ static int ldo_on;
 
 static void rpc_pmapp_init_rpc_ids(unsigned long vers)
 {
-	if (vers == PM_APP_USB_VERS_1_1) {
+	if (vers == PMAPP_RPC_VER_1_1) {
 		rpc_ids.reg_for_vbus_valid		= 5;
 		rpc_ids.vote_for_vbus_valid_switch	= 6;
-	} else if (vers == PM_APP_USB_VERS_1_2) {
+	} else if (vers == PMAPP_RPC_VER_1_2) {
 		rpc_ids.reg_for_vbus_valid		= 16;
 		rpc_ids.vote_for_vbus_valid_switch	= 17;
-	} else if (vers == PM_APP_USB_VERS_2_1) {
+	} else if (vers == PMAPP_RPC_VER_2_1) {
 		rpc_ids.reg_for_vbus_valid		= 0; /* NA */
 		rpc_ids.vote_for_vbus_valid_switch	= 0; /* NA */
 	}
@@ -239,29 +250,29 @@ int msm_pm_app_rpc_init(void)
 	}
 
 	client = msm_rpc_register_client("pmapp_usb",
-			PM_APP_USB_PROG,
-			PM_APP_USB_VERS_2_1, 1,
+			PMAPP_RPC_PROG,
+			PMAPP_RPC_VER_2_1, 1,
 			pm_app_usb_cb_func);
 	if (!IS_ERR(client)) {
-		rpc_pmapp_init_rpc_ids(PM_APP_USB_VERS_2_1);
+		rpc_pmapp_init_rpc_ids(PMAPP_RPC_VER_2_1);
 		goto done;
 	}
 
 	client = msm_rpc_register_client("pmapp_usb",
-			PM_APP_USB_PROG,
-			PM_APP_USB_VERS_1_2, 1,
+			PMAPP_RPC_PROG,
+			PMAPP_RPC_VER_1_2, 1,
 			pm_app_usb_cb_func);
 	if (!IS_ERR(client)) {
-		rpc_pmapp_init_rpc_ids(PM_APP_USB_VERS_1_2);
+		rpc_pmapp_init_rpc_ids(PMAPP_RPC_VER_1_2);
 		goto done;
 	}
 
 	client = msm_rpc_register_client("pmapp_usb",
-			PM_APP_USB_PROG,
-			PM_APP_USB_VERS_1_1, 1,
+			PMAPP_RPC_PROG,
+			PMAPP_RPC_VER_1_1, 1,
 			pm_app_usb_cb_func);
 	if (!IS_ERR(client))
-		rpc_pmapp_init_rpc_ids(PM_APP_USB_VERS_1_1);
+		rpc_pmapp_init_rpc_ids(PMAPP_RPC_VER_1_1);
 	else
 		return PTR_ERR(client);
 
@@ -280,18 +291,6 @@ void msm_pm_app_rpc_deinit(void)
 	}
 }
 EXPORT_SYMBOL(msm_pm_app_rpc_deinit);
-
-#define PMAPP_RPC_TIMEOUT (5*HZ)
-
-#define PMAPP_RPC_PROG		0x30000060
-#define PMAPP_RPC_VER_2_1	0x00020001
-#define PMAPP_RPC_VER_3_1	0x00030001
-
-#define PMAPP_DISPLAY_CLOCK_CONFIG_PROC		21
-#define PMAPP_CLOCK_VOTE_PROC			27
-
-/* Clock voter name max length */
-#define PMAPP_CLOCK_VOTER_ID_LEN		4
 
 /* error bit flags defined by modem side */
 #define PM_ERR_FLAG__PAR1_OUT_OF_RANGE		(0x0001)
@@ -545,3 +544,23 @@ int pmapp_clock_vote(const char *voter_id, uint clock_id, uint vote)
 			PMAPP_CLOCK_VOTE_PROC);
 }
 EXPORT_SYMBOL(pmapp_clock_vote);
+
+int pmapp_smps_clock_vote(const char *voter_id, uint vreg_id, uint vote)
+{
+	if (strlen(voter_id) != PMAPP_CLOCK_VOTER_ID_LEN)
+		return -EINVAL;
+
+	return pmapp_rpc_set_only(*((uint *) voter_id), vreg_id, vote, 0, 3,
+				  PMAPP_SMPS_CLOCK_VOTE_PROC);
+}
+EXPORT_SYMBOL(pmapp_smps_clock_vote);
+
+int pmapp_vreg_level_vote(const char *voter_id, uint vreg_id, uint level)
+{
+	if (strlen(voter_id) != PMAPP_CLOCK_VOTER_ID_LEN)
+		return -EINVAL;
+
+	return pmapp_rpc_set_only(*((uint *) voter_id), vreg_id, level, 0, 3,
+				  PMAPP_VREG_LEVEL_VOTE_PROC);
+}
+EXPORT_SYMBOL(pmapp_vreg_level_vote);

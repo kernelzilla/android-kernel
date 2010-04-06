@@ -47,6 +47,20 @@ enum {
 	PMAPP_CLOCK_VOTE_PIN_CTRL,
 };
 
+/* SMPS vreg ids */
+enum {
+	PMAPP_VREG_S3 = 21,
+	PMAPP_VREG_S2 = 23,
+	PMAPP_VREG_S4 = 24,
+};
+
+/* SMPS clock voting types */
+enum {
+	PMAPP_SMPS_CLK_VOTE_DONTCARE = 0,
+	PMAPP_SMPS_CLK_VOTE_2P74,	/* 2.74 MHz */
+	PMAPP_SMPS_CLK_VOTE_1P6,	/* 1.6 MHz */
+};
+
 int msm_pm_app_rpc_init(void);
 void msm_pm_app_rpc_deinit(void);
 int msm_pm_app_register_vbus_sn(void (*callback)(int online));
@@ -56,5 +70,7 @@ int msm_pm_app_enable_usb_ldo(int);
 int pmapp_display_clock_config(uint enable);
 
 int pmapp_clock_vote(const char *voter_id, uint clock_id, uint vote);
+int pmapp_smps_clock_vote(const char *voter_id, uint vreg_id, uint vote);
+int pmapp_vreg_level_vote(const char *voter_id, uint vreg_id, uint level);
 
 #endif
