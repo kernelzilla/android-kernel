@@ -432,7 +432,7 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 	if (pm8058_rev_is_a0(kp->pm_chip))
 		bits = fls(kp->pdata->debounce_ms[0]) - 1;
 	else
-		bits = kp->pdata->debounce_ms[1] / 5;
+		bits = (kp->pdata->debounce_ms[1] / 5) - 1;
 
 	scan_val |= (bits << KEYP_SCAN_DBOUNCE_SHIFT);
 
