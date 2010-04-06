@@ -651,6 +651,9 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	pPctxt = MEM_Calloc(sizeof(struct PROCESS_CONTEXT), MEM_PAGED);
 
 	if (pPctxt != NULL) {
+		mutex_init(&pPctxt->node_lock);
+		mutex_init(&pPctxt->dmm_lock);
+		mutex_init(&pPctxt->strm_lock);
 		DRV_ProcUpdatestate(pPctxt, PROC_RES_ALLOCATED);
 		filp->private_data = pPctxt;
 	}
@@ -783,9 +786,18 @@ DSP_STATUS DRV_RemoveAllResources(HANDLE hPCtxt)
 	DSP_STATUS status = DSP_SOK;
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	if (pCtxt != NULL) {
+		mutex_lock(&pCtxt->strm_lock);
 		DRV_RemoveAllSTRMResElements(pCtxt);
+		mutex_unlock(&pCtxt->strm_lock);
+
+		mutex_lock(&pCtxt->node_lock);
 		DRV_RemoveAllNodeResElements(pCtxt);
+		mutex_unlock(&pCtxt->node_lock);
+
+		mutex_lock(&pCtxt->dmm_lock);
 		DRV_RemoveAllDMMResElements(pCtxt);
+		mutex_unlock(&pCtxt->dmm_lock);
+
 		DRV_ProcUpdatestate(pCtxt, PROC_RES_FREED);
 	}
 	return status;

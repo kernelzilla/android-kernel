@@ -1009,11 +1009,13 @@ u32 PROCWRAP_Map(union Trapped_Args *args, void *pr_ctxt)
 	void *pMapAddr;
 
 	GT_0trace(WCD_debugMask, GT_ENTER, "PROCWRAP_Map: entered\n");
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->dmm_lock);
 	status = PROC_Map(args->ARGS_PROC_MAPMEM.hProcessor,
 			 args->ARGS_PROC_MAPMEM.pMpuAddr,
 			 args->ARGS_PROC_MAPMEM.ulSize,
 			 args->ARGS_PROC_MAPMEM.pReqAddr, &pMapAddr,
 			 args->ARGS_PROC_MAPMEM.ulMapAttr, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->dmm_lock);
 	if (DSP_SUCCEEDED(status)) {
 		if (put_user(pMapAddr, args->ARGS_PROC_MAPMEM.ppMapAddr))
 			status = DSP_EINVALIDARG;
@@ -1083,8 +1085,10 @@ u32 PROCWRAP_UnMap(union Trapped_Args *args, void *pr_ctxt)
 	DSP_STATUS status;
 
 	GT_0trace(WCD_debugMask, GT_ENTER, "PROCWRAP_UnMap: entered\n");
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->dmm_lock);
 	status = PROC_UnMap(args->ARGS_PROC_UNMAPMEM.hProcessor,
 			   args->ARGS_PROC_UNMAPMEM.pMapAddr, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->dmm_lock);
 	return status;
 }
 
@@ -1158,9 +1162,11 @@ u32 NODEWRAP_Allocate(union Trapped_Args *args, void *pr_ctxt)
 
 	}
 	if (DSP_SUCCEEDED(status)) {
+		mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 		status = NODE_Allocate(args->ARGS_NODE_ALLOCATE.hProcessor,
 				      &nodeId, (struct DSP_CBDATA *)pArgs,
 				      pAttrIn, &hNode, pr_ctxt);
+		mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 	}
 	cp_to_usr(args->ARGS_NODE_ALLOCATE.phNode, &hNode, status, 1);
 func_cont:
@@ -1286,7 +1292,9 @@ u32 NODEWRAP_Delete(union Trapped_Args *args, void *pr_ctxt)
 	u32 retVal;
 
 	GT_0trace(WCD_debugMask, GT_ENTER, "NODEWRAP_Delete: entered\n");
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 	retVal = NODE_Delete(args->ARGS_NODE_DELETE.hNode, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->node_lock);
 
 	return retVal;
 }
@@ -1486,9 +1494,11 @@ u32 STRMWRAP_AllocateBuffer(union Trapped_Args *args, void *pr_ctxt)
 
 	apBuffer = MEM_Alloc((uNumBufs * sizeof(u8 *)), MEM_NONPAGED);
 
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 	status = STRM_AllocateBuffer(args->ARGS_STRM_ALLOCATEBUFFER.hStream,
 				     args->ARGS_STRM_ALLOCATEBUFFER.uSize,
 				     apBuffer, uNumBufs, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 	cp_to_usr(args->ARGS_STRM_ALLOCATEBUFFER.apBuffer, apBuffer, status,
 		 uNumBufs);
 	if (apBuffer)
@@ -1502,7 +1512,13 @@ u32 STRMWRAP_AllocateBuffer(union Trapped_Args *args, void *pr_ctxt)
  */
 u32 STRMWRAP_Close(union Trapped_Args *args, void *pr_ctxt)
 {
-	return STRM_Close(args->ARGS_STRM_CLOSE.hStream, pr_ctxt);
+	DSP_STATUS status;
+
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
+	status = STRM_Close(args->ARGS_STRM_CLOSE.hStream, pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
+
+	return status;
 }
 
 /*
@@ -1522,8 +1538,10 @@ u32 STRMWRAP_FreeBuffer(union Trapped_Args *args, void *pr_ctxt)
 		 uNumBufs);
 
 	if (DSP_SUCCEEDED(status)) {
+		mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 		status = STRM_FreeBuffer(args->ARGS_STRM_FREEBUFFER.hStream,
 					 apBuffer, uNumBufs, pr_ctxt);
+		mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 	}
 	cp_to_usr(args->ARGS_STRM_FREEBUFFER.apBuffer, apBuffer, status,
 		 uNumBufs);
@@ -1615,10 +1633,12 @@ u32 STRMWRAP_Open(union Trapped_Args *args, void *pr_ctxt)
 			attr.pStreamAttrIn = &strmAttrIn;
 
 	}
+	mutex_lock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 	status = STRM_Open(args->ARGS_STRM_OPEN.hNode,
 			  args->ARGS_STRM_OPEN.uDirection,
 			  args->ARGS_STRM_OPEN.uIndex, &attr, &pStrm,
 			  pr_ctxt);
+	mutex_unlock(&((struct PROCESS_CONTEXT *)pr_ctxt)->strm_lock);
 	cp_to_usr(args->ARGS_STRM_OPEN.phStream, &pStrm, status, 1);
 	return status;
 }

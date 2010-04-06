@@ -155,6 +155,7 @@ static DSP_STATUS RequestBridgeResourcesDSP(u32 dwContext, s32 fRequest);
 
 static DSP_STATUS DRV_ProcFreeNodeRes(HANDLE hPCtxt);
 static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt);
+static DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt);
 extern enum NODE_STATE NODE_GetState(HANDLE hNode);
 
 /* Update the state of process context */
@@ -173,7 +174,8 @@ DSP_STATUS DRV_ProcUpdatestate(HANDLE hPCtxt, enum GPP_PROC_RES_STATE status)
 }
 
 /* Allocate and add a node resource element
-* This function is called from .Node_Allocate.  */
+* This function is called from .Node_Allocate.
+* Call this with the node_lock held */
 DSP_STATUS DRV_InsertNodeResElement(HANDLE hNode, HANDLE hNodeRes,
 					HANDLE hPCtxt)
 {
@@ -181,6 +183,7 @@ DSP_STATUS DRV_InsertNodeResElement(HANDLE hNode, HANDLE hNodeRes,
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
 	struct NODE_RES_OBJECT   *pTempNodeRes = NULL;
+
 	GT_0trace(curTrace, GT_ENTER, "DRV_InsertNodeResElement: 1");
 	*pNodeRes = (struct NODE_RES_OBJECT *)MEM_Calloc
 		    (1 * sizeof(struct NODE_RES_OBJECT), MEM_PAGED);
@@ -210,17 +213,20 @@ DSP_STATUS DRV_InsertNodeResElement(HANDLE hNode, HANDLE hNodeRes,
 }
 
 /* Release all Node resources and its context
-* This is called from .Node_Delete.  */
+* This is called from .Node_Delete.
+* call this function with the node_lock held */
 DSP_STATUS DRV_RemoveNodeResElement(HANDLE hNodeRes, HANDLE hPCtxt)
 {
 	struct NODE_RES_OBJECT *pNodeRes = (struct NODE_RES_OBJECT *)hNodeRes;
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS	status = DSP_SOK;
-	struct NODE_RES_OBJECT *pTempNode2 = pCtxt->pNodeList;
-	struct NODE_RES_OBJECT *pTempNode = pCtxt->pNodeList;
+	struct NODE_RES_OBJECT *pTempNode2;
+	struct NODE_RES_OBJECT *pTempNode;
 
 	DBC_Assert(hPCtxt != NULL);
 	GT_0trace(curTrace, GT_ENTER, "\nDRV_RemoveNodeResElement: 1\n");
+	pTempNode2 = pCtxt->pNodeList;
+	pTempNode = pCtxt->pNodeList;
 	while ((pTempNode != NULL) && (pTempNode != pNodeRes)) {
 		pTempNode2 = pTempNode;
 		pTempNode = pTempNode->next;
@@ -320,7 +326,8 @@ DSP_STATUS DRV_InsertDMMResElement(HANDLE hDMMRes, HANDLE hPCtxt)
 }
 
 /* Release DMM resource element context
-* This is called from Proc_UnMap. after the actual resource is freed */
+* This is called from Proc_UnMap. after the actual resource is freed
+* Call this with the dmm_lock held */
 DSP_STATUS 	DRV_RemoveDMMResElement(HANDLE hDMMRes, HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
@@ -372,15 +379,17 @@ DSP_STATUS DRV_UpdateDMMResElement(HANDLE hDMMRes, u32 pMpuAddr, u32 ulSize,
 }
 
 /* Actual DMM De-Allocation */
+/* Call this with the dmm_lock held */
 DSP_STATUS  DRV_ProcFreeDMMRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
-	struct DMM_RES_OBJECT *pDMMList = pCtxt->pDMMList;
+	struct DMM_RES_OBJECT *pDMMList;
 	struct DMM_RES_OBJECT *pDMMRes = NULL;
 
 	DBC_Assert(hPCtxt != NULL);
 	GT_0trace(curTrace, GT_ENTER, "\nDRV_ProcFreeDMMRes: 1\n");
+	pDMMList = pCtxt->pDMMList;
 	while (pDMMList != NULL) {
 		pDMMRes = pDMMList;
 		pDMMList = pDMMList->next;
@@ -416,6 +425,8 @@ DSP_STATUS DRV_RemoveAllDMMResElements(HANDLE hPCtxt)
 	return status;
 }
 
+/* This is called from PROC_UnMap */
+/* Call this with the dmm lock held */
 DSP_STATUS DRV_GetDMMResElement(u32 pMapAddr, HANDLE hDMMRes, HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
@@ -481,7 +492,8 @@ DSP_STATUS 	DRV_RemoveAllNodeResElements(HANDLE hPCtxt)
 	return status;
 }
 
-/* Getting the node resource element */
+/* Getting the node resource element
+ * call this function with node_lock held */
 DSP_STATUS DRV_GetNodeResElement(HANDLE hNode, HANDLE hNodeRes, HANDLE hPCtxt)
 {
 	struct NODE_RES_OBJECT **nodeRes = (struct NODE_RES_OBJECT **)hNodeRes;
@@ -544,16 +556,18 @@ DSP_STATUS DRV_ProcInsertSTRMResElement(HANDLE hStreamHandle, HANDLE hSTRMRes,
 
 /* Release Stream resource element context
 * This function called after the actual resource is freed
-*/
+* Call with strm_lock held */
 DSP_STATUS 	DRV_ProcRemoveSTRMResElement(HANDLE hSTRMRes, HANDLE hPCtxt)
 {
 	struct STRM_RES_OBJECT *pSTRMRes = (struct STRM_RES_OBJECT *)hSTRMRes;
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
-	struct STRM_RES_OBJECT *pTempSTRMRes2 = pCtxt->pSTRMList;
-	struct STRM_RES_OBJECT *pTempSTRMRes = pCtxt->pSTRMList;
+	struct STRM_RES_OBJECT *pTempSTRMRes2;
+	struct STRM_RES_OBJECT *pTempSTRMRes;
 
 	DBC_Assert(hPCtxt != NULL);
+	pTempSTRMRes2 = pCtxt->pSTRMList;
+	pTempSTRMRes = pCtxt->pSTRMList;
 	while ((pTempSTRMRes != NULL) && (pTempSTRMRes != pSTRMRes)) {
 		pTempSTRMRes2 = pTempSTRMRes;
 		pTempSTRMRes = pTempSTRMRes->next;
@@ -571,7 +585,7 @@ DSP_STATUS 	DRV_ProcRemoveSTRMResElement(HANDLE hSTRMRes, HANDLE hPCtxt)
 }
 
 /* Actual Stream De-Allocation */
-static DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
+DSP_STATUS  DRV_ProcFreeSTRMRes(HANDLE hPCtxt)
 {
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
@@ -635,16 +649,18 @@ DSP_STATUS	DRV_RemoveAllSTRMResElements(HANDLE hPCtxt)
 	return status;
 }
 
-/* Getting the stream resource element */
+/* Getting the stream resource element
+ * Call this with the strm_lock held */
 DSP_STATUS DRV_GetSTRMResElement(HANDLE hStrm, HANDLE hSTRMRes, HANDLE hPCtxt)
 {
 	struct STRM_RES_OBJECT **STRMRes = (struct STRM_RES_OBJECT **)hSTRMRes;
 	struct PROCESS_CONTEXT *pCtxt = (struct PROCESS_CONTEXT *)hPCtxt;
 	DSP_STATUS status = DSP_SOK;
 	struct STRM_RES_OBJECT *pTempSTRM2 = NULL;
-	struct STRM_RES_OBJECT *pTempSTRM = pCtxt->pSTRMList;
+	struct STRM_RES_OBJECT *pTempSTRM;
 
 	DBC_Assert(hPCtxt != NULL);
+	pTempSTRM = pCtxt->pSTRMList;
 	while ((pTempSTRM != NULL) && (pTempSTRM->hStream != hStrm)) {
 		GT_0trace(curTrace, GT_ENTER, "DRV_GetSTRMResElement: 2");
 		pTempSTRM2 = pTempSTRM;
