@@ -1,5 +1,4 @@
 obj-y += io.o dma.o memory.o
-obj-y += devices.o
 obj-y += proc_comm.o
 obj-y += vreg.o mpp.o
 obj-y += vreg.o
@@ -25,7 +24,6 @@ ifdef CONFIG_ARCH_QSD8X50
 	obj-$(CONFIG_MSM_SOC_REV_A) += acpuclock-8x50a.o
 endif
 
-obj-$(CONFIG_ARCH_MSM7X30) += acpuclock-7x30.o
 obj-$(CONFIG_MSM_CPU_AVS) += avs.o avs_hw.o
 obj-$(CONFIG_CPU_V6) += idle-v6.o
 obj-$(CONFIG_CPU_V7) += idle-v7.o
@@ -78,11 +76,12 @@ endif
 obj-$(CONFIG_MSM_DMA_TEST) += dma_test.o
 obj-$(CONFIG_SURF_FFA_GPIO_KEYPAD) += keypad-surf-ffa.o
 
-obj-$(CONFIG_ARCH_MSM7X01A) += board-halibut.o
+obj-$(CONFIG_ARCH_MSM7X01A) += board-halibut.o devices-msm7x01a.o
 obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-keypad.o board-trout-panel.o
 obj-$(CONFIG_MACH_TROUT) += htc_akm_cal.o htc_wifi_nvs.o htc_acoustic.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-mmc.o board-trout-wifi.o
+obj-$(CONFIG_ARCH_QSD8X50) += devices-qsd8x50.o
 obj-$(CONFIG_MACH_QSD8X50_SURF) += board-qsd8x50.o
 obj-$(CONFIG_MACH_QSD8X50_FFA) += board-qsd8x50.o
 #obj-$(CONFIG_MACH_QSD8X50_COMET) += board-comet.o
@@ -91,9 +90,10 @@ obj-$(CONFIG_MACH_QSD8X50A_FFA) += board-qsd8x50.o
 obj-$(CONFIG_TROUT_H2W) += board-trout-h2w.o
 obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
 obj-$(CONFIG_TROUT_PWRSINK) += htc_pwrsink.o
-obj-$(CONFIG_ARCH_MSM7X27) += board-msm7x27.o
-obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o clock-7x30.o
-obj-$(CONFIG_ARCH_MSM7X25) += board-msm7x27.o
+obj-$(CONFIG_ARCH_MSM7X27) += board-msm7x27.o devices-msm7x27.o
+obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+obj-$(CONFIG_ARCH_MSM7X30) += clock-7x30.o acpuclock-7x30.o
+obj-$(CONFIG_ARCH_MSM7X25) += board-msm7x27.o devices-msm7x25.o
 
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o board-sapphire-gpio.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-keypad.o board-sapphire-panel.o
