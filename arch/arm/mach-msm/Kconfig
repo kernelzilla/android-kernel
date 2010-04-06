@@ -551,6 +551,20 @@ choice
 	    prompt "Package 4"
 endchoice
 
+config MSM_RPC_SDIO_XPRT
+	depends on MSM_SDIO_AL
+	default y
+	bool "MSM SDIO XPRT Layer"
+	help
+	  SDIO Transport Layer for RPC Rouer
+
+config MSM_RPC_SDIO_DEBUG
+	depends on MSM_RPC_SDIO_XPRT
+	default y
+	bool "MSM SDIO XPRT debug support"
+	help
+	  Support for debugging SDIO XPRT
+
 config MSM_SMD_DEBUG
 	depends on MSM_SMD
 	default y
