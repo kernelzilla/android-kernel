@@ -27,7 +27,7 @@
 
 static int au_wbr_fd(struct path *path)
 {
-	int err, fd, flags;
+	int err, fd;
 	aufs_bindex_t wbi, bindex, bend;
 	struct file *h_file;
 	struct super_block *sb;
@@ -38,10 +38,6 @@ static int au_wbr_fd(struct path *path)
 	if (unlikely(err < 0))
 		goto out;
 	fd = err;
-
-	flags = O_RDONLY | O_DIRECTORY;
-	if (force_o_largefile())
-		flags |= O_LARGEFILE;
 
 	wbi = 0;
 	sb = path->dentry->d_sb;
@@ -61,7 +57,8 @@ static int au_wbr_fd(struct path *path)
 		wbr = au_sbr(sb, wbi);
 	}
 	AuDbg("wbi %d\n", wbi);
-	h_file = au_h_open(root, wbi, flags, NULL);
+	h_file = au_h_open(root, wbi, O_RDONLY | O_DIRECTORY | O_LARGEFILE,
+			   NULL);
 	aufs_read_unlock(root, AuLock_IR);
 	err = PTR_ERR(h_file);
 	if (IS_ERR(h_file))
