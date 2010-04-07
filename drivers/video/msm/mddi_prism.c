@@ -94,7 +94,7 @@ static int __init prism_init(void)
 		pinfo->bpp = 18;
 		pinfo->fb_num = 2;
 		pinfo->clk_rate = 153600000;
-		pinfo->clk_min = 150000000;
+		pinfo->clk_min = 140000000;
 		pinfo->clk_max = 160000000;
 		pinfo->lcd.vsync_enable = TRUE;
 		pinfo->lcd.refx100 = 6050;
