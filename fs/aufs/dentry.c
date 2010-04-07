@@ -794,19 +794,15 @@ static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 			err = au_reval_dpath(dentry, sigen);
 		if (unlikely(err))
 			goto out_dgrade;
-		AuDebugOn(au_digen(dentry) != sigen);
 	}
 	if (inode && au_iigen(inode) != sigen) {
 		AuDebugOn(IS_ROOT(dentry));
 		err = au_refresh_hinode(inode, dentry);
 		if (unlikely(err))
 			goto out_dgrade;
-		AuDebugOn(au_iigen(inode) != sigen);
 	}
 	di_downgrade_lock(dentry, AuLock_IR);
 
-	AuDebugOn(au_digen(dentry) != sigen);
-	AuDebugOn(inode && au_iigen(inode) != sigen);
 	err = -EINVAL;
 	do_udba = !au_opt_test(au_mntflags(sb), UDBA_NONE);
 	if (do_udba && inode) {
