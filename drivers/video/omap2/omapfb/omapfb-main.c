@@ -2222,17 +2222,16 @@ static int omapfb_probe(struct platform_device *pdev)
 			dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
 					def_display->name);
 
+		if (def_display->enable_te)
+			def_display->enable_te(def_display, 1);
+
 		/* set the update mode */
 		if (def_display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
 #ifdef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
-			if (def_display->enable_te)
-				def_display->enable_te(def_display, 1);
 			if (def_display->set_update_mode)
 				def_display->set_update_mode(def_display,
 						OMAP_DSS_UPDATE_AUTO);
 #else /* MANUAL_UPDATE */
-			if (def_display->enable_te)
-				def_display->enable_te(def_display, 0);
 			if (def_display->set_update_mode)
 				def_display->set_update_mode(def_display,
 						OMAP_DSS_UPDATE_MANUAL);
