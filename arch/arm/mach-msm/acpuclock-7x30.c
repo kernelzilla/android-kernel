@@ -85,18 +85,18 @@ static struct cpufreq_frequency_table freq_table[] = {
 #define SRC_LPXO (-2)
 #define SRC_AXI  (-1)
 static struct clkctl_acpu_speed acpu_freq_tbl[] = {
-	{ 24576,  SRC_LPXO, 0, 0,  30720,  1200, VDD_RAW(1200) },
-	{ 61440,  PLL_3,    5, 11, 61440,  1200, VDD_RAW(1200) },
-	{ 122880, PLL_3,    5, 5,  61440,  1200, VDD_RAW(1200) },
-	{ 184320, PLL_3,    5, 4,  61440,  1200, VDD_RAW(1200) },
-	{ MAX_AXI_KHZ, SRC_AXI, 1, 0, 61440, 1200, VDD_RAW(1200) },
-	{ 245760, PLL_3,    5, 2,  61440,  1200, VDD_RAW(1200) },
-	{ 368640, PLL_3,    5, 1,  122800, 1200, VDD_RAW(1200) },
-	{ 768000, PLL_1,    2, 0,  153600, 1200, VDD_RAW(1200) },
+	{ 24576,  SRC_LPXO, 0, 0,  30720,  1000, VDD_RAW(1000) },
+	{ 61440,  PLL_3,    5, 11, 61440,  1000, VDD_RAW(1000) },
+	{ 122880, PLL_3,    5, 5,  61440,  1000, VDD_RAW(1000) },
+	{ 184320, PLL_3,    5, 4,  61440,  1000, VDD_RAW(1000) },
+	{ MAX_AXI_KHZ, SRC_AXI, 1, 0, 61440, 1000, VDD_RAW(1000) },
+	{ 245760, PLL_3,    5, 2,  61440,  1000, VDD_RAW(1000) },
+	{ 368640, PLL_3,    5, 1,  122800, 1050, VDD_RAW(1050) },
+	{ 768000, PLL_1,    2, 0,  153600, 1100, VDD_RAW(1100) },
 	/* ACPU >= 806.4MHz requires MSMC1 @ 1.2V. Voting for
 	 * AXI @ 192MHz accomplishes this implicitly. 806.4MHz
 	 * is updated to 1024MHz at runtime for QSD8x55. */
-	{ 806400, PLL_2,    3, 0,  192000, 1200, VDD_RAW(1200) },
+	{ 806400, PLL_2,    3, 0,  192000, 1100, VDD_RAW(1100) },
 	{ 0 }
 };
 
