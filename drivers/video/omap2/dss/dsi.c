@@ -184,7 +184,7 @@ struct dsi_reg { u16 idx; };
 #define DSI_DT_RX_SHORT_READ_1		0x21
 #define DSI_DT_RX_SHORT_READ_2		0x22
 
-#define FINT_MAX 2100000
+#define FINT_MAX 2200000
 #define FINT_MIN 750000
 #define REGN_MAX (1 << 7)
 #define REGM_MAX ((1 << 11) - 1)
@@ -1077,7 +1077,7 @@ int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo)
 			26, 23);		/* DSIPROTO_CLOCK_DIV */
 	dsi_write_reg(DSI_PLL_CONFIGURATION1, l);
 
-	BUG_ON(cinfo->fint < 750000 || cinfo->fint > 2100000);
+	BUG_ON(cinfo->fint < FINT_MIN || cinfo->fint > FINT_MAX);
 	if (cinfo->fint < 1000000)
 		f = 0x3;
 	else if (cinfo->fint < 1250000)
