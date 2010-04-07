@@ -84,16 +84,16 @@ static int au_show_brs(struct seq_file *seq, struct super_block *sb)
 	int err;
 	aufs_bindex_t bindex, bend;
 	struct path path;
-	struct au_hdentry *hd;
+	struct au_hdentry *hdp;
 	struct au_branch *br;
 
 	err = 0;
 	bend = au_sbend(sb);
-	hd = au_di(sb->s_root)->di_hdentry;
+	hdp = au_di(sb->s_root)->di_hdentry;
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
 		br = au_sbr(sb, bindex);
 		path.mnt = br->br_mnt;
-		path.dentry = hd[bindex].hd_dentry;
+		path.dentry = hdp[bindex].hd_dentry;
 		err = au_seq_path(seq, &path);
 		if (err > 0)
 			err = seq_printf(seq, "=%s",
@@ -153,6 +153,7 @@ static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 	struct qstr *name;
 	struct file *f;
 	struct dentry *d, *h_root;
+	struct au_hdentry *hdp;
 
 	AuRwMustAnyLock(&sbinfo->si_rwsem);
 
@@ -167,7 +168,8 @@ static int au_show_xino(struct seq_file *seq, struct vfsmount *mnt)
 	brid = au_xino_brid(sb);
 	if (brid >= 0) {
 		bindex = au_br_index(sb, brid);
-		h_root = au_di(sb->s_root)->di_hdentry[0 + bindex].hd_dentry;
+		hdp = au_di(sb->s_root)->di_hdentry;
+		h_root = hdp[0 + bindex].hd_dentry;
 	}
 	d = f->f_dentry;
 	name = &d->d_name;

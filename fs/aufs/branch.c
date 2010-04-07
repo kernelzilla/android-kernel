@@ -662,13 +662,14 @@ static void au_br_do_del_hdp(struct au_dinfo *dinfo, const aufs_bindex_t bindex,
 
 	AuRwMustWriteLock(&dinfo->di_rwsem);
 
-	hdp = dinfo->di_hdentry + bindex;
+	hdp = dinfo->di_hdentry;
 	if (bindex < bend)
-		memmove(hdp, hdp + 1, sizeof(*hdp) * (bend - bindex));
-	dinfo->di_hdentry[0 + bend].hd_dentry = NULL;
+		memmove(hdp + bindex, hdp + bindex + 1,
+			sizeof(*hdp) * (bend - bindex));
+	hdp[0 + bend].hd_dentry = NULL;
 	dinfo->di_bend--;
 
-	p = krealloc(dinfo->di_hdentry, sizeof(*p) * bend, GFP_NOFS);
+	p = krealloc(hdp, sizeof(*p) * bend, GFP_NOFS);
 	if (p)
 		dinfo->di_hdentry = p;
 	/* harmless error */

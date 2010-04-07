@@ -321,7 +321,7 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len)
  * we need to close the file.
  */
 static int au_cp_regular(struct dentry *dentry, aufs_bindex_t bdst,
-			aufs_bindex_t bsrc, loff_t len)
+			 aufs_bindex_t bsrc, loff_t len)
 {
 	int err, i;
 	enum { SRC, DST };
@@ -797,25 +797,27 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	aufs_bindex_t bstart;
 	struct au_dinfo *dinfo;
 	struct dentry *h_d_dst, *h_d_start;
+	struct au_hdentry *hdp;
 
 	dinfo = au_di(dentry);
 	AuRwMustWriteLock(&dinfo->di_rwsem);
 
 	bstart = dinfo->di_bstart;
-	h_d_dst = dinfo->di_hdentry[0 + bdst].hd_dentry;
+	hdp = dinfo->di_hdentry;
+	h_d_dst = hdp[0 + bdst].hd_dentry;
 	dinfo->di_bstart = bdst;
-	dinfo->di_hdentry[0 + bdst].hd_dentry = wh_dentry;
-	h_d_start = dinfo->di_hdentry[0 + bstart].hd_dentry;
+	hdp[0 + bdst].hd_dentry = wh_dentry;
+	h_d_start = hdp[0 + bstart].hd_dentry;
 	if (file)
-		dinfo->di_hdentry[0 + bstart].hd_dentry
+		hdp[0 + bstart].hd_dentry
 			= au_h_fptr(file, au_fbstart(file))->f_dentry;
 	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME,
 			     /*h_parent*/NULL);
 	if (!err && file) {
 		err = au_reopen_nondir(file);
-		dinfo->di_hdentry[0 + bstart].hd_dentry = h_d_start;
+		hdp[0 + bstart].hd_dentry = h_d_start;
 	}
-	dinfo->di_hdentry[0 + bdst].hd_dentry = h_d_dst;
+	hdp[0 + bdst].hd_dentry = h_d_dst;
 	dinfo->di_bstart = bstart;
 
 	return err;
