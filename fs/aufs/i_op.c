@@ -457,7 +457,7 @@ int au_pin(struct au_pin *pin, struct dentry *dentry, aufs_bindex_t bindex,
  * ->setattr() and ->getattr() are called in various cases.
  * chmod, stat: dentry is revalidated.
  * fchmod, fstat: file and dentry are not revalidated, additionally they may be
- * 		  unhashed.
+ *		  unhashed.
  * for ->setattr(), ia->ia_file is passed from ftruncate only.
  */
 static int au_reval_for_attr(struct dentry *dentry, unsigned int sigen)
