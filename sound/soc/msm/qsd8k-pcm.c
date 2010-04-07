@@ -25,6 +25,7 @@
 #include <linux/time.h>
 #include <linux/wait.h>
 #include <linux/platform_device.h>
+#include <linux/interrupt.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -53,8 +54,10 @@ static void snd_qsd_timer(unsigned long data)
 		}
 		snd_pcm_period_elapsed(prtd->substream);
 	}
-	if (prtd->enabled)
+	if (prtd->enabled) {
+		prtd->timer.expires +=  prtd->expiry_delta;
 		add_timer(&prtd->timer);
+	}
 }
 
 static int rc = 1;
@@ -216,7 +219,11 @@ static int qsd_pcm_playback_prepare(struct snd_pcm_substream *substream)
 		prtd->enabled = 1;
 		expiry = ((unsigned long)((prtd->pcm_count * 1000)
 			/(runtime->rate * runtime->channels * 2)));
-		prtd->timer.expires = jiffies + msecs_to_jiffies(expiry);
+		expiry -= (expiry % 10) ;
+		prtd->timer.expires = jiffies + (msecs_to_jiffies(expiry));
+		prtd->expiry_delta = (msecs_to_jiffies(expiry));
+		if (!prtd->expiry_delta)
+			prtd->expiry_delta = 1;
 		setup_timer(&prtd->timer, snd_qsd_timer, (unsigned long)prtd);
 		add_timer(&prtd->timer);
 	}
@@ -535,7 +542,11 @@ static int qsd_pcm_capture_prepare(struct snd_pcm_substream *substream)
 		prtd->enabled = 1;
 		expiry = ((unsigned long)((prtd->pcm_count * 1000)
 			/(runtime->rate * runtime->channels * 2)));
-		prtd->timer.expires = jiffies + msecs_to_jiffies(expiry);
+		expiry -= (expiry % 10) ;
+		prtd->timer.expires = jiffies + (msecs_to_jiffies(expiry));
+		prtd->expiry_delta = (msecs_to_jiffies(expiry));
+		if (!prtd->expiry_delta)
+			prtd->expiry_delta = 1;
 		setup_timer(&prtd->timer, snd_qsd_timer, (unsigned long)prtd);
 		add_timer(&prtd->timer);
 	}
