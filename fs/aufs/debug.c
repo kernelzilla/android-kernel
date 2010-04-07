@@ -158,6 +158,7 @@ void au_dpri_dentry(struct dentry *dentry)
 	struct au_dinfo *dinfo;
 	aufs_bindex_t bindex;
 	int err;
+	struct au_hdentry *hdp;
 
 	err = do_pri_dentry(-1, dentry);
 	if (err || !au_test_aufs(dentry->d_sb))
@@ -171,8 +172,9 @@ void au_dpri_dentry(struct dentry *dentry)
 	     dinfo->di_bwh, dinfo->di_bdiropq, au_digen(dentry));
 	if (dinfo->di_bstart < 0)
 		return;
+	hdp = dinfo->di_hdentry;
 	for (bindex = dinfo->di_bstart; bindex <= dinfo->di_bend; bindex++)
-		do_pri_dentry(bindex, dinfo->di_hdentry[0 + bindex].hd_dentry);
+		do_pri_dentry(bindex, hdp[0 + bindex].hd_dentry);
 }
 
 static int do_pri_file(aufs_bindex_t bindex, struct file *file)
