@@ -30,6 +30,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/initval.h>
 #include <sound/control.h>
 #include <asm/dma.h>
@@ -299,6 +300,27 @@ void alsa_event_cb_capture(u32 event, void *evt_packet,
 	pr_debug("alsa_event_cb_capture pcm_irq_pos = %d\n", prtd->pcm_irq_pos);
 }
 
+static int hw_rule_periodsize_by_rate(struct snd_pcm_hw_params *params,
+					struct snd_pcm_hw_rule *rule)
+{
+	struct snd_interval *ps = hw_param_interval(params,
+						SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
+	struct snd_interval *r = hw_param_interval(params,
+						SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval ch;
+
+	if (!ps || !r)
+		return 0;
+
+	snd_interval_any(&ch);
+
+	if (r->min > 8000) {
+		ch.min = 512;
+		pr_debug("Minimum period size is adjusted to 512\n");
+		return snd_interval_refine(ps, &ch);
+	}
+	return 0;
+}
 
 static int qsd_pcm_open(struct snd_pcm_substream *substream)
 {
@@ -328,6 +350,16 @@ static int qsd_pcm_open(struct snd_pcm_substream *substream)
 	/* Ensure that buffer size is a multiple of period size */
 	ret = snd_pcm_hw_constraint_integer(runtime,
 					    SNDRV_PCM_HW_PARAM_PERIODS);
+	if (ret < 0) {
+		kfree(prtd);
+		return ret;
+	}
+
+	ret = snd_pcm_hw_rule_add(substream->runtime, 0,
+			SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
+			hw_rule_periodsize_by_rate, substream,
+			SNDRV_PCM_HW_PARAM_RATE, -1);
+
 	if (ret < 0) {
 		kfree(prtd);
 		return ret;
