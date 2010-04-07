@@ -699,6 +699,15 @@ static int msm_rotator_do_rotate(unsigned long arg)
 		rc = -EINVAL;
 		goto do_rotate_unlock_mutex;
 	}
+
+	if (msm_rotator_dev->img_info[s]->enable == 0) {
+		dev_dbg(msm_rotator_dev->device,
+			"%s() : Session_id %d not enabled \n",
+			__func__, s);
+		rc = -EINVAL;
+		goto do_rotate_unlock_mutex;
+	}
+
 	cancel_delayed_work(&msm_rotator_dev->rot_clk_work);
 	if (msm_rotator_dev->rot_clk_state == CLK_DIS) {
 		enable_rot_clks();
