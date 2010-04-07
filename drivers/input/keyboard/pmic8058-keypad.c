@@ -25,7 +25,7 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/delay.h>
 
-#include <mach/pmic8058-keypad.h>
+#include <linux/input/pmic8058-keypad.h>
 
 #define MATRIX_MIN_ROWS		5
 #define MATRIX_MIN_COLS		5
