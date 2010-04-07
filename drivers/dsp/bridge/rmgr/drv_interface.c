@@ -548,6 +548,10 @@ static void bridge_load_firmware(void)
 	printk(KERN_INFO "%s: loading bridge firmware from %s\n", __func__,
 	       firmware_file);
 
+	mutex_init(&pctxt.node_lock);
+	mutex_init(&pctxt.dmm_lock);
+	mutex_init(&pctxt.strm_lock);
+
 	DRV_ProcUpdatestate(&pctxt, PROC_RES_ALLOCATED);
 
 	status = PROC_Attach(0, NULL, &hProcessor, &pctxt);
