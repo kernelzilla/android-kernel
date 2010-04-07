@@ -487,7 +487,8 @@ static long audaac_in_ioctl(struct file *file,
 	switch (cmd) {
 	case AUDIO_START: {
 		uint32_t freq;
-		freq = audio->samp_rate;
+		/* Poll at 48KHz always */
+		freq = 48000;
 		MM_DBG("AUDIO_START\n");
 		rc = msm_snddev_request_freq(&freq, audio->enc_id,
 					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
@@ -499,17 +500,6 @@ static long audaac_in_ioctl(struct file *file,
 			msm_snddev_withdraw_freq(audio->enc_id,
 					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
 			MM_DBG("msm_snddev_withdraw_freq\n");
-			break;
-		}
-		/* Configured sample rate is not as requested,
-		   reject the request */
-		if (freq != audio->samp_rate) {
-			MM_DBG("sample rate can not be configured to %d\n", \
-				audio->samp_rate);
-			msm_snddev_withdraw_freq(audio->enc_id,
-					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
-			MM_DBG("msm_snddev_withdraw_freq\n");
-			rc = -EPERM;
 			break;
 		}
 		rc = audaac_in_enable(audio);

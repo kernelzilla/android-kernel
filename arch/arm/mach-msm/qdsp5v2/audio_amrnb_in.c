@@ -461,6 +461,20 @@ static long audamrnb_in_ioctl(struct file *file,
 	mutex_lock(&audio->lock);
 	switch (cmd) {
 	case AUDIO_START: {
+		uint32_t freq;
+		freq = 48000;
+		MM_DBG("AUDIO_START\n");
+		rc = msm_snddev_request_freq(&freq, audio->enc_id,
+					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
+		MM_DBG("sample rate configured %d\n", freq);
+		if (rc < 0) {
+			MM_DBG(" Sample rate can not be set, return code %d\n",
+								 rc);
+			msm_snddev_withdraw_freq(audio->enc_id,
+					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
+			MM_DBG("msm_snddev_withdraw_freq\n");
+			break;
+		}
 		rc = audamrnb_in_enable(audio);
 		if (!rc) {
 			rc =
@@ -477,6 +491,9 @@ static long audamrnb_in_ioctl(struct file *file,
 	}
 	case AUDIO_STOP: {
 		rc = audamrnb_in_disable(audio);
+		rc = msm_snddev_withdraw_freq(audio->enc_id,
+					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
+		MM_DBG("msm_snddev_withdraw_freq\n");
 		audio->stopped = 1;
 		break;
 	}
@@ -654,6 +671,10 @@ static int audamrnb_in_release(struct inode *inode, struct file *file)
 	MM_DBG("\n");
 	mutex_lock(&audio->lock);
 	audio->in_call = 0;
+	/* with draw frequency for session
+	   incase not stopped the driver */
+	msm_snddev_withdraw_freq(audio->enc_id, SNDDEV_CAP_TX,
+					AUDDEV_CLNT_ENC);
 	auddev_unregister_evt_listner(AUDDEV_CLNT_ENC, audio->enc_id);
 	audamrnb_in_disable(audio);
 	audamrnb_in_flush(audio);
