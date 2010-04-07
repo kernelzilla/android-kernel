@@ -157,7 +157,8 @@ static inline void au_h_dentry_init(struct au_hdentry *hdentry)
 
 static inline void au_hdput(struct au_hdentry *hd)
 {
-	dput(hd->hd_dentry);
+	if (hd)
+		dput(hd->hd_dentry);
 }
 
 static inline aufs_bindex_t au_dbstart(struct dentry *dentry)

@@ -185,16 +185,18 @@ static int au_reopen_wh(struct file *file, aufs_bindex_t btgt,
 	aufs_bindex_t bstart;
 	struct au_dinfo *dinfo;
 	struct dentry *h_dentry;
+	struct au_hdentry *hdp;
 
 	dinfo = au_di(file->f_dentry);
 	AuRwMustWriteLock(&dinfo->di_rwsem);
 
 	bstart = dinfo->di_bstart;
 	dinfo->di_bstart = btgt;
-	h_dentry = dinfo->di_hdentry[0 + btgt].hd_dentry;
-	dinfo->di_hdentry[0 + btgt].hd_dentry = hi_wh;
+	hdp = dinfo->di_hdentry;
+	h_dentry = hdp[0 + btgt].hd_dentry;
+	hdp[0 + btgt].hd_dentry = hi_wh;
 	err = au_reopen_nondir(file);
-	dinfo->di_hdentry[0 + btgt].hd_dentry = h_dentry;
+	hdp[0 + btgt].hd_dentry = h_dentry;
 	dinfo->di_bstart = bstart;
 
 	return err;
