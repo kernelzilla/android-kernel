@@ -77,11 +77,8 @@ void au_di_fin(struct dentry *dentry)
 	if (bindex >= 0) {
 		bend = di->di_bend;
 		p = di->di_hdentry + bindex;
-		while (bindex++ <= bend) {
-			if (p->hd_dentry)
-				au_hdput(p);
-			p++;
-		}
+		while (bindex++ <= bend)
+			au_hdput(p++);
 	}
 	kfree(di->di_hdentry);
 	AuRwDestroy(&di->di_rwsem);
@@ -299,8 +296,7 @@ void au_set_h_dptr(struct dentry *dentry, aufs_bindex_t bindex,
 
 	DiMustWriteLock(dentry);
 
-	if (hd->hd_dentry)
-		au_hdput(hd);
+	au_hdput(hd);
 	hd->hd_dentry = h_dentry;
 }
 
