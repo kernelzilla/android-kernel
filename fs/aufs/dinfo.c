@@ -77,11 +77,8 @@ void au_di_fin(struct dentry *dentry)
 	if (bindex >= 0) {
 		bend = di->di_bend;
 		p = di->di_hdentry + bindex;
-		while (bindex++ <= bend) {
-			if (p->hd_dentry)
-				au_hdput(p);
-			p++;
-		}
+		while (bindex++ <= bend)
+			au_hdput(p++);
 	}
 	kfree(di->di_hdentry);
 	AuRwDestroy(&di->di_rwsem);
@@ -299,8 +296,7 @@ void au_set_h_dptr(struct dentry *dentry, aufs_bindex_t bindex,
 
 	DiMustWriteLock(dentry);
 
-	if (hd->hd_dentry)
-		au_hdput(hd);
+	au_hdput(hd);
 	hd->hd_dentry = h_dentry;
 }
 
@@ -314,6 +310,7 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 {
 	struct au_dinfo *dinfo;
 	struct dentry *h_d;
+	struct au_hdentry *hdp;
 
 	DiMustWriteLock(dentry);
 
@@ -321,12 +318,13 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 	if (!dinfo || dinfo->di_bstart < 0)
 		return;
 
+	hdp = dinfo->di_hdentry;
 	if (do_put_zero) {
 		aufs_bindex_t bindex, bend;
 
 		bend = dinfo->di_bend;
 		for (bindex = dinfo->di_bstart; bindex <= bend; bindex++) {
-			h_d = dinfo->di_hdentry[0 + bindex].hd_dentry;
+			h_d = hdp[0 + bindex].hd_dentry;
 			if (h_d && !h_d->d_inode)
 				au_set_h_dptr(dentry, bindex, NULL);
 		}
@@ -334,7 +332,7 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 
 	dinfo->di_bstart = -1;
 	while (++dinfo->di_bstart <= dinfo->di_bend)
-		if (dinfo->di_hdentry[0 + dinfo->di_bstart].hd_dentry)
+		if (hdp[0 + dinfo->di_bstart].hd_dentry)
 			break;
 	if (dinfo->di_bstart > dinfo->di_bend) {
 		dinfo->di_bstart = -1;
@@ -344,7 +342,7 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 
 	dinfo->di_bend++;
 	while (0 <= --dinfo->di_bend)
-		if (dinfo->di_hdentry[0 + dinfo->di_bend].hd_dentry)
+		if (hdp[0 + dinfo->di_bend].hd_dentry)
 			break;
 	AuDebugOn(dinfo->di_bstart > dinfo->di_bend || dinfo->di_bend < 0);
 }
