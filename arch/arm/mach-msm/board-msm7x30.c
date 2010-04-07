@@ -1946,7 +1946,7 @@ static void __init msm_qsd_spi_init(void)
 	qsd_device_spi.dev.platform_data = &qsd_spi_pdata;
 }
 
-#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_MSM_OTG_72K
 static int hsusb_rpc_connect(int connect)
 {
 	if (connect)
@@ -1954,12 +1954,16 @@ static int hsusb_rpc_connect(int connect)
 	else
 		return msm_hsusb_rpc_close();
 }
+#endif
 
+#if defined(CONFIG_USB_MSM_OTG_72K) || defined(CONFIG_USB_EHCI_MSM)
 static int msm_hsusb_rpc_phy_reset(void __iomem *addr)
 {
 	return msm_hsusb_phy_reset();
 }
+#endif
 
+#ifdef CONFIG_USB_MSM_OTG_72K
 static int ldo_on;
 static struct vreg *usb_vreg;
 static int msm_pmic_enable_ldo(int enable)
@@ -2006,8 +2010,50 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.pmic_vbus_irq	= 1,
 };
 
+#ifdef CONFIG_USB_GADGET
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;
 #endif
+#endif
+
+#ifdef CONFIG_USB_EHCI_MSM
+static void msm_hsusb_vbus_power(unsigned phy_info, int on)
+{
+	int rc;
+	static int vbus_is_on;
+	struct pm8058_gpio usb_vbus = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.pull           = PM_GPIO_PULL_NO,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 1,
+		.vin_sel        = 2,
+		.out_strength   = PM_GPIO_STRENGTH_MED,
+		.function       = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol    = 0,
+	};
+
+	/* If VBUS is already on (or off), do nothing. */
+	if (unlikely(on == vbus_is_on))
+		return;
+
+	if (on) {
+		rc = pm8058_gpio_config(36, &usb_vbus);
+		if (rc) {
+			pr_err("%s PMIC GPIO 36 write failed\n", __func__);
+			return;
+		}
+	} else
+		gpio_set_value(PM8058_GPIO_PM_TO_SYS(36), 0);
+
+	vbus_is_on = on;
+}
+
+static struct msm_usb_host_platform_data msm_usb_host_pdata = {
+	.phy_info   = (USB_PHY_INTEGRATED | USB_PHY_MODEL_45NM),
+	.phy_reset  = msm_hsusb_rpc_phy_reset,
+	.vbus_power = msm_hsusb_vbus_power,
+};
+#endif
+
 static struct android_pmem_platform_data android_pmem_pdata = {
 	.name = "pmem",
 	.allocator_type = PMEM_ALLOCATORTYPE_ALLORNOTHING,
@@ -3070,9 +3116,13 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_hsusb_peripheral,
 	&mass_storage_device,
 #endif
-#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_MSM_OTG_72K
 	&msm_device_otg,
+#ifdef CONFIG_USB_GADGET
 	&msm_device_gadget_peripheral,
+#endif
+#endif
+#ifdef CONFIG_USB_ANDROID
 	&android_usb_device,
 #endif
 	&qsd_device_spi,
@@ -3647,17 +3697,23 @@ static void __init msm7x30_init(void)
 		[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency;
 	msm_device_hsusb_peripheral.dev.platform_data = &msm_hsusb_pdata;
 #endif
-#ifdef CONFIG_USB_ANDROID
+
+#ifdef CONFIG_USB_MSM_OTG_72K
+	msm_device_otg.dev.platform_data = &msm_otg_pdata;
+#ifdef CONFIG_USB_GADGET
 	msm_gadget_pdata.swfi_latency =
 		msm_pm_data
 		[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency;
-	msm_device_otg.dev.platform_data = &msm_otg_pdata;
 	msm_device_gadget_peripheral.dev.platform_data = &msm_gadget_pdata;
+#endif
 #endif
 	msm_uart_dm1_pdata.wakeup_irq = gpio_to_irq(136);
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 	rmt_storage_add_ramfs();
+#ifdef CONFIG_USB_EHCI_MSM
+	msm_add_host(0, &msm_usb_host_pdata);
+#endif
 	msm7x30_init_mmc();
 	msm_qsd_spi_init();
 	spi_register_board_info(msm_spi_board_info,
