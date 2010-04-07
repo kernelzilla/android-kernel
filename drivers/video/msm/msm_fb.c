@@ -1496,6 +1496,24 @@ int mdp_blit(struct fb_info *info, struct mdp_blit_req *req)
 	struct mdp_blit_req splitreq;
 	int s_x_0, s_x_1, s_w_0, s_w_1, s_y_0, s_y_1, s_h_0, s_h_1;
 	int d_x_0, d_x_1, d_w_0, d_w_1, d_y_0, d_y_1, d_h_0, d_h_1;
+
+	if (req->flags & MDP_ROT_90) {
+		if (((req->dst_rect.h == 1) && ((req->src_rect.w != 1) ||
+			(req->dst_rect.w != req->src_rect.h))) ||
+			((req->dst_rect.w == 1) && ((req->src_rect.h != 1) ||
+			(req->dst_rect.h != req->src_rect.w)))) {
+			printk(KERN_ERR "mpd_ppp: error scaling when size is 1!\n");
+			return -EINVAL;
+		}
+	} else {
+		if (((req->dst_rect.w == 1) && ((req->src_rect.w != 1) ||
+			(req->dst_rect.h != req->src_rect.h))) ||
+			((req->dst_rect.h == 1) && ((req->src_rect.h != 1) ||
+			(req->dst_rect.h != req->src_rect.h)))) {
+			printk(KERN_ERR "mpd_ppp: error scaling when size is 1!\n");
+			return -EINVAL;
+		}
+	}
 #endif
 	if (unlikely(req->src_rect.h == 0 || req->src_rect.w == 0)) {
 		printk(KERN_ERR "mpd_ppp: src img of zero size!\n");
@@ -1511,7 +1529,8 @@ int mdp_blit(struct fb_info *info, struct mdp_blit_req *req)
 	is_bpp_4 = (mdp_get_bytes_per_pixel(req->dst.format) == 4) ? 1 : 0;
 
 	if ((is_bpp_4 && (is_rem_6 || remainder == 14 || remainder == 22 ||
-		remainder == 30)) || remainder == 3 || remainder == 1) {
+		remainder == 30)) || remainder == 3 || (remainder == 1 &&
+		req->dst_rect.w != 1)) {
 		/* make new request as provide by user */
 		splitreq = *req;
 
@@ -1594,7 +1613,7 @@ int mdp_blit(struct fb_info *info, struct mdp_blit_req *req)
 		if (ret)
 			return ret;
 	} else if ((req->dst_rect.h % 32) == 3 ||
-		(req->dst_rect.h % 32) == 1)
+		((req->dst_rect.h % 32) == 1 && req->dst_rect.h != 1))
 		ret = mdp_blit_split_height(info, req);
 	else
 		ret = mdp_ppp_blit(info, req);
