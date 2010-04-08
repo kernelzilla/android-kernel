@@ -276,7 +276,7 @@ DSP_STATUS SleepDSP(struct WMD_DEV_CONTEXT *pDevContext, IN u32 dwCmd,
 				    &pwrState);
 	}
 
-	if (!timeout) {
+	if (pwrState != targetPwrState) {
 		pDevContext->dwBrdState = prev_state;
 		pr_err("Timed out waiting for DSP suspend %x\n", pwrState);
 #ifdef CONFIG_BRIDGE_NTFY_PWRERR
