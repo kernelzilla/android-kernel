@@ -98,6 +98,93 @@ static long hw3d_wait_for_interrupt(void)
 }
 
 #define HW3D_REGS_LEN 0x100000
+static long hw3d_wait_for_revoke(struct hw3d_info *info, struct file *filp)
+{
+	struct hw3d_data *data = filp->private_data;
+	int ret;
+
+	if (is_master(info, filp)) {
+		pr_err("%s: cannot revoke on master node\n", __func__);
+		return -EPERM;
+	}
+
+	ret = wait_event_interruptible(info->revoke_wq,
+				       info->revoking ||
+				       data->closing);
+	if (ret == 0 && data->closing)
+		ret = -EPIPE;
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
+static void locked_hw3d_client_done(struct hw3d_info *info, int had_timer)
+{
+	if (info->enabled) {
+		pr_debug("hw3d: was enabled\n");
+		info->enabled = 0;
+		clk_disable(info->grp_clk);
+		clk_disable(info->imem_clk);
+	}
+	info->revoking = 0;
+
+	/* double check that the irqs are disabled */
+	locked_hw3d_irq_disable(info);
+
+	if (had_timer)
+		wake_unlock(&info->wake_lock);
+	wake_up(&info->revoke_done_wq);
+}
+
+static void do_force_revoke(struct hw3d_info *info)
+{
+	unsigned long flags;
+
+	/* at this point, the task had a chance to relinquish the gpu, but
+	 * it hasn't. So, we kill it */
+	spin_lock_irqsave(&info->lock, flags);
+	pr_debug("hw3d: forcing revoke\n");
+	locked_hw3d_irq_disable(info);
+	if (info->client_task) {
+		pr_info("hw3d: force revoke from pid=%d\n",
+			info->client_task->pid);
+		force_sig(SIGKILL, info->client_task);
+		put_task_struct(info->client_task);
+		info->client_task = NULL;
+	}
+	locked_hw3d_client_done(info, 1);
+	pr_debug("hw3d: done forcing revoke\n");
+	spin_unlock_irqrestore(&info->lock, flags);
+}
+
+#define REVOKE_TIMEOUT		(2 * HZ)
+static void locked_hw3d_revoke(struct hw3d_info *info)
+{
+	/* force us to wait to suspend until the revoke is done. If the
+	 * user doesn't release the gpu, the timer will turn off the gpu,
+	 * and force kill the process. */
+	wake_lock(&info->wake_lock);
+	info->revoking = 1;
+	wake_up(&info->revoke_wq);
+	mod_timer(&info->revoke_timer, jiffies + REVOKE_TIMEOUT);
+}
+
+bool is_msm_hw3d_file(struct file *file)
+{
+	struct hw3d_info *info = hw3d_info;
+	if (MAJOR(file->f_dentry->d_inode->i_rdev) == MAJOR(info->devno) &&
+	    (is_master(info, file) || is_client(info, file)))
+		return 1;
+	return 0;
+}
+
+void put_msm_hw3d_file(struct file *file)
+{
+	if (!is_msm_hw3d_file(file))
+		return;
+	fput(file);
+}
+>>>>>>> ac0d24a... [ARM] msm: hw3d: bump the revoke timeout to 2 seconds
 
 static long hw3d_revoke_gpu(struct file *file)
 {
