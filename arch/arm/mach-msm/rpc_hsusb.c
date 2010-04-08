@@ -81,7 +81,7 @@ static int msm_hsusb_init_rpc_ids(unsigned long vers)
 		usb_rpc_ids.disable_pmic_ulpi_data0	= 19;
 		return 0;
 	} else {
-		printk(KERN_INFO "%s: no matches found for version\n",
+		pr_info("%s: no matches found for version\n",
 			__func__);
 		return -ENODATA;
 	}
@@ -110,13 +110,13 @@ int msm_hsusb_rpc_connect(void)
 {
 
 	if (usb_ep && !IS_ERR(usb_ep)) {
-		printk(KERN_INFO "%s: usb_ep already connected\n", __func__);
+		pr_info("%s: usb_ep already connected\n", __func__);
 		return 0;
 	}
 
 	/* Initialize rpc ids */
 	if (msm_hsusb_init_rpc_ids(0x00010001)) {
-		printk(KERN_ERR "%s: rpc ids initialization failed\n"
+		pr_err("%s: rpc ids initialization failed\n"
 			, __func__);
 		return -ENODATA;
 	}
@@ -126,12 +126,12 @@ int msm_hsusb_rpc_connect(void)
 					MSM_RPC_UNINTERRUPTIBLE);
 
 	if (IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: connect compatible failed vers = %lx\n",
+		pr_err("%s: connect compatible failed vers = %lx\n",
 			 __func__, usb_rpc_ids.vers_comp);
 
 		/* Initialize rpc ids */
 		if (msm_hsusb_init_rpc_ids(0x00010002)) {
-			printk(KERN_ERR "%s: rpc ids initialization failed\n",
+			pr_err("%s: rpc ids initialization failed\n",
 				__func__);
 			return -ENODATA;
 		}
@@ -141,11 +141,11 @@ int msm_hsusb_rpc_connect(void)
 	}
 
 	if (IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: connect compatible failed vers = %lx\n",
+		pr_err("%s: connect compatible failed vers = %lx\n",
 				__func__, usb_rpc_ids.vers_comp);
 		return -EAGAIN;
 	} else
-		printk(KERN_INFO "%s: rpc connect success vers = %lx\n",
+		pr_debug("%s: rpc connect success vers = %lx\n",
 				__func__, usb_rpc_ids.vers_comp);
 
 	return 0;
@@ -163,7 +163,7 @@ int msm_chg_rpc_connect(void)
 		return -ENOTSUPP;
 
 	if (chg_ep && !IS_ERR(chg_ep)) {
-		printk(KERN_INFO "%s: chg_ep already connected\n", __func__);
+		pr_debug("%s: chg_ep already connected\n", __func__);
 		return 0;
 	}
 
@@ -175,12 +175,12 @@ int msm_chg_rpc_connect(void)
 	if (!msm_chg_init_rpc(chg_vers))
 		goto chg_found;
 
-	printk(KERN_ERR "%s: connect compatible failed \n",
+	pr_err("%s: connect compatible failed \n",
 			__func__);
 	return -EAGAIN;
 
 chg_found:
-	printk(KERN_INFO "%s: connected to rpc vers = %x\n",
+	pr_debug("%s: connected to rpc vers = %x\n",
 			__func__, chg_vers);
 	return 0;
 }
@@ -195,7 +195,7 @@ int msm_hsusb_phy_reset(void)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: phy_reset rpc failed before call,"
+		pr_err("%s: phy_reset rpc failed before call,"
 			"rc = %ld\n", __func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -204,10 +204,10 @@ int msm_hsusb_phy_reset(void)
 				&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: phy_reset rpc failed! rc = %d\n",
+		pr_err("%s: phy_reset rpc failed! rc = %d\n",
 			__func__, rc);
 	} else
-		printk(KERN_INFO "msm_hsusb_phy_reset\n");
+		pr_debug("msm_hsusb_phy_reset\n");
 
 	return rc;
 }
@@ -222,7 +222,7 @@ int msm_hsusb_vbus_powerup(void)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: vbus_powerup rpc failed before call,"
+		pr_err("%s: vbus_powerup rpc failed before call,"
 			"rc = %ld\n", __func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -231,10 +231,10 @@ int msm_hsusb_vbus_powerup(void)
 		&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: vbus_powerup failed! rc = %d\n",
+		pr_err("%s: vbus_powerup failed! rc = %d\n",
 			__func__, rc);
 	} else
-		printk(KERN_INFO "msm_hsusb_vbus_powerup\n");
+		pr_debug("msm_hsusb_vbus_powerup\n");
 
 	return rc;
 }
@@ -249,7 +249,7 @@ int msm_hsusb_vbus_shutdown(void)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: vbus_shutdown rpc failed before call,"
+		pr_err("%s: vbus_shutdown rpc failed before call,"
 			"rc = %ld\n", __func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -258,10 +258,10 @@ int msm_hsusb_vbus_shutdown(void)
 		&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: vbus_shutdown failed! rc = %d\n",
+		pr_err("%s: vbus_shutdown failed! rc = %d\n",
 			__func__, rc);
 	} else
-		printk(KERN_INFO "msm_hsusb_vbus_shutdown\n");
+		pr_debug("msm_hsusb_vbus_shutdown\n");
 
 	return rc;
 }
@@ -276,7 +276,7 @@ int msm_hsusb_send_productID(uint32_t product_id)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: rpc connect failed: rc = %ld\n",
+		pr_err("%s: rpc connect failed: rc = %ld\n",
 			__func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -286,11 +286,11 @@ int msm_hsusb_send_productID(uint32_t product_id)
 				&req, sizeof(req),
 				5 * HZ);
 	if (rc < 0)
-		printk(KERN_ERR "%s: rpc call failed! error: %d\n",
+		pr_err("%s: rpc call failed! error: %d\n",
 			__func__, rc);
 	else
-		printk(KERN_ERR "%s: rpc call success\n" ,
-			__func__);
+		pr_debug("%s: rpc call success\n" , __func__);
+
 	return rc;
 }
 EXPORT_SYMBOL(msm_hsusb_send_productID);
@@ -305,7 +305,7 @@ int msm_hsusb_send_serial_number(char *serial_number)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: rpc connect failed: rc = %ld\n",
+		pr_err("%s: rpc connect failed: rc = %ld\n",
 			__func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -317,11 +317,11 @@ int msm_hsusb_send_serial_number(char *serial_number)
 				&req, sizeof(req),
 				5 * HZ);
 	if (rc < 0)
-		printk(KERN_ERR "%s: rpc call failed! error: %d\n",
+		pr_err("%s: rpc call failed! error: %d\n",
 			__func__, rc);
 	else
-		printk(KERN_ERR "%s: rpc call success\n" ,
-			__func__);
+		pr_debug("%s: rpc call success\n", __func__);
+
 	return rc;
 }
 EXPORT_SYMBOL(msm_hsusb_send_serial_number);
@@ -335,12 +335,12 @@ int msm_hsusb_is_serial_num_null(uint32_t val)
 	} req;
 
 	if (!usb_ep || IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: rpc connect failed: rc = %ld\n",
+		pr_err("%s: rpc connect failed: rc = %ld\n",
 			__func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
 	if (!usb_rpc_ids.update_is_serial_num_null) {
-		printk(KERN_ERR "%s: proc id not supported \n", __func__);
+		pr_err("%s: proc id not supported \n", __func__);
 		return -ENODATA;
 	}
 
@@ -349,11 +349,10 @@ int msm_hsusb_is_serial_num_null(uint32_t val)
 				&req, sizeof(req),
 				5 * HZ);
 	if (rc < 0)
-		printk(KERN_ERR "%s: rpc call failed! error: %d\n" ,
+		pr_err("%s: rpc call failed! error: %d\n" ,
 			__func__, rc);
 	else
-		printk(KERN_ERR "%s: rpc call success\n" ,
-			__func__);
+		pr_debug("%s: rpc call success\n", __func__);
 
 	return rc;
 }
@@ -374,10 +373,10 @@ int msm_chg_usb_charger_connected(uint32_t device)
 			&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: charger_connected failed! rc = %d\n",
+		pr_err("%s: charger_connected failed! rc = %d\n",
 			__func__, rc);
 	} else
-		printk(KERN_INFO "msm_chg_usb_charger_connected\n");
+		pr_debug("msm_chg_usb_charger_connected\n");
 
 	return rc;
 }
@@ -398,10 +397,10 @@ int msm_chg_usb_i_is_available(uint32_t sample)
 			&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: charger_i_available failed! rc = %d\n",
+		pr_err("%s: charger_i_available failed! rc = %d\n",
 			__func__, rc);
 	} else
-		pr_info("msm_chg_usb_i_is_available(%u)\n", sample);
+		pr_debug("msm_chg_usb_i_is_available(%u)\n", sample);
 
 	return rc;
 }
@@ -420,10 +419,10 @@ int msm_chg_usb_i_is_not_available(void)
 			&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: charger_i_not_available failed! rc ="
+		pr_err("%s: charger_i_not_available failed! rc ="
 			"%d \n", __func__, rc);
 	} else
-		printk(KERN_INFO "msm_chg_usb_i_is_not_available\n");
+		pr_debug("msm_chg_usb_i_is_not_available\n");
 
 	return rc;
 }
@@ -442,10 +441,10 @@ int msm_chg_usb_charger_disconnected(void)
 			&req, sizeof(req), 5 * HZ);
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: charger_disconnected failed! rc = %d\n",
+		pr_err("%s: charger_disconnected failed! rc = %d\n",
 			__func__, rc);
 	} else
-		printk(KERN_INFO "msm_chg_usb_charger_disconnected\n");
+		pr_debug("msm_chg_usb_charger_disconnected\n");
 
 	return rc;
 }
@@ -457,7 +456,7 @@ int msm_hsusb_rpc_close(void)
 	int rc = 0;
 
 	if (IS_ERR(usb_ep)) {
-		printk(KERN_ERR "%s: rpc_close failed before call, rc = %ld\n",
+		pr_err("%s: rpc_close failed before call, rc = %ld\n",
 			__func__, PTR_ERR(usb_ep));
 		return -EAGAIN;
 	}
@@ -466,11 +465,11 @@ int msm_hsusb_rpc_close(void)
 	usb_ep = NULL;
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: close rpc failed! rc = %d\n",
+		pr_err("%s: close rpc failed! rc = %d\n",
 			__func__, rc);
 		return -EAGAIN;
 	} else
-		printk(KERN_INFO "rpc close success\n");
+		pr_debug("rpc close success\n");
 
 	return rc;
 }
@@ -482,7 +481,7 @@ int msm_chg_rpc_close(void)
 	int rc = 0;
 
 	if (IS_ERR(chg_ep)) {
-		printk(KERN_ERR "%s: rpc_close failed before call, rc = %ld\n",
+		pr_err("%s: rpc_close failed before call, rc = %ld\n",
 			__func__, PTR_ERR(chg_ep));
 		return -EAGAIN;
 	}
@@ -491,11 +490,11 @@ int msm_chg_rpc_close(void)
 	chg_ep = NULL;
 
 	if (rc < 0) {
-		printk(KERN_ERR "%s: close rpc failed! rc = %d\n",
+		pr_err("%s: close rpc failed! rc = %d\n",
 			__func__, rc);
 		return -EAGAIN;
 	} else
-		printk(KERN_INFO "rpc close success\n");
+		pr_debug("rpc close success\n");
 
 	return rc;
 }
