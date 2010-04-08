@@ -106,6 +106,7 @@ static int update_resource_level(struct shared_resource *resp)
 	unsigned long target_level;
 	int ret;
 
+	mutex_lock(&resp->resource_mutex);
 	/* Regenerate the target_value for the resource */
 	if (resp->flags & RES_TYPE_PERFORMANCE) {
 		target_level = RES_PERFORMANCE_DEFAULTLEVEL;
@@ -118,9 +119,11 @@ static int update_resource_level(struct shared_resource *resp)
 			if (user->level < target_level)
 				target_level = user->level;
 	} else {
+		mutex_unlock(&resp->resource_mutex);
 		pr_debug("SRF: Unknown resource type\n");
 		return -EINVAL;
 	}
+	mutex_unlock(&resp->resource_mutex);
 
 	pr_debug("SRF: Changing Level for resource %s to %ld\n",
 				resp->name, target_level);
