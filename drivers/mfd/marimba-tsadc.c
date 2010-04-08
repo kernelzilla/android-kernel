@@ -320,12 +320,17 @@ static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 	tsadc->dev	= &pdev->dev;
 	tsadc->pdata = pdev->dev.platform_data;
 
+	if (tsadc->pdata->init) {
+		rc = tsadc->pdata->init();
+		if (rc < 0)
+			goto fail_tsadc_init;
+	}
+
 	if (tsadc->pdata->marimba_tsadc_power) {
 		rc = tsadc->pdata->marimba_tsadc_power(1);
 		if (rc) {
 			pr_err("%s: Unable to power up TSADC \n", __func__);
-			kfree(tsadc);
-			return rc;
+			goto fail_tsadc_power;
 		}
 	}
 
@@ -334,18 +339,28 @@ static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 	tsadc_dev = tsadc;
 
 	return rc;
+fail_tsadc_power:
+	if (tsadc->pdata->exit)
+		rc = tsadc->pdata->exit();
+fail_tsadc_init:
+	kfree(tsadc);
+	return rc;
 }
 
 static int __devexit marimba_tsadc_remove(struct platform_device *pdev)
 {
+	int rc = 0;
 	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
 
+	if (tsadc->pdata->exit)
+		rc = tsadc->pdata->exit();
+
 	if (tsadc->pdata->marimba_tsadc_power)
-		tsadc->pdata->marimba_tsadc_power(0);
+		rc = tsadc->pdata->marimba_tsadc_power(0);
 
 	platform_set_drvdata(pdev, NULL);
 	kfree(tsadc);
-	return 0;
+	return rc;
 }
 
 #ifdef CONFIG_PM
