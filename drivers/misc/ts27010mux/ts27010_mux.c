@@ -148,6 +148,8 @@ static struct ts0710_con ts0710_connection;
 
 static int debug = 0;
 
+module_param_named(debug_level, debug, int, S_IRUGO | S_IWUSR);
+
 #define ts_debug(level, format, arg...)	do {	\
 	if (debug & level)			\
 		pr_debug(format , ## arg);	\
