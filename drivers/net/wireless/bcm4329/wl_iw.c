@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.10 2010/03/25 07:22:21 Exp $
+ * $Id: wl_iw.c,v 1.51.4.9.2.6.4.90 2010/03/31 18:03:04 Exp $
  */
 
 
@@ -56,6 +56,9 @@ typedef const struct si_pub  si_t;
 
 #include <wl_iw.h>
 
+
+#define IW_WSEC_ENABLED(wsec)	((wsec) & (WEP_ENABLED | TKIP_ENABLED | AES_ENABLED))
+
 #include <linux/rtnetlink.h>
 #include <linux/mutex.h>
 
@@ -68,6 +71,9 @@ static struct net_device *priv_dev;
 static bool ap_cfg_running = FALSE;
 static bool ap_fw_loaded = FALSE;
 static int ap_mode = 0;
+struct net_device *ap_net_dev = NULL;
+struct semaphore  ap_eth_sema;
+static int wl_iw_set_ap_security(struct net_device *dev, struct ap_profile *ap);
 #endif
 
 #define WL_IW_IOCTL_CALL(func_call) \
@@ -4200,6 +4206,20 @@ wl_iw_set_wpaauth(
 			val |= iw->pwsec;
 		}
 
+		if (iw->privacy_invoked && !val) {
+			WL_WSEC(("%s: %s: 'Privacy invoked' TRUE but clearing wsec, assuming "
+				"we're a WPS enrollee\n", dev->name, __FUNCTION__));
+			if ((error = dev_wlc_intvar_set(dev, "is_WPS_enrollee", TRUE))) {
+				WL_WSEC(("Failed to set iovar is_WPS_enrollee\n"));
+				return error;
+			}
+		} else if (val) {
+			if ((error = dev_wlc_intvar_set(dev, "is_WPS_enrollee", FALSE))) {
+				WL_WSEC(("Failed to clear iovar is_WPS_enrollee\n"));
+				return error;
+			}
+		}
+
 		if ((error = dev_wlc_intvar_set(dev, "wsec", val)))
 			return error;
 
@@ -4278,20 +4298,35 @@ wl_iw_set_wpaauth(
 		WL_INFORM(("%s: IW_AUTH_ROAMING_CONTROL\n", __FUNCTION__));
 		
 		break;
-	case IW_AUTH_PRIVACY_INVOKED:
-		WL_INFORM(("%s: IW_AUTH_PRIVACY_INVOKED\n", __FUNCTION__));
-		/* if paramval is zero, allow association to AP with encryption while
-		 * wsec is not set in the driver. If set to 1, restore default wsec_restrict value
-		 */
-		WL_INFORM(("%s: IW_AUTH_PRIVACY_INVOKED %u\n", __FUNCTION__,
-			paramval));
+	case IW_AUTH_PRIVACY_INVOKED: {
+		int wsec;
 
-		if ((error = dev_wlc_intvar_set(dev, "wsec_restrict", !paramval))) {
-			WL_ERROR(("%s: FAILED IW_AUTH_PRIVACY_INVOKED %u\n", __FUNCTION__,
-				paramval));
-			return error;
+		if (paramval == 0) {
+			iw->privacy_invoked = FALSE;
+			if ((error = dev_wlc_intvar_set(dev, "is_WPS_enrollee", FALSE))) {
+				WL_WSEC(("Failed to clear iovar is_WPS_enrollee\n"));
+				return error;
+			}
+		} else {
+			iw->privacy_invoked = TRUE;
+			if ((error = dev_wlc_intvar_get(dev, "wsec", &wsec)))
+				return error;
+
+			if (!(IW_WSEC_ENABLED(wsec))) {
+
+				if ((error = dev_wlc_intvar_set(dev, "is_WPS_enrollee", TRUE))) {
+					WL_WSEC(("Failed to set iovar is_WPS_enrollee\n"));
+					return error;
+				}
+			} else {
+				if ((error = dev_wlc_intvar_set(dev, "is_WPS_enrollee", FALSE))) {
+					WL_WSEC(("Failed to clear iovar is_WPS_enrollee\n"));
+					return error;
+				}
+			}
 		}
 		break;
+	}
 #endif
 	default:
 		break;
@@ -4400,7 +4435,7 @@ wl_iw_get_wpaauth(
 		
 		break;
 	case IW_AUTH_PRIVACY_INVOKED:
-		WL_ERROR(("%s: IW_AUTH_PRIVACY_INVOKED\n", __FUNCTION__));
+		paramval = iw->privacy_invoked;
 		break;
 #endif 
 	}
@@ -4571,11 +4606,6 @@ int get_user_params(char *user_params, struct iw_point *dwrq)
 
 
 #ifdef SOFTAP
-
-struct net_device *ap_net_dev = NULL;
-struct semaphore  ap_eth_sema;
-static int wl_iw_set_ap_security(struct net_device *dev, struct ap_profile *ap);
-
 
 static int thr_wait_for_2nd_eth_dev(void *data)
 {
@@ -5022,7 +5052,6 @@ static int iwpriv_softap_stop(struct net_device *dev,
 	char *ext)
 {
 	int res = 0;
-	char buf[128];
 
 	WL_SOFTAP(("got iwpriv AP_BSS_STOP\n"));
 
@@ -5030,10 +5059,6 @@ static int iwpriv_softap_stop(struct net_device *dev,
 		WL_ERROR(("%s: dev is null\n", __FUNCTION__));
 		return res;
 	}
-
-	/* Make sure that interface is UP */
-	strcpy(buf, "cur_etheraddr");
-	dev_wlc_ioctl(dev, WLC_GET_VAR, buf, sizeof(buf));
 
 	res = wl_iw_softap_deassoc_stations(ap_net_dev);
 

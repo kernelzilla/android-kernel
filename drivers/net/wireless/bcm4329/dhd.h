@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h,v 1.32.4.7.2.4.14.27 2010/01/19 06:42:55 Exp $
+ * $Id: dhd.h,v 1.32.4.7.2.4.14.29 2010/02/23 06:58:21 Exp $
  */
 
 /****************
@@ -59,10 +59,6 @@
 
 #include <wlioctl.h>
 
-#if defined(NDIS60)
-#include <wdf.h>
-#include <WdfMiniport.h>
-#endif 
 
 /* Forward decls */
 struct dhd_bus;
@@ -148,17 +144,6 @@ typedef struct dhd_pub {
 
 	uint8 country_code[WLC_CNTRY_BUF_SZ];
 } dhd_pub_t;
-
-#if defined(NDIS60)
-
-typedef struct _wdf_device_info {
-	dhd_pub_t *dhd;
-} wdf_device_info_t;
-
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(wdf_device_info_t, dhd_get_wdf_device_info)
-
-
-#endif /* NDIS60 && !UNDERC_CE */
 
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 
