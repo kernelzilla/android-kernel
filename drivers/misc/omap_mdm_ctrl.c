@@ -1,5 +1,5 @@
 /*
-     Copyright (C) 2009 Motorola, Inc.
+     Copyright (C) 2010 Motorola, Inc.
 
      This program is free software; you can redistribute it and/or modify
      it under the terms of the GNU General Public License version 2 as
@@ -519,8 +519,8 @@ static int __devexit omap_mdm_ctrl_remove(struct platform_device *pdev)
 	return 0;
 }
 
-/* Initiate modem power down */
-static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
+/* Attempt to power off the modem */
+static void omap_mdm_ctrl_power_off_modem(void)
 {
 	int i;
 	int pd_failure = 1;
@@ -537,7 +537,7 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 	pr_info("%s: Initiate modem power down...\n", __func__);
 	/* Press modem Power Button */
 	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 1);
-	msleep(100);
+	mdelay(100);
 	gpio_set_value(omap_mdm_ctrl_data.gpios[BP_PWRON].gpio, 0);
 	/* Wait up to 5 seconds for the modem to properly power down */
 	for (i = 0; i < 10; i++) {
@@ -546,7 +546,7 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 			pd_failure = 0;
 			break;
 		} else
-			msleep(500);
+			mdelay(500);
 	}
 
 	if (pd_failure) {
@@ -554,14 +554,31 @@ static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
 		pr_info("%s: Modem pd failure.  Pull power.\n", __func__);
 		gpio_set_value(
 			omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 1);
-		msleep(5);
+		mdelay(5);
 		gpio_set_value(
 			omap_mdm_ctrl_data.gpios[AP_TO_BP_PSHOLD].gpio, 0);
 	}
-
-	/* Re-enable ability to notify clients of bp reset activity */
-	enable_irq(omap_mdm_ctrl_data.gpios[BP_RESOUT].irq);
 }
+
+/* Called in the event of a kernel panic */
+static int omap_mdm_ctrl_panic_handler(struct notifier_block *this,
+				       unsigned long event, void *ptr)
+{
+	pr_info("%s: Kernel panic detected, power down modem.\n", __func__);
+	omap_mdm_ctrl_power_off_modem();
+	return NOTIFY_DONE;
+}
+
+/* Called in the event the kernel is shutting down */
+static void __devexit omap_mdm_ctrl_shutdown(struct platform_device *pdev)
+{
+	pr_info("%s: Kernel shutdown detected, power down modem.\n", __func__);
+	omap_mdm_ctrl_power_off_modem();
+}
+
+static struct notifier_block panic_notifier = {
+	.notifier_call = omap_mdm_ctrl_panic_handler,
+};
 
 static struct platform_driver omap_mdm_ctrl_driver = {
 	.probe = omap_mdm_ctrl_probe,
@@ -575,11 +592,13 @@ static struct platform_driver omap_mdm_ctrl_driver = {
 
 static int __init omap_mdm_ctrl_os_init(void)
 {
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_notifier);
 	return platform_driver_register(&omap_mdm_ctrl_driver);
 }
 
 static void __exit omap_mdm_ctrl_os_exit(void)
 {
+	atomic_notifier_chain_unregister(&panic_notifier_list, &panic_notifier);
 	platform_driver_unregister(&omap_mdm_ctrl_driver);
 }
 
@@ -588,5 +607,5 @@ module_exit(omap_mdm_ctrl_os_exit);
 
 MODULE_AUTHOR("Motorola");
 MODULE_DESCRIPTION("OMAP Modem Control Driver");
-MODULE_VERSION("1.1.3");
+MODULE_VERSION("1.1.4");
 MODULE_LICENSE("GPL");
