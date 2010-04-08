@@ -234,6 +234,7 @@ struct msm_battery_info {
 	struct power_supply *msm_psy_ac;
 	struct power_supply *msm_psy_usb;
 	struct power_supply *msm_psy_batt;
+	struct power_supply *current_ps;
 
 	struct msm_rpc_client *batt_client;
 	struct msm_rpc_endpoint *chg_ep;
@@ -622,23 +623,28 @@ static void msm_batt_update_psy_status(void)
 		}
 	}
 
-	if (msm_batt_info.battery_voltage != battery_voltage) {
-		DBG_LIMIT("BATT: New voltage = %u mV\n", battery_voltage);
-		msm_batt_info.batt_capacity =
-			msm_batt_info.calculate_capacity(battery_voltage);
-	}
-
-	if (supp) {
-		DBG_LIMIT("BATT: supply = %s\n", supp->name);
-		power_supply_changed(supp);
-	}
-
 	msm_batt_info.charger_status 	= charger_status;
 	msm_batt_info.charger_type 	= charger_type;
 	msm_batt_info.battery_status 	= battery_status;
 	msm_batt_info.battery_level 	= battery_level;
-	msm_batt_info.battery_voltage  	= battery_voltage;
 	msm_batt_info.battery_temp 	= battery_temp;
+
+	if (msm_batt_info.battery_voltage != battery_voltage) {
+		msm_batt_info.battery_voltage  	= battery_voltage;
+		msm_batt_info.batt_capacity =
+			msm_batt_info.calculate_capacity(battery_voltage);
+		DBG_LIMIT("BATT: voltage = %u mV [capacity = %d%%]\n",
+			 battery_voltage, msm_batt_info.batt_capacity);
+
+		if (!supp)
+			supp = msm_batt_info.current_ps;
+	}
+
+	if (supp) {
+		msm_batt_info.current_ps = supp;
+		DBG_LIMIT("BATT: Supply = %s\n", supp->name);
+		power_supply_changed(supp);
+	}
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1077,8 +1083,13 @@ static u32 msm_batt_capacity(u32 current_voltage)
 	u32 low_voltage = msm_batt_info.voltage_min_design;
 	u32 high_voltage = msm_batt_info.voltage_max_design;
 
-	return (current_voltage - low_voltage) * 100
-		/ (high_voltage - low_voltage);
+	if (current_voltage <= low_voltage)
+		return 0;
+	else if (current_voltage >= high_voltage)
+		return 100;
+	else
+		return (current_voltage - low_voltage) * 100
+			/ (high_voltage - low_voltage);
 }
 
 
