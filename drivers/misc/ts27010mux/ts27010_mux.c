@@ -373,8 +373,8 @@ static int ts0710_pkt_send(struct ts0710_con *ts0710, u8 *data)
 			 data, TS0710_FRAME_SIZE(len));
 
 	if (!ts27010mux_tty) {
-		pr_warn("ts27010: ldisc closed.  discarding %d bytes\n",
-			TS0710_FRAME_SIZE(len));
+		pr_warning("ts27010: ldisc closed.  discarding %d bytes\n",
+			   TS0710_FRAME_SIZE(len));
 		return TS0710_FRAME_SIZE(len);
 	}
 
