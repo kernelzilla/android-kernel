@@ -185,8 +185,7 @@ qup_i2c_interrupt(int irq, void *devid)
 		err = -status;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1)
-			writel((status & I2C_STATUS_ERROR_MASK),
-				dev->base + QUP_I2C_STATUS);
+			writel(QUP_RESET_STATE, dev->base+QUP_STATE);
 		goto intr_done;
 	}
 
@@ -558,7 +557,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		enable_irq(dev->out_irq);
 	}
 	enable_irq(dev->err_irq);
-	writel(QUP_RESET_STATE, dev->base + QUP_STATE);
+	writel(1, dev->base + QUP_SW_RESET);
 	ret = qup_i2c_poll_state(dev, QUP_RESET_STATE);
 	if (ret) {
 		dev_err(dev->dev, "QUP Busy:Trying to recover\n");
@@ -566,7 +565,6 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	}
 
 	/* Initialize QUP registers */
-	writel(1, dev->base + QUP_SW_RESET);
 	writel(0, dev->base + QUP_CONFIG);
 	writel(QUP_OPERATIONAL_RESET, dev->base + QUP_OPERATIONAL);
 	writel(QUP_STATUS_ERROR_FLAGS, dev->base + QUP_ERROR_FLAGS_EN);
@@ -678,7 +676,6 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 			if (!timeout) {
 				dev_err(dev->dev, "Transaction timed out\n");
 				writel(1, dev->base + QUP_SW_RESET);
-				msleep(10);
 				ret = -ETIMEDOUT;
 				goto out_err;
 			}
