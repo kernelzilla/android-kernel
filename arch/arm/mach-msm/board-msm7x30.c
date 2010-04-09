@@ -882,6 +882,14 @@ static int fm_radio_setup(struct marimba_fm_platform_data *pdata)
 			__func__, PTR_ERR(pdata->vreg_s2));
 		return -1;
 	}
+
+	rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 1300);
+	if (rc < 0) {
+		printk(KERN_ERR "%s: voltage level vote failed (%d)\n",
+			__func__, rc);
+		return rc;
+	}
+
 	rc = vreg_enable(pdata->vreg_s2);
 	if (rc) {
 		printk(KERN_ERR "%s: vreg_enable() = %d \n",
@@ -914,7 +922,6 @@ fm_clock_vote_fail:
 	vreg_disable(pdata->vreg_s2);
 	return rc;
 
-
 };
 
 static void fm_radio_shutdown(struct marimba_fm_platform_data *pdata)
@@ -937,6 +944,10 @@ static void fm_radio_shutdown(struct marimba_fm_platform_data *pdata)
 					  PMAPP_CLOCK_VOTE_OFF);
 	if (rc < 0)
 		printk(KERN_ERR "%s: clock_vote return val: %d \n",
+						__func__, rc);
+	rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 0);
+	if (rc < 0)
+		printk(KERN_ERR "%s: vreg level vote return val: %d \n",
 						__func__, rc);
 }
 
