@@ -460,6 +460,8 @@ static struct resource resources_nand[] = {
 	},
 };
 
+#define PM8058_IRQ_CHGVAL 	(PMIC8058_IRQ_BASE + PM8058_GPIO_IRQS + \
+				PM8058_MPP_IRQS + 2)
 static struct resource resources_otg[] = {
 	{
 		.start	= MSM_HSUSB_PHYS,

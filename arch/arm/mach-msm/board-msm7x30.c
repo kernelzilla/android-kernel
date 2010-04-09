@@ -95,6 +95,14 @@
 #define PM8058_GPIO_PM_TO_SYS(pm_gpio)     (pm_gpio + NR_GPIO_IRQS)
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)    (sys_gpio - NR_GPIO_IRQS)
 
+#define PM8058_FIRST_IRQ 	PMIC8058_IRQ_BASE
+#define PM8058_FIRST_GPIO_IRQ	PM8058_FIRST_IRQ
+#define PM8058_FIRST_MPP_IRQ	(PM8058_FIRST_GPIO_IRQ + PM8058_GPIO_IRQS)
+#define PM8058_FIRST_MISC_IRQ	(PM8058_FIRST_MPP_IRQ + PM8058_MPP_IRQS)
+#define PM8058_IRQ_KEYPAD	PM8058_FIRST_MISC_IRQ
+#define PM8058_IRQ_KEYSTUCK	(PM8058_FIRST_MISC_IRQ + 1)
+#define PM8058_IRQ_CHGVAL	(PM8058_FIRST_MISC_IRQ + 2)
+
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
 	int rc;
@@ -349,7 +357,18 @@ static struct pmic8058_keypad_data fluid_keypad_data = {
 /* Put sub devices with fixed location first in sub_devices array */
 #define	PM8058_SUBDEV_KPD	0
 
+static struct pm8058_gpio_platform_data pm8058_gpio_data = {
+	.gpio_base	= PM8058_GPIO_PM_TO_SYS(0),
+	.irq_base	= PM8058_FIRST_IRQ,
+};
+
+static struct pm8058_gpio_platform_data pm8058_mpp_data = {
+	.gpio_base	= PM8058_GPIO_PM_TO_SYS(PM8058_GPIOS),
+	.irq_base	= PM8058_FIRST_MPP_IRQ,
+};
+
 static struct pm8058_platform_data pm8058_7x30_data = {
+	.irq_base = PMIC8058_IRQ_BASE,
 	.pm_irqs = {
 		[PM8058_IRQ_KEYPAD - PM8058_FIRST_IRQ] = 74,
 		[PM8058_IRQ_KEYSTUCK - PM8058_FIRST_IRQ] = 75,
@@ -364,8 +383,12 @@ static struct pm8058_platform_data pm8058_7x30_data = {
 			.resources	= resources_keypad,
 		},
 		{	.name = "pm8058-gpio",
+			.platform_data	= &pm8058_gpio_data,
+			.data_size	= sizeof(pm8058_gpio_data),
 		},
 		{	.name = "pm8058-mpp",
+			.platform_data	= &pm8058_mpp_data,
+			.data_size	= sizeof(pm8058_mpp_data),
 		},
 		{	.name = "pm8058-pwm",
 		},

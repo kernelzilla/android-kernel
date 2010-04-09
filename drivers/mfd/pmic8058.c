@@ -533,7 +533,7 @@ static void pm8058_irq_mask(unsigned int irq)
 	struct	pm8058_chip *chip = get_irq_data(irq);
 	u8	block, config;
 
-	irq -= PM8058_FIRST_IRQ;
+	irq -= chip->pdata.irq_base;
 	pm_irq = chip->pdata.pm_irqs[irq];
 	block = pm_irq / 8;
 	master = block / 8;
@@ -559,7 +559,7 @@ static void pm8058_irq_unmask(unsigned int irq)
 	struct	pm8058_chip *chip = get_irq_data(irq);
 	u8	block, config, old_irqs_allowed, old_blocks_allowed;
 
-	irq -= PM8058_FIRST_IRQ;
+	irq -= chip->pdata.irq_base;
 	pm_irq = chip->pdata.pm_irqs[irq];
 	block = pm_irq / 8;
 	master = block / 8;
@@ -603,7 +603,7 @@ static void pm8058_irq_ack(unsigned int irq)
 	struct	pm8058_chip *chip = get_irq_data(irq);
 	u8	block, config;
 
-	irq -= PM8058_FIRST_IRQ;
+	irq -= chip->pdata.irq_base;
 	pm_irq = chip->pdata.pm_irqs[irq];
 	block = pm_irq / 8;
 
@@ -618,7 +618,7 @@ static int pm8058_irq_set_type(unsigned int irq, unsigned int flow_type)
 	struct	pm8058_chip *chip = get_irq_data(irq);
 	u8	block, config;
 
-	irq -= PM8058_FIRST_IRQ;
+	irq -= chip->pdata.irq_base;
 	if (irq < (PM8058_GPIOS + PM8058_MPPS)) {
 		/* Create mapping for GPIO and MPP */
 		if (irq < PM8058_GPIOS)
@@ -628,7 +628,7 @@ static int pm8058_irq_set_type(unsigned int irq, unsigned int flow_type)
 				(irq - PM8058_GPIOS);
 
 		if (!chip->irq_i2e[pm_irq]) {
-			chip->irq_i2e[pm_irq] = irq + PM8058_FIRST_IRQ;
+			chip->irq_i2e[pm_irq] = irq + chip->pdata.irq_base;
 			chip->pdata.pm_irqs[irq] = pm_irq;
 
 			if (pm_irq > chip->pm_max_irq) {
@@ -669,7 +669,7 @@ static int pm8058_irq_set_wake(unsigned int irq, unsigned int on)
 {
 	struct	pm8058_chip *chip = get_irq_data(irq);
 
-	irq -= PM8058_FIRST_IRQ;
+	irq -= chip->pdata.irq_base;
 	if (on) {
 		if (!chip->wake_enable[irq]) {
 			chip->wake_enable[irq] = 1;
@@ -978,7 +978,7 @@ static int pm8058_probe(struct i2c_client *client,
 
 			pm8058_config_irq(chip, &block, &config);
 
-			chip->irq_i2e[pm_irq] = i + PM8058_FIRST_IRQ;
+			chip->irq_i2e[pm_irq] = i + pdata->irq_base;
 		}
 		if (pm_irq > chip->pm_max_irq)
 			chip->pm_max_irq = pm_irq;
@@ -999,7 +999,7 @@ static int pm8058_probe(struct i2c_client *client,
 	spin_lock_init(&chip->pm_lock);
 
 	/* Register for all reserved IRQs */
-	for (i = PM8058_FIRST_IRQ; i < (PM8058_FIRST_IRQ + PM8058_IRQS); i++) {
+	for (i = pdata->irq_base; i < (pdata->irq_base + PM8058_IRQS); i++) {
 		set_irq_chip(i, &pm8058_irq_chip);
 		set_irq_handler(i, handle_edge_irq);
 		set_irq_flags(i, IRQF_VALID);
@@ -1074,7 +1074,7 @@ static int pm8058_suspend(struct i2c_client *client, pm_message_t mesg)
 		if (chip->config[i] && !chip->wake_enable[i]) {
 			if (!((chip->config[i] & PM8058_IRQF_MASK_ALL)
 			      == PM8058_IRQF_MASK_ALL))
-				pm8058_irq_mask(i + PM8058_FIRST_IRQ);
+				pm8058_irq_mask(i + chip->pdata.irq_base);
 		}
 		spin_unlock_irqrestore(&chip->pm_lock, irqsave);
 	}
@@ -1098,7 +1098,7 @@ static int pm8058_resume(struct i2c_client *client)
 		if (chip->config[i] && !chip->wake_enable[i]) {
 			if (!((chip->config[i] & PM8058_IRQF_MASK_ALL)
 			      == PM8058_IRQF_MASK_ALL))
-				pm8058_irq_unmask(i + PM8058_FIRST_IRQ);
+				pm8058_irq_unmask(i + chip->pdata.irq_base);
 		}
 		spin_unlock_irqrestore(&chip->pm_lock, irqsave);
 	}

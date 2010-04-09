@@ -34,24 +34,16 @@
 #include <linux/irq.h>
 #include <linux/mfd/core.h>
 
+#define PM8058_GPIOS		40
+#define PM8058_MPPS		12
+
 /* PM8058 interrupt numbers */
-#define PM8058_FIRST_IRQ	PMIC8058_IRQ_BASE
-
-#define PM8058_FIRST_GPIO_IRQ	PM8058_FIRST_IRQ
-#define PM8058_FIRST_MPP_IRQ	(PM8058_FIRST_GPIO_IRQ + NR_PMIC8058_GPIO_IRQS)
-#define PM8058_FIRST_MISC_IRQ	(PM8058_FIRST_MPP_IRQ + NR_PMIC8058_MPP_IRQS)
-
-#define	PM8058_IRQ_KEYPAD	(PM8058_FIRST_MISC_IRQ)
-#define	PM8058_IRQ_KEYSTUCK	(PM8058_FIRST_MISC_IRQ + 1)
-#define PM8058_IRQ_CHGVAL	(PM8058_FIRST_MISC_IRQ + 2)
-
-#define PM8058_IRQS		NR_PMIC8058_IRQS
-
-#define PM8058_GPIOS		NR_PMIC8058_GPIO_IRQS
-#define PM8058_MPPS		NR_PMIC8058_MPP_IRQS
-
-/* IRQ# for GPIO number = 1 .. PM8058_GPIOS */
-#define PM8058_IRQ_GPIO(n)	(PM8058_FIRST_GPIO_IRQ + (n) - 1)
+#define PM8058_GPIO_IRQS	PM8058_GPIOS
+#define PM8058_MPP_IRQS		PM8058_MPPS
+#define PM8058_MISC_IRQS	8
+#define PM8058_IRQS		(PM8058_GPIO_IRQS + \
+				PM8058_MPP_IRQS + \
+				PM8058_MISC_IRQS)
 
 #define PM8058_MAX_SUBDEVICES	16
 
@@ -59,11 +51,17 @@ struct pm8058_chip;
 
 struct pm8058_platform_data {
 	/* This table is only needed for misc interrupts. */
+	int		irq_base;
 	unsigned int	pm_irqs[PM8058_IRQS];	/* block*8 + bit-pos */
 	int 		(*init)(struct pm8058_chip *pm_chip);
 
 	int		num_subdevs;
 	struct mfd_cell sub_devices[PM8058_MAX_SUBDEVICES];
+};
+
+struct pm8058_gpio_platform_data {
+	int	gpio_base;
+	int	irq_base;
 };
 
 /* GPIO parameters */

@@ -25,8 +25,6 @@
 #include <linux/mfd/pmic8058.h>
 #include "gpio_chip.h"
 
-#define PM8058_GPIO_TO_INT(n) (PMIC8058_IRQ_BASE + (n))
-
 static int pm8058_gpio_configure(struct qcom_gpio_chip *chip,
 				 unsigned int gpio,
 				 unsigned long flags)
@@ -73,8 +71,11 @@ static int pm8058_gpio_get_irq_num(struct qcom_gpio_chip *chip,
 				   unsigned int *irqp,
 				   unsigned long *irqnumflagsp)
 {
+	struct pm8058_gpio_platform_data *pdata;
+
+	pdata = chip->dev->platform_data;
 	gpio -= chip->start;
-	*irqp = PM8058_GPIO_TO_INT(gpio);
+	*irqp = pdata->irq_base + gpio;
 	if (irqnumflagsp)
 		*irqnumflagsp = 0;
 	return 0;
@@ -100,8 +101,6 @@ static int pm8058_gpio_write(struct qcom_gpio_chip *chip, unsigned n, unsigned o
 
 struct msm_gpio_chip pm8058_gpio_chip = {
 	.chip = {
-		.start = NR_GPIO_IRQS,
-		.end = NR_GPIO_IRQS + NR_PMIC8058_GPIO_IRQS - 1,
 		.configure = pm8058_gpio_configure,
 		.get_irq_num = pm8058_gpio_get_irq_num,
 		.read = pm8058_gpio_read,
@@ -112,8 +111,11 @@ struct msm_gpio_chip pm8058_gpio_chip = {
 static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 {
 	int	rc;
+	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
 
 	pm8058_gpio_chip.chip.dev = &pdev->dev;
+	pm8058_gpio_chip.chip.start = pdata->gpio_base;
+	pm8058_gpio_chip.chip.end = pdata->gpio_base + PM8058_GPIOS - 1;
 	rc = register_gpio_chip(&pm8058_gpio_chip.chip);
 	pr_info("%s: register_gpio_chip(): rc=%d\n", __func__, rc);
 
