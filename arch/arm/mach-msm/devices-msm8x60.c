@@ -39,24 +39,24 @@
 #define MSM_GSBI12_PHYS	0x19C00000
 
 /* GSBI QUPe devices */
-#define MSM_GSBI1_QUP_I2C_PHYS	0x16080000
-#define MSM_GSBI2_QUP_I2C_PHYS	0x16180000
-#define MSM_GSBI3_QUP_I2C_PHYS	0x16280000
-#define MSM_GSBI4_QUP_I2C_PHYS	0x16380000
-#define MSM_GSBI5_QUP_I2C_PHYS	0x16480000
-#define MSM_GSBI6_QUP_I2C_PHYS	0x16580000
-#define MSM_GSBI7_QUP_I2C_PHYS	0x16680000
-#define MSM_GSBI8_QUP_I2C_PHYS	0x19880000
-#define MSM_GSBI9_QUP_I2C_PHYS	0x19980000
-#define MSM_GSBI10_QUP_I2C_PHYS	0x19A80000
-#define MSM_GSBI11_QUP_I2C_PHYS	0x19B80000
-#define MSM_GSBI12_QUP_I2C_PHYS	0x19C80000
+#define MSM_GSBI1_QUP_PHYS	0x16080000
+#define MSM_GSBI2_QUP_PHYS	0x16180000
+#define MSM_GSBI3_QUP_PHYS	0x16280000
+#define MSM_GSBI4_QUP_PHYS	0x16380000
+#define MSM_GSBI5_QUP_PHYS	0x16480000
+#define MSM_GSBI6_QUP_PHYS	0x16580000
+#define MSM_GSBI7_QUP_PHYS	0x16680000
+#define MSM_GSBI8_QUP_PHYS	0x19880000
+#define MSM_GSBI9_QUP_PHYS	0x19980000
+#define MSM_GSBI10_QUP_PHYS	0x19A80000
+#define MSM_GSBI11_QUP_PHYS	0x19B80000
+#define MSM_GSBI12_QUP_PHYS	0x19C80000
 
 static struct resource gsbi3_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
-		.start	= MSM_GSBI3_QUP_I2C_PHYS,
-		.end	= MSM_GSBI3_QUP_I2C_PHYS + SZ_4K - 1,
+		.start	= MSM_GSBI3_QUP_PHYS,
+		.end	= MSM_GSBI3_QUP_PHYS + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -76,8 +76,8 @@ static struct resource gsbi3_qup_i2c_resources[] = {
 static struct resource gsbi4_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
-		.start	= MSM_GSBI4_QUP_I2C_PHYS,
-		.end	= MSM_GSBI4_QUP_I2C_PHYS + SZ_4K - 1,
+		.start	= MSM_GSBI4_QUP_PHYS,
+		.end	= MSM_GSBI4_QUP_PHYS + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -97,8 +97,8 @@ static struct resource gsbi4_qup_i2c_resources[] = {
 static struct resource gsbi7_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
-		.start	= MSM_GSBI7_QUP_I2C_PHYS,
-		.end	= MSM_GSBI7_QUP_I2C_PHYS + SZ_4K - 1,
+		.start	= MSM_GSBI7_QUP_PHYS,
+		.end	= MSM_GSBI7_QUP_PHYS + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -118,8 +118,8 @@ static struct resource gsbi7_qup_i2c_resources[] = {
 static struct resource gsbi8_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
-		.start	= MSM_GSBI8_QUP_I2C_PHYS,
-		.end	= MSM_GSBI8_QUP_I2C_PHYS + SZ_4K - 1,
+		.start	= MSM_GSBI8_QUP_PHYS,
+		.end	= MSM_GSBI8_QUP_PHYS + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -139,8 +139,8 @@ static struct resource gsbi8_qup_i2c_resources[] = {
 static struct resource gsbi9_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
-		.start	= MSM_GSBI9_QUP_I2C_PHYS,
-		.end	= MSM_GSBI9_QUP_I2C_PHYS + SZ_4K - 1,
+		.start	= MSM_GSBI9_QUP_PHYS,
+		.end	= MSM_GSBI9_QUP_PHYS + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -252,6 +252,35 @@ struct platform_device msm_device_ssbi3 = {
 	.resource	= msm_ssbi3_resources,
 };
 #endif /* CONFIG_I2C_SSBI */
+
+static struct resource gsbi1_qup_spi_resources[] = {
+	{
+		.name	= "spi_base",
+		.start	= MSM_GSBI1_QUP_PHYS,
+		.end	= MSM_GSBI1_QUP_PHYS + SZ_4K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "gsbi_base",
+		.start	= MSM_GSBI1_PHYS,
+		.end	= MSM_GSBI1_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "spi_irq_in",
+		.start	= GSBI1_QUP_IRQ,
+		.end	= GSBI1_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+/* Use GSBI1 QUP for SPI-0 */
+struct platform_device msm_gsbi1_qup_spi_device = {
+	.name		= "spi_qsd",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(gsbi1_qup_spi_resources),
+	.resource	= gsbi1_qup_spi_resources,
+};
 
 #define MSM_SDC1_BASE         0x12400000
 #define MSM_SDC2_BASE         0x12140000
@@ -463,7 +492,8 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("gsbi_uart_clk",	GSBI10_UART_CLK,	NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI11_UART_CLK,	NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI12_UART_CLK,	NULL, 0),
-	CLK_8X60("gsbi_qup_clk",	GSBI1_QUP_CLK,		NULL, 0),
+	CLK_8X60("gsbi_qup_clk",	GSBI1_QUP_CLK,
+					&msm_gsbi1_qup_spi_device.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI2_QUP_CLK,		NULL, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI3_QUP_CLK,
 					&msm_gsbi3_qup_i2c_device.dev, 0),
@@ -516,7 +546,8 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("usb_fs_src_clk",	USB_FS2_SRC_CLK,	NULL, 0),
 	CLK_8X60("usb_fs_clk",		USB_FS2_CLK,		NULL, 0),
 	CLK_8X60("usb_fs_sys_clk",	USB_FS2_SYS_CLK,	NULL, 0),
-	CLK_8X60("gsbi_pclk",		GSBI1_P_CLK,		NULL, 0),
+	CLK_8X60("gsbi_pclk",		GSBI1_P_CLK,
+					&msm_gsbi1_qup_spi_device.dev, 0),
 	CLK_8X60("gsbi_pclk",		GSBI2_P_CLK,		NULL, 0),
 	CLK_8X60("gsbi_pclk",		GSBI3_P_CLK,
 					&msm_gsbi3_qup_i2c_device.dev, 0),
