@@ -21,10 +21,11 @@
 #include "mddihosti.h"
 #include "mddi_toshiba.h"
 
+static struct msm_panel_info pinfo;
+
 static int __init mddi_toshiba_wvga_pt_init(void)
 {
 	int ret;
-	struct msm_panel_info pinfo;
 #ifdef CONFIG_FB_MSM_MDDI_AUTO_DETECT
 	uint id;
 
@@ -46,7 +47,13 @@ static int __init mddi_toshiba_wvga_pt_init(void)
 	pinfo.mddi.vdopkt = MDDI_DEFAULT_PRIM_PIX_ATTR;
 	pinfo.wait_cycle = 0;
 	pinfo.bpp = 18;
-	pinfo.lcd.vsync_enable = FALSE;
+	pinfo.lcd.vsync_enable = TRUE;
+	pinfo.lcd.refx100 = 6096; /* adjust refx100 to prevent tearing */
+	pinfo.lcd.v_back_porch = 2;     /* vsw=1 + vbp = 2 */
+	pinfo.lcd.v_front_porch = 3;
+	pinfo.lcd.v_pulse_width = 1;
+	pinfo.lcd.hw_vsync_mode = FALSE;
+	pinfo.lcd.vsync_notifier_period = (1 * HZ);
 	pinfo.bl_max = 15;
 	pinfo.bl_min = 1;
 	pinfo.clk_rate = 222750000;
