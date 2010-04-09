@@ -428,9 +428,9 @@ int msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 		rc = __msm_adsp_write(module, dsp_queue_addr, cmd_buf,
 								cmd_size);
 		if (rc == -EAGAIN)
-			udelay(10);
-	} while (rc == -EAGAIN && retries++ < 100);
-	if (retries > 50)
+			udelay(50);
+	} while (rc == -EAGAIN && retries++ < 40);
+	if (retries > 20)
 		MM_INFO("%s command took %d attempts: rc %d\n",
 			module->name, retries, rc);
 	return rc;
