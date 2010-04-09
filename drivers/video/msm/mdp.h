@@ -559,7 +559,9 @@ struct mdp_dma_data {
 /*
  * MDDI Register
  */
-#define MDDI_VDO_PACKET_DESC  0x5666
+#define MDDI_VDO_PACKET_DESC_16  0x5565
+#define MDDI_VDO_PACKET_DESC	 0x5666	/* 18 bits */
+#define MDDI_VDO_PACKET_DESC_24  0x5888
 
 #ifdef CONFIG_FB_MSM_MDP40
 #define MDP_INTR_ENABLE		(msm_mdp_base + 0x0050)
