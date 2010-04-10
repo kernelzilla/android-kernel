@@ -188,9 +188,11 @@ void mdp4_mddi_overlay_restore(void)
 void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
+#ifdef CONSOLIDATE_KICKOFF
 	if (pipe == mddi_pipe)  /* base layer */
 		if (mdp4_overlay_pipe_staged(pipe->mixer_num) > 1)
 			return;	/* let other pipe to kickoff */
+#endif
 
 	down(&mfd->sem);
 	mdp_enable_irq(MDP_OVERLAY0_TERM);
