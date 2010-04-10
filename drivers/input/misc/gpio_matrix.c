@@ -31,6 +31,7 @@ struct gpio_kp {
 	unsigned int key_state_changed:1;
 	unsigned int last_key_state_changed:1;
 	unsigned int some_keys_pressed:2;
+	unsigned int disabled_irq:1;
 	unsigned long keys_pressed[0];
 };
 
@@ -218,8 +219,12 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 	struct gpio_event_matrix_info *mi = kp->keypad_info;
 	unsigned gpio_keypad_flags = mi->flags;
 
-	if (!kp->use_irq) /* ignore interrupt while registering the handler */
+	if (!kp->use_irq) {
+		/* ignore interrupt while registering the handler */
+		kp->disabled_irq = 1;
+		disable_irq_nosync(irq_in);
 		return IRQ_HANDLED;
+	}
 
 	for (i = 0; i < mi->ninputs; i++) {
 		disable_irq_wake(gpio_to_irq(mi->input_gpios[i]));
@@ -272,6 +277,10 @@ static int gpio_keypad_request_irqs(struct gpio_kp *kp)
 			goto err_request_irq_failed;
 		}
 		disable_irq(irq);
+		if (kp->disabled_irq) {
+			kp->disabled_irq = 0;
+			enable_irq(irq);
+		}
 	}
 	return 0;
 
