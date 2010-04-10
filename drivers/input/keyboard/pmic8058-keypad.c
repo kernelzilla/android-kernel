@@ -184,7 +184,18 @@ static int pmic8058_chk_read_state(struct pmic8058_kp *kp, u16 data_reg)
 
 	return 0;
 }
-
+/*
+ * Synchronous read protocol for RevB0 onwards:
+ *
+ * 1. Write '1' to ReadState bit in KEYP_SCAN register
+ * 2. Wait 2*32KHz clocks, so that HW can successfully enter read mode
+ *    synchronously
+ * 3. Read rows in old array first if events are more than one
+ * 4. Read rows in recent array
+ * 5. Wait 4*32KHz clocks
+ * 6. Write '0' to ReadState bit of KEYP_SCAN register so that hw can
+ *    synchronously exit read mode.
+ */
 static int pmic8058_chk_sync_read(struct pmic8058_kp *kp)
 {
 	int rc;
@@ -205,9 +216,6 @@ static int pmic8058_kp_read_data(struct pmic8058_kp *kp, u16 *state,
 {
 	int rc, row;
 	u8 new_data[MATRIX_MAX_ROWS];
-
-	if (pm8058_rev_is_b0(kp->pm_chip))
-		pmic8058_chk_sync_read(kp);
 
 	rc = pmic8058_kp_read(kp, new_data, data_reg, read_rows);
 
@@ -239,6 +247,9 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 					 + 1];
 	else
 		read_rows = kp->pdata->num_rows;
+
+	if (pm8058_rev_is_b0(kp->pm_chip))
+		pmic8058_chk_sync_read(kp);
 
 	if (old_state)
 		rc = pmic8058_kp_read_data(kp, old_state, KEYP_OLD_DATA,
