@@ -3966,7 +3966,7 @@ static void __init msm7x30_allocate_memory_regions(void)
 
 static void __init msm7x30_map_io(void)
 {
-	msm_shared_ram_phys = 0x03700000;
+	msm_shared_ram_phys = 0x00100000;
 	msm_map_msm7x30_io();
 	msm7x30_allocate_memory_regions();
 	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
