@@ -101,8 +101,6 @@ extern int mdp_lcd_rd_cnt_offset_fast;
 extern int mdp_usec_diff_threshold;
 
 #ifdef CONFIG_FB_MSM_LCDC
-extern int mdp_lcdc_pclk_clk_rate;
-extern int mdp_lcdc_pad_pclk_clk_rate;
 extern int first_pixel_start_x;
 extern int first_pixel_start_y;
 #endif
@@ -735,12 +733,6 @@ static void mdp_drv_init(void)
 				msm_fb_debugfs_file_create(mdp_dir,
 					"lcdc_start_y",
 					(u32 *) &first_pixel_start_y);
-				msm_fb_debugfs_file_create(mdp_dir,
-					"mdp_lcdc_pclk_clk_rate",
-					(u32 *) &mdp_lcdc_pclk_clk_rate);
-				msm_fb_debugfs_file_create(mdp_dir,
-					"mdp_lcdc_pad_pclk_clk_rate",
-					(u32 *) &mdp_lcdc_pad_pclk_clk_rate);
 #endif
 			}
 		}

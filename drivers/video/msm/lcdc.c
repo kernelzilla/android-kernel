@@ -49,9 +49,6 @@ static int pdev_list_cnt;
 static struct clk *mdp_lcdc_pclk_clk;
 static struct clk *mdp_lcdc_pad_pclk_clk;
 
-int mdp_lcdc_pclk_clk_rate;
-int mdp_lcdc_pad_pclk_clk_rate;
-
 static struct platform_driver lcdc_driver = {
 	.probe = lcdc_probe,
 	.remove = lcdc_remove,
@@ -119,9 +116,6 @@ static int lcdc_on(struct platform_device *pdev)
 		       __func__, mfd->fbi->var.pixclock);
 		goto out;
 	}
-	mdp_lcdc_pclk_clk_rate = clk_get_rate(mdp_lcdc_pclk_clk);
-	mdp_lcdc_pad_pclk_clk_rate = clk_get_rate(mdp_lcdc_pad_pclk_clk);
-
 	ret = panel_next_on(pdev);
 out:
 	return ret;
