@@ -584,7 +584,7 @@ void pll_enable(uint32_t pll)
 
 	/* Wait until PLL is enabled. */
 	while ((readl(pll_status_addr[pll]) & PLL_ACTIVE_MASK) == 0)
-		;
+		cpu_relax();
 }
 
 static void src_enable(uint32_t src)
