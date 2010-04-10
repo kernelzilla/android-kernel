@@ -2300,7 +2300,8 @@ static struct platform_device android_pmem_audio_device = {
 };
 
 static struct kgsl_platform_data kgsl_pdata = {
-	.max_axi_freq = 192000,
+	.high_axi_3d = 192000,
+	.high_axi_2d = 192000,
 	.max_grp2d_freq = 245 * 1000*1000,
 	.min_grp2d_freq = 192 * 1000*1000,
 	.set_grp2d_async = set_grp2d_async,

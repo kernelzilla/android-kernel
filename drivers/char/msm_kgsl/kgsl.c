@@ -214,13 +214,10 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 			if (kgsl_driver.clk_freq[KGSL_3D_MIN_FREQ])
 				clk_set_min_rate(kgsl_driver.yamato_grp_src_clk,
 					kgsl_driver.clk_freq[KGSL_3D_MIN_FREQ]);
-			if ((kgsl_driver.g12_device.hwaccess_blocked ==
-				KGSL_TRUE) ||
-				(kgsl_driver.power_flags &
-				KGSL_PWRFLAGS_G12_CLK_OFF))
+			if (kgsl_driver.clk_freq[KGSL_AXI_HIGH_3D])
 				pm_qos_update_requirement(
 					PM_QOS_SYSTEM_BUS_FREQ,
-					DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
+					"kgsl_3d", PM_QOS_DEFAULT_VALUE);
 			kgsl_driver.power_flags &=
 					~(KGSL_PWRFLAGS_YAMATO_CLK_ON);
 			kgsl_driver.power_flags |= KGSL_PWRFLAGS_YAMATO_CLK_OFF;
@@ -228,11 +225,10 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 		return KGSL_SUCCESS;
 	case KGSL_PWRFLAGS_YAMATO_CLK_ON:
 		if (kgsl_driver.power_flags & KGSL_PWRFLAGS_YAMATO_CLK_OFF) {
-			if (kgsl_driver.clk_freq[KGSL_AXI_MAX_FREQ]) {
+			if (kgsl_driver.clk_freq[KGSL_AXI_HIGH_3D])
 				pm_qos_update_requirement(
-					PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
-				kgsl_driver.clk_freq[KGSL_AXI_MAX_FREQ]);
-			}
+					PM_QOS_SYSTEM_BUS_FREQ, "kgsl_3d",
+					kgsl_driver.clk_freq[KGSL_AXI_HIGH_3D]);
 			if (kgsl_driver.clk_freq[KGSL_3D_MAX_FREQ])
 				clk_set_min_rate(kgsl_driver.yamato_grp_src_clk,
 					kgsl_driver.clk_freq[KGSL_3D_MAX_FREQ]);
@@ -257,22 +253,20 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 					kgsl_driver.g12_grp_clk,
 					kgsl_driver.clk_freq[KGSL_2D_MIN_FREQ]);
 			}
-			if (kgsl_driver.power_flags &
-					KGSL_PWRFLAGS_YAMATO_CLK_OFF)
+			if (kgsl_driver.clk_freq[KGSL_AXI_HIGH_2D])
 				pm_qos_update_requirement(
 					PM_QOS_SYSTEM_BUS_FREQ,
-					DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
+					"kgsl_2d", PM_QOS_DEFAULT_VALUE);
 			kgsl_driver.power_flags &= ~(KGSL_PWRFLAGS_G12_CLK_ON);
 			kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_CLK_OFF;
 		}
 		return KGSL_SUCCESS;
 	case KGSL_PWRFLAGS_G12_CLK_ON:
 		if (kgsl_driver.power_flags & KGSL_PWRFLAGS_G12_CLK_OFF) {
-			if (kgsl_driver.clk_freq[KGSL_AXI_MAX_FREQ]) {
+			if (kgsl_driver.clk_freq[KGSL_AXI_HIGH_2D])
 				pm_qos_update_requirement(
-					PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
-				kgsl_driver.clk_freq[KGSL_AXI_MAX_FREQ]);
-			}
+					PM_QOS_SYSTEM_BUS_FREQ, "kgsl_2d",
+					kgsl_driver.clk_freq[KGSL_AXI_HIGH_2D]);
 			if (kgsl_driver.g12_grp_pclk)
 				clk_enable(kgsl_driver.g12_grp_pclk);
 			if (kgsl_driver.g12_grp_clk != NULL) {
@@ -1562,7 +1556,7 @@ static void kgsl_driver_cleanup(void)
 		kgsl_driver.g12_interrupt_num = 0;
 	}
 
-	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME);
+	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_3d");
 
 	if (kgsl_driver.yamato_grp_pclk) {
 		clk_put(kgsl_driver.yamato_grp_pclk);
@@ -1590,6 +1584,7 @@ static void kgsl_driver_cleanup(void)
 	if (kgsl_driver.g12_grp_clk) {
 		clk_put(kgsl_driver.g12_grp_clk);
 		kgsl_driver.g12_grp_clk = NULL;
+		pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_2d");
 	}
 
 	kgsl_driver.pdev = NULL;
@@ -1671,16 +1666,17 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 
 	kgsl_driver.power_flags = 0;
 
-	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
-				PM_QOS_DEFAULT_VALUE);
-
 	if (pdata) {
-		kgsl_driver.clk_freq[KGSL_AXI_MAX_FREQ] = pdata->max_axi_freq;
+		kgsl_driver.clk_freq[KGSL_AXI_HIGH_3D] = pdata->high_axi_3d;
+		kgsl_driver.clk_freq[KGSL_AXI_HIGH_2D] = pdata->high_axi_2d;
 		kgsl_driver.clk_freq[KGSL_2D_MIN_FREQ] = pdata->min_grp2d_freq;
 		kgsl_driver.clk_freq[KGSL_2D_MAX_FREQ] = pdata->max_grp2d_freq;
 		kgsl_driver.clk_freq[KGSL_3D_MIN_FREQ] = pdata->min_grp3d_freq;
 		kgsl_driver.clk_freq[KGSL_3D_MAX_FREQ] = pdata->max_grp3d_freq;
 	}
+
+	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_3d",
+				PM_QOS_DEFAULT_VALUE);
 
 	/*acquire yamato interrupt */
 	kgsl_driver.yamato_interrupt_num =
@@ -1726,6 +1722,8 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		disable_irq(kgsl_driver.g12_interrupt_num);
 
 		/* g12 config */
+		pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_2d",
+				PM_QOS_DEFAULT_VALUE);
 		result = kgsl_g12_config(&kgsl_driver.g12_config, pdev);
 		if (result != 0)
 			goto done;
