@@ -571,6 +571,7 @@ void vidc_720p_decode_bitstream_header(u32 n_ch_id,
 void vidc_720p_decode_get_seq_hdr_info(struct vidc_720p_seq_hdr_info_type
 					*p_seq_hdr_info)
 {
+	u32 n_display_status;
 	VIDC_IO_IN(REG_999267, &p_seq_hdr_info->n_img_size_x);
 
 	VIDC_IO_IN(REG_345712, &p_seq_hdr_info->n_img_size_y);
@@ -588,9 +589,23 @@ void vidc_720p_decode_get_seq_hdr_info(struct vidc_720p_seq_hdr_info_type
 				 &p_seq_hdr_info->n_level);
 
 	VIDC_IO_INF(REG_612715, DISPLAY_STATUS,
-		     &p_seq_hdr_info->n_progressive);
+				&n_display_status);
 	p_seq_hdr_info->n_progressive =
-		((p_seq_hdr_info->n_progressive & 0x4) >> 2);
+			((n_display_status & 0x4) >> 2);
+	/* bit 3 is for crop existence */
+	p_seq_hdr_info->n_crop_exists = ((n_display_status & 0x8) >> 3);
+
+	if (p_seq_hdr_info->n_crop_exists) {
+		/* read the cropping information */
+		VIDC_IO_INF(REG_881638, CROP_RIGHT_OFFSET, \
+			&p_seq_hdr_info->n_crop_right_offset);
+		VIDC_IO_INF(REG_881638, CROP_LEFT_OFFSET, \
+			&p_seq_hdr_info->n_crop_left_offset);
+		VIDC_IO_INF(REG_161486, CROP_BOTTOM_OFFSET, \
+			&p_seq_hdr_info->n_crop_bottom_offset);
+		VIDC_IO_INF(REG_161486, CROP_TOP_OFFSET, \
+			&p_seq_hdr_info->n_crop_top_offset);
+	}
 	/* Read the MPEG4 data partitioning indication */
 	VIDC_IO_INF(REG_441270, DATA_PARTITIONED, \
 				&p_seq_hdr_info->n_data_partitioned);
@@ -723,14 +738,16 @@ void vidc_720p_decode_display_info(struct vidc_720p_dec_disp_info_type
 	VIDC_IO_IN(REG_679165, &p_disp_info->n_pic_time_top);
 	VIDC_IO_IN(REG_374150, &p_disp_info->n_pic_time_bottom);
 
-	VIDC_IO_INF(REG_881638, CROP_RIGHT_OFFSET,
-		     &p_disp_info->n_crop_right_offset);
-	VIDC_IO_INF(REG_881638, CROP_LEFT_OFFSET,
-		     &p_disp_info->n_crop_left_offset);
-	VIDC_IO_INF(REG_161486, CROP_BOTTOM_OFFSET,
-		     &p_disp_info->n_crop_bottom_offset);
-	VIDC_IO_INF(REG_161486, CROP_TOP_OFFSET,
-		     &p_disp_info->n_crop_top_offset);
+	if (p_disp_info->n_crop_exists) {
+		VIDC_IO_INF(REG_881638, CROP_RIGHT_OFFSET,
+			&p_disp_info->n_crop_right_offset);
+		VIDC_IO_INF(REG_881638, CROP_LEFT_OFFSET,
+			&p_disp_info->n_crop_left_offset);
+		VIDC_IO_INF(REG_161486, CROP_BOTTOM_OFFSET,
+			&p_disp_info->n_crop_bottom_offset);
+		VIDC_IO_INF(REG_161486, CROP_TOP_OFFSET,
+			&p_disp_info->n_crop_top_offset);
+	}
 	VIDC_IO_IN(REG_613254, &p_disp_info->n_metadata_exists);
 
 	VIDC_IO_IN(REG_580603,

@@ -317,6 +317,9 @@ static u32 ddl_set_dec_property
 				    p_frame_size->n_width) {
 					p_decoder->client_frame_size =
 					    *p_frame_size;
+					ddl_calculate_stride(
+					&p_decoder->client_frame_size,
+					!p_decoder->n_progressive_only);
 					ddl_set_default_decoder_buffer_req
 					    (p_decoder, TRUE);
 				}
@@ -889,10 +892,6 @@ static u32 ddl_get_dec_property
 			if (sizeof(struct vcd_property_frame_size_type) ==
 			    p_property_hdr->n_size) {
 				if (p_decoder->client_frame_size.n_width) {
-					ddl_calculate_stride(
-						&p_decoder->client_frame_size,
-						(!p_decoder->
-						 n_progressive_only));
 					*(struct vcd_property_frame_size_type *)
 					    p_property_value =
 					    p_decoder->client_frame_size;
@@ -1077,10 +1076,12 @@ static u32 ddl_get_enc_property
 		{
 			if (sizeof(struct vcd_property_frame_size_type) ==
 			    p_property_hdr->n_size) {
-
+				ddl_calculate_stride(&p_encoder->frame_size,
+					FALSE);
 				*(struct vcd_property_frame_size_type *)
 					p_property_value =
 					p_encoder->frame_size;
+
 				vcd_status = VCD_S_SUCCESS;
 			}
 			break;
@@ -1479,6 +1480,8 @@ void ddl_set_default_dec_property(struct ddl_client_context_type *p_ddl)
 	p_decoder->buf_format.e_buffer_format = VCD_BUFFER_FORMAT_NV12;
 	p_decoder->client_frame_size.n_height = 144;
 	p_decoder->client_frame_size.n_width = 176;
+	p_decoder->client_frame_size.n_stride = 176;
+	p_decoder->client_frame_size.n_scan_lines = 144;
 	p_decoder->n_progressive_only = 1;
 	ddl_set_default_metadata_flag(p_ddl);
 
@@ -1737,8 +1740,8 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data_type *p_decoder,
 u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size_type *p_frame_size,
      struct vcd_property_buffer_format_type *p_buf_format, u32 inter_lace)
 {
-	u32 n_width = p_frame_size->n_width;
-	u32 n_height = p_frame_size->n_height;
+	u32 n_width = p_frame_size->n_stride;
+	u32 n_height = p_frame_size->n_scan_lines;
 	u32 n_total_memory_size;
 
 	if (p_buf_format->e_buffer_format != VCD_BUFFER_FORMAT_NV12) {
@@ -1767,12 +1770,6 @@ u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size_type *p_frame_size,
 						      DDL_TILE_MULTIPLY_FACTOR);
 		n_total_memory_size += n_component_mem_size;
 	} else {
-		n_width = ((n_width + 15) >> 4) << 4;
-		if (inter_lace)
-			n_height = ((n_height + 31) >> 5) << 5;
-		else
-			n_height = ((n_height + 15) >> 4) << 4;
-
 		n_total_memory_size = n_height * n_width;
 		n_total_memory_size += (n_total_memory_size >> 1);
 	}
@@ -1917,6 +1914,8 @@ void ddl_set_initial_default_values(struct ddl_client_context_type *p_ddl)
 		p_encoder->target_bit_rate.n_target_bitrate = 64000;
 		p_encoder->frame_size.n_width = 176;
 		p_encoder->frame_size.n_height = 144;
+		p_encoder->frame_size.n_stride = 176;
+		p_encoder->frame_size.n_scan_lines = 144;
 		p_encoder->frame_rate.n_fps_numerator = 30;
 		p_encoder->frame_rate.n_fps_denominator = 1;
 		ddl_set_default_enc_property(p_ddl);
