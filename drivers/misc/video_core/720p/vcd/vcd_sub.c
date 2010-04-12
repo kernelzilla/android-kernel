@@ -2048,42 +2048,6 @@ void vcd_handle_input_done_with_trans_end(
 
 		if (VCD_FAILED(rc))
 			VCD_MSG_ERROR("sched_update_client_o_tkn failed");
-	} else if (VCD_DEC_NUM_INTERLACED_FIELDS
-			   == p_cctxt->status.n_int_field_cnt)
-		p_cctxt->status.n_int_field_cnt = 0;
-}
-
-void vcd_handle_input_done_with_trans_end(
-	struct vcd_clnt_ctxt_type_t *p_cctxt)
-{
-	u32 rc;
-	union sched_value_type sched_val;
-	if (!p_cctxt->b_decoding)
-		return;
-
-	if (p_cctxt->out_buf_pool.n_in_use != p_cctxt->out_buf_pool.n_count)
-		return;
-
-	rc = vcd_map_sched_status(sched_get_client_param(
-		p_cctxt->p_dev_ctxt->sched_hdl, p_cctxt->sched_clnt_hdl,
-		SCHED_I_CLNT_OTKNCURRENT, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("sched_get_client_param:OTKNCURRENT failed");
-		return;
-	}
-
-	if (sched_val.un_value == 0) {
-		VCD_MSG_MED("All output buffers with core are pending display");
-
-		rc = vcd_map_sched_status(sched_update_client_o_tkn(
-			p_cctxt->p_dev_ctxt->sched_hdl,
-			p_cctxt->sched_clnt_hdl,
-			TRUE,
-			p_cctxt->n_sched_o_tkn_per_ip_frm));
-
-		if (VCD_FAILED(rc))
-			VCD_MSG_ERROR("sched_update_client_o_tkn failed");
 	}
 }
 
