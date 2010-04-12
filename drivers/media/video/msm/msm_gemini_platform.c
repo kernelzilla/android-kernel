@@ -21,9 +21,18 @@
 #include <mach/clk.h>
 #include <linux/io.h>
 #include <linux/android_pmem.h>
+#include <mach/msm_reqs.h>
 
 #include "msm_gemini_platform.h"
 #include "msm_gemini_common.h"
+
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+/* NPA Flow ID */
+#define MSM_SYSTEM_BUS_RATE	MSM_AXI_FLOW_JPEG_12MP
+#else
+/* AXI rate in KHz */
+#define MSM_SYSTEM_BUS_RATE	160000
+#endif
 
 void msm_gemini_platform_p2v(struct file  *file)
 {
@@ -105,7 +114,7 @@ int msm_gemini_platform_clk_enable(void)
 	}
 
 	rc = pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-		"msm_gemini", 160000);
+		"msm_gemini", MSM_SYSTEM_BUS_RATE);
 	if (rc) {
 		GMN_PR_ERR("request AXI bus QOS fails. rc = %d\n", rc);
 		goto fail;
