@@ -900,6 +900,14 @@ config MSM_NPA_REMOTE_ONCRPC
 	  Enables Linux NPA clients to talk to NPA nodes in the modem
 	  using ONCRPC communication protocol.
 
+config MSM_NPA_SYSTEM_BUS
+	bool "NPA-managed System Bus (AXI) rates through PM_QOS."
+	depends on MSM_NPA_REMOTE
+	default n
+	help
+	  PM_QOS System Bus rate requests are interpreted as 'Flow IDs' and
+	  are routed through the NPA framework.
+
 config MSM_SPM
 	bool "Subsystem Power Manager"
 	depends on ARCH_MSM7X30

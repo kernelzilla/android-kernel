@@ -23,6 +23,13 @@
 
 #ifdef CONFIG_MSM_NPA_REMOTE
 
+DECLARE_RESOURCE_REMOTE_AGGREGATION(
+	npa_memory_node,
+	npa_memory_resource,
+	NPA_MEMORY_NODE_NAME,
+	"", 2);
+
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
 #define SYSTEM_BUS_NPA_RESOURCE_NAME "/bus/arbiter"
 static struct pm_qos_plugin system_bus_plugin = {
 	.data = SYSTEM_BUS_NPA_RESOURCE_NAME,
@@ -37,22 +44,19 @@ DECLARE_RESOURCE_REMOTE_AGGREGATION(
 	SYSTEM_BUS_NPA_RESOURCE_NAME,
 	"flow", UINT_MAX);
 
-DECLARE_RESOURCE_REMOTE_AGGREGATION(
-	npa_memory_node,
-	npa_memory_resource,
-	NPA_MEMORY_NODE_NAME,
-	"", 2);
-
 static int __init npa_pm_qos_plugin_init(void)
 {
 	return pm_qos_register_plugin(PM_QOS_SYSTEM_BUS_FREQ,
 					&system_bus_plugin);
 }
 core_initcall(npa_pm_qos_plugin_init);
+#endif /* CONFIG_MSM_NPA_SYSTEM_BUS */
 
 static int __init npa_resource_init(void)
 {
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
 	npa_remote_define_node(&npa_system_bus_node, 0, NULL, NULL);
+#endif
 	npa_remote_define_node(&npa_memory_node, 0, NULL, NULL);
 
 	return 0;
