@@ -1249,7 +1249,6 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	int ret, mixer;
 	struct mdp4_overlay_pipe *pipe;
-	int pull;
 
 	if (mfd == NULL)
 		return -ENODEV;
@@ -1266,13 +1265,6 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	if (ret < 0) {
 		mutex_unlock(&mfd->dma->ov_mutex);
 		return ret;
-	}
-
-	pull = mdp4_pull_mode(mixer);
-
-	if (pull == 0) { /* mddi */
-		/* MDP cmd block enable */
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	}
 
 	/* return id back to user */
@@ -1311,11 +1303,8 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 
 	if (pull) /* LCDC or DTV mode */
 		mdp4_overlay_reg_flush(pipe, 0);
-	else  {	/* mddi */
-		/* MDP cmd block disable */
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+	else  	/* mddi */
 		mdp4_mddi_overlay_restore();
-	}
 
 	mdp4_overlay_pipe_free(pipe);
 
