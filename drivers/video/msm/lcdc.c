@@ -34,6 +34,7 @@
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/pm_qos_params.h>
+#include <mach/msm_reqs.h>
 
 #include "msm_fb.h"
 
@@ -87,19 +88,23 @@ static int lcdc_on(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm_fb_data_type *mfd;
-	unsigned long panel_pixclock_freq , pm_qos_freq;
+	unsigned long panel_pixclock_freq, pm_qos_rate;
 
 	mfd = platform_get_drvdata(pdev);
 	panel_pixclock_freq = mfd->fbi->var.pixclock;
 
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+	pm_qos_rate = MSM_AXI_FLOW_MDP_LCDC_WVGA_2BPP;
+#else
 	if (panel_pixclock_freq > 58000000)
-		/* pm_qos_freq should be in Khz */
-		pm_qos_freq = panel_pixclock_freq / 1000 ;
+		/* pm_qos_rate should be in Khz */
+		pm_qos_rate = panel_pixclock_freq / 1000 ;
 	else
-		pm_qos_freq = 58000;
+		pm_qos_rate = 58000;
+#endif
 
 	pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ , "lcdc",
-				  pm_qos_freq);
+				  pm_qos_rate);
 	mfd = platform_get_drvdata(pdev);
 
 	clk_enable(mdp_lcdc_pclk_clk);

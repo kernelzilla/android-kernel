@@ -34,10 +34,19 @@
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/pm_qos_params.h>
+#include <mach/msm_reqs.h>
 
 #define TVENC_C
 #include "tvenc.h"
 #include "msm_fb.h"
+
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+/* NPA Flow ID */
+#define MSM_SYSTEM_BUS_RATE	MSM_AXI_FLOW_MDP_TVENC_720P_2BPP
+#else
+/* AXI rate in KHz */
+#define MSM_SYSTEM_BUS_RATE	128000
+#endif
 
 static int tvenc_probe(struct platform_device *pdev);
 static int tvenc_remove(struct platform_device *pdev);
@@ -91,7 +100,7 @@ static int tvenc_on(struct platform_device *pdev)
 	int ret = 0;
 
 	pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ , "tvenc",
-				  128000);
+				  MSM_SYSTEM_BUS_RATE);
 	if (tvenc_pdata && tvenc_pdata->pm_vid_en)
 		ret = tvenc_pdata->pm_vid_en(1);
 
