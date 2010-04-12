@@ -34,6 +34,8 @@ struct pcm {
 	uint32_t rec_mode;
 };
 
+#define BUFSZ (256)
+
 void audio_client_dump(struct audio_client *ac);
 
 static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -83,6 +85,19 @@ static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+		if (!config.channel_count || config.channel_count > 2) {
+			rc = -EINVAL;
+			break;
+		}
+		if (config.sample_rate < 8000 || config.sample_rate > 48000) {
+			rc = -EINVAL;
+			break;
+		}
+		if (config.buffer_size < 128 || config.buffer_size > 8192) {
+			rc = -EINVAL;
+			break;
+		}
+
 		pcm->sample_rate = config.sample_rate;
 		pcm->channel_count = config.channel_count;
 		pcm->buffer_size = config.buffer_size;
@@ -134,7 +149,7 @@ static int q6_in_open(struct inode *inode, struct file *file)
 
 	pcm->channel_count = 1;
 	pcm->sample_rate = 8000;
-	pcm->buffer_size = 4096;
+	pcm->buffer_size = BUFSZ;
 	pcm->rec_mode = AUDIO_FLAG_READ;
 	file->private_data = pcm;
 	return 0;
