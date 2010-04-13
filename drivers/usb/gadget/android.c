@@ -108,7 +108,9 @@ struct android_dev {
 	unsigned long functions;
 };
 
+#ifdef CONFIG_USB_ANDROID_RNDIS
 static int rndis_enabled;
+#endif
 static int acm_func_cnt;
 static int gser_func_cnt;
 static struct android_dev *_android_dev;
