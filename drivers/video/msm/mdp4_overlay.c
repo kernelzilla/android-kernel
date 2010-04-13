@@ -1271,8 +1271,6 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	req->id = pipe->pipe_ndx;	/* pipe_ndx start from 1 */
 	pipe->req_data = *req;		/* keep original req */
 
-	mdp4_vg_qseed_init(pipe->mixer_num);
-
 	mutex_unlock(&mfd->dma->ov_mutex);
 
 	return 0;
