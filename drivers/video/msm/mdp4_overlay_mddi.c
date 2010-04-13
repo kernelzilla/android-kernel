@@ -83,8 +83,17 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 		}
 
 		MDP_OUTP(MDP_BASE + 0x00090, mddi_ld_param);
-		MDP_OUTP(MDP_BASE + 0x00094,
+
+		if (mfd->panel_info.bpp == 24)
+			MDP_OUTP(MDP_BASE + 0x00094,
+			 (MDDI_VDO_PACKET_DESC_24 << 16) | mddi_vdo_packet_reg);
+		else if (mfd->panel_info.bpp == 16)
+			MDP_OUTP(MDP_BASE + 0x00094,
+			 (MDDI_VDO_PACKET_DESC_16 << 16) | mddi_vdo_packet_reg);
+		else
+			MDP_OUTP(MDP_BASE + 0x00094,
 			 (MDDI_VDO_PACKET_DESC << 16) | mddi_vdo_packet_reg);
+
 		MDP_OUTP(MDP_BASE + 0x00098, 0x01);
 	} else {
 		pipe = mddi_pipe;
