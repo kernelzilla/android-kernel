@@ -209,7 +209,16 @@ static u32 ddl_header_done_callback(struct ddl_context_type *p_ddl_context)
 	p_decoder->n_progressive_only = 1 - seq_hdr_info.n_progressive;
 	ddl_getdec_profilelevel(p_decoder, seq_hdr_info.n_profile,
 		seq_hdr_info.n_level);
-
+	ddl_calculate_stride(&p_decoder->frame_size,
+			!p_decoder->n_progressive_only);
+	if (seq_hdr_info.n_crop_exists)	{
+		p_decoder->frame_size.n_width -=
+		(seq_hdr_info.n_crop_right_offset
+		+ seq_hdr_info.n_crop_left_offset);
+		p_decoder->frame_size.n_height -=
+		(seq_hdr_info.n_crop_top_offset +
+		seq_hdr_info.n_crop_bottom_offset);
+	}
 	ddl_set_default_decoder_buffer_req(p_decoder, FALSE);
 	if (seq_hdr_info.n_data_partitioned == 0x1 &&
 		p_decoder->codec_type.e_codec == VCD_CODEC_MPEG4 &&
@@ -714,8 +723,10 @@ static void ddl_decoder_ouput_done_callback(
 		p_output_vcd_frm->dec_op_prop.disp_frm.n_top =
 			p_dec_disp_info->n_crop_top_offset;
 		p_output_vcd_frm->dec_op_prop.disp_frm.n_right =
+			p_dec_disp_info->n_img_size_x -
 			p_dec_disp_info->n_crop_right_offset;
 		p_output_vcd_frm->dec_op_prop.disp_frm.n_bottom =
+			p_dec_disp_info->n_img_size_y -
 			p_dec_disp_info->n_crop_bottom_offset;
 	} else {
 		p_output_vcd_frm->dec_op_prop.disp_frm.n_left = 0;

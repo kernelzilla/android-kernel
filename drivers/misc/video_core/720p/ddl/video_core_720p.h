@@ -2373,6 +2373,11 @@ struct vidc_720p_seq_hdr_info_type {
 	u32 n_level;
 	u32 n_progressive;
 	u32 n_data_partitioned;
+	u32  n_crop_exists;
+	u32  n_crop_right_offset;
+	u32  n_crop_left_offset;
+	u32  n_crop_bottom_offset;
+	u32  n_crop_top_offset;
 };
 
 struct vidc_720p_enc_frame_info_type {
