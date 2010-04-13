@@ -242,9 +242,12 @@ struct msm_spi {
 	dma_addr_t               rx_padding_dma;
 	u32                      unaligned_len;
 	/* DMA statistics */
-	u32                      stat_dmov_err;
-	u32                      stat_rx;
-	u32                      stat_tx;
+	int                      stat_dmov_tx_err;
+	int                      stat_dmov_rx_err;
+	int                      stat_rx;
+	int                      stat_dmov_rx;
+	int                      stat_tx;
+	int                      stat_dmov_tx;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dent_spi;
 	struct dentry *debugfs_spi_regs[ARRAY_SIZE(debugfs_spi_regs)];
@@ -1091,9 +1094,9 @@ static ssize_t show_stats(struct device *dev, struct device_attribute *attr,
 			dd->rx_dma_chan,
 			dd->tx_dma_crci,
 			dd->rx_dma_crci,
-			dd->stat_rx,
-			dd->stat_tx,
-			dd->stat_dmov_err
+			dd->stat_rx + dd->stat_dmov_rx,
+			dd->stat_tx + dd->stat_dmov_tx,
+			dd->stat_dmov_tx_err + dd->stat_dmov_rx_err
 			);
 }
 
@@ -1104,7 +1107,10 @@ static ssize_t set_stats(struct device *dev, struct device_attribute *attr,
 	struct msm_spi *dd = dev_get_drvdata(dev);
 	dd->stat_rx = 0;
 	dd->stat_tx = 0;
-	dd->stat_dmov_err = 0;
+	dd->stat_dmov_rx = 0;
+	dd->stat_dmov_tx = 0;
+	dd->stat_dmov_rx_err = 0;
+	dd->stat_dmov_tx_err = 0;
 	return count;
 }
 
@@ -1139,12 +1145,12 @@ static void spi_dmov_tx_complete_func(struct msm_dmov_cmd *cmd,
 	/* restore original context */
 	dd = container_of(cmd, struct msm_spi, tx_hdr);
 	if (result & DMOV_RSLT_DONE)
-		dd->stat_tx++;
+		dd->stat_dmov_tx++;
 	else {
 		/* Error or flush */
 		if (result & DMOV_RSLT_ERROR) {
 			dev_err(dd->dev, "DMA error (0x%08x)\n", result);
-			dd->stat_dmov_err++;
+			dd->stat_dmov_tx_err++;
 		}
 		if (result & DMOV_RSLT_FLUSH) {
 			/*
@@ -1186,7 +1192,7 @@ static void spi_dmov_rx_complete_func(struct msm_dmov_cmd *cmd,
 	/* restore original context */
 	dd = container_of(cmd, struct msm_spi, rx_hdr);
 	if (result & DMOV_RSLT_DONE) {
-		dd->stat_rx++;
+		dd->stat_dmov_rx++;
 		if (atomic_inc_return(&dd->rx_irq_called) == 1)
 			return;
 		complete(&dd->transfer_complete);
@@ -1194,7 +1200,7 @@ static void spi_dmov_rx_complete_func(struct msm_dmov_cmd *cmd,
 		/** Error or flush  */
 		if (result & DMOV_RSLT_ERROR) {
 			dev_err(dd->dev, "DMA error(0x%08x)\n", result);
-			dd->stat_dmov_err++;
+			dd->stat_dmov_rx_err++;
 		}
 		if (result & DMOV_RSLT_FLUSH) {
 			dev_info(dd->dev,
