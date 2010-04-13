@@ -166,6 +166,7 @@ struct pmem_info {
 			const unsigned long,
 			const enum pmem_align);
 	int (*free)(int, int);
+	int (*free_space)(int, struct pmem_freespace *);
 	unsigned long (*len)(int, struct pmem_data *);
 	unsigned long (*start_addr)(int, struct pmem_data *);
 	int (*kapi_free_index)(const int32_t, int);
@@ -592,6 +593,19 @@ static int pmem_free_all_or_nothing(int id, int index)
 	return 0;
 }
 
+static int pmem_free_space_all_or_nothing(int id,
+		struct pmem_freespace *fs)
+{
+	/* caller should hold the lock on arena_mutex! */
+	fs->total = (unsigned long)
+		pmem[id].allocator.all_or_nothing.allocated == 0 ?
+		pmem[id].size : 0;
+
+	fs->largest = fs->total;
+	return 0;
+}
+
+
 static int pmem_free_buddy_bestfit(int id, int index)
 {
 	/* caller should hold the lock on arena_mutex! */
@@ -621,6 +635,29 @@ static int pmem_free_buddy_bestfit(int id, int index)
 
 	return 0;
 }
+
+
+static int pmem_free_space_buddy_bestfit(int id,
+		struct pmem_freespace *fs)
+{
+	/* caller should hold the lock on arena_mutex! */
+	int curr;
+	unsigned long size;
+	fs->total = 0;
+	fs->largest = 0;
+
+	for (curr = 0; curr < pmem[id].num_entries;
+	     curr = PMEM_BUDDY_NEXT_INDEX(id, curr)) {
+		if (PMEM_IS_FREE_BUDDY(id, curr)) {
+			size = PMEM_BUDDY_LEN(id, curr);
+			if (size > fs->largest)
+				fs->largest = size;
+			fs->total += size;
+		}
+	}
+	return 0;
+}
+
 
 static inline uint32_t start_mask(int bit_start)
 {
@@ -692,6 +729,54 @@ static int pmem_free_bitmap(int id, int bitnum)
 		get_task_comm(currtask_name, current));
 
 	return -1;
+}
+
+static int pmem_free_space_bitmap(int id, struct pmem_freespace *fs)
+{
+	int i, j;
+	int max_allocs = pmem[id].allocator.bitmap.bitmap_allocs;
+	int alloc_start = 0;
+	int next_alloc;
+	unsigned long size = 0;
+
+	fs->total = 0;
+	fs->largest = 0;
+
+	for (i = 0; i < max_allocs; i++) {
+
+		int alloc_quanta = 0;
+		int alloc_idx = 0;
+		next_alloc = pmem[id].num_entries;
+
+		/* Look for the lowest bit where next allocation starts */
+		for (j = 0; j < max_allocs; j++) {
+			const int curr_alloc = pmem[id].allocator.
+						bitmap.bitm_alloc[j].bit;
+			if (curr_alloc != -1) {
+				if (alloc_start >= curr_alloc)
+					continue;
+				if (curr_alloc < next_alloc) {
+					next_alloc = curr_alloc;
+					alloc_idx = j;
+				}
+			}
+		}
+		alloc_quanta = pmem[id].allocator.bitmap.
+				bitm_alloc[alloc_idx].quanta;
+		size = (next_alloc - (alloc_start + alloc_quanta)) *
+				pmem[id].quantum;
+
+		if (size > fs->largest)
+			fs->largest = size;
+		fs->total += size;
+
+		if (next_alloc == pmem[id].num_entries)
+			break;
+		else
+			alloc_start = next_alloc;
+	}
+
+	return 0;
 }
 
 static void pmem_revoke(struct file *file, struct pmem_data *data);
@@ -774,14 +859,14 @@ static int pmem_open(struct inode *inode, struct file *file)
 #endif
 
 	if (pmem[id].memory_state == MEMORY_UNSTABLE_NO_MEMORY_ALLOCATED)
-		return -1;
+		return -ENODEV;
 	DLOG("pid %u(%s) file %p(%ld) dev %s(id: %d)\n",
 		current->pid, get_task_comm(currtask_name, current),
 		file, file_count(file), get_name(file), id);
 	/* setup file->private_data to indicate its unmapped */
 	/*  you can only open a pmem device one time */
 	if (file->private_data != NULL)
-		return -1;
+		return -EINVAL;
 	data = kmalloc(sizeof(struct pmem_data), GFP_KERNEL);
 	if (!data) {
 		printk(KERN_ALERT "pmem: %s: unable to allocate memory for "
@@ -1386,7 +1471,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 
 	/* either no space was available or an error occured */
 	if (!has_allocation(file)) {
-		ret = -EINVAL;
+		ret = -ENOMEM;
 		printk(KERN_ALERT
 			"pmem: could not find allocation for map.\n");
 		goto error;
@@ -2268,8 +2353,28 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				return -EFAULT;
 			break;
 		}
+	case PMEM_GET_FREE_SPACE:
+		{
+			struct pmem_freespace fs;
+			DLOG("get freespace on %s(id: %d)\n",
+				get_name(file), id);
+
+			mutex_lock(&pmem[id].arena_mutex);
+			pmem[id].free_space(id, &fs);
+			mutex_unlock(&pmem[id].arena_mutex);
+
+			DLOG("%s(id: %d) total free %lu, largest %lu\n",
+				get_name(file), id, fs.total, fs.largest);
+
+			if (copy_to_user((void __user *)arg, &fs,
+				sizeof(struct pmem_freespace)))
+				return -EFAULT;
+			break;
+	}
+
 	case PMEM_ALLOCATE:
 		{
+			int ret = 0;
 			DLOG("allocate, id %d\n", id);
 			down_write(&data->sem);
 			if (has_allocation(file)) {
@@ -2282,9 +2387,10 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					arg,
 					PMEM_ALIGN_4K);
 			mutex_unlock(&pmem[id].arena_mutex);
-
+			ret = data->index == -1 ? -ENOMEM :
+				data->index;
 			up_write(&data->sem);
-			break;
+			return ret;
 		}
 	case PMEM_CONNECT:
 		DLOG("connect\n");
@@ -2601,6 +2707,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	case PMEM_ALLOCATORTYPE_ALLORNOTHING:
 		pmem[id].allocate = pmem_allocator_all_or_nothing;
 		pmem[id].free = pmem_free_all_or_nothing;
+		pmem[id].free_space = pmem_free_space_all_or_nothing;
 		pmem[id].kapi_free_index = pmem_kapi_free_index_allornothing;
 		pmem[id].len = pmem_len_all_or_nothing;
 		pmem[id].start_addr = pmem_start_addr_all_or_nothing;
@@ -2632,6 +2739,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 			}
 		pmem[id].allocate = pmem_allocator_buddy_bestfit;
 		pmem[id].free = pmem_free_buddy_bestfit;
+		pmem[id].free_space = pmem_free_space_buddy_bestfit;
 		pmem[id].kapi_free_index = pmem_kapi_free_index_buddybestfit;
 		pmem[id].len = pmem_len_buddy_bestfit;
 		pmem[id].start_addr = pmem_start_addr_buddy_bestfit;
@@ -2681,6 +2789,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 
 		pmem[id].allocate = pmem_allocator_bitmap;
 		pmem[id].free = pmem_free_bitmap;
+		pmem[id].free_space = pmem_free_space_bitmap;
 		pmem[id].kapi_free_index = pmem_kapi_free_index_bitmap;
 		pmem[id].len = pmem_len_bitmap;
 		pmem[id].start_addr = pmem_start_addr_bitmap;

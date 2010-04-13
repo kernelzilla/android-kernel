@@ -59,6 +59,7 @@
 #define PMEM_CLEAN_CACHES	_IOW(PMEM_IOCTL_MAGIC, 12, unsigned int)
 #define PMEM_INV_CACHES		_IOW(PMEM_IOCTL_MAGIC, 13, unsigned int)
 
+#define PMEM_GET_FREE_SPACE	_IOW(PMEM_IOCTL_MAGIC, 14, unsigned int)
 struct pmem_region {
 	unsigned long offset;
 	unsigned long len;
@@ -68,6 +69,11 @@ struct pmem_addr {
 	unsigned long vaddr;
 	unsigned long offset;
 	unsigned long length;
+};
+
+struct pmem_freespace {
+	unsigned long total;
+	unsigned long largest;
 };
 
 #ifdef __KERNEL__
