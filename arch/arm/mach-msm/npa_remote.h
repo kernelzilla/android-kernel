@@ -147,6 +147,9 @@ int npa_remote_destroy_client(void *handle);
  *   0: Success if the server received the request.
  *   NPA_REMOTE_FAILURE: The server returned a failure.
  *   NPA_REMOTE_PROTOCOL_FAILURE: The transport protocol layer failed.
+ *
+ * Note: If CONFIG_MSM_NPA_PROC_COMM is defined, then this API uses PROC COMM
+ * to issue requests to the modem.
  */
 int npa_remote_issue_required_request(void *handle, unsigned int state,
 		unsigned int *new_state);

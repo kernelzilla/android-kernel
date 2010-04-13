@@ -946,6 +946,14 @@ config MSM_NPA_REMOTE_ONCRPC
 	  Enables Linux NPA clients to talk to NPA nodes in the modem
 	  using ONCRPC communication protocol.
 
+config MSM_NPA_PROC_COMM
+	bool "Enables NPA remoting through PROC-COMM to issue requests"
+	depends on MSM_NPA_REMOTE_ONCRPC && MSM_PROC_COMM
+	default n
+	help
+	  Enables the use of PROC-COMM to make requests instead of ONCRPC.
+	  ONCRPC is however still required for NPA setup.
+
 config MSM_NPA_SYSTEM_BUS
 	bool "NPA-managed System Bus (AXI) rates through PM_QOS."
 	depends on MSM_NPA_REMOTE
