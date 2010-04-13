@@ -206,7 +206,7 @@ static int  android_bind_config(struct usb_configuration *c)
 	acm_func_cnt = 0;
 	gser_func_cnt = 0;
 	printk(KERN_DEBUG "android_bind_config c = 0x%x dev->cdev=0x%x\n",
-	       c, dev->cdev);
+	       (unsigned int) c, (unsigned int) dev->cdev);
 	n = dev->functions;
 	while (n) {
 		switch (n & 0x0F) {
