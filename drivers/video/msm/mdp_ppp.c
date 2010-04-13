@@ -1150,6 +1150,9 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 		 (dest0_ystride << 16 | dest0_ystride));
 
 	flush_imgs(req, inpBpp, iBuf->bpp, p_src_file, p_dst_file);
+#ifdef	CONFIG_FB_MSM_MDP31
+	MDP_OUTP(MDP_BASE + 0x00100, 0xFF00);
+#endif
 	mdp_pipe_kickoff(MDP_PPP_TERM, mfd);
 }
 
