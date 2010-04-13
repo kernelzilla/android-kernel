@@ -839,7 +839,7 @@ int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout)
 	for (idle_count = 0; idle_count < IDLE_COUNT_MAX; idle_count++) {
 		kgsl_yamato_regread(device, REG_RBBM_STATUS, &rbbm_status);
 
-		if (!(rbbm_status & RBBM_STATUS__GUI_ACTIVE_MASK)) {
+		if (rbbm_status == 0x110) {
 			status = 0;
 			break;
 		}
@@ -871,7 +871,7 @@ static unsigned int kgsl_yamato_isidle(struct kgsl_device *device)
 			/* Is the core idle? */
 			kgsl_yamato_regread(device, REG_RBBM_STATUS,
 					    &rbbm_status);
-			if (!(rbbm_status & RBBM_STATUS__GUI_ACTIVE_MASK))
+			if (rbbm_status == 0x110)
 				status = KGSL_TRUE;
 		}
 	}
