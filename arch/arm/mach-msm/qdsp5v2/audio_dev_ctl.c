@@ -707,7 +707,7 @@ struct miscdevice audio_dev_ctrl_misc = {
 
 static void broadcast_event(u32 evt_id, u32 dev_id)
 {
-	int clnt_id = 0;
+	int clnt_id = 0, i;
 	union auddev_evt_data *evt_payload;
 	struct msm_snd_evt_listner *callback;
 	struct msm_snddev_info *dev_info = NULL;
@@ -929,10 +929,15 @@ voc_events:
 					dev_info->sample_rate;
 				evt_payload->voc_devinfo.dev_id = dev_id;
 				if (dev_info->capability & SNDDEV_CAP_RX) {
-					evt_payload->voc_devinfo.max_rx_vol =
-						dev_info->max_voc_rx_vol;
-					evt_payload->voc_devinfo.min_rx_vol =
-						dev_info->min_voc_rx_vol;
+					for (i = 0; i < VOC_RX_VOL_ARRAY_NUM;
+						i++) {
+						evt_payload->
+						voc_devinfo.max_rx_vol[i] =
+						dev_info->max_voc_rx_vol[i];
+						evt_payload
+						->voc_devinfo.min_rx_vol[i] =
+						dev_info->min_voc_rx_vol[i];
+					}
 				}
 			}
 			callback->auddev_evt_listener(

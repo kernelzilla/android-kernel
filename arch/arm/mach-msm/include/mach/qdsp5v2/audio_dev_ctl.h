@@ -52,8 +52,8 @@ struct msm_snddev_info {
 	u32 sample_rate;
 	u32 set_sample_rate;
 	u32 sessions;
-	s32 max_voc_rx_vol;
-	s32 min_voc_rx_vol;
+	s32 max_voc_rx_vol[VOC_RX_VOL_ARRAY_NUM]; /* [0] is for NB,[1] for WB */
+	s32 min_voc_rx_vol[VOC_RX_VOL_ARRAY_NUM];
 };
 
 struct msm_volume {
@@ -87,8 +87,9 @@ struct auddev_evt_voc_devinfo {
 	u32 dev_type;           /* Rx or Tx */
 	u32 acdb_dev_id;        /* acdb id of device */
 	u32 dev_sample;         /* Sample rate of device */
-	s32 max_rx_vol; 	/* unit is mb (milibel */
-	s32 min_rx_vol;		/* unit is mb */
+	s32 max_rx_vol[VOC_RX_VOL_ARRAY_NUM]; 	/* unit is mb (milibel),
+						[0] is for NB, other for WB */
+	s32 min_rx_vol[VOC_RX_VOL_ARRAY_NUM];	/* unit is mb */
 	u32 dev_id;             /* registered device id */
 };
 
