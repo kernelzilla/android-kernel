@@ -73,6 +73,8 @@ struct mdp4_overlay_ctrl {
 
 static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
 
+struct mdp4_statistic mdp4_stat;
+
 void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int lcdc)
 {
 	uint32	dmae_cfg_reg;
@@ -291,6 +293,8 @@ void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe)
 	outpdw(rgb_base + 0x0060, pipe->phasey_step);
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
+	mdp4_stat.pipe_rgb[pipe->pipe_num]++;
 }
 
 void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
@@ -349,6 +353,8 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	}
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
+	mdp4_stat.pipe_vg[pipe->pipe_num]++;
 }
 
 int mdp4_overlay_format2type(uint32 format)
@@ -372,6 +378,7 @@ int mdp4_overlay_format2type(uint32 format)
 	case MDP_Y_CRCB_H2V2_TILE:
 		return OVERLAY_TYPE_VG;
 	default:
+		mdp4_stat.err_format++;
 		return -ERANGE;
 	}
 
@@ -598,6 +605,7 @@ int mdp4_overlay_format2pipe(struct mdp4_overlay_pipe *pipe)
 		break;
 	default:
 		/* not likely */
+		mdp4_stat.err_format++;
 		return -ERANGE;
 	}
 
@@ -1071,44 +1079,59 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 
 	if (mixer >= MDP4_MAX_MIXER) {
 		printk(KERN_ERR "mpd_overlay_req2pipe: mixer out of range!\n");
+		mdp4_stat.err_mixer++;
 		return -ERANGE;
 	}
 
 	if (req->z_order < 0 || req->z_order > 2) {
 		printk(KERN_ERR "mpd_overlay_req2pipe: z_order=%d out of range!\n",
 				req->z_order);
+		mdp4_stat.err_zorder++;
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h == 0 || req->src_rect.w == 0) {
 		printk(KERN_ERR "mpd_overlay_req2pipe: src img of zero size!\n");
+		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 
-	if (req->dst_rect.h > (req->src_rect.h * 8))	/* too much */
+	if (req->dst_rect.h > (req->src_rect.h * 8)) {	/* too much */
+		mdp4_stat.err_scale++;
 		return -ERANGE;
+	}
 
-	if (req->src_rect.h > (req->dst_rect.h * 8))	/* too little */
+	if (req->src_rect.h > (req->dst_rect.h * 8)) {	/* too little */
+		mdp4_stat.err_scale++;
 		return -ERANGE;
+	}
 
-	if (req->dst_rect.w > (req->src_rect.w * 8))	/* too much */
+	if (req->dst_rect.w > (req->src_rect.w * 8)) {	/* too much */
+		mdp4_stat.err_scale++;
 		return -ERANGE;
+	}
 
-	if (req->src_rect.w > (req->dst_rect.w * 8))	/* too little */
+	if (req->src_rect.w > (req->dst_rect.w * 8)) {	/* too little */
+		mdp4_stat.err_scale++;
 		return -ERANGE;
+	}
 
 	/*  non integer down saceling ratio  smaller than 1/4
 	 *  is not supportted
 	 */
 	if (req->src_rect.h > (req->dst_rect.h * 4)) {
-		if (req->src_rect.h % req->dst_rect.h)	/* need integer */
+		if (req->src_rect.h % req->dst_rect.h) { /* need integer */
+			mdp4_stat.err_scale++;
 			return -ERANGE;
+		}
 	}
 
 	if (req->src_rect.w > (req->dst_rect.w * 4)) {
-		if (req->src_rect.w % req->dst_rect.w)	/* need integer */
+		if (req->src_rect.w % req->dst_rect.w) { /* need integer */
+			mdp4_stat.err_scale++;
 			return -ERANGE;
+		}
 	}
 
 	ret = mdp4_overlay_req_check(req->id, req->z_order, mixer);
@@ -1271,6 +1294,8 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	req->id = pipe->pipe_ndx;	/* pipe_ndx start from 1 */
 	pipe->req_data = *req;		/* keep original req */
 
+	mdp4_stat.overlay_set[pipe->mixer_num]++;
+
 	mutex_unlock(&mfd->dma->ov_mutex);
 
 	return 0;
@@ -1303,6 +1328,8 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 		mdp4_overlay_reg_flush(pipe, 0);
 	else  	/* mddi */
 		mdp4_mddi_overlay_restore();
+
+	mdp4_stat.overlay_unset[pipe->mixer_num]++;
 
 	mdp4_overlay_pipe_free(pipe);
 
@@ -1406,6 +1433,8 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 	mdp4_mixer_stage_up(pipe);
 
 	pull = mdp4_pull_mode(pipe->mixer_num);
+
+	mdp4_stat.overlay_play[pipe->mixer_num]++;
 
 	if (pull) {	/* LCDC or DTV mode */
 		mdp4_overlay_reg_flush(pipe, 1);

@@ -199,8 +199,10 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 {
 #ifdef CONSOLIDATE_KICKOFF
 	if (pipe == mddi_pipe)  /* base layer */
-		if (mdp4_overlay_pipe_staged(pipe->mixer_num) > 1)
+		if (mdp4_overlay_pipe_staged(pipe->mixer_num) > 1) {
+			mdp4_stat.kickoff_mddi_skip++;
 			return;	/* let other pipe to kickoff */
+		}
 #endif
 
 	down(&mfd->sem);
@@ -215,7 +217,6 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 	/* wait until DMA finishes the current job */
 	wait_for_completion_killable(&pipe->comp);
 	mdp_disable_irq(MDP_OVERLAY0_TERM);
-
 }
 
 void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
@@ -226,6 +227,8 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 		mdp4_overlay_update_lcd(mfd);
 
 		mdp4_mddi_overlay_kickoff(mfd, mddi_pipe);
+
+		mdp4_stat.kickoff_mddi++;
 
 	/* signal if pan function is waiting for the update completion */
 		if (mfd->pan_waiting) {

@@ -299,5 +299,7 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	wait_for_completion_killable(&lcdc_pipe->comp);
 	mdp_disable_irq(MDP_OVERLAY0_TERM);
 
+	mdp4_stat.kickoff_lcdc++;
+
 	mutex_unlock(&mfd->dma->ov_mutex);
 }
