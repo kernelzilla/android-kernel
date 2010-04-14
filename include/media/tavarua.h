@@ -52,6 +52,11 @@
   #define FMDBG(fmt, args...)
 #endif
 
+/* function declarations */
+int tavarua_set_audio_path(int digital_on, int analog_on);
+
+/* defines and enums*/
+
 #define MARIMBA_A0 0x01010013
 #define MARIMBA_2_1 0x02010204
 #define WAIT_TIMEOUT 2000
@@ -191,6 +196,16 @@ enum register_t {
 /* Advanced features controls */
 #define RDSRTEN		(1 << 3)
 #define RDSPSEN		(1 << 4)
+
+/* Audio path control */
+#define AUDIORX_ANALOG_OFFSET 	0
+#define AUDIORX_ANALOG_MASK 	(1 << AUDIORX_ANALOG_OFFSET)
+#define AUDIORX_DIGITAL_OFFSET 	1
+#define AUDIORX_DIGITAL_MASK 	(1 << AUDIORX_DIGITAL_OFFSET)
+#define AUDIOTX_OFFSET		2
+#define AUDIOTX_MASK		(1 << AUDIOTX_OFFSET)
+#define I2SCTRL_OFFSET		3
+#define I2SCTRL_MASK		(1 << I2SCTRL_OFFSET)
 
 /* Search options */
 enum search_t {
