@@ -325,7 +325,7 @@ static struct pmic8058_keypad_data surf_keypad_data = {
 	.keymap			= surf_keymap,
 	.debounce_ms		= {8, 10},
 	.scan_delay_ms		= 32,
-	.row_hold_us		= 125,
+	.row_hold_ns		= 91500,
 	.wakeup			= 1,
 };
 
@@ -340,7 +340,7 @@ static struct pmic8058_keypad_data fluid_keypad_data = {
 	.keymap			= fluid_keymap,
 	.debounce_ms		= {8, 10},
 	.scan_delay_ms		= 32,
-	.row_hold_us		= 125,
+	.row_hold_ns		= 91500,
 	.wakeup			= 1,
 };
 

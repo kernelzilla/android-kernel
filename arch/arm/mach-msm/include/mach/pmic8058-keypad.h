@@ -60,7 +60,7 @@ struct pmic8058_keypad_data {
 
 	unsigned int debounce_ms[MAX_PM8058_REVS];
 	unsigned int scan_delay_ms;
-	unsigned int row_hold_us;
+	unsigned int row_hold_ns;
 
 	int keymap_size;
 	const unsigned int *keymap;

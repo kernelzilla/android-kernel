@@ -33,6 +33,10 @@
 #define MAX_SCAN_DELAY		128
 #define MIN_SCAN_DELAY		1
 
+/* in nanoseconds */
+#define MAX_ROW_HOLD_DELAY	122000
+#define MIN_ROW_HOLD_DELAY	30500
+
 #define MAX_DEBOUNCE_B0_TIME	20
 #define MIN_DEBOUNCE_B0_TIME	5
 
@@ -440,15 +444,9 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 	scan_val |= (bits << KEYP_SCAN_PAUSE_SHIFT);
 
 	/* Row hold time is a multiple of 32KHz cycles. */
-	cycles = kp->pdata->row_hold_us * KEYP_CLOCK_FREQ / USEC_PER_SEC;
-	bits = 3; /* Max : b11 */
-	while (bits) {
-		if (cycles >= (2 << bits))
-			break;
+	cycles = (kp->pdata->row_hold_ns * KEYP_CLOCK_FREQ) / NSEC_PER_SEC;
 
-		bits--;
-	}
-	scan_val |= (bits << KEYP_SCAN_ROW_HOLD_SHIFT);
+	scan_val |= (cycles << KEYP_SCAN_ROW_HOLD_SHIFT);
 
 	rc = pmic8058_kp_write_u8(kp, scan_val, KEYP_SCAN);
 
@@ -524,6 +522,13 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		|| pdata->scan_delay_ms < MIN_SCAN_DELAY ||
 		!is_power_of_2(pdata->scan_delay_ms)) {
 		dev_err(&pdev->dev, "invalid keypad scan time supplied\n");
+		return -EINVAL;
+	}
+
+	if (!pdata->row_hold_ns || pdata->row_hold_ns > MAX_ROW_HOLD_DELAY
+		|| pdata->row_hold_ns < MIN_ROW_HOLD_DELAY ||
+		((pdata->row_hold_ns % MIN_ROW_HOLD_DELAY) != 0)) {
+		dev_err(&pdev->dev, "invalid keypad row hold time supplied\n");
 		return -EINVAL;
 	}
 
