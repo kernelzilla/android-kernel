@@ -567,7 +567,7 @@ int64_t msm_timer_enter_idle(void)
 	}
 	if (delta <= 0)
 		return 0;
-	return clocksource_cyc2ns((alarm - count) >> clock->clocksource.shift,
+	return clocksource_cyc2ns((alarm - count) >> clock->shift,
 		      clock->clocksource.mult,
 		      clock->clocksource.shift);
 }
