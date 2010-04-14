@@ -104,6 +104,7 @@ struct venc_msg_list {
 };
 struct venc_buf {
 	int fd;
+	u32 src;
 	u32 offset;
 	u32 size;
 	u32 btype;
@@ -258,6 +259,7 @@ static struct venc_pmem_list *venc_add_pmem_to_list(struct venc_dev *dvenc,
 	plist->buf.size = mptr->size;
 	plist->buf.btype = btype;
 	plist->buf.offset = mptr->offset;
+	plist->buf.src = mptr->src;
 
 	spin_lock_irqsave(&dvenc->venc_pmem_list_lock, flags);
 	list_add(&plist->list, &dvenc->venc_pmem_list_head);
@@ -470,7 +472,7 @@ static int venc_encode_frame(struct venc_dev *dvenc, void *argp)
 	q6_input.flags = 0;
 	if (input.flags & VENC_FLAG_EOS)
 		q6_input.flags |= 0x00000001;
-	q6_input.yuv_buf.region = 0;
+	q6_input.yuv_buf.region = plist->buf.src;
 	q6_input.yuv_buf.phys = plist->buf.paddr;
 	q6_input.yuv_buf.size = plist->buf.size;
 	q6_input.yuv_buf.offset = 0;
@@ -523,7 +525,7 @@ static int venc_fill_output(struct venc_dev *dvenc, void *argp)
 			return -EPERM;
 		}
 	}
-	q6_output.bit_stream_buf.region = 0;
+	q6_output.bit_stream_buf.region = plist->buf.src;
 	q6_output.bit_stream_buf.phys = (u32)plist->buf.paddr;
 	q6_output.bit_stream_buf.size = plist->buf.size;
 	q6_output.bit_stream_buf.offset = 0;
