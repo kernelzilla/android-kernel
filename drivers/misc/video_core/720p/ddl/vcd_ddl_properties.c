@@ -425,6 +425,8 @@ static u32 ddl_set_enc_property(struct ddl_client_context_type *p_ddl,
 				p_framesize->n_height))
 				) {
 				p_encoder->frame_size = *p_framesize;
+				ddl_calculate_stride(&p_encoder->frame_size,
+					FALSE);
 				ddl_set_default_encoder_buffer_req(p_encoder);
 				vcd_status = VCD_S_SUCCESS;
 			}
@@ -1076,8 +1078,6 @@ static u32 ddl_get_enc_property
 		{
 			if (sizeof(struct vcd_property_frame_size_type) ==
 			    p_property_hdr->n_size) {
-				ddl_calculate_stride(&p_encoder->frame_size,
-					FALSE);
 				*(struct vcd_property_frame_size_type *)
 					p_property_value =
 					p_encoder->frame_size;
