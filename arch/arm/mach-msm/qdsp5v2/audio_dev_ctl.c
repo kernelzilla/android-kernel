@@ -762,8 +762,7 @@ static void broadcast_event(u32 evt_id, u32 dev_id)
 				continue;
 			}
 		}
-		if ((evt_id == AUDDEV_EVT_REL_PENDING)
-			|| (evt_id == AUDDEV_EVT_DEV_CHG_VOICE))
+		if (evt_id == AUDDEV_EVT_DEV_CHG_VOICE)
 			goto voc_events;
 
 volume_strm:
