@@ -968,14 +968,14 @@ static struct marimba_fm_platform_data marimba_fm_pdata = {
 #define MARIMBA_SLAVE_ID_CDC_ADDR	0x77
 #define MARIMBA_SLAVE_ID_QMEMBIST_ADDR	0X66
 
-#define TSADC_VOTER_ID "MADC"
+static const char *tsadc_id = "MADC";
 static const char *vregs_tsadc_name[] = {
 	"gp12",
 	"s2",
 };
 static struct vreg *vregs_tsadc[ARRAY_SIZE(vregs_tsadc_name)];
 
-static int msm_marimba_tsadc_power(int vreg_on)
+static int marimba_tsadc_power(int vreg_on)
 {
 	int i, rc = 0;
 
@@ -996,7 +996,7 @@ static int msm_marimba_tsadc_power(int vreg_on)
 		}
 	}
 	/* vote for D0 buffer */
-	rc = pmapp_clock_vote(TSADC_VOTER_ID, PMAPP_CLOCK_ID_DO,
+	rc = pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_DO,
 		vreg_on ? PMAPP_CLOCK_VOTE_ON : PMAPP_CLOCK_VOTE_OFF);
 	if (rc)	{
 		printk(KERN_ERR "%s: unable to %svote for d0 clk\n",
@@ -1012,9 +1012,9 @@ vreg_fail:
 	return rc;
 }
 
-static void __init tsadc_power_init(void)
+static int marimba_tsadc_init(void)
 {
-	int i;
+	int i, rc;
 
 	for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
 		vregs_tsadc[i] = vreg_get(NULL, vregs_tsadc_name[i]);
@@ -1022,13 +1022,64 @@ static void __init tsadc_power_init(void)
 			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
 			       __func__, vregs_tsadc_name[i],
 			       PTR_ERR(vregs_tsadc[i]));
-			return;
+			rc = PTR_ERR(vregs_tsadc[i]);
+			goto vreg_get_fail;
 		}
 	}
+
+	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
+			 PMAPP_SMPS_CLK_VOTE_1P6);
+	if (rc < 0) {
+		printk(KERN_ERR "%s: vreg smps clock vote on failed (%d)\n",
+			__func__, rc);
+		goto vreg_get_fail;
+	}
+
+	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 1300);
+	if (rc < 0) {
+		printk(KERN_ERR "%s: vreg level on failed (%d)\n",
+			__func__, rc);
+		goto vreg_smps_vote_fail;
+	}
+
+	return rc;
+
+vreg_smps_vote_fail:
+	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
+			 PMAPP_SMPS_CLK_VOTE_DONTCARE);
+vreg_get_fail:
+	while (i)
+		vreg_put(vregs_tsadc[--i]);
+	return rc;
+}
+
+static int marimba_tsadc_exit(void)
+{
+	int i, rc;
+
+	for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
+		if (vregs_tsadc[i])
+			vreg_put(vregs_tsadc[i]);
+	}
+
+	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
+			 PMAPP_SMPS_CLK_VOTE_DONTCARE);
+	if (rc < 0)
+		printk(KERN_ERR "%s: vreg smps clock vote off failed (%d)\n",
+				__func__, rc);
+
+	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 0);
+	if (rc < 0)
+		printk(KERN_ERR "%s: vreg level off failed (%d)\n",
+			__func__, rc);
+
+	return rc;
 }
 
 static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
-	.marimba_tsadc_power = msm_marimba_tsadc_power,
+	.marimba_tsadc_power =  marimba_tsadc_power,
+	.init		     =  marimba_tsadc_init,
+	.exit		     =  marimba_tsadc_exit,
 	.tsadc_prechg_en = true,
 	.setup = {
 		.pen_irq_en	=	true,
@@ -3755,7 +3806,6 @@ static void __init msm7x30_init(void)
 				ARRAY_SIZE(msm_camera_boardinfo));
 
 	bt_power_init();
-	tsadc_power_init();
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 	msm7x30_init_uart2();
 #endif
