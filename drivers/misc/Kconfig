@@ -17,6 +17,16 @@ config ANDROID_PMEM
 	bool "Android pmem allocator"
 	default y
 
+config ANDROID_PMEM_DEBUG
+	bool "Android pmem debug"
+	depends on ANDROID_PMEM
+	default n
+
+config ANDROID_PMEM_KAPI_TEST
+	tristate "Simple module to test Android pmem kernel API"
+	depends on ANDROID_PMEM
+	default m
+
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
 	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
