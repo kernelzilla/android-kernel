@@ -370,6 +370,8 @@ marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
 	int rc = 0;
 	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
 
+	marimba_tsadc_shutdown(tsadc);
+
 	if (tsadc->pdata->marimba_tsadc_power)
 		rc = tsadc->pdata->marimba_tsadc_power(0);
 
