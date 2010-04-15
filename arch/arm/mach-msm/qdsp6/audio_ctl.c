@@ -89,7 +89,7 @@ static int q6_ioctl(struct inode *inode, struct file *file,
 	case AUDIO_SWITCH_DEVICE:
 		rc = copy_from_user(&id, (void *)arg, sizeof(id));
 		if (!rc)
-			rc = q6audio_do_routing(id[0], 0);
+			rc = q6audio_do_routing(id[0], id[1]);
 		break;
 	case AUDIO_SET_VOLUME:
 		rc = copy_from_user(&n, (void *)arg, sizeof(n));

@@ -62,6 +62,12 @@ struct q6_device_info {
 #define CAD_HW_DEVICE_ID_DEFAULT_TX		0x0E
 #define CAD_HW_DEVICE_ID_DEFAULT_RX		0x0F
 
+
+#define CAD_HW_DEVICE_ID_SPKR_PHONE_DUAL_MIC_BROADSIDE      0x2B
+#define CAD_HW_DEVICE_ID_SPKR_PHONE_DUAL_MIC_ENDFIRE        0x2D
+#define CAD_HW_DEVICE_ID_HANDSET_DUAL_MIC_BROADSIDE         0x2C
+#define CAD_HW_DEVICE_ID_HANDSET_DUAL_MIC_ENDFIRE           0x2E
+
 /* Logical Device to indicate A2DP routing */
 #define CAD_HW_DEVICE_ID_BT_A2DP_TX             0x10
 #define CAD_HW_DEVICE_ID_HEADSET_MONO_PLUS_SPKR_MONO_RX		0x11
@@ -203,6 +209,42 @@ static struct q6_device_info q6_audio_devices[] = {
 		.cad_id	= CAD_HW_DEVICE_ID_SPKR_PHONE_MIC,
 		.path	= ADIE_PATH_SPEAKER_TX,
 		.rate   = 8000,
+		.dir	= Q6_TX,
+		.codec	= Q6_ICODEC_TX,
+		.hw	= Q6_HW_SPEAKER,
+	},
+	{
+		.id	= ADSP_AUDIO_DEVICE_ID_HANDSET_DUAL_MIC,
+		.cad_id	= CAD_HW_DEVICE_ID_HANDSET_DUAL_MIC_ENDFIRE,
+		.path	= ADIE_CODEC_HANDSET_SPKR_EF_TX,
+		.rate	= 8000,
+		.dir	= Q6_TX,
+		.codec	= Q6_ICODEC_TX,
+		.hw	= Q6_HW_HANDSET,
+	},
+	{
+		.id	= ADSP_AUDIO_DEVICE_ID_HANDSET_DUAL_MIC,
+		.cad_id	= CAD_HW_DEVICE_ID_HANDSET_DUAL_MIC_BROADSIDE,
+		.path	= ADIE_CODEC_HANDSET_SPKR_BS_TX,
+		.rate	= 8000,
+		.dir	= Q6_TX,
+		.codec	= Q6_ICODEC_TX,
+		.hw	= Q6_HW_HANDSET,
+	},
+	{
+		.id	= ADSP_AUDIO_DEVICE_ID_SPKR_PHONE_DUAL_MIC,
+		.cad_id	= CAD_HW_DEVICE_ID_SPKR_PHONE_DUAL_MIC_ENDFIRE,
+		.path	= ADIE_CODEC_HANDSET_SPKR_EF_TX,
+		.rate	= 8000,
+		.dir	= Q6_TX,
+		.codec	= Q6_ICODEC_TX,
+		.hw	= Q6_HW_SPEAKER,
+	},
+	{
+		.id	= ADSP_AUDIO_DEVICE_ID_SPKR_PHONE_DUAL_MIC,
+		.cad_id	= CAD_HW_DEVICE_ID_SPKR_PHONE_DUAL_MIC_BROADSIDE,
+		.path	= ADIE_CODEC_HANDSET_SPKR_BS_TX,
+		.rate	= 8000,
 		.dir	= Q6_TX,
 		.codec	= Q6_ICODEC_TX,
 		.hw	= Q6_HW_SPEAKER,

@@ -89,6 +89,17 @@ enum {
 #define ADIE_PATH_SPKR_MONO_HDPH_STEREO_RX	0x01073d88
 #define ADIE_PATH_SPKR_STEREO_HDPH_STEREO_RX	0x01073d89
 
+
+/** Fluence Profiles **/
+
+/* Broadside/Bowsetalk profile,
+ * For Handset and Speaker phone Tx*/
+#define ADIE_CODEC_HANDSET_SPKR_BS_TX          0x0108fafa
+/* EndFire profile,
+ * For Handset and Speaker phone Tx*/
+#define ADIE_CODEC_HANDSET_SPKR_EF_TX          0x0108fafb
+
+
 /* stages */
 #define ADIE_STAGE_PATH_OFF			0x0050
 #define ADIE_STAGE_DIGITAL_READY		0x0100
