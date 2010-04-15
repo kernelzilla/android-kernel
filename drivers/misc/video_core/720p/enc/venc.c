@@ -394,11 +394,16 @@ static u32 vid_enc_msg_pending(struct video_client_ctx *client_ctx)
 	islist_empty = list_empty(&client_ctx->msg_queue);
 	mutex_unlock(&client_ctx->msg_queue_lock);
 
-	if (islist_empty)
-		DBG("%s(): vid_enc msg queue empty \n",
+	if (islist_empty) {
+		DBG("%s(): vid_enc msg queue empty\n",
 			__func__);
-	else
-		DBG("%s(): vid_enc msg queue Not empty \n",
+		if (client_ctx->stop_msg) {
+			DBG("%s(): List empty and Stop Msg set\n",
+				__func__);
+			return client_ctx->stop_msg;
+		}
+	} else
+		DBG("%s(): vid_enc msg queue Not empty\n",
 			__func__);
 
 	return !islist_empty;
@@ -416,8 +421,10 @@ static u32 vid_enc_get_next_msg(struct video_client_ctx *client_ctx,
 	rc = wait_event_interruptible(client_ctx->msg_wait,
 		vid_enc_msg_pending(client_ctx));
 
-	if (rc < 0)
+	if (rc < 0 || client_ctx->stop_msg) {
+		DBG("rc = %d, stop_msg = %u\n", rc, client_ctx->stop_msg);
 		return FALSE;
+	}
 
 	mutex_lock(&client_ctx->msg_queue_lock);
 
@@ -533,7 +540,8 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 	INIT_LIST_HEAD(&client_ctx->msg_queue);
 	init_waitqueue_head(&client_ctx->msg_wait);
 	vcd_status = vcd_open(vid_enc_device_p->device_handle, FALSE,
-	vid_enc_vcd_cb, client_ctx);
+		vid_enc_vcd_cb, client_ctx);
+	client_ctx->stop_msg = 0;
 
 	wait_for_completion(&client_ctx->event);
 	file->private_data = client_ctx;
@@ -751,6 +759,13 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 				sizeof(cb_msg)))
 				return -EFAULT;
 		break;
+
+	case VEN_IOCTL_CMD_STOP_READ_MSG:
+		DBG("VEN_IOCTL_CMD_STOP_READ_MSG\n");
+		client_ctx->stop_msg = 1;
+		wake_up(&client_ctx->msg_wait);
+		break;
+
 	case VEN_IOCTL_CMD_ENCODE_FRAME:
 	case VEN_IOCTL_CMD_FILL_OUTPUT_BUFFER:
 		if (copy_from_user(&venc_msg, (void __user *)arg,
