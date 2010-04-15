@@ -1239,13 +1239,6 @@ static int __init omap3_pm_init(void)
 
 	pwrdm_add_wkdep(neon_pwrdm, mpu_pwrdm);
 	/*
-	 * REVISIT: This wkdep is only necessary when GPIO2-6 are enabled for
-	 * IO-pad wakeup.  Otherwise it will unnecessarily waste power
-	 * waking up PER with every CORE wakeup - see
-	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
-	*/
-	pwrdm_add_wkdep(per_pwrdm, core_pwrdm);
-	/*
 	 * A part of the fix for errata 1.158.
 	 * GPIO pad spurious transition (glitch/spike) upon wakeup
 	 * from SYSTEM OFF mode. The remaining fix is in:
