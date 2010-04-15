@@ -69,6 +69,7 @@
 #include <linux/msm_kgsl.h>
 #include <mach/dal_axi.h>
 #include <mach/msm_serial_hs.h>
+#include <mach/msm_reqs.h>
 
 #define MSM_PMEM_SF_SIZE	0x1700000
 #define MSM_FB_SIZE		0x500000
@@ -2408,8 +2409,15 @@ static struct platform_device android_pmem_audio_device = {
 };
 
 static struct kgsl_platform_data kgsl_pdata = {
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+	/* NPA Flow IDs */
+	.high_axi_3d = MSM_AXI_FLOW_3D_GPU_HIGH,
+	.high_axi_2d = MSM_AXI_FLOW_2D_GPU_HIGH,
+#else
+	/* AXI rates in KHz */
 	.high_axi_3d = 192000,
 	.high_axi_2d = 192000,
+#endif
 	.max_grp2d_freq = 192 * 1000*1000,
 	.min_grp2d_freq = 192 * 1000*1000,
 	.set_grp2d_async = set_grp2d_async,
