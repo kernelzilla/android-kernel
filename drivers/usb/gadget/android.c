@@ -205,8 +205,8 @@ static int  android_bind_config(struct usb_configuration *c)
 	unsigned long n;
 	acm_func_cnt = 0;
 	gser_func_cnt = 0;
-	printk(KERN_DEBUG "android_bind_config c = 0x%x dev->cdev=0x%x\n",
-	       (unsigned int) c, (unsigned int) dev->cdev);
+	pr_debug("android_bind_config c = 0x%x dev->cdev=0x%x\n",
+		(unsigned int) c, (unsigned int) dev->cdev);
 	n = dev->functions;
 	while (n) {
 		switch (n & 0x0F) {
@@ -265,7 +265,7 @@ static int  android_bind_config(struct usb_configuration *c)
 		case ANDROID_RMNET:
 			ret = rmnet_function_add(c);
 			if (ret) {
-				printk(KERN_ERR "failed to add rmnet function\n");
+				pr_err("failed to add rmnet function\n");
 				return ret;
 			}
 			break;
@@ -314,7 +314,7 @@ static int  android_bind(struct usb_composite_dev *cdev)
 	int			ret;
 	int                     num_ports;
 
-	printk(KERN_INFO "android_bind\n");
+	pr_debug("android_bind\n");
 
 	/* Allocate string descriptor numbers ... note that string
 	 * contents can be overridden by the composite_dev glue.
@@ -342,12 +342,12 @@ static int  android_bind(struct usb_composite_dev *cdev)
 		android_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
 	dev->cdev = cdev;
-	printk(KERN_INFO "android_bind assigned dev->cdev\n");
+	pr_debug("android_bind assigned dev->cdev\n");
 	dev->gadget = gadget;
 	/* register our configuration */
 	ret = usb_add_config(cdev, &android_config_driver);
 	if (ret) {
-		printk(KERN_ERR "usb_add_config failed\n");
+		pr_err("usb_add_config failed\n");
 		return ret;
 	}
 
@@ -388,7 +388,7 @@ static int  android_bind(struct usb_composite_dev *cdev)
 	if (ret < 0)
 		return ret;
 #endif
-	printk(KERN_INFO "android_bind done\n");
+	pr_debug("android_bind done\n");
 	return 0;
 }
 
@@ -408,7 +408,7 @@ struct usb_composition *android_validate_product_id(unsigned short pid)
 
 	for (i = 0; i < dev->pdata->num_compositions; i++) {
 		fi = &dev->pdata->compositions[i];
-		printk("pid=0x%x apid=0x%x\n",
+		pr_debug("pid=0x%x apid=0x%x\n",
 		       fi->product_id, fi->adb_product_id);
 		if ((fi->product_id == pid) || (fi->adb_product_id == pid))
 			return fi;
@@ -425,7 +425,7 @@ static int android_switch_composition(u16 pid)
 	/* Validate the prodcut id */
 	func = android_validate_product_id(pid);
 	if (!func) {
-		printk(KERN_ERR "%s: invalid product id %x\n", __func__, pid);
+		pr_err("%s: invalid product id %x\n", __func__, pid);
 		return -EINVAL;
 	}
 
@@ -473,7 +473,7 @@ static int android_set_sn(const char *kmessage, struct kernel_param *kp)
 	int len = strlen(kmessage);
 
 	if (len >= MAX_SERIAL_LEN) {
-		printk(KERN_ERR "serial number string too long\n");
+		pr_err("serial number string too long\n");
 		return -ENOSPC;
 	}
 
@@ -531,7 +531,7 @@ static int adb_enable_open(struct inode *ip, struct file *fp)
 		goto out;
 
 	dev->adb_enabled = 1;
-	printk(KERN_INFO "enabling adb\n");
+	pr_debug("enabling adb\n");
 	if (product_id)
 		ret = android_switch_composition(product_id);
 out:
@@ -550,7 +550,7 @@ static int adb_enable_release(struct inode *ip, struct file *fp)
 	if (!dev->adb_enabled)
 		goto out;
 
-	printk(KERN_INFO "disabling adb\n");
+	pr_debug("disabling adb\n");
 	dev->adb_enabled = 0;
 	if (product_id)
 		ret = android_switch_composition(product_id);
@@ -578,7 +578,7 @@ static int __init android_probe(struct platform_device *pdev)
 	struct android_dev *dev = _android_dev;
 	int ret;
 
-	printk(KERN_INFO "android_probe pdata: %p\n", pdata);
+	pr_debug("android_probe pdata: %p\n", pdata);
 
 	if (!pdata || !pdata->vendor_id || !pdata->product_name ||
 		!pdata->manufacturer_name)
@@ -618,7 +618,7 @@ static int __init init(void)
 	struct usb_composition *func;
 	int ret;
 
-	printk(KERN_INFO "android init\n");
+	pr_debug("android init\n");
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
@@ -652,7 +652,7 @@ static int __init init(void)
 	func = android_validate_product_id(product_id);
 	if (!func) {
 		mutex_unlock(&dev->lock);
-		printk(KERN_ERR "%s: invalid product id\n", __func__);
+		pr_err("%s: invalid product id\n", __func__);
 		ret = -EINVAL;
 		goto misc_deregister;
 	}
