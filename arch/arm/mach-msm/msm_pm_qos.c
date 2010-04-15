@@ -20,7 +20,7 @@
 #include <linux/err.h>
 #include <mach/msm_reqs.h>
 
-int npa_pm_qos_add(struct pm_qos_object *class, char *request_name,
+int msm_pm_qos_add(struct pm_qos_object *class, char *request_name,
 		   s32 value, void **request_data)
 {
 	char *resource_name = class->plugin->data;
@@ -29,7 +29,7 @@ int npa_pm_qos_add(struct pm_qos_object *class, char *request_name,
 	 * isn't available yet, the request can't be honoured. */
 	BUG_ON(value != class->default_value);
 
-	/* Create an NPA client for a resource. Store the client pointer
+	/* Create an client for a resource. Store the client pointer
 	 * where request_data points when the the resource is available. */
 	*request_data = msm_req_add(resource_name, request_name);
 	if (IS_ERR(*request_data))
@@ -38,13 +38,13 @@ int npa_pm_qos_add(struct pm_qos_object *class, char *request_name,
 	return 0;
 }
 
-int npa_pm_qos_update(struct pm_qos_object *class, char *request_name,
+int msm_pm_qos_update(struct pm_qos_object *class, char *request_name,
 		      s32 value, void **request_data)
 {
 	return msm_req_update(*request_data, value);
 }
 
-int npa_pm_qos_remove(struct pm_qos_object *class, char *request_name,
+int msm_pm_qos_remove(struct pm_qos_object *class, char *request_name,
 		      s32 value, void **request_data)
 {
 	return msm_req_remove(*request_data);
