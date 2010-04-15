@@ -35,6 +35,8 @@
 #include <linux/power_supply.h>
 #include <linux/input/pmic8058-keypad.h>
 #include <linux/i2c/isa1200.h>
+#include <linux/pwm.h>
+#include <linux/pmic8058-pwm.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -97,24 +99,12 @@
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)    (sys_gpio - NR_GPIO_IRQS)
 
 #define PMIC_GPIO_HAP_ENABLE   16  /* PMIC GPIO Number 17 */
-#define PMIC_GPIO_PWM_DRV_1 24
-#define PWM_CH_START_GPIO 24
 
 #define HAP_LVL_SHFT_MSM_GPIO 24
 
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
 	int rc;
-	struct pm8058_gpio backlight_drv = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-		.output_value   = 0,
-		.pull           = PM_GPIO_PULL_NO,
-		.vin_sel        = 2,
-		.out_strength   = PM_GPIO_STRENGTH_HIGH,
-		.function       = PM_GPIO_FUNC_2,
-	};
-
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	struct pm8058_gpio sdcc_det = {
 		.direction      = PM_GPIO_DIR_IN,
@@ -132,17 +122,6 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 		.inv_int_pol    = 0,
 	};
 
-	struct pm8058_gpio pwm_gpio_config = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.pull           = PM_GPIO_PULL_NO,
-		.out_strength   = PM_GPIO_STRENGTH_HIGH,
-		.function       = PM_GPIO_FUNC_2,
-		.inv_int_pol    = 0,
-		.vin_sel        = 6,
-		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-		.output_value   = 0,
-	};
-
 	struct pm8058_gpio haptics_enable = {
 		.direction      = PM_GPIO_DIR_OUT,
 		.pull           = PM_GPIO_PULL_NO,
@@ -155,24 +134,10 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 	};
 
 	if (machine_is_msm7x30_fluid()) {
-		/* pmic gpio 26 */
-		rc = pm8058_gpio_config_h(pm_chip, 25, &backlight_drv);
-		if (rc) {
-			pr_err("%s PMIC GPIO 25 write failed\n", __func__);
-			return rc;
-		}
-
 		rc = pm8058_gpio_config(PMIC_GPIO_HAP_ENABLE, &haptics_enable);
 		if (rc) {
 			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
 				(PMIC_GPIO_HAP_ENABLE + 1));
-			return rc;
-		}
-
-		rc = pm8058_gpio_config(PMIC_GPIO_PWM_DRV_1, &pwm_gpio_config);
-		if (rc) {
-			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
-				(PMIC_GPIO_PWM_DRV_1 + 1));
 			return rc;
 		}
 	}
@@ -199,6 +164,82 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 	}
 
 	return 0;
+}
+
+static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
+{
+	struct pm8058_gpio pwm_gpio_config = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 0,
+		.pull           = PM_GPIO_PULL_NO,
+		.vin_sel        = PM_GPIO_VIN_S3,
+		.out_strength   = PM_GPIO_STRENGTH_HIGH,
+		.function       = PM_GPIO_FUNC_2,
+	};
+	int	rc = -EINVAL;
+	int	id, mode, max_mA;
+
+	id = mode = max_mA = 0;
+	switch (ch) {
+	case 0:
+	case 1:
+	case 2:
+		if (on) {
+			id = 24 + ch;
+			rc = pm8058_gpio_config(id - 1, &pwm_gpio_config);
+			if (rc)
+				pr_err("%s: pm8058_gpio_config(%d): rc=%d\n",
+				       __func__, id, rc);
+		}
+		break;
+
+	case 3:
+		id = PM_PWM_LED_KPD;
+		mode = PM_PWM_CONF_DTEST3;
+		max_mA = 200;
+		break;
+
+	case 4:
+		id = PM_PWM_LED_0;
+		mode = PM_PWM_CONF_PWM1;
+		max_mA = 40;
+		break;
+
+	case 5:
+		id = PM_PWM_LED_2;
+		mode = PM_PWM_CONF_PWM2;
+		max_mA = 40;
+		break;
+
+	case 6:
+		id = PM_PWM_LED_FLASH;
+		mode = PM_PWM_CONF_DTEST3;
+		max_mA = 200;
+		break;
+
+	case 7:
+		rc = pwm_set_dtest(pwm, on);
+		if (rc)
+			pr_err("%s: pwm_set_dtest(%d): rc=%d\n",
+			       __func__, on, rc);
+		break;
+	default:
+		break;
+	}
+
+	if (ch >= 3 && ch <= 6) {
+		if (!on) {
+			mode = PM_PWM_CONF_NONE;
+			max_mA = 0;
+		}
+		rc = pm8058_pwm_config_led(pwm, id, mode, max_mA);
+		if (rc)
+			pr_err("%s: pm8058_pwm_config_led(ch=%d): rc=%d\n",
+			       __func__, ch, rc);
+	}
+
+	return rc;
 }
 
 static const unsigned int fluid_keymap[] = {
@@ -389,6 +430,10 @@ static struct pmic8058_keypad_data fluid_keypad_data = {
 	.wakeup			= 1,
 };
 
+static struct pm8058_pwm_pdata pm8058_pwm_data = {
+	.config		= pm8058_pwm_config,
+};
+
 /* Put sub devices with fixed location first in sub_devices array */
 #define	PM8058_SUBDEV_KPD	0
 
@@ -420,6 +465,8 @@ static struct mfd_cell pm8058_subdevs[] = {
 	},
 	{	.name = "pm8058-pwm",
 		.id		= -1,
+		.platform_data	= &pm8058_pwm_data,
+		.data_size	= sizeof(pm8058_pwm_data),
 	},
 };
 
@@ -3957,7 +4004,7 @@ gpio_request_fail:
 static struct isa1200_platform_data isa1200_1_pdata = {
 	.name = "vibrator",
 	.power_on = isa1200_power,
-	.pwm_ch_id = PMIC_GPIO_PWM_DRV_1 + 1 - PWM_CH_START_GPIO, /*channel id*/
+	.pwm_ch_id = 1, /*channel id*/
 	/*gpio to enable haptic*/
 	.hap_en_gpio = PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
 	.max_timeout = 15000,
