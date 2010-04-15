@@ -131,8 +131,8 @@ static void msm_enqueue(struct msm_device_queue *queue,
 		qcmd = list_first_entry(&__q->list,		\
 				struct msm_queue_cmd, member);	\
 		list_del_init(&qcmd->member);			\
-		spin_unlock_irqrestore(&__q->lock, flags);	\
 	}							\
+	spin_unlock_irqrestore(&__q->lock, flags);	\
 	qcmd;							\
 })
 
@@ -645,7 +645,6 @@ static int msm_control(struct msm_control_device *ctrl_pmsm,
 	udata.value = data;
 	if (udata.type == CAMERA_STOP_SNAPSHOT)
 		sync->get_pic_abort = 1;
-
 	qcmd.on_heap = 0;
 	qcmd.type = MSM_CAM_Q_CTRL;
 	qcmd.command = &udata;
@@ -1931,9 +1930,6 @@ static int __msm_release(struct msm_sync *sync)
 			put_pmem_file(region->file);
 			kfree(region);
 		}
-
-		msm_queue_drain(&sync->event_q, list_config);
-		msm_queue_drain(&sync->frame_q, list_frame);
 		msm_queue_drain(&sync->pict_q, list_pict);
 
 		wake_unlock(&sync->wake_lock);
@@ -1951,8 +1947,10 @@ static int msm_release_config(struct inode *node, struct file *filep)
 	struct msm_device *pmsm = filep->private_data;
 	CDBG("%s: %s\n", __func__, filep->f_path.dentry->d_name.name);
 	rc = __msm_release(pmsm->sync);
-	if (!rc)
+	if (!rc) {
+		msm_queue_drain(&pmsm->sync->event_q, list_config);
 		atomic_set(&pmsm->opened, 0);
+	}
 	return rc;
 }
 
@@ -1977,8 +1975,10 @@ static int msm_release_frame(struct inode *node, struct file *filep)
 	struct msm_device *pmsm = filep->private_data;
 	CDBG("%s: %s\n", __func__, filep->f_path.dentry->d_name.name);
 	rc = __msm_release(pmsm->sync);
-	if (!rc)
+	if (!rc) {
+		msm_queue_drain(&pmsm->sync->frame_q, list_frame);
 		atomic_set(&pmsm->opened, 0);
+	}
 	return rc;
 }
 
