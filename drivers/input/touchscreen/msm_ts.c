@@ -59,6 +59,9 @@ struct msm_ts {
 	uint32_t			ts_down:1;
 	struct ts_virt_key		*vkey_down;
 	struct marimba_tsadc_client	*ts_client;
+
+	unsigned int			sample_irq;
+	unsigned int			pen_up_irq;
 };
 
 static uint32_t msm_tsdebug;
@@ -222,6 +225,50 @@ static int __devinit msm_ts_hw_init(struct msm_ts *ts)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int
+msm_ts_suspend(struct platform_device *pdev, pm_message_t msg)
+{
+	struct msm_ts *ts = platform_get_drvdata(pdev);
+	uint32_t val;
+
+	disable_irq(ts->sample_irq);
+	disable_irq(ts->pen_up_irq);
+
+	val = tssc_readl(ts, TSSC_CTL);
+	val &= ~TSSC_CTL_ENABLE;
+	tssc_writel(ts, val, TSSC_CTL);
+
+	return 0;
+}
+
+static int
+msm_ts_resume(struct platform_device *pdev)
+{
+	struct msm_ts *ts = platform_get_drvdata(pdev);
+
+	msm_ts_hw_init(ts);
+
+	enable_irq(ts->sample_irq);
+	enable_irq(ts->pen_up_irq);
+
+	return 0;
+}
+#else
+static int
+msm_ts_suspend(struct platform_device *pdev, pm_message_t msg)
+{
+
+	return 0;
+}
+
+static int
+msm_ts_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+#endif
+
 static int __devinit msm_ts_probe(struct platform_device *pdev)
 {
 	struct msm_ts_platform_data *pdata = pdev->dev.platform_data;
@@ -255,6 +302,9 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	ts->pdata = pdata;
+
+	ts->sample_irq = irq1_res->start;
+	ts->pen_up_irq = irq2_res->start;
 
 	ts->tssc_base = ioremap(tssc_res->start, resource_size(tssc_res));
 	if (ts->tssc_base == NULL) {
@@ -314,7 +364,7 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 
 	msm_ts_hw_init(ts);
 
-	err = request_irq(irq1_res->start, msm_ts_irq,
+	err = request_irq(ts->sample_irq, msm_ts_irq,
 			  (irq1_res->flags & ~IORESOURCE_IRQ) | IRQF_DISABLED,
 			  "msm_touchscreen", ts);
 	if (err != 0) {
@@ -322,7 +372,7 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 		goto err_request_irq1;
 	}
 
-	err = request_irq(irq2_res->start, msm_ts_irq,
+	err = request_irq(ts->pen_up_irq, msm_ts_irq,
 			  (irq2_res->flags & ~IORESOURCE_IRQ) | IRQF_DISABLED,
 			  "msm_touchscreen", ts);
 	if (err != 0) {
@@ -333,12 +383,12 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ts);
 
 	pr_info("%s: tssc_base=%p irq1=%d irq2=%d\n", __func__,
-		ts->tssc_base, (int)irq1_res->start, (int)irq2_res->start);
+		ts->tssc_base, (int)ts->sample_irq, (int)ts->pen_up_irq);
 	dump_tssc_regs(ts);
 	return 0;
 
 err_request_irq2:
-	free_irq(irq1_res->start, ts);
+	free_irq(ts->sample_irq, ts);
 
 err_request_irq1:
 	/* disable the tssc */
@@ -363,15 +413,10 @@ err_ioremap_tssc:
 static int __devexit msm_ts_remove(struct platform_device *pdev)
 {
 	struct msm_ts *ts = platform_get_drvdata(pdev);
-	struct resource *irq1_res;
-	struct resource *irq2_res;
-
-	irq1_res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "tssc1");
-	irq2_res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "tssc2");
 
 	marimba_tsadc_unregister(ts->ts_client);
-	free_irq(irq1_res->start, ts);
-	free_irq(irq2_res->start, ts);
+	free_irq(ts->sample_irq, ts);
+	free_irq(ts->pen_up_irq, ts);
 	input_unregister_device(ts->input_dev);
 	iounmap(ts->tssc_base);
 	platform_set_drvdata(pdev, NULL);
@@ -385,8 +430,10 @@ static struct platform_driver msm_touchscreen_driver = {
 		.name = "msm_touchscreen",
 		.owner = THIS_MODULE,
 	},
-	.probe = msm_ts_probe,
-	.remove = __devexit_p(msm_ts_remove),
+	.probe		= msm_ts_probe,
+	.remove		= __devexit_p(msm_ts_remove),
+	.resume		= msm_ts_resume,
+	.suspend	= msm_ts_suspend,
 };
 
 static int __init msm_ts_init(void)
