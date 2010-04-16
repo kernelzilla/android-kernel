@@ -1097,6 +1097,44 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	},
 };
 
+static struct vreg *vreg_codec_s4;
+static int msm_marimba_codec_power(int vreg_on)
+{
+	int rc = 0;
+
+	if (!vreg_codec_s4) {
+
+		vreg_codec_s4 = vreg_get(NULL, "s4");
+
+		if (IS_ERR(vreg_codec_s4)) {
+			printk(KERN_ERR "%s: vreg_get() failed (%ld)\n",
+				__func__, PTR_ERR(vreg_codec_s4));
+			rc = PTR_ERR(vreg_codec_s4);
+			goto  vreg_codec_s4_fail;
+		}
+	}
+
+	if (vreg_on) {
+		rc = vreg_enable(vreg_codec_s4);
+		if (rc)
+			printk(KERN_ERR "%s: vreg_enable() = %d \n",
+					__func__, rc);
+		goto vreg_codec_s4_fail;
+	} else {
+		rc = vreg_disable(vreg_codec_s4);
+		if (rc)
+			printk(KERN_ERR "%s: vreg_disable() = %d \n",
+					__func__, rc);
+		goto vreg_codec_s4_fail;
+	}
+
+vreg_codec_s4_fail:
+	return rc;
+}
+
+static struct marimba_codec_platform_data mariba_codec_pdata = {
+	.marimba_codec_power =  msm_marimba_codec_power,
+};
 
 static struct marimba_platform_data marimba_pdata = {
 	.slave_id[MARIMBA_SLAVE_ID_FM]       = MARIMBA_SLAVE_ID_FM_ADDR,
@@ -1106,6 +1144,7 @@ static struct marimba_platform_data marimba_pdata = {
 	.marimba_shutdown = msm_marimba_shutdown_power,
 	.fm = &marimba_fm_pdata,
 	.tsadc = &marimba_tsadc_pdata,
+	.codec = &mariba_codec_pdata,
 };
 
 static void __init msm7x30_init_marimba(void)
