@@ -1065,6 +1065,12 @@ enum sched_status_type sched_process_clnt_lvl_get_param(
 			break;
 		}
 
+	case SCHED_I_CLNT_OTKNCURRENT:
+		{
+			p_param_value->un_value = p_clnt_ctx->n_curr_o_tkns;
+			break;
+		}
+
 	default:
 		{
 			status = SCHED_S_EBADPARM;
@@ -1087,6 +1093,7 @@ enum sched_status_type sched_process_clnt_lvl_set_param(
 
 	switch (param_index) {
 	case SCHED_I_CLNT_CURRQLEN:
+	case SCHED_I_CLNT_OTKNCURRENT:
 		{
 			status = SCHED_S_EINVALOP;
 			break;
