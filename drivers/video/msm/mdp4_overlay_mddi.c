@@ -192,11 +192,15 @@ void mdp4_overlay0_done_mddi()
 
 void mdp4_mddi_overlay_restore(void)
 {
+#ifdef MDP4_MDDI_DMA_SWITCH
+	mdp4_mddi_overlay_dmas_restore();
+#else
 	/* mutex holded by caller */
 	if (mddi_mfd && mddi_pipe) {
 		mdp4_overlay_update_lcd(mddi_mfd);
 		mdp4_mddi_overlay_kickoff(mddi_mfd, mddi_pipe);
 	}
+#endif
 }
 
 static ulong mddi_last_kick;
@@ -262,6 +266,107 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 #endif
 }
 
+#ifdef MDP4_MDDI_DMA_SWITCH
+
+void mdp4_dma_s_done_mddi()
+{
+	if (pending_pipe)
+		complete(&pending_pipe->dmas_comp);
+}
+void mdp4_dma_s_update_lcd(struct msm_fb_data_type *mfd,
+				struct mdp4_overlay_pipe *pipe)
+{
+	MDPIBUF *iBuf = &mfd->ibuf;
+	uint32 outBpp = iBuf->bpp;
+	uint16 mddi_vdo_packet_reg;
+	uint32 dma_s_cfg_reg;
+
+	dma_s_cfg_reg = 0;
+
+	if (mfd->fb_imgType == MDP_RGBA_8888)
+		dma_s_cfg_reg |= DMA_PACK_PATTERN_BGR; /* on purpose */
+	else if (mfd->fb_imgType == MDP_BGR_565)
+		dma_s_cfg_reg |= DMA_PACK_PATTERN_BGR;
+	else
+		dma_s_cfg_reg |= DMA_PACK_PATTERN_RGB;
+
+	if (outBpp == 4)
+		dma_s_cfg_reg |= (1 << 26); /* xRGB8888 */
+	else if (outBpp == 2)
+		dma_s_cfg_reg |= DMA_IBUF_FORMAT_RGB565;
+
+	dma_s_cfg_reg |= DMA_DITHER_EN;
+
+	/* MDP cmd block enable */
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+	/* PIXELSIZE */
+	MDP_OUTP(MDP_BASE + 0xa0004, (pipe->dst_h << 16 | pipe->dst_w));
+	MDP_OUTP(MDP_BASE + 0xa0008, pipe->srcp0_addr);	/* ibuf address */
+	MDP_OUTP(MDP_BASE + 0xa000c, pipe->srcp0_ystride);/* ystride */
+
+	if (mfd->panel_info.bpp == 24) {
+		dma_s_cfg_reg |= DMA_DSTC0G_8BITS |	/* 666 18BPP */
+		    DMA_DSTC1B_8BITS | DMA_DSTC2R_8BITS;
+	} else if (mfd->panel_info.bpp == 18) {
+		dma_s_cfg_reg |= DMA_DSTC0G_6BITS |	/* 666 18BPP */
+		    DMA_DSTC1B_6BITS | DMA_DSTC2R_6BITS;
+	} else {
+		dma_s_cfg_reg |= DMA_DSTC0G_6BITS |	/* 565 16BPP */
+		    DMA_DSTC1B_5BITS | DMA_DSTC2R_5BITS;
+	}
+
+	MDP_OUTP(MDP_BASE + 0xa0010, (pipe->dst_y << 16) | pipe->dst_x);
+	MDP_OUTP(MDP_BASE + 0x00090, 1); /* do not change this */
+
+	mddi_vdo_packet_reg = mfd->panel_info.mddi.vdopkt;
+
+	if (mfd->panel_info.bpp == 24)
+		MDP_OUTP(MDP_BASE + 0x00094,
+			(MDDI_VDO_PACKET_DESC_24 << 16) | mddi_vdo_packet_reg);
+	else if (mfd->panel_info.bpp == 16)
+		MDP_OUTP(MDP_BASE + 0x00094,
+			 (MDDI_VDO_PACKET_DESC_16 << 16) | mddi_vdo_packet_reg);
+	else
+		MDP_OUTP(MDP_BASE + 0x00094,
+			 (MDDI_VDO_PACKET_DESC << 16) | mddi_vdo_packet_reg);
+
+	MDP_OUTP(MDP_BASE + 0x00098, 0x01);
+
+	MDP_OUTP(MDP_BASE + 0xa0000, dma_s_cfg_reg);
+
+	/* MDP cmd block disable */
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+}
+
+void mdp4_mddi_dma_s_kickoff(struct msm_fb_data_type *mfd,
+				struct mdp4_overlay_pipe *pipe)
+{
+	down(&mfd->sem);
+	mdp_enable_irq(MDP_DMA_S_TERM);
+	mfd->dma->busy = TRUE;
+	INIT_COMPLETION(pipe->dmas_comp);
+	mfd->ibuf_flushed = TRUE;
+	pending_pipe = pipe;
+	/* start dma_s pipe */
+	mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
+	up(&mfd->sem);
+
+	/* wait until DMA finishes the current job */
+	wait_for_completion_killable(&pipe->dmas_comp);
+	pending_pipe = NULL;
+	mdp_disable_irq(MDP_DMA_S_TERM);
+}
+
+void mdp4_mddi_overlay_dmas_restore(void)
+{
+	/* mutex holded by caller */
+	if (mddi_mfd && mddi_pipe) {
+		mdp4_dma_s_update_lcd(mddi_mfd, mddi_pipe);
+		mdp4_mddi_dma_s_kickoff(mddi_mfd, mddi_pipe);
+	}
+}
+#endif
+
 void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 {
 	mutex_lock(&mfd->dma->ov_mutex);
@@ -273,7 +378,13 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 #endif
 		mdp4_overlay_update_lcd(mfd);
 
-		mdp4_mddi_overlay_kickoff(mfd, mddi_pipe);
+#ifdef MDP4_MDDI_DMA_SWITCH
+		if (mdp4_overlay_pipe_staged(mddi_pipe->mixer_num) <= 1) {
+			mdp4_dma_s_update_lcd(mfd, mddi_pipe);
+			mdp4_mddi_dma_s_kickoff(mfd, mddi_pipe);
+		} else
+#endif
+			mdp4_mddi_overlay_kickoff(mfd, mddi_pipe);
 
 		mdp4_stat.kickoff_mddi++;
 
