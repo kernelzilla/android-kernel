@@ -76,8 +76,13 @@
  * next layer of buffering.  For TX that's a circular buffer; for RX
  * consider it a NOP.  A third layer is provided by the TTY code.
  */
-#define QUEUE_SIZE		16
+#define TX_QUEUE_SIZE		8
+#define TX_BUF_SIZE		4096
 #define WRITE_BUF_SIZE		8192		/* TX only */
+
+#define RX_QUEUE_SIZE		8
+#define RX_BUF_SIZE		4096
+
 
 /* circular buffer */
 struct gs_buf {
@@ -364,10 +369,10 @@ __acquires(&port->port_lock)
 		int			len;
 
 		req = list_entry(pool->next, struct usb_request, list);
-		len = gs_send_packet(port, req->buf, in->maxpacket);
+		len = gs_send_packet(port, req->buf, TX_BUF_SIZE);
 		if (len == 0) {
 			/* Queue zero length packet */
-			if (prev_len == in->maxpacket) {
+			if (prev_len & (prev_len % in->maxpacket == 0)) {
 				req->length = 0;
 				list_del(&req->list);
 
@@ -447,7 +452,7 @@ __acquires(&port->port_lock)
 
 		req = list_entry(pool->next, struct usb_request, list);
 		list_del(&req->list);
-		req->length = out->maxpacket;
+		req->length = RX_BUF_SIZE;
 
 		/* drop lock while we call out; the controller driver
 		 * may need to call us back (e.g. for disconnect)
@@ -644,6 +649,7 @@ static void gs_free_requests(struct usb_ep *ep, struct list_head *head)
 }
 
 static int gs_alloc_requests(struct usb_ep *ep, struct list_head *head,
+		int num, int size,
 		void (*fn)(struct usb_ep *, struct usb_request *))
 {
 	int			i;
@@ -653,8 +659,8 @@ static int gs_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	 * do quite that many this time, don't fail ... we just won't
 	 * be as speedy as we might otherwise be.
 	 */
-	for (i = 0; i < QUEUE_SIZE; i++) {
-		req = gs_alloc_req(ep, ep->maxpacket, GFP_ATOMIC);
+	for (i = 0; i < num; i++) {
+		req = gs_alloc_req(ep, size, GFP_ATOMIC);
 		if (!req)
 			return list_empty(head) ? -ENOMEM : 0;
 		req->complete = fn;
@@ -685,12 +691,13 @@ static int gs_start_io(struct gs_port *port)
 	 * configurations may use different endpoints with a given port;
 	 * and high speed vs full speed changes packet sizes too.
 	 */
-	status = gs_alloc_requests(ep, head, gs_read_complete);
+	status = gs_alloc_requests(ep, head, RX_QUEUE_SIZE,
+			RX_BUF_SIZE, gs_read_complete);
 	if (status)
 		return status;
 
 	status = gs_alloc_requests(port->port_usb->in, &port->write_pool,
-			gs_write_complete);
+			TX_QUEUE_SIZE, TX_BUF_SIZE, gs_write_complete);
 	if (status) {
 		gs_free_requests(ep, head);
 		return status;
