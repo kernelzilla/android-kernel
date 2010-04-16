@@ -6820,6 +6820,14 @@ static int __devinit msm_nand_probe(struct platform_device *pdev)
 	struct msm_nand_info *info;
 	struct resource *res;
 	int err;
+	struct flash_platform_data *plat_data;
+
+	plat_data = pdev->dev.platform_data;
+
+	if (plat_data->interleave)
+		interleave_enable = plat_data->interleave;
+
+	pr_info("%s: Interleave_enable = %d \n", __func__, interleave_enable);
 
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "msm_nand_phys");

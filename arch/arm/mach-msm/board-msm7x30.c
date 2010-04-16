@@ -57,6 +57,7 @@
 #include <mach/msm_battery.h>
 
 #include <asm/mach/mmc.h>
+#include <asm/mach/flash.h>
 #include <mach/vreg.h>
 #include "devices.h"
 #include "timer.h"
@@ -3455,6 +3456,11 @@ static struct msm_gpio sdc1_lvlshft_cfg_data[] = {
 	{GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_16MA), "sdc1_lvlshft"},
 };
 
+static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
+	{GPIO_CFG(86, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_cs1"},
+	{GPIO_CFG(115, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_busy1"},
+};
+
 static struct msm_gpio sdc1_cfg_data[] = {
 	{GPIO_CFG(38, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc1_clk"},
 	{GPIO_CFG(39, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_cmd"},
@@ -3762,6 +3768,27 @@ static void __init msm7x30_init_mmc(void)
 
 }
 
+static void __init msm7x30_init_nand(void)
+{
+	char *build_id;
+	struct flash_platform_data *plat_data;
+
+	build_id = socinfo_get_build_id();
+	if (build_id == NULL) {
+		pr_err("%s: Build ID not available from socinfo\n", __func__);
+		return;
+	}
+
+	if (build_id[8] == 'C' &&
+			!msm_gpios_request_enable(msm_nand_ebi2_cfg_data,
+			ARRAY_SIZE(msm_nand_ebi2_cfg_data))) {
+		plat_data = msm_device_nand.dev.platform_data;
+		plat_data->interleave = 1;
+		printk(KERN_INFO "%s: Interleave mode Build ID found\n",
+			__func__);
+	}
+}
+
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 static struct msm_gpio uart2_config_data[] = {
 	{ GPIO_CFG(49, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_RFR"},
@@ -3836,6 +3863,7 @@ static void __init msm7x30_init(void)
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
 	msm7x30_init_mmc();
+	msm7x30_init_nand();
 	msm_qsd_spi_init();
 	spi_register_board_info(msm_spi_board_info,
 		ARRAY_SIZE(msm_spi_board_info));
