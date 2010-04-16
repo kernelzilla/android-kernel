@@ -20,6 +20,7 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
+#include <mach/debug_mm.h>
 
 #define BUFSZ (0)
 
@@ -36,21 +37,23 @@ static int q6_voice_start(void)
 	mutex_lock(&voice_lock);
 
 	if (voice_started) {
-		pr_err("voice: busy\n");
+		pr_err("[%s:%s] busy\n", __MM_FILE__, __func__);
 		rc = -EBUSY;
 		goto done;
 	}
 
 	voc_tx_clnt = q6voice_open(AUDIO_FLAG_WRITE);
 	if (!voc_tx_clnt) {
-		pr_err("voice: open voice tx failed.\n");
+		pr_err("[%s:%s] open voice tx failed.\n", __MM_FILE__,
+				__func__);
 		rc = -ENOMEM;
 		goto done;
 	}
 
 	voc_rx_clnt = q6voice_open(AUDIO_FLAG_READ);
 	if (!voc_rx_clnt) {
-		pr_err("voice: open voice rx failed.\n");
+		pr_err("[%s:%s] open voice rx failed.\n", __MM_FILE__,
+				__func__);
 		q6voice_close(voc_tx_clnt);
 		rc = -ENOMEM;
 	}

@@ -24,8 +24,8 @@
 
 #include <linux/msm_audio_qcp.h>
 #include <mach/msm_qdsp6_audio.h>
-#include <mach/debug_audio_mm.h>
 #include "dal_audio_format.h"
+#include <mach/debug_mm.h>
 
 struct evrc {
 	struct mutex lock;
@@ -99,7 +99,8 @@ static long q6_evrc_in_ioctl(struct file *file, unsigned int cmd,
 				&& evrc->voicerec_mode.rec_mode !=
 				AUDIO_FLAG_INCALL_MIXED) {
 			evrc->voicerec_mode.rec_mode = AUDIO_FLAG_READ;
-			MM_ERR("Invalid rec_mode\n");
+			pr_err("[%s:%s] Invalid rec_mode\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		break;
@@ -117,13 +118,15 @@ static long q6_evrc_in_ioctl(struct file *file, unsigned int cmd,
 		}
 
 		if (evrc->str_cfg.buffer_size < 23) {
-			MM_ERR("Buffer size too small\n");
+			pr_err("[%s:%s] Buffer size too small\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 			break;
 		}
 
 		if (evrc->str_cfg.buffer_count != 2)
-			MM_INFO("Buffer count set to 2\n");
+			pr_info("[%s:%s] Buffer count set to 2\n", __MM_FILE__,
+					__func__);
 		break;
 	case AUDIO_SET_EVRC_ENC_CONFIG:
 		if (copy_from_user(&evrc->cfg, (void *) arg,
@@ -131,11 +134,13 @@ static long q6_evrc_in_ioctl(struct file *file, unsigned int cmd,
 			rc = -EFAULT;
 
 		if (evrc->cfg.min_bit_rate > 4 || evrc->cfg.min_bit_rate < 1) {
-			MM_ERR("invalid min bitrate\n");
+			pr_err("[%s:%s] invalid min bitrate\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		if (evrc->cfg.max_bit_rate > 4 || evrc->cfg.max_bit_rate < 1) {
-			MM_ERR("invalid max bitrate\n");
+			pr_err("[%s:%s] invalid max bitrate\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		break;
@@ -158,7 +163,8 @@ static int q6_evrc_in_open(struct inode *inode, struct file *file)
 	struct evrc *evrc;
 	evrc = kmalloc(sizeof(struct evrc), GFP_KERNEL);
 	if (evrc == NULL) {
-		MM_ERR("Could not allocate memory for evrc driver\n");
+		pr_err("[%s:%s] Could not allocate memory for evrc driver\n",
+				__MM_FILE__, __func__);
 		return -ENOMEM;
 	}
 

@@ -25,6 +25,7 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
+#include <mach/debug_mm.h>
 
 void audio_client_dump(struct audio_client *ac);
 
@@ -67,7 +68,8 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (arg == 0) {
 			acdb_id = 0;
 		} else if (copy_from_user(&acdb_id, (void*) arg, sizeof(acdb_id))) {
-			pr_info("pcm_out: copy acdb_id from user failed\n");
+			pr_info("[%s:%s] copy acdb_id from user failed\n",
+					__MM_FILE__, __func__);
 			rc = -EFAULT;
 			break;
 		}
@@ -149,7 +151,7 @@ static int pcm_open(struct inode *inode, struct file *file)
 {
 	struct pcm *pcm;
 
-	pr_info("pcm_out: open\n");
+	pr_info("[%s:%s] open\n", __MM_FILE__, __func__);
 	pcm = kzalloc(sizeof(struct pcm), GFP_KERNEL);
 
 	if (!pcm)
@@ -185,7 +187,8 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 		if (ab->used)
 			if (!wait_event_timeout(ac->wait, (ab->used == 0), 5*HZ)) {
 				audio_client_dump(ac);
-				pr_err("pcm_write: timeout. dsp dead?\n");
+				pr_err("[%s:%s] timeout. dsp dead?\n",
+						__MM_FILE__, __func__);
 				BUG();
 			}
 
@@ -214,6 +217,7 @@ static int pcm_release(struct inode *inode, struct file *file)
 	if (pcm->ac)
 		q6audio_close(pcm->ac);
 	kfree(pcm);
+	pr_info("[%s:%s] release\n", __MM_FILE__, __func__);
 	return 0;
 }
 

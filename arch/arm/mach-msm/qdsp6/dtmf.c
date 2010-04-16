@@ -27,7 +27,7 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
-#include <mach/debug_audio_mm.h>
+#include <mach/debug_mm.h>
 
 struct dtmf {
 	struct mutex lock;
@@ -61,7 +61,8 @@ static long dtmf_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					dtmf->cfg.dtmf_low, dtmf->cfg.duration,
 					dtmf->cfg.rx_gain);
 		if (rc) {
-			MM_ERR("DTMF_START failed\n");
+			pr_err("[%s:%s] DTMF_START failed\n", __MM_FILE__,
+					__func__);
 			break;
 		}
 		break;

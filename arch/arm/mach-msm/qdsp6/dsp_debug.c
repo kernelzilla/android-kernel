@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 
 #include "../proc_comm.h"
+#include <mach/debug_mm.h>
 
 static wait_queue_head_t dsp_wait;
 static int dsp_has_crashed;
@@ -80,7 +81,8 @@ static ssize_t dsp_write(struct file *file, const char __user *buf,
 		dsp_has_crashed = 2;
 		wake_up(&dsp_wait);
 	} else {
-		pr_err("unknown dsp_debug command: %s\n", cmd);
+		pr_err("[%s:%s] unknown dsp_debug command: %s\n", __MM_FILE__,
+				__func__, cmd);
 	}
 
 	return count;
@@ -114,12 +116,14 @@ static ssize_t dsp_read(struct file *file, char __user *buf,
 	while (count >= PAGE_SIZE) {
 		ptr = ioremap(addr, mapsize);
 		if (!ptr) {
-			pr_err("dsp: map error @ %x\n", addr);
+			pr_err("[%s:%s] map error @ %x\n", __MM_FILE__,
+					__func__, addr);
 			return -EFAULT;
 		}
 		if (copy_to_user(buf, ptr, PAGE_SIZE)) {
 			iounmap(ptr);
-			pr_err("dsp: copy error @ %p\n", buf);
+			pr_err("[%s:%s] copy error @ %p\n", __MM_FILE__,
+					__func__, buf);
 			return -EFAULT;
 		}
 		copy_ok_count += PAGE_SIZE;
