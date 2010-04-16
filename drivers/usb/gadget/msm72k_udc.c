@@ -507,6 +507,8 @@ static void usb_ept_start(struct msm_endpoint *ept)
 {
 	struct usb_info *ui = ept->ui;
 	struct msm_request *req = ept->req;
+	int i, cnt;
+	unsigned n = 1 << ept->bit;
 
 	BUG_ON(req->live);
 
@@ -535,8 +537,26 @@ static void usb_ept_start(struct msm_endpoint *ept)
 	/* flush buffers before priming ept */
 	dma_coherent_pre_ops();
 
-	/* start the endpoint */
-	writel(1 << ept->bit, USB_ENDPTPRIME);
+	/* during high throughput testing it is observed that
+	 * ept stat bit is not set even thoguh all the data
+	 * structures are updated properly and ept prime bit
+	 * is set. To workaround the issue, try to check if
+	 * ept stat bit otherwise try to re-prime the ept
+	 */
+	for (i = 0; i < 5; i++) {
+		writel(n, USB_ENDPTPRIME);
+		for (cnt = 0; cnt < 3000; cnt++) {
+			if (!(readl(USB_ENDPTPRIME) & n) &&
+					(readl(USB_ENDPTSTAT) & n))
+				return;
+			udelay(1);
+		}
+	}
+
+	if (!(readl(USB_ENDPTSTAT) & n))
+		pr_err("Unable to prime the ept%d%s\n",
+				ept->num,
+				ept->flags & EPT_FLAG_IN ? "in" : "out");
 }
 
 int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
