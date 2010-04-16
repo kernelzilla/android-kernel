@@ -937,15 +937,16 @@ static u32 vid_dec_msg_pending(struct video_client_ctx *client_ctx)
 	islist_empty = list_empty(&client_ctx->msg_queue);
 	mutex_unlock(&client_ctx->msg_queue_lock);
 
-	if (islist_empty)
-		DBG("%s(): vid_dec msg queue empty \n", __func__);
-	else
-		DBG("%s(): vid_dec msg queue Not empty \n", __func__);
+	if (islist_empty) {
+		DBG("%s(): vid_dec msg queue empty\n", __func__);
+		if (client_ctx->stop_msg) {
+			DBG("%s(): List empty and Stop Msg set\n",
+				__func__);
+			return client_ctx->stop_msg;
+		}
+	} else
+		DBG("%s(): vid_dec msg queue Not empty\n", __func__);
 
-	if (islist_empty && client_ctx->stop_msg == 1) {
-		DBG("%s(): List empty and Stop Msg set \n", __func__);
-		return client_ctx->stop_msg;
-	}
 	return !islist_empty;
 }
 
@@ -960,7 +961,7 @@ static u32 vid_dec_get_next_msg(struct video_client_ctx *client_ctx,
 
 	rc = wait_event_interruptible(client_ctx->msg_wait,
 				      vid_dec_msg_pending(client_ctx));
-	if (rc < 0 || client_ctx->stop_msg == 1) {
+	if (rc < 0 || client_ctx->stop_msg) {
 		DBG("rc = %d, stop_msg = %u \n", rc, client_ctx->stop_msg);
 		return FALSE;
 	}
