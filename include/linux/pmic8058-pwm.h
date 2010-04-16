@@ -29,31 +29,43 @@
 #ifndef __PMIC8058_PWM_H__
 #define __PMIC8058_PWM_H__
 
-struct pw8058_pwm_config {
-	int	pwm_size;	/* round up to 6 or 9 for 6/9-bit PWM SIZE */
-	int	clk;
-	int	pre_div;
-	int	pre_div_exp;
-	int	pwm_value;
-	int	bypass_lut;
-};
+#define	PM_PWM_LUT_SIZE			64
+#define	PM_PWM_LUT_DUTY_TIME_MAX	512	/* ms */
+#define	PM_PWM_LUT_PAUSE_MAX		(7000 * PM_PWM_LUT_DUTY_TIME_MAX)
 
-/* clk */
-#define	PM_PWM_CLK_NO		0
-#define	PM_PWM_CLK_1KHZ		1
-#define	PM_PWM_CLK_32KHZ	2
-#define	PM_PWM_CLK_19P2MHZ	3
+/* Flags for Look Up Table */
+#define	PM_PWM_LUT_LOOP		0x01
+#define	PM_PWM_LUT_RAMP_UP	0x02
+#define	PM_PWM_LUT_REVERSE	0x04
 
-/* pre-divide */
-#define	PM_PWM_PREDIVIDE_2		0
-#define	PM_PWM_PREDIVIDE_3		1
-#define	PM_PWM_PREDIVIDE_5		2
-#define	PM_PWM_PREDIVIDE_6		3
+#define	PM_PWM_LUT_PAUSE_HI_EN	0x10
+#define	PM_PWM_LUT_PAUSE_LO_EN	0x20
 
-/* pre-divide exponent */
-#define	PM_PWM_PREDIVIDE_EXP_MASK	0x07
+/*
+ * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
+ *
+ * @pwm: the PWM device
+ * @period_ns: period in nano second
+ * @duty_pct: arrary of duty cycles in percent, like 20, 50.
+ * @duty_time_ms: time for each duty cycle in millisecond
+ * @start_idx: start index in lookup table from 0 to MAX-1
+ * @idx_len: number of index
+ * @pause_lo: pause time in millisecond at low index
+ * @pause_hi: pause time in millisecond at high index
+ * @flags: control flags
+ *
+ */
+int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
+			  int duty_pct[], int duty_time_ms, int start_idx,
+			  int len, int pause_lo, int pause_hi, int flags);
 
-int pwm_configure(struct pwm_device *pwm, struct pw8058_pwm_config *pwm_conf);
+/*
+ * pm8058_pwm_lut_enable - control a PWM device to start/stop LUT ramp
+ *
+ * @pwm: the PWM device
+ * @start: to start (1), or stop (0)
+ */
+int pm8058_pwm_lut_enable(struct pwm_device *pwm, int start);
 
 int pwm_set_dtest(struct pwm_device *pwm, int enable);
 
@@ -79,12 +91,6 @@ inline int pwm_enable(struct pwm_device *pwm)
 
 inline void pwm_disable(struct pwm_device *pwm)
 {
-}
-
-inline int pwm_configure(struct pwm_device *pwm,
-			 struct pw8058_pwm_config *pwm_conf)
-{
-	return 0;
 }
 
 inline int pwm_set_dtest(struct pwm_device *pwm, int enable)
