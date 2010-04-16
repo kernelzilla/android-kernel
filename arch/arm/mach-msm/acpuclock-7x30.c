@@ -43,11 +43,14 @@
 #define dprintk(msg...) \
 	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
 
-#define VREF_SEL_SHIFT	5
-#define VREF_SEL_VAL	7
-
-/* mv = (750mV + (raw*25mV))*(2-VREF_SEL_VAL)) */
-#define VDD_RAW(_mv) ((((_mv) - 750) / 25) | (VREF_SEL_VAL << VREF_SEL_SHIFT))
+#define VREF_SEL     1	/* 0: 0.625V (50mV step), 1: 0.3125V (25mV step). */
+#define V_STEP       (25 * (2 - VREF_SEL)) /* Minimum voltage step size. */
+#define VREG_DATA    (VREG_CONFIG | (VREF_SEL << 5))
+#define VREG_CONFIG  (BIT(7) | BIT(6)) /* Enable VREG, pull-down if disabled. */
+/* Cause a compile error if the voltage is not a multiple of the step size. */
+#define MV(mv)      ((mv) / (!((mv) % V_STEP)))
+/* mv = (750mV + (raw * 25mV)) * (2 - VREF_SEL) */
+#define VDD_RAW(mv) (((MV(mv) / V_STEP) - 30) | VREG_DATA)
 
 #define MAX_AXI_KHZ 192000
 
@@ -117,8 +120,8 @@ unsigned long acpuclk_wait_for_irq(void)
 }
 
 #define STS_PMIC_DATA_SHIFT	10
-#define STS_PMIC_DATA_VDD_MASK	(0x3F << STS_PMIC_DATA_SHIFT)
-#define VCTL_PMIC_DATA_VDD_MASK	0x3F
+#define STS_PMIC_DATA_MASK	(0xFF << STS_PMIC_DATA_SHIFT)
+#define VCTL_PMIC_DATA_MASK	0xFF
 #define PMIC_STATE_MASK		(0x3 << 20)
 #define PMIC_STATE_IDLE		0
 static int acpuclk_set_acpu_vdd(struct clkctl_acpu_speed *s)
@@ -128,7 +131,7 @@ static int acpuclk_set_acpu_vdd(struct clkctl_acpu_speed *s)
 
 	/* Set VDD. */
 	reg_val = readl(SAW_VCTL);
-	reg_val &= ~(VCTL_PMIC_DATA_VDD_MASK);
+	reg_val &= ~(VCTL_PMIC_DATA_MASK);
 	reg_val |= s->vdd_raw;
 	writel(reg_val, SAW_VCTL);
 
@@ -140,7 +143,7 @@ static int acpuclk_set_acpu_vdd(struct clkctl_acpu_speed *s)
 	}
 
 	/* Read set voltage to check for success. */
-	cur_raw_vdd = (readl(SAW_STS) & STS_PMIC_DATA_VDD_MASK)
+	cur_raw_vdd = (readl(SAW_STS) & STS_PMIC_DATA_MASK)
 				>> STS_PMIC_DATA_SHIFT;
 	if (timeout_count == 0 || cur_raw_vdd != s->vdd_raw)
 		return -EIO;
