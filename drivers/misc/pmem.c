@@ -112,7 +112,7 @@ struct pmem_region_node {
 #define PMEM_DEBUG_MSGS 0
 #if PMEM_DEBUG_MSGS
 #define DLOG(fmt,args...) \
-	do { printk(KERN_INFO "[%s:%s:%d] "fmt, __FILE__, __func__, __LINE__, \
+	do { pr_debug("[%s:%s:%d] "fmt, __FILE__, __func__, __LINE__, \
 		    ##args); } \
 	while (0)
 #else
@@ -1170,7 +1170,7 @@ static int pmem_allocator_bitmap(const int id,
 
 		if (!new_bitmap_allocs) { /* failed sanity check!! */
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: bitmap_allocs number"
+			pr_alert("pmem: bitmap_allocs number"
 				" wrapped around to zero! Something "
 				"is VERY wrong.\n");
 #endif
@@ -1180,7 +1180,7 @@ static int pmem_allocator_bitmap(const int id,
 		if (new_bitmap_allocs > pmem[id].num_entries) {
 			/* failed sanity check!! */
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: required bitmap_allocs"
+			pr_alert("pmem: required bitmap_allocs"
 				" number exceeds maximum entries possible"
 				" for current quanta\n");
 #endif
@@ -1193,7 +1193,7 @@ static int pmem_allocator_bitmap(const int id,
 				GFP_KERNEL);
 		if (!temp) {
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: can't realloc bitmap_allocs,"
+			pr_alert("pmem: can't realloc bitmap_allocs,"
 				"id %d, current num bitmap allocs %d\n",
 				id, pmem[id].allocator.bitmap.bitmap_allocs);
 #endif
@@ -1285,7 +1285,7 @@ static unsigned long pmem_len_bitmap(int id, struct pmem_data *data)
 	mutex_unlock(&pmem[id].arena_mutex);
 #if PMEM_DEBUG
 	if (i >= pmem[id].allocator.bitmap.bitmap_allocs)
-		printk(KERN_ALERT "pmem: %s: can't find bitnum %d in "
+		pr_alert("pmem: %s: can't find bitnum %d in "
 			"alloc'd array!\n", __func__, data->index);
 #endif
 	return ret;
@@ -1337,7 +1337,7 @@ static int pmem_map_pfn_range(int id, struct vm_area_struct *vma,
 		len, vma->vm_page_prot);
 	if (ret) {
 #if PMEM_DEBUG
-		printk(KERN_ALERT "pmem: %s: io_remap_pfn_range fails with "
+		pr_alert("pmem: %s: io_remap_pfn_range fails with "
 			"return value: %d!\n",	__func__, ret);
 #endif
 
@@ -1392,7 +1392,7 @@ static void pmem_vma_close(struct vm_area_struct *vma)
 		current->parent->pid, file, file_count(file));
 
 	if (unlikely(!is_pmem_file(file))) {
-		printk(KERN_WARNING "pmem: something is very wrong, you are "
+		pr_warning("pmem: something is very wrong, you are "
 		       "closing a vm backing an allocation that doesn't "
 		       "exist!\n");
 		return;
@@ -1401,7 +1401,7 @@ static void pmem_vma_close(struct vm_area_struct *vma)
 	down_write(&data->sem);
 	if (unlikely(!has_allocation(file))) {
 		up_write(&data->sem);
-		printk(KERN_WARNING "pmem: something is very wrong, you are "
+		pr_warning("pmem: something is very wrong, you are "
 		       "closing a vm backing an allocation that doesn't "
 		       "exist!\n");
 		return;
@@ -1436,7 +1436,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 		get_name(file), id);
 	if (vma->vm_pgoff || !PMEM_IS_PAGE_ALIGNED(vma_size)) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: mmaps must be at offset zero, aligned"
+		pr_err("pmem: mmaps must be at offset zero, aligned"
 				" and a multiple of pages_size.\n");
 #endif
 		return -EINVAL;
@@ -1449,7 +1449,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 	    (data->flags & PMEM_FLAGS_SUBMAP) ||
 	    (data->flags & PMEM_FLAGS_UNSUBMAP)) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: you can only mmap a pmem file once, "
+		pr_err("pmem: you can only mmap a pmem file once, "
 		       "this file is already mmaped. %x\n", data->flags);
 #endif
 		ret = -EINVAL;
@@ -1464,7 +1464,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 		mutex_unlock(&pmem[id].arena_mutex);
 		data->index = index;
 		if (data->index < 0) {
-			printk(KERN_ERR "pmem: mmap unable to allocate memory"
+			pr_err("pmem: mmap unable to allocate memory"
 				"on %s\n", get_name(file));
 		}
 	}
@@ -1472,14 +1472,13 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 	/* either no space was available or an error occured */
 	if (!has_allocation(file)) {
 		ret = -ENOMEM;
-		printk(KERN_ALERT
-			"pmem: could not find allocation for map.\n");
+		pr_err("pmem: could not find allocation for map.\n");
 		goto error;
 	}
 
 	if (pmem[id].len(id, data) < vma_size) {
 #if PMEM_DEBUG
-		printk(KERN_WARNING "pmem: mmap size [%lu] does not match"
+		pr_err("pmem: mmap size [%lu] does not match"
 		       " size of backing region [%lu].\n", vma_size,
 		       pmem[id].len(id, data));
 #endif
@@ -1495,7 +1494,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 		struct pmem_region_node *region_node;
 		struct list_head *elt;
 		if (pmem_map_garbage(id, vma, data, 0, vma_size)) {
-			printk(KERN_ALERT "pmem: mmap failed in kernel!\n");
+			pr_alert("pmem: mmap failed in kernel!\n");
 			ret = -EAGAIN;
 			goto error;
 		}
@@ -1523,7 +1522,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 		     current->pid);
 	} else {
 		if (pmem_map_pfn_range(id, vma, data, 0, vma_size)) {
-			printk(KERN_ERR "pmem: mmap failed in kernel!\n");
+			pr_err("pmem: mmap failed in kernel!\n");
 			ret = -EAGAIN;
 			goto error;
 		}
@@ -1554,7 +1553,7 @@ int get_pmem_user_addr(struct file *file, unsigned long *start,
 			} else {
 				*start = *len = 0;
 #if PMEM_DEBUG
-				printk(KERN_ERR "pmem: %s: no vma present.\n",
+				pr_err("pmem: %s: no vma present.\n",
 					__func__);
 #endif
 			}
@@ -1565,7 +1564,7 @@ int get_pmem_user_addr(struct file *file, unsigned long *start,
 
 #if PMEM_DEBUG
 	if (ret)
-		printk(KERN_ERR "pmem: %s: requested pmem data from invalid"
+		pr_err("pmem: %s: requested pmem data from invalid"
 			"file.\n", __func__);
 #endif
 	return ret;
@@ -1611,7 +1610,7 @@ int get_pmem_file(unsigned int fd, unsigned long *start, unsigned long *vstart,
 	struct file *file = fget(fd);
 
 	if (unlikely(file == NULL)) {
-		printk(KERN_ERR "pmem: %s: requested data from file "
+		pr_err("pmem: %s: requested data from file "
 			"descriptor that doesn't exist.\n", __func__);
 	} else {
 #if PMEM_DEBUG_MSGS
@@ -1658,7 +1657,7 @@ void put_pmem_file(struct file *file)
 		down_write(&data->sem);
 		if (!data->ref--) {
 			data->ref++;
-			printk(KERN_ALERT "pmem: pmem_put > pmem_get %s "
+			pr_alert("pmem: pmem_put > pmem_get %s "
 				"(pid %d)\n",
 			       pmem[get_id(file)].dev.name, data->pid);
 			BUG();
@@ -1821,7 +1820,7 @@ int32_t pmem_kalloc(const size_t size, const uint32_t flags)
 		align = PMEM_ALIGN_1M;
 		break;
 	default:
-		printk(KERN_ALERT "pmem: %s: Invalid alignment %#x\n",
+		pr_alert("pmem: %s: Invalid alignment %#x\n",
 			__func__, (flags & PMEM_ALIGNMENT_MASK));
 		return -EINVAL;
 	}
@@ -1835,15 +1834,14 @@ retry_memalloc:
 			break;
 		}
 	if (info_id < 0) {
-		printk(KERN_ALERT "pmem: %s: Kernel %#x memory arena is not "
+		pr_alert("pmem: %s: Kernel %#x memory arena is not "
 			"initialized. Check board file!\n",
 			__func__, (flags & PMEM_MEMTYPE_MASK));
 		return -EINVAL;
 	}
 
 	if (!pmem[info_id].allocate) {
-		printk(KERN_ALERT
-			"pmem: %s: Attempt to allocate size %u, alignment %#x"
+		pr_alert("pmem: %s: Attempt to allocate size %u, alignment %#x"
 			" from non-existent PMEM kernel region %d. "
 			"Driver/board setup is faulty!",
 			__func__, size, (flags & PMEM_ALIGNMENT_MASK),
@@ -1857,7 +1855,7 @@ retry_memalloc:
 				PMEM_ALLOCATORTYPE_ALLORNOTHING ||
 			pmem[info_id].allocator_type ==
 				PMEM_ALLOCATORTYPE_BUDDYBESTFIT))
-		printk(KERN_WARNING "pmem: %s: alignment other than on 4K "
+		pr_warning("pmem: %s: alignment other than on 4K "
 			"pages not supported with %s allocator for PMEM "
 			"memory region '%s'. Memory will be aligned to 4K "
 			"boundary. Check your board file or allocation "
@@ -1919,7 +1917,7 @@ int pmem_kfree(const int32_t physaddr)
 
 		if (!pmem[id].allocate) {
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: %s: "
+			pr_alert("pmem: %s: "
 				"Attempt to free physical address %#x "
 				"from unregistered PMEM kernel region"
 				" %d. Driver/board setup is faulty!",
@@ -1933,7 +1931,7 @@ int pmem_kfree(const int32_t physaddr)
 			return pmem[id].free(id, index) ?  -EINVAL : 0;
 	}
 #if PMEM_DEBUG
-	printk(KERN_ALERT "pmem: %s: Failed to free physaddr %#x, does not "
+	pr_alert("pmem: %s: Failed to free physaddr %#x, does not "
 		"seem be value returned by pmem_kalloc()!",
 		__func__, physaddr);
 #endif
@@ -1947,7 +1945,7 @@ static int pmem_connect(unsigned long connect, struct file *file)
 	struct file *src_file;
 
 	if (!file) {
-		printk(KERN_ERR "pmem: %s: NULL file pointer passed in, "
+		pr_err("pmem: %s: NULL file pointer passed in, "
 			"bailing out!\n", __func__);
 		ret = -EINVAL;
 		goto leave;
@@ -1956,20 +1954,20 @@ static int pmem_connect(unsigned long connect, struct file *file)
 	src_file = fget_light(connect, &put_needed);
 
 	if (!src_file) {
-		printk(KERN_ERR "pmem: %s: src file not found!\n", __func__);
+		pr_err("pmem: %s: src file not found!\n", __func__);
 		ret = -EBADF;
 		goto leave;
 	}
 
 	if (src_file == file) { /* degenerative case, operator error */
-		printk(KERN_ERR "pmem: %s: src_file and passed in file are "
+		pr_err("pmem: %s: src_file and passed in file are "
 			"the same; refusing to connect to self!\n", __func__);
 		ret = -EINVAL;
 		goto put_src_file;
 	}
 
 	if (unlikely(!is_pmem_file(src_file))) {
-		printk(KERN_ERR "pmem: %s: src file is not a pmem file!\n",
+		pr_err("pmem: %s: src file is not a pmem file!\n",
 			__func__);
 		ret = -EINVAL;
 		goto put_src_file;
@@ -1977,7 +1975,7 @@ static int pmem_connect(unsigned long connect, struct file *file)
 		struct pmem_data *src_data = src_file->private_data;
 
 		if (!src_data) {
-			printk(KERN_ERR "pmem: %s: src file pointer has no"
+			pr_err("pmem: %s: src file pointer has no"
 				"private data, bailing out!\n", __func__);
 			ret = -EINVAL;
 			goto put_src_file;
@@ -1987,8 +1985,8 @@ static int pmem_connect(unsigned long connect, struct file *file)
 
 		if (unlikely(!has_allocation(src_file))) {
 			up_read(&src_data->sem);
-			printk(KERN_ERR "pmem: %s: src file has no "
-				"allocation!\n", __func__);
+			pr_err("pmem: %s: src file has no allocation!\n",
+				__func__);
 			ret = -EINVAL;
 		} else {
 			struct pmem_data *data;
@@ -1998,7 +1996,7 @@ static int pmem_connect(unsigned long connect, struct file *file)
 
 			data = file->private_data;
 			if (!data) {
-				printk(KERN_ERR "pmem: %s: passed in file "
+				pr_err("pmem: %s: passed in file "
 					"pointer has no private data, bailing"
 					" out!\n", __func__);
 				ret = -EINVAL;
@@ -2010,7 +2008,7 @@ static int pmem_connect(unsigned long connect, struct file *file)
 					(data->index != src_index)) {
 				up_write(&data->sem);
 
-				printk(KERN_ERR "pmem: %s: file is already "
+				pr_err("pmem: %s: file is already "
 					"mapped but doesn't match this "
 					"src_file!\n", __func__);
 				ret = -EINVAL;
@@ -2062,8 +2060,7 @@ lock_mm:
 		if (!mm) {
 			up_read(&data->sem);
 #if PMEM_DEBUG
-			printk(KERN_ALERT
-				"pmem: can't remap - task is gone!\n");
+			pr_alert("pmem: can't remap - task is gone!\n");
 #endif
 			return -1;
 		}
@@ -2094,7 +2091,7 @@ lock_mm:
 		}
 		pmem_unlock_data_and_mm(data, mm);
 #if PMEM_DEBUG
-		printk(KERN_ALERT "pmem: vma.mm went away!\n");
+		pr_alert("pmem: vma.mm went away!\n");
 #endif
 		return -1;
 	}
@@ -2117,8 +2114,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 
 	if (!is_pmem_file(file)) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: remap request for non-pmem file "
-			"descriptor\n");
+		pr_err("pmem: remap request for non-pmem file descriptor\n");
 #endif
 		return -EINVAL;
 	}
@@ -2130,7 +2126,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 	if (unlikely(!PMEM_IS_PAGE_ALIGNED(region->offset) ||
 		 !PMEM_IS_PAGE_ALIGNED(region->len))) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: request for unaligned pmem"
+		pr_err("pmem: request for unaligned pmem"
 			"suballocation %lx %lx\n",
 			region->offset, region->len);
 #endif
@@ -2150,8 +2146,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 	 * that back in it */
 	if (!is_master_owner(file)) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: remap requested from non-master "
-			"process\n");
+		pr_err("pmem: remap requested from non-master process\n");
 #endif
 		ret = -EINVAL;
 		goto err;
@@ -2162,7 +2157,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 		     (region->len > pmem[id].len(id, data)) ||
 		     (region->offset + region->len > pmem[id].len(id, data)))) {
 #if PMEM_DEBUG
-		printk(KERN_ERR "pmem: suballoc doesn't fit in src_file!\n");
+		pr_err("pmem: suballoc doesn't fit in src_file!\n");
 #endif
 		ret = -EINVAL;
 		goto err;
@@ -2174,8 +2169,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 		if (!region_node) {
 			ret = -ENOMEM;
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: No space to allocate remap "
-					"metadata!");
+			pr_alert("pmem: No space to allocate remap metadata!");
 #endif
 			goto err;
 		}
@@ -2196,7 +2190,7 @@ int pmem_remap(struct pmem_region *region, struct file *file,
 		}
 		if (!found) {
 #if PMEM_DEBUG
-			printk(KERN_ALERT "pmem: Unmap region does not map any"
+			pr_err("pmem: Unmap region does not map any"
 				" mapped region!");
 #endif
 			ret = -EINVAL;
@@ -2304,7 +2298,7 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						sizeof(struct pmem_region)))
 				return -EFAULT;
 
-			printk(KERN_INFO "pmem: successful request for "
+			DLOG("pmem: successful request for "
 				"physical address of pmem region id %d, "
 				"offset %lu, len %lu\n",
 				id, region.offset, region.len);
@@ -2491,7 +2485,7 @@ static void pmem_setup_unstable_devices(unsigned long start_pfn,
 			continue;
 
 		pmem[id].base = tmp;
-		printk(KERN_ALERT "reserving %lx bytes unstable memory at %lx \
+		pr_info("reserving %lx bytes unstable memory at %lx \
 			for %s\n", pmem[id].size, pmem[id].base, pmem[id].name);
 		tmp += pmem[id].size;
 	}
@@ -2521,7 +2515,7 @@ static int pmem_mem_going_offline_callback(void *arg)
 		return 0;
 
 	if (active_unstable_pmem()) {
-		printk(KERN_ALERT "unstable PMEM memory device in use \
+		pr_alert("unstable PMEM memory device in use \
 			prevents memory hotremove!\n");
 		return -EAGAIN;
 	}
@@ -2544,7 +2538,7 @@ static int pmem_mem_online_callback(void *arg)
 
 	if (unstable_pmem_present == UNSTABLE_UNINITIALIZED) {
 		pmem_setup_unstable_devices(marg->start_pfn, marg->nr_pages);
-		printk(KERN_ALERT "unstable pmem start %lx size %lx\n",
+		pr_alert("unstable pmem start %lx size %lx\n",
 			unstable_pmem_start, unstable_pmem_size);
 		unstable_pmem_present = UNSTABLE_INITIALIZED;
 	}
@@ -2604,15 +2598,13 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	int i, index = 0, kapi_memtype_idx = -1, id, is_kernel_memtype = 0;
 
 	if (id_count >= PMEM_MAX_DEVICES) {
-		printk(KERN_ALERT
-			"pmem: %s: unable to register driver(%s) - no more "
+		pr_alert("pmem: %s: unable to register driver(%s) - no more "
 			"devices available!\n", __func__, pdata->name);
 		goto err_no_mem;
 	}
 
 	if (!pdata->size) {
-		printk(KERN_ALERT
-			"pmem: %s: unable to register pmem driver(%s) - zero "
+		pr_alert("pmem: %s: unable to register pmem driver(%s) - zero "
 			"size passed in!\n", __func__, pdata->name);
 		goto err_no_mem;
 	}
@@ -2622,8 +2614,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	pmem[id].id = id;
 
 	if (pmem[id].allocate) {
-		printk(KERN_ALERT
-			"pmem: %s: unable to register pmem driver - "
+		pr_alert("pmem: %s: unable to register pmem driver - "
 			"duplicate registration of %s!\n",
 			__func__, pdata->name);
 		goto err_no_mem;
@@ -2634,14 +2625,13 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	for (i = 0; i < ARRAY_SIZE(kapi_memtypes); i++) {
 		if (!strcmp(kapi_memtypes[i].name, pdata->name)) {
 			if (kapi_memtypes[i].info_id >= 0) {
-				printk(KERN_ALERT
-					"Unable to register kernel pmem "
+				pr_alert("Unable to register kernel pmem "
 					"driver - duplicate registration of "
 					"%s!\n", pdata->name);
 				goto err_no_mem;
 			}
 			if (pdata->cached) {
-				printk(KERN_ALERT "kernel arena memory must "
+				pr_alert("kernel arena memory must "
 					"NOT be configured as 'cached'. Check "
 					"and fix your board file. Failing "
 					"pmem driver %s registration!",
@@ -2661,8 +2651,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	pmem[id].quantum = pdata->quantum ?: PMEM_MIN_ALLOC;
 	if (pmem[id].quantum < PMEM_MIN_ALLOC ||
 		!is_power_of_2(pmem[id].quantum)) {
-		printk(KERN_ALERT
-			"pmem: %s: unable to register pmem driver %s - "
+		pr_alert("pmem: %s: unable to register pmem driver %s - "
 			"invalid quantum value (%#x)!\n",
 			__func__, pdata->name, pmem[id].quantum);
 		goto err_reset_pmem_info;
@@ -2670,7 +2659,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 
 	if (pdata->start % pmem[id].quantum) {
 		/* bad alignment for start! */
-		printk(KERN_ALERT "pmem: %s: Unable to register driver %s - "
+		pr_alert("pmem: %s: Unable to register driver %s - "
 			"improperly aligned memory region start address "
 			"(%#lx) as checked against quantum value of %#x!\n",
 			__func__, pdata->name, pdata->start,
@@ -2680,7 +2669,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 
 	if (pdata->size % pmem[id].quantum) {
 		/* bad alignment for size! */
-		printk(KERN_ALERT "pmem: %s: Unable to register driver %s - "
+		pr_alert("pmem: %s: Unable to register driver %s - "
 			"memory region size (%#lx) is not a multiple of "
 			"quantum size(%#x)!\n", __func__, pdata->name,
 			pdata->size, pmem[id].quantum);
@@ -2756,7 +2745,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 				sizeof(*pmem[id].allocator.bitmap.bitm_alloc),
 			GFP_KERNEL);
 		if (!pmem[id].allocator.bitmap.bitm_alloc) {
-			printk(KERN_ALERT "pmem: %s: Unable to register pmem "
+			pr_alert("pmem: %s: Unable to register pmem "
 					"driver %s - can't allocate "
 					"bitm_alloc!\n",
 					__func__, pdata->name);
@@ -2780,7 +2769,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 			kcalloc((pmem[id].num_entries + 31) / 32,
 				sizeof(unsigned int), GFP_KERNEL);
 		if (!pmem[id].allocator.bitmap.bitmap) {
-			printk(KERN_ALERT "pmem: %s: Unable to register pmem "
+			pr_alert("pmem: %s: Unable to register pmem "
 				"driver - can't allocate bitmap!\n",
 				__func__);
 			goto err_cant_register_device;
@@ -2801,8 +2790,8 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 		break;
 
 	default:
-		printk(KERN_ALERT "Invalid allocator type (%d) for pmem "
-			"driver\n", pdata->allocator_type);
+		pr_alert("Invalid allocator type (%d) for pmem driver\n",
+			pdata->allocator_type);
 		goto err_reset_pmem_info;
 	}
 
@@ -2816,17 +2805,16 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	if (!is_kernel_memtype) {
 		pmem[id].dev.minor = id;
 		pmem[id].dev.fops = &pmem_fops;
-		printk(KERN_INFO "pmem: Initializing %s (user-space) as %s\n",
+		pr_info("pmem: Initializing %s (user-space) as %s\n",
 			pdata->name, pdata->cached ? "cached" : "non-cached");
 
 		if (misc_register(&pmem[id].dev)) {
-			printk(KERN_ALERT "Unable to register pmem driver!\n");
+			pr_alert("Unable to register pmem driver!\n");
 			goto err_cant_register_device;
 		}
 	} else { /* kernel region, no user accessible device */
 		pmem[id].dev.minor = -1;
-		printk(KERN_INFO "pmem: Initializing %s (in-kernel)\n",
-				pdata->name);
+		pr_info("pmem: Initializing %s (in-kernel)\n", pdata->name);
 	}
 
 	/* do not set up unstable pmem now, wait until first memory hotplug */
@@ -2836,7 +2824,7 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 	if (!is_kernel_memtype) {
 		ioremap_pmem(id);
 		if (pmem[id].vbase == 0) {
-			printk(KERN_ERR "pmem: ioremap failed for device %s\n",
+			pr_err("pmem: ioremap failed for device %s\n",
 				pmem[id].name);
 			goto error_cant_remap;
 		}
@@ -2872,7 +2860,7 @@ static int pmem_probe(struct platform_device *pdev)
 	struct android_pmem_platform_data *pdata;
 
 	if (!pdev || !pdev->dev.platform_data) {
-		printk(KERN_ALERT "Unable to probe pmem!\n");
+		pr_alert("Unable to probe pmem!\n");
 		return -1;
 	}
 	pdata = pdev->dev.platform_data;
@@ -2900,8 +2888,7 @@ static int __init pmem_init(void)
 	pmem_kset = kset_create_and_add(PMEM_SYSFS_DIR_NAME,
 		NULL, kernel_kobj);
 	if (!pmem_kset) {
-		printk(KERN_ERR "pmem(%s):kset_create_and_add fail\n",
-			__func__);
+		pr_err("pmem(%s):kset_create_and_add fail\n", __func__);
 		return -ENOMEM;
 	}
 
