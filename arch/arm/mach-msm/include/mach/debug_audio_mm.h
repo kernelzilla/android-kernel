@@ -30,8 +30,8 @@
 #define __ARCH_ARM_MACH_MSM_DEBUG_AUDIO_MM_H_
 /* ************************DEBUG LEVELS*************************
  * 0 - Disables all the messages including error messages
- * 1 - Prints error messages only
- * 2 - Prints both error and info messages (Default)
+ * 1 - Prints error messages only (Default)
+ * 2 - Prints both error and info messages
  * 3 - Prints all the messages including debug messages
  * ************************************************************/
 /* Change the below defined debug level according to the levels
@@ -40,7 +40,14 @@
  * The debug level defined below will effect all the files across
  * this module i.e. audio module.
  */
-#define MSM_MM_DEBUG_LEVEL 2
+
+#if !defined(CONFIG_MSM_AUDIO_DEBUG_LEVEL) || \
+	(CONFIG_MSM_AUDIO_DEBUG_LEVEL < 0 && CONFIG_MSM_AUDIO_DEBUG_LEVEL > 3)
+#error "Invalid value for CONFIG_MSM_AUDIO_DEBUG_LEVEL"
+#endif
+
+/* TODO: rename MSM_MM_DEBUG_LEVEL to CONFIG_MSM_AUDIO_DEBUG_LEVEL */
+#define MSM_MM_DEBUG_LEVEL CONFIG_MSM_AUDIO_DEBUG_LEVEL
 #define MSM_MM_MODULE "msm-audio" /* module name used in log messages */
 #include <mach/debug_mm.h>
 #endif /* __ARCH_ARM_MACH_MSM_DEBUG_AUDIO_MM_H_ */
