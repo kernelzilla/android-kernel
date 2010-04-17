@@ -510,24 +510,33 @@ static void usb_ept_start(struct msm_endpoint *ept)
 
 	BUG_ON(req->live);
 
-	/* link the hw queue head to the request's transaction item */
-	ept->head->next = req->item_dma;
-	ept->head->info = 0;
-
-	/* mark this chain of requests as live */
 	while (req) {
 		req->live = 1;
-		if (req->item->next == TERMINATE)
+		/* prepare the transaction descriptor item for the hardware */
+		req->item->info =
+			INFO_BYTES(req->req.length) | INFO_IOC | INFO_ACTIVE;
+		req->item->page0 = req->dma;
+		req->item->page1 = (req->dma + 0x1000) & 0xfffff000;
+		req->item->page2 = (req->dma + 0x2000) & 0xfffff000;
+		req->item->page3 = (req->dma + 0x3000) & 0xfffff000;
+
+		if (req->next == NULL) {
+			req->item->next = TERMINATE;
 			break;
+		}
+		req->item->next = req->next->item_dma;
 		req = req->next;
 	}
+
+	/* link the hw queue head to the request's transaction item */
+	ept->head->next = ept->req->item_dma;
+	ept->head->info = 0;
 
 	/* flush buffers before priming ept */
 	dma_coherent_pre_ops();
 
 	/* start the endpoint */
 	writel(1 << ept->bit, USB_ENDPTPRIME);
-
 }
 
 int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
@@ -536,7 +545,6 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 	struct msm_request *req = to_msm_request(_req);
 	struct msm_request *last;
 	struct usb_info *ui = ept->ui;
-	struct ept_queue_item *item = req->item;
 	unsigned length = req->req.length;
 
 	if (length > 0x4000)
@@ -588,13 +596,6 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 				  (ept->flags & EPT_FLAG_IN) ?
 				  DMA_TO_DEVICE : DMA_FROM_DEVICE);
 
-	/* prepare the transaction descriptor item for the hardware */
-	item->next = TERMINATE;
-	item->info = INFO_BYTES(length) | INFO_IOC | INFO_ACTIVE;
-	item->page0 = req->dma;
-	item->page1 = (req->dma + 0x1000) & 0xfffff000;
-	item->page2 = (req->dma + 0x2000) & 0xfffff000;
-	item->page3 = (req->dma + 0x3000) & 0xfffff000;
 
 	/* Add the new request to the end of the queue */
 	last = ept->last;
@@ -606,11 +607,6 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 		last->next = req;
 		req->prev = last;
 
-		/* only modify the hw transaction next pointer if
-		 * that request is not live
-		 */
-		if (!last->live)
-			last->item->next = req->item_dma;
 	} else {
 		/* queue was empty -- kick the hardware */
 		ept->req = req;
@@ -881,10 +877,6 @@ static void handle_endpoint(struct usb_info *ui, unsigned bit)
 	/* expire all requests that are no longer active */
 	spin_lock_irqsave(&ui->lock, flags);
 	while ((req = ept->req)) {
-		/* clean speculative fetches on req->item->info */
-		dma_coherent_post_ops();
-		info = req->item->info;
-
 		/* if we've processed all live requests, time to
 		 * restart the hardware on the next non-live request
 		 */
@@ -893,6 +885,9 @@ static void handle_endpoint(struct usb_info *ui, unsigned bit)
 			break;
 		}
 
+		/* clean speculative fetches on req->item->info */
+		dma_coherent_post_ops();
+		info = req->item->info;
 		/* if the transaction is still in-flight, stop here */
 		if (info & INFO_ACTIVE)
 			break;
