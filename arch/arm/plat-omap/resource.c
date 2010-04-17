@@ -436,7 +436,7 @@ int resource_release(const char *name, struct device *dev)
 res_unlock:
 	mutex_unlock(&resp->resource_mutex);
 	/* Recompute and set the current level for the resource */
-	if (ret > 0)
+	if (ret >= 0)
 		ret = update_resource_level(resp);
 
 	return ret;
