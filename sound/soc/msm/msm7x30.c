@@ -479,6 +479,64 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 	return rc;
 }
 
+static int msm_device_volume_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 100;
+	return 0;
+}
+
+static int msm_device_volume_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct msm_snddev_info *dev_info;
+
+	int dev_id = ucontrol->value.integer.value[0];
+
+	dev_info = audio_dev_ctrl_find_dev(dev_id);
+	ucontrol->value.integer.value[0] = dev_info->dev_volume;
+
+	return 0;
+}
+
+static int msm_device_volume_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int rc = -EPERM;
+	struct msm_snddev_info *dev_info;
+
+	int dev_id = ucontrol->value.integer.value[0];
+	int volume = ucontrol->value.integer.value[1];
+
+	MM_DBG("dev_id = %d, volume = %d\n", dev_id, volume);
+
+	dev_info = audio_dev_ctrl_find_dev(dev_id);
+
+	if (IS_ERR(dev_info)) {
+		rc = PTR_ERR(dev_info);
+		pr_err("%s: audio_dev_ctrl_find_dev failed. %ld \n",
+			__func__, PTR_ERR(dev_info));
+		return rc;
+	}
+
+	MM_DBG("dev_name = %s dev_id = %d, volume = %d\n",
+				dev_info->name, dev_id, volume);
+
+	if (dev_info->dev_ops.set_device_volume)
+		rc = dev_info->dev_ops.set_device_volume(dev_info, volume);
+	else {
+		pr_info("%s : device %s does not support device volume "
+				"control.", __func__, dev_info->name);
+		return -EPERM;
+	}
+
+	return rc;
+}
+
+
 static struct snd_kcontrol_new snd_dev_controls[AUDIO_DEV_CTL_MAX_DEV];
 
 static int snd_dev_ctl_index(int idx)
@@ -531,6 +589,8 @@ static struct snd_kcontrol_new snd_msm_controls[] = {
 						 msm_v_mute_put, 0),
 	MSM_EXT("Voice Call", 8, msm_v_call_info, msm_v_call_get, \
 						msm_v_call_put, 0),
+	MSM_EXT("Device_Volume", 9, msm_device_volume_info,
+			msm_device_volume_get, msm_device_volume_put, 0),
 };
 
 static int msm_new_mixer(struct snd_card *card)

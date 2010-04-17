@@ -326,7 +326,7 @@ static int snddev_ecodec_probe(struct platform_device *pdev)
 		goto error;
 	}
 
-	dev_info = kmalloc(sizeof(struct msm_snddev_info), GFP_KERNEL);
+	dev_info = kzalloc(sizeof(struct msm_snddev_info), GFP_KERNEL);
 	if (!dev_info) {
 		kfree(ecodec);
 		rc = -ENOMEM;

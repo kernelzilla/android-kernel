@@ -40,4 +40,8 @@
 #define VOC_WB_INDEX	1
 #define VOC_RX_VOL_ARRAY_NUM	2
 
+/* Device volume types . In Current deisgn only one of these are supported. */
+#define SNDDEV_DEV_VOL_DIGITAL  0x1  /* Codec Digital volume control */
+#define SNDDEV_DEV_VOL_ANALOG   0x2  /* Codec Analog volume control */
+
 #endif /* _MACH_QDSP5_V2_AUDIO_DEF_H */
