@@ -25,6 +25,7 @@ typedef void (*audpp_event_func)(void *private, unsigned id, uint16_t *msg);
 #define MSM_AUD_DECODER_WAIT_MS 1000
 #define MSM_AUD_MODE_TUNNEL  0x00000100
 #define MSM_AUD_MODE_NONTUNNEL  0x00000200
+#define MSM_AUD_MODE_LP  0x00000400
 #define MSM_AUD_DECODER_MASK  0x0000FFFF
 #define MSM_AUD_OP_MASK  0xFFFF0000
 
@@ -38,11 +39,11 @@ typedef void (*audpp_event_func)(void *private, unsigned id, uint16_t *msg);
 #define NON_TUNNEL_MODE_PLAYBACK 1
 #define TUNNEL_MODE_PLAYBACK 0
 
-#define AUDPP_MIXER_0 AUDPP_CMD_CFG_DEV_MIXER_DEV_0
+#define AUDPP_MIXER_ICODEC AUDPP_CMD_CFG_DEV_MIXER_DEV_0
 #define AUDPP_MIXER_1 AUDPP_CMD_CFG_DEV_MIXER_DEV_1
 #define AUDPP_MIXER_2 AUDPP_CMD_CFG_DEV_MIXER_DEV_2
 #define AUDPP_MIXER_3 AUDPP_CMD_CFG_DEV_MIXER_DEV_3
-#define AUDPP_MIXER_4 AUDPP_CMD_CFG_DEV_MIXER_DEV_4
+#define AUDPP_MIXER_HLB AUDPP_CMD_CFG_DEV_MIXER_DEV_4
 
 enum obj_type {
 	COPP,
