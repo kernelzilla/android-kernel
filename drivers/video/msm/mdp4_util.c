@@ -38,6 +38,8 @@
 #include "msm_fb.h"
 #include "mdp4.h"
 
+struct mdp4_statistic mdp4_stat;
+
 void mdp4_sw_reset(ulong bits)
 {
 	bits &= 0x1f;	/* 5 bits */

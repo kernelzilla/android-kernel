@@ -73,8 +73,6 @@ struct mdp4_overlay_ctrl {
 
 static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
 
-struct mdp4_statistic mdp4_stat;
-
 void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int lcdc)
 {
 	uint32	dmae_cfg_reg;
