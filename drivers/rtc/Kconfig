@@ -601,10 +601,19 @@ config RTC_DRV_MSM
 	help
 	  RTC driver for Qualcomm chipsets
 
+
+config RTC_SECURE_TIME_SUPPORT
+        bool "Support for secure time on Qualcomm Chipsets"
+        depends on RTC_DRV_MSM = y
+        default y
+        help
+          Say yes here to have additional handle for reading secure time
+          maintained by ARM9.
+
 config RTC_DRV_MSM7X00A
 	tristate "MSM7X00A"
 	depends on ARCH_MSM
-	default y
+	default n
 	help
 	  RTC driver for Qualcomm MSM7K chipsets
 
