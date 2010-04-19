@@ -24,8 +24,8 @@
 
 #define MSM_AXI_QOS_NAME "msm_vidc_reg"
 
-static unsigned int mfc_clk_freq_table[2] = {
-	61440000, 170667000
+static unsigned int mfc_clk_freq_table[3] = {
+	61440000, 122880000, 170667000
 };
 
 static unsigned int axi_clk_freq_table[2] = {
@@ -139,7 +139,9 @@ u32 res_trk_get_max_perf_level(void)
 u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 	struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
-	u32 vga_perf_level = (640 * 480 * 30 / 256);
+	u32 vga_perf_level = 1200 * 30;
+	u32 wvga_perf_level = 1500 * 30;
+	u32 qvga_perf_level = 300 * 30;
 	int rc;
 	u32 axi_freq = 0, mfc_freq = 0, calc_mfc_freq = 0;
 
@@ -148,7 +150,7 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 			(u64)n_req_perf_lvl);
 		if (!p_cctxt->b_decoding) {
 			if (n_req_perf_lvl >= vga_perf_level) {
-				mfc_freq = mfc_clk_freq_table[1];
+				mfc_freq = mfc_clk_freq_table[2];
 				axi_freq = axi_clk_freq_table[1];
 			} else {
 				mfc_freq = mfc_clk_freq_table[0];
@@ -160,12 +162,17 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 				mfc_freq, calc_mfc_freq,
 				n_req_perf_lvl);
 		} else {
-			if (n_req_perf_lvl >= vga_perf_level) {
-				mfc_freq = mfc_clk_freq_table[1];
-				axi_freq = axi_clk_freq_table[1];
-			} else {
+			if (n_req_perf_lvl <= qvga_perf_level) {
 				mfc_freq = mfc_clk_freq_table[0];
 				axi_freq = axi_clk_freq_table[0];
+			} else {
+				axi_freq = axi_clk_freq_table[1];
+				if (n_req_perf_lvl <= vga_perf_level)
+					mfc_freq = mfc_clk_freq_table[0];
+				else if (n_req_perf_lvl <= wvga_perf_level)
+					mfc_freq = mfc_clk_freq_table[1];
+				else
+					mfc_freq = mfc_clk_freq_table[2];
 			}
 			VCDRES_MSG_HIGH("\n DECODER: axi_freq = %u"
 				", mfc_freq = %u, calc_mfc_freq = %u,"
@@ -179,7 +186,7 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 	}
 
 #ifdef AXI_CLK_SCALING
-    if (n_req_perf_lvl != 113700) {
+    if (n_req_perf_lvl != 37900) {
 		VCDRES_MSG_HIGH("\n %s(): Setting AXI freq to %u",
 			__func__, axi_freq);
 		rc = pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
@@ -194,11 +201,13 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 #endif
 
 #ifdef USE_RES_TRACKER
-	VCDRES_MSG_HIGH("\n %s(): Setting MFC freq to %u",
-		__func__, mfc_freq);
-	if (!vid_c_sel_clk_rate(mfc_freq)) {
-		VCDRES_MSG_ERROR("%s(): vid_c_sel_clk_rate FAILED\n",
-			__func__);
+    if (n_req_perf_lvl != 37900) {
+		VCDRES_MSG_HIGH("\n %s(): Setting MFC freq to %u",
+			__func__, mfc_freq);
+		if (!vid_c_sel_clk_rate(mfc_freq)) {
+			VCDRES_MSG_ERROR("%s(): vid_c_sel_clk_rate FAILED\n",
+				__func__);
+		}
 	}
 #endif
 	if (!mfc_freq) {
