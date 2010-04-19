@@ -25,6 +25,7 @@
 
 #include <mach/msm_smd.h>
 #include "smd_rpcrouter.h"
+#include "smd_private.h"
 
 struct rpcrouter_smd_xprt {
 	struct rpcrouter_xprt xprt;
@@ -56,6 +57,7 @@ static int rpcrouter_smd_remote_write(void *data, uint32_t len, uint32_t type)
 
 static int rpcrouter_smd_remote_close(void)
 {
+	smsm_change_state(SMSM_APPS_STATE, SMSM_RPCINIT, 0);
 	return smd_close(smd_remote_xprt.channel);
 }
 
@@ -154,6 +156,9 @@ static int rpcrouter_smd_remote_probe(struct platform_device *pdev)
 
 	msm_rpcrouter_xprt_notify(&smd_remote_xprt.xprt,
 				  RPCROUTER_XPRT_EVENT_OPEN);
+
+	smsm_change_state(SMSM_APPS_STATE, 0, SMSM_RPCINIT);
+
 	return 0;
 }
 
