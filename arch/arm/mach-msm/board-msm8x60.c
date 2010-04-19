@@ -1026,6 +1026,7 @@ static void __init msm8x60_init_tlmm(void)
 	}
 }
 
+#define GPIO_SDC3_WP_SWITCH (GPIO_EXPANDER_GPIO_BASE + (16 * 1) + 6)
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
@@ -1042,6 +1043,25 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 	/* Handle VREGs here once VREG support is available */
 
 	return rc;
+}
+
+static int msm_sdc3_get_wpswitch(struct device *dev)
+{
+	struct platform_device *pdev;
+	int status;
+	pdev = container_of(dev, struct platform_device, dev);
+
+	status = gpio_request(GPIO_SDC3_WP_SWITCH, "SD_WP_Switch");
+	if (status) {
+		pr_err("%s:Failed to request GPIO %d\n",
+					__func__, GPIO_SDC3_WP_SWITCH);
+	} else {
+		status = gpio_get_value(GPIO_SDC3_WP_SWITCH);
+		pr_info("%s: WP Status for Slot %d = %d\n", __func__,
+							pdev->id, status);
+		gpio_free(GPIO_SDC3_WP_SWITCH);
+	}
+	return (unsigned int) status;
 }
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
@@ -1082,6 +1102,7 @@ static struct mmc_platform_data msm8x60_sdc3_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+	.wpswitch  	= msm_sdc3_get_wpswitch,
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm8x60_sdcc_slot_status,
 	.status_irq  = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
