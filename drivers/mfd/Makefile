@@ -30,7 +30,7 @@ obj-$(CONFIG_TWL4030_POWER)    += twl4030-power.o
 
 obj-$(CONFIG_MARIMBA_CORE)	+= marimba-core.o
 obj-$(CONFIG_MARIMBA_TSADC)	+= marimba-tsadc.o
-
+obj-$(CONFIG_TPS65023)		+= tps65023.o
 
 obj-$(CONFIG_MFD_MC13783)	+= mc13783-core.o
 
