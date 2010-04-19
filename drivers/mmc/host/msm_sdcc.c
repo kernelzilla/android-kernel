@@ -935,7 +935,7 @@ msmsdcc_irq(int irq, void *dev_id)
 		}
 
 		ret = 1;
-	} while (status);
+	} while (status & ~(MCI_DATABLOCKENDMASK));
 
 	spin_unlock(&host->lock);
 
