@@ -25,8 +25,10 @@
 
 #ifdef __KERNEL__
 
+#include <linux/cred.h>
 #include <linux/fs.h>
 #include <linux/fs_stack.h>
+#include <linux/sched.h>
 
 /* cf. __getname() in linux/include/linux/fs.h */
 #define au_getname()	kmem_cache_alloc(names_cachep, GFP_NOFS)
