@@ -536,7 +536,7 @@ static long audamrnb_in_ioctl(struct file *file,
 	case AUDIO_GET_AMRNB_ENC_CONFIG_V2: {
 		struct msm_audio_amrnb_enc_config_v2 cfg;
 		memset(&cfg, 0, sizeof(cfg));
-		cfg.dtx_enable = ((audio->dtx_mode == -1) ? 0 : 1);
+		cfg.dtx_enable = ((audio->dtx_mode == -1) ? 1 : 0);
 		cfg.band_mode = audio->used_mode;
 		cfg.frame_format = audio->frame_format;
 		if (copy_to_user((void *) arg, &cfg, sizeof(cfg)))
@@ -554,7 +554,14 @@ static long audamrnb_in_ioctl(struct file *file,
 			rc = -EINVAL;
 			break;
 		}
-		audio->dtx_mode = ((cfg.dtx_enable == 0) ? -1 : 0);
+		if (cfg.dtx_enable == 0)
+			audio->dtx_mode = 0;
+		else if (cfg.dtx_enable == 1)
+			audio->dtx_mode = -1;
+		else {
+			rc = -EINVAL;
+			break;
+		}
 		audio->used_mode = cfg.band_mode;
 		break;
 	}
