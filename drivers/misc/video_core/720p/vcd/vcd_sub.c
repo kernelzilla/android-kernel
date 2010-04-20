@@ -1002,6 +1002,7 @@ void vcd_destroy_client_context(struct vcd_clnt_ctxt_type_t *p_cctxt)
 	vcd_free_buffers_internal(p_cctxt, &p_cctxt->out_buf_pool);
 	vcd_free_buffer_pool_entries(&p_cctxt->in_buf_pool);
 	vcd_free_buffer_pool_entries(&p_cctxt->out_buf_pool);
+	vcd_release_all_clnt_transc(p_cctxt);
 
 	if (p_cctxt->b_ddl_hdl_valid) {
 		(void)ddl_close(&p_cctxt->ddl_handle);
@@ -2774,6 +2775,22 @@ void vcd_release_all_clnt_def_frm_transc(struct vcd_clnt_ctxt_type_t *p_cctxt)
 				p_cctxt == p_dev_ctxt->a_trans_tbl[i].p_cctxt
 				&& p_dev_ctxt->a_trans_tbl[i].e_type ==
 				VCD_CMD_NONE) {
+					vcd_release_trans_tbl_entry(
+						&p_dev_ctxt->a_trans_tbl[i]);
+			}
+		}
+}
+
+void vcd_release_all_clnt_transc(struct vcd_clnt_ctxt_type_t *p_cctxt)
+{
+		struct vcd_dev_ctxt_type *p_dev_ctxt = p_cctxt->p_dev_ctxt;
+		u8 i;
+
+		VCD_MSG_LOW("vcd_release_all_clnt_def_frm_transc:");
+
+		for (i = 0; i < p_dev_ctxt->n_trans_tbl_size; i++) {
+			if (p_dev_ctxt->a_trans_tbl[i].b_in_use &&
+				p_cctxt == p_dev_ctxt->a_trans_tbl[i].p_cctxt) {
 					vcd_release_trans_tbl_entry(
 						&p_dev_ctxt->a_trans_tbl[i]);
 			}
