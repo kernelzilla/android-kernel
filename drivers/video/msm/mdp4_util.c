@@ -364,9 +364,6 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 #endif
 			} else {	/* MDDI */
 				dma->busy = FALSE;
-#ifdef MDP4_NONBLOCKING
-				mdp_disable_irq_nolock(MDP_OVERLAY0_TERM);
-#endif
 				mdp_pipe_ctrl(MDP_OVERLAY0_BLOCK,
 					MDP_BLOCK_POWER_OFF, TRUE);
 #ifdef CONFIG_FB_MSM_OVERLAY
