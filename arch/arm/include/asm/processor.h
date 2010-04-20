@@ -93,6 +93,11 @@ unsigned long get_wchan(struct task_struct *p);
 
 #define cpu_relax()			barrier()
 
+#if defined(CONFIG_CPU_32v6K) || __LINUX_ARM_ARCH__ >= 7
+#define sev() __asm__("sev")
+#define wfe() __asm__("wfe")
+#endif
+
 /*
  * Create a new kernel thread
  */
