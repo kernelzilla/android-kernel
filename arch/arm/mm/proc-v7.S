@@ -185,7 +185,7 @@ cpu_v7_name:
  *	- cache type register is implemented
  */
 __v7_setup:
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_ARCH_MSM_SCORPIONMP)
 	mrc	p15, 0, r0, c1, c0, 1
 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
