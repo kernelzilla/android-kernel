@@ -21,6 +21,7 @@
 #include "video_core_init.h"
 
 #include <linux/pm_qos_params.h>
+#include <mach/msm_reqs.h>
 
 #define MSM_AXI_QOS_NAME "msm_vidc_reg"
 
@@ -28,9 +29,23 @@ static unsigned int mfc_clk_freq_table[3] = {
 	61440000, 122880000, 170667000
 };
 
-static unsigned int axi_clk_freq_table[2] = {
+#ifndef CONFIG_MSM_NPA_SYSTEM_BUS
+static unsigned int axi_clk_freq_table_enc[2] = {
 	122880, 192000
 };
+static unsigned int axi_clk_freq_table_dec[2] = {
+	122880, 192000
+};
+#else
+static unsigned int axi_clk_freq_table_enc[2] = {
+	MSM_AXI_FLOW_VIDEO_RECORDING_720P,
+	MSM_AXI_FLOW_VIDEO_RECORDING_720P
+};
+static unsigned int axi_clk_freq_table_dec[2] = {
+	MSM_AXI_FLOW_VIDEO_PLAYBACK_720P,
+	MSM_AXI_FLOW_VIDEO_PLAYBACK_720P
+};
+#endif
 static u32 res_trk_convert_freq_to_perf_lvl(u64 n_freq)
 {
 	u64 n_perf_lvl;
@@ -151,10 +166,10 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 		if (!p_cctxt->b_decoding) {
 			if (n_req_perf_lvl >= vga_perf_level) {
 				mfc_freq = mfc_clk_freq_table[2];
-				axi_freq = axi_clk_freq_table[1];
+				axi_freq = axi_clk_freq_table_enc[1];
 			} else {
 				mfc_freq = mfc_clk_freq_table[0];
-				axi_freq = axi_clk_freq_table[0];
+				axi_freq = axi_clk_freq_table_enc[0];
 			}
 			VCDRES_MSG_HIGH("\n ENCODER: axi_freq = %u"
 				", mfc_freq = %u, calc_mfc_freq = %u,"
@@ -164,9 +179,9 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 		} else {
 			if (n_req_perf_lvl <= qvga_perf_level) {
 				mfc_freq = mfc_clk_freq_table[0];
-				axi_freq = axi_clk_freq_table[0];
+				axi_freq = axi_clk_freq_table_dec[0];
 			} else {
-				axi_freq = axi_clk_freq_table[1];
+				axi_freq = axi_clk_freq_table_dec[1];
 				if (n_req_perf_lvl <= vga_perf_level)
 					mfc_freq = mfc_clk_freq_table[0];
 				else if (n_req_perf_lvl <= wvga_perf_level)
