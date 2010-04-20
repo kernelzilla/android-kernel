@@ -2283,6 +2283,9 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 }
 
 #endif
+#if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT))
 
 static int msm_sdcc_get_wpswitch(struct device *dv)
 {
@@ -2308,6 +2311,7 @@ static int msm_sdcc_get_wpswitch(struct device *dv)
 	return ((ret == 0x02) ? 1 : 0);
 
 }
+#endif
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static struct mmc_platform_data qsd8x50_sdc1_data = {
