@@ -211,7 +211,7 @@ void vcd_release_trans_tbl_entry(struct vcd_transc_type *p_trans_entry);
 
 void vcd_release_all_clnt_frm_transc(struct vcd_clnt_ctxt_type_t *p_cctxt);
 void vcd_release_all_clnt_def_frm_transc(struct vcd_clnt_ctxt_type_t *p_cctxt);
-
+void vcd_release_all_clnt_transc(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
 u32 vcd_handle_input_done
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
