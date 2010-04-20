@@ -636,6 +636,9 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 		}
 		/* PPP Complete */
 		if (mdp_interrupt & MDP_PPP_DONE) {
+#ifdef	CONFIG_FB_MSM_MDP31
+			MDP_OUTP(MDP_BASE + 0x00100, 0xFFFF);
+#endif
 			mdp_pipe_ctrl(MDP_PPP_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
 			if (mdp_ppp_waiting) {
 				mdp_ppp_waiting = FALSE;
