@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/smd_debug.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -193,13 +193,14 @@ static int debug_read_diag_msg(char *buf, int max)
 
 static int dump_ch(char *buf, int max, int n,
 		  struct smd_half_channel *s,
-		  struct smd_half_channel *r)
+		   struct smd_half_channel *r,
+		   unsigned size)
 {
 	return scnprintf(
 		buf, max,
 		"ch%02d:"
 		" %8s(%04d/%04d) %c%c%c%c%c%c%c <->"
-		" %8s(%04d/%04d) %c%c%c%c%c%c%c\n", n,
+		" %8s(%04d/%04d) %c%c%c%c%c%c%c : %5x\n", n,
 		chstate(s->state), s->tail, s->head,
 		s->fDSR ? 'D' : 'd',
 		s->fCTS ? 'C' : 'c',
@@ -215,7 +216,8 @@ static int dump_ch(char *buf, int max, int n,
 		r->fRI ? 'I' : 'i',
 		r->fHEAD ? 'W' : 'w',
 		r->fTAIL ? 'R' : 'r',
-		r->fSTATE ? 'S' : 's'
+		r->fSTATE ? 'S' : 's',
+		size
 		);
 }
 
@@ -273,7 +275,7 @@ static int debug_read_ch_v1(char *buf, int max)
 			continue;
 		i += dump_ch(buf + i, max - i, n, shared,
 			     (shared + sizeof(struct smd_half_channel) +
-			      SMD_BUF_SIZE));
+			      SMD_BUF_SIZE), SMD_BUF_SIZE);
 	}
 
 	return i;
@@ -281,7 +283,8 @@ static int debug_read_ch_v1(char *buf, int max)
 
 static int debug_read_ch_v2(char *buf, int max)
 {
-	void *shared;
+	void *shared, *buffer;
+	unsigned buffer_sz;
 	int n, i = 0;
 
 	for (n = 0; n < SMD_CHANNELS; n++) {
@@ -290,8 +293,15 @@ static int debug_read_ch_v2(char *buf, int max)
 
 		if (shared == 0)
 			continue;
+
+		buffer = smem_get_entry(SMEM_SMD_FIFO_BASE_ID + n, &buffer_sz);
+
+		if (buffer == 0)
+			continue;
+
 		i += dump_ch(buf + i, max - i, n, shared,
-			     (shared + sizeof(struct smd_half_channel)));
+			     (shared + sizeof(struct smd_half_channel)),
+			     buffer_sz / 2);
 	}
 
 	return i;
