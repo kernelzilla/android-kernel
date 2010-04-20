@@ -3612,6 +3612,7 @@ out:
 }
 #endif
 
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
@@ -3643,6 +3644,7 @@ static int msm_sdcc_get_wpswitch(struct device *dv)
 
 	return ret;
 }
+#endif
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static struct mmc_platform_data msm7x30_sdc1_data = {
@@ -3701,6 +3703,7 @@ static struct mmc_platform_data msm7x30_sdc4_data = {
 };
 #endif
 
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static void msm_sdc1_lvlshft_enable(void)
 {
 	int rc;
@@ -3725,6 +3728,7 @@ static void msm_sdc1_lvlshft_enable(void)
 	if (rc)
 		printk(KERN_ERR "%s: Failed to turn on GPIO 35\n", __func__);
 }
+#endif
 
 static void __init msm7x30_init_mmc(void)
 {
