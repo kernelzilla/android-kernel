@@ -1,7 +1,7 @@
 /* drivers/android/pmem.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
+#include <asm/sizes.h>
 
 #define PMEM_MAX_USER_SPACE_DEVICES (10)
 #define PMEM_MAX_KERNEL_SPACE_DEVICES (2)
@@ -41,9 +42,6 @@
 #define PMEM_MIN_ALLOC PAGE_SIZE
 
 #define PMEM_INITIAL_NUM_BITMAP_ALLOCATIONS (64)
-
-#define PMEM_1M 	(1 << 20)
-#define PMEM_1M_MASK 	(0xfff00000)
 
 #define PMEM_32BIT_WORD_ORDER (5)
 #define PMEM_BITS_PER_WORD_MASK (BITS_PER_LONG - 1)
@@ -164,7 +162,7 @@ struct pmem_info {
 
 	int (*allocate)(const int,
 			const unsigned long,
-			const enum pmem_align);
+			const unsigned int);
 	int (*free)(int, int);
 	int (*free_space)(int, struct pmem_freespace *);
 	unsigned long (*len)(int, struct pmem_data *);
@@ -908,7 +906,7 @@ static unsigned long pmem_order(unsigned long len, int id)
 
 static int pmem_allocator_all_or_nothing(const int id,
 		const unsigned long len,
-		const enum pmem_align align)
+		const unsigned int align)
 {
 	/* caller should hold the lock on arena_mutex! */
 	DLOG("all or nothing\n");
@@ -921,7 +919,7 @@ static int pmem_allocator_all_or_nothing(const int id,
 
 static int pmem_allocator_buddy_bestfit(const int id,
 		const unsigned long len,
-		const enum pmem_align align)
+		unsigned int align)
 {
 	/* caller should hold the lock on arena_mutex! */
 	int curr;
@@ -1077,8 +1075,9 @@ bitmap_allocate_contiguous(uint32_t *bitp, int num_bits_to_alloc,
 
 static int reserve_quanta(const unsigned int quanta_needed,
 		const int id,
-		const enum pmem_align align)
+		unsigned int align)
 {
+	/* alignment should be a valid power of 2 */
 	int ret = -1, start_bit = 0, spacing = 1;
 
 	/* Sanity check */
@@ -1091,19 +1090,18 @@ static int reserve_quanta(const unsigned int quanta_needed,
 		return -1;
 	}
 
-	if (align == PMEM_ALIGN_1M) {
-		start_bit = bit_from_paddr(id,
-			(pmem[id].base + PMEM_1M - 1) & PMEM_1M_MASK);
-		if (start_bit <= -1) {
+	start_bit = bit_from_paddr(id,
+		(pmem[id].base + align - 1) & ~(align - 1));
+	if (start_bit <= -1) {
 #if PMEM_DEBUG
-			printk(KERN_ALERT
-				"pmem: %s: bit_from_paddr fails for"
-				" 1M alignment.\n", __func__);
+		printk(KERN_ALERT
+			"pmem: %s: bit_from_paddr fails for"
+			" %u alignment.\n", __func__, align);
 #endif
-			return -1;
-		}
-		spacing = PMEM_1M / pmem[id].quantum;
+		return -1;
 	}
+	spacing = align / pmem[id].quantum;
+	spacing = spacing > 1 ? spacing : 1;
 
 	ret = bitmap_allocate_contiguous(pmem[id].allocator.bitmap.bitmap,
 		quanta_needed,
@@ -1123,13 +1121,13 @@ static int reserve_quanta(const unsigned int quanta_needed,
 
 static int pmem_allocator_bitmap(const int id,
 		const unsigned long len,
-		const enum pmem_align align)
+		const unsigned int align)
 {
 	/* caller should hold the lock on arena_mutex! */
 	int bitnum, i;
 	unsigned int quanta_needed;
 
-	DLOG("bitmap id %d, len %ld, align %d\n", id, len, align);
+	DLOG("bitmap id %d, len %ld, align %u\n", id, len, align);
 	if (!pmem[id].allocator.bitmap.bitm_alloc) {
 #if PMEM_DEBUG
 		printk(KERN_ALERT "pmem: bitm_alloc not present! id: %d\n",
@@ -1460,7 +1458,7 @@ static int pmem_mmap(struct file *file, struct vm_area_struct *vma)
 		mutex_lock(&pmem[id].arena_mutex);
 		index = pmem[id].allocate(id,
 				vma->vm_end - vma->vm_start,
-				PMEM_ALIGN_4K);
+				SZ_4K);
 		mutex_unlock(&pmem[id].arena_mutex);
 		data->index = index;
 		if (data->index < 0) {
@@ -1809,15 +1807,15 @@ EXPORT_SYMBOL(pmem_cache_maint);
 int32_t pmem_kalloc(const size_t size, const uint32_t flags)
 {
 	int info_id, i, memtype, fallback = 0;
-	enum pmem_align align;
+	unsigned int align;
 	int32_t index = -1;
 
 	switch (flags & PMEM_ALIGNMENT_MASK) {
 	case PMEM_ALIGNMENT_4K:
-		align = PMEM_ALIGN_4K;
+		align = SZ_4K;
 		break;
 	case PMEM_ALIGNMENT_1M:
-		align = PMEM_ALIGN_1M;
+		align = SZ_1M;
 		break;
 	default:
 		pr_alert("pmem: %s: Invalid alignment %#x\n",
@@ -1850,7 +1848,7 @@ retry_memalloc:
 	}
 
 #if PMEM_DEBUG
-	if (align != PMEM_ALIGN_4K &&
+	if (align != SZ_4K &&
 			(pmem[info_id].allocator_type ==
 				PMEM_ALLOCATORTYPE_ALLORNOTHING ||
 			pmem[info_id].allocator_type ==
@@ -2258,7 +2256,7 @@ static void pmem_get_size(struct pmem_region *region, struct file *file)
 		region->len = pmem[id].len(id, data);
 	}
 	up_read(&data->sem);
-	DLOG("offset %lx len %lx\n", region->offset, region->len);
+	DLOG("offset 0x%lx len 0x%lx\n", region->offset, region->len);
 }
 
 
@@ -2300,7 +2298,7 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 			DLOG("pmem: successful request for "
 				"physical address of pmem region id %d, "
-				"offset %lu, len %lu\n",
+				"offset 0x%lx, len 0x%lx\n",
 				id, region.offset, region.len);
 
 			break;
@@ -2372,6 +2370,8 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			DLOG("allocate, id %d\n", id);
 			down_write(&data->sem);
 			if (has_allocation(file)) {
+				pr_err("pmem: Existing allocation found on "
+					"this file descrpitor\n");
 				up_write(&data->sem);
 				return -EINVAL;
 			}
@@ -2379,7 +2379,54 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			mutex_lock(&pmem[id].arena_mutex);
 			data->index = pmem[id].allocate(id,
 					arg,
-					PMEM_ALIGN_4K);
+					SZ_4K);
+			mutex_unlock(&pmem[id].arena_mutex);
+			ret = data->index == -1 ? -ENOMEM :
+				data->index;
+			up_write(&data->sem);
+			return ret;
+		}
+	case PMEM_ALLOCATE_ALIGNED:
+		{
+			struct pmem_allocation alloc;
+			int ret = 0;
+
+			if (copy_from_user(&alloc, (void __user *)arg,
+						sizeof(struct pmem_allocation)))
+				return -EFAULT;
+			DLOG("allocate id align %d %u\n", id, alloc.align);
+			down_write(&data->sem);
+			if (has_allocation(file)) {
+				pr_err("pmem: Existing allocation found on "
+					"this file descrpitor\n");
+				up_write(&data->sem);
+				return -EINVAL;
+			}
+
+			if (alloc.align & (alloc.align - 1)) {
+				pr_err("pmem: Alignment is not a power of 2\n");
+				return -EINVAL;
+			}
+
+			if (alloc.align != SZ_4K &&
+					(pmem[id].allocator_type !=
+						PMEM_ALLOCATORTYPE_BITMAP)) {
+				pr_err("pmem: Non 4k alignment requires bitmap"
+					" allocator on %s\n", pmem[id].name);
+				return -EINVAL;
+			}
+
+			if (alloc.align > SZ_1M ||
+				alloc.align < SZ_4K) {
+				pr_err("pmem: Invalid Alignment (%u) "
+					"specified\n", alloc.align);
+				return -EINVAL;
+			}
+
+			mutex_lock(&pmem[id].arena_mutex);
+			data->index = pmem[id].allocate(id,
+					alloc.size,
+					alloc.align);
 			mutex_unlock(&pmem[id].arena_mutex);
 			ret = data->index == -1 ? -ENOMEM :
 				data->index;
