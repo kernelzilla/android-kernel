@@ -458,6 +458,14 @@ int diagfwd_write_complete(struct diag_request *diag_write_ptr)
 int diagfwd_read_complete(struct diag_request *diag_read_ptr)
 {
 	int len = diag_read_ptr->actual;
+
+#ifdef DIAG_DEBUG
+	printk(KERN_INFO "read data from USB, pkt length %d \n",
+		    diag_read_ptr->actual);
+	print_hex_dump(KERN_DEBUG, "Read Packet Data from USB: ", 16, 1,
+		       DUMP_PREFIX_ADDRESS, diag_read_ptr->buf,
+		       diag_read_ptr->actual, 1);
+#endif
 	driver->read_len = len;
 	queue_work(driver->diag_wq , &(driver->diag_read_work));
 	return 0;
@@ -531,13 +539,6 @@ void diag_read_work_fn(struct work_struct *work)
 	driver->usb_read_ptr->buf = driver->usb_buf_out;
 	driver->usb_read_ptr->length = USB_MAX_OUT_BUF;
 	diag_read(driver->usb_read_ptr);
-#ifdef DIAG_DEBUG
-	printk(KERN_INFO "read data from USB, pkt length %d \n",
-		    driver->usb_read_ptr->actual);
-	print_hex_dump(KERN_DEBUG, "Read Packet Data from USB: ", 16, 1,
-		       DUMP_PREFIX_ADDRESS, driver->usb_read_ptr->buf,
-		       driver->usb_read_ptr->actual, 1);
-#endif
 }
 
 void diagfwd_init(void)
