@@ -1495,8 +1495,8 @@ static inline void hci_mode_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 				conn->power_save = 0;
 		} else {
 			sco = conn->link;
-			if (test_and_clear_bit(HCI_CONN_SCO_PEND, &sco->pend) &&
-				sco) {
+			if (sco && test_and_clear_bit(HCI_CONN_SCO_PEND,
+					&sco->pend)) {
 				if (lmp_esco_capable(hdev))
 					hci_setup_sync(sco, conn->handle);
 				else
