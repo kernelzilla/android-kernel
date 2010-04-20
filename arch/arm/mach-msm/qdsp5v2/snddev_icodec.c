@@ -449,9 +449,10 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 {
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	int i;
-	afe_disable(AFE_HW_PATH_CODEC_TX);
 
 	wake_lock(&drv->tx_idlelock);
+
+	afe_disable(AFE_HW_PATH_CODEC_TX);
 
 	/* Disable ADIE */
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_OFF);
