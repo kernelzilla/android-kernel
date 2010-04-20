@@ -25,7 +25,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/cred.h>
 #include <linux/fs.h>
+#include <linux/sched.h>
 
 /* ---------------------------------------------------------------------- */
 
