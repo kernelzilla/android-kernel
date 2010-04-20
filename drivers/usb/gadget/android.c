@@ -144,6 +144,18 @@ static struct usb_device_descriptor device_desc = {
 	.bNumConfigurations   = 1,
 };
 
+static struct usb_otg_descriptor otg_descriptor = {
+	.bLength =		sizeof otg_descriptor,
+	.bDescriptorType =	USB_DT_OTG,
+	.bmAttributes =		USB_OTG_SRP | USB_OTG_HNP,
+	.bcdOTG               = __constant_cpu_to_le16(0x0200),
+};
+
+static const struct usb_descriptor_header *otg_desc[] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
+	NULL,
+};
+
 #define android_func_attr(function, index)				\
 static ssize_t  show_##function(struct device *dev,			\
 		struct device_attribute *attr, char *buf)		\
@@ -401,6 +413,8 @@ static int  android_bind(struct usb_composite_dev *cdev)
 		return ret;
 	}
 #endif
+	if (gadget_is_otg(cdev->gadget))
+		android_config_driver.descriptors = otg_desc;
 
 	/* register our configuration */
 	ret = usb_add_config(cdev, &android_config_driver);
