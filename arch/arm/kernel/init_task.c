@@ -28,6 +28,12 @@ union thread_union init_thread_union __init_task_data =
 	{ INIT_THREAD_INFO(init_task) };
 
 /*
+ * Have to bring this back for San's "evil" no-dma hack in
+ * the tiwlan driver
+ */
+EXPORT_UNUSED_SYMBOL(init_mm);
+
+/*
  * Initial task structure.
  *
  * All other task structs will be allocated on slabs in fork.c
