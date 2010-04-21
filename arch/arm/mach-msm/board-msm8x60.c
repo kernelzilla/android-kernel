@@ -25,6 +25,7 @@
 #include <linux/input/pmic8058-keypad.h>
 #include <linux/pmic8058-pwrkey.h>
 #include <linux/pmic8058-vibrator.h>
+#include <linux/leds.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -306,6 +307,106 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
+#if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
+
+#define GPIO_LEFT_LED_1		(GPIO_EXPANDER_GPIO_BASE + (16 * 3))
+#define GPIO_LEFT_LED_2		(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 1)
+#define GPIO_LEFT_LED_3		(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 2)
+#define GPIO_LEFT_LED_WLAN	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 3)
+#define GPIO_LEFT_LED_5		(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 7)
+#define GPIO_RIGHT_LED_1	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8)
+#define GPIO_RIGHT_LED_2	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 1)
+#define GPIO_RIGHT_LED_3	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 2)
+#define GPIO_RIGHT_LED_BT	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 3)
+#define GPIO_RIGHT_LED_5	(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 7)
+
+static struct gpio_led gpio_exp_leds_config[] = {
+	{
+		.name = "left_led1:green",
+		.gpio = GPIO_LEFT_LED_1,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "left_led2:red",
+		.gpio = GPIO_LEFT_LED_2,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "left_led3:green",
+		.gpio = GPIO_LEFT_LED_3,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "wlan_led:orange",
+		.gpio = GPIO_LEFT_LED_WLAN,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "left_led5:green",
+		.gpio = GPIO_LEFT_LED_5,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "right_led1:green",
+		.gpio = GPIO_RIGHT_LED_1,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "right_led2:red",
+		.gpio = GPIO_RIGHT_LED_2,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "right_led3:green",
+		.gpio = GPIO_RIGHT_LED_3,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "bt_led:blue",
+		.gpio = GPIO_RIGHT_LED_BT,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	{
+		.name = "right_led5:green",
+		.gpio = GPIO_RIGHT_LED_5,
+		.active_low = 1,
+		.retain_state_suspended = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+};
+
+static struct gpio_led_platform_data gpio_leds_pdata = {
+	.num_leds = ARRAY_SIZE(gpio_exp_leds_config),
+	.leds = gpio_exp_leds_config,
+};
+
+static struct platform_device gpio_leds = {
+	.name          = "leds-gpio",
+	.id            = -1,
+	.dev           = {
+		.platform_data = &gpio_leds_pdata,
+	},
+};
+#endif
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 #ifdef CONFIG_I2C_QUP
@@ -353,6 +454,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_BATTERY_MSM
 	&msm_batt_device,
+#endif
+#if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
+	&gpio_leds,
 #endif
 };
 
