@@ -32,9 +32,9 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	int index;
 	int ret = 0;
 	struct cpufreq_freqs freqs;
-	struct cpufreq_frequency_table *table =
-		cpufreq_frequency_get_table(smp_processor_id());
+	struct cpufreq_frequency_table *table;
 
+	table = cpufreq_frequency_get_table(policy->cpu);
 	if (cpufreq_frequency_table_target(policy, table, target_freq, relation,
 			&index)) {
 		pr_err("cpufreq: invalid target_freq: %d\n", target_freq);
@@ -47,9 +47,10 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 #endif
 	freqs.old = policy->cur;
 	freqs.new = table[index].frequency;
-	freqs.cpu = smp_processor_id();
+	freqs.cpu = policy->cpu;
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	ret = acpuclk_set_rate(table[index].frequency, SETRATE_CPUFREQ);
+	ret = acpuclk_set_rate(policy->cpu, table[index].frequency,
+				SETRATE_CPUFREQ);
 	if (!ret)
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	return ret;
@@ -64,10 +65,10 @@ static int msm_cpufreq_verify(struct cpufreq_policy *policy)
 
 static int __init msm_cpufreq_init(struct cpufreq_policy *policy)
 {
-	struct cpufreq_frequency_table *table =
-		cpufreq_frequency_get_table(smp_processor_id());
+	struct cpufreq_frequency_table *table;
 
-	policy->cur = acpuclk_get_rate();
+	table = cpufreq_frequency_get_table(policy->cpu);
+	policy->cur = acpuclk_get_rate(policy->cpu);
 	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
