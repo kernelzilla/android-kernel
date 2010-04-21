@@ -42,7 +42,7 @@ static const int irqs[] = {
 	IRQ_IOP32X_CORE_PMU,
 #elif defined(CONFIG_ARCH_IOP33X)
 	IRQ_IOP33X_CORE_PMU,
-#elif defined(CONFIG_ARCH_MSM)
+#elif defined(CONFIG_ARCH_MSM_ARM11)
 	INT_ARM11_PMU,
 #elif defined(CONFIG_ARCH_PXA)
 	IRQ_PMU,
