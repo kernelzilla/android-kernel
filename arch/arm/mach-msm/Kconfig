@@ -707,25 +707,6 @@ config MSM_DALRPC_TEST
 	help
 	  Exercises DAL RPC calls to QDSP6.
 
-config MSM_CPU_FREQ_SCREEN
-	depends on (HAS_EARLYSUSPEND && !CPU_FREQ_MSM)
-	default n
-	bool "Enable simple cpu frequency scaling"
-	help
-	 Simple cpufreq scaling based on screen ON/OFF.
-
-if MSM_CPU_FREQ_SCREEN
-
-config MSM_CPU_FREQ_SCREEN_OFF
-	int "Screen off cpu frequency"
-	default 245760
-
-config MSM_CPU_FREQ_SCREEN_ON
-	int "Screen on cpu frequency"
-	default 384000
-
-endif # MSM_CPU_FREQ_SCREEN
-
 if CPU_FREQ_MSM
 
 config MSM_CPU_FREQ_SET_MIN_MAX

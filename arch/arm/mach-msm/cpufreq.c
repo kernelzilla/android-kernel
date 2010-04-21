@@ -3,7 +3,7 @@
  * MSM architecture cpufreq driver
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
  * Author: Mike A. Chan <mikechan@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -24,31 +24,6 @@
 
 #define dprintk(msg...) \
 		cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
-
-#ifdef CONFIG_MSM_CPU_FREQ_SCREEN
-static void msm_early_suspend(struct early_suspend *handler)
-{
-       acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_OFF, SETRATE_CPUFREQ);
-}
-
-static void msm_late_resume(struct early_suspend *handler)
-{
-       acpuclk_set_rate(CONFIG_MSM_CPU_FREQ_SCREEN_ON, SETRATE_CPUFREQ);
-}
-
-static struct early_suspend msm_power_suspend = {
-       .suspend = msm_early_suspend,
-       .resume = msm_late_resume,
-};
-
-static int __init clock_late_init(void)
-{
-       register_early_suspend(&msm_power_suspend);
-       return 0;
-}
-
-late_initcall(clock_late_init);
-#elif defined(CONFIG_CPU_FREQ_MSM)
 
 static int msm_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
@@ -124,4 +99,4 @@ static int __init msm_cpufreq_register(void)
 }
 
 late_initcall(msm_cpufreq_register);
-#endif
+
