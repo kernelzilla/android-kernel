@@ -24,6 +24,8 @@ ifdef CONFIG_ARCH_QSD8X50
 	obj-$(CONFIG_MSM_SOC_REV_A) += acpuclock-8x50a.o
 endif
 
+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+
 obj-$(CONFIG_MSM_CPU_AVS) += avs.o avs_hw.o
 obj-$(CONFIG_CPU_V6) += idle-v6.o
 obj-$(CONFIG_CPU_V7) += idle-v7.o
