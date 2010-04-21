@@ -34,6 +34,7 @@ struct sx150x_device_data {
 	u8 reg_irq_src;
 	u8 reg_sense;
 	u8 reg_clock;
+	u8 reg_misc;
 	u8 ngpios;
 };
 
@@ -90,6 +91,7 @@ static struct sx150x_device_data sx150x_devices[] = {
 		.reg_irq_src  = 0x0c,
 		.reg_sense    = 0x0b,
 		.reg_clock    = 0x0f,
+		.reg_misc     = 0x10,
 		.ngpios       = 8
 	},
 	[1] = { /* sx1509q */
@@ -103,6 +105,7 @@ static struct sx150x_device_data sx150x_devices[] = {
 		.reg_irq_src  = 0x19,
 		.reg_sense    = 0x17,
 		.reg_clock    = 0x1e,
+		.reg_misc     = 0x1f,
 		.ngpios       = 16
 	},
 };
@@ -481,6 +484,7 @@ static irqreturn_t sx150x_irq_thread_fn(int irq, void *dev_id)
 	unsigned n;
 	unsigned sub_irq;
 	u8 val;
+	unsigned nhandled = 0;
 
 	mutex_lock(&chip->mutex);
 	for (i = (chip->dev_cfg->ngpios / 8) - 1; i >= 0; --i) {
@@ -494,11 +498,13 @@ static irqreturn_t sx150x_irq_thread_fn(int irq, void *dev_id)
 			if (val & (1 << n)) {
 				sub_irq = chip->irq_base + (i * 8) + n;
 				generic_handle_irq(sub_irq);
+				++nhandled;
 			}
 		}
 	}
 	mutex_unlock(&chip->mutex);
-	return IRQ_HANDLED;
+
+	return (nhandled > 0 ? IRQ_HANDLED : IRQ_NONE);
 }
 
 static void sx150x_init_chip(struct sx150x_chip *chip,
@@ -558,6 +564,12 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
 {
 	int err = 0;
 	unsigned n;
+
+	err = sx150x_i2c_write(chip->client,
+			chip->dev_cfg->reg_misc,
+			0x01);
+	if (err < 0)
+		return err;
 
 	err = sx150x_init_io(chip, chip->dev_cfg->reg_pullup,
 			pdata->io_pullup_ena);
@@ -637,7 +649,7 @@ static int sx150x_install_irq_chip(struct sx150x_chip *chip,
 	err = request_threaded_irq(irq_summary,
 				sx150x_irq_handler,
 				sx150x_irq_thread_fn,
-				IRQF_TRIGGER_FALLING,
+				IRQF_SHARED | IRQF_TRIGGER_FALLING,
 				chip->irq_chip.name,
 				chip);
 	if (err < 0) {
