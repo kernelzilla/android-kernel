@@ -641,6 +641,31 @@ void pll_enable(uint32_t pll)
 		cpu_relax();
 }
 
+void pll_disable(uint32_t pll)
+{
+	uint32_t reg_val;
+	unsigned long flags;
+
+	BUG_ON(pll >= NUM_PLL);
+
+	spin_lock_irqsave(&pll_vote_lock, flags);
+	if (pll_count[pll]) {
+		pll_count[pll]--;
+	} else {
+		pr_warning("Reference count mismatch in PLL disable!\n");
+		goto out;
+	}
+
+	if (pll_count[pll] == 0) {
+		reg_val = readl(REG(PLL_ENA_REG));
+		reg_val &= ~(1 << pll);
+		writel(reg_val, REG(PLL_ENA_REG));
+		unvote_for_xo(pll_to_xo[pll]);
+	}
+out:
+	spin_unlock_irqrestore(&pll_vote_lock, flags);
+}
+
 static void src_enable(uint32_t src)
 {
 	switch (src) {
@@ -668,31 +693,6 @@ static void src_enable(uint32_t src)
 		pll_enable(src_pll_tbl[src]);
 		break;
 	}
-}
-
-void pll_disable(uint32_t pll)
-{
-	uint32_t reg_val;
-	unsigned long flags;
-
-	BUG_ON(pll >= NUM_PLL);
-
-	spin_lock_irqsave(&pll_vote_lock, flags);
-	if (pll_count[pll]) {
-		pll_count[pll]--;
-	} else {
-		pr_warning("Reference count mismatch in PLL disable!\n");
-		goto out;
-	}
-
-	if (pll_count[pll] == 0) {
-		reg_val = readl(REG(PLL_ENA_REG));
-		reg_val &= ~(1 << pll);
-		writel(reg_val, REG(PLL_ENA_REG));
-		unvote_for_xo(pll_to_xo[pll]);
-	}
-out:
-	spin_unlock_irqrestore(&pll_vote_lock, flags);
 }
 
 static void src_disable(uint32_t src)
