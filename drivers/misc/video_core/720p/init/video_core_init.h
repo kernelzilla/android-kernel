@@ -67,6 +67,7 @@ void __iomem *vid_c_get_ioaddr(void);
 #ifdef USE_RES_TRACKER
 
 u32 vid_c_sel_clk_rate(unsigned long hclk_rate);
+u32 vid_c_get_clk_rate(unsigned long *phclk_rate);
 u32 vid_c_enable_clk(void);
 u32 vid_c_disable_clk(void);
 u32 vid_c_enable_pwr_rail(void);

@@ -25,6 +25,10 @@
 
 #define MSM_AXI_QOS_NAME "msm_vidc_reg"
 
+#define QVGA_PERF_LEVEL (300 * 30)
+#define VGA_PERF_LEVEL (1200 * 30)
+#define WVGA_PERF_LEVEL (1500 * 30)
+
 static unsigned int mfc_clk_freq_table[3] = {
 	61440000, 122880000, 170667000
 };
@@ -124,47 +128,65 @@ u32 res_trk_power_down(void)
 	return TRUE;
 }
 
-u32 res_trk_enable_clock(void)
+u32 res_trk_enable_clocks(void)
 {
 	VCDRES_MSG_LOW("clk_regime_msm_enable");
 #ifdef USE_RES_TRACKER
-	VCDRES_MSG_MED("\n res_trk_enable_clock():: Calling "
+	VCDRES_MSG_MED("\n res_trk_enable_clocks():: Calling "
 		"vid_c_enable_clk()\n");
 	return vid_c_enable_clk();
 #endif
 	return TRUE;
 }
 
-u32 res_trk_disable_clock(void)
+u32 res_trk_disable_clocks(void)
 {
 	VCDRES_MSG_LOW("clk_regime_msm_disable");
 
 #ifdef USE_RES_TRACKER
-	VCDRES_MSG_MED("\n res_trk_disable_clock():: Calling "
+	VCDRES_MSG_MED("\n res_trk_disable_clocks():: Calling "
 		"vid_c_disable_clk()\n");
 	return vid_c_disable_clk();
 #endif
 	return TRUE;
 }
-u32 res_trk_get_max_perf_level(void)
+
+u32 res_trk_get_max_perf_level(u32 *pn_max_perf_lvl)
 {
-	return VCD_RESTRK_MAX_PERF_LEVEL;
+	if (!pn_max_perf_lvl) {
+		VCDRES_MSG_ERROR("%s(): pn_max_perf_lvl is NULL\n",
+			__func__);
+		return FALSE;
+	}
+
+	*pn_max_perf_lvl = VCD_RESTRK_MAX_PERF_LEVEL;
+	return TRUE;
 }
 
 u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 	struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
-	u32 vga_perf_level = 1200 * 30;
-	u32 wvga_perf_level = 1500 * 30;
-	u32 qvga_perf_level = 300 * 30;
-	int rc;
 	u32 axi_freq = 0, mfc_freq = 0, calc_mfc_freq = 0;
+	int rc = -1;
 
+	if (!pn_set_perf_lvl) {
+		VCDRES_MSG_ERROR("%s(): pn_perf_lvl is NULL\n",
+			__func__);
+		return FALSE;
+	}
+
+	VCDRES_MSG_LOW("%s(), n_req_perf_lvl = %d", __func__, n_req_perf_lvl);
 	if (p_cctxt) {
 		calc_mfc_freq = res_trk_convert_perf_lvl_to_freq(
 			(u64)n_req_perf_lvl);
+
+		if (calc_mfc_freq < VCD_RESTRK_MIN_FREQ_POINT)
+			calc_mfc_freq = VCD_RESTRK_MIN_FREQ_POINT;
+		else if (calc_mfc_freq > VCD_RESTRK_MAX_FREQ_POINT)
+			calc_mfc_freq = VCD_RESTRK_MAX_FREQ_POINT;
+
 		if (!p_cctxt->b_decoding) {
-			if (n_req_perf_lvl >= vga_perf_level) {
+			if (n_req_perf_lvl >= VGA_PERF_LEVEL) {
 				mfc_freq = mfc_clk_freq_table[2];
 				axi_freq = axi_clk_freq_table_enc[1];
 			} else {
@@ -177,14 +199,14 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 				mfc_freq, calc_mfc_freq,
 				n_req_perf_lvl);
 		} else {
-			if (n_req_perf_lvl <= qvga_perf_level) {
+			if (n_req_perf_lvl <= QVGA_PERF_LEVEL) {
 				mfc_freq = mfc_clk_freq_table[0];
 				axi_freq = axi_clk_freq_table_dec[0];
 			} else {
 				axi_freq = axi_clk_freq_table_dec[1];
-				if (n_req_perf_lvl <= vga_perf_level)
+				if (n_req_perf_lvl <= VGA_PERF_LEVEL)
 					mfc_freq = mfc_clk_freq_table[0];
-				else if (n_req_perf_lvl <= wvga_perf_level)
+				else if (n_req_perf_lvl <= WVGA_PERF_LEVEL)
 					mfc_freq = mfc_clk_freq_table[1];
 				else
 					mfc_freq = mfc_clk_freq_table[2];
@@ -201,7 +223,7 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 	}
 
 #ifdef AXI_CLK_SCALING
-    if (n_req_perf_lvl != 37900) {
+    if (n_req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
 		VCDRES_MSG_HIGH("\n %s(): Setting AXI freq to %u",
 			__func__, axi_freq);
 		rc = pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
@@ -216,29 +238,42 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 #endif
 
 #ifdef USE_RES_TRACKER
-    if (n_req_perf_lvl != 37900) {
+    if (n_req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
 		VCDRES_MSG_HIGH("\n %s(): Setting MFC freq to %u",
 			__func__, mfc_freq);
 		if (!vid_c_sel_clk_rate(mfc_freq)) {
 			VCDRES_MSG_ERROR("%s(): vid_c_sel_clk_rate FAILED\n",
 				__func__);
+			*pn_set_perf_lvl = 0;
+			return FALSE;
 		}
 	}
 #endif
-	if (!mfc_freq) {
-		*pn_set_perf_lvl = 0;
-		return FALSE;
-	} else {
-		*pn_set_perf_lvl =
-		    res_trk_convert_freq_to_perf_lvl((u64) mfc_freq);
-		return TRUE;
-	}
+
+	*pn_set_perf_lvl =
+	    res_trk_convert_freq_to_perf_lvl((u64) mfc_freq);
+	return TRUE;
 }
 
-u32 res_trk_get_curr_perf_level(void)
+u32 res_trk_get_curr_perf_level(u32 *pn_perf_lvl)
 {
-	u32 n_freq;
+	unsigned long n_freq;
+
+	if (!pn_perf_lvl) {
+		VCDRES_MSG_ERROR("%s(): pn_perf_lvl is NULL\n",
+			__func__);
+		return FALSE;
+	}
 	VCDRES_MSG_LOW("clk_regime_msm_get_clk_freq_hz");
-	n_freq = VCD_RESTRK_MAX_FREQ_POINT;
-	return res_trk_convert_freq_to_perf_lvl((u64) n_freq);
+	if (!vid_c_get_clk_rate(&n_freq)) {
+		VCDRES_MSG_ERROR("%s(): vid_c_get_clk_rate FAILED\n",
+			__func__);
+		*pn_perf_lvl = 0;
+		return FALSE;
+	}
+
+	*pn_perf_lvl = res_trk_convert_freq_to_perf_lvl((u64) n_freq);
+	VCDRES_MSG_MED("%s(): n_freq = %lu, *pn_perf_lvl = %u", n_freq,
+		*pn_perf_lvl);
+	return TRUE;
 }

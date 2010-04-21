@@ -398,7 +398,6 @@ u32 vid_c_enable_clk(void)
 			mutex_unlock(&vid_c_device_p->lock);
 			return FALSE;
 		}
-		msleep(20);
 	}
 
 	vid_c_device_p->clock_enabled = 1;
@@ -421,6 +420,24 @@ u32 vid_c_sel_clk_rate(unsigned long hclk_rate)
 	return TRUE;
 }
 EXPORT_SYMBOL(vid_c_sel_clk_rate);
+
+u32 vid_c_get_clk_rate(unsigned long *phclk_rate)
+{
+	if (!phclk_rate) {
+		ERR("vid_c_get_clk_rate(): phclk_rate is NULL\n");
+		return FALSE;
+	}
+	mutex_lock(&vid_c_device_p->lock);
+	*phclk_rate = clk_get_rate(vid_c_device_p->hclk);
+	if (!(*phclk_rate)) {
+		ERR("vidc hclk get rate failed \n");
+		mutex_unlock(&vid_c_device_p->lock);
+		return FALSE;
+	}
+	mutex_unlock(&vid_c_device_p->lock);
+	return TRUE;
+}
+EXPORT_SYMBOL(vid_c_get_clk_rate);
 
 u32 vid_c_disable_clk(void)
 {

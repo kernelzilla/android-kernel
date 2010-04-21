@@ -235,8 +235,11 @@ struct vcd_clnt_ctxt_type_t {
 do { \
 	if ((val) > 0) \
 		val--; \
-	else \
+	else { \
+		VCD_MSG_ERROR("%s(): Inconsistent val given in " \
+			" VCD_BUFFERPOOL_INUSE_DECREMENT\n", __func__); \
 		vcd_assert(); \
+	} \
 } while (0)
 
 #endif

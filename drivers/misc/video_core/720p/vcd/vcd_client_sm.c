@@ -256,8 +256,8 @@ static u32 vcd_pause_in_run(struct vcd_clnt_ctxt_type_t *p_cctxt)
 
 static u32 vcd_resume_in_paused(struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
+	struct vcd_dev_ctxt_type *p_dev_ctxt = p_cctxt->p_dev_ctxt;
 	u32 rc = VCD_S_SUCCESS;
-	struct vcd_transc_type *p_tansc;
 
 	VCD_MSG_LOW("vcd_resume_in_paused:");
 
@@ -283,15 +283,8 @@ static u32 vcd_resume_in_paused(struct vcd_clnt_ctxt_type_t *p_cctxt)
 			}
 
 		}
-		if (!VCD_FAILED(rc)) {
-			if (vcd_get_frame_channel(p_cctxt->p_dev_ctxt,
-				&p_tansc)) {
-				if (!vcd_submit_frame(p_cctxt->p_dev_ctxt,
-					p_tansc))
-					vcd_release_frame_channel(p_cctxt->
-						p_dev_ctxt,	p_tansc);
-			}
-		}
+		if (!VCD_FAILED(rc))
+			vcd_try_submit_frame(p_dev_ctxt);
 	}
 
 	if (!VCD_FAILED(rc)) {
@@ -395,26 +388,25 @@ static u32 vcd_stop_cmn(struct vcd_clnt_ctxt_type_t *p_cctxt)
 
 	VCD_FAILED_RETURN(rc, "Failed: vcd_flush_buffers");
 
-	rc = vcd_power_event(p_dev_ctxt, p_cctxt, VCD_EVT_PWR_CLNT_CMD_BEGIN);
-
-	VCD_FAILED_RETURN(rc, "Failed: VCD_EVT_PWR_CLNT_CMD_BEGIN");
-
 	if (!p_cctxt->status.n_frame_submitted) {
 
 		if (vcd_get_command_channel(p_dev_ctxt, &p_transc)) {
-			p_transc->e_type = VCD_CMD_CODEC_STOP;
-			p_transc->p_cctxt = p_cctxt;
+			rc = vcd_power_event(p_dev_ctxt, p_cctxt,
+				VCD_EVT_PWR_CLNT_CMD_BEGIN);
 
-			rc = vcd_submit_cmd_sess_end(p_transc);
+			if (!VCD_FAILED(rc)) {
+				p_transc->e_type = VCD_CMD_CODEC_STOP;
+				p_transc->p_cctxt = p_cctxt;
+
+				rc = vcd_submit_cmd_sess_end(p_transc);
+			} else {
+				VCD_MSG_ERROR("Failed:"
+					" VCD_EVT_PWR_CLNT_CMD_BEGIN");
+			}
 
 			if (VCD_FAILED(rc)) {
 				vcd_release_command_channel(p_dev_ctxt,
 							    p_transc);
-
-				VCD_MSG_ERROR
-				    ("rc = 0x%x. Failed: "
-				     "vcd_submit_cmd_sess_end",
-				     rc);
 			}
 
 		} else {
@@ -714,7 +706,6 @@ static u32 vcd_fill_output_buffer_cmn
 	struct vcd_buffer_entry_type *p_buf_entry;
 	struct vcd_frame_data_type *p_frm_entry;
 	u32 b_q_result = TRUE;
-	struct vcd_transc_type *p_transc;
 
 	VCD_MSG_LOW("vcd_fill_output_buffer_cmn in %d:",
 		    p_cctxt->clnt_state.e_state);
@@ -776,17 +767,8 @@ static u32 vcd_fill_output_buffer_cmn
 						   n_sched_o_tkn_per_ip_frm));
 		}
 
-		if (!VCD_FAILED(rc)) {
-			if (vcd_get_frame_channel
-			    (p_cctxt->p_dev_ctxt, &p_transc)) {
-				if (!vcd_submit_frame(
-					p_cctxt->p_dev_ctxt, p_transc)) {
-					vcd_release_frame_channel(p_cctxt->
-								  p_dev_ctxt,
-								  p_transc);
-				}
-			}
-		}
+		if (!VCD_FAILED(rc))
+			vcd_try_submit_frame(p_cctxt->p_dev_ctxt);
 
 	}
 
