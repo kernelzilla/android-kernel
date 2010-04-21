@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -174,10 +174,10 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		{V31_STATS_RS_STOP},
 		{V31_STATS_CS_START, V31_STATS_CS_LEN, V31_STATS_CS_OFF},
 		{V31_STATS_CS_STOP},
-		{V31_STATS_SKIN_START, V31_STATS_IHIST_LEN,
-			V31_STATS_IHIST_OFF},
+		{V31_STATS_SKIN_START},
 /*100*/	{V31_STATS_SKIN_STOP},
-		{V31_STATS_IHIST_START},
+		{V31_STATS_IHIST_START,
+		V31_STATS_IHIST_LEN, V31_STATS_IHIST_OFF},
 		{V31_STATS_IHIST_STOP},
 		{V31_DUMMY_10},
 		{V31_SYNC_TIMER_SETTING},
@@ -312,6 +312,31 @@ static void vfe31_proc_ops(enum VFE31_MESSAGE_ID id, void *msg, size_t len)
 		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_AEC,
 				rp->evt_msg.data, NULL, NULL);
 		break;
+
+	case MSG_ID_STATS_SKIN:
+		rp->type = VFE_MSG_STATS_SKIN;
+		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_SKIN,
+				rp->evt_msg.data, NULL, NULL);
+		break;
+
+	case MSG_ID_STATS_IHIST:
+		rp->type = VFE_MSG_STATS_IHIST;
+		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_IHIST,
+				rp->evt_msg.data, NULL, NULL);
+		break;
+
+	case MSG_ID_STATS_RS:
+		rp->type = VFE_MSG_STATS_RS;
+		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_RS,
+				rp->evt_msg.data, NULL, NULL);
+		break;
+
+	case MSG_ID_STATS_CS:
+		rp->type = VFE_MSG_STATS_CS;
+		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_CS,
+				rp->evt_msg.data, NULL, NULL);
+		break;
+
 	default:
 		rp->type = VFE_MSG_GENERAL;
 		break;
@@ -982,6 +1007,25 @@ void vfe31_write_gamma_cfg(enum VFE31_DMI_RAM_SEL channel_sel,
 	vfe31_program_dmi_cfg(NO_MEM_SELECTED);
 }
 
+void vfe31_write_la_cfg(enum VFE31_DMI_RAM_SEL channel_sel,
+						const uint32_t *tbl)
+{
+	uint32_t i;
+	uint32_t value, value1, value2;
+
+	vfe31_program_dmi_cfg(channel_sel);
+	/* for loop for extracting init table. */
+	for (i = 0 ; i < (VFE31_LA_TABLE_LENGTH/2) ; i++) {
+		value = *tbl++;
+		value1 = value & 0x0000FFFF;
+		value2 = (value & 0xFFFF0000)>>16;
+		msm_io_w((value1), vfe31_ctrl->vfebase + VFE_DMI_DATA_LO);
+		msm_io_w((value2), vfe31_ctrl->vfebase + VFE_DMI_DATA_LO);
+	}
+	vfe31_program_dmi_cfg(NO_MEM_SELECTED);
+}
+
+
 static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 {
 	int i , rc = 0;
@@ -1295,19 +1339,12 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		msm_io_memcpy(vfe31_ctrl->vfebase + vfe31_cmd[cmd->id].offset,
 				cmdp, (vfe31_cmd[cmd->id].length));
 
-		/* If the value is 0x00 then write in to LUT bank0
-		if the value is 0x01 then write in to LUT bank1 */
-		if (*cmdp == 0x0)
-			vfe31_program_dmi_cfg(LUMA_ADAPT_LUT_RAM_BANK0);
-		else
-			vfe31_program_dmi_cfg(LUMA_ADAPT_LUT_RAM_BANK1);
+		old_val = *cmdp;
 		cmdp += 1;
-		/* for loop for extracting init table. */
-		for (i = 0 ; i < VFE31_LA_TABLE_LENGTH ; i++) {
-			msm_io_w(*cmdp, vfe31_ctrl->vfebase + VFE_DMI_DATA_LO);
-			cmdp++;
-		}
-		vfe31_program_dmi_cfg(NO_MEM_SELECTED);
+		if (old_val == 0x0)
+			vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK0 , cmdp);
+		else
+			vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK1 , cmdp);
 		cmdp -= 1;
 		}
 		break;

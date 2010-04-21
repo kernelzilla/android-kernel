@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -165,15 +165,11 @@ enum VFE31_DMI_RAM_SEL {
 	 RGBLUT_RAM_CH1_BANK1     = 0x5,
 	 RGBLUT_RAM_CH2_BANK0     = 0x6,
 	 RGBLUT_RAM_CH2_BANK1     = 0x7,
-	 STATS_HIST_CB_EVEN_RAM   = 0x8,
-	 STATS_HIST_CB_ODD_RAM    = 0x9,
-	 STATS_HIST_CR_EVEN_RAM   = 0xa,
-	 STATS_HIST_CR_ODD_RAM    = 0xb,
-	 RGBLUT_CHX_BANK0         = 0xc,
-	 RGBLUT_CHX_BANK1         = 0xd,
-	 LUMA_ADAPT_LUT_RAM_BANK0 = 0xe,
-	 LUMA_ADAPT_LUT_RAM_BANK1 = 0xf
-
+	 STATS_HIST_RAM           = 0x8,
+	 RGBLUT_CHX_BANK0         = 0x9,
+	 RGBLUT_CHX_BANK1         = 0xa,
+	 LUMA_ADAPT_LUT_RAM_BANK0 = 0xb,
+	 LUMA_ADAPT_LUT_RAM_BANK1 = 0xc
 };
 
 enum  VFE_STATE {
@@ -605,7 +601,8 @@ struct vfe_cmd_color_correction_config {
 	int16_t  K2;
 };
 
-#define VFE_LA_TABLE_LENGTH 256
+#define VFE_LA_TABLE_LENGTH 64
+
 struct vfe_cmd_la_config {
 	uint8_t enable;
 	int16_t table[VFE_LA_TABLE_LENGTH];
