@@ -1311,6 +1311,15 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		}
 		break;
+	case VDEC_IOCTL_GET_NUMBER_INSTANCES:
+		DBG("VDEC_IOCTL_GET_NUMBER_INSTANCES\n");
+		if (copy_from_user(&vdec_msg, (void __user *)arg,
+					sizeof(vdec_msg)))
+			return -EFAULT;
+		if (copy_to_user((void __user *)vdec_msg.outputparam,
+			&vid_dec_device_p->num_clients, sizeof(u32)))
+			return -EFAULT;
+		break;
 
 	default:
 		ERR("%s(): Unsupported ioctl\n", __func__);
