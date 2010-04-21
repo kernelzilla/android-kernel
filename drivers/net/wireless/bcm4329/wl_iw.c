@@ -564,7 +564,7 @@ wl_iw_set_country(
 
 	
 	if (country_offset != 0) {
-		strncpy(country_code, extra + country_offset +1,
+		strncpy(country_code, extra + country_offset + 1,
 			MIN(country_code_size, sizeof(country_code)));
 
 		
@@ -584,6 +584,50 @@ exit:
 	return error;
 }
 
+#ifdef CUSTOMER_HW2
+static int
+wl_iw_set_power_mode(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra
+)
+{
+	int error = 0;
+	char *p = extra;
+	static int pm = PM_FAST;
+	int pm_local = PM_OFF;
+	char powermode_val = 0;
+
+	strncpy((char *)&powermode_val, extra + strlen("POWERMODE") + 1, 1);
+
+	if (strnicmp((char *)&powermode_val, "1", strlen("1")) == 0) {
+
+		WL_TRACE(("%s: DHCP session starts\n", __FUNCTION__));
+
+		dev_wlc_ioctl(dev, WLC_GET_PM, &pm, sizeof(pm));
+
+		dev_wlc_ioctl(dev, WLC_SET_PM, &pm_local, sizeof(pm_local));
+	}
+	else if (strnicmp((char *)&powermode_val, "0", strlen("0")) == 0) {
+
+		WL_TRACE(("%s: DHCP session done\n", __FUNCTION__));
+
+
+		dev_wlc_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm));
+	}
+	else {
+		WL_TRACE(("Unkwown yet power setting, ignored\n"));
+	}
+
+	p += snprintf(p, MAX_WX_STRING, "OK");
+
+	wrqu->data.length = p - extra + 1;
+
+	return error;
+}
+#endif
+
 static int
 wl_iw_set_btcoex_dhcp(
 	struct net_device *dev,
@@ -595,11 +639,8 @@ wl_iw_set_btcoex_dhcp(
 	int error = 0;
 	char *p = extra;
 	uint val;
-#ifdef  CUSTOMER_HW2
-	static int  pm = PM_FAST;
-	int  pm_local = PM_OFF;
-#endif	
 	char powermode_val = 0;
+
 	char buf_reg66va_dhcp_on[8] = { 66, 00, 00, 00, 0x10, 0x27, 0x00, 0x00 };
 	char buf_reg41va_dhcp_on[8] = { 41, 00, 00, 00, 0x33, 0x00, 0x00, 0x00 };
 	char buf_reg68va_dhcp_on[8] = { 68, 00, 00, 00, 0x90, 0x01, 0x00, 0x00 };
@@ -610,22 +651,18 @@ wl_iw_set_btcoex_dhcp(
 
 	char buf_flag7_default[8] =   { 7, 00, 00, 00, 0x0, 0x00, 0x00, 0x00};
 
-	
-	strncpy((char *)&powermode_val, extra + strlen("POWERMODE") +1, 1);
+#ifdef CUSTOMER_HW2
+	strncpy((char *)&powermode_val, extra + strlen("BTCOEXMODE") + 1, 1);
+#else
+	strncpy((char *)&powermode_val, extra + strlen("POWERMODE") + 1, 1);
+#endif
 
-	
 	dev_wlc_intvar_get_reg(dev, "btc_params", 68,  &val);
 
 	if (strnicmp((char *)&powermode_val, "1", strlen("1")) == 0) {
 
 		WL_TRACE(("%s: DHCP session starts\n", __FUNCTION__));
 
-#ifdef  CUSTOMER_HW2
-		
-		dev_wlc_ioctl(dev, WLC_GET_PM, &pm, sizeof(pm));
-		
-		dev_wlc_ioctl(dev, WLC_SET_PM, &pm_local, sizeof(pm_local));
-#endif 
 		dev_wlc_bufvar_set(dev, "btc_params", \
 				   (char *)&buf_reg66va_dhcp_on[0], sizeof(buf_reg66va_dhcp_on));
 		
@@ -635,33 +672,27 @@ wl_iw_set_btcoex_dhcp(
 		dev_wlc_bufvar_set(dev, "btc_params", \
 				   (char *)&buf_reg68va_dhcp_on[0], sizeof(buf_reg68va_dhcp_on));
 
-		
 		g_bt->bt_state = BT_DHCP_START;
 		g_bt->timer_on = 1;
 		mod_timer(&g_bt->timer, g_bt->timer.expires);
 		WL_TRACE(("%s enable BT DHCP Timer\n", __FUNCTION__));
-
 	}
+#ifdef CUSTOMER_HW2
+	else if (strnicmp((char *)&powermode_val, "2", strlen("2")) == 0) {
+#else
 	else if (strnicmp((char *)&powermode_val, "0", strlen("0")) == 0) {
-
+#endif
 		WL_TRACE(("%s: DHCP session done\n", __FUNCTION__));
 
-#ifdef  CUSTOMER_HW2
-		
-		dev_wlc_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm));
-#endif 
-		
 		WL_TRACE(("%s disable BT DHCP Timer\n", __FUNCTION__));
 		if (g_bt->timer_on) {
 			g_bt->timer_on = 0;
 			del_timer_sync(&g_bt->timer);
 		}
 
-		
 		dev_wlc_bufvar_set(dev, "btc_flags", \
 				(char *)&buf_flag7_default[0], sizeof(buf_flag7_default));
 
-		
 		dev_wlc_bufvar_set(dev, "btc_params", \
 				   (char *)&buf_reg66val_defualt[0], sizeof(buf_reg66val_defualt));
 		
@@ -5386,8 +5417,15 @@ static int wl_iw_set_priv(
 			ret = wl_iw_set_country(dev, info, (union iwreq_data *)dwrq, extra);
 		else if (strnicmp(extra, "STOP", strlen("STOP")) == 0)
 			ret = wl_iw_control_wl_off(dev, info);
+#ifdef CUSTOMER_HW2
+		else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
+			ret = wl_iw_set_power_mode(dev, info, (union iwreq_data *)dwrq, extra);
+		else if (strnicmp(extra, "BTCOEXMODE", strlen("BTCOEXMODE")) == 0)
+			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
+#else
 		else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
+#endif
 #ifdef SOFTAP
 		else if (strnicmp(extra, "ASCII_CMD", strlen("ASCII_CMD")) == 0) {
 			wl_iw_process_private_ascii_cmd(dev, info, (union iwreq_data *)dwrq, extra);
