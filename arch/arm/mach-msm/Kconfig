@@ -42,6 +42,7 @@ config ARCH_QSD8X50
 config ARCH_MSM8X60
 	bool "MSM8X60"
 	select ARCH_MSM_SCORPIONMP
+	select ARM_GIC
 	select CPU_V7
 	select MSM_REMOTE_SPINLOCK_LDREX
 
