@@ -331,6 +331,7 @@ static struct i2c_board_info __initdata msm8x60_i2c_gsbi8_info[] = {
 #endif
 
 #ifdef CONFIG_PMIC8058
+#define PMIC_GPIO_SDC3_DET 22
 
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
@@ -352,6 +353,18 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 				.inv_int_pol    = 0,
 			},
 		},
+#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+		{
+			PMIC_GPIO_SDC3_DET - 1,
+			{
+				.direction      = PM_GPIO_DIR_IN,
+				.pull           = PM_GPIO_PULL_UP_30,
+				.vin_sel        = 2,
+				.function       = PM_GPIO_FUNC_NORMAL,
+				.inv_int_pol    = 0,
+			},
+		},
+#endif
 	};
 
 	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
@@ -803,6 +816,18 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 
 	return rc;
 }
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+static unsigned int msm8x60_sdcc_slot_status(struct device *dev)
+{
+	int status;
+
+	status = !(gpio_get_value(
+			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC3_DET - 1)));
+	return (unsigned int) status;
+}
+#endif
+#endif
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
@@ -830,6 +855,12 @@ static struct mmc_platform_data msm8x60_sdc3_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+	.status      = msm8x60_sdcc_slot_status,
+	.status_irq  = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
+				       PMIC_GPIO_SDC3_DET - 1),
+	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+#endif
 };
 #endif
 
