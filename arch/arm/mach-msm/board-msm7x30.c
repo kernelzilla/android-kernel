@@ -2068,6 +2068,7 @@ static int msm_hsusb_rpc_phy_reset(void __iomem *addr)
 #endif
 
 #ifdef CONFIG_USB_MSM_OTG_72K
+#ifndef CONFIG_USB_EHCI_MSM
 static int ldo_on;
 static struct vreg *usb_vreg;
 static int msm_pmic_enable_ldo(int enable)
@@ -2100,18 +2101,19 @@ static void msm_pmic_notify_deinit(void)
 	msm_pmic_enable_ldo(0);
 	vreg_put(usb_vreg);
 }
-
+#endif
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
 	.phy_reset	= msm_hsusb_rpc_phy_reset,
 
+#ifndef CONFIG_USB_EHCI_MSM
 	/* vbus notification through pmic call backs */
 	.pmic_notif_init         = msm_pmic_notify_init,
 	.pmic_notif_deinit       = msm_pmic_notify_deinit,
 	.pmic_enable_ldo         = msm_pmic_enable_ldo,
-
-	.core_clk	= 1,
 	.pmic_vbus_irq	= 1,
+#endif
+	.core_clk	= 1,
 };
 
 #ifdef CONFIG_USB_GADGET
