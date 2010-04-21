@@ -291,7 +291,7 @@ msmrtc_virtual_alarm_set(struct device *dev, struct rtc_wkalrm *a)
 		rtc_tm_to_time(&a->time, &rtcalarm_time);
 
 	if (now > rtcalarm_time) {
-		printk(KERN_ERR "%s: Attempt to set alarm in the past\n",
+		pr_err("%s: Attempt to set alarm in the past\n",
 		       __func__);
 		rtcalarm_time = 0;
 		return -EINVAL;
@@ -391,7 +391,7 @@ static void process_cb_request(void *buffer)
 			be64_to_cpu(rtc_cb->cb_info_data.tod_update.stamp);
 		rtc_cb->cb_info_data.tod_update.freq =
 			be32_to_cpu(rtc_cb->cb_info_data.tod_update.freq);
-		printk(KERN_INFO "RPC CALL -- TOD TIME UPDATE: ttick = %d\n"
+		pr_info("RPC CALL -- TOD TIME UPDATE: ttick = %d\n"
 			"stamp=%lld, freq = %d\n",
 			rtc_cb->cb_info_data.tod_update.tick,
 			rtc_cb->cb_info_data.tod_update.stamp,
@@ -567,7 +567,7 @@ msmrtc_probe(struct platform_device *pdev)
 				  &msm_rtc_ops,
 				  THIS_MODULE);
 	if (IS_ERR(rtc)) {
-		printk(KERN_ERR "%s: Can't register RTC device (%ld)\n",
+		pr_err("%s: Can't register RTC device (%ld)\n",
 		       pdev->name, PTR_ERR(rtc));
 		rc = PTR_ERR(rtc);
 		goto fail_cb_setup;
@@ -580,7 +580,7 @@ msmrtc_probe(struct platform_device *pdev)
 				  THIS_MODULE);
 
 	if (IS_ERR(rtcsecure)) {
-		printk(KERN_ERR "%s: Can't register RTC Secure device (%ld)\n",
+		pr_err("%s: Can't register RTC Secure device (%ld)\n",
 		       pdev->name, PTR_ERR(rtcsecure));
 		rtc_device_unregister(rtc);
 		rc = PTR_ERR(rtcsecure);
@@ -667,13 +667,11 @@ static int __init msmrtc_init(void)
 	snprintf((char *)msmrtc_driver.driver.name,
 		 strlen(msmrtc_driver.driver.name)+1,
 		 "rs%08x", TIMEREMOTE_PROG_NUMBER);
-	printk(KERN_DEBUG "RTC Registering with %s\n",
-		msmrtc_driver.driver.name);
+	pr_debug("RTC Registering with %s\n", msmrtc_driver.driver.name);
 
 	rc = platform_driver_register(&msmrtc_driver);
 	if (rc) {
-		printk(KERN_ERR "%s: platfrom_driver_register failed\n",
-								__func__);
+		pr_err("%s: platfrom_driver_register failed\n", __func__);
 	}
 
 	return rc;
