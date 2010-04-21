@@ -515,6 +515,13 @@ config MSM_SERIAL_DEBUGGER_CONSOLE
 	  Enables a console so that printk messages are displayed on
 	  the debugger serial port as the occur.
 
+config MSM_PROC_COMM
+	default y
+	bool "Proc-Comm RPC Interface"
+	help
+	  Enables a lightweight communications interface to the
+	  baseband processor.
+
 config MSM_SMD
 	bool "MSM Shared Memory Driver (SMD)"
 	help
