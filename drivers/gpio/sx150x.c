@@ -35,6 +35,7 @@ struct sx150x_device_data {
 	u8 reg_sense;
 	u8 reg_clock;
 	u8 reg_misc;
+	u8 reg_reset;
 	u8 ngpios;
 };
 
@@ -92,6 +93,7 @@ static struct sx150x_device_data sx150x_devices[] = {
 		.reg_sense    = 0x0b,
 		.reg_clock    = 0x0f,
 		.reg_misc     = 0x10,
+		.reg_reset    = 0x7d,
 		.ngpios       = 8
 	},
 	[1] = { /* sx1509q */
@@ -106,6 +108,7 @@ static struct sx150x_device_data sx150x_devices[] = {
 		.reg_sense    = 0x17,
 		.reg_clock    = 0x1e,
 		.reg_misc     = 0x1f,
+		.reg_reset    = 0x7d,
 		.ngpios       = 16
 	},
 };
@@ -563,7 +566,12 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
 			struct sx150x_platform_data *pdata)
 {
 	int err = 0;
-	unsigned n;
+
+	err = i2c_smbus_write_word_data(chip->client,
+					chip->dev_cfg->reg_reset,
+					0x3412);
+	if (err < 0)
+		return err;
 
 	err = sx150x_i2c_write(chip->client,
 			chip->dev_cfg->reg_misc,
@@ -591,34 +599,9 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
 	if (err < 0)
 		return err;
 
-	for (n = 0; err >= 0 && n < (chip->dev_cfg->ngpios / 8); ++n)
-		err = sx150x_i2c_write(chip->client,
-				chip->dev_cfg->reg_irq_mask - n,
-				0xff);
-	if (err < 0)
-		return err;
-
-	for (n = 0; err >= 0 && n < (chip->dev_cfg->ngpios / 8); ++n)
-		err = sx150x_i2c_write(chip->client,
-				chip->dev_cfg->reg_dir - n,
-				0xff);
-	if (err < 0)
-		return err;
-
 	if (pdata->oscio_is_gpo)
 		sx150x_set_oscio(chip, 0);
 
-	for (n = 0; err >= 0 && n < (chip->dev_cfg->ngpios / 4); ++n)
-		err = sx150x_i2c_write(chip->client,
-				chip->dev_cfg->reg_sense - n,
-				0x00);
-	if (err < 0)
-		return err;
-
-	for (n = 0; err >= 0 && n < (chip->dev_cfg->ngpios / 8); ++n)
-		err = sx150x_i2c_write(chip->client,
-				chip->dev_cfg->reg_irq_src - n,
-				0xff);
 	return err;
 }
 
