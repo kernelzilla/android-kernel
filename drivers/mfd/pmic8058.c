@@ -730,11 +730,15 @@ static void pm8058_handle_isr(struct pm8058_chip *chip)
 	int	i, j, k;
 	u8	root, block, config, bits;
 	u8	blocks[MAX_PM_MASTERS];
-	int	masters, irq, handled = 0, spurious = 0;
+	int	masters = 0, irq, handled = 0, spurious = 0;
+	u16     irqs_to_handle[MAX_PM_IRQ];
+	unsigned long	irqsave;
+
+	spin_lock_irqsave(&chip->pm_lock, irqsave);
 
 	/* Read root for masters */
 	if (pm8058_read_root(chip, &root))
-		return;
+		goto bail_out;
 
 	masters = root >> 1;
 
@@ -793,8 +797,8 @@ static void pm8058_handle_isr(struct pm8058_chip *chip)
 
 					/* Found one */
 					irq = block * 8 + k;
-					irq = chip->irq_i2e[irq];
-					generic_handle_irq(irq);
+					irqs_to_handle[handled] =
+						chip->irq_i2e[irq];
 					handled++;
 				} else {
 					/* Clear and mask wrong one */
@@ -818,6 +822,12 @@ static void pm8058_handle_isr(struct pm8058_chip *chip)
 	}
 
 bail_out:
+
+	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
+
+	for (i = 0; i < handled; i++)
+		generic_handle_irq(irqs_to_handle[i]);
+
 	if (spurious) {
 		if (!pm8058_can_print())
 			return;
@@ -842,7 +852,6 @@ static int pm8058_ist(void *data)
 {
 	unsigned int irq = (unsigned int)data;
 	struct pm8058_chip *chip = get_irq_data(irq);
-	unsigned long	irqsave;
 
 	if (!chip) {
 		pr_err("%s: Invalid chip data: IRQ=%d\n", __func__, irq);
@@ -861,10 +870,7 @@ static int pm8058_ist(void *data)
 			continue;
 		}
 
-		spin_lock_irqsave(&chip->pm_lock, irqsave);
 		pm8058_handle_isr(chip);
-		spin_unlock_irqrestore(&chip->pm_lock, irqsave);
-
 		enable_irq(irq);
 	}
 
