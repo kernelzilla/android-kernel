@@ -120,8 +120,8 @@
 #define P_TSIF_P_CLK		85
 #define P_MDP_P_CLK		86
 #define P_SDAC_M_CLK		87
-#define P_MI2S_HDMI_CLK		88
-#define P_MI2S_HDMI_M_CLK	89
+#define P_MI2S_S_CLK		88
+#define P_MI2S_M_CLK		89
 #define P_AXI_ROTATOR_CLK	90
 #define P_HDMI_CLK		91
 #define P_CSI0_CLK		92

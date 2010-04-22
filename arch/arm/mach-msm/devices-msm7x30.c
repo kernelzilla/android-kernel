@@ -1029,6 +1029,8 @@ struct clk msm_clocks_7x30[] = {
 	CLK_PCOM("mfc_clk",		MFC_CLK,		NULL, 0),
 	CLK_PCOM("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
 	CLK_PCOM("mfc_pclk",		MFC_P_CLK,		NULL, 0),
+	CLK_PCOM("mi2s_m_clk",		MI2S_M_CLK,  		NULL, 0),
+	CLK_PCOM("mi2s_s_clk",		MI2S_S_CLK,  		NULL, 0),
 	CLK_PCOM("mi2s_codec_rx_m_clk",	MI2S_CODEC_RX_M_CLK,  NULL, 0),
 	CLK_PCOM("mi2s_codec_rx_s_clk",	MI2S_CODEC_RX_S_CLK,  NULL, 0),
 	CLK_PCOM("mi2s_codec_tx_m_clk",	MI2S_CODEC_TX_M_CLK,  NULL, 0),
