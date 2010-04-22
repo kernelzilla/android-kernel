@@ -4,7 +4,7 @@
  * common code to deal with the AUDPP dsp task (audio postproc)
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -123,6 +123,8 @@ struct audpp_state {
 	/* flags, 48 bits sample/bytes counter per channel */
 	uint16_t avsync[CH_COUNT * AUDPP_CLNT_MAX_COUNT + 1];
 	struct audpp_event_callback *cb_tbl[MAX_EVENT_CALLBACK_CLIENTS];
+
+	wait_queue_head_t event_wait;
 };
 
 struct audpp_state the_audpp_state = {
@@ -281,6 +283,7 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
 			MM_INFO("DISABLE\n");
 			audpp->enabled = 0;
+			wake_up(&audpp->event_wait);
 			audpp_broadcast(audpp, id, msg);
 		} else {
 			MM_ERR("invalid config msg %d\n", msg[0]);
@@ -366,6 +369,7 @@ void audpp_disable(int id, void *private)
 {
 	struct audpp_state *audpp = &the_audpp_state;
 	unsigned long flags;
+	int rc;
 
 	if (id < -1 || id > 4)
 		return;
@@ -390,6 +394,13 @@ void audpp_disable(int id, void *private)
 		MM_DBG("disable\n");
 		LOG(EV_DISABLE, 2);
 		audpp_dsp_config(0);
+		rc = wait_event_interruptible(audpp->event_wait,
+				(audpp->enabled == 0));
+		if (audpp->enabled == 0)
+			MM_INFO("Received CFG_MSG_DISABLE from ADSP\n");
+		else
+			MM_ERR("Didn't receive CFG_MSG DISABLE \
+					message from ADSP\n");
 		msm_adsp_disable(audpp->mod);
 		msm_adsp_put(audpp->mod);
 		audpp->mod = NULL;
@@ -812,6 +823,9 @@ static int audpp_probe(struct platform_device *pdev)
 			audpp->dec_database->num_dec);
 	MM_INFO("Number of concurrency supported %d\n",
 			audpp->dec_database->num_concurrency_support);
+
+	init_waitqueue_head(&audpp->event_wait);
+
 	for (idx = 0; idx < audpp->dec_database->num_dec; idx++) {
 		audpp->dec_info_table[idx].codec = -1;
 		audpp->dec_info_table[idx].pid = 0;
