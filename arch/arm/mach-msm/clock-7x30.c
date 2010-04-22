@@ -1025,7 +1025,7 @@ static unsigned soc_clk_get_rate(unsigned id)
 	unsigned ret = 0;
 
 	if (t->type == NORATE)
-		return -EINVAL;
+		return 0;
 
 	spin_lock_irqsave(&clock_reg_lock, flags);
 	ret = t->current_freq->freq_hz;
