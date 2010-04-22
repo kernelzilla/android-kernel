@@ -25,7 +25,7 @@
 #include <linux/msm_audio.h>
 #include <linux/msm_audio_aac.h>
 #include <mach/msm_qdsp6_audio.h>
-#include <mach/debug_audio_mm.h>
+#include <mach/debug_mm.h>
 
 struct aac {
 	struct mutex lock;
@@ -97,7 +97,8 @@ static long q6_aac_in_ioctl(struct file *file,
 			&& aac->voicerec_mode.rec_mode !=
 			AUDIO_FLAG_INCALL_MIXED) {
 			aac->voicerec_mode.rec_mode = AUDIO_FLAG_READ;
-			MM_ERR("Invalid rec_mode\n");
+			pr_err("[%s:%s] Invalid rec_mode\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		break;
@@ -114,12 +115,14 @@ static long q6_aac_in_ioctl(struct file *file,
 			break;
 		}
 		if (aac->str_cfg.buffer_size < 519) {
-			MM_ERR("Buffer size too small\n");
+			pr_err("[%s:%s] Buffer size too small\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 			break;
 		}
 		if (aac->str_cfg.buffer_count != 2)
-			MM_INFO("Buffer count set to 2\n");
+			pr_info("[%s:%s] Buffer count set to 2\n", __MM_FILE__,
+					__func__);
 
 		break;
 	case AUDIO_SET_AAC_ENC_CONFIG:
@@ -128,16 +131,19 @@ static long q6_aac_in_ioctl(struct file *file,
 			rc = -EFAULT;
 		}
 		if (aac->cfg.channels != 1) {
-			MM_ERR("only mono is supported\n");
+			pr_err("[%s:%s] only mono is supported\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		if (aac->cfg.sample_rate != 48000) {
-			MM_ERR("only 48KHz is supported\n");
+			pr_err("[%s:%s] only 48KHz is supported\n",
+					__MM_FILE__, __func__);
 			rc = -EINVAL;
 		}
 		if (aac->cfg.stream_format != AUDIO_AAC_FORMAT_RAW &&
 			aac->cfg.stream_format != AUDIO_AAC_FORMAT_ADTS) {
-			MM_ERR("unsupported AAC format\n");
+			pr_err("[%s:%s] unsupported AAC format\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		}
 		break;
@@ -161,7 +167,8 @@ static int q6_aac_in_open(struct inode *inode, struct file *file)
 	struct aac *aac;
 	aac = kmalloc(sizeof(struct aac), GFP_KERNEL);
 	if (aac == NULL) {
-		MM_ERR("Could not allocate memory for aac driver\n");
+		pr_err("[%s:%s] Could not allocate memory for aac driver\n",
+				__MM_FILE__, __func__);
 		return -ENOMEM;
 	}
 

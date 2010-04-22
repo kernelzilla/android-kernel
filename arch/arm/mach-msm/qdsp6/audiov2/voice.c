@@ -26,10 +26,10 @@
 #include <linux/kthread.h>
 #include <linux/completion.h>
 #include <linux/wait.h>
-#include <mach/debug_audio_mm.h>
 #include <mach/msm_qdsp6_audiov2.h>
 #include "../dal.h"
 #include "dal_voice.h"
+#include <mach/debug_mm.h>
 
 struct voice_struct {
 	struct dal_client *cvd;
@@ -111,7 +111,8 @@ static int voice_thread(void *data)
 			cvd_process_set_network();
 			break;
 		default:
-			MM_ERR("Undefined event\n");
+			pr_err("[%s:%s] Undefined event\n", __MM_FILE__,
+					__func__);
 
 		}
 	}
@@ -125,11 +126,13 @@ static void remote_cb_function(void *data, int len, void *cookie)
 	memcpy(&voice.apr_pkt, apr, sizeof(struct apr_command_pkt));
 
 	if (len <= 0) {
-		MM_ERR("unexpected event with length %d \n", len);
+		pr_err("[%s:%s] unexpected event with length %d\n",
+				__MM_FILE__, __func__, len);
 		return;
 	}
 
-	MM_DBG("APR = %x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
+	pr_debug("[%s:%s] APR = %x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n", __MM_FILE__,
+			__func__,
 	apr->header,
 	apr->reserved1,
 	apr->src_addr,
@@ -157,13 +160,14 @@ static int __init voice_init(void)
 			remote_cb_function, 0);
 
 	if (!voice.cvd) {
-		MM_ERR("audio_init: cannot attach to cvd\n");
+		pr_err("[%s:%s] audio_init: cannot attach to cvd\n",
+				__MM_FILE__, __func__);
 		res = -ENODEV;
 		goto done;
 	}
 
 	if (check_version(voice.cvd, VOICE_DAL_VERSION) != 0) {
-		pr_err("Incompatible cvd version\n");
+		pr_err("Incompatible cvd version\n", __MM_FILE__, __func__);
 		res = -ENODEV;
 		goto done;
 	}
@@ -174,7 +178,8 @@ static int __init voice_init(void)
 	task = kthread_run(voice_thread, &voice, "voice_thread");
 
 	if (IS_ERR(task)) {
-		MM_ERR("Cannot start the voice thread\n");
+		pr_err("[%s:%s] Cannot start the voice thread\n", __MM_FILE__,
+				__func__);
 		res = PTR_ERR(task);
 		task = NULL;
 	} else

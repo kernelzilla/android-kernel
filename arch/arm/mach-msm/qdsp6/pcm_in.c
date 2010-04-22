@@ -25,6 +25,7 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
+#include <mach/debug_mm.h>
 
 struct pcm {
 	struct audio_client *ac;
@@ -111,7 +112,8 @@ static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (voicerec_mode.rec_mode != AUDIO_FLAG_READ &&
 			voicerec_mode.rec_mode != AUDIO_FLAG_INCALL_MIXED) {
 			pcm->rec_mode = AUDIO_FLAG_READ;
-			pr_err("invalid rec_mode\n");
+			pr_err("[%s:%s] invalid rec_mode\n", __MM_FILE__,
+					__func__);
 			rc = -EINVAL;
 		} else
 			pcm->rec_mode = voicerec_mode.rec_mode;
@@ -141,7 +143,7 @@ static int q6_in_open(struct inode *inode, struct file *file)
 {
 	struct pcm *pcm;
 
-	pr_info("pcm_in: open\n");
+	pr_info("[%s:%s] open\n", __MM_FILE__, __func__);
 	pcm = kzalloc(sizeof(struct pcm), GFP_KERNEL);
 
 	if (!pcm)
@@ -176,7 +178,8 @@ static ssize_t q6_in_read(struct file *file, char __user *buf,
 		if (ab->used)
 			if (!wait_event_timeout(ac->wait, (ab->used == 0), 5*HZ)) {
 				audio_client_dump(ac);
-				pr_err("pcm_read: timeout. dsp dead?\n");
+				pr_err("[%s:%s] timeout. dsp dead?\n",
+						__MM_FILE__, __func__);
 				BUG();
 			}
 
@@ -209,7 +212,7 @@ static int q6_in_release(struct inode *inode, struct file *file)
 	if (pcm->ac)
 		rc = q6audio_close(pcm->ac);
 	kfree(pcm);
-	pr_info("pcm_out: release\n");
+	pr_info("[%s:%s] release\n", __MM_FILE__, __func__);
 	return rc;
 }
 

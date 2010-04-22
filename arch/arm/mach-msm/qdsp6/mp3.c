@@ -25,6 +25,7 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
+#include <mach/debug_mm.h>
 
 #define BUFSZ (8192)
 #define DMASZ (BUFSZ * 2)
@@ -65,7 +66,8 @@ static long mp3_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (arg == 0) {
 			acdb_id = 0;
 		} else if (copy_from_user(&acdb_id, (void*) arg, sizeof(acdb_id))) {
-			pr_info("pcm_out: copy acdb_id from user failed\n");
+			pr_info("[%s:%s] copy acdb_id from user failed\n",
+					__MM_FILE__, __func__);
 			rc = -EFAULT;
 			break;
 		}

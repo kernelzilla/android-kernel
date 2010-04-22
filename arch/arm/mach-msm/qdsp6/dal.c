@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 
 #include <mach/msm_smd.h>
+#include <mach/debug_mm.h>
 
 #include "dal.h"
 
@@ -225,8 +226,8 @@ again:
 				goto check_data;
 			}
 		}
-		pr_err("$$$ receiving unknown message len = %d $$$\n",
-		       dch->count);
+		pr_err("[%s:%s] $$$ receiving unknown message len = %d $$$\n",
+				__MM_FILE__, __func__, dch->count);
 		dch->active = 0;
 		dch->ptr = dch->data;
 	}
@@ -242,16 +243,17 @@ check_data:
 			panic("invalid read");
 
 #if DAL_TRACE
-		pr_info("dal recv %p <- %p %02x:%04x:%02x %d\n",
-			hdr->to, hdr->from, hdr->msgid, hdr->ddi,
-			hdr->prototype, hdr->length - sizeof(*hdr));
+		pr_info("[%s:%s] dal recv %p <- %p %02x:%04x:%02x %d\n",
+			__MM_FILE__, __func__, hdr->to, hdr->from, hdr->msgid,
+			hdr->ddi, hdr->prototype, hdr->length - sizeof(*hdr));
 		print_hex_dump_bytes("", DUMP_PREFIX_OFFSET, dch->ptr, len);
 #endif
 		dch->count = 0;
 
 		client = dch->active;
 		if (!client) {
-			pr_err("dal: message to %p discarded\n", dch->hdr.to);
+			pr_err("[%s:%s] message to %p discarded\n",
+				__MM_FILE__, __func__, dch->hdr.to);
 			goto again;
 		}
 
@@ -262,8 +264,9 @@ check_data:
 			if (client->event)
 				client->event(dch->ptr, len, client->cookie);
 			else
-				pr_err("dal: client %p has no event handler\n",
-				       client);
+				pr_err("[%s:%s] client %p has no event \
+					handler\n", __MM_FILE__, __func__,
+					client);
 			goto again;
 		}
 
@@ -278,7 +281,8 @@ check_data:
 			goto again;
 		}
 
-		pr_err("dal: cannot find client %p\n", dch->hdr.to);
+		pr_err("[%s:%s] cannot find client %p\n", __MM_FILE__,
+				__func__, dch->hdr.to);
 		goto again;
 	}
 
@@ -315,7 +319,8 @@ found_it:
 	if (!dch->sch) {
 		if (smd_named_open_on_edge(name, cpu, &dch->sch,
 					dch, dal_channel_notify)) {
-			pr_err("smd open failed\n");
+			pr_err("[%s:%s] smd open failed\n", __MM_FILE__,
+					__func__);
 			dch = NULL;
 		}
 		/* FIXME: wait for channel to open before returning */
@@ -342,9 +347,9 @@ int dal_call_raw(struct dal_client *client,
 	client->status = -EBUSY;
 
 #if DAL_TRACE
-	pr_info("dal send %p -> %p %02x:%04x:%02x %d\n",
-		hdr->from, hdr->to, hdr->msgid, hdr->ddi,
-		hdr->prototype, hdr->length - sizeof(*hdr));
+	pr_info("[%s:%s] dal send %p -> %p %02x:%04x:%02x %d\n",
+		__MM_FILE__, __func__, hdr->from, hdr->to, hdr->msgid,
+		hdr->ddi, hdr->prototype, hdr->length - sizeof(*hdr));
 	print_hex_dump_bytes("", DUMP_PREFIX_OFFSET, data, data_len);
 #endif
 
@@ -359,7 +364,8 @@ int dal_call_raw(struct dal_client *client,
 
 	if (!wait_event_timeout(client->wait, (client->status != -EBUSY), 5*HZ)) {
 		dal_trace_dump(client);
-		pr_err("dal: call timed out. dsp is probably dead.\n");
+		pr_err("[%s:%s] call timed out. dsp is probably dead.\n",
+				__MM_FILE__, __func__);
 		dal_trace_print(hdr, data, data_len, 0);
 		BUG();
 	}
@@ -450,12 +456,12 @@ struct dal_client *dal_attach(uint32_t device_id, const char *name,
 
 	if ((r == sizeof(reply)) && (reply.status == 0)) {
 		reply.name[63] = 0;
-		pr_info("dal_attach: status = %d, name = '%s'\n",
-			reply.status, reply.name);
+		pr_info("[%s:%s] status = %d, name = '%s'\n", __MM_FILE__,
+				__func__, reply.status, reply.name);
 		return client;
 	}
 
-	pr_err("dal_attach: failure\n");
+	pr_err("[%s:%s] failure\n", __MM_FILE__, __func__);
 
 	dal_detach(client);
 	return 0;
