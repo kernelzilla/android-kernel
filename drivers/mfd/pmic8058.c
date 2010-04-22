@@ -944,6 +944,9 @@ static int pm8058_probe(struct i2c_client *client,
 	(void) memcpy((void *)&chip->pdata, (const void *)pdata,
 		      sizeof(chip->pdata));
 
+	set_irq_data(chip->dev->irq, (void *)chip);
+	set_irq_wake(chip->dev->irq, 1);
+
 	chip->pm_task = pm8058_init_ist(chip->dev->irq, &chip->irq_completion);
 	if (chip->pm_task == NULL) {
 		pr_err("%s: pm8058_init_ist() failed\n", __func__);
@@ -994,17 +997,6 @@ static int pm8058_probe(struct i2c_client *client,
 		set_irq_data(i, (void *)chip);
 	}
 
-	rc = request_irq(chip->dev->irq, pm8058_int_handler,
-			 IRQ_NOAUTOEN | IRQF_DISABLED | IRQF_TRIGGER_LOW,
-			 "pm8058-irq", &chip->irq_completion);
-	if (rc < 0)
-		pr_err("%s: could not request irq %d: %d\n", __func__,
-					 chip->dev->irq, rc);
-	else {
-		set_irq_data(chip->dev->irq, (void *)chip);
-		set_irq_wake(chip->dev->irq, 1);
-	}
-
 	/* Add sub devices with the chip parameter as driver data */
 	for (i = 0; i < pdata->num_subdevs; i++)
 		pdata->sub_devices[i].driver_data = chip;
@@ -1015,12 +1007,20 @@ static int pm8058_probe(struct i2c_client *client,
 		rc = pdata->init(chip);
 		if (rc != 0) {
 			pr_err("%s: board init failed\n", __func__);
-			free_irq(chip->dev->irq, &chip->irq_completion);
 			kthread_stop(chip->pm_task);
 			chip->dev = NULL;
 			kfree(chip);
 			return -ENODEV;
 		}
+	}
+
+	if (chip->pm_max_irq) {
+		rc = request_irq(chip->dev->irq, pm8058_int_handler,
+				IRQF_DISABLED | IRQF_TRIGGER_LOW,
+				"pm8058-irq", &chip->irq_completion);
+		if (rc < 0)
+			pr_err("%s: could not request irq %d: %d\n", __func__,
+					chip->dev->irq, rc);
 	}
 
 	return 0;
