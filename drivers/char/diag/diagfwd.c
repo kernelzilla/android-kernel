@@ -39,8 +39,19 @@ MODULE_VERSION("1.0");
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
 
+/* State for diag forwarding */
+static unsigned char diag_debug_buf[1024];
+static int diag_debug_buf_idx;
+
 #define CHK_OVERFLOW(bufStart, start, end, length) \
 ((bufStart <= start) && (end - start >= length)) ? 1 : 0
+
+#define APPEND_DEBUG(ch) \
+do {							\
+	diag_debug_buf[diag_debug_buf_idx] = ch; \
+	(diag_debug_buf_idx < 1023) ? \
+	(diag_debug_buf_idx++) : (diag_debug_buf_idx = 0); \
+} while (0)
 
 static void diag_smd_send_req(int context)
 {
@@ -67,10 +78,12 @@ static void diag_smd_send_req(int context)
 			if (!buf) {
 				printk(KERN_INFO "Out of diagmem for a9\n");
 			} else {
+				APPEND_DEBUG('i');
 				if (context == SMD_CONTEXT)
 					smd_read_from_cb(driver->ch, buf, r);
 				else
 					smd_read(driver->ch, buf, r);
+				APPEND_DEBUG('j');
 				driver->in_busy = 1;
 				driver->usb_write_ptr->buf = buf;
 				driver->usb_write_ptr->length = r;
@@ -82,6 +95,7 @@ static void diag_smd_send_req(int context)
 					       DUMP_PREFIX_ADDRESS, buf, r, 1);
 #endif
 				diag_write(driver->usb_write_ptr);
+				APPEND_DEBUG('k');
 			}
 		}
 	}
@@ -104,15 +118,18 @@ static void diag_smd_qdsp_send_req(int context)
 			if (!buf) {
 				printk(KERN_INFO "Out of diagmem for q6\n");
 			} else {
+				APPEND_DEBUG('l');
 				if (context == SMD_CONTEXT)
 					smd_read_from_cb(
 						driver->chqdsp, buf, r);
 				else
 					smd_read(driver->chqdsp, buf, r);
+				APPEND_DEBUG('m');
 				driver->in_busy_qdsp = 1;
 				driver->usb_write_ptr_qdsp->buf = buf;
 				driver->usb_write_ptr_qdsp->length = r;
 				diag_write(driver->usb_write_ptr_qdsp);
+				APPEND_DEBUG('n');
 			}
 		}
 
@@ -403,7 +420,9 @@ static void diag_process_hdlc(void *data, unsigned len)
 
 	/* ignore 2 bytes for CRC, one for 7E and send */
 	if ((driver->ch) && (ret) && (type) && (hdlc.dest_idx > 3)) {
+		APPEND_DEBUG('g');
 		smd_write(driver->ch, driver->hdlc_buf, hdlc.dest_idx - 3);
+		APPEND_DEBUG('h');
 #ifdef DIAG_DEBUG
 		printk(KERN_INFO "writing data to SMD, pkt length %d \n", len);
 		print_hex_dump(KERN_DEBUG, "Written Packet Data to SMD: ", 16,
@@ -428,7 +447,9 @@ int diagfwd_connect(void)
 
 	driver->usb_read_ptr->buf = driver->usb_buf_out;
 	driver->usb_read_ptr->length = USB_MAX_OUT_BUF;
+	APPEND_DEBUG('a');
 	diag_read(driver->usb_read_ptr);
+	APPEND_DEBUG('b');
 	return 0;
 }
 
@@ -451,14 +472,17 @@ int diagfwd_write_complete(struct diag_request *diag_write_ptr)
 	/* Need a context variable here instead */
 	if (buf == (void *)driver->usb_buf_in) {
 		driver->in_busy = 0;
+		APPEND_DEBUG('o');
 		diag_smd_send_req(NON_SMD_CONTEXT);
 	} else if (buf == (void *)driver->usb_buf_in_qdsp) {
 		driver->in_busy_qdsp = 0;
+		APPEND_DEBUG('p');
 		diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
 	} else {
 		diagmem_free(driver, (unsigned char *)buf, POOL_TYPE_HDLC);
 		diagmem_free(driver, (unsigned char *)diag_write_ptr,
 							 POOL_TYPE_USB_STRUCT);
+		APPEND_DEBUG('q');
 	}
 	return 0;
 }
@@ -467,6 +491,7 @@ int diagfwd_read_complete(struct diag_request *diag_read_ptr)
 {
 	int len = diag_read_ptr->actual;
 
+	APPEND_DEBUG('c');
 #ifdef DIAG_DEBUG
 	printk(KERN_INFO "read data from USB, pkt length %d \n",
 		    diag_read_ptr->actual);
@@ -543,15 +568,18 @@ static struct platform_driver msm_smd_ch1_driver = {
 
 void diag_read_work_fn(struct work_struct *work)
 {
+	APPEND_DEBUG('d');
 	diag_process_hdlc(driver->usb_buf_out, driver->read_len);
 	driver->usb_read_ptr->buf = driver->usb_buf_out;
 	driver->usb_read_ptr->length = USB_MAX_OUT_BUF;
+	APPEND_DEBUG('e');
 	diag_read(driver->usb_read_ptr);
+	APPEND_DEBUG('f');
 }
 
 void diagfwd_init(void)
 {
-
+	diag_debug_buf_idx = 0;
 	if (driver->usb_buf_out  == NULL &&
 	     (driver->usb_buf_out = kzalloc(USB_MAX_OUT_BUF,
 					 GFP_KERNEL)) == NULL)
