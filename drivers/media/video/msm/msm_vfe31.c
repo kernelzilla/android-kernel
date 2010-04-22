@@ -22,6 +22,8 @@
 #include "msm_vfe31.h"
 #include <mach/camera.h>
 #include <linux/io.h>
+#include <mach/msm_reqs.h>
+#include <linux/pm_qos_params.h>
 
 #define CHECKED_COPY_FROM_USER(in) {					\
 	if (copy_from_user((in), (void __user *)cmd->value,		\
@@ -30,7 +32,18 @@
 		break;							\
 	}								\
 }
+
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+/* NPA Flow IDs */
+#define MSM_AXI_QOS_PREVIEW	MSM_AXI_FLOW_CAMERA_PREVIEW_HIGH
+#define MSM_AXI_QOS_SNAPSHOT	MSM_AXI_FLOW_CAMERA_SNAPSHOT_12MP
+#define MSM_AXI_QOS_RECORDING	MSM_AXI_FLOW_CAMERA_RECORDING_720P
+#else
+/* AXI rates in KHz */
 #define MSM_AXI_QOS_PREVIEW	192000
+#define MSM_AXI_QOS_SNAPSHOT	192000
+#define MSM_AXI_QOS_RECORDING	192000
+#endif
 
 static struct vfe31_ctrl_type *vfe31_ctrl;
 static void  *vfe_syncdata;
@@ -422,8 +435,8 @@ static void vfe31_release(struct platform_device *pdev)
 	vfe31_ctrl = NULL;
 	release_mem_region(vfemem->start, (vfemem->end - vfemem->start) + 1);
 	msm_camio_disable(pdev);
-	/* release AXI frequency request */
-	release_axi_qos();
+	update_axi_qos(PM_QOS_DEFAULT_VALUE);
+
 	vfe_syncdata = NULL;
 }
 
@@ -816,11 +829,13 @@ static void vfe31_start_common(void){
 
 static int vfe31_start_recording(void){
 	vfe31_ctrl->req_start_video_rec = TRUE;
+    update_axi_qos(MSM_AXI_QOS_RECORDING);
 	return 0;
 }
 
 static int vfe31_stop_recording(void){
 	vfe31_ctrl->req_stop_video_rec = TRUE;
+    update_axi_qos(MSM_AXI_QOS_PREVIEW);
 	return 0;
 }
 
@@ -882,6 +897,7 @@ static int vfe31_capture(uint32_t num_frames_capture)
 	}
 	msm_io_w(irq_comp_mask, vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+	update_axi_qos(MSM_AXI_QOS_SNAPSHOT);
 	vfe31_start_common();
 	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 	/* for debug */
@@ -923,6 +939,7 @@ static int vfe31_start(void)
 		temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
 			24 * (vfe31_ctrl->outpath.out0.ch1));
 	}
+	update_axi_qos(MSM_AXI_QOS_PREVIEW);
 	vfe31_start_common();
 	return 0;
 }
@@ -2536,10 +2553,6 @@ static int vfe31_init(struct msm_vfe_callback *presp,
 	rc = vfe31_resource_init(presp, dev, vfe_syncdata);
 	if (rc < 0)
 		return rc;
-		/* Set required axi bus frequency */
-	rc = request_axi_qos(MSM_AXI_QOS_PREVIEW);
-	if (rc < 0)
-		CDBG("request of axi qos failed\n");
 	/* Bring up all the required GPIOs and Clocks */
 	rc = msm_camio_enable(dev);
 	return rc;
