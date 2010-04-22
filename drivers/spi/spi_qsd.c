@@ -194,6 +194,7 @@ struct msm_spi {
 	void __iomem		*base;
 	struct device           *dev;
 	spinlock_t               queue_lock;
+	struct mutex             core_lock;
 	struct list_head         queue;
 	struct workqueue_struct	*workqueue;
 	struct work_struct       work_data;
@@ -809,6 +810,7 @@ static void msm_spi_workq(struct work_struct *work)
 	u32                  spi_op;
 	u32                  status_error = 0;
 
+	mutex_lock(&dd->core_lock);
 	if (dd->use_rlock) {
 		/* Don't allow power collapse until we release remote mutex */
 		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
@@ -860,6 +862,7 @@ static void msm_spi_workq(struct work_struct *work)
 		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
 					  PM_QOS_DEFAULT_VALUE);
 	}
+	mutex_unlock(&dd->core_lock);
 }
 
 static int msm_spi_transfer(struct spi_device *spi, struct spi_message *msg)
@@ -964,6 +967,12 @@ static int msm_spi_setup(struct spi_device *spi)
 
 	dd = spi_master_get_devdata(spi->master);
 
+	mutex_lock(&dd->core_lock);
+	if (dd->suspended) {
+		mutex_unlock(&dd->core_lock);
+		return -EBUSY;
+	}
+
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
 
@@ -991,6 +1000,7 @@ static int msm_spi_setup(struct spi_device *spi)
 	writel(spi_config, dd->base + SPI_CONFIG);
 	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
+	mutex_unlock(&dd->core_lock);
 
 err_setup_exit:
 	return rc;
@@ -1284,6 +1294,7 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 	struct msm_spi	       *dd;
 	struct resource	       *resource;
 	int			rc = 0;
+	int			locked = 0;
 	struct clk	       *pclk;
 	struct msm_spi_platform_data *pdata = pdev->dev.platform_data;
 
@@ -1351,6 +1362,7 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 	}
 
 	spin_lock_init(&dd->queue_lock);
+	mutex_init(&dd->core_lock);
 	INIT_LIST_HEAD(&dd->queue);
 	INIT_WORK(&dd->work_data, msm_spi_workq);
 	dd->workqueue = create_singlethread_workqueue(
@@ -1390,8 +1402,10 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 			goto err_probe_add_pm_qos;
 		}
 	}
+	mutex_lock(&dd->core_lock);
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
+	locked = 1;
 
 	dd->dev = &pdev->dev;
 	dd->clk = clk_get(&pdev->dev, "spi_clk");
@@ -1462,6 +1476,8 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 		disable_irq(dd->irq_err);
 		remote_mutex_unlock(&dd->r_lock);
 	}
+	mutex_unlock(&dd->core_lock);
+	locked = 0;
 
 	rc = spi_register_master(master);
 	if (rc)
@@ -1497,8 +1513,11 @@ err_probe_pclk_enable:
 err_probe_clk_enable:
 	clk_put(dd->clk);
 err_probe_clk_get:
-	if (dd->use_rlock)
-		remote_mutex_unlock(&dd->r_lock);
+	if (locked) {
+		if (dd->use_rlock)
+			remote_mutex_unlock(&dd->r_lock);
+		mutex_unlock(&dd->core_lock);
+	}
 err_probe_add_pm_qos:
 err_probe_rlock_init:
 	iounmap(dd->base);
@@ -1539,12 +1558,13 @@ static int msm_spi_suspend(struct platform_device *pdev, pm_message_t state)
 		msleep(1);
 	}
 
+	/* Make sure no one is accessing the core */
+	mutex_lock(&dd->core_lock);
 	disable_irq(dd->irq_in);
 	disable_irq(dd->irq_out);
 	disable_irq(dd->irq_err);
-	if (dd->use_rlock)
-		remote_mutex_unlock(&dd->r_lock);
 	clk_disable(dd->clk);
+	mutex_unlock(&dd->core_lock);
 
 suspend_exit:
 	return 0;
