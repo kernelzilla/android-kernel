@@ -108,6 +108,10 @@ struct pm8058_gpio_platform_data {
 #define	PM_GPIO_DTEST3			6
 #define	PM_GPIO_DTEST4			7
 
+#define PM_8058_REV_1p0			0xE1
+#define PM_8058_REV_2p0			0xE2
+#define PM_8058_REV_2p1			0xE3
+
 struct pm8058_gpio {
 	int		direction;
 	int		output_buffer;
@@ -138,6 +142,4 @@ int pm8058_mpp_get(struct pm8058_chip *pm_chip, unsigned mpp);
 int pm8058_gpio_config_kypd_drv(int gpio_start, int num_gpios);
 int pm8058_gpio_config_kypd_sns(int gpio_start, int num_gpios);
 
-int pm8058_rev_is_a0(struct pm8058_chip *pm_chip);
-int pm8058_rev_is_b0(struct pm8058_chip *pm_chip);
-
+int pm8058_rev(struct pm8058_chip *pm_chip);

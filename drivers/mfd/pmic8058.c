@@ -34,9 +34,6 @@
 /* PMIC8058 Revision */
 #define SSBI_REG_REV			0x002  /* PMIC4 revision */
 
-#define PMIC8058_REV_A0			0xE1
-#define PMIC8058_REV_B0			0xE2	/* REVISIT */
-
 /* PMIC8058 IRQ */
 #define	SSBI_REG_ADDR_IRQ_BASE		0x1BB
 
@@ -182,23 +179,14 @@ ssbi_read(struct i2c_client *client, u16 addr, u8 *buf, size_t len)
 }
 
 /* External APIs */
-int pm8058_rev_is_a0(struct pm8058_chip *chip)
+int pm8058_rev(struct pm8058_chip *chip)
 {
 	if (chip == NULL)
-		return 0;
+		return -EINVAL;
 
-	return chip->revision == PMIC8058_REV_A0;
+	return chip->revision;
 }
-EXPORT_SYMBOL(pm8058_rev_is_a0);
-
-int pm8058_rev_is_b0(struct pm8058_chip *chip)
-{
-	if (chip == NULL)
-		return 0;
-
-	return chip->revision == PMIC8058_REV_B0;
-}
-EXPORT_SYMBOL(pm8058_rev_is_b0);
+EXPORT_SYMBOL(pm8058_rev);
 
 int pm8058_read(struct pm8058_chip *chip, u16 addr, u8 *values,
 		unsigned int len)

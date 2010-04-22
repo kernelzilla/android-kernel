@@ -224,7 +224,7 @@ static int pmic8058_kp_read_data(struct pmic8058_kp *kp, u16 *state,
 	rc = pmic8058_kp_read(kp, new_data, data_reg, read_rows);
 
 	if (!rc) {
-		if (pm8058_rev_is_a0(kp->pm_chip))
+		if (pm8058_rev(kp->pm_chip) == PM_8058_REV_1p0)
 			pmic8058_chk_read_state(kp, data_reg);
 		for (row = 0; row < kp->pdata->num_rows; row++) {
 			dev_dbg(kp->dev, "new_data[%d] = %d\n", row,
@@ -252,7 +252,7 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 	else
 		read_rows = kp->pdata->num_rows;
 
-	if (pm8058_rev_is_b0(kp->pm_chip))
+	if (pm8058_rev(kp->pm_chip) > PM_8058_REV_1p0)
 		pmic8058_chk_sync_read(kp);
 
 	if (old_state)
@@ -262,7 +262,7 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 	rc = pmic8058_kp_read_data(kp, new_state, KEYP_RECENT_DATA,
 					 read_rows);
 
-	if (pm8058_rev_is_b0(kp->pm_chip)) {
+	if (pm8058_rev(kp->pm_chip) > PM_8058_REV_1p0) {
 		/* 4 * 32KHz clocks */
 		udelay((4 * USEC_PER_SEC / KEYP_CLOCK_FREQ) + 1);
 
@@ -376,7 +376,7 @@ static irqreturn_t pmic8058_kp_irq(int irq, void *data)
 	u8 ctrl_val, events;
 	int rc;
 
-	if (pm8058_rev_is_a0(kp->pm_chip))
+	if (pm8058_rev(kp->pm_chip) == PM_8058_REV_1p0)
 		mdelay(1);
 
 	dev_dbg(kp->dev, "key sense irq\n");
@@ -433,7 +433,7 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 
 	rc = pmic8058_kp_write_u8(kp, ctrl_val, KEYP_CTRL);
 
-	if (pm8058_rev_is_a0(kp->pm_chip))
+	if (pm8058_rev(kp->pm_chip) == PM_8058_REV_1p0)
 		bits = fls(kp->pdata->debounce_ms[0]) - 1;
 	else
 		bits = (kp->pdata->debounce_ms[1] / 5) - 1;
@@ -532,7 +532,7 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (pm8058_rev_is_a0(pm_chip)) {
+	if (pm8058_rev(pm_chip) == PM_8058_REV_1p0) {
 		if (!pdata->debounce_ms
 			|| !is_power_of_2(pdata->debounce_ms[0])
 			|| pdata->debounce_ms[0] > MAX_DEBOUNCE_A0_TIME
@@ -567,7 +567,7 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 	kp->keycodes	= keycodes;
 	kp->pm_chip	= pm_chip;
 
-	if (pm8058_rev_is_a0(pm_chip))
+	if (pm8058_rev(pm_chip) == PM_8058_REV_1p0)
 		kp->flags |= KEYF_FIX_LAST_ROW;
 
 	kp->input = input_allocate_device();
