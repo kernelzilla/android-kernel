@@ -184,7 +184,6 @@ void put_msm_hw3d_file(struct file *file)
 		return;
 	fput(file);
 }
->>>>>>> ac0d24a... [ARM] msm: hw3d: bump the revoke timeout to 2 seconds
 
 static long hw3d_revoke_gpu(struct file *file)
 {
@@ -243,6 +242,115 @@ static int hw3d_release(struct inode *inode, struct file *file)
 	}
 	up(&hw3d_sem);
 	return 0;
+}
+
+static void hw3d_vma_open(struct vm_area_struct *vma)
+{
+	/* XXX: should the master be allowed to fork and keep the mappings? */
+
+	/* TODO: remap garbage page into here.
+	 *
+	 * For now, just pull the mapping. The user shouldn't be forking
+	 * and using it anyway. */
+	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start, NULL);
+}
+
+static void hw3d_vma_close(struct vm_area_struct *vma)
+{
+	struct file *file = vma->vm_file;
+	struct hw3d_data *data = file->private_data;
+	int i;
+
+	pr_debug("hw3d: current %u ppid %u file %p count %ld\n",
+		 current->pid, current->parent->pid, file, file_count(file));
+
+	BUG_ON(!data);
+
+	mutex_lock(&data->mutex);
+	for (i = 0; i < HW3D_NUM_REGIONS; ++i) {
+		if (data->vmas[i] == vma) {
+			data->vmas[i] = NULL;
+			goto done;
+		}
+	}
+	pr_warning("%s: vma %p not of ours during vma_close\n", __func__, vma);
+done:
+	mutex_unlock(&data->mutex);
+}
+
+static int hw3d_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct hw3d_info *info = hw3d_info;
+	struct hw3d_data *data = file->private_data;
+	unsigned long vma_size = vma->vm_end - vma->vm_start;
+	int ret = 0;
+	int region = REGION_PAGE_ID(vma->vm_pgoff);
+
+	if (region >= HW3D_NUM_REGIONS) {
+		pr_err("%s: Trying to mmap unknown region %d\n", __func__,
+		       region);
+		return -EINVAL;
+	} else if (vma_size > info->regions[region].size) {
+		pr_err("%s: VMA size %ld exceeds region %d size %ld\n",
+			__func__, vma_size, region,
+			info->regions[region].size);
+		return -EINVAL;
+	} else if (REGION_PAGE_OFFS(vma->vm_pgoff) != 0 ||
+		   (vma_size & ~PAGE_MASK)) {
+		pr_err("%s: Can't remap part of the region %d\n", __func__,
+		       region);
+		return -EINVAL;
+	} else if (!is_master(info, file) &&
+		   current->group_leader != info->client_task) {
+		pr_err("%s: current(%d) != client_task(%d)\n", __func__,
+		       current->group_leader->pid, info->client_task->pid);
+		return -EPERM;
+	} else if (!is_master(info, file) &&
+		   (info->revoking || info->suspending)) {
+		pr_err("%s: cannot mmap while revoking(%d) or suspending(%d)\n",
+		       __func__, info->revoking, info->suspending);
+		return -EPERM;
+	}
+
+	mutex_lock(&data->mutex);
+	if (data->vmas[region] != NULL) {
+		pr_err("%s: Region %d already mapped (pid=%d tid=%d)\n",
+		       __func__, region, current->group_leader->pid,
+		       current->pid);
+		ret = -EBUSY;
+		goto done;
+	}
+
+	/* our mappings are always noncached */
+#ifdef pgprot_noncached
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
+
+	ret = io_remap_pfn_range(vma, vma->vm_start,
+				 info->regions[region].pbase >> PAGE_SHIFT,
+				 vma_size, vma->vm_page_prot);
+	if (ret) {
+		pr_err("%s: Cannot remap page range for region %d!\n", __func__,
+		       region);
+		ret = -EAGAIN;
+		goto done;
+	}
+
+	/* Prevent a malicious client from stealing another client's data
+	 * by forcing a revoke on it and then mmapping the GPU buffers.
+	 */
+	if (region != HW3D_REGS)
+		memset(info->regions[region].vbase, 0,
+		       info->regions[region].size);
+
+	vma->vm_ops = &hw3d_vm_ops;
+
+	/* mark this region as mapped */
+	data->vmas[region] = vma;
+
+done:
+	mutex_unlock(&data->mutex);
+	return ret;
 }
 
 static long hw3d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
