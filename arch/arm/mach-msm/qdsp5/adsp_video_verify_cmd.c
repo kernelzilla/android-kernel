@@ -166,7 +166,7 @@ static int verify_vdec_pkt_cmd(struct msm_adsp_module *module,
 		return -1;
 	if (filp) {
 		pmem_addr.vaddr = subframe_pkt_addr;
-		pmem_addr.length = subframe_pkt_size;
+		pmem_addr.length = ((subframe_pkt_size + 31) & (~31)) + 32;
 		pmem_addr.offset = offset;
 		if (pmem_cache_maint (filp, PMEM_CLEAN_CACHES, &pmem_addr)) {
 			MM_ERR("Cache operation failed for phys addr high %x"
