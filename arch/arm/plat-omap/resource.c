@@ -190,7 +190,7 @@ static struct users_list *get_user(void)
  * dynamically allocated, and if its from the static pool, marks it unused.
  * No return value.
  */
-void free_user(struct users_list *user)
+static void free_user(struct users_list *user)
 {
 	if (user->usage == DYNAMIC_ALLOC) {
 		kfree(user);
