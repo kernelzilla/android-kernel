@@ -7,7 +7,6 @@ obj-y += nand_partitions.o
 obj-y += modem_notifier.o
 obj-y += rpc_hsusb.o rpc_pmapp.o rpc_fsusb.o
 obj-y += socinfo.o
-obj-$(CONFIG_MSM_CPU_FREQ_SCREEN) += cpufreq.o
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o
 obj-$(CONFIG_DEBUG_FS) += nohlt.o
 obj-y += pmic.o
