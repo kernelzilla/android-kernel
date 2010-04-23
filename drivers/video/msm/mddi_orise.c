@@ -114,6 +114,7 @@ static int __init mddi_orise_init(void)
 		pinfo->clk_rate = 192000000;
 		pinfo->clk_min = 192000000;
 		pinfo->clk_max = 192000000;
+		pinfo->lcd.rev = 2;
 		pinfo->lcd.vsync_enable = FALSE;
 		pinfo->lcd.refx100 = 6050;
 		pinfo->lcd.v_back_porch = 2;
