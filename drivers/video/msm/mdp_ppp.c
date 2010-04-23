@@ -437,7 +437,7 @@ static void mdp_ppp_setbg(MDPIBUF *iBuf)
 						 8);
 		else if (iBuf->ibuf_type == MDP_XRGB_8888)
 			unpack_pattern =
-			    MDP_GET_PACK_PATTERN(CLR_B, CLR_G, CLR_R, CLR_ALPHA,
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			unpack_pattern =
@@ -630,6 +630,7 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 		    PPP_DST_BPP_3BYTES | PPP_DST_PLANE_INTERLVD;
 		break;
 
+	case MDP_BGRA_8888:
 	case MDP_XRGB_8888:
 	case MDP_ARGB_8888:
 	case MDP_RGBA_8888:
@@ -645,7 +646,7 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 						 8);
 		else if (iBuf->ibuf_type == MDP_XRGB_8888)
 			dst_packPattern =
-			    MDP_GET_PACK_PATTERN(CLR_B, CLR_G, CLR_R, CLR_ALPHA,
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			dst_packPattern =
@@ -854,7 +855,7 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 						 8);
 		else if (iBuf->ibuf_type == MDP_XRGB_8888)
 			packPattern =
-			    MDP_GET_PACK_PATTERN(CLR_B, CLR_G, CLR_R, CLR_ALPHA,
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			packPattern =
