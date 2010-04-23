@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.102 2010/03/30 02:22:02 Exp $
+ * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.109 2010/04/22 05:52:46 Exp $
  */
 
 #include <typedefs.h>
@@ -1047,6 +1047,8 @@ dhd_bus_txdata(struct dhd_bus *bus, void *pkt)
 	if (dhd_deferred_tx || bus->fcstate || pktq_len(&bus->txq) || bus->dpc_sched ||
 	    (!DATAOK(bus)) || (bus->flowcontrol & NBITVAL(prec)) ||
 	    (bus->clkstate == CLK_PENDING)) {
+		DHD_TRACE(("%s: deferring pktq len %d\n", __FUNCTION__,
+			pktq_len(&bus->txq)));
 		bus->fcqueued++;
 
 		/* Priority based enq */
@@ -1055,10 +1057,11 @@ dhd_bus_txdata(struct dhd_bus *bus, void *pkt)
 			PKTPULL(osh, pkt, SDPCM_HDRLEN);
 			dhd_txcomplete(bus->dhd, pkt, FALSE);
 			PKTFREE(osh, pkt, TRUE);
+			DHD_ERROR(("%s: out of bus->txq !!!\n", __FUNCTION__));
 			ret = BCME_NORESOURCE;
-		}
-		else
+		} else {
 			ret = BCME_OK;
+		}
 		dhd_os_sdunlock_txq(bus->dhd);
 
 		if ((pktq_len(&bus->txq) >= FCHI) && dhd_doflow)
@@ -1082,6 +1085,7 @@ dhd_bus_txdata(struct dhd_bus *bus, void *pkt)
 		dhdsdio_clkctl(bus, CLK_AVAIL, TRUE);
 
 #ifndef SDTEST
+		DHD_TRACE(("%s: calling txpkt\n", __FUNCTION__));
 		ret = dhdsdio_txpkt(bus, pkt, SDPCM_DATA_CHANNEL, TRUE);
 #else
 		ret = dhdsdio_txpkt(bus, pkt,

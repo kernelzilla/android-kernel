@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.11 2009/11/04 20:36:52 Exp $
+ * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.15 2010/04/14 21:11:46 Exp $
  */
 
 #include <typedefs.h>
@@ -75,7 +75,6 @@ extern int bcmsdh_probe(struct device *dev);
 extern int bcmsdh_remove(struct device *dev);
 struct device sdmmc_dev;
 
-
 static int bcmsdh_sdmmc_probe(struct sdio_func *func,
                               const struct sdio_device_id *id)
 {
@@ -126,7 +125,6 @@ static void bcmsdh_sdmmc_remove(struct sdio_func *func)
 static const struct sdio_device_id bcmsdh_sdmmc_ids[] = {
 	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, SDIO_DEVICE_ID_BROADCOM_4325) },
 	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, SDIO_DEVICE_ID_BROADCOM_4329) },
-	{ SDIO_DEVICE_CLASS(SDIO_CLASS_NONE)		},
 	{ /* end: all zeroes */				},
 };
 

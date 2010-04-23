@@ -2176,14 +2176,15 @@ dhd_detach(dhd_pub_t *dhdp)
 			/* Attach and link in the iw */
 			wl_iw_detach();
 #endif
-			if (dhd->sysioc_pid >= 0) {
-				KILL_PROC(dhd->sysioc_pid, SIGTERM);
-				wait_for_completion(&dhd->sysioc_exited);
-			}
 
 			for (i = 1; i < DHD_MAX_IFS; i++)
 				if (dhd->iflist[i])
 					dhd_del_if(dhd, i);
+
+			if (dhd->sysioc_pid >= 0) {
+				KILL_PROC(dhd->sysioc_pid, SIGTERM);
+				wait_for_completion(&dhd->sysioc_exited);
+			}
 
 			ifp = dhd->iflist[0];
 			ASSERT(ifp);

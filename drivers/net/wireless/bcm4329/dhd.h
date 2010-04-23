@@ -81,6 +81,9 @@ enum dhd_bus_wake_state {
 	WAKE_LOCK_TMOUT,
 	WAKE_LOCK_WATCHDOG,
 	WAKE_LOCK_LINK_DOWN_TMOUT,
+	WAKE_LOCK_SOFTAP_SET,
+	WAKE_LOCK_SOFTAP_STOP,
+	WAKE_LOCK_SOFTAP_START,
 	WAKE_LOCK_MAX
 };
 enum dhd_prealloc_index {
@@ -324,10 +327,6 @@ extern int wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag
 /* Watchdog timer interval */
 extern uint dhd_watchdog_ms;
 
-
-#if defined(DHD_DEBUG)
-extern uint wl_msg_level;
-#endif /* DHD_DEBUG */
 
 /* Use interrupts */
 extern uint dhd_intr;
