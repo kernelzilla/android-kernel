@@ -119,6 +119,10 @@ static struct omap_opp sholes_mpu_rate_table[] = {
 	{S550M, VDD1_OPP4, 0x38},
 	/*OPP5*/
 	{S600M, VDD1_OPP5, 0x3E},
+	/*OPP6*/
+	{S700M, VDD1_OPP6, 0x3E},
+	/*OPP7*/
+	{S800M, VDD1_OPP7, 0x44},
 };
 
 #define S80M 80250000

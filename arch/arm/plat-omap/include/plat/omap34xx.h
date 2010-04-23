@@ -96,6 +96,7 @@
 #define VDD1_OPP4	0x4
 #define VDD1_OPP5	0x5
 #define VDD1_OPP6	0x6
+#define VDD1_OPP7	0x7
 
 /* VDD2 OPPS */
 #define VDD2_OPP1	0x1
