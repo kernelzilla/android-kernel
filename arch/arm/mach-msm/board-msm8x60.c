@@ -30,6 +30,7 @@
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
 
+#include "devices.h"
 #include "timer.h"
 
 void __iomem *gic_cpu_base_addr;
@@ -71,6 +72,7 @@ unsigned long clk_get_max_axi_khz(void)
 static void __init msm8x60_map_io(void)
 {
 	msm_map_msm8x60_io();
+	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
 }
 
 static void __init msm8x60_init_irq(void)
