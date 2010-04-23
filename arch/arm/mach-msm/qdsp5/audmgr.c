@@ -271,7 +271,6 @@ int audmgr_enable(struct audmgr *am, struct audmgr_config *cfg)
 	rc = wait_event_timeout(am->wait, am->state != STATE_ENABLING, 15 * HZ);
 	if (rc == 0) {
 		pr_err("audmgr_enable: ARM9 did not reply to RPC am->state = %d\n", am->state);
-		BUG();
 	}
 	if (am->state == STATE_ENABLED)
 		return 0;
