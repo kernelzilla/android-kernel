@@ -453,7 +453,8 @@ void vcd_continue(void)
 
 			if (vcd_get_frame_channel_in_loop
 				(p_dev_ctxt, &p_transc)) {
-				if (vcd_submit_frame(p_dev_ctxt, p_transc)) {
+				if (vcd_try_submit_frame_in_continue(p_dev_ctxt,
+					p_transc)) {
 					b_continue = TRUE;
 				} else {
 					VCD_MSG_MED("No more frames to submit");
@@ -468,8 +469,15 @@ void vcd_continue(void)
 
 		} while (b_continue);
 
-	}
+		if (!vcd_core_is_busy(p_dev_ctxt)) {
+			rc = vcd_power_event(p_dev_ctxt, NULL,
+				VCD_EVT_PWR_CLNT_CMD_END);
 
+			if (VCD_FAILED(rc))
+				VCD_MSG_ERROR("Failed:"
+					"VCD_EVT_PWR_CLNT_CMD_END");
+		}
+	}
 }
 
 static void vcd_pause_all_sessions(struct vcd_dev_ctxt_type *p_dev_ctxt)
@@ -559,8 +567,9 @@ static u32 vcd_init_cmn
 static u32 vcd_init_in_null
 	(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 	 struct vcd_init_config_type *p_config, s32 *p_driver_handle) {
-	u32 rc;
+	u32 rc = VCD_S_SUCCESS;
 	struct vcd_dev_ctxt_type *p_dev_ctxt = &p_drv_ctxt->dev_ctxt;
+	u32 b_done_create_timer = FALSE;
 	VCD_MSG_LOW("vcd_init_in_dev_null:");
 
 
@@ -581,12 +590,14 @@ static u32 vcd_init_in_null
 			p_device_name);
 	}
 
-	if (p_config->pf_timer_create &&
-		!p_config->pf_timer_create(
-			vcd_hw_timeout_handler,	NULL,
-			&p_dev_ctxt->p_hw_timer_handle)) {
-		VCD_MSG_ERROR("Timer_create failed");
-		return VCD_ERR_FAIL ;
+	if (p_config->pf_timer_create) {
+		if (p_config->pf_timer_create(vcd_hw_timeout_handler,
+			NULL, &p_dev_ctxt->p_hw_timer_handle))
+			b_done_create_timer = TRUE;
+		else {
+			VCD_MSG_ERROR("timercreate failed");
+			return VCD_ERR_FAIL;
+		}
 	}
 
 
@@ -597,6 +608,17 @@ static u32 vcd_init_in_null
 						   VCD_DEVICE_STATE_NOT_INIT,
 						   DEVICE_STATE_EVENT_NUMBER
 						   (pf_init));
+	} else {
+		if (p_dev_ctxt->config.pf_un_map_dev_base_addr)
+			p_dev_ctxt->config.pf_un_map_dev_base_addr();
+
+		if (p_dev_ctxt->config.pf_deregister_isr)
+			p_dev_ctxt->config.pf_deregister_isr();
+
+		if (b_done_create_timer && p_dev_ctxt->config.pf_timer_release)
+			p_dev_ctxt->config.pf_timer_release(p_dev_ctxt->
+				p_hw_timer_handle);
+
 	}
 
 	return rc;
@@ -1040,18 +1062,9 @@ static void vcd_dev_cb_in_initing
 static void  vcd_hw_timeout_cmn(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 							  void *p_user_data)
 {
-	u32 rc;
 	struct vcd_dev_ctxt_type *p_dev_ctxt = &p_drv_ctxt->dev_ctxt;
 	VCD_MSG_LOW("vcd_hw_timeout_cmn:");
 	vcd_device_timer_stop(p_dev_ctxt);
-
-	/*
-	** Issue HW timeout power event.
-	*/
-	rc = vcd_power_event(p_dev_ctxt, NULL, VCD_EVT_PWR_DEV_HWTIMEOUT);
-
-	if (VCD_FAILED(rc))
-		VCD_MSG_ERROR("VCD_EVT_PWR_DEV_HWTIMEOUT failed");
 
 	vcd_handle_device_err_fatal(p_dev_ctxt, NULL);
 

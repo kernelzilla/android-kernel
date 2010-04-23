@@ -183,6 +183,14 @@ struct vcd_buffer_entry_type *vcd_check_fill_output_buffer
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
      struct vcd_frame_data_type *p_buffer);
 
+u32 vcd_requeue_input_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
+	struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_buffer_entry_type
+	*p_buf_entry);
+
+u32 vcd_schedule_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
+	struct vcd_clnt_ctxt_type_t **pp_cctxt, struct vcd_buffer_entry_type
+	**pp_ip_buf_entry);
+
 u32 vcd_map_sched_status(enum sched_status_type e_sched_status);
 
 u32 vcd_submit_command_in_continue
@@ -197,8 +205,12 @@ void vcd_submit_cmd_client_close(struct vcd_clnt_ctxt_type_t *p_cctxt);
 u32 vcd_submit_frame
     (struct vcd_dev_ctxt_type *p_dev_ctxt, struct vcd_transc_type *p_transc);
 
+u32 vcd_try_submit_frame_in_continue(struct vcd_dev_ctxt_type *p_dev_ctxt,
+	struct vcd_transc_type *p_transc);
+
 u32 vcd_process_cmd_sess_start(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
+void vcd_try_submit_frame(struct vcd_dev_ctxt_type *p_dev_ctxt);
 
 u32 vcd_setup_with_ddl_capabilities(struct vcd_dev_ctxt_type *p_dev_ctxt);
 void vcd_handle_submit_frame_failed(struct vcd_dev_ctxt_type *p_dev_ctxt,
@@ -324,6 +336,11 @@ u32 vcd_set_perf_level(struct vcd_dev_ctxt_type *p_dev_ctxt,
 u32 vcd_update_clnt_perf_lvl
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
      struct vcd_property_frame_rate_type *p_fps, u32 n_frm_p_units);
+
+u32 vcd_gate_clock(struct vcd_dev_ctxt_type *p_dev_ctxt);
+
+u32 vcd_un_gate_clock(struct vcd_dev_ctxt_type *p_dev_ctxt);
+
 void vcd_handle_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt,
 		u32 event, u32 status);
 
