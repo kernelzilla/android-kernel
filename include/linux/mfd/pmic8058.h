@@ -37,13 +37,17 @@
 #define PM8058_GPIOS		40
 #define PM8058_MPPS		12
 
-/* PM8058 interrupt numbers */
-#define PM8058_GPIO_IRQS	PM8058_GPIOS
-#define PM8058_MPP_IRQS		PM8058_MPPS
-#define PM8058_MISC_IRQS	8
-#define PM8058_IRQS		(PM8058_GPIO_IRQS + \
-				PM8058_MPP_IRQS + \
-				PM8058_MISC_IRQS)
+#define PM8058_IRQ_BLOCK_BIT(block, bit) ((block) * 8 + (bit))
+
+/* MPPs and GPIOs [0,N) */
+#define PM8058_MPP_IRQ(base, mpp)	((base) + \
+					PM8058_IRQ_BLOCK_BIT(16, (mpp)))
+#define PM8058_GPIO_IRQ(base, gpio)	((base) + \
+					PM8058_IRQ_BLOCK_BIT(24, (gpio)))
+
+#define PM8058_KEYPAD_IRQ(base)		((base) + PM8058_IRQ_BLOCK_BIT(9, 2))
+#define PM8058_KEYSTUCK_IRQ(base)	((base) + PM8058_IRQ_BLOCK_BIT(9, 3))
+#define PM8058_CHGVAL_IRQ(base)		((base) + PM8058_IRQ_BLOCK_BIT(1, 7))
 
 #define PM8058_MAX_SUBDEVICES	16
 
@@ -52,7 +56,6 @@ struct pm8058_chip;
 struct pm8058_platform_data {
 	/* This table is only needed for misc interrupts. */
 	int		irq_base;
-	unsigned int	pm_irqs[PM8058_IRQS];	/* block*8 + bit-pos */
 	int 		(*init)(struct pm8058_chip *pm_chip);
 
 	int		num_subdevs;
