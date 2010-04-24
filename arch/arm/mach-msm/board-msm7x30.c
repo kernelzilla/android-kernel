@@ -1029,26 +1029,15 @@ static int marimba_tsadc_init(void)
 		}
 	}
 
-	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
-			 PMAPP_SMPS_CLK_VOTE_1P6);
-	if (rc < 0) {
-		printk(KERN_ERR "%s: vreg smps clock vote on failed (%d)\n",
-			__func__, rc);
-		goto vreg_get_fail;
-	}
-
 	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 1300);
 	if (rc < 0) {
 		printk(KERN_ERR "%s: vreg level on failed (%d)\n",
 			__func__, rc);
-		goto vreg_smps_vote_fail;
+		goto vreg_get_fail;
 	}
 
 	return rc;
 
-vreg_smps_vote_fail:
-	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
-			 PMAPP_SMPS_CLK_VOTE_DONTCARE);
 vreg_get_fail:
 	while (i)
 		vreg_put(vregs_tsadc[--i]);
@@ -1063,12 +1052,6 @@ static int marimba_tsadc_exit(void)
 		if (vregs_tsadc[i])
 			vreg_put(vregs_tsadc[i]);
 	}
-
-	rc = pmapp_smps_clock_vote(tsadc_id, PMAPP_VREG_S2,
-			 PMAPP_SMPS_CLK_VOTE_DONTCARE);
-	if (rc < 0)
-		printk(KERN_ERR "%s: vreg smps clock vote off failed (%d)\n",
-				__func__, rc);
 
 	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 0);
 	if (rc < 0)
