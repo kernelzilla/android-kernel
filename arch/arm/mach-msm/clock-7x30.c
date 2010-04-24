@@ -1342,7 +1342,7 @@ void __init msm_clk_soc_set_ops(struct clk *clk)
 		if (ops)
 			clk->ops = ops;
 		else {
-			clk->ops = &clk_ops_pcom;
+			clk->ops = &clk_ops_remote;
 			clk->id = clk->remote_id;
 		}
 	}

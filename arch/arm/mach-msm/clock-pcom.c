@@ -116,7 +116,7 @@ long pc_clk_round_rate(unsigned id, unsigned rate)
 	return rate;
 }
 
-struct clk_ops clk_ops_pcom = {
+struct clk_ops clk_ops_remote = {
 	.enable = pc_clk_enable,
 	.disable = pc_clk_disable,
 	.auto_off = pc_clk_disable,

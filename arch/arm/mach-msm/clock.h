@@ -99,6 +99,8 @@ enum clkvote_client {
 	CLKVOTE_MAX,
 };
 
+extern struct clk_ops clk_ops_remote;
+
 #if defined(CONFIG_ARCH_MSM7X30)
 void msm_clk_soc_init(void);
 void msm_clk_soc_set_ops(struct clk *clk);

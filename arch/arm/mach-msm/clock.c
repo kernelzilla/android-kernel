@@ -28,7 +28,6 @@
 #include <mach/clk.h>
 
 #include "clock.h"
-#include "proc_comm.h"
 
 static DEFINE_MUTEX(clocks_mutex);
 static DEFINE_SPINLOCK(clocks_lock);
@@ -355,7 +354,7 @@ static int clock_debug_local_get(void *data, u64 *val)
 {
 	struct clk *clock = data;
 
-	*val = clock->ops != &clk_ops_pcom;
+	*val = clock->ops != &clk_ops_remote;
 
 	return 0;
 }
