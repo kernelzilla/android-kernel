@@ -30,6 +30,7 @@
 
 #include "clock.h"
 #include "clock-7x30.h"
+#include "clock-pcom.h"
 #include "proc_comm.h"
 
 enum {
@@ -1143,7 +1144,7 @@ struct clk_ops clk_ops_7x30 = {
 	.enable = soc_clk_enable,
 	.disable = soc_clk_disable,
 	.auto_off = soc_clk_auto_off,
-	.reset = NULL, /* Uses proc_comm */
+	.reset = pc_clk_reset,
 	.set_rate = soc_clk_set_rate,
 	.set_min_rate = soc_clk_set_min_rate,
 	.set_max_rate = soc_clk_set_max_rate,
@@ -1284,7 +1285,7 @@ static struct clk_local_ownership {
 	[C(ROTATOR_P)]			= { O(SH2_OWN_GLBL), B(13) },
 };
 
-struct clk_ops * __init clk_7x30_is_local(uint32_t id)
+static struct clk_ops * __init clk_is_local(uint32_t id)
 {
 	uint32_t local, bit = ownership_map[id].bit;
 	uint32_t *reg = ownership_map[id].reg;
@@ -1331,9 +1332,22 @@ static struct reg_init {
 	{REG(USBH3_NS), B(6), B(6)},
 };
 
+void __init msm_clk_soc_set_ops(struct clk *clk)
+{
+	if (!clk->ops) {
+		struct clk_ops *ops = clk_is_local(clk->id);
+		if (ops)
+			clk->ops = ops;
+		else {
+			clk->ops = &clk_ops_pcom;
+			clk->id = clk->remote_id;
+		}
+	}
+}
+
 #define set_1rate(clk) \
 	soc_clk_set_rate(C(clk), clk_local_tbl[C(clk)].freq_tbl->freq_hz)
-__init int clk_7x30_init(void)
+void __init msm_clk_soc_init(void)
 {
 	int i;
 	uint32_t val;
@@ -1370,6 +1384,4 @@ __init int clk_7x30_init(void)
 	set_1rate(UART2);
 	set_1rate(LPA_CODEC);
 	set_1rate(GLBL_ROOT);
-
-	return 0;
 }
