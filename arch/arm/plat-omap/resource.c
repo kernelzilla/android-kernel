@@ -125,6 +125,9 @@ static int update_resource_level(struct shared_resource *resp)
 	}
 	mutex_unlock(&resp->resource_mutex);
 
+	if (resp->curr_level == target_level)
+		return ret;
+
 	pr_debug("SRF: Changing Level for resource %s to %ld\n",
 				resp->name, target_level);
 	ret = resp->ops->change_level(resp, target_level);
