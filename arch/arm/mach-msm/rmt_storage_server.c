@@ -29,6 +29,7 @@
 #include <linux/sched.h>
 #include <linux/wakelock.h>
 #include <linux/rmt_storage_server.h>
+#include <linux/debugfs.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -64,6 +65,19 @@ struct rmt_storage_client_info {
 };
 
 static struct rmt_storage_server_info *_rms;
+
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+struct rmt_storage_stats {
+	char path[MAX_PATH_NAME];
+	unsigned long count;
+	ktime_t start;
+	ktime_t min;
+	ktime_t max;
+	ktime_t total;
+};
+static struct rmt_storage_stats client_stats[MAX_NUM_CLIENTS];
+static struct dentry *stats_dentry;
+#endif
 
 #define RMT_STORAGE_SRV_APIPROG            0x3000009C
 #define RMT_STORAGE_SRV_APIVERS            0x00010001
@@ -233,6 +247,9 @@ static int handle_rmt_storage_call(struct msm_rpc_server *server,
 	struct rmt_storage_server_info *rms = _rms;
 	struct rmt_storage_event *event_args;
 	struct rmt_storage_kevent *kevent;
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+	struct rmt_storage_stats *stats;
+#endif
 
 	kevent = kmalloc(sizeof(struct rmt_storage_kevent), GFP_KERNEL);
 	if (!kevent) {
@@ -265,6 +282,14 @@ static int handle_rmt_storage_call(struct msm_rpc_server *server,
 		len = be32_to_cpu(args->len);
 		snprintf(event_args->path, len, "%s", (char *) (args + 1));
 		pr_info("open partition %s\n\n", event_args->path);
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+		stats = &client_stats[result - 1];
+		memcpy(stats->path, event_args->path, len);
+		stats->count = 0;
+		stats->min.tv64 = KTIME_MAX;
+		stats->max.tv64 =  0;
+		stats->total.tv64 = 0;
+#endif
 		event_args->id = RMT_STORAGE_OPEN;
 		event_args->handle = result;
 		break;
@@ -336,6 +361,10 @@ static int handle_rmt_storage_call(struct msm_rpc_server *server,
 		ent = be32_to_cpu(args->count);
 		pr_info("handle = %d\n", event_args->handle);
 
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+		stats = &client_stats[event_args->handle - 1];
+		stats->start = ktime_get();
+#endif
 		iovec = (struct rmt_storage_iovec_desc *)(args + 1);
 		for (i = 0; i < ent; i++) {
 			xfer = &event_args->xfer_desc[i];
@@ -436,6 +465,10 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 	struct rmt_storage_server_info *rms = _rms;
 	struct rmt_storage_kevent *kevent;
 	struct rmt_storage_cb cb;
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+	struct rmt_storage_stats *stats;
+	ktime_t curr_stat;
+#endif
 
 	switch (cmd) {
 
@@ -482,6 +515,16 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 		if (ret < 0)
 			pr_err("%s: send callback failed with ret val = %d\n",
 				__func__, ret);
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+		stats = &client_stats[cb.handle - 1];
+		curr_stat = ktime_sub(ktime_get(), stats->start);
+		stats->total = ktime_add(stats->total, curr_stat);
+		stats->count++;
+		if (curr_stat.tv64 < stats->min.tv64)
+			stats->min = curr_stat;
+		if (curr_stat.tv64 > stats->max.tv64)
+			stats->max = curr_stat;
+#endif
 		if (atomic_dec_return(&rms->wcount) == 0)
 			wake_unlock(&rms->wlock);
 		break;
@@ -518,6 +561,49 @@ static int rmt_storage_mmap(struct file *file, struct vm_area_struct *vma)
 out:
 	return ret;
 }
+
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+static int rmt_storage_stats_open(struct inode *inode, struct file *file)
+{
+	return 0;
+}
+
+static ssize_t rmt_storage_stats_read(struct file *file, char __user *ubuf,
+		size_t count, loff_t *ppos)
+{
+	uint32_t tot_clients;
+	char buf[512];
+	int max, j, i = 0;
+	struct rmt_storage_stats *stats;
+
+	max = sizeof(buf) - 1;
+	tot_clients = find_first_zero_bit(&_rms->cids, sizeof(_rms->cids)) - 1;
+
+	for (j = 0; j < tot_clients; j++) {
+		stats = &client_stats[j];
+		i += scnprintf(buf + i, max - i, "stats for partition %s:\n",
+				stats->path);
+		i += scnprintf(buf + i, max - i, "Min time: %lld us\n",
+				ktime_to_us(stats->min));
+		i += scnprintf(buf + i, max - i, "Max time: %lld us\n",
+				ktime_to_us(stats->max));
+		i += scnprintf(buf + i, max - i, "Total time: %lld us\n",
+				ktime_to_us(stats->total));
+		i += scnprintf(buf + i, max - i, "Total requests: %ld\n",
+				stats->count);
+		if (stats->count)
+			i += scnprintf(buf + i, max - i, "Avg time: %lld us\n",
+			     div_s64(ktime_to_us(stats->total), stats->count));
+	}
+	return simple_read_from_buffer(ubuf, count, ppos, buf, i);
+}
+
+static const struct file_operations debug_ops = {
+	.owner = THIS_MODULE,
+	.open = rmt_storage_stats_open,
+	.read = rmt_storage_stats_read,
+};
+#endif
 
 const struct file_operations rmt_storage_fops = {
 	.owner = THIS_MODULE,
@@ -585,6 +671,12 @@ static int rmt_storage_server_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER_STATS
+	stats_dentry = debugfs_create_file("rmt_storage_stats", 0444, 0,
+					NULL, &debug_ops);
+	if (!stats_dentry)
+		pr_info("%s: Failed to create stats debugfs file\n", __func__);
+#endif
 	pr_info("%s: Remote storage RPC server initialized\n", __func__);
 	_rms = rms;
 	return 0;
