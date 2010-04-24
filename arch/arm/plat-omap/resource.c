@@ -151,6 +151,11 @@ static struct users_list *get_user(void)
 	int ind = 0;
 	struct users_list *user;
 
+	/*
+	 * When allocating from the static pool, we must lock resource mutex,
+	 * to protect against concurrent get_user() calls.
+	 */
+	down(&res_mutex);
 	/* See if something available in the static pool */
 	while (ind < MAX_USERS) {
 		if (usr_list[ind].usage == UNUSED)
@@ -162,23 +167,29 @@ static struct users_list *get_user(void)
 		/* Pick from the static pool */
 		user = &usr_list[ind];
 		user->usage = STATIC_ALLOC;
-	} else {
-		/* By this time we hope slab is initialized */
-		if (slab_is_available()) {
-			user = kmalloc(sizeof(struct  users_list), GFP_KERNEL);
-			if (!user) {
-				printk(KERN_ERR "SRF:FATAL ERROR: kmalloc"
-							"failed\n");
-				return ERR_PTR(-ENOMEM);
-			}
-			user->usage = DYNAMIC_ALLOC;
-		} else {
-			/* Dynamic alloc not available yet */
-			printk(KERN_ERR "SRF: FATAL ERROR: users_list"
-				"initial POOL EMPTY before slab init\n");
+		goto res_unlock;
+	}
+	/* By this time we hope slab is initialized */
+	if (slab_is_available()) {
+		user = kmalloc(sizeof(struct  users_list), GFP_KERNEL);
+		if (!user) {
+			printk(KERN_ERR "SRF:FATAL ERROR: kmalloc"
+					"failed\n");
 			return ERR_PTR(-ENOMEM);
 		}
+		user->usage = DYNAMIC_ALLOC;
+	} else {
+		/* Dynamic alloc not available yet */
+		printk(KERN_ERR "SRF: FATAL ERROR: users_list"
+				"initial POOL EMPTY before slab init\n");
+		return ERR_PTR(-ENOMEM);
 	}
+
+	return user;
+
+res_unlock:
+	up(&res_mutex);
+
 	return user;
 }
 
@@ -195,8 +206,12 @@ static void free_user(struct users_list *user)
 	if (user->usage == DYNAMIC_ALLOC) {
 		kfree(user);
 	} else {
-		user->usage = UNUSED;
+		/*
+		 * It is not necesssary to lock when returning to the
+		 * static pool.
+		 */
 		user->dev = NULL;
+		user->usage = UNUSED;
 	}
 }
 
