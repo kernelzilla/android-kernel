@@ -331,7 +331,7 @@ void msm_camio_disable(struct platform_device *);
 int msm_camio_probe_on(struct platform_device *);
 int msm_camio_probe_off(struct platform_device *);
 int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
-int request_axi_qos(uint32_t freq);
+int add_axi_qos(void);
 int update_axi_qos(uint32_t freq);
 void release_axi_qos(void);
 int msm_camio_read_camif_status(void);

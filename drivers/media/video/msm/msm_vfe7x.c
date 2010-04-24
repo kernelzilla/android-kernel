@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include "msm_vfe7x.h"
+#include <linux/pm_qos_params.h>
 
 #define QDSP_CMDQUEUE 25
 
@@ -44,7 +45,9 @@
 
 #define VFE_ADSP_EVENT 0xFFFF
 #define SNAPSHOT_MASK_MODE 0x00000002
-#define MSM_AXI_QOS_PREVIEW	192000
+#define MSM_AXI_QOS_PREVIEW		192000
+#define MSM_AXI_QOS_SNAPSHOT	192000
+
 
 static struct msm_adsp_module *qcam_mod;
 static struct msm_adsp_module *vfe_mod;
@@ -250,8 +253,8 @@ static void vfe_7x_release(struct platform_device *pdev)
 	kfree(extdata);
 	extlen = 0;
 
-	/* release AXI frequency request */
-	release_axi_qos();
+	/* set back the AXI frequency to default */
+	update_axi_qos(PM_QOS_DEFAULT_VALUE);
 }
 
 static int vfe_7x_init(struct msm_vfe_callback *presp,
@@ -272,12 +275,6 @@ static int vfe_7x_init(struct msm_vfe_callback *presp,
 	rc = msm_camio_enable(dev);
 	if (rc < 0)
 		return rc;
-
-	/* Set required axi bus frequency */
-	rc = request_axi_qos(MSM_AXI_QOS_PREVIEW);
-	if (rc < 0)
-		return rc;
-
 	msm_camio_camif_pad_reg_reset();
 
 	extlen = sizeof(struct vfe_frame_extra);
@@ -609,7 +606,14 @@ static int vfe_7x_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 				op_mode = *(++_mode);
 				if (op_mode & SNAPSHOT_MASK_MODE) {
 					/* request AXI bus for snapshot */
-					if (update_axi_qos(MSM_AXI_MAX_FREQ)
+					if (update_axi_qos(MSM_AXI_QOS_SNAPSHOT)
+						< 0) {
+						rc = -EFAULT;
+						goto config_failure;
+					}
+				} else {
+					/* request AXI bus for snapshot */
+					if (update_axi_qos(MSM_AXI_QOS_PREVIEW)
 						< 0) {
 						rc = -EFAULT;
 						goto config_failure;

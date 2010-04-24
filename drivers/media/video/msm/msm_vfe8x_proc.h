@@ -23,6 +23,12 @@
 #include <mach/camera.h>
 #include "msm_vfe8x.h"
 
+
+#define MSM_AXI_QOS_PREVIEW		128000
+#define MSM_AXI_QOS_SNAPSHOT	128000
+#define MSM_AXI_QOS_RECORDING	128000
+
+
 /* at start of camif,  bit 1:0 = 0x01:enable
  * image data capture at frame boundary. */
 #define CAMIF_COMMAND_START  0x00000005

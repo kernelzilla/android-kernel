@@ -2568,6 +2568,15 @@ int msm_camera_drv_start(struct platform_device *dev,
 	}
 
 	camera_node++;
+	if (camera_node == 1) {
+		rc = add_axi_qos();
+		if (rc < 0) {
+			msm_sync_destroy(sync);
+			kfree(pmsm);
+			return rc;
+		}
+	}
+
 	list_add(&sync->list, &msm_sensors);
 	return rc;
 }
