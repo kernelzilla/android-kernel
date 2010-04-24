@@ -2516,6 +2516,7 @@ int isp_get(void)
 			isp_restore_ctx();
 		else
 			has_context = 1;
+		enable_irq(omap3isp->irq);
 	}
 	isp_obj.ref_count++;
 	mutex_unlock(&(isp_obj.isp_mutex));
@@ -2543,6 +2544,7 @@ int isp_put(void)
 	mutex_lock(&(isp_obj.isp_mutex));
 	if (isp_obj.ref_count) {
 		if (--isp_obj.ref_count == 0) {
+			disable_irq_nosync(omap3isp->irq);
 			isp_save_ctx();
 			isp_release_resources();
 			isp_obj.module.isp_pipeline = 0;
