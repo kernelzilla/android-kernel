@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/smd_tty.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -19,7 +19,7 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/wait.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/wakelock.h>
 
@@ -39,19 +39,16 @@ struct smd_tty_info {
 	struct tty_struct *tty;
 	struct wake_lock wake_lock;
 	int open_count;
-	struct work_struct tty_work;
+	struct tasklet_struct tty_tsklt;
 };
 
 static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
-static struct workqueue_struct *smd_tty_wq;
 
-static void smd_tty_work_func(struct work_struct *work)
+static void smd_tty_read(unsigned long param)
 {
 	unsigned char *ptr;
 	int avail;
-	struct smd_tty_info *info = container_of(work,
-						struct smd_tty_info,
-						tty_work);
+	struct smd_tty_info *info = (struct smd_tty_info *)param;
 	struct tty_struct *tty = info->tty;
 
 	if (!tty)
@@ -59,18 +56,9 @@ static void smd_tty_work_func(struct work_struct *work)
 
 	for (;;) {
 		if (test_bit(TTY_THROTTLED, &tty->flags)) break;
-
-		mutex_lock(&smd_tty_lock);
-		if (info->ch == 0) {
-			mutex_unlock(&smd_tty_lock);
-			break;
-		}
-
 		avail = smd_read_avail(info->ch);
-		if (avail == 0) {
-			mutex_unlock(&smd_tty_lock);
+		if (avail == 0)
 			break;
-		}
 
 		avail = tty_prepare_flip_string(tty, &ptr, avail);
 
@@ -81,7 +69,6 @@ static void smd_tty_work_func(struct work_struct *work)
 			*/
 			printk(KERN_ERR "OOPS - smd_tty_buffer mismatch?!");
 		}
-		mutex_unlock(&smd_tty_lock);
 
 		wake_lock_timeout(&info->wake_lock, HZ / 2);
 		tty_flip_buffer_push(tty);
@@ -94,11 +81,15 @@ static void smd_tty_work_func(struct work_struct *work)
 static void smd_tty_notify(void *priv, unsigned event)
 {
 	struct smd_tty_info *info = priv;
+	struct tty_struct *tty = info->tty;
 
 	if (event != SMD_EVENT_DATA)
 		return;
 
-	queue_work(smd_tty_wq, &info->tty_work);
+	if (tty->low_latency)
+		tasklet_hi_schedule(&info->tty_tsklt);
+	else
+		tasklet_schedule(&info->tty_tsklt);
 }
 
 static int smd_tty_open(struct tty_struct *tty, struct file *f)
@@ -128,6 +119,8 @@ static int smd_tty_open(struct tty_struct *tty, struct file *f)
 
 	if (info->open_count++ == 0) {
 		info->tty = tty;
+		tasklet_init(&info->tty_tsklt, smd_tty_read,
+			     (unsigned long)info);
 		wake_lock_init(&info->wake_lock, WAKE_LOCK_SUSPEND, name);
 		if (!info->ch) {
 			if (n == 36) {
@@ -162,6 +155,7 @@ static void smd_tty_close(struct tty_struct *tty, struct file *f)
 	if (--info->open_count == 0) {
 		info->tty = 0;
 		tty->driver_data = 0;
+		tasklet_kill(&info->tty_tsklt);
 		wake_lock_destroy(&info->wake_lock);
 		if (info->ch) {
 			smd_close(info->ch);
@@ -202,7 +196,7 @@ static int smd_tty_chars_in_buffer(struct tty_struct *tty)
 static void smd_tty_unthrottle(struct tty_struct *tty)
 {
 	struct smd_tty_info *info = tty->driver_data;
-	queue_work(smd_tty_wq, &info->tty_work);
+	tasklet_hi_schedule(&info->tty_tsklt);
 	return;
 }
 
@@ -238,15 +232,9 @@ static int __init smd_tty_init(void)
 {
 	int ret;
 
-	smd_tty_wq = create_singlethread_workqueue("smd_tty");
-	if (smd_tty_wq == 0)
-		return -ENOMEM;
-
 	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
-	if (smd_tty_driver == 0) {
-		destroy_workqueue(smd_tty_wq);
+	if (smd_tty_driver == 0)
 		return -ENOMEM;
-	}
 
 	smd_tty_driver->owner = THIS_MODULE;
 	smd_tty_driver->driver_name = "smd_tty_driver";
@@ -269,19 +257,10 @@ static int __init smd_tty_init(void)
 
 	/* this should be dynamic */
 	tty_register_device(smd_tty_driver, 0, 0);
-	INIT_WORK(&smd_tty[0].tty_work, smd_tty_work_func);
-
 	tty_register_device(smd_tty_driver, 7, 0);
-	INIT_WORK(&smd_tty[7].tty_work, smd_tty_work_func);
-
-	tty_register_device(smd_tty_driver, 27, 0);
-	INIT_WORK(&smd_tty[27].tty_work, smd_tty_work_func);
-
-	tty_register_device(smd_tty_driver, 36, 0);
-	INIT_WORK(&smd_tty[36].tty_work, smd_tty_work_func);
-
 	tty_register_device(smd_tty_driver, 21, 0);
-	INIT_WORK(&smd_tty[21].tty_work, smd_tty_work_func);
+	tty_register_device(smd_tty_driver, 27, 0);
+	tty_register_device(smd_tty_driver, 36, 0);
 
 	return 0;
 }
