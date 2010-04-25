@@ -199,20 +199,25 @@ void mdp4_mddi_overlay_restore(void)
 	}
 }
 
+static ulong mddi_last_kick;
+static ulong mddi_kick_interval;
+
+
 void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
-
-#ifdef CONSOLIDATE_KICKOFF
-	if (pipe == mddi_pipe)  /* base layer */
-		if (mdp4_overlay_pipe_staged(pipe->mixer_num) > 1) {
-			mdp4_stat.kickoff_mddi_skip++;
-			return;	/* let other pipe to kickoff */
-		}
-#endif
-
 #ifdef MDP4_NONBLOCKING
 	unsigned long flag;
+
+	if (pipe == mddi_pipe) {  /* base layer */
+		if (mdp4_overlay_pipe_staged(pipe->mixer_num) > 1) {
+			if (time_before(jiffies,
+				(mddi_last_kick + mddi_kick_interval/2))) {
+				mdp4_stat.kickoff_mddi_skip++;
+				return;	/* let other pipe to kickoff */
+			}
+		}
+	}
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	if (mfd->dma->busy == TRUE) {
@@ -231,6 +236,14 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 	mfd->dma->busy = TRUE;
 	/* start OVERLAY pipe */
 	mdp_pipe_kickoff(MDP_OVERLAY0_TERM, mfd);
+	if (pipe != mddi_pipe) { /* non base layer */
+		int intv;
+
+		intv = jiffies - mddi_last_kick;
+		mddi_kick_interval += intv;
+		mddi_kick_interval /= 2;	/* average */
+		mddi_last_kick = jiffies;
+	}
 	up(&mfd->sem);
 #else
 	down(&mfd->sem);
@@ -247,7 +260,6 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 	wait_for_completion_killable(&pipe->comp);
 	mdp_disable_irq(MDP_OVERLAY0_TERM);
 #endif
-
 }
 
 void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
