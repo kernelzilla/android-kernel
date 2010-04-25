@@ -504,13 +504,15 @@ static irqreturn_t msm_spi_input_irq(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	/* fifo mode */
-	while ((readl(dd->base + SPI_OPERATIONAL) & SPI_OP_IP_FIFO_NOT_EMPTY) &&
-	       (dd->rx_bytes_remaining > 0)) {
-		msm_spi_read_word_from_fifo(dd);
+	if (dd->mode == SPI_FIFO_MODE) {
+		while ((readl(dd->base + SPI_OPERATIONAL) &
+			SPI_OP_IP_FIFO_NOT_EMPTY) &&
+			(dd->rx_bytes_remaining > 0)) {
+			msm_spi_read_word_from_fifo(dd);
+		}
+		if (dd->rx_bytes_remaining == 0)
+			complete(&dd->transfer_complete);
 	}
-	if (dd->rx_bytes_remaining == 0)
-		complete(&dd->transfer_complete);
 
 	return IRQ_HANDLED;
 }
@@ -559,14 +561,17 @@ static irqreturn_t msm_spi_output_irq(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	/* Output FIFO is empty. Transmit any outstanding write data. */
-	/* There could be one word in input FIFO, so don't send more  */
-	/* than input_fifo_size - 1 more words.                       */
-	while ((dd->tx_bytes_remaining > 0) &&
-	       (count < dd->input_fifo_size - 1) &&
-	       !(readl(dd->base + SPI_OPERATIONAL) & SPI_OP_OUTPUT_FIFO_FULL)) {
-		msm_spi_write_word_to_fifo(dd);
-		count++;
+	if (dd->mode == SPI_FIFO_MODE) {
+		/* Output FIFO is empty. Transmit any outstanding write data. */
+		/* There could be one word in input FIFO, so don't send more  */
+		/* than input_fifo_size - 1 more words.                       */
+		while ((dd->tx_bytes_remaining > 0) &&
+		       (count < dd->input_fifo_size - 1) &&
+		       !(readl(dd->base + SPI_OPERATIONAL)
+			 & SPI_OP_OUTPUT_FIFO_FULL)) {
+			msm_spi_write_word_to_fifo(dd);
+			count++;
+		}
 	}
 
 	return IRQ_HANDLED;
