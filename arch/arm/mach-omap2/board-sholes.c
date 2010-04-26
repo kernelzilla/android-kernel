@@ -119,8 +119,12 @@ static struct omap_opp sholes_mpu_rate_table[] = {
 	{S550M, VDD1_OPP4, 0x38},
 	/*OPP5*/
 	{S600M, VDD1_OPP5, 0x3E},
+	/*
+	 * Disclamer: 700mhz and 800mhz are NOT officially supported,
+	 * use at your own risk.
+	 */
 	/*OPP6*/
-	{S700M, VDD1_OPP6, 0x3E},
+	{S700M, VDD1_OPP6, 0x40},
 	/*OPP7*/
 	{S800M, VDD1_OPP7, 0x44},
 };
