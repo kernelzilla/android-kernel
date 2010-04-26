@@ -762,6 +762,14 @@ config MSM_ADSP
 	help
 	  Provides access to registers needed by the userspace aDSP library.
 
+config MSM7KV2_AUDIO
+	bool "MSM7K v2 audio"
+	depends on (ARCH_MSM7X30 && ANDROID_PMEM)
+	default y
+	help
+	  Enables QDSP5V2-based audio drivers for audio playbacks and
+	  voice call.
+
 config MSM_ADSP_DEBUG_LEVEL
 	depends on (MSM_ADSP || MSM7KV2_AUDIO)
 	int "Debug level for an adsp module"
@@ -769,18 +777,6 @@ config MSM_ADSP_DEBUG_LEVEL
 	default 1
 	help
 	  Debug level acress the adsp module:
-	  0 - Disables all the messages including error messages
-	  1 - Prints error messages only (Default)
-	  2 - Prints both error and info messages
-	  3 - Prints all the messages including debug messages
-
-config MSM_AUDIO_DEBUG_LEVEL
-	depends on (MSM_ADSP || MSM7KV2_AUDIO || MSM_QDSP6)
-	int "Debug level for an audio module"
-	range 0 3
-	default 1
-	help
-	  Debug level acress the audio module:
 	  0 - Disables all the messages including error messages
 	  1 - Prints error messages only (Default)
 	  2 - Prints both error and info messages
@@ -794,26 +790,30 @@ config MSM_ADSP_REPORT_EVENTS
 	  Normally, only messages from the aDSP are reported to userspace.
 	  With this option, we report events from the aDSP as well.
 
-config MSM7KV2_AUDIO
-	bool "MSM7K v2 audio"
-	depends on (ARCH_MSM7X30 && ANDROID_PMEM)
-	default y
-	help
-	  Enables QDSP5V2-based audio drivers for audio playbacks and
-	  voice call.
-
-config MSM_VREG_SWITCH_INVERTED
-	bool "Reverse vreg switch polarity"
-	default n
-	help
-	  Reverses the enable and disable for vreg switch.
-
 config MSM_QDSP6
 	tristate "QDSP6 support"
 	depends on ARCH_QSD8X50 && ANDROID_PMEM
 	default y
 	help
 	  Enable support for qdsp6. This provides audio and video functionality.
+
+config MSM_AUDIO_DEBUG_LEVEL
+	depends on (MSM_ADSP || MSM7KV2_AUDIO || MSM_QDSP6)
+	int "Debug level for an audio module"
+	range 0 3
+	default 1
+	help
+	  Debug level acress the audio module:
+	  0 - Disables all the messages including error messages
+	  1 - Prints error messages only (Default)
+	  2 - Prints both error and info messages
+	  3 - Prints all the messages including debug messages
+
+config MSM_VREG_SWITCH_INVERTED
+	bool "Reverse vreg switch polarity"
+	default n
+	help
+	  Reverses the enable and disable for vreg switch.
 
 config MSM_DMA_TEST
 	tristate "MSM DMA test module"
