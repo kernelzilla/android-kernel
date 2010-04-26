@@ -104,7 +104,7 @@ static int update_resource_level(struct shared_resource *resp)
 {
 	struct users_list *user;
 	unsigned long target_level;
-	int ret;
+	int ret = 0;
 
 	mutex_lock(&resp->resource_mutex);
 	/* Regenerate the target_value for the resource */
