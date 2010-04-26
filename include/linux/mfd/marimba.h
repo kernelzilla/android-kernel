@@ -106,6 +106,7 @@ struct marimba_tsadc_platform_data {
 	int (*marimba_tsadc_power)(int vreg_on);
 	int (*init)(void);
 	int (*exit)(void);
+	int (*level_vote)(int vote_on);
 	bool tsadc_prechg_en;
 	struct marimba_tsadc_setup_params setup;
 	struct marimba_tsadc_config_params2 params2;

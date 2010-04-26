@@ -1037,9 +1037,23 @@ vreg_fail:
 	return rc;
 }
 
+static int marimba_tsadc_vote(int vote_on)
+{
+	int rc, level;
+
+	level = vote_on ? 1300 : 0;
+
+	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, level);
+	if (rc < 0)
+		printk(KERN_ERR "%s: vreg level %s failed (%d)\n",
+			__func__, vote_on ? "on" : "off", rc);
+
+	return rc;
+}
+
 static int marimba_tsadc_init(void)
 {
-	int i, rc;
+	int i, rc = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
 		vregs_tsadc[i] = vreg_get(NULL, vregs_tsadc_name[i]);
@@ -1050,13 +1064,6 @@ static int marimba_tsadc_init(void)
 			rc = PTR_ERR(vregs_tsadc[i]);
 			goto vreg_get_fail;
 		}
-	}
-
-	rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 1300);
-	if (rc < 0) {
-		printk(KERN_ERR "%s: vreg level on failed (%d)\n",
-			__func__, rc);
-		goto vreg_get_fail;
 	}
 
 	return rc;
@@ -1088,6 +1095,7 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	.marimba_tsadc_power =  marimba_tsadc_power,
 	.init		     =  marimba_tsadc_init,
 	.exit		     =  marimba_tsadc_exit,
+	.level_vote	     =  marimba_tsadc_vote,
 	.tsadc_prechg_en = true,
 	.setup = {
 		.pen_irq_en	=	true,

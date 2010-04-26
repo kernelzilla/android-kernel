@@ -106,15 +106,25 @@ static int marimba_tsadc_write(struct marimba_tsadc *tsadc, u8 reg, u8 data)
 static int marimba_tsadc_shutdown(struct marimba_tsadc *tsadc)
 {
 	u8 val;
+	int rc;
 
 	/* force reset */
 	val = TS_CTL0_XO_EN | TS_CTL0_EOC_EN | TS_CTL0_PENIRQ_EN |
 				TS_CTL0_CLK_EN;
-	marimba_write_u8(tsadc, TS_CTL0, val);
+	rc = marimba_write_u8(tsadc, TS_CTL0, val);
+	if (rc < 0)
+		return rc;
 
 	/* disable xo, clock */
 	val = TS_CTL0_PENIRQ_EN | TS_CTL0_EOC_EN;
-	marimba_write_u8(tsadc, TS_CTL0, val);
+	rc = marimba_write_u8(tsadc, TS_CTL0, val);
+	if (rc < 0)
+		return rc;
+
+	/* de-vote S2 1.3v */
+	if (tsadc->pdata->level_vote)
+		/* REVISIT: Ignore error for level_vote(0) for now*/
+		tsadc->pdata->level_vote(0);
 
 	return 0;
 }
@@ -122,23 +132,45 @@ static int marimba_tsadc_shutdown(struct marimba_tsadc *tsadc)
 static int marimba_tsadc_startup(struct marimba_tsadc *tsadc)
 {
 	u8 val;
+	int rc = 0;
+
+	/* vote for S2 1.3v */
+	if (tsadc->pdata->level_vote) {
+		rc = tsadc->pdata->level_vote(1);
+		if (rc < 0)
+			return rc;
+	}
 
 	/* disable XO, clock and output enables */
-	marimba_write_u8(tsadc, TS_CTL0, 0x00);
+	rc = marimba_write_u8(tsadc, TS_CTL0, 0x00);
+	if (rc < 0)
+		goto fail_marimba_write;
 
 	/* Enable output enables */
 	val = TS_CTL0_XO_EN | TS_CTL0_EOC_EN | TS_CTL0_PENIRQ_EN;
-	marimba_write_u8(tsadc, TS_CTL0, val);
+	rc = marimba_write_u8(tsadc, TS_CTL0, val);
+	if (rc < 0)
+		goto fail_marimba_write;
 
 	/* Enable clock */
 	val = val | TS_CTL0_CLK_EN;
-	marimba_write_u8(tsadc, TS_CTL0, val);
+	rc = marimba_write_u8(tsadc, TS_CTL0, val);
+	if (rc < 0)
+		goto fail_marimba_write;
 
 	/* remove reset */
 	val = val | TS_CTL0_RESET;
-	marimba_write_u8(tsadc, TS_CTL0, val);
+	rc = marimba_write_u8(tsadc, TS_CTL0, val);
+	if (rc < 0)
+		goto fail_marimba_write;
 
 	return 0;
+
+fail_marimba_write:
+	if (tsadc->pdata->level_vote)
+		/* REVISIT: Ignore error for level_vote(0) for now*/
+		tsadc->pdata->level_vote(0);
+	return rc;
 }
 
 
@@ -147,8 +179,11 @@ static int marimba_tsadc_configure(struct marimba_tsadc *tsadc)
 	u8 rsv1 = 0,  setup = 0, i, count = 0;
 	u8 param2 = 0,  param3 = 0;
 	unsigned long val;
+	int rc;
 
-	marimba_tsadc_write(tsadc, SSBI_PRESET, 0x00);
+	rc = marimba_tsadc_write(tsadc, SSBI_PRESET, 0x00);
+	if (rc < 0)
+		return rc;
 
 	if (!tsadc->pdata)
 		return -EINVAL;
@@ -160,7 +195,9 @@ static int marimba_tsadc_configure(struct marimba_tsadc *tsadc)
 		rsv1 &= ~TSHK_RSV1_PRECHARGE_EN;
 
 	/*  Set RSV1 register*/
-	marimba_tsadc_write(tsadc, TSHK_RSV1, rsv1);
+	rc = marimba_tsadc_write(tsadc, TSHK_RSV1, rsv1);
+	if (rc < 0)
+		return rc;
 
 	/* Configure PARAM2 register */
 	/* Input clk */
@@ -181,7 +218,9 @@ static int marimba_tsadc_configure(struct marimba_tsadc *tsadc)
 	param2 |=  tsadc->pdata->params2.sample_prd << TSHK_SAMPLE_PRD_SHIFT;
 
 	/* Write PARAM2 register */
-	marimba_tsadc_write(tsadc, TSHK_PARAM2, param2);
+	rc = marimba_tsadc_write(tsadc, TSHK_PARAM2, param2);
+	if (rc < 0)
+		return rc;
 
 	/* REVISIT: If Precharge time, stabilization time  > 409.6us */
 	/* Configure PARAM3 register */
@@ -222,7 +261,9 @@ static int marimba_tsadc_configure(struct marimba_tsadc *tsadc)
 	if (i == 3) /* Set to normal mode if input is wrong */
 		param3 |= 0x00;
 
-	marimba_tsadc_write(tsadc, TSHK_PARAM3, param3);
+	rc = marimba_tsadc_write(tsadc, TSHK_PARAM3, param3);
+	if (rc < 0)
+		return rc;
 
 	/* Configure TSHK SETUP Register */
 	if (tsadc->pdata->setup.pen_irq_en == true)
@@ -236,13 +277,17 @@ static int marimba_tsadc_configure(struct marimba_tsadc *tsadc)
 		setup &= ~TSHK_SETUP_EN_ADC;
 
 	/* Enable signals to ADC, pen irq assertion */
-	marimba_tsadc_write(tsadc, TSHK_SETUP, setup);
+	rc = marimba_tsadc_write(tsadc, TSHK_SETUP, setup);
+	if (rc < 0)
+		return rc;
 
 	return 0;
 }
 
 int marimba_tsadc_start(struct marimba_tsadc_client *client)
 {
+	int rc = 0;
+
 	if (!client) {
 		pr_err("%s: Not a valid client\n", __func__);
 		return -ENODEV;
@@ -256,11 +301,19 @@ int marimba_tsadc_start(struct marimba_tsadc_client *client)
 
 	/* REVISIT - add locks */
 	if (client->is_ts) {
-		marimba_tsadc_startup(tsadc_dev);
-		marimba_tsadc_configure(tsadc_dev);
+		rc = marimba_tsadc_startup(tsadc_dev);
+		if (rc < 0)
+			goto fail_tsadc_startup;
+		rc = marimba_tsadc_configure(tsadc_dev);
+		if (rc < 0)
+			goto fail_tsadc_conf;
 	}
 
 	return 0;
+fail_tsadc_conf:
+	marimba_tsadc_shutdown(tsadc_dev);
+fail_tsadc_startup:
+	return rc;
 }
 EXPORT_SYMBOL(marimba_tsadc_start);
 
@@ -370,11 +423,23 @@ marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
 	int rc = 0;
 	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
 
-	marimba_tsadc_shutdown(tsadc);
+	rc = marimba_tsadc_shutdown(tsadc);
+	if (rc < 0) {
+		pr_err("%s: Unable to shutdown TSADC\n", __func__);
+		return rc;
+	}
 
-	if (tsadc->pdata->marimba_tsadc_power)
+	if (tsadc->pdata->marimba_tsadc_power) {
 		rc = tsadc->pdata->marimba_tsadc_power(0);
+		if (rc < 0)
+			goto fail_tsadc_power;
+	}
 
+	return rc;
+
+fail_tsadc_power:
+	marimba_tsadc_startup(tsadc_dev);
+	marimba_tsadc_configure(tsadc_dev);
 	return rc;
 }
 
@@ -391,9 +456,25 @@ static int marimba_tsadc_resume(struct platform_device *pdev)
 		}
 	}
 
-	marimba_tsadc_startup(tsadc_dev);
-	marimba_tsadc_configure(tsadc_dev);
+	rc = marimba_tsadc_startup(tsadc_dev);
+	if (rc < 0) {
+		pr_err("%s: Unable to startup TSADC\n", __func__);
+		goto fail_tsadc_startup;
+	}
 
+	rc = marimba_tsadc_configure(tsadc_dev);
+	if (rc < 0) {
+		pr_err("%s: Unable to configure TSADC\n", __func__);
+		goto fail_tsadc_configure;
+	}
+
+	return rc;
+
+fail_tsadc_configure:
+	marimba_tsadc_shutdown(tsadc_dev);
+fail_tsadc_startup:
+	if (tsadc->pdata->marimba_tsadc_power)
+		rc = tsadc->pdata->marimba_tsadc_power(0);
 	return rc;
 }
 #else
