@@ -418,6 +418,9 @@ void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd)
 	} else if (term == MDP_DMA_S_TERM) {
 		mdp_pipe_ctrl(MDP_DMA_S_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		outpdw(MDP_BASE + 0x0048, 0x0);	/* start DMA */
+	} else if (term == MDP_DMA_E_TERM) {
+		mdp_pipe_ctrl(MDP_DMA_E_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+		outpdw(MDP_BASE + 0x004C, 0x0);
 	}
 #endif
 }
@@ -614,6 +617,15 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 				      TRUE);
 			complete(&dma->comp);
 		}
+		/* DMA_E LCD-Out Complete */
+		if (mdp_interrupt & MDP_DMA_E_DONE) {
+			dma = &dma_s_data;
+			dma->busy = FALSE;
+			mdp_pipe_ctrl(MDP_DMA_E_BLOCK, MDP_BLOCK_POWER_OFF,
+				TRUE);
+			complete(&dma->comp);
+		}
+
 #endif
 
 		/* DMA2 LCD-Out Complete */
