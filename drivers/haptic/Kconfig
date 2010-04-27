@@ -13,10 +13,4 @@ config HAPTIC_CLASS
 
 comment "Haptic drivers"
 
-config HAPTIC_ISA1200
-	tristate "ISA1200 haptic support"
-	depends on HAPTIC_CLASS && I2C
-	help
-	  The ISA1200 is a high performance enhanced haptic driver.
-
 endif	# HAPTIC
