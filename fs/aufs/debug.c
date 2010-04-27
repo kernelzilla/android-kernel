@@ -191,7 +191,7 @@ static int do_pri_file(aufs_bindex_t bindex, struct file *file)
 	    && au_test_aufs(file->f_dentry->d_sb)
 	    && au_fi(file))
 		snprintf(a, sizeof(a), ", mmapped %d",
-			 !!au_fi(file)->fi_h_vm_ops);
+			 !!au_fi(file)->fi_hvmop);
 	dpri("f%d: mode 0x%x, flags 0%o, cnt %ld, pos %llu%s\n",
 	     bindex, file->f_mode, file->f_flags, (long)file_count(file),
 	     file->f_pos, a);

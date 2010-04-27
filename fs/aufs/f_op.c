@@ -75,7 +75,7 @@ int au_do_open_nondir(struct file *file, int flags)
 	err = 0;
 	dentry = file->f_dentry;
 	finfo = au_fi(file);
-	finfo->fi_h_vm_ops = NULL;
+	finfo->fi_hvmop = NULL;
 	finfo->fi_vm_ops = NULL;
 	mutex_init(&finfo->fi_mmap); /* regular file only? */
 	bindex = au_dbstart(dentry);
@@ -400,11 +400,11 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	/* do not revalidate, no si lock */
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
+	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
-	err = finfo->fi_h_vm_ops->fault(vma, vmf);
+	err = finfo->fi_hvmop->fault(vma, vmf);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
 	au_reset_file(vma, file);
@@ -430,11 +430,11 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
+	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
-	err = finfo->fi_h_vm_ops->page_mkwrite(vma, page);
+	err = finfo->fi_hvmop->page_mkwrite(vma, page);
 	au_reset_file(vma, file);
 	mutex_unlock(&finfo->fi_vm_mtx);
 	wake_up(&wq);
@@ -452,11 +452,11 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 
 	finfo = au_fi(file);
 	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
-	AuDebugOn(!h_file || !finfo->fi_h_vm_ops);
+	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
 	vma->vm_file = h_file;
-	finfo->fi_h_vm_ops->close(vma);
+	finfo->fi_hvmop->close(vma);
 	au_reset_file(vma, file);
 	mutex_unlock(&finfo->fi_vm_mtx);
 	wake_up(&wq);
@@ -548,7 +548,7 @@ static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
 	MtxMustLock(&finfo->fi_mmap);
 
 	err = 0;
-	h_ops = finfo->fi_h_vm_ops;
+	h_ops = finfo->fi_hvmop;
 	AuDebugOn(!h_ops);
 	if ((!h_ops->page_mkwrite && !h_ops->close)
 	    || finfo->fi_vm_ops)
@@ -699,7 +699,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_ops = &aufs_vm_ops;
 	if (!args.mmapped) {
-		finfo->fi_h_vm_ops = vm_ops;
+		finfo->fi_hvmop = vm_ops;
 		mutex_init(&finfo->fi_vm_mtx);
 	}
 

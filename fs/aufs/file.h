@@ -46,7 +46,7 @@ struct au_finfo {
 	union {
 		/* non-dir only */
 		struct {
-			struct vm_operations_struct	*fi_h_vm_ops;
+			struct vm_operations_struct	*fi_hvmop;
 			struct vm_operations_struct	*fi_vm_ops;
 			struct mutex			fi_vm_mtx;
 			struct mutex			fi_mmap;
@@ -200,7 +200,7 @@ static inline unsigned int au_figen(struct file *f)
 static inline int au_test_mmapped(struct file *f)
 {
 	FiMustAnyLock(f);
-	return !!(au_fi(f)->fi_h_vm_ops);
+	return !!(au_fi(f)->fi_hvmop);
 }
 
 #endif /* __KERNEL__ */
