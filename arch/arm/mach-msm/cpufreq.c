@@ -63,7 +63,7 @@ static int msm_cpufreq_verify(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int __init msm_cpufreq_init(struct cpufreq_policy *policy)
+static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 {
 	struct cpufreq_frequency_table *table;
 
