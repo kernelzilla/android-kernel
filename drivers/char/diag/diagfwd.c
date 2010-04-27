@@ -49,10 +49,18 @@ static void diag_smd_send_req(int context)
 	if (driver->ch && (!driver->in_busy)) {
 		int r = smd_read_avail(driver->ch);
 
-		if (r > USB_MAX_IN_BUF) {
-			printk(KERN_INFO "diag dropped num bytes = %d\n", r);
+	if (r > USB_MAX_IN_BUF) {
+		if (r < MAX_BUF_SIZE) {
+				printk(KERN_ALERT "\n diag: SMD sending in "
+					   "packets upto %d bytes", r);
+				driver->usb_buf_in = krealloc(
+					driver->usb_buf_in, r, GFP_KERNEL);
+		} else {
+			printk(KERN_ALERT "\n diag: SMD sending in "
+				 "packets more than %d bytes", MAX_BUF_SIZE);
 			return;
 		}
+	}
 		if (r > 0) {
 
 			buf = driver->usb_buf_in;
