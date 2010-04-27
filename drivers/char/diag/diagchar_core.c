@@ -374,7 +374,10 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	if (!buf_hdlc)
 		buf_hdlc = diagmem_alloc(driver, HDLC_OUT_BUF_SIZE,
 						 POOL_TYPE_HDLC);
-
+	if (!buf_hdlc) {
+		ret = -ENOMEM;
+		goto fail_free_hdlc;
+	}
 	if (HDLC_OUT_BUF_SIZE - driver->used <= (2*payload_size) + 3) {
 		driver->usb_write_ptr_svc = (struct diag_request *)
 			(diagmem_alloc(driver, sizeof(struct diag_request),
