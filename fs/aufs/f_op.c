@@ -504,40 +504,40 @@ static unsigned long au_flag_conv(unsigned long flags)
 		| AuConv_VM_MAP(flags, LOCKED);
 }
 
-static struct vm_operations_struct *au_vm_ops(struct file *h_file,
-					      struct vm_area_struct *vma)
+static struct vm_operations_struct *au_hvmop(struct file *h_file,
+					     struct vm_area_struct *vma)
 {
-	struct vm_operations_struct *vm_ops;
+	struct vm_operations_struct *h_vmop;
 	unsigned long prot;
 	int err;
 
-	vm_ops = ERR_PTR(-ENODEV);
+	h_vmop = ERR_PTR(-ENODEV);
 	if (!h_file->f_op || !h_file->f_op->mmap)
 		goto out;
 
 	prot = au_prot_conv(vma->vm_flags);
 	err = security_file_mmap(h_file, /*reqprot*/prot, prot,
 				 au_flag_conv(vma->vm_flags), vma->vm_start, 0);
-	vm_ops = ERR_PTR(err);
+	h_vmop = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
 
 	err = h_file->f_op->mmap(h_file, vma);
-	vm_ops = ERR_PTR(err);
+	h_vmop = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
 
-	vm_ops = vma->vm_ops;
+	h_vmop = vma->vm_ops;
 	err = do_munmap(current->mm, vma->vm_start,
 			vma->vm_end - vma->vm_start);
 	if (unlikely(err)) {
 		AuIOErr("failed internal unmapping %.*s, %d\n",
 			AuDLNPair(h_file->f_dentry), err);
-		vm_ops = ERR_PTR(-EIO);
+		h_vmop = ERR_PTR(-EIO);
 	}
 
  out:
-	return vm_ops;
+	return h_vmop;
 }
 
 static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
@@ -652,7 +652,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 	int err, wkq_err;
 	struct au_finfo *finfo;
 	struct dentry *h_dentry;
-	struct vm_operations_struct *vm_ops;
+	struct vm_operations_struct *h_vmop;
 	struct au_mmap_pre_args args = {
 		.file		= file,
 		.vma		= vma,
@@ -678,11 +678,11 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		file->f_mapping = args.h_file->f_mapping;
 	}
 
-	vm_ops = NULL;
+	h_vmop = NULL;
 	if (!args.mmapped) {
-		vm_ops = au_vm_ops(args.h_file, vma);
-		err = PTR_ERR(vm_ops);
-		if (IS_ERR(vm_ops))
+		h_vmop = au_hvmop(args.h_file, vma);
+		err = PTR_ERR(h_vmop);
+		if (IS_ERR(h_vmop))
 			goto out_unlock;
 	}
 
@@ -699,7 +699,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_ops = &aufs_vm_ops;
 	if (!args.mmapped) {
-		finfo->fi_hvmop = vm_ops;
+		finfo->fi_hvmop = h_vmop;
 		mutex_init(&finfo->fi_vm_mtx);
 	}
 
