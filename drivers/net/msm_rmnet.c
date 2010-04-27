@@ -37,6 +37,9 @@
 /* XXX should come from smd headers */
 #define SMD_PORT_ETHER0 11
 
+/* allow larger frames */
+#define RMNET_DATA_LEN 2000
+
 static const char *ch_name[3] = {
 	"DATA5",
 	"DATA6",
@@ -200,8 +203,9 @@ static void smd_net_data_handler(unsigned long arg)
 		if (sz == 0) break;
 		if (smd_read_avail(p->ch) < sz) break;
 
-		if (sz > 1514) {
-			pr_err("rmnet_recv() discarding %d len\n", sz);
+		if (sz > dev->mtu) {
+			pr_err("rmnet_recv() discarding %d len (%d mtu)\n",
+				sz, dev->mtu);
 			ptr = 0;
 		} else {
 			skb = dev_alloc_skb(sz + NET_IP_ALIGN);
@@ -334,6 +338,16 @@ static int rmnet_stop(struct net_device *dev)
 	return 0;
 }
 
+static int rmnet_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if (0 > new_mtu || RMNET_DATA_LEN < new_mtu)
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+
+	return 0;
+}
+
 static int rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct rmnet_private *p = netdev_priv(dev);
@@ -382,7 +396,7 @@ static const struct net_device_ops rmnet_ops = {
 	.ndo_get_stats		= rmnet_get_stats,
 	.ndo_set_multicast_list = rmnet_set_multicast_list,
 	.ndo_tx_timeout		= rmnet_tx_timeout,
-	.ndo_change_mtu		= 0,
+	.ndo_change_mtu		= rmnet_change_mtu,
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 };
@@ -394,6 +408,9 @@ static void __init rmnet_setup(struct net_device *dev)
 	dev->watchdog_timeo = 1000; /* 10 seconds? */
 
 	ether_setup(dev);
+
+	/* set this after calling ether_setup */
+	dev->mtu = RMNET_DATA_LEN;
 
 	random_ether_addr(dev->dev_addr);
 }
