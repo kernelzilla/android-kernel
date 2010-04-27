@@ -3667,7 +3667,7 @@ static struct mmc_platform_data msm7x30_sdc1_data = {
 
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
 static struct mmc_platform_data msm7x30_sdc2_data = {
-	.ocr_mask	= MMC_VDD_165_195,
+	.ocr_mask	= MMC_VDD_165_195 | MMC_VDD_27_28,
 	.translate_vdd	= msm_sdcc_setup_power,
 #ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
 	.mmc_bus_width  = MMC_CAP_8_BIT_DATA,
