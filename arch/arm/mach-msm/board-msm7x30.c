@@ -34,6 +34,7 @@
 #include <linux/ofn_atlab.h>
 #include <linux/power_supply.h>
 #include <linux/input/pmic8058-keypad.h>
+#include <linux/i2c/isa1200.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -95,6 +96,12 @@
 #define PM8058_GPIO_PM_TO_SYS(pm_gpio)     (pm_gpio + NR_GPIO_IRQS)
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)    (sys_gpio - NR_GPIO_IRQS)
 
+#define PMIC_GPIO_HAP_ENABLE   16  /* PMIC GPIO Number 17 */
+#define PMIC_GPIO_PWM_DRV_1 24
+#define PWM_CH_START_GPIO 24
+
+#define HAP_LVL_SHFT_MSM_GPIO 24
+
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
 	int rc;
@@ -125,11 +132,47 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 		.inv_int_pol    = 0,
 	};
 
+	struct pm8058_gpio pwm_gpio_config = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.pull           = PM_GPIO_PULL_NO,
+		.out_strength   = PM_GPIO_STRENGTH_HIGH,
+		.function       = PM_GPIO_FUNC_2,
+		.inv_int_pol    = 0,
+		.vin_sel        = 6,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 0,
+	};
+
+	struct pm8058_gpio haptics_enable = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.pull           = PM_GPIO_PULL_NO,
+		.out_strength   = PM_GPIO_STRENGTH_HIGH,
+		.function       = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol    = 0,
+		.vin_sel        = 2,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 0,
+	};
+
 	if (machine_is_msm7x30_fluid()) {
 		/* pmic gpio 26 */
 		rc = pm8058_gpio_config_h(pm_chip, 25, &backlight_drv);
 		if (rc) {
 			pr_err("%s PMIC GPIO 25 write failed\n", __func__);
+			return rc;
+		}
+
+		rc = pm8058_gpio_config(PMIC_GPIO_HAP_ENABLE, &haptics_enable);
+		if (rc) {
+			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
+				(PMIC_GPIO_HAP_ENABLE + 1));
+			return rc;
+		}
+
+		rc = pm8058_gpio_config(PMIC_GPIO_PWM_DRV_1, &pwm_gpio_config);
+		if (rc) {
+			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
+				(PMIC_GPIO_PWM_DRV_1 + 1));
 			return rc;
 		}
 	}
@@ -3840,6 +3883,122 @@ static struct msm_spm_platform_data msm_spm_data __initdata = {
 };
 #endif
 
+static const char *vregs_isa1200_name[] = {
+	"gp7",
+	"gp10",
+};
+
+static const int vregs_isa1200_val[] = {
+	1800,
+	2600,
+};
+static struct vreg *vregs_isa1200[ARRAY_SIZE(vregs_isa1200_name)];
+
+static struct msm_gpio fluid_hap_shift_lvl_gpio[] = {
+       { GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0, GPIO_OUTPUT, GPIO_NO_PULL,
+		GPIO_2MA), "haptics_shft_lvl_oe"},
+};
+
+static int isa1200_power(int vreg_on)
+{
+	int i, rc = 0;
+
+	for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
+		if (!vregs_isa1200[i]) {
+			printk(KERN_ERR "%s: vreg_get %s failed (%d)\n",
+				__func__, vregs_isa1200_name[i], rc);
+			goto vreg_fail;
+		}
+
+		rc = vreg_on ? vreg_enable(vregs_isa1200[i]) :
+			  vreg_disable(vregs_isa1200[i]);
+		if (rc < 0) {
+			printk(KERN_ERR "%s: vreg %s %s failed (%d)\n",
+				__func__, vregs_isa1200_name[i],
+			       vreg_on ? "enable" : "disable", rc);
+			goto vreg_fail;
+		}
+	}
+	return 0;
+
+vreg_fail:
+	while (i)
+		vreg_disable(vregs_isa1200[--i]);
+	return rc;
+}
+
+static int hap_lvl_shft_config(void)
+{
+	int rc;
+
+	rc = msm_gpios_request_enable(fluid_hap_shift_lvl_gpio,
+			ARRAY_SIZE(fluid_hap_shift_lvl_gpio));
+	if (rc) {
+		pr_err("%s gpio_request_enable failed rc=%d\n",
+				__func__, rc);
+		goto gpio_request_fail;
+	}
+
+	gpio_set_value(HAP_LVL_SHFT_MSM_GPIO, 1);
+
+	return 0;
+gpio_request_fail:
+	return rc;
+}
+
+static struct isa1200_platform_data isa1200_1_pdata = {
+	.name = "vibrator",
+	.power_on = isa1200_power,
+	.pwm_ch_id = PMIC_GPIO_PWM_DRV_1 + 1 - PWM_CH_START_GPIO, /*channel id*/
+	/*gpio to enable haptic*/
+	.hap_en_gpio = PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
+	.max_timeout = 15000,
+};
+
+static struct i2c_board_info msm_isa1200_board_info[] = {
+	{
+		I2C_BOARD_INFO("isa1200_1", 0x90>>1),
+		.platform_data = &isa1200_1_pdata,
+	},
+};
+
+static void isa1200_init(void)
+{
+	int i, rc;
+
+	for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
+		vregs_isa1200[i] = vreg_get(NULL, vregs_isa1200_name[i]);
+		if (IS_ERR(vregs_isa1200[i])) {
+			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
+				__func__, vregs_isa1200_name[i],
+				PTR_ERR(vregs_isa1200[i]));
+			rc = PTR_ERR(vregs_isa1200[i]);
+			goto vreg_get_fail;
+		}
+		rc = vreg_set_level(vregs_isa1200[i],
+				vregs_isa1200_val[i]);
+		if (rc) {
+			printk(KERN_ERR "%s: vreg_set_level() = %d\n",
+				__func__, rc);
+			goto vreg_get_fail;
+		}
+	}
+
+	rc = hap_lvl_shft_config();
+	if (rc) {
+		pr_err("%s: Haptic level shifter gpio %d configuration"
+			" failed\n", __func__, HAP_LVL_SHFT_MSM_GPIO);
+		goto vreg_get_fail;
+	}
+
+	i2c_register_board_info(0, msm_isa1200_board_info,
+		ARRAY_SIZE(msm_isa1200_board_info));
+	return;
+vreg_get_fail:
+	while (i)
+		vreg_put(vregs_isa1200[--i]);
+}
+
 static void __init msm7x30_init(void)
 {
 	if (socinfo_init() < 0)
@@ -3910,6 +4069,8 @@ static void __init msm7x30_init(void)
 	msm_device_ssbi6.dev.platform_data = &msm_i2c_ssbi6_pdata;
 	msm_device_ssbi7.dev.platform_data = &msm_i2c_ssbi7_pdata;
 #endif
+	if (machine_is_msm7x30_fluid())
+		isa1200_init();
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
