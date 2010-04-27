@@ -502,7 +502,7 @@ static int msm_pm_poll_state(int nr_grps, struct msm_pm_polled_group *grps)
 {
 	int i, k;
 
-	for (i = 0; i < 500000; i++)
+	for (i = 0; i < 50000; i++) {
 		for (k = 0; k < nr_grps; k++) {
 			bool all_set, all_clear;
 			bool any_set, any_clear;
@@ -521,6 +521,8 @@ static int msm_pm_poll_state(int nr_grps, struct msm_pm_polled_group *grps)
 			if (all_set && all_clear && (any_set || any_clear))
 				return k;
 		}
+		udelay(50);
+	}
 
 	printk(KERN_ERR "%s failed:\n", __func__);
 	for (k = 0; k < nr_grps; k++)
