@@ -45,6 +45,50 @@ mddi_lcd_func_type mddi_lcd;
 
 extern mddi_client_capability_type mddi_client_capability_pkt;
 
+#ifdef MDDI_HOST_WINDOW_WORKAROUND
+/* Tables showing number of rows that would cause a packet length
+ * ending in 0x02, for each number of columns. These tables have
+ * been generated for MDDI packets that have 16 and 16 bits-per-pixel.
+ * This is a work-around for MDDI clients that declare a CRC error
+ * on MDDI packets where ((length & 0x00ff) == 0x02).
+ */
+static uint16 error_vals_16bpp[] = {
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 12, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 10, 0, 0, 0, 14, 0, 0, 0, 2, 0, 0, 4, 6, 12, 0,
+0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0,
+0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 11, 4, 0, 12, 0,
+0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0,
+0, 10, 0, 1, 0, 14, 0, 0, 0, 2, 0, 3, 4, 6, 12, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 12, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 10, 0, 0, 0, 14, 0, 0, 0, 2, 0, 0, 4, 6, 12, 0,
+0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0,
+0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 11, 4, 0, 12, 0,
+0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0,
+};
+
+static uint16 error_vals_18bpp[] = {
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 14,
+0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 9, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 7,
+0, 0, 0, 0, 0, 0, 1, 0, 0, 16, 0, 0, 0, 0, 0, 6,
+14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+7, 0, 0, 0, 0, 0, 0, 4, 0, 16, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+0, 7, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 9, 0
+};
+#endif
+
 #ifdef FEATURE_MDDI_HITACHI
 extern void mddi_hitachi_window_adjust(uint16 x1,
 				       uint16 x2, uint16 y1, uint16 y2);
@@ -376,3 +420,29 @@ void mddi_window_adjust(struct msm_fb_data_type *mfd,
 {
 	mddi_window_adjust_ext(mfd, x1, x2, y1, y2, NULL);
 }
+
+#ifdef MDDI_HOST_WINDOW_WORKAROUND
+uint16 mddi_assign_pkt_height(uint16 pkt_width,
+	uint16 pkt_height, uint16 bpp)
+{
+	uint16 new_pkt_height;
+	uint16 problem_height = 0;
+
+	if (pkt_width <= 240) {
+		if (bpp == 16)
+			problem_height = error_vals_16bpp[pkt_width-1];
+		else if (bpp == 18)
+			problem_height = error_vals_18bpp[pkt_width-1];
+		else {
+			printk(KERN_ERR"Invalid bpp value");
+			return -EINVAL;
+		}
+	}
+	if (problem_height == pkt_height)
+		new_pkt_height = problem_height - 1;
+	else
+		new_pkt_height = pkt_height;
+
+	return new_pkt_height;
+}
+#endif

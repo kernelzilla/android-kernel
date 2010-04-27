@@ -377,6 +377,7 @@ static void mdp_dma_schedule(struct msm_fb_data_type *mfd, uint32 term)
 }
 
 #ifdef MDDI_HOST_WINDOW_WORKAROUND
+static void mdp_dma2_update_sub(struct msm_fb_data_type *mfd);
 void mdp_dma2_update(struct msm_fb_data_type *mfd)
 {
 	MDPIBUF *iBuf;
@@ -396,7 +397,7 @@ void mdp_dma2_update(struct msm_fb_data_type *mfd)
 	if (upper_height >= iBuf->dma_h) {
 		mdp_dma2_update_sub(mfd);
 	} else {
-		MDPIBUF lower_height;
+		uint32 lower_height;
 
 		/* sending the upper region first */
 		lower_height = iBuf->dma_h - upper_height;
@@ -411,7 +412,7 @@ void mdp_dma2_update(struct msm_fb_data_type *mfd)
 	}
 }
 
-void mdp_dma2_update_sub(struct msm_fb_data_type *mfd)
+static void mdp_dma2_update_sub(struct msm_fb_data_type *mfd)
 #else
 void mdp_dma2_update(struct msm_fb_data_type *mfd)
 #endif
