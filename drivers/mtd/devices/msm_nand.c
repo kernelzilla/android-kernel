@@ -487,43 +487,16 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 		pr_err("flash_onfi_probe: "
 				"No partition info available\n");
 		err = -EIO;
-		goto err_free_and_return;
+		return err;
 	}
 
-	onfi_identifier_buf = kmalloc(ONFI_IDENTIFIER_LENGTH, GFP_KERNEL);
-	if (!onfi_identifier_buf) {
-		pr_err("flash_onfi_probe: "
-				"failed to alloc identifier buffer\n");
-		err = -ENOMEM;
-		goto err_free_and_return;
-	}
-	onfi_param_info_buf = kmalloc(ONFI_PARAM_INFO_LENGTH, GFP_KERNEL);
-	if (!onfi_param_info_buf) {
-		pr_err("flash_onfi_probe: "
-				"failed to alloc param info buffer\n");
-		err = -ENOMEM;
-		goto err_free_and_return;
-	}
-	dma_addr_identifier = dma_map_single(chip->dev, onfi_identifier_buf,
-			ONFI_IDENTIFIER_LENGTH, DMA_FROM_DEVICE);
-	if (dma_mapping_error(chip->dev, dma_addr_identifier)) {
-		pr_err("flash_onfi_probe: "
-				"failed to get dma addr for %p\n",
-				onfi_identifier_buf);
-		err = -EIO;
-		goto err_free_and_return;
-	}
+	wait_event(chip->wait_queue, (onfi_identifier_buf =
+		msm_nand_get_dma_buffer(chip, ONFI_IDENTIFIER_LENGTH)));
+	dma_addr_identifier = msm_virt_to_dma(chip, onfi_identifier_buf);
 
-	dma_addr_param_info = dma_map_single(chip->dev, onfi_param_info_buf,
-			ONFI_PARAM_INFO_LENGTH, DMA_FROM_DEVICE);
-	if (dma_mapping_error(chip->dev, dma_addr_param_info)) {
-		pr_err("flash_onfi_probe: failed to get dma addr for %p\n",
-				onfi_param_info_buf);
-		dma_unmap_single(chip->dev, dma_addr_identifier,
-				ONFI_IDENTIFIER_LENGTH, DMA_FROM_DEVICE);
-		err = -EIO;
-		goto err_free_and_return;
-	}
+	wait_event(chip->wait_queue, (onfi_param_info_buf =
+		msm_nand_get_dma_buffer(chip, ONFI_PARAM_INFO_LENGTH)));
+	dma_addr_param_info = msm_virt_to_dma(chip, onfi_param_info_buf);
 
 	wait_event(chip->wait_queue, (dma_buffer = msm_nand_get_dma_buffer
 				(chip, sizeof(*dma_buffer))));
@@ -732,14 +705,11 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 	}
 
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-	dma_unmap_single(chip->dev, dma_addr_identifier,
-			ONFI_IDENTIFIER_LENGTH, DMA_FROM_DEVICE);
-	dma_unmap_single(chip->dev, dma_addr_param_info,
-			ONFI_PARAM_INFO_LENGTH, DMA_FROM_DEVICE);
+	msm_nand_release_dma_buffer(chip, onfi_param_info_buf,
+			ONFI_PARAM_INFO_LENGTH);
+	msm_nand_release_dma_buffer(chip, onfi_identifier_buf,
+			ONFI_IDENTIFIER_LENGTH);
 
-err_free_and_return:
-	kfree(onfi_identifier_buf);
-	kfree(onfi_param_info_buf);
 	return err;
 }
 
