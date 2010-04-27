@@ -25,7 +25,7 @@
 #include <linux/mfd/pmic8058.h>
 #include "gpio_chip.h"
 
-static int pm8058_gpio_configure(struct qcom_gpio_chip *chip,
+static int pm8058_gpio_configure(struct gpio_chip *chip,
 				 unsigned int gpio,
 				 unsigned long flags)
 {
@@ -66,7 +66,7 @@ bail_out:
 	return rc;
 }
 
-static int pm8058_gpio_get_irq_num(struct qcom_gpio_chip *chip,
+static int pm8058_gpio_get_irq_num(struct gpio_chip *chip,
 				   unsigned int gpio,
 				   unsigned int *irqp,
 				   unsigned long *irqnumflagsp)
@@ -81,7 +81,7 @@ static int pm8058_gpio_get_irq_num(struct qcom_gpio_chip *chip,
 	return 0;
 }
 
-static int pm8058_gpio_read(struct qcom_gpio_chip *chip, unsigned n)
+static int pm8058_gpio_read(struct gpio_chip *chip, unsigned n)
 {
 	struct pm8058_chip	*pm_chip;
 
@@ -90,7 +90,7 @@ static int pm8058_gpio_read(struct qcom_gpio_chip *chip, unsigned n)
 	return pm8058_gpio_get(pm_chip, n);
 }
 
-static int pm8058_gpio_write(struct qcom_gpio_chip *chip, unsigned n, unsigned on)
+static int pm8058_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
 {
 	struct pm8058_chip	*pm_chip;
 

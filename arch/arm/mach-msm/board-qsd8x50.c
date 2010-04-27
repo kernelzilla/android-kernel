@@ -245,14 +245,14 @@ static int qsd8x50_init_s1r72v05(void)
 	u8 cs_gpio = S1R72V05_CS_GPIO;
 	u8 irq_gpio = S1R72V05_IRQ_GPIO;
 
-	rc = qcom_gpio_request(cs_gpio, "ide_s1r72v05_cs");
+	rc = gpio_request(cs_gpio, "ide_s1r72v05_cs");
 	if (rc) {
 		pr_err("Failed to request GPIO pin %d (rc=%d)\n",
 		       cs_gpio, rc);
 		goto err;
 	}
 
-	rc = qcom_gpio_request(irq_gpio, "ide_s1r72v05_irq");
+	rc = gpio_request(irq_gpio, "ide_s1r72v05_irq");
 	if (rc) {
 		pr_err("Failed to request GPIO pin %d (rc=%d)\n",
 		       irq_gpio, rc);
@@ -284,8 +284,8 @@ static int qsd8x50_init_s1r72v05(void)
 	return 0;
 
 err:
-	qcom_gpio_free(cs_gpio);
-	qcom_gpio_free(irq_gpio);
+	gpio_free(cs_gpio);
+	gpio_free(irq_gpio);
 	return -ENODEV;
 }
 
@@ -895,7 +895,7 @@ static int msm_qsd_spi_gpio_config(void)
 		return rc;
 
 	/* Set direction for SPI_PWR */
-	qcom_gpio_direction_output(21, 1);
+	gpio_direction_output(21, 1);
 
 	return 0;
 }
@@ -1510,8 +1510,8 @@ static struct msm_acpu_clock_platform_data qsd8x50_clock_data = {
 
 static void touchpad_gpio_release(void)
 {
-	qcom_gpio_free(TOUCHPAD_IRQ);
-	qcom_gpio_free(TOUCHPAD_SUSPEND);
+	gpio_free(TOUCHPAD_IRQ);
+	gpio_free(TOUCHPAD_SUSPEND);
 }
 
 static int touchpad_gpio_setup(void)
@@ -1524,15 +1524,15 @@ static int touchpad_gpio_setup(void)
 	unsigned irq_cfg =
 		GPIO_CFG(irq_pin, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA);
 
-	rc = qcom_gpio_request(irq_pin, "msm_touchpad_irq");
+	rc = gpio_request(irq_pin, "msm_touchpad_irq");
 	if (rc) {
-		pr_err("qcom_gpio_request failed on pin %d (rc=%d)\n",
+		pr_err("gpio_request failed on pin %d (rc=%d)\n",
 		       irq_pin, rc);
 		goto err_gpioconfig;
 	}
-	rc = qcom_gpio_request(suspend_pin, "msm_touchpad_suspend");
+	rc = gpio_request(suspend_pin, "msm_touchpad_suspend");
 	if (rc) {
-		pr_err("qcom_gpio_request failed on pin %d (rc=%d)\n",
+		pr_err("gpio_request failed on pin %d (rc=%d)\n",
 		       suspend_pin, rc);
 		goto err_gpioconfig;
 	}
@@ -1567,8 +1567,8 @@ static struct msm_touchpad_platform_data msm_touchpad_data = {
 
 static void kbd_gpio_release(void)
 {
-	qcom_gpio_free(KBD_IRQ);
-	qcom_gpio_free(KBD_RST);
+	gpio_free(KBD_IRQ);
+	gpio_free(KBD_RST);
 }
 
 static int kbd_gpio_setup(void)
@@ -1581,15 +1581,15 @@ static int kbd_gpio_setup(void)
 	unsigned irqcfg =
 		GPIO_CFG(irqpin, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA);
 
-	rc = qcom_gpio_request(irqpin, "gpio_keybd_irq");
+	rc = gpio_request(irqpin, "gpio_keybd_irq");
 	if (rc) {
-		pr_err("qcom_gpio_request failed on pin %d (rc=%d)\n",
+		pr_err("gpio_request failed on pin %d (rc=%d)\n",
 			irqpin, rc);
 		goto err_gpioconfig;
 	}
-	rc = qcom_gpio_request(respin, "gpio_keybd_reset");
+	rc = gpio_request(respin, "gpio_keybd_reset");
 	if (rc) {
-		pr_err("qcom_gpio_request failed on pin %d (rc=%d)\n",
+		pr_err("gpio_request failed on pin %d (rc=%d)\n",
 			respin, rc);
 		goto err_gpioconfig;
 	}
@@ -1615,8 +1615,8 @@ err_gpioconfig:
 /* use gpio output pin to toggle keyboard external reset pin */
 static void kbd_hwreset(int kbd_mclrpin)
 {
-	qcom_gpio_direction_output(kbd_mclrpin, 0);
-	qcom_gpio_direction_output(kbd_mclrpin, 1);
+	gpio_direction_output(kbd_mclrpin, 0);
+	gpio_direction_output(kbd_mclrpin, 1);
 }
 
 static struct msm_i2ckbd_platform_data msm_kybd_data = {
@@ -2485,13 +2485,13 @@ static struct msm_i2c_platform_data msm_i2c_pdata = {
 
 static void __init msm_device_i2c_init(void)
 {
-	if (qcom_gpio_request(95, "i2c_pri_clk"))
+	if (gpio_request(95, "i2c_pri_clk"))
 		pr_err("failed to request gpio i2c_pri_clk\n");
-	if (qcom_gpio_request(96, "i2c_pri_dat"))
+	if (gpio_request(96, "i2c_pri_dat"))
 		pr_err("failed to request gpio i2c_pri_dat\n");
-	if (qcom_gpio_request(60, "i2c_sec_clk"))
+	if (gpio_request(60, "i2c_sec_clk"))
 		pr_err("failed to request gpio i2c_sec_clk\n");
-	if (qcom_gpio_request(61, "i2c_sec_dat"))
+	if (gpio_request(61, "i2c_sec_dat"))
 		pr_err("failed to request gpio i2c_sec_dat\n");
 
 	msm_i2c_pdata.rmutex = 1;

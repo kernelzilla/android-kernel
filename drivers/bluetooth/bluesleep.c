@@ -572,7 +572,7 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 	}
 	bsi->host_wake = res->start;
 
-	ret = qcom_gpio_request(bsi->host_wake, "bt_host_wake");
+	ret = gpio_request(bsi->host_wake, "bt_host_wake");
 	if (ret)
 		goto free_bsi;
 
@@ -585,7 +585,7 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 	}
 	bsi->ext_wake = res->start;
 
-	ret = qcom_gpio_request(bsi->ext_wake, "bt_ext_wake");
+	ret = gpio_request(bsi->ext_wake, "bt_ext_wake");
 	if (ret)
 		goto free_bt_host_wake;
 
@@ -600,9 +600,9 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 	return 0;
 
 free_bt_ext_wake:
-	qcom_gpio_free(bsi->ext_wake);
+	gpio_free(bsi->ext_wake);
 free_bt_host_wake:
-	qcom_gpio_free(bsi->host_wake);
+	gpio_free(bsi->host_wake);
 free_bsi:
 	kfree(bsi);
 	return ret;
@@ -610,8 +610,8 @@ free_bsi:
 
 static int bluesleep_remove(struct platform_device *pdev)
 {
-	qcom_gpio_free(bsi->host_wake);
-	qcom_gpio_free(bsi->ext_wake);
+	gpio_free(bsi->host_wake);
+	gpio_free(bsi->ext_wake);
 	kfree(bsi);
 	return 0;
 }

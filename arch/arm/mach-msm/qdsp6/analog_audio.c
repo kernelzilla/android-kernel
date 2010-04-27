@@ -28,7 +28,7 @@ void analog_init(void)
 	pmic_spkr_set_gain(RIGHT_SPKR, SPKR_GAIN_PLUS12DB);
 	pmic_mic_set_volt(MIC_VOLT_1_80V);
 
-	qcom_gpio_direction_output(GPIO_HEADSET_AMP, 1);
+	gpio_direction_output(GPIO_HEADSET_AMP, 1);
 	gpio_set_value(GPIO_HEADSET_AMP, 0);
 }
 

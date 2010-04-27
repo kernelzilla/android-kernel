@@ -196,11 +196,11 @@ device_initcall(batt_debug_init);
 
 static int init_batt_gpio(void)
 {
-	if (qcom_gpio_request(GPIO_BATTERY_DETECTION, "batt_detect") < 0)
+	if (gpio_request(GPIO_BATTERY_DETECTION, "batt_detect") < 0)
 		goto gpio_failed;
-	if (qcom_gpio_request(GPIO_BATTERY_CHARGER_EN, "charger_en") < 0)
+	if (gpio_request(GPIO_BATTERY_CHARGER_EN, "charger_en") < 0)
 		goto gpio_failed;
-	if (qcom_gpio_request(GPIO_BATTERY_CHARGER_CURRENT, "charge_current") < 0)
+	if (gpio_request(GPIO_BATTERY_CHARGER_CURRENT, "charge_current") < 0)
 		goto gpio_failed;
 
 	return 0;
@@ -223,17 +223,17 @@ static int battery_charging_ctrl(batt_ctl_t ctl)
 	case DISABLE:
 		BATT("charger OFF\n");
 		/* 0 for enable; 1 disable */
-		result = qcom_gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 1);
+		result = gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 1);
 		break;
 	case ENABLE_SLOW_CHG:
 		BATT("charger ON (SLOW)\n");
-		result = qcom_gpio_direction_output(GPIO_BATTERY_CHARGER_CURRENT, 0);
-		result = qcom_gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 0);
+		result = gpio_direction_output(GPIO_BATTERY_CHARGER_CURRENT, 0);
+		result = gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 0);
 		break;
 	case ENABLE_FAST_CHG:
 		BATT("charger ON (FAST)\n");
-		result = qcom_gpio_direction_output(GPIO_BATTERY_CHARGER_CURRENT, 1);
-		result = qcom_gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 0);
+		result = gpio_direction_output(GPIO_BATTERY_CHARGER_CURRENT, 1);
+		result = gpio_direction_output(GPIO_BATTERY_CHARGER_EN, 0);
 		break;
 	default:
 		printk(KERN_ERR "Not supported battery ctr called.!\n");

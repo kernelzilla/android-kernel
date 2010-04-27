@@ -30,13 +30,13 @@ struct gpio_state {
 
 static DEFINE_SPINLOCK(gpio_chips_lock);
 static LIST_HEAD(gpio_chip_list);
-static struct qcom_gpio_chip **gpio_chip_array;
+static struct gpio_chip **gpio_chip_array;
 static unsigned long gpio_chip_array_size;
 
-int register_gpio_chip(struct qcom_gpio_chip *new_gpio_chip)
+int register_gpio_chip(struct gpio_chip *new_gpio_chip)
 {
 	int err = 0;
-	struct qcom_gpio_chip *gpio_chip;
+	struct gpio_chip *gpio_chip;
 	int i;
 	unsigned long irq_flags;
 	unsigned int chip_array_start_index, chip_array_end_index;
@@ -51,7 +51,7 @@ int register_gpio_chip(struct qcom_gpio_chip *new_gpio_chip)
 	chip_array_start_index = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->start);
 	chip_array_end_index = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->end);
 	if (chip_array_end_index >= gpio_chip_array_size) {
-		struct qcom_gpio_chip **new_gpio_chip_array;
+		struct gpio_chip **new_gpio_chip_array;
 		unsigned long new_gpio_chip_array_size = chip_array_end_index + 1;
 
 		new_gpio_chip_array = kmalloc(new_gpio_chip_array_size * sizeof(new_gpio_chip_array[0]), GFP_ATOMIC);
@@ -93,10 +93,10 @@ failed:
 	return err;
 }
 
-static struct qcom_gpio_chip *get_gpio_chip_locked(unsigned int gpio)
+static struct gpio_chip *get_gpio_chip_locked(unsigned int gpio)
 {
 	unsigned long i;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 
 	i = GPIO_NUM_TO_CHIP_INDEX(gpio);
 	if (i >= gpio_chip_array_size)
@@ -116,7 +116,7 @@ static struct qcom_gpio_chip *get_gpio_chip_locked(unsigned int gpio)
 static int request_gpio(unsigned int gpio, unsigned long flags)
 {
 	int err = 0;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 	unsigned long chip_index;
 
@@ -141,15 +141,15 @@ err:
 	return err;
 }
 
-int qcom_gpio_request(unsigned gpio, const char *label)
+int gpio_request(unsigned gpio, const char *label)
 {
 	return request_gpio(gpio, 0);
 }
-EXPORT_SYMBOL(qcom_gpio_request);
+EXPORT_SYMBOL(gpio_request);
 
-void qcom_gpio_free(unsigned gpio)
+void gpio_free(unsigned gpio)
 {
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 	unsigned long chip_index;
 
@@ -161,12 +161,12 @@ void qcom_gpio_free(unsigned gpio)
 	}
 	spin_unlock_irqrestore(&gpio_chips_lock, irq_flags);
 }
-EXPORT_SYMBOL(qcom_gpio_free);
+EXPORT_SYMBOL(gpio_free);
 
 static int gpio_get_irq_num(unsigned int gpio, unsigned int *irqp, unsigned long *irqnumflagsp)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
@@ -190,7 +190,7 @@ EXPORT_SYMBOL(gpio_to_irq);
 int gpio_configure(unsigned int gpio, unsigned long flags)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
@@ -202,23 +202,23 @@ int gpio_configure(unsigned int gpio, unsigned long flags)
 }
 EXPORT_SYMBOL(gpio_configure);
 
-int qcom_gpio_direction_input(unsigned gpio)
+int gpio_direction_input(unsigned gpio)
 {
 	return gpio_configure(gpio, GPIOF_INPUT);
 }
-EXPORT_SYMBOL(qcom_gpio_direction_input);
+EXPORT_SYMBOL(gpio_direction_input);
 
-int qcom_gpio_direction_output(unsigned gpio, int value)
+int gpio_direction_output(unsigned gpio, int value)
 {
 	gpio_set_value(gpio, value);
 	return gpio_configure(gpio, GPIOF_DRIVE_OUTPUT);
 }
-EXPORT_SYMBOL(qcom_gpio_direction_output);
+EXPORT_SYMBOL(gpio_direction_output);
 
 int gpio_get_value(unsigned gpio)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
@@ -233,7 +233,7 @@ EXPORT_SYMBOL(gpio_get_value);
 void gpio_set_value(unsigned gpio, int on)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
@@ -247,7 +247,7 @@ EXPORT_SYMBOL(gpio_set_value);
 int gpio_read_detect_status(unsigned int gpio)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
@@ -262,7 +262,7 @@ EXPORT_SYMBOL(gpio_read_detect_status);
 int gpio_clear_detect_status(unsigned int gpio)
 {
 	int ret = -ENOTSUPP;
-	struct qcom_gpio_chip *chip;
+	struct gpio_chip *chip;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&gpio_chips_lock, irq_flags);

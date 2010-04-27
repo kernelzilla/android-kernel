@@ -456,9 +456,9 @@ static void mt9t013_sensor_init(void)
 
 	/*pull hi reset*/
 	printk(KERN_INFO "mt9t013: mt9t013_register_init\n");
-	ret = qcom_gpio_request(cam->sensor_reset, "mt9t013");
+	ret = gpio_request(cam->sensor_reset, "mt9t013");
 	if (!ret) {
-		qcom_gpio_direction_output(cam->sensor_reset, 1);
+		gpio_direction_output(cam->sensor_reset, 1);
 		printk(KERN_INFO "mt9t013: camera sensor_reset set as 1\n");
 	} else
 		printk(KERN_ERR "mt9t013 error: request gpio %d failed: "
@@ -466,12 +466,12 @@ static void mt9t013_sensor_init(void)
 	mdelay(2);
 
 	/* pull down power down */
-	ret = qcom_gpio_request(cam->sensor_pwd, "mt9t013");
+	ret = gpio_request(cam->sensor_pwd, "mt9t013");
 	if (!ret || ret == -EBUSY)
-		qcom_gpio_direction_output(cam->sensor_pwd, 0);
+		gpio_direction_output(cam->sensor_pwd, 0);
 	else printk(KERN_ERR "mt913t013 error: request gpio %d failed: "
 			"%d\n", cam->sensor_pwd, ret);
-	qcom_gpio_free(cam->sensor_pwd);
+	gpio_free(cam->sensor_pwd);
 
 	/* enable clk */
 	msm_camio_clk_enable(CAMIO_VFE_MDC_CLK);
@@ -492,10 +492,10 @@ static void mt9t013_sensor_init(void)
 	mdelay(2);
 
 	/* reset sensor sequency */
-	qcom_gpio_direction_output(cam->sensor_reset, 0);
+	gpio_direction_output(cam->sensor_reset, 0);
 	mdelay(2);
-	qcom_gpio_direction_output(cam->sensor_reset, 1);
-	qcom_gpio_free(cam->sensor_reset);
+	gpio_direction_output(cam->sensor_reset, 1);
+	gpio_free(cam->sensor_reset);
 	mdelay(2);
 
 	printk(KERN_INFO "mt9t013: camera sensor init sequence done\n");
@@ -818,12 +818,12 @@ static int mt9t013_lens_power(int on)
 {
 	int rc;
 	printk(KERN_INFO "mt9t013: lens power %d\n", on);
-	rc = qcom_gpio_request(cam->vcm_pwd, "mt9t013");
+	rc = gpio_request(cam->vcm_pwd, "mt9t013");
 	if (!rc)
-		qcom_gpio_direction_output(cam->vcm_pwd, !on);
+		gpio_direction_output(cam->vcm_pwd, !on);
 	else printk(KERN_ERR "mt9t013 error: request gpio %d failed:"
 		" %d\n", cam->vcm_pwd, rc);
-	qcom_gpio_free(cam->vcm_pwd);
+	gpio_free(cam->vcm_pwd);
 	return rc;
 }
 

@@ -84,10 +84,10 @@ int msm_gpios_enable(const struct msm_gpio *table, int size);
  */
 void msm_gpios_disable(const struct msm_gpio *table, int size);
 
-int qcom_gpio_request(unsigned gpio, const char *label);
-void qcom_gpio_free(unsigned gpio);
-int qcom_gpio_direction_input(unsigned gpio);
-int qcom_gpio_direction_output(unsigned gpio, int value);
+int gpio_request(unsigned gpio, const char *label);
+void gpio_free(unsigned gpio);
+int gpio_direction_input(unsigned gpio);
+int gpio_direction_output(unsigned gpio, int value);
 int gpio_get_value(unsigned gpio);
 void gpio_set_value(unsigned gpio, int value);
 int gpio_to_irq(unsigned gpio);

@@ -1456,8 +1456,8 @@ static int32_t vx6953_power_down(void)
 
 static int vx6953_probe_init_done(const struct msm_camera_sensor_info *data)
 {
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 	return 0;
 }
 static int vx6953_probe_init_sensor(const struct msm_camera_sensor_info *data)
@@ -1465,15 +1465,15 @@ static int vx6953_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	int32_t rc = 0;
 	unsigned short chipidl, chipidh;
 	CDBG("%s: %d\n", __func__, __LINE__);
-	rc = qcom_gpio_request(data->sensor_reset, "vx6953");
+	rc = gpio_request(data->sensor_reset, "vx6953");
 	CDBG(" vx6953_probe_init_sensor \n");
 	if (!rc) {
 		CDBG("sensor_reset = %d\n", rc);
 		CDBG(" vx6953_probe_init_sensor 1\n");
-		qcom_gpio_direction_output(data->sensor_reset, 0);
+		gpio_direction_output(data->sensor_reset, 0);
 		mdelay(50);
 		CDBG(" vx6953_probe_init_sensor 1\n");
-		qcom_gpio_direction_output(data->sensor_reset, 1);
+		gpio_direction_output(data->sensor_reset, 1);
 		mdelay(13);
 	} else {
 		CDBG(" vx6953_probe_init_sensor 2\n");
@@ -1833,9 +1833,9 @@ static int vx6953_sensor_release(void)
 	int rc = -EBADF;
 	mutex_lock(&vx6953_mut);
 	vx6953_power_down();
-	qcom_gpio_direction_output(vx6953_ctrl->sensordata->sensor_reset,
+	gpio_direction_output(vx6953_ctrl->sensordata->sensor_reset,
 		0);
-	qcom_gpio_free(vx6953_ctrl->sensordata->sensor_reset);
+	gpio_free(vx6953_ctrl->sensordata->sensor_reset);
 	kfree(vx6953_ctrl);
 	vx6953_ctrl = NULL;
 	CDBG("vx6953_release completed\n");

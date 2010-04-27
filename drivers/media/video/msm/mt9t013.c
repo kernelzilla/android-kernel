@@ -1087,8 +1087,8 @@ static int32_t mt9t013_move_focus(int direction, int32_t num_steps)
 
 static int mt9t013_sensor_init_done(const struct msm_camera_sensor_info *data)
 {
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 	return 0;
 }
 
@@ -1097,9 +1097,9 @@ static int mt9t013_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	int rc;
 	uint16_t chipid;
 
-	rc = qcom_gpio_request(data->sensor_reset, "mt9t013");
+	rc = gpio_request(data->sensor_reset, "mt9t013");
 	if (!rc)
-		qcom_gpio_direction_output(data->sensor_reset, 1);
+		gpio_direction_output(data->sensor_reset, 1);
 	else
 		goto init_probe_done;
 
@@ -1148,8 +1148,8 @@ static int mt9t013_probe_init_sensor(const struct msm_camera_sensor_info *data)
 #endif
 
 init_probe_fail:
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 init_probe_done:
 	return rc;
 }
@@ -1161,20 +1161,20 @@ static int32_t mt9t013_poweron_af(void)
 	/* enable AF actuator */
 	CDBG("enable AF actuator, gpio = %d\n",
 			mt9t013_ctrl->sensordata->vcm_pwd);
-	rc = qcom_gpio_request(mt9t013_ctrl->sensordata->vcm_pwd, "mt9t013");
+	rc = gpio_request(mt9t013_ctrl->sensordata->vcm_pwd, "mt9t013");
 	if (!rc) {
-		qcom_gpio_direction_output(mt9t013_ctrl->sensordata->vcm_pwd, 0);
+		gpio_direction_output(mt9t013_ctrl->sensordata->vcm_pwd, 0);
 		mdelay(20);
 		rc = mt9t013_set_default_focus(0);
 	} else
-		pr_err("%s, qcom_gpio_request failed (%d)!\n", __func__, rc);
+		pr_err("%s, gpio_request failed (%d)!\n", __func__, rc);
 	return rc;
 }
 
 static void mt9t013_poweroff_af(void)
 {
-	qcom_gpio_direction_output(mt9t013_ctrl->sensordata->vcm_pwd, 1);
-	qcom_gpio_free(mt9t013_ctrl->sensordata->vcm_pwd);
+	gpio_direction_output(mt9t013_ctrl->sensordata->vcm_pwd, 1);
+	gpio_free(mt9t013_ctrl->sensordata->vcm_pwd);
 }
 
 int mt9t013_sensor_open_init(const struct msm_camera_sensor_info *data)
@@ -1396,9 +1396,9 @@ int mt9t013_sensor_release(void)
 		mt9t013_poweroff_af();
 	mt9t013_power_down();
 
-	qcom_gpio_direction_output(mt9t013_ctrl->sensordata->sensor_reset,
+	gpio_direction_output(mt9t013_ctrl->sensordata->sensor_reset,
 			0);
-	qcom_gpio_free(mt9t013_ctrl->sensordata->sensor_reset);
+	gpio_free(mt9t013_ctrl->sensordata->sensor_reset);
 
 	kfree(mt9t013_ctrl);
 

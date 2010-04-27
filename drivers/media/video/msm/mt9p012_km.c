@@ -897,8 +897,8 @@ static int32_t mt9p012_km_set_default_focus(void)
 
 static int mt9p012_km_probe_init_done(const struct msm_camera_sensor_info *data)
 {
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 	return 0;
 }
 
@@ -908,9 +908,9 @@ static int
 	int32_t rc;
 	uint16_t chipid;
 
-	rc = qcom_gpio_request(data->sensor_reset, "mt9p012_km");
+	rc = gpio_request(data->sensor_reset, "mt9p012_km");
 	if (!rc)
-		qcom_gpio_direction_output(data->sensor_reset, 1);
+		gpio_direction_output(data->sensor_reset, 1);
 	else
 		goto init_probe_done;
 
@@ -1189,11 +1189,11 @@ int mt9p012_km_sensor_release(void)
 
 	mt9p012_km_power_down();
 
-	qcom_gpio_direction_output(mt9p012_km_ctrl->sensordata->sensor_reset, 0);
-	qcom_gpio_free(mt9p012_km_ctrl->sensordata->sensor_reset);
+	gpio_direction_output(mt9p012_km_ctrl->sensordata->sensor_reset, 0);
+	gpio_free(mt9p012_km_ctrl->sensordata->sensor_reset);
 
-	qcom_gpio_direction_output(mt9p012_km_ctrl->sensordata->vcm_pwd, 0);
-	qcom_gpio_free(mt9p012_km_ctrl->sensordata->vcm_pwd);
+	gpio_direction_output(mt9p012_km_ctrl->sensordata->vcm_pwd, 0);
+	gpio_free(mt9p012_km_ctrl->sensordata->vcm_pwd);
 
 	kfree(mt9p012_km_ctrl);
 	mt9p012_km_ctrl = NULL;

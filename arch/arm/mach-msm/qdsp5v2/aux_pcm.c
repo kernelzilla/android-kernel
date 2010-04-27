@@ -121,33 +121,33 @@ int aux_pcm_gpios_request(void)
 	int rc = 0;
 
 	MM_INFO(" aux_pcm_gpios_request \n");
-	rc = qcom_gpio_request(the_aux_pcm_state.dout, "AUX PCM DOUT");
+	rc = gpio_request(the_aux_pcm_state.dout, "AUX PCM DOUT");
 	if (rc) {
 		MM_ERR("GPIO request for AUX PCM DOUT failed\n");
 		return rc;
 	}
 
-	rc = qcom_gpio_request(the_aux_pcm_state.din, "AUX PCM DIN");
+	rc = gpio_request(the_aux_pcm_state.din, "AUX PCM DIN");
 	if (rc) {
 		MM_ERR("GPIO request for AUX PCM DIN failed\n");
-		qcom_gpio_free(the_aux_pcm_state.dout);
+		gpio_free(the_aux_pcm_state.dout);
 		return rc;
 	}
 
-	rc = qcom_gpio_request(the_aux_pcm_state.syncout, "AUX PCM SYNC OUT");
+	rc = gpio_request(the_aux_pcm_state.syncout, "AUX PCM SYNC OUT");
 	if (rc) {
 		MM_ERR("GPIO request for AUX PCM SYNC OUT failed\n");
-		qcom_gpio_free(the_aux_pcm_state.dout);
-		qcom_gpio_free(the_aux_pcm_state.din);
+		gpio_free(the_aux_pcm_state.dout);
+		gpio_free(the_aux_pcm_state.din);
 		return rc;
 	}
 
-	rc = qcom_gpio_request(the_aux_pcm_state.clkin_a, "AUX PCM CLKIN A");
+	rc = gpio_request(the_aux_pcm_state.clkin_a, "AUX PCM CLKIN A");
 	if (rc) {
 		MM_ERR("GPIO request for AUX PCM CLKIN A failed\n");
-		qcom_gpio_free(the_aux_pcm_state.dout);
-		qcom_gpio_free(the_aux_pcm_state.din);
-		qcom_gpio_free(the_aux_pcm_state.syncout);
+		gpio_free(the_aux_pcm_state.dout);
+		gpio_free(the_aux_pcm_state.din);
+		gpio_free(the_aux_pcm_state.syncout);
 		return rc;
 	}
 
@@ -171,10 +171,10 @@ void aux_pcm_gpios_free(void)
 	gpio_tlmm_config(GPIO_CFG(the_aux_pcm_state.dout, 1, GPIO_OUTPUT,
 		GPIO_NO_PULL, GPIO_2MA), GPIO_ENABLE);
 
-	qcom_gpio_free(the_aux_pcm_state.dout);
-	qcom_gpio_free(the_aux_pcm_state.din);
-	qcom_gpio_free(the_aux_pcm_state.syncout);
-	qcom_gpio_free(the_aux_pcm_state.clkin_a);
+	gpio_free(the_aux_pcm_state.dout);
+	gpio_free(the_aux_pcm_state.din);
+	gpio_free(the_aux_pcm_state.syncout);
+	gpio_free(the_aux_pcm_state.clkin_a);
 }
 EXPORT_SYMBOL(aux_pcm_gpios_free);
 

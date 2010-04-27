@@ -438,8 +438,8 @@ static int32_t s5k3e2fx_i2c_read_w(unsigned short saddr, unsigned short raddr,
 
 static int s5k3e2fx_probe_init_done(const struct msm_camera_sensor_info *data)
 {
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 	return 0;
 }
 
@@ -448,9 +448,9 @@ static int s5k3e2fx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	int32_t  rc;
 	uint16_t chipid = 0;
 
-	rc = qcom_gpio_request(data->sensor_reset, "s5k3e2fx");
+	rc = gpio_request(data->sensor_reset, "s5k3e2fx");
 	if (!rc)
-		qcom_gpio_direction_output(data->sensor_reset, 1);
+		gpio_direction_output(data->sensor_reset, 1);
 	else
 		goto init_probe_done;
 
@@ -845,9 +845,9 @@ static int s5k3e2fx_sensor_release(void)
 
 	s5k3e2fx_power_down();
 
-	qcom_gpio_direction_output(s5k3e2fx_ctrl->sensordata->sensor_reset,
+	gpio_direction_output(s5k3e2fx_ctrl->sensordata->sensor_reset,
 		0);
-	qcom_gpio_free(s5k3e2fx_ctrl->sensordata->sensor_reset);
+	gpio_free(s5k3e2fx_ctrl->sensordata->sensor_reset);
 
 	kfree(s5k3e2fx_ctrl);
 	s5k3e2fx_ctrl = NULL;

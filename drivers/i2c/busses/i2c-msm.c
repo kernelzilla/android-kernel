@@ -326,18 +326,18 @@ msm_i2c_recover_bus_busy(struct msm_i2c_dev *dev, struct i2c_adapter *adap)
 	for (i = 0; i < 9; i++) {
 		if (gpio_get_value(gpio_dat) && gpio_clk_status)
 			break;
-		qcom_gpio_direction_output(gpio_clk, 0);
+		gpio_direction_output(gpio_clk, 0);
 		udelay(5);
-		qcom_gpio_direction_output(gpio_dat, 0);
+		gpio_direction_output(gpio_dat, 0);
 		udelay(5);
-		qcom_gpio_direction_input(gpio_clk);
+		gpio_direction_input(gpio_clk);
 		udelay(5);
 		if (!gpio_get_value(gpio_clk))
 			udelay(20);
 		if (!gpio_get_value(gpio_clk))
 			msleep(10);
 		gpio_clk_status = gpio_get_value(gpio_clk);
-		qcom_gpio_direction_input(gpio_dat);
+		gpio_direction_input(gpio_dat);
 		udelay(5);
 	}
 	dev->pdata->msm_i2c_config_gpio(adap->nr, 1);

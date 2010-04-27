@@ -411,12 +411,12 @@ static int32_t vb6801_reset(const struct msm_camera_sensor_info *data)
 {
 	int rc;
 
-	rc = qcom_gpio_request(data->sensor_reset, "vb6801");
+	rc = gpio_request(data->sensor_reset, "vb6801");
 	if (!rc) {
 		CDBG("sensor_reset SUcceeded\n");
-		qcom_gpio_direction_output(data->sensor_reset, 0);
+		gpio_direction_output(data->sensor_reset, 0);
 		mdelay(50);
-		qcom_gpio_direction_output(data->sensor_reset, 1);
+		gpio_direction_output(data->sensor_reset, 1);
 		mdelay(13);
 	} else
 		CDBG("sensor_reset FAiled\n");
@@ -1207,8 +1207,8 @@ static int vb6801_config_sensor(int32_t ext_clk_freq_mhz,
 
 static int vb6801_sensor_init_done(const struct msm_camera_sensor_info *data)
 {
-	qcom_gpio_direction_output(data->sensor_reset, 0);
-	qcom_gpio_free(data->sensor_reset);
+	gpio_direction_output(data->sensor_reset, 0);
+	gpio_free(data->sensor_reset);
 	return 0;
 }
 

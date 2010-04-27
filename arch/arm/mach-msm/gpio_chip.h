@@ -18,7 +18,7 @@
 
 #include <linux/list.h>
 
-struct qcom_gpio_chip {
+struct gpio_chip {
 	struct list_head list;
 	struct gpio_state *state;
 
@@ -27,12 +27,12 @@ struct qcom_gpio_chip {
 	unsigned int start;
 	unsigned int end;
 
-	int (*configure)(struct qcom_gpio_chip *chip, unsigned int gpio, unsigned long flags);
-	int (*get_irq_num)(struct qcom_gpio_chip *chip, unsigned int gpio, unsigned int *irqp, unsigned long *irqnumflagsp);
-	int (*read)(struct qcom_gpio_chip *chip, unsigned int gpio);
-	int (*write)(struct qcom_gpio_chip *chip, unsigned int gpio, unsigned on);
-	int (*read_detect_status)(struct qcom_gpio_chip *chip, unsigned int gpio);
-	int (*clear_detect_status)(struct qcom_gpio_chip *chip, unsigned int gpio);
+	int (*configure)(struct gpio_chip *chip, unsigned int gpio, unsigned long flags);
+	int (*get_irq_num)(struct gpio_chip *chip, unsigned int gpio, unsigned int *irqp, unsigned long *irqnumflagsp);
+	int (*read)(struct gpio_chip *chip, unsigned int gpio);
+	int (*write)(struct gpio_chip *chip, unsigned int gpio, unsigned on);
+	int (*read_detect_status)(struct gpio_chip *chip, unsigned int gpio);
+	int (*clear_detect_status)(struct gpio_chip *chip, unsigned int gpio);
 };
 
 struct msm_gpio_regs {
@@ -49,7 +49,7 @@ struct msm_gpio_regs {
 #define MSM_GPIO_BROKEN_INT_CLEAR 1
 
 struct msm_gpio_chip {
-	struct qcom_gpio_chip        chip;
+	struct gpio_chip        chip;
 	struct msm_gpio_regs    regs;
 #if MSM_GPIO_BROKEN_INT_CLEAR
 	unsigned                int_status_copy;
@@ -58,6 +58,6 @@ struct msm_gpio_chip {
 	unsigned int            int_enable[2]; /* 0: awake, 1: sleep */
 };
 
-int register_gpio_chip(struct qcom_gpio_chip *gpio_chip);
+int register_gpio_chip(struct gpio_chip *gpio_chip);
 
 #endif

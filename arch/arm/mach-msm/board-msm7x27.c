@@ -579,15 +579,15 @@ static int gpio_array_num[] = {
 
 static void lcdc_gordon_gpio_init(void)
 {
-	if (qcom_gpio_request(GPIO_OUT_132, "spi_clk"))
+	if (gpio_request(GPIO_OUT_132, "spi_clk"))
 		pr_err("failed to request gpio spi_clk\n");
-	if (qcom_gpio_request(GPIO_OUT_131, "spi_cs"))
+	if (gpio_request(GPIO_OUT_131, "spi_cs"))
 		pr_err("failed to request gpio spi_cs\n");
-	if (qcom_gpio_request(GPIO_OUT_103, "spi_sdi"))
+	if (gpio_request(GPIO_OUT_103, "spi_sdi"))
 		pr_err("failed to request gpio spi_sdi\n");
-	if (qcom_gpio_request(GPIO_OUT_102, "spi_sdoi"))
+	if (gpio_request(GPIO_OUT_102, "spi_sdoi"))
 		pr_err("failed to request gpio spi_sdoi\n");
-	if (qcom_gpio_request(GPIO_OUT_88, "gpio_dac"))
+	if (gpio_request(GPIO_OUT_88, "gpio_dac"))
 		pr_err("failed to request gpio_dac\n");
 }
 
@@ -1370,17 +1370,17 @@ static void sdcc_gpio_init(void)
 {
 	/* SDC1 GPIOs */
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-	if (qcom_gpio_request(51, "sdc1_data_3"))
+	if (gpio_request(51, "sdc1_data_3"))
 		pr_err("failed to request gpio sdc1_data_3\n");
-	if (qcom_gpio_request(52, "sdc1_data_2"))
+	if (gpio_request(52, "sdc1_data_2"))
 		pr_err("failed to request gpio sdc1_data_2\n");
-	if (qcom_gpio_request(53, "sdc1_data_1"))
+	if (gpio_request(53, "sdc1_data_1"))
 		pr_err("failed to request gpio sdc1_data_1\n");
-	if (qcom_gpio_request(54, "sdc1_data_0"))
+	if (gpio_request(54, "sdc1_data_0"))
 		pr_err("failed to request gpio sdc1_data_0\n");
-	if (qcom_gpio_request(55, "sdc1_cmd"))
+	if (gpio_request(55, "sdc1_cmd"))
 		pr_err("failed to request gpio sdc1_cmd\n");
-	if (qcom_gpio_request(56, "sdc1_clk"))
+	if (gpio_request(56, "sdc1_clk"))
 		pr_err("failed to request gpio sdc1_clk\n");
 #endif
 	if (machine_is_msm7x25_ffa())
@@ -1388,17 +1388,17 @@ static void sdcc_gpio_init(void)
 
 	/* SDC2 GPIOs */
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
-	if (qcom_gpio_request(62, "sdc2_clk"))
+	if (gpio_request(62, "sdc2_clk"))
 		pr_err("failed to request gpio sdc2_clk\n");
-	if (qcom_gpio_request(63, "sdc2_cmd"))
+	if (gpio_request(63, "sdc2_cmd"))
 		pr_err("failed to request gpio sdc2_cmd\n");
-	if (qcom_gpio_request(64, "sdc2_data_3"))
+	if (gpio_request(64, "sdc2_data_3"))
 		pr_err("failed to request gpio sdc2_data_3\n");
-	if (qcom_gpio_request(65, "sdc2_data_2"))
+	if (gpio_request(65, "sdc2_data_2"))
 		pr_err("failed to request gpio sdc2_data_2\n");
-	if (qcom_gpio_request(66, "sdc2_data_1"))
+	if (gpio_request(66, "sdc2_data_1"))
 		pr_err("failed to request gpio sdc2_data_1\n");
-	if (qcom_gpio_request(67, "sdc2_data_0"))
+	if (gpio_request(67, "sdc2_data_0"))
 		pr_err("failed to request gpio sdc2_data_0\n");
 #endif
 	if (machine_is_msm7x27_ffa())
@@ -1406,33 +1406,33 @@ static void sdcc_gpio_init(void)
 
 	/* SDC3 GPIOs */
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-	if (qcom_gpio_request(88, "sdc3_clk"))
+	if (gpio_request(88, "sdc3_clk"))
 		pr_err("failed to request gpio sdc3_clk\n");
-	if (qcom_gpio_request(89, "sdc3_cmd"))
+	if (gpio_request(89, "sdc3_cmd"))
 		pr_err("failed to request gpio sdc3_cmd\n");
-	if (qcom_gpio_request(90, "sdc3_data_3"))
+	if (gpio_request(90, "sdc3_data_3"))
 		pr_err("failed to request gpio sdc3_data_3\n");
-	if (qcom_gpio_request(91, "sdc3_data_2"))
+	if (gpio_request(91, "sdc3_data_2"))
 		pr_err("failed to request gpio sdc3_data_2\n");
-	if (qcom_gpio_request(92, "sdc3_data_1"))
+	if (gpio_request(92, "sdc3_data_1"))
 		pr_err("failed to request gpio sdc3_data_1\n");
-	if (qcom_gpio_request(93, "sdc3_data_0"))
+	if (gpio_request(93, "sdc3_data_0"))
 		pr_err("failed to request gpio sdc3_data_0\n");
 #endif
 
 	/* SDC4 GPIOs */
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-	if (qcom_gpio_request(19, "sdc4_data_3"))
+	if (gpio_request(19, "sdc4_data_3"))
 		pr_err("failed to request gpio sdc4_data_3\n");
-	if (qcom_gpio_request(20, "sdc4_data_2"))
+	if (gpio_request(20, "sdc4_data_2"))
 		pr_err("failed to request gpio sdc4_data_2\n");
-	if (qcom_gpio_request(21, "sdc4_data_1"))
+	if (gpio_request(21, "sdc4_data_1"))
 		pr_err("failed to request gpio sdc4_data_1\n");
-	if (qcom_gpio_request(107, "sdc4_cmd"))
+	if (gpio_request(107, "sdc4_cmd"))
 		pr_err("failed to request gpio sdc4_cmd\n");
-	if (qcom_gpio_request(108, "sdc4_data_0"))
+	if (gpio_request(108, "sdc4_data_0"))
 		pr_err("failed to request gpio sdc4_data_0\n");
-	if (qcom_gpio_request(109, "sdc4_clk"))
+	if (gpio_request(109, "sdc4_clk"))
 		pr_err("failed to request gpio sdc4_clk\n");
 #endif
 }
@@ -1686,13 +1686,13 @@ static struct msm_i2c_platform_data msm_i2c_pdata = {
 
 static void __init msm_device_i2c_init(void)
 {
-	if (qcom_gpio_request(60, "i2c_pri_clk"))
+	if (gpio_request(60, "i2c_pri_clk"))
 		pr_err("failed to request gpio i2c_pri_clk\n");
-	if (qcom_gpio_request(61, "i2c_pri_dat"))
+	if (gpio_request(61, "i2c_pri_dat"))
 		pr_err("failed to request gpio i2c_pri_dat\n");
-	if (qcom_gpio_request(95, "i2c_sec_clk"))
+	if (gpio_request(95, "i2c_sec_clk"))
 		pr_err("failed to request gpio i2c_sec_clk\n");
-	if (qcom_gpio_request(96, "i2c_sec_dat"))
+	if (gpio_request(96, "i2c_sec_dat"))
 		pr_err("failed to request gpio i2c_sec_dat\n");
 
 	if (cpu_is_msm7x27())

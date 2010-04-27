@@ -3727,7 +3727,7 @@ static void msm_sdc1_lvlshft_enable(void)
 	if (rc)
 		printk(KERN_ERR "%s: Failed to enable GPIO 35\n", __func__);
 
-	rc = qcom_gpio_direction_output(GPIO_PIN(sdc1_lvlshft_cfg_data[0].gpio_cfg),
+	rc = gpio_direction_output(GPIO_PIN(sdc1_lvlshft_cfg_data[0].gpio_cfg),
 				1);
 	if (rc)
 		printk(KERN_ERR "%s: Failed to turn on GPIO 35\n", __func__);

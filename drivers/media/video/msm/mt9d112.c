@@ -67,15 +67,15 @@ static int mt9d112_reset(const struct msm_camera_sensor_info *dev)
 {
 	int rc = 0;
 
-	rc = qcom_gpio_request(dev->sensor_reset, "mt9d112");
+	rc = gpio_request(dev->sensor_reset, "mt9d112");
 
 	if (!rc) {
-		rc = qcom_gpio_direction_output(dev->sensor_reset, 0);
+		rc = gpio_direction_output(dev->sensor_reset, 0);
 		mdelay(20);
-		rc = qcom_gpio_direction_output(dev->sensor_reset, 1);
+		rc = gpio_direction_output(dev->sensor_reset, 1);
 	}
 
-	qcom_gpio_free(dev->sensor_reset);
+	gpio_free(dev->sensor_reset);
 	return rc;
 }
 
