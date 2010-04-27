@@ -49,9 +49,9 @@ static int __init mddi_toshiba_wvga_pt_init(void)
 	pinfo.lcd.vsync_enable = FALSE;
 	pinfo.bl_max = 15;
 	pinfo.bl_min = 1;
-	pinfo.clk_rate = 192000000;
-	pinfo.clk_min =  190000000;
-	pinfo.clk_max =  200000000;
+	pinfo.clk_rate = 222750000;
+	pinfo.clk_min =  200000000;
+	pinfo.clk_max =  240000000;
 	pinfo.fb_num = 2;
 
 	ret = mddi_toshiba_device_register(&pinfo, TOSHIBA_VGA_PRIM,
