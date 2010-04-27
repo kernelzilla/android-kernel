@@ -199,6 +199,7 @@ struct usb_info {
 
 	unsigned int ep0_dir;
 	u16 test_mode;
+	u8 offline_pending;
 
 	u8 remote_wakeup;
 	int self_powered;
@@ -1073,6 +1074,8 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 			** to fail
 			*/
 			ui->online = 0;
+			/* Defer sending offline uevent to userspace */
+			ui->offline_pending = 1;
 
 			flush_all_endpoints(ui);
 
@@ -1339,6 +1342,11 @@ static void usb_do_work(struct work_struct *w)
 			}
 			break;
 		case USB_STATE_ONLINE:
+			if (ui->offline_pending) {
+				switch_set_state(&ui->sdev, 0);
+				ui->offline_pending = 0;
+			}
+
 			/* If at any point when we were online, we received
 			 * the signal to go offline, we must honor it
 			 */
@@ -1417,7 +1425,11 @@ static void usb_do_work(struct work_struct *w)
 			if (flags & USB_FLAG_CONFIGURED) {
 				int maxpower = usb_get_max_power(ui);
 
-				switch_set_state(&ui->sdev, 1);
+				/* We may come here even when no configuration
+				 * is selected. Send online/offline event
+				 * accordingly.
+				 */
+				switch_set_state(&ui->sdev, ui->online);
 
 				if (maxpower < 0)
 					break;
