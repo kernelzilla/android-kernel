@@ -1,0 +1,20 @@
+
+Haptic handling under Linux
+========================
+
+In its simplest form, the haptic class just allows control of Haptics from
+userspace. Haptic appears in /sys/class/haptic/. The maximum level of the
+haptic is defined in max_level file.
+
+The interface is pretty simple - it provides oneshot mode where user
+can specify duration of the effect (in milliseconds) and desired level
+Of course, you can adjust the level by setting level property
+
+# echo ${millisecond} > /sys/class/haptic/<device>/oneshot
+
+# echo ${level} > /sys/class/haptic/<device>/level
+
+You can also enable or disable haptics devices by manipulating 'enable' attribute:
+
+# echo 1 > /sys/class/haptic/<device>/enable	-> Enable
+# echo 0 > /sys/class/haptic/<device>/enable	-> Disable
