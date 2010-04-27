@@ -42,8 +42,6 @@
 
 #define VID_C_HCLK_RATE 170667000
 
-#define ENABLE_TIMER 0
-
 #if DEBUG
 #define DBG(x...) printk(KERN_DEBUG x)
 #else
@@ -58,10 +56,6 @@
 static struct vid_dec_dev *vid_dec_device_p;
 static dev_t vid_dec_dev_num;
 static struct class *vid_dec_class;
-static void vid_dec_timer_fn(unsigned long data);
-static struct timer_list hw_timer = TIMER_INITIALIZER(vid_dec_timer_fn, 0, 0);
-/* static unsigned long hw_ticks; */
-static void (*hw_timeout_fn)(void *p_user_data);
 
 static s32 vid_dec_get_empty_client_index(void)
 {
@@ -1459,69 +1453,6 @@ void *vid_dec_map_dev_base_addr(void *device_name)
 	return vid_dec_device_p->virt_base;
 }
 
-void vid_dec_timer_handler (void *phandle)
-{
-#if ENABLE_TIMER
-	DBG("\n %s(): In\n", __func__);
-#endif
-}
-
-void vid_dec_timer_fn(unsigned long  data)
-{
-#if ENABLE_TIMER
-	DBG("\n %s(): In", __func__);
-	hw_timeout_fn((void *)hw_timer.data);
-#endif
-}
-
-u32 vid_dec_timer_create(void (*pf_timer_handler)(void *),
-	void *p_user_data, void **pp_timer_handle)
-{
-
-	DBG("\n %s():: Inside", __func__);
-	hw_timeout_fn = pf_timer_handler;
-	hw_timer.data = (unsigned long) p_user_data;
-	hw_timer.function = vid_dec_timer_fn;
-#if ENABLE_TIMER
-	*pp_timer_handle = &hw_timer;
-#endif
-	return TRUE;
-}
-
-void  vid_dec_timer_release(void *p_timer_handle)
-{
-#if ENABLE_TIMER
-	DBG("\n %s():: Inside", __func__);
-	memset(p_timer_handle, 0,
-		sizeof(struct timer_list));
-#endif
-}
-
-void  vid_dec_timer_start(void *p_timer_handle, u32 n_time_out)
-{
-#if ENABLE_TIMER
-	struct timeval value;
-	unsigned long interval;
-	DBG("\n %s():: Inside", __func__);
-
-	value.tv_usec = 250000;
-	value.tv_sec = 0;
-	interval = timeval_to_jiffies(&value);
-	hw_timer.expires = jiffies + interval;
-	DBG("\n %s():: interval = %lu\n", __func__, interval);
-	setup_timer(&hw_timer, vid_dec_timer_fn, (unsigned long)&hw_timer.data);
-	add_timer(&hw_timer);
-#endif
-}
-
-void  vid_dec_timer_stop(void *p_timer_handle)
-{
-#if ENABLE_TIMER
-	DBG("\n %s(): In\n", __func__);
-	del_timer(&hw_timer);
-#endif
-}
-
 static int vid_dec_vcd_init(void)
 {
 	int rc;
@@ -1552,10 +1483,10 @@ static int vid_dec_vcd_init(void)
 	vcd_init_config.pf_interrupt_clr = vid_dec_interrupt_clear;
 	vcd_init_config.pf_register_isr = vid_dec_interrupt_register;
 	vcd_init_config.pf_deregister_isr = vid_dec_interrupt_deregister;
-	vcd_init_config.pf_timer_create = vid_dec_timer_create;
-	vcd_init_config.pf_timer_release = vid_dec_timer_release;
-	vcd_init_config.pf_timer_start = vid_dec_timer_start;
-	vcd_init_config.pf_timer_stop = vid_dec_timer_stop;
+	vcd_init_config.pf_timer_create = vid_c_timer_create;
+	vcd_init_config.pf_timer_release = vid_c_timer_release;
+	vcd_init_config.pf_timer_start = vid_c_timer_start;
+	vcd_init_config.pf_timer_stop = vid_c_timer_stop;
 
 	rc = vcd_init(&vcd_init_config, &vid_dec_device_p->device_handle);
 
