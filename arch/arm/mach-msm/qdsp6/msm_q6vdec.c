@@ -59,7 +59,7 @@
 #define TRACE(fmt,x...)		do { } while (0)
 #endif
 
-#define MAX_SUPPORTED_INSTANCES 2
+#define MAX_SUPPORTED_INSTANCES 1
 
 enum {
 	VDEC_DALRPC_INITIALIZE = DAL_OP_FIRST_DEVICE_API,
