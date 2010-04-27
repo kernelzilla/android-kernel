@@ -176,6 +176,7 @@ enum chg_battery_level_type {
 	BATTERY_LEVEL_INVALID
 };
 
+#ifndef CONFIG_BATTERY_MSM_FAKE
 struct rpc_reply_batt_chg_v1 {
 	struct rpc_reply_hdr hdr;
 	u32 	more_data;
@@ -203,6 +204,7 @@ union rpc_reply_batt_chg {
 };
 
 static union rpc_reply_batt_chg rep_batt_chg;
+#endif
 
 struct msm_battery_info {
 	u32 voltage_max_design;
@@ -364,6 +366,7 @@ static struct power_supply msm_psy_batt = {
 	.get_property = msm_batt_power_get_property,
 };
 
+#ifndef CONFIG_BATTERY_MSM_FAKE
 struct msm_batt_get_volt_ret_data {
 	u32 battery_voltage;
 };
@@ -1036,11 +1039,13 @@ static int msm_batt_deregister(u32 batt_handle)
 
 	return 0;
 }
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 static int msm_batt_cleanup(void)
 {
 	int rc = 0;
 
+#ifndef CONFIG_BATTERY_MSM_FAKE
 	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE) {
 
 		rc = msm_batt_deregister(msm_batt_info.batt_handle);
@@ -1050,6 +1055,7 @@ static int msm_batt_cleanup(void)
 	}
 
 	msm_batt_info.batt_handle = INVALID_BATT_HANDLE;
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 	if (msm_batt_info.batt_client)
 		msm_rpc_unregister_client(msm_batt_info.batt_client);
@@ -1071,9 +1077,11 @@ static int msm_batt_cleanup(void)
 		}
 	}
 
+#ifndef CONFIG_BATTERY_MSM_FAKE
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	if (msm_batt_info.early_suspend.suspend == msm_batt_early_suspend)
 		unregister_early_suspend(&msm_batt_info.early_suspend);
+#endif
 #endif
 	return rc;
 }
@@ -1092,7 +1100,7 @@ static u32 msm_batt_capacity(u32 current_voltage)
 			/ (high_voltage - low_voltage);
 }
 
-
+#ifndef CONFIG_BATTERY_MSM_FAKE
 int msm_batt_get_charger_api_version(void)
 {
 	int rc ;
@@ -1223,6 +1231,7 @@ static int msm_batt_cb_func(struct msm_rpc_client *client,
 
 	return rc;
 }
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 static int __devinit msm_batt_probe(struct platform_device *pdev)
 {
@@ -1236,7 +1245,11 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_BATTERY_MSM_FAKE
 	if (pdata->avail_chg_sources & AC_CHG) {
+#else
+	{
+#endif
 		rc = power_supply_register(&pdev->dev, &msm_psy_ac);
 		if (rc < 0) {
 			dev_err(&pdev->dev,
@@ -1296,7 +1309,7 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 	}
 	msm_batt_info.msm_psy_batt = &msm_psy_batt;
 
-
+#ifndef CONFIG_BATTERY_MSM_FAKE
 	rc = msm_batt_register(BATTERY_LOW, BATTERY_ALL_ACTIVITY,
 			       BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
 	if (rc < 0) {
@@ -1323,6 +1336,10 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 	register_early_suspend(&msm_batt_info.early_suspend);
 #endif
 	msm_batt_update_psy_status();
+
+#else
+	power_supply_changed(&msm_psy_ac);
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 	return 0;
 }
@@ -1353,6 +1370,9 @@ static int __devinit msm_batt_init_rpc(void)
 {
 	int rc;
 
+#ifdef CONFIG_BATTERY_MSM_FAKE
+	pr_info("Faking MSM battery\n");
+#else
 	msm_batt_info.chg_ep =
 		msm_rpc_connect_compatible(CHG_RPC_PROG, CHG_RPC_VER_2_2, 0);
 
@@ -1408,6 +1428,7 @@ static int __devinit msm_batt_init_rpc(void)
 		msm_batt_info.batt_client = NULL;
 		return rc;
 	}
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 	rc = platform_driver_register(&msm_batt_driver);
 
