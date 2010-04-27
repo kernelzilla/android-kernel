@@ -220,7 +220,12 @@ void mddi_assign_max_pkt_dimensions(uint16 image_cols,
 				    uint16 image_rows,
 				    uint16 bpp,
 				    uint16 *max_cols, uint16 * max_rows);
+#ifdef MDDI_HOST_WINDOW_WORKAROUND
 uint16 mddi_assign_pkt_height(uint16 pkt_width, uint16 pkt_height, uint16 bpp);
+#endif
 void mddi_queue_reverse_encapsulation(boolean wait);
 void mddi_disable(int lock);
+void mddi_window_adjust(struct msm_fb_data_type *mfd,
+	uint16 x1, uint16 x2, uint16 y1, uint16 y2);
+
 #endif /* MDDIHOST_H */
