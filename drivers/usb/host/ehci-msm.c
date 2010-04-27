@@ -439,7 +439,6 @@ static int ehci_msm_reset(struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	int retval;
-	unsigned otgsc;
 
 	ehci->caps = USB_CAPLENGTH;
 	ehci->regs = USB_CAPLENGTH +
@@ -454,10 +453,8 @@ static int ehci_msm_reset(struct usb_hcd *hcd)
 
 	hcd->has_tt = 1;
 	ehci->sbrn = HCD_USB2;
-	/* restore otgsc after reset */
-	otgsc = readl(USB_OTGSC);
+
 	retval = ehci_reset(ehci);
-	writel((otgsc & ~OTGSC_IDIS), USB_OTGSC);
 
 	/* SW workaround, Issue#3 */
 	writel(0x0, USB_AHB_MODE);
