@@ -21,7 +21,6 @@
 #include <mach/clk.h>
 
 #include "clock-pcom.h"
-#include "clock-7x30.h"
 
 #define CLKFLAG_INVERT			0x00000001
 #define CLKFLAG_NOINVERT		0x00000002
@@ -99,6 +98,14 @@ enum clkvote_client {
 	CLKVOTE_PMQOS,
 	CLKVOTE_MAX,
 };
+
+#if defined(CONFIG_ARCH_MSM7X30)
+void msm_clk_soc_init(void);
+void msm_clk_soc_set_ops(struct clk *clk);
+#else
+static inline void msm_clk_soc_init(void) { }
+static inline void msm_clk_soc_set_ops(struct clk *clk) { }
+#endif
 
 int msm_clock_require_tcxo(unsigned long *reason, int nbits);
 int msm_clock_get_name(uint32_t id, char *name, uint32_t size);

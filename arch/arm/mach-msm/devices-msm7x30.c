@@ -24,6 +24,7 @@
 
 #include "devices.h"
 #include "smd_private.h"
+#include "clock-7x30.h"
 
 #include <asm/mach/flash.h>
 
