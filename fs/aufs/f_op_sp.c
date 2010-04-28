@@ -111,6 +111,7 @@ static struct au_sp_fop {
 } au_sp_fop[AuSp_Last] = {
 	[AuSp_FIFO] = {
 		.fop	= {
+			.owner	= THIS_MODULE,
 			.open	= aufs_open_sp
 		}
 	}
@@ -159,6 +160,7 @@ static void au_init_fop_sp(struct file *file)
 		spin_lock(&p->spin);
 		if (!p->done) {
 			p->fop = *h_file->f_op;
+			p->fop.owner = THIS_MODULE;
 			if (p->fop.aio_read)
 				p->fop.aio_read = aufs_aio_read_sp;
 			if (p->fop.aio_write)
