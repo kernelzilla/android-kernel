@@ -186,24 +186,27 @@ static ssize_t au_do_aio(struct file *h_file, int rw, struct kiocb *kio,
 {
 	ssize_t err;
 	struct file *file;
+	ssize_t (*func)(struct kiocb *, const struct iovec *, unsigned long,
+			loff_t);
 
 	err = security_file_permission(h_file, rw);
 	if (unlikely(err))
 		goto out;
 
-	file = kio->ki_filp;
-	if (!is_sync_kiocb(kio)) {
-		get_file(h_file);
-		fput(file);
-	}
-	kio->ki_filp = h_file;
+	err = -ENOSYS;
+	func = NULL;
 	if (rw == MAY_READ)
-		err = h_file->f_op->aio_read(kio, iov, nv, pos);
+		func = h_file->f_op->aio_read;
 	else if (rw == MAY_WRITE)
-		err = h_file->f_op->aio_write(kio, iov, nv, pos);
-	else
-		BUG();
-	/* do not restore kio->ki_filp */
+		func = h_file->f_op->aio_write;
+	if (func) {
+		file = kio->ki_filp;
+		kio->ki_filp = h_file;
+		err = func(kio, iov, nv, pos);
+		kio->ki_filp = file;
+	} else
+		/* currently there is no such fs */
+		WARN_ON_ONCE(1);
 
  out:
 	return err;
@@ -225,18 +228,11 @@ static ssize_t aufs_aio_read(struct kiocb *kio, const struct iovec *iov,
 	if (unlikely(err))
 		goto out;
 
-	err = -ENOSYS;
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (h_file->f_op && h_file->f_op->aio_read) {
-		err = au_do_aio(h_file, MAY_READ, kio, iov, nv, pos);
-		/* todo: necessary? */
-		/* file->f_ra = h_file->f_ra; */
-		fsstack_copy_attr_atime(dentry->d_inode,
-					h_file->f_dentry->d_inode);
-	} else
-		/* currently there is no such fs */
-		WARN_ON_ONCE(h_file->f_op && h_file->f_op->read);
-
+	err = au_do_aio(h_file, MAY_READ, kio, iov, nv, pos);
+	/* todo: necessary? */
+	/* file->f_ra = h_file->f_ra; */
+	fsstack_copy_attr_atime(dentry->d_inode, h_file->f_dentry->d_inode);
 	di_read_unlock(dentry, AuLock_IR);
 	fi_read_unlock(file);
 
@@ -261,7 +257,6 @@ static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
 	inode = dentry->d_inode;
 	mutex_lock(&inode->i_mutex);
 	si_read_lock(sb, AuLock_FLUSH);
-
 	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/1);
 	if (unlikely(err))
 		goto out;
@@ -271,16 +266,11 @@ static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
 	if (unlikely(err))
 		goto out_unlock;
 
-	err = -ENOSYS;
-	h_file = au_h_fptr(file, au_fbstart(file));
 	au_unpin(&pin);
-	if (h_file->f_op && h_file->f_op->aio_write) {
-		err = au_do_aio(h_file, MAY_WRITE, kio, iov, nv, pos);
-		au_cpup_attr_timesizes(inode);
-		inode->i_mode = h_file->f_dentry->d_inode->i_mode;
-	} else
-		/* currently there is no such fs */
-		WARN_ON_ONCE(h_file->f_op && h_file->f_op->write);
+	h_file = au_h_fptr(file, au_fbstart(file));
+	err = au_do_aio(h_file, MAY_WRITE, kio, iov, nv, pos);
+	au_cpup_attr_timesizes(inode);
+	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
 
  out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
