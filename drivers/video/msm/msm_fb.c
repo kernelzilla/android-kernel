@@ -1560,7 +1560,7 @@ int mdp_blit(struct fb_info *info, struct mdp_blit_req *req)
 		if (((req->dst_rect.w == 1) && ((req->src_rect.w != 1) ||
 			(req->dst_rect.h != req->src_rect.h))) ||
 			((req->dst_rect.h == 1) && ((req->src_rect.h != 1) ||
-			(req->dst_rect.h != req->src_rect.h)))) {
+			(req->dst_rect.w != req->src_rect.w)))) {
 			printk(KERN_ERR "mpd_ppp: error scaling when size is 1!\n");
 			return -EINVAL;
 		}
