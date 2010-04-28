@@ -74,6 +74,7 @@ static struct au_dykey *dy_bradd(struct au_branch *br, struct au_dykey *key)
 	return found;
 }
 
+/* kref_get() if @key is already added */
 static struct au_dykey *dy_gadd(struct au_splhead *spl, struct au_dykey *key)
 {
 	struct au_dykey *tmp, *found;
@@ -85,6 +86,7 @@ static struct au_dykey *dy_gadd(struct au_splhead *spl, struct au_dykey *key)
 	spin_lock(&spl->spin);
 	list_for_each_entry(tmp, head, dk_list)
 		if (tmp->dk_op.dy_hop == h_op) {
+			kref_get(&tmp->dk_kref);
 			found = tmp;
 			break;
 		}
@@ -242,13 +244,8 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 	spin_lock(&spl->spin);
 	key = dy_gfind_get(spl, op->dy_hop);
 	spin_unlock(&spl->spin);
-	if (key) {
-		old = dy_bradd(br, key);
-		if (old)
-			/* its ref-count should never be zero here */
-			kref_put(&key->dk_kref, dy_bug);
-		goto out; /* success */
-	}
+	if (key)
+		goto out_add; /* success */
 
 	p = a + op->dy_type;
 	key = kzalloc(p->sz, GFP_NOFS);
@@ -265,8 +262,12 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 		kfree(key);
 		key = old;
 	}
-	dy_bradd(br, key);
 
+out_add:
+	old = dy_bradd(br, key);
+	if (old)
+		/* its ref-count should never be zero here */
+		kref_put(&key->dk_kref, dy_bug);
 out:
 	return key;
 }
