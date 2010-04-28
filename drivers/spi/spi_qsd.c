@@ -1586,6 +1586,8 @@ static int msm_spi_suspend(struct platform_device *pdev, pm_message_t state)
 	disable_irq(dd->irq_out);
 	disable_irq(dd->irq_err);
 	clk_disable(dd->clk);
+	if (dd->pclk)
+		clk_disable(dd->pclk);
 	mutex_unlock(&dd->core_lock);
 
 suspend_exit:
@@ -1609,6 +1611,15 @@ static int msm_spi_resume(struct platform_device *pdev)
 		dev_err(dd->dev, "%s: unable to enable spi_clk\n",
 			__func__);
 		goto resume_exit;
+	}
+	if (dd->pclk) {
+		rc = clk_enable(dd->pclk);
+		if (rc) {
+			dev_err(&pdev->dev, "%s: unable to enable spi_pclk\n",
+				__func__);
+			clk_disable(dd->clk);
+			goto resume_exit;
+		}
 	}
 
 	enable_irq(dd->irq_in);
