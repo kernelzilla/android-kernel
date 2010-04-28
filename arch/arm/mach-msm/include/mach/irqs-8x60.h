@@ -268,4 +268,10 @@
 #define NR_GPIO_EXPANDER_IRQS 64
 #define NR_BOARD_IRQS (NR_PMIC8058_IRQS + NR_PMIC8901_IRQS +\
 		NR_GPIO_EXPANDER_IRQS)
+
+/* smd/smsm interrupts */
+#define INT_A9_M2A_0                    MARM_SCSS_GP_IRQ_0
+#define INT_A9_M2A_5                    MARM_SCSS_GP_IRQ_1
+#define INT_ADSP_A11                    LPASS_SCSS_GP_HIGH_IRQ
+
 #endif

@@ -310,7 +310,8 @@ struct smd_half_channel {
 
 extern spinlock_t smem_lock;
 
-extern int (*msm_check_for_modem_crash)(void);
+
+int smsm_check_for_modem_crash(void);
 void *smem_find(unsigned id, unsigned size);
 void *smem_get_entry(unsigned id, unsigned *size);
 void smd_diag(void);

@@ -37,7 +37,7 @@
 #include "proc_comm.h"
 #include "modem_notifier.h"
 
-#if defined(CONFIG_ARCH_QSD8X50)
+#if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM8X60)
 #define CONFIG_QDSP6 1
 #endif
 
@@ -113,9 +113,20 @@ module_param_named(debug_mask, msm_smd_debug_mask,
 static unsigned last_heap_free = 0xffffffff;
 
 #if defined(CONFIG_ARCH_MSM7X30)
-#define MSM_TRIG_A2M_INT(n) (writel(1 << n, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMD_INT   (writel(1 << 0, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMD_INT  (writel(1 << 8, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMSM_INT  (writel(1 << 5, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMSM_INT (writel(1 << 8, MSM_GCC_BASE + 0x8))
+#elif defined(CONFIG_ARCH_MSM8X60)
+#define MSM_TRIG_A2M_SMD_INT   (writel(1 << 3, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMD_INT  (writel(1 << 15, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMSM_INT  (writel(1 << 4, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMSM_INT (writel(1 << 15, MSM_GCC_BASE + 0x8))
 #else
-#define MSM_TRIG_A2M_INT(n) (writel(1, MSM_CSR_BASE + 0x400 + (n) * 4))
+#define MSM_TRIG_A2M_SMD_INT   (writel(1, MSM_CSR_BASE + 0x400 + (0) * 4))
+#define MSM_TRIG_A2Q6_SMD_INT  (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
+#define MSM_TRIG_A2M_SMSM_INT  (writel(1, MSM_CSR_BASE + 0x400 + (5) * 4))
+#define MSM_TRIG_A2Q6_SMSM_INT (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
 #endif
 
 #define SMD_LOOPBACK_CID 100
@@ -130,7 +141,7 @@ static void notify_other_smsm(uint32_t smsm_entry, uint32_t notify_mask)
 	   but still communicates with modem */
 	if (!smsm_info.intr_mask ||
 	    (readl(SMSM_INTR_MASK_ADDR(smsm_entry, SMSM_MODEM)) & notify_mask))
-		MSM_TRIG_A2M_INT(5);
+		MSM_TRIG_A2M_SMSM_INT;
 
 	if (smsm_info.intr_mask &&
 	    (readl(SMSM_INTR_MASK_ADDR(smsm_entry, SMSM_Q6_I)) & notify_mask)) {
@@ -140,18 +151,18 @@ static void notify_other_smsm(uint32_t smsm_entry, uint32_t notify_mask)
 			writel(mux_val, SMSM_INTR_MUX_ADDR(SMEM_APPS_Q6_SMSM));
 		}
 
-		MSM_TRIG_A2M_INT(8);
+		MSM_TRIG_A2Q6_SMSM_INT;
 	}
 }
 
 static inline void notify_modem_smd(void)
 {
-	MSM_TRIG_A2M_INT(0);
+	MSM_TRIG_A2M_SMD_INT;
 }
 
 static inline void notify_dsp_smd(void)
 {
-	MSM_TRIG_A2M_INT(8);
+	MSM_TRIG_A2Q6_SMD_INT;
 }
 
 void smd_diag(void)
@@ -188,7 +199,7 @@ static void handle_modem_crash(void)
 		;
 }
 
-static int check_for_modem_crash(void)
+int smsm_check_for_modem_crash(void)
 {
 	/* if the modem's not ready yet, we have to hope for the best */
 	if (!smsm_info.state)
@@ -273,7 +284,10 @@ static void smd_channel_probe_worker(struct work_struct *work)
 
 	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(*shared) * 64);
 
-	BUG_ON(!shared);
+	if (!shared) {
+		pr_err("%s: allocation table not initialized\n", __func__);
+		return;
+	}
 
 	for (n = 0; n < 64; n++) {
 		if (smd_ch_allocated[n])
@@ -1445,10 +1459,6 @@ static int __init msm_smd_probe(struct platform_device *pdev)
 		pr_err("smd_core_init() failed\n");
 		return -1;
 	}
-
-	do_smd_probe();
-
-	msm_check_for_modem_crash = check_for_modem_crash;
 
 	smd_initialized = 1;
 
