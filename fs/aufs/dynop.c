@@ -53,27 +53,23 @@ static struct au_dykey *dy_bradd(struct au_branch *br, struct au_dykey *key)
 {
 	struct au_dykey **k, *found;
 	const void *h_op = key->dk_op.dy_hop;
-	int i, added;
+	int i;
 
 	found = NULL;
 	k = br->br_dykey;
 	spin_lock(&br->br_dykey_lock);
 	for (i = 0; i < AuBrDynOp; i++)
-		if (k[i] && k[i]->dk_op.dy_hop == h_op) {
-			found = k[i];
-			break;
-		}
-	if (!found) {
-		added = 0;
-		for (i = 0; i < AuBrDynOp; i++)
-			if (!k[i]) {
-				k[i] = key;
-				added = 1;
+		if (k[i]) {
+			if (k[i]->dk_op.dy_hop == h_op) {
+				found = k[i];
 				break;
 			}
-		AuDebugOn(!added);
-	}
+		} else {
+			k[i] = key;
+			break;
+		}
 	spin_unlock(&br->br_dykey_lock);
+	BUG_ON(i == AuBrDynOp); /* expand the array */
 
 	return found;
 }
