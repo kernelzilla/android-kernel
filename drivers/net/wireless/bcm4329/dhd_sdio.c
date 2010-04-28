@@ -40,6 +40,7 @@
 #include <siutils.h>
 #include <hndpmu.h>
 #include <hndsoc.h>
+#include <hndrte_armtrap.h>
 #include <sbchipc.h>
 #include <sbhnddma.h>
 
@@ -404,6 +405,7 @@ static void dhdsdio_testrcv(dhd_bus_t *bus, void *pkt, uint seq);
 static void dhdsdio_sdtest_set(dhd_bus_t *bus, bool start);
 #endif
 
+static int dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size);
 static int dhdsdio_download_state(dhd_bus_t *bus, bool enter);
 
 static void dhdsdio_release(dhd_bus_t *bus, osl_t *osh);
@@ -1333,11 +1335,17 @@ dhd_bus_rxctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 		         __FUNCTION__, rxlen, msglen));
 	} else if (timeleft == 0) {
 		DHD_ERROR(("%s: resumed on timeout\n", __FUNCTION__));
+		dhd_os_sdlock(bus->dhd);
+		dhdsdio_checkdied(bus, NULL, 0);
+		dhd_os_sdunlock(bus->dhd);
 	} else if (pending == TRUE) {
 		DHD_CTL(("%s: cancelled\n", __FUNCTION__));
 		return -ERESTARTSYS;
 	} else {
 		DHD_CTL(("%s: resumed for unknown reason?\n", __FUNCTION__));
+		dhd_os_sdlock(bus->dhd);
+		dhdsdio_checkdied(bus, NULL, 0);
+		dhd_os_sdunlock(bus->dhd);
 	}
 
 	if (rxlen)
@@ -1357,6 +1365,7 @@ enum {
 	IOV_SDCIS,
 	IOV_MEMBYTES,
 	IOV_MEMSIZE,
+	IOV_CHECKDIED,
 	IOV_DOWNLOAD,
 	IOV_FORCEEVEN,
 	IOV_SDIOD_DRIVE,
@@ -1407,6 +1416,7 @@ const bcm_iovar_t dhdsdio_iovars[] = {
 	{"rxbound",	IOV_RXBOUND,	0,	IOVT_UINT32,	0 },
 	{"txminmax", IOV_TXMINMAX,	0,	IOVT_UINT32,	0 },
 	{"cpu",		IOV_CPU,	0,	IOVT_BOOL,	0 },
+	{"checkdied",	IOV_CHECKDIED,	0,	IOVT_BUFFER,	0 },
 #endif /* DHD_DEBUG */
 #ifdef SDTEST
 	{"extloop",	IOV_EXTLOOP,	0,	IOVT_BOOL,	0 },
@@ -1636,6 +1646,166 @@ xfer_done:
 	return bcmerror;
 }
 
+static int
+dhdsdio_readshared(dhd_bus_t *bus, sdpcm_shared_t *sh)
+{
+	uint32 addr;
+	int rv;
+
+	/* Read last word in memory to determine address of sdpcm_shared structure */
+	if ((rv = dhdsdio_membytes(bus, FALSE, bus->ramsize - 4, (uint8 *)&addr, 4)) < 0)
+		return rv;
+
+	addr = ltoh32(addr);
+
+	DHD_INFO(("sdpcm_shared address 0x%08X\n", addr));
+
+	/*
+	 * Check if addr is valid.
+	 * NVRAM length at the end of memory should have been overwritten.
+	 */
+	if (addr == 0 || ((~addr >> 16) & 0xffff) == (addr & 0xffff)) {
+		DHD_ERROR(("%s: address (0x%08x) of sdpcm_shared invalid\n", __FUNCTION__, addr));
+		return BCME_ERROR;
+	}
+
+	/* Read hndrte_shared structure */
+	if ((rv = dhdsdio_membytes(bus, FALSE, addr, (uint8 *)sh, sizeof(sdpcm_shared_t))) < 0)
+		return rv;
+
+	/* Endianness */
+	sh->flags = ltoh32(sh->flags);
+	sh->trap_addr = ltoh32(sh->trap_addr);
+	sh->assert_exp_addr = ltoh32(sh->assert_exp_addr);
+	sh->assert_file_addr = ltoh32(sh->assert_file_addr);
+	sh->assert_line = ltoh32(sh->assert_line);
+	sh->console_addr = ltoh32(sh->console_addr);
+	sh->msgtrace_addr = ltoh32(sh->msgtrace_addr);
+
+	if ((sh->flags & SDPCM_SHARED_VERSION_MASK) != SDPCM_SHARED_VERSION) {
+		DHD_ERROR(("%s: sdpcm_shared version %d in dhd "
+		           "is different than sdpcm_shared version %d in dongle\n",
+		           __FUNCTION__, SDPCM_SHARED_VERSION,
+		           sh->flags & SDPCM_SHARED_VERSION_MASK));
+		return BCME_ERROR;
+	}
+
+	return BCME_OK;
+}
+
+static int
+dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size)
+{
+	int bcmerror = 0;
+	uint msize = 512;
+	char *mbuffer = NULL;
+	uint maxstrlen = 256;
+	char *str = NULL;
+	trap_t tr;
+	sdpcm_shared_t sdpcm_shared;
+	struct bcmstrbuf strbuf;
+
+	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+
+	if (data == NULL) {
+		/*
+		 * Called after a rx ctrl timeout. "data" is NULL.
+		 * allocate memory to trace the trap or assert.
+		 */
+		size = msize;
+		mbuffer = data = MALLOC(bus->dhd->osh, msize);
+		if (mbuffer == NULL) {
+			DHD_ERROR(("%s: MALLOC(%d) failed \n", __FUNCTION__, msize));
+			bcmerror = BCME_NOMEM;
+			goto done;
+		}
+	}
+
+	if ((str = MALLOC(bus->dhd->osh, maxstrlen)) == NULL) {
+		DHD_ERROR(("%s: MALLOC(%d) failed \n", __FUNCTION__, maxstrlen));
+		bcmerror = BCME_NOMEM;
+		goto done;
+	}
+
+	if ((bcmerror = dhdsdio_readshared(bus, &sdpcm_shared)) < 0)
+		goto done;
+
+	bcm_binit(&strbuf, data, size);
+
+	bcm_bprintf(&strbuf, "msgtrace address : 0x%08X\nconsole address  : 0x%08X\n",
+	            sdpcm_shared.msgtrace_addr, sdpcm_shared.console_addr);
+
+	if ((sdpcm_shared.flags & SDPCM_SHARED_ASSERT_BUILT) == 0) {
+		/* NOTE: Misspelled assert is intentional - DO NOT FIX.
+		 * (Avoids conflict with real asserts for programmatic parsing of output.)
+		 */
+		bcm_bprintf(&strbuf, "Assrt not built in dongle\n");
+	}
+
+	if ((sdpcm_shared.flags & (SDPCM_SHARED_ASSERT|SDPCM_SHARED_TRAP)) == 0) {
+		/* NOTE: Misspelled assert is intentional - DO NOT FIX.
+		 * (Avoids conflict with real asserts for programmatic parsing of output.)
+		 */
+		bcm_bprintf(&strbuf, "No trap%s in dongle",
+		          (sdpcm_shared.flags & SDPCM_SHARED_ASSERT_BUILT)
+		          ?"/assrt" :"");
+	} else {
+		if (sdpcm_shared.flags & SDPCM_SHARED_ASSERT) {
+			/* Download assert */
+			bcm_bprintf(&strbuf, "Dongle assert");
+			if (sdpcm_shared.assert_exp_addr != 0) {
+				str[0] = '\0';
+				if ((bcmerror = dhdsdio_membytes(bus, FALSE,
+				                                 sdpcm_shared.assert_exp_addr,
+				                                 (uint8 *)str, maxstrlen)) < 0)
+					goto done;
+
+				str[maxstrlen - 1] = '\0';
+				bcm_bprintf(&strbuf, " expr \"%s\"", str);
+			}
+
+			if (sdpcm_shared.assert_file_addr != 0) {
+				str[0] = '\0';
+				if ((bcmerror = dhdsdio_membytes(bus, FALSE,
+				                                 sdpcm_shared.assert_file_addr,
+				                                 (uint8 *)str, maxstrlen)) < 0)
+					goto done;
+
+				str[maxstrlen - 1] = '\0';
+				bcm_bprintf(&strbuf, " file \"%s\"", str);
+			}
+
+			bcm_bprintf(&strbuf, " line %d ", sdpcm_shared.assert_line);
+		}
+
+		if (sdpcm_shared.flags & SDPCM_SHARED_TRAP) {
+			if ((bcmerror = dhdsdio_membytes(bus, FALSE,
+			                                 sdpcm_shared.trap_addr,
+			                                 (uint8*)&tr, sizeof(trap_t))) < 0)
+				goto done;
+
+			bcm_bprintf(&strbuf,
+			"Dongle trap type 0x%x @ epc 0x%x, cpsr 0x%x, spsr 0x%x, sp 0x%x,"
+			"lp 0x%x, rpc 0x%x Trap offset 0x%x, "
+			"r0 0x%x, r1 0x%x, r2 0x%x, r3 0x%x, r4 0x%x, r5 0x%x, r6 0x%x, r7 0x%x\n",
+			tr.type, tr.epc, tr.cpsr, tr.spsr, tr.r13, tr.r14, tr.pc,
+			sdpcm_shared.trap_addr,
+			tr.r0, tr.r1, tr.r2, tr.r3, tr.r4, tr.r5, tr.r6, tr.r7);
+		}
+	}
+
+	if (sdpcm_shared.flags & (SDPCM_SHARED_ASSERT | SDPCM_SHARED_TRAP)) {
+		DHD_ERROR(("%s: %s\n", __FUNCTION__, strbuf.origbuf));
+	}
+
+done:
+	if (mbuffer)
+		MFREE(bus->dhd->osh, mbuffer, msize);
+	if (str)
+		MFREE(bus->dhd->osh, str, maxstrlen);
+
+	return bcmerror;
+}
 
 int
 dhdsdio_downloadvars(dhd_bus_t *bus, void *arg, int len)
