@@ -76,7 +76,6 @@ int au_do_open_nondir(struct file *file, int flags)
 	dentry = file->f_dentry;
 	finfo = au_fi(file);
 	finfo->fi_hvmop = NULL;
-	finfo->fi_vm_ops = NULL;
 	mutex_init(&finfo->fi_mmap); /* regular file only? */
 	bindex = au_dbstart(dentry);
 	/* O_TRUNC is processed already */
@@ -105,7 +104,6 @@ static int aufs_open_nondir(struct inode *inode __maybe_unused,
 
 int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file)
 {
-	kfree(au_fi(file)->fi_vm_ops);
 	au_finfo_fin(file);
 	return 0;
 }
@@ -462,9 +460,10 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 	wake_up(&wq);
 }
 
-static struct vm_operations_struct aufs_vm_ops = {
-	/* .close and .page_mkwrite are not set by default */
+struct vm_operations_struct aufs_vm_ops = {
+	.close		= aufs_vm_close,
 	.fault		= aufs_fault,
+	.page_mkwrite	= aufs_page_mkwrite
 };
 
 /* ---------------------------------------------------------------------- */
@@ -504,8 +503,8 @@ static unsigned long au_flag_conv(unsigned long flags)
 		| AuConv_VM_MAP(flags, LOCKED);
 }
 
-static struct vm_operations_struct *au_hvmop(struct file *h_file,
-					     struct vm_area_struct *vma)
+static struct vm_operations_struct *
+au_hvmop(struct file *h_file, struct vm_area_struct *vma, unsigned long *flags)
 {
 	struct vm_operations_struct *h_vmop;
 	unsigned long prot;
@@ -528,6 +527,7 @@ static struct vm_operations_struct *au_hvmop(struct file *h_file,
 		goto out;
 
 	h_vmop = vma->vm_ops;
+	*flags = vma->vm_flags;
 	err = do_munmap(current->mm, vma->vm_start,
 			vma->vm_end - vma->vm_start);
 	if (unlikely(err)) {
@@ -538,37 +538,6 @@ static struct vm_operations_struct *au_hvmop(struct file *h_file,
 
  out:
 	return h_vmop;
-}
-
-static int au_custom_vm_ops(struct au_finfo *finfo, struct vm_area_struct *vma)
-{
-	int err;
-	struct vm_operations_struct *h_ops;
-
-	MtxMustLock(&finfo->fi_mmap);
-
-	err = 0;
-	h_ops = finfo->fi_hvmop;
-	AuDebugOn(!h_ops);
-	if ((!h_ops->page_mkwrite && !h_ops->close)
-	    || finfo->fi_vm_ops)
-		goto out;
-
-	err = -ENOMEM;
-	finfo->fi_vm_ops = kmemdup(&aufs_vm_ops, sizeof(aufs_vm_ops), GFP_NOFS);
-	if (unlikely(!finfo->fi_vm_ops))
-		goto out;
-
-	err = 0;
-	if (h_ops->page_mkwrite)
-		finfo->fi_vm_ops->page_mkwrite = aufs_page_mkwrite;
-	if (h_ops->close)
-		finfo->fi_vm_ops->close = aufs_vm_close;
-
-	vma->vm_ops = finfo->fi_vm_ops;
-
- out:
-	return err;
 }
 
 /*
@@ -600,13 +569,16 @@ struct au_mmap_pre_args {
 	/* output */
 	int *errp;
 	struct file *h_file;
+	struct au_branch *br;
 	int mmapped;
 };
 
 static int au_mmap_pre(struct file *file, struct vm_area_struct *vma,
-		       struct file **h_file, int *mmapped)
+		       struct file **h_file, struct au_branch **br,
+		       int *mmapped)
 {
 	int err;
+	aufs_bindex_t bstart;
 	const unsigned char wlock
 		= !!(file->f_mode & FMODE_WRITE) && (vma->vm_flags & VM_SHARED);
 	struct dentry *dentry;
@@ -630,7 +602,9 @@ static int au_mmap_pre(struct file *file, struct vm_area_struct *vma,
 		au_unpin(&pin);
 	} else
 		di_write_unlock(dentry);
-	*h_file = au_h_fptr(file, au_fbstart(file));
+	bstart = au_fbstart(file);
+	*br = au_sbr(sb, bstart);
+	*h_file = au_h_fptr(file, bstart);
 	get_file(*h_file);
 	au_fi_mmap_lock(file);
 
@@ -644,15 +618,17 @@ out:
 static void au_call_mmap_pre(void *args)
 {
 	struct au_mmap_pre_args *a = args;
-	*a->errp = au_mmap_pre(a->file, a->vma, &a->h_file, &a->mmapped);
+	*a->errp = au_mmap_pre(a->file, a->vma, &a->h_file, &a->br,
+			       &a->mmapped);
 }
 
 static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	int err, wkq_err;
+	unsigned long h_vmflags;
 	struct au_finfo *finfo;
 	struct dentry *h_dentry;
-	struct vm_operations_struct *h_vmop;
+	struct vm_operations_struct *h_vmop, *vmop;
 	struct au_mmap_pre_args args = {
 		.file		= file,
 		.vma		= vma,
@@ -678,13 +654,18 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		file->f_mapping = args.h_file->f_mapping;
 	}
 
-	h_vmop = NULL;
-	if (!args.mmapped) {
-		h_vmop = au_hvmop(args.h_file, vma);
-		err = PTR_ERR(h_vmop);
-		if (IS_ERR(h_vmop))
-			goto out_unlock;
-	}
+	/* always try this internal mmap to get vma flags */
+	h_vmflags = 0; /* gcc warning */
+	h_vmop = au_hvmop(args.h_file, vma, &h_vmflags);
+	err = PTR_ERR(h_vmop);
+	if (IS_ERR(h_vmop))
+		goto out_unlock;
+	AuDebugOn(args.mmapped && h_vmop != finfo->fi_hvmop);
+
+	vmop = (void *)au_dy_vmop(file, args.br, h_vmop);
+	err = PTR_ERR(vmop);
+	if (IS_ERR(vmop))
+		goto out_unlock;
 
 	/*
 	 * unnecessary to handle MAP_DENYWRITE and deny_write_access()?
@@ -697,15 +678,12 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 	if (unlikely(err))
 		goto out_unlock;
 
-	vma->vm_ops = &aufs_vm_ops;
+	vma->vm_ops = vmop;
+	vma->vm_flags = h_vmflags;
 	if (!args.mmapped) {
 		finfo->fi_hvmop = h_vmop;
 		mutex_init(&finfo->fi_vm_mtx);
 	}
-
-	err = au_custom_vm_ops(finfo, vma);
-	if (unlikely(err))
-		goto out_unlock;
 
 	vfsub_file_accessed(args.h_file);
 	/* update without lock, I don't think it a problem */
