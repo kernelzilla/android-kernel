@@ -165,7 +165,6 @@ static void dy_fop(struct au_dykey *key, const void *h_op,
 	DySetFop(sendpage);
 	DySetFop(get_unmapped_area);
 	DySetFop(check_flags);
-	DySetFop(dir_notify);
 	DySetFop(flock);
 	DySetFop(splice_write);
 	DySetFop(splice_read);
