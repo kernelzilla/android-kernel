@@ -6,6 +6,7 @@ aufs-y := module.o sbinfo.o super.o branch.o xino.o sysaufs.o opts.o \
 	wkq.o vfsub.o dcsub.o \
 	cpup.o whout.o plink.o wbr_policy.o \
 	dinfo.o dentry.o \
+	dynop.o \
 	finfo.o file.o f_op.o \
 	dir.o vdir.o \
 	iinfo.o inode.o i_op.o i_op_add.o i_op_del.o i_op_ren.o \
