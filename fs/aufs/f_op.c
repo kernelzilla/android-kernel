@@ -889,6 +889,7 @@ static ssize_t aufs_sendpage(struct file *file, struct page *page, int offset,
 /* ---------------------------------------------------------------------- */
 
 struct file_operations aufs_file_fop = {
+	.owner		= THIS_MODULE,
 	/*
 	 * while generic_file_llseek/_unlocked() don't use BKL,
 	 * don't use it since it operates file->f_mapping->host.
