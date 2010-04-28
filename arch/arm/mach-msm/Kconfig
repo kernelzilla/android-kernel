@@ -533,18 +533,17 @@ config MSM_SMD
 
 choice
 	prompt "MSM Shared memory interface version"
+	depends on MSM_SMD
 	default MSM_SMD_PKG3 if ARCH_MSM_ARM11
 	default MSM_SMD_PKG4 if ARCH_MSM_SCORPION
 
 	config MSM_SMD_PKG3
 	  bool
 	    prompt "Package 3"
-	    select MSM_SMD
 
 	config MSM_SMD_PKG4
 	  bool
 	    prompt "Package 4"
-	    select MSM_SMD
 endchoice
 
 config MSM_SMD_DEBUG
