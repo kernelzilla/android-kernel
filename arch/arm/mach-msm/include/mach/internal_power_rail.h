@@ -32,6 +32,7 @@
 /* Clock power rail IDs */
 #define PWR_RAIL_GRP_CLK	8
 #define PWR_RAIL_GRP_2D_CLK	58
+#define PWR_RAIL_MDP_CLK	14
 #define PWR_RAIL_MFC_CLK	68
 #define PWR_RAIL_ROTATOR_CLK	90
 #define PWR_RAIL_VDC_CLK	39

@@ -886,6 +886,9 @@ static int update_pwr_rail(unsigned id, int enable)
 	case C(GRP_3D):
 		pwr_id = PWR_RAIL_GRP_CLK;
 		break;
+	case C(MDP):
+		pwr_id = PWR_RAIL_MDP_CLK;
+		break;
 	case C(MFC):
 		pwr_id = PWR_RAIL_MFC_CLK;
 		break;
