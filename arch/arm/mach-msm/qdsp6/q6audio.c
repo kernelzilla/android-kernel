@@ -1531,8 +1531,10 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 
 	if (ac->flags & AUDIO_FLAG_WRITE) {
 		audio_rx_path_refcount++;
-		if (audio_rx_path_refcount == 1)
+		if (audio_rx_path_refcount == 1) {
 			_audio_rx_clk_enable();
+			_audio_rx_path_enable(0, acdb_id);
+		}
 	} else {
 		/* TODO: consider concurrency with voice call */
 		tx_clk_freq = rate;
@@ -1557,9 +1559,6 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 		msleep(1);
 	}
 
-	if (ac->flags & AUDIO_FLAG_WRITE)
-		if (audio_rx_path_refcount == 1)
-			_audio_rx_path_enable(0, acdb_id);
 	mutex_unlock(&audio_path_lock);
 
 	for (retry = 5;;retry--) {
