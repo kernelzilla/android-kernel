@@ -111,6 +111,7 @@ static int dbgaufs_xib_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations dbgaufs_xib_fop = {
+	.owner		= THIS_MODULE,
 	.open		= dbgaufs_xib_open,
 	.release	= dbgaufs_xi_release,
 	.read		= dbgaufs_xi_read
@@ -155,6 +156,7 @@ static int dbgaufs_xino_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations dbgaufs_xino_fop = {
+	.owner		= THIS_MODULE,
 	.open		= dbgaufs_xino_open,
 	.release	= dbgaufs_xi_release,
 	.read		= dbgaufs_xi_read
@@ -226,6 +228,7 @@ static int dbgaufs_xigen_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations dbgaufs_xigen_fop = {
+	.owner		= THIS_MODULE,
 	.open		= dbgaufs_xigen_open,
 	.release	= dbgaufs_xi_release,
 	.read		= dbgaufs_xi_read

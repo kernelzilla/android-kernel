@@ -41,7 +41,7 @@ static void au_refresh_hinode_attr(struct inode *inode, int do_version)
 
 int au_refresh_hinode_self(struct inode *inode, int do_attr)
 {
-	int err;
+	int err, e;
 	aufs_bindex_t bindex, new_bindex;
 	unsigned char update;
 	struct au_hinode *p, *q, tmp;
@@ -90,6 +90,9 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 		}
 	}
 	au_update_brange(inode, /*do_put_zero*/0);
+	e = au_dy_irefresh(inode);
+	if (unlikely(e && !err))
+		err = e;
 	if (do_attr)
 		au_refresh_hinode_attr(inode, update && S_ISDIR(inode->i_mode));
 
@@ -99,7 +102,7 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 
 int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 {
-	int err;
+	int err, e;
 	unsigned int flags;
 	aufs_bindex_t bindex, bend;
 	unsigned char isdir, update;
@@ -141,10 +144,9 @@ int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 		update = 1;
 	}
 	au_update_brange(inode, /*do_put_zero*/0);
-
-	if (unlikely(err))
-		goto out;
-
+	e = au_dy_irefresh(inode);
+	if (unlikely(e && !err))
+		err = e;
 	au_refresh_hinode_attr(inode, update && isdir);
 
  out:
@@ -174,8 +176,10 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	case S_IFREG:
 		btail = au_dbtail(dentry);
 		inode->i_op = &aufs_iop;
-		inode->i_fop = &aufs_file_fop;
 		inode->i_mapping->a_ops = &aufs_aop;
+		err = au_dy_ifop(inode, bstart, h_inode);
+		if (unlikely(err))
+			goto out;
 		break;
 	case S_IFDIR:
 		isdir = 1;

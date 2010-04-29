@@ -620,8 +620,14 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	err = cpup_iattr(dentry, bdst, h_src);
 	isdir = S_ISDIR(dst_inode->i_mode);
 	if (!err) {
-		if (bdst < old_ibstart)
+		if (bdst < old_ibstart) {
+			if (S_ISREG(inode->i_mode)) {
+				err = au_dy_ifop(inode, bdst, dst_inode);
+				if (unlikely(err))
+					goto out_rev;
+			}
 			au_set_ibstart(inode, bdst);
+		}
 		au_set_h_iptr(inode, bdst, au_igrab(dst_inode),
 			      au_hi_flags(inode, isdir));
 		mutex_unlock(&dst_inode->i_mutex);
@@ -633,6 +639,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	}
 
 	/* revert */
+out_rev:
 	h_path.dentry = h_parent;
 	mutex_unlock(&dst_inode->i_mutex);
 	au_dtime_store(&dt, dst_parent, &h_path);
