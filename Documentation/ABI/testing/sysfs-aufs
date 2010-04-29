@@ -21,5 +21,4 @@ Description:
 		Bitmap, Translation Table and Generation Table) file
 		even if it is the default path.
 		When the aufs mount option 'noxino' is specified, it
-		will be empty. About XINO files, see
-		Documentation/filesystems/aufs/aufs.5 in detail.
+		will be empty. About XINO files, see the aufs manual.
