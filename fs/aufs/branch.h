@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 #include <linux/mount.h>
 #include <linux/aufs_type.h>
+#include "dynop.h"
 #include "rwsem.h"
 #include "super.h"
 
@@ -59,6 +60,9 @@ struct au_wbr {
 	unsigned long long	wbr_bytes;
 };
 
+/* ext2 has 3 types of operations at least, ext3 has 4 */
+#define AuBrDynOp (AuDyLast * 4)
+
 /* protected by superblock rwsem */
 struct au_branch {
 	struct au_xino_file	br_xino;
@@ -67,6 +71,8 @@ struct au_branch {
 
 	int			br_perm;
 	struct vfsmount		*br_mnt;
+	spinlock_t		br_dykey_lock;
+	struct au_dykey		*br_dykey[AuBrDynOp];
 	atomic_t		br_count;
 
 	struct au_wbr		*br_wbr;
