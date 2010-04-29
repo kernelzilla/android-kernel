@@ -25,5 +25,6 @@ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
 
 obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
 obj-$(CONFIG_REGULATOR_TPS6507X) += tps6507x-regulator.o
+obj-$(CONFIG_REGULATOR_PMIC8058) += pmic8058-regulator.o
 
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
