@@ -118,6 +118,7 @@ static int __init aufs_init(void)
 
 	sysaufs_brs_init();
 	au_debug_init();
+	au_dy_init();
 	err = sysaufs_init();
 	if (unlikely(err))
 		goto out;
@@ -150,6 +151,7 @@ static int __init aufs_init(void)
 	au_wkq_fin();
  out_sysaufs:
 	sysaufs_fin();
+	au_dy_fin();
  out:
 	return err;
 }
@@ -162,6 +164,7 @@ static void __exit aufs_exit(void)
 	au_hnotify_fin();
 	au_wkq_fin();
 	sysaufs_fin();
+	au_dy_fin();
 }
 
 module_init(aufs_init);
