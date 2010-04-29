@@ -24,7 +24,6 @@
  * along with this program; if not, you can find it at http://www.fsf.org
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -48,6 +47,7 @@
 #include <mach/qdsp5v2/qdsp5audplaymsg.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/qdsp5v2/audpp.h>
+#include <mach/debug_mm.h>
 
 #define BUFSZ 1024 /* Hold minimum 700ms voice data and 14 bytes of meta in*/
 #define DMASZ (BUFSZ * 2)
@@ -1236,8 +1236,8 @@ static int audamrnb_release(struct inode *inode, struct file *file)
 {
 	struct audio *audio = file->private_data;
 
-	MM_DBG("\n"); /* Macro prints the file name and function */
 	MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
+
 	mutex_lock(&audio->lock);
 	auddev_unregister_evt_listner(AUDDEV_CLNT_DEC, audio->dec_id);
 	audamrnb_disable(audio);
@@ -1428,9 +1428,9 @@ static int audamrnb_open(struct inode *inode, struct file *file)
 			&audio->queue_id);
 
 	if (decid < 0) {
-		MM_ERR("No free decoder available\n");
+		MM_ERR("No free decoder available, freeing instance 0x%08x\n",
+				(int)audio);
 		rc = -ENODEV;
-		MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 		kfree(audio);
 		goto done;
 	}
@@ -1439,20 +1439,20 @@ static int audamrnb_open(struct inode *inode, struct file *file)
 
 	audio->phys = pmem_kalloc(DMASZ, PMEM_MEMTYPE_EBI1|PMEM_ALIGNMENT_4K);
 	if (IS_ERR((void *)audio->phys)) {
-		MM_ERR("could not allocate write buffers\n");
+		MM_ERR("could not allocate write buffers, freeing instance \
+				0x%08x\n", (int)audio);
 		rc = -ENOMEM;
 		audpp_adec_free(audio->dec_id);
-		MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 		kfree(audio);
 		goto done;
 	} else {
 		audio->data = ioremap(audio->phys, DMASZ);
 		if (!audio->data) {
-			MM_ERR("could not allocate write buffers\n");
+			MM_ERR("could not allocate write buffers, freeing \
+					instance 0x%08x\n", (int)audio);
 			rc = -ENOMEM;
 			pmem_kfree(audio->phys);
 			audpp_adec_free(audio->dec_id);
-			MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 			kfree(audio);
 			goto done;
 		}
@@ -1463,7 +1463,8 @@ static int audamrnb_open(struct inode *inode, struct file *file)
 	rc = msm_adsp_get(audio->module_name, &audio->audplay,
 		&audplay_adsp_ops_amrnb, audio);
 	if (rc) {
-		MM_ERR("failed to get %s module\n", audio->module_name);
+		MM_ERR("failed to get %s module freeing instance 0x%08x\n",
+				audio->module_name, (int)audio);
 		goto err;
 	}
 
@@ -1505,7 +1506,7 @@ static int audamrnb_open(struct inode *inode, struct file *file)
 					amrnb_listner,
 					(void *)audio);
 	if (rc) {
-		MM_ERR("%s: failed to register listnet\n", __func__);
+		MM_ERR("%s: failed to register listner\n", __func__);
 		goto event_err;
 	}
 
@@ -1541,7 +1542,6 @@ err:
 	iounmap(audio->data);
 	pmem_kfree(audio->phys);
 	audpp_adec_free(audio->dec_id);
-	MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 	kfree(audio);
 	return rc;
 }

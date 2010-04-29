@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
@@ -26,6 +25,7 @@
 #include <mach/qdsp5v2/lpa.h>
 #include <mach/qdsp5v2/lpa_hw.h>
 #include <mach/qdsp5v2/msm_lpa.h>
+#include <mach/debug_mm.h>
 
 #define LPA_REG_WRITEL(drv, val, reg)  writel(val, drv->baseaddr + reg)
 #define LPA_REG_READL(drv, reg)  readl(drv->baseaddr + reg)
@@ -492,7 +492,7 @@ int lpa_cmd_enable_codec(struct lpa_drv *lpa, bool enable)
 	u32 val;
 	struct lpa_mem_bank_select mem_bank;
 
-	MM_INFO(" %s\n", (enable ? "enable" : "disable"));
+	MM_DBG(" %s\n", (enable ? "enable" : "disable"));
 
 	if (!lpa)
 		return -EINVAL;
@@ -521,11 +521,11 @@ int lpa_cmd_enable_codec(struct lpa_drv *lpa, bool enable)
 		lpa_clear_llb(lpa);
 
 		lpa_enable_codec(lpa, 1);
-		MM_INFO("LPA codec is enabled\n");
+		MM_DBG("LPA codec is enabled\n");
 	} else {
 		if (val & LPA_OBUF_CODEC_CODEC_INTF_EN_BMSK) {
 			lpa_enable_codec(lpa, 0);
-			MM_INFO("LPA codec is disabled\n");
+			MM_DBG("LPA codec is disabled\n");
 		} else
 			MM_ERR("LPA codec is already disable\n");
 	}

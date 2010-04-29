@@ -21,7 +21,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -43,6 +42,7 @@
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <linux/msm_audio.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <mach/debug_mm.h>
 
 #define BUFSZ 1094 /* QCELP 13K Hold 600ms packet data = 36 * 30 and
 		      14 bytes of meta in */
@@ -1229,7 +1229,6 @@ static int audqcelp_release(struct inode *inode, struct file *file)
 {
 	struct audio *audio = file->private_data;
 
-	MM_DBG("\n"); /* Macro prints the file name and function */
 	MM_INFO("audio instance 0x%08x freeing\n", (int) audio);
 	mutex_lock(&audio->lock);
 	auddev_unregister_evt_listner(AUDDEV_CLNT_DEC, audio->dec_id);
@@ -1420,9 +1419,9 @@ static int audqcelp_open(struct inode *inode, struct file *file)
 	decid = audpp_adec_alloc(dec_attrb, &audio->module_name,
 			&audio->queue_id);
 	if (decid < 0) {
-		MM_ERR("No free decoder available\n");
+		MM_ERR("No free decoder available, freeing instance 0x%08x\n",
+				(int)audio);
 		rc = -ENODEV;
-		MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 		kfree(audio);
 		goto done;
 	}
@@ -1430,19 +1429,20 @@ static int audqcelp_open(struct inode *inode, struct file *file)
 
 	audio->phys = pmem_kalloc(DMASZ, PMEM_MEMTYPE_EBI1|PMEM_ALIGNMENT_4K);
 	if (IS_ERR((void *)audio->phys)) {
+		MM_ERR("could not allocate write buffers, freeing instance \
+				0x%08x\n", (int)audio);
 		rc = -ENOMEM;
 		audpp_adec_free(audio->dec_id);
-		MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 		kfree(audio);
 		goto done;
 	} else {
 		audio->data = ioremap(audio->phys, DMASZ);
 		if (!audio->data) {
-			MM_ERR("could not allocate write buffers\n");
+			MM_ERR("could not allocate write buffers, freeing \
+					instance 0x%08x\n", (int)audio);
 			rc = -ENOMEM;
 			pmem_kfree(audio->phys);
 			audpp_adec_free(audio->dec_id);
-			MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 			kfree(audio);
 			goto done;
 		}
@@ -1453,7 +1453,8 @@ static int audqcelp_open(struct inode *inode, struct file *file)
 	rc = msm_adsp_get(audio->module_name, &audio->audplay,
 		&audplay_adsp_ops_qcelp, audio);
 	if (rc) {
-		MM_ERR("failed to get %s module\n", audio->module_name);
+		MM_ERR("failed to get %s module, freeing instance  0x%08x\n",
+				audio->module_name, (int)audio);
 		goto err;
 	}
 
@@ -1533,7 +1534,6 @@ err:
 	iounmap(audio->data);
 	pmem_kfree(audio->phys);
 	audpp_adec_free(audio->dec_id);
-	MM_INFO("audio instance 0x%08x freeing\n", (int)audio);
 	kfree(audio);
 	return rc;
 }

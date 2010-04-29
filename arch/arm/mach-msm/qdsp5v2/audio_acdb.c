@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <linux/kthread.h>
@@ -37,7 +36,7 @@
 #include <mach/qdsp5v2/audio_acdb.h>
 #include <mach/qdsp5v2/audio_acdbi.h>
 #include <mach/qdsp5v2/acdb_commands.h>
-
+#include <mach/debug_mm.h>
 
 /* this is the ACDB device ID */
 #define DALDEVICEID_ACDB		0x02000069

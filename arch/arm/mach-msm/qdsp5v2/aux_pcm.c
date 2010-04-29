@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
@@ -24,6 +23,7 @@
 #include <mach/qdsp5v2/aux_pcm.h>
 #include <mach/gpio.h>
 #include <linux/delay.h>
+#include <mach/debug_mm.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -120,7 +120,7 @@ int aux_pcm_gpios_request(void)
 {
 	int rc = 0;
 
-	MM_INFO(" aux_pcm_gpios_request \n");
+	MM_DBG("aux_pcm_gpios_request\n");
 	rc = gpio_request(the_aux_pcm_state.dout, "AUX PCM DOUT");
 	if (rc) {
 		MM_ERR("GPIO request for AUX PCM DOUT failed\n");
@@ -158,7 +158,7 @@ EXPORT_SYMBOL(aux_pcm_gpios_request);
 
 void aux_pcm_gpios_free(void)
 {
-	MM_INFO(" aux_pcm_gpios_free \n");
+	MM_DBG(" aux_pcm_gpios_free \n");
 
 	/*
 	 * Feed silence frames before close to prevent buzzing sound in BT at
@@ -228,7 +228,7 @@ static int aux_pcm_probe(struct platform_device *pdev)
 	int rc = 0;
 	struct resource *mem_src;
 
-	MM_INFO("aux_pcm_probe \n");
+	MM_DBG("aux_pcm_probe \n");
 	mem_src = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"aux_codec_reg_addr");
 	if (!mem_src) {

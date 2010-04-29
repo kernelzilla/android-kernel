@@ -15,7 +15,6 @@
  * along with this program; if not, you can find it at http://www.fsf.org.
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -30,6 +29,7 @@
 #include <asm/dma.h>
 #include <linux/dma-mapping.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <mach/debug_mm.h>
 
 #include "msm7kv2-pcm.h"
 
@@ -115,7 +115,7 @@ void alsa_dsp_event(void *data, unsigned id, uint16_t *msg)
 		break;
 	}
 	case AUDPP_MSG_PCMDMAMISSED:
-		MM_ERR("PCMDMAMISSED %d\n", msg[0]);
+		MM_INFO("PCMDMAMISSED %d\n", msg[0]);
 		prtd->eos_ack++;
 		MM_DBG("PCMDMAMISSED Count per Buffer %d\n", prtd->eos_ack);
 		wake_up(&the_locks.eos_wait);

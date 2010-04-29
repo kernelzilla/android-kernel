@@ -16,7 +16,6 @@
  * along with this program; if not, you can find it at http://www.fsf.org.
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -38,6 +37,7 @@
 #include "msm7kv2-pcm.h"
 #include <asm/mach-types.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <mach/debug_mm.h>
 
 static struct platform_device *msm_audio_snd_device;
 struct audio_locks the_locks;
@@ -411,8 +411,8 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 	else
 		route_cfg.stream_type =	AUDIO_ROUTE_STREAM_REC;
 
-	MM_DBG("route cfg %d %d type for popp %d\n",
-		route_cfg.dev_id, route_cfg.stream_type, session_id);
+	MM_DBG("route cfg %d %d type for popp %d set value %d\n",
+		route_cfg.dev_id, route_cfg.stream_type, session_id, set);
 	dev_info = audio_dev_ctrl_find_dev(route_cfg.dev_id);
 
 	if (IS_ERR(dev_info)) {
@@ -517,8 +517,8 @@ static int msm_device_volume_put(struct snd_kcontrol *kcontrol,
 
 	if (IS_ERR(dev_info)) {
 		rc = PTR_ERR(dev_info);
-		pr_err("%s: audio_dev_ctrl_find_dev failed. %ld \n",
-			__func__, PTR_ERR(dev_info));
+		MM_ERR("audio_dev_ctrl_find_dev failed. %ld \n",
+				PTR_ERR(dev_info));
 		return rc;
 	}
 
@@ -528,8 +528,8 @@ static int msm_device_volume_put(struct snd_kcontrol *kcontrol,
 	if (dev_info->dev_ops.set_device_volume)
 		rc = dev_info->dev_ops.set_device_volume(dev_info, volume);
 	else {
-		pr_info("%s : device %s does not support device volume "
-				"control.", __func__, dev_info->name);
+		MM_INFO("device %s does not support device volume "
+				"control.", dev_info->name);
 		return -EPERM;
 	}
 
