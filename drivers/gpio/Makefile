@@ -20,3 +20,4 @@ obj-$(CONFIG_GPIO_BT8XX)	+= bt8xxgpio.o
 obj-$(CONFIG_GPIO_VR41XX)	+= vr41xx_giu.o
 obj-$(CONFIG_GPIO_WM831X)	+= wm831x-gpio.o
 obj-$(CONFIG_GPIO_SX150X)	+= sx150x.o
+obj-$(CONFIG_MPP_PMIC8901)	+= pmic8901-mpp.o
