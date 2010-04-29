@@ -1,6 +1,6 @@
 /* ehci-msm.c - HSUSB Host Controller Driver Implementation
  *
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * Partly derived from ehci-fsl.c and ehci-hcd.c
  * Copyright (c) 2000-2004 by David Brownell
@@ -646,6 +646,7 @@ static int __init ehci_msm_probe(struct platform_device *pdev)
 		usb_put_hcd(hcd);
 		return -ENODEV;
 	}
+	hcd->power_budget = pdata->power_budget;
 	mhcd->pdata = pdata;
 	INIT_WORK(&mhcd->lpm_exit_work, usb_lpm_exit_w);
 
