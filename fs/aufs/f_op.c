@@ -513,7 +513,7 @@ au_hvmop(struct file *h_file, struct vm_area_struct *vma, unsigned long *flags)
 		goto out;
 
 	err = ima_file_mmap(h_file, prot);
-	vm_ops = ERR_PTR(err);
+	h_vmop = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
 
