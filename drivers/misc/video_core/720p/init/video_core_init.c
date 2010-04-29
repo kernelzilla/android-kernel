@@ -62,7 +62,9 @@ static const struct file_operations vid_c_fops = {
 };
 
 struct workqueue_struct *vid_c_wq;
+struct workqueue_struct *vidc_timer_wq;
 static irqreturn_t vid_c_isr(int irq, void *dev);
+static spinlock_t vidc_spin_lock;
 
 #define VIDC_BOOT_FW			"vidc_720p_command_control.fw"
 #define VIDC_MPG4_DEC_FW		"vidc_720p_mp4_dec_mc.fw"
@@ -71,7 +73,41 @@ static irqreturn_t vid_c_isr(int irq, void *dev);
 #define VIDC_MPG4_ENC_FW		"vidc_720p_mp4_enc_mc.fw"
 #define VIDC_H264_ENC_FW		"vidc_720p_h264_enc_mc.fw"
 
+static void vid_c_timer_fn(unsigned long data)
+{
+	unsigned long flag;
+	struct vid_c_timer *hw_timer = NULL;
 
+	DBG("%s() Timer expired \n", __func__);
+	spin_lock_irqsave(&vidc_spin_lock, flag);
+	hw_timer = (struct vid_c_timer *)data;
+	list_add_tail(&hw_timer->list, &vid_c_device_p->vidc_timer_queue);
+	spin_unlock_irqrestore(&vidc_spin_lock, flag);
+	DBG("Queue the work for timer \n");
+	queue_work(vidc_timer_wq, &vid_c_device_p->vidc_timer_worker);
+}
+
+static void vid_c_timer_handler(struct work_struct *work)
+{
+	unsigned long flag = 0;
+	u32 islist_empty = 0;
+	struct vid_c_timer *hw_timer = NULL;
+
+	DBG("%s() Timer expired \n", __func__);
+	do {
+		spin_lock_irqsave(&vidc_spin_lock, flag);
+		islist_empty = list_empty(&vid_c_device_p->vidc_timer_queue);
+		if (!islist_empty) {
+			hw_timer = list_first_entry(
+				&vid_c_device_p->vidc_timer_queue,
+				struct vid_c_timer, list);
+			list_del(&hw_timer->list);
+		}
+		spin_unlock_irqrestore(&vidc_spin_lock, flag);
+		if (!islist_empty && hw_timer && hw_timer->cb_func)
+			hw_timer->cb_func(hw_timer->userdata);
+	} while (!islist_empty);
+}
 
 static void vid_c_work_handler(struct work_struct *work)
 {
@@ -114,7 +150,6 @@ static int __init vid_c_720p_probe(struct platform_device *pdev)
 		ERR("%s() : ioremap failed\n", __func__);
 		return -ENOMEM;
 	}
-
 	vid_c_device_p->device = &pdev->dev;
 	mutex_init(&vid_c_device_p->lock);
 
@@ -215,12 +250,22 @@ static int __init vid_c_init(void)
 
 	if (unlikely(rc)) {
 		ERR("%s() :request_irq failed\n", __func__);
-		return rc;
+		goto error_vid_c_platfom_register;
+	}
+
+	vidc_timer_wq = create_singlethread_workqueue("vidc_timer_wq");
+	if (!vidc_timer_wq) {
+		ERR("%s: create workque failed \n", __func__);
+		rc = -ENOMEM;
+		goto error_vid_c_platfom_register;
 	}
 
 	DBG("Disabling IRQ in %s()\n", __func__);
 	disable_irq_nosync(vid_c_device_p->irq);
-
+	INIT_WORK(&vid_c_device_p->vidc_timer_worker,
+			  vid_c_timer_handler);
+	spin_lock_init(&vidc_spin_lock);
+	INIT_LIST_HEAD(&vid_c_device_p->vidc_timer_queue);
 	vid_c_device_p->clock_enabled = 0;
 	vid_c_device_p->ref_count = 0;
 	vid_c_device_p->firmware_refcount = 0;
@@ -835,6 +880,55 @@ u32 vid_c_lookup_addr_table(struct video_client_ctx *client_ctx,
 	}
 }
 EXPORT_SYMBOL(vid_c_lookup_addr_table);
+
+u32 vid_c_timer_create(void (*pf_timer_handler)(void *),
+	void *p_user_data, void **pp_timer_handle)
+{
+	struct vid_c_timer *hw_timer = NULL;
+	if (!pf_timer_handler || !pp_timer_handle) {
+		DBG("%s(): timer creation failed \n ", __func__);
+		return FALSE;
+	}
+	hw_timer = kzalloc(sizeof(struct vid_c_timer), GFP_KERNEL);
+	if (!hw_timer) {
+		DBG("%s(): timer creation failed in allocation \n ", __func__);
+		return FALSE;
+	}
+	init_timer(&hw_timer->hw_timeout);
+	hw_timer->hw_timeout.data = (unsigned long)hw_timer;
+	hw_timer->hw_timeout.function = vid_c_timer_fn;
+	hw_timer->cb_func = pf_timer_handler;
+	hw_timer->userdata = p_user_data;
+	*pp_timer_handle = hw_timer;
+	return TRUE;
+}
+EXPORT_SYMBOL(vid_c_timer_create);
+
+void  vid_c_timer_release(void *p_timer_handle)
+{
+	kfree(p_timer_handle);
+}
+EXPORT_SYMBOL(vid_c_timer_release);
+
+void  vid_c_timer_start(void *p_timer_handle, u32 n_time_out)
+{
+	struct vid_c_timer *hw_timer = (struct vid_c_timer *)p_timer_handle;
+	DBG("%s(): start timer\n ", __func__);
+	if (hw_timer) {
+		hw_timer->hw_timeout.expires = jiffies + 1*HZ;
+		add_timer(&hw_timer->hw_timeout);
+	}
+}
+EXPORT_SYMBOL(vid_c_timer_start);
+
+void  vid_c_timer_stop(void *p_timer_handle)
+{
+	struct vid_c_timer *hw_timer = (struct vid_c_timer *)p_timer_handle;
+	DBG("%s(): stop timer\n ", __func__);
+	if (hw_timer)
+		del_timer(&hw_timer->hw_timeout);
+}
+EXPORT_SYMBOL(vid_c_timer_stop);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Video decoder/encoder driver Init Module");

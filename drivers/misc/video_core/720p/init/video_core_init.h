@@ -88,4 +88,11 @@ unsigned long *user_vaddr, unsigned long *kernel_vaddr,
 unsigned long *phy_addr, int *pmem_fd, struct file **file,
 s32 *buffer_index);
 
+u32 vid_c_timer_create(void (*pf_timer_handler)(void *),
+	void *p_user_data, void **pp_timer_handle);
+void  vid_c_timer_release(void *p_timer_handle);
+void  vid_c_timer_start(void *p_timer_handle, u32 n_time_out);
+void  vid_c_timer_stop(void *p_timer_handle);
+
+
 #endif

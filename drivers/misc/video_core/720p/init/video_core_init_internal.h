@@ -32,6 +32,13 @@
 
 #include <linux/cdev.h>
 
+struct vid_c_timer {
+	struct list_head list;
+	struct timer_list hw_timeout;
+	void (*cb_func)(void *);
+	void *userdata;
+};
+
 struct vid_c_dev {
 	struct cdev cdev;
 	struct device *device;
@@ -49,6 +56,8 @@ struct vid_c_dev {
 	unsigned int get_firmware;
 	struct mutex lock;
 	s32 device_handle;
+	struct list_head vidc_timer_queue;
+	struct work_struct vidc_timer_worker;
 };
 
 #endif
