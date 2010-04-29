@@ -559,6 +559,14 @@ config MSM_SMD_DEBUG
 	  Support for debugging the SMD for communication
 	  between the ARM9 and ARM11
 
+config MSM_SDIO_AL
+	depends on ARCH_MSM7X30
+	default y
+	tristate "SDIO-Abstraction-Layer"
+	help
+	  Support MSM<->MDM Communication over SDIO bus.
+	  MDM SDIO-Client should have pipes support.
+
 config MSM_N_WAY_SMD
 	depends on (MSM_SMD && (ARCH_MSM_SCORPION || ARCH_MSM7X27))
 	default y
