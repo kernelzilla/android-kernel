@@ -579,10 +579,6 @@ int msm_camio_probe_off(struct platform_device *pdev)
 	return msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
 }
 
-int msm_camio_read_camif_status(void)
-{
-	return msm_io_r(camifpadbase + 0x4);
-}
 int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 {
 	int rc = 0;

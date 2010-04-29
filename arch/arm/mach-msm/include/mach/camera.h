@@ -334,8 +334,6 @@ int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
 int add_axi_qos(void);
 int update_axi_qos(uint32_t freq);
 void release_axi_qos(void);
-int msm_camio_read_camif_status(void);
-
 void msm_io_w(u32 data, void __iomem *addr);
 void msm_io_w_mb(u32 data, void __iomem *addr);
 u32 msm_io_r(void __iomem *addr);

@@ -1730,8 +1730,6 @@ static inline void vfe31_read_irq_status(struct vfe31_irq_status *out)
 	temp = (uint32_t *)(vfe31_ctrl->vfebase + VFE_CAMIF_STATUS);
 	out->camifStatus = msm_io_r(temp);
 	CDBG("camifStatus  = 0x%x\n", out->camifStatus);
-
-	CDBG("camifPadStatus  = 0x%x\n", msm_camio_read_camif_status());
 }
 
 static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id)
