@@ -1742,6 +1742,7 @@ u32 vcd_handle_first_decode_frame(struct vcd_clnt_ctxt_type_t *p_cctxt)
 			} else {
 				p_out_buf_pool->a_queue[n_q_cntr]->b_in_use =
 					TRUE;
+				p_out_buf_pool->n_in_use++;
 			}
 		}
 
