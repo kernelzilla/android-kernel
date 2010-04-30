@@ -80,6 +80,8 @@ extern unsigned msm_num_clocks_7x30;
 extern struct clk msm_clocks_8x50[];
 extern unsigned msm_num_clocks_8x50;
 
+extern struct clk msm_clocks_8x60[];
+extern unsigned msm_num_clocks_8x60;
 
 void __init msm_fb_register_device(char *name, void *data);
 void __init msm_camera_register_device(void *, uint32_t, void *);
