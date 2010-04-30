@@ -99,6 +99,21 @@ static struct au_dykey *dy_gadd(struct au_splhead *spl, struct au_dykey *key)
 	return found;
 }
 
+static void dy_free(struct kref *kref)
+{
+	struct au_dykey *key;
+
+	key = container_of(kref, struct au_dykey, dk_kref);
+	DyPrSym(key);
+	au_spl_del(&key->dk_list, dynop + key->dk_op.dy_type);
+	kfree(key);
+}
+
+void au_dy_put(struct au_dykey *key)
+{
+	kref_put(&key->dk_kref, dy_free);
+}
+
 /* ---------------------------------------------------------------------- */
 
 #define DyDbgSize(cnt, op)	AuDebugOn(cnt != sizeof(op)/sizeof(void *))
@@ -201,21 +216,6 @@ static void dy_vmop(struct au_dykey *key, const void *h_op,
 }
 
 /* ---------------------------------------------------------------------- */
-
-static void dy_free(struct kref *kref)
-{
-	struct au_dykey *key;
-
-	key = container_of(kref, struct au_dykey, dk_kref);
-	DyPrSym(key);
-	au_spl_del(&key->dk_list, dynop + key->dk_op.dy_type);
-	kfree(key);
-}
-
-void au_dy_put(struct au_dykey *key)
-{
-	kref_put(&key->dk_kref, dy_free);
-}
 
 static void dy_bug(struct kref *kref)
 {
