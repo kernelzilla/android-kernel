@@ -59,11 +59,6 @@ static struct platform_device *devices[] __initdata = {
 	&smc91x_device,
 };
 
-void arch_idle(void)
-{
-
-}
-
 unsigned long clk_get_max_axi_khz(void)
 {
 	return 0;
