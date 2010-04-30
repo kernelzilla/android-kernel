@@ -161,6 +161,7 @@ int au_reopen_nondir(struct file *file)
 	au_set_fbstart(file, bstart);
 	au_set_h_fptr(file, bstart, h_file);
 	au_update_figen(file);
+	au_dy_frefresh(file);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
 
@@ -543,6 +544,12 @@ static int aufs_readpage(struct file *file __maybe_unused, struct page *page)
 	return 0;
 }
 
+/* it will never be called, but necessary to support O_DIRECT */
+static ssize_t aufs_direct_IO(int rw, struct kiocb *iocb,
+			      const struct iovec *iov, loff_t offset,
+			      unsigned long nr_segs)
+{ BUG(); return 0; }
+
 /* they will never be called. */
 #ifdef CONFIG_AUFS_DEBUG
 static int aufs_write_begin(struct file *file, struct address_space *mapping,
@@ -564,10 +571,6 @@ static void aufs_invalidatepage(struct page *page, unsigned long offset)
 { AuUnsupport(); }
 static int aufs_releasepage(struct page *page, gfp_t gfp)
 { AuUnsupport(); return 0; }
-static ssize_t aufs_direct_IO(int rw, struct kiocb *iocb,
-			      const struct iovec *iov, loff_t offset,
-			      unsigned long nr_segs)
-{ AuUnsupport(); return 0; }
 static int aufs_get_xip_mem(struct address_space *mapping, pgoff_t pgoff,
 			    int create, void **kmem, unsigned long *pfn)
 { AuUnsupport(); return 0; }
@@ -587,6 +590,7 @@ static int aufs_error_remove_page(struct address_space *mapping,
 
 const struct address_space_operations aufs_aop = {
 	.readpage		= aufs_readpage,
+	.direct_IO		= aufs_direct_IO,
 #ifdef CONFIG_AUFS_DEBUG
 	.writepage		= aufs_writepage,
 	.sync_page		= aufs_sync_page,
@@ -598,8 +602,7 @@ const struct address_space_operations aufs_aop = {
 	/* no bmap, no block device */
 	.invalidatepage		= aufs_invalidatepage,
 	.releasepage		= aufs_releasepage,
-	.direct_IO		= aufs_direct_IO,	/* todo */
-	.get_xip_mem		= aufs_get_xip_mem,	/* todo */
+	.get_xip_mem		= aufs_get_xip_mem,
 	.migratepage		= aufs_migratepage,
 	.launder_page		= aufs_launder_page,
 	.is_partially_uptodate	= aufs_is_partially_uptodate,

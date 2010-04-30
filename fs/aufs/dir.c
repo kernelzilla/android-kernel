@@ -569,6 +569,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 /* ---------------------------------------------------------------------- */
 
 const struct file_operations aufs_dir_fop = {
+	.owner		= THIS_MODULE,
 	.read		= generic_read_dir,
 	.readdir	= aufs_readdir,
 	.unlocked_ioctl	= aufs_ioctl_dir,

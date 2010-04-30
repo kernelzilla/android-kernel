@@ -13,8 +13,7 @@ Description:
 		It shows the consumed blocks by xib (External Inode Number
 		Bitmap), its block size and file size.
 		When the aufs mount option 'noxino' is specified, it
-		will be empty. About XINO files, see
-		Documentation/filesystems/aufs/aufs.5 in detail.
+		will be empty. About XINO files, see the aufs manual.
 
 What:		/debug/aufs/si_<id>/xino0, xino1 ... xinoN
 Date:		March 2009
@@ -24,8 +23,7 @@ Description:
 		Translation Table), its link count, block size and file
 		size.
 		When the aufs mount option 'noxino' is specified, it
-		will be empty. About XINO files, see
-		Documentation/filesystems/aufs/aufs.5 in detail.
+		will be empty. About XINO files, see the aufs manual.
 
 What:		/debug/aufs/si_<id>/xigen
 Date:		March 2009
@@ -36,5 +34,4 @@ Description:
 		If CONFIG_AUFS_EXPORT is disabled, this entry will not
 		be created.
 		When the aufs mount option 'noxino' is specified, it
-		will be empty. About XINO files, see
-		Documentation/filesystems/aufs/aufs.5 in detail.
+		will be empty. About XINO files, see the aufs manual.
