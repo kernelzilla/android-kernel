@@ -26,6 +26,7 @@
 #include <mach/msm_rpcrouter.h>
 
 #include "npa_remote.h"
+#include "proc_comm.h"
 
 #define NPA_REMOTEPROG			0x300000A4
 #define NPA_REMOTEVERS			0x00010001
@@ -393,6 +394,23 @@ int npa_remote_destroy_client(void *handle)
 }
 EXPORT_SYMBOL(npa_remote_destroy_client);
 
+#ifdef CONFIG_MSM_NPA_PROC_COMM
+int npa_remote_issue_required_request(void *handle, unsigned int state,
+		unsigned int *new_state)
+{
+	int err = 0;
+
+	err = msm_proc_comm(PCOM_NPA_ISSUE_REQUIRED_REQUEST,
+			(unsigned *)&handle, (unsigned *)&state);
+
+	*new_state = state;
+	if (err) {
+		pr_err("NPA Remote func %s returned error %d\n", __func__, err);
+		BUG();
+	}
+	return err;
+}
+#else
 static int npa_remote_issue_required_request_arg_fn(
 		struct msm_rpc_client *client,
 		struct msm_rpc_xdr *xdr, void *data)
@@ -445,6 +463,7 @@ int npa_remote_issue_required_request(void *handle, unsigned int state,
 
 	return ret.result;
 }
+#endif /* CONFIG_MSM_NPA_PROC_COMM */
 EXPORT_SYMBOL(npa_remote_issue_required_request);
 
 #define NPA_PROTOCOL_ONCRPC "/protocols/modem/oncrpc/1.0.0"
@@ -498,9 +517,30 @@ static int npa_remote_verify_cb(void *context, unsigned int size,
 	return 0;
 }
 
+#define NPA_PROC_COMM_VERSION_MAJOR 1
+#define NPA_PROC_COMM_VERSION_MINOR 0
+
 static void npa_remote_verify(struct work_struct *work)
 {
-	int err = npa_remote_init(NPA_REMOTE_VERSION_MAJOR,
+	int err = 0;
+
+	/* PROC COMM is used for issuing requests when enabled. However,
+	 * NPA remoting needs to be initialized with many parameters and
+	 * ONCRPC will be used to initialize and create remote node and
+	 * clients.
+	 */
+
+#ifdef CONFIG_MSM_NPA_PROC_COMM
+	int major = NPA_PROC_COMM_VERSION_MAJOR;
+	int minor = NPA_PROC_COMM_VERSION_MINOR;
+
+	/* Initialize PROC COMM transport layer for NPA. */
+	err = msm_proc_comm(PCOM_NPA_INIT,
+			(unsigned *)&major, (unsigned *)&minor);
+	BUG_ON(err);
+#endif
+	/* Initialize ONCRPC transport layer for NPA. */
+	err = npa_remote_init(NPA_REMOTE_VERSION_MAJOR,
 				NPA_REMOTE_VERSION_MINOR,
 				NPA_REMOTE_VERSION_BUILD,
 				npa_remote_verify_cb, NULL);
