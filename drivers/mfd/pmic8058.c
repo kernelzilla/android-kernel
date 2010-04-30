@@ -357,19 +357,12 @@ int pm8058_gpio_set_direction(struct pm8058_chip *chip,
 	if (!direction || chip == NULL)
 		return -EINVAL;
 
-	bank1 = PM8058_GPIO_WRITE |
-		((1 << PM8058_GPIO_BANK_SHIFT) &
-			PM8058_GPIO_BANK_MASK) |
-		((dir_map[direction] << PM8058_GPIO_MODE_SHIFT) &
-			PM8058_GPIO_MODE_MASK) |
-		((direction & PM_GPIO_DIR_OUT) ?
-			PM8058_GPIO_OUT_BUFFER : 0);
-
-	if (direction & PM_GPIO_DIR_OUT)
-		/* Carry over the old value */
-		bank1 |= chip->gpio_bank1[gpio] & PM8058_GPIO_OUT_INVERT;
-
 	spin_lock_irqsave(&chip->pm_lock, irqsave);
+	bank1 = chip->gpio_bank1[gpio] & ~PM8058_GPIO_MODE_MASK;
+
+	bank1 |= ((dir_map[direction] << PM8058_GPIO_MODE_SHIFT)
+		  & PM8058_GPIO_MODE_MASK);
+
 	chip->gpio_bank1[gpio] = bank1;
 	rc = ssbi_write(chip->dev, SSBI_REG_ADDR_GPIO(gpio), &bank1, 1);
 	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
@@ -390,12 +383,12 @@ int pm8058_gpio_set(struct pm8058_chip *chip, unsigned gpio, int value)
 	if (gpio >= PM8058_GPIOS || chip == NULL)
 		return -EINVAL;
 
+	spin_lock_irqsave(&chip->pm_lock, irqsave);
 	bank1 = chip->gpio_bank1[gpio] & ~PM8058_GPIO_OUT_INVERT;
 
 	if (value)
 		bank1 |= PM8058_GPIO_OUT_INVERT;
 
-	spin_lock_irqsave(&chip->pm_lock, irqsave);
 	chip->gpio_bank1[gpio] = bank1;
 	rc = ssbi_write(chip->dev, SSBI_REG_ADDR_GPIO(gpio), &bank1, 1);
 	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
