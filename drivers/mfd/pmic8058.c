@@ -112,11 +112,7 @@
 struct pm8058_chip {
 	struct pm8058_platform_data	pdata;
 
-	struct completion		irq_completion;
-
 	struct i2c_client		*dev;
-
-	struct task_struct		*pm_task;
 
 	u8	irqs_allowed[MAX_PM_BLOCKS];
 	u8	blocks_allowed[MAX_PM_MASTERS];
@@ -136,8 +132,6 @@ struct pm8058_chip {
 };
 
 static struct pm8058_chip *pmic_chip;
-
-static irqreturn_t pm8058_int_handler(int irq, void *devid);
 
 /* Helper Functions */
 DEFINE_RATELIMIT_STATE(pm8058_msg_ratelimit, 60 * HZ, 10);
@@ -695,8 +689,9 @@ bail_out:
 	return rc;
 }
 
-static void pm8058_handle_isr(struct pm8058_chip *chip)
+static irqreturn_t pm8058_isr_thread(int irq_requested, void *data)
 {
+	struct pm8058_chip *chip = data;
 	int	i, j, k;
 	u8	root, block, config, bits;
 	u8	blocks[MAX_PM_MASTERS];
@@ -800,7 +795,7 @@ bail_out:
 
 	if (spurious) {
 		if (!pm8058_can_print())
-			return;
+			return IRQ_HANDLED;
 
 		pr_err("%s: spurious = %d (handled = %d)\n",
 		       __func__, spurious, handled);
@@ -814,57 +809,6 @@ bail_out:
 				       i, chip->blocks_allowed[i]);
 		}
 	}
-
-	return;
-}
-
-static int pm8058_ist(void *data)
-{
-	unsigned int irq = (unsigned int)data;
-	struct pm8058_chip *chip = get_irq_data(irq);
-
-	if (!chip) {
-		pr_err("%s: Invalid chip data: IRQ=%d\n", __func__, irq);
-		return -EINVAL;
-	}
-
-	current->flags |= PF_NOFREEZE;
-
-	while (!kthread_should_stop()) {
-		int	rc;
-		rc = wait_for_completion_interruptible(&chip->irq_completion);
-		if (rc) {
-			pr_err("%s: wait_for_completion_interruptible: "
-			       "rc=%d\n", __func__, rc);
-			complete(&chip->irq_completion);
-			continue;
-		}
-
-		pm8058_handle_isr(chip);
-		enable_irq(irq);
-	}
-
-	return 0;
-}
-
-static struct task_struct *pm8058_init_ist(unsigned int irq,
-					   struct completion *irq_completion)
-{
-	struct task_struct *thread;
-
-	init_completion(irq_completion);
-	thread = kthread_run(pm8058_ist, (void *)irq, "pm8058-ist");
-	if (!thread)
-		pr_err("%s: Failed to create kernel thread for (irq=%d)\n",
-			__func__, irq);
-
-	return thread;
-}
-
-static irqreturn_t pm8058_int_handler(int irq, void *devid)
-{
-	disable_irq_nosync(irq);
-	complete(devid);
 
 	return IRQ_HANDLED;
 }
@@ -923,13 +867,6 @@ static int pm8058_probe(struct i2c_client *client,
 	set_irq_data(chip->dev->irq, (void *)chip);
 	set_irq_wake(chip->dev->irq, 1);
 
-	chip->pm_task = pm8058_init_ist(chip->dev->irq, &chip->irq_completion);
-	if (chip->pm_task == NULL) {
-		pr_err("%s: pm8058_init_ist() failed\n", __func__);
-		kfree(chip);
-		return -ESRCH;
-	}
-
 	chip->pm_max_irq = 0;
 	chip->pm_max_blocks = 0;
 	chip->pm_max_masters = 0;
@@ -957,16 +894,15 @@ static int pm8058_probe(struct i2c_client *client,
 		rc = pdata->init(chip);
 		if (rc != 0) {
 			pr_err("%s: board init failed\n", __func__);
-			kthread_stop(chip->pm_task);
 			chip->dev = NULL;
 			kfree(chip);
 			return -ENODEV;
 		}
 	}
 
-	rc = request_irq(chip->dev->irq, pm8058_int_handler,
-			IRQF_DISABLED | IRQF_TRIGGER_LOW,
-			"pm8058-irq", &chip->irq_completion);
+	rc = request_threaded_irq(chip->dev->irq, NULL, pm8058_isr_thread,
+			IRQF_ONESHOT | IRQF_DISABLED | IRQF_TRIGGER_LOW,
+			"pm8058-irq", chip);
 	if (rc < 0)
 		pr_err("%s: could not request irq %d: %d\n", __func__,
 				chip->dev->irq, rc);
@@ -982,11 +918,8 @@ static int __devexit pm8058_remove(struct i2c_client *client)
 	if (chip) {
 		if (chip->pm_max_irq) {
 			set_irq_wake(chip->dev->irq, 0);
-			free_irq(chip->dev->irq, &chip->irq_completion);
+			free_irq(chip->dev->irq, chip);
 		}
-
-		if (chip->pm_task != NULL)
-			kthread_stop(chip->pm_task);
 
 		chip->dev = NULL;
 
