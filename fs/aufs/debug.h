@@ -189,6 +189,12 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	sprint_symbol(sym, (unsigned long)addr);	\
 	AuDbg("%s\n", sym);				\
 } while (0)
+
+#define AuInfoSym(addr) do {				\
+	char sym[KSYM_SYMBOL_LEN];			\
+	sprint_symbol(sym, (unsigned long)addr);	\
+	AuInfo("%s\n", sym);				\
+} while (0)
 #else
 AuStubVoid(au_dbg_verify_dir_parent, struct dentry *dentry, unsigned int sigen)
 AuStubVoid(au_dbg_verify_nondir_parent, struct dentry *dentry,
@@ -209,6 +215,7 @@ AuStubVoid(au_debug_sbinfo_init, struct au_sbinfo *sbinfo)
 #define AuDbgSleepJiffy(jiffy)	do {} while (0)
 #define AuDbgIAttr(ia)		do {} while (0)
 #define AuDbgSym(addr)		do {} while (0)
+#define AuInfoSym(addr)		do {} while (0)
 #endif /* CONFIG_AUFS_DEBUG */
 
 /* ---------------------------------------------------------------------- */
