@@ -585,7 +585,8 @@ static void pm8058_irq_ack(unsigned int irq)
 	struct	pm8058_chip *chip = get_irq_data(irq);
 	u8	block, config;
 
-	block = (irq - chip->pdata.irq_base) / 8;
+	irq -= chip->pdata.irq_base;
+	block = irq / 8;
 
 	config = PM8058_IRQF_WRITE | chip->config[irq] | PM8058_IRQF_CLR;
 	pm8058_config_irq(chip, &block, &config);
