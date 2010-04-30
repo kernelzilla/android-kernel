@@ -256,8 +256,8 @@ static int rpcrouter_send_control_msg(struct rpcrouter_xprt_info *xprt_info,
 		msleep(250);
 		spin_lock_irqsave(&xprt_info->lock, flags);
 	}
-	xprt_info->xprt->write(&hdr, sizeof(hdr));
-	xprt_info->xprt->write(msg, hdr.size);
+	xprt_info->xprt->write(&hdr, sizeof(hdr), HEADER);
+	xprt_info->xprt->write(msg, hdr.size, PAYLOAD);
 	spin_unlock_irqrestore(&xprt_info->lock, flags);
 
 	return 0;
@@ -631,9 +631,7 @@ static int process_control_msg(struct rpcrouter_xprt_info *xprt_info,
 
 	switch (msg->cmd) {
 	case RPCROUTER_CTRL_CMD_HELLO:
-		RR("o HELLO\n");
-
-		RR("x HELLO\n");
+		RR("o HELLO PID %d\n", xprt_info->remote_pid);
 		memset(&ctl, 0, sizeof(ctl));
 		ctl.cmd = RPCROUTER_CTRL_CMD_HELLO;
 		rpcrouter_send_control_msg(xprt_info, &ctl);
@@ -1213,14 +1211,14 @@ static int msm_rpc_write_pkt(
 	}
 
 	/* TODO: deal with full fifo */
-	xprt_info->xprt->write(hdr, sizeof(*hdr));
+	xprt_info->xprt->write(hdr, sizeof(*hdr), HEADER);
 	RAW_HDR("[w rr_h] "
 		    "ver=%i,type=%s,src_pid=%08x,src_cid=%08x,"
 		"confirm_rx=%i,size=%3i,dst_pid=%08x,dst_cid=%08x\n",
 		hdr->version, type_to_str(hdr->type),
 		hdr->src_pid, hdr->src_cid,
 		hdr->confirm_rx, hdr->size, hdr->dst_pid, hdr->dst_cid);
-	xprt_info->xprt->write(&pacmark, sizeof(pacmark));
+	xprt_info->xprt->write(&pacmark, sizeof(pacmark), PACKMARK);
 
 #if defined(CONFIG_MSM_ONCRPCROUTER_DEBUG)
 	if ((smd_rpcrouter_debug_mask & RAW_PMW) &&
@@ -1239,7 +1237,7 @@ static int msm_rpc_write_pkt(
 	}
 #endif
 
-	xprt_info->xprt->write(buffer, count);
+	xprt_info->xprt->write(buffer, count, PAYLOAD);
 	spin_unlock(&ept->restart_lock);
 	spin_unlock_irqrestore(&xprt_info->lock, flags);
 
@@ -1888,7 +1886,6 @@ int msm_rpc_clear_netreset(struct msm_rpc_endpoint *ept)
 {
 	unsigned long flags;
 	int rc = 1;
-	RR("RESET RESTART FLAG for EPT:%08x \n", (unsigned int)ept);
 	spin_lock_irqsave(&ept->restart_lock, flags);
 	if (ept->restart_state !=  RESTART_NORMAL) {
 		ept->restart_state &= ~RESTART_PEND_NTFY;
@@ -2177,7 +2174,7 @@ static int __init rpcrouter_init(void)
 	int ret;
 
 	msm_rpc_connect_timeout_ms = 0;
-	smd_rpcrouter_debug_mask |= SMEM_LOG;
+	smd_rpcrouter_debug_mask |= SMEM_LOG | R2R_MSG;
 	debugfs_init();
 
 	/* Initialize what we need to start processing */

@@ -195,6 +195,12 @@ struct msm_rpc_endpoint {
 	dev_t dev;
 };
 
+enum write_data_type {
+	HEADER = 1,
+	PACKMARK,
+	PAYLOAD,
+};
+
 struct rpcrouter_xprt {
 	char *name;
 	void *priv;
@@ -202,7 +208,7 @@ struct rpcrouter_xprt {
 	int (*read_avail)(void);
 	int (*read)(void *data, uint32_t len);
 	int (*write_avail)(void);
-	int (*write)(void *data, uint32_t len);
+	int (*write)(void *data, uint32_t len, enum write_data_type type);
 	int (*close)(void);
 };
 
