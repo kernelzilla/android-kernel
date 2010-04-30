@@ -35,16 +35,16 @@ static struct au_dykey *dy_gfind_get(struct au_splhead *spl, const void *h_op)
 	struct au_dykey *key, *tmp;
 	struct list_head *head;
 
-	AuDebugOn(!spin_is_locked(&spl->spin));
-
 	key = NULL;
 	head = &spl->head;
-	list_for_each_entry(tmp, head, dk_list)
+	rcu_read_lock();
+	list_for_each_entry_rcu(tmp, head, dk_list)
 		if (tmp->dk_op.dy_hop == h_op) {
 			key = tmp;
 			kref_get(&key->dk_kref);
 			break;
 		}
+	rcu_read_unlock();
 
 	return key;
 }
@@ -101,7 +101,7 @@ static struct au_dykey *dy_gadd(struct au_splhead *spl, struct au_dykey *key)
 			break;
 		}
 	if (!found)
-		list_add(&key->dk_list, head);
+		list_add_rcu(&key->dk_list, head);
 	spin_unlock(&spl->spin);
 
 	if (!found)
@@ -109,14 +109,26 @@ static struct au_dykey *dy_gadd(struct au_splhead *spl, struct au_dykey *key)
 	return found;
 }
 
-static void dy_free(struct kref *kref)
+static void dy_free_rcu(struct rcu_head *rcu)
 {
 	struct au_dykey *key;
 
-	key = container_of(kref, struct au_dykey, dk_kref);
+	key = container_of(rcu, struct au_dykey, dk_rcu);
 	DyPrSym(key);
-	au_spl_del(&key->dk_list, dynop + key->dk_op.dy_type);
 	kfree(key);
+}
+
+static void dy_free(struct kref *kref)
+{
+	struct au_dykey *key;
+	struct au_splhead *spl;
+
+	key = container_of(kref, struct au_dykey, dk_kref);
+	spl = dynop + key->dk_op.dy_type;
+	spin_lock(&spl->spin);
+	list_del_rcu(&key->dk_list);
+	spin_unlock(&spl->spin);
+	call_rcu(&key->dk_rcu, dy_free_rcu);
 }
 
 void au_dy_put(struct au_dykey *key)
@@ -252,9 +264,7 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 	}, *p;
 
 	spl = dynop + op->dy_type;
-	spin_lock(&spl->spin);
 	key = dy_gfind_get(spl, op->dy_hop);
-	spin_unlock(&spl->spin);
 	if (key)
 		goto out_add; /* success */
 
@@ -267,6 +277,7 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 
 	key->dk_op.dy_hop = op->dy_hop;
 	kref_init(&key->dk_kref);
+	INIT_RCU_HEAD(&key->dk_rcu);
 	p->set_op(key, op->dy_hop, br->br_mnt->mnt_sb);
 	old = dy_gadd(spl, key);
 	if (old) {
