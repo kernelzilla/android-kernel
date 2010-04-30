@@ -27,6 +27,7 @@
 
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/rcupdate.h>
 #include <linux/aufs_type.h>
 #include "inode.h"
 
@@ -50,6 +51,7 @@ struct au_dykey {
 	 * branch is removed, kref is put.
 	 */
 	struct kref		dk_kref;
+	struct rcu_head		dk_rcu;
 };
 
 /* stop unioning since their sizes are very different from each other */
