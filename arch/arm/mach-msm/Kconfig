@@ -220,21 +220,21 @@ config MACH_MSM7X25_FFA
 	help
 	  Support for the Qualcomm MSM7x25 FFA eval board.
 
-config MACH_QSD8X55_SURF
+config MACH_MSM8X55_SURF
        depends on ARCH_MSM7X30
        depends on !MSM_STACKED_MEMORY
        default y
-       bool "QSD8X55 SURF"
+       bool "MSM8X55 SURF"
        help
-         Support for the Qualcomm QSD8x55 SURF eval board.
+         Support for the Qualcomm MSM8x55 SURF eval board.
 
-config MACH_QSD8X55_FFA
+config MACH_MSM8X55_FFA
        depends on ARCH_MSM7X30
        depends on !MSM_STACKED_MEMORY
        default y
-       bool "QSD8X55 FFA"
+       bool "MSM8X55 FFA"
        help
-         Support for the Qualcomm QSD8x55 FFA eval board.
+         Support for the Qualcomm MSM8x55 FFA eval board.
 
 config MACH_MSM8X60_RUMI3
 	depends on ARCH_MSM8X60

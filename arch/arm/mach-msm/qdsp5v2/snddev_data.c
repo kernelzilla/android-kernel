@@ -1283,7 +1283,7 @@ static const struct file_operations snddev_hsed_config_debug_fops = {
 
 void __init msm_snddev_init(void)
 {
-	if (machine_is_msm7x30_ffa() || machine_is_qsd8x55_ffa()) {
+	if (machine_is_msm7x30_ffa() || machine_is_msm8x55_ffa()) {
 		platform_add_devices(snd_devices_ffa,
 		ARRAY_SIZE(snd_devices_ffa));
 
@@ -1292,7 +1292,7 @@ void __init msm_snddev_init(void)
 					S_IFREG | S_IRUGO, NULL,
 		(void *) "msm_hsed_config", &snddev_hsed_config_debug_fops);
 #endif
-	} else if (machine_is_msm7x30_surf() || machine_is_qsd8x55_surf())
+	} else if (machine_is_msm7x30_surf() || machine_is_msm8x55_surf())
 		platform_add_devices(snd_devices_surf,
 		ARRAY_SIZE(snd_devices_surf));
 	else

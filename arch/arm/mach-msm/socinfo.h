@@ -98,7 +98,7 @@ static inline int cpu_is_qsd8x50a(void)
 	return cpu == MSM_CPU_8X50A;
 }
 
-static inline int cpu_is_qsd8x55(void)
+static inline int cpu_is_msm8x55(void)
 {
 	enum msm_cpu cpu = socinfo_get_msm_cpu();
 
