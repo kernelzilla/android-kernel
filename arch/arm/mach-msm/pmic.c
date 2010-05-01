@@ -102,6 +102,12 @@
 #define HSED_SET_HYSTERESIS_PROC 64
 #define HSED_SET_CURRENT_THRESHOLD_PROC 65
 #define HSED_ENABLE_PROC 66
+#define HIGH_CURRENT_LED_SET_CURRENT_PROC 67
+#define HIGH_CURRENT_LED_SET_POLARITY_PROC 68
+#define HIGH_CURRENT_LED_SET_MODE_PROC 69
+#define LP_FORCE_LPM_CONTROL_PROC 70
+#define LOW_CURRENT_LED_SET_EXT_SIGNAL_PROC 71
+#define LOW_CURRENT_LED_SET_CURRENT_PROC 72
 
 
 /* rpc related */
@@ -1060,3 +1066,57 @@ int pmic_hsed_enable(
 				 HSED_ENABLE_PROC);
 }
 EXPORT_SYMBOL(pmic_hsed_enable);
+
+int pmic_high_current_led_set_current(enum high_current_led led,
+		uint16_t milliamps)
+{
+	return pmic_rpc_set_only(led, milliamps, 0, 0,
+			2,
+			HIGH_CURRENT_LED_SET_CURRENT_PROC);
+}
+EXPORT_SYMBOL(pmic_high_current_led_set_current);
+
+int pmic_high_current_led_set_polarity(enum high_current_led led,
+		enum flash_led_pol polarity)
+{
+	return pmic_rpc_set_only(led, polarity, 0, 0,
+			2,
+			HIGH_CURRENT_LED_SET_POLARITY_PROC);
+}
+EXPORT_SYMBOL(pmic_high_current_led_set_polarity);
+
+int pmic_high_current_led_set_mode(enum high_current_led led,
+		enum flash_led_mode mode)
+{
+	return pmic_rpc_set_only(led, mode, 0, 0,
+			2,
+			HIGH_CURRENT_LED_SET_MODE_PROC);
+}
+EXPORT_SYMBOL(pmic_high_current_led_set_mode);
+
+int pmic_lp_force_lpm_control(enum switch_cmd cmd,
+		enum vreg_lpm_id vreg)
+{
+	return pmic_rpc_set_only(cmd, vreg, 0, 0,
+			2,
+			LP_FORCE_LPM_CONTROL_PROC);
+}
+EXPORT_SYMBOL(pmic_lp_force_lpm_control);
+
+int pmic_low_current_led_set_ext_signal(enum low_current_led led,
+		enum ext_signal sig)
+{
+	return pmic_rpc_set_only(led, sig, 0, 0,
+			2,
+			LOW_CURRENT_LED_SET_EXT_SIGNAL_PROC);
+}
+EXPORT_SYMBOL(pmic_low_current_led_set_ext_signal);
+
+int pmic_low_current_led_set_current(enum low_current_led led,
+		uint16_t milliamps)
+{
+	return pmic_rpc_set_only(led, milliamps, 0, 0,
+			2,
+			LOW_CURRENT_LED_SET_CURRENT_PROC);
+}
+EXPORT_SYMBOL(pmic_low_current_led_set_current);
