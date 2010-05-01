@@ -80,7 +80,7 @@ static struct cpufreq_frequency_table freq_table[] = {
 	{ 1, 245760 },
 	{ 2, 368640 },
 	{ 3, 768000 },
-	/* 806.4MHz is updated to 1024MHz at runtime for QSD8x55. */
+	/* 806.4MHz is updated to 1024MHz at runtime for MSM8x55. */
 	{ 4, 806400 },
 	{ 5, CPUFREQ_TABLE_END },
 };
@@ -99,7 +99,7 @@ static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 768000, PLL_1,    2, 0,  153600, 1100, VDD_RAW(1100) },
 	/* ACPU >= 806.4MHz requires MSMC1 @ 1.2V. Voting for
 	 * AXI @ 192MHz accomplishes this implicitly. 806.4MHz
-	 * is updated to 1024MHz at runtime for QSD8x55. */
+	 * is updated to 1024MHz at runtime for MSM8x55. */
 	{ 806400, PLL_2,    3, 0,  192000, 1100, VDD_RAW(1100) },
 	{ 0 }
 };
@@ -416,8 +416,8 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	mutex_init(&drv_state.lock);
 	drv_state.acpu_switch_time_us = clkdata->acpu_switch_time_us;
 	drv_state.vdd_switch_time_us = clkdata->vdd_switch_time_us;
-	/* PLL2 runs at 1024MHz for QSD8x55. */
-	if (cpu_is_qsd8x55())
+	/* PLL2 runs at 1024MHz for MSM8x55. */
+	if (cpu_is_msm8x55())
 		pll2_1024mhz_fixup();
 	saw_init();
 	acpuclk_init();
