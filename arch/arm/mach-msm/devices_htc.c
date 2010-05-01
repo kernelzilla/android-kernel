@@ -446,6 +446,27 @@ int __init parse_tag_engineerid(const struct tag *tags)
 }
 __tagtable(ATAG_ENGINEERID, parse_tag_engineerid);
 
+#define ATAG_MONODIE 0x4d534D76
+int __init parse_tag_monodie(const struct tag *tags)
+{
+	int monodie = 0, find = 0;
+	struct tag *t = (struct tag *)tags;
+
+	for (; t->hdr.size; t = tag_next(t)) {
+		if (t->hdr.tag == ATAG_MONODIE) {
+			printk(KERN_DEBUG "find the die size tag\n");
+			find = 1;
+			break;
+		}
+	}
+
+	if (find)
+		monodie = t->u.revision.rev;
+	printk(KERN_DEBUG "parse_tag_monodie: die size = 0x%x\n", monodie);
+	return monodie;
+}
+__tagtable(ATAG_MONODIE, parse_tag_monodie);
+
 static int mfg_mode;
 int __init board_mfg_mode_init(char *s)
 {

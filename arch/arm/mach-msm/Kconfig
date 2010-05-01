@@ -133,6 +133,14 @@ config HTC_HEADSET
 	 headset, on the trout platform. Can be used with the msm serial
 	 debugger, but not with serial console.
 
+config HTC_AUDIO_JACK
+	tristate "Audio Jack detection driver"
+	depends on HTC_HEADSET
+	default n
+	help
+	  Provides support for detecting audio jack, such as 3.5mm
+	  earphone, on the android platform.
+
 config HTC_35MM_JACK
 	bool "HTC 3.5mm headset jack"
 	default n

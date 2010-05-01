@@ -229,7 +229,7 @@ void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 static struct resource resources_hsusb[] = {
 	{
 		.start	= MSM_HSUSB_PHYS,
-		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE,
+		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
