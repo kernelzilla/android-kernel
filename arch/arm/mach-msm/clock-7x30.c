@@ -1366,9 +1366,11 @@ void __init msm_clk_soc_init(void)
 	 * before the register init loop since it changes the source of the
 	 * USB HS core clocks. */
 	for (i = 0; chld_usb_src[i] != C(NONE); i++)
-		_soc_clk_disable(chld_usb_src[i]);
+		if (clk_is_local(chld_usb_src[i]))
+			_soc_clk_disable(chld_usb_src[i]);
 
-	soc_clk_set_rate(C(USB_HS_SRC), clk_tbl_usb[0].freq_hz);
+	if (clk_is_local(C(USB_HS_SRC)))
+		soc_clk_set_rate(C(USB_HS_SRC), clk_tbl_usb[0].freq_hz);
 
 	for (i = 0; i < ARRAY_SIZE(ri_list); i++) {
 		val = readl(ri_list[i].reg);
