@@ -332,11 +332,19 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 		}
 		if (isr & INTR_DMA_S_DONE) {
 			mdp4_stat.intr_dma_s++;
+#ifdef MDP4_MDDI_DMA_SWITCH
+			dma = &dma2_data;
+			dma->busy = FALSE;
+			mdp_pipe_ctrl(MDP_DMA_S_BLOCK,
+					MDP_BLOCK_POWER_OFF, TRUE);
+			mdp4_dma_s_done_mddi();
+#else
 			dma = &dma_s_data;
 			dma->busy = FALSE;
 			mdp_pipe_ctrl(MDP_DMA_S_BLOCK,
 					MDP_BLOCK_POWER_OFF, TRUE);
 			complete(&dma->comp);
+#endif
 		}
 		if (isr & INTR_DMA_E_DONE) {
 			mdp4_stat.intr_dma_e++;

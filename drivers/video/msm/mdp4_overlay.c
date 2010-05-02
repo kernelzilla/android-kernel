@@ -1025,6 +1025,9 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(int ptype)
 		if (pipe->pipe_type == ptype && pipe->pipe_used == 0) {
 			pipe->pipe_used++;
 			init_completion(&pipe->comp);
+#ifdef MDP4_MDDI_DMA_SWITCH
+			init_completion(&pipe->dmas_comp);
+#endif
 	printk(KERN_INFO "mdp4_overlay_pipe_alloc: pipe=%x ndx=%d\n",
 					(int)pipe, pipe->pipe_ndx);
 			return pipe;
@@ -1434,15 +1437,10 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 
 	pull = mdp4_pull_mode(pipe->mixer_num);
 
-	mdp4_stat.overlay_play[pipe->mixer_num]++;
 
-	if (pull) {	/* LCDC or DTV mode */
+	if (pull)	/* LCDC or DTV mode */
 		mdp4_overlay_reg_flush(pipe, 1);
-		if (pipe->mixer_stage != MDP4_MIXER_STAGE_BASE) { /* done */
-			mutex_unlock(&mfd->dma->ov_mutex);
-			return 0;
-		}
-	} else { 	/* MDDI mode */
+	else { 	/* MDDI mode */
 
 #ifdef MDP4_NONBLOCKING
 		if (mfd->panel_power_on)
@@ -1450,7 +1448,10 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 		if (!mfd->dma->busy && mfd->panel_power_on)
 #endif
 			mdp4_mddi_overlay_kickoff(mfd, pipe);
+
 	}
+
+	mdp4_stat.overlay_play[pipe->mixer_num]++;
 
 	mutex_unlock(&mfd->dma->ov_mutex);
 

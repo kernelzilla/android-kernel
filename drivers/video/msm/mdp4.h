@@ -42,6 +42,8 @@ extern struct mdp4_statistic mdp4_stat;
 
 #define MDP4_NONBLOCKING
 
+#define MDP4_MDDI_DMA_SWITCH
+
 #define MDP4_OVERLAYPROC0_BASE	0x10000
 #define MDP4_OVERLAYPROC1_BASE	0x18000
 
@@ -113,8 +115,13 @@ enum {
 
 
 #ifdef CONFIG_FB_MSM_OVERLAY
+#ifdef MDP4_MDDI_DMA_SWITCH
+#define MDP4_ANY_INTR_MASK	(INTR_OVERLAY0_DONE | INTR_DMA_S_DONE | \
+					INTR_DMA_P_HISTOGRAM)
+#else
 #define MDP4_ANY_INTR_MASK	(INTR_OVERLAY0_DONE| \
 				INTR_DMA_P_HISTOGRAM)
+#endif
 #else
 #define MDP4_ANY_INTR_MASK	(INTR_DMA_P_DONE| \
 				INTR_DMA_P_HISTOGRAM)
@@ -283,6 +290,9 @@ struct mdp4_overlay_pipe {
 	uint32 element1; /* 0 = C0, 1 = C1, 2 = C2, 3 = C3 */
 	uint32 element0; /* 0 = C0, 1 = C1, 2 = C2, 3 = C3 */
 	struct completion comp;
+#ifdef MDP4_MDDI_DMA_SWITCH
+	struct completion dmas_comp;
+#endif
 	struct mdp_overlay req_data;
 };
 
@@ -378,8 +388,12 @@ void mdp4_overlay_dmae_xy(struct mdp4_overlay_pipe *pipe);
 int mdp4_overlay_pipe_staged(int mixer);
 void mdp4_overlay0_done_lcdc(void);
 void mdp4_overlay0_done_mddi(void);
+void mdp4_dma_s_done_mddi(void);
 void mdp4_overlay1_done_dtv(void);
 void mdp4_mddi_overlay_restore(void);
+#ifdef MDP4_MDDI_DMA_SWITCH
+void mdp4_mddi_overlay_dmas_restore(void);
+#endif
 void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe);
 void mdp4_rgb_igc_lut_setup(int num);
