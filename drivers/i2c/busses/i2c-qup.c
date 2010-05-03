@@ -112,6 +112,7 @@ enum {
 	I2C_STATUS_WR_BUFFER_FULL  = 1U << 0,
 	I2C_STATUS_BUS_ACTIVE      = 1U << 8,
 	I2C_STATUS_ERROR_MASK      = 0x38000FC,
+	QUP_I2C_NACK_FLAG          = 1U << 3,
 	QUP_IN_NOT_EMPTY           = 1U << 5,
 	QUP_STATUS_ERROR_FLAGS     = 0x7C,
 };
@@ -179,7 +180,7 @@ qup_i2c_interrupt(int irq, void *devid)
 		return IRQ_HANDLED;
 
 	if (status & I2C_STATUS_ERROR_MASK) {
-		dev_err(dev->dev, "QUP: Got i2c error :0x%x, irq:%d\n",
+		dev_err(dev->dev, "QUP: I2C status flags :0x%x, irq:%d\n",
 			status, irq);
 		err = -status;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
@@ -190,7 +191,7 @@ qup_i2c_interrupt(int irq, void *devid)
 	}
 
 	if (status1 & 0x7F) {
-		dev_err(dev->dev, "QUP: Got QUP error :0x%x\n", status1);
+		dev_err(dev->dev, "QUP: QUP status flags :0x%x\n", status1);
 		err = -status1;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1)
@@ -682,9 +683,13 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 				goto out_err;
 			}
 			if (dev->err) {
-				dev_err(dev->dev,
-					"Error during data xfer (%d)\n",
-					dev->err);
+				if (dev->err & QUP_I2C_NACK_FLAG)
+					dev_err(dev->dev,
+					"I2C slave addr:0x%x not connected\n",
+					dev->msg->addr);
+				else
+					dev_err(dev->dev,
+					"QUP data xfer error %d\n", dev->err);
 				ret = dev->err;
 				goto out_err;
 			}
