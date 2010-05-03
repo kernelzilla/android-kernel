@@ -448,6 +448,29 @@ config MMC_MSM_SDC4_DUMMY52_REQUIRED
 	  all data commands.  Required for some SDIO cards.
 	  If unsure, say N.
 
+config MMC_MSM_SDC5_SUPPORT
+	boolean "Qualcomm SDC5 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 5.
+
+config MMC_MSM_SDC5_8_BIT_SUPPORT
+	boolean "Qualcomm SDC5 8bit support"
+	depends on MMC_MSM_SDC5_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 5.
+
+config MMC_MSM_SDC5_DUMMY52_REQUIRED
+	boolean "Send dummy 52 read for SDC5"
+	depends on MMC_MSM_SDC5_SUPPORT && !MMC_MSM_PROG_DONE_SCAN
+	default n
+	help
+	  Select Y to enable sending dummy 52 reads to complete
+	  all data commands.  Required for some SDIO cards.
+	  If unsure, say N.
+
 config MMC_MSM_PROG_DONE_SCAN
 	bool "Perform prog done scan as needed for SDIO"
 	depends on MMC_MSM
