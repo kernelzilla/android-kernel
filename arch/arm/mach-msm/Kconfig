@@ -252,6 +252,14 @@ config MACH_MSM8X60_SIM
 	help
 	  Support for the Qualcomm MSM8x60 simulator.
 
+config MACH_MSM8X60_SURF
+	depends on ARCH_MSM8X60
+	default n
+	bool "MSM8x60 SURF"
+	select SMP_PARALLEL_START
+	help
+	  Support for the Qualcomm MSM8x60 SURF eval board.
+
 endmenu
 
 config MSM_STACKED_MEMORY
