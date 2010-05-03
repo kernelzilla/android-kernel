@@ -161,17 +161,16 @@ static struct users_list *get_user(void)
 	down(&res_mutex);
 	/* See if something available in the static pool */
 	while (ind < MAX_USERS) {
-		if (usr_list[ind].usage == UNUSED)
-			break;
-		else
-			ind++;
+		if (usr_list[ind].usage == UNUSED) {
+			/* Pick from the static pool */
+			user = &usr_list[ind];
+			user->usage = STATIC_ALLOC;
+			up(&res_mutex);
+			return user;
+		}
+		ind++;
 	}
-	if (ind < MAX_USERS) {
-		/* Pick from the static pool */
-		user = &usr_list[ind];
-		user->usage = STATIC_ALLOC;
-		goto res_unlock;
-	}
+	up(&res_mutex);
 	/* By this time we hope slab is initialized */
 	if (slab_is_available()) {
 		user = kmalloc(sizeof(struct  users_list), GFP_KERNEL);
@@ -187,11 +186,6 @@ static struct users_list *get_user(void)
 				"initial POOL EMPTY before slab init\n");
 		return ERR_PTR(-ENOMEM);
 	}
-
-	return user;
-
-res_unlock:
-	up(&res_mutex);
 
 	return user;
 }
