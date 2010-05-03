@@ -27,6 +27,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/rculist.h>
 
 struct au_splhead {
 	spinlock_t		spin;
@@ -50,6 +51,14 @@ static inline void au_spl_del(struct list_head *list, struct au_splhead *spl)
 {
 	spin_lock(&spl->spin);
 	list_del(list);
+	spin_unlock(&spl->spin);
+}
+
+static inline void au_spl_del_rcu(struct list_head *list,
+				  struct au_splhead *spl)
+{
+	spin_lock(&spl->spin);
+	list_del_rcu(list);
 	spin_unlock(&spl->spin);
 }
 

@@ -125,9 +125,7 @@ static void dy_free(struct kref *kref)
 
 	key = container_of(kref, struct au_dykey, dk_kref);
 	spl = dynop + key->dk_op.dy_type;
-	spin_lock(&spl->spin);
-	list_del_rcu(&key->dk_list);
-	spin_unlock(&spl->spin);
+	au_spl_del_rcu(&key->dk_list, spl);
 	call_rcu(&key->dk_rcu, dy_free_rcu);
 }
 
@@ -277,7 +275,6 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 
 	key->dk_op.dy_hop = op->dy_hop;
 	kref_init(&key->dk_kref);
-	INIT_RCU_HEAD(&key->dk_rcu);
 	p->set_op(key, op->dy_hop, br->br_mnt->mnt_sb);
 	old = dy_gadd(spl, key);
 	if (old) {

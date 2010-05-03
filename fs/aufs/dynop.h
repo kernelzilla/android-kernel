@@ -43,7 +43,10 @@ struct au_dynop {
 };
 
 struct au_dykey {
-	struct list_head	dk_list;
+	union {
+		struct list_head	dk_list;
+		struct rcu_head		dk_rcu;
+	};
 	struct au_dynop		dk_op;
 
 	/*
@@ -51,7 +54,6 @@ struct au_dykey {
 	 * branch is removed, kref is put.
 	 */
 	struct kref		dk_kref;
-	struct rcu_head		dk_rcu;
 };
 
 /* stop unioning since their sizes are very different from each other */
