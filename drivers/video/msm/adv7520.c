@@ -28,7 +28,6 @@ struct msm_panel_info *pinfo;
 static bool power_on = FALSE;	/* For power on/off */
 
 static u8 reg[256];	/* HDMI panel registers */
-static u8 ereg[256];  /*  EDID  memory        */
 
 static short  *hdtv_mux ;
 
@@ -171,9 +170,6 @@ static void adv7520_read_status(void)
 /* AV7520 chip specific initialization */
 static void adv7520_enable(void)
 {
-	struct hdmi_edid *p_edid  = (struct hdmi_edid *)ereg;
-	struct hdmi_edid_dtd_video *p_video_spec = NULL;
-	int i, horizontal_resolution, vertical_resolution ;
 
 	/* Initialize the variables used to read/write the ADV7520 chip. */
 	memset(&reg, 0xff, sizeof(reg));
@@ -273,45 +269,6 @@ static void adv7520_enable(void)
 	adv7520_write_reg(hclient, 0xba, reg[0xba]);
 	adv7520_write_reg(hclient, 0x3c, reg[0x3c]);
 
-
-	/* Read EDID memory */
-	for (i = 0; i <= 0xff; i++)
-		ereg[i] = adv7520_read_reg(eclient, i);
-
-	 /* Parse EDID Data */
-	for (i = 0; i < HDMI_EDID_MAX_DTDS; i++) {
-		if (p_edid->dtd[i].pixel_clock[0] != 0 &&
-			p_edid->dtd[i].pixel_clock[1] != 0)
-			p_video_spec = &p_edid->dtd[i];
-	}
-
-	/* Native Monitor Resoultion */
-	horizontal_resolution = (p_video_spec->horiz_high & 0xF0) * 256
-				+ p_video_spec->horiz_active   ;
-	vertical_resolution   = (p_video_spec->vert_high  & 0xF0) * 256
-				+ p_video_spec->vert_active    ;
-
-	if (horizontal_resolution == 720 && vertical_resolution == 480) {
-		/*  Fill the pinfo Data structure */
-		pinfo->xres = 720;
-		pinfo->yres = 480;
-		pinfo->type = LCDC_PANEL;
-		pinfo->pdest = DISPLAY_1;
-		pinfo->wait_cycle = 0;
-		pinfo->bpp = 24;
-		pinfo->fb_num = 2;
-		pinfo->clk_rate = 27027000;
-		pinfo->lcdc.h_back_porch = 60;
-		pinfo->lcdc.h_front_porch = 16;
-		pinfo->lcdc.h_pulse_width = 62;
-		pinfo->lcdc.v_back_porch = 30;
-		pinfo->lcdc.v_front_porch = 9;
-		pinfo->lcdc.v_pulse_width = 6;
-		pinfo->lcdc.border_clr = 0;	/* black */
-		pinfo->lcdc.underflow_clr = 0xff;	/* blue */
-		pinfo->lcdc.hsync_skew = 0;
-	}
-
 	adv7520_read_status();
 }
 
@@ -336,17 +293,11 @@ static struct platform_device hdmi_device = {
 static int __devinit
 adv7520_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	struct i2c_adapter *edid_adap = i2c_get_adapter(0);  /* Secondary I2C */
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
 
 	/* Init real i2c_client */
 	hclient = client;
-	/* Init EDID client	*/
-	eclient = i2c_new_dummy(edid_adap, ADV7520_EDIDI2CSLAVEADDRESS >> 1);
-	if (!eclient)
-		printk(KERN_ERR "Address %02x unavailable \n",
-					ADV7520_EDIDI2CSLAVEADDRESS >> 1);
 	adv7520_enable();
 	msm_fb_add_device(&hdmi_device);
 	return 0;
