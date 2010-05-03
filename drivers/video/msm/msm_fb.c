@@ -2196,13 +2196,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 	struct mdp_page_protection fb_page_protection;
 	int ret = 0;
 
-#ifdef CONFIG_FB_MSM_OVERLAY
-	/* always let unset cmd go */
-	if (cmd != MSMFB_OVERLAY_UNSET)
-#endif
-		if (!mfd->op_enable)
-			return -EPERM;
-
 	switch (cmd) {
 #ifdef CONFIG_FB_MSM_OVERLAY
 	case MSMFB_OVERLAY_GET:
