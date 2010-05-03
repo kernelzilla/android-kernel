@@ -1336,14 +1336,22 @@ static void __init sapphire_fixup(struct machine_desc *desc, struct tag *tags,
 		switch (sapphire_get_die_size()) {
 		case EBI1_DUAL_128MB_128MB:
 			mi->nr_banks = 2;
+#ifdef CONFIG_HOLES_IN_ZONE
 			mi->bank[0].size = 0x6d00000;
+#else
+			mi->bank[0].size = 0x6c00000;
+#endif
 			mi->bank[1].start = 0x20000000;
 			mi->bank[1].size = 0x5800000;
 			mi->bank[1].node = PHYS_TO_NID(0x20000000);
 			break;
 		case EBI1_MONO_256MB:
 			mi->nr_banks = 2;
+#ifdef CONFIG_HOLES_IN_ZONE
 			mi->bank[0].size = 0x6d00000;
+#else
+			mi->bank[0].size = 0x6c00000;
+#endif
 			mi->bank[1].start = 0x18000000;
 			mi->bank[1].size = 0x5800000;
 			mi->bank[1].node = PHYS_TO_NID(0x18000000);

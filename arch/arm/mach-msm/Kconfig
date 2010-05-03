@@ -85,6 +85,17 @@ endchoice
 
 comment "MSM Board Type"
 
+config HOLES_IN_ZONE
+	depends on ARCH_MSM7X00A || ARCH_QSD8X50
+	bool "Support for non-aligned zones"
+	default n
+	help
+	 Select this to support boards with zones that aren't aligned
+	 to MAX_ORDER boundaries (4MB by default).
+
+	 Both the start and end of all zones must be aligned without
+	 this option.
+
 config MACH_HALIBUT
 	depends on ARCH_MSM7X00A
 	default y
