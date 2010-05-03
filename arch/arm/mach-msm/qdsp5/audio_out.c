@@ -16,7 +16,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -40,6 +39,7 @@
 #include <mach/qdsp5/qdsp5audppmsg.h>
 
 #include <mach/htc_pwrsink.h>
+#include <mach/debug_mm.h>
 
 #include "evlog.h"
 
@@ -197,7 +197,7 @@ static int audio_enable(struct audio *audio)
 	struct audmgr_config cfg;
 	int rc;
 
-	MM_INFO("\n"); /* Macro prints the file name and function */
+	MM_DBG("\n"); /* Macro prints the file name and function */
 
 	if (audio->enabled)
 		return 0;	
@@ -240,7 +240,7 @@ static int audio_enable(struct audio *audio)
 /* must be called with audio->lock held */
 static int audio_disable(struct audio *audio)
 {
-	MM_INFO("\n"); /* Macro prints the file name and function */
+	MM_DBG("\n"); /* Macro prints the file name and function */
 	if (audio->enabled) {
 		audio->enabled = 0;
 		audio_dsp_out_enable(audio, 0);
@@ -330,14 +330,14 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 	case AUDPP_MSG_CFG_MSG:
 		if (msg[0] == AUDPP_MSG_ENA_ENA) {
 			LOG(EV_ENABLE, 1);
-			MM_INFO("CFG_MSG ENABLE\n");
+			MM_DBG("CFG_MSG ENABLE\n");
 			audio->out_needed = 0;
 			audio->running = 1;
 			audpp_dsp_set_vol_pan(5, &audio->vol_pan);
 			audio_dsp_out_enable(audio, 1);
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
 			LOG(EV_ENABLE, 0);
-			MM_INFO("CFG_MSG DISABLE\n");
+			MM_DBG("CFG_MSG DISABLE\n");
 			audio->running = 0;
 		} else {
 			MM_ERR("CFG_MSG %d?\n", msg[0]);

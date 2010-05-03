@@ -16,9 +16,9 @@
  *
  */
 
-#include <mach/debug_adsp_mm.h>
 #include <mach/qdsp5/qdsp5vfecmdi.h>
 #include "adsp.h"
+#include <mach/debug_mm.h>
 
 static uint32_t size1_y, size2_y, size1_cbcr, size2_cbcr;
 static uint32_t af_size = 4228;

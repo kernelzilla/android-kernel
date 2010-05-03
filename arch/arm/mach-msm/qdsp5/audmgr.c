@@ -16,7 +16,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
@@ -27,6 +26,7 @@
 #include <mach/msm_rpcrouter.h>
 
 #include "audmgr.h"
+#include <mach/debug_mm.h>
 
 #define STATE_CLOSED    0
 #define STATE_DISABLED  1

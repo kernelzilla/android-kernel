@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -25,6 +24,7 @@
 #include <mach/msm_rpcrouter.h>
 #include <linux/debugfs.h>
 #include <mach/qdsp5/snd_adie.h>
+#include <mach/debug_mm.h>
 
 static struct adie_svc_client adie_client[ADIE_SVC_MAX_CLIENTS];
 static DEFINE_MUTEX(adie_client_lock);

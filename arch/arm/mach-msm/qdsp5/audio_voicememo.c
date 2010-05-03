@@ -22,7 +22,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -36,6 +35,7 @@
 #include <asm/atomic.h>
 #include <asm/ioctls.h>
 #include <mach/msm_rpcrouter.h>
+#include <mach/debug_mm.h>
 
 #include "audmgr.h"
 

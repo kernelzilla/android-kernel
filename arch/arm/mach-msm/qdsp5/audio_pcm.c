@@ -23,7 +23,6 @@
  * along with this program; if not, you can find it at http://www.fsf.org
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -48,6 +47,7 @@
 #include <mach/qdsp5/qdsp5audppmsg.h>
 #include <mach/qdsp5/qdsp5audplaycmdi.h>
 #include <mach/qdsp5/qdsp5audplaymsg.h>
+#include <mach/debug_mm.h>
 
 /* for queue ids - should be relative to module number*/
 #include "adsp.h"
@@ -974,7 +974,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = wait_event_interruptible_timeout(audio->wait,
 				audio->dec_state != MSM_AUD_DECODER_STATE_NONE,
 				msecs_to_jiffies(MSM_AUD_DECODER_WAIT_MS));
-			MM_DBG("dec_state %d rc = %d\n", audio->dec_state, rc);
+			MM_INFO("dec_state %d rc = %d\n", audio->dec_state, rc);
 
 			if (audio->dec_state != MSM_AUD_DECODER_STATE_SUCCESS)
 				rc = -ENODEV;
@@ -1299,7 +1299,6 @@ static int audio_release(struct inode *inode, struct file *file)
 {
 	struct audio *audio = file->private_data;
 
-	MM_DBG("\n"); /* Macro prints the file name and function */
 	MM_DBG("audio instance 0x%08x freeing\n", (int)audio);
 	mutex_lock(&audio->lock);
 	audio_disable(audio);

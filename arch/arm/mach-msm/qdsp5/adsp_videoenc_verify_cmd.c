@@ -16,11 +16,11 @@
  *
  */
 
-#include <mach/debug_adsp_mm.h>
 #include <linux/io.h>
 
 #include <mach/qdsp5/qdsp5venccmdi.h>
 #include "adsp.h"
+#include <mach/debug_mm.h>
 
 
 static unsigned short x_dimension, y_dimension;

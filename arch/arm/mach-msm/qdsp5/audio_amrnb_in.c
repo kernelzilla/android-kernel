@@ -22,7 +22,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -45,6 +44,7 @@
 #include <mach/qdsp5/qdsp5audpreprocmsg.h>
 #include <mach/qdsp5/qdsp5audreccmdi.h>
 #include <mach/qdsp5/qdsp5audrecmsg.h>
+#include <mach/debug_mm.h>
 
 /* FRAME_NUM must be a power of two */
 #define FRAME_NUM		(8)

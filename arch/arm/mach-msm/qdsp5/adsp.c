@@ -24,7 +24,6 @@
  * - disallow access to non-associated queues
  */
 
-#include <mach/debug_adsp_mm.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -34,6 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 #include <linux/wakelock.h>
+#include <mach/debug_mm.h>
 
 static struct wake_lock adsp_wake_lock;
 static inline void prevent_suspend(void)
@@ -110,11 +110,11 @@ static int32_t adsp_validate_queue(uint32_t mod_id, unsigned q_idx,
 			if (q_idx == sptr->mod_to_q_tbl[i].q_type) {
 				if (size <= sptr->mod_to_q_tbl[i].q_max_len)
 					return 0;
-				MM_INFO("q_idx: %d is not a valid queue \
+				MM_ERR("q_idx: %d is not a valid queue \
 					for module %x\n", q_idx, mod_id);
 				return -EINVAL;
 			}
-	MM_INFO("cmd_buf size is more than allowed size\n");
+	MM_ERR("cmd_buf size is more than allowed size\n");
 	return -EINVAL;
 }
 
@@ -280,7 +280,7 @@ int msm_adsp_get(const char *name, struct msm_adsp_module **out,
 			adsp_info.init_info_state == ADSP_STATE_INIT_INFO,
 			5 * HZ);
 		if (!rc) {
-			MM_INFO("INIT_INFO failed\n");
+			MM_ERR("INIT_INFO failed\n");
 			return -ETIMEDOUT;
 		}
 		init_info_cmd_sent++;
@@ -315,7 +315,7 @@ int msm_adsp_get(const char *name, struct msm_adsp_module **out,
 		goto done;
 	}
 
-	MM_INFO("module %s has been registered\n", module->name);
+	MM_DBG("module %s has been registered\n", module->name);
 
 done:
 	mutex_unlock(&module->lock);
@@ -403,13 +403,13 @@ int __msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 	}
 	if (adsp_validate_module(module->id)) {
 		spin_unlock_irqrestore(&adsp_write_lock, flags);
-		MM_INFO("module id validation failed %s  %d\n",
+		MM_ERR("module id validation failed %s  %d\n",
 				module->name, module->id);
 		return -ENXIO;
 	}
 	if (dsp_queue_addr >= QDSP_MAX_NUM_QUEUES) {
 		spin_unlock_irqrestore(&adsp_write_lock, flags);
-		MM_INFO("Invalid Queue Index: %d\n", dsp_queue_addr);
+		MM_ERR("Invalid Queue Index: %d\n", dsp_queue_addr);
 		return -ENXIO;
 	}
 	if (adsp_validate_queue(module->id, dsp_queue_addr, cmd_size)) {
@@ -552,7 +552,7 @@ int msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 			udelay(10);
 	} while (rc == -EAGAIN && retries++ < 100);
 	if (retries > 50)
-		pr_warning("adsp: %s command took %d attempts: rc %d\n",
+		MM_ERR("adsp: %s command took %d attempts: rc %d\n",
 			module->name, retries, rc);
 	return rc;
 }
@@ -674,7 +674,7 @@ static void handle_adsp_rtos_mtoa_app(struct rpc_request_hdr *req)
 	module_id = be32_to_cpu(pkt_ptr->module);
 	image     = be32_to_cpu(pkt_ptr->image);
 
-	MM_INFO("rpc event=%d, proc_id=%d, module=%d, image=%d\n",
+	MM_DBG("rpc event=%d, proc_id=%d, module=%d, image=%d\n",
 		event, proc_id, module_id, image);
 
 	module = find_adsp_module_by_id(&adsp_info, module_id);
@@ -1064,7 +1064,7 @@ static int msm_adsp_disable_locked(struct msm_adsp_module *module)
 		if (--adsp_open_count == 0) {
 			disable_irq(INT_ADSP);
 			allow_suspend();
-			MM_INFO("disable interrupt\n");
+			MM_DBG("disable interrupt\n");
 		}
 		mutex_unlock(&adsp_open_lock);
 	}

@@ -19,9 +19,9 @@
 #include <linux/io.h>
 #include <linux/android_pmem.h>
 
-#include <mach/debug_adsp_mm.h>
 #include <mach/qdsp5/qdsp5vdeccmdi.h>
 #include "adsp.h"
+#include <mach/debug_mm.h>
 
 static inline void *high_low_short_to_ptr(unsigned short high,
 					  unsigned short low)

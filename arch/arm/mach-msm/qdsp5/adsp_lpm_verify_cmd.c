@@ -16,9 +16,9 @@
  *
  */
 
-#include <mach/debug_adsp_mm.h>
 #include <mach/qdsp5/qdsp5lpmcmdi.h>
 #include "adsp.h"
+#include <mach/debug_mm.h>
 
 int adsp_lpm_verify_cmd(struct msm_adsp_module *module,
 			 unsigned int queue_id, void *cmd_data,

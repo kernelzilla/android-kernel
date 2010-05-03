@@ -17,7 +17,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/wait.h>
@@ -35,6 +34,7 @@
 
 #include <mach/qdsp5/qdsp5audppcmdi.h>
 #include <mach/qdsp5/qdsp5audppmsg.h>
+#include <mach/debug_mm.h>
 
 #include "evlog.h"
 

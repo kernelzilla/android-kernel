@@ -23,7 +23,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/wait.h>
@@ -37,6 +36,7 @@
 #include <mach/qdsp5/qdsp5audrecmsg.h>
 
 #include "audmgr.h"
+#include <mach/debug_mm.h>
 
 static DEFINE_MUTEX(audrec_lock);
 
