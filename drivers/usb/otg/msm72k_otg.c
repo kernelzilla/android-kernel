@@ -318,10 +318,10 @@ static int msm_otg_set_peripheral(struct otg_transceiver *xceiv,
 		dev->pmic_register_vbus_sn(&msm_otg_set_vbus_state);
 	pr_info("peripheral driver registered w/ tranceiver\n");
 
-	if (is_b_sess_vld())
-		msm_otg_start_peripheral(&dev->otg, 1);
-	else if (is_host())
+	if (is_host())
 		msm_otg_start_host(&dev->otg, 1);
+	else if (is_b_sess_vld())
+		msm_otg_start_peripheral(&dev->otg, 1);
 	else
 		msm_otg_suspend(dev);
 
