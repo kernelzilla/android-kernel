@@ -438,12 +438,12 @@ config I2C_MSM
 	  built-in I2C interface on the MSM7X00A family processors.
 
 config I2C_QUP
-        tristate "I2C_QUP"
-        depends on I2C && ARCH_MSM7X30
-        default y
-        help
-          If you say yes to this option, support will be included for the
-          built-in I2C interface on the MSM family processors.
+	tristate "I2C_QUP"
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	default y
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the MSM family processors.
 
 config I2C_SSBI
         tristate "Qualcomm Single-wire Serial Bus Interface (SSBI)"
