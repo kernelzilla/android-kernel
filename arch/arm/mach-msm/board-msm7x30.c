@@ -37,6 +37,7 @@
 #include <linux/pmic8058-pwm.h>
 #include <linux/i2c/tsc2007.h>
 #include <linux/input/kp_flip_switch.h>
+#include <linux/leds-pmic8058.h>
 #include <mach/mpp.h>
 
 #include <asm/mach-types.h>
@@ -452,6 +453,7 @@ static struct pm8058_pwm_pdata pm8058_pwm_data = {
 
 /* Put sub devices with fixed location first in sub_devices array */
 #define	PM8058_SUBDEV_KPD	0
+#define	PM8058_SUBDEV_LED	1
 
 static struct pm8058_gpio_platform_data pm8058_gpio_data = {
 	.gpio_base	= PM8058_GPIO_PM_TO_SYS(0),
@@ -463,11 +465,45 @@ static struct pm8058_gpio_platform_data pm8058_mpp_data = {
 	.irq_base	= PM8058_MPP_IRQ(PMIC8058_IRQ_BASE, 0),
 };
 
+static struct pmic8058_led pmic8058_ffa_leds[] = {
+	[0] = {
+		.name		= "keyboard-backlight",
+		.max_brightness = 15,
+		.id		= PMIC8058_ID_LED_KB_LIGHT,
+	},
+};
+
+static struct pmic8058_leds_platform_data pm8058_ffa_leds_data = {
+	.num_leds = ARRAY_SIZE(pmic8058_ffa_leds),
+	.leds	= pmic8058_ffa_leds,
+};
+
+static struct pmic8058_led pmic8058_surf_leds[] = {
+	[0] = {
+		.name		= "keyboard-backlight",
+		.max_brightness = 15,
+		.id		= PMIC8058_ID_LED_KB_LIGHT,
+	},
+	[1] = {
+		.name		= "voice:red",
+		.max_brightness = 20,
+		.id		= PMIC8058_ID_LED_0,
+	},
+	[2] = {
+		.name		= "wlan:green",
+		.max_brightness = 20,
+		.id		= PMIC8058_ID_LED_2,
+	},
+};
+
 static struct mfd_cell pm8058_subdevs[] = {
 	{	.name = "pm8058-keypad",
 		.id		= -1,
 		.num_resources	= ARRAY_SIZE(resources_keypad),
 		.resources	= resources_keypad,
+	},
+	{	.name = "pm8058-led",
+		.id		= -1,
 	},
 	{	.name = "pm8058-gpio",
 		.id		= -1,
@@ -487,6 +523,11 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{	.name = "pm8058-nfc",
 		.id		= -1,
 	},
+};
+
+static struct pmic8058_leds_platform_data pm8058_surf_leds_data = {
+	.num_leds = ARRAY_SIZE(pmic8058_surf_leds),
+	.leds	= pmic8058_surf_leds,
 };
 
 static struct pm8058_platform_data pm8058_7x30_data = {
@@ -4009,6 +4050,21 @@ static void msm7x30_init_uart2(void)
 }
 #endif
 
+static void __init pmic8058_leds_init(void)
+{
+	if (machine_is_msm7x30_surf()) {
+		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
+			= &pm8058_surf_leds_data;
+		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
+			= sizeof(pm8058_surf_leds_data);
+	} else if (machine_is_msm7x30_ffa()) {
+		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
+			= &pm8058_ffa_leds_data;
+		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
+			= sizeof(pm8058_ffa_leds_data);
+	}
+}
+
 static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.reg_base_addr = MSM_SAW_BASE,
 
@@ -4344,6 +4400,7 @@ static void __init msm7x30_init(void)
 #endif
 	if (machine_is_msm7x30_surf())
 		platform_device_register(&flip_switch_device);
+	pmic8058_leds_init();
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
