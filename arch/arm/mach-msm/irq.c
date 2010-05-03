@@ -439,7 +439,6 @@ void msm_irq_exit_sleep3(void)
 
 static struct irq_chip msm_irq_chip = {
 	.name      = "msm",
-	.disable   = msm_irq_mask,
 	.ack       = msm_irq_ack,
 	.mask      = msm_irq_mask,
 	.unmask    = msm_irq_unmask,

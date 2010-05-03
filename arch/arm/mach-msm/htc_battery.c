@@ -343,7 +343,7 @@ int htc_cable_status_update(int status)
 		/* give userspace some time to see the uevent and update
 		 * LED state or whatnot...
 		 */
-		wake_lock_timeout(&vbus_wake_lock, HZ / 2);
+		wake_lock_timeout(&vbus_wake_lock, 2 * HZ);
 	}
 		if (htc_batt_info.rep.charging_source == CHARGER_BATTERY || last_source == CHARGER_BATTERY)
 	power_supply_changed(&htc_power_supplies[CHARGER_BATTERY]);

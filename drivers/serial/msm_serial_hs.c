@@ -1258,14 +1258,24 @@ static int msm_hs_startup(struct uart_port *uport)
 	ret = request_irq(uport->irq, msm_hs_isr, IRQF_TRIGGER_HIGH,
 			  "msm_hs_uart", msm_uport);
 	if (unlikely(ret))
-		return ret;
+		goto err_uport_irq_request;
+	ret = set_irq_wake(uport->irq, 1);
+	if (ret) {
+		ret = -ENXIO;
+		goto err_uport_irq_wake;
+	}
 	if (use_low_power_rx_wakeup(msm_uport)) {
 		ret = request_irq(msm_uport->rx_wakeup.irq,
 				  msm_hs_rx_wakeup_isr,
 				  IRQF_TRIGGER_FALLING,
 				  "msm_hs_rx_wakeup", msm_uport);
 		if (unlikely(ret))
-			return ret;
+			goto err_wakeup_irq_request;
+		ret = set_irq_wake(msm_uport->rx_wakeup.irq, 1);
+		if (ret) {
+			ret = -ENXIO;
+			goto err_wakeup_irq_wake;
+		}
 		disable_irq(msm_uport->rx_wakeup.irq);
 	}
 
@@ -1277,6 +1287,15 @@ static int msm_hs_startup(struct uart_port *uport)
 	spin_unlock_irqrestore(&uport->lock, flags);
 
 	return 0;
+
+err_wakeup_irq_wake:
+	free_irq(msm_uport->rx_wakeup.irq, msm_uport);
+err_wakeup_irq_request:
+	set_irq_wake(uport->irq, 0);
+err_uport_irq_wake:
+	free_irq(uport->irq, msm_uport);
+err_uport_irq_request:
+	return ret;
 }
 
 /* Initialize tx and rx data structures */
@@ -1369,8 +1388,6 @@ static int __init msm_hs_probe(struct platform_device *pdev)
 	uport->irq = platform_get_irq(pdev, 0);
 	if (unlikely(uport->irq < 0))
 		return -ENXIO;
-	if (unlikely(set_irq_wake(uport->irq, 1)))
-		return -ENXIO;
 
 	if (pdata == NULL || pdata->rx_wakeup_irq < 0)
 		msm_uport->rx_wakeup.irq = -1;
@@ -1381,8 +1398,6 @@ static int __init msm_hs_probe(struct platform_device *pdev)
 		msm_uport->rx_wakeup.rx_to_inject = pdata->rx_to_inject;
 
 		if (unlikely(msm_uport->rx_wakeup.irq < 0))
-			return -ENXIO;
-		if (unlikely(set_irq_wake(msm_uport->rx_wakeup.irq, 1)))
 			return -ENXIO;
 	}
 
@@ -1480,9 +1495,12 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_RX_DISABLE_BMSK);
 
 	/* Free the interrupt */
+	set_irq_wake(uport->irq, 0);
 	free_irq(uport->irq, msm_uport);
-	if (use_low_power_rx_wakeup(msm_uport))
+	if (use_low_power_rx_wakeup(msm_uport)) {
+		set_irq_wake(msm_uport->rx_wakeup.irq, 0);
 		free_irq(msm_uport->rx_wakeup.irq, msm_uport);
+	}
 
 	msm_uport->imr_reg = 0;
 	msm_hs_write(uport, UARTDM_IMR_ADDR, msm_uport->imr_reg);

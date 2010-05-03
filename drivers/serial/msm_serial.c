@@ -55,6 +55,27 @@ struct msm_port {
 #endif
 };
 
+#ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
+static inline void msm_port_set_clk_state(struct msm_port *msm_port, enum msm_clk_states_e state)
+{
+#define ENABLE_WAKE_IN_STATE(state) \
+	((state) == MSM_CLK_OFF || (state) == MSM_CLK_ON || \
+		(state) == MSM_CLK_REQUEST_OFF)
+
+	if (ENABLE_WAKE_IN_STATE(msm_port->clk_state) != ENABLE_WAKE_IN_STATE(state)) {
+#ifdef CONFIG_SERIAL_MSM_RX_WAKEUP
+		if (msm_port->uart.line == 0) {
+			set_irq_wake(MSM_GPIO_TO_INT(45), ENABLE_WAKE_IN_STATE(state));
+		}
+#endif
+
+		set_irq_wake(msm_port->uart.irq, ENABLE_WAKE_IN_STATE(state));
+	}
+
+	msm_port->clk_state = state;
+}
+#endif
+
 #define UART_TO_MSM(uart_port)	((struct msm_port *) uart_port)
 
 static inline void msm_write(struct uart_port *port, unsigned int val,
@@ -132,7 +153,7 @@ static enum hrtimer_restart msm_serial_clock_off(struct hrtimer *timer) {
 		if (uart_circ_empty(xmit)) {
 			struct msm_port *msm_port = UART_TO_MSM(port);
 			clk_disable(msm_port->clk);
-			msm_port->clk_state = MSM_CLK_OFF;
+			msm_port_set_clk_state(msm_port, MSM_CLK_OFF);
 		} else {
 			hrtimer_forward_now(timer, msm_port->clk_off_delay);
 			ret = HRTIMER_RESTART;
@@ -178,7 +199,7 @@ void msm_serial_clock_on(struct uart_port *port, int force) {
 	case MSM_CLK_REQUEST_OFF:
 		if (force) {
 			hrtimer_try_to_cancel(&msm_port->clk_off_timer);
-			msm_port->clk_state = MSM_CLK_ON;
+			msm_port_set_clk_state(msm_port, MSM_CLK_ON);
 		}
 		break;
 	case MSM_CLK_ON: break;
@@ -481,7 +502,7 @@ static void msm_init_clock(struct uart_port *port)
 	clk_enable(msm_port->clk);
 
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
-	msm_port->clk_state = MSM_CLK_ON;
+	msm_port_set_clk_state(msm_port, MSM_CLK_ON);
 #endif
 
 	if (port->uartclk == 19200000) {
@@ -507,6 +528,11 @@ static int msm_startup(struct uart_port *port)
 
 	snprintf(msm_port->name, sizeof(msm_port->name),
 		 "msm_serial%d", port->line);
+
+#ifndef CONFIG_SERIAL_MSM_CLOCK_CONTROL
+	if (unlikely(set_irq_wake(port->irq, 1)))
+		return -ENXIO;
+#endif
 
 	ret = request_irq(port->irq, msm_irq, IRQF_TRIGGER_HIGH,
 			  msm_port->name, port);
@@ -572,17 +598,18 @@ static void msm_shutdown(struct uart_port *port)
 
 	free_irq(port->irq, port);
 
-#ifdef CONFIG_SERIAL_MSM_RX_WAKEUP
-	if (port->line == 0)
-		free_irq(MSM_GPIO_TO_INT(45), port);
-#endif
-
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
 	if (msm_port->clk_state != MSM_CLK_OFF)
 		clk_disable(msm_port->clk);
-	msm_port->clk_state = MSM_CLK_PORT_OFF;
+	msm_port_set_clk_state(msm_port, MSM_CLK_PORT_OFF);
 #else
 	clk_disable(msm_port->clk);
+	set_irq_wake(port->irq, 0);
+#endif
+
+#ifdef CONFIG_SERIAL_MSM_RX_WAKEUP
+	if (port->line == 0)
+		free_irq(MSM_GPIO_TO_INT(45), port);
 #endif
 }
 
@@ -924,20 +951,12 @@ static int __init msm_serial_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, port);
 
-	if (unlikely(set_irq_wake(port->irq, 1)))
-		return -ENXIO;
-
-#ifdef CONFIG_SERIAL_MSM_RX_WAKEUP
-	if (port->line == 0)  /* BT is serial device 0 */
-		if (unlikely(set_irq_wake(MSM_GPIO_TO_INT(45), 1)))
-			return -ENXIO;
-#endif
-
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
-	msm_port->clk_state = MSM_CLK_PORT_OFF;
+	msm_port_set_clk_state(msm_port, MSM_CLK_PORT_OFF);
 	hrtimer_init(&msm_port->clk_off_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	msm_port->clk_off_timer.function = msm_serial_clock_off;
 	msm_port->clk_off_delay = ktime_set(0, 1000000);  /* 1 ms */
+#else
 #endif
 
 	return uart_add_one_port(&msm_uart_driver, port);
