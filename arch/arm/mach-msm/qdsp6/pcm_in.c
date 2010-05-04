@@ -180,7 +180,7 @@ static ssize_t q6_in_read(struct file *file, char __user *buf,
 				audio_client_dump(ac);
 				pr_err("[%s:%s] timeout. dsp dead?\n",
 						__MM_FILE__, __func__);
-				BUG();
+				q6audio_dsp_not_responding();
 			}
 
 		xfer = count;
