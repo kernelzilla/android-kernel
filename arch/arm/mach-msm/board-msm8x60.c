@@ -250,20 +250,26 @@ static void __init msm8x60_init_ebi2(void)
 	if (ebi2_cfg_ptr != 0) {
 		ebi2_cfg = readl(ebi2_cfg_ptr);
 
-		if (machine_is_msm8x60_sim())
-			ebi2_cfg |= (1 << 4); /* CS2_CFG */
+		if (machine_is_msm8x60_surf())
+			ebi2_cfg |= (1 << 4) | (1 << 5); /* CS2, CS3 */
+		else if (machine_is_msm8x60_sim())
+			ebi2_cfg |= (1 << 4); /* CS2 */
 		else if (machine_is_msm8x60_rumi3())
-			ebi2_cfg |= (1 << 5); /* CS3_CFG */
+			ebi2_cfg |= (1 << 5); /* CS3 */
 
 		writel(ebi2_cfg, ebi2_cfg_ptr);
 		iounmap(ebi2_cfg_ptr);
 	}
 
 	if (machine_is_msm8x60_surf()) {
-		ebi2_cfg_ptr = ioremap_nocache(0x1a110000, sizeof(uint32_t));
+		ebi2_cfg_ptr = ioremap_nocache(0x1a110000, SZ_4K);
 		if (ebi2_cfg_ptr != 0) {
 			/* EBI2_XMEM_CFG:PWRSAVE_MODE off */
 			writel(0UL, ebi2_cfg_ptr);
+
+			/* EBI2 CS3 muxed address/data,
+			 * two cyc addr enable */
+			writel(0xA3030020, ebi2_cfg_ptr + 0x34);
 			iounmap(ebi2_cfg_ptr);
 		}
 	}
@@ -302,10 +308,11 @@ static struct msm8x60_tlmm_cfg_struct msm8x60_tlmm_cfgs[] = {
 	      MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_NONE},
 	{ 65, MSM_GPIO_OE | MSM_GPIO_DRV_2MA |
 	      MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_NONE},
+
 	/*
-	 * EBI2 LAN9221 ethernet
+	 * EBI2
 	 */
-	{ 40, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(2) | MSM_GPIO_PULL_PULL_UP},
+	/* address lines */
 	{123, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{124, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{125, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
@@ -314,6 +321,7 @@ static struct msm8x60_tlmm_cfg_struct msm8x60_tlmm_cfgs[] = {
 	{128, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{129, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{130, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	/* A_D lines */
 	{135, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{136, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{137, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
@@ -330,8 +338,16 @@ static struct msm8x60_tlmm_cfg_struct msm8x60_tlmm_cfgs[] = {
 	{148, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{149, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{150, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	/* OE */
 	{151, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	/* WE */
 	{157, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	/* CS2 */
+	{ 40, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(2) | MSM_GPIO_PULL_PULL_UP},
+	/* CS3 */
+	{133, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
+	/* ADV */
+	{153, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 };
 
 static void __init msm8x60_init_tlmm(void)
