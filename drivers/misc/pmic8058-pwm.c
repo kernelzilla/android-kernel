@@ -621,7 +621,9 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 	int	i, len;
 	int	rc;
 
-	if (pwm == NULL || IS_ERR(pwm) || duty_pct == NULL || !idx_len)
+	if (pwm == NULL || IS_ERR(pwm) || !idx_len)
+		return -EINVAL;
+	if (duty_pct == NULL && !(flags & PM_PWM_LUT_NO_TABLE))
 		return -EINVAL;
 	if (pwm->chip == NULL)
 		return -ENODEV;
@@ -640,6 +642,9 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 	pm8058_pwm_calc_period(period_ns, &pwm_conf);
 
 	len = (idx_len > PM_PWM_LUT_SIZE) ? PM_PWM_LUT_SIZE : idx_len;
+
+	if (flags & PM_PWM_LUT_NO_TABLE)
+		goto after_table_write;
 
 	max_pwm_value = (1 << pwm_conf.pwm_size) - 1;
 	for (i = 0; i < len; i++) {
@@ -661,6 +666,7 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 			     &cfg1, 1);
 	}
 
+after_table_write:
 	pwm_conf.lut_duty_ms = duty_time_ms;
 	pwm_conf.lut_lo_index = start_idx;
 	pwm_conf.lut_hi_index = start_idx + len - 1;
