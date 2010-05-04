@@ -779,6 +779,8 @@ static DSP_STATUS proc_memory_sync(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 DSP_STATUS PROC_FlushMemory(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 			    u32 ulSize, u32 ulFlags)
 {
+	if (!pMpuAddr || !ulSize)
+		return DSP_SOK;
 	return proc_memory_sync(hProcessor, pMpuAddr, ulSize, ulFlags);
 }
 
@@ -792,6 +794,8 @@ DSP_STATUS PROC_InvalidateMemory(DSP_HPROCESSOR hProcessor, void *pMpuAddr,
 {
 	enum DSP_FLUSHTYPE mtype = PROC_INVALIDATE_MEM;
 
+	if (!pMpuAddr || !ulSize)
+		return DSP_SOK;
 	return proc_memory_sync(hProcessor, pMpuAddr, ulSize, mtype);
 }
 
