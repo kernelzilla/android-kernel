@@ -96,6 +96,10 @@ static void gsbi4_qup_i2c_gpio_config(int adap_id, int config_type)
 {
 }
 
+static void gsbi8_qup_i2c_gpio_config(int adap_id, int config_type)
+{
+}
+
 static void gsbi9_qup_i2c_gpio_config(int adap_id, int config_type)
 {
 }
@@ -114,6 +118,13 @@ static struct msm_i2c_platform_data msm_gsbi4_qup_i2c_pdata = {
 	.msm_i2c_config_gpio = gsbi4_qup_i2c_gpio_config,
 };
 
+static struct msm_i2c_platform_data msm_gsbi8_qup_i2c_pdata = {
+	.clk_freq = 100000,
+	.clk = "gsbi_qup_clk",
+	.pclk = "gsbi_pclk",
+	.msm_i2c_config_gpio = gsbi8_qup_i2c_gpio_config,
+};
+
 static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 	.clk_freq = 100000,
 	.clk = "gsbi_qup_clk",
@@ -127,6 +138,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
 #endif
 };
@@ -136,9 +148,15 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
+	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
 #endif
 };
+
+#ifdef CONFIG_I2C
+static struct i2c_board_info __initdata msm8x60_i2c_gsbi8_info[] = {
+};
+#endif
 
 unsigned long clk_get_max_axi_khz(void)
 {
@@ -150,6 +168,7 @@ static void __init msm8x60_init_buses(void)
 #ifdef CONFIG_I2C_QUP
 	msm_gsbi3_qup_i2c_device.dev.platform_data = &msm_gsbi3_qup_i2c_pdata;
 	msm_gsbi4_qup_i2c_device.dev.platform_data = &msm_gsbi4_qup_i2c_pdata;
+	msm_gsbi8_qup_i2c_device.dev.platform_data = &msm_gsbi8_qup_i2c_pdata;
 	msm_gsbi9_qup_i2c_device.dev.platform_data = &msm_gsbi9_qup_i2c_pdata;
 #endif
 }
@@ -244,6 +263,16 @@ struct msm8x60_tlmm_cfg_struct {
 };
 
 static struct msm8x60_tlmm_cfg_struct msm8x60_tlmm_cfgs[] = {
+	/*
+	 * GSBI8
+	 */
+	{ 64, MSM_GPIO_OE | MSM_GPIO_DRV_2MA |
+	      MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_NONE},
+	{ 65, MSM_GPIO_OE | MSM_GPIO_DRV_2MA |
+	      MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_NONE},
+	/*
+	 * EBI2 LAN9221 ethernet
+	 */
 	{ 40, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(2) | MSM_GPIO_PULL_PULL_UP},
 	{123, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
 	{124, MSM_GPIO_DRV_8MA | MSM_GPIO_FUNC_SEL(1) | MSM_GPIO_PULL_PULL_UP},
@@ -301,6 +330,11 @@ static void __init msm8x60_init(void)
 		platform_add_devices(rumi_sim_devices,
 				     ARRAY_SIZE(rumi_sim_devices));
 	}
+#ifdef CONFIG_I2C
+	i2c_register_board_info(msm_gsbi8_qup_i2c_device.id,
+				msm8x60_i2c_gsbi8_info,
+				ARRAY_SIZE(msm8x60_i2c_gsbi8_info));
+#endif
 }
 
 MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
