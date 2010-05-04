@@ -263,6 +263,12 @@ static void msm_gpio_irq_mask(unsigned int irq)
 	spin_unlock_irqrestore(&gpio_lock, irq_flags);
 }
 
+static void msm_gpio_irq_mask_ack(unsigned int irq)
+{
+	msm_gpio_irq_mask(irq);
+	msm_gpio_irq_ack(irq);
+}
+
 static void msm_gpio_irq_unmask(unsigned int irq)
 {
 	unsigned long irq_flags;
@@ -328,6 +334,7 @@ struct irq_chip msm_summary_irq_chip = {
 	.ack          = msm_gpio_irq_ack,
 	.mask         = msm_gpio_irq_mask,
 	.unmask       = msm_gpio_irq_unmask,
+	.mask_ack     = msm_gpio_irq_mask_ack,
 	.set_type     = msm_gpio_irq_set_type
 };
 
