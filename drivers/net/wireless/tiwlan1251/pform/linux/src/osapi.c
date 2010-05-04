@@ -1673,6 +1673,9 @@ VOID
 os_disableIrq( TI_HANDLE OsContext)
 {
     tiwlan_net_dev_t *drv = (tiwlan_net_dev_t *)OsContext;
+#ifdef CONFIG_ANDROID_POWER
+    set_irq_wake(drv->irq, 0);
+#endif
     disable_irq (drv->irq);
 }
 
@@ -1681,6 +1684,9 @@ os_enableIrq( TI_HANDLE OsContext)
 {
     tiwlan_net_dev_t *drv = (tiwlan_net_dev_t *)OsContext;
     enable_irq (drv->irq);
+#ifdef CONFIG_ANDROID_POWER
+    set_irq_wake (drv->irq, 1);
+#endif
 }
 
 int

@@ -1338,9 +1338,6 @@ int tiwlan_init_drv (tiwlan_net_dev_t *drv, tiwlan_dev_init_t *init_info)
 #endif
             return rc;
         }
-#ifdef CONFIG_ANDROID_POWER
-        set_irq_wake(drv->irq, 1);
-#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
         set_irq_type (drv->irq, IRQT_FALLING);
 #else
