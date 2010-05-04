@@ -676,7 +676,8 @@ static void vote_for_xo(unsigned xo)
 
 	if (!xo_votes[xo]) {
 		int enable = 1;
-		msm_proc_comm(PCOM_CLKCTL_RPC_SRC_REQUEST, &xo, &enable);
+		unsigned p_xo = xo;
+		msm_proc_comm(PCOM_CLKCTL_RPC_SRC_REQUEST, &p_xo, &enable);
 	}
 	xo_votes[xo]++;
 }
