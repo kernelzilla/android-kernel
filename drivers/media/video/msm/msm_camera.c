@@ -36,6 +36,8 @@
 #include <linux/poll.h>
 #include <media/msm_camera.h>
 #include <mach/camera.h>
+#include <linux/syscalls.h>
+#include <linux/hrtimer.h>
 DEFINE_MUTEX(hlist_mut);
 DEFINE_MUTEX(pp_prev_lock);
 DEFINE_MUTEX(pp_snap_lock);
@@ -453,6 +455,7 @@ static int __msm_get_frame(struct msm_sync *sync,
 		goto err;
 	}
 
+	frame->ts = qcmd->ts;
 	frame->buffer = (unsigned long)pmem_info.vaddr;
 	frame->y_off = pmem_info.y_off;
 	frame->cbcr_off = pmem_info.cbcr_off;
@@ -2070,6 +2073,8 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 	qcmd = ((struct msm_queue_cmd *)vdata) - 1;
 	qcmd->type = qtype;
 	qcmd->command = vdata;
+
+	ktime_get_ts(&(qcmd->ts));
 
 	if (qtype != MSM_CAM_Q_VFE_MSG)
 		goto for_config;

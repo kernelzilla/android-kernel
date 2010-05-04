@@ -19,9 +19,13 @@
 #ifndef __LINUX_MSM_CAMERA_H
 #define __LINUX_MSM_CAMERA_H
 
+#ifdef MSM_CAMERA_BIONIC
+#include <sys/types.h>
+#endif
 #include <linux/types.h>
 #include <asm/sizes.h>
 #include <linux/ioctl.h>
+#include <linux/time.h>
 
 #define MSM_CAM_IOCTL_MAGIC 'm'
 
@@ -308,6 +312,7 @@ struct outputCfg {
 #define OUTPUT_TYPE_V		4
 
 struct msm_frame {
+	struct timespec ts;
 	int path;
 	unsigned long buffer;
 	uint32_t y_off;
