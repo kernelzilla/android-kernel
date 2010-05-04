@@ -263,6 +263,5 @@
 #define NR_TLMM_SCSS_DIR_CONN_IRQ 10
 #define NR_GPIO_IRQS 173
 #define NR_MSM_IRQS 256
-#define NR_BOARD_IRQS 0
-
+#define NR_BOARD_IRQS 64
 #endif
