@@ -166,6 +166,62 @@ struct platform_device msm_gsbi9_qup_i2c_device = {
 	.resource	= gsbi9_qup_i2c_resources,
 };
 
+#ifdef CONFIG_I2C_SSBI
+/* 8058 PMIC SSBI on /dev/i2c-6 */
+#define MSM_SSBI1_PMIC1C_PHYS	0x00500000
+static struct resource msm_ssbi1_resources[] = {
+	{
+		.name   = "ssbi_base",
+		.start	= MSM_SSBI1_PMIC1C_PHYS,
+		.end	= MSM_SSBI1_PMIC1C_PHYS + SZ_4K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm_device_ssbi1 = {
+	.name		= "i2c_ssbi",
+	.id		= 6,
+	.num_resources	= ARRAY_SIZE(msm_ssbi1_resources),
+	.resource	= msm_ssbi1_resources,
+};
+
+/* 8901 PMIC SSBI on /dev/i2c-7 */
+#define MSM_SSBI2_PMIC2B_PHYS	0x00C00000
+static struct resource msm_ssbi2_resources[] = {
+	{
+		.name   = "ssbi_base",
+		.start	= MSM_SSBI2_PMIC2B_PHYS,
+		.end	= MSM_SSBI2_PMIC2B_PHYS + SZ_4K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm_device_ssbi2 = {
+	.name		= "i2c_ssbi",
+	.id		= 7,
+	.num_resources	= ARRAY_SIZE(msm_ssbi2_resources),
+	.resource	= msm_ssbi2_resources,
+};
+
+/* CODEC SSBI on /dev/i2c-8 */
+#define MSM_SSBI3_PHYS  0x18700000
+static struct resource msm_ssbi3_resources[] = {
+	{
+		.name   = "ssbi_base",
+		.start  = MSM_SSBI3_PHYS,
+		.end    = MSM_SSBI3_PHYS + SZ_4K - 1,
+		.flags  = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm_device_ssbi3 = {
+	.name		= "i2c_ssbi",
+	.id		= 8,
+	.num_resources	= ARRAY_SIZE(msm_ssbi3_resources),
+	.resource	= msm_ssbi3_resources,
+};
+#endif /* CONFIG_I2C_SSBI */
+
 struct clk msm_clocks_8x60[] = {
 	CLK_8X60("bbrx_ssbi_clk",	BBRX_SSBI_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI1_UART_CLK,		NULL, 0),
