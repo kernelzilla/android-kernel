@@ -230,7 +230,8 @@ msmsdcc_dma_exec_func(struct msm_dmov_cmd *cmd)
 
 	writel(host->cmd_timeout, host->base + MMCIDATATIMER);
 	writel((unsigned int)host->curr.xfer_size, host->base + MMCIDATALENGTH);
-	writel(host->cmd_pio_irqmask, host->base + MMCIMASK1);
+	writel((readl(host->base + MMCIMASK0) & (~(MCI_IRQ_PIO))) |
+			host->cmd_pio_irqmask, host->base + MMCIMASK0);
 	msmsdcc_delay(host);	/* Allow data parms to be applied */
 	writel(host->cmd_datactrl, host->base + MMCIDATACTRL);
 	msmsdcc_delay(host);	/* Force delay prior to ADM or command */
@@ -581,7 +582,8 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 
 		writel(host->curr.xfer_size, base + MMCIDATALENGTH);
 
-		writel(pio_irqmask, base + MMCIMASK1);
+		writel((readl(host->base + MMCIMASK0) & (~(MCI_IRQ_PIO))) |
+				pio_irqmask, host->base + MMCIMASK0);
 		msmsdcc_delay(host);	/* Allow parms to be applied */
 		writel(datactrl, base + MMCIDATACTRL);
 
@@ -697,6 +699,9 @@ msmsdcc_pio_irq(int irq, void *dev_id)
 	uint32_t		status;
 
 	status = readl(base + MMCISTATUS);
+	if (((readl(host->base + MMCIMASK0) & status) & (MCI_IRQ_PIO)) == 0)
+		return IRQ_NONE;
+
 #if IRQ_DEBUG
 	msmsdcc_print_status(host, "irq1-r", status);
 #endif
@@ -750,14 +755,17 @@ msmsdcc_pio_irq(int irq, void *dev_id)
 	} while (1);
 
 	if (status & MCI_RXACTIVE && host->curr.xfer_remain < MCI_FIFOSIZE) {
-		writel(MCI_RXDATAAVLBLMASK, base + MMCIMASK1);
+		writel((readl(host->base + MMCIMASK0) & (~(MCI_IRQ_PIO))) |
+				MCI_RXDATAAVLBLMASK, host->base + MMCIMASK0);
 		if (!host->curr.xfer_remain) {
 			/* Delay needed (same port was just written) */
 			msmsdcc_delay(host);
-			writel(0, base + MMCIMASK1);
+			writel((readl(host->base + MMCIMASK0) &
+				(~(MCI_IRQ_PIO))) | 0, host->base + MMCIMASK0);
 		}
 	} else if (!host->curr.xfer_remain)
-		writel(0, base + MMCIMASK1);
+		writel((readl(host->base + MMCIMASK0) & (~(MCI_IRQ_PIO))) | 0,
+				host->base + MMCIMASK0);
 
 	return IRQ_HANDLED;
 }
@@ -786,6 +794,12 @@ msmsdcc_irq(int irq, void *dev_id)
 		}
 
 		status = readl(host->base + MMCISTATUS);
+
+		if (((readl(host->base + MMCIMASK0) & status) &
+						(~(MCI_IRQ_PIO))) == 0) {
+			ret = 0;
+			break;
+		}
 
 #if IRQ_DEBUG
 		msmsdcc_print_status(host, "irq0-r", status);
@@ -1506,12 +1520,10 @@ msmsdcc_probe(struct platform_device *pdev)
 	if (ret)
 		goto sdiowakeup_irq_free;
 
-	if (irqres->end != irqres->start) {
-		ret = request_irq(irqres->end, msmsdcc_pio_irq, IRQF_SHARED,
-			DRIVER_NAME " (pio)", host);
-		if (ret)
-			goto irq_free;
-	}
+	ret = request_irq(irqres->end, msmsdcc_pio_irq, IRQF_SHARED,
+		DRIVER_NAME " (pio)", host);
+	if (ret)
+		goto irq_free;
 
 	mmc_set_drvdata(pdev, mmc);
 	mmc_add_host(mmc);
