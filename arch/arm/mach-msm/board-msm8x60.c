@@ -50,6 +50,11 @@
 
 void __iomem *gic_cpu_base_addr;
 
+static struct msm_acpu_clock_platform_data msm8x60_acpu_clock_data = {
+	/* SoC has no frequency step size constraints. */
+	.max_speed_delta_khz = UINT_MAX,
+};
+
 /*
  * The smc91x configuration varies depending on platform.
  * The resources data structure is filled in at runtime.
@@ -702,6 +707,10 @@ static void __init msm8x60_init_mmc(void)
 
 static void __init msm8x60_init(void)
 {
+	/* CPU frequency control is not supported on simulated targets. */
+	if (!machine_is_msm8x60_rumi3() && !machine_is_msm8x60_sim())
+		msm_acpu_clock_init(&msm8x60_acpu_clock_data);
+
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
 	msm8x60_init_mmc();
