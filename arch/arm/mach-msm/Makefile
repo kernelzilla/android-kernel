@@ -12,7 +12,7 @@ endif
 
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock.o timer.o gpio.o generic_gpio.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += timer.o gpio.o generic_gpio.o
-obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += timer.o gpio-v2.o
+obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += timer.o gpio-v2.o tlmm.o
 
 obj-$(CONFIG_MSM_VIC) += irq-vic.o
 
