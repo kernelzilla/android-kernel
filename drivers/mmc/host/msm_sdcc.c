@@ -1321,7 +1321,7 @@ msmsdcc_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	if (pdev->id < 1 || pdev->id > 4)
+	if (pdev->id < 1 || pdev->id > 5)
 		return -EINVAL;
 
 	if (pdev->resource == NULL || pdev->num_resources < 3) {
