@@ -31,13 +31,14 @@
 #include <linux/aufs_type.h>
 #include "inode.h"
 
-enum {AuDy_FOP, AuDy_VMOP, AuDyLast};
+enum {AuDy_FOP, AuDy_AOP, AuDy_VMOP, AuDyLast};
 
 struct au_dynop {
 	int						dy_type;
 	union {
 		const void				*dy_hop;
 		const struct file_operations		*dy_hfop;
+		const struct address_space_operations	*dy_haop;
 		const struct vm_operations_struct	*dy_hvmop;
 	};
 };
@@ -62,6 +63,13 @@ struct au_dyfop {
 	struct file_operations		df_op; /* not const */
 };
 
+struct au_dyaop {
+	struct au_dykey			da_key;
+	struct address_space_operations	da_op; /* not const */
+	int (*da_get_xip_mem)(struct address_space *, pgoff_t, int,
+			      void **, unsigned long *);
+};
+
 struct au_dyvmop {
 	struct au_dykey			dv_key;
 	struct vm_operations_struct	dv_op; /* not const */
@@ -72,8 +80,9 @@ struct au_dyvmop {
 /* dynop.c */
 struct au_branch;
 void au_dy_put(struct au_dykey *key);
-int au_dy_ifop(struct inode *inode, aufs_bindex_t bindex,
-	       struct inode *h_inode);
+int au_dy_ifaop(struct inode *inode, aufs_bindex_t bindex,
+		struct inode *h_inode);
+void au_dy_arefresh(int do_dio);
 const struct vm_operations_struct *
 au_dy_vmop(struct file *file, struct au_branch *br,
 	   const struct vm_operations_struct *h_vmop);
@@ -107,7 +116,7 @@ static inline int au_dy_irefresh(struct inode *inode)
 	if (S_ISREG(inode->i_mode)) {
 		bstart = au_ibstart(inode);
 		h_inode = au_h_iptr(inode, bstart);
-		err = au_dy_ifop(inode, bstart, h_inode);
+		err = au_dy_ifaop(inode, bstart, h_inode);
 	}
 	return err;
 }

@@ -176,8 +176,7 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	case S_IFREG:
 		btail = au_dbtail(dentry);
 		inode->i_op = &aufs_iop;
-		inode->i_mapping->a_ops = &aufs_aop;
-		err = au_dy_ifop(inode, bstart, h_inode);
+		err = au_dy_ifaop(inode, bstart, h_inode);
 		if (unlikely(err))
 			goto out;
 		break;
