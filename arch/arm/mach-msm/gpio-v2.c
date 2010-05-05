@@ -276,10 +276,13 @@ static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 
 	bits = readl(addr);
 
-	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING))
+	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING)) {
 		bits |= INTR_DECT_CTL_EDGE;
-	else
+		irq_desc[irq].handle_irq = handle_edge_irq;
+	} else {
 		bits &= ~INTR_DECT_CTL_EDGE;
+		irq_desc[irq].handle_irq = handle_level_irq;
+	}
 
 	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
 		bits |= INTR_POL_CTL_HI;
