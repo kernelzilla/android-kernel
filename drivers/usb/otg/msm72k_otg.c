@@ -193,7 +193,8 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	}
 
 	writel(readl(USB_USBCMD) | ASYNC_INTR_CTRL | ULPI_STP_CTRL, USB_USBCMD);
-	clk_disable(dev->pclk);
+	if (dev->pclk)
+		clk_disable(dev->pclk);
 	if (dev->cclk)
 		clk_disable(dev->cclk);
 	if (device_may_wakeup(dev->otg.dev)) {
@@ -227,7 +228,8 @@ static int msm_otg_resume(struct msm_otg *dev)
 		return 0;
 
 
-	clk_enable(dev->pclk);
+	if (dev->pclk)
+		clk_enable(dev->pclk);
 	if (dev->cclk)
 		clk_enable(dev->cclk);
 
@@ -470,6 +472,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		dev->rpc_connect = pdata->rpc_connect;
 		dev->phy_reset = pdata->phy_reset;
 		dev->core_clk  = pdata->core_clk;
+		dev->usb_in_sps = pdata->usb_in_sps;
+
 		/* pmic apis */
 		dev->pmic_notif_init = pdata->pmic_notif_init;
 		dev->pmic_notif_deinit = pdata->pmic_notif_deinit;
@@ -503,12 +507,17 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		ret = PTR_ERR(dev->clk);
 		goto rpc_fail;
 	}
-	dev->pclk = clk_get(&pdev->dev, "usb_hs_pclk");
-	if (IS_ERR(dev->pclk)) {
-		pr_err("%s: failed to get usb_hs_pclk\n", __func__);
-		ret = PTR_ERR(dev->pclk);
-		goto put_clk;
+	clk_set_rate(dev->clk, 60000000);
+
+	if (!dev->usb_in_sps) {
+		dev->pclk = clk_get(&pdev->dev, "usb_hs_pclk");
+		if (IS_ERR(dev->pclk)) {
+			pr_err("%s: failed to get usb_hs_pclk\n", __func__);
+			ret = PTR_ERR(dev->pclk);
+			goto put_clk;
+		}
 	}
+
 	if (dev->core_clk) {
 		dev->cclk = clk_get(&pdev->dev, "usb_hs_core_clk");
 		if (IS_ERR(dev->cclk)) {
@@ -538,7 +547,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 
 	/* enable clocks */
-	clk_enable(dev->pclk);
+	if (dev->pclk)
+		clk_enable(dev->pclk);
 	if (dev->cclk)
 		clk_enable(dev->cclk);
 
@@ -552,7 +562,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			dev->pmic_notif_supp = 1;
 			dev->pmic_enable_ldo(1);
 		} else if (ret != -ENOTSUPP) {
-			clk_disable(dev->pclk);
+			if (dev->pclk)
+				clk_disable(dev->pclk);
 			if (dev->cclk)
 				clk_disable(dev->cclk);
 			goto free_regs;
@@ -565,7 +576,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 					"msm_otg", dev);
 	if (ret) {
 		pr_info("%s: request irq failed\n", __func__);
-		clk_disable(dev->pclk);
+		if (dev->pclk)
+			clk_disable(dev->pclk);
 		if (dev->cclk)
 			clk_disable(dev->cclk);
 		goto free_regs;
@@ -603,7 +615,8 @@ put_cclk:
 	if (dev->cclk)
 		clk_put(dev->cclk);
 put_pclk:
-	clk_put(dev->pclk);
+	if (dev->pclk)
+		clk_put(dev->pclk);
 put_clk:
 	clk_put(dev->clk);
 rpc_fail:
@@ -626,10 +639,12 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	iounmap(dev->regs);
 	if (dev->cclk)
 		clk_disable(dev->cclk);
-	clk_disable(dev->pclk);
 	if (dev->cclk)
 		clk_put(dev->cclk);
-	clk_put(dev->pclk);
+	if (dev->pclk) {
+		clk_disable(dev->pclk);
+		clk_put(dev->pclk);
+	}
 	clk_put(dev->clk);
 	kfree(dev);
 	if (dev->rpc_connect)
