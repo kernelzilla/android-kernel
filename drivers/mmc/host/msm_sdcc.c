@@ -387,13 +387,17 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
 	nc = host->dma.nc;
 
 	if (host->pdev_id == 1)
-		crci = MSMSDCC_CRCI_SDC1;
+		crci = DMOV_SDC1_CRCI;
 	else if (host->pdev_id == 2)
-		crci = MSMSDCC_CRCI_SDC2;
+		crci = DMOV_SDC2_CRCI;
 	else if (host->pdev_id == 3)
-		crci = MSMSDCC_CRCI_SDC3;
+		crci = DMOV_SDC3_CRCI;
 	else if (host->pdev_id == 4)
-		crci = MSMSDCC_CRCI_SDC4;
+		crci = DMOV_SDC4_CRCI;
+#ifdef DMOV_SDC5_CRCI
+	else if (host->pdev_id == 5)
+		crci = DMOV_SDC5_CRCI;
+#endif
 	else {
 		host->dma.sg = NULL;
 		host->dma.num_ents = 0;
