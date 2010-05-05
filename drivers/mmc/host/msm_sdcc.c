@@ -1026,7 +1026,8 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (ios->clock) {
 
 		if (!host->clks_on) {
-			clk_enable(host->pclk);
+			if (!IS_ERR(host->pclk))
+				clk_enable(host->pclk);
 			clk_enable(host->clk);
 			host->clks_on = 1;
 		}
@@ -1087,7 +1088,8 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	if (!(clk & MCI_CLK_ENABLE) && host->clks_on) {
 		clk_disable(host->clk);
-		clk_disable(host->pclk);
+		if (!IS_ERR(host->pclk))
+			clk_disable(host->pclk);
 		host->clks_on = 0;
 	}
 }
@@ -1395,16 +1397,13 @@ msmsdcc_probe(struct platform_device *pdev)
 	 * Setup main peripheral bus clock
 	 */
 	host->pclk = clk_get(&pdev->dev, "sdc_pclk");
-	if (IS_ERR(host->pclk)) {
-		ret = PTR_ERR(host->pclk);
-		goto dma_free;
+	if (!IS_ERR(host->pclk)) {
+		ret = clk_enable(host->pclk);
+		if (ret)
+			goto pclk_put;
+
+		host->pclk_rate = clk_get_rate(host->pclk);
 	}
-
-	ret = clk_enable(host->pclk);
-	if (ret)
-		goto pclk_put;
-
-	host->pclk_rate = clk_get_rate(host->pclk);
 
 	/*
 	 * Setup SDC MMC clock
@@ -1576,10 +1575,12 @@ msmsdcc_probe(struct platform_device *pdev)
  clk_put:
 	clk_put(host->clk);
  pclk_disable:
-	clk_disable(host->pclk);
+	if (!IS_ERR(host->pclk))
+		clk_disable(host->pclk);
  pclk_put:
-	clk_put(host->pclk);
- dma_free:
+	if (!IS_ERR(host->pclk))
+		clk_put(host->pclk);
+
 	dma_free_coherent(NULL, sizeof(struct msmsdcc_nc_dmadata),
 			host->dma.nc, host->dma.nc_busaddr);
  ioremap_free:
@@ -1628,7 +1629,8 @@ static int msmsdcc_remove(struct platform_device *pdev)
 	writel(0, host->base + MMCICOMMAND);
 
 	clk_put(host->clk);
-	clk_put(host->pclk);
+	if (!IS_ERR(host->pclk))
+		clk_put(host->pclk);
 
 	dma_free_coherent(NULL, sizeof(struct msmsdcc_nc_dmadata),
 			host->dma.nc, host->dma.nc_busaddr);
@@ -1665,7 +1667,8 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 
 			if (host->clks_on) {
 				clk_disable(host->clk);
-				clk_disable(host->pclk);
+				if (!IS_ERR(host->pclk))
+					clk_disable(host->pclk);
 				host->clks_on = 0;
 			}
 		}
@@ -1690,7 +1693,8 @@ msmsdcc_resume(struct platform_device *dev)
 	if (mmc) {
 		spin_lock_irqsave(&host->lock, flags);
 		if (!host->clks_on) {
-			clk_enable(host->pclk);
+			if (!IS_ERR(host->pclk))
+				clk_enable(host->pclk);
 			clk_enable(host->clk);
 			host->clks_on = 1;
 		}
