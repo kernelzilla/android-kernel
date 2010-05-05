@@ -69,10 +69,17 @@ static int  msmsdcc_dbg_init(void);
 static int msmsdcc_auto_suspend(struct mmc_host *, int);
 #endif
 
+#ifdef CONFIG_ARCH_MSM8X60
+static unsigned int msmsdcc_fmin = 400000;
+static unsigned int msmsdcc_fmid = 24000000;
+static unsigned int msmsdcc_temp = 24000000;
+static unsigned int msmsdcc_fmax = 48000000;
+#else
 static unsigned int msmsdcc_fmin = 144000;
 static unsigned int msmsdcc_fmid = 24576000;
 static unsigned int msmsdcc_temp = 25000000;
 static unsigned int msmsdcc_fmax = 49152000;
+#endif
 static unsigned int msmsdcc_pwrsave = 1;
 
 #define DUMMY_52_STATE_NONE		0
