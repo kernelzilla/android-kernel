@@ -67,7 +67,7 @@
 
 #define GPIO_INTR_CFG_SU(gpio)    (MSM_TLMM_BASE + 0x0400 + (0x04 * (gpio)))
 #define DIR_CONN_INTR_CFG_SU(irq) (MSM_TLMM_BASE + 0x0700 + (0x04 * (irq)))
-#define GPIO_CFG(gpio)            (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
+#define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
 #define GPIO_IN_OUT(gpio)         (MSM_TLMM_BASE + 0x1004 + (0x10 * (gpio)))
 #define GPIO_INTR_CFG(gpio)       (MSM_TLMM_BASE + 0x1008 + (0x10 * (gpio)))
 #define GPIO_INTR_STATUS(gpio)    (MSM_TLMM_BASE + 0x100c + (0x10 * (gpio)))
@@ -144,38 +144,26 @@ int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq)
 }
 EXPORT_SYMBOL(msm_gpio_install_direct_irq);
 
-void msm_gpio_write_cfg(unsigned gpio, uint32_t flags)
+int gpio_tlmm_config(unsigned config, unsigned disable)
 {
+	uint32_t v2flags;
 	unsigned long irq_flags;
-	uint32_t      prev;
-	uint32_t      next;
+	unsigned gpio = GPIO_PIN(config);
 
-	if (gpio < NR_MSM_GPIOS) {
-		spin_lock_irqsave(&gpio_lock, irq_flags);
+	if (gpio > NR_MSM_GPIOS)
+		return -EINVAL;
 
-		prev  = readl(GPIO_CFG(gpio));
-		next  = prev & (1 << 9);
-		next |= flags & PUBLIC_CFG_MASK;
-		writel(next, GPIO_CFG(gpio));
+	v2flags = ((GPIO_DIR(config) << 9) & (0x1 << 9)) |
+		((GPIO_DRVSTR(config) << 6) & (0x7 << 6)) |
+		((GPIO_FUNC(config) << 2) & (0xf << 2)) |
+		((GPIO_PULL(config) & 0x3));
 
-		spin_unlock_irqrestore(&gpio_lock, irq_flags);
-	}
+	spin_lock_irqsave(&gpio_lock, irq_flags);
+	writel(v2flags, GPIO_CONFIG(gpio));
+	spin_unlock_irqrestore(&gpio_lock, irq_flags);
+	return 0;
 }
-EXPORT_SYMBOL(msm_gpio_write_cfg);
-
-int msm_gpio_read_cfg(unsigned gpio, uint32_t *flags)
-{
-	int rc = -EINVAL;
-
-	if (gpio < NR_MSM_GPIOS && flags != NULL) {
-		*flags  = readl(GPIO_CFG(gpio));
-		*flags &= PUBLIC_CFG_MASK;
-		rc = 0;
-	}
-
-	return rc;
-}
-EXPORT_SYMBOL(msm_gpio_read_cfg);
+EXPORT_SYMBOL(gpio_tlmm_config);
 
 static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
