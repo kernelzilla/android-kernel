@@ -1524,7 +1524,8 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 #ifdef CONFIG_WAKELOCK
 	wake_lock(&mcbsp_wakelock);
 #endif
-	TRY(omap_mcbsp_request(ssi))
+	if (omap_mcbsp_request(ssi) < 0)
+		goto error;
 
 	TRY(omap2_mcbsp_reset(ssi))
 
@@ -1541,6 +1542,7 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 
 out:
 	omap_mcbsp_free(ssi);
+error:
 #ifdef CONFIG_WAKELOCK
 	wake_unlock(&mcbsp_wakelock);
 #endif
