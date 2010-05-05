@@ -1234,8 +1234,7 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 		if (!err) {
 			err = 1;
 			au_fset_opts(opts->flags, REFRESH_DIR);
-			if (au_br_whable(opt->add.perm))
-				au_fset_opts(opts->flags, REFRESH_NONDIR);
+			au_fset_opts(opts->flags, REFRESH_NONDIR);
 		}
 		break;
 
