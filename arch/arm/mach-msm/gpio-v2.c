@@ -315,15 +315,49 @@ static void msm_summary_irq_handler(unsigned int irq,
 	desc->chip->ack(irq);
 }
 
+static void msm_gpio_irq_eoi(unsigned int irq)
+{
+}
+
+static int msm_gpio_irq_set_affinity(unsigned int irq,
+				const struct cpumask *dest)
+{
+	return -ENOTSUPP;
+}
+
+static int msm_gpio_irq_retrigger(unsigned int irq)
+{
+	generic_handle_irq(irq);
+	return 0;
+}
+
+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
+{
+	return -ENOTSUPP;
+}
+
+#ifdef CONFIG_IRQ_RELEASE_METHOD
+static void msm_gpio_irq_release(unsigned int irq, void *dev_id)
+{
+}
+#endif
+
 struct irq_chip msm_summary_irq_chip = {
 	.name         = "MSM_GPIO",
 	.enable       = msm_gpio_irq_enable,
 	.disable      = msm_gpio_irq_disable,
 	.ack          = msm_gpio_irq_ack,
 	.mask         = msm_gpio_irq_mask,
-	.unmask       = msm_gpio_irq_unmask,
 	.mask_ack     = msm_gpio_irq_mask_ack,
-	.set_type     = msm_gpio_irq_set_type
+	.unmask       = msm_gpio_irq_unmask,
+	.eoi          = msm_gpio_irq_eoi,
+	.set_affinity = msm_gpio_irq_set_affinity,
+	.retrigger    = msm_gpio_irq_retrigger,
+	.set_type     = msm_gpio_irq_set_type,
+	.set_wake     = msm_gpio_irq_set_wake,
+#ifdef CONFIG_IRQ_RELEASE_METHOD
+	.release      = msm_gpio_irq_release,
+#endif
 };
 
 static int __init msm_gpio_init(void)
