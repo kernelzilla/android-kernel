@@ -41,6 +41,7 @@ enum {
 	Opt_shwh, Opt_noshwh,
 	Opt_plink, Opt_noplink, Opt_list_plink,
 	Opt_udba,
+	Opt_dio, Opt_nodio,
 	/* Opt_lock, Opt_unlock, */
 	Opt_cmd, Opt_cmd_args,
 	Opt_diropq_a, Opt_diropq_w,
@@ -92,6 +93,9 @@ static match_table_t options = {
 #endif
 
 	{Opt_udba, "udba=%s"},
+
+	{Opt_dio, "dio"},
+	{Opt_nodio, "nodio"},
 
 	{Opt_diropq_a, "diropq=always"},
 	{Opt_diropq_a, "diropq=a"},
@@ -470,6 +474,12 @@ static void dump_opts(struct au_opts *opts)
 		case Opt_udba:
 			AuDbg("udba %d, %s\n",
 				  opt->udba, au_optstr_udba(opt->udba));
+			break;
+		case Opt_dio:
+			AuLabel(dio);
+			break;
+		case Opt_nodio:
+			AuLabel(nodio);
 			break;
 		case Opt_diropq_a:
 			AuLabel(diropq_a);
@@ -955,6 +965,8 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		case Opt_plink:
 		case Opt_noplink:
 		case Opt_list_plink:
+		case Opt_dio:
+		case Opt_nodio:
 		case Opt_diropq_a:
 		case Opt_diropq_w:
 		case Opt_warn_perm:
@@ -1102,6 +1114,15 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 	case Opt_list_plink:
 		if (au_opt_test(sbinfo->si_mntflags, PLINK))
 			au_plink_list(sb);
+		break;
+
+	case Opt_dio:
+		au_opt_set(sbinfo->si_mntflags, DIO);
+		au_fset_opts(opts->flags, REFRESH_DYAOP);
+		break;
+	case Opt_nodio:
+		au_opt_clr(sbinfo->si_mntflags, DIO);
+		au_fset_opts(opts->flags, REFRESH_DYAOP);
 		break;
 
 	case Opt_diropq_a:
@@ -1341,7 +1362,7 @@ int au_opts_verify(struct super_block *sb, unsigned long sb_flags,
 
 	err = 0;
 	root = sb->s_root;
-	dir = sb->s_root->d_inode;
+	dir = root->d_inode;
 	do_plink = !!au_opt_test(sbinfo->si_mntflags, PLINK);
 	bend = au_sbend(sb);
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
