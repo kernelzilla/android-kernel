@@ -23,6 +23,7 @@
 #include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 
 #include <mach/msm_iomap.h>
 #include <mach/clk.h>
@@ -60,6 +61,8 @@ struct clk_local {
 	uint32_t	*children;
 	struct clk_freq_tbl	*freq_tbl;
 	struct clk_freq_tbl	*current_freq;
+	uint32_t	halt_reg;
+	uint32_t	halt_mask;
 };
 
 
@@ -332,7 +335,7 @@ static struct clk_freq_tbl dummy_freq = F_END;
 
 #define C(x) L_7X30_##x##_CLK
 
-#define CLK_LOCAL(id, t, md, ns, f_msk, br, root, tbl, par, chld_lst) \
+#define CLK_LOCAL(id, t, md, ns, f_msk, br, root, tbl, par, chld_lst, h, hm) \
 	[C(id)] = { \
 	.type = t, \
 	.md_reg = md, \
@@ -344,30 +347,34 @@ static struct clk_freq_tbl dummy_freq = F_END;
 	.children = chld_lst, \
 	.freq_tbl = tbl, \
 	.current_freq = &dummy_freq, \
+	.halt_reg = h, \
+	.halt_mask = hm, \
 	}
 
-#define CLK_BASIC(id, ns, br, root, tbl, par) \
+#define CLK_BASIC(id, ns, br, root, tbl, par, h, hm) \
 		CLK_LOCAL(id, BASIC, 0, ns, F_MASK_BASIC, br, root, tbl, \
-								par, NULL)
-#define CLK_MND8_P(id, ns, m, l, br, root, tbl, par, chld_lst) \
+							par, NULL, h, hm)
+#define CLK_MND8_P(id, ns, m, l, br, root, tbl, par, chld_lst, h, hm) \
 		CLK_LOCAL(id, MND, (ns-4), ns, F_MASK_MND8(m, l), br, root, \
-							tbl, par, chld_lst)
-#define CLK_MND8(id, ns, m, l, br, root, tbl, chld_lst) \
-		CLK_MND8_P(id, ns, m, l, br, root, tbl, NONE, chld_lst)
-#define CLK_MND16(id, ns, br, root, tbl, par, chld_lst) \
+						tbl, par, chld_lst, h, hm)
+#define CLK_MND8(id, ns, m, l, br, root, tbl, chld_lst, h, hm) \
+		CLK_MND8_P(id, ns, m, l, br, root, tbl, NONE, chld_lst, h, hm)
+#define CLK_MND16(id, ns, br, root, tbl, par, chld_lst, h, hm) \
 		CLK_LOCAL(id, MND, (ns-4), ns, F_MASK_MND16, br, root, tbl, \
-								par, chld_lst)
-#define CLK_1RATE(id, ns, br, root, tbl) \
-		CLK_LOCAL(id, BASIC, 0, ns, 0, br, root, tbl, NONE, NULL)
-#define CLK_SLAVE(id, ns, br, par) \
-		CLK_LOCAL(id, NORATE, 0, ns, 0, br, 0, NULL, par, NULL)
-#define CLK_NORATE(id, ns, br, root) \
-		CLK_LOCAL(id, NORATE, 0, ns, 0, br, root, NULL, NONE, NULL)
-#define CLK_GLBL(id, glbl, root) \
-		CLK_LOCAL(id, NORATE, 0, glbl, 0, 0, root, NULL, \
-							GLBL_ROOT, NULL)
-#define CLK_BRIDGE(id, glbl, root, par) \
-		CLK_LOCAL(id, NORATE, 0, glbl, 0, 0, root, NULL, par, NULL)
+							par, chld_lst, h, hm)
+#define CLK_1RATE(id, ns, br, root, tbl, h, hm) \
+		CLK_LOCAL(id, BASIC, 0, ns, 0, br, root, tbl, NONE, NULL, h, hm)
+#define CLK_SLAVE(id, ns, br, par, h, hm) \
+		CLK_LOCAL(id, NORATE, 0, ns, 0, br, 0, NULL, par, NULL, h, hm)
+#define CLK_NORATE(id, ns, br, root, h, hm) \
+		CLK_LOCAL(id, NORATE, 0, ns, 0, br, root, NULL, NONE, NULL, \
+				h, hm)
+#define CLK_GLBL(id, glbl, br, h, hm) \
+		CLK_LOCAL(id, NORATE, 0, glbl, 0, br, 0, NULL, GLBL_ROOT, \
+				NULL, h, hm)
+#define CLK_BRIDGE(id, glbl, br, par, h, hm) \
+		CLK_LOCAL(id, NORATE, 0, glbl, 0, br, 0, NULL, par, NULL, \
+				h, hm)
 
 #define REG_BASE(off) (MSM_CLK_CTL_BASE + off)
 #define REG(off) (MSM_CLK_CTL_SH2_BASE + off)
@@ -410,6 +417,11 @@ static struct clk_freq_tbl dummy_freq = F_END;
 #define SH2_OWN_ROW1_REG	0x041C
 #define SH2_OWN_ROW2_REG	0x0424
 #define SH2_OWN_APPS3_REG	0x0444
+#define CLK_HALT_STATEA		0x0108
+#define CLK_HALT_STATEB		0x010C
+#define CLK_HALT_STATEC		0x02D4
+#define GLBL_CLK_STATE		0x0004
+#define GLBL_CLK_STATE_2	0x037C
 
 static uint32_t *pll_status_addr[NUM_PLL] = {
 	[PLL_0] = REG_BASE(0x318),
@@ -440,134 +452,201 @@ uint32_t chld_vfe[] = 			{C(VFE_MDC), C(VFE_CAMIF), C(CSI0_VFE),
 					 C(NONE)};
 
 static struct clk_local clk_local_tbl[] = {
-	CLK_NORATE(MDC,		MDC_NS, B(9), B(11)),
-	CLK_NORATE(LPA_CORE,	LPA_NS, B(5), 0),
+	CLK_NORATE(MDC,		MDC_NS, B(9), B(11), CLK_HALT_STATEA, B(10)),
+	CLK_NORATE(LPA_CORE,	LPA_NS, B(5), 0, CLK_HALT_STATEC, B(5)),
 
-	CLK_1RATE(I2C,		0x0068, B(9), B(11),	clk_tbl_tcxo),
-	CLK_1RATE(I2C_2,	0x02D8, B(0), B(2),	clk_tbl_tcxo),
-	CLK_1RATE(QUP_I2C,	0x04F0, B(0), B(2),	clk_tbl_tcxo),
-	CLK_1RATE(UART1,	UART_NS, B(5), B(4),	clk_tbl_tcxo),
-	CLK_1RATE(UART2,	UART2_NS, B(5), B(4),	clk_tbl_tcxo),
+	CLK_1RATE(I2C,		0x0068, B(9), B(11),	clk_tbl_tcxo,
+			CLK_HALT_STATEA, B(15)),
+	CLK_1RATE(I2C_2,	0x02D8, B(0), B(2),	clk_tbl_tcxo,
+			CLK_HALT_STATEC, B(2)),
+	CLK_1RATE(QUP_I2C,	0x04F0, B(0), B(2),	clk_tbl_tcxo,
+			CLK_HALT_STATEB, B(31)),
+	CLK_1RATE(UART1,	UART_NS, B(5), B(4),	clk_tbl_tcxo,
+			CLK_HALT_STATEB, B(7)),
+	CLK_1RATE(UART2,	UART2_NS, B(5), B(4),	clk_tbl_tcxo,
+			CLK_HALT_STATEB, B(5)),
 
-	CLK_BASIC(EMDH,	EMDH_NS,    0, B(11),	clk_tbl_mdh, AXI_LI_ADSP_A),
-	CLK_BASIC(PMDH,	PMDH_NS,    0, B(11),	clk_tbl_mdh, AXI_LI_ADSP_A),
-	CLK_BASIC(MDP,	0x014C, B(9), B(11),	clk_tbl_mdp_core, AXI_MDP),
+	CLK_BASIC(EMDH,	EMDH_NS,    0, B(11),	clk_tbl_mdh, AXI_LI_ADSP_A,
+			0, 0),
+	CLK_BASIC(PMDH,	PMDH_NS,    0, B(11),	clk_tbl_mdh, AXI_LI_ADSP_A,
+			0, 0),
+	CLK_BASIC(MDP,	0x014C, B(9), B(11),	clk_tbl_mdp_core, AXI_MDP,
+			CLK_HALT_STATEB, B(16)),
 
 	CLK_MND8_P(VPE, 0x015C, 22, 15, B(9), B(11), clk_tbl_vpe,
-							AXI_VPE, NULL),
+					AXI_VPE, NULL, CLK_HALT_STATEC, B(10)),
 	CLK_MND8_P(MFC, MFC_NS, 24, 17, B(9), B(11), clk_tbl_mfc,
-							AXI_MFC, chld_mfc),
-	CLK_SLAVE(MFC_DIV2, MFC_NS, B(15), MFC),
+				AXI_MFC, chld_mfc, CLK_HALT_STATEC, B(12)),
+	CLK_SLAVE(MFC_DIV2, MFC_NS, B(15), MFC, CLK_HALT_STATEC, B(11)),
 
-	CLK_MND8(SDC1,	0x00A4, 19, 12, B(9), B(11),	clk_tbl_sdc1_3,	NULL),
-	CLK_MND8(SDC2,	0x00AC, 20, 13, B(9), B(11),	clk_tbl_sdc2_4,	NULL),
-	CLK_MND8(SDC3,	0x00B4, 19, 12, B(9), B(11),	clk_tbl_sdc1_3,	NULL),
-	CLK_MND8(SDC4,	0x00BC, 20, 13, B(9), B(11),	clk_tbl_sdc2_4,	NULL),
-	CLK_MND8(SPI,	0x02C8, 19, 12, B(9), B(11),	clk_tbl_spi,	NULL),
-	CLK_MND8(MIDI,	0x02D0, 19, 12, B(9), B(11),	clk_tbl_midi,	NULL),
+	CLK_MND8(SDC1,	0x00A4, 19, 12, B(9), B(11),	clk_tbl_sdc1_3,	NULL,
+			CLK_HALT_STATEA, B(1)),
+	CLK_MND8(SDC2,	0x00AC, 20, 13, B(9), B(11),	clk_tbl_sdc2_4,	NULL,
+			CLK_HALT_STATEA, B(0)),
+	CLK_MND8(SDC3,	0x00B4, 19, 12, B(9), B(11),	clk_tbl_sdc1_3,	NULL,
+			CLK_HALT_STATEB, B(24)),
+	CLK_MND8(SDC4,	0x00BC, 20, 13, B(9), B(11),	clk_tbl_sdc2_4,	NULL,
+			CLK_HALT_STATEB, B(25)),
+	CLK_MND8(SPI,	0x02C8, 19, 12, B(9), B(11),	clk_tbl_spi,	NULL,
+			CLK_HALT_STATEC, B(0)),
+	CLK_MND8(MIDI,	0x02D0, 19, 12, B(9), B(11),	clk_tbl_midi,	NULL,
+			CLK_HALT_STATEC, B(1)),
 	CLK_MND8_P(USB_HS_SRC, USBH_NS, 23, 16, 0, B(11), clk_tbl_usb,
-					AXI_LI_ADSP_A,	chld_usb_src),
-	CLK_SLAVE(USB_HS,	USBH_NS,	B(9),	USB_HS_SRC),
-	CLK_SLAVE(USB_HS_CORE,	USBH_NS,	B(13),	USB_HS_SRC),
-	CLK_SLAVE(USB_HS2,	USBH2_NS,	B(9),	USB_HS_SRC),
-	CLK_SLAVE(USB_HS2_CORE,	USBH2_NS,	B(4),	USB_HS_SRC),
-	CLK_SLAVE(USB_HS3,	USBH3_NS,	B(9),	USB_HS_SRC),
-	CLK_SLAVE(USB_HS3_CORE,	USBH3_NS,	B(4),	USB_HS_SRC),
-	CLK_MND8(TV,	TV_NS, 23, 16, 0, B(11), clk_tbl_tv, chld_tv),
-	CLK_SLAVE(HDMI,		HDMI_NS, B(9),		TV),
-	CLK_SLAVE(TV_DAC,	TV_NS, B(12),		TV),
-	CLK_SLAVE(TV_ENC,	TV_NS, B(9),		TV),
+			AXI_LI_ADSP_A,	chld_usb_src, 0, 0),
+	CLK_SLAVE(USB_HS,	USBH_NS,	B(9),	USB_HS_SRC,
+			CLK_HALT_STATEB, B(26)),
+	CLK_SLAVE(USB_HS_CORE,	USBH_NS,	B(13),	USB_HS_SRC,
+			CLK_HALT_STATEA, B(27)),
+	CLK_SLAVE(USB_HS2,	USBH2_NS,	B(9),	USB_HS_SRC,
+			CLK_HALT_STATEB, B(3)),
+	CLK_SLAVE(USB_HS2_CORE,	USBH2_NS,	B(4),	USB_HS_SRC,
+			CLK_HALT_STATEA, B(28)),
+	CLK_SLAVE(USB_HS3,	USBH3_NS,	B(9),	USB_HS_SRC,
+			CLK_HALT_STATEB, B(2)),
+	CLK_SLAVE(USB_HS3_CORE,	USBH3_NS,	B(4),	USB_HS_SRC,
+			CLK_HALT_STATEA, B(29)),
+	CLK_MND8(TV,	TV_NS, 23, 16, 0, B(11), clk_tbl_tv, chld_tv, 0, 0),
+	CLK_SLAVE(HDMI,		HDMI_NS, B(9),	TV, CLK_HALT_STATEC, B(7)),
+	CLK_SLAVE(TV_DAC,	TV_NS, B(12),	TV, CLK_HALT_STATEB, B(27)),
+	CLK_SLAVE(TV_ENC,	TV_NS, B(9),	TV, CLK_HALT_STATEB, B(10)),
 	/* Hacking root & branch into one param. */
-	CLK_SLAVE(TSIF_REF,	0x00C4, B(9)|B(11),	TV),
+	CLK_SLAVE(TSIF_REF,	0x00C4, B(9)|B(11),	TV, CLK_HALT_STATEB,
+			B(11)),
 
-	CLK_MND16(UART1DM, 0x00D4, B(9), B(11), clk_tbl_uartdm, NONE, NULL),
-	CLK_MND16(UART2DM, 0x00DC, B(9), B(11), clk_tbl_uartdm, NONE, NULL),
+	CLK_MND16(UART1DM, 0x00D4, B(9), B(11), clk_tbl_uartdm, NONE, NULL,
+			CLK_HALT_STATEB, B(6)),
+	CLK_MND16(UART2DM, 0x00DC, B(9), B(11), clk_tbl_uartdm, NONE, NULL,
+			CLK_HALT_STATEB, B(23)),
 	CLK_MND16(JPEG,    0x0164, B(9), B(11), clk_tbl_vfe_jpeg,
-							AXI_LI_JPEG, NULL),
-	CLK_MND16(CAM_M, 0x0374, 0, B(9), clk_tbl_cam, NONE, NULL),
+				AXI_LI_JPEG, NULL, CLK_HALT_STATEB, B(1)),
+	CLK_MND16(CAM_M, 0x0374, 0, B(9), clk_tbl_cam, NONE, NULL, 0, 0),
 	CLK_MND16(VFE, CAM_VFE_NS, B(9), B(13), clk_tbl_vfe_jpeg,
-							AXI_LI_VFE, chld_vfe),
-	CLK_SLAVE(VFE_MDC, CAM_VFE_NS, B(11), VFE),
-	CLK_SLAVE(VFE_CAMIF, CAM_VFE_NS, B(15), VFE),
-	CLK_SLAVE(CSI0_VFE, CSI_NS, B(15), VFE),
+				AXI_LI_VFE, chld_vfe, CLK_HALT_STATEB, B(0)),
+	CLK_SLAVE(VFE_MDC, CAM_VFE_NS, B(11), VFE, CLK_HALT_STATEA, B(9)),
+	CLK_SLAVE(VFE_CAMIF, CAM_VFE_NS, B(15), VFE, CLK_HALT_STATEC, B(13)),
+	CLK_SLAVE(CSI0_VFE, CSI_NS, B(15), VFE, CLK_HALT_STATEA, B(4)),
 
 	CLK_MND16(SDAC, SDAC_NS, B(9), B(11), clk_tbl_sdac,
-							NONE, chld_sdac),
-	CLK_SLAVE(SDAC_M, SDAC_NS, B(12), SDAC),
+				NONE, chld_sdac, CLK_HALT_STATEA, B(2)),
+	CLK_SLAVE(SDAC_M, SDAC_NS, B(12), SDAC, CLK_HALT_STATEB, B(17)),
 
 	CLK_MND16(MDP_LCDC_PCLK, MDP_LCDC_NS, B(9), B(11), clk_tbl_mdp_lcdc,
-							NONE, chld_mdp_lcdc_p),
-	CLK_SLAVE(MDP_LCDC_PAD_PCLK, MDP_LCDC_NS, B(12), MDP_LCDC_PCLK),
-	CLK_1RATE(MDP_VSYNC, MDP_VSYNC_REG, B(0), 0, clk_tbl_mdp_vsync),
+			NONE, chld_mdp_lcdc_p, CLK_HALT_STATEB, B(28)),
+	CLK_SLAVE(MDP_LCDC_PAD_PCLK, MDP_LCDC_NS, B(12), MDP_LCDC_PCLK,
+			CLK_HALT_STATEB, B(29)),
+	CLK_1RATE(MDP_VSYNC, MDP_VSYNC_REG, B(0), 0, clk_tbl_mdp_vsync,
+			CLK_HALT_STATEB, B(30)),
 
 	CLK_MND16(MI2S_CODEC_RX_M, MI2S_RX_NS, B(12), B(11),
-				clk_tbl_mi2s_codec, NONE, chld_mi2s_codec_rx),
-	CLK_SLAVE(MI2S_CODEC_RX_S, MI2S_RX_NS, B(9), MI2S_CODEC_RX_M),
+				clk_tbl_mi2s_codec, NONE, chld_mi2s_codec_rx,
+				CLK_HALT_STATEA, B(12)),
+	CLK_SLAVE(MI2S_CODEC_RX_S, MI2S_RX_NS, B(9), MI2S_CODEC_RX_M,
+			CLK_HALT_STATEA, B(13)),
 
 	CLK_MND16(MI2S_CODEC_TX_M, MI2S_TX_NS, B(12), B(11),
-				clk_tbl_mi2s_codec, NONE, chld_mi2s_codec_tx),
-	CLK_SLAVE(MI2S_CODEC_TX_S, MI2S_TX_NS, B(9), MI2S_CODEC_TX_M),
+				clk_tbl_mi2s_codec, NONE, chld_mi2s_codec_tx,
+				CLK_HALT_STATEC, B(8)),
+	CLK_SLAVE(MI2S_CODEC_TX_S, MI2S_TX_NS, B(9), MI2S_CODEC_TX_M,
+			CLK_HALT_STATEA, B(11)),
 
 	CLK_MND16(MI2S_M, MI2S_NS, B(12), B(11),
-				clk_tbl_mi2s, NONE, chld_mi2s),
-	CLK_SLAVE(MI2S_S, MI2S_NS, B(9), MI2S_M),
+			clk_tbl_mi2s, NONE, chld_mi2s, CLK_HALT_STATEC, B(4)),
+	CLK_SLAVE(MI2S_S, MI2S_NS, B(9), MI2S_M, CLK_HALT_STATEC, B(3)),
 
 	CLK_LOCAL(GRP_2D, BASIC, 0, 0x0034, F_MASK_BASIC | (7 << 12),
-			B(7), B(11), clk_tbl_grp, AXI_GRP_2D, NULL),
+			B(7), B(11), clk_tbl_grp, AXI_GRP_2D, NULL,
+			CLK_HALT_STATEA, B(31)),
 	CLK_LOCAL(GRP_3D_SRC, BASIC, 0, GRP_NS, F_MASK_BASIC | (7 << 12),
-			0, B(11), clk_tbl_grp, AXI_LI_GRP, chld_grp_3d_src),
-	CLK_SLAVE(GRP_3D, GRP_NS, B(7), GRP_3D_SRC),
-	CLK_SLAVE(IMEM, GRP_NS, B(9), GRP_3D_SRC),
+			0, B(11), clk_tbl_grp, AXI_LI_GRP, chld_grp_3d_src,
+			0, 0),
+	CLK_SLAVE(GRP_3D, GRP_NS, B(7), GRP_3D_SRC, CLK_HALT_STATEB, B(18)),
+	CLK_SLAVE(IMEM, GRP_NS, B(9), GRP_3D_SRC, CLK_HALT_STATEB, B(19)),
 	CLK_LOCAL(LPA_CODEC, BASIC, 0, LPA_NS, BM(1, 0), B(9), 0,
-					clk_tbl_lpa_codec, NONE, NULL),
+				clk_tbl_lpa_codec, NONE, NULL, CLK_HALT_STATEC,
+				B(6)),
 
-	CLK_MND8(CSI0, CSI_NS, 24, 17, B(9), B(11), clk_tbl_csi, NULL),
+	CLK_MND8(CSI0, CSI_NS, 24, 17, B(9), B(11), clk_tbl_csi, NULL,
+			CLK_HALT_STATEB, B(9)),
 
 	/* For global clocks to be on we must have GLBL_ROOT_ENA set */
-	CLK_1RATE(GLBL_ROOT,	GLBL_CLK_ENA_SC, 0,	B(29), clk_tbl_axi),
+	CLK_1RATE(GLBL_ROOT,	GLBL_CLK_ENA_SC, 0,	B(29), clk_tbl_axi,
+			0, 0),
 
 	/* Peripheral bus clocks. */
-	CLK_GLBL(ADM,	 	GLBL_CLK_ENA_SC,	B(5)),
-	CLK_GLBL(CAMIF_PAD_P,	GLBL_CLK_ENA_SC,	B(9)),
-	CLK_GLBL(CSI0_P,	GLBL_CLK_ENA_SC,	B(30)),
-	CLK_GLBL(EMDH_P,	GLBL_CLK_ENA_2_SC,	B(3)),
-	CLK_GLBL(GRP_2D_P,	GLBL_CLK_ENA_SC,	B(24)),
-	CLK_GLBL(GRP_3D_P,	GLBL_CLK_ENA_2_SC,	B(17)),
-	CLK_GLBL(JPEG_P,	GLBL_CLK_ENA_2_SC,	B(24)),
-	CLK_GLBL(LPA_P,		GLBL_CLK_ENA_2_SC,	B(7)),
-	CLK_GLBL(MDP_P,		GLBL_CLK_ENA_2_SC,	B(6)),
-	CLK_GLBL(MFC_P,		GLBL_CLK_ENA_2_SC,	B(26)),
-	CLK_GLBL(PMDH_P,	GLBL_CLK_ENA_2_SC,	B(4)),
-	CLK_GLBL(ROTATOR_IMEM,	GLBL_CLK_ENA_2_SC,	B(23)),
-	CLK_GLBL(ROTATOR_P,	GLBL_CLK_ENA_2_SC,	B(25)),
-	CLK_GLBL(SDC1_P,	GLBL_CLK_ENA_SC,	B(7)),
-	CLK_GLBL(SDC2_P,	GLBL_CLK_ENA_SC,	B(8)),
-	CLK_GLBL(SDC3_P,	GLBL_CLK_ENA_SC,	B(27)),
-	CLK_GLBL(SDC4_P,	GLBL_CLK_ENA_SC,	B(28)),
-	CLK_GLBL(SPI_P,		GLBL_CLK_ENA_2_SC,	B(10)),
-	CLK_GLBL(TSIF_P,	GLBL_CLK_ENA_SC,	B(18)),
-	CLK_GLBL(UART1DM_P,	GLBL_CLK_ENA_SC,	B(17)),
-	CLK_GLBL(UART2DM_P,	GLBL_CLK_ENA_SC,	B(26)),
-	CLK_GLBL(USB_HS2_P,	GLBL_CLK_ENA_2_SC,	B(8)),
-	CLK_GLBL(USB_HS3_P,	GLBL_CLK_ENA_2_SC,	B(9)),
-	CLK_GLBL(USB_HS_P,	GLBL_CLK_ENA_SC,	B(25)),
-	CLK_GLBL(VFE_P,		GLBL_CLK_ENA_2_SC,	B(27)),
+	CLK_GLBL(ADM,	 	GLBL_CLK_ENA_SC,	B(5), 0, 0),
+	CLK_GLBL(CAMIF_PAD_P,	GLBL_CLK_ENA_SC,	B(9), GLBL_CLK_STATE,
+			B(9)),
+	CLK_GLBL(CSI0_P,	GLBL_CLK_ENA_SC,	B(30), GLBL_CLK_STATE,
+			B(30)),
+	CLK_GLBL(EMDH_P,	GLBL_CLK_ENA_2_SC,	B(3), 0, B(3)),
+	CLK_GLBL(GRP_2D_P,	GLBL_CLK_ENA_SC,	B(24), GLBL_CLK_STATE,
+			B(24)),
+	CLK_GLBL(GRP_3D_P,	GLBL_CLK_ENA_2_SC,	B(17), GLBL_CLK_STATE_2,
+			B(17)),
+	CLK_GLBL(JPEG_P,	GLBL_CLK_ENA_2_SC,	B(24), GLBL_CLK_STATE_2,
+			B(24)),
+	CLK_GLBL(LPA_P,		GLBL_CLK_ENA_2_SC,	B(7), GLBL_CLK_STATE_2,
+			B(7)),
+	CLK_GLBL(MDP_P,		GLBL_CLK_ENA_2_SC,	B(6), 0, 0),
+	CLK_GLBL(MFC_P,		GLBL_CLK_ENA_2_SC,	B(26), GLBL_CLK_STATE_2,
+			B(26)),
+	CLK_GLBL(PMDH_P,	GLBL_CLK_ENA_2_SC,	B(4), 0, 0),
+	CLK_GLBL(ROTATOR_IMEM,	GLBL_CLK_ENA_2_SC,	B(23), GLBL_CLK_STATE_2,
+			B(23)),
+	CLK_GLBL(ROTATOR_P,	GLBL_CLK_ENA_2_SC,	B(25), GLBL_CLK_STATE_2,
+			B(25)),
+	CLK_GLBL(SDC1_P,	GLBL_CLK_ENA_SC,	B(7), GLBL_CLK_STATE,
+			B(7)),
+	CLK_GLBL(SDC2_P,	GLBL_CLK_ENA_SC,	B(8), GLBL_CLK_STATE,
+			B(8)),
+	CLK_GLBL(SDC3_P,	GLBL_CLK_ENA_SC,	B(27), GLBL_CLK_STATE,
+			B(27)),
+	CLK_GLBL(SDC4_P,	GLBL_CLK_ENA_SC,	B(28), GLBL_CLK_STATE,
+			B(28)),
+	CLK_GLBL(SPI_P,		GLBL_CLK_ENA_2_SC,	B(10), GLBL_CLK_STATE_2,
+			B(10)),
+	CLK_GLBL(TSIF_P,	GLBL_CLK_ENA_SC,	B(18), GLBL_CLK_STATE,
+			B(18)),
+	CLK_GLBL(UART1DM_P,	GLBL_CLK_ENA_SC,	B(17), GLBL_CLK_STATE,
+			B(17)),
+	CLK_GLBL(UART2DM_P,	GLBL_CLK_ENA_SC,	B(26), GLBL_CLK_STATE,
+			B(26)),
+	CLK_GLBL(USB_HS2_P,	GLBL_CLK_ENA_2_SC,	B(8), GLBL_CLK_STATE_2,
+			B(8)),
+	CLK_GLBL(USB_HS3_P,	GLBL_CLK_ENA_2_SC,	B(9), GLBL_CLK_STATE_2,
+			B(9)),
+	CLK_GLBL(USB_HS_P,	GLBL_CLK_ENA_SC,	B(25), GLBL_CLK_STATE,
+			B(25)),
+	CLK_GLBL(VFE_P,		GLBL_CLK_ENA_2_SC,	B(27), GLBL_CLK_STATE_2,
+			B(27)),
 
 	/* AXI bridge clocks. */
-	CLK_BRIDGE(AXI_LI_APPS,	GLBL_CLK_ENA_SC,	B(2),	GLBL_ROOT),
-	CLK_BRIDGE(AXI_LI_ADSP_A, GLBL_CLK_ENA_2_SC,	B(14),	AXI_LI_APPS),
-	CLK_BRIDGE(AXI_LI_JPEG,	GLBL_CLK_ENA_2_SC,	B(19),	AXI_LI_APPS),
-	CLK_BRIDGE(AXI_LI_VFE,	GLBL_CLK_ENA_SC,	B(23),	AXI_LI_APPS),
-	CLK_BRIDGE(AXI_MDP,	GLBL_CLK_ENA_2_SC,	B(29),	AXI_LI_APPS),
+	CLK_BRIDGE(AXI_LI_APPS,	GLBL_CLK_ENA_SC,	B(2),	GLBL_ROOT,
+			GLBL_CLK_STATE, B(2)),
+	CLK_BRIDGE(AXI_LI_ADSP_A, GLBL_CLK_ENA_2_SC,	B(14),	AXI_LI_APPS,
+			0, 0),
+	CLK_BRIDGE(AXI_LI_JPEG,	GLBL_CLK_ENA_2_SC,	B(19),	AXI_LI_APPS,
+			GLBL_CLK_STATE_2, B(19)),
+	CLK_BRIDGE(AXI_LI_VFE,	GLBL_CLK_ENA_SC,	B(23),	AXI_LI_APPS,
+			0, 0),
+	CLK_BRIDGE(AXI_MDP,	GLBL_CLK_ENA_2_SC,	B(29),	AXI_LI_APPS,
+			0, B(29)),
 
-	CLK_BRIDGE(AXI_IMEM,	GLBL_CLK_ENA_2_SC,	B(18),	GLBL_ROOT),
+	CLK_BRIDGE(AXI_IMEM,	GLBL_CLK_ENA_2_SC,	B(18),	GLBL_ROOT,
+			GLBL_CLK_STATE_2, B(18)),
 
-	CLK_BRIDGE(AXI_LI_VG,	GLBL_CLK_ENA_SC,	B(3),	GLBL_ROOT),
-	CLK_BRIDGE(AXI_GRP_2D,	GLBL_CLK_ENA_SC,	B(21),	AXI_LI_VG),
-	CLK_BRIDGE(AXI_LI_GRP,	GLBL_CLK_ENA_SC,	B(22),	AXI_LI_VG),
-	CLK_BRIDGE(AXI_MFC,	GLBL_CLK_ENA_2_SC,	B(20),	AXI_LI_VG),
-	CLK_BRIDGE(AXI_ROTATOR,	GLBL_CLK_ENA_2_SC,	B(22),	AXI_LI_VG),
-	CLK_BRIDGE(AXI_VPE,	GLBL_CLK_ENA_2_SC,	B(21),	AXI_LI_VG),
+	CLK_BRIDGE(AXI_LI_VG,	GLBL_CLK_ENA_SC,	B(3),	GLBL_ROOT,
+			0, 0),
+	CLK_BRIDGE(AXI_GRP_2D,	GLBL_CLK_ENA_SC,	B(21),	AXI_LI_VG,
+			0, 0),
+	CLK_BRIDGE(AXI_LI_GRP,	GLBL_CLK_ENA_SC,	B(22),	AXI_LI_VG,
+			0, 0),
+	CLK_BRIDGE(AXI_MFC,	GLBL_CLK_ENA_2_SC,	B(20),	AXI_LI_VG,
+			GLBL_CLK_STATE_2, B(20)),
+	CLK_BRIDGE(AXI_ROTATOR,	GLBL_CLK_ENA_2_SC,	B(22),	AXI_LI_VG,
+			GLBL_CLK_STATE_2, B(22)),
+	CLK_BRIDGE(AXI_VPE,	GLBL_CLK_ENA_2_SC,	B(21),	AXI_LI_VG,
+			GLBL_CLK_STATE_2, B(21)),
 };
 
 static DEFINE_SPINLOCK(clock_reg_lock);
@@ -805,6 +884,19 @@ static int _soc_clk_enable(unsigned id)
 		reg_val |= t->br_en_mask;
 		writel(reg_val, ns_reg);
 	}
+	if (t->halt_reg) {
+		uint32_t halted, count = 0;
+
+		/* Wait for the halt bit to clear, but timeout after 100usecs
+		 * since the halt bit may be buggy. */
+		mb();
+		while ((halted = readl(REG(t->halt_reg)) & t->halt_mask)
+			&& count++ < 100)
+			udelay(1);
+		if (halted)
+			pr_warning("%s: clock %d never turned on\n", __func__,
+					id);
+	}
 	return 0;
 }
 
@@ -819,6 +911,19 @@ static void _soc_clk_disable(unsigned id)
 	if (t->br_en_mask) {
 		reg_val &= ~(t->br_en_mask);
 		writel(reg_val, ns_reg);
+	}
+	if (t->halt_reg) {
+		uint32_t halted, count = 0;
+
+		/* Wait for the halt bit to be set, but timeout after 100usecs
+		 * since the halt bit may be buggy. */
+		mb();
+		while (!(halted = readl(REG(t->halt_reg)) & t->halt_mask)
+			&& count++ < 100)
+			udelay(1);
+		if (!halted)
+			pr_warning("%s: clock %d never turned off\n", __func__,
+					id);
 	}
 	if (t->root_en_mask) {
 		reg_val &= ~(t->root_en_mask);
