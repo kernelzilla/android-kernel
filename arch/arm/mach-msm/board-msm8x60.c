@@ -183,6 +183,12 @@ static struct platform_device *surf_devices[] __initdata = {
 	&msm_device_ssbi2,
 	&msm_device_ssbi3,
 #endif
+#if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_HCD)
+	&msm_device_otg,
+#endif
+#ifdef CONFIG_USB_GADGET_MSM_72K
+	&msm_device_gadget_peripheral,
+#endif
 };
 
 #ifdef CONFIG_I2C
