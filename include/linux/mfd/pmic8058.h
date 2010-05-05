@@ -49,8 +49,6 @@
 #define PM8058_KEYSTUCK_IRQ(base)	((base) + PM8058_IRQ_BLOCK_BIT(9, 3))
 #define PM8058_CHGVAL_IRQ(base)		((base) + PM8058_IRQ_BLOCK_BIT(1, 7))
 
-#define PM8058_MAX_SUBDEVICES	16
-
 struct pm8058_chip;
 
 struct pm8058_platform_data {
@@ -59,7 +57,7 @@ struct pm8058_platform_data {
 	int 		(*init)(struct pm8058_chip *pm_chip);
 
 	int		num_subdevs;
-	struct mfd_cell sub_devices[PM8058_MAX_SUBDEVICES];
+	struct mfd_cell *sub_devices;
 };
 
 struct pm8058_gpio_platform_data {

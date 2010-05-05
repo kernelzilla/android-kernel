@@ -402,27 +402,29 @@ static struct pm8058_gpio_platform_data pm8058_mpp_data = {
 	.irq_base	= PM8058_MPP_IRQ(PMIC8058_IRQ_BASE, 0),
 };
 
+static struct mfd_cell pm8058_subdevs[] = {
+	{	.name = "pm8058-keypad",
+		.num_resources	= ARRAY_SIZE(resources_keypad),
+		.resources	= resources_keypad,
+	},
+	{	.name = "pm8058-gpio",
+		.platform_data	= &pm8058_gpio_data,
+		.data_size	= sizeof(pm8058_gpio_data),
+	},
+	{	.name = "pm8058-mpp",
+		.platform_data	= &pm8058_mpp_data,
+		.data_size	= sizeof(pm8058_mpp_data),
+	},
+	{	.name = "pm8058-pwm",
+	},
+};
+
 static struct pm8058_platform_data pm8058_7x30_data = {
 	.irq_base = PMIC8058_IRQ_BASE,
 	.init = pm8058_gpios_init,
 
-	.num_subdevs = 4,
-	.sub_devices = {
-		{	.name = "pm8058-keypad",
-			.num_resources	= ARRAY_SIZE(resources_keypad),
-			.resources	= resources_keypad,
-		},
-		{	.name = "pm8058-gpio",
-			.platform_data	= &pm8058_gpio_data,
-			.data_size	= sizeof(pm8058_gpio_data),
-		},
-		{	.name = "pm8058-mpp",
-			.platform_data	= &pm8058_mpp_data,
-			.data_size	= sizeof(pm8058_mpp_data),
-		},
-		{	.name = "pm8058-pwm",
-		},
-	},
+	.num_subdevs = ARRAY_SIZE(pm8058_subdevs),
+	.sub_devices = pm8058_subdevs,
 };
 
 static struct i2c_board_info pm8058_boardinfo[] __initdata = {
