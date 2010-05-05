@@ -1400,6 +1400,14 @@ sub process {
 				WARN("space required after Signed-off-by:\n" .
 					$herecurr);
 			}
+			if ($line =~ /^\s*signed-off-by:.*quicinc\.com/i) {
+				WARN("invalid Signed-off-by identity\n" . $line );
+			}
+		}
+
+#check the patch for invalid author credentials
+		if ($line =~ /^From:.*quicinc\.com/) {
+			WARN("invalid author identity\n" . $line );
 		}
 
 # Check for wrappage within a valid hunk of the file
