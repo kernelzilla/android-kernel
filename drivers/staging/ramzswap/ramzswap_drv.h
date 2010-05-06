@@ -165,31 +165,31 @@ struct ramzswap {
 
 /* Debugging and Stats */
 #if defined(CONFIG_RAMZSWAP_STATS)
-static void rzs_stat_inc(u32 *v)
+static void stat_inc(u32 *v)
 {
 	*v = *v + 1;
 }
 
-static void rzs_stat_dec(u32 *v)
+static void stat_dec(u32 *v)
 {
 	*v = *v - 1;
 }
 
-static void rzs_stat64_inc(struct ramzswap *rzs, u64 *v)
+static void stat64_inc(struct ramzswap *rzs, u64 *v)
 {
 	spin_lock(&rzs->stat64_lock);
 	*v = *v + 1;
 	spin_unlock(&rzs->stat64_lock);
 }
 
-static void rzs_stat64_dec(struct ramzswap *rzs, u64 *v)
+static void stat64_dec(struct ramzswap *rzs, u64 *v)
 {
 	spin_lock(&rzs->stat64_lock);
 	*v = *v - 1;
 	spin_unlock(&rzs->stat64_lock);
 }
 
-static u64 rzs_stat64_read(struct ramzswap *rzs, u64 *v)
+static u64 stat64_read(struct ramzswap *rzs, u64 *v)
 {
 	u64 val;
 
@@ -200,11 +200,11 @@ static u64 rzs_stat64_read(struct ramzswap *rzs, u64 *v)
 	return val;
 }
 #else
-#define rzs_stat_inc(v)
-#define rzs_stat_dec(v)
-#define rzs_stat64_inc(r, v)
-#define rzs_stat64_dec(r, v)
-#define rzs_stat64_read(r, v)
+#define stat_inc(v)
+#define stat_dec(v)
+#define stat64_inc(r, v)
+#define stat64_dec(r, v)
+#define stat64_read(r, v)
 #endif /* CONFIG_RAMZSWAP_STATS */
 
 #endif
