@@ -78,7 +78,10 @@ static int au_plink_maint_enter(struct file *file)
 /* ---------------------------------------------------------------------- */
 
 struct pseudo_link {
-	struct list_head list;
+	union {
+		struct list_head list;
+		struct rcu_head rcu;
+	};
 	struct inode *inode;
 };
 
@@ -95,10 +98,10 @@ void au_plink_list(struct super_block *sb)
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
 	plink_list = &sbinfo->si_plink.head;
-	spin_lock(&sbinfo->si_plink.spin);
-	list_for_each_entry(plink, plink_list, list)
+	rcu_read_lock();
+	list_for_each_entry_rcu(plink, plink_list, list)
 		AuDbg("%lu\n", plink->inode->i_ino);
-	spin_unlock(&sbinfo->si_plink.spin);
+	rcu_read_unlock();
 }
 #endif
 
@@ -116,13 +119,13 @@ int au_plink_test(struct inode *inode)
 
 	found = 0;
 	plink_list = &sbinfo->si_plink.head;
-	spin_lock(&sbinfo->si_plink.spin);
-	list_for_each_entry(plink, plink_list, list)
+	rcu_read_lock();
+	list_for_each_entry_rcu(plink, plink_list, list)
 		if (plink->inode == inode) {
 			found = 1;
 			break;
 		}
-	spin_unlock(&sbinfo->si_plink.spin);
+	rcu_read_unlock();
 	return found;
 }
 
@@ -258,9 +261,18 @@ static int whplink(struct dentry *h_dentry, struct inode *inode,
 /* free a single plink */
 static void do_put_plink(struct pseudo_link *plink, int do_del)
 {
-	iput(plink->inode);
 	if (do_del)
 		list_del(&plink->list);
+	iput(plink->inode);
+	kfree(plink);
+}
+
+static void do_put_plink_rcu(struct rcu_head *rcu)
+{
+	struct pseudo_link *plink;
+
+	plink = container_of(rcu, struct pseudo_link, rcu);
+	iput(plink->inode);
 	kfree(plink);
 }
 
@@ -274,53 +286,64 @@ void au_plink_append(struct inode *inode, aufs_bindex_t bindex,
 	struct super_block *sb;
 	struct au_sbinfo *sbinfo;
 	struct list_head *plink_list;
-	struct pseudo_link *plink;
+	struct pseudo_link *plink, *tmp;
 	int found, err, cnt;
 
 	sb = inode->i_sb;
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
-	err = 0;
 	cnt = 0;
 	found = 0;
 	plink_list = &sbinfo->si_plink.head;
-	spin_lock(&sbinfo->si_plink.spin);
-	list_for_each_entry(plink, plink_list, list) {
+	rcu_read_lock();
+	list_for_each_entry_rcu(plink, plink_list, list) {
 		cnt++;
 		if (plink->inode == inode) {
 			found = 1;
 			break;
 		}
 	}
-	if (found) {
-		spin_unlock(&sbinfo->si_plink.spin);
+	rcu_read_unlock();
+	if (found)
+		return;
+
+	tmp = kmalloc(sizeof(*plink), GFP_NOFS);
+	if (tmp)
+		tmp->inode = au_igrab(inode);
+	else {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	spin_lock(&sbinfo->si_plink.spin);
+	list_for_each_entry(plink, plink_list, list) {
+		if (plink->inode == inode) {
+			found = 1;
+			break;
+		}
+	}
+	if (!found)
+		list_add_rcu(&tmp->list, plink_list);
+	spin_unlock(&sbinfo->si_plink.spin);
+	if (!found) {
+		cnt++;
+		WARN_ONCE(cnt > AUFS_PLINK_WARN,
+			  "unexpectedly many pseudo links, %d\n", cnt);
+		au_plink_maint_block(sb);
+		err = whplink(h_dentry, inode, bindex, au_sbr(sb, bindex));
+	} else {
+		do_put_plink(tmp, 0);
 		return;
 	}
 
-	plink = NULL;
-	if (!found) {
-		plink = kmalloc(sizeof(*plink), GFP_ATOMIC);
-		if (plink) {
-			plink->inode = au_igrab(inode);
-			list_add(&plink->list, plink_list);
-			cnt++;
-		} else
-			err = -ENOMEM;
-	}
-	spin_unlock(&sbinfo->si_plink.spin);
-
-	if (!err) {
-		au_plink_maint_block(sb);
-		err = whplink(h_dentry, inode, bindex, au_sbr(sb, bindex));
-	}
-
-	if (unlikely(cnt > AUFS_PLINK_WARN))
-		AuWarn1("unexpectedly many pseudo links, %d\n", cnt);
+out:
 	if (unlikely(err)) {
 		pr_warning("err %d, damaged pseudo link.\n", err);
-		if (!found && plink)
-			do_put_plink(plink, /*do_del*/1);
+		if (tmp) {
+			au_spl_del_rcu(&tmp->list, &sbinfo->si_plink);
+			call_rcu(&tmp->rcu, do_put_plink_rcu);
+		}
 	}
 }
 
