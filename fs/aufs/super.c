@@ -230,6 +230,7 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	AuStr(UDBA, udba);
 	AuBool(SHWH, shwh);
 	AuBool(PLINK, plink);
+	AuBool(DIO, dio);
 	/* AuBool(DIRPERM1, dirperm1); */
 	/* AuBool(REFROF, refrof); */
 
@@ -622,7 +623,8 @@ static int cvt_err(int err)
 
 static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 {
-	int err;
+	int err, do_dx;
+	unsigned int mntflags;
 	struct au_opts opts;
 	struct dentry *root;
 	struct inode *inode;
@@ -663,6 +665,12 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 	if (au_ftest_opts(opts.flags, REFRESH_DIR)
 	    || au_ftest_opts(opts.flags, REFRESH_NONDIR))
 		au_remount_refresh(sb, opts.flags);
+
+	if (au_ftest_opts(opts.flags, REFRESH_DYAOP)) {
+		mntflags = au_mntflags(sb);
+		do_dx = !!au_opt_test(mntflags, DIO);
+		au_dy_arefresh(do_dx);
+	}
 
 	aufs_write_unlock(root);
 	mutex_unlock(&inode->i_mutex);
