@@ -854,13 +854,25 @@ static void vfe31_start_common(void){
 
 static int vfe31_start_recording(void){
 	vfe31_ctrl->req_start_video_rec = TRUE;
-    update_axi_qos(MSM_AXI_QOS_RECORDING);
+	update_axi_qos(MSM_AXI_QOS_RECORDING);
+	/* Mask with 0x7 to extract the pixel pattern*/
+	switch (msm_io_r(vfe31_ctrl->vfebase + VFE_CFG_OFF) & 0x7) {
+	case VFE_YUV_YCbYCr:
+	case VFE_YUV_YCrYCb:
+	case VFE_YUV_CbYCrY:
+	case VFE_YUV_CrYCbY:
+		msm_io_w_mb(1,
+		vfe31_ctrl->vfebase + VFE_REG_UPDATE_CMD);
+		break;
+	default:
+		break;
+	}
 	return 0;
 }
 
 static int vfe31_stop_recording(void){
 	vfe31_ctrl->req_stop_video_rec = TRUE;
-    update_axi_qos(MSM_AXI_QOS_PREVIEW);
+	update_axi_qos(MSM_AXI_QOS_PREVIEW);
 	return 0;
 }
 
@@ -1792,6 +1804,19 @@ static void vfe31_process_reg_update_irq(void)
 				24 * (vfe31_ctrl->outpath.out2.ch1));
 			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
 				20 + 24 * (vfe31_ctrl->outpath.out2.ch1));
+			/* Mask with 0x7 to extract the pixel pattern*/
+			switch (msm_io_r(vfe31_ctrl->vfebase + VFE_CFG_OFF)
+				& 0x7) {
+			case VFE_YUV_YCbYCr:
+			case VFE_YUV_YCrYCb:
+			case VFE_YUV_CbYCrY:
+			case VFE_YUV_CrYCbY:
+				msm_io_w_mb(1,
+				vfe31_ctrl->vfebase + VFE_REG_UPDATE_CMD);
+				break;
+			default:
+				break;
+			}
 		}
 		vfe31_ctrl->req_start_video_rec =  FALSE;
 		CDBG("start video triggered .\n");
@@ -1805,6 +1830,19 @@ static void vfe31_process_reg_update_irq(void)
 				24 * (vfe31_ctrl->outpath.out2.ch1));
 			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
 				20 + 24 * (vfe31_ctrl->outpath.out2.ch1));
+			/* Mask with 0x7 to extract the pixel pattern*/
+			switch (msm_io_r(vfe31_ctrl->vfebase + VFE_CFG_OFF)
+				& 0x7) {
+			case VFE_YUV_YCbYCr:
+			case VFE_YUV_YCrYCb:
+			case VFE_YUV_CbYCrY:
+			case VFE_YUV_CrYCbY:
+				msm_io_w_mb(1,
+				vfe31_ctrl->vfebase + VFE_REG_UPDATE_CMD);
+				break;
+			default:
+				break;
+			}
 		}
 		vfe31_ctrl->req_stop_video_rec =  FALSE;
 		CDBG("stop video triggered .\n");
