@@ -429,13 +429,21 @@ static void mdp_pipe_ctrl_workqueue_handler(struct work_struct *work)
 {
 	mdp_pipe_ctrl(MDP_MASTER_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }
-
 void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 		   boolean isr)
 {
 	boolean mdp_all_blocks_off = TRUE;
 	int i;
 	unsigned long flag;
+
+
+	/*
+	 * It is assumed that if isr = TRUE then start = OFF
+	 * if start = ON when isr = TRUE it could happen that the usercontext
+	 * could turn off the clocks while the interrupt is updating the
+	 * power to ON
+	 */
+	WARN_ON(isr == TRUE && state == MDP_BLOCK_POWER_ON);
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	if (MDP_BLOCK_POWER_ON == state) {

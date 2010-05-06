@@ -294,6 +294,11 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 	mdp_is_in_isr = TRUE;
 
 	while (1) {
+		/* complete all the reads before reading the interrupt
+		 * status register - eliminate effects of speculative
+		 * reads by the cpu
+		 */
+		rmb();
 		isr = inpdw(MDP_INTR_STATUS);
 		if (isr == 0)
 			break;
@@ -320,9 +325,11 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			dma = &dma2_data;
 			if (lcdc & 0x01) {	/* LCDC enable */
 				/* disable LCDC interrupt */
+				spin_lock(&mdp_spin_lock);
 				mdp_intr_mask &= ~INTR_DMA_P_DONE;
 				outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 				dma->waiting = FALSE;
+				spin_unlock(&mdp_spin_lock);
 			} else {
 				dma->busy = FALSE;
 				mdp_pipe_ctrl(MDP_DMA2_BLOCK,
@@ -349,6 +356,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 		if (isr & INTR_DMA_E_DONE) {
 			mdp4_stat.intr_dma_e++;
 			dma = &dma_e_data;
+			spin_lock(&mdp_spin_lock);
 			mdp_intr_mask &= ~INTR_DMA_E_DONE;
 			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 			dma->busy = FALSE;
@@ -357,6 +365,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 				dma->waiting = FALSE;
 				complete(&dma->comp);
 			}
+			spin_unlock(&mdp_spin_lock);
 		}
 		if (isr & INTR_OVERLAY0_DONE) {
 			mdp4_stat.intr_overlay0++;
@@ -364,9 +373,11 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			dma = &dma2_data;
 			if (lcdc & 0x01) {	/* LCDC enable */
 				/* disable LCDC interrupt */
+				spin_lock(&mdp_spin_lock);
 				mdp_intr_mask &= ~INTR_OVERLAY0_DONE;
 				outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 				dma->waiting = FALSE;
+				spin_unlock(&mdp_spin_lock);
 #ifdef CONFIG_FB_MSM_OVERLAY
 				mdp4_overlay0_done_lcdc();
 #endif
@@ -383,9 +394,11 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			mdp4_stat.intr_overlay1++;
 			/* disable DTV interrupt */
 			dma = &dma_e_data;
+			spin_lock(&mdp_spin_lock);
 			mdp_intr_mask &= ~INTR_OVERLAY1_DONE;
 			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 			dma->waiting = FALSE;
+			spin_unlock(&mdp_spin_lock);
 #ifdef CONFIG_FB_MSM_DTV
 			mdp4_overlay1_done_dtv();
 #endif
