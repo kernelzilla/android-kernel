@@ -152,7 +152,6 @@ static int __init rpc_server_init(void)
 	ret = msm_rpc_create_server(&rpc_server[1]);
 	if (ret < 0)
 		return ret;
-	printk(KERN_ERR "Using very old AMSS modem firmware.\n");
 	return msm_rpc_create_server(&rpc_server[0]);
 }
 
