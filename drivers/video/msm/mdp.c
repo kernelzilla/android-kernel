@@ -73,7 +73,7 @@ uint32 mdp_intr_mask = MDP_ANY_INTR_MASK;
 
 MDP_BLOCK_TYPE mdp_debug[MDP_MAX_BLOCK];
 
-int32 mdp_block_power_cnt[MDP_MAX_BLOCK];
+atomic_t mdp_block_power_cnt[MDP_MAX_BLOCK];
 
 spinlock_t mdp_spin_lock;
 struct workqueue_struct *mdp_dma_wq;	/*mdp dma wq */
@@ -447,14 +447,14 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	if (MDP_BLOCK_POWER_ON == state) {
-		mdp_block_power_cnt[block]++;
+		atomic_inc(&mdp_block_power_cnt[block]);
 
 		if (MDP_DMA2_BLOCK == block)
 			mdp_in_processing = TRUE;
 	} else {
-		mdp_block_power_cnt[block]--;
+		atomic_dec(&mdp_block_power_cnt[block]);
 
-		if (mdp_block_power_cnt[block] < 0) {
+		if (atomic_read(&mdp_block_power_cnt[block]) < 0) {
 			/*
 			* Master has to serve a request to power off MDP always
 			* It also has a timer to power off.  So, in case of
@@ -467,7 +467,7 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 				MSM_FB_INFO("mdp_block_power_cnt[block=%d] \
 				multiple power-off request\n", block);
 			}
-			mdp_block_power_cnt[block] = 0;
+			atomic_set(&mdp_block_power_cnt[block], 0);
 		}
 
 		if (MDP_DMA2_BLOCK == block)
@@ -482,7 +482,7 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 	if (isr) {
 		/* checking all blocks power state */
 		for (i = 0; i < MDP_MAX_BLOCK; i++) {
-			if (mdp_block_power_cnt[i] > 0)
+			if (atomic_read(&mdp_block_power_cnt[i]) > 0)
 				mdp_all_blocks_off = FALSE;
 		}
 
@@ -496,7 +496,7 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 		down(&mdp_pipe_ctrl_mutex);
 		/* checking all blocks power state */
 		for (i = 0; i < MDP_MAX_BLOCK; i++) {
-			if (mdp_block_power_cnt[i] > 0)
+			if (atomic_read(&mdp_block_power_cnt[i]) > 0)
 				mdp_all_blocks_off = FALSE;
 		}
 
@@ -726,7 +726,7 @@ static void mdp_drv_init(void)
 
 	/* initializing mdp power block counter to 0 */
 	for (i = 0; i < MDP_MAX_BLOCK; i++) {
-		mdp_block_power_cnt[i] = 0;
+		atomic_set(&mdp_block_power_cnt[i], 0);
 	}
 
 #ifdef MSM_FB_ENABLE_DBGFS
@@ -1085,7 +1085,8 @@ static void mdp_suspend_sub(void)
 	flush_workqueue(mdp_pipe_ctrl_wq);
 
 	/* let's wait for PPP completion */
-	while (mdp_block_power_cnt[MDP_PPP_BLOCK] > 0) ;
+	while (atomic_read(&mdp_block_power_cnt[MDP_PPP_BLOCK]) > 0)
+		cpu_relax();
 
 	/* try to power down */
 	mdp_pipe_ctrl(MDP_MASTER_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
