@@ -23,8 +23,12 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/mfd/pmic8058.h>
-#include "gpio_chip.h"
 
+#ifndef CONFIG_GPIOLIB
+#include "gpio_chip.h"
+#endif
+
+#ifndef CONFIG_GPIOLIB
 static int pm8058_mpp_get_irq_num(struct gpio_chip *chip,
 				   unsigned int gpio,
 				   unsigned int *irqp,
@@ -74,6 +78,48 @@ static int __devexit pm8058_mpp_remove(struct platform_device *pdev)
 {
 	return 0;
 }
+
+#else
+
+static int pm8058_mpp_to_irq(struct gpio_chip *chip, unsigned offset)
+{
+	struct pm8058_gpio_platform_data *pdata;
+	pdata = chip->dev->platform_data;
+	return pdata->irq_base + offset;
+}
+
+static int pm8058_mpp_read(struct gpio_chip *chip, unsigned offset)
+{
+	struct pm8058_chip *pm_chip;
+	pm_chip = dev_get_drvdata(chip->dev);
+	return pm8058_mpp_get(pm_chip, offset);
+}
+
+static struct gpio_chip pm8058_mpp_chip = {
+	.label		= "pm8058-mpp",
+	.to_irq		= pm8058_mpp_to_irq,
+	.get		= pm8058_mpp_read,
+	.ngpio		= PM8058_MPPS,
+};
+
+static int __devinit pm8058_mpp_probe(struct platform_device *pdev)
+{
+	int ret;
+	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
+
+	pm8058_mpp_chip.dev = &pdev->dev;
+	pm8058_mpp_chip.base = pdata->gpio_base;
+	ret = gpiochip_add(&pm8058_mpp_chip);
+	pr_info("%s: gpiochip_add(): rc=%d\n", __func__, ret);
+	return ret;
+}
+
+static int __devexit pm8058_mpp_remove(struct platform_device *pdev)
+{
+	return gpiochip_remove(&pm8058_mpp_chip);
+}
+
+#endif
 
 static struct platform_driver pm8058_mpp_driver = {
 	.probe		= pm8058_mpp_probe,
