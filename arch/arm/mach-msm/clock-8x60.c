@@ -1636,13 +1636,12 @@ static struct reg_init {
 	uint32_t mask;
 	uint32_t val;
 } ri_list[] __initdata = {
-	{REG(0x2EA0), 0x3, 0x1}, /* PXO src = PXO */
 
-	/* XXX
-	 * The PLL init code below is temporary.
-	 * The RPM or bootloader should do this.
-	 * XXX
-	 */
+	/* XXX START OF TEMPORARY CODE XXX
+	 * The RPM bootloader should take care of this. */
+
+	/* PXO src = PXO */
+	{REG(0x2EA0), 0x3, 0x1},
 
 	/* XXX PLL8 (MM_GPERF_PLL) @ 384MHz. */
 	{REG(0x3144), 0x3FF, 0xF},   /* LVAL = 15 */
@@ -1663,14 +1662,14 @@ static struct reg_init {
 	/* Don't bypass, enable outputs, deassert MND reset. */
 	{REG(0x30C0), 0x7, 0x7},
 
-	/* XXX MM_PLL2 (PLL3) @ <Varies>, 50.4005MHz for now. */
-	{REG_MM(0x033C), 0x3FF, 0x7},      /* LVAL = 7 */
-	{REG_MM(0x0340), 0x7FFFF, 0x189D}, /* MVAL = 6301 */
-	{REG_MM(0x0344), 0x7FFFF, 0x34BC}, /* NVAL = 13500 */
-	/* Enable MN, set VCO, main out, postdiv4. */
-	{REG_MM(0x0348), 0xFFFFFFFF, 0x00E02080},
-	/* MXO reference, don't bypass, enable outputs, deassert MND reset. */
-	{REG_MM(0x0338), 0x1F, 0x17},
+	/* XXX MM_PLL0 (PLL1) @ 1320MHz */
+	{REG_MM(0x0304), 0xFF, 0x35},    /* LVAL = 53 */
+	{REG_MM(0x0308), 0x7FFFF, 0x5B}, /* MVAL = 91 */
+	{REG_MM(0x030C), 0x7FFFF, 0x80}, /* NVAL = 128 */
+	/* Enable MN, set VCO, misc config. */
+	{REG_MM(0x0310), 0xFFFFFFFF, 0x14580},
+	 /* Don't bypass, enable outputs, deassert MND reset. */
+	{REG_MM(0x0300), 0xF, 0x7},
 
 	/* XXX MM_PLL1 (PLL2) @ 800MHz */
 	{REG_MM(0x0320), 0x3FF, 0x20},   /* LVAL = 32 */
@@ -1681,8 +1680,61 @@ static struct reg_init {
 	 /* Don't bypass, enable outputs, deassert MND reset. */
 	{REG_MM(0x031C), 0x7, 0x7},
 
+	/* XXX MM_PLL2 (PLL3) @ <Varies>, 50.4005MHz for now. */
+	{REG_MM(0x033C), 0x3FF, 0x7},      /* LVAL = 7 */
+	{REG_MM(0x0340), 0x7FFFF, 0x189D}, /* MVAL = 6301 */
+	{REG_MM(0x0344), 0x7FFFF, 0x34BC}, /* NVAL = 13500 */
+	/* Enable MN, set VCO, main out, postdiv4. */
+	{REG_MM(0x0348), 0xFFFFFFFF, 0x00E02080},
+	/* MXO reference, don't bypass, enable outputs, deassert MND reset. */
+	{REG_MM(0x0338), 0x1F, 0x17},
+
 	/* XXX Turn on all SC0 voteable PLLs (PLL0, PLL6, PLL8). */
 	{REG(PLL_ENA_REG), 0x141, 0x141},
+
+	/* XXX END OF TEMPORARY CODE XXX */
+
+	/* Enable locally controlled peripheral HCLKs in software mode. */
+	{REG(0x2700), 0x70, 0x10}, /* EN TSIF_HCLK */
+	{REG(0x2820), 0x70, 0x10}, /* EN SDC1_HCLK */
+	{REG(0x2840), 0x70, 0x10}, /* EN SDC2_HCLK */
+	{REG(0x2860), 0x70, 0x10}, /* EN SDC3_HCLK */
+	{REG(0x2880), 0x70, 0x10}, /* EN SDC4_HCLK */
+	{REG(0x28A0), 0x70, 0x10}, /* EN SDC5_HCLK */
+	{REG(0x2900), 0x70, 0x10}, /* EN USB_HS1_HCLK */
+	{REG(0x2960), 0x70, 0x10}, /* EN USB_FS1_HCLK */
+	{REG(0x2980), 0x70, 0x10}, /* EN USB_FS2_HCLK */
+	{REG(0x29C0), 0x70, 0x10}, /* EN GSBI1_HCLK */
+	{REG(0x29E0), 0x70, 0x10}, /* EN GSBI2_HCLK */
+	{REG(0x2A00), 0x70, 0x10}, /* EN GSBI3_HCLK */
+	{REG(0x2A20), 0x70, 0x10}, /* EN GSBI4_HCLK */
+	{REG(0x2A40), 0x70, 0x10}, /* EN GSBI5_HCLK */
+	{REG(0x2A60), 0x70, 0x10}, /* EN GSBI6_HCLK */
+	{REG(0x2A80), 0x70, 0x10}, /* EN GSBI7_HCLK */
+	{REG(0x2AA0), 0x70, 0x10}, /* EN GSBI8_HCLK */
+	{REG(0x2AC0), 0x70, 0x10}, /* EN GSBI9_HCLK */
+	{REG(0x2AE0), 0x70, 0x10}, /* EN GSBI10_HCLK */
+	{REG(0x2B00), 0x70, 0x10}, /* EN GSBI11_HCLK */
+	{REG(0x2B20), 0x70, 0x10}, /* EN GSBI12_HCLK */
+
+	{REG_MM(0x0204), 0x1, 0x0}, /* MM SW_RESET_ALL */
+
+	/* Enable all MM AHB clocks in software mode. */
+	{REG_MM(0x0004), 0x43C7, 0x0241}, /* MM AHB = PLL2/10 */
+	{REG_MM(0x0008), 0xFFFFFFFF, 0x93BDFEFF}, /* MM AHB_EN */
+	{REG_MM(0x0038), 0xFFFFFFFF, 0x1}, /* MM AHB_EN2 */
+	{REG_MM(0x020C), 0xFFFFFFFF, 0x0}, /* MM SW_RESET_AHB */
+
+	/* Enable all MM AXI clocks. */
+	{REG_MM(0x0014), 0x0FFFFFFF, 0x4248451}, /* MM AXI_NS */
+	{REG_MM(0x0018), 0xFFFFFFFF, 0x17FC0001}, /* MM MAXI_EN */
+	{REG_MM(0x0020), 0x7FFFFFFF, 0x75200400}, /* MM MAXI_EN2 */
+	{REG_MM(0x002C), 0xFFFFFFFF, 0x200400}, /* MM MAXI_EN3 */
+	{REG_MM(0x0030), 0x3FFF, 0x1C7}, /* MM SAXI_EN */
+	{REG_MM(0x0208), 0xE37F, 0x0}, /* SW_RESET_AXI */
+
+	/* Deassert all MM core resets. */
+	{REG_MM(0x0210), 0x1FFFFFF, 0x0}, /* MM SW_RESET_CORE */
 };
 
 #define set_1rate(clk) \
