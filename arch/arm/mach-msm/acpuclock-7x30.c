@@ -34,12 +34,10 @@
 #include "clock-7x30.h"
 #include "acpuclock.h"
 #include "socinfo.h"
+#include "spm.h"
 
 #define SCSS_CLK_CTL_ADDR	(MSM_ACC_BASE + 0x04)
 #define SCSS_CLK_SEL_ADDR	(MSM_ACC_BASE + 0x08)
-#define SAW_VCTL		(MSM_SAW_BASE + 0x08)
-#define SAW_STS			(MSM_SAW_BASE + 0x0C)
-#define SAW_SPM_CTL		(MSM_SAW_BASE + 0x14)
 
 #define dprintk(msg...) \
 	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
@@ -120,38 +118,14 @@ unsigned long acpuclk_wait_for_irq(void)
 	return ret;
 }
 
-#define STS_PMIC_DATA_SHIFT	10
-#define STS_PMIC_DATA_MASK	(0xFF << STS_PMIC_DATA_SHIFT)
-#define VCTL_PMIC_DATA_MASK	0xFF
-#define PMIC_STATE_MASK		(0x3 << 20)
-#define PMIC_STATE_IDLE		0
 static int acpuclk_set_acpu_vdd(struct clkctl_acpu_speed *s)
 {
-	uint32_t reg_val, cur_raw_vdd;
-	uint32_t timeout_count = 5;
-
-	/* Set VDD. */
-	reg_val = readl(SAW_VCTL);
-	reg_val &= ~(VCTL_PMIC_DATA_MASK);
-	reg_val |= s->vdd_raw;
-	writel(reg_val, SAW_VCTL);
-
-	/* Wait for PMIC to set VDD. Use timeout to detect unconfigured SAW. */
-	while ((readl(SAW_STS) & PMIC_STATE_MASK) != PMIC_STATE_IDLE
-			&& timeout_count > 0) {
-		udelay(10);
-		timeout_count--;
-	}
-
-	/* Read set voltage to check for success. */
-	cur_raw_vdd = (readl(SAW_STS) & STS_PMIC_DATA_MASK)
-				>> STS_PMIC_DATA_SHIFT;
-	if (timeout_count == 0 || cur_raw_vdd != s->vdd_raw)
-		return -EIO;
+	int ret = msm_spm_set_vdd(s->vdd_raw);
+	if (ret)
+		return ret;
 
 	/* Wait for voltage to stabilize. */
 	udelay(drv_state.vdd_switch_time_us);
-
 	return 0;
 }
 
@@ -398,16 +372,6 @@ void __init pll2_1024mhz_fixup(void)
 
 #define RPM_BYPASS_MASK	(1 << 3)
 #define PMIC_MODE_MASK	(1 << 4)
-static void __init saw_init(void)
-{
-	uint32_t reg_spmctl;
-
-	reg_spmctl = readl(SAW_SPM_CTL);
-	reg_spmctl |= RPM_BYPASS_MASK;	/* No RPM interface on 7x30, so
-					   bypass the RPM handshake. */
-	reg_spmctl |= PMIC_MODE_MASK;	/* PMIC_MODE is MSM7XXX.  */
-	writel(reg_spmctl, SAW_SPM_CTL);
-}
 
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 {
@@ -419,7 +383,6 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	/* PLL2 runs at 1024MHz for MSM8x55. */
 	if (cpu_is_msm8x55())
 		pll2_1024mhz_fixup();
-	saw_init();
 	acpuclk_init();
 	lpj_init();
 #ifdef CONFIG_CPU_FREQ_MSM

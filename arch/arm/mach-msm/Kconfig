@@ -1003,12 +1003,5 @@ config MSM_NPA_SYSTEM_BUS
 	  PM_QOS System Bus rate requests are interpreted as 'Flow IDs' and
 	  are routed through the NPA framework.
 
-config MSM_SPM
-	bool "Subsystem Power Manager"
-	depends on ARCH_MSM7X30
-	default y
-	help
-	  Enables support for the subsystem power manager.
-
 endif
 

@@ -3861,7 +3861,6 @@ static void msm7x30_init_uart2(void)
 }
 #endif
 
-#ifdef CONFIG_MSM_SPM
 static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.reg_base_addr = MSM_SAW_BASE,
 
@@ -3870,7 +3869,6 @@ static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.reg_init_values[MSM_SPM_REG_SAW_SPM_SLP_TMR_DLY] = 0x00006666,
 	.reg_init_values[MSM_SPM_REG_SAW_SPM_WAKE_TMR_DLY] = 0xFF000666,
 
-	.reg_init_values[MSM_SPM_REG_SAW_SPM_PMIC_CTL] = 0xE0F272,
 	.reg_init_values[MSM_SPM_REG_SAW_SLP_CLK_EN] = 0x01,
 	.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_PRECLMP_EN] = 0x03,
 	.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_POSTCLMP_EN] = 0x00,
@@ -3884,8 +3882,9 @@ static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.collapse_vlevel = 0x72,
 	.retention_mid_vlevel = 0xE0,
 	.collapse_mid_vlevel = 0xE0,
+
+	.vctl_timeout_us = 50,
 };
-#endif
 
 static const char *vregs_isa1200_name[] = {
 	"gp7",
@@ -4008,6 +4007,7 @@ static void __init msm7x30_init(void)
 	if (socinfo_init() < 0)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
 		       __func__);
+	msm_spm_init(&msm_spm_data, 1);
 	msm_acpu_clock_init(&msm7x30_clock_data);
 	if (machine_is_msm7x30_surf() || machine_is_msm7x30_fluid())
 		msm7x30_cfg_smsc911x();
@@ -4040,9 +4040,6 @@ static void __init msm7x30_init(void)
 	spi_register_board_info(msm_spi_board_info,
 		ARRAY_SIZE(msm_spi_board_info));
 	msm_fb_add_devices();
-#ifdef CONFIG_MSM_SPM
-	msm_spm_init(&msm_spm_data, 1);
-#endif
 	msm_pm_set_platform_data(msm_pm_data);
 	msm_device_i2c_init();
 	msm_device_i2c_2_init();
