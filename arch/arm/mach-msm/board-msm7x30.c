@@ -36,6 +36,8 @@
 #include <linux/pwm.h>
 #include <linux/pmic8058-pwm.h>
 #include <linux/i2c/tsc2007.h>
+#include <linux/input/kp_flip_switch.h>
+#include <mach/mpp.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -100,6 +102,8 @@
 #define PMIC_GPIO_HAP_ENABLE   16  /* PMIC GPIO Number 17 */
 
 #define HAP_LVL_SHFT_MSM_GPIO 24
+
+#define	PM_FLIP_MPP 5 /* PMIC MPP 06 */
 
 int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
@@ -4184,6 +4188,30 @@ vreg_get_fail:
 		vreg_put(vregs_isa1200[--i]);
 }
 
+static int kp_flip_mpp_config(void)
+{
+	return pm8058_mpp_config_digital_in(PM_FLIP_MPP,
+		PM8058_MPP_DIG_LEVEL_S3, PM_MPP_DIN_TO_INT);
+}
+
+static struct flip_switch_pdata flip_switch_data = {
+	.name = "kp_flip_switch",
+	.flip_gpio = PM8058_GPIO_PM_TO_SYS(PM8058_GPIOS) + PM_FLIP_MPP,
+	.left_key = KEY_OPEN,
+	.right_key = KEY_CLOSE,
+	.active_low = 0,
+	.wakeup = 1,
+	.flip_mpp_config = kp_flip_mpp_config,
+};
+
+static struct platform_device flip_switch_device = {
+	.name   = "kp_flip_switch",
+	.id	= -1,
+	.dev    = {
+		.platform_data = &flip_switch_data,
+	}
+};
+
 static void __init msm7x30_init(void)
 {
 	if (socinfo_init() < 0)
@@ -4257,6 +4285,8 @@ static void __init msm7x30_init(void)
 	i2c_register_board_info(2, tsc_i2c_board_info,
 			ARRAY_SIZE(tsc_i2c_board_info));
 #endif
+	if (machine_is_msm7x30_surf())
+		platform_device_register(&flip_switch_device);
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
