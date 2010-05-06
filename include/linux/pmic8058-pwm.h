@@ -41,6 +41,8 @@
 #define	PM_PWM_LUT_PAUSE_HI_EN	0x10
 #define	PM_PWM_LUT_PAUSE_LO_EN	0x20
 
+#define	PM_PWM_LUT_NO_TABLE	0x100
+
 /*
  * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
  *
