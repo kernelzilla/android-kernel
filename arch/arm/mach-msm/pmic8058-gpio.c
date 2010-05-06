@@ -23,8 +23,12 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/mfd/pmic8058.h>
-#include "gpio_chip.h"
 
+#ifndef CONFIG_GPIOLIB
+#include "gpio_chip.h"
+#endif
+
+#ifndef CONFIG_GPIOLIB
 static int pm8058_gpio_configure(struct gpio_chip *chip,
 				 unsigned int gpio,
 				 unsigned long flags)
@@ -126,6 +130,82 @@ static int __devexit pm8058_gpio_remove(struct platform_device *pdev)
 {
 	return 0;
 }
+
+#else
+
+static int pm8058_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+{
+	struct pm8058_gpio_platform_data *pdata;
+	pdata = chip->dev->platform_data;
+	return pdata->irq_base + offset;
+}
+
+static int pm8058_gpio_read(struct gpio_chip *chip, unsigned offset)
+{
+	struct pm8058_chip *pm_chip;
+	pm_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_get(pm_chip, offset);
+}
+
+static void pm8058_gpio_write(struct gpio_chip *chip,
+		unsigned offset, int val)
+{
+	struct pm8058_chip *pm_chip;
+	pm_chip = dev_get_drvdata(chip->dev);
+	pm8058_gpio_set(pm_chip, offset, val);
+}
+
+static int pm8058_gpio_direction_input(struct gpio_chip *chip,
+		unsigned offset)
+{
+	struct pm8058_chip *pm_chip;
+	pm_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_set_direction(pm_chip, offset, PM_GPIO_DIR_IN);
+}
+
+static int pm8058_gpio_direction_output(struct gpio_chip *chip,
+		unsigned offset,
+		int val)
+{
+	struct pm8058_chip *pm_chip;
+	int ret;
+
+	pm_chip = dev_get_drvdata(chip->dev);
+	ret = pm8058_gpio_set_direction(pm_chip, offset, PM_GPIO_DIR_OUT);
+	if (!ret)
+		ret = pm8058_gpio_set(pm_chip, offset, val);
+
+	return ret;
+}
+
+static struct gpio_chip pm8058_gpio_chip = {
+	.label			= "pm8058-gpio",
+	.direction_input	= pm8058_gpio_direction_input,
+	.direction_output	= pm8058_gpio_direction_output,
+	.to_irq			= pm8058_gpio_to_irq,
+	.get			= pm8058_gpio_read,
+	.set			= pm8058_gpio_write,
+	.ngpio			= PM8058_GPIOS,
+};
+
+static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
+{
+	int ret;
+	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
+
+	pm8058_gpio_chip.dev = &pdev->dev;
+	pm8058_gpio_chip.base = pdata->gpio_base;
+	ret = gpiochip_add(&pm8058_gpio_chip);
+	pr_info("%s: gpiochip_add(): rc=%d\n", __func__, ret);
+	return ret;
+}
+
+static int __devexit pm8058_gpio_remove(struct platform_device *pdev)
+{
+	return gpiochip_remove(&pm8058_gpio_chip);
+}
+
+#endif
 
 static struct platform_driver pm8058_gpio_driver = {
 	.probe		= pm8058_gpio_probe,
