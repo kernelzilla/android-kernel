@@ -622,7 +622,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	if (!err) {
 		if (bdst < old_ibstart) {
 			if (S_ISREG(inode->i_mode)) {
-				err = au_dy_ifop(inode, bdst, dst_inode);
+				err = au_dy_ifaop(inode, bdst, dst_inode);
 				if (unlikely(err))
 					goto out_rev;
 			}
