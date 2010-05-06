@@ -1053,7 +1053,8 @@ static int msm_pm_power_collapse
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
 		"%s(): restore clock rate to %lu\n", __func__,
 		saved_acpuclk_rate);
-	if (acpuclk_set_rate(saved_acpuclk_rate, SETRATE_PC) < 0)
+	if (acpuclk_set_rate(smp_processor_id(), saved_acpuclk_rate,
+			SETRATE_PC) < 0)
 		printk(KERN_ERR "%s(): failed to restore clock rate(%lu)\n",
 			__func__, saved_acpuclk_rate);
 
@@ -1306,7 +1307,8 @@ static int msm_pm_swfi(bool ramp_acpu)
 		MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
 			"%s(): restore clock rate to %lu\n", __func__,
 			saved_acpuclk_rate);
-		if (acpuclk_set_rate(saved_acpuclk_rate, SETRATE_SWFI) < 0)
+		if (acpuclk_set_rate(smp_processor_id(), saved_acpuclk_rate,
+				SETRATE_SWFI) < 0)
 			printk(KERN_ERR
 				"%s(): failed to restore clock rate(%lu)\n",
 				__func__, saved_acpuclk_rate);
