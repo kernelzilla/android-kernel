@@ -339,4 +339,14 @@ config INPUT_CAPELLA_CM3602
 	  Say Y here to enable the Capella CM3602 Short Distance Proximity
 	  Sensor with Ambient Light Sensor.
 
+config PMIC8058_PWRKEY
+	tristate "PMIC8058 power key support"
+	default n
+	depends on PMIC8058
+	help
+	  Say Y here if you want support for the PMIC8058 power key.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pmic8058-pwrkey.
+
 endif
