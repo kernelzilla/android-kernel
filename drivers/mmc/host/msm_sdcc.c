@@ -807,10 +807,8 @@ msmsdcc_irq(int irq, void *dev_id)
 		status = readl(host->base + MMCISTATUS);
 
 		if (((readl(host->base + MMCIMASK0) & status) &
-						(~(MCI_IRQ_PIO))) == 0) {
-			ret = 0;
+						(~(MCI_IRQ_PIO))) == 0)
 			break;
-		}
 
 #if IRQ_DEBUG
 		msmsdcc_print_status(host, "irq0-r", status);
