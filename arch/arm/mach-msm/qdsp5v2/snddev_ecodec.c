@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
@@ -26,6 +25,7 @@
 #include <mach/qdsp5v2/audio_interct.h>
 #include <mach/qdsp5v2/aux_pcm.h>
 #include <mach/qdsp5v2/afe.h>
+#include <mach/debug_mm.h>
 
 /* Context for each external codec device */
 struct snddev_ecodec_state {
@@ -53,7 +53,7 @@ static int snddev_ecodec_open_rx(struct snddev_ecodec_state *ecodec)
 	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
 	struct msm_afe_config afe_config;
 
-	MM_INFO(" snddev_ecodec_open_rx\n");
+	MM_DBG("snddev_ecodec_open_rx\n");
 
 	if (!drv->tx_active) {
 		/* request GPIO */
@@ -135,7 +135,7 @@ static int snddev_ecodec_open_tx(struct snddev_ecodec_state *ecodec)
 	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
 	struct msm_afe_config afe_config;
 
-	MM_INFO(" snddev_ecodec_open_tx \n");
+	MM_DBG("snddev_ecodec_open_tx\n");
 
 	/* request GPIO */
 	if (!drv->rx_active) {
@@ -375,7 +375,7 @@ static int __init snddev_ecodec_init(void)
 	int rc = 0;
 	struct snddev_ecodec_drv_state *ecodec_drv = &snddev_ecodec_drv;
 
-	MM_INFO(" snddev_ecodec_init \n");
+	MM_INFO("snddev_ecodec_init\n");
 	rc = platform_driver_register(&snddev_ecodec_driver);
 	if (IS_ERR_VALUE(rc))
 		goto error_platform_driver;
@@ -398,7 +398,7 @@ error_ecodec_clk:
 	platform_driver_unregister(&snddev_ecodec_driver);
 error_platform_driver:
 
-	MM_ERR("%s: encounter error\n", __func__);
+	MM_ERR("encounter error\n");
 	return -ENODEV;
 }
 

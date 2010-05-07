@@ -16,7 +16,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -34,6 +33,7 @@
 #include <mach/qdsp5v2/qdsp5audrecmsg.h>
 #include <mach/qdsp5v2/audpreproc.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <mach/debug_mm.h>
 
 /* FRAME_NUM must be a power of two */
 #define FRAME_NUM		(8)
@@ -289,7 +289,7 @@ static void audqcelp_in_get_dsp_frames(struct audio_in *audio)
 	/* If overflow, move the tail index foward. */
 	if (audio->in_head == audio->in_tail) {
 		audio->in_tail = (audio->in_tail + 1) & (FRAME_NUM - 1);
-		pr_err("in_count %d\n", audio->in_count);
+		MM_DBG("in_count %d\n", audio->in_count);
 	}	else
 		audio->in_count++;
 

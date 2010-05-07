@@ -17,7 +17,6 @@
  */
 
 
-#include <mach/debug_audio_mm.h>
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -37,6 +36,7 @@
 
 #include "msm7kv2-pcm.h"
 #include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <mach/debug_mm.h>
 
 #define HOSTPCM_STREAM_ID 5
 

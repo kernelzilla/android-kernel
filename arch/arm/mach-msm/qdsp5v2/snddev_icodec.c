@@ -30,8 +30,8 @@
 #include <mach/qdsp5v2/lpa.h>
 #include <mach/vreg.h>
 #include <mach/pmic.h>
-#include <mach/debug_audio_mm.h>
 #include <linux/wakelock.h>
+#include <mach/debug_mm.h>
 
 #define SNDDEV_ICODEC_PCM_SZ 32 /* 16 bit / sample stereo mode */
 #define SNDDEV_ICODEC_MUL_FACTOR 3 /* Multi by 8 Shift by 3  */
@@ -325,7 +325,7 @@ error_lpa:
 	clk_disable(drv->rx_mclk);
 error_invalid_freq:
 
-	pr_err("%s: encounter error\n", __func__);
+	MM_ERR("encounter error\n");
 
 	wake_unlock(&drv->rx_idlelock);
 	return -ENODEV;
@@ -402,7 +402,7 @@ error_invalid_freq:
 	if (icodec->data->pamp_off)
 		icodec->data->pamp_off();
 
-	pr_err("%s: encounter error\n", __func__);
+	MM_ERR("encounter error\n");
 
 	wake_unlock(&drv->tx_idlelock);
 	return -ENODEV;
@@ -500,9 +500,9 @@ static int snddev_icodec_set_device_volume_impl(
 		rc = adie_codec_set_device_digital_volume(icodec->adie_path,
 				icodec->data->channel_mode, volume);
 		if (rc < 0) {
-			pr_err("%s: unable to set_device_digital_volume for"
+			MM_ERR("unable to set_device_digital_volume for"
 				"%s volume in percentage = %u\n",
-				__func__, dev_info->name, volume);
+				dev_info->name, volume);
 			return rc;
 		}
 
@@ -510,13 +510,13 @@ static int snddev_icodec_set_device_volume_impl(
 		rc = adie_codec_set_device_analog_volume(icodec->adie_path,
 				icodec->data->channel_mode, volume);
 		if (rc < 0) {
-			pr_err("%s: unable to set_device_analog_volume for"
+			MM_ERR("unable to set_device_analog_volume for"
 				"%s volume in percentage = %u\n",
-				__func__, dev_info->name, volume);
+				dev_info->name, volume);
 			return rc;
 		}
 	else {
-		pr_err("%s: Invalid device volume control\n", __func__);
+		MM_ERR("Invalid device volume control\n");
 		return -EPERM;
 	}
 }
@@ -627,8 +627,7 @@ static int snddev_icodec_check_freq(u32 req_freq)
 			(req_freq == 48000)) {
 				rc = 0;
 		} else
-			pr_info("%s: Unsupported Frequency:%d\n", __func__,
-								req_freq);
+			MM_INFO("Unsupported Frequency:%d\n", req_freq);
 		}
 		return rc;
 }
@@ -710,7 +709,7 @@ int snddev_icodec_set_device_volume(struct msm_snddev_info *dev_info,
 	int rc = -EPERM;
 
 	if (!dev_info) {
-		pr_info("%s : device not intilized.\n", __func__);
+		MM_INFO("device not intilized.\n");
 		return  -EINVAL;
 	}
 
@@ -719,8 +718,8 @@ int snddev_icodec_set_device_volume(struct msm_snddev_info *dev_info,
 	if (!(icodec->data->dev_vol_type & (SNDDEV_DEV_VOL_DIGITAL
 				| SNDDEV_DEV_VOL_ANALOG))) {
 
-		pr_info("%s : device %s does not support device volume "
-				"control.", __func__, dev_info->name);
+		MM_INFO("device %s does not support device volume "
+				"control.", dev_info->name);
 		return -EPERM;
 	}
 	dev_info->dev_volume =  volume;
@@ -753,7 +752,7 @@ static int snddev_icodec_probe(struct platform_device *pdev)
 	pdata = pdev->dev.platform_data;
 	if ((pdata->capability & SNDDEV_CAP_RX) &&
 	   (pdata->capability & SNDDEV_CAP_TX)) {
-		pr_err("%s: invalid device data either RX or TX\n", __func__);
+		MM_ERR("invalid device data either RX or TX\n");
 		goto error;
 	}
 	icodec = kzalloc(sizeof(struct snddev_icodec_state), GFP_KERNEL);
@@ -820,7 +819,7 @@ static struct adie_codec_path *debugfs_tx_adie;
 static int snddev_icodec_debug_open(struct inode *inode, struct file *file)
 {
 	file->private_data = inode->i_private;
-	pr_info("snddev_icodec: debug intf %s\n", (char *) file->private_data);
+	MM_INFO("snddev_icodec: debug intf %s\n", (char *) file->private_data);
 	return 0;
 }
 
@@ -837,14 +836,14 @@ static void debugfs_adie_loopback(u32 loop)
 		clk_enable(drv->rx_mclk);
 		clk_enable(drv->rx_sclk);
 
-		pr_info("%s: configure ADIE RX path\n", __func__);
+		MM_INFO("configure ADIE RX path\n");
 		/* Configure ADIE */
 		adie_codec_open(&debug_rx_profile, &debugfs_rx_adie);
 		adie_codec_setpath(debugfs_rx_adie, 8000, 256);
 		adie_codec_proceed_stage(debugfs_rx_adie,
 		ADIE_CODEC_DIGITAL_ANALOG_READY);
 
-		pr_info("%s: Enable Handset Mic bias\n", __func__);
+		MM_INFO("Enable Handset Mic bias\n");
 		pmic_hsed_enable(PM_HSED_CONTROLLER_0, PM_HSED_ENABLE_PWM_TCXO);
 		/* enable MI2S TX master block */
 		/* enable MI2S TX bit clock */
@@ -853,7 +852,7 @@ static void debugfs_adie_loopback(u32 loop)
 		clk_enable(drv->tx_mclk);
 		clk_enable(drv->tx_sclk);
 
-		pr_info("%s: configure ADIE TX path\n", __func__);
+		MM_INFO("configure ADIE TX path\n");
 		/* Configure ADIE */
 		adie_codec_open(&debug_tx_lb_profile, &debugfs_tx_adie);
 		adie_codec_setpath(debugfs_tx_adie, 8000, 256);
@@ -895,7 +894,7 @@ static void debugfs_afe_loopback(u32 loop)
 		trc = clk_set_rate(drv->rx_mclk,
 		SNDDEV_ICODEC_CLK_RATE(8000));
 		if (IS_ERR_VALUE(trc))
-			pr_err("%s: failed to set clk rate\n", __func__);
+			MM_ERR("failed to set clk rate\n");
 		clk_enable(drv->rx_mclk);
 		clk_enable(drv->rx_sclk);
 		clk_enable(drv->lpa_codec_clk);
@@ -905,21 +904,21 @@ static void debugfs_afe_loopback(u32 loop)
 		audio_interct_codec(AUDIO_INTERCT_ADSP);
 		/* Set MI2S */
 		mi2s_set_codec_output_path(0, WT_16_BIT);
-		pr_info("%s: configure ADIE RX path\n", __func__);
+		MM_INFO("configure ADIE RX path\n");
 		/* Configure ADIE */
 		adie_codec_open(&debug_rx_profile, &debugfs_rx_adie);
 		adie_codec_setpath(debugfs_rx_adie, 8000, 256);
 		afe_config.sample_rate = 8;
 		afe_config.channel_mode = 1;
 		afe_config.volume = AFE_VOLUME_UNITY;
-		pr_info("%s: enable afe\n", __func__);
+		MM_INFO("enable afe\n");
 		trc = afe_enable(AFE_HW_PATH_CODEC_RX, &afe_config);
 		if (IS_ERR_VALUE(trc))
-			pr_err("%s: fail to enable afe rx\n", __func__);
+			MM_ERR("fail to enable afe rx\n");
 		adie_codec_proceed_stage(debugfs_rx_adie,
 		ADIE_CODEC_DIGITAL_ANALOG_READY);
 
-		pr_info("%s: Enable Handset Mic bias\n", __func__);
+		MM_INFO("Enable Handset Mic bias\n");
 		pmic_hsed_enable(PM_HSED_CONTROLLER_0, PM_HSED_ENABLE_PWM_TCXO);
 		/* enable MI2S TX master block */
 		/* enable MI2S TX bit clock */
@@ -929,7 +928,7 @@ static void debugfs_afe_loopback(u32 loop)
 		clk_enable(drv->tx_sclk);
 		/* Set MI2S */
 		mi2s_set_codec_input_path(0, WT_16_BIT);
-		pr_info("%s: configure ADIE TX path\n", __func__);
+		MM_INFO("configure ADIE TX path\n");
 		/* Configure ADIE */
 		adie_codec_open(&debug_tx_profile, &debugfs_tx_adie);
 		adie_codec_setpath(debugfs_tx_adie, 8000, 256);
@@ -941,7 +940,7 @@ static void debugfs_afe_loopback(u32 loop)
 		afe_config.volume = AFE_VOLUME_UNITY;
 		trc = afe_enable(AFE_HW_PATH_CODEC_TX, &afe_config);
 		if (IS_ERR_VALUE(trc))
-			pr_err("%s: failed to enable AFE TX\n", __func__);
+			MM_ERR("failed to enable AFE TX\n");
 	} else {
 		/* Disable ADIE */
 		adie_codec_proceed_stage(debugfs_rx_adie,
@@ -974,7 +973,7 @@ static ssize_t snddev_icodec_debug_write(struct file *filp,
 	if (get_user(cmd, ubuf))
 		return -EFAULT;
 
-	pr_info("%s: %s %c\n", __func__, lb_str, cmd);
+	MM_INFO("%s %c\n", lb_str, cmd);
 
 	if (!strcmp(lb_str, "adie_loopback")) {
 		switch (cmd) {
@@ -1073,7 +1072,7 @@ error_rx_mclk:
 	platform_driver_unregister(&snddev_icodec_driver);
 error_platform_driver:
 
-	pr_err("%s: encounter error\n", __func__);
+	MM_ERR("encounter error\n");
 	return -ENODEV;
 }
 

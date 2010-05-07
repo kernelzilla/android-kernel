@@ -16,7 +16,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/miscdevice.h>
@@ -31,7 +30,7 @@
 #include <linux/completion.h>
 #include <linux/wait.h>
 #include <mach/qdsp5v2/voice.h>
-#include <mach/debug_audio_mm.h>
+#include <mach/debug_mm.h>
 
 struct voice_data {
 	void *handle; /* DALRPC handle */
@@ -80,7 +79,7 @@ static int voice_cmd_change(void)
 	hdr.id = CMD_DEVICE_CHANGE;
 	hdr.data_len = 0;
 
-	MM_INFO("%s()\n", __func__);
+	MM_DBG("\n"); /* Macro prints the file name and function */
 
 	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &hdr,
 			sizeof(struct voice_header));
@@ -360,7 +359,7 @@ static void remote_cb_function(void *context, u32 param,
 
 	hdr = (struct voice_header *)evt_buf;
 
-	MM_INFO("%s() len=%d id=%d\n", __func__, len, hdr->id);
+	MM_INFO("len=%d id=%d\n", len, hdr->id);
 
 	if (len <= 0) {
 		MM_ERR("unexpected event with length %d \n", len);
@@ -416,7 +415,7 @@ static int voice_cmd_init(struct voice_data *v)
 	struct voice_init cmd;
 	int err;
 
-	MM_DBG("%s()\n", __func__);
+	MM_DBG("\n"); /* Macro prints the file name and function */
 
 	cmd.hdr.id = CMD_VOICE_INIT;
 	cmd.hdr.data_len = sizeof(struct voice_init) -
@@ -439,7 +438,7 @@ static int voice_cmd_acquire_done(struct voice_data *v)
 	hdr.id = CMD_ACQUIRE_DONE;
 	hdr.data_len = 0;
 
-	MM_INFO("%s()\n", __func__);
+	MM_INFO("\n"); /* Macro prints the file name and function */
 
 	/* Enable HW sidetone if device supports it  */
 	msm_snddev_enable_sidetone(v->dev_rx.dev_id, 1);
@@ -457,9 +456,9 @@ static int voice_cmd_device_info(struct voice_data *v)
 	struct voice_device cmd;
 	int err, vol;
 
-	MM_INFO("%s(), tx_dev=%d, rx_dev=%d, tx_sample=%d, rx_sample=%d \n",
-	__func__, v->dev_tx.dev_acdb_id, v->dev_rx.dev_acdb_id,
-	v->dev_tx.sample, v->dev_rx.sample);
+	MM_INFO("tx_dev=%d, rx_dev=%d, tx_sample=%d, tx_mute=%d\n",
+			v->dev_tx.dev_acdb_id, v->dev_rx.dev_acdb_id,
+			v->dev_tx.sample, v->dev_tx.mute);
 
 	cmd.hdr.id = CMD_DEVICE_INFO;
 	cmd.hdr.data_len = sizeof(struct voice_device) -
@@ -480,7 +479,7 @@ static int voice_cmd_device_info(struct voice_data *v)
 	cmd.rx_sample = v->dev_rx.sample/1000;
 	cmd.tx_sample = v->dev_tx.sample/1000;
 
-	MM_INFO("rx_vol=%d, tx_mute=%d\n", cmd.rx_volume, v->dev_tx.mute);
+	MM_DBG("rx_vol=%d, rx_sample=%d\n", cmd.rx_volume, v->dev_rx.sample);
 
 	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &cmd,
 			 sizeof(struct voice_device));
@@ -496,7 +495,7 @@ void voice_change_sample_rate(struct voice_data *v)
 	int freq = 48000;
 	int rc = 0;
 
-	MM_INFO(" network =%d, vote freq=%d\n", v->network, freq);
+	MM_DBG("network =%d, vote freq=%d\n", v->network, freq);
 	if (freq != v->dev_tx.sample) {
 		rc = msm_snddev_request_freq(&freq, 0,
 				SNDDEV_CAP_TX, AUDDEV_CLNT_VOC);
@@ -519,7 +518,7 @@ static int voice_thread(void *data)
 		wait_for_completion(&v->complete);
 		init_completion(&v->complete);
 
-		MM_INFO(" voc_event=%d, voice state =%d, dev_event=%d\n",
+		MM_DBG(" voc_event=%d, voice state =%d, dev_event=%d\n",
 				v->voc_event, v->voc_state, v->dev_event);
 		switch (v->voc_event) {
 		case VOICE_ACQUIRE_START:
@@ -622,7 +621,7 @@ static int __init voice_init(void)
 {
 	int rc, i;
 	struct voice_data *v = &voice;
-	MM_INFO("%s\n", __func__);
+	MM_INFO("\n"); /* Macro prints the file name and function */
 
 	mutex_init(&voice.lock);
 	v->handle = NULL;

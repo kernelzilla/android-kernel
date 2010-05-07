@@ -16,7 +16,6 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/wait.h>
@@ -37,6 +36,7 @@
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 
 #include "../qdsp5/evlog.h"
+#include <mach/debug_mm.h>
 
 enum {
 	EV_NULL,
@@ -295,8 +295,7 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 	switch (id) {
 	case AUDPP_MSG_STATUS_MSG:{
 			unsigned cid = msg[0];
-			pr_info("audpp: status %d %d %d\n", cid, msg[1],
-				msg[2]);
+			MM_DBG("status %d %d %d\n", cid, msg[1], msg[2]);
 
 			if ((cid < 5) && audpp->func[cid])
 				audpp->func[cid] (audpp->private[cid], id, msg);
@@ -311,16 +310,16 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 		break;
 	case AUDPP_MSG_CFG_MSG:
 		if (msg[0] == AUDPP_MSG_ENA_ENA) {
-			pr_info("audpp: ENABLE\n");
+			MM_INFO("ENABLE\n");
 			audpp->enabled = 1;
 			audpp_broadcast(audpp, id, msg);
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
-			pr_info("audpp: DISABLE\n");
+			MM_INFO("DISABLE\n");
 			audpp->enabled = 0;
 			wake_up(&audpp->event_wait);
 			audpp_broadcast(audpp, id, msg);
 		} else {
-			pr_err("audpp: invalid config msg %d\n", msg[0]);
+			MM_ERR("invalid config msg %d\n", msg[0]);
 		}
 		break;
 	case AUDPP_MSG_ROUTING_ACK:
@@ -329,9 +328,12 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 	case AUDPP_MSG_FLUSH_ACK:
 		audpp_notify_clnt(audpp, msg[0], id, msg);
 		break;
-
+	case ADSP_MESSAGE_ID:
+		MM_DBG("Received ADSP event: module enable/disable \
+				(audpptask)");
+		break;
 	default:
-		pr_info("audpp: unhandled msg id %x\n", id);
+		MM_INFO("unhandled msg id %x\n", id);
 	}
 }
 
@@ -369,10 +371,10 @@ int audpp_enable(int id, audpp_event_func func, void *private)
 
 	LOG(EV_ENABLE, 1);
 	if (audpp->open_count++ == 0) {
-		pr_info("audpp: enable\n");
+		MM_DBG("enable\n");
 		res = msm_adsp_get("AUDPPTASK", &audpp->mod, &adsp_ops, audpp);
 		if (res < 0) {
-			pr_err("audpp: cannot open AUDPPTASK\n");
+			MM_ERR("audpp: cannot open AUDPPTASK\n");
 			audpp->open_count = 0;
 			audpp->func[id] = NULL;
 			audpp->private[id] = NULL;
@@ -424,7 +426,7 @@ void audpp_disable(int id, void *private)
 	local_irq_restore(flags);
 
 	if (--audpp->open_count == 0) {
-		pr_info("audpp: disable\n");
+		MM_DBG("disable\n");
 		LOG(EV_DISABLE, 2);
 		audpp_dsp_config(0);
 		rc = wait_event_interruptible(audpp->event_wait,
@@ -832,7 +834,7 @@ int audpp_adec_alloc(unsigned dec_attrb, const char **module_name,
 			goto done;
 		}
 		audpp->codec_max_instances = max_instance;
-		MM_INFO("different codec running\n");
+		MM_DBG("different codec running\n");
 	} else {
 		max_instance = (dec_instance_list + audpp->op_mode *
 						MSM_MAX_DEC_CNT +
@@ -846,7 +848,7 @@ int audpp_adec_alloc(unsigned dec_attrb, const char **module_name,
 			goto done;
 		}
 		audpp->codec_max_instances = max_instance;
-		MM_INFO("same codec running\n");
+		MM_DBG("same codec running\n");
 	}
 
 	/* Point to Last entry of the row */
@@ -892,8 +894,8 @@ int audpp_adec_alloc(unsigned dec_attrb, const char **module_name,
 		      ((audpp->concurrency) * (audpp->dec_database->num_dec))) +
 		     lidx);
 		decid |= ((*concurrency_entry & AUDPP_OP_MASK) >> 12);
-		MM_INFO("%s:decid =0x%08x module_name=%s, queueid=%d \n",
-			__func__, decid, *module_name, *queueid);
+		MM_INFO("decid =0x%08x module_name=%s, queueid=%d \n", decid,
+				*module_name, *queueid);
 	}
 done:
 	mutex_unlock(audpp->lock_dec);
@@ -916,7 +918,7 @@ void audpp_adec_free(int decid)
 			audpp->dec_inuse &= ~(1 << (idx - 1));
 			audpp->dec_info_table[idx - 1].codec = -1;
 			audpp->dec_info_table[idx - 1].pid = 0;
-			pr_info("%s: free decid =%d \n", __func__, decid);
+			MM_INFO("free decid =%d \n", decid);
 			break;
 		}
 	}
@@ -946,18 +948,17 @@ static ssize_t concurrency_store(struct device *dev,
 	int rc = -1;
 	mutex_lock(audpp->lock_dec);
 	if (audpp->dec_inuse) {
-		pr_err("Can not change profile, while playback in progress\n");
+		MM_ERR("Can not change profile, while playback in progress\n");
 		goto done;
 	}
 	rc = strict_strtoul(buf, 10, &concurrency);
 	if (!rc &&
 		(concurrency < audpp->dec_database->num_concurrency_support)) {
 		audpp->concurrency = concurrency;
-		pr_debug("%s: Concurrency case %ld\n",
-				__func__, audpp->concurrency);
+		MM_DBG("Concurrency case %ld\n", audpp->concurrency);
 		rc = count;
 	} else {
-		pr_err("%s: Not a valid Concurrency case\n", __func__);
+		MM_ERR("Not a valid Concurrency case\n");
 		rc = -EINVAL;
 	}
 done:
@@ -1000,21 +1001,21 @@ static int audpp_probe(struct platform_device *pdev)
 	audpp->dec_database =
 	    (struct msm_adspdec_database *)pdev->dev.platform_data;
 
-	pr_info("Number of decoder supported  %d\n",
+	MM_INFO("Number of decoder supported  %d\n",
 		audpp->dec_database->num_dec);
-	pr_info("Number of concurrency supported  %d\n",
+	MM_INFO("Number of concurrency supported  %d\n",
 		audpp->dec_database->num_concurrency_support);
 	init_waitqueue_head(&audpp->event_wait);
 	for (idx = 0; idx < audpp->dec_database->num_dec; idx++) {
 		audpp->dec_info_table[idx].codec = -1;
 		audpp->dec_info_table[idx].pid = 0;
-		pr_info("module_name:%s \n",
+		MM_INFO("module_name:%s\n",
 			audpp->dec_database->dec_info_list[idx].module_name);
-		pr_info("queueid:%d \n",
+		MM_INFO("queueid:%d\n",
 			audpp->dec_database->dec_info_list[idx].module_queueid);
-		pr_info("decid:%d \n",
+		MM_INFO("decid:%d\n",
 			audpp->dec_database->dec_info_list[idx].module_decid);
-		pr_info("nr_codec_support:%d \n",
+		MM_INFO("nr_codec_support:%d\n",
 			audpp->dec_database->dec_info_list[idx].
 			nr_codec_support);
 	}

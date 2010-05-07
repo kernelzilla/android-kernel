@@ -17,13 +17,13 @@
  *
  */
 
-#include <mach/debug_audio_mm.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/wakelock.h>
 #include <mach/msm_adsp.h>
 
 #include <mach/qdsp5v2/audpreproc.h>
+#include <mach/debug_mm.h>
 
 #define MAX_ENC_COUNT 2
 

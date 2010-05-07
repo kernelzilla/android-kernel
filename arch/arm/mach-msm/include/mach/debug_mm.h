@@ -29,48 +29,6 @@
 #ifndef __ARCH_ARM_MACH_MSM_DEBUG_MM_H_
 #define __ARCH_ARM_MACH_MSM_DEBUG_MM_H_
 
-/* *********************DEBUG LEVELS************************
- * 0 - Disables all the messages including error messages
- * 1 - Prints error messages only
- * 2 - Prints both error and info messages (Default)
- * 3 - Prints all the messages including debug messages
- * ********************************************************/
-/* Change the debug level according to the above description in
- * individual module level header files i.e. debug_audio_mm.h
- * and debug_adsp_mm.h. More module level header files can be
- * added as per requirement.
- */
-
-#ifndef MSM_MM_DEBUG_LEVEL
-#undef MSM_MM_DEBUG
-#undef MSM_MM_INFO
-#undef MSM_MM_ERROR
-#elif (MSM_MM_DEBUG_LEVEL == 0)
-#undef MSM_MM_DEBUG
-#undef MSM_MM_INFO
-#undef MSM_MM_ERROR
-#elif (MSM_MM_DEBUG_LEVEL == 1)
-#undef MSM__DEBUG
-#undef MSM_MM_INFO
-#define MSM_MM_ERROR
-#elif (MSM_MM_DEBUG_LEVEL == 2)
-#undef MSM_MM_DEBUG
-#define MSM_MM_INFO
-#define MSM_MM_ERROR
-#elif (MSM_MM_DEBUG_LEVEL == 3)
-#define MSM_MM_DEBUG
-#define MSM_MM_INFO
-#define MSM_MM_ERROR
-#endif
-
-/* Defining the DEBUG macro before including "kernel.h" will
- * enable the pr_debug messages in corresponding modules
- */
-#ifdef MSM_MM_DEBUG
-#define DEBUG
-#endif
-#include <linux/kernel.h>
-
 /* The below macro removes the directory path name and retains only the
  * file name to avoid long path names in log messages that comes as
  * part of __FILE__ to compiler.
@@ -78,28 +36,12 @@
 #define __MM_FILE__ strrchr(__FILE__, '/') ? (strrchr(__FILE__, '/')+1) : \
 	__FILE__
 
-#ifndef MSM_MM_MODULE
-#define MSM_MM_MODULE ""
-#endif
+#define MM_DBG(fmt, args...) pr_debug("[%s] " fmt,\
+		__func__, ##args)
 
-#ifdef MSM_MM_DEBUG
-#define MM_DBG(fmt, args...) pr_debug("["MSM_MM_MODULE":%s:%s] " fmt,\
+#define MM_INFO(fmt, args...) pr_info("[%s:%s] " fmt,\
 	       __MM_FILE__, __func__, ##args)
-#else
-#define MM_DBG(fmt, args...) do {} while (0)
-#endif
 
-#ifdef MSM_MM_INFO
-#define MM_INFO(fmt, args...) pr_info("["MSM_MM_MODULE":%s:%s] " fmt,\
+#define MM_ERR(fmt, args...) pr_err("[%s:%s] " fmt,\
 	       __MM_FILE__, __func__, ##args)
-#else
-#define MM_INFO(fmt, args...) do {} while (0)
-#endif
-
-#ifdef MSM_MM_ERROR
-#define MM_ERR(fmt, args...) pr_err("["MSM_MM_MODULE":%s:%s] " fmt,\
-	       __MM_FILE__, __func__, ##args)
-#else
-#define MM_ERR(fmt, args...) do {} while (0)
-#endif
 #endif /* __ARCH_ARM_MACH_MSM_DEBUG_MM_H_ */

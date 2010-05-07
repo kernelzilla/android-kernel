@@ -15,7 +15,6 @@
  * GNU General Public License for more details.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -39,6 +38,7 @@
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 
 #include <mach/htc_pwrsink.h>
+#include <mach/debug_mm.h>
 
 #define BUFSZ (960 * 5)
 #define DMASZ (BUFSZ * 2)
@@ -146,7 +146,7 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg);
 /* must be called with audio->lock held */
 static int audio_enable(struct audio *audio)
 {
-	MM_INFO("\n"); /* Macro prints the file name and function */
+	MM_DBG("\n"); /* Macro prints the file name and function */
 
 	if (audio->enabled)
 		return 0;
@@ -177,7 +177,7 @@ static int audio_enable(struct audio *audio)
 /* must be called with audio->lock held */
 static int audio_disable(struct audio *audio)
 {
-	MM_INFO("\n"); /* Macro prints the file name and function */
+	MM_DBG("\n"); /* Macro prints the file name and function */
 	if (audio->enabled) {
 		audio->enabled = 0;
 		audio_dsp_out_enable(audio, 0);
@@ -197,6 +197,7 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 	struct audio *audio = private;
 	struct buffer *frame;
 	unsigned long flags;
+	static unsigned long pcmdmamsd_time;
 
 	switch (id) {
 	case AUDPP_MSG_HOST_PCM_INTF_MSG: {
@@ -234,14 +235,18 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 		break;
 	}
 	case AUDPP_MSG_PCMDMAMISSED:
-		MM_INFO("PCMDMAMISSED %d\n", msg[0]);
+		/* prints only if 1 second is elapsed since the last time
+		 * this message has been printed */
+		if (printk_timed_ratelimit(&pcmdmamsd_time, 1000))
+			printk(KERN_INFO "[%s:%s] PCMDMAMISSED %d\n",
+					__MM_FILE__, __func__, msg[0]);
 		audio->teos++;
 		MM_DBG("PCMDMAMISSED Count per Buffer %d\n", audio->teos);
 		wake_up(&audio->wait);
 		break;
 	case AUDPP_MSG_CFG_MSG:
 		if (msg[0] == AUDPP_MSG_ENA_ENA) {
-			MM_INFO("CFG_MSG ENABLE\n");
+			MM_DBG("CFG_MSG ENABLE\n");
 			audio->out_needed = 0;
 			audio->running = 1;
 			audpp_dsp_set_vol_pan(audio->dec_id, &audio->vol_pan,
@@ -249,7 +254,7 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 			audpp_route_stream(audio->dec_id, audio->source);
 			audio_dsp_out_enable(audio, 1);
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
-			MM_INFO("CFG_MSG DISABLE\n");
+			MM_DBG("CFG_MSG DISABLE\n");
 			audio->running = 0;
 		} else {
 			MM_ERR("CFG_MSG %d?\n", msg[0]);
@@ -622,7 +627,7 @@ static int audio_open(struct inode *inode, struct file *file)
 				|AUDDEV_EVT_DEV_RLS|
 				AUDDEV_EVT_STREAM_VOL_CHG;
 
-	MM_INFO("register for event callback pdata %p\n", audio);
+	MM_DBG("register for event callback pdata %p\n", audio);
 	rc = auddev_register_evt_listner(audio->device_events,
 					AUDDEV_CLNT_DEC,
 					audio->dec_id,

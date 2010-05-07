@@ -24,7 +24,7 @@
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
-#include <mach/debug_audio_mm.h>
+#include <mach/debug_mm.h>
 #include <mach/qdsp5v2/qdsp5audppmsg.h>
 #include <mach/qdsp5v2/audpp.h>
 

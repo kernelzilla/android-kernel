@@ -15,7 +15,6 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_audio_mm.h>
 #include <linux/module.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
@@ -24,6 +23,7 @@
 #include <mach/qdsp5v2/qdsp5afemsg.h>
 #include <mach/qdsp5v2/afe.h>
 #include <mach/msm_adsp.h>
+#include <mach/debug_mm.h>
 
 #define AFE_MAX_TIMEOUT 500 /* 500 ms */
 #define AFE_MAX_CLNT 6 /* 6 HW path defined so far */
@@ -50,13 +50,13 @@ static void afe_dsp_event(void *data, unsigned id, size_t len,
 {
 	struct msm_afe_state *afe = data;
 
-	MM_INFO("msg_id %d \n", id);
+	MM_DBG("msg_id %d \n", id);
 
 	switch (id) {
 	case AFE_APU_MSG_CODEC_CONFIG_ACK: {
 		struct afe_msg_codec_config_ack afe_ack;
 		getevent(&afe_ack, AFE_APU_MSG_CODEC_CONFIG_ACK_LEN);
-		MM_INFO("%s: device_id: %d device activity: %d\n", __func__,
+		MM_DBG("%s: device_id: %d device activity: %d\n", __func__,
 		afe_ack.device_id, afe_ack.device_activity);
 		if (afe_ack.device_activity == AFE_MSG_CODEC_CONFIG_DISABLED)
 			afe->codec_config[GETDEVICEID(afe_ack.device_id)] = 0;
@@ -67,6 +67,12 @@ static void afe_dsp_event(void *data, unsigned id, size_t len,
 		wake_up(&afe->wait);
 		break;
 	}
+	case AFE_APU_MSG_VOC_TIMING_SUCCESS:
+		MM_INFO("Received VOC_TIMING_SUCCESS message from AFETASK\n");
+		break;
+	case ADSP_MESSAGE_ID:
+		MM_DBG("Received ADSP event: module enable/disable(audpptask)");
+		break;
 	default:
 		MM_ERR("unexpected message from afe \n");
 	}
@@ -79,13 +85,13 @@ static void afe_dsp_codec_config(struct msm_afe_state *afe,
 {
 	struct afe_cmd_codec_config cmd;
 
-	MM_INFO("%s() %p\n", __func__, config);
+	MM_DBG("%s() %p\n", __func__, config);
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.cmd_id = AFE_CMD_CODEC_CONFIG_CMD;
 	cmd.device_id = path_id;
 	cmd.activity = enable;
 	if (config) {
-		MM_INFO("%s: sample_rate %x ch mode %x vol %x\n",
+		MM_DBG("%s: sample_rate %x ch mode %x vol %x\n",
 			__func__, config->sample_rate,
 			config->channel_mode, config->volume);
 		cmd.sample_rate = config->sample_rate;
@@ -100,7 +106,7 @@ int afe_enable(u8 path_id, struct msm_afe_config *config)
 	struct msm_afe_state *afe = &the_afe_state;
 	int rc;
 
-	MM_INFO("%s: path %d\n", __func__, path_id);
+	MM_DBG("%s: path %d\n", __func__, path_id);
 	mutex_lock(&afe->lock);
 	if (!afe->in_use && !afe->aux_conf_flag) {
 		/* enable afe */
@@ -156,7 +162,7 @@ int afe_config_aux_codec(int pcm_ctl_value, int aux_codec_intf_value,
 	struct msm_afe_state *afe = &the_afe_state;
 	int rc = 0;
 
-	MM_INFO(" configure aux codec \n");
+	MM_DBG(" configure aux codec \n");
 	mutex_lock(&afe->lock);
 	if (!afe->in_use && !afe->aux_conf_flag) {
 		/* enable afe */
@@ -198,7 +204,7 @@ int afe_disable(u8 path_id)
 	mutex_lock(&afe->lock);
 
 	BUG_ON(!afe->in_use);
-	MM_INFO("%s() path_id:%d codec state:%d\n", __func__, path_id,
+	MM_DBG("%s() path_id:%d codec state:%d\n", __func__, path_id,
 	afe->codec_config[GETDEVICEID(path_id)]);
 	afe_dsp_codec_config(afe, path_id, 0, NULL);
 	rc = wait_event_timeout(afe->wait,
@@ -210,7 +216,7 @@ int afe_disable(u8 path_id)
 	} else
 		rc = 0;
 	afe->in_use--;
-	MM_INFO("%s() in_use:%d \n", __func__, afe->in_use);
+	MM_DBG("%s() in_use:%d \n", __func__, afe->in_use);
 	if (!afe->in_use) {
 		msm_adsp_disable(afe->mod);
 		msm_adsp_put(afe->mod);

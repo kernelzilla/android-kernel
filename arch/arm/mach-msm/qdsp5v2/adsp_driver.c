@@ -14,18 +14,16 @@
  *
  */
 
-#include <mach/debug_adsp_mm.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/uaccess.h>
-
-#include "adsp.h"
-
 #include <linux/msm_adsp.h>
 #include <linux/android_pmem.h>
+#include "adsp.h"
+#include <mach/debug_mm.h>
 
 struct adsp_pmem_info {
 	int fd;
