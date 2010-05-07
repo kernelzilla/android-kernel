@@ -1256,7 +1256,10 @@ static void msm72k_pm_qos_update(int vote)
 {
 	struct msm_hsusb_gadget_platform_data *pdata =
 				the_usb_info->pdev->dev.platform_data;
-	u32 swfi_latency = pdata->swfi_latency + 1;
+	u32 swfi_latency = 0;
+
+	if (pdata)
+		swfi_latency = pdata->swfi_latency + 1;
 
 	if (vote) {
 		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
