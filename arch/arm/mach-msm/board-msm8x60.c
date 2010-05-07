@@ -21,6 +21,7 @@
 #include <linux/gpio.h>
 #include <linux/irq.h>
 #include <linux/io.h>
+#include <linux/mfd/pmic8058.h>
 
 #include <linux/i2c.h>
 #include <linux/smsc911x.h>
@@ -37,6 +38,11 @@
 
 #include "devices.h"
 #include "timer.h"
+
+/* Macros assume PMIC GPIOs start at 0 */
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + NR_GPIO_IRQS)
+#define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - NR_GPIO_IRQS)
+#define PM8058_IRQ_BASE				(NR_MSM_IRQS + NR_GPIO_IRQS)
 
 void __iomem *gic_cpu_base_addr;
 
@@ -183,6 +189,55 @@ static struct platform_device *surf_devices[] __initdata = {
 static struct i2c_board_info __initdata msm8x60_i2c_gsbi8_info[] = {
 };
 #endif
+
+#ifdef CONFIG_PMIC8058
+
+int pm8058_gpios_init(struct pm8058_chip *pm_chip)
+{
+	return 0;
+}
+
+#define PM8058_GPIO_INT           88
+
+static struct pm8058_gpio_platform_data pm8058_gpio_data = {
+	.gpio_base	= PM8058_GPIO_PM_TO_SYS(0),
+	.irq_base	= PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 0)
+};
+
+static struct pm8058_gpio_platform_data pm8058_mpp_data = {
+	.gpio_base	= PM8058_GPIO_PM_TO_SYS(PM8058_GPIOS),
+	.irq_base	= PM8058_MPP_IRQ(PM8058_IRQ_BASE, 0),
+};
+
+static struct mfd_cell pm8058_subdevs[] = {
+	{	.name = "pm8058-gpio",
+		.platform_data	= &pm8058_gpio_data,
+		.data_size	= sizeof(pm8058_gpio_data),
+	},
+	{	.name = "pm8058-mpp",
+		.platform_data	= &pm8058_mpp_data,
+		.data_size	= sizeof(pm8058_mpp_data),
+	},
+};
+
+static struct pm8058_platform_data pm8058_platform_data = {
+	.irq_base = PM8058_IRQ_BASE,
+	.init = pm8058_gpios_init,
+
+	.num_subdevs = ARRAY_SIZE(pm8058_subdevs),
+	.sub_devices = pm8058_subdevs,
+};
+
+static struct i2c_board_info pm8058_boardinfo[] __initdata = {
+	{
+		I2C_BOARD_INFO("pm8058-core", 0),
+		.irq = MSM_GPIO_TO_INT(PM8058_GPIO_INT),
+		.platform_data = &pm8058_platform_data,
+	},
+};
+
+#endif /* CONFIG_PMIC8058 */
+
 
 unsigned long clk_get_max_axi_khz(void)
 {
@@ -389,6 +444,11 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(59, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	GPIO_CFG(60, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 #endif
+
+#ifdef CONFIG_PMIC8058
+	/* PMIC8058 */
+	GPIO_CFG(PM8058_GPIO_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+#endif
 };
 
 static uint32_t msm8x60_hdrive_cfgs[][2] = {
@@ -535,6 +595,12 @@ static void __init msm8x60_init(void)
 	i2c_register_board_info(msm_gsbi8_qup_i2c_device.id,
 				msm8x60_i2c_gsbi8_info,
 				ARRAY_SIZE(msm8x60_i2c_gsbi8_info));
+#endif
+
+#ifdef CONFIG_PMIC8058
+	i2c_register_board_info(msm_device_ssbi1.id,
+				pm8058_boardinfo,
+				ARRAY_SIZE(pm8058_boardinfo));
 #endif
 }
 
