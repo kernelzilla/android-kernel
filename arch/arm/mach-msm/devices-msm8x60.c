@@ -419,6 +419,36 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	return platform_device_register(pdev);
 }
 
+static struct resource resources_otg[] = {
+	{
+		.start	= 0x12500000,
+		.end	= 0x12500000 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= USB1_HS_IRQ,
+		.end	= USB1_HS_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_otg = {
+	.name		= "msm_otg",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(resources_otg),
+	.resource	= resources_otg,
+};
+
+static u64 dma_mask = 0xffffffffULL;
+struct platform_device msm_device_gadget_peripheral = {
+	.name		= "msm_hsusb",
+	.id		= -1,
+	.dev		= {
+		.dma_mask 		= &dma_mask,
+		.coherent_dma_mask	= 0xffffffffULL,
+	},
+};
+
 struct clk msm_clocks_8x60[] = {
 	CLK_8X60("bbrx_ssbi_clk",	BBRX_SSBI_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI1_UART_CLK,		NULL, 0),
