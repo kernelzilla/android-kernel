@@ -49,7 +49,7 @@ struct usb_function_map {
 	unsigned bit_pos;
 };
 
-#ifndef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_FUNCTION
 /* platform device data for msm_hsusb driver */
 struct usb_composition {
 	__u16   product_id;

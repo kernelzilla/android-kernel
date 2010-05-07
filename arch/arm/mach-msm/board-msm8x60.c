@@ -36,6 +36,9 @@
 #include <asm/mach/mmc.h>
 #include <mach/tlmm.h>
 #include <mach/msm_hsusb.h>
+#ifdef CONFIG_USB_ANDROID
+#include <linux/usb/android.h>
+#endif
 
 #include "devices.h"
 #include "timer.h"
@@ -103,6 +106,103 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	 * used instead
 	 */
 	.usb_in_sps = 1,
+};
+#endif
+
+#ifdef CONFIG_USB_ANDROID
+/* dynamic composition */
+static struct usb_composition usb_func_composition[] = {
+	{
+		/* MSC */
+		.product_id         = 0xF000,
+		.functions	    = 0x02,
+		.adb_product_id     = 0x9015,
+		.adb_functions	    = 0x12
+	},
+#ifdef CONFIG_USB_F_SERIAL
+	{
+		/* MODEM */
+		.product_id         = 0xF00B,
+		.functions	    = 0x06,
+		.adb_product_id     = 0x901E,
+		.adb_functions	    = 0x16,
+	},
+#endif
+#ifdef CONFIG_USB_ANDROID_DIAG
+	{
+		/* DIAG */
+		.product_id         = 0x900E,
+		.functions	    = 0x04,
+		.adb_product_id     = 0x901D,
+		.adb_functions	    = 0x14,
+	},
+#endif
+#if defined(CONFIG_USB_ANDROID_DIAG) && defined(CONFIG_USB_F_SERIAL)
+	{
+		/* DIAG + MODEM */
+		.product_id         = 0x9004,
+		.functions	    = 0x64,
+		.adb_product_id     = 0x901F,
+		.adb_functions	    = 0x0614,
+	},
+	{
+		/* DIAG + MODEM + NMEA*/
+		.product_id         = 0x9016,
+		.functions	    = 0x764,
+		.adb_product_id     = 0x9020,
+		.adb_functions	    = 0x7614,
+	},
+	{
+		/* DIAG + MODEM + NMEA + MSC */
+		.product_id         = 0x9017,
+		.functions	    = 0x2764,
+		.adb_product_id     = 0x9018,
+		.adb_functions	    = 0x27614,
+	},
+#endif
+#ifdef CONFIG_USB_ANDROID_CDC_ECM
+	{
+		/* MSC + CDC-ECM */
+		.product_id         = 0x9014,
+		.functions	    = 0x82,
+		.adb_product_id     = 0x9023,
+		.adb_functions	    = 0x812,
+	},
+#endif
+#ifdef CONFIG_USB_ANDROID_RMNET
+	{
+		/* DIAG + RMNET */
+		.product_id         = 0x9021,
+		.functions	    = 0x94,
+		.adb_product_id     = 0x9022,
+		.adb_functions	    = 0x914,
+	},
+#endif
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	{
+		/* RNDIS */
+		.product_id         = 0xF00E,
+		.functions	    = 0xA,
+		.adb_product_id     = 0x9024,
+		.adb_functions	    = 0x1A,
+	},
+#endif
+};
+static struct android_usb_platform_data android_usb_pdata = {
+	.vendor_id	= 0x05C6,
+	.version	= 0x0100,
+	.compositions   = usb_func_composition,
+	.num_compositions = ARRAY_SIZE(usb_func_composition),
+	.product_name	= "Qualcomm HSUSB Device",
+	.manufacturer_name = "Qualcomm Incorporated",
+	.nluns = 1,
+};
+static struct platform_device android_usb_device = {
+	.name	= "android_usb",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &android_usb_pdata,
+	},
 };
 #endif
 
@@ -199,6 +299,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_USB_GADGET_MSM_72K
 	&msm_device_gadget_peripheral,
+#endif
+#ifdef CONFIG_USB_ANDROID
+	&android_usb_device,
 #endif
 };
 
