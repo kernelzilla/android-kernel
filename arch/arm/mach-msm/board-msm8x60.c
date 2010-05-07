@@ -336,10 +336,12 @@ static struct pm8058_gpio_platform_data pm8058_mpp_data = {
 
 static struct mfd_cell pm8058_subdevs[] = {
 	{	.name = "pm8058-gpio",
+		.id		= -1,
 		.platform_data	= &pm8058_gpio_data,
 		.data_size	= sizeof(pm8058_gpio_data),
 	},
 	{	.name = "pm8058-mpp",
+		.id		= -1,
 		.platform_data	= &pm8058_mpp_data,
 		.data_size	= sizeof(pm8058_mpp_data),
 	},
