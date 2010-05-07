@@ -34,6 +34,14 @@ config MSM_MDP31
 	depends on ARCH_QSD8X50
 	default y
 
+config TURBO_MODE
+    bool "Turbo mode"
+    depends on ARCH_MSM7225 || ARCH_MSM7X00A
+    default n
+    help
+      This option is used to indicate hardware support for running the
+      memory bus at a higher speed.(only for 7X00A/7225)
+
 config MSM_AMSS_VERSION
 	int
 	default 6210 if MSM_AMSS_VERSION_6210
