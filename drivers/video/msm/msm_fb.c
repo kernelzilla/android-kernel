@@ -98,7 +98,9 @@ static int msm_fb_set_par(struct fb_info *info);
 static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			    boolean op_enable);
 static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd);
+#if defined(CONFIG_PM) || defined(CONFIG_HAS_EARLYSUSPEND)
 static int msm_fb_resume_sub(struct msm_fb_data_type *mfd);
+#endif
 static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg);
 static int msm_fb_mmap(struct fb_info *info, struct vm_area_struct * vma);
@@ -424,6 +426,7 @@ static int msm_fb_resume(struct platform_device *pdev)
 #define msm_fb_resume NULL
 #endif
 
+#if defined(CONFIG_HAS_EARLYSUSPEND) || defined(CONFIG_PM)
 static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 {
 	int ret = 0;
@@ -449,6 +452,7 @@ static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 
 	return ret;
 }
+#endif
 
 static struct platform_driver msm_fb_driver = {
 	.probe = msm_fb_probe,
@@ -2114,8 +2118,10 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 
 	ret = mdp4_overlay_play(info, &req, &p_src_file);
 
+#ifdef CONFIG_ANDROID_PMEM
 	if (p_src_file)
 		put_pmem_file(p_src_file);
+#endif
 
 	return ret;
 }
