@@ -35,6 +35,7 @@
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
 #include <mach/tlmm.h>
+#include <mach/msm_hsusb.h>
 
 #include "devices.h"
 #include "timer.h"
@@ -94,6 +95,16 @@ static struct platform_device smsc911x_device = {
 		.platform_data = &smsc911x_config
 	}
 };
+
+#if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_HCD)
+static struct msm_otg_platform_data msm_otg_pdata = {
+	/* if usb link is in sps there is no need for
+	 * usb pclk as dayatona fabric clock will be
+	 * used instead
+	 */
+	.usb_in_sps = 1,
+};
+#endif
 
 #ifdef CONFIG_I2C_QUP
 static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
@@ -263,6 +274,9 @@ static void __init msm8x60_init_buses(void)
 	msm_device_ssbi1.dev.platform_data = &msm_ssbi1_pdata;
 	msm_device_ssbi2.dev.platform_data = &msm_ssbi2_pdata;
 	msm_device_ssbi3.dev.platform_data = &msm_ssbi3_pdata;
+#endif
+#if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_HCD)
+	msm_device_otg.dev.platform_data = &msm_otg_pdata;
 #endif
 }
 

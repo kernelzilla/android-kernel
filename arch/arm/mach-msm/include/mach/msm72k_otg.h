@@ -60,6 +60,7 @@ struct msm_otg {
 	int			vbus_on_irq;
 	void __iomem		*regs;
 	u8			in_lpm;
+	int			usb_in_sps;
 
 	unsigned int 		core_clk;
 	int 			(*rpc_connect)(int);

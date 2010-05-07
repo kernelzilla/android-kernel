@@ -104,6 +104,11 @@ struct msm_otg_platform_data {
 	int (*phy_reset)(void __iomem *);
 	unsigned int core_clk;
 	int pmic_vbus_irq;
+	/* if usb link is in sps there is no need for
+	 * usb pclk as dayatona fabric clock will be
+	 * used instead
+	 */
+	int usb_in_sps;
 
 	/* pmic notfications apis */
 	int (*pmic_notif_init) (void);
