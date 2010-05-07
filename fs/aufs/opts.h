@@ -49,6 +49,7 @@ struct super_block;
 #define AuOpt_SUM_W		(1 << 11)	/* unimplemented */
 #define AuOpt_WARN_PERM		(1 << 12)	/* warn when add-branch */
 #define AuOpt_VERBOSE		(1 << 13)	/* busy inode when del-branch */
+#define AuOpt_DIO		(1 << 14)	/* direct io */
 
 #ifndef CONFIG_AUFS_HNOTIFY
 #undef AuOpt_UDBA_HNOTIFY
@@ -161,6 +162,7 @@ struct au_opt {
 #define AuOpts_REFRESH_DIR	(1 << 1)
 #define AuOpts_REFRESH_NONDIR	(1 << 2)
 #define AuOpts_TRUNC_XIB	(1 << 3)
+#define AuOpts_REFRESH_DYAOP	(1 << 4)
 #define au_ftest_opts(flags, name)	((flags) & AuOpts_##name)
 #define au_fset_opts(flags, name)	{ (flags) |= AuOpts_##name; }
 #define au_fclr_opts(flags, name)	{ (flags) &= ~AuOpts_##name; }
