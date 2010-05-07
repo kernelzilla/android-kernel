@@ -34,6 +34,9 @@
 #define DIR_TX	2
 #define DIR_RX	1
 
+#define DEVICE_IGNORE	0xff
+#define SESSION_IGNORE 0x00000000
+
 struct msm_snddev_info {
 	const char *name;
 	u32 capability;
@@ -162,7 +165,6 @@ struct msm_snd_evt_listner {
 };
 
 struct event_listner {
-	struct mutex listner_lock;
 	struct msm_snd_evt_listner *cb;
 	u32 num_listner;
 	int state; /* Call state */ /* TODO remove this if not req*/
@@ -176,6 +178,7 @@ int auddev_register_evt_listner(u32 evt_id, u32 clnt_type, u32 clnt_id,
 		void *private_data);
 int auddev_unregister_evt_listner(u32 clnt_type, u32 clnt_id);
 void mixer_post_event(u32 evt_id, u32 dev_id);
+void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id);
 int msm_snddev_request_freq(int *freq, u32 session_id,
 			u32 capability, u32 clnt_type);
 int msm_snddev_withdraw_freq(u32 session_id,

@@ -32,10 +32,10 @@
 #define  MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
-#define DEVICE_IGNORE	0xff
+
+static DEFINE_MUTEX(session_lock);
 
 struct audio_dev_ctrl_state {
-	struct mutex lock;
 	struct msm_snddev_info *devs[AUDIO_DEV_CTL_MAX_DEV];
 	u32 num_dev;
 	atomic_t opened;
@@ -76,8 +76,8 @@ int msm_set_voice_mute(int dir, int mute)
 	MM_DBG("dir %x mute %x\n", dir, mute);
 	if (dir == DIR_TX) {
 		routing_info.tx_mute = mute;
-		mixer_post_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
-			routing_info.voice_tx_dev_id);
+		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
+			routing_info.voice_tx_dev_id, SESSION_IGNORE);
 	} else
 		return -EPERM;
 	return 0;
@@ -88,12 +88,14 @@ int msm_set_voice_vol(int dir, s32 volume)
 {
 	if (dir == DIR_TX) {
 		routing_info.voice_tx_vol = volume;
-		mixer_post_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
-					routing_info.voice_tx_dev_id);
+		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
+					routing_info.voice_tx_dev_id,
+					SESSION_IGNORE);
 	} else if (dir == DIR_RX) {
 		routing_info.voice_rx_vol = volume;
-		mixer_post_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
-					routing_info.voice_rx_dev_id);
+		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
+					routing_info.voice_rx_dev_id,
+					SESSION_IGNORE);
 	} else
 		return -EINVAL;
 	return 0;
@@ -102,7 +104,7 @@ EXPORT_SYMBOL(msm_set_voice_vol);
 
 void msm_snddev_register(struct msm_snddev_info *dev_info)
 {
-	mutex_lock(&audio_dev_ctrl.lock);
+	mutex_lock(&session_lock);
 	if (audio_dev_ctrl.num_dev < AUDIO_DEV_CTL_MAX_DEV) {
 		audio_dev_ctrl.devs[audio_dev_ctrl.num_dev] = dev_info;
 		dev_info->dev_volume = 0; /* 0 db */
@@ -110,7 +112,7 @@ void msm_snddev_register(struct msm_snddev_info *dev_info)
 		audio_dev_ctrl.num_dev++;
 	} else
 		MM_ERR("%s: device registry max out\n", __func__);
-	mutex_unlock(&audio_dev_ctrl.lock);
+	mutex_unlock(&session_lock);
 }
 EXPORT_SYMBOL(msm_snddev_register);
 
@@ -187,7 +189,7 @@ int msm_set_voc_route(struct msm_snddev_info *dev_info,
 	int rc = 0;
 	u32 session_mask = 0;
 
-	mutex_lock(&audio_dev_ctrl.lock);
+	mutex_lock(&session_lock);
 	switch (stream_type) {
 	case AUDIO_ROUTE_STREAM_VOICE_RX:
 		if (audio_dev_ctrl.voice_rx_dev)
@@ -229,7 +231,7 @@ int msm_set_voc_route(struct msm_snddev_info *dev_info,
 	default:
 		rc = -EINVAL;
 	}
-	mutex_unlock(&audio_dev_ctrl.lock);
+	mutex_unlock(&session_lock);
 	return rc;
 }
 EXPORT_SYMBOL(msm_set_voc_route);
@@ -261,17 +263,17 @@ int msm_get_voc_route(u32 *rx_id, u32 *tx_id)
 	if (!rx_id || !tx_id)
 		return -EINVAL;
 
-	mutex_lock(&audio_dev_ctrl.lock);
+	mutex_lock(&session_lock);
 	if (!audio_dev_ctrl.voice_rx_dev || !audio_dev_ctrl.voice_tx_dev) {
 		rc = -ENODEV;
-		mutex_unlock(&audio_dev_ctrl.lock);
+		mutex_unlock(&session_lock);
 		return rc;
 	}
 
 	*rx_id = audio_dev_ctrl.voice_rx_dev->acdb_id;
 	*tx_id = audio_dev_ctrl.voice_tx_dev->acdb_id;
 
-	mutex_unlock(&audio_dev_ctrl.lock);
+	mutex_unlock(&session_lock);
 
 	return rc;
 }
@@ -364,7 +366,7 @@ int auddev_register_evt_listner(u32 evt_id, u32 clnt_type, u32 clnt_id,
 		return -ENOMEM;
 	}
 
-	mutex_lock(&event.listner_lock);
+	mutex_lock(&session_lock);
 	new_cb->cb_next = NULL;
 	new_cb->auddev_evt_listener = listner;
 	new_cb->evt_id = evt_id;
@@ -388,7 +390,7 @@ int auddev_register_evt_listner(u32 evt_id, u32 clnt_type, u32 clnt_id,
 		new_cb->cb_prev = callback;
 	}
 	event.num_listner++;
-	mutex_unlock(&event.listner_lock);
+	mutex_unlock(&session_lock);
 	rc = 0;
 	return rc;
 }
@@ -401,14 +403,17 @@ int auddev_unregister_evt_listner(u32 clnt_type, u32 clnt_id)
 	u32 session_mask = 0;
 	int i = 0;
 
+	mutex_lock(&session_lock);
 	while (callback != NULL) {
 		if ((callback->clnt_type == clnt_type)
 			&& (callback->clnt_id == clnt_id))
 			break;
 		 callback = callback->cb_next;
 	}
-	if (callback == NULL)
+	if (callback == NULL) {
+		mutex_unlock(&session_lock);
 		return -EINVAL;
+	}
 
 	if ((callback->cb_next == NULL) && (callback->cb_prev == NULL))
 		event.cb = NULL;
@@ -428,6 +433,7 @@ int auddev_unregister_evt_listner(u32 clnt_type, u32 clnt_id)
 		info = audio_dev_ctrl.devs[i];
 		info->sessions &= ~session_mask;
 	}
+	mutex_unlock(&session_lock);
 	return 0;
 }
 EXPORT_SYMBOL(auddev_unregister_evt_listner);
@@ -540,10 +546,12 @@ int msm_snddev_request_freq(int *freq, u32 session_id,
 			*freq = info->set_sample_rate;
 
 			if (info->opened) {
-				mixer_post_event(AUDDEV_EVT_FREQ_CHG, i);
+				broadcast_event(AUDDEV_EVT_FREQ_CHG, i,
+							SESSION_IGNORE);
 				set_freq = info->dev_ops.set_freq(info,
 								set_freq);
-				mixer_post_event(AUDDEV_EVT_DEV_RDY, i);
+				broadcast_event(AUDDEV_EVT_DEV_RDY, i,
+							SESSION_IGNORE);
 			}
 		}
 		MM_DBG("info->set_sample_rate = %d\n", info->set_sample_rate);
@@ -582,7 +590,7 @@ static int audio_dev_ctrl_ioctl(struct inode *inode, struct file *file,
 	int rc = 0;
 	struct audio_dev_ctrl_state *dev_ctrl = file->private_data;
 
-	mutex_lock(&audio_dev_ctrl.lock);
+	mutex_lock(&session_lock);
 	switch (cmd) {
 	case AUDIO_GET_NUM_SND_DEVICE:
 		rc = put_user(dev_ctrl->num_dev, (uint32_t __user *) arg);
@@ -672,7 +680,7 @@ static int audio_dev_ctrl_ioctl(struct inode *inode, struct file *file,
 	default:
 		rc = -EINVAL;
 	}
-	mutex_unlock(&audio_dev_ctrl.lock);
+	mutex_unlock(&session_lock);
 	return rc;
 }
 
@@ -705,7 +713,13 @@ struct miscdevice audio_dev_ctrl_misc = {
 	.fops	= &audio_dev_ctrl_fops,
 };
 
-static void broadcast_event(u32 evt_id, u32 dev_id)
+/* session id is 32 bit routing mask per device
+ * 0-7 for voice clients
+ * 8-15 for Decoder clients
+ * 16-23 for Encoder clients
+ * 24-31 Do not care
+ */
+void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 {
 	int clnt_id = 0, i;
 	union auddev_evt_data *evt_payload;
@@ -725,6 +739,8 @@ static void broadcast_event(u32 evt_id, u32 dev_id)
 		callback = event.cb;
 	else
 		return;
+	mutex_lock(&session_lock);
+
 	evt_payload = kzalloc(sizeof(union auddev_evt_data),
 			GFP_KERNEL);
 
@@ -745,16 +761,20 @@ static void broadcast_event(u32 evt_id, u32 dev_id)
 			goto skip_check;
 		if (callback->clnt_type == AUDDEV_CLNT_AUDIOCAL)
 			goto aud_cal;
+
+		session_mask = (0x1 << (clnt_id))
+				<< (8 * ((int)callback->clnt_type-1));
+
 		if (evt_id == AUDDEV_EVT_STREAM_VOL_CHG) {
 			MM_DBG("AUDDEV_EVT_STREAM_VOL_CHG\n");
 			goto volume_strm;
 		}
 
-		session_mask = (0x1 << (clnt_id))
-				<< (8 * ((int)callback->clnt_type-1));
 		MM_DBG("dev_info->sessions = %08x\n", dev_info->sessions);
 
-		if (!(dev_info->sessions & session_mask)) {
+		if ((!session_id && !(dev_info->sessions & session_mask)) ||
+			(session_id && ((dev_info->sessions & session_mask) !=
+						session_id))) {
 			if (callback->cb_next == NULL)
 				break;
 			else {
@@ -769,9 +789,9 @@ volume_strm:
 		if (callback->clnt_type == AUDDEV_CLNT_DEC) {
 			MM_DBG("AUDDEV_CLNT_DEC\n");
 			if (evt_id == AUDDEV_EVT_STREAM_VOL_CHG) {
-				MM_DBG("clnt_id = %d, dev_id = %d\n",
-					clnt_id, dev_id);
-				if (clnt_id != dev_id)
+				MM_DBG("clnt_id = %d, session_id = 0x%8x\n",
+					clnt_id, session_id);
+				if (session_mask != session_id)
 					goto sent_dec;
 				else
 					evt_payload->session_vol =
@@ -955,55 +975,55 @@ sent_voc:
 		}
 	}
 	kfree(evt_payload);
+	mutex_unlock(&session_lock);
 }
+EXPORT_SYMBOL(broadcast_event);
 
 
 void mixer_post_event(u32 evt_id, u32 id)
 {
 
 	MM_DBG("evt_id = %d\n", evt_id);
-	mutex_lock(&event.listner_lock);
 	switch (evt_id) {
 	case AUDDEV_EVT_DEV_CHG_VOICE: /* Called from Voice_route */
-		broadcast_event(AUDDEV_EVT_DEV_CHG_VOICE, id);
+		broadcast_event(AUDDEV_EVT_DEV_CHG_VOICE, id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_DEV_RDY:
-		broadcast_event(AUDDEV_EVT_DEV_RDY, id);
+		broadcast_event(AUDDEV_EVT_DEV_RDY, id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_DEV_RLS:
-		broadcast_event(AUDDEV_EVT_DEV_RLS, id);
+		broadcast_event(AUDDEV_EVT_DEV_RLS, id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_REL_PENDING:
-		broadcast_event(AUDDEV_EVT_REL_PENDING, id);
+		broadcast_event(AUDDEV_EVT_REL_PENDING, id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_DEVICE_VOL_MUTE_CHG:
-		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG, id);
+		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG, id,
+							SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_STREAM_VOL_CHG:
-		broadcast_event(AUDDEV_EVT_STREAM_VOL_CHG, id);
+		broadcast_event(AUDDEV_EVT_STREAM_VOL_CHG, id,
+							SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_START_VOICE:
 		broadcast_event(AUDDEV_EVT_START_VOICE,
-				DEVICE_IGNORE);
+				id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_END_VOICE:
 		broadcast_event(AUDDEV_EVT_END_VOICE,
-				DEVICE_IGNORE);
+				id, SESSION_IGNORE);
 		break;
 	case AUDDEV_EVT_FREQ_CHG:
-		broadcast_event(AUDDEV_EVT_FREQ_CHG, id);
+		broadcast_event(AUDDEV_EVT_FREQ_CHG, id, SESSION_IGNORE);
 		break;
 	default:
 		break;
 	}
-	mutex_unlock(&event.listner_lock);
 }
 EXPORT_SYMBOL(mixer_post_event);
 
 static int __init audio_dev_ctrl_init(void)
 {
-	mutex_init(&audio_dev_ctrl.lock);
-	mutex_init(&event.listner_lock);
 	init_waitqueue_head(&audio_dev_ctrl.wait);
 
 	event.cb = NULL;
