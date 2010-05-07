@@ -164,7 +164,7 @@ static int oem_rapi_client_streaming_function_ret(struct msm_rpc_client *client,
 			 xdr_recv_uint32);
 
 	/* output */
-	if (ret->out_len && *ret->out_len && ret->output)
+	if (ret->out_len && *ret->out_len)
 		xdr_recv_bytes(xdr, (void **)&ret->output, &temp);
 
 	return 0;
