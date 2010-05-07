@@ -2174,7 +2174,7 @@ static int __init rpcrouter_init(void)
 	int ret;
 
 	msm_rpc_connect_timeout_ms = 0;
-	smd_rpcrouter_debug_mask |= SMEM_LOG | R2R_MSG;
+	smd_rpcrouter_debug_mask |= SMEM_LOG;
 	debugfs_init();
 
 	/* Initialize what we need to start processing */
