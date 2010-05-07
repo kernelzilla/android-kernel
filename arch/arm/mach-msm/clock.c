@@ -328,6 +328,9 @@ static int clock_debug_rate_get(void *data, u64 *val)
 	return 0;
 }
 
+DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
+			clock_debug_rate_set, "%llu\n");
+
 static int clock_debug_enable_set(void *data, u64 val)
 {
 	struct clk *clock = data;
@@ -350,6 +353,9 @@ static int clock_debug_enable_get(void *data, u64 *val)
 	return 0;
 }
 
+DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
+			clock_debug_enable_set, "%llu\n");
+
 static int clock_debug_local_get(void *data, u64 *val)
 {
 	struct clk *clock = data;
@@ -359,42 +365,42 @@ static int clock_debug_local_get(void *data, u64 *val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
-			clock_debug_rate_set, "%llu\n");
-DEFINE_SIMPLE_ATTRIBUTE(clock_enable_fops, clock_debug_enable_get,
-			clock_debug_enable_set, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
 			NULL, "%llu\n");
 
 static int __init clock_debug_init(void)
 {
-	struct dentry *dent_rate, *dent_enable, *dent_local;
+	struct dentry *base_dir;
 	struct clk *clock;
 	unsigned n = 0;
 	char temp[50], *ptr;
 
-	dent_rate = debugfs_create_dir("clk_rate", 0);
-	if (IS_ERR(dent_rate))
-		return PTR_ERR(dent_rate);
-
-	dent_enable = debugfs_create_dir("clk_enable", 0);
-	if (IS_ERR(dent_enable))
-		return PTR_ERR(dent_enable);
-
-	dent_local = debugfs_create_dir("clk_local", NULL);
-	if (IS_ERR(dent_local))
-		return PTR_ERR(dent_local);
+	base_dir = debugfs_create_dir("clk", NULL);
+	if (!base_dir)
+		return -ENOMEM;
 
 	while ((clock = msm_clock_get_nth(n++)) != 0) {
+		struct dentry *clk_dir;
+
 		strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
 		for (ptr = temp; *ptr; ptr++)
 			*ptr = tolower(*ptr);
-		debugfs_create_file(temp, 0644, dent_rate,
-				    clock, &clock_rate_fops);
-		debugfs_create_file(temp, 0644, dent_enable,
-				    clock, &clock_enable_fops);
-		debugfs_create_file(temp, S_IRUGO, dent_local,
-				    clock, &clock_local_fops);
+
+		clk_dir = debugfs_create_dir(temp, base_dir);
+		if (!clk_dir)
+			return -ENOMEM;
+
+		if (!debugfs_create_file("rate", S_IRUGO | S_IWUSR, clk_dir,
+					clock, &clock_rate_fops))
+			return -ENOMEM;
+
+		if (!debugfs_create_file("enable", S_IRUGO | S_IWUSR, clk_dir,
+					clock, &clock_enable_fops))
+			return -ENOMEM;
+
+		if (!debugfs_create_file("is_local", S_IRUGO, clk_dir, clock,
+					&clock_local_fops))
+			return -ENOMEM;
 	}
 	return 0;
 }
