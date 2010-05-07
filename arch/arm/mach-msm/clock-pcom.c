@@ -101,6 +101,12 @@ unsigned pc_clk_get_rate(unsigned id)
 		return id;
 }
 
+signed pc_clk_measure_rate(unsigned id)
+{
+	/* Not supported. */
+	return -EPERM;
+}
+
 unsigned pc_clk_is_enabled(unsigned id)
 {
 	if (msm_proc_comm(PCOM_CLKCTL_RPC_ENABLED, &id, NULL))
@@ -126,6 +132,7 @@ struct clk_ops clk_ops_remote = {
 	.set_max_rate = pc_clk_set_max_rate,
 	.set_flags = pc_clk_set_flags,
 	.get_rate = pc_clk_get_rate,
+	.measure_rate = pc_clk_measure_rate,
 	.is_enabled = pc_clk_is_enabled,
 	.round_rate = pc_clk_round_rate,
 };

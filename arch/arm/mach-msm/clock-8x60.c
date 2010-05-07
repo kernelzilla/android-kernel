@@ -1773,6 +1773,12 @@ static unsigned soc_clk_get_rate(unsigned id)
 	return ret;
 }
 
+static signed soc_clk_measure_rate(unsigned id)
+{
+	/* Not supported. */
+	return -EPERM;
+}
+
 static unsigned soc_clk_is_enabled(unsigned id)
 {
 	return !!(clk_local_tbl[id].count);
@@ -1802,6 +1808,7 @@ struct clk_ops clk_ops_8x60 = {
 	.set_max_rate = soc_clk_set_max_rate,
 	.set_flags = soc_clk_set_flags,
 	.get_rate = soc_clk_get_rate,
+	.measure_rate = soc_clk_measure_rate,
 	.is_enabled = soc_clk_is_enabled,
 	.round_rate = soc_clk_round_rate,
 };

@@ -75,6 +75,12 @@ unsigned rpm_clk_get_rate(unsigned id)
 	return 0;
 }
 
+signed rpm_clk_measure_rate(unsigned id)
+{
+	/* Not supported. */
+	return -EPERM;
+}
+
 unsigned rpm_clk_is_enabled(unsigned id)
 {
 	/* Not yet supported. */
@@ -97,6 +103,7 @@ struct clk_ops clk_ops_remote = {
 	.set_max_rate = rpm_clk_set_max_rate,
 	.set_flags = rpm_clk_set_flags,
 	.get_rate = rpm_clk_get_rate,
+	.measure_rate = rpm_clk_measure_rate,
 	.is_enabled = rpm_clk_is_enabled,
 	.round_rate = rpm_clk_round_rate,
 };
