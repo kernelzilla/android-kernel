@@ -335,7 +335,7 @@ static int __init adv7520_init(void)
 	pinfo->pdest = DISPLAY_2;
 	pinfo->wait_cycle = 0;
 	pinfo->bpp = 24;
-	pinfo->fb_num = 2;
+	pinfo->fb_num = 1;
 	pinfo->clk_rate = 74250000;
 	pinfo->lcdc.h_back_porch = 220;
 	pinfo->lcdc.h_front_porch = 110;
