@@ -1076,7 +1076,7 @@ static int mdp_probe(struct platform_device *pdev)
 	return rc;
 }
 
-#if defined(CONFIG_PM) || defined(CONFIG_HAS_EARLYSUSPEND)
+#ifdef CONFIG_PM
 static void mdp_suspend_sub(void)
 {
 	/* cancel pipe ctrl worker */
