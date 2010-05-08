@@ -47,6 +47,8 @@
 #define HS_END_K		0x51	/* End key or Power key */
 #define HS_STEREO_HEADSET_K	0x82
 #define HS_HEADSET_SWITCH_K	0x84
+#define HS_HEADSET_SWITCH_2_K	0xF0
+#define HS_HEADSET_SWITCH_3_K	0xF1
 #define HS_REL_K		0xFF	/* key release */
 
 #define KEY(hs_key, input_key) ((hs_key << 24) | input_key)
@@ -151,6 +153,8 @@ static const uint32_t hs_key_map[] = {
 	KEY(HS_END_K, KEY_END),
 	KEY(HS_STEREO_HEADSET_K, SW_HEADPHONE_INSERT),
 	KEY(HS_HEADSET_SWITCH_K, KEY_MEDIA),
+	KEY(HS_HEADSET_SWITCH_2_K, KEY_VOLUMEUP),
+	KEY(HS_HEADSET_SWITCH_3_K, KEY_VOLUMEDOWN),
 	0
 };
 
@@ -224,6 +228,8 @@ static void report_hs_key(uint32_t key_code, uint32_t key_parm)
 	case KEY_POWER:
 	case KEY_END:
 	case KEY_MEDIA:
+	case KEY_VOLUMEUP:
+	case KEY_VOLUMEDOWN:
 		input_report_key(hs->ipdev, key, (key_code != HS_REL_K));
 		break;
 	case SW_HEADPHONE_INSERT:
@@ -521,6 +527,8 @@ static int __devinit hs_probe(struct platform_device *pdev)
 	ipdev->id.version	= 1;
 
 	input_set_capability(ipdev, EV_KEY, KEY_MEDIA);
+	input_set_capability(ipdev, EV_KEY, KEY_VOLUMEUP);
+	input_set_capability(ipdev, EV_KEY, KEY_VOLUMEDOWN);
 	input_set_capability(ipdev, EV_SW, SW_HEADPHONE_INSERT);
 	input_set_capability(ipdev, EV_KEY, KEY_POWER);
 	input_set_capability(ipdev, EV_KEY, KEY_END);
