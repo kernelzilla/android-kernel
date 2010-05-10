@@ -21,8 +21,8 @@
 
 typedef void (*audpp_event_func)(void *private, unsigned id, uint16_t *msg);
 
-/* worst case delay of 100ms for response */
-#define MSM_AUD_DECODER_WAIT_MS 100
+/* worst case delay of 1sec for response */
+#define MSM_AUD_DECODER_WAIT_MS 1000
 #define MSM_AUD_MODE_TUNNEL  0x00000100
 #define MSM_AUD_MODE_NONTUNNEL  0x00000200
 #define MSM_AUD_DECODER_MASK  0x0000FFFF
