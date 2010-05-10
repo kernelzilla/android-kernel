@@ -644,6 +644,35 @@ wl_iw_set_power_mode(
 #endif
 
 static int
+wl_iw_get_power_mode(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra
+)
+{
+	int error;
+	char *p = extra;
+	int pm_local = PM_FAST;
+
+	error = dev_wlc_ioctl(dev, WLC_GET_PM, &pm_local, sizeof(pm_local));
+	if (!error) {
+		WL_TRACE(("%s: Powermode = %d\n", __func__, pm_local));
+		if (pm_local == PM_OFF)
+			pm_local = 1; /* Active */
+		else
+			pm_local = 0; /* Auto */
+		p += snprintf(p, MAX_WX_STRING, "powermode = %d", pm_local);
+	}
+	else {
+		WL_TRACE(("%s: Error = %d\n", __func__, error));
+		p += snprintf(p, MAX_WX_STRING, "FAIL");
+	}
+	wrqu->data.length = p - extra + 1;
+	return error;
+}
+
+static int
 wl_iw_set_btcoex_dhcp(
 	struct net_device *dev,
 	struct iw_request_info *info,
@@ -5529,6 +5558,8 @@ static int wl_iw_set_priv(
 		else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
 #endif
+		else if (strnicmp(extra, "GETPOWER", strlen("GETPOWER")) == 0)
+			ret = wl_iw_get_power_mode(dev, info, (union iwreq_data *)dwrq, extra);
 #ifdef SOFTAP
 		else if (strnicmp(extra, "ASCII_CMD", strlen("ASCII_CMD")) == 0) {
 			wl_iw_process_private_ascii_cmd(dev, info, (union iwreq_data *)dwrq, extra);
