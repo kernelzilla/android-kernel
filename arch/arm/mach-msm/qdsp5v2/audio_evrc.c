@@ -864,7 +864,7 @@ static long audevrc_ioctl(struct file *file, unsigned int cmd,
 			rc = wait_event_interruptible_timeout(audio->wait,
 				audio->dec_state != MSM_AUD_DECODER_STATE_NONE,
 				msecs_to_jiffies(MSM_AUD_DECODER_WAIT_MS));
-			MM_DBG("dec_state %d rc = %d\n", audio->dec_state, rc);
+			MM_INFO("dec_state %d rc = %d\n", audio->dec_state, rc);
 
 			if (audio->dec_state != MSM_AUD_DECODER_STATE_SUCCESS)
 				rc = -ENODEV;
