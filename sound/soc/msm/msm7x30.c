@@ -90,9 +90,11 @@ static int msm_v_call_put(struct snd_kcontrol *kcontrol,
 {
 	int start = ucontrol->value.integer.value[0];
 	if (start)
-		mixer_post_event(AUDDEV_EVT_START_VOICE, 0);
+		broadcast_event(AUDDEV_EVT_START_VOICE, DEVICE_IGNORE,
+							SESSION_IGNORE);
 	else
-		mixer_post_event(AUDDEV_EVT_END_VOICE, 0);
+		broadcast_event(AUDDEV_EVT_END_VOICE, DEVICE_IGNORE,
+							SESSION_IGNORE);
 	return 0;
 }
 
@@ -167,8 +169,9 @@ static int msm_volume_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	int ret = 0;
-	int dec_id = ucontrol->value.integer.value[0];
+	int session_id = ucontrol->value.integer.value[0];
 	int volume = ucontrol->value.integer.value[1];
+	u32 session_mask = 0;
 
 	if ((volume < 0) || (volume > 100))
 		return -EINVAL;
@@ -178,9 +181,12 @@ static int msm_volume_put(struct snd_kcontrol *kcontrol,
 	if (volume > MSM_MAX_VOLUME)
 		volume = MSM_MAX_VOLUME;
 
+	/* Only Decoder volume control supported */
+	session_mask = (0x1 << (session_id) << (8 * ((int)AUDDEV_CLNT_DEC-1)));
 	msm_vol_ctl.volume = volume;
-	MM_DBG("dec_id %d, volume %d", dec_id, volume);
-	mixer_post_event(AUDDEV_EVT_STREAM_VOL_CHG, dec_id);
+	MM_DBG("session_id %d, volume %d", session_id, volume);
+	broadcast_event(AUDDEV_EVT_STREAM_VOL_CHG, DEVICE_IGNORE,
+							session_mask);
 
 	return ret;
 }
@@ -205,6 +211,7 @@ static int msm_voice_put(struct snd_kcontrol *kcontrol,
 	struct msm_snddev_info *rx_dev_info;
 	struct msm_snddev_info *tx_dev_info;
 	int set = ucontrol->value.integer.value[2];
+	u32 session_mask;
 
 	if (!set)
 		return -EPERM;
@@ -229,7 +236,9 @@ static int msm_voice_put(struct snd_kcontrol *kcontrol,
 	msm_set_voc_route(rx_dev_info, AUDIO_ROUTE_STREAM_VOICE_RX,
 				rx_dev_id);
 
-	mixer_post_event(AUDDEV_EVT_DEV_CHG_VOICE, rx_dev_id);
+	session_mask =	0x1 << (8 * ((int)AUDDEV_CLNT_VOC-1));
+
+	broadcast_event(AUDDEV_EVT_DEV_CHG_VOICE, rx_dev_id, session_mask);
 
 
 	/* Tx Device Routing */
@@ -252,13 +261,14 @@ static int msm_voice_put(struct snd_kcontrol *kcontrol,
 
 	msm_set_voc_route(tx_dev_info, AUDIO_ROUTE_STREAM_VOICE_TX,
 				tx_dev_id);
-	mixer_post_event(AUDDEV_EVT_DEV_CHG_VOICE, tx_dev_id);
+
+	broadcast_event(AUDDEV_EVT_DEV_CHG_VOICE, tx_dev_id, session_mask);
 
 	if (rx_dev_info->opened)
-		mixer_post_event(AUDDEV_EVT_DEV_RDY, rx_dev_id);
+		broadcast_event(AUDDEV_EVT_DEV_RDY, rx_dev_id,	session_mask);
 
 	if (tx_dev_info->opened)
-		mixer_post_event(AUDDEV_EVT_DEV_RDY, tx_dev_id);
+		broadcast_event(AUDDEV_EVT_DEV_RDY, tx_dev_id, session_mask);
 
 	return rc;
 }
@@ -331,20 +341,23 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 				return rc;
 			}
 			dev_info->opened = 1;
-			mixer_post_event(AUDDEV_EVT_DEV_RDY, route_cfg.dev_id);
+			broadcast_event(AUDDEV_EVT_DEV_RDY, route_cfg.dev_id,
+							SESSION_IGNORE);
 		}
 	} else {
 		if (dev_info->opened) {
-			mixer_post_event(AUDDEV_EVT_REL_PENDING,
-						route_cfg.dev_id);
+			broadcast_event(AUDDEV_EVT_REL_PENDING,
+						route_cfg.dev_id,
+						SESSION_IGNORE);
 			rc = dev_info->dev_ops.close(dev_info);
 			if (rc < 0) {
 				MM_ERR("Snd device failed close!\n");
 				return rc;
 			} else {
 				dev_info->opened = 0;
-				mixer_post_event(AUDDEV_EVT_DEV_RLS,
-					route_cfg.dev_id);
+				broadcast_event(AUDDEV_EVT_DEV_RLS,
+					route_cfg.dev_id,
+					SESSION_IGNORE);
 			}
 		}
 
@@ -426,14 +439,16 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 			(0x1 << (session_id) << (8 * ((int)AUDDEV_CLNT_DEC-1)));
 		if (!set) {
 			if (dev_info->opened)
-				mixer_post_event(AUDDEV_EVT_DEV_RLS,
-							route_cfg.dev_id);
+				broadcast_event(AUDDEV_EVT_DEV_RLS,
+							route_cfg.dev_id,
+							session_mask);
 			dev_info->sessions &= ~(session_mask);
 		} else {
 			dev_info->sessions = dev_info->sessions | session_mask;
 			if (dev_info->opened)
-				mixer_post_event(AUDDEV_EVT_DEV_RDY,
-							route_cfg.dev_id);
+				broadcast_event(AUDDEV_EVT_DEV_RDY,
+							route_cfg.dev_id,
+							session_mask);
 		}
 	} else {
 		rc = msm_snddev_set_enc(session_id, dev_info->copp_id, set);
@@ -441,8 +456,9 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 			(0x1 << (session_id)) << (8 * ((int)AUDDEV_CLNT_ENC-1));
 		if (!set) {
 			if (dev_info->opened)
-				mixer_post_event(AUDDEV_EVT_DEV_RLS,
-							route_cfg.dev_id);
+				broadcast_event(AUDDEV_EVT_DEV_RLS,
+							route_cfg.dev_id,
+							session_mask);
 			dev_info->sessions &= ~(session_mask);
 		} else {
 			dev_info->sessions = dev_info->sessions | session_mask;
@@ -461,13 +477,15 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 					rc = msm_snddev_withdraw_freq
 						(session_id,
 						SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
-					mixer_post_event(AUDDEV_EVT_FREQ_CHG,
-							route_cfg.dev_id);
+					broadcast_event(AUDDEV_EVT_FREQ_CHG,
+							route_cfg.dev_id,
+							SESSION_IGNORE);
 				}
 			}
 			if (dev_info->opened)
-				mixer_post_event(AUDDEV_EVT_DEV_RDY,
-							route_cfg.dev_id);
+				broadcast_event(AUDDEV_EVT_DEV_RDY,
+							route_cfg.dev_id,
+							session_mask);
 		}
 	}
 
