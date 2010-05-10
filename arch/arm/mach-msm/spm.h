@@ -41,7 +41,6 @@ enum {
 	MSM_SPM_REG_SAW_SPM_CTL,
 	MSM_SPM_REG_SAW_SPM_SLP_TMR_DLY,
 	MSM_SPM_REG_SAW_SPM_WAKE_TMR_DLY,
-	MSM_SPM_REG_SAW_SPM_PMIC_CTL,
 	MSM_SPM_REG_SAW_SLP_CLK_EN,
 	MSM_SPM_REG_SAW_SLP_HSFS_PRECLMP_EN,
 	MSM_SPM_REG_SAW_SLP_HSFS_POSTCLMP_EN,
@@ -50,7 +49,9 @@ enum {
 	MSM_SPM_REG_SAW_SPM_MPM_CFG,
 	MSM_SPM_REG_NR_INITIALIZE,
 
-	MSM_SPM_REG_SAW_STS = MSM_SPM_REG_NR_INITIALIZE,
+	MSM_SPM_REG_SAW_VCTL = MSM_SPM_REG_NR_INITIALIZE,
+	MSM_SPM_REG_SAW_STS,
+	MSM_SPM_REG_SAW_SPM_PMIC_CTL,
 	MSM_SPM_REG_NR
 };
 
@@ -63,17 +64,25 @@ struct msm_spm_platform_data {
 	uint8_t collapse_vlevel;
 	uint8_t retention_mid_vlevel;
 	uint8_t collapse_mid_vlevel;
+
+	uint32_t vctl_timeout_us;
 };
 
-#ifdef CONFIG_MSM_SPM
+#ifdef CONFIG_ARCH_MSM7X30
 
 int msm_spm_set_low_power_mode(unsigned int mode, bool notify_rpm);
+int msm_spm_set_vdd(unsigned int vlevel);
 void msm_spm_reinit(void);
 int msm_spm_init(struct msm_spm_platform_data *data, int nr_devs);
 
 #else
 
 static inline int msm_spm_set_low_power_mode(unsigned int mode, bool notify_rpm)
+{
+	return -ENOSYS;
+}
+
+static inline int msm_spm_set_vdd(unsigned int vlevel)
 {
 	return -ENOSYS;
 }
@@ -88,6 +97,6 @@ static inline int msm_spm_init(struct msm_spm_platform_data *data, int nr_devs)
 	return -ENOSYS;
 }
 
-#endif  /* CONFIG_MSM_SPM */
+#endif  /* CONFIG_ARCH_MSM7X30 */
 
 #endif  /* __ARCH_ARM_MACH_MSM_SPM_H */
