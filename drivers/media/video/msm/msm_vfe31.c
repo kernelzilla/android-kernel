@@ -1939,13 +1939,13 @@ static void vfe31_set_default_reg_values(void)
 	msm_io_w(0xFFFFFF, vfe31_ctrl->vfebase + VFE_CLAMP_MAX);
 
 	/* stats UB config */
-	msm_io_w(0x3900008, vfe31_ctrl->vfebase + VFE_BUS_STATS_AEC_UB_CFG);
-	msm_io_w(0x3980008, vfe31_ctrl->vfebase + VFE_BUS_STATS_AF_UB_CFG);
-	msm_io_w(0x3A00010, vfe31_ctrl->vfebase + VFE_BUS_STATS_AWB_UB_CFG);
-	msm_io_w(0x3B00008, vfe31_ctrl->vfebase + VFE_BUS_STATS_RS_UB_CFG);
-	msm_io_w(0x3B80020, vfe31_ctrl->vfebase + VFE_BUS_STATS_CS_UB_CFG);
-	msm_io_w(0x3D80020, vfe31_ctrl->vfebase + VFE_BUS_STATS_HIST_UB_CFG);
-	msm_io_w(0x3F80008, vfe31_ctrl->vfebase + VFE_BUS_STATS_SKIN_UB_CFG);
+	msm_io_w(0x3900007, vfe31_ctrl->vfebase + VFE_BUS_STATS_AEC_UB_CFG);
+	msm_io_w(0x3980007, vfe31_ctrl->vfebase + VFE_BUS_STATS_AF_UB_CFG);
+	msm_io_w(0x3A0000F, vfe31_ctrl->vfebase + VFE_BUS_STATS_AWB_UB_CFG);
+	msm_io_w(0x3B00007, vfe31_ctrl->vfebase + VFE_BUS_STATS_RS_UB_CFG);
+	msm_io_w(0x3B8001F, vfe31_ctrl->vfebase + VFE_BUS_STATS_CS_UB_CFG);
+	msm_io_w(0x3D8001F, vfe31_ctrl->vfebase + VFE_BUS_STATS_HIST_UB_CFG);
+	msm_io_w(0x3F80007, vfe31_ctrl->vfebase + VFE_BUS_STATS_SKIN_UB_CFG);
 }
 
 static void vfe31_process_reset_irq(void)
