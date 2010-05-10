@@ -68,6 +68,7 @@ obj-$(CONFIG_MSM_RPC_PING) += ping_mdm_rpc_client.o
 obj-$(CONFIG_MSM_RPC_PROC_COMM_TEST) += proc_comm_test.o
 obj-$(CONFIG_MSM_RPC_PING) += ping_mdm_rpc_client.o ping_apps_server.o
 obj-$(CONFIG_MSM_RPC_OEM_RAPI) += oem_rapi_client.o
+obj-$(CONFIG_MSM_RPC_WATCHDOG) += rpc_dog_keepalive.o
 obj-$(CONFIG_MSM_RPCSERVER_WATCHDOG) += rpc_server_dog_keepalive.o
 obj-$(CONFIG_MSM_RPCSERVER_TIME_REMOTE) += rpc_server_time_remote.o
 obj-$(CONFIG_MSM_DALRPC) += dal.o

@@ -765,6 +765,13 @@ config MSM_RPCSERVER_WATCHDOG
 	help
 	  The dog_keepalive server handles watchdog events.
 
+config MSM_RPC_WATCHDOG
+	depends on MSM_ONCRPCROUTER
+	default n
+	bool "Watchdog RPC client"
+	help
+	  The dog_keepalive client module.
+
 config MSM_RPC_PING
 	depends on MSM_ONCRPCROUTER && DEBUG_FS
 	default m
