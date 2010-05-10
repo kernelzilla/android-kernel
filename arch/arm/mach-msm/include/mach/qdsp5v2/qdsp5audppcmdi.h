@@ -122,6 +122,26 @@ struct audpp_cmd_avsync{
 } __attribute__((packed));
 
 /*
+ * Macros used to store the AV Sync Info from DSP
+ */
+
+#define AUDPP_AVSYNC_CH_COUNT 1
+#define AUDPP_AVSYNC_NUM_WORDS 6
+/* Timeout of 3000ms for AV Sync Query response */
+#define AUDPP_AVSYNC_EVENT_TIMEOUT 3000
+
+/*
+ * Command Structure to Query AVSync Info from DSP
+ */
+
+#define AUDPP_CMD_QUERY_AVSYNC	0x0006
+
+struct audpp_cmd_query_avsync{
+	unsigned short cmd_id;
+	unsigned short stream_id;
+} __attribute__((packed));
+
+/*
  * Command Structure to enable or disable(sleep) the AUDPPTASK
  */
 
