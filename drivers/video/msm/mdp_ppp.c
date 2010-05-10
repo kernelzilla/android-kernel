@@ -1439,6 +1439,7 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req)
 	     (req->src.format == MDP_RGBA_8888)) &&
 	    (iBuf.mdpImg.mdpOp & MDPOP_ROT90) && (req->dst_rect.w <= 16)) {
 		int dst_h, src_w, i;
+		uint32 mdpOp = iBuf.mdpImg.mdpOp;
 
 		src_w = req->src_rect.w;
 		dst_h = iBuf.roi.dst_height;
@@ -1470,6 +1471,8 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req)
 			/* this is for a remainder update */
 			dst_h -= 16;
 			src_w -= iBuf.roi.width;
+			/* restore mdpOp since MDPOP_ASCALE have been cleared */
+			iBuf.mdpImg.mdpOp = mdpOp;
 		}
 
 		if ((dst_h < 0) || (src_w < 0))
