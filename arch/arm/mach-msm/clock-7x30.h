@@ -135,17 +135,6 @@ enum {
 	L_7X30_NR_CLKS
 };
 
-struct clk_ops;
-extern struct clk_ops clk_ops_7x30;
-
-#ifdef CONFIG_ARCH_MSM7X30
-struct clk_ops *clk_7x30_is_local(uint32_t id);
-int clk_7x30_init(void);
-#else
-static inline struct clk_ops *clk_7x30_is_local(uint32_t id) { return NULL; }
-static inline int clk_7x30_init(void) { return 0; }
-#endif
-
 void pll_enable(uint32_t pll);
 void pll_disable(uint32_t pll);
 
