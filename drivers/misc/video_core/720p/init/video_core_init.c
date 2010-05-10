@@ -72,6 +72,7 @@ static spinlock_t vidc_spin_lock;
 #define VIDC_H264_DEC_FW		"vidc_720p_h264_dec_mc.fw"
 #define VIDC_MPG4_ENC_FW		"vidc_720p_mp4_enc_mc.fw"
 #define VIDC_H264_ENC_FW		"vidc_720p_h264_enc_mc.fw"
+#define VIDC_VC1_DEC_FW		"vidc_720p_vc1_dec_mc.fw"
 
 static void vid_c_timer_fn(unsigned long data)
 {
@@ -685,6 +686,8 @@ u32 vid_c_mpg4_enc_fw_size;
 unsigned char *vid_c_h264_enc_fw;
 u32 vid_c_h264_enc_fw_size;
 
+unsigned char *vid_c_vc1_dec_fw;
+u32 vid_c_vc1_dec_fw_size;
 
 int vid_c_load_firmware(void)
 {
@@ -695,6 +698,7 @@ int vid_c_load_firmware(void)
 	const struct firmware *fw_h264_dec = NULL;
 	const struct firmware *fw_mpg4_enc = NULL;
 	const struct firmware *fw_h264_enc = NULL;
+	const struct firmware *fw_vc1_dec = NULL;
 
 	u32 status = TRUE;
 
@@ -716,7 +720,7 @@ int vid_c_load_firmware(void)
 			vid_c_device_p->device);
 		if (rc) {
 			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
+					VIDC_MPG4_DEC_FW, rc);
 			status = FALSE;
 			goto boot_fw_free;
 		}
@@ -728,7 +732,7 @@ int vid_c_load_firmware(void)
 			vid_c_device_p->device);
 		if (rc) {
 			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
+					VIDC_H263_DEC_FW, rc);
 			status = FALSE;
 			goto mp4dec_fw_free;
 		}
@@ -739,7 +743,7 @@ int vid_c_load_firmware(void)
 			vid_c_device_p->device);
 		if (rc) {
 			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
+					VIDC_H264_DEC_FW, rc);
 			status = FALSE;
 			goto h263dec_fw_free;
 		}
@@ -750,7 +754,7 @@ int vid_c_load_firmware(void)
 			vid_c_device_p->device);
 		if (rc) {
 			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
+					VIDC_MPG4_ENC_FW, rc);
 			status = FALSE;
 			goto h264dec_fw_free;
 		}
@@ -761,12 +765,23 @@ int vid_c_load_firmware(void)
 			vid_c_device_p->device);
 		if (rc) {
 			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
+					VIDC_H264_ENC_FW, rc);
 			status = FALSE;
 			goto mp4enc_fw_free;
 		}
 		vid_c_h264_enc_fw = (unsigned char *)fw_h264_enc->data;
 		vid_c_h264_enc_fw_size = (u32) fw_h264_enc->size;
+
+		rc = request_firmware(&fw_vc1_dec, VIDC_VC1_DEC_FW,
+			vid_c_device_p->device);
+		if (rc) {
+			ERR("request_firmware for %s failed with error %d\n",
+					VIDC_VC1_DEC_FW, rc);
+			status = FALSE;
+			goto h264enc_fw_free;
+		}
+		vid_c_vc1_dec_fw = (unsigned char *)fw_vc1_dec->data;
+		vid_c_vc1_dec_fw_size = (u32) fw_vc1_dec->size;
 		vid_c_device_p->get_firmware = 1;
 	}
 
@@ -775,6 +790,7 @@ int vid_c_load_firmware(void)
 	mutex_unlock(&vid_c_device_p->lock);
 	return status;
 
+h264enc_fw_free:
 	release_firmware(fw_h264_enc);
 mp4enc_fw_free:
 	release_firmware(fw_mpg4_enc);
