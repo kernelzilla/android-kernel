@@ -23,6 +23,7 @@
 #include <linux/io.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/pmic8058-pwrkey.h>
+#include <linux/pmic8058-vibrator.h>
 
 #include <linux/i2c.h>
 #include <linux/smsc911x.h>
@@ -343,6 +344,12 @@ static struct pmic8058_pwrkey_pdata pwrkey_pdata = {
 	.pwrkey_time_ms		= 500,
 };
 
+static struct pmic8058_vibrator_pdata pmic_vib_pdata = {
+	.initial_vibrate_ms  = 500,
+	.level_mV = 3000,
+	.max_timeout_ms = 15000,
+};
+
 #define PM8058_GPIO_INT           88
 
 static struct pm8058_gpio_platform_data pm8058_gpio_data = {
@@ -372,6 +379,12 @@ static struct mfd_cell pm8058_subdevs[] = {
 		.num_resources = ARRAY_SIZE(resources_pwrkey),
 		.platform_data = &pwrkey_pdata,
 		.data_size = sizeof(pwrkey_pdata),
+	},
+	{
+		.name = "pm8058-vib",
+		.id = -1,
+		.platform_data = &pmic_vib_pdata,
+		.data_size     = sizeof(pmic_vib_pdata),
 	},
 };
 
