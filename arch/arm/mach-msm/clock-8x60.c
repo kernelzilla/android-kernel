@@ -288,9 +288,13 @@ static void set_rate_mnd_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
 	uint32_t ns_reg_val, cc_reg_val;
 	uint32_t bank_sel;
 
-	/* Determine active bank and program the other one. */
+	/* Determine active bank and program the other one. If the clock is
+	 * off, program the active bank since bank switching won't work if
+	 * both banks aren't running. */
 	cc_reg_val = readl(clk->cc_reg);
 	bank_sel = !!(cc_reg_val & banks->bank_sel_mask);
+	 /* If clock is disabled, don't switch banks. */
+	bank_sel ^= !(clk->count);
 	if (bank_sel == 0) {
 		new_bank_masks = &banks->bank1_mask;
 		old_bank_masks = &banks->bank0_mask;
@@ -325,13 +329,16 @@ static void set_rate_mnd_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
 	ns_reg_val &= ~(new_bank_masks->rst_mask);
 	writel(ns_reg_val, clk->ns_reg);
 
-	/* Switch to new bank. */
-	cc_reg_val ^= banks->bank_sel_mask;
-	writel(cc_reg_val, clk->cc_reg);
+	/* Switch to the new bank if clock is on.  If it isn't, then no
+	 * switch is necessary since we programmed the active bank. */
+	if (clk->count) {
+		cc_reg_val ^= banks->bank_sel_mask;
+		writel(cc_reg_val, clk->cc_reg);
 
-	/* Disable previous MN counter. */
-	cc_reg_val &= ~(old_bank_masks->mnd_en_mask);
-	writel(cc_reg_val, clk->cc_reg);
+		/* Disable previous MN counter. */
+		cc_reg_val &= ~(old_bank_masks->mnd_en_mask);
+		writel(cc_reg_val, clk->cc_reg);
+	}
 
 	/* If this freq requires the MN counter to be enabled,
 	 * update the enable mask to match the current bank. */
@@ -343,11 +350,13 @@ static void set_rate_div_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
 {
 	uint32_t ns_reg_val, ns_mask, bank_sel;
 
-	/* Determine active bank from the bank select
-	 * bit and program the other one. */
+	/* Determine active bank and program the other one. If the clock is
+	 * off, program the active bank since bank switching won't work if
+	 * both banks aren't running. */
 	ns_reg_val = readl(clk->ns_reg);
 	bank_sel = !!(ns_reg_val & B(30));
-
+	 /* If clock is disabled, don't switch banks. */
+	bank_sel ^= !(clk->count);
 	if (bank_sel == 0)
 		ns_mask = (BM(29, 26) | BM(21, 19));
 	else
@@ -357,9 +366,12 @@ static void set_rate_div_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
 	ns_reg_val |= (nf->ns_val & ns_mask);
 	writel(ns_reg_val, clk->ns_reg);
 
-	/* Toggle bank select bit to switch to new bank. */
-	ns_reg_val ^= B(30);
-	writel(ns_reg_val, clk->ns_reg);
+	/* Switch to the new bank if clock is on.  If it isn't, then no
+	 * switch is necessary since we programmed the active bank. */
+	if (clk->count) {
+		ns_reg_val ^= B(30);
+		writel(ns_reg_val, clk->ns_reg);
+	}
 }
 
 static void set_rate_nop(struct clk_local *clk, struct clk_freq_tbl *nf)
