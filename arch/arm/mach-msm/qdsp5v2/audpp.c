@@ -70,7 +70,6 @@ static struct wake_lock audpp_wake_lock;
 
 #define CH_COUNT 5
 #define AUDPP_CLNT_MAX_COUNT 6
-#define AUDPP_AVSYNC_INFO_SIZE 7
 
 #define AUDPP_CMD_CFG_OBJ_UPDATE 0x8000
 #define AUDPP_CMD_EQ_FLAG_DIS	0x0000
@@ -118,11 +117,6 @@ struct audpp_state {
 	unsigned dec_inuse;
 	unsigned long concurrency;
 
-	/* which channels are actually enabled */
-	unsigned avsync_mask;
-
-	/* flags, 48 bits sample/bytes counter per channel */
-	uint16_t avsync[CH_COUNT * AUDPP_CLNT_MAX_COUNT + 1];
 	struct audpp_event_callback *cb_tbl[MAX_EVENT_CALLBACK_CLIENTS];
 
 	/* Related to decoder instances */
@@ -275,18 +269,6 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 	struct audpp_state *audpp = data;
 	uint16_t msg[8];
 
-	if (id == AUDPP_MSG_AVSYNC_MSG) {
-		getevent(audpp->avsync, sizeof(audpp->avsync));
-
-		/* mask off any channels we're not watching to avoid
-		 * cases where we might get one last update after
-		 * disabling avsync and end up in an odd state when
-		 * we next read...
-		 */
-		audpp->avsync[0] &= audpp->avsync_mask;
-		return;
-	}
-
 	getevent(msg, sizeof(msg));
 
 	LOG(EV_EVENT, (id << 16) | msg[0]);
@@ -331,6 +313,9 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 	case ADSP_MESSAGE_ID:
 		MM_DBG("Received ADSP event: module enable/disable \
 				(audpptask)");
+		break;
+	case AUDPP_MSG_AVSYNC_MSG:
+		audpp_notify_clnt(audpp, msg[0], id, msg);
 		break;
 	default:
 		MM_INFO("unhandled msg id %x\n", id);
@@ -448,75 +433,43 @@ EXPORT_SYMBOL(audpp_disable);
 
 #define BAD_ID(id) ((id < 0) || (id >= CH_COUNT))
 
-void audpp_avsync(int id, unsigned rate)
+int audpp_restore_avsync(int id, uint16_t *avsync)
 {
-	unsigned long flags;
 	struct audpp_cmd_avsync cmd;
 
 	if (BAD_ID(id))
-		return;
-
-	local_irq_save(flags);
-	if (rate)
-		the_audpp_state.avsync_mask |= (1 << id);
-	else
-		the_audpp_state.avsync_mask &= (~(1 << id));
-	the_audpp_state.avsync[0] &= the_audpp_state.avsync_mask;
-	local_irq_restore(flags);
+		return -1;
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.cmd_id = AUDPP_CMD_AVSYNC;
 	cmd.stream_id = id;
-	cmd.interrupt_interval = rate;
-	audpp_send_queue1(&cmd, sizeof(cmd));
-}
-EXPORT_SYMBOL(audpp_avsync);
+	cmd.interrupt_interval = 0; /* Setting it to Zero as there won't be
+					periodic update */
+	cmd.sample_counter_dlsw = avsync[3];
+	cmd.sample_counter_dmsw = avsync[2];
+	cmd.sample_counter_msw = avsync[1];
+	cmd.byte_counter_dlsw = avsync[6];
+	cmd.byte_counter_dmsw = avsync[5];
+	cmd.byte_counter_msw = avsync[4];
 
-unsigned audpp_avsync_sample_count(int id)
+	return audpp_send_queue1(&cmd, sizeof(cmd));
+}
+EXPORT_SYMBOL(audpp_restore_avsync);
+
+int audpp_query_avsync(int id)
 {
-	uint16_t *avsync = the_audpp_state.avsync;
-	unsigned val;
-	unsigned long flags;
-	unsigned mask;
+	struct audpp_cmd_query_avsync cmd;
 
 	if (BAD_ID(id))
-		return 0;
+		return -EINVAL;
 
-	mask = 1 << id;
-	id = id * AUDPP_AVSYNC_INFO_SIZE + 2;
-	local_irq_save(flags);
-	if (avsync[0] & mask)
-		val = (avsync[id] << 16) | avsync[id + 1];
-	else
-		val = 0;
-	local_irq_restore(flags);
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.cmd_id = AUDPP_CMD_QUERY_AVSYNC;
+	cmd.stream_id = id;
+	return audpp_send_queue1(&cmd, sizeof(cmd));
 
-	return val;
 }
-EXPORT_SYMBOL(audpp_avsync_sample_count);
-
-unsigned audpp_avsync_byte_count(int id)
-{
-	uint16_t *avsync = the_audpp_state.avsync;
-	unsigned val;
-	unsigned long flags;
-	unsigned mask;
-
-	if (BAD_ID(id))
-		return 0;
-
-	mask = 1 << id;
-	id = id * AUDPP_AVSYNC_INFO_SIZE + 5;
-	local_irq_save(flags);
-	if (avsync[0] & mask)
-		val = (avsync[id] << 16) | avsync[id + 1];
-	else
-		val = 0;
-	local_irq_restore(flags);
-
-	return val;
-}
-EXPORT_SYMBOL(audpp_avsync_byte_count);
+EXPORT_SYMBOL(audpp_query_avsync);
 
 int audpp_set_volume_and_pan(unsigned id, unsigned volume, int pan,
 			enum obj_type objtype)
