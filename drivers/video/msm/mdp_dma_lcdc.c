@@ -121,6 +121,8 @@ int mdp_lcdc_on(struct platform_device *pdev)
 
 	if (mfd->fb_imgType == MDP_BGR_565)
 		dma2_cfg_reg |= DMA_PACK_PATTERN_BGR;
+	else if (mfd->fb_imgType == MDP_RGBA_8888)
+		dma2_cfg_reg |= DMA_PACK_PATTERN_BGR;
 	else
 		dma2_cfg_reg |= DMA_PACK_PATTERN_RGB;
 
