@@ -2264,9 +2264,7 @@ static struct platform_device lcdc_sharp_panel_device = {
 };
 
 static struct msm_gpio dtv_panel_gpios[] = {
-#ifdef HDMI_INT
-	{ GPIO_CFG(18, 0, GPIO_INPUT,  GPIO_PULL_DOWN, GPIO_4MA), "hdmi_int" },
-#endif
+	{ GPIO_CFG(18, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_4MA), "hdmi_int" },
 	{ GPIO_CFG(120, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_mclk" },
 	{ GPIO_CFG(121, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_sd0" },
 	{ GPIO_CFG(122, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_sd1" },
