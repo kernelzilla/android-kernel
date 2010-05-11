@@ -1779,6 +1779,15 @@ static inline void vfe31_read_irq_status(struct vfe31_irq_status *out)
 	temp = (uint32_t *)(vfe31_ctrl->vfebase + VFE_CAMIF_STATUS);
 	out->camifStatus = msm_io_r(temp);
 	CDBG("camifStatus  = 0x%x\n", out->camifStatus);
+
+	/* clear the pending interrupt of the same kind.*/
+	msm_io_w(out->vfeIrqStatus0, vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_0);
+	msm_io_w(out->vfeIrqStatus1, vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_1);
+
+	/* Ensure the write order while writing
+	to the command register using the barrier */
+	msm_io_w_mb(1, vfe31_ctrl->vfebase + VFE_IRQ_CMD);
+
 }
 
 static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id)
@@ -2514,15 +2523,6 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 	list_add_tail(&qcmd->list, &vfe31_ctrl->tasklet_q);
 	spin_unlock_irqrestore(&vfe31_ctrl->tasklet_lock, flags);
 	tasklet_schedule(&vfe31_tasklet);
-
-	/* clear the pending interrupt of the same kind.*/
-	msm_io_w(irq.vfeIrqStatus0, vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_0);
-	msm_io_w(irq.vfeIrqStatus1, vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_1);
-
-	/* Ensure the write order while writing
-	to the command register using the barrier */
-	msm_io_w_mb(1, vfe31_ctrl->vfebase + VFE_IRQ_CMD);
-
 	return IRQ_HANDLED;
 }
 
