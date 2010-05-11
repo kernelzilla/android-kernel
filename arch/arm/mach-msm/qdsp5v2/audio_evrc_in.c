@@ -81,6 +81,7 @@ struct audio_in {
 	uint32_t device_events;
 	uint32_t in_call;
 	uint32_t dev_cnt;
+	int voice_state;
 	spinlock_t dev_lock;
 
 	/* data allocated for various buffers */
@@ -163,6 +164,21 @@ static void evrc_in_listener(u32 evt_id, union auddev_evt_data *evt_payload,
 
 		break;
 	}
+	case AUDDEV_EVT_VOICE_STATE_CHG: {
+		MM_DBG("AUDDEV_EVT_VOICE_STATE_CHG, state = %d\n",
+				evt_payload->voice_state);
+		audio->voice_state = evt_payload->voice_state;
+		if (audio->in_call && audio->running) {
+			if (audio->voice_state == VOICE_STATE_INCALL)
+				audevrc_in_record_config(audio, 1);
+			else if (audio->voice_state == VOICE_STATE_OFFCALL) {
+				audevrc_in_record_config(audio, 0);
+				wake_up(&audio->wait);
+			}
+		}
+
+		break;
+	}
 	default:
 		MM_ERR("wrong event %d\n", evt_id);
 		break;
@@ -228,7 +244,9 @@ static void audrec_dsp_event(void *data, unsigned id, size_t len,
 	case AUDREC_CMD_MEM_CFG_DONE_MSG: {
 		MM_DBG("CMD_MEM_CFG_DONE MSG DONE\n");
 		audio->running = 1;
-		if (audio->dev_cnt > 0)
+		if ((!audio->in_call && (audio->dev_cnt > 0)) ||
+			(audio->in_call &&
+				(audio->voice_state == VOICE_STATE_INCALL)))
 			audevrc_in_record_config(audio, 1);
 		break;
 	}
@@ -462,6 +480,11 @@ static long audevrc_in_ioctl(struct file *file,
 		uint32_t freq;
 		freq = 48000;
 		MM_DBG("AUDIO_START\n");
+		if (audio->in_call && (audio->voice_state !=
+				VOICE_STATE_INCALL)) {
+			rc = -EPERM;
+			break;
+		}
 		rc = msm_snddev_request_freq(&freq, audio->enc_id,
 					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
 		MM_DBG("sample rate configured %d\n", freq);
@@ -622,13 +645,22 @@ static ssize_t audevrc_in_read(struct file *file,
 	mutex_lock(&audio->read_lock);
 	while (count > 0) {
 		rc = wait_event_interruptible(
-			audio->wait, (audio->in_count > 0) || audio->stopped);
+			audio->wait, (audio->in_count > 0) || audio->stopped
+			|| (audio->in_call && audio->running &&
+				(audio->voice_state == VOICE_STATE_OFFCALL)));
 		if (rc < 0)
 			break;
 
-		if (audio->stopped && !audio->in_count) {
-			rc = 0;/* End of File */
-			break;
+		if (!audio->in_count) {
+			if (audio->stopped)  {
+				rc = 0;/* End of File */
+				break;
+			} else if (audio->in_call && audio->running &&
+				(audio->voice_state == VOICE_STATE_OFFCALL)) {
+				MM_DBG("Not Permitted Voice Terminated\n");
+				rc = -EPERM; /* Voice Call stopped */
+				break;
+			}
 		}
 
 		index = audio->in_tail;
@@ -737,8 +769,10 @@ static int audevrc_in_open(struct inode *inode, struct file *file)
 
 	audevrc_in_flush(audio);
 
-	audio->device_events = AUDDEV_EVT_DEV_RDY | AUDDEV_EVT_DEV_RLS;
+	audio->device_events = AUDDEV_EVT_DEV_RDY | AUDDEV_EVT_DEV_RLS |
+				AUDDEV_EVT_VOICE_STATE_CHG;
 
+	audio->voice_state = msm_get_voice_state();
 	rc = auddev_register_evt_listner(audio->device_events,
 					AUDDEV_CLNT_ENC, audio->enc_id,
 					evrc_in_listener, (void *) audio);
