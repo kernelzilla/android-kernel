@@ -651,6 +651,44 @@ static struct platform_device msm_tvenc_device = {
 	.resource       = msm_tvenc_resources,
 };
 
+#if defined(CONFIG_MSM_SOC_REV_A)
+#define MSM_QUP_PHYS           0xA1680000
+#define MSM_GSBI_QUP_I2C_PHYS  0xA1600000
+#define INT_PWB_QUP_ERR        INT_GSBI_QUP
+#else
+#define MSM_QUP_PHYS           0xA9900000
+#define MSM_GSBI_QUP_I2C_PHYS  0xA9900000
+#define INT_PWB_QUP_ERR        INT_PWB_I2C
+#endif
+#define MSM_QUP_SIZE           SZ_4K
+static struct resource resources_qup[] = {
+	{
+		.name   = "qup_phys_addr",
+		.start	= MSM_QUP_PHYS,
+		.end	= MSM_QUP_PHYS + MSM_QUP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name   = "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI_QUP_I2C_PHYS,
+		.end	= MSM_GSBI_QUP_I2C_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name   = "qup_err_intr",
+		.start	= INT_PWB_QUP_ERR,
+		.end	= INT_PWB_QUP_ERR,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device qup_device_i2c = {
+	.name		= "qup_i2c",
+	.id		= 4,
+	.num_resources	= ARRAY_SIZE(resources_qup),
+	.resource	= resources_qup,
+};
+
 /* TSIF begin */
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 

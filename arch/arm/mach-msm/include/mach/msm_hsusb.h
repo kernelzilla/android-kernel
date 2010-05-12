@@ -43,6 +43,12 @@ enum hsusb_phy_type {
 	INTEGRATED,
 	EXTERNAL,
 };
+/* used to detect the OTG Mode */
+enum otg_mode {
+	OTG_ID = 0, /* ID pin detection */
+	OTG_SYSFS,  /* sysfs mode */
+	OTG_VCHG,   /* Based on VCHG interrupt */
+};
 
 struct usb_function_map {
 	char name[20];
@@ -116,6 +122,8 @@ struct msm_otg_platform_data {
 	int (*pmic_register_vbus_sn) (void (*callback)(int online));
 	void (*pmic_unregister_vbus_sn) (void (*callback)(int online));
 	int (*pmic_enable_ldo) (int);
+	void (*setup_gpio)(unsigned int config);
+	u8      otg_mode;
 };
 
 struct msm_usb_host_platform_data {

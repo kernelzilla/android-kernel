@@ -204,6 +204,15 @@ config MACH_QSD8X50A_FFA
 	help
 	  Support for the Qualcomm QSD8x50A FFA eval board.
 
+config MACH_QSD8X50A_ST1_5
+	depends on ARCH_QSD8X50
+	depends on MSM_SOC_REV_A
+	depends on MSM_STACKED_MEMORY
+	default y
+	bool "QSD8x50A ST1.5"
+	help
+	  Support for the Qualcomm ST1.5.
+
 config MACH_MSM7X25_SURF
 	depends on ARCH_MSM7X25
 	depends on !MSM_STACKED_MEMORY
