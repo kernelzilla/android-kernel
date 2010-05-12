@@ -146,3 +146,5 @@ int pm8058_gpio_config_kypd_drv(int gpio_start, int num_gpios);
 int pm8058_gpio_config_kypd_sns(int gpio_start, int num_gpios);
 
 int pm8058_rev(struct pm8058_chip *pm_chip);
+
+int pm8058_irq_get_rt_status(struct pm8058_chip *pm_chip, int irq);
