@@ -106,9 +106,6 @@
 #define	MAX_PM_BLOCKS		(MAX_PM_IRQ / 8 + 1)
 #define	MAX_PM_MASTERS		(MAX_PM_BLOCKS / 8 + 1)
 
-#define FIRST_GPIO_IRQ_BLOCK		24
-#define FIRST_MPP_IRQ_BLOCK		16
-
 struct pm8058_chip {
 	struct pm8058_platform_data	pdata;
 
@@ -180,6 +177,46 @@ int pm8058_rev(struct pm8058_chip *chip)
 	return chip->revision;
 }
 EXPORT_SYMBOL(pm8058_rev);
+
+int pm8058_irq_get_rt_status(struct pm8058_chip *chip, int irq)
+{
+	int     rc;
+	u8      block, bits, bit;
+	unsigned long   irqsave;
+
+	if (chip == NULL || irq < chip->pdata.irq_base ||
+			irq >= chip->pdata.irq_base + MAX_PM_IRQ)
+		return -EINVAL;
+
+	irq -= chip->pdata.irq_base;
+
+	block = irq / 8;
+	bit = irq % 8;
+
+	spin_lock_irqsave(&chip->pm_lock, irqsave);
+
+	rc = ssbi_write(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, &block, 1);
+	if (rc) {
+		pr_err("%s: FAIL ssbi_write(): rc=%d (Select Block)\n",
+				__func__, rc);
+		goto bail_out;
+	}
+
+	rc = ssbi_read(chip->dev, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits, 1);
+	if (rc) {
+		pr_err("%s: FAIL ssbi_read(): rc=%d (Read RT Status)\n",
+				__func__, rc);
+		goto bail_out;
+	}
+
+	rc = (bits & (1 << bit)) ? 1 : 0;
+
+bail_out:
+	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8058_irq_get_rt_status);
 
 int pm8058_read(struct pm8058_chip *chip, u16 addr, u8 *values,
 		unsigned int len)
@@ -397,85 +434,30 @@ int pm8058_gpio_set(struct pm8058_chip *chip, unsigned gpio, int value)
 
 int pm8058_gpio_get(struct pm8058_chip *chip, unsigned gpio)
 {
-	int	mode, rc;
-	unsigned long	irqsave;
+	int	mode;
 
 	if (gpio >= PM8058_GPIOS || chip == NULL)
 		return -EINVAL;
-
-	spin_lock_irqsave(&chip->pm_lock, irqsave);
 
 	/* Get gpio value from config bank 1 if output gpio.
 	   Get gpio value from IRQ RT status register for all other gpio modes.
 	 */
 	mode = (chip->gpio_bank1[gpio] & PM8058_GPIO_MODE_MASK) >>
 		PM8058_GPIO_MODE_SHIFT;
-	if (mode == PM8058_GPIO_MODE_OUTPUT) {
-		rc = chip->gpio_bank1[gpio] & PM8058_GPIO_OUT_INVERT;
-	} else {
-		u8	block, bits, bit;
-
-		block = FIRST_GPIO_IRQ_BLOCK + gpio / 8;
-		bit = gpio % 8;
-
-		rc = ssbi_write(chip->dev,
-				SSBI_REG_ADDR_IRQ_BLK_SEL, &block, 1);
-		if (rc) {
-			pr_err("%s: FAIL ssbi_write(): rc=%d (Select Block)\n",
-			       __func__, rc);
-			goto bail_out;
-		}
-
-		rc = ssbi_read(chip->dev,
-			       SSBI_REG_ADDR_IRQ_RT_STATUS, &bits, 1);
-		if (rc) {
-			pr_err("%s: FAIL ssbi_read(): rc=%d (Read RT Status)\n",
-			       __func__, rc);
-			goto bail_out;
-		}
-		rc = (bits & (1 << bit)) ? 1 : 0;
-	}
-
-bail_out:
-	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
-
-	return rc;
+	if (mode == PM8058_GPIO_MODE_OUTPUT)
+		return chip->gpio_bank1[gpio] & PM8058_GPIO_OUT_INVERT;
+	else
+		return pm8058_irq_get_rt_status(chip,
+			PM8058_GPIO_IRQ(chip->pdata.irq_base, gpio));
 }
 
 int pm8058_mpp_get(struct pm8058_chip *chip, unsigned mpp)
 {
-	int     rc;
-	u8      block, bits, bit;
-	unsigned long	irqsave;
-
 	if (mpp >= PM8058_MPPS || chip == NULL)
 		return -EINVAL;
 
-	block = FIRST_MPP_IRQ_BLOCK + mpp / 8;
-	bit = mpp % 8;
-
-	spin_lock_irqsave(&chip->pm_lock, irqsave);
-
-	rc = ssbi_write(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, &block, 1);
-	if (rc) {
-		pr_err("%s: FAIL ssbi_write(): rc=%d (Select Block)\n",
-		       __func__, rc);
-		goto bail_out;
-	}
-
-	rc = ssbi_read(chip->dev, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits, 1);
-	if (rc) {
-		pr_err("%s: FAIL ssbi_read(): rc=%d (Read RT Status)\n",
-		       __func__, rc);
-		goto bail_out;
-	}
-
-	rc = (bits & (1 << bit)) ? 1 : 0;
-
-bail_out:
-	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
-
-	return rc;
+	return pm8058_irq_get_rt_status(chip,
+		PM8058_MPP_IRQ(chip->pdata.irq_base, mpp));
 }
 
 /* Internal functions */
