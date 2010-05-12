@@ -6859,96 +6859,81 @@ static int __devinit msm_nand_probe(struct platform_device *pdev)
 
 	plat_data = pdev->dev.platform_data;
 
-	if (plat_data->interleave)
-		interleave_enable = plat_data->interleave;
-
-	pr_info("%s: Interleave_enable = %d \n", __func__, interleave_enable);
-
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "msm_nand_phys");
 	if (!res || !res->start) {
-		pr_err("msm_nand_phys resource invalid/absent\n");
+		pr_err("%s: msm_nand_phys resource invalid/absent\n",
+				__func__);
 		return -ENODEV;
 	}
 	msm_nand_phys = res->start;
-	pr_info("msm_nand: phys addr 0x%lx \n", msm_nand_phys);
+	pr_info("%s: phys addr 0x%lx \n", __func__, msm_nand_phys);
 
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "msm_nandc01_phys");
-	if (!res || !res->start) {
-		pr_info("msm_nandc01_phys resource invalid/absent\n");
+	if (!res || !res->start)
 		goto no_dual_nand_ctlr_support;
-	}
 	msm_nandc01_phys = res->start;
-	pr_info("msm_nand: nandc01 phys addr 0x%lx \n", msm_nandc01_phys);
 
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "msm_nandc10_phys");
-	if (!res || !res->start) {
-		pr_info("msm_nandc10_phys resource invalid/absent\n");
+	if (!res || !res->start)
 		goto no_dual_nand_ctlr_support;
-	}
 	msm_nandc10_phys = res->start;
-	pr_info("msm_nand: nandc10 phys addr 0x%lx \n", msm_nandc10_phys);
 
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "msm_nandc11_phys");
-	if (!res || !res->start) {
-		pr_info("msm_nandc11_phys resource invalid/absent\n");
+	if (!res || !res->start)
 		goto no_dual_nand_ctlr_support;
-	}
 	msm_nandc11_phys = res->start;
-	pr_info("msm_nand: nandc11 phys addr 0x%lx \n", msm_nandc11_phys);
 
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "ebi2_reg_base");
-	if (!res || !res->start) {
-		pr_info("ebi2_register_base resource invalid/absent\n");
+	if (!res || !res->start)
 		goto no_dual_nand_ctlr_support;
-	}
 	ebi2_register_base = res->start;
-	pr_info("msm_nand: ebi2 register base phys addr 0x%lx \n",
-						 ebi2_register_base);
 
 	dual_nand_ctlr_present = 1;
-	if (!interleave_enable && dual_nand_ctlr_present) {
-		pr_info("msm_nand: Dual Nand Controller present,\
-			pingpong enabled \n");
-	} else {
-		pr_info("msm_nand: Dual Nand Controller present,\
-			interleave enabled \n");
-	}
+	interleave_enable = plat_data->interleave;
+
+	if (!interleave_enable)
+		pr_info("%s: Dual Nand Ctrl in ping-pong mode\n", __func__);
+	else
+		pr_info("%s: Dual Nand Ctrl in interleave mode\n", __func__);
 
 no_dual_nand_ctlr_support:
 	res = platform_get_resource_byname(pdev,
 					IORESOURCE_DMA, "msm_nand_dmac");
 	if (!res || !res->start) {
-		pr_err("invalid msm_nand_dmac resource");
+		pr_err("%s: invalid msm_nand_dmac resource\n", __func__);
 		return -ENODEV;
 	}
 
 	info = kzalloc(sizeof(struct msm_nand_info), GFP_KERNEL);
-	if (!info)
+	if (!info) {
+		pr_err("%s: No memory for msm_nand_info\n", __func__);
 		return -ENOMEM;
+	}
 
 	info->msm_nand.dev = &pdev->dev;
 
 	init_waitqueue_head(&info->msm_nand.wait_queue);
 
 	info->msm_nand.dma_channel = res->start;
-	pr_info("dmac 0x%x\n", info->msm_nand.dma_channel);
+	pr_info("%s: dmac 0x%x\n", __func__, info->msm_nand.dma_channel);
 
 	/* this currently fails if dev is passed in */
 	info->msm_nand.dma_buffer =
 		dma_alloc_coherent(/*dev*/ NULL, MSM_NAND_DMA_BUFFER_SIZE,
 				&info->msm_nand.dma_addr, GFP_KERNEL);
 	if (info->msm_nand.dma_buffer == NULL) {
+		pr_err("%s: No memory for msm_nand.dma_buffer\n", __func__);
 		err = -ENOMEM;
 		goto out_free_info;
 	}
 
-	pr_info("allocated dma buffer at %p, dma_addr %x\n",
-		info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
+	pr_info("%s: allocated dma buffer at %p, dma_addr %x\n",
+		__func__, info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
 
 	info->mtd.name = dev_name(&pdev->dev);
 	info->mtd.priv = &info->msm_nand;
@@ -6959,6 +6944,7 @@ no_dual_nand_ctlr_support:
 
 	if (msm_nand_scan(&info->mtd, 1))
 		if (msm_onenand_scan(&info->mtd, 1)) {
+			pr_err("%s: No nand device found\n", __func__);
 			err = -ENXIO;
 			goto out_free_dma_buffer;
 		}
