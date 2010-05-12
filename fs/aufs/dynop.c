@@ -176,22 +176,22 @@ static void dy_fop(struct au_dykey *key, const void *h_op,
 
 	AuDbg("%s\n", au_sbtype(h_sb));
 
-	DySetFopForce(owner);	/* force */
+	DySetFopForce(owner);		/* force */
 	DySetFop(llseek);
 	DySetFop(read);
-	DySetFop(write);
+	DySetFopForce(write);		/* force */
 	DySetFop(aio_read);
-	DySetFop(aio_write);
+	DySetFopForce(aio_write);	/* force */
 	DySetFop(readdir);
 	DySetFop(poll);
 	DySetFop(ioctl);
-	DySetFop(unlocked_ioctl);
+	DySetFopForce(unlocked_ioctl);	/* force */
 	DySetFop(compat_ioctl);
 	DySetFop(mmap);
-	DySetFopForce(open);	/* force */
+	DySetFopForce(open);		/* force */
 	DySetFop(flush);
-	DySetFopForce(release);	/* force */
-	DySetFop(fsync);
+	DySetFopForce(release);		/* force */
+	DySetFopForce(fsync);		/* force */
 	DySetFop(aio_fsync);
 	DySetFop(fasync);
 	DySetFop(lock);
@@ -200,7 +200,7 @@ static void dy_fop(struct au_dykey *key, const void *h_op,
 	DySetFop(check_flags);
 	DySetFop(dir_notify);
 	DySetFop(flock);
-	DySetFop(splice_write);
+	DySetFopForce(splice_write);	/* force */
 	DySetFop(splice_read);
 	DySetFop(setlease);
 
