@@ -607,7 +607,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 		} else
 			/* todo: cpup_wh_file? */
 			/* udba work */
-			au_update_brange(inode, 1);
+			au_update_ibrange(inode, /*do_put_zero*/1);
 	}
 
 	old_ibstart = au_ibstart(inode);

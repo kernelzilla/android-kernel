@@ -127,7 +127,7 @@ void au_update_iigen(struct inode *inode)
 }
 
 /* it may be called at remount time, too */
-void au_update_brange(struct inode *inode, int do_put_zero)
+void au_update_ibrange(struct inode *inode, int do_put_zero)
 {
 	struct au_iinfo *iinfo;
 

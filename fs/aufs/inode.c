@@ -89,7 +89,7 @@ int au_refresh_hinode_self(struct inode *inode, int do_attr)
 			p--;
 		}
 	}
-	au_update_brange(inode, /*do_put_zero*/0);
+	au_update_ibrange(inode, /*do_put_zero*/0);
 	e = au_dy_irefresh(inode);
 	if (unlikely(e && !err))
 		err = e;
@@ -143,7 +143,7 @@ int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 		au_set_h_iptr(inode, bindex, au_igrab(h_d->d_inode), flags);
 		update = 1;
 	}
-	au_update_brange(inode, /*do_put_zero*/0);
+	au_update_ibrange(inode, /*do_put_zero*/0);
 	e = au_dy_irefresh(inode);
 	if (unlikely(e && !err))
 		err = e;
