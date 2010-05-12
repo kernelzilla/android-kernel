@@ -1483,9 +1483,39 @@ msmsdcc_probe(struct platform_device *pdev)
 	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
 	host->mci_irqenable = MCI_IRQENABLE;
 
+	ret = request_irq(irqres->start, msmsdcc_irq, IRQF_SHARED,
+			  DRIVER_NAME " (cmd)", host);
+	if (ret)
+		goto clk_disable;
+
+	ret = request_irq(irqres->start, msmsdcc_pio_irq, IRQF_SHARED,
+		DRIVER_NAME " (pio)", host);
+	if (ret)
+		goto irq_free;
+
+	if (host->plat->sdiowakeup_irq) {
+		ret = request_irq(plat->sdiowakeup_irq,
+			msmsdcc_platform_sdiowakeup_irq,
+			IRQF_SHARED | IRQF_TRIGGER_FALLING,
+			DRIVER_NAME "sdiowakeup", host);
+		if (ret) {
+			pr_err("Unable to get sdio wakeup IRQ %d (%d)\n",
+				plat->sdiowakeup_irq, ret);
+			goto pio_irq_free;
+		} else {
+			set_irq_wake(host->plat->sdiowakeup_irq, 1);
+			disable_irq(host->plat->sdiowakeup_irq);
+		}
+	}
+
 	/*
 	 * Setup card detect change
 	 */
+
+	if (plat->status) {
+		host->oldstat = host->plat->status(mmc_dev(host->mmc));
+		host->eject = !host->oldstat;
+	}
 
 	if (plat->status_irq) {
 		ret = request_irq(plat->status_irq,
@@ -1496,43 +1526,13 @@ msmsdcc_probe(struct platform_device *pdev)
 		if (ret) {
 			pr_err("Unable to get slot IRQ %d (%d)\n",
 			       plat->status_irq, ret);
-			goto clk_disable;
+			goto sdiowakeup_irq_free;
 		}
 	} else if (plat->register_status_notify) {
 		plat->register_status_notify(msmsdcc_status_notify_cb, host);
 	} else if (!plat->status)
 		pr_err("%s: No card detect facilities available\n",
 		       mmc_hostname(mmc));
-
-	if (plat->status) {
-		host->oldstat = host->plat->status(mmc_dev(host->mmc));
-		host->eject = !host->oldstat;
-	}
-
-	if (host->plat->sdiowakeup_irq) {
-		ret = request_irq(plat->sdiowakeup_irq,
-			msmsdcc_platform_sdiowakeup_irq,
-			IRQF_SHARED | IRQF_TRIGGER_FALLING,
-			DRIVER_NAME "sdiowakeup", host);
-		if (ret) {
-			pr_err("Unable to get sdio wakeup IRQ %d (%d)\n",
-				plat->sdiowakeup_irq, ret);
-			goto platform_irq_free;
-		} else {
-			set_irq_wake(host->plat->sdiowakeup_irq, 1);
-			disable_irq(host->plat->sdiowakeup_irq);
-		}
-	}
-
-	ret = request_irq(irqres->start, msmsdcc_irq, IRQF_SHARED,
-			  DRIVER_NAME " (cmd)", host);
-	if (ret)
-		goto sdiowakeup_irq_free;
-
-	ret = request_irq(irqres->start, msmsdcc_pio_irq, IRQF_SHARED,
-		DRIVER_NAME " (pio)", host);
-	if (ret)
-		goto irq_free;
 
 	mmc_set_drvdata(pdev, mmc);
 	mmc_add_host(mmc);
@@ -1577,22 +1577,23 @@ msmsdcc_probe(struct platform_device *pdev)
 	if (!plat->status_irq) {
 		ret = sysfs_create_group(&pdev->dev.kobj, &dev_attr_grp);
 		if (ret)
-			goto pio_irq_free;
+			goto platform_irq_free;
 	}
 	return 0;
- pio_irq_free:
-	if (irqres->end != irqres->start)
-		free_irq(irqres->end, host);
- irq_free:
-	free_irq(irqres->start, host);
+
+ platform_irq_free:
+	if (plat->status_irq)
+		free_irq(plat->status_irq, host);
  sdiowakeup_irq_free:
 	if (plat->sdiowakeup_irq) {
 		set_irq_wake(host->plat->sdiowakeup_irq, 0);
 		free_irq(plat->sdiowakeup_irq, host);
 	}
- platform_irq_free:
-	if (plat->status_irq)
-		free_irq(plat->status_irq, host);
+ pio_irq_free:
+	if (irqres->end != irqres->start)
+		free_irq(irqres->end, host);
+ irq_free:
+	free_irq(irqres->start, host);
  clk_disable:
 	clk_disable(host->clk);
  clk_put:
