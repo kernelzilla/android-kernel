@@ -33,6 +33,7 @@
 #include <linux/usb.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
+#include <asm/mach-types.h>
 
 #define OTGSC_BSVIE            (1 << 27)
 #define OTGSC_IDIE             (1 << 24)
@@ -87,6 +88,12 @@ static inline int depends_on_axi_freq(struct otg_transceiver *xceiv)
 	struct msm_otg *dev;
 
 	if (!xceiv)
+		return 0;
+
+	/* for 8660 usb core is in sps and at the same time it does not
+	 * have core clock
+	 */
+	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa())
 		return 0;
 
 	dev = container_of(xceiv, struct msm_otg, otg);
