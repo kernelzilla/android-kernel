@@ -1065,14 +1065,17 @@ int mdp4_overlay_req_check(uint32 id, uint32 z_order, uint32 mixer)
 {
 	struct mdp4_overlay_pipe *pipe;
 
-	pipe = ctrl->stage[mixer][z_order];
+	pipe = ctrl->stage[mixer][z_order + MDP4_MIXER_STAGE0];
 
-	if (pipe == NULL)
-		return 0;
-
-	if (pipe->pipe_ndx == id)	/* same req, recycle */
-		return 0;
-
+	if (pipe == NULL) {
+		if (id == MSMFB_NEW_REQUEST)  /* new request */
+			return 0;
+	} else {
+		if (pipe->pipe_ndx == id)	/* same req, recycle */
+			return 0;
+	}
+	printk(KERN_INFO "%s: failed: mixer=%d z_order=%d\n",
+				__func__, mixer, z_order);
 	return -EPERM;
 }
 
@@ -1300,6 +1303,9 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	pipe->req_data = *req;		/* keep original req */
 
 	mdp4_stat.overlay_set[pipe->mixer_num]++;
+
+	/* mark stage (z_order) is used before overlay_play */
+	ctrl->stage[pipe->mixer_num][pipe->mixer_stage] = pipe;
 
 	mutex_unlock(&mfd->dma->ov_mutex);
 
