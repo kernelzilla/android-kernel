@@ -74,6 +74,12 @@ extern struct platform_device msm_device_ssbi3;
 #endif
 #endif
 
+#if defined(CONFIG_ARCH_MSM8X60)
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+extern struct platform_device msm_gsbi1_qup_spi_device;
+#endif
+#endif
+
 #if defined(CONFIG_ARCH_MSM7X30)
 extern struct platform_device msm_device_vidc_720p;
 #endif

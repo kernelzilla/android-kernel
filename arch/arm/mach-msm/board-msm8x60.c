@@ -27,6 +27,7 @@
 
 #include <linux/i2c.h>
 #include <linux/smsc911x.h>
+#include <linux/spi/spi.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -34,6 +35,7 @@
 
 #include <mach/board.h>
 #include <mach/irqs.h>
+#include <mach/msm_spi.h>
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
 #include <mach/tlmm.h>
@@ -254,6 +256,12 @@ static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 };
 #endif
 
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+static struct msm_spi_platform_data msm_gsbi1_qup_spi_pdata = {
+	.max_clock_speed = 26000000,
+};
+#endif
+
 #ifdef CONFIG_I2C_SSBI
 /* PMIC SSBI */
 static struct msm_ssbi_platform_data msm_ssbi1_pdata = {
@@ -280,6 +288,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
 #endif
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+	&msm_gsbi1_qup_spi_device,
+#endif
 #ifdef CONFIG_I2C_SSBI
 	&msm_device_ssbi1,
 	&msm_device_ssbi2,
@@ -295,6 +306,9 @@ static struct platform_device *surf_devices[] __initdata = {
 	&msm_gsbi7_qup_i2c_device,
 	&msm_gsbi8_qup_i2c_device,
 	&msm_gsbi9_qup_i2c_device,
+#endif
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+	&msm_gsbi1_qup_spi_device,
 #endif
 #ifdef CONFIG_I2C_SSBI
 	&msm_device_ssbi1,
@@ -420,6 +434,9 @@ static void __init msm8x60_init_buses(void)
 	msm_gsbi7_qup_i2c_device.dev.platform_data = &msm_gsbi7_qup_i2c_pdata;
 	msm_gsbi8_qup_i2c_device.dev.platform_data = &msm_gsbi8_qup_i2c_pdata;
 	msm_gsbi9_qup_i2c_device.dev.platform_data = &msm_gsbi9_qup_i2c_pdata;
+#endif
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+	msm_gsbi1_qup_spi_device.dev.platform_data = &msm_gsbi1_qup_spi_pdata;
 #endif
 #ifdef CONFIG_I2C_SSBI
 	msm_device_ssbi1.dev.platform_data = &msm_ssbi1_pdata;
@@ -619,6 +636,14 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 #ifdef CONFIG_PMIC8058
 	/* PMIC8058 */
 	GPIO_CFG(PM8058_GPIO_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+#endif
+
+#if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
+	/* GSBI1 QUP SPI */
+	GPIO_CFG(33, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(34, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(36, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 #endif
 };
 
