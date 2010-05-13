@@ -27,6 +27,7 @@
 #include <linux/pmic8058-vibrator.h>
 #include <linux/leds.h>
 #include <linux/pmic8058-othc.h>
+#include <linux/mfd/pmic8901.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -59,10 +60,12 @@
 #define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + NR_GPIO_IRQS)
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - NR_GPIO_IRQS)
 #define PM8058_IRQ_BASE				(NR_MSM_IRQS + NR_GPIO_IRQS)
+#define PM8901_IRQ_BASE				(PM8058_IRQ_BASE + \
+						NR_PMIC8058_IRQS)
 
 #define GPIO_EXPANDER_GPIO_BASE \
-	(NR_MSM_GPIOS + PM8058_GPIOS + PM8058_MPPS)
-#define GPIO_EXPANDER_IRQ_BASE (PM8058_IRQ_BASE + NR_PMIC8058_IRQS)
+	(NR_MSM_GPIOS + PM8058_GPIOS + PM8058_MPPS + PM8901_MPPS)
+#define GPIO_EXPANDER_IRQ_BASE (PM8901_IRQ_BASE + NR_PMIC8901_IRQS)
 
 /*
  * The UI_INTx_N lines are pmic gpio lines which connect i2c
@@ -998,6 +1001,24 @@ static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
 };
 #endif
 
+#ifdef CONFIG_PMIC8901
+
+#define PM8901_GPIO_INT           91
+
+static struct pm8901_platform_data pm8901_platform_data = {
+	.irq_base = PM8901_IRQ_BASE,
+};
+
+static struct i2c_board_info pm8901_boardinfo[] __initdata = {
+	{
+		I2C_BOARD_INFO("pm8901-core", 0),
+		.irq = MSM_GPIO_TO_INT(PM8901_GPIO_INT),
+		.platform_data = &pm8901_platform_data,
+	},
+};
+
+#endif /* CONFIG_PMIC8901 */
+
 unsigned long clk_get_max_axi_khz(void)
 {
 	return 0;
@@ -1023,6 +1044,14 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		MSM_SSBI1_I2C_BUS_ID,
 		pm8058_boardinfo,
 		ARRAY_SIZE(pm8058_boardinfo),
+	},
+#endif
+#ifdef CONFIG_PMIC8901
+	{
+		I2C_SURF | I2C_FFA,
+		MSM_SSBI2_I2C_BUS_ID,
+		pm8901_boardinfo,
+		ARRAY_SIZE(pm8901_boardinfo),
 	},
 #endif
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -1345,6 +1374,10 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(34, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	GPIO_CFG(36, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+#endif
+#ifdef CONFIG_PMIC8901
+	/* PMIC8901 */
+	GPIO_CFG(PM8901_GPIO_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
 #endif
 };
 
