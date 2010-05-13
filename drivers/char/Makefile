@@ -120,7 +120,6 @@ obj-$(CONFIG_PS3_FLASH)		+= ps3flash.o
 obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
 
-obj-$(CONFIG_MSM_KGSL)          += msm_kgsl/
 obj-$(CONFIG_MSM_ROTATOR)	+= msm_rotator.o
 
 # Files generated that shall be removed upon make clean
