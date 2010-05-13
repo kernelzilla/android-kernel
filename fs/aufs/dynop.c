@@ -162,50 +162,6 @@ void au_dy_put(struct au_dykey *key)
 	dst.func = src.func;			\
 } while (0)
 
-#define DySetFop(func) \
-	DySet(func, dyfop->df_op, aufs_file_fop, h_fop, h_sb)
-#define DySetFopForce(func) \
-	DySetForce(func, dyfop->df_op, aufs_file_fop)
-
-static void dy_fop(struct au_dykey *key, const void *h_op,
-		   struct super_block *h_sb __maybe_unused)
-{
-	struct au_dyfop *dyfop = (void *)key;
-	const struct file_operations *h_fop = h_op;
-	DyDbgDeclare(cnt);
-
-	AuDbg("%s\n", au_sbtype(h_sb));
-
-	DySetFopForce(owner);	/* force */
-	DySetFop(llseek);
-	DySetFop(read);
-	DySetFop(write);
-	DySetFop(aio_read);
-	DySetFop(aio_write);
-	DySetFop(readdir);
-	DySetFop(poll);
-	DySetFop(ioctl);
-	DySetFop(unlocked_ioctl);
-	DySetFop(compat_ioctl);
-	DySetFop(mmap);
-	DySetFopForce(open);	/* force */
-	DySetFop(flush);
-	DySetFopForce(release);	/* force */
-	DySetFop(fsync);
-	DySetFop(aio_fsync);
-	DySetFop(fasync);
-	DySetFop(lock);
-	DySetFop(sendpage);
-	DySetFop(get_unmapped_area);
-	DySetFop(check_flags);
-	DySetFop(flock);
-	DySetFop(splice_write);
-	DySetFop(splice_read);
-	DySetFop(setlease);
-
-	DyDbgSize(cnt, *h_fop);
-}
-
 #define DySetAop(func) \
 	DySet(func, dyaop->da_op, aufs_aop, h_aop, h_sb)
 #define DySetAopForce(func) \
@@ -286,10 +242,6 @@ static struct au_dykey *dy_get(struct au_dynop *op, struct au_branch *br)
 		void (*set_op)(struct au_dykey *key, const void *h_op,
 			       struct super_block *h_sb __maybe_unused);
 	} a[] = {
-		[AuDy_FOP] = {
-			.sz	= sizeof(struct au_dyfop),
-			.set_op	= dy_fop
-		},
 		[AuDy_AOP] = {
 			.sz	= sizeof(struct au_dyaop),
 			.set_op	= dy_aop
@@ -331,19 +283,6 @@ out:
 }
 
 /* ---------------------------------------------------------------------- */
-
-static struct au_dyfop *dy_fget(struct au_branch *br,
-				const struct file_operations *h_fop)
-{
-	struct au_dynop op = {
-		.dy_type	= AuDy_FOP,
-		/* .dy_hfop	= h_inode->i_fop */
-	};
-
-	op.dy_hfop = h_fop;
-	return (void *)dy_get(&op, br);
-}
-
 /*
  * Aufs prohibits O_DIRECT by defaut even if the branch supports it.
  * This behaviour is neccessary to return an error from open(O_DIRECT) instead
@@ -385,13 +324,12 @@ out:
 	return dyaop;
 }
 
-int au_dy_ifaop(struct inode *inode, aufs_bindex_t bindex,
+int au_dy_iaop(struct inode *inode, aufs_bindex_t bindex,
 		struct inode *h_inode)
 {
 	int err, do_dx;
 	struct super_block *sb;
 	struct au_branch *br;
-	struct au_dyfop *dyfop;
 	struct au_dyaop *dyaop;
 
 	AuDebugOn(!S_ISREG(h_inode->i_mode));
@@ -399,11 +337,6 @@ int au_dy_ifaop(struct inode *inode, aufs_bindex_t bindex,
 
 	sb = inode->i_sb;
 	br = au_sbr(sb, bindex);
-	dyfop = dy_fget(br, h_inode->i_fop);
-	err = PTR_ERR(dyfop);
-	if (IS_ERR(dyfop))
-		goto out;
-
 	do_dx = !!au_opt_test(au_mntflags(sb), DIO);
 	dyaop = dy_aget(br, h_inode->i_mapping->a_ops, do_dx);
 	err = PTR_ERR(dyaop);
@@ -412,7 +345,6 @@ int au_dy_ifaop(struct inode *inode, aufs_bindex_t bindex,
 		goto out;
 
 	err = 0;
-	inode->i_fop = &dyfop->df_op;
 	inode->i_mapping->a_ops = &dyaop->da_op;
 
 out:
@@ -455,7 +387,6 @@ void __init au_dy_init(void)
 	int i;
 
 	/* make sure that 'struct au_dykey *' can be any type */
-	BUILD_BUG_ON(offsetof(struct au_dyfop, df_key));
 	BUILD_BUG_ON(offsetof(struct au_dyaop, da_key));
 	BUILD_BUG_ON(offsetof(struct au_dyvmop, dv_key));
 

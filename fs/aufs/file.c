@@ -161,7 +161,6 @@ int au_reopen_nondir(struct file *file)
 	au_set_fbstart(file, bstart);
 	au_set_h_fptr(file, bstart, h_file);
 	au_update_figen(file);
-	au_dy_frefresh(file);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
 

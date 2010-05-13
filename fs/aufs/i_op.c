@@ -305,12 +305,11 @@ int au_wr_dir(struct dentry *dentry, struct dentry *src_dentry,
 		AuDebugOn(au_test_ro(sb, bcpup, dentry->d_inode));
 	}
 	AuDbg("bstart %d, bcpup %d\n", bstart, bcpup);
-	if (bstart < bcpup)
-		au_update_dbrange(dentry, /*do_put_zero*/1);
-
 	err = bcpup;
 	if (bcpup == bstart)
 		goto out; /* success */
+	else if (bstart < bcpup)
+		au_update_dbrange(dentry, /*do_put_zero*/1);
 
 	/* copyup the new parent into the branch we process */
 	err = au_wr_dir_cpup(dentry, parent, add_entry, bcpup, bstart);
