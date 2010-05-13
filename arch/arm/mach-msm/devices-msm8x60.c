@@ -24,6 +24,7 @@
 #include "clock.h"
 #include "clock-8x60.h"
 #include "clock-rpm.h"
+#include "devices-msm8x60.h"
 
 /* Address of GSBI blocks */
 #define MSM_GSBI1_PHYS	0x16000000
@@ -161,7 +162,7 @@ static struct resource gsbi9_qup_i2c_resources[] = {
 /* Use GSBI3 QUP for /dev/i2c-0 */
 struct platform_device msm_gsbi3_qup_i2c_device = {
 	.name		= "qup_i2c",
-	.id		= 0,
+	.id		= MSM_GSBI3_QUP_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(gsbi3_qup_i2c_resources),
 	.resource	= gsbi3_qup_i2c_resources,
 };
@@ -169,7 +170,7 @@ struct platform_device msm_gsbi3_qup_i2c_device = {
 /* Use GSBI4 QUP for /dev/i2c-1 */
 struct platform_device msm_gsbi4_qup_i2c_device = {
 	.name		= "qup_i2c",
-	.id		= 1,
+	.id		= MSM_GSBI4_QUP_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(gsbi4_qup_i2c_resources),
 	.resource	= gsbi4_qup_i2c_resources,
 };
@@ -177,7 +178,7 @@ struct platform_device msm_gsbi4_qup_i2c_device = {
 /* Use GSBI8 QUP for /dev/i2c-3 */
 struct platform_device msm_gsbi8_qup_i2c_device = {
 	.name		= "qup_i2c",
-	.id		= 3,
+	.id		= MSM_GSBI8_QUP_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(gsbi8_qup_i2c_resources),
 	.resource	= gsbi8_qup_i2c_resources,
 };
@@ -185,7 +186,7 @@ struct platform_device msm_gsbi8_qup_i2c_device = {
 /* Use GSBI9 QUP for /dev/i2c-2 */
 struct platform_device msm_gsbi9_qup_i2c_device = {
 	.name		= "qup_i2c",
-	.id		= 2,
+	.id		= MSM_GSBI9_QUP_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(gsbi9_qup_i2c_resources),
 	.resource	= gsbi9_qup_i2c_resources,
 };
@@ -193,7 +194,7 @@ struct platform_device msm_gsbi9_qup_i2c_device = {
 /* Use GSBI7 QUP for /dev/i2c-4 (Marimba) */
 struct platform_device msm_gsbi7_qup_i2c_device = {
 	.name		= "qup_i2c",
-	.id		= 4,
+	.id		= MSM_GSBI7_QUP_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(gsbi7_qup_i2c_resources),
 	.resource	= gsbi7_qup_i2c_resources,
 };
@@ -212,7 +213,7 @@ static struct resource msm_ssbi1_resources[] = {
 
 struct platform_device msm_device_ssbi1 = {
 	.name		= "i2c_ssbi",
-	.id		= 6,
+	.id		= MSM_SSBI1_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(msm_ssbi1_resources),
 	.resource	= msm_ssbi1_resources,
 };
@@ -230,7 +231,7 @@ static struct resource msm_ssbi2_resources[] = {
 
 struct platform_device msm_device_ssbi2 = {
 	.name		= "i2c_ssbi",
-	.id		= 7,
+	.id		= MSM_SSBI2_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(msm_ssbi2_resources),
 	.resource	= msm_ssbi2_resources,
 };
@@ -248,7 +249,7 @@ static struct resource msm_ssbi3_resources[] = {
 
 struct platform_device msm_device_ssbi3 = {
 	.name		= "i2c_ssbi",
-	.id		= 8,
+	.id		= MSM_SSBI3_I2C_BUS_ID,
 	.num_resources	= ARRAY_SIZE(msm_ssbi3_resources),
 	.resource	= msm_ssbi3_resources,
 };
