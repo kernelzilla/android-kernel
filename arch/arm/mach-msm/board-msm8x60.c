@@ -768,6 +768,10 @@ static struct mfd_cell pm8058_subdevs[] = {
 		.platform_data = &pmic_vib_pdata,
 		.data_size     = sizeof(pmic_vib_pdata),
 	},
+	{
+		.name = "pm8058-pwm",
+		.id = -1,
+	}
 };
 
 static struct pm8058_platform_data pm8058_platform_data = {
