@@ -82,7 +82,7 @@
 
 #define PMIC_GPIO_INT		27
 #define PMIC_VREG_WLAN_LEVEL	2900
-#define PMIC_GPIO_SD_DET	35  /* PMIC GPIO Number 36 */
+#define PMIC_GPIO_SD_DET	36
 #define PMIC_GPIO_SDC4_EN	17  /* PMIC GPIO Number 18 */
 
 #define FPGA_SDCC_STATUS       0x8E0001A8
@@ -181,7 +181,7 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 	if (machine_is_msm7x30_fluid())
 		sdcc_det.inv_int_pol = 1;
 
-	rc = pm8058_gpio_config_h(pm_chip, PMIC_GPIO_SD_DET, &sdcc_det);
+	rc = pm8058_gpio_config_h(pm_chip, PMIC_GPIO_SD_DET - 1, &sdcc_det);
 	if (rc) {
 		pr_err("%s PMIC_GPIO_SD_DET config failed\n", __func__);
 		return rc;
@@ -3670,7 +3670,7 @@ out:
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
 	return (unsigned int)
-		gpio_get_value(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET));
+		gpio_get_value(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1));
 }
 #endif
 
@@ -3746,7 +3746,7 @@ static struct mmc_platform_data msm7x30_sdc4_data = {
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7x30_sdcc_slot_status,
-	.status_irq  = MSM_GPIO_TO_INT(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET)),
+	.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET - 1),
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
 	.wpswitch    = msm_sdcc_get_wpswitch,
