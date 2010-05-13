@@ -227,7 +227,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & DEINIT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & DEINIT_TYPE;
-		if (copy_to_user(buf, (void *)&data_type, 4)) {
+		if ((count < ret+4) || (copy_to_user(buf,
+					 (void *)&data_type, 4))) {
 			ret = -EFAULT;
 			goto exit;
 		}
@@ -240,14 +241,15 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & MSG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MSG_MASKS_TYPE;
-		if (copy_to_user(buf, (void *)&data_type, 4)) {
+		if ((count < ret+4) || (copy_to_user(buf,
+					 (void *)&data_type, 4))) {
 			ret = -EFAULT;
 			goto exit;
 		}
 		ret += 4;
 
-		if (copy_to_user(buf+4, (void *)driver->msg_masks,
-				  MSG_MASK_SIZE)) {
+		if ((count < ret+MSG_MASK_SIZE) || (copy_to_user(buf+4,
+				   (void *)driver->msg_masks, MSG_MASK_SIZE))) {
 			ret =  -EFAULT;
 			goto exit;
 		}
@@ -259,13 +261,14 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & EVENT_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & EVENT_MASKS_TYPE;
-		if (copy_to_user(buf, (void *)&data_type, 4)) {
+		if ((count < ret+4) || (copy_to_user(buf,
+						      (void *)&data_type, 4))) {
 			ret = -EFAULT;
 			goto exit;
 		}
 		ret += 4;
-		if (copy_to_user(buf+4, (void *)driver->event_masks,
-				  EVENT_MASK_SIZE)) {
+		if ((count < ret+EVENT_MASK_SIZE) || (copy_to_user(buf+4,
+			(void *)driver->event_masks, EVENT_MASK_SIZE))) {
 			ret = -EFAULT;
 			goto exit;
 		}
@@ -277,14 +280,15 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & LOG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & LOG_MASKS_TYPE;
-		if (copy_to_user(buf, (void *)&data_type, 4)) {
+		if ((count < ret+4) || (copy_to_user(buf,
+					       (void *)&data_type, 4))) {
 			ret = -EFAULT;
 			goto exit;
 		}
 		ret += 4;
 
-		if (copy_to_user(buf+4, (void *)driver->log_masks,
-				 LOG_MASK_SIZE)) {
+		if ((count < ret+LOG_MASK_SIZE) || (copy_to_user(buf+4,
+			       (void *)driver->log_masks, LOG_MASK_SIZE))) {
 			ret = -EFAULT;
 			goto exit;
 		}
@@ -296,14 +300,15 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & PKT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & PKT_TYPE;
-		if (copy_to_user(buf, (void *)&data_type, 4)) {
+		if ((count < ret+4) || (copy_to_user(buf,
+					       (void *)&data_type, 4))) {
 			ret = -EFAULT;
 			goto exit;
 		}
 		ret += 4;
 
-		if (copy_to_user(buf+4, (void *)driver->pkt_buf,
-				 driver->pkt_length)) {
+		if ((count < ret+driver->pkt_length) || (copy_to_user(buf+4,
+			(void *)driver->pkt_buf, driver->pkt_length))) {
 			ret = -EFAULT;
 			goto exit;
 		}
