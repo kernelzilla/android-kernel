@@ -28,6 +28,7 @@
 #include <linux/leds.h>
 #include <linux/pmic8058-othc.h>
 #include <linux/mfd/pmic8901.h>
+#include <linux/regulator/pmic8901-regulator.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -1005,6 +1006,8 @@ static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
 
 static struct pm8901_platform_data pm8901_platform_data = {
 	.irq_base = PM8901_IRQ_BASE,
+	.num_subdevs = 0,
+	.sub_devices = NULL,
 };
 
 static struct i2c_board_info pm8901_boardinfo[] __initdata = {
