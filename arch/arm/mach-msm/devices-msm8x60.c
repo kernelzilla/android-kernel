@@ -642,6 +642,18 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("mi2s_src_clk",	MI2S_SRC_CLK,		NULL, 0),
 	CLK_8X60("mi2s_clk",		MI2S_CLK,		NULL, 0),
 	CLK_8X60("mi2s_m_clk",		MI2S_M_CLK,		NULL, 0),
+	CLK_8X60("i2s_mic_src_clk",	CODEC_I2S_MIC_SRC_CLK,	NULL, 0),
+	CLK_8X60("i2s_mic_clk",		CODEC_I2S_MIC_CLK,	NULL, 0),
+	CLK_8X60("i2s_mic_m_clk",	CODEC_I2S_MIC_M_CLK,	NULL, 0),
+	CLK_8X60("i2s_mic_src_clk",	SPARE_I2S_MIC_SRC_CLK,	NULL, 0),
+	CLK_8X60("i2s_mic_clk",		SPARE_I2S_MIC_CLK,	NULL, 0),
+	CLK_8X60("i2s_mic_m_clk",	SPARE_I2S_MIC_M_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_src_clk",	CODEC_I2S_SPKR_SRC_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_clk",	CODEC_I2S_SPKR_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_m_clk",	CODEC_I2S_SPKR_M_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_src_clk",	SPARE_I2S_SPKR_SRC_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_clk",	SPARE_I2S_SPKR_CLK,	NULL, 0),
+	CLK_8X60("i2s_spkr_m_clk",	SPARE_I2S_SPKR_M_CLK,	NULL, 0),
 	CLK_8X60("pcm_clk",		PCM_CLK,		NULL, 0),
 };
 
