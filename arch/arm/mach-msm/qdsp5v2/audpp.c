@@ -816,7 +816,7 @@ int audpp_adec_alloc(unsigned dec_attrb, const char **module_name,
 
 	for (idx = lidx; idx > 0; idx--, concurrency_entry--) {
 		if (!(audpp->dec_inuse & (1 << (idx - 1)))) {
-			if ((mode & *concurrency_entry) &&
+			if (((mode & *concurrency_entry) == mode) &&
 			    (codec & *concurrency_entry)) {
 				/* Check supports minimum number codecs */
 				codecs_supported =
