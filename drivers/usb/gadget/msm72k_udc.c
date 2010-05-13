@@ -199,6 +199,9 @@ struct usb_info {
 	atomic_t ep0_dir;
 	atomic_t test_mode;
 	atomic_t offline_pending;
+#ifdef CONFIG_USB_OTG
+	u8 hnp_avail;
+#endif
 
 	atomic_t remote_wakeup;
 	atomic_t self_powered;
@@ -769,6 +772,10 @@ static void handle_setup(struct usb_info *ui)
 	struct usb_ctrlrequest ctl;
 	struct usb_request *req = ui->setup_req;
 	int ret;
+#ifdef CONFIG_USB_OTG
+	u8 hnp;
+	unsigned long flags;
+#endif
 
 	memcpy(&ctl, ui->ep0out.head->setup_data, sizeof(ctl));
 	writel(EPT_RX(0), USB_ENDPTSETUPSTAT);
@@ -790,8 +797,10 @@ static void handle_setup(struct usb_info *ui)
 	if ((ctl.bRequestType & (USB_DIR_IN | USB_TYPE_MASK)) ==
 					(USB_DIR_IN | USB_TYPE_STANDARD)) {
 		if (ctl.bRequest == USB_REQ_GET_STATUS) {
-			if (ctl.wLength != 2)
-				goto stall;
+			/* OTG supplement Rev 2.0 introduces another device
+			 * GET_STATUS request for HNP polling with length = 1.
+			 */
+			u8 len = 2;
 			switch (ctl.bRequestType & USB_RECIP_MASK) {
 			case USB_RECIP_ENDPOINT:
 			{
@@ -816,11 +825,26 @@ static void handle_setup(struct usb_info *ui)
 			{
 				u16 temp = 0;
 
-				temp = (atomic_read(&ui->self_powered) <<
-						USB_DEVICE_SELF_POWERED);
-				temp |= (atomic_read(&ui->remote_wakeup) <<
-						USB_DEVICE_REMOTE_WAKEUP);
-				memcpy(req->buf, &temp, 2);
+				if (ctl.wIndex == OTG_STATUS_SELECTOR) {
+#ifdef CONFIG_USB_OTG
+					spin_lock_irqsave(&ui->lock, flags);
+					hnp = (ui->gadget.host_request <<
+							HOST_REQUEST_FLAG);
+					ui->hnp_avail = 1;
+					spin_unlock_irqrestore(&ui->lock,
+							flags);
+					memcpy(req->buf, &hnp, 1);
+					len = 1;
+#else
+					goto stall;
+#endif
+				} else {
+					temp = (atomic_read(&ui->self_powered)
+						<< USB_DEVICE_SELF_POWERED);
+					temp |= (atomic_read(&ui->remote_wakeup)
+						<< USB_DEVICE_REMOTE_WAKEUP);
+					memcpy(req->buf, &temp, 2);
+				}
 				break;
 			}
 			case USB_RECIP_INTERFACE:
@@ -829,7 +853,7 @@ static void handle_setup(struct usb_info *ui)
 			default:
 				goto stall;
 			}
-			ep0_setup_send(ui, 2);
+			ep0_setup_send(ui, len);
 			return;
 		}
 	}
@@ -883,6 +907,18 @@ static void handle_setup(struct usb_info *ui)
 			case USB_DEVICE_REMOTE_WAKEUP:
 				atomic_set(&ui->remote_wakeup, 1);
 				goto ack;
+#ifdef CONFIG_USB_OTG
+			case USB_DEVICE_B_HNP_ENABLE:
+				ui->gadget.b_hnp_enable = 1;
+				goto ack;
+			case USB_DEVICE_A_HNP_SUPPORT:
+			case USB_DEVICE_A_ALT_HNP_SUPPORT:
+				/* B-devices compliant to OTG spec
+				 * Rev 2.0 are not required to
+				 * suppport these features.
+				 */
+				goto stall;
+#endif
 			}
 		} else if ((ctl.bRequest == USB_REQ_CLEAR_FEATURE) &&
 				(ctl.wValue == USB_DEVICE_REMOTE_WAKEUP)) {
@@ -1090,6 +1126,13 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 
 		msm_hsusb_set_state(USB_STATE_DEFAULT);
 		atomic_set(&ui->remote_wakeup, 0);
+#ifdef CONFIG_USB_OTG
+		spin_lock_irqsave(&ui->lock, flags);
+		/* Host request is persistent across reset */
+		ui->gadget.b_hnp_enable = 0;
+		ui->hnp_avail = 0;
+		spin_unlock_irqrestore(&ui->lock, flags);
+#endif
 		schedule_delayed_work(&ui->chg_stop, 0);
 
 		writel(readl(USB_ENDPTSETUPSTAT), USB_ENDPTSETUPSTAT);
@@ -1403,6 +1446,11 @@ static void usb_do_work(struct work_struct *w)
 
 				/* synchronize with irq context */
 				spin_lock_irqsave(&ui->lock, iflags);
+#ifdef CONFIG_USB_OTG
+				ui->gadget.host_request = 0;
+				ui->gadget.b_hnp_enable = 0;
+				ui->hnp_avail = 0;
+#endif
 				msm72k_pullup(&ui->gadget, 0);
 				spin_unlock_irqrestore(&ui->lock, iflags);
 
@@ -2141,6 +2189,61 @@ static DEVICE_ATTR(chg_type, S_IRUSR, show_usb_chg_type, 0);
 static DEVICE_ATTR(chg_current, S_IWUSR | S_IRUSR,
 		show_usb_chg_current, store_usb_chg_current);
 
+#ifdef CONFIG_USB_OTG
+static ssize_t store_host_req(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct usb_info *ui = the_usb_info;
+	unsigned long val, flags;
+
+	if (strict_strtoul(buf, 10, &val))
+		return -EINVAL;
+
+	dev_dbg(&ui->pdev->dev, "%s host request\n",
+			val ? "set" : "clear");
+
+	spin_lock_irqsave(&ui->lock, flags);
+	if (ui->hnp_avail)
+		ui->gadget.host_request = !!val;
+	spin_unlock_irqrestore(&ui->lock, flags);
+
+	return count;
+}
+static DEVICE_ATTR(host_request, S_IWUSR, NULL, store_host_req);
+
+/* How do we notify user space about HNP availability?
+ * As we are compliant to Rev 2.0, Host will not set a_hnp_support.
+ * Introduce hnp_avail flag and set when HNP polling request arrives.
+ * The expectation is that user space checks hnp availability before
+ * requesting host role via above sysfs node.
+ */
+static ssize_t show_host_avail(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct usb_info *ui = the_usb_info;
+	size_t count;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ui->lock, flags);
+	count = sprintf(buf, "%d\n", ui->hnp_avail);
+	spin_unlock_irqrestore(&ui->lock, flags);
+
+	return count;
+}
+static DEVICE_ATTR(host_avail, S_IRUSR, show_host_avail, NULL);
+
+static struct attribute *otg_attrs[] = {
+	&dev_attr_host_request.attr,
+	&dev_attr_host_avail.attr,
+	NULL,
+};
+
+static struct attribute_group otg_attr_grp = {
+	.name  = "otg",
+	.attrs = otg_attrs,
+};
+#endif
+
 static int msm72k_probe(struct platform_device *pdev)
 {
 	struct usb_info *ui;
@@ -2186,6 +2289,10 @@ static int msm72k_probe(struct platform_device *pdev)
 	ui->gadget.dev.parent = &pdev->dev;
 	ui->gadget.dev.dma_mask = pdev->dev.dma_mask;
 
+#ifdef CONFIG_USB_OTG
+	ui->gadget.is_otg = 1;
+#endif
+
 	ui->sdev.name = DRIVER_NAME;
 	ui->sdev.print_name = print_switch_name;
 	ui->sdev.print_state = print_switch_state;
@@ -2206,6 +2313,15 @@ static int msm72k_probe(struct platform_device *pdev)
 	usb_debugfs_init(ui);
 
 	usb_prepare(ui);
+
+#ifdef CONFIG_USB_OTG
+	retval = sysfs_create_group(&pdev->dev.kobj, &otg_attr_grp);
+	if (retval) {
+		dev_err(&ui->pdev->dev,
+			"failed to create otg sysfs directory:"
+			"err:(%d)\n", retval);
+	}
+#endif
 
 	retval = otg_set_peripheral(ui->xceiv, &ui->gadget);
 	if (retval) {
