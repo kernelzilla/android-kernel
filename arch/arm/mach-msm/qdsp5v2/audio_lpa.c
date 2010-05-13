@@ -231,9 +231,9 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 						audio->vol_pan.volume);
 		audio->vol_pan.volume = evt_payload->session_vol;
 		if (audio->running)
-			audpp_dsp_set_vol_pan(audio->dec_id,
+			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
 						&audio->vol_pan,
-						POPP);
+						COPP);
 		break;
 	default:
 		MM_ERR(":ERROR:wrong event\n");

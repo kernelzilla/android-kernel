@@ -44,6 +44,7 @@ typedef void (*audpp_event_func)(void *private, unsigned id, uint16_t *msg);
 #define AUDPP_MIXER_2 AUDPP_CMD_CFG_DEV_MIXER_DEV_2
 #define AUDPP_MIXER_3 AUDPP_CMD_CFG_DEV_MIXER_DEV_3
 #define AUDPP_MIXER_HLB AUDPP_CMD_CFG_DEV_MIXER_DEV_4
+#define AUDPP_MAX_COPP_DEVICES		5
 
 enum obj_type {
 	COPP,
