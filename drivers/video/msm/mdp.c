@@ -776,8 +776,6 @@ static struct platform_driver mdp_driver = {
 	.remove = mdp_remove,
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = mdp_suspend,
-	.suspend_late = NULL,
-	.resume_early = NULL,
 	.resume = NULL,
 #endif
 	.shutdown = NULL,
