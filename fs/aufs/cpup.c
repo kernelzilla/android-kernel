@@ -607,7 +607,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 		} else
 			/* todo: cpup_wh_file? */
 			/* udba work */
-			au_update_brange(inode, 1);
+			au_update_ibrange(inode, /*do_put_zero*/1);
 	}
 
 	old_ibstart = au_ibstart(inode);
@@ -622,7 +622,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	if (!err) {
 		if (bdst < old_ibstart) {
 			if (S_ISREG(inode->i_mode)) {
-				err = au_dy_ifaop(inode, bdst, dst_inode);
+				err = au_dy_iaop(inode, bdst, dst_inode);
 				if (unlikely(err))
 					goto out_rev;
 			}
