@@ -287,7 +287,7 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
 	mutex_unlock(&clocks_mutex);
 
 	ebi1_clk = clk_get(NULL, "ebi1_clk");
-	BUG_ON(ebi1_clk == NULL);
+	BUG_ON(IS_ERR(ebi1_clk));
 
 	axi_freq_notifier_block.notifier_call = axi_freq_notifier_handler;
 	pm_qos_add_notifier(PM_QOS_SYSTEM_BUS_FREQ, &axi_freq_notifier_block);
