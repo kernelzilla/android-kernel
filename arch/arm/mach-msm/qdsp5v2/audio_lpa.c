@@ -183,37 +183,42 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 		} else
 			audio->source |= (0x1 << evt_payload->routing_id);
 
-		if (audio->running == 1 && audio->enabled == 1)
+		if (audio->running == 1 && audio->enabled == 1) {
 			audpp_route_stream(audio->dec_id, audio->source);
-		if (audio->drv_status & ADRV_STATUS_DEVICE_SWITCH_READY) {
-			audio->wflush = 1;
-			audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_READY;
-			audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
-			audpp_flush(audio->dec_id);
-			if (wait_event_interruptible(audio->write_wait,
-				  !audio->wflush) < 0)
-				MM_ERR("AUDIO_FLUSH interrupted\n");
+			if (audio->drv_status &
+					ADRV_STATUS_DEVICE_SWITCH_READY) {
+				audio->wflush = 1;
+				audio->drv_status &=
+					~ADRV_STATUS_DEVICE_SWITCH_READY;
+				audio->drv_status |=
+					ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
+				audpp_flush(audio->dec_id);
+				if (wait_event_interruptible(audio->write_wait,
+							 !audio->wflush) < 0)
+					MM_DBG("AUDIO_FLUSH interrupted\n");
+			}
 		}
 		break;
 	case AUDDEV_EVT_REL_PENDING:
-		MM_DBG("AUDDEV_EVT_REL_PENDING\n");
-		if (audio->drv_status & ADRV_STATUS_DEVICE_SWITCH_NONE) {
-			if (audpp_pause(audio->dec_id, 1))
-				MM_DBG("audpp pause failed\n");
-			audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_NONE;
-			audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_PENDING;
-			audio->avsync_flag = 0;
-			if (audpp_query_avsync(audio->dec_id) < 0) {
-				MM_DBG(" query avsync failed\n");
-				break;
-			}
+		MM_DBG(":AUDDEV_EVT_REL_PENDING\n");
+		if (audio->running == 1 && audio->enabled == 1) {
+			if (audio->drv_status &
+					ADRV_STATUS_DEVICE_SWITCH_NONE) {
+				if (audpp_pause(audio->dec_id, 1))
+					MM_DBG("audpp pause failed\n");
+				audio->drv_status &=
+					~ADRV_STATUS_DEVICE_SWITCH_NONE;
+				audio->drv_status |=
+					ADRV_STATUS_DEVICE_SWITCH_PENDING;
+				audio->avsync_flag = 0;
+				if (audpp_query_avsync(audio->dec_id) < 0)
+					MM_DBG("query avsync failed\n");
 
-			if (wait_event_interruptible_timeout(audio->avsync_wait,
-						audio->avsync_flag,
-				msecs_to_jiffies(AVSYNC_EVENT_TIMEOUT)) < 0) {
-				MM_DBG(" AV sync timeout failed\n");
+				if (wait_event_interruptible_timeout
+					(audio->avsync_wait, audio->avsync_flag,
+				 msecs_to_jiffies(AVSYNC_EVENT_TIMEOUT)) < 0)
+					MM_DBG("AV sync timeout failed\n");
 			}
-
 		}
 		break;
 	case AUDDEV_EVT_DEV_RLS:
