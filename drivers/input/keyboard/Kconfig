@@ -437,7 +437,7 @@ config KEYBOARD_I2C_MSM
 
 config KEYBOARD_PMIC8058
 	tristate "Qualcomm PMIC8058 keypad"
-	depends on PMIC8058 && ARCH_MSM7X30
+	depends on PMIC8058
 	default y
 	help
 	  Say Y here if you want to enable the driver for the PMIC8058
