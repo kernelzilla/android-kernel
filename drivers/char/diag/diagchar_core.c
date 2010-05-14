@@ -174,11 +174,12 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 				driver->table[i].process_id = current->tgid;
 				count_entries++;
 				if (pkt_params->count > count_entries)
-						pkt_params->params++;
+					pkt_params->params++;
 				else
-						break;
+					return -EINVAL;
 			}
 		}
+		success = 0;
 	} else if (iocmd == DIAG_IOCTL_GET_DELAYED_RSP_ID) {
 		struct diagpkt_delay_params *delay_params =
 					(struct diagpkt_delay_params *) ioarg;
@@ -191,8 +192,6 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			*(delay_params->num_bytes_ptr) = sizeof(delayed_rsp_id);
 			success = 0;
 		}
-
-	return success;
 	} else if (iocmd == DIAG_IOCTL_LSM_DEINIT) {
 		for (i = 0; i < driver->num_clients; i++)
 			if (driver->client_map[i] == current->tgid)
@@ -201,9 +200,10 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			return -EINVAL;
 		driver->data_ready[i] |= DEINIT_TYPE;
 		wake_up_interruptible(&driver->wait_q);
+		success = 0;
 	}
 
-	return -EINVAL;
+	return success;
 }
 
 static int diagchar_read(struct file *file, char __user *buf, size_t count,
