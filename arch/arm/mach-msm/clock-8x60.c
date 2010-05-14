@@ -402,6 +402,10 @@ static void set_rate_nop(struct clk_local *clk, struct clk_freq_tbl *nf)
 		CLK_LOCAL(id, NORATE, NULL, REG(reg), NULL, REG(r_reg), res, \
 				br, 0, 0, 0, NULL, NULL, NULL, par, NULL)
 
+#define CLK_NORATE_MM(id, reg, br) \
+		CLK_LOCAL(id, NORATE, NULL, REG_MM(reg), NULL, NULL, 0, \
+				br, 0, 0, 0, NULL, NULL, NULL, NONE, NULL)
+
 #define CLK_SLAVE_MM(id, reg, br, par) \
 		CLK_LOCAL(id, NORATE, NULL, REG_MM(reg), NULL, NULL, 0, \
 				br, 0, 0, 0, NULL, NULL, NULL, par, NULL)
@@ -781,10 +785,10 @@ struct banked_mnd_masks bmdn_info_gfx3d = {
 			.mode_mask =		BM(7, 6),
 	},
 };
-#define CLK_GFX3D(id, ns) \
+#define CLK_GFX3D(id, ns, par) \
 		CLK_LOCAL(id, MND, REG_MM(ns), REG_MM(ns-12), NULL, NULL, 0, \
 				B(0), B(2), 0, 0, set_rate_mnd_banked, \
-				clk_tbl_gfx3d, &bmdn_info_gfx3d, NONE, NULL)
+				clk_tbl_gfx3d, &bmdn_info_gfx3d, par, NULL)
 #define F_GFX3D(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD4(4, m, 0, n), \
 			NS_MND_BANKED4(18, 14, n, m, 3, 0, s), \
@@ -832,10 +836,10 @@ static struct clk_freq_tbl clk_tbl_ijpeg[] = {
 
 /* JPEGD */
 #define NS_MASK_JPEGD (BM(15, 12) | BM(2, 0))
-#define CLK_JPEGD(id, ns) \
+#define CLK_JPEGD(id, ns, par) \
 		CLK_LOCAL(id, BASIC, REG_MM(ns), REG_MM(ns-8), NULL, NULL, 0, \
 				B(0), B(2), NS_MASK_JPEGD, 0, set_rate_basic, \
-				clk_tbl_jpegd, 	NULL, NONE, NULL)
+				clk_tbl_jpegd, 	NULL, par, NULL)
 #define F_JPEGD(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, 0, NS_DIVSRC(15, 12, d, 2, 0, s), 0, 0)
 static struct clk_freq_tbl clk_tbl_jpegd[] = {
@@ -1039,10 +1043,10 @@ static struct clk_freq_tbl clk_tbl_vpe[] = {
 /* VFE */
 #define NS_MASK_VFE (BM(23, 16) | BM(11, 10) | BM(2, 0))
 #define CC_MASK_VFE (BM(7, 6))
-#define CLK_VFE(id, ns) \
+#define CLK_VFE(id, ns, par) \
 		CLK_LOCAL(id, MND, REG_MM(ns), REG_MM(ns-8), REG_MM(ns-4), \
 				NULL, 0, B(0), B(2), NS_MASK_VFE, CC_MASK_VFE, \
-				set_rate_mnd, clk_tbl_vfe, NULL, NONE, chld_vfe)
+				set_rate_mnd, clk_tbl_vfe, NULL, par, chld_vfe)
 #define F_VFE(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD8(8, m, 0, n), \
 			NS_MM(23, 16, n, m, 11, 10, d, 2, 0, s), \
@@ -1256,10 +1260,10 @@ static struct clk_local clk_local_tbl[] = {
 
 	CLK_GFX2D0(GFX2D0, 0x0070),
 	CLK_GFX2D1(GFX2D1, 0x007C),
-	CLK_GFX3D(GFX3D,   0x008C),
+	CLK_GFX3D(GFX3D,   0x008C, GMEM_AXI),
 
 	CLK_IJPEG(IJPEG, 0x00A0),
-	CLK_JPEGD(JPEGD, 0x00AC),
+	CLK_JPEGD(JPEGD, 0x00AC, JPEGD_AXI),
 
 	CLK_MDP(MDP, 0x00D0),
 	CLK_MDP_VSYNC(MDP_VSYNC, 0x0058),
@@ -1279,9 +1283,29 @@ static struct clk_local clk_local_tbl[] = {
 
 	CLK_VPE(VPE, 0x0118),
 
-	CLK_VFE(VFE, 0x010C),
+	CLK_VFE(VFE, 0x010C, VFE_AXI),
 	CLK_SLAVE_MM(CSI0_VFE, 0x0104, B(12), VFE),
 	CLK_SLAVE_MM(CSI1_VFE, 0x0104, B(10), VFE),
+
+	/* AXI Interfaces */
+	CLK_NORATE_MM(GMEM_AXI,  0x0018, B(24)),
+	CLK_NORATE_MM(JPEGD_AXI, 0x0018, B(25)),
+	CLK_NORATE_MM(VFE_AXI,   0x0018, B(18)),
+
+	/* AHB Interfaces */
+	CLK_NORATE_MM(AMP_P,    0x0008, B(24)),
+	CLK_NORATE_MM(APU_P,    0x0008, B(28)),
+	CLK_NORATE_MM(CSI0_P,   0x0008, B(7)),
+	CLK_NORATE_MM(CSI1_P,   0x0008, B(20)),
+	CLK_NORATE_MM(DSI_M_P,  0x0008, B(9)),
+	CLK_NORATE_MM(FAB_P,    0x0008, B(31)),
+	CLK_NORATE_MM(IJPEG_P,  0x0008, B(5)),
+	CLK_NORATE_MM(JPEGD_P,  0x0008, B(21)),
+	CLK_NORATE_MM(MDP_P,    0x0008, B(10)),
+	CLK_NORATE_MM(ROT_P,    0x0008, B(12)),
+	CLK_NORATE_MM(TV_ENC_P, 0x0008, B(25)),
+	CLK_NORATE_MM(VFE_P,    0x0008, B(13)),
+	CLK_NORATE_MM(VPE_P,    0x0008, B(16)),
 
 	/*
 	 * Low Power Audio Clocks
@@ -1768,18 +1792,26 @@ static struct reg_init {
 
 	{REG_MM(0x0204), 0x1, 0x0}, /* MM SW_RESET_ALL */
 
-	/* Enable all MM AHB clocks in software mode. */
+	/* Set up MM AHB clock. */
 	{REG_MM(0x0004), 0x43C7, 0x0241}, /* MM AHB = PLL2/10 */
-	{REG_MM(0x0008), 0xFFFFFFFF, 0x93BDFEFF}, /* MM AHB_EN */
+
+	/* Enable MM AHB clocks that don't have clock API support.
+	 * These will be put into hardware-controlled mode later. */
+	{REG_MM(0x0008), 0xFFFFFFFF, 0x8CC85F}, /* MM AHB_EN */
 	{REG_MM(0x0038), 0xFFFFFFFF, 0x1}, /* MM AHB_EN2 */
 	{REG_MM(0x020C), 0xFFFFFFFF, 0x0}, /* MM SW_RESET_AHB */
 
-	/* Enable all MM AXI clocks. */
+	/* Set up MM Fabric (AXI) clock. */
 	{REG_MM(0x0014), 0x0FFFFFFF, 0x4248451}, /* MM AXI_NS */
-	{REG_MM(0x0018), 0xFFFFFFFF, 0x17FC0001}, /* MM MAXI_EN */
+
+	/* Enable MM AXI clocks that don't have clock API support.
+	 * These will be put into hardware-controlled mode later. */
+	{REG_MM(0x0018), 0xFFFFFFFF, 0x14F80001}, /* MM MAXI_EN */
 	{REG_MM(0x0020), 0x7FFFFFFF, 0x75200400}, /* MM MAXI_EN2 */
 	{REG_MM(0x002C), 0xFFFFFFFF, 0x200400}, /* MM MAXI_EN3 */
 	{REG_MM(0x0030), 0x3FFF, 0x1C7}, /* MM SAXI_EN */
+
+	/* De-assert MM AXI resets to all hardware blocks. */
 	{REG_MM(0x0208), 0xE37F, 0x0}, /* SW_RESET_AXI */
 
 	/* Deassert all MM core resets. */
@@ -1799,4 +1831,6 @@ void __init msm_clk_soc_init(void)
 		val |= ri_list[i].val;
 		writel(val, ri_list[i].reg);
 	}
+
+	soc_clk_enable(C(FAB_P));
 }
