@@ -91,8 +91,8 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 			(sizedwords * sizeof(unsigned int)));
 	tmp.size = 12;
 
-	kgsl_sharedmem_write(&tmp, 4, &nextaddr, 4);
-	kgsl_sharedmem_write(&tmp, 8, &nextcnt,  4);
+	kgsl_sharedmem_writel(&tmp, 4, nextaddr);
+	kgsl_sharedmem_writel(&tmp, 8, nextcnt);
 
 	/* sync mem */
 	kgsl_sharedmem_write((const struct kgsl_memdesc *)

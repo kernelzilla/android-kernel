@@ -233,9 +233,31 @@ kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 }
 
 int
+kgsl_sharedmem_readl(const struct kgsl_memdesc *memdesc,
+			uint32_t *dst,
+			unsigned int offsetbytes)
+{
+	if (memdesc == NULL || memdesc->hostptr == NULL || dst == NULL) {
+		KGSL_MEM_ERR("bad ptr memdesc %p hostptr %p dst %p\n",
+				memdesc,
+				(memdesc ? memdesc->hostptr : NULL),
+				dst);
+		return -EINVAL;
+	}
+	if (offsetbytes + sizeof(unsigned int) > memdesc->size) {
+		KGSL_MEM_ERR("bad range: offset %d memdesc %d\n",
+				offsetbytes, memdesc->size);
+		return -ERANGE;
+	}
+	*dst = readl(memdesc->hostptr + offsetbytes);
+	return 0;
+}
+
+int
 kgsl_sharedmem_read(const struct kgsl_memdesc *memdesc, void *dst,
 			unsigned int offsetbytes, unsigned int sizebytes)
 {
+	BUG_ON(sizebytes == sizeof(unsigned int));
 	if (memdesc == NULL || memdesc->hostptr == NULL || dst == NULL) {
 		KGSL_MEM_ERR("bad ptr memdesc %p hostptr %p dst %p\n",
 				memdesc,
@@ -253,10 +275,32 @@ kgsl_sharedmem_read(const struct kgsl_memdesc *memdesc, void *dst,
 }
 
 int
+kgsl_sharedmem_writel(const struct kgsl_memdesc *memdesc,
+			unsigned int offsetbytes,
+			uint32_t src)
+{
+	if (memdesc == NULL || memdesc->hostptr == NULL) {
+		KGSL_MEM_ERR("bad ptr memdesc %p hostptr %p\n", memdesc,
+				(memdesc ? memdesc->hostptr : NULL));
+		return -EINVAL;
+	}
+	if (offsetbytes + sizeof(unsigned int) > memdesc->size) {
+		KGSL_MEM_ERR("bad range: offset %d memdesc %d\n",
+				offsetbytes, memdesc->size);
+		return -ERANGE;
+	}
+	writel((unsigned int *)(((char *)memdesc->hostptr) + offsetbytes),
+		src);
+	return 0;
+}
+
+
+int
 kgsl_sharedmem_write(const struct kgsl_memdesc *memdesc,
 			unsigned int offsetbytes,
 			void *src, unsigned int sizebytes)
 {
+	BUG_ON(sizebytes == sizeof(unsigned int));
 	if (memdesc == NULL || memdesc->hostptr == NULL) {
 		KGSL_MEM_ERR("bad ptr memdesc %p hostptr %p\n", memdesc,
 				(memdesc ? memdesc->hostptr : NULL));
