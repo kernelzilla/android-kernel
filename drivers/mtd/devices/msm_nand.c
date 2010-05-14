@@ -1170,7 +1170,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 			uint32_t cfg1;
 			uint32_t exec;
 			uint32_t ecccfg;
-			uint32_t ebi2_cfg;
 			uint32_t ebi2_chip_select_cfg0;
 			uint32_t adm_mux_data_ack_req_nc01;
 			uint32_t adm_mux_cmd_ack_req_nc01;
@@ -1182,7 +1181,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 			uint32_t nc10_flash_dev_cmd1;
 			uint32_t nc10_flash_dev_cmd_vld_default;
 			uint32_t nc10_flash_dev_cmd1_default;
-			uint32_t ebi2_cfg_default;
 			struct {
 				uint32_t flash_status;
 				uint32_t buffer_status;
@@ -1351,9 +1349,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		dma_buffer->data.nc10_flash_dev_cmd_vld_default = 0x1D;
 		dma_buffer->data.nc10_flash_dev_cmd1_default = 0xF00F3000;
 
-		/* config ebi2 cfg reg for pingpong ( 0xA000_0004 ) */
-		dma_buffer->data.ebi2_cfg = 0x4010080;
-		dma_buffer->data.ebi2_cfg_default = 0x4010000;
 		dma_buffer->data.ebi2_chip_select_cfg0 = 0x00000805;
 		dma_buffer->data.default_ebi2_chip_select_cfg0 = 0x00000801;
 
@@ -1373,14 +1368,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 
 			if (n == start_sector) {
 				if (!interleave_enable) {
-					/* config ebi2 cfg reg */
-					cmd->cmd = 0;
-					cmd->src = msm_virt_to_dma(chip,
-					&dma_buffer->data.ebi2_cfg);
-					cmd->dst = EBI2_CFG_REG;
-					cmd->len = 4;
-					cmd++;
-
 					cmd->cmd = 0;
 					cmd->src = msm_virt_to_dma(chip,
 					&dma_buffer->
@@ -1793,13 +1780,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 			cmd->src = msm_virt_to_dma(chip,
 			&dma_buffer->data.nc10_flash_dev_cmd1_default);
 			cmd->dst = NC10(MSM_NAND_DEV_CMD1);
-			cmd->len = 4;
-			cmd++;
-
-			cmd->cmd = 0;
-			cmd->src = msm_virt_to_dma(chip,
-			&dma_buffer->data.ebi2_cfg_default);
-			cmd->dst = EBI2_CFG_REG;
 			cmd->len = 4;
 			cmd++;
 		} else {
@@ -2357,7 +2337,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 			uint32_t cfg1;
 			uint32_t exec;
 			uint32_t ecccfg;
-			uint32_t ebi2_cfg;
 			uint32_t ebi2_chip_select_cfg0;
 			uint32_t adm_mux_data_ack_req_nc01;
 			uint32_t adm_mux_cmd_ack_req_nc01;
@@ -2369,7 +2348,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 			uint32_t nc10_flash_dev_cmd0;
 			uint32_t nc01_flash_dev_cmd_vld_default;
 			uint32_t nc10_flash_dev_cmd0_default;
-			uint32_t ebi2_cfg_default;
 			uint32_t flash_status[16];
 			uint32_t clrfstatus;
 			uint32_t clrrstatus;
@@ -2508,10 +2486,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 		/* GO bit for the EXEC register */
 		dma_buffer->data.exec = 1;
 
-		/* config ebi2 cfg reg ( 0xA000_0004 ) */
-		dma_buffer->data.ebi2_cfg = 0x4010080;
-		dma_buffer->data.ebi2_cfg_default = 0x4010000;
-
 		if (!interleave_enable) {
 			dma_buffer->data.nandc01_addr0 = (page << 16) | 0x0;
 			dma_buffer->data.nandc10_addr0 = (page << 16) | 0x108;
@@ -2530,14 +2504,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 
 			if (n == 0) {
 				if (!interleave_enable) {
-					/* config ebi2 cfg reg */
-					cmd->cmd = 0;
-					cmd->src = msm_virt_to_dma(chip,
-					&dma_buffer->data.ebi2_cfg);
-					cmd->dst = EBI2_CFG_REG;
-					cmd->len = 4;
-					cmd++;
-
 					cmd->cmd = 0;
 					cmd->src = msm_virt_to_dma(chip,
 					&dma_buffer->
@@ -2834,13 +2800,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 			cmd->src = msm_virt_to_dma(chip,
 			&dma_buffer->data.nc10_flash_dev_cmd0_default);
 			cmd->dst = NC10(MSM_NAND_DEV_CMD0);
-			cmd->len = 4;
-			cmd++;
-
-			cmd->cmd = 0;
-			cmd->src = msm_virt_to_dma(chip,
-				&dma_buffer->data.ebi2_cfg_default);
-			cmd->dst = EBI2_CFG_REG;
 			cmd->len = 4;
 			cmd++;
 		} else {
@@ -6920,6 +6879,10 @@ no_dual_nand_ctlr_support:
 	info->mtd.name = dev_name(&pdev->dev);
 	info->mtd.priv = &info->msm_nand;
 	info->mtd.owner = THIS_MODULE;
+
+	/* config ebi2_cfg register only for ping pong mode!!! */
+	if (!interleave_enable && dual_nand_ctlr_present)
+		flash_wr_reg(&info->msm_nand, EBI2_CFG_REG, 0x4010080);
 
 	if (dual_nand_ctlr_present)
 		msm_nand_nc10_xfr_settings(&info->mtd);
