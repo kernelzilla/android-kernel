@@ -37,8 +37,6 @@ static struct pwm_device *bl_pwm;
  */
 
 #define PWM_PERIOD 20000	/* ns, period of 50Khz */
-#define PWM_LEVEL 15
-#define PWM_DUTY_LEVEL (PWM_PERIOD / PWM_LEVEL)
 #endif
 
 static int spi_cs;
@@ -239,7 +237,9 @@ static void lcdc_sharp_panel_set_backlight(struct msm_fb_data_type *mfd)
 
 #ifdef CONFIG_PMIC8058_PWM
 	if (bl_pwm) {
-		pwm_config(bl_pwm, PWM_DUTY_LEVEL * bl_level, PWM_PERIOD);
+		int duty_level;
+		duty_level = (PWM_PERIOD / mfd->panel_info.bl_max);
+		pwm_config(bl_pwm, duty_level * bl_level, PWM_PERIOD);
 		pwm_enable(bl_pwm);
 	}
 #endif
