@@ -1057,7 +1057,7 @@ struct clk msm_clocks_7x30[] = {
 	CLK_7X30("spi_pclk",	SPI_P_CLK,	NULL, 0),
 	CLK_7X30("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
 	CLK_7X30("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_DAC_CLK,	NULL, 0),
+	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
 	CLK_7X30("uart_clk",	UART1_CLK,	&msm_device_uart1.dev, OFF),
 	CLK_7X30("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, 0),
 	CLK_7X30("uartdm_clk",	UART1DM_CLK,	&msm_device_uart_dm1.dev, OFF),
