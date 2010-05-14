@@ -134,21 +134,24 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 {
 	u32	mci_clk = 0;
 	u32	mci_mask0 = 0;
+	int ret;
 
 	/* Save the controller state */
 	mci_clk = readl(host->base + MMCICLOCK);
 	mci_mask0 = readl(host->base + MMCIMASK0);
 
 	/* Reset the controller */
-	if (clk_reset(host->clk, CLK_RESET_ASSERT)) {
-		pr_err("%s: Clock assert failed at %u Hz\n",
-				mmc_hostname(host->mmc), host->clk_rate);
+	ret = clk_reset(host->clk, CLK_RESET_ASSERT);
+	if (ret) {
+		pr_err("%s: Clock assert failed at %u Hz with err %d\n",
+				mmc_hostname(host->mmc), host->clk_rate, ret);
 		return;
 	}
 
-	if (clk_reset(host->clk, CLK_RESET_DEASSERT)) {
-		pr_err("%s: Clock deassert failed at %u Hz\n",
-				mmc_hostname(host->mmc), host->clk_rate);
+	ret = clk_reset(host->clk, CLK_RESET_DEASSERT);
+	if (ret) {
+		pr_err("%s: Clock deassert failed at %u Hz with err %d\n",
+				mmc_hostname(host->mmc), host->clk_rate, ret);
 		return;
 	}
 	pr_info("%s: Controller has been reset\n", mmc_hostname(host->mmc));
@@ -157,9 +160,10 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 	writel(host->pwr, host->base + MMCIPOWER);
 	writel(mci_clk, host->base + MMCICLOCK);
 	writel(mci_mask0, host->base + MMCIMASK0);
-	if (clk_set_rate(host->clk, host->clk_rate))
-		pr_err("%s: Failed to set clk rate %u Hz \n",
-				mmc_hostname(host->mmc), host->clk_rate);
+	ret = clk_set_rate(host->clk, host->clk_rate);
+	if (ret)
+		pr_err("%s: Failed to set clk rate %u Hz. err %d\n",
+				mmc_hostname(host->mmc), host->clk_rate, ret);
 }
 
 static int
