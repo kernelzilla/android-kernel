@@ -82,6 +82,7 @@ int kgsl_g12_last_release_locked(void)
 		kgsl_pwrctrl(KGSL_PWRFLAGS_G12_IRQ_OFF);
 		kgsl_g12_close(&kgsl_driver.g12_device);
 		kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_OFF);
+		kgsl_driver.g12_device.hwaccess_blocked = KGSL_FALSE;
 	}
 
 	return KGSL_SUCCESS;
