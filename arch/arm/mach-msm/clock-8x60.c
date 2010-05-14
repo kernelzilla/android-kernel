@@ -645,14 +645,10 @@ static struct clk_freq_tbl clk_tbl_tssc[] = {
 		CLK_LOCAL(id, MND, REG(ns), REG(ns), REG(ns-4), REG(ns+4), \
 				B(0), B(9), B(11), NS_MASK_USB, 0, \
 				set_rate_mnd, clk_tbl_usb, NULL, NONE, NULL)
-#define CLK_USB_FS1(id, ns) \
-		CLK_LOCAL(id, MND, REG(ns), REG(ns), REG(ns-4), REG(ns+12), \
-				B(0), 0, B(11), NS_MASK_USB, 0, set_rate_mnd, \
-				clk_tbl_usb, NULL, NONE, chld_usb_fs1_src)
-#define CLK_USB_FS2(id, ns) \
-		CLK_LOCAL(id, MND, REG(ns), REG(ns), REG(ns-4), REG(ns+12), \
-				B(0), 0, B(11), NS_MASK_USB, 0, set_rate_mnd, \
-				clk_tbl_usb, NULL, NONE, chld_usb_fs2_src)
+#define CLK_USB_FS(id, ns, chld_lst) \
+		CLK_LOCAL(id, MND, REG(ns), REG(ns), REG(ns-4), NULL, 0, \
+				0, B(11), NS_MASK_USB, 0, set_rate_mnd, \
+				clk_tbl_usb, NULL, NONE, chld_lst)
 #define F_USB(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD8(16, m, 0, n), \
 			NS(23, 16, n, m, 5, 4, 3, d, 2, 0, s), \
@@ -1136,8 +1132,10 @@ static uint32_t chld_gsbi_sim_src[] = 	{C(GSBI1_SIM), C(GSBI2_SIM),
 					 C(GSBI9_SIM), C(GSBI10_SIM),
 					 C(GSBI11_SIM), C(GSBI12_SIM),
 					 C(NONE)};
-static uint32_t chld_usb_fs1_src[] = 	{C(USB_FS1), C(USB_FS1_SYS), C(NONE)};
-static uint32_t chld_usb_fs2_src[] = 	{C(USB_FS2), C(USB_FS2_SYS), C(NONE)};
+static uint32_t chld_usb_fs1_src[] = 	{C(USB_FS1_XCVR), C(USB_FS1_SYS),
+					 C(NONE)};
+static uint32_t chld_usb_fs2_src[] = 	{C(USB_FS2_XCVR), C(USB_FS2_SYS),
+					 C(NONE)};
 static uint32_t chld_csi_src[] = 	{C(CSI0), C(CSI1), C(NONE)};
 static uint32_t chld_pixel_mdp[] = 	{C(PIXEL_LCDC), C(NONE)};
 static uint32_t chld_tv_src[] =		{C(TV_ENC), C(TV_DAC), C(MDP_TV),
@@ -1218,16 +1216,16 @@ static struct clk_local clk_local_tbl[] = {
 
 	CLK_TSSC(TSSC, 0x2CA0),
 
-	CLK_USB_HS(USB_HS,  0x290C),
+	CLK_USB_HS(USB_HS_XCVR,  0x290C),
 	CLK_RESET(USB_PHY0, 0x2E20, B(0)),
 
-	CLK_USB_FS1(USB_FS1_SRC, 0x2968),
-	CLK_SLAVE_RSET(USB_FS1,  0x2968, B(9), 0x2974, B(1), USB_FS1_SRC),
-	CLK_SLAVE(USB_FS1_SYS,   0x296C, B(4), USB_FS1_SRC),
+	CLK_USB_FS(USB_FS1_SRC, 0x2968, chld_usb_fs1_src),
+	CLK_SLAVE_RSET(USB_FS1_XCVR,  0x2968, B(9), 0x2974, B(1), USB_FS1_SRC),
+	CLK_SLAVE_RSET(USB_FS1_SYS,   0x296C, B(4), 0x2974, B(0), USB_FS1_SRC),
 
-	CLK_USB_FS2(USB_FS2_SRC, 0x2988),
-	CLK_SLAVE_RSET(USB_FS2,  0x2988, B(9), 0x2994, B(1), USB_FS2_SRC),
-	CLK_SLAVE(USB_FS2_SYS,   0x298C, B(4), USB_FS2_SRC),
+	CLK_USB_FS(USB_FS2_SRC, 0x2988, chld_usb_fs2_src),
+	CLK_SLAVE_RSET(USB_FS2_XCVR,  0x2988, B(9), 0x2994, B(1), USB_FS2_SRC),
+	CLK_SLAVE_RSET(USB_FS2_SYS,   0x298C, B(4), 0x2994, B(0), USB_FS2_SRC),
 
 	/* Fast Peripheral Bus Clocks */
 	CLK_NORATE(GSBI1_P,  0x29C0, B(4)),
