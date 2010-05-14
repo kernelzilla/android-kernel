@@ -1055,10 +1055,10 @@ static int msm_batt_cleanup(void)
 	}
 
 	msm_batt_info.batt_handle = INVALID_BATT_HANDLE;
-#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 	if (msm_batt_info.batt_client)
 		msm_rpc_unregister_client(msm_batt_info.batt_client);
+#endif  /* CONFIG_BATTERY_MSM_FAKE */
 
 	if (msm_batt_info.msm_psy_ac)
 		power_supply_unregister(msm_batt_info.msm_psy_ac);
@@ -1068,7 +1068,7 @@ static int msm_batt_cleanup(void)
 	if (msm_batt_info.msm_psy_batt)
 		power_supply_unregister(msm_batt_info.msm_psy_batt);
 
-
+#ifndef CONFIG_BATTERY_MSM_FAKE
 	if (msm_batt_info.chg_ep) {
 		rc = msm_rpc_close(msm_batt_info.chg_ep);
 		if (rc < 0) {
@@ -1077,7 +1077,6 @@ static int msm_batt_cleanup(void)
 		}
 	}
 
-#ifndef CONFIG_BATTERY_MSM_FAKE
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	if (msm_batt_info.early_suspend.suspend == msm_batt_early_suspend)
 		unregister_early_suspend(&msm_batt_info.early_suspend);
