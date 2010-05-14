@@ -54,6 +54,47 @@
 #define MSM_GSBI11_QUP_PHYS	0x19B80000
 #define MSM_GSBI12_QUP_PHYS	0x19C80000
 
+/* GSBI UART devices */
+#define MSM_UART1DM_PHYS    0x16040000
+#define MSM_UART2DM_PHYS    0x16140000
+#define MSM_UART3DM_PHYS    0x16240000
+#define MSM_UART4DM_PHYS    0x16340000
+#define MSM_UART5DM_PHYS    0x16440000
+#define MSM_UART6DM_PHYS    0x16540000
+#define MSM_UART7DM_PHYS    0x16640000
+#define MSM_UART8DM_PHYS    0x19840000
+#define MSM_UART9DM_PHYS    0x19940000
+#define MSM_UART10DM_PHYS   0x19A40000
+#define MSM_UART11DM_PHYS   0x19B40000
+#define MSM_UART12DM_PHYS   0x19C40000
+
+static struct resource msm_uart12_dm_resources[] = {
+	{
+		.start = MSM_UART12DM_PHYS,
+		.end   = MSM_UART12DM_PHYS + PAGE_SIZE - 1,
+		.name  = "uartdm_resource",
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = INT_UART12DM_IRQ,
+		.end   = INT_UART12DM_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = MSM_GSBI12_PHYS,
+		.end   = MSM_GSBI12_PHYS + PAGE_SIZE - 1,
+		.name  = "gsbi_resource",
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm_device_uart_dm12 = {
+	.name = "msm_serial_hsl",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(msm_uart12_dm_resources),
+	.resource = msm_uart12_dm_resources,
+};
+
 static struct resource gsbi3_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
@@ -495,7 +536,8 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("gsbi_uart_clk",	GSBI9_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI10_UART_CLK,	NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI11_UART_CLK,	NULL, 0),
-	CLK_8X60("gsbi_uart_clk",	GSBI12_UART_CLK,	NULL, 0),
+	CLK_8X60("gsbi_uart_clk",	GSBI12_UART_CLK,
+		 &msm_device_uart_dm12.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI1_QUP_CLK,
 					&msm_gsbi1_qup_spi_device.dev, 0),
 	CLK_8X60("gsbi_qup_clk",	GSBI2_QUP_CLK,		NULL, 0),

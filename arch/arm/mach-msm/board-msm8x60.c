@@ -409,6 +409,7 @@ static struct platform_device gpio_leds = {
 
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
+	&msm_device_uart_dm12,
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
@@ -428,6 +429,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 
 static struct platform_device *surf_devices[] __initdata = {
 	&smsc911x_device,
+	&msm_device_uart_dm12,
 #ifdef CONFIG_I2C_QUP
 	&msm_gsbi3_qup_i2c_device,
 	&msm_gsbi4_qup_i2c_device,
@@ -885,6 +887,21 @@ static void register_i2c_devices(void)
 #endif
 }
 
+static void __init msm8x60_init_uart12dm(void)
+{
+	void *fpga_mem = ioremap_nocache(0x1D000000, SZ_4K);
+	/* Advanced mode */
+	writew(0xFFFF, fpga_mem + 0x15C);
+	/* FPGA_UART_SEL */
+	writew(0, fpga_mem + 0x172);
+	/* FPGA_GPIO_CONFIG_117 */
+	writew(1, fpga_mem + 0xEA);
+	/* FPGA_GPIO_CONFIG_118 */
+	writew(1, fpga_mem + 0xEC);
+	dmb();
+	iounmap(fpga_mem);
+}
+
 static void __init msm8x60_init_buses(void)
 {
 #ifdef CONFIG_I2C_QUP
@@ -1093,6 +1110,18 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(65, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
 #endif
 
+	/*
+	 * GSBI12
+	 */
+	/* UARTDM_RFR */
+	GPIO_CFG(115, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_CTS */
+	GPIO_CFG(116, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_RX */
+	GPIO_CFG(117, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_TX */
+	GPIO_CFG(118, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+
 #ifdef CONFIG_PMIC8058
 	/* PMIC8058 */
 	GPIO_CFG(PM8058_GPIO_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
@@ -1293,6 +1322,7 @@ static void __init msm8x60_init(void)
 
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
+	msm8x60_init_uart12dm();
 	msm8x60_init_mmc();
 	msm8x60_init_buses();
 	if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
