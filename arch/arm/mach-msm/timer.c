@@ -974,11 +974,12 @@ void __cpuinit local_timer_setup(struct clock_event_device *evt)
 	unsigned long flags;
 	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
 
-	writel(0, clock->regbase  + TIMER_ENABLE);
-	writel(1, clock->regbase + TIMER_CLEAR);
-	writel(0, clock->regbase + TIMER_COUNT_VAL);
-	writel(~0, clock->regbase + TIMER_MATCH_VAL);
-
+	if (!local_clock_event) {
+		writel(0, clock->regbase  + TIMER_ENABLE);
+		writel(1, clock->regbase + TIMER_CLEAR);
+		writel(0, clock->regbase + TIMER_COUNT_VAL);
+		writel(~0, clock->regbase + TIMER_MATCH_VAL);
+	}
 	evt->irq = clock->irq.irq;
 	evt->name = "local_timer";
 	evt->features = CLOCK_EVT_FEAT_ONESHOT;
