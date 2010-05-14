@@ -239,7 +239,7 @@ static int __init dtv_driver_init(void)
 
 	tv_src_clk = clk_get(NULL, "tv_src_clk");
 	if (IS_ERR(tv_src_clk))
-		tv_src_clk = tv_dac_clk; /* Fallback to slave */
+		tv_src_clk = tv_enc_clk; /* Fallback to slave */
 
 	hdmi_clk = clk_get(NULL, "hdmi_clk");
 	if (IS_ERR(hdmi_clk)) {
