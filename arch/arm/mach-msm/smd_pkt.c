@@ -30,9 +30,12 @@
 #include <linux/delay.h>
 #include <linux/uaccess.h>
 #include <linux/workqueue.h>
+#include <linux/platform_device.h>
+#include <linux/completion.h>
 #include <asm/ioctls.h>
 
 #include <mach/msm_smd.h>
+#include <mach/peripheral-loader.h>
 
 #include "modem_notifier.h"
 #include "smd_private.h"
@@ -45,6 +48,8 @@ struct smd_pkt_dev {
 	struct cdev cdev;
 	char name[9];
 	struct device *devicep;
+	void *pil;
+	struct platform_driver driver;
 
 	struct smd_channel *ch;
 	struct mutex ch_lock;
@@ -407,6 +412,14 @@ static char *smd_ch_name[] = {
 	"LOOPBACK",
 };
 
+static DECLARE_COMPLETION(modem_loaded);
+
+static int smd_pkt_dummy_probe(struct platform_device *pdev)
+{
+	complete_all(&modem_loaded);
+	return 0;
+}
+
 int smd_pkt_open(struct inode *inode, struct file *file)
 {
 	int r = 0;
@@ -421,6 +434,29 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&smd_pkt_devp->ch_lock);
 	if (smd_pkt_devp->ch == 0) {
+
+		smd_pkt_devp->pil = pil_get("modem");
+		if (IS_ERR(smd_pkt_devp->pil)) {
+			r = PTR_ERR(smd_pkt_devp->pil);
+			goto out;
+		}
+		/*
+		 * Wait for a packet channel to be allocated so we know
+		 * the modem is ready enough.
+		 */
+		r = wait_for_completion_interruptible_timeout(&modem_loaded,
+				msecs_to_jiffies(60000));
+		if (r == 0) {
+			pr_err("Timed out waiting for SMD channel\n");
+			r = -ETIMEDOUT;
+			pil_put(smd_pkt_devp->pil);
+			goto out;
+		} else if (r < 0) {
+			pr_err("Error waiting for SMD channel: %d\n", r);
+			pil_put(smd_pkt_devp->pil);
+			goto out;
+		}
+
 		if (!strcmp(smd_ch_name[smd_pkt_devp->i], "LOOPBACK")) {
 			/* set smsm state to SMSM_SMD_LOOPBACK state
 			** and wait allowing enough time for Modem side
@@ -430,15 +466,19 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 					  0, SMSM_SMD_LOOPBACK);
 			msleep(100);
 		}
+
 		r = smd_open(smd_ch_name[smd_pkt_devp->i],
 			     &smd_pkt_devp->ch,
 			     smd_pkt_devp,
 			     ch_notify);
-		if (r < 0)
+		if (r < 0) {
 			printk(KERN_ERR "%s failed for %s with rc %d\n",
 					__func__, smd_ch_name[smd_pkt_devp->i],
 					r);
+			pil_put(smd_pkt_devp->pil);
+		}
 	}
+out:
 	mutex_unlock(&smd_pkt_devp->ch_lock);
 
 	return r;
@@ -458,6 +498,7 @@ int smd_pkt_release(struct inode *inode, struct file *file)
 	if (smd_pkt_devp->ch != 0) {
 		r = smd_close(smd_pkt_devp->ch);
 		smd_pkt_devp->ch = 0;
+		pil_put(smd_pkt_devp->pil);
 	}
 	mutex_unlock(&smd_pkt_devp->ch_lock);
 
@@ -570,6 +611,12 @@ static int __init smd_pkt_init(void)
 		modem_register_notifier(&smd_pkt_devp[i]->nb);
 		mutex_init(&smd_pkt_devp[i]->has_reset_lock);
 
+		smd_pkt_devp[i]->driver.probe = smd_pkt_dummy_probe;
+		smd_pkt_devp[i]->driver.driver.name = smd_ch_name[i];
+		smd_pkt_devp[i]->driver.driver.owner = THIS_MODULE;
+		r = platform_driver_register(&smd_pkt_devp[i]->driver);
+		if (r)
+			goto error2;
 	}
 
 	printk(KERN_INFO "SMD Packet Port Driver Initialized.\n");
@@ -578,6 +625,7 @@ static int __init smd_pkt_init(void)
  error2:
 	if (i > 0) {
 		while (--i >= 0) {
+			platform_driver_unregister(&smd_pkt_devp[i]->driver);
 			cdev_del(&smd_pkt_devp[i]->cdev);
 			kfree(smd_pkt_devp[i]);
 			device_destroy(smd_pkt_classp,
@@ -597,6 +645,7 @@ static void __exit smd_pkt_cleanup(void)
 	int i;
 
 	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
+		platform_driver_unregister(&smd_pkt_devp[i]->driver);
 		modem_unregister_notifier(&smd_pkt_devp[i]->nb);
 		cdev_del(&smd_pkt_devp[i]->cdev);
 		kfree(smd_pkt_devp[i]);
