@@ -983,7 +983,9 @@ static struct kobj_attribute sr_vdd2_autocomp = {
 static int __init omap3_sr_init(void)
 {
 	int ret = 0;
+#ifdef CONFIG_TWL4030_CORE
 	u8 RdReg;
+#endif
 
 	/* Exit if OPP tables are not defined */
         if (!(mpu_opps && l3_opps)) {
