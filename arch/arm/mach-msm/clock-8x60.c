@@ -176,8 +176,6 @@ struct clk_local {
 	struct clk_freq_tbl	*current_freq;
 };
 
-struct clk_ops clk_ops_remote;
-
 /*
  * Set-Rate Functions
  */
