@@ -269,7 +269,9 @@ void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe)
 	pattern = mdp4_overlay_unpack_pattern(pipe);
 
 #ifdef MDP4_IGC_LUT_ENABLE
-	pipe->op_mode |= MDP4_OP_IGC_LUT_EN;
+	pipe->op_mode = MDP4_OP_IGC_LUT_EN;
+#else
+	pipe->op_mode = 0;
 #endif
 
 	mdp4_scale_setup(pipe);
@@ -314,10 +316,10 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	pattern = mdp4_overlay_unpack_pattern(pipe);
 
 #ifdef MDP4_IGC_LUT_ENABLE
-	pipe->op_mode |= (MDP4_OP_CSC_EN | MDP4_OP_SRC_DATA_YCBCR |
+	pipe->op_mode = (MDP4_OP_CSC_EN | MDP4_OP_SRC_DATA_YCBCR |
 				MDP4_OP_IGC_LUT_EN);
 #else
-	pipe->op_mode |= (MDP4_OP_CSC_EN | MDP4_OP_SRC_DATA_YCBCR);
+	pipe->op_mode = (MDP4_OP_CSC_EN | MDP4_OP_SRC_DATA_YCBCR);
 #endif
 
 	mdp4_scale_setup(pipe);
