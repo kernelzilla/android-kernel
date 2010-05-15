@@ -458,6 +458,10 @@ int kgsl_mmu_init(struct kgsl_device *device)
 			kgsl_mmu_close(device);
 			return status;
 		}
+
+		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
+				   mmu->dummyspace.size);
+
 		kgsl_regwrite(device, mmu_reg[device->id-1].tran_error,
 						mmu->dummyspace.physaddr);
 
@@ -666,8 +670,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 
 	BUG_ON(range <= 0);
 
-	gen_pool_free(pagetable->pool, gpuaddr, range);
-
 	numpages = (range >> KGSL_PAGESIZE_SHIFT);
 	if (range & (KGSL_PAGESIZE - 1))
 		numpages++;
@@ -693,6 +695,8 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 	}
 
 	mb();
+
+	gen_pool_free(pagetable->pool, gpuaddr, range);
 
 	KGSL_MEM_VDBG("return %d\n", 0);
 
