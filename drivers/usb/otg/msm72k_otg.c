@@ -32,6 +32,7 @@
 #include <mach/msm_hsusb.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
+#include <mach/clk.h>
 
 #define MSM_USB_BASE	(dev->regs)
 #define is_host()	((OTGSC_ID & readl(USB_OTGSC)) ? 0 : 1)
@@ -412,6 +413,101 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#define ULPI_VERIFY_MAX_LOOP_COUNT  5
+#define PHY_CALIB_RETRY_COUNT 10
+static unsigned ulpi_read_with_reset(struct msm_otg *dev, unsigned reg)
+{
+	int temp;
+	unsigned res;
+
+	for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+		res = ulpi_read(dev, reg);
+		if (res != -1)
+			return res;
+
+		clk_reset(dev->phy_clk, CLK_RESET_ASSERT);
+		msleep(1);
+		clk_reset(dev->phy_clk, CLK_RESET_DEASSERT);
+		msleep(1);
+	}
+
+	pr_err("%s: ulpi read failed for %d times\n",
+			__func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+
+	return -1;
+}
+
+static int ulpi_write_with_reset(struct msm_otg *dev,
+		unsigned val, unsigned reg)
+{
+	int temp;
+	int res;
+
+	for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+		res = ulpi_write(dev, val, reg);
+		if (!res)
+			return 0;
+
+		clk_reset(dev->phy_clk, CLK_RESET_ASSERT);
+		msleep(1);
+		clk_reset(dev->phy_clk, CLK_RESET_DEASSERT);
+		msleep(1);
+	}
+
+	pr_err("%s: ulpi write failed for %d times\n",
+			__func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+	return -1;
+}
+
+static int msm_otg_xceiv_caliberate(struct msm_otg *dev)
+{
+	unsigned res;
+	int i = 0;
+
+	do {
+		res = ulpi_read_with_reset(dev, ULPI_FUNC_CTRL_CLR);
+		if (res == -1)
+			return -ETIMEDOUT;
+
+		res = ulpi_write_with_reset(dev,
+				res | ULPI_SUSPENDM,
+				ULPI_FUNC_CTRL_CLR);
+		if (res)
+			return -ETIMEDOUT;
+
+		msleep(1);
+
+		res = ulpi_read_with_reset(dev, ULPI_DEBUG);
+		if (res == -1)
+			return -ETIMEDOUT;
+
+		if (!(res & ULPI_CALIB_STS) && ULPI_CALIB_VAL(res))
+			break;
+
+		res = -1;
+		i++;
+
+	} while (i < PHY_CALIB_RETRY_COUNT);
+
+	return res;
+}
+
+static int msm_otg_xceiv_reset(struct msm_otg *dev)
+{
+	clk_reset(dev->clk, CLK_RESET_ASSERT);
+	clk_reset(dev->phy_clk, CLK_RESET_ASSERT);
+	msleep(1);
+	clk_reset(dev->phy_clk, CLK_RESET_DEASSERT);
+	clk_reset(dev->clk, CLK_RESET_DEASSERT);
+
+	msleep(1);
+
+	/* select ULPI phy */
+	writel(0x80000000, USB_PORTSC);
+
+	return msm_otg_xceiv_caliberate(dev);
+}
+
 #define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
 static void otg_reset(struct msm_otg *dev)
 {
@@ -421,6 +517,9 @@ static void otg_reset(struct msm_otg *dev)
 	clk_enable(dev->clk);
 	if (dev->phy_reset)
 		dev->phy_reset(dev->regs);
+	else
+		msm_otg_xceiv_reset(dev);
+
 	/*disable all phy interrupts*/
 	ulpi_write(dev, 0xFF, 0x0F);
 	ulpi_write(dev, 0xFF, 0x12);
@@ -526,11 +625,21 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto put_pclk;
 		}
 	}
+
+	if (!dev->phy_reset) {
+		dev->phy_clk = clk_get(&pdev->dev, "usb_phy_clk");
+		if (IS_ERR(dev->phy_clk)) {
+			pr_err("%s: failed to get usb_phy_clk\n", __func__);
+			ret = PTR_ERR(dev->phy_clk);
+			goto put_cclk;
+		}
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		pr_err("%s: failed to get platform resource mem\n", __func__);
 		ret = -ENODEV;
-		goto put_cclk;
+		goto put_phy_clk;
 	}
 
 	dev->regs = ioremap(res->start, resource_size(res));
@@ -611,6 +720,9 @@ free_otg_irq:
 	free_irq(dev->irq, dev);
 free_regs:
 	iounmap(dev->regs);
+put_phy_clk:
+	if (dev->phy_clk)
+		clk_put(dev->phy_clk);
 put_cclk:
 	if (dev->cclk)
 		clk_put(dev->cclk);
@@ -645,6 +757,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 		clk_disable(dev->pclk);
 		clk_put(dev->pclk);
 	}
+	if (dev->phy_clk)
+		clk_put(dev->phy_clk);
 	clk_put(dev->clk);
 	kfree(dev);
 	if (dev->rpc_connect)
