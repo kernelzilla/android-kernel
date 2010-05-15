@@ -41,6 +41,7 @@
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
 #include <mach/tlmm.h>
+#include <mach/msm_battery.h>
 #include <mach/msm_hsusb.h>
 #ifdef CONFIG_USB_ANDROID
 #include <linux/usb/android.h>
@@ -292,6 +293,19 @@ static struct msm_ssbi_platform_data msm_ssbi3_pdata = {
 };
 #endif
 
+#ifdef CONFIG_BATTERY_MSM
+/* Use basic value for fake MSM battery */
+static struct msm_psy_batt_pdata msm_psy_batt_data = {
+	.avail_chg_sources = AC_CHG,
+};
+
+static struct platform_device msm_batt_device = {
+	.name              = "msm-battery",
+	.id                = -1,
+	.dev.platform_data = &msm_psy_batt_data,
+};
+#endif
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 #ifdef CONFIG_I2C_QUP
@@ -336,6 +350,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_USB_ANDROID
 	&android_usb_device,
+#endif
+#ifdef CONFIG_BATTERY_MSM
+	&msm_batt_device,
 #endif
 };
 
