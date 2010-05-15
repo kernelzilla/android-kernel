@@ -40,16 +40,16 @@
 
 #ifdef KGSL_CMDSTREAM_USE_MEM_TIMESTAMP
 #define KGSL_CMDSTREAM_GET_SOP_TIMESTAMP(device, data) 	\
-		kgsl_sharedmem_read(&device->memstore, (data),	\
-				KGSL_DEVICE_MEMSTORE_OFFSET(soptimestamp), 4)
+		kgsl_sharedmem_readl(&device->memstore, (data),	\
+				KGSL_DEVICE_MEMSTORE_OFFSET(soptimestamp))
 #else
 #define KGSL_CMDSTREAM_GET_SOP_TIMESTAMP(device, data)	\
 		kgsl_yamato_regread(device, REG_CP_TIMESTAMP, (data))
 #endif /* KGSL_CMDSTREAM_USE_MEM_TIMESTAMP */
 
 #define KGSL_CMDSTREAM_GET_EOP_TIMESTAMP(device, data)	\
-		kgsl_sharedmem_read(&device->memstore, (data),	\
-				KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp), 4)
+		kgsl_sharedmem_readl(&device->memstore, (data),	\
+				KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp))
 
 int kgsl_cmdstream_init(struct kgsl_device *device);
 

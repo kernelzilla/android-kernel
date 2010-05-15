@@ -102,9 +102,16 @@ int kgsl_sharedmem_import(struct kgsl_pagetable *,
 
 void kgsl_sharedmem_free(struct kgsl_memdesc *memdesc);
 
+int kgsl_sharedmem_readl(const struct kgsl_memdesc *memdesc,
+			uint32_t *dst,
+			unsigned int offsetbytes);
 
 int kgsl_sharedmem_read(const struct kgsl_memdesc *memdesc, void *dst,
 			unsigned int offsetbytes, unsigned int sizebytes);
+
+int kgsl_sharedmem_writel(const struct kgsl_memdesc *memdesc,
+			unsigned int offsetbytes,
+			uint32_t src);
 
 int kgsl_sharedmem_write(const struct kgsl_memdesc *memdesc,
 			unsigned int offsetbytes,
