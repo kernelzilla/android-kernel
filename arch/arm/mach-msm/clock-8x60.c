@@ -1136,8 +1136,8 @@ static uint32_t chld_csi_src[] = 	{C(CSI0), C(CSI1), C(NONE)};
 static uint32_t chld_pixel_mdp[] = 	{C(PIXEL_LCDC), C(NONE)};
 static uint32_t chld_tv_src[] =		{C(TV_ENC), C(TV_DAC), C(MDP_TV),
 					 C(HDMI_TV), C(DSUB_TV), C(NONE)};
-static uint32_t chld_vfe_src[] =	{C(VFE), C(CS0_VFE),
-					 C(CS1_VFE), C(NONE)};
+static uint32_t chld_vfe_src[] =	{C(VFE),  C(CSI0_VFE), C(CSI1_VFE),
+					 C(NONE)};
 static uint32_t chld_mi2s_src[] =	{C(MI2S), C(MI2S_M), C(NONE)};
 
 static struct clk_local clk_local_tbl[] = {
@@ -1270,9 +1270,9 @@ static struct clk_local clk_local_tbl[] = {
 	CLK_VPE(VPE, 0x0118),
 
 	CLK_VFE(VFE_SRC, 0x010C),
-	CLK_SLAVE_MM(VFE,     0x0104, B(0),  VFE_SRC),
-	CLK_SLAVE_MM(CS0_VFE, 0x0104, B(12), VFE_SRC),
-	CLK_SLAVE_MM(CS1_VFE, 0x0104, B(10), VFE_SRC),
+	CLK_SLAVE_MM(VFE,      0x0104, B(0),  VFE_SRC),
+	CLK_SLAVE_MM(CSI0_VFE, 0x0104, B(12), VFE_SRC),
+	CLK_SLAVE_MM(CSI1_VFE, 0x0104, B(10), VFE_SRC),
 
 
 	/*
