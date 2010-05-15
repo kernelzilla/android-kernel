@@ -26,11 +26,20 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#ifndef __ARCH_ARM_MACH_MSM_DEVICES_MSM8X60_H
+#define __ARCH_ARM_MACH_MSM_DEVICES_MSM8X60_H
 
-#ifndef __ASM_ARCH_MSM_GPIO_V2_8X60_H
-#define __ASM_ARCH_MSM_GPIO_V2_8X60_H
+#define MSM_GSBI3_QUP_I2C_BUS_ID 0
+#define MSM_GSBI4_QUP_I2C_BUS_ID 1
+#define MSM_GSBI9_QUP_I2C_BUS_ID 2
+#define MSM_GSBI8_QUP_I2C_BUS_ID 3
+#define MSM_GSBI7_QUP_I2C_BUS_ID 4
+#define MSM_SSBI1_I2C_BUS_ID     6
+#define MSM_SSBI2_I2C_BUS_ID     7
+#define MSM_SSBI3_I2C_BUS_ID     8
 
-#define NR_MSM_GPIOS 173
-#define ARCH_NR_GPIOS 512
+#ifdef CONFIG_SPI_QUP
+extern struct platform_device msm_gsbi1_qup_spi_device;
+#endif
 
-#endif /* __ASM_ARCH_MSM_GPIO_V2_8X60_H */
+#endif
