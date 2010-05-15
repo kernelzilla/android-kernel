@@ -23,6 +23,7 @@
 #include <asm/mach/mmc.h>
 #include "clock.h"
 #include "clock-8x60.h"
+#include "clock-rpm.h"
 
 /* Address of GSBI blocks */
 #define MSM_GSBI1_PHYS	0x16000000
@@ -479,6 +480,8 @@ struct platform_device msm_device_gadget_peripheral = {
 };
 
 struct clk msm_clocks_8x60[] = {
+	CLK_RPM("ebi1_clk",		EBI1_CLK,		NULL, CLK_MIN),
+
 	CLK_8X60("bbrx_ssbi_clk",	BBRX_SSBI_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI1_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI2_UART_CLK,		NULL, 0),
