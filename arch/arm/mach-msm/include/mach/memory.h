@@ -19,6 +19,8 @@
 /* physical offset of RAM */
 #if defined(CONFIG_ARCH_QSD8X50)
 #define PHYS_OFFSET		UL(0x20000000)
+#elif defined(CONFIG_MSM_AMSS_SUPPORT_256MB_EBI1)
+#define PHYS_OFFSET		UL(0x19200000)
 #else
 #define PHYS_OFFSET		UL(0x10000000)
 #endif
