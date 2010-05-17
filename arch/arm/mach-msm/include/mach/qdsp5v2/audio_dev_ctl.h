@@ -60,6 +60,7 @@ struct msm_snddev_info {
 	u32 sample_rate;
 	u32 set_sample_rate;
 	u32 sessions;
+	int usage_count;
 	s32 max_voc_rx_vol[VOC_RX_VOL_ARRAY_NUM]; /* [0] is for NB,[1] for WB */
 	s32 min_voc_rx_vol[VOC_RX_VOL_ARRAY_NUM];
 };
