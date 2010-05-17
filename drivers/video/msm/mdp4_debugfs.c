@@ -360,16 +360,16 @@ static ssize_t mdp_stat_read(
 
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "pipe_rgb1:  %08lu\n", mdp4_stat.pipe_rgb[0]);
+	len = snprintf(bp, dlen, "pipe_rgb1:  %08lu\n", mdp4_stat.pipe[0]);
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "pipe_rgb2:  %08lu\n", mdp4_stat.pipe_rgb[1]);
+	len = snprintf(bp, dlen, "pipe_rgb2:  %08lu\n", mdp4_stat.pipe[1]);
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "pipe_vg1:   %08lu\n", mdp4_stat.pipe_vg[0]);
+	len = snprintf(bp, dlen, "pipe_vg1:   %08lu\n", mdp4_stat.pipe[2]);
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "pipe_vg2:   %08lu\n\n", mdp4_stat.pipe_vg[1]);
+	len = snprintf(bp, dlen, "pipe_vg2:   %08lu\n\n", mdp4_stat.pipe[3]);
 	bp += len;
 	dlen -= len;
 	len = snprintf(bp, dlen, "err_mixer:  %08lu\n", mdp4_stat.err_mixer);
