@@ -31,6 +31,8 @@
 #include <linux/i2c/sx150x.h>
 #include <linux/smsc911x.h>
 #include <linux/spi/spi.h>
+#include <linux/regulator/consumer.h>
+#include <linux/input/tdisc_shinetsu.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -627,6 +629,16 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 				.inv_int_pol    = 0,
 			},
 		},
+		{ /* TouchDisc Interrupt */
+			5,
+			{
+				.direction      = PM_GPIO_DIR_IN,
+				.pull           = PM_GPIO_PULL_UP_1P5,
+				.vin_sel        = 2,
+				.function       = PM_GPIO_FUNC_NORMAL,
+				.inv_int_pol    = 0,
+			}
+		},
 	};
 
 	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
@@ -791,9 +803,99 @@ static struct i2c_board_info pm8058_boardinfo[] __initdata = {
 		.platform_data = &pm8058_platform_data,
 	},
 };
-
 #endif /* CONFIG_PMIC8058 */
 
+#if defined(CONFIG_TOUCHDISC_VTD518_SHINETSU) || \
+		defined(CONFIG_TOUCHDISC_VTD518_SHINETSU_MODULE)
+#define TDISC_I2C_SLAVE_ADDR	0x67
+#define PMIC_GPIO_TDISC		PM8058_GPIO_PM_TO_SYS(5)
+#define TDISC_INT		PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 5)
+#define TDISC_OE		(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 4)
+
+static int tdisc_shinetsu_setup(void)
+{
+	int rc;
+
+	rc = gpio_request(PMIC_GPIO_TDISC, "tdisc_interrupt");
+	if (rc) {
+		pr_err("%s: gpio_request failed for PMIC_GPIO_TDISC\n",
+								__func__);
+		return rc;
+	}
+
+	rc = gpio_request(TDISC_OE, "tdisc_oe");
+	if (rc) {
+		pr_err("%s: gpio_request failed for TDISC_OE\n",
+							__func__);
+		goto fail_gpio_oe;
+	}
+
+	rc = gpio_direction_output(TDISC_OE, 1);
+	if (rc) {
+		pr_err("%s: gpio_direction_output failed for TDISC_OE\n",
+								__func__);
+		gpio_free(TDISC_OE);
+		goto fail_gpio_oe;
+	}
+
+	return rc;
+
+fail_gpio_oe:
+	gpio_free(PMIC_GPIO_TDISC);
+	return rc;
+}
+
+static void tdisc_shinetsu_release(void)
+{
+	gpio_free(PMIC_GPIO_TDISC);
+	gpio_free(TDISC_OE);
+}
+
+static int tdisc_shinetsu_enable(void)
+{
+	/* REVISIT: Enable regulators 8058_l5 and 8058_s3 */
+
+	/* Enable the OE (output enable) gpio */
+	gpio_set_value(TDISC_OE, 1);
+
+	return 0;
+}
+
+static void tdisc_shinetsu_disable(void)
+{
+	/* REVISIT: Disable regulators 8058_l5 and 8058_s3 */
+
+	/* Disable the OE (output enable) gpio */
+	gpio_set_value(TDISC_OE, 0);
+}
+
+static struct tdisc_abs_values tdisc_abs = {
+	.x_max = 32,
+	.y_max = 32,
+	.x_min = -32,
+	.y_min = -32,
+	.pressure_max = 32,
+	.pressure_min = 0,
+};
+
+static struct tdisc_platform_data tdisc_data = {
+	.tdisc_setup = tdisc_shinetsu_setup,
+	.tdisc_release = tdisc_shinetsu_release,
+	.tdisc_enable = tdisc_shinetsu_enable,
+	.tdisc_disable = tdisc_shinetsu_disable,
+	.tdisc_wakeup  = 1,
+	.tdisc_gpio = PMIC_GPIO_TDISC,
+	.tdisc_abs  = &tdisc_abs,
+};
+
+static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
+	{
+		I2C_BOARD_INFO("vtd518", TDISC_I2C_SLAVE_ADDR),
+		.irq =  TDISC_INT,
+		.platform_data = &tdisc_data,
+	},
+};
+#endif
 
 unsigned long clk_get_max_axi_khz(void)
 {
@@ -840,6 +942,15 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		MSM_GSBI3_QUP_I2C_BUS_ID,
 		fha_expanders_i2c_info,
 		ARRAY_SIZE(fha_expanders_i2c_info),
+	},
+#endif
+#if defined(CONFIG_TOUCHDISC_VTD518_SHINETSU) || \
+		defined(CONFIG_TOUCHDISC_VTD518_SHINETSU_MODULE)
+	{
+		I2C_SURF | I2C_FFA,
+		MSM_GSBI3_QUP_I2C_BUS_ID,
+		msm_i2c_gsbi3_tdisc_info,
+		ARRAY_SIZE(msm_i2c_gsbi3_tdisc_info),
 	},
 #endif
 };
