@@ -35,9 +35,11 @@
 #define SIMPLE_SLEW		6
 #define COMPLEX_SLEW		7
 
-#define L_VAL_384MHZ		0xA
-#define L_VAL_1497MHZ		0x27
-#define L_VAL_SCPLL_HW_MAX	L_VAL_1497MHZ
+/* PLL calibration limits.
+ * The PLL hardware is capable of 384MHz to 1497.6MHz. The L_VALs
+ * used for calibration should respect these limits. */
+#define L_VAL_SCPLL_CAL_MIN	0xA
+#define L_VAL_SCPLL_CAL_MAX	0x27
 
 /* SCPLL Modes. */
 #define SCPLL_POWER_DOWN	0
@@ -48,11 +50,17 @@
 #define SCPLL_STEP_CAL		6
 #define SCPLL_NORMAL		7
 
+#define SCPLL_DEBUG_NONE	0
+#define SCPLL_DEBUG_FULL	3
+
 /* Scorpion PLL registers. */
-#define SCPLL_CTL_ADDR         (MSM_SCPLL_BASE + 0x4)
-#define SCPLL_CAL_ADDR         (MSM_SCPLL_BASE + 0x8)
-#define SCPLL_STATUS_ADDR      (MSM_SCPLL_BASE + 0x10)
-#define SCPLL_FSM_CTL_EXT_ADDR (MSM_SCPLL_BASE + 0x24)
+#define SCPLL_DEBUG_ADDR        (MSM_SCPLL_BASE + 0x0)
+#define SCPLL_CTL_ADDR          (MSM_SCPLL_BASE + 0x4)
+#define SCPLL_CAL_ADDR          (MSM_SCPLL_BASE + 0x8)
+#define SCPLL_STATUS_ADDR       (MSM_SCPLL_BASE + 0x10)
+#define SCPLL_FSM_CTL_EXT_ADDR  (MSM_SCPLL_BASE + 0x24)
+#define SCPLL_LUT_A_HW_MAX_ADDR (MSM_SCPLL_BASE + (0x38 + \
+					((L_VAL_SCPLL_CAL_MAX / 4) * 4)))
 
 #define SPSS_CLK_CTL_ADDR	(MSM_CSR_BASE + 0x100)
 #define SPSS_CLK_SEL_ADDR	(MSM_CSR_BASE + 0x104)
@@ -84,6 +92,7 @@ struct clkctl_acpu_speed {
 	unsigned long    lpj; /* loops_per_jiffy */
 };
 
+#define PLL3_CALIBRATION_IDX 2 /* PLL0 */
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 0,  19200, ACPU_PLL_TCXO, 0, 0, 0, 0, 14000, 0, 0, 1225 },
 	/* Use AXI source. Row number in acpuclk_init() must match this. */
@@ -340,11 +349,29 @@ out:
 	return rc;
 }
 
+/* Make sure ACPU clock is not PLL3, so PLL3 can be re-programmed. */
+static void __init move_off_scpll(void)
+{
+	struct clkctl_acpu_speed *tgt_s = &acpu_freq_tbl[PLL3_CALIBRATION_IDX];
+
+	BUG_ON(tgt_s->pll == ACPU_PLL_3);
+	select_clk_source(tgt_s);
+	select_core_source(tgt_s->core_src_sel);
+	drv_state.current_speed = tgt_s;
+	calibrate_delay();
+}
+
 static void __init scpll_init(void)
 {
 	uint32_t regval;
 
 	dprintk("Initializing PLL 3\n");
+
+	/* Clear calibration LUT registers containing max frequency entry.
+	 * LUT registers are only writeable in debug mode. */
+	writel(SCPLL_DEBUG_FULL, SCPLL_DEBUG_ADDR);
+	writel(0x0, SCPLL_LUT_A_HW_MAX_ADDR);
+	writel(SCPLL_DEBUG_NONE, SCPLL_DEBUG_ADDR);
 
 	/* Power-up SCPLL into standby mode. */
 	writel(SCPLL_STANDBY, SCPLL_CTL_ADDR);
@@ -354,83 +381,27 @@ static void __init scpll_init(void)
 	 * might not use the full range of calibrated frequencies, but this
 	 * simplifies changes required for future increases in max CPU freq.
 	 */
-	regval = (L_VAL_SCPLL_HW_MAX << 24) | (L_VAL_384MHZ << 16);
+	regval = (L_VAL_SCPLL_CAL_MAX << 24) | (L_VAL_SCPLL_CAL_MIN << 16);
 	writel(regval, SCPLL_CAL_ADDR);
+
+	/* Start calibration */
 	writel(SCPLL_FULL_CAL, SCPLL_CTL_ADDR);
 
-	/* Wait for calibration to compelte. */
+	/* Wait for proof that calibration has started before checking the
+	 * 'calibration done' bit in the status register. Waiting for the
+	 * LUT register we cleared to contain data accomplishes this.
+	 * This is required since the 'calibration done' bit takes time to
+	 * transition from 'done' to 'not done' when starting a calibration.
+	 */
+	while (readl(SCPLL_LUT_A_HW_MAX_ADDR) == 0)
+		cpu_relax();
+
+	/* Wait for calibration to complete. */
 	while (readl(SCPLL_STATUS_ADDR) & 0x2)
-		;
+		cpu_relax();
 
 	/* Power-down SCPLL */
 	scpll_enable(0, NULL);
-}
-
-static void __init acpuclk_init(void)
-{
-	struct clkctl_acpu_speed *speed;
-	uint32_t div, sel, regval;
-	int res;
-
-	/* Determine the source of the Scorpion clock. */
-	regval = readl(SPSS_CLK_SEL_ADDR);
-	switch ((regval & 0x6) >> 1) {
-	case 0: /* raw source clock */
-	case 3: /* low jitter PLL1 (768Mhz) */
-		if (regval & 0x1) {
-			sel = ((readl(SPSS_CLK_CTL_ADDR) >> 4) & 0x7);
-			div = ((readl(SPSS_CLK_CTL_ADDR) >> 0) & 0xf);
-		} else {
-			sel = ((readl(SPSS_CLK_CTL_ADDR) >> 12) & 0x7);
-			div = ((readl(SPSS_CLK_CTL_ADDR) >> 8) & 0xf);
-		}
-
-		/* Find the matching clock rate. */
-		for (speed = acpu_freq_tbl; speed->acpuclk_khz != 0; speed++) {
-			if (speed->acpuclk_src_sel == sel &&
-			    speed->acpuclk_src_div == div)
-				break;
-		}
-		break;
-
-	case 1: /* unbuffered scorpion pll (384Mhz to 998.4Mhz) */
-		sel = ((readl(SCPLL_FSM_CTL_EXT_ADDR) >> 3) & 0x3f);
-
-		/* Find the matching clock rate. */
-		for (speed = acpu_freq_tbl; speed->acpuclk_khz != 0; speed++) {
-			if (speed->l_value == sel &&
-			    speed->core_src_sel == 1)
-				break;
-		}
-		break;
-
-	case 2: /* AXI bus clock (128Mhz) */
-		speed = &acpu_freq_tbl[1];
-		break;
-	default:
-		BUG();
-	}
-
-	/* Initialize scpll only if it wasn't already initialized by the boot
-	 * loader. If the CPU is already running on scpll, then the scpll was
-	 * initialized by the boot loader. */
-	if (speed->pll != ACPU_PLL_3)
-		scpll_init();
-
-	if (speed->acpuclk_khz == 0) {
-		pr_err("Error - ACPU clock reports invalid speed\n");
-		return;
-	}
-
-	/* Set initial ACPU VDD. */
-	acpuclk_set_vdd_level(speed->vdd);
-
-	drv_state.current_speed = speed;
-	res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK, speed->ebi1clk_khz * 1000);
-	if (res < 0)
-		pr_warning("Setting EBI1/AXI min rate failed (%d)\n", res);
-
-	pr_info("ACPU running at %d KHz\n", speed->acpuclk_khz);
 }
 
 /* Initalize the lpj field in the acpu_freq_tbl. */
@@ -485,8 +456,15 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	drv_state.max_vdd = clkdata->max_vdd;
 	drv_state.acpu_set_vdd = clkdata->acpu_set_vdd;
 
-	acpuclk_init();
+	/* Configure hardware. */
+	move_off_scpll();
+	scpll_init();
+
 	lpj_init();
+
+	/* Improve boot time by ramping up to 1190.4MHz immediately. */
+	acpuclk_set_rate(smp_processor_id(), 1190400, SETRATE_CPUFREQ);
+
 #ifdef CONFIG_CPU_FREQ_MSM
 	cpufreq_table_init();
 	cpufreq_frequency_table_get_attr(freq_table, smp_processor_id());
