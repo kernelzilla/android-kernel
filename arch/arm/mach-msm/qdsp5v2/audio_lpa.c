@@ -361,8 +361,9 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 			auddec_dsp_config(audio, 1);
 			audio->out_needed = 0;
 			audio->running = 1;
-			audpp_dsp_set_vol_pan(audio->dec_id, &audio->vol_pan,
-					POPP);
+			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+						&audio->vol_pan,
+						COPP);
 			audpp_dsp_set_eq(audio->dec_id, audio->eq_enable,
 					&audio->eq, POPP);
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
@@ -1001,8 +1002,9 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		spin_lock_irqsave(&audio->dsp_lock, flags);
 		audio->vol_pan.volume = arg;
 		if (audio->running)
-			audpp_dsp_set_vol_pan(audio->dec_id, &audio->vol_pan,
-					POPP);
+			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+						&audio->vol_pan,
+						COPP);
 		spin_unlock_irqrestore(&audio->dsp_lock, flags);
 		rc = 0;
 		break;
@@ -1011,8 +1013,9 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		spin_lock_irqsave(&audio->dsp_lock, flags);
 		audio->vol_pan.pan = arg;
 		if (audio->running)
-			audpp_dsp_set_vol_pan(audio->dec_id, &audio->vol_pan,
-					POPP);
+			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+						&audio->vol_pan,
+						COPP);
 		spin_unlock_irqrestore(&audio->dsp_lock, flags);
 		rc = 0;
 		break;
