@@ -1193,6 +1193,80 @@ static struct platform_device msm_fluid_iearpeice_rx_device = {
 	.dev = { .platform_data = &snddev_fluid_iearpiece_rx_data },
 };
 
+static struct adie_codec_action_unit fluid_idual_mic_ef_8KHz_osr256_actions[] =
+	MIC1_LEFT_AUX_IN_RIGHT_8000_OSR_256;
+
+static struct adie_codec_hwsetting_entry fluid_idual_mic_endfire_settings[] = {
+	{
+		.freq_plan = 8000,
+		.osr = 256,
+		.actions = fluid_idual_mic_ef_8KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE(fluid_idual_mic_ef_8KHz_osr256_actions),
+	}, /* 8KHz profile can be used for 16KHz */
+	{
+		.freq_plan = 16000,
+		.osr = 256,
+		.actions = fluid_idual_mic_ef_8KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE(fluid_idual_mic_ef_8KHz_osr256_actions),
+	}, /* 8KHz profile can also be used for 48KHz */
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions = fluid_idual_mic_ef_8KHz_osr256_actions,
+		.action_sz = ARRAY_SIZE(fluid_idual_mic_ef_8KHz_osr256_actions),
+	}
+};
+
+static struct adie_codec_dev_profile fluid_idual_mic_endfire_profile = {
+	.path_type = ADIE_CODEC_TX,
+	.settings = fluid_idual_mic_endfire_settings,
+	.setting_sz = ARRAY_SIZE(fluid_idual_mic_endfire_settings),
+};
+
+static enum hsed_controller fluid_idual_mic_endfire_pmctl_id[] = {
+	PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2
+};
+
+static struct snddev_icodec_data snddev_fluid_idual_mic_endfire_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "handset_dual_mic_endfire_tx",
+	.copp_id = 0,
+	.acdb_id = 0x2D,
+	.profile = &fluid_idual_mic_endfire_profile,
+	.channel_mode = 2,
+	.default_sample_rate = 48000,
+	.pmctl_id = fluid_idual_mic_endfire_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(fluid_idual_mic_endfire_pmctl_id),
+	.pamp_on = msm_snddev_tx_route_config,
+	.pamp_off = msm_snddev_tx_route_deconfig,
+};
+
+static struct platform_device msm_fluid_idual_mic_endfire_device = {
+	.name = "snddev_icodec",
+	.id = 24,
+	.dev = { .platform_data = &snddev_fluid_idual_mic_endfire_data },
+};
+
+static struct snddev_icodec_data snddev_fluid_spk_idual_mic_endfire_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "speaker_dual_mic_endfire_tx",
+	.copp_id = 0,
+	.acdb_id = 0x2D,
+	.profile = &fluid_idual_mic_endfire_profile,
+	.channel_mode = 2,
+	.default_sample_rate = 48000,
+	.pmctl_id = fluid_idual_mic_endfire_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(fluid_idual_mic_endfire_pmctl_id),
+	.pamp_on = msm_snddev_tx_route_config,
+	.pamp_off = msm_snddev_tx_route_deconfig,
+};
+
+static struct platform_device msm_fluid_spk_idual_mic_endfire_device = {
+	.name = "snddev_icodec",
+	.id = 25,
+	.dev = { .platform_data = &snddev_fluid_spk_idual_mic_endfire_data },
+};
+
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
@@ -1240,6 +1314,8 @@ static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_ispeaker_tx_device,
 	&msm_fluid_imic_tx_device,
 	&msm_fluid_iearpeice_rx_device,
+	&msm_fluid_idual_mic_endfire_device,
+	&msm_fluid_spk_idual_mic_endfire_device,
 };
 
 #ifdef CONFIG_DEBUG_FS
