@@ -1041,9 +1041,8 @@ static struct clk_freq_tbl clk_tbl_vpe[] = {
 #define CC_MASK_VFE (BM(7, 6))
 #define CLK_VFE(id, ns) \
 		CLK_LOCAL(id, MND, REG_MM(ns), REG_MM(ns-8), REG_MM(ns-4), \
-				NULL, 0, 0, B(2), NS_MASK_VFE, CC_MASK_VFE, \
-				set_rate_mnd, clk_tbl_vfe, NULL, NONE, \
-				chld_vfe_src)
+				NULL, 0, B(0), B(2), NS_MASK_VFE, CC_MASK_VFE, \
+				set_rate_mnd, clk_tbl_vfe, NULL, NONE, chld_vfe)
 #define F_VFE(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD8(8, m, 0, n), \
 			NS_MM(23, 16, n, m, 11, 10, d, 2, 0, s), \
@@ -1140,8 +1139,7 @@ static uint32_t chld_csi_src[] = 	{C(CSI0), C(CSI1), C(NONE)};
 static uint32_t chld_pixel_mdp[] = 	{C(PIXEL_LCDC), C(NONE)};
 static uint32_t chld_tv_src[] =		{C(TV_ENC), C(TV_DAC), C(MDP_TV),
 					 C(HDMI_TV), C(DSUB_TV), C(NONE)};
-static uint32_t chld_vfe_src[] =	{C(VFE),  C(CSI0_VFE), C(CSI1_VFE),
-					 C(NONE)};
+static uint32_t chld_vfe[] =		{C(CSI0_VFE), C(CSI1_VFE), C(NONE)};
 static uint32_t chld_mi2s_src[] =	{C(MI2S), C(MI2S_M), C(NONE)};
 static uint32_t chld_codec_i2s_mic_src[] =	{C(CODEC_I2S_MIC),
 						 C(CODEC_I2S_MIC_M), C(NONE)};
@@ -1281,11 +1279,9 @@ static struct clk_local clk_local_tbl[] = {
 
 	CLK_VPE(VPE, 0x0118),
 
-	CLK_VFE(VFE_SRC, 0x010C),
-	CLK_SLAVE_MM(VFE,      0x0104, B(0),  VFE_SRC),
-	CLK_SLAVE_MM(CSI0_VFE, 0x0104, B(12), VFE_SRC),
-	CLK_SLAVE_MM(CSI1_VFE, 0x0104, B(10), VFE_SRC),
-
+	CLK_VFE(VFE, 0x010C),
+	CLK_SLAVE_MM(CSI0_VFE, 0x0104, B(12), VFE),
+	CLK_SLAVE_MM(CSI1_VFE, 0x0104, B(10), VFE),
 
 	/*
 	 * Low Power Audio Clocks
