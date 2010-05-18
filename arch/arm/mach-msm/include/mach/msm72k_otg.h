@@ -33,6 +33,8 @@
 #include <linux/usb.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
+#include <linux/wakelock.h>
+
 #include <asm/mach-types.h>
 
 #define OTGSC_BSVIE            (1 << 27)
@@ -41,15 +43,62 @@
 #define OTGSC_ID               (1 << 8)
 #define OTGSC_IDIS             (1 << 16)
 #define OTGSC_BSV              (1 << 11)
+#define OTGSC_DPIE             (1 << 30)
+#define OTGSC_DPIS             (1 << 22)
+#define OTGSC_HADP             (1 << 6)
 
 #define ULPI_STP_CTRL   (1 << 30)
 #define ASYNC_INTR_CTRL (1 << 29)
 
 #define PORTSC_PHCD     (1 << 23)
+#define PORTSC_CSC	(1 << 1)
 #define disable_phy_clk() (writel(readl(USB_PORTSC) | PORTSC_PHCD, USB_PORTSC))
 #define enable_phy_clk() (writel(readl(USB_PORTSC) & ~PORTSC_PHCD, USB_PORTSC))
 #define is_phy_clk_disabled() (readl(USB_PORTSC) & PORTSC_PHCD)
 #define is_usb_active()       (!(readl(USB_PORTSC) & PORTSC_SUSP))
+
+/* Timeout (in msec) values (min - max) associated with OTG timers */
+
+#define TA_WAIT_VRISE	100	/* ( - 100)  */
+#define TA_WAIT_VFALL	500	/* ( - 1000) */
+#define TA_WAIT_BCON	30000	/* (1100 - 30000) */
+/* AIDL_BDIS should be 500 */
+#define TA_AIDL_BDIS	200	/* (200 - ) */
+#define TA_BIDL_ADIS	155	/* (155 - 200) */
+#define TB_SRP_FAIL	6000	/* (5000 - 6000) */
+#define TB_ASE0_BRST	155	/* (155 - ) */
+
+/* TB_SSEND_SRP and TB_SE0_SRP are combined */
+#define TB_SRP_INIT	2000	/* (1500 - ) */
+
+/* Timeout variables */
+
+#define A_WAIT_VRISE	0
+#define A_WAIT_VFALL	1
+#define A_WAIT_BCON	2
+#define A_AIDL_BDIS	3
+#define A_BIDL_ADIS	4
+#define B_SRP_FAIL	5
+#define B_ASE0_BRST	6
+
+/* Internal flags like a_set_b_hnp_en, b_hnp_en are maintained
+ * in usb_bus and usb_gadget
+ */
+
+#define A_BUS_DROP		0
+#define A_BUS_REQ		1
+#define A_SRP_DET		2
+#define A_VBUS_VLD		3
+#define B_CONN			4
+#define ID			5
+#define ADP_CHANGE		6
+#define POWER_UP		7
+#define A_CLR_ERR		8
+#define A_BUS_RESUME		9
+#define A_BUS_SUSPEND		10
+#define A_CONN			11
+#define B_BUS_REQ		12
+#define B_SESS_VLD		13
 
 struct msm_otg {
 	struct otg_transceiver otg;
@@ -75,6 +124,17 @@ struct msm_otg {
 	/* pmic notfications apis */
 	u8 pmic_notif_supp;
 	struct msm_otg_platform_data *pdata;
+
+	spinlock_t lock; /* protects OTG state */
+	struct wake_lock wlock;
+	unsigned long b_last_se0_sess; /* SRP initial condition check */
+	unsigned long inputs;
+	unsigned long tmouts;
+	u8 active_tmout;
+	struct hrtimer timer;
+	struct workqueue_struct *wq;
+	struct work_struct sm_work; /* state machine work */
+	struct notifier_block usbdev_nb;
 };
 
 /* usb controller's protocol engine depends on AXI clock.

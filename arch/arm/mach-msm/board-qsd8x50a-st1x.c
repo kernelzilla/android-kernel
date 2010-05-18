@@ -618,7 +618,6 @@ static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 
 static struct msm_usb_host_platform_data msm_usb_host_pdata = {
 	.phy_info	= (USB_PHY_INTEGRATED | USB_PHY_MODEL_180NM),
-	.phy_reset = msm_hsusb_native_phy_reset,
 	.vbus_power = msm_hsusb_vbus_power,
 };
 

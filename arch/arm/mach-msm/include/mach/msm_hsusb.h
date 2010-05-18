@@ -147,12 +147,12 @@ struct msm_otg_platform_data {
 	int (*pmic_enable_ldo) (int);
 	void (*setup_gpio)(unsigned int config);
 	u8      otg_mode;
+	void (*vbus_power) (unsigned phy_info, int on);
 };
 
 struct msm_usb_host_platform_data {
 	unsigned phy_info;
 	unsigned int power_budget;
-	int (*phy_reset)(void __iomem *addr);
 	void (*config_gpio)(unsigned int config);
 	void (*vbus_power) (unsigned phy_info, int on);
 	int  (*vbus_init)(int init);
