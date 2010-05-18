@@ -265,12 +265,23 @@ struct audpp_cmd_cfg_adec_params_wav {
 
 #define AUDPP_CMD_CFG_DEV_MIXER            0x0008
 
+#define AUDPP_CMD_CFG_DEV_MIXER_ID_0       0
+#define AUDPP_CMD_CFG_DEV_MIXER_ID_1       1
+#define AUDPP_CMD_CFG_DEV_MIXER_ID_2       2
+#define AUDPP_CMD_CFG_DEV_MIXER_ID_3       3
+#define AUDPP_CMD_CFG_DEV_MIXER_ID_4       4
+
 #define AUDPP_CMD_CFG_DEV_MIXER_DEV_NONE   0x0000
-#define AUDPP_CMD_CFG_DEV_MIXER_DEV_0      0x0001
-#define AUDPP_CMD_CFG_DEV_MIXER_DEV_1      0x0002
-#define AUDPP_CMD_CFG_DEV_MIXER_DEV_2      0x0004
-#define AUDPP_CMD_CFG_DEV_MIXER_DEV_3      0x0008
-#define AUDPP_CMD_CFG_DEV_MIXER_DEV_4      0x0010
+#define AUDPP_CMD_CFG_DEV_MIXER_DEV_0      \
+				(0x1 << AUDPP_CMD_CFG_DEV_MIXER_ID_0)
+#define AUDPP_CMD_CFG_DEV_MIXER_DEV_1      \
+				(0x1 << AUDPP_CMD_CFG_DEV_MIXER_ID_1)
+#define AUDPP_CMD_CFG_DEV_MIXER_DEV_2      \
+				(0x1 << AUDPP_CMD_CFG_DEV_MIXER_ID_2)
+#define AUDPP_CMD_CFG_DEV_MIXER_DEV_3      \
+				(0x1 << AUDPP_CMD_CFG_DEV_MIXER_ID_3)
+#define AUDPP_CMD_CFG_DEV_MIXER_DEV_4      \
+				(0x1 << AUDPP_CMD_CFG_DEV_MIXER_ID_4)
 
 struct audpp_cmd_cfg_dev_mixer_params {
 	unsigned short cmd_id;

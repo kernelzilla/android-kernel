@@ -666,7 +666,7 @@ int audpp_dsp_set_vol_pan(unsigned id,
 			return -EINVAL;
 		}
 	} else {
-		if (id > 3) {
+		if (id > AUDPP_MAX_COPP_DEVICES) {
 			MM_ERR("Wrong COPP decoder id: %d\n", id);
 			return -EINVAL;
 		}
