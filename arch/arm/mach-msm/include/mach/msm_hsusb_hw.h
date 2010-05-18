@@ -279,8 +279,6 @@ struct ept_queue_item {
 #define USB_PHY                  (1 << 18)
 
 #define ULPI_DEBUG               0x15
-#define ULPI_CALIB_STS          (1 << 7)
-#define ULPI_CALIB_VAL(x)       (x & 0x7C)
 #define ULPI_FUNC_CTRL_CLR       0x06
 #define ULPI_SUSPENDM            (1 << 6)
 #endif /* __LINUX_USB_GADGET_MSM72K_UDC_H__ */

@@ -57,7 +57,6 @@ struct msm_otg {
 	struct clk		*clk;
 	struct clk		*pclk;
 	struct clk		*cclk;
-	struct clk		*phy_clk;
 	int			irq;
 	int			vbus_on_irq;
 	void __iomem		*regs;
