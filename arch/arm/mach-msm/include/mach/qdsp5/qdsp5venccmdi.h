@@ -37,10 +37,16 @@ when       who     what, where, why
   #define VIDENC_CMD_FRAME_START   0x0003
   #define VIDENC_CMD_STATUS_QUERY  0x0004
   #define VIDENC_CMD_RC_CFG        0x0005
-  #define VIDENC_CMD_DIS_CFG       0x0006
-  #define VIDENC_CMD_DIS           0x0007
-  #define VIDENC_CMD_INTRA_REFRESH 0x0008
-  #define VIDENC_CMD_DIGITAL_ZOOM  0x0009
+  #define VIDENC_CMD_INTRA_REFRESH 0x0006
+  #define VIDENC_CMD_CODEC_CONFIG  0x0007
+  #define VIDENC_CMD_VIDEO_CONFIG  0x0008
+  #define VIDENC_CMD_PARAMETER_UPDATE       0x0009
+  #define VIDENC_CMD_VENC_CLOCK    0x000A
+  #define VIDENC_CMD_DIS_CFG       0x000B
+  #define VIDENC_CMD_DIS           0x000C
+  #define VIDENC_CMD_DIGITAL_ZOOM  0x000D
+
+
 
 
 /*
@@ -208,5 +214,18 @@ typedef struct {
     unsigned short  image_stab_info_0;
 } __attribute__((packed)) videnc_cmd_dis_cfg;
 
+
+/*
+ * Command to set VIDENC_CMD_VENC_CLOCK
+ */
+
+
+#define VIDENC_CMD_VENC_CLOCK_LEN \
+    sizeof(struct videnc_cmd_venc_clock)
+
+struct videnc_cmd_venc_clock {
+    unsigned short  cmd_id;
+    unsigned short  payload;
+} __attribute__((packed)) ;
 
 #endif
