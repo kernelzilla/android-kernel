@@ -616,6 +616,7 @@ struct usb_interface_assoc_descriptor {
 } __attribute__ ((packed));
 
 
+#define USB_DT_INTERFACE_ASSOCIATION_SIZE  8
 /*-------------------------------------------------------------------------*/
 
 /* USB_DT_SECURITY:  group of wireless security descriptors, including
