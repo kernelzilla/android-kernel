@@ -966,14 +966,14 @@ static void msm_fb_vreg_config(const char *name, int on)
 #define MDDI_RST_OUT_GPIO 100
 
 static int mddi_power_save_on;
-static void msm_fb_mddi_power_save(int on)
+static int msm_fb_mddi_power_save(int on)
 {
 	int flag_on = !!on;
-	int ret;
+	int ret = 0;
 
 
 	if (mddi_power_save_on == flag_on)
-		return;
+		return ret;
 
 	mddi_power_save_on = flag_on;
 
@@ -999,6 +999,8 @@ static void msm_fb_mddi_power_save(int on)
 		gpio_set_value(MDDI_RST_OUT_GPIO, 1);
 		mdelay(1);
 	}
+
+	return ret;
 }
 
 static int msm_fb_mddi_sel_clk(u32 *clk_rate)

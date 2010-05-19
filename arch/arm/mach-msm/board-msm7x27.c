@@ -627,33 +627,56 @@ static char *msm_fb_lcdc_vreg[] = {
 	"gp5"
 };
 
-#define MSM_FB_LCDC_VREG_OP(name, op) \
-do { \
-	vreg = vreg_get(0, name); \
-	if (vreg_##op(vreg)) \
-		printk(KERN_ERR "%s: %s vreg operation failed \n", \
-			(vreg_##op == vreg_enable) ? "vreg_enable" \
-				: "vreg_disable", name); \
-} while (0)
-
-static void msm_fb_lcdc_power_save(int on)
+static int msm_fb_lcdc_power_save(int on)
 {
-	struct vreg *vreg;
-	int i;
+	struct vreg *vreg[ARRAY_SIZE(msm_fb_lcdc_vreg)];
+	int i, rc = 0;
 
 	for (i = 0; i < ARRAY_SIZE(msm_fb_lcdc_vreg); i++) {
-		if (on)
-			MSM_FB_LCDC_VREG_OP(msm_fb_lcdc_vreg[i], enable);
-		else{
-			MSM_FB_LCDC_VREG_OP(msm_fb_lcdc_vreg[i], disable);
-			gpio_tlmm_config(GPIO_CFG(GPIO_OUT_88, 0,
-			GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), GPIO_ENABLE);
+		if (on) {
+			vreg[i] = vreg_get(0, msm_fb_lcdc_vreg[i]);
+			rc = vreg_enable(vreg[i]);
+			if (rc) {
+				printk(KERN_ERR "vreg_enable: %s vreg"
+						"operation failed \n",
+						msm_fb_lcdc_vreg[i]);
+				goto bail;
+			}
+		} else {
+			int tmp;
+			vreg[i] = vreg_get(0, msm_fb_lcdc_vreg[i]);
+			tmp = vreg_disable(vreg[i]);
+			if (tmp) {
+				printk(KERN_ERR "vreg_disable: %s vreg "
+						"operation failed \n",
+						msm_fb_lcdc_vreg[i]);
+				if (!rc)
+					rc = tmp;
+			}
+			tmp = gpio_tlmm_config(GPIO_CFG(GPIO_OUT_88, 0,
+						GPIO_OUTPUT, GPIO_NO_PULL,
+						GPIO_2MA), GPIO_ENABLE);
+			if (tmp) {
+				printk(KERN_ERR "gpio_tlmm_config failed\n");
+				if (!rc)
+					rc = tmp;
+			}
 			gpio_set_value(88, 0);
 			mdelay(15);
 			gpio_set_value(88, 1);
 			mdelay(15);
-			}
 		}
+	}
+
+	return rc;
+
+bail:
+	if (on) {
+		for (; i > 0; i--)
+			vreg_disable(vreg[i - 1]);
+	}
+
+	return rc;
 }
 static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_gpio_config = msm_fb_lcdc_config,
