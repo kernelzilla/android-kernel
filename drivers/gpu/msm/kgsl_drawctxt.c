@@ -25,6 +25,7 @@
 #include "kgsl.h"
 #include "kgsl_log.h"
 #include "kgsl_pm4types.h"
+#include "kgsl_cmdstream.h"
 
 #define DISABLE_SHADOW_WRITES
 /*
@@ -1713,8 +1714,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 		if (active_ctxt->flags & CTXT_FLAGS_SHADER_SAVE) {
 			/* save shader partitioning and instructions. */
 			KGSL_CTXT_DBG("save shader");
-			kgsl_ringbuffer_issuecmds(device, 1,
-					active_ctxt->shader_save, 3);
+			kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_PMODE,
+						  active_ctxt->shader_save, 3);
 
 			/* fixup shader partitioning parameter for
 			 *  SET_SHADER_BASES.
@@ -1736,7 +1737,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 			for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
 				if (active_ctxt->user_gmem_shadow[i].gmemshadow.
 				    size > 0) {
-					kgsl_ringbuffer_issuecmds(device, 1,
+					kgsl_ringbuffer_issuecmds(device,
+						KGSL_CMD_FLAGS_PMODE,
 					  active_ctxt->user_gmem_shadow[i].
 						gmem_save, 3);
 
@@ -1748,9 +1750,10 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 				}
 			}
 			if (numbuffers == 0) {
-				kgsl_ringbuffer_issuecmds(device, 1,
-					 active_ctxt->context_gmem_shadow.
-						gmem_save, 3);
+				kgsl_ringbuffer_issuecmds(device,
+				    KGSL_CMD_FLAGS_PMODE,
+				    active_ctxt->context_gmem_shadow.gmem_save,
+				    3);
 
 				/* Restore TP0_CHICKEN */
 				kgsl_ringbuffer_issuecmds(device, 0,
@@ -1780,7 +1783,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 			for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
 				if (drawctxt->user_gmem_shadow[i].gmemshadow.
 				    size > 0) {
-					kgsl_ringbuffer_issuecmds(device, 1,
+					kgsl_ringbuffer_issuecmds(device,
+						KGSL_CMD_FLAGS_PMODE,
 					  drawctxt->user_gmem_shadow[i].
 						gmem_restore, 3);
 
@@ -1791,7 +1795,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 				}
 			}
 			if (numbuffers == 0) {
-				kgsl_ringbuffer_issuecmds(device, 1,
+				kgsl_ringbuffer_issuecmds(device,
+					KGSL_CMD_FLAGS_PMODE,
 				  drawctxt->context_gmem_shadow.gmem_restore,
 					3);
 

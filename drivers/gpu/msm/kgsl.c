@@ -713,19 +713,13 @@ static long kgsl_ioctl_device_waittimestamp(struct kgsl_file_private *private,
 		goto done;
 	}
 
-	mutex_unlock(&kgsl_driver.mutex);
-	/* Don't wait forever, set a max value for now */
-	if (param.timeout == -1)
-		param.timeout = 10 * MSEC_PER_SEC;
 	if (param.device_id == KGSL_DEVICE_YAMATO) {
 		result = kgsl_yamato_waittimestamp(&kgsl_driver.yamato_device,
 				     param.timestamp,
 				     param.timeout);
-		mutex_lock(&kgsl_driver.mutex);
 
 		kgsl_runpending(&kgsl_driver.yamato_device);
 	} else if (param.device_id == KGSL_DEVICE_G12) {
-		mutex_lock(&kgsl_driver.mutex);
 		KGSL_G12_PRE_HWACCESS();
 		mutex_unlock(&kgsl_driver.mutex);
 		result = kgsl_g12_waittimestamp(&kgsl_driver.g12_device,

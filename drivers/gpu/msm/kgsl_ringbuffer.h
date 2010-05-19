@@ -249,7 +249,7 @@ int kgsl_ringbuffer_init(struct kgsl_device *device);
 int kgsl_ringbuffer_close(struct kgsl_ringbuffer *rb);
 
 uint32_t kgsl_ringbuffer_issuecmds(struct kgsl_device *device,
-					int pmodeoff,
+					unsigned int flags,
 					unsigned int *cmdaddr,
 					int sizedwords);
 
