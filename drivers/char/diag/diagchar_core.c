@@ -68,6 +68,16 @@ static uint16_t delayed_rsp_id = 1;
 #define DIAGPKT_NEXT_DELAYED_RSP_ID(x) \
 ((x < DIAGPKT_MAX_DELAYED_RSP) ? x++ : DIAGPKT_MAX_DELAYED_RSP)
 
+#define COPY_USER_SPACE(buf, data, length)				\
+do {									\
+	if ((count < ret+length) || (copy_to_user(buf,			\
+					(void *)&data, length))) {	\
+		ret = -EFAULT;						\
+		goto exit;						\
+	}								\
+	ret += length;							\
+} while (0)
+
 static void drain_timer_func(unsigned long data)
 {
 	queue_work(driver->diag_wq , &(driver->diag_drain_work));
@@ -79,12 +89,7 @@ void diag_drain_work_fn(struct work_struct *work)
 
 	mutex_lock(&driver->diagchar_mutex);
 	if (buf_hdlc) {
-		driver->usb_write_ptr_svc = (struct diag_request *)
-			(diagmem_alloc(driver, sizeof(struct diag_request),
-				 POOL_TYPE_USB_STRUCT));
-		driver->usb_write_ptr_svc->buf = buf_hdlc;
-		driver->usb_write_ptr_svc->length = driver->used;
-		diag_write(driver->usb_write_ptr_svc);
+		diag_device_write(buf_hdlc, APPS_DATA);
 		buf_hdlc = NULL;
 #ifdef DIAG_DEBUG
 		printk(KERN_INFO "\n Number of bytes written "
@@ -93,6 +98,16 @@ void diag_drain_work_fn(struct work_struct *work)
 		driver->used = 0;
 	}
 	mutex_unlock(&driver->diagchar_mutex);
+}
+
+void diag_read_smd_work_fn(struct work_struct *work)
+{
+	diag_smd_send_req(NON_SMD_CONTEXT);
+}
+
+void diag_read_smd_qdsp_work_fn(struct work_struct *work)
+{
+	diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
 }
 
 static int diagchar_open(struct inode *inode, struct file *file)
@@ -110,7 +125,8 @@ static int diagchar_open(struct inode *inode, struct file *file)
 			driver->client_map[i] = current->tgid;
 		else {
 			mutex_unlock(&driver->diagchar_mutex);
-			printk(KERN_ALERT "Max client limit for DIAG driver reached\n");
+			printk(KERN_ALERT "Max client limit "
+					"for DIAG driver reached\n");
 			return -ENOMEM;
 		}
 		driver->data_ready[i] |= MSG_MASKS_TYPE;
@@ -130,6 +146,11 @@ static int diagchar_close(struct inode *inode, struct file *file)
 {
 	int i = 0;
 
+	/* If the SD logging process exits, change logging to USB mode */
+	if (driver->logging_process_id == current->tgid) {
+		driver->logging_mode = USB_MODE;
+		diagfwd_connect();
+	}
 	/* Delete the pkt response table entry for the exiting process */
 	for (i = 0; i < REG_TABLE_SIZE; i++)
 			if (driver->table[i].process_id == current->tgid)
@@ -201,6 +222,26 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 		driver->data_ready[i] |= DEINIT_TYPE;
 		wake_up_interruptible(&driver->wait_q);
 		success = 0;
+	} else if (iocmd == DIAG_IOCTL_SWITCH_LOGGING) {
+		if (driver->logging_mode == NO_LOGGING_MODE) {
+			driver->in_busy = 0;
+			driver->in_busy_qdsp = 0;
+		}
+		if ((int)ioarg == NO_LOGGING_MODE)
+			diagfwd_disconnect();
+		else if ((int)ioarg == MEMORY_DEVICE_MODE) {
+			if (driver->logging_mode == USB_MODE) {
+				driver->usb_connected = 0;
+				diag_close();/* properly close USB port */
+		}
+		} else if (((int)ioarg == USB_MODE))
+			diagfwd_connect();
+
+		mutex_lock(&driver->diagchar_mutex);
+		driver->logging_mode = (int)ioarg;
+		mutex_unlock(&driver->diagchar_mutex);
+		driver->logging_process_id = current->tgid;
+		success = 1;
 	}
 
 	return success;
@@ -210,7 +251,7 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
 {
 	int index = -1, i = 0, ret = 0;
-	int data_type;
+	int num_data = 0, data_type;
 	for (i = 0; i < driver->num_clients; i++)
 		if (driver->client_map[i] == current->tgid)
 			index = i;
@@ -224,16 +265,92 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 				  driver->data_ready[index]);
 	mutex_lock(&driver->diagchar_mutex);
 
+	if (driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE) {
+		/*Copy the type of data being passed*/
+		data_type = driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE;
+		COPY_USER_SPACE(buf, data_type, 4);
+		/* place holder for number of data field */
+		ret += 4;
+
+		for (i = 0; i < driver->poolsize_usb_struct; i++) {
+			if (driver->buf_tbl[i].length > 0) {
+#ifdef DIAG_DEBUG
+				printk(KERN_INFO "\n WRITING the buf address "
+				       "and length is %x , %d\n", (unsigned int)
+					(driver->buf_tbl[i].buf),
+					driver->buf_tbl[i].length);
+#endif
+				num_data++;
+				/* Copy the length of data being passed */
+				if (copy_to_user(buf+ret, (void *)&(driver->
+						buf_tbl[i].length), 4)) {
+						num_data--;
+						goto drop;
+				}
+				ret += 4;
+
+				/* Copy the actual data being passed */
+				if (copy_to_user(buf+ret, (void *)driver->
+				buf_tbl[i].buf, driver->buf_tbl[i].length)) {
+					ret -= 4;
+					num_data--;
+					goto drop;
+				}
+				ret += driver->buf_tbl[i].length;
+drop:
+#ifdef DIAG_DEBUG
+				printk(KERN_INFO "\n DEQUEUE buf address and"
+				       " length is %x,%d\n", (unsigned int)
+				       (driver->buf_tbl[i].buf), driver->
+				       buf_tbl[i].length);
+#endif
+				diagmem_free(driver, (unsigned char *)
+				(driver->buf_tbl[i].buf), POOL_TYPE_HDLC);
+				driver->buf_tbl[i].length = 0;
+				driver->buf_tbl[i].buf = 0;
+			}
+		}
+
+		/* copy modem data */
+		if (driver->in_busy == 1) {
+			num_data++;
+			/*Copy the length of data being passed*/
+			COPY_USER_SPACE(buf+ret, (driver->usb_write_ptr->
+						  length), 4);
+			/*Copy the actual data being passed*/
+			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in),
+					 driver->usb_write_ptr->length);
+			driver->in_busy = 0;
+			queue_work(driver->diag_wq,
+				    &(driver->diag_read_smd_work));
+		}
+
+		/* copy q6 data */
+		if (driver->in_busy_qdsp == 1) {
+			num_data++;
+			/*Copy the length of data being passed*/
+			COPY_USER_SPACE(buf+ret, (driver->usb_write_ptr_qdsp->
+						  length), 4);
+			/*Copy the actual data being passed*/
+			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in_qdsp),
+					 driver->usb_write_ptr_qdsp->length);
+			driver->in_busy_qdsp = 0;
+			queue_work(driver->diag_wq,
+				    &(driver->diag_read_smd_qdsp_work));
+		}
+
+		/* copy number of data fields */
+		COPY_USER_SPACE(buf+4, num_data, 4);
+		ret -= 4;
+		driver->data_ready[index] ^= MEMORY_DEVICE_LOG_TYPE;
+		APPEND_DEBUG('n');
+		goto exit;
+	}
+
 	if (driver->data_ready[index] & DEINIT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & DEINIT_TYPE;
-		if ((count < ret+4) || (copy_to_user(buf,
-					 (void *)&data_type, 4))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-
-		ret += 4;
+		COPY_USER_SPACE(buf, data_type, 4);
 		driver->data_ready[index] ^= DEINIT_TYPE;
 		goto exit;
 	}
@@ -241,19 +358,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & MSG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MSG_MASKS_TYPE;
-		if ((count < ret+4) || (copy_to_user(buf,
-					 (void *)&data_type, 4))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += 4;
-
-		if ((count < ret+MSG_MASK_SIZE) || (copy_to_user(buf+4,
-				   (void *)driver->msg_masks, MSG_MASK_SIZE))) {
-			ret =  -EFAULT;
-			goto exit;
-		}
-		ret += MSG_MASK_SIZE;
+		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE(buf+4, *(driver->msg_masks), MSG_MASK_SIZE);
 		driver->data_ready[index] ^= MSG_MASKS_TYPE;
 		goto exit;
 	}
@@ -261,18 +367,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & EVENT_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & EVENT_MASKS_TYPE;
-		if ((count < ret+4) || (copy_to_user(buf,
-						      (void *)&data_type, 4))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += 4;
-		if ((count < ret+EVENT_MASK_SIZE) || (copy_to_user(buf+4,
-			(void *)driver->event_masks, EVENT_MASK_SIZE))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += EVENT_MASK_SIZE;
+		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE(buf+4, *(driver->event_masks), EVENT_MASK_SIZE);
 		driver->data_ready[index] ^= EVENT_MASKS_TYPE;
 		goto exit;
 	}
@@ -280,19 +376,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & LOG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & LOG_MASKS_TYPE;
-		if ((count < ret+4) || (copy_to_user(buf,
-					       (void *)&data_type, 4))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += 4;
-
-		if ((count < ret+LOG_MASK_SIZE) || (copy_to_user(buf+4,
-			       (void *)driver->log_masks, LOG_MASK_SIZE))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += LOG_MASK_SIZE;
+		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE(buf+4, *(driver->log_masks), LOG_MASK_SIZE);
 		driver->data_ready[index] ^= LOG_MASKS_TYPE;
 		goto exit;
 	}
@@ -300,19 +385,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	if (driver->data_ready[index] & PKT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & PKT_TYPE;
-		if ((count < ret+4) || (copy_to_user(buf,
-					       (void *)&data_type, 4))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += 4;
-
-		if ((count < ret+driver->pkt_length) || (copy_to_user(buf+4,
-			(void *)driver->pkt_buf, driver->pkt_length))) {
-			ret = -EFAULT;
-			goto exit;
-		}
-		ret += driver->pkt_length;
+		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE(buf+4, *(driver->pkt_buf), driver->pkt_length);
 		driver->data_ready[index] ^= PKT_TYPE;
 		goto exit;
 	}
@@ -334,7 +408,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	void *buf_copy;
 	int payload_size;
 
-	if (!driver->usb_connected) {
+	if ((driver->logging_mode == USB_MODE) && (!driver->usb_connected)) {
 		/*Drop the diag payload */
 		return -EIO;
 	}
@@ -343,6 +417,17 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	err = copy_from_user((&pkt_type), buf, 4);
 	/*First 4 bytes indicate the type of payload - ignore these */
 	payload_size = count - 4;
+
+	if (pkt_type == MEMORY_DEVICE_LOG_TYPE) {
+		buf = buf + 4;
+#ifdef DIAG_DEBUG
+		printk(KERN_INFO "\n I got the masks: %d\n", payload_size);
+		for (i = 0; i < payload_size; i++)
+			printk(KERN_DEBUG "\t %x", *(((unsigned char *)buf)+i));
+#endif
+		diag_process_hdlc((void *)buf, payload_size);
+		return 0;
+	}
 
 	buf_copy = diagmem_alloc(driver, payload_size, POOL_TYPE_COPY);
 	if (!buf_copy) {
@@ -384,12 +469,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 		goto fail_free_hdlc;
 	}
 	if (HDLC_OUT_BUF_SIZE - driver->used <= (2*payload_size) + 3) {
-		driver->usb_write_ptr_svc = (struct diag_request *)
-			(diagmem_alloc(driver, sizeof(struct diag_request),
-				POOL_TYPE_USB_STRUCT));
-		driver->usb_write_ptr_svc->buf = buf_hdlc;
-		driver->usb_write_ptr_svc->length = driver->used;
-		err = diag_write(driver->usb_write_ptr_svc);
+		err = diag_device_write(buf_hdlc, APPS_DATA);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -420,12 +500,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	and start aggregation in a newly allocated buffer */
 	if ((unsigned int) enc.dest >=
 		 (unsigned int)(buf_hdlc + HDLC_OUT_BUF_SIZE)) {
-		driver->usb_write_ptr_svc = (struct diag_request *)
-			(diagmem_alloc(driver, sizeof(struct diag_request),
-				POOL_TYPE_USB_STRUCT));
-		driver->usb_write_ptr_svc->buf = buf_hdlc;
-		driver->usb_write_ptr_svc->length = driver->used;
-		err = diag_write(driver->usb_write_ptr_svc);
+		err = diag_device_write(buf_hdlc, APPS_DATA);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -453,12 +528,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 
 	driver->used = (uint32_t) enc.dest - (uint32_t) buf_hdlc;
 	if (pkt_type == DATA_TYPE_RESPONSE) {
-		driver->usb_write_ptr_svc = (struct diag_request *)
-			(diagmem_alloc(driver, sizeof(struct diag_request),
-				 POOL_TYPE_USB_STRUCT));
-		driver->usb_write_ptr_svc->buf = buf_hdlc;
-		driver->usb_write_ptr_svc->length = driver->used;
-		err = diag_write(driver->usb_write_ptr_svc);
+		err = diag_device_write(buf_hdlc, APPS_DATA);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -484,6 +554,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 
 fail_free_hdlc:
 	buf_hdlc = NULL;
+	driver->used = 0;
 	diagmem_free(driver, buf_copy, POOL_TYPE_COPY);
 	mutex_unlock(&driver->diagchar_mutex);
 	return ret;
@@ -570,10 +641,14 @@ static int __init diagchar_init(void)
 		driver->itemsize_usb_struct = itemsize_usb_struct;
 		driver->poolsize_usb_struct = poolsize_usb_struct;
 		driver->num_clients = max_clients;
+		driver->logging_mode = USB_MODE;
 		mutex_init(&driver->diagchar_mutex);
 		init_waitqueue_head(&driver->wait_q);
 		diagfwd_init();
 		INIT_WORK(&(driver->diag_drain_work), diag_drain_work_fn);
+		INIT_WORK(&(driver->diag_read_smd_work), diag_read_smd_work_fn);
+		INIT_WORK(&(driver->diag_read_smd_qdsp_work),
+			   diag_read_smd_qdsp_work_fn);
 		printk(KERN_INFO "diagchar initializing ..\n");
 		driver->num = 1;
 		driver->name = ((void *)driver) + sizeof(struct diagchar_dev);

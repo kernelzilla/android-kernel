@@ -30,22 +30,29 @@
 #ifndef DIAGCHAR_SHARED
 #define DIAGCHAR_SHARED
 
-#define MSG_MASKS_TYPE 1
-#define LOG_MASKS_TYPE 2
-#define EVENT_MASKS_TYPE 4
-#define PKT_TYPE 8
-#define DEINIT_TYPE 16
+#define MSG_MASKS_TYPE			1
+#define LOG_MASKS_TYPE			2
+#define EVENT_MASKS_TYPE		4
+#define PKT_TYPE			8
+#define DEINIT_TYPE			16
+#define MEMORY_DEVICE_LOG_TYPE		32
+#define USB_MODE			1
+#define MEMORY_DEVICE_MODE		2
+#define NO_LOGGING_MODE			3
+#define MAX_SYNC_OBJ_NAME_SIZE		32
 
 /* different values that go in for diag_data_type */
-#define DATA_TYPE_EVENT         0
-#define DATA_TYPE_F3            1
-#define DATA_TYPE_LOG           2
-#define DATA_TYPE_RESPONSE      3
-#define DIAG_IOCTL_COMMAND_REG  0
-#define DIAG_IOCTL_GET_DELAYED_RSP_ID 8
-#define DIAG_IOCTL_LSM_DEINIT	9
-#define NON_SMD_CONTEXT 	0
-#define SMD_CONTEXT 		1
+#define DATA_TYPE_EVENT         	0
+#define DATA_TYPE_F3            	1
+#define DATA_TYPE_LOG           	2
+#define DATA_TYPE_RESPONSE      	3
+
+/* Different IOCTL values */
+#define DIAG_IOCTL_COMMAND_REG  	0
+#define DIAG_IOCTL_SWITCH_LOGGING	7
+#define DIAG_IOCTL_GET_DELAYED_RSP_ID 	8
+#define DIAG_IOCTL_LSM_DEINIT		9
+
 
 struct bindpkt_params {
 	uint16_t cmd_code;
@@ -57,8 +64,6 @@ struct bindpkt_params {
 	uint32_t log_code;
 	uint32_t client_id;
 };
-
-#define MAX_SYNC_OBJ_NAME_SIZE 32
 
 struct bindpkt_params_per_process {
 	/* Name of the synchronization object associated with this process */
