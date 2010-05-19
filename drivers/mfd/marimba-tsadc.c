@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/err.h>
+#include <linux/interrupt.h>
 #include <linux/mfd/marimba.h>
 #include <linux/mfd/marimba-tsadc.h>
 
@@ -357,13 +358,83 @@ void marimba_tsadc_unregister(struct marimba_tsadc_client *client)
 }
 EXPORT_SYMBOL(marimba_tsadc_unregister);
 
+static struct resource resources_tssc[] = {
+	{
+		.start	= 0xAD300000,
+		.end	= 0xAD300000 + SZ_4K - 1,
+		.name	= "tssc",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= 55,
+		.end	= 55,
+		.name	= "tssc1",
+		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
+	},
+	{
+		.start	= 56,
+		.end	= 56,
+		.name	= "tssc2",
+		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
+	},
+};
+
+static struct device *
+marimba_add_tssc_subdev(struct device *parent, const char *name, int num,
+			 struct resource *resources, int num_resources,
+			 void *pdata, int pdata_len)
+{
+	struct platform_device	*pdev;
+	int			status;
+
+	pdev = platform_device_alloc(name, num);
+	if (!pdev) {
+		dev_dbg(parent, "can't alloc dev\n");
+		status = -ENOMEM;
+		goto err;
+	}
+
+	pdev->dev.parent = parent;
+
+	if (pdata) {
+		status = platform_device_add_data(pdev, pdata, pdata_len);
+		if (status < 0) {
+			dev_dbg(&pdev->dev, "can't add platform_data\n");
+			goto err;
+		}
+	}
+
+	status = platform_device_add_resources(pdev, resources, num_resources);
+	if (status < 0) {
+		dev_dbg(&pdev->dev, "can't add resources\n");
+		goto err;
+	}
+
+	status = platform_device_add(pdev);
+
+err:
+	if (status < 0) {
+		platform_device_put(pdev);
+		dev_err(parent, "can't add %s dev\n", name);
+		return ERR_PTR(status);
+	}
+	return &pdev->dev;
+}
+
 static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 {
 	struct marimba *marimba = platform_get_drvdata(pdev);
 	struct marimba_tsadc *tsadc;
+	struct marimba_tsadc_platform_data *pdata = pdev->dev.platform_data;
 	int rc = 0;
+	struct device *child;
 
 	printk("%s\n", __func__);
+
+	if (!pdata) {
+		dev_dbg(&pdev->dev, "no tsadc platform data?\n");
+		return -EINVAL;
+	}
 
 	tsadc = kzalloc(sizeof *tsadc, GFP_KERNEL);
 	if (!tsadc)
@@ -371,7 +442,9 @@ static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 
 	tsadc->marimba	= marimba;
 	tsadc->dev	= &pdev->dev;
-	tsadc->pdata = pdev->dev.platform_data;
+	tsadc->pdata	= pdata;
+
+	platform_set_drvdata(pdev, tsadc);
 
 	if (tsadc->pdata->init) {
 		rc = tsadc->pdata->init();
@@ -387,7 +460,14 @@ static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 		}
 	}
 
-	platform_set_drvdata(pdev, tsadc);
+	child = marimba_add_tssc_subdev(&pdev->dev, "msm_touchscreen", -1,
+			 resources_tssc, ARRAY_SIZE(resources_tssc),
+			 pdata->tssc_data, sizeof(*pdata->tssc_data));
+
+	if (IS_ERR(child)) {
+		rc = PTR_ERR(child);
+		goto fail_tsadc_power;
+	}
 
 	tsadc_dev = tsadc;
 

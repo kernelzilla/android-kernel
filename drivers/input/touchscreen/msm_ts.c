@@ -336,6 +336,7 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 		goto err_alloc_input_dev;
 	}
 	ts->input_dev->name = "msm-touchscreen";
+	ts->input_dev->dev.parent = &pdev->dev;
 
 	input_set_drvdata(ts->input_dev, ts);
 

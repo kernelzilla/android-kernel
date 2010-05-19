@@ -1179,6 +1179,18 @@ static int marimba_tsadc_exit(void)
 	return rc;
 }
 
+
+static struct msm_ts_platform_data msm_ts_data = {
+	.min_x          = 0,
+	.max_x          = 4096,
+	.min_y          = 0,
+	.max_y          = 4096,
+	.min_press      = 0,
+	.max_press      = 255,
+	.inv_x          = 4096,
+	.inv_y          = 4096,
+};
+
 static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	.marimba_tsadc_power =  marimba_tsadc_power,
 	.init		     =  marimba_tsadc_init,
@@ -1198,6 +1210,7 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 		.stable_time_nsecs	=	6400,
 		.tsadc_test_mode	=	0,
 	},
+	.tssc_data = &msm_ts_data,
 };
 
 static struct vreg *vreg_codec_s4;
@@ -3324,16 +3337,6 @@ static struct platform_device msm_device_pmic_leds = {
 	.id = -1,
 };
 
-static struct msm_ts_platform_data msm_ts_data = {
-	.min_x          = 0,
-	.max_x          = 4096,
-	.min_y          = 0,
-	.max_y          = 4096,
-	.min_press      = 0,
-	.max_press      = 255,
-	.inv_x          = 4096,
-	.inv_y          = 4096,
-};
 
 static struct msm_psy_batt_pdata msm_psy_batt_data = {
 	.voltage_min_design 	= 2800,
@@ -3405,7 +3408,6 @@ static struct platform_device *devices[] __initdata = {
 #endif
 	&msm_device_kgsl,
 	&msm_device_pmic_leds,
-	&msm_device_tssc,
 #ifdef CONFIG_MT9T013
 	&msm_camera_sensor_mt9t013,
 #endif
@@ -4243,7 +4245,6 @@ static void __init msm7x30_init(void)
 				ARRAY_SIZE(msm_camera_boardinfo));
 
 	bt_power_init();
-	msm_device_tssc.dev.platform_data = &msm_ts_data;
 #ifdef CONFIG_I2C_SSBI
 	msm_device_ssbi6.dev.platform_data = &msm_i2c_ssbi6_pdata;
 	msm_device_ssbi7.dev.platform_data = &msm_i2c_ssbi7_pdata;

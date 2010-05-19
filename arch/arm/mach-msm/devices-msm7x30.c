@@ -897,34 +897,7 @@ struct platform_device msm_device_tsif = {
 #endif /* defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE) */
 /* TSIF end   */
 
-#define MSM_TSSC_PHYS         0xAD300000
-static struct resource resources_tssc[] = {
-	{
-		.start	= MSM_TSSC_PHYS,
-		.end	= MSM_TSSC_PHYS + SZ_4K - 1,
-		.name	= "tssc",
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.start	= INT_TCHSCRN1,
-		.end	= INT_TCHSCRN1,
-		.name	= "tssc1",
-		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
-	},
-	{
-		.start	= INT_TCHSCRN2,
-		.end	= INT_TCHSCRN2,
-		.name	= "tssc2",
-		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
-	},
-};
 
-struct platform_device msm_device_tssc = {
-	.name = "msm_touchscreen",
-	.id = 0,
-	.num_resources = ARRAY_SIZE(resources_tssc),
-	.resource = resources_tssc,
-};
 
 #ifdef CONFIG_MSM_ROTATOR
 static struct resource resources_msm_rotator[] = {

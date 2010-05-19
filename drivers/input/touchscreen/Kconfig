@@ -277,7 +277,7 @@ config TOUCHSCREEN_PENMOUNT
 
 config TOUCHSCREEN_MSM
 	bool "Qualcomm MSM touchscreen controller"
-	depends on ARCH_MSM7X30
+	depends on ARCH_MSM7X30 && MARIMBA_TSADC
 	default n
 	help
 	  Say Y here if you have a 4-wire resistive touchscreen panel
