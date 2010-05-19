@@ -83,10 +83,18 @@ u32 vid_c_disable_clk(void);
 int vid_c_load_firmware(void);
 void vid_c_release_firmware(void);
 u32 vid_c_lookup_addr_table(struct video_client_ctx *client_ctx,
-enum buffer_dir buffer_type, u32 search_with_user_vaddr,
-unsigned long *user_vaddr, unsigned long *kernel_vaddr,
-unsigned long *phy_addr, int *pmem_fd, struct file **file,
-s32 *buffer_index);
+	enum buffer_dir buffer_type, u32 search_with_user_vaddr,
+	unsigned long *user_vaddr, unsigned long *kernel_vaddr,
+	unsigned long *phy_addr, int *pmem_fd, struct file **file,
+	s32 *buffer_index);
+u32 vid_c_insert_addr_table(struct video_client_ctx *client_ctx,
+	enum buffer_dir buffer_type, unsigned long user_vaddr,
+	unsigned long *kernel_vaddr, int pmem_fd,
+	unsigned long buffer_addr_offset,
+	unsigned int max_num_buffers);
+u32 vid_c_delete_addr_table(struct video_client_ctx *client_ctx,
+	enum buffer_dir buffer_type, unsigned long user_vaddr,
+	unsigned long *kernel_vaddr);
 
 u32 vid_c_timer_create(void (*pf_timer_handler)(void *),
 	void *p_user_data, void **pp_timer_handle);

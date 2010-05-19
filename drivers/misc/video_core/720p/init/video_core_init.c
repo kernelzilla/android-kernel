@@ -881,6 +881,128 @@ u32 vid_c_lookup_addr_table(struct video_client_ctx *client_ctx,
 }
 EXPORT_SYMBOL(vid_c_lookup_addr_table);
 
+u32 vid_c_insert_addr_table(struct video_client_ctx *client_ctx,
+	enum buffer_dir buffer_type, unsigned long user_vaddr,
+	unsigned long *kernel_vaddr, int pmem_fd,
+	unsigned long buffer_addr_offset, unsigned int max_num_buffers)
+{
+	unsigned long len, phys_addr;
+	struct file *file;
+	u32 *num_of_buffers = NULL;
+	u32 i;
+	struct buf_addr_table *buf_addr_table;
+
+	if (!client_ctx)
+		return FALSE;
+
+	if (buffer_type == BUFFER_TYPE_INPUT) {
+		buf_addr_table = client_ctx->input_buf_addr_table;
+		num_of_buffers = &client_ctx->num_of_input_buffers;
+		DBG("%s(): buffer_type = INPUT #Buf = %d\n",
+			__func__, *num_of_buffers);
+
+	} else {
+		buf_addr_table = client_ctx->output_buf_addr_table;
+		num_of_buffers = &client_ctx->num_of_output_buffers;
+		DBG("%s(): buffer_type = OUTPUT #Buf = %d\n",
+			__func__, *num_of_buffers);
+	}
+
+	if (*num_of_buffers == max_num_buffers) {
+		ERR("%s(): Num of buffers reached max value : %d",
+			__func__, max_num_buffers);
+		return FALSE;
+	}
+
+	i = 0;
+	while (i < *num_of_buffers &&
+		user_vaddr != buf_addr_table[i].user_vaddr)
+		i++;
+	if (i < *num_of_buffers) {
+		DBG("%s() : client_ctx = %p."
+			" user_virt_addr = 0x%08lx already set",
+			__func__, client_ctx, user_vaddr);
+		return FALSE;
+	} else {
+		if (get_pmem_file(pmem_fd, &phys_addr,
+				kernel_vaddr, &len, &file)) {
+			ERR("%s(): get_pmem_file failed\n", __func__);
+			return FALSE;
+		}
+		put_pmem_file(file);
+		phys_addr += buffer_addr_offset;
+		(*kernel_vaddr) += buffer_addr_offset;
+		buf_addr_table[*num_of_buffers].user_vaddr = user_vaddr;
+		buf_addr_table[*num_of_buffers].kernel_vaddr = *kernel_vaddr;
+		buf_addr_table[*num_of_buffers].pmem_fd = pmem_fd;
+		buf_addr_table[*num_of_buffers].file = file;
+		buf_addr_table[*num_of_buffers].phy_addr = phys_addr;
+		*num_of_buffers = *num_of_buffers + 1;
+		DBG("%s() : client_ctx = %p, user_virt_addr = 0x%08lx, "
+			"kernel_vaddr = 0x%08lx inserted!",	__func__,
+			client_ctx, user_vaddr, *kernel_vaddr);
+	}
+	return TRUE;
+}
+EXPORT_SYMBOL(vid_c_insert_addr_table);
+
+u32 vid_c_delete_addr_table(struct video_client_ctx *client_ctx,
+	enum buffer_dir buffer_type,
+	unsigned long user_vaddr,
+	unsigned long *kernel_vaddr)
+{
+	u32 *num_of_buffers = NULL;
+	u32 i;
+	struct buf_addr_table *buf_addr_table;
+
+	if (!client_ctx)
+		return FALSE;
+
+	if (buffer_type == BUFFER_TYPE_INPUT) {
+		buf_addr_table = client_ctx->input_buf_addr_table;
+		num_of_buffers = &client_ctx->num_of_input_buffers;
+		DBG("%s(): buffer_type = INPUT \n", __func__);
+
+	} else {
+		buf_addr_table = client_ctx->output_buf_addr_table;
+		num_of_buffers = &client_ctx->num_of_output_buffers;
+		DBG("%s(): buffer_type = OUTPUT \n", __func__);
+	}
+
+	if (!*num_of_buffers)
+		return FALSE;
+
+	i = 0;
+	while (i < *num_of_buffers &&
+		user_vaddr != buf_addr_table[i].user_vaddr)
+		i++;
+	if (i == *num_of_buffers) {
+		DBG("%s() : client_ctx = %p."
+			" user_virt_addr = 0x%08lx NOT found",
+			__func__, client_ctx, user_vaddr);
+		return FALSE;
+	}
+	*kernel_vaddr = buf_addr_table[i].kernel_vaddr;
+	if (i < (*num_of_buffers - 1)) {
+		buf_addr_table[i].user_vaddr =
+			buf_addr_table[*num_of_buffers - 1].user_vaddr;
+		buf_addr_table[i].kernel_vaddr =
+			buf_addr_table[*num_of_buffers - 1].kernel_vaddr;
+		buf_addr_table[i].phy_addr =
+			buf_addr_table[*num_of_buffers - 1].phy_addr;
+		buf_addr_table[i].pmem_fd =
+			buf_addr_table[*num_of_buffers - 1].pmem_fd;
+		buf_addr_table[i].file =
+			buf_addr_table[*num_of_buffers - 1].file;
+	}
+	*num_of_buffers = *num_of_buffers - 1;
+	DBG("%s() : client_ctx = %p."
+		" user_virt_addr = 0x%08lx is found and deleted",
+		__func__, client_ctx, user_vaddr);
+	return TRUE;
+}
+EXPORT_SYMBOL(vid_c_delete_addr_table);
+
 u32 vid_c_timer_create(void (*pf_timer_handler)(void *),
 	void *p_user_data, void **pp_timer_handle)
 {

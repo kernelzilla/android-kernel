@@ -147,6 +147,10 @@ u32 vid_enc_set_buffer(struct video_client_ctx *client_ctx,
 		struct venc_bufferpayload *buffer_info,
 		enum venc_buffer_dir buffer_type);
 
+u32 vid_enc_free_buffer(struct video_client_ctx *client_ctx,
+		struct venc_bufferpayload *buffer_info,
+		enum venc_buffer_dir buffer_type);
+
 u32 vid_enc_encode_frame(struct video_client_ctx *client_ctx,
 		struct venc_buffer *input_frame_info);
 

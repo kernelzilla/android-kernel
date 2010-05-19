@@ -1521,95 +1521,68 @@ u32 vid_enc_set_buffer(struct video_client_ctx *client_ctx,
 		struct venc_bufferpayload *buffer_info,
 		enum venc_buffer_dir buffer_type)
 {
-	u32 vcd_status = VCD_ERR_FAIL;
-	enum vcd_buffer_type buffer_vcd_type;
+	enum vcd_buffer_type vcd_buffer_t = VCD_BUFFER_INPUT;
 	enum buffer_dir dir_buffer = BUFFER_TYPE_INPUT;
-	unsigned long user_vaddr, kernel_vaddr, phy_addr, len;
-	int pmem_fd;
-	struct file *file;
-	struct buf_addr_table *buf_addr_table;
-
-	s32 buffer_index = -1;
+	u32 vcd_status = VCD_ERR_FAIL;
+	unsigned long kernel_vaddr;
 
 	if (!client_ctx || !buffer_info)
 		return FALSE;
 
-	user_vaddr = (unsigned long)buffer_info->pbuffer;
-
-	if (buffer_type == VEN_BUFFER_TYPE_OUTPUT)
+	if (buffer_type == VEN_BUFFER_TYPE_OUTPUT) {
 		dir_buffer = BUFFER_TYPE_OUTPUT;
-
-	/*If buffer already set, ignore */
-	if (vid_c_lookup_addr_table(client_ctx, dir_buffer,
-			TRUE, &user_vaddr, &kernel_vaddr,
-			&phy_addr, &pmem_fd, &file,
-			&buffer_index)) {
-
-		DBG("%s() : user_virt_addr = 0x%08lx is already set.",
-				__func__, user_vaddr);
-		return TRUE;
+		vcd_buffer_t = VCD_BUFFER_OUTPUT;
 	}
 
-	if (get_pmem_file(buffer_info->fd,
-				&phy_addr, &kernel_vaddr, &len, &file)) {
-		ERR("%s(): get_pmem_file failed\n", __func__);
+	/*If buffer cannot be set, ignore */
+	if (!vid_c_insert_addr_table(client_ctx, dir_buffer,
+					(unsigned long)buffer_info->pbuffer,
+					&kernel_vaddr,
+					buffer_info->fd,
+					(unsigned long)buffer_info->offset,
+					VID_ENC_MAX_NUM_OF_BUFF)) {
+		DBG("%s() : user_virt_addr = 0x%08lx cannot be set.",
+		    __func__, buffer_info->buffer.bufferaddr);
 		return FALSE;
-	}
-	put_pmem_file(file);
-	if (buffer_type == VEN_BUFFER_TYPE_INPUT) {
-		buffer_vcd_type = VCD_BUFFER_INPUT;
-		client_ctx->num_of_input_buffers++;
-
-		if (client_ctx->num_of_input_buffers >
-				VID_ENC_MAX_NUM_OF_BUFF) {
-			ERR("%s(): num_of_input_buffers reached max value"
-			" VID_ENC_MAX_NUM_OF_BUFF \n", __func__);
-			client_ctx->num_of_input_buffers--;
-			return FALSE;
-		}
-
-		buffer_index = client_ctx->num_of_input_buffers - 1;
-		buf_addr_table =
-				&client_ctx->input_buf_addr_table[buffer_index];
-
-		buf_addr_table->user_vaddr =
-			(unsigned long)buffer_info->pbuffer;
-		kernel_vaddr += (unsigned long)buffer_info->offset;
-		phy_addr += (unsigned long)buffer_info->offset;
-		buf_addr_table->kernel_vaddr = kernel_vaddr;
-		buf_addr_table->phy_addr = phy_addr;
-		buf_addr_table->pmem_fd = buffer_info->fd;
-		buf_addr_table->file = file;
-	} else {
-		buffer_vcd_type = VCD_BUFFER_OUTPUT;
-
-		client_ctx->num_of_output_buffers++;
-
-		if (client_ctx->num_of_output_buffers >
-				VID_ENC_MAX_NUM_OF_BUFF) {
-			ERR("%s(): num_of_outut_buffers reached max value"
-			" VID_ENC_MAX_NUM_OF_BUFF \n", __func__);
-			client_ctx->num_of_output_buffers--;
-			return FALSE;
-		}
-
-		buffer_index = client_ctx->num_of_output_buffers - 1;
-
-		buf_addr_table =
-			&client_ctx->output_buf_addr_table[buffer_index];
-		kernel_vaddr += (unsigned long)buffer_info->offset;
-		phy_addr += (unsigned long)buffer_info->offset;
-		buf_addr_table->user_vaddr =
-			(unsigned long)buffer_info->pbuffer;
-		buf_addr_table->kernel_vaddr = kernel_vaddr;
-		buf_addr_table->phy_addr = phy_addr;
-		buf_addr_table->pmem_fd = buffer_info->fd;
-		buf_addr_table->file = file;
 	}
 
 	vcd_status = vcd_set_buffer(client_ctx->vcd_handle,
-	buffer_vcd_type, (u8 *) kernel_vaddr,
-	buffer_info->nsize);
+				    vcd_buffer_t, (u8 *) kernel_vaddr,
+				    buffer_info->nsize);
+
+	if (!vcd_status)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+u32 vid_enc_free_buffer(struct video_client_ctx *client_ctx,
+		struct venc_bufferpayload *buffer_info,
+		enum venc_buffer_dir buffer_type)
+{
+	enum vcd_buffer_type buffer_vcd_type = VCD_BUFFER_INPUT;
+	enum buffer_dir dir_buffer = BUFFER_TYPE_INPUT;
+	u32 vcd_status = VCD_ERR_FAIL;
+	unsigned long kernel_vaddr;
+
+	if (!client_ctx || !buffer_info)
+		return FALSE;
+
+	if (buffer_type == VEN_BUFFER_TYPE_OUTPUT) {
+		dir_buffer = BUFFER_TYPE_OUTPUT;
+		buffer_vcd_type = VCD_BUFFER_OUTPUT;
+	}
+	/*If buffer NOT set, ignore */
+	if (!vid_c_delete_addr_table(client_ctx, dir_buffer,
+				(unsigned long)buffer_info->pbuffer,
+				&kernel_vaddr)) {
+		DBG("%s() : user_virt_addr = 0x%08lx has not been set.",
+		    __func__, buffer_info->pbuffer);
+		return TRUE;
+	}
+
+	vcd_status = vcd_free_buffer(client_ctx->vcd_handle, buffer_vcd_type,
+					 (u8 *)kernel_vaddr);
 
 	if (!vcd_status)
 		return TRUE;
