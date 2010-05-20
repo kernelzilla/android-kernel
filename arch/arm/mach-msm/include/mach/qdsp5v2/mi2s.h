@@ -47,6 +47,13 @@ enum mi2s_ret_enum_type {
 #define MI2S_CHAN_8CHANNELS 5
 #define MI2S_CHAN_MAX_OUTBOUND_CHANNELS MI2S__CHAN_8CHANNELS
 
+#define MI2S_SD_0    0x01
+#define MI2S_SD_1    0x02
+#define MI2S_SD_2    0x04
+#define MI2S_SD_3    0x08
+
+#define MI2S_SD_LINE_MASK    (MI2S_SD_0 | MI2S_SD_1 | MI2S_SD_2 |  MI2S_SD_3)
+
 bool mi2s_set_hdmi_output_path(uint8_t channels, uint8_t size,
 				uint8_t sd_line);
 
@@ -57,4 +64,3 @@ bool mi2s_set_codec_output_path(uint8_t channels, uint8_t size);
 bool mi2s_set_codec_input_path(uint8_t channels, uint8_t size);
 
 #endif /* #ifndef MI2S_H */
-
