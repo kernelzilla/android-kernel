@@ -1751,6 +1751,15 @@ static int __init msm_pm_init(void)
 		return ret;
 	}
 
+#ifdef CONFIG_MSM_MEMORY_LOW_POWER_MODE
+	/* The wakeup_reason field is overloaded during initialization time
+	   to signal Modem that Apps will control the low power modes of
+	   the memory.
+	 */
+	msm_pm_smem_data->wakeup_reason = 1;
+	smsm_change_state(SMSM_APPS_DEM, 0, DEM_SLAVE_SMSM_RUN);
+#endif
+
 	BUG_ON(msm_pm_modes == NULL);
 
 	atomic_set(&msm_pm_init_done, 1);
