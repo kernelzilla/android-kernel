@@ -67,7 +67,7 @@
 #define SMPS_VPROG_MASK			0x1F
 #define SMPS_VLOW_SEL_MASK		0x01
 
-#define SMPS_MODE1_UV_MIN		1050000
+#define SMPS_MODE1_UV_MIN		1500000
 #define SMPS_MODE1_UV_MAX		3050000
 #define SMPS_MODE1_STEP			50000
 
@@ -389,10 +389,10 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 
 	/* set vlow bit for ultra low voltage mode */
 	if ((vreg->test_reg & SMPS_VLOW_SEL_MASK) != vlow) {
-		val = REGULATOR_BANK_WRITE | REGULATOR_BANK_SEL(1) | vlow;
-		mask = val | SMPS_VLOW_SEL_MASK;
+		vlow |= REGULATOR_BANK_WRITE | REGULATOR_BANK_SEL(1);
+		mask = vlow | SMPS_VLOW_SEL_MASK;
 		rc = pm8058_vreg_write(chip, vreg->test2_addr,
-				val, mask, &vreg->test_reg);
+				vlow, mask, &vreg->test_reg);
 	}
 
 	/* voltage setting */
