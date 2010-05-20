@@ -471,7 +471,20 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 		goto fail_othc_config;
 	}
 
-	/* REVISIT: Check if headset is present during boot */
+	/* Check if the headset is already inserted during boot up */
+	rc = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_ir);
+	if (rc < 0) {
+		pr_err("%s: Unable to get headset status at boot\n", __func__);
+		goto fail_ir_irq;
+	}
+	if (rc) {
+		pr_debug("%s: Headset inserted during boot up\n", __func__);
+		/* Headset present */
+		dd->othc_ir_state = true;
+		switch_set_state(&dd->othc_sdev, 1);
+		input_report_switch(dd->othc_ipd, SW_HEADPHONE_INSERT, 1);
+		input_sync(dd->othc_ipd);
+	}
 
 	rc = request_irq(dd->othc_irq_ir, pm8058_nc_ir,
 				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
@@ -579,6 +592,9 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 		config[dd->othc_pdata->micbias_select] = dd;
 
 	platform_set_drvdata(pd, dd);
+
+	pr_debug("%s: Device %s:%d successfully registered\n",
+				__func__, pd->name, pd->id);
 
 	return 0;
 
