@@ -479,6 +479,7 @@ static int rpcrouter_sdio_remote_probe(struct platform_device *pdev)
 	return 0;
 }
 
+/*Remove this platform driver after mainline of SDIO_AL update*/
 static struct platform_driver rpcrouter_sdio_remote_driver = {
 	.probe		= rpcrouter_sdio_remote_probe,
 	.driver		= {
@@ -487,11 +488,22 @@ static struct platform_driver rpcrouter_sdio_remote_driver = {
 	},
 };
 
+static struct platform_driver rpcrouter_sdio_driver = {
+	.probe		= rpcrouter_sdio_remote_probe,
+	.driver		= {
+			.name	= "SDIO_RPC",
+			.owner	= THIS_MODULE,
+	},
+};
 
 static int __init rpcrouter_sdio_init(void)
 {
+	int rc;
 	msm_sdio_xprt_debug_mask = 0x3;
-	return platform_driver_register(&rpcrouter_sdio_remote_driver);
+	rc = platform_driver_register(&rpcrouter_sdio_remote_driver);
+	if (rc < 0)
+		return rc;
+	return platform_driver_register(&rpcrouter_sdio_driver);
 }
 
 module_init(rpcrouter_sdio_init);
