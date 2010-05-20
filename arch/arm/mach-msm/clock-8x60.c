@@ -1403,6 +1403,10 @@ static int _soc_clk_enable(unsigned id)
 	void *reg = clk->cc_reg;
 	uint32_t reg_val;
 
+	WARN((clk->type != NORATE) && (clk->current_freq == &dummy_freq),
+		"Attempting to enable clock %d before setting its rate. "
+		"Set the rate first!\n", id);
+
 	reg_val = readl(reg);
 	if (clk->type == MND) {
 		reg_val |= clk->current_freq->mnd_en_mask;
