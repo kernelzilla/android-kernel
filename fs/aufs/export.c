@@ -302,8 +302,8 @@ static struct vfsmount *au_mnt_get(struct super_block *sb)
 }
 
 struct au_nfsd_si_lock {
-	const unsigned int sigen;
-	const aufs_bindex_t br_id;
+	unsigned int sigen;
+	aufs_bindex_t br_id;
 	unsigned char force_lock;
 };
 
@@ -574,14 +574,16 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 	ino_t ino, dir_ino;
 	aufs_bindex_t bindex;
 	struct au_nfsd_si_lock nsi_lock = {
-		.sigen		= fh[Fh_sigen],
-		.br_id		= fh[Fh_br_id],
 		.force_lock	= 0
 	};
 
-	AuDebugOn(fh_len < Fh_tail);
-
 	dentry = ERR_PTR(-ESTALE);
+	/* it should never happen, but the file handle is unreliable */
+	if (unlikely(fh_len < Fh_tail))
+		goto out;
+	nsi_lock.sigen = fh[Fh_sigen];
+	nsi_lock.br_id = fh[Fh_br_id];
+
 	/* branch id may be wrapped around */
 	bindex = si_nfsd_read_lock(sb, &nsi_lock);
 	if (unlikely(bindex < 0))
@@ -590,7 +592,10 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 
 	/* is this inode still cached? */
 	ino = decode_ino(fh + Fh_ino);
-	AuDebugOn(ino == AUFS_ROOT_INO);
+	/* it should never happen */
+	if (unlikely(ino == AUFS_ROOT_INO))
+		goto out;
+
 	dir_ino = decode_ino(fh + Fh_dir_ino);
 	dentry = decode_by_ino(sb, ino, dir_ino);
 	if (IS_ERR(dentry))
