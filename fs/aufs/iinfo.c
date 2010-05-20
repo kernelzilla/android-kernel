@@ -34,19 +34,6 @@ struct inode *au_h_iptr(struct inode *inode, aufs_bindex_t bindex)
 }
 
 /* todo: hard/soft set? */
-void au_set_ibstart(struct inode *inode, aufs_bindex_t bindex)
-{
-	struct au_iinfo *iinfo = au_ii(inode);
-	struct inode *h_inode;
-
-	IiMustWriteLock(inode);
-
-	iinfo->ii_bstart = bindex;
-	h_inode = iinfo->ii_hinode[bindex + 0].hi_inode;
-	if (h_inode)
-		au_cpup_igen(inode, h_inode);
-}
-
 void au_hiput(struct au_hinode *hinode)
 {
 	au_hn_free(hinode);
