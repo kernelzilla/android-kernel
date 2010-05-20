@@ -308,9 +308,16 @@ static int __devinit isa1200_probe(struct i2c_client *client,
 		goto timed_reg_fail;
 
 	i2c_set_clientdata(client, haptic);
-	/* REVISIT: Add gpio_request */
+
 	ret = gpio_is_valid(pdata->hap_en_gpio);
 	if (ret) {
+		ret = gpio_request(pdata->hap_en_gpio, "haptic_gpio");
+		if (ret) {
+			dev_err(&client->dev, "%s: gpio %d request failed\n",
+					__func__, pdata->hap_en_gpio);
+			goto gpio_fail;
+		}
+	} else {
 		dev_err(&client->dev, "%s: Invalid gpio %d\n", __func__,
 					pdata->hap_en_gpio);
 		goto gpio_fail;
@@ -339,6 +346,7 @@ static int __devexit isa1200_remove(struct i2c_client *client)
 	cancel_work_sync(&haptic->work);
 	hrtimer_cancel(&haptic->timer);
 	timed_output_dev_unregister(&haptic->dev);
+	gpio_free(haptic->pdata->hap_en_gpio);
 
 	if (haptic->pdata->power_on)
 		haptic->pdata->power_on(0);
