@@ -149,7 +149,15 @@
 #define	PRE_DIVIDE_MIN		PRE_DIVIDE_0
 #define	PRE_DIVIDE_MAX		PRE_DIVIDE_2
 
-static unsigned long pt_t[NUM_PRE_DIVIDE][NUM_CLOCKS] = {
+static char *clks[NUM_CLOCKS] = {
+	"1K", "32768", "19.2M"
+};
+
+static unsigned pre_div[NUM_PRE_DIVIDE] = {
+	PRE_DIVIDE_0, PRE_DIVIDE_1, PRE_DIVIDE_2
+};
+
+static unsigned int pt_t[NUM_PRE_DIVIDE][NUM_CLOCKS] = {
 	{	PRE_DIVIDE_0 * NSEC_1000HZ,
 		PRE_DIVIDE_0 * NSEC_32768HZ,
 		PRE_DIVIDE_0 * NSEC_19P2MHZ,
@@ -286,19 +294,22 @@ static int pm8058_pwm_start(struct pwm_device *pwm, int start, int ramp_start)
 	return rc;
 }
 
-static void pm8058_pwm_calc_period(unsigned int period_ns,
+static void pm8058_pwm_calc_period(unsigned int period_us,
 					   struct pw8058_pwm_config *pwm_conf)
 {
 	int	n, m, clk, div;
 	int	best_m, best_div, best_clk;
 	int	last_err, cur_err, better_err, better_m;
-	unsigned int	tmp_p, last_p, min_err, period;
+	unsigned int	tmp_p, last_p, min_err, period_n;
 
-	/* PWM Period / N */
-	period = (unsigned int)period_ns >> 6;
-	if (period >= MAX_MPT) {
+	/* PWM Period / N : handle underflow or overflow */
+	if (period_us < (PM_PWM_PERIOD_MAX / NSEC_PER_USEC))
+		period_n = (period_us * NSEC_PER_USEC) >> 6;
+	else
+		period_n = (period_us >> 6) * NSEC_PER_USEC;
+	if (period_n >= MAX_MPT) {
 		n = 9;
-		period >>= 3;
+		period_n >>= 3;
 	} else
 		n = 6;
 
@@ -307,10 +318,10 @@ static void pm8058_pwm_calc_period(unsigned int period_ns,
 	best_clk = 0;
 	best_div = 0;
 	for (clk = 0; clk < NUM_CLOCKS; clk++) {
-		tmp_p = period;
-		last_p = tmp_p;
 		for (div = 0; div < NUM_PRE_DIVIDE; div++) {
-			for (m = 0; m < PM8058_PWM_M_MAX; m++) {
+			tmp_p = period_n;
+			last_p = tmp_p;
+			for (m = 0; m <= PM8058_PWM_M_MAX; m++) {
 				if (tmp_p <= pt_t[div][clk]) {
 					/* Found local best */
 					if (!m) {
@@ -343,7 +354,6 @@ static void pm8058_pwm_calc_period(unsigned int period_ns,
 					last_p = tmp_p;
 					tmp_p >>= 1;
 				}
-
 			}
 		}
 	}
@@ -353,9 +363,9 @@ static void pm8058_pwm_calc_period(unsigned int period_ns,
 	pwm_conf->pre_div = best_div;
 	pwm_conf->pre_div_exp = best_m;
 
-	pr_debug("%s: [%d-bit] min_err=%d (pwm_p=%u) [m=%d, clk=%d, div=%d]: "
-		 "p=%d.\n", __func__, n, min_err, (unsigned)period_ns, best_m,
-		 best_clk, best_div, period);
+	pr_debug("%s: period=%u: n=%d, m=%d, clk[%d]=%s, div[%d]=%d\n",
+		 __func__, (unsigned)period_us, n, best_m,
+		 best_clk, clks[best_clk], best_div, pre_div[best_div]);
 }
 
 static int pm8058_pwm_configure(struct pwm_device *pwm,
@@ -367,7 +377,7 @@ static int pm8058_pwm_configure(struct pwm_device *pwm,
 	reg = (pwm_conf->pwm_size > 6) ? PM8058_PWM_SIZE_9_BIT : 0;
 	pwm->pwm_ctl[5] = reg;
 
-	reg = (pwm_conf->clk << PM8058_PWM_CLK_SEL_SHIFT)
+	reg = ((pwm_conf->clk + 1) << PM8058_PWM_CLK_SEL_SHIFT)
 		& PM8058_PWM_CLK_SEL_MASK;
 	reg |= (pwm_conf->pre_div << PM8058_PWM_PREDIVIDE_SHIFT)
 		& PM8058_PWM_PREDIVIDE_MASK;
@@ -513,17 +523,19 @@ EXPORT_SYMBOL(pwm_free);
  * pwm_config - change a PWM device configuration
  *
  * @pwm: the PWM device
- * @period_ns: period in nano second
- * @duty_ns: duty cycle in nano second
+ * @period_us: period in micro second
+ * @duty_us: duty cycle in micro second
  */
-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+int pwm_config(struct pwm_device *pwm, int duty_us, int period_us)
 {
 	struct pw8058_pwm_config	pwm_conf;
-	unsigned int max_pwm_value;
+	unsigned int max_pwm_value, tmp;
 	int	rc;
 
 	if (pwm == NULL || IS_ERR(pwm) ||
-		(unsigned)duty_ns > (unsigned)period_ns)
+		(unsigned)duty_us > (unsigned)period_us ||
+		(unsigned)period_us > PM_PWM_PERIOD_MAX ||
+		(unsigned)period_us < PM_PWM_PERIOD_MIN)
 		return -EINVAL;
 	if (pwm->chip == NULL)
 		return -ENODEV;
@@ -535,14 +547,27 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 		goto out_unlock;
 	}
 
-	pm8058_pwm_calc_period(period_ns, &pwm_conf);
+	pm8058_pwm_calc_period(period_us, &pwm_conf);
 
-	pwm_conf.pwm_value = (duty_ns << pwm_conf.pwm_size) / period_ns;
-	/* Avoid overflow */
+	/* Figure out pwm_value with overflow handling */
+	if ((unsigned)period_us > (1 << pwm_conf.pwm_size)) {
+		tmp = period_us;
+		tmp >>= pwm_conf.pwm_size;
+		pwm_conf.pwm_value = (unsigned)duty_us / tmp;
+	} else {
+		tmp = duty_us;
+		tmp <<= pwm_conf.pwm_size;
+		pwm_conf.pwm_value = tmp / (unsigned)period_us;
+	}
 	max_pwm_value = (1 << pwm_conf.pwm_size) - 1;
 	if (pwm_conf.pwm_value > max_pwm_value)
 		pwm_conf.pwm_value = max_pwm_value;
+
 	pwm_conf.bypass_lut = 1;
+
+	pr_debug("%s: duty/period=%u/%u usec: pwm_value=%d (of %d)\n",
+		 __func__, (unsigned)duty_us, (unsigned)period_us,
+		 pwm_conf.pwm_value, 1 << pwm_conf.pwm_size);
 
 	rc = pm8058_pwm_configure(pwm, &pwm_conf);
 
@@ -601,7 +626,7 @@ EXPORT_SYMBOL(pwm_disable);
  * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
  *
  * @pwm: the PWM device
- * @period_ns: period in nano second
+ * @period_us: period in micro second
  * @duty_pct: arrary of duty cycles in percent, like 20, 50.
  * @duty_time_ms: time for each duty cycle in millisecond
  * @start_idx: start index in lookup table from 0 to MAX-1
@@ -611,7 +636,7 @@ EXPORT_SYMBOL(pwm_disable);
  * @flags: control flags
  *
  */
-int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
+int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_us,
 			  int duty_pct[], int duty_time_ms, int start_idx,
 			  int idx_len, int pause_lo, int pause_hi, int flags)
 {
@@ -631,6 +656,9 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 		return -EINVAL;
 	if ((start_idx + idx_len) > PM_PWM_LUT_SIZE)
 		return -EINVAL;
+	if ((unsigned)period_us > PM_PWM_PERIOD_MAX ||
+		(unsigned)period_us < PM_PWM_PERIOD_MIN)
+		return -EINVAL;
 
 	mutex_lock(&pwm->chip->pwm_mutex);
 
@@ -639,7 +667,7 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 		goto out_unlock;
 	}
 
-	pm8058_pwm_calc_period(period_ns, &pwm_conf);
+	pm8058_pwm_calc_period(period_us, &pwm_conf);
 
 	len = (idx_len > PM_PWM_LUT_SIZE) ? PM_PWM_LUT_SIZE : idx_len;
 
@@ -656,7 +684,7 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 		cfg1 = (pwm_value >> 1) & 0x80;
 		cfg1 |= start_idx + i;
 
-		pr_info("%s: %d: pwm=%d\n", __func__, i, pwm_value);
+		pr_debug("%s: %d: pwm=%d\n", __func__, i, pwm_value);
 
 		pm8058_write(pwm->chip->pm_chip,
 			     SSBI_REG_ADDR_LPG_LUT_CFG0,

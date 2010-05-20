@@ -29,6 +29,11 @@
 #ifndef __PMIC8058_PWM_H__
 #define __PMIC8058_PWM_H__
 
+/* The MAX value is computation limit. Hardware limit is 393 seconds. */
+#define	PM_PWM_PERIOD_MAX		(274 * USEC_PER_SEC)
+/* The MIN value is hardware limit. */
+#define	PM_PWM_PERIOD_MIN		7 /* micro seconds */
+
 #define	PM_PWM_LUT_SIZE			64
 #define	PM_PWM_LUT_DUTY_TIME_MAX	512	/* ms */
 #define	PM_PWM_LUT_PAUSE_MAX		(7000 * PM_PWM_LUT_DUTY_TIME_MAX)
