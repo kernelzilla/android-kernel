@@ -1803,50 +1803,8 @@ static void __exit msmsdcc_exit(void)
 #endif
 }
 
-#ifndef MODULE
-static int __init msmsdcc_pwrsave_setup(char *__unused)
-{
-	msmsdcc_pwrsave = 1;
-	return 1;
-}
-
-static int __init msmsdcc_nopwrsave_setup(char *__unused)
-{
-	msmsdcc_pwrsave = 0;
-	return 1;
-}
-
-
-static int __init msmsdcc_fmin_setup(char *str)
-{
-	unsigned int n;
-
-	if (!get_option(&str, &n))
-		return 0;
-	msmsdcc_fmin = n;
-	return 1;
-}
-
-static int __init msmsdcc_fmax_setup(char *str)
-{
-	unsigned int n;
-
-	if (!get_option(&str, &n))
-		return 0;
-	msmsdcc_fmax = n;
-	return 1;
-}
-#endif
-
-__setup("msmsdcc_pwrsave", msmsdcc_pwrsave_setup);
-__setup("msmsdcc_nopwrsave", msmsdcc_nopwrsave_setup);
-__setup("msmsdcc_fmin=", msmsdcc_fmin_setup);
-__setup("msmsdcc_fmax=", msmsdcc_fmax_setup);
-
 module_init(msmsdcc_init);
 module_exit(msmsdcc_exit);
-module_param(msmsdcc_fmin, uint, 0444);
-module_param(msmsdcc_fmax, uint, 0444);
 
 MODULE_DESCRIPTION("Qualcomm Multimedia Card Interface driver");
 MODULE_LICENSE("GPL");
