@@ -56,6 +56,8 @@
 #include "devices-msm8x60.h"
 #include "timer.h"
 
+#define MSM_SHARED_RAM_PHYS 0x40000000
+
 /* Macros assume PMIC GPIOs start at 0 */
 #define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + NR_GPIO_IRQS)
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - NR_GPIO_IRQS)
@@ -434,6 +436,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 };
 
 static struct platform_device *surf_devices[] __initdata = {
+	&msm_device_smd,
 	&smsc911x_device,
 	&msm_device_uart_dm12,
 #ifdef CONFIG_I2C_QUP
@@ -1167,6 +1170,7 @@ static void __init msm8x60_init_buses(void)
 
 static void __init msm8x60_map_io(void)
 {
+	msm_shared_ram_phys = MSM_SHARED_RAM_PHYS;
 	msm_map_msm8x60_io();
 	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
 }

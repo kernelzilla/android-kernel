@@ -4,10 +4,13 @@ obj-y += modem_notifier.o
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o
 obj-$(CONFIG_DEBUG_FS) += nohlt.o
 
-obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o internal_power_rail.o
-obj-$(CONFIG_MSM_PROC_COMM) += vreg.o mpp.o
-ifdef CONFIG_MSM_PROC_COMM
-	obj-$(CONFIG_DEBUG_FS) += pmic_debugfs.o
+obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o
+ifndef CONFIG_ARCH_MSM8X60
+	obj-$(CONFIG_MSM_PROC_COMM) += clock-pcom.o internal_power_rail.o
+	obj-$(CONFIG_MSM_PROC_COMM) += vreg.o mpp.o
+	ifdef CONFIG_MSM_PROC_COMM
+		obj-$(CONFIG_DEBUG_FS) += pmic_debugfs.o
+	endif
 endif
 
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock.o timer.o gpio.o generic_gpio.o
@@ -40,10 +43,13 @@ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
 obj-$(CONFIG_MSM_FIQ_SUPPORT) += fiq_glue.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-rfkill.o
 obj-$(CONFIG_MSM_SDIO_AL) += sdio_al.o
-obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o remote_spinlock.o socinfo.o
-obj-$(CONFIG_MSM_SMD) += nand_partitions.o pmic.o
-obj-$(CONFIG_MSM_SMD) += rpc_hsusb.o rpc_pmapp.o rpc_fsusb.o
-obj-$(CONFIG_MSM_SMD_LOGGING) += smem_log.o
+obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o remote_spinlock.o
+ifndef CONFIG_ARCH_MSM8X60
+	obj-$(CONFIG_MSM_SMD) += socinfo.o
+	obj-$(CONFIG_MSM_SMD) += nand_partitions.o pmic.o
+	obj-$(CONFIG_MSM_ONCRPCROUTER) += rpc_hsusb.o rpc_pmapp.o rpc_fsusb.o
+	obj-$(CONFIG_MSM_SMD_LOGGING) += smem_log.o
+endif
 obj-$(CONFIG_MSM_SMD_TTY) += smd_tty.o
 obj-$(CONFIG_MSM_SMD_QMI) += smd_qmi.o
 obj-$(CONFIG_MSM_SMD_PKT) += smd_pkt.o
