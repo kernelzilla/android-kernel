@@ -328,14 +328,6 @@ config MMC_MSM
 	  This provides support for the SD/MMC cell found in the
           MSM and QSD SOCs from Qualcomm.
 
-config MMC_MSM7X00A_RESUME_IN_WQ
-	bool "Perform MMC resume in work-queue (EXPERIMENTAL)"
-        depends on EXPERIMENTAL && MMC_MSM
-	default n
-	help
-	  This forces msm host-controller driver to perform
-          the majority of its resume-work in a work-queue.
-
 config MMC_MSM_SDIO_SUPPORT
 	boolean "Qualcomm MSM SDIO support"
 	depends on MMC_MSM

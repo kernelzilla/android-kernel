@@ -1246,22 +1246,6 @@ msmsdcc_init_dma(struct msmsdcc_host *host)
 	return 0;
 }
 
-#ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ
-static void
-do_resume_work(struct work_struct *work)
-{
-	struct msmsdcc_host *host =
-		container_of(work, struct msmsdcc_host, resume_task);
-	struct mmc_host	*mmc = host->mmc;
-
-	if (mmc) {
-		mmc_resume_host(mmc);
-		if (host->plat->status_irq)
-			enable_irq(host->plat->status_irq);
-	}
-}
-#endif
-
 static ssize_t
 show_polling(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -1415,9 +1399,6 @@ msmsdcc_probe(struct platform_device *pdev)
 					   plat->embedded_sdio->num_funcs);
 #endif
 
-#ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ
-	INIT_WORK(&host->resume_task, do_resume_work);
-#endif
 	tasklet_init(&host->dma_tlet, msmsdcc_dma_complete_tlet,
 			(unsigned long)host);
 
@@ -1737,13 +1718,9 @@ msmsdcc_resume(struct platform_device *dev)
 			disable_irq(host->plat->sdiowakeup_irq);
 
 		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO) {
-#ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ
-			schedule_work(&host->resume_task);
-#else
 			mmc_resume_host(mmc);
 			if (host->plat->status_irq)
 				enable_irq(host->plat->status_irq);
-#endif
 		} else if (host->plat->status_irq)
 			enable_irq(host->plat->status_irq);
 
