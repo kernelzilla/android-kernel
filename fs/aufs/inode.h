@@ -179,7 +179,6 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 /* iinfo.c */
 struct inode *au_h_iptr(struct inode *inode, aufs_bindex_t bindex);
 void au_hiput(struct au_hinode *hinode);
-void au_set_ibstart(struct inode *inode, aufs_bindex_t bindex);
 void au_set_hi_wh(struct inode *inode, aufs_bindex_t bindex,
 		  struct dentry *h_wh);
 unsigned int au_hi_flags(struct inode *inode, int isdir);
@@ -339,6 +338,12 @@ static inline struct dentry *au_hi_wh(struct inode *inode, aufs_bindex_t bindex)
 {
 	IiMustAnyLock(inode);
 	return au_ii(inode)->ii_hinode[0 + bindex].hi_whdentry;
+}
+
+static inline void au_set_ibstart(struct inode *inode, aufs_bindex_t bindex)
+{
+	IiMustWriteLock(inode);
+	au_ii(inode)->ii_bstart = bindex;
 }
 
 static inline void au_set_ibend(struct inode *inode, aufs_bindex_t bindex)
