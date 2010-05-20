@@ -9,3 +9,4 @@ obj-y += audio_evrc_in.o audio_qcelp_in.o
 obj-y += adsp.o adsp_driver.o adsp_info.o
 obj-y += audio_acdb.o snddev_virtual.o
 obj-y += audio_fm.o
+obj-y += snddev_mi2s.o
