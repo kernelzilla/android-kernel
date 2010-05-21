@@ -185,6 +185,9 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 
 		if (audio->running == 1 && audio->enabled == 1) {
 			audpp_route_stream(audio->dec_id, audio->source);
+			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+				&audio->vol_pan,
+				COPP);
 			if (audio->drv_status &
 					ADRV_STATUS_DEVICE_SWITCH_READY) {
 				audio->wflush = 1;
