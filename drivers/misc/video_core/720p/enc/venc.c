@@ -320,8 +320,8 @@ static void vid_enc_lean_event(struct video_client_ctx *client_ctx,
 		break;
 
 	default:
-		ERR("%s() : unknown event type \n",
-			__func__);
+		ERR("%s() : unknown event type %u\n",
+			__func__, event);
 		break;
 	}
 
@@ -543,7 +543,19 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 		vid_enc_vcd_cb, client_ctx);
 	client_ctx->stop_msg = 0;
 
-	wait_for_completion(&client_ctx->event);
+	if (!vcd_status) {
+		wait_for_completion(&client_ctx->event);
+		if (client_ctx->event_status) {
+			ERR("callback for vcd_open returned error: %u",
+				client_ctx->event_status);
+			mutex_unlock(&vid_enc_device_p->lock);
+			return -EFAULT;
+		}
+	} else {
+		ERR("vcd_open returned error: %u", vcd_status);
+		mutex_unlock(&vid_enc_device_p->lock);
+		return -EFAULT;
+	}
 	file->private_data = client_ctx;
 	mutex_unlock(&vid_enc_device_p->lock);
 	return 0;
@@ -816,6 +828,34 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 		if (!result) {
 			DBG("\n VEN_IOCTL_SET_INPUT_BUFFER"
 				"/VEN_IOCTL_SET_OUTPUT_BUFFER failed");
+			return -EIO;
+		}
+		break;
+
+	case VEN_IOCTL_CMD_FREE_INPUT_BUFFER:
+	case VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER:
+
+		if (copy_from_user(&venc_msg,
+			(void __user *)arg, sizeof(venc_msg)))
+			return -EFAULT;
+
+		DBG("VEN_IOCTL_CMD_FREE_INPUT_BUFFER/"
+			"VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER\n");
+
+		if (copy_from_user(&buffer_info,
+			(void __user *)venc_msg.inputparam,
+			sizeof(buffer_info)))
+			return -EFAULT;
+
+		buffer_dir = VEN_BUFFER_TYPE_INPUT;
+		if (cmd == VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER)
+			buffer_dir = VEN_BUFFER_TYPE_OUTPUT;
+
+		result = vid_enc_free_buffer(client_ctx, &buffer_info,
+				buffer_dir);
+		if (!result) {
+			DBG("\n VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER"
+				"/VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER failed");
 			return -EIO;
 		}
 		break;
