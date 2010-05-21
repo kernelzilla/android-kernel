@@ -711,6 +711,8 @@ kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
 	link[1] = ibaddr;
 	link[2] = sizedwords;
 
+	kgsl_setstate(device, device->mmu.tlb_flags);
+
 	kgsl_drawctxt_switch(device, &device->drawctxt[drawctxt_index], flags);
 
 	*timestamp = kgsl_ringbuffer_addcmds(&device->ringbuffer,

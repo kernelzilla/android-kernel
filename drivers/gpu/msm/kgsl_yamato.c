@@ -1045,6 +1045,9 @@ int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 
 		cmd[0] = pm4_type3_packet(PM4_INTERRUPT, 1);
 		cmd[1] = CP_INT_CNTL__IB1_INT_MASK;
+
+		/* Need to flush tlb before submitting commands to GPU */
+		kgsl_setstate(device, device->mmu.tlb_flags);
 		kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_NO_TS_CMP,
 						cmd, 2);
 		kgsl_sharedmem_writel(&device->memstore,

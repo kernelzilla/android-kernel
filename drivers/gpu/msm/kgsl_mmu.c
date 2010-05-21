@@ -440,6 +440,7 @@ int kgsl_mmu_init(struct kgsl_device *device)
 			GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
 
 	mmu->flags |= KGSL_FLAGS_INITIALIZED;
+	mmu->tlb_flags = 0;
 
 	/* sub-client MMU lookups require address translation */
 	if ((mmu->config & ~0x1) > 0) {
@@ -643,18 +644,16 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 		if ((kgsl_driver.yamato_device.flags & KGSL_FLAGS_INITIALIZED)
 				&& (pagetable == kgsl_driver.yamato_device.mmu.
 				hwpagetable)) {
-			kgsl_setstate(&kgsl_driver.yamato_device,
-					KGSL_MMUFLAGS_TLBFLUSH);
-			GSL_TLBFLUSH_FILTER_RESET();
+			kgsl_driver.yamato_device.mmu.tlb_flags |=
+				KGSL_MMUFLAGS_TLBFLUSH;
 		}
 		if ((kgsl_driver.g12_device.flags & KGSL_FLAGS_INITIALIZED) &&
 				(pagetable == kgsl_driver.g12_device.mmu.
 				hwpagetable)) {
-			kgsl_setstate(&kgsl_driver.g12_device,
-					KGSL_MMUFLAGS_TLBFLUSH);
-			GSL_TLBFLUSH_FILTER_RESET();
+			kgsl_driver.g12_device.mmu.tlb_flags |=
+				KGSL_MMUFLAGS_TLBFLUSH;
 		}
-
+		GSL_TLBFLUSH_FILTER_RESET();
 	}
 
 
