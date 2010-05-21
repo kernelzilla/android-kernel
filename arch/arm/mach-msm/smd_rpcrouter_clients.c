@@ -100,12 +100,18 @@ static int rpc_clients_thread(void *data)
 
 	client = data;
 	for (;;) {
+		buffer = NULL;
 		rc = msm_rpc_read(client->ept, &buffer, -1, HZ);
 
-		if (client->exit_flag)
+		if (client->exit_flag) {
+			kfree(buffer);
 			break;
-		if (rc < ((int)(sizeof(uint32_t) * 2)))
+		}
+
+		if (rc < ((int)(sizeof(uint32_t) * 2))) {
+			kfree(buffer);
 			continue;
+		}
 
 		type = be32_to_cpu(*((uint32_t *)buffer + 1));
 		if (type == 1) {
