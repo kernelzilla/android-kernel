@@ -25,7 +25,7 @@
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/board.h>
 #include <asm/mach-types.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 /* define the value for BT_SCO */
 #define BT_SCO_PCM_CTL_VAL (PCM_CTL__RPCM_WIDTH__LINEAR_V |\
@@ -652,8 +652,9 @@ static struct adie_codec_dev_profile idual_mic_endfire_profile = {
 	.setting_sz = ARRAY_SIZE(idual_mic_endfire_settings),
 };
 
-static enum hsed_controller idual_mic_endfire_pmctl_id[] =
-	{PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2};
+static enum hsed_controller idual_mic_endfire_pmctl_id[] = {
+	PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2
+};
 
 static struct snddev_icodec_data snddev_idual_mic_endfire_data = {
 	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
@@ -705,8 +706,9 @@ static struct adie_codec_dev_profile idual_mic_broadside_profile = {
 	.setting_sz = ARRAY_SIZE(idual_mic_broadside_settings),
 };
 
-static enum hsed_controller idual_mic_broadside_pmctl_id[] =
-	{PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2};
+static enum hsed_controller idual_mic_broadside_pmctl_id[] = {
+	PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2
+};
 
 static struct snddev_icodec_data snddev_idual_mic_broadside_data = {
 	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
@@ -1147,6 +1149,50 @@ static struct platform_device msm_ihs_stereo_speaker_stereo_rx_device = {
 };
 
 
+static struct snddev_icodec_data snddev_fluid_imic_tx_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "handset_tx",
+	.copp_id = 0,
+	.acdb_id = 6,
+	.profile = &ispeaker_tx_profile,
+	.channel_mode = 1,
+	.pmctl_id = ispk_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(ispk_pmctl_id),
+	.default_sample_rate = 48000,
+	.pamp_on = msm_snddev_tx_route_config,
+	.pamp_off = msm_snddev_tx_route_deconfig,
+};
+
+static struct platform_device msm_fluid_imic_tx_device = {
+	.name = "snddev_icodec",
+	.id = 22,
+	.dev = { .platform_data = &snddev_fluid_imic_tx_data },
+};
+
+static struct snddev_icodec_data snddev_fluid_iearpiece_rx_data = {
+	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
+	.name = "handset_rx",
+	.copp_id = 0,
+	.acdb_id = 8,
+	.profile = &ispeaker_rx_profile,
+	.channel_mode = 2,
+	.pmctl_id = NULL,
+	.pmctl_id_sz = 0,
+	.default_sample_rate = 48000,
+	.pamp_on = &msm_snddev_poweramp_on,
+	.pamp_off = &msm_snddev_poweramp_off,
+	.max_voice_rx_vol[VOC_NB_INDEX] = -500,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1000,
+	.max_voice_rx_vol[VOC_WB_INDEX] = -500,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1000,
+};
+
+static struct platform_device msm_fluid_iearpeice_rx_device = {
+	.name = "snddev_icodec",
+	.id = 23,
+	.dev = { .platform_data = &snddev_fluid_iearpiece_rx_data },
+};
+
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
@@ -1192,6 +1238,8 @@ static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_ihs_mono_rx_device,
 	&msm_ispeaker_rx_device,
 	&msm_ispeaker_tx_device,
+	&msm_fluid_imic_tx_device,
+	&msm_fluid_iearpeice_rx_device,
 };
 
 #ifdef CONFIG_DEBUG_FS
