@@ -1449,15 +1449,15 @@ msmsdcc_probe(struct platform_device *pdev)
 		goto pclk_disable;
 	}
 
-	ret = clk_enable(host->clk);
-	if (ret)
-		goto clk_put;
-
 	ret = clk_set_rate(host->clk, msmsdcc_fmin);
 	if (ret) {
 		pr_err("%s: Clock rate set failed (%d)\n", __func__, ret);
-		goto clk_disable;
+		goto clk_put;
 	}
+
+	ret = clk_enable(host->clk);
+	if (ret)
+		goto clk_put;
 
 	host->clk_rate = clk_get_rate(host->clk);
 
