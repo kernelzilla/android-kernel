@@ -26,6 +26,7 @@
 #include <linux/pmic8058-pwrkey.h>
 #include <linux/pmic8058-vibrator.h>
 #include <linux/leds.h>
+#include <linux/pmic8058-othc.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -738,6 +739,81 @@ static struct pmic8058_vibrator_pdata pmic_vib_pdata = {
 	.max_timeout_ms = 15000,
 };
 
+
+#define PM8058_OTHC_CNTR_BASE0	0xA0
+#define PM8058_OTHC_CNTR_BASE1	0x134
+#define PM8058_OTHC_CNTR_BASE2	0x137
+
+static struct othc_hsed_config hsed_config_1 = {
+	.othc_headset = OTHC_HEADSET_NO,
+	.othc_lowcurr_thresh_uA = 100,
+	.othc_highcurr_thresh_uA = 700,
+	.othc_hyst_prediv_us = 7800,
+	.othc_period_clkdiv_us = 62500,
+	.othc_hyst_clk_us = 121000,
+	.othc_period_clk_us = 312500,
+	.othc_wakeup = 1,
+};
+
+/* MIC_BIAS0 is configured as normal MIC BIAS */
+static struct pmic8058_othc_config_pdata othc_config_pdata_0 = {
+	.micbias_select = OTHC_MICBIAS_0,
+	.micbias_capability = OTHC_MICBIAS,
+	.micbias_enable = OTHC_SIGNAL_OFF,
+};
+
+/* MIC_BIAS1 is configured as HSED_BIAS for OTHC */
+static struct pmic8058_othc_config_pdata othc_config_pdata_1 = {
+	.micbias_select = OTHC_MICBIAS_1,
+	.micbias_capability = OTHC_MICBIAS_HSED,
+	.micbias_enable = OTHC_SIGNAL_PWM_TCXO,
+	.hsed_config = &hsed_config_1,
+};
+
+/* MIC_BIAS2 is configured as normal MIC BIAS */
+static struct pmic8058_othc_config_pdata othc_config_pdata_2 = {
+	.micbias_select = OTHC_MICBIAS_2,
+	.micbias_capability = OTHC_MICBIAS,
+	.micbias_enable = OTHC_SIGNAL_OFF,
+};
+
+static struct resource resources_othc_0[] = {
+	{
+		.name = "othc_base",
+		.start = PM8058_OTHC_CNTR_BASE0,
+		.end   = PM8058_OTHC_CNTR_BASE0,
+		.flags = IORESOURCE_IO,
+	},
+};
+
+static struct resource resources_othc_1[] = {
+	{
+		.start = PM8058_SW_1_IRQ(PM8058_IRQ_BASE),
+		.end   = PM8058_SW_1_IRQ(PM8058_IRQ_BASE),
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = PM8058_IR_1_IRQ(PM8058_IRQ_BASE),
+		.end   = PM8058_IR_1_IRQ(PM8058_IRQ_BASE),
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "othc_base",
+		.start = PM8058_OTHC_CNTR_BASE1,
+		.end   = PM8058_OTHC_CNTR_BASE1,
+		.flags = IORESOURCE_IO,
+	},
+};
+
+static struct resource resources_othc_2[] = {
+	{
+		.name = "othc_base",
+		.start = PM8058_OTHC_CNTR_BASE2,
+		.end   = PM8058_OTHC_CNTR_BASE2,
+		.flags = IORESOURCE_IO,
+	},
+};
+
 #define PM8058_GPIO_INT           88
 
 static struct pm8058_gpio_platform_data pm8058_gpio_data = {
@@ -785,7 +861,32 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{
 		.name = "pm8058-pwm",
 		.id = -1,
-	}
+	},
+	{
+		.name = "pm8058-othc",
+		.id = 0,
+		.platform_data = &othc_config_pdata_0,
+		.data_size = sizeof(othc_config_pdata_0),
+		.num_resources = ARRAY_SIZE(resources_othc_0),
+		.resources = resources_othc_0,
+	},
+	{
+		/* OTHC1 module has headset/switch dection */
+		.name = "pm8058-othc",
+		.id = 1,
+		.num_resources = ARRAY_SIZE(resources_othc_1),
+		.resources = resources_othc_1,
+		.platform_data = &othc_config_pdata_1,
+		.data_size = sizeof(othc_config_pdata_1),
+	},
+	{
+		.name = "pm8058-othc",
+		.id = 2,
+		.platform_data = &othc_config_pdata_2,
+		.data_size = sizeof(othc_config_pdata_2),
+		.num_resources = ARRAY_SIZE(resources_othc_2),
+		.resources = resources_othc_2,
+	},
 };
 
 static struct pm8058_platform_data pm8058_platform_data = {
