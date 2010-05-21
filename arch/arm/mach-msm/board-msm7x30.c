@@ -3295,6 +3295,9 @@ static struct platform_device msm_batt_device = {
 };
 
 static struct platform_device *devices[] __initdata = {
+#if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
+	&msm_device_uart2,
+#endif
 	&msm_device_smd,
 	&msm_device_dmov,
 	&smc91x_device,
@@ -3347,9 +3350,6 @@ static struct platform_device *devices[] __initdata = {
 	&msm_bt_power_device,
 #endif
 	&msm_device_kgsl,
-#if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
-	&msm_device_uart2,
-#endif
 	&msm_device_pmic_leds,
 	&msm_device_tssc,
 #ifdef CONFIG_MT9T013
@@ -4023,6 +4023,9 @@ static void __init msm7x30_init(void)
 	if (socinfo_init() < 0)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
 		       __func__);
+#ifdef CONFIG_SERIAL_MSM_CONSOLE
+	msm7x30_init_uart2();
+#endif
 	msm_spm_init(&msm_spm_data, 1);
 	msm_acpu_clock_init(&msm7x30_clock_data);
 	if (machine_is_msm7x30_surf() || machine_is_msm7x30_fluid())
@@ -4076,9 +4079,6 @@ static void __init msm7x30_init(void)
 				ARRAY_SIZE(msm_camera_boardinfo));
 
 	bt_power_init();
-#ifdef CONFIG_SERIAL_MSM_CONSOLE
-	msm7x30_init_uart2();
-#endif
 	msm_device_tssc.dev.platform_data = &msm_ts_data;
 #ifdef CONFIG_I2C_SSBI
 	msm_device_ssbi6.dev.platform_data = &msm_i2c_ssbi6_pdata;
