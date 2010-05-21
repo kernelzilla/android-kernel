@@ -39,7 +39,7 @@
 #include "adsp.h"
 #include <mach/debug_mm.h>
 
-#define INT_ADSP INT_ADSP_A11
+#define INT_ADSP INT_ADSP_A9_A11
 
 static struct adsp_info adsp_info;
 static struct msm_adsp_module *adsp_modules;
@@ -963,8 +963,7 @@ static int msm_adsp_probe(struct platform_device *pdev)
 	spin_lock_init(&adsp_write_lock);
 
 	rc = request_irq(INT_ADSP, adsp_irq_handler,
-			IRQF_TRIGGER_RISING | IRQF_SHARED,
-			 "adsp", adsp_irq_handler);
+			IRQF_TRIGGER_RISING, "adsp", 0);
 	if (rc < 0)
 		goto fail_request_irq;
 	disable_irq(INT_ADSP);
