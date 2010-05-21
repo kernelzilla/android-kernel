@@ -34,6 +34,10 @@
 /* The MIN value is hardware limit. */
 #define	PM_PWM_PERIOD_MIN		7 /* micro seconds */
 
+struct pm8058_pwm_pdata {
+	int 	(*config)(struct pwm_device *pwm, int ch, int on);
+};
+
 #define	PM_PWM_LUT_SIZE			64
 #define	PM_PWM_LUT_DUTY_TIME_MAX	512	/* ms */
 #define	PM_PWM_LUT_PAUSE_MAX		(7000 * PM_PWM_LUT_DUTY_TIME_MAX)
@@ -42,11 +46,27 @@
 #define	PM_PWM_LUT_LOOP		0x01
 #define	PM_PWM_LUT_RAMP_UP	0x02
 #define	PM_PWM_LUT_REVERSE	0x04
-
 #define	PM_PWM_LUT_PAUSE_HI_EN	0x10
 #define	PM_PWM_LUT_PAUSE_LO_EN	0x20
 
 #define	PM_PWM_LUT_NO_TABLE	0x100
+
+/* PWM LED ID */
+#define	PM_PWM_LED_0		0
+#define	PM_PWM_LED_1		1
+#define	PM_PWM_LED_2		2
+#define	PM_PWM_LED_KPD		3
+#define	PM_PWM_LED_FLASH	4
+
+/* PWM LED configuration mode */
+#define	PM_PWM_CONF_NONE	0x0
+#define	PM_PWM_CONF_PWM1	0x1
+#define	PM_PWM_CONF_PWM2	0x2
+#define	PM_PWM_CONF_PWM3	0x3
+#define	PM_PWM_CONF_DTEST1	0x4
+#define	PM_PWM_CONF_DTEST2	0x5
+#define	PM_PWM_CONF_DTEST3	0x6
+#define	PM_PWM_CONF_DTEST4	0x7
 
 /*
  * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
@@ -75,6 +95,9 @@ int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
 int pm8058_pwm_lut_enable(struct pwm_device *pwm, int start);
 
 int pwm_set_dtest(struct pwm_device *pwm, int enable);
+
+int pm8058_pwm_config_led(struct pwm_device *pwm, int id,
+			  int mode, int max_current);
 
 #if !defined(CONFIG_PMIC8058_PWM)
 inline struct pwm_device *pwm_request(int pwm_id, const char *label)

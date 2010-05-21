@@ -194,6 +194,7 @@ struct pm8058_pwm_chip {
 	u8			bank_mask;
 	struct mutex		pwm_mutex;
 	struct pm8058_chip	*pm_chip;
+	struct pm8058_pwm_pdata	*pdata;
 };
 
 static struct pm8058_pwm_chip	*pwm_chip;
@@ -490,6 +491,9 @@ struct pwm_device *pwm_request(int pwm_id, const char *label)
 	if (!pwm->in_use) {
 		pwm->in_use = 1;
 		pwm->label = label;
+
+		if (pwm_chip->pdata && pwm_chip->pdata->config)
+			pwm_chip->pdata->config(pwm, pwm_id, 1);
 	} else
 		pwm = ERR_PTR(-EBUSY);
 	mutex_unlock(&pwm_chip->pwm_mutex);
@@ -510,6 +514,9 @@ void pwm_free(struct pwm_device *pwm)
 	if (pwm->in_use) {
 		pm8058_pwm_bank_sel(pwm);
 		pm8058_pwm_start(pwm, 0, 0);
+
+		if (pwm->chip->pdata && pwm->chip->pdata->config)
+			pwm->chip->pdata->config(pwm, pwm->pwm_id, 0);
 
 		pwm->in_use = 0;
 		pwm->label = NULL;
@@ -741,6 +748,69 @@ int pm8058_pwm_lut_enable(struct pwm_device *pwm, int start)
 }
 EXPORT_SYMBOL(pm8058_pwm_lut_enable);
 
+#define SSBI_REG_ADDR_LED_BASE		0x131
+#define SSBI_REG_ADDR_LED(n)		(SSBI_REG_ADDR_LED_BASE + (n))
+#define SSBI_REG_ADDR_FLASH_BASE	0x48
+#define SSBI_REG_ADDR_FLASH(n)		(SSBI_REG_ADDR_FLASH_BASE + (n))
+
+#define PM8058_LED_CURRENT_SHIFT	3
+#define PM8058_LED_MODE_MASK		0x07
+
+#define PM8058_FLASH_CURRENT_SHIFT	4
+#define PM8058_FLASH_MODE_MASK		0x03
+#define PM8058_FLASH_MODE_NONE		0
+#define PM8058_FLASH_MODE_DTEST1	1
+#define PM8058_FLASH_MODE_DTEST2	2
+#define PM8058_FLASH_MODE_PWM		3
+
+int pm8058_pwm_config_led(struct pwm_device *pwm, int id,
+			  int mode, int max_current)
+{
+	int	rc;
+	u8	conf;
+
+	switch (id) {
+	case PM_PWM_LED_0:
+	case PM_PWM_LED_1:
+	case PM_PWM_LED_2:
+		conf = mode & PM8058_LED_MODE_MASK;
+		conf |= (max_current / 2) << PM8058_LED_CURRENT_SHIFT;
+		rc = pm8058_write(pwm->chip->pm_chip,
+				  SSBI_REG_ADDR_LED(id), &conf, 1);
+		break;
+
+	case PM_PWM_LED_KPD:
+	case PM_PWM_LED_FLASH:
+		switch (mode) {
+		case PM_PWM_CONF_PWM1:
+		case PM_PWM_CONF_PWM2:
+		case PM_PWM_CONF_PWM3:
+			conf = PM8058_FLASH_MODE_PWM;
+			break;
+		case PM_PWM_CONF_DTEST1:
+			conf = PM8058_FLASH_MODE_DTEST1;
+			break;
+		case PM_PWM_CONF_DTEST2:
+			conf = PM8058_FLASH_MODE_DTEST2;
+			break;
+		default:
+			conf = PM8058_FLASH_MODE_NONE;
+			break;
+		}
+		conf |= (max_current / 20) << PM8058_FLASH_CURRENT_SHIFT;
+		id -= PM_PWM_LED_KPD;
+		rc = pm8058_write(pwm->chip->pm_chip,
+				  SSBI_REG_ADDR_FLASH(id), &conf, 1);
+		break;
+	default:
+		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8058_pwm_config_led);
+
 int pwm_set_dtest(struct pwm_device *pwm, int enable)
 {
 	int	rc;
@@ -797,6 +867,7 @@ static int __devinit pmic8058_pwm_probe(struct platform_device *pdev)
 
 	mutex_init(&chip->pwm_mutex);
 
+	chip->pdata = pdev->dev.platform_data;
 	chip->pm_chip = pm_chip;
 	pwm_chip = chip;
 	platform_set_drvdata(pdev, chip);
