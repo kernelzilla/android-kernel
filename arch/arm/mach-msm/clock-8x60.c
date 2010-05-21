@@ -176,6 +176,12 @@ struct clk_local {
 	struct clk_freq_tbl	*current_freq;
 };
 
+/* _soc_clk_set_rate() match types. */
+enum match_types {
+	MATCH_EXACT,
+	MATCH_MIN,
+};
+
 /*
  * Set-Rate Functions
  */
@@ -1483,8 +1489,7 @@ static int soc_clk_reset(unsigned id, enum clk_reset_action action)
 	return ret;
 }
 
-
-static int soc_clk_set_rate(unsigned id, unsigned rate)
+static int _soc_clk_set_rate(unsigned id, unsigned rate, enum match_types match)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
 	struct clk_freq_tbl *cf = clk->current_freq;
@@ -1502,9 +1507,20 @@ static int soc_clk_set_rate(unsigned id, unsigned rate)
 	if (rate == cf->freq_hz)
 		goto release_lock;
 
-	for (nf = clk->freq_tbl; nf->freq_hz != FREQ_END; nf++)
-		if (nf->freq_hz == rate)
-			break;
+	/* Find new frequency based on match rule. */
+	switch (match) {
+	case MATCH_MIN:
+		for (nf = clk->freq_tbl; nf->freq_hz != FREQ_END; nf++)
+			if (nf->freq_hz >= rate)
+				break;
+		break;
+	default:
+	case MATCH_EXACT:
+		for (nf = clk->freq_tbl; nf->freq_hz != FREQ_END; nf++)
+			if (nf->freq_hz == rate)
+				break;
+		break;
+	}
 
 	if (nf->freq_hz == FREQ_END) {
 		ret = -EINVAL;
@@ -1567,9 +1583,14 @@ release_lock:
 	return ret;
 }
 
+static int soc_clk_set_rate(unsigned id, unsigned rate)
+{
+	return _soc_clk_set_rate(id, rate, MATCH_EXACT);
+}
+
 static int soc_clk_set_min_rate(unsigned id, unsigned rate)
 {
-	return -EPERM;
+	return _soc_clk_set_rate(id, rate, MATCH_MIN);
 }
 
 static int soc_clk_set_max_rate(unsigned id, unsigned rate)
