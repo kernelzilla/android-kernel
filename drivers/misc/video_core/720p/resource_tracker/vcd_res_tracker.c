@@ -275,7 +275,7 @@ u32 res_trk_get_curr_perf_level(u32 *pn_perf_lvl)
 	}
 
 	*pn_perf_lvl = res_trk_convert_freq_to_perf_lvl((u64) n_freq);
-	VCDRES_MSG_MED("%s(): n_freq = %lu, *pn_perf_lvl = %u", n_freq,
-		*pn_perf_lvl);
+	VCDRES_MSG_MED("%s(): n_freq = %lu, *pn_perf_lvl = %u", __func__,
+		n_freq, *pn_perf_lvl);
 	return TRUE;
 }

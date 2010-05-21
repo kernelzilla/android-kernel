@@ -293,7 +293,7 @@ static void vid_dec_lean_event(struct video_client_ctx *client_ctx,
 	vdec_msg->vdec_msg_info.status_code = vid_dec_get_status(status);
 
 	switch (event) {
-	case VCD_EVT_IND_RECONFIG:
+	case VCD_EVT_IND_OUTPUT_RECONFIG:
 		INFO("\n msm_vidc_dec: Sending VDEC_MSG_EVT_CONFIG_CHANGED"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_EVT_CONFIG_CHANGED;
@@ -383,7 +383,7 @@ void vid_dec_vcd_cb(u32 event, u32 status,
 	case VCD_EVT_RESP_STOP:
 	case VCD_EVT_RESP_FLUSH_INPUT_DONE:
 	case VCD_EVT_RESP_FLUSH_OUTPUT_DONE:
-	case VCD_EVT_IND_RECONFIG:
+	case VCD_EVT_IND_OUTPUT_RECONFIG:
 	case VCD_EVT_IND_HWERRFATAL:
 	case VCD_EVT_IND_RESOURCES_LOST:
 		vid_dec_lean_event(client_ctx, event, status);
@@ -596,7 +596,7 @@ static u32 vid_dec_set_buffer(struct video_client_ctx *client_ctx,
 		(unsigned long)buffer_info->buffer.bufferaddr,
 		&kernel_vaddr, buffer_info->buffer.pmem_fd,
 		buf_adr_offset, MAX_VIDEO_NUM_OF_BUFF)) {
-		DBG("%s() : user_virt_addr = 0x%08lx cannot be set.",
+		DBG("%s() : user_virt_addr = %p cannot be set.",
 		    __func__, buffer_info->buffer.bufferaddr);
 		return FALSE;
 	}
@@ -631,7 +631,7 @@ static u32 vid_dec_free_buffer(struct video_client_ctx *client_ctx,
 	if (!vid_c_delete_addr_table(client_ctx, dir_buffer,
 				(unsigned long)buffer_info->buffer.bufferaddr,
 				&kernel_vaddr)) {
-		DBG("%s() : user_virt_addr = 0x%08lx has not been set.",
+		DBG("%s() : user_virt_addr = %p has not been set.",
 		    __func__, buffer_info->buffer.bufferaddr);
 		return TRUE;
 	}

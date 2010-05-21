@@ -1541,8 +1541,8 @@ u32 vid_enc_set_buffer(struct video_client_ctx *client_ctx,
 					buffer_info->fd,
 					(unsigned long)buffer_info->offset,
 					VID_ENC_MAX_NUM_OF_BUFF)) {
-		DBG("%s() : user_virt_addr = 0x%08lx cannot be set.",
-		    __func__, buffer_info->buffer.bufferaddr);
+		DBG("%s() : user_virt_addr = %p cannot be set.",
+		    __func__, buffer_info->pbuffer);
 		return FALSE;
 	}
 
@@ -1576,7 +1576,7 @@ u32 vid_enc_free_buffer(struct video_client_ctx *client_ctx,
 	if (!vid_c_delete_addr_table(client_ctx, dir_buffer,
 				(unsigned long)buffer_info->pbuffer,
 				&kernel_vaddr)) {
-		DBG("%s() : user_virt_addr = 0x%08lx has not been set.",
+		DBG("%s() : user_virt_addr = %p has not been set.",
 		    __func__, buffer_info->pbuffer);
 		return TRUE;
 	}

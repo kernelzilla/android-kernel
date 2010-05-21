@@ -373,7 +373,7 @@ void vid_enc_vcd_cb(u32 event, u32 status,
 	case VCD_EVT_RESP_STOP:
 	case VCD_EVT_RESP_FLUSH_INPUT_DONE:
 	case VCD_EVT_RESP_FLUSH_OUTPUT_DONE:
-	case VCD_EVT_IND_RECONFIG:
+	case VCD_EVT_IND_OUTPUT_RECONFIG:
 	case VCD_EVT_IND_HWERRFATAL:
 	case VCD_EVT_IND_RESOURCES_LOST:
 		vid_enc_lean_event(client_ctx, event, status);

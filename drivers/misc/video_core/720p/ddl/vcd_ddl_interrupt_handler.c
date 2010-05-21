@@ -289,7 +289,7 @@ static u32 ddl_header_done_callback(struct ddl_context_type *p_ddl_context)
 			    p_decoder->actual_input_buf_req;
 			VIDC_LOGERR_STRING
 			    ("ddlhdr_done_cb:Decode_reconfig_not_supported");
-			vcd_event = VCD_EVT_IND_RECONFIG;
+			vcd_event = VCD_EVT_IND_OUTPUT_RECONFIG;
 		}
 	}
 
