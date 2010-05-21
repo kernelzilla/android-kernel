@@ -24,8 +24,6 @@
 #include <linux/bootmem.h>
 #include <linux/io.h>
 #include <linux/usb/mass_storage_function.h>
-#include <linux/spi/spi.h>
-#include <linux/bma150.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/mfd/marimba.h>
 #include <linux/i2c.h>
@@ -1952,10 +1950,6 @@ static struct msm_hsusb_platform_data msm_hsusb_pdata = {
 };
 #endif
 
-static struct msm_gpio bma_spi_gpio_config_data[] = {
-	{ GPIO_CFG(51, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "bma_irq" },
-};
-
 static struct platform_device hs_device = {
 	.name   = "msm-handset",
 	.id     = -1,
@@ -1995,27 +1989,6 @@ static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR] = {
 	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].idle_enabled = 1,
 	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].latency = 2,
 	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].residency = 0,
-};
-
-static int msm_bma_gpio_setup(struct device *dev)
-{
-	int rc;
-
-	rc = msm_gpios_request_enable(bma_spi_gpio_config_data,
-		ARRAY_SIZE(bma_spi_gpio_config_data));
-
-	return rc;
-}
-
-static void msm_bma_gpio_teardown(struct device *dev)
-{
-	msm_gpios_disable_free(bma_spi_gpio_config_data,
-		ARRAY_SIZE(bma_spi_gpio_config_data));
-}
-
-static struct bma150_platform_data bma_pdata = {
-	.setup    = msm_bma_gpio_setup,
-	.teardown = msm_bma_gpio_teardown,
 };
 
 static struct resource qsd_spi_resources[] = {
@@ -2099,18 +2072,6 @@ static struct platform_device qsd_device_spi = {
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(qsd_spi_resources),
 	.resource	= qsd_spi_resources,
-};
-
-static struct spi_board_info msm_spi_board_info[] __initdata = {
-	{
-		.modalias	= "bma150",
-		.mode		= SPI_MODE_3,
-		.irq		= MSM_GPIO_TO_INT(51),
-		.bus_num	= 0,
-		.chip_select	= 0,
-		.max_speed_hz	= 10000000,
-		.platform_data	= &bma_pdata,
-	}
 };
 
 static struct msm_gpio qsd_spi_gpio_config_data[] = {
@@ -4089,8 +4050,6 @@ static void __init msm7x30_init(void)
 	msm7x30_init_mmc();
 	msm7x30_init_nand();
 	msm_qsd_spi_init();
-	spi_register_board_info(msm_spi_board_info,
-		ARRAY_SIZE(msm_spi_board_info));
 	msm_fb_add_devices();
 	msm_pm_set_platform_data(msm_pm_data);
 	msm_device_i2c_init();
