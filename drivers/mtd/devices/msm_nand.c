@@ -6844,7 +6844,11 @@ static int __devinit msm_nand_probe(struct platform_device *pdev)
 	ebi2_register_base = res->start;
 
 	dual_nand_ctlr_present = 1;
-	interleave_enable = plat_data->interleave;
+	if (plat_data != NULL)
+		interleave_enable = plat_data->interleave;
+	else
+		interleave_enable = 0;
+
 
 	if (!interleave_enable)
 		pr_info("%s: Dual Nand Ctrl in ping-pong mode\n", __func__);
