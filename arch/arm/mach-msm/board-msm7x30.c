@@ -466,6 +466,9 @@ static struct mfd_cell pm8058_subdevs[] = {
 		.platform_data	= &pm8058_pwm_data,
 		.data_size	= sizeof(pm8058_pwm_data),
 	},
+	{	.name = "pm8058-nfc",
+		.id		= -1,
+	},
 };
 
 static struct pm8058_platform_data pm8058_7x30_data = {
