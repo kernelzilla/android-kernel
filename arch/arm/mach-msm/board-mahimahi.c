@@ -437,8 +437,8 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 1000000,
-			.max_uV = 1300000,
+			.min_uV = 950000,
+			.max_uV = 1275000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},
 		.consumer_supplies = tps65023_dcdc1_supplies,
@@ -985,12 +985,12 @@ static ssize_t mahimahi_virtual_keys_show(struct kobject *kobj,
 			       struct kobj_attribute *attr, char *buf)
 {
 	if (system_rev > 2 && system_rev != 0xC0) {
-		/* center: x: back: 55, menu: 172, home: 298, search 412, y: 835 */
+		/* center: x: back: 60, menu: 172, home: 298, search 412, y: 840 */
 		return sprintf(buf,
-			__stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":55:835:90:55"
-		   ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":172:835:125:55"
-		   ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":298:835:115:55"
-		   ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":412:835:95:55"
+			__stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":55:840:90:60"
+		   ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":172:840:125:60"
+		   ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":298:840:115:60"
+		   ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":412:840:95:60"
 		   "\n");
 	} else {
 		/* center: x: home: 55, menu: 185, back: 305, search 425, y: 835 */
@@ -1140,10 +1140,11 @@ static void __init mahimahi_init(void)
 static void __init mahimahi_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
+        /* Modified to extend bank 0 by 13MB */
 	mi->nr_banks = 2;
 	mi->bank[0].start = PHYS_OFFSET;
 	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-	mi->bank[0].size = (219*1024*1024);
+	mi->bank[0].size = (232*1024*1024);
 	mi->bank[1].start = MSM_HIGHMEM_BASE;
 	mi->bank[1].node = PHYS_TO_NID(MSM_HIGHMEM_BASE);
 	mi->bank[1].size = MSM_HIGHMEM_SIZE;
