@@ -289,8 +289,7 @@ kgsl_sharedmem_writel(const struct kgsl_memdesc *memdesc,
 				offsetbytes, memdesc->size);
 		return -ERANGE;
 	}
-	writel((unsigned int *)(((char *)memdesc->hostptr) + offsetbytes),
-		src);
+	writel(src, memdesc->hostptr + offsetbytes);
 	return 0;
 }
 
