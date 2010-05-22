@@ -1070,29 +1070,29 @@ static struct clk_freq_tbl clk_tbl_vfe[] = {
 	F_END,
 };
 
-/* MI2S */
-#define NS_MASK_MI2S (BM(31, 24) | BM(6, 0))
-#define CLK_MI2S(id, ns) \
+/* Audio Interface */
+#define NS_MASK_AIF (BM(31, 24) | BM(6, 0))
+#define CLK_AIF(id, ns, chld_lst) \
 		CLK_LOCAL(id, MND, REG_LPA(ns), REG_LPA(ns), REG_LPA(ns+4), \
-				REG_LPA(ns), B(19), 0, B(9), NS_MASK_MI2S, 0, \
-				set_rate_mnd, clk_tbl_mi2s, NULL, NONE, \
-				chld_mi2s_src)
-#define F_MI2S(f, s, d, m, n) \
+				REG_LPA(ns), B(19), (B(15) | B(17)), B(9), \
+				NS_MASK_AIF, 0, set_rate_mnd, clk_tbl_aif, \
+				NULL, NONE, chld_lst)
+#define F_AIF(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD8(8, m, 0, n), \
 			NS(31, 24, n, m, 5, 4, 3, d, 2, 0, s), \
 			0, MND_EN(B(8), n))
-static struct clk_freq_tbl clk_tbl_mi2s[] = {
-	F_MI2S(  512000, LPA_PXO, 1, 1, 48),
-	F_MI2S(  768000, LPA_PXO, 1, 1, 32),
-	F_MI2S( 1024000, LPA_PXO, 1, 1, 24),
-	F_MI2S( 1536000, LPA_PXO, 1, 1, 16),
-	F_MI2S( 2048000, LPA_PXO, 1, 1, 12),
-	F_MI2S( 3072000, LPA_PXO, 1, 1,  8),
-	F_MI2S( 4096000, LPA_PXO, 1, 1,  6),
-	F_MI2S( 6144000, LPA_PXO, 1, 1,  4),
-	F_MI2S( 8192000, LPA_PXO, 1, 1,  3),
-	F_MI2S(12288000, LPA_PXO, 1, 1,  2),
-	F_MI2S(24580000, LPA_PXO, 1, 0,  0),
+static struct clk_freq_tbl clk_tbl_aif[] = {
+	F_AIF(  512000, LPA_PXO, 1, 1, 48),
+	F_AIF(  768000, LPA_PXO, 1, 1, 32),
+	F_AIF( 1024000, LPA_PXO, 1, 1, 24),
+	F_AIF( 1536000, LPA_PXO, 1, 1, 16),
+	F_AIF( 2048000, LPA_PXO, 1, 1, 12),
+	F_AIF( 3072000, LPA_PXO, 1, 1,  8),
+	F_AIF( 4096000, LPA_PXO, 1, 1,  6),
+	F_AIF( 6144000, LPA_PXO, 1, 1,  4),
+	F_AIF( 8192000, LPA_PXO, 1, 1,  3),
+	F_AIF(12288000, LPA_PXO, 1, 1,  2),
+	F_AIF(24580000, LPA_PXO, 1, 0,  0),
 	F_END,
 };
 
@@ -1100,8 +1100,8 @@ static struct clk_freq_tbl clk_tbl_mi2s[] = {
 #define NS_MASK_PCM (BM(31, 16) | BM(6, 0))
 #define CLK_PCM(id, ns) \
 		CLK_LOCAL(id, MND, REG_LPA(ns), REG_LPA(ns), REG_LPA(ns+4), \
-				REG_LPA(ns), B(13), 0, B(9), NS_MASK_PCM, 0, \
-				set_rate_mnd, clk_tbl_pcm, NULL, NONE, NULL)
+				REG_LPA(ns), B(13), B(11), B(9), NS_MASK_PCM, \
+				0, set_rate_mnd, clk_tbl_pcm, NULL, NONE, NULL)
 #define F_PCM(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD16(m, n), \
 			NS(31, 16, n, m, 5, 4, 3, d, 2, 0, s), \
@@ -1145,6 +1145,14 @@ static uint32_t chld_tv_src[] =		{C(TV_ENC), C(TV_DAC), C(MDP_TV),
 static uint32_t chld_vfe_src[] =	{C(VFE),  C(CSI0_VFE), C(CSI1_VFE),
 					 C(NONE)};
 static uint32_t chld_mi2s_src[] =	{C(MI2S), C(MI2S_M), C(NONE)};
+static uint32_t chld_codec_i2s_mic_src[] =	{C(CODEC_I2S_MIC),
+						 C(CODEC_I2S_MIC_M), C(NONE)};
+static uint32_t chld_codec_i2s_spkr_src[] =	{C(CODEC_I2S_SPKR),
+						 C(CODEC_I2S_SPKR_M), C(NONE)};
+static uint32_t chld_spare_i2s_mic_src[] =	{C(SPARE_I2S_MIC),
+						 C(SPARE_I2S_MIC_M), C(NONE)};
+static uint32_t chld_spare_i2s_spkr_src[] =	{C(SPARE_I2S_SPKR),
+						 C(SPARE_I2S_SPKR_M), C(NONE)};
 
 static struct clk_local clk_local_tbl[] = {
 
@@ -1285,9 +1293,25 @@ static struct clk_local clk_local_tbl[] = {
 	 * Low Power Audio Clocks
 	 */
 
-	CLK_MI2S(MI2S_SRC, 0x0048),
+	CLK_AIF(MI2S_SRC, 0x0048, chld_mi2s_src),
 	CLK_SLAVE_LPA(MI2S,   0x0048, B(15), MI2S_SRC),
 	CLK_SLAVE_LPA(MI2S_M, 0x0048, B(17), MI2S_SRC),
+
+	CLK_AIF(CODEC_I2S_MIC_SRC, 0x0060, chld_codec_i2s_mic_src),
+	CLK_SLAVE_LPA(CODEC_I2S_MIC,   0x0060, B(15), CODEC_I2S_MIC_SRC),
+	CLK_SLAVE_LPA(CODEC_I2S_MIC_M, 0x0060, B(17), CODEC_I2S_MIC_SRC),
+
+	CLK_AIF(SPARE_I2S_MIC_SRC, 0x0078, chld_spare_i2s_mic_src),
+	CLK_SLAVE_LPA(SPARE_I2S_MIC,   0x0078, B(15), SPARE_I2S_MIC_SRC),
+	CLK_SLAVE_LPA(SPARE_I2S_MIC_M, 0x0078, B(17), SPARE_I2S_MIC_SRC),
+
+	CLK_AIF(CODEC_I2S_SPKR_SRC, 0x006C, chld_codec_i2s_spkr_src),
+	CLK_SLAVE_LPA(CODEC_I2S_SPKR,   0x006C, B(15), CODEC_I2S_SPKR_SRC),
+	CLK_SLAVE_LPA(CODEC_I2S_SPKR_M, 0x006C, B(17), CODEC_I2S_SPKR_SRC),
+
+	CLK_AIF(SPARE_I2S_SPKR_SRC, 0x0084, chld_spare_i2s_spkr_src),
+	CLK_SLAVE_LPA(SPARE_I2S_SPKR,   0x0084, B(15), SPARE_I2S_SPKR_SRC),
+	CLK_SLAVE_LPA(SPARE_I2S_SPKR_M, 0x0084, B(17), SPARE_I2S_SPKR_SRC),
 
 	CLK_PCM(PCM, 0x0054),
 };
