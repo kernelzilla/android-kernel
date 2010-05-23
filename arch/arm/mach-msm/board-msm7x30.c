@@ -2938,7 +2938,8 @@ static struct msm_gpio lcd_sharp_panel_gpios[] = {
 
 static int lcdc_toshiba_panel_power(int on)
 {
-	int rc;
+	int rc, i;
+	struct msm_gpio *gp;
 
 	rc = display_common_power(on);
 	if (rc < 0) {
@@ -2954,12 +2955,13 @@ static int lcdc_toshiba_panel_power(int on)
 			printk(KERN_ERR "%s: gpio enable failed: %d\n",
 					__func__, rc);
 		}
-	} else {
-		rc = msm_gpios_disable(lcd_panel_gpios,
-				ARRAY_SIZE(lcd_panel_gpios));
-		if (rc < 0)
-			printk(KERN_ERR "%s: gpio disable failed: %d\n",
-					__func__, rc);
+	} else {	/* off */
+		gp = lcd_panel_gpios;
+		for (i = 0; i < ARRAY_SIZE(lcd_panel_gpios); i++) {
+			/* ouput low */
+			gpio_set_value(GPIO_PIN(gp->gpio_cfg), 0);
+			gp++;
+		}
 	}
 
 	return rc;
@@ -2967,7 +2969,8 @@ static int lcdc_toshiba_panel_power(int on)
 
 static int lcdc_sharp_panel_power(int on)
 {
-	int rc;
+	int rc, i;
+	struct msm_gpio *gp;
 
 	rc = display_common_power(on);
 	if (rc < 0) {
@@ -2983,12 +2986,13 @@ static int lcdc_sharp_panel_power(int on)
 			printk(KERN_ERR "%s: gpio enable failed: %d\n",
 				__func__, rc);
 		}
-	} else {
-		rc = msm_gpios_disable(lcd_sharp_panel_gpios,
-				ARRAY_SIZE(lcd_sharp_panel_gpios));
-		if (rc < 0)
-			printk(KERN_ERR "%s: gpio disable failed: %d\n",
-				__func__, rc);
+	} else {	/* off */
+		gp = lcd_sharp_panel_gpios;
+		for (i = 0; i < ARRAY_SIZE(lcd_sharp_panel_gpios); i++) {
+			/* ouput low */
+			gpio_set_value(GPIO_PIN(gp->gpio_cfg), 0);
+			gp++;
+		}
 	}
 
 	return rc;
