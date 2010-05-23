@@ -483,7 +483,6 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 		.io_polarity       = 0,
 		.irq_summary       = -1, /* see fixup_i2c_configs() */
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE,
-		.irq_sense         = 0,
 	},
 	/* "DOCKING" expander */
 	[1] = {
@@ -496,7 +495,6 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 		.irq_summary       = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
 						     UI_INT2_N),
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE + 16,
-		.irq_sense         = 0,
 	},
 	/* "SURF" expander */
 	[2] = {
@@ -509,7 +507,6 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 		.irq_summary       = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
 						     UI_INT1_N),
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE + (16 * 2),
-		.irq_sense         = 0,
 	},
 	/* left keyboard FHA/FFA I/O */
 	[3] = {
@@ -522,7 +519,6 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 		.irq_summary       = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
 						     UI_INT3_N),
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE + (16 * 3),
-		.irq_sense         = 0,
 	},
 	/* right keyboard FHA/FFA I/O */
 	[4] = {
@@ -535,7 +531,6 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 		.irq_summary       = PM8058_GPIO_IRQ(PM8058_IRQ_BASE,
 						     UI_INT3_N),
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE + (16 * 3) + 8,
-		.irq_sense         = 0,
 	},
 };
 

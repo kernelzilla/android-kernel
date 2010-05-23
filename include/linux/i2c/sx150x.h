@@ -75,21 +75,6 @@
  *            IRQ lines will appear.  Similarly to gpio_base, the expander
  *            will create a block of irqs beginning at this number.
  *            This value is ignored if irq_summary is < 0.
- * @irq_sense: Default edge-detection settings for IO lines to be used when
- *             they are enabled as IRQs.  Two bits are used to provide the
- *             default for each line, beginning with the LSB.  In each pair,
- *             the first bit enables rising-edge sensitivity, and the second,
- *             falling. For chips with less than 16 IO lines, not all 32 bits
- *             are used.
- *
- *             33222222222211111111110000000000 BIT
- *             10987654321098765432109876543210
- *             frfrfrfrfrfrfrfrfrfrfrfrfrfrfrfr
- *              1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
- *              5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 IO LINE
- *
- *             Example: to set all IO lines to rising-edge detection,
- *             set irq_sense to 0x55555555.
  */
 struct sx150x_platform_data {
 	unsigned gpio_base;
@@ -100,7 +85,6 @@ struct sx150x_platform_data {
 	u16      io_polarity;
 	int      irq_summary;
 	unsigned irq_base;
-	u32      irq_sense;
 };
 
 #endif /* __LINUX_I2C_SX150X_H */
