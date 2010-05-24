@@ -1485,6 +1485,9 @@ static struct mmc_platform_data msm8x60_sdc1_data = {
 #else
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #endif
+	.msmsdcc_fmin	= 400000,
+	.msmsdcc_fmid	= 24000000,
+	.msmsdcc_fmax	= 48000000,
 };
 #endif
 
@@ -1493,6 +1496,9 @@ static struct mmc_platform_data msm8x60_sdc2_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+	.msmsdcc_fmin	= 400000,
+	.msmsdcc_fmid	= 24000000,
+	.msmsdcc_fmax	= 48000000,
 };
 #endif
 
@@ -1508,6 +1514,9 @@ static struct mmc_platform_data msm8x60_sdc3_data = {
 				       PMIC_GPIO_SDC3_DET - 1),
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
+	.msmsdcc_fmin	= 400000,
+	.msmsdcc_fmid	= 24000000,
+	.msmsdcc_fmax	= 48000000,
 };
 #endif
 
@@ -1516,6 +1525,9 @@ static struct mmc_platform_data msm8x60_sdc4_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+	.msmsdcc_fmin	= 400000,
+	.msmsdcc_fmid	= 24000000,
+	.msmsdcc_fmax	= 48000000,
 };
 #endif
 
@@ -1524,6 +1536,9 @@ static struct mmc_platform_data msm8x60_sdc5_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+	.msmsdcc_fmin	= 400000,
+	.msmsdcc_fmid	= 24000000,
+	.msmsdcc_fmax	= 48000000,
 };
 #endif
 
