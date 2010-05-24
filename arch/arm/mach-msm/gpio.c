@@ -37,12 +37,21 @@ module_param_named(debug_mask, msm_gpio_debug_mask, int, S_IRUGO | S_IWUSR | S_I
 #define MSM_GPIOF_ENABLE_WAKE           0x40000000
 #define MSM_GPIOF_DISABLE_WAKE          0x80000000
 
-static int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio, unsigned long flags);
-static int msm_gpio_get_irq_num(struct gpio_chip *chip, unsigned int gpio, unsigned int *irqp, unsigned long *irqnumflagsp);
-static int msm_gpio_read(struct gpio_chip *chip, unsigned n);
-static int msm_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on);
-static int msm_gpio_read_detect_status(struct gpio_chip *chip, unsigned int gpio);
-static int msm_gpio_clear_detect_status(struct gpio_chip *chip, unsigned int gpio);
+static int msm_gpio_configure(struct goog_gpio_chip *chip,
+			unsigned int gpio,
+			unsigned long flags);
+static int msm_gpio_get_irq_num(struct goog_gpio_chip *chip,
+				unsigned int gpio,
+				unsigned int *irqp,
+				unsigned long *irqnumflagsp);
+static int msm_gpio_read(struct goog_gpio_chip *chip, unsigned n);
+static int msm_gpio_write(struct goog_gpio_chip *chip,
+			unsigned n,
+			unsigned on);
+static int msm_gpio_read_detect_status(struct goog_gpio_chip *chip,
+				unsigned int gpio);
+static int msm_gpio_clear_detect_status(struct goog_gpio_chip *chip,
+					unsigned int gpio);
 
 struct msm_gpio_chip msm_gpio_chips[] = {
 	{
@@ -272,7 +281,7 @@ static void msm_gpio_update_both_edge_detect(struct msm_gpio_chip *msm_chip)
 	printk(KERN_ERR "msm_gpio_update_both_edge_detect, failed to reach stable state %x != %x\n", val, val2);
 }
 
-static int msm_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
+static int msm_gpio_write(struct goog_gpio_chip *chip, unsigned n, unsigned on)
 {
 	struct msm_gpio_chip *msm_chip = container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (n - chip->start);
@@ -287,7 +296,7 @@ static int msm_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
 	return 0;
 }
 
-static int msm_gpio_read(struct gpio_chip *chip, unsigned n)
+static int msm_gpio_read(struct goog_gpio_chip *chip, unsigned n)
 {
 	struct msm_gpio_chip *msm_chip = container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (n - chip->start);
@@ -295,7 +304,8 @@ static int msm_gpio_read(struct gpio_chip *chip, unsigned n)
 	return (readl(msm_chip->regs.in) & b) ? 1 : 0;
 }
 
-static int msm_gpio_read_detect_status(struct gpio_chip *chip, unsigned int gpio)
+static int msm_gpio_read_detect_status(struct goog_gpio_chip *chip,
+				unsigned int gpio)
 {
 	struct msm_gpio_chip *msm_chip = container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
@@ -308,7 +318,8 @@ static int msm_gpio_read_detect_status(struct gpio_chip *chip, unsigned int gpio
 	return (v & b) ? 1 : 0;
 }
 
-static int msm_gpio_clear_detect_status(struct gpio_chip *chip, unsigned int gpio)
+static int msm_gpio_clear_detect_status(struct goog_gpio_chip *chip,
+					unsigned int gpio)
 {
 	struct msm_gpio_chip *msm_chip = container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
@@ -325,7 +336,9 @@ static int msm_gpio_clear_detect_status(struct gpio_chip *chip, unsigned int gpi
 	return 0;
 }
 
-int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio, unsigned long flags)
+int msm_gpio_configure(struct goog_gpio_chip *chip,
+		unsigned int gpio,
+		unsigned long flags)
 {
 	struct msm_gpio_chip *msm_chip = container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
@@ -390,7 +403,10 @@ int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio, unsigned long 
 	return 0;
 }
 
-static int msm_gpio_get_irq_num(struct gpio_chip *chip, unsigned int gpio, unsigned int *irqp, unsigned long *irqnumflagsp)
+static int msm_gpio_get_irq_num(struct goog_gpio_chip *chip,
+				unsigned int gpio,
+				unsigned int *irqp,
+				unsigned long *irqnumflagsp)
 {
 	*irqp = MSM_GPIO_TO_INT(gpio);
 	if (irqnumflagsp)
