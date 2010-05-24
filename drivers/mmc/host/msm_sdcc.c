@@ -69,17 +69,6 @@ static int  msmsdcc_dbg_init(void);
 static int msmsdcc_auto_suspend(struct mmc_host *, int);
 #endif
 
-#ifdef CONFIG_ARCH_MSM8X60
-static unsigned int msmsdcc_fmin = 400000;
-static unsigned int msmsdcc_fmid = 24000000;
-static unsigned int msmsdcc_temp = 24000000;
-static unsigned int msmsdcc_fmax = 48000000;
-#else
-static unsigned int msmsdcc_fmin = 144000;
-static unsigned int msmsdcc_fmid = 24576000;
-static unsigned int msmsdcc_temp = 25000000;
-static unsigned int msmsdcc_fmax = 49152000;
-#endif
 static unsigned int msmsdcc_pwrsave = 1;
 
 #define DUMMY_52_STATE_NONE		0
@@ -223,7 +212,7 @@ static inline uint32_t msmsdcc_fifo_addr(struct msmsdcc_host *host)
 static inline void msmsdcc_delay(struct msmsdcc_host *host)
 {
 	udelay(1 + ((3 * USEC_PER_SEC) /
-		(host->clk_rate ? host->clk_rate : msmsdcc_fmin)));
+		(host->clk_rate ? host->clk_rate : host->plat->msmsdcc_fmin)));
 }
 
 static inline void
@@ -1065,17 +1054,14 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			host->clks_on = 1;
 		}
 
-		if ((ios->clock < msmsdcc_fmax) && (ios->clock > msmsdcc_fmid))
-			ios->clock = msmsdcc_fmid;
+		if ((ios->clock < host->plat->msmsdcc_fmax) &&
+				(ios->clock > host->plat->msmsdcc_fmid))
+			ios->clock = host->plat->msmsdcc_fmid;
 
 		if (ios->clock != host->clk_rate) {
 			rc = clk_set_rate(host->clk, ios->clock);
-			if (rc < 0) {
-				rc = clk_set_rate(host->clk, msmsdcc_temp);
-				WARN_ON(rc < 0);
-				host->clk_rate = msmsdcc_temp;
-			} else
-				host->clk_rate = ios->clock;
+			WARN_ON(rc < 0);
+			host->clk_rate = ios->clock;
 		}
 		clk |= MCI_CLK_ENABLE;
 	}
@@ -1430,7 +1416,7 @@ msmsdcc_probe(struct platform_device *pdev)
 		goto pclk_disable;
 	}
 
-	ret = clk_set_rate(host->clk, msmsdcc_fmin);
+	ret = clk_set_rate(host->clk, plat->msmsdcc_fmin);
 	if (ret) {
 		pr_err("%s: Clock rate set failed (%d)\n", __func__, ret);
 		goto clk_put;
@@ -1448,8 +1434,8 @@ msmsdcc_probe(struct platform_device *pdev)
 	 * Setup MMC host structure
 	 */
 	mmc->ops = &msmsdcc_ops;
-	mmc->f_min = msmsdcc_fmin;
-	mmc->f_max = msmsdcc_fmax;
+	mmc->f_min = plat->msmsdcc_fmin;
+	mmc->f_max = plat->msmsdcc_fmax;
 	mmc->ocr_avail = plat->ocr_mask;
 	mmc->caps |= plat->mmc_bus_width;
 
@@ -1547,7 +1533,8 @@ msmsdcc_probe(struct platform_device *pdev)
 	pr_info("%s: polling status mode %s\n", mmc_hostname(mmc),
 	       (mmc->caps & MMC_CAP_NEEDS_POLL ? "enabled" : "disabled"));
 	pr_info("%s: MMC clock %u -> %u Hz, PCLK %u Hz\n",
-	       mmc_hostname(mmc), msmsdcc_fmin, msmsdcc_fmax, host->pclk_rate);
+	       mmc_hostname(mmc), plat->msmsdcc_fmin, plat->msmsdcc_fmax,
+							host->pclk_rate);
 	pr_info("%s: Slot eject status = %d\n", mmc_hostname(mmc),
 	       host->eject);
 	pr_info("%s: Power save feature enable = %d\n",
