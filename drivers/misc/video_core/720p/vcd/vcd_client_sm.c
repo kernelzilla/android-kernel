@@ -925,7 +925,7 @@ static void vcd_clnt_cb_in_run
 			break;
 		}
 
-	case VCD_EVT_IND_RECONFIG:
+	case VCD_EVT_IND_OUTPUT_RECONFIG:
 		{
 			break;
 		}
