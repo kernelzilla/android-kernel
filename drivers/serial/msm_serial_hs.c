@@ -286,16 +286,16 @@ static int msm_hs_init_clk(struct uart_port *uport)
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
 	wake_lock(&msm_uport->dma_wake_lock);
-	ret = clk_enable(msm_uport->clk);
-	if (ret) {
-		printk(KERN_ERR "Error could not turn on UART clk\n");
-		return ret;
-	}
-
 	/* Set up the MREG/NREG/DREG/MNDREG */
 	ret = clk_set_rate(msm_uport->clk, uport->uartclk);
 	if (ret) {
 		printk(KERN_WARNING "Error setting clock rate on UART\n");
+		return ret;
+	}
+
+	ret = clk_enable(msm_uport->clk);
+	if (ret) {
+		printk(KERN_ERR "Error could not turn on UART clk\n");
 		return ret;
 	}
 

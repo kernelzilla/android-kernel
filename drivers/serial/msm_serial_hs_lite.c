@@ -1006,16 +1006,16 @@ static int __init msm_serial_hsl_probe(struct platform_device *pdev)
 		return PTR_ERR(msm_hsl_port->clk);
 	}
 
-	ret = clk_enable(msm_hsl_port->clk);
-	if (ret) {
-		printk(KERN_ERR "Error could not turn on UART clk\n");
-		return ret;
-	}
-
 	/* Set up the MREG/NREG/DREG/MNDREG */
 	ret = clk_set_rate(msm_hsl_port->clk, 7372800);
 	if (ret) {
 		printk(KERN_WARNING "Error setting clock rate on UART\n");
+		return ret;
+	}
+
+	ret = clk_enable(msm_hsl_port->clk);
+	if (ret) {
+		printk(KERN_ERR "Error could not turn on UART clk\n");
 		return ret;
 	}
 
