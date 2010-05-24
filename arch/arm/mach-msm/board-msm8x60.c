@@ -607,7 +607,7 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 			UI_INT1_N,
 			{
 				.direction      = PM_GPIO_DIR_IN,
-				.pull           = PM_GPIO_PULL_UP_30,
+				.pull           = PM_GPIO_PULL_NO,
 				.vin_sel        = PM_GPIO_VIN_S3,
 				.function       = PM_GPIO_FUNC_NORMAL,
 				.inv_int_pol    = 0,
@@ -617,7 +617,7 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 			UI_INT2_N,
 			{
 				.direction      = PM_GPIO_DIR_IN,
-				.pull           = PM_GPIO_PULL_UP_30,
+				.pull           = PM_GPIO_PULL_NO,
 				.vin_sel        = PM_GPIO_VIN_S3,
 				.function       = PM_GPIO_FUNC_NORMAL,
 				.inv_int_pol    = 0,
@@ -627,7 +627,7 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 			UI_INT3_N,
 			{
 				.direction      = PM_GPIO_DIR_IN,
-				.pull           = PM_GPIO_PULL_UP_30,
+				.pull           = PM_GPIO_PULL_NO,
 				.vin_sel        = PM_GPIO_VIN_S3,
 				.function       = PM_GPIO_FUNC_NORMAL,
 				.inv_int_pol    = 0,
