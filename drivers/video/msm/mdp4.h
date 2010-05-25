@@ -166,7 +166,7 @@ enum {
 	MDP4_MIXER_STAGE2	/* zorder 2 */
 };
 
-#define MDP4_MAX_STAGE	5
+#define MDP4_MAX_STAGE	4
 
 enum {
 	MDP4_FRAME_FORMAT_LINEAR,
