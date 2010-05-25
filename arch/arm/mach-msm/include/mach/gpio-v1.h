@@ -79,11 +79,12 @@ void msm_gpios_free(const struct msm_gpio *table, int size);
 int msm_gpios_enable(const struct msm_gpio *table, int size);
 /**
  * msm_gpios_disable() - disable set of GPIOs
+ * Return error code.
  *
  * @table: GPIO table
  * @size:  number of entries in @table
  */
-void msm_gpios_disable(const struct msm_gpio *table, int size);
+int msm_gpios_disable(const struct msm_gpio *table, int size);
 
 int gpio_request(unsigned gpio, const char *label);
 void gpio_free(unsigned gpio);
