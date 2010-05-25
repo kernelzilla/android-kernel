@@ -461,13 +461,7 @@ static void audlpa_async_send_buffer(struct audio *audio)
 		}
 		if (next_buf && (temp == audio->bytecount_given)) {
 			cmd.cmd_id = AUDPLAY_CMD_BITSTREAM_DATA_AVAIL;
-			if (next_buf->buf.data_len)
-				cmd.decoder_id = audio->dec_id;
-			else {
-				cmd.decoder_id = -1;
-				MM_DBG("%s: input EOS signaled\n",
-					   __func__);
-			}
+			cmd.decoder_id = audio->dec_id;
 			cmd.buf_ptr	= (unsigned) next_buf->paddr;
 			cmd.buf_size = next_buf->buf.data_len >> 1;
 			cmd.partition_number	= 0;
@@ -484,13 +478,7 @@ static void audlpa_async_send_buffer(struct audio *audio)
 					struct audlpa_buffer_node, list);
 		if (next_buf) {
 			cmd.cmd_id = AUDPLAY_CMD_BITSTREAM_DATA_AVAIL;
-			if (next_buf->buf.data_len)
-				cmd.decoder_id = audio->dec_id;
-			else {
-				cmd.decoder_id = -1;
-				MM_DBG("%s: input EOS signaled\n",
-					   __func__);
-			}
+			cmd.decoder_id = audio->dec_id;
 			temp = audio->bytecount_head +
 				next_buf->buf.data_len -
 				audio->bytecount_consumed;
@@ -1224,7 +1212,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 /* Only useful in tunnel-mode */
 int audlpa_async_fsync(struct audio *audio)
 {
-	int rc = 0;
+	int rc = 0, empty = 0;
 	struct audlpa_buffer_node *buf_node;
 
 	MM_DBG("\n"); /* Macro prints the file name and function */
@@ -1236,43 +1224,28 @@ int audlpa_async_fsync(struct audio *audio)
 
 	mutex_lock(&audio->write_lock);
 	audio->teos = 0;
-	if (!(list_empty(&audio->out_queue) && (audio->out_needed == 1))) {
-		buf_node = kmalloc(sizeof(*buf_node), GFP_KERNEL);
-		if (!buf_node)
-			goto done;
+	empty = list_empty(&audio->out_queue);
+	buf_node = kmalloc(sizeof(*buf_node), GFP_KERNEL);
+	if (!buf_node)
+		goto done;
 
-		buf_node->paddr = 0xFFFFFFFF;
-		buf_node->buf.data_len = 0;
-		buf_node->buf.buf_addr = NULL;
-		buf_node->buf.buf_len = 0;
-		buf_node->buf.private_data = NULL;
-		list_add_tail(&buf_node->list, &audio->out_queue);
+	buf_node->paddr = 0xFFFFFFFF;
+	buf_node->buf.data_len = 0;
+	buf_node->buf.buf_addr = NULL;
+	buf_node->buf.buf_len = 0;
+	buf_node->buf.private_data = NULL;
+	list_add_tail(&buf_node->list, &audio->out_queue);
+	if ((empty != 0) && (audio->out_needed == 1))
+		audlpa_async_send_data(audio, 0, 0);
 
-		rc = wait_event_interruptible(audio->write_wait,
-			(audio->teos == 1) || audio->wflush || audio->stopped);
+	rc = wait_event_interruptible(audio->write_wait,
+				  audio->teos || audio->wflush ||
+				  audio->stopped);
 
-		if (rc < 0)
-			goto done;
-	}
-	if (audio->teos == 0) {
-		struct audplay_cmd_bitstream_data_avail cmd;
+	if (rc < 0)
+		goto done;
 
-		cmd.cmd_id = AUDPLAY_CMD_BITSTREAM_DATA_AVAIL;
-		cmd.decoder_id = -1;
-		cmd.buf_ptr	= (unsigned) 0xFFFFFFFF;
-		cmd.buf_size = 0;
-		cmd.partition_number	= 0;
-		audio->bytecount_given  = 0;
-		wmb();
-		audplay_send_queue0(audio, &cmd, sizeof(cmd));
-
-		rc = wait_event_interruptible(audio->write_wait,
-			(audio->teos == 1) || audio->stopped);
-
-		if (rc < 0)
-			goto done;
-
-	} else if (audio->teos == 1) {
+	if (audio->teos == 1) {
 		/* Releasing all the pending buffers to user */
 		audio->teos = 0;
 		audlpa_async_flush(audio);
