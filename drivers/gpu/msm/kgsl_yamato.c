@@ -437,7 +437,8 @@ int kgsl_yamato_setstate(struct kgsl_device *device, uint32_t flags)
 			sizedwords += 21;
 		}
 
-		kgsl_ringbuffer_issuecmds(device, 1, &link[0], sizedwords);
+		kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_PMODE,
+					&link[0], sizedwords);
 	} else {
 		KGSL_MEM_DBG("regs\n");
 
@@ -491,6 +492,7 @@ kgsl_yamato_getchipid(struct kgsl_device *device)
 int kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 {
 	int status = -EINVAL;
+	int init_reftimestamp = 0x7fffffff;
 	struct kgsl_memregion *regspace = &device->regspace;
 	unsigned int memflags = KGSL_MEMFLAGS_ALIGNPAGE | KGSL_MEMFLAGS_CONPHYS;
 
@@ -594,6 +596,10 @@ int kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 		goto error_close_cmdstream;
 	}
 	kgsl_sharedmem_set(&device->memstore, 0, 0, device->memstore.size);
+
+	kgsl_sharedmem_writel(&device->memstore,
+			     KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
+			     init_reftimestamp);
 
 	kgsl_yamato_regwrite(device, REG_RBBM_DEBUG, 0x00080000);
 
@@ -797,6 +803,20 @@ int kgsl_yamato_getproperty(struct kgsl_device *device,
 			status = 0;
 		}
 		break;
+	case KGSL_PROP_INTERRUPT_WAITS:
+		{
+			int int_waits = 1;
+			if (sizebytes != sizeof(int)) {
+				status = -EINVAL;
+				break;
+			}
+			if (copy_to_user(value, &int_waits, sizeof(int))) {
+				status = -EFAULT;
+				break;
+			}
+			status = 0;
+		}
+		break;
 	default:
 		status = -EINVAL;
 	}
@@ -979,14 +999,11 @@ int kgsl_yamato_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 	return 0;
 }
 
-int kgsl_yamato_waittimestamp(struct kgsl_device *device,
+static inline int _wait_timestamp(struct kgsl_device *device,
 				unsigned int timestamp,
 				unsigned int msecs)
 {
 	long status;
-
-	KGSL_DRV_INFO("enter (device=%p,timestamp=%d,timeout=0x%08x)\n",
-			device, timestamp, msecs);
 
 	status = wait_event_interruptible_timeout(device->ib1_wq,
 			kgsl_cmdstream_check_timestamp(device, timestamp),
@@ -1001,7 +1018,45 @@ int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 		}
 	}
 
-	KGSL_DRV_INFO("return %d\n", (int)status);
+	return (int)status;
+}
+
+/* MUST be called with the kgsl_driver.mutex held */
+int kgsl_yamato_waittimestamp(struct kgsl_device *device,
+				unsigned int timestamp,
+				unsigned int msecs)
+{
+	long status = 0;
+	uint32_t ref_ts;
+	unsigned int enableflag = 1;
+	unsigned int cmd[2];
+
+	KGSL_DRV_INFO("enter (device=%p,timestamp=%d,timeout=0x%08x)\n",
+			 device, timestamp, msecs);
+
+	if (!kgsl_cmdstream_check_timestamp(device, timestamp)) {
+		kgsl_sharedmem_readl(&device->memstore, &ref_ts,
+			KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
+		if (timestamp_cmp(ref_ts, timestamp)) {
+			kgsl_sharedmem_writel(&device->memstore,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
+				timestamp);
+		}
+
+		cmd[0] = pm4_type3_packet(PM4_INTERRUPT, 1);
+		cmd[1] = CP_INT_CNTL__IB1_INT_MASK;
+		kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_NO_TS_CMP,
+						cmd, 2);
+		kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
+			enableflag);
+
+		mutex_unlock(&kgsl_driver.mutex);
+		status = _wait_timestamp(device, timestamp, msecs);
+		mutex_lock(&kgsl_driver.mutex);
+	}
+
+	KGSL_DRV_INFO("return %ld\n", status);
 	return (int)status;
 }
 
