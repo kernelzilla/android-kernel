@@ -61,6 +61,14 @@ enum {
 	PMAPP_SMPS_CLK_VOTE_1P6,	/* 1.6 MHz */
 };
 
+/* SMPS mode voting types */
+enum {
+	PMAPP_SMPS_MODE_VOTE_DONTCARE = 0,
+	PMAPP_SMPS_MODE_VOTE_PWM,
+	PMAPP_SMPS_MODE_VOTE_PFM,
+	PMAPP_SMPS_MODE_VOTE_AUTO
+};
+
 int msm_pm_app_rpc_init(void);
 void msm_pm_app_rpc_deinit(void);
 int msm_pm_app_register_vbus_sn(void (*callback)(int online));
@@ -72,5 +80,6 @@ int pmapp_display_clock_config(uint enable);
 int pmapp_clock_vote(const char *voter_id, uint clock_id, uint vote);
 int pmapp_smps_clock_vote(const char *voter_id, uint vreg_id, uint vote);
 int pmapp_vreg_level_vote(const char *voter_id, uint vreg_id, uint level);
+int pmapp_smps_mode_vote(const char *voter_id, uint vreg_id, uint mode);
 
 #endif
