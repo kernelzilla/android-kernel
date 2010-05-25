@@ -35,6 +35,7 @@
 #include <linux/i2c/isa1200.h>
 #include <linux/pwm.h>
 #include <linux/pmic8058-pwm.h>
+#include <linux/i2c/tsc2007.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -3969,6 +3970,102 @@ static struct msm_spm_platform_data msm_spm_data __initdata = {
 	.vctl_timeout_us = 50,
 };
 
+#if defined(CONFIG_TOUCHSCREEN_TSC2007) || \
+	defined(CONFIG_TOUCHSCREEN_TSC2007_MODULE)
+
+#define TSC2007_TS_PEN_INT	20
+
+static struct msm_gpio tsc2007_config_data[] = {
+	{ GPIO_CFG(TSC2007_TS_PEN_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	"tsc2007_irq" },
+};
+
+static struct vreg *vreg_tsc_s3;
+
+static int tsc2007_init(void)
+{
+	int rc;
+
+	vreg_tsc_s3 = vreg_get(NULL, "s3");
+	if (IS_ERR(vreg_tsc_s3)) {
+		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
+		       __func__, PTR_ERR(vreg_tsc_s3));
+		return -ENODEV;
+	}
+
+	rc = vreg_set_level(vreg_tsc_s3, 1800);
+	if (rc) {
+		pr_err("%s: vreg_set_level failed \n", __func__);
+		goto fail_vreg_set_level;
+	}
+
+	rc = vreg_enable(vreg_tsc_s3);
+	if (rc) {
+		pr_err("%s: vreg_enable failed \n", __func__);
+		goto fail_vreg_set_level;
+	}
+
+	rc = msm_gpios_request_enable(tsc2007_config_data,
+			ARRAY_SIZE(tsc2007_config_data));
+	if (rc) {
+		pr_err("%s: Unable to request gpios\n", __func__);
+		goto fail_gpio_req;
+	}
+
+	return 0;
+
+fail_gpio_req:
+	vreg_disable(vreg_tsc_s3);
+fail_vreg_set_level:
+	vreg_put(vreg_tsc_s3);
+	return rc;
+}
+
+static int tsc2007_get_pendown_state(void)
+{
+	int rc;
+
+	rc = gpio_get_value(TSC2007_TS_PEN_INT);
+	if (rc < 0) {
+		pr_err("%s: MSM GPIO %d read failed\n", __func__,
+						TSC2007_TS_PEN_INT);
+		return rc;
+	}
+
+	return (rc == 0 ? 1 : 0);
+}
+
+static void tsc2007_exit(void)
+{
+	vreg_disable(vreg_tsc_s3);
+
+	msm_gpios_disable_free(tsc2007_config_data,
+		ARRAY_SIZE(tsc2007_config_data));
+}
+
+static struct tsc2007_platform_data tsc2007_ts_data = {
+	.model = 2007,
+	.x_plate_ohms = 300,
+	.irq_flags    = IRQF_TRIGGER_LOW,
+	.init_platform_hw = tsc2007_init,
+	.exit_platform_hw = tsc2007_exit,
+	.invert_x	  = true,
+	.invert_y	  = true,
+	/* REVISIT: Temporary fix for reversed pressure */
+	.invert_z1	  = true,
+	.invert_z2	  = true,
+	.get_pendown_state = tsc2007_get_pendown_state,
+};
+
+static struct i2c_board_info tsc_i2c_board_info[] = {
+	{
+		I2C_BOARD_INFO("tsc2007", 0x48),
+		.irq		= MSM_GPIO_TO_INT(TSC2007_TS_PEN_INT),
+		.platform_data = &tsc2007_ts_data,
+	},
+};
+#endif
+
 static const char *vregs_isa1200_name[] = {
 	"gp7",
 	"gp10",
@@ -4153,6 +4250,12 @@ static void __init msm7x30_init(void)
 #endif
 	if (machine_is_msm7x30_fluid())
 		isa1200_init();
+
+#if defined(CONFIG_TOUCHSCREEN_TSC2007) || \
+	defined(CONFIG_TOUCHSCREEN_TSC2007_MODULE)
+	i2c_register_board_info(2, tsc_i2c_board_info,
+			ARRAY_SIZE(tsc_i2c_board_info));
+#endif
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
