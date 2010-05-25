@@ -45,10 +45,15 @@
 /* Size of the buffer used for deframing a packet
   reveived from the PC tool*/
 #define HDLC_MAX 4096
-#define HDLC_OUT_BUF_SIZE 8192
-#define POOL_TYPE_COPY 1
-#define POOL_TYPE_HDLC 0
-#define POOL_TYPE_USB_STRUCT 2
+#define HDLC_OUT_BUF_SIZE		8192
+#define POOL_TYPE_COPY			1
+#define POOL_TYPE_HDLC			0
+#define POOL_TYPE_USB_STRUCT		2
+#define MODEM_DATA 			1
+#define QDSP_DATA  			2
+#define APPS_DATA  			3
+#define NON_SMD_CONTEXT		0
+#define SMD_CONTEXT			1
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
@@ -58,12 +63,24 @@
 #define REG_TABLE_SIZE 25
 #define PKT_SIZE 4096
 
+#define APPEND_DEBUG(ch) \
+do {							\
+	diag_debug_buf[diag_debug_buf_idx] = ch; \
+	(diag_debug_buf_idx < 1023) ? \
+	(diag_debug_buf_idx++) : (diag_debug_buf_idx = 0); \
+} while (0)
+
 struct diag_master_table {
 	uint16_t cmd_code;
 	uint16_t subsys_id;
 	uint16_t cmd_code_lo;
 	uint16_t cmd_code_hi;
 	int process_id;
+};
+
+struct diag_write_device {
+	void *buf;
+	int length;
 };
 
 struct diagchar_dev {
@@ -82,6 +99,9 @@ struct diagchar_dev {
 	int *client_map;
 	int *data_ready;
 	int num_clients;
+	struct diag_write_device *buf_tbl;
+
+	/* Memory pool parameters */
 	unsigned int itemsize;
 	unsigned int poolsize;
 	unsigned int itemsize_hdlc;
@@ -115,6 +135,8 @@ struct diagchar_dev {
 	struct workqueue_struct *diag_wq;
 	struct work_struct diag_read_work;
 	struct work_struct diag_drain_work;
+	struct work_struct diag_read_smd_work;
+	struct work_struct diag_read_smd_qdsp_work;
 	uint8_t *msg_masks;
 	uint8_t *log_masks;
 	uint8_t *event_masks;
@@ -125,6 +147,8 @@ struct diagchar_dev {
 	struct diag_request *usb_read_ptr;
 	struct diag_request *usb_write_ptr_svc;
 	struct diag_request *usb_write_ptr_qdsp;
+	int logging_mode;
+	int logging_process_id;
 };
 
 extern struct diagchar_dev *driver;

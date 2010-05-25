@@ -32,5 +32,15 @@
 
 void diagfwd_init(void);
 void diagfwd_exit(void);
+void diag_process_hdlc(void *data, unsigned len);
+void diag_smd_send_req(int mode);
+void diag_smd_qdsp_send_req(int mode);
+int diag_device_write(void *buf, int proc_num);
+int diagfwd_connect(void);
+int diagfwd_disconnect(void);
+
+/* State for diag forwarding */
+static int diag_debug_buf_idx;
+static unsigned char diag_debug_buf[1024];
 
 #endif

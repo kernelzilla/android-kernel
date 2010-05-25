@@ -38,22 +38,12 @@ MODULE_VERSION("1.0");
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
-
-/* State for diag forwarding */
-static unsigned char diag_debug_buf[1024];
-static int diag_debug_buf_idx;
+static unsigned int buf_tbl_size = 8; /*Number of entries in table of buffers */
 
 #define CHK_OVERFLOW(bufStart, start, end, length) \
 ((bufStart <= start) && (end - start >= length)) ? 1 : 0
 
-#define APPEND_DEBUG(ch) \
-do {							\
-	diag_debug_buf[diag_debug_buf_idx] = ch; \
-	(diag_debug_buf_idx < 1023) ? \
-	(diag_debug_buf_idx++) : (diag_debug_buf_idx = 0); \
-} while (0)
-
-static void diag_smd_send_req(int context)
+void diag_smd_send_req(int context)
 {
 	void *buf;
 
@@ -84,24 +74,72 @@ static void diag_smd_send_req(int context)
 				else
 					smd_read(driver->ch, buf, r);
 				APPEND_DEBUG('j');
-				driver->in_busy = 1;
-				driver->usb_write_ptr->buf = buf;
 				driver->usb_write_ptr->length = r;
-#ifdef DIAG_DEBUG
-				printk(KERN_INFO "writing data to USB,"
-						 " pkt length %d \n", r);
-				print_hex_dump(KERN_DEBUG, "Written Packet Data"
-					       " to USB: ", 16, 1,
-					       DUMP_PREFIX_ADDRESS, buf, r, 1);
-#endif
-				diag_write(driver->usb_write_ptr);
-				APPEND_DEBUG('k');
+				driver->in_busy = 1;
+				diag_device_write(buf, MODEM_DATA);
 			}
 		}
 	}
 }
 
-static void diag_smd_qdsp_send_req(int context)
+int diag_device_write(void *buf, int proc_num)
+{
+	int i, err = 0;
+
+	if (driver->logging_mode == USB_MODE) {
+		if (proc_num == APPS_DATA) {
+			driver->usb_write_ptr_svc = (struct diag_request *)
+			(diagmem_alloc(driver, sizeof(struct diag_request),
+				 POOL_TYPE_USB_STRUCT));
+			driver->usb_write_ptr_svc->length = driver->used;
+			driver->usb_write_ptr_svc->buf = buf;
+			err = diag_write(driver->usb_write_ptr_svc);
+		} else if (proc_num == MODEM_DATA) {
+				driver->usb_write_ptr->buf = buf;
+#ifdef DIAG_DEBUG
+				printk(KERN_INFO "writing data to USB,"
+						 " pkt length %d \n",
+				       driver->usb_write_ptr->length);
+				print_hex_dump(KERN_DEBUG, "Written Packet Data"
+					       " to USB: ", 16, 1, DUMP_PREFIX_
+					       ADDRESS, buf, driver->
+					       usb_write_ptr->length, 1);
+#endif
+			err = diag_write(driver->usb_write_ptr);
+		} else if (proc_num == QDSP_DATA) {
+			driver->usb_write_ptr_qdsp->buf = buf;
+			err = diag_write(driver->usb_write_ptr_qdsp);
+		}
+		APPEND_DEBUG('k');
+	} else {
+		if (proc_num == APPS_DATA) {
+			for (i = 0; i < driver->poolsize_usb_struct; i++)
+				if (driver->buf_tbl[i].length == 0) {
+					driver->buf_tbl[i].buf = buf;
+					driver->buf_tbl[i].length =
+								 driver->used;
+#ifdef DIAG_DEBUG
+					printk(KERN_INFO "\n ENQUEUE buf ptr"
+						   " and length is %x , %d\n",
+						   (unsigned int)(driver->buf_
+				tbl[i].buf), driver->buf_tbl[i].length);
+#endif
+					break;
+				}
+	}
+		for (i = 0; i < driver->num_clients; i++)
+			if (driver->client_map[i] == driver->logging_process_id)
+				break;
+		if (i < driver->num_clients) {
+			driver->data_ready[i] |= MEMORY_DEVICE_LOG_TYPE;
+			wake_up_interruptible(&driver->wait_q);
+		} else
+			return -EINVAL;
+	}
+    return err;
+}
+
+void diag_smd_qdsp_send_req(int context)
 {
 	void *buf;
 
@@ -125,11 +163,9 @@ static void diag_smd_qdsp_send_req(int context)
 				else
 					smd_read(driver->chqdsp, buf, r);
 				APPEND_DEBUG('m');
-				driver->in_busy_qdsp = 1;
-				driver->usb_write_ptr_qdsp->buf = buf;
 				driver->usb_write_ptr_qdsp->length = r;
-				diag_write(driver->usb_write_ptr_qdsp);
-				APPEND_DEBUG('n');
+				driver->in_busy_qdsp = 1;
+				diag_device_write(buf, QDSP_DATA);
 			}
 		}
 
@@ -391,11 +427,14 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 		return packet_type;
 }
 
-static void diag_process_hdlc(void *data, unsigned len)
+void diag_process_hdlc(void *data, unsigned len)
 {
 	struct diag_hdlc_decode_type hdlc;
 	int ret, type = 0;
-
+#ifdef DIAG_DEBUG
+	int i;
+	printk(KERN_INFO "\n HDLC decode function, len of data  %d\n", len);
+#endif
 	hdlc.dest_ptr = driver->hdlc_buf;
 	hdlc.dest_size = USB_MAX_OUT_BUF;
 	hdlc.src_ptr = data;
@@ -417,7 +456,12 @@ static void diag_process_hdlc(void *data, unsigned len)
 					   DUMP_PREFIX_ADDRESS, data, len, 1);
 		driver->debug_flag = 0;
 	}
-
+#ifdef DIAG_DEBUG
+	printk(KERN_INFO "\n hdlc.dest_idx = %d \n", hdlc.dest_idx);
+	for (i = 0; i < hdlc.dest_idx; i++)
+		printk(KERN_DEBUG "\t%x", *(((unsigned char *)
+							driver->hdlc_buf)+i));
+#endif
 	/* ignore 2 bytes for CRC, one for 7E and send */
 	if ((driver->ch) && (ret) && (type) && (hdlc.dest_idx > 3)) {
 		APPEND_DEBUG('g');
@@ -602,6 +646,11 @@ void diagfwd_init(void)
 	    (driver->client_map = kzalloc
 	     ((driver->num_clients) * 4, GFP_KERNEL)) == NULL)
 		goto err;
+	if (driver->buf_tbl == NULL)
+			driver->buf_tbl = kzalloc(buf_tbl_size *
+			  sizeof(struct diag_write_device), GFP_KERNEL);
+	if (driver->buf_tbl == NULL)
+		goto err;
 	if (driver->data_ready == NULL &&
 	     (driver->data_ready = kzalloc(driver->num_clients,
 					    GFP_KERNEL)) == NULL)
@@ -647,6 +696,7 @@ err:
 		kfree(driver->log_masks);
 		kfree(driver->event_masks);
 		kfree(driver->client_map);
+		kfree(driver->buf_tbl);
 		kfree(driver->data_ready);
 		kfree(driver->table);
 		kfree(driver->pkt_buf);
@@ -677,6 +727,7 @@ void diagfwd_exit(void)
 	kfree(driver->log_masks);
 	kfree(driver->event_masks);
 	kfree(driver->client_map);
+	kfree(driver->buf_tbl);
 	kfree(driver->data_ready);
 	kfree(driver->table);
 	kfree(driver->pkt_buf);
