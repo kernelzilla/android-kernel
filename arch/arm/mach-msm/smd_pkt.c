@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,7 +16,7 @@
  *
  */
 /*
- * SMD Control Driver -- Provides a binary SMD non-muxed control port
+ * SMD Packet Driver -- Provides a binary SMD non-muxed packet port
  *                       interface.
  */
 
@@ -35,23 +35,23 @@
 
 #include "modem_notifier.h"
 
-#define NUM_SMD_CTL_PORTS 3
+#define NUM_SMD_PKT_PORTS 3
 #define DEVICE_NAME "smdcntl"
 #define MAX_BUF_SIZE 2048
 
-struct smd_ctl_dev {
+struct smd_pkt_dev {
 	struct cdev cdev;
 	char name[9];
 	struct device *devicep;
 
-	struct smd_channel *ctl_ch;
-	struct mutex ctl_ch_lock;
+	struct smd_channel *ch;
+	struct mutex ch_lock;
 	struct mutex rx_lock;
 	struct mutex is_open_lock;
-	struct workqueue_struct *ctl_wq;
-	struct work_struct ctl_work;
-	wait_queue_head_t ctl_wait_queue;
-	wait_queue_head_t ctl_opened_wait_queue;
+	struct workqueue_struct *ch_wq;
+	struct work_struct ch_work;
+	wait_queue_head_t ch_wait_queue;
+	wait_queue_head_t ch_opened_wait_queue;
 
 	int i;
 
@@ -64,10 +64,10 @@ struct smd_ctl_dev {
 	int has_reset;
 	struct mutex has_reset_lock;
 
-} *smd_ctl_devp[NUM_SMD_CTL_PORTS];
+} *smd_pkt_devp[NUM_SMD_PKT_PORTS];
 
-struct class *smd_ctl_classp;
-static dev_t smd_ctl_number;
+struct class *smd_pkt_classp;
+static dev_t smd_pkt_number;
 
 #define DEBUG
 #undef DEBUG
@@ -91,43 +91,43 @@ do { \
 #define D(x...) do {} while (0)
 #endif
 
-static void clean_and_signal(struct smd_ctl_dev *smd_ctl_devp)
+static void clean_and_signal(struct smd_pkt_dev *smd_pkt_devp)
 {
-	flush_workqueue(smd_ctl_devp->ctl_wq);
+	flush_workqueue(smd_pkt_devp->ch_wq);
 
-	mutex_lock(&smd_ctl_devp->has_reset_lock);
-	smd_ctl_devp->has_reset = 1;
-	mutex_unlock(&smd_ctl_devp->has_reset_lock);
+	mutex_lock(&smd_pkt_devp->has_reset_lock);
+	smd_pkt_devp->has_reset = 1;
+	mutex_unlock(&smd_pkt_devp->has_reset_lock);
 
-	mutex_lock(&smd_ctl_devp->rx_lock);
-	smd_ctl_devp->bytes_read = 0;
-	mutex_unlock(&smd_ctl_devp->rx_lock);
+	mutex_lock(&smd_pkt_devp->rx_lock);
+	smd_pkt_devp->bytes_read = 0;
+	mutex_unlock(&smd_pkt_devp->rx_lock);
 
-	mutex_lock(&smd_ctl_devp->is_open_lock);
-	smd_ctl_devp->is_open = 0;
-	mutex_unlock(&smd_ctl_devp->is_open_lock);
+	mutex_lock(&smd_pkt_devp->is_open_lock);
+	smd_pkt_devp->is_open = 0;
+	mutex_unlock(&smd_pkt_devp->is_open_lock);
 
-	wake_up_interruptible(&smd_ctl_devp->ctl_wait_queue);
-	wake_up_interruptible(&smd_ctl_devp->ctl_opened_wait_queue);
+	wake_up_interruptible(&smd_pkt_devp->ch_wait_queue);
+	wake_up_interruptible(&smd_pkt_devp->ch_opened_wait_queue);
 }
 
 static int modem_notifier(struct notifier_block *this,
 			  unsigned long code,
 			  void *_cmd)
 {
-	struct smd_ctl_dev *smd_ctl_devp =
+	struct smd_pkt_dev *smd_pkt_devp =
 		container_of(this,
-			     struct smd_ctl_dev,
+			     struct smd_pkt_dev,
 			     nb);
 
-	if (!smd_ctl_devp)
+	if (!smd_pkt_devp)
 		return NOTIFY_DONE;
 
 	switch (code) {
 	case MODEM_NOTIFIER_START_RESET:
 		printk(KERN_ERR "Notify: start reset ch:%i\n",
-		       smd_ctl_devp->i);
-		clean_and_signal(smd_ctl_devp);
+		       smd_pkt_devp->i);
+		clean_and_signal(smd_pkt_devp);
 		break;
 	case MODEM_NOTIFIER_END_RESET:
 		printk(KERN_ERR "Notify: end reset\n");
@@ -139,22 +139,22 @@ static int modem_notifier(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
-int smd_ctl_ioctl(struct inode *inode,
+int smd_pkt_ioctl(struct inode *inode,
 		    struct file *file,
 		    unsigned int cmd,
 		    unsigned long arg)
 {
 	int ret;
-	struct smd_ctl_dev *smd_ctl_devp;
+	struct smd_pkt_dev *smd_pkt_devp;
 
-	smd_ctl_devp = file->private_data;
+	smd_pkt_devp = file->private_data;
 
 	switch (cmd) {
 	case TIOCMGET:
-		ret = smd_tiocmget(smd_ctl_devp->ctl_ch);
+		ret = smd_tiocmget(smd_pkt_devp->ch);
 		break;
 	case TIOCMSET:
-		ret = smd_tiocmset(smd_ctl_devp->ctl_ch, arg, ~arg);
+		ret = smd_tiocmset(smd_pkt_devp->ch, arg, ~arg);
 		break;
 	default:
 		ret = -1;
@@ -163,28 +163,28 @@ int smd_ctl_ioctl(struct inode *inode,
 	return ret;
 }
 
-ssize_t smd_ctl_read(struct file *file,
+ssize_t smd_pkt_read(struct file *file,
 		       char __user *buf,
 		       size_t count,
 		       loff_t *ppos)
 {
 	int r;
 	int bytes_read;
-	struct smd_ctl_dev *smd_ctl_devp;
+	struct smd_pkt_dev *smd_pkt_devp;
 
 	D(KERN_ERR "%s: read %i bytes\n",
 	  __func__, count);
 
-	smd_ctl_devp = file->private_data;
+	smd_pkt_devp = file->private_data;
 
-	if (!smd_ctl_devp->ctl_ch)
+	if (!smd_pkt_devp->ch)
 		return -EINVAL;
 
-	r = wait_event_interruptible(smd_ctl_devp->ctl_wait_queue,
-				     smd_ctl_devp->bytes_read |
-				     smd_ctl_devp->has_reset);
+	r = wait_event_interruptible(smd_pkt_devp->ch_wait_queue,
+				     smd_pkt_devp->bytes_read |
+				     smd_pkt_devp->has_reset);
 
-	if (smd_ctl_devp->has_reset)
+	if (smd_pkt_devp->has_reset)
 		return -ENETRESET;
 
 	if (r < 0) {
@@ -204,10 +204,10 @@ ssize_t smd_ctl_read(struct file *file,
 
 	/* Here we have a whole packet waiting for us */
 
-	mutex_lock(&smd_ctl_devp->rx_lock);
-	bytes_read = smd_ctl_devp->bytes_read;
-	smd_ctl_devp->bytes_read = 0;
-	mutex_unlock(&smd_ctl_devp->rx_lock);
+	mutex_lock(&smd_pkt_devp->rx_lock);
+	bytes_read = smd_pkt_devp->bytes_read;
+	smd_pkt_devp->bytes_read = 0;
+	mutex_unlock(&smd_pkt_devp->rx_lock);
 
 	D(KERN_ERR "%s: after wait_event_interruptible bytes_read = %i\n",
 	  __func__, bytes_read);
@@ -215,21 +215,21 @@ ssize_t smd_ctl_read(struct file *file,
 	if (bytes_read > count) {
 		printk(KERN_ERR "packet size %i > buffer size %i, "
 		       "dropping packet!", bytes_read, count);
-		smd_read(smd_ctl_devp->ctl_ch, 0, bytes_read);
+		smd_read(smd_pkt_devp->ch, 0, bytes_read);
 		return -EINVAL;
 	}
 
 	/* smd_read and copy_to_user need to be merged to only do 1 copy */
-	if (smd_read(smd_ctl_devp->ctl_ch, smd_ctl_devp->rx_buf, bytes_read)
+	if (smd_read(smd_pkt_devp->ch, smd_pkt_devp->rx_buf, bytes_read)
 	    != bytes_read) {
-		if (smd_ctl_devp->has_reset)
+		if (smd_pkt_devp->has_reset)
 			return -ENETRESET;
 
 		printk(KERN_ERR "user read: not enough data?!\n");
 		return -EINVAL;
 	}
-	D_DUMP_BUFFER("read: ", bytes_read, smd_ctl_devp->rx_buf);
-	r = copy_to_user(buf, smd_ctl_devp->rx_buf, bytes_read);
+	D_DUMP_BUFFER("read: ", bytes_read, smd_pkt_devp->rx_buf);
+	r = copy_to_user(buf, smd_pkt_devp->rx_buf, bytes_read);
 
 	if (r > 0) {
 		printk(KERN_ERR "ERROR:%s:%i:%s: "
@@ -250,20 +250,20 @@ ssize_t smd_ctl_read(struct file *file,
 	   the event. Queuing one more work item will catch this if
 	   its happened, but do nothing if it hasn't.
 	*/
-	queue_work(smd_ctl_devp->ctl_wq, &smd_ctl_devp->ctl_work);
+	queue_work(smd_pkt_devp->ch_wq, &smd_pkt_devp->ch_work);
 
 	D(KERN_ERR "%s: just queued more work\n", __func__);
 
 	return bytes_read;
 }
 
-ssize_t smd_ctl_write(struct file *file,
+ssize_t smd_pkt_write(struct file *file,
 		       const char __user *buf,
 		       size_t count,
 		       loff_t *ppos)
 {
 	int r;
-	struct smd_ctl_dev *smd_ctl_devp;
+	struct smd_pkt_dev *smd_pkt_devp;
 
 	if (count > MAX_BUF_SIZE)
 		return -EINVAL;
@@ -271,16 +271,16 @@ ssize_t smd_ctl_write(struct file *file,
 	D(KERN_ERR "%s: writting %i bytes\n",
 	  __func__, count);
 
-	smd_ctl_devp = file->private_data;
+	smd_pkt_devp = file->private_data;
 
-	if (!smd_ctl_devp->ctl_ch)
+	if (!smd_pkt_devp->ch)
 		return -EINVAL;
 
-	r = wait_event_interruptible(smd_ctl_devp->ctl_opened_wait_queue,
-				     smd_ctl_devp->is_open |
-				     smd_ctl_devp->has_reset);
+	r = wait_event_interruptible(smd_pkt_devp->ch_opened_wait_queue,
+				     smd_pkt_devp->is_open |
+				     smd_pkt_devp->has_reset);
 
-	if (smd_ctl_devp->has_reset)
+	if (smd_pkt_devp->has_reset)
 		return -ENETRESET;
 
 	if (r < 0) {
@@ -300,7 +300,7 @@ ssize_t smd_ctl_write(struct file *file,
 
 	D_DUMP_BUFFER("write: ", count, buf);
 
-	r = copy_from_user(smd_ctl_devp->tx_buf, buf, count);
+	r = copy_from_user(smd_pkt_devp->tx_buf, buf, count);
 	if (r > 0) {
 		printk(KERN_ERR "ERROR:%s:%i:%s: "
 		       "copy_from_user could not copy %i bytes.\n",
@@ -314,9 +314,9 @@ ssize_t smd_ctl_write(struct file *file,
 	D(KERN_ERR "%s: after copy_from_user. count = %i\n",
 	  __func__, count);
 
-	r = smd_write(smd_ctl_devp->ctl_ch, smd_ctl_devp->tx_buf, count);
+	r = smd_write(smd_pkt_devp->ch, smd_pkt_devp->tx_buf, count);
 	if (r != count) {
-		if (smd_ctl_devp->has_reset)
+		if (smd_pkt_devp->has_reset)
 			return -ENETRESET;
 
 		printk(KERN_ERR "ERROR:%s:%i:%s: "
@@ -335,31 +335,31 @@ ssize_t smd_ctl_write(struct file *file,
 	return count;
 }
 
-static void ctl_work_func(struct work_struct *work)
+static void ch_work_func(struct work_struct *work)
 {
 	/* unsigned char buf[MAX_BUF_SIZE]; */
 	int sz;
-	struct smd_ctl_dev *smd_ctl_devp = container_of(work,
-							struct smd_ctl_dev,
-							ctl_work);
+	struct smd_pkt_dev *smd_pkt_devp = container_of(work,
+							struct smd_pkt_dev,
+							ch_work);
 
-	if (!smd_ctl_devp->ctl_ch)
+	if (!smd_pkt_devp->ch)
 		return;
 
 	for (;;) {
-		sz = smd_cur_packet_size(smd_ctl_devp->ctl_ch);
+		sz = smd_cur_packet_size(smd_pkt_devp->ch);
 		if (sz == 0) {
 			D(KERN_ERR "%s: packet size is 0\n", __func__);
 			break;
 		}
-		if (sz > smd_read_avail(smd_ctl_devp->ctl_ch)) {
+		if (sz > smd_read_avail(smd_pkt_devp->ch)) {
 			D(KERN_ERR "%s: packet size is %i - "
 			  "the whole packet isn't here\n",
 			  __func__, sz);
 			break;
 		}
 		if (sz > MAX_BUF_SIZE) {
-			smd_read(smd_ctl_devp->ctl_ch, 0, sz);
+			smd_read(smd_pkt_devp->ch, 0, sz);
 			D(KERN_ERR "%s: packet size is %i - "
 			  "greater than max %i, dropping\n",
 			  __func__, sz, MAX_BUF_SIZE);
@@ -368,20 +368,20 @@ static void ctl_work_func(struct work_struct *work)
 
 		/* here we have a packet of size sz ready */
 
-		mutex_lock(&smd_ctl_devp->rx_lock);
-		smd_ctl_devp->bytes_read = sz;
-		mutex_unlock(&smd_ctl_devp->rx_lock);
-		wake_up_interruptible(&smd_ctl_devp->ctl_wait_queue);
+		mutex_lock(&smd_pkt_devp->rx_lock);
+		smd_pkt_devp->bytes_read = sz;
+		mutex_unlock(&smd_pkt_devp->rx_lock);
+		wake_up_interruptible(&smd_pkt_devp->ch_wait_queue);
 		D(KERN_ERR "%s: after wake_up\n", __func__);
 		break;
 	}
 }
 
-static void ctl_notify(void *priv, unsigned event)
+static void ch_notify(void *priv, unsigned event)
 {
-	struct smd_ctl_dev *smd_ctl_devp = priv;
+	struct smd_pkt_dev *smd_pkt_devp = priv;
 
-	if (smd_ctl_devp->ctl_ch == 0)
+	if (smd_pkt_devp->ch == 0)
 		return;
 
 	switch (event) {
@@ -389,14 +389,14 @@ static void ctl_notify(void *priv, unsigned event)
 		int sz;
 		D(KERN_ERR "%s: data\n",
 		  __func__);
-		sz = smd_cur_packet_size(smd_ctl_devp->ctl_ch);
+		sz = smd_cur_packet_size(smd_pkt_devp->ch);
 		D(KERN_ERR "%s: data sz = %i\n",
 		  __func__, sz);
 		D(KERN_ERR "%s: smd_read_avail = %i\n",
-		  __func__, smd_read_avail(smd_ctl_devp->ctl_ch));
-		if ((sz > 0) && (sz <= smd_read_avail(smd_ctl_devp->ctl_ch))) {
-			queue_work(smd_ctl_devp->ctl_wq,
-				   &smd_ctl_devp->ctl_work);
+		  __func__, smd_read_avail(smd_pkt_devp->ch));
+		if ((sz > 0) && (sz <= smd_read_avail(smd_pkt_devp->ch))) {
+			queue_work(smd_pkt_devp->ch_wq,
+				   &smd_pkt_devp->ch_work);
 			D(KERN_ERR "%s: data just queued\n",
 			  __func__);
 		}
@@ -407,88 +407,88 @@ static void ctl_notify(void *priv, unsigned event)
 	case SMD_EVENT_OPEN:
 		D(KERN_ERR "%s: smd opened\n",
 		  __func__);
-		smd_ctl_devp->is_open = 1;
-		wake_up_interruptible(&smd_ctl_devp->ctl_opened_wait_queue);
+		smd_pkt_devp->is_open = 1;
+		wake_up_interruptible(&smd_pkt_devp->ch_opened_wait_queue);
 		break;
 	case SMD_EVENT_CLOSE:
-		smd_ctl_devp->is_open = 0;
+		smd_pkt_devp->is_open = 0;
 		printk(KERN_ERR "%s: smd closed\n",
 		       __func__);
 		break;
 	}
 }
 
-static char *smd_ctl_name[] = {
+static char *smd_ch_name[] = {
 	"DATA5_CNTL",
 	"DATA6_CNTL",
 	"DATA7_CNTL",
 };
 
-int smd_ctl_open(struct inode *inode, struct file *file)
+int smd_pkt_open(struct inode *inode, struct file *file)
 {
 	int r = 0;
-	struct smd_ctl_dev *smd_ctl_devp;
+	struct smd_pkt_dev *smd_pkt_devp;
 
-	smd_ctl_devp = container_of(inode->i_cdev, struct smd_ctl_dev, cdev);
+	smd_pkt_devp = container_of(inode->i_cdev, struct smd_pkt_dev, cdev);
 
-	if (!smd_ctl_devp)
+	if (!smd_pkt_devp)
 		return -EINVAL;
 
-	file->private_data = smd_ctl_devp;
+	file->private_data = smd_pkt_devp;
 
-	mutex_lock(&smd_ctl_devp->ctl_ch_lock);
-	if (smd_ctl_devp->ctl_ch == 0)
-		r = smd_open(smd_ctl_name[smd_ctl_devp->i],
-			     &smd_ctl_devp->ctl_ch,
-			     smd_ctl_devp,
-			     ctl_notify);
-	mutex_unlock(&smd_ctl_devp->ctl_ch_lock);
+	mutex_lock(&smd_pkt_devp->ch_lock);
+	if (smd_pkt_devp->ch == 0)
+		r = smd_open(smd_ch_name[smd_pkt_devp->i],
+			     &smd_pkt_devp->ch,
+			     smd_pkt_devp,
+			     ch_notify);
+	mutex_unlock(&smd_pkt_devp->ch_lock);
 
 	return r;
 }
 
-int smd_ctl_release(struct inode *inode, struct file *file)
+int smd_pkt_release(struct inode *inode, struct file *file)
 {
 	int r = 0;
-	struct smd_ctl_dev *smd_ctl_devp = file->private_data;
+	struct smd_pkt_dev *smd_pkt_devp = file->private_data;
 
-	if (!smd_ctl_devp)
+	if (!smd_pkt_devp)
 		return -EINVAL;
 
-	clean_and_signal(smd_ctl_devp);
+	clean_and_signal(smd_pkt_devp);
 
-	mutex_lock(&smd_ctl_devp->ctl_ch_lock);
-	if (smd_ctl_devp->ctl_ch != 0) {
-		r = smd_close(smd_ctl_devp->ctl_ch);
-		smd_ctl_devp->ctl_ch = 0;
+	mutex_lock(&smd_pkt_devp->ch_lock);
+	if (smd_pkt_devp->ch != 0) {
+		r = smd_close(smd_pkt_devp->ch);
+		smd_pkt_devp->ch = 0;
 	}
-	mutex_unlock(&smd_ctl_devp->ctl_ch_lock);
+	mutex_unlock(&smd_pkt_devp->ch_lock);
 
-	mutex_lock(&smd_ctl_devp->has_reset_lock);
-	smd_ctl_devp->has_reset = 0;
-	mutex_unlock(&smd_ctl_devp->has_reset_lock);
+	mutex_lock(&smd_pkt_devp->has_reset_lock);
+	smd_pkt_devp->has_reset = 0;
+	mutex_unlock(&smd_pkt_devp->has_reset_lock);
 
 	return r;
 }
 
-static const struct file_operations smd_ctl_fops = {
+static const struct file_operations smd_pkt_fops = {
 	.owner = THIS_MODULE,
-	.open = smd_ctl_open,
-	.release = smd_ctl_release,
-	.read = smd_ctl_read,
-	.write = smd_ctl_write,
-	.ioctl = smd_ctl_ioctl,
+	.open = smd_pkt_open,
+	.release = smd_pkt_release,
+	.read = smd_pkt_read,
+	.write = smd_pkt_write,
+	.ioctl = smd_pkt_ioctl,
 };
 
-static int __init smd_ctl_init(void)
+static int __init smd_pkt_init(void)
 {
 	int i;
 	int r;
 	unsigned char buf[32];
 
-	r = alloc_chrdev_region(&smd_ctl_number,
+	r = alloc_chrdev_region(&smd_pkt_number,
 			       0,
-			       NUM_SMD_CTL_PORTS,
+			       NUM_SMD_PKT_PORTS,
 			       DEVICE_NAME);
 	if (IS_ERR_VALUE(r)) {
 		printk(KERN_ERR "ERROR:%s:%i:%s: "
@@ -500,8 +500,8 @@ static int __init smd_ctl_init(void)
 		goto error0;
 	}
 
-	smd_ctl_classp = class_create(THIS_MODULE, DEVICE_NAME);
-	if (IS_ERR(smd_ctl_classp)) {
+	smd_pkt_classp = class_create(THIS_MODULE, DEVICE_NAME);
+	if (IS_ERR(smd_pkt_classp)) {
 		printk(KERN_ERR "ERROR:%s:%i:%s: "
 		       "class_create() ENOMEM\n",
 		       __FILE__,
@@ -511,10 +511,10 @@ static int __init smd_ctl_init(void)
 		goto error1;
 	}
 
-	for (i = 0; i < NUM_SMD_CTL_PORTS; ++i) {
-		smd_ctl_devp[i] = kzalloc(sizeof(struct smd_ctl_dev),
+	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
+		smd_pkt_devp[i] = kzalloc(sizeof(struct smd_pkt_dev),
 					 GFP_KERNEL);
-		if (IS_ERR(smd_ctl_devp[i])) {
+		if (IS_ERR(smd_pkt_devp[i])) {
 			printk(KERN_ERR "ERROR:%s:%i:%s kmalloc() ENOMEM\n",
 			       __FILE__,
 			       __LINE__,
@@ -523,11 +523,11 @@ static int __init smd_ctl_init(void)
 			goto error2;
 		}
 
-		smd_ctl_devp[i]->i = i;
+		smd_pkt_devp[i]->i = i;
 
-		scnprintf(buf, 32, "ctl%i", i);
-		smd_ctl_devp[i]->ctl_wq = create_singlethread_workqueue(buf);
-		if (&smd_ctl_devp[i]->ctl_wq == 0) {
+		scnprintf(buf, 32, "pkt%i", i);
+		smd_pkt_devp[i]->ch_wq = create_singlethread_workqueue(buf);
+		if (&smd_pkt_devp[i]->ch_wq == 0) {
 			printk(KERN_ERR
 			       "%s:%i:%s: "
 			       "create_singlethread_workqueue() ret 0\n",
@@ -538,21 +538,21 @@ static int __init smd_ctl_init(void)
 			goto error2;
 		}
 
-		init_waitqueue_head(&smd_ctl_devp[i]->ctl_wait_queue);
-		smd_ctl_devp[i]->is_open = 0;
-		init_waitqueue_head(&smd_ctl_devp[i]->ctl_opened_wait_queue);
-		INIT_WORK(&smd_ctl_devp[i]->ctl_work,
-			  ctl_work_func);
+		init_waitqueue_head(&smd_pkt_devp[i]->ch_wait_queue);
+		smd_pkt_devp[i]->is_open = 0;
+		init_waitqueue_head(&smd_pkt_devp[i]->ch_opened_wait_queue);
+		INIT_WORK(&smd_pkt_devp[i]->ch_work,
+			  ch_work_func);
 
-		mutex_init(&smd_ctl_devp[i]->ctl_ch_lock);
-		mutex_init(&smd_ctl_devp[i]->rx_lock);
-		mutex_init(&smd_ctl_devp[i]->is_open_lock);
+		mutex_init(&smd_pkt_devp[i]->ch_lock);
+		mutex_init(&smd_pkt_devp[i]->rx_lock);
+		mutex_init(&smd_pkt_devp[i]->is_open_lock);
 
-		cdev_init(&smd_ctl_devp[i]->cdev, &smd_ctl_fops);
-		smd_ctl_devp[i]->cdev.owner = THIS_MODULE;
+		cdev_init(&smd_pkt_devp[i]->cdev, &smd_pkt_fops);
+		smd_pkt_devp[i]->cdev.owner = THIS_MODULE;
 
-		r = cdev_add(&smd_ctl_devp[i]->cdev,
-			     (smd_ctl_number + i),
+		r = cdev_add(&smd_pkt_devp[i]->cdev,
+			     (smd_pkt_number + i),
 			     1);
 
 		if (IS_ERR_VALUE(r)) {
@@ -561,78 +561,78 @@ static int __init smd_ctl_init(void)
 			       __LINE__,
 			       __func__,
 			       r);
-			destroy_workqueue(smd_ctl_devp[i]->ctl_wq);
-			kfree(smd_ctl_devp[i]);
+			destroy_workqueue(smd_pkt_devp[i]->ch_wq);
+			kfree(smd_pkt_devp[i]);
 			goto error2;
 		}
 
-		smd_ctl_devp[i]->devicep =
-			device_create(smd_ctl_classp,
+		smd_pkt_devp[i]->devicep =
+			device_create(smd_pkt_classp,
 				      NULL,
-				      (smd_ctl_number + i),
+				      (smd_pkt_number + i),
 				      NULL,
 				      DEVICE_NAME "%d",
 				      i);
 
-		if (IS_ERR(smd_ctl_devp[i]->devicep)) {
+		if (IS_ERR(smd_pkt_devp[i]->devicep)) {
 			printk(KERN_ERR "%s:%i:%s: "
 			       "device_create() ENOMEM\n",
 			       __FILE__,
 			       __LINE__,
 			       __func__);
 			r = -ENOMEM;
-			cdev_del(&smd_ctl_devp[i]->cdev);
-			destroy_workqueue(smd_ctl_devp[i]->ctl_wq);
-			kfree(smd_ctl_devp[i]);
+			cdev_del(&smd_pkt_devp[i]->cdev);
+			destroy_workqueue(smd_pkt_devp[i]->ch_wq);
+			kfree(smd_pkt_devp[i]);
 			goto error2;
 		}
 
-		smd_ctl_devp[i]->nb.notifier_call = modem_notifier;
-		modem_register_notifier(&smd_ctl_devp[i]->nb);
-		mutex_init(&smd_ctl_devp[i]->has_reset_lock);
+		smd_pkt_devp[i]->nb.notifier_call = modem_notifier;
+		modem_register_notifier(&smd_pkt_devp[i]->nb);
+		mutex_init(&smd_pkt_devp[i]->has_reset_lock);
 
 	}
 
-	printk(KERN_INFO "SMD Control Port Driver Initialized.\n");
+	printk(KERN_INFO "SMD Packet Port Driver Initialized.\n");
 	return 0;
 
  error2:
 	if (i > 0) {
 		while (--i >= 0) {
-			cdev_del(&smd_ctl_devp[i]->cdev);
-			destroy_workqueue(smd_ctl_devp[i]->ctl_wq);
-			kfree(smd_ctl_devp[i]);
-			device_destroy(smd_ctl_classp,
-				       MKDEV(MAJOR(smd_ctl_number), i));
+			cdev_del(&smd_pkt_devp[i]->cdev);
+			destroy_workqueue(smd_pkt_devp[i]->ch_wq);
+			kfree(smd_pkt_devp[i]);
+			device_destroy(smd_pkt_classp,
+				       MKDEV(MAJOR(smd_pkt_number), i));
 		}
 	}
 
-	class_destroy(smd_ctl_classp);
+	class_destroy(smd_pkt_classp);
  error1:
-	unregister_chrdev_region(MAJOR(smd_ctl_number), NUM_SMD_CTL_PORTS);
+	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
  error0:
 	return r;
 }
 
-static void __exit smd_ctl_cleanup(void)
+static void __exit smd_pkt_cleanup(void)
 {
 	int i;
 
-	for (i = 0; i < NUM_SMD_CTL_PORTS; ++i) {
-		modem_unregister_notifier(&smd_ctl_devp[i]->nb);
-		cdev_del(&smd_ctl_devp[i]->cdev);
-		kfree(smd_ctl_devp[i]);
-		device_destroy(smd_ctl_classp,
-			       MKDEV(MAJOR(smd_ctl_number), i));
+	for (i = 0; i < NUM_SMD_PKT_PORTS; ++i) {
+		modem_unregister_notifier(&smd_pkt_devp[i]->nb);
+		cdev_del(&smd_pkt_devp[i]->cdev);
+		kfree(smd_pkt_devp[i]);
+		device_destroy(smd_pkt_classp,
+			       MKDEV(MAJOR(smd_pkt_number), i));
 	}
 
-	class_destroy(smd_ctl_classp);
+	class_destroy(smd_pkt_classp);
 
-	unregister_chrdev_region(MAJOR(smd_ctl_number), NUM_SMD_CTL_PORTS);
+	unregister_chrdev_region(MAJOR(smd_pkt_number), NUM_SMD_PKT_PORTS);
 }
 
-module_init(smd_ctl_init);
-module_exit(smd_ctl_cleanup);
+module_init(smd_pkt_init);
+module_exit(smd_pkt_cleanup);
 
-MODULE_DESCRIPTION("MSM Shared Memory Control Port");
+MODULE_DESCRIPTION("MSM Shared Memory Packet Port");
 MODULE_LICENSE("GPL v2");

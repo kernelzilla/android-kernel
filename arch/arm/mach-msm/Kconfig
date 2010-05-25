@@ -657,12 +657,12 @@ config MSM_SMD_QMI
 
 	  If in doubt, say yes.
 
-config MSM_SMD_CTL
-	bool "SMD Control Driver"
+config MSM_SMD_PKT
+	bool "SMD Packet Driver"
 	depends on MSM_SMD
 	default y
 	help
-	  Provides a binary SMD non-muxed control port interface.
+	  Provides a binary SMD non-muxed packet port interface.
 
 	  If in doubt, say yes.
 
