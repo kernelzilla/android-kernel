@@ -38,13 +38,14 @@
 #include <linux/i2c/tsc2007.h>
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
-#include <mach/mpp.h>
 #include <linux/input/cy8ctma300.h>
+#include <linux/msm_adc.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/setup.h>
 
+#include <mach/mpp.h>
 #include <mach/gpio.h>
 #include <mach/board.h>
 #include <mach/camera.h>
@@ -3454,6 +3455,21 @@ static struct platform_device *early_devices[] __initdata = {
 #endif
 };
 
+static char *msm_adc_device_names[] = { "LTC_ADC1", "LTC_ADC2", "LTC_ADC3" };
+
+static struct msm_adc_platform_data msm_adc_pdata = {
+       .dev_names = msm_adc_device_names,
+       .num_adc = ARRAY_SIZE(msm_adc_device_names),
+};
+
+static struct platform_device msm_adc_device = {
+	.name   = "msm_adc",
+	.id = -1,
+	.dev = {
+		.platform_data = &msm_adc_pdata,
+	},
+};
+
 static struct platform_device *devices[] __initdata = {
 #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	&msm_device_uart2,
@@ -3530,6 +3546,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_gemini_device,
 #endif
 	&msm_batt_device,
+	&msm_adc_device,
 };
 
 static struct msm_gpio msm_i2c_gpios_hw[] = {
