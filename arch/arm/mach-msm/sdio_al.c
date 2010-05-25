@@ -28,8 +28,6 @@
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/fs.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
@@ -62,8 +60,16 @@
 /** CMD53/CMD54 Block size */
 #define SDIO_AL_BLOCK_SIZE   128
 
-/** Func#1 Mailbox base address    */
-#define MAILBOX_ADDR			0x1000
+/** Func#1 hardware Mailbox base address	 */
+#define HW_MAILBOX_ADDR			0x1000
+
+/** Func#1 peer sdioc software version.
+ *  The header is duplicated also to the mailbox of the other
+ *  functions. It can be used before other functions are enabled. */
+#define SDIOC_SW_HEADER_ADDR		0x0400
+
+/** Func#2..7 software Mailbox base address at 16K */
+#define SDIOC_SW_MAILBOX_ADDR			0x4000
 
 /** Some Mailbox registers address, written by host for
  control */
@@ -76,17 +82,31 @@
 #define EOT_PIPES_ENABLE		0x00
 
 /** Maximum read/write data available is SDIO-Client limitation */
-#define MAX_DATA_AVILABLE   		(16*1024)
-#define INVALID_DATA_AVILABLE  		(0x8000)
+#define MAX_DATA_AVAILABLE   		(16*1024)
+#define INVALID_DATA_AVAILABLE  	(0x8000)
 
-#define DEFAULT_WRITE_THRESHOLD 	(MAX_DATA_AVILABLE/2)
-#define DEFAULT_READ_THRESHOLD  	(MAX_DATA_AVILABLE/2)
+/** SDIO-Client HW threshold to generate interrupt to the
+ *  SDIO-Host on write available bytes.
+ */
+#define DEFAULT_WRITE_THRESHOLD 	(MAX_DATA_AVAILABLE/2)
+
+/** SDIO-Client HW threshold to generate interrupt to the
+ *  SDIO-Host on read available bytes, for streaming (non
+ *  packet) rx data.
+ */
+#define DEFAULT_READ_THRESHOLD  	(MAX_DATA_AVAILABLE/2)
+
+/** SW threshold to trigger reading the mailbox. */
 #define DEFAULT_MIN_WRITE_THRESHOLD 	1024
+
 #define THRESHOLD_DISABLE_VAL  		(0xFFFFFFFF)
 
-#define DEFAULT_POLL_DELAY_MSEC			10
+#define DEFAULT_POLL_DELAY_MSEC		10
 
-#define PEER_BLOCK_SIZE (1536)
+/** The SDIO-Client prepares N buffers of size X per Tx pipe.
+ *  Even when the transfer fills a partial buffer,
+ *  that buffer becomes unusable for the next transfer. */
+#define DEFAULT_PEER_TX_BUF_SIZE	(128)
 
 #define ROUND_UP(x, n) (((x + n - 1) / n) * n)
 
@@ -183,14 +203,44 @@ struct rx_packet_size {
 };
 
 /**
- * 	pending request info.
+ * Peer SDIO-Client channel configuration.
+ *
+ *  @is_ready - channel is ready and the data is valid.
+ *  @max_tx_threshold - maximum tx threshold, according to the
+ *  		      total buffers size on the peer pipe.
+ *  @max_rx_threshold - maximum rx threshold, according to the
+ *  		      total buffers size on the peer pipe.
+ *  @tx_buf_size - size of a single buffer on the peer pipe; a
+ *  		 transfer smaller than the buffer size still
+ *  		 make the buffer unusable for the next transfer.
+ *
  */
-struct sdio_request {
-	struct sdio_channel *ch;
-	int is_write;
-	void *data;
-	int len;
-	struct list_head	list;
+struct peer_sdioc_channel_config {
+	u32 is_ready;
+	u32 max_tx_threshold;
+	u32 max_rx_threshold;
+	u32 tx_buf_size;
+	u32 reserved[28];
+};
+
+#define PEER_SDIOC_SW_MAILBOX_SIGNATURE 0xFACECAFE
+
+/**
+ * Peer SDIO-Client software header.
+ */
+struct peer_sdioc_sw_header {
+	u32 signature;
+	u32 version;
+	u32 max_channels;
+	u32 reserved[29];
+};
+
+/**
+ * Peer SDIO-Client software mailbox.
+ */
+struct peer_sdioc_sw_mailbox {
+	struct peer_sdioc_sw_header sw_header;
+	struct peer_sdioc_channel_config ch_config[6];
 };
 
 /**
@@ -242,21 +292,13 @@ struct sdio_request {
  *  				  packet list. Maximum of 16KB-1 limited by
  *  				  SDIO-Client specification.
  *
- *  @read_avail - Avilable bytes to read.
+ *  @read_avail - Available bytes to read.
  *
- *  @write_avail - Avilable bytes to write.
+ *  @write_avail - Available bytes to write.
  *
  *  @rx_size_list_head - The head of Rx Pending Packets List.
  *
- *  @request - Pending client Read/Write request. There is a
- *  		 pending request when there is a higher priority
- *  		 channel using the bus.Only one request can be
- *  		 pending per channel since the SDIO-AL read/write
- *  		 API is blocking.
- *
- *  @completion - sync request completion.
- *
- *  @dev - user space device node.
+ *  @pdev - platform device - clients to probe for the sdio-al.
  *
  *  @signature - Context Validity check.
  *
@@ -289,17 +331,13 @@ struct sdio_channel {
 	u32 read_avail;
 	u32 write_avail;
 
-	u32 peer_block_size;
+	u32 peer_tx_buf_size;
 
 	u16 rx_pending_bytes;
 
 	struct list_head rx_size_list_head;
 
-	struct sdio_request *request;
-	struct completion *completion;
-
-	struct device *dev;
-	wait_queue_head_t   wait_cdev;
+	struct platform_device pdev;
 
 	u32 signature;
 };
@@ -320,23 +358,21 @@ struct sdio_channel {
  *  		   Reading the mailbox should not happen in
  *  		   interrupt context.
  *
- *  @work - work to submitt to workqueue.
+ *  @work - work to submit to workqueue.
  *
  *  @is_ready - driver is ready.
  *
  *  @ask_mbox - Flag to request reading the mailbox,
- *  					  for different reasonsns.
+ *  					  for different reasons.
  *
  *  @irq_state - interrupt detected. Need to release and
- *  			  re-calim the sdio-irq.
+ *  			  re-claim the sdio-irq.
  *
  *  @timer - timer to use for polling the mailbox.
  *
  *  @poll_delay_msec - timer delay for polling the mailbox.
  *
  *  @use_irq - allow to work in polling mode or interrupt mode.
- *
- *  @pdev - platform device - clients to prob for the sdio-al.
  *
  *  @is_err - error detected.
  *
@@ -347,6 +383,8 @@ struct sdio_al {
 	struct mmc_card *card;
 	struct sdio_mailbox *mailbox;
 	struct sdio_channel channel[SDIO_AL_MAX_CHANNELS];
+
+	struct peer_sdioc_sw_header *sdioc_sw_header;
 
 	struct mutex bus_lock;
 	struct workqueue_struct *workqueue;
@@ -363,12 +401,6 @@ struct sdio_al {
 
 	int use_irq;
 
-	struct platform_device pdev;
-
-	dev_t dev_num;
-	struct class *dev_class;
-	struct cdev *cdev;
-
 	int is_err;
 
 	u32 signature;
@@ -377,7 +409,7 @@ struct sdio_al {
 /** The driver context */
 static struct sdio_al *sdio_al;
 
-/* Static funcions declaration */
+/* Static functions declaration */
 static int enable_eot_interrupt(int pipe_index, int enable);
 static int enable_threshold_interrupt(int pipe_index, int enable);
 static void sdio_func_irq(struct sdio_func *func);
@@ -391,7 +423,7 @@ static int set_pipe_threshold(int pipe_index, int threshold);
  *  Read SDIO-Client Mailbox from Function#1.thresh_pipe
  *
  *  The mailbox contain the bytes available per pipe,
- *  and the End-Of-Transfer indication per pipe (if avilable).
+ *  and the End-Of-Transfer indication per pipe (if available).
  *
  * WARNING: Each time the Mailbox is read from the client, the
  * read_bytes_avail is incremented with another pending
@@ -407,7 +439,7 @@ static int read_mailbox(void)
 	int ret;
 	struct sdio_func *func1 = sdio_al->card->sdio_func[0];
 	struct sdio_mailbox *mailbox = sdio_al->mailbox;
-	u32 write_avail = 0;
+	u32 new_write_avail = 0;
 	u32 old_write_avail = 0;
 	int i;
 	u32 rx_notify_bitmask = 0;
@@ -416,7 +448,7 @@ static int read_mailbox(void)
 	u32 thresh_pipe = 0;
 	u32 overflow_pipe = 0;
 	u32 underflow_pipe = 0;
-	u32 thres_intr_mask = 0;
+	u32 thresh_intr_mask = 0;
 
 	if (sdio_al->is_err) {
 		pr_info(MODULE_MAME ":In Error state, ignore request\n");
@@ -437,9 +469,8 @@ static int read_mailbox(void)
 	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = sdio_memcpy_fromio(func1, mailbox,
-			MAILBOX_ADDR, sizeof(*mailbox));
+			HW_MAILBOX_ADDR, sizeof(*mailbox));
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	eot_pipe =	(mailbox->eot_pipe_0_7) |
 			(mailbox->eot_pipe_8_15<<8);
@@ -450,7 +481,7 @@ static int read_mailbox(void)
 			(mailbox->overflow_pipe_8_15<<8);
 	underflow_pipe = mailbox->underflow_pipe_0_7 |
 			(mailbox->underflow_pipe_8_15<<8);
-	thres_intr_mask =
+	thresh_intr_mask =
 		(mailbox->mask_thresh_above_limit_pipe_0_7) |
 		(mailbox->mask_thresh_above_limit_pipe_8_15<<8);
 
@@ -476,16 +507,18 @@ static int read_mailbox(void)
 	/* Scan for Rx Packets available and update read vailable bytes */
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
 		struct sdio_channel *ch = &sdio_al->channel[i];
+		u32 old_read_avail;
 		u32 read_avail;
 		u32 new_packet_size = 0;
 
 		if (!ch->is_open)
 			continue;
 
+		old_read_avail = ch->read_avail;
 		read_avail = mailbox->pipe_bytes_avail[ch->rx_pipe_index];
 
-		if (read_avail > INVALID_DATA_AVILABLE) {
-			pr_debug(MODULE_MAME
+		if (read_avail > INVALID_DATA_AVAILABLE) {
+			pr_info(MODULE_MAME
 				 ":Invalid read_avail 0x%x for pipe %d\n",
 				 read_avail, ch->rx_pipe_index);
 			continue;
@@ -496,8 +529,11 @@ static int read_mailbox(void)
 		else
 			ch->read_avail = read_avail;
 
-		if (((ch->is_packet_mode) && (new_packet_size > 0)) ||
-		    ((!ch->is_packet_mode) && (ch->read_avail > 0)))
+		if ((ch->is_packet_mode) && (new_packet_size > 0))
+			rx_notify_bitmask |= (1<<ch->num);
+
+		if ((!ch->is_packet_mode) && (ch->read_avail > 0) &&
+		    (old_read_avail == 0))
 			rx_notify_bitmask |= (1<<ch->num);
 	}
 
@@ -508,25 +544,27 @@ static int read_mailbox(void)
 		if (!ch->is_open)
 			continue;
 
-		write_avail = mailbox->pipe_bytes_avail[ch->tx_pipe_index];
+		new_write_avail = mailbox->pipe_bytes_avail[ch->tx_pipe_index];
 
-		if (write_avail > INVALID_DATA_AVILABLE) {
-			pr_debug(MODULE_MAME
+		if (new_write_avail > INVALID_DATA_AVAILABLE) {
+			pr_info(MODULE_MAME
 				 ":Invalid write_avail 0x%x for pipe %d\n",
-				 write_avail, ch->tx_pipe_index);
+				 new_write_avail, ch->tx_pipe_index);
 			continue;
 		}
 
 		old_write_avail = ch->write_avail;
-		ch->write_avail = write_avail;
+		ch->write_avail = new_write_avail;
 
-		if ((old_write_avail < ch->min_write_avail) &&
-			(write_avail >= ch->write_threshold))
+		if ((old_write_avail <= ch->min_write_avail) &&
+			(new_write_avail >= ch->min_write_avail))
 			tx_notify_bitmask |= (1<<ch->num);
 	}
 
 	if ((rx_notify_bitmask == 0) && (tx_notify_bitmask == 0))
 		pr_debug(MODULE_MAME ":Nothing to Notify\n");
+
+	mutex_unlock(&sdio_al->bus_lock);
 
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
 		struct sdio_channel *ch = &sdio_al->channel[i];
@@ -552,7 +590,7 @@ static int read_mailbox(void)
 			continue;
 
 
-		pipe_thresh_intr_disabled = thres_intr_mask &
+		pipe_thresh_intr_disabled = thresh_intr_mask &
 			(1<<ch->tx_pipe_index);
 	}
 
@@ -585,9 +623,16 @@ static u32 check_pending_rx_packet(struct sdio_channel *ch, u32 eot)
 
 
 	/* new packet detected */
-	if ((rx_avail > rx_pending) && (eot & (1<<ch->rx_pipe_index))) {
+	if (eot & (1<<ch->rx_pipe_index)) {
 		struct rx_packet_size *p = NULL;
 		new_packet_size = rx_avail - rx_pending;
+
+		if ((rx_avail <= rx_pending)) {
+			pr_info(MODULE_MAME ":Invalid new packet size."
+					    " rx_avail=%d.\n", rx_avail);
+			new_packet_size = 0;
+			goto exit_err;
+		}
 
 		p = kzalloc(sizeof(*p), GFP_KERNEL);
 		if (p == NULL)
@@ -659,7 +704,7 @@ static void worker(struct work_struct *work)
 
 /**
  *  Write command using CMD54 rather than CMD53.
- *  Writting with CMD54 generate EOT interrup at the
+ *  Writing with CMD54 generate EOT interrupt at the
  *  SDIO-Client.
  *  Based on mmc_io_rw_extended()
  */
@@ -741,8 +786,7 @@ static int sdio_write_cmd54(struct mmc_card *card, unsigned fn,
  *  Handle different data size types.
  *
  */
-static int sdio_ch_write(struct sdio_channel *ch,
-						 const u8 *buf,	u32 len)
+static int sdio_ch_write(struct sdio_channel *ch, const u8 *buf, u32 len)
 {
 	int ret = 0;
 	unsigned blksz = ch->func->cur_blksize;
@@ -750,6 +794,9 @@ static int sdio_ch_write(struct sdio_channel *ch,
 	int remain_bytes = len % blksz;
 	struct mmc_card *card = NULL;
 	u32 fn = ch->func->num;
+
+	if (len == 0)
+		return -EINVAL;
 
 	card = ch->func->card;
 
@@ -777,8 +824,11 @@ static int sdio_ch_write(struct sdio_channel *ch,
 /**
  * Set Channels Configuration.
  *
- *  @todo read channel configuration from platform data rather
+ * @todo read channel configuration from platform data rather
  *  	  than hard-coded.
+ *
+ * @note  When agregation is used there is No EOT interrupt
+ *  	  for Rx packet ready, therefore need polling.
  */
 static void set_default_channels_config(void)
 {
@@ -797,23 +847,22 @@ static void set_default_channels_config(void)
 		else
 			ch->poll_delay_msec = DEFAULT_POLL_DELAY_MSEC;
 		ch->is_packet_mode = true;
+		ch->peer_tx_buf_size = DEFAULT_PEER_TX_BUF_SIZE;
 	}
 
 
-	/* Note: When agregation is used,
-	   there is No EOT interrupt for Rx packet ready,
-	   therefore need polling */
 	sdio_al->channel[0].name = "SDIO_RPC";
 	sdio_al->channel[0].priority = SDIO_PRIORITY_HIGH;
+	sdio_al->channel[0].peer_tx_buf_size = 1536;
 
 	sdio_al->channel[1].name = "SDIO_RMNET_DATA";
 	sdio_al->channel[1].priority = SDIO_PRIORITY_MED;
 	sdio_al->channel[1].is_packet_mode = false;  /* No EOT for Rx Data */
-	sdio_al->channel[1].poll_delay_msec = 30; /* TBD */
+	sdio_al->channel[1].poll_delay_msec = 10;
 
-	sdio_al->channel[1].read_threshold  = 128;
-	sdio_al->channel[1].write_threshold = 128;
-	sdio_al->channel[1].min_write_avail = 128;
+	sdio_al->channel[1].read_threshold  = 14*1024;
+	sdio_al->channel[1].write_threshold = 2*1024;
+	sdio_al->channel[1].min_write_avail = 1024;
 
 	sdio_al->channel[2].name = "SDIO_QMI";
 	sdio_al->channel[2].priority = SDIO_PRIORITY_LOW;
@@ -821,6 +870,109 @@ static void set_default_channels_config(void)
 	sdio_al->channel[3].name = "SDIO_CS_DATA";
 	sdio_al->channel[3].priority = SDIO_PRIORITY_LOW;
 }
+
+
+/**
+ *  Read SDIO-Client software header
+ *
+ */
+static int read_sdioc_software_header(struct peer_sdioc_sw_header *header)
+{
+	int ret;
+	struct sdio_func *func1 = sdio_al->card->sdio_func[0];
+
+	pr_debug(MODULE_MAME ":reading sdioc sw header.\n");
+
+	ret = sdio_memcpy_fromio(func1, header,
+			SDIOC_SW_HEADER_ADDR, sizeof(*header));
+	if (ret) {
+		pr_info(MODULE_MAME ":fail to read sdioc sw header.\n");
+		goto exit_err;
+	}
+
+	if (header->signature != (u32) PEER_SDIOC_SW_MAILBOX_SIGNATURE) {
+		pr_info(MODULE_MAME ":sdioc sw invalid signature. 0x%x\n",
+			header->signature);
+		goto exit_err;
+	}
+
+	pr_info(MODULE_MAME ":sdioc sw version 0x%x\n", header->version);
+
+	return 0;
+
+exit_err:
+	memset(header, 0, sizeof(*header));
+
+	return -1;
+}
+
+/**
+ *  Read SDIO-Client channel configuration
+ *
+ */
+static int read_sdioc_channel_config(struct sdio_channel *ch)
+{
+	int ret;
+	struct peer_sdioc_sw_mailbox *sw_mailbox = NULL;
+	struct peer_sdioc_channel_config *ch_config = NULL;
+
+	if (sdio_al->sdioc_sw_header->version == 0)
+		return -1;
+
+	pr_debug(MODULE_MAME ":reading sw mailbox %s channel.\n", ch->name);
+
+	sw_mailbox = kzalloc(sizeof(*sw_mailbox), GFP_KERNEL);
+	if (sw_mailbox == NULL)
+		return -ENOMEM;
+
+	ret = sdio_memcpy_fromio(ch->func, sw_mailbox,
+			SDIOC_SW_MAILBOX_ADDR, sizeof(*sw_mailbox));
+	if (ret) {
+		pr_info(MODULE_MAME ":fail to read sw mailbox.\n");
+		goto exit_err;
+	}
+
+	ch_config = &sw_mailbox->ch_config[ch->num];
+
+	if (!ch_config->is_ready) {
+		pr_info(MODULE_MAME ":sw mailbox channel not ready.\n");
+		goto exit_err;
+	}
+
+	pr_info(MODULE_MAME ":ch %s max_rx_threshold=%d.\n",
+		ch->name, ch_config->max_rx_threshold);
+	pr_info(MODULE_MAME ":ch %s max_tx_threshold=%d.\n",
+		ch->name, ch_config->max_tx_threshold);
+	pr_info(MODULE_MAME ":ch %s tx_buf_size=%d.\n",
+		ch->name, ch_config->tx_buf_size);
+
+	/* Aggregation up to 90% of the maximum size */
+	ch_config->max_rx_threshold = (ch_config->max_rx_threshold * 9) / 10;
+	/* Threshold on 50% of the maximum size , sdioc uses double-buffer */
+	ch_config->max_tx_threshold = (ch_config->max_tx_threshold * 5) / 10;
+
+	ch->read_threshold = min(ch->read_threshold,
+				 (int) ch_config->max_rx_threshold);
+
+	ch->write_threshold = min(ch->write_threshold,
+				 (int) ch_config->max_tx_threshold);
+
+	if (ch->min_write_avail > ch->write_threshold)
+		ch->min_write_avail = ch->write_threshold;
+
+	ch->peer_tx_buf_size = ch_config->tx_buf_size;
+
+	kfree(sw_mailbox);
+
+	return 0;
+
+exit_err:
+	pr_info(MODULE_MAME ":Reading SW Mailbox error.\n");
+	kfree(sw_mailbox);
+
+	return -1;
+}
+
 
 /**
  *  Enable/Disable EOT interrupt of a pipe.
@@ -899,7 +1051,7 @@ exit_err:
 
 /**
  *  Set the threshold to trigger interrupt from SDIO-Card on
- *  pipe availiable bytes.
+ *  pipe available bytes.
  *
  */
 static int set_pipe_threshold(int pipe_index, int threshold)
@@ -959,6 +1111,9 @@ static int open_channel(struct sdio_channel *ch)
 
 	sdio_set_drvdata(ch->func, ch);
 
+	/* Get channel parameters from the peer SDIO-Client */
+	read_sdioc_channel_config(ch);
+
 	/* Set Pipes Threshold on Mailbox */
 	ret = set_pipe_threshold(ch->rx_pipe_index, ch->read_threshold);
 	if (ret)
@@ -978,8 +1133,6 @@ static int open_channel(struct sdio_channel *ch)
 				msecs_to_jiffies(sdio_al->poll_delay_msec);
 			add_timer(&sdio_al->timer);
 	}
-
-	init_waitqueue_head(&ch->wait_cdev);
 
 	/* Set flag before interrupts are enabled to allow notify */
 	ch->is_open = true;
@@ -1043,9 +1196,9 @@ static void ask_reading_mailbox(void)
 /**
  *  SDIO Function Interrupt handler.
  *
- *  Interrupt shall be triggerd by SDIO-Client when:
+ *  Interrupt shall be triggered by SDIO-Client when:
  *  1. End-Of-Transfer (EOT) detected in packet mode.
- *  2. Bytes-avilable reached the threshold.
+ *  2. Bytes-available reached the threshold.
  *
  *  Reading the mailbox clears the EOT/Threshold interrupt
  *  source.
@@ -1061,6 +1214,13 @@ static void sdio_func_irq(struct sdio_func *func)
 	pr_debug(MODULE_MAME ":-- IRQ Detected --\n");
 
 	al->irq_state = SDIO_IRQ_STATE_DETECTED;
+
+	/* Restart the timer */
+	if (sdio_al->poll_delay_msec) {
+		ulong expires =	jiffies +
+			msecs_to_jiffies(sdio_al->poll_delay_msec);
+		mod_timer(&sdio_al->timer, expires);
+	}
 
 	/* patch - Allow the worker to claim the host
 	 * for reading the mailbox */
@@ -1124,6 +1284,11 @@ static int sdio_al_setup(void)
 	if (sdio_al->mailbox == NULL)
 		return -ENOMEM;
 
+	sdio_al->sdioc_sw_header
+		= kzalloc(sizeof(*sdio_al->sdioc_sw_header), GFP_KERNEL);
+	if (sdio_al->sdioc_sw_header == NULL)
+		return -ENOMEM;
+
 	/* Init Func#1 */
 	ret = sdio_enable_func(func1);
 	if (ret) {
@@ -1166,6 +1331,8 @@ static int sdio_al_setup(void)
 		pr_debug(MODULE_MAME ":Not using IRQ\n");
 	}
 
+	read_sdioc_software_header(sdio_al->sdioc_sw_header);
+
 	sdio_release_host(sdio_al->card->sdio_func[0]);
 	sdio_al->is_ready = true;
 
@@ -1196,7 +1363,7 @@ static void sdio_al_tear_down(void)
 
 		sdio_al->is_ready = false; /* Flag worker to exit */
 		ask_reading_mailbox(); /* Wakeup worker */
-		mdelay(100); /* allow gracefull exit of the worker thread */
+		msleep(100); /* allow gracefully exit of the worker thread */
 
 		flush_workqueue(sdio_al->workqueue);
 		destroy_workqueue(sdio_al->workqueue);
@@ -1256,7 +1423,7 @@ static int get_min_poll_time_msec(void)
  *
  *  Enable the channel.
  *  Set the channel context.
- *  Trigger reading the mailbox to check avilable bytes.
+ *  Trigger reading the mailbox to check available bytes.
  *
  */
 int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
@@ -1347,12 +1514,14 @@ int sdio_close(struct sdio_channel *ch)
 	if  (ch->poll_delay_msec > 0)
 		sdio_al->poll_delay_msec = get_min_poll_time_msec();
 
+	platform_device_unregister(&ch->pdev);
+
 	return ret;
 }
 EXPORT_SYMBOL(sdio_close);
 
 /**
- *  Get the number of availiable bytes to write.
+ *  Get the number of available bytes to write.
  *
  */
 int sdio_write_avail(struct sdio_channel *ch)
@@ -1367,7 +1536,7 @@ int sdio_write_avail(struct sdio_channel *ch)
 EXPORT_SYMBOL(sdio_write_avail);
 
 /**
- *  Get the number of availiable bytes to read.
+ *  Get the number of available bytes to read.
  *
  */
 int sdio_read_avail(struct sdio_channel *ch)
@@ -1411,7 +1580,7 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 			 ch->name, (u32) data, len);
 
 	if ((ch->is_packet_mode) && (len != ch->read_avail)) {
-		pr_info(MODULE_MAME ":sdio_read ch %s len != packet size\n",
+		pr_info(MODULE_MAME ":sdio_read ch %s len != read_avail\n",
 				 ch->name);
 		return -EINVAL;
 	}
@@ -1451,7 +1620,6 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 {
 	int ret = 0;
 
-
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 	WARN_ON(len > ch->write_avail);
 
@@ -1461,7 +1629,7 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	}
 
 	if (!ch->is_open) {
-		pr_info(MODULE_MAME ":writting to closed channel %s\n",
+		pr_info(MODULE_MAME ":writing to closed channel %s\n",
 				 ch->name);
 		return -EINVAL;
 	}
@@ -1476,12 +1644,18 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = sdio_ch_write(ch, data, len);
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
-	if (ret)
+	if (ret) {
 		pr_info(MODULE_MAME ":sdio_write err=%d\n", -ret);
-	else
-		ch->write_avail -= ROUND_UP(len, PEER_BLOCK_SIZE);
+	} else {
+		/* Round up to whole buffer size */
+		len = ROUND_UP(len, ch->peer_tx_buf_size);
+		/* Protect from wraparound */
+		len = min(len, (int) ch->write_avail);
+		ch->write_avail -= len;
+	}
+
+	mutex_unlock(&sdio_al->bus_lock);
 
 	if (ch->write_avail < ch->min_write_avail)
 		ask_reading_mailbox();
@@ -1492,7 +1666,7 @@ EXPORT_SYMBOL(sdio_write);
 
 /**
  *  Set the threshold to trigger interrupt from SDIO-Card on
- *  availiable bytes to write.
+ *  available bytes to write.
  *
  */
 int sdio_set_write_threshold(struct sdio_channel *ch, int threshold)
@@ -1518,7 +1692,7 @@ EXPORT_SYMBOL(sdio_set_write_threshold);
 
 /**
  *  Set the threshold to trigger interrupt from SDIO-Card on
- *  availiable bytes to read.
+ *  available bytes to read.
  *
  */
 int sdio_set_read_threshold(struct sdio_channel *ch, int threshold)
@@ -1547,7 +1721,7 @@ EXPORT_SYMBOL(sdio_set_read_threshold);
  *  Set the polling delay.
  *
  */
-int sdio_poll_time(struct sdio_channel *ch, int poll_delay_msec)
+int sdio_set_poll_time(struct sdio_channel *ch, int poll_delay_msec)
 {
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 
@@ -1559,170 +1733,24 @@ int sdio_poll_time(struct sdio_channel *ch, int poll_delay_msec)
 
 	return sdio_al->poll_delay_msec;
 }
-EXPORT_SYMBOL(sdio_poll_time);
+EXPORT_SYMBOL(sdio_set_poll_time);
 
 /**
- * notify callback for user space.
+ *  Default platform device release function.
+ *
  */
-static void cdev_notify(void *priv, unsigned ch_event)
+static void default_sdio_al_release(struct device *dev)
 {
-	struct sdio_channel *ch = (struct sdio_channel *) priv;
-
-	pr_debug(MODULE_MAME ":cdev_notify ch %s event %d\n",
-		 ch->name, ch_event);
-
-	wake_up(&ch->wait_cdev);
+	pr_info(MODULE_MAME ":platform device released.\n");
 }
 
 /**
- * open channel	for user space.
- */
-static int cdev_open(struct inode *inode, struct file *file)
-{
-	int ret = 0;
-	struct sdio_channel *ch;
-	struct sdio_channel *dummy;
-	const char *name = "unknown";
-	u32 minor = iminor(inode);
-
-	ch = &sdio_al->channel[minor];
-	file->private_data = ch;
-	name = ch->name;
-
-	pr_debug(MODULE_MAME ":cdev_open ch %s\n", name);
-
-	ret = sdio_open(name, &dummy, ch, cdev_notify);
-
-	return ret;
-}
-
-/**
- * release channel.
- */
-static int cdev_release(struct inode *inode, struct file *file)
-{
-	int ret;
-	struct sdio_channel *ch = (struct sdio_channel *) file->private_data;
-
-	pr_debug(MODULE_MAME ":cdev_release\n");
-
-	ret = sdio_close(ch);
-
-	return ret;
-}
-
-/**
- * read from channel to user space.
- */
-
-static ssize_t cdev_read(struct file *file, char __user *buf,
-			  size_t size, loff_t *pos)
-{
-	int ret = 0;
-	struct sdio_channel *ch = (struct sdio_channel *) file->private_data;
-	int read_avail = 0;
-	u8 *kbuf = NULL;
-
-	read_avail = sdio_read_avail(ch);
-
-	if (read_avail == 0) {
-		if (file->f_flags & O_NONBLOCK) {
-			return -EAGAIN;
-		} else {
-			pr_debug(MODULE_MAME ":Wait for read avail\n");
-			wait_event(ch->wait_cdev, ch->read_avail > 0);
-			read_avail = sdio_read_avail(ch);
-		}
-	}
-
-	size = min(size, (size_t) read_avail);
-
-	kbuf = kmalloc(size, GFP_KERNEL);
-	if (kbuf == NULL)
-		goto exit_err;
-	ret = sdio_read(ch, kbuf, size);
-	WARN_ON(ret);
-	if (ret)
-		goto exit_err;
-	ret = copy_to_user(buf, kbuf, size);
-	WARN_ON(ret);
-	if (ret)
-		goto exit_err;
-
-	kfree(kbuf);
-	*pos += size;
-	return size;
-
-exit_err:
-	kfree(kbuf);
-	return ret;
-}
-
-/**
- * write to channel from user space.
- */
-static ssize_t cdev_write(struct file *file, const char __user *buf,
-			   size_t size, loff_t *pos)
-{
-	int ret = 0;
-	struct sdio_channel *ch = (struct sdio_channel *) file->private_data;
-	int write_avail = 0;
-	u8 *kbuf = NULL;
-
-	write_avail = sdio_write_avail(ch);
-	if (write_avail == 0) {
-		if (file->f_flags & O_NONBLOCK) {
-			return -EAGAIN;
-		} else {
-			pr_debug(MODULE_MAME ":Wait for write avail\n");
-			wait_event(ch->wait_cdev, ch->write_avail > 0);
-			write_avail = sdio_write_avail(ch);
-		}
-	}
-
-	size = min(size, (size_t) write_avail);
-
-	kbuf = kmalloc(size, GFP_KERNEL);
-	if (kbuf == NULL)
-		goto exit_err;
-	ret = copy_from_user(kbuf, buf, size);
-	WARN_ON(ret);
-	if (ret)
-		goto exit_err;
-	ret = sdio_write(ch, kbuf, size);
-	WARN_ON(ret);
-	if (ret)
-		goto exit_err;
-
-	pr_debug(MODULE_MAME ":cdev_write ok\n");
-
-	kfree(kbuf);
-	*pos += size;
-	return size;
-
-exit_err:
-	kfree(kbuf);
-	return ret;
-}
-
-/**
- * File Operations for user space char device.
- */
-static const struct file_operations cdev_fops = {
-		.owner = THIS_MODULE,
-		.open = cdev_open,
-		.release = cdev_release,
-		.read = cdev_read,
-		.write = cdev_write,
-};
-
-/**
- *  Prob to claim the SDIO card.
+ *  Probe to claim the SDIO card.
  *
  */
 static int mmc_probe(struct mmc_card *card)
 {
-    int ret;
+    int ret = 0;
     int i;
 
 	dev_info(&card->dev, "Probing..\n");
@@ -1744,50 +1772,12 @@ static int mmc_probe(struct mmc_card *card)
 
 	sdio_al->card = card;
 
-	/* Allow client to prob for this driver */
-	sdio_al->pdev.name = "SDIO_AL";
-	platform_device_register(&sdio_al->pdev);
-
-	ret = alloc_chrdev_region(&sdio_al->dev_num,
-				  0, SDIO_AL_MAX_CHANNELS, MODULE_MAME);
-	if (ret) {
-		pr_err(MODULE_MAME "alloc_chrdev_region err\n");
-		return -ENODEV;
-	}
-
-	sdio_al->dev_class = class_create(THIS_MODULE, "sdio_al_class");
-
-	/* Create file nodes for user space */
+	/* Allow clients to probe for this driver */
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
-		sdio_al->channel[i].dev =
-			device_create(sdio_al->dev_class,
-				NULL, /* parent */
-				MKDEV(MAJOR(sdio_al->dev_num), i),
-				&sdio_al->channel[i], /* drvdata */
-				"sdio_al_ch%d", i);
-
-		if (IS_ERR(sdio_al->channel[i].dev)) {
-			pr_err(MODULE_MAME ":device_create ch=%d err\n", i);
-			return -ENODEV;
-		}
+		sdio_al->channel[i].pdev.name = sdio_al->channel[i].name;
+		sdio_al->channel[i].pdev.dev.release = default_sdio_al_release;
+		platform_device_register(&sdio_al->channel[i].pdev);
 	}
-
-
-	sdio_al->cdev = cdev_alloc();
-	if (sdio_al->cdev == NULL) {
-		pr_err(MODULE_MAME ":cdev_alloc err\n");
-		return -ENODEV;
-	}
-
-	cdev_init(sdio_al->cdev, &cdev_fops);
-	sdio_al->cdev->owner = THIS_MODULE;
-
-	ret = cdev_add(sdio_al->cdev, sdio_al->dev_num, SDIO_AL_MAX_CHANNELS);
-
-	if (ret)
-		pr_info(MODULE_MAME ":mmc_probe err=%d\n", -ret);
-	else
-		pr_debug(MODULE_MAME ":mmc_probe ok\n");
 
 	return ret;
 }
@@ -1798,6 +1788,7 @@ static int mmc_probe(struct mmc_card *card)
  */
 static void mmc_remove(struct mmc_card *card)
 {
+	pr_info(MODULE_MAME ":sdio card removed.\n");
 }
 
 static struct mmc_driver mmc_driver = {
@@ -1850,8 +1841,6 @@ static int __init sdio_al_init(void)
  */
 static void __exit sdio_al_exit(void)
 {
-	int i;
-
 	if (sdio_al == NULL)
 		return;
 
@@ -1859,18 +1848,7 @@ static void __exit sdio_al_exit(void)
 
 	sdio_al_tear_down();
 
-	platform_device_unregister(&sdio_al->pdev);
-
-	if (sdio_al->cdev)
-		cdev_del(sdio_al->cdev);
-
-	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++)
-		if (sdio_al->channel[i].dev)
-			device_destroy(sdio_al->dev_class,
-				   MKDEV(MAJOR(sdio_al->dev_num), i));
-
-	unregister_chrdev_region(sdio_al->dev_num, SDIO_AL_MAX_CHANNELS);
-
+	kfree(sdio_al->sdioc_sw_header);
 	kfree(sdio_al->mailbox);
 	kfree(sdio_al);
 
