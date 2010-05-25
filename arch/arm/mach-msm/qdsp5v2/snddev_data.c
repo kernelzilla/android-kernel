@@ -381,8 +381,8 @@ static struct snddev_icodec_data snddev_ihs_mono_tx_data = {
 	.pmctl_id = NULL,
 	.pmctl_id_sz = 0,
 	.default_sample_rate = 48000,
-	.pamp_on = NULL,
-	.pamp_off = NULL,
+	.pamp_on = msm_snddev_tx_route_config,
+	.pamp_off = msm_snddev_tx_route_deconfig,
 };
 
 static struct platform_device msm_ihs_mono_tx_device = {
@@ -1310,6 +1310,7 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_ihs_stereo_rx_device,
 	&msm_ihs_mono_rx_device,
+	&msm_ihs_mono_tx_device,
 	&msm_ispeaker_rx_device,
 	&msm_ispeaker_tx_device,
 	&msm_fluid_imic_tx_device,
