@@ -451,7 +451,7 @@ static void sx150x_irq_set_type_wfn(struct work_struct *work)
 	unsigned n;
 	u8 val;
 
-	chip = container_of(work, struct sx150x_chip, irq_unmask_ws);
+	chip = container_of(work, struct sx150x_chip, irq_set_type_ws);
 
 	mutex_lock(&chip->mutex);
 	for (n = 0; n < chip->dev_cfg->ngpios; ++n) {
