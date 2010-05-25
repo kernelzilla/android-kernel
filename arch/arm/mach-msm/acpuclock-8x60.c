@@ -132,8 +132,8 @@ static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ {1, 1},  648000, ACPU_SCPLL, 0, 0, 1, 0x0C, 1100, 1, 0x0C },
 	{ {1, 1},  810000, ACPU_SCPLL, 0, 0, 1, 0x0F, 1100, 1, 0x0F },
 	{ {0, 0},  972000, ACPU_SCPLL, 0, 0, 1, 0x12, 1100, 1, 0x10 },
-	{ {0, 0}, 1080000, ACPU_SCPLL, 0, 0, 1, 0x14, 1100, 1, 0x10 },
-	{ {1, 1}, 1188000, ACPU_SCPLL, 0, 0, 1, 0x16, 1100, 1, 0x10 },
+	{ {1, 1}, 1080000, ACPU_SCPLL, 0, 0, 1, 0x14, 1100, 1, 0x10 },
+	{ {0, 0}, 1188000, ACPU_SCPLL, 0, 0, 1, 0x16, 1100, 1, 0x10 },
 	{ {0, 0}, 0 },
 };
 
@@ -601,9 +601,9 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	lpj_init();
 	precompute_stepping();
 
-	/* Improve boot time by ramping up to 1188MHz immediately. */
+	/* Improve boot time by ramping up CPUs immediately. */
 	for_each_online_cpu(cpu)
-		acpuclk_set_rate(cpu, 1188000, SETRATE_CPUFREQ);
+		acpuclk_set_rate(cpu, 1080000, SETRATE_CPUFREQ);
 
 	cpufreq_table_init();
 }
