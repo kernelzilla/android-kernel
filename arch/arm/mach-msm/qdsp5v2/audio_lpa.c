@@ -48,11 +48,12 @@
 #define ADRV_STATUS_OBUF_GIVEN 0x00000002
 #define ADRV_STATUS_IBUF_GIVEN 0x00000004
 #define ADRV_STATUS_FSYNC 0x00000008
-#define ADRV_STATUS_DEVICE_SWITCH_NONE     0x00000010
-#define ADRV_STATUS_DEVICE_SWITCH_PENDING  0x00000020
-#define ADRV_STATUS_DEVICE_SWITCH_READY    0x00000040
-#define ADRV_STATUS_DEVICE_SWITCH_COMPLETE 0x00000080
-#define ADRV_STATUS_PAUSE                  0x00000100
+#define ADRV_STATUS_PAUSE 0x00000010
+
+#define DEVICE_SWITCH_STATE_NONE     0
+#define DEVICE_SWITCH_STATE_PENDING  1
+#define DEVICE_SWITCH_STATE_READY    2
+#define DEVICE_SWITCH_STATE_COMPLETE 3
 
 #define AUDDEC_DEC_PCM 0
 #define AUDDEC_DEC_MP3 2
@@ -188,31 +189,37 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
 				&audio->vol_pan,
 				COPP);
-			if (audio->drv_status &
-					ADRV_STATUS_DEVICE_SWITCH_READY) {
+			if (audio->device_switch == DEVICE_SWITCH_STATE_READY) {
 				audio->wflush = 1;
-				audio->drv_status &=
-					~ADRV_STATUS_DEVICE_SWITCH_READY;
-				audio->drv_status |=
-					ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
+				audio->device_switch =
+					DEVICE_SWITCH_STATE_COMPLETE;
 				audpp_flush(audio->dec_id);
 				if (wait_event_interruptible(audio->write_wait,
 							 !audio->wflush) < 0)
 					MM_DBG("AUDIO_FLUSH interrupted\n");
+
+				if (audio->wflush == 0) {
+					if (audio->drv_status &
+						ADRV_STATUS_PAUSE) {
+						if (audpp_pause(audio->dec_id,
+							1))
+							MM_DBG("audpp_pause"
+								"failed\n");
+					}
+				}
 			}
 		}
 		break;
 	case AUDDEV_EVT_REL_PENDING:
 		MM_DBG(":AUDDEV_EVT_REL_PENDING\n");
 		if (audio->running == 1 && audio->enabled == 1) {
-			if (audio->drv_status &
-					ADRV_STATUS_DEVICE_SWITCH_NONE) {
-				if (audpp_pause(audio->dec_id, 1))
-					MM_DBG("audpp pause failed\n");
-				audio->drv_status &=
-					~ADRV_STATUS_DEVICE_SWITCH_NONE;
-				audio->drv_status |=
-					ADRV_STATUS_DEVICE_SWITCH_PENDING;
+			if (audio->device_switch == DEVICE_SWITCH_STATE_NONE) {
+				if (!(audio->drv_status & ADRV_STATUS_PAUSE)) {
+					if (audpp_pause(audio->dec_id, 1))
+						MM_DBG("audpp pause failed\n");
+				}
+				audio->device_switch =
+					DEVICE_SWITCH_STATE_PENDING;
 				audio->avsync_flag = 0;
 				if (audpp_query_avsync(audio->dec_id) < 0)
 					MM_DBG("query avsync failed\n");
@@ -221,6 +228,12 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 					(audio->avsync_wait, audio->avsync_flag,
 				 msecs_to_jiffies(AVSYNC_EVENT_TIMEOUT)) < 0)
 					MM_DBG("AV sync timeout failed\n");
+				if (audio->avsync_flag == 1) {
+					if (audio->device_switch ==
+						DEVICE_SWITCH_STATE_PENDING)
+						audio->device_switch =
+						DEVICE_SWITCH_STATE_READY;
+				}
 			}
 		}
 		break;
@@ -235,9 +248,9 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 			audpp_route_stream(audio->dec_id, audio->source);
 		break;
 	case AUDDEV_EVT_STREAM_VOL_CHG:
-		MM_DBG(":AUDDEV_EVT_STREAM_VOL_CHG, stream vol %d\n",
-						audio->vol_pan.volume);
 		audio->vol_pan.volume = evt_payload->session_vol;
+		MM_DBG("\n:AUDDEV_EVT_STREAM_VOL_CHG, stream vol %d\n",
+						audio->vol_pan.volume);
 		if (audio->running)
 			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
 						&audio->vol_pan,
@@ -285,8 +298,6 @@ static int audio_disable(struct audio *audio)
 		msm_adsp_disable(audio->audplay);
 		audpp_disable(audio->dec_id, audio);
 		audio->out_needed = 0;
-		audio->avsync_flag = 1;
-		wake_up(&audio->avsync_wait);
 	}
 	return 0;
 }
@@ -389,10 +400,6 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 	case AUDPP_MSG_FLUSH_ACK:
 		MM_DBG("FLUSH_ACK\n");
 		audio->wflush = 0;
-		if (audio->drv_status & ADRV_STATUS_PAUSE) {
-			if (audpp_pause(audio->dec_id, 1))
-				MM_DBG("audpp_pause failed\n");
-		}
 		wake_up(&audio->write_wait);
 		break;
 
@@ -405,10 +412,6 @@ static void audio_dsp_event(void *private, unsigned id, uint16_t *msg)
 		MM_DBG("AVSYNC_MSG\n");
 		memcpy(&audio->avsync[0], msg, sizeof(audio->avsync));
 		audio->avsync_flag = 1;
-		if (audio->drv_status & ADRV_STATUS_DEVICE_SWITCH_PENDING) {
-			audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_PENDING;
-			audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_READY;
-		}
 		wake_up(&audio->avsync_wait);
 		break;
 
@@ -452,7 +455,7 @@ static void audlpa_async_send_buffer(struct audio *audio)
 	struct audlpa_buffer_node *next_buf = NULL;
 
 	temp = audio->bytecount_head;
-	if (audio->drv_status & ADRV_STATUS_DEVICE_SWITCH_NONE) {
+	if (audio->device_switch == DEVICE_SWITCH_STATE_NONE) {
 		list_for_each_entry(next_buf, &audio->out_queue, list) {
 			if (temp == audio->bytecount_given)
 				break;
@@ -471,9 +474,8 @@ static void audlpa_async_send_buffer(struct audio *audio)
 			audio->out_needed = 0;
 			audio->drv_status |= ADRV_STATUS_OBUF_GIVEN;
 		}
-	} else if (audio->drv_status & ADRV_STATUS_DEVICE_SWITCH_COMPLETE) {
-		audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
-		audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_NONE;
+	} else if (audio->device_switch == DEVICE_SWITCH_STATE_COMPLETE) {
+		audio->device_switch = DEVICE_SWITCH_STATE_NONE;
 		next_buf = list_first_entry(&audio->out_queue,
 					struct audlpa_buffer_node, list);
 		if (next_buf) {
@@ -524,8 +526,8 @@ static void audlpa_async_send_data(struct audio *audio, unsigned needed,
 				audio->bytecount_consumed =
 					CALCULATE_AVSYNC_FROM_PAYLOAD(payload);
 
-			if ((audio->drv_status &
-				ADRV_STATUS_DEVICE_SWITCH_COMPLETE) &&
+			if ((audio->device_switch ==
+				DEVICE_SWITCH_STATE_COMPLETE) &&
 				(audio->avsync_flag == 1)) {
 				audio->avsync_flag = 0;
 				audio->bytecount_consumed =
@@ -579,10 +581,7 @@ static void audlpa_async_flush(struct audio *audio)
 	audio->bytecount_consumed = 0;
 	audio->bytecount_head = 0;
 	audio->bytecount_given = 0;
-	audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_NONE;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_PENDING;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_READY;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
+	audio->device_switch = DEVICE_SWITCH_STATE_NONE;
 	atomic_set(&audio->out_bytes, 0);
 }
 
@@ -926,9 +925,8 @@ static int audio_get_avsync_data(struct audio *audio,
 	int rc = -EINVAL;
 	unsigned long flags;
 
+	local_irq_save(flags);
 	if (audio->dec_id == audio->avsync[0] && audio->avsync_flag) {
-
-		spin_lock_irqsave(&audio->dsp_lock, flags);
 		/* av_sync sample count */
 		stats->sample_count = (audio->avsync[2] << 16) |
 						(audio->avsync[3]);
@@ -938,9 +936,9 @@ static int audio_get_avsync_data(struct audio *audio,
 						(audio->avsync[6]);
 
 		audio->avsync_flag = 0;
-		spin_unlock_irqrestore(&audio->dsp_lock, flags);
 		rc = 0;
 	}
+	local_irq_restore(flags);
 	return rc;
 
 }
@@ -965,18 +963,20 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return rc;
 
 		rc = wait_event_interruptible_timeout(audio->avsync_wait,
-				audio->avsync_flag,
+				(audio->avsync_flag == 1),
 				msecs_to_jiffies(AVSYNC_EVENT_TIMEOUT));
 
 		if (rc < 0)
 			return rc;
+		else if ((rc > 0) || ((rc == 0) && (audio->avsync_flag == 1))) {
+			if (audio_get_avsync_data(audio, &stats) < 0)
+				return rc;
 
-		if (audio_get_avsync_data(audio, &stats) < 0)
-			return rc;
-
-		if (copy_to_user((void *) arg, &stats, sizeof(stats)))
-			return -EFAULT;
-		return 0;
+			if (copy_to_user((void *) arg, &stats, sizeof(stats)))
+				return -EFAULT;
+			return 0;
+		} else
+			return -EAGAIN;
 	}
 
 	switch (cmd) {
@@ -1508,10 +1508,7 @@ static int audio_open(struct inode *inode, struct file *file)
 	audio->device_events = AUDDEV_EVT_DEV_RDY
 				|AUDDEV_EVT_DEV_RLS | AUDDEV_EVT_REL_PENDING
 				|AUDDEV_EVT_STREAM_VOL_CHG;
-	audio->drv_status |= ADRV_STATUS_DEVICE_SWITCH_NONE;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_PENDING;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_READY;
-	audio->drv_status &= ~ADRV_STATUS_DEVICE_SWITCH_COMPLETE;
+	audio->device_switch = DEVICE_SWITCH_STATE_NONE;
 	audio->drv_status &= ~ADRV_STATUS_PAUSE;
 	audio->bytecount_consumed = 0;
 	audio->bytecount_head = 0;
