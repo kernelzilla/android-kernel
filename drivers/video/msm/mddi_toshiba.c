@@ -1400,12 +1400,18 @@ static void mddi_toshiba_lcd_set_backlight(struct msm_fb_data_type *mfd)
 	int ret = -EPERM;
 	int max = mfd->panel_info.bl_max;
 	int min = mfd->panel_info.bl_min;
+	int i = 0;
 
 	if (mddi_toshiba_pdata && mddi_toshiba_pdata->pmic_backlight) {
-		ret = mddi_toshiba_pdata->pmic_backlight(mfd->bl_level);
-		if (!ret)
-			return;
+		while (i++ < 3) {
+			ret = mddi_toshiba_pdata->pmic_backlight(mfd->bl_level);
+			if (!ret)
+				return;
+			msleep(10);
+		}
+		printk(KERN_WARNING "%s: pmic_backlight Failed\n", __func__);
 	}
+
 
 	if (ret && mddi_toshiba_pdata && mddi_toshiba_pdata->backlight_level) {
 		level = mddi_toshiba_pdata->backlight_level(mfd->bl_level,

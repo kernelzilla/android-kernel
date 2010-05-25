@@ -283,12 +283,18 @@ static void lcdc_toshiba_set_backlight(struct msm_fb_data_type *mfd)
 {
 	int bl_level;
 	int ret = -EPERM;
+	int i = 0;
 
 	bl_level = mfd->bl_level;
-	ret = pmic_set_led_intensity(LED_LCD, bl_level);
 
-	if (ret)
-		printk(KERN_WARNING "%s: can't set lcd backlight!\n",
+	while (i++ < 3) {
+		ret = pmic_set_led_intensity(LED_LCD, bl_level);
+		if (ret == 0)
+			return;
+		msleep(10);
+	}
+
+	printk(KERN_WARNING "%s: can't set lcd backlight!\n",
 				__func__);
 }
 
