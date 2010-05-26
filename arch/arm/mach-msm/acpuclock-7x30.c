@@ -86,18 +86,26 @@ static struct cpufreq_frequency_table freq_table[] = {
 /* Use negative numbers for sources that can't be enabled/disabled */
 #define SRC_LPXO (-2)
 #define SRC_AXI  (-1)
+/*
+ * Each ACPU frequency has a certain minimum MSMC1 voltage requirement
+ * that is implicitly met by voting for a specific minimum AXI frequency.
+ * Do NOT change the AXI frequency unless you are _absoulutely_ sure you
+ * know all the h/w requirements.
+ */
 static struct clkctl_acpu_speed acpu_freq_tbl[] = {
-	{ 24576,  SRC_LPXO, 0, 0,  30720,  1000, VDD_RAW(1000) },
-	{ 61440,  PLL_3,    5, 11, 61440,  1000, VDD_RAW(1000) },
-	{ 122880, PLL_3,    5, 5,  61440,  1000, VDD_RAW(1000) },
-	{ 184320, PLL_3,    5, 4,  61440,  1000, VDD_RAW(1000) },
-	{ MAX_AXI_KHZ, SRC_AXI, 1, 0, 61440, 1000, VDD_RAW(1000) },
-	{ 245760, PLL_3,    5, 2,  61440,  1000, VDD_RAW(1000) },
-	{ 368640, PLL_3,    5, 1,  122800, 1050, VDD_RAW(1050) },
-	{ 768000, PLL_1,    2, 0,  153600, 1100, VDD_RAW(1100) },
-	/* ACPU >= 806.4MHz requires MSMC1 @ 1.2V. Voting for
-	 * AXI @ 192MHz accomplishes this implicitly. 806.4MHz
-	 * is updated to 1024MHz at runtime for MSM8x55. */
+	{ 24576,  SRC_LPXO, 0, 0,  30720,  900, VDD_RAW(900) },
+	{ 61440,  PLL_3,    5, 11, 61440,  900, VDD_RAW(900) },
+	{ 122880, PLL_3,    5, 5,  61440,  900, VDD_RAW(900) },
+	{ 184320, PLL_3,    5, 4,  61440,  900, VDD_RAW(900) },
+	{ MAX_AXI_KHZ, SRC_AXI, 1, 0, 61440, 900, VDD_RAW(900) },
+	{ 245760, PLL_3,    5, 2,  61440,  900, VDD_RAW(900) },
+	{ 368640, PLL_3,    5, 1,  122800, 900, VDD_RAW(900) },
+	/* AXI has MSMC1 implications. See above. */
+	{ 768000, PLL_1,    2, 0,  153600, 1050, VDD_RAW(1050) },
+	/*
+	 * AXI has MSMC1 implications. See above.
+	 * 806.4MHz is increased to match the SoC's capabilities at runtime
+	 */
 	{ 806400, PLL_2,    3, 0,  192000, 1100, VDD_RAW(1100) },
 	{ 0 }
 };
@@ -367,6 +375,8 @@ void __init pll2_1024mhz_fixup(void)
 		BUG();
 	}
 	acpu_freq_tbl[ARRAY_SIZE(acpu_freq_tbl)-2].acpu_clk_khz = 1024000;
+	acpu_freq_tbl[ARRAY_SIZE(acpu_freq_tbl)-2].vdd_mv = 1200;
+	acpu_freq_tbl[ARRAY_SIZE(acpu_freq_tbl)-2].vdd_raw = VDD_RAW(1200);
 	freq_table[ARRAY_SIZE(freq_table)-2].frequency = 1024000;
 }
 
