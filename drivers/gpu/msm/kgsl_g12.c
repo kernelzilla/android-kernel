@@ -168,17 +168,12 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 
 		if (status & REG_VGC_IRQSTATUS__FIFO_MASK)
 			KGSL_DRV_ERR("g12 fifo interrupt\n");
-		else if (status & REG_VGC_IRQSTATUS__MH_MASK)
+		if (status & REG_VGC_IRQSTATUS__MH_MASK)
 			KGSL_DRV_ERR("g12 mh interrupt\n");
-		else if (status & REG_VGC_IRQSTATUS__G2D_MASK) {
+		if (status & REG_VGC_IRQSTATUS__G2D_MASK) {
 				KGSL_DRV_VDBG("g12 g2d interrupt\n");
 				queue_work(device->irq_wq, &(device->irq_work));
-			}
-		else
-			KGSL_DRV_ERR(
-				"bad bits in ADDR_VGC_IRQ_STATUS %08x\n",
-						status);
-
+		}
 	}
 
 	mod_timer(&idle_timer, jiffies + INTERVAL_TIMEOUT);
@@ -320,6 +315,7 @@ int kgsl_g12_close(struct kgsl_device *device)
 {
 	struct kgsl_memregion *regspace = &device->regspace;
 
+	kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
 	kgsl_g12_cmdwindow_close(device);
 
 	if (device->memstore.hostptr)
@@ -454,34 +450,19 @@ int kgsl_g12_getproperty(struct kgsl_device *device,
 
 int kgsl_g12_idle(struct kgsl_device *device, unsigned int timeout)
 {
-	int status = -EINVAL;
-	unsigned int timestamp;
-	int idle_count = 0;
+	int status = KGSL_SUCCESS;
 
 	KGSL_DRV_VDBG("enter (device=%p, timeout=%d)\n", device, timeout);
 
-	(void)timeout;
 	if (device->flags & KGSL_FLAGS_STARTED) {
-
-		do {
-			idle_count++;
-			msleep(10);
-			timestamp = device->timestamp;
-
-		} while (idle_count < KGSL_G12_IDLE_COUNT_MAX &&
-			!(((timestamp - device->current_timestamp) >= 0
-			|| ((timestamp - device->current_timestamp) <
-			-KGSL_G12_TIMESTAMP_EPSILON))));
+		if (device->current_timestamp > device->timestamp)
+			status = kgsl_g12_waittimestamp(device,
+					device->current_timestamp, timeout);
 	}
 
+	if (status)
+		KGSL_DRV_ERR("Error, kgsl_g12_waittimestamp() timed out\n");
 
-	if (idle_count == KGSL_G12_IDLE_COUNT_MAX) {
-		KGSL_DRV_ERR("spun too long waiting for RB to idle\n");
-		status = -EINVAL;
-		goto done;
-	}
-
-done:
 	KGSL_DRV_VDBG("return %d\n", status);
 
 	return status;
@@ -578,7 +559,7 @@ int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 		kgsl_g12_regwrite(device, (ADDR_VGC_MH_READ_ADDR >> 2),
 				  offsetwords);
 		reg = (unsigned int *)(device->regspace.mmio_virt_base
-				+ (ADDR_VGC_MH_READ_ADDR << 2));
+				+ (ADDR_VGC_MH_DATA_ADDR << 2));
 	} else {
 		if (offsetwords * sizeof(uint32_t) >=
 				device->regspace.sizebytes) {

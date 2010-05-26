@@ -41,11 +41,12 @@ struct kgsl_device;
 int kgsl_g12_cmdstream_check_timestamp(struct kgsl_device *device,
 					unsigned int timestamp);
 int kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
+			struct kgsl_pagetable *pagetable,
 			int drawctxt_index,
 			uint32_t ibaddr,
 			int sizedwords,
 			int *timestamp,
-			unsigned int flags);
+			unsigned int ctrl);
 int kgsl_g12_cmdstream_addtimestamp(struct kgsl_device *device,
 			  int *timestamp);
 #endif  /* _GSL_CMDSTREAM_H */

@@ -799,6 +799,7 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_file_private *private,
 		}
 
 		result = kgsl_g12_cmdstream_issueibcmds(&kgsl_driver.g12_device,
+						     private->pagetable,
 						     param.drawctxt_id,
 						     param.ibaddr,
 						     param.sizedwords,
