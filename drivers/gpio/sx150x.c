@@ -449,7 +449,8 @@ static void sx150x_irq_set_type_wfn(struct work_struct *work)
 {
 	struct sx150x_chip *chip;
 	unsigned n;
-	u8 val;
+	unsigned val;
+	int irq;
 
 	chip = container_of(work, struct sx150x_chip, irq_set_type_ws);
 
@@ -463,7 +464,11 @@ static void sx150x_irq_set_type_wfn(struct work_struct *work)
 					chip->irq_cmds))
 			val |= 0x2;
 
-		if (val)
+		chip->irq_sense &= ~(3UL << (n * 2));
+		chip->irq_sense |= val << (n * 2);
+
+		irq = chip->irq_base + n;
+		if (!(irq_to_desc(irq)->status & IRQ_MASKED))
 			sx150x_write_cfg(chip, n, 2,
 					chip->dev_cfg->reg_sense, val);
 	}
@@ -607,8 +612,7 @@ static int sx150x_init_hw(struct sx150x_chip *chip,
 
 static int sx150x_install_irq_chip(struct sx150x_chip *chip,
 				int irq_summary,
-				int irq_base,
-				u32 irq_sense)
+				int irq_base)
 {
 	int err;
 	unsigned n;
@@ -616,7 +620,6 @@ static int sx150x_install_irq_chip(struct sx150x_chip *chip,
 
 	chip->irq_summary = irq_summary;
 	chip->irq_base    = irq_base;
-	chip->irq_sense   = irq_sense;
 
 	for (n = 0; n < chip->dev_cfg->ngpios; ++n) {
 		irq = irq_base + n;
@@ -638,7 +641,6 @@ static int sx150x_install_irq_chip(struct sx150x_chip *chip,
 	if (err < 0) {
 		chip->irq_summary = -1;
 		chip->irq_base    = -1;
-		chip->irq_sense   =  0;
 	}
 
 	return err;
@@ -691,8 +693,7 @@ static int __devinit sx150x_probe(struct i2c_client *client,
 	if (pdata->irq_summary >= 0) {
 		rc = sx150x_install_irq_chip(chip,
 					pdata->irq_summary,
-					pdata->irq_base,
-					pdata->irq_sense);
+					pdata->irq_base);
 		if (rc < 0)
 			goto probe_fail;
 	}
