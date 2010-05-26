@@ -307,6 +307,18 @@ static int debug_read_ch_v2(char *buf, int max)
 	return i;
 }
 
+static int debug_read_ch(char *buf, int max)
+{
+	uint32_t *smd_ver;
+
+	smd_ver = smem_alloc(SMEM_VERSION_SMD, 32 * sizeof(uint32_t));
+
+	if (smd_ver && ((smd_ver[VERSION_MODEM] >> 16) >= 1))
+		return debug_read_ch_v2(buf, max);
+	else
+		return debug_read_ch_v1(buf, max);
+}
+
 static int debug_read_smem_version(char *buf, int max)
 {
 	struct smem_shared *shared = (void *) MSM_SHARED_RAM_BASE;
@@ -451,19 +463,12 @@ static void debug_create(const char *name, mode_t mode,
 static int __init smd_debugfs_init(void)
 {
 	struct dentry *dent;
-	uint32_t *smd_ver;
 
 	dent = debugfs_create_dir("smd", 0);
 	if (IS_ERR(dent))
 		return PTR_ERR(dent);
 
-	smd_ver = smem_alloc(SMEM_VERSION_SMD, 32 * sizeof(uint32_t));
-
-	if (smd_ver && ((smd_ver[VERSION_MODEM] >> 16) >= 1))
-		debug_create("ch", 0444, dent, debug_read_ch_v2);
-	else
-		debug_create("ch", 0444, dent, debug_read_ch_v1);
-
+	debug_create("ch", 0444, dent, debug_read_ch);
 	debug_create("diag", 0444, dent, debug_read_diag_msg);
 	debug_create("mem", 0444, dent, debug_read_mem);
 	debug_create("version", 0444, dent, debug_read_smd_version);

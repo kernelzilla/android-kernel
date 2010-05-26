@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/proc_comm.c
  *
  * Copyright (C) 2007-2008 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -24,16 +24,19 @@
 #include <mach/system.h>
 
 #include "proc_comm.h"
+#include "smd_private.h"
 
 #if defined(CONFIG_ARCH_MSM7X30)
-#define MSM_TRIG_A2M_INT(n) (writel(1 << n, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_PC_INT (writel(1 << 6, MSM_GCC_BASE + 0x8))
+#elif defined(CONFIG_ARCH_MSM8X60)
+#define MSM_TRIG_A2M_PC_INT (writel(1 << 5, MSM_GCC_BASE + 0x8))
 #else
-#define MSM_TRIG_A2M_INT(n) (writel(1, MSM_CSR_BASE + 0x400 + (n) * 4))
+#define MSM_TRIG_A2M_PC_INT (writel(1, MSM_CSR_BASE + 0x400 + (6) * 4))
 #endif
 
 static inline void notify_other_proc_comm(void)
 {
-	MSM_TRIG_A2M_INT(6);
+	MSM_TRIG_A2M_PC_INT;
 }
 
 #define APP_COMMAND 0x00
@@ -47,11 +50,6 @@ static inline void notify_other_proc_comm(void)
 #define MDM_DATA2   0x1C
 
 static DEFINE_SPINLOCK(proc_comm_lock);
-
-/* The higher level SMD support will install this to
- * provide a way to check for and handle modem restart?
- */
-int (*msm_check_for_modem_crash)(void);
 
 /* Poll for a state change, checking for possible
  * modem crashes along the way (so we don't wait
@@ -67,9 +65,8 @@ static int proc_comm_wait_for(unsigned addr, unsigned value)
 		if (readl(addr) == value)
 			return 0;
 
-		if (msm_check_for_modem_crash)
-			if (msm_check_for_modem_crash())
-				return -EAGAIN;
+		if (smsm_check_for_modem_crash())
+			return -EAGAIN;
 
 		udelay(5);
 	}
