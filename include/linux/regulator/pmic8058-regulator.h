@@ -68,7 +68,10 @@
 #define PM8058_VREG_ID_LVS0	31
 #define PM8058_VREG_ID_LVS1	32
 
-#define PM8058_VREG_MAX		(PM8058_VREG_ID_LVS1 + 1)
+/* Negative charge pump regulator id */
+#define PM8058_VREG_ID_NCP	33
+
+#define PM8058_VREG_MAX		(PM8058_VREG_ID_NCP + 1)
 
 struct pm8058_vreg_pdata {
 	int min_uV;

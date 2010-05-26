@@ -28,6 +28,7 @@
 #define REGULATOR_TYPE_LDO		0
 #define REGULATOR_TYPE_SMPS		1
 #define REGULATOR_TYPE_LVS		2
+#define REGULATOR_TYPE_NCP		3
 
 /* Common masks */
 #define REGULATOR_EN_MASK		0x80
@@ -84,6 +85,13 @@
 
 #define SMPS_IS_MODE3(uV)		((uV) < SMPS_MODE2_UV_MIN)
 #define SMPS_IS_MODE2(uV)		((uV) < SMPS_MODE1_UV_MIN)
+
+/* NCP masks and values */
+#define NCP_VPROG_MASK			0x1F
+
+#define NCP_UV_MIN			-3000000
+#define NCP_UV_MAX			-1500000
+#define NCP_UV_STEP			50000
 
 struct pm8058_vreg {
 	const char			*name;
@@ -159,6 +167,25 @@ struct pm8058_vreg {
 	}, \
 }
 
+#define NCP(_name, _ctrl_addr) \
+{ \
+	.name = _name, \
+	.ctrl_addr = _ctrl_addr, \
+	.type = REGULATOR_TYPE_NCP, \
+	.rsupply = { \
+		.supply = _name, \
+	}, \
+	.rdata = { \
+		.constraints = { \
+			.name = _name, \
+			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
+			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
+				REGULATOR_CHANGE_STATUS, \
+		}, \
+		.num_consumer_supplies = 1, \
+	}, \
+}
+
 static struct pm8058_vreg pm8058_vreg[] = {
 	/*   name       ctrl   test   n/p */
 	LDO("8058_l0",  0x009, 0x065, 1),
@@ -198,6 +225,9 @@ static struct pm8058_vreg pm8058_vreg[] = {
 	/*   name        ctrl  */
 	LVS("8058_lvs0", 0x12D),
 	LVS("8058_lvs1", 0x12F),
+
+	/*   name       ctrl */
+	NCP("8058_ncp", 0x090),
 };
 
 static int pm8058_vreg_write(struct pm8058_chip *chip,
@@ -405,6 +435,25 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 	return rc;
 }
 
+static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
+		int min_uV, int max_uV)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	int rc, uV = (min_uV + max_uV) / 2;
+	u8 val;
+
+	val = (NCP_UV_MAX - uV) / NCP_UV_STEP;
+
+	/* voltage setting */
+	rc = pm8058_vreg_write(chip, vreg->ctrl_addr, val, NCP_VPROG_MASK,
+			&vreg->ctrl_reg);
+	if (rc)
+		pr_err("%s: pm8058_vreg_write failed\n", __func__);
+
+	return rc;
+}
+
 static struct regulator_ops pm8058_ldo_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
@@ -420,6 +469,12 @@ static struct regulator_ops pm8058_smps_ops = {
 static struct regulator_ops pm8058_lvs_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
+};
+
+static struct regulator_ops pm8058_ncp_ops = {
+	.enable = pm8058_vreg_enable,
+	.disable = pm8058_vreg_disable,
+	.set_voltage = pm8058_ncp_set_voltage,
 };
 
 static int pm8058_init_regulator(struct pm8058_chip *chip,
@@ -491,6 +546,9 @@ static int pm8058_register_regulator(struct pm8058_chip *chip,
 		break;
 	case REGULATOR_TYPE_LVS:
 		rdesc->ops = &pm8058_lvs_ops;
+		break;
+	case REGULATOR_TYPE_NCP:
+		rdesc->ops = &pm8058_ncp_ops;
 		break;
 	}
 
