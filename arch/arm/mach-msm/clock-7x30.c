@@ -868,6 +868,10 @@ static int _soc_clk_enable(unsigned id)
 	void *ns_reg = REG(t->ns_reg);
 	uint32_t reg_val = 0;
 
+	WARN((t->type != NORATE) && (t->current_freq == &dummy_freq),
+		"Attempting to enable clock %d before setting its rate. "
+		"Set the rate first!\n", id);
+
 	reg_val = readl(ns_reg);
 	if (t->type == MND) {
 		/* mode can be either 0 or 1. So the R-value of the
