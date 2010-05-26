@@ -79,6 +79,11 @@ struct tsc2007 {
 	bool			pendown;
 	int			irq;
 
+	bool			invert_x;
+	bool			invert_y;
+	bool			invert_z1;
+	bool			invert_z2;
+
 	int			(*get_pendown_state)(void);
 	void			(*clear_penirq)(void);
 };
@@ -116,6 +121,18 @@ static void tsc2007_read_values(struct tsc2007 *tsc, struct ts_event *tc)
 	/* turn y+ off, x- on; we'll use formula #1 */
 	tc->z1 = tsc2007_xfer(tsc, READ_Z1);
 	tc->z2 = tsc2007_xfer(tsc, READ_Z2);
+
+	if (tsc->invert_x == true)
+		tc->x = MAX_12BIT - tc->x;
+
+	if (tsc->invert_y == true)
+		tc->y = MAX_12BIT - tc->y;
+
+	if (tsc->invert_z1 == true)
+		tc->z1 = MAX_12BIT - tc->z1;
+
+	if (tsc->invert_z2 == true)
+		tc->z2 = MAX_12BIT - tc->z2;
 
 	/* Prepare for next touch reading - power down ADC, enable PENIRQ */
 	tsc2007_xfer(tsc, PWRDOWN);
@@ -294,6 +311,10 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 	ts->x_plate_ohms      = pdata->x_plate_ohms;
 	ts->get_pendown_state = pdata->get_pendown_state;
 	ts->clear_penirq      = pdata->clear_penirq;
+	ts->invert_x	      = pdata->invert_x;
+	ts->invert_y	      = pdata->invert_y;
+	ts->invert_z1	      = pdata->invert_z1;
+	ts->invert_z2	      = pdata->invert_z2;
 
 	snprintf(ts->phys, sizeof(ts->phys),
 		 "%s/input0", dev_name(&client->dev));
@@ -312,7 +333,7 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 	if (pdata->init_platform_hw)
 		pdata->init_platform_hw();
 
-	err = request_irq(ts->irq, tsc2007_irq, 0,
+	err = request_irq(ts->irq, tsc2007_irq, pdata->irq_flags,
 			client->dev.driver->name, ts);
 	if (err < 0) {
 		dev_err(&client->dev, "irq %d busy?\n", ts->irq);
@@ -341,6 +362,42 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 	kfree(ts);
 	return err;
 }
+
+#ifdef CONFIG_PM
+/* REVISIT: Changes for Power optimization */
+static int tsc2007_suspend(struct i2c_client *client,
+					pm_message_t state)
+{
+	struct tsc2007	*ts = i2c_get_clientdata(client);
+
+	disable_irq(ts->irq);
+
+	if (cancel_delayed_work_sync(&ts->work))
+		enable_irq(ts->irq);
+
+	return 0;
+}
+
+static int tsc2007_resume(struct i2c_client *client)
+{
+	struct tsc2007	*ts = i2c_get_clientdata(client);
+
+	enable_irq(ts->irq);
+
+	return 0;
+}
+#else
+static int tsc2007_suspend(struct i2c_client *client,
+					pm_message_t state)
+{
+	return 0;
+}
+
+static int tsc2007_resume(struct i2c_client *client)
+{
+	return 0;
+}
+#endif
 
 static int __devexit tsc2007_remove(struct i2c_client *client)
 {
@@ -373,6 +430,8 @@ static struct i2c_driver tsc2007_driver = {
 	.id_table	= tsc2007_idtable,
 	.probe		= tsc2007_probe,
 	.remove		= __devexit_p(tsc2007_remove),
+	.suspend	= tsc2007_suspend,
+	.resume		= tsc2007_resume,
 };
 
 static int __init tsc2007_init(void)
