@@ -138,6 +138,7 @@ struct kgsl_mmu {
 	/* current page table object being used by device mmu */
 	struct kgsl_pagetable  *defaultpagetable;
 	struct kgsl_pagetable  *hwpagetable;
+	unsigned int tlb_flags;
 };
 
 

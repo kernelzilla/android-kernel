@@ -69,6 +69,8 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	struct kgsl_memdesc tmp = {0};
 	unsigned int cmd;
 
+	kgsl_setstate(device, device->mmu.tlb_flags);
+
 	cmd = ibaddr;
 
 	tmp.hostptr = (void *)*timestamp;
