@@ -598,7 +598,7 @@ config MSM_SDIO_AL
 	  MDM SDIO-Client should have pipes support.
 
 config MSM_N_WAY_SMD
-	depends on (MSM_SMD && (ARCH_MSM_SCORPION || ARCH_MSM7X27))
+	depends on (MSM_SMD && (ARCH_MSM_SCORPION || ARCH_MSM_SCORPIONMP || ARCH_MSM7X27))
 	default y
 	bool "MSM N-WAY SMD support"
 	help
@@ -606,7 +606,7 @@ config MSM_N_WAY_SMD
 	  normal APPS-MODEM SMD communication.
 
 config MSM_N_WAY_SMSM
-	depends on (MSM_SMD && (ARCH_MSM_SCORPION || ARCH_MSM7X27))
+	depends on (MSM_SMD && (ARCH_MSM_SCORPION || ARCH_MSM_SCORPIONMP || ARCH_MSM7X27))
 	default y
 	bool "MSM N-WAY SMSM support"
 	help
@@ -713,7 +713,7 @@ config MSM_RPC_PING
 	  Implements MSM rpc ping test module.
 
 config MSM_RPC_PROC_COMM_TEST
-	depends on DEBUG_FS
+	depends on DEBUG_FS && MSM_PROC_COMM
 	default m
 	bool "MSM rpc proc comm test"
 	help

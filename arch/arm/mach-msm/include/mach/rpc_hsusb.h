@@ -25,7 +25,7 @@
 #include <mach/msm_otg.h>
 #include <mach/msm_hsusb.h>
 
-#ifdef CONFIG_MSM_SMD
+#ifdef CONFIG_MSM_ONCRPCROUTER
 int msm_hsusb_rpc_connect(void);
 int msm_hsusb_phy_reset(void);
 int msm_hsusb_vbus_powerup(void);

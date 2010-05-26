@@ -521,6 +521,11 @@ struct platform_device msm_device_gadget_peripheral = {
 	},
 };
 
+struct platform_device msm_device_smd = {
+	.name           = "msm_smd",
+	.id             = -1,
+};
+
 struct clk msm_clocks_8x60[] = {
 	CLK_RPM("ebi1_clk",		EBI1_CLK,		NULL, CLK_MIN),
 
