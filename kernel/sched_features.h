@@ -17,7 +17,7 @@ SCHED_FEAT(GENTLE_FAIR_SLEEPERS, 1)
  * longer period, and lighter task an effective shorter period they
  * are considered running.
  */
-SCHED_FEAT(NORMALIZED_SLEEPER, 0)
+SCHED_FEAT(NORMALIZED_SLEEPER, 1)
 
 /*
  * Place new tasks ahead so that they do not starve already running
