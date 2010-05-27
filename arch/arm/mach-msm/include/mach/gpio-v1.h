@@ -17,6 +17,32 @@
 #ifndef __ASM_ARCH_MSM_GPIO_V1_H
 #define __ASM_ARCH_MSM_GPIO_V1_H
 
+#ifdef CONFIG_GPIOLIB
+
+#define ARCH_NR_GPIOS	512
+
+#include <asm-generic/gpio.h>
+
+#define gpio_get_value	__gpio_get_value
+#define gpio_set_value	__gpio_set_value
+#define gpio_cansleep	__gpio_cansleep
+#define gpio_to_irq	__gpio_to_irq
+
+#else
+
+int gpio_request(unsigned gpio, const char *label);
+void gpio_free(unsigned gpio);
+int gpio_direction_input(unsigned gpio);
+int gpio_direction_output(unsigned gpio, int value);
+int gpio_get_value(unsigned gpio);
+void gpio_set_value(unsigned gpio, int value);
+int gpio_to_irq(unsigned gpio);
+
+#include <linux/device.h>
+#include <asm-generic/gpio.h>
+
+#endif
+
 #include <linux/interrupt.h>
 #include <mach/gpio-tlmm-v1.h>
 
@@ -85,16 +111,6 @@ int msm_gpios_enable(const struct msm_gpio *table, int size);
  * @size:  number of entries in @table
  */
 int msm_gpios_disable(const struct msm_gpio *table, int size);
-
-int gpio_request(unsigned gpio, const char *label);
-void gpio_free(unsigned gpio);
-int gpio_direction_input(unsigned gpio);
-int gpio_direction_output(unsigned gpio, int value);
-int gpio_get_value(unsigned gpio);
-void gpio_set_value(unsigned gpio, int value);
-int gpio_to_irq(unsigned gpio);
-
-#include <asm-generic/gpio.h>
 
 /* extended gpio api */
 
