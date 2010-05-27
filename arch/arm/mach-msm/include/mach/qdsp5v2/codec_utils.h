@@ -132,7 +132,6 @@ struct audio {
 
 	uint32_t device_events;
 	uint32_t device_switch;       /* Flag to indicate device switch */
-	uint32_t pause_state;
 	uint64_t bytecount_consumed;
 	uint64_t bytecount_head;
 	uint64_t bytecount_given;
