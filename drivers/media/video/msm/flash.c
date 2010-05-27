@@ -41,12 +41,6 @@ static int msm_camera_flash_pwm(
 		}
 	}
 
-	rc = pwm_set_dtest(flash_pwm, 1);
-	if (rc < 0) {
-		pr_err("%s: FAIL pwm_set_dtest(): rc=%d\n", __func__, rc);
-		return -ENXIO;
-	}
-
 	switch (led_state) {
 	case MSM_CAMERA_LED_LOW:
 		rc = pwm_config(flash_pwm,
@@ -66,7 +60,6 @@ static int msm_camera_flash_pwm(
 
 	case MSM_CAMERA_LED_OFF:
 		pwm_disable(flash_pwm);
-		rc = pwm_set_dtest(flash_pwm, 0);
 		break;
 
 	default:

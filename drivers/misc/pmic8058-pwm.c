@@ -817,7 +817,7 @@ int pm8058_pwm_config_led(struct pwm_device *pwm, int id,
 }
 EXPORT_SYMBOL(pm8058_pwm_config_led);
 
-int pwm_set_dtest(struct pwm_device *pwm, int enable)
+int pm8058_pwm_set_dtest(struct pwm_device *pwm, int enable)
 {
 	int	rc;
 	u8	reg;
@@ -827,7 +827,6 @@ int pwm_set_dtest(struct pwm_device *pwm, int enable)
 	if (pwm->chip == NULL)
 		return -ENODEV;
 
-	mutex_lock(&pwm->chip->pwm_mutex);
 	if (!pwm->in_use)
 		rc = -EINVAL;
 	else {
@@ -843,10 +842,9 @@ int pwm_set_dtest(struct pwm_device *pwm, int enable)
 			       __func__, reg, rc);
 
 	}
-	mutex_unlock(&pwm->chip->pwm_mutex);
 	return rc;
 }
-EXPORT_SYMBOL(pwm_set_dtest);
+EXPORT_SYMBOL(pm8058_pwm_set_dtest);
 
 static int __devinit pmic8058_pwm_probe(struct platform_device *pdev)
 {

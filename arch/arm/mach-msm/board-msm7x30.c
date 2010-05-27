@@ -221,12 +221,6 @@ static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 		max_mA = 200;
 		break;
 
-	case 7:
-		rc = pwm_set_dtest(pwm, on);
-		if (rc)
-			pr_err("%s: pwm_set_dtest(%d): rc=%d\n",
-			       __func__, on, rc);
-		break;
 	default:
 		break;
 	}
@@ -242,6 +236,24 @@ static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 			       __func__, ch, rc);
 	}
 
+	return rc;
+}
+
+static int pm8058_pwm_enable(struct pwm_device *pwm, int ch, int on)
+{
+	int	rc;
+
+	switch (ch) {
+	case 7:
+		rc = pm8058_pwm_set_dtest(pwm, on);
+		if (rc)
+			pr_err("%s: pwm_set_dtest(%d): rc=%d\n",
+			       __func__, on, rc);
+		break;
+	default:
+		rc = -EINVAL;
+		break;
+	}
 	return rc;
 }
 
@@ -435,6 +447,7 @@ static struct pmic8058_keypad_data fluid_keypad_data = {
 
 static struct pm8058_pwm_pdata pm8058_pwm_data = {
 	.config		= pm8058_pwm_config,
+	.enable		= pm8058_pwm_enable,
 };
 
 /* Put sub devices with fixed location first in sub_devices array */
