@@ -130,3 +130,6 @@ obj-$(CONFIG_MSM_NPA) += npa.o npa_resources.o msm_pm_qos.o msm_reqs.o
 obj-$(CONFIG_MSM_NPA_REMOTE) += npa_remote.o
 obj-$(CONFIG_MSM_NPA_REMOTE_ONCRPC) += npa_remote_rpc_client.o
 obj-$(CONFIG_ARCH_MSM7X30) += spm.o
+
+obj-$(CONFIG_SMMU)		+= smmu_driver.o smmu_driver_enum.o
+obj-$(CONFIG_SMMU_8X60)		+= board-msm8x60-smmu.o
