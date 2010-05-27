@@ -80,39 +80,29 @@ PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOI
 {
     PVR_UNREFERENCED_PARAMETER(ui32Flags);
 
+    if (phBlockAlloc && ui32Size > PAGE_SIZE) {
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-    *ppvCpuVAddr = _KMallocWrapper(ui32Size, pszFilename, ui32Line);
+        *ppvCpuVAddr = _VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED, pszFilename, ui32Line);
 #else
-    *ppvCpuVAddr = KMallocWrapper(ui32Size);
+        *ppvCpuVAddr = VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED);
 #endif
-    if(*ppvCpuVAddr)
-    {
-    if (phBlockAlloc)
-    {
-        
-        *phBlockAlloc = HOST_ALLOC_MEM_USING_KMALLOC;
-    }
-    }
-    else
-    {
-    if (!phBlockAlloc)
-    {
-        return PVRSRV_ERROR_OUT_OF_MEMORY;
-    }
 
-    
+        if (!*ppvCpuVAddr)
+            return PVRSRV_ERROR_OUT_OF_MEMORY;
+
+        *phBlockAlloc = HOST_ALLOC_MEM_USING_VMALLOC;
+    } else {
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-    *ppvCpuVAddr = _VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED, pszFilename, ui32Line);
+        *ppvCpuVAddr = _KMallocWrapper(ui32Size, pszFilename, ui32Line);
 #else
-    *ppvCpuVAddr = VMallocWrapper(ui32Size, PVRSRV_HAP_CACHED);
+        *ppvCpuVAddr = KMallocWrapper(ui32Size);
 #endif
-    if (!*ppvCpuVAddr)
-    {
-         return PVRSRV_ERROR_OUT_OF_MEMORY;
-    }
 
-    
-    *phBlockAlloc = HOST_ALLOC_MEM_USING_VMALLOC;
+        if(!*ppvCpuVAddr)
+            return PVRSRV_ERROR_OUT_OF_MEMORY;
+
+        if (phBlockAlloc)
+            *phBlockAlloc = HOST_ALLOC_MEM_USING_KMALLOC;
     }
 
     return PVRSRV_OK;
