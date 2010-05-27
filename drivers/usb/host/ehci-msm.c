@@ -288,7 +288,6 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 	else
 		ret = usb_lpm_enter(hcd);
 
-	msm_xusb_pm_qos_update(mhcd, 0);
 	wake_unlock(&mhcd->wlock);
 	return ret;
 }
@@ -298,7 +297,6 @@ static int ehci_msm_bus_resume(struct usb_hcd *hcd)
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
 
 	wake_lock(&mhcd->wlock);
-	msm_xusb_pm_qos_update(mhcd, 1);
 
 	if (PHY_TYPE(mhcd->pdata->phy_info) == USB_PHY_INTEGRATED) {
 		otg_set_suspend(mhcd->xceiv, 0);
