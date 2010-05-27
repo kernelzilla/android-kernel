@@ -17,6 +17,8 @@
  */
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/msm_kgsl.h>
+#include "kgsl_g12_cmdwindow.h"
 #include "kgsl_g12_cmdstream.h"
 #include "kgsl_cmdstream.h"
 
@@ -55,11 +57,12 @@ static void beginpacket(struct kgsl_g12_z1xx *z1xx,
 
 int
 kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
+			struct kgsl_pagetable *pagetable,
 			int drawctxt_index,
 			uint32_t ibaddr,
 			int sizedwords,
 			int *timestamp,
-			unsigned int flags)
+			unsigned int ctrl)
 {
 	unsigned int ofs        = PACKETSIZE_STATESTREAM * sizeof(unsigned int);
 	unsigned int cnt        = 5;
@@ -69,20 +72,21 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	struct kgsl_memdesc tmp = {0};
 	unsigned int cmd;
 
-	kgsl_setstate(device, device->mmu.tlb_flags);
-
 	cmd = ibaddr;
 
 	tmp.hostptr = (void *)*timestamp;
 
-	device->current_timestamp++;
-	*timestamp = device->current_timestamp;
-
 	/* context switch */
 	if (drawctxt_index != (int)g_z1xx.prevctx) {
+		kgsl_mmu_setstate(device, pagetable);
 		cnt = PACKETSIZE_STATESTREAM;
 		ofs = 0;
+	} else {
+		kgsl_setstate(device, device->mmu.tlb_flags);
 	}
+
+	device->current_timestamp++;
+	*timestamp = device->current_timestamp;
 
 	g_z1xx.prevctx = drawctxt_index;
 
@@ -105,6 +109,10 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	g_z1xx.offs = 0;
 	g_z1xx.curr = nextbuf;
 
+	kgsl_g12_cmdwindow_write(device,
+				KGSL_CMDWINDOW_2D, ADDR_VGV3_CONTROL, ctrl);
+	kgsl_g12_cmdwindow_write(device,
+				KGSL_CMDWINDOW_2D, ADDR_VGV3_CONTROL, 0);
 	return KGSL_SUCCESS;
 }
 

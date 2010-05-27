@@ -78,6 +78,7 @@
 #define ADDR_MH_MMU_TRAN_ERROR           0x0044
 #define ADDR_MH_MMU_VA_RANGE             0x0041
 #define ADDR_VGC_MH_READ_ADDR            0x0510
+#define ADDR_VGC_MH_DATA_ADDR            0x0518
 #define ADDR_MH_MMU_PAGE_FAULT           0x0043
 #define ADDR_VGC_COMMANDSTREAM           0x0000
 #define ADDR_VGC_IRQENABLE               0x0438
