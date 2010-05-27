@@ -358,4 +358,17 @@ config PMIC8058_OTHC
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called pmic8058-othc.
+
+config INPUT_KP_FLIP_SWITCH
+	tristate "flip switch detection support"
+	default y
+	depends on PMIC8058 && ARCH_MSM7X30
+	help
+	  Say Y here if you want support for the flip switch detection.
+	  This driver can be used with Qualcomm MSM7x30 based development
+	  platforms which have flip switch as part of the PMIC8058 keypad.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kp_flip_switch.
+
 endif
