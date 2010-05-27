@@ -25,6 +25,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/hrtimer.h>
+#include <linux/slab.h>
 #include <mach/htc_headset.h>
 #include <mach/audio_jack.h>
 #include <asm/gpio.h>
