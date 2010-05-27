@@ -48,7 +48,7 @@ static unsigned int poolsize_hdlc = 8;  /*Number of items in the mempool */
 static unsigned int itemsize_usb_struct = 20; /*Size of item in the mempool */
 static unsigned int poolsize_usb_struct = 8; /*Number of items in the mempool */
 /* This is the maximum number of user-space clients supported */
-static unsigned int max_clients = 10;
+static unsigned int max_clients = 15;
 /* Timer variables */
 static struct timer_list drain_timer;
 static int timer_in_progress;
