@@ -188,8 +188,17 @@ void kgsl_yamato_rbbm_intrcallback(struct kgsl_device *device)
 	kgsl_yamato_regread(device, REG_RBBM_INT_STATUS, &status);
 
 	if (status & RBBM_INT_CNTL__RDERR_INT_MASK) {
+		union rbbm_read_error_u rerr;
 		kgsl_yamato_regread(device, REG_RBBM_READ_ERROR, &rderr);
-		KGSL_DRV_FATAL("rbbm read error interrupt: %08x\n", rderr);
+		rerr.val = rderr;
+		if (rerr.f.read_address == REG_CP_INT_STATUS &&
+			rerr.f.read_error &&
+			rerr.f.read_requester)
+			KGSL_DRV_WARN("rbbm read error interrupt: %08x\n",
+					rderr);
+		else
+			KGSL_DRV_FATAL("rbbm read error interrupt: %08x\n",
+					rderr);
 	} else if (status & RBBM_INT_CNTL__DISPLAY_UPDATE_INT_MASK) {
 		KGSL_DRV_DBG("rbbm display update interrupt\n");
 	} else if (status & RBBM_INT_CNTL__GUI_IDLE_INT_MASK) {
