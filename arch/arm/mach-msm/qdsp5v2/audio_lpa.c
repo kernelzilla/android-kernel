@@ -450,6 +450,7 @@ static int auddec_dsp_config(struct audio *audio, int enable)
 
 static void audlpa_async_send_buffer(struct audio *audio)
 {
+	int	found = 0;
 	uint64_t temp = 0;
 	struct audplay_cmd_bitstream_data_avail cmd;
 	struct audlpa_buffer_node *next_buf = NULL;
@@ -457,12 +458,13 @@ static void audlpa_async_send_buffer(struct audio *audio)
 	temp = audio->bytecount_head;
 	if (audio->device_switch == DEVICE_SWITCH_STATE_NONE) {
 		list_for_each_entry(next_buf, &audio->out_queue, list) {
-			if (temp == audio->bytecount_given)
+			if (temp == audio->bytecount_given) {
+				found = 1;
 				break;
-			else
+			} else
 				temp += next_buf->buf.data_len;
 		}
-		if (next_buf && (temp == audio->bytecount_given)) {
+		if (next_buf && found) {
 			cmd.cmd_id = AUDPLAY_CMD_BITSTREAM_DATA_AVAIL;
 			cmd.decoder_id = audio->dec_id;
 			cmd.buf_ptr	= (unsigned) next_buf->paddr;
