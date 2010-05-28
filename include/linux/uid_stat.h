@@ -19,11 +19,11 @@
 /* Contains definitions for resource tracking per uid. */
 
 #ifdef CONFIG_UID_STAT
-int update_tcp_snd(uid_t uid, int size);
-int update_tcp_rcv(uid_t uid, int size);
+int uid_stat_tcp_snd(uid_t uid, int size);
+int uid_stat_tcp_rcv(uid_t uid, int size);
 #else
-#define update_tcp_snd(uid, size) do {} while (0);
-#define update_tcp_rcv(uid, size) do {} while (0);
+#define uid_stat_tcp_snd(uid, size) do {} while (0);
+#define uid_stat_tcp_rcv(uid, size) do {} while (0);
 #endif
 
 #endif /* _LINUX_UID_STAT_H */

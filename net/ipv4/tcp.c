@@ -1101,7 +1101,7 @@ out:
 	release_sock(sk);
 
 	if (copied > 0)
-		update_tcp_snd(current_uid(), copied);
+		uid_stat_tcp_snd(current_uid(), copied);
 	return copied;
 
 do_fault:
@@ -1346,7 +1346,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	/* Clean up data we have read: This will do ACK frames. */
 	if (copied > 0) {
 		tcp_cleanup_rbuf(sk, copied);
-		update_tcp_rcv(current_uid(), copied);
+		uid_stat_tcp_rcv(current_uid(), copied);
 	}
 
 	return copied;
@@ -1746,7 +1746,7 @@ skip_copy:
 	release_sock(sk);
 
 	if (copied > 0)
-		update_tcp_rcv(current_uid(), copied);
+		uid_stat_tcp_rcv(current_uid(), copied);
 	return copied;
 
 out:
@@ -1757,7 +1757,7 @@ out:
 recv_urg:
 	err = tcp_recv_urg(sk, msg, len, flags);
 	if (err > 0)
-		update_tcp_rcv(current_uid(), err);
+		uid_stat_tcp_rcv(current_uid(), err);
 	goto out;
 }
 
