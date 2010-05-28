@@ -29,7 +29,6 @@
 #include "gpio_chip.h"
 #endif
 
-#ifndef CONFIG_GPIOLIB
 /* MPP Control Registers */
 #define	SSBI_MPP_CNTRL_BASE		0x50
 #define	SSBI_MPP_CNTRL(n)		(SSBI_MPP_CNTRL_BASE + (n))
@@ -45,6 +44,7 @@
 /* MPP Config Control */
 #define	PM8058_MPP_CONFIG_CTL_MASK	0x03
 
+#ifndef CONFIG_GPIOLIB
 static int pm8058_mpp_get_irq_num(struct gpio_chip *chip,
 				   unsigned int gpio,
 				   unsigned int *irqp,
@@ -142,6 +142,31 @@ static struct gpio_chip pm8058_mpp_chip = {
 	.get		= pm8058_mpp_read,
 	.ngpio		= PM8058_MPPS,
 };
+
+int pm8058_mpp_config(unsigned mpp, unsigned type, unsigned level,
+		      unsigned control)
+{
+	u8	config;
+	int	rc;
+	struct pm8058_chip *pm_chip;
+
+	if (mpp >= PM8058_MPPS)
+		return -EINVAL;
+
+	pm_chip = dev_get_drvdata(pm8058_mpp_chip.dev);
+
+	config = (type << PM8058_MPP_TYPE_SHIFT) & PM8058_MPP_TYPE_MASK;
+	config |= (level << PM8058_MPP_CONFIG_LVL_SHIFT) &
+			PM8058_MPP_CONFIG_LVL_MASK;
+	config |= control & PM8058_MPP_CONFIG_CTL_MASK;
+
+	rc = pm8058_write(pm_chip, SSBI_MPP_CNTRL(mpp), &config, 1);
+	if (rc)
+		pr_err("%s: pm8058_write(): rc=%d\n", __func__, rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8058_mpp_config);
 
 static int __devinit pm8058_mpp_probe(struct platform_device *pdev)
 {
