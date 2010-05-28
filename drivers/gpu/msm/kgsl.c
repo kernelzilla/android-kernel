@@ -1630,10 +1630,6 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 
 	/* put the AXI bus into asynchronous mode with the graphics cores */
 	if (pdata != NULL) {
-		if ((pdata->set_grp2d_async != NULL) &&
-			(pdata->max_grp2d_freq) &&
-			(!pdata->set_grp2d_async()))
-			clk_set_min_rate(clk, pdata->max_grp2d_freq);
 		if ((pdata->set_grp3d_async != NULL) &&
 			(pdata->max_grp3d_freq) &&
 			(!pdata->set_grp3d_async()))
@@ -1661,6 +1657,13 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		KGSL_DRV_ERR("clk_get(grp_2d_clk) returned %d\n", result);
 	}
 	kgsl_driver.g12_grp_clk = clk;
+
+	if (pdata != NULL && clk != NULL) {
+		if ((pdata->set_grp2d_async != NULL) &&
+			(pdata->max_grp2d_freq) &&
+			(!pdata->set_grp2d_async()))
+			clk_set_min_rate(clk, pdata->max_grp2d_freq);
+	}
 
 	kgsl_driver.power_flags = 0;
 
