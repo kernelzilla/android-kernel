@@ -643,6 +643,8 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("vfe_clk",		VFE_CLK,		NULL, 0),
 	CLK_8X60("csi_vfe_clk",		CSI0_VFE_CLK,		NULL, 0),
 	CLK_8X60("csi_vfe_clk",		CSI1_VFE_CLK,		NULL, 0),
+	CLK_8X60("smmu_jpegd_clk", 	JPEGD_AXI_CLK,		NULL, 0),
+	CLK_8X60("smmu_vfe_clk", 	VFE_AXI_CLK,		NULL, 0),
 	CLK_8X60("amp_pclk",		AMP_P_CLK,		NULL, 0),
 	CLK_8X60("apu_pclk",		APU_P_CLK,		NULL, 0),
 	CLK_8X60("csi_pclk",		CSI0_P_CLK,		NULL, 0),
