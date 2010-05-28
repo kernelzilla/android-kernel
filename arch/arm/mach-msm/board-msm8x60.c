@@ -1559,8 +1559,6 @@ static void __init msm8x60_init_tlmm(void)
 	if (machine_is_msm8x60_rumi3())
 		msm_gpio_install_direct_irq(0, 0);
 	else if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
-		msm_gpio_install_direct_irq(62, 0);
-
 		for (n = 0; n < ARRAY_SIZE(msm8x60_tlmm_cfgs); ++n)
 			gpio_tlmm_config(msm8x60_tlmm_cfgs[n], 0);
 		for (n = 0; n < ARRAY_SIZE(msm8x60_hdrive_cfgs); ++n)
@@ -1843,15 +1841,10 @@ static void __init msm_fb_add_devices(void)
 
 static void __init msm8x60_cfg_smsc911x(void)
 {
-	if (machine_is_msm8x60_ffa()) {
-		smsc911x_resources[1].start =
-			PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
-		smsc911x_resources[1].end =
-			PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
-	} else {
-		smsc911x_resources[1].start = TLMM_SCSS_DIR_CONN_IRQ_0;
-		smsc911x_resources[1].end = TLMM_SCSS_DIR_CONN_IRQ_0;
-	}
+	smsc911x_resources[1].start =
+		PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
+	smsc911x_resources[1].end =
+		PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
 }
 
 static void __init msm8x60_init(void)
