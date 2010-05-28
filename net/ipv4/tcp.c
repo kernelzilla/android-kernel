@@ -264,6 +264,9 @@
 #include <linux/cache.h>
 #include <linux/err.h>
 #include <linux/crypto.h>
+#ifdef CONFIG_UID_STAT
+#include <linux/uid_stat.h>
+#endif
 
 #include <net/icmp.h>
 #include <net/tcp.h>
@@ -1098,6 +1101,11 @@ out:
 		tcp_push(sk, flags, mss_now, tp->nonagle);
 	TCP_CHECK_TIMER(sk);
 	release_sock(sk);
+
+#ifdef CONFIG_UID_STAT
+	if (copied > 0)
+		update_tcp_snd(current_uid(), copied);
+#endif
 	return copied;
 
 do_fault:
@@ -1340,8 +1348,13 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	tcp_rcv_space_adjust(sk);
 
 	/* Clean up data we have read: This will do ACK frames. */
-	if (copied > 0)
+	if (copied > 0) {
 		tcp_cleanup_rbuf(sk, copied);
+#ifdef CONFIG_UID_STAT
+		update_tcp_rcv(current_uid(), copied);
+#endif
+	}
+
 	return copied;
 }
 
@@ -1737,6 +1750,11 @@ skip_copy:
 
 	TCP_CHECK_TIMER(sk);
 	release_sock(sk);
+
+#ifdef CONFIG_UID_STAT
+	if (copied > 0)
+		update_tcp_rcv(current_uid(), copied);
+#endif
 	return copied;
 
 out:
@@ -1746,6 +1764,10 @@ out:
 
 recv_urg:
 	err = tcp_recv_urg(sk, msg, len, flags);
+#ifdef CONFIG_UID_STAT
+	if (err > 0)
+		update_tcp_rcv(current_uid(), err);
+#endif
 	goto out;
 }
 
