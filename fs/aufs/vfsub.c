@@ -408,6 +408,7 @@ long vfsub_splice_to(struct file *in, loff_t *ppos,
 	lockdep_off();
 	err = do_splice_to(in, ppos, pipe, len, flags);
 	lockdep_on();
+	file_accessed(in);
 	if (err >= 0)
 		vfsub_update_h_iattr(&in->f_path, /*did*/NULL); /*ignore*/
 	return err;
