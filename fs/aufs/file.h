@@ -164,7 +164,7 @@ static inline aufs_bindex_t au_fbstart(struct file *file)
 	return au_fi(file)->fi_btop;
 }
 
-static inline aufs_bindex_t au_fbend(struct file *file)
+static inline aufs_bindex_t au_fbend_dir(struct file *file)
 {
 	FiMustAnyLock(file);
 	AuDebugOn(!au_fi(file)->fi_hdir);
@@ -184,7 +184,7 @@ static inline void au_set_fbstart(struct file *file, aufs_bindex_t bindex)
 	au_fi(file)->fi_btop = bindex;
 }
 
-static inline void au_set_fbend(struct file *file, aufs_bindex_t bindex)
+static inline void au_set_fbend_dir(struct file *file, aufs_bindex_t bindex)
 {
 	FiMustWriteLock(file);
 	AuDebugOn(!au_fi(file)->fi_hdir);

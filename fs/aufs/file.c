@@ -527,7 +527,7 @@ static int refresh_file(struct file *file, int (*reopen)(struct file *file))
 
 	/* error, close all lower files */
 	if (finfo->fi_hdir) {
-		bend = au_fbend(file);
+		bend = au_fbend_dir(file);
 		for (bindex = au_fbstart(file); bindex <= bend; bindex++)
 			au_set_h_fptr(file, bindex, NULL);
 	}

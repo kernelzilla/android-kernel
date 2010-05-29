@@ -55,7 +55,7 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		AuDebugOn(!file->f_dentry->d_inode);
 		AuDebugOn(!S_ISDIR(file->f_dentry->d_inode->i_mode));
 
-		bend = au_fbend(file);
+		bend = au_fbend_dir(file);
 		for (bindex = au_fbstart(file);
 		     bindex <= bend && sz < KMALLOC_MAX_SIZE;
 		     bindex++) {
@@ -108,9 +108,9 @@ static int reopen_dir(struct file *file)
 	au_set_fbstart(file, bstart);
 
 	btail = au_dbtaildir(dentry);
-	for (bindex = au_fbend(file); btail < bindex; bindex--)
+	for (bindex = au_fbend_dir(file); btail < bindex; bindex--)
 		au_set_h_fptr(file, bindex, NULL);
-	au_set_fbend(file, btail);
+	au_set_fbend_dir(file, btail);
 
 	flags = file->f_flags;
 	for (bindex = bstart; bindex <= btail; bindex++) {
@@ -151,7 +151,7 @@ static int do_open_dir(struct file *file, int flags)
 	bindex = au_dbstart(dentry);
 	au_set_fbstart(file, bindex);
 	btail = au_dbtaildir(dentry);
-	au_set_fbend(file, btail);
+	au_set_fbend_dir(file, btail);
 	for (; !err && bindex <= btail; bindex++) {
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (!h_dentry)
@@ -174,7 +174,8 @@ static int do_open_dir(struct file *file, int flags)
 	for (bindex = au_fbstart(file); bindex <= btail; bindex++)
 		au_set_h_fptr(file, bindex, NULL);
 	au_set_fbstart(file, -1);
-	au_set_fbend(file, -1);
+	au_set_fbend_dir(file, -1);
+
 	return err;
 }
 
@@ -242,7 +243,7 @@ static int au_do_flush_dir(struct file *file, fl_owner_t id)
 	struct file *h_file;
 
 	err = 0;
-	bend = au_fbend(file);
+	bend = au_fbend_dir(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
 		h_file = au_hf_dir(file, bindex);
 		if (h_file)
@@ -318,7 +319,7 @@ static int au_do_fsync_dir(struct file *file, int datasync)
 
 	sb = file->f_dentry->d_sb;
 	inode = file->f_dentry->d_inode;
-	bend = au_fbend(file);
+	bend = au_fbend_dir(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
 		h_file = au_hf_dir(file, bindex);
 		if (!h_file || au_test_ro(sb, bindex, inode))
