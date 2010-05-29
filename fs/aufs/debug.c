@@ -372,20 +372,6 @@ void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen)
 	au_dpages_free(&dpages);
 }
 
-void au_dbg_verify_hf(struct au_finfo *finfo)
-{
-	struct au_hfile *hf;
-	aufs_bindex_t bend, bindex;
-
-	if (finfo->fi_btop >= 0) {
-		bend = finfo->fi_hdir->fd_bbot;
-		for (bindex = finfo->fi_btop; bindex <= bend; bindex++) {
-			hf = finfo->fi_hdir->fd_hfile + bindex;
-			AuDebugOn(hf->hf_file || hf->hf_br);
-		}
-	}
-}
-
 void au_dbg_verify_kthread(void)
 {
 	if (au_test_wkq(current)) {
