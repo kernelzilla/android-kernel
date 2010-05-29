@@ -23,11 +23,13 @@
 #include <mach/board.h>
 
 #include "devices.h"
+#include "gpio_hw.h"
 
 #include <asm/mach/flash.h>
 
 #include <asm/mach/mmc.h>
 #include <mach/msm_hsusb.h>
+#include <linux/msm7200a-gpio.h>
 
 static struct resource resources_uart1[] = {
 	{
@@ -868,3 +870,26 @@ struct clk msm_clocks_8x50[] = {
 
 unsigned msm_num_clocks_8x50 = ARRAY_SIZE(msm_clocks_8x50);
 
+#ifdef CONFIG_GPIOLIB
+static struct msm7200a_gpio_platform_data gpio_platform_data[] = {
+	MSM7200A_GPIO_PLATFORM_DATA(0,   0,  15, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(1,  16,  42, INT_GPIO_GROUP2),
+	MSM7200A_GPIO_PLATFORM_DATA(2,  43,  67, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(3,  68,  94, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(4,  95, 103, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(5, 104, 121, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(6, 122, 152, INT_GPIO_GROUP1),
+	MSM7200A_GPIO_PLATFORM_DATA(7, 153, 164, INT_GPIO_GROUP1),
+};
+
+struct platform_device msm_gpio_devices[] = {
+	MSM7200A_GPIO_DEVICE(0, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(1, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(2, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(3, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(4, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(5, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(6, gpio_platform_data),
+	MSM7200A_GPIO_DEVICE(7, gpio_platform_data),
+};
+#endif
