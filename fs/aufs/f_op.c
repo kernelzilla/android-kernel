@@ -371,7 +371,7 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	/* do not revalidate, no si lock */
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
+	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
@@ -401,7 +401,7 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 	wait_event(wq, (file = au_safe_file(vma)));
 
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
+	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
@@ -423,7 +423,7 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 	wait_event(wq, (file = au_safe_file(vma)));
 
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_bstart].hf_file;
+	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);

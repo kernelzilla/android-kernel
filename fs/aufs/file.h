@@ -41,7 +41,7 @@ struct au_finfo {
 
 	struct au_rwsem		fi_rwsem;
 	struct au_hfile		*fi_hfile;
-	aufs_bindex_t		fi_bstart, fi_bend;
+	aufs_bindex_t		fi_btop, fi_bbot;
 
 	union {
 		/* non-dir only */
@@ -152,13 +152,13 @@ AuSimpleRwsemFuncs(fi, struct file *f, &au_fi(f)->fi_rwsem);
 static inline aufs_bindex_t au_fbstart(struct file *file)
 {
 	FiMustAnyLock(file);
-	return au_fi(file)->fi_bstart;
+	return au_fi(file)->fi_btop;
 }
 
 static inline aufs_bindex_t au_fbend(struct file *file)
 {
 	FiMustAnyLock(file);
-	return au_fi(file)->fi_bend;
+	return au_fi(file)->fi_bbot;
 }
 
 static inline struct au_vdir *au_fvdir_cache(struct file *file)
@@ -170,13 +170,13 @@ static inline struct au_vdir *au_fvdir_cache(struct file *file)
 static inline void au_set_fbstart(struct file *file, aufs_bindex_t bindex)
 {
 	FiMustWriteLock(file);
-	au_fi(file)->fi_bstart = bindex;
+	au_fi(file)->fi_btop = bindex;
 }
 
 static inline void au_set_fbend(struct file *file, aufs_bindex_t bindex)
 {
 	FiMustWriteLock(file);
-	au_fi(file)->fi_bend = bindex;
+	au_fi(file)->fi_bbot = bindex;
 }
 
 static inline void au_set_fvdir_cache(struct file *file,

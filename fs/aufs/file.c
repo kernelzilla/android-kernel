@@ -375,7 +375,7 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	sb = dentry->d_sb;
 	inode = dentry->d_inode;
 	bstart = au_ibstart(inode);
-	if (bstart == finfo->fi_bstart)
+	if (bstart == finfo->fi_btop)
 		goto out;
 
 	parent = dget_parent(dentry);
@@ -430,10 +430,10 @@ static void au_do_refresh_file(struct file *file)
 
 	sb = file->f_dentry->d_sb;
 	finfo = au_fi(file);
-	p = finfo->fi_hfile + finfo->fi_bstart;
+	p = finfo->fi_hfile + finfo->fi_btop;
 	brid = p->hf_br->br_id;
-	bend = finfo->fi_bend;
-	for (bindex = finfo->fi_bstart; bindex <= bend; bindex++, p++) {
+	bend = finfo->fi_bbot;
+	for (bindex = finfo->fi_btop; bindex <= bend; bindex++, p++) {
 		if (!p->hf_file)
 			continue;
 
@@ -459,8 +459,8 @@ static void au_do_refresh_file(struct file *file)
 	p = finfo->fi_hfile;
 	if (!au_test_mmapped(file) && !d_unhashed(file->f_dentry)) {
 		bend = au_sbend(sb);
-		for (finfo->fi_bstart = 0; finfo->fi_bstart <= bend;
-		     finfo->fi_bstart++, p++)
+		for (finfo->fi_btop = 0; finfo->fi_btop <= bend;
+		     finfo->fi_btop++, p++)
 			if (p->hf_file) {
 				if (p->hf_file->f_dentry
 				    && p->hf_file->f_dentry->d_inode)
@@ -470,16 +470,16 @@ static void au_do_refresh_file(struct file *file)
 			}
 	} else {
 		bend = au_br_index(sb, brid);
-		for (finfo->fi_bstart = 0; finfo->fi_bstart < bend;
-		     finfo->fi_bstart++, p++)
+		for (finfo->fi_btop = 0; finfo->fi_btop < bend;
+		     finfo->fi_btop++, p++)
 			if (p->hf_file)
 				au_hfput(p, file);
 		bend = au_sbend(sb);
 	}
 
 	p = finfo->fi_hfile + bend;
-	for (finfo->fi_bend = bend; finfo->fi_bend >= finfo->fi_bstart;
-	     finfo->fi_bend--, p--)
+	for (finfo->fi_bbot = bend; finfo->fi_bbot >= finfo->fi_btop;
+	     finfo->fi_bbot--, p--)
 		if (p->hf_file) {
 			if (p->hf_file->f_dentry
 			    && p->hf_file->f_dentry->d_inode)
@@ -487,7 +487,7 @@ static void au_do_refresh_file(struct file *file)
 			else
 				au_hfput(p, file);
 		}
-	AuDebugOn(finfo->fi_bend < finfo->fi_bstart);
+	AuDebugOn(finfo->fi_bbot < finfo->fi_btop);
 }
 
 /*

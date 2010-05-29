@@ -213,9 +213,9 @@ void au_dpri_file(struct file *file)
 	finfo = au_fi(file);
 	if (!finfo)
 		return;
-	if (finfo->fi_bstart < 0)
+	if (finfo->fi_btop < 0)
 		return;
-	for (bindex = finfo->fi_bstart; bindex <= finfo->fi_bend; bindex++) {
+	for (bindex = finfo->fi_btop; bindex <= finfo->fi_bbot; bindex++) {
 		struct au_hfile *hf;
 
 		hf = finfo->fi_hfile + bindex;
@@ -372,9 +372,9 @@ void au_dbg_verify_hf(struct au_finfo *finfo)
 	struct au_hfile *hf;
 	aufs_bindex_t bend, bindex;
 
-	if (finfo->fi_bstart >= 0) {
-		bend = finfo->fi_bend;
-		for (bindex = finfo->fi_bstart; bindex <= bend; bindex++) {
+	if (finfo->fi_btop >= 0) {
+		bend = finfo->fi_bbot;
+		for (bindex = finfo->fi_btop; bindex <= bend; bindex++) {
 			hf = finfo->fi_hfile + bindex;
 			AuDebugOn(hf->hf_file || hf->hf_br);
 		}

@@ -79,13 +79,13 @@ void au_finfo_fin(struct file *file)
 	aufs_bindex_t bindex, bend;
 
 	finfo = au_fi(file);
-	bindex = finfo->fi_bstart;
+	bindex = finfo->fi_btop;
 	if (bindex >= 0) {
 		/*
 		 * calls fput() instead of filp_close(),
 		 * since no dnotify or lock for the lower file.
 		 */
-		bend = finfo->fi_bend;
+		bend = finfo->fi_bbot;
 		for (; bindex <= bend; bindex++)
 			au_set_h_fptr(file, bindex, NULL);
 	}
@@ -120,8 +120,8 @@ int au_finfo_init(struct file *file)
 		goto out_finfo;
 
 	au_rw_write_lock(&finfo->fi_rwsem);
-	finfo->fi_bstart = -1;
-	finfo->fi_bend = -1;
+	finfo->fi_btop = -1;
+	finfo->fi_bbot = -1;
 	atomic_set(&finfo->fi_generation, au_digen(dentry));
 	/* smp_mb(); */ /* atomic_set */
 
@@ -143,7 +143,7 @@ int au_fi_realloc(struct au_finfo *finfo, int nbr)
 	struct au_hfile *hfp;
 
 	err = -ENOMEM;
-	sz = sizeof(*hfp) * (finfo->fi_bend + 1);
+	sz = sizeof(*hfp) * (finfo->fi_bbot + 1);
 	if (!sz)
 		sz = sizeof(*hfp);
 	hfp = au_kzrealloc(finfo->fi_hfile, sz, sizeof(*hfp) * nbr, GFP_NOFS);
