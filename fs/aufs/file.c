@@ -331,6 +331,32 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 
 /* ---------------------------------------------------------------------- */
 
+int au_do_flush(struct file *file, fl_owner_t id,
+		int (*flush)(struct file *file, fl_owner_t id))
+{
+	int err;
+	struct dentry *dentry;
+	struct super_block *sb;
+	struct inode *inode;
+
+	dentry = file->f_dentry;
+	sb = dentry->d_sb;
+	inode = dentry->d_inode;
+	si_noflush_read_lock(sb);
+	fi_read_lock(file);
+	di_read_lock_child(dentry, AuLock_IW);
+
+	err = flush(file, id);
+	au_cpup_attr_timesizes(inode);
+
+	di_read_unlock(dentry, AuLock_IW);
+	fi_read_unlock(file);
+	si_read_unlock(sb);
+	return err;
+}
+
+/* ---------------------------------------------------------------------- */
+
 static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 {
 	int err;

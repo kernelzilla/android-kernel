@@ -202,6 +202,29 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 
 /* ---------------------------------------------------------------------- */
 
+static int au_do_flush_dir(struct file *file, fl_owner_t id)
+{
+	int err;
+	aufs_bindex_t bindex, bend;
+	struct file *h_file;
+
+	err = 0;
+	bend = au_fbend(file);
+	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
+		h_file = au_h_fptr(file, bindex);
+		if (h_file)
+			err = vfsub_flush(h_file, id);
+	}
+	return err;
+}
+
+static int aufs_flush_dir(struct file *file, fl_owner_t id)
+{
+	return au_do_flush(file, id, au_do_flush_dir);
+}
+
+/* ---------------------------------------------------------------------- */
+
 static int au_do_fsync_dir_no_file(struct dentry *dentry, int datasync)
 {
 	int err;
@@ -575,6 +598,6 @@ struct file_operations aufs_dir_fop = {
 	.unlocked_ioctl	= aufs_ioctl_dir,
 	.open		= aufs_open_dir,
 	.release	= aufs_release_dir,
-	.flush		= aufs_flush,
+	.flush		= aufs_flush_dir,
 	.fsync		= aufs_fsync_dir
 };

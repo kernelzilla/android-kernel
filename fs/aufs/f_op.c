@@ -27,41 +27,6 @@
 #include <linux/security.h>
 #include "aufs.h"
 
-/* common function to regular file and dir */
-int aufs_flush(struct file *file, fl_owner_t id)
-{
-	int err;
-	aufs_bindex_t bindex, bend;
-	struct dentry *dentry;
-	struct file *h_file;
-
-	dentry = file->f_dentry;
-	si_noflush_read_lock(dentry->d_sb);
-	fi_read_lock(file);
-	di_read_lock_child(dentry, AuLock_IW);
-
-	err = 0;
-	bend = au_fbend(file);
-	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
-		h_file = au_h_fptr(file, bindex);
-		if (!h_file || !h_file->f_op || !h_file->f_op->flush)
-			continue;
-
-		err = h_file->f_op->flush(h_file, id);
-		if (!err)
-			vfsub_update_h_iattr(&h_file->f_path, /*did*/NULL);
-		/*ignore*/
-	}
-	au_cpup_attr_timesizes(dentry->d_inode);
-
-	di_read_unlock(dentry, AuLock_IW);
-	fi_read_unlock(file);
-	si_read_unlock(dentry->d_sb);
-	return err;
-}
-
-/* ---------------------------------------------------------------------- */
-
 int au_do_open_nondir(struct file *file, int flags)
 {
 	int err;
@@ -106,6 +71,25 @@ int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file)
 {
 	au_finfo_fin(file);
 	return 0;
+}
+
+/* ---------------------------------------------------------------------- */
+
+static int au_do_flush_nondir(struct file *file, fl_owner_t id)
+{
+	int err;
+	struct file *h_file;
+
+	err = 0;
+	h_file = au_h_fptr(file, au_fbstart(file));
+	if (h_file)
+		err = vfsub_flush(h_file, id);
+	return err;
+}
+
+static int aufs_flush_nondir(struct file *file, fl_owner_t id)
+{
+	return au_do_flush(file, id, au_do_flush_nondir);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -872,7 +856,7 @@ struct file_operations aufs_file_fop = {
 	.unlocked_ioctl	= aufs_ioctl_nondir,
 	.mmap		= aufs_mmap,
 	.open		= aufs_open_nondir,
-	.flush		= aufs_flush,
+	.flush		= aufs_flush_nondir,
 	.release	= aufs_release_nondir,
 	.fsync		= aufs_fsync_nondir,
 	/* .aio_fsync	= aufs_aio_fsync_nondir, */

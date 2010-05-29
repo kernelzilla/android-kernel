@@ -387,6 +387,20 @@ ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count, loff_t *ppos)
 	return err;
 }
 
+int vfsub_flush(struct file *file, fl_owner_t id)
+{
+	int err;
+
+	err = 0;
+	if (file->f_op && file->f_op->flush) {
+		err = file->f_op->flush(file, id);
+		if (!err)
+			vfsub_update_h_iattr(&file->f_path, /*did*/NULL);
+		/*ignore*/
+	}
+	return err;
+}
+
 int vfsub_readdir(struct file *file, filldir_t filldir, void *arg)
 {
 	int err;
