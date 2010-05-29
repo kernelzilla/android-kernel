@@ -95,7 +95,7 @@ static int au_do_flush_nondir(struct file *file, fl_owner_t id)
 	struct file *h_file;
 
 	err = 0;
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	if (h_file)
 		err = vfsub_flush(h_file, id);
 	return err;
@@ -123,7 +123,7 @@ static ssize_t aufs_read(struct file *file, char __user *buf, size_t count,
 	if (unlikely(err))
 		goto out;
 
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	err = vfsub_read_u(h_file, buf, count, ppos);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
@@ -140,7 +140,6 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 			  size_t count, loff_t *ppos)
 {
 	ssize_t err;
-	aufs_bindex_t bstart;
 	struct au_pin pin;
 	struct dentry *dentry;
 	struct inode *inode;
@@ -163,8 +162,7 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 	if (unlikely(err))
 		goto out_unlock;
 
-	bstart = au_fbstart(file);
-	h_file = au_h_fptr(file, bstart);
+	h_file = au_hf_top(file);
 	au_unpin(&pin);
 	err = vfsub_write_u(h_file, buf, count, ppos);
 	au_cpup_attr_timesizes(inode);
@@ -226,7 +224,7 @@ static ssize_t aufs_aio_read(struct kiocb *kio, const struct iovec *iov,
 	if (unlikely(err))
 		goto out;
 
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	err = au_do_aio(h_file, MAY_READ, kio, iov, nv, pos);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
@@ -265,7 +263,7 @@ static ssize_t aufs_aio_write(struct kiocb *kio, const struct iovec *iov,
 		goto out_unlock;
 
 	au_unpin(&pin);
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	err = au_do_aio(h_file, MAY_WRITE, kio, iov, nv, pos);
 	au_cpup_attr_timesizes(inode);
 	inode->i_mode = h_file->f_dentry->d_inode->i_mode;
@@ -296,7 +294,7 @@ static ssize_t aufs_splice_read(struct file *file, loff_t *ppos,
 		goto out;
 
 	err = -EINVAL;
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	if (au_test_loopback_kthread()) {
 		file->f_mapping = h_file->f_mapping;
 		smp_mb(); /* unnecessary? */
@@ -340,7 +338,7 @@ aufs_splice_write(struct pipe_inode_info *pipe, struct file *file, loff_t *ppos,
 	if (unlikely(err))
 		goto out_unlock;
 
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	au_unpin(&pin);
 	err = vfsub_splice_from(pipe, h_file, ppos, len, flags);
 	au_cpup_attr_timesizes(inode);
@@ -595,7 +593,7 @@ static int au_mmap_pre(struct file *file, struct vm_area_struct *vma,
 		di_write_unlock(dentry);
 	bstart = au_fbstart(file);
 	*br = au_sbr(sb, bstart);
-	*h_file = au_h_fptr(file, bstart);
+	*h_file = au_hf_top(file);
 	get_file(*h_file);
 	au_fi_mmap_lock(file);
 
@@ -721,7 +719,7 @@ static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 	au_unpin(&pin);
 
 	err = -EINVAL;
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	if (h_file->f_op && h_file->f_op->fsync) {
 		struct dentry *h_d;
 		struct mutex *h_mtx;
@@ -786,7 +784,7 @@ static int aufs_aio_fsync_nondir(struct kiocb *kio, int datasync)
 	au_unpin(&pin);
 
 	err = -ENOSYS;
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	if (h_file->f_op && h_file->f_op->aio_fsync) {
 		struct dentry *h_d;
 		struct mutex *h_mtx;
@@ -831,7 +829,7 @@ static int aufs_fasync(int fd, struct file *file, int flag)
 	if (unlikely(err))
 		goto out;
 
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	if (h_file->f_op && h_file->f_op->fasync)
 		err = h_file->f_op->fasync(fd, h_file, flag);
 

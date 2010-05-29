@@ -162,7 +162,7 @@ int au_reopen_nondir(struct file *file)
 	bstart = au_dbstart(dentry);
 	h_file_tmp = NULL;
 	if (au_fbstart(file) == bstart) {
-		h_file = au_h_fptr(file, bstart);
+		h_file = au_hf_top(file);
 		if (file->f_mode == h_file->f_mode)
 			return 0; /* success */
 		h_file_tmp = h_file;
@@ -259,7 +259,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	AuDebugOn(au_special_file(inode->i_mode));
 	bstart = au_fbstart(file);
 	err = au_test_ro(sb, bstart, inode);
-	if (!err && (au_h_fptr(file, bstart)->f_mode & FMODE_WRITE)) {
+	if (!err && (au_hf_top(file)->f_mode & FMODE_WRITE)) {
 		err = au_pin(pin, dentry, bstart, AuOpt_UDBA_NONE, /*flags*/0);
 		goto out;
 	}
@@ -284,7 +284,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	if (unlikely(err))
 		goto out_dgrade;
 
-	h_dentry = au_h_fptr(file, bstart)->f_dentry;
+	h_dentry = au_hf_top(file)->f_dentry;
 	h_inode = h_dentry->d_inode;
 	mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 	h_file = au_h_open_pre(dentry, bstart);

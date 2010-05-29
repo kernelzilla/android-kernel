@@ -184,7 +184,7 @@ static int au_rdu(struct file *file, struct aufs_rdu *rdu)
 	/* AuDbg("b%d, b%d\n", cookie->bindex, bend); */
 	for (; !err && cookie->bindex <= bend;
 	     cookie->bindex++, cookie->h_pos = 0) {
-		h_file = au_h_fptr(file, cookie->bindex);
+		h_file = au_hf_dir(file, cookie->bindex);
 		if (!h_file)
 			continue;
 

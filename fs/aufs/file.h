@@ -199,15 +199,18 @@ static inline void au_set_fvdir_cache(struct file *file,
 	au_fi(file)->fi_hdir->fd_vdir_cache = vdir_cache;
 }
 
-static inline struct file *au_h_fptr(struct file *file, aufs_bindex_t bindex)
+static inline struct file *au_hf_top(struct file *file)
 {
 	FiMustAnyLock(file);
-	if (!au_fi(file)->fi_hdir) {
-		if (au_fi(file)->fi_btop == bindex)
-			return au_fi(file)->fi_htop.hf_file;
-		return NULL;
-	} else
-		return au_fi(file)->fi_hdir->fd_hfile[0 + bindex].hf_file;
+	AuDebugOn(au_fi(file)->fi_hdir);
+	return au_fi(file)->fi_htop.hf_file;
+}
+
+static inline struct file *au_hf_dir(struct file *file, aufs_bindex_t bindex)
+{
+	FiMustAnyLock(file);
+	AuDebugOn(!au_fi(file)->fi_hdir);
+	return au_fi(file)->fi_hdir->fd_hfile[0 + bindex].hf_file;
 }
 
 /* todo: memory barrier? */

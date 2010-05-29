@@ -59,7 +59,7 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		for (bindex = au_fbstart(file);
 		     bindex <= bend && sz < KMALLOC_MAX_SIZE;
 		     bindex++) {
-			h_file = au_h_fptr(file, bindex);
+			h_file = au_hf_dir(file, bindex);
 			if (h_file
 			    && h_file->f_dentry
 			    && h_file->f_dentry->d_inode)
@@ -117,7 +117,7 @@ static int reopen_dir(struct file *file)
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (!h_dentry)
 			continue;
-		h_file = au_h_fptr(file, bindex);
+		h_file = au_hf_dir(file, bindex);
 		if (h_file)
 			continue;
 
@@ -244,7 +244,7 @@ static int au_do_flush_dir(struct file *file, fl_owner_t id)
 	err = 0;
 	bend = au_fbend(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
-		h_file = au_h_fptr(file, bindex);
+		h_file = au_hf_dir(file, bindex);
 		if (h_file)
 			err = vfsub_flush(h_file, id);
 	}
@@ -320,7 +320,7 @@ static int au_do_fsync_dir(struct file *file, int datasync)
 	inode = file->f_dentry->d_inode;
 	bend = au_fbend(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
-		h_file = au_h_fptr(file, bindex);
+		h_file = au_hf_dir(file, bindex);
 		if (!h_file || au_test_ro(sb, bindex, inode))
 			continue;
 

@@ -585,7 +585,7 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 	bstart = au_fbstart(file);
 	bend = au_fbend(file);
 	for (bindex = bstart; !err && bindex <= bend; bindex++) {
-		hf = au_h_fptr(file, bindex);
+		hf = au_hf_dir(file, bindex);
 		if (!hf)
 			continue;
 
