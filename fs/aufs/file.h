@@ -36,26 +36,33 @@ struct au_hfile {
 };
 
 struct au_vdir;
+struct au_fidir {
+	aufs_bindex_t		fd_bbot;
+	aufs_bindex_t		fd_nent;
+	struct au_vdir		*fd_vdir_cache;
+	struct au_hfile		fd_hfile[];
+};
+
+static inline int au_fidir_sz(int nent)
+{
+       AuDebugOn(nent < 0);
+       return sizeof(struct au_fidir) + sizeof(struct au_hfile) * nent;
+}
+
 struct au_finfo {
 	atomic_t		fi_generation;
 
 	struct au_rwsem		fi_rwsem;
-	struct au_hfile		*fi_hfile;
-	aufs_bindex_t		fi_btop, fi_bbot;
+	aufs_bindex_t		fi_btop;
 
-	union {
-		/* non-dir only */
-		struct {
-			struct vm_operations_struct	*fi_hvmop;
-			struct mutex			fi_vm_mtx;
-			struct mutex			fi_mmap;
-		};
-
-		/* dir only */
-		struct {
-			struct au_vdir		*fi_vdir_cache;
-		};
+	/* do not union them */
+	struct {				/* for non-dir */
+		struct au_hfile			fi_htop;
+		struct vm_operations_struct	*fi_hvmop;
+		struct mutex			fi_vm_mtx;
+		struct mutex			fi_mmap;
 	};
+	struct au_fidir		*fi_hdir;	/* for dir only */
 } ____cacheline_aligned_in_smp;
 
 /* ---------------------------------------------------------------------- */
@@ -66,7 +73,8 @@ void au_store_oflag(struct nameidata *nd, struct inode *inode);
 unsigned int au_file_roflags(unsigned int flags);
 struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 		       struct file *file);
-int au_do_open(struct file *file, int (*open)(struct file *file, int flags));
+int au_do_open(struct file *file, int (*open)(struct file *file, int flags),
+	       struct au_fidir *fidir);
 int au_reopen_nondir(struct file *file);
 struct au_pin;
 int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin);
@@ -118,11 +126,12 @@ void au_set_h_fptr(struct file *file, aufs_bindex_t bindex,
 void au_update_figen(struct file *file);
 void au_fi_mmap_lock(struct file *file);
 void au_fi_mmap_unlock(struct file *file);
+struct au_fidir *au_fidir_alloc(struct super_block *sb);
+int au_fidir_realloc(struct au_finfo *finfo, int nbr);
 
 void au_fi_init_once(void *_fi);
 void au_finfo_fin(struct file *file);
-int au_finfo_init(struct file *file);
-int au_fi_realloc(struct au_finfo *finfo, int nbr);
+int au_finfo_init(struct file *file, struct au_fidir *fidir);
 
 /* ioctl.c */
 long aufs_ioctl_nondir(struct file *file, unsigned int cmd, unsigned long arg);
@@ -158,13 +167,15 @@ static inline aufs_bindex_t au_fbstart(struct file *file)
 static inline aufs_bindex_t au_fbend(struct file *file)
 {
 	FiMustAnyLock(file);
-	return au_fi(file)->fi_bbot;
+	AuDebugOn(!au_fi(file)->fi_hdir);
+	return au_fi(file)->fi_hdir->fd_bbot;
 }
 
 static inline struct au_vdir *au_fvdir_cache(struct file *file)
 {
 	FiMustAnyLock(file);
-	return au_fi(file)->fi_vdir_cache;
+	AuDebugOn(!au_fi(file)->fi_hdir);
+	return au_fi(file)->fi_hdir->fd_vdir_cache;
 }
 
 static inline void au_set_fbstart(struct file *file, aufs_bindex_t bindex)
@@ -176,20 +187,27 @@ static inline void au_set_fbstart(struct file *file, aufs_bindex_t bindex)
 static inline void au_set_fbend(struct file *file, aufs_bindex_t bindex)
 {
 	FiMustWriteLock(file);
-	au_fi(file)->fi_bbot = bindex;
+	AuDebugOn(!au_fi(file)->fi_hdir);
+	au_fi(file)->fi_hdir->fd_bbot = bindex;
 }
 
 static inline void au_set_fvdir_cache(struct file *file,
 				      struct au_vdir *vdir_cache)
 {
 	FiMustWriteLock(file);
-	au_fi(file)->fi_vdir_cache = vdir_cache;
+	AuDebugOn(!au_fi(file)->fi_hdir);
+	au_fi(file)->fi_hdir->fd_vdir_cache = vdir_cache;
 }
 
 static inline struct file *au_h_fptr(struct file *file, aufs_bindex_t bindex)
 {
 	FiMustAnyLock(file);
-	return au_fi(file)->fi_hfile[0 + bindex].hf_file;
+	if (!au_fi(file)->fi_hdir) {
+		if (au_fi(file)->fi_btop == bindex)
+			return au_fi(file)->fi_htop.hf_file;
+		return NULL;
+	} else
+		return au_fi(file)->fi_hdir->fd_hfile[0 + bindex].hf_file;
 }
 
 /* todo: memory barrier? */

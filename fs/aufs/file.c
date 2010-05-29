@@ -125,35 +125,35 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	return h_file;
 }
 
-int au_do_open(struct file *file, int (*open)(struct file *file, int flags))
+int au_do_open(struct file *file, int (*open)(struct file *file, int flags),
+	       struct au_fidir *fidir)
 {
 	int err;
 	struct dentry *dentry;
-	struct super_block *sb;
 
-	dentry = file->f_dentry;
-	sb = dentry->d_sb;
-	si_read_lock(sb, AuLock_FLUSH);
-	err = au_finfo_init(file);
+	err = au_finfo_init(file, fidir);
 	if (unlikely(err))
 		goto out;
 
+	dentry = file->f_dentry;
 	di_read_lock_child(dentry, AuLock_IR);
 	err = open(file, file->f_flags);
 	di_read_unlock(dentry, AuLock_IR);
 
 	fi_write_unlock(file);
-	if (unlikely(err))
+	if (unlikely(err)) {
+		au_fi(file)->fi_hdir = NULL;
 		au_finfo_fin(file);
+	}
+
  out:
-	si_read_unlock(sb);
 	return err;
 }
 
 int au_reopen_nondir(struct file *file)
 {
 	int err;
-	aufs_bindex_t bstart, bindex, bend;
+	aufs_bindex_t bstart;
 	struct dentry *dentry;
 	struct file *h_file, *h_file_tmp;
 
@@ -169,8 +169,8 @@ int au_reopen_nondir(struct file *file)
 		get_file(h_file_tmp);
 		au_set_h_fptr(file, bstart, NULL);
 	}
-	AuDebugOn(au_fbstart(file) < bstart
-		  || au_fi(file)->fi_hfile[0 + bstart].hf_file);
+	AuDebugOn(au_fi(file)->fi_hdir);
+	AuDebugOn(au_fbstart(file) < bstart);
 
 	h_file = au_h_open(dentry, bstart, file->f_flags & ~O_TRUNC, file);
 	err = PTR_ERR(h_file);
@@ -183,12 +183,6 @@ int au_reopen_nondir(struct file *file)
 	au_update_figen(file);
 	/* todo: necessary? */
 	/* file->f_ra = h_file->f_ra; */
-
-	/* close lower files */
-	bend = au_fbend(file);
-	for (bindex = bstart + 1; bindex <= bend; bindex++)
-		au_set_h_fptr(file, bindex, NULL);
-	au_set_fbend(file, bstart);
 
  out:
 	if (h_file_tmp)
@@ -425,14 +419,17 @@ static void au_do_refresh_file(struct file *file)
 	struct au_hfile *p, tmp, *q;
 	struct au_finfo *finfo;
 	struct super_block *sb;
+	struct au_fidir *fidir;
 
 	FiMustWriteLock(file);
 
 	sb = file->f_dentry->d_sb;
 	finfo = au_fi(file);
-	p = finfo->fi_hfile + finfo->fi_btop;
+	fidir = finfo->fi_hdir;
+	AuDebugOn(!fidir);
+	p = fidir->fd_hfile + finfo->fi_btop;
 	brid = p->hf_br->br_id;
-	bend = finfo->fi_bbot;
+	bend = fidir->fd_bbot;
 	for (bindex = finfo->fi_btop; bindex <= bend; bindex++, p++) {
 		if (!p->hf_file)
 			continue;
@@ -446,7 +443,7 @@ static void au_do_refresh_file(struct file *file)
 		}
 
 		/* swap two lower inode, and loop again */
-		q = finfo->fi_hfile + new_bindex;
+		q = fidir->fd_hfile + new_bindex;
 		tmp = *q;
 		*q = *p;
 		*p = tmp;
@@ -456,7 +453,7 @@ static void au_do_refresh_file(struct file *file)
 		}
 	}
 
-	p = finfo->fi_hfile;
+	p = fidir->fd_hfile;
 	if (!au_test_mmapped(file) && !d_unhashed(file->f_dentry)) {
 		bend = au_sbend(sb);
 		for (finfo->fi_btop = 0; finfo->fi_btop <= bend;
@@ -477,9 +474,9 @@ static void au_do_refresh_file(struct file *file)
 		bend = au_sbend(sb);
 	}
 
-	p = finfo->fi_hfile + bend;
-	for (finfo->fi_bbot = bend; finfo->fi_bbot >= finfo->fi_btop;
-	     finfo->fi_bbot--, p--)
+	p = fidir->fd_hfile + bend;
+	for (fidir->fd_bbot = bend; fidir->fd_bbot >= finfo->fi_btop;
+	     fidir->fd_bbot--, p--)
 		if (p->hf_file) {
 			if (p->hf_file->f_dentry
 			    && p->hf_file->f_dentry->d_inode)
@@ -487,7 +484,7 @@ static void au_do_refresh_file(struct file *file)
 			else
 				au_hfput(p, file);
 		}
-	AuDebugOn(finfo->fi_bbot < finfo->fi_btop);
+	AuDebugOn(fidir->fd_bbot < finfo->fi_btop);
 }
 
 /*
@@ -496,14 +493,26 @@ static void au_do_refresh_file(struct file *file)
 static int refresh_file(struct file *file, int (*reopen)(struct file *file))
 {
 	int err, need_reopen;
-	struct dentry *dentry;
 	aufs_bindex_t bend, bindex;
+	struct dentry *dentry;
+	struct au_finfo *finfo;
+	struct au_hfile *hfile;
 
 	dentry = file->f_dentry;
-	err = au_fi_realloc(au_fi(file), au_sbend(dentry->d_sb) + 1);
-	if (unlikely(err))
-		goto out;
-	au_do_refresh_file(file);
+	finfo = au_fi(file);
+	if (!finfo->fi_hdir) {
+		hfile = &finfo->fi_htop;
+		AuDebugOn(!hfile->hf_file);
+		bindex = au_br_index(dentry->d_sb, hfile->hf_br->br_id);
+		AuDebugOn(bindex < 0);
+		if (bindex != finfo->fi_btop)
+			au_set_fbstart(file, bindex);
+	} else {
+		err = au_fidir_realloc(finfo, au_sbend(dentry->d_sb) + 1);
+		if (unlikely(err))
+			goto out;
+		au_do_refresh_file(file);
+	}
 
 	err = 0;
 	need_reopen = 1;
@@ -513,13 +522,15 @@ static int refresh_file(struct file *file, int (*reopen)(struct file *file))
 		err = reopen(file);
 	if (!err) {
 		au_update_figen(file);
-		return 0; /* success */
+		goto out; /* success */
 	}
 
 	/* error, close all lower files */
-	bend = au_fbend(file);
-	for (bindex = au_fbstart(file); bindex <= bend; bindex++)
-		au_set_h_fptr(file, bindex, NULL);
+	if (finfo->fi_hdir) {
+		bend = au_fbend(file);
+		for (bindex = au_fbstart(file); bindex <= bend; bindex++)
+			au_set_h_fptr(file, bindex, NULL);
+	}
 
  out:
 	return err;

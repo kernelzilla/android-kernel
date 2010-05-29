@@ -251,7 +251,14 @@ static int au_do_open_sp(struct file *file, int flags)
 
 static int aufs_open_sp(struct inode *inode, struct file *file)
 {
-	return au_do_open(file, au_do_open_sp);
+	int err;
+	struct super_block *sb;
+
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	err = au_do_open(file, au_do_open_sp, /*fidir*/NULL);
+	si_read_unlock(sb);
+	return err;
 }
 
 /* ---------------------------------------------------------------------- */

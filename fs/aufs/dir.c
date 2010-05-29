@@ -147,7 +147,6 @@ static int do_open_dir(struct file *file, int flags)
 
 	err = 0;
 	dentry = file->f_dentry;
-	au_set_fvdir_cache(file, NULL);
 	file->f_version = dentry->d_inode->i_version;
 	bindex = au_dbstart(dentry);
 	au_set_fbstart(file, bindex);
@@ -182,7 +181,21 @@ static int do_open_dir(struct file *file, int flags)
 static int aufs_open_dir(struct inode *inode __maybe_unused,
 			 struct file *file)
 {
-	return au_do_open(file, do_open_dir);
+	int err;
+	struct super_block *sb;
+	struct au_fidir *fidir;
+
+	err = -ENOMEM;
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	fidir = au_fidir_alloc(inode->i_sb);
+	if (fidir) {
+		err = au_do_open(file, do_open_dir, fidir);
+		if (unlikely(err))
+			kfree(fidir);
+	}
+	si_read_unlock(sb);
+	return err;
 }
 
 static int aufs_release_dir(struct inode *inode __maybe_unused,
@@ -190,12 +203,32 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 {
 	struct au_vdir *vdir_cache;
 	struct super_block *sb;
+	struct au_finfo *finfo;
+	struct au_fidir *fidir;
+	aufs_bindex_t bindex, bend;
 
-	sb = file->f_dentry->d_sb;
-	vdir_cache = au_fi(file)->fi_vdir_cache; /* lock-free */
-	if (vdir_cache)
-		au_vdir_free(vdir_cache);
 	au_plink_maint_leave(file);
+	sb = file->f_dentry->d_sb;
+	finfo = au_fi(file);
+	fidir = finfo->fi_hdir;
+	if (fidir) {
+		vdir_cache = fidir->fd_vdir_cache; /* lock-free */
+		if (vdir_cache)
+			au_vdir_free(vdir_cache);
+
+		bindex = finfo->fi_btop;
+		if (bindex >= 0) {
+			/*
+			 * calls fput() instead of filp_close(),
+			 * since no dnotify or lock for the lower file.
+			 */
+			bend = fidir->fd_bbot;
+			for (; bindex <= bend; bindex++)
+				au_set_h_fptr(file, bindex, NULL);
+		}
+		kfree(fidir);
+		finfo->fi_hdir = NULL;
+	}
 	au_finfo_fin(file);
 	return 0;
 }

@@ -40,8 +40,8 @@ int au_do_open_nondir(struct file *file, int flags)
 	err = 0;
 	dentry = file->f_dentry;
 	finfo = au_fi(file);
+	memset(&finfo->fi_htop, 0, sizeof(finfo->fi_htop));
 	finfo->fi_hvmop = NULL;
-	mutex_init(&finfo->fi_mmap); /* regular file only? */
 	bindex = au_dbstart(dentry);
 	/* O_TRUNC is processed already */
 	BUG_ON(au_test_ro(dentry->d_sb, bindex, dentry->d_inode)
@@ -52,7 +52,6 @@ int au_do_open_nondir(struct file *file, int flags)
 		err = PTR_ERR(h_file);
 	else {
 		au_set_fbstart(file, bindex);
-		au_set_fbend(file, bindex);
 		au_set_h_fptr(file, bindex, h_file);
 		au_update_figen(file);
 		/* todo: necessary? */
@@ -64,11 +63,26 @@ int au_do_open_nondir(struct file *file, int flags)
 static int aufs_open_nondir(struct inode *inode __maybe_unused,
 			    struct file *file)
 {
-	return au_do_open(file, au_do_open_nondir);
+	int err;
+	struct super_block *sb;
+
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	err = au_do_open(file, au_do_open_nondir, /*fidir*/NULL);
+	si_read_unlock(sb);
+	return err;
 }
 
 int aufs_release_nondir(struct inode *inode __maybe_unused, struct file *file)
 {
+	struct au_finfo *finfo;
+	aufs_bindex_t bindex;
+
+	finfo = au_fi(file);
+	bindex = finfo->fi_btop;
+	if (bindex >= 0)
+		au_set_h_fptr(file, bindex, NULL);
+
 	au_finfo_fin(file);
 	return 0;
 }
@@ -371,7 +385,8 @@ static int aufs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	/* do not revalidate, no si lock */
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
+	AuDebugOn(finfo->fi_hdir);
+	h_file = finfo->fi_htop.hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
@@ -401,7 +416,8 @@ static int aufs_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 	wait_event(wq, (file = au_safe_file(vma)));
 
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
+	AuDebugOn(finfo->fi_hdir);
+	h_file = finfo->fi_htop.hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
@@ -423,7 +439,8 @@ static void aufs_vm_close(struct vm_area_struct *vma)
 	wait_event(wq, (file = au_safe_file(vma)));
 
 	finfo = au_fi(file);
-	h_file = finfo->fi_hfile[0 + finfo->fi_btop].hf_file;
+	AuDebugOn(finfo->fi_hdir);
+	h_file = finfo->fi_htop.hf_file;
 	AuDebugOn(!h_file || !finfo->fi_hvmop);
 
 	mutex_lock(&finfo->fi_vm_mtx);
@@ -654,10 +671,8 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_ops = vmop;
 	vma->vm_flags = h_vmflags;
-	if (!args.mmapped) {
+	if (!args.mmapped)
 		finfo->fi_hvmop = h_vmop;
-		mutex_init(&finfo->fi_vm_mtx);
-	}
 
 	vfsub_file_accessed(args.h_file);
 	/* update without lock, I don't think it a problem */
