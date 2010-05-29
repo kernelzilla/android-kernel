@@ -413,7 +413,7 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	return err;
 }
 
-static void au_do_refresh_file(struct file *file)
+static void au_do_refresh_dir(struct file *file)
 {
 	aufs_bindex_t bindex, bend, new_bindex, brid;
 	struct au_hfile *p, tmp, *q;
@@ -511,7 +511,7 @@ static int refresh_file(struct file *file, int (*reopen)(struct file *file))
 		err = au_fidir_realloc(finfo, au_sbend(dentry->d_sb) + 1);
 		if (unlikely(err))
 			goto out;
-		au_do_refresh_file(file);
+		au_do_refresh_dir(file);
 	}
 
 	err = 0;
