@@ -203,6 +203,8 @@ static int do_pri_file(aufs_bindex_t bindex, struct file *file)
 void au_dpri_file(struct file *file)
 {
 	struct au_finfo *finfo;
+	struct au_fidir *fidir;
+	struct au_hfile *hfile;
 	aufs_bindex_t bindex;
 	int err;
 
@@ -213,14 +215,17 @@ void au_dpri_file(struct file *file)
 	finfo = au_fi(file);
 	if (!finfo)
 		return;
-	if (finfo->fi_bstart < 0)
+	if (finfo->fi_btop < 0)
 		return;
-	for (bindex = finfo->fi_bstart; bindex <= finfo->fi_bend; bindex++) {
-		struct au_hfile *hf;
-
-		hf = finfo->fi_hfile + bindex;
-		do_pri_file(bindex, hf ? hf->hf_file : NULL);
-	}
+	fidir = finfo->fi_hdir;
+	if (!fidir)
+		do_pri_file(finfo->fi_btop, finfo->fi_htop.hf_file);
+	else
+		for (bindex = finfo->fi_btop; bindex <= fidir->fd_bbot;
+		     bindex++) {
+			hfile = fidir->fd_hfile + bindex;
+			do_pri_file(bindex, hfile ? hfile->hf_file : NULL);
+		}
 }
 
 static int do_pri_br(aufs_bindex_t bindex, struct au_branch *br)
@@ -365,20 +370,6 @@ void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen)
 			AuDebugOn(au_digen(dentries[j]) != sigen);
 	}
 	au_dpages_free(&dpages);
-}
-
-void au_dbg_verify_hf(struct au_finfo *finfo)
-{
-	struct au_hfile *hf;
-	aufs_bindex_t bend, bindex;
-
-	if (finfo->fi_bstart >= 0) {
-		bend = finfo->fi_bend;
-		for (bindex = finfo->fi_bstart; bindex <= bend; bindex++) {
-			hf = finfo->fi_hfile + bindex;
-			AuDebugOn(hf->hf_file || hf->hf_br);
-		}
-	}
 }
 
 void au_dbg_verify_kthread(void)
