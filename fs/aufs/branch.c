@@ -880,7 +880,7 @@ static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)
 			continue;
 		}
 
-		hf = au_h_fptr(file, bstart);
+		hf = au_hf_top(file);
 		FiMustNoWaiters(file);
 		fi_read_unlock(file);
 

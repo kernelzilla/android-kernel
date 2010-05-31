@@ -816,8 +816,7 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	hdp[0 + bdst].hd_dentry = wh_dentry;
 	h_d_start = hdp[0 + bstart].hd_dentry;
 	if (file)
-		hdp[0 + bstart].hd_dentry
-			= au_h_fptr(file, au_fbstart(file))->f_dentry;
+		hdp[0 + bstart].hd_dentry = au_hf_top(file)->f_dentry;
 	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME,
 			     /*h_parent*/NULL);
 	if (!err && file) {
@@ -914,7 +913,7 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 
 		/* this temporary unlock is safe */
 		if (file)
-			h_dentry = au_h_fptr(file, au_fbstart(file))->f_dentry;
+			h_dentry = au_hf_top(file)->f_dentry;
 		else
 			h_dentry = au_h_dptr(dentry, au_dbstart(dentry));
 		h_inode = h_dentry->d_inode;

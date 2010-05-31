@@ -630,7 +630,7 @@ static int aufs_setattr(struct dentry *dentry, struct iattr *ia)
 		err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/1);
 		if (unlikely(err))
 			goto out_si;
-		ia->ia_file = au_h_fptr(file, au_fbstart(file));
+		ia->ia_file = au_hf_top(file);
 		a->udba = AuOpt_UDBA_NONE;
 	} else {
 		/* fchmod() doesn't pass ia_file */
