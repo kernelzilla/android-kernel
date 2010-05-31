@@ -28,6 +28,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/msm7200a-gpio.h>
+#include <linux/pm_runtime.h>
 
 /*
  * The INT_STATUS register latches both edge- and level-detection events,
@@ -37,12 +38,20 @@
  */
 #define MSM_GPIO_DONT_LATCH_LEVEL_IRQS 1
 
+enum {
+	IRQ_MASK_NORMAL = 0,
+	IRQ_MASK_WAKE_ON,
+	NUM_IRQ_MASKS
+};
+
 struct msm_gpio_dev {
 	struct gpio_chip		gpio_chip;
 	spinlock_t			lock;
 	unsigned			irq_base;
 	unsigned			irq_summary;
 	struct msm7200a_gpio_regs	regs;
+	u32				irq_masks[NUM_IRQ_MASKS];
+	int				nsuspend;
 };
 
 #define TO_MSM_GPIO_DEV(c) container_of(c, struct msm_gpio_dev, gpio_chip)
@@ -162,7 +171,8 @@ static void msm_gpio_irq_mask(unsigned int irq)
 
 	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
 	forget_level_irq(msm_gpio, offset);
-	clr_gpio_bit(offset, msm_gpio->regs.int_en);
+	msm_gpio->irq_masks[IRQ_MASK_NORMAL] &= ~bit(offset);
+	writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL], msm_gpio->regs.int_en);
 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
 }
 
@@ -174,7 +184,8 @@ static void msm_gpio_irq_unmask(unsigned int irq)
 
 	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
 	forget_level_irq(msm_gpio, offset);
-	set_gpio_bit(offset, msm_gpio->regs.int_en);
+	msm_gpio->irq_masks[IRQ_MASK_NORMAL] |= bit(offset);
+	writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL], msm_gpio->regs.int_en);
 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
 }
 
@@ -230,7 +241,18 @@ static int msm_gpio_irq_retrigger(unsigned int irq)
 
 static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 {
-	return -ENOTSUPP;
+	unsigned long irq_flags;
+	struct msm_gpio_dev *msm_gpio = get_irq_chip_data(irq);
+	unsigned offset = irq - msm_gpio->irq_base;
+
+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
+	if (on)
+		msm_gpio->irq_masks[IRQ_MASK_WAKE_ON] |= bit(offset);
+	else
+		msm_gpio->irq_masks[IRQ_MASK_WAKE_ON] &= ~bit(offset);
+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
+
+	return set_irq_wake(msm_gpio->irq_summary, on);
 }
 
 static irqreturn_t msm_gpio_irq_handler(int irq, void *dev)
@@ -345,7 +367,16 @@ static int msm_gpio_probe(struct platform_device *dev)
 	if (ret < 0)
 		goto err_post_gpiochip_add;
 
+#ifdef CONFIG_PM_RUNTIME
+	ret = pm_runtime_set_active(&dev->dev);
+	if (ret < 0)
+		goto err_post_req_irq;
+	pm_runtime_enable(&dev->dev);
+#endif
+
 	return ret;
+err_post_req_irq:
+	free_irq(msm_gpio->irq_summary, msm_gpio);
 err_post_gpiochip_add:
 	/*
 	 * Under no circumstances should a line be held on a gpiochip
@@ -366,18 +397,88 @@ static int msm_gpio_remove(struct platform_device *dev)
 	if (ret < 0)
 		return ret;
 
+#ifdef CONFIG_PM_RUNTIME
+	pm_runtime_disable(&dev->dev);
+#endif
 	free_irq(msm_gpio->irq_summary, msm_gpio);
 	kfree(msm_gpio);
 
 	return 0;
 }
 
+static int msm_gpio_suspend(struct msm_gpio_dev *msm_gpio)
+{
+	unsigned long irq_flags;
+	unsigned long irq_mask;
+
+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
+	if ((msm_gpio->nsuspend)++ == 0) {
+		irq_mask = msm_gpio->irq_masks[IRQ_MASK_NORMAL] &
+			   msm_gpio->irq_masks[IRQ_MASK_WAKE_ON];
+		writel(irq_mask, msm_gpio->regs.int_en);
+	}
+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
+
+	return 0;
+}
+
+static int msm_gpio_resume(struct msm_gpio_dev *msm_gpio)
+{
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
+	if (--(msm_gpio->nsuspend) == 0)
+		writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL],
+		       msm_gpio->regs.int_en);
+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
+
+	return 0;
+}
+
+static int msm_gpio_legacy_suspend(struct platform_device *dev,
+				   pm_message_t state)
+{
+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(dev);
+
+	return msm_gpio_suspend(msm_gpio);
+}
+
+static int msm_gpio_legacy_resume(struct platform_device *dev)
+{
+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(dev);
+
+	return msm_gpio_resume(msm_gpio);
+}
+
+static int msm_gpio_dev_pm_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(pdev);
+
+	return msm_gpio_suspend(msm_gpio);
+}
+
+static int msm_gpio_dev_pm_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(pdev);
+
+	return msm_gpio_resume(msm_gpio);
+}
+
+static SIMPLE_DEV_PM_OPS(msm_gpio_pm_ops,
+			 msm_gpio_dev_pm_suspend,
+			 msm_gpio_dev_pm_resume);
+
 static struct platform_driver msm_gpio_driver = {
-	.probe = msm_gpio_probe,
-	.remove = msm_gpio_remove,
-	.driver = {
-		.name = "msm7200a-gpio",
+	.probe   = msm_gpio_probe,
+	.remove  = msm_gpio_remove,
+	.suspend = msm_gpio_legacy_suspend,
+	.resume  = msm_gpio_legacy_resume,
+	.driver  = {
+		.name  = "msm7200a-gpio",
 		.owner = THIS_MODULE,
+		.pm    = &msm_gpio_pm_ops,
 	},
 };
 
