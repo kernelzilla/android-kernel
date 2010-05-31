@@ -39,7 +39,7 @@ static ssize_t aufs_aio_read_sp(struct kiocb *kio, const struct iovec *iov,
 	si_read_lock(sb, AuLock_FLUSH);
 	fi_read_lock(file);
 	bstart = au_fbstart(file);
-	h_file = au_h_fptr(file, bstart);
+	h_file = au_hf_top(file);
 	fi_read_unlock(file);
 	wbr = !!au_br_writable(au_sbr(sb, bstart)->br_perm);
 	si_read_unlock(sb);
@@ -67,7 +67,7 @@ static ssize_t aufs_aio_write_sp(struct kiocb *kio, const struct iovec *iov,
 	si_read_lock(sb, AuLock_FLUSH);
 	fi_read_lock(file);
 	bstart = au_fbstart(file);
-	h_file = au_h_fptr(file, bstart);
+	h_file = au_hf_top(file);
 	fi_read_unlock(file);
 	wbr = !!au_br_writable(au_sbr(sb, bstart)->br_perm);
 	si_read_unlock(sb);
@@ -89,7 +89,7 @@ static int aufs_release_sp(struct inode *inode, struct file *file)
 	struct file *h_file;
 
 	fi_read_lock(file);
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	fi_read_unlock(file);
 	/* close this fifo in aufs */
 	err = h_file->f_op->release(inode, file); /* ignore */
@@ -156,7 +156,7 @@ static void au_init_fop_sp(struct file *file)
 	p += i;
 	if (unlikely(!p->done)) {
 		/* initialize first time only */
-		h_file = au_h_fptr(file, au_fbstart(file));
+		h_file = au_hf_top(file);
 		spin_lock(&p->spin);
 		if (!p->done) {
 			p->fop = *h_file->f_op;
@@ -230,7 +230,7 @@ static int au_do_open_sp(struct file *file, int flags)
 		goto out;
 
 	sb = dentry->d_sb;
-	h_file = au_h_fptr(file, au_fbstart(file));
+	h_file = au_hf_top(file);
 	h_inode = h_file->f_dentry->d_inode;
 	di_read_unlock(dentry, AuLock_IR);
 	fi_write_unlock(file);
@@ -251,7 +251,14 @@ static int au_do_open_sp(struct file *file, int flags)
 
 static int aufs_open_sp(struct inode *inode, struct file *file)
 {
-	return au_do_open(file, au_do_open_sp);
+	int err;
+	struct super_block *sb;
+
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	err = au_do_open(file, au_do_open_sp, /*fidir*/NULL);
+	si_read_unlock(sb);
+	return err;
 }
 
 /* ---------------------------------------------------------------------- */
