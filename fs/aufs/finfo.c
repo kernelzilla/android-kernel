@@ -38,9 +38,16 @@ void au_set_h_fptr(struct file *file, aufs_bindex_t bindex, struct file *val)
 {
 	struct au_finfo *finfo = au_fi(file);
 	struct au_hfile *hf;
+	struct au_fidir *fidir;
 
-	hf = finfo->fi_hfile + bindex;
-	if (hf->hf_file)
+	fidir = finfo->fi_hdir;
+	if (!fidir) {
+		AuDebugOn(finfo->fi_btop != bindex);
+		hf = &finfo->fi_htop;
+	} else
+		hf = fidir->fd_hfile + bindex;
+
+	if (hf && hf->hf_file)
 		au_hfput(hf, file);
 	if (val) {
 		FiMustWriteLock(file);
@@ -74,25 +81,53 @@ void au_fi_mmap_unlock(struct file *file)
 
 /* ---------------------------------------------------------------------- */
 
+struct au_fidir *au_fidir_alloc(struct super_block *sb)
+{
+	struct au_fidir *fidir;
+	int nbr;
+
+	nbr = au_sbend(sb) + 1;
+	if (nbr < 2)
+		nbr = 2; /* initial allocate for 2 branches */
+	fidir = kzalloc(au_fidir_sz(nbr), GFP_NOFS);
+	if (fidir) {
+		fidir->fd_bbot = -1;
+		fidir->fd_nent = nbr;
+		fidir->fd_vdir_cache = NULL;
+	}
+
+	return fidir;
+}
+
+int au_fidir_realloc(struct au_finfo *finfo, int nbr)
+{
+	int err;
+	struct au_fidir *fidir, *p;
+
+	AuRwMustWriteLock(&finfo->fi_rwsem);
+	fidir = finfo->fi_hdir;
+	AuDebugOn(!fidir);
+
+	err = -ENOMEM;
+	p = au_kzrealloc(fidir, au_fidir_sz(fidir->fd_nent), au_fidir_sz(nbr),
+			 GFP_NOFS);
+	if (p) {
+		p->fd_nent = nbr;
+		finfo->fi_hdir = p;
+		err = 0;
+	}
+
+	return err;
+}
+
+/* ---------------------------------------------------------------------- */
+
 void au_finfo_fin(struct file *file)
 {
 	struct au_finfo *finfo;
-	aufs_bindex_t bindex, bend;
 
 	finfo = au_fi(file);
-	bindex = finfo->fi_bstart;
-	if (bindex >= 0) {
-		/*
-		 * calls fput() instead of filp_close(),
-		 * since no dnotify or lock for the lower file.
-		 */
-		bend = finfo->fi_bend;
-		for (; bindex <= bend; bindex++)
-			au_set_h_fptr(file, bindex, NULL);
-	}
-
-	au_dbg_verify_hf(finfo);
-	kfree(finfo->fi_hfile);
+	AuDebugOn(finfo->fi_hdir);
 	AuRwDestroy(&finfo->fi_rwsem);
 	au_cache_free_finfo(finfo);
 }
@@ -102,52 +137,31 @@ void au_fi_init_once(void *_fi)
 	struct au_finfo *fi = _fi;
 
 	au_rw_init(&fi->fi_rwsem);
+	mutex_init(&fi->fi_vm_mtx);
+	mutex_init(&fi->fi_mmap);
 }
 
-int au_finfo_init(struct file *file)
+int au_finfo_init(struct file *file, struct au_fidir *fidir)
 {
+	int err;
 	struct au_finfo *finfo;
 	struct dentry *dentry;
 
+	err = -ENOMEM;
 	dentry = file->f_dentry;
 	finfo = au_cache_alloc_finfo();
 	if (unlikely(!finfo))
 		goto out;
 
-	finfo->fi_hfile = kcalloc(au_sbend(dentry->d_sb) + 1,
-				  sizeof(*finfo->fi_hfile), GFP_NOFS);
-	if (unlikely(!finfo->fi_hfile))
-		goto out_finfo;
-
+	err = 0;
 	au_rw_write_lock(&finfo->fi_rwsem);
-	finfo->fi_bstart = -1;
-	finfo->fi_bend = -1;
+	finfo->fi_btop = -1;
+	finfo->fi_hdir = fidir;
 	atomic_set(&finfo->fi_generation, au_digen(dentry));
 	/* smp_mb(); */ /* atomic_set */
 
 	file->private_data = finfo;
-	return 0; /* success */
 
- out_finfo:
-	au_cache_free_finfo(finfo);
- out:
-	return -ENOMEM;
-}
-
-int au_fi_realloc(struct au_finfo *finfo, int nbr)
-{
-	int err, sz;
-	struct au_hfile *hfp;
-
-	err = -ENOMEM;
-	sz = sizeof(*hfp) * (finfo->fi_bend + 1);
-	if (!sz)
-		sz = sizeof(*hfp);
-	hfp = au_kzrealloc(finfo->fi_hfile, sz, sizeof(*hfp) * nbr, GFP_NOFS);
-	if (hfp) {
-		finfo->fi_hfile = hfp;
-		err = 0;
-	}
-
+out:
 	return err;
 }

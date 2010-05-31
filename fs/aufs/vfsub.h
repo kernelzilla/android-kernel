@@ -94,6 +94,7 @@ ssize_t vfsub_write_u(struct file *file, const char __user *ubuf, size_t count,
 		      loff_t *ppos);
 ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count,
 		      loff_t *ppos);
+int vfsub_flush(struct file *file, fl_owner_t id);
 int vfsub_readdir(struct file *file, filldir_t filldir, void *arg);
 
 static inline unsigned int vfsub_file_flags(struct file *file)

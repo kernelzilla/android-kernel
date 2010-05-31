@@ -55,11 +55,11 @@ loff_t au_dir_size(struct file *file, struct dentry *dentry)
 		AuDebugOn(!file->f_dentry->d_inode);
 		AuDebugOn(!S_ISDIR(file->f_dentry->d_inode->i_mode));
 
-		bend = au_fbend(file);
+		bend = au_fbend_dir(file);
 		for (bindex = au_fbstart(file);
 		     bindex <= bend && sz < KMALLOC_MAX_SIZE;
 		     bindex++) {
-			h_file = au_h_fptr(file, bindex);
+			h_file = au_hf_dir(file, bindex);
 			if (h_file
 			    && h_file->f_dentry
 			    && h_file->f_dentry->d_inode)
@@ -108,16 +108,16 @@ static int reopen_dir(struct file *file)
 	au_set_fbstart(file, bstart);
 
 	btail = au_dbtaildir(dentry);
-	for (bindex = au_fbend(file); btail < bindex; bindex--)
+	for (bindex = au_fbend_dir(file); btail < bindex; bindex--)
 		au_set_h_fptr(file, bindex, NULL);
-	au_set_fbend(file, btail);
+	au_set_fbend_dir(file, btail);
 
 	flags = vfsub_file_flags(file);
 	for (bindex = bstart; bindex <= btail; bindex++) {
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (!h_dentry)
 			continue;
-		h_file = au_h_fptr(file, bindex);
+		h_file = au_hf_dir(file, bindex);
 		if (h_file)
 			continue;
 
@@ -147,12 +147,11 @@ static int do_open_dir(struct file *file, int flags)
 
 	err = 0;
 	dentry = file->f_dentry;
-	au_set_fvdir_cache(file, NULL);
 	file->f_version = dentry->d_inode->i_version;
 	bindex = au_dbstart(dentry);
 	au_set_fbstart(file, bindex);
 	btail = au_dbtaildir(dentry);
-	au_set_fbend(file, btail);
+	au_set_fbend_dir(file, btail);
 	for (; !err && bindex <= btail; bindex++) {
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (!h_dentry)
@@ -175,14 +174,29 @@ static int do_open_dir(struct file *file, int flags)
 	for (bindex = au_fbstart(file); bindex <= btail; bindex++)
 		au_set_h_fptr(file, bindex, NULL);
 	au_set_fbstart(file, -1);
-	au_set_fbend(file, -1);
+	au_set_fbend_dir(file, -1);
+
 	return err;
 }
 
 static int aufs_open_dir(struct inode *inode __maybe_unused,
 			 struct file *file)
 {
-	return au_do_open(file, do_open_dir);
+	int err;
+	struct super_block *sb;
+	struct au_fidir *fidir;
+
+	err = -ENOMEM;
+	sb = file->f_dentry->d_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	fidir = au_fidir_alloc(inode->i_sb);
+	if (fidir) {
+		err = au_do_open(file, do_open_dir, fidir);
+		if (unlikely(err))
+			kfree(fidir);
+	}
+	si_read_unlock(sb);
+	return err;
 }
 
 static int aufs_release_dir(struct inode *inode __maybe_unused,
@@ -190,14 +204,57 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 {
 	struct au_vdir *vdir_cache;
 	struct super_block *sb;
+	struct au_finfo *finfo;
+	struct au_fidir *fidir;
+	aufs_bindex_t bindex, bend;
 
-	sb = file->f_dentry->d_sb;
-	vdir_cache = au_fi(file)->fi_vdir_cache; /* lock-free */
-	if (vdir_cache)
-		au_vdir_free(vdir_cache);
 	au_plink_maint_leave(file);
+	sb = file->f_dentry->d_sb;
+	finfo = au_fi(file);
+	fidir = finfo->fi_hdir;
+	if (fidir) {
+		vdir_cache = fidir->fd_vdir_cache; /* lock-free */
+		if (vdir_cache)
+			au_vdir_free(vdir_cache);
+
+		bindex = finfo->fi_btop;
+		if (bindex >= 0) {
+			/*
+			 * calls fput() instead of filp_close(),
+			 * since no dnotify or lock for the lower file.
+			 */
+			bend = fidir->fd_bbot;
+			for (; bindex <= bend; bindex++)
+				au_set_h_fptr(file, bindex, NULL);
+		}
+		kfree(fidir);
+		finfo->fi_hdir = NULL;
+	}
 	au_finfo_fin(file);
 	return 0;
+}
+
+/* ---------------------------------------------------------------------- */
+
+static int au_do_flush_dir(struct file *file, fl_owner_t id)
+{
+	int err;
+	aufs_bindex_t bindex, bend;
+	struct file *h_file;
+
+	err = 0;
+	bend = au_fbend_dir(file);
+	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
+		h_file = au_hf_dir(file, bindex);
+		if (h_file)
+			err = vfsub_flush(h_file, id);
+	}
+	return err;
+}
+
+static int aufs_flush_dir(struct file *file, fl_owner_t id)
+{
+	return au_do_flush(file, id, au_do_flush_dir);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -262,9 +319,9 @@ static int au_do_fsync_dir(struct file *file, int datasync)
 
 	sb = file->f_dentry->d_sb;
 	inode = file->f_dentry->d_inode;
-	bend = au_fbend(file);
+	bend = au_fbend_dir(file);
 	for (bindex = au_fbstart(file); !err && bindex <= bend; bindex++) {
-		h_file = au_h_fptr(file, bindex);
+		h_file = au_hf_dir(file, bindex);
 		if (!h_file || au_test_ro(sb, bindex, inode))
 			continue;
 
@@ -575,6 +632,6 @@ const struct file_operations aufs_dir_fop = {
 	.unlocked_ioctl	= aufs_ioctl_dir,
 	.open		= aufs_open_dir,
 	.release	= aufs_release_dir,
-	.flush		= aufs_flush,
+	.flush		= aufs_flush_dir,
 	.fsync		= aufs_fsync_dir
 };
