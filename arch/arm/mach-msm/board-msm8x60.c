@@ -365,6 +365,23 @@ static struct platform_device android_pmem_device = {
 };
 #endif
 
+#define GPIO_BACKLIGHT_PWM0 0
+#define GPIO_BACKLIGHT_PWM1 1
+
+static int pmic_backlight_gpio[2]
+	= { GPIO_BACKLIGHT_PWM0, GPIO_BACKLIGHT_PWM1 };
+static struct msm_panel_common_pdata lcdc_samsung_panel_data = {
+	.gpio_num = pmic_backlight_gpio, /* two LPG CHANNELS for backlight */
+};
+
+static struct platform_device lcdc_samsung_panel_device = {
+	.name = "lcdc_samsung_wsvga",
+	.id = 0,
+	.dev = {
+		.platform_data = &lcdc_samsung_panel_data,
+	}
+};
+
 static void __init msm8x60_allocate_memory_regions(void)
 {
 	void *addr;
@@ -513,6 +530,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&android_pmem_device,
 #endif
 	&msm_fb_device,
+	&lcdc_samsung_panel_device,
 };
 
 static struct platform_device *surf_devices[] __initdata = {
@@ -553,6 +571,7 @@ static struct platform_device *surf_devices[] __initdata = {
 	&android_pmem_device,
 #endif
 	&msm_fb_device,
+	&lcdc_samsung_panel_device,
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -671,6 +690,31 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 				.vin_sel        = 2,
 				.function       = PM_GPIO_FUNC_NORMAL,
 				.inv_int_pol    = 0,
+			},
+		},
+		/* PM_GPIO24 and PM_GPIO25 are backlight intensity control */
+		{
+			23,
+			{
+				.direction      = PM_GPIO_DIR_OUT,
+				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+				.output_value   = 0,
+				.pull           = PM_GPIO_PULL_NO,
+				.vin_sel        = PM_GPIO_VIN_VPH,
+				.out_strength   = PM_GPIO_STRENGTH_HIGH,
+				.function       = PM_GPIO_FUNC_2,
+			},
+		},
+		{
+			24,
+			{
+				.direction      = PM_GPIO_DIR_OUT,
+				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+				.output_value   = 0,
+				.pull           = PM_GPIO_PULL_NO,
+				.vin_sel        = PM_GPIO_VIN_VPH,
+				.out_strength   = PM_GPIO_STRENGTH_HIGH,
+				.function       = PM_GPIO_FUNC_2,
 			},
 		},
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
