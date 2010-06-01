@@ -190,6 +190,7 @@ struct msm_panel_common_pdata {
 	int (*panel_num)(void);
 	void (*panel_config_gpio)(int);
 	int *gpio_num;
+	int mdp_core_clk_rate;
 };
 
 struct lcdc_platform_data {
