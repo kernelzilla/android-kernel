@@ -61,21 +61,14 @@ struct msm_otg {
 	int			vbus_on_irq;
 	void __iomem		*regs;
 	u8			in_lpm;
-	int			usb_in_sps;
 
 	unsigned int 		core_clk;
-	int 			(*rpc_connect)(int);
-	int 			(*phy_reset)(void __iomem *);
 	void (*start_host)	(struct usb_bus *bus, int suspend);
 	/* Enable/disable the clocks */
 	int (*set_clk)		(struct otg_transceiver *otg, int on);
 	/* pmic notfications apis */
 	u8 pmic_notif_supp;
-	int (*pmic_notif_init) (void);
-	void (*pmic_notif_deinit) (void);
-	int (*pmic_register_vbus_sn) (void (*callback)(int online));
-	void (*pmic_unregister_vbus_sn) (void (*callback)(int online));
-	int (*pmic_enable_ldo) (int);
+	struct msm_otg_platform_data *pdata;
 };
 
 /* usb controller's protocol engine depends on AXI clock.
