@@ -48,6 +48,10 @@ ifeq ($(CONFIG_USB_ANDROID_RMNET),y)
 F_RMNET = f_rmnet.o
 endif
 
+ifeq ($(CONFIG_USB_ANDROID_RNDIS),y)
+F_RNDIS = rndis.o f_rndis.o
+endif
+
 g_zero-objs			:= zero.o
 g_audio-objs			:= audio.o
 g_ether-objs			:= ether.o
