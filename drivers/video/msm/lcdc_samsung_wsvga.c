@@ -30,19 +30,14 @@
 static struct pwm_device *bl_pwm0;
 static struct pwm_device *bl_pwm1;
 
-/* 50 Khz == 20000 ns period
- * divide 20000 ns to 15 levels
- * each level has 1333 ns
- */
-
 /* for samsung panel 300hz was the minimum freq where flickering wasnt
  * observed as the screen was dimmed
  */
 
 #define PWM_FREQ_HZ 300
-#define PWM_PERIOD (NSEC_PER_SEC / PWM_FREQ_HZ)
+#define PWM_PERIOD_USEC (USEC_PER_SEC / PWM_FREQ_HZ)
 #define PWM_LEVEL 15
-#define PWM_DUTY_LEVEL (PWM_PERIOD / PWM_LEVEL)
+#define PWM_DUTY_LEVEL (PWM_PERIOD_USEC / PWM_LEVEL)
 #endif
 
 static struct msm_panel_common_pdata *lcdc_samsung_pdata;
@@ -58,15 +53,15 @@ static void lcdc_samsung_panel_set_backlight(struct msm_fb_data_type *mfd)
 #ifdef CONFIG_PMIC8058_PWM
 	if (bl_pwm0) {
 		ret = pwm_config(bl_pwm0, PWM_DUTY_LEVEL * bl_level,
-			PWM_PERIOD);
+			PWM_PERIOD_USEC);
 		if (ret)
 			printk(KERN_ERR "pwm_config on pwm 0 failed %d\n", ret);
 	}
 
 	if (bl_pwm1) {
 		ret = pwm_config(bl_pwm1,
-			PWM_PERIOD - (PWM_DUTY_LEVEL * bl_level),
-			PWM_PERIOD);
+			PWM_PERIOD_USEC - (PWM_DUTY_LEVEL * bl_level),
+			PWM_PERIOD_USEC);
 		if (ret)
 			printk(KERN_ERR "pwm_config on pwm 1 failed %d\n", ret);
 	}

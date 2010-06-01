@@ -30,6 +30,8 @@
 #include <linux/mfd/pmic8901.h>
 #include <linux/regulator/pmic8901-regulator.h>
 #include <linux/bootmem.h>
+#include <linux/pwm.h>
+#include <linux/pmic8058-pwm.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -692,31 +694,6 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 				.inv_int_pol    = 0,
 			},
 		},
-		/* PM_GPIO24 and PM_GPIO25 are backlight intensity control */
-		{
-			23,
-			{
-				.direction      = PM_GPIO_DIR_OUT,
-				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-				.output_value   = 0,
-				.pull           = PM_GPIO_PULL_NO,
-				.vin_sel        = PM_GPIO_VIN_VPH,
-				.out_strength   = PM_GPIO_STRENGTH_HIGH,
-				.function       = PM_GPIO_FUNC_2,
-			},
-		},
-		{
-			24,
-			{
-				.direction      = PM_GPIO_DIR_OUT,
-				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-				.output_value   = 0,
-				.pull           = PM_GPIO_PULL_NO,
-				.vin_sel        = PM_GPIO_VIN_VPH,
-				.out_strength   = PM_GPIO_STRENGTH_HIGH,
-				.function       = PM_GPIO_FUNC_2,
-			},
-		},
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 		{
 			PMIC_GPIO_SDC3_DET - 1,
@@ -943,6 +920,44 @@ static struct resource resources_othc_2[] = {
 	},
 };
 
+static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
+{
+	struct pm8058_gpio pwm_gpio_config = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 0,
+		.pull           = PM_GPIO_PULL_NO,
+		.vin_sel        = PM_GPIO_VIN_VPH,
+		.out_strength   = PM_GPIO_STRENGTH_HIGH,
+		.function       = PM_GPIO_FUNC_2,
+	};
+
+	int rc = -EINVAL;
+	int id;
+
+	switch (ch) {
+	case 0:
+	case 1:
+	case 2:
+		if (on) {
+			id = 24 + ch;
+			rc = pm8058_gpio_config(id - 1, &pwm_gpio_config);
+			if (rc)
+				pr_err("%s: pm8058_gpio_config(%d): rc=%d\n",
+					__func__, id, rc);
+		}
+
+	default:
+		break;
+	}
+	return rc;
+
+}
+
+static struct pm8058_pwm_pdata pm8058_pwm_data = {
+	.config		= pm8058_pwm_config,
+};
+
 #define PM8058_GPIO_INT           88
 
 static struct pm8058_gpio_platform_data pm8058_gpio_data = {
@@ -990,6 +1005,8 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{
 		.name = "pm8058-pwm",
 		.id = -1,
+		.platform_data = &pm8058_pwm_data,
+		.data_size = sizeof(pm8058_pwm_data),
 	},
 	{
 		.name = "pm8058-othc",
