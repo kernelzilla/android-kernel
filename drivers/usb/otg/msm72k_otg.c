@@ -206,7 +206,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	dev->in_lpm = 1;
 
 	if (!vbus && dev->pmic_notif_supp)
-		dev->pmic_enable_ldo(0);
+		dev->pdata->pmic_enable_ldo(0);
 
 	pr_info("%s: usb in low power mode\n", __func__);
 
@@ -273,7 +273,7 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 
 		disable_irq(dev->irq);
 		if (dev->pmic_notif_supp)
-			dev->pmic_enable_ldo(1);
+			dev->pdata->pmic_enable_ldo(1);
 
 		msm_otg_resume(dev);
 
@@ -310,14 +310,15 @@ static int msm_otg_set_peripheral(struct otg_transceiver *xceiv,
 		msm_otg_start_peripheral(xceiv, 0);
 		dev->otg.gadget = 0;
 		disable_sess_valid(dev);
-		if (dev->pmic_notif_supp && dev->pmic_unregister_vbus_sn)
-			dev->pmic_unregister_vbus_sn(&msm_otg_set_vbus_state);
+		if (dev->pmic_notif_supp && dev->pdata->pmic_unregister_vbus_sn)
+			dev->pdata->pmic_unregister_vbus_sn
+				(&msm_otg_set_vbus_state);
 		return 0;
 	}
 	dev->otg.gadget = gadget;
 	enable_sess_valid(dev);
-	if (dev->pmic_notif_supp && dev->pmic_register_vbus_sn)
-		dev->pmic_register_vbus_sn(&msm_otg_set_vbus_state);
+	if (dev->pmic_notif_supp && dev->pdata->pmic_register_vbus_sn)
+		dev->pdata->pmic_register_vbus_sn(&msm_otg_set_vbus_state);
 	pr_info("peripheral driver registered w/ tranceiver\n");
 
 	if (is_host())
@@ -419,8 +420,8 @@ static void otg_reset(struct msm_otg *dev)
 	unsigned temp;
 
 	clk_enable(dev->clk);
-	if (dev->phy_reset)
-		dev->phy_reset(dev->regs);
+	if (dev->pdata->phy_reset)
+		dev->pdata->phy_reset(dev->regs);
 	/*disable all phy interrupts*/
 	ulpi_write(dev, 0xFF, 0x0F);
 	ulpi_write(dev, 0xFF, 0x12);
@@ -459,30 +460,20 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	int vbus_on_irq = 0;
 	struct resource *res;
 	struct msm_otg *dev;
-	struct msm_otg_platform_data *pdata;
 
 	dev = kzalloc(sizeof(struct msm_otg), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
 
 	dev->otg.dev = &pdev->dev;
-	pdata = pdev->dev.platform_data;
+	dev->pdata = pdev->dev.platform_data;
 
-	if (pdev->dev.platform_data) {
-		dev->rpc_connect = pdata->rpc_connect;
-		dev->phy_reset = pdata->phy_reset;
-		dev->core_clk  = pdata->core_clk;
-		dev->usb_in_sps = pdata->usb_in_sps;
-
-		/* pmic apis */
-		dev->pmic_notif_init = pdata->pmic_notif_init;
-		dev->pmic_notif_deinit = pdata->pmic_notif_deinit;
-		dev->pmic_register_vbus_sn = pdata->pmic_register_vbus_sn;
-		dev->pmic_unregister_vbus_sn = pdata->pmic_unregister_vbus_sn;
-		dev->pmic_enable_ldo = pdata->pmic_enable_ldo;
+	if (!dev->pdata) {
+		ret = -ENODEV;
+		goto free_dev;
 	}
 
-	if (pdata && pdata->pmic_vbus_irq) {
+	if (dev->pdata->pmic_vbus_irq) {
 		vbus_on_irq = platform_get_irq_byname(pdev, "vbus_on");
 		if (vbus_on_irq < 0) {
 			pr_err("%s: unable to get vbus on irq\n", __func__);
@@ -491,8 +482,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (dev->rpc_connect) {
-		ret = dev->rpc_connect(1);
+	if (dev->pdata->rpc_connect) {
+		ret = dev->pdata->rpc_connect(1);
 		pr_info("%s: rpc_connect(%d)\n", __func__, ret);
 		if (ret) {
 			pr_err("%s: rpc connect failed\n", __func__);
@@ -509,7 +500,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 	clk_set_rate(dev->clk, 60000000);
 
-	if (!dev->usb_in_sps) {
+	if (!dev->pdata->usb_in_sps) {
 		dev->pclk = clk_get(&pdev->dev, "usb_hs_pclk");
 		if (IS_ERR(dev->pclk)) {
 			pr_err("%s: failed to get usb_hs_pclk\n", __func__);
@@ -518,7 +509,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (dev->core_clk) {
+	if (dev->pdata->core_clk) {
 		dev->cclk = clk_get(&pdev->dev, "usb_hs_core_clk");
 		if (IS_ERR(dev->cclk)) {
 			pr_err("%s: failed to get usb_hs_core_clk\n", __func__);
@@ -556,11 +547,11 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	 * on the board, PMIC comparators can be used to detect VBUS
 	 * session change.
 	 */
-	if (dev->pmic_notif_init) {
-		ret = dev->pmic_notif_init();
+	if (dev->pdata->pmic_notif_init) {
+		ret = dev->pdata->pmic_notif_init();
 		if (!ret) {
 			dev->pmic_notif_supp = 1;
-			dev->pmic_enable_ldo(1);
+			dev->pdata->pmic_enable_ldo(1);
 		} else if (ret != -ENOTSUPP) {
 			if (dev->pclk)
 				clk_disable(dev->pclk);
@@ -620,7 +611,7 @@ put_pclk:
 put_clk:
 	clk_put(dev->clk);
 rpc_fail:
-	dev->rpc_connect(0);
+	dev->pdata->rpc_connect(0);
 free_dev:
 	kfree(dev);
 	return ret;
@@ -631,7 +622,7 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	struct msm_otg *dev = the_msm_otg;
 
 	if (dev->pmic_notif_supp)
-		dev->pmic_notif_deinit();
+		dev->pdata->pmic_notif_deinit();
 
 	free_irq(dev->irq, pdev);
 	if (dev->vbus_on_irq)
@@ -647,8 +638,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	}
 	clk_put(dev->clk);
 	kfree(dev);
-	if (dev->rpc_connect)
-		dev->rpc_connect(0);
+	if (dev->pdata->rpc_connect)
+		dev->pdata->rpc_connect(0);
 	return 0;
 }
 
