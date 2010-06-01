@@ -456,8 +456,6 @@ static struct platform_driver msm_fb_driver = {
 	.remove = msm_fb_remove,
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = msm_fb_suspend,
-	.suspend_late = NULL,
-	.resume_early = NULL,
 	.resume = msm_fb_resume,
 #endif
 	.shutdown = NULL,
