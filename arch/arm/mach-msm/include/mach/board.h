@@ -251,7 +251,6 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
 struct mmc_platform_data;
 int __init msm_add_sdcc(unsigned int controller,
 		struct mmc_platform_data *plat);
-int __init rmt_storage_add_ramfs(void);
 
 struct msm_usb_host_platform_data;
 int __init msm_add_host(unsigned int host,

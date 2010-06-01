@@ -4243,7 +4243,6 @@ static void __init msm7x30_init(void)
 	msm_uart_dm1_pdata.wakeup_irq = gpio_to_irq(136);
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 	platform_add_devices(devices, ARRAY_SIZE(devices));
-	rmt_storage_add_ramfs();
 #ifdef CONFIG_USB_EHCI_MSM
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
