@@ -25,7 +25,11 @@
 #include <linux/types.h>
 #include <asm/sizes.h>
 #include <linux/ioctl.h>
+#ifdef MSM_CAMERA_GCC
+#include <time.h>
+#else
 #include <linux/time.h>
+#endif
 
 #define MSM_CAM_IOCTL_MAGIC 'm'
 
