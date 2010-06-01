@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -53,6 +53,12 @@
 #endif
 
 /* function declarations */
+/* FM Core audio paths. */
+#define TAVARUA_AUDIO_OUT_ANALOG_OFF	(0)
+#define TAVARUA_AUDIO_OUT_ANALOG_ON	(1)
+#define TAVARUA_AUDIO_OUT_DIGITAL_OFF	(0)
+#define TAVARUA_AUDIO_OUT_DIGITAL_ON	(1)
+
 int tavarua_set_audio_path(int digital_on, int analog_on);
 
 /* defines and enums*/
@@ -229,7 +235,7 @@ enum search_t {
 
 #define FM_ENABLE	0x22
 #define SET_REG_FIELD(reg, val, offset, mask) \
-	(reg = (reg & ~mask) | ((val << offset) & mask))
+	(reg = (reg & ~mask) | (((val) << offset) & mask))
 #define GET_REG_FIELD(reg, offset, mask) ((reg & mask) >> offset)
 
 enum radio_state_t {
