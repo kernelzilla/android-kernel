@@ -622,7 +622,8 @@ static long kgsl_ioctl_cmdwindow_write(struct kgsl_file_private *private,
 
 	if (param.device_id == KGSL_DEVICE_YAMATO) {
 		result = -EINVAL;
-	} else if (param.device_id == KGSL_DEVICE_G12) {
+	} else if (param.device_id == KGSL_DEVICE_G12 &&
+			kgsl_driver.g12_device.flags & KGSL_FLAGS_STARTED) {
 		KGSL_G12_PRE_HWACCESS();
 		result = kgsl_g12_cmdwindow_write(&kgsl_driver.g12_device,
 					     param.target,
@@ -1648,6 +1649,7 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		kgsl_driver.imem_clk = clk;
 	}
 
+#ifdef CONFIG_MSM_KGSL_2D
 	clk = clk_get(&pdev->dev, "grp_2d_pclk");
 	if (IS_ERR(clk))
 		clk = NULL;
@@ -1667,6 +1669,11 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		kgsl_driver.g12_device.hwaccess_blocked = KGSL_TRUE;
 	}
 	kgsl_driver.g12_grp_clk = clk;
+#else
+	kgsl_driver.g12_grp_clk = NULL;
+	kgsl_driver.g12_grp_pclk = NULL;
+	kgsl_driver.g12_device.hwaccess_blocked = KGSL_TRUE;
+#endif
 
 	if (pdata != NULL && clk != NULL) {
 		if ((pdata->set_grp2d_async != NULL) &&

@@ -113,6 +113,7 @@ enum kgsl_status {
 #define KGSL_TRUE 1
 #define KGSL_FALSE 0
 
+#ifdef CONFIG_MSM_KGSL_2D
 #define KGSL_G12_PRE_HWACCESS() \
 while (1) { \
 	if (kgsl_driver.g12_device.hwaccess_blocked == KGSL_FALSE) { \
@@ -126,6 +127,12 @@ while (1) { \
 	wait_for_completion(&kgsl_driver.g12_device.hwaccess_gate); \
 	mutex_lock(&kgsl_driver.mutex); \
 }
+#else
+#define KGSL_G12_PRE_HWACCESS() do { \
+	return -ENODEV; \
+	} while (0)
+#endif
+
 #define KGSL_G12_POST_HWACCESS() mutex_unlock(&kgsl_driver.mutex)
 
 #define KGSL_PRE_HWACCESS() \
