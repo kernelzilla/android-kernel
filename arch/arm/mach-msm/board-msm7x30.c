@@ -2571,6 +2571,9 @@ static struct kgsl_platform_data kgsl_pdata = {
 	.max_grp3d_freq = 245 * 1000*1000,
 	.min_grp3d_freq = 192 * 1000*1000,
 	.set_grp3d_async = set_grp3d_async,
+	.imem_clk_name = "imem_clk",
+	.grp3d_clk_name = "grp_clk",
+	.grp2d_clk_name = "grp_2d_clk",
 };
 
 static struct resource kgsl_resources[] = {

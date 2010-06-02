@@ -1793,6 +1793,9 @@ static void __init msm7x2x_init(void)
 	kgsl_pdata.max_grp3d_freq = 0;
 	kgsl_pdata.min_grp3d_freq = 0;
 	kgsl_pdata.set_grp3d_async = NULL;
+	kgsl_pdata.imem_clk_name = "imem_clk";
+	kgsl_pdata.grp3d_clk_name = "grp_clk";
+	kgsl_pdata.grp2d_clk_name = NULL;
 #endif
 
 #ifdef CONFIG_USB_FUNCTION

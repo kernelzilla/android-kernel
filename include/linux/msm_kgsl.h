@@ -119,6 +119,9 @@ struct kgsl_platform_data {
 	unsigned int max_grp3d_freq;
 	unsigned int min_grp3d_freq;
 	int (*set_grp3d_async)(void);
+	const char *imem_clk_name;
+	const char *grp3d_clk_name;
+	const char *grp2d_clk_name;
 };
 
 /* ioctls */
