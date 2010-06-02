@@ -73,7 +73,7 @@ struct pm8058_pwm_pdata {
  * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
  *
  * @pwm: the PWM device
- * @period_ns: period in nano second
+ * @period_us: period in micro second
  * @duty_pct: arrary of duty cycles in percent, like 20, 50.
  * @duty_time_ms: time for each duty cycle in millisecond
  * @start_idx: start index in lookup table from 0 to MAX-1
@@ -83,7 +83,7 @@ struct pm8058_pwm_pdata {
  * @flags: control flags
  *
  */
-int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
+int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_us,
 			  int duty_pct[], int duty_time_ms, int start_idx,
 			  int len, int pause_lo, int pause_hi, int flags);
 
