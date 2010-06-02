@@ -1582,6 +1582,16 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 			radio->xfr_bytes_left = 0;
 			FMDBG("turning on ..\n");
 			retval = tavarua_start(radio, FM_RECV);
+			if (retval >= 0) {
+				FMDBG("Setting audio path ...\n");
+				retval = tavarua_set_audio_path(
+					TAVARUA_AUDIO_OUT_DIGITAL_ON,
+					TAVARUA_AUDIO_OUT_ANALOG_OFF);
+				if (retval < 0) {
+					FMDBG("Error in tavarua_set_audio_path"
+						" %d\n", retval);
+				}
+			}
 		}
 		/* check if off */
 		else if ((ctrl->value == 0) && radio->registers[RDCTRL]) {
@@ -2003,19 +2013,19 @@ int tavarua_set_audio_path(int digital_on, int analog_on)
 	/* RX */
 	FMDBG("%s: digital: %d analog: %d\n", __func__, digital_on, analog_on);
 	SET_REG_FIELD(radio->registers[AUDIOCTRL],
-		(rx_on && analog_on) ? 1 : 0,
+		((rx_on && analog_on) ? 1 : 0),
 		AUDIORX_ANALOG_OFFSET,
 		AUDIORX_ANALOG_MASK);
 	SET_REG_FIELD(radio->registers[AUDIOCTRL],
-		(rx_on && digital_on) ? 1 : 0,
+		((rx_on && digital_on) ? 1 : 0),
 		AUDIORX_DIGITAL_OFFSET,
 		AUDIORX_DIGITAL_MASK);
 	SET_REG_FIELD(radio->registers[AUDIOCTRL],
-		rx_on ? 0 : 1,
+		(rx_on ? 0 : 1),
 		AUDIOTX_OFFSET,
 		AUDIOTX_MASK);
 	SET_REG_FIELD(radio->registers[AUDIOCTRL],
-		rx_on ? 1 : 0,
+		(0),
 		I2SCTRL_OFFSET,
 		I2SCTRL_MASK);
 	return tavarua_write_register(radio, AUDIOCTRL,
