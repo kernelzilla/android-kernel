@@ -139,11 +139,9 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 				  struct nameidata *nd)
 {
 	struct dentry *ret, *parent;
-	struct inode *inode, *h_inode;
-	struct mutex *mtx;
+	struct inode *inode;
 	struct super_block *sb;
 	int err, npositive;
-	aufs_bindex_t bstart;
 
 	IMustLock(dir);
 
@@ -168,19 +166,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 
 	inode = NULL;
 	if (npositive) {
-		bstart = au_dbstart(dentry);
-		h_inode = au_h_dptr(dentry, bstart)->d_inode;
-		if (!S_ISDIR(h_inode->i_mode)) {
-			/*
-			 * stop 'race'-ing between hardlinks under different
-			 * parents.
-			 */
-			mtx = &au_sbr(sb, bstart)->br_xino.xi_nondir_mtx;
-			mutex_lock(mtx);
-			inode = au_new_inode(dentry, /*must_new*/0);
-			mutex_unlock(mtx);
-		} else
-			inode = au_new_inode(dentry, /*must_new*/0);
+		inode = au_new_inode(dentry, /*must_new*/0);
 		ret = (void *)inode;
 	}
 	if (IS_ERR(inode))
