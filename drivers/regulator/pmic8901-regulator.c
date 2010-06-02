@@ -27,7 +27,7 @@
 /* Regulator types */
 #define REGULATOR_TYPE_LDO		0
 #define REGULATOR_TYPE_SMPS		1
-#define REGULATOR_TYPE_LVS		2
+#define REGULATOR_TYPE_VS		2
 
 /* Bank select/write macros */
 #define REGULATOR_BANK_SEL(n)           ((n) << 4)
@@ -89,9 +89,9 @@
 #define NLDO_UV_STEP			25000
 #define NLDO_FINE_STEP_UV		12500
 
-/* LVS programming */
-#define LVS_CTRL_ENABLE_MASK		0xC0
-#define LVS_CTRL_ENABLE			0xC0
+/* VS programming */
+#define VS_CTRL_ENABLE_MASK		0xC0
+#define VS_CTRL_ENABLE			0xC0
 
 struct pm8901_vreg {
 	const char			*name;
@@ -151,12 +151,12 @@ struct pm8901_vreg {
 	}, \
 }
 
-#define LVS(_name, _ctrl_addr, _pmr_addr) \
+#define VS(_name, _ctrl_addr, _pmr_addr) \
 { \
 	.name = _name, \
 	.ctrl_addr = _ctrl_addr, \
 	.pmr_addr = _pmr_addr, \
-	.type = REGULATOR_TYPE_LVS, \
+	.type = REGULATOR_TYPE_VS, \
 	.rsupply = { \
 		.supply = _name, \
 	}, \
@@ -187,11 +187,14 @@ static struct pm8901_vreg pm8901_vreg[] = {
 	SMPS("8901_s3", 0x088, 0x0A9),
 	SMPS("8901_s4", 0x097, 0x0AA),
 
-	/*  name         ctrl   pmr */
-	LVS("8901_lvs0", 0x046, 0x0B2),
-	LVS("8901_lvs1", 0x048, 0x0B3),
-	LVS("8901_lvs2", 0x04A, 0x0B4),
-	LVS("8901_lvs3", 0x04C, 0x0B5),
+	/*  name            ctrl   pmr */
+	VS("8901_lvs0",     0x046, 0x0B2),
+	VS("8901_lvs1",     0x048, 0x0B3),
+	VS("8901_lvs2",     0x04A, 0x0B4),
+	VS("8901_lvs3",     0x04C, 0x0B5),
+	VS("8901_mvs0",     0x052, 0x0B6),
+	VS("8901_usb_otg",  0x055, 0x0B7),
+	VS("8901_hdmi_mvs", 0x058, 0x0B8),
 };
 
 static int pm8901_vreg_write(struct pm8901_chip *chip,
@@ -401,7 +404,7 @@ static struct regulator_ops pm8901_smps_ops = {
 	.set_voltage = pm8901_smps_set_voltage,
 };
 
-static struct regulator_ops pm8901_lvs_ops = {
+static struct regulator_ops pm8901_vs_ops = {
 	.enable = pm8901_vreg_enable,
 	.disable = pm8901_vreg_disable,
 };
@@ -464,8 +467,8 @@ static int pm8901_register_regulator(struct pm8901_chip *chip,
 	case REGULATOR_TYPE_SMPS:
 		rdesc->ops = &pm8901_smps_ops;
 		break;
-	case REGULATOR_TYPE_LVS:
-		rdesc->ops = &pm8901_lvs_ops;
+	case REGULATOR_TYPE_VS:
+		rdesc->ops = &pm8901_vs_ops;
 		break;
 	}
 
