@@ -152,11 +152,9 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 				  struct nameidata *nd)
 {
 	struct dentry *ret, *parent;
-	struct inode *inode, *h_inode;
-	struct mutex *mtx;
+	struct inode *inode;
 	struct super_block *sb;
 	int err, npositive;
-	aufs_bindex_t bstart;
 
 	IMustLock(dir);
 
@@ -181,19 +179,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 
 	inode = NULL;
 	if (npositive) {
-		bstart = au_dbstart(dentry);
-		h_inode = au_h_dptr(dentry, bstart)->d_inode;
-		if (!S_ISDIR(h_inode->i_mode)) {
-			/*
-			 * stop 'race'-ing between hardlinks under different
-			 * parents.
-			 */
-			mtx = &au_sbr(sb, bstart)->br_xino.xi_nondir_mtx;
-			mutex_lock(mtx);
-			inode = au_new_inode(dentry, /*must_new*/0);
-			mutex_unlock(mtx);
-		} else
-			inode = au_new_inode(dentry, /*must_new*/0);
+		inode = au_new_inode(dentry, /*must_new*/0);
 		ret = (void *)inode;
 	}
 	if (IS_ERR(inode))
@@ -831,29 +817,31 @@ static int aufs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 static void *aufs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int err;
-	char *buf;
 	mm_segment_t old_fs;
+	union {
+		char *k;
+		char __user *u;
+	} buf;
 
 	err = -ENOMEM;
-	buf = __getname_gfp(GFP_NOFS);
-	if (unlikely(!buf))
+	buf.k = __getname_gfp(GFP_NOFS);
+	if (unlikely(!buf.k))
 		goto out;
 
 	aufs_read_lock(dentry, AuLock_IR);
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = h_readlink(dentry, au_dbstart(dentry), (char __user *)buf,
-			 PATH_MAX);
+	err = h_readlink(dentry, au_dbstart(dentry), buf.u, PATH_MAX);
 	set_fs(old_fs);
 	aufs_read_unlock(dentry, AuLock_IR);
 
 	if (err >= 0) {
-		buf[err] = 0;
+		buf.k[err] = 0;
 		/* will be freed by put_link */
-		nd_set_link(nd, buf);
+		nd_set_link(nd, buf.k);
 		return NULL; /* success */
 	}
-	__putname(buf);
+	__putname(buf.k);
 
  out:
 	path_put(&nd->path);

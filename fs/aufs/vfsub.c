@@ -168,7 +168,7 @@ int vfsub_create(struct inode *dir, struct path *path, int mode)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_mknod(path, path->dentry, mode, 0);
+	err = security_path_mknod(path, d, mode, 0);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -215,7 +215,7 @@ int vfsub_symlink(struct inode *dir, struct path *path, const char *symname)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_symlink(path, path->dentry, symname);
+	err = security_path_symlink(path, d, symname);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -246,7 +246,7 @@ int vfsub_mknod(struct inode *dir, struct path *path, int mode, dev_t dev)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_mknod(path, path->dentry, mode, dev);
+	err = security_path_mknod(path, d, mode, dev);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -291,7 +291,7 @@ int vfsub_link(struct dentry *src_dentry, struct inode *dir, struct path *path)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_link(src_dentry, path, path->dentry);
+	err = security_path_link(src_dentry, path, d);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -333,7 +333,7 @@ int vfsub_rename(struct inode *src_dir, struct dentry *src_dentry,
 	d = path->dentry;
 	path->dentry = d->d_parent;
 	tmp.dentry = src_dentry->d_parent;
-	err = security_path_rename(&tmp, src_dentry, path, path->dentry);
+	err = security_path_rename(&tmp, src_dentry, path, d);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -368,7 +368,7 @@ int vfsub_mkdir(struct inode *dir, struct path *path, int mode)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_mkdir(path, path->dentry, mode);
+	err = security_path_mkdir(path, d, mode);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -399,7 +399,7 @@ int vfsub_rmdir(struct inode *dir, struct path *path)
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
-	err = security_path_rmdir(path, path->dentry);
+	err = security_path_rmdir(path, d);
 	path->dentry = d;
 	if (unlikely(err))
 		goto out;
@@ -439,10 +439,15 @@ ssize_t vfsub_read_k(struct file *file, void *kbuf, size_t count,
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_read_u(file, (char __user *)kbuf, count, ppos);
+	err = vfsub_read_u(file, buf.u, count, ppos);
 	set_fs(oldfs);
 	return err;
 }
@@ -464,10 +469,15 @@ ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count, loff_t *ppos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		const char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_write_u(file, (const char __user *)kbuf, count, ppos);
+	err = vfsub_write_u(file, buf.u, count, ppos);
 	set_fs(oldfs);
 	return err;
 }
