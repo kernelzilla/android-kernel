@@ -36,6 +36,7 @@
 
 struct pm8058_pwm_pdata {
 	int 	(*config)(struct pwm_device *pwm, int ch, int on);
+	int 	(*enable)(struct pwm_device *pwm, int ch, int on);
 };
 
 #define	PM_PWM_LUT_SIZE			64

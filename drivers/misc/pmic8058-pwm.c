@@ -600,6 +600,9 @@ int pwm_enable(struct pwm_device *pwm)
 	if (!pwm->in_use)
 		rc = -EINVAL;
 	else {
+		if (pwm->chip->pdata && pwm->chip->pdata->enable)
+			pwm->chip->pdata->enable(pwm, pwm->pwm_id, 1);
+
 		rc = pm8058_pwm_bank_enable(pwm, 1);
 
 		pm8058_pwm_bank_sel(pwm);
@@ -624,6 +627,9 @@ void pwm_disable(struct pwm_device *pwm)
 		pm8058_pwm_start(pwm, 0, 0);
 
 		pm8058_pwm_bank_enable(pwm, 0);
+
+		if (pwm->chip->pdata && pwm->chip->pdata->enable)
+			pwm->chip->pdata->enable(pwm, pwm->pwm_id, 0);
 	}
 	mutex_unlock(&pwm->chip->pwm_mutex);
 }
