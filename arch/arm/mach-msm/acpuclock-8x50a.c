@@ -77,7 +77,7 @@ struct clkctl_acpu_speed {
 	unsigned int     acpuclk_src_div;
 	unsigned int     ahbclk_khz;
 	unsigned int     ahbclk_div;
-	unsigned int     axiclk_khz;
+	unsigned int     ebi1clk_khz;
 	unsigned int     core_src_sel;
 	unsigned int     l_value;
 	int              vdd;
@@ -87,7 +87,7 @@ struct clkctl_acpu_speed {
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 0,  19200, ACPU_PLL_TCXO, 0, 0, 0, 0, 14000, 0, 0, 1225 },
 	/* Use AXI source. Row number in acpuclk_init() must match this. */
-	{ 0,  128000, ACPU_PLL_1, 1, 5, 0, 0, 14000, 2, 0, 1225 },
+	{ 0,  192000, ACPU_PLL_1, 1, 5, 0, 0, 14000, 2, 0, 1225 },
 	{ 1,  245760, ACPU_PLL_0, 4, 0, 0, 0, 29000, 0, 0, 1225 },
 	{ 1,  384000, ACPU_PLL_3, 0, 0, 0, 0, 58000, 1, 0xA, 1225 },
 	{ 0,  422400, ACPU_PLL_3, 0, 0, 0, 0, 117000, 1, 0xB, 1225 },
@@ -102,11 +102,11 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 1,  768000, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x14, 1225 },
 	{ 0,  806400, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x15, 1225 },
 	{ 0,  844800, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x16, 1225 },
-	{ 0,  883200, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x17, 1225 },
-	{ 0,  921600, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x18, 1225 },
-	{ 0,  960000, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x19, 1225 },
-	{ 1,  998400, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x1A, 1225 },
-	{ 1, 1190400, ACPU_PLL_3, 0, 0, 0, 0, 128000, 1, 0x1F, 1225 },
+	{ 0,  883200, ACPU_PLL_3, 0, 0, 0, 0, 160000, 1, 0x17, 1225 },
+	{ 0,  921600, ACPU_PLL_3, 0, 0, 0, 0, 160000, 1, 0x18, 1225 },
+	{ 0,  960000, ACPU_PLL_3, 0, 0, 0, 0, 192000, 1, 0x19, 1225 },
+	{ 1,  998400, ACPU_PLL_3, 0, 0, 0, 0, 192000, 1, 0x1A, 1225 },
+	{ 1, 1190400, ACPU_PLL_3, 0, 0, 0, 0, 259200, 1, 0x1F, 1225 },
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
@@ -123,7 +123,7 @@ static struct clock_state drv_state = { 0 };
 
 unsigned long clk_get_max_axi_khz(void)
 {
-	return 128000;
+	return 192000;
 }
 EXPORT_SYMBOL(clk_get_max_axi_khz);
 
@@ -314,11 +314,12 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	if (reason == SETRATE_SWFI)
 		goto out;
 
-	if (strt_s->axiclk_khz != tgt_s->axiclk_khz) {
+	if (strt_s->ebi1clk_khz != tgt_s->ebi1clk_khz) {
 		res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK,
-			tgt_s->axiclk_khz * 1000);
+			tgt_s->ebi1clk_khz * 1000);
 		if (res < 0)
-			pr_warning("Setting AXI min rate failed (%d)\n", res);
+			pr_warning("Setting EBI1/AXI min rate failed (%d)\n",
+									res);
 	}
 
 	/* Nothing else to do for power collapse */
@@ -425,9 +426,9 @@ static void __init acpuclk_init(void)
 	acpuclk_set_vdd_level(speed->vdd);
 
 	drv_state.current_speed = speed;
-	res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK, speed->axiclk_khz * 1000);
+	res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK, speed->ebi1clk_khz * 1000);
 	if (res < 0)
-		pr_warning("Setting AXI min rate failed (%d)\n", res);
+		pr_warning("Setting EBI1/AXI min rate failed (%d)\n", res);
 
 	pr_info("ACPU running at %d KHz\n", speed->acpuclk_khz);
 }
