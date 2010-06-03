@@ -539,8 +539,7 @@ wait_for_int:
 		remote_mutex_unlock(&dev->r_lock);
 	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_i2c",
 					PM_QOS_DEFAULT_VALUE);
-	dev->pwr_timer.expires = jiffies + 3*HZ;
-	add_timer(&dev->pwr_timer);
+	mod_timer(&dev->pwr_timer, (jiffies + 3*HZ));
 	mutex_unlock(&dev->mlock);
 	return ret;
 }
