@@ -271,11 +271,10 @@ int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 {
 	int err;
 	struct mutex *mtx;
-	const int isdir = (d_type == DT_DIR);
 
-	/* prevent hardlinks from race condition */
+	/* prevent hardlinked inode number from race condition */
 	mtx = NULL;
-	if (!isdir) {
+	if (d_type != DT_DIR) {
 		mtx = &au_sbr(sb, bindex)->br_xino.xi_nondir_mtx;
 		mutex_lock(mtx);
 	}
@@ -294,7 +293,7 @@ int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 	}
 
  out:
-	if (!isdir)
+	if (mtx)
 		mutex_unlock(mtx);
 	return err;
 }
@@ -303,9 +302,10 @@ int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 /* todo: return with unlocked? */
 struct inode *au_new_inode(struct dentry *dentry, int must_new)
 {
-	struct inode *inode;
+	struct inode *inode, *h_inode;
 	struct dentry *h_dentry;
 	struct super_block *sb;
+	struct mutex *mtx;
 	ino_t h_ino, ino;
 	int err, match;
 	aufs_bindex_t bstart;
@@ -313,12 +313,25 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 	sb = dentry->d_sb;
 	bstart = au_dbstart(dentry);
 	h_dentry = au_h_dptr(dentry, bstart);
-	h_ino = h_dentry->d_inode->i_ino;
+	h_inode = h_dentry->d_inode;
+	h_ino = h_inode->i_ino;
+
+	/*
+	 * stop 'race'-ing between hardlinks under different
+	 * parents.
+	 */
+	mtx = NULL;
+	if (!S_ISDIR(h_inode->i_mode))
+		mtx = &au_sbr(sb, bstart)->br_xino.xi_nondir_mtx;
+
+ new_ino:
+	if (mtx)
+		mutex_lock(mtx);
 	err = au_xino_read(sb, bstart, h_ino, &ino);
 	inode = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
- new_ino:
+
 	if (!ino) {
 		ino = au_xino_new_ino(sb);
 		if (unlikely(!ino)) {
@@ -346,11 +359,21 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 		iget_failed(inode);
 		goto out_err;
 	} else if (!must_new) {
+		/*
+		 * horrible race condition between lookup, readdir and copyup
+		 * (or something).
+		 */
+		if (mtx)
+			mutex_unlock(mtx);
 		err = reval_inode(inode, dentry, &match);
-		if (!err)
+		if (!err) {
+			mtx = NULL;
 			goto out; /* success */
-		else if (match)
+		} else if (match) {
+			mtx = NULL;
 			goto out_iput;
+		} else if (mtx)
+			mutex_lock(mtx);
 	}
 
 	if (unlikely(au_test_fs_unique_ino(h_dentry->d_inode)))
@@ -362,6 +385,8 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
 	err = au_xino_write(sb, bstart, h_ino, /*ino*/0);
 	if (!err) {
 		iput(inode);
+		if (mtx)
+			mutex_unlock(mtx);
 		goto new_ino;
 	}
 
@@ -370,6 +395,8 @@ struct inode *au_new_inode(struct dentry *dentry, int must_new)
  out_err:
 	inode = ERR_PTR(err);
  out:
+	if (mtx)
+		mutex_unlock(mtx);
 	return inode;
 }
 
