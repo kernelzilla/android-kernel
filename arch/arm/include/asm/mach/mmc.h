@@ -30,6 +30,7 @@ struct mmc_platform_data {
 	unsigned int msmsdcc_fmin;
 	unsigned int msmsdcc_fmid;
 	unsigned int msmsdcc_fmax;
+	bool nonremovable;
 };
 
 #endif
