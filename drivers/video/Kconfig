@@ -2244,6 +2244,18 @@ config FB_MSM_LCDC_PANEL
 	select FB_MSM_LCDC
 	default n
 
+config FB_MSM_LCDC_ST15_WXGA
+    bool
+    select FB_MSM_LCDC_PANEL
+    default n
+
+config FB_MSM_LCDC_ST15_PANEL
+    depends on FB_MSM_LCDC_HW
+    bool "LCDC ST1.5 Panel"
+    select FB_MSM_LCDC_ST15_WXGA
+    ---help---
+      Support for ST1.5 WXGA (1366x768) panel
+
 config FB_MSM_LCDC_PRISM_WVGA
 	bool
 	select FB_MSM_LCDC_PANEL
@@ -2322,6 +2334,7 @@ config FB_MSM_TRY_MDDI_CATCH_LCDC_PRISM
 	select FB_MSM_LCDC_WXGA
 	select FB_MSM_LCDC_TOSHIBA_WVGA_PT
 	select FB_MSM_LCDC_SHARP_WVGA_PT
+	select FB_MSM_LCDC_ST15_WXGA
 	---help---
 	  Support for MDDI panel auto detect.
 	  If it can't find any MDDI panel, it will load an LCDC panel.
