@@ -25,6 +25,8 @@
 
 #include "smd_private.h"
 
+#ifndef CONFIG_GPIOLIB
+
 enum {
 	GPIO_DEBUG_SLEEP = 1U << 0,
 };
@@ -616,6 +618,59 @@ static int __init msm_init_gpio(void)
 
 postcore_initcall(msm_init_gpio);
 
+#if defined(CONFIG_DEBUG_FS)
+
+static int msm_gpio_debug_result = 1;
+
+static int gpio_enable_set(void *data, u64 val)
+{
+	msm_gpio_debug_result = gpio_tlmm_config(val, 0);
+	return 0;
+}
+static int gpio_disable_set(void *data, u64 val)
+{
+	msm_gpio_debug_result = gpio_tlmm_config(val, 1);
+	return 0;
+}
+
+static int gpio_debug_get(void *data, u64 *val)
+{
+	unsigned int result = msm_gpio_debug_result;
+	msm_gpio_debug_result = 1;
+	if (result)
+		*val = 1;
+	else
+		*val = 0;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(gpio_enable_fops, gpio_debug_get,
+						gpio_enable_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(gpio_disable_fops, gpio_debug_get,
+						gpio_disable_set, "%llu\n");
+
+static int __init gpio_debug_init(void)
+{
+	struct dentry *dent;
+	dent = debugfs_create_dir("gpio", 0);
+	if (IS_ERR(dent))
+		return 0;
+
+	debugfs_create_file("enable", 0644, dent, 0, &gpio_enable_fops);
+	debugfs_create_file("disable", 0644, dent, 0, &gpio_disable_fops);
+	return 0;
+}
+
+device_initcall(gpio_debug_init);
+#endif
+
+#else /* ifdef CONFIG_GPIOLIB */
+
+void msm_gpio_enter_sleep(int from_idle) {}
+void msm_gpio_exit_sleep(void) {}
+
+#endif
+
 int gpio_tlmm_config(unsigned config, unsigned disable)
 {
 	return msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, &disable);
@@ -724,50 +779,3 @@ int msm_gpios_disable(const struct msm_gpio *table, int size)
 	return rc;
 }
 EXPORT_SYMBOL(msm_gpios_disable);
-
-#if defined(CONFIG_DEBUG_FS)
-
-static int msm_gpio_debug_result = 1;
-
-static int gpio_enable_set(void *data, u64 val)
-{
-	msm_gpio_debug_result = gpio_tlmm_config(val, 0);
-	return 0;
-}
-static int gpio_disable_set(void *data, u64 val)
-{
-	msm_gpio_debug_result = gpio_tlmm_config(val, 1);
-	return 0;
-}
-
-static int gpio_debug_get(void *data, u64 *val)
-{
-	unsigned int result = msm_gpio_debug_result;
-	msm_gpio_debug_result = 1;
-	if (result)
-		*val = 1;
-	else
-		*val = 0;
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(gpio_enable_fops, gpio_debug_get,
-						gpio_enable_set, "%llu\n");
-DEFINE_SIMPLE_ATTRIBUTE(gpio_disable_fops, gpio_debug_get,
-						gpio_disable_set, "%llu\n");
-
-static int __init gpio_debug_init(void)
-{
-	struct dentry *dent;
-	dent = debugfs_create_dir("gpio", 0);
-	if (IS_ERR(dent))
-		return 0;
-
-	debugfs_create_file("enable", 0644, dent, 0, &gpio_enable_fops);
-	debugfs_create_file("disable", 0644, dent, 0, &gpio_disable_fops);
-	return 0;
-}
-
-device_initcall(gpio_debug_init);
-#endif
-
