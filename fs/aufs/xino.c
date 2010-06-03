@@ -25,17 +25,22 @@
 #include <linux/uaccess.h>
 #include "aufs.h"
 
-ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
+ssize_t xino_fread(au_readf_t func, struct file *file, void *kbuf, size_t size,
 		   loff_t *pos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 	do {
 		/* todo: signal_pending? */
-		err = func(file, (char __user *)buf, size, pos);
+		err = func(file, buf.u, size, pos);
 	} while (err == -EAGAIN || err == -EINTR);
 	set_fs(oldfs);
 
@@ -49,18 +54,23 @@ ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
 
 /* ---------------------------------------------------------------------- */
 
-static ssize_t do_xino_fwrite(au_writef_t func, struct file *file, void *buf,
+static ssize_t do_xino_fwrite(au_writef_t func, struct file *file, void *kbuf,
 			      size_t size, loff_t *pos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		const char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 	/* lockdep_off(); */
 	do {
 		/* todo: signal_pending? */
-		err = func(file, (const char __user *)buf, size, pos);
+		err = func(file, buf.u, size, pos);
 	} while (err == -EAGAIN || err == -EINTR);
 	/* lockdep_on(); */
 	set_fs(oldfs);
