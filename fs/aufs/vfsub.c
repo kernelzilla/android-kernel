@@ -354,10 +354,15 @@ ssize_t vfsub_read_k(struct file *file, void *kbuf, size_t count,
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_read_u(file, (char __user *)kbuf, count, ppos);
+	err = vfsub_read_u(file, buf.u, count, ppos);
 	set_fs(oldfs);
 	return err;
 }
@@ -379,10 +384,15 @@ ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count, loff_t *ppos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
+	union {
+		void *k;
+		const char __user *u;
+	} buf;
 
+	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_write_u(file, (const char __user *)kbuf, count, ppos);
+	err = vfsub_write_u(file, buf.u, count, ppos);
 	set_fs(oldfs);
 	return err;
 }
