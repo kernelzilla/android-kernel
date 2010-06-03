@@ -24,7 +24,6 @@
 /* #define VERBOSE_DEBUG */
 
 #include <linux/kernel.h>
-#include <linux/utsname.h>
 #include <linux/device.h>
 
 #include "u_serial.h"
@@ -123,7 +122,7 @@ static struct usb_cdc_header_desc obex_cdc_header_desc __initdata = {
 	.bLength		= sizeof(obex_cdc_header_desc),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= USB_CDC_HEADER_TYPE,
-	.bcdCDC			= __constant_cpu_to_le16(0x0120),
+	.bcdCDC			= cpu_to_le16(0x0120),
 };
 
 static struct usb_cdc_union_desc obex_cdc_union_desc __initdata = {
@@ -138,7 +137,7 @@ static struct usb_cdc_obex_desc obex_desc __initdata = {
 	.bLength		= sizeof(obex_desc),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= USB_CDC_OBEX_TYPE,
-	.bcdVersion		= __constant_cpu_to_le16(0x0100),
+	.bcdVersion		= cpu_to_le16(0x0100),
 };
 
 /* High-Speed Support */
@@ -149,7 +148,7 @@ static struct usb_endpoint_descriptor obex_hs_ep_out_desc __initdata = {
 
 	.bEndpointAddress	= USB_DIR_OUT,
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize		= __constant_cpu_to_le16(512),
+	.wMaxPacketSize		= cpu_to_le16(512),
 };
 
 static struct usb_endpoint_descriptor obex_hs_ep_in_desc __initdata = {
@@ -158,7 +157,7 @@ static struct usb_endpoint_descriptor obex_hs_ep_in_desc __initdata = {
 
 	.bEndpointAddress	= USB_DIR_IN,
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize		= __constant_cpu_to_le16(512),
+	.wMaxPacketSize		= cpu_to_le16(512),
 };
 
 static struct usb_descriptor_header *hs_function[] __initdata = {
