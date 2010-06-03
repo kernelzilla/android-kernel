@@ -116,6 +116,11 @@ u32 vcd_fw_init(void)
 					vid_c_h264_enc_fw_size, TRUE);
 	}
 
+	if (b_status) {
+		b_status = vcd_fw_prepare(&vcd_firmware.dec_vc1,
+					vid_c_vc1_dec_fw,
+					vid_c_vc1_dec_fw_size, TRUE);
+	}
 	return b_status;
 }
 

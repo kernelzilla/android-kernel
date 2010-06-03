@@ -58,6 +58,8 @@ extern unsigned char *vid_c_mpg4_enc_fw;
 extern u32 vid_c_mpg4_enc_fw_size;
 extern unsigned char *vid_c_h264_enc_fw;
 extern u32 vid_c_h264_enc_fw_size;
+extern unsigned char *vid_c_vc1_dec_fw;
+extern u32 vid_c_vc1_dec_fw_size;
 
 u32 vcd_fw_init(void);
 u32 vcd_get_fw_property(u32 prop_id, void *prop_details);
