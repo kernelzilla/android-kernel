@@ -41,6 +41,7 @@
 DEFINE_MUTEX(hlist_mut);
 DEFINE_MUTEX(pp_prev_lock);
 DEFINE_MUTEX(pp_snap_lock);
+DEFINE_MUTEX(ctrl_cmd_lock);
 
 #define MSM_MAX_CAMERA_SENSORS 5
 #define CAMERA_STOP_SNAPSHOT 42
@@ -1882,7 +1883,9 @@ static long msm_ioctl_control(struct file *filep, unsigned int cmd,
 		/* Coming from control thread, may need to wait for
 		 * command status */
 		CDBG("calling msm_control kernel msm_ioctl_control\n");
+		mutex_lock(&ctrl_cmd_lock);
 		rc = msm_control(ctrl_pmsm, 1, argp);
+		mutex_unlock(&ctrl_cmd_lock);
 		break;
 	case MSM_CAM_IOCTL_CTRL_COMMAND_2:
 		/* Sends a message, returns immediately */
