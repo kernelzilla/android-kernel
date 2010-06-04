@@ -533,8 +533,7 @@ static int msm_hsl_startup(struct uart_port *port)
 	msm_hsl_write(port, data, UARTDM_MR1_ADDR);
 
 	/* Make sure IPR is not 0 to start with*/
-	data = UARTDM_IPR_STALE_LSB_BMSK;
-	msm_hsl_write(port, 0x2, UARTDM_IPR_ADDR);
+	msm_hsl_write(port, UARTDM_IPR_STALE_LSB_BMSK, UARTDM_IPR_ADDR);
 
 	msm_hsl_write(port, UARTDM_MR2_BITS_PER_CHAR_8 | STOP_BIT_ONE,
 		      UARTDM_MR2_ADDR);	/* 8N1 */
