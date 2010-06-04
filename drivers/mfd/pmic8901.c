@@ -248,22 +248,6 @@ static void pm8901_irq_unmask(unsigned int irq)
 	pm8901_config_irq(chip, &block, &config);
 }
 
-static void pm8901_irq_disable(unsigned int irq)
-{
-	struct irq_desc *desc = irq_to_desc(irq);
-
-	pm8901_irq_mask(irq);
-	desc->status |= IRQ_MASKED;
-}
-
-static void pm8901_irq_enable(unsigned int irq)
-{
-	struct irq_desc *desc = irq_to_desc(irq);
-
-	pm8901_irq_unmask(irq);
-	desc->status &= ~IRQ_MASKED;
-}
-
 static void pm8901_irq_ack(unsigned int irq)
 {
 	struct	pm8901_chip *chip = get_irq_data(irq);
@@ -515,8 +499,6 @@ static struct irq_chip pm8901_irq_chip = {
 	.ack       = pm8901_irq_ack,
 	.mask      = pm8901_irq_mask,
 	.unmask    = pm8901_irq_unmask,
-	.disable   = pm8901_irq_disable,
-	.enable    = pm8901_irq_enable,
 	.set_type  = pm8901_irq_set_type,
 	.set_wake  = pm8901_irq_set_wake,
 };
