@@ -125,32 +125,6 @@ void kgsl_g12_idle_check(struct work_struct *work)
 	}
 	mutex_unlock(&kgsl_driver.mutex);
 }
-void kgsl_g12_updatetimestamp(struct kgsl_device *device)
-{
-	unsigned int count = 0;
-
-	KGSL_DRV_DBG("kgsl_g12_updatetimestamp\n");
-
-	kgsl_g12_regread(device, ADDR_VGC_IRQ_ACTIVE_CNT >> 2, &count);
-
-	count >>= 8;
-	count &= 255;
-	device->timestamp += count;
-
-	KGSL_DRV_DBG("kgsl_g12_updatetimestamp : %i Current :%i\n",
-				device->timestamp, device->current_timestamp);
-}
-
-void kgsl_g12_irqtask(struct work_struct *work)
-{
-	struct kgsl_device *device = &kgsl_driver.g12_device;
-
-	/* read IRQ count and update timestamp */
-	kgsl_g12_updatetimestamp(device);
-
-	/* wake up timestamp wait */
-	wake_up_interruptible(&(device->wait_timestamp_wq));
-}
 
 irqreturn_t kgsl_g12_isr(int irq, void *data)
 {
@@ -171,8 +145,18 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 		if (status & REG_VGC_IRQSTATUS__MH_MASK)
 			KGSL_DRV_ERR("g12 mh interrupt\n");
 		if (status & REG_VGC_IRQSTATUS__G2D_MASK) {
-				KGSL_DRV_VDBG("g12 g2d interrupt\n");
-				queue_work(device->irq_wq, &(device->irq_work));
+			int count;
+
+			KGSL_DRV_VDBG("g12 g2d interrupt\n");
+			kgsl_g12_regread(device,
+					 ADDR_VGC_IRQ_ACTIVE_CNT >> 2,
+					 &count);
+
+			count >>= 8;
+			count &= 255;
+			device->timestamp += count;
+
+			wake_up_interruptible(&(device->wait_timestamp_wq));
 		}
 	}
 
@@ -226,13 +210,6 @@ kgsl_g12_init(struct kgsl_device *device,
 
 	/* initilization of timestamp wait */
 	init_waitqueue_head(&(device->wait_timestamp_wq));
-
-	/* workqueue for G12 IRQ work */
-	device->irq_wq = create_singlethread_workqueue("z1xx_sync_wq");
-
-	/* initialization of G12 IRQ work */
-	INIT_WORK(&(device->irq_work), kgsl_g12_irqtask);
-
 
 	memcpy(regspace, &config->regspace, sizeof(device->regspace));
 	if (regspace->mmio_phys_base == 0 || regspace->sizebytes == 0) {
@@ -379,14 +356,6 @@ int kgsl_g12_stop(struct kgsl_device *device)
 		kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
 		device->flags &= ~KGSL_FLAGS_STARTED;
 	}
-
-	/* destroy workqueue for IRQ work */
-	if (device->irq_wq) {
-		KGSL_DRV_DBG("destroy workqueue for IRQ work\n");
-		destroy_workqueue(device->irq_wq);
-		device->irq_wq = 0x0;
-	}
-
 
 	return 0;
 }
@@ -619,6 +588,9 @@ int kgsl_g12_waittimestamp(struct kgsl_device *device,
 
 	KGSL_DRV_INFO("enter (device=%p,timestamp=%d,timeout=0x%08x)\n",
 			device, timestamp, msecs);
+
+	KGSL_DRV_INFO("current (device=%p,timestamp=%d)\n",
+			device, device->timestamp);
 
 	timeout = wait_event_interruptible_timeout(device->wait_timestamp_wq,
 			kgsl_g12_cmdstream_check_timestamp(device, timestamp),

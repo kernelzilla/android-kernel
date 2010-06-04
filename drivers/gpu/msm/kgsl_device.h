@@ -126,8 +126,6 @@ struct kgsl_device {
 	int timestamp;
 
 	wait_queue_head_t wait_timestamp_wq;
-	struct workqueue_struct *irq_wq;
-	struct work_struct irq_work;
 };
 
 struct kgsl_devconfig {
