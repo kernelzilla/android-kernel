@@ -54,9 +54,11 @@
 struct msm_otg {
 	struct otg_transceiver otg;
 
-	struct clk		*clk;
-	struct clk		*pclk;
-	struct clk		*cclk;
+	/* usb clocks */
+	struct clk		*hs_clk;
+	struct clk		*hs_pclk;
+	struct clk		*hs_cclk;
+
 	int			irq;
 	int			vbus_on_irq;
 	void __iomem		*regs;

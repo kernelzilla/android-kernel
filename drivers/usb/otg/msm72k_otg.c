@@ -121,9 +121,9 @@ static int msm_otg_set_clk(struct otg_transceiver *xceiv, int on)
 
 	if (on)
 		/* enable clocks */
-		clk_enable(dev->clk);
+		clk_enable(dev->hs_clk);
 	else
-		clk_disable(dev->clk);
+		clk_disable(dev->hs_clk);
 
 	return 0;
 }
@@ -193,10 +193,10 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	}
 
 	writel(readl(USB_USBCMD) | ASYNC_INTR_CTRL | ULPI_STP_CTRL, USB_USBCMD);
-	if (dev->pclk)
-		clk_disable(dev->pclk);
-	if (dev->cclk)
-		clk_disable(dev->cclk);
+	if (dev->hs_pclk)
+		clk_disable(dev->hs_pclk);
+	if (dev->hs_cclk)
+		clk_disable(dev->hs_cclk);
 	if (device_may_wakeup(dev->otg.dev)) {
 		enable_irq_wake(dev->irq);
 		if (dev->vbus_on_irq)
@@ -228,10 +228,10 @@ static int msm_otg_resume(struct msm_otg *dev)
 		return 0;
 
 
-	if (dev->pclk)
-		clk_enable(dev->pclk);
-	if (dev->cclk)
-		clk_enable(dev->cclk);
+	if (dev->hs_pclk)
+		clk_enable(dev->hs_pclk);
+	if (dev->hs_cclk)
+		clk_enable(dev->hs_cclk);
 
 	temp = readl(USB_USBCMD);
 	temp &= ~ASYNC_INTR_CTRL;
@@ -419,7 +419,7 @@ static void otg_reset(struct msm_otg *dev)
 	unsigned long timeout;
 	unsigned temp;
 
-	clk_enable(dev->clk);
+	clk_enable(dev->hs_clk);
 	if (dev->pdata->phy_reset)
 		dev->pdata->phy_reset(dev->regs);
 	/*disable all phy interrupts*/
@@ -446,7 +446,7 @@ static void otg_reset(struct msm_otg *dev)
 
 	writel(0x0, USB_AHB_BURST);
 	writel(0x00, USB_AHB_MODE);
-	clk_disable(dev->clk);
+	clk_disable(dev->hs_clk);
 
 	if (dev->otg.gadget)
 		enable_sess_valid(dev);
@@ -492,43 +492,43 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		}
 	}
 
-	dev->clk = clk_get(&pdev->dev, "usb_hs_clk");
-	if (IS_ERR(dev->clk)) {
+	dev->hs_clk = clk_get(&pdev->dev, "usb_hs_clk");
+	if (IS_ERR(dev->hs_clk)) {
 		pr_err("%s: failed to get usb_hs_clk\n", __func__);
-		ret = PTR_ERR(dev->clk);
+		ret = PTR_ERR(dev->hs_clk);
 		goto rpc_fail;
 	}
-	clk_set_rate(dev->clk, 60000000);
+	clk_set_rate(dev->hs_clk, 60000000);
 
 	if (!dev->pdata->usb_in_sps) {
-		dev->pclk = clk_get(&pdev->dev, "usb_hs_pclk");
-		if (IS_ERR(dev->pclk)) {
+		dev->hs_pclk = clk_get(&pdev->dev, "usb_hs_pclk");
+		if (IS_ERR(dev->hs_pclk)) {
 			pr_err("%s: failed to get usb_hs_pclk\n", __func__);
-			ret = PTR_ERR(dev->pclk);
-			goto put_clk;
+			ret = PTR_ERR(dev->hs_pclk);
+			goto put_hs_clk;
 		}
 	}
 
 	if (dev->pdata->core_clk) {
-		dev->cclk = clk_get(&pdev->dev, "usb_hs_core_clk");
-		if (IS_ERR(dev->cclk)) {
+		dev->hs_cclk = clk_get(&pdev->dev, "usb_hs_core_clk");
+		if (IS_ERR(dev->hs_cclk)) {
 			pr_err("%s: failed to get usb_hs_core_clk\n", __func__);
-			ret = PTR_ERR(dev->cclk);
-			goto put_pclk;
+			ret = PTR_ERR(dev->hs_cclk);
+			goto put_hs_pclk;
 		}
 	}
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		pr_err("%s: failed to get platform resource mem\n", __func__);
 		ret = -ENODEV;
-		goto put_cclk;
+		goto put_hs_cclk;
 	}
 
 	dev->regs = ioremap(res->start, resource_size(res));
 	if (!dev->regs) {
 		pr_err("%s: ioremap failed\n", __func__);
 		ret = -ENOMEM;
-		goto put_cclk;
+		goto put_hs_cclk;
 	}
 	dev->irq = platform_get_irq(pdev, 0);
 	if (!dev->irq) {
@@ -538,10 +538,10 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 
 	/* enable clocks */
-	if (dev->pclk)
-		clk_enable(dev->pclk);
-	if (dev->cclk)
-		clk_enable(dev->cclk);
+	if (dev->hs_pclk)
+		clk_enable(dev->hs_pclk);
+	if (dev->hs_cclk)
+		clk_enable(dev->hs_cclk);
 
 	/* To reduce phy power consumption and to avoid external LDO
 	 * on the board, PMIC comparators can be used to detect VBUS
@@ -553,10 +553,10 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			dev->pmic_notif_supp = 1;
 			dev->pdata->pmic_enable_ldo(1);
 		} else if (ret != -ENOTSUPP) {
-			if (dev->pclk)
-				clk_disable(dev->pclk);
-			if (dev->cclk)
-				clk_disable(dev->cclk);
+			if (dev->hs_pclk)
+				clk_disable(dev->hs_pclk);
+			if (dev->hs_cclk)
+				clk_disable(dev->hs_cclk);
 			goto free_regs;
 		}
 	}
@@ -567,10 +567,10 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 					"msm_otg", dev);
 	if (ret) {
 		pr_info("%s: request irq failed\n", __func__);
-		if (dev->pclk)
-			clk_disable(dev->pclk);
-		if (dev->cclk)
-			clk_disable(dev->cclk);
+		if (dev->hs_pclk)
+			clk_disable(dev->hs_pclk);
+		if (dev->hs_cclk)
+			clk_disable(dev->hs_cclk);
 		goto free_regs;
 	}
 
@@ -602,14 +602,15 @@ free_otg_irq:
 	free_irq(dev->irq, dev);
 free_regs:
 	iounmap(dev->regs);
-put_cclk:
-	if (dev->cclk)
-		clk_put(dev->cclk);
-put_pclk:
-	if (dev->pclk)
-		clk_put(dev->pclk);
-put_clk:
-	clk_put(dev->clk);
+put_hs_cclk:
+	if (dev->hs_cclk)
+		clk_put(dev->hs_cclk);
+put_hs_pclk:
+	if (dev->hs_pclk)
+		clk_put(dev->hs_pclk);
+put_hs_clk:
+	if (dev->hs_clk)
+		clk_put(dev->hs_clk);
 rpc_fail:
 	dev->pdata->rpc_connect(0);
 free_dev:
@@ -628,15 +629,16 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	if (dev->vbus_on_irq)
 		free_irq(dev->irq, 0);
 	iounmap(dev->regs);
-	if (dev->cclk)
-		clk_disable(dev->cclk);
-	if (dev->cclk)
-		clk_put(dev->cclk);
-	if (dev->pclk) {
-		clk_disable(dev->pclk);
-		clk_put(dev->pclk);
+	if (dev->hs_cclk) {
+		clk_disable(dev->hs_cclk);
+		clk_put(dev->hs_cclk);
 	}
-	clk_put(dev->clk);
+	if (dev->hs_pclk) {
+		clk_disable(dev->hs_pclk);
+		clk_put(dev->hs_pclk);
+	}
+	if (dev->hs_clk)
+		clk_put(dev->hs_clk);
 	kfree(dev);
 	if (dev->pdata->rpc_connect)
 		dev->pdata->rpc_connect(0);
