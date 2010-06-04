@@ -63,6 +63,7 @@
 #include <mach/tlmm.h>
 #include <mach/msm_battery.h>
 #include <mach/msm_hsusb.h>
+#include <mach/msm_xo.h>
 #ifdef CONFIG_USB_ANDROID
 #include <linux/usb/android_composite.h>
 #endif
@@ -1521,6 +1522,19 @@ static struct platform_device *early_devices[] __initdata = {
 	&msm_device_saw_s1,
 };
 
+#if (defined(CONFIG_BAHAMA_CORE)) && \
+	(defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
+
+static int bluetooth_power(int);
+static struct platform_device msm_bt_power_device = {
+	.name	 = "bt_power",
+	.id	 = -1,
+	.dev	 = {
+		.platform_data = &bluetooth_power,
+	},
+};
+#endif
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 	&msm_device_uart_dm12,
@@ -1653,7 +1667,11 @@ static struct platform_device *surf_devices[] __initdata = {
 #if defined(CONFIG_MSM_RPM_LOG) || defined(CONFIG_MSM_RPM_LOG_MODULE)
 	&msm_rpm_log_device,
 #endif
-	&msm_device_vidc
+	&msm_device_vidc,
+#if (defined(CONFIG_BAHAMA_CORE)) && \
+	(defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
+	&msm_bt_power_device,
+#endif
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -4238,6 +4256,258 @@ static void __init msm_fb_add_devices(void)
 	msm_fb_register_device("lcdc", &lcdc_pdata);
 	msm_fb_register_device("mipi_dsi", 0);
 }
+
+#if (defined(CONFIG_BAHAMA_CORE)) && \
+	(defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
+static int bahama_bt(int on)
+{
+	int rc;
+	int i;
+	struct bahama config = { .mod_id = BAHAMA_SLAVE_ID_BAHAMA };
+
+	struct bahama_config_register {
+		u8 reg;
+		u8 value;
+		u8 mask;
+	};
+
+	struct bahama_variant_register {
+		const size_t size;
+		const struct bahama_config_register *set;
+	};
+
+	const struct bahama_config_register *p;
+
+	u8 version;
+
+	const struct bahama_config_register v10_bt_on[] = {
+		{ 0xE9, 0x00, 0xFF },
+		{ 0xF4, 0x80, 0xFF },
+		{ 0xE4, 0x00, 0xFF },
+		{ 0xE5, 0x00, 0x0F },
+#ifdef CONFIG_WLAN
+		{ 0xE6, 0x38, 0x7F },
+		{ 0xE7, 0x06, 0xFF },
+#endif
+		{ 0xE9, 0x21, 0xFF },
+		{ 0x01, 0x0C, 0x1F },
+		{ 0x01, 0x08, 0x1F },
+	};
+
+	const struct bahama_config_register v10_bt_off[] = {
+		{ 0xE9, 0x00, 0xFF },
+	};
+
+	const struct bahama_variant_register bt_bahama[2][1] = {
+		{
+			{ ARRAY_SIZE(v10_bt_off), v10_bt_off },
+		},
+		{
+			{ ARRAY_SIZE(v10_bt_on), v10_bt_on }
+		}
+	};
+
+	on = on ? 1 : 0;
+
+	rc = bahama_read_bit_mask(&config, 0x00,  &version, 1, 0x1F);
+	if (rc < 0) {
+		dev_err(&msm_bt_power_device.dev,
+			"%s: version read failed: %d\n",
+			__func__, rc);
+		return rc;
+	}
+
+	if ((version >= ARRAY_SIZE(bt_bahama[on])) ||
+	    (bt_bahama[on][version].size == 0)) {
+		dev_err(&msm_bt_power_device.dev,
+			"%s: unsupported version\n",
+			__func__);
+		return -EIO;
+	}
+
+	p = bt_bahama[on][version].set;
+
+	dev_info(&msm_bt_power_device.dev,
+		"%s: found version %d\n", __func__, version);
+
+	for (i = 0; i < bt_bahama[on][version].size; i++) {
+		u8 value = (p+i)->value;
+		rc = bahama_write_bit_mask(&config,
+			(p+i)->reg,
+			&value,
+			sizeof((p+i)->value),
+			(p+i)->mask);
+		if (rc < 0) {
+			dev_err(&msm_bt_power_device.dev,
+				"%s: reg %d write failed: %d\n",
+				__func__, (p+i)->reg, rc);
+			return rc;
+		}
+		dev_dbg(&msm_bt_power_device.dev,
+			"%s: reg 0x%02x write value 0x%02x mask 0x%02x\n",
+				__func__, (p+i)->reg,
+				value, (p+i)->mask);
+	}
+	return 0;
+}
+
+static const struct {
+	char *name;
+	int vmin;
+	int vmax;
+} bt_regs_info[] = {
+	{ "8058_s3", 1800000, 1800000 },
+	{ "8058_l2", 1800000, 1800000 },
+	{ "8058_l8", 2900000, 2900000 },
+#ifdef CAN_SET_VOLTAGE_8901_S4
+	{ "8901_s4", 1300000, 1300000 },
+#endif
+};
+
+static struct regulator *bt_regs[ARRAY_SIZE(bt_regs_info)];
+
+static int bluetooth_use_regulators(int on)
+{
+	int i, recover = -1, rc = 0;
+
+	for (i = 0; i < ARRAY_SIZE(bt_regs_info); i++) {
+		bt_regs[i] = on ? regulator_get(&msm_bt_power_device.dev,
+						bt_regs_info[i].name) :
+				(regulator_put(bt_regs[i]), NULL);
+		if (IS_ERR(bt_regs[i])) {
+			rc = PTR_ERR(bt_regs[i]);
+			dev_err(&msm_bt_power_device.dev,
+				"regulator %s get failed (%d)\n",
+				bt_regs_info[i].name, rc);
+			recover = i - 1;
+			bt_regs[i] = NULL;
+			break;
+		}
+
+		if (!on)
+			continue;
+
+		rc = regulator_set_voltage(bt_regs[i],
+					  bt_regs_info[i].vmin,
+					  bt_regs_info[i].vmax);
+		if (rc < 0) {
+			dev_err(&msm_bt_power_device.dev,
+				"regulator %s voltage set (%d)\n",
+				bt_regs_info[i].name, rc);
+			recover = i;
+			break;
+		}
+	}
+
+	if (on && (recover > -1))
+		for (i = recover; i >= 0; i--) {
+			regulator_put(bt_regs[i]);
+			bt_regs[i] = NULL;
+		}
+
+	return rc;
+}
+
+static int bluetooth_switch_regulators(int on)
+{
+	int i, rc = 0;
+
+	for (i = 0; i < ARRAY_SIZE(bt_regs_info); i++) {
+		rc = on ? regulator_enable(bt_regs[i]) :
+			  regulator_disable(bt_regs[i]);
+		if (rc < 0) {
+			dev_err(&msm_bt_power_device.dev,
+				"regulator %s %s failed (%d)\n",
+				bt_regs_info[i].name,
+				on ? "enable" : "disable", rc);
+			if (on && (i > 0)) {
+				while (--i)
+					regulator_disable(bt_regs[i]);
+				break;
+			}
+			break;
+		}
+	}
+	return rc;
+}
+
+static struct msm_xo_voter *bt_clock;
+
+static int bluetooth_power(int on)
+{
+	int rc = 0;
+
+	if (on) {
+
+		rc = bluetooth_use_regulators(1);
+		if (rc < 0)
+			goto out;
+
+		rc = bluetooth_switch_regulators(1);
+
+		if (rc < 0)
+			goto fail_put;
+
+		bt_clock = msm_xo_get(TCXO_D0, "bt_power");
+
+		if (IS_ERR(bt_clock)) {
+			pr_err("Couldn't get TCXO_D0 voter\n");
+			goto fail_switch;
+		}
+
+		rc = msm_xo_mode_vote(bt_clock, XO_MODE_ON);
+
+		if (rc < 0) {
+			pr_err("Failed to vote for TCXO_DO ON\n");
+			goto fail_vote;
+		}
+
+		rc = bahama_bt(1);
+
+		if (rc < 0)
+			goto fail_clock;
+
+#ifdef CAN_HANDLE_PIN_CTRL
+		rc = msm_xo_mode_vote(bt_clock, XO_MODE_PIN_CTRL);
+
+		if (rc < 0) {
+			pr_err("Failed to vote for TCXO_DO pin control\n");
+			goto fail_vote;
+		}
+#endif
+	} else {
+		/* check for initial RFKILL block (power off) */
+		/* some RFKILL versions/configurations rfkill_register */
+		/* calls here for an initial set_block */
+		/* avoid calling i2c and regulator before unblock (on) */
+		if (platform_get_drvdata(&msm_bt_power_device) == NULL) {
+			dev_info(&msm_bt_power_device.dev,
+				"%s: initialized OFF/blocked\n", __func__);
+			goto out;
+		}
+
+		bahama_bt(0);
+
+fail_clock:
+		msm_xo_mode_vote(bt_clock, XO_MODE_OFF);
+fail_vote:
+		msm_xo_put(bt_clock);
+fail_switch:
+		bluetooth_switch_regulators(0);
+fail_put:
+		bluetooth_use_regulators(0);
+	}
+
+out:
+	if (rc < 0)
+		on = 0;
+	dev_info(&msm_bt_power_device.dev,
+		"Bluetooth power switch: state %d result %d\n", on, rc);
+
+	return rc;
+}
+
+#endif /* CONFIG_BAHAMA_CORE, CONFIG_MSM_BT_POWER, CONFIG_MSM_BT_POWER_MODULE */
 
 static void __init msm8x60_cfg_smsc911x(void)
 {
