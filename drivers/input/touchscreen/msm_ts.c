@@ -26,6 +26,10 @@
 #include <linux/platform_device.h>
 #include <linux/mfd/marimba-tsadc.h>
 
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#endif
+
 #include <mach/msm_ts.h>
 
 #define TSSC_CTL			0x100
@@ -62,6 +66,11 @@ struct msm_ts {
 
 	unsigned int			sample_irq;
 	unsigned int			pen_up_irq;
+
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	struct early_suspend		early_suspend;
+#endif
+	struct device			*dev;
 };
 
 static uint32_t msm_tsdebug;
@@ -269,6 +278,25 @@ msm_ts_resume(struct platform_device *pdev)
 }
 #endif
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void msm_ts_early_suspend(struct early_suspend *h)
+{
+	struct msm_ts *ts = container_of(h, struct msm_ts, early_suspend);
+	struct platform_device *pdev = to_platform_device(ts->dev);
+
+	msm_ts_suspend(pdev, PMSG_SUSPEND);
+}
+
+static void msm_ts_late_resume(struct early_suspend *h)
+{
+	struct msm_ts *ts = container_of(h, struct msm_ts, early_suspend);
+	struct platform_device *pdev = to_platform_device(ts->dev);
+
+	msm_ts_resume(pdev);
+}
+#endif
+
+
 static int __devinit msm_ts_probe(struct platform_device *pdev)
 {
 	struct msm_ts_platform_data *pdata = pdev->dev.platform_data;
@@ -302,6 +330,7 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	ts->pdata = pdata;
+	ts->dev	  = &pdev->dev;
 
 	ts->sample_irq = irq1_res->start;
 	ts->pen_up_irq = irq2_res->start;
@@ -383,6 +412,14 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ts);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN +
+						TSSC_SUSPEND_LEVEL;
+	ts->early_suspend.suspend = msm_ts_early_suspend;
+	ts->early_suspend.resume = msm_ts_late_resume;
+	register_early_suspend(&ts->early_suspend);
+#endif
+
 	pr_info("%s: tssc_base=%p irq1=%d irq2=%d\n", __func__,
 		ts->tssc_base, (int)ts->sample_irq, (int)ts->pen_up_irq);
 	dump_tssc_regs(ts);
@@ -420,6 +457,9 @@ static int __devexit msm_ts_remove(struct platform_device *pdev)
 	free_irq(ts->pen_up_irq, ts);
 	input_unregister_device(ts->input_dev);
 	iounmap(ts->tssc_base);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&ts->early_suspend);
+#endif
 	platform_set_drvdata(pdev, NULL);
 	kfree(ts);
 
@@ -433,8 +473,10 @@ static struct platform_driver msm_touchscreen_driver = {
 	},
 	.probe		= msm_ts_probe,
 	.remove		= __devexit_p(msm_ts_remove),
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.resume		= msm_ts_resume,
 	.suspend	= msm_ts_suspend,
+#endif
 };
 
 static int __init msm_ts_init(void)
