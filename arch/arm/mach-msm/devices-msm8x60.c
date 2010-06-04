@@ -689,6 +689,33 @@ struct platform_device msm_device_smd = {
 	.id             = -1,
 };
 
+
+/* MSM Video core device */
+
+#define MSM_VIDC_BASE_PHYS 0x04400000
+#define MSM_VIDC_BASE_SIZE 0x00100000
+
+static struct resource msm_device_vidc_resources[] = {
+	{
+		.start	= MSM_VIDC_BASE_PHYS,
+		.end	= MSM_VIDC_BASE_PHYS + MSM_VIDC_BASE_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= VCODEC_IRQ,
+		.end	= VCODEC_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_vidc = {
+	.name = "msm_vidc",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(msm_device_vidc_resources),
+	.resource = msm_device_vidc_resources,
+};
+
+
 struct clk msm_clocks_8x60[] = {
 	CLK_RPM("ebi1_clk",		EBI1_CLK,		NULL, CLK_MIN),
 

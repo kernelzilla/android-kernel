@@ -422,8 +422,6 @@ static struct platform_device android_usb_device = {
 
 #ifdef CONFIG_MSM_CAMERA
 
-#define MSM_PMEM_ADSP_SIZE      0x2000000
-#define PMEM_KERNEL_EBI1_SIZE   0x600000
 static uint32_t camera_off_gpio_table[] = {
 	GPIO_CFG(47, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
 	GPIO_CFG(48, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
@@ -649,38 +647,25 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
-#ifdef CONFIG_MSM_CAMERA
-static struct android_pmem_platform_data android_pmem_adsp_pdata = {
-       .name = "pmem_adsp",
-       .allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
-       .cached = 0,
-};
-
-static struct platform_device android_pmem_adsp_device = {
-       .name = "android_pmem",
-       .id = 2,
-       .dev = { .platform_data = &android_pmem_adsp_pdata },
-};
-
-static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
-static void __init pmem_adsp_size_setup(char **p)
-{
-	pmem_adsp_size = memparse(*p, p);
-}
-__early_param("pmem_adsp_size=", pmem_adsp_size_setup);
-#endif
-
 #define MSM_FB_SIZE 0x500000;
 #define MSM_PMEM_SF_SIZE 0x1700000;
-#define MSM_PMEM_KERNEL_EBI1_SIZE 0x0
-
 #define MSM_GPU_PHYS_SIZE       SZ_2M
-static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
-static void __init pmem_sf_size_setup(char **p)
-{
-	pmem_sf_size = memparse(*p, p);
-}
-__early_param("pmem_sf_size=", pmem_sf_size_setup);
+
+#define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000
+#define MSM_PMEM_ADSP_SIZE         0x2000000
+
+#define MSM_SMI_BASE          0x38000000
+/* Kernel SMI PMEM Region for video core, used for Firmware */
+/* and encoder,decoder scratch buffers */
+/* Kernel SMI PMEM Region Should always precede the user space */
+/* SMI PMEM Region, as the video core will use offset address */
+/* from the Firmware base */
+#define PMEM_KERNEL_SMI_BASE  (MSM_SMI_BASE)
+#define PMEM_KERNEL_SMI_SIZE  0x1000000
+/* User space SMI PMEM Region for video core*/
+/* used for encoder, decoder input & output buffers  */
+#define MSM_PMEM_SMIPOOL_BASE (PMEM_KERNEL_SMI_BASE + PMEM_KERNEL_SMI_SIZE)
+#define MSM_PMEM_SMIPOOL_SIZE 0x2800000
 
 static unsigned fb_size = MSM_FB_SIZE;
 static void __init fb_size_setup(char **p)
@@ -705,6 +690,23 @@ static void __init pmem_kernel_ebi1_size_setup(char **p)
 __early_param("pmem_kernel_ebi1_size=", pmem_kernel_ebi1_size_setup);
 #endif
 
+#ifdef CONFIG_ANDROID_PMEM
+static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
+static void __init pmem_sf_size_setup(char **p)
+{
+	pmem_sf_size = memparse(*p, p);
+}
+__early_param("pmem_sf_size=", pmem_sf_size_setup);
+
+static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
+
+static void __init pmem_adsp_size_setup(char **p)
+{
+	pmem_adsp_size = memparse(*p, p);
+}
+__early_param("pmem_adsp_size=", pmem_adsp_size_setup);
+#endif
+
 static struct resource msm_fb_resources[] = {
 	{
 		.flags  = IORESOURCE_DMA,
@@ -718,6 +720,34 @@ static struct platform_device msm_fb_device = {
 	.resource       = msm_fb_resources,
 };
 
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
+	.name = PMEM_KERNEL_EBI1_DATA_NAME,
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
+
+static struct platform_device android_pmem_kernel_ebi1_device = {
+	.name = "android_pmem",
+	.id = 1,
+	.dev = { .platform_data = &android_pmem_kernel_ebi1_pdata },
+};
+#endif
+
+#ifdef CONFIG_KERNEL_PMEM_SMI_REGION
+static struct android_pmem_platform_data android_pmem_kernel_smi_pdata = {
+	.name = PMEM_KERNEL_SMI_DATA_NAME,
+	/* defaults to bitmap don't edit */
+	.cached = 0,
+};
+
+static struct platform_device android_pmem_kernel_smi_device = {
+	.name = "android_pmem",
+	.id = 6,
+	.dev = { .platform_data = &android_pmem_kernel_smi_pdata },
+};
+#endif
+
 #ifdef CONFIG_ANDROID_PMEM
 static struct android_pmem_platform_data android_pmem_pdata = {
 	.name = "pmem",
@@ -725,32 +755,34 @@ static struct android_pmem_platform_data android_pmem_pdata = {
 	.cached = 0,
 };
 
-#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
-static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
-	.name = PMEM_KERNEL_EBI1_DATA_NAME,
-	/* if no allocator_type, defaults to PMEM_ALLOCATORTYPE_BITMAP,
-	* the only valid choice at this time. The board structure is
-	* set to all zeros by the C runtime initialization and that is now
-	* the enum value of PMEM_ALLOCATORTYPE_BITMAP, now forced to 0 in
-	* include/linux/android_pmem.h.
-	*/
-	.cached = 0,
-};
-#endif
-
 static struct platform_device android_pmem_device = {
 	.name = "android_pmem",
 	.id = 0,
 	.dev = {.platform_data = &android_pmem_pdata},
 };
 
-#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
-static struct platform_device android_pmem_kernel_ebi1_device = {
-	.name = "android_pmem",
-	.id = 1,
-	.dev = { .platform_data = &android_pmem_kernel_ebi1_pdata },
+static struct android_pmem_platform_data android_pmem_adsp_pdata = {
+	.name = "pmem_adsp",
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
 };
-#endif
+
+static struct platform_device android_pmem_adsp_device = {
+	.name = "android_pmem",
+	.id = 2,
+	.dev = { .platform_data = &android_pmem_adsp_pdata },
+};
+static struct android_pmem_platform_data android_pmem_smipool_pdata = {
+	.name = "pmem_smipool",
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
+static struct platform_device android_pmem_smipool_device = {
+	.name = "android_pmem",
+	.id = 7,
+	.dev = { .platform_data = &android_pmem_smipool_pdata },
+};
+
 #endif
 
 #define GPIO_BACKLIGHT_PWM0 0
@@ -775,30 +807,6 @@ static void __init msm8x60_allocate_memory_regions(void)
 	void *addr;
 	unsigned long size;
 
-
-#ifdef CONFIG_ANDROID_PMEM
-	size = pmem_sf_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_pdata.start = __pa(addr);
-		android_pmem_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
-
-#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
-	size = pmem_kernel_ebi1_size;
-if (size) {
-		addr = alloc_bootmem_aligned(size, 0x100000);
-		android_pmem_kernel_ebi1_pdata.start = __pa(addr);
-		android_pmem_kernel_ebi1_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for kernel"
-			" ebi1 pmem arena\n", size, addr, __pa(addr));
-	}
-#endif
-
-#endif
-
 	size = MSM_FB_SIZE;
 	addr = alloc_bootmem(size);
 	msm_fb_resources[0].start = __pa(addr);
@@ -815,13 +823,54 @@ if (size) {
 		pr_info("allocating %lu bytes at %p (%lx physical) for "
 		"KGSL\n", size, addr, __pa(addr));
 	}
-#ifdef CONFIG_MSM_CAMERA
+
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+	size = pmem_kernel_ebi1_size;
+	if (size) {
+		addr = alloc_bootmem_aligned(size, 0x100000);
+		android_pmem_kernel_ebi1_pdata.start = __pa(addr);
+		android_pmem_kernel_ebi1_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for kernel"
+			" ebi1 pmem arena\n", size, addr, __pa(addr));
+	}
+#endif
+
+#ifdef CONFIG_KERNEL_PMEM_SMI_REGION
+	size = PMEM_KERNEL_SMI_SIZE;
+	if (size) {
+		android_pmem_kernel_smi_pdata.start = PMEM_KERNEL_SMI_BASE;
+		android_pmem_kernel_smi_pdata.size = size;
+		pr_info("allocating %lu bytes at %lx physical for kernel"
+			" smi pmem arena\n", size,
+			(unsigned long) PMEM_KERNEL_SMI_BASE);
+	}
+#endif
+
+#ifdef CONFIG_ANDROID_PMEM
 	size = pmem_adsp_size;
 	if (size) {
 		addr = alloc_bootmem(size);
 		android_pmem_adsp_pdata.start = __pa(addr);
 		android_pmem_adsp_pdata.size = size;
 		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
+
+	size = MSM_PMEM_SMIPOOL_SIZE;
+	if (size) {
+		android_pmem_smipool_pdata.start = MSM_PMEM_SMIPOOL_BASE;
+		android_pmem_smipool_pdata.size = size;
+		pr_info("allocating %lu bytes at %lx physical for user"
+			" smi  pmem arena\n", size,
+			(unsigned long) MSM_PMEM_SMIPOOL_BASE);
+	}
+
+	size = pmem_sf_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_pdata.start = __pa(addr);
+		android_pmem_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
 			"pmem arena\n", size, addr, __pa(addr));
 	}
 #endif
@@ -995,21 +1044,26 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_device_ssbi2,
 	&msm_device_ssbi3,
 #endif
-#ifdef CONFIG_ANDROID_PMEM
-	&android_pmem_device,
 #ifdef CONFIG_KERNEL_PMEM_EBI_REGION
 	&android_pmem_kernel_ebi1_device,
 #endif
+#ifdef CONFIG_KERNEL_PMEM_SMI_REGION
+	&android_pmem_kernel_smi_device,
+#endif
+#ifdef CONFIG_ANDROID_PMEM
+	&android_pmem_device,
+	&android_pmem_adsp_device,
+	&android_pmem_smipool_device,
 #endif
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
 #ifdef CONFIG_MSM_CAMERA
-	&android_pmem_adsp_device,
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
 #endif
 #endif
+	&msm_device_vidc
 };
 
 static struct platform_device *surf_devices[] __initdata = {
@@ -1047,22 +1101,26 @@ static struct platform_device *surf_devices[] __initdata = {
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 	&gpio_leds,
 #endif
-#ifdef CONFIG_ANDROID_PMEM
-	&android_pmem_device,
 #ifdef CONFIG_KERNEL_PMEM_EBI_REGION
 	&android_pmem_kernel_ebi1_device,
 #endif
+#ifdef CONFIG_KERNEL_PMEM_SMI_REGION
+	&android_pmem_kernel_smi_device,
+#endif
+#ifdef CONFIG_ANDROID_PMEM
+	&android_pmem_device,
+	&android_pmem_adsp_device,
+	&android_pmem_smipool_device,
 #endif
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
 #ifdef CONFIG_MSM_CAMERA
-	&android_pmem_adsp_device,
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
 #endif
 #endif
-
+	&msm_device_vidc
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -2666,7 +2724,7 @@ static struct lcdc_platform_data lcdc_pdata = {
 };
 
 static struct msm_panel_common_pdata mdp_pdata = {
-	.mdp_core_clk_rate = 128000000,
+	.mdp_core_clk_rate = 200000000,
 };
 
 static void __init msm_fb_add_devices(void)
