@@ -181,11 +181,25 @@ struct ept_queue_item {
 #define CTRL_RXT_EP_TYPE_SHIFT 2
 
 #define ULPI_CONFIG_REG		0x31
+#ifdef CONFIG_ARCH_MSM7X30
+#define ULPI_DIGOUT_CTRL	0X36
+#define ULPI_CDR_AUTORESET	(1 << 1)
+#else
+#define ULPI_DIGOUT_CTRL	0X31
+#define ULPI_CDR_AUTORESET	(1 << 5)
+#endif
+#define ULPI_CONFIG_REG1	0x30
+#define ULPI_CONFIG_REG2	0X31
+#define ULPI_CONFIG_REG3	0X32
+#define ULPI_IFC_CTRL_CLR	0x09
 #define ULPI_AMPLITUDE_MAX	0x0C
 #define ULPI_OTG_CTRL		0x0B
 #define ULPI_OTG_CTRL_CLR       0x0C
 #define ULPI_INT_RISE_CLR       0x0F
 #define ULPI_INT_FALL_CLR       0x12
+#define ULPI_PRE_EMPHASIS_MASK	(3 << 4)
+#define ULPI_DRV_AMPL_MASK	(3 << 2)
+#define ULPI_ONCLOCK	       (1 << 6)
 #define ULPI_IDPU	      (1 << 0)
 #define ULPI_HOST_DISCONNECT  (1 << 0)
 #define ULPI_VBUS_VALID       (1 << 1)
@@ -281,4 +295,7 @@ struct ept_queue_item {
 #define ULPI_DEBUG               0x15
 #define ULPI_FUNC_CTRL_CLR       0x06
 #define ULPI_SUSPENDM            (1 << 6)
+#define ULPI_CLOCK_SUSPENDM     (1 << 3)
+#define ULPI_CALIB_STS          (1 << 7)
+#define ULPI_CALIB_VAL(x)       (x & 0x7C)
 #endif /* __LINUX_USB_GADGET_MSM72K_UDC_H__ */

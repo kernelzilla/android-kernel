@@ -72,6 +72,25 @@ enum chg_type {
 };
 #endif
 
+enum pre_emphasis_level {
+	PRE_EMPHASIS_DEFAULT,
+	PRE_EMPHASIS_DISABLE,
+	PRE_EMPHASIS_WITH_10_PERCENT = (1 << 5),
+	PRE_EMPHASIS_WITH_20_PERCENT = (3 << 4),
+};
+enum cdr_auto_reset {
+	CDR_AUTO_RESET_DEFAULT,
+	CDR_AUTO_RESET_ENABLE,
+	CDR_AUTO_RESET_DISABLE,
+};
+enum hs_drv_amplitude {
+	HS_DRV_AMPLITUDE_DEFAULT,
+	HS_DRV_AMPLITUDE_ZERO_PERCENT,
+	HS_DRV_AMPLITUDE_25_PERCENTI = (1 << 2),
+	HS_DRV_AMPLITUDE_5_PERCENT = (1 << 3),
+	HS_DRV_AMPLITUDE_75_PERCENT = (3 << 2),
+};
+
 struct msm_hsusb_gadget_platform_data {
 	int *phy_init_seq;
 	void (*phy_reset)(void);
@@ -115,6 +134,10 @@ struct msm_otg_platform_data {
 	 * used instead
 	 */
 	int usb_in_sps;
+	enum pre_emphasis_level	pemp_level;
+	enum cdr_auto_reset	cdr_autoreset;
+	enum hs_drv_amplitude	drv_ampl;
+	int			phy_reset_sig_inverted;
 
 	/* pmic notfications apis */
 	int (*pmic_notif_init) (void);

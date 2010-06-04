@@ -2036,6 +2036,9 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.pmic_register_vbus_sn   = msm_pm_app_register_vbus_sn,
 	.pmic_unregister_vbus_sn = msm_pm_app_unregister_vbus_sn,
 	.pmic_enable_ldo         = msm_pm_app_enable_usb_ldo,
+	.pemp_level              = PRE_EMPHASIS_WITH_10_PERCENT,
+	.cdr_autoreset           = CDR_AUTO_RESET_DEFAULT,
+	.drv_ampl                = HS_DRV_AMPLITUDE_5_PERCENT,
 };
 
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;
