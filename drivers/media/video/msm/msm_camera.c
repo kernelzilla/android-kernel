@@ -34,7 +34,6 @@
 #include <mach/camera.h>
 
 #include <asm/cacheflush.h>
-#define dmac_inv_range(a,b) WARN(1, "need cache invalidate\n")
 
 #define MSM_MAX_CAMERA_SENSORS 5
 
@@ -1512,7 +1511,7 @@ static int msm_get_pic(struct msm_sync *sync, void __user *arg)
 		__func__,
 		pic_pmem_region.kvaddr, end);
 
-	dmac_inv_range((const void *)pic_pmem_region.kvaddr,
+	dmac_flush_range((const void *)pic_pmem_region.kvaddr,
 			(const void *)end);
 
 	CDBG("%s: copy snapshot frame to user\n", __func__);
