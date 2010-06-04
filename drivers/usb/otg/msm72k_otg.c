@@ -32,10 +32,12 @@
 #include <mach/msm_hsusb.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
+#include <mach/clk.h>
 
 #define MSM_USB_BASE	(dev->regs)
 #define is_host()	((OTGSC_ID & readl(USB_OTGSC)) ? 0 : 1)
 #define is_b_sess_vld()	((OTGSC_BSV & readl(USB_OTGSC)) ? 1 : 0)
+#define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
 #define DRIVER_NAME	"msm_otg"
 
 static void otg_reset(struct msm_otg *dev);
@@ -110,6 +112,49 @@ static void disable_sess_valid(struct msm_otg *dev)
 	ulpi_write(dev, (1<<2), 0x0F);
 	ulpi_write(dev, (1<<2), 0x12);
 	writel(readl(USB_OTGSC) & ~OTGSC_BSVIE, USB_OTGSC);
+}
+
+static inline void set_pre_emphasis_level(struct msm_otg *dev)
+{
+	unsigned res = 0;
+
+	if (!dev->pdata || dev->pdata->pemp_level == PRE_EMPHASIS_DEFAULT)
+		return;
+
+	res = ulpi_read(dev, ULPI_CONFIG_REG3);
+	res &= ~(ULPI_PRE_EMPHASIS_MASK);
+	if (dev->pdata->pemp_level != PRE_EMPHASIS_DISABLE)
+		res |= dev->pdata->pemp_level;
+	ulpi_write(dev, res, ULPI_CONFIG_REG3);
+}
+
+static inline void set_cdr_auto_reset(struct msm_otg *dev)
+{
+	unsigned res = 0;
+
+	if (!dev->pdata || dev->pdata->cdr_autoreset == CDR_AUTO_RESET_DEFAULT)
+		return;
+
+	res = ulpi_read(dev, ULPI_DIGOUT_CTRL);
+	if (dev->pdata->cdr_autoreset == CDR_AUTO_RESET_ENABLE)
+		res &=  ~ULPI_CDR_AUTORESET;
+	else
+		res |=  ULPI_CDR_AUTORESET;
+	ulpi_write(dev, res, ULPI_DIGOUT_CTRL);
+}
+
+static inline void set_driver_amplitude(struct msm_otg *dev)
+{
+	unsigned res = 0;
+
+	if (!dev->pdata || dev->pdata->drv_ampl == HS_DRV_AMPLITUDE_DEFAULT)
+		return;
+
+	res = ulpi_read(dev, ULPI_CONFIG_REG2);
+	res &= ~ULPI_DRV_AMPL_MASK;
+	if (dev->pdata->drv_ampl != HS_DRV_AMPLITUDE_ZERO_PERCENT)
+		res |= dev->pdata->drv_ampl;
+	ulpi_write(dev, dev->pdata->drv_ampl, ULPI_CONFIG_REG2);
 }
 
 static int msm_otg_set_clk(struct otg_transceiver *xceiv, int on)
@@ -413,15 +458,199 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-#define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
+#define ULPI_VERIFY_MAX_LOOP_COUNT  5
+#define PHY_CALIB_RETRY_COUNT 10
+static void phy_clk_reset(struct msm_otg *dev)
+{
+	unsigned rc;
+	enum clk_reset_action assert = CLK_RESET_ASSERT;
+
+	if (dev->pdata->phy_reset_sig_inverted)
+		assert = CLK_RESET_DEASSERT;
+
+	rc = clk_reset(dev->phy_reset_clk, assert);
+	if (rc) {
+		pr_err("%s: phy clk assert failed\n", __func__);
+		return;
+	}
+
+	msleep(1);
+
+	rc = clk_reset(dev->phy_reset_clk, !assert);
+	if (rc) {
+		pr_err("%s: phy clk deassert failed\n", __func__);
+		return;
+	}
+
+	msleep(1);
+}
+
+static unsigned ulpi_read_with_reset(struct msm_otg *dev, unsigned reg)
+{
+	int temp;
+	unsigned res;
+
+	for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+		res = ulpi_read(dev, reg);
+		if (res != 0xffffffff)
+			return res;
+
+		phy_clk_reset(dev);
+	}
+
+	pr_err("%s: ulpi read failed for %d times\n",
+			__func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+
+	return -1;
+}
+
+static int ulpi_write_with_reset(struct msm_otg *dev,
+unsigned val, unsigned reg)
+{
+	int temp, res;
+
+	for (temp = 0; temp < ULPI_VERIFY_MAX_LOOP_COUNT; temp++) {
+		res = ulpi_write(dev, val, reg);
+		if (!res)
+			return 0;
+		phy_clk_reset(dev);
+	}
+	pr_err("%s: ulpi write failed for %d times\n",
+		__func__, ULPI_VERIFY_MAX_LOOP_COUNT);
+
+	return -1;
+}
+
+/* some of the older targets does not turn off the PLL
+ * if onclock bit is set and clocksuspendM bit is on,
+ * hence clear them too and initiate the suspend mode
+ * by clearing SupendM bit.
+ */
+static inline int turn_off_phy_pll(struct msm_otg *dev)
+{
+	unsigned res;
+
+	res = ulpi_read_with_reset(dev, ULPI_CONFIG_REG1);
+	if (res == 0xffffffff)
+		return -ETIMEDOUT;
+
+	res = ulpi_write_with_reset(dev,
+		res & ~(ULPI_ONCLOCK), ULPI_CONFIG_REG1);
+	if (res)
+		return -ETIMEDOUT;
+
+	res = ulpi_write_with_reset(dev,
+		ULPI_CLOCK_SUSPENDM, ULPI_IFC_CTRL_CLR);
+	if (res)
+		return -ETIMEDOUT;
+
+	/*Clear SuspendM bit to initiate suspend mode */
+	res = ulpi_write_with_reset(dev,
+		ULPI_SUSPENDM, ULPI_FUNC_CTRL_CLR);
+	if (res)
+		return -ETIMEDOUT;
+
+	return res;
+}
+
+static inline int check_phy_caliberation(struct msm_otg *dev)
+{
+	unsigned res;
+
+	res = ulpi_read_with_reset(dev, ULPI_DEBUG);
+
+	if (res == 0xffffffff)
+		return -ETIMEDOUT;
+
+	if (!(res & ULPI_CALIB_STS) && ULPI_CALIB_VAL(res))
+		return 0;
+
+	return -1;
+}
+
+static int msm_otg_phy_caliberate(struct msm_otg *dev)
+{
+	int i = 0;
+	unsigned long res;
+
+	do {
+		res = turn_off_phy_pll(dev);
+		if (res)
+			return -ETIMEDOUT;
+
+		/* bring phy out of suspend */
+		phy_clk_reset(dev);
+
+		res = check_phy_caliberation(dev);
+		if (!res)
+			return res;
+		i++;
+
+	} while (i < PHY_CALIB_RETRY_COUNT);
+
+	return res;
+}
+
+static int msm_otg_phy_reset(struct msm_otg *dev)
+{
+	unsigned rc;
+	unsigned temp;
+	unsigned long timeout;
+
+	rc = clk_reset(dev->hs_clk, CLK_RESET_ASSERT);
+	if (rc) {
+		pr_err("%s: usb hs clk assert failed\n", __func__);
+		return -1;
+	}
+
+	phy_clk_reset(dev);
+
+	rc = clk_reset(dev->hs_clk, CLK_RESET_DEASSERT);
+	if (rc) {
+		pr_err("%s: usb hs clk deassert failed\n", __func__);
+		return -1;
+	}
+
+	/* select ULPI phy */
+	temp = (readl(USB_PORTSC) & ~PORTSC_PTS);
+	writel(temp | PORTSC_PTS_ULPI, USB_PORTSC);
+
+	rc = msm_otg_phy_caliberate(dev);
+	if (rc)
+		return rc;
+
+	/* TBD: There are two link resets. One is below and other one
+	 * is done immediately after this function. See if we can
+	 * eliminate one of these.
+	 */
+	writel(USBCMD_RESET, USB_USBCMD);
+	timeout = jiffies + USB_LINK_RESET_TIMEOUT;
+	do {
+		if (time_after(jiffies, timeout)) {
+			pr_err("msm_otg: usb link reset timeout\n");
+			break;
+		}
+		msleep(1);
+	} while (readl(USB_USBCMD) & USBCMD_RESET);
+
+	if (readl(USB_USBCMD) & USBCMD_RESET) {
+		pr_err("%s: usb core reset failed\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
 static void otg_reset(struct msm_otg *dev)
 {
 	unsigned long timeout;
-	unsigned temp;
 
 	clk_enable(dev->hs_clk);
 	if (dev->pdata->phy_reset)
 		dev->pdata->phy_reset(dev->regs);
+	else
+		msm_otg_phy_reset(dev);
+
 	/*disable all phy interrupts*/
 	ulpi_write(dev, 0xFF, 0x0F);
 	ulpi_write(dev, 0xFF, 0x12);
@@ -440,9 +669,9 @@ static void otg_reset(struct msm_otg *dev)
 	/* select ULPI phy */
 	writel(0x80000000, USB_PORTSC);
 
-	temp = ulpi_read(dev, ULPI_CONFIG_REG);
-	temp |= ULPI_AMPLITUDE_MAX;
-	ulpi_write(dev, temp, ULPI_CONFIG_REG);
+	set_pre_emphasis_level(dev);
+	set_cdr_auto_reset(dev);
+	set_driver_amplitude(dev);
 
 	writel(0x0, USB_AHB_BURST);
 	writel(0x00, USB_AHB_MODE);
@@ -517,18 +746,28 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto put_hs_pclk;
 		}
 	}
+
+	if (!dev->pdata->phy_reset) {
+		dev->phy_reset_clk = clk_get(&pdev->dev, "usb_phy_clk");
+		if (IS_ERR(dev->phy_reset_clk)) {
+			pr_err("%s: failed to get usb_phy_clk\n", __func__);
+			ret = PTR_ERR(dev->phy_reset_clk);
+			goto put_hs_cclk;
+		}
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		pr_err("%s: failed to get platform resource mem\n", __func__);
 		ret = -ENODEV;
-		goto put_hs_cclk;
+		goto put_phy_clk;
 	}
 
 	dev->regs = ioremap(res->start, resource_size(res));
 	if (!dev->regs) {
 		pr_err("%s: ioremap failed\n", __func__);
 		ret = -ENOMEM;
-		goto put_hs_cclk;
+		goto put_phy_clk;
 	}
 	dev->irq = platform_get_irq(pdev, 0);
 	if (!dev->irq) {
@@ -602,6 +841,9 @@ free_otg_irq:
 	free_irq(dev->irq, dev);
 free_regs:
 	iounmap(dev->regs);
+put_phy_clk:
+	if (dev->phy_reset_clk)
+		clk_put(dev->phy_reset_clk);
 put_hs_cclk:
 	if (dev->hs_cclk)
 		clk_put(dev->hs_cclk);
@@ -639,6 +881,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	}
 	if (dev->hs_clk)
 		clk_put(dev->hs_clk);
+	if (dev->phy_reset_clk)
+		clk_put(dev->phy_reset_clk);
 	kfree(dev);
 	if (dev->pdata->rpc_connect)
 		dev->pdata->rpc_connect(0);

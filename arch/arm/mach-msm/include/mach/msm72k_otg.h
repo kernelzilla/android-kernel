@@ -58,13 +58,17 @@ struct msm_otg {
 	struct clk		*hs_clk;
 	struct clk		*hs_pclk;
 	struct clk		*hs_cclk;
+	/* clk regime has created dummy clock id for phy so
+	 * that generic clk_reset api can be used to reset phy
+	 */
+	struct clk		*phy_reset_clk;
 
 	int			irq;
 	int			vbus_on_irq;
 	void __iomem		*regs;
 	u8			in_lpm;
-
 	unsigned int 		core_clk;
+
 	void (*start_host)	(struct usb_bus *bus, int suspend);
 	/* Enable/disable the clocks */
 	int (*set_clk)		(struct otg_transceiver *otg, int on);
