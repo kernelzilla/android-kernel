@@ -230,6 +230,7 @@ struct msm_i2c_platform_data {
 	int aux_dat;
 	const char *clk;
 	const char *pclk;
+	int src_clk_rate;
 	void (*msm_i2c_config_gpio)(int iface, int config_type);
 };
 
