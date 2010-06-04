@@ -59,8 +59,8 @@ struct clk_local {
 	uint32_t	root_en_mask;
 	int		parent;
 	uint32_t	*children;
-	struct clk_freq_tbl	*freq_tbl;
-	struct clk_freq_tbl	*current_freq;
+	const struct clk_freq_tbl	*freq_tbl;
+	const struct clk_freq_tbl	*current_freq;
 	uint32_t	halt_reg;
 	uint32_t	halt_mask;
 };
@@ -115,24 +115,24 @@ static uint32_t src_pll_tbl[] = {
 	F_RAW(f, s, MD8(m, n), N8(nmsb, nlsb, m, n)|SPDIV(s, div), !!(n), v)
 #define F_END	F_RAW(FREQ_END, SRC_MAX, 0, 0, 0, MSMC1_END)
 
-static struct clk_freq_tbl clk_tbl_csi[] = {
+static const struct clk_freq_tbl clk_tbl_csi[] = {
 	F_MND8(153600000, 24, 17, SRC_PLL1, 2, 2, 5, NOMINAL),
 	F_MND8(192000000, 24, 17, SRC_PLL1, 4, 0, 0, NOMINAL),
 	F_MND8(384000000, 24, 17, SRC_PLL1, 2, 0, 0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_tcxo[] = {
+static const struct clk_freq_tbl clk_tbl_tcxo[] = {
 	F_RAW(19200000, SRC_TCXO, 0, 0, 0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_axi[] = {
+static const struct clk_freq_tbl clk_tbl_axi[] = {
 	F_RAW(1, SRC_AXI, 0, 0, 0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_uartdm[] = {
+static const struct clk_freq_tbl clk_tbl_uartdm[] = {
 	F_MND16( 3686400, SRC_PLL3, 3,   3, 200, NOMINAL),
 	F_MND16( 7372800, SRC_PLL3, 3,   3, 100, NOMINAL),
 	F_MND16(14745600, SRC_PLL3, 3,   3,  50, NOMINAL),
@@ -143,7 +143,7 @@ static struct clk_freq_tbl clk_tbl_uartdm[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mdh[] = {
+static const struct clk_freq_tbl clk_tbl_mdh[] = {
 	F_BASIC( 73728000, SRC_PLL3, 10, NOMINAL),
 	F_BASIC( 92160000, SRC_PLL3,  8, NOMINAL),
 	F_BASIC(122880000, SRC_PLL3,  6, NOMINAL),
@@ -155,7 +155,7 @@ static struct clk_freq_tbl clk_tbl_mdh[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_grp[] = {
+static const struct clk_freq_tbl clk_tbl_grp[] = {
 	F_BASIC( 24576000, SRC_LPXO,  1, NOMINAL),
 	F_BASIC( 46080000, SRC_PLL3, 16, NOMINAL),
 	F_BASIC( 49152000, SRC_PLL3, 15, NOMINAL),
@@ -177,7 +177,7 @@ static struct clk_freq_tbl clk_tbl_grp[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_sdc1_3[] = {
+static const struct clk_freq_tbl clk_tbl_sdc1_3[] = {
 	F_MND8(  144000, 19, 12, SRC_LPXO, 1,   1,  171, NOMINAL),
 	F_MND8(  400000, 19, 12, SRC_LPXO, 1,   2,  123, NOMINAL),
 	F_MND8(16027000, 19, 12, SRC_PLL3, 3,  14,  215, NOMINAL),
@@ -188,7 +188,7 @@ static struct clk_freq_tbl clk_tbl_sdc1_3[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_sdc2_4[] = {
+static const struct clk_freq_tbl clk_tbl_sdc2_4[] = {
 	F_MND8(  144000, 20, 13, SRC_LPXO, 1,   1,  171, NOMINAL),
 	F_MND8(  400000, 20, 13, SRC_LPXO, 1,   2,  123, NOMINAL),
 	F_MND8(16027000, 20, 13, SRC_PLL3, 3,  14,  215, NOMINAL),
@@ -199,7 +199,7 @@ static struct clk_freq_tbl clk_tbl_sdc2_4[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mdp_core[] = {
+static const struct clk_freq_tbl clk_tbl_mdp_core[] = {
 	F_BASIC( 46080000, SRC_PLL3, 16, NOMINAL),
 	F_BASIC( 49152000, SRC_PLL3, 15, NOMINAL),
 	F_BASIC( 52663000, SRC_PLL3, 14, NOMINAL),
@@ -211,34 +211,35 @@ static struct clk_freq_tbl clk_tbl_mdp_core[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mdp_lcdc[] = {
+static const struct clk_freq_tbl clk_tbl_mdp_lcdc[] = {
 	F_MND16(24576000, SRC_LPXO, 1,   0,   0, NOMINAL),
 	F_MND16(30720000, SRC_PLL3, 4,   1,   6, NOMINAL),
 	F_MND16(40960000, SRC_PLL3, 2,   1,   9, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mdp_vsync[] = {
+static const struct clk_freq_tbl clk_tbl_mdp_vsync[] = {
 	F_RAW(24576000, SRC_LPXO, 0, 0, 0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mi2s_codec[] = {
+static const struct clk_freq_tbl clk_tbl_mi2s_codec[] = {
 	F_MND16( 2048000, SRC_LPXO, 4,   1,   3, NOMINAL),
 	F_MND16(12288000, SRC_LPXO, 2,   0,   0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mi2s[] = {
+static const struct clk_freq_tbl clk_tbl_mi2s[] = {
 	F_MND16(12288000, SRC_LPXO, 2,   0,   0, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_midi[] = {
+static const struct clk_freq_tbl clk_tbl_midi[] = {
 	F_MND8(98304000, 19, 12, SRC_PLL3, 3,  2,  5, NOMINAL),
 	F_END,
 };
-static struct clk_freq_tbl clk_tbl_sdac[] = {
+
+static const struct clk_freq_tbl clk_tbl_sdac[] = {
 	F_MND16( 256000, SRC_LPXO, 4,   1,    24, NOMINAL),
 	F_MND16( 352800, SRC_LPXO, 1, 147, 10240, NOMINAL),
 	F_MND16( 384000, SRC_LPXO, 4,   1,    16, NOMINAL),
@@ -251,18 +252,18 @@ static struct clk_freq_tbl clk_tbl_sdac[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_tv[] = {
+static const struct clk_freq_tbl clk_tbl_tv[] = {
 	F_MND8(27000000, 23, 16, SRC_PLL4, 2,  2,  33, NOMINAL),
 	F_MND8(74250000, 23, 16, SRC_PLL4, 2,  1,   6, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_usb[] = {
+static const struct clk_freq_tbl clk_tbl_usb[] = {
 	F_MND8(60000000, 23, 16, SRC_PLL1, 2,  5,  32, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_vfe_jpeg[] = {
+static const struct clk_freq_tbl clk_tbl_vfe_jpeg[] = {
 	F_MND16( 36864000, SRC_PLL3, 4,   1,   5, NOMINAL),
 	F_MND16( 46080000, SRC_PLL3, 4,   1,   4, NOMINAL),
 	F_MND16( 61440000, SRC_PLL3, 4,   1,   3, NOMINAL),
@@ -277,7 +278,7 @@ static struct clk_freq_tbl clk_tbl_vfe_jpeg[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_cam[] = {
+static const struct clk_freq_tbl clk_tbl_cam[] = {
 	F_MND16( 6000000, SRC_PLL1, 4,   1,  32, NOMINAL),
 	F_MND16( 8000000, SRC_PLL1, 4,   1,  24, NOMINAL),
 	F_MND16(12000000, SRC_PLL1, 4,   1,  16, NOMINAL),
@@ -290,7 +291,7 @@ static struct clk_freq_tbl clk_tbl_cam[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_vpe[] = {
+static const struct clk_freq_tbl clk_tbl_vpe[] = {
 	F_MND8( 24576000, 22, 15, SRC_LPXO, 1,   0,   0, NOMINAL),
 	F_MND8( 30720000, 22, 15, SRC_PLL3, 4,   1,   6, NOMINAL),
 	F_MND8( 61440000, 22, 15, SRC_PLL3, 4,   1,   3, NOMINAL),
@@ -301,7 +302,7 @@ static struct clk_freq_tbl clk_tbl_vpe[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_mfc[] = {
+static const struct clk_freq_tbl clk_tbl_mfc[] = {
 	F_MND8( 24576000, 24, 17, SRC_LPXO, 1,   0,   0, NOMINAL),
 	F_MND8( 30720000, 24, 17, SRC_PLL3, 4,   1,   6, NOMINAL),
 	F_MND8( 61440000, 24, 17, SRC_PLL3, 4,   1,   3, NOMINAL),
@@ -313,13 +314,13 @@ static struct clk_freq_tbl clk_tbl_mfc[] = {
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_spi[] = {
+static const struct clk_freq_tbl clk_tbl_spi[] = {
 	F_MND8( 9963243, 19, 12, SRC_PLL3, 4,   7,   129, NOMINAL),
 	F_MND8(26331429, 19, 12, SRC_PLL3, 4,  34,   241, NOMINAL),
 	F_END,
 };
 
-static struct clk_freq_tbl clk_tbl_lpa_codec[] = {
+static const struct clk_freq_tbl clk_tbl_lpa_codec[] = {
 	F_RAW(1, SRC_MAX, 0,  0,  0, MSMC1_END), /* src = MI2S_CODEC_RX */
 	F_RAW(2, SRC_MAX, 0,  1,  0, MSMC1_END), /* src = ECODEC_CIF */
 	F_RAW(3, SRC_MAX, 0,  2,  0, MSMC1_END), /* src = MI2S */
@@ -660,7 +661,7 @@ enum {
 static unsigned xo_votes[NUM_XO]; /* Tracks the number of users for each XO */
 
 /* Map PLLs to which XO they use */
-static unsigned pll_to_xo[] = {
+static const unsigned pll_to_xo[] = {
 	[PLL_0] = TCXO,
 	[PLL_1] = TCXO,
 	[PLL_2] = TCXO,
@@ -1060,7 +1061,7 @@ static void soc_clk_auto_off(unsigned id)
 static long soc_clk_round_rate(unsigned id, unsigned rate)
 {
 	struct clk_local *t = &clk_local_tbl[id];
-	struct clk_freq_tbl *f;
+	const struct clk_freq_tbl *f;
 
 	if (t->type != MND && t->type != BASIC)
 		return -EINVAL;
@@ -1075,8 +1076,8 @@ static long soc_clk_round_rate(unsigned id, unsigned rate)
 static int soc_clk_set_rate(unsigned id, unsigned rate)
 {
 	struct clk_local *t = &clk_local_tbl[id];
-	struct clk_freq_tbl *cf = t->current_freq;
-	struct clk_freq_tbl *nf;
+	const struct clk_freq_tbl *cf = t->current_freq;
+	const struct clk_freq_tbl *nf;
 	uint32_t *chld = t->children;
 	void *ns_reg = REG(t->ns_reg);
 	void *md_reg = REG(t->md_reg);
@@ -1253,7 +1254,7 @@ static unsigned soc_clk_is_enabled(unsigned id)
 	return !!(clk_local_tbl[id].count);
 }
 
-struct clk_ops clk_ops_7x30 = {
+static struct clk_ops clk_ops_7x30 = {
 	.enable = soc_clk_enable,
 	.disable = soc_clk_disable,
 	.auto_off = soc_clk_auto_off,
@@ -1305,10 +1306,10 @@ static void __init print_ownership(void)
  * checking the ownership bit of one register (usually the ns register).
  */
 #define O(x) &ownership_regs[x]
-static struct clk_local_ownership {
-	uint32_t *reg;
-	uint32_t bit;
-} ownership_map[] __initdata = {
+static const struct clk_local_ownership {
+	const uint32_t *reg;
+	const uint32_t bit;
+} ownership_map[] __initconst = {
 	[C(GRP_2D)]			= { O(SH2_OWN_APPS1), B(6) },
 	[C(GRP_2D_P)]			= { O(SH2_OWN_APPS1), B(6) },
 	[C(HDMI)]			= { O(SH2_OWN_APPS1), B(31) },
@@ -1401,7 +1402,7 @@ static struct clk_local_ownership {
 static struct clk_ops * __init clk_is_local(uint32_t id)
 {
 	uint32_t local, bit = ownership_map[id].bit;
-	uint32_t *reg = ownership_map[id].reg;
+	const uint32_t *reg = ownership_map[id].reg;
 
 	BUG_ON(id >= ARRAY_SIZE(ownership_map) || !reg);
 
@@ -1409,11 +1410,11 @@ static struct clk_ops * __init clk_is_local(uint32_t id)
 	return local ? &clk_ops_7x30 : NULL;
 }
 
-static struct reg_init {
-	void *reg;
+static const struct reg_init {
+	const void *reg;
 	uint32_t mask;
 	uint32_t val;
-} ri_list[] __initdata = {
+} ri_list[] __initconst = {
 	/* Enable UMDX_P clock. Known to causes issues, so never turn off. */
 	{REG(GLBL_CLK_ENA_2_SC), B(2), B(2)},
 
