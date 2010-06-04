@@ -23,8 +23,13 @@
 #include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
+#include <linux/clk.h>
 #include <linux/mfd/marimba.h>
 #include <linux/mfd/marimba-tsadc.h>
+
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#endif
 
 /* marimba configuration block: TS_CTL0 */
 #define TS_CTL0			0xFF
@@ -74,6 +79,10 @@ struct marimba_tsadc {
 	struct marimba *marimba;
 	struct device *dev;
 	struct marimba_tsadc_platform_data *pdata;
+	struct clk	*codec_ssbi;
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	struct early_suspend		early_suspend;
+#endif
 };
 
 static struct marimba_tsadc *tsadc_dev;
@@ -421,6 +430,108 @@ err:
 	return &pdev->dev;
 }
 
+#ifdef CONFIG_PM
+static int
+marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
+{
+	int rc = 0;
+	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
+
+	rc = marimba_tsadc_shutdown(tsadc);
+	if (rc < 0) {
+		pr_err("%s: Unable to shutdown TSADC\n", __func__);
+		return rc;
+	}
+
+	clk_disable(tsadc->codec_ssbi);
+
+	if (tsadc->pdata->marimba_tsadc_power) {
+		rc = tsadc->pdata->marimba_tsadc_power(0);
+		if (rc < 0)
+			goto fail_tsadc_power;
+	}
+
+	return rc;
+
+fail_tsadc_power:
+	marimba_tsadc_startup(tsadc_dev);
+	marimba_tsadc_configure(tsadc_dev);
+	return rc;
+}
+
+static int marimba_tsadc_resume(struct platform_device *pdev)
+{
+	int rc = 0;
+	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
+
+	if (tsadc->pdata->marimba_tsadc_power) {
+		rc = tsadc->pdata->marimba_tsadc_power(1);
+		if (rc) {
+			pr_err("%s: Unable to power on TSADC \n", __func__);
+			return rc;
+		}
+	}
+
+	rc = clk_enable(tsadc->codec_ssbi);
+	if (rc != 0)
+		goto fail_clk_enable;
+
+	rc = marimba_tsadc_startup(tsadc_dev);
+	if (rc < 0) {
+		pr_err("%s: Unable to startup TSADC\n", __func__);
+		goto fail_tsadc_startup;
+	}
+
+	rc = marimba_tsadc_configure(tsadc_dev);
+	if (rc < 0) {
+		pr_err("%s: Unable to configure TSADC\n", __func__);
+		goto fail_tsadc_configure;
+	}
+
+	return rc;
+
+fail_tsadc_configure:
+	marimba_tsadc_shutdown(tsadc_dev);
+fail_tsadc_startup:
+	clk_disable(tsadc->codec_ssbi);
+fail_clk_enable:
+	if (tsadc->pdata->marimba_tsadc_power)
+		rc = tsadc->pdata->marimba_tsadc_power(0);
+	return rc;
+}
+#else
+static int
+marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
+{
+	return 0;
+}
+
+static int marimba_tsadc_resume(struct platform_device *pd)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void marimba_tsadc_early_suspend(struct early_suspend *h)
+{
+	struct marimba_tsadc *tsadc = container_of(h, struct marimba_tsadc,
+						 early_suspend);
+	struct platform_device *pdev = to_platform_device(tsadc->dev);
+
+	marimba_tsadc_suspend(pdev, PMSG_SUSPEND);
+}
+
+static void marimba_tsadc_late_resume(struct early_suspend *h)
+{
+	struct marimba_tsadc *tsadc = container_of(h, struct marimba_tsadc,
+						 early_suspend);
+	struct platform_device *pdev = to_platform_device(tsadc->dev);
+
+	marimba_tsadc_resume(pdev);
+}
+#endif
+
 static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 {
 	struct marimba *marimba = platform_get_drvdata(pdev);
@@ -460,18 +571,47 @@ static int __devinit marimba_tsadc_probe(struct platform_device *pdev)
 		}
 	}
 
+	tsadc->codec_ssbi = clk_get(NULL, "codec_ssbi_clk");
+	if (IS_ERR(tsadc->codec_ssbi)) {
+		rc = PTR_ERR(tsadc->codec_ssbi);
+		goto fail_clk_get;
+	}
+	rc = clk_enable(tsadc->codec_ssbi);
+	if (rc != 0)
+		goto fail_clk_enable;
+
 	child = marimba_add_tssc_subdev(&pdev->dev, "msm_touchscreen", -1,
 			 resources_tssc, ARRAY_SIZE(resources_tssc),
 			 pdata->tssc_data, sizeof(*pdata->tssc_data));
 
 	if (IS_ERR(child)) {
 		rc = PTR_ERR(child);
-		goto fail_tsadc_power;
+		goto fail_add_subdev;
 	}
+
+	platform_set_drvdata(pdev, tsadc);
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	tsadc->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN +
+						 TSADC_SUSPEND_LEVEL;
+	tsadc->early_suspend.suspend = marimba_tsadc_early_suspend;
+	tsadc->early_suspend.resume = marimba_tsadc_late_resume;
+	register_early_suspend(&tsadc->early_suspend);
+#endif
 
 	tsadc_dev = tsadc;
 
 	return rc;
+
+fail_add_subdev:
+	clk_disable(tsadc->codec_ssbi);
+
+fail_clk_enable:
+	clk_put(tsadc->codec_ssbi);
+
+fail_clk_get:
+	if (tsadc->pdata->marimba_tsadc_power)
+		rc = tsadc->pdata->marimba_tsadc_power(0);
 fail_tsadc_power:
 	if (tsadc->pdata->exit)
 		rc = tsadc->pdata->exit();
@@ -485,90 +625,24 @@ static int __devexit marimba_tsadc_remove(struct platform_device *pdev)
 	int rc = 0;
 	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
 
+	clk_disable(tsadc->codec_ssbi);
+	clk_put(tsadc->codec_ssbi);
+
 	if (tsadc->pdata->exit)
 		rc = tsadc->pdata->exit();
 
 	if (tsadc->pdata->marimba_tsadc_power)
 		rc = tsadc->pdata->marimba_tsadc_power(0);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&tsadc->early_suspend);
+#endif
+
 	platform_set_drvdata(pdev, NULL);
 	kfree(tsadc);
 	return rc;
 }
 
-#ifdef CONFIG_PM
-static int
-marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
-{
-	int rc = 0;
-	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
-
-	rc = marimba_tsadc_shutdown(tsadc);
-	if (rc < 0) {
-		pr_err("%s: Unable to shutdown TSADC\n", __func__);
-		return rc;
-	}
-
-	if (tsadc->pdata->marimba_tsadc_power) {
-		rc = tsadc->pdata->marimba_tsadc_power(0);
-		if (rc < 0)
-			goto fail_tsadc_power;
-	}
-
-	return rc;
-
-fail_tsadc_power:
-	marimba_tsadc_startup(tsadc_dev);
-	marimba_tsadc_configure(tsadc_dev);
-	return rc;
-}
-
-static int marimba_tsadc_resume(struct platform_device *pdev)
-{
-	int rc = 0;
-	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
-
-	if (tsadc->pdata->marimba_tsadc_power) {
-		rc = tsadc->pdata->marimba_tsadc_power(1);
-		if (rc) {
-			pr_err("%s: Unable to power on TSADC \n", __func__);
-			return rc;
-		}
-	}
-
-	rc = marimba_tsadc_startup(tsadc_dev);
-	if (rc < 0) {
-		pr_err("%s: Unable to startup TSADC\n", __func__);
-		goto fail_tsadc_startup;
-	}
-
-	rc = marimba_tsadc_configure(tsadc_dev);
-	if (rc < 0) {
-		pr_err("%s: Unable to configure TSADC\n", __func__);
-		goto fail_tsadc_configure;
-	}
-
-	return rc;
-
-fail_tsadc_configure:
-	marimba_tsadc_shutdown(tsadc_dev);
-fail_tsadc_startup:
-	if (tsadc->pdata->marimba_tsadc_power)
-		rc = tsadc->pdata->marimba_tsadc_power(0);
-	return rc;
-}
-#else
-static int
-marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
-{
-	return 0;
-}
-
-static int marimba_tsadc_resume(struct platform_device *pd)
-{
-	return 0;
-}
-#endif
 
 static struct platform_driver tsadc_driver = {
 	.probe	= marimba_tsadc_probe,
@@ -577,8 +651,10 @@ static struct platform_driver tsadc_driver = {
 		.name = "marimba_tsadc",
 		.owner = THIS_MODULE,
 	},
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.resume = marimba_tsadc_resume,
 	.suspend = marimba_tsadc_suspend,
+#endif
 };
 
 static int __init marimba_tsadc_init(void)
