@@ -2414,7 +2414,7 @@ config FB_MSM_SECONDARY_PANEL_NONE
 endchoice
 
 config FB_MSM_HDMI_ADV7520_PANEL
-	depends on FB_MSM_MDP40
+	depends on FB_MSM_MDP40 && FB_MSM_OVERLAY
         bool "LCDC HDMI ADV7520 720p Panel"
         select FB_MSM_DTV
 	default n
