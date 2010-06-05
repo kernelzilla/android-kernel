@@ -1,3 +1,7 @@
+config MSM_CAMERA_OLD
+	bool "Use old camera implementation"
+	depends on MSM_CAMERA && ARCH_MSM7X00A
+	  
 comment "Camera Sensor Selection"
 config MT9T013
 	bool "Sensor mt9t013 (BAYER 3M)"

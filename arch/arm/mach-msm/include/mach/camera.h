@@ -85,6 +85,12 @@ struct msm_sensor_ctrl {
 
 /* this structure is used in kernel */
 struct msm_queue_cmd {
+#ifdef CONFIG_MSM_CAMERA_OLD
+        struct list_head list;
+        enum msm_queue type;
+        void *command;
+        int on_heap;
+#else
 	struct list_head list_config;
 	struct list_head list_control;
 	struct list_head list_frame;
@@ -92,6 +98,7 @@ struct msm_queue_cmd {
 	enum msm_queue type;
 	void *command;
 	int on_heap;
+#endif
 };
 
 struct msm_device_queue {
@@ -104,6 +111,51 @@ struct msm_device_queue {
 };
 
 struct msm_sync {
+#ifdef CONFIG_MSM_CAMERA_OLD
+        /* These two queues are accessed from a process context only. */
+        struct hlist_head frame; /* most-frequently accessed */
+        struct hlist_head stats;
+
+        /* The message queue is used by the control thread to send commands
+         * to the config thread, and also by the DSP to send messages to the
+         * config thread.  Thus it is the only queue that is accessed from
+         * both interrupt and process context.
+         */
+        spinlock_t msg_event_q_lock;
+        struct list_head msg_event_q;
+        wait_queue_head_t msg_event_wait;
+
+        /* This queue contains preview frames. It is accessed by the DSP (in
+         * in interrupt context, and by the frame thread.
+         */
+        spinlock_t prev_frame_q_lock;
+        struct list_head prev_frame_q;
+        wait_queue_head_t prev_frame_wait;
+        int unblock_poll_frame;
+
+        /* This queue contains snapshot frames.  It is accessed by the DSP (in
+         * interrupt context, and by the control thread.
+         */
+        spinlock_t pict_frame_q_lock;
+        struct list_head pict_frame_q;
+        wait_queue_head_t pict_frame_wait;
+
+        struct msm_camera_sensor_info *sdata;
+        struct msm_camvfe_fn vfefn;
+        struct msm_sensor_ctrl sctrl;
+        struct wake_lock wake_lock;
+        struct platform_device *pdev;
+        uint8_t opencnt;
+        void *cropinfo;
+        int  croplen;
+        unsigned pict_pp;
+        uint8_t pp_sync_flag;
+
+        const char *apps_id;
+
+        struct mutex lock;
+        struct list_head list;
+#else
 	/* These two queues are accessed from a process context only.  They contain
 	 * pmem descriptors for the preview frames and the stats coming from the
 	 * camera sensor.
@@ -151,6 +203,7 @@ struct msm_sync {
 
 	struct mutex lock;
 	struct list_head list;
+#endif
 };
 
 #define MSM_APPS_ID_V4L2 "msm_v4l2"
@@ -166,6 +219,22 @@ struct msm_device {
 	atomic_t opened;
 };
 
+#ifdef CONFIG_MSM_CAMERA_OLD
+struct msm_control_device_queue {
+        spinlock_t ctrl_status_q_lock;
+        struct list_head ctrl_status_q;
+        wait_queue_head_t ctrl_status_wait;
+};
+
+struct msm_control_device {
+        struct msm_device *pmsm;
+
+        /* This queue used by the config thread to send responses back to the
+         * control thread.  It is accessed only from a process context.
+         */
+        struct msm_control_device_queue ctrl_q;
+};
+#else
 struct msm_control_device {
 	struct msm_device *pmsm;
 
@@ -179,6 +248,7 @@ struct msm_control_device {
 	 */
 	struct msm_device_queue ctrl_q;
 };
+#endif
 
 struct register_address_value_pair {
 	uint16_t register_address;
