@@ -31,4 +31,14 @@ config VP_A1026
 	help
 	  A1026 Voice Processor Driver implemented by HTC.
 
+config SENSORS_PCA963X
+        tristate "Philips PCA963X 4-bit I2C-bus LED"
+        depends on I2C && EXPERIMENTAL
+        help
+         If you say yes here you get support for the Philips PCA963X
+         4-bit I2C-bus LED.
+
+         This driver can also be built as a module.  If so, the module
+         will be called pca963X.
+
 endmenu
