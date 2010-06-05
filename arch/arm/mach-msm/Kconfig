@@ -54,6 +54,7 @@ config ARCH_MSM8X60
 	select MSM_ADM3
 	select REGULATOR
 	select MSM8660_TLMM
+	select ARCH_HAS_CPU_IDLE_WAIT
 
 endchoice
 
