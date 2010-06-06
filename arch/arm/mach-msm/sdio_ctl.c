@@ -747,35 +747,37 @@ static void sdio_demux_fn(struct work_struct *work)
 	int r = 0, read_avail = 0;
 	void *ctl_data;
 
-	read_avail = sdio_read_avail(sdio_ctl_chl);
-	if (read_avail < 0) {
-		D(KERN_ERR "%s: sdio_read_avail failed with rc %d\n",
-			    __func__, read_avail);
-		return;
+	while (1) {
+		read_avail = sdio_read_avail(sdio_ctl_chl);
+		if (read_avail < 0) {
+			D(KERN_ERR "%s: sdio_read_avail failed with rc %d\n",
+			  __func__, read_avail);
+			return;
+		}
+
+		if (read_avail == 0) {
+			D(KERN_INFO "%s: Nothing to read\n", __func__);
+			return;
+		}
+
+		D(KERN_INFO "%s: kmalloc %d bytes\n", __func__, read_avail);
+		ctl_data = kmalloc(read_avail, GFP_KERNEL);
+		if (!ctl_data) {
+			D(KERN_ERR "%s: kmalloc Failed\n", __func__);
+			return;
+		}
+
+		D(KERN_INFO "%s: sdio_read %d bytes\n", __func__, read_avail);
+		r = sdio_read(sdio_ctl_chl, ctl_data, read_avail);
+		if (r < 0) {
+			D(KERN_ERR "%s: sdio_read failed with rc %d\n",
+			  __func__, r);
+			kfree(ctl_data);
+			return;
+		}
+
+		parse_ctl_data(ctl_data, read_avail);
 	}
-
-	if (read_avail == 0) {
-		D(KERN_INFO "%s: Nothing to read\n", __func__);
-		return;
-	}
-
-	D(KERN_INFO "%s: kmalloc %d bytes\n", __func__, read_avail);
-	ctl_data = kmalloc(read_avail, GFP_KERNEL);
-	if (!ctl_data) {
-		D(KERN_ERR "%s: kmalloc Failed\n", __func__);
-		return;
-	}
-
-	D(KERN_INFO "%s: sdio_read %d bytes\n", __func__, read_avail);
-	r = sdio_read(sdio_ctl_chl, ctl_data, read_avail);
-	if (r < 0) {
-		D(KERN_ERR "%s: sdio_read failed with rc %d\n", __func__, r);
-		kfree(ctl_data);
-		return;
-	}
-
-	parse_ctl_data(ctl_data, read_avail);
-
 	return;
 }
 
