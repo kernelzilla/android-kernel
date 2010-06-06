@@ -35,6 +35,7 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
+#include <linux/swap.h>
 
 static uint32_t lowmem_debug_level = 2;
 static int lowmem_adj[6] = {
@@ -82,6 +83,7 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 {
 	struct task_struct *p;
 	struct task_struct *selected = NULL;
+	struct sysinfo si;
 	int rem = 0;
 	int tasksize;
 	int i;
@@ -91,6 +93,10 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	int array_size = ARRAY_SIZE(lowmem_adj);
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_ACTIVE_FILE) + global_page_state(NR_INACTIVE_FILE);
+#ifdef CONFIG_SWAP
+	si_swapinfo(&si);
+	other_free += (si.freeswap * si.mem_unit) / 8;
+#endif
 
 	/*
 	 * If we already have a death outstanding, then
