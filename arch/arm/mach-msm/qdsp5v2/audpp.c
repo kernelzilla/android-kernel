@@ -91,7 +91,7 @@ static struct wake_lock audpp_wake_lock;
 
 #define MAX_EVENT_CALLBACK_CLIENTS 	1
 
-#define AUDPP_CONCURRENCY_DEFAULT 6	/* All non tunnel mode */
+#define AUDPP_CONCURRENCY_DEFAULT 0	/* Set default to LPA mode */
 #define AUDPP_MAX_DECODER_CNT 5
 #define AUDPP_CODEC_MASK 0x000000FF
 #define AUDPP_MODE_MASK 0x00000F00
