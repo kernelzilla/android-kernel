@@ -3426,12 +3426,6 @@ static void __init bt_power_init(void)
 #define bt_power_init(x) do {} while (0)
 #endif
 
-static struct platform_device msm_device_pmic_leds = {
-	.name   = "pmic-leds",
-	.id = -1,
-};
-
-
 static struct msm_psy_batt_pdata msm_psy_batt_data = {
 	.voltage_min_design 	= 2800,
 	.voltage_max_design	= 4300,
@@ -3501,7 +3495,6 @@ static struct platform_device *devices[] __initdata = {
 	&msm_bt_power_device,
 #endif
 	&msm_device_kgsl,
-	&msm_device_pmic_leds,
 #ifdef CONFIG_MT9T013
 	&msm_camera_sensor_mt9t013,
 #endif
