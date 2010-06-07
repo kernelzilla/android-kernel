@@ -28,6 +28,7 @@
 #include <mach/clk.h>
 
 #include "clock.h"
+#include "socinfo.h"
 
 static DEFINE_MUTEX(clocks_mutex);
 static DEFINE_SPINLOCK(clocks_lock);
@@ -176,6 +177,7 @@ EXPORT_SYMBOL(clk_set_flags);
  */
 static unsigned long ebi1_min_rate[CLKVOTE_MAX];
 static struct clk *ebi1_clk;
+static struct clk *pbus_clk;
 
 /* Rate is in Hz to be consistent with the other clk APIs. */
 int ebi1_clk_set_min_rate(enum clkvote_client client, unsigned long rate)
@@ -220,7 +222,13 @@ static int axi_freq_notifier_handler(struct notifier_block *block,
 	if (min_freq != MSM_AXI_MAX_FREQ)
 		min_freq *= 1000;
 
-	return ebi1_clk_set_min_rate(CLKVOTE_PMQOS, min_freq);
+	/* On 7x30, ebi1_clk votes are dropped during power collapse, but
+	 * pbus_clk votes are not. Use pbus_clk to implicitly request ebi1
+	 * and AXI rates. */
+	if (cpu_is_msm7x30() || cpu_is_msm8x55())
+		return clk_set_min_rate(pbus_clk, min_freq/2);
+	else
+		return ebi1_clk_set_min_rate(CLKVOTE_PMQOS, min_freq);
 }
 
 /*
@@ -296,6 +304,10 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
 
 	ebi1_clk = clk_get(NULL, "ebi1_clk");
 	BUG_ON(IS_ERR(ebi1_clk));
+	if (cpu_is_msm7x30() || cpu_is_msm8x55()) {
+		pbus_clk = clk_get(NULL, "pbus_clk");
+		BUG_ON(IS_ERR(pbus_clk));
+	}
 
 	axi_freq_notifier_block.notifier_call = axi_freq_notifier_handler;
 	pm_qos_add_notifier(PM_QOS_SYSTEM_BUS_FREQ, &axi_freq_notifier_block);
