@@ -346,10 +346,12 @@ static int rmnet_open(struct net_device *dev)
 static int __rmnet_close(struct net_device *dev)
 {
 	struct rmnet_private *p = netdev_priv(dev);
-	int rc;
+	int rc = 0;
 
 	if (p->device_up) {
-		rc = msm_rmnet_sdio_close(p->ch_id);
+		/* do not close rmnet port once up,  this causes
+		   remote side to hang if tried to open again */
+		/* rc = msm_rmnet_sdio_close(p->ch_id); */
 		p->device_up = DEVICE_INACTIVE;
 		return rc;
 	} else
