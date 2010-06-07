@@ -47,9 +47,14 @@ int au_test_loopback_overlap(struct super_block *sb, struct dentry *h_d1,
 /* true if a kernel thread named 'loop[0-9].*' accesses a file */
 int au_test_loopback_kthread(void)
 {
-	const char c = current->comm[4];
+	int ret;
 
-	return current->mm == NULL
-	       && '0' <= c && c <= '9'
-	       && strncmp(current->comm, "loop", 4) == 0;
+	ret = 0;
+	if (current->flags & PF_KTHREAD) {
+		const char c = current->comm[4];
+		ret = ('0' <= c && c <= '9'
+		       && !strncmp(current->comm, "loop", 4));
+	}
+
+	return ret;
 }

@@ -231,7 +231,8 @@ void au_export_init(struct super_block *sb);
 
 static inline int au_test_nfsd(struct task_struct *tsk)
 {
-	return !tsk->mm && !strcmp(tsk->comm, "nfsd");
+	return (current->flags & PF_KTHREAD)
+		&& !strcmp(tsk->comm, "nfsd");
 }
 
 int au_xigen_inc(struct inode *inode);
