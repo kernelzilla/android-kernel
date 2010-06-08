@@ -1449,7 +1449,10 @@ struct platform_device msm_lpa_device = {
 
 static unsigned int dec_concurrency_table[] = {
 	/* Audio LP */
-	0, 0, 0, 0,
+	0,
+	(DEC3_FORMAT|(1<<MSM_ADSP_MODE_NONTUNNEL)|(1<<MSM_ADSP_OP_DM)),
+	(DEC2_FORMAT|(1<<MSM_ADSP_MODE_NONTUNNEL)|(1<<MSM_ADSP_OP_DM)),
+	(DEC1_FORMAT|(1<<MSM_ADSP_MODE_NONTUNNEL)|(1<<MSM_ADSP_OP_DM)),
 	(DEC0_FORMAT|(1<<MSM_ADSP_MODE_TUNNEL)|(1<<MSM_ADSP_MODE_LP)|
 	(1<<MSM_ADSP_OP_DM)),
 
