@@ -487,33 +487,83 @@ static int xib_pindex(struct super_block *sb, unsigned long pindex)
 
 /* ---------------------------------------------------------------------- */
 
-int au_xino_write0(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
-		   ino_t ino)
+static void au_xib_clear_bit(struct inode *inode)
 {
 	int err, bit;
 	unsigned long pindex;
+	struct super_block *sb;
 	struct au_sbinfo *sbinfo;
 
-	if (!au_opt_test(au_mntflags(sb), XINO))
-		return 0;
+	AuDebugOn(inode->i_nlink);
 
-	err = 0;
-	if (ino) {
-		sbinfo = au_sbi(sb);
-		xib_calc_bit(ino, &pindex, &bit);
-		AuDebugOn(page_bits <= bit);
-		mutex_lock(&sbinfo->si_xib_mtx);
-		err = xib_pindex(sb, pindex);
-		if (!err) {
-			clear_bit(bit, sbinfo->si_xib_buf);
-			sbinfo->si_xib_next_bit = bit;
-		}
-		mutex_unlock(&sbinfo->si_xib_mtx);
+	sb = inode->i_sb;
+	xib_calc_bit(inode->i_ino, &pindex, &bit);
+	AuDebugOn(page_bits <= bit);
+	sbinfo = au_sbi(sb);
+	mutex_lock(&sbinfo->si_xib_mtx);
+	err = xib_pindex(sb, pindex);
+	if (!err) {
+		clear_bit(bit, sbinfo->si_xib_buf);
+		sbinfo->si_xib_next_bit = bit;
+	}
+	mutex_unlock(&sbinfo->si_xib_mtx);
+}
+
+/* for s_op->delete_inode() */
+void au_xino_delete_inode(struct inode *inode, const int unlinked)
+{
+	int err;
+	unsigned int mnt_flags;
+	aufs_bindex_t bindex, bend, bi;
+	unsigned char try_trunc;
+	struct au_iinfo *iinfo;
+	struct super_block *sb;
+	struct au_hinode *hi;
+	struct inode *h_inode;
+	struct au_branch *br;
+	au_writef_t xwrite;
+
+	sb = inode->i_sb;
+	mnt_flags = au_mntflags(sb);
+	if (!au_opt_test(mnt_flags, XINO)
+	    || inode->i_ino == AUFS_ROOT_INO)
+		return;
+
+	if (unlinked) {
+		au_xigen_inc(inode);
+		au_xib_clear_bit(inode);
 	}
 
-	if (!err)
-		err = au_xino_write(sb, bindex, h_ino, 0);
-	return err;
+	iinfo = au_ii(inode);
+	if (!iinfo)
+		return;
+
+	bindex = iinfo->ii_bstart;
+	if (bindex < 0)
+		return;
+
+	xwrite = au_sbi(sb)->si_xwrite;
+	try_trunc = !!au_opt_test(mnt_flags, TRUNC_XINO);
+	hi = iinfo->ii_hinode + bindex;
+	bend = iinfo->ii_bend;
+	for (; bindex <= bend; bindex++, hi++) {
+		h_inode = hi->hi_inode;
+		if (!h_inode
+		    || (!unlinked && h_inode->i_nlink))
+			continue;
+
+		/* inode may not be revalidated */
+		bi = au_br_index(sb, hi->hi_id);
+		if (bi < 0)
+			continue;
+
+		br = au_sbr(sb, bi);
+		err = au_xino_do_write(xwrite, br->br_xino.xi_file,
+				       h_inode->i_ino, /*ino*/0);
+		if (!err && try_trunc
+		    && au_test_fs_trunc_xino(br->br_mnt->mnt_sb))
+			xino_try_trunc(sb, br);
+	}
 }
 
 /* get an unused inode number from bitmap */

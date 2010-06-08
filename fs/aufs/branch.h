@@ -157,8 +157,7 @@ ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 struct file *au_xino_create2(struct file *base_file, struct file *copy_src);
 struct file *au_xino_create(struct super_block *sb, char *fname, int silent);
 ino_t au_xino_new_ino(struct super_block *sb);
-int au_xino_write0(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
-		   ino_t ino);
+void au_xino_delete_inode(struct inode *inode, const int unlinked);
 int au_xino_write(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 		  ino_t ino);
 int au_xino_read(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
