@@ -707,7 +707,6 @@ static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
 };
 
 #ifdef CONFIG_KERNEL_PMEM_SMI_REGION
-
 static struct android_pmem_platform_data android_pmem_kernel_smi_pdata = {
 	.name = PMEM_KERNEL_SMI_DATA_NAME,
 	/* if no allocator_type, defaults to PMEM_ALLOCATORTYPE_BITMAP,
@@ -718,7 +717,14 @@ static struct android_pmem_platform_data android_pmem_kernel_smi_pdata = {
 	 */
 	.cached = 0,
 };
-
+#else
+static struct android_pmem_platform_data android_pmem_smipool_pdata = {
+	.name = "pmem_smipool",
+	.start = MSM_PMEM_SMIPOOL_BASE,
+	.size = MSM_PMEM_SMIPOOL_SIZE,
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
 #endif
 
 static struct android_pmem_platform_data android_pmem_pdata = {
@@ -731,14 +737,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.name = "pmem_adsp",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 1,
-};
-
-static struct android_pmem_platform_data android_pmem_smipool_pdata = {
-	.name = "pmem_smipool",
-	.start = MSM_PMEM_SMIPOOL_BASE,
-	.size = MSM_PMEM_SMIPOOL_SIZE,
-	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
-	.cached = 0,
 };
 
 
@@ -754,13 +752,6 @@ static struct platform_device android_pmem_adsp_device = {
 	.dev = { .platform_data = &android_pmem_adsp_pdata },
 };
 
-static struct platform_device android_pmem_smipool_device = {
-	.name = "android_pmem",
-	.id = 2,
-	.dev = { .platform_data = &android_pmem_smipool_pdata },
-};
-
-
 static struct platform_device android_pmem_kernel_ebi1_device = {
 	.name = "android_pmem",
 	.id = 3,
@@ -772,6 +763,12 @@ static struct platform_device android_pmem_kernel_smi_device = {
 	.name = "android_pmem",
 	.id = 4,
 	.dev = { .platform_data = &android_pmem_kernel_smi_pdata },
+};
+#else
+static struct platform_device android_pmem_smipool_device = {
+	.name = "android_pmem",
+	.id = 2,
+	.dev = { .platform_data = &android_pmem_smipool_pdata },
 };
 #endif
 
@@ -1706,10 +1703,11 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_kernel_ebi1_device,
 #ifdef CONFIG_KERNEL_PMEM_SMI_REGION
 	&android_pmem_kernel_smi_device,
+#else
+	&android_pmem_smipool_device,
 #endif
 	&android_pmem_device,
 	&android_pmem_adsp_device,
-	&android_pmem_smipool_device,
 	&msm_device_nand,
 	&msm_device_i2c,
 	&qup_device_i2c,
