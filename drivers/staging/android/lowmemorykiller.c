@@ -95,7 +95,7 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	int other_file = global_page_state(NR_ACTIVE_FILE) + global_page_state(NR_INACTIVE_FILE);
 #ifdef CONFIG_SWAP
 	si_swapinfo(&si);
-	other_free += (si.freeswap * si.mem_unit) / 8;
+	other_free += si.freeswap;
 #endif
 
 	/*
