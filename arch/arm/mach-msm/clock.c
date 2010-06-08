@@ -339,6 +339,16 @@ static int clock_debug_rate_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(clock_rate_fops, clock_debug_rate_get,
 			clock_debug_rate_set, "%llu\n");
 
+static int clock_debug_measure_get(void *data, u64 *val)
+{
+	struct clk *clock = data;
+	*val = clock->ops->measure_rate(clock->id);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(clock_measure_fops, clock_debug_measure_get,
+			NULL, "%lld\n");
+
 static int clock_debug_enable_set(void *data, u64 val)
 {
 	struct clk *clock = data;
@@ -408,6 +418,10 @@ static int __init clock_debug_init(void)
 
 		if (!debugfs_create_file("is_local", S_IRUGO, clk_dir, clock,
 					&clock_local_fops))
+			return -ENOMEM;
+
+		if (!debugfs_create_file("measure", S_IRUGO, clk_dir,
+					clock, &clock_measure_fops))
 			return -ENOMEM;
 	}
 	return 0;
