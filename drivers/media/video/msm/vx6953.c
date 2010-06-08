@@ -33,44 +33,46 @@
 #define REG_GROUPED_PARAMETER_HOLD			0x0104
 #define GROUPED_PARAMETER_HOLD_OFF			0x00
 #define GROUPED_PARAMETER_HOLD				0x01
-#define REG_MODE_SELECT						0x0100
+#define REG_MODE_SELECT					0x0100
 #define MODE_SELECT_STANDBY_MODE			0x00
 #define MODE_SELECT_STREAM				0x01
 /* Integration Time */
-#define REG_COARSE_INTEGRATION_TIME_HI		0x0202
-#define REG_COARSE_INTEGRATION_TIME_LO	0x0203
+#define REG_COARSE_INTEGRATION_TIME_HI			0x0202
+#define REG_COARSE_INTEGRATION_TIME_LO			0x0203
 /* Gain */
-#define REG_ANALOGUE_GAIN_CODE_GLOBAL_HI	0x0204
-#define REG_ANALOGUE_GAIN_CODE_GLOBAL_LO	0x0205
+#define REG_ANALOGUE_GAIN_CODE_GLOBAL_HI		0x0204
+#define REG_ANALOGUE_GAIN_CODE_GLOBAL_LO		0x0205
 /* Digital Gain */
-#define REG_DIGITAL_GAIN_GREEN_R_HI		0x020E
-#define REG_DIGITAL_GAIN_GREEN_R_LO		0x020F
-#define REG_DIGITAL_GAIN_RED_HI			0x0210
-#define REG_DIGITAL_GAIN_RED_LO			0x0211
-#define REG_DIGITAL_GAIN_BLUE_HI		0x0212
-#define REG_DIGITAL_GAIN_BLUE_LO		0x0213
-#define REG_DIGITAL_GAIN_GREEN_B_HI		0x0214
-#define REG_DIGITAL_GAIN_GREEN_B_LO		0x0215
+#define REG_DIGITAL_GAIN_GREEN_R_HI			0x020E
+#define REG_DIGITAL_GAIN_GREEN_R_LO			0x020F
+#define REG_DIGITAL_GAIN_RED_HI				0x0210
+#define REG_DIGITAL_GAIN_RED_LO				0x0211
+#define REG_DIGITAL_GAIN_BLUE_HI			0x0212
+#define REG_DIGITAL_GAIN_BLUE_LO			0x0213
+#define REG_DIGITAL_GAIN_GREEN_B_HI			0x0214
+#define REG_DIGITAL_GAIN_GREEN_B_LO			0x0215
 /* output bits setting */
 #define REG_0x0112					0x0112
 #define REG_0x0113					0x0113
 /* PLL registers */
-#define REG_VT_PIX_CLK_DIV			0x0301
-#define REG_PRE_PLL_CLK_DIV			0x0305
-#define REG_PLL_MULTIPLIER			0x0307
-#define REG_OP_PIX_CLK_DIV			0x0309
+#define REG_VT_PIX_CLK_DIV				0x0301
+#define REG_PRE_PLL_CLK_DIV				0x0305
+#define REG_PLL_MULTIPLIER				0x0307
+#define REG_OP_PIX_CLK_DIV				0x0309
 #define REG_0x034c					0x034c
 #define REG_0x034d					0x034d
 #define REG_0x034e					0x034e
 #define REG_0x034f					0x034f
 #define REG_0x0387					0x0387
 #define REG_0x0383					0x0383
-#define REG_FRAME_LENGTH_LINES_HI		0x0340
-#define REG_FRAME_LENGTH_LINES_LO		0x0341
-#define REG_LINE_LENGTH_PCK_HI		0x0342
-#define REG_LINE_LENGTH_PCK_LO		0x0343
+#define REG_FRAME_LENGTH_LINES_HI			0x0340
+#define REG_FRAME_LENGTH_LINES_LO			0x0341
+#define REG_LINE_LENGTH_PCK_HI				0x0342
+#define REG_LINE_LENGTH_PCK_LO				0x0343
 #define REG_0x3030					0x3030
 #define REG_0x0111					0x0111
+#define REG_0x0136					0x0136
+#define REG_0x0137					0x0137
 #define REG_0x0b00					0x0b00
 #define REG_0x3001					0x3001
 #define REG_0x3004					0x3004
@@ -81,8 +83,12 @@
 #define REG_0x3365					0x3365
 #define REG_0x0b83					0x0b83
 #define REG_0x0b84					0x0b84
+#define REG_0x0b85					0x0b85
+#define REG_0x0b88					0x0b88
+#define REG_0x0b89					0x0b89
 #define REG_0x0b8a					0x0b8a
 #define REG_0x3005					0x3005
+#define REG_0x3010					0x3010
 #define REG_0x3036					0x3036
 #define REG_0x3041					0x3041
 #define REG_0x0b80					0x0b80
@@ -99,11 +105,18 @@
 #define REG_0x1717					0x1717
 #define REG_0x1718					0x1718
 #define REG_0x1719					0x1719
+#define REG_0x3006					0x3006
+#define REG_0x301b					0x301b
+#define REG_0x3098					0x3098
+#define REG_0x309d					0x309d
 #define REG_0x3011					0x3011
 #define REG_0x3035					0x3035
 #define REG_0x3045					0x3045
+#define REG_0x3210					0x3210
+#define	REG_0x0111					0x0111
+#define REG_0x3410					0x3410
 /* Test Pattern */
-#define REG_TEST_PATTERN_MODE		0x0601
+#define REG_TEST_PATTERN_MODE				0x0601
 
 /*============================================================================
 							 TYPE DECLARATIONS
@@ -112,6 +125,7 @@
 /* 16bit address - 8 bit context register structure */
 #define	VX6953_STM5M0EDOF_OFFSET	9
 #define	Q8		0x00000100
+#define	Q10		0x00000400
 #define	VX6953_STM5M0EDOF_MAX_SNAPSHOT_EXPOSURE_LINE_COUNT	2922
 #define	VX6953_STM5M0EDOF_DEFAULT_MASTER_CLK_RATE	24000000
 #define	VX6953_STM5M0EDOF_OP_PIXEL_CLOCK_RATE	79800000
@@ -175,7 +189,7 @@ static uint16_t vx6953_stm5m0edof_delay_msecs_stream = 20;
 static struct vx6953_ctrl_t *vx6953_ctrl;
 static DECLARE_WAIT_QUEUE_HEAD(vx6953_wait_queue);
 DEFINE_MUTEX(vx6953_mut);
-static struct vx6953_i2c_reg_conf patch_tbl[] = {
+static struct vx6953_i2c_reg_conf patch_tbl_cut2[] = {
 	{0xFB94, 0},	/*intialise Data Xfer Status reg*/
 	{0xFB95, 0},	/*gain 1	  (0x00)*/
 	{0xFB96, 0},	/*gain 1.07   (0x10)*/
@@ -715,6 +729,844 @@ static struct vx6953_i2c_reg_conf patch_tbl[] = {
 	{0x35C0, 0x01},/* Enable*/
 
 };
+static struct vx6953_i2c_reg_conf edof_tbl[] = {
+		{0xa098, 0x02},
+		{0xa099, 0x87},
+		{0xa09c, 0x00},
+		{0xa09d, 0xc4},
+		{0xa4ec, 0x04},
+		{0xa4ed, 0x04},
+		{0xa4f0, 0x03},
+		{0xa4f1, 0x04},
+		{0xa4f4, 0x04},
+		{0xa4f5, 0x05},
+		{0xa4f8, 0x05},
+		{0xa4f9, 0x07},
+		{0xa4fc, 0x07},
+		{0xa4fd, 0x07},
+		{0xa500, 0x09},
+		{0xa501, 0x0a},
+		{0xa504, 0x0b},
+		{0xa505, 0x0b},
+		{0xa534, 0x00},
+		{0xa535, 0x04},
+		{0xa538, 0x04},
+		{0xa539, 0x03},
+		{0xa53c, 0x03},
+		{0xa53d, 0x03},
+		{0xa540, 0x04},
+		{0xa541, 0x04},
+		{0xa544, 0x04},
+		{0xa545, 0x04},
+		{0xa548, 0x04},
+		{0xa549, 0x04},
+		{0xa54c, 0x04},
+		{0xa54d, 0x05},
+		{0xa550, 0x05},
+		{0xa551, 0x04},
+		{0xa554, 0x04},
+		{0xa555, 0x04},
+		{0xa558, 0x06},
+		{0xa559, 0x07},
+		{0xa55c, 0x09},
+		{0xa55d, 0x0a},
+		{0xa56c, 0x00},
+		{0xa56d, 0x0a},
+		{0xa570, 0x05},
+		{0xa571, 0x00},
+		{0xa574, 0x00},
+		{0xa575, 0x00},
+		{0xa578, 0x00},
+		{0xa579, 0x00},
+		{0xa58c, 0x1f},
+		{0xa58d, 0x1f},
+		{0xa590, 0x18},
+		{0xa591, 0x10},
+		{0xa594, 0x0d},
+		{0xa595, 0x09},
+		{0xa598, 0x0d},
+		{0xa599, 0x10},
+		{0xa59c, 0x03},
+		{0xa59d, 0x03},
+		{0xa5a0, 0x03},
+		{0xa5a1, 0x03},
+		{0xa5a4, 0x03},
+		{0xa5a5, 0x04},
+		{0xa5a8, 0x05},
+		{0xa5a9, 0x00},
+		{0xa5ac, 0x00},
+		{0xa5ad, 0x00},
+		{0xa5b0, 0x00},
+		{0xa5b1, 0x00},
+		{0xa5b4, 0x00},
+		{0xa5b5, 0x00},
+		{0xa5c4, 0x1f},
+		{0xa5c5, 0x0f},
+		{0xa5c8, 0x12},
+		{0xa5c9, 0x14},
+		{0xa5cc, 0x0f},
+		{0xa5cd, 0x09},
+		{0xa5d0, 0x10},
+		{0xa5d1, 0x16},
+		{0xa5f4, 0x01},
+		{0xa5f5, 0x03},
+		{0xa5f8, 0x05},
+		{0xa5f9, 0x06},
+		{0xa5fc, 0x07},
+		{0xa5fd, 0x07},
+		{0xa600, 0x07},
+		{0xa601, 0x07},
+		{0xa604, 0x07},
+		{0xa605, 0x07},
+		{0xa608, 0x09},
+		{0xa609, 0x0b},
+		{0xa60c, 0x0b},
+		{0xa60d, 0x0a},
+		{0xa63c, 0x00},
+		{0xa63d, 0x02},
+		{0xa640, 0x02},
+		{0xa641, 0x02},
+		{0xa644, 0x02},
+		{0xa645, 0x02},
+		{0xa648, 0x03},
+		{0xa649, 0x04},
+		{0xa64c, 0x08},
+		{0xa64d, 0x08},
+		{0xa650, 0x08},
+		{0xa651, 0x09},
+		{0xa654, 0x09},
+		{0xa655, 0x0a},
+		{0xa658, 0x0a},
+		{0xa659, 0x0b},
+		{0xa65c, 0x0b},
+		{0xa65d, 0x0b},
+		{0xa660, 0x0c},
+		{0xa661, 0x0c},
+		{0xa664, 0x0c},
+		{0xa665, 0x0c},
+		{0xa694, 0x1f},
+		{0xa695, 0x12},
+		{0xa698, 0x0f},
+		{0xa699, 0x0c},
+		{0xa69c, 0x0c},
+		{0xa69d, 0x0c},
+		{0xa6a0, 0x0e},
+		{0xa6a1, 0x0f},
+		{0xa6a4, 0x00},
+		{0xa6a5, 0x00},
+		{0xa6a8, 0x00},
+		{0xa6a9, 0x00},
+		{0xa6ac, 0x00},
+		{0xa6ad, 0x00},
+		{0xa6b0, 0x00},
+		{0xa6b1, 0x04},
+		{0xa6b4, 0x04},
+		{0xa6b5, 0x04},
+		{0xa6b8, 0x04},
+		{0xa6b9, 0x04},
+		{0xa6bc, 0x05},
+		{0xa6bd, 0x05},
+		{0xa6c0, 0x1f},
+		{0xa6c1, 0x1f},
+		{0xa6c4, 0x1f},
+		{0xa6c5, 0x1f},
+		{0xa6c8, 0x1f},
+		{0xa6c9, 0x1f},
+		{0xa6cc, 0x1f},
+		{0xa6cd, 0x0c},
+		{0xa6d0, 0x0b},
+		{0xa6d1, 0x0a},
+		{0xa6d4, 0x0a},
+		{0xa6d5, 0x0a},
+		{0xa6d8, 0x0d},
+		{0xa6d9, 0x0f},
+		{0xa6fc, 0x01},
+		{0xa6fd, 0x01},
+		{0xa700, 0x01},
+		{0xa701, 0x02},
+		{0xa704, 0x03},
+		{0xa705, 0x04},
+		{0xa708, 0x05},
+		{0xa709, 0x02},
+		{0xa70c, 0x02},
+		{0xa70d, 0x02},
+		{0xa710, 0x04},
+		{0xa711, 0x06},
+		{0xa714, 0x06},
+		{0xa715, 0x05},
+		{0xa744, 0x00},
+		{0xa745, 0x03},
+		{0xa748, 0x04},
+		{0xa749, 0x04},
+		{0xa74c, 0x04},
+		{0xa74d, 0x03},
+		{0xa750, 0x04},
+		{0xa751, 0x04},
+		{0xa754, 0x03},
+		{0xa755, 0x03},
+		{0xa758, 0x03},
+		{0xa759, 0x04},
+		{0xa75c, 0x04},
+		{0xa75d, 0x05},
+		{0xa760, 0x06},
+		{0xa761, 0x07},
+		{0xa764, 0x07},
+		{0xa765, 0x07},
+		{0xa768, 0x09},
+		{0xa769, 0x0b},
+		{0xa77c, 0x00},
+		{0xa77d, 0x04},
+		{0xa780, 0x02},
+		{0xa781, 0x00},
+		{0xa79c, 0x1f},
+		{0xa79d, 0x17},
+		{0xa7a0, 0x13},
+		{0xa7a1, 0x0e},
+		{0xa7a4, 0x0c},
+		{0xa7a5, 0x0a},
+		{0xa7a8, 0x0e},
+		{0xa7a9, 0x11},
+		{0xa7ac, 0x02},
+		{0xa7ad, 0x02},
+		{0xa7b0, 0x02},
+		{0xa7b1, 0x02},
+		{0xa7b4, 0x02},
+		{0xa7b5, 0x03},
+		{0xa7b8, 0x03},
+		{0xa7b9, 0x00},
+		{0xa7bc, 0x00},
+		{0xa7bd, 0x00},
+		{0xa7c0, 0x00},
+		{0xa7c1, 0x00},
+		{0xa7c4, 0x00},
+		{0xa7c5, 0x00},
+		{0xa7d4, 0x1f},
+		{0xa7d5, 0x0a},
+		{0xa7d8, 0x0c},
+		{0xa7d9, 0x0d},
+		{0xa7dc, 0x0c},
+		{0xa7dd, 0x0a},
+		{0xa7e0, 0x0d},
+		{0xa7e1, 0x10},
+		{0xa7f4, 0x00},
+		{0xa7f5, 0x03},
+		{0xa7f8, 0x04},
+		{0xa7f9, 0x04},
+		{0xa7fc, 0x04},
+		{0xa7fd, 0x03},
+		{0xa800, 0x03},
+		{0xa801, 0x03},
+		{0xa804, 0x03},
+		{0xa805, 0x03},
+		{0xa808, 0x03},
+		{0xa809, 0x03},
+		{0xa80c, 0x03},
+		{0xa80d, 0x04},
+		{0xa810, 0x04},
+		{0xa811, 0x0a},
+		{0xa814, 0x0a},
+		{0xa815, 0x0a},
+		{0xa818, 0x0f},
+		{0xa819, 0x14},
+		{0xa81c, 0x14},
+		{0xa81d, 0x14},
+		{0xa82c, 0x00},
+		{0xa82d, 0x04},
+		{0xa830, 0x02},
+		{0xa831, 0x00},
+		{0xa834, 0x00},
+		{0xa835, 0x00},
+		{0xa838, 0x00},
+		{0xa839, 0x00},
+		{0xa840, 0x1f},
+		{0xa841, 0x1f},
+		{0xa848, 0x1f},
+		{0xa849, 0x1f},
+		{0xa84c, 0x1f},
+		{0xa84d, 0x0c},
+		{0xa850, 0x0c},
+		{0xa851, 0x0c},
+		{0xa854, 0x0c},
+		{0xa855, 0x0c},
+		{0xa858, 0x0c},
+		{0xa859, 0x0c},
+		{0xa85c, 0x0c},
+		{0xa85d, 0x0c},
+		{0xa860, 0x0c},
+		{0xa861, 0x0c},
+		{0xa864, 0x0c},
+		{0xa865, 0x0c},
+		{0xa868, 0x0c},
+		{0xa869, 0x0c},
+		{0xa86c, 0x0c},
+		{0xa86d, 0x0c},
+		{0xa870, 0x0c},
+		{0xa871, 0x0c},
+		{0xa874, 0x0c},
+		{0xa875, 0x0c},
+		{0xa878, 0x1f},
+		{0xa879, 0x1f},
+		{0xa87c, 0x1f},
+		{0xa87d, 0x1f},
+		{0xa880, 0x1f},
+		{0xa881, 0x1f},
+		{0xa884, 0x1f},
+		{0xa885, 0x0c},
+		{0xa888, 0x0c},
+		{0xa889, 0x0c},
+		{0xa88c, 0x0c},
+		{0xa88d, 0x0c},
+		{0xa890, 0x0c},
+		{0xa891, 0x0c},
+		{0xa898, 0x1f},
+		{0xa899, 0x1f},
+		{0xa8a0, 0x1f},
+		{0xa8a1, 0x1f},
+		{0xa8a4, 0x1f},
+		{0xa8a5, 0x0c},
+		{0xa8a8, 0x0c},
+		{0xa8a9, 0x0c},
+		{0xa8ac, 0x0c},
+		{0xa8ad, 0x0c},
+		{0xa8b0, 0x0c},
+		{0xa8b1, 0x0c},
+		{0xa8b4, 0x0c},
+		{0xa8b5, 0x0c},
+		{0xa8b8, 0x0c},
+		{0xa8b9, 0x0c},
+		{0xa8bc, 0x0c},
+		{0xa8bd, 0x0c},
+		{0xa8c0, 0x0c},
+		{0xa8c1, 0x0c},
+		{0xa8c4, 0x0c},
+		{0xa8c5, 0x0c},
+		{0xa8c8, 0x0c},
+		{0xa8c9, 0x0c},
+		{0xa8cc, 0x0c},
+		{0xa8cd, 0x0c},
+		{0xa8d0, 0x1f},
+		{0xa8d1, 0x1f},
+		{0xa8d4, 0x1f},
+		{0xa8d5, 0x1f},
+		{0xa8d8, 0x1f},
+		{0xa8d9, 0x1f},
+		{0xa8dc, 0x1f},
+		{0xa8dd, 0x0c},
+		{0xa8e0, 0x0c},
+		{0xa8e1, 0x0c},
+		{0xa8e4, 0x0c},
+		{0xa8e5, 0x0c},
+		{0xa8e8, 0x0c},
+		{0xa8e9, 0x0c},
+		{0xa8f0, 0x1f},
+		{0xa8f1, 0x1f},
+		{0xa8f8, 0x1f},
+		{0xa8f9, 0x1f},
+		{0xa8fc, 0x1f},
+		{0xa8fd, 0x0c},
+		{0xa900, 0x0c},
+		{0xa901, 0x0c},
+		{0xa904, 0x0c},
+		{0xa905, 0x0c},
+		{0xa908, 0x0c},
+		{0xa909, 0x0c},
+		{0xa90c, 0x0c},
+		{0xa90d, 0x0c},
+		{0xa910, 0x0c},
+		{0xa911, 0x0c},
+		{0xa914, 0x0c},
+		{0xa915, 0x0c},
+		{0xa918, 0x0c},
+		{0xa919, 0x0c},
+		{0xa91c, 0x0c},
+		{0xa91d, 0x0c},
+		{0xa920, 0x0c},
+		{0xa921, 0x0c},
+		{0xa924, 0x0c},
+		{0xa925, 0x0c},
+		{0xa928, 0x1f},
+		{0xa929, 0x1f},
+		{0xa92c, 0x1f},
+		{0xa92d, 0x1f},
+		{0xa930, 0x1f},
+		{0xa931, 0x1f},
+		{0xa934, 0x1f},
+		{0xa935, 0x0c},
+		{0xa938, 0x0c},
+		{0xa939, 0x0c},
+		{0xa93c, 0x0c},
+		{0xa93d, 0x0c},
+		{0xa940, 0x0c},
+		{0xa941, 0x0c},
+		{0xa96c, 0x0d},
+		{0xa96d, 0x12},
+		{0xa970, 0x1a},
+		{0xa971, 0x0d},
+		{0xa974, 0x12},
+		{0xa975, 0x1a},
+		{0xa978, 0x0d},
+		{0xa979, 0x10},
+		{0xa97c, 0x1a},
+		{0xa97d, 0x0d},
+		{0xa980, 0x10},
+		{0xa981, 0x1a},
+		{0xa984, 0x0d},
+		{0xa985, 0x10},
+		{0xa988, 0x1a},
+		{0xa989, 0x0d},
+		{0xa98c, 0x10},
+		{0xa98d, 0x1a},
+		{0xa990, 0x0a},
+		{0xa991, 0x10},
+		{0xa994, 0x02},
+		{0xa995, 0x0a},
+		{0xa998, 0x10},
+		{0xa999, 0x02},
+		{0xa99c, 0x0a},
+		{0xa99d, 0x11},
+		{0xa9a0, 0x02},
+		{0xa9a1, 0x0a},
+		{0xa9a4, 0x0e},
+		{0xa9a5, 0x02},
+		{0xa9a8, 0x0a},
+		{0xa9a9, 0x0e},
+		{0xa9ac, 0x02},
+		{0xa9ad, 0x0a},
+		{0xa9b0, 0x0e},
+		{0xa9b1, 0x02},
+		{0xa9b4, 0x10},
+		{0xa9b5, 0x22},
+		{0xa9b8, 0x10},
+		{0xa9b9, 0x10},
+		{0xa9bc, 0x22},
+		{0xa9bd, 0x10},
+		{0xa9c0, 0x10},
+		{0xa9c1, 0x1e},
+		{0xa9c4, 0x10},
+		{0xa9c5, 0x10},
+		{0xa9c8, 0x1e},
+		{0xa9c9, 0x10},
+		{0xa9cc, 0x10},
+		{0xa9cd, 0x20},
+		{0xa9d0, 0x10},
+		{0xa9d1, 0x10},
+		{0xa9d4, 0x24},
+		{0xa9d5, 0x10},
+		{0xa9f0, 0x02},
+		{0xa9f1, 0x01},
+		{0xa9f8, 0x19},
+		{0xa9f9, 0x0b},
+		{0xa9fc, 0x0a},
+		{0xa9fd, 0x07},
+		{0xaa00, 0x0c},
+		{0xaa01, 0x0e},
+		{0xaa08, 0x0c},
+		{0xaa09, 0x06},
+		{0xaa0c, 0x0c},
+		{0xaa0d, 0x0a},
+		{0xaa24, 0x10},
+		{0xaa25, 0x12},
+		{0xaa28, 0x08},
+		{0xaa29, 0x07},
+		{0xaa2c, 0x10},
+		{0xaa2d, 0x14},
+		{0xaa34, 0x0e},
+		{0xaa35, 0x0e},
+		{0xaa3c, 0x0e},
+		{0xaa3d, 0x0e},
+		{0xaa48, 0x09},
+		{0xaa49, 0x0c},
+		{0xaa4c, 0x0c},
+		{0xaa4d, 0x07},
+		{0xaa54, 0x08},
+		{0xaa55, 0x06},
+		{0xaa58, 0x04},
+		{0xaa59, 0x05},
+		{0xaa5c, 0x06},
+		{0xaa5d, 0x06},
+		{0xaa68, 0x05},
+		{0xaa69, 0x05},
+		{0xaa6c, 0x04},
+		{0xaa6d, 0x05},
+		{0xaa74, 0x06},
+		{0xaa75, 0x04},
+		{0xaa78, 0x05},
+		{0xaa79, 0x05},
+		{0xaa7c, 0x04},
+		{0xaa7d, 0x06},
+		{0xac18, 0x14},
+		{0xac19, 0x00},
+		{0xac1c, 0x14},
+		{0xac1d, 0x00},
+		{0xac20, 0x14},
+		{0xac21, 0x00},
+		{0xac24, 0x14},
+		{0xac25, 0x00},
+		{0xac28, 0x14},
+		{0xac29, 0x00},
+		{0xac2c, 0x14},
+		{0xac2d, 0x00},
+		{0xac34, 0x16},
+		{0xac35, 0x00},
+		{0xac38, 0x16},
+		{0xac39, 0x00},
+		{0xac3c, 0x16},
+		{0xac3d, 0x00},
+		{0xac40, 0x16},
+		{0xac41, 0x00},
+		{0xac44, 0x16},
+		{0xac45, 0x00},
+		{0xac48, 0x16},
+		{0xac49, 0x00},
+		{0xac50, 0x1b},
+		{0xac51, 0x00},
+		{0xac54, 0x1b},
+		{0xac55, 0x00},
+		{0xac58, 0x1b},
+		{0xac59, 0x00},
+		{0xac5c, 0x1b},
+		{0xac5d, 0x00},
+		{0xac60, 0x1b},
+		{0xac61, 0x00},
+		{0xac64, 0x1b},
+		{0xac65, 0x00},
+		{0xac74, 0x09},
+		{0xac75, 0x0c},
+		{0xac78, 0x0f},
+		{0xac79, 0x11},
+		{0xac7c, 0x12},
+		{0xac7d, 0x14},
+		{0xac80, 0x09},
+		{0xac81, 0x0c},
+		{0xac84, 0x0f},
+		{0xac85, 0x11},
+		{0xac88, 0x12},
+		{0xac89, 0x14},
+		{0xac8c, 0x09},
+		{0xac8d, 0x0c},
+		{0xac90, 0x0f},
+		{0xac91, 0x11},
+		{0xac94, 0x12},
+		{0xac95, 0x14},
+		{0xac98, 0x09},
+		{0xac99, 0x0c},
+		{0xac9c, 0x0f},
+		{0xac9d, 0x11},
+		{0xaca0, 0x12},
+		{0xaca1, 0x14},
+		{0xaca4, 0x09},
+		{0xaca5, 0x0c},
+		{0xaca8, 0x0f},
+		{0xaca9, 0x11},
+		{0xacac, 0x12},
+		{0xacad, 0x14},
+		{0xacb0, 0x07},
+		{0xacb1, 0x09},
+		{0xacb4, 0x0c},
+		{0xacb5, 0x0d},
+		{0xacb8, 0x0d},
+		{0xacb9, 0x0e},
+		{0xacbc, 0x05},
+		{0xacbd, 0x07},
+		{0xacc0, 0x0a},
+		{0xacc1, 0x0b},
+		{0xacc4, 0x0b},
+		{0xacc5, 0x0c},
+		{0xacc8, 0x03},
+		{0xacc9, 0x04},
+		{0xaccc, 0x07},
+		{0xaccd, 0x08},
+		{0xacd0, 0x09},
+		{0xacd1, 0x09},
+};
+
+static struct vx6953_i2c_reg_conf patch_tbl_cut3[] = {
+		{0xF800, 0xc3},
+		{0xF801, 0x90},
+		{0xF802, 0x0b},
+		{0xF803, 0x89},
+		{0xF804, 0xe0},
+		{0xF805, 0x94},
+		{0xF806, 0x1e},
+		{0xF807, 0x90},
+		{0xF808, 0x0b},
+		{0xF809, 0x88},
+		{0xF80A, 0xe0},
+		{0xF80B, 0x94},
+		{0xF80C, 0x00},
+		{0xF80D, 0x50},
+		{0xF80E, 0x06},
+		{0xF80F, 0x7e},
+		{0xF810, 0x00},
+		{0xF811, 0x7f},
+		{0xF812, 0x01},
+		{0xF813, 0x80},
+		{0xF814, 0x3d},
+		{0xF815, 0xc3},
+		{0xF816, 0x90},
+		{0xF817, 0x0b},
+		{0xF818, 0x89},
+		{0xF819, 0xe0},
+		{0xF81A, 0x94},
+		{0xF81B, 0x3c},
+		{0xF81C, 0x90},
+		{0xF81D, 0x0b},
+		{0xF81E, 0x88},
+		{0xF81F, 0xe0},
+		{0xF820, 0x94},
+		{0xF821, 0x00},
+		{0xF822, 0x50},
+		{0xF823, 0x06},
+		{0xF824, 0x7e},
+		{0xF825, 0x00},
+		{0xF826, 0x7f},
+		{0xF827, 0x02},
+		{0xF828, 0x80},
+		{0xF829, 0x28},
+		{0xF82A, 0xc3},
+		{0xF82B, 0x90},
+		{0xF82C, 0x0b},
+		{0xF82D, 0x89},
+		{0xF82E, 0xe0},
+		{0xF82F, 0x94},
+		{0xF830, 0xfa},
+		{0xF831, 0x90},
+		{0xF832, 0x0b},
+		{0xF833, 0x88},
+		{0xF834, 0xe0},
+		{0xF835, 0x94},
+		{0xF836, 0x00},
+		{0xF837, 0x50},
+		{0xF838, 0x06},
+		{0xF839, 0x7e},
+		{0xF83A, 0x00},
+		{0xF83B, 0x7f},
+		{0xF83C, 0x03},
+		{0xF83D, 0x80},
+		{0xF83E, 0x13},
+		{0xF83F, 0xc3},
+		{0xF840, 0x90},
+		{0xF841, 0x0b},
+		{0xF842, 0x88},
+		{0xF843, 0xe0},
+		{0xF844, 0x94},
+		{0xF845, 0x80},
+		{0xF846, 0x50},
+		{0xF847, 0x06},
+		{0xF848, 0x7e},
+		{0xF849, 0x00},
+		{0xF84A, 0x7f},
+		{0xF84B, 0x04},
+		{0xF84C, 0x80},
+		{0xF84D, 0x04},
+		{0xF84E, 0xae},
+		{0xF84F, 0x7e},
+		{0xF850, 0xaf},
+		{0xF851, 0x7f},
+		{0xF852, 0x90},
+		{0xF853, 0xa0},
+		{0xF854, 0xf8},
+		{0xF855, 0xee},
+		{0xF856, 0xf0},
+		{0xF857, 0xa3},
+		{0xF858, 0xef},
+		{0xF859, 0xf0},
+		{0xF85A, 0x22},
+		{0xF85B, 0x90},
+		{0xF85C, 0x33},
+		{0xF85D, 0x82},
+		{0xF85E, 0xe0},
+		{0xF85F, 0xff},
+		{0xF860, 0x64},
+		{0xF861, 0x01},
+		{0xF862, 0x70},
+		{0xF863, 0x30},
+		{0xF864, 0xe5},
+		{0xF865, 0x7f},
+		{0xF866, 0x64},
+		{0xF867, 0x02},
+		{0xF868, 0x45},
+		{0xF869, 0x7e},
+		{0xF86A, 0x70},
+		{0xF86B, 0x04},
+		{0xF86C, 0x7d},
+		{0xF86D, 0x1e},
+		{0xF86E, 0x80},
+		{0xF86F, 0x1d},
+		{0xF870, 0xe5},
+		{0xF871, 0x7f},
+		{0xF872, 0x64},
+		{0xF873, 0x03},
+		{0xF874, 0x45},
+		{0xF875, 0x7e},
+		{0xF876, 0x70},
+		{0xF877, 0x04},
+		{0xF878, 0x7d},
+		{0xF879, 0x3c},
+		{0xF87A, 0x80},
+		{0xF87B, 0x11},
+		{0xF87C, 0xe5},
+		{0xF87D, 0x7f},
+		{0xF87E, 0x64},
+		{0xF87F, 0x04},
+		{0xF880, 0x45},
+		{0xF881, 0x7e},
+		{0xF882, 0x70},
+		{0xF883, 0x04},
+		{0xF884, 0x7d},
+		{0xF885, 0xfa},
+		{0xF886, 0x80},
+		{0xF887, 0x05},
+		{0xF888, 0x90},
+		{0xF889, 0x33},
+		{0xF88A, 0x81},
+		{0xF88B, 0xe0},
+		{0xF88C, 0xfd},
+		{0xF88D, 0xae},
+		{0xF88E, 0x05},
+		{0xF88F, 0x90},
+		{0xF890, 0x33},
+		{0xF891, 0x81},
+		{0xF892, 0xed},
+		{0xF893, 0xf0},
+		{0xF894, 0xef},
+		{0xF895, 0xb4},
+		{0xF896, 0x01},
+		{0xF897, 0x10},
+		{0xF898, 0x90},
+		{0xF899, 0x01},
+		{0xF89A, 0x00},
+		{0xF89B, 0xe0},
+		{0xF89C, 0x60},
+		{0xF89D, 0x0a},
+		{0xF89E, 0x90},
+		{0xF89F, 0xa1},
+		{0xF8A0, 0x10},
+		{0xF8A1, 0xe0},
+		{0xF8A2, 0xf5},
+		{0xF8A3, 0x7e},
+		{0xF8A4, 0xa3},
+		{0xF8A5, 0xe0},
+		{0xF8A6, 0xf5},
+		{0xF8A7, 0x7f},
+		{0xF8A8, 0x22},
+		{0xF8A9, 0xf0},
+		{0xF8AA, 0x90},
+		{0xF8AB, 0x36},
+		{0xF8AC, 0x08},
+		{0xF8AD, 0xe0},
+		{0xF8AE, 0x60},
+		{0xF8AF, 0x0c},
+		{0xF8B0, 0x90},
+		{0xF8B1, 0x43},
+		{0xF8B2, 0x41},
+		{0xF8B3, 0xe0},
+		{0xF8B4, 0x24},
+		{0xF8B5, 0xf6},
+		{0xF8B6, 0xff},
+		{0xF8B7, 0x90},
+		{0xF8B8, 0x43},
+		{0xF8B9, 0x40},
+		{0xF8BA, 0x80},
+		{0xF8BB, 0x0a},
+		{0xF8BC, 0x90},
+		{0xF8BD, 0x03},
+		{0xF8BE, 0x41},
+		{0xF8BF, 0xe0},
+		{0xF8C0, 0x24},
+		{0xF8C1, 0xf6},
+		{0xF8C2, 0xff},
+		{0xF8C3, 0x90},
+		{0xF8C4, 0x03},
+		{0xF8C5, 0x40},
+		{0xF8C6, 0xe0},
+		{0xF8C7, 0x34},
+		{0xF8C8, 0xff},
+		{0xF8C9, 0xfe},
+		{0xF8CA, 0x90},
+		{0xF8CB, 0x33},
+		{0xF8CC, 0x86},
+		{0xF8CD, 0xee},
+		{0xF8CE, 0xf0},
+		{0xF8CF, 0xa3},
+		{0xF8D0, 0xef},
+		{0xF8D1, 0xf0},
+		{0xF8D2, 0x02},
+		{0xF8D3, 0x24},
+		{0xF8D4, 0x97},
+		{0xF8D5, 0x22},
+		{0xF8D6, 0x78},
+		{0xF8D7, 0x07},
+		{0xF8D8, 0xe6},
+		{0xF8D9, 0x60},
+		{0xF8DA, 0x1b},
+		{0xF8DB, 0x90},
+		{0xF8DC, 0x43},
+		{0xF8DD, 0x83},
+		{0xF8DE, 0xe0},
+		{0xF8DF, 0xb4},
+		{0xF8E0, 0x01},
+		{0xF8E1, 0x14},
+		{0xF8E2, 0x90},
+		{0xF8E3, 0x43},
+		{0xF8E4, 0x87},
+		{0xF8E5, 0xe0},
+		{0xF8E6, 0xb4},
+		{0xF8E7, 0x01},
+		{0xF8E8, 0x0d},
+		{0xF8E9, 0x16},
+		{0xF8EA, 0xe6},
+		{0xF8EB, 0x90},
+		{0xF8EC, 0x30},
+		{0xF8ED, 0xa1},
+		{0xF8EE, 0xf0},
+		{0xF8EF, 0x90},
+		{0xF8F0, 0x30},
+		{0xF8F1, 0xa0},
+		{0xF8F2, 0x74},
+		{0xF8F3, 0x01},
+		{0xF8F4, 0xf0},
+		{0xF8F5, 0x22},
+		{0xF8F6, 0xe4},
+		{0xF8F7, 0x90},
+		{0xF8F8, 0x30},
+		{0xF8F9, 0xa0},
+		{0xF8FA, 0xf0},
+		{0xF8FB, 0x22},
+		{0xF8FC, 0xf0},
+		{0xF8FD, 0xe5},
+		{0xF8FE, 0x3a},
+		{0xF8FF, 0xb4},
+		{0xF900, 0x06},
+		{0xF901, 0x06},
+		{0xF902, 0x63},
+		{0xF903, 0x3e},
+		{0xF904, 0x02},
+		{0xF905, 0x12},
+		{0xF906, 0x03},
+		{0xF907, 0xea},
+		{0xF908, 0x02},
+		{0xF909, 0x17},
+		{0xF90A, 0x4a},
+		{0xF90B, 0x22},
+		{0x35C9, 0x5B},
+		{0x35CB, 0xA9},
+		{0x35CD, 0xD6},
+		{0x35CF, 0xFC},
+		{0x35E6, 0x2D},
+		{0x35E7, 0x07},
+		{0x35E8, 0x04},
+		{0x35E9, 0x43},
+		{0x35EA, 0x24},
+		{0x35EB, 0x82},
+		{0x35EC, 0x2A},
+		{0x35ED, 0x15},
+		{0x35EE, 0x17},
+		{0x35EF, 0x41},
+		{0x35C3, 0x1F},
+		{0x35C0, 0x01},
+};
+
 /*=============================================================*/
 
 static int vx6953_i2c_rxdata(unsigned short saddr,
@@ -923,83 +1775,78 @@ static int32_t vx6953_set_fps(struct fps_cfg	*fps)
 static int32_t vx6953_write_exp_gain(uint16_t gain, uint32_t line)
 {
 	static uint16_t stored_line_length_ratio = 1*Q8;
-	static uint16_t stored_gain = 0x0;
-	static uint16_t stored_line = 0x0;
 	uint16_t line_length_pck, frame_length_lines;
 	uint8_t gain_hi, gain_lo;
 	uint8_t intg_time_hi, intg_time_lo;
 	uint8_t line_length_pck_hi = 0, line_length_pck_lo = 0;
 	uint16_t line_length_ratio = 1 * Q8;
 	int32_t rc = 0;
-	if (gain != stored_gain || line != stored_line) {
-		if (vx6953_ctrl->sensormode != SENSOR_SNAPSHOT_MODE) {
-			frame_length_lines = VX6953_QTR_SIZE_HEIGHT +
-			VX6953_VER_QTR_BLK_LINES;
-			line_length_pck = VX6953_QTR_SIZE_WIDTH +
-				VX6953_HRZ_QTR_BLK_PIXELS;
-			if (line > (frame_length_lines -
-				VX6953_STM5M0EDOF_OFFSET)) {
-				vx6953_ctrl->fps = (uint16_t) (30 * Q8 *
-				(frame_length_lines - VX6953_STM5M0EDOF_OFFSET)/
-				line);
-			} else {
-				vx6953_ctrl->fps = (uint16_t) (30 * Q8);
-			}
+	if (vx6953_ctrl->sensormode != SENSOR_SNAPSHOT_MODE) {
+		frame_length_lines = VX6953_QTR_SIZE_HEIGHT +
+		VX6953_VER_QTR_BLK_LINES;
+		line_length_pck = VX6953_QTR_SIZE_WIDTH +
+			VX6953_HRZ_QTR_BLK_PIXELS;
+		if (line > (frame_length_lines -
+			VX6953_STM5M0EDOF_OFFSET)) {
+			vx6953_ctrl->fps = (uint16_t) (30 * Q8 *
+			(frame_length_lines - VX6953_STM5M0EDOF_OFFSET)/
+			line);
 		} else {
-			frame_length_lines = VX6953_FULL_SIZE_HEIGHT +
-					VX6953_VER_FULL_BLK_LINES;
-			line_length_pck = VX6953_FULL_SIZE_WIDTH +
-					VX6953_HRZ_FULL_BLK_PIXELS;
+			vx6953_ctrl->fps = (uint16_t) (30 * Q8);
 		}
-		/* calculate line_length_ratio */
-		if ((frame_length_lines - VX6953_STM5M0EDOF_OFFSET) < line) {
-			line_length_ratio = (line*Q8) /
-				(frame_length_lines - VX6953_STM5M0EDOF_OFFSET);
-			line = frame_length_lines - VX6953_STM5M0EDOF_OFFSET;
-		} else {
-			line_length_ratio = 1*Q8;
-		}
-		vx6953_i2c_write_b_sensor(REG_GROUPED_PARAMETER_HOLD,
-			GROUPED_PARAMETER_HOLD);
-		if (line_length_ratio != stored_line_length_ratio) {
-			line_length_pck = (line_length_pck >
-				MAX_LINE_LENGTH_PCK) ?
-				MAX_LINE_LENGTH_PCK : line_length_pck;
-			line_length_pck = (uint16_t) (line_length_pck *
-				line_length_ratio/Q8);
-			line_length_pck_hi = (uint8_t) ((line_length_pck &
-				0xFF00) >> 8);
-			line_length_pck_lo = (uint8_t) (line_length_pck &
-				0x00FF);
-			vx6953_i2c_write_b_sensor(REG_LINE_LENGTH_PCK_HI,
-				line_length_pck_hi);
-			vx6953_i2c_write_b_sensor(REG_LINE_LENGTH_PCK_LO,
-				line_length_pck_lo);
-			stored_line_length_ratio = line_length_ratio;
-		}
-		/* update analogue gain registers */
-		gain_hi = (uint8_t) ((gain & 0xFF00) >> 8);
-		gain_lo = (uint8_t) (gain & 0x00FF);
-		vx6953_i2c_write_b_sensor(REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
-			gain_lo);
-		vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_GREEN_R_LO, gain_hi);
-		vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_RED_LO, gain_hi);
-		vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_BLUE_LO, gain_hi);
-		vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_GREEN_B_LO, gain_hi);
-		CDBG("%s, gain_hi 0x%x, gain_lo 0x%x\n", __func__,
-			gain_hi, gain_lo);
-		/* update line count registers */
-		intg_time_hi = (uint8_t) (((uint16_t)line & 0xFF00) >> 8);
-		intg_time_lo = (uint8_t) ((uint16_t)line & 0x00FF);
-		vx6953_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_HI,
-			intg_time_hi);
-		vx6953_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_LO,
-			intg_time_lo);
-		vx6953_i2c_write_b_sensor(REG_GROUPED_PARAMETER_HOLD,
-			GROUPED_PARAMETER_HOLD_OFF);
-		stored_gain = gain;
-		stored_line = line;
+	} else {
+		frame_length_lines = VX6953_FULL_SIZE_HEIGHT +
+				VX6953_VER_FULL_BLK_LINES;
+		line_length_pck = VX6953_FULL_SIZE_WIDTH +
+				VX6953_HRZ_FULL_BLK_PIXELS;
 	}
+	/* calculate line_length_ratio */
+	if ((frame_length_lines - VX6953_STM5M0EDOF_OFFSET) < line) {
+		line_length_ratio = (line*Q8) /
+			(frame_length_lines - VX6953_STM5M0EDOF_OFFSET);
+		line = frame_length_lines - VX6953_STM5M0EDOF_OFFSET;
+	} else {
+		line_length_ratio = 1*Q8;
+	}
+	vx6953_i2c_write_b_sensor(REG_GROUPED_PARAMETER_HOLD,
+		GROUPED_PARAMETER_HOLD);
+	if (line_length_ratio != stored_line_length_ratio) {
+		line_length_pck = (line_length_pck >
+			MAX_LINE_LENGTH_PCK) ?
+			MAX_LINE_LENGTH_PCK : line_length_pck;
+		line_length_pck = (uint16_t) (line_length_pck *
+			line_length_ratio/Q8);
+		line_length_pck_hi = (uint8_t) ((line_length_pck &
+			0xFF00) >> 8);
+		line_length_pck_lo = (uint8_t) (line_length_pck &
+			0x00FF);
+		vx6953_i2c_write_b_sensor(REG_LINE_LENGTH_PCK_HI,
+			line_length_pck_hi);
+		vx6953_i2c_write_b_sensor(REG_LINE_LENGTH_PCK_LO,
+			line_length_pck_lo);
+		stored_line_length_ratio = line_length_ratio;
+	}
+	/* update analogue gain registers */
+	gain_hi = (uint8_t) ((gain & 0xFF00) >> 8);
+	gain_lo = (uint8_t) (gain & 0x00FF);
+	vx6953_i2c_write_b_sensor(REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+		gain_lo);
+	vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_GREEN_R_LO, gain_hi);
+	vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_RED_LO, gain_hi);
+	vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_BLUE_LO, gain_hi);
+	vx6953_i2c_write_b_sensor(REG_DIGITAL_GAIN_GREEN_B_LO, gain_hi);
+	CDBG("%s, gain_hi 0x%x, gain_lo 0x%x\n", __func__,
+		gain_hi, gain_lo);
+	/* update line count registers */
+	intg_time_hi = (uint8_t) (((uint16_t)line & 0xFF00) >> 8);
+	intg_time_lo = (uint8_t) ((uint16_t)line & 0x00FF);
+	vx6953_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_HI,
+		intg_time_hi);
+	vx6953_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_LO,
+		intg_time_lo);
+	vx6953_i2c_write_b_sensor(REG_GROUPED_PARAMETER_HOLD,
+		GROUPED_PARAMETER_HOLD_OFF);
+
 	return rc;
 }
 
@@ -1065,8 +1912,18 @@ static int vx6953_enable_edof(enum edof_mode_t edof_mode)
 static int32_t vx6953_patch_for_cut2(void)
 {
 	int32_t rc = 0;
-	rc = vx6953_i2c_write_w_table(patch_tbl,
-		ARRAY_SIZE(patch_tbl));
+	rc = vx6953_i2c_write_w_table(patch_tbl_cut2,
+		ARRAY_SIZE(patch_tbl_cut2));
+	if (rc < 0)
+		return rc;
+
+	return rc;
+}
+static int32_t vx6953_patch_for_cut3(void)
+{
+	int32_t rc = 0;
+	rc = vx6953_i2c_write_w_table(patch_tbl_cut3,
+		ARRAY_SIZE(patch_tbl_cut3));
 	if (rc < 0)
 		return rc;
 
@@ -1077,195 +1934,875 @@ static int32_t vx6953_sensor_setting(int update_type, int rt)
 
 	int32_t rc = 0;
 	unsigned short frame_cnt;
-	switch (update_type) {
-	case REG_INIT:
+	struct msm_camera_csi_params vx6953_csi_params;
+	if (vx6953_ctrl->sensor_type != VX6953_STM5M0EDOF_CUT_2) {
+		switch (update_type) {
+		case REG_INIT:
 		if (rt == RES_PREVIEW || rt == RES_CAPTURE) {
 			struct vx6953_i2c_reg_conf init_tbl[] = {
-				{REG_0x0112,
-					vx6953_regs.reg_pat_init[0].reg_0x0112},
-				{REG_0x0113,
-					vx6953_regs.reg_pat_init[0].reg_0x0113},
-				{REG_VT_PIX_CLK_DIV,
-					vx6953_regs.reg_pat_init[0].
-					vt_pix_clk_div},
-				{REG_PRE_PLL_CLK_DIV,
-					vx6953_regs.reg_pat_init[0].
-					pre_pll_clk_div},
-				{REG_PLL_MULTIPLIER,
-					vx6953_regs.reg_pat_init[0].
-					pll_multiplier},
-				{REG_OP_PIX_CLK_DIV,
-					vx6953_regs.reg_pat_init[0].
-					op_pix_clk_div},
-				{REG_COARSE_INTEGRATION_TIME_HI,
-					vx6953_regs.reg_pat[rt].
-					coarse_integration_time_hi},
-				{REG_COARSE_INTEGRATION_TIME_LO,
-					vx6953_regs.reg_pat[rt].
-					coarse_integration_time_lo},
-				{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
-					vx6953_regs.reg_pat[rt].
-					analogue_gain_code_global},
-				{REG_0x3030,
-					vx6953_regs.reg_pat_init[0].reg_0x3030},
-				/* 953 specific registers */
-				{REG_0x0111,
-					vx6953_regs.reg_pat_init[0].reg_0x0111},
-				{REG_0x0b00,
-					vx6953_regs.reg_pat_init[0].reg_0x0b00},
-				{REG_0x3001,
-					vx6953_regs.reg_pat_init[0].reg_0x3001},
-				{REG_0x3004,
-					vx6953_regs.reg_pat_init[0].reg_0x3004},
-				{REG_0x3007,
-					vx6953_regs.reg_pat_init[0].reg_0x3007},
-				{REG_0x3016,
-					vx6953_regs.reg_pat_init[0].reg_0x3016},
-				{REG_0x301d,
-					vx6953_regs.reg_pat_init[0].reg_0x301d},
-				{REG_0x317e,
-					vx6953_regs.reg_pat_init[0].reg_0x317e},
-				{REG_0x317f,
-					vx6953_regs.reg_pat_init[0].reg_0x317f},
-				{REG_0x3400,
-					vx6953_regs.reg_pat_init[0].reg_0x3400},
-				/* DEFCOR settings */
-				/*Single Defect Correction Weight DISABLE*/
-				{0x0b06,
-					vx6953_regs.reg_pat_init[0].reg_0x0b06},
-				/*Single_defect_correct_weight = auto*/
-				{0x0b07,
-					vx6953_regs.reg_pat_init[0].reg_0x0b07},
-				/*Dynamic couplet correction ENABLED*/
-				{0x0b08,
-					vx6953_regs.reg_pat_init[0].reg_0x0b08},
-				/*Dynamic couplet correction weight*/
-				{0x0b09,
-					vx6953_regs.reg_pat_init[0].reg_0x0b09},
-				/* Clock Setup */
-				/* Tell sensor ext clk is 24MHz*/
-				{0x0136,
-					vx6953_regs.reg_pat_init[0].reg_0x0136},
-				{0x0137,
-					vx6953_regs.reg_pat_init[0].reg_0x0137},
-				/* The white balance gains must be written
-				to the sensor every frame. */
-				/* Edof */
-				{REG_0x0b83,
-					vx6953_regs.reg_pat_init[0].reg_0x0b83},
-				{REG_0x0b84,
-					vx6953_regs.reg_pat_init[0].reg_0x0b84},
-				{0x0b85,
-					vx6953_regs.reg_pat_init[0].reg_0x0b85},
-				{0x0b88,
-					vx6953_regs.reg_pat_init[0].reg_0x0b88},
-				{0x0b89,
-					vx6953_regs.reg_pat_init[0].reg_0x0b89},
-				{REG_0x0b8a,
-					vx6953_regs.reg_pat_init[0].reg_0x0b8a},
-				/* Mode specific regieters */
-				{REG_FRAME_LENGTH_LINES_HI,
-					vx6953_regs.reg_pat[rt].
-					frame_length_lines_hi},
-				{REG_FRAME_LENGTH_LINES_LO,
-					vx6953_regs.reg_pat[rt].
-					frame_length_lines_lo},
-				{REG_LINE_LENGTH_PCK_HI,
-					vx6953_regs.reg_pat[rt].
-					line_length_pck_hi},
-				{REG_LINE_LENGTH_PCK_LO,
-					vx6953_regs.reg_pat[rt].
-					line_length_pck_lo},
-				{REG_0x3005,
-					vx6953_regs.reg_pat[rt].reg_0x3005},
-				{0x3010,
-					vx6953_regs.reg_pat[rt].reg_0x3010},
-				{REG_0x3011,
-					vx6953_regs.reg_pat[rt].reg_0x3011},
-				{REG_0x301a,
-					vx6953_regs.reg_pat[rt].reg_0x301a},
-				{REG_0x3035,
-					vx6953_regs.reg_pat[rt].reg_0x3035},
-				{REG_0x3036,
-					vx6953_regs.reg_pat[rt].reg_0x3036},
-				{REG_0x3041,
-					vx6953_regs.reg_pat[rt].reg_0x3041},
-				{0x3042,
-					vx6953_regs.reg_pat[rt].reg_0x3042},
-				{REG_0x3045,
-					vx6953_regs.reg_pat[rt].reg_0x3045},
-				/*EDOF: Estimation settings for Preview mode
-				Application settings for capture mode
-				(standard settings - Not tuned) */
-				{REG_0x0b80,
-					vx6953_regs.reg_pat[rt].reg_0x0b80},
-				{REG_0x0900,
-					vx6953_regs.reg_pat[rt].reg_0x0900},
-				{REG_0x0901,
-					vx6953_regs.reg_pat[rt].reg_0x0901},
-				{REG_0x0902,
-					vx6953_regs.reg_pat[rt].reg_0x0902},
-				{REG_0x0383,
-					vx6953_regs.reg_pat[rt].reg_0x0383},
-				{REG_0x0387,
-					vx6953_regs.reg_pat[rt].reg_0x0387},
-				/* Change output size / frame rate */
-				{REG_0x034c,
-					vx6953_regs.reg_pat[rt].reg_0x034c},
-				{REG_0x034d,
-					vx6953_regs.reg_pat[rt].reg_0x034d},
-				{REG_0x034e,
-					vx6953_regs.reg_pat[rt].reg_0x034e},
-				{REG_0x034f,
-					vx6953_regs.reg_pat[rt].reg_0x034f},
-				{REG_0x1716,
-					vx6953_regs.reg_pat[rt].reg_0x1716},
-				{REG_0x1717,
-					vx6953_regs.reg_pat[rt].reg_0x1717},
-				{REG_0x1718,
-					vx6953_regs.reg_pat[rt].reg_0x1718},
-				{REG_0x1719,
-					vx6953_regs.reg_pat[rt].reg_0x1719},
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{0x6003, 0x01},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
+			{REG_VT_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
+			{REG_PRE_PLL_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
+			{REG_PLL_MULTIPLIER,
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
+			{REG_OP_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+			{REG_COARSE_INTEGRATION_TIME_HI,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_hi},
+			{REG_COARSE_INTEGRATION_TIME_LO,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_lo},
+			{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+				vx6953_regs.reg_pat[rt].
+				analogue_gain_code_global},
+			{REG_0x3030,
+				vx6953_regs.reg_pat_init[0].reg_0x3030},
+			/* 953 specific registers */
+			{REG_0x0111,
+				vx6953_regs.reg_pat_init[0].reg_0x0111},
+			{REG_0x0b00,
+				vx6953_regs.reg_pat_init[0].reg_0x0b00},
+			{REG_0x3001,
+				vx6953_regs.reg_pat_init[0].reg_0x3001},
+			{REG_0x3004,
+				vx6953_regs.reg_pat_init[0].reg_0x3004},
+			{0x3006, 0x00},
+			{REG_0x3007,
+				vx6953_regs.reg_pat_init[0].reg_0x3007},
+			{0x301b, 0x29},
+			/* DEFCOR settings */
+			/*Single Defect Correction Weight DISABLE*/
+			{0x0b06,
+				vx6953_regs.reg_pat_init[0].reg_0x0b06},
+			/*Single_defect_correct_weight = auto*/
+			{0x0b07,
+				vx6953_regs.reg_pat_init[0].reg_0x0b07},
+			/*Dynamic couplet correction ENABLED*/
+			{0x0b08,
+				vx6953_regs.reg_pat_init[0].reg_0x0b08},
+			/*Dynamic couplet correction weight*/
+			{0x0b09,
+				vx6953_regs.reg_pat_init[0].reg_0x0b09},
+			/* Clock Setup */
+			/* Tell sensor ext clk is 24MHz*/
+			{REG_0x0136,
+				vx6953_regs.reg_pat_init[0].reg_0x0136},
+			{REG_0x0137,
+				vx6953_regs.reg_pat_init[0].reg_0x0137},
+			/* The white balance gains must be written
+			to the sensor every frame. */
+			/* Edof */
+			{REG_0x0b83,
+				vx6953_regs.reg_pat_init[0].reg_0x0b83},
+			{REG_0x0b84,
+				vx6953_regs.reg_pat_init[0].reg_0x0b84},
+			{REG_0x0b85,
+				vx6953_regs.reg_pat_init[0].reg_0x0b85},
+			{REG_0x0b88,
+				vx6953_regs.reg_pat_init[0].reg_0x0b88},
+			{REG_0x0b89,
+				vx6953_regs.reg_pat_init[0].reg_0x0b89},
+			{REG_0x0b8a,
+				vx6953_regs.reg_pat_init[0].reg_0x0b8a},
+			/* Mode specific regieters */
+			{REG_FRAME_LENGTH_LINES_HI,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_hi},
+			{REG_FRAME_LENGTH_LINES_LO,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_lo},
+			{REG_LINE_LENGTH_PCK_HI,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_hi},
+			{REG_LINE_LENGTH_PCK_LO,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_lo},
+			{REG_0x3005,
+				vx6953_regs.reg_pat[rt].reg_0x3005},
+			{0x3010,
+				vx6953_regs.reg_pat[rt].reg_0x3010},
+			{REG_0x3011,
+				vx6953_regs.reg_pat[rt].reg_0x3011},
+			{REG_0x301a,
+				vx6953_regs.reg_pat[rt].reg_0x301a},
+			{REG_0x3035,
+				vx6953_regs.reg_pat[rt].reg_0x3035},
+			{REG_0x3036,
+				vx6953_regs.reg_pat[rt].reg_0x3036},
+			{REG_0x3041,
+				vx6953_regs.reg_pat[rt].reg_0x3041},
+			{0x3042,
+				vx6953_regs.reg_pat[rt].reg_0x3042},
+			{REG_0x3045,
+				vx6953_regs.reg_pat[rt].reg_0x3045},
+			/*EDOF: Estimation settings for Preview mode
+			Application settings for capture mode
+			(standard settings - Not tuned) */
+			{REG_0x0b80,
+				vx6953_regs.reg_pat[rt].reg_0x0b80},
+			{REG_0x0900,
+				vx6953_regs.reg_pat[rt].reg_0x0900},
+			{REG_0x0901,
+				vx6953_regs.reg_pat[rt].reg_0x0901},
+			{REG_0x0902,
+				vx6953_regs.reg_pat[rt].reg_0x0902},
+			{REG_0x0383,
+				vx6953_regs.reg_pat[rt].reg_0x0383},
+			{REG_0x0387,
+				vx6953_regs.reg_pat[rt].reg_0x0387},
+			/* Change output size / frame rate */
+			{REG_0x034c,
+				vx6953_regs.reg_pat[rt].reg_0x034c},
+			{REG_0x034d,
+				vx6953_regs.reg_pat[rt].reg_0x034d},
+			{REG_0x034e,
+				vx6953_regs.reg_pat[rt].reg_0x034e},
+			{REG_0x034f,
+				vx6953_regs.reg_pat[rt].reg_0x034f},
 			};
 			/* reset fps_divider */
 			vx6953_ctrl->fps = 30 * Q8;
 			/* stop streaming */
+
+			/* Reset everything first */
+			if (vx6953_i2c_write_b_sensor(0x103, 0x01) < 0) {
+				CDBG("S/W reset failed\n");
+				return rc;
+			} else
+				CDBG("S/W reset successful\n");
+
+			msleep(10);
+
+			CDBG("Init vx6953_sensor_setting standby\n");
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STANDBY_MODE) < 0)
+				return rc;
+			/*vx6953_stm5m0edof_delay_msecs_stdby*/
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_csi_params.data_format = CSI_8BIT;
+			vx6953_csi_params.lane_cnt = 1;
+			vx6953_csi_params.lane_assign = 0xe4;
+			vx6953_csi_params.dpcm_scheme = 0;
+			vx6953_csi_params.settle_cnt = 7;
+			rc = msm_camio_csi_config(&vx6953_csi_params);
+			if (rc < 0)
+				CDBG(" config csi controller failed \n");
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_patch_for_cut3();
+			rc = vx6953_i2c_write_w_table(&init_tbl[0],
+				ARRAY_SIZE(init_tbl));
+			if (rc < 0)
+				return rc;
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_i2c_write_b_sensor(0x0b80, 0x00);
+			vx6953_i2c_write_b_sensor(0x3388, 0x03);
+			vx6953_i2c_write_b_sensor(0x3640, 0x00);
+			/* Start sensor streaming */
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STREAM) < 0)
+				return rc;
+			CDBG("Init vx6953_sensor_setting stream\n");
+			msleep(vx6953_stm5m0edof_delay_msecs_stream);
+			if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
+				return rc;
+
+			rc = vx6953_i2c_write_w_table(&edof_tbl[0],
+				ARRAY_SIZE(edof_tbl));
+			vx6953_i2c_write_b_sensor(0x3388, 0x00);
+
+			while (frame_cnt == 0xFF) {
+				if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
+					return rc;
+				CDBG("frame_cnt=%d", frame_cnt);
+				msleep(10);
+			}
+		}
+		return rc;
+		case UPDATE_PERIODIC:
+		if (rt == RES_PREVIEW || rt == RES_CAPTURE) {
+			struct vx6953_i2c_reg_conf preview_mode_tbl[] = {
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{0x6003, 0x01},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
+			{REG_VT_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
+			{REG_PRE_PLL_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
+			{REG_PLL_MULTIPLIER,
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
+			{REG_OP_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+
+			{REG_COARSE_INTEGRATION_TIME_HI,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_hi},
+			{REG_COARSE_INTEGRATION_TIME_LO,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_lo},
+			{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+				vx6953_regs.reg_pat[rt].
+				analogue_gain_code_global},
+
+			{REG_0x3210, vx6953_regs.reg_pat[rt].reg_0x3210},
+			{REG_0x0111, vx6953_regs.reg_pat[rt].reg_0x111},
+			{REG_0x3410, vx6953_regs.reg_pat[rt].reg_0x3410},
+
+			{REG_0x3004,
+				vx6953_regs.reg_pat_init[0].reg_0x3004},
+			{REG_0x3006, 0x00},
+			{REG_0x3007,
+				vx6953_regs.reg_pat_init[0].reg_0x3007},
+			{REG_0x301b, 0x29},
+			{REG_0x3036,
+				vx6953_regs.reg_pat[rt].reg_0x3036},
+			{REG_0x3045, vx6953_regs.reg_pat[rt].reg_0x3045},
+			{REG_0x3098, vx6953_regs.reg_pat[rt].reg_0x3098},
+			{REG_0x309d, vx6953_regs.reg_pat[rt].reg_0x309D},
+
+			{REG_0x0900, vx6953_regs.reg_pat[rt].reg_0x0900},
+			{REG_0x0901, vx6953_regs.reg_pat[rt].reg_0x0901},
+			{REG_0x0902, vx6953_regs.reg_pat[rt].reg_0x0902},
+			{REG_0x0383, vx6953_regs.reg_pat[rt].reg_0x0383},
+			{REG_0x0387, vx6953_regs.reg_pat[rt].reg_0x0387},
+
+			{REG_FRAME_LENGTH_LINES_HI,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_hi},
+			{REG_FRAME_LENGTH_LINES_LO,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_lo},
+			{REG_LINE_LENGTH_PCK_HI,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_hi},
+			{REG_LINE_LENGTH_PCK_LO,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_lo},
+			{REG_0x034c,
+				vx6953_regs.reg_pat[rt].reg_0x034c},
+			{REG_0x034d,
+				vx6953_regs.reg_pat[rt].reg_0x034d},
+			{REG_0x034e,
+				vx6953_regs.reg_pat[rt].reg_0x034e},
+			{REG_0x034f,
+				vx6953_regs.reg_pat[rt].reg_0x034f},
+
+			{REG_0x3005, vx6953_regs.reg_pat[rt].reg_0x3005},
+			{REG_0x3010, vx6953_regs.reg_pat[rt].reg_0x3010},
+			{REG_0x3011, vx6953_regs.reg_pat[rt].reg_0x3011},
+			{REG_0x301a, vx6953_regs.reg_pat[rt].reg_0x301a},
+			{REG_0x3030, 0x08},
+			{REG_0x3035, vx6953_regs.reg_pat[rt].reg_0x3035},
+			{REG_0x3041, vx6953_regs.reg_pat[rt].reg_0x3041},
+			{0x3042, vx6953_regs.reg_pat[rt].reg_0x3042},
+
+			{0x200, vx6953_regs.reg_pat[rt].reg_0x0200},
+			{0x201, vx6953_regs.reg_pat[rt].reg_0x0201},
+
+			{0x0b06,
+				vx6953_regs.reg_pat_init[0].reg_0x0b06},
+			/*Single_defect_correct_weight = auto*/
+			{0x0b07,
+				vx6953_regs.reg_pat_init[0].reg_0x0b07},
+			/*Dynamic couplet correction ENABLED*/
+			{0x0b08,
+				vx6953_regs.reg_pat_init[0].reg_0x0b08},
+			/*Dynamic couplet correction weight*/
+			{0x0b09,
+				vx6953_regs.reg_pat_init[0].reg_0x0b09},
+
+			{REG_0x0136,
+				vx6953_regs.reg_pat_init[0].reg_0x0136},
+			{REG_0x0137,
+				vx6953_regs.reg_pat_init[0].reg_0x0137},
+
+			/*EDOF: Estimation settings for Preview mode
+			Application settings for capture
+			mode(standard settings - Not tuned) */
+			{REG_0x0b80, vx6953_regs.reg_pat[rt].reg_0x0b80},
+			{REG_0x0b83,
+				vx6953_regs.reg_pat_init[0].reg_0x0b83},
+			{REG_0x0b84,
+				vx6953_regs.reg_pat_init[0].reg_0x0b84},
+			{REG_0x0b85,
+				vx6953_regs.reg_pat_init[0].reg_0x0b85},
+			{REG_0x0b88,
+				vx6953_regs.reg_pat_init[0].reg_0x0b88},
+			{REG_0x0b89,
+				vx6953_regs.reg_pat_init[0].reg_0x0b89},
+			{REG_0x0b8a,
+				vx6953_regs.reg_pat_init[0].reg_0x0b8a},
+			{0x3393, 0x06}, /* man_spec_edof_ctrl_edof*/
+			{0x3394, 0x07}, /* man_spec_edof_ctrl_edof*/
+			};
+
+			struct vx6953_i2c_reg_conf snapshot_mode_tbl[] = {
+			{REG_MODE_SELECT,	MODE_SELECT_STANDBY_MODE},
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{0x6003, 0x01},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
+			{REG_VT_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
+			{0x303,	1}, /* VT_SYS_CLK_DIV */
+			{REG_PRE_PLL_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
+			{REG_PLL_MULTIPLIER,
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
+			{REG_OP_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+			{0x30b,	1},
+			{REG_COARSE_INTEGRATION_TIME_HI,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_hi},
+			{REG_COARSE_INTEGRATION_TIME_LO,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_lo},
+			{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+				vx6953_regs.reg_pat[rt].
+				analogue_gain_code_global},
+			{REG_LINE_LENGTH_PCK_HI,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_hi},
+			{REG_LINE_LENGTH_PCK_LO,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_lo},
+			{REG_FRAME_LENGTH_LINES_HI,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_hi},
+			{REG_FRAME_LENGTH_LINES_LO,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_lo},
+			{REG_0x3210, vx6953_regs.reg_pat[rt].reg_0x3210},
+			{REG_0x0111, vx6953_regs.reg_pat[rt].reg_0x111},
+
+			{REG_0x0b00,
+				vx6953_regs.reg_pat_init[0].reg_0x0b00},
+			{0x3140, 0x01},  /* AV2X2 block enabled */
+			{REG_0x3410, vx6953_regs.reg_pat[rt].reg_0x3410},
+			{0x0b06,
+				vx6953_regs.reg_pat_init[0].reg_0x0b06},
+			/*Single_defect_correct_weight = auto*/
+			{0x0b07,
+				vx6953_regs.reg_pat_init[0].reg_0x0b07},
+			/*Dynamic couplet correction ENABLED*/
+			{0x0b08,
+				vx6953_regs.reg_pat_init[0].reg_0x0b08},
+			/*Dynamic couplet correction weight*/
+			{0x0b09,
+				vx6953_regs.reg_pat_init[0].reg_0x0b09},
+
+
+			{REG_0x3004,
+				vx6953_regs.reg_pat_init[0].reg_0x3004},
+			{REG_0x3006, 0x00},
+			{REG_0x3007,
+				vx6953_regs.reg_pat_init[0].reg_0x3007},
+			{0x301A, 0x6A},
+			{REG_0x301b, 0x29},
+			{REG_0x3036,
+				vx6953_regs.reg_pat[rt].reg_0x3036},
+			{REG_0x3045, vx6953_regs.reg_pat[rt].reg_0x3045},
+			{REG_0x3098, vx6953_regs.reg_pat[rt].reg_0x3098},
+			{REG_0x309d, vx6953_regs.reg_pat[rt].reg_0x309D},
+
+			{REG_0x0136,
+				vx6953_regs.reg_pat_init[0].reg_0x0136},
+			{REG_0x0137,
+				vx6953_regs.reg_pat_init[0].reg_0x0137},
+
+			{REG_0x0b80, vx6953_regs.reg_pat[rt].reg_0x0b80},
+			{REG_0x0b83,
+				vx6953_regs.reg_pat_init[0].reg_0x0b83},
+			{REG_0x0b84,
+				vx6953_regs.reg_pat_init[0].reg_0x0b84},
+			{REG_0x0b85,
+				vx6953_regs.reg_pat_init[0].reg_0x0b85},
+			{REG_0x0b88,
+				vx6953_regs.reg_pat_init[0].reg_0x0b88},
+			{REG_0x0b89,
+				vx6953_regs.reg_pat_init[0].reg_0x0b89},
+			{REG_0x0b8a,
+				vx6953_regs.reg_pat_init[0].reg_0x0b8a},
+			{0x3393, 0x06}, /* man_spec_edof_ctrl*/
+			{0x3394, 0x07}, /* man_spec_edof_ctrl*/
+			};
+			/* stop streaming */
+			msleep(5);
+
+			/* Reset everything first */
+
+			if (vx6953_i2c_write_b_sensor(0x103, 0x01) < 0) {
+				CDBG("S/W reset failed\n");
+				return rc;
+			} else
+				CDBG("S/W reset successful\n");
+
+			msleep(10);
+
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STANDBY_MODE) < 0)
+				return rc;
+			/*vx6953_stm5m0edof_delay_msecs_stdby*/
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_csi_params.data_format = CSI_8BIT;
+			vx6953_csi_params.lane_cnt = 1;
+			vx6953_csi_params.lane_assign = 0xe4;
+			vx6953_csi_params.dpcm_scheme = 0;
+			vx6953_csi_params.settle_cnt = 7;
+			rc = msm_camio_csi_config(&vx6953_csi_params);
+			if (rc < 0)
+				CDBG(" config csi controller failed \n");
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_patch_for_cut3();
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			if (rt == RES_PREVIEW) {
+				rc = vx6953_i2c_write_w_table(
+					&preview_mode_tbl[0],
+					ARRAY_SIZE(preview_mode_tbl));
+				if (rc < 0)
+					return rc;
+			}
+			if (rt == RES_CAPTURE) {
+				rc = vx6953_i2c_write_w_table(
+					&snapshot_mode_tbl[0],
+					ARRAY_SIZE(snapshot_mode_tbl));
+				if (rc < 0)
+					return rc;
+			}
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			/* Start sensor streaming */
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STREAM) < 0)
+				return rc;
+			msleep(vx6953_stm5m0edof_delay_msecs_stream);
+			/* man_spec_edof_ctrl_tune_smooth_lowlight*/
+			vx6953_i2c_write_b_sensor(0x338d, 0x08);
+			/* man_spec_edof_ctrl_tune_smooth_indoor*/
+			vx6953_i2c_write_b_sensor(0x338e, 0x08);
+			/* man_spec_edof_ctrl_tune_smooth_outdoor*/
+			vx6953_i2c_write_b_sensor(0x338f, 0x00);
+			/*Apply Capture FPGA state machine reset*/
+			vx6953_i2c_write_b_sensor(0x16, 0x00);
+			msleep(100);
+			vx6953_i2c_write_b_sensor(0x16, 0x01);
+
+			if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
+				return rc;
+
+			while (frame_cnt == 0xFF) {
+				if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
+					return rc;
+				CDBG("frame_cnt=%d", frame_cnt);
+				msleep(10);
+			}
+		}
+		return rc;
+		default:
+			return rc;
+		}
+	} else {
+		switch (update_type) {
+		case REG_INIT:
+		if (rt == RES_PREVIEW || rt == RES_CAPTURE) {
+			struct vx6953_i2c_reg_conf init_tbl[] = {
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
+			{REG_VT_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
+			{REG_PRE_PLL_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
+			{REG_PLL_MULTIPLIER,
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
+			{REG_OP_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+			{REG_COARSE_INTEGRATION_TIME_HI,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_hi},
+			{REG_COARSE_INTEGRATION_TIME_LO,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_lo},
+			{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+				vx6953_regs.reg_pat[rt].
+				analogue_gain_code_global},
+			{REG_0x3030,
+				vx6953_regs.reg_pat_init[0].reg_0x3030},
+			/* 953 specific registers */
+			{REG_0x0111,
+				vx6953_regs.reg_pat_init[0].reg_0x0111},
+			{REG_0x0b00,
+				vx6953_regs.reg_pat_init[0].reg_0x0b00},
+			{REG_0x3001,
+				vx6953_regs.reg_pat_init[0].reg_0x3001},
+			{REG_0x3004,
+				vx6953_regs.reg_pat_init[0].reg_0x3004},
+			{REG_0x3007,
+				vx6953_regs.reg_pat_init[0].reg_0x3007},
+			{REG_0x3016,
+				vx6953_regs.reg_pat_init[0].reg_0x3016},
+			{REG_0x301d,
+				vx6953_regs.reg_pat_init[0].reg_0x301d},
+			{REG_0x317e,
+				vx6953_regs.reg_pat_init[0].reg_0x317e},
+			{REG_0x317f,
+				vx6953_regs.reg_pat_init[0].reg_0x317f},
+			{REG_0x3400,
+				vx6953_regs.reg_pat_init[0].reg_0x3400},
+			/* DEFCOR settings */
+			/*Single Defect Correction Weight DISABLE*/
+			{0x0b06,
+				vx6953_regs.reg_pat_init[0].reg_0x0b06},
+			/*Single_defect_correct_weight = auto*/
+			{0x0b07,
+				vx6953_regs.reg_pat_init[0].reg_0x0b07},
+			/*Dynamic couplet correction ENABLED*/
+			{0x0b08,
+				vx6953_regs.reg_pat_init[0].reg_0x0b08},
+			/*Dynamic couplet correction weight*/
+			{0x0b09,
+				vx6953_regs.reg_pat_init[0].reg_0x0b09},
+			/* Clock Setup */
+			/* Tell sensor ext clk is 24MHz*/
+			{0x0136,
+				vx6953_regs.reg_pat_init[0].reg_0x0136},
+			{0x0137,
+				vx6953_regs.reg_pat_init[0].reg_0x0137},
+			/* The white balance gains must be written
+			to the sensor every frame. */
+			/* Edof */
+			{REG_0x0b83,
+				vx6953_regs.reg_pat_init[0].reg_0x0b83},
+			{REG_0x0b84,
+				vx6953_regs.reg_pat_init[0].reg_0x0b84},
+			{0x0b85,
+				vx6953_regs.reg_pat_init[0].reg_0x0b85},
+			{0x0b88,
+				vx6953_regs.reg_pat_init[0].reg_0x0b88},
+			{0x0b89,
+				vx6953_regs.reg_pat_init[0].reg_0x0b89},
+			{REG_0x0b8a,
+				vx6953_regs.reg_pat_init[0].reg_0x0b8a},
+			/* Mode specific regieters */
+			{REG_FRAME_LENGTH_LINES_HI,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_hi},
+			{REG_FRAME_LENGTH_LINES_LO,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_lo},
+			{REG_LINE_LENGTH_PCK_HI,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_hi},
+			{REG_LINE_LENGTH_PCK_LO,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_lo},
+			{REG_0x3005,
+				vx6953_regs.reg_pat[rt].reg_0x3005},
+			{0x3010,
+				vx6953_regs.reg_pat[rt].reg_0x3010},
+			{REG_0x3011,
+				vx6953_regs.reg_pat[rt].reg_0x3011},
+			{REG_0x301a,
+				vx6953_regs.reg_pat[rt].reg_0x301a},
+			{REG_0x3035,
+				vx6953_regs.reg_pat[rt].reg_0x3035},
+			{REG_0x3036,
+				vx6953_regs.reg_pat[rt].reg_0x3036},
+			{REG_0x3041,
+				vx6953_regs.reg_pat[rt].reg_0x3041},
+			{0x3042,
+				vx6953_regs.reg_pat[rt].reg_0x3042},
+			{REG_0x3045,
+				vx6953_regs.reg_pat[rt].reg_0x3045},
+			/*EDOF: Estimation settings for Preview mode
+			Application settings for capture mode
+			(standard settings - Not tuned) */
+			{REG_0x0b80,
+				vx6953_regs.reg_pat[rt].reg_0x0b80},
+			{REG_0x0900,
+				vx6953_regs.reg_pat[rt].reg_0x0900},
+			{REG_0x0901,
+				vx6953_regs.reg_pat[rt].reg_0x0901},
+			{REG_0x0902,
+				vx6953_regs.reg_pat[rt].reg_0x0902},
+			{REG_0x0383,
+				vx6953_regs.reg_pat[rt].reg_0x0383},
+			{REG_0x0387,
+				vx6953_regs.reg_pat[rt].reg_0x0387},
+			/* Change output size / frame rate */
+			{REG_0x034c,
+				vx6953_regs.reg_pat[rt].reg_0x034c},
+			{REG_0x034d,
+				vx6953_regs.reg_pat[rt].reg_0x034d},
+			{REG_0x034e,
+				vx6953_regs.reg_pat[rt].reg_0x034e},
+			{REG_0x034f,
+				vx6953_regs.reg_pat[rt].reg_0x034f},
+			{REG_0x1716,
+				vx6953_regs.reg_pat[rt].reg_0x1716},
+			{REG_0x1717,
+				vx6953_regs.reg_pat[rt].reg_0x1717},
+			{REG_0x1718,
+				vx6953_regs.reg_pat[rt].reg_0x1718},
+			{REG_0x1719,
+				vx6953_regs.reg_pat[rt].reg_0x1719},
+			};
+						/* reset fps_divider */
+			vx6953_ctrl->fps = 30 * Q8;
+			/* stop streaming */
+
+			/* Reset everything first */
+			if (vx6953_i2c_write_b_sensor(0x103, 0x01) < 0) {
+				CDBG("S/W reset failed\n");
+				return rc;
+			} else
+				CDBG("S/W reset successful\n");
+
+			msleep(10);
+
+			CDBG("Init vx6953_sensor_setting standby\n");
 			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
 				MODE_SELECT_STANDBY_MODE) < 0)
 				return rc;
 				/*vx6953_stm5m0edof_delay_msecs_stdby*/
-			mdelay(vx6953_stm5m0edof_delay_msecs_stdby);
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+
+			vx6953_csi_params.data_format = CSI_8BIT;
+			vx6953_csi_params.lane_cnt = 1;
+			vx6953_csi_params.lane_assign = 0xe4;
+			vx6953_csi_params.dpcm_scheme = 0;
+			vx6953_csi_params.settle_cnt = 7;
+			rc = msm_camio_csi_config(&vx6953_csi_params);
+			if (rc < 0)
+				CDBG(" config csi controller failed \n");
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+
 			vx6953_patch_for_cut2();
 			rc = vx6953_i2c_write_w_table(&init_tbl[0],
 				ARRAY_SIZE(init_tbl));
 			if (rc < 0)
 				return rc;
+				msleep(vx6953_stm5m0edof_delay_msecs_stdby);
 			/* Start sensor streaming */
 			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
 				MODE_SELECT_STREAM) < 0)
 				return rc;
-			mdelay(vx6953_stm5m0edof_delay_msecs_stream);
+				CDBG("Init vx6953_sensor_setting stream\n");
+			msleep(vx6953_stm5m0edof_delay_msecs_stream);
 			if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
 				return rc;
 			while (frame_cnt == 0xFF) {
 				if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
 					return rc;
 				CDBG("frame_cnt=%d", frame_cnt);
+				msleep(10);
 			}
 		}
-		return rc;
+	return rc;
 	case UPDATE_PERIODIC:
 		if (rt == RES_PREVIEW || rt == RES_CAPTURE) {
-			struct vx6953_i2c_reg_conf mode_tbl[] = {
+			struct vx6953_i2c_reg_conf init_mode_tbl[] =  {
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
 			{REG_VT_PIX_CLK_DIV,
-				vx6953_regs.reg_pat_init[0].vt_pix_clk_div},
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
 			{REG_PRE_PLL_CLK_DIV,
-				vx6953_regs.reg_pat_init[0].pre_pll_clk_div},
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
 			{REG_PLL_MULTIPLIER,
-				vx6953_regs.reg_pat_init[0].pll_multiplier},
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
 			{REG_OP_PIX_CLK_DIV,
-				vx6953_regs.reg_pat_init[0].op_pix_clk_div},
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+			{REG_COARSE_INTEGRATION_TIME_HI,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_hi},
+			{REG_COARSE_INTEGRATION_TIME_LO,
+				vx6953_regs.reg_pat[rt].
+				coarse_integration_time_lo},
+			{REG_ANALOGUE_GAIN_CODE_GLOBAL_LO,
+				vx6953_regs.reg_pat[rt].
+				analogue_gain_code_global},
+			{REG_0x3030,
+				vx6953_regs.reg_pat_init[0].reg_0x3030},
+			/* 953 specific registers */
+			{REG_0x0111,
+				vx6953_regs.reg_pat_init[0].reg_0x0111},
+			{REG_0x0b00,
+				vx6953_regs.reg_pat_init[0].reg_0x0b00},
+			{REG_0x3001,
+				vx6953_regs.reg_pat_init[0].reg_0x3001},
+			{REG_0x3004,
+				vx6953_regs.reg_pat_init[0].reg_0x3004},
+			{REG_0x3007,
+				vx6953_regs.reg_pat_init[0].reg_0x3007},
+			{REG_0x3016,
+				vx6953_regs.reg_pat_init[0].reg_0x3016},
+			{REG_0x301d,
+				vx6953_regs.reg_pat_init[0].reg_0x301d},
+			{REG_0x317e,
+				vx6953_regs.reg_pat_init[0].reg_0x317e},
+			{REG_0x317f,
+				vx6953_regs.reg_pat_init[0].reg_0x317f},
+			{REG_0x3400,
+				vx6953_regs.reg_pat_init[0].reg_0x3400},
+			{0x0b06,
+				vx6953_regs.reg_pat_init[0].reg_0x0b06},
+			/*Single_defect_correct_weight = auto*/
+			{0x0b07,
+				vx6953_regs.reg_pat_init[0].reg_0x0b07},
+			/*Dynamic couplet correction ENABLED*/
+			{0x0b08,
+				vx6953_regs.reg_pat_init[0].reg_0x0b08},
+			/*Dynamic couplet correction weight*/
+			{0x0b09,
+				vx6953_regs.reg_pat_init[0].reg_0x0b09},
+			/* Clock Setup */
+			/* Tell sensor ext clk is 24MHz*/
+			{0x0136,
+				vx6953_regs.reg_pat_init[0].reg_0x0136},
+			{0x0137,
+				vx6953_regs.reg_pat_init[0].reg_0x0137},
+			/* The white balance gains must be written
+			to the sensor every frame. */
+			/* Edof */
+			{REG_0x0b83,
+				vx6953_regs.reg_pat_init[0].reg_0x0b83},
+			{REG_0x0b84,
+				vx6953_regs.reg_pat_init[0].reg_0x0b84},
+			{0x0b85,
+				vx6953_regs.reg_pat_init[0].reg_0x0b85},
+			{0x0b88,
+				vx6953_regs.reg_pat_init[0].reg_0x0b88},
+			{0x0b89,
+				vx6953_regs.reg_pat_init[0].reg_0x0b89},
+			{REG_0x0b8a,
+				vx6953_regs.reg_pat_init[0].reg_0x0b8a},
 			/* Mode specific regieters */
+			{REG_FRAME_LENGTH_LINES_HI,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_hi},
+			{REG_FRAME_LENGTH_LINES_LO,
+				vx6953_regs.reg_pat[rt].
+				frame_length_lines_lo},
+			{REG_LINE_LENGTH_PCK_HI,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_hi},
+			{REG_LINE_LENGTH_PCK_LO,
+				vx6953_regs.reg_pat[rt].
+				line_length_pck_lo},
+			{REG_0x3005,
+				vx6953_regs.reg_pat[rt].reg_0x3005},
+			{0x3010,
+				vx6953_regs.reg_pat[rt].reg_0x3010},
+			{REG_0x3011,
+				vx6953_regs.reg_pat[rt].reg_0x3011},
+			{REG_0x301a,
+				vx6953_regs.reg_pat[rt].reg_0x301a},
+			{REG_0x3035,
+				vx6953_regs.reg_pat[rt].reg_0x3035},
+			{REG_0x3036,
+				vx6953_regs.reg_pat[rt].reg_0x3036},
+			{REG_0x3041,
+				vx6953_regs.reg_pat[rt].reg_0x3041},
+			{0x3042,
+				vx6953_regs.reg_pat[rt].reg_0x3042},
+			{REG_0x3045,
+				vx6953_regs.reg_pat[rt].reg_0x3045},
+			/*EDOF: Estimation settings for Preview mode
+			Application settings for capture mode
+			(standard settings - Not tuned) */
+			{REG_0x0b80,
+				vx6953_regs.reg_pat[rt].reg_0x0b80},
+			{REG_0x0900,
+				vx6953_regs.reg_pat[rt].reg_0x0900},
+			{REG_0x0901,
+				vx6953_regs.reg_pat[rt].reg_0x0901},
+			{REG_0x0902,
+				vx6953_regs.reg_pat[rt].reg_0x0902},
+			{REG_0x0383,
+				vx6953_regs.reg_pat[rt].reg_0x0383},
+			{REG_0x0387,
+				vx6953_regs.reg_pat[rt].reg_0x0387},
+			/* Change output size / frame rate */
+			{REG_0x034c,
+				vx6953_regs.reg_pat[rt].reg_0x034c},
+			{REG_0x034d,
+				vx6953_regs.reg_pat[rt].reg_0x034d},
+			{REG_0x034e,
+				vx6953_regs.reg_pat[rt].reg_0x034e},
+			{REG_0x034f,
+				vx6953_regs.reg_pat[rt].reg_0x034f},
+			{REG_0x1716,
+				vx6953_regs.reg_pat[rt].reg_0x1716},
+			{REG_0x1717,
+				vx6953_regs.reg_pat[rt].reg_0x1717},
+			{REG_0x1718,
+				vx6953_regs.reg_pat[rt].reg_0x1718},
+			{REG_0x1719,
+				vx6953_regs.reg_pat[rt].reg_0x1719},
+			};
+			struct vx6953_i2c_reg_conf mode_tbl[] = {
+			{REG_0x0112,
+				vx6953_regs.reg_pat_init[0].reg_0x0112},
+			{REG_0x0113,
+				vx6953_regs.reg_pat_init[0].reg_0x0113},
+			{REG_VT_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				vt_pix_clk_div},
+			{REG_PRE_PLL_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				pre_pll_clk_div},
+			{REG_PLL_MULTIPLIER,
+				vx6953_regs.reg_pat_init[0].
+				pll_multiplier},
+			{REG_OP_PIX_CLK_DIV,
+				vx6953_regs.reg_pat_init[0].
+				op_pix_clk_div},
+		/* Mode specific regieters */
 			{REG_FRAME_LENGTH_LINES_HI,
 				vx6953_regs.reg_pat[rt].frame_length_lines_hi},
 			{REG_FRAME_LENGTH_LINES_LO,
@@ -1303,36 +2840,73 @@ static int32_t vx6953_sensor_setting(int update_type, int rt)
 			{REG_0x1717, vx6953_regs.reg_pat[rt].reg_0x1717},
 			{REG_0x1718, vx6953_regs.reg_pat[rt].reg_0x1718},
 			{REG_0x1719, vx6953_regs.reg_pat[rt].reg_0x1719},
-		};
+			};
 			/* stop streaming */
-		mdelay(5);
-		if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
-			MODE_SELECT_STANDBY_MODE) < 0)
-			return rc;
-		/*vx6953_stm5m0edof_delay_msecs_stdby*/
-		mdelay(vx6953_stm5m0edof_delay_msecs_stdby);
-		rc = vx6953_i2c_write_w_table(&mode_tbl[0],
-			ARRAY_SIZE(mode_tbl));
-		if (rc < 0)
-			return rc;
-		/* Start sensor streaming */
-		if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
-			MODE_SELECT_STREAM) < 0)
-			return rc;
-		mdelay(vx6953_stm5m0edof_delay_msecs_stream);
-		if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
-			return rc;
-		while (frame_cnt == 0xFF) {
+			msleep(5);
+
+			/* Reset everything first */
+			if (vx6953_i2c_write_b_sensor(0x103, 0x01) < 0) {
+				CDBG("S/W reset failed\n");
+				return rc;
+			} else
+				CDBG("S/W reset successful\n");
+
+			msleep(10);
+
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STANDBY_MODE) < 0)
+				return rc;
+			/*vx6953_stm5m0edof_delay_msecs_stdby*/
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+
+			vx6953_csi_params.data_format = CSI_8BIT;
+			vx6953_csi_params.lane_cnt = 1;
+			vx6953_csi_params.lane_assign = 0xe4;
+			vx6953_csi_params.dpcm_scheme = 0;
+			vx6953_csi_params.settle_cnt = 7;
+			rc = msm_camio_csi_config(&vx6953_csi_params);
+			if (rc < 0)
+				CDBG(" config csi controller failed \n");
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			vx6953_patch_for_cut2();
+			rc = vx6953_i2c_write_w_table(&init_mode_tbl[0],
+				ARRAY_SIZE(init_mode_tbl));
+			if (rc < 0)
+				return rc;
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			rc = vx6953_i2c_write_w_table(&mode_tbl[0],
+				ARRAY_SIZE(mode_tbl));
+			if (rc < 0)
+				return rc;
+
+			msleep(vx6953_stm5m0edof_delay_msecs_stdby);
+
+			/* Start sensor streaming */
+			if (vx6953_i2c_write_b_sensor(REG_MODE_SELECT,
+				MODE_SELECT_STREAM) < 0)
+				return rc;
+			msleep(vx6953_stm5m0edof_delay_msecs_stream);
+
 			if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
 				return rc;
+
+			while (frame_cnt == 0xFF) {
+				if (vx6953_i2c_read(0x0005, &frame_cnt, 1) < 0)
+					return rc;
 				CDBG("frame_cnt=%d", frame_cnt);
+				msleep(10);
 			}
 		}
 		return rc;
 	default:
 		return rc;
 	}
-
+	}
 	return rc;
 }
 
@@ -1347,13 +2921,13 @@ static int32_t vx6953_video_config(int mode)
 		if (vx6953_ctrl->prev_res == QTR_SIZE) {
 			rt = RES_PREVIEW;
 			vx6953_stm5m0edof_delay_msecs_stdby	=
-				((2 * 1000 * Q8 * vx6953_ctrl->fps_divider) /
-				vx6953_ctrl->fps) + 1;
+				((((2 * 1000 * vx6953_ctrl->fps_divider) /
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		} else {
 			rt = RES_CAPTURE;
 			vx6953_stm5m0edof_delay_msecs_stdby	=
-				((1000 * Q8 * vx6953_ctrl->fps_divider) /
-				vx6953_ctrl->fps) + 1;
+				((((1000 * vx6953_ctrl->fps_divider) /
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		}
 		if (vx6953_sensor_setting(UPDATE_PERIODIC, rt) < 0)
 			return rc;
@@ -1380,17 +2954,17 @@ static int32_t vx6953_snapshot_config(int mode)
 		if (vx6953_ctrl->pict_res == QTR_SIZE) {
 			rt = RES_PREVIEW;
 			vx6953_stm5m0edof_delay_msecs_stdby =
-				((2 * 1000 * Q8 * vx6953_ctrl->fps_divider)/
-				vx6953_ctrl->fps) + 1;
+				((((2 * 1000 * vx6953_ctrl->fps_divider) /
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		} else {
 			rt = RES_CAPTURE;
 			vx6953_stm5m0edof_delay_msecs_stdby =
-				((1000 * Q8 * vx6953_ctrl->fps_divider)/
-				vx6953_ctrl->fps) + 1;
+				((((1000 * vx6953_ctrl->fps_divider) /
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		}
 	if (vx6953_sensor_setting(UPDATE_PERIODIC, rt) < 0)
 		return rc;
-}
+	}
 
 	vx6953_ctrl->edof_mode = VX6953_EDOF_APPLICATION;
 	if (vx6953_enable_edof(vx6953_ctrl->edof_mode) < 0)
@@ -1409,14 +2983,13 @@ static int32_t vx6953_raw_snapshot_config(int mode)
 		if (vx6953_ctrl->pict_res == QTR_SIZE) {
 			rt = RES_PREVIEW;
 			vx6953_stm5m0edof_delay_msecs_stdby =
-				((2 * 1000 * Q8 *
-				vx6953_ctrl->fps_divider) /
-				vx6953_ctrl->fps) + 1;
+				((((2 * 1000 * vx6953_ctrl->fps_divider)/
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		} else {
 			rt = RES_CAPTURE;
 			vx6953_stm5m0edof_delay_msecs_stdby =
-				((1000 * Q8 * vx6953_ctrl->fps_divider)/
-				vx6953_ctrl->fps) + 1;
+				((((1000 * vx6953_ctrl->fps_divider)/
+				vx6953_ctrl->fps) * Q8) / Q10) + 1;
 		}
 		if (vx6953_sensor_setting(UPDATE_PERIODIC, rt) < 0)
 			return rc;
