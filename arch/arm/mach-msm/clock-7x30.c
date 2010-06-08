@@ -31,7 +31,6 @@
 
 #include "clock.h"
 #include "clock-7x30.h"
-#include "clock-pcom.h"
 #include "proc_comm.h"
 
 enum {
@@ -1258,7 +1257,6 @@ static struct clk_ops clk_ops_7x30 = {
 	.enable = soc_clk_enable,
 	.disable = soc_clk_disable,
 	.auto_off = soc_clk_auto_off,
-	.reset = pc_clk_reset,
 	.set_rate = soc_clk_set_rate,
 	.set_min_rate = soc_clk_set_min_rate,
 	.set_max_rate = soc_clk_set_max_rate,

@@ -107,7 +107,15 @@ EXPORT_SYMBOL(clk_disable);
 
 int clk_reset(struct clk *clk, enum clk_reset_action action)
 {
-	return clk->ops->reset(clk->remote_id, action);
+	int ret = -EPERM;
+
+	/* Try clk->ops->reset() and fallback to a remote reset if it fails. */
+	if (clk->ops->reset != NULL)
+		ret = clk->ops->reset(clk->id, action);
+	if (ret == -EPERM && clk_ops_remote.reset != NULL)
+		ret = clk_ops_remote.reset(clk->remote_id, action);
+
+	return ret;
 }
 EXPORT_SYMBOL(clk_reset);
 
