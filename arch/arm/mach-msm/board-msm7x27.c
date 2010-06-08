@@ -316,17 +316,9 @@ static int hsusb_rpc_connect(int connect)
 }
 #endif
 
-#if defined(CONFIG_USB_MSM_OTG_72K) || defined(CONFIG_USB_EHCI_MSM)
-static int msm_hsusb_rpc_phy_reset(void __iomem *addr)
-{
-	return msm_hsusb_phy_reset();
-}
-#endif
-
 #ifdef CONFIG_USB_MSM_OTG_72K
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
-	.phy_reset	= msm_hsusb_rpc_phy_reset,
 	.pmic_notif_init         = msm_pm_app_rpc_init,
 	.pmic_notif_deinit       = msm_pm_app_rpc_deinit,
 	.pmic_register_vbus_sn   = msm_pm_app_register_vbus_sn,
@@ -1379,7 +1371,6 @@ static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 
 static struct msm_usb_host_platform_data msm_usb_host_pdata = {
 	.phy_info       = (USB_PHY_INTEGRATED | USB_PHY_MODEL_65NM),
-	.phy_reset = msm_hsusb_rpc_phy_reset,
 	.vbus_power = msm_hsusb_vbus_power,
 };
 static void __init msm7x2x_init_host(void)
@@ -1746,6 +1737,21 @@ static void __init msm_device_i2c_init(void)
 	msm_device_i2c.dev.platform_data = &msm_i2c_pdata;
 }
 
+static void usb_mpp_init(void)
+{
+	unsigned rc;
+	unsigned mpp_usb = 7;
+
+	if (machine_is_msm7x25_ffa() || machine_is_msm7x27_ffa()) {
+		rc = mpp_config_digital_out(mpp_usb,
+			MPP_CFG(MPP_DLOGIC_LVL_VDD,
+				MPP_DLOGIC_OUT_CTRL_HIGH));
+		if (rc)
+			pr_err("%s: configuring mpp pin"
+				"to enable 3.3V LDO failed\n", __func__);
+	}
+}
+
 static void __init msm7x2x_init(void)
 {
 	if (socinfo_init() < 0)
@@ -1797,6 +1803,7 @@ static void __init msm7x2x_init(void)
 	kgsl_pdata.grp3d_clk_name = "grp_clk";
 	kgsl_pdata.grp2d_clk_name = NULL;
 #endif
+	usb_mpp_init();
 
 #ifdef CONFIG_USB_FUNCTION
 	msm_hsusb_pdata.swfi_latency =

@@ -2199,13 +2199,6 @@ static int hsusb_rpc_connect(int connect)
 }
 #endif
 
-#if defined(CONFIG_USB_MSM_OTG_72K) || defined(CONFIG_USB_EHCI_MSM)
-static int msm_hsusb_rpc_phy_reset(void __iomem *addr)
-{
-	return msm_hsusb_phy_reset();
-}
-#endif
-
 #ifdef CONFIG_USB_MSM_OTG_72K
 #ifndef CONFIG_USB_EHCI_MSM
 static int ldo_on;
@@ -2243,7 +2236,6 @@ static void msm_pmic_notify_deinit(void)
 #endif
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
-	.phy_reset	= msm_hsusb_rpc_phy_reset,
 
 #ifndef CONFIG_USB_EHCI_MSM
 	/* vbus notification through pmic call backs */
@@ -2297,7 +2289,6 @@ static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 
 static struct msm_usb_host_platform_data msm_usb_host_pdata = {
 	.phy_info   = (USB_PHY_INTEGRATED | USB_PHY_MODEL_45NM),
-	.phy_reset  = msm_hsusb_rpc_phy_reset,
 	.vbus_power = msm_hsusb_vbus_power,
 	.power_budget   = 180,
 };
