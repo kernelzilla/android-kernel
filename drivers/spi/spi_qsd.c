@@ -322,6 +322,8 @@ static irqreturn_t msm_spi_output_irq(int irq, void *dev_id);
 static irqreturn_t msm_spi_error_irq(int irq, void *dev_id);
 static inline int msm_spi_set_state(struct msm_spi *dd,
 				    enum msm_spi_state state);
+static void msm_spi_write_word_to_fifo(struct msm_spi *dd);
+static inline void msm_spi_write_rmn_to_fifo(struct msm_spi *dd);
 
 #if defined(CONFIG_SPI_QSD) || defined(CONFIG_SPI_QSD_MODULE)
 /* Interrupt Handling */
@@ -400,6 +402,11 @@ static inline void msm_spi_ack_clk_err(struct msm_spi *dd) {}
 static inline void msm_spi_set_qup_config(struct msm_spi *dd, int bpw) {}
 
 static inline int msm_spi_prepare_for_write(struct msm_spi *dd) { return 0; }
+static inline void msm_spi_start_write(struct msm_spi *dd, u32 read_count)
+{
+	msm_spi_write_word_to_fifo(dd);
+}
+static inline void msm_spi_set_write_count(struct msm_spi *dd, int val) {}
 
 #elif defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
 
@@ -538,6 +545,20 @@ static inline int msm_spi_prepare_for_write(struct msm_spi *dd)
 		return -1;
 	return 0;
 }
+
+static inline void msm_spi_start_write(struct msm_spi *dd, u32 read_count)
+{
+	if (read_count <= dd->input_fifo_size)
+		msm_spi_write_rmn_to_fifo(dd);
+	else
+		msm_spi_write_word_to_fifo(dd);
+}
+
+static inline void msm_spi_set_write_count(struct msm_spi *dd, int val)
+{
+	writel(val, dd->base + QUP_MX_WRITE_COUNT);
+}
+
 #endif
 
 static void msm_spi_clock_set(struct msm_spi *dd, int speed)
@@ -922,10 +943,20 @@ static void msm_spi_write_word_to_fifo(struct msm_spi *dd)
 	writel(word, dd->base + SPI_OUTPUT_FIFO);
 }
 
+static inline void msm_spi_write_rmn_to_fifo(struct msm_spi *dd)
+{
+	int count = 0;
+
+	while ((dd->tx_bytes_remaining > 0) && (count < dd->input_fifo_size) &&
+	       !(readl(dd->base + SPI_OPERATIONAL) & SPI_OP_OUTPUT_FIFO_FULL)) {
+		msm_spi_write_word_to_fifo(dd);
+		count++;
+	}
+}
+
 static irqreturn_t msm_spi_output_irq(int irq, void *dev_id)
 {
 	struct msm_spi	       *dd = dev_id;
-	int                     count = 0;
 
 	dd->stat_tx++;
 
@@ -944,18 +975,9 @@ static irqreturn_t msm_spi_output_irq(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	if (dd->mode == SPI_FIFO_MODE) {
-		/* Output FIFO is empty. Transmit any outstanding write data. */
-		/* There could be one word in input FIFO, so don't send more  */
-		/* than input_fifo_size - 1 more words.                       */
-		while ((dd->tx_bytes_remaining > 0) &&
-		       (count < dd->input_fifo_size - 1) &&
-		       !(readl(dd->base + SPI_OPERATIONAL)
-			 & SPI_OP_OUTPUT_FIFO_FULL)) {
-			msm_spi_write_word_to_fifo(dd);
-			count++;
-		}
-	}
+	/* Output FIFO is empty. Transmit any outstanding write data. */
+	if (dd->mode == SPI_FIFO_MODE)
+		msm_spi_write_rmn_to_fifo(dd);
 
 	return IRQ_HANDLED;
 }
@@ -1087,10 +1109,13 @@ static void msm_spi_process_transfer(struct msm_spi *dd)
 		   larger than fifo size READ COUNT must be disabled.
 		   For those transactions we usually move to Data Mover mode.
 		*/
-		if (read_count <= dd->input_fifo_size)
+		if (read_count <= dd->input_fifo_size) {
 			writel(read_count, dd->base + SPI_MX_READ_COUNT);
-		else
+			msm_spi_set_write_count(dd, read_count);
+		} else {
 			writel(0, dd->base + SPI_MX_READ_COUNT);
+			msm_spi_set_write_count(dd, 0);
+		}
 	} else
 		dd->mode = SPI_DMOV_MODE;
 
@@ -1133,7 +1158,7 @@ static void msm_spi_process_transfer(struct msm_spi *dd)
 	else if (dd->mode == SPI_FIFO_MODE) {
 		if (msm_spi_prepare_for_write(dd))
 			goto transfer_end;
-		msm_spi_write_word_to_fifo(dd);
+		msm_spi_start_write(dd, read_count);
 	}
 
 	/* Only enter the RUN state after the first word is written into
