@@ -240,7 +240,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 		return;
 	}
 
-	skb_reserve(skb_mux, NET_IP_ALIGN);
+	skb_reserve(skb_mux, NET_IP_ALIGN + len);
 	ptr = skb_put(skb_mux, sz);
 
 	/* half second wakelock is fine? */
@@ -324,6 +324,7 @@ static int sdio_mux_write_cmd(void *data, uint32_t len)
 static void sdio_mux_write_data(struct work_struct *work)
 {
 	int i, rc, reschedule = 0;
+	struct sk_buff *skb;
 
 	for (i = 0; i < 8; i++) {
 		mutex_lock(&sdio_ch[i].lock);
@@ -333,9 +334,9 @@ static void sdio_mux_write_data(struct work_struct *work)
 			if (rc == -EAGAIN) {
 				reschedule = 1;
 			} else if (!rc) {
-				sdio_ch[i].write_done(sdio_ch[i].priv,
-						      sdio_ch[i].skb);
+				skb = sdio_ch[i].skb;
 				sdio_ch[i].skb = NULL;
+				sdio_ch[i].write_done(sdio_ch[i].priv, skb);
 			}
 		}
 		mutex_unlock(&sdio_ch[i].lock);
