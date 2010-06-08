@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This code is based in part on arch/arm/mach-msm/qdsp5/audio_mp3.c
  *
@@ -845,9 +845,12 @@ struct miscdevice audio_voicememo_misc = {
 	.fops	= &audio_fops,
 };
 
-static int __init audio_voicememo_init(void)
+static int audio_voicememo_probe(struct platform_device *pdev)
 {
 	int rc;
+
+	if (pdev->id != (SND_VERS_COMP & RPC_VERSION_MAJOR_MASK))
+		return -EINVAL;
 
 	mutex_init(&the_audio_voicememo.lock);
 	mutex_init(&the_audio_voicememo.read_lock);
@@ -914,6 +917,23 @@ static void __exit audio_voicememo_exit(void)
 			the_audio_voicememo.phys);
 	the_audio_voicememo.rec_buf_ptr = NULL;
 	misc_deregister(&audio_voicememo_misc);
+}
+
+static char audio_voicememo_rpc_name[] = "rs00000000";
+
+static struct platform_driver audio_voicememo_driver = {
+	.probe = audio_voicememo_probe,
+	.driver = {
+		.owner = THIS_MODULE,
+	},
+ };
+
+static int __init audio_voicememo_init(void)
+{
+	snprintf(audio_voicememo_rpc_name, sizeof(audio_voicememo_rpc_name),
+			"rs%08x", SND_PROG);
+	audio_voicememo_driver.driver.name = audio_voicememo_rpc_name;
+	return platform_driver_register(&audio_voicememo_driver);
 }
 
 module_init(audio_voicememo_init);
