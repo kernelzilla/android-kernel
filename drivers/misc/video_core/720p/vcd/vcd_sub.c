@@ -2201,13 +2201,18 @@ u32 vcd_handle_frame_done(
 	}
 
 	if (status != VCD_ERR_INTRLCD_FIELD_DROP) {
+		if (p_op_frm->vcd_frm.n_flags & VCD_FRAME_FLAG_DECODEONLY) {
+			VCD_MSG_LOW("\n[VCD] Not coded OP frame!");
+			rc = vcd_return_op_buffer_to_hw(p_cctxt,
+				&p_op_frm->vcd_frm, NULL);
+		} else
 		p_cctxt->callback(event,
 				  status,
 				  &p_op_frm->vcd_frm,
 				  sizeof(struct vcd_frame_data_type),
 				  p_cctxt, p_cctxt->p_client_data);
 	}
-	return VCD_S_SUCCESS;
+	return rc;
 }
 
 void vcd_handle_frame_done_in_eos(
@@ -3263,5 +3268,81 @@ u32 vcd_handle_ind_output_reconfig_in_flushing(
 		p_payload = NULL;
 	}
 	rc = vcd_handle_ind_output_reconfig(p_cctxt, p_payload, status);
+	return rc;
+}
+
+u32 vcd_return_op_buffer_to_hw(struct vcd_clnt_ctxt_type_t *p_cctxt,
+     struct vcd_frame_data_type *p_buffer,
+     u32 *b_handled)
+{
+	u32 rc = VCD_S_SUCCESS;
+	struct vcd_buffer_entry_type *p_buf_entry;
+	struct vcd_frame_data_type *p_frm_entry;
+	u32 b_q_result = TRUE;
+
+	VCD_MSG_LOW("vcd_return_op_buffer_to_hw in %d:",
+		    p_cctxt->clnt_state.e_state);
+
+	p_buf_entry = vcd_check_fill_output_buffer(p_cctxt, p_buffer);
+	if (!p_buf_entry)
+		return VCD_ERR_BAD_POINTER;
+
+	if (!p_cctxt->status.b_first_op_frame_recvd && b_handled) {
+		rc = vcd_handle_first_fill_output_buffer(p_cctxt, p_buffer,
+			b_handled);
+		if (VCD_FAILED(rc))
+			VCD_MSG_ERROR(
+			"rc = 0x%x. vcd_handle_first_fill_output_buffer", rc);
+		else
+			p_cctxt->status.b_first_op_frame_recvd = TRUE;
+
+		if (*b_handled)
+			return rc;
+	}
+
+	b_q_result =
+	    vcd_buffer_pool_entry_en_q(&p_cctxt->out_buf_pool, p_buf_entry);
+	if (!b_q_result && !p_cctxt->b_decoding) {
+		VCD_MSG_ERROR("Failed: vcd_buffer_pool_entry_en_q");
+
+		return VCD_ERR_FAIL;
+	}
+
+	p_frm_entry = &p_buf_entry->frame;
+	*p_frm_entry = *p_buffer;
+	p_frm_entry->p_physical = p_buf_entry->p_physical;
+	p_frm_entry->n_ip_frm_tag = VCD_FRAMETAG_INVALID;
+	p_frm_entry->n_intrlcd_ip_frm_tag = VCD_FRAMETAG_INVALID;
+	p_frm_entry->n_data_len = 0;
+
+	if (p_cctxt->b_decoding) {
+		struct vcd_property_hdr_type Prop_hdr;
+		struct ddl_frame_data_type_tag ddl_frm;
+		Prop_hdr.prop_id = DDL_I_DPB_RELEASE;
+		Prop_hdr.n_size =
+			sizeof(struct ddl_frame_data_type_tag);
+		memset(&ddl_frm, 0, sizeof(ddl_frm));
+		ddl_frm.vcd_frm = *p_frm_entry;
+		rc = ddl_set_property(p_cctxt->ddl_handle, &Prop_hdr,
+				      &ddl_frm);
+		if (VCD_FAILED(rc)) {
+			VCD_MSG_ERROR("Error returning output buffer to"
+					" HW. rc = 0x%x", rc);
+			p_buf_entry->b_in_use = FALSE;
+		} else {
+			p_cctxt->out_buf_pool.n_in_use++;
+			p_buf_entry->b_in_use = TRUE;
+		}
+	}
+
+	if (p_cctxt->b_sched_clnt_valid && !VCD_FAILED(rc)) {
+		rc = vcd_map_sched_status(sched_update_client_o_tkn
+					  (p_cctxt->p_dev_ctxt->
+					   sched_hdl,
+					   p_cctxt->sched_clnt_hdl,
+					   TRUE,
+					   p_cctxt->
+					   n_sched_o_tkn_per_ip_frm));
+	}
 	return rc;
 }

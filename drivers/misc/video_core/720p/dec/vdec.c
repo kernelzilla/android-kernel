@@ -422,8 +422,8 @@ static u32 vid_dec_set_codec(struct video_client_ctx *client_ctx,
 	case VDEC_CODECTYPE_H264:
 		codec_type.e_codec = VCD_CODEC_H264;
 		break;
-	case VDEC_CODECTYPE_DIVX_3:
-		codec_type.e_codec = VCD_CODEC_DIVX_3;
+	case VDEC_CODECTYPE_DIVX_5:
+		codec_type.e_codec = VCD_CODEC_DIVX_5;
 		break;
 	case VDEC_CODECTYPE_XVID:
 		codec_type.e_codec = VCD_CODEC_XVID;
