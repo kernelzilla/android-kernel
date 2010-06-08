@@ -83,42 +83,41 @@ static long kgsl_cache_range_op(unsigned long addr, int size,
 	BUG_ON(addr & (KGSL_PAGESIZE - 1));
 	BUG_ON(size & (KGSL_PAGESIZE - 1));
 
-	if (flags & KGSL_CACHE_FLUSH)
+	if (flags & KGSL_MEMFLAGS_CACHE_FLUSH)
 		dmac_flush_range((const void *)addr,
 				(const void *)(addr + size));
 	else
-		if (flags & KGSL_CACHE_CLEAN)
+		if (flags & KGSL_MEMFLAGS_CACHE_CLEAN)
 			dmac_clean_range((const void *)addr,
 					(const void *)(addr + size));
-		else
+		else if (flags & KGSL_MEMFLAGS_CACHE_INV)
 			dmac_inv_range((const void *)addr,
 					(const void *)(addr + size));
 
 #ifdef CONFIG_OUTER_CACHE
 	for (end = addr; end < (addr + size); end += KGSL_PAGESIZE) {
-		pte_t *pte_ptr, pte;
 		unsigned long physaddr;
-		if (flags & KGSL_CACHE_VMALLOC_ADDR)
+		if (flags & KGSL_MEMFLAGS_VMALLOC_MEM)
 			physaddr = vmalloc_to_pfn((void *)end);
 		else
-			if (flags & KGSL_CACHE_USER_ADDR) {
-				pte_ptr = kgsl_get_pte_from_vaddr(end);
-				if (!pte_ptr)
+			if (flags & KGSL_MEMFLAGS_HOSTADDR) {
+				physaddr = kgsl_virtaddr_to_physaddr(end);
+				if (!physaddr) {
+					KGSL_MEM_ERR
+					("Unable to find physaddr for "
+					"address: %x\n", (unsigned int)end);
 					return -EINVAL;
-				pte = *pte_ptr;
-				physaddr = pte_pfn(pte);
-				pte_unmap(pte_ptr);
+				}
 			} else
 				return -EINVAL;
 
-		physaddr <<= PAGE_SHIFT;
-		if (flags & KGSL_CACHE_FLUSH)
+		if (flags & KGSL_MEMFLAGS_CACHE_FLUSH)
 			outer_flush_range(physaddr, physaddr + KGSL_PAGESIZE);
 		else
-			if (flags & KGSL_CACHE_CLEAN)
+			if (flags & KGSL_MEMFLAGS_CACHE_CLEAN)
 				outer_clean_range(physaddr,
 					physaddr + KGSL_PAGESIZE);
-			else
+			else if (flags & KGSL_MEMFLAGS_CACHE_INV)
 				outer_inv_range(physaddr,
 					physaddr + KGSL_PAGESIZE);
 	}
@@ -135,12 +134,12 @@ static long kgsl_clean_cache_all(struct kgsl_file_private *private)
 	kgsl_runpending(&kgsl_driver.g12_device);
 
 	list_for_each_entry(entry, &private->mem_list, list) {
-		if (KGSL_MEMFLAGS_MEM_REQUIRES_FLUSH & entry->memdesc.priv) {
+		if (KGSL_MEMFLAGS_CACHE_MASK & entry->memdesc.priv) {
 			result =
 			    kgsl_cache_range_op((unsigned long)entry->
 						   memdesc.hostptr,
 						   entry->memdesc.size,
-				KGSL_CACHE_CLEAN | KGSL_CACHE_USER_ADDR);
+							entry->memdesc.priv);
 			if (result)
 				goto done;
 		}
@@ -876,7 +875,7 @@ static long kgsl_ioctl_cmdstream_freememontimestamp(struct kgsl_file_private
 	}
 #ifdef CONFIG_MSM_KGSL_MMU
 	if (entry->memdesc.priv & KGSL_MEMFLAGS_VMALLOC_MEM)
-		entry->memdesc.priv &= ~KGSL_MEMFLAGS_MEM_REQUIRES_FLUSH;
+		entry->memdesc.priv &= ~KGSL_MEMFLAGS_CACHE_MASK;
 #endif
 	if (param.device_id == KGSL_DEVICE_YAMATO) {
 		result = kgsl_cmdstream_freememontimestamp(
@@ -1138,20 +1137,21 @@ static long kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_file_private *private,
 			goto error_free_entry;
 		}
 		kgsl_cache_range_op((unsigned int)vmalloc_area, len,
-				KGSL_CACHE_INV | KGSL_CACHE_VMALLOC_ADDR);
+			KGSL_MEMFLAGS_CACHE_INV | KGSL_MEMFLAGS_VMALLOC_MEM);
 
 		result =
 		    kgsl_mmu_map(private->pagetable,
 			(unsigned long)vmalloc_area, len,
 			GSL_PT_PAGE_RV | GSL_PT_PAGE_WV,
-			&entry->memdesc.gpuaddr, KGSL_MEMFLAGS_ALIGN4K);
+			&entry->memdesc.gpuaddr, KGSL_MEMFLAGS_ALIGN4K |
+						KGSL_MEMFLAGS_VMALLOC_MEM);
 		if (result != 0)
 			goto error_free_vmalloc;
 
 		entry->memdesc.pagetable = private->pagetable;
 		entry->memdesc.size = len;
 		entry->memdesc.priv = KGSL_MEMFLAGS_VMALLOC_MEM |
-			    KGSL_MEMFLAGS_MEM_REQUIRES_FLUSH;
+			    KGSL_MEMFLAGS_CACHE_CLEAN;
 		entry->memdesc.physaddr = (unsigned long)vmalloc_area;
 		entry->priv = private;
 		private->vmalloc_size += len;
@@ -1344,9 +1344,10 @@ static long kgsl_ioctl_sharedmem_flush_cache(struct kgsl_file_private *private,
 	}
 	result = kgsl_cache_range_op((unsigned long)entry->memdesc.hostptr,
 					entry->memdesc.size,
-				KGSL_CACHE_CLEAN | KGSL_CACHE_USER_ADDR);
+				KGSL_MEMFLAGS_CACHE_CLEAN |
+				KGSL_MEMFLAGS_HOSTADDR);
 	/* Mark memory as being flushed so we don't flush it again */
-	entry->memdesc.priv &= ~KGSL_MEMFLAGS_MEM_REQUIRES_FLUSH;
+	entry->memdesc.priv &= ~KGSL_MEMFLAGS_CACHE_MASK;
 done:
 	return result;
 }
