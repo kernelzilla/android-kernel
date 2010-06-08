@@ -33,8 +33,7 @@
 #define MAX_MDELAY_US 2000
 #define MIN_MDELAY_US 1000
 
-static struct adie_codec_register adie_codec_tx_regs[] =
-{
+static struct adie_codec_register adie_codec_tx_regs[] = {
 	{ 0x04, 0xc0, 0x8C },
 	{ 0x0D, 0xFF, 0x00 },
 	{ 0x0E, 0xFF, 0x00 },
@@ -56,8 +55,7 @@ static struct adie_codec_register adie_codec_tx_regs[] =
 	{ 0x8A, 0xF0, 0x30 }
 };
 
-static struct adie_codec_register adie_codec_rx_regs[] =
-{
+static struct adie_codec_register adie_codec_rx_regs[] = {
 	{ 0x23, 0xF8, 0x00 },
 	{ 0x24, 0x6F, 0x00 },
 	{ 0x25, 0x7F, 0x00 },
@@ -104,8 +102,7 @@ static struct adie_codec_register adie_codec_rx_regs[] =
 	{ 0x8E, 0xFF, 0x00 }
 };
 
-static struct adie_codec_register adie_codec_lb_regs[] =
-{
+static struct adie_codec_register adie_codec_lb_regs[] = {
 	{ 0x2B, 0x8F, 0x02 },
 	{ 0x2C, 0x8F, 0x02 }
 };
@@ -482,7 +479,8 @@ int adie_codec_setpath(struct adie_codec_path *path_ptr, u32 freq_plan, u32 osr)
 	int rc = 0;
 	u32 i, freq_idx = 0, freq = 0;
 
-	if (path_ptr->curr_stage != ADIE_CODEC_DIGITAL_OFF) {
+	if ((path_ptr->curr_stage != ADIE_CODEC_DIGITAL_OFF) &&
+		(path_ptr->curr_stage != ADIE_CODEC_FLASH_IMAGE)) {
 		rc = -EBUSY;
 		goto error;
 	}
