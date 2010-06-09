@@ -1039,7 +1039,7 @@ int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 	long status = 0;
 	uint32_t ref_ts;
 	unsigned int enableflag = 1;
-	unsigned int cmd[2];
+	unsigned int cmd[4];
 
 	KGSL_DRV_INFO("enter (device=%p,timestamp=%d,timeout=0x%08x)\n",
 			 device, timestamp, msecs);
@@ -1053,13 +1053,15 @@ int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 				timestamp);
 		}
 
-		cmd[0] = pm4_type3_packet(PM4_INTERRUPT, 1);
-		cmd[1] = CP_INT_CNTL__IB1_INT_MASK;
+		cmd[0] = pm4_type3_packet(PM4_WAIT_FOR_IDLE, 1);
+		cmd[1] = 0x00000000;
+		cmd[2] = pm4_type3_packet(PM4_INTERRUPT, 1);
+		cmd[3] = CP_INT_CNTL__IB1_INT_MASK;
 
 		/* Need to flush tlb before submitting commands to GPU */
 		kgsl_setstate(device, device->mmu.tlb_flags);
 		kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_NO_TS_CMP,
-						cmd, 2);
+						cmd, 4);
 		kgsl_sharedmem_writel(&device->memstore,
 			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
 			enableflag);

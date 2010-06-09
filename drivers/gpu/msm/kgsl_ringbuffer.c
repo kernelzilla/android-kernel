@@ -663,9 +663,6 @@ kgsl_ringbuffer_addcmds(struct kgsl_ringbuffer *rb,
 	*ringcmds++ = rb->timestamp;
 
 	if (!(flags & KGSL_CMD_FLAGS_NO_TS_CMP)) {
-		/*  Add idle packet so avoid RBBM errors */
-		*ringcmds++ = pm4_type3_packet(PM4_WAIT_FOR_IDLE, 1);
-		*ringcmds++ = 0x00000000;
 		/* Conditional execution based on memory values */
 		*ringcmds++ = pm4_type3_packet(PM4_COND_EXEC, 4);
 		*ringcmds++ = (rb->device->memstore.gpuaddr +
@@ -674,7 +671,9 @@ kgsl_ringbuffer_addcmds(struct kgsl_ringbuffer *rb,
 			KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts)) >> 2;
 		*ringcmds++ = rb->timestamp;
 		/* # of conditional command DWORDs */
-		*ringcmds++ = 2;
+		*ringcmds++ = 4;
+		*ringcmds++ = pm4_type3_packet(PM4_WAIT_FOR_IDLE, 1);
+		*ringcmds++ = 0x00000000;
 		*ringcmds++ = pm4_type3_packet(PM4_INTERRUPT, 1);
 		*ringcmds++ = CP_INT_CNTL__RB_INT_MASK;
 	}
