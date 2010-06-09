@@ -1279,7 +1279,6 @@ static int kgsl_ioctl_sharedmem_from_pmem(struct kgsl_file_private *private,
 	}
 
 	entry->pmem_file = pmem_file;
-	list_add(&entry->list, &private->mem_list);
 
 	entry->memdesc.pagetable = private->pagetable;
 
@@ -1305,6 +1304,7 @@ static int kgsl_ioctl_sharedmem_from_pmem(struct kgsl_file_private *private,
 		result = -EFAULT;
 		goto error_unmap_entry;
 	}
+	list_add(&entry->list, &private->mem_list);
 	return result;
 
 error_unmap_entry:
