@@ -68,8 +68,7 @@
 #define QUP_CONFIG_SPI_MODE           0x0100
 
 #define GSBI_CTRL_REG                 0x0
-#define GSBI_CTRL_PROTO_CODE          4
-#define GSBI_SPI                      0x3
+#define GSBI_SPI_CONFIG               0x30
 #endif
 
 #define SPI_CONFIG                    QSD_REG(0x0000) QUP_REG(0x0300)
@@ -452,8 +451,8 @@ static inline int msm_spi_request_gsbi(struct msm_spi *dd)
 
 static inline void msm_spi_init_gsbi(struct msm_spi *dd)
 {
-	/* Set GSBI to SPI mode */
-	writel(GSBI_SPI << GSBI_CTRL_PROTO_CODE, dd->gsbi_base + GSBI_CTRL_REG);
+	/* Set GSBI to SPI mode, and CRCI_MUX_CTRL to SPI CRCI ports */
+	writel(GSBI_SPI_CONFIG, dd->gsbi_base + GSBI_CTRL_REG);
 }
 
 /* Figure which irq occured and call the relevant functions */
@@ -1723,26 +1722,25 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 
 	if (pdata && pdata->dma_config) {
 		rc = pdata->dma_config();
-		if (!rc) {
-			resource = platform_get_resource_byname(pdev,
-					IORESOURCE_DMA, "spidm_channels");
-			if (resource) {
-				dd->rx_dma_chan = resource->start;
-				dd->tx_dma_chan = resource->end;
+		if (rc)
+			goto err_probe_res;
+	}
+	resource = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+						"spidm_channels");
+	if (resource) {
+		dd->rx_dma_chan = resource->start;
+		dd->tx_dma_chan = resource->end;
 
-				resource = platform_get_resource_byname(pdev,
-						IORESOURCE_DMA, "spidm_crci");
-				if (!resource) {
-					rc = -ENXIO;
-					goto err_probe_res;
-				}
-				dd->rx_dma_crci = resource->start;
-				dd->tx_dma_crci = resource->end;
-				dd->use_dma = 1;
-				master->dma_alignment =
-					dma_get_cache_alignment();
-			}
+		resource = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+							"spidm_crci");
+		if (!resource) {
+			rc = -ENXIO;
+			goto err_probe_res;
 		}
+		dd->rx_dma_crci = resource->start;
+		dd->tx_dma_crci = resource->end;
+		dd->use_dma = 1;
+		master->dma_alignment = dma_get_cache_alignment();
 	}
 
 	if (pdata && pdata->gpio_config) {
