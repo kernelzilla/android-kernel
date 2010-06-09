@@ -610,6 +610,14 @@ config RTC_SECURE_TIME_SUPPORT
           Say yes here to have additional handle for reading secure time
           maintained by ARM9.
 
+config RTC_ASYNC_MODEM_SUPPORT
+	bool "Support for time update on async modem boot"
+        depends on RTC_DRV_MSM && (ARCH_MSM8X60 || ARCH_QSD8X50)
+	default n
+	help
+	 Say yes here to have the system time updated if there is
+	 an asynchronous MODEM boot.
+
 config RTC_DRV_MSM7X00A
 	tristate "MSM7X00A"
 	depends on ARCH_MSM
