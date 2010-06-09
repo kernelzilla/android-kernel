@@ -588,6 +588,10 @@ msmrtc_probe(struct platform_device *pdev)
 	}
 #endif
 
+#ifdef CONFIG_RTC_ASYNC_MODEM_SUPPORT
+	rtc_hctosys();
+#endif
+
 	return 0;
 
 fail_cb_setup:
