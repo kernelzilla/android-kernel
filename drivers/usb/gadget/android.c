@@ -341,6 +341,10 @@ static int  android_bind(struct usb_composite_dev *cdev)
 	if (gadget->ops->wakeup)
 		android_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
+	if (dev->pdata->self_powered && !usb_gadget_set_selfpowered(gadget)) {
+		android_config_driver.bmAttributes |= USB_CONFIG_ATT_SELFPOWER;
+		android_config_driver.bMaxPower	= 0x32; /* 100 mA */
+	}
 	dev->cdev = cdev;
 	pr_debug("android_bind assigned dev->cdev\n");
 	dev->gadget = gadget;
