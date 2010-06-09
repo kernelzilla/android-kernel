@@ -75,9 +75,6 @@ int kgsl_yamato_setup_pt(struct kgsl_device *device,
 			 struct kgsl_pagetable *pagetable);
 int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
 			   struct kgsl_pagetable *pagetable);
-/* Private memory flags for use with memdesc->priv feild */
-#define KGSL_MEMFLAGS_MEM_REQUIRES_FLUSH    0x00000001
-#define KGSL_MEMFLAGS_VMALLOC_MEM           0x00000002
 
 #define KGSL_GRAPHICS_MEMORY_LOW_WATERMARK  0x1000000
 

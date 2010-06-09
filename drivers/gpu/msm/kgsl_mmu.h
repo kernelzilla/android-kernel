@@ -172,7 +172,7 @@ int kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 int kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 					unsigned int gpuaddr, int range);
 
-pte_t *kgsl_get_pte_from_vaddr(unsigned int virtaddr);
+unsigned int kgsl_virtaddr_to_physaddr(unsigned int virtaddr);
 #else
 static inline int kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 		 unsigned int address,

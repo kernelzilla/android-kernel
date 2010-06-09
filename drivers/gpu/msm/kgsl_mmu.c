@@ -502,11 +502,12 @@ int kgsl_mmu_init(struct kgsl_device *device)
 
 #ifdef CONFIG_MSM_KGSL_MMU
 
-pte_t *kgsl_get_pte_from_vaddr(unsigned int virtaddr)
+unsigned int kgsl_virtaddr_to_physaddr(unsigned int virtaddr)
 {
+	unsigned int physaddr = 0;
 	pgd_t *pgd_ptr = NULL;
 	pmd_t *pmd_ptr = NULL;
-	pte_t *pte_ptr = NULL;
+	pte_t *pte_ptr = NULL, pte;
 
 	pgd_ptr = pgd_offset(current->mm, virtaddr);
 	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
@@ -531,7 +532,11 @@ pte_t *kgsl_get_pte_from_vaddr(unsigned int virtaddr)
 		     "address to physical\n");
 		return 0;
 	}
-	return pte_ptr;
+	pte = *pte_ptr;
+	physaddr = pte_pfn(pte);
+	pte_unmap(pte_ptr);
+	physaddr <<= PAGE_SHIFT;
+	return physaddr;
 }
 
 int
@@ -545,7 +550,6 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	int numpages;
 	unsigned int pte, ptefirst, ptelast, physaddr;
 	int flushtlb, alloc_size;
-	int phys_contiguous = flags & KGSL_MEMFLAGS_CONPHYS;
 	unsigned int align = flags & KGSL_MEMFLAGS_ALIGN_MASK;
 
 	KGSL_MEM_VDBG("enter (pt=%p, physaddr=%08x, range=%08d, gpuaddr=%p)\n",
@@ -613,18 +617,21 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 			if (GSL_TLBFLUSH_FILTER_ISDIRTY(pte / GSL_PT_SUPER_PTE))
 				flushtlb = 1;
 		/* mark pte as in use */
-		if (phys_contiguous)
+		if (flags & KGSL_MEMFLAGS_CONPHYS)
 			physaddr = address;
-		else {
+		else if (flags & KGSL_MEMFLAGS_VMALLOC_MEM) {
 			physaddr = vmalloc_to_pfn((void *)address);
 			physaddr <<= PAGE_SHIFT;
-		}
+		} else if (flags & KGSL_MEMFLAGS_HOSTADDR)
+			physaddr = kgsl_virtaddr_to_physaddr(address);
+		else
+			physaddr = 0;
 
 		if (physaddr) {
 			kgsl_pt_map_set(pagetable, pte, physaddr | protflags);
 		} else {
 			KGSL_MEM_ERR
-			("Unable to find physaddr for vmallloc address: %x\n",
+			("Unable to find physaddr for address: %x\n",
 			     address);
 			kgsl_mmu_unmap(pagetable, *gpuaddr, range);
 			return -EFAULT;
