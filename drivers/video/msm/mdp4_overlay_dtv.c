@@ -202,8 +202,8 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	}
 
 	dtv_underflow_clr |= 0x80000000;	/* enable recovery */
-	hsync_polarity = 0;
-	vsync_polarity = 0;
+	hsync_polarity = fbi->var.yres >= 720 ? 0 : 1;
+	vsync_polarity = fbi->var.yres >= 720 ? 0 : 1;
 	data_en_polarity = 0;
 
 	ctrl_polarity =
@@ -224,11 +224,17 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	MDP_OUTP(MDP_BASE + DTV_BASE + 0x30, active_v_start);
 	MDP_OUTP(MDP_BASE + DTV_BASE + 0x38, active_v_end);
 
+	/* Test pattern 8 x 8 pixel */
+	/* MDP_OUTP(MDP_BASE + DTV_BASE + 0x4C, 0x80000808); */
+
 	ret = panel_next_on(pdev);
 	if (ret == 0) {
 		/* enable DTV block */
 		MDP_OUTP(MDP_BASE + DTV_BASE, 1);
 		mdp_pipe_ctrl(MDP_OVERLAY1_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+		dev_info(&pdev->dev, "mdp4_overlay_dtv: on");
+	} else {
+		dev_warn(&pdev->dev, "mdp4_overlay_dtv: panel_next_on failed");
 	}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
