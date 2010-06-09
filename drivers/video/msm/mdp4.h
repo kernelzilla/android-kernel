@@ -42,7 +42,9 @@ extern struct mdp4_statistic mdp4_stat;
 
 #define MDP4_NONBLOCKING
 
+#ifdef CONFIG_FB_MSM_OVERLAY
 #define MDP4_MDDI_DMA_SWITCH
+#endif
 
 #define MDP4_OVERLAYPROC0_BASE	0x10000
 #define MDP4_OVERLAYPROC1_BASE	0x18000
