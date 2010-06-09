@@ -455,6 +455,7 @@ static int rpcrouter_sdio_remote_probe(struct platform_device *pdev)
 	sdio_remote_xprt.xprt.write_avail = rpcrouter_sdio_remote_write_avail;
 	sdio_remote_xprt.xprt.write = rpcrouter_sdio_remote_write;
 	sdio_remote_xprt.xprt.close = rpcrouter_sdio_remote_close;
+	sdio_remote_xprt.xprt.priv = NULL;
 
 	init_waitqueue_head(&free_buf_wait);
 

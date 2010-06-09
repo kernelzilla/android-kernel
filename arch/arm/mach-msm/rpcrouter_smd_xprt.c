@@ -114,6 +114,7 @@ static int rpcrouter_smd_loopback_probe(struct platform_device *pdev)
 	smd_loopback_xprt.xprt.write_avail = rpcrouter_smd_loopback_write_avail;
 	smd_loopback_xprt.xprt.write = rpcrouter_smd_loopback_write;
 	smd_loopback_xprt.xprt.close = rpcrouter_smd_loopback_close;
+	smd_loopback_xprt.xprt.priv = NULL;
 
 	/* Open up SMD LOOPBACK channel */
 	rc = smd_named_open_on_edge("local_loopback", SMD_LOOPBACK_TYPE,
@@ -147,6 +148,7 @@ static int rpcrouter_smd_remote_probe(struct platform_device *pdev)
 	smd_remote_xprt.xprt.write_avail = rpcrouter_smd_remote_write_avail;
 	smd_remote_xprt.xprt.write = rpcrouter_smd_remote_write;
 	smd_remote_xprt.xprt.close = rpcrouter_smd_remote_close;
+	smd_remote_xprt.xprt.priv = NULL;
 
 	/* Open up SMD channel */
 	rc = smd_open("RPCCALL", &smd_remote_xprt.channel, NULL,
