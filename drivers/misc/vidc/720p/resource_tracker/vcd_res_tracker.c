@@ -129,8 +129,7 @@ static u32 res_trk_disable_pwr_rail(void)
 
 u32 res_trk_enable_clocks(void)
 {
-	VCDRES_MSG_LOW("clk_regime_msm_enable");
-	VCDRES_MSG_HIGH("\n in res_trk_enable_clocks()");
+	VCDRES_MSG_LOW("\n in res_trk_enable_clocks()");
 
 	mutex_lock(&resource_context.lock);
 	if (!resource_context.clock_enabled) {
@@ -203,8 +202,7 @@ static u32 res_trk_get_clk_rate(unsigned long *phclk_rate)
 
 u32 res_trk_disable_clocks(void)
 {
-	VCDRES_MSG_LOW("clk_regime_msm_disable");
-	VCDRES_MSG_HIGH("in res_trk_disable_clocks()\n");
+	VCDRES_MSG_LOW("in res_trk_disable_clocks()\n");
 
 	mutex_lock(&resource_context.lock);
 

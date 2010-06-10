@@ -30,7 +30,6 @@
 #define _VCD_H_
 
 #include "vcd_api.h"
-#include "vid_frame_scheduler_api.h"
 #include "vcd_ddl_api.h"
 #include "vcd_res_tracker_api.h"
 #include "vcd_util.h"
@@ -161,8 +160,6 @@ u32 vcd_handle_recvd_eos
 
 u32 vcd_handle_first_decode_frame(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
-u32 vcd_add_client_to_sched(struct vcd_clnt_ctxt_type_t *p_cctxt);
-
 u32 vcd_handle_input_frame
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
      struct vcd_frame_data_type *p_input_frame);
@@ -198,15 +195,9 @@ u32 vcd_handle_first_fill_output_buffer_for_dec
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
      struct vcd_frame_data_type *p_frm_entry, u32 *p_b_handled);
 
-u32 vcd_requeue_input_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
-	struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_buffer_entry_type
-	*p_buf_entry);
-
 u32 vcd_schedule_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
 	struct vcd_clnt_ctxt_type_t **pp_cctxt, struct vcd_buffer_entry_type
 	**pp_ip_buf_entry);
-
-u32 vcd_map_sched_status(enum sched_status_type e_sched_status);
 
 u32 vcd_submit_command_in_continue
     (struct vcd_dev_ctxt_type *p_dev_ctxt, struct vcd_transc_type *p_transc);
@@ -315,7 +306,6 @@ void vcd_handle_stop_done_in_starting(struct vcd_clnt_ctxt_type_t *p_cctxt,
 void vcd_handle_stop_done_in_invalid(struct vcd_clnt_ctxt_type_t *p_cctxt,
 		u32 status);
 
-
 void vcd_send_flush_done(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 status);
 
 void vcd_process_pending_flush_in_eos(struct vcd_clnt_ctxt_type_t *p_cctxt);
@@ -377,9 +367,38 @@ void vcd_handle_err_in_starting(struct vcd_clnt_ctxt_type_t *p_cctxt,
 void vcd_handle_ind_hw_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt,
 		u32 event, u32 status);
 
-u32 vcd_return_op_buffer_to_hw
-	(struct vcd_clnt_ctxt_type_t *p_cctxt,
-	 struct vcd_frame_data_type *p_buffer,
-	 u32 *b_handled);
+u32 vcd_return_op_buffer_to_hw(struct vcd_clnt_ctxt_type_t *p_cctxt,
+	struct vcd_buffer_entry_type *p_buf_entry);
+
+u32 vcd_sched_create(u32 n_perf_lvl, struct vcd_sched_ctx_type **p_sched_ctx);
+
+void vcd_sched_destroy(struct vcd_sched_ctx_type *p_sched_ctx);
+
+u32 vcd_sched_add_client(struct vcd_clnt_ctxt_type_t *p_cctxt);
+
+u32 vcd_sched_remove_client(struct vcd_sched_ctx_type *p_sched,
+	struct vcd_sched_clnt_ctx_type *p_sched_cctxt);
+
+u32 vcd_sched_update_config(struct vcd_clnt_ctxt_type_t *p_cctxt);
+
+u32 vcd_sched_queue_buffer(
+	struct vcd_sched_clnt_ctx_type *p_sched_cctxt,
+	struct vcd_buffer_entry_type *p_buffer, u32 b_tail);
+
+u32 vcd_sched_dequeue_buffer(
+	struct vcd_sched_clnt_ctx_type *p_sched_cctxt,
+	struct vcd_buffer_entry_type **pp_buffer);
+
+u32 vcd_sched_mark_client_eof(struct vcd_sched_clnt_ctx_type *p_sched_cctxt);
+
+u32 vcd_sched_suspend_resume_clnt(
+	struct vcd_sched_clnt_ctx_type *p_sched_cctxt, u32 b_state);
+
+void vcd_sched_update_tkn_bucket(
+	struct vcd_sched_clnt_ctx_type *p_sched_cctxt, u32 n_actual_time);
+
+u32 vcd_sched_get_client_frame(struct vcd_sched_ctx_type *p_sched,
+	struct vcd_clnt_ctxt_type_t **pp_cctxt,
+	struct vcd_buffer_entry_type **pp_buffer);
 
 #endif

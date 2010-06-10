@@ -30,7 +30,6 @@
 #define _VCD_CORE_H_
 
 #include "vcd_api.h"
-#include "vid_frame_scheduler_api.h"
 #include "vcd_ddl_api.h"
 
 #include "vcd_util.h"
@@ -88,6 +87,7 @@ struct vcd_cmd_q_element_type {
 };
 
 struct vcd_buffer_entry_type {
+	struct list_head sched_list;
 	struct list_head list;
 	u32 b_valid;
 	u8 *p_alloc;
@@ -195,6 +195,25 @@ struct vcd_clnt_status_type {
 	u32	b_close_pending;
 };
 
+struct vcd_sched_clnt_ctx_type {
+	struct list_head list;
+	u32 b_clnt_active;
+	void *p_clnt_data;
+	u32 n_p_tkn_per_frm;
+	u32 n_p_tkn_rate;
+	u32 n_bkt_lst_sup_time;
+	s32 n_bkt_tkns;
+	u32 n_bkt_size;
+	u32 n_o_tkns;
+	struct list_head clnt_frm_list;
+};
+
+struct vcd_sched_ctx_type {
+	u32 n_perf_lvl;
+	u32 n_total_clnt_bw;
+	struct list_head clnt_list;
+};
+
 struct vcd_clnt_ctxt_type_t {
 	u32 n_signature;
 	struct vcd_clnt_state_ctxt_type_t clnt_state;
@@ -216,9 +235,8 @@ struct vcd_clnt_ctxt_type_t {
 			  void *handle, void *const p_client_data);
 	void *p_client_data;
 
-	u32 b_sched_clnt_valid;
-	void *sched_clnt_hdl;
-	u32 n_sched_o_tkn_per_ip_frm;
+	struct vcd_sched_clnt_ctx_type *sched_clnt_hdl;
+
 	u32	b_ddl_hdl_valid;
 	u32 *ddl_handle;
 	struct vcd_dev_ctxt_type *p_dev_ctxt;
