@@ -559,6 +559,10 @@ static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 	switch (PHY_TYPE(pdata->phy_info)) {
 	case USB_PHY_INTEGRATED:
 		msm_hsusb_rpc_connect();
+
+		if (pdata->vbus_init)
+			pdata->vbus_init(1);
+
 		/* VBUS might be present. Turn off vbus */
 		if (pdata->vbus_power)
 			pdata->vbus_power(pdata->phy_info, 0);
@@ -671,6 +675,8 @@ static void msm_xusb_uninit_host(struct msmusb_hcd *mhcd)
 
 	switch (PHY_TYPE(pdata->phy_info)) {
 	case USB_PHY_INTEGRATED:
+		if (pdata->vbus_init)
+			pdata->vbus_init(0);
 		otg_set_host(mhcd->xceiv, NULL);
 		otg_put_transceiver(mhcd->xceiv);
 		cancel_work_sync(&mhcd->otg_work);
