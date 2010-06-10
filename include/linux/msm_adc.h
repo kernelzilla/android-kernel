@@ -46,7 +46,8 @@ struct msm_adc_conversion {
 
 /*
  * Issue a blocking adc conversion request. Once the call returns, the data
- * can be found in the 'result' field of msm_adc_conversion.
+ * can be found in the 'result' field of msm_adc_conversion. This call will
+ * return ENODATA if there is an invalid result returned by the modem driver.
  */
 #define MSM_ADC_REQUEST			_IOWR(MSM_ADC_IOCTL_CODE, 1,	\
 					     struct msm_adc_conversion)
@@ -93,6 +94,8 @@ struct msm_adc_aio_result {
  * should be used before using this command to verify how many pending requests
  * are available for the file descriptor. This call will fail with errno set to
  * ENOMSG if there are no pending messages to be read at the time of the call.
+ * The call will return ENODATA if there is an invalid result returned by the
+ * modem driver.
  */
 #define MSM_ADC_AIO_READ		_IOR(MSM_ADC_IOCTL_CODE, 5,	\
 					     struct msm_adc_aio_result)
