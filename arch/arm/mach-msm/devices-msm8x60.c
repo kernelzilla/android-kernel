@@ -21,6 +21,7 @@
 #include <mach/irqs.h>
 #include <mach/dma.h>
 #include <asm/mach/mmc.h>
+#include <linux/msm_kgsl.h>
 #include "clock.h"
 #include "clock-8x60.h"
 #include "clock-rpm.h"
@@ -197,6 +198,70 @@ static struct resource gsbi9_qup_i2c_resources[] = {
 		.start	= GSBI9_QUP_IRQ,
 		.end	= GSBI9_QUP_IRQ,
 		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct resource kgsl_resources[] = {
+	{
+		.name = "kgsl_reg_memory",
+		.start = 0x04300000, /* GFX3D address */
+		.end = 0x0431ffff,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name   = "kgsl_phys_memory",
+		.start = 0,
+		.end = 0,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name = "kgsl_yamato_irq",
+		.start = GFX3D_IRQ,
+		.end = GFX3D_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "kgsl_g12_reg_memory",
+		.start = 0x04100000, /* Z180 base address */
+		.end = 0x04100FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = "kgsl_g12_irq",
+		.start = GFX2D0_IRQ,
+		.end = GFX2D0_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct kgsl_platform_data kgsl_pdata = {
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
+	/* NPA Flow IDs */
+	.high_axi_3d = MSM_AXI_FLOW_3D_GPU_HIGH,
+	.high_axi_2d = MSM_AXI_FLOW_2D_GPU_HIGH,
+#else
+	/* AXI rates in KHz */
+	.high_axi_3d = 200000,
+	.high_axi_2d = 160000,
+#endif
+	.max_grp2d_freq = 160*1000*1000,
+	.min_grp2d_freq = 160*1000*1000,
+	.set_grp2d_async = NULL, /* HW workaround, run Z180 SYNC @ 192 MHZ */
+	.max_grp3d_freq = 250 * 1000*1000,
+	.min_grp3d_freq = 200 * 1000*1000,
+	.set_grp3d_async = NULL,
+	.imem_clk_name = NULL,
+	.grp3d_clk_name = "gfx3d_clk",
+	.grp2d_clk_name = "gfx2d_clk",
+};
+
+struct platform_device msm_device_kgsl = {
+	.name = "kgsl",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(kgsl_resources),
+	.resource = kgsl_resources,
+	.dev = {
+		.platform_data = &kgsl_pdata,
 	},
 };
 

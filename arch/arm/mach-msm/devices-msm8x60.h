@@ -43,5 +43,5 @@ extern struct platform_device msm_gsbi1_qup_spi_device;
 #endif
 
 extern struct platform_device msm_device_smd;
-
+extern struct platform_device msm_device_kgsl;
 #endif

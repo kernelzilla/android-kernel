@@ -325,7 +325,8 @@ static struct platform_device msm_batt_device = {
 #endif
 
 #define MSM_FB_SIZE 0x500000;
-#define MSM_PMEM_SF_SIZE 0x1000000;
+#define MSM_PMEM_SF_SIZE 0x1700000;
+#define MSM_GPU_PHYS_SIZE       SZ_2M
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
 static void __init pmem_sf_size_setup(char **p)
 {
@@ -339,6 +340,13 @@ static void __init fb_size_setup(char **p)
 	fb_size = memparse(*p, p);
 }
 __early_param("fb_size=", fb_size_setup);
+
+static unsigned gpu_phys_size = MSM_GPU_PHYS_SIZE;
+static void __init gpu_phys_size_setup(char **p)
+{
+	gpu_phys_size = memparse(*p, p);
+}
+__early_param("gpu_phys_size=", gpu_phys_size_setup);
 
 static struct resource msm_fb_resources[] = {
 	{
@@ -408,6 +416,16 @@ static void __init msm8x60_allocate_memory_regions(void)
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
 		size, addr, __pa(addr));
+
+	size = gpu_phys_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		msm_device_kgsl.resource[1].start = __pa(addr);
+		msm_device_kgsl.resource[1].end =
+			msm_device_kgsl.resource[1].start + size - 1;
+		pr_info("allocating %lu bytes at %p (%lx physical) for "
+		"KGSL\n", size, addr, __pa(addr));
+	}
 }
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -532,6 +550,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&android_pmem_device,
 #endif
 	&msm_fb_device,
+	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
 };
 
@@ -573,6 +592,7 @@ static struct platform_device *surf_devices[] __initdata = {
 	&android_pmem_device,
 #endif
 	&msm_fb_device,
+	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
 };
 
