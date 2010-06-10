@@ -1530,7 +1530,7 @@ static const struct reg_init {
 	{REG(LPA_CORE_CLK_MA2), B(0), B(0)},
 	{REG(0x02EC), 0xF, 0xD}, /* MI2S_CODEC_RX_S div = div-8. */
 	{REG(0x02F0), 0xF, 0xD}, /* MI2S_CODEC_TX_S div = div-8. */
-	{REG(0x02E4), 0xF, 0x3}, /* MI2S_S div = div-4. */
+	{REG(0x02E4), 0xF, 0x7}, /* MI2S_S div = div-8. */
 	{REG(MDC_NS), 0x3, 0x3}, /* MDC src = external MDH src. */
 	{REG(SDAC_NS), BM(15, 14), 0x0}, /* SDAC div = div-1. */
 	/* Disable sources TCXO/5 & TCXO/6. UART1 src = TCXO*/
