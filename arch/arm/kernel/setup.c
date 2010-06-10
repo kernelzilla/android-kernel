@@ -470,6 +470,34 @@ static void __init early_mem_reserved(char **p)
 	}
 }
 __early_param("mem_reserved=", early_mem_reserved);
+
+static void __init early_mem_low_power(char **p)
+{
+	unsigned int start;
+	unsigned int size;
+	unsigned int end;
+	unsigned int h_end;
+
+	start = PHYS_OFFSET;
+	size  = memparse(*p, p);
+	if (**p == '@')
+		start = memparse(*p + 1, p);
+
+	if (low_power_memory_start) {
+		end = start + size;
+		h_end = low_power_memory_start + low_power_memory_size;
+		end = max(end, h_end);
+		low_power_memory_start = min(low_power_memory_start,
+			(unsigned long)start);
+		low_power_memory_size = end - low_power_memory_start;
+	} else {
+		low_power_memory_start = start;
+		low_power_memory_size = size;
+	}
+
+	arm_add_memory(start, size);
+}
+__early_param("mem_low_power=", early_mem_low_power);
 #endif
 
 /*
@@ -633,6 +661,35 @@ static int __init parse_tag_mem32_reserved(const struct tag *tag)
 }
 
 __tagtable(ATAG_MEM_RESERVED, parse_tag_mem32_reserved);
+
+static int __init parse_tag_mem32_low_power(const struct tag *tag)
+{
+	unsigned int start;
+	unsigned int size;
+	unsigned int end;
+	unsigned int h_end;
+
+	start = tag->u.mem.start;
+	size = tag->u.mem.size;
+
+	if (low_power_memory_start) {
+		end = start + size;
+		h_end = low_power_memory_start + low_power_memory_size;
+		end = max(end, h_end);
+		low_power_memory_start = min(low_power_memory_start,
+			(unsigned long)start);
+		low_power_memory_size = end - low_power_memory_start;
+	} else {
+		low_power_memory_start = tag->u.mem.start;
+		low_power_memory_size = tag->u.mem.size;
+	}
+	printk(KERN_ALERT "low power memory %lx at %lx\n",
+		low_power_memory_size, low_power_memory_start);
+
+	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
+}
+
+__tagtable(ATAG_MEM_LOW_POWER, parse_tag_mem32_low_power);
 #endif
 
 #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)

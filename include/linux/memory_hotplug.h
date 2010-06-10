@@ -11,6 +11,7 @@ struct pglist_data;
 struct mem_section;
 
 extern unsigned long movable_reserved_start, movable_reserved_size;
+extern unsigned long low_power_memory_start, low_power_memory_size;
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 
@@ -223,3 +224,5 @@ extern int physical_remove_memory(u64 start, u64 size);
 extern int arch_physical_remove_memory(u64 start, u64 size);
 extern int physical_low_power_memory(u64 start, u64 size);
 extern int arch_physical_low_power_memory(u64 start, u64 size);
+extern int physical_active_memory(u64 start, u64 size);
+extern int arch_physical_active_memory(u64 start, u64 size);

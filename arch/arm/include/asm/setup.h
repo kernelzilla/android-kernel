@@ -41,6 +41,9 @@ struct tag_core {
 /* these indicate places where hotpluggable memory is present */
 /* which are not active during boot */
 #define ATAG_MEM_RESERVED	0x5441000A
+/* it is allowed to have multiple ATAG_MEM_LOW_POWER nodes */
+/* these indicate memory which can be put in a low power state */
+#define ATAG_MEM_LOW_POWER	0x5441000B
 
 struct tag_mem32 {
 	__u32	size;
