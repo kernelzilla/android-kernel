@@ -2181,12 +2181,6 @@ static struct msm_spi_platform_data qsd_spi_pdata = {
 
 static void __init msm_qsd_spi_init(void)
 {
-	if (machine_is_msm7x30_fluid()) {
-		qsd_spi_pdata.rsl_id = "D:SPI_MP_00";
-		qsd_spi_pdata.pm_lat =
-		msm_pm_data[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN]
-		.latency;
-	}
 	qsd_device_spi.dev.platform_data = &qsd_spi_pdata;
 }
 
