@@ -958,6 +958,42 @@ config MSM_MEMORY_LOW_POWER_MODE
 	  which low power mode.
 
 choice
+	prompt "Default Memory Low Power Mode during Idle"
+	depends on MSM_MEMORY_LOW_POWER_MODE
+	default MSM_MEMORY_LOW_POWER_MODE_IDLE_ACTIVE
+	help
+	  Selects the default low power mode of the memory during idle
+	  sleep.
+
+	config MSM_MEMORY_LOW_POWER_MODE_IDLE_ACTIVE
+		bool "Memory active"
+
+	config MSM_MEMORY_LOW_POWER_MODE_IDLE_RETENTION
+		bool "Memory in retention"
+
+	config MSM_MEMORY_LOW_POWER_MODE_IDLE_DEEP_POWER_DOWN
+		bool "Memory in deep power down"
+endchoice
+
+choice
+	prompt "Default Memory Low Power Mode during Suspend"
+	depends on MSM_MEMORY_LOW_POWER_MODE
+	default MSM_MEMORY_LOW_POWER_MODE_SUSPEND_ACTIVE
+	help
+	  Selects the default low power mode of the memory during suspend
+	  sleep.
+
+	config MSM_MEMORY_LOW_POWER_MODE_SUSPEND_ACTIVE
+		bool "Memory active"
+
+	config MSM_MEMORY_LOW_POWER_MODE_SUSPEND_RETENTION
+		bool "Memory in retention"
+
+	config MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN
+		bool "Memory in deep power down"
+endchoice
+
+choice
 	prompt "Power management timeout action"
 	default MSM_PM_TIMEOUT_HALT
 	help

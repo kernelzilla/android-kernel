@@ -351,8 +351,16 @@ void __init msm_pm_set_platform_data(struct msm_pm_platform_data *data)
  *****************************************************************************/
 enum {
 	SLEEP_LIMIT_NONE = 0,
-	SLEEP_LIMIT_NO_TCXO_SHUTDOWN = 2
+	SLEEP_LIMIT_NO_TCXO_SHUTDOWN = 2,
+	SLEEP_LIMIT_MASK = 0x03,
 };
+
+#ifdef CONFIG_MSM_MEMORY_LOW_POWER_MODE
+enum {
+	SLEEP_RESOURCE_MEMORY_BIT0 = 0x0200,
+	SLEEP_RESOURCE_MEMORY_BIT1 = 0x0010,
+};
+#endif
 
 
 /******************************************************************************
@@ -746,7 +754,8 @@ static int msm_pm_read_proc
 		}
 
 		SNPRINTF(p, count, "Last power collapse voted ");
-		if (msm_pm_sleep_limit == SLEEP_LIMIT_NONE)
+		if ((msm_pm_sleep_limit & SLEEP_LIMIT_MASK) ==
+			SLEEP_LIMIT_NONE)
 			SNPRINTF(p, count, "for TCXO shutdown\n\n");
 		else
 			SNPRINTF(p, count, "against TCXO shutdown\n\n");
@@ -1437,6 +1446,12 @@ void arch_idle(void)
 		if (!allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE])
 			sleep_limit = SLEEP_LIMIT_NO_TCXO_SHUTDOWN;
 
+#if defined(CONFIG_MSM_MEMORY_LOW_POWER_MODE_IDLE_ACTIVE)
+		sleep_limit |= SLEEP_RESOURCE_MEMORY_BIT1;
+#elif defined(CONFIG_MSM_MEMORY_LOW_POWER_MODE_IDLE_RETENTION)
+		sleep_limit |= SLEEP_RESOURCE_MEMORY_BIT0;
+#endif
+
 		ret = msm_pm_power_collapse(true, sleep_delay, sleep_limit);
 		low_power = (ret != -EBUSY && ret != -ETIMEDOUT);
 
@@ -1597,6 +1612,12 @@ static int msm_pm_enter(suspend_state_t state)
 #endif
 		if (!allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE])
 			sleep_limit = SLEEP_LIMIT_NO_TCXO_SHUTDOWN;
+
+#if defined(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_ACTIVE)
+		sleep_limit |= SLEEP_RESOURCE_MEMORY_BIT1;
+#elif defined(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_RETENTION)
+		sleep_limit |= SLEEP_RESOURCE_MEMORY_BIT0;
+#endif
 
 		ret = msm_pm_power_collapse(
 			false, msm_pm_max_sleep_time, sleep_limit);
