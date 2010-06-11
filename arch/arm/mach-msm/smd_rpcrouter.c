@@ -142,6 +142,9 @@ static DEFINE_SPINLOCK(local_endpoints_lock);
 static DEFINE_SPINLOCK(remote_endpoints_lock);
 static DEFINE_SPINLOCK(server_list_lock);
 
+static LIST_HEAD(rpc_board_dev_list);
+static DEFINE_SPINLOCK(rpc_board_dev_list_lock);
+
 static struct workqueue_struct *rpcrouter_workqueue;
 
 static atomic_t next_xid = ATOMIC_INIT(1);
@@ -181,6 +184,12 @@ struct rr_context {
 };
 
 struct rr_context the_rr_context;
+
+struct rpc_board_dev_info {
+	struct list_head list;
+
+	struct rpc_board_dev *dev;
+};
 
 static struct platform_device rpcrouter_pdev = {
 	.name		= "oncrpc_router",
@@ -392,6 +401,52 @@ static void rpcrouter_destroy_server(struct rr_server *server)
 	spin_unlock_irqrestore(&server_list_lock, flags);
 	device_destroy(msm_rpcrouter_class, server->device_number);
 	kfree(server);
+}
+
+int msm_rpc_add_board_dev(struct rpc_board_dev *devices, int num)
+{
+	unsigned long flags;
+	struct rpc_board_dev_info *board_info;
+	int i;
+
+	for (i = 0; i < num; i++) {
+		board_info = kzalloc(sizeof(struct rpc_board_dev_info),
+				     GFP_KERNEL);
+		if (!board_info)
+			return -ENOMEM;
+
+		board_info->dev = &devices[i];
+		D("%s: adding program %x\n", __func__, board_info->dev->prog);
+		spin_lock_irqsave(&rpc_board_dev_list_lock, flags);
+		list_add_tail(&board_info->list, &rpc_board_dev_list);
+		spin_unlock_irqrestore(&rpc_board_dev_list_lock, flags);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_rpc_add_board_dev);
+
+static void rpcrouter_register_board_dev(struct rr_server *server)
+{
+	struct rpc_board_dev_info *board_info;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&rpc_board_dev_list_lock, flags);
+	list_for_each_entry(board_info, &rpc_board_dev_list, list) {
+		if (server->prog == board_info->dev->prog) {
+			D("%s: registering device %x\n",
+			  __func__, board_info->dev->prog);
+			list_del(&board_info->list);
+			rc = platform_device_register(&board_info->dev->pdev);
+			if (rc)
+				pr_err("%s: board dev register failed %d\n",
+				       __func__, rc);
+			kfree(board_info);
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&rpc_board_dev_list_lock, flags);
 }
 
 static struct rr_server *rpcrouter_lookup_server(uint32_t prog, uint32_t ver)
@@ -717,6 +772,7 @@ static int process_control_msg(struct rpcrouter_xprt_info *xprt_info,
 						"rpcrouter:Client create"
 						"error (%d)\n", rc);
 			}
+			rpcrouter_register_board_dev(server);
 			schedule_work(&work_create_pdevs);
 			wake_up(&newserver_wait);
 		} else {
