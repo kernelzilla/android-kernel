@@ -32,11 +32,17 @@
 /* Bank select/write macros */
 #define REGULATOR_BANK_SEL(n)           ((n) << 4)
 #define REGULATOR_BANK_WRITE            0x80
+#define LDO_TEST_BANKS			7
 
 /* Pin mask resource register prgramming */
 #define REGULATOR_PMR_STATE_MASK	0x60
 #define REGULATOR_PMR_STATE_HPM		0x60
+#define REGULATOR_PMR_STATE_LPM		0x40
 #define REGULATOR_PMR_STATE_OFF		0x20
+
+#define REGULATOR_IS_EN(pmr_reg) \
+	((pmr_reg & REGULATOR_PMR_STATE_MASK) == REGULATOR_PMR_STATE_HPM || \
+	 (pmr_reg & REGULATOR_PMR_STATE_MASK) == REGULATOR_PMR_STATE_LPM)
 
 /* FTSMPS programming */
 #define SMPS_VCTRL_BAND_MASK		0xC0
@@ -64,9 +70,12 @@
 /* LDO programming */
 #define LDO_CTRL_VPROG_MASK		0x1F
 
+/* bank 2 */
 #define LDO_TEST_VREF_UPDATE_MASK	0x08
 #define LDO_TEST_VREF_MASK		0x04
 #define LDO_TEST_FINE_STEP_MASK		0x02
+
+/* bank 4 */
 #define LDO_TEST_RANGE_EXTN_MASK	0x01
 
 #define PLDO_LOW_UV_MIN			750000
@@ -101,8 +110,7 @@ struct pm8901_vreg {
 	u8				type;
 	u8				ctrl_reg;
 	u8				pmr_reg;
-	u8				test_reg;
-	u8				test_reg2;
+	u8				test_reg[LDO_TEST_BANKS];
 	u8				is_nmos;
 	struct regulator_consumer_supply rsupply;
 	struct regulator_desc		rdesc;
@@ -123,9 +131,11 @@ struct pm8901_vreg {
 	.rdata = { \
 		.constraints = { \
 			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
+				REGULATOR_MODE_STANDBY, \
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS, \
+				REGULATOR_CHANGE_STATUS | \
+				REGULATOR_CHANGE_MODE, \
 		}, \
 		.num_consumer_supplies = 1, \
 	}, \
@@ -143,9 +153,11 @@ struct pm8901_vreg {
 	.rdata = { \
 		.constraints = { \
 			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
+				REGULATOR_MODE_STANDBY, \
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS, \
+				REGULATOR_CHANGE_STATUS | \
+				REGULATOR_CHANGE_MODE, \
 		}, \
 		.num_consumer_supplies = 1, \
 	}, \
@@ -241,6 +253,12 @@ static int pm8901_vreg_disable(struct regulator_dev *dev)
 	return rc;
 }
 
+static int pm8901_vreg_is_enabled(struct regulator_dev *dev)
+{
+	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
+	return REGULATOR_IS_EN(vreg->pmr_reg);
+}
+
 static int pm8901_pldo_set_voltage(struct pm8901_chip *chip,
 		struct pm8901_vreg *vreg, int uV)
 {
@@ -278,14 +296,14 @@ static int pm8901_pldo_set_voltage(struct pm8901_chip *chip,
 	}
 
 	/* update reference voltage and fine step selection if necessary */
-	if ((vreg->test_reg & LDO_TEST_FINE_STEP_MASK) != val ||
-			(vreg->test_reg & LDO_TEST_VREF_MASK) != vref) {
+	if ((vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK) != val ||
+			(vreg->test_reg[2] & LDO_TEST_VREF_MASK) != vref) {
 		val |= REGULATOR_BANK_SEL(2) | REGULATOR_BANK_WRITE |
 			LDO_TEST_VREF_UPDATE_MASK | vref;
 		mask = LDO_TEST_VREF_MASK | LDO_TEST_FINE_STEP_MASK | val;
 
 		rc = pm8901_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg);
+				mask, &vreg->test_reg[2]);
 		if (rc) {
 			pr_err("%s: pm8901_write failed\n", __func__);
 			return rc;
@@ -293,13 +311,13 @@ static int pm8901_pldo_set_voltage(struct pm8901_chip *chip,
 	}
 
 	/* update range extension if necessary */
-	if ((vreg->test_reg2 & LDO_TEST_RANGE_EXTN_MASK) != range_extn) {
+	if ((vreg->test_reg[4] & LDO_TEST_RANGE_EXTN_MASK) != range_extn) {
 		val = REGULATOR_BANK_SEL(4) | REGULATOR_BANK_WRITE |
 			range_extn;
 		mask = LDO_TEST_RANGE_EXTN_MASK | val;
 
 		rc = pm8901_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg2);
+				mask, &vreg->test_reg[4]);
 		if (rc) {
 			pr_err("%s: pm8901_write failed\n", __func__);
 			return rc;
@@ -328,12 +346,12 @@ static int pm8901_nldo_set_voltage(struct pm8901_chip *chip,
 	}
 
 	/* update reference voltage and fine step selection if necessary */
-	if ((vreg->test_reg & LDO_TEST_FINE_STEP_MASK) != val) {
+	if ((vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK) != val) {
 		val |= REGULATOR_BANK_SEL(2) | REGULATOR_BANK_WRITE;
 		mask = LDO_TEST_FINE_STEP_MASK | val;
 
 		rc = pm8901_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg);
+				mask, &vreg->test_reg[2]);
 		if (rc) {
 			pr_err("%s: pm8901_write failed\n", __func__);
 			return rc;
@@ -361,6 +379,110 @@ static int pm8901_ldo_set_voltage(struct regulator_dev *dev,
 		return pm8901_nldo_set_voltage(chip, vreg, uV);
 	else
 		return pm8901_pldo_set_voltage(chip, vreg, uV);
+}
+
+static int pm8901_pldo_get_voltage(struct pm8901_vreg *vreg)
+{
+	int uV, min, max, step, fine_step;
+	u8 range_extn, vref, vprog, fine_step_sel;
+
+	fine_step_sel = vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK;
+	vref = vreg->test_reg[2] & LDO_TEST_VREF_MASK;
+	range_extn = vreg->test_reg[4] & LDO_TEST_RANGE_EXTN_MASK;
+	vprog = vreg->ctrl_reg & LDO_CTRL_VPROG_MASK;
+
+	if (vref) {
+		/* low range mode */
+		fine_step = PLDO_LOW_FINE_STEP_UV;
+		min = PLDO_LOW_UV_MIN;
+		max = PLDO_LOW_UV_MAX;
+		step = PLDO_LOW_UV_STEP;
+	} else if (!range_extn) {
+		/* normal mode */
+		fine_step = PLDO_NORM_FINE_STEP_UV;
+		min = PLDO_NORM_UV_MIN;
+		max = PLDO_NORM_UV_MAX;
+		step = PLDO_NORM_UV_STEP;
+	} else {
+		/* high range mode */
+		fine_step = PLDO_HIGH_FINE_STEP_UV;
+		min = PLDO_HIGH_UV_MIN;
+		max = PLDO_HIGH_UV_MAX;
+		step = PLDO_HIGH_UV_STEP;
+	}
+
+	uV = step * vprog + min;
+	if (fine_step_sel)
+		uV += fine_step;
+
+	return uV;
+}
+
+static int pm8901_nldo_get_voltage(struct pm8901_vreg *vreg)
+{
+	int uV;
+	u8 vprog, fine_step;
+
+	fine_step = vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK;
+	vprog = vreg->ctrl_reg & LDO_CTRL_VPROG_MASK;
+
+	uV = NLDO_UV_STEP * vprog + NLDO_UV_MIN;
+	if (fine_step)
+		uV += NLDO_FINE_STEP_UV;
+
+	return uV;
+}
+
+static int pm8901_ldo_get_voltage(struct regulator_dev *dev)
+{
+	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
+
+	if (vreg->is_nmos)
+		return pm8901_nldo_get_voltage(vreg);
+	else
+		return pm8901_pldo_get_voltage(vreg);
+}
+
+static int pm8901_vreg_set_mode(struct regulator_dev *dev, unsigned int mode)
+{
+	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
+	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	int rc;
+	u8 val;
+
+	if (mode == REGULATOR_MODE_NORMAL) {
+		/* high power mode */
+		val = REGULATOR_PMR_STATE_HPM;
+	} else if (mode == REGULATOR_MODE_STANDBY) {
+		/* low power mode */
+		val = REGULATOR_PMR_STATE_LPM;
+	} else {
+		return -EINVAL;
+	}
+
+	rc = pm8901_vreg_write(chip, vreg->pmr_addr,
+			val, REGULATOR_PMR_STATE_MASK,
+			&vreg->pmr_reg);
+	if (rc)
+		pr_err("%s: pm8901_vreg_write failed\n", __func__);
+
+	return rc;
+}
+
+static unsigned int pm8901_vreg_get_mode(struct regulator_dev *dev)
+{
+	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
+	u8 mode = vreg->pmr_reg & REGULATOR_PMR_STATE_MASK;
+
+	if (mode == REGULATOR_PMR_STATE_HPM) {
+		return REGULATOR_MODE_NORMAL;
+	} else if (mode == REGULATOR_PMR_STATE_LPM) {
+		return REGULATOR_MODE_STANDBY;
+	} else {
+		pr_err("%s: unexpected mode 0x%x\n",
+				__func__, mode);
+		return (unsigned int) -EINVAL;
+	}
 }
 
 static int pm8901_smps_set_voltage(struct regulator_dev *dev,
@@ -392,46 +514,67 @@ static int pm8901_smps_set_voltage(struct regulator_dev *dev,
 	return rc;
 }
 
+static int pm8901_smps_get_voltage(struct regulator_dev *dev)
+{
+	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
+	u8 vprog, band;
+
+	vprog = vreg->ctrl_reg & SMPS_VCTRL_VPROG_MASK;
+	band = vreg->ctrl_reg & SMPS_VCTRL_BAND_MASK;
+
+	if (band == SMPS_VCTRL_BAND_1)
+		return vprog * SMPS_BAND_1_UV_STEP + SMPS_BAND_1_UV_MIN;
+	else if (band == SMPS_VCTRL_BAND_2)
+		return vprog * SMPS_BAND_2_UV_STEP + SMPS_BAND_2_UV_MIN;
+	else
+		return vprog * SMPS_BAND_3_UV_STEP + SMPS_BAND_3_UV_MIN;
+}
+
 static struct regulator_ops pm8901_ldo_ops = {
 	.enable = pm8901_vreg_enable,
 	.disable = pm8901_vreg_disable,
+	.is_enabled = pm8901_vreg_is_enabled,
 	.set_voltage = pm8901_ldo_set_voltage,
+	.get_voltage = pm8901_ldo_get_voltage,
+	.set_mode = pm8901_vreg_set_mode,
+	.get_mode = pm8901_vreg_get_mode,
 };
 
 static struct regulator_ops pm8901_smps_ops = {
 	.enable = pm8901_vreg_enable,
 	.disable = pm8901_vreg_disable,
+	.is_enabled = pm8901_vreg_is_enabled,
 	.set_voltage = pm8901_smps_set_voltage,
+	.get_voltage = pm8901_smps_get_voltage,
+	.set_mode = pm8901_vreg_set_mode,
+	.get_mode = pm8901_vreg_get_mode,
 };
 
 static struct regulator_ops pm8901_vs_ops = {
 	.enable = pm8901_vreg_enable,
 	.disable = pm8901_vreg_disable,
+	.is_enabled = pm8901_vreg_is_enabled,
 };
 
 static int pm8901_init_regulator(struct pm8901_chip *chip,
 		struct pm8901_vreg *vreg)
 {
-	int rc;
+	int rc, i;
+	u8 bank;
 
 	if (vreg->type == REGULATOR_TYPE_LDO) {
-		u8 val = REGULATOR_BANK_SEL(2);
-		rc = pm8901_write(chip, vreg->test_addr, &val, 1);
-		if (rc)
-			goto bail;
+		for (i = 0; i < LDO_TEST_BANKS; i++) {
+			bank = REGULATOR_BANK_SEL(i);
+			rc = pm8901_write(chip, vreg->test_addr,
+					&bank, 1);
+			if (rc)
+				goto bail;
 
-		rc = pm8901_read(chip, vreg->test_addr, &vreg->test_reg, 1);
-		if (rc)
-			goto bail;
-
-		val = REGULATOR_BANK_SEL(4);
-		rc = pm8901_write(chip, vreg->test_addr, &val, 1);
-		if (rc)
-			goto bail;
-
-		rc = pm8901_read(chip, vreg->test_addr, &vreg->test_reg2, 1);
-		if (rc)
-			goto bail;
+			rc = pm8901_read(chip, vreg->test_addr,
+					&vreg->test_reg[i], 1);
+			if (rc)
+				goto bail;
+		}
 	}
 
 	rc = pm8901_read(chip, vreg->ctrl_addr, &vreg->ctrl_reg, 1);

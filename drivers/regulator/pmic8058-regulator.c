@@ -35,12 +35,30 @@
 #define REGULATOR_BANK_SEL(n)		((n) << 4)
 #define REGULATOR_BANK_WRITE		0x80
 
+#define LDO_TEST_BANKS			7
+#define SMPS_TEST_BANKS			8
+#define REGULATOR_TEST_BANKS_MAX	SMPS_TEST_BANKS
+
+#define REGULATOR_IS_EN(ctrl_reg)	((ctrl_reg & REGULATOR_EN_MASK) > 0)
+
 /* LDO programming */
 #define LDO_CTRL_VPROG_MASK		0x1F
 
+#define LDO_CTRL_PM_MASK		0x20
+#define LDO_CTRL_PM_NORMAL		0x00
+#define LDO_CTRL_PM_LOW			0x20
+
+/* bank 0 */
+#define LDO_TEST_LPM_MASK		0x40
+#define LDO_TEST_LPM_SEL_CTRL		0x00
+#define LDO_TEST_LPM_SEL_TCXO		0x40
+
+/* bank 2 */
 #define LDO_TEST_VREF_UPDATE_MASK	0x08
 #define LDO_TEST_VREF_MASK		0x04
 #define LDO_TEST_FINE_STEP_MASK		0x02
+
+/* bank 4 */
 #define LDO_TEST_RANGE_EXTN_MASK	0x01
 
 #define PLDO_LOW_UV_MIN			750000
@@ -66,6 +84,8 @@
 /* SMPS masks and values */
 #define SMPS_VREF_SEL_MASK		0x20
 #define SMPS_VPROG_MASK			0x1F
+
+/* bank 1 */
 #define SMPS_VLOW_SEL_MASK		0x01
 
 #define SMPS_MODE1_UV_MIN		1500000
@@ -83,8 +103,10 @@
 #define SMPS_UV_MIN			SMPS_MODE3_UV_MIN
 #define SMPS_UV_MAX			SMPS_MODE1_UV_MAX
 
-#define SMPS_IS_MODE3(uV)		((uV) < SMPS_MODE2_UV_MIN)
-#define SMPS_IS_MODE2(uV)		((uV) < SMPS_MODE1_UV_MIN)
+#define SMPS_CLK_CTRL_MASK		0x30
+#define SMPS_CLK_CTRL_FOLLOW_TCXO	0x00
+#define SMPS_CLK_CTRL_PWM		0x10
+#define SMPS_CLK_CTRL_PFM		0x20
 
 /* NCP masks and values */
 #define NCP_VPROG_MASK			0x1F
@@ -98,10 +120,12 @@ struct pm8058_vreg {
 	u16				ctrl_addr;
 	u16				test_addr;
 	u16				test2_addr;
+	u16				clk_ctrl_addr;
 	u8				type;
 	u8				ctrl_reg;
-	u8				test_reg;
-	u8				test_reg2;
+	u8				test_reg[REGULATOR_TEST_BANKS_MAX];
+	u8				test2_reg[REGULATOR_TEST_BANKS_MAX];
+	u8				clk_ctrl_reg;
 	u8				is_nmos;
 	struct regulator_consumer_supply rsupply;
 	struct regulator_desc		rdesc;
@@ -121,19 +145,21 @@ struct pm8058_vreg {
 	.rdata = { \
 		.constraints = { \
 			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
+				REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS, \
+				REGULATOR_CHANGE_STATUS | \
+				REGULATOR_CHANGE_MODE, \
 		}, \
 		.num_consumer_supplies = 1, \
 	}, \
 }
 
-#define SMPS(_name, _ctrl_addr, _test2_addr) \
-{ \
+#define SMPS(_name, _ctrl_addr, _test2_addr, _clk_ctrl_addr) { \
 	.name = _name, \
 	.ctrl_addr = _ctrl_addr, \
 	.test2_addr = _test2_addr, \
+	.clk_ctrl_addr = _clk_ctrl_addr, \
 	.type = REGULATOR_TYPE_SMPS, \
 	.rsupply = { \
 		.supply = _name, \
@@ -141,16 +167,17 @@ struct pm8058_vreg {
 	.rdata = { \
 		.constraints = { \
 			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
+				REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS, \
+				REGULATOR_CHANGE_STATUS | \
+				REGULATOR_CHANGE_MODE, \
 		}, \
 		.num_consumer_supplies = 1, \
 	}, \
 }
 
-#define LVS(_name, _ctrl_addr) \
-{ \
+#define LVS(_name, _ctrl_addr) { \
 	.name = _name, \
 	.ctrl_addr = _ctrl_addr, \
 	.type = REGULATOR_TYPE_LVS, \
@@ -167,8 +194,7 @@ struct pm8058_vreg {
 	}, \
 }
 
-#define NCP(_name, _ctrl_addr) \
-{ \
+#define NCP(_name, _ctrl_addr) { \
 	.name = _name, \
 	.ctrl_addr = _ctrl_addr, \
 	.type = REGULATOR_TYPE_NCP, \
@@ -215,12 +241,12 @@ static struct pm8058_vreg pm8058_vreg[] = {
 	LDO("8058_l24", 0x123, 0x12B, 1),
 	LDO("8058_l25", 0x124, 0x12C, 1),
 
-	/*    name      ctrl   test2 */
-	SMPS("8058_s0", 0x004, 0x084),
-	SMPS("8058_s1", 0x005, 0x085),
-	SMPS("8058_s2", 0x110, 0x119),
-	SMPS("8058_s3", 0x111, 0x11A),
-	SMPS("8058_s4", 0x112, 0x11B),
+	/*    name      ctrl   test2  clk_ctrl */
+	SMPS("8058_s0", 0x004, 0x084, 0x1D1),
+	SMPS("8058_s1", 0x005, 0x085, 0x1D2),
+	SMPS("8058_s2", 0x110, 0x119, 0x1D3),
+	SMPS("8058_s3", 0x111, 0x11A, 0x1D4),
+	SMPS("8058_s4", 0x112, 0x11B, 0x1D5),
 
 	/*   name        ctrl  */
 	LVS("8058_lvs0", 0x12D),
@@ -257,6 +283,12 @@ static int pm8058_vreg_enable(struct regulator_dev *dev)
 		pr_err("%s: pm8058_vreg_write failed\n", __func__);
 
 	return rc;
+}
+
+static int pm8058_vreg_is_enabled(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	return REGULATOR_IS_EN(vreg->ctrl_reg);
 }
 
 static int pm8058_vreg_disable(struct regulator_dev *dev)
@@ -310,14 +342,14 @@ static int pm8058_pldo_set_voltage(struct pm8058_chip *chip,
 	}
 
 	/* update reference voltage and fine step selection if necessary */
-	if ((vreg->test_reg & LDO_TEST_FINE_STEP_MASK) != val ||
-			(vreg->test_reg & LDO_TEST_VREF_MASK) != vref) {
+	if ((vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK) != val ||
+			(vreg->test_reg[2] & LDO_TEST_VREF_MASK) != vref) {
 		val |= REGULATOR_BANK_SEL(2) | REGULATOR_BANK_WRITE |
 			LDO_TEST_VREF_UPDATE_MASK | vref;
 		mask = LDO_TEST_VREF_MASK | LDO_TEST_FINE_STEP_MASK | val;
 
 		rc = pm8058_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg);
+				mask, &vreg->test_reg[2]);
 		if (rc) {
 			pr_err("%s: pm8058_write failed\n", __func__);
 			return rc;
@@ -325,13 +357,13 @@ static int pm8058_pldo_set_voltage(struct pm8058_chip *chip,
 	}
 
 	/* update range extension if necessary */
-	if ((vreg->test_reg2 & LDO_TEST_RANGE_EXTN_MASK) != range_extn) {
+	if ((vreg->test_reg[4] & LDO_TEST_RANGE_EXTN_MASK) != range_extn) {
 		val = REGULATOR_BANK_SEL(4) | REGULATOR_BANK_WRITE |
 			range_extn;
 		mask = LDO_TEST_RANGE_EXTN_MASK | val;
 
 		rc = pm8058_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg2);
+				mask, &vreg->test_reg[4]);
 		if (rc) {
 			pr_err("%s: pm8058_write failed\n", __func__);
 			return rc;
@@ -347,6 +379,7 @@ static int pm8058_pldo_set_voltage(struct pm8058_chip *chip,
 
 	return rc;
 }
+
 static int pm8058_nldo_set_voltage(struct pm8058_chip *chip,
 		struct pm8058_vreg *vreg, int uV)
 {
@@ -359,12 +392,12 @@ static int pm8058_nldo_set_voltage(struct pm8058_chip *chip,
 	}
 
 	/* update reference voltage and fine step selection if necessary */
-	if ((vreg->test_reg & LDO_TEST_FINE_STEP_MASK) != val) {
+	if ((vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK) != val) {
 		val |= REGULATOR_BANK_SEL(2) | REGULATOR_BANK_WRITE;
 		mask = LDO_TEST_FINE_STEP_MASK | val;
 
 		rc = pm8058_vreg_write(chip, vreg->test_addr, val,
-				mask, &vreg->test_reg);
+				mask, &vreg->test_reg[2]);
 		if (rc) {
 			pr_err("%s: pm8058_write failed\n", __func__);
 			return rc;
@@ -394,6 +427,135 @@ static int pm8058_ldo_set_voltage(struct regulator_dev *dev,
 		return pm8058_pldo_set_voltage(chip, vreg, uV);
 }
 
+static int pm8058_pldo_get_voltage(struct pm8058_vreg *vreg)
+{
+	int uV, min, max, step, fine_step;
+	u8 range_extn, vref, vprog, fine_step_sel;
+
+	fine_step_sel = vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK;
+	vref = vreg->test_reg[2] & LDO_TEST_VREF_MASK;
+	range_extn = vreg->test_reg[4] & LDO_TEST_RANGE_EXTN_MASK;
+	vprog = vreg->ctrl_reg & LDO_CTRL_VPROG_MASK;
+
+	if (vref) {
+		/* low range mode */
+		fine_step = PLDO_LOW_FINE_STEP_UV;
+		min = PLDO_LOW_UV_MIN;
+		max = PLDO_LOW_UV_MAX;
+		step = PLDO_LOW_UV_STEP;
+	} else if (!range_extn) {
+		/* normal mode */
+		fine_step = PLDO_NORM_FINE_STEP_UV;
+		min = PLDO_NORM_UV_MIN;
+		max = PLDO_NORM_UV_MAX;
+		step = PLDO_NORM_UV_STEP;
+	} else {
+		/* high range mode */
+		fine_step = PLDO_HIGH_FINE_STEP_UV;
+		min = PLDO_HIGH_UV_MIN;
+		max = PLDO_HIGH_UV_MAX;
+		step = PLDO_HIGH_UV_STEP;
+	}
+
+	uV = step * vprog + min;
+	if (fine_step_sel)
+		uV += fine_step;
+
+	return uV;
+}
+
+static int pm8058_nldo_get_voltage(struct pm8058_vreg *vreg)
+{
+	int uV;
+	u8 vprog, fine_step;
+
+	fine_step = vreg->test_reg[2] & LDO_TEST_FINE_STEP_MASK;
+	vprog = vreg->ctrl_reg & LDO_CTRL_VPROG_MASK;
+
+	uV = NLDO_UV_STEP * vprog + NLDO_UV_MIN;
+	if (fine_step)
+		uV += NLDO_FINE_STEP_UV;
+
+	return uV;
+}
+
+static int pm8058_ldo_get_voltage(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+
+	if (vreg->is_nmos)
+		return pm8058_nldo_get_voltage(vreg);
+	else
+		return pm8058_pldo_get_voltage(vreg);
+}
+
+static int pm8058_ldo_set_mode(struct regulator_dev *dev, unsigned int mode)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	int rc = 0;
+	u8 ctrl, test, mask, val;
+
+	if (mode == REGULATOR_MODE_NORMAL) {
+		/* disable low power mode */
+		test = LDO_TEST_LPM_SEL_TCXO;
+		ctrl = LDO_CTRL_PM_NORMAL;
+	} else if (mode == REGULATOR_MODE_IDLE) {
+		/* enable low power mode but follow tcxo */
+		test = LDO_TEST_LPM_SEL_TCXO;
+		ctrl = LDO_CTRL_PM_LOW;
+	} else if (mode == REGULATOR_MODE_STANDBY) {
+		/* force low power mode */
+		test = LDO_TEST_LPM_SEL_CTRL;
+		ctrl = LDO_CTRL_PM_LOW;
+	} else {
+		return -EINVAL;
+	}
+
+	if ((vreg->test_reg[0] & LDO_TEST_LPM_MASK) != test) {
+		val = REGULATOR_EN_MASK | REGULATOR_BANK_SEL(0) | test;
+		mask = REGULATOR_EN_MASK | REGULATOR_BANK_SEL(0) |
+			LDO_TEST_LPM_MASK;
+		rc = pm8058_vreg_write(chip, vreg->test_addr,
+				val, mask, &vreg->test_reg[0]);
+		if (rc) {
+			pr_err("%s: pm8058_vreg_write failed\n", __func__);
+			return rc;
+		}
+	}
+
+	if ((vreg->ctrl_reg & LDO_CTRL_PM_MASK) != ctrl) {
+		val = ctrl;
+		mask = LDO_CTRL_PM_MASK;
+		rc = pm8058_vreg_write(chip, vreg->ctrl_addr,
+				val, mask, &vreg->ctrl_reg);
+		if (rc)
+			pr_err("%s: pm8058_vreg_write failed\n", __func__);
+	}
+
+	return rc;
+}
+
+static unsigned int pm8058_ldo_get_mode(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	u8 lp_sel, pm;
+
+	lp_sel = vreg->test_reg[0] & LDO_TEST_LPM_MASK;
+	pm = vreg->ctrl_reg & LDO_CTRL_PM_MASK;
+
+	if (pm == LDO_CTRL_PM_NORMAL)
+		return REGULATOR_MODE_NORMAL;
+	else if (lp_sel == LDO_TEST_LPM_SEL_TCXO && pm == LDO_CTRL_PM_LOW)
+		return REGULATOR_MODE_IDLE;
+	else if (lp_sel == LDO_TEST_LPM_SEL_CTRL && pm == LDO_CTRL_PM_LOW)
+		return REGULATOR_MODE_STANDBY;
+
+	pr_err("%s: unexpected lpm config 0x%x 0x%x\n",
+			__func__, lp_sel, pm);
+	return (unsigned int) -EINVAL;
+}
+
 static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
@@ -418,11 +580,11 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 	}
 
 	/* set vlow bit for ultra low voltage mode */
-	if ((vreg->test_reg & SMPS_VLOW_SEL_MASK) != vlow) {
+	if ((vreg->test2_reg[1] & SMPS_VLOW_SEL_MASK) != vlow) {
 		vlow |= REGULATOR_BANK_WRITE | REGULATOR_BANK_SEL(1);
 		mask = vlow | SMPS_VLOW_SEL_MASK;
 		rc = pm8058_vreg_write(chip, vreg->test2_addr,
-				vlow, mask, &vreg->test_reg);
+				vlow, mask, &vreg->test2_reg[1]);
 	}
 
 	/* voltage setting */
@@ -433,6 +595,74 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 		pr_err("%s: pm8058_vreg_write failed\n", __func__);
 
 	return rc;
+}
+
+static int pm8058_smps_get_voltage(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	u8 vlow, vref, vprog;
+	int uV;
+
+	vlow = vreg->test2_reg[1] & SMPS_VLOW_SEL_MASK;
+	vref = vreg->ctrl_reg & SMPS_VREF_SEL_MASK;
+	vprog = vreg->ctrl_reg & SMPS_VPROG_MASK;
+
+	if (vlow && vref) {
+		/* mode 3 */
+		uV = vprog * SMPS_MODE3_STEP + SMPS_MODE3_UV_MIN;
+	} else if (vref) {
+		/* mode 2 */
+		uV = vprog * SMPS_MODE2_STEP + SMPS_MODE2_UV_MIN;
+	} else {
+		/* mode 1 */
+		uV = vprog * SMPS_MODE1_STEP + SMPS_MODE1_UV_MIN;
+	}
+
+	return uV;
+}
+
+static int pm8058_smps_set_mode(struct regulator_dev *dev, unsigned int mode)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	int rc;
+	u8 clk;
+
+	if (mode == REGULATOR_MODE_NORMAL)
+		clk = SMPS_CLK_CTRL_PWM;
+	else if (mode == REGULATOR_MODE_IDLE)
+		clk = SMPS_CLK_CTRL_FOLLOW_TCXO;
+	else if (mode == REGULATOR_MODE_STANDBY)
+		clk = SMPS_CLK_CTRL_PFM;
+	else
+		return -EINVAL;
+
+	if ((vreg->clk_ctrl_reg & SMPS_CLK_CTRL_MASK) == clk)
+		return 0;
+
+	rc = pm8058_vreg_write(chip, vreg->clk_ctrl_addr,
+			clk, SMPS_CLK_CTRL_MASK, &vreg->clk_ctrl_reg);
+	if (rc)
+		pr_err("%s: pm8058_vreg_write failed\n", __func__);
+
+	return rc;
+}
+
+static unsigned int pm8058_smps_get_mode(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	u8 mode = vreg->clk_ctrl_reg & SMPS_CLK_CTRL_MASK;
+
+	if (mode == SMPS_CLK_CTRL_PWM)
+		return REGULATOR_MODE_NORMAL;
+	else if (mode == SMPS_CLK_CTRL_FOLLOW_TCXO)
+		return REGULATOR_MODE_IDLE;
+	else if (mode == SMPS_CLK_CTRL_PFM)
+		return REGULATOR_MODE_STANDBY;
+
+	pr_err("%s: unexpected smps mode 0x%x\n",
+			__func__, mode);
+	return (unsigned int) -EINVAL;
 }
 
 static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
@@ -454,33 +684,51 @@ static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
 	return rc;
 }
 
+static int pm8058_ncp_get_voltage(struct regulator_dev *dev)
+{
+	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
+	u8 vprog = vreg->ctrl_reg & NCP_VPROG_MASK;
+	return NCP_UV_MAX - vprog * NCP_UV_STEP;
+}
+
 static struct regulator_ops pm8058_ldo_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
+	.is_enabled = pm8058_vreg_is_enabled,
 	.set_voltage = pm8058_ldo_set_voltage,
+	.get_voltage = pm8058_ldo_get_voltage,
+	.set_mode = pm8058_ldo_set_mode,
+	.get_mode = pm8058_ldo_get_mode,
 };
 
 static struct regulator_ops pm8058_smps_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
+	.is_enabled = pm8058_vreg_is_enabled,
 	.set_voltage = pm8058_smps_set_voltage,
+	.get_voltage = pm8058_smps_get_voltage,
+	.set_mode = pm8058_smps_set_mode,
+	.get_mode = pm8058_smps_get_mode,
 };
 
 static struct regulator_ops pm8058_lvs_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
+	.is_enabled = pm8058_vreg_is_enabled,
 };
 
 static struct regulator_ops pm8058_ncp_ops = {
 	.enable = pm8058_vreg_enable,
 	.disable = pm8058_vreg_disable,
+	.is_enabled = pm8058_vreg_is_enabled,
 	.set_voltage = pm8058_ncp_set_voltage,
+	.get_voltage = pm8058_ncp_get_voltage,
 };
 
 static int pm8058_init_regulator(struct pm8058_chip *chip,
 		struct pm8058_vreg *vreg)
 {
-	int rc = 0;
+	int rc = 0, i;
 	u8 bank;
 
 	/* save the current control register state */
@@ -490,29 +738,34 @@ static int pm8058_init_regulator(struct pm8058_chip *chip,
 
 	/* save the current test/test2 register state */
 	if (vreg->type == REGULATOR_TYPE_LDO) {
-		bank = REGULATOR_BANK_SEL(2);
-		rc = pm8058_write(chip, vreg->test_addr, &bank, 1);
-		if (rc)
-			goto bail;
+		for (i = 0; i < LDO_TEST_BANKS; i++) {
+			bank = REGULATOR_BANK_SEL(i);
+			rc = pm8058_write(chip, vreg->test_addr,
+					&bank, 1);
+			if (rc)
+				goto bail;
 
-		rc = pm8058_read(chip, vreg->test_addr, &vreg->test_reg, 1);
-		if (rc)
-			goto bail;
-
-		bank = REGULATOR_BANK_SEL(4);
-		rc = pm8058_write(chip, vreg->test_addr, &bank, 1);
-		if (rc)
-			goto bail;
-
-		rc = pm8058_read(chip, vreg->test_addr, &vreg->test_reg2, 1);
-		if (rc)
-			goto bail;
+			rc = pm8058_read(chip, vreg->test_addr,
+					&vreg->test_reg[i], 1);
+			if (rc)
+				goto bail;
+		}
 	} else if (vreg->type == REGULATOR_TYPE_SMPS) {
-		bank = REGULATOR_BANK_SEL(1);
-		rc = pm8058_write(chip, vreg->test2_addr, &bank, 1);
-		if (rc)
-			goto bail;
-		rc = pm8058_read(chip, vreg->test2_addr, &vreg->test_reg, 1);
+		for (i = 0; i < SMPS_TEST_BANKS; i++) {
+			bank = REGULATOR_BANK_SEL(i);
+			rc = pm8058_write(chip, vreg->test2_addr,
+					&bank, 1);
+			if (rc)
+				goto bail;
+
+			rc = pm8058_read(chip, vreg->test2_addr,
+					&vreg->test2_reg[i], 1);
+			if (rc)
+				goto bail;
+		}
+
+		rc = pm8058_read(chip, vreg->clk_ctrl_addr,
+				&vreg->clk_ctrl_reg, 1);
 		if (rc)
 			goto bail;
 	}
