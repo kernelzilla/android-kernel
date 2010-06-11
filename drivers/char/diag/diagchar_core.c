@@ -67,7 +67,7 @@ static uint16_t delayed_rsp_id = 1;
 #define DIAGPKT_NEXT_DELAYED_RSP_ID(x) 				\
 ((x < DIAGPKT_MAX_DELAYED_RSP) ? x++ : DIAGPKT_MAX_DELAYED_RSP)
 
-#define COPY_USER_SPACE(buf, data, length)			\
+#define COPY_USER_SPACE_OR_EXIT(buf, data, length)		\
 do {								\
 	if ((count < ret+length) || (copy_to_user(buf,		\
 			(void *)&data, length))) {		\
@@ -304,7 +304,7 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 					logging_mode == MEMORY_DEVICE_MODE)) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
 		/* place holder for number of data field */
 		ret += 4;
 
@@ -351,10 +351,10 @@ drop:
 		if (driver->in_busy == 1) {
 			num_data++;
 			/*Copy the length of data being passed*/
-			COPY_USER_SPACE(buf+ret, (driver->usb_write_ptr->
-						  length), 4);
+			COPY_USER_SPACE_OR_EXIT(buf+ret,
+					 (driver->usb_write_ptr->length), 4);
 			/*Copy the actual data being passed*/
-			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in),
+			COPY_USER_SPACE_OR_EXIT(buf+ret, *(driver->usb_buf_in),
 					 driver->usb_write_ptr->length);
 			driver->in_busy = 0;
 		}
@@ -363,16 +363,16 @@ drop:
 		if (driver->in_busy_qdsp == 1) {
 			num_data++;
 			/*Copy the length of data being passed*/
-			COPY_USER_SPACE(buf+ret, (driver->usb_write_ptr_qdsp->
-						  length), 4);
+			COPY_USER_SPACE_OR_EXIT(buf+ret,
+				 (driver->usb_write_ptr_qdsp->length), 4);
 			/*Copy the actual data being passed*/
-			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in_qdsp),
-					 driver->usb_write_ptr_qdsp->length);
+			COPY_USER_SPACE_OR_EXIT(buf+ret, *(driver->
+			usb_buf_in_qdsp), driver->usb_write_ptr_qdsp->length);
 			driver->in_busy_qdsp = 0;
 		}
 
 		/* copy number of data fields */
-		COPY_USER_SPACE(buf+4, num_data, 4);
+		COPY_USER_SPACE_OR_EXIT(buf+4, num_data, 4);
 		ret -= 4;
 		driver->data_ready[index] ^= MEMORY_DEVICE_LOG_TYPE;
 		if (driver->ch)
@@ -388,7 +388,7 @@ drop:
 	if (driver->data_ready[index] & DEINIT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & DEINIT_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
 		driver->data_ready[index] ^= DEINIT_TYPE;
 		goto exit;
 	}
@@ -396,8 +396,9 @@ drop:
 	if (driver->data_ready[index] & MSG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MSG_MASKS_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
-		COPY_USER_SPACE(buf+4, *(driver->msg_masks), MSG_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->msg_masks),
+							 MSG_MASK_SIZE);
 		driver->data_ready[index] ^= MSG_MASKS_TYPE;
 		goto exit;
 	}
@@ -405,8 +406,9 @@ drop:
 	if (driver->data_ready[index] & EVENT_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & EVENT_MASKS_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
-		COPY_USER_SPACE(buf+4, *(driver->event_masks), EVENT_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->event_masks),
+							 EVENT_MASK_SIZE);
 		driver->data_ready[index] ^= EVENT_MASKS_TYPE;
 		goto exit;
 	}
@@ -414,8 +416,9 @@ drop:
 	if (driver->data_ready[index] & LOG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & LOG_MASKS_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
-		COPY_USER_SPACE(buf+4, *(driver->log_masks), LOG_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->log_masks),
+							 LOG_MASK_SIZE);
 		driver->data_ready[index] ^= LOG_MASKS_TYPE;
 		goto exit;
 	}
@@ -423,8 +426,9 @@ drop:
 	if (driver->data_ready[index] & PKT_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & PKT_TYPE;
-		COPY_USER_SPACE(buf, data_type, 4);
-		COPY_USER_SPACE(buf+4, *(driver->pkt_buf), driver->pkt_length);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
+		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->pkt_buf),
+							 driver->pkt_length);
 		driver->data_ready[index] ^= PKT_TYPE;
 		goto exit;
 	}
