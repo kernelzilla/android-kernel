@@ -1267,7 +1267,11 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 		} else if (modm & SMSM_RESET) {
 			apps |= SMSM_RESET;
 		} else {
-			apps |= SMSM_INIT;
+			if (!(apps & SMSM_INIT)) {
+				apps |= SMSM_INIT;
+				modem_queue_smsm_init_notify();
+			}
+
 			if (modm & SMSM_SMDINIT)
 				apps |= SMSM_SMDINIT;
 			if ((apps & (SMSM_INIT | SMSM_SMDINIT | SMSM_RPCINIT)) ==
