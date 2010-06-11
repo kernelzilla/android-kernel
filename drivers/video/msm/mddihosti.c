@@ -1005,6 +1005,10 @@ static void mddi_process_rev_packets(void)
 			}
 			break;
 
+		case INVALID_PKT_TYPE:	/* 0xFFFF */
+			MDDI_MSG_ERR("!!!INVALID_PKT_TYPE rcvd\n");
+			break;
+
 		default:	/* any other packet */
 			{
 				uint16 hdlr;
@@ -1012,10 +1016,12 @@ static void mddi_process_rev_packets(void)
 				for (hdlr = 0; hdlr < MAX_MDDI_REV_HANDLERS;
 				     hdlr++) {
 					if (mddi_rev_pkt_handler[hdlr].
+							handler == NULL)
+						continue;
+					if (mddi_rev_pkt_handler[hdlr].
 					    pkt_type ==
 					    rev_pkt_ptr->packet_type) {
-						(*
-						 (mddi_rev_pkt_handler[hdlr].
+						(*(mddi_rev_pkt_handler[hdlr].
 						  handler)) (rev_pkt_ptr);
 					/* pmhctl->rev_state = MDDI_REV_IDLE; */
 						break;
