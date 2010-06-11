@@ -2235,15 +2235,16 @@ __early_param("audio_size=", audio_size_setup);
 
 static void __init qsd8x50_init(void)
 {
+	if (socinfo_init() < 0)
+		printk(KERN_ERR "%s: socinfo_init() failed!\n",
+		       __func__);
+	msm_clock_init(msm_clocks_8x50, msm_num_clocks_8x50);
 	hs_clk = clk_get(NULL, "usb_hs_clk");
 	if (IS_ERR(hs_clk))
 		printk(KERN_ERR "%s: hs_clk get failed!\n", __func__);
 	phy_clk = clk_get(NULL, "usb_phy_clk");
 	if (IS_ERR(phy_clk))
 		printk(KERN_ERR "%s: phy_clk get failed!\n", __func__);
-	if (socinfo_init() < 0)
-		printk(KERN_ERR "%s: socinfo_init() failed!\n",
-		       __func__);
 	qsd8x50_cfg_smsc911x();
 	msm_acpu_clock_init(&qsd8x50_clock_data);
 
@@ -2353,7 +2354,6 @@ static void __init qsd8x50_map_io(void)
 	msm_shared_ram_phys = MSM_SHARED_RAM_PHYS;
 	msm_map_qsd8x50_io();
 	qsd8x50_allocate_memory_regions();
-	msm_clock_init(msm_clocks_8x50, msm_num_clocks_8x50);
 }
 
 MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")

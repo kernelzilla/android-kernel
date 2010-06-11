@@ -1756,6 +1756,11 @@ static void __init msm7x2x_init(void)
 {
 	if (socinfo_init() < 0)
 		BUG();
+#ifdef CONFIG_ARCH_MSM7X25
+	msm_clock_init(msm_clocks_7x25, msm_num_clocks_7x25);
+#elif CONFIG_ARCH_MSM7X27
+	msm_clock_init(msm_clocks_7x27, msm_num_clocks_7x27);
+#endif
 
 #if defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	msm_serial_debug_init(MSM_UART3_PHYS, INT_UART3,
@@ -1951,17 +1956,6 @@ static void __init msm_msm7x2x_allocate_memory_regions(void)
 static void __init msm7x2x_map_io(void)
 {
 	msm_map_common_io();
-	/* Technically dependent on the SoC but using machine_is
-	 * macros since socinfo is not available this early and there
-	 * are plans to restructure the code which will eliminate the
-	 * need for socinfo.
-	 */
-	if (machine_is_msm7x27_surf() || machine_is_msm7x27_ffa())
-		msm_clock_init(msm_clocks_7x27, msm_num_clocks_7x27);
-
-	if (machine_is_msm7x25_surf() || machine_is_msm7x25_ffa())
-		msm_clock_init(msm_clocks_7x25, msm_num_clocks_7x25);
-
 	msm_msm7x2x_allocate_memory_regions();
 
 #ifdef CONFIG_CACHE_L2X0

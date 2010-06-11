@@ -1305,6 +1305,8 @@ static void __init halibut_init(void)
 	if (socinfo_init() < 0)
 		BUG();
 
+	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+
 	if (machine_is_msm7201a_ffa()) {
 		smc91x_resources[0].start = 0x98000300;
 		smc91x_resources[0].end = 0x980003ff;
@@ -1459,7 +1461,6 @@ static void __init halibut_map_io(void)
 	msm_shared_ram_phys = 0x01F00000;
 
 	msm_map_common_io();
-	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
 	msm_halibut_allocate_memory_regions();
 }
 
