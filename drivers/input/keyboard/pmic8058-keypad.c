@@ -313,7 +313,8 @@ static int pmic8058_detect_ghost_keys(struct pmic8058_kp *kp, u16 *new_state)
 
 	check = 0;
 	for (row = 0; row < kp->pdata->num_rows; row++) {
-		row_state = (~new_state[row]) & 0xff;
+		row_state = (~new_state[row]) &
+				 ((1 << kp->pdata->num_cols) - 1);
 
 		if (hweight16(row_state) > 1) {
 			if (found_first == -1)
