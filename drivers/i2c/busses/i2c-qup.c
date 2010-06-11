@@ -894,19 +894,6 @@ qup_i2c_probe(struct platform_device *pdev)
 	dev->pdata = pdata;
 	dev->clk_ctl = 0;
 
-	i2c_set_adapdata(&dev->adapter, dev);
-	dev->adapter.algo = &qup_i2c_algo;
-	strlcpy(dev->adapter.name,
-		"QUP I2C adapter",
-		sizeof(dev->adapter.name));
-
-	dev->adapter.nr = pdev->id;
-	ret = i2c_add_numbered_adapter(&dev->adapter);
-	if (ret) {
-		dev_err(&pdev->dev, "i2c_add_adapter failed\n");
-		goto err_i2c_add_adapter_failed;
-	}
-
 	/*
 	 * We use num_irqs to also indicate if we got 3 interrupts or just 1.
 	 * If we have just 1, we use err_irq as the general purpose irq
@@ -953,17 +940,31 @@ qup_i2c_probe(struct platform_device *pdev)
 		disable_irq(dev->in_irq);
 		disable_irq(dev->out_irq);
 	}
+	i2c_set_adapdata(&dev->adapter, dev);
+	dev->adapter.algo = &qup_i2c_algo;
+	strlcpy(dev->adapter.name,
+		"QUP I2C adapter",
+		sizeof(dev->adapter.name));
+	dev->adapter.nr = pdev->id;
 	pdata->msm_i2c_config_gpio(dev->adapter.nr, 1);
 
 	dev->suspended = 0;
 	mutex_init(&dev->mlock);
 	dev->clk_state = 0;
 	setup_timer(&dev->pwr_timer, qup_i2c_pwr_timer, (unsigned long) dev);
-	return 0;
+
+	ret = i2c_add_numbered_adapter(&dev->adapter);
+	if (ret) {
+		dev_err(&pdev->dev, "i2c_add_adapter failed\n");
+		if (dev->num_irqs == 3) {
+			free_irq(dev->out_irq, dev);
+			free_irq(dev->in_irq, dev);
+		}
+		free_irq(dev->err_irq, dev);
+	} else
+		return 0;
 
 err_request_irq_failed:
-	i2c_del_adapter(&dev->adapter);
-err_i2c_add_adapter_failed:
 	iounmap(dev->gsbi);
 err_gsbi_failed:
 	iounmap(dev->base);
