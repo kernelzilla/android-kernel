@@ -274,7 +274,7 @@ static int pm8058_vreg_write(struct pm8058_chip *chip,
 static int pm8058_vreg_enable(struct regulator_dev *dev)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc = 0;
 
 	rc = pm8058_vreg_write(chip, vreg->ctrl_addr,
@@ -294,7 +294,7 @@ static int pm8058_vreg_is_enabled(struct regulator_dev *dev)
 static int pm8058_vreg_disable(struct regulator_dev *dev)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc = 0;
 
 	rc = pm8058_vreg_write(chip, vreg->ctrl_addr, 0,
@@ -418,7 +418,7 @@ static int pm8058_ldo_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int uV = (min_uV + max_uV) / 2;
 
 	if (vreg->is_nmos)
@@ -492,7 +492,7 @@ static int pm8058_ldo_get_voltage(struct regulator_dev *dev)
 static int pm8058_ldo_set_mode(struct regulator_dev *dev, unsigned int mode)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc = 0;
 	u8 ctrl, test, mask, val;
 
@@ -560,7 +560,7 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc, uV = (min_uV + max_uV) / 2;
 	u8 val, mask, vlow;
 
@@ -624,7 +624,7 @@ static int pm8058_smps_get_voltage(struct regulator_dev *dev)
 static int pm8058_smps_set_mode(struct regulator_dev *dev, unsigned int mode)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc;
 	u8 clk;
 
@@ -669,7 +669,7 @@ static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8058_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc, uV = (min_uV + max_uV) / 2;
 	u8 val;
 

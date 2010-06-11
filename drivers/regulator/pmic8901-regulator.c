@@ -225,7 +225,7 @@ static int pm8901_vreg_write(struct pm8901_chip *chip,
 static int pm8901_vreg_enable(struct regulator_dev *dev)
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc;
 
 	rc = pm8901_vreg_write(chip, vreg->pmr_addr,
@@ -240,7 +240,7 @@ static int pm8901_vreg_enable(struct regulator_dev *dev)
 static int pm8901_vreg_disable(struct regulator_dev *dev)
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc;
 
 	rc = pm8901_vreg_write(chip, vreg->pmr_addr,
@@ -372,7 +372,7 @@ static int pm8901_ldo_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int uV = (min_uV + max_uV) / 2;
 
 	if (vreg->is_nmos)
@@ -446,7 +446,7 @@ static int pm8901_ldo_get_voltage(struct regulator_dev *dev)
 static int pm8901_vreg_set_mode(struct regulator_dev *dev, unsigned int mode)
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int rc;
 	u8 val;
 
@@ -489,7 +489,7 @@ static int pm8901_smps_set_voltage(struct regulator_dev *dev,
 		int min_uV, int max_uV)
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
-	struct pm8901_chip *chip = dev_get_drvdata(vreg->rdev->dev.parent);
+	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
 	int uV = (min_uV + max_uV) / 2;
 	int rc;
 	u8 val, band;
