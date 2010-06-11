@@ -40,7 +40,7 @@ int diagfwd_connect(void);
 int diagfwd_disconnect(void);
 
 /* State for diag forwarding */
-static int diag_debug_buf_idx;
-static unsigned char diag_debug_buf[1024];
+extern int diag_debug_buf_idx;
+extern unsigned char diag_debug_buf[1024];
 
 #endif

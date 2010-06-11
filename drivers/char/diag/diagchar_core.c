@@ -65,17 +65,17 @@ static uint16_t delayed_rsp_id = 1;
 /* This macro gets the next delayed respose id. Once it reaches
  DIAGPKT_MAX_DELAYED_RSP, it stays at DIAGPKT_MAX_DELAYED_RSP */
 
-#define DIAGPKT_NEXT_DELAYED_RSP_ID(x) \
+#define DIAGPKT_NEXT_DELAYED_RSP_ID(x) 				\
 ((x < DIAGPKT_MAX_DELAYED_RSP) ? x++ : DIAGPKT_MAX_DELAYED_RSP)
 
-#define COPY_USER_SPACE(buf, data, length)				\
-do {									\
-	if ((count < ret+length) || (copy_to_user(buf,			\
-					(void *)&data, length))) {	\
-		ret = -EFAULT;						\
-		goto exit;						\
-	}								\
-	ret += length;							\
+#define COPY_USER_SPACE(buf, data, length)			\
+do {								\
+	if ((count < ret+length) || (copy_to_user(buf,		\
+			(void *)&data, length))) {		\
+		ret = -EFAULT;					\
+		goto exit;					\
+	}							\
+	ret += length;						\
 } while (0)
 
 static void drain_timer_func(unsigned long data)
@@ -85,11 +85,18 @@ static void drain_timer_func(unsigned long data)
 
 void diag_drain_work_fn(struct work_struct *work)
 {
+	int err = 0;
 	timer_in_progress = 0;
 
 	mutex_lock(&driver->diagchar_mutex);
 	if (buf_hdlc) {
-		diag_device_write(buf_hdlc, APPS_DATA);
+		err = diag_device_write(buf_hdlc, APPS_DATA);
+		if (err) {
+			/*Free the buffer right away if write failed */
+			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
+			diagmem_free(driver, (unsigned char *)driver->
+				 usb_write_ptr_svc, POOL_TYPE_USB_STRUCT);
+		}
 		buf_hdlc = NULL;
 #ifdef DIAG_DEBUG
 		printk(KERN_INFO "\n Number of bytes written "
@@ -175,7 +182,7 @@ static int diagchar_close(struct inode *inode, struct file *file)
 static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			   unsigned int iocmd, unsigned long ioarg)
 {
-	int i, count_entries = 0;
+	int i, count_entries = 0, temp;
 	int success = -1;
 
 	if (iocmd == DIAG_IOCTL_COMMAND_REG) {
@@ -221,26 +228,45 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			return -EINVAL;
 		driver->data_ready[i] |= DEINIT_TYPE;
 		wake_up_interruptible(&driver->wait_q);
-		success = 0;
+		success = 1;
 	} else if (iocmd == DIAG_IOCTL_SWITCH_LOGGING) {
-		if (driver->logging_mode == NO_LOGGING_MODE) {
+		mutex_lock(&driver->diagchar_mutex);
+		temp = driver->logging_mode;
+		driver->logging_mode = (int)ioarg;
+
+		if (temp == USB_MODE && driver->logging_mode == NO_LOGGING_MODE)
+			diagfwd_disconnect();
+		else if (temp == NO_LOGGING_MODE && driver->logging_mode
+								== USB_MODE)
+			diagfwd_connect();
+		else if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
+							== NO_LOGGING_MODE) {
+			driver->in_busy = 1;
+			driver->in_busy_qdsp = 1;
+		} else if (temp == NO_LOGGING_MODE && driver->logging_mode
+							== MEMORY_DEVICE_MODE) {
 			driver->in_busy = 0;
 			driver->in_busy_qdsp = 0;
-		}
-		if ((int)ioarg == NO_LOGGING_MODE)
+			/* Poll SMD channels to check for data*/
+			if (driver->ch)
+				diag_smd_send_req(NON_SMD_CONTEXT);
+			if (driver->chqdsp)
+				diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+		} else if (temp == USB_MODE && driver->logging_mode
+							== MEMORY_DEVICE_MODE) {
 			diagfwd_disconnect();
-		else if ((int)ioarg == MEMORY_DEVICE_MODE) {
-			if (driver->logging_mode == USB_MODE) {
-				driver->usb_connected = 0;
-				diag_close();/* properly close USB port */
-		}
-		} else if (((int)ioarg == USB_MODE))
+			driver->in_busy = 0;
+			driver->in_busy_qdsp = 0;
+			/* Poll SMD channels to check for data*/
+			if (driver->ch)
+				diag_smd_send_req(NON_SMD_CONTEXT);
+			if (driver->chqdsp)
+				diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+		} else if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
+								== USB_MODE)
 			diagfwd_connect();
-
-		mutex_lock(&driver->diagchar_mutex);
-		driver->logging_mode = (int)ioarg;
-		mutex_unlock(&driver->diagchar_mutex);
 		driver->logging_process_id = current->tgid;
+		mutex_unlock(&driver->diagchar_mutex);
 		success = 1;
 	}
 
@@ -265,7 +291,8 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 				  driver->data_ready[index]);
 	mutex_lock(&driver->diagchar_mutex);
 
-	if (driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE) {
+	if ((driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE) && (driver->
+					logging_mode == MEMORY_DEVICE_MODE)) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE;
 		COPY_USER_SPACE(buf, data_type, 4);
@@ -321,8 +348,6 @@ drop:
 			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in),
 					 driver->usb_write_ptr->length);
 			driver->in_busy = 0;
-			queue_work(driver->diag_wq,
-				    &(driver->diag_read_smd_work));
 		}
 
 		/* copy q6 data */
@@ -335,14 +360,18 @@ drop:
 			COPY_USER_SPACE(buf+ret, *(driver->usb_buf_in_qdsp),
 					 driver->usb_write_ptr_qdsp->length);
 			driver->in_busy_qdsp = 0;
-			queue_work(driver->diag_wq,
-				    &(driver->diag_read_smd_qdsp_work));
 		}
 
 		/* copy number of data fields */
 		COPY_USER_SPACE(buf+4, num_data, 4);
 		ret -= 4;
 		driver->data_ready[index] ^= MEMORY_DEVICE_LOG_TYPE;
+		if (driver->ch)
+			queue_work(driver->diag_wq,
+					 &(driver->diag_read_smd_work));
+		if (driver->chqdsp)
+			queue_work(driver->diag_wq,
+					 &(driver->diag_read_smd_qdsp_work));
 		APPEND_DEBUG('n');
 		goto exit;
 	}
@@ -408,7 +437,8 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	void *buf_copy;
 	int payload_size;
 
-	if ((driver->logging_mode == USB_MODE) && (!driver->usb_connected)) {
+	if (((driver->logging_mode == USB_MODE) && (!driver->usb_connected)) ||
+				(driver->logging_mode == NO_LOGGING_MODE)) {
 		/*Drop the diag payload */
 		return -EIO;
 	}

@@ -35,6 +35,9 @@ MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
 
+int diag_debug_buf_idx;
+unsigned char diag_debug_buf[1024];
+
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
@@ -111,7 +114,7 @@ int diag_device_write(void *buf, int proc_num)
 			err = diag_write(driver->usb_write_ptr_qdsp);
 		}
 		APPEND_DEBUG('k');
-	} else {
+	} else if (driver->logging_mode == MEMORY_DEVICE_MODE) {
 		if (proc_num == APPS_DATA) {
 			for (i = 0; i < driver->poolsize_usb_struct; i++)
 				if (driver->buf_tbl[i].length == 0) {
@@ -126,7 +129,7 @@ int diag_device_write(void *buf, int proc_num)
 #endif
 					break;
 				}
-	}
+		}
 		for (i = 0; i < driver->num_clients; i++)
 			if (driver->client_map[i] == driver->logging_process_id)
 				break;
@@ -135,6 +138,17 @@ int diag_device_write(void *buf, int proc_num)
 			wake_up_interruptible(&driver->wait_q);
 		} else
 			return -EINVAL;
+	} else if (driver->logging_mode == NO_LOGGING_MODE) {
+		if (proc_num == MODEM_DATA) {
+			driver->in_busy = 0;
+			queue_work(driver->diag_wq, &(driver->
+							diag_read_smd_work));
+		} else if (proc_num == QDSP_DATA) {
+			driver->in_busy_qdsp = 0;
+			queue_work(driver->diag_wq, &(driver->
+						diag_read_smd_qdsp_work));
+		}
+		err = -1;
 	}
     return err;
 }
@@ -151,7 +165,6 @@ void diag_smd_qdsp_send_req(int context)
 			return;
 		}
 		if (r > 0) {
-
 			buf = driver->usb_buf_in_qdsp;
 			if (!buf) {
 				printk(KERN_INFO "Out of diagmem for q6\n");
@@ -478,9 +491,12 @@ void diag_process_hdlc(void *data, unsigned len)
 
 int diagfwd_connect(void)
 {
-	printk(KERN_DEBUG "diag: USB connected\n");
-	diag_open(driver->poolsize + 3); /* 2 for A9 ; 1 for q6*/
+	int err;
 
+	printk(KERN_DEBUG "diag: USB connected\n");
+	err = diag_open(driver->poolsize + 3); /* 2 for A9 ; 1 for q6*/
+	if (err)
+		printk(KERN_ERR "diag: USB port open failed");
 	driver->usb_connected = 1;
 	driver->in_busy = 0;
 	driver->in_busy_qdsp = 0;
@@ -544,7 +560,8 @@ int diagfwd_read_complete(struct diag_request *diag_read_ptr)
 		       diag_read_ptr->actual, 1);
 #endif
 	driver->read_len = len;
-	queue_work(driver->diag_wq , &(driver->diag_read_work));
+	if (driver->logging_mode == USB_MODE)
+		queue_work(driver->diag_wq , &(driver->diag_read_work));
 	return 0;
 }
 
