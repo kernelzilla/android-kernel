@@ -47,6 +47,7 @@ config ARCH_MSM8X60
 	select MSM_REMOTE_SPINLOCK_LDREX
 	select ARCH_REQUIRE_GPIOLIB
 	select MSM_ADM3
+	select REGULATOR
 
 endchoice
 
