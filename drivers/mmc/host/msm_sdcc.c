@@ -1704,11 +1704,9 @@ msmsdcc_resume(struct platform_device *dev)
 		if (host->plat->sdiowakeup_irq)
 			disable_irq(host->plat->sdiowakeup_irq);
 
-		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO) {
+		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO)
 			mmc_resume_host(mmc);
-			if (host->plat->status_irq)
-				enable_irq(host->plat->status_irq);
-		} else if (host->plat->status_irq)
+		if (host->plat->status_irq)
 			enable_irq(host->plat->status_irq);
 
 	}
