@@ -318,12 +318,12 @@ int au_do_flush(struct file *file, fl_owner_t id,
 	inode = dentry->d_inode;
 	si_noflush_read_lock(sb);
 	fi_read_lock(file);
-	di_read_lock_child(dentry, AuLock_IW);
+	ii_read_lock_child(inode);
 
 	err = flush(file, id);
 	au_cpup_attr_timesizes(inode);
 
-	di_read_unlock(dentry, AuLock_IW);
+	ii_read_unlock(inode);
 	fi_read_unlock(file);
 	si_read_unlock(sb);
 	return err;
