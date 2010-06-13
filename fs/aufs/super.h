@@ -231,10 +231,11 @@ void au_export_init(struct super_block *sb);
 
 static inline int au_test_nfsd(struct task_struct *tsk)
 {
-	return !tsk->mm && !strcmp(tsk->comm, "nfsd");
+	return (current->flags & PF_KTHREAD)
+		&& !strcmp(tsk->comm, "nfsd");
 }
 
-int au_xigen_inc(struct inode *inode);
+void au_xigen_inc(struct inode *inode);
 int au_xigen_new(struct inode *inode);
 int au_xigen_set(struct super_block *sb, struct file *base);
 void au_xigen_clr(struct super_block *sb);
@@ -248,7 +249,7 @@ static inline int au_busy_or_stale(void)
 #else
 AuStubVoid(au_export_init, struct super_block *sb)
 AuStubInt0(au_test_nfsd, struct task_struct *tsk)
-AuStubInt0(au_xigen_inc, struct inode *inode)
+AuStubVoid(au_xigen_inc, struct inode *inode)
 AuStubInt0(au_xigen_new, struct inode *inode)
 AuStubInt0(au_xigen_set, struct super_block *sb, struct file *base)
 AuStubVoid(au_xigen_clr, struct super_block *sb)
