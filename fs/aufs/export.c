@@ -91,41 +91,28 @@ static int au_test_anon(struct dentry *dentry)
 /* ---------------------------------------------------------------------- */
 /* inode generation external table */
 
-int au_xigen_inc(struct inode *inode)
+void au_xigen_inc(struct inode *inode)
 {
-	int err;
 	loff_t pos;
 	ssize_t sz;
 	__u32 igen;
 	struct super_block *sb;
 	struct au_sbinfo *sbinfo;
 
-	err = 0;
 	sb = inode->i_sb;
-	sbinfo = au_sbi(sb);
-	/*
-	 * temporary workaround for escaping from SiMustAnyLock() in
-	 * au_mntflags(), since this function is called from au_iinfo_fin().
-	 */
-	if (unlikely(!au_opt_test(sbinfo->si_mntflags, XINO)))
-		goto out;
+	AuDebugOn(!au_opt_test(au_mntflags(sb), XINO));
 
+	sbinfo = au_sbi(sb);
 	pos = inode->i_ino;
 	pos *= sizeof(igen);
 	igen = inode->i_generation + 1;
 	sz = xino_fwrite(sbinfo->si_xwrite, sbinfo->si_xigen, &igen,
 			 sizeof(igen), &pos);
 	if (sz == sizeof(igen))
-		goto out; /* success */
+		return; /* success */
 
-	err = sz;
-	if (unlikely(sz >= 0)) {
-		err = -EIO;
+	if (unlikely(sz >= 0))
 		AuIOErr("xigen error (%zd)\n", sz);
-	}
-
- out:
-	return err;
 }
 
 int au_xigen_new(struct inode *inode)

@@ -526,11 +526,10 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
  * test if the branch is deletable or not.
  */
 static int test_dentry_busy(struct dentry *root, aufs_bindex_t bindex,
-			    unsigned int sigen)
+			    unsigned int sigen, const unsigned int verbose)
 {
 	int err, i, j, ndentry;
 	aufs_bindex_t bstart, bend;
-	unsigned char verbose;
 	struct au_dcsub_pages dpages;
 	struct au_dpage *dpage;
 	struct dentry *d;
@@ -543,7 +542,6 @@ static int test_dentry_busy(struct dentry *root, aufs_bindex_t bindex,
 	if (unlikely(err))
 		goto out_dpages;
 
-	verbose = !!au_opt_test(au_mntflags(root->d_sb), VERBOSE);
 	for (i = 0; !err && i < dpages.ndpage; i++) {
 		dpage = dpages.dpages + i;
 		ndentry = dpage->ndentry;
@@ -584,15 +582,13 @@ static int test_dentry_busy(struct dentry *root, aufs_bindex_t bindex,
 }
 
 static int test_inode_busy(struct super_block *sb, aufs_bindex_t bindex,
-			   unsigned int sigen)
+			   unsigned int sigen, const unsigned int verbose)
 {
 	int err;
 	struct inode *i;
 	aufs_bindex_t bstart, bend;
-	unsigned char verbose;
 
 	err = 0;
-	verbose = !!au_opt_test(au_mntflags(sb), VERBOSE);
 	list_for_each_entry(i, &sb->s_inodes, i_sb_list) {
 		AuDebugOn(!atomic_read(&i->i_count));
 		if (!list_empty(&i->i_dentry))
@@ -628,7 +624,8 @@ static int test_inode_busy(struct super_block *sb, aufs_bindex_t bindex,
 	return err;
 }
 
-static int test_children_busy(struct dentry *root, aufs_bindex_t bindex)
+static int test_children_busy(struct dentry *root, aufs_bindex_t bindex,
+			      const unsigned int verbose)
 {
 	int err;
 	unsigned int sigen;
@@ -637,9 +634,9 @@ static int test_children_busy(struct dentry *root, aufs_bindex_t bindex)
 	DiMustNoWaiters(root);
 	IiMustNoWaiters(root->d_inode);
 	di_write_unlock(root);
-	err = test_dentry_busy(root, bindex, sigen);
+	err = test_dentry_busy(root, bindex, sigen, verbose);
 	if (!err)
-		err = test_inode_busy(root->d_sb, bindex, sigen);
+		err = test_inode_busy(root->d_sb, bindex, sigen, verbose);
 	di_write_lock_child(root); /* aufs_write_lock() calls ..._child() */
 
 	return err;
@@ -776,7 +773,7 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 		}
 	}
 
-	err = test_children_busy(sb->s_root, bindex);
+	err = test_children_busy(sb->s_root, bindex, verbose);
 	if (unlikely(err)) {
 		if (do_wh)
 			goto out_wh;
