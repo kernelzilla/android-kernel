@@ -63,7 +63,7 @@ void au_wkq_fin(void);
 
 static inline int au_test_wkq(struct task_struct *tsk)
 {
-	return !tsk->mm
+	return (current->flags & PF_KTHREAD)
 		&& !strncmp(tsk->comm, AUFS_WKQ_NAME "/",
 			    sizeof(AUFS_WKQ_NAME));
 }

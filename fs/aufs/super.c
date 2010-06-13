@@ -686,6 +686,7 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 static const struct super_operations aufs_sop = {
 	.alloc_inode	= aufs_alloc_inode,
 	.destroy_inode	= aufs_destroy_inode,
+	/* always deleting, no clearing */
 	.drop_inode	= generic_delete_inode,
 	.show_options	= aufs_show_options,
 	.statfs		= aufs_statfs,
