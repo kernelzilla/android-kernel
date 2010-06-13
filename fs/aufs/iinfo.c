@@ -211,67 +211,38 @@ int au_ii_realloc(struct au_iinfo *iinfo, int nbr)
 	return err;
 }
 
-static int au_iinfo_write0(struct super_block *sb, struct au_hinode *hinode,
-			   ino_t ino)
-{
-	int err;
-	aufs_bindex_t bindex;
-	unsigned char locked;
-
-	err = 0;
-	locked = !!si_noflush_read_trylock(sb);
-	bindex = au_br_index(sb, hinode->hi_id);
-	if (bindex >= 0)
-		err = au_xino_write0(sb, bindex, hinode->hi_inode->i_ino, ino);
-	/* error action? */
-	if (locked)
-		si_read_unlock(sb);
-	return err;
-}
-
 void au_iinfo_fin(struct inode *inode)
 {
-	ino_t ino;
-	aufs_bindex_t bend;
-	unsigned char unlinked = !inode->i_nlink;
 	struct au_iinfo *iinfo;
 	struct au_hinode *hi;
 	struct super_block *sb;
-
-	if (unlinked) {
-		int err = au_xigen_inc(inode);
-		if (unlikely(err))
-			AuWarn1("failed resetting i_generation, %d\n", err);
-	}
+	aufs_bindex_t bindex, bend;
+	unsigned char locked;
 
 	iinfo = au_ii(inode);
 	/* bad_inode case */
 	if (!iinfo)
 		return;
 
+	sb = inode->i_sb;
+	locked = !!si_noflush_read_trylock(sb);
+	au_xino_delete_inode(inode, !inode->i_nlink);
+	if (locked)
+		si_read_unlock(sb);
+
 	if (iinfo->ii_vdir)
 		au_vdir_free(iinfo->ii_vdir);
 
-	if (iinfo->ii_bstart >= 0) {
-		sb = inode->i_sb;
-		ino = 0;
-		if (unlinked)
-			ino = inode->i_ino;
-		hi = iinfo->ii_hinode + iinfo->ii_bstart;
+	bindex = iinfo->ii_bstart;
+	if (bindex >= 0) {
+		hi = iinfo->ii_hinode + bindex;
 		bend = iinfo->ii_bend;
-		while (iinfo->ii_bstart++ <= bend) {
-			if (hi->hi_inode) {
-				if (unlinked || !hi->hi_inode->i_nlink) {
-					au_iinfo_write0(sb, hi, ino);
-					/* ignore this error */
-					ino = 0;
-				}
+		while (bindex++ <= bend) {
+			if (hi->hi_inode)
 				au_hiput(hi);
-			}
 			hi++;
 		}
 	}
-
 	kfree(iinfo->ii_hinode);
 	AuRwDestroy(&iinfo->ii_rwsem);
 }

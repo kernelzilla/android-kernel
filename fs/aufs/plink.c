@@ -421,7 +421,6 @@ long au_plink_ioctl(struct file *file, unsigned int cmd)
 {
 	long err;
 	struct super_block *sb;
-	struct au_sbinfo *sbinfo;
 
 	err = -EACCES;
 	if (!capable(CAP_SYS_ADMIN))
@@ -429,7 +428,6 @@ long au_plink_ioctl(struct file *file, unsigned int cmd)
 
 	err = 0;
 	sb = file->f_dentry->d_sb;
-	sbinfo = au_sbi(sb);
 	switch (cmd) {
 	case AUFS_CTL_PLINK_MAINT:
 		/*
@@ -440,7 +438,7 @@ long au_plink_ioctl(struct file *file, unsigned int cmd)
 		break;
 	case AUFS_CTL_PLINK_CLEAN:
 		aufs_write_lock(sb->s_root);
-		if (au_opt_test(sbinfo->si_mntflags, PLINK))
+		if (au_opt_test(au_mntflags(sb), PLINK))
 			au_plink_put(sb);
 		aufs_write_unlock(sb->s_root);
 		break;
