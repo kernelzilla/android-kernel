@@ -1942,6 +1942,10 @@ static struct ofn_atlab_platform_data optnav_data = {
 	},
 };
 
+static struct msm_hdmi_platform_data adv7520_hdmi_data = {
+		.irq = MSM_GPIO_TO_INT(18),
+};
+
 static struct i2c_board_info msm_i2c_board_info[] = {
 	{
 		I2C_BOARD_INFO("m33c01", OPTNAV_I2C_SLAVE_ADDR),
@@ -1950,6 +1954,7 @@ static struct i2c_board_info msm_i2c_board_info[] = {
 	},
 	{
 		I2C_BOARD_INFO("adv7520", 0x72 >> 1),
+		.platform_data = &adv7520_hdmi_data,
 	},
 };
 
