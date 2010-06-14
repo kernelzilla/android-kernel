@@ -299,16 +299,16 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		clk = clk_get(NULL, "camif_pad_pclk");
 		break;
 
-	case CAMIO_CSI_CLK:
+	case CAMIO_CSI0_CLK:
 		camio_csi_clk =
 		clk = clk_get(NULL, "csi_clk");
 		msm_camio_clk_rate_set_2(clk, 153600000);
 		break;
-	case CAMIO_CSI_VFE_CLK:
+	case CAMIO_CSI0_VFE_CLK:
 		camio_csi_vfe_clk =
 		clk = clk_get(NULL, "csi_vfe_clk");
 		break;
-	case CAMIO_CSI_PCLK:
+	case CAMIO_CSI0_PCLK:
 		camio_csi_pclk =
 		clk = clk_get(NULL, "csi_pclk");
 		break;
@@ -356,13 +356,13 @@ int msm_camio_clk_disable(enum msm_camio_clk_type clktype)
 	case CAMIO_CAMIF_PAD_PBDG_CLK:
 		clk = camio_camif_pad_pbdg_clk;
 		break;
-	case CAMIO_CSI_CLK:
+	case CAMIO_CSI0_CLK:
 		clk = camio_csi_clk;
 		break;
-	case CAMIO_CSI_VFE_CLK:
+	case CAMIO_CSI0_VFE_CLK:
 		clk = camio_csi_vfe_clk;
 		break;
-	case CAMIO_CSI_PCLK:
+	case CAMIO_CSI0_PCLK:
 		clk = camio_csi_pclk;
 		break;
 	default:
@@ -443,9 +443,9 @@ int msm_camio_enable(struct platform_device *pdev)
 		if (rc < 0)
 			goto csi_irq_fail;
 		/* enable required clocks for CSI */
-		msm_camio_clk_enable(CAMIO_CSI_PCLK);
-		msm_camio_clk_enable(CAMIO_CSI_VFE_CLK);
-		msm_camio_clk_enable(CAMIO_CSI_CLK);
+		msm_camio_clk_enable(CAMIO_CSI0_PCLK);
+		msm_camio_clk_enable(CAMIO_CSI0_VFE_CLK);
+		msm_camio_clk_enable(CAMIO_CSI0_CLK);
 	}
 	return 0;
 
@@ -477,9 +477,9 @@ void msm_camio_disable(struct platform_device *pdev)
 		release_mem_region(camio_ext.camifpadphy, camio_ext.camifpadsz);
 	} else {
 		free_irq(camio_ext.csiirq, 0);
-		msm_camio_clk_disable(CAMIO_CSI_PCLK);
-		msm_camio_clk_disable(CAMIO_CSI_VFE_CLK);
-		msm_camio_clk_disable(CAMIO_CSI_CLK);
+		msm_camio_clk_disable(CAMIO_CSI0_PCLK);
+		msm_camio_clk_disable(CAMIO_CSI0_VFE_CLK);
+		msm_camio_clk_disable(CAMIO_CSI0_CLK);
 		iounmap(csibase);
 		release_mem_region(camio_ext.csiphy, camio_ext.csisz);
 	}
