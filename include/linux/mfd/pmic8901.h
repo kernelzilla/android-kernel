@@ -65,5 +65,6 @@ int pm8901_read(struct pm8901_chip *pm_chip, u16 addr, u8 *values,
 int pm8901_write(struct pm8901_chip *pm_chip, u16 addr, u8 *values,
 		 unsigned int len);
 
-int pm8901_mpp_get(struct pm8901_chip *pm_chip, unsigned mpp);
+int pm8901_irq_get_rt_status(struct pm8901_chip *pm_chip, int irq);
+
 #endif /* __PMIC8901_H__ */
