@@ -231,7 +231,7 @@ msmsdcc_dma_exec_func(struct msm_dmov_cmd *cmd)
 	writel(host->cmd_timeout, host->base + MMCIDATATIMER);
 	writel((unsigned int)host->curr.xfer_size, host->base + MMCIDATALENGTH);
 	writel((readl(host->base + MMCIMASK0) & (~(MCI_IRQ_PIO))) |
-			host->cmd_pio_irqmask, host->base + MMCIMASK0);
+	       host->cmd_pio_irqmask, host->base + MMCIMASK0);
 	msmsdcc_delay(host);	/* Allow data parms to be applied */
 	writel(host->cmd_datactrl, host->base + MMCIDATACTRL);
 	msmsdcc_delay(host);	/* Force delay prior to ADM or command */
@@ -615,17 +615,17 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 		       data->blksz, data->blocks);
 		data->error = -EILSEQ;
 	} else if (status & MCI_DATATIMEOUT) {
-			/* CRC is optional for the bus test commands, not all
-			 * cards respond back with CRC. However controller
-			 * waits for the CRC and times out. Hence ignore the
-			 * data timeouts during the Bustest.
-			 */
-			if (!(data->mrq->cmd->opcode == MMC_BUSTEST_W
-			    || data->mrq->cmd->opcode == MMC_BUSTEST_R)) {
-				pr_err("%s: Data timeout\n",
-					 mmc_hostname(host->mmc));
-				data->error = -ETIMEDOUT;
-			}
+		/* CRC is optional for the bus test commands, not all
+		 * cards respond back with CRC. However controller
+		 * waits for the CRC and times out. Hence ignore the
+		 * data timeouts during the Bustest.
+		 */
+		if (!(data->mrq->cmd->opcode == MMC_BUSTEST_W
+			|| data->mrq->cmd->opcode == MMC_BUSTEST_R)) {
+			pr_err("%s: Data timeout\n",
+				 mmc_hostname(host->mmc));
+			data->error = -ETIMEDOUT;
+		}
 	} else if (status & MCI_RXOVERRUN) {
 		pr_err("%s: RX overrun\n", mmc_hostname(host->mmc));
 		data->error = -EIO;
@@ -1455,7 +1455,7 @@ msmsdcc_probe(struct platform_device *pdev)
 		goto clk_disable;
 
 	ret = request_irq(irqres->start, msmsdcc_pio_irq, IRQF_SHARED,
-		DRIVER_NAME " (pio)", host);
+			  DRIVER_NAME " (pio)", host);
 	if (ret)
 		goto irq_free;
 
