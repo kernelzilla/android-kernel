@@ -843,6 +843,7 @@ static void vfe_process_camif_sof_irq(void)
 		if (ctrl->vfeFrameSkipCount == (ctrl->vfeFrameSkipPeriod + 1))
 			ctrl->vfeFrameSkipCount = 0;
 	}
+	vfe_proc_ops(VFE_MSG_ID_SOF_ACK, NULL);
 }
 
 static boolean vfe_get_af_pingpong_status(void)
