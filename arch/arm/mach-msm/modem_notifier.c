@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,6 +32,23 @@
 
 static struct srcu_notifier_head modem_notifier_list;
 static struct workqueue_struct *modem_notifier_wq;
+
+static void notify_work_smsm_init(struct work_struct *work)
+{
+	modem_notify(0, MODEM_NOTIFIER_SMSM_INIT);
+}
+static DECLARE_WORK(modem_notifier_smsm_init_work, &notify_work_smsm_init);
+
+void modem_queue_smsm_init_notify(void)
+{
+	int ret;
+
+	ret = queue_work(modem_notifier_wq, &modem_notifier_smsm_init_work);
+
+	if (!ret)
+		printk(KERN_ERR "%s\n", __func__);
+}
+EXPORT_SYMBOL(modem_queue_smsm_init_notify);
 
 static void notify_work_start_reset(struct work_struct *work)
 {
@@ -160,6 +177,9 @@ static int modem_notifier_test_call(struct notifier_block *this,
 		break;
 	case MODEM_NOTIFIER_END_RESET:
 		printk(KERN_ERR "Notify: end reset\n");
+		break;
+	case MODEM_NOTIFIER_SMSM_INIT:
+		printk(KERN_ERR "Notify: smsm init\n");
 		break;
 	default:
 		printk(KERN_ERR "Notify: general\n");
