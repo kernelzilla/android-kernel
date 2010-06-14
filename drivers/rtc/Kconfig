@@ -876,4 +876,14 @@ config RTC_DRV_PCAP
 	  If you say Y here you will get support for the RTC found on
 	  the PCAP2 ASIC used on some Motorola phones.
 
+config RTC_PM8058
+	tristate "PMIC8058 RTC support"
+	default n
+	depends on PMIC8058
+	help
+	  Say Y here if you want support for the PMIC8058 RTC.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pmic8058-rtc.
+
 endif # RTC_CLASS
