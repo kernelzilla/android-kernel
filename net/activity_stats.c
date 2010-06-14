@@ -76,7 +76,7 @@ static int activity_stats_read_proc(char *page, char **start, off_t off,
 
 	for (i = 0; i < BUCKET_MAX; i++) {
 		len = snprintf(p, count, "%15d %lu\n", 1 << i, activity_stats[i]);
-		count -= len
+		count -= len;
 		p += len;
 	}
 	*eof = 1;
