@@ -79,6 +79,53 @@ static enum led_brightness kp_bl_get(struct pmic8058_led_data *led)
 		return LED_OFF;
 }
 
+static void led_lc_set(struct pmic8058_led_data *led, enum led_brightness value)
+{
+	unsigned long flags;
+	int rc, offset;
+	u8 level, tmp;
+
+	spin_lock_irqsave(&led->value_lock, flags);
+
+	level = (led->brightness << PM8058_DRV_LED_CTRL_SHIFT) &
+		PM8058_DRV_LED_CTRL_MASK;
+
+	offset = PMIC8058_LED_OFFSET(led->id);
+	tmp = led->reg_led_ctrl[offset];
+
+	tmp &= ~PM8058_DRV_LED_CTRL_MASK;
+	tmp |= level;
+	spin_unlock_irqrestore(&led->value_lock, flags);
+
+	rc = pm8058_write(led->pm_chip,	SSBI_REG_ADDR_LED_CTRL(offset),
+			&tmp, 1);
+	if (rc) {
+		dev_err(led->cdev.dev, "can't set (%d) led value\n",
+				led->id);
+		mutex_unlock(&led->lock);
+		return;
+	}
+
+	spin_lock_irqsave(&led->value_lock, flags);
+	led->reg_led_ctrl[offset] = tmp;
+	spin_unlock_irqrestore(&led->value_lock, flags);
+}
+
+static enum led_brightness led_lc_get(struct pmic8058_led_data *led)
+{
+	int offset;
+	u8 value;
+
+	offset = PMIC8058_LED_OFFSET(led->id);
+	value = led->reg_led_ctrl[offset];
+
+	if ((value & PM8058_DRV_LED_CTRL_MASK) >>
+			PM8058_DRV_LED_CTRL_SHIFT)
+		return LED_FULL;
+	else
+		return LED_OFF;
+}
+
 static void pmic8058_led_set(struct led_classdev *led_cdev,
 	enum led_brightness value)
 {
@@ -97,9 +144,6 @@ static void pmic8058_led_work(struct work_struct *work)
 {
 	struct pmic8058_led_data *led = container_of(work,
 					 struct pmic8058_led_data, work);
-	unsigned long flags;
-	int rc, offset;
-	u8 level, tmp;
 
 	mutex_lock(&led->lock);
 
@@ -110,35 +154,7 @@ static void pmic8058_led_work(struct work_struct *work)
 	case PMIC8058_ID_LED_0:
 	case PMIC8058_ID_LED_1:
 	case PMIC8058_ID_LED_2:
-		/* scale led levels from 0...255 to 1..20mA current level
-		 * required by low level led current drivers, with
-		 * some rounding.
-		 */
-		spin_lock_irqsave(&led->value_lock, flags);
-
-		level = (led->brightness << PM8058_DRV_LED_CTRL_SHIFT) &
-				 PM8058_DRV_LED_CTRL_MASK;
-
-		offset = PMIC8058_LED_OFFSET(led->id);
-		tmp = led->reg_led_ctrl[offset];
-
-		tmp &= ~PM8058_DRV_LED_CTRL_MASK;
-		tmp |= level;
-		spin_unlock_irqrestore(&led->value_lock, flags);
-
-		rc = pm8058_write(led->pm_chip,	SSBI_REG_ADDR_LED_CTRL(offset),
-				 &tmp, 1);
-		if (rc) {
-			dev_err(led->cdev.dev, "can't set (%d) led value\n",
-					 led->id);
-			mutex_unlock(&led->lock);
-			return;
-		}
-
-		spin_lock_irqsave(&led->value_lock, flags);
-		led->reg_led_ctrl[offset] = tmp;
-		spin_unlock_irqrestore(&led->value_lock, flags);
-
+		led_lc_set(led, led->brightness);
 		break;
 	}
 
@@ -148,8 +164,6 @@ static void pmic8058_led_work(struct work_struct *work)
 static enum led_brightness pmic8058_led_get(struct led_classdev *led_cdev)
 {
 	struct pmic8058_led_data *led;
-	int offset;
-	u8 value;
 
 	led = container_of(led_cdev, struct pmic8058_led_data, cdev);
 
@@ -159,16 +173,7 @@ static enum led_brightness pmic8058_led_get(struct led_classdev *led_cdev)
 	case PMIC8058_ID_LED_0:
 	case PMIC8058_ID_LED_1:
 	case PMIC8058_ID_LED_2:
-
-		offset = PMIC8058_LED_OFFSET(led->id);
-		value = led->reg_led_ctrl[offset];
-
-		if ((value & PM8058_DRV_LED_CTRL_MASK) >>
-					 PM8058_DRV_LED_CTRL_SHIFT)
-			return LED_FULL;
-		else
-			return LED_OFF;
-		break;
+		return led_lc_get(led);
 	}
 	return LED_OFF;
 }
