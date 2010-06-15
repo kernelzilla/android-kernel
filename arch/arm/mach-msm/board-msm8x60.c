@@ -291,7 +291,9 @@ static struct msm_i2c_platform_data msm_gsbi9_qup_i2c_pdata = {
 
 #if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
 static struct msm_spi_platform_data msm_gsbi1_qup_spi_pdata = {
-	.max_clock_speed = 26000000,
+	.max_clock_speed = 24000000,
+	.clk_name = "gsbi_qup_clk",
+	.pclk_name = "gsbi_pclk",
 };
 #endif
 
