@@ -65,6 +65,8 @@
 struct pm8901_vreg_pdata {
 	int min_uV;
 	int max_uV;
+	int (*init)(void *data);
+	void *init_data;
 };
 
 #endif
