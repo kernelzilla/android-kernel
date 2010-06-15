@@ -188,7 +188,12 @@ uint32_t socinfo_get_platform_version(void)
 
 enum msm_cpu socinfo_get_msm_cpu(void)
 {
+#ifdef CONFIG_ARCH_MSM8X60
+	/* Hardcode CPU for 8x60, which doesn't support socinfo yet. */
+	return MSM_CPU_8X60;
+#else
 	return cur_cpu;
+#endif
 }
 
 static ssize_t
