@@ -111,7 +111,7 @@ struct sdio_write_data_struct {
 static struct sdio_write_data_struct *sdio_write_pkt;
 static void sdio_xprt_write_data(struct work_struct *work);
 static DECLARE_WORK(work_write_data, sdio_xprt_write_data);
-
+static wait_queue_head_t write_avail_wait_q;
 
 static void free_sdio_xprt(struct sdio_xprt *chnl)
 {
@@ -253,7 +253,6 @@ static int rpcrouter_sdio_remote_write(void *data, uint32_t len,
 static void sdio_xprt_write_data(struct work_struct *work)
 {
 	int rc = 0, sdio_write_retry = 0;
-	uint32_t write_avail;
 	unsigned long flags;
 	struct sdio_write_data_struct *sdio_write_data;
 
@@ -265,15 +264,10 @@ static void sdio_xprt_write_data(struct work_struct *work)
 		list_del(&sdio_write_data->list);
 		spin_unlock_irqrestore(&write_list_lock, flags);
 
-		while ((write_avail = sdio_write_avail(
-				sdio_remote_xprt.channel->handle)) <
-				sdio_write_data->write_len) {
-			SDIO_XPRT_DBG("sdio_write_avail %d bytes, "
-				      "sdio_write_data %d bytes\n",
-				       write_avail,
-				       sdio_write_data->write_len);
-			msleep(250);
-		}
+		wait_event(write_avail_wait_q,
+			   (sdio_write_avail(
+			   sdio_remote_xprt.channel->handle) >=
+			   sdio_write_data->write_len));
 		while (((rc = sdio_write(sdio_remote_xprt.channel->handle,
 					sdio_write_data->write_data,
 					sdio_write_data->write_len)) < 0) &&
@@ -393,6 +387,11 @@ static void rpcrouter_sdio_remote_notify(void *_dev, unsigned event)
 			      "SDIO_EVENT_DATA_READ_AVAIL\n", __func__);
 		queue_work(sdio_xprt_read_workqueue, &work_read_data);
 	}
+	if (event == SDIO_EVENT_DATA_WRITE_AVAIL) {
+		SDIO_XPRT_DBG("%s Received Notify"
+			      "SDIO_EVENT_DATA_WRITE_AVAIL\n", __func__);
+		wake_up(&write_avail_wait_q);
+	}
 }
 
 static int allocate_sdio_xprt(struct sdio_xprt **sdio_xprt_chnl)
@@ -458,7 +457,7 @@ static int rpcrouter_sdio_remote_probe(struct platform_device *pdev)
 	sdio_remote_xprt.xprt.priv = NULL;
 
 	init_waitqueue_head(&free_buf_wait);
-
+	init_waitqueue_head(&write_avail_wait_q);
 
 	INIT_LIST_HEAD(&write_list);
 
