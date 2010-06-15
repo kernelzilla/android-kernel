@@ -1035,6 +1035,19 @@ static struct pm8058_vreg_pdata pm8058_vreg_pdata[PM8058_VREG_MAX] = {
 	[PM8058_VREG_ID_NCP]	= { .min_uV = -1800000,	.max_uV = -1800000 },
 };
 
+static struct resource resources_rtc[] = {
+       {
+		.start  = PM8058_RTC_IRQ(PM8058_IRQ_BASE),
+		.end    = PM8058_RTC_IRQ(PM8058_IRQ_BASE),
+		.flags  = IORESOURCE_IRQ,
+       },
+       {
+		.start  = PM8058_RTC_ALARM_IRQ(PM8058_IRQ_BASE),
+		.end    = PM8058_RTC_ALARM_IRQ(PM8058_IRQ_BASE),
+		.flags  = IORESOURCE_IRQ,
+       },
+};
+
 static struct mfd_cell pm8058_subdevs[] = {
 	{
 		.name = "pm8058-keypad",
@@ -1097,6 +1110,12 @@ static struct mfd_cell pm8058_subdevs[] = {
 		.data_size = sizeof(othc_config_pdata_2),
 		.num_resources = ARRAY_SIZE(resources_othc_2),
 		.resources = resources_othc_2,
+	},
+	{
+		.name = "pm8058-rtc",
+		.id = -1,
+		.num_resources  = ARRAY_SIZE(resources_rtc),
+		.resources      = resources_rtc,
 	},
 	PM8058_VREG(PM8058_VREG_ID_L0),
 	PM8058_VREG(PM8058_VREG_ID_L1),
