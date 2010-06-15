@@ -438,10 +438,15 @@ static int msm_route_put(struct snd_kcontrol *kcontrol,
 		session_mask =
 			(0x1 << (session_id) << (8 * ((int)AUDDEV_CLNT_DEC-1)));
 		if (!set) {
-			if (dev_info->opened)
+			if (dev_info->opened) {
+				broadcast_event(AUDDEV_EVT_REL_PENDING,
+						route_cfg.dev_id,
+						session_mask);
+
 				broadcast_event(AUDDEV_EVT_DEV_RLS,
 							route_cfg.dev_id,
 							session_mask);
+			}
 			dev_info->sessions &= ~(session_mask);
 		} else {
 			dev_info->sessions = dev_info->sessions | session_mask;
