@@ -132,19 +132,16 @@ enum {
 enum {
 	OVERLAY_PIPE_RGB1,
 	OVERLAY_PIPE_RGB2,
-	OVERLAY_PIPE_RGB_MAX
-};
-
-enum {
 	OVERLAY_PIPE_VG1,	/* video/graphic */
 	OVERLAY_PIPE_VG2,
-	OVERLAY_PIPE_VG_MAX
+	OVERLAY_PIPE_MAX
 };
 
-enum {
-	OVERLAY_TYPE_RGB,
-	OVERLAY_TYPE_VG		/* video/graphic */
-};
+/* 2 VG pipes can be shared by RGB and VIDEO */
+#define MDP4_MAX_PIPE 	(OVERLAY_PIPE_MAX + 2)
+
+#define OVERLAY_TYPE_RGB	0x01
+#define	OVERLAY_TYPE_VIDEO	0x02
 
 enum {
 	MDP4_MIXER0,
@@ -224,10 +221,6 @@ enum {
 
 #define MDP4_MAX_PLANE		4
 
-#define MDP4_MAX_VIDEO_PIPE 2
-#define MDP4_MAX_RGB_PIPE 2
-#define MDP4_MAX_OVERLAY_PIPE 	4
-
 
 struct mdp4_overlay_pipe {
 	uint32 pipe_used;
@@ -268,7 +261,6 @@ struct mdp4_overlay_pipe {
 	uint32 chroma_sample;		/* video */
 	uint32 solid_fill;
 	uint32 vc1_reduce;		/* video */
-	uint32 fatch_planes;		/* video */
 	uint32 unpack_align_msb;/* 0 to LSB, 1 to MSB */
 	uint32 unpack_tight;/* 0 for loose, 1 for tight */
 	uint32 unpack_count;/* 0 = 1 component, 1 = 2 component ... */
@@ -298,6 +290,11 @@ struct mdp4_overlay_pipe {
 	struct mdp_overlay req_data;
 };
 
+struct mdp4_pipe_desc {
+	uint32 ref_cnt;
+	struct mdp4_overlay_pipe *player;
+};
+
 struct mdp4_statistic {
 	ulong intr_tot;
 	ulong intr_dma_p;
@@ -314,8 +311,7 @@ struct mdp4_statistic {
 	ulong overlay_set[MDP4_MIXER_MAX];
 	ulong overlay_unset[MDP4_MIXER_MAX];
 	ulong overlay_play[MDP4_MIXER_MAX];
-	ulong pipe_rgb[OVERLAY_PIPE_RGB_MAX];
-	ulong pipe_vg[OVERLAY_PIPE_VG_MAX];
+	ulong pipe[MDP4_MAX_PIPE];
 	ulong err_mixer;
 	ulong err_zorder;
 	ulong err_size;
