@@ -4537,7 +4537,7 @@ static void tma300_init(void)
 	}
 
 	/* Initialize platform data for fluid v2 hardware */
-	if (socinfo_get_platform_version() == 2) {
+	if (SOCINFO_VERSION_MAJOR(socinfo_get_platform_version()) == 2) {
 		cy8ctma300_pdata.res_y = 920;
 		cy8ctma300_pdata.invert_y = 0;
 		cy8ctma300_pdata.use_polling = 0;
