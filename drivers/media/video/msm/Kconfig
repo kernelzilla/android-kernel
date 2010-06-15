@@ -1,14 +1,14 @@
 comment "Camera Sensor Selection"
 config MT9T013
 	bool "Sensor mt9t013 (BAYER 3M)"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	default y
 	---help---
 	  MICRON 3M Bayer Sensor with AutoFocus
 
 config MT9D112
 	bool "Sensor mt9d112 (YUV 2M)"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	default y
 	---help---
 	  MICRON 2M YUV Sensor
@@ -21,14 +21,14 @@ config VX6953
 
 config MT9P012
 	bool "Sensor mt9p012 (BAYER 5M)"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	default y
 	---help---
 	  MICRON 5M Bayer Sensor with Autofocus
 
 choice
 	prompt "AF module"
-	depends on MT9P012
+	depends on MT9P012 && !ARCH_MSM8X60
 	default MSM_CAMERA_AF_FOXCONN
 
 config MSM_CAMERA_AF_FOXCONN
@@ -45,21 +45,21 @@ endchoice
 
 config MT9P012_KM
 	bool "Sensor mt9p012 KM module (BAYER 5M)"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	default y
 	---help---
 	  MICRON 5M Bayer Sensor KM modules with Autofocus
 
 config S5K3E2FX
 	bool "Sensor s5k3e2fx (Samsung 5M)"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	default y
 	---help---
 	  Samsung 5M with Autofocus
 
 config VB6801
 	bool "Sensor vb6801"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && !ARCH_MSM8X60
 	---help---
 	  5M with flash
 
