@@ -30,6 +30,8 @@
 #include <mach/msm_rotator_imem.h>
 #include <linux/ktime.h>
 #include <linux/workqueue.h>
+#include <linux/file.h>
+#include <linux/major.h>
 
 #define DRIVER_NAME "msm_rotator"
 
@@ -649,12 +651,42 @@ static int msm_rotator_rgb_types(struct msm_rotator_img_info *info,
 	return 0;
 }
 
+static int get_img(int memory_id, unsigned long *start, unsigned long *len,
+		struct file **pp_file)
+{
+	int put_needed, ret = 0, fb_num;
+	struct file *file;
+#ifdef CONFIG_ANDROID_PMEM
+	unsigned long vstart;
+#endif
+
+#ifdef CONFIG_ANDROID_PMEM
+	if (!get_pmem_file(memory_id, start, &vstart, len, pp_file))
+		return 0;
+#endif
+	file = fget_light(memory_id, &put_needed);
+	if (file == NULL)
+		return -1;
+
+	if (MAJOR(file->f_dentry->d_inode->i_rdev) == FB_MAJOR) {
+		fb_num = MINOR(file->f_dentry->d_inode->i_rdev);
+		if (get_fb_phys_info(start, len, fb_num))
+			ret = -1;
+		else
+			*pp_file = file;
+	} else
+		ret = -1;
+	if (ret)
+		fput_light(file, put_needed);
+	return ret;
+}
+
 static int msm_rotator_do_rotate(unsigned long arg)
 {
 	int rc = 0;
 	unsigned int status;
 	struct msm_rotator_data_info info;
-	unsigned int in_paddr, out_paddr, vaddr;
+	unsigned int in_paddr, out_paddr;
 	unsigned long len;
 	struct file *src_file = 0;
 	struct file *dst_file = 0;
@@ -664,21 +696,19 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	if (copy_from_user(&info, (void __user *)arg, sizeof(info)))
 		return -EFAULT;
 
-	rc = get_pmem_file(info.src.memory_id, (unsigned long *)&in_paddr,
-			   (unsigned long *)&vaddr, (unsigned long *)&len,
-			   &src_file);
+	rc = get_img(info.src.memory_id, (unsigned long *)&in_paddr,
+			(unsigned long *)&len, &src_file);
 	if (rc) {
-		printk(KERN_ERR "%s: in get_pmem_file() failed id=0x%08x\n",
+		printk(KERN_ERR "%s: in get_img() failed id=0x%08x\n",
 		       DRIVER_NAME, info.src.memory_id);
 		return rc;
 	}
 	in_paddr += info.src.offset;
 
-	rc = get_pmem_file(info.dst.memory_id, (unsigned long *)&out_paddr,
-			   (unsigned long *)&vaddr, (unsigned long *)&len,
-			   &dst_file);
+	rc = get_img(info.dst.memory_id, (unsigned long *)&out_paddr,
+			(unsigned long *)&len, &dst_file);
 	if (rc) {
-		printk(KERN_ERR "%s: out get_pmem_file() failed id=0x%08x\n",
+		printk(KERN_ERR "%s: out get_img() failed id=0x%08x\n",
 		       DRIVER_NAME, info.dst.memory_id);
 		return rc;
 	}

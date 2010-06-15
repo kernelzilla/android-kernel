@@ -1254,7 +1254,7 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 static int get_img(struct msmfb_data *img, struct fb_info *info,
 	unsigned long *start, unsigned long *len, struct file **pp_file)
 {
-	int put_needed, ret = 0;
+	int put_needed, ret = 0, fb_num;
 	struct file *file;
 #ifdef CONFIG_ANDROID_PMEM
 	unsigned long vstart;
@@ -1269,15 +1269,18 @@ static int get_img(struct msmfb_data *img, struct fb_info *info,
 		return -1;
 
 	if (MAJOR(file->f_dentry->d_inode->i_rdev) == FB_MAJOR) {
-		*start = info->fix.smem_start;
-		*len = info->fix.smem_len;
-		*pp_file = file;
-	} else {
+		fb_num = MINOR(file->f_dentry->d_inode->i_rdev);
+		if (get_fb_phys_info(start, len, fb_num))
+			ret = -1;
+		else
+			*pp_file = file;
+	} else
 		ret = -1;
+	if (ret)
 		fput_light(file, put_needed);
-	}
 	return ret;
 }
+
 int mdp4_overlay_get(struct fb_info *info, struct mdp_overlay *req)
 {
 	struct mdp4_overlay_pipe *pipe;
