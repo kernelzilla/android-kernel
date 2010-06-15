@@ -88,16 +88,16 @@
 /** SDIO-Client HW threshold to generate interrupt to the
  *  SDIO-Host on write available bytes.
  */
-#define DEFAULT_WRITE_THRESHOLD 	(MAX_DATA_AVAILABLE/2)
+#define DEFAULT_WRITE_THRESHOLD 	(1024)
 
 /** SDIO-Client HW threshold to generate interrupt to the
  *  SDIO-Host on read available bytes, for streaming (non
  *  packet) rx data.
  */
-#define DEFAULT_READ_THRESHOLD  	(MAX_DATA_AVAILABLE/2)
+#define DEFAULT_READ_THRESHOLD  	(1024)
 
 /** SW threshold to trigger reading the mailbox. */
-#define DEFAULT_MIN_WRITE_THRESHOLD 	1024
+#define DEFAULT_MIN_WRITE_THRESHOLD 	(1024)
 
 #define THRESHOLD_DISABLE_VAL  		(0xFFFFFFFF)
 
@@ -840,21 +840,20 @@ static void set_default_channels_config(void)
 
 	sdio_al->channel[0].name = "SDIO_RPC";
 	sdio_al->channel[0].priority = SDIO_PRIORITY_HIGH;
-	sdio_al->channel[0].peer_tx_buf_size = 1536;
 
 	sdio_al->channel[1].name = "SDIO_RMNET_DATA";
 	sdio_al->channel[1].priority = SDIO_PRIORITY_MED;
 	sdio_al->channel[1].is_packet_mode = false;  /* No EOT for Rx Data */
-	sdio_al->channel[1].poll_delay_msec = 10;
+	sdio_al->channel[1].poll_delay_msec = 30;
 
 	sdio_al->channel[1].read_threshold  = 14*1024;
 	sdio_al->channel[1].write_threshold = 2*1024;
-	sdio_al->channel[1].min_write_avail = 1024;
+	sdio_al->channel[1].min_write_avail = 1600;
 
 	sdio_al->channel[2].name = "SDIO_QMI";
 	sdio_al->channel[2].priority = SDIO_PRIORITY_LOW;
 
-	sdio_al->channel[3].name = "SDIO_CS_DATA";
+	sdio_al->channel[3].name = "SDIO_DIAG";
 	sdio_al->channel[3].priority = SDIO_PRIORITY_LOW;
 }
 
