@@ -380,6 +380,18 @@ static struct resource gsbi1_qup_spi_resources[] = {
 		.end	= GSBI1_QUP_IRQ,
 		.flags	= IORESOURCE_IRQ,
 	},
+	{
+		.name   = "spidm_channels",
+		.start  = 5,
+		.end    = 6,
+		.flags  = IORESOURCE_DMA,
+	},
+	{
+		.name   = "spidm_crci",
+		.start  = 8,
+		.end    = 7,
+		.flags  = IORESOURCE_DMA,
+	},
 };
 
 /* Use GSBI1 QUP for SPI-0 */
