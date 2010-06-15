@@ -206,9 +206,10 @@ struct rx_packet_size {
  * Peer SDIO-Client channel configuration.
  *
  *  @is_ready - channel is ready and the data is valid.
- *  @max_tx_threshold - maximum tx threshold, according to the
- *  		      total buffers size on the peer pipe.
+ *
  *  @max_rx_threshold - maximum rx threshold, according to the
+ *  		      total buffers size on the peer pipe.
+ *  @max_tx_threshold - maximum tx threshold, according to the
  *  		      total buffers size on the peer pipe.
  *  @tx_buf_size - size of a single buffer on the peer pipe; a
  *  		 transfer smaller than the buffer size still
@@ -217,8 +218,8 @@ struct rx_packet_size {
  */
 struct peer_sdioc_channel_config {
 	u32 is_ready;
-	u32 max_tx_threshold;
-	u32 max_rx_threshold;
+	u32 max_rx_threshold; /* Downlink */
+	u32 max_tx_threshold; /* Uplink */
 	u32 tx_buf_size;
 	u32 reserved[28];
 };
