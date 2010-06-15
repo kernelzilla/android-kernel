@@ -40,6 +40,22 @@
 /* MPP Config Control */
 #define	PM8901_MPP_CONFIG_CTL_MASK	0x03
 
+struct pm8901_mpp_chip {
+	struct gpio_chip	chip;
+	struct pm8901_chip	*pm_chip;
+	u8			ctrl[PM8901_MPPS];
+};
+
+static int pm8901_mpp_write(struct pm8901_chip *chip, u16 addr, u8 val,
+		u8 mask, u8 *bak)
+{
+	u8 reg = (*bak & ~mask) | (val & mask);
+	int rc = pm8901_write(chip, addr, &reg, 1);
+	if (!rc)
+		*bak = reg;
+	return rc;
+}
+
 static int pm8901_mpp_to_irq(struct gpio_chip *chip, unsigned offset)
 {
 	struct pm8901_gpio_platform_data *pdata;
@@ -49,38 +65,61 @@ static int pm8901_mpp_to_irq(struct gpio_chip *chip, unsigned offset)
 
 static int pm8901_mpp_get(struct gpio_chip *chip, unsigned offset)
 {
-	struct pm8901_chip *pm_chip = dev_get_drvdata(chip->dev);
-	return pm8901_irq_get_rt_status(pm_chip,
-			pm8901_mpp_to_irq(chip, offset));
+	struct pm8901_mpp_chip *mpp_chip = dev_get_drvdata(chip->dev);
+	int ret;
+
+	if ((mpp_chip->ctrl[offset] & PM8901_MPP_TYPE_MASK) >>
+			PM8901_MPP_TYPE_SHIFT == PM_MPP_TYPE_D_OUTPUT)
+		ret = mpp_chip->ctrl[offset] & PM8901_MPP_CONFIG_CTL_MASK;
+	else
+		ret = pm8901_irq_get_rt_status(mpp_chip->pm_chip,
+				pm8901_mpp_to_irq(chip, offset));
+	return ret;
 }
 
-static struct gpio_chip pm8901_mpp_chip = {
-	.label		= "pm8901-mpp",
-	.to_irq		= pm8901_mpp_to_irq,
-	.get		= pm8901_mpp_get,
-	.ngpio		= PM8901_MPPS,
+static void pm8901_mpp_set(struct gpio_chip *chip, unsigned offset, int val)
+{
+	struct pm8901_mpp_chip *mpp_chip = dev_get_drvdata(chip->dev);
+	u8 reg = val ? PM_MPP_DOUT_CTL_HIGH : PM_MPP_DOUT_CTL_LOW;
+	int rc;
+
+	rc = pm8901_mpp_write(mpp_chip->pm_chip, SSBI_MPP_CNTRL(offset),
+			reg, PM8901_MPP_CONFIG_CTL_MASK,
+			&mpp_chip->ctrl[offset]);
+	if (rc)
+		pr_err("%s: pm8901_mpp_write(): rc=%d\n", __func__, rc);
+}
+
+static struct pm8901_mpp_chip pm8901_mpp_chip = {
+	.chip = {
+		.label		= "pm8901-mpp",
+		.to_irq		= pm8901_mpp_to_irq,
+		.get		= pm8901_mpp_get,
+		.set		= pm8901_mpp_set,
+		.ngpio		= PM8901_MPPS,
+	},
 };
 
 int pm8901_mpp_config(unsigned mpp, unsigned type, unsigned level,
 		      unsigned control)
 {
-	u8	config;
+	u8	config, mask;
 	int	rc;
-	struct pm8901_chip *pm_chip;
 
 	if (mpp >= PM8901_MPPS)
 		return -EINVAL;
 
-	pm_chip = dev_get_drvdata(pm8901_mpp_chip.dev);
-
+	mask = PM8901_MPP_TYPE_MASK | PM8901_MPP_CONFIG_LVL_MASK |
+		PM8901_MPP_CONFIG_CTL_MASK;
 	config = (type << PM8901_MPP_TYPE_SHIFT) & PM8901_MPP_TYPE_MASK;
 	config |= (level << PM8901_MPP_CONFIG_LVL_SHIFT) &
 			PM8901_MPP_CONFIG_LVL_MASK;
 	config |= control & PM8901_MPP_CONFIG_CTL_MASK;
 
-	rc = pm8901_write(pm_chip, SSBI_MPP_CNTRL(mpp), &config, 1);
+	rc = pm8901_mpp_write(pm8901_mpp_chip.pm_chip, SSBI_MPP_CNTRL(mpp),
+			config, mask, &pm8901_mpp_chip.ctrl[mpp]);
 	if (rc)
-		pr_err("%s: pm8901_write(): rc=%d\n", __func__, rc);
+		pr_err("%s: pm8901_mpp_write(): rc=%d\n", __func__, rc);
 
 	return rc;
 }
@@ -88,19 +127,30 @@ EXPORT_SYMBOL(pm8901_mpp_config);
 
 static int __devinit pm8901_mpp_probe(struct platform_device *pdev)
 {
-	int ret;
+	int ret, i;
 	struct pm8901_gpio_platform_data *pdata = pdev->dev.platform_data;
 
-	pm8901_mpp_chip.dev = &pdev->dev;
-	pm8901_mpp_chip.base = pdata->gpio_base;
-	ret = gpiochip_add(&pm8901_mpp_chip);
+	pm8901_mpp_chip.pm_chip = platform_get_drvdata(pdev);
+	for (i = 0; i < PM8901_MPPS; i++) {
+		ret = pm8901_read(pm8901_mpp_chip.pm_chip,
+				SSBI_MPP_CNTRL(i), &pm8901_mpp_chip.ctrl[i], 1);
+		if (ret)
+			goto bail;
+
+	}
+	platform_set_drvdata(pdev, &pm8901_mpp_chip);
+	pm8901_mpp_chip.chip.dev = &pdev->dev;
+	pm8901_mpp_chip.chip.base = pdata->gpio_base;
+	ret = gpiochip_add(&pm8901_mpp_chip.chip);
+
+bail:
 	pr_info("%s: gpiochip_add(): rc=%d\n", __func__, ret);
 	return ret;
 }
 
 static int __devexit pm8901_mpp_remove(struct platform_device *pdev)
 {
-	return gpiochip_remove(&pm8901_mpp_chip);
+	return gpiochip_remove(&pm8901_mpp_chip.chip);
 }
 
 static struct platform_driver pm8901_mpp_driver = {
