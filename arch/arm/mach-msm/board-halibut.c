@@ -1201,6 +1201,10 @@ static struct mmc_platform_data halibut_sdcc_data = {
 	.status_irq	= MSM_GPIO_TO_INT(49),
 	.irq_flags      = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
+	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
+	.msmsdcc_fmin   = 144000,
+	.msmsdcc_fmid   = 25000000,
+	.msmsdcc_fmax   = 49152000,
 };
 
 static void __init halibut_init_mmc(void)
