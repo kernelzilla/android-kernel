@@ -45,7 +45,6 @@
 #define GSBIn_UART_APPS_NS_REG(n)	REG(0x29D4+(0x20*((n)-1)))
 #define PDM_CLK_NS_REG			REG(0x2CC0)
 #define PLL_ENA_SC0_REG			REG(0x34C0)
-#define PMIC_SSBI2_NS_REG		REG(0x280C)
 #define PRNG_CLK_NS_REG			REG(0x2E80)
 #define RINGOSC_NS_REG			REG(0x2DC0)
 #define RINGOSC_STATUS_REG		REG(0x2DCC)
@@ -676,19 +675,6 @@ static struct clk_freq_tbl clk_tbl_prng[] = {
 	F_END,
 };
 
-/* PMIC_SSBI2 */
-#define NS_MASK_PMIC_SSBI2 (BM(4, 3) | BM(1, 0))
-#define CLK_PMIC_SSBI2(id, ns, tv) \
-		CLK_LOCAL(id, BASIC, ns, ns, NULL, ns, B(12), 0, B(11), \
-				NS_MASK_PMIC_SSBI2, 0, set_rate_basic, \
-				clk_tbl_pmic_ssbi2, NULL, NONE, NULL, tv)
-#define F_PMIC_SSBI2(f, s, d, m, n) \
-		F_RAW(f, s##_PLL, 0, NS_DIVSRC(4, 3, d, 1, 0, s), 0, 0)
-static struct clk_freq_tbl clk_tbl_pmic_ssbi2[] = {
-	F_PMIC_SSBI2(13500000, XO_MXO, 2, 0, 0),
-	F_END,
-};
-
 /* SDC */
 #define NS_MASK_SDC (BM(23, 16) | BM(6, 0))
 #define CLK_SDC(id, ns, tv) \
@@ -1316,8 +1302,6 @@ static struct clk_local clk_local_tbl[] = {
 	CLK_PDM(PDM, PDM_CLK_NS_REG),
 
 	CLK_PRNG(PRNG, PRNG_CLK_NS_REG, TEST_PER(0x7D)),
-
-	CLK_PMIC_SSBI2(PMIC_SSBI2, PMIC_SSBI2_NS_REG, TEST_PER(0x7A)),
 
 	CLK_SDC(SDC1, SDCn_APPS_CLK_NS_REG(1), TEST_PER(0x13)),
 	CLK_SDC(SDC2, SDCn_APPS_CLK_NS_REG(2), TEST_PER(0x15)),
@@ -2091,7 +2075,6 @@ void __init msm_clk_soc_init(void)
 	/* Initialize rates for clocks that only support one. */
 	set_1rate(BBRX_SSBI);
 	set_1rate(MDP_VSYNC);
-	set_1rate(PMIC_SSBI2);
 	set_1rate(TSIF_REF);
 	set_1rate(TSSC);
 	set_1rate(USB_HS_XCVR);

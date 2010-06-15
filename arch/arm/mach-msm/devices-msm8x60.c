@@ -698,7 +698,6 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("gsbi_sim_clk",	GSBI12_SIM_CLK,		NULL, 0),
 	CLK_8X60("pdm_clk",		PDM_CLK,		NULL, 0),
 	CLK_8X60("prng_clk",		PRNG_CLK,		NULL, 0),
-	CLK_8X60("pmic_ssbi2_clk",	PMIC_SSBI2_CLK,		NULL, 0),
 	CLK_8X60("sdc_clk",		SDC1_CLK,
 					&msm_device_sdc1.dev, 0),
 	CLK_8X60("sdc_clk",		SDC2_CLK,
