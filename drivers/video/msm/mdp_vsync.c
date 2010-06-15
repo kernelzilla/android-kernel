@@ -41,10 +41,17 @@
 #include "mddihost.h"
 
 #ifdef CONFIG_FB_MSM_MDP40
+#include "mdp4.h"
+
 #define MDP_SYNC_CFG_0		0x100
 #define MDP_SYNC_STATUS_0	0x10c
+#define MDP_SYNC_CFG_1		0x104
+#define MDP_SYNC_STATUS_1	0x110
 #define MDP_PRIM_VSYNC_OUT_CTRL	0x118
+#define MDP_SEC_VSYNC_OUT_CTRL	0x11C
+#define MDP_VSYNC_SEL		0x124
 #define MDP_PRIM_VSYNC_INIT_VAL	0x128
+#define MDP_SEC_VSYNC_INIT_VAL	0x12C
 #else
 #define MDP_SYNC_CFG_0		0x300
 #define MDP_SYNC_STATUS_0	0x30c
@@ -116,8 +123,12 @@ static void mdp_vsync_handler(void *data)
 
 	if (mfd->use_mdp_vsync) {
 #ifdef MDP_HW_VSYNC
-		if (mfd->panel_power_on)
+		if (mfd->panel_power_on) {
 			MDP_OUTP(MDP_BASE + MDP_SYNC_STATUS_0, vsync_load_cnt);
+#ifdef MDP4_MDDI_DMA_SWITCH
+			MDP_OUTP(MDP_BASE + MDP_SYNC_STATUS_1, vsync_load_cnt);
+#endif
+		}
 
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
 #endif
@@ -153,6 +164,21 @@ static void mdp_set_sync_cfg_0(struct msm_fb_data_type *mfd, int vsync_cnt)
 
 	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_0, cfg);
 }
+
+#ifdef MDP4_MDDI_DMA_SWITCH
+static void mdp_set_sync_cfg_1(struct msm_fb_data_type *mfd, int vsync_cnt)
+{
+	unsigned long cfg;
+
+	cfg = mfd->total_lcd_lines - 1;
+	cfg <<= MDP_SYNCFG_HGT_LOC;
+	if (mfd->panel_info.lcd.hw_vsync_mode)
+		cfg |= MDP_SYNCFG_VSYNC_EXT_EN;
+	cfg |= (MDP_SYNCFG_VSYNC_INT_EN | vsync_cnt);
+
+	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_1, cfg);
+}
+#endif
 #endif
 
 void mdp_config_vsync(struct msm_fb_data_type *mfd)
@@ -212,6 +238,9 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 				mdp_hw_vsync_clk_enable(mfd);
 
 				mdp_set_sync_cfg_0(mfd, vsync_cnt_cfg);
+#ifdef MDP4_MDDI_DMA_SWITCH
+				mdp_set_sync_cfg_1(mfd, vsync_cnt_cfg);
+#endif
 
 				/*
 				 * load the last line + 1 to be in the
@@ -222,13 +251,22 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 				/* line counter init value at the next pulse */
 				MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_INIT_VAL,
 							vsync_load_cnt);
+#ifdef MDP4_MDDI_DMA_SWITCH
+				MDP_OUTP(MDP_BASE + MDP_SEC_VSYNC_INIT_VAL,
+							vsync_load_cnt);
+#endif
 
 				/*
 				 * external vsync source pulse width and
 				 * polarity flip
 				 */
 				MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_OUT_CTRL,
-							BIT(30) | BIT(0));
+							BIT(0));
+#ifdef MDP4_MDDI_DMA_SWITCH
+				MDP_OUTP(MDP_BASE + MDP_SEC_VSYNC_OUT_CTRL,
+							BIT(0));
+				MDP_OUTP(MDP_BASE + MDP_VSYNC_SEL, 0x20);
+#endif
 
 
 				/* threshold */

@@ -557,12 +557,90 @@ static ssize_t pmdh_reg_read(
 }
 
 
-static const struct file_operations pmdh = {
+static const struct file_operations pmdh_fops = {
 	.open = mddi_reg_open,
 	.release = mddi_reg_release,
 	.read = pmdh_reg_read,
 	.write = pmdh_reg_write,
 };
+
+
+#ifdef MDP4_MDDI_DMA_SWITCH
+static int vsync_reg_open(struct inode *inode, struct file *file)
+{
+	/* non-seekable */
+	file->f_mode &= ~(FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE);
+	return 0;
+}
+
+static int vsync_reg_release(struct inode *inode, struct file *file)
+{
+	return 0;
+}
+
+static ssize_t vsync_reg_write(
+	struct file *file,
+	const char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	uint32 enable;
+	int cnt;
+
+	if (count > sizeof(debug_buf))
+		return -EFAULT;
+
+	if (copy_from_user(debug_buf, buff, count))
+		return -EFAULT;
+
+	debug_buf[count] = 0;	/* end of string */
+
+	cnt = sscanf(debug_buf, "%x", &enable);
+
+	mdp_dmap_vsync_set(enable);
+
+	return count;
+}
+
+static ssize_t vsync_reg_read(
+	struct file *file,
+	char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	char *bp;
+	int len = 0;
+	int tot = 0;
+	int dlen;
+
+	if (*ppos)
+		return 0;	/* the end */
+
+	bp = debug_buf;
+	dlen = sizeof(debug_buf);
+	len = snprintf(bp, dlen, "%x\n", mdp_dmap_vsync_get());
+	tot += len;
+	bp += len;
+	*bp = 0;
+	tot++;
+
+	if (copy_to_user(buff, debug_buf, tot))
+		return -EFAULT;
+
+	*ppos += tot;	/* increase offset */
+
+	return tot;
+}
+
+
+static const struct file_operations vsync_fops = {
+	.open = vsync_reg_open,
+	.release = vsync_reg_release,
+	.read = vsync_reg_read,
+	.write = vsync_reg_write,
+};
+
+#endif
 
 static ssize_t emdh_reg_write(
 	struct file *file,
@@ -612,7 +690,7 @@ static ssize_t emdh_reg_read(
 	return tot;
 }
 
-static const struct file_operations emdh = {
+static const struct file_operations emdh_fops = {
 	.open = mddi_reg_open,
 	.release = mddi_reg_release,
 	.read = emdh_reg_read,
@@ -663,12 +741,21 @@ int mdp4_debugfs_init(void)
 		return -1;
 	}
 
-	if (debugfs_create_file("reg", 0644, dent, 0, &pmdh)
+	if (debugfs_create_file("reg", 0644, dent, 0, &pmdh_fops)
 			== NULL) {
 		printk(KERN_ERR "%s(%d): debugfs_create_file: debug fail\n",
 			__FILE__, __LINE__);
 		return -1;
 	}
+
+#ifdef MDP4_MDDI_DMA_SWITCH
+	if (debugfs_create_file("vsync", 0644, dent, 0, &vsync_fops)
+			== NULL) {
+		printk(KERN_ERR "%s(%d): debugfs_create_file: debug fail\n",
+			__FILE__, __LINE__);
+		return -1;
+	}
+#endif
 
 	dent = debugfs_create_dir("emdh", NULL);
 
@@ -678,7 +765,7 @@ int mdp4_debugfs_init(void)
 		return -1;
 	}
 
-	if (debugfs_create_file("reg", 0644, dent, 0, &emdh)
+	if (debugfs_create_file("reg", 0644, dent, 0, &emdh_fops)
 			== NULL) {
 		printk(KERN_ERR "%s(%d): debugfs_create_file: debug fail\n",
 			__FILE__, __LINE__);
