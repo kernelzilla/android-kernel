@@ -201,7 +201,7 @@ static void
 msmsdcc_stop_data(struct msmsdcc_host *host)
 {
 	host->curr.data = NULL;
-	host->curr.got_dataend = host->curr.got_datablkend = 0;
+	host->curr.got_dataend = 0;
 }
 
 static inline uint32_t msmsdcc_fifo_addr(struct msmsdcc_host *host)
@@ -293,12 +293,9 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 	host->dma.sg = NULL;
 	host->dma.busy = 0;
 
-	if ((host->curr.got_dataend && host->curr.got_datablkend)
-             || mrq->data->error) {
+	if (host->curr.got_dataend || mrq->data->error) {
 
-		if (mrq->data->error
-		    && !(host->curr.got_dataend
-			 && host->curr.got_datablkend)) {
+		if (mrq->data->error && !(host->curr.got_dataend)) {
 			pr_info("%s: Worked around bug 1535304\n",
 			       mmc_hostname(host->mmc));
 		}
@@ -534,7 +531,6 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 	host->curr.xfer_remain = host->curr.xfer_size;
 	host->curr.data_xfered = 0;
 	host->curr.got_dataend = 0;
-	host->curr.got_datablkend = 0;
 
 	memset(&host->pio, 0, sizeof(host->pio));
 
@@ -810,8 +806,7 @@ msmsdcc_irq(int irq, void *dev_id)
 #if IRQ_DEBUG
 		msmsdcc_print_status(host, "irq0-r", status);
 #endif
-		status &= (readl(host->base + MMCIMASK0) |
-					      MCI_DATABLOCKENDMASK);
+		status &= readl(host->base + MMCIMASK0);
 		writel(status, host->base + MMCICLEAR);
 #if IRQ_DEBUG
 		msmsdcc_print_status(host, "irq0-p", status);
@@ -926,13 +921,7 @@ msmsdcc_irq(int irq, void *dev_id)
 			if (!host->curr.got_dataend && (status & MCI_DATAEND))
 				host->curr.got_dataend = 1;
 
-			if (!host->curr.got_datablkend &&
-			    (status & MCI_DATABLOCKEND)) {
-				host->curr.got_datablkend = 1;
-			}
-
-			if (host->curr.got_dataend &&
-			    host->curr.got_datablkend) {
+			if (host->curr.got_dataend) {
 				/*
 				 * If DMA is still in progress, we complete
 				 * via the completion handler
@@ -972,7 +961,7 @@ msmsdcc_irq(int irq, void *dev_id)
 		}
 
 		ret = 1;
-	} while (status & ~(MCI_DATABLOCKENDMASK));
+	} while (status);
 
 	spin_unlock(&host->lock);
 
