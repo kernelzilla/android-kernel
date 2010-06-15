@@ -139,41 +139,45 @@ int pm8901_write(struct pm8901_chip *chip, u16 addr, u8 *values,
 }
 EXPORT_SYMBOL(pm8901_write);
 
-int pm8901_mpp_get(struct pm8901_chip *chip, unsigned mpp)
+int pm8901_irq_get_rt_status(struct pm8901_chip *chip, int irq)
 {
 	int     rc;
-	u8      block, bits;
-	unsigned long	irqsave;
+	u8      block, bits, bit;
+	unsigned long   irqsave;
 
-	if (mpp >= PM8901_MPPS || chip == NULL)
+	if (chip == NULL || irq < chip->pdata.irq_base ||
+			irq >= chip->pdata.irq_base + MAX_PM_IRQ)
 		return -EINVAL;
 
-	block = MPP_IRQ_BLOCK;
+	irq -= chip->pdata.irq_base;
+
+	block = irq / 8;
+	bit = irq % 8;
 
 	spin_lock_irqsave(&chip->pm_lock, irqsave);
 
 	rc = ssbi_write(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, &block, 1);
 	if (rc) {
 		pr_err("%s: FAIL ssbi_write(): rc=%d (Select Block)\n",
-		       __func__, rc);
+				__func__, rc);
 		goto bail_out;
 	}
 
 	rc = ssbi_read(chip->dev, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits, 1);
 	if (rc) {
 		pr_err("%s: FAIL ssbi_read(): rc=%d (Read RT Status)\n",
-		       __func__, rc);
+				__func__, rc);
 		goto bail_out;
 	}
 
-	rc = (bits >> mpp) & 1;
+	rc = (bits & (1 << bit)) ? 1 : 0;
 
 bail_out:
 	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
 
 	return rc;
 }
-EXPORT_SYMBOL(pm8901_mpp_get);
+EXPORT_SYMBOL(pm8901_irq_get_rt_status);
 
 /* Internal functions */
 static inline int

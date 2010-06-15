@@ -47,17 +47,17 @@ static int pm8901_mpp_to_irq(struct gpio_chip *chip, unsigned offset)
 	return pdata->irq_base + offset;
 }
 
-static int pm8901_mpp_read(struct gpio_chip *chip, unsigned offset)
+static int pm8901_mpp_get(struct gpio_chip *chip, unsigned offset)
 {
-	struct pm8901_chip *pm_chip;
-	pm_chip = dev_get_drvdata(chip->dev);
-	return pm8901_mpp_get(pm_chip, offset);
+	struct pm8901_chip *pm_chip = dev_get_drvdata(chip->dev);
+	return pm8901_irq_get_rt_status(pm_chip,
+			pm8901_mpp_to_irq(chip, offset));
 }
 
 static struct gpio_chip pm8901_mpp_chip = {
 	.label		= "pm8901-mpp",
 	.to_irq		= pm8901_mpp_to_irq,
-	.get		= pm8901_mpp_read,
+	.get		= pm8901_mpp_get,
 	.ngpio		= PM8901_MPPS,
 };
 
