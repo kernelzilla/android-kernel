@@ -40,6 +40,7 @@
 #include <linux/spi/spi.h>
 #include <linux/regulator/consumer.h>
 #include <linux/input/tdisc_shinetsu.h>
+#include <linux/input/cy8c_ts.h>
 
 #ifdef CONFIG_ANDROID_PMEM
 #include <linux/android_pmem.h>
@@ -436,6 +437,52 @@ static void __init msm8x60_allocate_memory_regions(void)
 		pr_info("allocating %lu bytes at %p (%lx physical) for "
 		"KGSL\n", size, addr, __pa(addr));
 	}
+}
+
+#define TS_PEN_IRQ_GPIO 61
+static int tmg200_power(int vreg_on)
+{
+	/* REVISIT: Add regulator enable/disable code for smps3 */
+	return 0;
+}
+
+static struct cy8c_ts_platform_data cy8ctmg200_pdata = {
+	.ts_name = "msm_tmg200_ts",
+	.dis_min_x = 0,
+	.dis_max_x = 1023,
+	.dis_min_y = 0,
+	.dis_max_y = 599,
+	.use_polling = 0,
+	.min_tid = 1,
+	.max_tid = 255,
+	.min_touch = 0,
+	.max_touch = 255,
+	.min_width = 0,
+	.max_width = 255,
+	.power_on = tmg200_power,
+	.nfingers = 2,
+};
+
+static struct i2c_board_info cy8ctmg200_board_info[] = {
+	{
+		I2C_BOARD_INFO("cy8ctmg200", 0x2),
+		.platform_data = &cy8ctmg200_pdata,
+		.irq = MSM_GPIO_TO_INT(TS_PEN_IRQ_GPIO),
+	}
+};
+
+static void __init cy8ctmg200_init(void)
+{
+	int rc;
+
+	/* REVISIT: Add regulator get/set code for smps3 */
+
+	/* configure touchscreen interrupt gpio */
+	rc = gpio_tlmm_config(GPIO_CFG(TS_PEN_IRQ_GPIO, 0, GPIO_INPUT,
+				GPIO_NO_PULL, GPIO_2MA), 0);
+	if (rc)
+		pr_err("%s: unable to configure gpio %d\n",
+			__func__, TS_PEN_IRQ_GPIO);
 }
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -1419,6 +1466,12 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		ARRAY_SIZE(msm_i2c_gsbi3_tdisc_info),
 	},
 #endif
+	{
+		I2C_SURF | I2C_FFA,
+		MSM_GSBI3_QUP_I2C_BUS_ID,
+		cy8ctmg200_board_info,
+		ARRAY_SIZE(cy8ctmg200_board_info),
+	},
 };
 #endif /* CONFIG_I2C */
 
@@ -2062,6 +2115,8 @@ static void __init msm8x60_init(void)
 		msm_fb_add_devices();
 	fixup_i2c_configs();
 	register_i2c_devices();
+
+	cy8ctmg200_init();
 }
 
 MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
