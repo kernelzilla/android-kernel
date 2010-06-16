@@ -39,6 +39,7 @@
 #define PMAPP_VREG_LEVEL_VOTE_PROC		23
 #define PMAPP_SMPS_CLOCK_VOTE_PROC		26
 #define PMAPP_CLOCK_VOTE_PROC			27
+#define PMAPP_SMPS_MODE_VOTE_PROC		28
 
 /* Clock voter name max length */
 #define PMAPP_CLOCK_VOTER_ID_LEN		4
@@ -564,3 +565,12 @@ int pmapp_vreg_level_vote(const char *voter_id, uint vreg_id, uint level)
 				  PMAPP_VREG_LEVEL_VOTE_PROC);
 }
 EXPORT_SYMBOL(pmapp_vreg_level_vote);
+
+int pmapp_smps_mode_vote(const char *voter_id, uint vreg_id, uint mode)
+{
+	if (strlen(voter_id) != PMAPP_CLOCK_VOTER_ID_LEN)
+		return -EINVAL;
+
+	return pmapp_rpc_set_only(*((uint *) voter_id), vreg_id, mode, 0, 3,
+				  PMAPP_SMPS_MODE_VOTE_PROC);
+}
