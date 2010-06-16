@@ -41,6 +41,10 @@
 #include <dhd_bus.h>
 #include <dhd_dbg.h>
 
+#ifdef SET_RANDOM_MAC_SOFTAP
+#include <linux/random.h>
+#include <linux/jiffies.h>
+#endif
 
 /* Packet alignment for most efficient SDIO (can change based on platform) */
 #ifndef DHD_SDALIGN
@@ -626,7 +630,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32					pattern_size;
 	char buf[256];
 	uint filter_mode = 1;
-
+#ifdef SET_RANDOM_MAC_SOFTAP
+	uint rand_mac;
+#endif
 	dhd_os_proto_block(dhd);
 	/* Get the device MAC address */
 	strcpy(iovbuf, "cur_etheraddr");
@@ -635,7 +641,31 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		dhd_os_proto_unblock(dhd);
 		return BCME_NOTUP;
 	}
+
 	memcpy(dhd->mac.octet, iovbuf, ETHER_ADDR_LEN);
+
+#ifdef SET_RANDOM_MAC_SOFTAP
+	if (strstr(fw_path, "apsta") != NULL) {
+		srandom32((uint)jiffies);
+		rand_mac = random32();
+		iovbuf[0] |= 0x02;		/* locally administered bit */
+		iovbuf[3] = (unsigned char)rand_mac;
+		iovbuf[4] = (unsigned char)(rand_mac >> 8);
+		iovbuf[5] = (unsigned char)(rand_mac >> 16);
+
+		printk("Broadcom Dongle Host Driver mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
+			 iovbuf[0], iovbuf[1], iovbuf[2], iovbuf[3], iovbuf[4], iovbuf[5]);
+
+		bcm_mkiovar("cur_etheraddr", (void *)iovbuf, ETHER_ADDR_LEN, buf, sizeof(buf));
+		ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, buf, sizeof(buf));
+		if (ret < 0) {
+			DHD_ERROR(("%s: can't set MAC address , error=%d\n", __FUNCTION__, ret));
+		}
+		else {
+			memcpy(dhd->mac.octet, iovbuf, ETHER_ADDR_LEN);
+		}
+	}
+#endif /* SET_RANDOM_MAC_SOFTAP */
 
 	/* Set Country code */
 	if (dhd->country_code[0] != 0) {
