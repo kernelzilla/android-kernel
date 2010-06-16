@@ -631,6 +631,5 @@ u32 ddl_reset_hw(u32 n_mode)
 	ddl_release_context_buffers(p_ddl_context);
 	DDL_MEMSET(p_ddl_context, 0, sizeof(struct ddl_context_type));
 
-	VIDC_LOG_BUFFER_INIT;
 	return TRUE;
 }

@@ -763,7 +763,7 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 		DBG("VEN_IOCTL_CMD_READ_NEXT_MSG\n");
 		result = vid_enc_get_next_msg(client_ctx, &cb_msg);
 		if (!result) {
-			ERR("VEN_IOCTL_CMD_READ_NEXT_MSG failed\n");
+			ERR("VEN_IOCTL_CMD_READ_NEXT_MSG stopped\n");
 			return -EIO;
 		} else
 			if (copy_to_user((void __user *) \

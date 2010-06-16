@@ -348,18 +348,24 @@ void vcd_handle_device_err_fatal(struct vcd_dev_ctxt_type *p_dev_ctxt,
 	struct vcd_clnt_ctxt_type_t *p_trig_clnt)
 {
 	struct vcd_clnt_ctxt_type_t *p_cctxt = p_dev_ctxt->p_cctxt_list_head;
+	struct vcd_clnt_ctxt_type_t *p_tmp_clnt = NULL;
 	VCD_MSG_LOW("vcd_handle_device_err_fatal:");
 	while (p_cctxt) {
-		if (p_cctxt != p_trig_clnt) {
-			vcd_clnt_handle_device_err_fatal(p_cctxt,
-				VCD_EVT_IND_HWERRFATAL);
-		}
+		p_tmp_clnt = p_cctxt;
 		p_cctxt = p_cctxt->p_next;
+		if (p_tmp_clnt != p_trig_clnt)
+			vcd_clnt_handle_device_err_fatal(p_tmp_clnt,
+				VCD_EVT_IND_HWERRFATAL);
 	}
 	p_dev_ctxt->e_pending_cmd = VCD_CMD_DEVICE_RESET;
-	vcd_do_device_state_transition(vcd_get_drv_context(),
-		VCD_DEVICE_STATE_INVALID,
-		DEVICE_STATE_EVENT_NUMBER(pf_dev_cb));
+	if (!p_dev_ctxt->p_cctxt_list_head)
+		vcd_do_device_state_transition(vcd_get_drv_context(),
+			VCD_DEVICE_STATE_NOT_INIT,
+			DEVICE_STATE_EVENT_NUMBER(pf_timeout));
+	else
+		vcd_do_device_state_transition(vcd_get_drv_context(),
+			VCD_DEVICE_STATE_INVALID,
+			DEVICE_STATE_EVENT_NUMBER(pf_dev_cb));
 }
 
 void vcd_handle_for_last_clnt_close(

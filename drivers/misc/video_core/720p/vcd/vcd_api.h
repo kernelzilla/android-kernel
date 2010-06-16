@@ -32,6 +32,7 @@
 #include "vcd_status.h"
 
 #define VCD_FRAME_FLAG_EOS 0x00000001
+#define VCD_FRAME_FLAG_DECODEONLY   0x00000004
 #define VCD_FRAME_FLAG_ENDOFFRAME 0x00000010
 #define VCD_FRAME_FLAG_SYNCFRAME 0x00000020
 #define VCD_FRAME_FLAG_EXTRADATA 0x00000040
@@ -55,6 +56,7 @@ enum vcd_frame_type {
 	VCD_FRAME_I,
 	VCD_FRAME_P,
 	VCD_FRAME_B,
+	VCD_FRAME_NOTCODED,
 	VCD_FRAME_32BIT = 0x7fffffff
 };
 
@@ -76,6 +78,7 @@ struct vcd_frame_data_type {
 	u32 b_interlaced;
 	enum vcd_frame_type e_frame_type;
 	u32 n_ip_frm_tag;
+	u32 n_intrlcd_ip_frm_tag;
 };
 
 struct vcd_sequence_hdr_type {

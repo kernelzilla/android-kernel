@@ -138,6 +138,9 @@
 #define METADATA_NO_SPACE_SLICE_SIZE 181
 #define RESOLUTION_WARNING 182
 
+static void ddl_handle_npf_decoding_error(
+	struct ddl_context_type *p_ddl_context);
+
 void ddl_hw_fatal_cb(struct ddl_context_type *p_ddl_context)
 {
 	/* Invalidate the command state */
@@ -300,8 +303,8 @@ static u32 ddl_handle_core_recoverable_errors(struct ddl_context_type \
 	switch (p_ddl_context->n_cmd_err_status) {
 	case NON_PAIRED_FIELD_NOT_SUPPORTED:
 		{
-		vcd_status = VCD_ERR_INTRLCD_FIELD_DROP;
-		break;
+			ddl_handle_npf_decoding_error(p_ddl_context);
+			return TRUE;
 		}
 	case NO_BUFFER_RELEASED_FROM_HOST:
 		{
@@ -506,4 +509,29 @@ u32 ddl_handle_core_errors(struct ddl_context_type *p_ddl_context)
 		b_status = ddl_handle_client_fatal_errors(p_ddl_context);
 
 	return b_status;
+}
+
+void ddl_handle_npf_decoding_error(struct ddl_context_type *p_ddl_context)
+{
+	struct ddl_client_context_type *p_ddl = p_ddl_context->p_current_ddl;
+	struct ddl_decoder_data_type *p_decoder = &p_ddl->codec_data.decoder;
+	if (!p_ddl->b_decoding) {
+		ERR("FWISSUE-ENC-NPF!!!");
+		ddl_client_fatal_cb(p_ddl_context);
+		return;
+	}
+	vidc_720p_decode_display_info(&p_decoder->dec_disp_info);
+	ddl_decode_dynamic_property(p_ddl, FALSE);
+	p_ddl->output_frame.vcd_frm.n_ip_frm_tag =
+		p_decoder->dec_disp_info.n_tag_top;
+	p_ddl->output_frame.vcd_frm.p_physical = NULL;
+	p_ddl->output_frame.b_frm_trans_end = FALSE;
+	p_ddl->p_ddl_context->ddl_callback(
+		VCD_EVT_RESP_OUTPUT_DONE,
+		VCD_ERR_INTRLCD_FIELD_DROP,
+		&p_ddl->output_frame,
+		sizeof(struct ddl_frame_data_type_tag),
+		(void *)p_ddl,
+		p_ddl->p_ddl_context->p_client_data);
+	ddl_decode_frame_run(p_ddl);
 }

@@ -56,6 +56,8 @@
 
 #define VCD_MAX_CLIENT_TRANSACTIONS          32
 
+#define VCD_MAX_BUFFER_ENTRIES               32
+
 #define VCD_SEQ_HDR_PADDING_BYTES            256
 
 #define VCD_DEC_NUM_INTERLACED_FIELDS        2
@@ -86,6 +88,7 @@ struct vcd_cmd_q_element_type {
 };
 
 struct vcd_buffer_entry_type {
+	struct list_head list;
 	u32 b_valid;
 	u8 *p_alloc;
 	u8 *p_virtual;
@@ -104,11 +107,8 @@ struct vcd_buffer_pool_type {
 	u32 n_validated;
 	u32 n_allocated;
 	u32 n_in_use;
-	struct vcd_buffer_entry_type **a_queue;
+	struct list_head a_queue;
 	u16 n_q_len;
-	u16 n_q_head;
-	u16 n_q_tail;
-
 };
 
 struct vcd_transc_type {
@@ -168,9 +168,8 @@ struct vcd_dev_ctxt_type {
 struct vcd_clnt_status_type {
 	u32 b_req_perf_lvl;
 
-	u32 b1st_frame_recvd;
-	u32 b1st_ip_done_recvd;
-	u32 b1st_op_done_recvd;
+	u32 b_first_ip_frame_recvd;
+	u32 b_first_op_frame_recvd;
 
 	u32 n_frame_submitted;
 	u32 n_frame_delayed;

@@ -251,26 +251,30 @@ u32 vid_enc_set_get_framesize(struct video_client_ctx *client_ctx,
 	vcd_property_hdr.n_size =
 		sizeof(struct vcd_property_frame_size_type);
 
+	vcd_status = vcd_get_property(client_ctx->vcd_handle,
+					&vcd_property_hdr, &frame_size);
+
+	if (vcd_status) {
+		ERR("%s(): Get VCD_I_FRAME_SIZE Failed\n",
+				__func__);
+		return FALSE;
+	}
 	if (set_flag) {
-		frame_size.n_height = *height;
-		frame_size.n_width = *width;
-		vcd_status = vcd_set_property(client_ctx->vcd_handle,
-				&vcd_property_hdr, &frame_size);
-
-		if (vcd_status) {
-			ERR("%s(): Set VCD_I_FRAME_SIZE Failed\n",
-					__func__);
-			return FALSE;
+		if (frame_size.n_height != *height ||
+			frame_size.n_width != *width) {
+			DBG("%s(): ENC Set Size (%d x %d)\n",
+				__func__, *height, *width);
+			frame_size.n_height = *height;
+			frame_size.n_width = *width;
+			vcd_status = vcd_set_property(client_ctx->vcd_handle,
+					&vcd_property_hdr, &frame_size);
+			if (vcd_status) {
+				ERR("%s(): Set VCD_I_FRAME_SIZE Failed\n",
+						__func__);
+				return FALSE;
+			}
 		}
-	}	else {
-		vcd_status = vcd_get_property(client_ctx->vcd_handle,
-						&vcd_property_hdr, &frame_size);
-
-		if (vcd_status) {
-			ERR("%s(): Get VCD_I_FRAME_SIZE Failed\n",
-					__func__);
-			return FALSE;
-		}
+	} else {
 		*height = frame_size.n_height;
 		*width = frame_size.n_width;
 	}

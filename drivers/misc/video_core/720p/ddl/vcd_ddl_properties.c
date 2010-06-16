@@ -514,6 +514,14 @@ static u32 ddl_set_enc_property(struct ddl_client_context_type *p_ddl,
 				) {
 				p_encoder->profile = *p_profile;
 				vcd_status = VCD_S_SUCCESS;
+
+				if (p_profile->e_profile ==
+					VCD_PROFILE_H264_BASELINE)
+					p_encoder->entropy_control.e_entropy_sel
+						= VCD_ENTROPY_SEL_CAVLC;
+				else
+					p_encoder->entropy_control.e_entropy_sel
+						= VCD_ENTROPY_SEL_CABAC;
 			}
 			break;
 		}
@@ -1670,7 +1678,7 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data_type *p_encoder)
 
 	p_encoder->output_buf_req.n_min_count = 2;
 	p_encoder->output_buf_req.n_actual_count =
-	    p_encoder->output_buf_req.n_min_count;
+	    p_encoder->output_buf_req.n_min_count + 5;
 	p_encoder->output_buf_req.n_max_count = DDL_MAX_BUFFER_COUNT;
 	p_encoder->output_buf_req.n_align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
 	p_encoder->output_buf_req.n_size = n_y_cb_cr_size;
@@ -1681,7 +1689,7 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data_type *p_encoder)
 void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data_type *p_decoder,
 		u32 b_estimate)
 {
-	u32 n_y_cb_cr_size, n_min_dpb;
+	u32 n_y_cb_cr_size, n_min_dpb, n_num_mb;
 	struct vcd_property_frame_size_type  *p_frame_size;
 	struct vcd_buffer_requirement_type *p_output_buf_req, *p_input_buf_req;
 
@@ -1707,7 +1715,15 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data_type *p_decoder,
 	memset(p_output_buf_req, 0, sizeof(struct vcd_buffer_requirement_type));
 
 	p_output_buf_req->n_min_count = n_min_dpb;
-	p_output_buf_req->n_actual_count = p_output_buf_req->n_min_count;
+
+	n_num_mb = (p_frame_size->n_width * p_frame_size->n_height) >> 8;
+	if (n_num_mb >= VIDC_DDL_WVGA_MBS) {
+		p_output_buf_req->n_actual_count = n_min_dpb + 2;
+		if (p_output_buf_req->n_actual_count < 10)
+			p_output_buf_req->n_actual_count = 10;
+	} else
+		p_output_buf_req->n_actual_count = n_min_dpb + 5;
+
 	p_output_buf_req->n_max_count = DDL_MAX_BUFFER_COUNT;
 	p_output_buf_req->n_size = n_y_cb_cr_size;
 	if (p_decoder->buf_format.e_buffer_format != VCD_BUFFER_FORMAT_NV12)
@@ -1795,12 +1811,10 @@ static u32 ddl_valid_buffer_requirement
 	struct vcd_buffer_requirement_type *req_buf_req)
 {
 	u32 b_status = FALSE;
-	if (
-		   original_buf_req->n_max_count >= req_buf_req->n_actual_count
-		   && original_buf_req->n_actual_count <=
-		   req_buf_req->n_actual_count &&
-		   original_buf_req->n_align <= req_buf_req->n_align &&
-		   original_buf_req->n_size <= req_buf_req->n_size) {
+	if (original_buf_req->n_max_count >= req_buf_req->n_actual_count &&
+		original_buf_req->n_min_count <= req_buf_req->n_actual_count &&
+		original_buf_req->n_align <= req_buf_req->n_align &&
+		original_buf_req->n_size <= req_buf_req->n_size) {
 		b_status = TRUE;
 	} else {
 		VIDC_LOGERR_STRING("ddl_valid_buf_req:Failed");
