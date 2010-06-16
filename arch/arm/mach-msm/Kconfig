@@ -1033,5 +1033,27 @@ config MSM_NPA_SYSTEM_BUS
 	  PM_QOS System Bus rate requests are interpreted as 'Flow IDs' and
 	  are routed through the NPA framework.
 
+config SMMU_8X60
+	bool
+
+config SMMU
+	bool "System MMU support"
+	depends on MMU
+	select VCM_MM
+	select SMMU_8X60 if ARCH_MSM8X60
+	depends on ARCH_MSM8X60
+	default n
+	help
+	  This is the System MMU driver for 8x60.
+
+config SMMU_PGTABLES_L2
+	bool "Allow SMMU page tables in the L2 cache (Experimental)"
+	depends on SMMU=y
+	depends on MMU
+	depends on CPU_DCACHE_DISABLE=n
+	default y
+	help
+	 Improves page fault latency at the expense of potential L2 pollution.
+	 Most people can probably say Y here.
 endif
 
