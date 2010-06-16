@@ -1065,6 +1065,7 @@ static int set_pipe_threshold(int pipe_index, int threshold)
 static int open_channel(struct sdio_channel *ch)
 {
 	int ret = 0;
+	int i;
 
 	/* Init channel Context */
 	/** Func#1 is reserved for mailbox */
@@ -1072,6 +1073,10 @@ static int open_channel(struct sdio_channel *ch)
 	ch->rx_pipe_index = ch->num*2;
 	ch->tx_pipe_index = ch->num*2+1;
 	ch->signature = SDIO_AL_SIGNATURE;
+
+	ch->write_avail = 0;
+	ch->read_avail = 0;
+	ch->rx_pending_bytes = 0;
 
 	mutex_init(&ch->ch_lock);
 
@@ -1081,7 +1086,15 @@ static int open_channel(struct sdio_channel *ch)
 	INIT_LIST_HEAD(&(ch->rx_size_list_head));
 
 	/* Init SDIO Function */
-	ret = sdio_enable_func(ch->func);
+	for (i = 0; i < 10; i++) {
+		ret = sdio_enable_func(ch->func);
+		if (ret) {
+			pr_info(MODULE_MAME ":retry enable ch %s func#%d\n",
+					 ch->name, ch->func->num);
+			msleep(1000);
+		} else
+			break;
+	}
 	if (ret) {
 		pr_info(MODULE_MAME ":sdio_enable_func() err=%d\n", -ret);
 		goto exit_err;
@@ -1851,3 +1864,4 @@ module_exit(sdio_al_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("SDIO Abstraction Layer");
 MODULE_AUTHOR("Amir Samuelov <amirs@qualcomm.com>");
+
