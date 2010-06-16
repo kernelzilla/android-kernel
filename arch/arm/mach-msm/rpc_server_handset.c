@@ -172,6 +172,7 @@ static const unsigned int rpc_vers[] = {
 struct msm_handset {
 	struct input_dev *ipdev;
 	struct switch_dev sdev;
+	struct msm_handset_platform_data *hs_pdata;
 };
 
 static struct msm_rpc_client *rpc_client;
@@ -518,7 +519,10 @@ static int __devinit hs_probe(struct platform_device *pdev)
 	hs->ipdev = ipdev;
 
 	if (pdev->dev.platform_data)
-		ipdev->name = pdev->dev.platform_data;
+		hs->hs_pdata = pdev->dev.platform_data;
+
+	if (hs->hs_pdata->hs_name)
+		ipdev->name = hs->hs_pdata->hs_name;
 	else
 		ipdev->name	= DRIVER_NAME;
 
