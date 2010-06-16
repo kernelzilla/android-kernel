@@ -150,6 +150,11 @@ struct msm_otg_platform_data {
 	void (*setup_gpio)(unsigned int config);
 	u8      otg_mode;
 	void (*vbus_power) (unsigned phy_info, int on);
+
+	/* charger notification apis */
+	void (*chg_connected)(enum chg_type chg_type);
+	void (*chg_vbus_draw)(unsigned ma);
+	int  (*chg_init)(int init);
 };
 
 struct msm_usb_host_platform_data {

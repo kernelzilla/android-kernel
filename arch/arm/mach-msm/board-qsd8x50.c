@@ -1799,7 +1799,10 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.pemp_level              = PRE_EMPHASIS_WITH_10_PERCENT,
 	.cdr_autoreset           = CDR_AUTO_RESET_DEFAULT,
 	.drv_ampl                = HS_DRV_AMPLITUDE_5_PERCENT,
-	.vbus_power = msm_hsusb_vbus_power,
+	.vbus_power		 = msm_hsusb_vbus_power,
+	.chg_vbus_draw		 = hsusb_chg_vbus_draw,
+	.chg_connected		 = hsusb_chg_connected,
+	.chg_init		 = hsusb_chg_init,
 };
 
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;

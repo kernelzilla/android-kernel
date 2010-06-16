@@ -375,6 +375,26 @@ out:
 	return ret;
 }
 
+static int msm_otg_set_power(struct otg_transceiver *xceiv, unsigned mA)
+{
+	static enum chg_type 	curr_chg = USB_CHG_TYPE__INVALID;
+	struct msm_otg		*dev = container_of(xceiv, struct msm_otg, otg);
+	struct msm_otg_platform_data *pdata = dev->pdata;
+	enum chg_type 		new_chg = atomic_read(&dev->chg_type);
+
+	/* Call chg_connected only if the charger has changed */
+	if (new_chg != curr_chg && pdata->chg_connected) {
+		curr_chg = new_chg;
+		pdata->chg_connected(new_chg);
+	}
+
+	/* Call vbus_draw only if the charger is of known type */
+	if (pdata->chg_vbus_draw && new_chg != USB_CHG_TYPE__INVALID)
+		pdata->chg_vbus_draw(mA);
+
+	return 0;
+}
+
 static int msm_otg_set_clk(struct otg_transceiver *xceiv, int on)
 {
 	struct msm_otg *dev = container_of(xceiv, struct msm_otg, otg);
@@ -392,13 +412,17 @@ static int msm_otg_set_clk(struct otg_transceiver *xceiv, int on)
 }
 static void msm_otg_start_peripheral(struct otg_transceiver *xceiv, int on)
 {
+	struct msm_otg *dev = container_of(xceiv, struct msm_otg, otg);
+
 	if (!xceiv->gadget)
 		return;
 
-	if (on)
+	if (on) {
 		usb_gadget_vbus_connect(xceiv->gadget);
-	else
+	} else {
+		atomic_set(&dev->chg_type, USB_CHG_TYPE__INVALID);
 		usb_gadget_vbus_disconnect(xceiv->gadget);
+	}
 }
 
 static void msm_otg_start_host(struct otg_transceiver *xceiv, int on)
@@ -1874,12 +1898,17 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	dev->otg.set_suspend = msm_otg_set_suspend;
 	dev->otg.start_hnp = msm_otg_start_hnp;
 	dev->otg.send_event = msm_otg_send_event;
+	dev->otg.set_power = msm_otg_set_power;
 	dev->set_clk = msm_otg_set_clk;
 	dev->reset = otg_reset;
 	if (otg_set_transceiver(&dev->otg)) {
 		WARN_ON(1);
 		goto free_otg_irq;
 	}
+
+	atomic_set(&dev->chg_type, USB_CHG_TYPE__INVALID);
+	if (dev->pdata->chg_init && dev->pdata->chg_init(1))
+		pr_err("%s: chg_init failed\n", __func__);
 
 	device_init_wakeup(&pdev->dev, 1);
 
@@ -1889,7 +1918,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		if (ret) {
 			pr_info("%s: request_irq for vbus_on"
 					"interrupt failed\n", __func__);
-			goto free_otg_irq;
+			goto chg_deinit;
 		}
 	}
 
@@ -1915,6 +1944,9 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 free_vbus_irq:
 	if (vbus_on_irq)
 		free_irq(vbus_on_irq, 0);
+chg_deinit:
+	if (dev->pdata->chg_init)
+		dev->pdata->chg_init(0);
 free_otg_irq:
 	free_irq(dev->irq, dev);
 free_wq:
@@ -1956,6 +1988,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	if (dev->pmic_notif_supp)
 		dev->pdata->pmic_notif_deinit();
 
+	if (dev->pdata->chg_init)
+		dev->pdata->chg_init(0);
 	free_irq(dev->irq, pdev);
 	if (dev->vbus_on_irq)
 		free_irq(dev->irq, 0);
