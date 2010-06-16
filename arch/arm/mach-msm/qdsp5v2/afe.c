@@ -155,6 +155,81 @@ error_adsp_get:
 }
 EXPORT_SYMBOL(afe_enable);
 
+int afe_config_fm_codec(int fm_enable, uint16_t source)
+{
+	struct afe_cmd_fm_codec_config cmd;
+	struct msm_afe_state *afe = &the_afe_state;
+	int rc = 0;
+	int i = 0;
+	unsigned short *ptrmem = (unsigned short *)&cmd;
+
+	MM_INFO(" configure fm codec\n");
+	mutex_lock(&afe->lock);
+	if (!afe->in_use) {
+		/* enable afe */
+		rc = msm_adsp_get("AFETASK", &afe->mod, &afe->adsp_ops, afe);
+		if (rc < 0) {
+			MM_ERR("%s: failed to get AFETASK module\n", __func__);
+			goto error_adsp_get;
+		}
+		rc = msm_adsp_enable(afe->mod);
+		if (rc < 0)
+			goto error_adsp_enable;
+	}
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.cmd_id = AFE_CMD_FM_RX_ROUTING_CMD;
+	cmd.enable = fm_enable;
+	cmd.device_id = source;
+
+	for (i = 0; i < sizeof(cmd)/2; i++, ++ptrmem)
+		MM_DBG("cmd[%d]=0x%04x\n", i, *ptrmem);
+	afe_send_queue(afe, &cmd, sizeof(cmd));
+
+	mutex_unlock(&afe->lock);
+	return rc;
+error_adsp_enable:
+	msm_adsp_put(afe->mod);
+error_adsp_get:
+	mutex_unlock(&afe->lock);
+	return rc;
+}
+EXPORT_SYMBOL(afe_config_fm_codec);
+
+int afe_config_fm_volume(uint16_t volume)
+{
+	struct afe_cmd_fm_volume_config cmd;
+	struct msm_afe_state *afe = &the_afe_state;
+	int rc = 0;
+
+	MM_INFO(" configure fm volume\n");
+	mutex_lock(&afe->lock);
+	if (!afe->in_use) {
+		/* enable afe */
+		rc = msm_adsp_get("AFETASK", &afe->mod, &afe->adsp_ops, afe);
+		if (rc < 0) {
+			MM_ERR("%s: failed to get AFETASK module\n", __func__);
+			goto error_adsp_get;
+		}
+		rc = msm_adsp_enable(afe->mod);
+		if (rc < 0)
+			goto error_adsp_enable;
+	}
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.cmd_id = AFE_CMD_FM_PLAYBACK_VOLUME_CMD;
+	cmd.volume = volume;
+
+	afe_send_queue(afe, &cmd, sizeof(cmd));
+
+	mutex_unlock(&afe->lock);
+	return rc;
+error_adsp_enable:
+	msm_adsp_put(afe->mod);
+error_adsp_get:
+	mutex_unlock(&afe->lock);
+	return rc;
+}
+EXPORT_SYMBOL(afe_config_fm_volume);
+
 int afe_config_aux_codec(int pcm_ctl_value, int aux_codec_intf_value,
 				int data_format_pad)
 {

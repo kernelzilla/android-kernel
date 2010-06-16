@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -53,5 +53,8 @@ int afe_disable(u8 path_id);
 
 int afe_config_aux_codec(int pcm_ctl_value, int aux_codec_intf_value,
 			int data_format_pad);
+int afe_config_fm_codec(int fm_enable, uint16_t source);
+
+int afe_config_fm_volume(uint16_t volume);
 
 #endif
