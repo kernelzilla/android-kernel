@@ -201,7 +201,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	unsigned otgsc;
 
 	disable_irq(dev->irq);
-	if (dev->in_lpm)
+	if (atomic_read(&dev->in_lpm))
 		goto out;
 
 	/* Don't reset if mini-A cable is connected */
@@ -248,7 +248,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 			enable_irq_wake(dev->vbus_on_irq);
 	}
 
-	dev->in_lpm = 1;
+	atomic_set(&dev->in_lpm, 1);
 
 	if (!vbus && dev->pmic_notif_supp)
 		dev->pdata->pmic_enable_ldo(0);
@@ -269,7 +269,7 @@ static int msm_otg_resume(struct msm_otg *dev)
 {
 	unsigned temp;
 
-	if (!dev->in_lpm)
+	if (!atomic_read(&dev->in_lpm))
 		return 0;
 
 
@@ -295,7 +295,8 @@ static int msm_otg_resume(struct msm_otg *dev)
 			disable_irq_wake(dev->vbus_on_irq);
 	}
 
-	dev->in_lpm = 0;
+	atomic_set(&dev->in_lpm, 0);
+
 	pr_info("%s: usb exited from low power mode\n", __func__);
 
 	return 0;
@@ -308,7 +309,7 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 	if (!dev || (dev != the_msm_otg))
 		return -ENODEV;
 
-	if (suspend == dev->in_lpm)
+	if (suspend == atomic_read(&dev->in_lpm))
 		return 0;
 
 	if (suspend)
@@ -436,7 +437,7 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	struct msm_otg *dev = data;
 	u32 otgsc = 0;
 
-	if (dev->in_lpm) {
+	if (atomic_read(&dev->in_lpm)) {
 		msm_otg_resume(dev);
 		return IRQ_HANDLED;
 	}
