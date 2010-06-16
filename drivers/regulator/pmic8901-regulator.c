@@ -618,6 +618,8 @@ static int pm8901_register_regulator(struct pm8901_chip *chip,
 	if (pdata) {
 		rdata->constraints.min_uV = pdata->min_uV;
 		rdata->constraints.max_uV = pdata->max_uV;
+		rdata->regulator_init = pdata->init;
+		rdata->driver_data = pdata->init_data;
 	}
 
 	rdata->consumer_supplies = &vreg->rsupply;
