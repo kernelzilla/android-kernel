@@ -192,4 +192,11 @@ struct mdp_page_protection {
 	uint32_t page_protection;
 };
 
+#ifdef __KERNEL__
+
+/* get the framebuffer physical address information */
+int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num);
+
+#endif
+
 #endif /*_MSM_MDP_H_*/

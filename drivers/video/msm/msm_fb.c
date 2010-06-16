@@ -2485,6 +2485,23 @@ void msm_fb_add_device(struct platform_device *pdev)
 }
 EXPORT_SYMBOL(msm_fb_add_device);
 
+int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num)
+{
+	struct fb_info *info;
+
+	if (fb_num > MAX_FBI_LIST)
+		return -1;
+
+	info = fbi_list[fb_num];
+	if (!info)
+		return -1;
+
+	*start = info->fix.smem_start;
+	*len = info->fix.smem_len;
+	return 0;
+}
+EXPORT_SYMBOL(get_fb_phys_info);
+
 int __init msm_fb_init(void)
 {
 	int rc = -ENODEV;
