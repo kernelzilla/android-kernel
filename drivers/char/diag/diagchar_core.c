@@ -60,7 +60,6 @@ module_param(max_clients, uint, 0);
 /* delayed_rsp_id 0 represents no delay in the response. Any other number
     means that the diag packet has a delayed response. */
 static uint16_t delayed_rsp_id = 1;
-
 #define DIAGPKT_MAX_DELAYED_RSP 0xFFFF
 /* This macro gets the next delayed respose id. Once it reaches
  DIAGPKT_MAX_DELAYED_RSP, it stays at DIAGPKT_MAX_DELAYED_RSP */
@@ -109,12 +108,18 @@ void diag_drain_work_fn(struct work_struct *work)
 
 void diag_read_smd_work_fn(struct work_struct *work)
 {
-	diag_smd_send_req(NON_SMD_CONTEXT);
+	unsigned long flags = 0;
+	spin_lock_irqsave(&diagchar_smd_lock, flags);
+	__diag_smd_send_req(NON_SMD_CONTEXT);
+	spin_unlock_irqrestore(&diagchar_smd_lock, flags);
 }
 
 void diag_read_smd_qdsp_work_fn(struct work_struct *work)
 {
-	diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+	unsigned long flags = 0;
+	spin_lock_irqsave(&diagchar_smd_qdsp_lock, flags);
+	__diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+	spin_unlock_irqrestore(&diagchar_smd_qdsp_lock, flags);
 }
 
 static int diagchar_open(struct inode *inode, struct file *file)
@@ -249,9 +254,11 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			driver->in_busy_qdsp = 0;
 			/* Poll SMD channels to check for data*/
 			if (driver->ch)
-				diag_smd_send_req(NON_SMD_CONTEXT);
+				queue_work(driver->diag_wq,
+					&(driver->diag_read_smd_work));
 			if (driver->chqdsp)
-				diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+				queue_work(driver->diag_wq,
+					&(driver->diag_read_smd_qdsp_work));
 		} else if (temp == USB_MODE && driver->logging_mode
 							== MEMORY_DEVICE_MODE) {
 			diagfwd_disconnect();
@@ -259,9 +266,11 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			driver->in_busy_qdsp = 0;
 			/* Poll SMD channels to check for data*/
 			if (driver->ch)
-				diag_smd_send_req(NON_SMD_CONTEXT);
+				queue_work(driver->diag_wq,
+					 &(driver->diag_read_smd_work));
 			if (driver->chqdsp)
-				diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+				queue_work(driver->diag_wq,
+					&(driver->diag_read_smd_qdsp_work));
 		} else if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
 								== USB_MODE)
 			diagfwd_connect();
