@@ -1,6 +1,5 @@
 /* Header file for:
  * Cypress CY8CTMA300 Prototype touchscreen driver.
- * include/linux/cy8ctma300.h
  *
  * Copyright (C) 2009, 2010 Cypress Semiconductor, Inc.
  * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
@@ -31,13 +30,13 @@
  *			(C) 2009 Enea - Original prototype
  *
  */
-#ifndef __CY8CTMA300_H__
-#define __CY8CTMA300_H__
+#ifndef __CY8C8CTS_H__
+#define __CY8C8CTS_H__
 
 
-/* CY8CTMA300 platform data
+/* CY8CTMA300-TMG200 platform data
  */
-struct cy8ctma300_platform_data {
+struct cy8c_ts_platform_data {
 	int (*power_on)(int on);
 	const char *ts_name;
 	u32 dis_min_x; /* display resoltion */

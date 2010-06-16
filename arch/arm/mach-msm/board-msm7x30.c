@@ -38,7 +38,7 @@
 #include <linux/i2c/tsc2007.h>
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
-#include <linux/input/cy8ctma300.h>
+#include <linux/input/cy8c_ts.h>
 #include <linux/msm_adc.h>
 
 #include <asm/mach-types.h>
@@ -4381,7 +4381,7 @@ vreg_fail:
 	return rc;
 }
 
-static struct cy8ctma300_platform_data cy8ctma300_pdata = {
+static struct cy8c_ts_platform_data cy8ctma300_pdata = {
 	.power_on = tma300_power,
 	.ts_name = "msm_tma300_ts",
 	.dis_min_x = 0,
