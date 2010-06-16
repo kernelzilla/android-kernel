@@ -50,6 +50,9 @@ struct pmic8058_led_data {
 	u8			reg_led_ctrl[3];
 };
 
+#define PM8058_MAX_LEDS		32
+static struct pmic8058_led_data led_data[PM8058_MAX_LEDS];
+
 static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
 {
 	int rc;
@@ -181,7 +184,7 @@ static enum led_brightness pmic8058_led_get(struct led_classdev *led_cdev)
 static int pmic8058_led_probe(struct platform_device *pdev)
 {
 	struct pmic8058_leds_platform_data *pdata = pdev->dev.platform_data;
-	struct pmic8058_led_data *led_data, *led_dat;
+	struct pmic8058_led_data *led_dat;
 	struct pmic8058_led *curr_led;
 	int rc, i = 0;
 	struct pm8058_chip	*pm_chip;
@@ -197,13 +200,6 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "platform data not supplied\n");
 		return -EINVAL;
-	}
-
-	led_data = kzalloc(sizeof(struct pmic8058_led_data) * pdata->num_leds,
-					 GFP_KERNEL);
-	if (led_data == NULL) {
-		dev_err(&pdev->dev, "failed to alloc memory for LEDs\n");
-		return -ENOMEM;
 	}
 
 	rc = pm8058_read(pm_chip, SSBI_REG_ADDR_DRV_KEYPAD, &reg_kp,
@@ -222,7 +218,7 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 
 	for (i = 0; i < pdata->num_leds; i++) {
 		curr_led	= &pdata->leds[i];
-		led_dat		= &led_data[i];
+		led_dat		= &led_data[curr_led->id];
 
 		led_dat->cdev.name		= curr_led->name;
 		led_dat->cdev.default_trigger   = curr_led->default_trigger;
@@ -269,8 +265,6 @@ fail_id_check:
 		for (i = i - 1; i >= 0; i--)
 			led_classdev_unregister(&led_data[i].cdev);
 	}
-
-	kfree(led_data);
 	return rc;
 }
 
@@ -281,11 +275,9 @@ static int __devexit pmic8058_led_remove(struct platform_device *pdev)
 	struct pmic8058_led_data *led = platform_get_drvdata(pdev);
 
 	for (i = 0; i < pdata->num_leds; i++) {
-		led_classdev_unregister(&led[i].cdev);
-		cancel_work_sync(&led[i].work);
+		led_classdev_unregister(&led[led->id].cdev);
+		cancel_work_sync(&led[led->id].work);
 	}
-
-	kfree(led);
 
 	return 0;
 }
