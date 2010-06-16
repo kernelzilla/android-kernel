@@ -1273,6 +1273,19 @@ static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
 
 #define PM8901_GPIO_INT           91
 
+static int pm8901_mpp0_init(void *data)
+{
+	int val = machine_is_msm8x60_surf() ?
+		PM_MPP_DOUT_CTL_LOW : PM_MPP_DOUT_CTL_HIGH;
+	int rc = pm8901_mpp_config(0, PM_MPP_TYPE_D_OUTPUT,
+			PM8901_MPP_DIG_LEVEL_VPH,
+			val);
+	if (!rc)
+		pr_err("%s: pm8901_mpp_config failed with %d\n", __func__, rc);
+
+	return rc;
+}
+
 static struct pm8901_gpio_platform_data pm8901_mpp_data = {
 	.gpio_base	= PM8901_GPIO_PM_TO_SYS(0),
 	.irq_base	= PM8901_MPP_IRQ(PM8901_IRQ_BASE, 0),
@@ -1286,17 +1299,18 @@ static struct pm8901_gpio_platform_data pm8901_mpp_data = {
 }
 
 static struct pm8901_vreg_pdata pm8901_vreg_pdata[PM8901_VREG_MAX] = {
-	[PM8901_VREG_ID_L0]	= { .min_uV = 1200000,	.max_uV = 1200000 },
-	[PM8901_VREG_ID_L1]	= { .min_uV = 3300000,	.max_uV = 3300000 },
-	[PM8901_VREG_ID_L2]	= { .min_uV = 3300000,	.max_uV = 3300000 },
-	[PM8901_VREG_ID_L3]	= { .min_uV = 3300000,	.max_uV = 3300000 },
-	[PM8901_VREG_ID_L4]	= { .min_uV = 2600000,	.max_uV = 2600000 },
-	[PM8901_VREG_ID_L5]	= { .min_uV = 2850000,	.max_uV = 2850000 },
-	[PM8901_VREG_ID_L6]	= { .min_uV = 2200000,	.max_uV = 2200000 },
-	[PM8901_VREG_ID_S0]	= { .min_uV = 1100000,	.max_uV = 1100000 },
-	[PM8901_VREG_ID_S1]	= { .min_uV = 1100000,	.max_uV = 1100000 },
-	[PM8901_VREG_ID_S3]	= { .min_uV = 1100000,	.max_uV = 1100000 },
-	[PM8901_VREG_ID_S4]	= { .min_uV = 1300000,	.max_uV = 1300000 },
+	[PM8901_VREG_ID_L0]      = {1200000, 1200000, NULL,             NULL},
+	[PM8901_VREG_ID_L1]      = {3300000, 3300000, NULL,             NULL},
+	[PM8901_VREG_ID_L2]      = {3300000, 3300000, NULL,             NULL},
+	[PM8901_VREG_ID_L3]      = {3300000, 3300000, NULL,             NULL},
+	[PM8901_VREG_ID_L4]      = {2600000, 2600000, NULL,             NULL},
+	[PM8901_VREG_ID_L5]      = {2850000, 2850000, NULL,             NULL},
+	[PM8901_VREG_ID_L6]      = {2200000, 2200000, NULL,             NULL},
+	[PM8901_VREG_ID_S0]      = {1100000, 1100000, NULL,             NULL},
+	[PM8901_VREG_ID_S1]      = {1100000, 1100000, NULL,             NULL},
+	[PM8901_VREG_ID_S3]      = {1100000, 1100000, NULL,             NULL},
+	[PM8901_VREG_ID_S4]      = {1300000, 1300000, NULL,             NULL},
+	[PM8901_VREG_ID_USB_OTG] = {1300000, 1300000, pm8901_mpp0_init, NULL},
 };
 
 static struct mfd_cell pm8901_subdevs[] = {
