@@ -113,12 +113,7 @@ int msm_gemini_platform_clk_enable(void)
 		goto fail;
 	}
 
-	rc = pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-		"msm_gemini", MSM_SYSTEM_BUS_RATE);
-	if (rc) {
-		GMN_PR_ERR("request AXI bus QOS fails. rc = %d\n", rc);
-		goto fail;
-	}
+	/* Need to add  PM QOS bus requirement once updated */
 
 GMN_DBG("%s:%d]\n", __func__, __LINE__);
 	return rc;
@@ -138,7 +133,7 @@ int msm_gemini_platform_clk_disable(void)
 	clk_put(jpeg_pclk);
 	jpeg_pclk = NULL;
 
-	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "msm_gemini");
+	/* Need to add the code for remove PM QOS requirement */
 	return 0;
 }
 
