@@ -50,6 +50,7 @@
 #include <asm/hardware/gic.h>
 #include <asm/setup.h>
 
+#include <mach/mpp.h>
 #include <mach/board.h>
 #include <mach/irqs.h>
 #include <mach/msm_spi.h>
@@ -69,14 +70,20 @@
 #define MSM_SHARED_RAM_PHYS 0x40000000
 
 /* Macros assume PMIC GPIOs start at 0 */
-#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + NR_GPIO_IRQS)
-#define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - NR_GPIO_IRQS)
+#define PM8058_GPIO_BASE			NR_MSM_GPIOS
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8058_GPIO_BASE)
+#define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - PM8058_GPIO_BASE)
 #define PM8058_IRQ_BASE				(NR_MSM_IRQS + NR_GPIO_IRQS)
+
+#define PM8901_GPIO_BASE			(PM8058_GPIO_BASE + \
+						PM8058_GPIOS + PM8058_MPPS)
+#define PM8901_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8901_GPIO_BASE)
+#define PM8901_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - PM901_GPIO_BASE)
 #define PM8901_IRQ_BASE				(PM8058_IRQ_BASE + \
 						NR_PMIC8058_IRQS)
 
 #define GPIO_EXPANDER_GPIO_BASE \
-	(NR_MSM_GPIOS + PM8058_GPIOS + PM8058_MPPS + PM8901_MPPS)
+	(PM8901_GPIO_BASE + PM8901_MPPS)
 #define GPIO_EXPANDER_IRQ_BASE (PM8901_IRQ_BASE + NR_PMIC8901_IRQS)
 
 /*
@@ -1266,6 +1273,11 @@ static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
 
 #define PM8901_GPIO_INT           91
 
+static struct pm8901_gpio_platform_data pm8901_mpp_data = {
+	.gpio_base	= PM8901_GPIO_PM_TO_SYS(0),
+	.irq_base	= PM8901_MPP_IRQ(PM8901_IRQ_BASE, 0),
+};
+
 #define PM8901_VREG(_id) { \
 	.name = "pm8901-regulator", \
 	.id = _id, \
@@ -1288,6 +1300,11 @@ static struct pm8901_vreg_pdata pm8901_vreg_pdata[PM8901_VREG_MAX] = {
 };
 
 static struct mfd_cell pm8901_subdevs[] = {
+	{	.name = "pm8901-mpp",
+		.id		= -1,
+		.platform_data	= &pm8901_mpp_data,
+		.data_size	= sizeof(pm8901_mpp_data),
+	},
 	PM8901_VREG(PM8901_VREG_ID_L0),
 	PM8901_VREG(PM8901_VREG_ID_L1),
 	PM8901_VREG(PM8901_VREG_ID_L2),
