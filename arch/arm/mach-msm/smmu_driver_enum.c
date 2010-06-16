@@ -159,7 +159,12 @@ int smmu_driver_probe(struct platform_device *pdev)
 				pr_err("clock defined but not present\n");
 				goto fail_nodev;
 			}
+
+			if (smmu_dev->clk_rate != 0)
+				clk_set_rate(smmu_clk, smmu_dev->clk_rate);
+
 			clk_enable(smmu_clk);
+			clk_put(smmu_clk);
 		}
 
 		drv = kzalloc(sizeof(struct smmu_driver), GFP_KERNEL);
@@ -216,8 +221,8 @@ int smmu_driver_probe(struct platform_device *pdev)
 		nm2v = GET_NM2VCBMT((unsigned long) regs_base);
 		ncb = GET_NCB((unsigned long) regs_base);
 
-		printk(KERN_INFO "Registered driver for %s at %lx, \
-				  irq %d (%d cb, %d m2v) \n",
+		printk(KERN_INFO "Registered driver for %s at %lx, "
+				 "irq %d (%d cb, %d m2v) \n",
 		       pdev->name, (unsigned long) regs_base,
 		       irq, ncb+1, nm2v+1);
 
