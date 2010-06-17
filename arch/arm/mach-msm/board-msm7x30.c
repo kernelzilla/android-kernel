@@ -3703,11 +3703,11 @@ struct sdcc_gpio {
 	struct msm_gpio *cfg_data;
 	uint32_t size;
 };
-
+#if defined(CONFIG_MMC_MSM_SDC1_SUPPORT)
 static struct msm_gpio sdc1_lvlshft_cfg_data[] = {
 	{GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_16MA), "sdc1_lvlshft"},
 };
-
+#endif
 static struct msm_gpio sdc1_cfg_data[] = {
 	{GPIO_CFG(38, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc1_clk"},
 	{GPIO_CFG(39, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_cmd"},
