@@ -8,6 +8,11 @@ config MSM_KGSL
 	  3D graphics driver. Required to use hardware accelerated
 	  OpenGL ES 2.0 and 1.1.
 
+config MSM_KGSL_2D
+	bool "Enable the 2D core. Required for OpenVG"
+	default n
+	depends on MSM_KGSL && !ARCH_MSM7X27
+
 config MSM_KGSL_DRM
 	bool "Build a DRM interface for the MSM_KGSL driver"
 	depends on MSM_KGSL && DRM
