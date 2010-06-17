@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -62,6 +62,22 @@ struct afe_cmd_aux_codec_config{
 	uint16_t data_format_padding_info;
 } __attribute__ ((packed));
 
+#define AFE_CMD_FM_RX_ROUTING_CMD	0x6
+#define AFE_CMD_FM_RX_ROUTING_LEN sizeof(struct afe_cmd_fm_codec_config)
 
+struct afe_cmd_fm_codec_config{
+	uint16_t cmd_id;
+	uint16_t enable;
+	uint16_t device_id;
+} __attribute__ ((packed));
+
+#define AFE_CMD_FM_PLAYBACK_VOLUME_CMD	0x8
+#define AFE_CMD_FM_PLAYBACK_VOLUME_LEN sizeof(struct afe_cmd_fm_volume_config)
+
+struct afe_cmd_fm_volume_config{
+	uint16_t cmd_id;
+	uint16_t volume;
+	uint16_t reserved;
+} __attribute__ ((packed));
 
 #endif
