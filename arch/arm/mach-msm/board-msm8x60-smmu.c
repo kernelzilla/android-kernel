@@ -319,11 +319,15 @@ static struct smmu_device vcodec_b_smmu = {
 };
 
 static struct smmu_device gfx3d_smmu = {
-	.name = "gfx3d"
+	.name = "gfx3d",
+	.clk = "gfx3d_clk",
+	.clk_rate = 27000000
 };
 
 static struct smmu_device gfx2d0_smmu = {
-	.name = "gfx2d0"
+	.name = "gfx2d0",
+	.clk = "gfx2d_clk",
+	.clk_rate = 27000000
 };
 
 static struct platform_device msm_device_smmu_jpegd = {

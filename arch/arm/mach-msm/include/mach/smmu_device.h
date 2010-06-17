@@ -44,12 +44,14 @@
  * struct smmu_device - a single SMMU hardware instance
  * name		Human-readable name given to this SMMU HW instance
  * clk		Name of the AXI clock used for the config space of this SMMU
+ * clk_rate	Rate to set for the AXI clock. 0 means don't set a rate
  * num_ctx	Number of context banks on this SMMU device
  *
  */
 struct smmu_device {
 	char *name;
 	char *clk;
+	unsigned long clk_rate;
 	unsigned int num_ctx;
 };
 
