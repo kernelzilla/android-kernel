@@ -40,6 +40,9 @@
 #include <mach/sdio_al.h>
 
 #define MODULE_MAME "sdio_al"
+#define DRV_VERSION "1.07"
+
+/* #define DEBUG_SDIO_AL_UNIT_TEST 1 */
 
 /**
  *  Func#0 has SDIO standard registers
@@ -333,6 +336,9 @@ struct sdio_channel {
 	struct list_head rx_size_list_head;
 
 	struct platform_device pdev;
+
+	u32 total_rx_bytes;
+	u32 total_tx_bytes;
 
 	u32 signature;
 };
@@ -883,7 +889,7 @@ static int read_sdioc_software_header(struct peer_sdioc_sw_header *header)
 		goto exit_err;
 	}
 
-	pr_info(MODULE_MAME ":sdioc sw version 0x%x\n", header->version);
+	pr_info(MODULE_MAME ":SDIOC SW version 0x%x\n", header->version);
 
 	return 0;
 
@@ -1073,6 +1079,9 @@ static int open_channel(struct sdio_channel *ch)
 	ch->rx_pipe_index = ch->num*2;
 	ch->tx_pipe_index = ch->num*2+1;
 	ch->signature = SDIO_AL_SIGNATURE;
+
+	ch->total_rx_bytes = 0;
+	ch->total_tx_bytes = 0;
 
 	ch->write_avail = 0;
 	ch->read_avail = 0;
@@ -1317,6 +1326,7 @@ static int sdio_al_setup(void)
 	}
 
 	read_sdioc_software_header(sdio_al->sdioc_sw_header);
+	pr_info(MODULE_MAME ":SDIO-AL SW version %s.\n", DRV_VERSION);
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
 	sdio_al->is_ready = true;
@@ -1558,7 +1568,6 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 {
 	int ret = 0;
 
-
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 
 	if (sdio_al->is_err) {
@@ -1572,8 +1581,8 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		return -EINVAL;
 	}
 
-	pr_debug(MODULE_MAME ":sdio_read %s buf=0x%x len=0x%x\n",
-			 ch->name, (u32) data, len);
+	pr_info(MODULE_MAME ":start ch %s read %d avail %d.\n",
+		ch->name, len, ch->read_avail);
 
 	if ((ch->is_packet_mode) && (len != ch->read_avail)) {
 		pr_info(MODULE_MAME ":sdio_read ch %s len != read_avail\n",
@@ -1581,8 +1590,11 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		return -EINVAL;
 	}
 
-	if (mutex_is_locked(&sdio_al->bus_lock))
-		pr_debug(MODULE_MAME ":bus is locked\n");
+	if (len > ch->read_avail) {
+		pr_info(MODULE_MAME ":ERR ch %s read %d avail %d.\n",
+				ch->name, len, ch->read_avail);
+		return -ENOMEM;
+	}
 
 	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
@@ -1596,6 +1608,10 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		remove_handled_rx_packet(ch);
 	else
 		ch->read_avail -= len;
+
+	ch->total_rx_bytes += len;
+	pr_info(MODULE_MAME ":end ch %s read %d avail %d total %d.\n",
+		ch->name, len, ch->read_avail, ch->total_rx_bytes);
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
 	mutex_unlock(&sdio_al->bus_lock);
@@ -1630,16 +1646,22 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 		return -EINVAL;
 	}
 
-	pr_debug(MODULE_MAME ":sdio_write %s buf=0x%x len=0x%x\n",
-			 ch->name, (u32) data, len);
+	pr_info(MODULE_MAME ":start ch %s write %d avail %d.\n",
+		ch->name, len, ch->write_avail);
 
-	if (mutex_is_locked(&sdio_al->bus_lock))
-		pr_debug(MODULE_MAME ":bus is locked\n");
+	if (len > ch->write_avail) {
+		pr_info(MODULE_MAME ":ERR ch %s write %d avail %d.\n",
+				ch->name, len, ch->write_avail);
+		return -ENOMEM;
+	}
 
 	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = sdio_ch_write(ch, data, len);
-	sdio_release_host(sdio_al->card->sdio_func[0]);
+
+	ch->total_tx_bytes += len;
+	pr_info(MODULE_MAME ":end ch %s write %d avail %d total %d.\n",
+		ch->name, len, ch->write_avail, ch->total_tx_bytes);
 
 	if (ret) {
 		pr_info(MODULE_MAME ":sdio_write err=%d\n", -ret);
@@ -1651,6 +1673,7 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 		ch->write_avail -= len;
 	}
 
+	sdio_release_host(sdio_al->card->sdio_func[0]);
 	mutex_unlock(&sdio_al->bus_lock);
 
 	if (ch->write_avail < ch->min_write_avail)
@@ -1768,12 +1791,16 @@ static int mmc_probe(struct mmc_card *card)
 
 	sdio_al->card = card;
 
+	#ifdef DEBUG_SDIO_AL_UNIT_TEST
+	pr_info(MODULE_MAME ":==== SDIO-AL UNIT-TEST ====\n");
+	#else
 	/* Allow clients to probe for this driver */
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
 		sdio_al->channel[i].pdev.name = sdio_al->channel[i].name;
 		sdio_al->channel[i].pdev.dev.release = default_sdio_al_release;
 		platform_device_register(&sdio_al->channel[i].pdev);
 	}
+	#endif
 
 	return ret;
 }
@@ -1784,10 +1811,12 @@ static int mmc_probe(struct mmc_card *card)
  */
 static void mmc_remove(struct mmc_card *card)
 {
+	#ifndef DEBUG_SDIO_AL_UNIT_TEST
 	int i;
 
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++)
 		platform_device_unregister(&sdio_al->channel[i].pdev);
+	#endif
 
 	pr_info(MODULE_MAME ":sdio card removed.\n");
 }
@@ -1811,9 +1840,6 @@ static int __init sdio_al_init(void)
 	int ret = 0;
 
 	pr_debug(MODULE_MAME ":sdio_al_init\n");
-
-	pr_debug(MODULE_MAME ":SDIO Mailbox size=%d\n",
-		 (u32) sizeof(struct sdio_mailbox));
 
 	sdio_al = kzalloc(sizeof(struct sdio_al), GFP_KERNEL);
 	if (sdio_al == NULL)
@@ -1864,4 +1890,5 @@ module_exit(sdio_al_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("SDIO Abstraction Layer");
 MODULE_AUTHOR("Amir Samuelov <amirs@qualcomm.com>");
+MODULE_VERSION(DRV_VERSION);
 
