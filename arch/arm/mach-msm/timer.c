@@ -969,7 +969,7 @@ static void __init msm_timer_init(void)
 }
 
 #ifdef CONFIG_SMP
-void __cpuinit local_timer_setup(struct clock_event_device *evt)
+void local_timer_setup(struct clock_event_device *evt)
 {
 	unsigned long flags;
 	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
