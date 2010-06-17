@@ -435,6 +435,7 @@ int vcm_free(struct vcm *vcm)
 static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 {
 	struct res *res = NULL;
+	int align_attr = 0;
 
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
@@ -452,17 +453,27 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 		goto fail;
 	}
 
+	align_attr = (attr >> VCM_ALIGN_SHIFT) & VCM_ALIGN_MASK;
+
+	if (align_attr >= 32) {
+		vcm_err("Invalid alignment attribute: %d\n", align_attr);
+		goto fail2;
+	}
+
 	INIT_LIST_HEAD(&res->res_elm);
 	res->vcm_id = vcm;
 	res->len = len;
 	res->attr = attr;
 
-	if (len/SZ_1M)
-		res->alignment_req = SZ_1M;
-	else if (len/SZ_64K)
-		res->alignment_req = SZ_64K;
-	else
-		res->alignment_req = SZ_4K;
+	if (align_attr == 0) {
+		if (len/SZ_1M)
+			res->alignment_req = SZ_1M;
+		else if (len/SZ_64K)
+			res->alignment_req = SZ_64K;
+		else
+			res->alignment_req = SZ_4K;
+	} else
+		res->alignment_req = 1 << align_attr;
 
 	res->aligned_len = res->alignment_req + len;
 
@@ -711,6 +722,62 @@ static int vcm_to_smmu_attr(uint32_t attr)
 }
 
 
+static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
+			unsigned long len, unsigned int attr, int map)
+{
+	int ret;
+	unsigned long map_len = SZ_4K;
+
+	if (IS_ALIGNED(va, SZ_64K) && len >= SZ_64K)
+		map_len = SZ_64K;
+
+	if (IS_ALIGNED(va, SZ_1M) && len >= SZ_1M)
+		map_len = SZ_1M;
+
+	if (IS_ALIGNED(va, SZ_16M) && len >= SZ_16M)
+		map_len = SZ_16M;
+
+#ifdef VCM_PERF_DEBUG
+	if (va & (len - 1))
+		pr_warning("Warning! Suboptimal VCM mapping alignment "
+			   "va = %p, len = %p. Expect TLB performance "
+			   "degradation.\n", (void *) va, (void *) len);
+#endif
+
+	while (len) {
+		if (va & (SZ_4K - 1)) {
+			vcm_err("Tried to map w/ align < 4k! va = %08lx\n", va);
+			goto fail;
+		}
+
+		if (map_len > len) {
+			vcm_err("map_len = %lu, len = %lu, trying to overmap\n",
+				 map_len, len);
+			goto fail;
+		}
+
+		if (map)
+			ret = smmu_map((struct smmu_dev *) dev_id, pa, va,
+								map_len, attr);
+		else
+			ret = smmu_unmap((struct smmu_dev *) dev_id, va,
+								map_len);
+		if (ret) {
+			vcm_err("smmu_map/unmap(%p, %p, %p, 0x%x, 0x%x) ret %i"
+				"map = %d", (void *) dev_id, (void *) pa,
+				(void *) va, (int) map_len, attr, ret, map);
+			goto fail;
+		}
+
+		va += map_len;
+		pa += map_len;
+		len -= map_len;
+	}
+	return 0;
+fail:
+	return -1;
+}
+
 /* TBD if you vcm_back again what happens? */
 int vcm_back(struct res *res, struct physmem *physmem)
 {
@@ -820,12 +887,11 @@ int vcm_back(struct res *res, struct physmem *physmem)
 			list_for_each_entry(avcm, &vcm->assoc_head,
 					    assoc_elm) {
 
-				ret = smmu_map(
-					(struct smmu_dev *) avcm->dev_id,
-					chunk->pa, va, chunk_size, attr);
+				ret = vcm_process_chunk(avcm->dev_id, chunk->pa,
+						      va, chunk_size, attr, 1);
 				if (ret != 0) {
-					vcm_err("smmu_map(%p, %p, %p, 0x%x,"
-						"0x%x)"
+					vcm_err("vcm_back_chunk(%p, %p, %p,"
+						" 0x%x, 0x%x)"
 						" ret %i",
 						(void *) avcm->dev_id,
 						(void *) chunk->pa,
@@ -1009,11 +1075,10 @@ int vcm_unback(struct res *res)
 
 			/* un map all */
 			list_for_each_entry(avcm, &vcm->assoc_head, assoc_elm) {
-				ret = smmu_unmap(
-					(struct smmu_dev *) avcm->dev_id,
-					va, chunk_size);
+				ret = vcm_process_chunk(avcm->dev_id, 0, va,
+							chunk_size, 0, 0);
 				if (ret != 0) {
-					vcm_err("smmu_unmap(%p, %p, 0x%x)"
+					vcm_err("vcm_unback_chunk(%p, %p, 0x%x)"
 						" ret %i",
 						(void *) avcm->dev_id,
 						(void *) va,
