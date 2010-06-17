@@ -98,7 +98,7 @@ static long kgsl_cache_range_op(unsigned long addr, int size,
 	for (end = addr; end < (addr + size); end += KGSL_PAGESIZE) {
 		unsigned long physaddr;
 		if (flags & KGSL_MEMFLAGS_VMALLOC_MEM)
-			physaddr = vmalloc_to_pfn((void *)end);
+			physaddr = page_to_phys(vmalloc_to_page((void *) end));
 		else
 			if (flags & KGSL_MEMFLAGS_HOSTADDR) {
 				physaddr = kgsl_virtaddr_to_physaddr(end);
