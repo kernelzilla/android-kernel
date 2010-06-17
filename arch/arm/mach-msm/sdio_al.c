@@ -40,7 +40,7 @@
 #include <mach/sdio_al.h>
 
 #define MODULE_MAME "sdio_al"
-#define DRV_VERSION "1.07"
+#define DRV_VERSION "1.08"
 
 /* #define DEBUG_SDIO_AL_UNIT_TEST 1 */
 
@@ -352,8 +352,6 @@ struct sdio_channel {
  *
  *  @channel - Channels context.
  *
- *  @bus_lock - Lock when the bus is in use.
- *
  *  @workqueue - workqueue to read the mailbox and handle
  *  		   pending requests according to priority.
  *  		   Reading the mailbox should not happen in
@@ -384,7 +382,6 @@ struct sdio_al {
 
 	struct peer_sdioc_sw_header *sdioc_sw_header;
 
-	struct mutex bus_lock;
 	struct workqueue_struct *workqueue;
 	struct work_struct work;
 
@@ -1295,8 +1292,6 @@ static int sdio_al_setup(void)
 	ret = sdio_set_block_size(func1, SDIO_AL_BLOCK_SIZE);
 	func1->max_blksize = SDIO_AL_BLOCK_SIZE;
 
-	mutex_init(&sdio_al->bus_lock);
-
 	sdio_al->workqueue = create_singlethread_workqueue("sdio_al_wq");
 	INIT_WORK(&sdio_al->work, worker);
 
@@ -1468,11 +1463,9 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 	}
 
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = open_channel(ch);
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	if (ret)
 		pr_info(MODULE_MAME ":sdio_open %s err=%d\n", name, -ret);
@@ -1509,11 +1502,9 @@ int sdio_close(struct sdio_channel *ch)
 
 	ch->notify = NULL;
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = close_channel(ch);
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	do
 		ret = remove_handled_rx_packet(ch);
@@ -1596,7 +1587,6 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		return -ENOMEM;
 	}
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = sdio_memcpy_fromio(ch->func, data, PIPE_RX_FIFO_ADDR, len);
 
@@ -1614,7 +1604,6 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		ch->name, len, ch->read_avail, ch->total_rx_bytes);
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	if ((ch->read_avail == 0) &&
 	    !((ch->is_packet_mode) && (sdio_al->use_irq)))
@@ -1655,7 +1644,6 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 		return -ENOMEM;
 	}
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = sdio_ch_write(ch, data, len);
 
@@ -1674,7 +1662,6 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	}
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	if (ch->write_avail < ch->min_write_avail)
 		ask_reading_mailbox();
@@ -1699,11 +1686,9 @@ int sdio_set_write_threshold(struct sdio_channel *ch, int threshold)
 	pr_debug(MODULE_MAME ":sdio_set_write_threshold %s 0x%x\n",
 			 ch->name, ch->write_threshold);
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = set_pipe_threshold(ch->tx_pipe_index, ch->write_threshold);
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	return ret;
 }
@@ -1725,11 +1710,9 @@ int sdio_set_read_threshold(struct sdio_channel *ch, int threshold)
 	pr_debug(MODULE_MAME ":sdio_set_write_threshold %s 0x%x\n",
 			 ch->name, ch->read_threshold);
 
-	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = set_pipe_threshold(ch->rx_pipe_index, ch->read_threshold);
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	mutex_unlock(&sdio_al->bus_lock);
 
 	return ret;
 }
