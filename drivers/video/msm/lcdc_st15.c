@@ -300,7 +300,6 @@ static int hdmi_sii_probe(struct i2c_client *client,
 		rc = -ENODEV;
 		goto probe_free;
 	}
-	msm_fb_add_device(&sii9022_device);
 	if (dd->pd->irq) {
 		INIT_WORK(&dd->work, sii9022_work_f);
 		rc = request_irq(dd->pd->irq,
@@ -309,7 +308,9 @@ static int hdmi_sii_probe(struct i2c_client *client,
 				 "sii9022_cable", dd);
 		if (rc)
 			goto probe_free;
+		disable_irq(dd->pd->irq);
 	}
+	msm_fb_add_device(&sii9022_device);
 	dd->x_res = sii9022_panel_data.panel_info.xres;
 	dd->y_res = sii9022_panel_data.panel_info.yres;
 
