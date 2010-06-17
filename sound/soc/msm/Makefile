@@ -24,3 +24,14 @@ obj-$(CONFIG_SND_MSM_SOC_MSM7KV2) += snd-soc-msm7kv2.o
 
 snd-soc-qsd8k-objs := qsd8k.o
 obj-$(CONFIG_SND_QSD_SOC_QSD8K) += snd-soc-qsd8k.o
+
+# 8660 ALSA Support
+snd-soc-msm8x60-dai-objs := msm8x60-dai.o
+obj-$(CONFIG_SND_SOC_MSM8X60_DAI) += snd-soc-msm8x60-dai.o
+
+snd-soc-msm8x60-pcm-objs := msm8x60-dsp.o msm8x60-pcm.o
+obj-$(CONFIG_SND_SOC_MSM8X60_PCM) += snd-soc-msm8x60-pcm.o
+
+snd-soc-msm8x60-objs := msm8x60.o
+obj-$(CONFIG_SND_SOC_MSM8X60) += snd-soc-msm8x60.o
+

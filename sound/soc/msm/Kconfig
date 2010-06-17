@@ -56,4 +56,27 @@ config SND_MSM_SOC_MSM7KV2
 	help
 	 To add support for SoC audio on qsd8k.
 
+
+config SND_SOC_MSM8X60_PCM
+	tristate "SoC audio for the MSM8X60 chip"
+	depends on ARCH_MSM8X60 && SND_SOC && MSM8X60_AUDIO
+	default y
+	help
+	 To add support for ALSA PCM driver for MSM8X60.
+
+config SND_SOC_MSM8X60_DAI
+	tristate "SoC CPU/CODEC DAI for MSM8X60"
+	depends on SND_SOC_MSM8X60_PCM
+	default y
+	help
+	 To add support for ALSA PCM driver for MSM8X60.
+
+config SND_SOC_MSM8X60
+	tristate "SoC Audio support for MSM8X60"
+	depends on SND_SOC_MSM8X60_PCM
+	default y
+	help
+	 To add support for SoC audio on MSM8X60.
+
+
 endmenu
