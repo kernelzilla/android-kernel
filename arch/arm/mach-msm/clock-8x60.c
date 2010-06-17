@@ -47,6 +47,7 @@
 #define PLL_ENA_SC0_REG			REG(0x34C0)
 #define PMIC_SSBI2_NS_REG		REG(0x280C)
 #define PRNG_CLK_NS_REG			REG(0x2E80)
+#define RINGOSC_NS_REG			REG(0x2DC0)
 #define RINGOSC_STATUS_REG		REG(0x2DCC)
 #define RINGOSC_TCXO_CTL_REG		REG(0x2DC4)
 #define SDCn_APPS_CLK_NS_REG(n)		REG(0x282C+(0x20*((n)-1)))
@@ -1825,7 +1826,7 @@ static signed soc_clk_measure_rate(unsigned id)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
 	unsigned long flags;
-	uint32_t vector, pdm_reg_backup;
+	uint32_t vector, pdm_reg_backup, ringosc_reg_backup;
 	uint64_t raw_count_short, raw_count_full;
 	signed ret;
 
@@ -1854,9 +1855,11 @@ static signed soc_clk_measure_rate(unsigned id)
 		goto err;
 	}
 
-	/* Enable CXO/4 branch and root. */
+	/* Enable CXO/4 and RINGOSC branch and root. */
 	pdm_reg_backup = readl(PDM_CLK_NS_REG);
+	ringosc_reg_backup = readl(RINGOSC_NS_REG);
 	writel(0x2898, PDM_CLK_NS_REG);
+	writel(0xA00, RINGOSC_NS_REG);
 
 	/*
 	 * The ring oscillator counter will not reset if the measured clock
@@ -1870,6 +1873,7 @@ static signed soc_clk_measure_rate(unsigned id)
 	/* Run a full measurement. (~14 ms) */
 	raw_count_full = run_measurement(0x10000);
 
+	writel(ringosc_reg_backup, RINGOSC_NS_REG);
 	writel(pdm_reg_backup, PDM_CLK_NS_REG);
 
 	/* Return 0 if the clock is off. */
