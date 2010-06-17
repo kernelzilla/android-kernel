@@ -858,6 +858,25 @@ config MSM_ADSP
 	help
 	  Provides access to registers needed by the userspace aDSP library.
 
+config ADSP_RPC_VER
+	hex
+	default 0x30002 if (ARCH_MSM7X27 || (ARCH_MSM7X25 && AMSS_7X25_VERSION_2009))
+	default 0x30001 if (ARCH_MSM7X01A || (ARCH_MSM7X25 && AMSS_7X25_VERSION_2008))
+	depends on MSM_ADSP
+	help
+	 Select proper ADSP RPC version
+choice
+	prompt "ADSP RPC version"
+
+	default AMSS_7X25_VERSION_2009
+
+	config AMSS_7X25_VERSION_2009
+		bool "2.0.09"
+
+	config AMSS_7X25_VERSION_2008
+		bool "2.0.08"
+endchoice
+
 config MSM7KV2_AUDIO
 	bool "MSM7K v2 audio"
 	depends on (ARCH_MSM7X30 && ANDROID_PMEM)
