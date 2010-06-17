@@ -3682,6 +3682,11 @@ static void __init msm7x30_init_irq(void)
 	msm_init_irq();
 }
 
+static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
+	{GPIO_CFG(86, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_cs1"},
+	{GPIO_CFG(115, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_busy1"},
+};
+
 struct vreg *vreg_s3;
 struct vreg *vreg_mmc;
 
@@ -3697,11 +3702,6 @@ struct sdcc_gpio {
 
 static struct msm_gpio sdc1_lvlshft_cfg_data[] = {
 	{GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_16MA), "sdc1_lvlshft"},
-};
-
-static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
-	{GPIO_CFG(86, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_cs1"},
-	{GPIO_CFG(115, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_busy1"},
 };
 
 static struct msm_gpio sdc1_cfg_data[] = {
