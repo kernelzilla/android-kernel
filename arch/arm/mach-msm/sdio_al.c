@@ -314,6 +314,7 @@ struct sdio_channel {
 	void *priv;
 
 	int is_open;
+	int is_suspend;
 
 	struct sdio_func *func;
 
@@ -1435,6 +1436,15 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 	/* Note: Set caller returned context before interrupts are enabled */
 	*ret_ch = ch;
 
+	if (ch->is_suspend) {
+		pr_info(MODULE_MAME ":Resume channel %s.\n", name);
+		ch->is_suspend = false;
+		ch->is_open = true;
+		ask_reading_mailbox();
+		return 0;
+	}
+
+
 	mutex_lock(&sdio_al->bus_lock);
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
 	ret = open_channel(ch);
@@ -1464,12 +1474,16 @@ int sdio_close(struct sdio_channel *ch)
 	int ret;
 
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
-	WARN_ON(!ch->is_open);
 
-	pr_debug(MODULE_MAME ":sdio_close %s\n", ch->name);
+	if (!ch->is_open)
+		return -EINVAL;
+
+	pr_info(MODULE_MAME ":sdio_close %s\n", ch->name);
 
 	/* Stop channel notifications, and read/write operations. */
 	ch->is_open = false;
+	ch->is_suspend = true;
+
 	ch->notify = NULL;
 
 	mutex_lock(&sdio_al->bus_lock);
@@ -1484,8 +1498,6 @@ int sdio_close(struct sdio_channel *ch)
 
 	if  (ch->poll_delay_msec > 0)
 		sdio_al->poll_delay_msec = get_min_poll_time_msec();
-
-	platform_device_unregister(&ch->pdev);
 
 	return ret;
 }
@@ -1759,6 +1771,11 @@ static int mmc_probe(struct mmc_card *card)
  */
 static void mmc_remove(struct mmc_card *card)
 {
+	int i;
+
+	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++)
+		platform_device_unregister(&sdio_al->channel[i].pdev);
+
 	pr_info(MODULE_MAME ":sdio card removed.\n");
 }
 
