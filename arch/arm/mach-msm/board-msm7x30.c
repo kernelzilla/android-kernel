@@ -4125,6 +4125,7 @@ static struct msm_gpio tsc2007_config_data[] = {
 };
 
 static struct vreg *vreg_tsc_s3;
+static struct vreg *vreg_tsc_s2;
 
 static int tsc2007_init(void)
 {
@@ -4149,6 +4150,25 @@ static int tsc2007_init(void)
 		goto fail_vreg_set_level;
 	}
 
+	vreg_tsc_s2 = vreg_get(NULL, "s2");
+	if (IS_ERR(vreg_tsc_s2)) {
+		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
+		       __func__, PTR_ERR(vreg_tsc_s2));
+		goto fail_vreg_get;
+	}
+
+	rc = vreg_set_level(vreg_tsc_s2, 1300);
+	if (rc) {
+		pr_err("%s: vreg_set_level failed \n", __func__);
+		goto fail_vreg_s2_level;
+	}
+
+	rc = vreg_enable(vreg_tsc_s2);
+	if (rc) {
+		pr_err("%s: vreg_enable failed \n", __func__);
+		goto fail_vreg_s2_level;
+	}
+
 	rc = msm_gpios_request_enable(tsc2007_config_data,
 			ARRAY_SIZE(tsc2007_config_data));
 	if (rc) {
@@ -4159,6 +4179,10 @@ static int tsc2007_init(void)
 	return 0;
 
 fail_gpio_req:
+	vreg_disable(vreg_tsc_s2);
+fail_vreg_s2_level:
+	vreg_put(vreg_tsc_s2);
+fail_vreg_get:
 	vreg_disable(vreg_tsc_s3);
 fail_vreg_set_level:
 	vreg_put(vreg_tsc_s3);
@@ -4584,9 +4608,11 @@ static void __init msm7x30_init(void)
 
 #if defined(CONFIG_TOUCHSCREEN_TSC2007) || \
 	defined(CONFIG_TOUCHSCREEN_TSC2007_MODULE)
-	i2c_register_board_info(2, tsc_i2c_board_info,
-			ARRAY_SIZE(tsc_i2c_board_info));
+	if (machine_is_msm8x55_svlte_ffa())
+		i2c_register_board_info(2, tsc_i2c_board_info,
+				ARRAY_SIZE(tsc_i2c_board_info));
 #endif
+
 	if (machine_is_msm7x30_surf())
 		platform_device_register(&flip_switch_device);
 	pmic8058_leds_init();
