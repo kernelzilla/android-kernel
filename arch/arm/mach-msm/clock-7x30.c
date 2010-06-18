@@ -1096,7 +1096,7 @@ static long soc_clk_round_rate(unsigned id, unsigned rate)
 static int soc_clk_set_rate(unsigned id, unsigned rate)
 {
 	struct clk_local *t = &clk_local_tbl[id];
-	const struct clk_freq_tbl *cf = t->current_freq;
+	const struct clk_freq_tbl *cf;
 	const struct clk_freq_tbl *nf;
 	uint32_t *chld = t->children;
 	void *ns_reg = REG(t->ns_reg);
@@ -1116,6 +1116,7 @@ static int soc_clk_set_rate(unsigned id, unsigned rate)
 		return -EPERM;
 
 	spin_lock_irqsave(&clock_reg_lock, flags);
+	cf = t->current_freq;
 
 	if (rate == cf->freq_hz)
 		goto release_lock;
