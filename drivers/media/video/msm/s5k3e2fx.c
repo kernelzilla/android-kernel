@@ -18,7 +18,7 @@
 static uint16_t g_usModuleVersion;	/*0: rev.4, 1: rev.5 */
 
 /* prepare for modify PCLK*/
-#define REG_PLL_MULTIPLIER_LSB_VALUE	  0x90
+#define REG_PLL_MULTIPLIER_LSB_VALUE	  0xA0
 /* 0xA0 for PCLK=80MHz */
 /* 0x90 for PCLK=72MHz */
 
