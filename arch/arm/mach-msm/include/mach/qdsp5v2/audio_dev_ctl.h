@@ -34,8 +34,6 @@
 #define DIR_TX	2
 #define DIR_RX	1
 
-#define PSEUDO_ACDB_ID 0xFFFF /* ID used for virtual devices */
-
 #define DEVICE_IGNORE	0xff
 #define SESSION_IGNORE 0x00000000
 
