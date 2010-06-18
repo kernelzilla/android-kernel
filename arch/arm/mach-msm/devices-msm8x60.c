@@ -22,6 +22,7 @@
 #include <mach/dma.h>
 #include <asm/mach/mmc.h>
 #include <linux/msm_kgsl.h>
+#include <mach/msm_hsusb.h>
 #include "clock.h"
 #include "clock-8x60.h"
 #include "clock-rpm.h"
@@ -642,6 +643,46 @@ struct platform_device msm_device_gadget_peripheral = {
 		.coherent_dma_mask	= 0xffffffffULL,
 	},
 };
+#ifdef CONFIG_USB_EHCI_MSM
+static struct resource resources_hsusb_host[] = {
+	{
+		.start	= 0x12500000,
+		.end	= 0x12500000 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= USB1_HS_IRQ,
+		.end	= USB1_HS_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_hsusb_host = {
+	.name		= "msm_hsusb_host",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(resources_hsusb_host),
+	.resource	= resources_hsusb_host,
+	.dev		= {
+		.dma_mask 		= &dma_mask,
+		.coherent_dma_mask	= 0xffffffffULL,
+	},
+};
+
+static struct platform_device *msm_host_devices[] = {
+	&msm_device_hsusb_host,
+};
+
+int msm_add_host(unsigned int host, struct msm_usb_host_platform_data *plat)
+{
+	struct platform_device	*pdev;
+
+	pdev = msm_host_devices[host];
+	if (!pdev)
+		return -ENODEV;
+	pdev->dev.platform_data = plat;
+	return platform_device_register(pdev);
+}
+#endif
 
 struct platform_device msm_device_smd = {
 	.name           = "msm_smd",

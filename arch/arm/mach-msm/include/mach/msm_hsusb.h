@@ -155,6 +155,7 @@ struct msm_usb_host_platform_data {
 	int (*phy_reset)(void __iomem *addr);
 	void (*config_gpio)(unsigned int config);
 	void (*vbus_power) (unsigned phy_info, int on);
+	int  (*vbus_init)(int init);
 };
 
 #endif
