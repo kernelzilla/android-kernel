@@ -27,11 +27,18 @@
 #define PM8058_DRV_KEYPAD_BL_MASK	0xf0
 #define PM8058_DRV_KEYPAD_BL_SHIFT	0x04
 
+#define SSBI_REG_ADDR_FLASH_DRV0        0x49
+#define PM8058_DRV_FLASH_MASK           0xf0
+#define PM8058_DRV_FLASH_SHIFT          0x04
+
+#define SSBI_REG_ADDR_FLASH_DRV1        0xFB
+
 #define SSBI_REG_ADDR_LED_CTRL_BASE	0x131
 #define SSBI_REG_ADDR_LED_CTRL(n)	(SSBI_REG_ADDR_LED_CTRL_BASE + (n))
 #define PM8058_DRV_LED_CTRL_MASK	0xf8
 #define PM8058_DRV_LED_CTRL_SHIFT	0x03
 
+#define MAX_FLASH_CURRENT	300
 #define MAX_KEYPAD_BL_LEVEL	(1 << 4)
 #define MAX_LED_DRV_LEVEL	20 /* 2 * 20 mA */
 
@@ -48,9 +55,11 @@ struct pmic8058_led_data {
 	spinlock_t		value_lock;
 	u8			reg_kp;
 	u8			reg_led_ctrl[3];
+	u8			reg_flash_led0;
+	u8			reg_flash_led1;
 };
 
-#define PM8058_MAX_LEDS		32
+#define PM8058_MAX_LEDS		5
 static struct pmic8058_led_data led_data[PM8058_MAX_LEDS];
 
 static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
@@ -129,6 +138,61 @@ static enum led_brightness led_lc_get(struct pmic8058_led_data *led)
 		return LED_OFF;
 }
 
+static void
+led_flash_set(struct pmic8058_led_data *led, enum led_brightness value)
+{
+	int rc;
+	u8 level;
+	unsigned long flags;
+	u8 reg_flash_led;
+	u16 reg_addr;
+
+	spin_lock_irqsave(&led->value_lock, flags);
+	level = (value << PM8058_DRV_FLASH_SHIFT) &
+				 PM8058_DRV_FLASH_MASK;
+
+	if (led->id == PMIC8058_ID_FLASH_LED_0) {
+		led->reg_flash_led0 &= ~PM8058_DRV_FLASH_MASK;
+		led->reg_flash_led0 |= level;
+		reg_flash_led	    = led->reg_flash_led0;
+		reg_addr	    = SSBI_REG_ADDR_FLASH_DRV0;
+	} else {
+		led->reg_flash_led1 &= ~PM8058_DRV_FLASH_MASK;
+		led->reg_flash_led1 |= level;
+		reg_flash_led	    = led->reg_flash_led1;
+		reg_addr	    = SSBI_REG_ADDR_FLASH_DRV1;
+	}
+	spin_unlock_irqrestore(&led->value_lock, flags);
+
+	rc = pm8058_write(led->pm_chip, reg_addr, &reg_flash_led, 1);
+	if (rc)
+		pr_err("%s: can't set flash led%d level\n", __func__, led->id);
+}
+
+int pm8058_set_flash_led_current(enum pmic8058_leds id, unsigned mA)
+{
+	struct pmic8058_led_data *led;
+
+	if ((id < PMIC8058_ID_FLASH_LED_0) || (id > PMIC8058_ID_FLASH_LED_1)) {
+		pr_err("%s: invalid LED ID (%d) specified\n", __func__, id);
+		return -EINVAL;
+	}
+
+	led = &led_data[id];
+	if (!led) {
+		pr_err("%s: flash led not available\n", __func__);
+		return -EINVAL;
+	}
+
+	if (mA > MAX_FLASH_CURRENT)
+		return -EINVAL;
+
+	led_flash_set(led, mA / 20);
+
+	return 0;
+}
+EXPORT_SYMBOL(pm8058_set_flash_led_current);
+
 static void pmic8058_led_set(struct led_classdev *led_cdev,
 	enum led_brightness value)
 {
@@ -159,6 +223,9 @@ static void pmic8058_led_work(struct work_struct *work)
 	case PMIC8058_ID_LED_2:
 		led_lc_set(led, led->brightness);
 		break;
+	case PMIC8058_ID_FLASH_LED_0:
+	case PMIC8058_ID_FLASH_LED_1:
+		return led_flash_set(led, led->brightness);
 	}
 
 	mutex_unlock(&led->lock);
@@ -190,6 +257,8 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 	struct pm8058_chip	*pm_chip;
 	u8			reg_kp;
 	u8			reg_led_ctrl[3];
+	u8			reg_flash_led0;
+	u8			reg_flash_led1;
 
 	pm_chip = platform_get_drvdata(pdev);
 	if (pm_chip == NULL) {
@@ -216,6 +285,20 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 		goto err_reg_read;
 	}
 
+	rc = pm8058_read(pm_chip, SSBI_REG_ADDR_FLASH_DRV0,
+			&reg_flash_led0, 1);
+	if (rc) {
+		dev_err(&pdev->dev, "can't read flash led0\n");
+		goto err_reg_read;
+	}
+
+	rc = pm8058_read(pm_chip, SSBI_REG_ADDR_FLASH_DRV1,
+			&reg_flash_led1, 1);
+	if (rc) {
+		dev_err(&pdev->dev, "can't get flash led1\n");
+		goto err_reg_read;
+	}
+
 	for (i = 0; i < pdata->num_leds; i++) {
 		curr_led	= &pdata->leds[i];
 		led_dat		= &led_data[curr_led->id];
@@ -232,9 +315,11 @@ static int pmic8058_led_probe(struct platform_device *pdev)
 		led_dat->reg_kp			= reg_kp;
 		memcpy(led_data->reg_led_ctrl, reg_led_ctrl,
 					 sizeof(reg_led_ctrl));
+		led_dat->reg_flash_led0		= reg_flash_led0;
+		led_dat->reg_flash_led1		= reg_flash_led1;
 
 		if (!((led_dat->id >= PMIC8058_ID_LED_KB_LIGHT) &&
-					(led_dat->id <= PMIC8058_ID_LED_2))) {
+				(led_dat->id <= PMIC8058_ID_FLASH_LED_1))) {
 			dev_err(&pdev->dev, "invalid LED ID (%d) specified\n",
 						 led_dat->id);
 			rc = -EINVAL;

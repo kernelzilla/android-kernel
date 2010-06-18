@@ -33,6 +33,7 @@
 #include <linux/bootmem.h>
 #include <linux/pwm.h>
 #include <linux/pmic8058-pwm.h>
+#include <linux/leds-pmic8058.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -1396,6 +1397,24 @@ static struct resource resources_rtc[] = {
        },
 };
 
+static struct pmic8058_led pmic8058_flash_leds[] = {
+	[0] = {
+		.name		= "camera:flash0",
+		.max_brightness = 15,
+		.id		= PMIC8058_ID_FLASH_LED_0,
+	},
+	[1] = {
+		.name		= "camera:flash1",
+		.max_brightness = 15,
+		.id		= PMIC8058_ID_FLASH_LED_1,
+	},
+};
+
+static struct pmic8058_leds_platform_data pm8058_flash_leds_data = {
+	.num_leds = ARRAY_SIZE(pmic8058_flash_leds),
+	.leds	= pmic8058_flash_leds,
+};
+
 static struct mfd_cell pm8058_subdevs[] = {
 	{
 		.name = "pm8058-keypad",
@@ -1464,6 +1483,11 @@ static struct mfd_cell pm8058_subdevs[] = {
 		.id = -1,
 		.num_resources  = ARRAY_SIZE(resources_rtc),
 		.resources      = resources_rtc,
+	},
+	{	.name = "pm8058-led",
+		.id		= -1,
+		.platform_data = &pm8058_flash_leds_data,
+		.data_size = sizeof(pm8058_flash_leds_data),
 	},
 	PM8058_VREG(PM8058_VREG_ID_L0),
 	PM8058_VREG(PM8058_VREG_ID_L1),
