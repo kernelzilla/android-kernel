@@ -153,9 +153,11 @@ static int msm_volume_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 2; /* Volume */
+	uinfo->count = 3; /* Volume and 10-base multiply factor*/
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 16383;
+
+	/* limit the muliply factor to 4 decimal digit */
+	uinfo->value.integer.max = 1000000;
 	return 0;
 }
 static int msm_volume_get(struct snd_kcontrol *kcontrol,
@@ -171,12 +173,23 @@ static int msm_volume_put(struct snd_kcontrol *kcontrol,
 	int ret = 0;
 	int session_id = ucontrol->value.integer.value[0];
 	int volume = ucontrol->value.integer.value[1];
+	int factor = ucontrol->value.integer.value[2];
 	u32 session_mask = 0;
 
-	if ((volume < 0) || (volume > 100))
+
+	if (factor > 10000)
+		return -EINVAL;
+
+	if ((volume < 0) || (volume/factor > 100))
 		return -EINVAL;
 
 	volume = (MSM_VOLUME_STEP * volume);
+
+	/* Convert back to original decimal point by removing the 10-base factor
+	* and discard the fractional portion
+	*/
+
+	volume = volume/factor;
 
 	if (volume > MSM_MAX_VOLUME)
 		volume = MSM_MAX_VOLUME;
