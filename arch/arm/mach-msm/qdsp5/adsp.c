@@ -3,7 +3,7 @@
  * Register/Interrupt access for userspace aDSP library.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  * Author: Iliyan Malchev <ibm@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -644,8 +644,13 @@ static void handle_adsp_rtos_mtoa_app(struct rpc_request_hdr *req)
 		}
 
 		iptr->module_table_size = be32_to_cpu(sptr->module_table_size);
+#if CONFIG_ADSP_RPC_VER > 0x30001
 		if (iptr->module_table_size > MODULES_MAX)
 			iptr->module_table_size = MODULES_MAX;
+#else
+		if (iptr->module_table_size > ENTRIES_MAX)
+			iptr->module_table_size = ENTRIES_MAX;
+#endif
 		mptr = &sptr->module_entries[0];
 		for (i_no = 0; i_no < iptr->module_table_size; i_no++)
 			iptr->module_entries[i_no] = be32_to_cpu(mptr[i_no]);
@@ -739,8 +744,12 @@ static int handle_adsp_rtos_mtoa(struct rpc_request_hdr *req)
 					     req->xid,
 					     RPC_ACCEPTSTAT_SUCCESS);
 		break;
+#if CONFIG_ADSP_RPC_VER > 0x30001
 	case RPC_ADSP_RTOS_MTOA_INIT_INFO_PROC:
 	case RPC_ADSP_RTOS_MTOA_EVENT_INFO_PROC:
+#else
+	case RPC_ADSP_RTOS_MODEM_TO_APP_PROC:
+#endif
 		handle_adsp_rtos_mtoa_app(req);
 		break;
 	default:
@@ -1196,8 +1205,13 @@ static int __init adsp_init(void)
 	rpc_adsp_rtos_atom_vers = 0x10001;
 	rpc_adsp_rtos_atom_vers_comp = 0x00010001;
 	rpc_adsp_rtos_mtoa_prog = 0x3000000b;
+#if CONFIG_ADSP_RPC_VER > 0x30001
 	rpc_adsp_rtos_mtoa_vers = 0x30002;
 	rpc_adsp_rtos_mtoa_vers_comp = 0x00030002;
+#else
+	rpc_adsp_rtos_mtoa_vers = 0x30001;
+	rpc_adsp_rtos_mtoa_vers_comp = 0x00030001;
+#endif
 
 	snprintf(msm_adsp_driver_name, sizeof(msm_adsp_driver_name),
 		"rs%08x",

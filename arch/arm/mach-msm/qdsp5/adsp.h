@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/qdsp5/adsp.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  * Author: Iliyan Malchev <ibm@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -186,9 +186,14 @@ struct adsp_rtos_mp_mtoa_type {
 };
 
 /* ADSP RTOS MP Communications - Modem to APP's Init Info  */
+#if CONFIG_ADSP_RPC_VER > 0x30001
 #define IMG_MAX         2
 #define ENTRIES_MAX     36
 #define MODULES_MAX     64
+#else
+#define IMG_MAX         6
+#define ENTRIES_MAX     48
+#endif
 #define QUEUES_MAX      64
 
 struct queue_to_offset_type {
@@ -210,7 +215,11 @@ struct adsp_rtos_mp_mtoa_init_info_type {
 	uint32_t	task_to_module_tbl[IMG_MAX][ENTRIES_MAX];
 
 	uint32_t	module_table_size;
+#if CONFIG_ADSP_RPC_VER > 0x30001
 	uint32_t	module_entries[MODULES_MAX];
+#else
+	uint32_t	module_entries[ENTRIES_MAX];
+#endif
 	uint32_t	mod_to_q_entries;
 	struct mod_to_queue_offsets	mod_to_q_tbl[ENTRIES_MAX];
 	/*
@@ -221,7 +230,9 @@ struct adsp_rtos_mp_mtoa_init_info_type {
 
 struct adsp_rtos_mp_mtoa_s_type {
 	struct adsp_rtos_mp_mtoa_header_type mp_mtoa_header;
-
+#if CONFIG_ADSP_RPC_VER == 0x30001
+	uint32_t desc_field;
+#endif
 	union {
 		struct adsp_rtos_mp_mtoa_init_info_type mp_mtoa_init_packet;
 		struct adsp_rtos_mp_mtoa_type mp_mtoa_packet;
