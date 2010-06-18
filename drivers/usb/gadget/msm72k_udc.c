@@ -219,6 +219,27 @@ static void flush_endpoint(struct msm_endpoint *ept);
 static void msm72k_pm_qos_update(int);
 
 
+static void msm_hsusb_set_state(enum usb_device_state state)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&the_usb_info->lock, flags);
+	the_usb_info->usb_state = state;
+	spin_unlock_irqrestore(&the_usb_info->lock, flags);
+}
+
+static enum usb_device_state msm_hsusb_get_state(void)
+{
+	unsigned long flags;
+	enum usb_device_state state;
+
+	spin_lock_irqsave(&the_usb_info->lock, flags);
+	state = the_usb_info->usb_state;
+	spin_unlock_irqrestore(&the_usb_info->lock, flags);
+
+	return state;
+}
+
 static ssize_t print_switch_name(struct switch_dev *sdev, char *buf)
 {
 	return sprintf(buf, "%s\n", DRIVER_NAME);
@@ -247,11 +268,13 @@ static int usb_get_max_power(struct usb_info *ui)
 	enum chg_type temp;
 	int suspended;
 	int configured;
+	unsigned bmaxpow;
 
 	spin_lock_irqsave(&ui->lock, flags);
 	temp = ui->chg_type;
 	suspended = ui->usb_state == USB_STATE_SUSPENDED ? 1 : 0;
 	configured = atomic_read(&ui->configured);
+	bmaxpow = ui->b_max_pow;
 	spin_unlock_irqrestore(&ui->lock, flags);
 
 	if (temp == USB_CHG_TYPE__INVALID)
@@ -263,7 +286,7 @@ static int usb_get_max_power(struct usb_info *ui)
 	if (suspended || !configured)
 		return 0;
 
-	return ui->b_max_pow;
+	return bmaxpow;
 }
 
 static void usb_chg_stop(struct work_struct *w)
@@ -836,12 +859,13 @@ static void handle_setup(struct usb_info *ui)
 	if (ctl.bRequestType == (USB_DIR_OUT | USB_TYPE_STANDARD)) {
 		if (ctl.bRequest == USB_REQ_SET_CONFIGURATION) {
 			atomic_set(&ui->configured, !!ctl.wValue);
-			ui->usb_state = USB_STATE_CONFIGURED;
+			msm_hsusb_set_state(USB_STATE_CONFIGURED);
 		} else if (ctl.bRequest == USB_REQ_SET_ADDRESS) {
+			msm_hsusb_set_state(USB_STATE_ADDRESS);
+
 			/* write address delayed (will take effect
 			** after the next IN txn)
 			*/
-			ui->usb_state = USB_STATE_ADDRESS;
 			writel((ctl.wValue << 25) | (1 << 24), USB_DEVICEADDR);
 			goto ack;
 		} else if (ctl.bRequest == USB_REQ_SET_FEATURE) {
@@ -1023,6 +1047,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 {
 	struct usb_info *ui = data;
 	unsigned n;
+	unsigned long flags;
 
 	n = readl(USB_USBSTS);
 	writel(n, USB_USBSTS);
@@ -1048,19 +1073,22 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 		}
 		if (atomic_read(&ui->configured)) {
 			wake_lock(&ui->wlock);
-			ui->usb_state = USB_STATE_CONFIGURED;
-			ui->driver->resume(&ui->gadget);
 
+			spin_lock_irqsave(&ui->lock, flags);
+			ui->usb_state = USB_STATE_CONFIGURED;
 			ui->flags = USB_FLAG_CONFIGURED;
+			spin_unlock_irqrestore(&ui->lock, flags);
+
+			ui->driver->resume(&ui->gadget);
 			schedule_work(&ui->work);
 		} else
-			ui->usb_state = USB_STATE_DEFAULT;
+			msm_hsusb_set_state(USB_STATE_DEFAULT);
 	}
 
 	if (n & STS_URI) {
 		dev_info(&ui->pdev->dev, "reset\n");
 
-		ui->usb_state = USB_STATE_DEFAULT;
+		msm_hsusb_set_state(USB_STATE_DEFAULT);
 		atomic_set(&ui->remote_wakeup, 0);
 		schedule_delayed_work(&ui->chg_stop, 0);
 
@@ -1093,10 +1121,13 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 
 	if (n & STS_SLI) {
 		dev_info(&ui->pdev->dev, "suspend\n");
-		ui->usb_state = USB_STATE_SUSPENDED;
-		ui->driver->suspend(&ui->gadget);
 
+		spin_lock_irqsave(&ui->lock, flags);
+		ui->usb_state = USB_STATE_SUSPENDED;
 		ui->flags = USB_FLAG_SUSPEND;
+		spin_unlock_irqrestore(&ui->lock, flags);
+
+		ui->driver->suspend(&ui->gadget);
 		schedule_work(&ui->work);
 	}
 
@@ -1353,8 +1384,15 @@ static void usb_do_work(struct work_struct *w)
 			 */
 			if (flags & USB_FLAG_VBUS_OFFLINE) {
 				enum chg_type temp;
-				if (ui->chg_type == USB_CHG_TYPE__WALLCHARGER)
+
+				spin_lock_irqsave(&ui->lock, iflags);
+				temp = ui->chg_type;
+				ui->chg_type = USB_CHG_TYPE__INVALID;
+				ui->chg_current = 0;
+				spin_unlock_irqrestore(&ui->lock, iflags);
+				if (temp == USB_CHG_TYPE__WALLCHARGER)
 					msm72k_pm_qos_update(1);
+
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: ONLINE -> OFFLINE\n");
 				otg_set_suspend(ui->xceiv, 0);
@@ -1368,12 +1406,6 @@ static void usb_do_work(struct work_struct *w)
 				spin_unlock_irqrestore(&ui->lock, iflags);
 
 				cancel_delayed_work(&ui->chg_det);
-
-				spin_lock_irqsave(&ui->lock, iflags);
-				temp = ui->chg_type;
-				ui->chg_type = USB_CHG_TYPE__INVALID;
-				ui->chg_current = 0;
-				spin_unlock_irqrestore(&ui->lock, iflags);
 
 				/* if charger is initialized to known type
 				 * we must let modem know about charger
@@ -2038,7 +2070,6 @@ static void usb_do_remote_wakeup(struct work_struct *w)
 static ssize_t show_usb_state(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
-	struct usb_info *ui = the_usb_info;
 	size_t i;
 	char *state[] = {"USB_STATE_NOTATTACHED", "USB_STATE_ATTACHED",
 			"USB_STATE_POWERED", "USB_STATE_UNAUTHENTICATED",
@@ -2047,7 +2078,7 @@ static ssize_t show_usb_state(struct device *dev, struct device_attribute *attr,
 			"USB_STATE_SUSPENDED"
 	};
 
-	i = scnprintf(buf, PAGE_SIZE, "%s\n", state[ui->usb_state]);
+	i = scnprintf(buf, PAGE_SIZE, "%s\n", state[msm_hsusb_get_state()]);
 	return i;
 }
 
