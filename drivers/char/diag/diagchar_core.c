@@ -238,7 +238,8 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 		mutex_lock(&driver->diagchar_mutex);
 		temp = driver->logging_mode;
 		driver->logging_mode = (int)ioarg;
-
+		driver->logging_process_id = current->tgid;
+		mutex_unlock(&driver->diagchar_mutex);
 		if (temp == USB_MODE && driver->logging_mode == NO_LOGGING_MODE)
 			diagfwd_disconnect();
 		else if (temp == NO_LOGGING_MODE && driver->logging_mode
@@ -274,8 +275,6 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 		} else if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
 								== USB_MODE)
 			diagfwd_connect();
-		driver->logging_process_id = current->tgid;
-		mutex_unlock(&driver->diagchar_mutex);
 		success = 1;
 	}
 
