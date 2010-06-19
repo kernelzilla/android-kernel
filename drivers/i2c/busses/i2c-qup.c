@@ -514,18 +514,25 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		return -EIO;
 	}
 
-	if (dev->clk_state == 0)
+	if (dev->clk_state == 0) {
+		if (dev->clk_ctl == 0) {
+			if (dev->pdata->src_clk_rate > 0)
+				clk_set_rate(dev->clk,
+						dev->pdata->src_clk_rate);
+			else
+				dev->pdata->src_clk_rate = 19200000;
+		}
 		qup_i2c_pwr_mgmt(dev, 1);
+	}
 	/* Initialize QUP registers during first transfer */
 	if (dev->clk_ctl == 0) {
 		int fs_div;
 		int hs_div;
-		int i2c_clk;
 		uint32_t fifo_reg;
 		writel(0x2 << 4, dev->gsbi);
 
-		i2c_clk = 19200000; /* input clock */
-		fs_div = ((i2c_clk / dev->pdata->clk_freq) / 2) - 3;
+		fs_div = ((dev->pdata->src_clk_rate
+				/ dev->pdata->clk_freq) / 2) - 3;
 		hs_div = 3;
 		dev->clk_ctl = ((hs_div & 0x7) << 8) | (fs_div & 0xff);
 		fifo_reg = readl(dev->base + QUP_IO_MODE);
