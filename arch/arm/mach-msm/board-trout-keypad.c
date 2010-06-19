@@ -23,7 +23,7 @@
 
 static char *keycaps = "--qwerty";
 #undef MODULE_PARAM_PREFIX
-#define MODULE_PARAM_PREFIX "board_trout."
+#define MODULE_PARAM_PREFIX "androidboot."
 module_param_named(keycaps, keycaps, charp, 0);
 
 
