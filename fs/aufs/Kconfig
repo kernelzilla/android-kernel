@@ -46,6 +46,7 @@ endchoice
 
 config AUFS_HNOTIFY
 	bool "Detect direct branch access (bypassing aufs)"
+	depends on !AUFS_FS=m
 	help
 	If you want to modify files on branches directly, eg. bypassing aufs,
 	and want aufs to detect the changes of them fully, then enable this
