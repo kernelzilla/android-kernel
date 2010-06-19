@@ -1193,12 +1193,15 @@ config VMALLOC_RESERVE
 source "mm/Kconfig"
 
 config ARCH_MEMORY_PROBE
-	def_bool y
+	def_bool n
 	depends on MEMORY_HOTPLUG
 
 config ARCH_MEMORY_REMOVE
-	def_bool y
+	def_bool n
 	depends on MEMORY_HOTPLUG
+
+config DONT_RESERVE_FROM_MOVABLE_ZONE
+	def_bool n
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
