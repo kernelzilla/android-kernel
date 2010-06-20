@@ -838,3 +838,8 @@ struct clk msm_clocks_8x60[] = {
 };
 
 unsigned msm_num_clocks_8x60 = ARRAY_SIZE(msm_clocks_8x60);
+
+struct platform_device msm_device_gpio __initdata = {
+	.name = "msm8660-gpio",
+	.id   = 0,
+};
