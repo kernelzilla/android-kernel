@@ -97,3 +97,28 @@ int gpio_tlmm_config(unsigned config, unsigned disable)
 	return 0;
 }
 EXPORT_SYMBOL(gpio_tlmm_config);
+
+int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq)
+{
+	unsigned long irq_flags;
+
+	if (gpio >= NR_MSM_GPIOS || irq >= NR_TLMM_SCSS_DIR_CONN_IRQ)
+		return -EINVAL;
+
+	spin_lock_irqsave(&tlmm_lock, irq_flags);
+
+	writel(readl(GPIO_CONFIG(gpio)) | BIT(GPIO_OE_BIT),
+		GPIO_CONFIG(gpio));
+	writel(readl(GPIO_INTR_CFG(gpio)) &
+		~(INTR_RAW_STATUS_EN | INTR_ENABLE),
+		GPIO_INTR_CFG(gpio));
+	writel(DC_IRQ_ENABLE | TARGET_PROC_NONE,
+		GPIO_INTR_CFG_SU(gpio));
+	writel(DC_POLARITY_HI |	TARGET_PROC_SCORPION | (gpio << 3),
+		DIR_CONN_INTR_CFG_SU(irq));
+
+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_gpio_install_direct_irq);

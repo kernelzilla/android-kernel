@@ -71,32 +71,6 @@ static void disable_summary_irq(unsigned gpio)
 	clear_bit(gpio, enabled_irqs);
 }
 
-int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq)
-{
-	int rc = -EINVAL;
-	unsigned long irq_flags;
-
-	if (gpio < NR_MSM_GPIOS && irq < NR_TLMM_SCSS_DIR_CONN_IRQ) {
-		spin_lock_irqsave(&gpio_lock, irq_flags);
-
-		set_gpio_bit(gpio, GPIO_OE_CLR(gpio));
-		disable_summary_irq(gpio);
-
-		writel(DC_IRQ_ENABLE | TARGET_PROC_NONE,
-			GPIO_INTR_CFG_SU(gpio));
-
-		writel(DC_POLARITY_HI |	TARGET_PROC_SCORPION | (gpio << 3),
-			DIR_CONN_INTR_CFG_SU(irq));
-
-		spin_unlock_irqrestore(&gpio_lock, irq_flags);
-
-		rc = 0;
-	}
-
-	return rc;
-}
-EXPORT_SYMBOL(msm_gpio_install_direct_irq);
-
 static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	int i = 0;
