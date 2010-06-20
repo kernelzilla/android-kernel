@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <mach/tlmm.h>
 #include <mach/msm_iomap.h>
+#include <mach/gpio.h>
 #include "tlmm-msm8660.h"
 
 enum msm_tlmm_register {
@@ -78,3 +79,21 @@ void msm_tlmm_set_pull(enum msm_tlmm_pull_tgt tgt, int pull)
 	msm_tlmm_set_field(tlmm_pull_cfgs, tgt, 2, pull);
 }
 EXPORT_SYMBOL(msm_tlmm_set_pull);
+
+int gpio_tlmm_config(unsigned config, unsigned disable)
+{
+	uint32_t flags;
+	unsigned gpio = GPIO_PIN(config);
+
+	if (gpio > NR_MSM_GPIOS)
+		return -EINVAL;
+
+	flags = ((GPIO_DIR(config) << 9) & (0x1 << 9)) |
+		((GPIO_DRVSTR(config) << 6) & (0x7 << 6)) |
+		((GPIO_FUNC(config) << 2) & (0xf << 2)) |
+		((GPIO_PULL(config) & 0x3));
+	writel(flags, GPIO_CONFIG(gpio));
+
+	return 0;
+}
+EXPORT_SYMBOL(gpio_tlmm_config);

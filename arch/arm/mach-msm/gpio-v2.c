@@ -97,27 +97,6 @@ int msm_gpio_install_direct_irq(unsigned gpio, unsigned irq)
 }
 EXPORT_SYMBOL(msm_gpio_install_direct_irq);
 
-int gpio_tlmm_config(unsigned config, unsigned disable)
-{
-	uint32_t v2flags;
-	unsigned long irq_flags;
-	unsigned gpio = GPIO_PIN(config);
-
-	if (gpio > NR_MSM_GPIOS)
-		return -EINVAL;
-
-	v2flags = ((GPIO_DIR(config) << 9) & (0x1 << 9)) |
-		((GPIO_DRVSTR(config) << 6) & (0x7 << 6)) |
-		((GPIO_FUNC(config) << 2) & (0xf << 2)) |
-		((GPIO_PULL(config) & 0x3));
-
-	spin_lock_irqsave(&gpio_lock, irq_flags);
-	writel(v2flags, GPIO_CONFIG(gpio));
-	spin_unlock_irqrestore(&gpio_lock, irq_flags);
-	return 0;
-}
-EXPORT_SYMBOL(gpio_tlmm_config);
-
 static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	int i = 0;
