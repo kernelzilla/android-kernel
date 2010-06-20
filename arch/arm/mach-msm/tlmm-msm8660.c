@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <mach/tlmm.h>
 #include <mach/msm_iomap.h>
+#include "tlmm-msm8660.h"
 
 enum msm_tlmm_register {
 	SDC4_HDRV_PULL_CTL       = 0x20a0,
