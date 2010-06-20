@@ -397,15 +397,12 @@ static int kgsl_first_open_locked(void)
 	if (kgsl_driver.g12_device.hwaccess_blocked == KGSL_FALSE)
 		kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_CLK_OFF |
 			KGSL_PWRFLAGS_G12_IRQ_OFF;
-	#ifndef CONFIG_ARCH_MSM7X30
-		kgsl_pwrctrl(KGSL_PWRFLAGS_POWER_ON);
-	#endif
+
+	/* Turn the clocks on before the power.  Required for some platforms,
+	   has no adverse effect on the others */
 	kgsl_pwrctrl(KGSL_PWRFLAGS_YAMATO_CLK_ON);
-	#ifdef CONFIG_ARCH_MSM7X30
-		/* 7x30 has HW bug and needs clocks turned on before the power
-		rails */
-		kgsl_pwrctrl(KGSL_PWRFLAGS_POWER_ON);
-	#endif
+	kgsl_pwrctrl(KGSL_PWRFLAGS_POWER_ON);
+
 	kgsl_driver.is_suspended = KGSL_FALSE;
 
 	INIT_LIST_HEAD(&kgsl_driver.pagetable_list);
@@ -437,15 +434,10 @@ static int kgsl_last_release_locked(void)
 	/* close yamato */
 	kgsl_yamato_close(&kgsl_driver.yamato_device);
 
-	#ifndef CONFIG_ARCH_MSM7X30
-		kgsl_pwrctrl(KGSL_PWRFLAGS_YAMATO_CLK_OFF);
-	#endif
+	/* For some platforms, power needs to go off before clocks */
 	kgsl_pwrctrl(KGSL_PWRFLAGS_POWER_OFF);
-	#ifdef CONFIG_ARCH_MSM7X30
-		/* 7x30 has HW bug and needs clocks turned off before the power
-		rails */
-		kgsl_pwrctrl(KGSL_PWRFLAGS_YAMATO_CLK_OFF);
-	#endif
+	kgsl_pwrctrl(KGSL_PWRFLAGS_YAMATO_CLK_OFF);
+
 	kgsl_driver.power_flags = 0;
 
 	return 0;
