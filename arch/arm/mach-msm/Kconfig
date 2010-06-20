@@ -48,6 +48,7 @@ config ARCH_MSM8X60
 	select ARCH_REQUIRE_GPIOLIB
 	select MSM_ADM3
 	select REGULATOR
+	select MSM8660_TLMM
 
 endchoice
 
@@ -1112,3 +1113,5 @@ config SMMU_PGTABLES_L2
 	 Most people can probably say Y here.
 endif
 
+config MSM8660_TLMM
+       bool
