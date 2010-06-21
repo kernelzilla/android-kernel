@@ -111,6 +111,11 @@ struct rpc_reply_hdr
 	} data;
 };
 
+struct rpc_board_dev {
+	uint32_t prog;
+	struct platform_device pdev;
+};
+
 /* flags for msm_rpc_connect() */
 #define MSM_RPC_UNINTERRUPTIBLE 0x0001
 
@@ -136,6 +141,8 @@ int msm_rpc_register_server(struct msm_rpc_endpoint *ept,
 			    uint32_t prog, uint32_t vers);
 int msm_rpc_unregister_server(struct msm_rpc_endpoint *ept,
 			      uint32_t prog, uint32_t vers);
+
+int msm_rpc_add_board_dev(struct rpc_board_dev *board_dev, int num);
 
 int msm_rpc_clear_netreset(struct msm_rpc_endpoint *ept);
 /* simple blocking rpc call
