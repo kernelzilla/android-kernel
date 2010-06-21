@@ -1191,7 +1191,7 @@ static void __init sapphire_init(void)
 		sapphire_search_button_info.keymap = sapphire_search_button_v1;
 
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
-	msm_pm_set_platform_data(msm_pm_data);
+	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 

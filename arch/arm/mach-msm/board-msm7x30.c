@@ -4550,7 +4550,7 @@ static void __init msm7x30_init(void)
 	msm7x30_init_nand();
 	msm_qsd_spi_init();
 	msm_fb_add_devices();
-	msm_pm_set_platform_data(msm_pm_data);
+	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
 	msm_device_i2c_init();
 	msm_device_i2c_2_init();
 	qup_device_i2c_init();

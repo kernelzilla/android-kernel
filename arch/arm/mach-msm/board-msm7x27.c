@@ -1889,9 +1889,11 @@ static void __init msm7x2x_init(void)
 	bt_power_init();
 
 	if (cpu_is_msm7x27())
-		msm_pm_set_platform_data(msm7x27_pm_data);
+		msm_pm_set_platform_data(msm7x27_pm_data,
+					ARRAY_SIZE(msm7x27_pm_data));
 	else
-		msm_pm_set_platform_data(msm7x25_pm_data);
+		msm_pm_set_platform_data(msm7x25_pm_data,
+					ARRAY_SIZE(msm7x25_pm_data));
 }
 
 static unsigned pmem_kernel_ebi1_size = PMEM_KERNEL_EBI1_SIZE;

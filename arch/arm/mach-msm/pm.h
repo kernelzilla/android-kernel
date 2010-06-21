@@ -31,6 +31,8 @@ enum {
 	MSM_PM_SLEEP_MODE_NR
 };
 
+#define MSM_PM_MODE(cpu, mode_nr)  ((cpu) * MSM_PM_SLEEP_MODE_NR + (mode_nr))
+
 struct msm_pm_platform_data {
 	u8 supported;
 	u8 suspend_enabled;  /* enabled for suspend */
@@ -41,5 +43,6 @@ struct msm_pm_platform_data {
 				staying in the low power mode saves power */
 };
 
-void msm_pm_set_platform_data(struct msm_pm_platform_data *data);
+void msm_pm_set_platform_data(struct msm_pm_platform_data *data, int count);
+
 #endif
