@@ -45,15 +45,15 @@
 /* Size of the buffer used for deframing a packet
   reveived from the PC tool*/
 #define HDLC_MAX 4096
-#define HDLC_OUT_BUF_SIZE		8192
-#define POOL_TYPE_COPY			1
-#define POOL_TYPE_HDLC			0
-#define POOL_TYPE_USB_STRUCT		2
-#define MODEM_DATA 			1
-#define QDSP_DATA  			2
-#define APPS_DATA  			3
-#define NON_SMD_CONTEXT		0
-#define SMD_CONTEXT			1
+#define HDLC_OUT_BUF_SIZE	8192
+#define POOL_TYPE_COPY		1
+#define POOL_TYPE_HDLC		0
+#define POOL_TYPE_USB_STRUCT	2
+#define MODEM_DATA 		1
+#define QDSP_DATA  		2
+#define APPS_DATA  		3
+#define NON_SMD_CONTEXT	0
+#define SMD_CONTEXT		1
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12

@@ -46,7 +46,7 @@ static unsigned int buf_tbl_size = 8; /*Number of entries in table of buffers */
 #define CHK_OVERFLOW(bufStart, start, end, length) \
 ((bufStart <= start) && (end - start >= length)) ? 1 : 0
 
-void diag_smd_send_req(int context)
+void __diag_smd_send_req(int context)
 {
 	void *buf;
 
@@ -153,7 +153,7 @@ int diag_device_write(void *buf, int proc_num)
     return err;
 }
 
-void diag_smd_qdsp_send_req(int context)
+void __diag_smd_qdsp_send_req(int context)
 {
 	void *buf;
 
@@ -502,8 +502,8 @@ int diagfwd_connect(void)
 	driver->in_busy_qdsp = 0;
 
 	/* Poll SMD channels to check for data*/
-	diag_smd_send_req(NON_SMD_CONTEXT);
-	diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+	queue_work(driver->diag_wq, &(driver->diag_read_smd_work));
+	queue_work(driver->diag_wq, &(driver->diag_read_smd_qdsp_work));
 
 	driver->usb_read_ptr->buf = driver->usb_buf_out;
 	driver->usb_read_ptr->length = USB_MAX_OUT_BUF;
@@ -533,11 +533,15 @@ int diagfwd_write_complete(struct diag_request *diag_write_ptr)
 	if (buf == (void *)driver->usb_buf_in) {
 		driver->in_busy = 0;
 		APPEND_DEBUG('o');
-		diag_smd_send_req(NON_SMD_CONTEXT);
+		spin_lock(&diagchar_smd_lock);
+		__diag_smd_send_req(NON_SMD_CONTEXT);
+		spin_unlock(&diagchar_smd_lock);
 	} else if (buf == (void *)driver->usb_buf_in_qdsp) {
 		driver->in_busy_qdsp = 0;
 		APPEND_DEBUG('p');
-		diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+		spin_lock(&diagchar_smd_qdsp_lock);
+		__diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
+		spin_unlock(&diagchar_smd_qdsp_lock);
 	} else {
 		diagmem_free(driver, (unsigned char *)buf, POOL_TYPE_HDLC);
 		diagmem_free(driver, (unsigned char *)diag_write_ptr,
@@ -574,13 +578,17 @@ static struct diag_operations diagfwdops = {
 
 static void diag_smd_notify(void *ctxt, unsigned event)
 {
-	diag_smd_send_req(SMD_CONTEXT);
+	spin_lock(&diagchar_smd_lock);
+	__diag_smd_send_req(SMD_CONTEXT);
+	spin_unlock(&diagchar_smd_lock);
 }
 
 #if defined(CONFIG_MSM_N_WAY_SMD)
 static void diag_smd_qdsp_notify(void *ctxt, unsigned event)
 {
-	diag_smd_qdsp_send_req(SMD_CONTEXT);
+	spin_lock(&diagchar_smd_qdsp_lock);
+	__diag_smd_qdsp_send_req(SMD_CONTEXT);
+	spin_unlock(&diagchar_smd_qdsp_lock);
 }
 #endif
 
@@ -641,6 +649,8 @@ void diag_read_work_fn(struct work_struct *work)
 void diagfwd_init(void)
 {
 	diag_debug_buf_idx = 0;
+	spin_lock_init(&diagchar_smd_lock);
+	spin_lock_init(&diagchar_smd_qdsp_lock);
 	if (driver->usb_buf_out  == NULL &&
 	     (driver->usb_buf_out = kzalloc(USB_MAX_OUT_BUF,
 					 GFP_KERNEL)) == NULL)
