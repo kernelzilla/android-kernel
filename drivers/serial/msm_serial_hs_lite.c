@@ -917,7 +917,6 @@ static void msm_hsl_console_write(struct console *co, const char *s,
 		spin_lock(&port->lock);
 	}
 
-	clk_enable(msm_hsl_port->clk);
 	/* need to replace LFs by CRLFs */
 	last_break = s;
 	for (i = 0; i < count; i++, s++) {
@@ -936,7 +935,6 @@ static void msm_hsl_console_write(struct console *co, const char *s,
 		}
 	}
 	msm_hsl_console_putchars(port, num, last_break);
-	clk_disable(msm_hsl_port->clk);
 
 	if (locked == 1)
 		spin_unlock(&port->lock);

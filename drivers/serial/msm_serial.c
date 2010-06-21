@@ -919,9 +919,7 @@ static void msm_console_write(struct console *co, const char *s,
 		spin_lock(&port->lock);
 	}
 
-	clk_enable(msm_port->clk);
 	uart_console_write(port, s, count, msm_console_putchar);
-	clk_disable(msm_port->clk);
 
 	if (locked)
 		spin_unlock(&port->lock);
