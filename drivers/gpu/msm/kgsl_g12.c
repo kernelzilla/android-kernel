@@ -143,7 +143,7 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 		if (status & REG_VGC_IRQSTATUS__FIFO_MASK)
 			KGSL_DRV_ERR("g12 fifo interrupt\n");
 		if (status & REG_VGC_IRQSTATUS__MH_MASK)
-			KGSL_DRV_ERR("g12 mh interrupt\n");
+			kgsl_mh_intrcallback(device);
 		if (status & REG_VGC_IRQSTATUS__G2D_MASK) {
 			int count;
 
@@ -528,7 +528,7 @@ int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 		kgsl_g12_regwrite(device, (ADDR_VGC_MH_READ_ADDR >> 2),
 				  offsetwords);
 		reg = (unsigned int *)(device->regspace.mmio_virt_base
-				+ (ADDR_VGC_MH_DATA_ADDR << 2));
+				+ ADDR_VGC_MH_DATA_ADDR);
 	} else {
 		if (offsetwords * sizeof(uint32_t) >=
 				device->regspace.sizebytes) {
