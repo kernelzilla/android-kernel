@@ -15,7 +15,7 @@ endif
 
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock.o timer.o gpio.o generic_gpio.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += timer.o gpio.o generic_gpio.o
-obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += timer.o gpio-v2.o
+obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += timer.o
 
 obj-$(CONFIG_MSM_VIC) += irq-vic.o
 
@@ -133,4 +133,4 @@ obj-$(CONFIG_ARCH_MSM7X30) += spm.o
 
 obj-$(CONFIG_SMMU)		+= smmu_driver.o smmu_driver_enum.o
 obj-$(CONFIG_SMMU_8X60)		+= board-msm8x60-smmu.o
-obj-$(CONFIG_MSM8660_TLMM)	+= tlmm-msm8660.o
+obj-$(CONFIG_MSM8660_TLMM)	+= tlmm-msm8660.o msm8660-gpio.o
