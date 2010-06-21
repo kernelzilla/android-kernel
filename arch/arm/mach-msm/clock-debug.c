@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <linux/clk.h>
 #include "clock.h"
 
@@ -106,6 +107,32 @@ int __init clock_debug_init(void)
 	return 0;
 }
 
+static int list_rates_show(struct seq_file *m, void *unused)
+{
+	struct clk *clock = m->private;
+	unsigned rate, i = 0;
+
+	if (clock->ops->list_rate == NULL)
+		return -EINVAL;
+
+	while ((rate = clock->ops->list_rate(clock->id, i++)))
+		seq_printf(m, "%d\n", rate);
+
+	return 0;
+}
+
+static int list_rates_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, list_rates_show, inode->i_private);
+}
+
+static const struct file_operations list_rates_fops = {
+	.open		= list_rates_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
 int __init clock_debug_add(struct clk *clock)
 {
 	char temp[50], *ptr;
@@ -136,6 +163,10 @@ int __init clock_debug_add(struct clk *clock)
 
 	if (!debugfs_create_file("measure", S_IRUGO, clk_dir,
 				clock, &clock_measure_fops))
+		goto error;
+
+	if (!debugfs_create_file("list_rates", S_IRUGO, clk_dir,
+				clock, &list_rates_fops))
 		goto error;
 
 	return 0;
