@@ -102,6 +102,8 @@ enum clkvote_client {
 	CLKVOTE_MAX,
 };
 
+extern unsigned msm_num_clocks;
+extern struct clk *msm_clocks;
 extern struct clk_ops clk_ops_remote;
 
 #if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
