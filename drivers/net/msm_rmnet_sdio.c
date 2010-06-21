@@ -44,7 +44,7 @@ struct sdio_ch_info {
 	void (*receive_cb)(void *, struct sk_buff *);
 	void (*write_done)(void *, struct sk_buff *);
 	void *priv;
-	struct mutex lock;
+	spinlock_t lock;
 	struct sk_buff *skb;
 };
 
@@ -118,6 +118,7 @@ static void *handle_sdio_mux_data(struct sdio_mux_hdr *hdr,
 {
 	struct sk_buff *skb;
 	void *rp = (void *)hdr;
+	unsigned long flags;
 
 	/* protect? */
 	rp += sizeof(*hdr);
@@ -149,12 +150,12 @@ static void *handle_sdio_mux_data(struct sdio_mux_hdr *hdr,
 
 	/* probably we should check channel status */
 	/* discard packet early if local side not open */
-	mutex_lock(&sdio_ch[hdr->ch_id].lock);
+	spin_lock_irqsave(&sdio_ch[hdr->ch_id].lock, flags);
 	if (sdio_ch[hdr->ch_id].receive_cb)
 		sdio_ch[hdr->ch_id].receive_cb(sdio_ch[hdr->ch_id].priv, skb);
 	else
 		dev_kfree_skb_any(skb);
-	mutex_unlock(&sdio_ch[hdr->ch_id].lock);
+	spin_unlock_irqrestore(&sdio_ch[hdr->ch_id].lock, flags);
 
 packet_done:
 	return rp;
@@ -164,6 +165,7 @@ static void *handle_sdio_mux_command(struct sdio_mux_hdr *hdr,
 				     struct sk_buff *skb_mux)
 {
 	void *rp;
+	unsigned long flags;
 
 	pr_info("%s: cmd %d\n", __func__, hdr->cmd);
 	switch (hdr->cmd) {
@@ -171,16 +173,16 @@ static void *handle_sdio_mux_command(struct sdio_mux_hdr *hdr,
 		rp = handle_sdio_mux_data(hdr, skb_mux);
 		break;
 	case SDIO_MUX_HDR_CMD_OPEN:
-		mutex_lock(&sdio_ch[hdr->ch_id].lock);
+		spin_lock_irqsave(&sdio_ch[hdr->ch_id].lock, flags);
 		sdio_ch[hdr->ch_id].status |= SDIO_CH_REMOTE_OPEN;
-		mutex_unlock(&sdio_ch[hdr->ch_id].lock);
+		spin_unlock_irqrestore(&sdio_ch[hdr->ch_id].lock, flags);
 		rp = hdr + 1;
 		break;
 	case SDIO_MUX_HDR_CMD_CLOSE:
 		/* probably should drop pending write */
-		mutex_lock(&sdio_ch[hdr->ch_id].lock);
+		spin_lock_irqsave(&sdio_ch[hdr->ch_id].lock, flags);
 		sdio_ch[hdr->ch_id].status &= ~SDIO_CH_REMOTE_OPEN;
-		mutex_unlock(&sdio_ch[hdr->ch_id].lock);
+		spin_unlock_irqrestore(&sdio_ch[hdr->ch_id].lock, flags);
 		rp = hdr + 1;
 		break;
 	default:
@@ -325,21 +327,25 @@ static void sdio_mux_write_data(struct work_struct *work)
 {
 	int i, rc, reschedule = 0;
 	struct sk_buff *skb;
+	unsigned long flags;
 
 	for (i = 0; i < 8; i++) {
-		mutex_lock(&sdio_ch[i].lock);
+		spin_lock_irqsave(&sdio_ch[i].lock, flags);
 		if (sdio_ch_is_local_open(i) && sdio_ch[i].skb) {
-			rc = sdio_mux_write(sdio_ch[i].skb);
+			skb = sdio_ch[i].skb;
+			spin_unlock_irqrestore(&sdio_ch[i].lock, flags);
+			rc = sdio_mux_write(skb);
 			pr_info("%s: write returned %d\n", __func__, rc);
 			if (rc == -EAGAIN) {
 				reschedule = 1;
 			} else if (!rc) {
-				skb = sdio_ch[i].skb;
+				spin_lock_irqsave(&sdio_ch[i].lock, flags);
 				sdio_ch[i].skb = NULL;
 				sdio_ch[i].write_done(sdio_ch[i].priv, skb);
+				spin_unlock_irqrestore(&sdio_ch[i].lock, flags);
 			}
-		}
-		mutex_unlock(&sdio_ch[i].lock);
+		} else
+			spin_unlock_irqrestore(&sdio_ch[i].lock, flags);
 	}
 
 	/* probably should use delayed work */
@@ -351,12 +357,13 @@ int msm_rmnet_sdio_write(uint32_t id, struct sk_buff *skb)
 {
 	int rc = 0;
 	struct sdio_mux_hdr *hdr;
+	unsigned long flags;
 
 	if (!skb)
 		return -EINVAL;
 
 	pr_info("%s: writing ch %d\n", __func__, id);
-	/* mutex_lock(&sdio_ch[id].lock); */
+	spin_lock_irqsave(&sdio_ch[id].lock, flags);
 	if (!sdio_ch_is_local_open(id)) {
 		pr_err("%s: port not open: %d\n", __func__, sdio_ch[id].status);
 		rc = -ENODEV;
@@ -392,7 +399,7 @@ int msm_rmnet_sdio_write(uint32_t id, struct sk_buff *skb)
 	queue_work(sdio_mux_workqueue, &work_sdio_mux_write);
 
 write_done:
-	/* mutex_unlock(&sdio_ch[id].lock); */
+	spin_unlock_irqrestore(&sdio_ch[id].lock, flags);
 	return rc;
 }
 
@@ -401,21 +408,25 @@ int msm_rmnet_sdio_open(uint32_t id, void *priv,
 			void (*write_done)(void *, struct sk_buff *))
 {
 	struct sdio_mux_hdr hdr;
+	unsigned long flags;
 
 	pr_info("%s: opening ch %d\n", __func__, id);
 
 	if (id >= 8)
 		return -EINVAL;
 
-	/* mutex_lock(&sdio_ch[id].lock); */
+	spin_lock_irqsave(&sdio_ch[id].lock, flags);
 	if (sdio_ch_is_local_open(id)) {
 		pr_info("%s: Already opened %d\n", __func__, id);
+		spin_unlock_irqrestore(&sdio_ch[id].lock, flags);
 		goto open_done;
 	}
 
 	sdio_ch[id].receive_cb = receive_cb;
 	sdio_ch[id].write_done = write_done;
 	sdio_ch[id].priv = priv;
+	sdio_ch[id].status |= SDIO_CH_LOCAL_OPEN;
+	spin_unlock_irqrestore(&sdio_ch[id].lock, flags);
 
 	hdr.magic_num = SDIO_MUX_HDR_MAGIC_NO;
 	hdr.cmd = SDIO_MUX_HDR_CMD_OPEN;
@@ -426,11 +437,9 @@ int msm_rmnet_sdio_open(uint32_t id, void *priv,
 
 	pr_info("%s: before sdio_mux_write_cmd() %d\n", __func__, id);
 
-	sdio_ch[id].status |= SDIO_CH_LOCAL_OPEN;
 	sdio_mux_write_cmd((void *)&hdr, sizeof(hdr));
 
 open_done:
-	/* mutex_unlock(&sdio_ch[id].lock); */
 	pr_info("%s: opened ch %d\n", __func__, id);
 	return 0;
 }
@@ -438,15 +447,18 @@ open_done:
 int msm_rmnet_sdio_close(uint32_t id)
 {
 	struct sdio_mux_hdr hdr;
+	unsigned long flags;
 
-	mutex_lock(&sdio_ch[id].lock);
+	spin_lock_irqsave(&sdio_ch[id].lock, flags);
+
+	if (sdio_ch[id].skb) {
+		spin_unlock_irqrestore(&sdio_ch[id].lock, flags);
+		return -EINVAL;
+	}
+
 	sdio_ch[id].receive_cb = NULL;
 	sdio_ch[id].priv = NULL;
-
-	if (sdio_ch[id].skb)
-		dev_kfree_skb_any(sdio_ch[id].skb);
-
-	sdio_ch[id].skb = NULL;
+	spin_unlock_irqrestore(&sdio_ch[id].lock, flags);
 
 	hdr.magic_num = SDIO_MUX_HDR_MAGIC_NO;
 	hdr.cmd = SDIO_MUX_HDR_CMD_CLOSE;
@@ -456,8 +468,6 @@ int msm_rmnet_sdio_close(uint32_t id)
 	hdr.pad_len = 0;
 
 	sdio_mux_write_cmd((void *)&hdr, sizeof(hdr));
-
-	mutex_unlock(&sdio_ch[id].lock);
 
 	return 0;
 }
@@ -502,7 +512,7 @@ static int msm_rmnet_sdio_probe(struct platform_device *pdev)
 	wake_lock_init(&sdio_mux_ch_wakelock, WAKE_LOCK_SUSPEND,
 		       "rmnet_sdio_mux");
 	for (rc = 0; rc < 8; rc++)
-		mutex_init(&sdio_ch[rc].lock);
+		spin_lock_init(&sdio_ch[rc].lock);
 
 	sdio_mux_initialized = 1;
 	return 0;
