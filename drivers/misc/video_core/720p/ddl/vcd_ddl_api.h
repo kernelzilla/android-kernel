@@ -39,7 +39,6 @@ struct ddl_init_config_type {
 
 struct ddl_frame_data_type_tag {
 	struct vcd_frame_data_type vcd_frm;
-	u32 n_intrlcd_ip_frm_tag;
 	u32 b_frm_trans_end;
 	u32 n_frm_delta;
 };

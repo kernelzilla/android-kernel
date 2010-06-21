@@ -57,4 +57,11 @@ void ddl_reset_time_variables(u8 codec_type);
 #define DDL_ADDR_IS_ALIGNED(addr, align_bytes) \
 (!((u32)(addr) & ((align_bytes) - 1)))
 
+#define VIDC_DDL_QCIF_MBS 99
+#define VIDC_DDL_CIF_MBS  396
+#define VIDC_DDL_QVGA_MBS 300
+#define VIDC_DDL_VGA_MBS  1200
+#define VIDC_DDL_WVGA_MBS 1500
+#define VIDC_DDL_720P_MBS 3600
+
 #endif

@@ -162,6 +162,7 @@ u32 ddl_decoder_dpb_transact(struct ddl_decoder_data_type *p_decoder,
 				}
 			} else {
 				p_in_out_frame->vcd_frm.p_physical = NULL;
+				p_in_out_frame->vcd_frm.p_virtual = NULL;
 				vcd_status = VCD_ERR_BAD_POINTER;
 				VIDC_LOG_STRING("BUF_NOT_FOUND");
 			}
@@ -242,8 +243,10 @@ u32 ddl_decoder_dpb_transact(struct ddl_decoder_data_type *p_decoder,
 			}
 			if (p_found_frame)
 				*p_in_out_frame = *p_found_frame;
-			else
+			else {
 				p_in_out_frame->vcd_frm.p_physical = NULL;
+				p_in_out_frame->vcd_frm.p_virtual = NULL;
+			}
 			break;
 		}
 	}

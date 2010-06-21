@@ -143,6 +143,9 @@ u32 vcd_buffer_pool_entry_en_q
     (struct vcd_buffer_pool_type *p_pool,
      struct vcd_buffer_entry_type *p_entry);
 
+u32 vcd_check_if_buffer_req_met(struct vcd_clnt_ctxt_type_t *p_cctxt,
+	enum vcd_buffer_type e_buffer);
+
 u32 vcd_client_cmd_en_q
     (struct vcd_clnt_ctxt_type_t *p_cctxt, enum vcd_command_type e_command);
 
@@ -182,6 +185,18 @@ u32 vcd_calculate_frame_delta
 struct vcd_buffer_entry_type *vcd_check_fill_output_buffer
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
      struct vcd_frame_data_type *p_buffer);
+
+u32 vcd_handle_first_fill_output_buffer
+    (struct vcd_clnt_ctxt_type_t *p_cctxt,
+     struct vcd_frame_data_type *p_buffer, u32 *p_b_handled);
+
+u32 vcd_handle_first_fill_output_buffer_for_enc
+    (struct vcd_clnt_ctxt_type_t *p_cctxt,
+     struct vcd_frame_data_type *p_frm_entry, u32 *p_b_handled);
+
+u32 vcd_handle_first_fill_output_buffer_for_dec
+    (struct vcd_clnt_ctxt_type_t *p_cctxt,
+     struct vcd_frame_data_type *p_frm_entry, u32 *p_b_handled);
 
 u32 vcd_requeue_input_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
 	struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_buffer_entry_type
@@ -235,6 +250,11 @@ void vcd_handle_input_done_in_eos
 void vcd_handle_input_done_failed
     (struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_transc_type *p_transc);
 
+void vcd_handle_input_done_with_codec_config
+	(struct vcd_clnt_ctxt_type_t *p_cctxt,
+	struct vcd_transc_type *p_transc,
+	struct ddl_frame_data_type_tag *p_frm);
+
 void vcd_handle_input_done_for_interlacing
     (struct vcd_clnt_ctxt_type_t *p_cctxt);
 
@@ -250,14 +270,9 @@ void vcd_handle_frame_done_for_interlacing
      struct vcd_transc_type *p_transc_ip1,
      struct ddl_frame_data_type_tag *p_op_frm, u32 status);
 
-u32 vcd_handle_first_frame_done
-    (struct vcd_clnt_ctxt_type_t *p_cctxt, void *p_payload);
 
 void vcd_handle_frame_done_in_eos
     (struct vcd_clnt_ctxt_type_t *p_cctxt, void *p_payload, u32 status);
-
-u32 vcd_handle_first_encode_frame_done
-    (struct vcd_clnt_ctxt_type_t *p_cctxt, void *p_payload);
 
 u32 vcd_handle_output_required(struct vcd_clnt_ctxt_type_t *p_cctxt,
 	void *p_payload, u32 status);
@@ -308,6 +323,12 @@ void vcd_process_pending_flush_in_eos(struct vcd_clnt_ctxt_type_t *p_cctxt);
 void vcd_process_pending_stop_in_eos(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
 void vcd_handle_trans_pending(struct vcd_clnt_ctxt_type_t *p_cctxt);
+
+u32 vcd_handle_ind_output_reconfig
+    (struct vcd_clnt_ctxt_type_t *p_cctxt, void* p_payload, u32 status);
+
+u32 vcd_handle_ind_output_reconfig_in_flushing
+    (struct vcd_clnt_ctxt_type_t *p_cctxt, void* p_payload, u32 status);
 
 void vcd_flush_output_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
