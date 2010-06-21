@@ -29,7 +29,7 @@
 
 #include <asm/mach/mmc.h>
 #include <mach/msm_hsusb.h>
-#include <linux/msm7200a-gpio.h>
+#include "msm7200a-gpio.h"
 
 static struct resource resources_uart1[] = {
 	{
