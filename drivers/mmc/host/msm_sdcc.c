@@ -131,18 +131,15 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 
 	/* Reset the controller */
 	ret = clk_reset(host->clk, CLK_RESET_ASSERT);
-	if (ret) {
+	if (ret)
 		pr_err("%s: Clock assert failed at %u Hz with err %d\n",
 				mmc_hostname(host->mmc), host->clk_rate, ret);
-		return;
-	}
 
 	ret = clk_reset(host->clk, CLK_RESET_DEASSERT);
-	if (ret) {
+	if (ret)
 		pr_err("%s: Clock deassert failed at %u Hz with err %d\n",
 				mmc_hostname(host->mmc), host->clk_rate, ret);
-		return;
-	}
+
 	pr_info("%s: Controller has been reset\n", mmc_hostname(host->mmc));
 
 	/* Restore the contoller state */
