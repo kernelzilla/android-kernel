@@ -35,8 +35,8 @@
 
 #include "modem_notifier.h"
 
-#define NUM_SMD_PKT_PORTS 3
-#define DEVICE_NAME "smdcntl"
+#define NUM_SMD_PKT_PORTS 4
+#define DEVICE_NAME "smdpkt"
 #define MAX_BUF_SIZE 2048
 
 struct smd_pkt_dev {
@@ -418,10 +418,18 @@ static void ch_notify(void *priv, unsigned event)
 	}
 }
 
+static char *smd_pkt_dev_name[] = {
+	"smdcntl0",
+	"smdcntl1",
+	"smdcntl2",
+	"smd22",
+};
+
 static char *smd_ch_name[] = {
 	"DATA5_CNTL",
 	"DATA6_CNTL",
 	"DATA7_CNTL",
+	"DATA22",
 };
 
 int smd_pkt_open(struct inode *inode, struct file *file)
@@ -571,8 +579,7 @@ static int __init smd_pkt_init(void)
 				      NULL,
 				      (smd_pkt_number + i),
 				      NULL,
-				      DEVICE_NAME "%d",
-				      i);
+				      smd_pkt_dev_name[i]);
 
 		if (IS_ERR(smd_pkt_devp[i]->devicep)) {
 			printk(KERN_ERR "%s:%i:%s: "
