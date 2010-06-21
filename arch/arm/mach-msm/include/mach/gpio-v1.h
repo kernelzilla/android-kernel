@@ -127,9 +127,29 @@ int msm_gpios_disable(const struct msm_gpio *table, int size);
 #define GPIOIRQF_SHARED         0x00000001 /* the irq line is shared with
 					    * other inputs */
 
-extern int gpio_configure(unsigned int gpio, unsigned long flags);
-extern int gpio_read_detect_status(unsigned int gpio);
-extern int gpio_clear_detect_status(unsigned int gpio);
+#ifdef CONFIG_GPIOLIB
+static inline int gpio_configure(unsigned int gpio, unsigned long flags)
+{
+	WARN("%s is deprecated. Do not use it.\n", __func__);
+	return -ENOSYS;
+}
+
+static inline int gpio_read_detect_status(unsigned int gpio)
+{
+	WARN("%s is deprecated. Do not use it.\n", __func__);
+	return -ENOSYS;
+}
+
+static inline int gpio_clear_detect_status(unsigned int gpio)
+{
+	WARN("%s is deprecated. Do not use it.\n", __func__);
+	return -ENOSYS;
+}
+#else
+int gpio_configure(unsigned int gpio, unsigned long flags);
+int gpio_read_detect_status(unsigned int gpio);
+int gpio_clear_detect_status(unsigned int gpio);
+#endif
 
 #endif
 
