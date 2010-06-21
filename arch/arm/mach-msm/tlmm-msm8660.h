@@ -29,6 +29,41 @@
 #ifndef _ARCH_ARM_MACH_MSM_TLMM_MSM8660_H
 #define _ARCH_ARM_MACH_MSM_TLMM_MSM8660_H
 
+/* Bits of interest in the GPIO_CFG register.
+ */
+enum {
+	GPIO_OE_BIT = 9,
+};
+
+/* Bits of interest in the GPIO_IN_OUT register.
+ */
+enum {
+	GPIO_IN_BIT  = 0,
+	GPIO_OUT_BIT = 1
+};
+
+/* Bits of interest in the GPIO_INTR_CFG register.
+ */
+enum {
+	INTR_ENABLE_BIT        = 0,
+	INTR_POL_CTL_BIT       = 1,
+	INTR_DECT_CTL_BIT      = 2,
+	INTR_RAW_STATUS_EN_BIT = 3,
+};
+
+/* Bits of interest in the GPIO_INTR_STATUS register.
+ */
+enum {
+	INTR_STATUS_BIT = 0,
+};
+
+/* "super-user" irq-processor targets.
+ */
+enum {
+	TARGET_PROC_SCORPION = 4,
+	TARGET_PROC_NONE     = 7,
+};
+
 /*
  * When a GPIO triggers, two separate decisions are made, controlled
  * by two separate flags.
@@ -41,13 +76,10 @@
  * If INTR_ENABLE is set and INTR_RAW_STATUS_EN is NOT set, an interrupt
  * can be triggered but the status register will not reflect it.
  */
-#define INTR_RAW_STATUS_EN (1 << 3)
-#define INTR_DECT_CTL_EDGE (1 << 2)
-#define INTR_POL_CTL_HI    (1 << 1)
-#define INTR_ENABLE        1
-
-#define TARGET_PROC_SCORPION 4
-#define TARGET_PROC_NONE     7
+#define INTR_RAW_STATUS_EN BIT(INTR_RAW_STATUS_EN_BIT)
+#define INTR_DECT_CTL_EDGE BIT(INTR_DECT_CTL_BIT)
+#define INTR_POL_CTL_HI    BIT(INTR_POL_CTL_BIT)
+#define INTR_ENABLE        BIT(INTR_ENABLE_BIT)
 
 #define DC_IRQ_DISABLE (0 << 3)
 #define DC_IRQ_ENABLE  (1 << 3)
