@@ -35,7 +35,8 @@
 
 #include "smd_rpcrouter.h"
 
-#define SAFETY_MEM_SIZE 65536
+/* Support 64KB of data plus some space for headers */
+#define SAFETY_MEM_SIZE (65536 + sizeof(struct rpc_request_hdr))
 
 /* Next minor # available for a remote server */
 static int next_minor = 1;
@@ -218,6 +219,10 @@ static long rpcrouter_ioctl(struct file *filp, unsigned int cmd,
 
 	case RPC_ROUTER_IOCTL_CLEAR_NETRESET:
 		msm_rpc_clear_netreset(ept);
+		break;
+
+	case RPC_ROUTER_IOCTL_GET_CURR_PKT_SIZE:
+		rc = msm_rpc_get_curr_pkt_size(ept);
 		break;
 
 	default:
