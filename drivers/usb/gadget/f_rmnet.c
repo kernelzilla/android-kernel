@@ -32,6 +32,7 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/bitops.h>
+#include <linux/termios.h>
 
 #include <mach/msm_smd.h>
 #include <linux/usb/cdc.h>
@@ -49,6 +50,8 @@ static char *rmnet_data_ch = CONFIG_RMNET_SMD_DATA_CHANNEL;
 module_param(rmnet_data_ch, charp, S_IRUGO);
 MODULE_PARM_DESC(rmnet_data_ch, "RmNet data SMD channel");
 #endif
+
+#define ACM_CTRL_DTR	(1 << 0)
 
 #define RMNET_NOTIFY_INTERVAL	5
 #define RMNET_MAX_NOTIFY_SIZE	sizeof(struct usb_cdc_notification)
@@ -532,6 +535,23 @@ rmnet_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 			spin_unlock(&dev->lock);
 		}
 		break;
+	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_REQ_SET_CONTROL_LINE_STATE:
+		/* This is a workaround for RmNet and is borrowed from the
+		 * CDC/ACM standard. The host driver will issue the above ACM
+		 * standard request to the RmNet interface in the following
+		 * scenario: Once the network adapter is disabled from device
+		 * manager, the above request will be sent from the qcusbnet
+		 * host driver, with DTR being '0'. Once network adapter is
+		 * enabled from device manager (or during enumeration), the
+		 * request will be sent with DTR being '1'.
+		 */
+		if (w_index != dev->ifc_id)
+			goto invalid;
+		if (w_value & ACM_CTRL_DTR)
+			smd_tiocmset(dev->smd_ctl.ch, TIOCM_DTR, 0);
+		else
+			smd_tiocmset(dev->smd_ctl.ch, 0, TIOCM_DTR);
 	default:
 
 invalid:
