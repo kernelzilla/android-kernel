@@ -155,8 +155,8 @@ struct usb_info {
 	unsigned state;
 	unsigned flags;
 
-	unsigned	online:1;
-	unsigned	running:1;
+	atomic_t configured;
+	atomic_t running;
 
 	struct dma_pool *pool;
 
@@ -196,12 +196,12 @@ struct usb_info {
 #define ep0out ept[0]
 #define ep0in  ept[16]
 
-	unsigned int ep0_dir;
-	u16 test_mode;
-	u8 offline_pending;
+	atomic_t ep0_dir;
+	atomic_t test_mode;
+	atomic_t offline_pending;
 
-	u8 remote_wakeup;
-	int self_powered;
+	atomic_t remote_wakeup;
+	atomic_t self_powered;
 	struct delayed_work rw_work;
 
 	struct otg_transceiver *xceiv;
@@ -228,7 +228,8 @@ static ssize_t print_switch_state(struct switch_dev *sdev, char *buf)
 {
 	struct usb_info *ui = the_usb_info;
 
-	return sprintf(buf, "%s\n", (ui->online ? "online" : "offline"));
+	return sprintf(buf, "%s\n",
+			(atomic_read(&ui->configured) ? "online" : "offline"));
 }
 
 static inline enum chg_type usb_get_chg_type(struct usb_info *ui)
@@ -250,7 +251,7 @@ static int usb_get_max_power(struct usb_info *ui)
 	spin_lock_irqsave(&ui->lock, flags);
 	temp = ui->chg_type;
 	suspended = ui->usb_state == USB_STATE_SUSPENDED ? 1 : 0;
-	configured = ui->online;
+	configured = atomic_read(&ui->configured);
 	spin_unlock_irqrestore(&ui->lock, flags);
 
 	if (temp == USB_CHG_TYPE__INVALID)
@@ -580,7 +581,7 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 		return -EBUSY;
 	}
 
-	if (!ui->online && (ept->num != 0)) {
+	if (!atomic_read(&ui->configured) && (ept->num != 0)) {
 		req->req.status = -ESHUTDOWN;
 		spin_unlock_irqrestore(&ui->lock, flags);
 		dev_info(&ui->pdev->dev,
@@ -589,7 +590,7 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 	}
 
 	if (ui->usb_state == USB_STATE_SUSPENDED) {
-		if (!ui->remote_wakeup) {
+		if (!atomic_read(&ui->remote_wakeup)) {
 			req->req.status = -EAGAIN;
 			spin_unlock_irqrestore(&ui->lock, flags);
 			dev_err(&ui->pdev->dev,
@@ -664,7 +665,7 @@ static void ep0_queue_ack_complete(struct usb_ep *ep,
 	/* queue up the receive of the ACK response from the host */
 	if (_req->status == 0 && _req->actual == _req->length) {
 		req->length = 0;
-		if (ui->ep0_dir == USB_DIR_IN)
+		if (atomic_read(&ui->ep0_dir) == USB_DIR_IN)
 			usb_ept_queue_xfer(&ui->ep0out, req);
 		else
 			usb_ept_queue_xfer(&ui->ep0in, req);
@@ -681,11 +682,12 @@ static void ep0_setup_ack_complete(struct usb_ep *ep, struct usb_request *req)
 	struct msm_endpoint *ept = to_msm_endpoint(ep);
 	struct usb_info *ui = ept->ui;
 	unsigned int temp;
+	int test_mode = atomic_read(&ui->test_mode);
 
-	if (!ui->test_mode)
+	if (!test_mode)
 		return;
 
-	switch (ui->test_mode) {
+	switch (test_mode) {
 	case J_TEST:
 		dev_info(&ui->pdev->dev, "usb electrical test mode: (J)\n");
 		temp = readl(USB_PORTSC) & (~PORTSC_PTC);
@@ -749,9 +751,9 @@ static void handle_setup(struct usb_info *ui)
 	writel(EPT_RX(0), USB_ENDPTSETUPSTAT);
 
 	if (ctl.bRequestType & USB_DIR_IN)
-		ui->ep0_dir = USB_DIR_IN;
+		atomic_set(&ui->ep0_dir, USB_DIR_IN);
 	else
-		ui->ep0_dir = USB_DIR_OUT;
+		atomic_set(&ui->ep0_dir, USB_DIR_OUT);
 
 	/* any pending ep0 transactions must be canceled */
 	flush_endpoint(&ui->ep0out);
@@ -791,9 +793,9 @@ static void handle_setup(struct usb_info *ui)
 			{
 				u16 temp = 0;
 
-				temp = (ui->self_powered <<
+				temp = (atomic_read(&ui->self_powered) <<
 						USB_DEVICE_SELF_POWERED);
-				temp |= (ui->remote_wakeup <<
+				temp |= (atomic_read(&ui->remote_wakeup) <<
 						USB_DEVICE_REMOTE_WAKEUP);
 				memcpy(req->buf, &temp, 2);
 				break;
@@ -833,7 +835,7 @@ static void handle_setup(struct usb_info *ui)
 	}
 	if (ctl.bRequestType == (USB_DIR_OUT | USB_TYPE_STANDARD)) {
 		if (ctl.bRequest == USB_REQ_SET_CONFIGURATION) {
-			ui->online = !!ctl.wValue;
+			atomic_set(&ui->configured, !!ctl.wValue);
 			ui->usb_state = USB_STATE_CONFIGURED;
 		} else if (ctl.bRequest == USB_REQ_SET_ADDRESS) {
 			/* write address delayed (will take effect
@@ -850,17 +852,17 @@ static void handle_setup(struct usb_info *ui)
 				case K_TEST:
 				case SE0_NAK_TEST:
 				case TST_PKT_TEST:
-					ui->test_mode = ctl.wIndex;
+					atomic_set(&ui->test_mode, ctl.wIndex);
 					goto ack;
 				}
 				goto stall;
 			case USB_DEVICE_REMOTE_WAKEUP:
-				ui->remote_wakeup = 1;
+				atomic_set(&ui->remote_wakeup, 1);
 				goto ack;
 			}
 		} else if ((ctl.bRequest == USB_REQ_CLEAR_FEATURE) &&
 				(ctl.wValue == USB_DEVICE_REMOTE_WAKEUP)) {
-			ui->remote_wakeup = 0;
+			atomic_set(&ui->remote_wakeup, 0);
 			goto ack;
 		}
 	}
@@ -1026,7 +1028,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 	writel(n, USB_USBSTS);
 
 	/* somehow we got an IRQ while in the reset sequence: ignore it */
-	if (ui->running == 0)
+	if (!atomic_read(&ui->running))
 		return IRQ_HANDLED;
 
 	if (n & STS_PCI) {
@@ -1044,7 +1046,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 			ui->gadget.speed = USB_SPEED_HIGH;
 			break;
 		}
-		if (ui->online) {
+		if (atomic_read(&ui->configured)) {
 			wake_lock(&ui->wlock);
 			ui->usb_state = USB_STATE_CONFIGURED;
 			ui->driver->resume(&ui->gadget);
@@ -1059,7 +1061,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 		dev_info(&ui->pdev->dev, "reset\n");
 
 		ui->usb_state = USB_STATE_DEFAULT;
-		ui->remote_wakeup = 0;
+		atomic_set(&ui->remote_wakeup, 0);
 		schedule_delayed_work(&ui->chg_stop, 0);
 
 		writel(readl(USB_ENDPTSETUPSTAT), USB_ENDPTSETUPSTAT);
@@ -1068,13 +1070,13 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 		writel(0, USB_ENDPTCTRL(1));
 
 		wake_lock(&ui->wlock);
-		if (ui->online != 0) {
+		if (atomic_read(&ui->configured)) {
 			/* marking us offline will cause ept queue attempts
 			** to fail
 			*/
-			ui->online = 0;
+			atomic_set(&ui->configured, 0);
 			/* Defer sending offline uevent to userspace */
-			ui->offline_pending = 1;
+			atomic_set(&ui->offline_pending, 1);
 
 			flush_all_endpoints(ui);
 
@@ -1142,7 +1144,6 @@ static void usb_prepare(struct usb_info *ui)
 
 static void usb_reset(struct usb_info *ui)
 {
-	unsigned long flags;
 	unsigned cfg_val;
 	struct msm_otg *otg = to_msm_otg(ui->xceiv);
 
@@ -1150,9 +1151,8 @@ static void usb_reset(struct usb_info *ui)
 
 	if (otg->set_clk)
 		otg->set_clk(ui->xceiv, 1);
-	spin_lock_irqsave(&ui->lock, flags);
-	ui->running = 0;
-	spin_unlock_irqrestore(&ui->lock, flags);
+
+	atomic_set(&ui->running, 0);
 
 #if 0
 	/* we should flush and shutdown cleanly if already running */
@@ -1200,7 +1200,7 @@ static void usb_reset(struct usb_info *ui)
 	configure_endpoints(ui);
 
 	/* marking us offline will cause ept queue attempts to fail */
-	ui->online = 0;
+	atomic_set(&ui->configured, 0);
 
 	/* terminate any pending transactions */
 	flush_all_endpoints(ui);
@@ -1215,9 +1215,8 @@ static void usb_reset(struct usb_info *ui)
 
 	if (otg->set_clk)
 		otg->set_clk(ui->xceiv, 0);
-	spin_lock_irqsave(&ui->lock, flags);
-	ui->running = 1;
-	spin_unlock_irqrestore(&ui->lock, flags);
+
+	atomic_set(&ui->running, 1);
 }
 
 static void usb_start(struct usb_info *ui)
@@ -1344,9 +1343,9 @@ static void usb_do_work(struct work_struct *w)
 			}
 			break;
 		case USB_STATE_ONLINE:
-			if (ui->offline_pending) {
+			if (atomic_read(&ui->offline_pending)) {
 				switch_set_state(&ui->sdev, 0);
-				ui->offline_pending = 0;
+				atomic_set(&ui->offline_pending, 0);
 			}
 
 			/* If at any point when we were online, we received
@@ -1359,11 +1358,12 @@ static void usb_do_work(struct work_struct *w)
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: ONLINE -> OFFLINE\n");
 				otg_set_suspend(ui->xceiv, 0);
+
+				atomic_set(&ui->running, 0);
+				atomic_set(&ui->remote_wakeup, 0);
+
 				/* synchronize with irq context */
 				spin_lock_irqsave(&ui->lock, iflags);
-				ui->running = 0;
-				ui->online = 0;
-				ui->remote_wakeup = 0;
 				msm72k_pullup(&ui->gadget, 0);
 				spin_unlock_irqrestore(&ui->lock, iflags);
 
@@ -1431,7 +1431,8 @@ static void usb_do_work(struct work_struct *w)
 				 * is selected. Send online/offline event
 				 * accordingly.
 				 */
-				switch_set_state(&ui->sdev, ui->online);
+				switch_set_state(&ui->sdev,
+						atomic_read(&ui->configured));
 
 				if (maxpower < 0)
 					break;
@@ -1765,7 +1766,7 @@ msm72k_queue(struct usb_ep *_ep, struct usb_request *req, gfp_t gfp_flags)
 		** calling req->complete
 		*/
 		req->complete = ep0_queue_ack_complete;
-		if (ui->ep0_dir == USB_DIR_OUT)
+		if (atomic_read(&ui->ep0_dir) == USB_DIR_OUT)
 			ep = &ui->ep0out;
 		goto ep_queue_done;
 	}
@@ -1952,13 +1953,13 @@ static int msm72k_wakeup(struct usb_gadget *_gadget)
 	struct usb_info *ui = container_of(_gadget, struct usb_info, gadget);
 	struct msm_otg *otg = to_msm_otg(ui->xceiv);
 
-	if (!ui->remote_wakeup) {
+	if (!atomic_read(&ui->remote_wakeup)) {
 		dev_err(&ui->pdev->dev,
 			"%s: remote wakeup not supported\n", __func__);
 		return -ENOTSUPP;
 	}
 
-	if (!ui->online) {
+	if (!atomic_read(&ui->configured)) {
 		dev_err(&ui->pdev->dev,
 			"%s: device is not configured\n", __func__);
 		return -ENODEV;
@@ -2005,12 +2006,12 @@ static int msm72k_set_selfpowered(struct usb_gadget *_gadget, int set)
 	spin_lock_irqsave(&ui->lock, flags);
 	if (set) {
 		if (pdata && pdata->self_powered)
-			ui->self_powered = 1;
+			atomic_set(&ui->self_powered, 1);
 		else
 			ret = -EOPNOTSUPP;
 	} else {
 		/* We can always work as a bus powered device */
-		ui->self_powered = 0;
+		atomic_set(&ui->self_powered, 0);
 	}
 	spin_unlock_irqrestore(&ui->lock, flags);
 
@@ -2280,7 +2281,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	msm72k_pullup(&dev->gadget, 0);
 	dev->state = USB_STATE_IDLE;
-	dev->online = 0;
+	atomic_set(&dev->configured, 0);
 	switch_set_state(&dev->sdev, 0);
 	device_remove_file(&dev->gadget.dev, &dev_attr_usb_state);
 	device_remove_file(&dev->gadget.dev, &dev_attr_usb_speed);
