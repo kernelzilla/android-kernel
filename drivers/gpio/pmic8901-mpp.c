@@ -24,6 +24,7 @@
 #include <linux/gpio.h>
 #include <linux/mfd/pmic8901.h>
 #include <mach/mpp.h>
+#include <linux/seq_file.h>
 
 /* MPP Control Registers */
 #define	SSBI_MPP_CNTRL_BASE		0x27
@@ -90,13 +91,67 @@ static void pm8901_mpp_set(struct gpio_chip *chip, unsigned offset, int val)
 		pr_err("%s: pm8901_mpp_write(): rc=%d\n", __func__, rc);
 }
 
+static int pm8901_mpp_dir_input(struct gpio_chip *chip, unsigned offset)
+{
+	struct pm8901_mpp_chip *mpp_chip = dev_get_drvdata(chip->dev);
+	int rc = pm8901_mpp_write(mpp_chip->pm_chip,
+			SSBI_MPP_CNTRL(offset),
+			PM_MPP_TYPE_D_INPUT << PM8901_MPP_TYPE_SHIFT,
+			PM8901_MPP_TYPE_MASK, &mpp_chip->ctrl[offset]);
+	if (rc)
+		pr_err("%s: pm8901_mpp_write(): rc=%d\n", __func__, rc);
+	return rc;
+}
+
+static int pm8901_mpp_dir_output(struct gpio_chip *chip,
+		unsigned offset, int val)
+{
+	struct pm8901_mpp_chip *mpp_chip = dev_get_drvdata(chip->dev);
+	u8 reg = (PM_MPP_TYPE_D_OUTPUT << PM8901_MPP_TYPE_SHIFT) |
+		(val & PM8901_MPP_CONFIG_CTL_MASK);
+	u8 mask = PM8901_MPP_TYPE_MASK | PM8901_MPP_CONFIG_CTL_MASK;
+	int rc = pm8901_mpp_write(mpp_chip->pm_chip,
+			SSBI_MPP_CNTRL(offset), reg, mask,
+			&mpp_chip->ctrl[offset]);
+	if (rc)
+		pr_err("%s: pm8901_mpp_write(): rc=%d\n", __func__, rc);
+	return rc;
+}
+
+static void pm8901_mpp_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+{
+	static const char *ctype[] = { "d_in", "d_out", "bi_dir", "a_in",
+		"a_out", "sink", "dtest_sink", "dtest_out" };
+	struct pm8901_mpp_chip *mpp_chip = dev_get_drvdata(chip->dev);
+	u8 type, state;
+	const char *label;
+	int i;
+
+	for (i = 0; i < PM8901_MPPS; i++) {
+		label = gpiochip_is_requested(chip, i);
+		type = (mpp_chip->ctrl[i] & PM8901_MPP_TYPE_MASK) >>
+			PM8901_MPP_TYPE_SHIFT;
+		state = pm8901_mpp_get(chip, i);
+		seq_printf(s, "gpio-%-3d (%-12.12s) %-10.10s"
+				" %s 0x%02x\n",
+				chip->base + i,
+				label ? label : "--",
+				ctype[type],
+				state ? "hi" : "lo",
+				mpp_chip->ctrl[i]);
+	}
+}
+
 static struct pm8901_mpp_chip pm8901_mpp_chip = {
 	.chip = {
-		.label		= "pm8901-mpp",
-		.to_irq		= pm8901_mpp_to_irq,
-		.get		= pm8901_mpp_get,
-		.set		= pm8901_mpp_set,
-		.ngpio		= PM8901_MPPS,
+		.label			= "pm8901-mpp",
+		.to_irq			= pm8901_mpp_to_irq,
+		.get			= pm8901_mpp_get,
+		.set			= pm8901_mpp_set,
+		.direction_input	= pm8901_mpp_dir_input,
+		.direction_output	= pm8901_mpp_dir_output,
+		.dbg_show		= pm8901_mpp_dbg_show,
+		.ngpio			= PM8901_MPPS,
 	},
 };
 
