@@ -382,6 +382,10 @@ drop:
 					 &(driver->diag_read_smd_qdsp_work));
 		APPEND_DEBUG('n');
 		goto exit;
+	} else if (driver->data_ready[index] & MEMORY_DEVICE_LOG_TYPE) {
+		/* In case, the thread wakes up and the logging mode is
+		not memory device any more, the condition needs to be cleared */
+		driver->data_ready[index] ^= MEMORY_DEVICE_LOG_TYPE;
 	}
 
 	if (driver->data_ready[index] & DEINIT_TYPE) {
