@@ -510,6 +510,11 @@ CONFIG_IPV6_NDISC_NODETYPE=y
 # CONFIG_NET_SCHED is not set
 # CONFIG_DCB is not set
 
+# Graphics support
+CONFIG_MSM_KGSL=y
+CONFIG_MSM_KGSL_MMU=y
+CONFIG_MSM_KGSL_2D=y
+
 #
 # Network testing
 #
