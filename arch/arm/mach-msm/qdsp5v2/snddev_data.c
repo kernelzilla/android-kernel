@@ -27,6 +27,10 @@
 #include <mach/board.h>
 #include <asm/mach-types.h>
 #include <linux/uaccess.h>
+#include <mach/gpio.h>
+#include <mach/qdsp5v2/snddev_mi2s.h>
+#include <mach/qdsp5v2/mi2s.h>
+
 
 /* define the value for BT_SCO */
 #define BT_SCO_PCM_CTL_VAL (PCM_CTL__RPCM_WIDTH__LINEAR_V |\
@@ -1149,6 +1153,168 @@ static struct platform_device msm_ihs_stereo_speaker_stereo_rx_device = {
 	.dev = { .platform_data = &snddev_ihs_stereo_speaker_stereo_rx_data },
 };
 
+static struct snddev_mi2s_data snddev_mi2s_stereo_rx_data = {
+	.capability = SNDDEV_CAP_RX ,
+	.name = "hdmi_stereo_rx",
+	.copp_id = 3,
+	.acdb_id = 6,
+	.channel_mode = 2,
+	.sd_lines = MI2S_SD_0,
+	.route = msm_snddev_tx_route_config,
+	.deroute = msm_snddev_tx_route_deconfig,
+	.default_sample_rate = 48000,
+};
+
+static struct platform_device msm_snddev_mi2s_stereo_rx_device = {
+	.name = "snddev_mi2s",
+	.id = 0,
+	.dev = { .platform_data = &snddev_mi2s_stereo_rx_data },
+};
+
+
+static struct snddev_mi2s_data snddev_mi2s_fm_tx_data = {
+	.capability = SNDDEV_CAP_TX ,
+	.name = "fmradio_stereo_tx",
+	.copp_id = 2,
+	.acdb_id = 0x18,
+	.channel_mode = 2,
+	.sd_lines = MI2S_SD_3,
+	.route = NULL,
+	.deroute = NULL,
+	.default_sample_rate = 48000,
+};
+
+static struct platform_device  msm_snddev_mi2s_fm_tx_device = {
+	.name = "snddev_mi2s",
+	.id = 1,
+	.dev = { .platform_data = &snddev_mi2s_fm_tx_data},
+};
+
+static struct msm_gpio mi2s_clk_gpios[] = {
+	{ GPIO_CFG(145, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_SCLK"},
+	{ GPIO_CFG(144, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_WS"},
+	{ GPIO_CFG(120, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_MCLK_A"},
+};
+
+static struct msm_gpio mi2s_rx_data_lines_gpios[] = {
+	{ GPIO_CFG(121, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD0_A"},
+	{ GPIO_CFG(122, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD1_A"},
+	{ GPIO_CFG(123, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD2_A"},
+	{ GPIO_CFG(146, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD3"},
+};
+
+static struct msm_gpio mi2s_tx_data_lines_gpios[] = {
+	{ GPIO_CFG(146, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD3"},
+};
+
+int mi2s_config_clk_gpio(void)
+{
+	int rc = 0;
+
+	rc = msm_gpios_request_enable(mi2s_clk_gpios,
+			ARRAY_SIZE(mi2s_clk_gpios));
+	if (rc) {
+		pr_err("%s: enable mi2s clk gpios  failed\n",
+					__func__);
+		return rc;
+	}
+	return 0;
+}
+
+int mi2s_config_data_gpio(u32 direction, u8 sd_line_mask)
+{
+	int i , rc = 0;
+
+	sd_line_mask &= MI2S_SD_LINE_MASK;
+
+	if (direction == DIR_TX) {
+
+		if ((sd_line_mask & MI2S_SD_0) || (sd_line_mask & MI2S_SD_1) ||
+		   (sd_line_mask & MI2S_SD_2) || !(sd_line_mask & MI2S_SD_3)) {
+
+			pr_err("%s: can not use SD0 or SD1 or SD2 for TX"
+				".only can use SD3. sd_line_mask = 0x%x\n",
+				__func__ , sd_line_mask);
+
+			 return -EINVAL;
+		}
+
+		rc = msm_gpios_request_enable(mi2s_tx_data_lines_gpios, 1);
+
+		if (rc)
+			pr_err("%s: enable mi2s gpios for TX failed\n",
+					__func__);
+		return rc;
+	}
+
+	if (direction != DIR_RX) {
+		pr_err("%s: Invaild direction  direction = %u\n",
+				__func__, direction);
+		return -EINVAL;
+	}
+
+	i = 0;
+	while (sd_line_mask) {
+
+		if (sd_line_mask & 0x1) {
+			rc = msm_gpios_request_enable(
+					mi2s_rx_data_lines_gpios + i , 1);
+			if (rc) {
+				pr_err("%s: enable mi2s gpios for RX failed. "
+					"SD line = %s\n", __func__,
+					(mi2s_rx_data_lines_gpios + i)->label);
+				return rc;
+			}
+		}
+		sd_line_mask = sd_line_mask >> 1;
+		i++;
+	}
+	return rc;
+}
+
+int mi2s_unconfig_clk_gpio(void)
+{
+	msm_gpios_disable_free(mi2s_clk_gpios, ARRAY_SIZE(mi2s_clk_gpios));
+	return 0;
+}
+
+int  mi2s_unconfig_data_gpio(u32 direction, u8 sd_line_mask)
+{
+	int i;
+	sd_line_mask &= MI2S_SD_LINE_MASK;
+
+	if (direction == DIR_TX) {
+		msm_gpios_disable_free(mi2s_tx_data_lines_gpios, 1);
+		return 0;
+	}
+
+	if (direction != DIR_RX) {
+		pr_err("%s: Invaild direction  direction = %u\n",
+				__func__, direction);
+		return -EINVAL;
+	}
+
+	i = 0;
+	while (sd_line_mask) {
+
+		if (sd_line_mask & 0x1)
+			msm_gpios_disable_free(
+					mi2s_rx_data_lines_gpios + i , 1);
+
+		sd_line_mask = sd_line_mask >> 1;
+		i++;
+	}
+	return 0;
+}
+
 static struct snddev_icodec_data snddev_fluid_imic_tx_data = {
 	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
 	.name = "handset_tx",
@@ -1315,6 +1481,8 @@ static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_ihs_stereo_speaker_stereo_rx_device,
 	&msm_a2dp_rx_device,
 	&msm_a2dp_tx_device,
+	&msm_snddev_mi2s_stereo_rx_device,
+	&msm_snddev_mi2s_fm_tx_device,
 };
 
 static struct platform_device *snd_devices_surf[] __initdata = {
@@ -1335,6 +1503,8 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_ihs_stereo_speaker_stereo_rx_device,
 	&msm_a2dp_rx_device,
 	&msm_a2dp_tx_device,
+	&msm_snddev_mi2s_stereo_rx_device,
+	&msm_snddev_mi2s_fm_tx_device,
 };
 
 static struct platform_device *snd_devices_fluid[] __initdata = {
@@ -1349,6 +1519,7 @@ static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_fluid_spk_idual_mic_endfire_device,
 	&msm_a2dp_rx_device,
 	&msm_a2dp_tx_device,
+	&msm_snddev_mi2s_stereo_rx_device,
 };
 
 #ifdef CONFIG_DEBUG_FS
