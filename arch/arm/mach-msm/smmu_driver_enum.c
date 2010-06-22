@@ -318,8 +318,8 @@ static int ctx_driver_probe(struct platform_device *pdev)
 		/* Set MID associated with this context bank */
 		SET_CBVMID(drv->base, c->num, mid);
 
-		/* Set security bit override to be Secure */
-		SET_NSCFG(drv->base, mid, 2);
+		/* Set security bit override to be Non-secure */
+		SET_NSCFG(drv->base, mid, 3);
 	}
 
 	return 0;
