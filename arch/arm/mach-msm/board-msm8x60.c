@@ -2130,7 +2130,7 @@ static struct lcdc_platform_data lcdc_pdata = {
 };
 
 static struct msm_panel_common_pdata mdp_pdata = {
-	.mdp_core_clk_rate = 59080000,
+	.mdp_core_clk_rate = 128000000,
 };
 
 static void __init msm_fb_add_devices(void)
