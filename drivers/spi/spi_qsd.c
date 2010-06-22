@@ -1208,13 +1208,17 @@ static void msm_spi_workq(struct work_struct *work)
 	u32                  status_error = 0;
 
 	mutex_lock(&dd->core_lock);
-	if (dd->use_rlock) {
-		/* Don't allow power collapse until we release remote mutex */
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
-					  dd->pm_lat);
+
+	/* Don't allow power collapse until we release mutex */
+	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
+				  dd->pm_lat);
+	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
-		msm_spi_enable_irqs(dd);
-	}
+
+	clk_enable(dd->clk);
+	if (dd->pclk)
+		clk_enable(dd->pclk);
+	msm_spi_enable_irqs(dd);
 
 	if (!msm_spi_is_valid_state(dd)) {
 		dev_err(dd->dev, "%s: SPI operational state not valid\n",
@@ -1244,12 +1248,17 @@ static void msm_spi_workq(struct work_struct *work)
 	dd->transfer_pending = 0;
 	spin_unlock_irqrestore(&dd->queue_lock, flags);
 
-	if (dd->use_rlock) {
-		msm_spi_disable_irqs(dd);
+	msm_spi_disable_irqs(dd);
+	clk_disable(dd->clk);
+	if (dd->pclk)
+		clk_disable(dd->pclk);
+
+	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
-					  PM_QOS_DEFAULT_VALUE);
-	}
+
+	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
+				  PM_QOS_DEFAULT_VALUE);
+
 	mutex_unlock(&dd->core_lock);
 	/* If needed, this can be done after the current message is complete,
 	   and work can be continued upon resume. No motivation for now. */
@@ -1377,6 +1386,10 @@ static int msm_spi_setup(struct spi_device *spi)
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
 
+	clk_enable(dd->clk);
+	if (dd->pclk)
+		clk_enable(dd->pclk);
+
 	spi_ioc = readl(dd->base + SPI_IO_CONTROL);
 	mask = SPI_IO_C_CS_N_POLARITY_0 << spi->chip_select;
 	if (spi->mode & SPI_CS_HIGH)
@@ -1387,6 +1400,7 @@ static int msm_spi_setup(struct spi_device *spi)
 		spi_ioc |= SPI_IO_C_CLK_IDLE_HIGH;
 	else
 		spi_ioc &= ~SPI_IO_C_CLK_IDLE_HIGH;
+
 	writel(spi_ioc, dd->base + SPI_IO_CONTROL);
 
 	spi_config = readl(dd->base + SPI_CONFIG);
@@ -1399,6 +1413,11 @@ static int msm_spi_setup(struct spi_device *spi)
 	else
 		spi_config |= SPI_CFG_INPUT_FIRST;
 	writel(spi_config, dd->base + SPI_CONFIG);
+
+	clk_disable(dd->clk);
+	if (dd->pclk)
+		clk_disable(dd->pclk);
+
 	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
 	mutex_unlock(&dd->core_lock);
@@ -1711,6 +1730,8 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 	struct resource	       *resource;
 	int                     rc = -ENXIO;
 	int                     locked = 0;
+	int                     clk_enabled = 0;
+	int                     pclk_enabled = 0;
 	struct msm_spi_platform_data *pdata = pdev->dev.platform_data;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(struct msm_spi));
@@ -1838,12 +1859,6 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 		rc = PTR_ERR(dd->clk);
 		goto err_probe_clk_get;
 	}
-	rc = clk_enable(dd->clk);
-	if (rc) {
-		dev_err(&pdev->dev, "%s: unable to enable %s\n",
-			__func__, pdata->clk_name);
-		goto err_probe_clk_enable;
-	}
 	if (pdata && pdata->pclk_name) {
 		dd->pclk = clk_get(&pdev->dev, pdata->pclk_name);
 		if (IS_ERR(dd->pclk)) {
@@ -1852,16 +1867,29 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 			rc = PTR_ERR(dd->clk);
 			goto err_probe_pclk_get;
 		}
-		rc = clk_enable(dd->pclk);
-		if (rc) {
-			dev_err(&pdev->dev, "%s: unable to enable %s\n",
-				__func__, pdata->pclk_name);
-			goto err_probe_pclk_enable;
-		}
 	}
 	msm_spi_init_gsbi(dd);
 	if (pdata && pdata->max_clock_speed)
 		msm_spi_clock_set(dd, dd->pdata->max_clock_speed);
+
+	rc = clk_enable(dd->clk);
+	if (rc) {
+		dev_err(&pdev->dev, "%s: unable to enable %s\n",
+			__func__, pdata->clk_name);
+		goto err_probe_clk_enable;
+	}
+	clk_enabled = 1;
+
+	if (dd->pclk) {
+		rc = clk_enable(dd->pclk);
+		if (rc) {
+			dev_err(&pdev->dev, "%s: unable to enable %s\n",
+			__func__, pdata->pclk_name);
+			goto err_probe_pclk_enable;
+		}
+		pclk_enabled = 1;
+	}
+
 	msm_spi_calculate_fifo_size(dd);
 	if (dd->use_dma) {
 		rc = msm_spi_init_dma(dd);
@@ -1882,6 +1910,12 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 	rc = msm_spi_set_state(dd, SPI_OP_STATE_RESET);
 	if (rc)
 		goto err_probe_state;
+
+	clk_disable(dd->clk);
+	if (dd->pclk)
+		clk_disable(dd->pclk);
+	clk_enabled = 0;
+	pclk_enabled = 0;
 
 	dd->suspended = 0;
 	dd->transfer_pending = 0;
@@ -1919,14 +1953,15 @@ err_probe_irq:
 err_probe_state:
 	msm_spi_teardown_dma(dd);
 err_probe_dma:
-	if (dd->pclk)
+	if (pclk_enabled)
 		clk_disable(dd->pclk);
 err_probe_pclk_enable:
+	if (clk_enabled)
+		clk_disable(dd->clk);
+err_probe_clk_enable:
 	if (dd->pclk)
 		clk_put(dd->pclk);
 err_probe_pclk_get:
-	clk_disable(dd->clk);
-err_probe_clk_enable:
 	clk_put(dd->clk);
 err_probe_clk_get:
 err_probe_clk_undefined:
@@ -1976,14 +2011,6 @@ static int msm_spi_suspend(struct platform_device *pdev, pm_message_t state)
 	/* Wait for transactions to end, or time out */
 	wait_event_interruptible(dd->continue_suspend, !dd->transfer_pending);
 
-	/* Make sure no one is accessing the core */
-	mutex_lock(&dd->core_lock);
-	msm_spi_disable_irqs(dd);
-	clk_disable(dd->clk);
-	if (dd->pclk)
-		clk_disable(dd->pclk);
-	mutex_unlock(&dd->core_lock);
-
 suspend_exit:
 	return 0;
 }
@@ -1992,7 +2019,6 @@ static int msm_spi_resume(struct platform_device *pdev)
 {
 	struct spi_master *master = platform_get_drvdata(pdev);
 	struct msm_spi    *dd;
-	int rc;
 
 	if (!master)
 		goto resume_exit;
@@ -2000,23 +2026,6 @@ static int msm_spi_resume(struct platform_device *pdev)
 	if (!dd)
 		goto resume_exit;
 
-	rc = clk_enable(dd->clk);
-	if (rc) {
-		dev_err(dd->dev, "%s: unable to enable spi_clk\n",
-			__func__);
-		goto resume_exit;
-	}
-	if (dd->pclk) {
-		rc = clk_enable(dd->pclk);
-		if (rc) {
-			dev_err(&pdev->dev, "%s: unable to enable spi_pclk\n",
-				__func__);
-			clk_disable(dd->clk);
-			goto resume_exit;
-		}
-	}
-
-	msm_spi_enable_irqs(dd);
 	dd->suspended = 0;
 resume_exit:
 	return 0;
@@ -2045,12 +2054,9 @@ static int __devexit msm_spi_remove(struct platform_device *pdev)
 	iounmap(dd->base);
 	release_mem_region(dd->mem_phys_addr, dd->mem_size);
 	msm_spi_release_gsbi(dd);
-	clk_disable(dd->clk);
 	clk_put(dd->clk);
-	if (dd->pclk) {
-		clk_disable(dd->pclk);
+	if (dd->pclk)
 		clk_put(dd->pclk);
-	}
 	destroy_workqueue(dd->workqueue);
 	platform_set_drvdata(pdev, 0);
 	spi_unregister_master(master);
