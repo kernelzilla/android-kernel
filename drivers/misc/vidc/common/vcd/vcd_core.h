@@ -137,7 +137,7 @@ struct vcd_dev_ctxt_type {
 	u32 n_ddl_frame_ch_free;
 	u32 n_ddl_cmd_ch_free;
 
-	void *sched_hdl;
+	struct list_head sched_clnt_list;
 
 	struct vcd_init_config_type config;
 
@@ -199,19 +199,10 @@ struct vcd_sched_clnt_ctx_type {
 	struct list_head list;
 	u32 b_clnt_active;
 	void *p_clnt_data;
-	u32 n_p_tkn_per_frm;
-	u32 n_p_tkn_rate;
-	u32 n_bkt_lst_sup_time;
-	s32 n_bkt_tkns;
-	u32 n_bkt_size;
 	u32 n_o_tkns;
-	struct list_head clnt_frm_list;
-};
-
-struct vcd_sched_ctx_type {
-	u32 n_perf_lvl;
-	u32 n_total_clnt_bw;
-	struct list_head clnt_list;
+	u32 r_p_frm;
+	u32 n_rounds;
+	struct list_head ip_frm_list;
 };
 
 struct vcd_clnt_ctxt_type_t {

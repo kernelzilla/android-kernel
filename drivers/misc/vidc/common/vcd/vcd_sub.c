@@ -951,8 +951,7 @@ void vcd_destroy_client_context(struct vcd_clnt_ctxt_type_t *p_cctxt)
 					"vcd_sched_de_queue_buffer");
 		}
 
-		rc = vcd_sched_remove_client(p_dev_ctxt->sched_hdl,
-				p_cctxt->sched_clnt_hdl);
+		rc = vcd_sched_remove_client(p_cctxt->sched_clnt_hdl);
 		if (VCD_FAILED(rc))
 			VCD_MSG_ERROR("\n Failed: sched_remove_client");
 		p_cctxt->sched_clnt_hdl = NULL;
@@ -1211,7 +1210,7 @@ u32 vcd_schedule_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
 		return FALSE;
 	}
 
-	rc = vcd_sched_get_client_frame(p_dev_ctxt->sched_hdl,
+	rc = vcd_sched_get_client_frame(&p_dev_ctxt->sched_clnt_list,
 		pp_cctxt, pp_ip_buf_entry);
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_FATAL("vcd_submit_frame: sched_de_queue_frame"
@@ -2065,8 +2064,7 @@ u32 vcd_handle_first_fill_output_buffer(
 	}
 
 	if (p_cctxt->sched_clnt_hdl)
-		rc = vcd_sched_suspend_resume_clnt(
-			p_cctxt->sched_clnt_hdl, TRUE);
+		rc = vcd_sched_suspend_resume_clnt(p_cctxt, TRUE);
 	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
 
 	if (p_cctxt->b_decoding)
@@ -2646,7 +2644,6 @@ u32 vcd_set_frame_size(
 		VCD_MSG_ERROR("rc = 0x%x. Failed: vcd_update_clnt_perf_lvl",
 				  rc);
 	}
-	rc = vcd_sched_update_config(p_cctxt);
 
 	return rc;
 }
@@ -2793,8 +2790,7 @@ void vcd_handle_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 event,
 		p_cctxt->status.e_last_evt = event;
 
 		if (p_cctxt->sched_clnt_hdl) {
-			rc = vcd_sched_suspend_resume_clnt(
-				p_cctxt->sched_clnt_hdl, FALSE);
+			rc = vcd_sched_suspend_resume_clnt(p_cctxt, FALSE);
 			if (VCD_FAILED(rc))
 				VCD_MSG_ERROR("Failed: sched_suspend_resume_"
 					"client rc=0x%x", rc);
@@ -2924,8 +2920,7 @@ u32 vcd_handle_ind_output_reconfig(
 		rc = vcd_handle_output_required(p_cctxt, p_payload, status);
 	VCD_FAILED_RETURN(rc, "Failed: vcd_handle_output_required in reconfig");
 
-	p_cctxt->sched_clnt_hdl->n_o_tkns++;
-	rc = vcd_sched_suspend_resume_clnt(p_cctxt->sched_clnt_hdl, FALSE);
+	rc = vcd_sched_suspend_resume_clnt(p_cctxt, FALSE);
 	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
 
 	p_out_buf_pool = &p_cctxt->out_buf_pool;

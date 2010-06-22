@@ -370,14 +370,13 @@ void vcd_handle_ind_hw_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt,
 u32 vcd_return_op_buffer_to_hw(struct vcd_clnt_ctxt_type_t *p_cctxt,
 	struct vcd_buffer_entry_type *p_buf_entry);
 
-u32 vcd_sched_create(u32 n_perf_lvl, struct vcd_sched_ctx_type **p_sched_ctx);
+u32 vcd_sched_create(struct list_head *p_sched_list);
 
-void vcd_sched_destroy(struct vcd_sched_ctx_type *p_sched_ctx);
+void vcd_sched_destroy(struct list_head *p_sched_clnt_list);
 
 u32 vcd_sched_add_client(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
-u32 vcd_sched_remove_client(struct vcd_sched_ctx_type *p_sched,
-	struct vcd_sched_clnt_ctx_type *p_sched_cctxt);
+u32 vcd_sched_remove_client(struct vcd_sched_clnt_ctx_type *p_sched_cctxt);
 
 u32 vcd_sched_update_config(struct vcd_clnt_ctxt_type_t *p_cctxt);
 
@@ -392,12 +391,9 @@ u32 vcd_sched_dequeue_buffer(
 u32 vcd_sched_mark_client_eof(struct vcd_sched_clnt_ctx_type *p_sched_cctxt);
 
 u32 vcd_sched_suspend_resume_clnt(
-	struct vcd_sched_clnt_ctx_type *p_sched_cctxt, u32 b_state);
+	struct vcd_clnt_ctxt_type_t *p_cctxt, u32 b_state);
 
-void vcd_sched_update_tkn_bucket(
-	struct vcd_sched_clnt_ctx_type *p_sched_cctxt, u32 n_actual_time);
-
-u32 vcd_sched_get_client_frame(struct vcd_sched_ctx_type *p_sched,
+u32 vcd_sched_get_client_frame(struct list_head *p_sched_clnt_list,
 	struct vcd_clnt_ctxt_type_t **pp_cctxt,
 	struct vcd_buffer_entry_type **pp_buffer);
 

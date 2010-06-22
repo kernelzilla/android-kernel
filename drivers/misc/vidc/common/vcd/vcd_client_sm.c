@@ -225,8 +225,7 @@ static u32 vcd_pause_in_run(struct vcd_clnt_ctxt_type_t *p_cctxt)
 	VCD_MSG_LOW("vcd_pause_in_run:");
 
 	if (p_cctxt->sched_clnt_hdl) {
-		rc = vcd_sched_suspend_resume_clnt(
-			p_cctxt->sched_clnt_hdl, FALSE);
+		rc = vcd_sched_suspend_resume_clnt(p_cctxt, FALSE);
 		VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
 	}
 
@@ -275,8 +274,7 @@ static u32 vcd_resume_in_paused(struct vcd_clnt_ctxt_type_t *p_cctxt)
 			VCD_MSG_ERROR("VCD_EVT_PWR_CLNT_RESUME failed");
 		} else {
 
-			rc = vcd_sched_suspend_resume_clnt(
-				p_cctxt->sched_clnt_hdl, TRUE);
+			rc = vcd_sched_suspend_resume_clnt(p_cctxt, TRUE);
 			if (VCD_FAILED(rc)) {
 				VCD_MSG_ERROR
 				    ("rc = 0x%x. Failed: "
@@ -1419,7 +1417,7 @@ static void vcd_clnt_enter_eos(struct vcd_clnt_ctxt_type_t *p_cctxt,
    u32     rc;
 
    VCD_MSG_MED("Entering CLIENT_STATE_EOS on api %d", n_state_event_type);
-	rc = vcd_sched_suspend_resume_clnt(p_cctxt->sched_clnt_hdl, FALSE);
+	rc = vcd_sched_suspend_resume_clnt(p_cctxt, FALSE);
 	if (VCD_FAILED(rc))
 		VCD_MSG_ERROR("Failed: vcd_sched_suspend_resume_clnt."
 					  "rc=0x%x", rc);
@@ -1483,7 +1481,7 @@ static void vcd_clnt_exit_eos
 {
 	u32 rc;
 	VCD_MSG_MED("Exiting CLIENT_STATE_EOS on api %d", n_state_event_type);
-	rc = vcd_sched_suspend_resume_clnt(p_cctxt->sched_clnt_hdl, TRUE);
+	rc = vcd_sched_suspend_resume_clnt(p_cctxt, TRUE);
 	if (VCD_FAILED(rc))
 		VCD_MSG_ERROR("Failed: vcd_sched_suspend_resume_clnt. rc=0x%x",
 			rc);
