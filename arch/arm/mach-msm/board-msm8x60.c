@@ -306,6 +306,114 @@ static struct platform_device android_usb_device = {
 };
 #endif
 
+#ifdef CONFIG_MSM_CAMERA
+
+#define MSM_PMEM_ADSP_SIZE      0x2000000
+#define PMEM_KERNEL_EBI1_SIZE   0x600000
+static uint32_t camera_off_gpio_table[] = {
+	GPIO_CFG(47, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(48, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(32, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(105, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(106, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+};
+
+static uint32_t camera_on_gpio_table[] = {
+	GPIO_CFG(47, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(48, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(32, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(105, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(106, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+};
+
+static void config_gpio_table(uint32_t *table, int len)
+{
+	int n, rc;
+	for (n = 0; n < len; n++) {
+		rc = gpio_tlmm_config(table[n], GPIO_ENABLE);
+		if (rc) {
+			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
+				__func__, table[n], rc);
+			break;
+		}
+	}
+}
+#define GPIO_CAM_EN (GPIO_EXPANDER_GPIO_BASE + 13)
+static void config_camera_on_gpios(void)
+{
+	int rc;
+	config_gpio_table(camera_on_gpio_table,
+		ARRAY_SIZE(camera_on_gpio_table));
+
+	rc = gpio_request(GPIO_CAM_EN, "CAM_EN");
+	if (rc) {
+		printk(KERN_ERR "%s: CAMSENSOR gpio %d request"
+			"failed\n", __func__, GPIO_CAM_EN);
+		return;
+	}
+	gpio_direction_output(GPIO_CAM_EN, 0);
+	mdelay(20);
+	gpio_set_value(GPIO_CAM_EN, 1);
+}
+
+static void config_camera_off_gpios(void)
+{
+	config_gpio_table(camera_off_gpio_table,
+		ARRAY_SIZE(camera_off_gpio_table));
+
+	gpio_set_value(GPIO_CAM_EN, 0);
+	mdelay(20);
+	gpio_free(GPIO_CAM_EN);
+}
+
+
+struct msm_camera_device_platform_data msm_camera_device_data = {
+	.camera_gpio_on  = config_camera_on_gpios,
+	.camera_gpio_off = config_camera_off_gpios,
+	.ioext.csiphy = 0x04800000,
+	.ioext.csisz  = 0x00000400,
+	.ioext.csiirq = CSI_0_IRQ,
+};
+
+struct resource msm_camera_resources[] = {
+	{
+		.start	= 0x04500000,
+		.end	= 0x04500000 + SZ_1M - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= VFE_IRQ,
+		.end	= VFE_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct i2c_board_info msm_camera_boardinfo[]  __initdata = {
+};
+
+#ifdef CONFIG_MSM_GEMINI
+static struct resource msm_gemini_resources[] = {
+	{
+		.start  = 0xA3A00000,
+		.end    = 0xA3A00000 + 0x0150 - 1,
+		.flags  = IORESOURCE_MEM,
+	},
+	{
+		.start  = INT_JPEG,
+		.end    = INT_JPEG,
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device msm_gemini_device = {
+	.name           = "msm_gemini",
+	.resource       = msm_gemini_resources,
+	.num_resources  = ARRAY_SIZE(msm_gemini_resources),
+};
+#endif
+#endif
+
+
 #ifdef CONFIG_I2C_QUP
 static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 {
@@ -388,6 +496,27 @@ static struct platform_device msm_batt_device = {
 	.id                = -1,
 	.dev.platform_data = &msm_psy_batt_data,
 };
+#endif
+
+#ifdef CONFIG_MSM_CAMERA
+static struct android_pmem_platform_data android_pmem_adsp_pdata = {
+       .name = "pmem_adsp",
+       .allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+       .cached = 0,
+};
+
+static struct platform_device android_pmem_adsp_device = {
+       .name = "android_pmem",
+       .id = 2,
+       .dev = { .platform_data = &android_pmem_adsp_pdata },
+};
+
+static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
+static void __init pmem_adsp_size_setup(char **p)
+{
+	pmem_adsp_size = memparse(*p, p);
+}
+__early_param("pmem_adsp_size=", pmem_adsp_size_setup);
 #endif
 
 #define MSM_FB_SIZE 0x500000;
@@ -492,6 +621,16 @@ static void __init msm8x60_allocate_memory_regions(void)
 		pr_info("allocating %lu bytes at %p (%lx physical) for "
 		"KGSL\n", size, addr, __pa(addr));
 	}
+#ifdef CONFIG_MSM_CAMERA
+	size = pmem_adsp_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_adsp_pdata.start = __pa(addr);
+		android_pmem_adsp_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
+#endif
 }
 
 #define TS_PEN_IRQ_GPIO 61
@@ -664,6 +803,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
+#ifdef CONFIG_MSM_CAMERA
+	&android_pmem_adsp_device,
+#endif
 };
 
 static struct platform_device *surf_devices[] __initdata = {
@@ -706,6 +848,9 @@ static struct platform_device *surf_devices[] __initdata = {
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
+#ifdef CONFIG_MSM_CAMERA
+	&android_pmem_adsp_device,
+#endif
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -714,9 +859,9 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 	[0] = {
 		.gpio_base         = GPIO_EXPANDER_GPIO_BASE,
 		.oscio_is_gpo      = false,
-		.io_pullup_ena     = 0xEFFB,
+		.io_pullup_ena     = 0xCFFB,
 		.io_pulldn_ena     = 0,
-		.io_open_drain_ena = 0xEFFF,
+		.io_open_drain_ena = 0xCFFF,
 		.io_polarity       = 0,
 		.irq_summary       = -1, /* see fixup_i2c_configs() */
 		.irq_base          = GPIO_EXPANDER_IRQ_BASE,
@@ -1527,6 +1672,14 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		cy8ctmg200_board_info,
 		ARRAY_SIZE(cy8ctmg200_board_info),
 	},
+#ifdef CONFIG_MSM_CAMERA
+    {
+		I2C_SURF | I2C_FFA,
+		MSM_GSBI4_QUP_I2C_BUS_ID,
+		msm_camera_boardinfo,
+		ARRAY_SIZE(msm_camera_boardinfo),
+	},
+#endif
 };
 #endif /* CONFIG_I2C */
 
@@ -1795,6 +1948,11 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	/* GSBI8 QUP I2C */
 	GPIO_CFG(64, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
 	GPIO_CFG(65, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+#ifdef CONFIG_MSM_CAMERA
+	/* GSBI4 QUP I2C */
+	GPIO_CFG(47, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(48, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+#endif
 #endif
 
 	/*
