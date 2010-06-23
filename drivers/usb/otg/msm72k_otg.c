@@ -154,7 +154,7 @@ static inline void set_driver_amplitude(struct msm_otg *dev)
 	res &= ~ULPI_DRV_AMPL_MASK;
 	if (dev->pdata->drv_ampl != HS_DRV_AMPLITUDE_ZERO_PERCENT)
 		res |= dev->pdata->drv_ampl;
-	ulpi_write(dev, dev->pdata->drv_ampl, ULPI_CONFIG_REG2);
+	ulpi_write(dev, res, ULPI_CONFIG_REG2);
 }
 
 static int msm_otg_set_clk(struct otg_transceiver *xceiv, int on)
