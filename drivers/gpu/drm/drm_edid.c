@@ -1096,6 +1096,9 @@ struct edid *drm_get_edid(struct drm_connector *connector,
 	int ret;
 	struct edid *edid;
 
+	if (drm_core_check_feature(connector->dev, DRIVER_USE_PLATFORM_DEVICE))
+		return NULL;
+
 	edid = kmalloc(EDID_LENGTH * (MAX_EDID_EXT_NUM + 1),
 		       GFP_KERNEL);
 	if (edid == NULL) {
