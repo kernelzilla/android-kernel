@@ -73,6 +73,7 @@ struct pm8058_platform_data {
 struct pm8058_gpio_platform_data {
 	int	gpio_base;
 	int	irq_base;
+	int	(*init)(void);
 };
 
 /* GPIO parameters */
@@ -149,18 +150,6 @@ int pm8058_write(struct pm8058_chip *pm_chip, u16 addr, u8 *values,
 		 unsigned int len);
 
 int pm8058_gpio_config(int gpio, struct pm8058_gpio *param);
-
-int pm8058_gpio_config_h(struct pm8058_chip *pm_chip, int gpio,
-			 struct pm8058_gpio *param);
-int pm8058_gpio_set_direction(struct pm8058_chip *pm_chip,
-			      unsigned gpio, int direction);
-int pm8058_gpio_set(struct pm8058_chip *pm_chip, unsigned gpio, int value);
-int pm8058_gpio_get(struct pm8058_chip *pm_chip, unsigned gpio);
-
-int pm8058_mpp_get(struct pm8058_chip *pm_chip, unsigned mpp);
-
-int pm8058_gpio_config_kypd_drv(int gpio_start, int num_gpios);
-int pm8058_gpio_config_kypd_sns(int gpio_start, int num_gpios);
 
 int pm8058_rev(struct pm8058_chip *pm_chip);
 

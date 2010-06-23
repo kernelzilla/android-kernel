@@ -504,6 +504,62 @@ static int pmic8058_kp_resume(struct platform_device *pdev)
 #define pmic8058_kp_resume	NULL
 #endif
 
+static int pm8058_kp_config_drv(int gpio_start, int num_gpios)
+{
+	int	rc;
+	struct pm8058_gpio kypd_drv = {
+		.direction	= PM_GPIO_DIR_OUT,
+		.output_buffer	= PM_GPIO_OUT_BUF_OPEN_DRAIN,
+		.output_value	= 0,
+		.pull		= PM_GPIO_PULL_NO,
+		.vin_sel	= 2,
+		.out_strength	= PM_GPIO_STRENGTH_LOW,
+		.function	= PM_GPIO_FUNC_1,
+		.inv_int_pol	= 1,
+	};
+
+	if (gpio_start < 0 || num_gpios < 0 || num_gpios > PM8058_GPIOS)
+		return -EINVAL;
+
+	while (num_gpios--) {
+		rc = pm8058_gpio_config(gpio_start++, &kypd_drv);
+		if (rc) {
+			pr_err("%s: FAIL pm8058_gpio_config(): rc=%d.\n",
+				__func__, rc);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+static int pm8058_kp_config_sns(int gpio_start, int num_gpios)
+{
+	int	rc;
+	struct pm8058_gpio kypd_sns = {
+		.direction	= PM_GPIO_DIR_IN,
+		.pull		= PM_GPIO_PULL_UP_31P5,
+		.vin_sel	= 2,
+		.out_strength	= PM_GPIO_STRENGTH_NO,
+		.function	= PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol	= 1,
+	};
+
+	if (gpio_start < 0 || num_gpios < 0 || num_gpios > PM8058_GPIOS)
+		return -EINVAL;
+
+	while (num_gpios--) {
+		rc = pm8058_gpio_config(gpio_start++, &kypd_sns);
+		if (rc) {
+			pr_err("%s: FAIL pm8058_gpio_config(): rc=%d.\n",
+				__func__, rc);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * keypad controller should be initialized in the following sequence
  * only, otherwise it might get into FSM stuck state.
@@ -673,15 +729,15 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_kpd_init;
 	}
 
-	rc = pm8058_gpio_config_kypd_sns(pdata->cols_gpio_start,
-						 pdata->num_cols);
+	rc = pm8058_kp_config_sns(pdata->cols_gpio_start,
+			pdata->num_cols);
 	if (rc < 0) {
 		dev_err(&pdev->dev, "unable to configure keypad sense lines\n");
 		goto err_gpio_config;
 	}
 
-	rc = pm8058_gpio_config_kypd_drv(pdata->rows_gpio_start,
-						 pdata->num_rows);
+	rc = pm8058_kp_config_drv(pdata->rows_gpio_start,
+			pdata->num_rows);
 	if (rc < 0) {
 		dev_err(&pdev->dev, "unable to configure keypad drive lines\n");
 		goto err_gpio_config;
