@@ -21,6 +21,7 @@
 #include <linux/adv7520.h>
 #include "msm_fb.h"
 
+
 static struct i2c_client *hclient;
 static struct i2c_client *eclient;
 
@@ -28,7 +29,6 @@ struct msm_panel_info *pinfo;
 static bool power_on = FALSE;	/* For power on/off */
 
 static u8 reg[256];	/* HDMI panel registers */
-
 static short  *hdtv_mux ;
 
 /*
@@ -170,14 +170,10 @@ static void adv7520_read_status(void)
 /* AV7520 chip specific initialization */
 static void adv7520_enable(void)
 {
-
 	/* Initialize the variables used to read/write the ADV7520 chip. */
 	memset(&reg, 0xff, sizeof(reg));
 
-	adv7520_read_status();
-
 	/* Get the values from the "Fixed Registers That Must Be Set". */
-
 	reg[0x98] = adv7520_read_reg(hclient, 0x98);
 	reg[0x9c] = adv7520_read_reg(hclient, 0x9c);
 	reg[0x9d] = adv7520_read_reg(hclient, 0x9d);
@@ -192,43 +188,38 @@ static void adv7520_enable(void)
 	/* Get the "HDMI/DVI Selection" register. */
 	reg[0xaf] = adv7520_read_reg(hclient, 0xaf);
 
-	/* Get the i2s audio registers */
-	reg[0x01] = adv7520_read_reg(hclient, 0x01);
-	reg[0x02] = adv7520_read_reg(hclient, 0x02);
-	reg[0x03] = adv7520_read_reg(hclient, 0x03);
-	reg[0x0a] = adv7520_read_reg(hclient, 0x0a);
-	reg[0x0b] = adv7520_read_reg(hclient, 0x0b);
-	reg[0x0c] = adv7520_read_reg(hclient, 0x0c);
-
 	/* Hard coded values provided by ADV7520 data sheet. */
 	reg[0x98] = 0x03;
 	reg[0x9c] = 0x38;
-	reg[0x9d] = (reg[0x9d] & 0xfc) | 0x01;
-	reg[0xa2] = (reg[0xa2] & 0x03) | 0x94;
-	reg[0xa3] = (reg[0xa3] & 0x03) | 0x94;
+	reg[0x9d] = 0x61 ;
+	reg[0xa2] = 0x94;
+	reg[0xa3] = 0x94;
 	reg[0xde] = 0x88;
 
 	/* Set the HDMI select bit. */
-	reg[0xaf] |= 0x02;
+	reg[0xaf] |= 0x16;
 
-	/* Convert the 20-bit 'N' value to write to the ADV chip. */
-	reg[0x01] = (u8) ((ADV7520_AUDIO_CTS_20BIT_N >> 16) & 0x0f);
-	reg[0x02] = (u8) ((ADV7520_AUDIO_CTS_20BIT_N >> 8) & 0xff);
-	reg[0x03] = (u8) (ADV7520_AUDIO_CTS_20BIT_N & 0xff);
+	/* Set the audio related registers. */
+	reg[0x01] = 0x00;
+	reg[0x02] = 0x2d;
+	reg[0x03] = 0x80;
+	reg[0x0a] = 0x4d ;
+	reg[0x0b] = 0x0e ;
+	reg[0x0c] =  0x84 ;
+	reg[0x0d] =  0x10 ;
+	reg[0x12] =  0x00 ;
+	reg[0x14] =  0x00 ;
+	reg[0x15] =  0x20 ;
+	reg[0x44] =  0x79 ;
+	reg[0x73] =  0x1 ;
+	reg[0x76] =  0x00 ;
 
-	/* 0x0A[4] = 0 (I2S)            */
-	/* 0x0A[2] = 0 (MCLK inactive)  */
-	/* 0x0A[1:0] = 01 (x256 fs)     */
-	reg[0x0a] = (reg[0x0a] & 0xe8) | 0x01;
-
-	/* 0x0B[6] = 0 (MCLK polarity rising edge) */
-	reg[0x0b] = (reg[0x0b] & 0xbf);
-
-	/* 0x0C[7] = 0 (use sampling frequency from I2S stream) */
-	/* 0x0C[6] = 0 (use channel status bits from I2S stream) */
-	/* 0x0C[5:2] = 0001 (I2S0) */
-	/* 0x0C[1:0] = 00 (standard I2S mode) */
-	reg[0x0c] = 0x04;
+	/* Set 720p display related registers */
+	reg[0x16] = 0x00;
+	reg[0x18] = 0x46;
+	reg[0x55] = 0x00;
+	reg[0xba] = 0x60;
+	reg[0x3c] = 0x04;
 
 	/* Set the values from the "Fixed Registers That Must Be Set". */
 	adv7520_write_reg(hclient, 0x98, reg[0x98]);
@@ -241,7 +232,7 @@ static void adv7520_enable(void)
 	/* Set the "HDMI/DVI Selection" register. */
 	adv7520_write_reg(hclient, 0xaf, reg[0xaf]);
 
-	/* set EDID Monitor address */
+	/* Set EDID Monitor address */
 	reg[0x43] = ADV7520_EDIDI2CSLAVEADDRESS ;
 	adv7520_write_reg(hclient, 0x43, reg[0x43]);
 
@@ -252,24 +243,21 @@ static void adv7520_enable(void)
 	adv7520_write_reg(hclient, 0x0a, reg[0x0a]);
 	adv7520_write_reg(hclient, 0x0b, reg[0x0b]);
 	adv7520_write_reg(hclient, 0x0c, reg[0x0c]);
-
-       /* Settings for 720p */
-
-	reg[0x15] = 0x00;
-	reg[0x16] = 0x00;
-	reg[0x18] = 0x46;
-	reg[0x55] = 0x00;
-	reg[0xba] = 0x60;
-	reg[0x3c] = 0x04;
-
+	adv7520_write_reg(hclient, 0x0d, reg[0x0d]);
+	adv7520_write_reg(hclient, 0x12, reg[0x12]);
+	adv7520_write_reg(hclient, 0x14, reg[0x14]);
 	adv7520_write_reg(hclient, 0x15, reg[0x15]);
+	adv7520_write_reg(hclient, 0x44, reg[0x44]);
+	adv7520_write_reg(hclient, 0x73, reg[0x73]);
+	adv7520_write_reg(hclient, 0x76, reg[0x76]);
+
+       /* Enable  720p display */
 	adv7520_write_reg(hclient, 0x16, reg[0x16]);
 	adv7520_write_reg(hclient, 0x18, reg[0x18]);
 	adv7520_write_reg(hclient, 0x55, reg[0x55]);
 	adv7520_write_reg(hclient, 0xba, reg[0xba]);
 	adv7520_write_reg(hclient, 0x3c, reg[0x3c]);
 
-	adv7520_read_status();
 }
 
 static const struct i2c_device_id adv7520_id[] = {
