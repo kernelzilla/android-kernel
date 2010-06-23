@@ -3,7 +3,7 @@
  * Verificion code for aDSP VDEC packets from userspace.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -129,6 +129,8 @@ static int verify_vdec_pkt_cmd(struct msm_adsp_module *module,
 		num_addr = 3;
 		skip = 0;
 		start_pos = 6;
+		if (((frame_header_pkt[5] & 0x000c) >> 2) == 0x2) /* B-frame */
+			start_pos = 8;
 		break;
 	case 0x0001: /* wmv */
 		num_addr = 2;
