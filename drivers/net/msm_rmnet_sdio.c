@@ -39,6 +39,38 @@
 #define SDIO_MUX_HDR_CMD_OPEN    1
 #define SDIO_MUX_HDR_CMD_CLOSE   2
 
+#define DEBUG
+
+static int msm_rmnet_sdio_debug_mask;
+module_param_named(debug_mask, msm_rmnet_sdio_debug_mask,
+		   int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+#if defined(DEBUG)
+static uint32_t msm_rmnet_sdio_read_cnt;
+static uint32_t msm_rmnet_sdio_write_cnt;
+
+#define DBG(x...) do {		                \
+		if (msm_rmnet_sdio_debug_mask)	\
+			printk(KERN_DEBUG x);	\
+	} while (0)
+
+#define DBG_INC_READ_CNT(x) do {	                       \
+		msm_rmnet_sdio_read_cnt += (x);                \
+		printk(KERN_DEBUG "%s: total read bytes %u\n", \
+		       __func__, msm_rmnet_sdio_read_cnt);     \
+	} while (0)
+
+#define DBG_INC_WRITE_CNT(x)  do {	                          \
+		msm_rmnet_sdio_write_cnt += (x);                  \
+		printk(KERN_DEBUG "%s: total written bytes %u\n", \
+		       __func__, msm_rmnet_sdio_write_cnt);	  \
+	} while (0)
+#else
+#define DBG(x...) do { } while (0)
+#define DBG_INC_READ_CNT(x...) do { } while (0)
+#define DBG_INC_WRITE_CNT(x...) do { } while (0)
+#endif
+
 struct sdio_ch_info {
 	uint32_t status;
 	void (*receive_cb)(void *, struct sk_buff *);
@@ -101,7 +133,7 @@ static void sdio_mux_save_partial_pkt(struct sdio_mux_hdr *hdr,
 	/* i think we can avoid cloning here */
 	skb =  skb_clone(skb_mux, GFP_KERNEL);
 	if (!skb) {
-		pr_err("rmnet_recv() cannot clone skb\n");
+		pr_err("%s: cannot clone skb\n", __func__);
 		return;
 	}
 
@@ -110,6 +142,8 @@ static void sdio_mux_save_partial_pkt(struct sdio_mux_hdr *hdr,
 		     skb->tail - (unsigned char *)hdr);
 	sdio_partial_pkt.skb = skb;
 	sdio_partial_pkt.valid = 1;
+	DBG("%s: head %p data %p tail %p end %p len %d\n", __func__,
+	    skb->head, skb->data, skb->tail, skb->end, skb->len);
 	return;
 }
 
@@ -122,12 +156,8 @@ static void *handle_sdio_mux_data(struct sdio_mux_hdr *hdr,
 
 	/* protect? */
 	rp += sizeof(*hdr);
-	pr_info("%s: hdr %p rp %p tail %p\n", __func__, hdr, rp, skb_mux->tail);
 	if (rp < (void *)skb_mux->tail)
 		rp += (hdr->pkt_len + hdr->pad_len);
-
-	pr_info("%s: hdr %p rp %p tail %p pkt_size %d\n",
-		__func__, hdr, rp, skb_mux->tail, hdr->pkt_len + hdr->pad_len);
 
 	if (rp > (void *)skb_mux->tail) {
 		/* partial packet */
@@ -135,18 +165,18 @@ static void *handle_sdio_mux_data(struct sdio_mux_hdr *hdr,
 		goto packet_done;
 	}
 
+	DBG("%s: hdr %p next %p tail %p pkt_size %d\n",
+	    __func__, hdr, rp, skb_mux->tail, hdr->pkt_len + hdr->pad_len);
+
 	skb =  skb_clone(skb_mux, GFP_KERNEL);
 	if (!skb) {
-		pr_err("rmnet_recv() cannot clone skb\n");
+		pr_err("%s: cannot clone skb\n", __func__);
 		goto packet_done;
 	}
 
-
-	pr_info("%s: head %p data %p tail %p end %p len %d\n",
-		__func__, skb->head, skb->data, skb->tail, skb->end, skb->len);
 	skb_set_data(skb, (unsigned char *)(hdr + 1), hdr->pkt_len);
-	pr_info("%s: head %p data %p tail %p end %p len %d\n",
-		__func__, skb->head, skb->data, skb->tail, skb->end, skb->len);
+	DBG("%s: head %p data %p tail %p end %p len %d\n",
+	    __func__, skb->head, skb->data, skb->tail, skb->end, skb->len);
 
 	/* probably we should check channel status */
 	/* discard packet early if local side not open */
@@ -167,7 +197,7 @@ static void *handle_sdio_mux_command(struct sdio_mux_hdr *hdr,
 	void *rp;
 	unsigned long flags;
 
-	pr_info("%s: cmd %d\n", __func__, hdr->cmd);
+	DBG("%s: cmd %d ch %d\n", __func__, hdr->cmd, hdr->ch_id);
 	switch (hdr->cmd) {
 	case SDIO_MUX_HDR_CMD_DATA:
 		rp = handle_sdio_mux_data(hdr, skb_mux);
@@ -208,6 +238,10 @@ static void *handle_sdio_partial_pkt(struct sk_buff *skb_mux)
 		sdio_partial_pkt.valid = 0;
 		dev_kfree_skb_any(p_skb);
 
+		DBG("%s: head %p data %p tail %p end %p len %d\n", __func__,
+		    skb_mux->head, skb_mux->data, skb_mux->tail,
+		    skb_mux->end, skb_mux->len);
+
 		p_hdr = (struct sdio_mux_hdr *)skb_mux->data;
 		rp = handle_sdio_mux_command(p_hdr, skb_mux);
 	}
@@ -221,13 +255,14 @@ static void sdio_mux_read_data(struct work_struct *work)
 	int sz, rc, len = 0;
 	struct sdio_mux_hdr *hdr;
 
-	pr_info("%s: reading\n", __func__);
+	DBG("%s: reading\n", __func__);
 	/* should probably have a separate read lock */
 	mutex_lock(&sdio_mux_lock);
 	sz = sdio_read_avail(sdio_mux_ch);
-	pr_info("%s: read avail %d\n", __func__, sz);
+	DBG("%s: read avail %d\n", __func__, sz);
 	if (sz <= 0) {
-		pr_info("rmnet_recv() no or invalid data\n");
+		if (sz)
+			pr_err("%s: read avail failed %d\n", __func__, sz);
 		mutex_unlock(&sdio_mux_lock);
 		return;
 	}
@@ -237,7 +272,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 		len = sdio_partial_pkt.skb->len;
 	skb_mux = dev_alloc_skb(sz + NET_IP_ALIGN + len);
 	if (skb_mux == NULL) {
-		pr_err("rmnet_recv() cannot allocate skb\n");
+		pr_err("%s: cannot allocate skb\n", __func__);
 		mutex_unlock(&sdio_mux_lock);
 		return;
 	}
@@ -248,15 +283,20 @@ static void sdio_mux_read_data(struct work_struct *work)
 	/* half second wakelock is fine? */
 	wake_lock_timeout(&sdio_mux_ch_wakelock, HZ / 2);
 	rc = sdio_read(sdio_mux_ch, ptr, sz);
-	pr_info("%s: read %d\n", __func__, rc);
+	DBG("%s: read %d\n", __func__, rc);
 	if (rc) {
-		pr_err("%s sdio read failed %d\n", __func__, rc);
+		pr_err("%s: sdio read failed %d\n", __func__, rc);
 		dev_kfree_skb_any(skb_mux);
 		mutex_unlock(&sdio_mux_lock);
 		queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
 		return;
 	}
 	mutex_unlock(&sdio_mux_lock);
+
+	DBG_INC_READ_CNT(sz);
+	DBG("%s: head %p data %p tail %p end %p len %d\n", __func__,
+	    skb_mux->head, skb_mux->data, skb_mux->tail,
+	    skb_mux->end, skb_mux->len);
 
 	/* move to a separate function */
 	/* probably do skb_pull instead of pointer adjustment */
@@ -270,7 +310,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 		}
 
 		if (hdr->magic_num != SDIO_MUX_HDR_MAGIC_NO) {
-			pr_err("rmnet_recv() packet error\n");
+			pr_err("%s: packet error\n", __func__);
 			break;
 		}
 
@@ -278,7 +318,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 	}
 	dev_kfree_skb_any(skb_mux);
 
-	pr_info("%s: read done\n", __func__);
+	DBG("%s: read done\n", __func__);
 	queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
 }
 
@@ -288,13 +328,14 @@ static int sdio_mux_write(struct sk_buff *skb)
 
 	mutex_lock(&sdio_mux_lock);
 	sz = sdio_write_avail(sdio_mux_ch);
-	pr_info("%s: avail %d len %d\n", __func__, sz, skb->len);
+	DBG("%s: avail %d len %d\n", __func__, sz, skb->len);
 	if (skb->len <= sz) {
-		pr_info("%s: before sdio_write \n", __func__);
 		rc = sdio_write(sdio_mux_ch, skb->data, skb->len);
-		pr_info("%s: sdio_write returned %d\n", __func__, rc);
+		DBG("%s: write returned %d\n", __func__, rc);
 		if (rc)
 			rc = -EAGAIN;
+		else
+			DBG_INC_WRITE_CNT(skb->len);
 	} else
 		rc = -ENOMEM;
 
@@ -308,13 +349,14 @@ static int sdio_mux_write_cmd(void *data, uint32_t len)
 	for (;;) {
 		mutex_lock(&sdio_mux_lock);
 		avail = sdio_write_avail(sdio_mux_ch);
-		pr_info("%s: before sdio_mux_write_cmd(), avail =  %d\n",
-			__func__, avail);
+		DBG("%s: avail %d len %d\n", __func__, avail, len);
 		if (avail >= len) {
 			rc = sdio_write(sdio_mux_ch, data, len);
-			pr_info("%s: sdio_write returned = %d\n", __func__, rc);
-			if (!rc)
+			DBG("%s: write returned %d\n", __func__, rc);
+			if (!rc) {
+				DBG_INC_WRITE_CNT(len);
 				break;
+			}
 		}
 		mutex_unlock(&sdio_mux_lock);
 		msleep(250);
@@ -334,8 +376,8 @@ static void sdio_mux_write_data(struct work_struct *work)
 		if (sdio_ch_is_local_open(i) && sdio_ch[i].skb) {
 			skb = sdio_ch[i].skb;
 			spin_unlock_irqrestore(&sdio_ch[i].lock, flags);
+			DBG("%s: writing for ch %d\n", __func__, i);
 			rc = sdio_mux_write(skb);
-			pr_info("%s: write returned %d\n", __func__, rc);
 			if (rc == -EAGAIN) {
 				reschedule = 1;
 			} else if (!rc) {
@@ -362,7 +404,7 @@ int msm_rmnet_sdio_write(uint32_t id, struct sk_buff *skb)
 	if (!skb)
 		return -EINVAL;
 
-	pr_info("%s: writing ch %d\n", __func__, id);
+	DBG("%s: writing to ch %d len %d\n", __func__, id, skb->len);
 	spin_lock_irqsave(&sdio_ch[id].lock, flags);
 	if (!sdio_ch_is_local_open(id)) {
 		pr_err("%s: port not open: %d\n", __func__, sdio_ch[id].status);
@@ -375,8 +417,6 @@ int msm_rmnet_sdio_write(uint32_t id, struct sk_buff *skb)
 		rc = -EPERM;
 		goto write_done;
 	}
-
-	pr_info("%s: skb len without hdr %d\n", __func__, skb->len);
 
 	hdr = (struct sdio_mux_hdr *)skb_push(skb, sizeof(struct sdio_mux_hdr));
 
@@ -392,9 +432,9 @@ int msm_rmnet_sdio_write(uint32_t id, struct sk_buff *skb)
 
 	hdr->pad_len = skb->len - (sizeof(struct sdio_mux_hdr) + hdr->pkt_len);
 
-	pr_info("%s: data %p, tail %p skb len %d pkt len %d pad len %d\n",
-		__func__, skb->data, skb->tail, skb->len,
-		hdr->pkt_len, hdr->pad_len);
+	DBG("%s: data %p, tail %p skb len %d pkt len %d pad len %d\n",
+	    __func__, skb->data, skb->tail, skb->len,
+	    hdr->pkt_len, hdr->pad_len);
 	sdio_ch[id].skb = skb;
 	queue_work(sdio_mux_workqueue, &work_sdio_mux_write);
 
@@ -410,8 +450,7 @@ int msm_rmnet_sdio_open(uint32_t id, void *priv,
 	struct sdio_mux_hdr hdr;
 	unsigned long flags;
 
-	pr_info("%s: opening ch %d\n", __func__, id);
-
+	DBG("%s: opening ch %d\n", __func__, id);
 	if (id >= 8)
 		return -EINVAL;
 
@@ -435,8 +474,6 @@ int msm_rmnet_sdio_open(uint32_t id, void *priv,
 	hdr.pkt_len = 0;
 	hdr.pad_len = 0;
 
-	pr_info("%s: before sdio_mux_write_cmd() %d\n", __func__, id);
-
 	sdio_mux_write_cmd((void *)&hdr, sizeof(hdr));
 
 open_done:
@@ -449,6 +486,7 @@ int msm_rmnet_sdio_close(uint32_t id)
 	struct sdio_mux_hdr hdr;
 	unsigned long flags;
 
+	DBG("%s: closing ch %d\n", __func__, id);
 	spin_lock_irqsave(&sdio_ch[id].lock, flags);
 
 	if (sdio_ch[id].skb) {
@@ -469,12 +507,13 @@ int msm_rmnet_sdio_close(uint32_t id)
 
 	sdio_mux_write_cmd((void *)&hdr, sizeof(hdr));
 
+	pr_info("%s: closed ch %d\n", __func__, id);
 	return 0;
 }
 
 static void sdio_mux_notify(void *_dev, unsigned event)
 {
-	pr_info("%s notify called\n", __func__);
+	DBG("%s: event %d notified\n", __func__, event);
 
 	/* write avail may not be enouogh for a packet, but should be fine */
 	if ((event == SDIO_EVENT_DATA_WRITE_AVAIL) &&
@@ -484,7 +523,6 @@ static void sdio_mux_notify(void *_dev, unsigned event)
 	if ((event == SDIO_EVENT_DATA_READ_AVAIL) &&
 	    sdio_read_avail(sdio_mux_ch))
 		queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
-
 }
 
 static int msm_rmnet_sdio_probe(struct platform_device *pdev)
@@ -492,8 +530,7 @@ static int msm_rmnet_sdio_probe(struct platform_device *pdev)
 	int rc;
 	static int sdio_mux_initialized;
 
-	pr_info("%s probe called\n", __func__);
-
+	DBG("%s probe called\n", __func__);
 	if (sdio_mux_initialized)
 		return 0;
 
@@ -503,8 +540,8 @@ static int msm_rmnet_sdio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	rc = sdio_open("SDIO_RMNET_DATA", &sdio_mux_ch, NULL, sdio_mux_notify);
-	pr_info("%s: sido open result %d\n", __func__, rc);
 	if (rc < 0) {
+		pr_err("%s: sido open failed %d\n", __func__, rc);
 		destroy_workqueue(sdio_mux_workqueue);
 		return rc;
 	}
