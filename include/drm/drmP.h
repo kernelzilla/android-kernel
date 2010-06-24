@@ -1154,6 +1154,7 @@ extern int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma);
 extern void drm_vm_open_locked(struct vm_area_struct *vma);
 extern resource_size_t drm_core_get_map_ofs(struct drm_local_map * map);
 extern resource_size_t drm_core_get_reg_ofs(struct drm_device *dev);
+extern void drm_vm_close_locked(struct vm_area_struct *vma);
 extern unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait);
 
 				/* Memory management support (drm_memory.h) */
