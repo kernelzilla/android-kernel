@@ -714,7 +714,9 @@ static u32 ddl_decoder_output_done_callback(
 
 	if (p_decoder->codec_type.e_codec == VCD_CODEC_MPEG4 ||
 		p_decoder->codec_type.e_codec == VCD_CODEC_VC1 ||
-		p_decoder->codec_type.e_codec == VCD_CODEC_VC1_RCV){
+		p_decoder->codec_type.e_codec == VCD_CODEC_VC1_RCV ||
+		(p_decoder->codec_type.e_codec >= VCD_CODEC_DIVX_3 &&
+		 p_decoder->codec_type.e_codec <= VCD_CODEC_XVID)){
 		vidc_720p_decode_skip_frm_details(&n_free_luma_dpb);
 		if (n_free_luma_dpb)
 			p_output_vcd_frm->p_physical = (u8 *) n_free_luma_dpb;

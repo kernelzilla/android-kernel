@@ -376,4 +376,10 @@ void vcd_handle_err_in_starting(struct vcd_clnt_ctxt_type_t *p_cctxt,
 
 void vcd_handle_ind_hw_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt,
 		u32 event, u32 status);
+
+u32 vcd_return_op_buffer_to_hw
+	(struct vcd_clnt_ctxt_type_t *p_cctxt,
+	 struct vcd_frame_data_type *p_buffer,
+	 u32 *b_handled);
+
 #endif
