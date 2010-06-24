@@ -1448,7 +1448,7 @@ static void __init halibut_init(void)
 	msm_hsusb_rpc_connect();
 	msm_hsusb_set_vbus_state(1) ;
 #endif
-	msm_pm_set_platform_data(msm_pm_data);
+	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
 }
 
 static unsigned pmem_kernel_ebi1_size = PMEM_KERNEL_EBI1_SIZE;
