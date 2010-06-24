@@ -1320,7 +1320,6 @@ static struct marimba_platform_data marimba_pdata = {
 	.marimba_setup = msm_marimba_setup_power,
 	.marimba_shutdown = msm_marimba_shutdown_power,
 	.fm = &marimba_fm_pdata,
-	.tsadc = &marimba_tsadc_pdata,
 	.codec = &mariba_codec_pdata,
 };
 
@@ -4565,6 +4564,9 @@ static void __init msm7x30_init(void)
 
 	i2c_register_board_info(0, msm_i2c_board_info,
 			ARRAY_SIZE(msm_i2c_board_info));
+
+	if (machine_is_msm7x30_surf() || machine_is_msm7x30_ffa())
+		marimba_pdata.tsadc = &marimba_tsadc_pdata;
 
 	i2c_register_board_info(2, msm_marimba_board_info,
 			ARRAY_SIZE(msm_marimba_board_info));
