@@ -949,6 +949,18 @@ source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
 
+config KSAPI
+        tristate "KSAPI support (EXPERIMENTAL)"
+	depends on ARCH_MSM_SCORPION
+	default n
+	help
+	  KSAPI: Performance monitoring tool for linux.
+	  KSAPI records performance statistics for Snapdragon linux platform.
+	  It uses the /proc FS as a means to exchange configuration data and
+	  counter statistics. It can monitor the counter statistics for
+	  Scorpion processor supported hardware performace counters on a per
+	  thread basis or AXI counters on an overall system basis.
+
 endmenu
 
 menu "Kernel Features"
