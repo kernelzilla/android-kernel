@@ -99,14 +99,10 @@ void kgsl_cp_intrcallback(struct kgsl_device *device)
 
 	if (status & CP_INT_CNTL__RB_INT_MASK) {
 		/* signal intr completion event */
-		unsigned int init_reftimestamp = 0x7fffffff;
 		unsigned int enableflag = 0;
 		kgsl_sharedmem_writel(&rb->device->memstore,
 			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
 			enableflag);
-		kgsl_sharedmem_writel(&rb->device->memstore,
-			KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
-			init_reftimestamp);
 		KGSL_CMD_WARN("ringbuffer rb interrupt\n");
 	}
 
