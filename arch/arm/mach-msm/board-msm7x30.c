@@ -2034,6 +2034,7 @@ static struct msm_hsusb_platform_data msm_hsusb_pdata = {
 
 static struct msm_handset_platform_data hs_platform_data = {
 	.hs_name = "7k_handset",
+	.pwr_key_delay_ms = 500, /* 0 will disable end key */
 };
 
 static struct platform_device hs_device = {
