@@ -221,6 +221,7 @@ struct mdp_dma_data {
 #define MDP_OVERLAY0_TERM 0x20
 #define MDP_OVERLAY1_TERM 0x40
 #endif
+#define MDP_HISTOGRAM_TERM 0x80
 
 #define ACTIVE_START_X_EN BIT(31)
 #define ACTIVE_START_Y_EN BIT(31)
