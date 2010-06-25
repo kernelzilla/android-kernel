@@ -123,9 +123,15 @@ struct usb_interface_assoc_descriptor rndis_interface_assoc_desc = {
 	.bLength           = USB_DT_INTERFACE_ASSOCIATION_SIZE,
 	.bDescriptorType   = USB_DT_INTERFACE_ASSOCIATION,
 	.bInterfaceCount   = 2,
+#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
+	.bFunctionClass    = USB_CLASS_WIRELESS_CONTROLLER,
+	.bFunctionSubClass = 1,
+	.bFunctionProtocol = 3,
+#else
 	.bFunctionClass    = USB_CLASS_COMM,
 	.bFunctionSubClass = USB_CDC_SUBCLASS_ACM,
 	.bFunctionProtocol = USB_CDC_ACM_PROTO_VENDOR,
+#endif
 };
 
 static struct usb_interface_descriptor rndis_control_intf = {
@@ -135,9 +141,15 @@ static struct usb_interface_descriptor rndis_control_intf = {
 	/* .bInterfaceNumber = DYNAMIC */
 	/* status endpoint is optional; this could be patched later */
 	.bNumEndpoints =	1,
+#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
+	.bInterfaceClass =	USB_CLASS_WIRELESS_CONTROLLER,
+	.bInterfaceSubClass =   1,
+	.bInterfaceProtocol =   3,
+#else
 	.bInterfaceClass =	USB_CLASS_COMM,
 	.bInterfaceSubClass =   USB_CDC_SUBCLASS_ACM,
 	.bInterfaceProtocol =   USB_CDC_ACM_PROTO_VENDOR,
+#endif
 	/* .iInterface = DYNAMIC */
 };
 
