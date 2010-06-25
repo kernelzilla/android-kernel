@@ -1925,10 +1925,10 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 	if (rc)
 		goto err_probe_irq;
 
-	if (dd->use_rlock) {
-		msm_spi_disable_irqs(dd);
+	msm_spi_disable_irqs(dd);
+	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
-	}
+
 	mutex_unlock(&dd->core_lock);
 	locked = 0;
 
