@@ -26,6 +26,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #ifndef CONFIG_GPIOLIB
 #include "gpio_chip.h"
@@ -162,6 +163,32 @@ static int pm8058_gpio_set_direction(struct pm8058_gpio_chip *chip,
 	return rc;
 }
 
+static int pm8058_gpio_init_bank1(struct pm8058_gpio_chip *chip)
+{
+	int i, rc;
+	u8 bank;
+
+	for (i = 0; i < PM8058_GPIOS; i++) {
+		bank = 1 << PM8058_GPIO_BANK_SHIFT;
+		rc = pm8058_write(chip->pm_chip,
+				SSBI_REG_ADDR_GPIO(i),
+				&bank, 1);
+		if (rc) {
+			pr_err("%s: error setting bank\n", __func__);
+			return rc;
+		}
+
+		rc = pm8058_read(chip->pm_chip,
+				SSBI_REG_ADDR_GPIO(i),
+				&chip->bank1[i], 1);
+		if (rc) {
+			pr_err("%s: error reading bank 1\n", __func__);
+			return rc;
+		}
+	}
+	return 0;
+}
+
 #ifndef CONFIG_GPIOLIB
 static int pm8058_gpio_configure(struct gpio_chip *chip,
 				 unsigned int gpio,
@@ -251,7 +278,7 @@ static struct pm8058_gpio_chip pm8058_gpio_chip = {
 
 static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 {
-	int	rc;
+	int	rc = 0;
 	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
 
 	spin_lock_init(&pm8058_gpio_chip.pm_lock);
@@ -261,11 +288,23 @@ static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 		PM8058_GPIOS - 1;
 	pm8058_gpio_chip.pm_chip = platform_get_drvdata(pdev);
 	platform_set_drvdata(pdev, &pm8058_gpio_chip);
-	rc = register_gpio_chip(&pm8058_gpio_chip.gpio_chip);
-	if (!rc && pdata->init)
-		rc = pdata->init();
-	pr_info("%s: register_gpio_chip(): rc=%d\n", __func__, rc);
 
+	rc = register_gpio_chip(&pm8058_gpio_chip.gpio_chip);
+	if (!rc)
+		goto bail;
+
+	rc = pm8058_gpio_init_bank1(&pm8058_gpio_chip);
+	if (rc)
+		goto bail;
+
+	if (pdata->init)
+		rc = pdata->init();
+
+bail:
+	if (rc)
+		platform_set_drvdata(pdev, pm8058_gpio_chip.pm_chip);
+
+	pr_info("%s: register_gpio_chip(): rc=%d\n", __func__, rc);
 	return rc;
 }
 
@@ -321,6 +360,39 @@ static int pm8058_gpio_direction_output(struct gpio_chip *chip,
 	return ret;
 }
 
+static void pm8058_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+{
+	static const char *cmode[] = { "in", "in/out", "out", "off" };
+	struct pm8058_gpio_chip *gpio_chip = dev_get_drvdata(chip->dev);
+	u8 mode, state, bank;
+	const char *label;
+	int i, j;
+
+	for (i = 0; i < PM8058_GPIOS; i++) {
+		label = gpiochip_is_requested(chip, i);
+		mode = (gpio_chip->bank1[i] & PM8058_GPIO_MODE_MASK) >>
+			PM8058_GPIO_MODE_SHIFT;
+		state = pm8058_gpio_get(gpio_chip, i);
+		seq_printf(s, "gpio-%-3d (%-12.12s) %-10.10s"
+				" %s",
+				chip->base + i,
+				label ? label : "--",
+				cmode[mode],
+				state ? "hi" : "lo");
+		for (j = 0; j < PM8058_GPIO_BANKS; j++) {
+			bank = j << PM8058_GPIO_BANK_SHIFT;
+			pm8058_write(gpio_chip->pm_chip,
+					SSBI_REG_ADDR_GPIO(i),
+					&bank, 1);
+			pm8058_read(gpio_chip->pm_chip,
+					SSBI_REG_ADDR_GPIO(i),
+					&bank, 1);
+			seq_printf(s, " 0x%02x", bank);
+		}
+		seq_printf(s, "\n");
+	}
+}
+
 static struct pm8058_gpio_chip pm8058_gpio_chip = {
 	.gpio_chip = {
 		.label			= "pm8058-gpio",
@@ -329,6 +401,7 @@ static struct pm8058_gpio_chip pm8058_gpio_chip = {
 		.to_irq			= pm8058_gpio_to_irq,
 		.get			= pm8058_gpio_read,
 		.set			= pm8058_gpio_write,
+		.dbg_show		= pm8058_gpio_dbg_show,
 		.ngpio			= PM8058_GPIOS,
 		.can_sleep		= 1,
 	},
@@ -344,10 +417,28 @@ static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 	pm8058_gpio_chip.gpio_chip.base = pdata->gpio_base;
 	pm8058_gpio_chip.pm_chip = platform_get_drvdata(pdev);
 	platform_set_drvdata(pdev, &pm8058_gpio_chip);
+
 	ret = gpiochip_add(&pm8058_gpio_chip.gpio_chip);
-	if (!ret && pdata->init)
+	if (ret)
+		goto unset_drvdata;
+
+	ret = pm8058_gpio_init_bank1(&pm8058_gpio_chip);
+	if (ret)
+		goto remove_chip;
+
+	if (pdata->init)
 		ret = pdata->init();
+	if (!ret)
+		goto ok;
+
+remove_chip:
+	if (gpiochip_remove(&pm8058_gpio_chip.gpio_chip))
+		pr_err("%s: failed to remove gpio chip\n", __func__);
+unset_drvdata:
+	platform_set_drvdata(pdev, pm8058_gpio_chip.pm_chip);
+ok:
 	pr_info("%s: gpiochip_add(): rc=%d\n", __func__, ret);
+
 	return ret;
 }
 
