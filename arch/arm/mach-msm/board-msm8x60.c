@@ -4059,6 +4059,80 @@ void msm_snddev_rx_route_deconfig(void)
 	gpio_tlmm_config(msm_snddev_rx_gpio[0], GPIO_CFG_DISABLE);
 }
 
+#define GPIO_CLASS_D1_EN (GPIO_EXPANDER_GPIO_BASE + 0)
+#define PM8901_MPP_3 (2) /* PM8901 MPP starts from 0 */
+static void config_class_d1_gpio(int enable)
+{
+	int rc;
+
+	if (enable) {
+		rc = gpio_request(GPIO_CLASS_D1_EN, "CLASSD1_EN");
+		if (rc) {
+			pr_err("%s: spkr pamp gpio %d request"
+			"failed\n", __func__, GPIO_CLASS_D1_EN);
+			return;
+		}
+		gpio_direction_output(GPIO_CLASS_D1_EN, 1);
+		gpio_set_value(GPIO_CLASS_D1_EN, 1);
+	} else {
+		gpio_set_value(GPIO_CLASS_D1_EN, 0);
+		gpio_free(GPIO_CLASS_D1_EN);
+	}
+}
+
+static void config_class_d0_gpio(int enable)
+{
+	int rc;
+
+	if (enable) {
+		rc = pm8901_mpp_config_digital_out(PM8901_MPP_3,
+			PM8901_MPP_DIG_LEVEL_MSMIO, 1);
+
+		if (rc) {
+			pr_err("%s: CLASS_D0_EN failed\n", __func__);
+			return;
+		}
+
+		rc = gpio_request(PM8901_GPIO_PM_TO_SYS(PM8901_MPP_3),
+			"CLASSD0_EN");
+
+		if (rc) {
+			pr_err("%s: spkr pamp gpio pm8901 mpp3 request"
+			"failed\n", __func__);
+			pm8901_mpp_config_digital_out(PM8901_MPP_3,
+			PM8901_MPP_DIG_LEVEL_MSMIO, 0);
+			return;
+		}
+
+		gpio_direction_output(PM8901_GPIO_PM_TO_SYS(PM8901_MPP_3), 1);
+		gpio_set_value(PM8901_GPIO_PM_TO_SYS(PM8901_MPP_3), 1);
+
+	} else {
+		pm8901_mpp_config_digital_out(PM8901_MPP_3,
+		PM8901_MPP_DIG_LEVEL_MSMIO, 0);
+		gpio_set_value(PM8901_GPIO_PM_TO_SYS(PM8901_MPP_3), 0);
+		gpio_free(PM8901_GPIO_PM_TO_SYS(PM8901_MPP_3));
+	}
+}
+
+void msm_snddev_poweramp_on(void)
+{
+
+	pr_debug("%s: enable stereo spkr amp\n", __func__);
+	msm_snddev_rx_route_config();
+	config_class_d0_gpio(1);
+	config_class_d1_gpio(1);
+}
+
+void msm_snddev_poweramp_off(void)
+{
+
+	pr_debug("%s: disable stereo spkr amp\n", __func__);
+	msm_snddev_rx_route_deconfig();
+	config_class_d0_gpio(0);
+	config_class_d1_gpio(0);
+}
+
 static struct msm_panel_common_pdata mdp_pdata = {
 	.mdp_core_clk_rate = 200000000,
 };
