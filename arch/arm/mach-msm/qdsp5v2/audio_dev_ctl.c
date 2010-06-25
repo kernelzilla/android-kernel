@@ -850,6 +850,7 @@ sent_dec:
 			}
 		}
 		if (callback->clnt_type == AUDDEV_CLNT_ENC) {
+
 			MM_DBG("AUDDEV_CLNT_ENC\n");
 			if (evt_id == AUDDEV_EVT_FREQ_CHG) {
 				if (routing_info.enc_freq[clnt_id].evt) {
@@ -883,6 +884,7 @@ sent_enc:
 		}
 aud_cal:
 		if (callback->clnt_type == AUDDEV_CLNT_AUDIOCAL) {
+			int temp_sessions;
 			MM_DBG("AUDDEV_CLNT_AUDIOCAL\n");
 			if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
 				evt_payload->voice_state =
@@ -901,6 +903,24 @@ aud_cal:
 					dev_info->set_sample_rate ?
 					dev_info->set_sample_rate :
 					dev_info->sample_rate;
+			}
+			if (evt_payload->audcal_info.dev_type ==
+						SNDDEV_CAP_TX) {
+				if (session_id == SESSION_IGNORE)
+					temp_sessions = dev_info->sessions;
+				else
+					temp_sessions = session_id;
+				evt_payload->audcal_info.sessions =
+					(temp_sessions >>
+						((AUDDEV_CLNT_ENC-1) * 8));
+			} else {
+				if (session_id == SESSION_IGNORE)
+					temp_sessions = dev_info->sessions;
+				else
+					temp_sessions = session_id;
+				evt_payload->audcal_info.sessions =
+					(temp_sessions >>
+						((AUDDEV_CLNT_DEC-1) * 8));
 			}
 			callback->auddev_evt_listener(
 				evt_id,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -122,10 +122,5 @@ struct acdb_mbadrc_block {
 	struct mbadrc_band_config_type	band_config[5];
 	struct mbadrc_parameter		parameters;
 };
-
-struct acdb_iir_block *get_audpp_irr_block(void);
-void get_aupp_mbadrc_block(u32 *phy_addr);
-struct acdb_iir_block *get_audpreproc_irr_block(void);
-struct acdb_agc_block *get_audpreproc_agc_block(void);
 
 #endif
