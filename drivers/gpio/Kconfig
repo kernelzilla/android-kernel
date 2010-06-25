@@ -67,14 +67,6 @@ config GPIO_SYSFS
 
 comment "Memory mapped GPIO expanders:"
 
-config GPIO_MSM7200A
-	tristate "Qualcomm MSM7200A SoC GPIO support"
-	depends on GPIOLIB
-	help
-	  Say yes here to support GPIO functionality on Qualcomm's
-	  MSM chipsets which descend from the MSM7200a:
-          MSM7x01(a), MSM7x25, MSM7x27, MSM7x30, QSD8x50(a).
-
 config GPIO_PL061
 	bool "PrimeCell PL061 GPIO support"
 	depends on ARM_AMBA

@@ -133,4 +133,7 @@ obj-$(CONFIG_ARCH_MSM7X30) += spm.o
 
 obj-$(CONFIG_SMMU)		+= smmu_driver.o smmu_driver_enum.o
 obj-$(CONFIG_SMMU_8X60)		+= board-msm8x60-smmu.o
+ifdef CONFIG_GPIOLIB
+obj-$(CONFIG_MSM7200A_TLMM)	+= msm7200a-gpio.o
+endif
 obj-$(CONFIG_MSM8660_TLMM)	+= tlmm-msm8660.o msm8660-gpio.o

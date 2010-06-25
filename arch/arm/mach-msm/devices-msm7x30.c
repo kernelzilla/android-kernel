@@ -34,7 +34,7 @@
 #include <linux/mfd/pmic8058.h>
 #endif
 
-#include <linux/msm7200a-gpio.h>
+#include "msm7200a-gpio.h"
 
 static struct resource resources_uart1[] = {
 	{

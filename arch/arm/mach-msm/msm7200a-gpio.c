@@ -27,8 +27,8 @@
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/msm7200a-gpio.h>
 #include <linux/pm_runtime.h>
+#include "msm7200a-gpio.h"
 
 /*
  * The INT_STATUS register latches both edge- and level-detection events,
