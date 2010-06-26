@@ -1009,15 +1009,52 @@ int kgsl_yamato_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 	return 0;
 }
 
-static inline int _wait_timestamp(struct kgsl_device *device,
+static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
+					unsigned int timestamp)
+{
+	int status;
+	unsigned int ref_ts, enableflag;
+
+	status = kgsl_cmdstream_check_timestamp(device, timestamp);
+	if (!status) {
+		mutex_lock(&kgsl_driver.mutex);
+		kgsl_sharedmem_readl(&device->memstore, &enableflag,
+			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable));
+
+		if (enableflag) {
+			kgsl_sharedmem_readl(&device->memstore, &ref_ts,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
+			if (timestamp_cmp(ref_ts, timestamp))
+				kgsl_sharedmem_writel(&device->memstore,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
+				timestamp);
+		} else {
+			kgsl_sharedmem_writel(&device->memstore,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
+				timestamp);
+			enableflag = 1;
+			kgsl_sharedmem_writel(&device->memstore,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
+				enableflag);
+		}
+		mutex_unlock(&kgsl_driver.mutex);
+	}
+
+	return status;
+}
+
+/* MUST be called with the kgsl_driver.mutex held */
+int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 				unsigned int timestamp,
 				unsigned int msecs)
 {
 	long status;
 
+	mutex_unlock(&kgsl_driver.mutex);
 	status = wait_event_interruptible_timeout(device->ib1_wq,
-			kgsl_cmdstream_check_timestamp(device, timestamp),
+			kgsl_check_interrupt_timestamp(device, timestamp),
 			msecs_to_jiffies(msecs));
+	mutex_lock(&kgsl_driver.mutex);
 
 	if (status > 0)
 		status = 0;
@@ -1028,50 +1065,6 @@ static inline int _wait_timestamp(struct kgsl_device *device,
 		}
 	}
 
-	return (int)status;
-}
-
-/* MUST be called with the kgsl_driver.mutex held */
-int kgsl_yamato_waittimestamp(struct kgsl_device *device,
-				unsigned int timestamp,
-				unsigned int msecs)
-{
-	long status = 0;
-	uint32_t ref_ts;
-	unsigned int enableflag = 1;
-	unsigned int cmd[4];
-
-	KGSL_DRV_INFO("enter (device=%p,timestamp=%d,timeout=0x%08x)\n",
-			 device, timestamp, msecs);
-
-	if (!kgsl_cmdstream_check_timestamp(device, timestamp)) {
-		kgsl_sharedmem_readl(&device->memstore, &ref_ts,
-			KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
-		if (timestamp_cmp(ref_ts, timestamp)) {
-			kgsl_sharedmem_writel(&device->memstore,
-				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
-				timestamp);
-		}
-
-		cmd[0] = pm4_type3_packet(PM4_WAIT_FOR_IDLE, 1);
-		cmd[1] = 0x00000000;
-		cmd[2] = pm4_type3_packet(PM4_INTERRUPT, 1);
-		cmd[3] = CP_INT_CNTL__IB1_INT_MASK;
-
-		/* Need to flush tlb before submitting commands to GPU */
-		kgsl_setstate(device, device->mmu.tlb_flags);
-		kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_NO_TS_CMP,
-						cmd, 4);
-		kgsl_sharedmem_writel(&device->memstore,
-			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
-			enableflag);
-
-		mutex_unlock(&kgsl_driver.mutex);
-		status = _wait_timestamp(device, timestamp, msecs);
-		mutex_lock(&kgsl_driver.mutex);
-	}
-
-	KGSL_DRV_INFO("return %ld\n", status);
 	return (int)status;
 }
 
