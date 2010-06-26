@@ -375,8 +375,10 @@ static int msm_gpio_probe(struct platform_device *dev)
 #endif
 
 	return ret;
+#ifdef CONFIG_PM_RUNTIME
 err_post_req_irq:
 	free_irq(msm_gpio->irq_summary, msm_gpio);
+#endif
 err_post_gpiochip_add:
 	/*
 	 * Under no circumstances should a line be held on a gpiochip
