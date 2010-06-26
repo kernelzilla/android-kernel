@@ -73,6 +73,7 @@ struct rmt_storage_client_info {
 	struct wake_lock wlock;
 	atomic_t wcount;
 	struct shared_ramfs_entry *smem_info;
+	int sync_token;
 };
 
 struct rmt_storage_kevent {
@@ -98,6 +99,8 @@ static struct dentry *stats_dentry;
 
 #define RMT_STORAGE_APIPROG            0x300000A7
 
+#define RMT_STORAGE_FORCE_SYNC_PROC 7
+#define RMT_STORAGE_GET_SYNC_STATUS_PROC 8
 #define RMT_STORAGE_WRITE_FINISH_PROC 2
 #define RMT_STORAGE_REGISTER_OPEN_PROC 3
 #define RMT_STORAGE_REGISTER_WRITE_IOVEC_PROC 4
@@ -625,6 +628,78 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 	return ret;
 }
 
+struct rmt_storage_sync_recv_arg {
+	int data;
+};
+
+static int rmt_storage_receive_sync_arg(struct msm_rpc_client *client,
+				struct msm_rpc_xdr *xdr, void *data)
+{
+	struct rmt_storage_sync_recv_arg *args = data;
+
+	xdr_recv_int32(xdr, &args->data);
+	_rmc->sync_token = args->data;
+	return 0;
+}
+
+static int rmt_storage_force_sync(void)
+{
+	struct rmt_storage_sync_recv_arg args;
+	int rc;
+
+	rc = msm_rpc_client_req2(client,
+			RMT_STORAGE_FORCE_SYNC_PROC, NULL, NULL,
+			rmt_storage_receive_sync_arg, &args, -1);
+	if (rc) {
+		pr_err("%s: force sync RPC req failed: %d\n", __func__, rc);
+		return rc;
+	}
+	return 0;
+}
+
+struct rmt_storage_sync_sts_arg {
+	int token;
+};
+
+static int rmt_storage_send_sync_sts_arg(struct msm_rpc_client *client,
+				struct msm_rpc_xdr *xdr, void *data)
+{
+	struct rmt_storage_sync_sts_arg *req = data;
+
+	xdr_send_int32(xdr, &req->token);
+	return 0;
+}
+
+static int rmt_storage_receive_sync_sts_arg(struct msm_rpc_client *client,
+				struct msm_rpc_xdr *xdr, void *data)
+{
+	struct rmt_storage_sync_recv_arg *args = data;
+
+	xdr_recv_int32(xdr, &args->data);
+	return 0;
+}
+
+static int rmt_storage_get_sync_status(void)
+{
+	struct rmt_storage_sync_recv_arg recv_args;
+	struct rmt_storage_sync_sts_arg send_args;
+	int rc;
+
+	if (_rmc->sync_token < 0)
+		return -EINVAL;
+
+	send_args.token = _rmc->sync_token;
+	rc = msm_rpc_client_req2(client,
+			RMT_STORAGE_GET_SYNC_STATUS_PROC,
+			rmt_storage_send_sync_sts_arg, &send_args,
+			rmt_storage_receive_sync_sts_arg, &recv_args, -1);
+	if (rc) {
+		pr_err("%s: sync status RPC req failed: %d\n", __func__, rc);
+		return rc;
+	}
+	return recv_args.data;
+}
+
 static int rmt_storage_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct rmt_storage_client_info *rmc = _rmc;
@@ -787,6 +862,42 @@ static int rmt_storage_get_ramfs(struct rmt_storage_client_info *rmc)
 	return -ENOENT;
 }
 
+static ssize_t
+set_force_sync(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	int value, rc;
+
+	sscanf(buf, "%d", &value);
+	if (!!value) {
+		rc = rmt_storage_force_sync();
+		if (rc)
+			return rc;
+	}
+	return count;
+}
+
+/* Returns -EINVAL for invalid sync token and an error value for any failure
+ * in RPC call. Upon success, it returns a sync status of 1 (sync done)
+ * or 0 (sync still pending).
+ */
+static ssize_t
+show_sync_sts(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", rmt_storage_get_sync_status());
+}
+
+static DEVICE_ATTR(force_sync, S_IRUGO | S_IWUSR, NULL, set_force_sync);
+static DEVICE_ATTR(sync_sts, S_IRUGO | S_IWUSR, show_sync_sts, NULL);
+static struct attribute *dev_attrs[] = {
+	&dev_attr_force_sync.attr,
+	&dev_attr_sync_sts.attr,
+	NULL,
+};
+static struct attribute_group dev_attr_grp = {
+	.attrs = dev_attrs,
+};
+
 static int rmt_storage_probe(struct platform_device *pdev)
 {
 	struct rpcsvr_platform_device *dev;
@@ -885,6 +996,9 @@ static int rmt_storage_probe(struct platform_device *pdev)
 	if (!stats_dentry)
 		pr_info("%s: Failed to create stats debugfs file\n", __func__);
 #endif
+	ret = sysfs_create_group(&pdev->dev.kobj, &dev_attr_grp);
+	if (ret)
+		pr_info("%s: Failed to create sysfs node: %d\n", __func__, ret);
 	goto out;
 
 unregister_client:
