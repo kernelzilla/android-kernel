@@ -521,6 +521,8 @@ __early_param("pmem_adsp_size=", pmem_adsp_size_setup);
 
 #define MSM_FB_SIZE 0x500000;
 #define MSM_PMEM_SF_SIZE 0x1700000;
+#define MSM_PMEM_KERNEL_EBI1_SIZE 0x0
+
 #define MSM_GPU_PHYS_SIZE       SZ_2M
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
 static void __init pmem_sf_size_setup(char **p)
@@ -543,6 +545,15 @@ static void __init gpu_phys_size_setup(char **p)
 }
 __early_param("gpu_phys_size=", gpu_phys_size_setup);
 
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+static unsigned pmem_kernel_ebi1_size = MSM_PMEM_KERNEL_EBI1_SIZE;
+static void __init pmem_kernel_ebi1_size_setup(char **p)
+{
+	pmem_kernel_ebi1_size = memparse(*p, p);
+}
+__early_param("pmem_kernel_ebi1_size=", pmem_kernel_ebi1_size_setup);
+#endif
+
 static struct resource msm_fb_resources[] = {
 	{
 		.flags  = IORESOURCE_DMA,
@@ -563,11 +574,32 @@ static struct android_pmem_platform_data android_pmem_pdata = {
 	.cached = 0,
 };
 
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
+	.name = PMEM_KERNEL_EBI1_DATA_NAME,
+	/* if no allocator_type, defaults to PMEM_ALLOCATORTYPE_BITMAP,
+	* the only valid choice at this time. The board structure is
+	* set to all zeros by the C runtime initialization and that is now
+	* the enum value of PMEM_ALLOCATORTYPE_BITMAP, now forced to 0 in
+	* include/linux/android_pmem.h.
+	*/
+	.cached = 0,
+};
+#endif
+
 static struct platform_device android_pmem_device = {
 	.name = "android_pmem",
 	.id = 0,
 	.dev = {.platform_data = &android_pmem_pdata},
 };
+
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+static struct platform_device android_pmem_kernel_ebi1_device = {
+	.name = "android_pmem",
+	.id = 1,
+	.dev = { .platform_data = &android_pmem_kernel_ebi1_pdata },
+};
+#endif
 #endif
 
 #define GPIO_BACKLIGHT_PWM0 0
@@ -602,6 +634,17 @@ static void __init msm8x60_allocate_memory_regions(void)
 		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
 			"pmem arena\n", size, addr, __pa(addr));
 	}
+
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+	size = pmem_kernel_ebi1_size;
+if (size) {
+		addr = alloc_bootmem_aligned(size, 0x100000);
+		android_pmem_kernel_ebi1_pdata.start = __pa(addr);
+		android_pmem_kernel_ebi1_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for kernel"
+			" ebi1 pmem arena\n", size, addr, __pa(addr));
+	}
+#endif
 
 #endif
 
@@ -799,6 +842,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #endif
 #ifdef CONFIG_ANDROID_PMEM
 	&android_pmem_device,
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+	&android_pmem_kernel_ebi1_device,
+#endif
 #endif
 	&msm_fb_device,
 	&msm_device_kgsl,
@@ -844,6 +890,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_ANDROID_PMEM
 	&android_pmem_device,
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+	&android_pmem_kernel_ebi1_device,
+#endif
 #endif
 	&msm_fb_device,
 	&msm_device_kgsl,
