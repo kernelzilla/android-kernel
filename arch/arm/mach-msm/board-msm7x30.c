@@ -403,9 +403,6 @@ static const unsigned int surf_keymap[] = {
 	KEY(11, 7, KEY_RIGHTSHIFT),
 };
 
-/* REVISIT - this needs to be done through add_subdevice
- * API
- */
 static struct resource resources_keypad[] = {
 	{
 		.start	= PM8058_KEYPAD_IRQ(PMIC8058_IRQ_BASE),
