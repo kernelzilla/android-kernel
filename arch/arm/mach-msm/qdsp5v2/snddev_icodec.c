@@ -302,6 +302,10 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	/* Set MI2S */
 	mi2s_set_codec_output_path((icodec->data->channel_mode == 2 ?
 	MI2S_CHAN_STEREO : MI2S_CHAN_MONO_PACKED), WT_16_BIT);
+
+	if (icodec->data->voltage_on)
+		icodec->data->voltage_on();
+
 	/* Configure ADIE */
 	trc = adie_codec_open(icodec->data->profile, &icodec->adie_path);
 	if (IS_ERR_VALUE(trc))
@@ -457,6 +461,9 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	icodec->adie_path = NULL;
 
 	afe_disable(AFE_HW_PATH_CODEC_RX);
+
+	if (icodec->data->voltage_off)
+		icodec->data->voltage_off();
 
 	/* Disable LPA Sub system */
 	lpa_cmd_enable_codec(drv->lpa, 0);

@@ -896,7 +896,7 @@ void msm_snddev_poweramp_off(void)
 
 static struct vreg *snddev_vreg_ncp, *snddev_vreg_gp4;
 
-void msm_snddev_hsed_pamp_on(void)
+void msm_snddev_hsed_voltage_on(void)
 {
 	int rc;
 
@@ -921,7 +921,7 @@ void msm_snddev_hsed_pamp_on(void)
 		pr_err("%s: vreg_enable(ncp) failed (%d)\n", __func__, rc);
 }
 
-void msm_snddev_hsed_pamp_off(void)
+void msm_snddev_hsed_voltage_off(void)
 {
 	int rc;
 
