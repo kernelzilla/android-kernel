@@ -62,6 +62,8 @@
 
 #define __exception	__attribute__((section(".exception.text")))
 
+void cpu_idle_wait(void);
+
 struct thread_info;
 struct task_struct;
 
