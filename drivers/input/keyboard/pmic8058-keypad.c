@@ -28,8 +28,13 @@
 
 #include <linux/input/pmic8058-keypad.h>
 
-#define MATRIX_MIN_ROWS		5
-#define MATRIX_MIN_COLS		5
+#define PM8058_MAX_ROWS		18
+#define PM8058_MAX_COLS		8
+#define PM8058_ROW_SHIFT	3
+#define PM8058_MATRIX_MAX_SIZE	(PM8058_MAX_ROWS * PM8058_MAX_COLS)
+
+#define PM8058_MIN_ROWS		5
+#define PM8058_MIN_COLS		5
 
 #define MAX_SCAN_DELAY		128
 #define MIN_SCAN_DELAY		1
@@ -88,6 +93,7 @@
 /* Internal flags */
 #define KEYF_FIX_LAST_ROW		0x01
 
+
 /* ---------------------------------------------------------------------*/
 struct pmic8058_kp {
 	const struct pmic8058_keypad_data *pdata;
@@ -98,8 +104,8 @@ struct pmic8058_kp {
 	unsigned short *keycodes;
 
 	struct device *dev;
-	u16 keystate[MATRIX_MAX_ROWS];
-	u16 stuckstate[MATRIX_MAX_ROWS];
+	u16 keystate[PM8058_MAX_ROWS];
+	u16 stuckstate[PM8058_MAX_ROWS];
 
 	u32	flags;
 	struct pm8058_chip	*pm_chip;
@@ -220,7 +226,7 @@ static int pmic8058_kp_read_data(struct pmic8058_kp *kp, u16 *state,
 					u16 data_reg, int read_rows)
 {
 	int rc, row;
-	u8 new_data[MATRIX_MAX_ROWS];
+	u8 new_data[PM8058_MAX_ROWS];
 
 	rc = pmic8058_kp_read(kp, new_data, data_reg, read_rows);
 
@@ -247,7 +253,7 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 	};
 
 	if (kp->flags & KEYF_FIX_LAST_ROW &&
-			(kp->pdata->num_rows != MATRIX_MAX_ROWS))
+			(kp->pdata->num_rows != PM8058_MAX_ROWS))
 		read_rows = rows[kp->pdata->num_rows - KEYP_CTRL_SCAN_ROWS_MIN
 					 + 1];
 	else
@@ -294,7 +300,7 @@ static int __pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, u16 *new_state,
 					!(new_state[row] & (1 << col)) ?
 					"pressed" : "released");
 
-			code = (row << 3) + col;
+			code = MATRIX_SCAN_CODE(row, col, PM8058_ROW_SHIFT);
 			input_event(kp->input, EV_MSC, MSC_SCAN, code);
 			input_report_key(kp->input,
 					kp->keycodes[code],
@@ -333,8 +339,8 @@ static int pmic8058_detect_ghost_keys(struct pmic8058_kp *kp, u16 *new_state)
 
 static int pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, unsigned int events)
 {
-	u16 new_state[MATRIX_MAX_ROWS];
-	u16 old_state[MATRIX_MAX_ROWS];
+	u16 new_state[PM8058_MAX_ROWS];
+	u16 old_state[PM8058_MAX_ROWS];
 	int rc;
 
 	switch (events) {
@@ -376,8 +382,8 @@ static int pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, unsigned int events)
  */
 static irqreturn_t pmic8058_kp_stuck_irq(int irq, void *data)
 {
-	u16 new_state[MATRIX_MAX_ROWS];
-	u16 old_state[MATRIX_MAX_ROWS];
+	u16 new_state[PM8058_MAX_ROWS];
+	u16 old_state[PM8058_MAX_ROWS];
 	int rc;
 	struct pmic8058_kp *kp = data;
 
@@ -445,14 +451,14 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 	/* Find row bits */
 	if (kp->pdata->num_rows < KEYP_CTRL_SCAN_ROWS_MIN)
 		bits = 0;
-	else if (kp->pdata->num_rows > MATRIX_MAX_ROWS)
+	else if (kp->pdata->num_rows > PM8058_MAX_ROWS)
 		bits = KEYP_CTRL_SCAN_ROWS_BITS;
 	else
 		bits = row_bits[kp->pdata->num_rows - KEYP_CTRL_SCAN_ROWS_MIN];
 
 	/* Use max rows to fix last row problem if actual rows are less */
 	if (kp->flags & KEYF_FIX_LAST_ROW &&
-			 (kp->pdata->num_rows != MATRIX_MAX_ROWS))
+			 (kp->pdata->num_rows != PM8058_MAX_ROWS))
 		bits = row_bits[kp->pdata->num_rows - KEYP_CTRL_SCAN_ROWS_MIN
 					 + 1];
 
@@ -576,8 +582,9 @@ static int pm8058_kp_config_sns(int gpio_start, int num_gpios)
 static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 {
 	struct pmic8058_keypad_data *pdata = pdev->dev.platform_data;
+	const struct matrix_keymap_data *keymap_data;
 	struct pmic8058_kp *kp;
-	int rc, i;
+	int rc;
 	unsigned short *keycodes;
 	u8 ctrl_val;
 	struct pm8058_chip	*pm_chip;
@@ -589,11 +596,10 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 	}
 
 	if (!pdata || !pdata->num_cols || !pdata->num_rows ||
-		pdata->num_cols > MATRIX_MAX_COLS ||
-		pdata->num_rows > MATRIX_MAX_ROWS ||
-		pdata->num_cols < MATRIX_MIN_COLS ||
-		pdata->num_rows < MATRIX_MIN_ROWS ||
-		!pdata->keymap) {
+		pdata->num_cols > PM8058_MAX_COLS ||
+		pdata->num_rows > PM8058_MAX_ROWS ||
+		pdata->num_cols < PM8058_MIN_COLS ||
+		pdata->num_rows < PM8058_MIN_ROWS) {
 		dev_err(&pdev->dev, "invalid platform data\n");
 		return -EINVAL;
 	}
@@ -635,11 +641,18 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		}
 	}
 
+	keymap_data = pdata->keymap_data;
+	if (!keymap_data) {
+		dev_err(&pdev->dev, "no keymap data supplied\n");
+		return -EINVAL;
+	}
+
 	kp = kzalloc(sizeof(*kp), GFP_KERNEL);
 	if (!kp)
 		return -ENOMEM;
 
-	keycodes = kzalloc(MATRIX_MAX_SIZE * sizeof(keycodes), GFP_KERNEL);
+	keycodes = kzalloc(PM8058_MATRIX_MAX_SIZE * sizeof(*keycodes),
+				 GFP_KERNEL);
 	if (!keycodes) {
 		rc = -ENOMEM;
 		goto err_alloc_mem;
@@ -699,19 +712,11 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		__set_bit(EV_REP, kp->input->evbit);
 
 	kp->input->keycode	= keycodes;
-	kp->input->keycodemax	= MATRIX_MAX_SIZE;
+	kp->input->keycodemax	= PM8058_MATRIX_MAX_SIZE;
 	kp->input->keycodesize	= sizeof(*keycodes);
 
-	/* build keycodes for faster scanning */
-	for (i = 0; i < pdata->keymap_size; i++) {
-		unsigned int row = KEY_ROW(pdata->keymap[i]);
-		unsigned int col = KEY_COL(pdata->keymap[i]);
-		unsigned short keycode = KEY_VAL(pdata->keymap[i]);
-
-		keycodes[(row << 3) + col] = keycode;
-		__set_bit(keycode, kp->input->keybit);
-	}
-	__clear_bit(KEY_RESERVED, kp->input->keybit);
+	matrix_keypad_build_keymap(keymap_data, PM8058_ROW_SHIFT,
+					kp->input->keycode, kp->input->keybit);
 
 	input_set_capability(kp->input, EV_MSC, MSC_SCAN);
 	input_set_drvdata(kp->input, kp);
