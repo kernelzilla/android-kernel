@@ -311,8 +311,6 @@ static void bluesleep_tx_timer_expire(unsigned long data)
  */
 static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
 {
-	gpio_clear_detect_status(bsi->host_wake_irq);
-
 	/* schedule a tasklet to handle the change in the host wake line */
 	tasklet_schedule(&hostwake_task);
 	return IRQ_HANDLED;
