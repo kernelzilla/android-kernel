@@ -100,8 +100,14 @@ typedef unsigned int boolean;
 #define MSM_FB_ENABLE_DBGFS
 #define FEATURE_MDDI
 
-#if defined(CONFIG_FB_MSM_MDP40) || defined(CONFIG_FB_MSM_MDP31)
-#define MSMFB_FRAMEBUF_32
+#if defined(CONFIG_FB_MSM_DEFAULT_DEPTH_RGB565)
+#define MSMFB_DEFAULT_TYPE MDP_RGB_565
+#elif defined(CONFIG_FB_MSM_DEFAULT_DEPTH_ARGB8888)
+#define MSMFB_DEFAULT_TYPE MDP_ARGB_8888
+#elif defined(CONFIG_FB_MSM_DEFAULT_DEPTH_RGBA8888)
+#define MSMFB_DEFAULT_TYPE MDP_RGBA_8888
+#else
+#define MSMFB_DEFAULT_TYPE MDP_RGB_565
 #endif
 
 #define outp32(addr, val) writel(val, addr)
