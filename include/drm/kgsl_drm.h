@@ -1,5 +1,4 @@
-
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -42,6 +41,10 @@
 #define DRM_KGSL_GEM_BIND_GPU 0x06
 #define DRM_KGSL_GEM_UNBIND_GPU 0x07
 
+#define DRM_KGSL_GEM_GET_BUFINFO 0x08
+#define DRM_KGSL_GEM_SET_BUFCOUNT 0x09
+#define DRM_KGSL_GEM_SET_ACTIVE 0x0A
+
 #define DRM_IOCTL_KGSL_GEM_CREATE \
 DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_CREATE, struct drm_kgsl_gem_create)
 
@@ -69,10 +72,49 @@ DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_BIND_GPU, struct drm_kgsl_gem_bind_gpu)
 DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_UNBIND_GPU, \
 struct drm_kgsl_gem_bind_gpu)
 
+#define DRM_IOCTL_KGSL_GEM_GET_BUFINFO \
+DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_GET_BUFINFO, \
+	 struct drm_kgsl_gem_bufinfo)
+
+#define DRM_IOCTL_KGSL_GEM_SET_BUFCOUNT \
+DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_SET_BUFCOUNT, \
+	 struct drm_kgsl_gem_bufcount)
+
+#define DRM_IOCTL_KGSL_GEM_SET_ACTIVE \
+DRM_IOWR(DRM_COMMAND_BASE + DRM_KGSL_GEM_SET_ACTIVE, \
+	 struct drm_kgsl_gem_active)
+
+/* Maximum number of sub buffers per GEM object */
+#define DRM_KGSL_GEM_MAX_BUFFERS 2
+
+/* Memory types - these define the source and caching policies
+   of the GEM memory chunk */
+
+/* Legacy definitions left for compatability */
+
 #define DRM_KGSL_GEM_TYPE_EBI          0
 #define DRM_KGSL_GEM_TYPE_SMI          1
 #define DRM_KGSL_GEM_TYPE_KMEM         2
 #define DRM_KGSL_GEM_TYPE_KMEM_NOCACHE 3
+#define DRM_KGSL_GEM_TYPE_MEM_MASK     0xF
+
+/* Contiguous memory (PMEM) */
+#define DRM_KGSL_GEM_TYPE_PMEM       0x000100
+
+/* PMEM memory types */
+#define DRM_KGSL_GEM_PMEM_EBI        0x001000
+#define DRM_KGSL_GEM_PMEM_SMI        0x002000
+
+/* Standard paged memory */
+#define DRM_KGSL_GEM_TYPE_MEM        0x010000
+
+/* Caching controls */
+#define DRM_KGSL_GEM_CACHE_NONE      0x000000
+#define DRM_KGSL_GEM_CACHE_WCOMBINE  0x100000
+#define DRM_KGSL_GEM_CACHE_WTHROUGH  0x200000
+#define DRM_KGSL_GEM_CACHE_WBACK     0x400000
+#define DRM_KGSL_GEM_CACHE_WBACKWA   0x800000
+#define DRM_KGSL_GEM_CACHE_MASK      0xF00000
 
 struct drm_kgsl_gem_create {
 	uint32_t size;
@@ -105,6 +147,24 @@ struct drm_kgsl_gem_alloc {
 struct drm_kgsl_gem_bind_gpu {
 	uint32_t handle;
 	uint32_t gpuptr;
+};
+
+struct drm_kgsl_gem_bufinfo {
+	uint32_t handle;
+	uint32_t count;
+	uint32_t active;
+	uint32_t offset[DRM_KGSL_GEM_MAX_BUFFERS];
+	uint32_t gpuaddr[DRM_KGSL_GEM_MAX_BUFFERS];
+};
+
+struct drm_kgsl_gem_bufcount {
+	uint32_t handle;
+	uint32_t bufcount;
+};
+
+struct drm_kgsl_gem_active {
+	uint32_t handle;
+	uint32_t active;
 };
 
 #endif

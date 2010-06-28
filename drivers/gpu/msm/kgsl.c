@@ -1383,9 +1383,12 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 			kgsl_clean_cache_all(private);
 #endif
 #ifdef CONFIG_MSM_KGSL_DRM
-		kgsl_gpu_mem_flush();
+		kgsl_gpu_mem_flush(DRM_KGSL_GEM_CACHE_OP_TO_DEV);
 #endif
 		result = kgsl_ioctl_rb_issueibcmds(private, (void __user *)arg);
+#ifdef CONFIG_MSM_KGSL_DRM
+		kgsl_gpu_mem_flush(DRM_KGSL_GEM_CACHE_OP_FROM_DEV);
+#endif
 		break;
 
 	case IOCTL_KGSL_CMDSTREAM_READTIMESTAMP:
