@@ -44,7 +44,6 @@
 #include <mach/msm_serial_hs.h>
 #include <mach/msm_spi.h>
 #include <linux/spi/spi.h>
-#include <mach/s1r72v05.h>
 #include <mach/rpc_hsusb.h>
 
 #include "devices.h"
@@ -643,77 +642,6 @@ cpld_base_exit:
 	return comet_cpld_base_addr;
 }
 
-#define S1R72V05_IRQ_GPIO 99
-
-static int comet_init_s1r72v05(void)
-{
-	int rc;
-	u16 per_enable;
-	u8 irq_gpio = S1R72V05_IRQ_GPIO;
-
-	per_enable = readw(cpld_base + COMET_CPLD_PER_ENABLE);
-	per_enable |= COMET_CPLD_PER_ENABLE_HDD | COMET_CPLD_PER_ENABLE_IDE;
-	writew(per_enable,
-	       cpld_base + COMET_CPLD_PER_ENABLE);
-	cpld_info->per_reset_all_reset &= ~COMET_CPLD_PER_RESET_IDE;
-	writew(cpld_info->per_reset_all_reset,
-	       cpld_base + COMET_CPLD_PER_RESET);
-
-	rc = gpio_request(irq_gpio, "ide_s1r72v05_irq");
-	if (rc) {
-		pr_err("Failed to request GPIO pin %d (rc=%d)\n",
-		       irq_gpio, rc);
-		goto err;
-	}
-
-	if (gpio_tlmm_config(GPIO_CFG(irq_gpio,
-				      0, GPIO_INPUT, GPIO_NO_PULL,
-				      GPIO_2MA),
-			     GPIO_ENABLE)) {
-		printk(KERN_ALERT
-		       "s1r72v05: Could not configure IRQ gpio\n");
-		goto err;
-	}
-
-	if (gpio_configure(irq_gpio, IRQF_TRIGGER_FALLING)) {
-		printk(KERN_ALERT
-		       "s1r72v05: Could not set IRQ polarity\n");
-		goto err;
-	}
-	return 0;
-
-err:
-	gpio_free(irq_gpio);
-	return -ENODEV;
-}
-
-static struct resource s1r72v05_resources[] = {
-	[0] = {
-		.start = 0x70000000,
-		.end = 0x70000000 + 0xFF,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = MSM_GPIO_TO_INT(S1R72V05_IRQ_GPIO),
-		.end = S1R72V05_IRQ_GPIO,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-static struct s1r72v05_platform_data s1r72v05_data = {
-	.gpio_setup = comet_init_s1r72v05,
-};
-
-static struct platform_device s1r72v05_device = {
-	.name           = "s1r72v05",
-	.id             = 0,
-	.num_resources  = ARRAY_SIZE(s1r72v05_resources),
-	.resource       = s1r72v05_resources,
-	.dev            = {
-		.platform_data          = &s1r72v05_data,
-	},
-};
-
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
 	.wakeup_irq = MSM_GPIO_TO_INT(45),
 	.inject_rx_on_wakeup = 1,
@@ -879,7 +807,6 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_smd,
 	&msm_device_dmov,
 	&smc911x_device,
-	&s1r72v05_device,
 	&android_pmem_kernel_ebi1_device,
 	&android_pmem_device,
 	&android_pmem_adsp_device,

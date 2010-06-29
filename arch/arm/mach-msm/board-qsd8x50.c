@@ -54,7 +54,6 @@
 #include <mach/camera.h>
 #include <mach/memory.h>
 #include <mach/msm_spi.h>
-#include <mach/s1r72v05.h>
 #include <mach/msm_tsif.h>
 #include <mach/msm_battery.h>
 #include <mach/rpc_server_handset.h>
@@ -235,86 +234,6 @@ static struct platform_device smc91x_device = {
 	.id             = 0,
 	.num_resources  = ARRAY_SIZE(smc91x_resources),
 	.resource       = smc91x_resources,
-};
-
-#define S1R72V05_CS_GPIO 152
-#define S1R72V05_IRQ_GPIO 148
-
-static int qsd8x50_init_s1r72v05(void)
-{
-	int rc;
-	u8 cs_gpio = S1R72V05_CS_GPIO;
-	u8 irq_gpio = S1R72V05_IRQ_GPIO;
-
-	rc = gpio_request(cs_gpio, "ide_s1r72v05_cs");
-	if (rc) {
-		pr_err("Failed to request GPIO pin %d (rc=%d)\n",
-		       cs_gpio, rc);
-		goto err;
-	}
-
-	rc = gpio_request(irq_gpio, "ide_s1r72v05_irq");
-	if (rc) {
-		pr_err("Failed to request GPIO pin %d (rc=%d)\n",
-		       irq_gpio, rc);
-		goto err;
-	}
-	if (gpio_tlmm_config(GPIO_CFG(cs_gpio,
-				      2, GPIO_OUTPUT, GPIO_NO_PULL,
-				      GPIO_2MA),
-			     GPIO_ENABLE)) {
-		printk(KERN_ALERT
-		       "s1r72v05: Could not configure CS gpio\n");
-		goto err;
-	}
-
-	if (gpio_tlmm_config(GPIO_CFG(irq_gpio,
-				      0, GPIO_INPUT, GPIO_NO_PULL,
-				      GPIO_2MA),
-			     GPIO_ENABLE)) {
-		printk(KERN_ALERT
-		       "s1r72v05: Could not configure IRQ gpio\n");
-		goto err;
-	}
-
-	if (gpio_configure(irq_gpio, IRQF_TRIGGER_FALLING)) {
-		printk(KERN_ALERT
-		       "s1r72v05: Could not set IRQ polarity\n");
-		goto err;
-	}
-	return 0;
-
-err:
-	gpio_free(cs_gpio);
-	gpio_free(irq_gpio);
-	return -ENODEV;
-}
-
-static struct resource s1r72v05_resources[] = {
-	[0] = {
-		.start = 0x88000000,
-		.end = 0x88000000 + 0xFF,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = MSM_GPIO_TO_INT(S1R72V05_IRQ_GPIO),
-		.end = S1R72V05_IRQ_GPIO,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-static struct s1r72v05_platform_data s1r72v05_data = {
-	.gpio_setup = qsd8x50_init_s1r72v05,
-};
-
-static struct platform_device s1r72v05_device = {
-	.name           = "s1r72v05",
-	.id             = 0,
-	.num_resources  = ARRAY_SIZE(s1r72v05_resources),
-	.resource       = s1r72v05_resources,
-	.dev            = {
-		.platform_data          = &s1r72v05_data,
-	},
 };
 
 #ifdef CONFIG_USB_FUNCTION
@@ -1891,7 +1810,6 @@ static struct platform_device *devices[] __initdata = {
 	&msm_fb_device,
 	&mddi_toshiba_device,
 	&smc91x_device,
-	&s1r72v05_device,
 	&msm_device_smd,
 	&msm_device_dmov,
 	&android_pmem_kernel_ebi1_device,
