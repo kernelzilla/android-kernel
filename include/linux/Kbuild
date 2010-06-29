@@ -384,3 +384,12 @@ unifdef-y += xfrm.h
 objhdr-y += version.h
 header-y += wimax.h
 header-y += wimax/
+
+header-y += msm_mdp.h
+header-y += msm_kgsl.h
+header-y += msm_q6venc.h
+header-y += msm_q6vdec.h
+header-y += msm_audio.h
+header-y += msm_audio_aac.h
+header-y += android_pmem.h
+
