@@ -116,144 +116,89 @@
 #define NCP_UV_STEP			50000
 
 struct pm8058_vreg {
-	const char			*name;
-	u16				ctrl_addr;
-	u16				test_addr;
-	u16				test2_addr;
-	u16				clk_ctrl_addr;
-	u8				type;
-	u8				ctrl_reg;
-	u8				test_reg[REGULATOR_TEST_BANKS_MAX];
-	u8				test2_reg[REGULATOR_TEST_BANKS_MAX];
-	u8				clk_ctrl_reg;
-	u8				is_nmos;
-	struct regulator_consumer_supply rsupply;
-	struct regulator_desc		rdesc;
-	struct regulator_init_data	rdata;
-	struct regulator_dev		*rdev;
-	struct platform_device		*pdev;
+	u16			ctrl_addr;
+	u16			test_addr;
+	u16			test2_addr;
+	u16			clk_ctrl_addr;
+	u8			type;
+	u8			ctrl_reg;
+	u8			test_reg[REGULATOR_TEST_BANKS_MAX];
+	u8			test2_reg[REGULATOR_TEST_BANKS_MAX];
+	u8			clk_ctrl_reg;
+	u8			is_nmos;
+	struct regulator_dev	*rdev;
 };
 
-#define LDO(_name, _ctrl_addr, _test_addr, _is_nmos) { \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.test_addr = _test_addr, \
-	.type = REGULATOR_TYPE_LDO, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
-				REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
-			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS | \
-				REGULATOR_CHANGE_MODE, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define LDO(_id, _ctrl_addr, _test_addr, _is_nmos) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.test_addr = _test_addr, \
+		.type = REGULATOR_TYPE_LDO, \
+		.is_nmos = _is_nmos, \
+	}
 
-#define SMPS(_name, _ctrl_addr, _test2_addr, _clk_ctrl_addr) { \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.test2_addr = _test2_addr, \
-	.clk_ctrl_addr = _clk_ctrl_addr, \
-	.type = REGULATOR_TYPE_SMPS, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
-				REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
-			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS | \
-				REGULATOR_CHANGE_MODE, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define SMPS(_id, _ctrl_addr, _test2_addr, _clk_ctrl_addr) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.test2_addr = _test2_addr, \
+		.clk_ctrl_addr = _clk_ctrl_addr, \
+		.type = REGULATOR_TYPE_SMPS, \
+	}
 
-#define LVS(_name, _ctrl_addr) { \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.type = REGULATOR_TYPE_LVS, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define LVS(_id, _ctrl_addr) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.type = REGULATOR_TYPE_LVS, \
+	}
 
-#define NCP(_name, _ctrl_addr) { \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.type = REGULATOR_TYPE_NCP, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
-			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define NCP(_id, _ctrl_addr) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.type = REGULATOR_TYPE_NCP, \
+	}
 
 static struct pm8058_vreg pm8058_vreg[] = {
-	/*   name       ctrl   test   n/p */
-	LDO("8058_l0",  0x009, 0x065, 1),
-	LDO("8058_l1",  0x00A, 0x066, 1),
-	LDO("8058_l2",  0x00B, 0x067, 0),
-	LDO("8058_l3",  0x00C, 0x068, 0),
-	LDO("8058_l4",  0x00D, 0x069, 0),
-	LDO("8058_l5",  0x00E, 0x06A, 0),
-	LDO("8058_l6",  0x00F, 0x06B, 0),
-	LDO("8058_l7",  0x010, 0x06C, 0),
-	LDO("8058_l8",  0x011, 0x06D, 0),
-	LDO("8058_l9",  0x012, 0x06E, 0),
-	LDO("8058_l10", 0x013, 0x06F, 0),
-	LDO("8058_l11", 0x014, 0x070, 0),
-	LDO("8058_l12", 0x015, 0x071, 0),
-	LDO("8058_l13", 0x016, 0x072, 0),
-	LDO("8058_l14", 0x017, 0x073, 0),
-	LDO("8058_l15", 0x089, 0x0E5, 0),
-	LDO("8058_l16", 0x08A, 0x0E6, 0),
-	LDO("8058_l17", 0x08B, 0x0E7, 0),
-	LDO("8058_l18", 0x11D, 0x125, 0),
-	LDO("8058_l19", 0x11E, 0x126, 0),
-	LDO("8058_l20", 0x11F, 0x127, 0),
-	LDO("8058_l21", 0x120, 0x128, 1),
-	LDO("8058_l22", 0x121, 0x129, 1),
-	LDO("8058_l23", 0x122, 0x12A, 1),
-	LDO("8058_l24", 0x123, 0x12B, 1),
-	LDO("8058_l25", 0x124, 0x12C, 1),
+	/*  id                  ctrl   test   n/p */
+	LDO(PM8058_VREG_ID_L0,  0x009, 0x065, 1),
+	LDO(PM8058_VREG_ID_L1,  0x00A, 0x066, 1),
+	LDO(PM8058_VREG_ID_L2,  0x00B, 0x067, 0),
+	LDO(PM8058_VREG_ID_L3,  0x00C, 0x068, 0),
+	LDO(PM8058_VREG_ID_L4,  0x00D, 0x069, 0),
+	LDO(PM8058_VREG_ID_L5,  0x00E, 0x06A, 0),
+	LDO(PM8058_VREG_ID_L6,  0x00F, 0x06B, 0),
+	LDO(PM8058_VREG_ID_L7,  0x010, 0x06C, 0),
+	LDO(PM8058_VREG_ID_L8,  0x011, 0x06D, 0),
+	LDO(PM8058_VREG_ID_L9,  0x012, 0x06E, 0),
+	LDO(PM8058_VREG_ID_L10, 0x013, 0x06F, 0),
+	LDO(PM8058_VREG_ID_L11, 0x014, 0x070, 0),
+	LDO(PM8058_VREG_ID_L12, 0x015, 0x071, 0),
+	LDO(PM8058_VREG_ID_L13, 0x016, 0x072, 0),
+	LDO(PM8058_VREG_ID_L14, 0x017, 0x073, 0),
+	LDO(PM8058_VREG_ID_L15, 0x089, 0x0E5, 0),
+	LDO(PM8058_VREG_ID_L16, 0x08A, 0x0E6, 0),
+	LDO(PM8058_VREG_ID_L17, 0x08B, 0x0E7, 0),
+	LDO(PM8058_VREG_ID_L18, 0x11D, 0x125, 0),
+	LDO(PM8058_VREG_ID_L19, 0x11E, 0x126, 0),
+	LDO(PM8058_VREG_ID_L20, 0x11F, 0x127, 0),
+	LDO(PM8058_VREG_ID_L21, 0x120, 0x128, 1),
+	LDO(PM8058_VREG_ID_L22, 0x121, 0x129, 1),
+	LDO(PM8058_VREG_ID_L23, 0x122, 0x12A, 1),
+	LDO(PM8058_VREG_ID_L24, 0x123, 0x12B, 1),
+	LDO(PM8058_VREG_ID_L25, 0x124, 0x12C, 1),
 
-	/*    name      ctrl   test2  clk_ctrl */
-	SMPS("8058_s0", 0x004, 0x084, 0x1D1),
-	SMPS("8058_s1", 0x005, 0x085, 0x1D2),
-	SMPS("8058_s2", 0x110, 0x119, 0x1D3),
-	SMPS("8058_s3", 0x111, 0x11A, 0x1D4),
-	SMPS("8058_s4", 0x112, 0x11B, 0x1D5),
+	/*   id                 ctrl   test2  clk_ctrl */
+	SMPS(PM8058_VREG_ID_S0, 0x004, 0x084, 0x1D1),
+	SMPS(PM8058_VREG_ID_S1, 0x005, 0x085, 0x1D2),
+	SMPS(PM8058_VREG_ID_S2, 0x110, 0x119, 0x1D3),
+	SMPS(PM8058_VREG_ID_S3, 0x111, 0x11A, 0x1D4),
+	SMPS(PM8058_VREG_ID_S4, 0x112, 0x11B, 0x1D5),
 
-	/*   name        ctrl  */
-	LVS("8058_lvs0", 0x12D),
-	LVS("8058_lvs1", 0x12F),
+	/*   id                   ctrl  */
+	LVS(PM8058_VREG_ID_LVS0, 0x12D),
+	LVS(PM8058_VREG_ID_LVS1, 0x12F),
 
-	/*   name       ctrl */
-	NCP("8058_ncp", 0x090),
+	/*   id                  ctrl */
+	NCP(PM8058_VREG_ID_NCP, 0x090),
 };
 
 static int pm8058_vreg_write(struct pm8058_chip *chip,
@@ -725,6 +670,55 @@ static struct regulator_ops pm8058_ncp_ops = {
 	.get_voltage = pm8058_ncp_get_voltage,
 };
 
+#define VREG_DESCRIP(_id, _name, _ops) \
+	[_id] = { \
+		.id = _id, \
+		.name = _name, \
+		.ops = _ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+	}
+
+static struct regulator_desc pm8058_vreg_descrip[] = {
+	VREG_DESCRIP(PM8058_VREG_ID_L0,  "8058_l0",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L1,  "8058_l1",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L2,  "8058_l2",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L3,  "8058_l3",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L4,  "8058_l4",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L5,  "8058_l5",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L6,  "8058_l6",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L7,  "8058_l7",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L8,  "8058_l8",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L9,  "8058_l9",  &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L10, "8058_l10", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L11, "8058_l11", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L12, "8058_l12", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L13, "8058_l13", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L14, "8058_l14", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L15, "8058_l15", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L16, "8058_l16", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L17, "8058_l17", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L18, "8058_l18", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L19, "8058_l19", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L20, "8058_l20", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L21, "8058_l21", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L22, "8058_l22", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L23, "8058_l23", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L24, "8058_l24", &pm8058_ldo_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_L25, "8058_l25", &pm8058_ldo_ops),
+
+	VREG_DESCRIP(PM8058_VREG_ID_S0, "8058_s0", &pm8058_smps_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_S1, "8058_s1", &pm8058_smps_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_S2, "8058_s2", &pm8058_smps_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_S3, "8058_s3", &pm8058_smps_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_S4, "8058_s4", &pm8058_smps_ops),
+
+	VREG_DESCRIP(PM8058_VREG_ID_LVS0, "8058_lvs0", &pm8058_lvs_ops),
+	VREG_DESCRIP(PM8058_VREG_ID_LVS1, "8058_lvs1", &pm8058_lvs_ops),
+
+	VREG_DESCRIP(PM8058_VREG_ID_NCP, "8058_ncp", &pm8058_ncp_ops),
+};
+
 static int pm8058_init_regulator(struct pm8058_chip *chip,
 		struct pm8058_vreg *vreg)
 {
@@ -777,64 +771,36 @@ bail:
 	return rc;
 }
 
-static int pm8058_register_regulator(struct pm8058_chip *chip,
-		struct device *dev, int id)
-{
-	struct pm8058_vreg_pdata *pdata = dev->platform_data;
-	struct pm8058_vreg *vreg = &pm8058_vreg[id];
-	struct regulator_desc *rdesc = &vreg->rdesc;
-	struct regulator_init_data *rdata = &vreg->rdata;
-	int rc = 0;
-
-	rdesc->name = vreg->name;
-	rdesc->id = id;
-	rdesc->type = REGULATOR_VOLTAGE;
-	rdesc->owner = THIS_MODULE;
-	switch (vreg->type) {
-	case REGULATOR_TYPE_LDO:
-		rdesc->ops = &pm8058_ldo_ops;
-		break;
-	case REGULATOR_TYPE_SMPS:
-		rdesc->ops = &pm8058_smps_ops;
-		break;
-	case REGULATOR_TYPE_LVS:
-		rdesc->ops = &pm8058_lvs_ops;
-		break;
-	case REGULATOR_TYPE_NCP:
-		rdesc->ops = &pm8058_ncp_ops;
-		break;
-	}
-
-	if (pdata) {
-		rdata->constraints.min_uV = pdata->min_uV;
-		rdata->constraints.max_uV = pdata->max_uV;
-	}
-	rdata->consumer_supplies = &vreg->rsupply;
-
-	rc = pm8058_init_regulator(chip, vreg);
-	if (rc)
-		return rc;
-
-	vreg->rdev = regulator_register(rdesc, dev, rdata, vreg);
-	if (IS_ERR(vreg->rdev))
-		rc = PTR_ERR(vreg->rdev);
-
-	return rc;
-}
-
 static int __devinit pm8058_vreg_probe(struct platform_device *pdev)
 {
+	struct regulator_init_data *init_data;
+	struct regulator_desc *rdesc;
+	struct pm8058_chip *chip;
+	struct pm8058_vreg *vreg;
 	int rc = 0;
 
 	if (pdev == NULL)
 		return -EINVAL;
 
-	if (pdev->id >= 0 && pdev->id < PM8058_VREG_MAX)
-		rc = pm8058_register_regulator(platform_get_drvdata(pdev),
-				&pdev->dev, pdev->id);
-	else
-		rc = -ENODEV;
+	if (pdev->id >= 0 && pdev->id < PM8058_VREG_MAX) {
+		chip = platform_get_drvdata(pdev);
+		rdesc = &pm8058_vreg_descrip[pdev->id];
+		vreg = &pm8058_vreg[pdev->id];
+		init_data = pdev->dev.platform_data;
 
+		rc = pm8058_init_regulator(chip, vreg);
+		if (rc)
+			goto bail;
+
+		vreg->rdev = regulator_register(rdesc, &pdev->dev,
+				init_data, vreg);
+		if (IS_ERR(vreg->rdev))
+			rc = PTR_ERR(vreg->rdev);
+	} else {
+		rc = -ENODEV;
+	}
+
+bail:
 	pr_info("%s: id=%d, rc=%d\n", __func__, pdev->id, rc);
 
 	return rc;

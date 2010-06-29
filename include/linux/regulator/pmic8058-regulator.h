@@ -73,9 +73,4 @@
 
 #define PM8058_VREG_MAX		(PM8058_VREG_ID_NCP + 1)
 
-struct pm8058_vreg_pdata {
-	int min_uV;
-	int max_uV;
-};
-
 #endif
