@@ -32,6 +32,11 @@
 #include <mach/pmic.h>
 #include <linux/wakelock.h>
 #include <mach/debug_mm.h>
+#include <mach/rpc_pmapp.h>
+#include <mach/qdsp5v2/audio_acdb_def.h>
+
+#define SMPS_AUDIO_PLAYBACK_ID	"AUPB"
+#define SMPS_AUDIO_RECORD_ID	"AURC"
 
 #define SNDDEV_ICODEC_PCM_SZ 32 /* 16 bit / sample stereo mode */
 #define SNDDEV_ICODEC_MUL_FACTOR 3 /* Multi by 8 Shift by 3  */
@@ -245,12 +250,27 @@ static struct snddev_icodec_drv_state snddev_icodec_drv;
 
 static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 {
-	int trc;
+	int trc, err;
+	int smps_mode = PMAPP_SMPS_MODE_VOTE_PWM;
 	struct msm_afe_config afe_config;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	struct lpa_codec_config lpa_config;
 
 	wake_lock(&drv->rx_idlelock);
+
+	if ((icodec->data->acdb_id == ACDB_ID_HEADSET_SPKR_MONO) ||
+		(icodec->data->acdb_id == ACDB_ID_HEADSET_SPKR_STEREO)) {
+		/* Vote PMAPP_SMPS_MODE_VOTE_PFM for headset */
+		smps_mode = PMAPP_SMPS_MODE_VOTE_PFM;
+		MM_DBG("snddev_icodec_open_rx: PMAPP_SMPS_MODE_VOTE_PFM \n");
+	} else
+		MM_DBG("snddev_icodec_open_rx: PMAPP_SMPS_MODE_VOTE_PWM \n");
+
+	/* Vote for SMPS mode*/
+	err = pmapp_smps_mode_vote(SMPS_AUDIO_PLAYBACK_ID,
+				PMAPP_VREG_S4, smps_mode);
+	if (err != 0)
+		MM_ERR("pmapp_smps_mode_vote error %d\n", err);
 
 	/* enable MI2S RX master block */
 	/* enable MI2S RX bit clock */
@@ -334,11 +354,17 @@ error_invalid_freq:
 static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 {
 	int trc;
-	int i;
+	int i, err;
 	struct msm_afe_config afe_config;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;;
 
 	wake_lock(&drv->tx_idlelock);
+
+	/* Vote for PWM mode*/
+	err = pmapp_smps_mode_vote(SMPS_AUDIO_RECORD_ID,
+			PMAPP_VREG_S4, PMAPP_SMPS_MODE_VOTE_PWM);
+	if (err != 0)
+		MM_ERR("pmapp_smps_mode_vote error %d\n", err);
 
 	/* Reuse pamp_on for TX platform-specific setup  */
 	if (icodec->data->pamp_on)
@@ -410,9 +436,16 @@ error_invalid_freq:
 
 static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 {
+	int err;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
 	wake_lock(&drv->rx_idlelock);
+
+	/* Remove the vote for SMPS mode*/
+	err = pmapp_smps_mode_vote(SMPS_AUDIO_PLAYBACK_ID,
+			PMAPP_VREG_S4, PMAPP_SMPS_MODE_VOTE_DONTCARE);
+	if (err != 0)
+		MM_ERR("pmapp_smps_mode_vote error %d\n", err);
 
 	/* Disable power amplifier */
 	if (icodec->data->pamp_off)
@@ -448,9 +481,15 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 {
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
-	int i;
+	int i, err;
 
 	wake_lock(&drv->tx_idlelock);
+
+	/* Remove the vote for SMPS mode*/
+	err = pmapp_smps_mode_vote(SMPS_AUDIO_RECORD_ID,
+			PMAPP_VREG_S4, PMAPP_SMPS_MODE_VOTE_DONTCARE);
+	if (err != 0)
+		MM_ERR("pmapp_smps_mode_vote error %d\n", err);
 
 	afe_disable(AFE_HW_PATH_CODEC_TX);
 

@@ -35,6 +35,7 @@
 #include <mach/qdsp5v2/qdsp5audppmsg.h>
 #include <mach/qdsp5v2/audio_acdbi.h>
 #include <mach/qdsp5v2/acdb_commands.h>
+#include <mach/qdsp5v2/audio_acdb_def.h>
 #include <mach/debug_mm.h>
 
 /* this is the ACDB device ID */
