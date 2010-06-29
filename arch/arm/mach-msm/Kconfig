@@ -1123,10 +1123,10 @@ config SMMU_PGTABLES_L2
 	help
 	 Improves page fault latency at the expense of potential L2 pollution.
 	 Most people can probably say Y here.
-endif
 
 config MSM7200A_TLMM
        bool
 
 config MSM8660_TLMM
        bool
+endif
