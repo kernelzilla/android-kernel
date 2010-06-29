@@ -343,12 +343,12 @@ kgsl_gem_free_memory(struct drm_gem_object *obj)
 	kgsl_gem_mem_flush((void *)priv->cpuaddr, priv->size,
 		priv->type, DRM_KGSL_GEM_CACHE_OP_FROM_DEV);
 
+	kgsl_gem_unmap(obj);
+
 	if (TYPE_IS_PMEM(priv->type))
 		pmem_kfree(priv->cpuaddr);
-	else if (TYPE_IS_MEM(priv->type)) {
-		kgsl_gem_unmap(obj);
+	else if (TYPE_IS_MEM(priv->type))
 		vfree((void *) priv->cpuaddr);
-	}
 
 	priv->cpuaddr = 0;
 
@@ -611,28 +611,22 @@ kgsl_gem_unbind_gpu_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
-
+#ifdef CONFIG_MSM_KGSL_MMU
 static int
 kgsl_gem_map(struct drm_gem_object *obj)
 {
 	struct drm_kgsl_gem_object *priv = obj->driver_private;
 	int index;
 	int ret = -EINVAL;
+	int flags = KGSL_MEMFLAGS_CONPHYS;
 
-	/* At some point we will map PMEM in the GPU as well, so handle it
-	   in this function to limit the disruption on the other functions */
-
-	if (TYPE_IS_PMEM(priv->type)) {
-		for (index = 0; index < priv->bufcount; index++)
-			priv->bufs[index].gpuaddr =
-			priv->cpuaddr + priv->bufs[index].offset;
-
-		return 0;
-	}
-
-#ifdef CONFIG_MSM_KGSL_MMU
 	if (priv->flags & DRM_KGSL_GEM_FLAG_MAPPED)
 		return 0;
+
+	if (TYPE_IS_PMEM(priv->type))
+		flags = KGSL_MEMFLAGS_CONPHYS;
+	else
+		flags = KGSL_MEMFLAGS_VMALLOC_MEM;
 
 	/* Get the global page table */
 
@@ -657,7 +651,7 @@ kgsl_gem_map(struct drm_gem_object *obj)
 				   obj->size,
 				   GSL_PT_PAGE_RV | GSL_PT_PAGE_WV,
 				   &priv->bufs[index].gpuaddr,
-				   KGSL_MEMFLAGS_ALIGN4K);
+				   flags | KGSL_MEMFLAGS_ALIGN4K);
 	}
 
 	/* Add cached memory to the list to be cached */
@@ -667,10 +661,24 @@ kgsl_gem_map(struct drm_gem_object *obj)
 		list_add(&priv->list, &kgsl_mem_list);
 
 	priv->flags |= DRM_KGSL_GEM_FLAG_MAPPED;
-#endif
 
 	return ret;
 }
+#else
+static int
+kgsl_gem_map(struct drm_gem_object *obj)
+{
+	if (TYPE_IS_PMEM(priv->type)) {
+		for (index = 0; index < priv->bufcount; index++)
+			priv->bufs[index].gpuaddr =
+			priv->cpuaddr + priv->bufs[index].offset;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+#endif
 
 int
 kgsl_gem_bind_gpu_ioctl(struct drm_device *dev, void *data,
