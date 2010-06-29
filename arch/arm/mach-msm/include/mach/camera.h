@@ -182,7 +182,7 @@ struct msm_sync {
 #define MSM_APPS_ID_V4L2 "msm_v4l2"
 #define MSM_APPS_ID_PROP "msm_qct"
 
-struct msm_device {
+struct msm_cam_device {
 	struct msm_sync *sync; /* most-frequently accessed */
 	struct device *device;
 	struct cdev cdev;
@@ -193,7 +193,7 @@ struct msm_device {
 };
 
 struct msm_control_device {
-	struct msm_device *pmsm;
+	struct msm_cam_device *pmsm;
 
 	/* Used for MSM_CAM_IOCTL_CTRL_CMD_DONE responses */
 	uint8_t ctrl_data[max_control_command_size];

@@ -1667,7 +1667,7 @@ done:
 	return 0;
 }
 
-static long msm_ioctl_common(struct msm_device *pmsm,
+static long msm_ioctl_common(struct msm_cam_device *pmsm,
 		unsigned int cmd,
 		void __user *argp)
 {
@@ -1687,7 +1687,7 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 {
 	int rc = -EINVAL;
 	void __user *argp = (void __user *)arg;
-	struct msm_device *pmsm = filep->private_data;
+	struct msm_cam_device *pmsm = filep->private_data;
 
 	CDBG("%s: cmd %d\n", __func__, _IOC_NR(cmd));
 
@@ -1781,7 +1781,7 @@ static long msm_ioctl_frame(struct file *filep, unsigned int cmd,
 {
 	int rc = -EINVAL;
 	void __user *argp = (void __user *)arg;
-	struct msm_device *pmsm = filep->private_data;
+	struct msm_cam_device *pmsm = filep->private_data;
 
 
 	switch (cmd) {
@@ -1810,7 +1810,7 @@ static long msm_ioctl_control(struct file *filep, unsigned int cmd,
 	int rc = -EINVAL;
 	void __user *argp = (void __user *)arg;
 	struct msm_control_device *ctrl_pmsm = filep->private_data;
-	struct msm_device *pmsm = ctrl_pmsm->pmsm;
+	struct msm_cam_device *pmsm = ctrl_pmsm->pmsm;
 
 	switch (cmd) {
 	case MSM_CAM_IOCTL_CTRL_COMMAND:
@@ -1891,7 +1891,7 @@ static int __msm_release(struct msm_sync *sync)
 static int msm_release_config(struct inode *node, struct file *filep)
 {
 	int rc;
-	struct msm_device *pmsm = filep->private_data;
+	struct msm_cam_device *pmsm = filep->private_data;
 	CDBG("%s: %s\n", __func__, filep->f_path.dentry->d_name.name);
 	rc = __msm_release(pmsm->sync);
 	if (!rc) {
@@ -1905,7 +1905,7 @@ static int msm_release_control(struct inode *node, struct file *filep)
 {
 	int rc;
 	struct msm_control_device *ctrl_pmsm = filep->private_data;
-	struct msm_device *pmsm = ctrl_pmsm->pmsm;
+	struct msm_cam_device *pmsm = ctrl_pmsm->pmsm;
 	CDBG("%s: %s\n", __func__, filep->f_path.dentry->d_name.name);
 	g_v4l2_opencnt--;
 	rc = __msm_release(pmsm->sync);
@@ -1919,7 +1919,7 @@ static int msm_release_control(struct inode *node, struct file *filep)
 static int msm_release_frame(struct inode *node, struct file *filep)
 {
 	int rc;
-	struct msm_device *pmsm = filep->private_data;
+	struct msm_cam_device *pmsm = filep->private_data;
 	CDBG("%s: %s\n", __func__, filep->f_path.dentry->d_name.name);
 	rc = __msm_release(pmsm->sync);
 	if (!rc) {
@@ -1966,7 +1966,7 @@ static unsigned int __msm_poll_frame(struct msm_sync *sync,
 static unsigned int msm_poll_frame(struct file *filep,
 	struct poll_table_struct *pll_table)
 {
-	struct msm_device *pmsm = filep->private_data;
+	struct msm_cam_device *pmsm = filep->private_data;
 	return __msm_poll_frame(pmsm->sync, filep, pll_table);
 }
 
@@ -2217,8 +2217,8 @@ static int msm_open_common(struct inode *inode, struct file *filep,
 			   int once)
 {
 	int rc;
-	struct msm_device *pmsm =
-		container_of(inode->i_cdev, struct msm_device, cdev);
+	struct msm_cam_device *pmsm =
+		container_of(inode->i_cdev, struct msm_cam_device, cdev);
 
 	CDBG("%s: open %s\n", __func__, filep->f_path.dentry->d_name.name);
 
@@ -2345,7 +2345,7 @@ static const struct file_operations msm_fops_frame = {
 	.poll = msm_poll_frame,
 };
 
-static int msm_setup_cdev(struct msm_device *msm,
+static int msm_setup_cdev(struct msm_cam_device *msm,
 			int node,
 			dev_t devno,
 			const char *suffix,
@@ -2377,7 +2377,7 @@ static int msm_setup_cdev(struct msm_device *msm,
 	return rc;
 }
 
-static int msm_tear_down_cdev(struct msm_device *msm, dev_t devno)
+static int msm_tear_down_cdev(struct msm_cam_device *msm, dev_t devno)
 {
 	cdev_del(&msm->cdev);
 	device_destroy(msm_class, devno);
@@ -2455,7 +2455,7 @@ static int msm_sync_destroy(struct msm_sync *sync)
 	return 0;
 }
 
-static int msm_device_init(struct msm_device *pmsm,
+static int msm_device_init(struct msm_cam_device *pmsm,
 		struct msm_sync *sync,
 		int node)
 {
@@ -2505,7 +2505,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 		int (*sensor_probe)(const struct msm_camera_sensor_info *,
 			struct msm_sensor_ctrl *))
 {
-	struct msm_device *pmsm = NULL;
+	struct msm_cam_device *pmsm = NULL;
 	struct msm_sync *sync;
 	int rc = -ENODEV;
 	static int camera_node;
@@ -2535,7 +2535,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 		}
 	}
 
-	pmsm = kzalloc(sizeof(struct msm_device) * 3 +
+	pmsm = kzalloc(sizeof(struct msm_cam_device) * 3 +
 			sizeof(struct msm_sync), GFP_ATOMIC);
 	if (!pmsm)
 		return -ENOMEM;
