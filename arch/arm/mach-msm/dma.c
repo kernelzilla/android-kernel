@@ -47,8 +47,6 @@ struct msm_dmov_chan_conf {
 
 struct msm_dmov_conf {
 	void *base;
-	int ci_count;
-	struct msm_dmov_ci_conf *ci_conf;
 	struct msm_dmov_crci_conf *crci_conf;
 	struct msm_dmov_chan_conf *chan_conf;
 	int channel_active;
@@ -62,6 +60,7 @@ struct msm_dmov_conf {
 #ifdef CONFIG_ARCH_MSM8X60
 
 #define DMOV_CHANNEL_DEFAULT_CONF { .sd = 0, .block = 0, .priority = 0 }
+#define DMOV_CHANNEL_MODEM_CONF { .sd = 3, .block = 0, .priority = 0 }
 #define DMOV_CHANNEL_CONF(secd, blk, pri) \
 	{ .sd = secd, .block = blk, .priority = pri }
 
@@ -76,11 +75,11 @@ static struct msm_dmov_chan_conf adm0_chan_conf[] = {
 	DMOV_CHANNEL_DEFAULT_CONF,
 	DMOV_CHANNEL_DEFAULT_CONF,
 	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
 	DMOV_CHANNEL_DEFAULT_CONF,
 };
 
@@ -95,48 +94,12 @@ static struct msm_dmov_chan_conf adm1_chan_conf[] = {
 	DMOV_CHANNEL_DEFAULT_CONF,
 	DMOV_CHANNEL_DEFAULT_CONF,
 	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-	DMOV_CHANNEL_DEFAULT_CONF,
-};
-
-static struct msm_dmov_ci_conf adm0_ci_conf[] = {
-	{
-		.start = 0x0,
-		.end = 0xC0,
-		.burst = 8
-	}, {
-		.start = 0x40,
-		.end = 0xC0,
-		.burst = 8
-	}, {
-		.start = 0x16,
-		.end = 0x25,
-		.burst = 8
-	}
-};
-
-static struct msm_dmov_ci_conf adm1_ci_conf[] = {
-	{
-		.start = 0x00,
-		.end = 0xC0,
-		.burst = 8
-	}, {
-		.start = 0x40,
-		.end = 0xC0,
-		.burst = 8
-	}, {
-		.start = 0x2E,
-		.end = 0x40,
-		.burst = 8
-	}, {
-		.start = 0x16,
-		.end = 0x25,
-		.burst = 8
-	}
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
+	DMOV_CHANNEL_MODEM_CONF,
 };
 
 #define DMOV_CRCI_DEFAULT_CONF { .sd = 0, .blk_size = 0 }
@@ -183,16 +146,12 @@ static struct msm_dmov_crci_conf adm1_crci_conf[] = {
 static struct msm_dmov_conf dmov_conf[] = {
 	{
 		.base = MSM_DMOV_ADM0_BASE,
-		.ci_count = 3,
-		.ci_conf = adm0_ci_conf,
 		.crci_conf = adm0_crci_conf,
 		.chan_conf = adm0_chan_conf,
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
 		.irq = INT_ADM0_MASTER
 	}, {
 		.base = MSM_DMOV_ADM1_BASE,
-		.ci_count = 4,
-		.ci_conf = adm1_ci_conf,
 		.crci_conf = adm1_crci_conf,
 		.chan_conf = adm1_chan_conf,
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
@@ -203,8 +162,6 @@ static struct msm_dmov_conf dmov_conf[] = {
 static struct msm_dmov_conf dmov_conf[] = {
 	{
 		.base = MSM_DMOV_BASE,
-		.ci_count = 0,
-		.ci_conf = NULL,
 		.crci_conf = NULL,
 		.chan_conf = NULL,
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
@@ -683,36 +640,19 @@ static struct platform_driver msm_dmov_driver = {
 static void config_datamover(int adm)
 {
 #ifdef CONFIG_MSM_ADM3
-	int conf0 = 0;
-	int conf1 = 0;
 	int i;
-
-	PRINT_FLOW("Starting DMA engine %d\n", adm);
-	for (i = 0; i < dmov_conf[adm].ci_count; i++) {
-		struct msm_dmov_ci_conf *ci_conf = dmov_conf[adm].ci_conf;
-		writel(DMOV_CI_CONF_RANGE_START(ci_conf[i].start)
-		     | DMOV_CI_CONF_RANGE_END(ci_conf[i].end)
-		     | DMOV_CI_CONF_MAX_BURST(ci_conf[i].burst),
-		       DMOV_REG(DMOV_CI_CONF(i), adm));
-	}
-	for (i = 0; i < MSM_DMOV_CRCI_COUNT; i++) {
-		struct msm_dmov_crci_conf *crci_conf =
-		  dmov_conf[adm].crci_conf;
-		if (i < DMOV_CRCIS_PER_CONF)
-			conf0 |= DMOV_CRCI_CONF0_SD(i, crci_conf[i].sd);
-		else
-			conf1 |= DMOV_CRCI_CONF1_SD(i, crci_conf[i].sd);
-
-		writel(DMOV_CRCI_CTL_BLK_SZ(crci_conf[i].blk_size),
-		       DMOV_REG(DMOV_CRCI_CTL(i), adm));
-	}
-	writel(conf0, DMOV_REG(DMOV_CRCI_CONF0, adm));
-	writel(conf1, DMOV_REG(DMOV_CRCI_CONF1, adm));
 	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
 		struct msm_dmov_chan_conf *chan_conf =
 			dmov_conf[adm].chan_conf;
-		writel(DMOV_CONF_SD(chan_conf[i].sd)
-		     | DMOV_CONF_SHADOW_EN, DMOV_REG(DMOV_CONF(i), adm));
+		unsigned conf;
+		/* Only configure scorpion channels */
+		if (chan_conf[i].sd <= 1) {
+			conf = readl(DMOV_REG(DMOV_CONF(i), adm));
+			conf &= ~DMOV_CONF_SD(7);
+			conf |= DMOV_CONF_SD(chan_conf[i].sd);
+			writel(conf | DMOV_CONF_SHADOW_EN,
+			       DMOV_REG(DMOV_CONF(i), adm));
+		}
 	}
 #endif
 }
