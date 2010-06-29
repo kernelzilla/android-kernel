@@ -49,17 +49,13 @@ static void addmarker(struct kgsl_g12_z1xx *z1xx)
 
 int
 kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			unsigned int type,
-			unsigned int *drawctxt_id,
-			unsigned int flags)
+			uint32_t ctxt_id_mask,
+			unsigned int *drawctxt_id)
 {
 	int i;
 	int cmd;
 	int result;
-
-	(void)device;
-	(void)type;
-	(void)flags;
+	unsigned int ctx_id;
 
 	if (g_z1xx.numcontext == 0) {
 		for (i = 0; i < GSL_HAL_NUMCMDBUFFERS; i++) {
@@ -112,8 +108,15 @@ kgsl_g12_drawctxt_create(struct kgsl_device *device,
 		if (result != 0)
 			return result;
 	}
+	ctx_id = ffz(ctxt_id_mask);
+
 	g_z1xx.numcontext++;
-	*drawctxt_id = g_z1xx.numcontext;
+	if (g_z1xx.numcontext > KGSL_G12_CONTEXT_MAX) {
+		*drawctxt_id = 0;
+		return KGSL_FAILURE;
+
+	}
+	*drawctxt_id = ctx_id;
 
 	return KGSL_SUCCESS;
 }
@@ -122,16 +125,10 @@ int
 kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 			unsigned int drawctxt_id)
 {
-
-	(void)device;
-	(void)drawctxt_id;
+	if (drawctxt_id >= KGSL_G12_CONTEXT_MAX)
+		return KGSL_FAILURE;
 
 	g_z1xx.numcontext--;
-	if (g_z1xx.numcontext < 0) {
-		g_z1xx.numcontext = 0;
-		return KGSL_FAILURE;
-	}
-
 	if (g_z1xx.numcontext == 0) {
 		int i;
 		for (i = 0; i < GSL_HAL_NUMCMDBUFFERS; i++) {
@@ -141,5 +138,11 @@ kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 
 		memset(&g_z1xx, 0, sizeof(struct kgsl_g12_z1xx));
 	}
+
+	if (g_z1xx.numcontext < 0) {
+		g_z1xx.numcontext = 0;
+		return KGSL_FAILURE;
+	}
+
 	return KGSL_SUCCESS;
 }

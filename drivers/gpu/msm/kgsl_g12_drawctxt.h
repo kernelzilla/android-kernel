@@ -54,10 +54,7 @@ struct kgsl_device;
 #define PACKETSIZE_STATESTREAM  (ALIGN_IN_BYTES((PACKETSIZE_STATE * \
 				 sizeof(unsigned int)), 32) / \
 				 sizeof(unsigned int))
-
-struct kgsl_g12_hal_z1xxdrawctx_t {
-	unsigned int id;
-};
+#define KGSL_G12_CONTEXT_MAX 16
 
 struct kgsl_g12_z1xx {
 	unsigned int offs;
@@ -74,9 +71,8 @@ extern struct kgsl_g12_z1xx g_z1xx;
 
 int
 kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			unsigned int type,
-			unsigned int *drawctxt_id,
-			unsigned int flags);
+			uint32_t ctxt_id_mask,
+			unsigned int *drawctxt_id);
 
 int
 kgsl_g12_drawctxt_destroy(struct kgsl_device *device,

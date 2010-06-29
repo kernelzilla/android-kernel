@@ -773,9 +773,7 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_file_private *private,
 					     param.flags);
 	} else if (param.device_id == KGSL_DEVICE_G12) {
 		KGSL_G12_PRE_HWACCESS();
-		if (param.drawctxt_id >= KGSL_CONTEXT_MAX ||
-			(private->g12_ctxt_id_mask & 1 <<
-				(param.drawctxt_id - 1)) == 0) {
+		if ((private->g12_ctxt_id_mask & 1 << param.drawctxt_id) == 0) {
 
 			result = -EINVAL;
 			KGSL_DRV_ERR("invalid drawctxt drawctxt_id %d\n",
@@ -925,9 +923,8 @@ static long kgsl_ioctl_drawctxt_create(struct kgsl_file_private *private,
 	} else if (param.device_id == KGSL_DEVICE_G12) {
 		KGSL_G12_PRE_HWACCESS();
 		result = kgsl_g12_drawctxt_create(&kgsl_driver.g12_device,
-					0,
-					&param.drawctxt_id,
-					param.flags);
+					private->g12_ctxt_id_mask,
+					&param.drawctxt_id);
 		if (result != 0)
 			goto done;
 
@@ -938,7 +935,7 @@ static long kgsl_ioctl_drawctxt_create(struct kgsl_file_private *private,
 
 		/* if KGSL_CONTEXT_MAX is more than 16,
 		then linked list should be used for them */
-		private->g12_ctxt_id_mask |= 1 << (param.drawctxt_id - 1);
+		private->g12_ctxt_id_mask |= 1 << param.drawctxt_id;
 	} else {
 		result = -EINVAL;
 	}
@@ -973,9 +970,7 @@ static long kgsl_ioctl_drawctxt_destroy(struct kgsl_file_private *private,
 					~(1 << param.drawctxt_id);
 	} else if (param.device_id == KGSL_DEVICE_G12) {
 		KGSL_G12_PRE_HWACCESS();
-		if (param.drawctxt_id >= KGSL_CONTEXT_MAX
-				|| (private->g12_ctxt_id_mask & 1 <<
-				(param.drawctxt_id-1)) == 0) {
+		if ((private->g12_ctxt_id_mask & 1 << param.drawctxt_id) == 0) {
 			result = -EINVAL;
 			goto done;
 		}
@@ -984,7 +979,7 @@ static long kgsl_ioctl_drawctxt_destroy(struct kgsl_file_private *private,
 					param.drawctxt_id);
 		if (result == 0)
 			private->g12_ctxt_id_mask &= ~(1 <<
-						(param.drawctxt_id-1));
+						param.drawctxt_id);
 
 		kgsl_runpending(&kgsl_driver.g12_device);
 	} else {
