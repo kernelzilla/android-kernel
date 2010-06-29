@@ -217,7 +217,6 @@ static void msm_summary_irq_handler(unsigned int irq,
 	     i < NR_MSM_GPIOS;
 	     i = find_next_bit(enabled_irqs, NR_MSM_GPIOS, i + 1)) {
 		if (readl(GPIO_INTR_STATUS(i)) & 0x01) {
-			writel(0x01, GPIO_INTR_STATUS(i));
 			generic_handle_irq(gpio_to_irq(i));
 		}
 	}
