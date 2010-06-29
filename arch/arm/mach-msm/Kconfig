@@ -57,6 +57,7 @@ config ARCH_MSM8X60
 	select MSM8660_TLMM
 	select ARCH_HAS_CPU_IDLE_WAIT
 	select MSM_DIRECT_SCLK_ACCESS
+	select MSM_RPM
 
 endchoice
 
@@ -82,6 +83,9 @@ config  ARCH_MSM_SCORPIONMP
 
 config  MSM_VIC
 	bool
+
+config MSM_RPM
+	bool "Resource Power Manager"
 
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
