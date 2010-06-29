@@ -318,6 +318,13 @@ config PHYS_OFFSET
 	default "0x40200000" if ARCH_MSM8X60
 	default "0x10000000"
 
+config KERNEL_PMEM_EBI_REGION
+	bool "Enable in-kernel PMEM region for EBI"
+	default n
+	depends on ANDROID_PMEM && ARCH_MSM8X60
+	help
+	   Enable the in-kernel PMEM alloator to use EBI memory.
+
 config KERNEL_PMEM_SMI_REGION
 	bool "Enable in-kernel PMEM region for SMI"
 	default n
