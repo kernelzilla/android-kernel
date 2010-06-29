@@ -1114,9 +1114,6 @@ static const unsigned int ffa_keymap[] = {
 	KEY(5, 4, KEY_MENU),	  /* Center switch: MIC */
 };
 
-/* REVISIT - this needs to be done through add_subdevice
- * API
- */
 static struct resource resources_keypad[] = {
 	{
 		.start	= PM8058_KEYPAD_IRQ(PM8058_IRQ_BASE),
