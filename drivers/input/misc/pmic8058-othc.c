@@ -482,7 +482,7 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 		input_sync(dd->othc_ipd);
 	}
 
-	rc = request_irq(dd->othc_irq_ir, pm8058_nc_ir,
+	rc = request_threaded_irq(dd->othc_irq_ir, NULL, pm8058_nc_ir,
 				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 				"pm8058_othc_ir", dd);
 	if (rc < 0) {
@@ -492,7 +492,7 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 
 	if (hsed_config->othc_headset == OTHC_HEADSET_NO) {
 		/* This irq is used only for NO type headset */
-		rc = request_irq(dd->othc_irq_sw, pm8058_no_sw,
+		rc = request_threaded_irq(dd->othc_irq_sw, NULL, pm8058_no_sw,
 			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 				"pm8058_othc_sw", dd);
 		if (rc < 0) {
