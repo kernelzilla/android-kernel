@@ -725,9 +725,12 @@ static struct acdb_cache_node *get_acdb_values_from_cache_tx(
 
 static void update_acdb_data_struct(struct acdb_cache_node *cur_node)
 {
-	acdb_data.device_info = &cur_node->device_info;
-	acdb_data.virt_addr = cur_node->virt_addr_acdb_values;
-	acdb_data.phys_addr = cur_node->phys_addr_acdb_values;
+	if (cur_node) {
+		acdb_data.device_info = &cur_node->device_info;
+		acdb_data.virt_addr = cur_node->virt_addr_acdb_values;
+		acdb_data.phys_addr = cur_node->phys_addr_acdb_values;
+	} else
+		MM_ERR("error in curent node\n");
 }
 
 static void send_acdb_values_for_active_devices(void)
@@ -971,13 +974,20 @@ static void device_cb(u32 evt_id, union auddev_evt_data *evt, void *private)
 		free_acdb_cache_node(evt);
 		goto done;
 	}
-
 	audcal_info = evt->audcal_info;
 	MM_DBG("dev_id = %d\n", audcal_info.dev_id);
 	MM_DBG("sample_rate = %d\n", audcal_info.sample_rate);
 	MM_DBG("acdb_id = %d\n", audcal_info.acdb_id);
 	MM_DBG("sessions = %d\n", audcal_info.sessions);
 	MM_DBG("acdb_state = %d\n", acdb_data.acdb_state);
+	/*if session value is zero it indicates that device call back is for
+	voice call we will drop the request as acdb values for voice call is
+	not applied from acdb driver*/
+	if (!audcal_info.sessions) {
+		MM_DBG("no active sessions and call back is for"
+				" voice call\n");
+		goto done;
+	}
 	mutex_lock(&acdb_data.acdb_mutex);
 	if (acdb_data.acdb_state & CAL_DATA_READY) {
 		if ((audcal_info.dev_id ==
