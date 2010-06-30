@@ -4,6 +4,8 @@
 
 ccflags-y := -Iinclude/drm
 
+CFLAGS_REMOVE_drm_edid.o += -Werror
+
 drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
 		drm_context.o drm_dma.o drm_drawable.o \
 		drm_drv.o drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
