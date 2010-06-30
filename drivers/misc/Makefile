@@ -30,7 +30,7 @@ obj-y				+= cb710/
 obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
 obj-$(CONFIG_APANIC)		+= apanic.o
 
-obj-$(CONFIG_MSM_720P_CORE)	+= video_core/720p/
+obj-$(CONFIG_VIDC) += vidc/
 obj-$(CONFIG_TSIF) += msm_tsif.o
 msm_tsif-objs := tsif.o
 
