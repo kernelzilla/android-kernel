@@ -1649,6 +1649,32 @@ static int soc_clk_reset(unsigned id, enum clk_reset_action action)
 	return ret;
 }
 
+static struct clk_freq_tbl *find_freq(struct clk_freq_tbl *freq_tbl,
+				      unsigned rate, enum match_types match)
+{
+	struct clk_freq_tbl *nf;
+
+	/* Find new frequency based on match rule. */
+	switch (match) {
+	case MATCH_MIN:
+		for (nf = freq_tbl; nf->freq_hz != FREQ_END; nf++)
+			if (nf->freq_hz >= rate)
+				break;
+		break;
+	default:
+	case MATCH_EXACT:
+		for (nf = freq_tbl; nf->freq_hz != FREQ_END; nf++)
+			if (nf->freq_hz == rate)
+				break;
+		break;
+	}
+
+	if (nf->freq_hz == FREQ_END)
+		return ERR_PTR(-EINVAL);
+
+	return nf;
+}
+
 static int _soc_clk_set_rate(unsigned id, unsigned rate, enum match_types match)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
@@ -1656,37 +1682,23 @@ static int _soc_clk_set_rate(unsigned id, unsigned rate, enum match_types match)
 	struct clk_freq_tbl *nf;
 	uint32_t *chld = clk->children;
 	uint32_t reg_val = 0;
-	int i, ret = 0;
+	int i;
 	unsigned long flags;
 
 	if (clk->type == NORATE || clk->type == RESET)
 		return -EPERM;
 
+	/* Find new frequency. */
+	nf = find_freq(clk->freq_tbl, rate, match);
+	if (IS_ERR(nf))
+		return PTR_ERR(nf);
+
 	spin_lock_irqsave(&clock_reg_lock, flags);
+
+	/* Check if frequency is actually changed. */
 	cf = clk->current_freq;
-
-	if (rate == cf->freq_hz)
+	if (nf == cf)
 		goto release_lock;
-
-	/* Find new frequency based on match rule. */
-	switch (match) {
-	case MATCH_MIN:
-		for (nf = clk->freq_tbl; nf->freq_hz != FREQ_END; nf++)
-			if (nf->freq_hz >= rate)
-				break;
-		break;
-	default:
-	case MATCH_EXACT:
-		for (nf = clk->freq_tbl; nf->freq_hz != FREQ_END; nf++)
-			if (nf->freq_hz == rate)
-				break;
-		break;
-	}
-
-	if (nf->freq_hz == FREQ_END) {
-		ret = -EINVAL;
-		goto release_lock;
-	}
 
 	/* Disable clocks if clock is not glitch-free banked. */
 	if (clk->banked_mnd_masks == NULL) {
@@ -1741,7 +1753,7 @@ static int _soc_clk_set_rate(unsigned id, unsigned rate, enum match_types match)
 
 release_lock:
 	spin_unlock_irqrestore(&clock_reg_lock, flags);
-	return ret;
+	return 0;
 }
 
 static int soc_clk_set_rate(unsigned id, unsigned rate)
