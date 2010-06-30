@@ -1733,27 +1733,89 @@ static struct pm8901_gpio_platform_data pm8901_mpp_data = {
 	.irq_base	= PM8901_MPP_IRQ(PM8901_IRQ_BASE, 0),
 };
 
+static struct regulator_consumer_supply pm8901_vreg_supply[PM8901_VREG_MAX] = {
+	[PM8901_VREG_ID_L0]  = REGULATOR_SUPPLY("8901_l0",  NULL),
+	[PM8901_VREG_ID_L1]  = REGULATOR_SUPPLY("8901_l1",  NULL),
+	[PM8901_VREG_ID_L2]  = REGULATOR_SUPPLY("8901_l2",  NULL),
+	[PM8901_VREG_ID_L3]  = REGULATOR_SUPPLY("8901_l3",  NULL),
+	[PM8901_VREG_ID_L4]  = REGULATOR_SUPPLY("8901_l4",  NULL),
+	[PM8901_VREG_ID_L5]  = REGULATOR_SUPPLY("8901_l5",  NULL),
+	[PM8901_VREG_ID_L6]  = REGULATOR_SUPPLY("8901_l6",  NULL),
+
+	[PM8901_VREG_ID_S0] = REGULATOR_SUPPLY("8901_s0", NULL),
+	[PM8901_VREG_ID_S1] = REGULATOR_SUPPLY("8901_s1", NULL),
+	[PM8901_VREG_ID_S3] = REGULATOR_SUPPLY("8901_s3", NULL),
+	[PM8901_VREG_ID_S4] = REGULATOR_SUPPLY("8901_s4", NULL),
+
+	[PM8901_VREG_ID_LVS0]     = REGULATOR_SUPPLY("8901_lvs0",     NULL),
+	[PM8901_VREG_ID_LVS1]     = REGULATOR_SUPPLY("8901_lvs1",     NULL),
+	[PM8901_VREG_ID_LVS2]     = REGULATOR_SUPPLY("8901_lvs2",     NULL),
+	[PM8901_VREG_ID_LVS3]     = REGULATOR_SUPPLY("8901_lvs3",     NULL),
+	[PM8901_VREG_ID_MVS0]     = REGULATOR_SUPPLY("8901_mvs0",     NULL),
+	[PM8901_VREG_ID_USB_OTG]  = REGULATOR_SUPPLY("8901_usb_otg",  NULL),
+	[PM8901_VREG_ID_HDMI_MVS] = REGULATOR_SUPPLY("8901_hdmi_mvs", NULL),
+};
+
+#define PM8901_VREG_INIT(_id, _min_uV, _max_uV, \
+		_modes, _ops, _apply_uV, _init) \
+	[_id] = { \
+		.constraints = { \
+			.valid_modes_mask = _modes, \
+			.valid_ops_mask = _ops, \
+			.min_uV = _min_uV, \
+			.max_uV = _max_uV, \
+			.apply_uV = _apply_uV, \
+		}, \
+		.num_consumer_supplies = 1, \
+		.consumer_supplies = &pm8901_vreg_supply[_id], \
+		.regulator_init = _init, \
+	}
+
+#define PM8901_VREG_INIT_LDO(_id, _min_uV, _max_uV) \
+	PM8901_VREG_INIT(_id, _min_uV, _max_uV, REGULATOR_MODE_NORMAL | \
+			REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
+			REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_STATUS | \
+			REGULATOR_CHANGE_MODE, 1, NULL)
+
+#define PM8901_VREG_INIT_SMPS(_id, _min_uV, _max_uV) \
+	PM8901_VREG_INIT(_id, _min_uV, _max_uV, REGULATOR_MODE_NORMAL | \
+			REGULATOR_MODE_IDLE | REGULATOR_MODE_STANDBY, \
+			REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_STATUS | \
+			REGULATOR_CHANGE_MODE, 1, NULL)
+
+#define PM8901_VREG_INIT_VS(_id, _init) \
+	PM8901_VREG_INIT(_id, 0, 0, REGULATOR_MODE_NORMAL, \
+			REGULATOR_CHANGE_STATUS, 0, _init)
+
+static struct regulator_init_data pm8901_vreg_init[PM8901_VREG_MAX] = {
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L0, 1200000, 1200000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L1, 3300000, 3300000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L2, 3300000, 3300000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L3, 3300000, 3300000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L4, 2600000, 2600000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L5, 2850000, 2850000),
+	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L6, 2200000, 2200000),
+
+	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S0, 1100000, 1100000),
+	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S1, 1100000, 1100000),
+	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S3, 1100000, 1100000),
+	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S4, 1100000, 1100000),
+
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_LVS0,     NULL),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_LVS1,     NULL),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_LVS2,     NULL),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_LVS3,     NULL),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_MVS0,     NULL),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_USB_OTG,  pm8901_mpp0_init),
+	PM8901_VREG_INIT_VS(PM8901_VREG_ID_HDMI_MVS, NULL),
+};
+
 #define PM8901_VREG(_id) { \
 	.name = "pm8901-regulator", \
 	.id = _id, \
-	.platform_data = &pm8901_vreg_pdata[_id], \
-	.data_size = sizeof(pm8901_vreg_pdata[_id]), \
+	.platform_data = &pm8901_vreg_init[_id], \
+	.data_size = sizeof(pm8901_vreg_init[_id]), \
 }
-
-static struct pm8901_vreg_pdata pm8901_vreg_pdata[PM8901_VREG_MAX] = {
-	[PM8901_VREG_ID_L0]      = {1200000, 1200000, NULL,             NULL},
-	[PM8901_VREG_ID_L1]      = {3300000, 3300000, NULL,             NULL},
-	[PM8901_VREG_ID_L2]      = {3300000, 3300000, NULL,             NULL},
-	[PM8901_VREG_ID_L3]      = {3300000, 3300000, NULL,             NULL},
-	[PM8901_VREG_ID_L4]      = {2600000, 2600000, NULL,             NULL},
-	[PM8901_VREG_ID_L5]      = {2850000, 2850000, NULL,             NULL},
-	[PM8901_VREG_ID_L6]      = {2200000, 2200000, NULL,             NULL},
-	[PM8901_VREG_ID_S0]      = {1100000, 1100000, NULL,             NULL},
-	[PM8901_VREG_ID_S1]      = {1100000, 1100000, NULL,             NULL},
-	[PM8901_VREG_ID_S3]      = {1100000, 1100000, NULL,             NULL},
-	[PM8901_VREG_ID_S4]      = {1300000, 1300000, NULL,             NULL},
-	[PM8901_VREG_ID_USB_OTG] = {1300000, 1300000, pm8901_mpp0_init, NULL},
-};
 
 static struct mfd_cell pm8901_subdevs[] = {
 	{	.name = "pm8901-mpp",

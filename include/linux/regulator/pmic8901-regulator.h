@@ -62,11 +62,4 @@
 
 #define PM8901_VREG_MAX		(PM8901_VREG_ID_HDMI_MVS + 1)
 
-struct pm8901_vreg_pdata {
-	int min_uV;
-	int max_uV;
-	int (*init)(void *data);
-	void *init_data;
-};
-
 #endif

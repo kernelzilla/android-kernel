@@ -103,110 +103,65 @@
 #define VS_CTRL_ENABLE			0xC0
 
 struct pm8901_vreg {
-	const char			*name;
-	u16				ctrl_addr;
-	u16				pmr_addr;
-	u16				test_addr;
-	u8				type;
-	u8				ctrl_reg;
-	u8				pmr_reg;
-	u8				test_reg[LDO_TEST_BANKS];
-	u8				is_nmos;
-	struct regulator_consumer_supply rsupply;
-	struct regulator_desc		rdesc;
-	struct regulator_init_data	rdata;
-	struct regulator_dev		*rdev;
-	struct platform_device		*pdev;
+	u16			ctrl_addr;
+	u16			pmr_addr;
+	u16			test_addr;
+	u8			type;
+	u8			ctrl_reg;
+	u8			pmr_reg;
+	u8			test_reg[LDO_TEST_BANKS];
+	u8			is_nmos;
+	struct regulator_dev	*rdev;
 };
 
-#define LDO(_name, _ctrl_addr, _pmr_addr, _test_addr, _is_nmos) { \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.pmr_addr = _pmr_addr, \
-	.test_addr = _test_addr, \
-	.type = REGULATOR_TYPE_LDO, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
-				REGULATOR_MODE_STANDBY, \
-			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS | \
-				REGULATOR_CHANGE_MODE, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define LDO(_id, _ctrl_addr, _pmr_addr, _test_addr, _is_nmos) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.pmr_addr = _pmr_addr, \
+		.test_addr = _test_addr, \
+		.type = REGULATOR_TYPE_LDO, \
+		.is_nmos = _is_nmos, \
+	}
 
-#define SMPS(_name, _ctrl_addr, _pmr_addr) \
-{ \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.pmr_addr = _pmr_addr, \
-	.type = REGULATOR_TYPE_SMPS, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL | \
-				REGULATOR_MODE_STANDBY, \
-			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | \
-				REGULATOR_CHANGE_STATUS | \
-				REGULATOR_CHANGE_MODE, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define SMPS(_id, _ctrl_addr, _pmr_addr) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.pmr_addr = _pmr_addr, \
+		.type = REGULATOR_TYPE_SMPS, \
+	}
 
-#define VS(_name, _ctrl_addr, _pmr_addr) \
-{ \
-	.name = _name, \
-	.ctrl_addr = _ctrl_addr, \
-	.pmr_addr = _pmr_addr, \
-	.type = REGULATOR_TYPE_VS, \
-	.rsupply = { \
-		.supply = _name, \
-	}, \
-	.rdata = { \
-		.constraints = { \
-			.name = _name, \
-			.valid_modes_mask = REGULATOR_MODE_NORMAL, \
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS, \
-		}, \
-		.num_consumer_supplies = 1, \
-	}, \
-}
+#define VS(_id, _ctrl_addr, _pmr_addr) \
+	[_id] = { \
+		.ctrl_addr = _ctrl_addr, \
+		.pmr_addr = _pmr_addr, \
+		.type = REGULATOR_TYPE_VS, \
+	}
 
 static struct pm8901_vreg pm8901_vreg[] = {
-	/*  name       ctrl   pmr    tst    n/p */
-	LDO("8901_l0", 0x02F, 0x0AB, 0x030, 1),
-	LDO("8901_l1", 0x031, 0x0AC, 0x032, 0),
-	LDO("8901_l2", 0x033, 0x0AD, 0x034, 0),
-	LDO("8901_l3", 0x035, 0x0AE, 0x036, 0),
-	LDO("8901_l4", 0x037, 0x0AF, 0x038, 0),
-	LDO("8901_l5", 0x039, 0x0B0, 0x03A, 0),
-	LDO("8901_l6", 0x03B, 0x0B1, 0x03C, 0),
+	/*  id                 ctrl   pmr    tst    n/p */
+	LDO(PM8901_VREG_ID_L0, 0x02F, 0x0AB, 0x030, 1),
+	LDO(PM8901_VREG_ID_L1, 0x031, 0x0AC, 0x032, 0),
+	LDO(PM8901_VREG_ID_L2, 0x033, 0x0AD, 0x034, 0),
+	LDO(PM8901_VREG_ID_L3, 0x035, 0x0AE, 0x036, 0),
+	LDO(PM8901_VREG_ID_L4, 0x037, 0x0AF, 0x038, 0),
+	LDO(PM8901_VREG_ID_L5, 0x039, 0x0B0, 0x03A, 0),
+	LDO(PM8901_VREG_ID_L6, 0x03B, 0x0B1, 0x03C, 0),
 
-	/*   name       ctrl   pmr */
-	SMPS("8901_s0", 0x05B, 0x0A6),
-	SMPS("8901_s1", 0x06A, 0x0A7),
-	SMPS("8901_s2", 0x079, 0x0A8),
-	SMPS("8901_s3", 0x088, 0x0A9),
-	SMPS("8901_s4", 0x097, 0x0AA),
+	/*   id                 ctrl   pmr */
+	SMPS(PM8901_VREG_ID_S0, 0x05B, 0x0A6),
+	SMPS(PM8901_VREG_ID_S1, 0x06A, 0x0A7),
+	SMPS(PM8901_VREG_ID_S2, 0x079, 0x0A8),
+	SMPS(PM8901_VREG_ID_S3, 0x088, 0x0A9),
+	SMPS(PM8901_VREG_ID_S4, 0x097, 0x0AA),
 
-	/*  name            ctrl   pmr */
-	VS("8901_lvs0",     0x046, 0x0B2),
-	VS("8901_lvs1",     0x048, 0x0B3),
-	VS("8901_lvs2",     0x04A, 0x0B4),
-	VS("8901_lvs3",     0x04C, 0x0B5),
-	VS("8901_mvs0",     0x052, 0x0B6),
-	VS("8901_usb_otg",  0x055, 0x0B7),
-	VS("8901_hdmi_mvs", 0x058, 0x0B8),
+	/* id                       ctrl   pmr */
+	VS(PM8901_VREG_ID_LVS0,     0x046, 0x0B2),
+	VS(PM8901_VREG_ID_LVS1,     0x048, 0x0B3),
+	VS(PM8901_VREG_ID_LVS2,     0x04A, 0x0B4),
+	VS(PM8901_VREG_ID_LVS3,     0x04C, 0x0B5),
+	VS(PM8901_VREG_ID_MVS0,     0x052, 0x0B6),
+	VS(PM8901_VREG_ID_USB_OTG,  0x055, 0x0B7),
+	VS(PM8901_VREG_ID_HDMI_MVS, 0x058, 0x0B8),
 };
 
 static int pm8901_vreg_write(struct pm8901_chip *chip,
@@ -556,6 +511,39 @@ static struct regulator_ops pm8901_vs_ops = {
 	.is_enabled = pm8901_vreg_is_enabled,
 };
 
+#define VREG_DESCRIP(_id, _name, _ops) \
+	[_id] = { \
+		.name = _name, \
+		.id = _id, \
+		.ops = _ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+	}
+
+static struct regulator_desc pm8901_vreg_descrip[] = {
+	VREG_DESCRIP(PM8901_VREG_ID_L0, "8901_l0", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L1, "8901_l1", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L2, "8901_l2", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L3, "8901_l3", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L4, "8901_l4", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L5, "8901_l5", &pm8901_ldo_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_L6, "8901_l6", &pm8901_ldo_ops),
+
+	VREG_DESCRIP(PM8901_VREG_ID_S0, "8901_s0", &pm8901_smps_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_S1, "8901_s1", &pm8901_smps_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_S2, "8901_s2", &pm8901_smps_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_S3, "8901_s3", &pm8901_smps_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_S4, "8901_s4", &pm8901_smps_ops),
+
+	VREG_DESCRIP(PM8901_VREG_ID_LVS0,     "8901_lvs0",     &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_LVS1,     "8901_lvs1",     &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_LVS2,     "8901_lvs2",     &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_LVS3,     "8901_lvs3",     &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_MVS0,     "8901_mvs0",     &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_USB_OTG,  "8901_usb_otg",  &pm8901_vs_ops),
+	VREG_DESCRIP(PM8901_VREG_ID_HDMI_MVS, "8901_hdmi_mvs", &pm8901_vs_ops),
+};
+
 static int pm8901_init_regulator(struct pm8901_chip *chip,
 		struct pm8901_vreg *vreg)
 {
@@ -590,64 +578,36 @@ bail:
 	return rc;
 }
 
-static int pm8901_register_regulator(struct pm8901_chip *chip,
-		struct device *dev, int id)
-{
-	struct pm8901_vreg_pdata *pdata = dev->platform_data;
-	struct pm8901_vreg *vreg = &pm8901_vreg[id];
-	struct regulator_desc *rdesc = &vreg->rdesc;
-	struct regulator_init_data *rdata = &vreg->rdata;
-	int rc = 0;
-
-	rdesc->name = vreg->name;
-	rdesc->id = id;
-	rdesc->type = REGULATOR_VOLTAGE;
-	rdesc->owner = THIS_MODULE;
-	switch (vreg->type) {
-	case REGULATOR_TYPE_LDO:
-		rdesc->ops = &pm8901_ldo_ops;
-		break;
-	case REGULATOR_TYPE_SMPS:
-		rdesc->ops = &pm8901_smps_ops;
-		break;
-	case REGULATOR_TYPE_VS:
-		rdesc->ops = &pm8901_vs_ops;
-		break;
-	}
-
-	if (pdata) {
-		rdata->constraints.min_uV = pdata->min_uV;
-		rdata->constraints.max_uV = pdata->max_uV;
-		rdata->regulator_init = pdata->init;
-		rdata->driver_data = pdata->init_data;
-	}
-
-	rdata->consumer_supplies = &vreg->rsupply;
-
-	rc = pm8901_init_regulator(chip, vreg);
-	if (rc)
-		return rc;
-
-	vreg->rdev = regulator_register(rdesc, dev, rdata, vreg);
-	if (IS_ERR(vreg->rdev))
-		rc = PTR_ERR(vreg->rdev);
-
-	return rc;
-}
-
 static int __devinit pm8901_vreg_probe(struct platform_device *pdev)
 {
+	struct regulator_init_data *init_data;
+	struct regulator_desc *rdesc;
+	struct pm8901_chip *chip;
+	struct pm8901_vreg *vreg;
 	int rc = 0;
 
 	if (pdev == NULL)
-		return -1;
+		return -EINVAL;
 
-	if (pdev->id >= 0 && pdev->id < PM8901_VREG_MAX)
-		rc = pm8901_register_regulator(platform_get_drvdata(pdev),
-				&pdev->dev, pdev->id);
-	else
+	if (pdev->id >= 0 && pdev->id < PM8901_VREG_MAX) {
+		chip = platform_get_drvdata(pdev);
+		rdesc = &pm8901_vreg_descrip[pdev->id];
+		vreg = &pm8901_vreg[pdev->id];
+		init_data = pdev->dev.platform_data;
+
+		rc = pm8901_init_regulator(chip, vreg);
+		if (rc)
+			goto bail;
+
+		vreg->rdev = regulator_register(rdesc, &pdev->dev,
+				init_data, vreg);
+		if (IS_ERR(vreg->rdev))
+			rc = PTR_ERR(vreg->rdev);
+	} else {
 		rc = -ENODEV;
+	}
 
+bail:
 	pr_info("%s: id=%d, rc=%d\n", __func__, pdev->id, rc);
 
 	return rc;
