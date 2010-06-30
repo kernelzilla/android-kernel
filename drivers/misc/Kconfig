@@ -320,6 +320,13 @@ config TSIF_CHRDEV
 	  To compile this driver as module, choose M here: the
 	  module will be called tsif_chrdev.
 
+config TSIF_DEBUG
+	tristate "Turn on debugging information for tsif driver"
+	depends on TSIF
+	default n
+	---help---
+	  This turns on debugging information for the tsif driver
+
 config PMIC8058_PWM
 	tristate "Qualcomm PM8058 PWM support"
 	depends on PMIC8058
