@@ -3363,6 +3363,15 @@ void scanMngrAddNormalChannel( TI_HANDLE hScanMngr, scan_Method_t* scanMethod, U
                    MAC_ADDR_LEN );
 }
                                     
+/* Clear all candidate BSSList for Roaming */
+void scanMngrClearBSSListEntry( TI_HANDLE hScanMngr )
+{
+    scanMngr_t* pScanMngr = (scanMngr_t*)hScanMngr;
+
+    while(pScanMngr->BSSList.numOfEntries)
+        scanMngrRemoveBSSListEntry(hScanMngr, pScanMngr->BSSList.numOfEntries-1);
+}
+
 /**
  * \author Ronen Kalish\n
  * \date 02-Mar-2005\n

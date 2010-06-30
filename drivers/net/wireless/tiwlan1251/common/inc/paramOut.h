@@ -860,6 +860,29 @@ typedef struct{
     } content;
 } paramInfo_t;
 
+
+/* paramInfoPartial_t is part of paramInfo_t it is implemented to reduce stack usage */
+typedef struct{
+    UINT32              paramType;
+    UINT32              paramLength;
+
+    union
+    {
+	  TspecConfigure_t 		TspecConfigure;
+	  BOOL					rsnPreAuthStatus;
+	  macAddress_t			rsnApMac;
+	  cipherSuite_e         rsnEncryptionStatus;
+	  BOOL                  rsnMixedMode;
+
+	  /* Application Config Parameters Manager */
+	  applicationConfigBuffer_t	applicationConfigBuffer;
+
+	  /* ctrl data section */
+	  preamble_e              ctrlDataCurrentPreambleType;
+
+    } content;
+}paramInfoPartial_t;
+
 /* Set/get params function prototype */
 typedef TI_STATUS (*paramFunc_t)(TI_HANDLE handle, paramInfo_t	*pParam);
 
@@ -1224,16 +1247,16 @@ typedef struct
     UINT32                      beaconReceiveTime;
     UINT8                       hangoverPeriod;
     UINT8                       beaconListenInterval;
-    UINT8				 dtimListenInterval;
+    UINT8				 		dtimListenInterval;
     UINT8                       nConsecutiveBeaconsMissed;
     UINT8                       EnterTo802_11PsRetries;
     UINT8                       HwPsPollResponseTimeout;
-    UINT16                      		autoModeInterval;
-    UINT16                      		autoModeActiveTH;
-    UINT16                      		autoModeDozeTH;
+    UINT16                      autoModeInterval;
+    UINT16                      autoModeActiveTH;
+    UINT16                      autoModeDozeTH;
     PowerMgr_PowerMode_e        autoModeDozeMode;
 
-    	powerAutho_PowerPolicy_e defaultPowerLevel;
+    powerAutho_PowerPolicy_e defaultPowerLevel;
 	powerAutho_PowerPolicy_e PowerSavePowerLevel;     	
 
 	
@@ -1254,7 +1277,7 @@ typedef struct
     UINT8						listenInterval;
 
     /* BET */
-    UINT32  MaximalFullBeaconReceptionInterval; /* maximal time between full beacon reception */
+    UINT32  MaximalFullBeaconReceptionInterval; /* maximal "beacon periods" between full beacon reception */
     UINT8   BetEnableThreshold;
     UINT8   BetDisableThreshold;
     UINT8	BetEnable;             

@@ -212,7 +212,6 @@ int powerAutho_CalcMinPowerLevel(TI_HANDLE hPowerAutho)
 {
 	powerAutho_t *pPowerAutho = (powerAutho_t*)hPowerAutho;
 	powerAutho_PowerPolicy_e newMinPowerLevel;
-	whalParamInfo_t ParamInfo;
 
 	/* calc the new MinPowerLevel */
 	if(pPowerAutho->m_AwakeRequired >  0)
@@ -235,10 +234,7 @@ int powerAutho_CalcMinPowerLevel(TI_HANDLE hPowerAutho)
 			whalCtrl_ElpCtrl_SetMode(pPowerAutho->hHalCtrl, pPowerAutho->m_ElpCtrl_Mode_LUT[newMinPowerLevel]);
 
 			/* Send MIB with PowerPolicy */
-			ParamInfo.paramType = (UINT32)HAL_CTRL_MIN_POWER_LEVEL;
-			ParamInfo.paramLength = sizeof(powerAutho_PowerPolicy_e);
-			ParamInfo.content.minPowerPolicy = newMinPowerLevel;
-			whalCtrl_SetParam(pPowerAutho->hHalCtrl, &ParamInfo);
+			whalCtrl_SetMinPowerLevel(pPowerAutho->hHalCtrl, newMinPowerLevel);
             return OK;
 		}
 	}
@@ -297,12 +293,11 @@ int powerAutho_Restart(TI_HANDLE hMacServices)
 {			
 	powerAutho_t *pPowerAutho = (powerAutho_t*)(((MacServices_t*)hMacServices)->hPowerAutho);
 
-		/* set as 'before init complete' */
+	/* set as 'before init complete' */
 	pPowerAutho->initComplete = FALSE; 
 	
 	pPowerAutho->m_PowerPolicy = POWERAUTHO_POLICY_AWAKE;
 	pPowerAutho->m_MinPowerLevel = POWERAUTHO_POLICY_AWAKE;
-
 
 	return pPowerAutho->m_MinPowerLevel;
 }

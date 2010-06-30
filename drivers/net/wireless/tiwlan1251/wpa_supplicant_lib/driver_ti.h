@@ -92,6 +92,7 @@ struct wpa_driver_ti_data {
     int btcoex_scan;                   /* BtCoex Scan */
     unsigned rts_threshold;            /* RTS Threshold */
     int last_scan;                     /* Last scan type */
+    int force_merge_flag;              /* Force scan results merge */
     SHLIST scan_merge_list;            /* Previous scan list */
     int driverEventsSocket;
     int block_disassoc_events;

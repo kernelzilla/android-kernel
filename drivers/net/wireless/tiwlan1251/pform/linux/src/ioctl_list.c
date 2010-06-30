@@ -252,3 +252,12 @@ int ti1610_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     }
     return res;
 }
+
+
+int tiwlan_ioctl_init( struct net_device *dev )
+{
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 31))
+        dev->do_ioctl       = ti1610_do_ioctl;
+#endif
+        return 0;
+}

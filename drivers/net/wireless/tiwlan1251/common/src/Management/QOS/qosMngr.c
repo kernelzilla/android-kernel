@@ -735,7 +735,93 @@ UINT8 qosMngr_evalSite(TI_HANDLE hQosMngr, BOOL siteAPSDSupport)
    return 0;
 }
 
+/************************************************************************
+ *                        qosMngr_getParamsPatial         			    *
+ ************************************************************************
+DESCRIPTION: The function is an API for external modules to qet qos parameters
+                                                                                                   
+INPUT:      hQosMngr	         -	Qos Manager handle.
+            pParamInfo           -  qos parameters information.
 
+
+OUTPUT:		
+
+RETURN:     OK on success, NOK otherwise
+
+************************************************************************/
+
+TI_STATUS qosMngr_getParamsPatial(TI_HANDLE  hQosMngr,paramInfoPartial_t *pParamInfo)
+{
+	qosMngr_t *pQosMngr = (qosMngr_t *)hQosMngr;
+
+	if(pQosMngr == NULL)
+		return NOK;
+
+	WLAN_REPORT_INFORMATION(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, ("qosMngr_getParams: %x\n", pParamInfo->paramType)); 
+
+	switch(pParamInfo->paramType)
+	{
+
+	case QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC:
+	/* Check if voice call present. If so, store current TSPEC configuration */
+		pParamInfo->content.TspecConfigure.voiceTspecConfigure = (UINT8)pQosMngr->voiceTspecConfigured;
+		pParamInfo->content.TspecConfigure.videoTspecConfigure = (UINT8)pQosMngr->videoTspecConfigured;
+
+		WLAN_REPORT_INFORMATION(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, ("qosMngr_getParams: QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC=%d\n", pQosMngr->voiceTspecConfigured)); 
+
+		if (pQosMngr->voiceTspecConfigured == TRUE) 
+		{
+			OS_802_11_QOS_TSPEC_PARAMS *pTspecParams;
+			tspecInfo_t *pConfiguredParams;
+
+			/* Store voice TSPEC params - must be configured */
+			pTspecParams = &pQosMngr->tspecRenegotiationParams[USER_PRIORITY_6];
+			pConfiguredParams = &pQosMngr->resourceMgmtTable.candidateTspecInfo[USER_PRIORITY_6];
+
+			pTspecParams->uUserPriority = pConfiguredParams->userPriority;
+			pTspecParams->uNominalMSDUsize = pConfiguredParams->nominalMsduSize;
+			pTspecParams->uMeanDataRate = pConfiguredParams->meanDataRate;
+			pTspecParams->uMinimumPHYRate = pConfiguredParams->minimumPHYRate;
+			pTspecParams->uSurplusBandwidthAllowance = pConfiguredParams->surplausBwAllowance;
+			pTspecParams->uAPSDFlag = pConfiguredParams->UPSDFlag;
+			pTspecParams->uMediumTime = pConfiguredParams->mediumTime;
+		}
+		else
+		{
+			pQosMngr->tspecRenegotiationParams[USER_PRIORITY_6].uUserPriority = MAX_USER_PRIORITY;
+		}
+
+		if (pQosMngr->videoTspecConfigured == TRUE) 
+		{
+			OS_802_11_QOS_TSPEC_PARAMS *pTspecParams;
+			tspecInfo_t *pConfiguredParams;
+
+			/* Store signalling TSPEC params if configured in user priority 4 */
+			pTspecParams = &pQosMngr->tspecRenegotiationParams[USER_PRIORITY_4];
+			pConfiguredParams = &pQosMngr->resourceMgmtTable.candidateTspecInfo[USER_PRIORITY_4];
+
+			pTspecParams->uUserPriority = pConfiguredParams->userPriority;
+			pTspecParams->uNominalMSDUsize = pConfiguredParams->nominalMsduSize;
+			pTspecParams->uMeanDataRate = pConfiguredParams->meanDataRate;
+			pTspecParams->uMinimumPHYRate = pConfiguredParams->minimumPHYRate;
+			pTspecParams->uSurplusBandwidthAllowance = pConfiguredParams->surplausBwAllowance;
+			pTspecParams->uAPSDFlag = pConfiguredParams->UPSDFlag;
+			pTspecParams->uMediumTime = pConfiguredParams->mediumTime;
+		}
+		else
+		{
+			pQosMngr->tspecRenegotiationParams[USER_PRIORITY_4].uUserPriority = MAX_USER_PRIORITY;
+		}
+		break;
+
+	default:
+           WLAN_REPORT_ERROR(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, 
+				("qosMngr_getParamsExtend Error: unknown paramType 0x%x!\n",pParamInfo->paramType)); 
+			return (PARAM_NOT_SUPPORTED);
+
+	}
+	return OK;
+}
 
 /************************************************************************
  *                        qosMngr_getACparams           			    *
@@ -1205,6 +1291,43 @@ TI_STATUS qosMngr_setParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo)
 	return OK;
 
 
+}
+
+TI_STATUS qosMngr_setParamsPartial(TI_HANDLE  hQosMngr,paramInfoPartial_t *pParamInfo)
+{
+    qosMngr_t *pQosMngr = (qosMngr_t *)hQosMngr;
+    
+	if(pQosMngr == NULL)
+		return NOK;
+
+	if(pParamInfo == NULL)
+	{
+		WLAN_REPORT_ERROR(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, 
+			("qosMngr_setParams :Error trying to set NULL params!\n")); 
+		return NOK;
+	}
+
+	WLAN_REPORT_INFORMATION(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, ("qosMngr_setParams: %x\n", pParamInfo->paramType)); 
+
+	switch(pParamInfo->paramType)
+	{
+	case QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC:
+		if( pParamInfo->content.TspecConfigure.voiceTspecConfigure || pParamInfo->content.TspecConfigure.videoTspecConfigure)
+            pQosMngr->performTSPECRenegotiation = TRUE;
+		else
+			pQosMngr->performTSPECRenegotiation = FALSE;
+
+	   WLAN_REPORT_INFORMATION(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, 
+							   ("qosMngr_setParams: QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC=%d\n", pQosMngr->performTSPECRenegotiation)); 
+	   break;
+
+	default:
+         WLAN_REPORT_ERROR(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG, 
+				("qosMngr_getParams Error: unknown paramType 0x%x!\n",pParamInfo->paramType)); 
+			return (PARAM_NOT_SUPPORTED);
+	}
+
+	return OK;
 }
 
 /************************************************************************
@@ -2283,7 +2406,6 @@ TI_STATUS qosMngr_requestAdmission(TI_HANDLE			hQosMngr,
 	}
 
 	/* check msdu size validity */
-
 	if( (addTspecParams->uNominalMSDUsize & !FIX_MSDU_SIZE) > MAX_DATA_BODY_LENGTH)
 	{
 		WLAN_REPORT_ERROR(pQosMngr->hReport, QOS_MANAGER_MODULE_LOG,("uNominalMSDUsize = %d > 2312, !!!\n",addTspecParams->uNominalMSDUsize));

@@ -383,7 +383,7 @@ TI_STATUS conn_start(TI_HANDLE hConn, connType_e connType,
 						BOOL reNegotiateTspec)
 {
 	conn_t *pConn = (conn_t *)hConn;
-	paramInfo_t param;
+	paramInfoPartial_t param;
 
 	pConn->pConnStatusCB = pConnStatusCB;
 	pConn->connStatCbObj = connStatCbObj;
@@ -399,7 +399,7 @@ TI_STATUS conn_start(TI_HANDLE hConn, connType_e connType,
 	param.paramType = QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC;
 	param.content.TspecConfigure.voiceTspecConfigure = reNegotiateTspec; 
 	param.content.TspecConfigure.videoTspecConfigure = reNegotiateTspec; 
-	qosMngr_setParams(pConn->hQosMngr, &param);
+	qosMngr_setParamsPartial(pConn->hQosMngr, &param);
 
 	switch(pConn->currentConnType)
 	{
@@ -671,7 +671,7 @@ static void release_module(conn_t *pConn, UINT32 initVec)
 	if (initVec & (1 << TIMER_INIT_BIT))
 		utils_nullTimerDestroy(pConn->hOs, pConn->pTimer);
 
-	if (initVec & (1 << CONN_INIT_BIT))
+    if (initVec & (1 << CONN_INIT_BIT))
 		utils_nullMemoryFree(pConn->hOs, pConn, sizeof(conn_t));
 
 	initVec = 0;

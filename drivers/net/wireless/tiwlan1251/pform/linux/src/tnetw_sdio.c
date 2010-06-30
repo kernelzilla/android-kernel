@@ -130,14 +130,12 @@ static inline int spans_page(void *s, int len)
 
 static void *vmalloc_to_unity(void *a)
 {
-	pte_t *pte;
+	struct page *pg;
 	unsigned long virt = (unsigned long) a;
-	unsigned long phys;
 
-	pte = pte_offset_map(pmd_offset(pgd_offset_k(virt), virt), virt);
-	phys = (pte_val(*pte) & ~(PAGE_SIZE -1)) | (virt & (PAGE_SIZE -1));
-	pte_unmap(pte);
-	return phys_to_virt(phys);
+	pg = vmalloc_to_page(a);
+	virt = (unsigned long)page_address(pg) | (virt & (PAGE_SIZE -1));
+	return (void *)virt;
 }
 
 SDIO_Status SDIO_SyncRead(SDIO_Handle Handle, SDIO_Request_t *Req)

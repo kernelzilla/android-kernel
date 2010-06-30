@@ -51,9 +51,9 @@
 
 /* base version */
 
-#define SW_RELEASE_MONTH    2
-#define SW_RELEASE_DAY      14
-#define SW_RELEASE_YEAR     2008
+#define SW_RELEASE_MONTH	6
+#define SW_RELEASE_DAY		5
+#define SW_RELEASE_YEAR		2008
 
 #endif /* _WSP_VER_H_ */
 

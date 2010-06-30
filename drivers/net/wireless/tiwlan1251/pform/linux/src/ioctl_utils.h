@@ -92,5 +92,4 @@ int util_add_key(struct net_device *dev, void *data, ULONG length);
 int util_remove_key(struct net_device *dev, void *data, ULONG length);
 int util_remove_wep(struct net_device *dev, void *data, ULONG length);
 int util_get_association_info(struct net_device *dev, ULONG *data, ULONG *length );
-int ti1610_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 #endif

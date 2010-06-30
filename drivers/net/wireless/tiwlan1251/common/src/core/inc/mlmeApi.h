@@ -232,6 +232,8 @@ TI_STATUS assoc_setParam(TI_HANDLE hCtrlData, paramInfo_t	*pParam);
 
 TI_STATUS assoc_getParam(TI_HANDLE hCtrlData, paramInfo_t	*pParam);
 
+TI_STATUS assoc_getParamPartial(TI_HANDLE hAssoc, paramInfoPartial_t *pParam);
+
 /* Authentication SM API */
 
 TI_HANDLE auth_create(TI_HANDLE hOs);

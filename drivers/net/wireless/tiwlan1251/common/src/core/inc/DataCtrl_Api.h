@@ -86,7 +86,7 @@ TI_STATUS rxData_config(TI_HANDLE       hRxData,
                      TI_HANDLE          hCtrlData, 
                      TI_HANDLE          hTxData,
                      TI_HANDLE          hTnetwDrv,
-                        TI_HANDLE   hHalCtrl,
+                     TI_HANDLE   hHalCtrl,
                      TI_HANDLE          hMlme, 
                      TI_HANDLE          hRsn, 
                      TI_HANDLE          hSiteMgr, 
@@ -94,8 +94,8 @@ TI_STATUS rxData_config(TI_HANDLE       hRxData,
                      TI_HANDLE          hOs, 
                      TI_HANDLE          hReport,
                      TI_HANDLE          hMemMngr,
-                        TI_HANDLE   hEvHandler,
-                        rxDataInitParams_t * rxDataInitParams);
+                     TI_HANDLE   hEvHandler,
+                     rxDataInitParams_t * rxDataInitParams);
 
 void rxData_receiveMsduFromWlan(TI_HANDLE hRxData, mem_MSDU_T *pMsdu, Rx_attr_t* pRxAttr);
 
@@ -325,6 +325,8 @@ TI_STATUS ctrlData_config(TI_HANDLE         hCtrlData,
 TI_STATUS ctrlData_unLoad(TI_HANDLE hCtrlData); 
 
 TI_STATUS ctrlData_getParam(TI_HANDLE hCtrlData, paramInfo_t *pParamInfo);  
+
+TI_STATUS ctrlData_getParamPartial(TI_HANDLE hCtrlData, paramInfoPartial_t *pParamInfo);
 
 TI_STATUS ctrlData_setParam(TI_HANDLE hCtrlData, paramInfo_t *pParamInfo);  
 

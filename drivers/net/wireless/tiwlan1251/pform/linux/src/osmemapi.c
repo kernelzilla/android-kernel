@@ -108,7 +108,7 @@ os_memoryAlloc(
         otherwise allocate from virtual pool.
     */
     /* 2 pages */
-    if (Size <= 2 * 4096)
+    if (total_size < 2 * 4096)
     {
         if (in_atomic())
             blk = kmalloc(total_size, GFP_ATOMIC);

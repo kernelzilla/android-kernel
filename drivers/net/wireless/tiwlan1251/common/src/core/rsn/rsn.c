@@ -765,6 +765,63 @@ TI_STATUS rsn_getParam(TI_HANDLE hRsn, paramInfo_t *pParam)
 
 /**
 *
+* rsn_getParamPartial - Get a specific parameter from the rsniation SM
+*
+* \b Description: 
+*
+* Get a specific parameter from the rsniation SM.
+*
+* \b ARGS:
+*
+*  I   - hRsn - Rsniation SM context  \n
+*  I/O - pParam - Parameter \n
+*
+* \b RETURNS:
+*
+*  OK if successful, NOK otherwise.
+*
+* \sa rsn_Start, rsn_Stop
+*/
+
+/* note: rsn_getParamPartial() is part of rsn_getParam() it was implemented to reduce Stack usage */
+TI_STATUS rsn_getParamPartial(TI_HANDLE hRsn, paramInfoPartial_t *pParam)
+{
+    rsn_t      *pRsn;
+    TI_STATUS   status = OK;
+
+    pRsn = (rsn_t*)hRsn;
+
+    if ((pRsn == NULL) || (pParam == NULL))
+    {
+        return NOK;
+    }
+
+    switch (pParam->paramType)
+    {
+    case RSN_PRE_AUTH_STATUS:
+        {
+            UINT8 cacheIndex;
+        
+            pParam->content.rsnPreAuthStatus = pRsn->pAdmCtrl->getPreAuthStatus (pRsn->pAdmCtrl, &pParam->content.rsnApMac, &cacheIndex);
+        }
+        break;
+
+	case RSN_ENCRYPTION_STATUS_PARAM: 
+		status = pRsn->pAdmCtrl->getCipherSuite (pRsn->pAdmCtrl, &pParam->content.rsnEncryptionStatus);
+		break;
+
+    case RSN_MIXED_MODE:
+        status = pRsn->pAdmCtrl->getMixedMode (pRsn->pAdmCtrl, &pParam->content.rsnMixedMode);
+        break;
+        
+    default:
+        return NOK;
+    }
+    
+    return status;
+}
+/**
+*
 * rsn_SetParam - Set a specific parameter to the rsniation SM
 *
 * \b Description: 

@@ -177,8 +177,9 @@ BOOL apConn_isSiteBanned(TI_HANDLE hAPConnection, macAddress_t * bssid);
 
 BOOL apConn_getPreAuthAPStatus(TI_HANDLE hAPConnection,
                               macAddress_t *givenAp);
-TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs);
+TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs, UINT8 listAPs_numOfEntries);
 TI_STATUS apConn_prepareToRoaming(TI_HANDLE hAPConnection, apConn_roamingTrigger_e reason);
+TI_STATUS apConn_reportRoamingEventDisconnect(TI_HANDLE hAPConnection,UINT16 uStatusCode,BOOLEAN  bDeAuthenticate );
 
 #endif /*  _AP_CONNECTION_API_H_*/
 

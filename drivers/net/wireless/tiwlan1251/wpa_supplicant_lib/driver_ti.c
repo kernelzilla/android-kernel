@@ -64,44 +64,24 @@
 static int lfp;
 #endif
 /*-------------------------------------------------------------------*/
-#ifdef ANDROID
-typedef struct REG_DOMAIN_STRUCT {
-    char tmzn_name[PROPERTY_VALUE_MAX];
-    int size;
-    int num_of_channels;
-} reg_domain_struct_t;
 
-reg_domain_struct_t reg_domain_str[] = {
-    { "US", 2, NUMBER_SCAN_CHANNELS_FCC },
-    { "AU", 2, NUMBER_SCAN_CHANNELS_FCC },
-    { "SG", 2, NUMBER_SCAN_CHANNELS_FCC },
-    { "CA", 2, NUMBER_SCAN_CHANNELS_FCC },
-    { "GB", 2, NUMBER_SCAN_CHANNELS_ETSI },
-    { "JP", 2, NUMBER_SCAN_CHANNELS_MKK1 },
-    { "ZZ", 2, NUMBER_SCAN_CHANNELS_FCC }
-};
-#endif
 /*-----------------------------------------------------------------------------
-Routine Name: check_and_get_carrier_channels
-Routine Description: get number of allowed channels according to locale
-as determined by the carrier being used.
+Routine Name: check_and_get_build_channels
+Routine Description: get number of allowed channels according to a build var.
 Arguments: None
 Return Value: Number of channels
 -----------------------------------------------------------------------------*/
-static int check_and_get_carrier_channels( void )
+static int check_and_get_build_channels( void )
 {
 #ifdef ANDROID
     char prop_status[PROPERTY_VALUE_MAX];
-    char *prop_name = "ro.product.locale.region";
-    int default_channels = NUMBER_SCAN_CHANNELS_ETSI;
-    unsigned i;
+    char *prop_name = "ro.wifi.channels";
+    int i, default_channels = NUMBER_SCAN_CHANNELS_FCC;
 
-    if( !property_get(prop_name, prop_status, NULL) )
-        return default_channels;
-    for(i=0;( i < (sizeof(reg_domain_str)/sizeof(reg_domain_struct_t)) );i++) {
-        if( strncmp(prop_status, reg_domain_str[i].tmzn_name,
-                    reg_domain_str[i].size) == 0 )
-            return reg_domain_str[i].num_of_channels;
+    if( property_get(prop_name, prop_status, NULL) ) {
+        i = atoi(prop_status);
+        if( i != 0 )
+            default_channels = i;
     }
     return( default_channels );
 #else
@@ -464,7 +444,8 @@ static int wpa_driver_tista_set_auth_mode( void *priv )
     wpa_printf(MSG_DEBUG, "proto: %d", myDrv->proto); /* should be set BEFORE */
     wpa_printf(MSG_DEBUG, "auth_alg: %d",myDrv->auth_alg);
 
-    if( myDrv->auth_alg == AUTH_ALG_OPEN_SYSTEM ) {
+    if( (myDrv->auth_alg == AUTH_ALG_OPEN_SYSTEM) ||
+        (myDrv->auth_alg == AUTH_ALG_LEAP) ) {
         switch( myDrv->key_mgmt ) {
             case KEY_MGMT_802_1X:
                 if( myDrv->proto & WPA_PROTO_WPA ) {
@@ -495,8 +476,9 @@ static int wpa_driver_tista_set_auth_mode( void *priv )
     else if( myDrv->auth_alg == AUTH_ALG_SHARED_KEY ) {
         myAuth = os802_11AuthModeShared;
     }
-    else if( myDrv->auth_alg == AUTH_ALG_LEAP ) {                 /* Dm: ??? */
-        myAuth = os802_11AuthModeWPA;
+    if( myDrv->auth_alg == AUTH_ALG_LEAP ) {
+        TI_SetEAPType( myDrv->hDriver, OS_EAP_TYPE_LEAP );
+        TI_SetEAPTypeDriver( myDrv->hDriver, OS_EAP_TYPE_LEAP );
     }
     wpa_driver_tista_print_auth_mode( myAuth );
     ret = TI_SetAuthenticationMode( myDrv->hDriver, myAuth );
@@ -792,13 +774,14 @@ Return Value: None
 -----------------------------------------------------------------------------*/
 static void ti_init_scan_params( scan_Params_t *pScanParams,
                                  scan_Policy_t *pScanPolicy,
+                                 int scan_type,
                                  struct wpa_driver_ti_data *myDrv )
 {
     UINT32 scanMaxDwellTime = SME_SCAN_BG_MAX_DWELL_TIME_DEF;
     UINT32 scanMinDwellTime = SME_SCAN_BG_MIN_DWELL_TIME_DEF;
     UINT32 chanMaxDwellTime = SME_SCAN_BG_MIN_DWELL_TIME_DEF;
     UINT32 chanMinDwellTime = SME_SCAN_BG_MIN_DWELL_TIME_DEF / 2;
-    int scanType = myDrv->scan_type;
+    int scanType = scan_type;
     int noOfChan = myDrv->scan_channels;
     int btCoexScan = myDrv->btcoex_scan;
     int i, j;
@@ -856,7 +839,7 @@ static void ti_init_scan_params( scan_Params_t *pScanParams,
     for(i=0;( i < noOfChan );i++) {
         pScanPolicy->bandScanPolicy[ 0 ].channelList[ i ] = i + 1;
     }
-    pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.scanType = scanType;
+    pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.scanType = SCAN_TYPE_NO_SCAN;
     pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.method.basicMethodParams.earlyTerminationEvent = SCAN_ET_COND_DISABLE;
     pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.method.basicMethodParams.ETMaxNumberOfApFrames = 0;
     pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.method.basicMethodParams.maxChannelDwellTime = chanMaxDwellTime;
@@ -868,7 +851,7 @@ static void ti_init_scan_params( scan_Params_t *pScanParams,
 #else
     pScanPolicy->bandScanPolicy[ 0 ].trackingMethod.method.basicMethodParams.probReqParams.txPowerDbm = MAX_TX_POWER;
 #endif
-    pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.scanType = scanType;
+    pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.scanType = SCAN_TYPE_NO_SCAN;
     pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.method.basicMethodParams.earlyTerminationEvent = SCAN_ET_COND_DISABLE;
     pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.method.basicMethodParams.ETMaxNumberOfApFrames = 0;
     pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.method.basicMethodParams.maxChannelDwellTime = chanMaxDwellTime;
@@ -880,7 +863,7 @@ static void ti_init_scan_params( scan_Params_t *pScanParams,
 #else
     pScanPolicy->bandScanPolicy[ 0 ].discoveryMethod.method.basicMethodParams.probReqParams.txPowerDbm = MAX_TX_POWER;
 #endif
-    pScanPolicy->bandScanPolicy[ 0 ].immediateScanMethod.scanType = scanType;
+    pScanPolicy->bandScanPolicy[ 0 ].immediateScanMethod.scanType = btCoexScan ? SCAN_TYPE_TRIGGERED_ACTIVE : SCAN_TYPE_NORMAL_ACTIVE;
     pScanPolicy->bandScanPolicy[ 0 ].immediateScanMethod.method.basicMethodParams.earlyTerminationEvent = SCAN_ET_COND_DISABLE;
     pScanPolicy->bandScanPolicy[ 0 ].immediateScanMethod.method.basicMethodParams.ETMaxNumberOfApFrames = 0;
     pScanPolicy->bandScanPolicy[ 0 ].immediateScanMethod.method.basicMethodParams.maxChannelDwellTime = chanMaxDwellTime;
@@ -905,22 +888,39 @@ Return Value: 0 on success, -1 on failure
 -----------------------------------------------------------------------------*/
 static int wpa_driver_tista_scan( void *priv, const UINT8 *ssid, size_t ssid_len )
 {
+    struct wpa_driver_ti_data *myDrv = (struct wpa_driver_ti_data *)priv;
+    struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)(myDrv->hWpaSupplicant);
+    struct wpa_ssid *issid;
     scan_Params_t scanParams;
     scan_Policy_t scanPolicy;
-    struct wpa_driver_ti_data *myDrv = (struct wpa_driver_ti_data *)priv;
-    int ret;
+    int scan_type, ret, scan_probe_flag = 0;
 
     wpa_printf(MSG_DEBUG,"wpa_driver_tista_scan called");
     /* If driver is not initialized yet - we cannot access it so return */
     TI_CHECK_DRIVER( myDrv->driver_is_loaded, -1 );
 
-    ti_init_scan_params( &scanParams, &scanPolicy, myDrv );
-    if (ssid && ssid_len > 0 && ssid_len <= sizeof(scanParams.desiredSsid.ssidString)) {
+    scan_type = myDrv->scan_type;
+    if (wpa_s->prev_scan_ssid != BROADCAST_SSID_SCAN) {
+        if (wpa_s->prev_scan_ssid->scan_ssid) {
+            scan_type = SCAN_TYPE_NORMAL_ACTIVE;
+            scan_probe_flag = 1;
+        }
+    }
+
+    ti_init_scan_params( &scanParams, &scanPolicy, scan_type, myDrv );
+
+    myDrv->force_merge_flag = 0; /* Set merge flag */
+
+    if ((scan_probe_flag && ssid) &&
+        (ssid_len > 0 && ssid_len <= sizeof(scanParams.desiredSsid.ssidString))) {
         os_memcpy(scanParams.desiredSsid.ssidString, ssid, ssid_len);
+	if (ssid_len < sizeof(scanParams.desiredSsid.ssidString))
+            scanParams.desiredSsid.ssidString[ssid_len] = '\0';
         scanParams.desiredSsid.len = ssid_len;
+        myDrv->force_merge_flag = 1;
     }
     TI_SetScanPolicy( myDrv->hDriver, (UINT8 *)&scanPolicy, sizeof(scan_Policy_t) );
-    myDrv->last_scan = myDrv->scan_type; /* Remember scan type for last scan */
+    myDrv->last_scan = scan_type; /* Remember scan type for last scan */
     ret = TI_StartScan( myDrv->hDriver, (scan_Params_t *)&scanParams );
     return( TI2WPA_STATUS(ret) );
 }
@@ -953,22 +953,26 @@ Return Value: pointer to BSSID structure or NULL
 -----------------------------------------------------------------------------*/
 static OS_802_11_BSSID_EX *wpa_driver_tista_get_bssid_info( TI_HANDLE hDriver )
 {
-    OS_802_11_BSSID_EX mySelectedBssidInfo;
     OS_802_11_BSSID_LIST_EX *bssid_list;
     OS_802_11_BSSID_EX *pBssid, *nBssid = NULL;
     int i, number_items, res;
-
-    res = TI_GetSelectedBSSIDInfo( hDriver, &mySelectedBssidInfo );
-    if( res != TI_RESULT_OK )
-        return( nBssid );
+    OS_802_11_MAC_ADDRESS bssid;
+    OS_802_11_SSID ssid;
 
     if( TI_GetBSSIDList( hDriver, &bssid_list ) || !bssid_list )
+        return( nBssid );
+
+    if( TI_GetBSSID( hDriver, &bssid ) != TI_RESULT_OK )
+        return( nBssid );
+
+    if( TI_GetCurrentSSID( hDriver, &ssid ) != TI_RESULT_OK )
         return( nBssid );
 
     pBssid = &bssid_list->Bssid[0];
     number_items = (int)(bssid_list->NumberOfItems);
     for(i=0;( i < number_items );i++) {
-        if( os_memcmp( mySelectedBssidInfo.Ssid.Ssid, pBssid->Ssid.Ssid, pBssid->Ssid.SsidLength ) == 0 ) {
+        if( !os_memcmp((void *)&bssid, pBssid->MacAddress, MAC_ADDR_LEN) &&
+            !os_memcmp(ssid.Ssid, pBssid->Ssid.Ssid, pBssid->Ssid.SsidLength) ) {
             nBssid = (OS_802_11_BSSID_EX *)os_malloc( pBssid->Length );
             if( nBssid != NULL )
                 os_memcpy( nBssid, pBssid, pBssid->Length );
@@ -1078,7 +1082,7 @@ static int wpa_driver_tista_get_scan_results( void *priv,
         pBssid = (OS_802_11_BSSID_EX *)(((u8 *)pBssid) + pBssid->Length);
     }
     /* Merge new results with previous */
-    number_items = scan_merge( myDrv, results, number_items, max_size );
+    number_items = scan_merge( myDrv, results, myDrv->force_merge_flag, number_items, max_size );
 
     qsort( results, number_items, sizeof(struct wpa_scan_result),
            wpa_driver_tista_scan_result_compare );
@@ -1147,7 +1151,7 @@ static void wpa_driver_tista_receive_driver_event( int sock, void *priv, void *s
                     /* Get AP Beacon IEs - especially WPA/RSN IE */
                     pSelectedBssidInfo = wpa_driver_tista_get_bssid_info( mySuppl->hDriver );
                     if( pSelectedBssidInfo ) {
-                        if( pSelectedBssidInfo->IELength && pSelectedBssidInfo->IEs ) { // Dm: Fixed IEs ???
+                        if( pSelectedBssidInfo->IELength && pSelectedBssidInfo->IEs ) { /* Dm: Fixed IEs */
                             myEventData.assoc_info.beacon_ies = (UINT8 *)pSelectedBssidInfo->IEs + sizeof(OS_802_11_FIXED_IEs);
                             myEventData.assoc_info.beacon_ies_len = pSelectedBssidInfo->IELength - sizeof(OS_802_11_FIXED_IEs);
                         }
@@ -1369,15 +1373,16 @@ static void *wpa_driver_tista_init( void *priv, const char *ifname )
 
     wpa_printf(MSG_DEBUG,"driver events socket is 0x%x...",myDrv->driverEventsSocket);
 
-    /* Signal that driver is not loaded yet */
+    /* Signal that driver is not stopped */
     myDrv->driver_is_loaded = TRUE;
 
     /* Set default scan type */
     myDrv->scan_type = SCAN_TYPE_NORMAL_ACTIVE;
+    myDrv->force_merge_flag = 0;
     scan_init( myDrv );
 
     /* Set default amount of channels */
-    myDrv->scan_channels = check_and_get_carrier_channels();
+    myDrv->scan_channels = check_and_get_build_channels();
 
     /* Link Speed will be set by the message from the driver */
     myDrv->link_speed = 0;
@@ -1504,30 +1509,30 @@ Return Value: 0 - success, -1 - error
 static int prepare_filter_struct( void *priv, int type,
                                   TIWLAN_DATA_FILTER_REQUEST *dfreq_ptr )
 {
-    const u8 *macaddr;
+    u8 *macaddr = NULL;
     size_t len = 0;
-    u8 mask;
+    u8 mask = 0;
     int ret = -1;
 
     wpa_printf(MSG_ERROR, "%s: type=%d", __func__, type);
     switch (type ) {
       case RX_SELF_FILTER:
-        macaddr = wpa_driver_tista_get_mac_addr(priv);
+        macaddr = (u8 *)wpa_driver_tista_get_mac_addr(priv);
         len = MAC_ADDR_LEN;
         mask = 0x3F; /* 6 bytes */
         break;
       case RX_BROADCAST_FILTER:
-        macaddr = (const u8 *)"\xFF\xFF\xFF\xFF\xFF\xFF";
+        macaddr = (u8 *)"\xFF\xFF\xFF\xFF\xFF\xFF";
         len = MAC_ADDR_LEN;
         mask = 0x3F; /* 6 bytes */
         break;
       case RX_IPV4_MULTICAST_FILTER:
-        macaddr = (const u8 *)"\x01\x00\x5E";
+        macaddr = (u8 *)"\x01\x00\x5E";
         len = 3;
         mask = 0x7; /* 3 bytes */
         break;
       case RX_IPV6_MULTICAST_FILTER:
-        macaddr = (const u8 *)"\x33\x33";
+        macaddr = (u8 *)"\x33\x33";
         len = 2;
         mask = 0x3; /* 2 bytes */
         break;
@@ -1569,7 +1574,6 @@ int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_le
         if( ret == OK ) {
             /* Signal that driver is not loaded yet */
             myDrv->driver_is_loaded = TRUE;
-            myDrv->scan_channels = check_and_get_carrier_channels();
             wpa_msg(myDrv->hWpaSupplicant, MSG_INFO, WPA_EVENT_DRIVER_STATE "STARTED");
         }
         else
@@ -1647,9 +1651,34 @@ int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_le
             }
         }
     }
+    else if( os_strcasecmp(cmd, "rssi-approx") == 0 ) {
+        struct wpa_scan_result *cur_res;
+        struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)(myDrv->hWpaSupplicant);
+        int rssi, len;
+
+        wpa_printf(MSG_DEBUG,"rssi-approx command");
+
+        if( !wpa_s )
+            return( ret );
+        cur_res = scan_get_by_bssid( myDrv, wpa_s->bssid );
+        if( cur_res ) {
+            len = (int)(cur_res->ssid_len);
+            rssi = cur_res->level;
+            if( (len > 0) && (len <= MAX_SSID_LEN) && (len < (int)buf_len)) {
+                os_memcpy( (void *)buf, (void *)(cur_res->ssid), len );
+                ret = len;
+                ret += snprintf(&buf[ret], buf_len-len, " rssi %d\n", rssi);
+                if (ret < (int)buf_len) {
+                    return( ret );
+                }
+            }
+        }
+    }
     else if( os_strcasecmp(cmd, "rssi") == 0 ) {
 #if 1
         u8 ssid[MAX_SSID_LEN];
+        struct wpa_scan_result *cur_res;
+        struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)(myDrv->hWpaSupplicant);
         int rssi, len;
 
         wpa_printf(MSG_DEBUG,"rssi command");
@@ -1661,9 +1690,12 @@ int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_le
                 os_memcpy( (void *)buf, (void *)ssid, len );
                 ret = len;
                 ret += snprintf(&buf[ret], buf_len-len, " rssi %d\n", rssi);
-                if (ret < (int)buf_len) {
+                if( !wpa_s )
                     return( ret );
-                }
+                cur_res = scan_get_by_bssid( myDrv, wpa_s->bssid );
+                if( cur_res )
+                    cur_res->level = rssi;
+                return( ret );
             }
         }
 #else

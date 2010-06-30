@@ -171,6 +171,8 @@ TI_STATUS rsn_setParam(TI_HANDLE hCtrlData, paramInfo_t	*pParam);
 
 TI_STATUS rsn_getParam(TI_HANDLE hCtrlData, paramInfo_t	*pParam);
 
+TI_STATUS rsn_getParamPartial(TI_HANDLE hRsn, paramInfoPartial_t *pParam);
+
 TI_STATUS rsn_evalSite(TI_HANDLE hRsn, rsnData_t *pRsnData, bssType_e bssType, macAddress_t bssid, UINT32 *pMetric);
 
 TI_STATUS rsn_setSite(TI_HANDLE hRsn, rsnData_t *pRsnData, UINT8 *pAssocIe, UINT8 *pAssocIeLen);

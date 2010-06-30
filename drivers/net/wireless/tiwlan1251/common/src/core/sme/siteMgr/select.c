@@ -177,6 +177,14 @@ static TI_STATUS sendProbeResponse(siteMgr_t *pSiteMgr, macAddress_t *pBssid);
 /* Interface functions Implementation */
 
 
+/**************************************************************/
+/* DEBUG CLI CRASH (systemConfig stack usage reduction)       */
+/**************************************************************/
+
+static paramInfo_t gSystemCfgParam;
+static UINT8       curRsnData[255];
+/**************************************************************/
+
 /***********************************************************************
  *                        siteMgr_disSelectSite									
  ***********************************************************************
@@ -245,19 +253,18 @@ siteEntry_t* siteMgr_selectSiteFromTable(TI_HANDLE	hSiteMgr)
 	UINT32		prevMatchingLevel = 0;		
 	UINT8		siteIndex, tableIndex, numberOfSites = 0;
 	siteMgr_t	*pSiteMgr = (siteMgr_t *)hSiteMgr;
-	siteEntry_t *pSiteEntry, *pLastMatchSite = NULL;	
+	siteEntry_t	*pSiteEntry, *pLastMatchSite = NULL;
 	rsnData_t	rsnData;
-    dot11_RSN_t *pRsnIe;
-    UINT8       rsnIECount=0;
-    UINT8       curRsnData[255];
-    UINT8       length=0;
+	dot11_RSN_t	*pRsnIe;
+	UINT8		rsnIECount=0;
+	UINT8       	length=0;
 	paramInfo_t	param;
-    radioBand_e radioBand;
+	radioBand_e	radioBand;
 	BOOL		bRegulatoryDomainEnabled;
 
 	siteTablesParams_t* currTable = pSiteMgr->pSitesMgmtParams->pCurrentSiteTable;
 
-	WLAN_REPORT_INFORMATION(pSiteMgr->hReport, SITE_MGR_MODULE_LOG,  
+	WLAN_REPORT_INFORMATION(pSiteMgr->hReport, SITE_MGR_MODULE_LOG,
 							("SITE MATCH , Desired ssid (%s) len= (%d)\n\n", 
 							 pSiteMgr->pDesiredParams->siteMgrDesiredSSID.ssidString, 
 							 pSiteMgr->pDesiredParams->siteMgrDesiredSSID.len));
@@ -1150,13 +1157,11 @@ RETURN:     OK
 ************************************************************************/
 TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 { 
-	paramInfo_t param;
 	siteEntry_t *pPrimarySite = pSiteMgr->pSitesMgmtParams->pPrimarySite;
 	rsnData_t	rsnData;
 	UINT8		rsnAssocIeLen;
     dot11_RSN_t *pRsnIe;
     UINT8       rsnIECount=0;
-    UINT8       curRsnData[255];
     UINT16      length;
     UINT16      capabilities;
     UINT16      PktLength=0;
@@ -1269,21 +1274,21 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 	pSiteMgr->currentDataModulation = pSiteMgr->chosenModulation;
 	/***************** Config Data CTRL *************************/
 	
-	param.paramType = CTRL_DATA_CURRENT_BSSID_PARAM;							/* Current BSSID */
-	os_memoryCopy(pSiteMgr->hOs, &(param.content.ctrlDataCurrentBSSID), &(pPrimarySite->bssid), sizeof(macAddress_t));
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_BSSID_PARAM;							/* Current BSSID */
+	os_memoryCopy(pSiteMgr->hOs, &(gSystemCfgParam.content.ctrlDataCurrentBSSID), &(pPrimarySite->bssid), sizeof(macAddress_t));
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
 
-	param.paramType = CTRL_DATA_CURRENT_BSS_TYPE_PARAM;							/* Current BSS Type */
-	param.content.ctrlDataCurrentBssType = pPrimarySite->bssType;
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_BSS_TYPE_PARAM;							/* Current BSS Type */
+	gSystemCfgParam.content.ctrlDataCurrentBssType = pPrimarySite->bssType;
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
 
-	param.paramType = CTRL_DATA_CURRENT_PREAMBLE_TYPE_PARAM;					/* Current Preamble Type */
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_PREAMBLE_TYPE_PARAM;					/* Current Preamble Type */
 	if ((pSiteMgr->pDesiredParams->siteMgrDesiredPreambleType == PREAMBLE_SHORT) &&
 		(pPrimarySite->currentPreambleType == PREAMBLE_SHORT))
-		param.content.ctrlDataCurrentPreambleType = PREAMBLE_SHORT;
+		gSystemCfgParam.content.ctrlDataCurrentPreambleType = PREAMBLE_SHORT;
 	else
-		param.content.ctrlDataCurrentPreambleType = PREAMBLE_LONG;
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
+		gSystemCfgParam.content.ctrlDataCurrentPreambleType = PREAMBLE_LONG;
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
 
     /* Mutual Rates Matching */
 	StaTotalRates = pSiteMgr->pDesiredParams->siteMgrCurrentDesiredRateMask.basicRateMask |
@@ -1307,29 +1312,27 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 
     pSiteMgr->pDesiredParams->siteMgrMatchedMaxActiveRate = MAX(pSiteMgr->pDesiredParams->siteMgrMatchedMaxBasicRate,pSiteMgr->pDesiredParams->siteMgrMatchedMaxActiveRate);
 
-	param.paramType = CTRL_DATA_CURRENT_BASIC_RATE_PARAM;						/* Current Basic Rate */
-	param.content.ctrlDataCurrentBasicRate = (rate_e)pSiteMgr->pDesiredParams->siteMgrMatchedMaxBasicRate;
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_BASIC_RATE_PARAM;						/* Current Basic Rate */
+	gSystemCfgParam.content.ctrlDataCurrentBasicRate = (rate_e)pSiteMgr->pDesiredParams->siteMgrMatchedMaxBasicRate;
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
 
-	param.paramType = CTRL_DATA_CURRENT_BASIC_RATE_MASK_PARAM;
-	param.content.ctrlDataBasicRateBitMask = pSiteMgr->pDesiredParams->siteMgrMatchedBasicRateMask;
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
-
-	param.paramType = CTRL_DATA_CURRENT_BASIC_MODULATION_PARAM;						/* Current Mgmt Rate */
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_BASIC_RATE_MASK_PARAM;
+	gSystemCfgParam.content.ctrlDataBasicRateBitMask = pSiteMgr->pDesiredParams->siteMgrMatchedBasicRateMask;
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
+	gSystemCfgParam.paramType = CTRL_DATA_CURRENT_BASIC_MODULATION_PARAM;						/* Current Mgmt Rate */
 	if ((pPrimarySite->maxBasicRate == DRV_RATE_1M) || (pPrimarySite->maxBasicRate == DRV_RATE_2M))
-		param.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_QPSK;
+		gSystemCfgParam.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_QPSK;
 	else if (pPrimarySite->maxBasicRate == DRV_RATE_22M)
-		param.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_PBCC;
+		gSystemCfgParam.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_PBCC;
 	else if (pPrimarySite->maxBasicRate < DRV_RATE_22M)
-		param.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_CCK;
+		gSystemCfgParam.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_CCK;
 	else
-		param.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_OFDM;
+		gSystemCfgParam.content.ctrlDataCurrentBasicModulationType = DRV_MODULATION_OFDM;
 
-	ctrlData_setParam(pSiteMgr->hCtrlData, &param);
-
-    param.paramType = CTRL_DATA_CURRENT_PROTECTION_STATUS_PARAM;
-    param.content.ctrlDataProtectionEnabled = pPrimarySite->useProtection;
-    ctrlData_setParam(pSiteMgr->hCtrlData, &param);
+	ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
+    gSystemCfgParam.paramType = CTRL_DATA_CURRENT_PROTECTION_STATUS_PARAM;
+    gSystemCfgParam.content.ctrlDataProtectionEnabled = pPrimarySite->useProtection;
+    ctrlData_setParam(pSiteMgr->hCtrlData, &gSystemCfgParam);
 
 	ctrlData_setSite(pSiteMgr->hCtrlData, &pPrimarySite->fourXParams);
 
@@ -1341,30 +1344,30 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 	 status = siteMgr_getWMEParamsSite(pSiteMgr,&p_ACParametersDummy);
 	 if(status == OK)
 	 {
-		 param.content.qosSiteProtocol = WME;
+		 gSystemCfgParam.content.qosSiteProtocol = WME;
 	 }
 	 else
 	 {
-			 param.content.qosSiteProtocol = NONE_QOS;
+			 gSystemCfgParam.content.qosSiteProtocol = NONE_QOS;
 	 }
 
 	WLAN_REPORT_DEBUG_TX(pSiteMgr->hReport,
-	 (" systemConfigt() : param.content.qosSiteProtoco %d\n", param.content.qosSiteProtocol));
+	 (" systemConfigt() : param.content.qosSiteProtoco %d\n", gSystemCfgParam.content.qosSiteProtocol));
 
-	 param.paramType = QOS_MNGR_SET_SITE_PROTOCOL;
-	 qosMngr_setParams(pSiteMgr->hQosMngr,&param);
+	 gSystemCfgParam.paramType = QOS_MNGR_SET_SITE_PROTOCOL;
+	 qosMngr_setParams(pSiteMgr->hQosMngr,&gSystemCfgParam);
 	 
      /* Set active protocol in qosMngr according to station desired mode and site capabilities 
 	Must be called BEFORE setting the "CURRENT_PS_MODE" into the QosMngr */
      qosMngr_selectActiveProtocol(pSiteMgr->hQosMngr);
 
 	 /* set PS capability parameter */
-	 param.paramType = QOS_MNGR_CURRENT_PS_MODE;
+	 gSystemCfgParam.paramType = QOS_MNGR_CURRENT_PS_MODE;
 	 if(pPrimarySite->APSDSupport == TRUE)
-		 param.content.currentPsMode = PS_SCHEME_UPSD_TRIGGER;
+		 gSystemCfgParam.content.currentPsMode = PS_SCHEME_UPSD_TRIGGER;
 	 else
-		 param.content.currentPsMode = PS_SCHEME_LEGACY_PSPOLL;
-      qosMngr_setParams(pSiteMgr->hQosMngr,&param);
+		 gSystemCfgParam.content.currentPsMode = PS_SCHEME_LEGACY_PSPOLL;
+      qosMngr_setParams(pSiteMgr->hQosMngr,&gSystemCfgParam);
 
      /* Set upsd/ps_poll configuration */
      /* Must be done AFTER setting the active Protocol */
@@ -1406,9 +1409,9 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
     {
         WLAN_REPORT_INFORMATION(pSiteMgr->hReport, SITE_MGR_MODULE_LOG,
 			("Select Exc_ParseClientTP == OK: Dbm = %d\n",ExternTxPower));
-		param.paramType = REGULATORY_DOMAIN_EXTERN_TX_POWER_PREFERRED;
-		param.content.ExternTxPowerPreferred = ExternTxPower;
-		regulatoryDomain_setParam(pSiteMgr->hRegulatoryDomain,&param);
+		gSystemCfgParam.paramType = REGULATORY_DOMAIN_EXTERN_TX_POWER_PREFERRED;
+		gSystemCfgParam.content.ExternTxPowerPreferred = ExternTxPower;
+		regulatoryDomain_setParam(pSiteMgr->hRegulatoryDomain,&gSystemCfgParam);
     }
 	/* Parse and save the EXC Version Number if exists */
 	excMngr_parseExcVer(pSiteMgr->hExcMngr, pIeBuffer, PktLength);
@@ -1418,9 +1421,9 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 	/* Note: TX Power Control adjustment is now done through siteMgr_assocReport() */
 	if (pPrimarySite->powerConstraint>0)
 	{	/* setting power constraint */
-		param.paramType = REGULATORY_DOMAIN_SET_POWER_CONSTRAINT_PARAM;
-		param.content.powerConstraint = pPrimarySite->powerConstraint;
-		regulatoryDomain_setParam(pSiteMgr->hRegulatoryDomain,&param);
+		gSystemCfgParam.paramType = REGULATORY_DOMAIN_SET_POWER_CONSTRAINT_PARAM;
+		gSystemCfgParam.content.powerConstraint = pPrimarySite->powerConstraint;
+		regulatoryDomain_setParam(pSiteMgr->hRegulatoryDomain,&gSystemCfgParam);
 	}
 
 
@@ -1434,4 +1437,3 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
     
 	return OK;
 }
-

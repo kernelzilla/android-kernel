@@ -767,6 +767,55 @@ TI_STATUS assoc_getParam(TI_HANDLE hAssoc, paramInfo_t *pParam)
 
 /**
 *
+* assoc_getParamPartial - Get a specific parameter from the association SM
+*
+* \b Description: 
+*
+* Get a specific parameter from the association SM.
+*
+* \b ARGS:
+*
+*  I   - hAssoc - Association SM context  \n
+*  I/O - pParam - Parameter \n
+*
+* \b RETURNS:
+*
+*  OK if successful, NOK otherwise.
+*
+* \sa assoc_Start, assoc_Stop
+*/
+/* note: assoc_getParamPartial() is part of assoc_getParam() it was implemented to reduce Stack usage */
+TI_STATUS assoc_getParamPartial(TI_HANDLE hAssoc, paramInfoPartial_t *pParam)
+{
+	assoc_t		*pHandle;
+
+	pHandle = (assoc_t*)hAssoc;
+
+	if ((pHandle == NULL) || (pParam == NULL))
+	{
+		return NOK;
+	}
+
+	/* serch parameter type */
+	switch (pParam->paramType)
+	{
+    case ASSOC_ASSOCIATION_RESP_PARAM:
+		pParam->content.applicationConfigBuffer.buffer = pHandle->assocRespBuffer;
+		pParam->content.applicationConfigBuffer.bufferSize = pHandle->assocRespLen;
+		break;
+
+	default:
+		WLAN_REPORT_ERROR(pHandle->hReport, ASSOC_MODULE_LOG, 
+							  ("assoc_getParamPartial no such entry %d\n",pParam->paramType));
+        return NOK;
+	}
+
+	return OK;
+}
+
+
+/**
+*
 * assoc_setParam - Set a specific parameter to the association SM
 *
 * \b Description: 
@@ -963,7 +1012,7 @@ TI_STATUS assoc_smFailureWait(assoc_t *pAssoc)
 	else	/* (uRspStatus == 0) how did we get here ? */ 
 	{
 		WLAN_REPORT_ERROR(pAssoc->hReport, ASSOC_MODULE_LOG,
-			("%s while Response status is OK (0) !!! \n"));
+			("assoc_smFailureWait: while Response status is OK (0) !!! \n"));
 
 		status = assoc_smReportFailure(pAssoc, (UINT16)NOK);
 	}

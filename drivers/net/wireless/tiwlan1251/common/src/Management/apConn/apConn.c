@@ -1204,13 +1204,13 @@ BOOL apConn_getPreAuthAPStatus(TI_HANDLE hAPConnection,
                               macAddress_t *givenAp)
 {
     apConn_t *pAPConnection = (apConn_t *)hAPConnection;
-    paramInfo_t     param;
+    paramInfoPartial_t   param;
 
     AP_CONN_VALIDATE_HANDLE(hAPConnection);
 
     param.paramType = RSN_PRE_AUTH_STATUS;
     os_memoryCopy(pAPConnection->hOs, (void *)param.content.rsnApMac.addr, (void *)givenAp->addr, MAC_ADDR_LEN);
-    rsn_getParam(pAPConnection->hPrivacy, &param);
+    rsn_getParamPartial(pAPConnection->hPrivacy, &param);
 
     return param.content.rsnPreAuthStatus;
 }
@@ -1237,7 +1237,7 @@ BOOL apConn_getPreAuthAPStatus(TI_HANDLE hAPConnection,
 *
 * \sa 
 */
-TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs)
+TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs, UINT8 listAPs_numOfEntries)
 {
     apConn_t *pAPConnection = (apConn_t *)hAPConnection;
     bssidList4PreAuth_t apList;
@@ -1255,27 +1255,34 @@ TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs)
         WLAN_REPORT_INFORMATION(pAPConnection->hReport, SITE_MGR_MODULE_LOG, ("apConn_reserveResources \n"));
 #endif
 
-    for (listIndex=0, apListIndex=0; listIndex<listAPs->numOfEntries; listIndex++)
-    {
-        os_memoryCopy(pAPConnection->hOs, &(apList.bssidList[apListIndex].bssId), 
-                      (void *)listAPs->BSSList[listIndex].BSSID.addr, MAC_ADDR_LEN);
-
-        /* search in the buffer pointer to the beginning of the
-            RSN IE according to the IE ID */
-        if (!parseIeBuffer(pAPConnection->hOs, listAPs->BSSList[listIndex].pBuffer, listAPs->BSSList[listIndex].bufferLength, RSN_IE_ID, &pRsnIEs, NULL, 0))
+	if (listAPs_numOfEntries != 0) {
+		for (listIndex=0, apListIndex=0; listIndex<listAPs->numOfEntries; listIndex++)
+		{
+			os_memoryCopy(pAPConnection->hOs, &(apList.bssidList[apListIndex].bssId), 
+						  (void *)listAPs->BSSList[listIndex].BSSID.addr, MAC_ADDR_LEN);
+	
+			/* search in the buffer pointer to the beginning of the
+				RSN IE according to the IE ID */
+			if (!parseIeBuffer(pAPConnection->hOs, listAPs->BSSList[listIndex].pBuffer, listAPs->BSSList[listIndex].bufferLength, RSN_IE_ID, &pRsnIEs, NULL, 0))
+			{
+				WLAN_REPORT_INFORMATION(pAPConnection->hReport, ROAMING_MANAGER_MODULE_LOG, 
+									  ("apConn_preAuthenticate, no RSN IE was found \n")); 
+				WLAN_REPORT_HEX_INFORMATION(pAPConnection->hReport, ROAMING_MANAGER_MODULE_LOG, 
+									  listAPs->BSSList[listIndex].pBuffer, listAPs->BSSList[listIndex].bufferLength); 
+	
+				continue;
+			}
+	
+			apList.bssidList[apListIndex].pRsnIEs = (dot11_RSN_t*)pRsnIEs;
+			apList.bssidList[apListIndex].rsnIeLen = apList.bssidList[apListIndex].pRsnIEs->hdr.eleLen+2;
+			apListIndex++;
+		}
+	}
+        else
         {
-            WLAN_REPORT_INFORMATION(pAPConnection->hReport, ROAMING_MANAGER_MODULE_LOG, 
-                                  ("apConn_preAuthenticate, no RSN IE was found \n")); 
-            WLAN_REPORT_HEX_INFORMATION(pAPConnection->hReport, ROAMING_MANAGER_MODULE_LOG, 
-                                  listAPs->BSSList[listIndex].pBuffer, listAPs->BSSList[listIndex].bufferLength); 
-
-            continue;
-        }
-
-        apList.bssidList[apListIndex].pRsnIEs = (dot11_RSN_t*)pRsnIEs;
-        apList.bssidList[apListIndex].rsnIeLen = apList.bssidList[apListIndex].pRsnIEs->hdr.eleLen+2;
-        apListIndex++;
-    }
+           listIndex=0;
+           apListIndex=0;
+         }
 
     /* Start pre-auth after any Conn succ (including first), 
     and not only when a New BSSID was added, in order to save/refresh 
@@ -1472,6 +1479,37 @@ TI_STATUS apConn_stop(TI_HANDLE hAPConnection, BOOLEAN removeKeys, BOOLEAN immed
     return OK;
 }
 
+/**
+*
+* apConn_reportRoamingEventDisconnect
+*
+* \b Description: 
+*
+* Called by Roaming Manager to inform of Disconnect
+*   uStatusCode - status code of deauth/disassoc packet
+*   bDeAuthenticate - Whether this packet is DeAuth ( if
+*                     DisAssoc than FALSE)
+*
+* \b ARGS:
+*
+*
+* \b RETURNS:
+*
+*  OK if successful, NOK otherwise.
+*
+* \sa 
+*/
+TI_STATUS apConn_reportRoamingEventDisconnect(TI_HANDLE hAPConnection,UINT16 uStatusCode,BOOLEAN  bDeAuthenticate )
+{
+	apConn_t *pAPConnection = (apConn_t *)hAPConnection;
+	roamingEventData_u RoamingEventData;
+
+	RoamingEventData.APDisconnect.uStatusCode = uStatusCode ; /* status code of deauth/disassoc packet */
+	RoamingEventData.APDisconnect.bDeAuthenticate = bDeAuthenticate; /* TRUE state that it is DeAuth packet */
+	apConn_reportRoamingEvent(pAPConnection, ROAMING_TRIGGER_AP_DISCONNECT, &RoamingEventData);
+	return( TI_OK );	
+}
+            
 
 /**
 *
@@ -1618,19 +1656,14 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
         return OK;
     }
 
-    if (roamingEventType == ROAMING_TRIGGER_LOW_QUALITY) 
-    {
-        EvHandlerSendEvent(pAPConnection->hEvHandler, IPC_EVENT_LOW_RSSI, NULL,0);
-    }
-    else if (roamingEventType == ROAMING_TRIGGER_LOW_SNR)
-    {
-        EvHandlerSendEvent(pAPConnection->hEvHandler, IPC_EVENT_LOW_SNR, NULL,0);
-    }
-
     /* 5. Report Roaming Manager */
     if ((pAPConnection->roamingEnabled == TRUE) && (pAPConnection->roamEventCallb != NULL))
     {
         WLAN_REPORT_INFORMATION(pAPConnection->hReport, ROAMING_MANAGER_MODULE_LOG, ("Roaming event raised: ev = %d\n", roamingEventType));
+        if (roamingEventType == ROAMING_TRIGGER_LOW_QUALITY) 
+        {
+            EvHandlerSendEvent(pAPConnection->hEvHandler, IPC_EVENT_LOW_RSSI, NULL,0);
+        }
         /* Report to Roaming Manager */
         pAPConnection->roamEventCallb(pAPConnection->hRoamMng, &roamingEventType);
     }
@@ -1789,6 +1822,28 @@ void apConn_resetRoamingStatistics(TI_HANDLE hAPConnection)
 
 /**
 *
+* apConn_stopRoamingStatistics
+*
+* \b Description: 
+*
+* Called from Measurement CCX sub-module in order to stop roaming statistics. 
+*
+* \b ARGS: AP Connection handle
+*
+* \b RETURNS:
+*
+* \sa 
+*/
+void apConn_stopRoamingStatistics(TI_HANDLE hAPConnection)
+{
+    apConn_t *pAPConnection = (apConn_t *)hAPConnection;
+    
+    pAPConnection->resetReportedRoamingStatistics = FALSE;
+}
+
+
+/**
+*
 * apConn_printStatistics
 *
 * \b Description: 
@@ -1815,7 +1870,7 @@ void apConn_printStatistics(TI_HANDLE hAPConnection)
     WLAN_OS_REPORT(("- AP Disconnect = %d\n",   ((apConn_t *)hAPConnection)->roamingTriggerEvents[ROAMING_TRIGGER_AP_DISCONNECT]));
     WLAN_OS_REPORT(("- SEC attack = %d\n",      ((apConn_t *)hAPConnection)->roamingTriggerEvents[ROAMING_TRIGGER_SECURITY_ATTACK]));
     WLAN_OS_REPORT(("\n"));
-    WLAN_OS_REPORT(("- Succesfull roaming = %d\n",                  ((apConn_t *)hAPConnection)->roamingSuccesfulHandoverTotalNum));
+    WLAN_OS_REPORT(("- Succesfull Total roaming = %d\n",                  ((apConn_t *)hAPConnection)->roamingSuccesfulHandoverTotalNum));
     WLAN_OS_REPORT(("- Unsuccesfull roaming = %d\n",                ((apConn_t *)hAPConnection)->roamingFailedHandoverNum));
     WLAN_OS_REPORT(("- Giving up roaming = %d\n",                   ((apConn_t *)hAPConnection)->retainCurrAPNum));
     WLAN_OS_REPORT(("- Disconnect cmd from roaming manager = %d\n", ((apConn_t *)hAPConnection)->disconnectFromRoamMngrNum));
@@ -1985,7 +2040,7 @@ static TI_STATUS apConn_startWaitingForTriggers(void *pData)
 {
     apConn_t    *pAPConnection;
     apConn_connStatus_t reportStatus;  
-    paramInfo_t param;
+    paramInfoPartial_t param;
 
     pAPConnection = (apConn_t *)pData;
     
@@ -1993,7 +2048,7 @@ static TI_STATUS apConn_startWaitingForTriggers(void *pData)
     {
         param.paramType   = ASSOC_ASSOCIATION_RESP_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        assoc_getParamPartial(pAPConnection->hAssoc, &param);
         reportStatus.dataBuf = (char *)(param.content.applicationConfigBuffer.buffer);
         reportStatus.dataBufLength = param.content.applicationConfigBuffer.bufferSize;
 
@@ -2034,7 +2089,7 @@ static TI_STATUS apConn_connectedToNewAP(void *pData)
 {
     apConn_t    *pAPConnection;
     apConn_connStatus_t reportStatus; 
-    paramInfo_t param;
+    paramInfoPartial_t param;
 
     pAPConnection = (apConn_t *)pData;
     
@@ -2055,7 +2110,7 @@ static TI_STATUS apConn_connectedToNewAP(void *pData)
     {
         param.paramType   = ASSOC_ASSOCIATION_RESP_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        assoc_getParamPartial(pAPConnection->hAssoc, &param);
         reportStatus.dataBuf = (char *)(param.content.applicationConfigBuffer.buffer);
         reportStatus.dataBufLength = param.content.applicationConfigBuffer.bufferSize;
 
@@ -2378,7 +2433,7 @@ static TI_STATUS apConn_invokeConnectionToNewAp(void *data)
 {
     apConn_t    *pAPConnection;
     connType_e  connType;
-    paramInfo_t param;
+    paramInfoPartial_t param;
     UINT8   staPrivacySupported, apPrivacySupported;
     BOOL    renegotiateTspec = FALSE;
     
@@ -2388,7 +2443,7 @@ static TI_STATUS apConn_invokeConnectionToNewAp(void *data)
 
     /* Check privacy compatibility */
     param.paramType = RSN_ENCRYPTION_STATUS_PARAM;
-    rsn_getParam(pAPConnection->hPrivacy, &param);
+    rsn_getParamPartial(pAPConnection->hPrivacy, &param);
 
     staPrivacySupported = (param.content.rsnEncryptionStatus == RSN_CIPHER_NONE) ? FALSE : TRUE;
     apPrivacySupported  = ((pAPConnection->newAP->capabilities >> CAP_PRIVACY_SHIFT) & CAP_PRIVACY_MASK) ? TRUE : FALSE;
@@ -2396,7 +2451,7 @@ static TI_STATUS apConn_invokeConnectionToNewAp(void *data)
     if (staPrivacySupported != apPrivacySupported)
     {
         param.paramType = RSN_MIXED_MODE;
-        rsn_getParam(pAPConnection->hPrivacy, &param);
+        rsn_getParamPartial(pAPConnection->hPrivacy, &param);
 
         if (apPrivacySupported ||
             (!param.content.rsnMixedMode && staPrivacySupported))
@@ -2477,7 +2532,7 @@ static TI_STATUS apConn_reportConnFail(void *data)
 {
     apConn_t *pAPConnection;
     apConn_connStatus_t reportStatus; 
-    paramInfo_t param;
+    paramInfoPartial_t param;
 
     pAPConnection = (apConn_t *)data;
 
@@ -2492,7 +2547,7 @@ static TI_STATUS apConn_reportConnFail(void *data)
     {
         param.paramType   = ASSOC_ASSOCIATION_RESP_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        assoc_getParamPartial(pAPConnection->hAssoc, &param);
         reportStatus.dataBuf = (char *)(param.content.applicationConfigBuffer.buffer);
         reportStatus.dataBufLength = param.content.applicationConfigBuffer.bufferSize;
 
@@ -2526,12 +2581,12 @@ static TI_STATUS apConn_reportConnFail(void *data)
 static TI_STATUS apConn_configureDriverBeforeRoaming(void *pData)
 {
     apConn_t    *pAPConnection = (apConn_t*)pData;
-    paramInfo_t param;
+    paramInfoPartial_t param;
     
     /* Configure SCR group of allowed clients according to 'Roaming' rule */
     scr_setGroup (pAPConnection->hScr, SCR_GID_ROAMING);
     param.paramType = QOS_MNGR_VOICE_RE_NEGOTIATE_TSPEC;
-    qosMngr_getParams(pAPConnection->hQos, &param);
+    qosMngr_getParamsPatial(pAPConnection->hQos, &param);
     pAPConnection->voiceTspecConfigured = param.content.TspecConfigure.voiceTspecConfigure;  
 	pAPConnection->videoTspecConfigured = param.content.TspecConfigure.videoTspecConfigure;  
     pAPConnection->resetReportedRoamingStatistics = FALSE;

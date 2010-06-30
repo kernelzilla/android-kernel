@@ -73,6 +73,15 @@
 #define MAX_WPA_CIPHER_SUITE 7
 
 
+/**************************************************************/
+/* reduce stack usage (admCtrlWpa_setSite)*/
+/**************************************************************/
+static   paramInfo_t         param;
+static   whalParamInfo_t     whalParam;
+static   wpaIeData_t         gWpaDataIE;
+/**************************************************************/
+
+
 
 /* Enumerations */
 
@@ -711,9 +720,6 @@ TI_STATUS admCtrlWpa_getInfoElement(admCtrl_t *pAdmCtrl, UINT8 *pIe, UINT8 *pLen
 TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pAssocIe, UINT8 *pAssocIeLen)
 {
     TI_STATUS           status;
-    paramInfo_t         param;
-    whalParamInfo_t     whalParam;
-    wpaIeData_t         wpaData;
     cipherSuite_e       encryptionStatus;
     admCtrlWpa_validity_t *pAdmCtrlWpa_validity=NULL;
     UINT8                 *pWpaIe;
@@ -763,23 +769,23 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
 	{                                                                                    
 		return status;                                                        
 	}
-    status = admCtrlWpa_parseIe(pAdmCtrl, pWpaIe, &wpaData);
+    status = admCtrlWpa_parseIe(pAdmCtrl, pWpaIe, &gWpaDataIE);
     if (status != OK)
     {
         return status;
     }
-    if ((wpaData.unicastSuite[0]>=MAX_WPA_CIPHER_SUITE) ||
-        (wpaData.broadcastSuite>=MAX_WPA_CIPHER_SUITE) ||
+    if ((gWpaDataIE.unicastSuite[0]>=MAX_WPA_CIPHER_SUITE) ||
+        (gWpaDataIE.broadcastSuite>=MAX_WPA_CIPHER_SUITE) ||
         (pAdmCtrl->unicastSuite>=MAX_WPA_CIPHER_SUITE))
     {
         return NOK;
     }
 
-    pAdmCtrl->encrInSw = wpaData.excKp;
-    pAdmCtrl->micInSw = wpaData.excMic; 
+    pAdmCtrl->encrInSw = gWpaDataIE.excKp;
+    pAdmCtrl->micInSw = gWpaDataIE.excMic; 
 
     /*Because ckip is a proprietary encryption for Cisco then a different validity check is needed */
-    if(wpaData.broadcastSuite == RSN_CIPHER_CKIP || wpaData.unicastSuite[0] ==  RSN_CIPHER_CKIP)
+    if(gWpaDataIE.broadcastSuite == RSN_CIPHER_CKIP || gWpaDataIE.unicastSuite[0] ==  RSN_CIPHER_CKIP)
     {
         pAdmCtrl->getCipherSuite(pAdmCtrl, &encryptionStatus);
 	/*Funk supplicant can support CCKM only if it configures the driver to TKIP encryption. */
@@ -791,15 +797,15 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
     else
     {
         /* Check validity of Group suite */
-        if (!broadcastCipherSuiteValidity[pAdmCtrl->networkMode][wpaData.broadcastSuite])
+        if (!broadcastCipherSuiteValidity[pAdmCtrl->networkMode][gWpaDataIE.broadcastSuite])
         {   /* check Group suite validity */                                          
             return NOK;
         }
 
         pAdmCtrl->getCipherSuite(pAdmCtrl, &encryptionStatus);
-        for (index=0; index<wpaData.unicastSuiteCnt; index++)
+        for (index=0; index<gWpaDataIE.unicastSuiteCnt; index++)
         {
-            pAdmCtrlWpa_validity = &admCtrlWpa_validityTable[wpaData.unicastSuite[index]][wpaData.broadcastSuite][encryptionStatus];
+            pAdmCtrlWpa_validity = &admCtrlWpa_validityTable[gWpaDataIE.unicastSuite[index]][gWpaDataIE.broadcastSuite][encryptionStatus];
             if (pAdmCtrlWpa_validity->status ==OK)
             {
                 break;
@@ -812,11 +818,11 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
         }
    
         /* set cipher suites */
-        wpaData.unicastSuite[0] = pAdmCtrlWpa_validity->unicast ;/*wpaData.unicastSuite[0];*/
-        wpaData.broadcastSuite = pAdmCtrlWpa_validity->broadcast; /*wpaData.broadcastSuite;*/
+        gWpaDataIE.unicastSuite[0] = pAdmCtrlWpa_validity->unicast ;/*wpaData.unicastSuite[0];*/
+        gWpaDataIE.broadcastSuite = pAdmCtrlWpa_validity->broadcast; /*wpaData.broadcastSuite;*/
     }
     /* set external auth mode according to the key Mng Suite */
-    switch (wpaData.KeyMngSuite[0])
+    switch (gWpaDataIE.KeyMngSuite[0])
     {
     case WPA_IE_KEY_MNG_NONE:
         pAdmCtrl->externalAuthMode = RSN_EXT_AUTH_MODE_OPEN;
@@ -839,16 +845,16 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
 
 #ifdef EXC_MODULE_INCLUDED
 	param.paramType = EXC_CCKM_EXISTS;
-	param.content.excCckmExists = (wpaData.KeyMngSuite[0]==WPA_IE_KEY_MNG_CCKM) ? TRUE : FALSE;
+	param.content.excCckmExists = (gWpaDataIE.KeyMngSuite[0]==WPA_IE_KEY_MNG_CCKM) ? TRUE : FALSE;
 	excMngr_setParam(pAdmCtrl->hExcMngr, &param);
 #endif
     /* set replay counter */
-    pAdmCtrl->replayCnt = wpaData.replayCounters;
+    pAdmCtrl->replayCnt = gWpaDataIE.replayCounters;
 
     *pAssocIeLen = pRsnData->ieLen;
     if (pAssocIe != NULL)
     {
-        os_memoryCopy(pAdmCtrl->hOs, pAssocIe, &wpaData, sizeof(wpaIeData_t));
+        os_memoryCopy(pAdmCtrl->hOs, pAssocIe, &gWpaDataIE, sizeof(wpaIeData_t));
     }
 
 
@@ -883,7 +889,7 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
 
 	/* Configure privacy status in HAL so that HW is prepared to recieve keys */
 	whalParam.paramType = HAL_CTRL_RSN_SECURITY_MODE_PARAM;   
-	whalParam.content.rsnEncryptionStatus = (halCtrl_CipherSuite_e)wpaData.unicastSuite[0];
+	whalParam.content.rsnEncryptionStatus = (halCtrl_CipherSuite_e)gWpaDataIE.unicastSuite[0];
 	status = whalCtrl_SetParam(pAdmCtrl->pRsn->hWhalCtrl, &whalParam);
 	if (status != OK)
 	{
@@ -894,14 +900,14 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
 	    
 	/* set MIC and KP in HAL  */
     whalParam.paramType = HAL_CTRL_RSN_EXC_SW_ENC_ENABLE_PARAM; 
-    whalParam.content.rsnExcSwEncFlag = wpaData.excKp;
+    whalParam.content.rsnExcSwEncFlag = gWpaDataIE.excKp;
     status = whalCtrl_SetParam(pAdmCtrl->pRsn->hWhalCtrl, &whalParam);
     if (status != OK)
     {
         return status;
     }
     whalParam.paramType = HAL_CTRL_RSN_EXC_MIC_FIELD_ENABLE_PARAM; 
-    whalParam.content.rsnExcMicFieldFlag = wpaData.excMic;
+    whalParam.content.rsnExcMicFieldFlag = gWpaDataIE.excMic;
     status = whalCtrl_SetParam(pAdmCtrl->pRsn->hWhalCtrl, &whalParam);
     
     if (status != OK)
@@ -911,7 +917,7 @@ TI_STATUS admCtrlWpa_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pA
 #endif /*EXC_MODULE_INCLUDED*/
 
     /* re-config PAE */
-    status = admCtrlWpa_dynamicConfig(pAdmCtrl,&wpaData);
+    status = admCtrlWpa_dynamicConfig(pAdmCtrl,&gWpaDataIE);
     if (status != OK)
     {
         return status;

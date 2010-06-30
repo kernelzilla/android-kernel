@@ -93,6 +93,14 @@
 /* Global variables */
 static UINT8 wpa2IeOuiIe[3] = { 0x00, 0x0f, 0xac};
 
+/**************************************************************/
+/* reduce stack usage (admCtrlWpa_setSite)*/
+/**************************************************************/
+static   paramInfo_t         param;
+static   whalParamInfo_t     whalParam;
+static   wpa2IeData_t        wpa2DataIE;
+/**************************************************************/
+
 static BOOL broadcastCipherSuiteValidity[MAX_NETWORK_MODE][MAX_WPA2_CIPHER_SUITE]=
 {
     /* RSN_IBSS */  {
@@ -716,9 +724,6 @@ TI_STATUS admCtrlWpa2_getInfoElement(admCtrl_t *pAdmCtrl, UINT8 *pIe, UINT8 *pLe
 TI_STATUS admCtrlWpa2_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *pAssocIe, UINT8 *pAssocIeLen)
 {
     TI_STATUS               status;
-    paramInfo_t             param;
-    whalParamInfo_t         whalParam;
-    wpa2IeData_t            wpa2Data;
     rsn_paeConfig_t         paeConfig;
     UINT8                   *pWpa2Ie;
     cipherSuite_e           uSuite, bSuite;
@@ -769,34 +774,34 @@ TI_STATUS admCtrlWpa2_setSite(admCtrl_t *pAdmCtrl, rsnData_t *pRsnData, UINT8 *p
     WLAN_REPORT_INFORMATION(pAdmCtrl->hReport, RSN_MODULE_LOG, 
                             ("admCtrlWpa2_setSite: RSN_IE=\n"));
     WLAN_REPORT_HEX_INFORMATION(pAdmCtrl->hReport, RSN_MODULE_LOG, pRsnData->pIe, pRsnData->ieLen);
-    status = admCtrlWpa2_parseIe(pAdmCtrl, pWpa2Ie, &wpa2Data);
+    status = admCtrlWpa2_parseIe(pAdmCtrl, pWpa2Ie, &wpa2DataIE);
     if (status != OK)
     {
         return status;
     }
-    if ((wpa2Data.unicastSuite[0]>=MAX_WPA2_CIPHER_SUITE) ||
-        (wpa2Data.broadcastSuite>=MAX_WPA2_CIPHER_SUITE) ||
+    if ((wpa2DataIE.unicastSuite[0]>=MAX_WPA2_CIPHER_SUITE) ||
+        (wpa2DataIE.broadcastSuite>=MAX_WPA2_CIPHER_SUITE) ||
         (pAdmCtrl->unicastSuite>=MAX_WPA2_CIPHER_SUITE))
     {
         return NOK;
     }
     /* Check validity of Group suite */
-    if (!broadcastCipherSuiteValidity[pAdmCtrl->networkMode][wpa2Data.broadcastSuite])
+    if (!broadcastCipherSuiteValidity[pAdmCtrl->networkMode][wpa2DataIE.broadcastSuite])
     {   /* check Group suite validity */                                          
         return NOK;
     }
 
     
-    if(admCtrlWpa2_getCipherSuiteMetric (pAdmCtrl, &wpa2Data, NULL, &uSuite, &bSuite) != OK)
+    if(admCtrlWpa2_getCipherSuiteMetric (pAdmCtrl, &wpa2DataIE, NULL, &uSuite, &bSuite) != OK)
         return NOK;
 
     /* set replay counter */
-    pAdmCtrl->replayCnt = wpa2Data.ptkReplayCounters;
+    pAdmCtrl->replayCnt = wpa2DataIE.ptkReplayCounters;
 
     *pAssocIeLen = pRsnData->ieLen;
     if (pAssocIe != NULL)
     {
-        os_memoryCopy(pAdmCtrl->hOs, pAssocIe, &wpa2Data, sizeof(wpa2IeData_t));
+        os_memoryCopy(pAdmCtrl->hOs, pAssocIe, &wpa2DataIE, sizeof(wpa2IeData_t));
     }
 
     /* re-config PAE with updated unicast and broadcast suite values            */

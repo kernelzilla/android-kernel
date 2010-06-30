@@ -220,7 +220,6 @@ TI_STATUS ctrlData_config(TI_HANDLE         hCtrlData,
     pCtrlData->disassocSentCBObj = disassocSentCBObj;
     pCtrlData->disassocSentCBFunc = disassocSentCBFunc;
 
-
     /*  set Control module parameters */
     pCtrlData->ctrlDataRateControlEnable = ctrlDataInitParams->ctrlDataRateControlEnable;
     pCtrlData->ctrlDataIbssProtectionType = ctrlDataInitParams->ctrlDataDesiredIbssProtection;
@@ -486,6 +485,39 @@ TI_STATUS ctrlData_getParam(TI_HANDLE hCtrlData, paramInfo_t *pParamInfo)
             (" ctrlData_getParam() : PARAMETER NOT SUPPORTED \n"));
         return NOK;
         break; - unreachable */
+    }
+
+    return (OK);
+}
+
+
+/***************************************************************************
+*                           ctrlData_getParam                              *
+****************************************************************************
+* DESCRIPTION:  get a specific parameter
+* 
+* INPUTS:       hCtrlData - the object
+*               
+*       
+* OUTPUT:       pParamInfo - structure which include the value of 
+*               the requested parameter
+* 
+* RETURNS:      OK
+*               NOK
+***************************************************************************/
+/* note: ctrlData_getParamPartial() is part of ctrlData_getParam() it was implemented to reduce Stack usage */
+TI_STATUS ctrlData_getParamPartial(TI_HANDLE hCtrlData, paramInfoPartial_t *pParamInfo)   
+{
+    ctrlData_t *pCtrlData = (ctrlData_t *)hCtrlData;
+    
+  switch (pParamInfo->paramType)
+    {
+    case CTRL_DATA_CURRENT_PREAMBLE_TYPE_PARAM: 
+        pParamInfo->content.ctrlDataCurrentPreambleType = pCtrlData->ctrlDataCurrentPreambleType;        
+        break; 
+
+	default:
+        return (PARAM_NOT_SUPPORTED);
     }
 
     return (OK);
@@ -1374,6 +1406,7 @@ void ctrlData_txCompleteStatus( TI_HANDLE hCtrlData,
             ("De Auth TxCmplt: txStatus = %d, txActualRate = %d  \n",pTxCompleteAttr->status,pTxCompleteAttr->rate));
             pCtrlData->disassocSentCBFunc( pCtrlData->disassocSentCBObj );
     }
+
     if(txData_isQueueUseMediumTime(pCtrlData->hTxData , qId) == TRUE )
     {
         WLAN_REPORT_INFORMATION(pCtrlData->hReport, CTRL_DATA_MODULE_LOG, 

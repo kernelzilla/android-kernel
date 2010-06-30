@@ -207,7 +207,16 @@ static void siteMgr_externalConfigurationParametersSet(TI_HANDLE hSiteMgr);
 
 void siteMgr_gotFirstBcn(TI_HANDLE hSiteMgr);
 
-
+/**************************************************************/
+/* DEBUG CLI CRASH                                            */
+/**************************************************************/
+static    whalCtrl_joinBss_t      joinParams;
+static    whalCtrl_setTemplate_t  templateStruct;
+static    probeRspTemplate_t      probeRspTemplate;
+static    nullDataTemplate_t      nullDataTemplate;
+static    psPollTemplate_t        psPollTemplate;
+static    QosNullDataTemplate_t   QosNullDataTemplate;
+/**************************************************************/
 
 #define CHAN_FREQ_TABLE_SIZE        (sizeof(ChanFreq) / sizeof(struct CHAN_FREQ))
 
@@ -1434,7 +1443,7 @@ TI_STATUS siteMgr_getParam(TI_HANDLE        hSiteMgr,
         break;
 
     case SITE_MGR_DESIRED_DOT11_MODE_PARAM:
-			pParam->content.siteMgrDot11Mode = pSiteMgr->pDesiredParams->siteMgrDesiredDot11Mode;
+        pParam->content.siteMgrDot11Mode = pSiteMgr->pDesiredParams->siteMgrDesiredDot11Mode;
         break;
 
 	case SITE_MGR_NETWORK_TYPE_IN_USE:
@@ -1636,16 +1645,9 @@ RETURN:     OK on success, NOK otherwise
 TI_STATUS siteMgr_join(TI_HANDLE    hSiteMgr)
 {
     siteMgr_t               *pSiteMgr = (siteMgr_t *)hSiteMgr;
-    whalCtrl_joinBss_t      joinParams;
-    whalCtrl_setTemplate_t  templateStruct;
-    probeRspTemplate_t      probeRspTemplate;
-    nullDataTemplate_t      nullDataTemplate;
-    psPollTemplate_t        psPollTemplate;
-    QosNullDataTemplate_t   QosNullDataTemplate;
     siteEntry_t             *pPrimarySite = pSiteMgr->pSitesMgmtParams->pPrimarySite;
     rate_e                  rate;
-    paramInfo_t             param;
-
+	paramInfoPartial_t      param;
 
     if (pPrimarySite == NULL)
     {
@@ -1679,7 +1681,7 @@ TI_STATUS siteMgr_join(TI_HANDLE    hSiteMgr)
     joinParams.hwGenCtrlTxRate = rate;
 
     param.paramType = CTRL_DATA_CURRENT_PREAMBLE_TYPE_PARAM;
-    ctrlData_getParam(pSiteMgr->hCtrlData, &param);
+    ctrlData_getParamPartial(pSiteMgr->hCtrlData, &param);
     joinParams.preamble = param.content.ctrlDataCurrentPreambleType;
      /*set the preamble before the join*/
     whalCtrl_SetPreamble(pSiteMgr->hHalCtrl, joinParams.preamble);
@@ -2543,15 +2545,14 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
         
         UPDATE_CAPABILITIES(pSite, pFrameInfo);
         
-            if (utils_isIESSID_Broadcast(pFrameInfo->content.iePacket.pSsid) == FALSE)
-            {   /* And the SSID is not Broadcast */
+		if (utils_isIESSID_Broadcast(pFrameInfo->content.iePacket.pSsid) == FALSE)
+        {   /* And the SSID is not Broadcast */
                 ssidUpdated = TRUE;
                 UPDATE_SSID(pSite, pFrameInfo);
-            }
+        }
 
         if (ssidUpdated)
         {
-
             UPDATE_PRIVACY(pSite, pFrameInfo);
         }
 
@@ -2592,7 +2593,6 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
 
         /* Updating QoS params */
         updateBeaconQosParams(pSiteMgr, pSite, pFrameInfo);
-
 
         /* updating CountryIE  */
         if ((pFrameInfo->content.iePacket.country  != NULL) && 
@@ -2790,7 +2790,7 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
             param.paramType = REGULATORY_DOMAIN_COUNTRY_PARAM;
             param.content.pCountry = (country_t *)pFrameInfo->content.iePacket.country;
             regulatoryDomain_setParam(pSiteMgr->hRegulatoryDomain,&param);
-        }
+		}
 
         UPDATE_LOCAL_TIME_STAMP(pSiteMgr, pSite, pFrameInfo);
 

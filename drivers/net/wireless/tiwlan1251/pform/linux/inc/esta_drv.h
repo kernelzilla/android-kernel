@@ -330,5 +330,6 @@ int tiwlan_start_drv(tiwlan_net_dev_t *drv);
 int tiwlan_stop_drv(tiwlan_net_dev_t *drv);
 int tiwlan_stop_and_destroy_drv(tiwlan_net_dev_t *drv);
 int tiwlan_stop_and_destroy_drv_request(tiwlan_req_t *req);
+int tiwlan_ioctl_init(struct net_device *dev);
 
 #endif /* ESTA_DRV_INCLUDE_FILE*/

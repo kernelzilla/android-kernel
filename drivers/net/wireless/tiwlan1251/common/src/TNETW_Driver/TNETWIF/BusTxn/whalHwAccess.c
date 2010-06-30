@@ -117,7 +117,7 @@
   #else /* ifdef _WINDOWS */
   #endif /* ifdef _WINDOWS */
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
 #include "wspi.h" 
 
@@ -357,7 +357,7 @@ TI_HANDLE   whal_hwAccess_Create(TI_HANDLE hOs)
 
     status = SDIO_Init(&configParams, &pHwAccess->hDriver); 
     
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     pHwAccess->AsyncMode = TRUE;
 
@@ -403,7 +403,7 @@ int whal_hwAccess_Destroy(TI_HANDLE hHwAccess)
         SDIO_Stop(pHwAccess->hDriver, 0);
         SDIO_Shutdown(pHwAccess->hDriver);  
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
         WSPI_Close(pHwAccess->hDriver);
 
@@ -463,7 +463,7 @@ int whal_hwAccess_Config(TI_HANDLE hHwAccess, TI_HANDLE hReport,UINT32 RegBaseAd
 
     status = (status == SDIO_SUCCESS) ? TNETWIF_COMPLETE : TNETWIF_ERROR;
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     wspi_config.isFixedAddress = FALSE;
     wspi_config.fixedBusyLength = HW_ACCESS_WSPI_FIXED_BUSY_LEN;
@@ -509,7 +509,7 @@ int whal_hwAccess_ReConfig(TI_HANDLE hHwAccess)
 #ifdef HW_ACCESS_SDIO
     SDIO_Stop (pHwAccess->hDriver, 0);
     SDIO_Start (pHwAccess->hDriver);
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
     /* TODO*/
 #endif
 #endif /* _WINDOWS */
@@ -539,7 +539,7 @@ int whal_hwAccess_WriteELP (TI_HANDLE hHwAccess, UINT32 data)
 
 #ifdef HW_ACCESS_SDIO
     status = SDIO_TNETW_Set_ELP_Reg(pHwAccess->hDriver, HW_ACCESS_ELP_CTRL_REG_ADDR, data);
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
     status = WSPI_WriteSync (pHwAccess->hDriver, HW_ACCESS_ELP_CTRL_REG_ADDR, (UINT8*)&data, HW_ACCESS_REGISTER_SIZE); 
 #endif
 
@@ -738,7 +738,7 @@ int         whal_hwAccess_ReadMem_Align(TI_HANDLE hHwAccess, UINT32 addr, UINT8*
     os_profile (pHwAccess->hOs, 3, 0);
 
     
-#elif HW_ACCESS_WSPI    
+#elif defined(HW_ACCESS_WSPI)    
 
     /* check address */
     if (((addr+len) > pHwAccess->workingPartUpperLimit) || (addr < pHwAccess->MemRegionAddr))
@@ -839,7 +839,7 @@ int         whal_hwAccess_WriteMem_Align(TI_HANDLE hHwAccess, UINT32 addr, UINT8
     os_profile (pHwAccess->hOs, 3, 0);
  
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     /* check address */
     if (((addr+len) > pHwAccess->workingPartUpperLimit) || (addr < pHwAccess->MemRegionAddr))
@@ -1123,7 +1123,7 @@ int         whal_hwAccess_ReadMem(TI_HANDLE hHwAccess, UINT32 addr, UINT8* data,
 
 #ifdef HW_ACCESS_SDIO
     struct SDIO_Request request;
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
     int reminder = len%HW_ACCESS_WSPI_ALIGNED_SIZE;
     int tempLen = len - reminder;
     UINT32 mask = 0;
@@ -1189,7 +1189,7 @@ int         whal_hwAccess_ReadMem(TI_HANDLE hHwAccess, UINT32 addr, UINT8* data,
         return status;
     }
 
-#elif HW_ACCESS_WSPI 
+#elif defined(HW_ACCESS_WSPI) 
 
     /* check address */
     if (((addr+len) > pHwAccess->workingPartUpperLimit) || (addr < pHwAccess->MemRegionAddr))
@@ -1297,7 +1297,7 @@ int         whal_hwAccess_WriteMem(TI_HANDLE hHwAccess, UINT32 addr, UINT8* data
     
 #ifdef HW_ACCESS_SDIO
     struct SDIO_Request request;
-#elif HW_ACCESS_WSPI    
+#elif defined(HW_ACCESS_WSPI)    
     int reminder = len % HW_ACCESS_WSPI_ALIGNED_SIZE;
     int tempLen = len - reminder;
     UINT32 mask = 0;
@@ -1360,7 +1360,7 @@ int         whal_hwAccess_WriteMem(TI_HANDLE hHwAccess, UINT32 addr, UINT8* data
         return status;
     }
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     /* check address */
     if (((addr+len) > pHwAccess->workingPartUpperLimit) || (addr < pHwAccess->MemRegionAddr))
@@ -1705,7 +1705,7 @@ int whal_hwAccess_ReadMemAsync (TI_HANDLE hHwAccess, UINT32 addr, UINT8* data, U
         return TNETWIF_COMPLETE;
     }
             
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     os_profile (pHwAccess->hOs, 2, 0);
 
@@ -1779,7 +1779,7 @@ int         whal_hwAccess_ReadReg(TI_HANDLE hHwAccess, UINT32 addr, UINT32* data
     os_profile (pHwAccess->hOs, 3, 0);
 
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     status = whal_hwAccess_ReadRegAsync(hHwAccess, addr, data);
     if (status == TNETWIF_COMPLETE)
@@ -1856,7 +1856,7 @@ int whal_hwAccess_Stop(TI_HANDLE hHwAccess)
 
 #ifdef HW_ACCESS_SDIO
     SDIO_Stop(pHwAccess->hDriver,0);
-#elif defined (HW_ACCESS_WSPI)
+#elif defined(HW_ACCESS_WSPI)
     /* TODO*/
 #endif
     return OK;
@@ -1914,7 +1914,7 @@ int         whal_hwAccess_WriteReg(TI_HANDLE hHwAccess, UINT32 addr, UINT32 data
 
     os_profile (pHwAccess->hOs, 3, 0);
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
     status = whal_hwAccess_WriteRegAsync(hHwAccess, addr,  data);
     if (status == TNETWIF_COMPLETE)
     {
@@ -2176,7 +2176,7 @@ int whal_hwAccess_SetPartitions (TI_HANDLE hHwAccess, TNETIF_HwAccess_SetPartiti
     status = (status == SDIO_SUCCESS) ? SDIO_TNETWConfig(pHwAccess->hDriver, &cfg) : status;  
     status = (status == SDIO_SUCCESS) ? TNETWIF_COMPLETE : TNETWIF_ERROR;
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
     /* 
      * IMPORTANT NOTE (TODO): the ASYNC API is used here assuming the call will always
      * be completed synchronously. This is done because only the Async API is wokring
@@ -2272,7 +2272,7 @@ int whal_hwAccess_SetPartitionsAsync (TI_HANDLE hHwAccess, TNETIF_HwAccess_SetPa
     status = (status == SDIO_SUCCESS) ? SDIO_TNETWConfig(pHwAccess->hDriver, &cfg) : status;  
     status = (status == SDIO_SUCCESS) ? TNETWIF_COMPLETE : TNETWIF_ERROR;
 
-#elif HW_ACCESS_WSPI
+#elif defined(HW_ACCESS_WSPI)
 
     /* May use only one write because the addresses in the firmware are sequential */
     status = WSPI_WriteAsync (pHwAccess->hDriver, 
@@ -2867,7 +2867,7 @@ void whal_hwAccess_Print(TI_HANDLE hHwAccess)
     
       return (status == SDIO_SUCCESS) ? OK : NOK;
   }
-#elif defined (HW_ACCESS_WSPI)
+#elif defined(HW_ACCESS_WSPI)
   TI_STATUS whal_hwAccess_RecreateInterface(TI_HANDLE hHwAccess)
   {
       HwAccess_T_new *pHwAccess = (HwAccess_T_new*)hHwAccess;

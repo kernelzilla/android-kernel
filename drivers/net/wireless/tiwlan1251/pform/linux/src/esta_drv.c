@@ -104,7 +104,6 @@
 #include "802_11Defs.h"
 #include "Ethernet.h"
 #include "tiwlan_profile.h"
-#include "ioctl_utils.h"
 
 #if defined(CONFIG_TROUT_PWRSINK) || defined(CONFIG_HTC_PWRSINK)
 #define RX_RATE_INTERVAL_SEC 10
@@ -115,7 +114,9 @@ static unsigned long num_rx_pkt_last = 0;
 #ifdef TIWLAN_MSM7000
 extern unsigned char *get_wifi_nvs_ram(void);
 extern void SDIO_SetFunc( struct sdio_func * );
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 29))
 static struct proc_dir_entry *tiwlan_calibration;
+#endif
 static struct completion sdio_wait;
 #ifdef CONFIG_WIFI_CONTROL_FUNC
 static struct wifi_platform_data *wifi_control_data = NULL;
@@ -151,7 +152,27 @@ typedef void (* tiwlan_drv_isr_t)(int, void *, struct pt_regs *);
 static int tiwlan_drv_net_open(struct net_device * dev);
 static int tiwlan_drv_net_stop(struct net_device * dev);
 static int tiwlan_drv_net_xmit(struct sk_buff * skb, struct net_device * dev);
+static int tiwlan_drv_dummy_net_xmit(struct sk_buff * skb, struct net_device * dev);
 static struct net_device_stats * tiwlan_drv_net_get_stats(struct net_device * dev);
+int ti1610_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 31))
+static struct net_device_ops tiwlan_ops_pri = {
+	.ndo_open = tiwlan_drv_net_open,
+	.ndo_stop = tiwlan_drv_net_stop,
+	.ndo_get_stats = tiwlan_drv_net_get_stats,
+	.ndo_do_ioctl = ti1610_do_ioctl,
+	.ndo_start_xmit = tiwlan_drv_net_xmit,
+};
+
+static struct net_device_ops tiwlan_ops_dummy = {
+	.ndo_open = tiwlan_drv_net_open,
+	.ndo_stop = tiwlan_drv_net_stop,
+	.ndo_get_stats = tiwlan_drv_net_get_stats,
+	.ndo_do_ioctl = ti1610_do_ioctl,
+	.ndo_start_xmit = tiwlan_drv_dummy_net_xmit,
+};
+#endif
 
 #define OS_WRITE_REG(drv,reg,val)   \
     os_hwWriteMemRegisterUINT32(drv, (UINT32 *)((unsigned long)drv->acx_reg.va + reg), (__u32)(val))
@@ -447,6 +468,7 @@ static int tiwlan_deb_write_proc(struct file *file, const char *buffer,
 }
 
 #ifdef TIWLAN_MSM7000
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 29))
 #define WIFI_NVS_LEN_OFFSET     0x0C
 #define WIFI_NVS_DATA_OFFSET    0x40
 #define WIFI_NVS_MAX_SIZE       0x800UL
@@ -487,6 +509,7 @@ static int tiwlan_calibration_write_proc(struct file *file, const char *buffer,
 {
     return 0;
 }
+#endif
 #endif
 
 /*********************************************************************************************/
@@ -747,14 +770,6 @@ struct net_device_stats * tiwlan_drv_net_get_stats(struct net_device * dev)
     return &drv->stats;
 }
 
-static const struct net_device_ops tiwlan_drv_net_dev_ops =
-{
-    .ndo_open = tiwlan_drv_net_open,
-    .ndo_stop = tiwlan_drv_net_stop,
-    .ndo_start_xmit = tiwlan_drv_net_xmit,
-    .ndo_get_stats = tiwlan_drv_net_get_stats,
-    .ndo_do_ioctl = ti1610_do_ioctl
-};
 
 static int setup_netif(tiwlan_net_dev_t *drv)
 {
@@ -772,8 +787,23 @@ static int setup_netif(tiwlan_net_dev_t *drv)
     drv->netdev = dev;
     strcpy(dev->name, TIWLAN_DRV_IF_NAME);
     netif_carrier_off(dev);
-    dev->netdev_ops = &tiwlan_drv_net_dev_ops;
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 31))
+    dev->open = tiwlan_drv_net_open;
+    dev->stop = tiwlan_drv_net_stop;
+    dev->hard_start_xmit = tiwlan_drv_dummy_net_xmit;
+    dev->get_stats = tiwlan_drv_net_get_stats;
+#else
+    dev->netdev_ops = &tiwlan_ops_dummy;
+#endif
     dev->tx_queue_len = 100;
+
+    res = tiwlan_ioctl_init(dev);
+    if( res < 0 )
+    {
+        ti_dprintf(TIWLAN_LOG_ERROR, "tiwlan_ioctl_init() failed : %d\n", res);
+        kfree(dev);
+        return res;
+    }
 
     res = register_netdev(dev);
     if (res != 0)
@@ -930,7 +960,7 @@ static void tiwlan_irq_handler( struct work_struct *work )
     if( drv->receive_packet ) {
         drv->receive_packet = 0;
         /* Keep awake for 500 ms to give a chance to network stack */
-        android_lock_suspend_auto_expire( &drv->rx_wake_lock, (HZ >> 1) );
+        android_lock_suspend_auto_expire( &drv->rx_wake_lock, HZ );
     }
     android_unlock_suspend( &drv->exec_wake_lock );
 #endif
@@ -1338,6 +1368,9 @@ int tiwlan_init_drv (tiwlan_net_dev_t *drv, tiwlan_dev_init_t *init_info)
 #endif
             return rc;
         }
+#ifdef CONFIG_ANDROID_POWER
+        set_irq_wake(drv->irq, 1);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
         set_irq_type (drv->irq, IRQT_FALLING);
 #else
@@ -1407,6 +1440,11 @@ int tiwlan_init_drv (tiwlan_net_dev_t *drv, tiwlan_dev_init_t *init_info)
         }
 
         /* Finalize network interface setup */
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 31))
+        drv->netdev->hard_start_xmit = tiwlan_drv_net_xmit;
+#else
+        drv->netdev->netdev_ops = &tiwlan_ops_pri;
+#endif
         memcpy (drv->netdev->dev_addr, drv->adapter.CurrentAddr, MAC_ADDR_LEN);
         drv->netdev->addr_len = MAC_ADDR_LEN;
 
@@ -1528,7 +1566,14 @@ static void tiwlan_destroy_drv(tiwlan_net_dev_t *drv)
         }
         else
             del_timer_sync(&drv->poll_timer);
-
+#ifdef DM_USE_WORKQUEUE
+        flush_work(&drv->tirq);
+        flush_work(&drv->tw);
+        flush_work(&drv->txmit);
+#if defined(CONFIG_TROUT_PWRSINK) || defined(CONFIG_HTC_PWRSINK)
+        cancel_delayed_work_sync(&drv->trxw);
+#endif
+#endif
         /* Unload all modules (free memory) & destroy timers */
         configMgr_UnloadModules (drv->adapter.CoreHalCtx);
 
@@ -1801,10 +1846,12 @@ int omap1610_drv_create(void)
 
 #define TROUT_IRQ MSM_GPIO_TO_INT(29)
 
+#ifdef SDIO_INTERRUPT_HANDLING_ON
 static void tiwlan_sdio_irq(struct sdio_func *func)
 {
     printk("%s:\n", __FUNCTION__);
 }
+#endif
 
 static const struct sdio_device_id tiwlan_sdio_ids[] = {
     { SDIO_DEVICE_CLASS(SDIO_CLASS_WLAN)    },
@@ -1852,11 +1899,11 @@ static int tiwlan_sdio_probe(struct sdio_func *func, const struct sdio_device_id
     rc = tiwlan_sdio_init(func);
     if (rc)
         goto err2;
-
+#ifdef SDIO_INTERRUPT_HANDLING_ON
     rc = sdio_claim_irq(func, tiwlan_sdio_irq);
     if (rc)
         goto err1;
-
+#endif
     SDIO_SetFunc( func );
 
     rc = tiwlan_create_drv(0, 0, 0, 0, 0, TROUT_IRQ, NULL, NULL);
@@ -1864,8 +1911,10 @@ static int tiwlan_sdio_probe(struct sdio_func *func, const struct sdio_device_id
     printk(KERN_INFO "TIWLAN: Driver initialized (rc %d)\n", rc);
     complete(&sdio_wait);
     return rc;
+#ifdef SDIO_INTERRUPT_HANDLING_ON
 err1:
     sdio_disable_func(func);
+#endif
 err2:
     sdio_release_host(func);
     complete(&sdio_wait);
@@ -1876,7 +1925,9 @@ err2:
 static void tiwlan_sdio_remove(struct sdio_func *func)
 {
     printk(KERN_DEBUG "TIWLAN: Releasing SDIO resources\n");
+#ifdef SDIO_INTERRUPT_HANDLING_ON
     sdio_release_irq(func);
+#endif
     sdio_disable_func(func);
     sdio_release_host(func);
     printk(KERN_DEBUG "TIWLAN: SDIO resources released\n");
@@ -2014,20 +2065,21 @@ static int __init tiwlan_module_init(void)
         return rc;
     }
     /* rc = tiwlan_create_drv(0, 0, 0, 0, 0, TROUT_IRQ, NULL, NULL); -- Called in probe */
-
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 29))
     tiwlan_calibration = create_proc_entry("calibration", 0644, NULL);
-    if (tiwlan_calibration == NULL) {
-        remove_proc_entry(TIWLAN_DBG_PROC, NULL);
-        return -EINVAL;
+    if (tiwlan_calibration) {
+        tiwlan_calibration->size = tiwlan_get_nvs_size();
+        tiwlan_calibration->read_proc = tiwlan_calibration_read_proc;
+        tiwlan_calibration->write_proc = tiwlan_calibration_write_proc;
     }
-    tiwlan_calibration->size = tiwlan_get_nvs_size();
-    tiwlan_calibration->read_proc = tiwlan_calibration_read_proc;
-    tiwlan_calibration->write_proc = tiwlan_calibration_write_proc;
-
+#endif
     if (!wait_for_completion_timeout(&sdio_wait, msecs_to_jiffies(10000))) {
         printk(KERN_ERR "%s: Timed out waiting for device detect\n", __func__);
         remove_proc_entry(TIWLAN_DBG_PROC, NULL);
-        remove_proc_entry("calibration", NULL);
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 29))
+	if (tiwlan_calibration)
+            remove_proc_entry("calibration", NULL);
+#endif
         sdio_unregister_driver(&tiwlan_sdio_drv);
 #ifdef CONFIG_WIFI_CONTROL_FUNC
         wifi_del_dev();
@@ -2066,7 +2118,10 @@ static void __exit tiwlan_module_cleanup(void)
     }
     remove_proc_entry(TIWLAN_DBG_PROC, NULL);
 #ifdef TIWLAN_MSM7000
-    remove_proc_entry("calibration", NULL);
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 29))
+    if(tiwlan_calibration)
+        remove_proc_entry("calibration", NULL);
+#endif
     sdio_unregister_driver(&tiwlan_sdio_drv);
 #ifdef CONFIG_WIFI_CONTROL_FUNC
     wifi_del_dev();

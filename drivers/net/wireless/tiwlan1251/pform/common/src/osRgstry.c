@@ -914,19 +914,17 @@ Return Value:
 -----------------------------------------------------------------------------*/
 void regConvertStringtoMACAddress(UINT8 *staMACAddressString,UINT8 *MacAddressArray)
 {
-
-char *ptr;
-UINT8 *tmpMacAddr;
-UINT8 value=0,value_l,value_h,add_value;
-int i;
-
+    char *ptr;
+    UINT8 *tmpMacAddr;
+    UINT8 value = 0, value_l, value_h, add_value;
+    int i, str_len;
 
     /* Take the pointer to the string MAC Address to convert it to the Array MAC Address */
-    ptr=(char *)staMACAddressString;
+    ptr = (char *)staMACAddressString;
     tmpMacAddr = MacAddressArray;
-
+    str_len = 3 * MAC_ADDR_LEN - 1;
 #if 0 
-    for(i=0 ; i<MAC_ADDR_LEN ; ptr++)
+    for(i=0; i<MAC_ADDR_LEN ; ptr++)
     {
         value_l = (*ptr-'0');
 
@@ -936,8 +934,6 @@ int i;
         {
             value = value*10 + value_l;             
             /* PRINTF(DBG_REGISTRY,("value %d value_l %d  \n",value,value_l));*/
-
-
         }
         else
         {
@@ -946,18 +942,18 @@ int i;
             value = 0;
             i++;
         }
-
     }
-
 #else
-
-    for(i=0 ; i<MAC_ADDR_LEN ; ptr++)
+    for(i=0;(i < MAC_ADDR_LEN);ptr++,str_len--)
     {
-        
-        /* The value can be or "0-9" or from "a-f" */
-        value_l = (*ptr-'0');
-        value_h = (*ptr - 'a');
-
+        if (str_len > 0) {
+            /* The value can be or "0-9" or from "a-f" */
+            value_l = (*ptr - '0');
+            value_h = (*ptr - 'a');
+        }
+        else { /* last element */
+            value_l = value_h = 16;
+        }
         /*PRINTF(DBG_REGISTRY,("value_l [%d] value_h [%d] *ptr %c value %d\n",value_l,value_h,*ptr,value));*/
 
         if( (value_l <= 9) || (value_h <= 15 ) )
@@ -974,19 +970,16 @@ int i;
                 /* 'a' is in fact 10 decimal in hexa */
                 add_value = value_h + 10;
             }
-            value = value*16 + add_value;               
-        /*  PRINTF(DBG_REGISTRY,("value %d add_value %d  \n",value,add_value));*/
-
-
+            value = value * 16 + add_value;
+            /*PRINTF(DBG_REGISTRY,("value %d add_value %d  \n",value,add_value));*/
         }
         else
         {
             tmpMacAddr[i] = value;
-        /*  PRINTF(DBG_REGISTRY,("tmpMacAddr[%d]  is %x\n",i,tmpMacAddr[i]));*/
+            /*PRINTF(DBG_REGISTRY,("tmpMacAddr[%d]  is %x\n",i,tmpMacAddr[i]));*/
             value = 0;
             i++;
         }
-
     }
 #endif
 
@@ -1048,7 +1041,7 @@ regFillInitTable(
 
     /*defaults values for beacon IE table*/
     /*UINT8 defBeaconIETableSize = 0 ;*/
-    UINT8 defBeaconIETable[] = "00 01 01 01 32 01 2a 01 03 01 06 01 07 01 20 01 25 01 23 01 30 01 28 01 2e 01 85 01 dd 01 00 52 f2 02 00 01";
+    static UINT8 defBeaconIETable[] = "00 01 01 01 32 01 2a 01 03 01 06 01 07 01 20 01 25 01 23 01 30 01 28 01 2e 01 85 01 dd 01 00 52 f2 02 00 01";
     /*UINT8 tmpIeTable[BEACON_FILTER_TABLE_MAX_SIZE] ;*/
     UINT8 staBeaconFilterIETable[BEACON_FILTER_STRING_MAX_LEN] ;
     UINT8 tmpIeTableSize = 35;
@@ -1063,11 +1056,11 @@ regFillInitTable(
     initTable_t* p = (initTable_t*) pInitTable;
     USHORT  tableLen = 0;
     USHORT  loopIndex = 0;
-    UINT8   ScanControlTable24Tmp[2 * NUM_OF_CHANNELS_24];
-    UINT8   ScanControlTable5Tmp[2 * A_5G_BAND_NUM_CHANNELS];
-    UINT8   ScanControlTable24Def[2* NUM_OF_CHANNELS_24] = "FFFFFFFFFFFFFFFFFFFFFFFFFFFF";
-    UINT8   ScanControlTable5Def[2 * A_5G_BAND_NUM_CHANNELS] = "FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000000000000000000000000000000000000000000000000000000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000FF000000FF000000FF000000FF00000000000000000000000000000000000000";
-    UINT8   reportSeverityTableDefaults[WLAN_MAX_SEVERITIES] = "000000000000";
+    static UINT8   ScanControlTable24Tmp[2 * NUM_OF_CHANNELS_24];
+    static UINT8   ScanControlTable5Tmp[2 * A_5G_BAND_NUM_CHANNELS];
+    static UINT8   ScanControlTable24Def[2* NUM_OF_CHANNELS_24] = "FFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+    static UINT8   ScanControlTable5Def[2 * A_5G_BAND_NUM_CHANNELS] = "FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000000000000000000000000000000000000000000000000000000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000FF000000FF000000FF000000FF00000000000000000000000000000000000000";
+    UINT8   reportSeverityTableDefaults[WLAN_MAX_SEVERITIES] = "00000000000";
     UINT8   reportModuleTableDefaults[WLAN_MAX_LOG_MODULES];
     UINT16  reportSeverityTableLen;
     UINT16  reportModuleTableLen;
@@ -4913,17 +4906,15 @@ Return Value:
 -----------------------------------------------------------------------------*/
 void regConvertStringtoBeaconIETable(UINT8 *staIpAddressString,UINT8 *IpAddressArray, UINT8 size)
 {
-
-char *ptr;
-UINT8 *tmpIpAddr;
-UINT8 value=0,value_l,value_h,add_value;
-int i;
-
+    char *ptr;
+    UINT8 *tmpIpAddr;
+    UINT8 value = 0, value_l, value_h, add_value;
+    int i, str_len;
 
     /* Take the pointer to the string MAC Address to convert it to the Array MAC Address */
-    ptr=(char *)staIpAddressString;
+    ptr = (char *)staIpAddressString;
     tmpIpAddr = IpAddressArray;
-
+    str_len = 3 * size - 1;
 #if 0 
     for(i=0 ; i<size ; ptr++)
     {
@@ -4935,8 +4926,6 @@ int i;
         {
             value = value*10 + value_l;             
             /* PRINTF(DBG_REGISTRY,("value %d value_l %d  \n",value,value_l));*/
-
-
         }
         else
         {
@@ -4947,16 +4936,17 @@ int i;
         }
 
     }
-
 #else
-
-    for(i=0 ; i<size ; ptr++)
+    for(i=0;(i < size);ptr++,str_len--)
     {
-        
-        /* The value can be or "0-9" or from "a-f" */
-        value_l = (*ptr-'0');
-        value_h = (*ptr - 'a');
-
+        if (str_len > 0) {
+            /* The value can be or "0-9" or from "a-f" */
+            value_l = (*ptr - '0');
+            value_h = (*ptr - 'a');
+        }
+        else { /* last element */
+            value_l = value_h = 16;
+        }
         /*PRINTF(DBG_REGISTRY,("value_l [%d] value_h [%d] *ptr %c value %d\n",value_l,value_h,*ptr,value));*/
 
         if( (value_l <= 9) || (value_h <= 15 ) )
@@ -4973,22 +4963,18 @@ int i;
                 /* 'a' is in fact 10 decimal in hexa */
                 add_value = value_h + 10;
             }
-            value = value*16 + add_value;               
-        /*  PRINTF(DBG_REGISTRY,("value %d add_value %d  \n",value,add_value));*/
-
-
+            value = value * 16 + add_value;
+            /*PRINTF(DBG_REGISTRY,("value %d add_value %d  \n",value,add_value));*/
         }
         else
         {
             tmpIpAddr[i] = value;
-        /*  PRINTF(DBG_REGISTRY,("tmpMacAddr[%d]  is %x\n",i,tmpMacAddr[i]));*/
+            /*PRINTF(DBG_REGISTRY,("tmpMacAddr[%d]  is %x\n",i,tmpMacAddr[i]));*/
             value = 0;
             i++;
         }
-
     }
 #endif
-
 }
 
 //TRS:WDK provide callback functions

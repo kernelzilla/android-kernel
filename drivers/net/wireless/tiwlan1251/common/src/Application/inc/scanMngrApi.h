@@ -300,6 +300,9 @@ TI_STATUS scanMngr_setParam( TI_HANDLE hScanMngr, paramInfo_t *pParam );
  */
 void scanMngr_setScanPolicy( TI_HANDLE hScanMngr, scan_Policy_t* scanPolicy );
 
+/* Clear all candidate BSSList for Roaming */
+void scanMngrClearBSSListEntry( TI_HANDLE hScanMngr );
+
 #ifdef TI_DBG
 /**
  * \author Ronen Kalish\n

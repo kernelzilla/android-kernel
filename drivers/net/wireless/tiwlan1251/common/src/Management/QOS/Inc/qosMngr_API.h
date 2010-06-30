@@ -104,7 +104,11 @@ TI_STATUS qosMngr_connect(TI_HANDLE hQosMngr);
 
 TI_STATUS qosMngr_setParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo);
 
+TI_STATUS qosMngr_setParamsPartial(TI_HANDLE  hQosMngr,paramInfoPartial_t *pParamInfo);
+
 TI_STATUS qosMngr_getParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo);
+
+TI_STATUS qosMngr_getParamsPatial(TI_HANDLE  hQosMngr,paramInfoPartial_t *pParamInfo);
 
 TI_STATUS qosMngr_assocReqBuild(TI_HANDLE  hQosMngr, UINT8 *pQosIe, UINT8 *pLen);
 
