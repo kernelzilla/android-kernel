@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -450,7 +450,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 #endif
 	struct diag_send_desc_type send = { NULL, NULL, DIAG_STATE_START, 0 };
 	struct diag_hdlc_dest_type enc = { NULL, NULL, 0 };
-	void *buf_copy;
+	void *buf_copy = NULL;
 	int payload_size;
 
 	if (((driver->logging_mode == USB_MODE) && (!driver->usb_connected)) ||
@@ -465,6 +465,10 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	payload_size = count - 4;
 
 	if (pkt_type == MEMORY_DEVICE_LOG_TYPE) {
+		if (!mask_request_validate((unsigned char *)buf)) {
+			printk(KERN_ALERT "mask request Invalid ..cannot send to modem \n");
+			return -EFAULT;
+		}
 		buf = buf + 4;
 #ifdef DIAG_DEBUG
 		printk(KERN_INFO "\n I got the masks: %d\n", payload_size);
@@ -608,6 +612,43 @@ fail_free_hdlc:
 fail_free_copy:
 	diagmem_free(driver, buf_copy, POOL_TYPE_COPY);
 	return ret;
+}
+
+int mask_request_validate(unsigned char mask_buf[])
+{
+	if (mask_buf[4] == 0x1D || mask_buf[4] == 0x00 ||
+		mask_buf[4] == 0x7C || mask_buf[4] == 0x1C ||
+		mask_buf[4] == 0x0C || mask_buf[4] == 0x63 ||
+		mask_buf[4] == 0x73 || mask_buf[4] == 0x7D ||
+		mask_buf[4] == 0x81 || mask_buf[4] == 0x60 ||
+		mask_buf[4] == 0x82)
+			return 1;
+	else if (mask_buf[4] == 0x4B) {
+		switch (mask_buf[5]) {
+		case 0xF:
+		case 0x9:
+			if (mask_buf[6] == 0 && mask_buf[7] == 0)
+				return 1;
+			else
+				return 0;
+		case 0x8:
+		case 0x13:
+			if ((mask_buf[6] == 1 || mask_buf[6] == 0) &&
+						 mask_buf[7] == 0)
+				return 1;
+			else
+				return 0;
+		case 0x4:
+			if ((mask_buf[6] == 0 || mask_buf[6] == 0xF) &&
+							 mask_buf[7] == 0)
+				return 1;
+			else
+				return 0;
+		default:
+				return 0;
+		}
+	} else
+		return 0;
 }
 
 static const struct file_operations diagcharfops = {
