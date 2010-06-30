@@ -27,6 +27,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 #include <linux/uaccess.h>
 #include <linux/workqueue.h>
 #include <asm/ioctls.h>
@@ -34,8 +35,9 @@
 #include <mach/msm_smd.h>
 
 #include "modem_notifier.h"
+#include "smd_private.h"
 
-#define NUM_SMD_PKT_PORTS 4
+#define NUM_SMD_PKT_PORTS 5
 #define DEVICE_NAME "smdpkt"
 #define MAX_BUF_SIZE 2048
 
@@ -423,6 +425,7 @@ static char *smd_pkt_dev_name[] = {
 	"smdcntl1",
 	"smdcntl2",
 	"smd22",
+	"smd_pkt_loopback",
 };
 
 static char *smd_ch_name[] = {
@@ -430,6 +433,7 @@ static char *smd_ch_name[] = {
 	"DATA6_CNTL",
 	"DATA7_CNTL",
 	"DATA22",
+	"LOOPBACK",
 };
 
 int smd_pkt_open(struct inode *inode, struct file *file)
@@ -445,11 +449,25 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 	file->private_data = smd_pkt_devp;
 
 	mutex_lock(&smd_pkt_devp->ch_lock);
-	if (smd_pkt_devp->ch == 0)
+	if (smd_pkt_devp->ch == 0) {
+		if (!strcmp(smd_ch_name[smd_pkt_devp->i], "LOOPBACK")) {
+			/* set smsm state to SMSM_SMD_LOOPBACK state
+			** and wait allowing enough time for Modem side
+			** to open the loopback port (Currently, this is
+			** this is effecient than polling).*/
+			smsm_change_state(SMSM_APPS_STATE,
+					  0, SMSM_SMD_LOOPBACK);
+			msleep(100);
+		}
 		r = smd_open(smd_ch_name[smd_pkt_devp->i],
 			     &smd_pkt_devp->ch,
 			     smd_pkt_devp,
 			     ch_notify);
+		if (r < 0)
+			printk(KERN_ERR "%s failed for %s with rc %d\n",
+					__func__, smd_ch_name[smd_pkt_devp->i],
+					r);
+	}
 	mutex_unlock(&smd_pkt_devp->ch_lock);
 
 	return r;
