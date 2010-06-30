@@ -1000,7 +1000,7 @@ static struct i2c_board_info fha_expanders_i2c_info[] __initdata = {
 #ifdef CONFIG_PMIC8058
 #define PMIC_GPIO_SDC3_DET 22
 
-int pm8058_gpios_init(struct pm8058_chip *pm_chip)
+static int pm8058_gpios_init(void)
 {
 	int i;
 	int rc;
@@ -1075,9 +1075,8 @@ int pm8058_gpios_init(struct pm8058_chip *pm_chip)
 	};
 
 	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
-		rc = pm8058_gpio_config_h(pm_chip,
-					  gpio_cfgs[i].gpio,
-					  &gpio_cfgs[i].cfg);
+		rc = pm8058_gpio_config(gpio_cfgs[i].gpio,
+				&gpio_cfgs[i].cfg);
 		if (rc < 0) {
 			pr_err("%s pmic gpio config failed\n",
 				__func__);
@@ -1286,6 +1285,7 @@ static struct pm8058_pwm_pdata pm8058_pwm_data = {
 static struct pm8058_gpio_platform_data pm8058_gpio_data = {
 	.gpio_base	= PM8058_GPIO_PM_TO_SYS(0),
 	.irq_base	= PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 0),
+	.init		= pm8058_gpios_init,
 };
 
 static struct pm8058_gpio_platform_data pm8058_mpp_data = {
@@ -1455,7 +1455,6 @@ static struct mfd_cell pm8058_subdevs[] = {
 
 static struct pm8058_platform_data pm8058_platform_data = {
 	.irq_base = PM8058_IRQ_BASE,
-	.init = pm8058_gpios_init,
 
 	.num_subdevs = ARRAY_SIZE(pm8058_subdevs),
 	.sub_devices = pm8058_subdevs,

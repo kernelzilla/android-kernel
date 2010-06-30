@@ -23,10 +23,144 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/mfd/pmic8058.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/fs.h>
 
 #ifndef CONFIG_GPIOLIB
 #include "gpio_chip.h"
 #endif
+
+/* GPIO registers */
+#define	SSBI_REG_ADDR_GPIO_BASE		0x150
+#define	SSBI_REG_ADDR_GPIO(n)		(SSBI_REG_ADDR_GPIO_BASE + n)
+
+/* GPIO */
+#define	PM8058_GPIO_BANK_MASK		0x70
+#define	PM8058_GPIO_BANK_SHIFT		4
+#define	PM8058_GPIO_WRITE		0x80
+
+/* Bank 0 */
+#define	PM8058_GPIO_VIN_MASK		0x0E
+#define	PM8058_GPIO_VIN_SHIFT		1
+#define	PM8058_GPIO_MODE_ENABLE		0x01
+
+/* Bank 1 */
+#define	PM8058_GPIO_MODE_MASK		0x0C
+#define	PM8058_GPIO_MODE_SHIFT		2
+#define	PM8058_GPIO_OUT_BUFFER		0x02
+#define	PM8058_GPIO_OUT_INVERT		0x01
+
+#define	PM8058_GPIO_MODE_OFF		3
+#define	PM8058_GPIO_MODE_OUTPUT		2
+#define	PM8058_GPIO_MODE_INPUT		0
+#define	PM8058_GPIO_MODE_BOTH		1
+
+/* Bank 2 */
+#define	PM8058_GPIO_PULL_MASK		0x0E
+#define	PM8058_GPIO_PULL_SHIFT		1
+
+/* Bank 3 */
+#define	PM8058_GPIO_OUT_STRENGTH_MASK	0x0C
+#define	PM8058_GPIO_OUT_STRENGTH_SHIFT	2
+
+/* Bank 4 */
+#define	PM8058_GPIO_FUNC_MASK		0x0E
+#define	PM8058_GPIO_FUNC_SHIFT		1
+
+/* Bank 5 */
+#define	PM8058_GPIO_NON_INT_POL_INV	0x08
+#define PM8058_GPIO_BANKS		6
+
+struct pm8058_gpio_chip {
+	struct gpio_chip	gpio_chip;
+	struct pm8058_chip	*pm_chip;
+	spinlock_t		pm_lock;
+	u8			bank1[PM8058_GPIOS];
+};
+
+static int pm8058_gpio_get(struct pm8058_gpio_chip *chip, unsigned gpio)
+{
+	struct pm8058_gpio_platform_data	*pdata;
+	int	mode;
+
+	if (gpio >= PM8058_GPIOS || chip == NULL)
+		return -EINVAL;
+
+	pdata = chip->gpio_chip.dev->platform_data;
+
+	/* Get gpio value from config bank 1 if output gpio.
+	   Get gpio value from IRQ RT status register for all other gpio modes.
+	 */
+	mode = (chip->bank1[gpio] & PM8058_GPIO_MODE_MASK) >>
+		PM8058_GPIO_MODE_SHIFT;
+	if (mode == PM8058_GPIO_MODE_OUTPUT)
+		return chip->bank1[gpio] & PM8058_GPIO_OUT_INVERT;
+	else
+		return pm8058_irq_get_rt_status(chip->pm_chip,
+				pdata->irq_base + gpio);
+}
+
+static int pm8058_gpio_set(struct pm8058_gpio_chip *chip,
+		unsigned gpio, int value)
+{
+	int	rc;
+	u8	bank1;
+	unsigned long	irqsave;
+
+	if (gpio >= PM8058_GPIOS || chip == NULL)
+		return -EINVAL;
+
+	spin_lock_irqsave(&chip->pm_lock, irqsave);
+	bank1 = chip->bank1[gpio] & ~PM8058_GPIO_OUT_INVERT;
+
+	if (value)
+		bank1 |= PM8058_GPIO_OUT_INVERT;
+
+	chip->bank1[gpio] = bank1;
+	rc = pm8058_write(chip->pm_chip, SSBI_REG_ADDR_GPIO(gpio), &bank1, 1);
+	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
+
+	if (rc)
+		pr_err("%s: FAIL pm8058_write(): rc=%d. "
+		       "(gpio=%d, value=%d)\n",
+		       __func__, rc, gpio, value);
+
+	return rc;
+}
+
+static int pm8058_gpio_set_direction(struct pm8058_gpio_chip *chip,
+			      unsigned gpio, int direction)
+{
+	int	rc;
+	u8	bank1;
+	static int	dir_map[] = {
+		PM8058_GPIO_MODE_OFF,
+		PM8058_GPIO_MODE_OUTPUT,
+		PM8058_GPIO_MODE_INPUT,
+		PM8058_GPIO_MODE_BOTH,
+	};
+	unsigned long	irqsave;
+
+	if (!direction || chip == NULL)
+		return -EINVAL;
+
+	spin_lock_irqsave(&chip->pm_lock, irqsave);
+	bank1 = chip->bank1[gpio] & ~PM8058_GPIO_MODE_MASK;
+
+	bank1 |= ((dir_map[direction] << PM8058_GPIO_MODE_SHIFT)
+		  & PM8058_GPIO_MODE_MASK);
+
+	chip->bank1[gpio] = bank1;
+	rc = pm8058_write(chip->pm_chip, SSBI_REG_ADDR_GPIO(gpio), &bank1, 1);
+	spin_unlock_irqrestore(&chip->pm_lock, irqsave);
+
+	if (rc)
+		pr_err("%s: Failed on pm8058_write(): rc=%d (GPIO config)\n",
+				__func__, rc);
+
+	return rc;
+}
 
 #ifndef CONFIG_GPIOLIB
 static int pm8058_gpio_configure(struct gpio_chip *chip,
@@ -34,7 +168,7 @@ static int pm8058_gpio_configure(struct gpio_chip *chip,
 				 unsigned long flags)
 {
 	int	rc = 0, direction;
-	struct pm8058_chip	*pm_chip;
+	struct pm8058_gpio_chip	*gpio_chip;
 
 	gpio -= chip->start;
 
@@ -45,13 +179,15 @@ static int pm8058_gpio_configure(struct gpio_chip *chip,
 		if (flags & GPIOF_DRIVE_OUTPUT)
 			direction |= PM_GPIO_DIR_OUT;
 
-		pm_chip = dev_get_drvdata(chip->dev);
+		gpio_chip = dev_get_drvdata(chip->dev);
 
 		if (flags & (GPIOF_OUTPUT_LOW | GPIOF_OUTPUT_HIGH)) {
 			if (flags & GPIOF_OUTPUT_HIGH)
-				rc = pm8058_gpio_set(pm_chip, gpio, 1);
+				rc = pm8058_gpio_set(gpio_chip,
+						gpio, 1);
 			else
-				rc = pm8058_gpio_set(pm_chip, gpio, 0);
+				rc = pm8058_gpio_set(gpio_chip,
+						gpio, 0);
 
 			if (rc) {
 				pr_err("%s: FAIL pm8058_gpio_set(): rc=%d.\n",
@@ -60,7 +196,8 @@ static int pm8058_gpio_configure(struct gpio_chip *chip,
 			}
 		}
 
-		rc = pm8058_gpio_set_direction(pm_chip, gpio, direction);
+		rc = pm8058_gpio_set_direction(gpio_chip,
+				gpio, direction);
 		if (rc)
 			pr_err("%s: FAIL pm8058_gpio_config(): rc=%d.\n",
 				__func__, rc);
@@ -87,29 +224,29 @@ static int pm8058_gpio_get_irq_num(struct gpio_chip *chip,
 
 static int pm8058_gpio_read(struct gpio_chip *chip, unsigned n)
 {
-	struct pm8058_chip	*pm_chip;
+	struct pm8058_gpio_chip	*gpio_chip;
 
 	n -= chip->start;
-	pm_chip = dev_get_drvdata(chip->dev);
-	return pm8058_gpio_get(pm_chip, n);
+	gpio_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_get(gpio_chip, n);
 }
 
 static int pm8058_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
 {
-	struct pm8058_chip	*pm_chip;
+	struct pm8058_gpio_chip	*gpio_chip;
 
 	n -= chip->start;
-	pm_chip = dev_get_drvdata(chip->dev);
-	return pm8058_gpio_set(pm_chip, n, on);
+	gpio_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_set(gpio_chip, n, on);
 }
 
-struct msm_gpio_chip pm8058_gpio_chip = {
-	.chip = {
+static struct pm8058_gpio_chip pm8058_gpio_chip = {
+	.gpio_chip = {
 		.configure = pm8058_gpio_configure,
 		.get_irq_num = pm8058_gpio_get_irq_num,
 		.read = pm8058_gpio_read,
 		.write = pm8058_gpio_write,
-	}
+	},
 };
 
 static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
@@ -117,10 +254,16 @@ static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 	int	rc;
 	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
 
-	pm8058_gpio_chip.chip.dev = &pdev->dev;
-	pm8058_gpio_chip.chip.start = pdata->gpio_base;
-	pm8058_gpio_chip.chip.end = pdata->gpio_base + PM8058_GPIOS - 1;
-	rc = register_gpio_chip(&pm8058_gpio_chip.chip);
+	spin_lock_init(&pm8058_gpio_chip.pm_lock);
+	pm8058_gpio_chip.gpio_chip.dev = &pdev->dev;
+	pm8058_gpio_chip.gpio_chip.start = pdata->gpio_base;
+	pm8058_gpio_chip.gpio_chip.end = pdata->gpio_base +
+		PM8058_GPIOS - 1;
+	pm8058_gpio_chip.pm_chip = platform_get_drvdata(pdev);
+	platform_set_drvdata(pdev, &pm8058_gpio_chip);
+	rc = register_gpio_chip(&pm8058_gpio_chip.gpio_chip);
+	if (!rc && pdata->init)
+		rc = pdata->init();
 	pr_info("%s: register_gpio_chip(): rc=%d\n", __func__, rc);
 
 	return rc;
@@ -142,50 +285,53 @@ static int pm8058_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 
 static int pm8058_gpio_read(struct gpio_chip *chip, unsigned offset)
 {
-	struct pm8058_chip *pm_chip;
-	pm_chip = dev_get_drvdata(chip->dev);
-	return pm8058_gpio_get(pm_chip, offset);
+	struct pm8058_gpio_chip *gpio_chip;
+	gpio_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_get(gpio_chip, offset);
 }
 
 static void pm8058_gpio_write(struct gpio_chip *chip,
 		unsigned offset, int val)
 {
-	struct pm8058_chip *pm_chip;
-	pm_chip = dev_get_drvdata(chip->dev);
-	pm8058_gpio_set(pm_chip, offset, val);
+	struct pm8058_gpio_chip *gpio_chip;
+	gpio_chip = dev_get_drvdata(chip->dev);
+	pm8058_gpio_set(gpio_chip, offset, val);
 }
 
 static int pm8058_gpio_direction_input(struct gpio_chip *chip,
 		unsigned offset)
 {
-	struct pm8058_chip *pm_chip;
-	pm_chip = dev_get_drvdata(chip->dev);
-	return pm8058_gpio_set_direction(pm_chip, offset, PM_GPIO_DIR_IN);
+	struct pm8058_gpio_chip *gpio_chip;
+	gpio_chip = dev_get_drvdata(chip->dev);
+	return pm8058_gpio_set_direction(gpio_chip, offset, PM_GPIO_DIR_IN);
 }
 
 static int pm8058_gpio_direction_output(struct gpio_chip *chip,
 		unsigned offset,
 		int val)
 {
-	struct pm8058_chip *pm_chip;
+	struct pm8058_gpio_chip *gpio_chip;
 	int ret;
 
-	pm_chip = dev_get_drvdata(chip->dev);
-	ret = pm8058_gpio_set_direction(pm_chip, offset, PM_GPIO_DIR_OUT);
+	gpio_chip = dev_get_drvdata(chip->dev);
+	ret = pm8058_gpio_set_direction(gpio_chip, offset, PM_GPIO_DIR_OUT);
 	if (!ret)
-		ret = pm8058_gpio_set(pm_chip, offset, val);
+		ret = pm8058_gpio_set(gpio_chip, offset, val);
 
 	return ret;
 }
 
-static struct gpio_chip pm8058_gpio_chip = {
-	.label			= "pm8058-gpio",
-	.direction_input	= pm8058_gpio_direction_input,
-	.direction_output	= pm8058_gpio_direction_output,
-	.to_irq			= pm8058_gpio_to_irq,
-	.get			= pm8058_gpio_read,
-	.set			= pm8058_gpio_write,
-	.ngpio			= PM8058_GPIOS,
+static struct pm8058_gpio_chip pm8058_gpio_chip = {
+	.gpio_chip = {
+		.label			= "pm8058-gpio",
+		.direction_input	= pm8058_gpio_direction_input,
+		.direction_output	= pm8058_gpio_direction_output,
+		.to_irq			= pm8058_gpio_to_irq,
+		.get			= pm8058_gpio_read,
+		.set			= pm8058_gpio_write,
+		.ngpio			= PM8058_GPIOS,
+		.can_sleep		= 1,
+	},
 };
 
 static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
@@ -193,19 +339,90 @@ static int __devinit pm8058_gpio_probe(struct platform_device *pdev)
 	int ret;
 	struct pm8058_gpio_platform_data *pdata = pdev->dev.platform_data;
 
-	pm8058_gpio_chip.dev = &pdev->dev;
-	pm8058_gpio_chip.base = pdata->gpio_base;
-	ret = gpiochip_add(&pm8058_gpio_chip);
+	spin_lock_init(&pm8058_gpio_chip.pm_lock);
+	pm8058_gpio_chip.gpio_chip.dev = &pdev->dev;
+	pm8058_gpio_chip.gpio_chip.base = pdata->gpio_base;
+	pm8058_gpio_chip.pm_chip = platform_get_drvdata(pdev);
+	platform_set_drvdata(pdev, &pm8058_gpio_chip);
+	ret = gpiochip_add(&pm8058_gpio_chip.gpio_chip);
+	if (!ret && pdata->init)
+		ret = pdata->init();
 	pr_info("%s: gpiochip_add(): rc=%d\n", __func__, ret);
 	return ret;
 }
 
 static int __devexit pm8058_gpio_remove(struct platform_device *pdev)
 {
-	return gpiochip_remove(&pm8058_gpio_chip);
+	return gpiochip_remove(&pm8058_gpio_chip.gpio_chip);
 }
 
 #endif
+
+int pm8058_gpio_config(int gpio, struct pm8058_gpio *param)
+{
+	int	rc;
+	u8	bank[8];
+	static int	dir_map[] = {
+		PM8058_GPIO_MODE_OFF,
+		PM8058_GPIO_MODE_OUTPUT,
+		PM8058_GPIO_MODE_INPUT,
+		PM8058_GPIO_MODE_BOTH,
+	};
+	unsigned long	irqsave;
+
+	if (param == NULL)
+		return -EINVAL;
+
+	/* Select banks and configure the gpio */
+	bank[0] = PM8058_GPIO_WRITE |
+		((param->vin_sel << PM8058_GPIO_VIN_SHIFT) &
+			PM8058_GPIO_VIN_MASK) |
+		PM8058_GPIO_MODE_ENABLE;
+	bank[1] = PM8058_GPIO_WRITE |
+		((1 << PM8058_GPIO_BANK_SHIFT) &
+			PM8058_GPIO_BANK_MASK) |
+		((dir_map[param->direction] <<
+			PM8058_GPIO_MODE_SHIFT) &
+			PM8058_GPIO_MODE_MASK) |
+		((param->direction & PM_GPIO_DIR_OUT) ?
+			((param->output_buffer & 1) ?
+			 PM8058_GPIO_OUT_BUFFER : 0) : 0) |
+		((param->direction & PM_GPIO_DIR_OUT) ?
+			param->output_value & 0x01 : 0);
+	bank[2] = PM8058_GPIO_WRITE |
+		((2 << PM8058_GPIO_BANK_SHIFT) &
+			PM8058_GPIO_BANK_MASK) |
+		((param->pull << PM8058_GPIO_PULL_SHIFT) &
+			PM8058_GPIO_PULL_MASK);
+	bank[3] = PM8058_GPIO_WRITE |
+		((3 << PM8058_GPIO_BANK_SHIFT) &
+			PM8058_GPIO_BANK_MASK) |
+		((param->out_strength <<
+			PM8058_GPIO_OUT_STRENGTH_SHIFT) &
+			PM8058_GPIO_OUT_STRENGTH_MASK);
+	bank[4] = PM8058_GPIO_WRITE |
+		((4 << PM8058_GPIO_BANK_SHIFT) &
+			PM8058_GPIO_BANK_MASK) |
+		((param->function << PM8058_GPIO_FUNC_SHIFT) &
+			PM8058_GPIO_FUNC_MASK);
+	bank[5] = PM8058_GPIO_WRITE |
+		((5 << PM8058_GPIO_BANK_SHIFT) & PM8058_GPIO_BANK_MASK) |
+		(param->inv_int_pol ? 0 : PM8058_GPIO_NON_INT_POL_INV);
+
+	spin_lock_irqsave(&pm8058_gpio_chip.pm_lock, irqsave);
+	/* Remember bank1 for later use */
+	pm8058_gpio_chip.bank1[gpio] = bank[1];
+	rc = pm8058_write(pm8058_gpio_chip.pm_chip,
+			SSBI_REG_ADDR_GPIO(gpio), bank, 6);
+	spin_unlock_irqrestore(&pm8058_gpio_chip.pm_lock, irqsave);
+
+	if (rc)
+		pr_err("%s: Failed on pm8058_write(): rc=%d (GPIO config)\n",
+				__func__, rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8058_gpio_config);
 
 static struct platform_driver pm8058_gpio_driver = {
 	.probe		= pm8058_gpio_probe,
@@ -216,14 +433,177 @@ static struct platform_driver pm8058_gpio_driver = {
 	},
 };
 
+#if defined(CONFIG_DEBUG_FS)
+
+#define DEBUG_MAX_RW_BUF   128
+#define DEBUG_MAX_FNAME    8
+
+static struct dentry *debug_dent;
+
+static char debug_read_buf[DEBUG_MAX_RW_BUF];
+static char debug_write_buf[DEBUG_MAX_RW_BUF];
+
+static int debug_gpios[PM8058_GPIOS];
+
+static int debug_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
+static int debug_read_gpio_bank(int gpio, int bank, u8 *data)
+{
+	int rc;
+	unsigned long irqsave;
+
+	spin_lock_irqsave(&pm8058_gpio_chip.pm_lock, irqsave);
+
+	*data = bank << PM8058_GPIO_BANK_SHIFT;
+	rc = pm8058_write(pm8058_gpio_chip.pm_chip,
+			SSBI_REG_ADDR_GPIO(gpio), data, 1);
+	if (rc)
+		goto bail_out;
+
+	*data = bank << PM8058_GPIO_BANK_SHIFT;
+	rc = pm8058_read(pm8058_gpio_chip.pm_chip,
+			SSBI_REG_ADDR_GPIO(gpio), data, 1);
+
+bail_out:
+	spin_unlock_irqrestore(&pm8058_gpio_chip.pm_lock, irqsave);
+
+	return rc;
+}
+
+static ssize_t debug_read(struct file *file, char __user *buf,
+			  size_t count, loff_t *ppos)
+{
+	int gpio = *((int *) file->private_data);
+	int len = 0;
+	int rc = -EINVAL;
+	u8 bank[PM8058_GPIO_BANKS];
+	int val = -1;
+	int mode;
+	int i;
+
+	for (i = 0; i < PM8058_GPIO_BANKS; i++) {
+		rc = debug_read_gpio_bank(gpio, i, &bank[i]);
+		if (rc)
+			pr_err("pmic failed to read bank %d\n", i);
+	}
+
+	if (rc) {
+		len = snprintf(debug_read_buf, DEBUG_MAX_RW_BUF - 1, "-1\n");
+		goto bail_out;
+	}
+
+	val = pm8058_gpio_get(&pm8058_gpio_chip, gpio);
+
+	/* print the mode and the value */
+	mode = (bank[1] & PM8058_GPIO_MODE_MASK) >>  PM8058_GPIO_MODE_SHIFT;
+	if (mode == PM8058_GPIO_MODE_BOTH)
+		len = snprintf(debug_read_buf, DEBUG_MAX_RW_BUF - 1,
+			       "BOTH %d ", val);
+	else if (mode == PM8058_GPIO_MODE_INPUT)
+		len = snprintf(debug_read_buf, DEBUG_MAX_RW_BUF - 1,
+			       "IN   %d ", val);
+	else if (mode == PM8058_GPIO_MODE_OUTPUT)
+		len = snprintf(debug_read_buf, DEBUG_MAX_RW_BUF - 1,
+			       "OUT  %d ", val);
+	else
+		len = snprintf(debug_read_buf, DEBUG_MAX_RW_BUF - 1,
+			       "OFF  %d ", val);
+
+	/* print the control register values */
+	len += snprintf(debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
+			"[0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x]\n",
+			bank[0], bank[1], bank[2], bank[3], bank[4], bank[5]);
+
+bail_out:
+	rc = simple_read_from_buffer((void __user *) buf, len,
+				     ppos, (void *) debug_read_buf, len);
+
+	return rc;
+}
+
+static ssize_t debug_write(struct file *file, const char __user *buf,
+			   size_t count, loff_t *ppos)
+{
+	int gpio = *((int *) file->private_data);
+	unsigned long val;
+	int mode;
+
+	mode = (pm8058_gpio_chip.bank1[gpio] & PM8058_GPIO_MODE_MASK) >>
+		PM8058_GPIO_MODE_SHIFT;
+	if (mode == PM8058_GPIO_MODE_OFF || mode == PM8058_GPIO_MODE_INPUT)
+		return count;
+
+	if (copy_from_user(debug_write_buf, (void __user *) buf, count)) {
+		pr_err("failed to copy from user\n");
+		return -EFAULT;
+	}
+	debug_write_buf[count] = '\0';
+
+	(void) strict_strtoul(debug_write_buf, 10, &val);
+
+	if (pm8058_gpio_set(&pm8058_gpio_chip, gpio, val)) {
+		pr_err("gpio write failed\n");
+		return -EINVAL;
+	}
+
+	return count;
+}
+
+static const struct file_operations debug_ops = {
+	.open =         debug_open,
+	.read =         debug_read,
+	.write =        debug_write,
+};
+
+static void debug_init(void)
+{
+	int i;
+	char name[DEBUG_MAX_FNAME];
+
+	debug_dent = debugfs_create_dir("pm_gpio", NULL);
+	if (IS_ERR(debug_dent)) {
+		pr_err("pmic8058 debugfs_create_dir fail, error %ld\n",
+		       PTR_ERR(debug_dent));
+		return;
+	}
+
+	for (i = 0; i < PM8058_GPIOS; i++) {
+		snprintf(name, DEBUG_MAX_FNAME-1, "%d", i+1);
+		debug_gpios[i] = i;
+		if (debugfs_create_file(name, 0644, debug_dent,
+					&debug_gpios[i], &debug_ops) == NULL) {
+			pr_err("pmic8058 debugfs_create_file %s failed\n",
+			       name);
+		}
+	}
+}
+
+static void debug_exit(void)
+{
+	debugfs_remove_recursive(debug_dent);
+}
+
+#else
+static void debug_init(void) { }
+static void debug_exit(void) { }
+#endif
+
 static int __init pm8058_gpio_init(void)
 {
-	return platform_driver_register(&pm8058_gpio_driver);
+	int rc = platform_driver_register(&pm8058_gpio_driver);
+	if (!rc)
+		debug_init();
+	return rc;
 }
 
 static void __exit pm8058_gpio_exit(void)
 {
 	platform_driver_unregister(&pm8058_gpio_driver);
+	debug_exit();
 }
 
 subsys_initcall(pm8058_gpio_init);
