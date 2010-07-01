@@ -1576,7 +1576,7 @@ static int pm8901_mpp0_init(void *data)
 	int rc = pm8901_mpp_config(0, PM_MPP_TYPE_D_OUTPUT,
 			PM8901_MPP_DIG_LEVEL_VPH,
 			val);
-	if (!rc)
+	if (rc)
 		pr_err("%s: pm8901_mpp_config failed with %d\n", __func__, rc);
 
 	return rc;
