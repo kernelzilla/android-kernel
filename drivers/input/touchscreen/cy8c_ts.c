@@ -253,6 +253,11 @@ static void cy8c_ts_xy_worker(struct work_struct *work)
 		process_tmg200_data(ts);
 
 schedule:
+	if (ts->pdata->use_polling)
+		queue_delayed_work(ts->wq, &ts->work, TOUCHSCREEN_TIMEOUT);
+	else
+		enable_irq(ts->client->irq);
+
 	/* write to STATUS_REG to update coordinates*/
 	rc = cy8c_ts_write_reg_u8(ts->client, ts->dd->status_reg,
 						ts->dd->update_data);
@@ -264,11 +269,6 @@ schedule:
 		if (rc < 0)
 			dev_err(&ts->client->dev, "write failed, exiting\n");
 	}
-
-	if (ts->pdata->use_polling)
-		queue_delayed_work(ts->wq, &ts->work, TOUCHSCREEN_TIMEOUT);
-	else
-		enable_irq(ts->client->irq);
 }
 
 static irqreturn_t cy8c_ts_irq(int irq, void *dev_id)
