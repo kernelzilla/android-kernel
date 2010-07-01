@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/vcm_mm.h>
 #include <linux/vcm.h>
+#include <linux/vcm_alloc.h>
 #include <linux/vcm_types.h>
 #include <linux/errno.h>
 #include <linux/spinlock.h>
@@ -36,25 +37,16 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 
-/* may be temporary */
-#include <linux/bootmem.h>
-
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
-
-#define BOOTMEM_SZ	SZ_32M
-#define BOOTMEM_ALIGN	SZ_1M
-
-#define CONT_SZ		SZ_8M
-#define CONT_ALIGN	SZ_1M
 
 #define ONE_TO_ONE_CHK 1
 
 #define vcm_err(a, ...)							\
 	pr_err("ERROR %s %i " a, __func__, __LINE__, ##__VA_ARGS__)
 
-static void *bootmem;
-static void *bootmem_cont;
+static phys_addr_t *bootmem_cont;
+static int cont_sz;
 static struct vcm *cont_vcm_id;
 static struct phys_chunk *cont_phys_chunk;
 
@@ -182,9 +174,8 @@ static struct vcm *vcm_create_flagged(int flag, size_t start_addr, size_t len)
 	/* special one-to-one mapping case */
 	if ((flag & ONE_TO_ONE_CHK) &&
 	    bootmem_cont &&
-	    __pa(bootmem_cont) &&
-	    start_addr == __pa(bootmem_cont) &&
-	    len == CONT_SZ) {
+	    start_addr == (size_t) bootmem_cont &&
+	    len == cont_sz) {
 		vcm->type = VCM_ONE_TO_ONE;
 	} else {
 		ret = vcm_create_pool(vcm, start_addr, len);
@@ -466,7 +457,9 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 	res->attr = attr;
 
 	if (align_attr == 0) {
-		if (len/SZ_1M)
+		if (len/SZ_16M)
+			res->alignment_req = SZ_16M;
+		else if (len/SZ_1M)
 			res->alignment_req = SZ_1M;
 		else if (len/SZ_64K)
 			res->alignment_req = SZ_64K;
@@ -1153,21 +1146,21 @@ static int vcm_alloc_max_munch_cont(size_t start_addr, size_t len,
 		goto fail;
 	}
 
-	if (start_addr < __pa(bootmem_cont)) {
+	if (start_addr < (int) bootmem_cont) {
 		vcm_err("phys start addr (%p) < base (%p)\n",
-			(void *) start_addr, (void *) __pa(bootmem_cont));
+			(void *) start_addr, (void *) bootmem_cont);
 		goto fail;
 	}
 
-	if ((start_addr + len) >= (__pa(bootmem_cont) + CONT_SZ)) {
+	if ((start_addr + len) >= ((size_t) bootmem_cont + cont_sz)) {
 		vcm_err("requested region (%p + %i) > "
 			" available region (%p + %i)",
 			(void *) start_addr, (int) len,
-			(void *) __pa(bootmem_cont), CONT_SZ);
+			(void *) bootmem_cont, cont_sz);
 		goto fail;
 	}
 
-	i = (start_addr - __pa(bootmem_cont))/SZ_4K;
+	i = (start_addr - (size_t) bootmem_cont)/SZ_4K;
 
 	for (j = 0; j < ARRAY_SIZE(chunk_sizes); ++j) {
 		while (len/chunk_sizes[j]) {
@@ -1265,7 +1258,7 @@ struct physmem *vcm_phys_alloc(enum memtype_t memtype, size_t len,
 			goto fail3;
 		}
 	} else {
-		blocks_allocated = vcm_alloc_max_munch(len,
+		blocks_allocated = vcm_alloc_max_munch(len, memtype,
 						       &physmem->alloc_head);
 		if (blocks_allocated == 0) {
 			vcm_err("physical allocation failed:"
@@ -1330,7 +1323,8 @@ int vcm_phys_free(struct physmem *physmem)
 
 	} else {
 
-		ret = vcm_alloc_free_blocks(&physmem->alloc_head);
+		ret = vcm_alloc_free_blocks(physmem->memtype,
+					    &physmem->alloc_head);
 		if (ret != 0) {
 			vcm_err("failed to free physical blocks:"
 				" vcm_alloc_free_blocks(%p) ret %i\n",
@@ -1709,7 +1703,7 @@ size_t vcm_get_cont_memtype_pa(enum memtype_t memtype)
 		goto fail;
 	}
 
-	return (size_t) __pa(bootmem_cont);
+	return (size_t) bootmem_cont;
 fail:
 	return 0;
 }
@@ -1723,7 +1717,7 @@ size_t vcm_get_cont_memtype_len(enum memtype_t memtype)
 		return 0;
 	}
 
-	return CONT_SZ;
+	return cont_sz;
 }
 
 int vcm_hook(size_t dev_id, vcm_handler handler, void *data)
@@ -1765,10 +1759,10 @@ static int vcm_cont_phys_chunk_init(void)
 		goto fail;
 	}
 
-	cont_pa = (int) __pa(bootmem_cont);
+	cont_pa = (size_t) bootmem_cont;
 
-	for (i = 0; i < CONT_SZ/PAGE_SIZE; ++i) {
-		cont_phys_chunk[i].pa = (int) cont_pa; cont_pa += PAGE_SIZE;
+	for (i = 0; i < cont_sz/PAGE_SIZE; ++i) {
+		cont_phys_chunk[i].pa = cont_pa; cont_pa += PAGE_SIZE;
 		cont_phys_chunk[i].size_idx = IDX_4K;
 		INIT_LIST_HEAD(&cont_phys_chunk[i].allocated);
 	}
@@ -1779,16 +1773,14 @@ fail:
 	return -1;
 }
 
-
-int vcm_sys_init(void)
+int vcm_sys_init(struct physmem_region *mem, int n_regions,
+		 struct vcm_memtype_map *mt_map, int n_mt,
+		 void *cont_pa, unsigned int cont_len)
 {
 	int ret;
 	printk(KERN_INFO "VCM Initialization\n");
-	if (!bootmem) {
-		vcm_err("bootmem is 0\n");
-		ret = -1;
-		goto fail;
-	}
+	bootmem_cont = cont_pa;
+	cont_sz = cont_len;
 
 	if (!bootmem_cont) {
 		vcm_err("bootmem_cont is 0\n");
@@ -1804,28 +1796,28 @@ int vcm_sys_init(void)
 	}
 
 
-	ret = vcm_alloc_init(__pa(bootmem));
+	ret = vcm_alloc_init(mem, n_regions, mt_map, n_mt);
+
 	if (ret != 0) {
-		vcm_err("vcm_alloc_init(%p) ret %i\n", (void *) __pa(bootmem),
-			ret);
+		vcm_err("vcm_alloc_init() ret %i\n", ret);
 		ret = -1;
 		goto fail;
 	}
 
-	cont_phys_chunk = kzalloc(sizeof(*cont_phys_chunk)*(CONT_SZ/PAGE_SIZE),
+	cont_phys_chunk = kzalloc(sizeof(*cont_phys_chunk)*(cont_sz/PAGE_SIZE),
 				  GFP_KERNEL);
 	if (!cont_phys_chunk) {
 		vcm_err("kzalloc(%lu, GFP_KERNEL) ret 0",
-			sizeof(*cont_phys_chunk)*(CONT_SZ/PAGE_SIZE));
+			sizeof(*cont_phys_chunk)*(cont_sz/PAGE_SIZE));
 		goto fail_free;
 	}
 
 	/* the address and size will hit our special case unless we
 	   pass an override */
-	cont_vcm_id = vcm_create_flagged(0, __pa(bootmem_cont), CONT_SZ);
+	cont_vcm_id = vcm_create_flagged(0, (size_t)bootmem_cont, cont_sz);
 	if (cont_vcm_id == 0) {
 		vcm_err("vcm_create_flagged(0, %p, %i) ret 0\n",
-			(void *) __pa(bootmem_cont), CONT_SZ);
+			bootmem_cont, cont_sz);
 		ret = -1;
 		goto fail_free2;
 	}
@@ -1896,71 +1888,6 @@ int vcm_sys_destroy(void)
 
 	return ret;
 }
-
-int vcm_init(void)
-{
-	int ret;
-
-	bootmem = __alloc_bootmem(BOOTMEM_SZ, BOOTMEM_ALIGN, 0);
-	if (!bootmem) {
-		vcm_err("segregated block pool alloc failed:"
-			" __alloc_bootmem(%i, %i, 0)\n",
-			BOOTMEM_SZ, BOOTMEM_ALIGN);
-		goto fail;
-	}
-
-	bootmem_cont = __alloc_bootmem(CONT_SZ, CONT_ALIGN, 0);
-	if (!bootmem_cont) {
-		vcm_err("contiguous pool alloc failed:"
-			" __alloc_bootmem(%i, %i, 0)\n",
-			CONT_SZ, CONT_ALIGN);
-		goto fail_free;
-	}
-
-	ret = vcm_sys_init();
-	if (ret != 0) {
-		vcm_err("vcm_sys_init() ret %i\n", ret);
-		goto fail_free2;
-	}
-
-	return 0;
-
-fail_free2:
-	free_bootmem(__pa(bootmem_cont), CONT_SZ);
-fail_free:
-	free_bootmem(__pa(bootmem), BOOTMEM_SZ);
-fail:
-	return -1;
-};
-
-/* Useful for testing, and if VCM is ever unloaded */
-void vcm_exit(void)
-{
-	int ret;
-
-	if (!bootmem_cont) {
-		vcm_err("bootmem_cont is 0\n");
-		goto fail;
-	}
-
-	if (!bootmem) {
-		vcm_err("bootmem is 0\n");
-		goto fail;
-	}
-
-	ret = vcm_sys_destroy();
-	if (ret != 0) {
-		vcm_err("vcm_sys_destroy() ret %i\n", ret);
-		goto fail;
-	}
-
-	free_bootmem(__pa(bootmem_cont), CONT_SZ);
-	free_bootmem(__pa(bootmem), BOOTMEM_SZ);
-fail:
-	return;
-}
-early_initcall(vcm_init);
-module_exit(vcm_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Zach Pfeffer <zpfeffer@codeaurora.org>");
