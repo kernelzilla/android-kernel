@@ -765,7 +765,8 @@ static u32 vcd_open_cmn
 	p_cctxt->b_decoding = b_decoding;
 	p_cctxt->callback = callback;
 	p_cctxt->p_client_data = p_client_data;
-
+	INIT_LIST_HEAD(&p_cctxt->in_buf_pool.a_queue);
+	INIT_LIST_HEAD(&p_cctxt->out_buf_pool.a_queue);
 	p_client = p_dev_ctxt->p_cctxt_list_head;
 	p_dev_ctxt->p_cctxt_list_head = p_cctxt;
 	p_cctxt->p_next = p_client;

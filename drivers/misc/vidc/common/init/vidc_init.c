@@ -31,7 +31,6 @@
 #include <linux/workqueue.h>
 #include <linux/android_pmem.h>
 #include <linux/clk.h>
-#include <linux/firmware.h>
 #include <linux/delay.h>
 #include <mach/internal_power_rail.h>
 #include <mach/clk.h>
@@ -39,6 +38,7 @@
 #include "vcd_api.h"
 #include "vidc_init_internal.h"
 #include "vidc_init.h"
+#include "vcd_res_tracker_api.h"
 
 #if DEBUG
 #define DBG(x...) printk(KERN_DEBUG x)
@@ -65,14 +65,6 @@ struct workqueue_struct *vidc_wq;
 struct workqueue_struct *vidc_timer_wq;
 static irqreturn_t vidc_isr(int irq, void *dev);
 static spinlock_t vidc_spin_lock;
-
-#define VIDC_BOOT_FW			"vidc_720p_command_control.fw"
-#define VIDC_MPG4_DEC_FW		"vidc_720p_mp4_dec_mc.fw"
-#define VIDC_H263_DEC_FW		"vidc_720p_h263_dec_mc.fw"
-#define VIDC_H264_DEC_FW		"vidc_720p_h264_dec_mc.fw"
-#define VIDC_MPG4_ENC_FW		"vidc_720p_mp4_enc_mc.fw"
-#define VIDC_H264_ENC_FW		"vidc_720p_h264_enc_mc.fw"
-#define VIDC_VC1_DEC_FW		    "vidc_720p_vc1_dec_mc.fw"
 
 static void vidc_timer_fn(unsigned long data)
 {
@@ -267,6 +259,7 @@ static int __init vidc_init(void)
 			  vidc_timer_handler);
 	spin_lock_init(&vidc_spin_lock);
 	INIT_LIST_HEAD(&vidc_device_p->vidc_timer_queue);
+	res_trk_init(vidc_device_p->device, vidc_device_p->irq);
 	vidc_device_p->clock_enabled = 0;
 	vidc_device_p->ref_count = 0;
 	vidc_device_p->firmware_refcount = 0;
@@ -668,142 +661,21 @@ EXPORT_SYMBOL(vidc_disable_clk);
 
 #endif
 
-unsigned char *vidc_command_control_fw;
-u32 vidc_command_control_fw_size;
-
-unsigned char *vidc_mpg4_dec_fw;
-u32 vidc_mpg4_dec_fw_size;
-
-unsigned char *vidc_h263_dec_fw;
-u32 vidc_h263_dec_fw_size;
-
-unsigned char *vidc_h264_dec_fw;
-u32 vidc_h264_dec_fw_size;
-
-unsigned char *vidc_mpg4_enc_fw;
-u32 vidc_mpg4_enc_fw_size;
-
-unsigned char *vidc_h264_enc_fw;
-u32 vidc_h264_enc_fw_size;
-
-unsigned char *vidc_vc1_dec_fw;
-u32 vidc_vc1_dec_fw_size;
-
 int vidc_load_firmware(void)
 {
-	int rc = 0;
-	const struct firmware *fw_boot = NULL;
-	const struct firmware *fw_mpg4_dec = NULL;
-	const struct firmware *fw_h263_dec = NULL;
-	const struct firmware *fw_h264_dec = NULL;
-	const struct firmware *fw_mpg4_enc = NULL;
-	const struct firmware *fw_h264_enc = NULL;
-	const struct firmware *fw_vc1_dec = NULL;
-
 	u32 status = TRUE;
 
 	mutex_lock(&vidc_device_p->lock);
-
 	if (!vidc_device_p->get_firmware) {
-		rc = request_firmware(&fw_boot,
-			VIDC_BOOT_FW, vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_BOOT_FW, rc);
-			mutex_unlock(&vidc_device_p->lock);
-			return FALSE;
-		}
-		vidc_command_control_fw = (unsigned char *)fw_boot->data;
-		vidc_command_control_fw_size = (u32) fw_boot->size;
-
-		rc = request_firmware(&fw_mpg4_dec, VIDC_MPG4_DEC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_MPG4_DEC_FW, rc);
-			status = FALSE;
-			goto boot_fw_free;
-		}
-		vidc_mpg4_dec_fw = (unsigned char *)fw_mpg4_dec->data;
-		vidc_mpg4_dec_fw_size = (u32) fw_mpg4_dec->size;
-
-
-		rc = request_firmware(&fw_h263_dec, VIDC_H263_DEC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_H263_DEC_FW, rc);
-			status = FALSE;
-			goto mp4dec_fw_free;
-		}
-		vidc_h263_dec_fw = (unsigned char *)fw_h263_dec->data;
-		vidc_h263_dec_fw_size = (u32) fw_h263_dec->size;
-
-		rc = request_firmware(&fw_h264_dec, VIDC_H264_DEC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_H264_DEC_FW, rc);
-			status = FALSE;
-			goto h263dec_fw_free;
-		}
-		vidc_h264_dec_fw = (unsigned char *)fw_h264_dec->data;
-		vidc_h264_dec_fw_size = (u32) fw_h264_dec->size;
-
-		rc = request_firmware(&fw_mpg4_enc, VIDC_MPG4_ENC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_MPG4_ENC_FW, rc);
-			status = FALSE;
-			goto h264dec_fw_free;
-		}
-		vidc_mpg4_enc_fw = (unsigned char *)fw_mpg4_enc->data;
-		vidc_mpg4_enc_fw_size = (u32) fw_mpg4_enc->size;
-
-		rc = request_firmware(&fw_h264_enc, VIDC_H264_ENC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_H264_ENC_FW, rc);
-			status = FALSE;
-			goto mp4enc_fw_free;
-		}
-		vidc_h264_enc_fw = (unsigned char *)fw_h264_enc->data;
-		vidc_h264_enc_fw_size = (u32) fw_h264_enc->size;
-
-		rc = request_firmware(&fw_vc1_dec, VIDC_VC1_DEC_FW,
-			vidc_device_p->device);
-		if (rc) {
-			ERR("request_firmware for %s failed with error %d\n",
-					VIDC_VC1_DEC_FW, rc);
-			status = FALSE;
-			goto h264enc_fw_free;
-		}
-		vidc_vc1_dec_fw = (unsigned char *)fw_vc1_dec->data;
-		vidc_vc1_dec_fw_size = (u32) fw_vc1_dec->size;
+		status = res_trk_download_firmware();
+		if (!status)
+			goto error;
 		vidc_device_p->get_firmware = 1;
 	}
-
 	vidc_device_p->firmware_refcount++;
-
+error:
 	mutex_unlock(&vidc_device_p->lock);
 	return status;
-
-h264enc_fw_free:
-	release_firmware(fw_h264_enc);
-mp4enc_fw_free:
-	release_firmware(fw_mpg4_enc);
-h264dec_fw_free:
-	release_firmware(fw_h264_dec);
-h263dec_fw_free:
-	release_firmware(fw_h263_dec);
-mp4dec_fw_free:
-	release_firmware(fw_mpg4_dec);
-boot_fw_free:
-	release_firmware(fw_boot);
-	mutex_unlock(&vidc_device_p->lock);
-	return FALSE;
 }
 EXPORT_SYMBOL(vidc_load_firmware);
 

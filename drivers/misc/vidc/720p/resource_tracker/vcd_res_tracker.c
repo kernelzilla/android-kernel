@@ -15,13 +15,13 @@
  * 02110-1301, USA.
  *
  */
+#include <linux/firmware.h>
+#include <linux/pm_qos_params.h>
+#include <mach/msm_reqs.h>
 
 #include "vidc_type.h"
 #include "vcd_res_tracker.h"
 #include "vidc_init.h"
-
-#include <linux/pm_qos_params.h>
-#include <mach/msm_reqs.h>
 
 #define MSM_AXI_QOS_NAME "msm_vidc_reg"
 
@@ -50,6 +50,38 @@ static unsigned int axi_clk_freq_table_dec[2] = {
 	MSM_AXI_FLOW_VIDEO_PLAYBACK_720P
 };
 #endif
+
+static struct res_trk_context resource_context;
+
+#define VIDC_BOOT_FW			"vidc_720p_command_control.fw"
+#define VIDC_MPG4_DEC_FW		"vidc_720p_mp4_dec_mc.fw"
+#define VIDC_H263_DEC_FW		"vidc_720p_h263_dec_mc.fw"
+#define VIDC_H264_DEC_FW		"vidc_720p_h264_dec_mc.fw"
+#define VIDC_MPG4_ENC_FW		"vidc_720p_mp4_enc_mc.fw"
+#define VIDC_H264_ENC_FW		"vidc_720p_h264_enc_mc.fw"
+#define VIDC_VC1_DEC_FW		"vidc_720p_vc1_dec_mc.fw"
+
+unsigned char *vidc_command_control_fw;
+u32 vidc_command_control_fw_size;
+
+unsigned char *vidc_mpg4_dec_fw;
+u32 vidc_mpg4_dec_fw_size;
+
+unsigned char *vidc_h263_dec_fw;
+u32 vidc_h263_dec_fw_size;
+
+unsigned char *vidc_h264_dec_fw;
+u32 vidc_h264_dec_fw_size;
+
+unsigned char *vidc_mpg4_enc_fw;
+u32 vidc_mpg4_enc_fw_size;
+
+unsigned char *vidc_h264_enc_fw;
+u32 vidc_h264_enc_fw_size;
+
+unsigned char *vidc_vc1_dec_fw;
+u32 vidc_vc1_dec_fw_size;
+
 static u32 res_trk_convert_freq_to_perf_lvl(u64 n_freq)
 {
 	u64 n_perf_lvl;
@@ -278,4 +310,125 @@ u32 res_trk_get_curr_perf_level(u32 *pn_perf_lvl)
 	VCDRES_MSG_MED("%s(): n_freq = %lu, *pn_perf_lvl = %u", __func__,
 		n_freq, *pn_perf_lvl);
 	return TRUE;
+}
+
+u32 res_trk_download_firmware(void)
+{
+	const struct firmware *fw_boot = NULL;
+	const struct firmware *fw_mpg4_dec = NULL;
+	const struct firmware *fw_h263_dec = NULL;
+	const struct firmware *fw_h264_dec = NULL;
+	const struct firmware *fw_mpg4_enc = NULL;
+	const struct firmware *fw_h264_enc = NULL;
+	const struct firmware *fw_vc1_dec = NULL;
+	int rc = 0;
+	u32 status = TRUE;
+
+	VCDRES_MSG_HIGH("%s(): Request firmware download \n",
+		__func__);
+
+	rc = request_firmware(&fw_boot, VIDC_BOOT_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_BOOT_FW, rc);
+		return FALSE;
+	}
+	vidc_command_control_fw = (unsigned char *)fw_boot->data;
+	vidc_command_control_fw_size = (u32) fw_boot->size;
+
+	rc = request_firmware(&fw_mpg4_dec, VIDC_MPG4_DEC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_MPG4_DEC_FW, rc);
+		status = FALSE;
+		goto boot_fw_free;
+	}
+	vidc_mpg4_dec_fw = (unsigned char *)fw_mpg4_dec->data;
+	vidc_mpg4_dec_fw_size = (u32) fw_mpg4_dec->size;
+
+
+	rc = request_firmware(&fw_h263_dec, VIDC_H263_DEC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_H263_DEC_FW, rc);
+		status = FALSE;
+		goto mp4dec_fw_free;
+	}
+	vidc_h263_dec_fw = (unsigned char *)fw_h263_dec->data;
+	vidc_h263_dec_fw_size = (u32) fw_h263_dec->size;
+
+	rc = request_firmware(&fw_h264_dec, VIDC_H264_DEC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_H264_DEC_FW, rc);
+		status = FALSE;
+		goto h263dec_fw_free;
+	}
+	vidc_h264_dec_fw = (unsigned char *)fw_h264_dec->data;
+	vidc_h264_dec_fw_size = (u32) fw_h264_dec->size;
+
+	rc = request_firmware(&fw_mpg4_enc, VIDC_MPG4_ENC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_MPG4_ENC_FW, rc);
+		status = FALSE;
+		goto h264dec_fw_free;
+	}
+	vidc_mpg4_enc_fw = (unsigned char *)fw_mpg4_enc->data;
+	vidc_mpg4_enc_fw_size = (u32) fw_mpg4_enc->size;
+
+	rc = request_firmware(&fw_h264_enc, VIDC_H264_ENC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_H264_ENC_FW, rc);
+		status = FALSE;
+		goto mp4enc_fw_free;
+	}
+	vidc_h264_enc_fw = (unsigned char *)fw_h264_enc->data;
+	vidc_h264_enc_fw_size = (u32) fw_h264_enc->size;
+
+	rc = request_firmware(&fw_vc1_dec, VIDC_VC1_DEC_FW,
+						  resource_context.device);
+	if (rc) {
+		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
+				VIDC_VC1_DEC_FW, rc);
+		status = FALSE;
+		goto h264enc_fw_free;
+	}
+	vidc_vc1_dec_fw = (unsigned char *)fw_vc1_dec->data;
+	vidc_vc1_dec_fw_size = (u32) fw_vc1_dec->size;
+
+	return status;
+
+h264enc_fw_free:
+	release_firmware(fw_h264_enc);
+mp4enc_fw_free:
+	release_firmware(fw_mpg4_enc);
+h264dec_fw_free:
+	release_firmware(fw_h264_dec);
+h263dec_fw_free:
+	release_firmware(fw_h263_dec);
+mp4dec_fw_free:
+	release_firmware(fw_mpg4_dec);
+boot_fw_free:
+	release_firmware(fw_boot);
+	return FALSE;
+}
+
+void res_trk_init(struct device *device, u32 irq)
+{
+	if (resource_context.device || resource_context.irq_num ||
+		!device) {
+		VCDRES_MSG_ERROR("%s() Resource Tracker Init error \n",
+				__func__);
+		return;
+	}
+	resource_context.device = device;
+	resource_context.irq_num = irq;
 }

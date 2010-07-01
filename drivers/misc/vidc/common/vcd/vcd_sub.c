@@ -669,9 +669,11 @@ void vcd_reset_buffer_pool_for_reuse(struct vcd_buffer_pool_type *p_buf_pool)
 {
 	VCD_MSG_LOW("vcd_reset_buffer_pool_for_reuse:");
 
-	memset(&p_buf_pool->a_entries[1], 0,
-		sizeof(struct vcd_buffer_entry_type) *
-		VCD_MAX_BUFFER_ENTRIES);
+	if (p_buf_pool->a_entries) {
+		memset(&p_buf_pool->a_entries[1], 0,
+			sizeof(struct vcd_buffer_entry_type) *
+			VCD_MAX_BUFFER_ENTRIES);
+	}
 	p_buf_pool->n_q_len = 0;
 
 	p_buf_pool->n_validated = 0;
