@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/mfd/marimba-tsadc.h>
+#include <linux/pm.h>
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 #include <linux/earlysuspend.h>
@@ -236,9 +237,9 @@ static int __devinit msm_ts_hw_init(struct msm_ts *ts)
 
 #ifdef CONFIG_PM
 static int
-msm_ts_suspend(struct platform_device *pdev, pm_message_t msg)
+msm_ts_suspend(struct device *dev)
 {
-	struct msm_ts *ts = platform_get_drvdata(pdev);
+	struct msm_ts *ts =  dev_get_drvdata(dev);
 	uint32_t val;
 
 	disable_irq(ts->sample_irq);
@@ -252,9 +253,9 @@ msm_ts_suspend(struct platform_device *pdev, pm_message_t msg)
 }
 
 static int
-msm_ts_resume(struct platform_device *pdev)
+msm_ts_resume(struct device *dev)
 {
-	struct msm_ts *ts = platform_get_drvdata(pdev);
+	struct msm_ts *ts =  dev_get_drvdata(dev);
 
 	msm_ts_hw_init(ts);
 
@@ -263,36 +264,28 @@ msm_ts_resume(struct platform_device *pdev)
 
 	return 0;
 }
-#else
-static int
-msm_ts_suspend(struct platform_device *pdev, pm_message_t msg)
-{
 
-	return 0;
-}
-
-static int
-msm_ts_resume(struct platform_device *pdev)
-{
-	return 0;
-}
+static struct dev_pm_ops msm_touchscreen_pm_ops = {
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend	= msm_ts_suspend,
+	.resume		= msm_ts_resume,
+#endif
+};
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void msm_ts_early_suspend(struct early_suspend *h)
 {
 	struct msm_ts *ts = container_of(h, struct msm_ts, early_suspend);
-	struct platform_device *pdev = to_platform_device(ts->dev);
 
-	msm_ts_suspend(pdev, PMSG_SUSPEND);
+	msm_ts_suspend(ts->dev);
 }
 
 static void msm_ts_late_resume(struct early_suspend *h)
 {
 	struct msm_ts *ts = container_of(h, struct msm_ts, early_suspend);
-	struct platform_device *pdev = to_platform_device(ts->dev);
 
-	msm_ts_resume(pdev);
+	msm_ts_resume(ts->dev);
 }
 #endif
 
@@ -470,13 +463,12 @@ static struct platform_driver msm_touchscreen_driver = {
 	.driver = {
 		.name = "msm_touchscreen",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &msm_touchscreen_pm_ops,
+#endif
 	},
 	.probe		= msm_ts_probe,
 	.remove		= __devexit_p(msm_ts_remove),
-#ifndef CONFIG_HAS_EARLYSUSPEND
-	.resume		= msm_ts_resume,
-	.suspend	= msm_ts_suspend,
-#endif
 };
 
 static int __init msm_ts_init(void)
