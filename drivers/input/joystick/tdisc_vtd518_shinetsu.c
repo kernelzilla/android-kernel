@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 #include <linux/input/tdisc_shinetsu.h>
 
 MODULE_LICENSE("GPL v2");
@@ -238,28 +239,32 @@ static int __devexit tdisc_remove(struct i2c_client *client)
 
 #ifdef CONFIG_PM
 /* TODO: Power optimization in suspend and resume */
-static int tdisc_suspend(struct i2c_client *client,
-			    pm_message_t state)
+static int tdisc_suspend(struct device *dev)
 {
 	struct tdisc_data *dd;
 
-	dd = i2c_get_clientdata(client);
+	dd = dev_get_drvdata(dev);
 	if (device_may_wakeup(&dd->clientp->dev))
 		enable_irq_wake(dd->clientp->irq);
 
 	return 0;
 }
 
-static int tdisc_resume(struct i2c_client *client)
+static int tdisc_resume(struct device *dev)
 {
 	struct tdisc_data *dd;
 
-	dd = i2c_get_clientdata(client);
+	dd = dev_get_drvdata(dev);
 	if (device_may_wakeup(&dd->clientp->dev))
 		disable_irq_wake(dd->clientp->irq);
 
 	return 0;
 }
+
+static struct dev_pm_ops tdisc_pm_ops = {
+	.suspend = tdisc_suspend,
+	.resume  = tdisc_resume,
+};
 #endif
 
 static const struct i2c_device_id tdisc_id[] = {
@@ -389,13 +394,12 @@ static struct i2c_driver tdisc_driver = {
 	.driver = {
 		.name   = DRIVER_NAME,
 		.owner  = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &tdisc_pm_ops,
+#endif
 	},
 	.probe   = tdisc_probe,
 	.remove  =  __devexit_p(tdisc_remove),
-#ifdef CONFIG_PM
-	.suspend = tdisc_suspend,
-	.resume  = tdisc_resume,
-#endif
 	.id_table = tdisc_id,
 };
 
