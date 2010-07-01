@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/i2c/tsc2007.h>
+#include <linux/pm.h>
 
 #define TS_POLL_DELAY			1 /* ms delay between samples */
 #define TS_POLL_PERIOD			1 /* ms delay between samples */
@@ -365,10 +366,9 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 
 #ifdef CONFIG_PM
 /* REVISIT: Changes for Power optimization */
-static int tsc2007_suspend(struct i2c_client *client,
-					pm_message_t state)
+static int tsc2007_suspend(struct device *dev)
 {
-	struct tsc2007	*ts = i2c_get_clientdata(client);
+	struct tsc2007	*ts = dev_get_drvdata(dev);
 
 	disable_irq(ts->irq);
 
@@ -378,25 +378,19 @@ static int tsc2007_suspend(struct i2c_client *client,
 	return 0;
 }
 
-static int tsc2007_resume(struct i2c_client *client)
+static int tsc2007_resume(struct device *dev)
 {
-	struct tsc2007	*ts = i2c_get_clientdata(client);
+	struct tsc2007	*ts = dev_get_drvdata(dev);
 
 	enable_irq(ts->irq);
 
 	return 0;
 }
-#else
-static int tsc2007_suspend(struct i2c_client *client,
-					pm_message_t state)
-{
-	return 0;
-}
 
-static int tsc2007_resume(struct i2c_client *client)
-{
-	return 0;
-}
+static struct dev_pm_ops tsc2007_pm_ops = {
+	.suspend	= tsc2007_suspend,
+	.resume		= tsc2007_resume,
+};
 #endif
 
 static int __devexit tsc2007_remove(struct i2c_client *client)
@@ -425,13 +419,14 @@ MODULE_DEVICE_TABLE(i2c, tsc2007_idtable);
 static struct i2c_driver tsc2007_driver = {
 	.driver = {
 		.owner	= THIS_MODULE,
-		.name	= "tsc2007"
+		.name	= "tsc2007",
+#ifdef CONFIG_PM
+		.pm = &tsc2007_pm_ops,
+#endif
 	},
 	.id_table	= tsc2007_idtable,
 	.probe		= tsc2007_probe,
 	.remove		= __devexit_p(tsc2007_remove),
-	.suspend	= tsc2007_suspend,
-	.resume		= tsc2007_resume,
 };
 
 static int __init tsc2007_init(void)
