@@ -24,6 +24,7 @@
 #include <linux/bitops.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/delay.h>
+#include <linux/pm.h>
 
 #include <linux/input/pmic8058-keypad.h>
 
@@ -480,28 +481,30 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 }
 
 #ifdef CONFIG_PM
-static int pmic8058_kp_suspend(struct platform_device *pdev, pm_message_t msg)
+static int pmic8058_kp_suspend(struct device *dev)
 {
-	struct pmic8058_kp *kp = platform_get_drvdata(pdev);
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(&pdev->dev))
+	if (device_may_wakeup(dev))
 		enable_irq_wake(kp->key_sense_irq);
 
 	return 0;
 }
 
-static int pmic8058_kp_resume(struct platform_device *pdev)
+static int pmic8058_kp_resume(struct device *dev)
 {
-	struct pmic8058_kp *kp = platform_get_drvdata(pdev);
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(&pdev->dev))
+	if (device_may_wakeup(dev))
 		disable_irq_wake(kp->key_sense_irq);
 
 	return 0;
 }
-#else
-#define pmic8058_kp_suspend	NULL
-#define pmic8058_kp_resume	NULL
+
+static struct dev_pm_ops pm8058_kp_pm_ops = {
+	.suspend	= pmic8058_kp_suspend,
+	.resume		= pmic8058_kp_resume,
+};
 #endif
 
 static int pm8058_kp_config_drv(int gpio_start, int num_gpios)
@@ -801,11 +804,12 @@ static int __devexit pmic8058_kp_remove(struct platform_device *pdev)
 static struct platform_driver pmic8058_kp_driver = {
 	.probe		= pmic8058_kp_probe,
 	.remove		= __devexit_p(pmic8058_kp_remove),
-	.suspend	= pmic8058_kp_suspend,
-	.resume		= pmic8058_kp_resume,
 	.driver		= {
 		.name = "pm8058-keypad",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &pm8058_kp_pm_ops,
+#endif
 	},
 };
 
