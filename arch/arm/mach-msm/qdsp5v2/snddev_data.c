@@ -286,8 +286,8 @@ static struct snddev_icodec_data snddev_ihs_ffa_stereo_rx_data = {
 	.profile = &ihs_ffa_stereo_rx_profile,
 	.channel_mode = 2,
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_pamp_on,
-	.pamp_off = msm_snddev_hsed_pamp_off,
+	.voltage_on = msm_snddev_hsed_voltage_on,
+	.voltage_off = msm_snddev_hsed_voltage_off,
 	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
 	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
@@ -326,8 +326,8 @@ static struct snddev_icodec_data snddev_ihs_ffa_mono_rx_data = {
 	.profile = &ihs_ffa_mono_rx_profile,
 	.channel_mode = 1,
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_pamp_on,
-	.pamp_off = msm_snddev_hsed_pamp_off,
+	.pamp_on = msm_snddev_hsed_voltage_on,
+	.pamp_off = msm_snddev_hsed_voltage_off,
 	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
 	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
@@ -578,8 +578,8 @@ static struct snddev_icodec_data snddev_ifmradio_ffa_headset_data = {
 	.profile = &ifmradio_ffa_headset_profile,
 	.channel_mode = 1,
 	.default_sample_rate = 8000,
-	.pamp_on = msm_snddev_hsed_pamp_on,
-	.pamp_off = msm_snddev_hsed_pamp_off,
+	.pamp_on = msm_snddev_hsed_voltage_on,
+	.pamp_off = msm_snddev_hsed_voltage_off,
 	.dev_vol_type = SNDDEV_DEV_VOL_DIGITAL,
 };
 
@@ -1119,18 +1119,6 @@ static struct adie_codec_dev_profile ihs_stereo_speaker_stereo_rx_profile = {
 	.setting_sz = ARRAY_SIZE(ihs_stereo_speaker_stereo_rx_settings),
 };
 
-
-static void msm_snddev_hsed_speaker_pamp_on(void)
-{
-	msm_snddev_hsed_pamp_on();
-	msm_snddev_poweramp_on();
-}
-static void msm_snddev_hsed_speaker_pamp_off(void)
-{
-	msm_snddev_poweramp_off();
-	msm_snddev_hsed_pamp_off();
-}
-
 static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "headset_stereo_speaker_stereo_rx",
@@ -1139,8 +1127,10 @@ static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data = {
 	.profile = &ihs_stereo_speaker_stereo_rx_profile,
 	.channel_mode = 2,
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_speaker_pamp_on,
-	.pamp_off = msm_snddev_hsed_speaker_pamp_off,
+	.pamp_on = msm_snddev_poweramp_on,
+	.pamp_off = msm_snddev_poweramp_off,
+	.voltage_on = msm_snddev_hsed_voltage_on,
+	.voltage_off = msm_snddev_hsed_voltage_off,
 	.max_voice_rx_vol[VOC_NB_INDEX] = -500,
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2000,
 	.max_voice_rx_vol[VOC_WB_INDEX] = -500,
@@ -1533,15 +1523,15 @@ static void snddev_hsed_config_modify_setting(int type)
 
 	if (icodec_data) {
 		if (type == 1) {
-			icodec_data->pamp_on = NULL;
-			icodec_data->pamp_off = NULL;
+			icodec_data->voltage_on = NULL;
+			icodec_data->voltage_off = NULL;
 			icodec_data->profile->settings =
 				ihs_ffa_stereo_rx_class_d_legacy_settings;
 			icodec_data->profile->setting_sz =
 			ARRAY_SIZE(ihs_ffa_stereo_rx_class_d_legacy_settings);
 		} else if (type == 2) {
-			icodec_data->pamp_on = NULL;
-			icodec_data->pamp_off = NULL;
+			icodec_data->voltage_on = NULL;
+			icodec_data->voltage_off = NULL;
 			icodec_data->profile->settings =
 				ihs_ffa_stereo_rx_class_ab_legacy_settings;
 			icodec_data->profile->setting_sz =
@@ -1559,8 +1549,8 @@ static void snddev_hsed_config_restore_setting(void)
 	icodec_data = (struct snddev_icodec_data *)device->dev.platform_data;
 
 	if (icodec_data) {
-		icodec_data->pamp_on = msm_snddev_hsed_pamp_on;
-		icodec_data->pamp_off = msm_snddev_hsed_pamp_off;
+		icodec_data->voltage_on = msm_snddev_hsed_voltage_on;
+		icodec_data->voltage_off = msm_snddev_hsed_voltage_off;
 		icodec_data->profile->settings = ihs_ffa_stereo_rx_settings;
 		icodec_data->profile->setting_sz =
 			ARRAY_SIZE(ihs_ffa_stereo_rx_settings);
