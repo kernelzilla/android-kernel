@@ -1,6 +1,6 @@
 /* arch/arm/mach-msm/rpc_server_handset.c
  *
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -34,6 +34,7 @@
 
 #define HS_RPC_PROG 0x30000091
 
+#define HS_PROCESS_CMD_PROC 0x02
 #define HS_SUBSCRIBE_SRVC_PROC 0x03
 #define HS_REPORT_EVNT_PROC    0x05
 #define HS_EVENT_CB_PROC	1
@@ -147,6 +148,35 @@ struct hs_event_cb_recv {
 	uint32_t hs_key_data_ptr;
 	struct hs_key_data key;
 };
+enum hs_ext_cmd_type {
+	HS_EXT_CMD_KPD_SEND_KEY = 0, /* Send Key */
+	HS_EXT_CMD_KPD_BKLT_CTRL, /* Keypad backlight intensity	*/
+	HS_EXT_CMD_LCD_BKLT_CTRL, /* LCD Backlight intensity */
+	HS_EXT_CMD_DIAG_KEYMAP, /* Emulating a Diag key sequence */
+	HS_EXT_CMD_DIAG_LOCK, /* Device Lock/Unlock */
+	HS_EXT_CMD_GET_EVNT_STATUS, /* Get the status for one of the drivers */
+	HS_EXT_CMD_KPD_GET_KEYS_STATUS,/* Get a list of keys status */
+	HS_EXT_CMD_KPD_SET_PWR_KEY_RST_THOLD, /* PWR Key HW Reset duration */
+	HS_EXT_CMD_KPD_SET_PWR_KEY_THOLD, /* Set pwr key threshold duration */
+	HS_EXT_CMD_LAST, /* Should always be the last command type */
+	HS_EXT_CMD_MAX = 0x7FFFFFFF /* Force enum to be an 32-bit number */
+};
+
+struct hs_cmd_data_type {
+	uint32_t hs_cmd_data_type_ptr; /* hs_cmd_data_type ptr length */
+	uint32_t ver; /* version */
+	enum hs_ext_cmd_type id; /* command id */
+	uint32_t handle; /* handle returned from subscribe proc */
+	enum hs_ext_cmd_type disc_id1; /* discriminator id */
+	uint32_t input_ptr; /* input ptr length */
+	uint32_t input_val; /* command specific data */
+	uint32_t input_len; /* length of command input */
+	enum hs_ext_cmd_type disc_id2; /* discriminator id */
+	uint32_t output_len; /* length of output data */
+	uint32_t delayed; /* execution context for modem
+				true - caller context
+				false - hs task context*/
+};
 
 static const uint32_t hs_key_map[] = {
 	KEY(HS_PWR_K, KEY_POWER),
@@ -168,6 +198,16 @@ static const unsigned int rpc_vers[] = {
 	0x00020001,
 	0x00010001,
 };
+/* hs subscription request parameters */
+struct hs_subs_rpc_req {
+	uint32_t hs_subs_ptr;
+	struct hs_subs hs_subs;
+	uint32_t hs_cb_id;
+	uint32_t hs_handle_ptr;
+	uint32_t hs_handle_data;
+};
+
+static struct hs_subs_rpc_req *hs_subs_req;
 
 struct msm_handset {
 	struct input_dev *ipdev;
@@ -358,33 +398,57 @@ void report_headset_status(bool connected)
 }
 EXPORT_SYMBOL(report_headset_status);
 
+static int hs_rpc_pwr_cmd_arg(struct msm_rpc_client *client,
+				    void *buffer, void *data)
+{
+	struct hs_cmd_data_type *hs_pwr_cmd = buffer;
+
+	hs_pwr_cmd->hs_cmd_data_type_ptr = cpu_to_be32(0x01);
+
+	hs_pwr_cmd->ver = cpu_to_be32(0x03);
+	hs_pwr_cmd->id = cpu_to_be32(HS_EXT_CMD_KPD_SET_PWR_KEY_THOLD);
+	hs_pwr_cmd->handle = cpu_to_be32(hs_subs_req->hs_handle_data);
+	hs_pwr_cmd->disc_id1 = cpu_to_be32(HS_EXT_CMD_KPD_SET_PWR_KEY_THOLD);
+	hs_pwr_cmd->input_ptr = cpu_to_be32(0x01);
+	hs_pwr_cmd->input_val = cpu_to_be32(hs->hs_pdata->pwr_key_delay_ms);
+	hs_pwr_cmd->input_len = cpu_to_be32(0x01);
+	hs_pwr_cmd->disc_id2 = cpu_to_be32(HS_EXT_CMD_KPD_SET_PWR_KEY_THOLD);
+	hs_pwr_cmd->output_len = cpu_to_be32(0x00);
+	hs_pwr_cmd->delayed = cpu_to_be32(0x00);
+
+	return sizeof(*hs_pwr_cmd);
+}
+
+static int hs_rpc_pwr_cmd_res(struct msm_rpc_client *client,
+				    void *buffer, void *data)
+{
+	uint32_t result;
+
+	result = be32_to_cpu(*((uint32_t *)buffer));
+	pr_debug("%s: request completed: 0x%x\n", __func__, result);
+
+	return 0;
+}
+
 static int hs_rpc_register_subs_arg(struct msm_rpc_client *client,
 				    void *buffer, void *data)
 {
-	struct hs_subs_rpc_req {
-		uint32_t hs_subs_ptr;
-		struct hs_subs hs_subs;
-		uint32_t hs_cb_id;
-		uint32_t hs_handle_ptr;
-		uint32_t hs_handle_data;
-	};
+	hs_subs_req = buffer;
 
-	struct hs_subs_rpc_req *req = buffer;
+	hs_subs_req->hs_subs_ptr	= cpu_to_be32(0x1);
+	hs_subs_req->hs_subs.ver	= cpu_to_be32(0x1);
+	hs_subs_req->hs_subs.srvc	= cpu_to_be32(HS_SUBS_RCV_EVNT);
+	hs_subs_req->hs_subs.req	= cpu_to_be32(HS_SUBS_REGISTER);
+	hs_subs_req->hs_subs.host_os	= cpu_to_be32(0x4); /* linux */
+	hs_subs_req->hs_subs.disc	= cpu_to_be32(HS_SUBS_RCV_EVNT);
+	hs_subs_req->hs_subs.id.evnt	= cpu_to_be32(HS_EVNT_CLASS_ALL);
 
-	req->hs_subs_ptr	= cpu_to_be32(0x1);
-	req->hs_subs.ver	= cpu_to_be32(0x1);
-	req->hs_subs.srvc	= cpu_to_be32(HS_SUBS_RCV_EVNT);
-	req->hs_subs.req	= cpu_to_be32(HS_SUBS_REGISTER);
-	req->hs_subs.host_os	= cpu_to_be32(0x4); /* linux */
-	req->hs_subs.disc	= cpu_to_be32(HS_SUBS_RCV_EVNT);
-	req->hs_subs.id.evnt	= cpu_to_be32(HS_EVNT_CLASS_ALL);
+	hs_subs_req->hs_cb_id		= cpu_to_be32(0x1);
 
-	req->hs_cb_id		= cpu_to_be32(0x1);
+	hs_subs_req->hs_handle_ptr	= cpu_to_be32(0x1);
+	hs_subs_req->hs_handle_data	= cpu_to_be32(0x0);
 
-	req->hs_handle_ptr	= cpu_to_be32(0x1);
-	req->hs_handle_data	= cpu_to_be32(0x0);
-
-	return sizeof(*req);
+	return sizeof(*hs_subs_req);
 }
 
 static int hs_rpc_register_subs_res(struct msm_rpc_client *client,
@@ -452,10 +516,20 @@ static int __init hs_rpc_cb_init(void)
 				hs_rpc_register_subs_arg, NULL,
 				hs_rpc_register_subs_res, NULL, -1);
 	if (rc) {
-		pr_err("%s: couldn't send rpc client request\n", __func__);
-		msm_rpc_unregister_client(rpc_client);
+		pr_err("%s: RPC client request failed for subscribe services\n",
+						__func__);
+		goto err_client_req;
 	}
 
+	rc = msm_rpc_client_req(rpc_client, HS_PROCESS_CMD_PROC,
+			hs_rpc_pwr_cmd_arg, NULL,
+			hs_rpc_pwr_cmd_res, NULL, -1);
+	if (rc)
+		pr_err("%s: RPC client request failed for pwr key"
+			" delay cmd, using normal mode\n", __func__);
+	return 0;
+err_client_req:
+	msm_rpc_unregister_client(rpc_client);
 	return rc;
 }
 
