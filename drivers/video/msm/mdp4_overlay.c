@@ -1414,8 +1414,7 @@ uint32 tile_mem_size(struct mdp4_overlay_pipe *pipe, struct tile_desc *tp)
 
 	row_num_w = (pipe->src_width + tile_w - 1) / tile_w;
 	row_num_h = (pipe->src_height + tile_h - 1) / tile_h;
-
-	return row_num_w * row_num_h * tile_w * tile_h;
+	return ((row_num_w * row_num_h * tile_w * tile_h) + 8191) & ~8191;
 }
 
 int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
