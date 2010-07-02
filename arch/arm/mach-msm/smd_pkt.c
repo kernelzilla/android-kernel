@@ -59,7 +59,6 @@ struct smd_pkt_dev {
 
 	unsigned char tx_buf[MAX_BUF_SIZE];
 	unsigned char rx_buf[MAX_BUF_SIZE];
-	int bytes_read;
 	int is_open;
 
 	struct notifier_block nb;
@@ -100,10 +99,6 @@ static void clean_and_signal(struct smd_pkt_dev *smd_pkt_devp)
 	mutex_lock(&smd_pkt_devp->has_reset_lock);
 	smd_pkt_devp->has_reset = 1;
 	mutex_unlock(&smd_pkt_devp->has_reset_lock);
-
-	mutex_lock(&smd_pkt_devp->rx_lock);
-	smd_pkt_devp->bytes_read = 0;
-	mutex_unlock(&smd_pkt_devp->rx_lock);
 
 	mutex_lock(&smd_pkt_devp->is_open_lock);
 	smd_pkt_devp->is_open = 0;
@@ -173,6 +168,7 @@ ssize_t smd_pkt_read(struct file *file,
 	int r;
 	int bytes_read;
 	struct smd_pkt_dev *smd_pkt_devp;
+	struct smd_channel *chl;
 
 	D(KERN_ERR "%s: read %i bytes\n",
 	  __func__, count);
@@ -182,8 +178,12 @@ ssize_t smd_pkt_read(struct file *file,
 	if (!smd_pkt_devp->ch)
 		return -EINVAL;
 
+	chl = smd_pkt_devp->ch;
+wait_for_packet:
 	r = wait_event_interruptible(smd_pkt_devp->ch_wait_queue,
-				     smd_pkt_devp->bytes_read |
+				     (smd_cur_packet_size(chl) > 0 &&
+				      smd_read_avail(chl) >=
+				      smd_cur_packet_size(chl)) |
 				     smd_pkt_devp->has_reset);
 
 	if (smd_pkt_devp->has_reset)
@@ -207,16 +207,22 @@ ssize_t smd_pkt_read(struct file *file,
 	/* Here we have a whole packet waiting for us */
 
 	mutex_lock(&smd_pkt_devp->rx_lock);
-	bytes_read = smd_pkt_devp->bytes_read;
-	smd_pkt_devp->bytes_read = 0;
-	mutex_unlock(&smd_pkt_devp->rx_lock);
+	bytes_read = smd_cur_packet_size(smd_pkt_devp->ch);
 
 	D(KERN_ERR "%s: after wait_event_interruptible bytes_read = %i\n",
 	  __func__, bytes_read);
 
+	if (bytes_read == 0 ||
+	    bytes_read < smd_read_avail(smd_pkt_devp->ch)) {
+		D(KERN_ERR "%s: Nothing to read\n", __func__);
+		mutex_unlock(&smd_pkt_devp->rx_lock);
+		goto wait_for_packet;
+	}
+
 	if (bytes_read > count) {
 		printk(KERN_ERR "packet size %i > buffer size %i, "
 		       "dropping packet!", bytes_read, count);
+		mutex_unlock(&smd_pkt_devp->rx_lock);
 		smd_read(smd_pkt_devp->ch, 0, bytes_read);
 		return -EINVAL;
 	}
@@ -224,12 +230,14 @@ ssize_t smd_pkt_read(struct file *file,
 	/* smd_read and copy_to_user need to be merged to only do 1 copy */
 	if (smd_read(smd_pkt_devp->ch, smd_pkt_devp->rx_buf, bytes_read)
 	    != bytes_read) {
+		mutex_unlock(&smd_pkt_devp->rx_lock);
 		if (smd_pkt_devp->has_reset)
 			return -ENETRESET;
 
 		printk(KERN_ERR "user read: not enough data?!\n");
 		return -EINVAL;
 	}
+	mutex_unlock(&smd_pkt_devp->rx_lock);
 	D_DUMP_BUFFER("read: ", bytes_read, smd_pkt_devp->rx_buf);
 	r = copy_to_user(buf, smd_pkt_devp->rx_buf, bytes_read);
 
@@ -369,10 +377,6 @@ static void ch_work_func(struct work_struct *work)
 		}
 
 		/* here we have a packet of size sz ready */
-
-		mutex_lock(&smd_pkt_devp->rx_lock);
-		smd_pkt_devp->bytes_read = sz;
-		mutex_unlock(&smd_pkt_devp->rx_lock);
 		wake_up_interruptible(&smd_pkt_devp->ch_wait_queue);
 		D(KERN_ERR "%s: after wake_up\n", __func__);
 		break;
