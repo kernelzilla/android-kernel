@@ -49,6 +49,7 @@
 #include <mach/memory.h>
 #include <mach/msm_battery.h>
 #include <mach/camera.h>
+#include <mach/rpc_server_handset.h>
 
 #ifdef CONFIG_USB_FUNCTION
 #include <linux/usb/mass_storage_function.h>
@@ -131,9 +132,16 @@ static struct platform_device android_usb_device = {
 };
 #endif
 
+static struct msm_handset_platform_data hs_platform_data = {
+	.hs_name = "7k_handset",
+};
+
 static struct platform_device hs_device = {
 	.name   = "msm-handset",
 	.id     = -1,
+	.dev    = {
+		.platform_data = &hs_platform_data,
+	},
 };
 
 #ifdef CONFIG_USB_FUNCTION
