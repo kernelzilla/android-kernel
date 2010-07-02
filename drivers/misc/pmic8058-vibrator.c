@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/pmic8058-vibrator.h>
 #include <linux/mfd/pmic8058.h>
+#include <linux/pm.h>
 
 #include "../staging/android/timed_output.h"
 
@@ -163,6 +164,23 @@ static enum hrtimer_restart pmic8058_vib_timer_func(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+#ifdef CONFIG_PM
+static int pmic8058_vib_suspend(struct device *dev)
+{
+	struct pmic8058_vib *vib = dev_get_drvdata(dev);
+
+	hrtimer_cancel(&vib->vib_timer);
+	cancel_work_sync(&vib->work);
+	/* turn-off vibrator */
+	pmic8058_vib_set(vib, 0);
+	return 0;
+}
+
+static struct dev_pm_ops pmic8058_vib_pm_ops = {
+	.suspend = pmic8058_vib_suspend,
+};
+#endif
+
 static int __devinit pmic8058_vib_probe(struct platform_device *pdev)
 
 {
@@ -251,6 +269,9 @@ static struct platform_driver pmic8058_vib_driver = {
 	.driver		= {
 		.name	= "pm8058-vib",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm	= &pmic8058_vib_pm_ops,
+#endif
 	},
 };
 
