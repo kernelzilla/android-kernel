@@ -179,7 +179,7 @@ static struct acdb_iir_block *get_audpp_irr_block(void)
 }
 
 
-static void acdb_fill_audpp_iir(void)
+static s32 acdb_fill_audpp_iir(void)
 {
 	struct acdb_iir_block *acdb_iir;
 	s32 i = 0;
@@ -187,7 +187,7 @@ static void acdb_fill_audpp_iir(void)
 	acdb_iir = get_audpp_irr_block();
 	if (acdb_iir == NULL) {
 		MM_ERR("unable to find  audpp iir block returning\n");
-		return;
+		return -1;
 	}
 	memset(acdb_data.pp_iir, 0, sizeof(*acdb_data.pp_iir));
 
@@ -236,6 +236,7 @@ static void acdb_fill_audpp_iir(void)
 		acdb_data.pp_iir->params_filter.filter_4_params.pan_filter[i].
 			pan_filter_0 = acdb_iir->pan[i];
 	}
+	return 0;
 }
 
 static void extract_mbadrc(u32 *phy_addr, struct header *prs_hdr, u32 *index)
@@ -302,11 +303,15 @@ static void get_audpp_mbadrc_block(u32 *phy_addr)
 	}
 }
 
-static void acdb_fill_audpp_mbadrc(void)
+static s32 acdb_fill_audpp_mbadrc(void)
 {
 	u32 mbadrc_phys_addr = 0;
 
 	get_audpp_mbadrc_block(&mbadrc_phys_addr);
+	if (IS_ERR_VALUE(mbadrc_phys_addr)) {
+		MM_ERR("failed to get mbadrc block\n");
+		return -1;
+	}
 
 	memset(acdb_data.pp_mbadrc, 0, sizeof(*acdb_data.pp_mbadrc));
 
@@ -342,32 +347,42 @@ static void acdb_fill_audpp_mbadrc(void)
 					band_config,
 		sizeof(struct mbadrc_band_config_type) *
 			acdb_data.mbadrc_block.parameters.mbadrc_num_bands);
+	return 0;
 }
 
-s32 acdb_calibrate_audpp(void)
+static s32 acdb_calibrate_audpp(void)
 {
 	s32	result = 0;
 
-	acdb_fill_audpp_iir();
-	acdb_fill_audpp_mbadrc();
-
-	result = audpp_dsp_set_rx_iir(acdb_data.device_info->dev_id,
+	result = acdb_fill_audpp_iir();
+	if (!IS_ERR_VALUE(result)) {
+		result = audpp_dsp_set_rx_iir(acdb_data.device_info->dev_id,
 				acdb_data.pp_iir->active_flag,
 					acdb_data.pp_iir, COPP);
-	if (result) {
-		MM_ERR("ACDB=> Failed to send IIR data to postproc\n");
-		result = -EINVAL;
-		goto done;
+		if (result) {
+			MM_ERR("ACDB=> Failed to send IIR data to postproc\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("AUDPP is calibrated with IIR parameters"
+					" for COPP ID %d\n",
+						acdb_data.device_info->dev_id);
 	}
-	result = audpp_dsp_set_mbadrc(acdb_data.device_info->dev_id,
-			acdb_data.pp_mbadrc->enable, acdb_data.pp_mbadrc, COPP);
-	if (result) {
-		MM_ERR("ACDB=> Failed to send MBADRC data to postproc\n");
-		result = -EINVAL;
-		goto done;
+	result = acdb_fill_audpp_mbadrc();
+	if (!IS_ERR_VALUE(result)) {
+		result = audpp_dsp_set_mbadrc(acdb_data.device_info->dev_id,
+					acdb_data.pp_mbadrc->enable,
+					acdb_data.pp_mbadrc, COPP);
+		if (result) {
+			MM_ERR("ACDB=> Failed to send MBADRC data to"
+					" postproc\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("AUDPP is calibrated with MBADRC parameters"
+					" for COPP ID %d\n",
+					acdb_data.device_info->dev_id);
 	}
-	MM_DBG("audpp is calibrated with iir and mbadrc parameters"
-			" for COPP ID %d\n", acdb_data.device_info->dev_id);
 done:
 	return result;
 }
@@ -398,14 +413,14 @@ static struct acdb_agc_block *get_audpreproc_agc_block(void)
 	return NULL;
 }
 
-static void acdb_fill_audpreproc_agc(void)
+static s32 acdb_fill_audpreproc_agc(void)
 {
 	struct acdb_agc_block	*acdb_agc;
 
 	acdb_agc = get_audpreproc_agc_block();
 	if (!acdb_agc) {
 		MM_DBG("unable to find preproc agc parameters winding up\n");
-		goto done;
+		return -1;
 	}
 	memset(acdb_data.preproc_agc, 0, sizeof(*acdb_data.preproc_agc));
 	acdb_data.preproc_agc->cmd_id = AUDPREPROC_CMD_CFG_AGC_PARAMS;
@@ -464,8 +479,7 @@ static void acdb_fill_audpreproc_agc(void)
 		acdb_agc->comp_rlink_release_k_lsw;
 	acdb_data.preproc_agc->comp_rlink_rms_tav =
 		acdb_agc->comp_rlink_rms_trav;
-done:
-	return;
+	return 0;
 }
 
 static struct acdb_iir_block *get_audpreproc_irr_block(void)
@@ -495,7 +509,7 @@ static struct acdb_iir_block *get_audpreproc_irr_block(void)
 }
 
 
-static void acdb_fill_audpreproc_iir(void)
+static s32 acdb_fill_audpreproc_iir(void)
 {
 	struct acdb_iir_block	*acdb_iir;
 
@@ -503,7 +517,7 @@ static void acdb_fill_audpreproc_iir(void)
 	acdb_iir =  get_audpreproc_irr_block();
 	if (!acdb_iir) {
 		MM_DBG("unable to find preproc iir parameters winding up\n");
-		goto done;
+		return -1;
 	}
 	memset(acdb_data.preproc_iir, 0, sizeof(*acdb_data.preproc_iir));
 
@@ -618,35 +632,42 @@ static void acdb_fill_audpreproc_iir(void)
 		acdb_iir->pan[2];
 	acdb_data.preproc_iir->pan_of_filter3 =
 		acdb_iir->pan[3];
-done:
-	return;
+	return 0;
 }
 
 s32 acdb_calibrate_audpreproc(void)
 {
 	s32	result = 0;
 
-	acdb_fill_audpreproc_agc();
-	acdb_fill_audpreproc_iir();
-
-	result = audpreproc_dsp_set_agc(acdb_data.preproc_agc, sizeof(
+	result = acdb_fill_audpreproc_agc();
+	if (!IS_ERR_VALUE(result)) {
+		result = audpreproc_dsp_set_agc(acdb_data.preproc_agc, sizeof(
 					struct audpreproc_cmd_cfg_agc_params));
-	if (result) {
-		MM_ERR("ACDB=> Failed to send AGC data to preproc)\n");
-		result = -EINVAL;
-		goto done;
+		if (result) {
+			MM_ERR("ACDB=> Failed to send AGC data to preproc)\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("AUDPREC is calibrated with AGC parameters"
+				" for COPP ID %d and AUDREC session %d\n",
+					acdb_data.device_info->dev_id,
+					acdb_data.preproc_stream_id);
 	}
-	result = audpreproc_dsp_set_iir(acdb_data.preproc_iir, sizeof(struct
+	result = acdb_fill_audpreproc_iir();
+	if (!IS_ERR_VALUE(result)) {
+		result = audpreproc_dsp_set_iir(acdb_data.preproc_iir,
+				sizeof(struct\
 				audpreproc_cmd_cfg_iir_tuning_filter_params));
-	if (result) {
-		MM_ERR("ACDB=> Failed to send IIR data to preproc\n");
-		result = -EINVAL;
-		goto done;
+		if (result) {
+			MM_ERR("ACDB=> Failed to send IIR data to preproc\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("audpreproc is calibrated with iir parameters"
+			" for COPP ID %d and AUREC session %d\n",
+					acdb_data.device_info->dev_id,
+					acdb_data.preproc_stream_id);
 	}
-	MM_DBG("audpreproc is calibrated with iir and agc parameters"
-		" for COPP ID %d and AUREC session %d\n",
-				acdb_data.device_info->dev_id,
-				acdb_data.preproc_stream_id);
 done:
 	return result;
 }
