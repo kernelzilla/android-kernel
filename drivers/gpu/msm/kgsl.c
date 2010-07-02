@@ -34,6 +34,7 @@
 #include <linux/vmalloc.h>
 #include <asm/cacheflush.h>
 #include <linux/notifier.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/delay.h>
 #include <asm/atomic.h>
@@ -577,15 +578,31 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 	KGSL_POST_HWACCESS();
 	kfree(dev_priv);
 
+	BUG_ON(kgsl_driver.pdev == NULL);
+	pm_runtime_put(&kgsl_driver.pdev->dev);
+
 	return result;
 }
 
 static int kgsl_open(struct inode *inodep, struct file *filep)
 {
-	int result = 0;
+	int result;
 	struct kgsl_device_private *dev_priv;
 	struct kgsl_device *device;
 	unsigned int minor = iminor(inodep);
+	struct device *dev;
+
+	BUG_ON(kgsl_driver.pdev == NULL);
+	dev = &kgsl_driver.pdev->dev;
+
+	result = pm_runtime_get_sync(dev);
+	if (result < 0) {
+		dev_err(dev,
+			"Runtime PM: Unable to wake up the device, rc = %d\n",
+			result);
+		return result;
+	}
+	result = 0;
 
 	KGSL_DRV_DBG("file %p pid %d minor %d\n",
 		      filep, task_pid_nr(current), minor);
@@ -1415,6 +1432,23 @@ done:
 	return result;
 }
 
+static int kgsl_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int kgsl_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static struct dev_pm_ops kgsl_dev_pm_ops = {
+	.runtime_suspend = kgsl_runtime_suspend,
+	.runtime_resume = kgsl_runtime_resume,
+};
+
 static const struct file_operations kgsl_fops = {
 	.owner = THIS_MODULE,
 	.release = kgsl_release,
@@ -1749,6 +1783,7 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 
 	INIT_LIST_HEAD(&kgsl_driver.pagetable_list);
 	mutex_init(&kgsl_driver.pt_mutex);
+	pm_runtime_enable(&pdev->dev);
 
 	result = kgsl_yamato_init(kgsl_get_yamato_generic_device(),
 				  &kgsl_driver.yamato_config);
@@ -1791,7 +1826,7 @@ done:
 
 static int kgsl_platform_remove(struct platform_device *pdev)
 {
-
+	pm_runtime_disable(&pdev->dev);
 	kgsl_driver_cleanup();
 	kgsl_drm_exit();
 	kgsl_device_unregister();
@@ -1806,7 +1841,8 @@ static struct platform_driver kgsl_platform_driver = {
 	.resume = kgsl_resume,
 	.driver = {
 		.owner = THIS_MODULE,
-		.name = DRIVER_NAME
+		.name = DRIVER_NAME,
+		.pm = &kgsl_dev_pm_ops,
 	}
 };
 
