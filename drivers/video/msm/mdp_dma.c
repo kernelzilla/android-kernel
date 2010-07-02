@@ -68,6 +68,7 @@ static void mdp_dma2_update_lcd(struct msm_fb_data_type *mfd)
 	struct msm_fb_panel_data *pdata =
 	    (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 	uint32 ystride = mfd->fbi->fix.line_length;
+	uint32 mddi_pkt_desc;
 
 	dma2_cfg_reg = DMA_PACK_TIGHT | DMA_PACK_ALIGN_LSB |
 	    DMA_OUT_SEL_AHB | DMA_IBUF_NONCONTIGUOUS;
@@ -166,12 +167,15 @@ static void mdp_dma2_update_lcd(struct msm_fb_data_type *mfd)
 #endif
 
 	if (mfd->panel_info.bpp == 18) {
+		mddi_pkt_desc = MDDI_VDO_PACKET_DESC;
 		dma2_cfg_reg |= DMA_DSTC0G_6BITS |	/* 666 18BPP */
 		    DMA_DSTC1B_6BITS | DMA_DSTC2R_6BITS;
 	} else if (mfd->panel_info.bpp == 24) {
+		mddi_pkt_desc = MDDI_VDO_PACKET_DESC_24;
 		dma2_cfg_reg |= DMA_DSTC0G_8BITS |      /* 888 24BPP */
 			DMA_DSTC1B_8BITS | DMA_DSTC2R_8BITS;
 	} else {
+		mddi_pkt_desc = MDDI_VDO_PACKET_DESC_16;
 		dma2_cfg_reg |= DMA_DSTC0G_6BITS |	/* 565 16BPP */
 		    DMA_DSTC1B_5BITS | DMA_DSTC2R_5BITS;
 	}
@@ -182,12 +186,12 @@ static void mdp_dma2_update_lcd(struct msm_fb_data_type *mfd)
 			 (iBuf->dma_y << 16) | iBuf->dma_x);
 		MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01a0, mddi_ld_param);
 		MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01a4,
-			 (MDDI_VDO_PACKET_DESC << 16) | mddi_vdo_packet_reg);
+			 (mddi_pkt_desc << 16) | mddi_vdo_packet_reg);
 #else
 		MDP_OUTP(MDP_BASE + 0x90010, (iBuf->dma_y << 16) | iBuf->dma_x);
 		MDP_OUTP(MDP_BASE + 0x00090, mddi_ld_param);
 		MDP_OUTP(MDP_BASE + 0x00094,
-			 (MDDI_VDO_PACKET_DESC << 16) | mddi_vdo_packet_reg);
+			 (mddi_pkt_desc << 16) | mddi_vdo_packet_reg);
 #endif
 	} else {
 		/* setting EBI2 LCDC write window */
