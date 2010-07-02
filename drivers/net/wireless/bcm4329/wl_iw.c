@@ -4731,8 +4731,15 @@ get_channel_retry:
 	if (!ap_cfg_running) {
 		kernel_thread(thr_wait_for_2nd_eth_dev, 0, 0);
 	} else {
-		WL_TRACE(("%s: Configure security & restart AP bss \n", __FUNCTION__));
-		res |= wl_iw_set_ap_security(dev, &my_ap);
+		if (ap_net_dev == NULL) {
+			WL_ERROR(("%s: ERROR: ap_net_dev is NULL !!!\n",__FUNCTION__));
+			return -1;
+		}
+
+		/* if  the AP interface wl0.1 already exists we call security & bss UP in here */
+		WL_ERROR(("%s: %s Configure security & restart AP bss\n", __FUNCTION__, ap_net_dev->name));
+
+		res |= wl_iw_set_ap_security(ap_net_dev, &my_ap);
 		res |= dev_iw_write_cfg1_bss_var(dev, 1);
 	}
 	return res;
