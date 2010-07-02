@@ -822,6 +822,10 @@ static struct platform_device gpio_leds = {
 };
 #endif
 
+static struct platform_device *early_devices[] __initdata = {
+	&msm_device_gpio,
+};
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 	&msm_device_uart_dm12,
@@ -2360,6 +2364,7 @@ static void __init msm8x60_init(void)
 	if (!machine_is_msm8x60_rumi3() && !machine_is_msm8x60_sim())
 		msm_acpu_clock_init(&msm8x60_acpu_clock_data);
 
+	platform_add_devices(early_devices, ARRAY_SIZE(early_devices));
 	msm8x60_init_ebi2();
 	msm8x60_init_tlmm();
 	msm8x60_init_uart12dm();
