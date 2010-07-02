@@ -31,6 +31,7 @@
 
 #include "smd_private.h"
 #include "clock.h"
+#include "clock-local.h"
 #include "clock-7x30.h"
 #include "acpuclock.h"
 #include "socinfo.h"
@@ -187,12 +188,12 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	if (reason == SETRATE_CPUFREQ) {
 		/* Increase VDDs if needed. */
 		if (tgt_s->msmc1 > strt_s->msmc1) {
-			rc = vote_msmc1(tgt_s->msmc1);
+			rc = local_vote_sys_vdd(tgt_s->msmc1);
 			if (rc) {
 				pr_err("Failed to vote for MSMC1\n");
 				goto out;
 			}
-			unvote_msmc1(strt_s->msmc1);
+			local_unvote_sys_vdd(strt_s->msmc1);
 		}
 		if (tgt_s->vdd_mv > strt_s->vdd_mv) {
 
@@ -223,7 +224,7 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	/* Make sure target PLL is on. */
 	if (strt_s->src != tgt_s->src && tgt_s->src >= 0) {
 		dprintk("Enabling PLL %d\n", tgt_s->src);
-		pll_enable(tgt_s->src);
+		local_src_enable(tgt_s->src);
 	}
 
 	/* Perform the frequency switch */
@@ -238,7 +239,7 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	/* Turn off previous PLL if not used. */
 	if (strt_s->src != tgt_s->src && strt_s->src >= 0) {
 		dprintk("Disabling PLL %d\n", strt_s->src);
-		pll_disable(strt_s->src);
+		local_src_disable(strt_s->src);
 	}
 
 	/* Decrease the AXI bus frequency if we can. */
@@ -261,11 +262,11 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 					tgt_s->vdd_mv, res);
 	}
 	if (tgt_s->msmc1 < strt_s->msmc1) {
-		res = vote_msmc1(tgt_s->msmc1);
+		res = local_vote_sys_vdd(tgt_s->msmc1);
 		if (res)
 			pr_err("Failed to vote for MSMC1\n");
 		else
-			unvote_msmc1(strt_s->msmc1);
+			local_unvote_sys_vdd(strt_s->msmc1);
 	}
 
 	dprintk("ACPU speed change complete\n");
@@ -352,7 +353,7 @@ static void __init acpuclk_init(void)
 	}
 
 	/* Set initial VDDs */
-	res = vote_msmc1(s->msmc1);
+	res = local_vote_sys_vdd(s->msmc1);
 	if (res)
 		pr_warning("Failed to vote for MSMC1\n");
 	acpuclk_set_acpu_vdd(s);
@@ -361,7 +362,7 @@ static void __init acpuclk_init(void)
 
 	/* Initialize current PLL's reference count. */
 	if (s->src >= 0)
-		pll_enable(s->src);
+		local_src_enable(s->src);
 
 	res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK, s->axi_clk_khz * 1000);
 	if (res < 0)
