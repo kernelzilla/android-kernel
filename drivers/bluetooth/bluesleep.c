@@ -573,6 +573,9 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 	ret = gpio_request(bsi->host_wake, "bt_host_wake");
 	if (ret)
 		goto free_bsi;
+	ret = gpio_direction_input(bsi->host_wake);
+	if (ret)
+		goto free_bt_host_wake;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
 				"gpio_ext_wake");
@@ -586,6 +589,10 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 	ret = gpio_request(bsi->ext_wake, "bt_ext_wake");
 	if (ret)
 		goto free_bt_host_wake;
+	/* assert bt wake */
+	ret = gpio_direction_output(bsi->ext_wake, 0);
+	if (ret)
+		goto free_bt_ext_wake;
 
 	bsi->host_wake_irq = platform_get_irq_byname(pdev, "host_wake");
 	if (bsi->host_wake_irq < 0) {
@@ -608,6 +615,17 @@ free_bsi:
 
 static int bluesleep_remove(struct platform_device *pdev)
 {
+	/* assert bt wake */
+	gpio_set_value(bsi->ext_wake, 0);
+	if (test_bit(BT_PROTO, &flags)) {
+		if (disable_irq_wake(bsi->host_wake_irq))
+			BT_ERR("Couldn't disable hostwake IRQ wakeup mode \n");
+		free_irq(bsi->host_wake_irq, NULL);
+		del_timer(&tx_timer);
+		if (test_bit(BT_ASLEEP, &flags))
+			hsuart_power(1);
+	}
+
 	gpio_free(bsi->host_wake);
 	gpio_free(bsi->ext_wake);
 	kfree(bsi);
@@ -701,8 +719,6 @@ static int __init bluesleep_init(void)
 	/* initialize host wake tasklet */
 	tasklet_init(&hostwake_task, bluesleep_hostwake_task, 0);
 
-	/* assert bt wake */
-	gpio_set_value(bsi->ext_wake, 0);
 	hci_register_notifier(&hci_event_nblock);
 
 	return 0;
@@ -722,17 +738,6 @@ fail:
  */
 static void __exit bluesleep_exit(void)
 {
-	/* assert bt wake */
-	gpio_set_value(bsi->ext_wake, 0);
-	if (test_bit(BT_PROTO, &flags)) {
-		if (disable_irq_wake(bsi->host_wake_irq))
-			BT_ERR("Couldn't disable hostwake IRQ wakeup mode \n");
-		free_irq(bsi->host_wake_irq, NULL);
-		del_timer(&tx_timer);
-		if (test_bit(BT_ASLEEP, &flags))
-			hsuart_power(1);
-	}
-
 	hci_unregister_notifier(&hci_event_nblock);
 	platform_driver_unregister(&bluesleep_driver);
 
