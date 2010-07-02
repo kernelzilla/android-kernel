@@ -1935,34 +1935,7 @@ static struct reg_init {
 	uint32_t val;
 } ri_list[] __initdata = {
 
-	/* XXX START OF TEMPORARY CODE XXX
-	 * The RPM bootloader should take care of this. */
-
-	/* PXO src = PXO */
-	{REG(0x2EA0), 0x3, 0x1},
-
-	/* XXX PLL8 (MM_GPERF_PLL) @ 384MHz. */
-	{REG(0x3144), 0x3FF,  14}, /* LVAL */
-	{REG(0x3148), 0x7FFFF, 2}, /* MVAL */
-	{REG(0x314C), 0x7FFFF, 9}, /* NVAL */
-	{REG(0x3140), B(4), B(4)}, /* Ref = MXO */
-	/* Enable MN, set VCO, main out. */
-	{REG(0x3154), B(23) | B(22) | 0x3 << 16, B(23) | B(22) | 0x1 << 16},
-	 /* Don't bypass, enable outputs, deassert MND reset. */
-	{REG(0x3140), 0x7, 0x7},
-
-	/* XXX PLL0 @ (MM_GPLL0) @ 621MHz. */
-	{REG(0x30C4), 0x3FF,   23}, /* LVAL */
-	{REG(0x30C8), 0x7FFFF,  0}, /* MVAL */
-	{REG(0x30CC), 0x7FFFF,  1}, /* NVAL */
-	{REG(0x30C0), B(4), B(4)},  /* Ref = MXO */
-	/* Enable MN, set VCO, main out. */
-	{REG(0x30D4), B(23) | B(22) | 0x3 << 20 | 0x3 << 16,
-		B(23) | B(22) | 0x1 << 16},
-	/* Don't bypass, enable outputs, deassert MND reset. */
-	{REG(0x30C0), 0x7, 0x7},
-
-	/* XXX MM_PLL0 (PLL1) @ 1320MHz */
+	/* Program MM_PLL0 (PLL1) @ 1320MHz */
 	{REG_MM(0x0304), 0xFF,   48}, /* LVAL */
 	{REG_MM(0x0308), 0x7FFFF, 8}, /* MVAL */
 	{REG_MM(0x030C), 0x7FFFF, 9}, /* NVAL */
@@ -1972,7 +1945,7 @@ static struct reg_init {
 	 /* Don't bypass, enable outputs, deassert MND reset. */
 	{REG_MM(0x0300), 0xF, 0x7},
 
-	/* XXX MM_PLL1 (PLL2) @ 800MHz */
+	/* Program MM_PLL1 (PLL2) @ 800MHz */
 	{REG_MM(0x0320), 0x3FF,   29}, /* LVAL */
 	{REG_MM(0x0324), 0x7FFFF, 17}, /* MVAL */
 	{REG_MM(0x0328), 0x7FFFF, 27}, /* NVAL */
@@ -1982,7 +1955,7 @@ static struct reg_init {
 	 /* Don't bypass, enable outputs, deassert MND reset. */
 	{REG_MM(0x031C), 0x7, 0x7},
 
-	/* XXX MM_PLL2 (PLL3) @ <Varies>, 50.4005MHz for now. */
+	/* Program MM_PLL2 (PLL3) @ <Varies>, 50.4005MHz for now. */
 	{REG_MM(0x033C), 0x3FF,       7}, /* LVAL */
 	{REG_MM(0x0340), 0x7FFFF,  6301}, /* MVAL */
 	{REG_MM(0x0344), 0x7FFFF, 13500}, /* NVAL */
@@ -1992,7 +1965,7 @@ static struct reg_init {
 	/* Don't bypass, enable outputs, deassert MND reset. */
 	{REG_MM(0x0338), 0x7, 0x7},
 
-	/* XXX LPA_PLL (PLL4) @ 540.6720 MHz */
+	/* Program LPA_PLL (PLL4) @ 540.6720 MHz */
 	{REG_LPA(0x0004), 0x3FF,     20}, /* LVAL */
 	{REG_LPA(0x0008), 0x7FFFF,   28}, /* MVAL */
 	{REG_LPA(0x000C), 0x7FFFF, 1125}, /* NVAL */
@@ -2002,10 +1975,8 @@ static struct reg_init {
 	/* Don't bypass, enable outputs, deassert MND reset. */
 	{REG_LPA(0x0000), 0x7, 0x7},
 
-	/* XXX Turn on all SC0 voteable PLLs (PLL0, PLL6, PLL8). */
+	/* Turn on all SC0 voteable PLLs (PLL0, PLL6, PLL8). */
 	{PLL_ENA_SC0_REG, 0x141, 0x141},
-
-	/* XXX END OF TEMPORARY CODE XXX */
 
 	/* Enable locally controlled peripheral HCLKs in software mode. */
 	{TSIF_HCLK_CTL_REG,		0x70,	0x10},
