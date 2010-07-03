@@ -32,6 +32,7 @@
 
 #include "vidc_type.h"
 
+#define VIDC_MAX_NUM_CLIENTS 4
 #define MAX_VIDEO_NUM_OF_BUFF 100
 
 enum buffer_dir {

@@ -898,7 +898,25 @@ void vcd_response_handler(void)
 }
 EXPORT_SYMBOL(vcd_response_handler);
 
+u8 vcd_get_num_of_clients(void)
+{
+	struct vcd_drv_ctxt_type_t *p_drv_ctxt;
+	struct vcd_clnt_ctxt_type_t *p_cctxt;
+	u8 count = 0;
 
+	VCD_MSG_LOW("vcd_get_num_of_clients:");
+	p_drv_ctxt = vcd_get_drv_context();
+
+	vcd_critical_section_enter(p_drv_ctxt->dev_cs);
+	p_cctxt = p_drv_ctxt->dev_ctxt.p_cctxt_list_head;
+	while (p_cctxt) {
+		count++;
+		p_cctxt = p_cctxt->p_next;
+	}
+	vcd_critical_section_leave(p_drv_ctxt->dev_cs);
+	return count;
+}
+EXPORT_SYMBOL(vcd_get_num_of_clients);
 
 
 
