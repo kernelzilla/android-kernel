@@ -1027,6 +1027,7 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 			return -EIO;
 		break;
 	case VDEC_IOCTL_SET_BUFFER_REQ:
+		DBG("VDEC_IOCTL_SET_BUFFER_REQ\n");
 		if (copy_from_user(&vdec_msg, (void __user *)arg,
 				   sizeof(vdec_msg)))
 			return -EFAULT;
@@ -1091,6 +1092,8 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 			(void __user *)vdec_msg.inputparam, sizeof(setbuffer)))
 			return -EFAULT;
 		result = vid_dec_set_buffer(client_ctx, &setbuffer);
+		if (!result)
+			return -EIO;
 		break;
 	case VDEC_IOCTL_FREE_BUFFER:
 		DBG("VDEC_IOCTL_FREE_BUFFER\n");
