@@ -1966,6 +1966,28 @@ int msm_rpc_unregister_server(struct msm_rpc_endpoint *ept,
 	return 0;
 }
 
+int msm_rpc_get_curr_pkt_size(struct msm_rpc_endpoint *ept)
+{
+	unsigned long flags;
+	struct rr_packet *pkt;
+	int rc = 0;
+
+	if (!ept)
+		return -EINVAL;
+
+	if (!msm_rpc_clear_netreset(ept))
+		return -ENETRESET;
+
+	spin_lock_irqsave(&ept->read_q_lock, flags);
+	if (!list_empty(&ept->read_q)) {
+		pkt = list_first_entry(&ept->read_q, struct rr_packet, list);
+		rc = pkt->length;
+	}
+	spin_unlock_irqrestore(&ept->read_q_lock, flags);
+
+	return rc;
+}
+
 static int msm_rpcrouter_modem_notify(struct notifier_block *this,
 				      unsigned long code,
 				      void *_cmd)

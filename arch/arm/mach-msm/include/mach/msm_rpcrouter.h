@@ -145,6 +145,8 @@ int msm_rpc_unregister_server(struct msm_rpc_endpoint *ept,
 int msm_rpc_add_board_dev(struct rpc_board_dev *board_dev, int num);
 
 int msm_rpc_clear_netreset(struct msm_rpc_endpoint *ept);
+
+int msm_rpc_get_curr_pkt_size(struct msm_rpc_endpoint *ept);
 /* simple blocking rpc call
  *
  * request is mandatory and must have a rpc_request_hdr
