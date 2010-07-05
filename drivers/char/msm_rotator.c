@@ -408,7 +408,7 @@ static unsigned int tile_size(unsigned int src_width,
 	tile_h = tp->height * tp->row_tile_h;
 	row_num_w = (src_width + tile_w - 1) / tile_w;
 	row_num_h = (src_height + tile_h - 1) / tile_h;
-	return row_num_w * row_num_h * tile_w * tile_h;
+	return ((row_num_w * row_num_h * tile_w * tile_h) + 8191) & ~8191;
 }
 
 static int msm_rotator_ycxcx_h2v2_tile(struct msm_rotator_img_info *info,
