@@ -166,6 +166,7 @@
 #define XO_MXO_SRC	2
 #define LPA_PXO_SRC	0
 #define LPA_CXO_SRC	1
+#define LPA_PLL0_SRC	2
 
 /* Source name to PLL mappings. */
 #define NONE_PLL	-1
@@ -187,6 +188,7 @@
 #define XO_MXO_PLL	NONE_PLL
 #define LPA_PXO_PLL	NONE_PLL
 #define LPA_CXO_PLL	NONE_PLL
+#define LPA_PLL0_PLL	PLL_4
 
 /* Bit manipulation macros. */
 #define B(x)	BIT(x)
@@ -1184,17 +1186,17 @@ static struct clk_freq_tbl clk_tbl_vfe[] = {
 			NS(31, 24, n, m, 5, 4, 3, d, 2, 0, s), \
 			0, MND_EN(B(8), n))
 static struct clk_freq_tbl clk_tbl_aif[] = {
-	F_AIF(  512000, LPA_PXO, 1, 1, 48),
-	F_AIF(  768000, LPA_PXO, 1, 1, 32),
-	F_AIF( 1024000, LPA_PXO, 1, 1, 24),
-	F_AIF( 1536000, LPA_PXO, 1, 1, 16),
-	F_AIF( 2048000, LPA_PXO, 1, 1, 12),
-	F_AIF( 3072000, LPA_PXO, 1, 1,  8),
-	F_AIF( 4096000, LPA_PXO, 1, 1,  6),
-	F_AIF( 6144000, LPA_PXO, 1, 1,  4),
-	F_AIF( 8192000, LPA_PXO, 1, 1,  3),
-	F_AIF(12288000, LPA_PXO, 1, 1,  2),
-	F_AIF(24580000, LPA_PXO, 1, 0,  0),
+	F_AIF(  512000, LPA_PLL0, 4, 1, 264),
+	F_AIF(  768000, LPA_PLL0, 2, 1, 352),
+	F_AIF( 1024000, LPA_PLL0, 4, 1, 132),
+	F_AIF( 1536000, LPA_PLL0, 4, 1,  88),
+	F_AIF( 2048000, LPA_PLL0, 4, 1,  66),
+	F_AIF( 3072000, LPA_PLL0, 4, 1,  44),
+	F_AIF( 4096000, LPA_PLL0, 4, 1,  33),
+	F_AIF( 6144000, LPA_PLL0, 4, 1,  22),
+	F_AIF( 8192000, LPA_PLL0, 2, 1,  33),
+	F_AIF(12288000, LPA_PLL0, 4, 1,  11),
+	F_AIF(24576000, LPA_PLL0, 2, 1,  11),
 	F_END,
 };
 
@@ -1209,17 +1211,17 @@ static struct clk_freq_tbl clk_tbl_aif[] = {
 			NS(31, 16, n, m, 5, 4, 3, d, 2, 0, s), \
 			0, MND_EN(B(8), n))
 static struct clk_freq_tbl clk_tbl_pcm[] = {
-	F_PCM(  512000, LPA_PXO, 1, 1, 48),
-	F_PCM(  768000, LPA_PXO, 1, 1, 32),
-	F_PCM( 1024000, LPA_PXO, 1, 1, 24),
-	F_PCM( 1536000, LPA_PXO, 1, 1, 16),
-	F_PCM( 2048000, LPA_PXO, 1, 1, 12),
-	F_PCM( 3072000, LPA_PXO, 1, 1,  8),
-	F_PCM( 4096000, LPA_PXO, 1, 1,  6),
-	F_PCM( 6144000, LPA_PXO, 1, 1,  4),
-	F_PCM( 8192000, LPA_PXO, 1, 1,  3),
-	F_PCM(12288000, LPA_PXO, 1, 1,  2),
-	F_PCM(24580000, LPA_PXO, 1, 0,  0),
+	F_PCM(  512000, LPA_PLL0, 4, 1, 264),
+	F_PCM(  768000, LPA_PLL0, 2, 1, 352),
+	F_PCM( 1024000, LPA_PLL0, 4, 1, 132),
+	F_PCM( 1536000, LPA_PLL0, 4, 1,  88),
+	F_PCM( 2048000, LPA_PLL0, 4, 1,  66),
+	F_PCM( 3072000, LPA_PLL0, 4, 1,  44),
+	F_PCM( 4096000, LPA_PLL0, 4, 1,  33),
+	F_PCM( 6144000, LPA_PLL0, 4, 1,  22),
+	F_PCM( 8192000, LPA_PLL0, 2, 1,  33),
+	F_PCM(12288000, LPA_PLL0, 4, 1,  11),
+	F_PCM(24580000, LPA_PLL0, 2, 1,  11),
 	F_END,
 };
 
@@ -2068,12 +2070,12 @@ static struct reg_init {
 	/* Set HDMI reference clock to MM_PLL2/2 */
 	{MISC_CC2_REG,		B(28)|BM(21, 18), B(28)|BVAL(21, 18, 0x1)},
 
-	/* Set Audio Interface bit clocks to 1/8th of the OSR (m_clk) clocks. */
-	{LCC_CODEC_I2S_MIC_NS_REG,  BM(13, 10), BVAL(13, 10, 0x7)},
-	{LCC_CODEC_I2S_SPKR_NS_REG, BM(13, 10), BVAL(13, 10, 0x7)},
-	{LCC_SPARE_I2S_MIC_NS_REG,  BM(13, 10), BVAL(13, 10, 0x7)},
-	{LCC_SPARE_I2S_SPKR_NS_REG, BM(13, 10), BVAL(13, 10, 0x7)},
-	{LCC_MI2S_NS_REG,           BM(13, 10), BVAL(13, 10, 0x7)},
+	/* Set audio bit clock sources to OSR (m_clk) and divider to 1/8. */
+	{LCC_CODEC_I2S_MIC_NS_REG,  BM(14, 10), BVAL(14, 10, 0x7)},
+	{LCC_CODEC_I2S_SPKR_NS_REG, BM(14, 10), BVAL(14, 10, 0x7)},
+	{LCC_SPARE_I2S_MIC_NS_REG,  BM(14, 10), BVAL(14, 10, 0x7)},
+	{LCC_SPARE_I2S_SPKR_NS_REG, BM(14, 10), BVAL(14, 10, 0x7)},
+	{LCC_MI2S_NS_REG,           BM(14, 10), BVAL(14, 10, 0x7)},
 
 };
 
