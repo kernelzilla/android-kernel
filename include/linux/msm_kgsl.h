@@ -326,4 +326,12 @@ struct kgsl_cmdwindow_write {
 #define IOCTL_KGSL_CMDWINDOW_WRITE \
 	_IOW(KGSL_IOC_TYPE, 0x2e, struct kgsl_cmdwindow_write)
 
+#ifdef __KERNEL__
+#ifdef CONFIG_MSM_KGSL_DRM
+int kgsl_gem_obj_addr(int drm_fd, int handle, unsigned long *start,
+			unsigned long *len);
+#else
+#define kgsl_gem_obj_addr(...) 0
+#endif
+#endif
 #endif /* _MSM_KGSL_H */
