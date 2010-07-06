@@ -3,3 +3,4 @@ obj-$(CONFIG_MARIMBA_CODEC) += snddev_icodec.o
 obj-y += snddev_ecodec.o
 obj-y += apr.o apr_tal.o apr_tal_debug.o
 obj-y += q6asm.o q6adm.o q6afe.o
+obj-y += pcm_out.o pcm_in.o
