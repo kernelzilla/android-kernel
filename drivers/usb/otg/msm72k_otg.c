@@ -197,7 +197,6 @@ static void msm_otg_start_host(struct otg_transceiver *xceiv, int on)
 static int msm_otg_suspend(struct msm_otg *dev)
 {
 	unsigned long timeout;
-	int vbus = 0;
 	unsigned otgsc;
 
 	disable_irq(dev->irq);
@@ -249,9 +248,6 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	}
 
 	atomic_set(&dev->in_lpm, 1);
-
-	if (!vbus && dev->pmic_notif_supp)
-		dev->pdata->pmic_enable_ldo(0);
 
 	pr_info("%s: usb in low power mode\n", __func__);
 
@@ -318,8 +314,6 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 		unsigned long timeout;
 
 		disable_irq(dev->irq);
-		if (dev->pmic_notif_supp)
-			dev->pdata->pmic_enable_ldo(1);
 
 		msm_otg_resume(dev);
 
