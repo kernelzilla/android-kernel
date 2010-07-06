@@ -2529,15 +2529,16 @@ static void display_common_power(int on)
 			gpio_direction_output(GPIO_LVDS_STDN_OUT_N, 0);
 			gpio_direction_output(GPIO_BACKLIGHT_EN, 0);
 			mdelay(20);
-			gpio_set_value(GPIO_LVDS_STDN_OUT_N, 1);
-			gpio_set_value(GPIO_BACKLIGHT_EN, 1);
+			gpio_set_value_cansleep(GPIO_LVDS_STDN_OUT_N, 1);
+			gpio_set_value_cansleep(GPIO_BACKLIGHT_EN, 1);
 
 		} else {
 			if (!rc) {
 				/* BACKLIGHT */
-				gpio_set_value(GPIO_BACKLIGHT_EN, 0);
+				gpio_set_value_cansleep(GPIO_BACKLIGHT_EN, 0);
 				/* LVDS */
-				gpio_set_value(GPIO_LVDS_STDN_OUT_N, 0);
+				gpio_set_value_cansleep(GPIO_LVDS_STDN_OUT_N,
+				0);
 				mdelay(20);
 				gpio_free(GPIO_BACKLIGHT_EN);
 				gpio_free(GPIO_LVDS_STDN_OUT_N);
