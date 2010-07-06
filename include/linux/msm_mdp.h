@@ -158,10 +158,14 @@ struct mdp_blit_req_list {
 	struct mdp_blit_req req[];
 };
 
+#define MSMFB_DATA_VERSION 2
+
 struct msmfb_data {
 	uint32_t offset;
 	int memory_id;
 	int id;
+	uint32_t flags;
+	uint32_t priv;
 };
 
 #define MSMFB_NEW_REQUEST -1
