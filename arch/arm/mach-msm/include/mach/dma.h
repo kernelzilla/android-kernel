@@ -174,11 +174,11 @@ unsigned int msm_dmov_build_crci_mask(int n, ...);
 #define DMOV_TSIF_CHAN         4
 #define DMOV_TSIF_CRCI         6
 
-#define DMOV_HSUART1_TX_CHAN   7
-#define DMOV_HSUART1_TX_CRCI   11
+#define DMOV_HSUART1_TX_CHAN   22
+#define DMOV_HSUART1_TX_CRCI   8
 
-#define DMOV_HSUART1_RX_CHAN   7
-#define DMOV_HSUART1_RX_CRCI   12
+#define DMOV_HSUART1_RX_CHAN   23
+#define DMOV_HSUART1_RX_CRCI   9
 
 #define DMOV_HSUART2_TX_CHAN   8
 #define DMOV_HSUART2_TX_CRCI   13
