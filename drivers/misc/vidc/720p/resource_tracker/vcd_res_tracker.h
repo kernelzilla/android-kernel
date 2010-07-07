@@ -40,6 +40,13 @@
 struct res_trk_context {
 	struct device *device;
 	u32 irq_num;
+	struct mutex lock;
+	struct clk *hclk;
+	struct clk *hclk_div2;
+	struct clk *pclk;
+	unsigned long hclk_rate;
+	unsigned int clock_enabled;
+	unsigned int rail_enabled;
 };
 
 #if DEBUG
