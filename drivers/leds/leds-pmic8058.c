@@ -59,7 +59,7 @@ struct pmic8058_led_data {
 	u8			reg_flash_led1;
 };
 
-#define PM8058_MAX_LEDS		5
+#define PM8058_MAX_LEDS		7
 static struct pmic8058_led_data led_data[PM8058_MAX_LEDS];
 
 static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
@@ -114,7 +114,6 @@ static void led_lc_set(struct pmic8058_led_data *led, enum led_brightness value)
 	if (rc) {
 		dev_err(led->cdev.dev, "can't set (%d) led value\n",
 				led->id);
-		mutex_unlock(&led->lock);
 		return;
 	}
 
@@ -225,7 +224,8 @@ static void pmic8058_led_work(struct work_struct *work)
 		break;
 	case PMIC8058_ID_FLASH_LED_0:
 	case PMIC8058_ID_FLASH_LED_1:
-		return led_flash_set(led, led->brightness);
+		led_flash_set(led, led->brightness);
+		break;
 	}
 
 	mutex_unlock(&led->lock);
