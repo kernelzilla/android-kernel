@@ -719,6 +719,13 @@ static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 	int ret, i;
 	unsigned long map_len = chunk_sizes[ARRAY_SIZE(chunk_sizes) - 1];
 
+	ret = smmu_update_start((struct smmu_dev *) dev_id);
+
+	if (ret) {
+		pr_err("smmu_update_start returned %d\n", ret);
+		goto fail;
+	}
+
 	for (i = 0; i < ARRAY_SIZE(chunk_sizes); i++) {
 		if (IS_ALIGNED(va, chunk_sizes[i]) && len >= chunk_sizes[i]) {
 			map_len = chunk_sizes[i];
@@ -762,6 +769,14 @@ static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 		pa += map_len;
 		len -= map_len;
 	}
+
+	ret = smmu_update_done((struct smmu_dev *) dev_id);
+
+	if (ret) {
+		pr_err("smmu_update_done returned %d\n", ret);
+		goto fail;
+	}
+
 	return 0;
 fail:
 	return -1;
