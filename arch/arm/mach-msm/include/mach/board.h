@@ -214,6 +214,10 @@ struct mddi_platform_data {
 	int (*mddi_sel_clk)(u32 *clk_rate);
 };
 
+struct mipi_dsi_platform_data {
+	int (*dsi_power_save)(int on);
+};
+
 struct msm_fb_platform_data {
 	int (*detect_client)(const char *name);
 	int mddi_prescan;

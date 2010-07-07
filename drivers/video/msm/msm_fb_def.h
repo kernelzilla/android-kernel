@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -51,19 +51,21 @@
 #include <linux/debugfs.h>
 #include <linux/console.h>
 #include <linux/android_pmem.h>
-
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include "linux/proc_fs.h"
-#include <mach/hardware.h>
 #include <linux/io.h>
 #include <linux/fb.h>
+#include <linux/platform_device.h>
+
 #include <asm/system.h>
 #include <asm/mach-types.h>
-#include <linux/platform_device.h>
+
+#include <mach/hardware.h>
+
 
 typedef s64 int64;
 typedef s32 int32;
@@ -204,10 +206,12 @@ extern u32 msm_fb_msg_level;
 unsigned char *msm_mdp_base;
 unsigned char *msm_pmdh_base;
 unsigned char *msm_emdh_base;
+unsigned char *mipi_dsi_base;
 #else
 extern unsigned char *msm_mdp_base;
 extern unsigned char *msm_pmdh_base;
 extern unsigned char *msm_emdh_base;
+extern unsigned char *mipi_dsi_base;
 #endif
 
 #endif /* MSM_FB_DEF_H */

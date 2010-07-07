@@ -115,6 +115,11 @@ struct platform_device *msm_fb_device_alloc(struct msm_fb_panel_data *pdata,
 		snprintf(dev_name, sizeof(dev_name), "dtv");
 		break;
 
+	case MIPI_VIDEO_PANEL:
+	case MIPI_CMD_PANEL:
+		snprintf(dev_name, sizeof(dev_name), "mipi_dsi");
+		break;
+
 	default:
 		return NULL;
 	}

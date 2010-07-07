@@ -2197,6 +2197,10 @@ config FB_MSM_MDDI
 	bool
 	default n
 
+config FB_MSM_MIPI_DSI
+	bool
+	default n
+
 config FB_MSM_LCDC
 	bool
 	default n
@@ -2374,6 +2378,10 @@ config FB_MSM_MDDI_SHARP_QVGA_128x128
 	select FB_MSM_MDDI
 	---help---
 	  Support for MDDI Sharp QVGA (240x320) and 128x128 dual panel
+
+config FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT
+	bool "MIPI Toshiba WVGA PT Panel"
+	select FB_MSM_MIPI_DSI
 
 config FB_MSM_EBI2_TMD_QVGA_EPSON_QCIF
 	bool "EBI2 TMD QVGA Epson QCIF Dual Panel"

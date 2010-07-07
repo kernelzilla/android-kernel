@@ -25,15 +25,13 @@
 #include <linux/spinlock.h>
 #include <linux/hrtimer.h>
 #include <linux/clk.h>
-#include <mach/hardware.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>
-
-#include <asm/system.h>
-#include <asm/mach-types.h>
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
-
+#include <asm/system.h>
+#include <asm/mach-types.h>
+#include <mach/hardware.h>
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
@@ -71,9 +69,26 @@ void mdp4_overlay_cfg(int overlayer, int blt_mode, int refresh, int direct_out)
 
 void mdp4_display_intf_sel(int output, ulong intf)
 {
-	ulong bits, mask;
+	ulong bits, mask, data;
 
 	bits = inpdw(MDP_BASE + 0x0038);	/* MDP_DISP_INTF_SEL */
+
+	if (intf == DSI_VIDEO_INTF) {
+		data = 0x40;	/* bit 6 */
+		intf = MDDI_LCDC_INTF;
+		if (output == SECONDARY_INTF_SEL) {
+			printk(KERN_INFO "%s: Illegal INTF selected, output=%d \
+				intf=%d\n", __func__, output, (int)intf);
+		}
+	} else if (intf == DSI_CMD_INTF) {
+		data = 0x80;	/* bit 7 */
+		intf = MDDI_INTF;
+		if (output == EXTERNAL_INTF_SEL) {
+			printk(KERN_INFO "%s: Illegal INTF selected, output=%d \
+				intf=%d\n", __func__, output, (int)intf);
+		}
+	} else
+		data = 0;
 
 	mask = 0x03;	/* 2 bits */
 	intf &= 0x03;	/* 2 bits */
@@ -92,6 +107,8 @@ void mdp4_display_intf_sel(int output, ulong intf)
 		break;
 	}
 
+	intf |= data;
+	mask |= data;
 
 	bits &= ~mask;
 	bits |= intf;
@@ -389,6 +406,12 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 #ifdef CONFIG_FB_MSM_OVERLAY
 				mdp4_overlay0_done_lcdc();
 #endif
+#ifdef CONFIG_FB_MSM_MIPI_DSI
+			} else {	/* MIPI_DSI VIDEO */
+				dma->busy = FALSE;
+				mdp4_overlay0_done_dsi_video();
+			}
+#else
 			} else {	/* MDDI */
 				dma->busy = FALSE;
 				mdp_pipe_ctrl(MDP_OVERLAY0_BLOCK,
@@ -397,6 +420,7 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 				mdp4_overlay0_done_mddi();
 #endif
 			}
+#endif
 		}
 		if (isr & INTR_OVERLAY1_DONE) {
 			mdp4_stat.intr_overlay1++;
