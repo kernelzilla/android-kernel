@@ -163,7 +163,6 @@ u32 res_trk_enable_clocks(void)
 			mutex_unlock(&resource_context.lock);
 			return FALSE;
 		}
-		msleep(20);
 	}
 
 	resource_context.clock_enabled = 1;
@@ -388,8 +387,10 @@ u32 res_trk_get_max_perf_level(u32 *pn_max_perf_lvl)
 u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 	struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
+	struct vcd_clnt_ctxt_type_t *p_cctxt_itr = NULL;
 	u32 axi_freq = 0, mfc_freq = 0, calc_mfc_freq = 0;
 	int rc = -1;
+	u8 enc_clnt_present = FALSE;
 
 	if (!pn_set_perf_lvl) {
 		VCDRES_MSG_ERROR("%s(): pn_perf_lvl is NULL\n",
@@ -407,7 +408,20 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 		else if (calc_mfc_freq > VCD_RESTRK_MAX_FREQ_POINT)
 			calc_mfc_freq = VCD_RESTRK_MAX_FREQ_POINT;
 
-		if (!p_cctxt->b_decoding) {
+		p_cctxt_itr = p_cctxt->p_dev_ctxt->p_cctxt_list_head;
+		while (p_cctxt_itr) {
+			VCDRES_MSG_LOW("\n p_cctxt_itr = %p", p_cctxt_itr);
+			if (!p_cctxt_itr->b_decoding) {
+					VCDRES_MSG_LOW("\n Encoder client");
+					enc_clnt_present = TRUE;
+					break;
+			} else {
+					VCDRES_MSG_LOW("\n Decoder client");
+			}
+			p_cctxt_itr = p_cctxt_itr->p_next;
+		}
+
+		if (!p_cctxt->b_decoding || enc_clnt_present) {
 			if (n_req_perf_lvl >= VGA_PERF_LEVEL) {
 				mfc_freq = mfc_clk_freq_table[2];
 				axi_freq = axi_clk_freq_table_enc[1];
