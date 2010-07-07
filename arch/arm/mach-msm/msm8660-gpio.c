@@ -92,7 +92,12 @@ static int msm_gpio_direction_output(struct gpio_chip *chip,
 
 static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 {
-	return gpio_to_irq(offset);
+	return MSM_GPIO_TO_INT(offset - chip->base);
+}
+
+static inline int msm_irq_to_gpio(struct gpio_chip *chip, unsigned irq)
+{
+	return irq - MSM_GPIO_TO_INT(chip->base);
 }
 
 static struct msm_gpio_dev msm_gpio = {
@@ -109,12 +114,13 @@ static struct msm_gpio_dev msm_gpio = {
 
 static void msm_gpio_irq_ack(unsigned int irq)
 {
-	writel(BIT(INTR_STATUS_BIT), GPIO_INTR_STATUS(irq_to_gpio(irq)));
+	writel(BIT(INTR_STATUS_BIT),
+	       GPIO_INTR_STATUS(msm_irq_to_gpio(&msm_gpio.gpio_chip, irq)));
 }
 
 static void msm_gpio_irq_mask(unsigned int irq)
 {
-	int gpio = irq_to_gpio(irq);
+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&msm_gpio.lock, irq_flags);
@@ -126,7 +132,7 @@ static void msm_gpio_irq_mask(unsigned int irq)
 
 static void msm_gpio_irq_unmask(unsigned int irq)
 {
-	int gpio = irq_to_gpio(irq);
+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&msm_gpio.lock, irq_flags);
@@ -138,7 +144,7 @@ static void msm_gpio_irq_unmask(unsigned int irq)
 
 static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 {
-	void *addr = GPIO_INTR_CFG(irq_to_gpio(irq));
+	void *addr = GPIO_INTR_CFG(msm_irq_to_gpio(&msm_gpio.gpio_chip, irq));
 	unsigned long irq_flags;
 	uint32_t bits;
 
@@ -183,7 +189,8 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
 	     i < NR_MSM_GPIOS;
 	     i = find_next_bit(msm_gpio.enabled_irqs, NR_MSM_GPIOS, i + 1)) {
 		if (readl(GPIO_INTR_STATUS(i)) & BIT(INTR_STATUS_BIT))
-			generic_handle_irq(gpio_to_irq(i));
+			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+							   i));
 	}
 	desc->chip->ack(irq);
 }
@@ -208,7 +215,7 @@ static int __devinit msm_gpio_probe(struct platform_device *dev)
 		return ret;
 
 	for (i = 0; i < msm_gpio.gpio_chip.ngpio; ++i) {
-		irq = gpio_to_irq(i);
+		irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
 		set_irq_chip(irq, &msm_gpio_irq_chip);
 		set_irq_handler(irq, handle_level_irq);
 		set_irq_flags(irq, IRQF_VALID);
