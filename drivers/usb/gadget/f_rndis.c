@@ -864,7 +864,7 @@ int __init rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	/* start disabled */
-	rndis->port.func.disabled = 1;
+	rndis->port.func.hidden = 1;
 #endif
 
 	status = usb_add_function(c, &rndis->port.func);
@@ -879,7 +879,7 @@ fail:
 #ifdef CONFIG_USB_ANDROID_RNDIS
 #include "rndis.c"
 
-static int rndis_probe(struct platform_device *pdev)
+static int __init rndis_probe(struct platform_device *pdev)
 {
 	rndis_pdata = pdev->dev.platform_data;
 	return 0;
