@@ -137,7 +137,6 @@ enum {
 	MSM_CLOCK_DGT,
 };
 
-static struct msm_clock *msm_active_clock;
 
 struct msm_clock_percpu_data {
 	uint32_t                  last_set;
@@ -229,6 +228,8 @@ static struct clock_event_device *local_clock_event;
 
 static DEFINE_PER_CPU(struct msm_clock_percpu_data[NR_TIMERS],
     msm_clocks_percpu);
+
+static DEFINE_PER_CPU(struct msm_clock *, msm_active_clock);
 
 static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
 {
@@ -374,7 +375,8 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		clock_state->sleep_offset =
 			-msm_read_timer_count(clock, LOCAL_TIMER) +
 			clock_state->stopped_tick;
-		msm_active_clock = clock;
+		get_cpu_var(msm_active_clock) = clock;
+		put_cpu_var(msm_active_clock);
 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
 #if defined(CONFIG_MSM_SMD)
 		if (clock != &msm_clocks[MSM_CLOCK_GPT])
@@ -385,7 +387,8 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
-		msm_active_clock = NULL;
+		get_cpu_var(msm_active_clock) = NULL;
+		put_cpu_var(msm_active_clock);
 		clock_state->in_sync = 0;
 		clock_state->stopped = 1;
 		clock_state->stopped_tick =
@@ -754,7 +757,7 @@ static void msm_timer_reactivate_alarm(struct msm_clock *clock)
 int64_t msm_timer_enter_idle(void)
 {
 	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
-	struct msm_clock *clock = msm_active_clock;
+	struct msm_clock *clock = __get_cpu_var(msm_active_clock);
 	struct msm_clock_percpu_data *clock_state =
 		&__get_cpu_var(msm_clocks_percpu)[clock->index];
 	uint32_t alarm;
@@ -789,7 +792,7 @@ int64_t msm_timer_enter_idle(void)
 void msm_timer_exit_idle(int low_power)
 {
 	struct msm_clock *gpt_clk = &msm_clocks[MSM_CLOCK_GPT];
-	struct msm_clock *clock = msm_active_clock;
+	struct msm_clock *clock = __get_cpu_var(msm_active_clock);
 	struct msm_clock_percpu_data *gpt_clk_state =
 		&__get_cpu_var(msm_clocks_percpu)[MSM_CLOCK_GPT];
 	struct msm_clock_percpu_data *clock_state =
@@ -924,9 +927,10 @@ unsigned long long sched_clock(void)
 	cycle_t ticks;
 	static unsigned long long result;
 	struct clocksource *cs;
-	struct msm_clock *clock = msm_active_clock;
+	struct msm_clock *clock;
 
 	local_irq_save(irq_flags);
+	clock = __get_cpu_var(msm_active_clock);
 	if (clock) {
 		cs = &clock->clocksource;
 
