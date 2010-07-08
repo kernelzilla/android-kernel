@@ -75,8 +75,40 @@
  *					-back and no-write-allocate.
  */
 
-#define VCM_CACHE_POLICY	(0xF << 0)
+/* Order of alignment (power of 2). Ie, 12 = 4k, 13 = 8k, 14 = 16k
+ * Alignments of less than 1MB on buffers of size 1MB or greater should be
+ * avoided. Alignments of less than 64KB on buffers of size 64KB or greater
+ * should be avoided. Strictly speaking, it will work, but will result in
+ * suboptimal performance, and a warning will be printed to that effect if
+ * VCM_PERF_WARN is enabled.
+ */
+#define VCM_ALIGN_SHIFT		10
+#define VCM_ALIGN_MASK		0x1F
+#define VCM_ALIGN_ATTR(order) 	(((order) & VCM_ALIGN_MASK) << VCM_ALIGN_SHIFT)
 
+#define VCM_ALIGN_DEFAULT	0
+#define VCM_ALIGN_4K		(VCM_ALIGN_ATTR(12))
+#define VCM_ALIGN_8K		(VCM_ALIGN_ATTR(13))
+#define VCM_ALIGN_16K		(VCM_ALIGN_ATTR(14))
+#define VCM_ALIGN_32K		(VCM_ALIGN_ATTR(15))
+#define VCM_ALIGN_64K		(VCM_ALIGN_ATTR(16))
+#define VCM_ALIGN_128K		(VCM_ALIGN_ATTR(17))
+#define VCM_ALIGN_256K		(VCM_ALIGN_ATTR(18))
+#define VCM_ALIGN_512K		(VCM_ALIGN_ATTR(19))
+#define VCM_ALIGN_1M		(VCM_ALIGN_ATTR(20))
+#define VCM_ALIGN_2M		(VCM_ALIGN_ATTR(21))
+#define VCM_ALIGN_4M		(VCM_ALIGN_ATTR(22))
+#define VCM_ALIGN_8M		(VCM_ALIGN_ATTR(23))
+#define VCM_ALIGN_16M		(VCM_ALIGN_ATTR(24))
+#define VCM_ALIGN_32M		(VCM_ALIGN_ATTR(25))
+#define VCM_ALIGN_64M		(VCM_ALIGN_ATTR(26))
+#define VCM_ALIGN_128M		(VCM_ALIGN_ATTR(27))
+#define VCM_ALIGN_256M		(VCM_ALIGN_ATTR(28))
+#define VCM_ALIGN_512M		(VCM_ALIGN_ATTR(29))
+#define VCM_ALIGN_1GB		(VCM_ALIGN_ATTR(30))
+
+
+#define VCM_CACHE_POLICY	(0xF << 0)
 #define VCM_READ		(1UL << 9)
 #define VCM_WRITE		(1UL << 8)
 #define VCM_EXECUTE		(1UL << 7)
@@ -111,7 +143,6 @@
  *			because it's shared.
  */
 
-#define VCM_ALIGNMENT_MASK      (0x1FUL << 6) /* 5-bit field */
 #define VCM_4KB			(1UL << 5)
 #define VCM_64KB		(1UL << 4)
 #define VCM_1MB			(1UL << 3)
