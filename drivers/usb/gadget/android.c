@@ -276,21 +276,6 @@ static int  android_bind_config(struct usb_configuration *c)
 
 }
 
-static int is_usb_networking_on(void)
-{
-	/* Android user space allows USB tethering only when usb0 is listed
-	 * in network interfaces. Setup network link though RNDIS/CDC-ECM
-	 * is not listed in current composition. Network links is not setup
-	 * for every composition switch. It is setup one time and teared down
-	 * during module removal.
-	 */
-#if defined(CONFIG_USB_ANDROID_CDC_ECM) || defined(CONFIG_USB_ANDROID_RNDIS)
-	return 1;
-#else
-	return 0;
-#endif
-}
-
 static int get_num_of_serial_ports(void)
 {
 	struct android_dev *dev = _android_dev;
@@ -402,14 +387,20 @@ static int  android_bind(struct usb_composite_dev *cdev)
 			return ret;
 	}
 
-	if (is_usb_networking_on()) {
-		/* set up network link layer */
-		ret = gether_setup(cdev->gadget, hostaddr);
-		if (ret && (ret != -EBUSY)) {
-			gserial_cleanup();
-			return ret;
-		}
+	/* Android user space allows USB tethering only when usb0 is listed
+	 * in network interfaces. Setup network link though RNDIS/CDC-ECM
+	 * is not listed in current composition. Network links is not setup
+	 * for every composition switch. It is setup one time and teared down
+	 * during module removal.
+	 */
+#if defined(CONFIG_USB_ANDROID_CDC_ECM) || defined(CONFIG_USB_ANDROID_RNDIS)
+	/* set up network link layer */
+	ret = gether_setup(cdev->gadget, hostaddr);
+	if (ret && (ret != -EBUSY)) {
+		gserial_cleanup();
+		return ret;
 	}
+#endif
 
 	/* register our configuration */
 	ret = usb_add_config(cdev, &android_config_driver);
@@ -737,8 +728,9 @@ module_init(init);
 
 static void __exit cleanup(void)
 {
-	if (is_usb_networking_on())
-		gether_cleanup();
+#if defined(CONFIG_USB_ANDROID_CDC_ECM) || defined(CONFIG_USB_ANDROID_RNDIS)
+	gether_cleanup();
+#endif
 
 	usb_composite_unregister(&android_usb_driver);
 	misc_deregister(&adb_enable_device);
