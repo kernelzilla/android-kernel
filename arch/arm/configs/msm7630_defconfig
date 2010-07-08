@@ -1228,7 +1228,7 @@ CONFIG_SPI_MASTER=y
 #
 # CONFIG_SPI_BITBANG is not set
 # CONFIG_SPI_GPIO is not set
-# CONFIG_SPI_QSD is not set
+CONFIG_SPI_QSD=y
 
 #
 # SPI Protocol Masters
