@@ -1409,6 +1409,8 @@ static struct clk_local clk_local_tbl[] = {
 	CLK_SLAVE_MM(HDMI_TV, TV_CC_REG,  B(12), TV_SRC, TEST_MMHS(0x3D)),
 	CLK_SLAVE_MM(DSUB_TV, TV_CC2_REG, B(11), TV_SRC, TEST_MMHS(0x4B)),
 
+	CLK_NORATE_MM(HDMI_APP, MISC_CC2_REG, B(11), TEST_MMLS(0x3F)),
+
 	CLK_VCODEC(VCODEC, VCODEC_NS_REG, TEST_MMHS(0x17)),
 
 	CLK_VPE(VPE, VPE_NS_REG, TEST_MMHS(0x39)),
@@ -2067,8 +2069,11 @@ static struct reg_init {
 	/* Deassert all MM core resets. */
 	{SW_RESET_CORE_REG,	0x1FFFFFF,	0x0},
 
-	/* Set HDMI reference clock to MM_PLL2/2 */
+	/* Set hdmi_ref_clk to MM_PLL2/2. */
 	{MISC_CC2_REG,		B(28)|BM(21, 18), B(28)|BVAL(21, 18, 0x1)},
+	/* Set hdmi_app_clk source to MXO and divider to 1 (27MHz). */
+	{MISC_CC2_REG,		B(17),		B(17)},
+	{MISC_CC_REG,		BM(19, 18),	0},
 
 	/* Set audio bit clock sources to OSR (m_clk) and divider to 1/8. */
 	{LCC_CODEC_I2S_MIC_NS_REG,  BM(14, 10), BVAL(14, 10, 0x7)},
