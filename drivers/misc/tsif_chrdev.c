@@ -226,5 +226,5 @@ module_init(mod_init);
 module_exit(mod_exit);
 
 MODULE_DESCRIPTION("TSIF character device interface");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL v2");
 

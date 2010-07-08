@@ -1417,5 +1417,5 @@ module_exit(mod_exit);
 
 MODULE_DESCRIPTION("TSIF (Transport Stream Interface)"
 		   " Driver for the MSM chipset");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL v2");
 
