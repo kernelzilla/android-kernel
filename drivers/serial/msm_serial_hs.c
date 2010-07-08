@@ -1349,7 +1349,8 @@ static int msm_hs_startup(struct uart_port *uport)
 
 	tx->xfer.complete_func = msm_hs_dmov_tx_callback;
 
-	tx->xfer.crci_mask = msm_dmov_build_crci_mask(msm_uport->dma_tx_crci);
+	tx->xfer.crci_mask = msm_dmov_build_crci_mask(1,
+						      msm_uport->dma_tx_crci);
 
 	tx->command_ptr->cmd = CMD_LC |
 	    CMD_DST_CRCI(msm_uport->dma_tx_crci) | CMD_MODE_BOX;
@@ -1455,7 +1456,8 @@ static int uartdm_init_port(struct uart_port *uport)
 
 	rx->xfer.complete_func = msm_hs_dmov_rx_callback;
 
-	rx->xfer.crci_mask = msm_dmov_build_crci_mask(msm_uport->dma_rx_crci);
+	rx->xfer.crci_mask = msm_dmov_build_crci_mask(1,
+						      msm_uport->dma_rx_crci);
 
 	rx->command_ptr->cmd = CMD_LC |
 	    CMD_SRC_CRCI(msm_uport->dma_rx_crci) | CMD_MODE_BOX;
