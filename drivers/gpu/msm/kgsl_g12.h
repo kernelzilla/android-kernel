@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,45 +26,32 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#ifndef __GSL_DRAWCTXT_G12_H
-#define __GSL_DRAWCTXT_G12_H
+#ifndef _KGSL_G12_H
+#define _KGSL_G12_H
 
-#include "kgsl_sharedmem.h"
+struct kgsl_g12_device {
+	struct kgsl_device dev;    /* Must be first field in this struct */
+	int current_timestamp;
+	int timestamp;
+	wait_queue_head_t wait_timestamp_wq;
+};
 
-struct kgsl_device;
+struct kgsl_g12_z1xx {
+	unsigned int prevctx;
+	unsigned int numcontext;
+	struct kgsl_memdesc      cmdbufdesc;
+};
 
-#define KGSL_G12_PACKET_SIZE 10
-#define KGSL_G12_PACKET_COUNT 8
-#define KGSL_G12_RB_SIZE (KGSL_G12_PACKET_SIZE*KGSL_G12_PACKET_COUNT \
-			  *sizeof(uint32_t))
+extern struct kgsl_g12_z1xx g_z1xx;
 
-#define ALIGN_IN_BYTES(dim, alignment) (((dim) + (alignment - 1)) & \
-		~(alignment - 1))
+struct kgsl_g12_device *kgsl_get_g12_device(void);
+struct kgsl_device *kgsl_get_g12_generic_device(void);
+int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags);
+int kgsl_g12_first_open_locked(void);
+int kgsl_g12_last_release_locked(void);
+int kgsl_g12_getfunctable(struct kgsl_functable *ftbl);
+int kgsl_g12_waittimestamp(struct kgsl_device *device,
+				unsigned int timestamp, unsigned int timeout);
 
 
-#define NUMTEXUNITS             4
-#define TEXUNITREGCOUNT         25
-#define VG_REGCOUNT             0x39
-
-#define PACKETSIZE_BEGIN        3
-#define PACKETSIZE_G2DCOLOR     2
-#define PACKETSIZE_TEXUNIT      (TEXUNITREGCOUNT * 2)
-#define PACKETSIZE_REG          (VG_REGCOUNT * 2)
-#define PACKETSIZE_STATE        (PACKETSIZE_TEXUNIT * NUMTEXUNITS + \
-				 PACKETSIZE_REG + PACKETSIZE_BEGIN + \
-				 PACKETSIZE_G2DCOLOR)
-#define PACKETSIZE_STATESTREAM  (ALIGN_IN_BYTES((PACKETSIZE_STATE * \
-				 sizeof(unsigned int)), 32) / \
-				 sizeof(unsigned int))
-#define KGSL_G12_CONTEXT_MAX 16
-
-int
-kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			uint32_t ctxt_id_mask,
-			unsigned int *drawctxt_id);
-
-int
-kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
-			unsigned int drawctxt_id);
-
-#endif  /* __GSL_DRAWCTXT_H */
+#endif /* _KGSL_G12_H */

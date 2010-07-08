@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,45 +26,22 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#ifndef __GSL_DRAWCTXT_G12_H
-#define __GSL_DRAWCTXT_G12_H
+#ifndef _KGSL_YAMATO_H
+#define _KGSL_YAMATO_H
 
-#include "kgsl_sharedmem.h"
+struct kgsl_yamato_device {
+	struct kgsl_device dev;    /* Must be first field in this struct */
+	struct kgsl_memregion gmemspace;
+	unsigned int      drawctxt_count;
+	struct kgsl_drawctxt *drawctxt_active;
+	struct kgsl_drawctxt drawctxt[KGSL_CONTEXT_MAX];
+	wait_queue_head_t ib1_wq;
+};
 
-struct kgsl_device;
+struct kgsl_yamato_device *kgsl_get_yamato_device(void);
+struct kgsl_device *kgsl_get_yamato_generic_device(void);
+int kgsl_yamato_first_open_locked(void);
+int kgsl_yamato_last_release_locked(void);
+int kgsl_yamato_getfunctable(struct kgsl_functable *ftbl);
 
-#define KGSL_G12_PACKET_SIZE 10
-#define KGSL_G12_PACKET_COUNT 8
-#define KGSL_G12_RB_SIZE (KGSL_G12_PACKET_SIZE*KGSL_G12_PACKET_COUNT \
-			  *sizeof(uint32_t))
-
-#define ALIGN_IN_BYTES(dim, alignment) (((dim) + (alignment - 1)) & \
-		~(alignment - 1))
-
-
-#define NUMTEXUNITS             4
-#define TEXUNITREGCOUNT         25
-#define VG_REGCOUNT             0x39
-
-#define PACKETSIZE_BEGIN        3
-#define PACKETSIZE_G2DCOLOR     2
-#define PACKETSIZE_TEXUNIT      (TEXUNITREGCOUNT * 2)
-#define PACKETSIZE_REG          (VG_REGCOUNT * 2)
-#define PACKETSIZE_STATE        (PACKETSIZE_TEXUNIT * NUMTEXUNITS + \
-				 PACKETSIZE_REG + PACKETSIZE_BEGIN + \
-				 PACKETSIZE_G2DCOLOR)
-#define PACKETSIZE_STATESTREAM  (ALIGN_IN_BYTES((PACKETSIZE_STATE * \
-				 sizeof(unsigned int)), 32) / \
-				 sizeof(unsigned int))
-#define KGSL_G12_CONTEXT_MAX 16
-
-int
-kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			uint32_t ctxt_id_mask,
-			unsigned int *drawctxt_id);
-
-int
-kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
-			unsigned int drawctxt_id);
-
-#endif  /* __GSL_DRAWCTXT_H */
+#endif /*_KGSL_YAMATO_H */

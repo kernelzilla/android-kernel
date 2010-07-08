@@ -113,7 +113,7 @@ static ssize_t rb_regs_read(struct file *file, char __user *buf, size_t count,
 	struct kgsl_ringbuffer *rb = NULL;
 	struct kgsl_rb_debug rb_debug;
 
-	device = &kgsl_driver.yamato_device;
+	device = kgsl_get_yamato_generic_device();
 
 	rb = &device->ringbuffer;
 
@@ -199,7 +199,7 @@ static ssize_t mmu_regs_read(struct file *file, char __user *buf, size_t count,
 	struct kgsl_mmu *mmu = NULL;
 	struct kgsl_mmu_debug mmu_debug;
 
-	device = &kgsl_driver.yamato_device;
+	device = kgsl_get_yamato_generic_device();
 
 	mmu = &device->mmu;
 

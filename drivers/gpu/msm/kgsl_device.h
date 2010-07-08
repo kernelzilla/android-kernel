@@ -37,8 +37,6 @@
 
 #include <asm/atomic.h>
 
-#include "kgsl_g12_drawctxt.h"
-#include "kgsl_drawctxt.h"
 #include "kgsl_mmu.h"
 #include "kgsl_ringbuffer.h"
 
@@ -46,6 +44,8 @@
 
 #define KGSL_TIMEOUT_NONE       0
 #define KGSL_TIMEOUT_DEFAULT    0xFFFFFFFF
+
+#define FIRST_TIMEOUT (HZ / 2)
 
 #define KGSL_DEV_FLAGS_INITIALIZED0	0x00000001
 #define KGSL_DEV_FLAGS_INITIALIZED	0x00000002
@@ -55,8 +55,8 @@
 /*****************************************************************************
 ** power flags
 *****************************************************************************/
-#define KGSL_PWRFLAGS_POWER_OFF			0x00000001
-#define KGSL_PWRFLAGS_POWER_ON			0x00000002
+#define KGSL_PWRFLAGS_YAMATO_POWER_OFF		0x00000001
+#define KGSL_PWRFLAGS_YAMATO_POWER_ON		0x00000002
 #define KGSL_PWRFLAGS_YAMATO_CLK_ON		0x00000004
 #define KGSL_PWRFLAGS_YAMATO_CLK_OFF		0x00000008
 #define KGSL_PWRFLAGS_OVERRIDE_ON		0x00000010
@@ -67,6 +67,8 @@
 #define KGSL_PWRFLAGS_G12_CLK_OFF		0x00000200
 #define KGSL_PWRFLAGS_G12_IRQ_ON		0x00000400
 #define KGSL_PWRFLAGS_G12_IRQ_OFF		0x00000800
+#define KGSL_PWRFLAGS_G12_POWER_OFF		0x00001000
+#define KGSL_PWRFLAGS_G12_POWER_ON		0x00002000
 
 #define KGSL_CHIPID_YAMATODX_REV21  0x20100
 #define KGSL_CHIPID_YAMATODX_REV211 0x20101
@@ -100,8 +102,6 @@ struct kgsl_memregion {
 };
 
 struct kgsl_device {
-
-	unsigned int	  refcnt;
 	uint32_t       flags;
 	enum kgsl_deviceid    id;
 	unsigned int      chip_id;
@@ -109,20 +109,12 @@ struct kgsl_device {
 	struct kgsl_memdesc memstore;
 
 	struct kgsl_mmu 	  mmu;
-	struct kgsl_memregion gmemspace;
 	struct kgsl_ringbuffer ringbuffer;
-	unsigned int      drawctxt_count;
-	struct kgsl_drawctxt *drawctxt_active;
-	struct kgsl_drawctxt drawctxt[KGSL_CONTEXT_MAX];
 	unsigned int hwaccess_blocked;
 	struct completion hwaccess_gate;
 	struct kgsl_functable ftbl;
-	wait_queue_head_t ib1_wq;
-
-	int current_timestamp;
-	int timestamp;
-
-	wait_queue_head_t wait_timestamp_wq;
+	struct timer_list idle_timer;
+	atomic_t open_count;
 };
 
 struct kgsl_devconfig {
@@ -138,7 +130,7 @@ struct kgsl_devconfig {
 };
 
 static inline struct kgsl_mmu *
-kgsl_yamato_get_mmu(struct kgsl_device *device)
+kgsl_get_mmu(struct kgsl_device *device)
 {
 	return (struct kgsl_mmu *) (device ? &device->mmu : NULL);
 }
@@ -198,22 +190,12 @@ int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 int kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int value);
 
-int kgsl_g12_waittimestamp(struct kgsl_device *device,
-				unsigned int timestamp, unsigned int timeout);
-
-
 int kgsl_g12_init(struct kgsl_device *, struct kgsl_devconfig *);
 
 int kgsl_g12_close(struct kgsl_device *device);
 
 int __init kgsl_g12_config(struct kgsl_devconfig *,
 				struct platform_device *pdev);
-
-int kgsl_g12_setup_pt(struct kgsl_device *device,
-			struct kgsl_pagetable *);
-
-int kgsl_g12_cleanup_pt(struct kgsl_device *device,
-			struct kgsl_pagetable *);
 
 irqreturn_t kgsl_g12_isr(int irq, void *data);
 

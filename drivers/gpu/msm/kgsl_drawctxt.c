@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +23,7 @@
 
 #include "yamato_reg.h"
 #include "kgsl.h"
+#include "kgsl_yamato.h"
 #include "kgsl_log.h"
 #include "kgsl_pm4types.h"
 #include "kgsl_cmdstream.h"
@@ -1356,14 +1357,16 @@ create_gpustate_shadow(struct kgsl_device *device,
 
 /* create buffers for saving/restoring registers, constants, & GMEM */
 static int
-create_gmem_shadow(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
+create_gmem_shadow(struct kgsl_yamato_device *yamato_device,
+		   struct kgsl_drawctxt *drawctxt,
 		   struct tmp_ctx *ctx)
 {
 	unsigned int flags = KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN8K, i;
+	struct kgsl_device *device = &yamato_device->dev;
 
 	config_gmemsize(&drawctxt->context_gmem_shadow,
-			device->gmemspace.sizebytes);
-	ctx->gmem_base = device->gmemspace.gpu_base;
+			yamato_device->gmemspace.sizebytes);
+	ctx->gmem_base = yamato_device->gmemspace.gpu_base;
 
 	/* allocate memory for GMEM shadow */
 	if (kgsl_sharedmem_alloc(flags, drawctxt->context_gmem_shadow.size,
@@ -1445,17 +1448,20 @@ kgsl_drawctxt_create(struct kgsl_device *device,
 		     unsigned int flags, unsigned int *drawctxt_id)
 {
 	struct kgsl_drawctxt *drawctxt;
+	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
+							device;
 	int index;
 	struct tmp_ctx ctx;
 
 	KGSL_CTXT_INFO("pt %p flags %08x\n", pagetable, flags);
-	if (device->drawctxt_count >= KGSL_CONTEXT_MAX)
+	if (yamato_device->drawctxt_count >= KGSL_CONTEXT_MAX)
 		return -EINVAL;
 
 	/* find a free context slot */
 	index = 0;
 	while (index < KGSL_CONTEXT_MAX) {
-		if (device->drawctxt[index].flags == CTXT_FLAGS_NOT_IN_USE)
+		if (yamato_device->drawctxt[index].flags ==
+							CTXT_FLAGS_NOT_IN_USE)
 			break;
 
 		index++;
@@ -1464,12 +1470,12 @@ kgsl_drawctxt_create(struct kgsl_device *device,
 	if (index >= KGSL_CONTEXT_MAX)
 		return -EINVAL;
 
-	drawctxt = &device->drawctxt[index];
+	drawctxt = &yamato_device->drawctxt[index];
 	drawctxt->pagetable = pagetable;
 	drawctxt->flags = CTXT_FLAGS_IN_USE;
 	drawctxt->bin_base_offset = 0;
 
-	device->drawctxt_count++;
+	yamato_device->drawctxt_count++;
 
 	if (create_gpustate_shadow(device, drawctxt, &ctx)
 			!= 0) {
@@ -1486,7 +1492,7 @@ kgsl_drawctxt_create(struct kgsl_device *device,
 		       sizeof(struct gmem_shadow_t) *
 				KGSL_MAX_GMEM_SHADOW_BUFFERS);
 
-		if (create_gmem_shadow(device, drawctxt, &ctx)
+		if (create_gmem_shadow(yamato_device, drawctxt, &ctx)
 				!= 0) {
 			kgsl_drawctxt_destroy(device, index);
 			return -EINVAL;
@@ -1506,13 +1512,15 @@ kgsl_drawctxt_create(struct kgsl_device *device,
 int kgsl_drawctxt_destroy(struct kgsl_device *device, unsigned int drawctxt_id)
 {
 	struct kgsl_drawctxt *drawctxt;
+	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
+							device;
 
-	drawctxt = &device->drawctxt[drawctxt_id];
+	drawctxt = &yamato_device->drawctxt[drawctxt_id];
 
 	KGSL_CTXT_INFO("drawctxt_id %d ptr %p\n", drawctxt_id, drawctxt);
 	if (drawctxt->flags != CTXT_FLAGS_NOT_IN_USE) {
 		/* deactivate context */
-		if (device->drawctxt_active == drawctxt) {
+		if (yamato_device->drawctxt_active == drawctxt) {
 			/* no need to save GMEM or shader, the context is
 			 * being destroyed.
 			 */
@@ -1521,7 +1529,7 @@ int kgsl_drawctxt_destroy(struct kgsl_device *device, unsigned int drawctxt_id)
 					     CTXT_FLAGS_GMEM_SHADOW |
 					     CTXT_FLAGS_STATE_SHADOW);
 
-			kgsl_drawctxt_switch(device, NULL, 0);
+			kgsl_drawctxt_switch(yamato_device, NULL, 0);
 		}
 
 		kgsl_yamato_idle(device, KGSL_TIMEOUT_DEFAULT);
@@ -1550,15 +1558,15 @@ int kgsl_drawctxt_destroy(struct kgsl_device *device, unsigned int drawctxt_id)
 
 		drawctxt->flags = CTXT_FLAGS_NOT_IN_USE;
 
-		BUG_ON(device->drawctxt_count == 0);
-		device->drawctxt_count--;
+		BUG_ON(yamato_device->drawctxt_count == 0);
+		yamato_device->drawctxt_count--;
 	}
 	KGSL_CTXT_INFO("return\n");
 	return 0;
 }
 
 /* Binds a user specified buffer as GMEM shadow area */
-int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_device *device,
+int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_yamato_device *yamato_device,
 		unsigned int drawctxt_id,
 		const struct kgsl_gmem_desc *gmem_desc,
 		unsigned int shadow_x,
@@ -1567,6 +1575,7 @@ int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_device *device,
 		*shadow_buffer, unsigned int buffer_id)
 {
 	struct kgsl_drawctxt *drawctxt;
+	struct kgsl_device *device = &yamato_device->dev;
 
     /* Shadow struct being modified */
     struct gmem_shadow_t *shadow;
@@ -1577,7 +1586,7 @@ int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_device *device,
 		* skips context switch */
 		return 0;
 
-	drawctxt = &device->drawctxt[drawctxt_id];
+	drawctxt = &yamato_device->drawctxt[drawctxt_id];
 
 	shadow = &drawctxt->user_gmem_shadow[buffer_id];
 
@@ -1672,8 +1681,10 @@ int kgsl_drawctxt_set_bin_base_offset(struct kgsl_device *device,
 					unsigned int offset)
 {
 	struct kgsl_drawctxt *drawctxt;
+	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
+								device;
 
-	drawctxt = &device->drawctxt[drawctxt_id];
+	drawctxt = &yamato_device->drawctxt[drawctxt_id];
 
 	drawctxt->bin_base_offset = offset;
 
@@ -1682,10 +1693,12 @@ int kgsl_drawctxt_set_bin_base_offset(struct kgsl_device *device,
 
 /* switch drawing contexts */
 void
-kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
+kgsl_drawctxt_switch(struct kgsl_yamato_device *yamato_device,
+			struct kgsl_drawctxt *drawctxt,
 			unsigned int flags)
 {
-	struct kgsl_drawctxt *active_ctxt = device->drawctxt_active;
+	struct kgsl_drawctxt *active_ctxt = yamato_device->drawctxt_active;
+	struct kgsl_device *device = &yamato_device->dev;
 	unsigned int cmds[2];
 
 	if (drawctxt) {
@@ -1702,7 +1715,7 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 		return;
 
 	KGSL_CTXT_INFO("from %p to %p flags %d\n",
-			device->drawctxt_active, drawctxt, flags);
+			yamato_device->drawctxt_active, drawctxt, flags);
 	/* save old context*/
 	if (active_ctxt != NULL) {
 		KGSL_CTXT_INFO("active_ctxt flags %08x\n", active_ctxt->flags);
@@ -1763,7 +1776,7 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 		}
 	}
 
-	device->drawctxt_active = drawctxt;
+	yamato_device->drawctxt_active = drawctxt;
 
 	/* restore new context */
 	if (drawctxt != NULL) {
