@@ -19,7 +19,7 @@
 const struct reg_struct_init imx074_reg_init[1] = {
 	{
 		/* PLL setting */
-		0x26,	/* pll_multiplier 0x0307 */
+		0x2D,	/* pll_multiplier 0x0307 */
 		0x02,	/* pll_divider 0x0305 */
 		0x4B,	/* plstatim 0x302b */
 		0x03,	/* reg_3024 */
