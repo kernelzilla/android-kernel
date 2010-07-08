@@ -49,6 +49,7 @@ static unsigned int itemsize_usb_struct = 20; /*Size of item in the mempool */
 static unsigned int poolsize_usb_struct = 8; /*Number of items in the mempool */
 /* This is the maximum number of user-space clients supported */
 static unsigned int max_clients = 15;
+static unsigned int threshold_client_limit = 30;
 /* Timer variables */
 static struct timer_list drain_timer;
 static int timer_in_progress;
@@ -136,10 +137,23 @@ static int diagchar_open(struct inode *inode, struct file *file)
 		if (i < driver->num_clients)
 			driver->client_map[i] = current->tgid;
 		else {
-			mutex_unlock(&driver->diagchar_mutex);
-			printk(KERN_ALERT "Max client limit "
-					"for DIAG driver reached\n");
-			return -ENOMEM;
+			if (i < threshold_client_limit) {
+				driver->num_clients++;
+				driver->client_map = krealloc(
+					driver->client_map, (driver->
+						num_clients) * 4, GFP_KERNEL);
+				driver->client_map[i] = current->tgid;
+			} else {
+				mutex_unlock(&driver->diagchar_mutex);
+				printk(KERN_ALERT "Max client limit "
+						"for DIAG driver reached\n");
+				printk(KERN_INFO "Cannot open handle for"
+				   " the new process %d\n", current->tgid);
+				for (i = 0; i < driver->num_clients; i++)
+					printk(KERN_INFO "Client%d has Process"
+					 " ID=%d", i, driver->client_map[i]);
+				return -ENOMEM;
+			}
 		}
 		driver->data_ready[i] |= MSG_MASKS_TYPE;
 		driver->data_ready[i] |= EVENT_MASKS_TYPE;
