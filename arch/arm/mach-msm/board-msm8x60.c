@@ -3865,6 +3865,41 @@ static struct lcdc_platform_data lcdc_pdata = {
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
+static uint32_t msm_snddev_rx_gpio[] = {
+	GPIO_CFG(109, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+};
+
+static uint32_t msm_snddev_tx_gpio[] = {
+	GPIO_CFG(108, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(110, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+};
+
+void msm_snddev_tx_route_config(void)
+{
+	pr_debug("%s\n", __func__);
+	gpio_tlmm_config(msm_snddev_tx_gpio[0], GPIO_CFG_ENABLE);
+	gpio_tlmm_config(msm_snddev_tx_gpio[1], GPIO_CFG_ENABLE);
+}
+
+void msm_snddev_tx_route_deconfig(void)
+{
+	pr_debug("%s\n", __func__);
+	gpio_tlmm_config(msm_snddev_tx_gpio[0], GPIO_CFG_DISABLE);
+	gpio_tlmm_config(msm_snddev_tx_gpio[1], GPIO_CFG_DISABLE);
+}
+
+void msm_snddev_rx_route_config(void)
+{
+	pr_debug("%s\n", __func__);
+	gpio_tlmm_config(msm_snddev_rx_gpio[0], GPIO_CFG_ENABLE);
+}
+
+void msm_snddev_rx_route_deconfig(void)
+{
+	pr_debug("%s\n", __func__);
+	gpio_tlmm_config(msm_snddev_rx_gpio[0], GPIO_CFG_DISABLE);
+}
+
 static struct msm_panel_common_pdata mdp_pdata = {
 	.mdp_core_clk_rate = 200000000,
 };
