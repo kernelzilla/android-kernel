@@ -1275,20 +1275,33 @@ static int msm_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		break;
 
 	case 32:
-		if ((var->blue.offset != 8) ||
-			(var->green.offset != 16) ||
-			(var->red.offset != 24) ||
-			(var->blue.length != 8) ||
-			(var->green.length != 8) ||
-			(var->red.length != 8) ||
-			(var->blue.msb_right != 0) ||
-			(var->green.msb_right != 0) ||
-			(var->red.msb_right != 0) ||
-			!(((var->transp.offset == 0) &&
-				(var->transp.length == 8)) ||
-			((var->transp.offset == 0) &&
-				(var->transp.length == 8))))
+		/* Figure out if the user meant RGBA or ARGB
+		   and verify the position of the RGB components */
+
+		if (var->transp.offset == 24) {
+			if ((var->blue.offset != 0) ||
+			    (var->green.offset != 8) ||
+			    (var->red.offset != 16))
 				return -EINVAL;
+		} else if (var->transp.offset == 0) {
+			if ((var->blue.offset != 8) ||
+			    (var->green.offset != 16) ||
+			    (var->red.offset != 24))
+				return -EINVAL;
+		} else
+			return -EINVAL;
+
+		/* Check the common values for both RGBA and ARGB */
+
+		if ((var->blue.length != 8) ||
+		    (var->green.length != 8) ||
+		    (var->red.length != 8) ||
+		    (var->transp.length != 8) ||
+		    (var->blue.msb_right != 0) ||
+		    (var->green.msb_right != 0) ||
+		    (var->red.msb_right != 0))
+			return -EINVAL;
+
 		break;
 
 	default:
@@ -1345,7 +1358,10 @@ static int msm_fb_set_par(struct fb_info *info)
 		break;
 
 	case 32:
-		mfd->fb_imgType = MDP_RGBA_8888;
+		if (var->transp.offset == 24)
+			mfd->fb_imgType = MDP_ARGB_8888;
+		else
+			mfd->fb_imgType = MDP_RGBA_8888;
 		break;
 
 	default:
