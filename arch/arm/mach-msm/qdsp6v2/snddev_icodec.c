@@ -17,17 +17,20 @@
  */
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
+#include <linux/wakelock.h>
+#include <linux/pmic8058-othc.h>
 #include <asm/uaccess.h>
-#include "snddev_icodec.h"
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/vreg.h>
 #include <mach/pmic.h>
 #include <mach/debug_mm.h>
-#include <linux/wakelock.h>
-#include <linux/mfd/marimba-codec.h>
+#include "q6afe.h"
+#include "apr_audio.h"
+#include "snddev_icodec.h"
 
 #define SNDDEV_ICODEC_PCM_SZ 32 /* 16 bit / sample stereo mode */
 #define SNDDEV_ICODEC_MUL_FACTOR 3 /* Multi by 8 Shift by 3  */
@@ -224,14 +227,12 @@ struct snddev_icodec_drv_state {
 	struct mutex tx_lock;
 	u32 rx_active; /* ensure one rx device at a time */
 	u32 tx_active; /* ensure one tx device at a time */
-	struct clk *rx_mclk;
 	struct clk *rx_sclk;
-	struct clk *tx_mclk;
+	struct clk *rx_mclk;
+	struct clk *rx_clk;
 	struct clk *tx_sclk;
-	struct clk *lpa_codec_clk;
-	struct clk *lpa_core_clk;
-	struct clk *lpa_p_clk;
-	struct lpa_drv *lpa;
+	struct clk *tx_mclk;
+	struct clk *tx_clk;
 
 	struct wake_lock rx_idlelock;
 	struct wake_lock tx_idlelock;
@@ -246,18 +247,27 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 
 	wake_lock(&drv->rx_idlelock);
 
-	/* enable MI2S RX master block */
-	/* enable MI2S RX bit clock */
-	trc = clk_set_rate(drv->rx_mclk,
-		SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
-	if (IS_ERR_VALUE(trc))
+	drv->rx_sclk = clk_get(0, "i2s_spkr_src_clk");
+	if (IS_ERR(drv->rx_sclk))
+		pr_err("%s source clock Error\n", __func__);
+
+	trc =  clk_set_rate(drv->rx_sclk,
+			SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
+	if (IS_ERR_VALUE(trc)) {
+		pr_err("ERROR setting Src clock1\n");
 		goto error_invalid_freq;
+	}
+
+	drv->rx_mclk = clk_get(0, "i2s_spkr_m_clk");
+	if (IS_ERR(drv->rx_mclk))
+		pr_err("%s master clock Error\n", __func__);
+
 	clk_enable(drv->rx_mclk);
-	clk_enable(drv->rx_sclk);
-	/* clk_set_rate(drv->lpa_codec_clk, 1); */ /* Remove if use pcom */
-	clk_enable(drv->lpa_p_clk);
-	clk_enable(drv->lpa_codec_clk);
-	clk_enable(drv->lpa_core_clk);
+	drv->rx_clk = clk_get(0, "i2s_spkr_clk");
+	if (IS_ERR(drv->rx_clk))
+		pr_err("%s clock Error\n", __func__);
+
+	clk_enable(drv->rx_clk);
 
 	/* Configure ADIE */
 	trc = adie_codec_open(icodec->data->profile, &icodec->adie_path);
@@ -267,6 +277,9 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	 * If OSR is to be changed, need clock API for setting the divider
 	 */
 	adie_codec_setpath(icodec->adie_path, icodec->sample_rate, 256);
+
+	trc = afe_open(PRIMARY_I2S_RX, icodec->sample_rate,
+						icodec->data->channel_mode);
 
 	/* Enable ADIE */
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_READY);
@@ -283,10 +296,7 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	return 0;
 
 error_adie:
-	clk_disable(drv->lpa_p_clk);
-	clk_disable(drv->lpa_codec_clk);
-	clk_disable(drv->lpa_core_clk);
-	clk_disable(drv->rx_sclk);
+	clk_disable(drv->rx_clk);
 	clk_disable(drv->rx_mclk);
 error_invalid_freq:
 
@@ -307,14 +317,32 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	if (icodec->data->pamp_on)
 		icodec->data->pamp_on();
 
-	/* enable MI2S TX master block */
-	/* enable MI2S TX bit clock */
-	trc = clk_set_rate(drv->tx_mclk,
-		SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
-	if (IS_ERR_VALUE(trc))
+	drv->tx_sclk = clk_get(0, "i2s_mic_src_clk");
+	if (IS_ERR(drv->tx_sclk))
+		pr_err("%s source clock Error\n", __func__);
+
+	trc =  clk_set_rate(drv->tx_sclk,
+			SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
+	if (IS_ERR_VALUE(trc)) {
+		pr_err("ERROR setting Src clock1\n");
 		goto error_invalid_freq;
+	}
+
+	drv->tx_mclk = clk_get(0, "i2s_mic_m_clk");
+	if (IS_ERR(drv->tx_mclk))
+		pr_err("%s master clock Error\n", __func__);
+
 	clk_enable(drv->tx_mclk);
-	clk_enable(drv->tx_sclk);
+	drv->tx_clk = clk_get(0, "i2s_mic_clk");
+	if (IS_ERR(drv->tx_clk))
+		pr_err("%s clock Error\n", __func__);
+
+	clk_enable(drv->tx_clk);
+
+	trc = pm8058_micbias_enable(OTHC_MICBIAS_0,
+						OTHC_SIGNAL_ALWAYS_ON);
+	if (trc)
+		pr_err("Error Enabling Mic Bias....\n");
 
 	/* Enable ADIE */
 	trc = adie_codec_open(icodec->data->profile, &icodec->adie_path);
@@ -322,10 +350,13 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 		goto error_adie;
 	/* Enable ADIE */
 	adie_codec_setpath(icodec->adie_path, icodec->sample_rate, 256);
+
+	trc = afe_open(PRIMARY_I2S_TX, icodec->sample_rate,
+			icodec->data->channel_mode);
+
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_READY);
 	adie_codec_proceed_stage(icodec->adie_path,
-	ADIE_CODEC_DIGITAL_ANALOG_READY);
-
+					ADIE_CODEC_DIGITAL_ANALOG_READY);
 
 	icodec->enabled = 1;
 
@@ -333,7 +364,7 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	return 0;
 
 error_adie:
-	clk_disable(drv->tx_sclk);
+	clk_disable(drv->tx_clk);
 	clk_disable(drv->tx_mclk);
 error_invalid_freq:
 
@@ -361,14 +392,9 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	adie_codec_close(icodec->adie_path);
 	icodec->adie_path = NULL;
 
-	/* Disable LPA clocks */
-	clk_disable(drv->lpa_p_clk);
-	clk_disable(drv->lpa_codec_clk);
-	clk_disable(drv->lpa_core_clk);
+	afe_close(PRIMARY_I2S_RX);
 
-	/* Disable MI2S RX master block */
-	/* Disable MI2S RX bit clock */
-	clk_disable(drv->rx_sclk);
+	clk_disable(drv->rx_clk);
 	clk_disable(drv->rx_mclk);
 
 	icodec->enabled = 0;
@@ -388,9 +414,11 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 	adie_codec_close(icodec->adie_path);
 	icodec->adie_path = NULL;
 
-	/* Disable MI2S TX master block */
-	/* Disable MI2S TX bit clock */
-	clk_disable(drv->tx_sclk);
+	pm8058_micbias_enable(OTHC_MICBIAS_0,
+					OTHC_SIGNAL_OFF);
+	afe_close(PRIMARY_I2S_TX);
+
+	clk_disable(drv->tx_clk);
 	clk_disable(drv->tx_mclk);
 
 	/* Reuse pamp_off for TX platform-specific setup  */
@@ -663,7 +691,7 @@ static int snddev_icodec_probe(struct platform_device *pdev)
 	struct snddev_icodec_state *icodec;
 
 	if (!pdev || !pdev->dev.platform_data) {
-		printk(KERN_ALERT "Invalid caller \n");
+		printk(KERN_ALERT "Invalid caller\n");
 		rc = -1;
 		goto error;
 	}
@@ -749,10 +777,10 @@ static void debugfs_adie_loopback(u32 loop)
 
 		/* enable MI2S RX master block */
 		/* enable MI2S RX bit clock */
-		clk_set_rate(drv->rx_mclk,
+		clk_set_rate(drv->rx_sclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
 		clk_enable(drv->rx_mclk);
-		clk_enable(drv->rx_sclk);
+		clk_enable(drv->rx_clk);
 
 		pr_info("%s: configure ADIE RX path\n", __func__);
 		/* Configure ADIE */
@@ -762,13 +790,13 @@ static void debugfs_adie_loopback(u32 loop)
 		ADIE_CODEC_DIGITAL_ANALOG_READY);
 
 		pr_info("%s: Enable Handset Mic bias\n", __func__);
-		/* enable MI2S TX master block */
-		/* enable MI2S TX bit clock */
-		clk_set_rate(drv->tx_mclk,
+		clk_set_rate(drv->tx_sclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
 		clk_enable(drv->tx_mclk);
-		clk_enable(drv->tx_sclk);
+		clk_enable(drv->tx_clk);
 
+		pm8058_micbias_enable(OTHC_MICBIAS_0,
+						OTHC_SIGNAL_ALWAYS_ON);
 		pr_info("%s: configure ADIE TX path\n", __func__);
 		/* Configure ADIE */
 		adie_codec_open(&debug_tx_lb_profile, &debugfs_tx_adie);
@@ -784,15 +812,13 @@ static void debugfs_adie_loopback(u32 loop)
 		ADIE_CODEC_DIGITAL_OFF);
 		adie_codec_close(debugfs_tx_adie);
 
+		pm8058_micbias_enable(OTHC_MICBIAS_0,
+						OTHC_SIGNAL_OFF);
 
-		/* Disable MI2S RX master block */
-		/* Disable MI2S RX bit clock */
-		clk_disable(drv->rx_sclk);
+		clk_disable(drv->rx_clk);
 		clk_disable(drv->rx_mclk);
 
-		/* Disable MI2S TX master block */
-		/* Disable MI2S TX bit clock */
-		clk_disable(drv->tx_sclk);
+		clk_disable(drv->tx_clk);
 		clk_disable(drv->tx_mclk);
 	}
 }
@@ -800,39 +826,42 @@ static void debugfs_adie_loopback(u32 loop)
 static void debugfs_afe_loopback(u32 loop)
 {
 	int trc;
+	int sample_rate, channel_mode;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
 	if (loop) {
 
 		/* enable MI2S RX master block */
 		/* enable MI2S RX bit clock */
-		trc = clk_set_rate(drv->rx_mclk,
-		SNDDEV_ICODEC_CLK_RATE(8000));
-		if (IS_ERR_VALUE(trc))
-			pr_err("%s: failed to set clk rate\n", __func__);
+		clk_set_rate(drv->rx_sclk,
+			SNDDEV_ICODEC_CLK_RATE(8000));
 		clk_enable(drv->rx_mclk);
-		clk_enable(drv->rx_sclk);
-		clk_enable(drv->lpa_codec_clk);
-		clk_enable(drv->lpa_core_clk);
-		clk_enable(drv->lpa_p_clk);
+		clk_enable(drv->rx_clk);
 		pr_info("%s: configure ADIE RX path\n", __func__);
 		/* Configure ADIE */
 		adie_codec_open(&debug_rx_profile, &debugfs_rx_adie);
 		adie_codec_setpath(debugfs_rx_adie, 8000, 256);
+		sample_rate = 8000;
+		channel_mode = 3;  /* stereo */
+		trc = afe_open(PRIMARY_I2S_RX, sample_rate, channel_mode);
 		adie_codec_proceed_stage(debugfs_rx_adie,
 		ADIE_CODEC_DIGITAL_ANALOG_READY);
 
 		pr_info("%s: Enable Handset Mic bias\n", __func__);
 		/* enable MI2S TX master block */
 		/* enable MI2S TX bit clock */
-		clk_set_rate(drv->tx_mclk,
+		clk_set_rate(drv->tx_sclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
 		clk_enable(drv->tx_mclk);
-		clk_enable(drv->tx_sclk);
+		clk_enable(drv->tx_clk);
+		pm8058_micbias_enable(OTHC_MICBIAS_0,
+						OTHC_SIGNAL_ALWAYS_ON);
 		pr_info("%s: configure ADIE TX path\n", __func__);
 		/* Configure ADIE */
 		adie_codec_open(&debug_tx_profile, &debugfs_tx_adie);
 		adie_codec_setpath(debugfs_tx_adie, 8000, 256);
+		sample_rate = 8000;
+		trc = afe_open(PRIMARY_I2S_TX, sample_rate, channel_mode);
 		adie_codec_proceed_stage(debugfs_tx_adie,
 		ADIE_CODEC_DIGITAL_ANALOG_READY);
 	} else {
@@ -845,14 +874,19 @@ static void debugfs_afe_loopback(u32 loop)
 		adie_codec_close(debugfs_tx_adie);
 
 
+		pm8058_micbias_enable(OTHC_MICBIAS_0,
+						OTHC_SIGNAL_OFF);
+		afe_close(PRIMARY_I2S_TX);
+		afe_close(PRIMARY_I2S_RX);
+
 		/* Disable MI2S RX master block */
 		/* Disable MI2S RX bit clock */
-		clk_disable(drv->rx_sclk);
+		clk_disable(drv->rx_clk);
 		clk_disable(drv->rx_mclk);
 
 		/* Disable MI2S TX master block */
 		/* Disable MI2S TX bit clock */
-		clk_disable(drv->tx_sclk);
+		clk_disable(drv->tx_clk);
 		clk_disable(drv->tx_mclk);
 	}
 }
@@ -903,29 +937,6 @@ static int __init snddev_icodec_init(void)
 	struct snddev_icodec_drv_state *icodec_drv = &snddev_icodec_drv;
 
 	rc = platform_driver_register(&snddev_icodec_driver);
-	if (IS_ERR_VALUE(rc))
-		goto error_platform_driver;
-	icodec_drv->rx_mclk = clk_get(NULL, "mi2s_codec_rx_m_clk");
-	if (IS_ERR(icodec_drv->rx_mclk))
-		goto error_rx_mclk;
-	icodec_drv->rx_sclk = clk_get(NULL, "mi2s_codec_rx_s_clk");
-	if (IS_ERR(icodec_drv->rx_sclk))
-		goto error_rx_sclk;
-	icodec_drv->tx_mclk = clk_get(NULL, "mi2s_codec_tx_m_clk");
-	if (IS_ERR(icodec_drv->tx_mclk))
-		goto error_tx_mclk;
-	icodec_drv->tx_sclk = clk_get(NULL, "mi2s_codec_tx_s_clk");
-	if (IS_ERR(icodec_drv->tx_sclk))
-		goto error_tx_sclk;
-	icodec_drv->lpa_codec_clk = clk_get(NULL, "lpa_codec_clk");
-	if (IS_ERR(icodec_drv->lpa_codec_clk))
-		goto error_lpa_codec_clk;
-	icodec_drv->lpa_core_clk = clk_get(NULL, "lpa_core_clk");
-	if (IS_ERR(icodec_drv->lpa_core_clk))
-		goto error_lpa_core_clk;
-	icodec_drv->lpa_p_clk = clk_get(NULL, "lpa_pclk");
-	if (IS_ERR(icodec_drv->lpa_p_clk))
-		goto error_lpa_p_clk;
 
 #ifdef CONFIG_DEBUG_FS
 	debugfs_sdev_dent = debugfs_create_dir("snddev_icodec", 0);
@@ -942,31 +953,12 @@ static int __init snddev_icodec_init(void)
 	mutex_init(&icodec_drv->tx_lock);
 	icodec_drv->rx_active = 0;
 	icodec_drv->tx_active = 0;
-	icodec_drv->lpa = NULL;
 	wake_lock_init(&icodec_drv->tx_idlelock, WAKE_LOCK_IDLE,
 			"snddev_tx_idle");
 	wake_lock_init(&icodec_drv->rx_idlelock, WAKE_LOCK_IDLE,
 			"snddev_rx_idle");
 	return 0;
 
-error_lpa_p_clk:
-	clk_put(icodec_drv->lpa_core_clk);
-error_lpa_core_clk:
-	clk_put(icodec_drv->lpa_codec_clk);
-error_lpa_codec_clk:
-	clk_put(icodec_drv->tx_sclk);
-error_tx_sclk:
-	clk_put(icodec_drv->tx_mclk);
-error_tx_mclk:
-	clk_put(icodec_drv->rx_sclk);
-error_rx_sclk:
-	clk_put(icodec_drv->rx_mclk);
-error_rx_mclk:
-	platform_driver_unregister(&snddev_icodec_driver);
-error_platform_driver:
-
-	pr_err("%s: encounter error\n", __func__);
-	return -ENODEV;
 }
 
 static void __exit snddev_icodec_exit(void)

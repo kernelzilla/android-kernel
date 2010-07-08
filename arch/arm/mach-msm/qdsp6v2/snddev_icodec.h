@@ -28,7 +28,7 @@
  */
 #ifndef __MACH_QDSP6V2_SNDDEV_ICODEC_H
 #define __MACH_QDSP6V2_SNDDEV_ICODEC_H
-#include <mach/qdsp5v2/adie_marimba.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <mach/qdsp5v2/audio_def.h>
 #include <mach/pmic.h>
 
