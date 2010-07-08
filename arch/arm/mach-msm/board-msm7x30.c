@@ -24,6 +24,9 @@
 #include <linux/bootmem.h>
 #include <linux/io.h>
 #include <linux/usb/mass_storage_function.h>
+#ifdef CONFIG_SPI_QSD
+#include <linux/spi/spi.h>
+#endif
 #include <linux/mfd/pmic8058.h>
 #include <linux/mfd/marimba.h>
 #include <linux/i2c.h>
@@ -2161,6 +2164,27 @@ static struct platform_device qsd_device_spi = {
 	.resource	= qsd_spi_resources,
 };
 
+#ifdef CONFIG_SPI_QSD
+static struct spi_board_info lcdc_sharp_spi_board_info[] __initdata = {
+	{
+		.modalias	= "lcdc_sharp_ls038y7dx01",
+		.mode		= SPI_MODE_1,
+		.bus_num	= 0,
+		.chip_select	= 0,
+		.max_speed_hz	= 26331429,
+	}
+};
+static struct spi_board_info lcdc_toshiba_spi_board_info[] __initdata = {
+	{
+		.modalias       = "lcdc_toshiba_ltm030dd40",
+		.mode           = SPI_MODE_3|SPI_CS_HIGH,
+		.bus_num        = 0,
+		.chip_select    = 0,
+		.max_speed_hz   = 9963243,
+	}
+};
+#endif
+
 static struct msm_gpio qsd_spi_gpio_config_data[] = {
 	{ GPIO_CFG(45, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
 	{ GPIO_CFG(46, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
@@ -2311,6 +2335,7 @@ static struct platform_device android_pmem_device = {
 	.dev = { .platform_data = &android_pmem_pdata },
 };
 
+#ifndef CONFIG_SPI_QSD
 static int lcdc_gpio_array_num[] = {
 				45, /* spi_clk */
 				46, /* spi_cs  */
@@ -2336,10 +2361,13 @@ static void lcdc_config_gpios(int enable)
 					    ARRAY_SIZE(
 						    lcdc_gpio_config_data));
 }
+#endif
 
 static struct msm_panel_common_pdata lcdc_sharp_panel_data = {
+#ifndef CONFIG_SPI_QSD
 	.panel_config_gpio = lcdc_config_gpios,
 	.gpio_num          = lcdc_gpio_array_num,
+#endif
 	.gpio = 2, 	/* LPG PMIC_GPIO26 channel number */
 };
 
@@ -2963,10 +2991,12 @@ static struct msm_gpio lcd_panel_gpios[] = {
 	{ GPIO_CFG(23, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red0" },
 	{ GPIO_CFG(24, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red1" },
 	{ GPIO_CFG(25, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red2" },
+#ifndef CONFIG_SPI_QSD
 	{ GPIO_CFG(45, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
 	{ GPIO_CFG(46, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
 	{ GPIO_CFG(47, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_mosi" },
 	{ GPIO_CFG(48, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_miso" },
+#endif
 	{ GPIO_CFG(90, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_pclk" },
 	{ GPIO_CFG(91, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_en" },
 	{ GPIO_CFG(92, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_vsync" },
@@ -4571,6 +4601,16 @@ static void __init msm7x30_init(void)
 	msm7x30_init_mmc();
 	msm7x30_init_nand();
 	msm_qsd_spi_init();
+
+#ifdef CONFIG_SPI_QSD
+	if (machine_is_msm7x30_fluid())
+		spi_register_board_info(lcdc_sharp_spi_board_info,
+			ARRAY_SIZE(lcdc_sharp_spi_board_info));
+	else
+		spi_register_board_info(lcdc_toshiba_spi_board_info,
+			ARRAY_SIZE(lcdc_toshiba_spi_board_info));
+#endif
+
 	msm_fb_add_devices();
 	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
 	msm_device_i2c_init();

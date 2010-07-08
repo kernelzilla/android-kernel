@@ -22,10 +22,16 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/pmic8058-pwm.h>
 #endif
+#ifdef CONFIG_SPI_QSD
+#include <linux/spi/spi.h>
+#endif
 #include <mach/gpio.h>
 #include "msm_fb.h"
 
-
+#ifdef CONFIG_SPI_QSD
+#define LCDC_SHARP_SPI_DEVICE_NAME	"lcdc_sharp_ls038y7dx01"
+static struct spi_device *lcdc_spi_client;
+#endif
 static int lcdc_sharp_panel_off(struct platform_device *pdev);
 
 #ifdef CONFIG_PMIC8058_PWM
@@ -39,6 +45,7 @@ static struct pwm_device *bl_pwm;
 #define PWM_PERIOD 20000	/* ns, period of 50Khz */
 #endif
 
+#ifndef CONFIG_SPI_QSD
 static int spi_cs;
 static int spi_sclk;
 static int spi_mosi;
@@ -52,6 +59,7 @@ static unsigned char bit_shift[8] = { (1 << 7),	/* MSB */
 	(1 << 1),
 	(1 << 0)		               /* LSB */
 };
+#endif
 
 struct sharp_state_type {
 	boolean disp_initialized;
@@ -126,6 +134,7 @@ static struct sharp_spi_data init_sequence[] = {
 static struct sharp_state_type sharp_state = { 0 };
 static struct msm_panel_common_pdata *lcdc_sharp_pdata;
 
+#ifndef CONFIG_SPI_QSD
 static void sharp_spi_write_byte(u8 val)
 {
 	int i;
@@ -143,9 +152,34 @@ static void sharp_spi_write_byte(u8 val)
 		gpio_set_value(spi_sclk, 0);
 	}
 }
+#endif
 
-static void serigo(u8 reg, u8 data)
+static int serigo(u8 reg, u8 data)
 {
+#ifdef CONFIG_SPI_QSD
+	char                tx_buf[2];
+	int                 rc;
+	struct spi_message  m;
+	struct spi_transfer t;
+
+	if (!lcdc_spi_client) {
+		printk(KERN_ERR "%s lcdc_spi_client is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	memset(&t, 0, sizeof t);
+	t.tx_buf = tx_buf;
+	spi_setup(lcdc_spi_client);
+	spi_message_init(&m);
+	spi_message_add_tail(&t, &m);
+
+	tx_buf[0] = reg;
+	tx_buf[1] = data;
+	t.rx_buf = NULL;
+	t.len = 2;
+	rc = spi_sync(lcdc_spi_client, &m);
+	return rc;
+#else
 	/* Enable the Chip Select - low */
 	gpio_set_value(spi_cs, 0);
 	udelay(1);
@@ -160,8 +194,11 @@ static void serigo(u8 reg, u8 data)
 
 	gpio_set_value(spi_mosi, 0);
 	gpio_set_value(spi_cs, 1);
+	return 0;
+#endif
 }
 
+#ifndef CONFIG_SPI_QSD
 static void sharp_spi_init(void)
 {
 	spi_sclk = *(lcdc_sharp_pdata->gpio_num);
@@ -176,6 +213,7 @@ static void sharp_spi_init(void)
 	/* Set the Chip Select deasserted (active low) */
 	gpio_set_value(spi_cs, 1);
 }
+#endif
 
 static void sharp_disp_powerup(void)
 {
@@ -205,8 +243,10 @@ static void sharp_disp_on(void)
 static int lcdc_sharp_panel_on(struct platform_device *pdev)
 {
 	if (!sharp_state.disp_initialized) {
+#ifndef CONFIG_SPI_QSD
 		lcdc_sharp_pdata->panel_config_gpio(1);
 		sharp_spi_init();
+#endif
 		sharp_disp_powerup();
 		sharp_disp_on();
 		sharp_state.disp_initialized = TRUE;
@@ -268,6 +308,27 @@ static int __init sharp_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_SPI_QSD
+static int __devinit lcdc_sharp_spi_probe(struct spi_device *spi)
+{
+	lcdc_spi_client = spi;
+	lcdc_spi_client->bits_per_word = 32;
+	return 0;
+}
+static int __devexit lcdc_sharp_spi_remove(struct spi_device *spi)
+{
+	lcdc_spi_client = NULL;
+	return 0;
+}
+static struct spi_driver lcdc_sharp_spi_driver = {
+	.driver = {
+		.name  = LCDC_SHARP_SPI_DEVICE_NAME,
+		.owner = THIS_MODULE,
+	},
+	.probe         = lcdc_sharp_spi_probe,
+	.remove        = __devexit_p(lcdc_sharp_spi_remove),
+};
+#endif
 static struct platform_driver this_driver = {
 	.probe  = sharp_probe,
 	.driver = {
@@ -326,10 +387,36 @@ static int __init lcdc_sharp_panel_init(void)
 	pinfo->lcdc.hsync_skew = 0;
 
 	ret = platform_device_register(&this_device);
-	if (ret)
+	if (ret) {
+		printk(KERN_ERR "%s not able to register the device\n",
+			__func__);
+		goto fail_driver;
+	}
+#ifdef CONFIG_SPI_QSD
+	ret = spi_register_driver(&lcdc_sharp_spi_driver);
+
+	if (ret) {
+		printk(KERN_ERR "%s not able to register spi\n", __func__);
+		goto fail_device;
+	}
+#endif
+	return ret;
+#ifdef CONFIG_SPI_QSD
+fail_device:
+	platform_device_unregister(&this_device);
+#endif
+fail_driver:
 		platform_driver_unregister(&this_driver);
 
 	return ret;
 }
 
 module_init(lcdc_sharp_panel_init);
+#ifdef CONFIG_SPI_QSD
+static void __exit lcdc_sharp_panel_exit(void)
+{
+	spi_unregister_driver(&lcdc_sharp_spi_driver);
+}
+module_exit(lcdc_sharp_panel_exit);
+#endif
+
