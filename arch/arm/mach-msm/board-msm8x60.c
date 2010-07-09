@@ -68,6 +68,7 @@
 
 #include "devices.h"
 #include "devices-msm8x60.h"
+#include "spm.h"
 #include "timer.h"
 
 #define MSM_SHARED_RAM_PHYS 0x40000000
@@ -98,6 +99,58 @@
 #define UI_INT3_N 14
 
 void __iomem *gic_cpu_base_addr;
+
+static struct msm_spm_platform_data msm_spm_data[] __initdata = {
+	[0] = {
+		.reg_base_addr = MSM_SAW0_BASE,
+
+		.reg_init_values[MSM_SPM_REG_SAW_CFG] = 0x0F,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_CTL] = 0x68,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_SLP_TMR_DLY] = 0xFFFFFFFF,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_WAKE_TMR_DLY] = 0xFFFFFFFF,
+
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_CLK_EN] = 0x17,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_PRECLMP_EN] = 0x07,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_POSTCLMP_EN] = 0x00,
+
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_CLMP_EN] = 0x01,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_RST_EN] = 0x00,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_MPM_CFG] = 0x00,
+
+		.awake_vlevel = 0x9C,
+		.retention_vlevel = 0x81,
+		.collapse_vlevel = 0x20,
+		.retention_mid_vlevel = 0x94,
+		.collapse_mid_vlevel = 0x8C,
+
+		.vctl_timeout_us = 50,
+	},
+
+	[1] = {
+		.reg_base_addr = MSM_SAW1_BASE,
+
+		.reg_init_values[MSM_SPM_REG_SAW_CFG] = 0x0F,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_CTL] = 0x68,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_SLP_TMR_DLY] = 0xFFFFFFFF,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_WAKE_TMR_DLY] = 0xFFFFFFFF,
+
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_CLK_EN] = 0x17,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_PRECLMP_EN] = 0x07,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_HSFS_POSTCLMP_EN] = 0x00,
+
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_CLMP_EN] = 0x01,
+		.reg_init_values[MSM_SPM_REG_SAW_SLP_RST_EN] = 0x00,
+		.reg_init_values[MSM_SPM_REG_SAW_SPM_MPM_CFG] = 0x00,
+
+		.awake_vlevel = 0x9C,
+		.retention_vlevel = 0x81,
+		.collapse_vlevel = 0x20,
+		.retention_mid_vlevel = 0x94,
+		.collapse_mid_vlevel = 0x8C,
+
+		.vctl_timeout_us = 50,
+	},
+};
 
 static struct msm_acpu_clock_platform_data msm8x60_acpu_clock_data = {
 	/* SoC has no frequency step size constraints. */
@@ -2582,6 +2635,10 @@ static void __init msm8x60_cfg_smsc911x(void)
 
 static void __init msm8x60_init(void)
 {
+	/* initialize SPM before acpuclock as the latter calls into SPM
+	 * driver to set ACPU voltages.
+	 */
+	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
 	/* CPU frequency control is not supported on simulated targets. */
 	if (!machine_is_msm8x60_rumi3() && !machine_is_msm8x60_sim())
 		msm_acpu_clock_init(&msm8x60_acpu_clock_data);
