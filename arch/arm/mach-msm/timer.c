@@ -76,6 +76,10 @@ module_param_named(debug_mask, msm_timer_debug_mask, int, S_IRUGO | S_IWUSR | S_
 #define MSM_TMR_BASE_CPU0      0
 #endif
 
+#if defined(CONFIG_MSM_DIRECT_SCLK_ACCESS)
+#define MPM_SCLK_COUNT_VAL    0x0024
+#endif
+
 #define NR_TIMERS ARRAY_SIZE(msm_clocks)
 
 #if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM8X60)
@@ -415,9 +419,48 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
  *      0: the operation failed
  *      >0: the slow clock value after time-sync
  */
-#if defined(CONFIG_MSM_SMD)
 static void (*msm_timer_sync_timeout)(void);
-#if defined(CONFIG_MSM_N_WAY_SMSM)
+#if defined(CONFIG_MSM_DIRECT_SCLK_ACCESS)
+static uint32_t msm_timer_do_sync_to_sclk(
+	void (*time_start)(struct msm_timer_sync_data_t *data),
+	bool (*time_expired)(struct msm_timer_sync_data_t *data),
+	void (*update)(struct msm_timer_sync_data_t *, uint32_t, uint32_t),
+	struct msm_timer_sync_data_t *data)
+{
+	uint32_t t1, t2;
+	int loop_count = 10;
+	int loop_zero_count = 3;
+	int tmp = USEC_PER_SEC/SCLK_HZ/(loop_zero_count-1);
+
+	while (loop_zero_count--) {
+		t1 = readl(MSM_RPM_MPM_BASE + MPM_SCLK_COUNT_VAL);
+		do {
+			udelay(1);
+			t2 = t1;
+			t1 = readl(MSM_RPM_MPM_BASE + MPM_SCLK_COUNT_VAL);
+		} while ((t2 != t1) && --loop_count);
+
+		if (!loop_count) {
+			printk(KERN_EMERG "SCLK  did not stabilize\n");
+			return 0;
+		}
+
+		if (t1)
+			break;
+
+		udelay(tmp);
+	}
+
+	if (!loop_zero_count) {
+		printk(KERN_EMERG "SCLK reads zero\n");
+		return 0;
+	}
+
+	if (update != NULL)
+		update(data, t1, SCLK_HZ);
+	return t1;
+}
+#elif defined(CONFIG_MSM_N_WAY_SMSM)
 static uint32_t msm_timer_do_sync_to_sclk(
 	void (*time_start)(struct msm_timer_sync_data_t *data),
 	bool (*time_expired)(struct msm_timer_sync_data_t *data),
@@ -828,7 +871,6 @@ int64_t msm_timer_get_sclk_time(int64_t *period)
 	int64_t tmp;
 
 	memset(&data, 0, sizeof(data));
-
 	clock_value = msm_timer_do_sync_to_sclk(
 		msm_timer_get_sclk_time_start,
 		msm_timer_get_sclk_time_expired,
@@ -916,7 +958,6 @@ unsigned long long sched_clock(void)
 	local_irq_restore(irq_flags);
 	return result; 
 }
-#endif /* CONFIG_MSM_SMD */
 
 static void __init msm_timer_init(void)
 {

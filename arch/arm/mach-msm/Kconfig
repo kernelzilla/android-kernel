@@ -55,6 +55,7 @@ config ARCH_MSM8X60
 	select REGULATOR
 	select MSM8660_TLMM
 	select ARCH_HAS_CPU_IDLE_WAIT
+	select MSM_DIRECT_SCLK_ACCESS
 
 endchoice
 
@@ -1131,6 +1132,10 @@ config SMMU_PGTABLES_L2
 	help
 	 Improves page fault latency at the expense of potential L2 pollution.
 	 Most people can probably say Y here.
+
+config MSM_DIRECT_SCLK_ACCESS
+	bool "Direct access to the SCLK timer"
+	default n
 
 config MSM7200A_TLMM
        bool
