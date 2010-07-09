@@ -3521,7 +3521,7 @@ static int msm_sdc3_get_wpswitch(struct device *dev)
 		pr_err("%s:Failed to request GPIO %d\n",
 					__func__, GPIO_SDC3_WP_SWITCH);
 	} else {
-		status = gpio_get_value(GPIO_SDC3_WP_SWITCH);
+		status = gpio_get_value_cansleep(GPIO_SDC3_WP_SWITCH);
 		pr_info("%s: WP Status for Slot %d = %d\n", __func__,
 							pdev->id, status);
 		gpio_free(GPIO_SDC3_WP_SWITCH);
@@ -3534,7 +3534,7 @@ static unsigned int msm8x60_sdcc_slot_status(struct device *dev)
 {
 	int status;
 
-	status = !(gpio_get_value(
+	status = !(gpio_get_value_cansleep(
 			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC3_DET - 1)));
 	return (unsigned int) status;
 }
