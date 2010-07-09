@@ -1399,6 +1399,7 @@ static void usb_do_work(struct work_struct *w)
 
 				atomic_set(&ui->running, 0);
 				atomic_set(&ui->remote_wakeup, 0);
+				atomic_set(&ui->configured, 0);
 
 				/* synchronize with irq context */
 				spin_lock_irqsave(&ui->lock, iflags);
