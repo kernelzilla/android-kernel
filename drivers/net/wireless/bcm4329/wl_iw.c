@@ -77,6 +77,7 @@ static int ap_mode = 0;
 
 static int		g_onoff = G_WLAN_SET_ON;
 static struct mutex	wl_start_lock;
+static struct mutex	wl_cache_lock;
 
 extern bool wl_iw_conn_status_str(uint32 event_type, uint32 status,
 	uint32 reason, char* stringBuf, uint buflen);
@@ -1875,7 +1876,6 @@ wl_iw_get_aplist(
 	if (!extra)
 		return -EINVAL;
 
-	
 	list = kmalloc(buflen, GFP_KERNEL);
 	if (!list)
 		return -ENOMEM;
@@ -1929,7 +1929,6 @@ wl_iw_get_aplist(
 		
 		dwrq->flags = 1;
 	}
-
 	return 0;
 }
 
@@ -2004,7 +2003,6 @@ wl_iw_iscan_get_aplist(
 		
 		dwrq->flags = 1;
 	}
-
 	return 0;
 }
 
@@ -2101,7 +2099,7 @@ wl_iw_iscan_get(iscan_info_t *iscan)
 	wl_scan_results_t *results;
 	uint32 status;
 
-	
+	mutex_lock(&wl_cache_lock);
 	if (iscan->list_cur) {
 		buf = iscan->list_cur;
 		iscan->list_cur = buf->next;
@@ -2111,6 +2109,7 @@ wl_iw_iscan_get(iscan_info_t *iscan)
 		if (!buf) {
 			WL_ERROR(("%s can't alloc iscan_buf_t : going to abort currect iscan\n", \
 						__FUNCTION__));
+			mutex_unlock(&wl_cache_lock);
 			return WL_SCAN_RESULTS_NO_MEM;
 		}
 		buf->next = NULL;
@@ -2147,6 +2146,7 @@ wl_iw_iscan_get(iscan_info_t *iscan)
 
 	WL_TRACE(("results->buflen = %d\n", results->buflen));
 	status = dtoh32(list_buf->status);
+	mutex_unlock(&wl_cache_lock);
 	return status;
 }
 
@@ -2312,6 +2312,7 @@ wl_iw_free_ss_cache(void)
 
 	WL_TRACE(("%s called\n", __FUNCTION__));
 
+	mutex_lock(&wl_cache_lock);
 	spec_scan_head = &g_ss_cache_ctrl.m_cache_head;
 	node = *spec_scan_head;
 
@@ -2322,6 +2323,7 @@ wl_iw_free_ss_cache(void)
 		kfree(cur);
 	}
 	*spec_scan_head = NULL;
+	mutex_unlock(&wl_cache_lock);
 }
 
 
@@ -2367,6 +2369,7 @@ wl_iw_reset_ss_cache(void)
 	wl_iw_ss_cache_t *node, *prev, *cur;
 	wl_iw_ss_cache_t **spec_scan_head;
 
+	mutex_lock(&wl_cache_lock);
 	spec_scan_head = &g_ss_cache_ctrl.m_cache_head;
 	node = *spec_scan_head;
 	prev = node;
@@ -2393,7 +2396,7 @@ wl_iw_reset_ss_cache(void)
 		prev = node;
 		node = node->next;
 	}
-
+	mutex_unlock(&wl_cache_lock);
 }
 
 
@@ -2406,13 +2409,13 @@ wl_iw_add_bss_to_ss_cache(wl_scan_results_t *ss_list)
 	wl_bss_info_t *bi = NULL;
 	int i;
 
-	spec_scan_head = &g_ss_cache_ctrl.m_cache_head;
-	
 	if (!ss_list->count) {
 		return 0;
 	}
 
-	
+	mutex_lock(&wl_cache_lock);
+	spec_scan_head = &g_ss_cache_ctrl.m_cache_head;
+
 	for (i = 0; i < ss_list->count; i++) {
 
 		node = *spec_scan_head;
@@ -2437,6 +2440,7 @@ wl_iw_add_bss_to_ss_cache(wl_scan_results_t *ss_list)
 		}
 		leaf = kmalloc(WLC_IW_SS_CACHE_MAXLEN, GFP_KERNEL);
 		if (!leaf) {
+			mutex_unlock(&wl_cache_lock);
 			return -ENOMEM;
 		}
 
@@ -2459,8 +2463,8 @@ wl_iw_add_bss_to_ss_cache(wl_scan_results_t *ss_list)
 			prev->next = leaf;
 		}
 	}
+	mutex_unlock(&wl_cache_lock);
 	return 0;
-
 }
 
 
@@ -2471,6 +2475,7 @@ __u16 *merged_len)
 	wl_iw_ss_cache_t *node;
 	wl_scan_results_t *list_merge;
 
+	mutex_lock(&wl_cache_lock);
 	node = g_ss_cache_ctrl.m_cache_head;
 	for (;node;) {
 		list_merge = (wl_scan_results_t *)node;
@@ -2485,6 +2490,7 @@ __u16 *merged_len)
 		}
 		node = node->next;
 	}
+	mutex_unlock(&wl_cache_lock);
 	return 0;
 }
 
@@ -2496,6 +2502,7 @@ wl_iw_delete_bss_from_ss_cache(void *addr)
 	wl_iw_ss_cache_t *node, *prev;
 	wl_iw_ss_cache_t **spec_scan_head;
 
+	mutex_lock(&wl_cache_lock);
 	spec_scan_head = &g_ss_cache_ctrl.m_cache_head;
 	node = *spec_scan_head;
 	prev = node;
@@ -2518,8 +2525,8 @@ wl_iw_delete_bss_from_ss_cache(void *addr)
 	}
 
 	memset(addr, 0, ETHER_ADDR_LEN);
+	mutex_unlock(&wl_cache_lock);
 	return 0;
-
 }
 
 
@@ -2915,7 +2922,6 @@ wl_iw_get_scan(
 	iscan_buf_t * p_buf;
 	uint32 counter = 0;
 #endif
-
 	WL_TRACE(("%s: buflen_from_user %d: \n", dev->name, buflen_from_user));
 
 	if (!extra) {
@@ -2988,6 +2994,7 @@ wl_iw_get_scan(
 		kfree(list);
 	}
 
+	mutex_lock(&wl_cache_lock);
 #if defined(WL_IW_USE_ISCAN)
 	if (g_scan_specified_ssid)
 		WL_TRACE(("%s: Specified scan APs from scan=%d\n", __FUNCTION__, list->count));
@@ -3007,11 +3014,11 @@ wl_iw_get_scan(
 	list_merge = (wl_scan_results_t *) g_scan;
 	len_ret = (__u16) wl_iw_get_scan_prep(list_merge, info, extra, buflen_from_user);
 #endif
+	mutex_unlock(&wl_cache_lock);
 	if (g_ss_cache_ctrl.m_link_down) {
-		
 		wl_iw_delete_bss_from_ss_cache(g_ss_cache_ctrl.m_active_bssid);
 	}
-	
+
 	wl_iw_merge_scan_cache(info, extra+len_ret, buflen_from_user-len_ret, &merged_len);
 	len_ret += merged_len;
 	wl_iw_run_ss_cache_timer(0);
@@ -3078,8 +3085,6 @@ wl_iw_iscan_get_scan(
 		return wl_iw_get_scan(dev, info, dwrq, extra);
 	}
 
-	
-
 	if (g_ss_cache_ctrl.m_timer_expired) {
 		wl_iw_free_ss_cache();
 		g_ss_cache_ctrl.m_timer_expired ^= 1;
@@ -3089,12 +3094,11 @@ wl_iw_iscan_get_scan(
 	}
 	else {
 		if (g_ss_cache_ctrl.m_link_down) {
-			
 			wl_iw_delete_bss_from_ss_cache(g_ss_cache_ctrl.m_active_bssid);
 		}
 		if (g_ss_cache_ctrl.m_prev_scan_mode || g_ss_cache_ctrl.m_cons_br_scan_cnt > 4) {
 			g_ss_cache_ctrl.m_cons_br_scan_cnt = 0;
-			
+
 			wl_iw_reset_ss_cache();
 		}
 		g_ss_cache_ctrl.m_prev_scan_mode = g_scan_specified_ssid;
@@ -3198,7 +3202,6 @@ wl_iw_iscan_get_scan(
 	dwrq->length = event - extra;
 	dwrq->flags = 0;	
 
-	
 	wl_iw_merge_scan_cache(info, event, buflen_from_user - dwrq->length, &merged_len);
 	dwrq->length += merged_len;
 	wl_iw_run_ss_cache_timer(0);
@@ -3208,7 +3211,6 @@ wl_iw_iscan_get_scan(
 
 	WL_TRACE(("%s return to WE %d bytes APs=%d\n", __FUNCTION__, dwrq->length, counter));
 
-	
 	if (!dwrq->length)
 		return -EAGAIN;
 
@@ -6121,13 +6123,11 @@ wl_iw_bt_flag_set(
 #endif
 
 	if (set == TRUE) {
-		
-		dev_wlc_bufvar_set(dev, "btc_flags", \
+		dev_wlc_bufvar_set(dev, "btc_flags",
 					(char *)&buf_flag7_dhcp_on[0], sizeof(buf_flag7_dhcp_on));
 	}
 	else  {
-		
-		dev_wlc_bufvar_set(dev, "btc_flags", \
+		dev_wlc_bufvar_set(dev, "btc_flags",
 					(char *)&buf_flag7_default[0], sizeof(buf_flag7_default));
 	}
 
@@ -6142,7 +6142,7 @@ wl_iw_bt_timerfunc(ulong data)
 	bt_info_t  *bt_local = (bt_info_t *)data;
 	bt_local->timer_on = 0;
 	WL_TRACE(("%s\n", __FUNCTION__));
-	
+
 	up(&bt_local->bt_sem);
 }
 
@@ -6162,13 +6162,12 @@ _bt_dhcp_sysioc_thread(void *data)
 
 		switch (g_bt->bt_state) {
 			case BT_DHCP_START:
-				
 				g_bt->bt_state = BT_DHCP_OPPORTUNITY_WINDOW;
 				mod_timer(&g_bt->timer, jiffies + BT_DHCP_OPPORTUNITY_WINDOW_TIEM*HZ/1000);
 				g_bt->timer_on = 1;
 				break;
+
 			case BT_DHCP_OPPORTUNITY_WINDOW:
-				
 				WL_TRACE(("%s waiting for %d msec expired, force bt flag\n", \
 						__FUNCTION__, BT_DHCP_OPPORTUNITY_WINDOW_TIEM));
 				if (g_bt->dev) wl_iw_bt_flag_set(g_bt->dev, TRUE);
@@ -6176,8 +6175,8 @@ _bt_dhcp_sysioc_thread(void *data)
 				mod_timer(&g_bt->timer, jiffies + BT_DHCP_FLAG_FORCE_TIME*HZ/1000);
 				g_bt->timer_on = 1;
 				break;
+
 			case BT_DHCP_FLAG_FORCE_TIMEOUT:
-				
 				WL_TRACE(("%s waiting for %d msec expired remove bt flag\n", \
 						__FUNCTION__, BT_DHCP_FLAG_FORCE_TIME));
 				
@@ -6185,6 +6184,7 @@ _bt_dhcp_sysioc_thread(void *data)
 				g_bt->bt_state = BT_DHCP_IDLE;
 				g_bt->timer_on = 0;
 				break;
+
 			default:
 				WL_ERROR(("%s error g_status=%d !!!\n", __FUNCTION__, \
 				          g_bt->bt_state));
@@ -6259,7 +6259,12 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 	wl_iw_t *iw;
 #if defined(WL_IW_USE_ISCAN)
 	iscan_info_t *iscan = NULL;
+#endif
 
+	mutex_init(&wl_cache_lock);
+	mutex_init(&wl_start_lock);
+
+#if defined(WL_IW_USE_ISCAN)
 	if (!dev)
 		return 0;
 
@@ -6275,7 +6280,6 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 	g_first_broadcast_scan = BROADCAST_SCAN_FIRST_IDLE;
 	g_iscan->scan_flag = 0;
 
-	
 	iscan->timer_ms    = 3000;
 	init_timer(&iscan->timer);
 	iscan->timer.data = (ulong)iscan;
@@ -6286,14 +6290,12 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 	iscan->sysioc_pid = kernel_thread(_iscan_sysioc_thread, iscan, 0);
 	if (iscan->sysioc_pid < 0)
 		return -ENOMEM;
-#endif 
-	mutex_init(&wl_start_lock);
+#endif
 
 	iw = *(wl_iw_t **)netdev_priv(dev);
 	iw->pub = (dhd_pub_t *)dhdp;
 	g_scan = NULL;
 
-	
 	g_scan = (void *)kmalloc(G_SCAN_RESULTS, GFP_KERNEL);
 	if (!g_scan)
 		return -ENOMEM;
@@ -6302,7 +6304,7 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 	g_scan_specified_ssid = 0;
 
 	wl_iw_init_ss_cache_ctrl();
-	
+
 	wl_iw_bt_init(dev);
 
 #ifdef SOFTAP
@@ -6324,7 +6326,7 @@ void wl_iw_detach(void)
 		KILL_PROC(iscan->sysioc_pid, SIGTERM);
 		wait_for_completion(&iscan->sysioc_exited);
 	}
-
+	mutex_lock(&wl_cache_lock);
 	while (iscan->list_hdr) {
 		buf = iscan->list_hdr->next;
 		kfree(iscan->list_hdr);
@@ -6332,6 +6334,7 @@ void wl_iw_detach(void)
 	}
 	kfree(iscan);
 	g_iscan = NULL;
+	mutex_unlock(&wl_cache_lock);
 #endif
 
 	if (g_scan)
@@ -6340,7 +6343,6 @@ void wl_iw_detach(void)
 	g_scan = NULL;
 	wl_iw_release_ss_cache_ctrl();
 	wl_iw_bt_release();
-
 #ifdef SOFTAP
 	if (ap_mode) {
 		WL_TRACE(("\n%s AP is going down\n", __FUNCTION__));
