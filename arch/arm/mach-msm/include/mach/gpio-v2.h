@@ -43,16 +43,7 @@
 #define gpio_get_value __gpio_get_value
 #define gpio_set_value __gpio_set_value
 #define gpio_cansleep  __gpio_cansleep
-
-static inline int gpio_to_irq(unsigned gpio)
-{
-	return (gpio < ARCH_NR_GPIOS ? MSM_GPIO_TO_INT(gpio) : -EINVAL);
-}
-
-static inline int irq_to_gpio(unsigned irq)
-{
-	return irq - MSM_GPIO_TO_INT(0);
-}
+#define gpio_to_irq    __gpio_to_irq
 
 /*
  * A GPIO can be set as a direct-connect IRQ.  This can be used to bypass
