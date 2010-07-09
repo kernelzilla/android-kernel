@@ -1,5 +1,4 @@
-/* arch/arm/mach-msm/include/mach/msm_ts.h
- *
+/*
  * Internal platform definitions for msm/qsd touchscreen devices
  *
  * Copyright (C) 2008 Google Incorporated
@@ -46,6 +45,7 @@ struct msm_ts_platform_data {
 	uint32_t			virt_y_start;
 	uint32_t			inv_x;
 	uint32_t			inv_y;
+	bool				can_wakeup;
 };
 
 #endif /* __ASM_ARCH_MSM_TS_H */

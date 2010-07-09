@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -119,6 +119,7 @@ struct marimba_tsadc_platform_data {
 	int (*exit)(void);
 	int (*level_vote)(int vote_on);
 	bool tsadc_prechg_en;
+	bool can_wakeup;
 	struct marimba_tsadc_setup_params setup;
 	struct marimba_tsadc_config_params2 params2;
 	struct marimba_tsadc_config_params3 params3;
