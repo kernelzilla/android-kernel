@@ -142,6 +142,7 @@ static struct map_desc msm8x60_io_desc[] __initdata = {
 	MSM_DEVICE(CLK_CTL),
 	MSM_DEVICE(MMSS_CLK_CTL),
 	MSM_DEVICE(LPASS_CLK_CTL),
+	MSM_DEVICE(SIC_NON_SECURE),
 	{
 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
 		.length =   MSM_SHARED_RAM_SIZE,
