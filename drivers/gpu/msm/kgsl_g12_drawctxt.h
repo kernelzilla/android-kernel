@@ -33,8 +33,11 @@
 
 struct kgsl_device;
 
-#define GSL_HAL_NUMCMDBUFFERS       5
-#define GSL_HAL_CMDBUFFERSIZE       ((1024 + 13) * sizeof(unsigned int))
+#define KGSL_G12_PACKET_SIZE 10
+#define KGSL_G12_PACKET_COUNT 8
+#define KGSL_G12_RB_SIZE (KGSL_G12_PACKET_SIZE*KGSL_G12_PACKET_COUNT \
+			  *sizeof(uint32_t))
+
 
 #define ALIGN_IN_BYTES(dim, alignment) (((dim) + (alignment - 1)) & \
 		~(alignment - 1))
@@ -57,14 +60,9 @@ struct kgsl_device;
 #define KGSL_G12_CONTEXT_MAX 16
 
 struct kgsl_g12_z1xx {
-	unsigned int offs;
-	unsigned int curr;
 	unsigned int prevctx;
-
-	unsigned int            *cmdbuf[GSL_HAL_NUMCMDBUFFERS];
-	struct kgsl_memdesc      cmdbufdesc[GSL_HAL_NUMCMDBUFFERS];
-
 	unsigned int numcontext;
+	struct kgsl_memdesc      cmdbufdesc;
 };
 
 extern struct kgsl_g12_z1xx g_z1xx;
