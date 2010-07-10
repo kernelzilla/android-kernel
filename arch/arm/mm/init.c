@@ -402,6 +402,28 @@ static void arm_memory_present(struct meminfo *mi, int node)
 }
 #endif
 
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
+int _early_pfn_valid(unsigned long pfn)
+{
+	struct meminfo *mi = &meminfo;
+	unsigned int left = 0, right = mi->nr_banks;
+
+	do {
+		unsigned int mid = (right + left) / 2;
+		struct membank *bank = &mi->bank[mid];
+
+		if (pfn < bank_pfn_start(bank))
+			right = mid;
+		else if (pfn >= bank_pfn_end(bank))
+			left = mid + 1;
+		else
+			return 1;
+	} while (left < right);
+	return 0;
+}
+EXPORT_SYMBOL(_early_pfn_valid);
+#endif
+
 static int __init meminfo_cmp(const void *_a, const void *_b)
 {
 	const struct membank *a = _a, *b = _b;
