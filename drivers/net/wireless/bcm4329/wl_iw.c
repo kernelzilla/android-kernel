@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.3 2010/03/16 22:09:45 Exp $
+ * $Id: wl_iw.c,v 1.51.4.9.2.6.4.84.2.10 2010/03/25 07:22:21 Exp $
  */
 
 
@@ -4730,6 +4730,12 @@ get_channel_retry:
 	ASSERT(iolen);
 	res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
 
+	if (res != 0) {
+		WL_ERROR(("ERROR:%d in:%s, Security & BSS reconfiguration is skipped\n",
+			res, __FUNCTION__));
+		return res;
+	}
+
 	if (!ap_cfg_running) {
 		kernel_thread(thr_wait_for_2nd_eth_dev, 0, 0);
 	} else {
@@ -4973,21 +4979,70 @@ int get_parmeter_from_string(
 }
 
 
+static int wl_iw_softap_deassoc_stations(struct net_device *dev)
+{
+	int i;
+	int res = 0;
+	char mac_buf[128] = {0};
+	struct maclist *assoc_maclist = (struct maclist *)mac_buf;
+
+	memset(assoc_maclist, 0, sizeof(mac_buf));
+	assoc_maclist->count = 8;
+
+	res = dev_wlc_ioctl(dev, WLC_GET_ASSOCLIST, assoc_maclist, 128);
+	if (res != 0) {
+		WL_SOFTAP((" Error:%d in :%s, Couldn't get ASSOC List\n", res, __FUNCTION__));
+		return res;
+	}
+
+	if (assoc_maclist->count) {
+		for (i = 0; i < assoc_maclist->count; i++) {
+			scb_val_t scbval;
+
+			scbval.val = htod32(1);
+			bcopy(&assoc_maclist->ea[i], &scbval.ea, ETHER_ADDR_LEN);
+
+			WL_SOFTAP(("deauth STA:%d \n", i));
+			res |= dev_wlc_ioctl(dev, WLC_SCB_DEAUTHENTICATE_FOR_REASON,
+					&scbval, sizeof(scb_val_t));
+		}
+	} else {
+		WL_SOFTAP((" STA ASSOC list is empty\n"));
+	}
+
+	if (res != 0)
+		WL_SOFTAP((" Error:%d in :%s\n", res, __FUNCTION__));
+	return res;
+}
+
+
 static int iwpriv_softap_stop(struct net_device *dev,
 	struct iw_request_info *info,
 	union iwreq_data *wrqu,
 	char *ext)
 {
-	int res;
+	int res = 0;
+	char buf[128];
 
-	WL_SOFTAP((" iw_handler SOFTAP_STP \n"));
+	WL_SOFTAP(("got iwpriv AP_BSS_STOP\n"));
 
-	ap_mode = 0;
-	ap_cfg_running = FALSE;
+	if ((!dev) && (!ap_net_dev)) {
+		WL_ERROR(("%s: dev is null\n", __FUNCTION__));
+		return res;
+	}
 
-	res = dev_iw_write_cfg1_bss_var(dev, 2);
+	/* Make sure that interface is UP */
+	strcpy(buf, "cur_etheraddr");
+	dev_wlc_ioctl(dev, WLC_GET_VAR, buf, sizeof(buf));
+
+	res = wl_iw_softap_deassoc_stations(ap_net_dev);
+
+	bcm_mdelay(200);
+	res |= dev_iw_write_cfg1_bss_var(dev, 2);
 
 	wrqu->data.length = 0;
+	ap_mode = 0;
+	ap_cfg_running = FALSE;
 
 	return res;
 }

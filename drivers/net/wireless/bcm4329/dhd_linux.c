@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.60 2010/02/23 00:18:36 Exp $
+ * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.60.4.4 2010/03/25 05:07:49 Exp $
  */
 
 #ifdef CONFIG_WIFI_CONTROL_FUNC
@@ -812,8 +812,30 @@ _dhd_sysioc_thread(void *data)
 		dhd_os_wake_lock(&dhd->pub);
 		for (i = 0; i < DHD_MAX_IFS; i++) {
 			if (dhd->iflist[i]) {
+#ifdef SOFTAP
+				bool in_ap = (ap_net_dev != NULL);
+#endif /* SOFTAP */
+
 				if (dhd->iflist[i]->state)
 					dhd_op_if(dhd->iflist[i]);
+
+#ifdef SOFTAP
+				if (dhd->iflist[i] == NULL) {
+					DHD_TRACE(("%s: interface %d just been removed!\n\n", __FUNCTION__, i));
+					continue;
+				}
+
+				if (in_ap && dhd->set_macaddress) {
+					DHD_TRACE(("attempt to set MAC for %s in AP Mode blocked.\n", dhd->iflist[i]->net->name));
+					dhd->set_multicast = FALSE;
+					continue;
+				} else if (in_ap && dhd->set_multicast) {
+					DHD_TRACE(("attempt to set MULTICAST list for %s in AP Mode blocked.\n", dhd->iflist[i]->net->name));
+					dhd->set_macaddress = FALSE;
+					continue;
+				}
+#endif /* SOFTAP */
+
 				if (dhd->set_multicast) {
 					dhd->set_multicast = FALSE;
 					_dhd_set_multicast_list(dhd, i);
@@ -916,7 +938,8 @@ dhd_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 	/* Reject if down */
 	if (!dhd->pub.up || (dhd->pub.busstate == DHD_BUS_DOWN)) {
-		DHD_ERROR(("%s: xmit rejected due to dhd bus down status \n", __FUNCTION__));
+		DHD_ERROR(("%s: xmit rejected pub.up=%d busstate=%d\n",
+			 __FUNCTION__, dhd->pub.up, dhd->pub.busstate));
 		netif_stop_queue(net);
 		return -ENODEV;
 	}
