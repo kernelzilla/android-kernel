@@ -451,8 +451,8 @@ void ddl_list_buffers(struct ddl_client_context_type *p_ddl);
 #ifdef DDL_MSG_LOG
 s8 *ddl_get_state_string(enum ddl_client_state_type e_client_state);
 #endif
-extern unsigned char *vidc_command_control_fw;
-extern u32 vidc_command_control_fw_size;
+extern unsigned char *vidc_video_codec_fw;
+extern u32 vidc_video_codec_fw_size;
 
 u32 ddl_fw_init(struct ddl_buf_addr_type *p_dram_base);
 void ddl_get_fw_info(const unsigned char **p_fw_array_addr,

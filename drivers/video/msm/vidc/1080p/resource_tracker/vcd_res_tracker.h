@@ -37,6 +37,16 @@
 #define VCD_RESTRK_MAX_FREQ_POINT 170667000
 #define VCD_RESTRK_HZ_PER_1000_PERFLVL 1580250
 
+struct res_trk_context {
+	struct device *device;
+	u32 irq_num;
+	struct mutex lock;
+	struct clk *vcodec_clk;
+	unsigned long vcodec_clk_rate;
+	unsigned int clock_enabled;
+	unsigned int rail_enabled;
+};
+
 #if DEBUG
 
 #define VCDRES_MSG_LOW(xx_fmt...)	printk(KERN_INFO "\n\t* " xx_fmt)

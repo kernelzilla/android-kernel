@@ -45,13 +45,6 @@ struct vidc_dev {
 	resource_size_t phys_base;
 	void __iomem *virt_base;
 	unsigned int irq;
-	struct clk *hclk;
-	struct clk *hclk_div2;
-	struct clk *pclk;
-	struct clk *vcodec_clk;
-	unsigned long hclk_rate;
-	unsigned int clock_enabled;
-	unsigned int rail_enabled;
 	unsigned int ref_count;
 	unsigned int firmware_refcount;
 	unsigned int get_firmware;
