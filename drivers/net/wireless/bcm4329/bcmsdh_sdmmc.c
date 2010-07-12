@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc.c,v 1.1.2.5.6.28 2009/11/04 20:36:52 Exp $
+ * $Id: bcmsdh_sdmmc.c,v 1.1.2.5.6.29 2010/03/19 17:16:08 Exp $
  */
 #include <typedefs.h>
 
@@ -228,9 +228,8 @@ sdioh_enable_func_intr(void)
 			return SDIOH_API_RC_FAIL;
 		}
 
-		reg |= 1 << 1;	/* enable function-1 interrupt */
-		reg |= 2 << 1;	/* enable function-2 interrupt */
-		reg |= 1;		/* Master interrupt enable */
+		/* Enable F1 and F2 interrupts, set master enable */
+		reg |= (INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN | INTR_CTL_MASTER_EN);
 
 		sdio_writeb(gInstance->func[0], reg, SDIOD_CCCR_INTEN, &err);
 		sdio_release_host(gInstance->func[0]);
@@ -259,8 +258,7 @@ sdioh_disable_func_intr(void)
 			return SDIOH_API_RC_FAIL;
 		}
 
-		reg &= ~(1 << 1);
-		reg &= ~(1 << 2);
+		reg &= ~(INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN);
 		/* Disable master interrupt with the last function interrupt */
 		if (!(reg & 0xFE))
 			reg = 0;

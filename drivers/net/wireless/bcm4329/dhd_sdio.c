@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.98 2010/02/01 05:22:19 Exp $
+ * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.102 2010/03/30 02:22:02 Exp $
  */
 
 #include <typedefs.h>
@@ -3752,8 +3752,9 @@ dhdsdio_dpc(dhd_bus_t *bus)
 		if (err) {
 			DHD_ERROR(("%s: error reading DEVCTL: %d\n", __FUNCTION__, err));
 			bus->dhd->busstate = DHD_BUS_DOWN;
-		} else
+		} else {
 			ASSERT(devctl & SBSDIO_DEVCTL_CA_INT_ONLY);
+		}
 #endif /* DHD_DEBUG */
 
 		/* Read CSR, if clock on switch to AVAIL, else ignore */

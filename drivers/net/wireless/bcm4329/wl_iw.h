@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.h,v 1.5.34.1.6.13 2010/03/10 03:55:02 Exp $
+ * $Id: wl_iw.h,v 1.5.34.1.6.15 2010/03/29 23:51:17 Exp $
  */
 
 
@@ -82,6 +82,7 @@ typedef struct wl_iw {
 	int spy_num;
 	uint32 pwsec;
 	uint32 gwsec;
+	bool privacy_invoked;
 
 	struct ether_addr spy_addr[IW_MAX_SPY];
 	struct iw_quality spy_qual[IW_MAX_SPY];
