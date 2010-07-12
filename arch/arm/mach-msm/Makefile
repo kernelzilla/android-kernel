@@ -80,12 +80,14 @@ obj-$(CONFIG_MSM_RPCSERVER_HANDSET) += rpc_server_handset.o
 obj-$(CONFIG_MSM_QDSP6) += qdsp6/
 obj-$(CONFIG_MSM8X60_AUDIO) += qdsp6v2/
 obj-$(CONFIG_MSM_HW3D) += hw3d.o
-ifdef CONFIG_MSM_N_WAY_SMSM
-	obj-$(CONFIG_PM) += pm2.o
+ifdef CONFIG_PM
+	obj-$(CONFIG_ARCH_MSM8X60) += pm-8x60.o
+	obj-$(CONFIG_ARCH_QSD8X50) += pm2.o
+	obj-$(CONFIG_ARCH_MSM7X30) += pm2.o
+	obj-$(CONFIG_ARCH_MSM7X27) += pm2.o
+	obj-$(CONFIG_ARCH_MSM7X25) += pm.o
+	obj-$(CONFIG_ARCH_MSM7X01A) += pm.o
 else
-	obj-$(CONFIG_PM) += pm.o
-endif
-ifndef CONFIG_PM
 	obj-y += no-pm.o
 endif
 obj-$(CONFIG_MSM_DMA_TEST) += dma_test.o

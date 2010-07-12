@@ -15,177 +15,91 @@
  * 02110-1301, USA.
  */
 
-#include <linux/sched.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/cpuidle.h>
-#include <linux/memory.h>
-#include <linux/smp.h>
-#include <linux/cpumask.h>
 
-#include "idle.h"
+#include "cpuidle.h"
+#include "pm.h"
 
-
-#define MSM_STATE_C1 0
-#define MSM_STATE_C2 1
-#define MSM_STATE_C3 2
-#define MSM_MAX_STATES 3
-
-struct msm_processor_cx {
-	u8 type;
-	u32 sleep_latency;
-	u32 wakeup_latency;
-	u32 threshold;
-	u32 flags;
-	int (*enter)    (struct cpuidle_device *dev,
-				 struct cpuidle_state *state);
-};
-
-static int msm_idle_c1_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state);
-static int msm_idle_c2_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state);
-static int msm_idle_c3_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state);
-
-struct msm_processor_cx msm_power_states[MSM_MAX_STATES] = {
-
-	[MSM_STATE_C1] = {
-				.type = MSM_STATE_C1,
-				.sleep_latency = 2,
-				.wakeup_latency = 2,
-				.threshold = 2,
-				.flags = CPUIDLE_FLAG_TIME_VALID,
-				.enter = msm_idle_c1_enter,
-			},
-
-	[MSM_STATE_C2] = {
-				.type = MSM_STATE_C2,
-				.sleep_latency = 10,
-				.wakeup_latency = 10,
-				.threshold = 10,
-				.flags = CPUIDLE_FLAG_TIME_VALID,
-				.enter = msm_idle_c2_enter,
-			},
-
-	[MSM_STATE_C3] = {
-				.type = MSM_STATE_C3,
-				.sleep_latency = 20,
-				.wakeup_latency = 20,
-				.threshold = 20,
-				.flags = CPUIDLE_FLAG_TIME_VALID,
-				.enter = msm_idle_c3_enter,
-			},
-};
-
-/**
- * msm_enter_idle - Programs MSM to enter the specified state
- * @dev: cpuidle device
- * @state: The target state to be programmed
- *
- * Called from the CPUidle framework to program the device to the
- * specified target state selected by the governor.
- */
-static int msm_enter_idle(struct cpuidle_device *dev,
-			struct cpuidle_state *state)
-{
-	struct timespec ts_preidle, ts_postidle, ts_idle;
-
-
-	/* Used to keep track of the total time in idle */
-	getnstimeofday(&ts_preidle);
-
-	local_irq_disable();
-	local_fiq_disable();
-
-	/* Execute ARM wfi */
-	msm_arch_idle();
-
-	getnstimeofday(&ts_postidle);
-	ts_idle = timespec_sub(ts_postidle, ts_preidle);
-
-	local_irq_enable();
-	local_fiq_enable();
-
-	return (u32)timespec_to_ns(&ts_idle)/1000;
-}
-
-static int msm_idle_c1_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state)
-{
-	return msm_enter_idle(dev, state);
-}
-
-
-static int msm_idle_c2_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state)
-{
-	return msm_enter_idle(dev, state);
-}
-
-static int msm_idle_c3_enter(struct cpuidle_device *dev,
-				struct cpuidle_state *state)
-{
-	return msm_enter_idle(dev, state);
-}
-
-DEFINE_PER_CPU(struct cpuidle_device, msm_idle_dev);
-
-struct cpuidle_driver msm_idle_driver = {
-	.name =	"msm_idle",
+static DEFINE_PER_CPU_SHARED_ALIGNED(struct cpuidle_device, msm_cpuidle_devs);
+static struct cpuidle_driver msm_cpuidle_driver = {
+	.name = "msm_idle",
 	.owner = THIS_MODULE,
 };
 
-/**
- * msm_idle_init - init routine for MSM idle
- *
- * Registers the MSM specific cpuidle driver with the cpuidle
- * framework with the valid set of states.
- */
-int __init msm_idle_init(void)
+static int msm_cpuidle_enter(
+	struct cpuidle_device *dev, struct cpuidle_state *state)
 {
+	int ret;
 
-	int i, cpu;
-	struct msm_processor_cx *cx;
-	struct cpuidle_state *state;
-	struct cpuidle_device *dev;
+	local_irq_disable();
+	ret = msm_pm_idle_enter((enum msm_pm_sleep_mode) (state->driver_data));
+	local_irq_enable();
 
-	cpuidle_register_driver(&msm_idle_driver);
+	return ret;
+}
+
+void __init msm_cpuidle_set_states(struct msm_cpuidle_state *states,
+	int nr_states, struct msm_pm_platform_data *pm_data)
+{
+	unsigned int cpu;
 
 	for_each_possible_cpu(cpu) {
-		dev = &per_cpu(msm_idle_dev, cpu);
+		struct cpuidle_device *dev = &per_cpu(msm_cpuidle_devs, cpu);
+		int i;
+
 		dev->cpu = cpu;
+		for (i = 0; i < nr_states; i++) {
+			struct msm_cpuidle_state *cstate = &states[i];
+			struct cpuidle_state *state;
+			struct msm_pm_platform_data *pm_mode;
 
-		for (i = MSM_STATE_C1; i < MSM_MAX_STATES; i++) {
-			cx = &msm_power_states[i];
-			state = &dev->states[i];
+			if (cstate->cpu != cpu)
+				continue;
 
-			cpuidle_set_statedata(state, cx);
-			state->exit_latency =
-				cx->sleep_latency + cx->wakeup_latency;
-			state->target_residency = cx->threshold;
-			state->flags = cx->flags;
-			state->enter = cx->enter;
-			if (cx->type == MSM_STATE_C1)
-				dev->safe_state = state;
-			sprintf(state->name, "C%d", i+1);
+			state = &dev->states[cstate->state_nr];
+			pm_mode = &pm_data[MSM_PM_MODE(cpu, cstate->mode_nr)];
+
+			snprintf(state->name, CPUIDLE_NAME_LEN, cstate->name);
+			snprintf(state->desc, CPUIDLE_DESC_LEN, cstate->desc);
+			state->driver_data = (void *) cstate->mode_nr;
+			state->flags = CPUIDLE_FLAG_TIME_VALID;
+			state->exit_latency = pm_mode->latency;
+			state->power_usage = 0;
+			state->target_residency = pm_mode->residency;
+			state->enter = msm_cpuidle_enter;
 		}
 
-		dev->state_count = MSM_MAX_STATES;
-
-		if (cpuidle_register_device(dev)) {
-			printk(KERN_ERR "%s: CPUidle register device failed\n",
-			       __func__);
+		for (i = 0; i < CPUIDLE_STATE_MAX; i++) {
+			if (dev->states[i].enter == NULL)
+				break;
+			dev->state_count = i + 1;
 		}
+	}
+}
 
-		printk(KERN_INFO "cpuidle device registered for cpu=%d \n",
-			cpu);
+int __init msm_cpuidle_init(void)
+{
+	unsigned int cpu;
+	int ret;
+
+	ret = cpuidle_register_driver(&msm_cpuidle_driver);
+	if (ret)
+		pr_err("%s: failed to register cpuidle driver: %d\n",
+			__func__, ret);
+
+	for_each_possible_cpu(cpu) {
+		struct cpuidle_device *dev = &per_cpu(msm_cpuidle_devs, cpu);
+
+		ret = cpuidle_register_device(dev);
+		if (ret) {
+			pr_err("%s: failed to register cpuidle device for "
+				"cpu %u: %d\n", __func__, cpu, ret);
+			return ret;
+		}
 	}
 
 	return 0;
 }
-
-late_initcall(msm_idle_init);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("msm cpuidle driver");
-MODULE_VERSION("1.0");
-MODULE_AUTHOR("Qualcomm Innovation Center, Inc.");

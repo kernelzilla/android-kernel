@@ -20,7 +20,7 @@
 
 #include <linux/types.h>
 
-enum {
+enum msm_pm_sleep_mode {
 	MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SUSPEND,
 	MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 	MSM_PM_SLEEP_MODE_APPS_SLEEP,
@@ -44,5 +44,6 @@ struct msm_pm_platform_data {
 };
 
 void msm_pm_set_platform_data(struct msm_pm_platform_data *data, int count);
+int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode);
 
 #endif

@@ -68,6 +68,8 @@
 
 #include "devices.h"
 #include "devices-msm8x60.h"
+#include "cpuidle.h"
+#include "pm.h"
 #include "spm.h"
 #include "timer.h"
 
@@ -202,6 +204,61 @@ static struct platform_device smsc911x_device = {
 	.dev           = {
 		.platform_data = &smsc911x_config
 	}
+};
+
+static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR * 2] = {
+	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 1,
+		.latency = 1000,
+		.residency = 9000,
+	},
+
+	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 1,
+		.latency = 500,
+		.residency = 6000,
+	},
+
+	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 1,
+		.latency = 2,
+		.residency = 0,
+	},
+
+	[MSM_PM_MODE(1, MSM_PM_SLEEP_MODE_POWER_COLLAPSE)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 0,
+		.latency = 600,
+		.residency = 7200,
+	},
+
+	[MSM_PM_MODE(1, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 1,
+		.latency = 500,
+		.residency = 6000,
+	},
+
+	[MSM_PM_MODE(1, MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT)] = {
+		.supported = 1,
+		.suspend_enabled = 1,
+		.idle_enabled = 1,
+		.latency = 2,
+		.residency = 0,
+	},
+};
+
+static struct msm_cpuidle_state msm_cstates[] __initdata = {
+	{0, 0, "C0", "WFI", MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
+	{1, 0, "C0", "WFI", MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
 };
 
 #if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_HCD)
@@ -2666,6 +2723,10 @@ static void __init msm8x60_init(void)
 		msm_fb_add_devices();
 	fixup_i2c_configs();
 	register_i2c_devices();
+
+	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
+	msm_cpuidle_set_states(msm_cstates, ARRAY_SIZE(msm_cstates),
+				msm_pm_data);
 
 	cy8ctmg200_init();
 }
