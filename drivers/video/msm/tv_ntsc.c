@@ -133,7 +133,11 @@ static struct msm_fb_panel_data ntsc_panel_data = {
 	.panel_info.type = TV_PANEL,
 	.panel_info.pdest = DISPLAY_1,
 	.panel_info.wait_cycle = 0,
+#ifdef CONFIG_FB_MSM_MDP40
+	.panel_info.bpp = 24,
+#else
 	.panel_info.bpp = 16,
+#endif
 	.panel_info.fb_num = 2,
 	.on = ntsc_on,
 	.off = ntsc_off,

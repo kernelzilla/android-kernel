@@ -146,7 +146,7 @@ static int pal_on(struct platform_device *pdev)
 	TV_OUT(TV_LEVEL, 0x00000000);	/* DC offset to 0. */
 	TV_OUT(TV_OFFSET, 0x008080f0);
 
-#ifdef CONFIG_FB_MSM_MDP31
+#if defined(CONFIG_FB_MSM_MDP31)
 	TV_OUT(TV_DAC_INTF, 0x29);
 #endif
 	TV_OUT(TV_ENC_CTL, reg);
@@ -165,6 +165,14 @@ static int pal_off(struct platform_device *pdev)
 
 static int __init pal_probe(struct platform_device *pdev)
 {
+#if defined CONFIG_FB_MSM_TVOUT_PAL_M
+	pdev->id = PAL_M;
+#elif defined CONFIG_FB_MSM_TVOUT_PAL_N
+	pdev->id = PAL_N;
+#else
+	pdev->id = PAL_BDGHIN;
+#endif
+
 	msm_fb_add_device(pdev);
 
 	return 0;
@@ -183,7 +191,11 @@ static struct msm_fb_panel_data pal_panel_data = {
 	.panel_info.type = TV_PANEL,
 	.panel_info.pdest = DISPLAY_1,
 	.panel_info.wait_cycle = 0,
+#ifdef CONFIG_FB_MSM_MDP40
+	.panel_info.bpp = 24,
+#else
 	.panel_info.bpp = 16,
+#endif
 	.panel_info.fb_num = 2,
 	.on = pal_on,
 	.off = pal_off,

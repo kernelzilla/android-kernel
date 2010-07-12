@@ -1057,11 +1057,19 @@ static int mdp_probe(struct platform_device *pdev)
 		break;
 
 	case TV_PANEL:
+#ifdef CONFIG_FB_MSM_OVERLAY
+		pdata->on = mdp4_atv_on;
+		pdata->off = mdp4_atv_off;
+		mfd->dma_fnc = mdp4_atv_overlay;
+		mfd->dma = &dma_e_data;
+		mdp4_display_intf_sel(EXTERNAL_INTF_SEL, TV_INTF);
+#else
 		pdata->on = mdp_dma3_on;
 		pdata->off = mdp_dma3_off;
 		mfd->hw_refresh = TRUE;
 		mfd->dma_fnc = mdp_dma3_update;
 		mfd->dma = &dma3_data;
+#endif
 		break;
 
 	default:
