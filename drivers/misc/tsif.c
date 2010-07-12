@@ -39,15 +39,6 @@
 #include <mach/dma.h>
 #include <mach/msm_tsif.h>
 
-/**
- * WORKAROUND_TCR - enable work around for TCR counter
- *
- * tcif_ref_clk have output from TV clock control unit, for this output to work,
- * M/N divider in TV controlling unit should be ON. Modem software do not turn
- * it on unless some TV clock requested. As work around, I turn on tv_enc_clk.
- */
-#define WORKAROUND_TCR
-
 /*
  * TSIF register offsets
  */
@@ -157,9 +148,6 @@ struct msm_tsif_device {
 	/* clocks */
 	struct clk *tsif_clk;
 	struct clk *tsif_ref_clk;
-#ifdef WORKAROUND_TCR
-	struct clk *tv_enc_clk;
-#endif /*WORKAROUND_TCR*/
 	/* debugfs */
 	struct dentry *dent_tsif;
 	struct dentry *debugfs_tsif_regs[ARRAY_SIZE(debugfs_tsif_regs)];
@@ -208,12 +196,6 @@ static void tsif_put_clocks(struct msm_tsif_device *tsif_device)
 		clk_put(tsif_device->tsif_ref_clk);
 		tsif_device->tsif_ref_clk = NULL;
 	}
-#ifdef WORKAROUND_TCR
-	if (tsif_device->tv_enc_clk) {
-		clk_put(tsif_device->tv_enc_clk);
-		tsif_device->tv_enc_clk = NULL;
-	}
-#endif /*WORKAROUND_TCR*/
 }
 
 static int tsif_get_clocks(struct msm_tsif_device *tsif_device)
@@ -234,15 +216,6 @@ static int tsif_get_clocks(struct msm_tsif_device *tsif_device)
 		tsif_device->tsif_ref_clk = NULL;
 		goto ret;
 	}
-#ifdef WORKAROUND_TCR
-	tsif_device->tv_enc_clk = clk_get(NULL, "tv_enc_clk");
-	if (IS_ERR(tsif_device->tv_enc_clk)) {
-		dev_err(&tsif_device->pdev->dev, "failed to get tv_enc_clk\n");
-		rc = PTR_ERR(tsif_device->tv_enc_clk);
-		tsif_device->tv_enc_clk = NULL;
-		goto ret;
-	}
-#endif /*WORKAROUND_TCR*/
 	return 0;
 ret:
 	tsif_put_clocks(tsif_device);
@@ -252,17 +225,11 @@ ret:
 static void tsif_clock(struct msm_tsif_device *tsif_device, int on)
 {
 	if (on) {
-#ifdef WORKAROUND_TCR
-		clk_enable(tsif_device->tv_enc_clk);
-#endif /*WORKAROUND_TCR*/
 		clk_enable(tsif_device->tsif_clk);
 		clk_enable(tsif_device->tsif_ref_clk);
 	} else {
 		clk_disable(tsif_device->tsif_clk);
 		clk_disable(tsif_device->tsif_ref_clk);
-#ifdef WORKAROUND_TCR
-		clk_disable(tsif_device->tv_enc_clk);
-#endif /*WORKAROUND_TCR*/
 	}
 }
 /* ===clocks end=== */
