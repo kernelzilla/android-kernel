@@ -42,6 +42,10 @@
 #define CONFIG_QDSP6 1
 #endif
 
+#if defined(CONFIG_ARCH_MSM8X60)
+#define CONFIG_DSPS 1
+#endif
+
 #define MODULE_NAME "msm_smd"
 #define SMEM_VERSION 0x000B
 #define SMD_VERSION 0x00020000
@@ -77,7 +81,7 @@ enum {
 
 enum {
 	SMD_APPS_QDSP_I = 1,
-	SMD_MODEM_QDSP_I = 2
+	SMD_APPS_DSPS_I = 3,
 };
 
 static int msm_smd_debug_mask;
@@ -114,20 +118,23 @@ module_param_named(debug_mask, msm_smd_debug_mask,
 static unsigned last_heap_free = 0xffffffff;
 
 #if defined(CONFIG_ARCH_MSM7X30)
-#define MSM_TRIG_A2M_SMD_INT   (writel(1 << 0, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2Q6_SMD_INT  (writel(1 << 8, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2M_SMSM_INT  (writel(1 << 5, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2Q6_SMSM_INT (writel(1 << 8, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMD_INT     (writel(1 << 0, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMD_INT    (writel(1 << 8, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMSM_INT    (writel(1 << 5, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMSM_INT   (writel(1 << 8, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2DSPS_SMD_INT
 #elif defined(CONFIG_ARCH_MSM8X60)
-#define MSM_TRIG_A2M_SMD_INT   (writel(1 << 3, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2Q6_SMD_INT  (writel(1 << 15, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2M_SMSM_INT  (writel(1 << 4, MSM_GCC_BASE + 0x8))
-#define MSM_TRIG_A2Q6_SMSM_INT (writel(1 << 15, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMD_INT     (writel(1 << 3, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMD_INT    (writel(1 << 15, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2M_SMSM_INT    (writel(1 << 4, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2Q6_SMSM_INT   (writel(1 << 15, MSM_GCC_BASE + 0x8))
+#define MSM_TRIG_A2DSPS_SMD_INT  (writel(1, MSM_SIC_NON_SECURE_BASE + 0x4080))
 #else
-#define MSM_TRIG_A2M_SMD_INT   (writel(1, MSM_CSR_BASE + 0x400 + (0) * 4))
-#define MSM_TRIG_A2Q6_SMD_INT  (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
-#define MSM_TRIG_A2M_SMSM_INT  (writel(1, MSM_CSR_BASE + 0x400 + (5) * 4))
-#define MSM_TRIG_A2Q6_SMSM_INT (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
+#define MSM_TRIG_A2M_SMD_INT     (writel(1, MSM_CSR_BASE + 0x400 + (0) * 4))
+#define MSM_TRIG_A2Q6_SMD_INT    (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
+#define MSM_TRIG_A2M_SMSM_INT    (writel(1, MSM_CSR_BASE + 0x400 + (5) * 4))
+#define MSM_TRIG_A2Q6_SMSM_INT   (writel(1, MSM_CSR_BASE + 0x400 + (8) * 4))
+#define MSM_TRIG_A2DSPS_SMD_INT
 #endif
 
 #define SMD_LOOPBACK_CID 100
@@ -164,6 +171,11 @@ static inline void notify_modem_smd(void)
 static inline void notify_dsp_smd(void)
 {
 	MSM_TRIG_A2Q6_SMD_INT;
+}
+
+static inline void notify_dsps_smd(void)
+{
+	MSM_TRIG_A2DSPS_SMD_INT;
 }
 
 void smd_diag(void)
@@ -272,6 +284,7 @@ struct smd_channel {
 static LIST_HEAD(smd_ch_closed_list);
 static LIST_HEAD(smd_ch_list_modem);
 static LIST_HEAD(smd_ch_list_dsp);
+static LIST_HEAD(smd_ch_list_dsps);
 
 static unsigned char smd_ch_allocated[64];
 static struct work_struct probe_work;
@@ -282,6 +295,7 @@ static void smd_channel_probe_worker(struct work_struct *work)
 {
 	struct smd_alloc_elm *shared;
 	unsigned n;
+	uint32_t type;
 
 	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(*shared) * 64);
 
@@ -296,7 +310,9 @@ static void smd_channel_probe_worker(struct work_struct *work)
 
 		/* channel should be allocated only if APPS
 		   processor is involved */
-		if (SMD_CHANNEL_TYPE(shared[n].type) == SMD_MODEM_QDSP_I)
+		type = SMD_CHANNEL_TYPE(shared[n].type);
+		if ((type != SMD_APPS_MODEM) && (type != SMD_APPS_QDSP_I) &&
+		    (type != SMD_APPS_DSPS_I))
 			continue;
 		if (!shared[n].ref_count)
 			continue;
@@ -566,10 +582,19 @@ static irqreturn_t smd_dsp_irq_handler(int irq, void *data)
 }
 #endif
 
+#if defined(CONFIG_DSPS)
+static irqreturn_t smd_dsps_irq_handler(int irq, void *data)
+{
+	handle_smd_irq(&smd_ch_list_dsps, notify_dsps_smd);
+	return IRQ_HANDLED;
+}
+#endif
+
 static void smd_fake_irq_handler(unsigned long arg)
 {
 	handle_smd_irq(&smd_ch_list_modem, notify_modem_smd);
 	handle_smd_irq(&smd_ch_list_dsp, notify_dsp_smd);
+	handle_smd_irq(&smd_ch_list_dsps, notify_dsps_smd);
 }
 
 static DECLARE_TASKLET(smd_fake_irq_tasklet, smd_fake_irq_handler, 0);
@@ -599,6 +624,12 @@ void smd_sleep_exit(void)
 		}
 	}
 	list_for_each_entry(ch, &smd_ch_list_dsp, ch_list) {
+		if (smd_need_int(ch)) {
+			need_int = 1;
+			break;
+		}
+	}
+	list_for_each_entry(ch, &smd_ch_list_dsps, ch_list) {
 		if (smd_need_int(ch)) {
 			need_int = 1;
 			break;
@@ -822,8 +853,10 @@ static int smd_alloc_channel(struct smd_alloc_elm *alloc_elm)
 
 	if (ch->type == SMD_APPS_MODEM)
 		ch->notify_other_cpu = notify_modem_smd;
-	else
+	else if (ch->type == SMD_APPS_QDSP)
 		ch->notify_other_cpu = notify_dsp_smd;
+	else
+		ch->notify_other_cpu = notify_dsps_smd;
 
 	if (smd_is_packet(alloc_elm)) {
 		ch->read = smd_packet_read;
@@ -981,6 +1014,8 @@ int smd_named_open_on_edge(const char *name, uint32_t edge,
 		list_add(&ch->ch_list, &smd_ch_list_modem);
 	else if (SMD_CHANNEL_TYPE(ch->type) == SMD_APPS_QDSP_I)
 		list_add(&ch->ch_list, &smd_ch_list_dsp);
+	else if (SMD_CHANNEL_TYPE(ch->type) == SMD_APPS_DSPS_I)
+		list_add(&ch->ch_list, &smd_ch_list_dsps);
 	else
 		list_add(&ch->ch_list, &smd_ch_list_loopback);
 
@@ -1484,11 +1519,29 @@ int smd_core_init(void)
 	if (r < 0) {
 		free_irq(INT_A9_M2A_0, 0);
 		free_irq(INT_A9_M2A_5, 0);
-		free_irq(INT_ADSP_A11, 0);
+		free_irq(INT_ADSP_A11, smd_dsp_irq_handler);
 		return r;
 	}
 
 	r = enable_irq_wake(INT_ADSP_A11);
+	if (r < 0)
+		pr_err("smd_core_init: "
+		       "enable_irq_wake failed for INT_ADSP_A11\n");
+#endif
+
+#if defined(CONFIG_DSPS)
+	r = request_irq(INT_DSPS_A11, smd_dsps_irq_handler,
+			IRQF_TRIGGER_RISING | IRQF_SHARED, "smd_dev",
+			smd_dsps_irq_handler);
+	if (r < 0) {
+		free_irq(INT_A9_M2A_0, 0);
+		free_irq(INT_A9_M2A_5, 0);
+		free_irq(INT_ADSP_A11, smd_dsp_irq_handler);
+		free_irq(INT_ADSP_A11, smsm_irq_handler);
+		return r;
+	}
+
+	r = enable_irq_wake(INT_DSPS_A11);
 	if (r < 0)
 		pr_err("smd_core_init: "
 		       "enable_irq_wake failed for INT_ADSP_A11\n");
