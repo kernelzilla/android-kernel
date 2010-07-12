@@ -42,6 +42,7 @@
 #include <linux/gpio.h>
 #include <linux/workqueue.h>
 #include <linux/input/cy8c_ts.h>
+#include <linux/pm.h>
 
 #define CY8CTMA300	0x0
 #define CY8CTMG200	0x1
@@ -454,9 +455,9 @@ error_alloc_dev:
 }
 
 #ifdef CONFIG_PM
-static int cy8c_ts_suspend(struct i2c_client *client, pm_message_t message)
+static int cy8c_ts_suspend(struct device *dev)
 {
-	struct cy8c_ts *ts = i2c_get_clientdata(client);
+	struct cy8c_ts *ts = dev_get_drvdata(dev);
 	int rc = 0;
 
 	if (!ts->pdata->use_polling)
@@ -470,22 +471,22 @@ static int cy8c_ts_suspend(struct i2c_client *client, pm_message_t message)
 	if (ts->pdata->power_on) {
 		rc = ts->pdata->power_on(0);
 		if (rc) {
-			dev_err(&client->dev, "unable to goto suspend\n");
+			dev_err(dev, "unable to goto suspend\n");
 			return rc;
 		}
 	}
 	return 0;
 }
 
-static int cy8c_ts_resume(struct i2c_client *client)
+static int cy8c_ts_resume(struct device *dev)
 {
-	struct cy8c_ts *ts = i2c_get_clientdata(client);
+	struct cy8c_ts *ts = dev_get_drvdata(dev);
 	int rc = 0;
 
 	if (ts->pdata->power_on) {
 		rc = ts->pdata->power_on(1);
 		if (rc) {
-			dev_err(&client->dev, "unable to resume\n");
+			dev_err(dev, "unable to resume\n");
 			return rc;
 		}
 	}
@@ -497,9 +498,11 @@ static int cy8c_ts_resume(struct i2c_client *client)
 
 	return 0;
 }
-#else
-#define cy8c_ts_resume NULL
-#define cy8c_ts_suspend NULL
+
+static struct dev_pm_ops cy8c_ts_pm_ops = {
+	.suspend	= cy8c_ts_suspend,
+	.resume		= cy8c_ts_resume,
+};
 #endif
 
 static int __devinit cy8c_ts_probe(struct i2c_client *client,
@@ -576,15 +579,17 @@ static const struct i2c_device_id cy8c_ts_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, cy8c_ts_id);
 
+
 static struct i2c_driver cy8c_ts_driver = {
 	.driver = {
 		.name = "cy8c_ts",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &cy8c_ts_pm_ops,
+#endif
 	},
 	.probe		= cy8c_ts_probe,
 	.remove		= __devexit_p(cy8c_ts_remove),
-	.suspend	= cy8c_ts_suspend,
-	.resume		= cy8c_ts_resume,
 	.id_table	= cy8c_ts_id,
 };
 
