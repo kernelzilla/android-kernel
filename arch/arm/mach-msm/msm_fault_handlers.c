@@ -27,6 +27,30 @@ static int msm_imp_ext_abort(unsigned long addr, unsigned int fsr,
 			     struct pt_regs *regs)
 {
 	int cpu;
+	unsigned int regval;
+	static unsigned char flush_toggle;
+
+	asm("mrc p15, 7, %0, c15, c0, 1\n" /* read EFSR for fault status */
+	    : "=r" (regval));
+	if (regval == 0x2) {
+		/* Fault was caused by icache parity error. Alternate
+		 * simply retrying the access and flushing the icache. */
+		flush_toggle ^= 1;
+		if (flush_toggle)
+			asm("mcr p15, 0, %0, c7, c5, 0\n"
+				:
+				: "r" (regval)); /* input value is ignored */
+		/* Clear fault in EFSR. */
+		asm("mcr p15, 7, %0, c15, c0, 1\n"
+			:
+			: "r" (regval));
+		/* Clear fault in ADFSR. */
+		regval = 0;
+		asm("mcr p15, 0, %0, c5, c1, 0\n"
+			:
+			: "r" (regval));
+		return 0;
+	}
 
 	MRC(ADFSR,    p15, 0,  c5, c1, 0);
 	MRC(DFSR,     p15, 0,  c5, c0, 0);
