@@ -249,10 +249,16 @@ ret:
 static void tsif_clock(struct msm_tsif_device *tsif_device, int on)
 {
 	if (on) {
-		clk_enable(tsif_device->tsif_clk);
+		if (tsif_device->tsif_clk)
+			clk_enable(tsif_device->tsif_clk);
+		if (tsif_device->tsif_pclk)
+			clk_enable(tsif_device->tsif_pclk);
 		clk_enable(tsif_device->tsif_ref_clk);
 	} else {
-		clk_disable(tsif_device->tsif_clk);
+		if (tsif_device->tsif_clk)
+			clk_disable(tsif_device->tsif_clk);
+		if (tsif_device->tsif_pclk)
+			clk_disable(tsif_device->tsif_pclk);
 		clk_disable(tsif_device->tsif_ref_clk);
 	}
 }
