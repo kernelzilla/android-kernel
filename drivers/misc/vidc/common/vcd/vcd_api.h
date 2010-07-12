@@ -150,5 +150,6 @@ u32 vcd_set_device_power(s32 driver_handle,
 		enum vcd_power_state_type e_pwr_state);
 void vcd_read_and_clear_interrupt(void);
 void vcd_response_handler(void);
+u8 vcd_get_num_of_clients(void);
 
 #endif
