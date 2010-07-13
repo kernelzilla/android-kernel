@@ -42,11 +42,6 @@
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
 
-#define GSBI_CONTROL_ADDR              0x0
-#define GSBI_PROTOCOL_CODE_MASK        0x30
-#define GSBI_PROTOCOL_UART             0x40
-#define GSBI_PROTOCOL_IDLE             0x0
-
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
 enum msm_hsl_clk_states_e {
 	MSM_HSL_CLK_PORT_OFF,     /* uart port not in use */

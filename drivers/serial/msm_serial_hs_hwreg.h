@@ -21,6 +21,16 @@
 #ifndef MSM_SERIAL_HS_HWREG_H
 #define MSM_SERIAL_HS_HWREG_H
 
+#define GSBI_CONTROL_ADDR              0x0
+#define GSBI_PROTOCOL_CODE_MASK        0x30
+#define GSBI_PROTOCOL_UART             0x40
+#define GSBI_PROTOCOL_IDLE             0x0
+
+#define TCSR_ADM_1_A_CRCI_MUX_SEL      0x78
+#define TCSR_ADM_1_B_CRCI_MUX_SEL      0x7C
+#define ADM1_CRCI_GSBI6_RX_SEL         0x800
+#define ADM1_CRCI_GSBI6_TX_SEL         0x400
+
 #define UARTDM_MR1_ADDR 0x0
 #define UARTDM_MR2_ADDR 0x4
 

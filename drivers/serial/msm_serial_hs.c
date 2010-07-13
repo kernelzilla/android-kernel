@@ -139,12 +139,15 @@ struct msm_hs_port {
 	struct clk *clk;
 	struct msm_hs_tx tx;
 	struct msm_hs_rx rx;
-
+	/* gsbi uarts have to do additional writes to gsbi memory */
+	/* block and top control status block. The following pointers */
+	/* keep a handle to these blocks. */
+	unsigned char __iomem	*mapped_gsbi;
+	unsigned char __iomem	*mapped_tcsr;
 	int dma_tx_channel;
 	int dma_rx_channel;
 	int dma_tx_crci;
 	int dma_rx_crci;
-
 	struct hrtimer clk_off_timer;  /* to poll TXEMT before clock off */
 	ktime_t clk_off_delay;
 	enum msm_hs_clk_states_e clk_state;
@@ -218,7 +221,14 @@ static DEVICE_ATTR(clock, S_IWUSR | S_IRUGO, show_clock, set_clock);
 
 static inline unsigned int use_low_power_wakeup(struct msm_hs_port *msm_uport)
 {
-	return (msm_uport->wakeup.irq >= 0);
+	return (msm_uport->wakeup.irq > 0);
+}
+
+static inline int is_gsbi_uart(struct msm_hs_port *msm_uport)
+{
+	/* assume gsbi uart if gsbi and tcsr resource found in pdata */
+	return ((msm_uport->mapped_gsbi != NULL) &&
+		(msm_uport->mapped_tcsr != NULL));
 }
 
 static inline unsigned int msm_hs_read(struct uart_port *uport,
@@ -235,10 +245,77 @@ static inline void msm_hs_write(struct uart_port *uport, unsigned int offset,
 
 static void msm_hs_release_port(struct uart_port *port)
 {
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(port);
+	struct platform_device *pdev = to_platform_device(port->dev);
+	struct resource *gsbi_resource;
+	struct resource *tcsr_resource;
+	resource_size_t size;
+
+	if (is_gsbi_uart(msm_uport)) {
+		iowrite32(GSBI_PROTOCOL_IDLE, msm_uport->mapped_gsbi +
+			  GSBI_CONTROL_ADDR);
+		gsbi_resource = platform_get_resource_byname(pdev,
+							     IORESOURCE_MEM,
+							     "gsbi_resource");
+		size = gsbi_resource->end - gsbi_resource->start + 1;
+		release_mem_region(gsbi_resource->start, size);
+		iounmap(msm_uport->mapped_gsbi);
+		msm_uport->mapped_gsbi = NULL;
+		iowrite32(0x0, msm_uport->mapped_tcsr +
+			  TCSR_ADM_1_A_CRCI_MUX_SEL);
+		iowrite32(0x0, msm_uport->mapped_tcsr +
+			  TCSR_ADM_1_B_CRCI_MUX_SEL);
+		dmb();
+		tcsr_resource = platform_get_resource_byname(pdev,
+							     IORESOURCE_MEM,
+							     "tcsr_resource");
+		size = tcsr_resource->end - tcsr_resource->start + 1;
+		release_mem_region(tcsr_resource->start, size);
+		iounmap(msm_uport->mapped_tcsr);
+		msm_uport->mapped_tcsr = NULL;
+	}
 }
 
 static int msm_hs_request_port(struct uart_port *port)
 {
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(port);
+	struct platform_device *pdev = to_platform_device(port->dev);
+	struct resource *gsbi_resource;
+	struct resource *tcsr_resource;
+	resource_size_t size;
+
+	gsbi_resource = platform_get_resource_byname(pdev,
+						     IORESOURCE_MEM,
+						     "gsbi_resource");
+	tcsr_resource = platform_get_resource_byname(pdev,
+						     IORESOURCE_MEM,
+						     "tcsr_resource");
+	if (gsbi_resource) {
+		/* gsbi uarts need to set an additional mux */
+		/* in tcsr block to operate in dma mode. */
+		if (!tcsr_resource)
+			return -ENXIO;
+		size = gsbi_resource->end - gsbi_resource->start + 1;
+		if (unlikely(!request_mem_region(gsbi_resource->start, size,
+						 "msm_serial_hs")))
+			return -EBUSY;
+		msm_uport->mapped_gsbi = ioremap(gsbi_resource->start,
+						 size);
+		if (!msm_uport->mapped_gsbi) {
+			release_mem_region(gsbi_resource->start, size);
+			return -EBUSY;
+		}
+		size = tcsr_resource->end - tcsr_resource->start + 1;
+		if (unlikely(!request_mem_region(tcsr_resource->start, size,
+						 "msm_serial_hs")))
+			return -EBUSY;
+		msm_uport->mapped_tcsr = ioremap(tcsr_resource->start, size);
+		if (!msm_uport->mapped_tcsr) {
+			release_mem_region(tcsr_resource->start, size);
+			return -EBUSY;
+		}
+	}
+	/* no gsbi uart */
 	return 0;
 }
 
@@ -1014,11 +1091,23 @@ static void msm_hs_break_ctl(struct uart_port *uport, int ctl)
 static void msm_hs_config_port(struct uart_port *uport, int cfg_flags)
 {
 	unsigned long flags;
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
 	spin_lock_irqsave(&uport->lock, flags);
 	if (cfg_flags & UART_CONFIG_TYPE) {
 		uport->type = PORT_MSM;
 		msm_hs_request_port(uport);
+	}
+	if (is_gsbi_uart(msm_uport)) {
+		iowrite32(GSBI_PROTOCOL_UART, msm_uport->mapped_gsbi +
+			  GSBI_CONTROL_ADDR);
+		iowrite32(ADM1_CRCI_GSBI6_RX_SEL | ADM1_CRCI_GSBI6_TX_SEL,
+			  msm_uport->mapped_tcsr +
+			  TCSR_ADM_1_A_CRCI_MUX_SEL);
+		iowrite32(ADM1_CRCI_GSBI6_RX_SEL | ADM1_CRCI_GSBI6_TX_SEL,
+			  msm_uport->mapped_tcsr +
+			  TCSR_ADM_1_B_CRCI_MUX_SEL);
+		dmb();
 	}
 	spin_unlock_irqrestore(&uport->lock, flags);
 }
@@ -1544,9 +1633,19 @@ static int __init msm_hs_probe(struct platform_device *pdev)
 	uport->flags = UPF_BOOT_AUTOCONF;
 	uport->uartclk = 7372800;
 	msm_uport->imr_reg = 0x0;
-	msm_uport->clk = clk_get(&pdev->dev, "uartdm_clk");
+
+	if (pdata && pdata->clk_name)
+		msm_uport->clk = clk_get(&pdev->dev, pdata->clk_name);
+	else
+		msm_uport->clk = clk_get(&pdev->dev, "uartdm_clk");
 	if (IS_ERR(msm_uport->clk))
 		return PTR_ERR(msm_uport->clk);
+
+	ret = clk_set_rate(msm_uport->clk, uport->uartclk);
+	if (ret) {
+		printk(KERN_WARNING "Error setting clock rate on UART\n");
+		return ret;
+	}
 
 	ret = uartdm_init_port(uport);
 	if (unlikely(ret))
