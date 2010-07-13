@@ -19,6 +19,13 @@ obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
 obj-$(CONFIG_PCI)		+= pci-quirks.o
 
 obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
+
+ifeq ($(CONFIG_USB_EHCI_HCD),y)
+CFLAGS_REMOVE_ehci-hub.o = -Werror
+CFLAGS_REMOVE_ehci-q.o = -Werror
+CFLAGS_REMOVE_ehci-hcd.o = -Werror
+endif
+
 obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
 obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
 obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o

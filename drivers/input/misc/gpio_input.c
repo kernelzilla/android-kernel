@@ -1,4 +1,4 @@
-#warning compile out
+/* #warning compile out */
 #if 0
 /* drivers/input/misc/gpio_input.c
  *
