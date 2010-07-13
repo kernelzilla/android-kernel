@@ -194,6 +194,7 @@ static int audamrnb_enable(struct audio *audio)
 	if (audio->enabled)
 		return 0;
 
+	audio->dec_state = MSM_AUD_DECODER_STATE_NONE;
 	audio->out_tail = 0;
 	audio->out_needed = 0;
 
@@ -801,7 +802,6 @@ static long audamrnb_ioctl(struct file *file, unsigned int cmd,
 	switch (cmd) {
 	case AUDIO_START:
 		MM_DBG("AUDIO_START\n");
-		audio->dec_state = MSM_AUD_DECODER_STATE_NONE;
 		rc = audamrnb_enable(audio);
 		if (!rc) {
 			rc = wait_event_interruptible_timeout(audio->wait,
