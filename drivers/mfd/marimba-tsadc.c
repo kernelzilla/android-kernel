@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/mfd/marimba.h>
 #include <linux/mfd/marimba-tsadc.h>
+#include <linux/pm.h>
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 #include <linux/earlysuspend.h>
@@ -432,10 +433,10 @@ err:
 
 #ifdef CONFIG_PM
 static int
-marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
+marimba_tsadc_suspend(struct device *dev)
 {
 	int rc = 0;
-	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
+	struct marimba_tsadc *tsadc = dev_get_drvdata(dev);
 
 	rc = marimba_tsadc_shutdown(tsadc);
 	if (rc < 0) {
@@ -459,10 +460,10 @@ fail_tsadc_power:
 	return rc;
 }
 
-static int marimba_tsadc_resume(struct platform_device *pdev)
+static int marimba_tsadc_resume(struct device *dev)
 {
 	int rc = 0;
-	struct marimba_tsadc *tsadc = platform_get_drvdata(pdev);
+	struct marimba_tsadc *tsadc = dev_get_drvdata(dev);
 
 	if (tsadc->pdata->marimba_tsadc_power) {
 		rc = tsadc->pdata->marimba_tsadc_power(1);
@@ -499,17 +500,13 @@ fail_clk_enable:
 		rc = tsadc->pdata->marimba_tsadc_power(0);
 	return rc;
 }
-#else
-static int
-marimba_tsadc_suspend(struct platform_device *pdev, pm_message_t msg)
-{
-	return 0;
-}
 
-static int marimba_tsadc_resume(struct platform_device *pd)
-{
-	return 0;
-}
+static struct dev_pm_ops tsadc_pm_ops = {
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend = marimba_tsadc_suspend,
+	.resume = marimba_tsadc_resume,
+#endif
+};
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -517,18 +514,16 @@ static void marimba_tsadc_early_suspend(struct early_suspend *h)
 {
 	struct marimba_tsadc *tsadc = container_of(h, struct marimba_tsadc,
 						 early_suspend);
-	struct platform_device *pdev = to_platform_device(tsadc->dev);
 
-	marimba_tsadc_suspend(pdev, PMSG_SUSPEND);
+	marimba_tsadc_suspend(tsadc->dev);
 }
 
 static void marimba_tsadc_late_resume(struct early_suspend *h)
 {
 	struct marimba_tsadc *tsadc = container_of(h, struct marimba_tsadc,
 						 early_suspend);
-	struct platform_device *pdev = to_platform_device(tsadc->dev);
 
-	marimba_tsadc_resume(pdev);
+	marimba_tsadc_resume(tsadc->dev);
 }
 #endif
 
@@ -643,18 +638,16 @@ static int __devexit marimba_tsadc_remove(struct platform_device *pdev)
 	return rc;
 }
 
-
 static struct platform_driver tsadc_driver = {
 	.probe	= marimba_tsadc_probe,
 	.remove	= __devexit_p(marimba_tsadc_remove),
 	.driver	= {
 		.name = "marimba_tsadc",
 		.owner = THIS_MODULE,
-	},
-#ifndef CONFIG_HAS_EARLYSUSPEND
-	.resume = marimba_tsadc_resume,
-	.suspend = marimba_tsadc_suspend,
+#ifdef CONFIG_PM
+		.pm = &tsadc_pm_ops,
 #endif
+	},
 };
 
 static int __init marimba_tsadc_init(void)
