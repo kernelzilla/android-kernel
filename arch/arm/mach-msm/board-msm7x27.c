@@ -1606,7 +1606,7 @@ static struct mmc_platform_data msm7x2x_sdc1_data = {
 	.msmsdcc_fmin	= 144000,
 	.msmsdcc_fmid	= 24576000,
 	.msmsdcc_fmax	= 49152000,
-	.nonremovable	= 1,
+	.nonremovable	= 0,
 };
 #endif
 
@@ -1621,7 +1621,7 @@ static struct mmc_platform_data msm7x2x_sdc2_data = {
 	.msmsdcc_fmin	= 144000,
 	.msmsdcc_fmid	= 24576000,
 	.msmsdcc_fmax	= 49152000,
-	.nonremovable	= 0,
+	.nonremovable	= 1,
 };
 #endif
 
@@ -1662,16 +1662,12 @@ static void __init msm7x2x_init_mmc(void)
 
 	sdcc_gpio_init();
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-	if (machine_is_msm7x27_ffa())
-		msm7x2x_sdc1_data.nonremovable = 0;
 	msm_add_sdcc(1, &msm7x2x_sdc1_data);
 #endif
 
 	if (machine_is_msm7x25_surf() || machine_is_msm7x27_surf() ||
 		machine_is_msm7x27_ffa()) {
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
-		if (machine_is_msm7x27_ffa())
-			msm7x2x_sdc2_data.nonremovable = 1;
 		msm_add_sdcc(2, &msm7x2x_sdc2_data);
 #endif
 	}
