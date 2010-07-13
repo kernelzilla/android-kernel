@@ -893,9 +893,8 @@ u32 vid_enc_set_get_entropy_cfg(struct video_client_ctx *client_ctx,
 	vcd_property_hdr.prop_id = VCD_I_ENTROPY_CTRL;
 	vcd_property_hdr.n_size =
 		sizeof(struct vcd_property_entropy_control_type);
-
 	if (set_flag) {
-		switch (entropy_cfg->cabacmodel) {
+		switch (entropy_cfg->longentropysel) {
 		case VEN_ENTROPY_MODEL_CAVLC:
 			control_type.e_entropy_sel = VCD_ENTROPY_SEL_CAVLC;
 			break;
