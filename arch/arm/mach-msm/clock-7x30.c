@@ -33,12 +33,6 @@
 #include "clock-7x30.h"
 #include "proc_comm.h"
 
-enum {
-	NOMINAL,
-	HIGH,
-	MSMC1_END
-};
-
 struct clk_freq_tbl {
 	uint32_t	freq_hz;
 	uint32_t	src;
@@ -833,14 +827,21 @@ static int update_msmc1(void)
 {
 	int err, target, mvolts;
 
-	target = mvolts = msmc1_votes[HIGH] ? 1200 : 1100;
+	if (msmc1_votes[HIGH])
+		target = 1200;
+	else if (msmc1_votes[NOMINAL])
+		target = 1100;
+	else
+		target = 1000;
 
 	if (target == msmc1_level)
 		return 0;
 
+	mvolts = target;
 	err = msm_proc_comm(PCOM_CLKCTL_RPC_MIN_MSMC1, &mvolts, NULL);
 	if (err)
 		goto out;
+
 	if (mvolts) {
 		err = -EINVAL;
 		goto out;
@@ -850,7 +851,7 @@ out:
 	return err;
 }
 
-static void unvote_msmc1(unsigned level)
+void unvote_msmc1(unsigned level)
 {
 	if (level >= ARRAY_SIZE(msmc1_votes))
 		return;
@@ -865,7 +866,7 @@ static void unvote_msmc1(unsigned level)
 	update_msmc1();
 }
 
-static int vote_msmc1(unsigned level)
+int vote_msmc1(unsigned level)
 {
 	int ret;
 
