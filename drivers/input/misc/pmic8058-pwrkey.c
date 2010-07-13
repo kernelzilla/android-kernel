@@ -27,6 +27,7 @@
 #include <linux/log2.h>
 #include <linux/spinlock.h>
 #include <linux/hrtimer.h>
+#include <linux/pm.h>
 
 #define PON_CNTL_1	0x1C
 #define PON_CNTL_PULL_UP BIT(7)
@@ -115,35 +116,30 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 }
 
 #ifdef CONFIG_PM
-static int pmic8058_pwrkey_suspend(struct platform_device *pdev,
-					 pm_message_t msg)
+static int pmic8058_pwrkey_suspend(struct device *dev)
 {
-	struct pmic8058_pwrkey *pwrkey = platform_get_drvdata(pdev);
+	struct pmic8058_pwrkey *pwrkey = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(&pdev->dev))
+	if (device_may_wakeup(dev))
 		enable_irq_wake(pwrkey->key_press_irq);
 
 	return 0;
 }
-static int pmic8058_pwrkey_resume(struct platform_device *pdev)
-{
-	struct pmic8058_pwrkey *pwrkey = platform_get_drvdata(pdev);
 
-	if (device_may_wakeup(&pdev->dev))
+static int pmic8058_pwrkey_resume(struct device *dev)
+{
+	struct pmic8058_pwrkey *pwrkey = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
 		disable_irq_wake(pwrkey->key_press_irq);
 
 	return 0;
 }
-#else
-static int pmic8058_pwrkey_suspend(struct platform_device *pdev,
-					 pm_message_t msg)
-{
-	return 0;
-}
-static int pmic8058_pwrkey_resume(struct platform_device *pdev)
-{
-	return 0;
-}
+
+static struct dev_pm_ops pm8058_pwr_key_pm_ops = {
+	.suspend	= pmic8058_pwrkey_suspend,
+	.resume		= pmic8058_pwrkey_resume,
+};
 #endif
 
 static int __devinit pmic8058_pwrkey_probe(struct platform_device *pdev)
@@ -289,11 +285,12 @@ static int __devexit pmic8058_pwrkey_remove(struct platform_device *pdev)
 static struct platform_driver pmic8058_pwrkey_driver = {
 	.probe		= pmic8058_pwrkey_probe,
 	.remove		= __devexit_p(pmic8058_pwrkey_remove),
-	.suspend	= pmic8058_pwrkey_suspend,
-	.resume		= pmic8058_pwrkey_resume,
 	.driver		= {
 		.name	= "pm8058-pwrkey",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm	= &pm8058_pwr_key_pm_ops,
+#endif
 	},
 };
 
