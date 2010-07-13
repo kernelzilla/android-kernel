@@ -31,10 +31,10 @@ struct flip_switch {
 
 static irqreturn_t flip_switch_irq(int irq, void *data)
 {
-	int state;
 	struct flip_switch *flip = data;
+	int state;
 
-	state = (gpio_get_value(flip->fs_pdata->flip_gpio) ? 1 : 0) ^
+	state = (gpio_get_value_cansleep(flip->fs_pdata->flip_gpio) ? 1 : 0) ^
 						flip->fs_pdata->active_low;
 
 	/* Flip switch gpio with value active_low means left portion of
@@ -58,6 +58,7 @@ static irqreturn_t flip_switch_irq(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+
 static int __devinit kp_flip_switch_probe(struct platform_device *pdev)
 {
 	struct flip_switch_pdata *pdata = pdev->dev.platform_data;
@@ -118,8 +119,9 @@ static int __devinit kp_flip_switch_probe(struct platform_device *pdev)
 		}
 	}
 
-	rc = request_irq(gpio_to_irq(flip->fs_pdata->flip_gpio),
-		flip_switch_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+	rc = request_threaded_irq(gpio_to_irq(flip->fs_pdata->flip_gpio),
+		NULL, flip_switch_irq,
+		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 		"flip_switch", flip);
 	if (rc) {
 		dev_err(&pdev->dev, "failed to request flip irq\n");
