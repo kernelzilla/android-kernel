@@ -5370,44 +5370,25 @@ static void __init msm7x30_allocate_memory_regions(void)
 {
 	void *addr;
 	unsigned long size;
+/*
+   Request allocation of Hardware accessible PMEM regions
+   at the beginning to make sure they are allocated in EBI-0.
+   This will allow 7x30 with two mem banks enter the second
+   mem bank into Self-Refresh State during Idle Power Collapse.
 
-	size = pmem_sf_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_pdata.start = __pa(addr);
-		android_pmem_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
+    The current HW accessible PMEM regions are
+    1. Frame Buffer.
+       LCDC HW can access msm_fb_resources during Idle-PC.
 
+    2. Audio
+       LPA HW can access android_pmem_audio_pdata during Idle-PC.
+*/
 	size = fb_size ? : MSM_FB_SIZE;
 	addr = alloc_bootmem(size);
 	msm_fb_resources[0].start = __pa(addr);
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
 		size, addr, __pa(addr));
-
-	size = gpu_phys_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		kgsl_resources[1].start = __pa(addr);
-		kgsl_resources[1].end = kgsl_resources[1].start + size - 1;
-		pr_info("allocating %lu bytes at %p (%lx physical) for "
-			"KGSL\n", size, addr, __pa(addr));
-	}
-
-	if machine_is_msm7x30_fluid()
-		size = fluid_pmem_adsp_size;
-	else
-		size = pmem_adsp_size;
-
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_adsp_pdata.start = __pa(addr);
-		android_pmem_adsp_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
 
 	size = pmem_audio_size;
 	if (size) {
@@ -5416,6 +5397,15 @@ static void __init msm7x30_allocate_memory_regions(void)
 		android_pmem_audio_pdata.size = size;
 		pr_info("allocating %lu bytes at %p (%lx physical) for audio "
 			"pmem arena\n", size, addr, __pa(addr));
+	}
+
+	size = gpu_phys_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		kgsl_resources[1].start = __pa(addr);
+		kgsl_resources[1].end = kgsl_resources[1].start + size - 1;
+		pr_info("allocating %lu bytes at %p (%lx physical) for "
+			"KGSL\n", size, addr, __pa(addr));
 	}
 
 	size = pmem_kernel_ebi1_size;
@@ -5427,6 +5417,26 @@ static void __init msm7x30_allocate_memory_regions(void)
 			" ebi1 pmem arena\n", size, addr, __pa(addr));
 	}
 
+	size = pmem_sf_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_pdata.start = __pa(addr);
+		android_pmem_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
+
+	if machine_is_msm7x30_fluid()
+		size = fluid_pmem_adsp_size;
+	else
+		size = pmem_adsp_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_adsp_pdata.start = __pa(addr);
+		android_pmem_adsp_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
 }
 
 static void __init msm7x30_map_io(void)
