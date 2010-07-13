@@ -28,6 +28,7 @@
 #include "clock-8x60.h"
 #include "clock-rpm.h"
 #include "devices-msm8x60.h"
+#include <linux/dma-mapping.h>
 
 /* Address of GSBI blocks */
 #define MSM_GSBI1_PHYS	0x16000000
@@ -58,32 +59,77 @@
 #define MSM_GSBI12_QUP_PHYS	0x19C80000
 
 /* GSBI UART devices */
-#define MSM_UART1DM_PHYS    0x16040000
-#define MSM_UART2DM_PHYS    0x16140000
-#define MSM_UART3DM_PHYS    0x16240000
-#define MSM_UART4DM_PHYS    0x16340000
-#define MSM_UART5DM_PHYS    0x16440000
-#define MSM_UART6DM_PHYS    0x16540000
-#define MSM_UART7DM_PHYS    0x16640000
-#define MSM_UART8DM_PHYS    0x19840000
-#define MSM_UART9DM_PHYS    0x19940000
-#define MSM_UART10DM_PHYS   0x19A40000
-#define MSM_UART11DM_PHYS   0x19B40000
-#define MSM_UART12DM_PHYS   0x19C40000
+#define MSM_UART1DM_PHYS    (MSM_GSBI6_PHYS + 0x40000)
+#define INT_UART1DM_IRQ     GSBI6_UARTDM_IRQ
+#define INT_UART2DM_IRQ     GSBI12_UARTDM_IRQ
+#define MSM_UART2DM_PHYS    0x19C40000
+#define TCSR_BASE_PHYS      0x16b00000
+
+static struct resource msm_uart1_dm_resources[] = {
+	{
+		.start = MSM_UART1DM_PHYS,
+		.end   = MSM_UART1DM_PHYS + PAGE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = INT_UART1DM_IRQ,
+		.end   = INT_UART1DM_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		/* GSBI6 is UARTDM1 */
+		.start = MSM_GSBI6_PHYS,
+		.end   = MSM_GSBI6_PHYS + 4 - 1,
+		.name  = "gsbi_resource",
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = TCSR_BASE_PHYS,
+		.end   = TCSR_BASE_PHYS + 0x80 - 1,
+		.name  = "tcsr_resource",
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = DMOV_HSUART1_TX_CHAN,
+		.end   = DMOV_HSUART1_RX_CHAN,
+		.name  = "uartdm_channels",
+		.flags = IORESOURCE_DMA,
+	},
+	{
+		.start = DMOV_HSUART1_TX_CRCI,
+		.end   = DMOV_HSUART1_RX_CRCI,
+		.name  = "uartdm_crci",
+		.flags = IORESOURCE_DMA,
+	},
+};
+
+static u64 msm_uart_dm1_dma_mask = DMA_BIT_MASK(32);
+
+struct platform_device msm_device_uart_dm1 = {
+	.name = "msm_serial_hs",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(msm_uart1_dm_resources),
+	.resource = msm_uart1_dm_resources,
+	.dev            = {
+		.dma_mask = &msm_uart_dm1_dma_mask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	},
+};
 
 static struct resource msm_uart12_dm_resources[] = {
 	{
-		.start = MSM_UART12DM_PHYS,
-		.end   = MSM_UART12DM_PHYS + PAGE_SIZE - 1,
+		.start = MSM_UART2DM_PHYS,
+		.end   = MSM_UART2DM_PHYS + PAGE_SIZE - 1,
 		.name  = "uartdm_resource",
 		.flags = IORESOURCE_MEM,
 	},
 	{
-		.start = INT_UART12DM_IRQ,
-		.end   = INT_UART12DM_IRQ,
+		.start = INT_UART2DM_IRQ,
+		.end   = INT_UART2DM_IRQ,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
+		/* GSBI 12 is UARTDM2 */
 		.start = MSM_GSBI12_PHYS,
 		.end   = MSM_GSBI12_PHYS + PAGE_SIZE - 1,
 		.name  = "gsbi_resource",
@@ -769,7 +815,8 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("gsbi_uart_clk",	GSBI3_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI4_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI5_UART_CLK,		NULL, 0),
-	CLK_8X60("gsbi_uart_clk",	GSBI6_UART_CLK,		NULL, 0),
+	CLK_8X60("gsbi_uart_clk",	GSBI6_UART_CLK,
+		 &msm_device_uart_dm1.dev, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI7_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI8_UART_CLK,		NULL, 0),
 	CLK_8X60("gsbi_uart_clk",	GSBI9_UART_CLK,		NULL, 0),
