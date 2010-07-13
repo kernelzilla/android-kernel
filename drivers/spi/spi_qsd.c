@@ -148,7 +148,6 @@ enum msm_spi_state {
 };
 
 /* SPI_ERROR_FLAGS fields */
-#define SPI_ERR_TIME_OUT_ERR          0x00000040
 #define SPI_ERR_OUTPUT_OVER_RUN_ERR   0x00000020
 #define SPI_ERR_INPUT_UNDER_RUN_ERR   0x00000010
 #define SPI_ERR_OUTPUT_UNDER_RUN_ERR  0x00000008
@@ -161,8 +160,6 @@ enum msm_spi_state {
    mx_input/output_cnt register size */
 #define SPI_MAX_TRANSFERS             QSD_REG(0xFC0) QUP_REG(0xFC0)
 #define SPI_MAX_LEN                   (SPI_MAX_TRANSFERS * dd->bytes_per_word)
-#define SPI_MAX_TIMEOUT               0x00010000
-#define SPI_MIN_TRANS_TIME            50
 
 #define SPI_NUM_CHIPSELECTS           4
 #define SPI_SUPPORTED_MODES  (SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP)
@@ -761,7 +758,7 @@ static void msm_spi_setup_dm_transfer(struct msm_spi *dd)
 {
 	dmov_box *box;
 	int bytes_to_send, num_rows, bytes_sent;
-	u32 num_transfers, timeout;
+	u32 num_transfers;
 
 	atomic_set(&dd->rx_irq_called, 0);
 	bytes_sent = dd->cur_transfer->len - dd->tx_bytes_remaining;
@@ -770,9 +767,6 @@ static void msm_spi_setup_dm_transfer(struct msm_spi *dd)
 			  SPI_MAX_LEN : dd->tx_bytes_remaining;
 	num_transfers = DIV_ROUND_UP(bytes_to_send, dd->bytes_per_word);
 	dd->unaligned_len = bytes_to_send % dd->burst_size;
-	/* We multiply by 8bitsinbyte and multiply by 1.5 for safety */
-	timeout = bytes_to_send * 12 > SPI_MAX_TIMEOUT ?
-			0 : roundup(bytes_to_send * 12, SPI_MIN_TRANS_TIME);
 	num_rows = bytes_to_send / dd->burst_size;
 
 	dd->mode = SPI_DMOV_MODE;
@@ -834,8 +828,6 @@ static void msm_spi_setup_dm_transfer(struct msm_spi *dd)
 		writel(num_transfers, dd->base + SPI_MX_OUTPUT_COUNT);
 	if (dd->read_buf)
 		writel(num_transfers, dd->base + SPI_MX_INPUT_COUNT);
-	/* Write timeout */
-	writel(timeout, dd->base + SPI_TIME_OUT);
 }
 
 static void msm_spi_enqueue_dm_commands(struct msm_spi *dd)
@@ -881,7 +873,6 @@ static inline void msm_spi_ack_transfer(struct msm_spi *dd)
 {
 	writel(SPI_OP_MAX_INPUT_DONE_FLAG | SPI_OP_MAX_OUTPUT_DONE_FLAG,
 	       dd->base + SPI_OPERATIONAL);
-	writel(0, dd->base + SPI_TIME_OUT);
 }
 
 static irqreturn_t msm_spi_input_irq(int irq, void *dev_id)
@@ -989,11 +980,6 @@ static irqreturn_t msm_spi_error_irq(int irq, void *dev_id)
 	u32                      spi_err;
 
 	spi_err = readl(dd->base + SPI_ERROR_FLAGS);
-	if (spi_err & SPI_ERR_TIME_OUT_ERR) {
-		dev_warn(master->dev.parent, "SPI timeout error\n");
-		msm_dmov_flush(dd->tx_dma_chan);
-		msm_dmov_flush(dd->rx_dma_chan);
-	}
 	if (spi_err & SPI_ERR_OUTPUT_OVER_RUN_ERR)
 		dev_warn(master->dev.parent, "SPI output overrun error\n");
 	if (spi_err & SPI_ERR_INPUT_UNDER_RUN_ERR)
@@ -1182,7 +1168,6 @@ static void msm_spi_process_transfer(struct msm_spi *dd)
 						 "timeout\n", __func__);
 				dd->cur_msg->status = -EIO;
 				if (dd->mode == SPI_DMOV_MODE) {
-					writel(0, dd->base + SPI_TIME_OUT);
 					msm_dmov_flush(dd->tx_dma_chan);
 					msm_dmov_flush(dd->rx_dma_chan);
 				}
@@ -1582,7 +1567,6 @@ static void spi_dmov_tx_complete_func(struct msm_dmov_cmd *cmd,
 				err->flush[0], err->flush[1], err->flush[2],
 				err->flush[3], err->flush[4], err->flush[5]);
 		dd->cur_msg->status = -EIO;
-		writel(0, dd->base + SPI_TIME_OUT);
 		complete(&dd->transfer_complete);
 	}
 }
@@ -1627,7 +1611,6 @@ static void spi_dmov_rx_complete_func(struct msm_dmov_cmd *cmd,
 				err->flush[0], err->flush[1], err->flush[2],
 				err->flush[3], err->flush[4], err->flush[5]);
 		dd->cur_msg->status = -EIO;
-		writel(0, dd->base + SPI_TIME_OUT);
 		complete(&dd->transfer_complete);
 	}
 }
