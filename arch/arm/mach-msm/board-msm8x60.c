@@ -876,11 +876,72 @@ static void __init msm8x60_allocate_memory_regions(void)
 #endif
 }
 
+static struct regulator *vreg_tmg200;
+
 #define TS_PEN_IRQ_GPIO 61
 static int tmg200_power(int vreg_on)
 {
-	/* REVISIT: Add regulator enable/disable code for smps3 */
+	int rc = -EINVAL;
+
+	if (!vreg_tmg200) {
+		printk(KERN_ERR "%s: regulator 8058_s3 not found (%d)\n",
+			__func__, rc);
+		return rc;
+	}
+
+	rc = vreg_on ? regulator_enable(vreg_tmg200) :
+		  regulator_disable(vreg_tmg200);
+	if (rc < 0)
+		printk(KERN_ERR "%s: vreg 8058_s3 %s failed (%d)\n",
+				__func__, vreg_on ? "enable" : "disable", rc);
+	return rc;
+}
+
+static int tmg200_dev_setup(bool enable)
+{
+	int rc;
+
+	if (enable) {
+		vreg_tmg200 = regulator_get(NULL, "8058_s3");
+		if (IS_ERR(vreg_tmg200)) {
+			pr_err("%s: regulator get of 8058_s3 failed (%ld)\n",
+				__func__, PTR_ERR(vreg_tmg200));
+			rc = PTR_ERR(vreg_tmg200);
+			return rc;
+		}
+
+		rc = regulator_set_voltage(vreg_tmg200, 1800000, 1800000);
+		if (rc) {
+			pr_err("%s: regulator_set_voltage() = %d\n",
+				__func__, rc);
+			goto reg_put;
+		}
+
+		/* configure touchscreen interrupt gpio */
+		rc = gpio_tlmm_config(GPIO_CFG(TS_PEN_IRQ_GPIO, 0, GPIO_INPUT,
+					GPIO_NO_PULL, GPIO_2MA), 0);
+		if (rc) {
+			pr_err("%s: unable to configure gpio %d\n",
+				__func__, TS_PEN_IRQ_GPIO);
+			goto reg_put;
+		}
+
+		rc = gpio_request(TS_PEN_IRQ_GPIO, "cy8ctmg200_irq_gpio");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d\n",
+				__func__, TS_PEN_IRQ_GPIO);
+			goto reg_put;
+		}
+	} else {
+		/* put voltage sources */
+		regulator_put(vreg_tmg200);
+		/* free gpio */
+		gpio_free(TS_PEN_IRQ_GPIO);
+	}
 	return 0;
+reg_put:
+	regulator_put(vreg_tmg200);
+	return rc;
 }
 
 static struct cy8c_ts_platform_data cy8ctmg200_pdata = {
@@ -897,6 +958,7 @@ static struct cy8c_ts_platform_data cy8ctmg200_pdata = {
 	.min_width = 0,
 	.max_width = 255,
 	.power_on = tmg200_power,
+	.dev_setup = tmg200_dev_setup,
 	.nfingers = 2,
 };
 
@@ -907,20 +969,6 @@ static struct i2c_board_info cy8ctmg200_board_info[] = {
 		.irq = MSM_GPIO_TO_INT(TS_PEN_IRQ_GPIO),
 	}
 };
-
-static void __init cy8ctmg200_init(void)
-{
-	int rc;
-
-	/* REVISIT: Add regulator get/set code for smps3 */
-
-	/* configure touchscreen interrupt gpio */
-	rc = gpio_tlmm_config(GPIO_CFG(TS_PEN_IRQ_GPIO, 0, GPIO_INPUT,
-				GPIO_NO_PULL, GPIO_2MA), 0);
-	if (rc)
-		pr_err("%s: unable to configure gpio %d\n",
-			__func__, TS_PEN_IRQ_GPIO);
-}
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 
@@ -2845,7 +2893,6 @@ static void __init msm8x60_init(void)
 	msm_cpuidle_set_states(msm_cstates, ARRAY_SIZE(msm_cstates),
 				msm_pm_data);
 
-	cy8ctmg200_init();
 }
 
 MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
