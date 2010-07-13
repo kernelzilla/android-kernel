@@ -290,7 +290,6 @@ static int tsif_start_hw(struct msm_tsif_device *tsif_device)
 		ctl |= (1 << 5);
 		break;
 	case 3: /* manual - control from debugfs */
-		/* ctl |= (2 << 5); */
 		return 0;
 		break;
 	default:
@@ -394,7 +393,7 @@ static void tsif_dma_schedule(struct msm_tsif_device *tsif_device)
 				 "Overflow detected\n");
 		}
 		xfer->wi = tsif_device->dmwi;
-#ifdef TSIF_DEBUG
+#ifdef CONFIG_TSIF_DEBUG
 		dev_info(&tsif_device->pdev->dev,
 			"schedule xfer[%d] -> [%2d]{%2d}\n",
 			i, dmwi0, xfer->wi);
@@ -455,7 +454,7 @@ static void tsif_dmov_complete_func(struct msm_dmov_cmd *cmd,
 		if (w == xfer->wi)
 			tsif_device->stat_soft_drop++;
 		reschedule = (tsif_device->state == tsif_state_running);
-#ifdef TSIF_DEBUG
+#ifdef CONFIG_TSIF_DEBUG
 		/* IFI calculation */
 		/*
 		 * update stat_ifi (inter frame interval)
@@ -688,8 +687,10 @@ static irqreturn_t tsif_irq(int irq, void *dev_id)
 		dev_info(&tsif_device->pdev->dev, "TSIF IRQ: OVERFLOW\n");
 		tsif_device->stat_overflow++;
 	}
-	if (sts_ctl & TSIF_STS_CTL_LOST_SYNC)
+	if (sts_ctl & TSIF_STS_CTL_LOST_SYNC) {
+		dev_info(&tsif_device->pdev->dev, "TSIF IRQ: LOST SYNC\n");
 		tsif_device->stat_lost_sync++;
+	}
 	if (sts_ctl & TSIF_STS_CTL_TIMEOUT) {
 		dev_info(&tsif_device->pdev->dev, "TSIF IRQ: TIMEOUT\n");
 		tsif_device->stat_timeout++;
