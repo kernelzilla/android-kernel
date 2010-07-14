@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/switch.h>
+#include <linux/pm.h>
 
 #include <linux/mfd/pmic8058.h>
 #include <linux/pmic8058-othc.h>
@@ -107,11 +108,11 @@ int pm8058_micbias_enable(enum othc_micbias micbias,
 EXPORT_SYMBOL(pm8058_micbias_enable);
 
 #ifdef CONFIG_PM
-static int pm8058_othc_suspend(struct platform_device *pd, pm_message_t msg)
+static int pm8058_othc_suspend(struct device *dev)
 {
-	struct pm8058_othc *dd = platform_get_drvdata(pd);
+	struct pm8058_othc *dd = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(&pd->dev)) {
+	if (device_may_wakeup(dev)) {
 		enable_irq_wake(dd->othc_irq_sw);
 		enable_irq_wake(dd->othc_irq_ir);
 	}
@@ -119,27 +120,22 @@ static int pm8058_othc_suspend(struct platform_device *pd, pm_message_t msg)
 	return 0;
 }
 
-static int pm8058_othc_resume(struct platform_device *pd)
+static int pm8058_othc_resume(struct device *dev)
 {
-	struct pm8058_othc *dd = platform_get_drvdata(pd);
+	struct pm8058_othc *dd = dev_get_drvdata(pd);
 
-	if (device_may_wakeup(&pd->dev)) {
+	if (device_may_wakeup(dev)) {
 		disable_irq_wake(dd->othc_irq_sw);
 		disable_irq_wake(dd->othc_irq_ir);
 	}
 
 	return 0;
 }
-#else
-static int pm8058_othc_suspend(struct platform_device *pd, pm_message_t msg)
-{
-	return 0;
-}
 
-static int pm8058_othc_resume(struct platform_device *pd)
-{
-	return 0;
-}
+static struct dev_pm_ops pm8058_othc_pm_ops = {
+	.suspend = pm8058_othc_suspend,
+	.resume = pm8058_othc_resume,
+};
 #endif
 
 static int __devexit pm8058_othc_remove(struct platform_device *pd)
@@ -607,11 +603,12 @@ static struct platform_driver pm8058_othc_driver = {
 	.driver = {
 		.name = "pm8058-othc",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &pm8058_othc_pm_ops;
+#endif
 	},
 	.probe = pm8058_othc_probe,
 	.remove = __devexit_p(pm8058_othc_remove),
-	.suspend = pm8058_othc_suspend,
-	.resume = pm8058_othc_resume,
 };
 
 static int __init pm8058_othc_init(void)
