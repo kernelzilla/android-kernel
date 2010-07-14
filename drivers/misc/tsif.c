@@ -147,6 +147,7 @@ struct msm_tsif_device {
 	struct wake_lock wake_lock;
 	/* clocks */
 	struct clk *tsif_clk;
+	struct clk *tsif_pclk;
 	struct clk *tsif_ref_clk;
 	/* debugfs */
 	struct dentry *dent_tsif;
@@ -192,6 +193,11 @@ static void tsif_put_clocks(struct msm_tsif_device *tsif_device)
 		clk_put(tsif_device->tsif_clk);
 		tsif_device->tsif_clk = NULL;
 	}
+	if (tsif_device->tsif_pclk) {
+		clk_put(tsif_device->tsif_pclk);
+		tsif_device->tsif_pclk = NULL;
+	}
+
 	if (tsif_device->tsif_ref_clk) {
 		clk_put(tsif_device->tsif_ref_clk);
 		tsif_device->tsif_ref_clk = NULL;
@@ -200,21 +206,39 @@ static void tsif_put_clocks(struct msm_tsif_device *tsif_device)
 
 static int tsif_get_clocks(struct msm_tsif_device *tsif_device)
 {
+	struct msm_tsif_platform_data *pdata =
+		tsif_device->pdev->dev.platform_data;
 	int rc = 0;
-	tsif_device->tsif_clk = clk_get(NULL, "tsif_clk");
-	if (IS_ERR(tsif_device->tsif_clk)) {
-		dev_err(&tsif_device->pdev->dev, "failed to get tsif_clk\n");
-		rc = PTR_ERR(tsif_device->tsif_clk);
-		tsif_device->tsif_clk = NULL;
-		goto ret;
+
+	if (pdata->tsif_clk) {
+		tsif_device->tsif_clk = clk_get(NULL, pdata->tsif_clk);
+		if (IS_ERR(tsif_device->tsif_clk)) {
+			dev_err(&tsif_device->pdev->dev, "failed to get %s\n",
+				pdata->tsif_clk);
+			rc = PTR_ERR(tsif_device->tsif_clk);
+			tsif_device->tsif_clk = NULL;
+			goto ret;
+		}
 	}
-	tsif_device->tsif_ref_clk = clk_get(NULL, "tsif_ref_clk");
-	if (IS_ERR(tsif_device->tsif_ref_clk)) {
-		dev_err(&tsif_device->pdev->dev,
-			"failed to get tsif_ref_clk\n");
-		rc = PTR_ERR(tsif_device->tsif_ref_clk);
-		tsif_device->tsif_ref_clk = NULL;
-		goto ret;
+	if (pdata->tsif_pclk) {
+		tsif_device->tsif_pclk = clk_get(NULL, pdata->tsif_pclk);
+		if (IS_ERR(tsif_device->tsif_pclk)) {
+			dev_err(&tsif_device->pdev->dev, "failed to get %s\n",
+				pdata->tsif_pclk);
+			rc = PTR_ERR(tsif_device->tsif_pclk);
+			tsif_device->tsif_pclk = NULL;
+			goto ret;
+		}
+	}
+	if (pdata->tsif_ref_clk) {
+		tsif_device->tsif_ref_clk = clk_get(NULL, pdata->tsif_ref_clk);
+		if (IS_ERR(tsif_device->tsif_ref_clk)) {
+			dev_err(&tsif_device->pdev->dev, "failed to get %s\n",
+				pdata->tsif_ref_clk);
+			rc = PTR_ERR(tsif_device->tsif_ref_clk);
+			tsif_device->tsif_ref_clk = NULL;
+			goto ret;
+		}
 	}
 	return 0;
 ret:
