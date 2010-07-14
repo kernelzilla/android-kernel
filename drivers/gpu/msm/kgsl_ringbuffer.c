@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,8 +20,10 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 
+#include "kgsl_drawctxt.h"
 #include "kgsl.h"
 #include "kgsl_device.h"
+#include "kgsl_yamato.h"
 #include "kgsl_log.h"
 #include "kgsl_pm4types.h"
 #include "kgsl_ringbuffer.h"
@@ -68,6 +70,8 @@ inline unsigned int kgsl_ringbuffer_sizelog2quadwords(unsigned int sizedwords)
 void kgsl_cp_intrcallback(struct kgsl_device *device)
 {
 	unsigned int status = 0, num_reads = 0, master_status = 0;
+	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
+								device;
 	struct kgsl_ringbuffer *rb = &device->ringbuffer;
 
 	KGSL_CMD_VDBG("enter (device=%p)\n", device);
@@ -91,7 +95,7 @@ void kgsl_cp_intrcallback(struct kgsl_device *device)
 			 * did not ack any interrupts this interrupt will
 			 * be generated again */
 			KGSL_DRV_WARN("Unable to read CP_INT_STATUS\n");
-			wake_up_interruptible_all(&device->ib1_wq);
+			wake_up_interruptible_all(&yamato_device->ib1_wq);
 		} else
 			KGSL_DRV_WARN("Spurious interrput detected\n");
 		return;
@@ -108,7 +112,7 @@ void kgsl_cp_intrcallback(struct kgsl_device *device)
 
 	if (status & (CP_INT_CNTL__IB1_INT_MASK | CP_INT_CNTL__RB_INT_MASK)) {
 		KGSL_CMD_WARN("ringbuffer ib1/rb interrupt\n");
-		wake_up_interruptible_all(&device->ib1_wq);
+		wake_up_interruptible_all(&yamato_device->ib1_wq);
 	}
 	if (status & CP_INT_CNTL__T0_PACKET_IN_IB_MASK) {
 		KGSL_CMD_FATAL("ringbuffer TO packet in IB interrupt\n");
@@ -157,7 +161,7 @@ void kgsl_ringbuffer_watchdog()
 	struct kgsl_device *device = NULL;
 	struct kgsl_ringbuffer *rb = NULL;
 
-	device = &kgsl_driver.yamato_device;
+	device = kgsl_get_yamato_generic_device();
 
 	BUG_ON(device == NULL);
 
@@ -297,7 +301,7 @@ static int kgsl_ringbuffer_load_pm4_ucode(struct kgsl_device *device)
 	size_t fw_word_size = 0;
 
 	status = request_firmware(&fw, YAMATO_PM4_FW,
-					kgsl_driver.misc.this_device);
+				kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
 	if (status != 0) {
 		KGSL_DRV_ERR("request_firmware failed for %s with error %d\n",
 				YAMATO_PM4_FW, status);
@@ -332,7 +336,7 @@ static int kgsl_ringbuffer_load_pfp_ucode(struct kgsl_device *device)
 	size_t fw_word_size = 0;
 
 	status = request_firmware(&fw, YAMATO_PFP_FW,
-				kgsl_driver.misc.this_device);
+				kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
 	if (status != 0) {
 		KGSL_DRV_ERR("request_firmware for %s failed with error %d\n",
 				YAMATO_PFP_FW, status);
@@ -712,6 +716,8 @@ kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
 				unsigned int flags)
 {
 	unsigned int link[3];
+	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
+							device;
 
 	KGSL_CMD_VDBG("enter (device_id=%d, drawctxt_index=%d, ibaddr=0x%08x,"
 			" sizedwords=%d, timestamp=%p)\n",
@@ -732,7 +738,8 @@ kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
 
 	kgsl_setstate(device, device->mmu.tlb_flags);
 
-	kgsl_drawctxt_switch(device, &device->drawctxt[drawctxt_index], flags);
+	kgsl_drawctxt_switch(yamato_device,
+			&yamato_device->drawctxt[drawctxt_index], flags);
 
 	*timestamp = kgsl_ringbuffer_addcmds(&device->ringbuffer,
 					0, &link[0], 3);

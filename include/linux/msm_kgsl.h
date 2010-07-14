@@ -46,9 +46,8 @@
 
 /* device id */
 enum kgsl_deviceid {
-	KGSL_DEVICE_ANY		= 0x00000000,
-	KGSL_DEVICE_YAMATO	= 0x00000001,
-	KGSL_DEVICE_G12		= 0x00000002,
+	KGSL_DEVICE_YAMATO	= 0x00000000,
+	KGSL_DEVICE_G12		= 0x00000001,
 	KGSL_DEVICE_MAX		= 0x00000002
 };
 
@@ -138,7 +137,6 @@ struct kgsl_platform_data {
    struct kgsl_memstore into userspace.
 */
 struct kgsl_device_getproperty {
-	unsigned int device_id;
 	unsigned int type;
 	void  *value;
 	unsigned int sizebytes;
@@ -153,7 +151,6 @@ struct kgsl_device_getproperty {
    GPU register space.
  */
 struct kgsl_device_regread {
-	unsigned int device_id;
 	unsigned int offsetwords;
 	unsigned int value; /* output param */
 };
@@ -166,7 +163,6 @@ struct kgsl_device_regread {
  * timeout is in milliseconds.
  */
 struct kgsl_device_waittimestamp {
-	unsigned int device_id;
 	unsigned int timestamp;
 	unsigned int timeout;
 };
@@ -185,7 +181,6 @@ struct kgsl_device_waittimestamp {
  * the GPU.
  */
 struct kgsl_ringbuffer_issueibcmds {
-	unsigned int device_id;
 	unsigned int drawctxt_id;
 	unsigned int ibaddr;
 	unsigned int sizedwords;
@@ -200,7 +195,6 @@ struct kgsl_ringbuffer_issueibcmds {
  * type should be a value from enum kgsl_timestamp_type
  */
 struct kgsl_cmdstream_readtimestamp {
-	unsigned int device_id;
 	unsigned int type;
 	unsigned int timestamp; /*output param */
 };
@@ -214,7 +208,6 @@ struct kgsl_cmdstream_readtimestamp {
  * type should be a value from enum kgsl_timestamp_type
  */
 struct kgsl_cmdstream_freememontimestamp {
-	unsigned int device_id;
 	unsigned int gpuaddr;
 	unsigned int type;
 	unsigned int timestamp;
@@ -227,7 +220,6 @@ struct kgsl_cmdstream_freememontimestamp {
  * The flags field may contain a mask KGSL_CONTEXT_*  values
  */
 struct kgsl_drawctxt_create {
-	unsigned int device_id;
 	unsigned int flags;
 	unsigned int drawctxt_id; /*output param */
 };
@@ -237,7 +229,6 @@ struct kgsl_drawctxt_create {
 
 /* destroy a draw context */
 struct kgsl_drawctxt_destroy {
-	unsigned int device_id;
 	unsigned int drawctxt_id;
 };
 
@@ -309,7 +300,6 @@ struct kgsl_sharedmem_from_vmalloc {
 	_IOW(KGSL_IOC_TYPE, 0x24, struct kgsl_sharedmem_free)
 
 struct kgsl_drawctxt_set_bin_base_offset {
-	unsigned int device_id;
 	unsigned int drawctxt_id;
 	unsigned int offset;
 };
@@ -328,7 +318,6 @@ enum kgsl_cmdwindow_type {
 
 /* write to the command window */
 struct kgsl_cmdwindow_write {
-	unsigned int device_id;
 	enum kgsl_cmdwindow_type target;
 	unsigned int addr;
 	unsigned int data;

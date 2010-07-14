@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -54,6 +54,7 @@
 #define KGSL_MAX_GMEM_SHADOW_BUFFERS	2
 
 struct kgsl_device;
+struct kgsl_yamato_device;
 
 /*  types */
 
@@ -112,10 +113,10 @@ int kgsl_drawctxt_init(struct kgsl_device *device);
 
 int kgsl_drawctxt_close(struct kgsl_device *device);
 
-void kgsl_drawctxt_switch(struct kgsl_device *device,
+void kgsl_drawctxt_switch(struct kgsl_yamato_device *yamato_device,
 				struct kgsl_drawctxt *drawctxt,
 				unsigned int flags);
-int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_device *device,
+int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_yamato_device *yamato_device,
 			unsigned int drawctxt_id,
 			const struct kgsl_gmem_desc *gmem_desc,
 			unsigned int shadow_x,

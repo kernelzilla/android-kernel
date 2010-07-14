@@ -22,6 +22,7 @@
 #include "kgsl_g12_drawctxt.h"
 #include "kgsl_sharedmem.h"
 #include "kgsl.h"
+#include "kgsl_g12.h"
 #include "kgsl_log.h"
 #include "kgsl_g12_cmdwindow.h"
 #include "kgsl_g12_vgv3types.h"
@@ -83,6 +84,8 @@ int
 kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 			unsigned int drawctxt_id)
 {
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
+
 	if (drawctxt_id >= KGSL_G12_CONTEXT_MAX)
 		return KGSL_FAILURE;
 
@@ -93,8 +96,8 @@ kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 	if (g_z1xx.numcontext == 0) {
 		kgsl_sharedmem_free(&g_z1xx.cmdbufdesc);
 		memset(&g_z1xx, 0, sizeof(struct kgsl_g12_z1xx));
-		device->timestamp = 0;
-		device->current_timestamp = 0;
+		g12_device->timestamp = 0;
+		g12_device->current_timestamp = 0;
 	}
 
 	return KGSL_SUCCESS;

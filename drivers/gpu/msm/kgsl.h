@@ -31,10 +31,10 @@
 
 #include <linux/types.h>
 #include <linux/msm_kgsl.h>
-#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/mutex.h>
+#include <linux/cdev.h>
 
 #include <asm/atomic.h>
 
@@ -42,6 +42,7 @@
 #include "kgsl_sharedmem.h"
 
 #define DRIVER_NAME "kgsl"
+#define CLASS_NAME "msm_kgsl"
 #define CHIP_REV_251 0x020501
 
 enum kgsl_clk_freq {
@@ -67,9 +68,12 @@ enum kgsl_clk_freq {
 #define DRM_KGSL_GEM_CACHE_OP_FROM_DEV	0x0002
 
 struct kgsl_driver {
-	struct miscdevice misc;
+	struct cdev cdev;
+	dev_t dev_num;
+	struct class *class;
+	struct device *base_dev[KGSL_DEVICE_MAX];
+	int num_devs;
 	struct platform_device *pdev;
-	atomic_t open_count;
 	struct mutex mutex;
 
 	int yamato_interrupt_num;
@@ -93,11 +97,9 @@ struct kgsl_driver {
 	uint32_t flags_debug;
 
 	struct kgsl_sharedmem shmem;
-	struct kgsl_device yamato_device;
-	struct kgsl_device g12_device;
 
-	struct list_head client_list;
-
+	/* Global list of device_private struct one per open file descriptor */
+	struct list_head dev_priv_list;
 	/* Global list of pagetables */
 	struct list_head pagetable_list;
 	/* Mutex for accessing the pagetable list */
@@ -125,40 +127,23 @@ enum kgsl_status {
 #define KGSL_TRUE 1
 #define KGSL_FALSE 0
 
-#ifdef CONFIG_MSM_KGSL_2D
-#define KGSL_G12_PRE_HWACCESS() \
-while (1) { \
-	if (kgsl_driver.g12_device.hwaccess_blocked == KGSL_FALSE) { \
-		break; \
-	} \
-	if (kgsl_driver.is_suspended != KGSL_TRUE) { \
-		kgsl_g12_wake(&kgsl_driver.g12_device); \
-		break; \
-	} \
-	mutex_unlock(&kgsl_driver.mutex); \
-	wait_for_completion(&kgsl_driver.g12_device.hwaccess_gate); \
-	mutex_lock(&kgsl_driver.mutex); \
-}
-#else
-#define KGSL_G12_PRE_HWACCESS() do { \
-	return -ENODEV; \
-	} while (0)
-#endif
-
-#define KGSL_G12_POST_HWACCESS() mutex_unlock(&kgsl_driver.mutex)
-
 #define KGSL_PRE_HWACCESS() \
 while (1) { \
 	mutex_lock(&kgsl_driver.mutex); \
-	if (kgsl_driver.yamato_device.hwaccess_blocked == KGSL_FALSE) { \
+	if (device == NULL) \
+		break; \
+	if (device->hwaccess_blocked == KGSL_FALSE) { \
 		break; \
 	} \
 	if (kgsl_driver.is_suspended != KGSL_TRUE) { \
-		kgsl_yamato_wake(&kgsl_driver.yamato_device); \
+		if (device->id == KGSL_DEVICE_YAMATO) \
+			kgsl_yamato_wake(device); \
+		else if (device->id == KGSL_DEVICE_G12) \
+			kgsl_g12_wake(device); \
 		break; \
 	} \
 	mutex_unlock(&kgsl_driver.mutex); \
-	wait_for_completion(&kgsl_driver.yamato_device.hwaccess_gate); \
+	wait_for_completion(&device->hwaccess_gate); \
 }
 
 #define KGSL_POST_HWACCESS() \
@@ -174,10 +159,7 @@ void kgsl_remove_mem_entry(struct kgsl_mem_entry *entry, bool preserve);
 
 int kgsl_pwrctrl(unsigned int pwrflag);
 int kgsl_yamato_sleep(struct kgsl_device *device, const int idle);
-int kgsl_g12_last_release_locked(void);
-int kgsl_g12_first_open_locked(void);
 int kgsl_g12_sleep(struct kgsl_device *device, const int idle);
-int kgsl_g12_wake(struct kgsl_device *device);
 int kgsl_idle(struct kgsl_device *device, unsigned int timeout);
 int kgsl_setstate(struct kgsl_device *device, uint32_t flags);
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,

@@ -26,21 +26,23 @@
 
 #include "kgsl.h"
 #include "kgsl_device.h"
+#include "kgsl_g12.h"
+#include "kgsl_g12_drawctxt.h"
 #include "kgsl_log.h"
 
 #include "g12_reg.h"
 
-int kgsl_g12_cmdstream_check_timestamp(struct kgsl_device *device,
+int kgsl_g12_cmdstream_check_timestamp(struct kgsl_g12_device *g12_device,
 					unsigned int timestamp)
 {
 	int ts_diff;
 
-	ts_diff = device->timestamp - timestamp;
+	ts_diff = g12_device->timestamp - timestamp;
 
 	return (ts_diff >= 0) || (ts_diff < -20000);
 }
 
-static int room_in_rb(struct kgsl_device *device)
+static int room_in_rb(struct kgsl_g12_device *device)
 {
 	int ts_diff;
 
@@ -88,6 +90,7 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	unsigned int nextcnt    = 0x9000 | 5;
 	struct kgsl_memdesc tmp = {0};
 	unsigned int cmd;
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 
 	cmd = ibaddr;
 
@@ -101,11 +104,11 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 		cnt = PACKETSIZE_STATESTREAM;
 		ofs = 0;
 	} else {
-		kgsl_setstate(device, device->mmu.tlb_flags);
+		kgsl_g12_setstate(device, device->mmu.tlb_flags);
 	}
 
-	result = wait_event_interruptible_timeout(device->wait_timestamp_wq,
-				  room_in_rb(device),
+	result = wait_event_interruptible_timeout(g12_device->wait_timestamp_wq,
+				  room_in_rb(g12_device),
 				  msecs_to_jiffies(KGSL_TIMEOUT_DEFAULT));
 	if (result < 0) {
 		KGSL_CMD_ERR("failed waiting for ringbuffer. result %d",
@@ -114,9 +117,9 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	}
 	result = 0;
 
-	index = device->current_timestamp % KGSL_G12_PACKET_COUNT;
-	device->current_timestamp++;
-	*timestamp = device->current_timestamp;
+	index = g12_device->current_timestamp % KGSL_G12_PACKET_COUNT;
+	g12_device->current_timestamp++;
+	*timestamp = g12_device->current_timestamp;
 
 	g_z1xx.prevctx = drawctxt_index;
 
@@ -138,5 +141,29 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 				KGSL_CMDWINDOW_2D, ADDR_VGV3_CONTROL, 0);
 error:
 	return result;
+}
+
+void kgsl_g12_cmdstream_memqueue_drain(struct kgsl_g12_device *g12_device)
+{
+	struct kgsl_mem_entry *entry, *entry_tmp;
+	uint32_t ts_processed;
+	struct kgsl_device *device = &g12_device->dev;
+	struct kgsl_ringbuffer *rb = &device->ringbuffer;
+
+	/* get current EOP timestamp */
+	ts_processed = g12_device->timestamp;
+
+	list_for_each_entry_safe(entry, entry_tmp, &rb->memqueue, free_list) {
+		/*NOTE: this assumes that the free list is sorted by
+		 * timestamp, but I'm not yet sure that it is a valid
+		 * assumption
+		 */
+		if (!timestamp_cmp(ts_processed, entry->free_timestamp))
+			break;
+		KGSL_MEM_DBG("ts_processed %d ts_free %d gpuaddr %x)\n",
+			     ts_processed, entry->free_timestamp,
+			     entry->memdesc.gpuaddr);
+		kgsl_remove_mem_entry(entry, true);
+	}
 }
 
