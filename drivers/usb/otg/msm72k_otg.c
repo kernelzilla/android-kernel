@@ -209,8 +209,11 @@ static int msm_otg_suspend(struct msm_otg *dev)
 
 	/* In case of fast plug-in and plug-out inside the otg_reset() the
 	 * servicing of BSV is missed (in the window of after phy and link
-	 * reset). Handle it if any missing bsv is detected */
-	if (is_b_sess_vld() && !is_host()) {
+	 * reset). Handle it if any missing bsv is detected.
+	 * Ignore BSV, as it may remain set while using debugfs to change modes
+	 */
+	if (is_b_sess_vld() && !is_host() &&
+				(dev->pdata->otg_mode == OTG_ID)) {
 		otgsc = readl(USB_OTGSC);
 		writel(otgsc, USB_OTGSC);
 		pr_info("%s:Process mising BSV\n", __func__);
@@ -678,6 +681,70 @@ static void otg_reset(struct msm_otg *dev)
 		enable_idgnd(dev);
 }
 
+#ifdef CONFIG_DEBUG_FS
+static int otg_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+static ssize_t otg_mode_write(struct file *file, const char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	struct msm_otg *dev = file->private_data;
+	struct otg_transceiver *otg = &dev->otg;
+	int ret = count;
+
+	if (otg->host) {
+		pr_err("%s: mode switch not supported with host mode\n",
+						__func__);
+		return -EINVAL;
+	}
+
+	if (!memcmp(buf, "none", count - 1)) {
+		msm_otg_start_peripheral(otg, 0);
+	} else if (!memcmp(buf, "peripheral", count - 1)) {
+		if (atomic_read(&dev->in_lpm))
+			msm_otg_set_suspend(otg, 0);
+		msm_otg_start_peripheral(otg, 1);
+	} else {
+		pr_info("%s: unknown mode specified\n", __func__);
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+const struct file_operations otgfs_fops = {
+	.open	= otg_open,
+	.write	= otg_mode_write,
+};
+
+struct dentry *otg_debug_root;
+struct dentry *otg_debug_mode;
+
+static int otg_debugfs_init(struct msm_otg *dev)
+{
+	otg_debug_root = debugfs_create_dir("otg", NULL);
+	if (!otg_debug_root)
+		return -ENOENT;
+
+	otg_debug_mode = debugfs_create_file("mode", 0222,
+						otg_debug_root, dev,
+						&otgfs_fops);
+	if (!otg_debug_mode) {
+		debugfs_remove(otg_debug_root);
+		otg_debug_root = NULL;
+		return -ENOENT;
+	}
+
+	return 0;
+}
+
+static void otg_debugfs_cleanup(void)
+{
+       debugfs_remove(otg_debug_mode);
+       debugfs_remove(otg_debug_root);
+}
+#endif
 static int __init msm_otg_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -830,8 +897,20 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto free_otg_irq;
 		}
 	}
-
+#ifdef CONFIG_DEBUG_FS
+	ret = otg_debugfs_init(dev);
+	if (ret) {
+		pr_info("%s: otg_debugfs_init failed\n", __func__);
+		goto free_vbus_irq;
+	}
+#endif
 	return 0;
+
+#ifdef CONFIG_DEBUG_FS
+free_vbus_irq:
+	if (vbus_on_irq)
+		free_irq(vbus_on_irq, 0);
+#endif
 free_otg_irq:
 	free_irq(dev->irq, dev);
 free_regs:
@@ -859,6 +938,9 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 {
 	struct msm_otg *dev = the_msm_otg;
 
+#ifdef CONFIG_DEBUG_FS
+	otg_debugfs_cleanup();
+#endif
 	if (dev->pmic_notif_supp)
 		dev->pdata->pmic_notif_deinit();
 
