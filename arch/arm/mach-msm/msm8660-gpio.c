@@ -16,8 +16,10 @@
  *
  */
 #include <linux/bitmap.h>
+#include <linux/bitops.h>
 #include <linux/gpio.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -218,10 +220,15 @@ static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 {
 	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
 
-	if (on)
+	if (on) {
+		if (bitmap_empty(msm_gpio.wake_irqs, NR_MSM_GPIOS))
+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 1);
 		set_bit(gpio, msm_gpio.wake_irqs);
-	else
+	} else {
 		clear_bit(gpio, msm_gpio.wake_irqs);
+		if (bitmap_empty(msm_gpio.wake_irqs, NR_MSM_GPIOS))
+			set_irq_wake(TLMM_SCSS_SUMMARY_IRQ, 0);
+	}
 
 	return 0;
 }
@@ -279,6 +286,37 @@ static int __devexit msm_gpio_remove(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int msm_gpio_suspend_noirq(struct device *dev)
+{
+	unsigned long irq_flags;
+	unsigned long i;
+
+	spin_lock_irqsave(&msm_gpio.lock, irq_flags);
+	for_each_bit(i, msm_gpio.enabled_irqs, NR_MSM_GPIOS) {
+		if (!test_bit(i, msm_gpio.wake_irqs))
+			writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(i));
+	}
+	spin_unlock_irqrestore(&msm_gpio.lock, irq_flags);
+	return 0;
+}
+
+static int msm_gpio_resume_noirq(struct device *dev)
+{
+	unsigned long irq_flags;
+	unsigned long i;
+
+	spin_lock_irqsave(&msm_gpio.lock, irq_flags);
+	for_each_bit(i, msm_gpio.enabled_irqs, NR_MSM_GPIOS)
+		writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(i));
+	spin_unlock_irqrestore(&msm_gpio.lock, irq_flags);
+	return 0;
+}
+#else
+#define msm_gpio_suspend_noirq NULL
+#define msm_gpio_resume_noirq NULL
+#endif
+
 #ifdef CONFIG_PM_RUNTIME
 static int msm_gpio_runtime_suspend(struct device *dev)
 {
@@ -304,6 +342,12 @@ static int msm_gpio_runtime_idle(struct device *dev)
 #endif
 
 static struct dev_pm_ops msm_gpio_dev_pm_ops = {
+	.suspend_noirq  = msm_gpio_suspend_noirq,
+	.resume_noirq   = msm_gpio_resume_noirq,
+	.freeze_noirq   = msm_gpio_suspend_noirq,
+	.thaw_noirq     = msm_gpio_resume_noirq,
+	.poweroff_noirq = msm_gpio_suspend_noirq,
+	.restore_noirq  = msm_gpio_resume_noirq,
 	.runtime_suspend = msm_gpio_runtime_suspend,
 	.runtime_resume = msm_gpio_runtime_resume,
 	.runtime_idle = msm_gpio_runtime_idle,
