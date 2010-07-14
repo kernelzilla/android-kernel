@@ -539,13 +539,15 @@ static int __devinit hs_rpc_init(void)
 
 	rc = hs_rpc_cb_init();
 	if (rc) {
-		pr_err("%s: failed to initialize rpc client\n", __func__);
-		return rc;
-	}
+		pr_err("%s: failed to initialize rpc client, try server...\n",
+						__func__);
 
-	rc = msm_rpc_create_server(&hs_rpc_server);
-	if (rc)
-		pr_err("%s: failed to create rpc server\n", __func__);
+		rc = msm_rpc_create_server(&hs_rpc_server);
+		if (rc) {
+			pr_err("%s: failed to create rpc server\n", __func__);
+			return rc;
+		}
+	}
 
 	return rc;
 }
