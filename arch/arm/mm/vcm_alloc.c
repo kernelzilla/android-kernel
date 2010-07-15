@@ -25,9 +25,9 @@
 
 int basicalloc_init;
 
-int chunk_sizes[NUM_CHUNK_SIZES] = {SZ_1M, SZ_64K, SZ_4K};
-#define LAST_SZ() (ARRAY_SIZE(chunk_sizes) - 1)
+int chunk_sizes[NUM_CHUNK_SIZES] = {SZ_16M, SZ_1M, SZ_64K, SZ_4K};
 
+#define LAST_SZ() (ARRAY_SIZE(chunk_sizes) - 1)
 #define vcm_alloc_err(a, ...)						\
 	pr_err("ERROR %s %i " a, __func__, __LINE__, ##__VA_ARGS__)
 
@@ -324,10 +324,14 @@ int vcm_alloc_init(struct physmem_region *mem, int n_regions,
 		for (i = 0; i < ARRAY_SIZE(chunk_sizes); ++i) {
 			pch = vcm_phys_pool[r].heads[i];
 
-			num_chunks = mem[r].size / mem[r].chunk_fraction[i] /
-				     chunk_sizes[i];
+			/* A fraction of 0 means don't use that chunk size */
+			if (mem[r].chunk_fraction[i] > 0)
+				num_chunks = mem[r].size /
+				      mem[r].chunk_fraction[i] / chunk_sizes[i];
+			else
+				num_chunks = 0;
 
-			printk(KERN_INFO "VCM Init: region %d, chunk size=%d,"
+			printk(KERN_INFO "VCM Init: region %d, chunk size=%d, "
 			       "num=%d, pa=%p\n", r, chunk_sizes[i], num_chunks,
 			       (void *)pa);
 

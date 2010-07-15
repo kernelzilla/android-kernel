@@ -220,19 +220,6 @@ int vcm_unreserve(struct res *res_id);
 size_t vcm_get_res_len(struct res *res_id);
 
 
-/* Data structure to inform VCM about the memory it manages */
-struct physmem_region {
-	size_t addr;
-	size_t size;
-	int chunk_fraction[NUM_CHUNK_SIZES];
-};
-
-/* Mapping between memtypes and physmem_regions based on chunk size */
-struct vcm_memtype_map {
-	int pool_id[NUM_CHUNK_SIZES];
-};
-
-
 /**
  * vcm_set_res_attr() - Set attributes of an existing reservation.
  * @res_id	An existing reservation of interest.
@@ -703,15 +690,6 @@ int vcm_hook(size_t dev_id, vcm_handler handler, void *data);
  * @dev_id	The device.
  */
 size_t vcm_hw_ver(size_t dev_id);
-
-
-
-/* bring-up init, destroy */
-int vcm_sys_init(struct physmem_region *mem, int n_regions,
-		 struct vcm_memtype_map *mt_map, int n_mt,
-		 void *cont_pa, unsigned int cont_sz);
-
-int vcm_sys_destroy(void);
 
 #endif /* _VCM_H_ */
 

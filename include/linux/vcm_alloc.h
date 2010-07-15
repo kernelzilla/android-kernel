@@ -34,10 +34,27 @@
 #include <linux/vcm.h>
 #include <linux/vcm_types.h>
 
+#define NUM_CHUNK_SIZES 4
+extern int chunk_sizes[NUM_CHUNK_SIZES];
+
 enum chunk_size_idx {
-	IDX_1M = 0,
+	IDX_16M = 0,
+	IDX_1M,
 	IDX_64K,
 	IDX_4K
+};
+
+
+/* Data structure to inform VCM about the memory it manages */
+struct physmem_region {
+	size_t addr;
+	size_t size;
+	int chunk_fraction[NUM_CHUNK_SIZES];
+};
+
+/* Mapping between memtypes and physmem_regions based on chunk size */
+struct vcm_memtype_map {
+	int pool_id[NUM_CHUNK_SIZES];
 };
 
 int vcm_alloc_idx_to_size(int idx);
@@ -58,5 +75,12 @@ int vcm_alloc_num_blocks(int num, enum memtype_t memtype,
 			 struct phys_chunk *alloc_head);
 int vcm_alloc_max_munch(int len, enum memtype_t memtype,
 			struct phys_chunk *alloc_head);
+
+/* bring-up init, destroy */
+int vcm_sys_init(struct physmem_region *mem, int n_regions,
+		 struct vcm_memtype_map *mt_map, int n_mt,
+		 void *cont_pa, unsigned int cont_sz);
+
+int vcm_sys_destroy(void);
 
 #endif /* VCM_ALLOC_H */

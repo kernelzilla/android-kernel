@@ -357,7 +357,4 @@ struct res {
 	int mapped;
 };
 
-#define NUM_CHUNK_SIZES 3
-extern int chunk_sizes[NUM_CHUNK_SIZES];
-
 #endif /* VCM_TYPES_H */
