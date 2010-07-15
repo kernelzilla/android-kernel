@@ -933,11 +933,13 @@ static int action_open(struct msm_tsif_device *tsif_device)
 	 * DMA should be scheduled prior to TSIF hardware initialization,
 	 * otherwise "bus error" will be reported by Data Mover
 	 */
-	tsif_dma_schedule(tsif_device);
 	tsif_clock(tsif_device, 1);
+	tsif_dma_schedule(tsif_device);
 	rc = tsif_start_hw(tsif_device);
 	if (rc) {
+		dev_err(&tsif_device->pdev->dev, "Unable to start HW\n");
 		tsif_dma_exit(tsif_device);
+		tsif_clock(tsif_device, 0);
 		return rc;
 	}
 	wake_lock(&tsif_device->wake_lock);
@@ -952,8 +954,8 @@ static int action_close(struct msm_tsif_device *tsif_device)
 	 * DMA should be flushed/stopped prior to TSIF hardware stop,
 	 * otherwise "bus error" will be reported by Data Mover
 	 */
-	tsif_dma_exit(tsif_device);
 	tsif_stop_hw(tsif_device);
+	tsif_dma_exit(tsif_device);
 	tsif_clock(tsif_device, 0);
 	wake_unlock(&tsif_device->wake_lock);
 	return 0;

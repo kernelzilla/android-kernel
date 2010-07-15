@@ -790,14 +790,14 @@ static struct platform_device msm_tvenc_device = {
 /* TSIF begin */
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 
-#define MSM_TSIF_PHYS        (0xa0100000)
+#define MSM_TSIF_PHYS        (0xa3400000)
 #define MSM_TSIF_SIZE        (0x200)
 
 static struct resource tsif_resources[] = {
 	[0] = {
 		.flags = IORESOURCE_IRQ,
-		.start = INT_TSIF_IRQ,
-		.end   = INT_TSIF_IRQ,
+		.start = INT_TSIF,
+		.end   = INT_TSIF,
 	},
 	[1] = {
 		.flags = IORESOURCE_MEM,
@@ -961,6 +961,8 @@ struct clk msm_clocks_7x30[] = {
 	CLK_7X30("sdc_pclk",	SDC4_P_CLK,	&msm_device_sdc4.dev, OFF),
 	CLK_7X30("spi_clk",	SPI_CLK,	NULL, 0),
 	CLK_7X30("spi_pclk",	SPI_P_CLK,	NULL, 0),
+	CLK_7X30("tsif_ref_clk", TSIF_REF_CLK,	NULL, 0),
+	CLK_7X30("tsif_pclk",	TSIF_P_CLK,	NULL, 0),
 	CLK_7X30("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
 	CLK_7X30("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
 	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
