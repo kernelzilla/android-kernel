@@ -2052,6 +2052,77 @@ static void vfe31_process_camif_sof_irq(void)
 		vfe31_ctrl->vfeFrameId);
 }
 
+static void vfe31_process_error_irq(uint32_t errStatus)
+{
+	if (errStatus & VFE31_IMASK_CAMIF_ERROR) {
+		CDBG("vfe31_irq: camif errors\n");
+		vfe31_send_msg_no_payload(MSG_ID_CAMIF_ERROR);
+	}
+
+	if (errStatus & VFE31_IMASK_STATS_CS_OVWR)
+		CDBG("vfe31_irq: stats cs overwrite\n");
+
+	if (errStatus & VFE31_IMASK_STATS_IHIST_OVWR)
+		CDBG("vfe31_irq: stats ihist overwrite\n");
+
+	if (errStatus & VFE31_IMASK_REALIGN_BUF_Y_OVFL)
+		CDBG("vfe31_irq: realign bug Y overflow\n");
+
+	if (errStatus & VFE31_IMASK_REALIGN_BUF_CB_OVFL)
+		CDBG("vfe31_irq: realign bug CB overflow\n");
+
+	if (errStatus & VFE31_IMASK_REALIGN_BUF_CR_OVFL)
+		CDBG("vfe31_irq: realign bug CR overflow\n");
+
+	if (errStatus & VFE31_IMASK_VIOLATION)
+		CDBG("vfe31_irq: violation interrupt\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_0_BUS_OVFL)
+		CDBG("vfe31_irq: image master 0 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_1_BUS_OVFL)
+		CDBG("vfe31_irq: image master 1 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_2_BUS_OVFL)
+		CDBG("vfe31_irq: image master 2 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_3_BUS_OVFL)
+		CDBG("vfe31_irq: image master 3 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_4_BUS_OVFL)
+		CDBG("vfe31_irq: image master 4 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_5_BUS_OVFL)
+		CDBG("vfe31_irq: image master 5 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_IMG_MAST_6_BUS_OVFL)
+		CDBG("vfe31_irq: image master 6 bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_AE_BUS_OVFL)
+		CDBG("vfe31_irq: ae stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_AF_BUS_OVFL)
+		CDBG("vfe31_irq: af stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_AWB_BUS_OVFL)
+		CDBG("vfe31_irq: awb stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_RS_BUS_OVFL)
+		CDBG("vfe31_irq: rs stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_CS_BUS_OVFL)
+		CDBG("vfe31_irq: cs stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_IHIST_BUS_OVFL)
+		CDBG("vfe31_irq: ihist stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_STATS_SKIN_BUS_OVFL)
+		CDBG("vfe31_irq: skin stats bus overflow\n");
+
+	if (errStatus & VFE31_IMASK_AXI_ERROR)
+		CDBG("vfe31_irq: axi error\n");
+}
+
 #define VFE31_AXI_OFFSET 0x0050
 #define vfe31_get_ch_ping_addr(chn) \
 	(msm_io_r(vfe31_ctrl->vfebase + 0x0050 + 0x18 * (chn)))
@@ -2451,6 +2522,13 @@ static void vfe31_do_tasklet(unsigned long data)
 				VFE_IMASK_WHILE_STOPPING_1) {
 			CDBG("irq	resetAckIrq\n");
 			vfe31_process_reset_irq();
+		}
+
+		if (qcmd->vfeInterruptStatus1 &
+				VFE31_IMASK_ERROR_ONLY_1) {
+			CDBG("irq	errorIrq\n");
+			vfe31_process_error_irq(qcmd->vfeInterruptStatus1 &
+				VFE31_IMASK_ERROR_ONLY_1);
 		}
 
 		spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);

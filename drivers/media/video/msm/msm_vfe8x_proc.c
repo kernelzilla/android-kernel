@@ -814,8 +814,10 @@ static void vfe_process_error_irq(struct vfe_interrupt_status *irqstatus)
 	if (irqstatus->busOverflowIrq)
 		vfe_proc_ops(VFE_MSG_ID_BUS_OVERFLOW, NULL);
 
-	if (irqstatus->camifErrorIrq)
+	if (irqstatus->camifErrorIrq) {
+		CDBG("vfe_irq: camif errors\n");
 		vfe_proc_ops(VFE_MSG_ID_CAMIF_ERROR, NULL);
+	}
 
 	if (irqstatus->camifOverflowIrq)
 		vfe_proc_ops(VFE_MSG_ID_CAMIF_OVERFLOW, NULL);
