@@ -383,6 +383,9 @@ module_param(dhd_pktgen_len, uint, 0);
 
 /* Version string to report */
 #ifdef DHD_DEBUG
+#ifndef SRCBASE
+#define SRCBASE        "drivers/net/wireless/bcm4329"
+#endif
 #define DHD_COMPILED "\nCompiled in " SRCBASE
 #else
 #define DHD_COMPILED
@@ -2080,7 +2083,7 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 	if (ifidx == 1) {
 		DHD_TRACE(("%s ACCESS POINT MAC: \n", __FUNCTION__));
 		/*  ACCESSPOINT INTERFACE CASE */
-		temp_addr[0] |= 0X02;  /* set bit 2 , - Locally Administered address  */
+		temp_addr[0] |= 0x02;  /* set bit 2 , - Locally Administered address  */
 	}
 	net->hard_header_len = ETH_HLEN + dhd->pub.hdrlen;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
