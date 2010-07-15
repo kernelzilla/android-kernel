@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/rtc.h>
 #include <linux/mfd/pmic8058.h>
+#include <linux/pm.h>
 
 #define PM8058_RTC_CTRL		0x1E8
 	#define PM8058_RTC_ENABLE	BIT(7)
@@ -316,10 +317,9 @@ fail_rtc_enable:
 }
 
 #ifdef CONFIG_PM
-static int
-pm8058_rtc_resume(struct platform_device *dev)
+static int pm8058_rtc_resume(struct device *dev)
 {
-	struct pm8058_rtc *rtc_dd = platform_get_drvdata(dev);
+	struct pm8058_rtc *rtc_dd = dev_get_drvdata(dev);
 
 	if (device_may_wakeup(dev))
 		disable_irq_wake(rtc_dd->rtc_alarm_irq);
@@ -327,28 +327,20 @@ pm8058_rtc_resume(struct platform_device *dev)
 	return 0;
 }
 
-static int
-pm8058_rtc_suspend(struct platform_device *dev, pm_message_t state)
+static int pm8058_rtc_suspend(struct device *dev)
 {
-	struct pm8058_rtc *rtc_dd = platform_get_drvdata(dev);
+	struct pm8058_rtc *rtc_dd = dev_get_drvdata(dev);
 
 	if (device_may_wakeup(dev))
 		enable_irq_wake(rtc_dd->rtc_alarm_irq);
 
 	return 0;
 }
-#else
-static int
-pm8058_rtc_resume(struct platform_device *dev)
-{
-	return 0;
-}
 
-static int
-pm8058_rtc_suspend(struct platform_device *dev, pm_message_t state)
-{
-	return 0;
-}
+static struct dev_pm_ops pm8058_rtc_pm_ops = {
+	.suspend = pm8058_rtc_suspend,
+	.resume = pm8058_rtc_resume,
+};
 #endif
 
 static int __devexit pm8058_rtc_remove(struct platform_device *pdev)
@@ -365,12 +357,13 @@ static int __devexit pm8058_rtc_remove(struct platform_device *pdev)
 
 static struct platform_driver pm8058_rtc_driver = {
 	.probe		= pm8058_rtc_probe,
-	.suspend	= pm8058_rtc_suspend,
-	.resume		= pm8058_rtc_resume,
 	.remove		= __devexit_p(pm8058_rtc_remove),
 	.driver	= {
 		.name	= "pm8058-rtc",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm	= &pm8058_rtc_pm_ops,
+#endif
 	},
 };
 
