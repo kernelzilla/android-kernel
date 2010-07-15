@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wlioctl.h,v 1.601.4.15.2.14.2.59 2010/02/09 13:23:22 Exp $
+ * $Id: wlioctl.h,v 1.601.4.15.2.14.2.60 2010/04/12 05:33:02 Exp $
  */
 
 
@@ -1324,12 +1324,12 @@ typedef struct wl_pfn_param {
 } wl_pfn_param_t;
 
 typedef struct wl_pfn {
-	wlc_ssid_t		ssid;			
-	int32			bss_type;		
-	int32			infra;			
-	int32			auth;			
-	int32			wpa_auth;		
-	int32			wsec;			
+	wlc_ssid_t		ssid;
+	int32			bss_type;
+	int32			infra;
+	int32			auth;
+	uint32			wpa_auth;
+	int32			wsec;
 #ifdef WLPFN_AUTO_CONNECT
 	union {
 		wl_wsec_key_t	sec_key;		

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Mon Apr 12 11:02:22 2010
+# Wed Apr 28 14:28:40 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -609,8 +609,8 @@ CONFIG_NET_SCHED=y
 #
 # Queueing/Scheduling
 #
-CONFIG_NET_SCH_CBQ=y
-# CONFIG_NET_SCH_HTB is not set
+# CONFIG_NET_SCH_CBQ is not set
+CONFIG_NET_SCH_HTB=y
 # CONFIG_NET_SCH_HFSC is not set
 # CONFIG_NET_SCH_PRIO is not set
 # CONFIG_NET_SCH_MULTIQ is not set
