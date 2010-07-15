@@ -308,8 +308,14 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 		mask = inpdw(MDP_INTR_ENABLE);
 		outpdw(MDP_INTR_CLEAR, isr);
 
-		if (isr & INTR_PRIMARY_INTF_UDERRUN)
+		if (isr & INTR_PRIMARY_INTF_UDERRUN) {
 			mdp4_stat.intr_underrun_p++;
+			/* When underun occurs mdp clear the histogram registers
+			that are set before in hw_init so restore them back so
+			that histogram works.*/
+			MDP_OUTP(MDP_BASE + 0x95010, 1);
+			outpdw(MDP_BASE + 0x9501c, INTR_HIST_DONE);
+		}
 
 		if (isr & INTR_EXTERNAL_INTF_UDERRUN)
 			mdp4_stat.intr_underrun_e++;

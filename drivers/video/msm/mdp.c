@@ -236,6 +236,8 @@ static int mdp_do_histogram(struct fb_info *info, struct mdp_histogram *hist)
 	mdp_hist.g = (hist->g) ? mdp_hist_g : 0;
 	mdp_hist.b = (hist->b) ? mdp_hist_b : 0;
 
+	mdp_enable_irq(MDP_HISTOGRAM_TERM);
+
 #ifdef CONFIG_FB_MSM_MDP40
 	MDP_OUTP(MDP_BASE + 0x95004, hist->frame_cnt);
 	MDP_OUTP(MDP_BASE + 0x95000, 1);
@@ -244,6 +246,10 @@ static int mdp_do_histogram(struct fb_info *info, struct mdp_histogram *hist)
 	MDP_OUTP(MDP_BASE + 0x94000, 1);
 #endif
 	wait_for_completion_killable(&mdp_hist_comp);
+
+	/* disable the irq for histogram since we handled it
+	   when the control reaches here */
+	mdp_disable_irq(MDP_HISTOGRAM_TERM);
 
 	if (hist->r) {
 		ret = copy_to_user(hist->r, mdp_hist.r, hist->bin_cnt*4);
@@ -603,6 +609,11 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 		/* LCDC UnderFlow */
 		if (mdp_interrupt & LCDC_UNDERFLOW) {
 			mdp_lcdc_underflow_cnt++;
+			/*when underflow happens HW resets all the histogram
+			 registers that were set before so restore them back
+			 to normal.*/
+			MDP_OUTP(MDP_BASE + 0x94010, 1);
+			MDP_OUTP(MDP_BASE + 0x9401c, 2);
 		}
 		/* LCDC Frame Start */
 		if (mdp_interrupt & LCDC_FRAME_START) {
