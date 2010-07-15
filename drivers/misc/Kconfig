@@ -321,7 +321,7 @@ config TSIF_CHRDEV
 	  module will be called tsif_chrdev.
 
 config TSIF_DEBUG
-	tristate "Turn on debugging information for tsif driver"
+	bool "Turn on debugging information for tsif driver"
 	depends on TSIF
 	default n
 	---help---
