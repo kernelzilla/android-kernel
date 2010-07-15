@@ -371,7 +371,7 @@ int kgsl_yamato_last_release_locked(void)
 	struct kgsl_device *device;
 
 	BUG_ON(kgsl_driver.yamato_grp_clk == NULL);
-	BUG_ON(kgsl_driver.imem_clk == NULL);
+
 	device = kgsl_get_yamato_generic_device();
 
 	kgsl_pwrctrl(KGSL_PWRFLAGS_YAMATO_IRQ_OFF);
@@ -394,7 +394,6 @@ int kgsl_yamato_first_open_locked(void)
 	struct kgsl_device *device;
 
 	BUG_ON(kgsl_driver.yamato_grp_clk == NULL);
-	BUG_ON(kgsl_driver.imem_clk == NULL);
 
 	device = kgsl_get_yamato_generic_device();
 
