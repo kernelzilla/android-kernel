@@ -93,7 +93,6 @@
 #define DBG_BUS_VEC_H_REG		REG_MM(0x01E4)
 #define DBG_CFG_REG_HS_REG		REG_MM(0x01B4)
 #define DBG_CFG_REG_LS_REG		REG_MM(0x01B8)
-#define DSI_NS_REG			REG_MM(0x0054)
 #define GFX2D0_MD0_REG			REG_MM(0x0064)
 #define GFX2D0_MD1_REG			REG_MM(0x0068)
 #define GFX2D0_NS_REG			REG_MM(0x0070)
@@ -843,6 +842,24 @@ static struct clk_freq_tbl clk_tbl_csi[] = {
 	F_END,
 };
 
+/* DSI_BYTE */
+#define NS_MASK_DSI_BYTE BM(27, 24)
+#define CLK_DSI_BYTE(id, ns, h_r, h_c, h_b, tv) \
+		CLK_LOCAL(id, BASIC, ns, (ns-4), NULL, NULL, 0, h_r, h_c, h_b, \
+			0, B(2), NS_MASK_DSI_BYTE, 0, set_rate_basic, \
+			clk_tbl_dsi_byte, NULL, NONE, NULL, tv)
+#define F_DSI(d) F_RAW(d, NONE_PLL, 0, BVAL(27, 24, (d-1)), 0, 0)
+/* The DSI_BYTE clock is sourced from the DSI PHY PLL, which may change rate
+ * without this clock driver knowing.  So, overload the clk_set_rate() to set
+ * the divider (1 to 16) of the clock with respect to the PLL rate. */
+static struct clk_freq_tbl clk_tbl_dsi_byte[] = {
+	F_DSI(1),  F_DSI(2),  F_DSI(3),  F_DSI(4),
+	F_DSI(5),  F_DSI(6),  F_DSI(7),  F_DSI(8),
+	F_DSI(9),  F_DSI(10), F_DSI(11), F_DSI(12),
+	F_DSI(13), F_DSI(14), F_DSI(15), F_DSI(16),
+	F_END,
+};
+
 /* GFX2D0 and GFX2D1 */
 struct banked_mnd_masks bmdn_info_gfx2d0 = {
 	.bank_sel_mask =			B(11),
@@ -1498,6 +1515,11 @@ static struct clk_local clk_local_tbl[] = {
 		HALT, 13, CSI_SRC, TEST_MMHS(0x01)),
 	CLK_SLAVE_MM(CSI1, CSI_CC_REG, B(7), DBG_BUS_VEC_B_REG,
 		HALT, 14, CSI_SRC, TEST_MMHS(0x03)),
+
+	CLK_DSI_BYTE(DSI_BYTE, MISC_CC2_REG, DBG_BUS_VEC_B_REG,
+		HALT, 23, TEST_MMLS(0x01)),
+	CLK_NORATE_MM(DSI_ESC, MISC_CC_REG, B(0), DBG_BUS_VEC_B_REG,
+		HALT, 24, TEST_MMLS(0x47)),
 
 	CLK_GFX2D0(GFX2D0, GFX2D0_NS_REG, DBG_BUS_VEC_A_REG,
 		HALT, 9,  TEST_MMHS(0x0F)),
@@ -2296,6 +2318,8 @@ static struct reg_init {
 	/* Deassert all MM core resets. */
 	{SW_RESET_CORE_REG,	0x1FFFFFF,	0x0},
 
+	/* Set dsi_byte_clk src to the DSI PHY PLL, and dsi_esc_clk to MXO/2. */
+	{MISC_CC2_REG,	B(22)|B(14)|BM(1, 0),	B(22)|B(14)|BVAL(1, 0, 0x1)},
 	/* Set hdmi_ref_clk to MM_PLL2/2. */
 	{MISC_CC2_REG,		B(28)|BM(21, 18), B(28)|BVAL(21, 18, 0x1)},
 	/* Set hdmi_app_clk source to MXO and divider to 1 (27MHz). */
