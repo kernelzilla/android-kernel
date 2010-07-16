@@ -41,6 +41,12 @@
 #define MSM_ROTATOR_IOCTL_FINISH   \
 		_IOW(MSM_ROTATOR_IOCTL_MAGIC, 3, int)
 
+enum rotator_clk_type {
+	ROTATOR_AXI_CLK,
+	ROTATOR_PCLK,
+	ROTATOR_IMEM_CLK
+};
+
 struct msm_rotator_img_info {
 	unsigned int session_id;
 	struct msmfb_img  src;
@@ -58,5 +64,16 @@ struct msm_rotator_data_info {
 	struct msmfb_data dst;
 };
 
+struct msm_rot_clocks {
+	const char *clk_name;
+	enum rotator_clk_type clk_type;
+	unsigned int clk_rate;
+};
+
+struct msm_rotator_platform_data {
+	unsigned int number_of_clocks;
+	unsigned int hardware_version_number;
+	struct msm_rot_clocks *rotator_clks;
+};
 #endif
 
