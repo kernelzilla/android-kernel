@@ -521,7 +521,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 	}
 		break;
 
-	case OUTPUT_1_AND_2: {
+	case OUTPUT_1_AND_2:
 		/* use wm0& 4 for thumbnail, wm1&5 for main image.*/
 		if ((ad->bufnum1 < 1) || (ad->bufnum2 < 1))
 			return -EINVAL;
@@ -543,21 +543,53 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		outp1 = &(vfe31_ctrl->outpath.out0);
 		outp2 = &(vfe31_ctrl->outpath.out1); /* snapshot */
 
-		p1 = ao + 6;   /* wm0 ping */
-		*p1++ = (regp1->paddr + regp1->info.y_off);
-		/* this is to duplicate ping address to pong.*/
-		*p1 = (regp1->paddr + regp1->info.y_off);
-		p1 = ao + 30;  /* wm4 ping */
-		*p1++ = (regp1->paddr + regp1->info.cbcr_off);
-		/* this is to duplicate ping address to pong.*/
-		*p1 = (regp1->paddr + regp1->info.cbcr_off);
-		p1 = ao + 12;   /* wm1 ping */
-		*p1++ = (regp2->paddr + regp2->info.y_off);
-		/* pong = ping,*/
-		*p1 = (regp2->paddr + regp2->info.y_off);
-		p1 = ao + 36;  /* wm5 */
-		*p1++ = (regp2->paddr + regp2->info.cbcr_off);
-		*p1 = (regp2->paddr + regp2->info.cbcr_off);
+		/*  Parse the buffers!!! */
+		if (ad->bufnum2 == 1) {	/* assuming bufnum1 = bufnum2 */
+			p1 = ao + 6;   /* wm0 ping */
+			*p1++ = (regp1->paddr + regp1->info.y_off);
+			/* this is to duplicate ping address to pong.*/
+			*p1 = (regp1->paddr + regp1->info.y_off);
+			p1 = ao + 30;  /* wm4 ping */
+			*p1++ = (regp1->paddr + regp1->info.cbcr_off);
+			/* this is to duplicate ping address to pong.*/
+			*p1 = (regp1->paddr + regp1->info.cbcr_off);
+			p1 = ao + 12;   /* wm1 ping */
+			*p1++ = (regp2->paddr + regp2->info.y_off);
+			/* pong = ping,*/
+			*p1 = (regp2->paddr + regp2->info.y_off);
+			p1 = ao + 36;  /* wm5 */
+			*p1++ = (regp2->paddr + regp2->info.cbcr_off);
+			*p1 = (regp2->paddr + regp2->info.cbcr_off);
+
+		} else { /* more than one snapshot */
+			/* first fill ping & pong */
+			for (i = 0; i < 2; i++) {
+				p1 = ao + 6 + i;    /* wm0 for y  */
+				*p1 = (regp1->paddr + regp1->info.y_off);
+				p1 = ao + 30 + i;  /* wm4 for cbcr */
+				*p1 = (regp1->paddr + regp1->info.cbcr_off);
+				regp1++;
+			}
+
+			for (i = 0; i < 2; i++) {
+				p2 = ao + 12 + i;    /* wm1 for y  */
+				*p2 = (regp2->paddr + regp2->info.y_off);
+				p2 = ao + 36 + i;  /* wm5 for cbcr */
+				*p2 = (regp2->paddr + regp2->info.cbcr_off);
+				regp2++;
+			}
+
+			if (ad->bufnum2 == 3) { /* 3 maximum to begin with. */
+				outp1->free_buf.available = 1;
+				outp1->free_buf.paddr = regp1->paddr;
+				outp1->free_buf.y_off = regp1->info.y_off;
+				outp1->free_buf.cbcr_off = regp1->info.cbcr_off;
+
+				outp2->free_buf.available = 1;
+				outp2->free_buf.paddr = regp2->paddr;
+				outp2->free_buf.y_off = regp2->info.y_off;
+				outp2->free_buf.cbcr_off = regp2->info.cbcr_off;
+			}
 		}
 		break;
 
@@ -1052,6 +1084,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 	uint32_t old_val = 0 , new_val = 0;
 	uint32_t *cmdp = NULL;
 	uint32_t *cmdp_local = NULL;
+	uint32_t snapshot_cnt = 0;
 	CDBG("vfe31_proc_general: cmdID = %d, length = %d\n",
 		cmd->id, cmd->length);
 	switch (cmd->id) {
@@ -1065,7 +1098,12 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		vfe31_update();
 		break;
 	case V31_CAPTURE:
-		rc = vfe31_capture(1);
+		if (copy_from_user(&snapshot_cnt, (void __user *)(cmd->value),
+				sizeof(uint32_t))) {
+			rc = -EFAULT;
+			goto proc_general_done;
+		}
+		rc = vfe31_capture(snapshot_cnt);
 		break;
 	case V31_START_RECORDING:
 		rc = vfe31_start_recording();
@@ -2073,16 +2111,18 @@ static void vfe31_process_output_path_irq_0(void)
 				vfe31_ctrl->outpath.out0.free_buf.paddr +
 				vfe31_ctrl->outpath.out0.free_buf.cbcr_off);
 
-				vfe31_ctrl->outpath.out0.free_buf.available =
-					 0;
+				vfe31_ctrl->outpath.out0.free_buf.available = 0;
 			}
 			if (vfe31_ctrl->operation_mode & 1) {
 				/* will add message for multi-shot. */
 				vfe31_ctrl->outpath.out0.capture_cnt--;
-		} else {
+				vfe_send_outmsg(MSG_ID_OUTPUT_T, pyaddr,
+					pcbcraddr);
+			} else {
 			/* always send message for continous mode. */
-			/* if continuous mode, this is for display. (preview) */
-			vfe_send_outmsg(MSG_ID_OUTPUT_P, pyaddr, pcbcraddr);
+			/* if continuous mode, for display. (preview) */
+				vfe_send_outmsg(MSG_ID_OUTPUT_P, pyaddr,
+					pcbcraddr);
 			}
 
 		} else {
@@ -2133,8 +2173,11 @@ static void vfe31_process_output_path_irq_1(void)
 				vfe31_ctrl->outpath.out1.free_buf.cbcr_off);
 				vfe31_ctrl->outpath.out1.free_buf.available = 0;
 			}
-
-			vfe31_ctrl->outpath.out1.capture_cnt--;
+			if (vfe31_ctrl->operation_mode & 1) {
+				vfe31_ctrl->outpath.out1.capture_cnt--;
+				vfe_send_outmsg(MSG_ID_OUTPUT_S, pyaddr,
+					pcbcraddr);
+			}
 		} else {
 			vfe31_ctrl->outpath.out1.frame_drop_cnt++;
 			CDBG("path_irq_1 - no free buffer!\n");

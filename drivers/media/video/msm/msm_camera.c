@@ -41,6 +41,7 @@
 DEFINE_MUTEX(hlist_mut);
 DEFINE_MUTEX(pp_prev_lock);
 DEFINE_MUTEX(pp_snap_lock);
+DEFINE_MUTEX(pp_thumb_lock);
 DEFINE_MUTEX(ctrl_cmd_lock);
 
 #define MSM_MAX_CAMERA_SENSORS 5
@@ -227,8 +228,7 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 		return -EINVAL;
 
 	CDBG("%s: type %d, paddr 0x%lx, vaddr 0x%lx\n",
-		__func__,
-		info->type, paddr, (unsigned long)info->vaddr);
+		__func__, info->type, paddr, (unsigned long)info->vaddr);
 
 	region = kmalloc(sizeof(struct msm_pmem_region), GFP_KERNEL);
 	if (!region)
@@ -731,18 +731,16 @@ static int msm_divert_frame(struct msm_sync *sync,
 	struct msm_postproc buf;
 	int rc;
 
-	pr_info("%s: preview PP sync->pp_mask %d\n", __func__, sync->pp_mask);
+	pr_info("%s: Frame PP sync->pp_mask %d\n", __func__, sync->pp_mask);
 
-	if (!(sync->pp_mask & PP_PREV)) {
-		pr_err("%s: diverting preview frame but not in PP_PREV!\n",
+	if (!(sync->pp_mask & PP_PREV)  && !(sync->pp_mask & PP_SNAP)) {
+		pr_err("%s: diverting frame, not in PP_PREV or PP_SNAP!\n",
 			__func__);
 		return -EINVAL;
 	}
 
-	rc = msm_pmem_frame_ptov_lookup(sync,
-			data->phy.y_phy,
-			data->phy.cbcr_phy,
-			&pinfo,
+	rc = msm_pmem_frame_ptov_lookup(sync, data->phy.y_phy,
+			data->phy.cbcr_phy, &pinfo,
 			0);  /* do clear the active flag */
 	if (rc < 0) {
 		CDBG("%s: msm_pmem_frame_ptov_lookup failed\n", __func__);
@@ -754,75 +752,12 @@ static int msm_divert_frame(struct msm_sync *sync,
 	buf.fmain.cbcr_off = pinfo.cbcr_off;
 	buf.fmain.fd = pinfo.fd;
 
-	CDBG("%s: buf %ld fd %d\n",
-		__func__, buf.fmain.buffer,
-		buf.fmain.fd);
+	CDBG("%s: buf %ld fd %d\n", __func__, buf.fmain.buffer, buf.fmain.fd);
 	if (copy_to_user((void *)(se->stats_event.data),
-			&(buf.fmain),
-			sizeof(struct msm_frame))) {
+			&(buf.fmain), sizeof(struct msm_frame))) {
 		ERR_COPY_TO_USER();
 		return -EFAULT;
 	}
-
-	return 0;
-}
-
-static int msm_divert_snapshot(struct msm_sync *sync,
-		struct msm_vfe_resp *data,
-		struct msm_stats_event_ctrl *se)
-{
-	struct msm_postproc buf;
-	struct msm_pmem_region region;
-
-	CDBG("%s: preview PP sync->pp_mask %d\n", __func__, sync->pp_mask);
-
-	if (!(sync->pp_mask & (PP_SNAP|PP_RAW_SNAP))) {
-		pr_err("%s: diverting snapshot but not in PP_SNAP!\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	memset(&region, 0, sizeof(region));
-	buf.fmnum = msm_pmem_region_lookup(&sync->pmem_frames,
-					MSM_PMEM_THUMBNAIL,
-					&region, 1);
-	if (buf.fmnum == 1) {
-		buf.fthumnail.buffer = (uint32_t)region.info.vaddr;
-		buf.fthumnail.y_off  = region.info.y_off;
-		buf.fthumnail.cbcr_off = region.info.cbcr_off;
-		buf.fthumnail.fd = region.info.fd;
-	}
-
-	buf.fmnum = msm_pmem_region_lookup(&sync->pmem_frames,
-					MSM_PMEM_MAINIMG,
-					&region, 1);
-	if (buf.fmnum == 1) {
-		buf.fmain.buffer = (uint32_t)region.info.vaddr;
-		buf.fmain.y_off  = region.info.y_off;
-		buf.fmain.cbcr_off = region.info.cbcr_off;
-		buf.fmain.fd = region.info.fd;
-		goto end;
-	}
-
-	buf.fmnum = msm_pmem_region_lookup(&sync->pmem_frames,
-					MSM_PMEM_RAW_MAINIMG,
-					&region, 1);
-	if (buf.fmnum == 1) {
-		buf.fmain.path = MSM_FRAME_PREV_2;
-		buf.fmain.buffer = (uint32_t)region.info.vaddr;
-		buf.fmain.fd = region.info.fd;
-	} else {
-		pr_err("%s: pmem lookup fail (found %d)\n",
-			__func__, buf.fmnum);
-		return -EIO;
-	}
-end:
-	CDBG("%s: snapshot copy_to_user!\n", __func__);
-	if (copy_to_user((void *)(se->stats_event.data), &buf, sizeof(buf))) {
-		ERR_COPY_TO_USER();
-		return -EFAULT;
-	}
-
 	return 0;
 }
 
@@ -923,11 +858,10 @@ static int msm_get_stats(struct msm_sync *sync, void __user *arg)
 			if ((sync->pp_mask & PP_PREV) &&
 				(data->type == VFE_MSG_OUTPUT_P))
 					rc = msm_divert_frame(sync, data, &se);
-			else if ((sync->pp_mask & (PP_SNAP|PP_RAW_SNAP)) &&
-				  (data->type == VFE_MSG_SNAPSHOT ||
-				   data->type == VFE_MSG_OUTPUT_S))
-					rc = msm_divert_snapshot(sync,
-								data, &se);
+			else if (sync->pp_mask & PP_SNAP)
+				if (data->type == VFE_MSG_OUTPUT_S ||
+					data->type == VFE_MSG_OUTPUT_T)
+					rc = msm_divert_frame(sync, data, &se);
 		}
 		break;
 
@@ -2112,6 +2046,46 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 			qcmd->on_heap++;
 		break;
 
+		case VFE_MSG_OUTPUT_T:
+		if (sync->pp_mask & PP_SNAP) {
+			mutex_lock(&pp_thumb_lock);
+			if (sync->pp_thumb)
+				pr_warning("%s: overwriting pp_thumb!\n",
+					__func__);
+			pr_info("%s: pp sending thumbnail to config\n",
+				__func__);
+			sync->pp_thumb = qcmd;
+			mutex_unlock(&pp_thumb_lock);
+			break;
+		} else {
+		/* this is for normal snapshot case. right now we only have
+		single shot. still keeping the old way. therefore no need
+		to send anything to user.*/
+			if (!--qcmd->on_heap)
+				kfree(qcmd);
+			return;
+		}
+
+		case VFE_MSG_OUTPUT_S:
+		if (sync->pp_mask & PP_SNAP) {
+			mutex_lock(&pp_snap_lock);
+			if (sync->pp_snap)
+				pr_warning("%s: overwriting pp_snap!\n",
+					__func__);
+			pr_info("%s: pp sending main image to config\n",
+				__func__);
+			sync->pp_snap = qcmd;
+			mutex_unlock(&pp_snap_lock);
+			break;
+		} else {
+		/* this is for normal snapshot case. right now we only have
+		  single shot. still keeping the old way. therefore no need
+		  to send anything to user.*/
+			if (!--qcmd->on_heap)
+				kfree(qcmd);
+			return;
+		}
+
 		case VFE_MSG_OUTPUT_V:
 		CDBG("%s: msm_enqueue video frame_q\n", __func__);
 		msm_enqueue(&sync->frame_q, &qcmd->list_frame);
@@ -2130,12 +2104,11 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 			pr_info("%s: sending snapshot to config\n", __func__);
 			sync->pp_snap = qcmd;
 			mutex_unlock(&pp_snap_lock);
-				break;
-			}
-
-		msm_enqueue(&sync->pict_q, &qcmd->list_pict);
-		if (qcmd->on_heap)
-			qcmd->on_heap++;
+		} else {
+			msm_enqueue(&sync->pict_q, &qcmd->list_pict);
+			if (qcmd->on_heap)
+				qcmd->on_heap++;
+		}
 		break;
 
 		case VFE_MSG_STATS_AWB:
