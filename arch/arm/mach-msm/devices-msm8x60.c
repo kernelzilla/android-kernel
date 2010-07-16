@@ -22,6 +22,7 @@
 #include <mach/dma.h>
 #include <asm/mach/mmc.h>
 #include <linux/msm_kgsl.h>
+#include <linux/msm_rotator.h>
 #include <mach/msm_hsusb.h>
 #include "clock.h"
 #include "clock-8x60.h"
@@ -585,6 +586,49 @@ static struct platform_device msm_mdp_device = {
 	.num_resources  = ARRAY_SIZE(msm_mdp_resources),
 	.resource       = msm_mdp_resources,
 };
+#ifdef CONFIG_MSM_ROTATOR
+static struct resource resources_msm_rotator[] = {
+	{
+		.start	= 0x04E00000,
+		.end	= 0x04F00000 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= ROT_IRQ,
+		.end	= ROT_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct msm_rot_clocks rotator_clocks[] = {
+	{
+		.clk_name = "rot_clk",
+		.clk_type = ROTATOR_AXI_CLK,
+		.clk_rate = 160 * 1000 * 1000,
+	},
+	{
+		.clk_name = "rotator_pclk",
+		.clk_type = ROTATOR_PCLK,
+		.clk_rate = 0,
+	},
+};
+
+static struct msm_rotator_platform_data rotator_pdata = {
+	.number_of_clocks = ARRAY_SIZE(rotator_clocks),
+	.hardware_version_number = 0x01010307,
+	.rotator_clks = rotator_clocks,
+};
+
+struct platform_device msm_rotator_device = {
+	.name		= "msm_rotator",
+	.id		= 0,
+	.num_resources  = ARRAY_SIZE(resources_msm_rotator),
+	.resource       = resources_msm_rotator,
+	.dev		= {
+		.platform_data = &rotator_pdata,
+	},
+};
+#endif
 
 static void __init msm_register_device(struct platform_device *pdev, void *data)
 {

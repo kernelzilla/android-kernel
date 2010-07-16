@@ -1055,6 +1055,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&android_pmem_adsp_device,
 	&android_pmem_smipool_device,
 #endif
+#ifdef CONFIG_MSM_ROTATOR
+	&msm_rotator_device,
+#endif
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
@@ -1111,6 +1114,9 @@ static struct platform_device *surf_devices[] __initdata = {
 	&android_pmem_device,
 	&android_pmem_adsp_device,
 	&android_pmem_smipool_device,
+#endif
+#ifdef CONFIG_MSM_ROTATOR
+	&msm_rotator_device,
 #endif
 	&msm_fb_device,
 	&msm_device_kgsl,
