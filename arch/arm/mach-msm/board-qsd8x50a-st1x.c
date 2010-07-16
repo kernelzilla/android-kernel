@@ -1195,7 +1195,7 @@ static struct resource msm_audio_resources[] = {
 
 static unsigned st15_audio_gpio_on[] = {
 	/* enable headset amplifier */
-	GPIO_CFG(48, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(48, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
 };
 
 static unsigned audio_gpio_on[] = {
