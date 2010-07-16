@@ -17,7 +17,7 @@
  */
 
 #include <asm/div64.h>
-#include <linux/list.h>
+
 #include "vidc_type.h"
 #include "vcd.h"
 #include "vdec_internal.h"
@@ -793,15 +793,11 @@ void vcd_flush_output_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt)
 	p_buf_pool->n_in_use = 0;
 	p_buf_pool->n_q_len = 0;
 
-	if (p_cctxt->b_sched_clnt_valid && n_count > 0) {
-		VCD_MSG_LOW("Updating scheduler O tkns = %u", n_count);
-
-		(void)sched_update_client_o_tkn(p_cctxt->p_dev_ctxt->sched_hdl,
-						p_cctxt->sched_clnt_hdl,
-						FALSE,
-						n_count *
-						p_cctxt->
-						n_sched_o_tkn_per_ip_frm);
+	if (p_cctxt->sched_clnt_hdl) {
+		if (n_count > p_cctxt->sched_clnt_hdl->n_o_tkns)
+			p_cctxt->sched_clnt_hdl->n_o_tkns = 0;
+		else
+			p_cctxt->sched_clnt_hdl->n_o_tkns -= n_count;
 	}
 
 	if (p_cctxt->b_ddl_hdl_valid && p_cctxt->b_decoding) {
@@ -816,7 +812,6 @@ void vcd_flush_output_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt)
 
 u32 vcd_flush_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 n_mode)
 {
-	struct vcd_dev_ctxt_type *p_dev_ctxt = p_cctxt->p_dev_ctxt;
 	u32 rc = VCD_S_SUCCESS;
 	struct vcd_buffer_entry_type *p_buf_entry;
 
@@ -830,11 +825,11 @@ u32 vcd_flush_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 n_mode)
 
 	VCD_MSG_MED("Flush mode %d requested", n_mode);
 
-	if ((n_mode & VCD_FLUSH_INPUT) && p_cctxt->b_sched_clnt_valid) {
-		rc = vcd_map_sched_status(sched_flush_client_buffer
-					  (p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl,
-					   (void **)&p_buf_entry));
+	if ((n_mode & VCD_FLUSH_INPUT) &&
+		p_cctxt->sched_clnt_hdl) {
+
+		rc = vcd_sched_dequeue_buffer(
+			p_cctxt->sched_clnt_hdl, &p_buf_entry);
 
 		while (!VCD_FAILED(rc) &&
 			   rc != VCD_S_SCHED_QEMPTY && p_buf_entry) {
@@ -853,14 +848,12 @@ u32 vcd_flush_buffers(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 n_mode)
 			VCD_BUFFERPOOL_INUSE_DECREMENT(
 				p_cctxt->in_buf_pool.n_in_use);
 			p_buf_entry = NULL;
-			rc = vcd_map_sched_status(sched_flush_client_buffer
-						  (p_dev_ctxt->sched_hdl,
-						   p_cctxt->sched_clnt_hdl,
-						   (void **)&p_buf_entry));
+			rc = vcd_sched_dequeue_buffer(
+				p_cctxt->sched_clnt_hdl, &p_buf_entry);
 		}
 
 	}
-	VCD_FAILED_RETURN(rc, "Failed: sched_flush_client_buffer");
+	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_dequeue_buffer");
 
 	if (p_cctxt->status.n_frame_submitted > 0) {
 
@@ -917,8 +910,8 @@ void vcd_destroy_client_context(struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
 	struct vcd_dev_ctxt_type *p_dev_ctxt;
 	struct vcd_clnt_ctxt_type_t *p_client;
+	struct vcd_buffer_entry_type *p_buf_entry;
 	u32 rc = VCD_S_SUCCESS;
-	int n_idx;
 
 	VCD_MSG_LOW("vcd_destroy_client_context:");
 
@@ -946,26 +939,23 @@ void vcd_destroy_client_context(struct vcd_clnt_ctxt_type_t *p_cctxt)
 	if (VCD_FAILED(rc))
 		return;
 
-	if (p_cctxt->b_sched_clnt_valid) {
+	if (p_cctxt->sched_clnt_hdl) {
 		rc = VCD_S_SUCCESS;
 		while (!VCD_FAILED(rc) && rc != VCD_S_SCHED_QEMPTY) {
 
-			rc = vcd_map_sched_status(sched_flush_client_buffer
-						  (p_dev_ctxt->sched_hdl,
-						   p_cctxt->sched_clnt_hdl,
-						   (void *)&n_idx));
+			rc = vcd_sched_dequeue_buffer(
+				p_cctxt->sched_clnt_hdl, &p_buf_entry);
+
 			if (VCD_FAILED(rc))
 				VCD_MSG_ERROR("\n Failed: "
-					"sched_flush_client_buffer");
+					"vcd_sched_de_queue_buffer");
 		}
 
-		rc = vcd_map_sched_status(sched_remove_client
-					  (p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl));
+		rc = vcd_sched_remove_client(p_dev_ctxt->sched_hdl,
+				p_cctxt->sched_clnt_hdl);
 		if (VCD_FAILED(rc))
 			VCD_MSG_ERROR("\n Failed: sched_remove_client");
-
-		p_cctxt->b_sched_clnt_valid = FALSE;
+		p_cctxt->sched_clnt_hdl = NULL;
 	}
 
 	if (p_cctxt->seq_hdr.p_sequence_header) {
@@ -1061,36 +1051,6 @@ u32 vcd_get_next_queued_client_cmd(struct vcd_dev_ctxt_type *p_dev_ctxt,
 		p_client = p_client->p_next;
 	}
 	return b_result;
-}
-
-u32 vcd_map_sched_status(enum sched_status_type sched_status)
-{
-	u32 rc = VCD_S_SUCCESS;
-
-	switch (sched_status) {
-
-	case SCHED_S_OK:
-		rc = VCD_S_SUCCESS;
-		break;
-
-	case SCHED_S_EOF:
-		rc = VCD_S_SCHED_EOS;
-		break;
-
-	case SCHED_S_QEMPTY:
-		rc = VCD_S_SCHED_QEMPTY;
-		break;
-
-	case SCHED_S_QFULL:
-		rc = VCD_S_SCHED_QFULL;
-		break;
-
-	default:
-		rc = VCD_ERR_FAIL;
-		break;
-	}
-
-	return rc;
 }
 
 u32 vcd_submit_cmd_sess_start(struct vcd_transc_type *p_transc)
@@ -1251,8 +1211,8 @@ u32 vcd_schedule_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
 		return FALSE;
 	}
 
-	rc = vcd_map_sched_status(sched_de_queue_frame(p_dev_ctxt->sched_hdl,
-		(void **) pp_ip_buf_entry, (void **) pp_cctxt));
+	rc = vcd_sched_get_client_frame(p_dev_ctxt->sched_hdl,
+		pp_cctxt, pp_ip_buf_entry);
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_FATAL("vcd_submit_frame: sched_de_queue_frame"
 			"failed 0x%x", rc);
@@ -1269,9 +1229,6 @@ u32 vcd_schedule_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
 			"ipbuf=%p",	*pp_cctxt, *pp_ip_buf_entry);
 		return FALSE;
 	}
-
-	if (rc == VCD_S_SCHED_EOS)
-		(*pp_ip_buf_entry)->frame.n_flags |= VCD_FRAME_FLAG_EOS;
 
 	return TRUE;
 }
@@ -1304,12 +1261,9 @@ void vcd_try_submit_frame(struct vcd_dev_ctxt_type *p_dev_ctxt)
 	} else {
 		VCD_MSG_ERROR("Failed: VCD_EVT_PWR_CLNT_CMD_BEGIN");
 
-		(void) vcd_requeue_input_frame(p_dev_ctxt, p_cctxt,
-				p_ip_buf_entry);
-
-		(void) vcd_map_sched_status(sched_update_client_o_tkn(
-			p_dev_ctxt->sched_hdl, p_cctxt->sched_clnt_hdl,
-			TRUE, p_cctxt->n_sched_o_tkn_per_ip_frm));
+		(void) vcd_sched_queue_buffer(
+			p_cctxt->sched_clnt_hdl, p_ip_buf_entry, FALSE);
+		p_cctxt->sched_clnt_hdl->n_o_tkns++;
 	}
 
 	if (!b_result) {
@@ -1507,11 +1461,8 @@ void vcd_send_frame_done_in_eos_for_dec(
 
 		vcd_assert();
 	} else {
-		(void)
-			vcd_map_sched_status(sched_update_client_o_tkn
-					 (p_cctxt->p_dev_ctxt->sched_hdl,
-					  p_cctxt->sched_clnt_hdl, FALSE,
-					  p_cctxt->n_sched_o_tkn_per_ip_frm));
+		if (p_cctxt->sched_clnt_hdl->n_o_tkns)
+			p_cctxt->sched_clnt_hdl->n_o_tkns--;
 
 		VCD_MSG_MED("Sending non-NULL output with EOS");
 
@@ -1552,11 +1503,8 @@ void vcd_send_frame_done_in_eos_for_enc(
 			"failed\n", __func__);
 		vcd_assert();
 	} else {
-		(void)
-			vcd_map_sched_status(sched_update_client_o_tkn
-					 (p_cctxt->p_dev_ctxt->sched_hdl,
-					  p_cctxt->sched_clnt_hdl, FALSE,
-					  p_cctxt->n_sched_o_tkn_per_ip_frm));
+		if (p_cctxt->sched_clnt_hdl->n_o_tkns)
+			p_cctxt->sched_clnt_hdl->n_o_tkns--;
 
 		VCD_MSG_MED("Sending non-NULL output with EOS");
 
@@ -1578,7 +1526,6 @@ u32 vcd_handle_recvd_eos(
 	struct vcd_clnt_ctxt_type_t *p_cctxt,
 	 struct vcd_frame_data_type *p_input_frame, u32 *pb_eos_handled)
 {
-	union sched_value_type sched_val;
 	u32 rc;
 
 	VCD_MSG_LOW("vcd_handle_recvd_eos:");
@@ -1591,43 +1538,21 @@ u32 vcd_handle_recvd_eos(
 
 	p_input_frame->n_data_len = 0;
 
-	rc = vcd_map_sched_status(sched_get_client_param
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   p_cctxt->sched_clnt_hdl,
-				   SCHED_I_CLNT_CURRQLEN, &sched_val));
+	rc = vcd_sched_mark_client_eof(p_cctxt->sched_clnt_hdl);
 
-	VCD_FAILED_RETURN(rc, "Failed: sched_get_client_param");
-
-	if (sched_val.un_value > 0) {
-		rc = vcd_map_sched_status(sched_mark_client_eof
-					  (p_cctxt->p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl));
-
-		if (!VCD_FAILED(rc)) {
-			*pb_eos_handled = TRUE;
-		} else {
-			VCD_MSG_ERROR("rc = 0x%x. Failed: "
-				"sched_mark_client_eof", rc);
-		}
-
-	} else if (p_cctxt->b_decoding && !p_input_frame->p_virtual) {
-		rc = vcd_map_sched_status(sched_update_client_o_tkn
-					  (p_cctxt->p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl, TRUE,
-					   p_cctxt->n_sched_o_tkn_per_ip_frm));
-	} else if (!p_cctxt->b_decoding) {
-
+	if (rc == VCD_S_SUCCESS)
+		*pb_eos_handled = TRUE;
+	else if (p_cctxt->b_decoding && !p_input_frame->p_virtual)
+		p_cctxt->sched_clnt_hdl->n_o_tkns++;
+	else if (!p_cctxt->b_decoding) {
 		vcd_send_frame_done_in_eos(p_cctxt, p_input_frame, FALSE);
-
 		if (p_cctxt->status.b_eos_wait_for_op_buf) {
 			vcd_do_client_state_transition(p_cctxt,
 				VCD_CLIENT_STATE_EOS,
 				CLIENT_STATE_EVENT_NUMBER
 				(pf_encode_frame));
 		}
-
 		*pb_eos_handled = TRUE;
-
 	}
 
 	if (*pb_eos_handled &&
@@ -1644,7 +1569,7 @@ u32 vcd_handle_recvd_eos(
 
 u32 vcd_handle_first_decode_frame(struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
-	u32 rc;
+	u32 rc =  VCD_ERR_BAD_STATE;
 
 	VCD_MSG_LOW("vcd_handle_first_decode_frame:");
 
@@ -1653,24 +1578,13 @@ u32 vcd_handle_first_decode_frame(struct vcd_clnt_ctxt_type_t *p_cctxt)
 		p_cctxt->in_buf_pool.n_validated !=
 		p_cctxt->in_buf_pool.n_count ||
 		p_cctxt->out_buf_pool.n_validated !=
-		p_cctxt->out_buf_pool.n_count) {
+		p_cctxt->out_buf_pool.n_count)
 		VCD_MSG_ERROR("Buffer pool is not completely setup yet");
-
-		return VCD_ERR_BAD_STATE;
-	}
-
-	rc = vcd_add_client_to_sched(p_cctxt);
-
-	VCD_FAILED_RETURN(rc, "Failed: vcd_add_client_to_sched");
-	if (p_cctxt->out_buf_pool.n_q_len > 0) {
-		rc = vcd_map_sched_status(sched_update_client_o_tkn
-					  (p_cctxt->p_dev_ctxt->
-					   sched_hdl,
-					   p_cctxt->sched_clnt_hdl,
-					   TRUE,
-					   p_cctxt->
-					   n_sched_o_tkn_per_ip_frm *
-					   p_cctxt->out_buf_pool.n_q_len));
+	else {
+		rc = vcd_sched_add_client(p_cctxt);
+		VCD_FAILED_RETURN(rc, "Failed: vcd_add_client_to_sched");
+		p_cctxt->sched_clnt_hdl->n_o_tkns =
+			p_cctxt->out_buf_pool.n_q_len;
 	}
 	return rc;
 }
@@ -1764,82 +1678,6 @@ void vcd_release_trans_tbl_entry(struct vcd_transc_type *p_trans_entry)
 {
 	if (p_trans_entry)
 		p_trans_entry->b_in_use = FALSE;
-}
-
-u32 vcd_add_client_to_sched(struct vcd_clnt_ctxt_type_t *p_cctxt)
-{
-	struct vcd_property_hdr_type prop_hdr;
-	struct sched_client_init_param_type sched_input_init;
-	u32 rc;
-
-	if (p_cctxt->b_sched_clnt_valid) {
-		VCD_MSG_HIGH("Schedulder client is already added ");
-		return VCD_S_SUCCESS;
-	}
-
-	prop_hdr.prop_id = DDL_I_FRAME_PROC_UNITS;
-	prop_hdr.n_size = sizeof(p_cctxt->n_frm_p_units);
-	rc = ddl_get_property(p_cctxt->ddl_handle, &prop_hdr,
-				  &p_cctxt->n_frm_p_units);
-	VCD_FAILED_RETURN(rc, "Failed: Get DDL_I_FRAME_PROC_UNITS");
-
-	if (p_cctxt->b_decoding) {
-		p_cctxt->frm_rate.n_fps_numerator = VCD_DEC_INITIAL_FRAME_RATE;
-		p_cctxt->frm_rate.n_fps_denominator = 1;
-
-		sched_input_init.n_o_tkn_per_ip_frm =
-			p_cctxt->n_sched_o_tkn_per_ip_frm =
-			VCD_SCHEDULER_DEC_DFLT_OTKN_PERFRM;
-		sched_input_init.n_o_tkn_max =
-			p_cctxt->n_sched_o_tkn_per_ip_frm *
-			p_cctxt->out_buf_pool.n_count+1;
-	} else {
-		sched_input_init.n_o_tkn_per_ip_frm =
-		p_cctxt->n_sched_o_tkn_per_ip_frm =
-			VCD_SCHEDULER_ENC_DFLT_OTKN_PERFRM;
-		sched_input_init.n_o_tkn_max =
-			p_cctxt->out_buf_pool.n_count;
-		prop_hdr.prop_id = VCD_I_FRAME_RATE;
-		prop_hdr.n_size = sizeof(p_cctxt->frm_rate);
-		rc = ddl_get_property(p_cctxt->ddl_handle, &prop_hdr,
-					  &p_cctxt->frm_rate);
-	}
-
-	VCD_FAILED_RETURN(rc, "Failed: DDL get VCD_I_FRAME_RATE");
-
-	if (p_cctxt->b_live)
-		sched_input_init.client_ctgy = SCHED_CLNT_RT_NOBUFF;
-	else
-		sched_input_init.client_ctgy = SCHED_CLNT_NONRT;
-
-	sched_input_init.n_max_queue_len = MAX(p_cctxt->in_buf_pool.n_count,
-						   VCD_MAX_SCHEDULER_QUEUE_SIZE
-						   (p_cctxt->frm_rate.
-						n_fps_numerator,
-						p_cctxt->frm_rate.
-						n_fps_denominator));
-	p_cctxt->n_reqd_perf_lvl =
-		p_cctxt->n_frm_p_units * p_cctxt->frm_rate.n_fps_numerator /
-		p_cctxt->frm_rate.n_fps_denominator;
-
-	sched_input_init.frm_rate.n_numer = p_cctxt->frm_rate.n_fps_numerator;
-	sched_input_init.frm_rate.n_denom = p_cctxt->frm_rate.n_fps_denominator;
-	sched_input_init.n_p_tkn_per_frm = p_cctxt->n_frm_p_units;
-	sched_input_init.n_alloc_p_tkn_rate = p_cctxt->n_reqd_perf_lvl;
-
-	sched_input_init.n_o_tkn_init = 0;
-
-	sched_input_init.p_client_data = p_cctxt;
-
-	rc = vcd_map_sched_status(sched_add_client
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   &sched_input_init,
-				   &p_cctxt->sched_clnt_hdl));
-
-	if (!VCD_FAILED(rc))
-		p_cctxt->b_sched_clnt_valid = TRUE;
-
-	return rc;
 }
 
 u32 vcd_handle_input_done(
@@ -1969,11 +1807,7 @@ void vcd_handle_input_done_failed(
 	struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_transc_type *p_transc)
 {
 	if (p_cctxt->b_decoding) {
-		(void)vcd_map_sched_status(sched_update_client_o_tkn
-				 (p_cctxt->p_dev_ctxt->sched_hdl,
-				  p_cctxt->sched_clnt_hdl, TRUE,
-				  p_cctxt->n_sched_o_tkn_per_ip_frm));
-
+		p_cctxt->sched_clnt_hdl->n_o_tkns++;
 		p_transc->b_in_use = FALSE;
 	}
 }
@@ -1982,30 +1816,17 @@ void vcd_handle_input_done_with_codec_config(
 	struct vcd_clnt_ctxt_type_t *p_cctxt, struct vcd_transc_type *p_transc,
 	struct ddl_frame_data_type_tag *p_frm)
 {
-	(void) vcd_map_sched_status(sched_update_client_o_tkn
-					(p_cctxt->p_dev_ctxt->sched_hdl,
-					p_cctxt->sched_clnt_hdl, TRUE,
-					p_cctxt->n_sched_o_tkn_per_ip_frm));
-
+	p_cctxt->sched_clnt_hdl->n_o_tkns++;
 	if (p_frm->b_frm_trans_end)
 		p_transc->b_in_use = FALSE;
 }
 
 void vcd_handle_input_done_for_interlacing(struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
-	u32 rc;
-
 	p_cctxt->status.n_int_field_cnt++;
-
-	if (p_cctxt->status.n_int_field_cnt == 1) {
-		rc = vcd_map_sched_status(sched_update_client_o_tkn
-					  (p_cctxt->p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl, TRUE,
-					   p_cctxt->n_sched_o_tkn_per_ip_frm));
-
-		if (VCD_FAILED(rc))
-			VCD_MSG_ERROR("sched_update_client_o_tkn failed");
-	} else if (p_cctxt->status.n_int_field_cnt ==
+	if (p_cctxt->status.n_int_field_cnt == 1)
+		p_cctxt->sched_clnt_hdl->n_o_tkns++;
+	else if (p_cctxt->status.n_int_field_cnt ==
 		VCD_DEC_NUM_INTERLACED_FIELDS)
 		p_cctxt->status.n_int_field_cnt = 0;
 }
@@ -2013,36 +1834,13 @@ void vcd_handle_input_done_for_interlacing(struct vcd_clnt_ctxt_type_t *p_cctxt)
 void vcd_handle_input_done_with_trans_end(
 	struct vcd_clnt_ctxt_type_t *p_cctxt)
 {
-	u32 rc;
-	union sched_value_type sched_val;
 	if (!p_cctxt->b_decoding)
 		return;
-
 	if (p_cctxt->out_buf_pool.n_in_use <
 		p_cctxt->out_buf_pool.buf_req.n_min_count)
 		return;
-
-	rc = vcd_map_sched_status(sched_get_client_param(
-		p_cctxt->p_dev_ctxt->sched_hdl, p_cctxt->sched_clnt_hdl,
-		SCHED_I_CLNT_OTKNCURRENT, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("sched_get_client_param:OTKNCURRENT failed");
-		return;
-	}
-
-	if (!sched_val.un_value) {
-		VCD_MSG_MED("All output buffers with core are pending display");
-
-		rc = vcd_map_sched_status(sched_update_client_o_tkn(
-			p_cctxt->p_dev_ctxt->sched_hdl,
-			p_cctxt->sched_clnt_hdl,
-			TRUE,
-			p_cctxt->n_sched_o_tkn_per_ip_frm));
-
-		if (VCD_FAILED(rc))
-			VCD_MSG_ERROR("sched_update_client_o_tkn failed");
-	}
+	if (!p_cctxt->sched_clnt_hdl->n_o_tkns)
+		p_cctxt->sched_clnt_hdl->n_o_tkns++;
 }
 
 u32 vcd_handle_output_required(struct vcd_clnt_ctxt_type_t
@@ -2072,21 +1870,9 @@ u32 vcd_handle_output_required(struct vcd_clnt_ctxt_type_t
 		return VCD_ERR_BAD_STATE;
 	}
 
-	rc = vcd_map_sched_status(sched_re_queue_frame(
-			p_cctxt->p_dev_ctxt->sched_hdl,
-			p_cctxt->sched_clnt_hdl,
-			(void *) p_transc->p_ip_buf_entry));
-
-	VCD_FAILED_RETURN(rc, "Failed: sched_re_queue_frame");
-
-	if (p_transc->p_ip_buf_entry->frame.n_flags &
-		VCD_FRAME_FLAG_EOS) {
-		rc = vcd_map_sched_status(sched_mark_client_eof(
-			p_cctxt->p_dev_ctxt->sched_hdl,
-			p_cctxt->sched_clnt_hdl));
-	}
-
-	VCD_FAILED_RETURN(rc, "Failed: sched_mark_client_eof");
+	rc = vcd_sched_queue_buffer(p_cctxt->sched_clnt_hdl,
+			p_transc->p_ip_buf_entry, FALSE);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_queue_buffer");
 
 	p_transc->p_ip_buf_entry = NULL;
 	p_transc->b_in_use = FALSE;
@@ -2143,7 +1929,7 @@ u32 vcd_handle_frame_done(
 	struct vcd_clnt_ctxt_type_t *p_cctxt,
 	 void *p_payload, u32 event, u32 status)
 {
-	struct vcd_buffer_entry_type *p_op_buf_entry;
+	struct vcd_buffer_entry_type *p_op_buf_entry = NULL;
 	struct ddl_frame_data_type_tag *p_op_frm =
 		(struct ddl_frame_data_type_tag *) p_payload;
 	struct vcd_transc_type *p_transc;
@@ -2203,16 +1989,11 @@ u32 vcd_handle_frame_done(
 	}
 
 	if (status != VCD_ERR_INTRLCD_FIELD_DROP) {
-		if (p_op_frm->vcd_frm.n_flags & VCD_FRAME_FLAG_DECODEONLY) {
-			VCD_MSG_LOW("\n[VCD] Not coded OP frame!");
-			rc = vcd_return_op_buffer_to_hw(p_cctxt,
-				&p_op_frm->vcd_frm, NULL);
-		} else
 		p_cctxt->callback(event,
-				  status,
-				  &p_op_frm->vcd_frm,
-				  sizeof(struct vcd_frame_data_type),
-				  p_cctxt, p_cctxt->p_client_data);
+			status,
+			&p_op_frm->vcd_frm,
+			sizeof(struct vcd_frame_data_type),
+			p_cctxt, p_cctxt->p_client_data);
 	}
 	return rc;
 }
@@ -2283,11 +2064,10 @@ u32 vcd_handle_first_fill_output_buffer(
 		return VCD_ERR_BAD_STATE;
 	}
 
-	if (p_cctxt->b_sched_clnt_valid)
-		rc = vcd_map_sched_status(sched_suspend_resume_client(
-	p_cctxt->p_dev_ctxt->sched_hdl,
-	p_cctxt->sched_clnt_hdl, TRUE));
-	VCD_FAILED_RETURN(rc, "Failed: Sched_SuspendResumeClient");
+	if (p_cctxt->sched_clnt_hdl)
+		rc = vcd_sched_suspend_resume_clnt(
+			p_cctxt->sched_clnt_hdl, TRUE);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
 
 	if (p_cctxt->b_decoding)
 		rc = vcd_handle_first_fill_output_buffer_for_dec(
@@ -2672,21 +2452,12 @@ u32 vcd_handle_input_frame(
 		return rc;
 	}
 
-	rc = vcd_map_sched_status(sched_queue_frame(p_dev_ctxt->sched_hdl,
-							p_cctxt->sched_clnt_hdl,
-							(void *)p_buf_entry));
-
-	VCD_FAILED_RETURN(rc, "Failed: sched_queue_frame");
+	rc = vcd_sched_queue_buffer(
+		p_cctxt->sched_clnt_hdl, p_buf_entry, TRUE);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_queue_buffer");
 
 	p_buf_entry->b_in_use = TRUE;
 	p_cctxt->in_buf_pool.n_in_use++;
-	if (p_input_frame->n_flags & VCD_FRAME_FLAG_EOS) {
-		rc = vcd_map_sched_status(sched_mark_client_eof
-					  (p_cctxt->p_dev_ctxt->sched_hdl,
-					   p_cctxt->sched_clnt_hdl));
-	}
-
-	VCD_FAILED_RETURN(rc, "Failed: sched_mark_client_eof");
 
 	vcd_try_submit_frame(p_dev_ctxt);
 	return rc;
@@ -2839,44 +2610,18 @@ u32 vcd_set_frame_rate(
 	struct vcd_clnt_ctxt_type_t *p_cctxt,
 	 struct vcd_property_frame_rate_type *p_fps)
 {
-	union sched_value_type sched_val;
 	u32 rc;
-
-	sched_val.frm_rate.n_numer = p_fps->n_fps_numerator;
-	sched_val.frm_rate.n_denom = p_fps->n_fps_denominator;
 	p_cctxt->frm_rate = *p_fps;
-
-	rc = vcd_map_sched_status(sched_set_client_param
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   p_cctxt->sched_clnt_hdl,
-				   SCHED_I_CLNT_FRAMERATE, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("rc = 0x%x. Failed: Set SCHED_I_CLNT_FRAMERATE",
-				  rc);
-	}
 
 	rc = vcd_update_clnt_perf_lvl(p_cctxt, &p_cctxt->frm_rate,
 					  p_cctxt->n_frm_p_units);
-
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_ERROR("rc = 0x%x. Failed: vcd_update_clnt_perf_lvl",
 				  rc);
 	}
+	rc = vcd_sched_update_config(p_cctxt);
 
-	sched_val.un_value = p_cctxt->n_reqd_perf_lvl;
-
-	rc = vcd_map_sched_status(sched_set_client_param
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   p_cctxt->sched_clnt_hdl,
-				   SCHED_I_CLNT_PTKNRATE, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("rc = 0x%x. Failed: Set SCHED_I_CLNT_PTKNRATE",
-				  rc);
-	}
-
-	return VCD_S_SUCCESS;
+	return rc;
 }
 
 u32 vcd_set_frame_size(
@@ -2884,7 +2629,6 @@ u32 vcd_set_frame_size(
 	 struct vcd_property_frame_size_type *p_frm_size)
 {
 	struct vcd_property_hdr_type prop_hdr;
-	union sched_value_type sched_val;
 	u32 rc;
 	u32 n_frm_p_units;
 	p_frm_size = NULL;
@@ -2892,42 +2636,19 @@ u32 vcd_set_frame_size(
 	prop_hdr.prop_id = DDL_I_FRAME_PROC_UNITS;
 	prop_hdr.n_size = sizeof(n_frm_p_units);
 	rc = ddl_get_property(p_cctxt->ddl_handle, &prop_hdr, &n_frm_p_units);
-
 	VCD_FAILED_RETURN(rc, "Failed: Get DDL_I_FRAME_PROC_UNITS");
 
-	p_cctxt->n_frm_p_units = sched_val.un_value = n_frm_p_units;
-
-	rc = vcd_map_sched_status(sched_set_client_param
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   p_cctxt->sched_clnt_hdl,
-				   SCHED_I_CLNT_PTKNPERFRM, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("rc = 0x%x. Failed: Set SCHED_I_CLNT_PTKNPERFRM",
-				  rc);
-	}
+	p_cctxt->n_frm_p_units = n_frm_p_units;
 
 	rc = vcd_update_clnt_perf_lvl(p_cctxt, &p_cctxt->frm_rate,
 					  n_frm_p_units);
-
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_ERROR("rc = 0x%x. Failed: vcd_update_clnt_perf_lvl",
 				  rc);
 	}
+	rc = vcd_sched_update_config(p_cctxt);
 
-	sched_val.un_value = p_cctxt->n_reqd_perf_lvl;
-
-	rc = vcd_map_sched_status(sched_set_client_param
-				  (p_cctxt->p_dev_ctxt->sched_hdl,
-				   p_cctxt->sched_clnt_hdl,
-				   SCHED_I_CLNT_PTKNRATE, &sched_val));
-
-	if (VCD_FAILED(rc)) {
-		VCD_MSG_ERROR("rc = 0x%x. Failed: Set SCHED_I_CLNT_PTKNRATE",
-				  rc);
-	}
-
-	return VCD_S_SUCCESS;
+	return rc;
 }
 
 void vcd_process_pending_flush_in_eos(struct vcd_clnt_ctxt_type_t *p_cctxt)
@@ -3071,14 +2792,12 @@ void vcd_handle_err_fatal(struct vcd_clnt_ctxt_type_t *p_cctxt, u32 event,
 	} else if (VCD_FAILED_CLIENT_FATAL(status)) {
 		p_cctxt->status.e_last_evt = event;
 
-		if (p_cctxt->b_sched_clnt_valid) {
-			rc = vcd_map_sched_status(sched_suspend_resume_client(
-				p_cctxt->p_dev_ctxt->sched_hdl,
-				p_cctxt->sched_clnt_hdl, FALSE));
-			if (VCD_FAILED(rc)) {
+		if (p_cctxt->sched_clnt_hdl) {
+			rc = vcd_sched_suspend_resume_clnt(
+				p_cctxt->sched_clnt_hdl, FALSE);
+			if (VCD_FAILED(rc))
 				VCD_MSG_ERROR("Failed: sched_suspend_resume_"
 					"client rc=0x%x", rc);
-			}
 		}
 		p_cctxt->callback(event, VCD_ERR_HW_FATAL, NULL, 0, p_cctxt,
 						   p_cctxt->p_client_data);
@@ -3113,27 +2832,6 @@ void vcd_handle_trans_pending(struct vcd_clnt_ctxt_type_t *p_cctxt)
 	p_cctxt->status.n_frame_submitted--;
 	p_cctxt->status.n_frame_delayed++;
 	vcd_mark_frame_channel(p_cctxt->p_dev_ctxt);
-}
-
-u32 vcd_requeue_input_frame(struct vcd_dev_ctxt_type *p_dev_ctxt,
-	struct vcd_clnt_ctxt_type_t *p_cctxt,
-	struct vcd_buffer_entry_type *p_buf_entry)
-{
-	u32 rc;
-	rc = vcd_map_sched_status(sched_re_queue_frame(p_dev_ctxt->sched_hdl,
-		p_cctxt->sched_clnt_hdl, (void *) p_buf_entry));
-
-	VCD_FAILED_RETURN(rc, "Failed: Sched_ReQueueFrame");
-
-	if (p_buf_entry->frame.n_flags & VCD_FRAME_FLAG_EOS) {
-		rc = vcd_map_sched_status(sched_mark_client_eof(p_dev_ctxt->
-			sched_hdl, p_cctxt->sched_clnt_hdl));
-	}
-
-	if (VCD_FAILED(rc))
-		VCD_MSG_ERROR("rc = 0x%x: Failed: Sched_MarkClientEOF", rc);
-
-	return rc;
 }
 
 void vcd_handle_submit_frame_failed(struct vcd_dev_ctxt_type
@@ -3224,12 +2922,11 @@ u32 vcd_handle_ind_output_reconfig(
 
 	if (p_frame)
 		rc = vcd_handle_output_required(p_cctxt, p_payload, status);
-	VCD_FAILED_RETURN(rc, "Failed: VCD_HandleInputFrameReQueue");
+	VCD_FAILED_RETURN(rc, "Failed: vcd_handle_output_required in reconfig");
 
-	rc = vcd_map_sched_status(sched_suspend_resume_client(
-		p_cctxt->p_dev_ctxt->sched_hdl,
-		p_cctxt->sched_clnt_hdl, FALSE));
-	VCD_FAILED_RETURN(rc, "Failed: Sched_SuspendResumeClient");
+	p_cctxt->sched_clnt_hdl->n_o_tkns++;
+	rc = vcd_sched_suspend_resume_clnt(p_cctxt->sched_clnt_hdl, FALSE);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
 
 	p_out_buf_pool = &p_cctxt->out_buf_pool;
 	prop_hdr.prop_id = DDL_I_OUTPUT_BUF_REQ;
@@ -3274,44 +2971,14 @@ u32 vcd_handle_ind_output_reconfig_in_flushing(
 }
 
 u32 vcd_return_op_buffer_to_hw(struct vcd_clnt_ctxt_type_t *p_cctxt,
-     struct vcd_frame_data_type *p_buffer,
-     u32 *b_handled)
+	struct vcd_buffer_entry_type *p_buf_entry)
 {
 	u32 rc = VCD_S_SUCCESS;
-	struct vcd_buffer_entry_type *p_buf_entry;
-	struct vcd_frame_data_type *p_frm_entry;
-	u32 b_q_result = TRUE;
+	struct vcd_frame_data_type *p_frm_entry = &p_buf_entry->frame;
 
 	VCD_MSG_LOW("vcd_return_op_buffer_to_hw in %d:",
 		    p_cctxt->clnt_state.e_state);
 
-	p_buf_entry = vcd_check_fill_output_buffer(p_cctxt, p_buffer);
-	if (!p_buf_entry)
-		return VCD_ERR_BAD_POINTER;
-
-	if (!p_cctxt->status.b_first_op_frame_recvd && b_handled) {
-		rc = vcd_handle_first_fill_output_buffer(p_cctxt, p_buffer,
-			b_handled);
-		if (VCD_FAILED(rc))
-			VCD_MSG_ERROR(
-			"rc = 0x%x. vcd_handle_first_fill_output_buffer", rc);
-		else
-			p_cctxt->status.b_first_op_frame_recvd = TRUE;
-
-		if (*b_handled)
-			return rc;
-	}
-
-	b_q_result =
-	    vcd_buffer_pool_entry_en_q(&p_cctxt->out_buf_pool, p_buf_entry);
-	if (!b_q_result && !p_cctxt->b_decoding) {
-		VCD_MSG_ERROR("Failed: vcd_buffer_pool_entry_en_q");
-
-		return VCD_ERR_FAIL;
-	}
-
-	p_frm_entry = &p_buf_entry->frame;
-	*p_frm_entry = *p_buffer;
 	p_frm_entry->p_physical = p_buf_entry->p_physical;
 	p_frm_entry->n_ip_frm_tag = VCD_FRAMETAG_INVALID;
 	p_frm_entry->n_intrlcd_ip_frm_tag = VCD_FRAMETAG_INVALID;
@@ -3335,16 +3002,6 @@ u32 vcd_return_op_buffer_to_hw(struct vcd_clnt_ctxt_type_t *p_cctxt,
 			p_cctxt->out_buf_pool.n_in_use++;
 			p_buf_entry->b_in_use = TRUE;
 		}
-	}
-
-	if (p_cctxt->b_sched_clnt_valid && !VCD_FAILED(rc)) {
-		rc = vcd_map_sched_status(sched_update_client_o_tkn
-					  (p_cctxt->p_dev_ctxt->
-					   sched_hdl,
-					   p_cctxt->sched_clnt_hdl,
-					   TRUE,
-					   p_cctxt->
-					   n_sched_o_tkn_per_ip_frm));
 	}
 	return rc;
 }
