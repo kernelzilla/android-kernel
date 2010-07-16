@@ -33,11 +33,16 @@
  * keeping track of which gpios are unmasked as irq sources, we avoid
  * having to do readl calls on hundreds of iomapped registers each time
  * the summary interrupt fires in order to locate the active interrupts.
+ *
+ * @wake_irqs: a bitmap for tracking which interrupt lines are enabled
+ * as wakeup sources.  When the device is suspended, interrupts which are
+ * not wakeup sources are disabled.
  */
 struct msm_gpio_dev {
 	struct gpio_chip gpio_chip;
 	spinlock_t       lock;
 	DECLARE_BITMAP(enabled_irqs, NR_MSM_GPIOS);
+	DECLARE_BITMAP(wake_irqs, NR_MSM_GPIOS);
 };
 
 static inline struct msm_gpio_dev *to_msm_gpio_dev(struct gpio_chip *chip)
@@ -195,12 +200,25 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
 	desc->chip->ack(irq);
 }
 
+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
+{
+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, irq);
+
+	if (on)
+		set_bit(gpio, msm_gpio.wake_irqs);
+	else
+		clear_bit(gpio, msm_gpio.wake_irqs);
+
+	return 0;
+}
+
 static struct irq_chip msm_gpio_irq_chip = {
 	.name		= "msm_gpio",
 	.mask		= msm_gpio_irq_mask,
 	.unmask		= msm_gpio_irq_unmask,
 	.ack		= msm_gpio_irq_ack,
 	.set_type	= msm_gpio_irq_set_type,
+	.set_wake	= msm_gpio_irq_set_wake,
 };
 
 static int __devinit msm_gpio_probe(struct platform_device *dev)
@@ -209,6 +227,7 @@ static int __devinit msm_gpio_probe(struct platform_device *dev)
 
 	spin_lock_init(&msm_gpio.lock);
 	bitmap_zero(msm_gpio.enabled_irqs, NR_MSM_GPIOS);
+	bitmap_zero(msm_gpio.wake_irqs, NR_MSM_GPIOS);
 	msm_gpio.gpio_chip.label = dev->name;
 	ret = gpiochip_add(&msm_gpio.gpio_chip);
 	if (ret < 0)
