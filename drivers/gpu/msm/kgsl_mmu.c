@@ -551,7 +551,7 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 				unsigned int *gpuaddr,
 				unsigned int flags)
 {
-	int numpages;
+	int numpages, i;
 	unsigned int pte, ptefirst, ptelast, physaddr;
 	int flushtlb, alloc_size;
 	unsigned int align = flags & KGSL_MEMFLAGS_ALIGN_MASK;
@@ -653,16 +653,14 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	/* Invalidate tlb only if current page table used by GPU is the
 	 * pagetable that we used to allocate */
 	if (flushtlb) {
-		device = kgsl_get_yamato_generic_device();
-		if ((device->flags & KGSL_FLAGS_INITIALIZED)
-				&& (pagetable == device->mmu.hwpagetable)) {
-			device->mmu.tlb_flags |= KGSL_MMUFLAGS_TLBFLUSH;
-		}
-		if (kgsl_driver.base_dev[KGSL_DEVICE_G12] != NULL) {
-			device = kgsl_get_g12_generic_device();
-			if ((device->flags & KGSL_FLAGS_INITIALIZED) &&
-				(pagetable == device->mmu.hwpagetable)) {
-				device->mmu.tlb_flags |= KGSL_MMUFLAGS_TLBFLUSH;
+		for (i = 0; i < kgsl_driver.num_devs; i++) {
+			device = kgsl_driver.devp[i];
+			if (device != NULL) {
+				if ((device->flags & KGSL_FLAGS_INITIALIZED) &&
+				    (pagetable == device->mmu.hwpagetable)) {
+					device->mmu.tlb_flags |=
+							KGSL_MMUFLAGS_TLBFLUSH;
+				}
 			}
 		}
 		GSL_TLBFLUSH_FILTER_RESET();

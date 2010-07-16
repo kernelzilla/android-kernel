@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -73,6 +73,7 @@ static const unsigned int kgsl_cfg_rb_blksizequadwords  = GSL_RB_SIZE_16;
 
 
 struct kgsl_device;
+struct kgsl_device_private;
 struct kgsl_drawctxt;
 struct kgsl_ringbuffer;
 
@@ -239,7 +240,8 @@ struct kgsl_ringbuffer {
 
 struct kgsl_mem_entry;
 
-int kgsl_ringbuffer_issueibcmds(struct kgsl_device *, int drawctxt_index,
+int kgsl_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
+				int drawctxt_index,
 				uint32_t ibaddr, int sizedwords,
 				uint32_t *timestamp,
 				unsigned int flags);
@@ -257,7 +259,7 @@ int kgsl_ringbuffer_gettimestampshadow(struct kgsl_device *device,
 					unsigned int *sopaddr,
 					unsigned int *eopaddr);
 
-void kgsl_ringbuffer_watchdog(void);
+void kgsl_ringbuffer_watchdog(struct kgsl_device *device);
 
 void kgsl_cp_intrcallback(struct kgsl_device *device);
 
