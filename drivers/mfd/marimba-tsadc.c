@@ -660,7 +660,7 @@ static void __exit marimba_tsadc_exit(void)
 {
 	return platform_driver_unregister(&tsadc_driver);
 }
-device_exit(marimba_tsadc_exit);
+module_exit(marimba_tsadc_exit);
 
 MODULE_DESCRIPTION("Marimba TSADC driver");
 MODULE_VERSION("0.1");
