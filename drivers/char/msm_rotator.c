@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
+#include <mach/clk.h>
 #include <linux/android_pmem.h>
 #include <linux/msm_rotator.h>
 #include <linux/io.h>
@@ -57,8 +58,6 @@
 #define MSM_ROTATOR_OUT_YSTRIDE2		(MSM_ROTATOR_BASE+0x117c)
 #define MSM_ROTATOR_SRC_XY			(MSM_ROTATOR_BASE+0x1200)
 #define MSM_ROTATOR_SRC_IMAGE_SIZE		(MSM_ROTATOR_BASE+0x1208)
-
-#define MSM_ROTATOR_HW_VERSION_VALUE 0x1000303
 
 #define MSM_ROTATOR_MAX_ROT	0x07
 #define MSM_ROTATOR_MAX_H	0x1fff
@@ -1018,7 +1017,8 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 {
 	int rc = 0;
 	struct resource *res;
-	int i;
+	struct msm_rotator_platform_data *pdata = NULL;
+	int i, number_of_clks;
 	uint32_t ver;
 
 	msm_rotator_dev = kzalloc(sizeof(struct msm_rotator_dev), GFP_KERNEL);
@@ -1033,38 +1033,66 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 
 	msm_rotator_dev->imem_owner = IMEM_NO_OWNER;
 	mutex_init(&msm_rotator_dev->imem_lock);
+	pdata = pdev->dev.platform_data;
+	number_of_clks = pdata->number_of_clocks;
 
 	msm_rotator_dev->imem_clk_state = CLK_DIS;
 	INIT_DELAYED_WORK(&msm_rotator_dev->imem_clk_work,
 			  msm_rotator_imem_clk_work_f);
-	msm_rotator_dev->imem_clk =
-		clk_get(&msm_rotator_dev->pdev->dev, "rotator_imem_clk");
-	if (IS_ERR(msm_rotator_dev->imem_clk)) {
-		rc = PTR_ERR(msm_rotator_dev->imem_clk);
-		msm_rotator_dev->imem_clk = NULL;
-		printk(KERN_ERR "%s: cannot get imem_clk rc=%d\n",
-		       DRIVER_NAME, rc);
-		goto error_imem_clk;
-	}
 
-	msm_rotator_dev->pclk =
-		clk_get(&msm_rotator_dev->pdev->dev, "rotator_pclk");
-	if (IS_ERR(msm_rotator_dev->pclk)) {
-		rc = PTR_ERR(msm_rotator_dev->pclk);
-		msm_rotator_dev->pclk = NULL;
-		printk(KERN_ERR "%s: cannot get pclk rc=%d\n",
-		       DRIVER_NAME, rc);
-		goto error_pclk;
-	}
-	msm_rotator_dev->axi_clk =
-		clk_get(&msm_rotator_dev->pdev->dev, "rotator_clk");
-	if (IS_ERR(msm_rotator_dev->axi_clk)) {
-		rc = PTR_ERR(msm_rotator_dev->axi_clk);
-		msm_rotator_dev->axi_clk = NULL;
-		printk(KERN_ERR "%s: cannot get axi clk rc=%d\n",
-		       DRIVER_NAME, rc);
-		goto error_axi_clk;
-	}
+	msm_rotator_dev->imem_clk = NULL;
+	for (i = 0; i < number_of_clks; i++) {
+		if (pdata->rotator_clks[i].clk_type == ROTATOR_IMEM_CLK) {
+			msm_rotator_dev->imem_clk =
+			clk_get(&msm_rotator_dev->pdev->dev,
+				pdata->rotator_clks[i].clk_name);
+			if (IS_ERR(msm_rotator_dev->imem_clk)) {
+				rc = PTR_ERR(msm_rotator_dev->imem_clk);
+				msm_rotator_dev->imem_clk = NULL;
+				printk(KERN_ERR "%s: cannot get imem_clk "
+					"rc=%d\n", DRIVER_NAME, rc);
+				goto error_imem_clk;
+			}
+			if (pdata->rotator_clks[i].clk_rate)
+				clk_set_min_rate(msm_rotator_dev->imem_clk,
+					pdata->rotator_clks[i].clk_rate);
+		}
+
+		if (pdata->rotator_clks[i].clk_type == ROTATOR_PCLK) {
+			msm_rotator_dev->pclk =
+			clk_get(&msm_rotator_dev->pdev->dev,
+				pdata->rotator_clks[i].clk_name);
+			if (IS_ERR(msm_rotator_dev->pclk)) {
+				rc = PTR_ERR(msm_rotator_dev->pclk);
+				msm_rotator_dev->pclk = NULL;
+				printk(KERN_ERR "%s: cannot get pclk rc=%d\n",
+					DRIVER_NAME, rc);
+				goto error_pclk;
+			}
+
+			if (pdata->rotator_clks[i].clk_rate)
+				clk_set_min_rate(msm_rotator_dev->pclk,
+					pdata->rotator_clks[i].clk_rate);
+		}
+
+		if (pdata->rotator_clks[i].clk_type == ROTATOR_AXI_CLK) {
+			msm_rotator_dev->axi_clk =
+			clk_get(&msm_rotator_dev->pdev->dev,
+				pdata->rotator_clks[i].clk_name);
+			if (IS_ERR(msm_rotator_dev->axi_clk)) {
+				rc = PTR_ERR(msm_rotator_dev->axi_clk);
+				msm_rotator_dev->axi_clk = NULL;
+				printk(KERN_ERR "%s: cannot get axi clk "
+					"rc=%d\n", DRIVER_NAME, rc);
+			goto error_axi_clk;
+			}
+
+			if (pdata->rotator_clks[i].clk_rate)
+				clk_set_min_rate(msm_rotator_dev->axi_clk,
+					pdata->rotator_clks[i].clk_rate);
+		}
+}
+
 	msm_rotator_dev->rot_clk_state = CLK_DIS;
 	INIT_DELAYED_WORK(&msm_rotator_dev->rot_clk_work,
 			  msm_rotator_rot_clk_work_f);
@@ -1072,7 +1100,6 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	mutex_init(&msm_rotator_dev->rotator_lock);
 
 	msm_rotator_dev->pdev = pdev;
-/*	pdev->dev.driver_data = msm_rotator_dev; */
 	platform_set_drvdata(pdev, msm_rotator_dev);
 
 
@@ -1085,12 +1112,15 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	}
 	msm_rotator_dev->io_base = ioremap(res->start,
 					   resource_size(res));
-	clk_enable(msm_rotator_dev->imem_clk);
+    if (msm_rotator_dev->imem_clk)
+		clk_enable(msm_rotator_dev->imem_clk);
+
 	enable_rot_clks();
 	ver = ioread32(MSM_ROTATOR_HW_VERSION);
 	disable_rot_clks();
-	clk_disable(msm_rotator_dev->imem_clk);
-	if (ver != MSM_ROTATOR_HW_VERSION_VALUE) {
+    if (msm_rotator_dev->imem_clk)
+		clk_disable(msm_rotator_dev->imem_clk);
+	if (ver != pdata->hardware_version_number) {
 		printk(KERN_ALERT "%s: invalid HW version\n", DRIVER_NAME);
 		rc = -ENODEV;
 		goto error_get_resource;
@@ -1166,7 +1196,8 @@ error_get_resource:
 error_axi_clk:
 	clk_put(msm_rotator_dev->pclk);
 error_pclk:
-	clk_put(msm_rotator_dev->imem_clk);
+	if (msm_rotator_dev->imem_clk)
+		clk_put(msm_rotator_dev->imem_clk);
 error_imem_clk:
 	mutex_destroy(&msm_rotator_dev->imem_lock);
 	kfree(msm_rotator_dev);
@@ -1188,7 +1219,8 @@ static int __devexit msm_rotator_remove(struct platform_device *plat_dev)
 	if (msm_rotator_dev->imem_clk_state == CLK_EN)
 		clk_disable(msm_rotator_dev->imem_clk);
 	clk_put(msm_rotator_dev->imem_clk);
-	msm_rotator_dev->imem_clk = NULL;
+	if (msm_rotator_dev->imem_clk)
+		msm_rotator_dev->imem_clk = NULL;
 	if (msm_rotator_dev->rot_clk_state == CLK_EN)
 		disable_rot_clks();
 	clk_put(msm_rotator_dev->pclk);
