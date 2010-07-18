@@ -4707,7 +4707,7 @@ static void __init msm7x30_init(void)
 	i2c_register_board_info(0, msm_i2c_board_info,
 			ARRAY_SIZE(msm_i2c_board_info));
 
-	if (machine_is_msm7x30_surf() || machine_is_msm7x30_ffa())
+	if (!machine_is_msm8x55_svlte_ffa())
 		marimba_pdata.tsadc = &marimba_tsadc_pdata;
 
 	i2c_register_board_info(2, msm_marimba_board_info,
