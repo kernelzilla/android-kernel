@@ -171,6 +171,7 @@ struct msm_sync {
 	uint32_t pp_mask;
 	struct msm_queue_cmd *pp_prev;
 	struct msm_queue_cmd *pp_snap;
+	struct msm_queue_cmd *pp_thumb;
 
 	const char *apps_id;
 
