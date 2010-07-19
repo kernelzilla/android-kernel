@@ -151,6 +151,10 @@ kgsl_mmu_isenabled(struct kgsl_mmu *mmu)
 
 int kgsl_mmu_init(struct kgsl_device *device);
 
+int kgsl_mmu_start(struct kgsl_device *device);
+
+int kgsl_mmu_stop(struct kgsl_device *device);
+
 int kgsl_mmu_close(struct kgsl_device *device);
 
 struct kgsl_pagetable *kgsl_mmu_getpagetable(struct kgsl_mmu *mmu,

@@ -54,9 +54,8 @@ static void kgsl_put_phys_file(struct file *file);
 
 static int kgsl_runpending(struct kgsl_device *device)
 {
-	if (device->flags & KGSL_FLAGS_INITIALIZED) {
+	if (device->flags & KGSL_FLAGS_STARTED)
 		kgsl_cmdstream_memqueue_drain(device);
-	}
 
 	return KGSL_SUCCESS;
 }
@@ -610,7 +609,6 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 	dev_priv->ctxt_id_mask = 0;
 	dev_priv->device = device;
 	dev_priv->pid = task_pid_nr(current);
-	dev_priv->device->id = minor;
 	filep->private_data = dev_priv;
 
 	list_add(&dev_priv->list, &kgsl_driver.dev_priv_list);
@@ -1501,7 +1499,7 @@ static void kgsl_driver_cleanup(void)
 static int kgsl_add_device(int dev_idx)
 {
 	struct kgsl_device *device;
-	int err = KGSL_FAILURE;
+	int err = 0;
 
 	/* init fields which kgsl_open() will use */
 	if (dev_idx == KGSL_DEVICE_YAMATO) {
@@ -1516,13 +1514,11 @@ static int kgsl_add_device(int dev_idx)
 			goto done;
 		kgsl_driver.devp[KGSL_DEVICE_G12] = device;
 		err = kgsl_g12_getfunctable(&device->ftbl);
-	}
-	if (err != KGSL_SUCCESS) {
-		KGSL_DRV_ERR("kgsl_*_getfunctable() failed dev_idx=%d\n",
-					dev_idx);
+	} else {
+		err = -EINVAL;
 		goto done;
 	}
-	err = KGSL_SUCCESS;
+
 	atomic_set(&device->open_count, -1);
 
  done:
