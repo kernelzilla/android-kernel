@@ -378,12 +378,10 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		get_cpu_var(msm_active_clock) = clock;
 		put_cpu_var(msm_active_clock);
 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
-#if defined(CONFIG_MSM_SMD)
 		if (clock != &msm_clocks[MSM_CLOCK_GPT])
 			writel(TIMER_ENABLE_EN,
 				msm_clocks[MSM_CLOCK_GPT].regbase +
 			       TIMER_ENABLE);
-#endif
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
@@ -395,13 +393,11 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 			msm_read_timer_count(clock, LOCAL_TIMER) +
 			clock_state->sleep_offset;
 		writel(0, clock->regbase + TIMER_ENABLE);
-#if defined(CONFIG_MSM_SMD)
 		if (clock != &msm_clocks[MSM_CLOCK_GPT]) {
 			gpt_state->in_sync = 0;
 			writel(0, msm_clocks[MSM_CLOCK_GPT].regbase +
 			       TIMER_ENABLE);
 		}
-#endif
 		break;
 	}
 	local_irq_restore(irq_flags);
