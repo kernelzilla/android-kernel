@@ -60,13 +60,14 @@ static uint32_t bytes_per_pixel[] = {
 extern uint32 mdp_plv[];
 extern struct semaphore mdp_ppp_mutex;
 
-uint32_t mdp_get_bytes_per_pixel(uint32_t format)
+int mdp_get_bytes_per_pixel(uint32_t format)
 {
-	uint32_t bpp = 0;
+	int bpp = -EINVAL;
 	if (format < ARRAY_SIZE(bytes_per_pixel))
 		bpp = bytes_per_pixel[format];
 
-	BUG_ON(!bpp);
+	if (bpp <= 0)
+		printk(KERN_ERR "%s incorrect format %d\n", __func__, format);
 	return bpp;
 }
 
