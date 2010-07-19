@@ -59,6 +59,8 @@ kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 
 	if (g_z1xx.numcontext == 0)
 		return KGSL_FAILURE;
+	if (g_z1xx.prevctx == drawctxt_id)
+		g_z1xx.prevctx = KGSL_G12_INVALID_CONTEXT;
 
 	g_z1xx.numcontext--;
 

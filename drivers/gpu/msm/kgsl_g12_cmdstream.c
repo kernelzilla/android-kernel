@@ -45,6 +45,11 @@ int kgsl_g12_cmdstream_check_timestamp(struct kgsl_g12_device *g12_device,
 
 int kgsl_g12_cmdstream_init(struct kgsl_device *device)
 {
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
+	memset(&g_z1xx, 0, sizeof(struct kgsl_g12_z1xx));
+	g_z1xx.prevctx = KGSL_G12_INVALID_CONTEXT;
+	g12_device->timestamp = 0;
+	g12_device->current_timestamp = 0;
 	return kgsl_sharedmem_alloc(0, KGSL_G12_RB_SIZE, &g_z1xx.cmdbufdesc);
 }
 
@@ -79,12 +84,8 @@ int kgsl_g12_cmdstream_start(struct kgsl_device *device)
 
 void kgsl_g12_cmdstream_close(struct kgsl_device *device)
 {
-	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
-
 	kgsl_sharedmem_free(&g_z1xx.cmdbufdesc);
 	memset(&g_z1xx, 0, sizeof(struct kgsl_g12_z1xx));
-	g12_device->timestamp = 0;
-	g12_device->current_timestamp = 0;
 }
 
 static int room_in_rb(struct kgsl_g12_device *device)
@@ -143,9 +144,11 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 	tmp.hostptr = (void *)*timestamp;
 
 	KGSL_CMD_INFO("ctxt %d ibaddr 0x%08x sizedwords %d",
-			drawctxt_index, ibaddr, sizedwords);
+		      drawctxt_index, ibaddr, sizedwords);
 	/* context switch */
 	if (drawctxt_index != (int)g_z1xx.prevctx) {
+		KGSL_CMD_INFO("context switch %d -> %d",
+				drawctxt_index, g_z1xx.prevctx);
 		kgsl_mmu_setstate(device, pagetable);
 		cnt = PACKETSIZE_STATESTREAM;
 		ofs = 0;
