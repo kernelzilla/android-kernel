@@ -774,7 +774,8 @@ void gpio_unexport(unsigned gpio)
 			status = 0;
 		} else
 			status = -ENODEV;
-	}
+	} else
+		status = 0;
 
 	mutex_unlock(&sysfs_lock);
 done:
