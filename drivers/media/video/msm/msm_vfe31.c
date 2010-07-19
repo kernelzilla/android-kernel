@@ -597,8 +597,6 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		/* use wm0& 4 for preview, wm1&5 for video.*/
 		if ((ad->bufnum1 < 2) || (ad->bufnum2 < 2))
 			return -EINVAL;
-		*p++ = 0x1;    /* xbar cfg0 */
-		*p = 0x1a03;    /* xbar cfg1 */
 		vfe31_ctrl->outpath.out0.ch0 = 0; /* preview luma   */
 		vfe31_ctrl->outpath.out0.ch1 = 4; /* preview chroma */
 		vfe31_ctrl->outpath.out2.ch0 = 1; /* video luma     */
