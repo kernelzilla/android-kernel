@@ -28,19 +28,19 @@
 #include "kgsl_g12_vgv3types.h"
 #include "g12_reg.h"
 
-struct kgsl_g12_z1xx g_z1xx = {0};
-
 int
 kgsl_g12_drawctxt_create(struct kgsl_device_private *dev_priv,
 			uint32_t unused,
 			unsigned int *drawctxt_id)
 {
 	unsigned int ctx_id;
+	struct kgsl_device *device = dev_priv->device;
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 
 	ctx_id = ffz(dev_priv->ctxt_id_mask);
 
-	g_z1xx.numcontext++;
-	if (g_z1xx.numcontext > KGSL_G12_CONTEXT_MAX) {
+	g12_device->ringbuffer.numcontext++;
+	if (g12_device->ringbuffer.numcontext > KGSL_G12_CONTEXT_MAX) {
 		*drawctxt_id = 0;
 		return KGSL_FAILURE;
 
@@ -54,15 +54,16 @@ int
 kgsl_g12_drawctxt_destroy(struct kgsl_device *device,
 			unsigned int drawctxt_id)
 {
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 	if (drawctxt_id >= KGSL_G12_CONTEXT_MAX)
 		return KGSL_FAILURE;
 
-	if (g_z1xx.numcontext == 0)
+	if (g12_device->ringbuffer.numcontext == 0)
 		return KGSL_FAILURE;
-	if (g_z1xx.prevctx == drawctxt_id)
-		g_z1xx.prevctx = KGSL_G12_INVALID_CONTEXT;
+	if (g12_device->ringbuffer.prevctx == drawctxt_id)
+		g12_device->ringbuffer.prevctx = KGSL_G12_INVALID_CONTEXT;
 
-	g_z1xx.numcontext--;
+	g12_device->ringbuffer.numcontext--;
 
 	return KGSL_SUCCESS;
 }
