@@ -93,42 +93,43 @@
 #define VEN_CODEC_H263	3/* H.263 Codec */
 
 /*Video codec profile types.*/
-#define VEN_PROFILE_MPEG4_SP	1/* 1 - MPEG4 SP profile  */
-#define VEN_PROFILE_MPEG4_ASP	2/* 2 - MPEG4 ASP profile */
-#define VEN_PROFILE_H264_BASELINE	3/* 3 - H264 Baseline profile	*/
-#define VEN_PROFILE_H264_MAIN	4/* 4 - H264 Main profile*/
-#define VEN_PROFILE_H264_HIGH	5/* 5 - H264 High profile*/
-#define VEN_PROFILE_H263_BASELINE	6/* 6 - H263 Baseline profile */
+#define VEN_PROFILE_MPEG4_SP      1/* 1 - MPEG4 SP profile      */
+#define VEN_PROFILE_MPEG4_ASP     2/* 2 - MPEG4 ASP profile     */
+#define VEN_PROFILE_H264_BASELINE 3/* 3 - H264 Baseline profile	*/
+#define VEN_PROFILE_H264_MAIN     4/* 4 - H264 Main profile     */
+#define VEN_PROFILE_H264_HIGH     5/* 5 - H264 High profile     */
+#define VEN_PROFILE_H263_BASELINE 6/* 6 - H263 Baseline profile */
 
 /*Video codec profile level types.*/
-#define VEN_LEVEL_MPEG4_0	0x1/* MPEG4 Level 0	 */
-#define VEN_LEVEL_MPEG4_1	0x2/* MPEG4 Level 1	 */
-#define VEN_LEVEL_MPEG4_2	0x3/* MPEG4 Level 2	 */
-#define VEN_LEVEL_MPEG4_3	0x4/* MPEG4 Level 3	 */
-#define VEN_LEVEL_MPEG4_4	0x5/* MPEG4 Level 4	 */
-#define VEN_LEVEL_MPEG4_5	0x6/* MPEG4 Level 5	 */
-#define VEN_LEVEL_MPEG4_3b	0x7/* MPEG4 Level 3b  */
-#define VEN_LEVEL_MPEG4_6	0x8/* MPEG4 Level 6	 */
+#define VEN_LEVEL_MPEG4_0	 0x1/* MPEG4 Level 0  */
+#define VEN_LEVEL_MPEG4_1	 0x2/* MPEG4 Level 1  */
+#define VEN_LEVEL_MPEG4_2	 0x3/* MPEG4 Level 2  */
+#define VEN_LEVEL_MPEG4_3	 0x4/* MPEG4 Level 3  */
+#define VEN_LEVEL_MPEG4_4	 0x5/* MPEG4 Level 4  */
+#define VEN_LEVEL_MPEG4_5	 0x6/* MPEG4 Level 5  */
+#define VEN_LEVEL_MPEG4_3b	 0x7/* MPEG4 Level 3b */
+#define VEN_LEVEL_MPEG4_6	 0x8/* MPEG4 Level 6  */
 
-#define VEN_LEVEL_H264_1	0x9/* H.264 Level 1	 */
-#define VEN_LEVEL_H264_1b 0xA/* H.264 Level 1b  */
-#define VEN_LEVEL_H264_1p1	0xB/* H.264 Level 1.1 */
-#define VEN_LEVEL_H264_1p2	0xC/* H.264 Level 1.2 */
-#define VEN_LEVEL_H264_1p3	0xD/* H.264 Level 1.3 */
-#define VEN_LEVEL_H264_2	0xE/* H.264 Level 2	 */
-#define VEN_LEVEL_H264_2p1	0xF/* H.264 Level 2.1 */
+#define VEN_LEVEL_H264_1	 0x9/* H.264 Level 1   */
+#define VEN_LEVEL_H264_1b        0xA/* H.264 Level 1b  */
+#define VEN_LEVEL_H264_1p1	 0xB/* H.264 Level 1.1 */
+#define VEN_LEVEL_H264_1p2	 0xC/* H.264 Level 1.2 */
+#define VEN_LEVEL_H264_1p3	 0xD/* H.264 Level 1.3 */
+#define VEN_LEVEL_H264_2	 0xE/* H.264 Level 2   */
+#define VEN_LEVEL_H264_2p1	 0xF/* H.264 Level 2.1 */
 #define VEN_LEVEL_H264_2p2	0x10/* H.264 Level 2.2 */
-#define VEN_LEVEL_H264_3	0x11/* H.264 Level 3	 */
+#define VEN_LEVEL_H264_3	0x11/* H.264 Level 3   */
 #define VEN_LEVEL_H264_3p1	0x12/* H.264 Level 3.1 */
+#define VEN_LEVEL_H264_4	0x13/* H.264 Level 4   */
 
-#define VEN_LEVEL_H263_10	0x13/* H.263 Level 10  */
-#define VEN_LEVEL_H263_20	0x14/* H.263 Level 20  */
-#define VEN_LEVEL_H263_30	0x15/* H.263 Level 30  */
-#define VEN_LEVEL_H263_40	0x16/* H.263 Level 40  */
-#define VEN_LEVEL_H263_45	0x17/* H.263 Level 45  */
-#define VEN_LEVEL_H263_50	0x18/* H.263 Level 50  */
-#define VEN_LEVEL_H263_60	0x19/* H.263 Level 60  */
-#define VEN_LEVEL_H263_70	0x1A/* H.263 Level 70  */
+#define VEN_LEVEL_H263_10	0x14/* H.263 Level 10  */
+#define VEN_LEVEL_H263_20	0x15/* H.263 Level 20  */
+#define VEN_LEVEL_H263_30	0x16/* H.263 Level 30  */
+#define VEN_LEVEL_H263_40	0x17/* H.263 Level 40  */
+#define VEN_LEVEL_H263_45	0x18/* H.263 Level 45  */
+#define VEN_LEVEL_H263_50	0x19/* H.263 Level 50  */
+#define VEN_LEVEL_H263_60	0x1A/* H.263 Level 60  */
+#define VEN_LEVEL_H263_70	0x1B/* H.263 Level 70  */
 
 /*Entropy coding model selection for H.264 encoder.*/
 #define VEN_ENTROPY_MODEL_CAVLC	1
