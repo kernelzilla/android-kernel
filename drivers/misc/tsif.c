@@ -933,6 +933,7 @@ static int action_open(struct msm_tsif_device *tsif_device)
 	 * DMA should be scheduled prior to TSIF hardware initialization,
 	 * otherwise "bus error" will be reported by Data Mover
 	 */
+	enable_irq(tsif_device->irq);
 	tsif_clock(tsif_device, 1);
 	tsif_dma_schedule(tsif_device);
 	rc = tsif_start_hw(tsif_device);
@@ -957,6 +958,7 @@ static int action_close(struct msm_tsif_device *tsif_device)
 	tsif_stop_hw(tsif_device);
 	tsif_dma_exit(tsif_device);
 	tsif_clock(tsif_device, 0);
+	disable_irq(tsif_device->irq);
 	wake_unlock(&tsif_device->wake_lock);
 	return 0;
 }
@@ -1206,6 +1208,7 @@ static int __init msm_tsif_probe(struct platform_device *pdev)
 		tsif_device->irq = rc;
 		rc = request_irq(tsif_device->irq, tsif_irq, IRQF_SHARED,
 				 dev_name(&pdev->dev), tsif_device);
+		disable_irq(tsif_device->irq);
 	}
 	if (rc) {
 		dev_err(&pdev->dev, "failed to request IRQ %d : %d\n",
