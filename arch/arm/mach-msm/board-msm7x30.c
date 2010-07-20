@@ -4636,33 +4636,6 @@ vreg_fail:
 	return rc;
 }
 
-static struct cy8c_ts_platform_data cy8ctma300_pdata = {
-	.power_on = tma300_power,
-	.ts_name = "msm_tma300_ts",
-	.dis_min_x = 0,
-	.dis_max_x = 479,
-	.dis_min_y = 0,
-	.dis_max_y = 799,
-	.res_x	 = 479,
-	.res_y	 = 1009,
-	.min_tid = 1,
-	.max_tid = 255,
-	.min_touch = 0,
-	.max_touch = 255,
-	.min_width = 0,
-	.max_width = 255,
-	.use_polling = 1,
-	.invert_y = 1,
-	.nfingers = 4,
-};
-
-static struct i2c_board_info cy8ctma300_board_info[] = {
-	{
-		I2C_BOARD_INFO("cy8ctma300", 0x2),
-		.platform_data = &cy8ctma300_pdata,
-	}
-};
-
 /*virtual key support */
 static ssize_t tma300_vkeys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
@@ -4691,71 +4664,106 @@ static struct attribute_group tma300_properties_attr_group = {
 	.attrs = tma300_properties_attrs,
 };
 
+static struct kobject *properties_kobj;
+
 #define TS_GPIO_IRQ 150
 
-static void tma300_init(void)
+static int tma300_dev_setup(bool enable)
 {
-	struct kobject *properties_kobj;
 	int i, rc;
-	/* enable voltage sources */
-	for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++) {
-		vregs_tma300[i] = vreg_get(NULL, vregs_tma300_name[i]);
-		if (IS_ERR(vregs_tma300[i])) {
-			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
-				__func__, vregs_tma300_name[i],
-				PTR_ERR(vregs_tma300[i]));
-			rc = PTR_ERR(vregs_tma300[i]);
-			goto vreg_get_fail;
+
+	if (enable) {
+		/* get voltage sources */
+		for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++) {
+			vregs_tma300[i] = vreg_get(NULL, vregs_tma300_name[i]);
+			if (IS_ERR(vregs_tma300[i])) {
+				pr_err("%s: vreg get %s failed (%ld)\n",
+					__func__, vregs_tma300_name[i],
+					PTR_ERR(vregs_tma300[i]));
+				rc = PTR_ERR(vregs_tma300[i]);
+				goto vreg_get_fail;
+			}
+			rc = vreg_set_level(vregs_tma300[i],
+					vregs_tma300_val[i]);
+			if (rc) {
+				pr_err("%s: vreg_set_level() = %d\n",
+					__func__, rc);
+				i++;
+				goto vreg_get_fail;
+			}
 		}
-		rc = vreg_set_level(vregs_tma300[i],
-				vregs_tma300_val[i]);
+
+		/* enable interrupt gpio */
+		rc = gpio_tlmm_config(GPIO_CFG(TS_GPIO_IRQ, 0, GPIO_INPUT,
+				GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
 		if (rc) {
-			printk(KERN_ERR "%s: vreg_set_level() = %d\n",
-				__func__, rc);
+			pr_err("%s: Could not configure gpio %d\n",
+					__func__, TS_GPIO_IRQ);
 			goto vreg_get_fail;
 		}
+
+		rc = gpio_request(TS_GPIO_IRQ, "ts_irq");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n",
+					__func__, TS_GPIO_IRQ, rc);
+			goto vreg_get_fail;
+		}
+
+		/* virtual keys */
+		properties_kobj = kobject_create_and_add("board_properties",
+					NULL);
+		if (properties_kobj)
+			rc = sysfs_create_group(properties_kobj,
+				&tma300_properties_attr_group);
+		if (!properties_kobj || rc)
+			pr_err("%s: failed to create board_properties\n",
+					__func__);
+	} else {
+		/* put voltage sources */
+		for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++)
+			vreg_put(vregs_tma300[i]);
+		/* free gpio */
+		gpio_free(TS_GPIO_IRQ);
+		/* destroy virtual keys */
+		if (properties_kobj)
+			sysfs_remove_group(properties_kobj,
+				&tma300_properties_attr_group);
 	}
-	/* enable interrupt gpio */
-	rc = gpio_tlmm_config(GPIO_CFG(TS_GPIO_IRQ, 0, GPIO_INPUT,
-			GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
-	if (rc) {
-		printk(KERN_ALERT "%s: Could not configure gpio %d\n",
-				__func__, TS_GPIO_IRQ);
-		goto vreg_get_fail;
-	}
+	return 0;
 
-	rc = gpio_request(TS_GPIO_IRQ, "ts_irq");
-	if (rc) {
-		pr_err("%s: unable to request gpio %d (%d)\n",
-				__func__, TS_GPIO_IRQ, rc);
-		goto vreg_get_fail;
-	}
-
-	/* Initialize platform data for fluid v2 hardware */
-	if (SOCINFO_VERSION_MAJOR(socinfo_get_platform_version()) == 2) {
-		cy8ctma300_pdata.res_y = 920;
-		cy8ctma300_pdata.invert_y = 0;
-		cy8ctma300_pdata.use_polling = 0;
-		cy8ctma300_board_info[0].irq = MSM_GPIO_TO_INT(TS_GPIO_IRQ);
-	}
-
-	i2c_register_board_info(0, cy8ctma300_board_info,
-		ARRAY_SIZE(cy8ctma300_board_info));
-
-	/* virtual keys */
-	properties_kobj = kobject_create_and_add("board_properties",
-				NULL);
-	if (properties_kobj)
-		rc = sysfs_create_group(properties_kobj,
-			&tma300_properties_attr_group);
-	if (!properties_kobj || rc)
-		pr_err("failed to create board_properties\n");
-
-	return;
 vreg_get_fail:
 	while (i)
 		vreg_put(vregs_tma300[--i]);
+	return rc;
 }
+
+static struct cy8c_ts_platform_data cy8ctma300_pdata = {
+	.power_on = tma300_power,
+	.dev_setup = tma300_dev_setup,
+	.ts_name = "msm_tma300_ts",
+	.dis_min_x = 0,
+	.dis_max_x = 479,
+	.dis_min_y = 0,
+	.dis_max_y = 799,
+	.res_x	 = 479,
+	.res_y	 = 1009,
+	.min_tid = 1,
+	.max_tid = 255,
+	.min_touch = 0,
+	.max_touch = 255,
+	.min_width = 0,
+	.max_width = 255,
+	.use_polling = 1,
+	.invert_y = 1,
+	.nfingers = 4,
+};
+
+static struct i2c_board_info cy8ctma300_board_info[] = {
+	{
+		I2C_BOARD_INFO("cy8ctma300", 0x2),
+		.platform_data = &cy8ctma300_pdata,
+	}
+};
 
 static void __init msm7x30_init(void)
 {
@@ -4857,8 +4865,19 @@ static void __init msm7x30_init(void)
 		platform_device_register(&flip_switch_device);
 	pmic8058_leds_init();
 
-	if (machine_is_msm7x30_fluid())
-		tma300_init();
+	if (machine_is_msm7x30_fluid()) {
+		/* Initialize platform data for fluid v2 hardware */
+		if (SOCINFO_VERSION_MAJOR(
+				socinfo_get_platform_version()) == 2) {
+			cy8ctma300_pdata.res_y = 920;
+			cy8ctma300_pdata.invert_y = 0;
+			cy8ctma300_pdata.use_polling = 0;
+			cy8ctma300_board_info[0].irq =
+				MSM_GPIO_TO_INT(TS_GPIO_IRQ);
+		}
+		i2c_register_board_info(0, cy8ctma300_board_info,
+			ARRAY_SIZE(cy8ctma300_board_info));
+	}
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
