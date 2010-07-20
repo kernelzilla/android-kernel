@@ -156,6 +156,11 @@ struct device *kgsl_driver_getdevnode(void)
 	return &kgsl_driver.pdev->dev;
 }
 
+struct kgsl_device *kgsl_get_device(int dev_idx)
+{
+	BUG_ON(dev_idx >= KGSL_DEVICE_MAX || dev_idx < KGSL_DEVICE_YAMATO);
+	return kgsl_driver.devp[dev_idx];
+}
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int *value)
 {
@@ -545,8 +550,7 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 
 	KGSL_DRV_DBG("file %p pid %d\n", filep, task_pid_nr(current));
 
-	BUG_ON(minor >= KGSL_DEVICE_MAX || minor < KGSL_DEVICE_YAMATO);
-	device = kgsl_driver.devp[minor];
+	device = kgsl_get_device(minor);
 	BUG_ON(device == NULL);
 
 	if (filep->f_flags & O_EXCL) {

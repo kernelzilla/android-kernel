@@ -178,6 +178,8 @@ struct kgsl_devconfig {
 	struct kgsl_memregion gmemspace;
 };
 
+struct kgsl_device *kgsl_get_device(int dev_idx);
+
 static inline struct kgsl_mmu *
 kgsl_get_mmu(struct kgsl_device *device)
 {

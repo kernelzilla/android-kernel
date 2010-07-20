@@ -621,7 +621,6 @@ kgsl_gem_map(struct drm_gem_object *obj)
 	int index;
 	int ret = -EINVAL;
 	int flags = KGSL_MEMFLAGS_CONPHYS;
-	struct kgsl_device *yamato_device = kgsl_get_yamato_generic_device();
 
 	if (priv->flags & DRM_KGSL_GEM_FLAG_MAPPED)
 		return 0;
@@ -634,7 +633,9 @@ kgsl_gem_map(struct drm_gem_object *obj)
 	/* Get the global page table */
 
 	if (priv->pagetable == NULL) {
-		struct kgsl_mmu *mmu = kgsl_get_mmu(yamato_device);
+		struct kgsl_device *kgsldev =
+			kgsl_get_device(KGSL_DEVICE_YAMATO);
+		struct kgsl_mmu *mmu = kgsl_get_mmu(kgsldev);
 
 		if (mmu == NULL || !kgsl_mmu_isenabled(mmu))
 			return -EINVAL;
