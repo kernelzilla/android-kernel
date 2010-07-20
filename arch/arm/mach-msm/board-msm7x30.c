@@ -181,46 +181,80 @@ static int pm8058_gpios_init(void)
 #define CYTTSP_TS_GPIO_IRQ	150
 static int cyttsp_platform_init(struct i2c_client *client)
 {
-	/* add any special code to initialize any required system hardware
-	 * such as regulators or gpio pins
-	 */
-	int rc;
+	int rc = -EINVAL, data;
 	struct vreg *vreg_ldo8, *vreg_ldo15;
-	pr_info(" %s: in cyttsp_platform_init \n", __func__);
 
 	vreg_ldo8 = vreg_get(NULL, "gp7");
+
+	if (!vreg_ldo8) {
+		pr_err("%s: VREG L8 get failed\n", __func__);
+		return rc;
+	}
+
 	rc = vreg_set_level(vreg_ldo8, 1800);
-	if (rc)
-		pr_info(" %s: VREG set failed\n", __func__);
+	if (rc) {
+		pr_err("%s: VREG L8 set failed\n", __func__);
+		goto l8_put;
+	}
 
 	rc = vreg_enable(vreg_ldo8);
-	if (rc)
-		pr_info(" %s: VREG enable failed\n", __func__);
+	if (rc) {
+		pr_err("%s: VREG L8 enable failed\n", __func__);
+		goto l8_put;
+	}
 
 	vreg_ldo15 = vreg_get(NULL, "gp6");
 
+	if (!vreg_ldo15) {
+		pr_err("%s: VREG L15 get failed\n", __func__);
+		goto l8_disable;
+	}
+
 	rc = vreg_set_level(vreg_ldo15, 3050);
-	if (rc)
-		pr_info(" %s: VREG set failed\n", __func__);
+	if (rc) {
+		pr_err("%s: VREG L15 set failed\n", __func__);
+		goto l15_put;
+	}
 
 	rc = vreg_enable(vreg_ldo15);
-	if (rc)
-		pr_info(" %s: VREG enable failed\n", __func__);
+	if (rc) {
+		pr_err("%s: VREG L15 enable failed\n", __func__);
+		goto l15_put;
+	}
 
-	mdelay(100);
+	/* check this device active by reading first byte/register */
+	data = i2c_smbus_read_byte_data(client, 0x01);
+	if (data < 0) {
+		pr_err("%s: i2c sanity check failed\n", __func__);
+		goto l15_disable;
+	}
 
 	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_INPUT,
 					GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
-	if (rc)
-		printk(KERN_ALERT "%s: Could not configure gpio %d\n",
+	if (rc) {
+		pr_err("%s: Could not configure gpio %d\n",
 					 __func__, CYTTSP_TS_GPIO_IRQ);
+		goto l15_disable;
+	}
 
 	rc = gpio_request(CYTTSP_TS_GPIO_IRQ, "ts_irq");
-	if (rc)
+	if (rc) {
 		pr_err("%s: unable to request gpio %d (%d)\n",
 			__func__, CYTTSP_TS_GPIO_IRQ, rc);
+		goto l15_disable;
+	}
 
 	return CY_OK;
+
+l15_disable:
+	vreg_disable(vreg_ldo15);
+l15_put:
+	vreg_put(vreg_ldo15);
+l8_disable:
+	vreg_disable(vreg_ldo8);
+l8_put:
+	vreg_put(vreg_ldo8);
+	return rc;
 }
 
 static int cyttsp_platform_resume(struct i2c_client *client)
