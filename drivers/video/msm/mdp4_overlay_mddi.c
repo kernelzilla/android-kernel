@@ -303,7 +303,11 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 	if (pipe != mddi_pipe) { /* non base layer */
 		int intv;
 
-		intv = jiffies - mddi_last_kick;
+		if (mddi_last_kick == 0)
+			intv = 0;
+		else
+			intv = jiffies - mddi_last_kick;
+
 		mddi_kick_interval += intv;
 		mddi_kick_interval /= 2;	/* average */
 		mddi_last_kick = jiffies;
