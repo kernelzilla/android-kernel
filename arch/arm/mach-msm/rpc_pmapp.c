@@ -28,6 +28,7 @@
 #define PMAPP_RPC_VER_1_2		0x00010002
 #define PMAPP_RPC_VER_2_1		0x00020001
 #define PMAPP_RPC_VER_3_1		0x00030001
+#define PMAPP_RPC_VER_5_1		0x00050001
 
 #define VBUS_SESS_VALID_CB_PROC			1
 #define PM_VOTE_USB_PWR_SEL_SWITCH_APP__HSUSB 	(1 << 2)
@@ -437,7 +438,11 @@ static int pmapp_rpc_req_reply(struct pmapp_buf *tbuf, struct pmapp_buf *rbuf,
 
 	if ((pm->endpoint == NULL) || IS_ERR(pm->endpoint)) {
 		pm->endpoint = msm_rpc_connect_compatible(PMAPP_RPC_PROG,
-					PMAPP_RPC_VER_3_1, 0);
+					PMAPP_RPC_VER_5_1, 0);
+		if (IS_ERR(pm->endpoint)) {
+			pm->endpoint = msm_rpc_connect_compatible(
+				PMAPP_RPC_PROG, PMAPP_RPC_VER_3_1, 0);
+		}
 		if (IS_ERR(pm->endpoint)) {
 			pm->endpoint = msm_rpc_connect_compatible(
 				PMAPP_RPC_PROG, PMAPP_RPC_VER_2_1, 0);
