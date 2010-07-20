@@ -122,7 +122,7 @@ static int pm8058_othc_suspend(struct device *dev)
 
 static int pm8058_othc_resume(struct device *dev)
 {
-	struct pm8058_othc *dd = dev_get_drvdata(pd);
+	struct pm8058_othc *dd = dev_get_drvdata(dev);
 
 	if (device_may_wakeup(dev)) {
 		disable_irq_wake(dd->othc_irq_sw);
@@ -604,7 +604,7 @@ static struct platform_driver pm8058_othc_driver = {
 		.name = "pm8058-othc",
 		.owner = THIS_MODULE,
 #ifdef CONFIG_PM
-		.pm = &pm8058_othc_pm_ops;
+		.pm = &pm8058_othc_pm_ops,
 #endif
 	},
 	.probe = pm8058_othc_probe,
