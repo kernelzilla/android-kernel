@@ -31,8 +31,8 @@
 #define VCM_ALLOC_H
 
 #include <linux/list.h>
-
-#define NUM_CHUNK_SIZES 3
+#include <linux/vcm.h>
+#include <linux/vcm_types.h>
 
 enum chunk_size_idx {
 	IDX_1M = 0,
@@ -40,31 +40,23 @@ enum chunk_size_idx {
 	IDX_4K
 };
 
-struct phys_chunk {
-	struct list_head list;
-	struct list_head allocated; /* used to record is allocated */
-
-	struct list_head refers_to;
-
-	/* TODO: change to unsigned long */
-	int pa;
-	int size_idx;
-};
-
+int vcm_alloc_idx_to_size(int idx);
 int vcm_alloc_get_mem_size(void);
-int vcm_alloc_blocks_avail(enum chunk_size_idx idx);
+int vcm_alloc_blocks_avail(enum memtype_t memtype, enum chunk_size_idx idx);
 int vcm_alloc_get_num_chunks(void);
-int vcm_alloc_all_blocks_avail(void);
-int vcm_alloc_count_allocated(void);
-void vcm_alloc_print_list(int just_allocated);
+int vcm_alloc_all_blocks_avail(enum memtarget_t memtype);
+int vcm_alloc_count_allocated(enum memtype_t memtype);
+void vcm_alloc_print_list(enum memtype_t memtype, int just_allocated);
 int vcm_alloc_idx_to_size(int idx);
 int vcm_alloc_destroy(void);
-int vcm_alloc_init(unsigned int set_base_pa);
-int vcm_alloc_free_blocks(struct phys_chunk *alloc_head);
-int vcm_alloc_num_blocks(int num,
+int vcm_alloc_init(struct physmem_region *mem, int n_regions,
+		   struct vcm_memtype_map *mt_map, int n_mt);
+int vcm_alloc_free_blocks(enum memtype_t memtype,
+			  struct phys_chunk *alloc_head);
+int vcm_alloc_num_blocks(int num, enum memtype_t memtype,
 			 enum chunk_size_idx idx, /* chunk size */
 			 struct phys_chunk *alloc_head);
-int vcm_alloc_max_munch(int len,
+int vcm_alloc_max_munch(int len, enum memtype_t memtype,
 			struct phys_chunk *alloc_head);
 
 #endif /* VCM_ALLOC_H */

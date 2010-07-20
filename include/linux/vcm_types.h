@@ -34,7 +34,6 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/genalloc.h>
-#include <linux/vcm_alloc.h>
 #include <linux/list.h>
 
 /*
@@ -219,11 +218,13 @@ enum memtarget_t {
  *
  */
 enum memtype_t {
-	VCM_INVALID,
-	VCM_MEMTYPE_0,
-	VCM_MEMTYPE_1,
-	VCM_MEMTYPE_2,
+	VCM_MEMTYPE_0 = 0,
+	VCM_MEMTYPE_1 = 1,
+	VCM_MEMTYPE_2 = 2,
+	VCM_INVALID = 3,
 };
+
+#define NUM_MEMTYPES 3
 
 
 /**
@@ -296,6 +297,17 @@ struct bound {
 	size_t len;
 };
 
+struct phys_chunk {
+	struct list_head list;
+	struct list_head allocated; /* used to record is allocated */
+
+	struct list_head refers_to;
+
+	/* TODO: change to unsigned long */
+	int pa;
+	int size_idx;
+};
+
 
 /**
  * physmem - A physical memory allocation.
@@ -316,6 +328,7 @@ struct physmem {
 	int is_cont;
 	struct res *res;
 };
+
 
 /**
  * res - A reservation in a VCM region.
@@ -344,6 +357,7 @@ struct res {
 	int mapped;
 };
 
+#define NUM_CHUNK_SIZES 3
 extern int chunk_sizes[NUM_CHUNK_SIZES];
 
 #endif /* VCM_TYPES_H */

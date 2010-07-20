@@ -17,9 +17,18 @@
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/bootmem.h>
+
+#include <linux/vcm.h>
 #include <mach/msm_iomap-8x60.h>
 #include <mach/irqs-8x60.h>
 #include <mach/smmu_device.h>
+
+#define MSM_SMI_BASE           0x38000000
+#define MSM_SMI_SIZE           0x04000000
+
+#define VCM_EBI_SIZE	SZ_32M
+#define VCM_EBI_ALIGN	SZ_1M
 
 static struct resource msm_smmu_jpegd_resources[] = {
 	{
@@ -256,19 +265,19 @@ static struct resource msm_smmu_gfx2d0_resources[] = {
 
 static void ctx_release(struct device *dev)
 {
-	printk(KERN_INFO "%s\n", __func__);
+	pr_info("%s\n", __func__);
 	return;
 }
 
 static void smmu_release(struct device *dev)
 {
-	printk(KERN_INFO "%s\n", __func__);
+	pr_info("%s\n", __func__);
 	return;
 }
 
 static void smmu_release_top(struct device *dev)
 {
-	printk(KERN_INFO "%s\n", __func__);
+	pr_info("%s\n", __func__);
 	return;
 }
 
@@ -863,6 +872,79 @@ static struct smmu_ctx *smmu_ctxs_data[] = {
 	&gfx2d0_texv3_ctx,
 };
 
+#define SMI 0
+#define EBI 1
+
+#define HLF 2
+#define QTR 4
+struct physmem_region memory[] = {
+	{
+		.addr = MSM_SMI_BASE,	/* Base address */
+		.size = SZ_32M,		/* Memory size */
+
+		/* Half the memory goes to 1MB chunks */
+		/* 1/4th of the memory goes to 64K and 4K chunks */
+		.chunk_fraction = {HLF, QTR, QTR}
+	},
+	{
+		.addr = 0,		/* To be dynamically allocated */
+		.size = VCM_EBI_SIZE,
+		.chunk_fraction = {HLF, QTR, QTR}
+	},
+};
+
+struct vcm_memtype_map mt_map[] = {	/* Sources of 1MB, 64K, and 4K chunks */
+	{
+		.pool_id = {SMI, SMI, SMI}	/* MEMTYPE_0 */
+	},
+	{
+		.pool_id = {SMI, SMI, EBI}	/* MEMTYPE_1 */
+	},
+	{
+		.pool_id = {EBI, EBI, EBI}	/* MEMTYPE_2 */
+	}
+};
+
+static int msm8x60_vcm_init(void)
+{
+	int ret;
+	void *vcm_ebi_base;
+
+	vcm_ebi_base = __alloc_bootmem(VCM_EBI_SIZE, VCM_EBI_ALIGN, 0);
+
+	if (!vcm_ebi_base) {
+		pr_err("Could not allocate VCM-managed physical memory\n");
+		goto fail;
+	}
+	memory[1].addr = __pa(vcm_ebi_base);
+
+	ret = vcm_sys_init(memory, ARRAY_SIZE(memory),
+			   mt_map, ARRAY_SIZE(mt_map),
+			   (void *)MSM_SMI_BASE + MSM_SMI_SIZE - SZ_8M, SZ_8M);
+
+	if (ret != 0) {
+		pr_err("vcm_sys_init() ret %i\n", ret);
+		goto fail;
+	}
+
+	return 0;
+fail:
+	return -1;
+};
+
+/* Useful for testing, and if VCM is ever unloaded */
+static void msm8x60_vcm_exit(void)
+{
+	int ret;
+
+	ret = vcm_sys_destroy();
+	if (ret != 0) {
+		pr_err("vcm_sys_destroy() ret %i\n", ret);
+		goto fail;
+	}
+fail:
+	return;
+}
 
 static int msm8x60_smmu_init(void)
 {
@@ -870,7 +952,7 @@ static int msm8x60_smmu_init(void)
 
 	ret = platform_device_register(&msm_device_all_smmus);
 	if (ret != 0) {
-		printk(KERN_ERR "Failed to register parent device!\n");
+		pr_err("Failed to register parent device!\n");
 		goto failure;
 	}
 
@@ -879,16 +961,16 @@ static int msm8x60_smmu_init(void)
 					       smmu_device_data[i],
 					       sizeof(struct smmu_device));
 		if (ret != 0) {
-			printk(KERN_ERR "platform_device_add_data smmu failed, \
-					 i = %d\n", i);
+			pr_err("platform_device_add_data smmu failed, "
+			       "i = %d\n", i);
 			goto failure_unwind;
 		}
 
 		ret = platform_device_register(smmu_devices[i]);
 
 		if (ret != 0) {
-			printk(KERN_ERR "platform_device_register smmu failed, \
-					 i = %d\n", i);
+			pr_err("platform_device_register smmu failed, "
+			       "i = %d\n", i);
 			goto failure_unwind;
 		}
 	}
@@ -898,17 +980,22 @@ static int msm8x60_smmu_init(void)
 					       smmu_ctxs_data[i],
 					       sizeof(struct smmu_ctx));
 		if (ret != 0) {
-			printk(KERN_ERR "platform_device_add_data smmu failed, \
-					 i = %d\n", i);
+			pr_err("platform_device_add_data smmu failed, "
+			       "i = %d\n", i);
 			goto failure_unwind2;
 		}
 
 		ret = platform_device_register(smmu_ctxs[i]);
 		if (ret != 0) {
-			printk(KERN_ERR "platform_device_register ctx failed, \
-					 i = %d\n", i);
+			pr_err("platform_device_register ctx failed, "
+			       "i = %d\n", i);
 			goto failure_unwind2;
 		}
+	}
+
+	if (msm8x60_vcm_init() != 0) {
+		pr_err("Could not initialize VCM\n");
+		goto failure;
 	}
 
 	return 0;
@@ -936,8 +1023,8 @@ static void msm8x60_smmu_exit(void)
 		platform_device_unregister(smmu_devices[i]);
 
 	platform_device_unregister(&msm_device_all_smmus);
-
-	printk(KERN_INFO "%s\n", __func__);
+	msm8x60_vcm_exit();
+	pr_info("%s\n", __func__);
 }
 
 subsys_initcall(msm8x60_smmu_init);
