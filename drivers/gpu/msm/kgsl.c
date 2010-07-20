@@ -33,6 +33,7 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <asm/cacheflush.h>
+#include <linux/notifier.h>
 
 #include <linux/delay.h>
 #include <asm/atomic.h>
@@ -161,6 +162,23 @@ struct kgsl_device *kgsl_get_device(int dev_idx)
 	BUG_ON(dev_idx >= KGSL_DEVICE_MAX || dev_idx < KGSL_DEVICE_YAMATO);
 	return kgsl_driver.devp[dev_idx];
 }
+
+int kgsl_register_ts_notifier(struct kgsl_device *device,
+			      struct notifier_block *nb)
+{
+	BUG_ON(device == NULL);
+	return atomic_notifier_chain_register(&device->ts_notifier_list,
+					      nb);
+}
+
+int kgsl_unregister_ts_notifier(struct kgsl_device *device,
+				struct notifier_block *nb)
+{
+	BUG_ON(device == NULL);
+	return atomic_notifier_chain_unregister(&device->ts_notifier_list,
+						nb);
+}
+
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int *value)
 {

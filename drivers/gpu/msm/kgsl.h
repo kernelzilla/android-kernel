@@ -163,6 +163,12 @@ int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 int kgsl_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int value);
 
+int kgsl_register_ts_notifier(struct kgsl_device *device,
+			      struct notifier_block *nb);
+
+int kgsl_unregister_ts_notifier(struct kgsl_device *device,
+				struct notifier_block *nb);
+
 #ifdef CONFIG_MSM_KGSL_DRM
 extern int kgsl_drm_init(struct platform_device *dev);
 extern void kgsl_drm_exit(void);

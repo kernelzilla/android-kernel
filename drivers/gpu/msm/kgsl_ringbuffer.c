@@ -112,6 +112,9 @@ void kgsl_cp_intrcallback(struct kgsl_device *device)
 	if (status & (CP_INT_CNTL__IB1_INT_MASK | CP_INT_CNTL__RB_INT_MASK)) {
 		KGSL_CMD_WARN("ringbuffer ib1/rb interrupt\n");
 		wake_up_interruptible_all(&yamato_device->ib1_wq);
+		atomic_notifier_call_chain(&(device->ts_notifier_list),
+					   KGSL_DEVICE_YAMATO,
+					   NULL);
 	}
 	if (status & CP_INT_CNTL__T0_PACKET_IN_IB_MASK) {
 		KGSL_CMD_FATAL("ringbuffer TO packet in IB interrupt\n");
