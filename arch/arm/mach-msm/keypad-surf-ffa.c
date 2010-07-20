@@ -177,7 +177,7 @@ static const unsigned short keypad_keymap_8k_ffa[QSD8x50_FFA_KEYMAP_SIZE] = {
 	/*[KEYMAP_INDEX(5, 0)] = ,*/
 	[FFA_8K_KEYMAP_INDEX(5, 1)] = 227,           /* KEY_STAR */
 	[FFA_8K_KEYMAP_INDEX(5, 2)] = 230, /*SOFT2*/ /* 2 */
-	[FFA_8K_KEYMAP_INDEX(5, 3)] = KEY_MENU,      /* 1 */
+	[FFA_8K_KEYMAP_INDEX(5, 3)] = 229,      /* 1 */
 	[FFA_8K_KEYMAP_INDEX(5, 4)] = KEY_7,
 };
 
