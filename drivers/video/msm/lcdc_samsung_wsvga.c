@@ -154,7 +154,7 @@ static int __init lcdc_samsung_panel_init(void)
 	pinfo->wait_cycle = 0;
 	pinfo->bpp = 18;
 	pinfo->fb_num = 2;
-	pinfo->clk_rate = 53990000;
+	pinfo->clk_rate = 43192000;
 	pinfo->bl_max = 15;
 	pinfo->bl_min = 1;
 
