@@ -51,6 +51,12 @@ enum kgsl_deviceid {
 	KGSL_DEVICE_MAX		= 0x00000002
 };
 
+enum kgsl_user_mem_type {
+	KGSL_USER_MEM_TYPE_PMEM		= 0x00000000,
+	KGSL_USER_MEM_TYPE_ASHMEM	= 0x00000001,
+	KGSL_USER_MEM_TYPE_ADDR		= 0x00000002
+};
+
 struct kgsl_devinfo {
 
 	unsigned int device_id;
@@ -234,6 +240,22 @@ struct kgsl_drawctxt_destroy {
 
 #define IOCTL_KGSL_DRAWCTXT_DESTROY \
 	_IOW(KGSL_IOC_TYPE, 0x14, struct kgsl_drawctxt_destroy)
+
+/* add a block of pmem, fb, ashmem or user allocated address
+ * into the GPU address space */
+struct kgsl_map_user_mem {
+	int fd;
+	unsigned int gpuaddr;   /*output param */
+	unsigned int len;
+	unsigned int offset;
+	unsigned int hostptr;   /*input param */
+	enum kgsl_user_mem_type memtype;
+	unsigned int reserved;	/* May be required to add
+				params for another mem type */
+};
+
+#define IOCTL_KGSL_MAP_USER_MEM \
+	_IOWR(KGSL_IOC_TYPE, 0x15, struct kgsl_map_user_mem)
 
 /* add a block of pmem or fb into the GPU address space */
 struct kgsl_sharedmem_from_pmem {
