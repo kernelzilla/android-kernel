@@ -19,13 +19,12 @@
 #include <linux/types.h>
 #include <linux/msm_kgsl.h>
 
-#include "kgsl_drawctxt.h"
-
 #include "yamato_reg.h"
 #include "kgsl.h"
 #include "kgsl_yamato.h"
 #include "kgsl_log.h"
 #include "kgsl_pm4types.h"
+#include "kgsl_drawctxt.h"
 #include "kgsl_cmdstream.h"
 
 /*
@@ -1443,13 +1442,14 @@ int kgsl_drawctxt_close(struct kgsl_device *device)
 /* create a new drawing context */
 
 int
-kgsl_drawctxt_create(struct kgsl_device *device,
-		     struct kgsl_pagetable *pagetable,
-		     unsigned int flags, unsigned int *drawctxt_id)
+kgsl_drawctxt_create(struct kgsl_device_private *dev_priv,
+		     uint32_t flags, unsigned int *drawctxt_id)
 {
 	struct kgsl_drawctxt *drawctxt;
+	struct kgsl_device *device = dev_priv->device;
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
 							device;
+	struct kgsl_pagetable *pagetable = dev_priv->process_priv->pagetable;
 	int index;
 	struct tmp_ctx ctx;
 
@@ -1514,6 +1514,9 @@ int kgsl_drawctxt_destroy(struct kgsl_device *device, unsigned int drawctxt_id)
 	struct kgsl_drawctxt *drawctxt;
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
 							device;
+
+	if (drawctxt_id >= KGSL_CONTEXT_MAX)
+		return -EINVAL;
 
 	drawctxt = &yamato_device->drawctxt[drawctxt_id];
 

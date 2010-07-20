@@ -29,6 +29,8 @@
 #ifndef _KGSL_YAMATO_H
 #define _KGSL_YAMATO_H
 
+#include "kgsl_drawctxt.h"
+
 struct kgsl_yamato_device {
 	struct kgsl_device dev;    /* Must be first field in this struct */
 	struct kgsl_memregion gmemspace;
@@ -38,10 +40,17 @@ struct kgsl_yamato_device {
 	wait_queue_head_t ib1_wq;
 };
 
-struct kgsl_yamato_device *kgsl_get_yamato_device(void);
+
+irqreturn_t kgsl_yamato_isr(int irq, void *data);
+int __init kgsl_yamato_config(struct kgsl_devconfig *,
+				struct platform_device *pdev);
+
+int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout);
+int kgsl_yamato_regread(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int *value);
+int kgsl_yamato_regwrite(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int value);
 struct kgsl_device *kgsl_get_yamato_generic_device(void);
-int kgsl_yamato_first_open_locked(void);
-int kgsl_yamato_last_release_locked(void);
 int kgsl_yamato_getfunctable(struct kgsl_functable *ftbl);
 
 #endif /*_KGSL_YAMATO_H */

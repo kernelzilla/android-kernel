@@ -44,14 +44,16 @@ struct kgsl_g12_z1xx {
 
 extern struct kgsl_g12_z1xx g_z1xx;
 
-struct kgsl_g12_device *kgsl_get_g12_device(void);
-struct kgsl_device *kgsl_get_g12_generic_device(void);
+irqreturn_t kgsl_g12_isr(int irq, void *data);
 int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags);
-int kgsl_g12_first_open_locked(void);
-int kgsl_g12_last_release_locked(void);
+struct kgsl_device *kgsl_get_g12_generic_device(void);
+int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int *value);
+int kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
+			unsigned int value);
+int __init kgsl_g12_config(struct kgsl_devconfig *,
+				struct platform_device *pdev);
 int kgsl_g12_getfunctable(struct kgsl_functable *ftbl);
-int kgsl_g12_waittimestamp(struct kgsl_device *device,
-				unsigned int timestamp, unsigned int timeout);
 
 
 #endif /* _KGSL_G12_H */

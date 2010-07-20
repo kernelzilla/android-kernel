@@ -32,6 +32,7 @@
 #include "kgsl_sharedmem.h"
 
 struct kgsl_device;
+struct kgsl_device_private;
 
 #define KGSL_G12_PACKET_SIZE 10
 #define KGSL_G12_PACKET_COUNT 8
@@ -59,8 +60,8 @@ struct kgsl_device;
 #define KGSL_G12_CONTEXT_MAX 16
 
 int
-kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			uint32_t ctxt_id_mask,
+kgsl_g12_drawctxt_create(struct kgsl_device_private *dev_priv,
+			uint32_t unused,
 			unsigned int *drawctxt_id);
 
 int

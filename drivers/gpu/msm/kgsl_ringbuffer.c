@@ -20,7 +20,6 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 
-#include "kgsl_drawctxt.h"
 #include "kgsl.h"
 #include "kgsl_device.h"
 #include "kgsl_yamato.h"
@@ -156,12 +155,9 @@ void kgsl_cp_intrcallback(struct kgsl_device *device)
 }
 
 
-void kgsl_ringbuffer_watchdog()
+void kgsl_ringbuffer_watchdog(struct kgsl_device *device)
 {
-	struct kgsl_device *device = NULL;
 	struct kgsl_ringbuffer *rb = NULL;
-
-	device = kgsl_get_yamato_generic_device();
 
 	BUG_ON(device == NULL);
 
@@ -708,7 +704,7 @@ kgsl_ringbuffer_issuecmds(struct kgsl_device *device,
 }
 
 int
-kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
+kgsl_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 				int drawctxt_index,
 				uint32_t ibaddr,
 				int sizedwords,
@@ -716,6 +712,7 @@ kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
 				unsigned int flags)
 {
 	unsigned int link[3];
+	struct kgsl_device *device = dev_priv->device;
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
 							device;
 
@@ -724,7 +721,9 @@ kgsl_ringbuffer_issueibcmds(struct kgsl_device *device,
 			device->id, drawctxt_index, ibaddr,
 			sizedwords, timestamp);
 
-	if (!(device->ringbuffer.flags & KGSL_FLAGS_STARTED)) {
+
+	if (!(device->ringbuffer.flags & KGSL_FLAGS_STARTED) ||
+				(drawctxt_index >= KGSL_CONTEXT_MAX)) {
 		KGSL_CMD_VDBG("return %d\n", -EINVAL);
 		return -EINVAL;
 	}

@@ -31,13 +31,14 @@
 struct kgsl_g12_z1xx g_z1xx = {0};
 
 int
-kgsl_g12_drawctxt_create(struct kgsl_device *device,
-			uint32_t ctxt_id_mask,
+kgsl_g12_drawctxt_create(struct kgsl_device_private *dev_priv,
+			uint32_t unused,
 			unsigned int *drawctxt_id)
 {
 	int cmd;
 	int result;
 	unsigned int ctx_id;
+	struct kgsl_device *device = dev_priv->device;
 
 	if (g_z1xx.numcontext == 0) {
 		if (kgsl_sharedmem_alloc(0, KGSL_G12_RB_SIZE,
@@ -67,7 +68,7 @@ kgsl_g12_drawctxt_create(struct kgsl_device *device,
 		if (result != 0)
 			return result;
 	}
-	ctx_id = ffz(ctxt_id_mask);
+	ctx_id = ffz(dev_priv->ctxt_id_mask);
 
 	g_z1xx.numcontext++;
 	if (g_z1xx.numcontext > KGSL_G12_CONTEXT_MAX) {

@@ -71,6 +71,7 @@ struct kgsl_driver {
 	struct cdev cdev;
 	dev_t dev_num;
 	struct class *class;
+	struct kgsl_device *devp[KGSL_DEVICE_MAX];
 	struct device *base_dev[KGSL_DEVICE_MAX];
 	int num_devs;
 	struct platform_device *pdev;
@@ -136,10 +137,7 @@ while (1) { \
 		break; \
 	} \
 	if (kgsl_driver.is_suspended != KGSL_TRUE) { \
-		if (device->id == KGSL_DEVICE_YAMATO) \
-			kgsl_yamato_wake(device); \
-		else if (device->id == KGSL_DEVICE_G12) \
-			kgsl_g12_wake(device); \
+		device->ftbl.device_wake(device); \
 		break; \
 	} \
 	mutex_unlock(&kgsl_driver.mutex); \
@@ -158,8 +156,6 @@ while (1) { \
 void kgsl_remove_mem_entry(struct kgsl_mem_entry *entry, bool preserve);
 
 int kgsl_pwrctrl(unsigned int pwrflag);
-int kgsl_yamato_sleep(struct kgsl_device *device, const int idle);
-int kgsl_g12_sleep(struct kgsl_device *device, const int idle);
 int kgsl_idle(struct kgsl_device *device, unsigned int timeout);
 int kgsl_setstate(struct kgsl_device *device, uint32_t flags);
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,

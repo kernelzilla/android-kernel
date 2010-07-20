@@ -17,9 +17,9 @@
  */
 
 #include "kgsl.h"
-#include "kgsl_device.h"
 #include "kgsl_cmdstream.h"
 #include "kgsl_sharedmem.h"
+#include "kgsl_yamato.h"
 
 int kgsl_cmdstream_init(struct kgsl_device *device)
 {
@@ -69,7 +69,7 @@ void kgsl_cmdstream_memqueue_drain(struct kgsl_device *device)
 	struct kgsl_ringbuffer *rb = &device->ringbuffer;
 
 	/* get current EOP timestamp */
-	ts_processed = kgsl_cmdstream_readtimestamp(
+	ts_processed = device->ftbl.device_cmdstream_readtimestamp(
 					device,
 					KGSL_TIMESTAMP_RETIRED);
 

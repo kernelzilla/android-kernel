@@ -74,12 +74,11 @@ static void addcmd(struct kgsl_g12_z1xx *z1xx, unsigned int index,
 }
 
 int
-kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
-			struct kgsl_pagetable *pagetable,
+kgsl_g12_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 			int drawctxt_index,
 			uint32_t ibaddr,
 			int sizedwords,
-			int *timestamp,
+			uint32_t *timestamp,
 			unsigned int ctrl)
 {
 	unsigned int result = 0;
@@ -90,6 +89,8 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device *device,
 	unsigned int nextcnt    = 0x9000 | 5;
 	struct kgsl_memdesc tmp = {0};
 	unsigned int cmd;
+	struct kgsl_device *device = dev_priv->device;
+	struct kgsl_pagetable *pagetable = dev_priv->process_priv->pagetable;
 	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 
 	cmd = ibaddr;
@@ -143,27 +144,13 @@ error:
 	return result;
 }
 
-void kgsl_g12_cmdstream_memqueue_drain(struct kgsl_g12_device *g12_device)
+unsigned int kgsl_g12_cmdstream_readtimestamp(struct kgsl_device *device,
+			     enum kgsl_timestamp_type type)
 {
-	struct kgsl_mem_entry *entry, *entry_tmp;
-	uint32_t ts_processed;
-	struct kgsl_device *device = &g12_device->dev;
-	struct kgsl_ringbuffer *rb = &device->ringbuffer;
+	struct kgsl_g12_device *g12_device;
 
+	g12_device = (struct kgsl_g12_device *) device;
 	/* get current EOP timestamp */
-	ts_processed = g12_device->timestamp;
-
-	list_for_each_entry_safe(entry, entry_tmp, &rb->memqueue, free_list) {
-		/*NOTE: this assumes that the free list is sorted by
-		 * timestamp, but I'm not yet sure that it is a valid
-		 * assumption
-		 */
-		if (!timestamp_cmp(ts_processed, entry->free_timestamp))
-			break;
-		KGSL_MEM_DBG("ts_processed %d ts_free %d gpuaddr %x)\n",
-			     ts_processed, entry->free_timestamp,
-			     entry->memdesc.gpuaddr);
-		kgsl_remove_mem_entry(entry, true);
-	}
+	return g12_device->timestamp;
 }
 

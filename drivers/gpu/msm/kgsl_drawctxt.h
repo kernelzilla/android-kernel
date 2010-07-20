@@ -55,6 +55,7 @@
 
 struct kgsl_device;
 struct kgsl_yamato_device;
+struct kgsl_device_private;
 
 /*  types */
 
@@ -103,8 +104,8 @@ struct kgsl_drawctxt {
 };
 
 
-int kgsl_drawctxt_create(struct kgsl_device *, struct kgsl_pagetable *,
-			  unsigned int flags,
+int kgsl_drawctxt_create(struct kgsl_device_private *dev_priv,
+			  uint32_t flags,
 			  unsigned int *drawctxt_id);
 
 int kgsl_drawctxt_destroy(struct kgsl_device *device, unsigned int drawctxt_id);

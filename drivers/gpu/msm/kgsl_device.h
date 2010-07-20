@@ -84,14 +84,45 @@ int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
 
 struct kgsl_device;
 struct platform_device;
+struct kgsl_device_private;
 
 struct kgsl_functable {
 	int (*device_regread) (struct kgsl_device *device,
-				unsigned int offsetwords, unsigned int *value);
+					unsigned int offsetwords,
+					unsigned int *value);
 	int (*device_regwrite) (struct kgsl_device *device,
-				unsigned int offsetwords, unsigned int value);
+					unsigned int offsetwords,
+					unsigned int value);
 	int (*device_setstate) (struct kgsl_device *device, uint32_t flags);
 	int (*device_idle) (struct kgsl_device *device, unsigned int timeout);
+	int (*device_suspend) (struct kgsl_device *device);
+	int (*device_wake) (struct kgsl_device *device);
+	int (*device_last_release_locked) (struct kgsl_device *device);
+	int (*device_first_open_locked) (struct kgsl_device *device);
+	int (*device_getproperty) (struct kgsl_device *device,
+					enum kgsl_property_type type,
+					void *value,
+					unsigned int sizebytes);
+	int (*device_waittimestamp) (struct kgsl_device *device,
+					unsigned int timestamp,
+					unsigned int msecs);
+	unsigned int (*device_cmdstream_readtimestamp) (
+					struct kgsl_device *device,
+					enum kgsl_timestamp_type type);
+	int (*device_issueibcmds) (struct kgsl_device_private *dev_priv,
+				int drawctxt_index,
+				uint32_t ibaddr, int sizedwords,
+				uint32_t *timestamp,
+				unsigned int flags);
+	int (*device_drawctxt_create) (struct kgsl_device_private *dev_priv,
+					uint32_t flags,
+					unsigned int *drawctxt_id);
+	int (*device_drawctxt_destroy) (struct kgsl_device *device,
+					unsigned int drawctxt_id);
+	long (*device_ioctl) (struct kgsl_device_private *dev_priv,
+					unsigned int cmd,
+					unsigned long arg);
+
 };
 
 struct kgsl_memregion {
@@ -113,8 +144,26 @@ struct kgsl_device {
 	unsigned int hwaccess_blocked;
 	struct completion hwaccess_gate;
 	struct kgsl_functable ftbl;
+	struct work_struct idle_check_ws;
 	struct timer_list idle_timer;
 	atomic_t open_count;
+};
+
+struct kgsl_file_private {
+	unsigned int refcnt;
+	struct list_head mem_list;
+	struct kgsl_pagetable *pagetable;
+	unsigned long vmalloc_size;
+	struct list_head preserve_entry_list;
+	int preserve_list_size;
+};
+
+struct kgsl_device_private {
+	struct list_head list;
+	uint32_t ctxt_id_mask;
+	unsigned long pid;
+	struct kgsl_device *device;
+	struct kgsl_file_private *process_priv;
 };
 
 struct kgsl_devconfig {
@@ -134,69 +183,5 @@ kgsl_get_mmu(struct kgsl_device *device)
 {
 	return (struct kgsl_mmu *) (device ? &device->mmu : NULL);
 }
-
-int kgsl_yamato_start(struct kgsl_device *device, uint32_t flags);
-
-int kgsl_yamato_stop(struct kgsl_device *device);
-
-int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout);
-
-int kgsl_yamato_wake(struct kgsl_device *device);
-
-int kgsl_yamato_suspend(struct kgsl_device *device);
-
-int kgsl_yamato_getproperty(struct kgsl_device *device,
-				enum kgsl_property_type type, void *value,
-				unsigned int sizebytes);
-
-int kgsl_yamato_regread(struct kgsl_device *device, unsigned int offsetwords,
-				unsigned int *value);
-
-int kgsl_yamato_regwrite(struct kgsl_device *device, unsigned int offsetwords,
-				unsigned int value);
-
-int kgsl_yamato_waittimestamp(struct kgsl_device *device,
-				unsigned int timestamp, unsigned int timeout);
-
-
-int kgsl_yamato_init(struct kgsl_device *, struct kgsl_devconfig *);
-
-int kgsl_yamato_close(struct kgsl_device *device);
-
-int __init kgsl_yamato_config(struct kgsl_devconfig *,
-				struct platform_device *pdev);
-
-int kgsl_yamato_setstate(struct kgsl_device *device, uint32_t flags);
-
-irqreturn_t kgsl_yamato_isr(int irq, void *data);
-
-int kgsl_g12_start(struct kgsl_device *device, uint32_t flags);
-
-int kgsl_g12_stop(struct kgsl_device *device);
-
-int kgsl_g12_idle(struct kgsl_device *device, unsigned int timeout);
-
-int kgsl_g12_wake(struct kgsl_device *device);
-
-int kgsl_g12_suspend(struct kgsl_device *device);
-
-int kgsl_g12_getproperty(struct kgsl_device *device,
-				enum kgsl_property_type type, void *value,
-				unsigned int sizebytes);
-
-int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
-				unsigned int *value);
-
-int kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
-				unsigned int value);
-
-int kgsl_g12_init(struct kgsl_device *, struct kgsl_devconfig *);
-
-int kgsl_g12_close(struct kgsl_device *device);
-
-int __init kgsl_g12_config(struct kgsl_devconfig *,
-				struct platform_device *pdev);
-
-irqreturn_t kgsl_g12_isr(int irq, void *data);
 
 #endif  /* _KGSL_DEVICE_H */
