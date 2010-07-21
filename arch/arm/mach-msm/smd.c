@@ -32,6 +32,7 @@
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#include <linux/remote_spinlock.h>
 
 #include "smd_private.h"
 #include "proc_comm.h"
@@ -1115,9 +1116,63 @@ int smd_tiocmset(smd_channel_t *ch, unsigned int set, unsigned int clear)
 
 /* -------------------------------------------------------------------------- */
 
+/* smem_alloc returns the pointer to smem item if it is already allocated.
+ * Otherwise, it returns NULL.
+ */
 void *smem_alloc(unsigned id, unsigned size)
 {
 	return smem_find(id, size);
+}
+
+#define SMEM_SPINLOCK_SMEM_ALLOC       "S:3"
+static remote_spinlock_t remote_spinlock;
+
+/* smem_alloc2 returns the pointer to smem item.  If it is not allocated,
+ * it allocates it and then returns the pointer to it.
+ */
+static void *smem_alloc2(unsigned id, unsigned size_in)
+{
+	struct smem_shared *shared = (void *) MSM_SHARED_RAM_BASE;
+	struct smem_heap_entry *toc = shared->heap_toc;
+	unsigned long flags;
+	void *ret = NULL;
+
+	if (!shared->heap_info.initialized) {
+		pr_err("%s: smem heap info not initialized\n", __func__);
+		return NULL;
+	}
+
+	if (id >= SMEM_NUM_ITEMS)
+		return NULL;
+
+	size_in = ALIGN(size_in, 8);
+	remote_spin_lock_irqsave(&remote_spinlock, flags);
+	if (toc[id].allocated) {
+		SMD_DBG("%s: %u already allocated\n", __func__, id);
+		if (size_in != toc[id].size)
+			pr_err("%s: wrong size %u (expected %u)\n",
+			       __func__, toc[id].size, size_in);
+		else
+			ret = (void *)(MSM_SHARED_RAM_BASE + toc[id].offset);
+	} else if (id > SMEM_FIXED_ITEM_LAST) {
+		SMD_DBG("%s: allocating %u\n", __func__, id);
+		if (shared->heap_info.heap_remaining >= size_in) {
+			toc[id].allocated = 1;
+			toc[id].offset = shared->heap_info.free_offset;
+			toc[id].size = size_in;
+
+			shared->heap_info.free_offset += size_in;
+			shared->heap_info.heap_remaining -= size_in;
+			ret = (void *)(MSM_SHARED_RAM_BASE + toc[id].offset);
+		} else
+			pr_err("%s: not enough memory %u (required %u)\n",
+			       __func__, shared->heap_info.heap_remaining,
+			       size_in);
+	}
+	/* TODO: system/hardware barrier required? */
+	barrier();
+	remote_spin_unlock_irqrestore(&remote_spinlock, flags);
+	return ret;
 }
 
 void *smem_get_entry(unsigned id, unsigned *size)
@@ -1162,10 +1217,16 @@ static int smsm_init(void)
 	struct smem_shared *shared = (void *) MSM_SHARED_RAM_BASE;
 	int i;
 
+	i = remote_spin_lock_init(&remote_spinlock, SMEM_SPINLOCK_SMEM_ALLOC);
+	if (i) {
+		pr_err("%s: remote spinlock init failed %d\n", __func__, i);
+		return i;
+	}
+
 	if (!smsm_info.state) {
-		smsm_info.state = smem_alloc(ID_SHARED_STATE,
-					     SMSM_NUM_ENTRIES *
-					     sizeof(uint32_t));
+		smsm_info.state = smem_alloc2(ID_SHARED_STATE,
+					      SMSM_NUM_ENTRIES *
+					      sizeof(uint32_t));
 
 		if (smsm_info.state) {
 			writel(0, SMSM_STATE_ADDR(SMSM_APPS_STATE));
@@ -1175,10 +1236,10 @@ static int smsm_init(void)
 	}
 
 	if (!smsm_info.intr_mask) {
-		smsm_info.intr_mask = smem_alloc(SMEM_SMSM_CPU_INTR_MASK,
-						 SMSM_NUM_ENTRIES *
-						 SMSM_NUM_HOSTS *
-						 sizeof(uint32_t));
+		smsm_info.intr_mask = smem_alloc2(SMEM_SMSM_CPU_INTR_MASK,
+						  SMSM_NUM_ENTRIES *
+						  SMSM_NUM_HOSTS *
+						  sizeof(uint32_t));
 
 		if (smsm_info.intr_mask)
 			for (i = 0; i < SMSM_NUM_ENTRIES; i++)
@@ -1187,9 +1248,9 @@ static int smsm_init(void)
 	}
 
 	if (!smsm_info.intr_mux)
-		smsm_info.intr_mux = smem_alloc(SMEM_SMD_SMSM_INTR_MUX,
-						SMSM_NUM_INTR_MUX *
-						sizeof(uint32_t));
+		smsm_info.intr_mux = smem_alloc2(SMEM_SMD_SMSM_INTR_MUX,
+						 SMSM_NUM_INTR_MUX *
+						 sizeof(uint32_t));
 
 	return 0;
 }
@@ -1229,7 +1290,6 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 	static uint32_t prev_smem_q6_apps_smsm;
 	uint32_t mux_val;
 
-	smsm_init();
 	if (irq == INT_ADSP_A11) {
 		if (!smsm_info.intr_mux)
 			return IRQ_HANDLED;
@@ -1266,7 +1326,7 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 
 		} else if (modm & SMSM_RESET) {
 			apps |= SMSM_RESET;
-		} else {
+		} else if (modm & SMSM_INIT) {
 			if (!(apps & SMSM_INIT)) {
 				apps |= SMSM_INIT;
 				modem_queue_smsm_init_notify();
