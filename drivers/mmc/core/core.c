@@ -1357,11 +1357,12 @@ int mmc_resume_host(struct mmc_host *host)
 
 	return err;
 }
+EXPORT_SYMBOL(mmc_resume_host);
 
 /* Do the card removal on suspend if card is assumed removeable
  * Do that in pm notifier while userspace isn't yet frozen, so we will be able
-   to sync the card.
-*/
+ * to sync the card.
+ */
 int mmc_pm_notify(struct notifier_block *notify_block,
 					unsigned long mode, void *unused)
 {
@@ -1387,8 +1388,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 
 	return 0;
 }
-
-EXPORT_SYMBOL(mmc_resume_host);
 
 #endif
 
