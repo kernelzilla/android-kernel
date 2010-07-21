@@ -106,4 +106,7 @@ int audpp_dsp_set_rx_iir(unsigned id, unsigned enable,
 	struct audpp_cmd_cfg_object_params_pcm *iir,
 	enum obj_type objtype);
 
+int audpp_dsp_set_gain_rx(unsigned id,
+	struct audpp_cmd_cfg_cal_gain *calib_gain_rx,
+	enum obj_type objtype);
 #endif

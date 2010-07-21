@@ -123,4 +123,14 @@ struct acdb_mbadrc_block {
 	struct mbadrc_parameter		parameters;
 };
 
+struct  acdb_calib_gain_rx {
+	u16 audppcalgain;
+	u16 reserved;
+};
+
+struct acdb_calib_gain_tx {
+	u16 audprecalgain;
+	u16 reserved;
+};
+
 #endif

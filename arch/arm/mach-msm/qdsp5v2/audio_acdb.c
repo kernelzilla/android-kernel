@@ -75,9 +75,11 @@ struct acdb_data {
 	struct audpreproc_event_callback audpreproc_cb;
 
 	struct audpp_cmd_cfg_object_params_pcm *pp_iir;
+	struct audpp_cmd_cfg_cal_gain *calib_gain_rx;
 	struct audpp_cmd_cfg_object_params_mbadrc *pp_mbadrc;
 	struct audpreproc_cmd_cfg_agc_params *preproc_agc;
 	struct audpreproc_cmd_cfg_iir_tuning_filter_params *preproc_iir;
+	struct audpreproc_cmd_cfg_cal_gain *calib_gain_tx;
 	struct acdb_mbadrc_block mbadrc_block;
 
 	wait_queue_head_t wait;
@@ -350,6 +352,59 @@ static s32 acdb_fill_audpp_mbadrc(void)
 	return 0;
 }
 
+static struct acdb_calib_gain_rx *get_audpp_cal_gain(void)
+{
+	struct header *prs_hdr;
+	u32 index = 0;
+
+	while (index < acdb_data.acdb_result.used_bytes) {
+		prs_hdr = (struct header *)(acdb_data.virt_addr + index);
+		if (prs_hdr->dbor_signature == DBOR_SIGNATURE) {
+			if (prs_hdr->abid == ABID_AUDIO_CALIBRATION_GAIN_RX) {
+				if (prs_hdr->iid ==
+					IID_AUDIO_CALIBRATION_GAIN_RX) {
+					MM_DBG("Got audpp_calib_gain_rx"
+					" block\n");
+					return (struct acdb_calib_gain_rx *)
+						(acdb_data.virt_addr + index
+						+ sizeof(struct header));
+				}
+			} else {
+				index += prs_hdr->data_len +
+					sizeof(struct header);
+			}
+		} else {
+			break;
+		}
+	}
+	return NULL;
+}
+
+static s32 acdb_fill_audpp_cal_gain(void)
+{
+	struct acdb_calib_gain_rx *acdb_calib_gain_rx = NULL;
+
+	acdb_calib_gain_rx = get_audpp_cal_gain();
+	if (acdb_calib_gain_rx == NULL) {
+		MM_ERR("unable to find  audpp"
+			" calibration gain block returning\n");
+		return -1;
+	}
+	MM_DBG("Calibration value"
+		" for calib_gain_rx %d\n", acdb_calib_gain_rx->audppcalgain);
+	memset(acdb_data.calib_gain_rx, 0, sizeof(*acdb_data.calib_gain_rx));
+
+	acdb_data.calib_gain_rx->common.cmd_id = AUDPP_CMD_CFG_OBJECT_PARAMS;
+	acdb_data.calib_gain_rx->common.stream = AUDPP_CMD_COPP_STREAM;
+	acdb_data.calib_gain_rx->common.stream_id = 0;
+	acdb_data.calib_gain_rx->common.obj_cfg = AUDPP_CMD_OBJ0_UPDATE;
+	acdb_data.calib_gain_rx->common.command_type = 0;
+
+	acdb_data.calib_gain_rx->audppcalgain =
+				acdb_calib_gain_rx->audppcalgain;
+	return 0;
+}
+
 static s32 acdb_calibrate_audpp(void)
 {
 	s32	result = 0;
@@ -382,6 +437,18 @@ static s32 acdb_calibrate_audpp(void)
 			MM_DBG("AUDPP is calibrated with MBADRC parameters"
 					" for COPP ID %d\n",
 					acdb_data.device_info->dev_id);
+	}
+	result = acdb_fill_audpp_cal_gain();
+	if (!(IS_ERR_VALUE(result))) {
+		result = audpp_dsp_set_gain_rx(acdb_data.device_info->dev_id,
+					acdb_data.calib_gain_rx, COPP);
+		if (result) {
+			MM_ERR("ACDB=> Failed to send gain_rx"
+				" data to postproc\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("AUDPP is calibrated with calib_gain_rx \n");
 	}
 done:
 	return result;
@@ -635,6 +702,56 @@ static s32 acdb_fill_audpreproc_iir(void)
 	return 0;
 }
 
+static struct acdb_calib_gain_tx *get_audpreproc_cal_gain(void)
+{
+	struct header *prs_hdr;
+	u32 index = 0;
+
+	while (index < acdb_data.acdb_result.used_bytes) {
+		prs_hdr = (struct header *)(acdb_data.virt_addr + index);
+		if (prs_hdr->dbor_signature == DBOR_SIGNATURE) {
+			if (prs_hdr->abid == ABID_AUDIO_CALIBRATION_GAIN_TX) {
+				if (prs_hdr->iid ==
+					IID_AUDIO_CALIBRATION_GAIN_TX) {
+					MM_DBG("Got audpreproc_calib_gain_tx"
+					" block\n");
+					return (struct acdb_calib_gain_tx *)
+						(acdb_data.virt_addr + index
+						+ sizeof(struct header));
+				}
+			} else {
+				index += prs_hdr->data_len +
+					sizeof(struct header);
+			}
+		} else {
+			break;
+		}
+	}
+	return NULL;
+}
+
+static s32 acdb_fill_audpreproc_cal_gain(void)
+{
+	struct acdb_calib_gain_tx *acdb_calib_gain_tx = NULL;
+
+	acdb_calib_gain_tx = get_audpreproc_cal_gain();
+	if (acdb_calib_gain_tx == NULL) {
+		MM_ERR("unable to find  audpreproc"
+			" calibration block returning\n");
+		return -1;
+	}
+	MM_DBG("Calibration value"
+		" for calib_gain_tx %d\n", acdb_calib_gain_tx->audprecalgain);
+	memset(acdb_data.calib_gain_tx, 0, sizeof(*acdb_data.calib_gain_tx));
+
+	acdb_data.calib_gain_tx->cmd_id =
+					AUDPREPROC_CMD_CFG_CAL_GAIN_PARAMS;
+	acdb_data.calib_gain_tx->stream_id = acdb_data.preproc_stream_id;
+	acdb_data.calib_gain_tx->audprecalgain =
+					acdb_calib_gain_tx->audprecalgain;
+	return 0;
+}
+
 s32 acdb_calibrate_audpreproc(void)
 {
 	s32	result = 0;
@@ -667,6 +784,19 @@ s32 acdb_calibrate_audpreproc(void)
 			" for COPP ID %d and AUREC session %d\n",
 					acdb_data.device_info->dev_id,
 					acdb_data.preproc_stream_id);
+	}
+	result = acdb_fill_audpreproc_cal_gain();
+	if (!(IS_ERR_VALUE(result))) {
+		result = audpreproc_dsp_set_gain_tx(acdb_data.calib_gain_tx,
+				sizeof(struct audpreproc_cmd_cfg_cal_gain));
+		if (result) {
+			MM_ERR("ACDB=> Failed to send calib_gain_tx"
+				" data to preproc\n");
+			result = -EINVAL;
+			goto done;
+		} else
+			MM_DBG("AUDPREPROC is calibrated"
+				" with calib_gain_tx \n");
 	}
 done:
 	return result;
@@ -948,24 +1078,49 @@ static s32 initialize_memory(void)
 		result = -ENOMEM;
 		goto done;
 	}
-
-	acdb_data.preproc_agc = kmalloc(sizeof(*acdb_data.preproc_agc),
-						GFP_KERNEL);
-	if (acdb_data.preproc_agc == NULL) {
-		MM_ERR("ACDB=> Could not allocate preproc agc memory\n");
-		result = -ENOMEM;
+	acdb_data.calib_gain_rx = kmalloc(sizeof(*acdb_data.calib_gain_rx),
+							GFP_KERNEL);
+	if (acdb_data.calib_gain_rx == NULL) {
+		MM_ERR("ACDB=> Could not allocate"
+			" postproc calib_gain_rx memory\n");
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
+		result = -ENOMEM;
+		goto done;
+	}
+
+	acdb_data.preproc_agc = kmalloc(sizeof(*acdb_data.preproc_agc),
+							GFP_KERNEL);
+	if (acdb_data.preproc_agc == NULL) {
+		MM_ERR("ACDB=> Could not allocate preproc agc memory\n");
+		kfree(acdb_data.pp_iir);
+		kfree(acdb_data.pp_mbadrc);
+		kfree(acdb_data.calib_gain_rx);
+		result = -ENOMEM;
 		goto done;
 	}
 
 	acdb_data.preproc_iir = kmalloc(sizeof(*acdb_data.preproc_iir),
-		GFP_KERNEL);
+							GFP_KERNEL);
 	if (acdb_data.preproc_iir == NULL) {
 		MM_ERR("ACDB=> Could not allocate preproc iir memory\n");
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
+		kfree(acdb_data.calib_gain_rx);
 		kfree(acdb_data.preproc_agc);
+		result = -ENOMEM;
+		goto done;
+	}
+	acdb_data.calib_gain_tx = kmalloc(sizeof(*acdb_data.calib_gain_tx),
+							GFP_KERNEL);
+	if (acdb_data.calib_gain_tx == NULL) {
+		MM_ERR("ACDB=> Could not allocate"
+			" preproc calib_gain_tx memory\n");
+		kfree(acdb_data.pp_iir);
+		kfree(acdb_data.pp_mbadrc);
+		kfree(acdb_data.calib_gain_rx);
+		kfree(acdb_data.preproc_agc);
+		kfree(acdb_data.preproc_iir);
 		result = -ENOMEM;
 		goto done;
 	}
