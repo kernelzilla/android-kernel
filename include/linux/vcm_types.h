@@ -83,7 +83,7 @@
  */
 #define VCM_ALIGN_SHIFT		10
 #define VCM_ALIGN_MASK		0x1F
-#define VCM_ALIGN_ATTR(order) 	(((order) & VCM_ALIGN_MASK) << VCM_ALIGN_SHIFT)
+#define VCM_ALIGN_ATTR(order)	(((order) & VCM_ALIGN_MASK) << VCM_ALIGN_SHIFT)
 
 #define VCM_ALIGN_DEFAULT	0
 #define VCM_ALIGN_4K		(VCM_ALIGN_ATTR(12))
@@ -163,7 +163,7 @@
  *
  * Used in vcm_assoc(), vcm_set_assoc_attr().
  *
- * 	VCM_USE_LOW_BASE	Use the low base register.
+ *	VCM_USE_LOW_BASE	Use the low base register.
  *	VCM_USE_HIGH_BASE	Use the high base register.
  *
  *	VCM_SPLIT		A 5 bit field that defines the
@@ -197,8 +197,7 @@
 
 /**
  * enum memtarget_t - A logical location in a VCM.
- *
- * VCM_START	Indicates the start of a VCM_REGION.
+ * @VCM_START:			Indicates the start of a VCM_REGION.
  */
 enum memtarget_t {
 	VCM_START
@@ -207,10 +206,9 @@ enum memtarget_t {
 
 /**
  * enum memtype_t - A logical location in a VCM.
- *
- * VCM_MEMTYPE_0	Generic memory type 0
- * VCM_MEMTYPE_1	Generic memory type 1
- * VCM_MEMTYPE_2	Generic memory type 2
+ * @VCM_MEMTYPE_0:		Generic memory type 0
+ * @VCM_MEMTYPE_1:		Generic memory type 1
+ * @VCM_MEMTYPE_2:		Generic memory type 2
  *
  * A memtype encapsulates a platform specific memory arrangement. The
  * memtype needn't refer to a single type of memory, it can refer to a
@@ -221,25 +219,31 @@ enum memtype_t {
 	VCM_MEMTYPE_0 = 0,
 	VCM_MEMTYPE_1 = 1,
 	VCM_MEMTYPE_2 = 2,
-	VCM_INVALID = 3,
+	VCM_MEMTYPE_3 = 3,
+	VCM_INVALID = 4,
 };
-
-#define NUM_MEMTYPES 3
-
 
 /**
  * vcm_handler - The signature of the fault hook.
- * @dev_id	The device id of the faulting device.
- * @data	The generic data pointer.
- * @fault_data	System specific common fault data.
+ * @dev:			The device id of the faulting device.
+ * @data:			The generic data pointer.
+ * @fault_data:			System specific common fault data.
  *
  * The handler should return 0 for success. This indicates that the
  * fault was handled. A non-zero return value is an error and will be
  * propagated up the stack.
  */
-typedef int (*vcm_handler)(size_t dev_id, void *data, void *fault_data);
+typedef int (*vcm_handler)(size_t dev, void *data, void *fault_data);
 
 
+/**
+ * enum vcm_type - The type of VCM.
+ * @VCM_DEVICE:			VCM used for device mappings
+ * @VCM_EXT_KERNEL:		VCM used for kernel-side mappings
+ * @VCM_EXT_USER:		VCM used for userspace mappings
+ * @VCM_ONE_TO_ONE:		VCM used for devices without SMMUs
+ *
+ */
 enum vcm_type {
 	VCM_DEVICE,
 	VCM_EXT_KERNEL,
@@ -249,18 +253,20 @@ enum vcm_type {
 
 
 /**
- * vcm - A Virtually Contiguous Memory region.
- * @start_addr	The starting address of the VCM region.
- * @len 	The len of the VCM region. This must be at least
- *		vcm_min() bytes.
+ * struct vcm - A Virtually Contiguous Memory region.
+ * @start_addr:		The starting address of the VCM region.
+ * @len:		The len of the VCM region. This must be at least
+ *			vcm_min() bytes.
  */
 struct vcm {
-	enum vcm_type type;
-
-	size_t start_addr;
+	/* public */
+	unsigned long start_addr;
 	size_t len;
 
-	size_t dev_id; /* opaque device control */
+	/* private */
+	enum vcm_type type;
+
+	struct device *dev; /* opaque device control */
 
 	/* allocator dependent */
 	struct gen_pool *pool;
@@ -272,28 +278,30 @@ struct vcm {
 };
 
 /**
- * avcm - A VCM to device association
- * @vcm		The VCM region of interest.
- * @dev_id	The device to associate the VCM with.
- * @attr	See 'Association Attributes'.
+ * struct avcm - A VCM to device association
+ * @vcm:		The VCM region of interest.
+ * @dev:		The device to associate the VCM with.
+ * @attr:		See 'Association Attributes'.
  */
 struct avcm {
-	struct vcm *vcm_id;
-	size_t dev_id;
-	uint32_t attr;
+	/* public */
+	struct vcm *vcm;
+	size_t dev;
+	u32 attr;
 
+	/* private */
 	struct list_head assoc_elm;
 
 	int is_active; /* is this particular association active */
 };
 
 /**
- * bound - A boundary to reserve from in a VCM region.
- * @vcm		The VCM that needs a bound.
- * @len		The len of the bound.
+ * struct bound - A boundary to reserve from in a VCM region.
+ * @vcm:		The VCM that needs a bound.
+ * @len:		The len of the bound.
  */
 struct bound {
-	struct vcm *vcm_id;
+	struct vcm *vcm;
 	size_t len;
 };
 
@@ -302,26 +310,24 @@ struct phys_chunk {
 	struct list_head allocated; /* used to record is allocated */
 
 	struct list_head refers_to;
-
-	/* TODO: change to unsigned long */
-	int pa;
-	int size_idx;
+	phys_addr_t pa;
+	int pool_idx;
+	int size;
 };
 
-
 /**
- * physmem - A physical memory allocation.
- * @memtype	The memory type of the VCM region.
- * @len		The len of the physical memory allocation.
- * @attr 	See 'Physical Allocation Attributes'.
- *
+ * struct physmem - A physical memory allocation.
+ * @memtype:		The memory type of the VCM region.
+ * @len:		The len of the physical memory allocation.
+ * @attr:		See 'Physical Allocation Attributes'.
  */
-
 struct physmem {
+	/* public */
 	enum memtype_t memtype;
 	size_t len;
-	uint32_t attr;
+	u32 attr;
 
+	/* private */
 	struct phys_chunk alloc_head;
 
 	/* if the physmem is cont then use the built in VCM */
@@ -331,26 +337,28 @@ struct physmem {
 
 
 /**
- * res - A reservation in a VCM region.
- * @vcm		The VCM region to reserve from.
- * @len		The length of the reservation. Must be at least vcm_min()
- *		bytes.
- * @attr	See 'Reservation Attributes'.
+ * struct res - A reservation in a VCM region.
+ * @vcm:		The VCM region to reserve from.
+ * @len:		The length of the reservation. Must be at least
+ *			vcm_min() bytes.
+ * @attr:		See 'Reservation Attributes'.
+ * @dev_addr:		The device-side address.
  */
 struct res {
-	struct vcm *vcm_id;
-	struct physmem *physmem_id;
+	/* public */
+	struct vcm *vcm;
 	size_t len;
-	uint32_t attr;
+	u32 attr;
+	unsigned long dev_addr;
 
+	/* private */
+	struct physmem *physmem;
 	/* allocator dependent */
 	size_t alignment_req;
 	size_t aligned_len;
 	unsigned long ptr;
-	size_t aligned_ptr;
 
 	struct list_head res_elm;
-
 
 	/* type VCM_EXT_KERNEL */
 	struct vm_struct *vm_area;

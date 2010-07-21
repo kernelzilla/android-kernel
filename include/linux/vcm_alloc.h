@@ -34,33 +34,26 @@
 #include <linux/vcm.h>
 #include <linux/vcm_types.h>
 
-#define NUM_CHUNK_SIZES 4
-extern int chunk_sizes[NUM_CHUNK_SIZES];
-
-enum chunk_size_idx {
-	IDX_16M = 0,
-	IDX_1M,
-	IDX_64K,
-	IDX_4K
-};
-
+#define MAX_NUM_PRIO_POOLS 8
 
 /* Data structure to inform VCM about the memory it manages */
 struct physmem_region {
 	size_t addr;
 	size_t size;
-	int chunk_fraction[NUM_CHUNK_SIZES];
+	int chunk_size;
 };
 
 /* Mapping between memtypes and physmem_regions based on chunk size */
 struct vcm_memtype_map {
-	int pool_id[NUM_CHUNK_SIZES];
+	int pool_id[MAX_NUM_PRIO_POOLS];
+	int num_pools;
 };
 
+int vcm_alloc_pool_idx_to_size(int pool_idx);
 int vcm_alloc_idx_to_size(int idx);
 int vcm_alloc_get_mem_size(void);
-int vcm_alloc_blocks_avail(enum memtype_t memtype, enum chunk_size_idx idx);
-int vcm_alloc_get_num_chunks(void);
+int vcm_alloc_blocks_avail(enum memtype_t memtype, int idx);
+int vcm_alloc_get_num_chunks(enum memtype_t memtype);
 int vcm_alloc_all_blocks_avail(enum memtarget_t memtype);
 int vcm_alloc_count_allocated(enum memtype_t memtype);
 void vcm_alloc_print_list(enum memtype_t memtype, int just_allocated);
@@ -71,7 +64,7 @@ int vcm_alloc_init(struct physmem_region *mem, int n_regions,
 int vcm_alloc_free_blocks(enum memtype_t memtype,
 			  struct phys_chunk *alloc_head);
 int vcm_alloc_num_blocks(int num, enum memtype_t memtype,
-			 enum chunk_size_idx idx, /* chunk size */
+			 int idx, /* chunk size */
 			 struct phys_chunk *alloc_head);
 int vcm_alloc_max_munch(int len, enum memtype_t memtype,
 			struct phys_chunk *alloc_head);

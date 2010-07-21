@@ -45,12 +45,25 @@
 #define vcm_err(a, ...)							\
 	pr_err("ERROR %s %i " a, __func__, __LINE__, ##__VA_ARGS__)
 
+static unsigned int smmu_map_sizes[4] = {SZ_16M, SZ_1M, SZ_64K, SZ_4K};
+
 static phys_addr_t *bootmem_cont;
 static int cont_sz;
 static struct vcm *cont_vcm_id;
 static struct phys_chunk *cont_phys_chunk;
 
 DEFINE_SPINLOCK(vcmlock);
+
+/* Leaving this in for now to keep compatibility of the API. */
+/* This will disappear. */
+phys_addr_t vcm_get_dev_addr(struct res *res)
+{
+	if (!res) {
+		vcm_err("NULL RES");
+		return -EINVAL;
+	}
+	return res->dev_addr;
+}
 
 static int vcm_no_res(struct vcm *vcm)
 {
@@ -91,7 +104,7 @@ static int vcm_all_activated(struct vcm *vcm)
 
 	return 1;
 fail:
-	return -1;
+	return -EINVAL;
 }
 
 static void vcm_destroy_common(struct vcm *vcm)
@@ -126,7 +139,8 @@ fail:
 }
 
 
-static int vcm_create_pool(struct vcm *vcm, size_t start_addr, size_t len)
+static int vcm_create_pool(struct vcm *vcm, unsigned long start_addr,
+			   size_t len)
 {
 	int ret = 0;
 
@@ -156,11 +170,12 @@ static int vcm_create_pool(struct vcm *vcm, size_t start_addr, size_t len)
 fail2:
 	gen_pool_destroy(vcm->pool);
 fail:
-	return -1;
+	return -EINVAL;
 }
 
 
-static struct vcm *vcm_create_flagged(int flag, size_t start_addr, size_t len)
+static struct vcm *vcm_create_flagged(int flag, unsigned long start_addr,
+				      size_t len)
 {
 	int ret = 0;
 	struct vcm *vcm = 0;
@@ -196,7 +211,7 @@ fail:
 	return NULL;
 }
 
-struct vcm *vcm_create(size_t start_addr, size_t len)
+struct vcm *vcm_create(unsigned long start_addr, size_t len)
 {
 	unsigned long flags;
 	struct vcm *vcm;
@@ -256,7 +271,7 @@ fail:
 }
 
 
-struct vcm *vcm_clone(struct vcm *vcm_id)
+struct vcm *vcm_clone(struct vcm *vcm)
 {
 	return 0;
 }
@@ -368,7 +383,7 @@ static int vcm_free_pool(struct vcm *vcm)
 	return 0;
 
 fail:
-	return -1;
+	return -EINVAL;
 }
 
 
@@ -423,7 +438,7 @@ int vcm_free(struct vcm *vcm)
 }
 
 
-static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
+static struct res *__vcm_reserve(struct vcm *vcm, size_t len, u32 attr)
 {
 	struct res *res = NULL;
 	int align_attr = 0, i = 0;
@@ -452,15 +467,15 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 	}
 
 	INIT_LIST_HEAD(&res->res_elm);
-	res->vcm_id = vcm;
+	res->vcm = vcm;
 	res->len = len;
 	res->attr = attr;
-	res->alignment_req = chunk_sizes[ARRAY_SIZE(chunk_sizes) - 1];
+	res->alignment_req = smmu_map_sizes[ARRAY_SIZE(smmu_map_sizes) - 1];
 
 	if (align_attr == 0) {
-		for (i = 0; i < ARRAY_SIZE(chunk_sizes); i++)
-			if (len / chunk_sizes[i]) {
-				res->alignment_req = chunk_sizes[i];
+		for (i = 0; i < ARRAY_SIZE(smmu_map_sizes); i++)
+			if (len / smmu_map_sizes[i]) {
+				res->alignment_req = smmu_map_sizes[i];
 				break;
 			}
 	} else
@@ -484,7 +499,7 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 		}
 
 		/* Calculate alignment... this will all change anyway */
-		res->aligned_ptr = res->ptr +
+		res->dev_addr = res->ptr +
 			(res->alignment_req -
 			 (res->ptr & (res->alignment_req - 1)));
 
@@ -497,7 +512,7 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 			goto fail2;
 		}
 
-		res->aligned_ptr = (size_t) res->vm_area->addr +
+		res->dev_addr = (size_t) res->vm_area->addr +
 			(res->alignment_req -
 			 ((size_t) res->vm_area->addr &
 			  (res->alignment_req - 1)));
@@ -521,7 +536,7 @@ fail:
 }
 
 
-struct res *vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
+struct res *vcm_reserve(struct vcm *vcm, size_t len, u32 attr)
 {
 	unsigned long flags;
 	struct res *res;
@@ -534,22 +549,10 @@ struct res *vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 }
 
 
-struct res *vcm_reserve_at(enum memtarget_t memtarget, struct vcm* vcm,
-		     size_t len, uint32_t attr)
+struct res *vcm_reserve_at(enum memtarget_t memtarget, struct vcm *vcm,
+			   size_t len, u32 attr)
 {
 	return 0;
-}
-
-
-/* No lock needed, res->vcm_id is never updated after creation */
-struct vcm *vcm_get_vcm_from_res(struct res *res)
-{
-	if (!res) {
-		vcm_err("NULL res\n");
-		return 0;
-	}
-
-	return res->vcm_id;
 }
 
 
@@ -562,12 +565,12 @@ static int __vcm_unreserve(struct res *res)
 		goto fail;
 	}
 
-	if (!res->vcm_id) {
-		vcm_err("NULL res->vcm_id\n");
+	if (!res->vcm) {
+		vcm_err("NULL res->vcm\n");
 		goto fail;
 	}
 
-	vcm = res->vcm_id;
+	vcm = res->vcm;
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
 		goto fail;
@@ -575,13 +578,13 @@ static int __vcm_unreserve(struct res *res)
 
 	switch (vcm->type) {
 	case VCM_DEVICE:
-		if (!res->vcm_id->pool) {
-			vcm_err("NULL (res->vcm_id))->pool\n");
+		if (!res->vcm->pool) {
+			vcm_err("NULL (res->vcm))->pool\n");
 			goto fail;
 		}
 
 		/* res->ptr could be zero, this isn't an error */
-		gen_pool_free(res->vcm_id->pool, res->ptr,
+		gen_pool_free(res->vcm->pool, res->ptr,
 			      res->aligned_len);
 		break;
 	case VCM_EXT_KERNEL:
@@ -648,13 +651,13 @@ size_t vcm_get_res_len(struct res *res)
 }
 
 
-int vcm_set_res_attr(struct res *res, uint32_t attr)
+int vcm_set_res_attr(struct res *res, u32 attr)
 {
 	return 0;
 }
 
 
-uint32_t vcm_get_res_attr(struct res *res)
+u32 vcm_get_res_attr(struct res *res)
 {
 	return 0;
 }
@@ -672,8 +675,8 @@ struct res *vcm_get_next_res(struct vcm *vcm, struct res *res)
 }
 
 
-size_t vcm_res_copy(struct res *to, size_t to_off, struct res *from,
-		    size_t from_off, size_t len)
+size_t vcm_res_copy(struct res *to, size_t to_off, struct res *from, size_t
+		    from_off, size_t len)
 {
 	return 0;
 }
@@ -685,7 +688,7 @@ size_t vcm_get_min_page_size(void)
 }
 
 
-static int vcm_to_smmu_attr(uint32_t attr)
+static int vcm_to_smmu_attr(u32 attr)
 {
 	int smmu_attr = 0;
 
@@ -706,29 +709,30 @@ static int vcm_to_smmu_attr(uint32_t attr)
 		smmu_attr |= VCM_DEV_ATTR_SH;
 		break;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
 	return smmu_attr;
 }
 
 
-static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
-			unsigned long len, unsigned int attr, int map)
+static int vcm_process_chunk(size_t dev, phys_addr_t pa, unsigned long va,
+			     size_t len, u32 attr, int map)
 {
 	int ret, i;
-	unsigned long map_len = chunk_sizes[ARRAY_SIZE(chunk_sizes) - 1];
+	unsigned long map_len = smmu_map_sizes[ARRAY_SIZE(smmu_map_sizes) - 1];
 
-	ret = smmu_update_start((struct smmu_dev *) dev_id);
+	ret = smmu_update_start((struct smmu_dev *) dev);
 
 	if (ret) {
 		pr_err("smmu_update_start returned %d\n", ret);
 		goto fail;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(chunk_sizes); i++) {
-		if (IS_ALIGNED(va, chunk_sizes[i]) && len >= chunk_sizes[i]) {
-			map_len = chunk_sizes[i];
+	for (i = 0; i < ARRAY_SIZE(smmu_map_sizes); i++) {
+		if (IS_ALIGNED(va, smmu_map_sizes[i]) && len >=
+							smmu_map_sizes[i]) {
+			map_len = smmu_map_sizes[i];
 			break;
 		}
 	}
@@ -747,20 +751,20 @@ static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 		}
 
 		if (map_len > len) {
-			vcm_err("map_len = %lu, len = %lu, trying to overmap\n",
+			vcm_err("map_len = %lu, len = %d, trying to overmap\n",
 				 map_len, len);
 			goto fail;
 		}
 
 		if (map)
-			ret = smmu_map((struct smmu_dev *) dev_id, pa, va,
+			ret = smmu_map((struct smmu_dev *) dev, pa, va,
 								map_len, attr);
 		else
-			ret = smmu_unmap((struct smmu_dev *) dev_id, va,
+			ret = smmu_unmap((struct smmu_dev *) dev, va,
 								map_len);
 		if (ret) {
 			vcm_err("smmu_map/unmap(%p, %p, %p, 0x%x, 0x%x) ret %i"
-				"map = %d", (void *) dev_id, (void *) pa,
+				"map = %d", (void *) dev, (void *) pa,
 				(void *) va, (int) map_len, attr, ret, map);
 			goto fail;
 		}
@@ -770,16 +774,16 @@ static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 		len -= map_len;
 	}
 
-	ret = smmu_update_done((struct smmu_dev *) dev_id);
+	ret = smmu_update_done((struct smmu_dev *) dev);
 
 	if (ret) {
-		pr_err("smmu_update_done returned %d\n", ret);
+		vcm_err("smmu_update_done returned %d\n", ret);
 		goto fail;
 	}
 
 	return 0;
 fail:
-	return -1;
+	return -EINVAL;
 }
 
 /* TBD if you vcm_back again what happens? */
@@ -799,7 +803,7 @@ int vcm_back(struct res *res, struct physmem *physmem)
 		goto fail;
 	}
 
-	vcm = res->vcm_id;
+	vcm = res->vcm;
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
 		goto fail;
@@ -853,7 +857,7 @@ int vcm_back(struct res *res, struct physmem *physmem)
 		}
 	}
 
-	ret = vcm_no_assoc(res->vcm_id);
+	ret = vcm_no_assoc(res->vcm);
 	if (ret == 1) {
 		vcm_err("can't back un associated VCM\n");
 		goto fail;
@@ -864,7 +868,7 @@ int vcm_back(struct res *res, struct physmem *physmem)
 		goto fail;
 	}
 
-	ret = vcm_all_activated(res->vcm_id);
+	ret = vcm_all_activated(res->vcm);
 	if (ret == 0) {
 		vcm_err("can't back, not all associations are activated\n");
 		goto fail_eagain;
@@ -875,12 +879,17 @@ int vcm_back(struct res *res, struct physmem *physmem)
 		goto fail;
 	}
 
-	va = res->aligned_ptr;
+	va = res->dev_addr;
 
 	list_for_each_entry(chunk, &physmem->alloc_head.allocated,
 			    allocated) {
-		struct vcm *vcm = res->vcm_id;
-		size_t chunk_size =  vcm_alloc_idx_to_size(chunk->size_idx);
+		struct vcm *vcm = res->vcm;
+		size_t chunk_size = chunk->size;
+
+		if (chunk_size <= 0) {
+			vcm_err("Bad chunk size: %d\n", chunk_size);
+			goto fail;
+		}
 
 		switch (vcm->type) {
 		case VCM_DEVICE:
@@ -891,18 +900,17 @@ int vcm_back(struct res *res, struct physmem *physmem)
 			list_for_each_entry(avcm, &vcm->assoc_head,
 					    assoc_elm) {
 
-				ret = vcm_process_chunk(avcm->dev_id, chunk->pa,
+				ret = vcm_process_chunk(avcm->dev, chunk->pa,
 						      va, chunk_size, attr, 1);
 				if (ret != 0) {
 					vcm_err("vcm_back_chunk(%p, %p, %p,"
 						" 0x%x, 0x%x)"
 						" ret %i",
-						(void *) avcm->dev_id,
+						(void *) avcm->dev,
 						(void *) chunk->pa,
 						(void *) va,
 						(int) chunk_size, attr, ret);
 					goto fail;
-					/* TODO handle weird inter-map case */
 				}
 			}
 			break;
@@ -979,7 +987,7 @@ int vcm_back(struct res *res, struct physmem *physmem)
 	}
 
 	/* note the reservation */
-	res->physmem_id = physmem;
+	res->physmem = physmem;
 
 	spin_unlock_irqrestore(&vcmlock, flags);
 	return 0;
@@ -1004,18 +1012,18 @@ int vcm_unback(struct res *res)
 	if (!res)
 		goto fail;
 
-	vcm = res->vcm_id;
+	vcm = res->vcm;
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
 		goto fail;
 	}
 
-	if (!res->physmem_id) {
+	if (!res->physmem) {
 		vcm_err("can't unback a non-backed reservation\n");
 		goto fail;
 	}
 
-	physmem = res->physmem_id;
+	physmem = res->physmem;
 	if (!physmem) {
 		vcm_err("physmem is NULL\n");
 		goto fail;
@@ -1026,25 +1034,25 @@ int vcm_unback(struct res *res)
 		goto fail;
 	}
 
-	ret = vcm_no_assoc(res->vcm_id);
+	ret = vcm_no_assoc(res->vcm);
 	if (ret == 1) {
 		vcm_err("can't unback a unassociated reservation\n");
 		goto fail;
 	}
 
 	if (ret == -1) {
-		vcm_err("vcm_no_assoc(%p) ret -1\n", (void *) res->vcm_id);
+		vcm_err("vcm_no_assoc(%p) ret -1\n", (void *) res->vcm);
 		goto fail;
 	}
 
-	ret = vcm_all_activated(res->vcm_id);
+	ret = vcm_all_activated(res->vcm);
 	if (ret == 0) {
 		vcm_err("can't unback, not all associations are active\n");
 		goto fail_eagain;
 	}
 
 	if (ret == -1) {
-		vcm_err("vcm_all_activated(%p) ret -1\n", (void *) res->vcm_id);
+		vcm_err("vcm_all_activated(%p) ret -1\n", (void *) res->vcm);
 		goto fail;
 	}
 
@@ -1068,23 +1076,22 @@ int vcm_unback(struct res *res)
 	{
 #ifdef CONFIG_SMMU
 		struct phys_chunk *chunk;
-		size_t va = res->aligned_ptr;
+		size_t va = res->dev_addr;
 
 		list_for_each_entry(chunk, &physmem->alloc_head.allocated,
 				    allocated) {
-			struct vcm *vcm = res->vcm_id;
-			size_t chunk_size =
-				vcm_alloc_idx_to_size(chunk->size_idx);
+			struct vcm *vcm = res->vcm;
+			size_t chunk_size = chunk->size;
 			struct avcm *avcm;
 
 			/* un map all */
 			list_for_each_entry(avcm, &vcm->assoc_head, assoc_elm) {
-				ret = vcm_process_chunk(avcm->dev_id, 0, va,
+				ret = vcm_process_chunk(avcm->dev, 0, va,
 							chunk_size, 0, 0);
 				if (ret != 0) {
 					vcm_err("vcm_unback_chunk(%p, %p, 0x%x)"
 						" ret %i",
-						(void *) avcm->dev_id,
+						(void *) avcm->dev,
 						(void *) va,
 						(int) chunk_size, ret);
 					goto fail;
@@ -1111,7 +1118,7 @@ int vcm_unback(struct res *res)
 	}
 
 	/* clear the reservation */
-	res->physmem_id = 0;
+	res->physmem = 0;
 
 	spin_unlock_irqrestore(&vcmlock, flags);
 	return 0;
@@ -1134,7 +1141,7 @@ static int vcm_free_max_munch_cont(struct phys_chunk *head)
 	struct phys_chunk *chunk, *tmp;
 
 	if (!head)
-		return -1;
+		return -EINVAL;
 
 	list_for_each_entry_safe(chunk, tmp, &head->allocated,
 				 allocated) {
@@ -1173,20 +1180,20 @@ static int vcm_alloc_max_munch_cont(size_t start_addr, size_t len,
 
 	i = (start_addr - (size_t) bootmem_cont)/SZ_4K;
 
-	for (j = 0; j < ARRAY_SIZE(chunk_sizes); ++j) {
-		while (len/chunk_sizes[j]) {
+	for (j = 0; j < ARRAY_SIZE(smmu_map_sizes); ++j) {
+		while (len/smmu_map_sizes[j]) {
 			if (!list_empty(&cont_phys_chunk[i].allocated)) {
 				vcm_err("chunk %i ( addr %p) already mapped\n",
 					i, (void *) (start_addr +
-						     (i*chunk_sizes[j])));
+						     (i*smmu_map_sizes[j])));
 				goto fail_free;
 			}
 			list_add_tail(&cont_phys_chunk[i].allocated,
 				      &head->allocated);
-			cont_phys_chunk[i].size_idx = j;
+			cont_phys_chunk[i].size = smmu_map_sizes[j];
 
-			len -= chunk_sizes[j];
-			i += chunk_sizes[j]/SZ_4K;
+			len -= smmu_map_sizes[j];
+			i += smmu_map_sizes[j]/SZ_4K;
 		}
 	}
 
@@ -1219,8 +1226,7 @@ fail:
 	return 0;
 }
 
-struct physmem *vcm_phys_alloc(enum memtype_t memtype, size_t len,
-			       uint32_t attr)
+struct physmem *vcm_phys_alloc(enum memtype_t memtype, size_t len, u32 attr)
 {
 	unsigned long flags;
 	int ret;
@@ -1260,7 +1266,7 @@ struct physmem *vcm_phys_alloc(enum memtype_t memtype, size_t len,
 		   the shadow physmem links*/
 		blocks_allocated =
 			vcm_alloc_max_munch_cont(
-				vcm_get_dev_addr(physmem->res),
+				physmem->res->dev_addr,
 				len,
 				&physmem->alloc_head);
 
@@ -1357,7 +1363,7 @@ fail:
 }
 
 
-struct avcm *vcm_assoc(struct vcm *vcm, size_t dev_id, uint32_t attr)
+struct avcm *vcm_assoc(struct vcm *vcm, size_t dev, u32 attr)
 {
 	unsigned long flags;
 	struct avcm *avcm = NULL;
@@ -1369,7 +1375,7 @@ struct avcm *vcm_assoc(struct vcm *vcm, size_t dev_id, uint32_t attr)
 		goto fail;
 	}
 
-	if (!dev_id) {
+	if (!dev) {
 		vcm_err("dev_id is NULL\n");
 		goto fail;
 	}
@@ -1386,9 +1392,9 @@ struct avcm *vcm_assoc(struct vcm *vcm, size_t dev_id, uint32_t attr)
 		goto fail;
 	}
 
-	avcm->dev_id = dev_id;
+	avcm->dev = dev;
 
-	avcm->vcm_id = vcm;
+	avcm->vcm = vcm;
 	avcm->attr = attr;
 	avcm->is_active = 0;
 
@@ -1441,13 +1447,13 @@ fail:
 }
 
 
-int vcm_set_assoc_attr(struct avcm *avcm, uint32_t attr)
+int vcm_set_assoc_attr(struct avcm *avcm, u32 attr)
 {
 	return 0;
 }
 
 
-uint32_t vcm_get_assoc_attr(struct avcm *avcm)
+u32 vcm_get_assoc_attr(struct avcm *avcm)
 {
 	return 0;
 }
@@ -1465,13 +1471,13 @@ int vcm_activate(struct avcm *avcm)
 		goto fail;
 	}
 
-	vcm = avcm->vcm_id;
+	vcm = avcm->vcm;
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
 		goto fail;
 	}
 
-	if (!avcm->dev_id) {
+	if (!avcm->dev) {
 		vcm_err("cannot activate without a device\n");
 		goto fail_nodev;
 	}
@@ -1483,10 +1489,10 @@ int vcm_activate(struct avcm *avcm)
 
 	if (vcm->type == VCM_DEVICE) {
 #ifdef CONFIG_SMMU
-		int ret = smmu_is_active((struct smmu_dev *) avcm->dev_id);
+		int ret = smmu_is_active((struct smmu_dev *) avcm->dev);
 		if (ret == -1) {
 			vcm_err("smmu_is_active(%p) ret -1\n",
-				(void *) avcm->dev_id);
+				(void *) avcm->dev);
 			goto fail_dev;
 		}
 
@@ -1496,11 +1502,11 @@ int vcm_activate(struct avcm *avcm)
 		}
 
 		/* TODO, pmem check */
-		ret = smmu_activate((struct smmu_dev *) avcm->dev_id);
+		ret = smmu_activate((struct smmu_dev *) avcm->dev);
 		if (ret != 0) {
 			vcm_err("smmu_activate(%p) ret %i"
 				" SMMU failed to activate\n",
-				(void *) avcm->dev_id, ret);
+				(void *) avcm->dev, ret);
 			goto fail_dev;
 		}
 #else
@@ -1516,7 +1522,7 @@ int vcm_activate(struct avcm *avcm)
 #ifdef CONFIG_SMMU
 fail_dev:
 	spin_unlock_irqrestore(&vcmlock, flags);
-	return -1;
+	return -ENODEV;
 #endif
 fail_busy:
 	spin_unlock_irqrestore(&vcmlock, flags);
@@ -1540,13 +1546,13 @@ int vcm_deactivate(struct avcm *avcm)
 	if (!avcm)
 		goto fail;
 
-	vcm = avcm->vcm_id;
+	vcm = avcm->vcm;
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
 		goto fail;
 	}
 
-	if (!avcm->dev_id) {
+	if (!avcm->dev) {
 		vcm_err("cannot deactivate without a device\n");
 		goto fail;
 	}
@@ -1558,10 +1564,10 @@ int vcm_deactivate(struct avcm *avcm)
 
 	if (vcm->type == VCM_DEVICE) {
 #ifdef CONFIG_SMMU
-		int ret = smmu_is_active((struct smmu_dev *) avcm->dev_id);
+		int ret = smmu_is_active((struct smmu_dev *) avcm->dev);
 		if (ret == -1) {
 			vcm_err("smmu_is_active(%p) ret %i\n",
-				(void *) avcm->dev_id, ret);
+				(void *) avcm->dev, ret);
 			goto fail_dev;
 		}
 
@@ -1571,10 +1577,10 @@ int vcm_deactivate(struct avcm *avcm)
 		}
 
 		/* TODO, pmem check */
-		ret = smmu_deactivate((struct smmu_dev *) avcm->dev_id);
+		ret = smmu_deactivate((struct smmu_dev *) avcm->dev);
 		if (ret != 0) {
 			vcm_err("smmu_deactivate(%p) ret %i\n",
-				(void *) avcm->dev_id, ret);
+				(void *) avcm->dev, ret);
 			goto fail_dev;
 		}
 #else
@@ -1589,7 +1595,7 @@ int vcm_deactivate(struct avcm *avcm)
 #ifdef CONFIG_SMMU
 fail_dev:
 	spin_unlock_irqrestore(&vcmlock, flags);
-	return -1;
+	return -ENODEV;
 #endif
 fail_nobusy:
 	spin_unlock_irqrestore(&vcmlock, flags);
@@ -1607,12 +1613,12 @@ struct bound *vcm_create_bound(struct vcm *vcm, size_t len)
 
 int vcm_free_bound(struct bound *bound)
 {
-	return -1;
+	return -EINVAL;
 }
 
 
 struct res *vcm_reserve_from_bound(struct bound *bound, size_t len,
-				   uint32_t attr)
+				   u32 attr)
 {
 	return 0;
 }
@@ -1630,79 +1636,71 @@ size_t vcm_get_bound_len(struct bound *bound)
 }
 
 
-struct physmem *vcm_map_phys_addr(size_t phys, size_t len)
+struct physmem *vcm_map_phys_addr(phys_addr_t phys, size_t len)
 {
 	return 0;
 }
 
 
-size_t vcm_get_next_phys_addr(struct physmem *physmem, size_t phys, size_t *len)
+size_t vcm_get_next_phys_addr(struct physmem *physmem, phys_addr_t phys,
+			      size_t *len)
 {
 	return 0;
 }
 
 
-size_t vcm_get_dev_addr(struct res *res)
-{
-	if (!res) {
-		vcm_err("res is NULL\n");
-		return 0;
-	}
-
-	return res->aligned_ptr;
-}
-
-
-struct res *vcm_get_res(size_t dev_addr, struct vcm *vcm)
+struct res *vcm_get_res(unsigned long dev_addr, struct vcm *vcm)
 {
 	return 0;
 }
 
 
-size_t vcm_translate(size_t src_dev, struct vcm *src_vcm, struct vcm *dst_vcm)
+size_t vcm_translate(size_t src_dev, struct vcm *src_vcm,
+		     struct vcm *dst_vcm)
 {
 	return 0;
 }
 
 
-size_t vcm_get_phys_num_res(size_t phys)
+size_t vcm_get_phys_num_res(phys_addr_t phys)
 {
 	return 0;
 }
 
 
-struct res *vcm_get_next_phys_res(size_t phys, struct res *res_id, size_t *len)
+struct res *vcm_get_next_phys_res(phys_addr_t phys, struct res *res,
+				  size_t *len)
 {
 	return 0;
 }
 
 
-size_t vcm_get_pgtbl_pa(struct vcm *vcm)
+phys_addr_t vcm_get_pgtbl_pa(struct vcm *vcm)
 {
 	return 0;
 }
 
 
 /* No lock needed, smmu_translate has its own lock */
-size_t vcm_dev_addr_to_phys_addr(size_t dev_id, size_t dev_addr)
+phys_addr_t vcm_dev_addr_to_phys_addr(size_t dev, unsigned long dev_addr)
 {
 #ifdef CONFIG_SMMU
 	int ret;
-	ret = smmu_translate((struct smmu_dev *) dev_id, dev_addr);
+	ret = smmu_translate((struct smmu_dev *) dev, dev_addr);
 	if (ret == -1)
 		vcm_err("smmu_translate(%p, %p) ret %i\n",
-			(void *) dev_id, (void *) dev_addr, ret);
+			(void *) dev, (void *) dev_addr, ret);
 
 	return ret;
 #else
 	vcm_err("No support for SMMU - manual translation not supported\n");
-	return -1;
+	return -ENODEV;
 #endif
 }
 
 
 /* No lock needed, bootmem_cont never changes after  */
-size_t vcm_get_cont_memtype_pa(enum memtype_t memtype)
+phys_addr_t vcm_get_cont_memtype_pa(enum memtype_t memtype)
 {
 	if (memtype != VCM_MEMTYPE_0) {
 		vcm_err("memtype != VCM_MEMTYPE_0\n");
@@ -1731,25 +1729,25 @@ size_t vcm_get_cont_memtype_len(enum memtype_t memtype)
 	return cont_sz;
 }
 
-int vcm_hook(size_t dev_id, vcm_handler handler, void *data)
+int vcm_hook(size_t dev, vcm_handler handler, void *data)
 {
 #ifdef CONFIG_SMMU
 	int ret;
 
-	ret = smmu_hook_irpt((struct smmu_dev *) dev_id, handler, data);
+	ret = smmu_hook_irpt((struct smmu_dev *) dev, handler, data);
 	if (ret != 0)
-		vcm_err("smmu_hook_irpt(%p, %p, %p) ret %i\n", (void *) dev_id,
+		vcm_err("smmu_hook_irpt(%p, %p, %p) ret %i\n", (void *) dev,
 			(void *) handler, (void *) data, ret);
 
 	return ret;
 #else
 	vcm_err("No support for SMMU - interrupts not supported\n");
-	return -1;
+	return -ENODEV;
 #endif
 }
 
 
-size_t vcm_hw_ver(size_t dev_id)
+size_t vcm_hw_ver(size_t dev)
 {
 	return 0;
 }
@@ -1774,14 +1772,16 @@ static int vcm_cont_phys_chunk_init(void)
 
 	for (i = 0; i < cont_sz/PAGE_SIZE; ++i) {
 		cont_phys_chunk[i].pa = cont_pa; cont_pa += PAGE_SIZE;
-		cont_phys_chunk[i].size_idx = IDX_4K;
+		cont_phys_chunk[i].size = SZ_4K;
+		/* Not part of an allocator-managed pool */
+		cont_phys_chunk[i].pool_idx = -1;
 		INIT_LIST_HEAD(&cont_phys_chunk[i].allocated);
 	}
 
 	return 0;
 
 fail:
-	return -1;
+	return -EINVAL;
 }
 
 int vcm_sys_init(struct physmem_region *mem, int n_regions,
@@ -1847,7 +1847,7 @@ fail_free3:
 	if (ret != 0) {
 		vcm_err("vcm_free(%p) ret %i during failure path\n",
 			(void *) cont_vcm_id, ret);
-		return -1;
+		return ret;
 	}
 
 fail_free2:
@@ -1860,7 +1860,7 @@ fail_free:
 		vcm_err("vcm_alloc_destroy() ret %i during failure path\n",
 			ret);
 
-	ret = -1;
+	ret = -EINVAL;
 fail:
 	return ret;
 }
@@ -1872,18 +1872,18 @@ int vcm_sys_destroy(void)
 
 	if (!cont_phys_chunk) {
 		vcm_err("cont_phys_chunk is 0\n");
-		return -1;
+		return -ENODEV;
 	}
 
 	if (!cont_vcm_id) {
 		vcm_err("cont_vcm_id is 0\n");
-		return -1;
+		return -ENODEV;
 	}
 
 	ret = __vcm_free(cont_vcm_id);
 	if (ret != 0) {
 		vcm_err("vcm_free(%p) ret %i\n", (void *) cont_vcm_id, ret);
-		return -1;
+		return -ENODEV;
 	}
 
 	cont_vcm_id = 0;
@@ -1894,7 +1894,7 @@ int vcm_sys_destroy(void)
 	ret = vcm_alloc_destroy();
 	if (ret != 0) {
 		vcm_err("vcm_alloc_destroy() ret %i\n", ret);
-		return -1;
+		return ret;
 	}
 
 	return ret;
