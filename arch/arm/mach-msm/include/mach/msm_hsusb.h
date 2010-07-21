@@ -45,9 +45,9 @@ enum hsusb_phy_type {
 };
 /* used to detect the OTG Mode */
 enum otg_mode {
-	OTG_ID = 0, /* ID pin detection */
-	OTG_SYSFS,  /* sysfs mode */
-	OTG_VCHG,   /* Based on VCHG interrupt */
+	OTG_ID = 0,   		/* ID pin detection */
+	OTG_USER_CONTROL,  	/* User configurable */
+	OTG_VCHG,     		/* Based on VCHG interrupt */
 };
 
 struct usb_function_map {
