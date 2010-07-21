@@ -3096,6 +3096,11 @@ static struct platform_device msm_fb_device = {
 	}
 };
 
+static struct platform_device msm_migrate_pages_device = {
+	.name   = "msm_migrate_pages",
+	.id     = -1,
+};
+
 static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
        .name = PMEM_KERNEL_EBI1_DATA_NAME,
 	/* if no allocator_type, defaults to PMEM_ALLOCATORTYPE_BITMAP,
@@ -4105,6 +4110,7 @@ static struct platform_device *devices[] __initdata = {
 #endif
 	&android_pmem_device,
 	&msm_fb_device,
+	&msm_migrate_pages_device,
 	&mddi_toshiba_device,
 	&lcdc_toshiba_panel_device,
 #ifdef CONFIG_MSM_ROTATOR
