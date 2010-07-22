@@ -1,6 +1,6 @@
 Source: linux
 Priority: optional
-Maintainer: Linux Build <linux.build@quicinc.com>
+Maintainer: Linux Build <linux.build@codeaurora.org>
 Build-Depends: debhelper (>= 7)
 Standards-Version: 3.8.1
 Section: devel
