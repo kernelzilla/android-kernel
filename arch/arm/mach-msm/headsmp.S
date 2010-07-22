@@ -10,7 +10,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 
-	__INIT
+	__CPUINIT
 
 /* Called very early during init. Only allowed to continue if we are the
  * primary CPU, otherwise go to the secondary startup waiting to be brought
