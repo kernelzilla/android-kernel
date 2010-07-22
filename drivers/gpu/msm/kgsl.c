@@ -224,6 +224,28 @@ int kgsl_idle(struct kgsl_device *device, unsigned int timeout)
 	return status;
 }
 
+void kgsl_idle_check(struct work_struct *work)
+{
+	struct kgsl_device *device = container_of(work, struct kgsl_device,
+							idle_check_ws);
+
+	mutex_lock(&kgsl_driver.mutex);
+	if (device->hwaccess_blocked == KGSL_FALSE
+	    && device->flags & KGSL_FLAGS_STARTED) {
+		if (device->ftbl.device_sleep(device, KGSL_FALSE) ==
+								KGSL_FAILURE)
+			mod_timer(&device->idle_timer,
+					jiffies + device->interval_timeout);
+	}
+	mutex_unlock(&kgsl_driver.mutex);
+}
+
+void kgsl_timer(unsigned long data)
+{
+	struct kgsl_device *device = (struct kgsl_device *) data;
+	/* Have work run in a non-interrupt context. */
+	schedule_work(&device->idle_check_ws);
+}
 
 int kgsl_pwrctrl(unsigned int pwrflag)
 {
