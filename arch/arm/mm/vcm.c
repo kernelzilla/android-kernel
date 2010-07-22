@@ -426,7 +426,7 @@ int vcm_free(struct vcm *vcm)
 static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 {
 	struct res *res = NULL;
-	int align_attr = 0;
+	int align_attr = 0, i = 0;
 
 	if (!vcm) {
 		vcm_err("NULL vcm\n");
@@ -455,16 +455,14 @@ static struct res *__vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr)
 	res->vcm_id = vcm;
 	res->len = len;
 	res->attr = attr;
+	res->alignment_req = chunk_sizes[ARRAY_SIZE(chunk_sizes) - 1];
 
 	if (align_attr == 0) {
-		if (len/SZ_16M)
-			res->alignment_req = SZ_16M;
-		else if (len/SZ_1M)
-			res->alignment_req = SZ_1M;
-		else if (len/SZ_64K)
-			res->alignment_req = SZ_64K;
-		else
-			res->alignment_req = SZ_4K;
+		for (i = 0; i < ARRAY_SIZE(chunk_sizes); i++)
+			if (len / chunk_sizes[i]) {
+				res->alignment_req = chunk_sizes[i];
+				break;
+			}
 	} else
 		res->alignment_req = 1 << align_attr;
 
@@ -718,17 +716,22 @@ static int vcm_to_smmu_attr(uint32_t attr)
 static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 			unsigned long len, unsigned int attr, int map)
 {
-	int ret;
-	unsigned long map_len = SZ_4K;
+	int ret, i;
+	unsigned long map_len = chunk_sizes[ARRAY_SIZE(chunk_sizes) - 1];
 
-	if (IS_ALIGNED(va, SZ_64K) && len >= SZ_64K)
-		map_len = SZ_64K;
+	ret = smmu_update_start((struct smmu_dev *) dev_id);
 
-	if (IS_ALIGNED(va, SZ_1M) && len >= SZ_1M)
-		map_len = SZ_1M;
+	if (ret) {
+		pr_err("smmu_update_start returned %d\n", ret);
+		goto fail;
+	}
 
-	if (IS_ALIGNED(va, SZ_16M) && len >= SZ_16M)
-		map_len = SZ_16M;
+	for (i = 0; i < ARRAY_SIZE(chunk_sizes); i++) {
+		if (IS_ALIGNED(va, chunk_sizes[i]) && len >= chunk_sizes[i]) {
+			map_len = chunk_sizes[i];
+			break;
+		}
+	}
 
 #ifdef VCM_PERF_DEBUG
 	if (va & (len - 1))
@@ -766,6 +769,14 @@ static int vcm_process_chunk(size_t dev_id, unsigned long pa, unsigned long va,
 		pa += map_len;
 		len -= map_len;
 	}
+
+	ret = smmu_update_done((struct smmu_dev *) dev_id);
+
+	if (ret) {
+		pr_err("smmu_update_done returned %d\n", ret);
+		goto fail;
+	}
+
 	return 0;
 fail:
 	return -1;
