@@ -656,10 +656,12 @@ void free_initmem(void)
 				    "TCM link");
 #endif
 
+#ifndef CONFIG_HOTPLUG_CPU
 	if (!machine_is_integrator() && !machine_is_cintegrator())
 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
 					    __phys_to_pfn(__pa(__init_end)),
 					    "init");
+#endif
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
