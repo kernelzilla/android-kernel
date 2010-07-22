@@ -159,7 +159,6 @@ config LEDS_LP3944
 
 config LEDS_CPLD
 	tristate "LED Support for CPLD connected LEDs"
-	default y
 	depends on LEDS_CLASS
 	help
 	  This option enables support for the LEDs connected to CPLD
