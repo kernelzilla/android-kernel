@@ -479,8 +479,6 @@ static void msm_hsusb_request_host(void *handle, int request)
 		msm_xusb_disable_clks(mhcd);
 		wake_lock_timeout(&mhcd->wlock, HZ/2);
 		msm_xusb_pm_qos_update(mhcd, 0);
-		if (PHY_TYPE(pdata->phy_info) == USB_PHY_INTEGRATED)
-			otg_set_suspend(mhcd->xceiv, 1);
 		break;
 	}
 }
@@ -498,7 +496,11 @@ static void msm_hsusb_start_host(struct usb_bus *bus, int start)
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
 
 	mhcd->flags = start ? REQUEST_START : REQUEST_STOP;
-	schedule_work(&mhcd->otg_work);
+	if (in_interrupt())
+		schedule_work(&mhcd->otg_work);
+	else
+		msm_hsusb_request_host((void *)mhcd, mhcd->flags);
+
 }
 
 static int msm_xusb_init_phy(struct msmusb_hcd *mhcd)
@@ -547,11 +549,25 @@ static int msm_xusb_rpc_close(struct msmusb_hcd *mhcd)
 	return retval;
 }
 
+#ifdef	CONFIG_USB_OTG
+static void ehci_msm_start_hnp(struct ehci_hcd *ehci)
+{
+	struct usb_hcd *hcd = ehci_to_hcd(ehci);
+	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
+
+	/* OTG driver handles HNP */
+	otg_start_hnp(mhcd->xceiv);
+}
+#else
+#define ehci_msm_start_hnp	NULL
+#endif
+
 static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 {
 	int ret = 0;
 	struct msm_otg *otg;
 	struct usb_hcd *hcd = mhcd_to_hcd(mhcd);
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct msm_usb_host_platform_data *pdata = mhcd->pdata;
 	struct device *dev = container_of((void *)hcd, struct device,
 							platform_data);	
@@ -574,6 +590,7 @@ static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 		otg = container_of(mhcd->xceiv, struct msm_otg, otg);
 		hcd->regs = otg->regs;
 		otg->start_host = msm_hsusb_start_host;
+		ehci->start_hnp = ehci_msm_start_hnp;
 
 		ret = otg_set_host(mhcd->xceiv, &hcd->self);
 		break;

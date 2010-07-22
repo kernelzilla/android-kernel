@@ -2265,6 +2265,44 @@ static void __init msm_qsd_spi_init(void)
 	qsd_device_spi.dev.platform_data = &qsd_spi_pdata;
 }
 
+#ifdef CONFIG_USB_EHCI_MSM
+static void msm_hsusb_vbus_power(unsigned phy_info, int on)
+{
+	int rc;
+	static int vbus_is_on;
+	struct pm8058_gpio usb_vbus = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.pull           = PM_GPIO_PULL_NO,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 1,
+		.vin_sel        = 2,
+		.out_strength   = PM_GPIO_STRENGTH_MED,
+		.function       = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol    = 0,
+	};
+
+	/* If VBUS is already on (or off), do nothing. */
+	if (unlikely(on == vbus_is_on))
+		return;
+
+	if (on) {
+		rc = pm8058_gpio_config(36, &usb_vbus);
+		if (rc) {
+			pr_err("%s PMIC GPIO 36 write failed\n", __func__);
+			return;
+		}
+	} else
+		gpio_set_value(PM8058_GPIO_PM_TO_SYS(36), 0);
+
+	vbus_is_on = on;
+}
+
+static struct msm_usb_host_platform_data msm_usb_host_pdata = {
+	.phy_info   = (USB_PHY_INTEGRATED | USB_PHY_MODEL_45NM),
+	.power_budget   = 180,
+};
+#endif
+
 #ifdef CONFIG_USB_MSM_OTG_72K
 static int hsusb_rpc_connect(int connect)
 {
@@ -2319,6 +2357,8 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.pmic_notif_deinit       = msm_pmic_notify_deinit,
 	.pmic_enable_ldo         = msm_pmic_enable_ldo,
 	.pmic_vbus_irq	= 1,
+#else
+	.vbus_power = msm_hsusb_vbus_power,
 #endif
 	.core_clk	= 1,
 	.pemp_level     = PRE_EMPHASIS_WITH_20_PERCENT,
@@ -2329,45 +2369,6 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 #ifdef CONFIG_USB_GADGET
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;
 #endif
-#endif
-
-#ifdef CONFIG_USB_EHCI_MSM
-static void msm_hsusb_vbus_power(unsigned phy_info, int on)
-{
-	int rc;
-	static int vbus_is_on;
-	struct pm8058_gpio usb_vbus = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.pull           = PM_GPIO_PULL_NO,
-		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-		.output_value   = 1,
-		.vin_sel        = 2,
-		.out_strength   = PM_GPIO_STRENGTH_MED,
-		.function       = PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol    = 0,
-	};
-
-	/* If VBUS is already on (or off), do nothing. */
-	if (unlikely(on == vbus_is_on))
-		return;
-
-	if (on) {
-		rc = pm8058_gpio_config(36, &usb_vbus);
-		if (rc) {
-			pr_err("%s PMIC GPIO 36 write failed\n", __func__);
-			return;
-		}
-	} else
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(36), 0);
-
-	vbus_is_on = on;
-}
-
-static struct msm_usb_host_platform_data msm_usb_host_pdata = {
-	.phy_info   = (USB_PHY_INTEGRATED | USB_PHY_MODEL_45NM),
-	.vbus_power = msm_hsusb_vbus_power,
-	.power_budget   = 180,
-};
 #endif
 
 static struct android_pmem_platform_data android_pmem_pdata = {
