@@ -1358,12 +1358,12 @@ static unsigned soc_clk_is_enabled(unsigned id)
 
 
 /* Return the nth supported frequency for a given clock. */
-static unsigned soc_clk_list_rate(unsigned id, unsigned n)
+static int soc_clk_list_rate(unsigned id, unsigned n)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
 
-	if (!clk->freq_tbl)
-		return 0;
+	if (!clk->freq_tbl || clk->freq_tbl->freq_hz == FREQ_END)
+		return -ENXIO;
 
 	return (clk->freq_tbl + n)->freq_hz;
 }

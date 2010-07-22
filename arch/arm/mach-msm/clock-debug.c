@@ -110,12 +110,12 @@ int __init clock_debug_init(void)
 static int list_rates_show(struct seq_file *m, void *unused)
 {
 	struct clk *clock = m->private;
-	unsigned rate, i = 0;
+	int rate, i = 0;
 
 	if (clock->ops->list_rate == NULL)
 		return -EINVAL;
 
-	while ((rate = clock->ops->list_rate(clock->id, i++)))
+	while ((rate = clock->ops->list_rate(clock->id, i++)) >= 0)
 		seq_printf(m, "%d\n", rate);
 
 	return 0;
