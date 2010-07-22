@@ -66,6 +66,7 @@
 #include <mach/msm_battery.h>
 #include <mach/rpc_server_handset.h>
 #include <mach/msm_tsif.h>
+#include <linux/cyttsp.h>
 
 #include <asm/mach/mmc.h>
 #include <asm/mach/flash.h>
@@ -176,6 +177,92 @@ static int pm8058_gpios_init(void)
 
 	return 0;
 }
+
+#define CYTTSP_TS_GPIO_IRQ	150
+static int cyttsp_platform_init(struct i2c_client *client)
+{
+	/* add any special code to initialize any required system hardware
+	 * such as regulators or gpio pins
+	 */
+	int rc;
+	struct vreg *vreg_ldo8, *vreg_ldo15;
+	pr_info(" %s: in cyttsp_platform_init \n", __func__);
+
+	vreg_ldo8 = vreg_get(NULL, "gp7");
+	rc = vreg_set_level(vreg_ldo8, 1800);
+	if (rc)
+		pr_info(" %s: VREG set failed\n", __func__);
+
+	rc = vreg_enable(vreg_ldo8);
+	if (rc)
+		pr_info(" %s: VREG enable failed\n", __func__);
+
+	vreg_ldo15 = vreg_get(NULL, "gp6");
+
+	rc = vreg_set_level(vreg_ldo15, 3050);
+	if (rc)
+		pr_info(" %s: VREG set failed\n", __func__);
+
+	rc = vreg_enable(vreg_ldo15);
+	if (rc)
+		pr_info(" %s: VREG enable failed\n", __func__);
+
+	mdelay(100);
+
+	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_INPUT,
+					GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
+	if (rc)
+		printk(KERN_ALERT "%s: Could not configure gpio %d\n",
+					 __func__, CYTTSP_TS_GPIO_IRQ);
+
+	rc = gpio_request(CYTTSP_TS_GPIO_IRQ, "ts_irq");
+	if (rc)
+		pr_err("%s: unable to request gpio %d (%d)\n",
+			__func__, CYTTSP_TS_GPIO_IRQ, rc);
+
+	return CY_OK;
+}
+
+static int cyttsp_platform_resume(struct i2c_client *client)
+{
+	/* add any special code to strobe a wakeup pin or chip reset */
+	mdelay(10);
+
+	return CY_OK;
+}
+
+static struct cyttsp_platform_data cyttsp_data = {
+	.maxx = 479,
+	.maxy = 799,
+	.flags = 0,
+	.gen = CY_GEN3,	/* or */
+	.use_st = CY_USE_ST,
+	.use_mt = CY_USE_MT,
+	.use_hndshk = CY_SEND_HNDSHK,
+	.use_trk_id = CY_USE_TRACKING_ID,
+	.use_sleep = CY_USE_SLEEP,
+	.use_gestures = CY_USE_GESTURES,
+	/* activate up to 4 groups
+	 * and set active distance
+	 */
+	.gest_set = CY_GEST_GRP1 | CY_GEST_GRP2 |
+				CY_GEST_GRP3 | CY_GEST_GRP4 |
+				CY_ACT_DIST,
+	/* change act_intrvl to customize the Active power state
+	 * scanning/processing refresh interval for Operating mode
+	 */
+	.act_intrvl = CY_ACT_INTRVL_DFLT,
+	/* change tch_tmout to customize the touch timeout for the
+	 * Active power state for Operating mode
+	 */
+	.tch_tmout = CY_TCH_TMOUT_DFLT,
+	/* change lp_intrvl to customize the Low Power power state
+	 * scanning/processing refresh interval for Operating mode
+	 */
+	.lp_intrvl = CY_LP_INTRVL_DFLT,
+	.resume = cyttsp_platform_resume,
+	.init = cyttsp_platform_init,
+};
 
 static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 {
@@ -547,6 +634,16 @@ static struct i2c_board_info pm8058_boardinfo[] __initdata = {
 		I2C_BOARD_INFO("pm8058-core", 0),
 		.irq = MSM_GPIO_TO_INT(PMIC_GPIO_INT),
 		.platform_data = &pm8058_7x30_data,
+	},
+};
+
+static struct i2c_board_info cy8info[] __initdata = {
+	{
+		I2C_BOARD_INFO(CY_I2C_NAME, 0x24),
+		.platform_data = &cyttsp_data,
+#ifndef CY_USE_TIMER
+		.irq = MSM_GPIO_TO_INT(CYTTSP_TS_GPIO_IRQ),
+#endif /* CY_USE_TIMER */
 	},
 };
 
@@ -4730,6 +4827,10 @@ static void __init msm7x30_init(void)
 
 	if (!machine_is_msm8x55_svlte_ffa())
 		marimba_pdata.tsadc = &marimba_tsadc_pdata;
+
+	if (machine_is_msm7x30_fluid())
+		i2c_register_board_info(0, cy8info,
+					ARRAY_SIZE(cy8info));
 
 	i2c_register_board_info(2, msm_marimba_board_info,
 			ARRAY_SIZE(msm_marimba_board_info));
