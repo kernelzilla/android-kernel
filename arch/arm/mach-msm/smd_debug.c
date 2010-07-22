@@ -313,7 +313,9 @@ static int debug_read_ch(char *buf, int max)
 
 	smd_ver = smem_alloc(SMEM_VERSION_SMD, 32 * sizeof(uint32_t));
 
-	if (smd_ver && ((smd_ver[VERSION_MODEM] >> 16) >= 1))
+	if (smd_ver && (((smd_ver[VERSION_MODEM] >> 16) >= 1) ||
+			((smd_ver[VERSION_QDSP6] >> 16) >= 1) ||
+			((smd_ver[VERSION_DSPS] >> 16) >= 1)))
 		return debug_read_ch_v2(buf, max);
 	else
 		return debug_read_ch_v1(buf, max);
@@ -378,7 +380,8 @@ static int debug_read_alloc_tbl(char *buf, int max)
 
 	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(struct smd_alloc_elm[64]));
 
-	BUG_ON(!shared);
+	if (!shared)
+		return 0;
 
 	for (n = 0; n < 64; n++) {
 		i += scnprintf(buf + i, max - i,

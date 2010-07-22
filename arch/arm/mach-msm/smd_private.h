@@ -51,6 +51,7 @@ struct smem_proc_comm
 #define VERSION_MODEM_SBL 7
 #define VERSION_APPS      8
 #define VERSION_MODEM     9
+#define VERSION_DSPS      10
 
 #define SMD_HEAP_SIZE 512
 
