@@ -20,6 +20,7 @@
 #include <linux/bootmem.h>
 
 #include <linux/vcm.h>
+#include <linux/vcm_alloc.h>
 #include <mach/msm_iomap-8x60.h>
 #include <mach/irqs-8x60.h>
 #include <mach/smmu_device.h>
@@ -872,36 +873,36 @@ static struct smmu_ctx *smmu_ctxs_data[] = {
 	&gfx2d0_texv3_ctx,
 };
 
-#define SMI 0
-#define EBI 1
+#define SMI  0
+#define EBI  1
 
 #define HLF 2
 #define QTR 4
+#define EIGTH 8
 struct physmem_region memory[] = {
 	{
 		.addr = MSM_SMI_BASE,	/* Base address */
 		.size = SZ_32M,		/* Memory size */
 
-		/* Half the memory goes to 1MB chunks */
-		/* 1/4th of the memory goes to 64K and 4K chunks */
-		.chunk_fraction = {HLF, QTR, QTR}
+		/* 1/2 to 16MB, 1/4th to 1MB, 1/8th to 64KB and 4KB */
+		.chunk_fraction = {HLF, QTR, EIGTH, EIGTH}
 	},
 	{
 		.addr = 0,		/* To be dynamically allocated */
 		.size = VCM_EBI_SIZE,
-		.chunk_fraction = {HLF, QTR, QTR}
+		.chunk_fraction = {HLF, QTR, EIGTH, EIGTH}
 	},
 };
 
 struct vcm_memtype_map mt_map[] = {	/* Sources of 1MB, 64K, and 4K chunks */
 	{
-		.pool_id = {SMI, SMI, SMI}	/* MEMTYPE_0 */
+		.pool_id = {SMI, SMI, SMI, SMI}	/* MEMTYPE_0 */
 	},
 	{
-		.pool_id = {SMI, SMI, EBI}	/* MEMTYPE_1 */
+		.pool_id = {SMI, SMI, SMI, EBI}	/* MEMTYPE_1 */
 	},
 	{
-		.pool_id = {EBI, EBI, EBI}	/* MEMTYPE_2 */
+		.pool_id = {SMI, EBI, EBI, EBI}	/* MEMTYPE_2 */
 	}
 };
 
