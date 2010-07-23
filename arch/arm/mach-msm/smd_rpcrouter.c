@@ -214,6 +214,8 @@ struct rpcrouter_xprt_info {
 static LIST_HEAD(xprt_info_list);
 static DEFINE_SPINLOCK(xprt_info_list_lock);
 
+DECLARE_COMPLETION(rpc_remote_router_up);
+
 static struct rpcrouter_xprt_info *rpcrouter_get_xprt_info(uint32_t remote_pid)
 {
 	struct rpcrouter_xprt_info *xprt_info;
@@ -834,7 +836,9 @@ static int process_control_msg(struct rpcrouter_xprt_info *xprt_info,
 
 static void do_create_rpcrouter_pdev(struct work_struct *work)
 {
+	D("%s: modem rpc router up\n", __func__);
 	platform_device_register(&rpcrouter_pdev);
+	complete_all(&rpc_remote_router_up);
 }
 
 static void do_create_pdevs(struct work_struct *work)
