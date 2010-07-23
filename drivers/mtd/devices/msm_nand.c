@@ -1875,7 +1875,7 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		if (pageerr) {
 			for (n = start_sector; n < cwperpage; n++) {
 				if (dma_buffer->data.result[n].buffer_status
-						& 0x8) {
+					& MSM_NAND_BUF_STAT_UNCRCTBL_ERR) {
 					/* not thread safe */
 					mtd->ecc_stats.failed++;
 					pageerr = -EBADMSG;
@@ -1886,7 +1886,8 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		if (!rawerr) { /* check for corretable errors */
 			for (n = start_sector; n < cwperpage; n++) {
 				ecc_errors = dma_buffer->data.
-					result[n].buffer_status & 0x7;
+					result[n].buffer_status
+					& MSM_NAND_BUF_STAT_NUM_ERR_MASK;
 				if (ecc_errors) {
 					total_ecc_errors += ecc_errors;
 					/* not thread safe */

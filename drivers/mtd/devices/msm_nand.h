@@ -184,6 +184,9 @@ extern unsigned long ebi2_register_base;
 #define EBI2_CFG_REG		       	EBI2_REG(0x0004)
 #define EBI2_NAND_ADM_MUX       	EBI2_REG(0x005C)
 
+#define MSM_NAND_BUF_STAT_UNCRCTBL_ERR	(1 << 8)
+#define MSM_NAND_BUF_STAT_NUM_ERR_MASK	(0xf)
+
 extern struct flash_platform_data msm_nand_data;
 
 #endif
