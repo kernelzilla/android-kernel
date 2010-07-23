@@ -408,3 +408,11 @@ struct audpreproc_cmd_cfg_iir_tuning_filter_params *iir, unsigned len)
 				QDSP_uPAudPreProcCmdQueue, iir, len);
 }
 EXPORT_SYMBOL(audpreproc_dsp_set_iir);
+
+int audpreproc_dsp_set_gain_tx(
+		struct audpreproc_cmd_cfg_cal_gain *calib_gain_tx, unsigned len)
+{
+	return msm_adsp_write(the_audpreproc_state.mod,
+			QDSP_uPAudPreProcCmdQueue, calib_gain_tx, len);
+}
+EXPORT_SYMBOL(audpreproc_dsp_set_gain_tx);

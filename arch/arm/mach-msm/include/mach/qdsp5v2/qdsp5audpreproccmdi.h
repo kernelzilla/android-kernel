@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -453,5 +453,20 @@ struct audpreproc_cmd_cfg_iir_tuning_filter_params {
 	unsigned short	pan_of_filter2;
 	unsigned short	pan_of_filter3;
 } __attribute__((packed));
+
+/*
+ * Command to configure parameters for calibration gain rx
+ */
+
+#define AUDPREPROC_CMD_CFG_CAL_GAIN_PARAMS 0x0004
+#define AUDPREPROC_CMD_CFG_CAL_GAIN_LEN    \
+	sizeof(struct audpreproc_cmd_cfg_cal_gain)
+
+struct audpreproc_cmd_cfg_cal_gain {
+	unsigned short  cmd_id;
+	unsigned short  stream_id;
+	unsigned short  audprecalgain;
+	unsigned short  reserved;
+}  __attribute__((packed));
 
 #endif /* QDSP5AUDPREPROCCMDI_H */

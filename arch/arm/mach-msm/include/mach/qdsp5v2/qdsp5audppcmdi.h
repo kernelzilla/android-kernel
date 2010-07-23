@@ -15,7 +15,7 @@ REFERENCES
 EXTERNALIZED FUNCTIONS
   None
 
-Copyright (c) 1992-2009, Code Aurora Forum. All rights reserved.
+Copyright(c) 1992-2010, Code Aurora Forum. All rights reserved.
 
 This software is licensed under the terms of the GNU General Public
 License version 2, as published by the Free Software Foundation, and
@@ -651,6 +651,15 @@ struct audpp_cmd_cfg_object_params_pcm {
 		struct filter_3			filter_3_params;
 		struct filter_4			filter_4_params;
 	} __attribute__((packed)) params_filter;
+} __attribute__((packed));
+
+#define AUDPP_CMD_CFG_CAL_GAIN_LEN sizeof(struct audpp_cmd_cfg_cal_gain)
+
+
+struct audpp_cmd_cfg_cal_gain {
+	struct audpp_cmd_cfg_object_params_common common;
+	unsigned short audppcalgain;
+	unsigned short reserved;
 } __attribute__((packed));
 
 

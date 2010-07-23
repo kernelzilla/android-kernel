@@ -88,6 +88,7 @@ static struct wake_lock audpp_wake_lock;
 #define AUDPP_CMD_QAFX			8
 #define AUDPP_CMD_QRUMBLE		9
 #define AUDPP_CMD_MBADRC		10
+#define AUDPP_CMD_CALIB_GAIN_RX         15
 
 #define MAX_EVENT_CALLBACK_CLIENTS 	1
 
@@ -614,6 +615,31 @@ int audpp_dsp_set_rx_iir(unsigned id, unsigned enable,
 		sizeof(struct audpp_cmd_cfg_object_params_pcm));
 }
 EXPORT_SYMBOL(audpp_dsp_set_rx_iir);
+
+int audpp_dsp_set_gain_rx(unsigned id,
+			struct audpp_cmd_cfg_cal_gain *calib_gain_rx,
+			enum obj_type objtype)
+{
+	if (objtype) {
+		return -EINVAL;
+	} else {
+		if (id > 3) {
+			MM_ERR("Wrong COPP decoder id: %d\n", id);
+			return -EINVAL;
+		}
+	}
+	calib_gain_rx->common.cmd_id = AUDPP_CMD_CFG_OBJECT_PARAMS;
+	calib_gain_rx->common.stream = AUDPP_CMD_COPP_STREAM;
+
+	calib_gain_rx->common.stream_id = id;
+	calib_gain_rx->common.obj_cfg = AUDPP_CMD_CFG_OBJ_UPDATE;
+	calib_gain_rx->common.command_type = AUDPP_CMD_CALIB_GAIN_RX;
+
+	return audpp_send_queue3(calib_gain_rx,
+			sizeof(struct audpp_cmd_cfg_cal_gain));
+}
+EXPORT_SYMBOL(audpp_dsp_set_gain_rx);
+
 
 /* Implementation Of COPP + POPP */
 int audpp_dsp_set_eq(unsigned id, unsigned enable,

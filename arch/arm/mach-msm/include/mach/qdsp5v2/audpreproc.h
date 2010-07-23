@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -73,5 +73,6 @@ int audpreproc_unregister_event_callback(struct audpreproc_event_callback *ecb);
 
 int audpreproc_register_event_callback(struct audpreproc_event_callback *ecb);
 
-
+int audpreproc_dsp_set_gain_tx(
+	struct audpreproc_cmd_cfg_cal_gain *calib_gain_tx, unsigned len);
 #endif /* _MACH_QDSP5_V2_AUDPREPROC_H */
