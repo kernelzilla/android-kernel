@@ -1373,9 +1373,14 @@ int q6audio_set_rx_volume(int level)
 
 	mutex_lock(&audio_path_lock);
 	adev = ADSP_AUDIO_DEVICE_ID_VOICE;
-	vol = q6_device_volume(audio_rx_device_id, level);
-	audio_rx_mute(ac_control, adev, 0);
-	audio_rx_volume(ac_control, adev, vol);
+
+	if (level) {
+		vol = q6_device_volume(audio_rx_device_id, level);
+		audio_rx_mute(ac_control, adev, 0);
+		audio_rx_volume(ac_control, adev, vol);
+	} else
+		audio_rx_mute(ac_control, adev, 1);
+
 	rx_vol_level = level;
 	mutex_unlock(&audio_path_lock);
 	return 0;
