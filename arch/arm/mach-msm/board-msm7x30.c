@@ -171,8 +171,7 @@ static int pm8058_gpios_init(void)
 								 __func__);
 			return rc;
 		}
-		gpio_set_value_cansleep(
-			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN), 1);
+		gpio_set_value(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN), 1);
 	}
 
 	return 0;
@@ -3966,8 +3965,7 @@ out:
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
 	return (unsigned int)
-		gpio_get_value_cansleep(
-			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1));
+		gpio_get_value(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1));
 }
 #endif
 
