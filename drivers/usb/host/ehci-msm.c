@@ -437,8 +437,36 @@ static void msm_hsusb_request_host(void *handle, int request)
 	struct usb_hcd *hcd = mhcd_to_hcd(mhcd);
 	struct msm_usb_host_platform_data *pdata = mhcd->pdata;
 	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, otg);
+	struct usb_device *udev = hcd->self.root_hub;
 
 	switch (request) {
+#ifdef CONFIG_USB_OTG
+	case REQUEST_HNP_SUSPEND:
+		/* disable Root hub auto suspend. As hardware is configured
+		 * for peripheral mode, mark hardware is not available.
+		 */
+		if (PHY_TYPE(pdata->phy_info) == USB_PHY_INTEGRATED) {
+			udev->autosuspend_disabled = 1;
+			/* Mark root hub as disconnected. This would
+			 * protect suspend/resume via sysfs.
+			 */
+			udev->state = USB_STATE_NOTATTACHED;
+			clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+			hcd->state = HC_STATE_HALT;
+		}
+		break;
+	case REQUEST_HNP_RESUME:
+		if (PHY_TYPE(pdata->phy_info) == USB_PHY_INTEGRATED) {
+			disable_irq(hcd->irq);
+			ehci_msm_reset(hcd);
+			ehci_msm_run(hcd);
+			set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+			udev->autosuspend_disabled = 0;
+			udev->state = USB_STATE_CONFIGURED;
+			enable_irq(hcd->irq);
+		}
+		break;
+#endif
 	case REQUEST_RESUME:
 		usb_hcd_resume_root_hub(hcd);
 		break;
@@ -495,7 +523,7 @@ static void msm_hsusb_start_host(struct usb_bus *bus, int start)
 	struct usb_hcd *hcd = bus_to_hcd(bus);
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
 
-	mhcd->flags = start ? REQUEST_START : REQUEST_STOP;
+	mhcd->flags = start;
 	if (in_interrupt())
 		schedule_work(&mhcd->otg_work);
 	else

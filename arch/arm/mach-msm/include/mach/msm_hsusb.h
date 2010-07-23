@@ -1,7 +1,7 @@
 /* linux/include/mach/hsusb.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -37,6 +37,8 @@
 #define REQUEST_STOP		0
 #define REQUEST_START		1
 #define REQUEST_RESUME		2
+#define REQUEST_HNP_SUSPEND	3
+#define REQUEST_HNP_RESUME	4
 
 enum hsusb_phy_type {
 	UNDEFINED,
