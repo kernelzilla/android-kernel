@@ -227,15 +227,20 @@ static int __devinit pmic8058_pwrkey_probe(struct platform_device *pdev)
 		goto free_input_dev;
 	}
 
-	err = request_irq(key_press_irq, pwrkey_press_irq, IRQF_TRIGGER_RISING,
-			"pmic8058_pwrkey_press", pwrkey);
+	pwrkey->key_press_irq = key_press_irq;
+	pwrkey->pwr = pwr;
+
+	platform_set_drvdata(pdev, pwrkey);
+
+	err = request_threaded_irq(key_press_irq, NULL, pwrkey_press_irq,
+			 IRQF_TRIGGER_RISING, "pmic8058_pwrkey_press", pwrkey);
 	if (err < 0) {
 		dev_dbg(&pdev->dev, "Can't get %d IRQ for pwrkey: %d\n",
 				 key_press_irq, err);
 		goto unreg_input_dev;
 	}
 
-	err = request_irq(key_release_irq, pwrkey_release_irq,
+	err = request_threaded_irq(key_release_irq, NULL, pwrkey_release_irq,
 			 IRQF_TRIGGER_RISING, "pmic8058_pwrkey_release",
 				 pwrkey);
 	if (err < 0) {
@@ -244,11 +249,6 @@ static int __devinit pmic8058_pwrkey_probe(struct platform_device *pdev)
 
 		goto free_press_irq;
 	}
-
-	pwrkey->key_press_irq = key_press_irq;
-	pwrkey->pwr = pwr;
-
-	platform_set_drvdata(pdev, pwrkey);
 
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
 
