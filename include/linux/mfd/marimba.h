@@ -47,7 +47,17 @@
 
 #define MARIMBA_ID_TSADC			0x04
 
+#if defined(CONFIG_ARCH_MSM7X30)
 #define MARIMBA_SSBI_ADAP		0x7
+#elif defined(CONFIG_ARCH_MSM8X60)
+#define MARIMBA_SSBI_ADAP		0X8
+#endif
+
+enum chip_id {
+	MARIMBA_ID = 0,
+	TIMPANI_ID,
+	CHIP_ID_MAX
+};
 
 struct marimba{
 	struct i2c_client *client;
@@ -148,5 +158,10 @@ int marimba_write_bit_mask(struct marimba *, u8 reg, u8 *value,
  * * */
 int marimba_ssbi_read(struct marimba *, u16 reg, u8 *value, int len);
 int marimba_ssbi_write(struct marimba *, u16 reg , u8 *value, int len);
+
+/* Read and write to Timpani */
+int timpani_read(struct marimba*, u8 reg, u8 *value, unsigned num_bytes);
+int timpani_write(struct marimba*, u8 reg, u8 *value,
+				unsigned num_bytes);
 
 #endif

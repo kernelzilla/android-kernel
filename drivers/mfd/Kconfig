@@ -110,7 +110,7 @@ config PMIC8901
 
 config MARIMBA_TSADC
 	tristate "Support for Marimba Touchscreen ADC"
-	depends on MARIMBA_CORE
+	depends on MARIMBA_CORE && ARCH_MSM7X30
 	default y if MARIMBA_CORE
 	help
 	  Say yes here if you want to include support for TSADC in the
@@ -142,7 +142,7 @@ config TWL4030_CORE
 
 config MARIMBA_CORE
 	tristate "Marimba Core"
-	depends on I2C && ARCH_MSM7X30
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60)
 	default n
 	help
 	  Enables the Marimba Core driver. The core driver provides
