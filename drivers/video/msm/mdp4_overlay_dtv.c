@@ -179,8 +179,14 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	dtv_underflow_clr = mfd->panel_info.lcdc.underflow_clr;
 	dtv_hsync_skew = mfd->panel_info.lcdc.hsync_skew;
 
-	dtv_width = mfd->panel_info.xres;
-	dtv_height = mfd->panel_info.yres;
+	pr_info("%s: <ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>\n", __func__,
+		var->reserved[3], var->xres, var->yres,
+		var->right_margin, var->hsync_len, var->left_margin,
+		var->lower_margin, var->vsync_len, var->upper_margin,
+		var->pixclock/1000/1000);
+
+	dtv_width = var->xres;
+	dtv_height = var->yres;
 	dtv_bpp = mfd->panel_info.bpp;
 
 	hsync_period =
@@ -273,6 +279,8 @@ int mdp4_dtv_off(struct platform_device *pdev)
 
 	/* delay to make sure the last frame finishes */
 	msleep(100);
+
+	pr_info("%s\n", __func__);
 
 	/* dis-engage rgb2 from mixer1 */
 	if (dtv_pipe)
