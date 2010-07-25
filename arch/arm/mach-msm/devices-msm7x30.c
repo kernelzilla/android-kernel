@@ -15,7 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-
+#include <linux/msm_rotator.h>
 #include <linux/dma-mapping.h>
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
@@ -844,11 +844,38 @@ static struct resource resources_msm_rotator[] = {
 	},
 };
 
+static struct msm_rot_clocks rotator_clocks[] = {
+	{
+		.clk_name = "rotator_clk",
+		.clk_type = ROTATOR_AXI_CLK,
+		.clk_rate = 0,
+	},
+	{
+		.clk_name = "rotator_pclk",
+		.clk_type = ROTATOR_PCLK,
+		.clk_rate = 0,
+	},
+	{
+		.clk_name = "rotator_imem_clk",
+		.clk_type = ROTATOR_IMEM_CLK,
+		.clk_rate = 0,
+	},
+};
+
+static struct msm_rotator_platform_data rotator_pdata = {
+	.number_of_clocks = ARRAY_SIZE(rotator_clocks),
+	.hardware_version_number = 0x1000303,
+	.rotator_clks = rotator_clocks,
+};
+
 struct platform_device msm_rotator_device = {
 	.name		= "msm_rotator",
 	.id		= 0,
 	.num_resources  = ARRAY_SIZE(resources_msm_rotator),
 	.resource       = resources_msm_rotator,
+	.dev = {
+		.platform_data = &rotator_pdata,
+	},
 };
 #endif
 
