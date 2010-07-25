@@ -38,6 +38,7 @@
  */
 struct cy8c_ts_platform_data {
 	int (*power_on)(int on);
+	int (*dev_setup)(bool on);
 	const char *ts_name;
 	u32 dis_min_x; /* display resoltion */
 	u32 dis_max_x;
