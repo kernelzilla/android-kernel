@@ -109,4 +109,9 @@ struct hdmi_edid {			/* Bytes */
 	u8   extension_checksum;      	/* 127 */
 } ;
 
+struct hdmi_state {
+	struct kobject kobj;
+	int hdmi_connection_state;
+};
+
 #endif
