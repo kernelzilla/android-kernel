@@ -53,6 +53,9 @@
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
 
+/*
+regional parameters for radio device
+*/
 struct region_params_t {
 	enum tavarua_region_t region;
 	unsigned int band_high;
@@ -69,6 +72,9 @@ struct srch_params_t {
 	int get_list;
 };
 
+/* Main radio device structure,
+acts as a shadow copy of the
+actual tavaura registers */
 struct tavarua_device {
 	struct video_device *videodev;
 	/* driver management */
@@ -139,10 +145,29 @@ static void start_pending_xfr(struct tavarua_device *radio);
 /* work function */
 static void read_int_stat(struct work_struct *work);
 
+/*=============================================================================
+FUNCTION:  tavarua_isr
+=============================================================================*/
+/**
+  This function is called when GPIO is toggled. This functions queues the event
+  to interrupt queue, which is later handled by isr handling funcion.
+  i.e. INIT_DELAYED_WORK(&radio->work, read_int_stat);
+
+  @param irq: irq that is toggled.
+  @param dev_id: structure pointer passed by client.
+
+  @return IRQ_HANDLED.
+*/
 static irqreturn_t tavarua_isr(int irq, void *dev_id)
 {
 	struct tavarua_device *radio = dev_id;
 	/* schedule a tasklet to handle host intr */
+  /* The call to queue_delayed_work ensures that a minimum delay (in jiffies)
+   * passes before the work is actually executed. The return value from the
+   * function is nonzero if the work_struct was actually added to queue
+   * (otherwise, it may have already been there and will not be added a second
+   * time).
+   */
 	queue_delayed_work(radio->wqueue, &radio->work,
 				msecs_to_jiffies(TAVARUA_DELAY));
 	return IRQ_HANDLED;
@@ -151,6 +176,21 @@ static irqreturn_t tavarua_isr(int irq, void *dev_id)
 /**************************************************************************
  * Interface to radio internal registers over top level marimba driver
  *************************************************************************/
+
+/*=============================================================================
+FUNCTION:  tavarua_read_registers
+=============================================================================*/
+/**
+  This function is called to read a number of bytes from an I2C interface.
+  The bytes read are stored in internal register status (shadow copy).
+
+  @param radio: structure pointer passed by client.
+  @param offset: register offset.
+  @param len: num of bytes.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_read_registers(struct tavarua_device *radio,
 				unsigned char offset, int len)
 {
@@ -159,9 +199,21 @@ static int tavarua_read_registers(struct tavarua_device *radio,
 				&radio->registers[offset], len);
 
 }
-/*
- * tavarua_write_register - Writes the value a register
- */
+
+/*=============================================================================
+FUNCTION:  tavarua_write_register
+=============================================================================*/
+/**
+  This function is called to write a byte over the I2C interface.
+  The corresponding shadow copy is stored in internal register status.
+
+  @param radio: structure pointer passed by client.
+  @param offset: register offset.
+  @param value: buffer to be written to the registers.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_write_register(struct tavarua_device *radio,
 			unsigned char offset, unsigned char value)
 {
@@ -175,6 +227,21 @@ static int tavarua_write_register(struct tavarua_device *radio,
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_write_registers
+=============================================================================*/
+/**
+  This function is called to write a number of bytes over the I2C interface.
+  The corresponding shadow copy is stored in internal register status.
+
+  @param radio: structure pointer passed by client.
+  @param offset: register offset.
+  @param buf: buffer to be written to the registers.
+  @param len: num of bytes.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_write_registers(struct tavarua_device *radio,
 			unsigned char offset, unsigned char *buf, int len)
 {
@@ -192,18 +259,37 @@ static int tavarua_write_registers(struct tavarua_device *radio,
 	return retval;
 }
 
-/*
- * reads Raw RDS blocks from Host regs to driver internal regs
- */
+/*=============================================================================
+FUNCTION:  read_data_blocks
+=============================================================================*/
+/**
+  This function reads Raw RDS blocks from Core regs to driver
+  internal regs (shadow copy).
+
+  @param radio: structure pointer passed by client.
+  @param offset: register offset.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int read_data_blocks(struct tavarua_device *radio, unsigned char offset)
 {
 	/* read all 3 RDS blocks */
 	return tavarua_read_registers(radio, offset, RDS_BLOCK*4);
 }
 
-/*
- * tavarua_rds_read - rds processing function
- */
+/*=============================================================================
+FUNCTION:  tavarua_rds_read
+=============================================================================*/
+/**
+  This is a rds processing function reads that reads Raw RDS blocks from Core
+  regs to driver internal regs (shadow copy). It then fills the V4L2 RDS buffer,
+  which is read by App using JNI interface.
+
+  @param radio: structure pointer passed by client.
+
+  @return None.
+*/
 static void tavarua_rds_read(struct tavarua_device *radio)
 {
 	struct kfifo *rds_buf = radio->data_buf[TAVARUA_BUF_RAW_RDS];
@@ -213,7 +299,7 @@ static void tavarua_rds_read(struct tavarua_device *radio)
 	if (read_data_blocks(radio, RAW_RDS) < 0)
 		return;
 	 /* copy all four RDS blocks to internal buffer */
-	for (blocknum = 0; blocknum < 4; blocknum++) {
+	for (blocknum = 0; blocknum < RDS_BLOCKS_NUM; blocknum++) {
 		/* Fill the V4L2 RDS buffer */
 		put_unaligned(cpu_to_le16(radio->registers[RAW_RDS +
 			blocknum*RDS_BLOCK]), (unsigned short *) tmp);
@@ -229,9 +315,34 @@ static void tavarua_rds_read(struct tavarua_device *radio)
 		wake_up_interruptible(&radio->read_queue);
 
 }
-/*
- * request read xfr
- */
+
+/*=============================================================================
+FUNCTION:  request_read_xfr
+=============================================================================*/
+/**
+  This function sets the desired MODE in the XFRCTRL register and also sets the
+  CTRL field to read.
+  This is an asynchronous way of reading the XFR registers. Client would request
+  by setting the desired mode in the XFRCTRL register and then would initiate
+  the actual data register read by calling copy_from_xfr up on SOC signals
+  success.
+
+  NOTE:
+
+  The Data Transfer (XFR) registers are used to pass various data and
+  configuration parameters between the Core and host processor.
+
+  To read from the XFR registers, the host processor must set the desired MODE
+  in the XFRCTRL register and set the CTRL field to read. The Core will then
+  populate the XFRDAT0 - XFRDAT15 registers with the defined mode bytes. The
+  Core will set the TRANSFER interrupt status bit and interrupt the host if the
+  TRANSFERCTRL interrupt control bit is set. The host can then extract the XFR
+  mode bytes once it detects that the Core has updated the registers.
+
+  @param radio: structure pointer passed by client.
+
+  @return Always returns 0.
+*/
 static int request_read_xfr(struct tavarua_device *radio,
 				enum tavarua_xfr_ctrl_t mode){
 
@@ -240,9 +351,25 @@ static int request_read_xfr(struct tavarua_device *radio,
 	return 0;
 }
 
-/*
- * Copy from XFR regs to the appropriate internal buffer n bytes
- */
+/*=============================================================================
+FUNCTION:  copy_from_xfr
+=============================================================================*/
+/**
+  This function is used to read XFR mode bytes once it detects that the Core
+  has updated the registers. It also updates XFR regs to the appropriate
+  internal buffer n bytes.
+
+  NOTE:
+
+  This function should be used in conjuction with request_read_xfr. Refer
+  request_read_xfr for XFR mode transaction details.
+
+  @param radio: structure pointer passed by client.
+  @param buf_type: Index into RDS/Radio event buffer to use.
+  @param len: num of bytes.
+
+  @return Always returns 0.
+*/
 static int copy_from_xfr(struct tavarua_device *radio,
 		enum tavarua_buf_t buf_type, unsigned int n){
 
@@ -252,18 +379,60 @@ static int copy_from_xfr(struct tavarua_device *radio,
 	return 0;
 }
 
-/*
- * write_to_xfr
- */
+/*=============================================================================
+FUNCTION:  write_to_xfr
+=============================================================================*/
+/**
+  This function sets the desired MODE in the XFRCTRL register and it also sets
+  the CTRL field and data to write.
+  This also writes all the XFRDATx registers with the desired input buffer.
+
+  NOTE:
+
+  The Data Transfer (XFR) registers are used to pass various data and
+  configuration parameters between the Core and host processor.
+
+  To write data to the Core, the host processor updates XFRDAT0 - XFRDAT15 with
+  the appropriate mode bytes. The host processor must then set the desired MODE
+  in the XFRCTRL register and set the CTRL field to write. The core will detect
+  that the XFRCTRL register was written to and will read the XFR mode bytes.
+  After reading all the mode bytes, the Core will set the TRANSFER interrupt
+  status bit and interrupt the host if the TRANSFERCTRL interrupt control bit
+  is set.
+
+  @param radio: structure pointer passed by client.
+  @param mode: XFR mode to write in XFRCTRL register.
+  @param buf: buffer to be written to the registers.
+  @param len: num of bytes.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int write_to_xfr(struct tavarua_device *radio, unsigned char mode,
 			char *buf, int len)
 {
 	char buffer[len+1];
 	memcpy(buffer+1, buf, len);
+	/* buffer[0] corresponds to XFRCTRL register
+	   set the CTRL bit to 1 for write mode
+	*/
 	buffer[0] = ((1<<7) | mode);
 	return tavarua_write_registers(radio, XFRCTRL, buffer, sizeof(buffer));
 }
 
+/*=============================================================================
+FUNCTION:  xfr_intf_own
+=============================================================================*/
+/**
+  This function is used to check if there is any pending XFR mode operation.
+  If yes, wait for it to complete, else update the flag to indicate XFR
+  operation is in progress
+
+  @param radio: structure pointer passed by client.
+
+  @return 0      on success.
+	-ETIME on timeout.
+*/
 static int xfr_intf_own(struct tavarua_device *radio)
 {
 
@@ -282,9 +451,19 @@ static int xfr_intf_own(struct tavarua_device *radio)
 	return 0;
 }
 
-/*
- * sync_read_xfr
- */
+/*=============================================================================
+FUNCTION:  sync_read_xfr
+=============================================================================*/
+/**
+  This function is used to do synchronous XFR read operation.
+
+  @param radio: structure pointer passed by client.
+  @param xfr_type: XFR mode to write in XFRCTRL register.
+  @param buf: buffer to be read from the core.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int sync_read_xfr(struct tavarua_device *radio,
 			enum tavarua_xfr_ctrl_t xfr_type, unsigned char *buf)
 {
@@ -293,6 +472,8 @@ static int sync_read_xfr(struct tavarua_device *radio,
 	if (retval < 0)
 		return retval;
 	retval = tavarua_write_register(radio, XFRCTRL, xfr_type);
+
+  /* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
 	if (!wait_for_completion_timeout(&radio->sync_req_done,
 		msecs_to_jiffies(WAIT_TIMEOUT)) || (retval < 0)) {
 		retval = -ETIME;
@@ -305,9 +486,19 @@ static int sync_read_xfr(struct tavarua_device *radio,
 	return retval;
 }
 
-/*
- * sync_write_xfr
- */
+/*=============================================================================
+FUNCTION:  sync_write_xfr
+=============================================================================*/
+/**
+  This function is used to do synchronous XFR write operation.
+
+  @param radio: structure pointer passed by client.
+  @param xfr_type: XFR mode to write in XFRCTRL register.
+  @param buf: buffer to be written to the core.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int sync_write_xfr(struct tavarua_device *radio,
 		enum tavarua_xfr_ctrl_t xfr_type, unsigned char *buf)
 {
@@ -316,6 +507,8 @@ static int sync_write_xfr(struct tavarua_device *radio,
 	if (retval < 0)
 		return retval;
 	retval = write_to_xfr(radio, xfr_type, buf, XFR_REG_NUM);
+
+  /* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
 	if (!wait_for_completion_timeout(&radio->sync_req_done,
 		msecs_to_jiffies(WAIT_TIMEOUT)) || (retval < 0)) {
 		retval = -ETIME;
@@ -326,9 +519,19 @@ static int sync_write_xfr(struct tavarua_device *radio,
 	return retval;
 }
 
-/*
- * start_pending_xfr
- */
+/*=============================================================================
+FUNCTION:  start_pending_xfr
+=============================================================================*/
+/**
+  This function checks if their are any pending xfr interrupts and if
+  the interrupts are either RDS PS, RDS RT, RDS AF, SCANNEXT, SEARCH or SYNC
+  then initiates corresponding read operation. Preference is given to RAW RDS
+  data (SYNC) over processed data (PS, RT, AF, etc) from core.
+
+  @param radio: structure pointer passed by client.
+
+  @return None.
+*/
 static void start_pending_xfr(struct tavarua_device *radio)
 {
 	int i;
@@ -361,14 +564,27 @@ static void start_pending_xfr(struct tavarua_device *radio)
 			radio->pending_xfrs[i] = 0;
 			FMDBG("resurrect xfr %d\n", i);
 			}
-
 	}
 	return;
 }
 
-/*
- * queue event for user
- */
+/*=============================================================================
+FUNCTION:  tavarua_q_event
+=============================================================================*/
+/**
+  This function is called to queue an event for user.
+
+  NOTE:
+  Applications call the VIDIOC_QBUF ioctl to enqueue an empty (capturing) or
+  filled (output) buffer in the driver's incoming queue.
+
+  Pleaes refer tavarua_probe where we register different ioctl's for FM.
+
+  @param radio: structure pointer passed by client.
+  @param event: event to be queued.
+
+  @return None.
+*/
 static void tavarua_q_event(struct tavarua_device *radio,
 				enum tavarua_evt_t event)
 {
@@ -380,7 +596,22 @@ static void tavarua_q_event(struct tavarua_device *radio,
 		wake_up_interruptible(&radio->event_queue);
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_start_xfr
+=============================================================================*/
+/**
+  This function is called to process interrupts which require multiple XFR
+  operations (RDS search, RDS PS, RDS RT, etc). if any XFR operation is
+  already in progress we store information about pending interrupt, which
+  will be processed in future when current pending operation is done.
 
+  @param radio: structure pointer passed by client.
+  @param pending_id: XFR operation (which requires multiple XFR operations in
+	steps) to start.
+  @param xfr_id: XFR mode to write in XFRCTRL register.
+
+  @return None.
+*/
 static void tavarua_start_xfr(struct tavarua_device *radio,
 		enum tavarua_xfr_t pending_id, enum tavarua_xfr_ctrl_t xfr_id)
 {
@@ -392,9 +623,25 @@ static void tavarua_start_xfr(struct tavarua_device *radio,
 		}
 }
 
-/*
- * Process the interrupts
- */
+/*=============================================================================
+FUNCTION:  tavarua_handle_interrupts
+=============================================================================*/
+/**
+  This function processes the interrupts.
+
+  NOTE:
+  tavarua_q_event is used to queue events in App buffer. i.e. App calls the
+  VIDIOC_QBUF ioctl to enqueue an empty (capturing) buffer, which is filled
+  by tavarua_q_event call.
+
+  Any async event that requires multiple steps, i.e. search, RT, PS, etc is
+  handled one at a time. (We preserve other interrupts when processing one).
+  Sync interrupts are given priority.
+
+  @param radio: structure pointer passed by client.
+
+  @return None.
+*/
 static void tavarua_handle_interrupts(struct tavarua_device *radio)
 {
 	int i;
@@ -658,9 +905,25 @@ static void tavarua_handle_interrupts(struct tavarua_device *radio)
 
 }
 
-/*
- * Scheduled event handler
- */
+/*=============================================================================
+FUNCTION:  read_int_stat
+=============================================================================*/
+/**
+  This function is scheduled whenever there is an interrupt pending in interrupt
+  queue. i.e. kfmradio.
+
+  Whenever there is a GPIO interrupt, a delayed work will be queued in to the
+  'kfmradio' work queue. Upon execution of this work in the queue, a  a call
+  to read_int_stat function will be made , which would in turn handle the
+  interrupts by reading the INTSTATx registers.
+  NOTE:
+  Tasks to be run out of a workqueue need to be packaged in a struct
+  work_struct structure.
+
+  @param work: work_struct structure.
+
+  @return None.
+*/
 static void read_int_stat(struct work_struct *work)
 {
 	struct tavarua_device *radio = container_of(work,
@@ -672,9 +935,16 @@ static void read_int_stat(struct work_struct *work)
  * irq helper functions
  ************************************************************************/
 
-/*
- * tavarua_request_irq
- */
+/*=============================================================================
+FUNCTION:  tavarua_request_irq
+=============================================================================*/
+/**
+  This function is called to acquire a FM GPIO and enable FM interrupts.
+
+  @param radio: structure pointer passed by client.
+
+  @return 0 if success else otherwise.
+*/
 static int tavarua_request_irq(struct tavarua_device *radio)
 {
 	int retval;
@@ -682,9 +952,31 @@ static int tavarua_request_irq(struct tavarua_device *radio)
 	if (radio == NULL)
 		return -EINVAL;
 
+  /* A workqueue created with create_workqueue() will have one worker thread
+   * for each CPU on the system; create_singlethread_workqueue(), instead,
+   * creates a workqueue with a single worker process. The name of the queue
+   * is limited to ten characters; it is only used for generating the "command"
+   * for the kernel thread(s) (which can be seen in ps or top).
+   */
 	radio->wqueue  = create_singlethread_workqueue("kfmradio");
 	if (!radio->wqueue)
 		return -ENOMEM;
+  /* allocate an interrupt line */
+  /* On success, request_irq() returns 0 if everything goes  as
+     planned.  Your interrupt handler will start receiving its
+     interrupts immediately. On failure, request_irq()
+     returns:
+	-EINVAL
+		The  IRQ  number  you  requested  was either
+		invalid or reserved, or your passed  a  NULL
+		pointer for the handler() parameter.
+
+	-EBUSY The  IRQ you requested is already being
+		handled, and the IRQ cannot  be  shared.
+
+	-ENXIO The m68k returns this value for  an  invalid
+		IRQ number.
+  */
 	retval = request_irq(irq, tavarua_isr, IRQ_TYPE_EDGE_FALLING,
 				"fm interrupt", radio);
 	if (retval < 0) {
@@ -701,9 +993,17 @@ static int tavarua_request_irq(struct tavarua_device *radio)
 	return retval;
 }
 
-/*
- * tavarua_disable_irq
- */
+/*=============================================================================
+FUNCTION:  tavarua_disable_irq
+=============================================================================*/
+/**
+  This function is called to disable FM irq and free up FM interrupt handling
+  resources.
+
+  @param radio: structure pointer passed by client.
+
+  @return 0 if success else otherwise.
+*/
 static int tavarua_disable_irq(struct tavarua_device *radio)
 {
 	int irq;
@@ -722,10 +1022,19 @@ static int tavarua_disable_irq(struct tavarua_device *radio)
  * fops/IOCTL helper functions
  ************************************************************************/
 
+/*=============================================================================
+FUNCTION:  tavarua_search
+=============================================================================*/
+/**
+  This interface sets the search control features.
 
-/*
- * tavarua_search
- */
+  @param radio: structure pointer passed by client.
+  @param on: The value of a control.
+  @param dir: FM search direction.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_search(struct tavarua_device *radio, int on, int dir)
 {
 	enum search_t srch = radio->registers[SRCHCTRL] & SRCH_MODE;
@@ -766,9 +1075,20 @@ static int tavarua_search(struct tavarua_device *radio, int on, int dir)
 	return tavarua_write_registers(radio, SRCHRDS1,
 				&radio->registers[SRCHRDS1], 3);
 }
-/*
- * tavarua_set_region
- */
+
+/*=============================================================================
+FUNCTION:  tavarua_set_region
+=============================================================================*/
+/**
+  This interface configures the FM radio.
+
+  @param radio: structure pointer passed by client.
+  @param req_region: FM band types.  These types defines the FM band minimum and
+  maximum frequencies in the FM band.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_set_region(struct tavarua_device *radio,
 				int req_region)
 {
@@ -893,9 +1213,31 @@ static int tavarua_set_region(struct tavarua_device *radio,
 	return retval;
 }
 
-/*
- * tavarua_get_freq - get the frequency
- */
+/*=============================================================================
+FUNCTION:  tavarua_get_freq
+=============================================================================*/
+/**
+  This interface gets the current frequency.
+
+  @param radio: structure pointer passed by client.
+  @param freq: struct v4l2_frequency. This will be set to the resultant
+  frequency in units of 62.5 kHz on success.
+
+  NOTE:
+  To get the current tuner or modulator radio frequency applications set the
+  tuner field of a struct v4l2_frequency to the respective tuner or modulator
+  number (only input devices have tuners, only output devices have modulators),
+  zero out the reserved array and call the VIDIOC_G_FREQUENCY ioctl with a
+  pointer to this structure. The driver stores the current frequency in the
+  frequency field.
+
+  Tuning frequency is in units of 62.5 kHz, or if the struct v4l2_tuner or
+  struct v4l2_modulator capabilities flag V4L2_TUNER_CAP_LOW is set, in
+  units of 62.5 Hz.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_get_freq(struct tavarua_device *radio,
 				struct v4l2_frequency *freq)
 {
@@ -916,7 +1258,30 @@ static int tavarua_get_freq(struct tavarua_device *radio,
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_set_freq
+=============================================================================*/
+/**
+  This interface sets the current frequency.
 
+  @param radio: structure pointer passed by client.
+  @param freq: desired frequency sent by the client in 62.5 kHz units.
+
+  NOTE:
+  To change the current tuner or modulator radio frequency, applications
+  initialize the tuner, type and frequency fields, and the reserved array of a
+  struct v4l2_frequency and call the VIDIOC_S_FREQUENCY ioctl with a pointer to
+  this structure. When the requested frequency is not possible the driver
+  assumes the closest possible value. However VIDIOC_S_FREQUENCY is a
+  write-only ioctl, it does not return the actual new frequency.
+
+  Tuning frequency is in units of 62.5 kHz, or if the struct v4l2_tuner
+  or struct v4l2_modulator capabilities flag V4L2_TUNER_CAP_LOW is set,
+  in units of 62.5 Hz.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_set_freq(struct tavarua_device *radio, unsigned int freq)
 {
 
@@ -925,7 +1290,7 @@ static int tavarua_set_freq(struct tavarua_device *radio, unsigned int freq)
 	unsigned char cmd[] = {0x00, 0x00};
 	unsigned int spacing;
 	int retval;
-	band_bottom = radio->region_params.band_low;;
+	band_bottom = radio->region_params.band_low;
 	spacing  = 0.100 * FREQ_MUL;
 	if ((freq % 1600) == 800) {
 		cmd[1] = ADD_OFFSET;
@@ -948,8 +1313,22 @@ static int tavarua_set_freq(struct tavarua_device *radio, unsigned int freq)
  * File Operations Interface
  *************************************************************************/
 
-/*
-** tavarua_fops_read - read RDS data
+/*=============================================================================
+FUNCTION:  tavarua_fops_read
+=============================================================================*/
+/**
+  This function is called when a process, which already opened the dev file,
+  attempts to read from it.
+
+  In case of tavarua driver, it is called to read RDS data.
+
+  @param file: file descriptor.
+	@param buf: The buffer to fill with data.
+	@param count: The length of the buffer in bytes.
+	@param ppos: Our offset in the file.
+
+  @return The number of bytes put into the buffer on sucess.
+	-EFAULT if there is no access to user buffer
 */
 static ssize_t tavarua_fops_read(struct file *file, char __user *buf,
 				size_t count, loff_t *ppos)
@@ -967,19 +1346,32 @@ static ssize_t tavarua_fops_read(struct file *file, char __user *buf,
 	}
 
 	/* calculate block count from byte count */
-	count /= 3;
+	count /= BYTES_PER_BLOCK;
 
 
 	/* check if we can write to the user buffer */
-	if (!access_ok(VERIFY_WRITE, buf, count*3))
+	if (!access_ok(VERIFY_WRITE, buf, count*BYTES_PER_BLOCK))
 		return -EFAULT;
 
 	/* copy RDS block out of internal buffer and to user buffer */
-	return kfifo_get(rds_buf, buf, count*3);
+	return kfifo_get(rds_buf, buf, count*BYTES_PER_BLOCK);
 }
 
-/*
-** tavarua_fops_write - write RDS data to host
+/*=============================================================================
+FUNCTION:  tavarua_fops_write
+=============================================================================*/
+/**
+  This function is called when a process, which already opened the dev file,
+  attempts to write to it.
+
+  In case of tavarua driver, it is called to write RDS data to host.
+
+  @param file: file descriptor.
+	@param buf: The buffer which has data to write.
+	@param count: The length of the buffer.
+	@param ppos: Our offset in the file.
+
+  @return The number of bytes written from the buffer.
 */
 static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 			size_t count, loff_t *ppos)
@@ -994,11 +1386,11 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 	/* Disable TX of this type first */
 	switch (radio->tx_mode) {
 	case TAVARUA_TX_RT:
-		bytes_left = min((int)count, 64);
+		bytes_left = min((int)count, MAX_RT_LENGTH);
 		tx_data[1] = 0;
 		break;
 	case TAVARUA_TX_PS:
-		bytes_left = min((int)count, 96);
+		bytes_left = min((int)count, MAX_PS_LENGTH);
 		tx_data[4] = 0;
 		break;
 	default:
@@ -1052,8 +1444,17 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 	return bytes_copied;
 }
 
-/*
-** tavarua_fops_open - file open
+/*=============================================================================
+FUNCTION:  tavarua_fops_open
+=============================================================================*/
+/**
+  This function is called when a process tries to open the device file, like
+	"cat /dev/mycharfile"
+
+  @param file: file descriptor.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
 */
 static int tavarua_fops_open(struct file *file)
 {
@@ -1101,6 +1502,7 @@ static int tavarua_fops_open(struct file *file)
 						__func__);
 		goto open_err_all;
 	}
+  /* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
 	if (!wait_for_completion_timeout(&radio->sync_req_done,
 		msecs_to_jiffies(WAIT_TIMEOUT))) {
 		retval = -1;
@@ -1134,6 +1536,7 @@ static int tavarua_fops_open(struct file *file)
 
 
 open_err_all:
+    /*Disable FM in case of error*/
 	value = 0x00;
 	marimba_write_bit_mask(radio->marimba, MARIMBA_XO_BUFF_CNTRL,
 							&value, 1, value);
@@ -1146,10 +1549,17 @@ open_err_setup:
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_fops_release
+=============================================================================*/
+/**
+  This function is called when a process closes the device file.
 
-/*
- * tavarua_fops_release - file release
- */
+  @param file: file descriptor.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_fops_release(struct file *file)
 {
 	int retval;
@@ -1400,10 +1810,25 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {
 	}
 };
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_querycap
+=============================================================================*/
+/**
+  This function is called to query device capabilities.
 
-/*
- * tavarua_vidioc_querycap - query device capabilities
- */
+  NOTE:
+  All V4L2 devices support the VIDIOC_QUERYCAP ioctl. It is used to identify
+  kernel devices compatible with this specification and to obtain information
+  about driver and hardware capabilities. The ioctl takes a pointer to a struct
+  v4l2_capability which is filled by the driver. When the driver is not
+  compatible with this specification the ioctl returns an EINVAL error code.
+
+  @param file: File descriptor returned by open().
+  @param capability: pointer to struct v4l2_capability.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The device is not compatible with this specification.
+*/
 static int tavarua_vidioc_querycap(struct file *file, void *priv,
 		struct v4l2_capability *capability)
 {
@@ -1415,10 +1840,25 @@ static int tavarua_vidioc_querycap(struct file *file, void *priv,
 	return 0;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_queryctrl
+=============================================================================*/
+/**
+  This function is called to query the device and driver for supported video
+  controls (enumerate control items).
 
-/*
- * tavarua_vidioc_queryctrl - enumerate control items
- */
+  NOTE:
+  To query the attributes of a control, the applications set the id field of
+  a struct v4l2_queryctrl and call the VIDIOC_QUERYCTRL ioctl with a pointer
+  to this structure. The driver fills the rest of the structure or returns an
+  EINVAL error code when the id is invalid.
+
+  @param file: File descriptor returned by open().
+  @param qc: pointer to struct v4l2_queryctrl.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The struct v4l2_queryctrl id is invalid.
+*/
 static int tavarua_vidioc_queryctrl(struct file *file, void *priv,
 		struct v4l2_queryctrl *qc)
 {
@@ -1439,15 +1879,37 @@ static int tavarua_vidioc_queryctrl(struct file *file, void *priv,
 	return retval;
 }
 
-/*
- * tavarua_vidioc_g_ctrl - get the value of a control
- */
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_g_ctrl
+=============================================================================*/
+/**
+  This function is called to get the value of a control.
+
+  NOTE:
+  To get the current value of a control, applications initialize the id field
+  of a struct v4l2_control and call the VIDIOC_G_CTRL ioctl with a pointer to
+  this structure.
+
+  When the id is invalid drivers return an EINVAL error code. When the value is
+  out of bounds drivers can choose to take the closest valid value or return an
+  ERANGE error code, whatever seems more appropriate.
+
+  @param file: File descriptor returned by open().
+  @param ctrl: pointer to struct v4l2_control.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The struct v4l2_control id is invalid.
+  @return ERANGE: The struct v4l2_control value is out of bounds.
+  @return EBUSY: The control is temporarily not changeable, possibly because
+  another applications took over control of the device function this control
+  belongs to.
+*/
 static int tavarua_vidioc_g_ctrl(struct file *file, void *priv,
 		struct v4l2_control *ctrl)
 {
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
-	unsigned char xfr_buf[XFR_REG_NUM];
+	char xfr_buf[XFR_REG_NUM];
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_VOLUME:
@@ -1534,18 +1996,38 @@ static int tavarua_vidioc_g_ctrl(struct file *file, void *priv,
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_s_ctrl
+=============================================================================*/
+/**
+  This function is called to set the value of a control.
 
-/*
- * tavarua_vidioc_s_ctrl - set the value of a control
- */
+  NOTE:
+  To change the value of a control, applications initialize the id and value
+  fields of a struct v4l2_control and call the VIDIOC_S_CTRL ioctl.
+
+  When the id is invalid drivers return an EINVAL error code. When the value is
+  out of bounds drivers can choose to take the closest valid value or return an
+  ERANGE error code, whatever seems more appropriate.
+
+  @param file: File descriptor returned by open().
+  @param ctrl: pointer to struct v4l2_control.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The struct v4l2_control id is invalid.
+  @return ERANGE: The struct v4l2_control value is out of bounds.
+  @return EBUSY: The control is temporarily not changeable, possibly because
+  another applications took over control of the device function this control
+  belongs to.
+*/
 static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 		struct v4l2_control *ctrl)
 {
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
 	unsigned char value;
-	unsigned char lp_buf[] = {0x00, 0x00, 0x00};
-	unsigned char xfr_buf[XFR_REG_NUM];
+	char lp_buf[] = {0x00, 0x00, 0x00};
+	char xfr_buf[XFR_REG_NUM];
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_VOLUME:
@@ -1568,12 +2050,12 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 	/* start/stop search */
 	case V4L2_CID_PRIVATE_TAVARUA_SRCHON:
 		FMDBG("starting search\n");
-		tavarua_search(radio, ctrl->value, 0);
+		tavarua_search(radio, ctrl->value, SRCH_DIR_UP);
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_STATE:
 		/* check if already on */
 		radio->handle_irq = 1;
-		if ((ctrl->value == 1) && !(radio->registers[RDCTRL] &
+		if ((ctrl->value == FM_RECV) && !(radio->registers[RDCTRL] &
 							FM_RECV)) {
 			FMDBG("clearing flags\n");
 			init_completion(&radio->sync_xfr_start);
@@ -1594,14 +2076,14 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 			}
 		}
 		/* check if off */
-		else if ((ctrl->value == 0) && radio->registers[RDCTRL]) {
+		else if ((ctrl->value == FM_OFF) && radio->registers[RDCTRL]) {
 			FMDBG("turning off...\n");
 			retval = tavarua_write_register(radio, RDCTRL,
 							ctrl->value);
-		} else if ((ctrl->value == 2) && ((radio->registers[RDCTRL] &
-							0x03) != 0x02)) {
+		} else if ((ctrl->value == FM_TRANS) &&
+			   ((radio->registers[RDCTRL] & 0x03) != FM_TRANS)) {
 			FMDBG("transmit mode\n");
-			retval = tavarua_start(radio, 2);
+			retval = tavarua_start(radio, FM_TRANS);
 		}
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_REGION:
@@ -1611,8 +2093,9 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 		retval = sync_read_xfr(radio, RX_CONFIG, xfr_buf);
 		if (retval < 0)
 			break;
-		xfr_buf[0] = ctrl->value;
-		xfr_buf[1] = ctrl->value;
+		/* RMSSI Threshold is a signed 8 bit value */
+		xfr_buf[0] = (char)ctrl->value;
+		xfr_buf[1] = (char)ctrl->value;
 		xfr_buf[4] = 0x01;
 		retval = sync_write_xfr(radio, RX_CONFIG, xfr_buf);
 		break;
@@ -1702,10 +2185,26 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_g_tuner
+=============================================================================*/
+/**
+  This function is called to get tuner attributes.
 
-/*
- * tavarua_vidioc_g_tuner - get tuner attributes
- */
+  NOTE:
+  To query the attributes of a tuner, applications initialize the index field
+  and zero out the reserved array of a struct v4l2_tuner and call the
+  VIDIOC_G_TUNER ioctl with a pointer to this structure. Drivers fill the rest
+  of the structure or return an EINVAL error code when the index is out of
+  bounds. To enumerate all tuners applications shall begin at index zero,
+  incrementing by one until the driver returns EINVAL.
+
+  @param file: File descriptor returned by open().
+  @param tuner: pointer to struct v4l2_tuner.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The struct v4l2_tuner index is out of bounds.
+*/
 static int tavarua_vidioc_g_tuner(struct file *file, void *priv,
 		struct v4l2_tuner *tuner)
 {
@@ -1744,11 +2243,29 @@ static int tavarua_vidioc_g_tuner(struct file *file, void *priv,
 	return 0;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_s_tuner
+=============================================================================*/
+/**
+  This function is called to set tuner attributes. Used to set mono/stereo mode.
 
-/*
- * tavarua_vidioc_s_tuner - set tuner attributes
- * Used to set mono/stereo mode
- */
+  NOTE:
+  Tuners have two writable properties, the audio mode and the radio frequency.
+  To change the audio mode, applications initialize the index, audmode and
+  reserved fields and call the VIDIOC_S_TUNER ioctl. This will not change the
+  current tuner, which is determined by the current video input. Drivers may
+  choose a different audio mode if the requested mode is invalid or unsupported.
+  Since this is a write-only ioctl, it does not return the actually selected
+  audio mode.
+
+  To change the radio frequency the VIDIOC_S_FREQUENCY ioctl is available.
+
+  @param file: File descriptor returned by open().
+  @param tuner: pointer to struct v4l2_tuner.
+
+  @return On success 0 is returned, else error code.
+  @return -EINVAL: The struct v4l2_tuner index is out of bounds.
+*/
 static int tavarua_vidioc_s_tuner(struct file *file, void *priv,
 		struct v4l2_tuner *tuner)
 {
@@ -1775,10 +2292,29 @@ static int tavarua_vidioc_s_tuner(struct file *file, void *priv,
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_g_frequency
+=============================================================================*/
+/**
+  This function is called to get tuner or modulator radio frequency.
 
-/*
- * tavarua_vidioc_g_frequency - get tuner or modulator radio frequency
- */
+  NOTE:
+  To get the current tuner or modulator radio frequency applications set the
+  tuner field of a struct v4l2_frequency to the respective tuner or modulator
+  number (only input devices have tuners, only output devices have modulators),
+  zero out the reserved array and call the VIDIOC_G_FREQUENCY ioctl with a
+  pointer to this structure. The driver stores the current frequency in the
+  frequency field.
+
+  @param file: File descriptor returned by open().
+  @param freq: pointer to struct v4l2_frequency. This will be set to the
+   resultant
+  frequency in 62.5 khz on success.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The tuner index is out of bounds or the value in the type
+  field is wrong.
+*/
 static int tavarua_vidioc_g_frequency(struct file *file, void *priv,
 		struct v4l2_frequency *freq)
 {
@@ -1788,10 +2324,27 @@ static int tavarua_vidioc_g_frequency(struct file *file, void *priv,
 
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_s_frequency
+=============================================================================*/
+/**
+  This function is called to set tuner or modulator radio frequency.
 
-/*
- * tavarua_vidioc_s_frequency - set tuner or modulator radio frequency
- */
+  NOTE:
+  To change the current tuner or modulator radio frequency applications
+  initialize the tuner, type and frequency fields, and the reserved array of
+  a struct v4l2_frequency and call the VIDIOC_S_FREQUENCY ioctl with a pointer
+  to this structure. When the requested frequency is not possible the driver
+  assumes the closest possible value. However VIDIOC_S_FREQUENCY is a
+  write-only ioctl, it does not return the actual new frequency.
+
+  @param file: File descriptor returned by open().
+  @param freq: pointer to struct v4l2_frequency.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The tuner index is out of bounds or the value in the type
+  field is wrong.
+*/
 static int tavarua_vidioc_s_frequency(struct file *file, void *priv,
 					struct v4l2_frequency *freq)
 {
@@ -1807,16 +2360,47 @@ static int tavarua_vidioc_s_frequency(struct file *file, void *priv,
 		printk(KERN_WARNING DRIVER_NAME
 			": set frequency failed with %d\n", retval);
 
+  /* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
 	if (!wait_for_completion_timeout(&radio->sync_req_done,
 		msecs_to_jiffies(WAIT_TIMEOUT)))
 		return -ETIME;
 	return retval;
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_dqbuf
+=============================================================================*/
+/**
+  This function is called to exchange a buffer with the driver.
+  This is main buffer function, in essense its equivalent to a blocking
+  read call.
 
-/*
- * Our main buffer function, in essense its equivalent to a blocking read call
- */
+  Applications call the VIDIOC_DQBUF ioctl to dequeue a filled (capturing) or
+  displayed (output) buffer from the driver's outgoing queue. They just set
+  the type and memory fields of a struct v4l2_buffer as above, when VIDIOC_DQBUF
+  is called with a pointer to this structure the driver fills the remaining
+  fields or returns an error code.
+
+  NOTE:
+  By default VIDIOC_DQBUF blocks when no buffer is in the outgoing queue.
+  When the O_NONBLOCK flag was given to the open() function, VIDIOC_DQBUF
+  returns immediately with an EAGAIN error code when no buffer is available.
+
+  @param file: File descriptor returned by open().
+  @param buffer: pointer to struct v4l2_buffer.
+
+  @return On success 0 is returned, else error code.
+  @return EAGAIN: Non-blocking I/O has been selected using O_NONBLOCK and no
+  buffer was in the outgoing queue.
+  @return EINVAL: The buffer type is not supported, or the index is out of
+  bounds, or no buffers have been allocated yet, or the userptr or length are
+  invalid.
+  @return ENOMEM: Not enough physical or virtual memory was available to enqueue
+  a user pointer buffer.
+  @return EIO: VIDIOC_DQBUF failed due to an internal error. Can also indicate
+  temporary problems like signal loss. Note the driver might dequeue an (empty)
+  buffer despite returning an error, or even stop capturing.
+*/
 static int tavarua_vidioc_dqbuf(struct file *file, void *priv,
 				struct v4l2_buffer *buffer)
 {
@@ -1847,10 +2431,20 @@ static int tavarua_vidioc_dqbuf(struct file *file, void *priv,
 	return 0;
 }
 
-/*
- * This function is here to make the v4l2 framework happy.
- * We cannot use private buffers without it
- */
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_g_fmt_type_private
+=============================================================================*/
+/**
+  This function is here to make the v4l2 framework happy.
+  We cannot use private buffers without it.
+
+  @param file: File descriptor returned by open().
+  @param f: pointer to struct v4l2_format.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The tuner index is out of bounds or the value in the type
+  field is wrong.
+*/
 static int tavarua_vidioc_g_fmt_type_private(struct file *file, void *priv,
 						struct v4l2_format *f)
 {
@@ -1858,17 +2452,38 @@ static int tavarua_vidioc_g_fmt_type_private(struct file *file, void *priv,
 
 }
 
+/*=============================================================================
+FUNCTION:  tavarua_vidioc_s_hw_freq_seek
+=============================================================================*/
+/**
+  This function is called to perform a hardware frequency seek.
+
+  Start a hardware frequency seek from the current frequency. To do this
+  applications initialize the tuner, type, seek_upward and wrap_around fields,
+  and zero out the reserved array of a struct v4l2_hw_freq_seek and call the
+  VIDIOC_S_HW_FREQ_SEEK ioctl with a pointer to this structure.
+
+  This ioctl is supported if the V4L2_CAP_HW_FREQ_SEEK capability is set.
+
+  @param file: File descriptor returned by open().
+  @param seek: pointer to struct v4l2_hw_freq_seek.
+
+  @return On success 0 is returned, else error code.
+  @return EINVAL: The tuner index is out of bounds or the value in the type
+  field is wrong.
+  @return EAGAIN: The ioctl timed-out. Try again.
+*/
 static int tavarua_vidioc_s_hw_freq_seek(struct file *file, void *priv,
 					struct v4l2_hw_freq_seek *seek)
 {
 	struct tavarua_device  *radio = video_get_drvdata(video_devdata(file));
 	int dir;
 	if (seek->seek_upward)
-		dir = 0;
+		dir = SRCH_DIR_UP;
 	else
-		dir = 1;
+		dir = SRCH_DIR_DOWN;
 	FMDBG("starting search\n");
-	return tavarua_search(radio, 1, dir);
+	return tavarua_search(radio, CTRL_ON, dir);
 }
 
 /*
@@ -1895,6 +2510,18 @@ static struct video_device tavarua_viddev_template = {
 	.release                = video_device_release,
 };
 
+/*==============================================================
+FUNCTION:  FmQSocCom_EnableInterrupts
+==============================================================*/
+/**
+  This function enable interrupts.
+
+  @param radio: structure pointer passed by client.
+  @param state: FM radio state (receiver/transmitter/off/reset).
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_setup_interrupts(struct tavarua_device *radio,
 					enum radio_state_t state)
 {
@@ -1934,6 +2561,18 @@ static int tavarua_setup_interrupts(struct tavarua_device *radio,
 	return retval;
 
 }
+
+/*==============================================================
+FUNCTION:  tavarua_disable_interrupts
+==============================================================*/
+/**
+  This function disables interrupts.
+
+  @param radio: structure pointer passed by client.
+
+  @return => 0 if successful.
+  @return < 0 if failure.
+*/
 static int tavarua_disable_interrupts(struct tavarua_device *radio)
 {
 	unsigned char lpm_buf[XFR_REG_NUM];
@@ -1951,6 +2590,17 @@ static int tavarua_disable_interrupts(struct tavarua_device *radio)
 
 }
 
+/*==============================================================
+FUNCTION:  tavarua_start
+==============================================================*/
+/**
+  Starts/enables the device (FM radio).
+
+  @param radio: structure pointer passed by client.
+  @param state: FM radio state (receiver/transmitter/off/reset).
+
+  @return On success 0 is returned, else error code.
+*/
 static int tavarua_start(struct tavarua_device *radio,
 				enum radio_state_t state)
 {
@@ -1969,13 +2619,23 @@ static int tavarua_start(struct tavarua_device *radio,
 	/* enable interrupts */
 	tavarua_setup_interrupts(radio, state);
 	/* default region is US */
-	radio->region_params.band_low = 87.5 * FREQ_MUL;
-	radio->region_params.band_high = 108 * FREQ_MUL;
+	radio->region_params.band_low = US_LOW_BAND * FREQ_MUL;
+	radio->region_params.band_high = US_HIGH_BAND * FREQ_MUL;
 
 	return 0;
 }
 
+/*==============================================================
+FUNCTION:  tavarua_suspend
+==============================================================*/
+/**
+  Save state and stop all devices in system.
 
+  @param pdev: platform device to be suspended.
+  @param state: Power state to put each device in.
+
+  @return On success 0 is returned, else error code.
+*/
 static int tavarua_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tavarua_device *radio = platform_get_drvdata(pdev);
@@ -1989,6 +2649,16 @@ static int tavarua_suspend(struct platform_device *pdev, pm_message_t state)
 	return 0;
 }
 
+/*==============================================================
+FUNCTION:  tavarua_resume
+==============================================================*/
+/**
+  Restore state of each device in system.
+
+  @param pdev: platform device to be resumed.
+
+  @return On success 0 is returned, else error code.
+*/
 static int tavarua_resume(struct platform_device *pdev)
 {
 
@@ -2004,6 +2674,23 @@ static int tavarua_resume(struct platform_device *pdev)
 	return 0;
 }
 
+/*==============================================================
+FUNCTION:  tavarua_set_audio_path
+==============================================================*/
+/**
+  This function will configure the audio path to and from the
+  FM core.
+
+  This interface is expected to be called from the multimedia
+  driver's thread.  This interface should only be called when
+  the FM hardware is enabled.  If the FM hardware is not
+  currently enabled, this interface will return an error.
+
+  @param digital_on: Digital audio from the FM core should be enabled/disbled.
+  @param analog_on: Analog audio from the FM core should be enabled/disbled.
+
+  @return On success 0 is returned, else error code.
+*/
 int tavarua_set_audio_path(int digital_on, int analog_on)
 {
 	struct tavarua_device *radio = private_data;
@@ -2028,18 +2715,34 @@ int tavarua_set_audio_path(int digital_on, int analog_on)
 		(0),
 		I2SCTRL_OFFSET,
 		I2SCTRL_MASK);
+	FMDBG("%s: %x\n", __func__, radio->registers[AUDIOCTRL]);
 	return tavarua_write_register(radio, AUDIOCTRL,
 					radio->registers[AUDIOCTRL]);
 
-
 }
 
+/*==============================================================
+FUNCTION:  tavarua_probe
+==============================================================*/
+/**
+  Once called this functions initiates, allocates resources and registers video
+  tuner device with the v4l2 framework.
+
+  NOTE:
+  probe() should verify that the specified device hardware
+  actually exists; sometimes platform setup code can't be sure.  The probing
+  can use device resources, including clocks, and device platform_data.
+
+  @param pdev: platform device to be probed.
+
+  @return On success 0 is returned, else error code.
+	-ENOMEM in low memory cases
+*/
 static int  __init tavarua_probe(struct platform_device *pdev)
 {
 
 	struct marimba_fm_platform_data *tavarua_pdata;
 	struct tavarua_device *radio;
-	unsigned int buf_size;
 	int retval;
 	int i;
 	FMDBG("%s: probe called\n", __func__);
@@ -2066,14 +2769,13 @@ static int  __init tavarua_probe(struct platform_device *pdev)
 	  sizeof(tavarua_viddev_template));
 
 	/*allocate internal buffers for decoded rds and event buffer*/
-	buf_size = 64;
 	for (i = 0; i < TAVARUA_BUF_MAX; i++) {
 		spin_lock_init(&radio->buf_lock[i]);
 		if (i == TAVARUA_BUF_RAW_RDS)
 			radio->data_buf[i] = kfifo_alloc(rds_buf*3,
 				GFP_KERNEL, &radio->buf_lock[i]);
 		else
-			radio->data_buf[i] = kfifo_alloc(buf_size,
+			radio->data_buf[i] = kfifo_alloc(STD_BUF_SIZE,
 				GFP_KERNEL, &radio->buf_lock[i]);
 
 		if (IS_ERR(radio->data_buf[i])) {
@@ -2109,6 +2811,8 @@ static int  __init tavarua_probe(struct platform_device *pdev)
 	init_waitqueue_head(&radio->event_queue);
 
 	video_set_drvdata(radio->videodev, radio);
+    /*Start the worker thread for event handling and register read_int_stat
+	as worker function*/
 	INIT_DELAYED_WORK(&radio->work, read_int_stat);
 
 	/* register video device */
@@ -2131,6 +2835,16 @@ err_initial:
 	return retval;
 }
 
+/*==============================================================
+FUNCTION:  tavarua_remove
+==============================================================*/
+/**
+  Removes the device.
+
+  @param pdev: platform device to be removed.
+
+  @return On success 0 is returned, else error code.
+*/
 static int __devexit tavarua_remove(struct platform_device *pdev)
 {
 	int i;
@@ -2153,6 +2867,12 @@ static int __devexit tavarua_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/*
+ Platform drivers follow the standard driver model convention, where
+ discovery/enumeration is handled outside the drivers, and drivers
+ provide probe() and remove() methods.  They support power management
+ and shutdown notifications using the standard conventions.
+*/
 static struct platform_driver tavarua_driver = {
 	.driver = {
 		.owner  = THIS_MODULE,
@@ -2162,23 +2882,40 @@ static struct platform_driver tavarua_driver = {
 	.remove = __devexit_p(tavarua_remove),
 	.suspend = tavarua_suspend,
 	.resume = tavarua_resume,
-};
+}; /* platform device we're adding */
 
 
 /*************************************************************************
  * Module Interface
  ************************************************************************/
 
+/*==============================================================
+FUNCTION:  radio_module_init
+==============================================================*/
+/**
+  Module entry - add a platform-level device.
+
+  @return Returns zero if the driver registered and bound to a device, else
+  returns a negative error code when the driver not registered.
+*/
 static int __init radio_module_init(void)
 {
 	printk(KERN_INFO DRIVER_DESC ", Version " DRIVER_VERSION "\n");
 	return platform_driver_register(&tavarua_driver);
 }
 
+/*==============================================================
+FUNCTION:  radio_module_exit
+==============================================================*/
+/**
+  Module exit - removes a platform-level device.
 
-/*
- * tavarua_module_exit - module exit
- */
+  NOTE:
+  Note that this function will also release all memory- and port-based
+  resources owned by the device (dev->resource).
+
+  @return none.
+*/
 static void __exit radio_module_exit(void)
 {
   platform_driver_unregister(&tavarua_driver);
