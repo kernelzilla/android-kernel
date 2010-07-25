@@ -191,8 +191,7 @@ u32 vcd_init_device_context(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 
 	VCD_MSG_HIGH("Device powered ON and clocked");
 
-	rc = vcd_sched_create(p_dev_ctxt->n_max_perf_lvl,
-		(struct vcd_sched_ctx_type **)&p_dev_ctxt->sched_hdl);
+	rc = vcd_sched_create(&p_dev_ctxt->sched_clnt_list);
 
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_ERROR("rc = 0x%x. Failed: vcd_sched_create", rc);
@@ -214,8 +213,7 @@ u32 vcd_init_device_context(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 	if (VCD_FAILED(rc)) {
 		VCD_MSG_ERROR("rc = 0x%x. Failed: ddl_device_init", rc);
 
-		vcd_sched_destroy(p_dev_ctxt->sched_hdl);
-		p_dev_ctxt->sched_hdl = NULL;
+		vcd_sched_destroy(&p_dev_ctxt->sched_clnt_list);
 
 		(void)vcd_power_event(p_dev_ctxt, NULL,
 					  VCD_EVT_PWR_DEV_INIT_FAIL);
@@ -250,8 +248,7 @@ void vcd_handle_device_init_failed(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 	if (ddl_device_release(NULL))
 		VCD_MSG_ERROR("Failed: ddl_device_release");
 
-	vcd_sched_destroy(p_drv_ctxt->dev_ctxt.sched_hdl);
-	p_drv_ctxt->dev_ctxt.sched_hdl = NULL;
+	vcd_sched_destroy(&p_drv_ctxt->dev_ctxt.sched_clnt_list);
 
 	if (vcd_power_event(&p_drv_ctxt->dev_ctxt,
 		NULL, VCD_EVT_PWR_DEV_INIT_FAIL))
@@ -283,8 +280,7 @@ u32 vcd_deinit_device_context(struct vcd_drv_ctxt_type_t *p_drv_ctxt,
 		(void)vcd_power_event(p_dev_ctxt, NULL,
 					  VCD_EVT_PWR_DEV_TERM_FAIL);
 	} else {
-		vcd_sched_destroy(p_dev_ctxt->sched_hdl);
-		p_dev_ctxt->sched_hdl = NULL;
+		vcd_sched_destroy(&p_dev_ctxt->sched_clnt_list);
 
 		(void) vcd_power_event(p_dev_ctxt, NULL,
 			VCD_EVT_PWR_DEV_TERM_END);
