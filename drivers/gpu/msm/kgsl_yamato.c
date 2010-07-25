@@ -23,6 +23,7 @@
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
+#include <linux/notifier.h>
 
 #include "kgsl_drawctxt.h"
 #include "kgsl.h"
@@ -617,6 +618,8 @@ kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 	device->id = KGSL_DEVICE_YAMATO;
 	init_completion(&device->hwaccess_gate);
 	device->hwaccess_blocked = KGSL_FALSE;
+
+	ATOMIC_INIT_NOTIFIER_HEAD(&device->ts_notifier_list);
 
 	kgsl_yamato_getfunctable(&device->ftbl);
 	if (config->mmu_config) {

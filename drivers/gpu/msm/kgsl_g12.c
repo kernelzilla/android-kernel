@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/sched.h>
 #include <linux/workqueue.h>
+#include <linux/notifier.h>
 
 #include "kgsl.h"
 #include "kgsl_g12.h"
@@ -170,6 +171,10 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 			g12_device->timestamp += count;
 
 			wake_up_interruptible(&(g12_device->wait_timestamp_wq));
+
+			atomic_notifier_call_chain(
+				&(device->ts_notifier_list),
+				KGSL_DEVICE_G12, NULL);
 		}
 	}
 
@@ -257,6 +262,8 @@ kgsl_g12_init(struct kgsl_device *device,
 	init_completion(&device->hwaccess_gate);
 	kgsl_g12_getfunctable(&device->ftbl);
 	device->hwaccess_blocked = KGSL_FALSE;
+
+	ATOMIC_INIT_NOTIFIER_HEAD(&device->ts_notifier_list);
 
 	printk(KERN_INFO "kgsl mmu config 0x%x\n", config->mmu_config);
 	if (config->mmu_config) {
