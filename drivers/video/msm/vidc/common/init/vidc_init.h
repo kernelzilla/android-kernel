@@ -63,23 +63,6 @@ struct video_client_ctx {
 };
 
 void __iomem *vidc_get_ioaddr(void);
-
-#ifdef USE_RES_TRACKER
-
-u32 vidc_sel_clk_rate(unsigned long hclk_rate);
-u32 vidc_get_clk_rate(unsigned long *phclk_rate);
-u32 vidc_enable_clk(void);
-u32 vidc_disable_clk(void);
-u32 vidc_enable_pwr_rail(void);
-u32 vidc_disable_pwr_rail(void);
-
-#else
-
-u32 vidc_enable_clk(unsigned long hclk_rate);
-u32 vidc_disable_clk(void);
-
-#endif
-
 int vidc_load_firmware(void);
 void vidc_release_firmware(void);
 u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,

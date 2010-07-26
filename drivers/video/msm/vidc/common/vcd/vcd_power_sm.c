@@ -93,12 +93,6 @@ u32 vcd_device_power_event(struct vcd_dev_ctxt_type *p_dev_ctxt, u32 event,
 					p_dev_ctxt->n_active_clnts = 0;
 					p_dev_ctxt->b_set_perf_lvl_pending =
 						FALSE;
-					if (!vidc_sel_clk_rate(228570000))
-						VCD_MSG_HIGH("%s(): vidc_sel_\
-						clk_rate FAILED\n", __func__);
-					else
-						VCD_MSG_ERROR("%s(): vidc_sel_\
-						clk_rate SUCCESS\n", __func__);
 					rc = vcd_enable_clock(p_dev_ctxt,
 						p_cctxt);
 					if (VCD_FAILED(rc)) {
