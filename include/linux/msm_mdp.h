@@ -88,6 +88,8 @@ enum {
 #define MDP_BLIT_WITH_DMA_BARRIERS	0x000
 #define MDP_BLIT_WITH_NO_DMA_BARRIERS    \
 	(MDP_NO_DMA_BARRIER_START | MDP_NO_DMA_BARRIER_END)
+#define MDP_BLIT_SRC_GEM                0x04000000
+#define MDP_BLIT_DST_GEM                0x02000000
 #define MDP_TRANSP_NOP 0xffffffff
 #define MDP_ALPHA_NOP 0xff
 
@@ -114,6 +116,7 @@ struct mdp_img {
 	uint32_t format;
 	uint32_t offset;
 	int memory_id;		/* the file descriptor */
+	uint32_t priv;
 };
 
 /*
@@ -131,6 +134,13 @@ struct mdp_ccs {
 	uint16_t ccs[MDP_CCS_SIZE];	/* 3x3 color coefficients */
 	uint16_t bv[MDP_BV_SIZE];	/* 1x3 bias vector */
 };
+
+/* The version of the mdp_blit_req structure so that
+ * user applications can selectively decide which functionality
+ * to include
+ */
+
+#define MDP_BLIT_REQ_VERSION 2
 
 struct mdp_blit_req {
 	struct mdp_img src;
