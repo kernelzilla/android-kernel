@@ -43,6 +43,7 @@
 #define ACDB_PORT_NAME			"DAL00"
 #define ACDB_CPU			SMD_APPS_MODEM
 #define ACDB_BUF_SIZE			4096
+#define PBE_BUF_SIZE                    (33*1024)
 
 #define ACDB_VALUES_NOT_FILLED  	0
 #define ACDB_VALUES_FILLED      	1
@@ -76,6 +77,7 @@ struct acdb_data {
 
 	struct audpp_cmd_cfg_object_params_pcm *pp_iir;
 	struct audpp_cmd_cfg_cal_gain *calib_gain_rx;
+	struct audpp_cmd_cfg_pbe *pbe_block;
 	struct audpp_cmd_cfg_object_params_mbadrc *pp_mbadrc;
 	struct audpreproc_cmd_cfg_agc_params *preproc_agc;
 	struct audpreproc_cmd_cfg_iir_tuning_filter_params *preproc_iir;
@@ -93,6 +95,9 @@ struct acdb_data {
 	u32 multiple_sessions;
 	u32 cur_tx_session;
 	struct acdb_result acdb_result;
+	u16 *pbe_extbuff;
+	u16 *pbe_enable_flag;
+	struct acdb_pbe_block *pbe_blk;
 };
 
 static struct acdb_data		acdb_data;
@@ -405,6 +410,113 @@ static s32 acdb_fill_audpp_cal_gain(void)
 	return 0;
 }
 
+static void extract_pbe_block(struct header *prs_hdr, u32 *index)
+{
+	if (prs_hdr->iid == IID_AUDIO_PBE_RX_ENABLE_FLAG) {
+		MM_DBG("Got IID = IID_AUDIO_PBE_RX_ENABLE\n");
+		acdb_data.pbe_enable_flag = (u16 *)(acdb_data.virt_addr +
+							*index +
+							sizeof(struct header));
+		*index += prs_hdr->data_len + sizeof(struct header);
+	} else if (prs_hdr->iid == IID_PBE_CONFIG_PARAMETERS) {
+		MM_DBG("Got IID == IID_PBE_CONFIG_PARAMETERS\n");
+		acdb_data.pbe_blk = (struct acdb_pbe_block *)
+					(acdb_data.virt_addr + *index
+					+ sizeof(struct header));
+		*index += prs_hdr->data_len + sizeof(struct header);
+	}
+}
+
+static s32 get_audpp_pbe_block(void)
+{
+	struct header *prs_hdr;
+	u32 index = 0;
+	s32 result = -1;
+
+	while (index < acdb_data.acdb_result.used_bytes) {
+		prs_hdr = (struct header *)(acdb_data.virt_addr + index);
+
+		if (prs_hdr->dbor_signature == DBOR_SIGNATURE) {
+			if (prs_hdr->abid == ABID_AUDIO_PBE_RX) {
+				if ((prs_hdr->iid == IID_PBE_CONFIG_PARAMETERS)
+					|| (prs_hdr->iid ==
+						IID_AUDIO_PBE_RX_ENABLE_FLAG)) {
+					extract_pbe_block(prs_hdr, &index);
+					result = 0;
+				}
+			} else {
+				index += prs_hdr->data_len +
+					sizeof(struct header);
+			}
+		} else {
+			break;
+		}
+	}
+	return result;
+}
+
+static s32 acdb_fill_audpp_pbe(void)
+{
+	s32 result = -1;
+
+	result = get_audpp_pbe_block();
+	if (IS_ERR_VALUE(result))
+		return result;
+	memset(acdb_data.pbe_block, 0, sizeof(*acdb_data.pbe_block));
+
+	acdb_data.pbe_block->common.cmd_id = AUDPP_CMD_CFG_OBJECT_PARAMS;
+	acdb_data.pbe_block->common.stream = AUDPP_CMD_COPP_STREAM;
+	acdb_data.pbe_block->common.stream_id = 0;
+	acdb_data.pbe_block->common.obj_cfg = AUDPP_CMD_OBJ0_UPDATE;
+	acdb_data.pbe_block->common.command_type = 0;
+	acdb_data.pbe_block->pbe_enable = *acdb_data.pbe_enable_flag;
+
+	acdb_data.pbe_block->realbassmix = acdb_data.pbe_blk->realbassmix;
+	acdb_data.pbe_block->basscolorcontrol =
+					acdb_data.pbe_blk->basscolorcontrol;
+	acdb_data.pbe_block->mainchaindelay = acdb_data.pbe_blk->mainchaindelay;
+	acdb_data.pbe_block->xoverfltorder = acdb_data.pbe_blk->xoverfltorder;
+	acdb_data.pbe_block->bandpassfltorder =
+					acdb_data.pbe_blk->bandpassfltorder;
+	acdb_data.pbe_block->adrcdelay = acdb_data.pbe_blk->adrcdelay;
+	acdb_data.pbe_block->downsamplelevel =
+					acdb_data.pbe_blk->downsamplelevel;
+	acdb_data.pbe_block->comprmstav = acdb_data.pbe_blk->comprmstav;
+	acdb_data.pbe_block->expthreshold = acdb_data.pbe_blk->expthreshold;
+	acdb_data.pbe_block->expslope = acdb_data.pbe_blk->expslope;
+	acdb_data.pbe_block->compthreshold = acdb_data.pbe_blk->compthreshold;
+	acdb_data.pbe_block->compslope = acdb_data.pbe_blk->compslope;
+	acdb_data.pbe_block->cpmpattack_lsw = acdb_data.pbe_blk->cpmpattack_lsw;
+	acdb_data.pbe_block->compattack_msw = acdb_data.pbe_blk->compattack_msw;
+	acdb_data.pbe_block->comprelease_lsw =
+					acdb_data.pbe_blk->comprelease_lsw;
+	acdb_data.pbe_block->comprelease_msw =
+					acdb_data.pbe_blk->comprelease_msw;
+	acdb_data.pbe_block->compmakeupgain = acdb_data.pbe_blk->compmakeupgain;
+	acdb_data.pbe_block->baselimthreshold =
+					acdb_data.pbe_blk->baselimthreshold;
+	acdb_data.pbe_block->highlimthreshold =
+					acdb_data.pbe_blk->highlimthreshold;
+	acdb_data.pbe_block->basslimmakeupgain =
+					acdb_data.pbe_blk->basslimmakeupgain;
+	acdb_data.pbe_block->highlimmakeupgain =
+					acdb_data.pbe_blk->highlimmakeupgain;
+	acdb_data.pbe_block->limbassgrc = acdb_data.pbe_blk->limbassgrc;
+	acdb_data.pbe_block->limhighgrc = acdb_data.pbe_blk->limhighgrc;
+	acdb_data.pbe_block->limdelay = acdb_data.pbe_blk->limdelay;
+	memcpy(acdb_data.pbe_block->filter_coeffs,
+		acdb_data.pbe_blk->filter_coeffs, sizeof(u16)*90);
+	acdb_data.pbe_block->extpartition = 0;
+	acdb_data.pbe_block->extbuffsize_lsw = PBE_BUF_SIZE;
+	acdb_data.pbe_block->extbuffsize_msw = 0;
+	acdb_data.pbe_block->extbuffstart_lsw = ((u32)acdb_data.pbe_extbuff
+							& 0xFFFF);
+	acdb_data.pbe_block->extbuffstart_msw = (((u32)acdb_data.pbe_extbuff
+							& 0xFFFF0000) >> 16);
+	return 0;
+}
+
+
 static s32 acdb_calibrate_audpp(void)
 {
 	s32	result = 0;
@@ -448,7 +560,20 @@ static s32 acdb_calibrate_audpp(void)
 			result = -EINVAL;
 			goto done;
 		} else
-			MM_DBG("AUDPP is calibrated with calib_gain_rx \n");
+			MM_DBG("AUDPP is calibrated with calib_gain_rx\n");
+	}
+	result = acdb_fill_audpp_pbe();
+	if (!(IS_ERR_VALUE(result))) {
+		result = audpp_dsp_set_pbe(acdb_data.device_info->dev_id,
+					acdb_data.pbe_block->pbe_enable,
+					acdb_data.pbe_block, COPP);
+		if (result) {
+			MM_ERR("ACDB=> Failed to send pbe block"
+				"data to postproc\n");
+			result = -EINVAL;
+			goto done;
+		}
+		MM_DBG("AUDPP is calibarted with PBE\n");
 	}
 done:
 	return result;
@@ -1000,8 +1125,8 @@ static u32 allocate_memory_acdb_cache_tx(void)
 	return result;
 error:
 	for (err = 0; err < i; err++) {
-		iounmap(acdb_cache_rx[i].virt_addr_acdb_values);
-		pmem_kfree(acdb_cache_rx[i].phys_addr_acdb_values);
+		iounmap(acdb_cache_tx[i].virt_addr_acdb_values);
+		pmem_kfree(acdb_cache_tx[i].phys_addr_acdb_values);
 
 	}
 	return result;
@@ -1048,6 +1173,26 @@ error:
 	return result;
 }
 
+static void free_memory_acdb_cache_rx(void)
+{
+	u32 i = 0;
+
+	for (i = 0; i < MAX_COPP_NODE_SUPPORTED; i++) {
+		iounmap(acdb_cache_rx[i].virt_addr_acdb_values);
+		pmem_kfree(acdb_cache_rx[i].phys_addr_acdb_values);
+	}
+}
+
+static void free_memory_acdb_cache_tx(void)
+{
+	u32 i = 0;
+
+	for (i = 0; i < MAX_AUDREC_SESSIONS; i++) {
+		iounmap(acdb_cache_tx[i].virt_addr_acdb_values);
+		pmem_kfree(acdb_cache_tx[i].phys_addr_acdb_values);
+	}
+}
+
 static s32 initialize_memory(void)
 {
 	s32 result = 0;
@@ -1060,6 +1205,7 @@ static s32 initialize_memory(void)
 	result = allocate_memory_acdb_cache_tx();
 	if (result < 0) {
 		MM_ERR("memory allocation for tx cache is failed\n");
+		free_memory_acdb_cache_rx();
 		goto done;
 	}
 
@@ -1067,6 +1213,8 @@ static s32 initialize_memory(void)
 		GFP_KERNEL);
 	if (acdb_data.pp_iir == NULL) {
 		MM_ERR("ACDB=> Could not allocate postproc iir memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		result = -ENOMEM;
 		goto done;
 	}
@@ -1074,6 +1222,8 @@ static s32 initialize_memory(void)
 	acdb_data.pp_mbadrc = kmalloc(sizeof(*acdb_data.pp_mbadrc), GFP_KERNEL);
 	if (acdb_data.pp_mbadrc == NULL) {
 		MM_ERR("ACDB=> Could not allocate postproc mbadrc memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		kfree(acdb_data.pp_iir);
 		result = -ENOMEM;
 		goto done;
@@ -1083,6 +1233,8 @@ static s32 initialize_memory(void)
 	if (acdb_data.calib_gain_rx == NULL) {
 		MM_ERR("ACDB=> Could not allocate"
 			" postproc calib_gain_rx memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
 		result = -ENOMEM;
@@ -1093,6 +1245,8 @@ static s32 initialize_memory(void)
 							GFP_KERNEL);
 	if (acdb_data.preproc_agc == NULL) {
 		MM_ERR("ACDB=> Could not allocate preproc agc memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
 		kfree(acdb_data.calib_gain_rx);
@@ -1104,6 +1258,8 @@ static s32 initialize_memory(void)
 							GFP_KERNEL);
 	if (acdb_data.preproc_iir == NULL) {
 		MM_ERR("ACDB=> Could not allocate preproc iir memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
 		kfree(acdb_data.calib_gain_rx);
@@ -1116,11 +1272,45 @@ static s32 initialize_memory(void)
 	if (acdb_data.calib_gain_tx == NULL) {
 		MM_ERR("ACDB=> Could not allocate"
 			" preproc calib_gain_tx memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
 		kfree(acdb_data.pp_iir);
 		kfree(acdb_data.pp_mbadrc);
 		kfree(acdb_data.calib_gain_rx);
 		kfree(acdb_data.preproc_agc);
 		kfree(acdb_data.preproc_iir);
+		result = -ENOMEM;
+		goto done;
+	}
+	acdb_data.pbe_block = kmalloc(sizeof(*acdb_data.pbe_block),
+						GFP_KERNEL);
+	if (acdb_data.pbe_block == NULL) {
+		MM_ERR("ACDB=> Could not allocate pbe_block memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
+		kfree(acdb_data.pp_iir);
+		kfree(acdb_data.pp_mbadrc);
+		kfree(acdb_data.calib_gain_rx);
+		kfree(acdb_data.preproc_agc);
+		kfree(acdb_data.preproc_iir);
+		kfree(acdb_data.calib_gain_tx);
+		result = -ENOMEM;
+		goto done;
+	}
+	acdb_data.pbe_extbuff = (u16 *)(pmem_kalloc(PBE_BUF_SIZE,
+					(PMEM_MEMTYPE_EBI1 |
+					PMEM_ALIGNMENT_4K)));
+	if (IS_ERR((void *)acdb_data.pbe_extbuff)) {
+		MM_ERR("ACDB=> Cannot allocate physical memory\n");
+		free_memory_acdb_cache_rx();
+		free_memory_acdb_cache_tx();
+		kfree(acdb_data.pp_iir);
+		kfree(acdb_data.pp_mbadrc);
+		kfree(acdb_data.calib_gain_rx);
+		kfree(acdb_data.preproc_agc);
+		kfree(acdb_data.preproc_iir);
+		kfree(acdb_data.calib_gain_tx);
+		kfree(acdb_data.pbe_block);
 		result = -ENOMEM;
 		goto done;
 	}
@@ -1539,6 +1729,7 @@ static void __exit acdb_exit(void)
 	kfree(acdb_data.pp_mbadrc);
 	kfree(acdb_data.preproc_agc);
 	kfree(acdb_data.preproc_iir);
+	pmem_kfree((int32_t)acdb_data.pbe_extbuff);
 	mutex_destroy(&acdb_data.acdb_mutex);
 	memset(&acdb_data, 0, sizeof(acdb_data));
 }
