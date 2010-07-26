@@ -38,6 +38,7 @@
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
 #include <linux/mutex.h>
+#include <linux/msm_kgsl.h>
 
 #include "mdp.h"
 #include "msm_fb.h"
@@ -1259,6 +1260,12 @@ static int get_img(struct msmfb_data *img, struct fb_info *info,
 #ifdef CONFIG_ANDROID_PMEM
 	unsigned long vstart;
 #endif
+
+	if (img->flags & MDP_BLIT_SRC_GEM) {
+		*pp_file = NULL;
+		return kgsl_gem_obj_addr(img->memory_id, (int) img->priv,
+					 start, len);
+	}
 
 #ifdef CONFIG_ANDROID_PMEM
 	if (!get_pmem_file(img->memory_id, start, &vstart, len, pp_file))
