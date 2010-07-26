@@ -52,8 +52,15 @@ int kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int *value);
 int kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int value);
+
 int __init kgsl_g12_config(struct kgsl_devconfig *,
 				struct platform_device *pdev);
+
+int __init kgsl_g12_init(struct kgsl_device *device,
+			 struct kgsl_devconfig *config);
+
+int kgsl_g12_close(struct kgsl_device *device);
+
 int kgsl_g12_getfunctable(struct kgsl_functable *ftbl);
 
 
