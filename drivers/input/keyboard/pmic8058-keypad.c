@@ -24,6 +24,7 @@
 #include <linux/bitops.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/delay.h>
+#include <linux/mutex.h>
 #include <linux/pm.h>
 
 #include <linux/input/pmic8058-keypad.h>
@@ -109,6 +110,13 @@ struct pmic8058_kp {
 
 	u32	flags;
 	struct pm8058_chip	*pm_chip;
+
+	/* protect read/write */
+	struct mutex		mutex;
+	bool			user_disabled;
+	u32			disable_depth;
+
+	u8			ctrl_reg;
 };
 
 static int pmic8058_kp_write_u8(struct pmic8058_kp *kp,
@@ -369,6 +377,82 @@ static int pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, unsigned int events)
 	}
 	return rc;
 }
+
+static inline int pmic8058_kp_disabled(struct pmic8058_kp *kp)
+{
+	return kp->disable_depth != 0;
+}
+
+static void pmic8058_kp_enable(struct pmic8058_kp *kp)
+{
+	if (!pmic8058_kp_disabled(kp))
+		return;
+
+	if (--kp->disable_depth == 0) {
+
+		kp->ctrl_reg |= KEYP_CTRL_KEYP_EN;
+		pmic8058_kp_write_u8(kp, kp->ctrl_reg, KEYP_CTRL);
+
+		enable_irq(kp->key_sense_irq);
+		enable_irq(kp->key_stuck_irq);
+	}
+}
+
+static void pmic8058_kp_disable(struct pmic8058_kp *kp)
+{
+	if (kp->disable_depth++ == 0) {
+		disable_irq(kp->key_sense_irq);
+		disable_irq(kp->key_stuck_irq);
+
+		kp->ctrl_reg &= ~KEYP_CTRL_KEYP_EN;
+		pmic8058_kp_write_u8(kp, kp->ctrl_reg, KEYP_CTRL);
+	}
+}
+
+static ssize_t pmic8058_kp_disable_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%u\n", pmic8058_kp_disabled(kp));
+}
+
+static ssize_t pmic8058_kp_disable_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
+	long i = 0;
+	int rc;
+
+	rc = strict_strtoul(buf, 10, &i);
+	if (rc)
+		return -EINVAL;
+
+	i = !!i;
+
+	mutex_lock(&kp->mutex);
+	if (i == kp->user_disabled) {
+		mutex_unlock(&kp->mutex);
+		return count;
+	}
+
+	kp->user_disabled = i;
+
+	if (i)
+		pmic8058_kp_disable(kp);
+	else
+		pmic8058_kp_enable(kp);
+	mutex_unlock(&kp->mutex);
+
+	return count;
+}
+
+static DEVICE_ATTR(disable_kp, 0664, pmic8058_kp_disable_show,
+			pmic8058_kp_disable_store);
+
+
 /*
  * NOTE: We are reading recent and old data registers blindly
  * whenever key-stuck interrupt happens, because events counter doesn't
@@ -485,33 +569,6 @@ static int pmic8058_kpd_init(struct pmic8058_kp *kp)
 
 	return rc;
 }
-
-#ifdef CONFIG_PM
-static int pmic8058_kp_suspend(struct device *dev)
-{
-	struct pmic8058_kp *kp = dev_get_drvdata(dev);
-
-	if (device_may_wakeup(dev))
-		enable_irq_wake(kp->key_sense_irq);
-
-	return 0;
-}
-
-static int pmic8058_kp_resume(struct device *dev)
-{
-	struct pmic8058_kp *kp = dev_get_drvdata(dev);
-
-	if (device_may_wakeup(dev))
-		disable_irq_wake(kp->key_sense_irq);
-
-	return 0;
-}
-
-static struct dev_pm_ops pm8058_kp_pm_ops = {
-	.suspend	= pmic8058_kp_suspend,
-	.resume		= pmic8058_kp_resume,
-};
-#endif
 
 static int pm8058_kp_config_drv(int gpio_start, int num_gpios)
 {
@@ -659,6 +716,7 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, kp);
+	mutex_init(&kp->mutex);
 
 	kp->pdata	= pdata;
 	kp->dev		= &pdev->dev;
@@ -766,16 +824,27 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_req_stuck_irq;
 	}
 
-	rc = pmic8058_kp_read(kp, &ctrl_val, KEYP_CTRL, 1);
+	rc = pmic8058_kp_read_u8(kp, &ctrl_val, KEYP_CTRL);
 	ctrl_val |= KEYP_CTRL_KEYP_EN;
 	rc = pmic8058_kp_write_u8(kp, ctrl_val, KEYP_CTRL);
 
+	kp->ctrl_reg = ctrl_val;
+
 	__dump_kp_regs(kp, "probe");
 
-	device_init_wakeup(&pdev->dev, pdata->wakeup);
+	/* wakeup or dynamic keypad enable/disable functionality */
+	if (!pdata->wakeup) {
+		rc = device_create_file(&pdev->dev, &dev_attr_disable_kp);
+		if (rc < 0)
+			goto err_create_file;
+	} else {
+		device_init_wakeup(&pdev->dev, pdata->wakeup);
+	}
 
 	return 0;
 
+err_create_file:
+	free_irq(kp->key_stuck_irq, NULL);
 err_req_stuck_irq:
 	free_irq(kp->key_sense_irq, NULL);
 err_req_sense_irq:
@@ -795,8 +864,12 @@ err_alloc_mem:
 static int __devexit pmic8058_kp_remove(struct platform_device *pdev)
 {
 	struct pmic8058_kp *kp = platform_get_drvdata(pdev);
+	struct pmic8058_keypad_data *pdata = pdev->dev.platform_data;
 
-	device_init_wakeup(&pdev->dev, 0);
+	if (!pdata->wakeup)
+		device_remove_file(&pdev->dev, &dev_attr_disable_kp);
+	else
+		device_init_wakeup(&pdev->dev, 0);
 	free_irq(kp->key_stuck_irq, NULL);
 	free_irq(kp->key_sense_irq, NULL);
 	input_unregister_device(kp->input);
@@ -806,6 +879,43 @@ static int __devexit pmic8058_kp_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+#ifdef CONFIG_PM
+static int pmic8058_kp_suspend(struct device *dev)
+{
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev)) {
+		enable_irq_wake(kp->key_sense_irq);
+	} else {
+		mutex_lock(&kp->mutex);
+		pmic8058_kp_disable(kp);
+		mutex_unlock(&kp->mutex);
+	}
+
+	return 0;
+}
+
+static int pmic8058_kp_resume(struct device *dev)
+{
+	struct pmic8058_kp *kp = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev)) {
+		disable_irq_wake(kp->key_sense_irq);
+	} else {
+		mutex_lock(&kp->mutex);
+		pmic8058_kp_enable(kp);
+		mutex_unlock(&kp->mutex);
+	}
+
+	return 0;
+}
+
+static struct dev_pm_ops pm8058_kp_pm_ops = {
+	.suspend	= pmic8058_kp_suspend,
+	.resume		= pmic8058_kp_resume,
+};
+#endif
 
 static struct platform_driver pmic8058_kp_driver = {
 	.probe		= pmic8058_kp_probe,
