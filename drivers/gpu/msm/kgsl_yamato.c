@@ -1108,15 +1108,20 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
 		mutex_lock(&kgsl_driver.mutex);
 		kgsl_sharedmem_readl(&device->memstore, &enableflag,
 			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable));
+		rmb();
 
 		if (enableflag) {
 			kgsl_sharedmem_readl(&device->memstore, &ref_ts,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
-			if (timestamp_cmp(ref_ts, timestamp))
+			rmb();
+			if (timestamp_cmp(ref_ts, timestamp)) {
 				kgsl_sharedmem_writel(&device->memstore,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
 				timestamp);
+				wmb();
+			}
 		} else {
+			unsigned int cmds[2];
 			kgsl_sharedmem_writel(&device->memstore,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
 				timestamp);
@@ -1124,6 +1129,13 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
 			kgsl_sharedmem_writel(&device->memstore,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
 				enableflag);
+			wmb();
+			/* submit a dummy packet so that even if all
+			* commands upto timestamp get executed we will still
+			* get an interrupt */
+			cmds[0] = pm4_type3_packet(PM4_NOP, 1);
+			cmds[1] = 0;
+			kgsl_ringbuffer_issuecmds(device, 0, &cmds[0], 2);
 		}
 		mutex_unlock(&kgsl_driver.mutex);
 	}
@@ -1131,27 +1143,46 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
 	return status;
 }
 
+/*
+ wait_event_interruptible_timeout checks for the exit condition before
+ placing a process in wait q. For conditional interrupts we expect the
+ process to already be in its wait q when its exit condition checking
+ function is called.
+*/
+#define kgsl_wait_event_interruptible_timeout(wq, condition, timeout)	\
+({									\
+	long __ret = timeout;						\
+	__wait_event_interruptible_timeout(wq, condition, __ret); 	\
+	__ret;								\
+})
+
 /* MUST be called with the kgsl_driver.mutex held */
 static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 				unsigned int timestamp,
 				unsigned int msecs)
 {
-	long status;
+	long status = 0;
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
 								device;
 
-	mutex_unlock(&kgsl_driver.mutex);
-	status = wait_event_interruptible_timeout(yamato_device->ib1_wq,
-			kgsl_check_interrupt_timestamp(device, timestamp),
-			msecs_to_jiffies(msecs));
-	mutex_lock(&kgsl_driver.mutex);
+	if (!kgsl_cmdstream_check_timestamp(device, timestamp)) {
+		mutex_unlock(&kgsl_driver.mutex);
+		/* We need to make sure that the process is placed in wait-q
+		 * before its condition is called */
+		status = kgsl_wait_event_interruptible_timeout(
+				yamato_device->ib1_wq,
+				kgsl_check_interrupt_timestamp(device,
+					timestamp), msecs_to_jiffies(msecs));
+		mutex_lock(&kgsl_driver.mutex);
 
-	if (status > 0)
-		status = 0;
-	else if (status == 0) {
-		if (!kgsl_cmdstream_check_timestamp(device, timestamp)) {
-			status = -ETIMEDOUT;
-			kgsl_register_dump(device);
+		if (status > 0)
+			status = 0;
+		else if (status == 0) {
+			if (!kgsl_cmdstream_check_timestamp(device,
+				timestamp)) {
+				status = -ETIMEDOUT;
+				kgsl_register_dump(device);
+			}
 		}
 	}
 
