@@ -3290,12 +3290,73 @@ static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_power_save   = lcdc_panel_power,
 };
 
+static int atv_dac_power(int on)
+{
+	int rc = 0;
+	struct vreg *vreg_s4, *vreg_ldo9;
+
+	vreg_s4 = vreg_get(NULL, "s4");
+	if (IS_ERR(vreg_s4)) {
+		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
+			   __func__, PTR_ERR(vreg_s4));
+		return -1;
+	}
+
+	if (on) {
+		rc = vreg_enable(vreg_s4);
+		if (rc) {
+			printk(KERN_ERR "%s: vreg_enable() = %d \n",
+				__func__, rc);
+			return rc;
+		}
+	} else {
+		rc = vreg_disable(vreg_s4);
+		if (rc) {
+			pr_err("%s: S4 vreg enable failed (%d)\n",
+				   __func__, rc);
+			return rc;
+		}
+	}
+
+	vreg_ldo9 = vreg_get(NULL, "gp1");
+	if (IS_ERR(vreg_ldo9)) {
+		rc = PTR_ERR(vreg_ldo9);
+		pr_err("%s: gp1 vreg get failed (%d)\n",
+			   __func__, rc);
+		return rc;
+	}
+
+
+	if (on) {
+		rc = vreg_enable(vreg_ldo9);
+		if (rc) {
+			pr_err("%s: LDO9 vreg enable failed (%d)\n",
+				__func__, rc);
+			return rc;
+		}
+	} else {
+		rc = vreg_disable(vreg_ldo9);
+		if (rc) {
+			pr_err("%s: LDO20 vreg enable failed (%d)\n",
+				   __func__, rc);
+			return rc;
+		}
+	}
+
+	return rc;
+}
+
+static struct tvenc_platform_data atv_pdata = {
+	.pm_vid_en   = atv_dac_power,
+};
+
 static void __init msm_fb_add_devices(void)
 {
 	msm_fb_register_device("mdp", &mdp_pdata);
 	msm_fb_register_device("pmdh", &mddi_pdata);
 	msm_fb_register_device("lcdc", &lcdc_pdata);
 	msm_fb_register_device("dtv", &dtv_pdata);
+	msm_fb_register_device("tvenc", &atv_pdata);
 }
 
 static struct msm_panel_common_pdata lcdc_toshiba_panel_data = {
