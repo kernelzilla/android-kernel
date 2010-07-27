@@ -1040,6 +1040,7 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&msm_rotator_dev->imem_clk_work,
 			  msm_rotator_imem_clk_work_f);
 
+	msm_rotator_dev->pdev = pdev;
 	msm_rotator_dev->imem_clk = NULL;
 	for (i = 0; i < number_of_clks; i++) {
 		if (pdata->rotator_clks[i].clk_type == ROTATOR_IMEM_CLK) {
@@ -1099,7 +1100,6 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 
 	mutex_init(&msm_rotator_dev->rotator_lock);
 
-	msm_rotator_dev->pdev = pdev;
 	platform_set_drvdata(pdev, msm_rotator_dev);
 
 
