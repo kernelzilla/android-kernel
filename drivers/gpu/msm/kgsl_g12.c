@@ -234,6 +234,7 @@ kgsl_g12_init(struct kgsl_device *device,
 	memcpy(regspace, &config->regspace, sizeof(device->regspace));
 	if (regspace->mmio_phys_base == 0 || regspace->sizebytes == 0) {
 		KGSL_DRV_ERR("dev %d invalid regspace\n", device->id);
+		status = -ENODEV;
 		goto error;
 	}
 	if (!request_mem_region(regspace->mmio_phys_base,
@@ -281,32 +282,34 @@ kgsl_g12_init(struct kgsl_device *device,
 
 	kgsl_g12_regwrite(device, (ADDR_VGC_IRQENABLE >> 2), 0x3);
 
-	status = kgsl_mmu_init(device);
-
-	if (status != 0) {
-		status = -ENODEV;
+	status = kgsl_g12_cmdstream_init(device);
+	if (status != 0)
 		goto error_iounmap;
-	}
+
+
+	status = kgsl_mmu_init(device);
+	if (status != 0)
+		goto error_close_cmdstream;
 
 	status = kgsl_sharedmem_alloc(memflags, sizeof(device->memstore),
 					&device->memstore);
 
-	if (status != 0)  {
-		status = -ENODEV;
+	if (status != 0)
 		goto error_close_mmu;
-	}
 
 	kgsl_sharedmem_set(&device->memstore, 0, 0, device->memstore.size);
 
 	return 0;
 
+error_close_mmu:
+	kgsl_mmu_close(device);
+error_close_cmdstream:
+	kgsl_g12_cmdstream_close(device);
 error_iounmap:
 	iounmap(regspace->mmio_virt_base);
 	regspace->mmio_virt_base = NULL;
 error_release_mem:
 	release_mem_region(regspace->mmio_phys_base, regspace->sizebytes);
-error_close_mmu:
-	kgsl_mmu_close(device);
 error:
 	return status;
 }
@@ -321,6 +324,8 @@ static int kgsl_g12_close(struct kgsl_device *device)
 		kgsl_sharedmem_free(&device->memstore);
 
 	kgsl_mmu_close(device);
+
+	kgsl_g12_cmdstream_close(device);
 
 	if (regspace->mmio_virt_base != NULL) {
 		KGSL_MEM_INFO("iounmap(regs) = %p\n",
@@ -360,8 +365,7 @@ static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 
 	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
 
-	KGSL_DRV_VDBG("return");
-	return 0;
+	return kgsl_g12_cmdstream_start(device);
 }
 
 static int kgsl_g12_stop(struct kgsl_device *device)
