@@ -657,15 +657,16 @@ static int msm_otg_set_host(struct otg_transceiver *xceiv, struct usb_bus *host)
 		disable_idgnd(dev);
 		return 0;
 	}
+#ifdef CONFIG_USB_OTG
+	host->otg_port = 1;
+#endif
 	dev->usbdev_nb.notifier_call = usbdev_notify;
 	usb_register_notify(&dev->usbdev_nb);
 	dev->otg.host = host;
 	enable_idgnd(dev);
 	pr_info("host driver registered w/ tranceiver\n");
 
-#ifdef CONFIG_USB_OTG
-	host->otg_port = 1;
-#else
+#ifndef CONFIG_USB_MSM_72K
 	wake_lock(&dev->wlock);
 	queue_work(dev->wq, &dev->sm_work);
 #endif
