@@ -31,7 +31,7 @@
 #include <linux/earlysuspend.h>
 #endif
 
-#include <mach/msm_ts.h>
+#include <linux/input/msm_ts.h>
 
 #define TSSC_CTL			0x100
 #define 	TSSC_CTL_PENUP_IRQ	(1 << 12)

@@ -35,7 +35,7 @@
 
 #include <linux/types.h>
 #include <linux/i2c.h>
-#include <mach/msm_ts.h>
+#include <linux/input/msm_ts.h>
 #include <mach/vreg.h>
 
 #define MARIMBA_NUM_CHILD			4
