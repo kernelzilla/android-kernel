@@ -2629,7 +2629,7 @@ sub process {
 		}
 
 # check the patch for use of mdelay
-		if ($line =~ /\bmdelay\(/) {
+		if ($line =~ /\bmdelay\s*\(/) {
 			WARN("use of mdelay() found: msleep() is the preferred API.\n" . $line );
 		}
 
