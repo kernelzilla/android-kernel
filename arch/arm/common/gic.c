@@ -171,6 +171,11 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 	chip->unmask(irq);
 }
 
+static int gic_set_wake(unsigned int irq, unsigned int on)
+{
+	return 0;
+}
+
 static int gic_set_type(unsigned int irq, unsigned int type)
 {
 	void __iomem *base = gic_dist_base(irq);
@@ -227,6 +232,7 @@ static struct irq_chip gic_chip = {
 	.set_affinity	= gic_set_cpu,
 #endif
 	.set_type	= gic_set_type,
+	.set_wake	= gic_set_wake,
 };
 
 void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
