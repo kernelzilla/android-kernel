@@ -35,8 +35,6 @@
 #include <mach/clk.h>
 
 #define MSM_USB_BASE	(dev->regs)
-#define is_host()	((OTGSC_ID & readl(USB_OTGSC)) ? 0 : 1)
-#define is_b_sess_vld()	((OTGSC_BSV & readl(USB_OTGSC)) ? 1 : 0)
 #define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
 #define DRIVER_NAME	"msm_otg"
 
@@ -44,6 +42,26 @@ static void otg_reset(struct msm_otg *dev, int phy_reset);
 static void msm_otg_set_vbus_state(int online);
 
 struct msm_otg *the_msm_otg;
+
+static int is_host(void)
+{
+	struct msm_otg *dev = the_msm_otg;
+
+	if (dev->pdata->otg_mode == OTG_ID)
+		return (OTGSC_ID & readl(USB_OTGSC)) ? 0 : 1;
+	else
+		return (dev->otg.state >= OTG_STATE_A_IDLE);
+}
+
+static int is_b_sess_vld(void)
+{
+	struct msm_otg *dev = the_msm_otg;
+
+	if (dev->pdata->otg_mode == OTG_ID)
+		return (OTGSC_BSV & readl(USB_OTGSC)) ? 1 : 0;
+	else
+		return (dev->otg.state == OTG_STATE_B_PERIPHERAL);
+}
 
 static unsigned ulpi_read(struct msm_otg *dev, unsigned reg)
 {
@@ -89,6 +107,10 @@ static int ulpi_write(struct msm_otg *dev, unsigned val, unsigned reg)
 #ifdef CONFIG_USB_EHCI_MSM
 static void enable_idgnd(struct msm_otg *dev)
 {
+	/* Do nothing if instead of ID pin, USER controls mode switch */
+	if (dev->pdata->otg_mode == OTG_USER_CONTROL)
+		return;
+
 	ulpi_write(dev, (1<<4), 0x0E);
 	ulpi_write(dev, (1<<4), 0x11);
 	writel(readl(USB_OTGSC) | OTGSC_IDIE, USB_OTGSC);
@@ -96,6 +118,10 @@ static void enable_idgnd(struct msm_otg *dev)
 
 static void disable_idgnd(struct msm_otg *dev)
 {
+	/* Do nothing if instead of ID pin, USER controls mode switch */
+	if (dev->pdata->otg_mode == OTG_USER_CONTROL)
+		return;
+
 	ulpi_write(dev, (1<<4), 0x0F);
 	ulpi_write(dev, (1<<4), 0x12);
 	writel(readl(USB_OTGSC) & ~OTGSC_IDIE, USB_OTGSC);
@@ -104,6 +130,10 @@ static void disable_idgnd(struct msm_otg *dev)
 
 static void enable_sess_valid(struct msm_otg *dev)
 {
+	/* Do nothing if instead of ID pin, USER controls mode switch */
+	if (dev->pdata->otg_mode == OTG_USER_CONTROL)
+		return;
+
 	ulpi_write(dev, (1<<2), 0x0E);
 	ulpi_write(dev, (1<<2), 0x11);
 	writel(readl(USB_OTGSC) | OTGSC_BSVIE, USB_OTGSC);
@@ -111,6 +141,10 @@ static void enable_sess_valid(struct msm_otg *dev)
 
 static void disable_sess_valid(struct msm_otg *dev)
 {
+	/* Do nothing if instead of ID pin, USER controls mode switch */
+	if (dev->pdata->otg_mode == OTG_USER_CONTROL)
+		return;
+
 	ulpi_write(dev, (1<<2), 0x0F);
 	ulpi_write(dev, (1<<2), 0x12);
 	writel(readl(USB_OTGSC) & ~OTGSC_BSVIE, USB_OTGSC);
@@ -332,12 +366,19 @@ static void msm_otg_start_peripheral(struct otg_transceiver *xceiv, int on)
 static void msm_otg_start_host(struct otg_transceiver *xceiv, int on)
 {
 	struct msm_otg *dev = container_of(xceiv, struct msm_otg, otg);
+	struct msm_otg_platform_data *pdata = dev->pdata;
 
 	if (!xceiv->host)
 		return;
 
-	if (dev->start_host)
+	if (dev->start_host) {
+		/* Some targets, e.g. ST1.5, use GPIO to choose b/w connector */
+		if (on && pdata->setup_gpio)
+			pdata->setup_gpio(on);
 		dev->start_host(xceiv->host, on);
+		if (!on && pdata->setup_gpio)
+			pdata->setup_gpio(on);
+	}
 }
 
 static int msm_otg_suspend(struct msm_otg *dev)
@@ -669,6 +710,10 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 		msm_otg_resume(dev);
 		goto out;
 	}
+
+	/* Return immediately if instead of ID pin, USER controls mode switch */
+	if (dev->pdata->otg_mode == OTG_USER_CONTROL)
+		return IRQ_NONE;
 
 	otgsc = readl(USB_OTGSC);
 	sts = readl(USB_USBSTS);
@@ -1023,10 +1068,12 @@ static void msm_otg_sm_work(struct work_struct *w)
 
 	switch (state) {
 	case OTG_STATE_UNDEFINED:
-		if (!dev->otg.host || !is_host())
+		if  (!dev->otg.host || !is_host() ||
+				(dev->pdata->otg_mode == OTG_USER_CONTROL))
 			set_bit(ID, &dev->inputs);
 
-		if (dev->otg.gadget && is_b_sess_vld())
+		if ((dev->otg.gadget && is_b_sess_vld()) ||
+				(dev->pdata->otg_mode == OTG_USER_CONTROL))
 			set_bit(B_SESS_VLD, &dev->inputs);
 
 		spin_lock_irq(&dev->lock);
@@ -1553,26 +1600,29 @@ static ssize_t otg_mode_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	struct msm_otg *dev = file->private_data;
-	struct otg_transceiver *otg = &dev->otg;
 	int ret = count;
 	int work = 0;
+	unsigned long flags;
 
-	if (otg->host) {
-		pr_err("%s: mode switch not supported with host mode\n",
-						__func__);
-		return -EINVAL;
-	}
-
+	spin_lock_irqsave(&dev->lock, flags);
 	if (!memcmp(buf, "none", count - 1)) {
 		clear_bit(B_SESS_VLD, &dev->inputs);
+		set_bit(ID, &dev->inputs);
 		work = 1;
 	} else if (!memcmp(buf, "peripheral", count - 1)) {
 		set_bit(B_SESS_VLD, &dev->inputs);
+		set_bit(ID, &dev->inputs);
+		work = 1;
+	} else if (!memcmp(buf, "host", count - 1)) {
+		clear_bit(B_SESS_VLD, &dev->inputs);
+		clear_bit(ID, &dev->inputs);
+		set_bit(A_BUS_REQ, &dev->inputs);
 		work = 1;
 	} else {
 		pr_info("%s: unknown mode specified\n", __func__);
 		ret = -EINVAL;
 	}
+	spin_unlock_irqrestore(&dev->lock, flags);
 
 	if (work) {
 		wake_lock(&dev->wlock);

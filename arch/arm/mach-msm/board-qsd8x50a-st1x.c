@@ -598,10 +598,7 @@ static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 
 	switch (PHY_TYPE(phy_info)) {
 	case USB_PHY_INTEGRATED:
-		if (on)
-			msm_hsusb_vbus_powerup();
-		else
-			msm_hsusb_vbus_shutdown();
+		pr_debug("%s: VBUS is always ON\n", __func__);
 		break;
 	case USB_PHY_SERIAL_PMIC:
 		if (on)
@@ -618,7 +615,6 @@ static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 
 static struct msm_usb_host_platform_data msm_usb_host_pdata = {
 	.phy_info	= (USB_PHY_INTEGRATED | USB_PHY_MODEL_180NM),
-	.vbus_power = msm_hsusb_vbus_power,
 };
 
 #ifdef CONFIG_USB_FS_HOST
@@ -1622,7 +1618,8 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
 	.phy_reset	= msm_hsusb_native_phy_reset,
 	.setup_gpio 	= msm_otg_setup_gpio,
-	.otg_mode	= OTG_SYSFS,
+	.otg_mode	= OTG_USER_CONTROL,
+	.vbus_power 	= msm_hsusb_vbus_power,
 };
 
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;
