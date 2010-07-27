@@ -628,7 +628,10 @@ static ssize_t debug_write(struct file *file, const char __user *buf,
 	if (mode == PM8058_GPIO_MODE_OFF || mode == PM8058_GPIO_MODE_INPUT)
 		return count;
 
-	if (copy_from_user(debug_write_buf, (void __user *) buf, count)) {
+	if (count > sizeof(debug_write_buf))
+		return -EFAULT;
+
+	if (copy_from_user(debug_write_buf, buf, count)) {
 		pr_err("failed to copy from user\n");
 		return -EFAULT;
 	}
