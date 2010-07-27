@@ -38,7 +38,7 @@
 #define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
 #define DRIVER_NAME	"msm_otg"
 
-static void otg_reset(struct msm_otg *dev, int phy_reset);
+static void otg_reset(struct otg_transceiver *xceiv, int phy_reset);
 static void msm_otg_set_vbus_state(int online);
 
 struct msm_otg *the_msm_otg;
@@ -402,7 +402,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 		if (time_after(jiffies, timeout)) {
 			pr_err("%s: Unable to suspend phy\n", __func__);
 			/* Reset both phy and link */
-			otg_reset(dev, 1);
+			otg_reset(&dev->otg, 1);
 			goto out;
 		}
 		msleep(1);
@@ -550,7 +550,7 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 			if (time_after(jiffies, timeout)) {
 				pr_err("%s: Unable to wakeup phy\n", __func__);
 				/* Reset both phy and link */
-				otg_reset(dev, 1);
+				otg_reset(&dev->otg, 1);
 				break;
 			}
 			udelay(10);
@@ -994,8 +994,9 @@ static int msm_otg_phy_reset(struct msm_otg *dev)
 	return 0;
 }
 
-static void otg_reset(struct msm_otg *dev, int phy_reset)
+static void otg_reset(struct otg_transceiver *xceiv, int phy_reset)
 {
+	struct msm_otg *dev = container_of(xceiv, struct msm_otg, otg);
 	unsigned long timeout;
 	u32 mode;
 
@@ -1092,7 +1093,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (!test_bit(ID, &dev->inputs)) {
 			pr_debug("!id\n");
 			clear_bit(B_BUS_REQ, &dev->inputs);
-			otg_reset(dev, 0);
+			otg_reset(&dev->otg, 0);
 
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_IDLE;
@@ -1157,7 +1158,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->b_last_se0_sess = jiffies;
 
 			/* Workaround: Reset phy after session */
-			otg_reset(dev, 1);
+			otg_reset(&dev->otg, 1);
 
 			/* come back later to put hardware in
 			 * lpm. This removes addition checks in
@@ -1200,7 +1201,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 
 			/* Workaround: Reset phy after session */
-			otg_reset(dev, 1);
+			otg_reset(&dev->otg, 1);
 			work = 1;
 		} else if (test_bit(A_CONN, &dev->inputs)) {
 			pr_debug("a_conn\n");
@@ -1243,7 +1244,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->otg.state = OTG_STATE_B_IDLE;
 			spin_unlock_irq(&dev->lock);
 			/* Workaround: Reset phy after session */
-			otg_reset(dev, 1);
+			otg_reset(&dev->otg, 1);
 			work = 1;
 		}
 		break;
@@ -1252,7 +1253,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (test_bit(ID, &dev->inputs)) {
 			pr_debug("id\n");
 			dev->otg.default_a = 0;
-			otg_reset(dev, 0);
+			otg_reset(&dev->otg, 0);
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_B_IDLE;
 			spin_unlock_irq(&dev->lock);
@@ -1475,7 +1476,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (test_bit(A_WAIT_VFALL, &dev->tmouts)) {
 			clear_bit(A_VBUS_VLD, &dev->inputs);
 			/* Reset both phy and link */
-			otg_reset(dev, 1);
+			otg_reset(&dev->otg, 1);
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_IDLE;
 			spin_unlock_irq(&dev->lock);
@@ -1799,7 +1800,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 
 	/* Reset both phy and link */
-	otg_reset(dev, 1);
+	otg_reset(&dev->otg, 1);
 
 	/* ACk all pending interrupts and clear interrupt enable registers */
 	writel((readl(USB_OTGSC) & ~OTGSC_INTR_MASK), USB_OTGSC);
@@ -1826,6 +1827,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	dev->otg.set_suspend = msm_otg_set_suspend;
 	dev->otg.start_hnp = msm_otg_start_hnp;
 	dev->set_clk = msm_otg_set_clk;
+	dev->reset = otg_reset;
 	if (otg_set_transceiver(&dev->otg)) {
 		WARN_ON(1);
 		goto free_otg_irq;
