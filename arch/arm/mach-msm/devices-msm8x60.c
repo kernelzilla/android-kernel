@@ -862,7 +862,7 @@ struct clk msm_clocks_8x60[] = {
 	CLK_8X60("ijpeg_clk",		IJPEG_CLK,		NULL, 0),
 	CLK_8X60("jpegd_clk",		JPEGD_CLK,		NULL, 0),
 	CLK_8X60("mdp_clk",		MDP_CLK,		NULL, 0),
-	CLK_8X60("mdp_vsync_clk",	MDP_VSYNC_CLK,		NULL, 0),
+	CLK_8X60("mdp_vsync_clk",	MDP_VSYNC_CLK,		NULL, OFF),
 	CLK_8X60("pixel_mdp_clk",	PIXEL_MDP_CLK,		NULL, 0),
 	CLK_8X60("pixel_lcdc_clk",	PIXEL_LCDC_CLK,		NULL, 0),
 	CLK_8X60("rot_clk",		ROT_CLK,		NULL, 0),

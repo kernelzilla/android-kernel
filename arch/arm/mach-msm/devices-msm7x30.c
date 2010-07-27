@@ -963,7 +963,7 @@ struct clk msm_clocks_7x30[] = {
 	CLK_7X30("mdp_pclk",	MDP_P_CLK,	NULL, 0),
 	CLK_7X30("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
 	CLK_7X30("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
-	CLK_7X30("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, 0),
+	CLK_7X30("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, OFF),
 	CLK_7X30("mfc_clk",		MFC_CLK,		NULL, 0),
 	CLK_7X30("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
 	CLK_7X30("mfc_pclk",		MFC_P_CLK,		NULL, 0),
