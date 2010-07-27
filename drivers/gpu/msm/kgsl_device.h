@@ -98,8 +98,8 @@ struct kgsl_functable {
 	int (*device_suspend) (struct kgsl_device *device);
 	int (*device_sleep) (struct kgsl_device *device, const int idle);
 	int (*device_wake) (struct kgsl_device *device);
-	int (*device_last_release_locked) (struct kgsl_device *device);
-	int (*device_first_open_locked) (struct kgsl_device *device);
+	int (*device_start) (struct kgsl_device *device);
+	int (*device_stop) (struct kgsl_device *device);
 	int (*device_getproperty) (struct kgsl_device *device,
 					enum kgsl_property_type type,
 					void *value,

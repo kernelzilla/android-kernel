@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
@@ -61,46 +62,13 @@
 #define KGSL_G12_TIMESTAMP_EPSILON 20000
 #define KGSL_G12_IDLE_COUNT_MAX 1000000
 
-static int
-kgsl_g12_init(struct kgsl_device *device, struct kgsl_devconfig *config);
-static int kgsl_g12_close(struct kgsl_device *device);
-static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags);
+static int kgsl_g12_start(struct kgsl_device *device);
 static int kgsl_g12_stop(struct kgsl_device *device);
 static int kgsl_g12_idle(struct kgsl_device *device, unsigned int timeout);
 static int kgsl_g12_sleep(struct kgsl_device *device, const int idle);
 static int kgsl_g12_waittimestamp(struct kgsl_device *device,
 				unsigned int timestamp,
 				unsigned int msecs);
-
-static int kgsl_g12_last_release_locked(struct kgsl_device *device)
-{
-
-	KGSL_DRV_INFO("kgsl_g12_last_release_locked()\n");
-
-	kgsl_g12_stop(device);
-
-	kgsl_g12_close(device);
-	return KGSL_SUCCESS;
-}
-
-static int kgsl_g12_first_open_locked(struct kgsl_device *device)
-{
-	int result = KGSL_SUCCESS;
-
-	KGSL_DRV_INFO("kgsl_g12_first_open()\n");
-
-	result = kgsl_g12_init(device, &kgsl_driver.g12_config);
-	if (result != 0)
-		goto done;
-
-	result = kgsl_g12_start(device, 0);
-	if (result != 0)
-		goto done;
-
- done:
-	return result;
-
-}
 
 irqreturn_t kgsl_g12_isr(int irq, void *data)
 {
@@ -173,7 +141,7 @@ int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags)
 	return 0;
 }
 
-static int
+int __init
 kgsl_g12_init(struct kgsl_device *device,
 		struct kgsl_devconfig *config)
 {
@@ -219,6 +187,16 @@ kgsl_g12_init(struct kgsl_device *device,
 		goto error_release_mem;
 	}
 
+	status = request_irq(kgsl_driver.g12_interrupt_num, kgsl_g12_isr,
+			     IRQF_TRIGGER_HIGH, DRIVER_NAME, device);
+	if (status) {
+		KGSL_DRV_ERR("request_irq(%d) returned %d\n",
+			      kgsl_driver.g12_interrupt_num, status);
+		goto error_iounmap;
+	}
+	kgsl_driver.g12_have_irq = 1;
+	disable_irq(kgsl_driver.g12_interrupt_num);
+
 	KGSL_DRV_INFO("dev_id %d regs phys 0x%08x size 0x%08x virt %p\n",
 			device->id, regspace->mmio_phys_base,
 			regspace->sizebytes, regspace->mmio_virt_base);
@@ -247,8 +225,7 @@ kgsl_g12_init(struct kgsl_device *device,
 
 	status = kgsl_g12_cmdstream_init(device);
 	if (status != 0)
-		goto error_iounmap;
-
+		goto error_free_irq;
 
 	status = kgsl_mmu_init(device);
 	if (status != 0)
@@ -268,6 +245,9 @@ error_close_mmu:
 	kgsl_mmu_close(device);
 error_close_cmdstream:
 	kgsl_g12_cmdstream_close(device);
+error_free_irq:
+	free_irq(kgsl_driver.g12_interrupt_num, NULL);
+	kgsl_driver.g12_have_irq = 0;
 error_iounmap:
 	iounmap(regspace->mmio_virt_base);
 	regspace->mmio_virt_base = NULL;
@@ -277,7 +257,7 @@ error:
 	return status;
 }
 
-static int kgsl_g12_close(struct kgsl_device *device)
+int kgsl_g12_close(struct kgsl_device *device)
 {
 	struct kgsl_memregion *regspace = &device->regspace;
 
@@ -296,13 +276,15 @@ static int kgsl_g12_close(struct kgsl_device *device)
 		release_mem_region(regspace->mmio_phys_base,
 					regspace->sizebytes);
 	}
+	free_irq(kgsl_driver.g12_interrupt_num, NULL);
+	kgsl_driver.g12_have_irq = 0;
 
 	KGSL_DRV_VDBG("return %d\n", 0);
 	device->flags &= ~KGSL_FLAGS_INITIALIZED;
 	return 0;
 }
 
-static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
+static int kgsl_g12_start(struct kgsl_device *device)
 {
 	int status = 0;
 	KGSL_DRV_VDBG("enter (device=%p)\n", device);
@@ -746,8 +728,8 @@ int kgsl_g12_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_sleep = kgsl_g12_sleep;
 	ftbl->device_suspend = kgsl_g12_suspend;
 	ftbl->device_wake = kgsl_g12_wake;
-	ftbl->device_last_release_locked = kgsl_g12_last_release_locked;
-	ftbl->device_first_open_locked = kgsl_g12_first_open_locked;
+	ftbl->device_start = kgsl_g12_start;
+	ftbl->device_stop = kgsl_g12_stop;
 	ftbl->device_getproperty = kgsl_g12_getproperty;
 	ftbl->device_waittimestamp = kgsl_g12_waittimestamp;
 	ftbl->device_cmdstream_readtimestamp = kgsl_g12_cmdstream_readtimestamp;

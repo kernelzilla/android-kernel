@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
@@ -60,10 +61,7 @@
 		| (1 << MH_ARBITER_CONFIG__RB_CLNT_ENABLE__SHIFT) \
 		| (1 << MH_ARBITER_CONFIG__PA_CLNT_ENABLE__SHIFT))
 
-static int
-kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config);
-static int kgsl_yamato_close(struct kgsl_device *device);
-static int kgsl_yamato_start(struct kgsl_device *device, uint32_t flags);
+static int kgsl_yamato_start(struct kgsl_device *device);
 static int kgsl_yamato_stop(struct kgsl_device *device);
 static int kgsl_yamato_sleep(struct kgsl_device *device, const int idle);
 
@@ -230,6 +228,10 @@ irqreturn_t kgsl_yamato_isr(int irq, void *data)
 
 	device = (struct kgsl_device *) data;
 
+	BUG_ON(device == NULL);
+	BUG_ON(device->regspace.sizebytes == 0);
+	BUG_ON(device->regspace.mmio_virt_base == 0);
+
 	kgsl_yamato_regread(device, REG_MASTER_INT_SIGNAL, &status);
 
 	if (status & MASTER_INT_SIGNAL__MH_INT_STAT) {
@@ -352,35 +354,6 @@ error:
 	return result;
 
 }
-
-static int kgsl_yamato_last_release_locked(struct kgsl_device *device)
-{
-	BUG_ON(kgsl_driver.yamato_grp_clk == NULL);
-
-	kgsl_yamato_stop(device);
-
-	kgsl_yamato_close(device);
-
-	return 0;
-}
-
-static int kgsl_yamato_first_open_locked(struct kgsl_device *device)
-{
-	int result = 0;
-
-	BUG_ON(kgsl_driver.yamato_grp_clk == NULL);
-
-	result = kgsl_yamato_init(device, &kgsl_driver.yamato_config);
-	if (result != 0)
-		goto done;
-
-	result = kgsl_yamato_start(device, 0);
-	if (result != 0)
-		goto done;
-done:
-	return result;
-}
-
 
 static int kgsl_yamato_setstate(struct kgsl_device *device, uint32_t flags)
 {
@@ -523,7 +496,7 @@ kgsl_yamato_getchipid(struct kgsl_device *device)
 	return chipid;
 }
 
-static int
+int __init
 kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 {
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
@@ -564,6 +537,16 @@ kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 		goto error_release_mem;
 	}
 
+	status = request_irq(kgsl_driver.yamato_interrupt_num, kgsl_yamato_isr,
+			     IRQF_TRIGGER_HIGH, DRIVER_NAME, device);
+	if (status) {
+		KGSL_DRV_ERR("request_irq(%d) returned %d\n",
+			      kgsl_driver.yamato_interrupt_num, status);
+		goto error_iounmap;
+	}
+	kgsl_driver.yamato_have_irq = 1;
+	disable_irq(kgsl_driver.yamato_interrupt_num);
+
 	KGSL_DRV_INFO("dev %d regs phys 0x%08x size 0x%08x virt %p\n",
 			device->id, regspace->mmio_phys_base,
 			regspace->sizebytes, regspace->mmio_virt_base);
@@ -590,7 +573,7 @@ kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 	status = kgsl_mmu_init(device);
 	if (status != 0) {
 		status = -ENODEV;
-		goto error_iounmap;
+		goto error_free_irq;
 	}
 
 	status = kgsl_cmdstream_init(device);
@@ -634,6 +617,9 @@ error_close_cmdstream:
 	kgsl_cmdstream_close(device);
 error_close_mmu:
 	kgsl_mmu_close(device);
+error_free_irq:
+	free_irq(kgsl_driver.yamato_interrupt_num, NULL);
+	kgsl_driver.yamato_have_irq = 0;
 error_iounmap:
 	iounmap(regspace->mmio_virt_base);
 	regspace->mmio_virt_base = NULL;
@@ -643,7 +629,7 @@ error:
 	return status;
 }
 
-static int kgsl_yamato_close(struct kgsl_device *device)
+int kgsl_yamato_close(struct kgsl_device *device)
 {
 	struct kgsl_memregion *regspace = &device->regspace;
 
@@ -662,13 +648,15 @@ static int kgsl_yamato_close(struct kgsl_device *device)
 		release_mem_region(regspace->mmio_phys_base,
 					regspace->sizebytes);
 	}
+	free_irq(kgsl_driver.yamato_interrupt_num, NULL);
+	kgsl_driver.yamato_have_irq = 0;
 
 	KGSL_DRV_VDBG("return %d\n", 0);
 	device->flags &= ~KGSL_FLAGS_INITIALIZED;
 	return 0;
 }
 
-static int kgsl_yamato_start(struct kgsl_device *device, uint32_t flags)
+static int kgsl_yamato_start(struct kgsl_device *device)
 {
 	int status = -EINVAL;
 	struct kgsl_yamato_device *yamato_device = (struct kgsl_yamato_device *)
@@ -1290,8 +1278,8 @@ int kgsl_yamato_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_sleep = kgsl_yamato_sleep;
 	ftbl->device_suspend = kgsl_yamato_suspend;
 	ftbl->device_wake = kgsl_yamato_wake;
-	ftbl->device_last_release_locked = kgsl_yamato_last_release_locked;
-	ftbl->device_first_open_locked = kgsl_yamato_first_open_locked;
+	ftbl->device_start = kgsl_yamato_start;
+	ftbl->device_stop = kgsl_yamato_stop;
 	ftbl->device_getproperty = kgsl_yamato_getproperty;
 	ftbl->device_waittimestamp = kgsl_yamato_waittimestamp;
 	ftbl->device_cmdstream_readtimestamp = kgsl_cmdstream_readtimestamp;

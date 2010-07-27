@@ -47,6 +47,11 @@ irqreturn_t kgsl_yamato_isr(int irq, void *data);
 int __init kgsl_yamato_config(struct kgsl_devconfig *,
 				struct platform_device *pdev);
 
+int __init kgsl_yamato_init(struct kgsl_device *device,
+			    struct kgsl_devconfig *config);
+
+int kgsl_yamato_close(struct kgsl_device *device);
+
 int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout);
 int kgsl_yamato_regread(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int *value);
