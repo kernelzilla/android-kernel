@@ -67,17 +67,22 @@ EXPORT_SYMBOL(clk_put);
 
 int clk_enable(struct clk *clk)
 {
+	int ret = 0;
 	unsigned long flags;
+
 	spin_lock_irqsave(&clocks_lock, flags);
-	clk->count++;
-	if (clk->count == 1) {
-		clk->ops->enable(clk->id);
+	if (clk->count == 0) {
+		ret = clk->ops->enable(clk->id);
+		if (ret)
+			goto out;
 		spin_lock(&clock_map_lock);
 		clock_map_enabled[BIT_WORD(clk->id)] |= BIT_MASK(clk->id);
 		spin_unlock(&clock_map_lock);
 	}
+	clk->count++;
+out:
 	spin_unlock_irqrestore(&clocks_lock, flags);
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(clk_enable);
 
