@@ -60,8 +60,6 @@
 		| (1 << MH_ARBITER_CONFIG__RB_CLNT_ENABLE__SHIFT) \
 		| (1 << MH_ARBITER_CONFIG__PA_CLNT_ENABLE__SHIFT))
 
-#define INTERVAL_TIMEOUT (HZ / 5)
-
 static int
 kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config);
 static int kgsl_yamato_close(struct kgsl_device *device);
@@ -69,27 +67,6 @@ static int kgsl_yamato_start(struct kgsl_device *device, uint32_t flags);
 static int kgsl_yamato_stop(struct kgsl_device *device);
 static int kgsl_yamato_sleep(struct kgsl_device *device, const int idle);
 
-static void kgsl_yamato_timer(unsigned long data)
-{
-	struct kgsl_device *device = (struct kgsl_device *) data;
-	/* Have work run in a non-interrupt context. */
-	schedule_work(&device->idle_check_ws);
-}
-
-static void kgsl_yamato_idle_check(struct work_struct *work)
-{
-	struct kgsl_device *device = container_of(work, struct kgsl_device,
-							idle_check_ws);
-
-	mutex_lock(&kgsl_driver.mutex);
-	if (device->hwaccess_blocked == KGSL_FALSE
-	    && device->flags & KGSL_FLAGS_STARTED) {
-		if (kgsl_yamato_sleep(device, KGSL_FALSE) == KGSL_FAILURE)
-			mod_timer(&device->idle_timer,
-						jiffies + INTERVAL_TIMEOUT);
-	}
-	mutex_unlock(&kgsl_driver.mutex);
-}
 
 static void kgsl_register_dump(struct kgsl_device *device)
 {
@@ -275,7 +252,7 @@ irqreturn_t kgsl_yamato_isr(int irq, void *data)
 		result = IRQ_HANDLED;
 	}
 	/* Reset the time-out in our idle timer */
-	mod_timer(&device->idle_timer, jiffies + INTERVAL_TIMEOUT);
+	mod_timer(&device->idle_timer, jiffies + device->interval_timeout);
 	return result;
 }
 
@@ -618,6 +595,8 @@ kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 	device->id = KGSL_DEVICE_YAMATO;
 	init_completion(&device->hwaccess_gate);
 	device->hwaccess_blocked = KGSL_FALSE;
+	device->interval_timeout = INTERVAL_YAMATO_TIMEOUT;
+
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&device->ts_notifier_list);
 
@@ -778,11 +757,11 @@ static int kgsl_yamato_start(struct kgsl_device *device, uint32_t flags)
 
 	device->flags |= KGSL_FLAGS_STARTED;
 	init_timer(&device->idle_timer);
-	device->idle_timer.function = kgsl_yamato_timer;
+	device->idle_timer.function = kgsl_timer;
 	device->idle_timer.data = (unsigned long) device;
 	device->idle_timer.expires = jiffies + FIRST_TIMEOUT;
 	add_timer(&device->idle_timer);
-	INIT_WORK(&device->idle_check_ws, kgsl_yamato_idle_check);
+	INIT_WORK(&device->idle_check_ws, kgsl_idle_check);
 
 	KGSL_DRV_VDBG("return %d\n", status);
 	return status;
@@ -1297,6 +1276,7 @@ int kgsl_yamato_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_regwrite = kgsl_yamato_regwrite;
 	ftbl->device_setstate = kgsl_yamato_setstate;
 	ftbl->device_idle = kgsl_yamato_idle;
+	ftbl->device_sleep = kgsl_yamato_sleep;
 	ftbl->device_suspend = kgsl_yamato_suspend;
 	ftbl->device_wake = kgsl_yamato_wake;
 	ftbl->device_last_release_locked = kgsl_yamato_last_release_locked;

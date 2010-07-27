@@ -58,8 +58,6 @@
 		| (1 << MH_ARBITER_CONFIG__RB_CLNT_ENABLE__SHIFT) \
 		| (1 << MH_ARBITER_CONFIG__PA_CLNT_ENABLE__SHIFT))
 
-#define INTERVAL_TIMEOUT (HZ / 10)
-
 #define KGSL_G12_TIMESTAMP_EPSILON 20000
 #define KGSL_G12_IDLE_COUNT_MAX 1000000
 
@@ -73,13 +71,6 @@ static int kgsl_g12_sleep(struct kgsl_device *device, const int idle);
 static int kgsl_g12_waittimestamp(struct kgsl_device *device,
 				unsigned int timestamp,
 				unsigned int msecs);
-
-static void kgsl_g12_timer(unsigned long data)
-{
-	struct kgsl_device *device = (struct kgsl_device *) data;
-	/* Have work run in a non-interrupt context. */
-	schedule_work(&device->idle_check_ws);
-}
 
 static int kgsl_g12_last_release_locked(struct kgsl_device *device)
 {
@@ -122,20 +113,6 @@ static int kgsl_g12_first_open_locked(struct kgsl_device *device)
 
 }
 
-static void kgsl_g12_idle_check(struct work_struct *work)
-{
-	struct kgsl_device *device = container_of(work, struct kgsl_device,
-							idle_check_ws);
-
-	KGSL_DRV_DBG("kgsl_g12_idle_check\n");
-	mutex_lock(&kgsl_driver.mutex);
-	if (device->flags & KGSL_FLAGS_STARTED) {
-		if (kgsl_g12_sleep(device, false) == KGSL_FAILURE)
-			mod_timer(&device->idle_timer,
-						jiffies + INTERVAL_TIMEOUT);
-	}
-	mutex_unlock(&kgsl_driver.mutex);
-}
 irqreturn_t kgsl_g12_isr(int irq, void *data)
 {
 	irqreturn_t result = IRQ_NONE;
@@ -178,7 +155,7 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 		}
 	}
 
-	mod_timer(&device->idle_timer, jiffies + INTERVAL_TIMEOUT);
+	mod_timer(&device->idle_timer, jiffies + device->interval_timeout);
 
 	return result;
 }
@@ -263,6 +240,7 @@ kgsl_g12_init(struct kgsl_device *device,
 	init_completion(&device->hwaccess_gate);
 	kgsl_g12_getfunctable(&device->ftbl);
 	device->hwaccess_blocked = KGSL_FALSE;
+	device->interval_timeout = INTERVAL_G12_TIMEOUT;
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&device->ts_notifier_list);
 
@@ -357,11 +335,11 @@ static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 
 	device->flags |= KGSL_FLAGS_STARTED;
 	init_timer(&device->idle_timer);
-	device->idle_timer.function = kgsl_g12_timer;
+	device->idle_timer.function = kgsl_timer;
 	device->idle_timer.data = (unsigned long) device;
 	device->idle_timer.expires = jiffies + FIRST_TIMEOUT;
 	add_timer(&device->idle_timer);
-	INIT_WORK(&device->idle_check_ws, kgsl_g12_idle_check);
+	INIT_WORK(&device->idle_check_ws, kgsl_idle_check);
 
 	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
 
@@ -754,6 +732,7 @@ int kgsl_g12_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_regwrite = kgsl_g12_regwrite;
 	ftbl->device_setstate = kgsl_g12_setstate;
 	ftbl->device_idle = kgsl_g12_idle;
+	ftbl->device_sleep = kgsl_g12_sleep;
 	ftbl->device_suspend = kgsl_g12_suspend;
 	ftbl->device_wake = kgsl_g12_wake;
 	ftbl->device_last_release_locked = kgsl_g12_last_release_locked;

@@ -156,6 +156,8 @@ while (1) { \
 void kgsl_remove_mem_entry(struct kgsl_mem_entry *entry, bool preserve);
 
 int kgsl_pwrctrl(unsigned int pwrflag);
+void kgsl_timer(unsigned long data);
+void kgsl_idle_check(struct work_struct *work);
 int kgsl_idle(struct kgsl_device *device, unsigned int timeout);
 int kgsl_setstate(struct kgsl_device *device, uint32_t flags);
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
