@@ -127,7 +127,7 @@ static int rpcrouter_sdio_remote_read_avail(void)
 {
 	int i, size = 0;
 	unsigned long flags;
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 
 	spin_lock_irqsave(&sdio_remote_xprt.channel->lock, flags);
 	for (i = 0; i < NO_OF_SDIO_IN_BUF; i++)
@@ -145,7 +145,7 @@ static int sdio_buf_read(void *data, uint32_t len)
 	unsigned char *src;
 	struct sdio_in_buf *active_buf;
 
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 
 	active_buf = &sdio_remote_xprt.channel->buffer[active_in_buf];
 	while ((xfer > 0) && (active_buf->read_avail > 0)) {
@@ -182,7 +182,7 @@ static int rpcrouter_sdio_remote_read(void *data, uint32_t len)
 	uint32_t i, xfer = 0, size;
 	unsigned long flags;
 
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 	if (len < 0 || !data)
 		return -EINVAL;
 	else if (len == 0)
@@ -206,7 +206,7 @@ static int rpcrouter_sdio_remote_read(void *data, uint32_t len)
 
 static int rpcrouter_sdio_remote_write_avail(void)
 {
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 	return sdio_write_avail(sdio_remote_xprt.channel->handle);
 }
 
@@ -218,7 +218,7 @@ static int rpcrouter_sdio_remote_write(void *data, uint32_t len,
 
 	switch (type) {
 	case HEADER:
-		SDIO_XPRT_INFO("sdio_xprt WRITE HEADER %s\n", __func__);
+		SDIO_XPRT_DBG("sdio_xprt WRITE HEADER %s\n", __func__);
 		sdio_write_pkt = kmalloc(sizeof(struct sdio_write_data_struct),
 					 GFP_KERNEL);
 		sdio_write_pkt->write_len = len +
@@ -230,15 +230,15 @@ static int rpcrouter_sdio_remote_write(void *data, uint32_t len,
 		buf = (void *)((unsigned char *)buf + len);
 		return len;
 	case PACKMARK:
-		SDIO_XPRT_INFO("sdio_xprt WRITE PACKMARK %s\n",	__func__);
+		SDIO_XPRT_DBG("sdio_xprt WRITE PACKMARK %s\n",	__func__);
 		memcpy(buf, data, len);
 		buf = (void *)((unsigned char *)buf + len);
 		return len;
 	case PAYLOAD:
-		SDIO_XPRT_INFO("sdio_xprt WRITE PAYLOAD %s \n",	__func__);
+		SDIO_XPRT_DBG("sdio_xprt WRITE PAYLOAD %s \n",	__func__);
 		memcpy(buf, data, len);
 
-		SDIO_XPRT_INFO("sdio_xprt flush %d bytes\n",
+		SDIO_XPRT_DBG("sdio_xprt flush %d bytes\n",
 				sdio_write_pkt->write_len);
 		spin_lock_irqsave(&write_list_lock, flags);
 		list_add_tail(&sdio_write_pkt->list, &write_list);
@@ -272,12 +272,13 @@ static void sdio_xprt_write_data(struct work_struct *work)
 					sdio_write_data->write_data,
 					sdio_write_data->write_len)) < 0) &&
 			(sdio_write_retry++ < MAX_SDIO_WRITE_RETRY)) {
-			SDIO_XPRT_DBG("sdio_write failed with RC %d\n",
+			printk(KERN_ERR "sdio_write failed with RC %d\n",
 					rc);
 			msleep(250);
 		}
-		SDIO_XPRT_INFO("sdio_write %d bytes completed\n",
-				sdio_write_data->write_len);
+		if (!rc)
+			SDIO_XPRT_DBG("sdio_write %d bytes completed\n",
+					sdio_write_data->write_len);
 
 		kfree(sdio_write_data->write_data);
 		kfree(sdio_write_data);
@@ -288,7 +289,7 @@ static void sdio_xprt_write_data(struct work_struct *work)
 
 static int rpcrouter_sdio_remote_close(void)
 {
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 	sdio_close(sdio_remote_xprt.channel->handle);
 	free_sdio_xprt(sdio_remote_xprt.channel);
 	return 0;
@@ -300,7 +301,7 @@ static void sdio_xprt_read_data(struct work_struct *work)
 	unsigned long flags;
 	unsigned char *data;
 	struct sdio_in_buf *input_buffer;
-	SDIO_XPRT_INFO("sdio_xprt Called %s\n", __func__);
+	SDIO_XPRT_DBG("sdio_xprt Called %s\n", __func__);
 
 find_buf:
 	spin_lock_irqsave(&sdio_remote_xprt.channel->lock, flags);
@@ -346,9 +347,9 @@ find_buf:
 			work_queued = 0;
 			spin_unlock_irqrestore(&sdio_remote_xprt.channel->lock,
 						 flags);
-			SDIO_XPRT_DBG("sdio_read failed,"
-				      " read %d bytes, expected %d \n",
-				      size, avail);
+			printk(KERN_ERR "sdio_read failed,"
+					" read %d bytes, expected %d \n",
+					size, avail);
 			return;
 		}
 
@@ -370,9 +371,9 @@ find_buf:
 
 	msm_rpcrouter_xprt_notify(&sdio_remote_xprt.xprt,
 				  RPCROUTER_XPRT_EVENT_DATA);
-	SDIO_XPRT_INFO("%s Notify Router Event Data\n", __func__);
+	SDIO_XPRT_DBG("%s Notify Router Event Data\n", __func__);
 	for (i = 0; i < NO_OF_SDIO_IN_BUF; i++) {
-		SDIO_XPRT_INFO("sdio_xprt Buffer %d: RA %4d bytes,"
+		SDIO_XPRT_DBG("sdio_xprt Buffer %d: RA %4d bytes,"
 			"SI: %4d, EI %4d\n", i,
 			sdio_remote_xprt.channel->buffer[i].read_avail,
 			sdio_remote_xprt.channel->buffer[0].read_start_index,
@@ -403,13 +404,13 @@ static int allocate_sdio_xprt(struct sdio_xprt **sdio_xprt_chnl)
 
 	buf = kmalloc(SDIO_IN_BUF_SIZE, GFP_KERNEL);
 	if (!buf) {
-		SDIO_XPRT_DBG("sdio_in_buf 1 allocation failed\n");
+		printk(KERN_ERR "sdio_in_buf allocation failed\n");
 		return -ENOMEM;
 	}
 
 	chnl = kmalloc(sizeof(struct sdio_xprt), GFP_KERNEL);
 	if (!chnl) {
-		SDIO_XPRT_DBG("sdio_xprt channel allocation failed\n");
+		printk(KERN_ERR "sdio_xprt channel allocation failed\n");
 		goto alloc_failure;
 	}
 
@@ -474,7 +475,7 @@ static int rpcrouter_sdio_remote_probe(struct platform_device *pdev)
 	msm_rpcrouter_xprt_notify(&sdio_remote_xprt.xprt,
 				  RPCROUTER_XPRT_EVENT_OPEN);
 
-	SDIO_XPRT_DBG("%s Completed\n", __func__);
+	SDIO_XPRT_INFO("%s Completed\n", __func__);
 
 	return 0;
 }
@@ -499,7 +500,7 @@ static struct platform_driver rpcrouter_sdio_driver = {
 static int __init rpcrouter_sdio_init(void)
 {
 	int rc;
-	msm_sdio_xprt_debug_mask = 0x3;
+	msm_sdio_xprt_debug_mask = 0x2;
 	rc = platform_driver_register(&rpcrouter_sdio_remote_driver);
 	if (rc < 0)
 		return rc;
