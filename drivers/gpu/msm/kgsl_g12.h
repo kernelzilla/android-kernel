@@ -29,20 +29,19 @@
 #ifndef _KGSL_G12_H
 #define _KGSL_G12_H
 
-struct kgsl_g12_device {
-	struct kgsl_device dev;    /* Must be first field in this struct */
-	int current_timestamp;
-	int timestamp;
-	wait_queue_head_t wait_timestamp_wq;
-};
-
-struct kgsl_g12_z1xx {
+struct kgsl_g12_ringbuffer {
 	unsigned int prevctx;
 	unsigned int numcontext;
 	struct kgsl_memdesc      cmdbufdesc;
 };
 
-extern struct kgsl_g12_z1xx g_z1xx;
+struct kgsl_g12_device {
+	struct kgsl_device dev;    /* Must be first field in this struct */
+	int current_timestamp;
+	int timestamp;
+	wait_queue_head_t wait_timestamp_wq;
+	struct kgsl_g12_ringbuffer ringbuffer;
+};
 
 irqreturn_t kgsl_g12_isr(int irq, void *data);
 int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags);
