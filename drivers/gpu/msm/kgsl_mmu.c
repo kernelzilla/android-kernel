@@ -390,9 +390,6 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	int status;
 	uint32_t flags;
 	struct kgsl_mmu *mmu = &device->mmu;
-#ifdef _DEBUG
-	struct kgsl_mmu_debug regs;
-#endif /* _DEBUG */
 
 	KGSL_MEM_VDBG("enter (device=%p)\n", device);
 
@@ -407,42 +404,16 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	mmu->config = 0x00000000;
 #endif
 
-	/* setup MMU and sub-client behavior */
-	kgsl_regwrite(device, mmu_reg[device->id].config, mmu->config);
-
-	/* enable axi interrupts */
-	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
-		     GSL_MMU_INT_MASK);
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
-				GSL_MMU_INT_MASK);
-
-	mmu->flags |= KGSL_FLAGS_INITIALIZED0;
-
 	/* MMU not enabled */
 	if ((mmu->config & 0x1) == 0) {
 		KGSL_MEM_VDBG("return %d\n", 0);
 		return 0;
 	}
 
-	/* idle device */
-	kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
-
 	/* make sure aligned to pagesize */
 	BUG_ON(mmu->mpu_base & (KGSL_PAGESIZE - 1));
 	BUG_ON((mmu->mpu_base + mmu->mpu_range) & (KGSL_PAGESIZE - 1));
 
-	/* define physical memory range accessible by the core */
-	kgsl_regwrite(device, mmu_reg[device->id].mpu_base, mmu->mpu_base);
-	kgsl_regwrite(device, mmu_reg[device->id].mpu_end,
-			mmu->mpu_base + mmu->mpu_range);
-
-	/* enable axi interrupts */
-	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
-		     GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
-			GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
-
-	mmu->flags |= KGSL_FLAGS_INITIALIZED;
 	mmu->tlb_flags = 0;
 
 	/* sub-client MMU lookups require address translation */
@@ -459,9 +430,83 @@ int kgsl_mmu_init(struct kgsl_device *device)
 		if (status != 0) {
 			KGSL_MEM_ERR
 			    ("Unable to allocate dummy space memory.\n");
-			kgsl_mmu_close(device);
-			return status;
+			goto error;
 		}
+
+		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
+				   mmu->dummyspace.size);
+
+		mmu->defaultpagetable = kgsl_mmu_getpagetable(mmu,
+							 KGSL_MMU_GLOBAL_PT);
+
+		if (!mmu->defaultpagetable) {
+			KGSL_MEM_ERR("Failed to create global page table\n");
+			status = -ENOMEM;
+			goto error_free_dummyspace;
+		}
+		mmu->hwpagetable = mmu->defaultpagetable;
+
+	}
+	mmu->flags |= KGSL_FLAGS_INITIALIZED;
+
+	KGSL_MEM_VDBG("return %d\n", 0);
+
+	return 0;
+
+error_free_dummyspace:
+	kgsl_sharedmem_free(&mmu->dummyspace);
+error:
+	return status;
+}
+
+int kgsl_mmu_start(struct kgsl_device *device)
+{
+	/*
+	 * intialize device mmu
+	 *
+	 * call this with the global lock held
+	 */
+	int status;
+	struct kgsl_mmu *mmu = &device->mmu;
+
+	KGSL_MEM_VDBG("enter (device=%p)\n", device);
+
+	if (mmu->flags & KGSL_FLAGS_STARTED) {
+		KGSL_MEM_INFO("MMU already started.\n");
+		return 0;
+	}
+
+	/* setup MMU and sub-client behavior */
+	kgsl_regwrite(device, mmu_reg[device->id].config, mmu->config);
+
+	/* enable axi interrupts */
+	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
+		     GSL_MMU_INT_MASK);
+	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
+				GSL_MMU_INT_MASK);
+
+	/* MMU not enabled */
+	if ((mmu->config & 0x1) == 0) {
+		KGSL_MEM_VDBG("return %d\n", 0);
+		return 0;
+	}
+
+	/* idle device */
+	kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
+
+	/* define physical memory range accessible by the core */
+	kgsl_regwrite(device, mmu_reg[device->id].mpu_base, mmu->mpu_base);
+	kgsl_regwrite(device, mmu_reg[device->id].mpu_end,
+			mmu->mpu_base + mmu->mpu_range);
+
+	/* enable axi interrupts */
+	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
+		     GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
+	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
+			GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
+
+	/* sub-client MMU lookups require address translation */
+	if ((mmu->config & ~0x1) > 0) {
 
 		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
 				   mmu->dummyspace.size);
@@ -474,27 +519,17 @@ int kgsl_mmu_init(struct kgsl_device *device)
 		kgsl_regwrite(device, mmu_reg[device->id].tran_error,
 						mmu->dummyspace.physaddr + 32);
 
-		mmu->defaultpagetable = kgsl_mmu_getpagetable(mmu,
-							 KGSL_MMU_GLOBAL_PT);
-
-		if (!mmu->defaultpagetable) {
-			KGSL_MEM_ERR("Failed to create global page table\n");
-			kgsl_mmu_close(device);
-			return -ENOMEM;
-		}
 		mmu->hwpagetable = mmu->defaultpagetable;
 
 		kgsl_regwrite(device, mmu_reg[device->id].pt_page,
-					mmu->hwpagetable->base.gpuaddr);
+			      mmu->hwpagetable->base.gpuaddr);
 		kgsl_regwrite(device, mmu_reg[device->id].va_range,
-				(mmu->hwpagetable->va_base |
-				(mmu->hwpagetable->va_range >> 16)));
+			      (mmu->hwpagetable->va_base |
+			      (mmu->hwpagetable->va_range >> 16)));
 		status = kgsl_setstate(device, KGSL_MMUFLAGS_TLBFLUSH);
-
 		if (status) {
 			KGSL_MEM_ERR("Failed to setstate TLBFLUSH\n");
-			kgsl_mmu_close(device);
-			return status;
+			goto error;
 		}
 		mmu->flags |= KGSL_FLAGS_STARTED;
 	}
@@ -502,7 +537,14 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	KGSL_MEM_VDBG("return %d\n", 0);
 
 	return 0;
+error:
+	/* disable MMU */
+	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
+	kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
+	return status;
 }
+
+
 
 #ifdef CONFIG_MSM_KGSL_MMU
 
@@ -718,6 +760,34 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 }
 #endif /*CONFIG_MSM_KGSL_MMU*/
 
+int kgsl_mmu_stop(struct kgsl_device *device)
+{
+	/*
+	 *  stop device mmu
+	 *
+	 *  call this with the global lock held
+	 */
+	struct kgsl_mmu *mmu = &device->mmu;
+
+	KGSL_MEM_VDBG("enter (device=%p)\n", device);
+
+	if (mmu->flags & KGSL_FLAGS_STARTED) {
+		/* disable mh interrupts */
+		KGSL_MEM_DBG("disabling mmu interrupts\n");
+		/* disable MMU */
+		kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
+		kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
+
+		mmu->flags &= ~KGSL_FLAGS_STARTED;
+	}
+
+	KGSL_MEM_VDBG("return %d\n", 0);
+
+	return 0;
+
+
+}
+
 int kgsl_mmu_close(struct kgsl_device *device)
 {
 	/*
@@ -726,23 +796,13 @@ int kgsl_mmu_close(struct kgsl_device *device)
 	 *  call this with the global lock held
 	 */
 	struct kgsl_mmu *mmu = &device->mmu;
-#ifdef _DEBUG
-	int i;
-#endif /* _DEBUG */
 
 	KGSL_MEM_VDBG("enter (device=%p)\n", device);
 
 	if (mmu->flags & KGSL_FLAGS_INITIALIZED0) {
-		/* disable mh interrupts */
-		KGSL_MEM_DBG("disabling mmu interrupts\n");
-		/* disable MMU */
-		kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
-		kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
-
 		if (mmu->dummyspace.gpuaddr)
 			kgsl_sharedmem_free(&mmu->dummyspace);
 
-		mmu->flags &= ~KGSL_FLAGS_STARTED;
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED;
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED0;
 		if (mmu->defaultpagetable) {

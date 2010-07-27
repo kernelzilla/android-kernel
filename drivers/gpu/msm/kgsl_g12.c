@@ -78,11 +78,8 @@ static int kgsl_g12_last_release_locked(struct kgsl_device *device)
 	KGSL_DRV_INFO("kgsl_g12_last_release_locked()\n");
 
 	kgsl_g12_stop(device);
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_IRQ_OFF);
-	kgsl_g12_close(device);
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_OFF);
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_POWER_OFF);
 
+	kgsl_g12_close(device);
 	return KGSL_SUCCESS;
 }
 
@@ -92,13 +89,6 @@ static int kgsl_g12_first_open_locked(struct kgsl_device *device)
 
 	KGSL_DRV_INFO("kgsl_g12_first_open()\n");
 
-	kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_CLK_OFF |
-		KGSL_PWRFLAGS_G12_POWER_OFF | KGSL_PWRFLAGS_G12_IRQ_OFF;
-
-
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_POWER_ON);
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_ON);
-
 	result = kgsl_g12_init(device, &kgsl_driver.g12_config);
 	if (result != 0)
 		goto done;
@@ -107,7 +97,6 @@ static int kgsl_g12_first_open_locked(struct kgsl_device *device)
 	if (result != 0)
 		goto done;
 
-	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_IRQ_ON);
  done:
 	return result;
 
@@ -201,7 +190,6 @@ kgsl_g12_init(struct kgsl_device *device,
 		KGSL_DRV_VDBG("return %d\n", 0);
 		return 0;
 	}
-	memset(device, 0, sizeof(*g12_device));
 
 	device->flags |= KGSL_FLAGS_INITIALIZED;
 
@@ -239,10 +227,14 @@ kgsl_g12_init(struct kgsl_device *device,
 	device->id = KGSL_DEVICE_G12;
 	init_completion(&device->hwaccess_gate);
 	kgsl_g12_getfunctable(&device->ftbl);
-	device->hwaccess_blocked = KGSL_FALSE;
 	device->interval_timeout = INTERVAL_G12_TIMEOUT;
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&device->ts_notifier_list);
+
+	setup_timer(&device->idle_timer, kgsl_timer, (unsigned long) device);
+	INIT_WORK(&device->idle_check_ws, kgsl_idle_check);
+
+	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
 
 	printk(KERN_INFO "kgsl mmu config 0x%x\n", config->mmu_config);
 	if (config->mmu_config) {
@@ -252,13 +244,6 @@ kgsl_g12_init(struct kgsl_device *device,
 		device->mmu.va_base   = config->va_base;
 		device->mmu.va_range  = config->va_range;
 	}
-
-	/* Set up MH arbiter.  MH offsets are considered to be dword
-	 * based, therefore no down shift. */
-	kgsl_g12_regwrite(device, ADDR_MH_ARBITER_CONFIG,
-			  KGSL_G12_CFG_G12_MHARB);
-
-	kgsl_g12_regwrite(device, (ADDR_VGC_IRQENABLE >> 2), 0x3);
 
 	status = kgsl_g12_cmdstream_init(device);
 	if (status != 0)
@@ -296,8 +281,6 @@ static int kgsl_g12_close(struct kgsl_device *device)
 {
 	struct kgsl_memregion *regspace = &device->regspace;
 
-	kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
-
 	if (device->memstore.hostptr)
 		kgsl_sharedmem_free(&device->memstore);
 
@@ -321,6 +304,7 @@ static int kgsl_g12_close(struct kgsl_device *device)
 
 static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 {
+	int status = 0;
 	KGSL_DRV_VDBG("enter (device=%p)\n", device);
 
 	if (!(device->flags & KGSL_FLAGS_INITIALIZED)) {
@@ -332,28 +316,55 @@ static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 		KGSL_DRV_VDBG("already started");
 		return 0;
 	}
+	kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_CLK_OFF |
+		KGSL_PWRFLAGS_G12_POWER_OFF | KGSL_PWRFLAGS_G12_IRQ_OFF;
 
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_POWER_ON);
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_ON);
+
+	/* Set up MH arbiter.  MH offsets are considered to be dword
+	 * based, therefore no down shift. */
+	kgsl_g12_regwrite(device, ADDR_MH_ARBITER_CONFIG,
+			  KGSL_G12_CFG_G12_MHARB);
+
+	kgsl_g12_regwrite(device, (ADDR_VGC_IRQENABLE >> 2), 0x3);
+
+	status = kgsl_mmu_start(device);
+	if (status)
+		goto error_clk_off;
+
+	status = kgsl_g12_cmdstream_start(device);
+	if (status)
+		goto error_mmu_stop;
+
+	device->hwaccess_blocked = KGSL_FALSE;
+	mod_timer(&device->idle_timer, jiffies + FIRST_TIMEOUT);
 	device->flags |= KGSL_FLAGS_STARTED;
-	init_timer(&device->idle_timer);
-	device->idle_timer.function = kgsl_timer;
-	device->idle_timer.data = (unsigned long) device;
-	device->idle_timer.expires = jiffies + FIRST_TIMEOUT;
-	add_timer(&device->idle_timer);
-	INIT_WORK(&device->idle_check_ws, kgsl_idle_check);
-
-	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
-
-	return kgsl_g12_cmdstream_start(device);
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_IRQ_ON);
+	return 0;
+error_clk_off:
+	kgsl_g12_regwrite(device, (ADDR_VGC_IRQENABLE >> 2), 0);
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_OFF);
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_POWER_OFF);
+error_mmu_stop:
+	kgsl_mmu_stop(device);
+	return status;
 }
 
 static int kgsl_g12_stop(struct kgsl_device *device)
 {
-	del_timer(&device->idle_timer);
-	if (device->flags & KGSL_FLAGS_STARTED) {
-		kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
-		device->flags &= ~KGSL_FLAGS_STARTED;
-	}
+	kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
 
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_IRQ_OFF);
+
+	del_timer(&device->idle_timer);
+
+	kgsl_mmu_stop(device);
+
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_CLK_OFF);
+	kgsl_pwrctrl(KGSL_PWRFLAGS_G12_POWER_OFF);
+
+	device->flags &= ~KGSL_FLAGS_STARTED;
 	return 0;
 }
 
