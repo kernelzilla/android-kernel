@@ -322,24 +322,24 @@ config PHYS_OFFSET
 
 config KERNEL_PMEM_EBI_REGION
 	bool "Enable in-kernel PMEM region for EBI"
-	default n
+	default y if ARCH_MSM8X60
 	depends on ANDROID_PMEM && ARCH_MSM8X60
 	help
-	   Enable the in-kernel PMEM alloator to use EBI memory.
+	   Enable the in-kernel PMEM allocator to use EBI memory.
 
 config KERNEL_PMEM_SMI_REGION
 	bool "Enable in-kernel PMEM region for SMI"
-	default n
-	depends on ARCH_QSD8X50 && !PMEM_GPU0
+	default y if ARCH_MSM8X60
+	depends on ANDROID_PMEM && ((ARCH_QSD8X50 && !PMEM_GPU0) || (ARCH_MSM8X60 && !VCM))
 	help
-	   Enable the in-kernel PMEM alloator to use SMI memory.
+	   Enable the in-kernel PMEM allocator to use SMI memory.
 
 config PMEM_GPU0
 	bool "Enable PMEM GPU0 region"
 	default y
 	depends on ARCH_QSD8X50 && ANDROID_PMEM
 	help
-	  Enable the PMEM GPU0 device
+	  Enable the PMEM GPU0 device on SMI Memory.
 
 config MSM_AMSS_VERSION
 	int
