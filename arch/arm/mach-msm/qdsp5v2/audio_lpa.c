@@ -270,6 +270,7 @@ static int audio_enable(struct audio *audio)
 	if (audio->enabled)
 		return 0;
 
+	audio->dec_state = MSM_AUD_DECODER_STATE_NONE;
 	audio->out_needed = 0;
 
 	if (msm_adsp_enable(audio->audplay)) {
@@ -1057,7 +1058,6 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case AUDIO_START:
 		MM_DBG("AUDIO_START\n");
-		audio->dec_state = MSM_AUD_DECODER_STATE_NONE;
 		rc = audio_enable(audio);
 		if (!rc) {
 			rc = wait_event_interruptible_timeout(audio->wait,
