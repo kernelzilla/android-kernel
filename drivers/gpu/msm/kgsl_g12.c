@@ -316,7 +316,6 @@ static int kgsl_g12_close(struct kgsl_device *device)
 	struct kgsl_memregion *regspace = &device->regspace;
 
 	kgsl_g12_idle(device, KGSL_TIMEOUT_DEFAULT);
-	kgsl_g12_cmdwindow_close(device);
 
 	if (device->memstore.hostptr)
 		kgsl_sharedmem_free(&device->memstore);
@@ -339,8 +338,6 @@ static int kgsl_g12_close(struct kgsl_device *device)
 
 static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 {
-	int status = -EINVAL;
-
 	KGSL_DRV_VDBG("enter (device=%p)\n", device);
 
 	if (!(device->flags & KGSL_FLAGS_INITIALIZED)) {
@@ -353,12 +350,6 @@ static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 		return 0;
 	}
 
-	status = kgsl_g12_cmdwindow_init(device);
-	if (status != 0) {
-		kgsl_g12_stop(device);
-		return status;
-	}
-
 	device->flags |= KGSL_FLAGS_STARTED;
 	init_timer(&device->idle_timer);
 	device->idle_timer.function = kgsl_g12_timer;
@@ -369,8 +360,8 @@ static int kgsl_g12_start(struct kgsl_device *device, uint32_t flags)
 
 	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
 
-	KGSL_DRV_VDBG("return %d\n", status);
-	return status;
+	KGSL_DRV_VDBG("return");
+	return 0;
 }
 
 static int kgsl_g12_stop(struct kgsl_device *device)
