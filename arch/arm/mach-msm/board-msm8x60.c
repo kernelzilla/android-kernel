@@ -1810,9 +1810,20 @@ static struct i2c_board_info pm8058_boardinfo[] __initdata = {
 #define TDISC_INT		PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 5)
 #define TDISC_OE		(GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 4)
 
+static const char *vregs_tdisc_name[] = {
+	"8058_l5",
+	"8058_s3",
+};
+
+static const int vregs_tdisc_val[] = {
+	2850000,/* uV */
+	1800000,
+};
+static struct regulator *vregs_tdisc[ARRAY_SIZE(vregs_tdisc_name)];
+
 static int tdisc_shinetsu_setup(void)
 {
-	int rc;
+	int rc, i;
 
 	rc = gpio_request(PMIC_GPIO_TDISC, "tdisc_interrupt");
 	if (rc) {
@@ -1836,8 +1847,31 @@ static int tdisc_shinetsu_setup(void)
 		goto fail_gpio_oe;
 	}
 
-	return rc;
+	for (i = 0; i < ARRAY_SIZE(vregs_tdisc_name); i++) {
+		vregs_tdisc[i] = regulator_get(NULL, vregs_tdisc_name[i]);
+		if (IS_ERR(vregs_tdisc[i])) {
+			printk(KERN_ERR "%s: regulator get %s failed (%ld)\n",
+				__func__, vregs_tdisc_name[i],
+				PTR_ERR(vregs_tdisc[i]));
+			rc = PTR_ERR(vregs_tdisc[i]);
+			goto vreg_get_fail;
+		}
 
+		rc = regulator_set_voltage(vregs_tdisc[i],
+				vregs_tdisc_val[i], vregs_tdisc_val[i]);
+		if (rc) {
+			printk(KERN_ERR "%s: regulator_set_voltage() = %d\n",
+				__func__, rc);
+			goto vreg_set_voltage_fail;
+		}
+	}
+
+	return rc;
+vreg_set_voltage_fail:
+	i++;
+vreg_get_fail:
+	while (i)
+		regulator_put(vregs_tdisc[--i]);
 fail_gpio_oe:
 	gpio_free(PMIC_GPIO_TDISC);
 	return rc;
@@ -1845,23 +1879,46 @@ fail_gpio_oe:
 
 static void tdisc_shinetsu_release(void)
 {
+	for (i = 0; i < ARRAY_SIZE(vregs_tdisc_name); i++)
+		regulator_put(vregs_tdisc_name[i]);
+
 	gpio_free(PMIC_GPIO_TDISC);
 	gpio_free(TDISC_OE);
 }
 
 static int tdisc_shinetsu_enable(void)
 {
-	/* REVISIT: Enable regulators 8058_l5 and 8058_s3 */
+	int i, rc = -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(vregs_tdisc_name); i++) {
+		rc = regulator_enable(vregs_tdisc[i]);
+		if (rc < 0) {
+			printk(KERN_ERR "%s: vreg %s enable failed (%d)\n",
+				__func__, vregs_tdisc_name[i], rc);
+			goto vreg_fail;
+		}
+	}
 
 	/* Enable the OE (output enable) gpio */
 	gpio_set_value(TDISC_OE, 1);
 
 	return 0;
+vreg_fail:
+	while (i)
+		regulator_disable(vregs_tdisc[--i]);
+	return rc;
 }
 
 static void tdisc_shinetsu_disable(void)
 {
-	/* REVISIT: Disable regulators 8058_l5 and 8058_s3 */
+	int i, rc;
+
+	for (i = 0; i < ARRAY_SIZE(vregs_tdisc_name); i++) {
+		rc = regulator_disable(vregs_tdisc[i]);
+		if (rc < 0)
+			printk(KERN_ERR "%s: vreg %s disable failed (%d)\n",
+				__func__, vregs_tdisc_name[i], rc);
+	}
 
 	/* Disable the OE (output enable) gpio */
 	gpio_set_value(TDISC_OE, 0);
