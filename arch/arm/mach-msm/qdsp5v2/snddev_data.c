@@ -1449,6 +1449,19 @@ static struct platform_device msm_a2dp_tx_device = {
 	.dev = { .platform_data = &snddev_a2dp_tx_data },
 };
 
+static struct snddev_virtual_data snddev_uplink_rx_data = {
+	.capability = SNDDEV_CAP_RX,
+	.name = "uplink_rx",
+	.copp_id = 5,
+	.acdb_id = PSEUDO_ACDB_ID,
+};
+
+static struct platform_device msm_uplink_rx_device = {
+	.name = "snddev_virtual",
+	.id = 2,
+	.dev = { .platform_data = &snddev_uplink_rx_data },
+};
+
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
@@ -1473,6 +1486,7 @@ static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_a2dp_tx_device,
 	&msm_snddev_mi2s_stereo_rx_device,
 	&msm_snddev_mi2s_fm_tx_device,
+	&msm_uplink_rx_device,
 };
 
 static struct platform_device *snd_devices_surf[] __initdata = {
@@ -1495,6 +1509,7 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_a2dp_tx_device,
 	&msm_snddev_mi2s_stereo_rx_device,
 	&msm_snddev_mi2s_fm_tx_device,
+	&msm_uplink_rx_device,
 };
 
 static struct platform_device *snd_devices_fluid[] __initdata = {
@@ -1510,6 +1525,7 @@ static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_a2dp_rx_device,
 	&msm_a2dp_tx_device,
 	&msm_snddev_mi2s_stereo_rx_device,
+	&msm_uplink_rx_device,
 };
 
 #ifdef CONFIG_DEBUG_FS
