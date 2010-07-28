@@ -528,20 +528,21 @@ int diagfwd_disconnect(void)
 int diagfwd_write_complete(struct diag_request *diag_write_ptr)
 {
 	unsigned char *buf = diag_write_ptr->buf;
+	unsigned long flags = 0;
 	/*Determine if the write complete is for data from arm9/apps/q6 */
 	/* Need a context variable here instead */
 	if (buf == (void *)driver->usb_buf_in) {
 		driver->in_busy = 0;
 		APPEND_DEBUG('o');
-		spin_lock(&diagchar_smd_lock);
+		spin_lock_irqsave(&diagchar_smd_lock, flags);
 		__diag_smd_send_req(NON_SMD_CONTEXT);
-		spin_unlock(&diagchar_smd_lock);
+		spin_unlock_irqrestore(&diagchar_smd_lock, flags);
 	} else if (buf == (void *)driver->usb_buf_in_qdsp) {
 		driver->in_busy_qdsp = 0;
 		APPEND_DEBUG('p');
-		spin_lock(&diagchar_smd_qdsp_lock);
+		spin_lock_irqsave(&diagchar_smd_qdsp_lock, flags);
 		__diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
-		spin_unlock(&diagchar_smd_qdsp_lock);
+		spin_unlock_irqrestore(&diagchar_smd_qdsp_lock, flags);
 	} else {
 		diagmem_free(driver, (unsigned char *)buf, POOL_TYPE_HDLC);
 		diagmem_free(driver, (unsigned char *)diag_write_ptr,
@@ -578,17 +579,19 @@ static struct diag_operations diagfwdops = {
 
 static void diag_smd_notify(void *ctxt, unsigned event)
 {
-	spin_lock(&diagchar_smd_lock);
+	unsigned long flags = 0;
+	spin_lock_irqsave(&diagchar_smd_lock, flags);
 	__diag_smd_send_req(SMD_CONTEXT);
-	spin_unlock(&diagchar_smd_lock);
+	spin_unlock_irqrestore(&diagchar_smd_lock, flags);
 }
 
 #if defined(CONFIG_MSM_N_WAY_SMD)
 static void diag_smd_qdsp_notify(void *ctxt, unsigned event)
 {
-	spin_lock(&diagchar_smd_qdsp_lock);
+	unsigned long flags = 0;
+	spin_lock_irqsave(&diagchar_smd_qdsp_lock, flags);
 	__diag_smd_qdsp_send_req(SMD_CONTEXT);
-	spin_unlock(&diagchar_smd_qdsp_lock);
+	spin_unlock_irqrestore(&diagchar_smd_qdsp_lock, flags);
 }
 #endif
 
