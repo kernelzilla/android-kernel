@@ -4472,7 +4472,7 @@ static void __init pmic8058_leds_init(void)
 			= &pm8058_surf_leds_data;
 		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
 			= sizeof(pm8058_surf_leds_data);
-	} else if (machine_is_msm7x30_ffa()) {
+	} else if (!machine_is_msm7x30_fluid()) {
 		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
 			= &pm8058_ffa_leds_data;
 		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
