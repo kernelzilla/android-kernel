@@ -619,7 +619,6 @@ static int msm_otg_set_peripheral(struct otg_transceiver *xceiv,
 		return 0;
 	}
 	dev->otg.gadget = gadget;
-	enable_sess_valid(dev);
 	if (dev->pmic_notif_supp && dev->pdata->pmic_register_vbus_sn)
 		dev->pdata->pmic_register_vbus_sn(&msm_otg_set_vbus_state);
 	pr_info("peripheral driver registered w/ tranceiver\n");
@@ -701,7 +700,6 @@ static int msm_otg_set_host(struct otg_transceiver *xceiv, struct usb_bus *host)
 	dev->usbdev_nb.notifier_call = usbdev_notify;
 	usb_register_notify(&dev->usbdev_nb);
 	dev->otg.host = host;
-	enable_idgnd(dev);
 	pr_info("host driver registered w/ tranceiver\n");
 
 #ifndef CONFIG_USB_MSM_72K
@@ -1108,6 +1106,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 
 	switch (state) {
 	case OTG_STATE_UNDEFINED:
+		/* Reset both phy and link */
+		otg_reset(&dev->otg, 1);
+
 		if  (!dev->otg.host || !is_host() ||
 				(dev->pdata->otg_mode == OTG_USER_CONTROL))
 			set_bit(ID, &dev->inputs);
@@ -1847,9 +1848,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto free_wq;
 		}
 	}
-
-	/* Reset both phy and link */
-	otg_reset(&dev->otg, 1);
 
 	/* ACk all pending interrupts and clear interrupt enable registers */
 	writel((readl(USB_OTGSC) & ~OTGSC_INTR_MASK), USB_OTGSC);
