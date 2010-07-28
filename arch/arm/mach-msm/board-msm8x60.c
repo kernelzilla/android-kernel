@@ -1999,6 +1999,9 @@ static struct mfd_cell pm8058_subdevs[] = {
 	PM8058_VREG(PM8058_VREG_ID_NCP),
 	PM8058_VREG(PM8058_VREG_ID_LVS0),
 	PM8058_VREG(PM8058_VREG_ID_LVS1),
+	{	.name = "pm8058-upl",
+		.id		= -1,
+	},
 };
 
 static struct pm8058_platform_data pm8058_platform_data = {
