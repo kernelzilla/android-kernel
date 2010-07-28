@@ -539,17 +539,18 @@ static int msm_rmnet_sdio_probe(struct platform_device *pdev)
 	if (!sdio_mux_workqueue)
 		return -ENOMEM;
 
-	rc = sdio_open("SDIO_RMNET_DATA", &sdio_mux_ch, NULL, sdio_mux_notify);
-	if (rc < 0) {
-		pr_err("%s: sido open failed %d\n", __func__, rc);
-		destroy_workqueue(sdio_mux_workqueue);
-		return rc;
-	}
+	for (rc = 0; rc < 8; rc++)
+		spin_lock_init(&sdio_ch[rc].lock);
 
 	wake_lock_init(&sdio_mux_ch_wakelock, WAKE_LOCK_SUSPEND,
 		       "rmnet_sdio_mux");
-	for (rc = 0; rc < 8; rc++)
-		spin_lock_init(&sdio_ch[rc].lock);
+	rc = sdio_open("SDIO_RMNET_DATA", &sdio_mux_ch, NULL, sdio_mux_notify);
+	if (rc < 0) {
+		pr_err("%s: sido open failed %d\n", __func__, rc);
+		wake_lock_destroy(&sdio_mux_ch_wakelock);
+		destroy_workqueue(sdio_mux_workqueue);
+		return rc;
+	}
 
 	sdio_mux_initialized = 1;
 	return 0;
