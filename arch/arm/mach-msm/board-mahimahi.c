@@ -50,11 +50,11 @@
 #include <mach/msm_serial_hs.h>
 #include <mach/bcm_bt_lpm.h>
 #include <mach/msm_smd.h>
+#include <mach/msm_flashlight.h>
 
 #include "board-mahimahi.h"
 #include "devices.h"
 #include "proc_comm.h"
-#include "board-mahimahi-flashlight.h"
 #include "board-mahimahi-tpa2018d1.h"
 #include "board-mahimahi-smb329.h"
 
@@ -639,6 +639,9 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
         .camera_flash           = flashlight_control,
         .num_flash_levels       = FLASHLIGHT_NUM,
+	.low_temp_limit		= 5,
+	.low_cap_limit		= 15,
+
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_s5k3e2fx_data = {
@@ -725,6 +728,7 @@ static struct platform_device mahimahi_flashlight_device = {
 		.platform_data  = &mahimahi_flashlight_data,
 	},
 };
+
 static struct timed_gpio timed_gpios[] = {
 	{
 		.name = "vibrator",
