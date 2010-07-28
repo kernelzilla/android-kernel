@@ -55,8 +55,6 @@ u32 ddl_device_init(struct ddl_init_config *ddl_init_config,
 	    ddl_init_config->core_virtual_base_addr;
 	ddl_context->client_data = client_data;
 
-	ddl_context->intr_status = DDL_INVALID_INTR_STATUS;
-
 	vidc_720p_set_device_virtual_base(ddl_context->
 					   core_virtual_base_addr);
 

@@ -170,7 +170,6 @@ void vcd_mark_command_channel(struct vcd_dev_ctxt *dev_ctxt,
 		dev_ctxt->ddl_cmd_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_ERROR("\n Command channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -183,7 +182,6 @@ void vcd_release_command_channel(
 	if (dev_ctxt->ddl_cmd_ch_interim + dev_ctxt->ddl_cmd_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_ERROR("\n Command channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -196,7 +194,6 @@ void vcd_release_multiple_command_channels(struct vcd_dev_ctxt
 		dev_ctxt->ddl_cmd_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_ERROR("\n Command channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -208,7 +205,6 @@ void vcd_release_interim_command_channels(struct vcd_dev_ctxt *dev_ctxt)
 	if (dev_ctxt->ddl_cmd_ch_interim + dev_ctxt->ddl_cmd_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_ERROR("\n Command channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -290,7 +286,6 @@ void vcd_mark_frame_channel(struct vcd_dev_ctxt *dev_ctxt)
 		dev_ctxt->ddl_frame_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_FATAL("Frame channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -305,7 +300,6 @@ void vcd_release_frame_channel(struct vcd_dev_ctxt *dev_ctxt,
 		dev_ctxt->ddl_frame_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_FATAL("Frame channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -318,7 +312,6 @@ void vcd_release_multiple_frame_channels(struct vcd_dev_ctxt
 		dev_ctxt->ddl_frame_ch_free >
 		dev_ctxt->ddl_frame_ch_depth) {
 		VCD_MSG_FATAL("Frame channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -332,7 +325,6 @@ void vcd_release_interim_frame_channels(struct vcd_dev_ctxt
 	if (dev_ctxt->ddl_frame_ch_free >
 		dev_ctxt->ddl_cmd_ch_depth) {
 		VCD_MSG_FATAL("Frame channel access counters messed up");
-		vcd_assert();
 	}
 }
 
@@ -1190,7 +1182,6 @@ u32 vcd_submit_command_in_continue(struct vcd_dev_ctxt
 			{
 				VCD_MSG_ERROR("\n vcd_submit_command: Unknown"
 					"command %d", (int)cmd);
-				vcd_assert();
 				break;
 			}
 		 }
@@ -1389,7 +1380,6 @@ u32 vcd_process_cmd_sess_start(struct vcd_clnt_ctxt *cctxt)
 			rc = VCD_ERR_BUSY;
 			VCD_MSG_ERROR("%s(): vcd_client_cmd_en_q() "
 				"failed\n", __func__);
-			vcd_assert();
 		}
 	}
 
@@ -1464,8 +1454,7 @@ void vcd_send_frame_done_in_eos_for_dec(
 	if (!buf_entry) {
 		VCD_MSG_ERROR("Unrecognized buffer address provided = %p",
 				  ddl_frm.vcd_frm.virtual);
-
-		vcd_assert();
+		return;
 	} else {
 		if (cctxt->sched_clnt_hdl->tkns)
 			cctxt->sched_clnt_hdl->tkns--;
@@ -1507,7 +1496,6 @@ void vcd_send_frame_done_in_eos_for_enc(
 	if (!op_buf_entry) {
 		VCD_MSG_ERROR("%s(): vcd_buffer_pool_entry_de_q() "
 			"failed\n", __func__);
-		vcd_assert();
 	} else {
 		if (cctxt->sched_clnt_hdl->tkns)
 			cctxt->sched_clnt_hdl->tkns--;
@@ -1688,8 +1676,6 @@ u32 vcd_handle_input_done(
 	if (!cctxt->status.frame_submitted &&
 		!cctxt->status.frame_delayed) {
 		VCD_MSG_ERROR("Input done was not expected");
-		vcd_assert();
-
 		return VCD_ERR_BAD_STATE;
 	}
 
@@ -1702,7 +1688,9 @@ u32 vcd_handle_input_done(
 		 frame->vcd_frm.virtual)
 		|| !transc->ip_buf_entry->in_use) {
 		VCD_MSG_ERROR("Bad frm transaction state");
-		vcd_assert();
+		vcd_handle_ind_hw_err_fatal(cctxt,
+			VCD_EVT_IND_HWERRFATAL, VCD_ERR_CLIENT_FATAL);
+		return VCD_ERR_BAD_POINTER;
 	}
 
 	frame->vcd_frm.ip_frm_tag = transc->ip_frm_tag;
@@ -1780,15 +1768,12 @@ u32 vcd_validate_io_done_pyld(void *payload, u32 status)
 
 	if (!frame) {
 		VCD_MSG_ERROR("Bad payload from DDL");
-		vcd_assert();
-
 		return VCD_ERR_BAD_POINTER;
 	}
 
 	if (!frame->vcd_frm.ip_frm_tag ||
 		frame->vcd_frm.ip_frm_tag == VCD_FRAMETAG_INVALID) {
 		VCD_MSG_ERROR("bad input frame tag");
-		vcd_assert();
 		return VCD_ERR_BAD_POINTER;
 	}
 
@@ -1950,12 +1935,14 @@ u32 vcd_handle_frame_done(
 		if (!op_buf_entry) {
 			VCD_MSG_ERROR("Invalid output buffer returned"
 				"from DDL");
-			vcd_assert();
+			vcd_handle_ind_hw_err_fatal(cctxt,
+				VCD_EVT_IND_HWERRFATAL, VCD_ERR_CLIENT_FATAL);
 			rc = VCD_ERR_BAD_POINTER;
 		} else if (!op_buf_entry->in_use) {
 			VCD_MSG_ERROR("Bad output buffer 0x%p recvd from DDL",
 					  op_buf_entry->frame.virtual);
-			vcd_assert();
+			vcd_handle_ind_hw_err_fatal(cctxt,
+				VCD_EVT_IND_HWERRFATAL, VCD_ERR_CLIENT_FATAL);
 			rc = VCD_ERR_BAD_POINTER;
 		} else {
 			op_buf_entry->in_use = false;
@@ -2800,7 +2787,6 @@ void vcd_handle_trans_pending(struct vcd_clnt_ctxt *cctxt)
 {
 	if (!cctxt->status.frame_submitted) {
 		VCD_MSG_ERROR("Transaction pending response was not expected");
-		vcd_assert();
 		return;
 	}
 	cctxt->status.frame_submitted--;

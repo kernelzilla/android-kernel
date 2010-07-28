@@ -73,7 +73,6 @@
 
 #define DDL_INVALID_CHANNEL_ID  ((u32)~0)
 #define DDL_INVALID_CODEC_TYPE ((u32)~0)
-#define DDL_INVALID_INTR_STATUS ((u32)~0)
 
 #define DDL_ENC_REQ_IFRAME                      0x1
 #define DDL_ENC_CHANGE_IPERIOD                  0x2

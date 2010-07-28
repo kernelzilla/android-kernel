@@ -244,7 +244,6 @@ do { \
 	else { \
 		VCD_MSG_ERROR("%s(): Inconsistent val given in " \
 			" VCD_BUFFERPOOL_INUSE_DECREMENT\n", __func__); \
-		vcd_assert(); \
 	} \
 } while (0)
 

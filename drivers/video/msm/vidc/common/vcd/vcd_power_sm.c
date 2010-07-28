@@ -239,7 +239,6 @@ u32 vcd_enable_clock(struct vcd_dev_ctxt *dev_ctxt,
 	if (dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_OFF) {
 		VCD_MSG_ERROR("vcd_enable_clock(): Already in state "
 			"VCD_PWRCLK_STATE_OFF\n");
-		vcd_assert();
 		rc = VCD_ERR_FAIL;
 	} else if (dev_ctxt->pwr_clk_state ==
 		VCD_PWRCLK_STATE_ON_NOTCLOCKED) {
@@ -276,7 +275,6 @@ u32 vcd_disable_clock(struct vcd_dev_ctxt *dev_ctxt)
 	if (dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_OFF) {
 		VCD_MSG_ERROR("vcd_disable_clock(): Already in state "
 			"VCD_PWRCLK_STATE_OFF\n");
-		vcd_assert();
 		rc = VCD_ERR_FAIL;
 	} else if (dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_ON_CLOCKED ||
 		dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_ON_CLOCKGATED) {
@@ -347,8 +345,7 @@ u32 vcd_gate_clock(struct vcd_dev_ctxt *dev_ctxt)
 
 	if (dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_OFF ||
 		dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_ON_NOTCLOCKED) {
-		VCD_MSG_ERROR("%s(): Clk is Off or Not Clked yet \n", __func__);
-		vcd_assert();
+		VCD_MSG_ERROR("%s(): Clk is Off or Not Clked yet\n", __func__);
 		return VCD_ERR_FAIL;
 	}
 
@@ -369,8 +366,7 @@ u32 vcd_un_gate_clock(struct vcd_dev_ctxt *dev_ctxt)
 #if ENA_CLK_GATE
 	if (dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_OFF ||
 		dev_ctxt->pwr_clk_state == VCD_PWRCLK_STATE_ON_NOTCLOCKED) {
-		VCD_MSG_ERROR("%s(): Clk is Off or Not Clked yet \n", __func__);
-		vcd_assert();
+		VCD_MSG_ERROR("%s(): Clk is Off or Not Clked yet\n", __func__);
 		return VCD_ERR_FAIL;
 	}
 
