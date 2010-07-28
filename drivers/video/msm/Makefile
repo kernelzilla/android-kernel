@@ -54,6 +54,9 @@ obj-$(CONFIG_FB_MSM_EXTMDDI) += msm_mddi_ext.o
 
 # TVEnc
 obj-$(CONFIG_FB_MSM_TVOUT) += tvenc.o
+ifeq ($(CONFIG_FB_MSM_OVERLAY),y)
+obj-$(CONFIG_FB_MSM_TVOUT) += mdp4_overlay_atv.o
+endif
 
 # MSM FB Panel
 obj-y += msm_fb_panel.o

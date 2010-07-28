@@ -37,6 +37,7 @@
 #include "msm_fb.h"
 #include "mdp4.h"
 #include "mddihosti.h"
+#include "tvenc.h"
 
 #define MDP_DEBUG_BUF	2048
 
@@ -333,6 +334,11 @@ static ssize_t mdp_stat_read(
 	dlen -= len;
 	len = snprintf(bp, dlen, "kickoff_dtv:       %08lu\n\n",
 					mdp4_stat.kickoff_dtv);
+
+	bp += len;
+	dlen -= len;
+	len = snprintf(bp, dlen, "kickoff_atv:       %08lu\n\n",
+					mdp4_stat.kickoff_atv);
 	bp += len;
 	dlen -= len;
 	len = snprintf(bp, dlen, "overlay0_set:   %08lu\n",
@@ -697,6 +703,255 @@ static const struct file_operations emdh_fops = {
 	.write = emdh_reg_write,
 };
 
+
+uint32 dbg_offset;
+uint32 dbg_count;
+char *dbg_base;
+
+
+static int dbg_open(struct inode *inode, struct file *file)
+{
+	/* non-seekable */
+	file->f_mode &= ~(FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE);
+	return 0;
+}
+
+static int dbg_release(struct inode *inode, struct file *file)
+{
+	return 0;
+}
+
+static ssize_t dbg_base_write(
+	struct file *file,
+	const char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	return count;
+}
+
+static ssize_t dbg_base_read(
+	struct file *file,
+	char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	int len = 0;
+	int tot = 0;
+	int dlen;
+	char *bp;
+
+
+	if (*ppos)
+		return 0;	/* the end */
+
+
+	bp = debug_buf;
+	dlen = sizeof(debug_buf);
+
+	len = snprintf(bp, dlen, "mdp_base  :    %08x\n",
+				(int)msm_mdp_base);
+	bp += len;
+	dlen -= len;
+	len = snprintf(bp, dlen, "mddi_base :    %08x\n",
+				(int)msm_pmdh_base);
+	bp += len;
+	dlen -= len;
+	len = snprintf(bp, dlen, "emdh_base :    %08x\n",
+				(int)msm_emdh_base);
+	bp += len;
+	dlen -= len;
+	len = snprintf(bp, dlen, "tvenv_base:    %08x\n",
+				(int)tvenc_base);
+	bp += len;
+	dlen -= len;
+
+	tot = (uint32)bp - (uint32)debug_buf;
+	*bp = 0;
+	tot++;
+
+	if (copy_to_user(buff, debug_buf, tot))
+		return -EFAULT;
+
+	if (tot < 0)
+		return 0;
+
+	*ppos += tot;	/* increase offset */
+
+	return tot;
+}
+
+static const struct file_operations dbg_base_fops = {
+	.open = dbg_open,
+	.release = dbg_release,
+	.read = dbg_base_read,
+	.write = dbg_base_write,
+};
+
+static ssize_t dbg_offset_write(
+	struct file *file,
+	const char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	uint32 off, cnt, base;
+
+	if (count > sizeof(debug_buf))
+		return -EFAULT;
+
+	if (copy_from_user(debug_buf, buff, count))
+		return -EFAULT;
+
+	debug_buf[count] = 0;	/* end of string */
+
+	sscanf(debug_buf, "%x %d %x", &off, &cnt, &base);
+
+	if (cnt <= 0)
+		cnt = 1;
+
+	dbg_offset = off;
+	dbg_count = cnt;
+	dbg_base = (char *)base;
+
+	printk(KERN_INFO "%s: offset=%x cnt=%d base=%x\n", __func__,
+				dbg_offset, dbg_count, (int)dbg_base);
+
+	return count;
+}
+
+static ssize_t dbg_offset_read(
+	struct file *file,
+	char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	int len = 0;
+
+
+	if (*ppos)
+		return 0;	/* the end */
+
+	len = snprintf(debug_buf, sizeof(debug_buf), "0x%08x %d 0x%08x\n",
+				dbg_offset, dbg_count, (int)dbg_base);
+
+	if (copy_to_user(buff, debug_buf, len))
+		return -EFAULT;
+
+	if (len < 0)
+		return 0;
+
+	*ppos += len;	/* increase offset */
+
+	return len;
+}
+
+static const struct file_operations dbg_off_fops = {
+	.open = dbg_open,
+	.release = dbg_release,
+	.read = dbg_offset_read,
+	.write = dbg_offset_write,
+};
+
+
+static ssize_t dbg_reg_write(
+	struct file *file,
+	const char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	uint32 off, data;
+	int cnt;
+
+	if (count > sizeof(debug_buf))
+		return -EFAULT;
+
+	if (copy_from_user(debug_buf, buff, count))
+		return -EFAULT;
+
+	debug_buf[count] = 0;	/* end of string */
+
+	cnt = sscanf(debug_buf, "%x %x", &off, &data);
+
+	writel(data, dbg_base + off);
+
+	printk(KERN_INFO "%s: addr=%x data=%x\n",
+			__func__, (int)(dbg_base+off), (int)data);
+
+	return count;
+}
+
+static ssize_t dbg_reg_read(
+	struct file *file,
+	char __user *buff,
+	size_t count,
+	loff_t *ppos)
+{
+	int len = 0;
+	uint32 data;
+	int i, j, off, dlen, num;
+	char *bp, *cp;
+	int tot = 0;
+
+
+	if (*ppos)
+		return 0;	/* the end */
+
+	if (dbg_base == 0)
+		return 0;	/* nothing to read */
+
+	j = 0;
+	num = 0;
+	bp = debug_buf;
+	cp = (char *)(dbg_base + dbg_offset);
+	dlen = sizeof(debug_buf);
+	while (j++ < 8) {
+		len = snprintf(bp, dlen, "0x%08x: ", (int)cp);
+		tot += len;
+		bp += len;
+		dlen -= len;
+		off = 0;
+		i = 0;
+		while (i++ < 4) {
+			data = readl(cp + off);
+			len = snprintf(bp, dlen, "%08x ", data);
+			tot += len;
+			bp += len;
+			dlen -= len;
+			off += 4;
+			num++;
+			if (num >= dbg_count)
+				break;
+		}
+		data = readl((u32)cp + off);
+		*bp++ = '\n';
+		tot++;
+		cp += off;
+		if (num >= dbg_count)
+			break;
+	}
+	*bp = 0;
+	tot++;
+
+	if (copy_to_user(buff, debug_buf, tot))
+		return -EFAULT;
+
+	if (tot < 0)
+		return 0;
+
+	*ppos += tot;	/* increase offset */
+
+	return tot;
+}
+
+
+static const struct file_operations dbg_reg_fops = {
+	.open = dbg_open,
+	.release = dbg_release,
+	.read = dbg_reg_read,
+	.write = dbg_reg_write,
+};
+
+
 /*
  * debugfs
  *
@@ -766,6 +1021,35 @@ int mdp4_debugfs_init(void)
 	}
 
 	if (debugfs_create_file("reg", 0644, dent, 0, &emdh_fops)
+			== NULL) {
+		printk(KERN_ERR "%s(%d): debugfs_create_file: debug fail\n",
+			__FILE__, __LINE__);
+		return -1;
+	}
+
+	dent = debugfs_create_dir("mdp-dbg", NULL);
+
+	if (IS_ERR(dent)) {
+		printk(KERN_ERR "%s(%d): debugfs_create_dir fail, error %ld\n",
+			__FILE__, __LINE__, PTR_ERR(dent));
+		return -1;
+	}
+
+	if (debugfs_create_file("base", 0644, dent, 0, &dbg_base_fops)
+			== NULL) {
+		printk(KERN_ERR "%s(%d): debugfs_create_file: index fail\n",
+			__FILE__, __LINE__);
+		return -1;
+	}
+
+	if (debugfs_create_file("off", 0644, dent, 0, &dbg_off_fops)
+			== NULL) {
+		printk(KERN_ERR "%s(%d): debugfs_create_file: index fail\n",
+			__FILE__, __LINE__);
+		return -1;
+	}
+
+	if (debugfs_create_file("reg", 0644, dent, 0, &dbg_reg_fops)
 			== NULL) {
 		printk(KERN_ERR "%s(%d): debugfs_create_file: debug fail\n",
 			__FILE__, __LINE__);

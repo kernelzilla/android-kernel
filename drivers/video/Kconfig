@@ -2432,7 +2432,7 @@ config FB_MSM_TVOUT_PAL
 	default n
 
 choice
-	depends on  (FB_MSM_MDP22 || FB_MSM_MDP31)
+	depends on  (FB_MSM_MDP22 || FB_MSM_MDP31 || FB_MSM_MDP40)
 	prompt "TVOut Region"
 	default FB_MSM_TVOUT_NTSC_M
 

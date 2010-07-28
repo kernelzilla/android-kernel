@@ -164,6 +164,8 @@ void mdp4_fetch_cfg(uint32 core_clk)
 
 	/* dma_p fetch config */
 	outpdw(MDP_BASE + 0x91004, dmap_data);
+	/* dma_e fetch config */
+	outpdw(MDP_BASE + 0x91004, dmap_data);
 
 	/*
 	 * set up two vg pipes and two rgb pipes
@@ -405,8 +407,11 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 			dma->waiting = FALSE;
 			spin_unlock(&mdp_spin_lock);
-#ifdef CONFIG_FB_MSM_DTV
+#if defined(CONFIG_FB_MSM_DTV)
 			mdp4_overlay1_done_dtv();
+#elif defined(CONFIG_FB_MSM_TVOUT)
+			mdp4_overlay1_done_atv();
+#else
 #endif
 		}
 		if (isr & INTR_DMA_P_HISTOGRAM) {
@@ -1137,8 +1142,8 @@ void mdp4_vg_csc_post_lv_setup(int vp_num)
 
 static uint32 csc_rgb2yuv_matrix_tab[9] = {
 	0x0083, 0x0102, 0x0032,
-	0xffb5, 0xff6c, 0x00e1,
-	0x00e1, 0xff45, 0xffdc
+	0x1fb5, 0x1f6c, 0x00e1,
+	0x00e1, 0x1f45, 0x1fdc
 };
 
 static uint32 csc_rgb2yuv_pre_bv_tab[3] = {0, 0, 0};

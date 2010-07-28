@@ -59,6 +59,9 @@ static int pdev_list_cnt;
 
 static struct clk *tvenc_clk;
 static struct clk *tvdac_clk;
+#ifdef CONFIG_FB_MSM_MDP40
+static struct clk *tv_src_clk;
+#endif
 
 static struct platform_driver tvenc_driver = {
 	.probe = tvenc_probe,
@@ -100,7 +103,11 @@ static int tvenc_on(struct platform_device *pdev)
 	int ret = 0;
 
 	pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ , "tvenc",
+#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
 				  MSM_SYSTEM_BUS_RATE);
+#else
+				  65000);
+#endif
 	if (tvenc_pdata && tvenc_pdata->pm_vid_en)
 		ret = tvenc_pdata->pm_vid_en(1);
 
@@ -112,6 +119,9 @@ static int tvenc_on(struct platform_device *pdev)
 
 	clk_enable(tvenc_clk);
 	clk_enable(tvdac_clk);
+#ifdef CONFIG_FB_MSM_MDP40
+	clk_enable(tv_src_clk);
+#endif
 
 	ret = panel_next_on(pdev);
 
@@ -247,7 +257,11 @@ static int tvenc_probe(struct platform_device *pdev)
 	 * get/set panel specific fb info
 	 */
 	mfd->panel_info = pdata->panel_info;
+#ifdef CONFIG_FB_MSM_MDP40
+	mfd->fb_imgType = MDP_RGB_565;  /* base layer */
+#else
 	mfd->fb_imgType = MDP_YCRYCB_H2V1;
+#endif
 
 	/*
 	 * set driver data
@@ -284,6 +298,12 @@ static int __init tvenc_driver_init(void)
 {
 	tvenc_clk = clk_get(NULL, "tv_enc_clk");
 	tvdac_clk = clk_get(NULL, "tv_dac_clk");
+
+#ifdef CONFIG_FB_MSM_MDP40
+	tv_src_clk = clk_get(NULL, "tv_src_clk");
+	if (IS_ERR(tv_src_clk))
+		tv_src_clk = tvenc_clk; /* Fallback to slave */
+#endif
 
 	if (IS_ERR(tvenc_clk)) {
 		printk(KERN_ERR "error: can't get tvenc_clk!\n");

@@ -62,11 +62,12 @@ enum {		/* display */
 };
 
 enum {
-	LCDC_RGB_INTF,
-	DTV_INTF = LCDC_RGB_INTF,
-	MDDI_LCDC_INTF,
-	MDDI_INTF,
-	EBI2_INTF
+	LCDC_RGB_INTF,			/* 0 */
+	DTV_INTF = LCDC_RGB_INTF,	/* 0 */
+	MDDI_LCDC_INTF,			/* 1 */
+	MDDI_INTF,			/* 2 */
+	EBI2_INTF,			/* 3 */
+	TV_INTF = EBI2_INTF		/* 3 */
 };
 
 enum {
@@ -308,6 +309,7 @@ struct mdp4_statistic {
 	ulong kickoff_mddi_skip;
 	ulong kickoff_lcdc;
 	ulong kickoff_dtv;
+	ulong kickoff_atv;
 	ulong overlay_set[MDP4_MIXER_MAX];
 	ulong overlay_unset[MDP4_MIXER_MAX];
 	ulong overlay_play[MDP4_MIXER_MAX];
@@ -361,6 +363,9 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd);
 void mdp4_dtv_overlay(struct msm_fb_data_type *mfd);
 int mdp4_dtv_on(struct platform_device *pdev);
 int mdp4_dtv_off(struct platform_device *pdev);
+void mdp4_atv_overlay(struct msm_fb_data_type *mfd);
+int mdp4_atv_on(struct platform_device *pdev);
+int mdp4_atv_off(struct platform_device *pdev);
 void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe);
 void mdp4_overlay_reg_flush(struct mdp4_overlay_pipe *pipe, int all);
 void mdp4_mixer_blend_setup(struct mdp4_overlay_pipe *pipe);
@@ -381,13 +386,14 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(int ptype);
 void mdp4_overlay_pipe_free(struct mdp4_overlay_pipe *pipe);
 void mdp4_overlay_dmap_cfg(struct msm_fb_data_type *mfd, int lcdc);
 void mdp4_overlay_dmap_xy(struct mdp4_overlay_pipe *pipe);
-void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int lcdc);
+void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int atv);
 void mdp4_overlay_dmae_xy(struct mdp4_overlay_pipe *pipe);
 int mdp4_overlay_pipe_staged(int mixer);
 void mdp4_overlay0_done_lcdc(void);
 void mdp4_overlay0_done_mddi(void);
 void mdp4_dma_s_done_mddi(void);
 void mdp4_overlay1_done_dtv(void);
+void mdp4_overlay1_done_atv(void);
 void mdp4_mddi_overlay_restore(void);
 #ifdef MDP4_MDDI_DMA_SWITCH
 void mdp4_mddi_overlay_dmas_restore(void);
