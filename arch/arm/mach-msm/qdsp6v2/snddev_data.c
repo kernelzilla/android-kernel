@@ -25,6 +25,8 @@
 #include "snddev_icodec.h"
 #include "snddev_ecodec.h"
 #include "timpani_profile_8x60.h"
+#include "snddev_hdmi.h"
+#include "apr_audio.h"
 
 /* define the value for BT_SCO */
 
@@ -232,17 +234,34 @@ static struct platform_device msm_imic_ffa_device = {
 	.dev = { .platform_data = &snddev_imic_ffa_data },
 };
 
+static struct snddev_hdmi_data snddev_hdmi_stereo_rx_data = {
+	.capability = SNDDEV_CAP_RX ,
+	.name = "hdmi_stereo_rx",
+	.copp_id = HDMI_RX,
+	.acdb_id = 3,
+	.channel_mode = 0,
+	.default_sample_rate = 48000,
+};
+
+static struct platform_device msm_snddev_hdmi_stereo_rx_device = {
+	.name = "snddev_hdmi",
+	.id = 0,
+	.dev = { .platform_data = &snddev_hdmi_stereo_rx_data },
+};
+
 
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
 	&msm_ispkr_stereo_device,
+	&msm_snddev_hdmi_stereo_rx_device,
 };
 
 static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_iearpiece_device,
 	&msm_imic_device,
 	&msm_ispkr_stereo_device,
+	&msm_snddev_hdmi_stereo_rx_device,
 };
 
 void __init msm_snddev_init(void)
