@@ -65,10 +65,6 @@ static struct dentry *debugfs_file;
 static int  msmsdcc_dbg_init(void);
 #endif
 
-#ifdef CONFIG_MMC_AUTO_SUSPEND
-static int msmsdcc_auto_suspend(struct mmc_host *, int);
-#endif
-
 static unsigned int msmsdcc_pwrsave = 1;
 
 #define DUMMY_52_STATE_NONE		0
@@ -1139,9 +1135,6 @@ static const struct mmc_host_ops msmsdcc_ops = {
 #ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 	.enable_sdio_irq = msmsdcc_enable_sdio_irq,
 #endif
-#ifdef CONFIG_MMC_AUTO_SUSPEND
-	.auto_suspend	= msmsdcc_auto_suspend,
-#endif
 };
 
 static void
@@ -1636,10 +1629,6 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 	struct msmsdcc_host *host = mmc_priv(mmc);
 	int rc = 0;
 
-#ifdef CONFIG_MMC_AUTO_SUSPEND
-	if (test_and_set_bit(0, &host->suspended))
-		return 0;
-#endif
 	if (mmc) {
 		if (host->plat->status_irq)
 			disable_irq(host->plat->status_irq);
@@ -1670,10 +1659,6 @@ msmsdcc_resume(struct platform_device *dev)
 	struct msmsdcc_host *host = mmc_priv(mmc);
 	unsigned long flags;
 
-#ifdef CONFIG_MMC_AUTO_SUSPEND
-	if (!test_and_clear_bit(0, &host->suspended))
-		return 0;
-#endif
 	if (mmc) {
 		spin_lock_irqsave(&host->lock, flags);
 		if (!host->clks_on) {
@@ -1701,21 +1686,6 @@ msmsdcc_resume(struct platform_device *dev)
 #else
 #define msmsdcc_suspend NULL
 #define msmsdcc_resume NULL
-#endif
-
-#ifdef CONFIG_MMC_AUTO_SUSPEND
-static int msmsdcc_auto_suspend(struct mmc_host *host, int suspend)
-{
-	struct platform_device *pdev;
-	pdev = container_of(host->parent, struct platform_device, dev);
-
-	if (suspend)
-		return msmsdcc_suspend(pdev, PMSG_AUTO_SUSPEND);
-	else
-		return msmsdcc_resume(pdev);
-}
-#else
-#define msmsdcc_auto_suspend NULL
 #endif
 
 static struct platform_driver msmsdcc_driver = {
