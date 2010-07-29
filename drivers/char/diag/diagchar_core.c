@@ -113,18 +113,12 @@ void diag_drain_work_fn(struct work_struct *work)
 
 void diag_read_smd_work_fn(struct work_struct *work)
 {
-	unsigned long flags = 0;
-	spin_lock_irqsave(&diagchar_smd_lock, flags);
-	__diag_smd_send_req(NON_SMD_CONTEXT);
-	spin_unlock_irqrestore(&diagchar_smd_lock, flags);
+	__diag_smd_send_req();
 }
 
 void diag_read_smd_qdsp_work_fn(struct work_struct *work)
 {
-	unsigned long flags = 0;
-	spin_lock_irqsave(&diagchar_smd_qdsp_lock, flags);
-	__diag_smd_qdsp_send_req(NON_SMD_CONTEXT);
-	spin_unlock_irqrestore(&diagchar_smd_qdsp_lock, flags);
+	__diag_smd_qdsp_send_req();
 }
 
 static int diagchar_open(struct inode *inode, struct file *file)
@@ -782,11 +776,11 @@ static int __init diagchar_init(void)
 		driver->logging_mode = USB_MODE;
 		mutex_init(&driver->diagchar_mutex);
 		init_waitqueue_head(&driver->wait_q);
-		diagfwd_init();
 		INIT_WORK(&(driver->diag_drain_work), diag_drain_work_fn);
 		INIT_WORK(&(driver->diag_read_smd_work), diag_read_smd_work_fn);
 		INIT_WORK(&(driver->diag_read_smd_qdsp_work),
 			   diag_read_smd_qdsp_work_fn);
+		diagfwd_init();
 		printk(KERN_INFO "diagchar initializing ..\n");
 		driver->num = 1;
 		driver->name = ((void *)driver) + sizeof(struct diagchar_dev);
