@@ -541,12 +541,13 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 	},
 	#endif
 };
+#endif
 
 #ifdef CONFIG_MSM_GEMINI
 static struct resource msm_gemini_resources[] = {
 	{
-		.start  = 0xA3A00000,
-		.end    = 0xA3A00000 + 0x0150 - 1,
+		.start  = 0x04600000,
+		.end    = 0x04600000 + SZ_1M - 1,
 		.flags  = IORESOURCE_MEM,
 	},
 	{
@@ -562,8 +563,6 @@ static struct platform_device msm_gemini_device = {
 	.num_resources  = ARRAY_SIZE(msm_gemini_resources),
 };
 #endif
-#endif
-
 
 #ifdef CONFIG_I2C_QUP
 static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
@@ -1181,6 +1180,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_camera_sensor_imx074,
 #endif
 #endif
+#ifdef CONFIG_MSM_GEMINI
+	&msm_gemini_device,
+#endif
 	&msm_device_vidc
 };
 
@@ -1246,6 +1248,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
 #endif
+#endif
+#ifdef CONFIG_MSM_GEMINI
+	&msm_gemini_device,
 #endif
 	&msm_device_vidc
 };
