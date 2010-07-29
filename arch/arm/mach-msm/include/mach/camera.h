@@ -283,6 +283,8 @@ enum msm_camio_clk_type {
 	CAMIO_CSI1_CLK,
 	CAMIO_CSI0_PCLK,
 	CAMIO_CSI1_PCLK,
+	CAMIO_JPEG_CLK,
+	CAMIO_JPEG_PCLK,
 	CAMIO_MAX_CLK
 };
 
@@ -322,6 +324,8 @@ enum msm_s_setting {
 };
 
 int msm_camio_enable(struct platform_device *dev);
+int msm_camio_jpeg_clk_enable(void);
+int msm_camio_jpeg_clk_disable(void);
 
 int  msm_camio_clk_enable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_disable(enum msm_camio_clk_type clk);

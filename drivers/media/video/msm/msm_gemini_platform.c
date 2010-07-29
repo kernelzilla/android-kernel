@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/android_pmem.h>
 #include <mach/msm_reqs.h>
+#include <mach/camera.h>
 
 #include "msm_gemini_platform.h"
 #include "msm_gemini_common.h"
@@ -60,81 +61,6 @@ uint32_t msm_gemini_platform_v2p(int fd, uint32_t len, struct file **file_p)
 	}
 
 	return paddr;
-}
-
-static struct clk *jpeg_clk;
-static struct clk *jpeg_pclk;
-
-int msm_gemini_platform_clk_enable(void)
-{
-	/* MP*fps*(1 + %blanking)
-	   2MP: 24MHz  ------ 2 x 10 x 1.2
-	   3MP: 36MHz  ------ 3 x 10 x 1.2
-	   5MP: 60MHz  ------ 5 x 10 x 1.2
-	   8MP: 96MHz  ------ 8 x 10 x 1.2
-	  12MP: 144MHz ------12 x 10 x 1.2
-	 */
-	int rc = -1;
-	u32 rate = 144000000;
-
-	if (jpeg_clk  == NULL) {
-		jpeg_clk  = clk_get(NULL, "jpeg_clk");
-		if (jpeg_clk  == NULL) {
-			GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__,
-				rc);
-			goto fail;
-		}
-	}
-
-	rc = clk_set_min_rate(jpeg_clk, rate);
-	if (rc) {
-		GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
-		goto fail;
-	}
-
-	rc = clk_enable(jpeg_clk);
-	if (rc) {
-		GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
-		goto fail;
-	}
-
-	if (jpeg_pclk == NULL) {
-		jpeg_pclk = clk_get(NULL, "jpeg_pclk");
-		if (jpeg_pclk == NULL) {
-			GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__,
-				rc);
-			goto fail;
-		}
-	}
-
-	rc = clk_enable(jpeg_pclk);
-	if (rc) {
-		GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
-		goto fail;
-	}
-
-	/* Need to add  PM QOS bus requirement once updated */
-
-GMN_DBG("%s:%d]\n", __func__, __LINE__);
-	return rc;
-
-fail:
-	GMN_PR_ERR("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
-	return rc;
-}
-
-int msm_gemini_platform_clk_disable(void)
-{
-	clk_disable(jpeg_clk);
-	clk_put(jpeg_clk);
-	jpeg_clk = NULL;
-
-	clk_disable(jpeg_pclk);
-	clk_put(jpeg_pclk);
-	jpeg_pclk = NULL;
-
-	/* Need to add the code for remove PM QOS requirement */
-	return 0;
 }
 
 int msm_gemini_platform_init(struct platform_device *pdev,
@@ -184,7 +110,7 @@ int msm_gemini_platform_init(struct platform_device *pdev,
 		goto fail2;
 	}
 
-	rc = msm_gemini_platform_clk_enable();
+	rc = msm_camio_jpeg_clk_enable();
 	if (rc) {
 		GMN_PR_ERR("%s: clk failed rc = %d\n", __func__, rc);
 		goto fail3;
@@ -212,7 +138,7 @@ int msm_gemini_platform_release(struct resource *mem, void *base, int irq,
 {
 	int result;
 
-	result = msm_gemini_platform_clk_disable();
+	result = msm_camio_jpeg_clk_disable();
 
 	free_irq(irq, context);
 
