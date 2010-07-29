@@ -35,6 +35,7 @@
 #include <linux/pmic8058-pwm.h>
 #include <linux/leds-pmic8058.h>
 #include <linux/rtc/rtc-pm8058.h>
+#include <linux/mfd/marimba.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -1419,6 +1420,19 @@ static int pm8058_gpios_init(void)
 				.inv_int_pol    = 0,
 			}
 		},
+		{ /* Timpani Reset */
+			20,
+			{
+				.direction	= PM_GPIO_DIR_OUT,
+				.output_value	= 1,
+				.output_buffer	= PM_GPIO_OUT_BUF_CMOS,
+				.pull		= PM_GPIO_PULL_DN,
+				.out_strength	= PM_GPIO_STRENGTH_HIGH,
+				.function	= PM_GPIO_FUNC_NORMAL,
+				.vin_sel	= 2,
+				.inv_int_pol	= 0,
+			}
+		}
 	};
 
 	for (i = 0; i < ARRAY_SIZE(gpio_cfgs); ++i) {
@@ -2072,6 +2086,85 @@ static struct i2c_board_info msm_i2c_gsbi3_tdisc_info[] = {
 };
 #endif
 
+static struct regulator *vreg_timpani_1;
+static struct regulator *vreg_timpani_2;
+
+static unsigned int msm_timpani_setup_power(void)
+{
+	int rc;
+
+	vreg_timpani_1 = regulator_get(NULL, "8058_l0");
+	if (IS_ERR(vreg_timpani_1)) {
+		pr_err("%s: Unable to get 8058_l0\n", __func__);
+		return -ENODEV;
+	}
+
+	vreg_timpani_2 = regulator_get(NULL, "8058_s3");
+	if (IS_ERR(vreg_timpani_2)) {
+		pr_err("%s: Unable to get 8058_s3\n", __func__);
+		return -ENODEV;
+	}
+
+	rc = regulator_enable(vreg_timpani_1);
+
+	if (rc) {
+		pr_err("%s: Enable regulator 8058_l0 failed\n", __func__);
+		return rc;
+	}
+
+	rc = regulator_enable(vreg_timpani_2);
+
+	if (rc) {
+		pr_err("%s: Enable regulator 8058_s3 failed\n", __func__);
+		goto fail_s3;
+	}
+	return rc;
+
+fail_s3:
+	regulator_put(vreg_timpani_1);
+	return rc;
+}
+
+static void msm_timpani_shutdown_power(void)
+{
+	int rc;
+
+	rc = regulator_disable(vreg_timpani_1);
+	if (rc)
+		pr_err("%s: Disable regulator 8058_l0 failed\n", __func__);
+
+	regulator_put(vreg_timpani_1);
+
+	rc = regulator_disable(vreg_timpani_2);
+	if (rc)
+		pr_err("%s: Disable regulator 8058_s3 failed\n", __func__);
+
+	regulator_put(vreg_timpani_2);
+}
+
+static struct marimba_codec_platform_data timpani_codec_pdata = {
+};
+
+#define TIMPANI_SLAVE_ID_CDC_ADDR		0X77
+#define TIMPANI_SLAVE_ID_QMEMBIST_ADDR		0X66
+
+static struct marimba_platform_data timpani_pdata = {
+	.slave_id[MARIMBA_SLAVE_ID_CDC]	= TIMPANI_SLAVE_ID_CDC_ADDR,
+	.slave_id[MARIMBA_SLAVE_ID_QMEMBIST] = TIMPANI_SLAVE_ID_QMEMBIST_ADDR,
+	.marimba_setup = msm_timpani_setup_power,
+	.marimba_shutdown = msm_timpani_shutdown_power,
+	.codec = &timpani_codec_pdata,
+};
+
+#define TIMPANI_I2C_SLAVE_ADDR	0xD
+
+static struct i2c_board_info msm_i2c_gsbi7_timpani_info[] = {
+	{
+		I2C_BOARD_INFO("timpani", TIMPANI_I2C_SLAVE_ADDR),
+		.platform_data = &timpani_pdata,
+	},
+};
+
 #ifdef CONFIG_PMIC8901
 
 #define PM8901_GPIO_INT           91
@@ -2298,6 +2391,12 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		ARRAY_SIZE(msm_camera_boardinfo),
 	},
 #endif
+	{
+		I2C_SURF | I2C_FFA,
+		MSM_GSBI7_QUP_I2C_BUS_ID,
+		msm_i2c_gsbi7_timpani_info,
+		ARRAY_SIZE(msm_i2c_gsbi7_timpani_info),
+	},
 };
 #endif /* CONFIG_I2C */
 
