@@ -650,7 +650,7 @@ static int msm_otg_set_host(struct otg_transceiver *xceiv, struct usb_bus *host)
 		return -ENODEV;
 
 	if (!host) {
-		msm_otg_start_host(xceiv, 0);
+		msm_otg_start_host(xceiv, REQUEST_STOP);
 		usb_unregister_notify(&dev->usbdev_nb);
 		dev->otg.host = 0;
 		dev->start_host = 0;
@@ -1179,7 +1179,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			 * pull-up to meet HNP timings.
 			 */
 			dev->otg.host->is_b_host = 1;
-			msm_otg_start_host(&dev->otg, 1);
+			msm_otg_start_host(&dev->otg, REQUEST_START);
 
 		}
 		break;
@@ -1191,7 +1191,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			/* A-device is physically disconnected during
 			 * HNP. Remove HCD.
 			 */
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->otg.host->is_b_host = 0;
 
 			clear_bit(B_BUS_REQ, &dev->inputs);
@@ -1216,7 +1216,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			 * not handled for now.
 			 */
 			pr_debug("b_ase0_brst_tmout\n");
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->otg.host->is_b_host = 0;
 			clear_bit(B_ASE0_BRST, &dev->tmouts);
 			clear_bit(A_BUS_SUSPEND, &dev->inputs);
@@ -1238,7 +1238,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			clear_bit(A_CONN, &dev->inputs);
 			clear_bit(B_BUS_REQ, &dev->inputs);
 
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->otg.host->is_b_host = 0;
 
 			spin_lock_irq(&dev->lock);
@@ -1306,7 +1306,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
 			/* Start HCD to detect peripherals. */
-			msm_otg_start_host(&dev->otg, 1);
+			msm_otg_start_host(&dev->otg, REQUEST_START);
 		}
 		break;
 	case OTG_STATE_A_WAIT_BCON:
@@ -1316,7 +1316,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			pr_debug("id || a_bus_drop || a_wait_bcon_tmout\n");
 			msm_otg_del_timer(dev);
 			clear_bit(A_BUS_REQ, &dev->inputs);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_VFALL;
@@ -1334,7 +1334,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("!a_vbus_vld\n");
 			msm_otg_del_timer(dev);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_VBUS_ERR;
 			spin_unlock_irq(&dev->lock);
@@ -1348,7 +1348,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_VFALL;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
@@ -1357,17 +1357,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_VBUS_ERR;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			/* no work */
 		} else if (!test_bit(A_BUS_REQ, &dev->inputs)) {
 			/* a_bus_req is de-asserted when root hub is
 			 * suspended or HNP is in progress.
 			 */
 			pr_debug("!a_bus_req\n");
-			/* TODO: HCD is stopped after B-device disconnect.
-			 * usb_remove_hcd is taking 120 msec and HNP timings
-			 * are not met.
-			 */
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_SUSPEND;
 			spin_unlock_irq(&dev->lock);
@@ -1396,7 +1392,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_VFALL;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
@@ -1406,7 +1402,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_VBUS_ERR;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 		} else if (!test_bit(B_CONN, &dev->inputs) &&
 				dev->otg.host->b_hnp_enable) {
 			pr_debug("!b_conn && b_hnp_enable");
@@ -1416,7 +1412,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->otg.state = OTG_STATE_A_PERIPHERAL;
 			spin_unlock_irq(&dev->lock);
 
-			msm_otg_start_host(&dev->otg, 0);
+			msm_otg_start_host(&dev->otg, REQUEST_HNP_SUSPEND);
 
 			/* We may come here even when B-dev is physically
 			 * disconnected during HNP. We go back to host
@@ -1448,6 +1444,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			msm_otg_start_peripheral(&dev->otg, 0);
 			dev->otg.gadget->is_a_peripheral = 0;
+			/* HCD was suspended before. Stop it now */
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
@@ -1460,6 +1458,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			msm_otg_start_peripheral(&dev->otg, 0);
 			dev->otg.gadget->is_a_peripheral = 0;
+			/* HCD was suspended before. Stop it now */
+			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 		} else if (test_bit(A_BIDL_ADIS, &dev->tmouts)) {
 			pr_debug("a_bidl_adis_tmout\n");
 			msm_otg_start_peripheral(&dev->otg, 0);
@@ -1469,7 +1469,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irq(&dev->lock);
 			set_bit(A_BUS_REQ, &dev->inputs);
-			msm_otg_start_host(&dev->otg, 1);
+			msm_otg_start_host(&dev->otg, REQUEST_HNP_RESUME);
 			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
 		}
 		break;
