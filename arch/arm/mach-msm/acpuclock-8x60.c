@@ -106,7 +106,7 @@ static struct clock_state {
 } drv_state;
 
 struct clkctl_acpu_speed {
-	unsigned int     use_for_scaling[NR_CPUS];
+	unsigned int     use_for_scaling[2]; /* One for each CPU. */
 	unsigned int     acpuclk_khz;
 	int              pll;
 	unsigned int     acpuclk_src_sel;
@@ -120,6 +120,8 @@ struct clkctl_acpu_speed {
 	struct clkctl_acpu_speed *up;
 	struct clkctl_acpu_speed *down;
 };
+
+static struct clkctl_acpu_speed *l2_vote[NR_CPUS];
 
 #define AFAB_IDX 1
 /* L_VAL's below assume MXO (27 MHz) sources for all SCPLLs.
@@ -270,10 +272,6 @@ static void update_l2_speed(unsigned int voting_cpu,
 {
 	int cpu;
 	struct clkctl_acpu_speed *max;
-	static struct clkctl_acpu_speed *l2_vote[NR_CPUS] = {
-		acpu_freq_tbl,
-		acpu_freq_tbl,
-	};
 
 	/* Update voting CPU's L2 speed vote. */
 	l2_vote[voting_cpu] = speed;
@@ -313,17 +311,14 @@ static void switch_sc_speed(int cpu, struct clkctl_acpu_speed *tgt_s)
 	drv_state.current_speed[cpu] = tgt_s;
 
 	/* Adjust lpj for the new clock speed. */
-	per_cpu(cpu_data, cpu).loops_per_jiffy = tgt_s->lpj;
-
-	/* XXX Temporary hack until udelay is fixed. udelay uses the global
-	 * loop_per_jiffy, not the per-cpu loops_per_jiffy. Update the global
-	 * variable to the max of the per-cpu variables so that delays are
-	 * never shorter than intended. */
+	/* XXX Temporary hack until udelay is fixed to not care about lpj.
+	 * Currently, the per-cpu loop_per_jiffy variables are unused and
+	 * are not even defined on UP kernels. So, just update the global
+	 * loops_per_jiffy variable to be the max of the two CPUs' values. */
 	loops_per_jiffy = tgt_s->lpj;
 	for_each_online_cpu(cpu)
-		if (per_cpu(cpu_data, cpu).loops_per_jiffy > loops_per_jiffy)
-			loops_per_jiffy =
-				per_cpu(cpu_data, cpu).loops_per_jiffy;
+		if (drv_state.current_speed[cpu]->lpj > loops_per_jiffy)
+			loops_per_jiffy = drv_state.current_speed[cpu]->lpj;
 }
 
 int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
@@ -501,6 +496,7 @@ static void __init force_all_to_afab(void)
 		select_clk_source_div(cpu, &acpu_freq_tbl[AFAB_IDX]);
 		select_core_source(cpu, 0);
 		drv_state.current_speed[cpu] = &acpu_freq_tbl[AFAB_IDX];
+		l2_vote[cpu] = &acpu_freq_tbl[AFAB_IDX];
 	}
 
 	select_core_source(L2, 0);
@@ -508,8 +504,6 @@ static void __init force_all_to_afab(void)
 
 	/* Both cores are assumed to have the same lpj values when on AFAB. */
 	calibrate_delay();
-	for_each_possible_cpu(cpu)
-		per_cpu(cpu_data, cpu).loops_per_jiffy = loops_per_jiffy;
 }
 
 /* Ensure SCPLLs use the MXO reference, not PXO. */
@@ -539,8 +533,7 @@ static void __init lpj_init(void)
 	for (i = 0; acpu_freq_tbl[i].acpuclk_khz; i++) {
 		acpu_freq_tbl[i].lpj =
 			cpufreq_scale(
-				per_cpu(cpu_data,
-					smp_processor_id()).loops_per_jiffy,
+				loops_per_jiffy,
 				base_freq->acpuclk_khz,
 				acpu_freq_tbl[i].acpuclk_khz);
 	}
