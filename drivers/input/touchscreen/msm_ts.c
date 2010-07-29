@@ -235,19 +235,33 @@ static int __devinit msm_ts_hw_init(struct msm_ts *ts)
 	return 0;
 }
 
+static void msm_ts_enable(struct msm_ts *ts, bool enable)
+{
+	uint32_t val;
+
+	if (enable == true)
+		msm_ts_hw_init(ts);
+	else {
+		val = tssc_readl(ts, TSSC_CTL);
+		val &= ~TSSC_CTL_ENABLE;
+		tssc_writel(ts, val, TSSC_CTL);
+	}
+}
+
 #ifdef CONFIG_PM
 static int
 msm_ts_suspend(struct device *dev)
 {
 	struct msm_ts *ts =  dev_get_drvdata(dev);
-	uint32_t val;
 
-	disable_irq(ts->sample_irq);
-	disable_irq(ts->pen_up_irq);
-
-	val = tssc_readl(ts, TSSC_CTL);
-	val &= ~TSSC_CTL_ENABLE;
-	tssc_writel(ts, val, TSSC_CTL);
+	if (device_may_wakeup(dev) &&
+			device_may_wakeup(dev->parent))
+		enable_irq_wake(ts->sample_irq);
+	else {
+		disable_irq(ts->sample_irq);
+		disable_irq(ts->pen_up_irq);
+		msm_ts_enable(ts, false);
+	}
 
 	return 0;
 }
@@ -257,10 +271,14 @@ msm_ts_resume(struct device *dev)
 {
 	struct msm_ts *ts =  dev_get_drvdata(dev);
 
-	msm_ts_hw_init(ts);
-
-	enable_irq(ts->sample_irq);
-	enable_irq(ts->pen_up_irq);
+	if (device_may_wakeup(dev) &&
+			device_may_wakeup(dev->parent))
+		disable_irq_wake(ts->sample_irq);
+	else {
+		msm_ts_enable(ts, true);
+		enable_irq(ts->sample_irq);
+		enable_irq(ts->pen_up_irq);
+	}
 
 	return 0;
 }
@@ -413,6 +431,7 @@ static int __devinit msm_ts_probe(struct platform_device *pdev)
 	register_early_suspend(&ts->early_suspend);
 #endif
 
+	device_init_wakeup(&pdev->dev, pdata->can_wakeup);
 	pr_info("%s: tssc_base=%p irq1=%d irq2=%d\n", __func__,
 		ts->tssc_base, (int)ts->sample_irq, (int)ts->pen_up_irq);
 	dump_tssc_regs(ts);
@@ -445,6 +464,7 @@ static int __devexit msm_ts_remove(struct platform_device *pdev)
 {
 	struct msm_ts *ts = platform_get_drvdata(pdev);
 
+	device_init_wakeup(&pdev->dev, 0);
 	marimba_tsadc_unregister(ts->ts_client);
 	free_irq(ts->sample_irq, ts);
 	free_irq(ts->pen_up_irq, ts);
