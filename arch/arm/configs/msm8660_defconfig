@@ -1,6 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
+# Tue Jul 20 10:48:31 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1035,6 +1036,8 @@ CONFIG_MFD_CORE=y
 CONFIG_PMIC8058=y
 CONFIG_PMIC8901=y
 # CONFIG_TWL4030_CORE is not set
+CONFIG_MARIMBA_CORE=y
+# CONFIG_MARIMBA_CODEC is not set
 # CONFIG_MFD_TMIO is not set
 # CONFIG_MFD_TC6393XB is not set
 # CONFIG_PMIC_DA903X is not set
