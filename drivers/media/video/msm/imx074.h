@@ -33,7 +33,6 @@
 extern struct imx074_reg imx074_regs;
 struct reg_struct_init {
     /* PLL setting */
-	uint8_t pll_multiplier; /* 0x0307 */
 	uint8_t pre_pll_clk_div; /* 0x0305 */
 	uint8_t plstatim; /* 0x302b */
 	uint8_t reg_3024; /*ox3024*/
@@ -74,6 +73,7 @@ struct reg_struct_init {
 };
 
 struct reg_struct {
+	uint8_t pll_multiplier; /* 0x0307 */
 	uint8_t frame_length_lines_hi; /* 0x0340*/
 	uint8_t frame_length_lines_lo; /* 0x0341*/
 	uint8_t y_addr_start;  /* 0x347 */

@@ -478,9 +478,6 @@ static int32_t imx074_sensor_setting(int update_type, int rt)
 	case REG_INIT:
 		if (rt == RES_PREVIEW || rt == RES_CAPTURE) {
 			struct imx074_i2c_reg_conf init_tbl[] = {
-				{REG_PLL_MULTIPLIER,
-					imx074_regs.reg_pat_init[0].
-					pll_multiplier},
 				{REG_PRE_PLL_CLK_DIV,
 					imx074_regs.reg_pat_init[0].
 					pre_pll_clk_div},
@@ -568,6 +565,9 @@ static int32_t imx074_sensor_setting(int update_type, int rt)
 			struct imx074_i2c_reg_conf init_mode_tbl[] = {
 				{REG_GROUPED_PARAMETER_HOLD,
 					GROUPED_PARAMETER_HOLD},
+				{REG_PLL_MULTIPLIER,
+					imx074_regs.reg_pat[rt].
+					pll_multiplier},
 				{REG_FRAME_LENGTH_LINES_HI,
 					imx074_regs.reg_pat[rt].
 					frame_length_lines_hi},
@@ -674,6 +674,9 @@ static int32_t imx074_sensor_setting(int update_type, int rt)
 			struct imx074_i2c_reg_conf mode_tbl[] = {
 				{REG_GROUPED_PARAMETER_HOLD,
 					GROUPED_PARAMETER_HOLD},
+				{REG_PLL_MULTIPLIER,
+					imx074_regs.reg_pat[rt].
+					pll_multiplier},
 				{REG_FRAME_LENGTH_LINES_HI,
 					imx074_regs.reg_pat[rt].
 					frame_length_lines_hi},

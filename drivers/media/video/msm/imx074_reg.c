@@ -19,7 +19,6 @@
 const struct reg_struct_init imx074_reg_init[1] = {
 	{
 		/* PLL setting */
-		0x2D,	/* pll_multiplier 0x0307 */
 		0x02,	/* pll_divider 0x0305 */
 		0x4B,	/* plstatim 0x302b */
 		0x03,	/* reg_3024 */
@@ -65,6 +64,7 @@ const struct reg_struct_init imx074_reg_init[1] = {
 const struct reg_struct	imx074_reg_pat[2] = {
 	/*preview*/
 	{
+		0x2D, /*pll_multiplier*/
 		0x06, /*frame_length_lines_hi 0x0340*/
 		0x48, /* frame_length_lines_lo 0x0341*/
 		0x00, /* y_addr_start 0x347 */
@@ -88,6 +88,7 @@ const struct reg_struct	imx074_reg_pat[2] = {
 
 	/*snapshot*/
 	{
+		0x26, /*pll_multiplier*/
 		0x0C, /* frame_length_lines_hi 0x0340*/
 		0x90, /* frame_length_lines_lo 0x0341*/
 		0x00, /* y_addr_start 0x347 */
