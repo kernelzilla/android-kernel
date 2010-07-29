@@ -569,8 +569,6 @@ static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 	struct usb_hcd *hcd = mhcd_to_hcd(mhcd);
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct msm_usb_host_platform_data *pdata = mhcd->pdata;
-	struct device *dev = container_of((void *)hcd, struct device,
-							platform_data);	
 
 	switch (PHY_TYPE(pdata->phy_info)) {
 	case USB_PHY_INTEGRATED:
@@ -600,13 +598,13 @@ static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 		if (!hcd->regs)
 			return -EFAULT;
 		/* get usb clocks */
-		mhcd->clk = clk_get(dev, "usb_hs2_clk");
+		mhcd->clk = clk_get(NULL, "usb_hs2_clk");
 		if (IS_ERR(mhcd->clk)) {
 			iounmap(hcd->regs);
 			return PTR_ERR(mhcd->clk);
 		}
 
-		mhcd->pclk = clk_get(dev, "usb_hs2_pclk");
+		mhcd->pclk = clk_get(NULL, "usb_hs2_pclk");
 		if (IS_ERR(mhcd->pclk)) {
 			iounmap(hcd->regs);
 			clk_put(mhcd->clk);
