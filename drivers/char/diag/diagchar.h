@@ -60,8 +60,10 @@
 #define MSG_MASK_SIZE 8000
 #define LOG_MASK_SIZE 1000
 #define EVENT_MASK_SIZE 1000
-#define REG_TABLE_SIZE 25
 #define PKT_SIZE 4096
+/* This is the maximum number of pkt registrations supported at initialization*/
+extern unsigned int diag_max_registration;
+extern unsigned int diag_threshold_registration;
 
 #define APPEND_DEBUG(ch) \
 do {							\
