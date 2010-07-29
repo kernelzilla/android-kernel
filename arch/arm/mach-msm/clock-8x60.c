@@ -93,7 +93,6 @@
 #define DBG_BUS_VEC_H_REG		REG_MM(0x01E4)
 #define DBG_CFG_REG_HS_REG		REG_MM(0x01B4)
 #define DBG_CFG_REG_LS_REG		REG_MM(0x01B8)
-#define DSI_NS_REG			REG_MM(0x0054)
 #define GFX2D0_MD0_REG			REG_MM(0x0064)
 #define GFX2D0_MD1_REG			REG_MM(0x0068)
 #define GFX2D0_NS_REG			REG_MM(0x0070)
@@ -257,7 +256,7 @@
 	}
 #define F_RAW(f, p, m_v, n_v, c_v, m_m) \
 		F_RAW_PLL(f, p, m_v, n_v, c_v, m_m, 0)
-#define FREQ_END	0
+#define FREQ_END	(UINT_MAX-1)
 #define F_END	F_RAW(FREQ_END, NONE_PLL, 0, 0, 0, 0)
 
 #define PLL_RATE(r, l, m, n, v, d) { l, m, n, v, (d>>1) }
@@ -843,6 +842,24 @@ static struct clk_freq_tbl clk_tbl_csi[] = {
 	F_END,
 };
 
+/* DSI_BYTE */
+#define NS_MASK_DSI_BYTE BM(27, 24)
+#define CLK_DSI_BYTE(id, ns, h_r, h_c, h_b, tv) \
+		CLK_LOCAL(id, BASIC, ns, (ns-4), NULL, NULL, 0, h_r, h_c, h_b, \
+			0, B(2), NS_MASK_DSI_BYTE, 0, set_rate_basic, \
+			clk_tbl_dsi_byte, NULL, NONE, NULL, tv)
+#define F_DSI(d) F_RAW(d, NONE_PLL, 0, BVAL(27, 24, (d-1)), 0, 0)
+/* The DSI_BYTE clock is sourced from the DSI PHY PLL, which may change rate
+ * without this clock driver knowing.  So, overload the clk_set_rate() to set
+ * the divider (1 to 16) of the clock with respect to the PLL rate. */
+static struct clk_freq_tbl clk_tbl_dsi_byte[] = {
+	F_DSI(1),  F_DSI(2),  F_DSI(3),  F_DSI(4),
+	F_DSI(5),  F_DSI(6),  F_DSI(7),  F_DSI(8),
+	F_DSI(9),  F_DSI(10), F_DSI(11), F_DSI(12),
+	F_DSI(13), F_DSI(14), F_DSI(15), F_DSI(16),
+	F_END,
+};
+
 /* GFX2D0 and GFX2D1 */
 struct banked_mnd_masks bmdn_info_gfx2d0 = {
 	.bank_sel_mask =			B(11),
@@ -1214,29 +1231,45 @@ static struct clk_freq_tbl clk_tbl_vfe[] = {
 	F_END,
 };
 
-/* Audio Interface */
-#define NS_MASK_AIF (BM(31, 24) | BM(6, 0))
-#define CLK_AIF(id, ns, chld_lst) \
-		CLK_LOCAL(id, MND, ns, ns, (ns+4), ns, B(19), NULL, 0, 0, \
-				(B(15) | B(17)), B(9), NS_MASK_AIF, 0, \
-				set_rate_mnd, clk_tbl_aif, NULL, NONE, \
-				chld_lst, 0)
-#define F_AIF(f, s, d, m, n) \
+/* Audio Interface OSR */
+#define NS_MASK_AIF_OSR (BM(31, 24) | BM(6, 0))
+#define CLK_AIF_OSR(id, ns, h_r, h_c, h_b, tv) \
+		CLK_LOCAL(id, MND, ns, ns, (ns+4), ns, B(19), h_r, h_c, h_b, \
+				B(17), B(9), NS_MASK_AIF_OSR, 0, set_rate_mnd, \
+				clk_tbl_aif_osr, NULL, NONE, NULL, tv)
+#define F_AIF_OSR(f, s, d, m, n) \
 		F_RAW(f, s##_PLL, MD8(8, m, 0, n), \
 			NS(31, 24, n, m, 5, 4, 3, d, 2, 0, s), \
 			0, MND_EN(B(8), n))
-static struct clk_freq_tbl clk_tbl_aif[] = {
-	F_AIF(  512000, LPA_PLL0, 4, 1, 264),
-	F_AIF(  768000, LPA_PLL0, 2, 1, 352),
-	F_AIF( 1024000, LPA_PLL0, 4, 1, 132),
-	F_AIF( 1536000, LPA_PLL0, 4, 1,  88),
-	F_AIF( 2048000, LPA_PLL0, 4, 1,  66),
-	F_AIF( 3072000, LPA_PLL0, 4, 1,  44),
-	F_AIF( 4096000, LPA_PLL0, 4, 1,  33),
-	F_AIF( 6144000, LPA_PLL0, 4, 1,  22),
-	F_AIF( 8192000, LPA_PLL0, 2, 1,  33),
-	F_AIF(12288000, LPA_PLL0, 4, 1,  11),
-	F_AIF(24576000, LPA_PLL0, 2, 1,  11),
+static struct clk_freq_tbl clk_tbl_aif_osr[] = {
+	F_AIF_OSR(  768000, LPA_PLL0, 4, 1, 176),
+	F_AIF_OSR( 1024000, LPA_PLL0, 4, 1, 132),
+	F_AIF_OSR( 1536000, LPA_PLL0, 4, 1,  88),
+	F_AIF_OSR( 2048000, LPA_PLL0, 4, 1,  66),
+	F_AIF_OSR( 3072000, LPA_PLL0, 4, 1,  44),
+	F_AIF_OSR( 4096000, LPA_PLL0, 4, 1,  33),
+	F_AIF_OSR( 6144000, LPA_PLL0, 4, 1,  22),
+	F_AIF_OSR( 8192000, LPA_PLL0, 2, 1,  33),
+	F_AIF_OSR(12288000, LPA_PLL0, 4, 1,  11),
+	F_AIF_OSR(24576000, LPA_PLL0, 2, 1,  11),
+	F_END,
+};
+
+/* Audio Interface Bit */
+#define NS_MASK_AIF_BIT BM(14, 10)
+#define CLK_AIF_BIT(id, ns, h_r, h_c, h_b, tv) \
+		CLK_LOCAL(id, BASIC, ns, ns, 0, ns, B(19), h_r, h_c, h_b, \
+				B(15), 0, NS_MASK_AIF_BIT, 0, set_rate_basic, \
+				clk_tbl_aif_bit, NULL, NONE, NULL, tv)
+#define F_AIF_BIT(d, s) \
+		F_RAW(d, NONE_PLL, 0, (BVAL(14, 14, s) | BVAL(13, 10, (d-1))), \
+			0, 0)
+static struct clk_freq_tbl clk_tbl_aif_bit[] = {
+	F_AIF_BIT(0, 1),  /* Use external clock. */
+	F_AIF_BIT(1, 0),  F_AIF_BIT(2, 0),  F_AIF_BIT(3, 0),  F_AIF_BIT(4, 0),
+	F_AIF_BIT(5, 0),  F_AIF_BIT(6, 0),  F_AIF_BIT(7, 0),  F_AIF_BIT(8, 0),
+	F_AIF_BIT(9, 0),  F_AIF_BIT(10, 0), F_AIF_BIT(11, 0), F_AIF_BIT(12, 0),
+	F_AIF_BIT(13, 0), F_AIF_BIT(14, 0), F_AIF_BIT(15, 0), F_AIF_BIT(16, 0),
 	F_END,
 };
 
@@ -1252,7 +1285,7 @@ static struct clk_freq_tbl clk_tbl_aif[] = {
 			0, MND_EN(B(8), n))
 static struct clk_freq_tbl clk_tbl_pcm[] = {
 	F_PCM(  512000, LPA_PLL0, 4, 1, 264),
-	F_PCM(  768000, LPA_PLL0, 2, 1, 352),
+	F_PCM(  768000, LPA_PLL0, 4, 1, 176),
 	F_PCM( 1024000, LPA_PLL0, 4, 1, 132),
 	F_PCM( 1536000, LPA_PLL0, 4, 1,  88),
 	F_PCM( 2048000, LPA_PLL0, 4, 1,  66),
@@ -1286,15 +1319,6 @@ static uint32_t chld_pixel_mdp[] = 	{C(PIXEL_LCDC), C(NONE)};
 static uint32_t chld_tv_src[] =		{C(TV_ENC), C(TV_DAC), C(MDP_TV),
 					 C(HDMI_TV), C(DSUB_TV), C(NONE)};
 static uint32_t chld_vfe[] =		{C(CSI0_VFE), C(CSI1_VFE), C(NONE)};
-static uint32_t chld_mi2s_src[] =	{C(MI2S), C(MI2S_M), C(NONE)};
-static uint32_t chld_codec_i2s_mic_src[] =	{C(CODEC_I2S_MIC),
-						 C(CODEC_I2S_MIC_M), C(NONE)};
-static uint32_t chld_codec_i2s_spkr_src[] =	{C(CODEC_I2S_SPKR),
-						 C(CODEC_I2S_SPKR_M), C(NONE)};
-static uint32_t chld_spare_i2s_mic_src[] =	{C(SPARE_I2S_MIC),
-						 C(SPARE_I2S_MIC_M), C(NONE)};
-static uint32_t chld_spare_i2s_spkr_src[] =	{C(SPARE_I2S_SPKR),
-						 C(SPARE_I2S_SPKR_M), C(NONE)};
 
 /* Test Vector Macros */
 #define TEST_TYPE_PER		1
@@ -1499,6 +1523,11 @@ static struct clk_local clk_local_tbl[] = {
 	CLK_SLAVE_MM(CSI1, CSI_CC_REG, B(7), DBG_BUS_VEC_B_REG,
 		HALT, 14, CSI_SRC, TEST_MMHS(0x03)),
 
+	CLK_DSI_BYTE(DSI_BYTE, MISC_CC2_REG, DBG_BUS_VEC_B_REG,
+		HALT, 23, TEST_MMLS(0x01)),
+	CLK_NORATE_MM(DSI_ESC, MISC_CC_REG, B(0), DBG_BUS_VEC_B_REG,
+		HALT, 24, TEST_MMLS(0x47)),
+
 	CLK_GFX2D0(GFX2D0, GFX2D0_NS_REG, DBG_BUS_VEC_A_REG,
 		HALT, 9,  TEST_MMHS(0x0F)),
 	CLK_GFX2D1(GFX2D1, GFX2D1_NS_REG, DBG_BUS_VEC_A_REG,
@@ -1589,52 +1618,33 @@ static struct clk_local clk_local_tbl[] = {
 	 * Low Power Audio Clocks
 	 */
 
-	CLK_AIF(MI2S_SRC, LCC_MI2S_NS_REG, chld_mi2s_src),
-	CLK_SLAVE_LPA(MI2S, LCC_MI2S_NS_REG, B(15),
-			LCC_MI2S_STATUS_REG, ENABLE, 0,
-			MI2S_SRC, TEST_LPA(0x17)),
-	CLK_SLAVE_LPA(MI2S_M, LCC_MI2S_NS_REG, B(17),
-			LCC_MI2S_STATUS_REG, ENABLE, 1,
-			MI2S_SRC, TEST_LPA(0x15)),
+	CLK_AIF_OSR(MI2S_OSR, LCC_MI2S_NS_REG,
+		LCC_MI2S_STATUS_REG, ENABLE, 1, TEST_LPA(0x15)),
+	CLK_AIF_BIT(MI2S_BIT, LCC_MI2S_NS_REG,
+		LCC_MI2S_STATUS_REG, ENABLE, 0, TEST_LPA(0x17)),
 
-	CLK_AIF(CODEC_I2S_MIC_SRC, LCC_CODEC_I2S_MIC_NS_REG,
-			chld_codec_i2s_mic_src),
-	CLK_SLAVE_LPA(CODEC_I2S_MIC, LCC_CODEC_I2S_MIC_NS_REG, B(15),
-			LCC_CODEC_I2S_MIC_STATUS_REG, ENABLE, 0,
-			CODEC_I2S_MIC_SRC, TEST_LPA(0x1B)),
-	CLK_SLAVE_LPA(CODEC_I2S_MIC_M, LCC_CODEC_I2S_MIC_NS_REG, B(17),
-			LCC_CODEC_I2S_MIC_STATUS_REG, ENABLE, 1,
-			CODEC_I2S_MIC_SRC, TEST_LPA(0x19)),
+	CLK_AIF_OSR(CODEC_I2S_MIC_OSR, LCC_CODEC_I2S_MIC_NS_REG,
+		LCC_CODEC_I2S_MIC_STATUS_REG, ENABLE, 1, TEST_LPA(0x19)),
+	CLK_AIF_BIT(CODEC_I2S_MIC_BIT, LCC_CODEC_I2S_MIC_NS_REG,
+		LCC_CODEC_I2S_MIC_STATUS_REG, ENABLE, 0, TEST_LPA(0x1B)),
 
-	CLK_AIF(SPARE_I2S_MIC_SRC, LCC_SPARE_I2S_MIC_NS_REG,
-			chld_spare_i2s_mic_src),
-	CLK_SLAVE_LPA(SPARE_I2S_MIC,   LCC_SPARE_I2S_MIC_NS_REG, B(15),
-			LCC_SPARE_I2S_MIC_STATUS_REG, ENABLE, 0,
-			SPARE_I2S_MIC_SRC, TEST_LPA(0x23)),
-	CLK_SLAVE_LPA(SPARE_I2S_MIC_M, LCC_SPARE_I2S_MIC_NS_REG, B(17),
-			LCC_SPARE_I2S_MIC_STATUS_REG, ENABLE, 1,
-			SPARE_I2S_MIC_SRC, TEST_LPA(0x21)),
+	CLK_AIF_OSR(SPARE_I2S_MIC_OSR, LCC_SPARE_I2S_MIC_NS_REG,
+		LCC_SPARE_I2S_MIC_STATUS_REG, ENABLE, 1, TEST_LPA(0x21)),
+	CLK_AIF_BIT(SPARE_I2S_MIC_BIT, LCC_SPARE_I2S_MIC_NS_REG,
+		LCC_SPARE_I2S_MIC_STATUS_REG, ENABLE, 0, TEST_LPA(0x23)),
 
-	CLK_AIF(CODEC_I2S_SPKR_SRC, LCC_CODEC_I2S_SPKR_NS_REG,
-			chld_codec_i2s_spkr_src),
-	CLK_SLAVE_LPA(CODEC_I2S_SPKR,   LCC_CODEC_I2S_SPKR_NS_REG, B(15),
-			LCC_CODEC_I2S_SPKR_STATUS_REG, ENABLE, 0,
-			CODEC_I2S_SPKR_SRC, TEST_LPA(0x1F)),
-	CLK_SLAVE_LPA(CODEC_I2S_SPKR_M, LCC_CODEC_I2S_SPKR_NS_REG, B(17),
-			LCC_CODEC_I2S_SPKR_STATUS_REG, ENABLE, 1,
-			CODEC_I2S_SPKR_SRC, TEST_LPA(0x1D)),
+	CLK_AIF_OSR(CODEC_I2S_SPKR_OSR, LCC_CODEC_I2S_SPKR_NS_REG,
+		LCC_CODEC_I2S_SPKR_STATUS_REG, ENABLE, 1, TEST_LPA(0x1D)),
+	CLK_AIF_BIT(CODEC_I2S_SPKR_BIT, LCC_CODEC_I2S_SPKR_NS_REG,
+		LCC_CODEC_I2S_SPKR_STATUS_REG, ENABLE, 0, TEST_LPA(0x1F)),
 
-	CLK_AIF(SPARE_I2S_SPKR_SRC, LCC_SPARE_I2S_SPKR_NS_REG,
-			chld_spare_i2s_spkr_src),
-	CLK_SLAVE_LPA(SPARE_I2S_SPKR,   LCC_SPARE_I2S_SPKR_NS_REG, B(15),
-			LCC_SPARE_I2S_SPKR_STATUS_REG, ENABLE, 0,
-			SPARE_I2S_SPKR_SRC, TEST_LPA(0x27)),
-	CLK_SLAVE_LPA(SPARE_I2S_SPKR_M, LCC_SPARE_I2S_SPKR_NS_REG, B(17),
-			LCC_SPARE_I2S_SPKR_STATUS_REG, ENABLE, 1,
-			SPARE_I2S_SPKR_SRC, TEST_LPA(0x25)),
+	CLK_AIF_OSR(SPARE_I2S_SPKR_OSR, LCC_SPARE_I2S_SPKR_NS_REG,
+		LCC_SPARE_I2S_SPKR_STATUS_REG, ENABLE, 1, TEST_LPA(0x25)),
+	CLK_AIF_BIT(SPARE_I2S_SPKR_BIT, LCC_SPARE_I2S_SPKR_NS_REG,
+		LCC_SPARE_I2S_SPKR_STATUS_REG, ENABLE, 0, TEST_LPA(0x27)),
 
 	CLK_PCM(PCM, LCC_PCM_NS_REG, LCC_PCM_STATUS_REG, ENABLE, 0,
-			TEST_LPA(0x29)),
+		TEST_LPA(0x29)),
 };
 
 static DEFINE_SPINLOCK(clock_reg_lock);
@@ -2156,12 +2166,12 @@ static long soc_clk_round_rate(unsigned id, unsigned rate)
 }
 
 /* Return the nth supported frequency for a given clock. */
-static unsigned soc_clk_list_rate(unsigned id, unsigned n)
+static int soc_clk_list_rate(unsigned id, unsigned n)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
 
-	if (!clk->freq_tbl)
-		return 0;
+	if (!clk->freq_tbl || clk->freq_tbl->freq_hz == FREQ_END)
+		return -ENXIO;
 
 	return (clk->freq_tbl + n)->freq_hz;
 }
@@ -2296,19 +2306,13 @@ static struct reg_init {
 	/* Deassert all MM core resets. */
 	{SW_RESET_CORE_REG,	0x1FFFFFF,	0x0},
 
+	/* Set dsi_byte_clk src to the DSI PHY PLL, and dsi_esc_clk to MXO/2. */
+	{MISC_CC2_REG,	B(22)|B(14)|BM(1, 0),	B(22)|B(14)|BVAL(1, 0, 0x1)},
 	/* Set hdmi_ref_clk to MM_PLL2/2. */
 	{MISC_CC2_REG,		B(28)|BM(21, 18), B(28)|BVAL(21, 18, 0x1)},
 	/* Set hdmi_app_clk source to MXO and divider to 1 (27MHz). */
 	{MISC_CC2_REG,		B(17),		B(17)},
 	{MISC_CC_REG,		BM(19, 18),	0},
-
-	/* Set audio bit clock sources to OSR (m_clk) and divider to 1/8. */
-	{LCC_CODEC_I2S_MIC_NS_REG,  BM(14, 10), BVAL(14, 10, 0x7)},
-	{LCC_CODEC_I2S_SPKR_NS_REG, BM(14, 10), BVAL(14, 10, 0x7)},
-	{LCC_SPARE_I2S_MIC_NS_REG,  BM(14, 10), BVAL(14, 10, 0x7)},
-	{LCC_SPARE_I2S_SPKR_NS_REG, BM(14, 10), BVAL(14, 10, 0x7)},
-	{LCC_MI2S_NS_REG,           BM(14, 10), BVAL(14, 10, 0x7)},
-
 };
 
 #define set_1rate(clk) \

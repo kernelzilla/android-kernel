@@ -43,7 +43,7 @@ struct clk_ops {
 	int (*set_max_rate)(unsigned id, unsigned rate);
 	int (*set_flags)(unsigned id, unsigned flags);
 	unsigned (*get_rate)(unsigned id);
-	unsigned (*list_rate)(unsigned id, unsigned n);
+	int (*list_rate)(unsigned id, unsigned n);
 	signed (*measure_rate)(unsigned id);
 	unsigned (*is_enabled)(unsigned id);
 	long (*round_rate)(unsigned id, unsigned rate);
