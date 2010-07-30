@@ -2182,7 +2182,7 @@ static void __init qsd8x50_init(void)
 	qsd8x50_cfg_smsc911x();
 	msm_acpu_clock_init(&qsd8x50_clock_data);
 
-	msm_hsusb_pdata.swfi_latency =
+	msm_otg_pdata.swfi_latency =
 		msm_pm_data
 		[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency;
 	msm_device_hsusb_peripheral.dev.platform_data = &msm_hsusb_pdata;

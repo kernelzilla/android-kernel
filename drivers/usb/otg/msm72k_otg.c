@@ -27,6 +27,7 @@
 #include <linux/ioport.h>
 
 #include <linux/device.h>
+#include <linux/pm_qos_params.h>
 #include <mach/msm_hsusb_hw.h>
 #include <mach/msm72k_otg.h>
 #include <mach/msm_hsusb.h>
@@ -227,6 +228,32 @@ static const char *timer_string(int bit)
 	}
 }
 
+static void msm72k_pm_qos_update(int vote)
+{
+	struct msm_otg *dev = the_msm_otg;
+	struct msm_otg_platform_data *pdata = dev->pdata;
+	u32 swfi_latency = 0;
+
+	if (pdata)
+		swfi_latency = pdata->swfi_latency + 1;
+
+	if (vote) {
+		if (dev->otg.gadget)
+			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
+				DRIVER_NAME, swfi_latency);
+		if (depends_on_axi_freq(&dev->otg))
+			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
+				DRIVER_NAME, MSM_AXI_MAX_FREQ);
+	} else {
+		if (dev->otg.gadget)
+			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
+				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
+		if (depends_on_axi_freq(&dev->otg))
+			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
+				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
+	}
+}
+
 /* Controller gives interrupt for every 1 mesc if 1MSIE is set in OTGSC.
  * This interrupt can be used as a timer source and OTG timers can be
  * implemented. But hrtimers on MSM hardware can give atleast 1/32 KHZ
@@ -392,6 +419,11 @@ static int msm_otg_set_power(struct otg_transceiver *xceiv, unsigned mA)
 	if (pdata->chg_vbus_draw && new_chg != USB_CHG_TYPE__INVALID)
 		pdata->chg_vbus_draw(mA);
 
+	if (new_chg == USB_CHG_TYPE__WALLCHARGER) {
+		wake_lock(&dev->wlock);
+		queue_work(dev->wq, &dev->sm_work);
+	}
+
 	return 0;
 }
 
@@ -418,10 +450,18 @@ static void msm_otg_start_peripheral(struct otg_transceiver *xceiv, int on)
 		return;
 
 	if (on) {
+		/* Prevent idle and suspend power collapse(pc) while USB cable
+		 * is connected in Peripheral mode. Also vote for max
+		 * AXI frequency
+		 */
+		msm72k_pm_qos_update(1);
 		usb_gadget_vbus_connect(xceiv->gadget);
 	} else {
+		/* Vote for max AXI as wall-charger may have released it */
+		msm72k_pm_qos_update(1);
 		atomic_set(&dev->chg_type, USB_CHG_TYPE__INVALID);
 		usb_gadget_vbus_disconnect(xceiv->gadget);
+		msm72k_pm_qos_update(0);
 	}
 }
 
@@ -1114,7 +1154,8 @@ reset_link:
 
 static void msm_otg_sm_work(struct work_struct *w)
 {
-	struct msm_otg *dev = container_of(w, struct msm_otg, sm_work);
+	struct msm_otg	*dev = container_of(w, struct msm_otg, sm_work);
+	enum chg_type	chg_type = atomic_read(&dev->chg_type);
 	int ret;
 	int work = 0;
 	enum usb_otg_state state;
@@ -1246,6 +1287,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			dev->otg.host->is_b_host = 1;
 			msm_otg_start_host(&dev->otg, REQUEST_START);
 
+		} else if (chg_type == USB_CHG_TYPE__WALLCHARGER) {
+			/* Workaround: Reset PHY in SE1 state */
+			otg_reset(&dev->otg, 1);
+
+			pr_debug("entering into lpm with wall-charger\n");
+			msm_otg_suspend(dev);
+			msm72k_pm_qos_update(0);
 		}
 		break;
 	case OTG_STATE_B_WAIT_ACON:
@@ -1939,6 +1987,11 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		goto free_vbus_irq;
 	}
 
+	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME,
+					PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
+					PM_QOS_DEFAULT_VALUE);
+
 	return 0;
 
 free_vbus_irq:
@@ -2010,6 +2063,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 		dev->pdata->rpc_connect(0);
 
 	kfree(dev);
+	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME);
+	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME);
 	return 0;
 }
 

@@ -97,7 +97,6 @@ struct msm_hsusb_gadget_platform_data {
 	int *phy_init_seq;
 	void (*phy_reset)(void);
 
-	u32 swfi_latency;
 	int self_powered;
 };
 
@@ -141,6 +140,7 @@ struct msm_otg_platform_data {
 	enum hs_drv_amplitude	drv_ampl;
 	int			phy_reset_sig_inverted;
 
+	u32 			swfi_latency;
 	/* pmic notfications apis */
 	int (*pmic_notif_init) (void);
 	void (*pmic_notif_deinit) (void);

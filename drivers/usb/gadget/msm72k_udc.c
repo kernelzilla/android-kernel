@@ -29,7 +29,6 @@
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
 #include <linux/workqueue.h>
-#include <linux/pm_qos_params.h>
 #include <linux/switch.h>
 
 #include <mach/msm72k_otg.h>
@@ -217,8 +216,6 @@ static int msm72k_wakeup(struct usb_gadget *_gadget);
 static int msm72k_pullup_internal(struct usb_gadget *_gadget, int is_active);
 static int msm72k_set_halt(struct usb_ep *_ep, int value);
 static void flush_endpoint(struct msm_endpoint *ept);
-static void msm72k_pm_qos_update(int);
-
 
 static void msm_hsusb_set_state(enum usb_device_state state)
 {
@@ -328,12 +325,11 @@ static void usb_chg_detect(struct work_struct *w)
 	/* USB driver prevents idle and suspend power collapse(pc)
 	 * while USB cable is connected. But when dedicated charger is
 	 * connected, driver can vote for idle and suspend pc.
-	 * To allow idle & suspend pc when dedicated charger is connected,
-	 * release the wakelock and set driver latency to default sothat,
-	 * driver will reacquire wakelocks for any sub-sequent usb interrupts.
+	 * OTG driver handles idle pc as part of above otg_set_power call
+	 * when wallcharger is attached. To allow suspend pc, release the
+	 * wakelock which will be re-acquired for any sub-sequent usb interrupts
 	 * */
 	if (temp == USB_CHG_TYPE__WALLCHARGER) {
-		msm72k_pm_qos_update(0);
 		wake_unlock(&ui->wlock);
 	}
 }
@@ -1259,33 +1255,7 @@ static int usb_free(struct usb_info *ui, int ret)
 	if (ui->dma)
 		dma_free_coherent(&ui->pdev->dev, 4096, ui->buf, ui->dma);
 	kfree(ui);
-	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME);
-	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME);
 	return ret;
-}
-
-static void msm72k_pm_qos_update(int vote)
-{
-	struct msm_hsusb_gadget_platform_data *pdata =
-				the_usb_info->pdev->dev.platform_data;
-	u32 swfi_latency = 0;
-
-	if (pdata)
-		swfi_latency = pdata->swfi_latency + 1;
-
-	if (vote) {
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
-				DRIVER_NAME, swfi_latency);
-		if (depends_on_axi_freq(the_usb_info->xceiv))
-			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-				DRIVER_NAME, MSM_AXI_MAX_FREQ);
-	} else {
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
-				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
-		if (depends_on_axi_freq(the_usb_info->xceiv))
-			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
-	}
 }
 
 static void usb_do_work_check_vbus(struct usb_info *ui)
@@ -1328,7 +1298,6 @@ static void usb_do_work(struct work_struct *w)
 					break;
 				}
 
-				msm72k_pm_qos_update(1);
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: IDLE -> ONLINE\n");
 				usb_reset(ui);
@@ -1342,7 +1311,6 @@ static void usb_do_work(struct work_struct *w)
 					dev_err(&ui->pdev->dev,
 						"hsusb: peripheral: request irq"
 						" failed:(%d)", ret);
-					msm72k_pm_qos_update(0);
 					break;
 				}
 				ui->irq = otg->irq;
@@ -1372,9 +1340,6 @@ static void usb_do_work(struct work_struct *w)
 				/* wait incase chg_detect is running */
 				if (!ui->gadget.is_a_peripheral)
 					cancel_delayed_work_sync(&ui->chg_det);
-
-				/* vote against pc as WC may have released it */
-				msm72k_pm_qos_update(1);
 
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: ONLINE -> OFFLINE\n");
@@ -1418,7 +1383,6 @@ static void usb_do_work(struct work_struct *w)
 
 				ui->state = USB_STATE_OFFLINE;
 				usb_do_work_check_vbus(ui);
-				msm72k_pm_qos_update(0);
 				wake_unlock(&ui->wlock);
 				break;
 			}
@@ -1477,7 +1441,6 @@ static void usb_do_work(struct work_struct *w)
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: OFFLINE -> ONLINE\n");
 
-				msm72k_pm_qos_update(1);
 				usb_reset(ui);
 				ui->state = USB_STATE_ONLINE;
 				usb_do_work_check_vbus(ui);
@@ -2261,10 +2224,6 @@ static int msm72k_probe(struct platform_device *pdev)
 	wake_lock_init(&ui->wlock,
 			WAKE_LOCK_SUSPEND, "usb_bus_active");
 
-	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME,
-					PM_QOS_DEFAULT_VALUE);
-	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
-					PM_QOS_DEFAULT_VALUE);
 	usb_debugfs_init(ui);
 
 	usb_prepare(ui);
