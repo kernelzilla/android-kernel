@@ -761,11 +761,12 @@ static ssize_t dbg_base_read(
 				(int)msm_emdh_base);
 	bp += len;
 	dlen -= len;
+#ifdef CONFIG_FB_MSM_TVOUT
 	len = snprintf(bp, dlen, "tvenv_base:    %08x\n",
 				(int)tvenc_base);
 	bp += len;
 	dlen -= len;
-
+#endif
 	tot = (uint32)bp - (uint32)debug_buf;
 	*bp = 0;
 	tot++;
