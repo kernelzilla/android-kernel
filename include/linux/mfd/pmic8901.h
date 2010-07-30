@@ -45,6 +45,9 @@
 #define PM8901_MPP_IRQ(base, mpp)	((base) + \
 					PM8901_IRQ_BLOCK_BIT(6, (mpp)))
 
+#define PM8901_TEMP_ALARM_IRQ(base)	((base) + PM8901_IRQ_BLOCK_BIT(6, 4))
+#define PM8901_TEMP_HI_ALARM_IRQ(base)	((base) + PM8901_IRQ_BLOCK_BIT(6, 5))
+
 struct pm8901_chip;
 
 struct pm8901_platform_data {
