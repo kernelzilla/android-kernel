@@ -17,7 +17,7 @@
  */
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/mfd/marimba-codec.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
