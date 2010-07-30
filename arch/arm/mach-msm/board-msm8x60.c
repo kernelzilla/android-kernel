@@ -2751,6 +2751,19 @@ static struct pm8901_gpio_platform_data pm8901_mpp_data = {
 	.irq_base	= PM8901_MPP_IRQ(PM8901_IRQ_BASE, 0),
 };
 
+static struct resource pm8901_temp_alarm[] = {
+	{
+		.start = PM8901_TEMP_ALARM_IRQ(PM8901_IRQ_BASE),
+		.end = PM8901_TEMP_ALARM_IRQ(PM8901_IRQ_BASE),
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = PM8901_TEMP_HI_ALARM_IRQ(PM8901_IRQ_BASE),
+		.end = PM8901_TEMP_HI_ALARM_IRQ(PM8901_IRQ_BASE),
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
 static struct regulator_consumer_supply pm8901_vreg_supply[PM8901_VREG_MAX] = {
 	[PM8901_VREG_ID_L0]  = REGULATOR_SUPPLY("8901_l0",  NULL),
 	[PM8901_VREG_ID_L1]  = REGULATOR_SUPPLY("8901_l1",  NULL),
@@ -2836,6 +2849,11 @@ static struct mfd_cell pm8901_subdevs[] = {
 		.id		= -1,
 		.platform_data	= &pm8901_mpp_data,
 		.data_size	= sizeof(pm8901_mpp_data),
+	},
+	{	.name = "pm8901-tm",
+		.id		= -1,
+		.num_resources  = ARRAY_SIZE(pm8901_temp_alarm),
+		.resources      = pm8901_temp_alarm,
 	},
 	PM8901_VREG(PM8901_VREG_ID_L0),
 	PM8901_VREG(PM8901_VREG_ID_L1),
