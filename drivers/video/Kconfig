@@ -2421,6 +2421,21 @@ config FB_MSM_HDMI_ADV7520_PANEL
         ---help---
         Support for LCDC 720p HDMI panel attached to ADV7520
 
+config FB_MSM_HDMI_MSM_PANEL
+	depends on FB_MSM_MDP40
+	bool "MSM HDMI 1080p Panel"
+	select FB_MSM_DTV
+	default n
+	---help---
+	  Support for 480p/720p/1080i/1080p output through MSM HDMI
+
+config FB_MSM_HDMI_MSM_PANEL_DVI_SUPPORT
+	depends on FB_MSM_HDMI_MSM_PANEL
+	bool "Use DVI mode"
+	default n
+	---help---
+	  Support for DVI mode for MSM HDMI 1080p Panel
+
 config FB_MSM_TVOUT_NTSC
 	bool
 	select FB_MSM_TVOUT

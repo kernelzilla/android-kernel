@@ -647,7 +647,14 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+/* prim = 1024 x 600 x 4(bpp) x 2(pages)
+ * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
+ * Note: must be multiple of 4096 */
+#define MSM_FB_SIZE 0x8A5000;
+#else /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #define MSM_FB_SIZE 0x500000;
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #define MSM_PMEM_SF_SIZE 0x1700000;
 #define MSM_GPU_PHYS_SIZE       SZ_2M
 
@@ -713,11 +720,28 @@ static struct resource msm_fb_resources[] = {
 	}
 };
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+static int msm_fb_detect_panel(const char *name)
+{
+	if (!strcmp(name, "hdmi_msm"))
+		return 0;
+	pr_warning("%s: not supported '%s'", __func__, name);
+	return -ENODEV;
+}
+
+static struct msm_fb_platform_data msm_fb_pdata = {
+	.detect_client = msm_fb_detect_panel,
+};
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+
 static struct platform_device msm_fb_device = {
 	.name   = "msm_fb",
 	.id     = 0,
-	.num_resources  = ARRAY_SIZE(msm_fb_resources),
-	.resource       = msm_fb_resources,
+	.num_resources     = ARRAY_SIZE(msm_fb_resources),
+	.resource          = msm_fb_resources,
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+	.dev.platform_data = &msm_fb_pdata,
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
 #ifdef CONFIG_KERNEL_PMEM_EBI_REGION
@@ -801,6 +825,36 @@ static struct platform_device lcdc_samsung_panel_device = {
 		.platform_data = &lcdc_samsung_panel_data,
 	}
 };
+
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+static struct resource hdmi_msm_resources[] = {
+	{
+		.name  = "hdmi_msm_qfprom_addr",
+		.start = 0x00700000,
+		.end   = 0x007060FF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = "hdmi_msm_hdmi_addr",
+		.start = 0x04A00000,
+		.end   = 0x04A00FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = "hdmi_msm_irq",
+		.start = HDMI_IRQ,
+		.end   = HDMI_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device hdmi_msm_device = {
+	.name = "hdmi_msm",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(hdmi_msm_resources),
+	.resource = hdmi_msm_resources,
+};
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
@@ -1109,6 +1163,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+	&hdmi_msm_device,
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #ifdef CONFIG_MSM_CAMERA
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
@@ -1169,6 +1226,9 @@ static struct platform_device *surf_devices[] __initdata = {
 	&msm_fb_device,
 	&msm_device_kgsl,
 	&lcdc_samsung_panel_device,
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+	&hdmi_msm_device,
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 #ifdef CONFIG_MSM_CAMERA
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
@@ -2529,6 +2589,17 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	/* PMIC8901 */
 	GPIO_CFG(PM8901_GPIO_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
 #endif
+
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+	/* gpio_cec_var */
+	GPIO_CFG(169, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA),
+	/* gpio_ddc_clk */
+	GPIO_CFG(170, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA),
+	/* gpio_ddc_data */
+	GPIO_CFG(171, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA),
+	/* gpio_hpd */
+	GPIO_CFG(172, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
 static uint32_t msm8x60_hdrive_cfgs[][2] = {
@@ -2814,6 +2885,84 @@ static void lcdc_samsung_panel_power(int on)
 		gpio_tlmm_config(lcd_panel_gpios[n], 0);
 }
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+static struct regulator *reg_8058_l16;
+static struct regulator *reg_8901_l3;
+static struct regulator *reg_8901_hdmi_mvs;
+static int __init hdmi_msm_init(void)
+{
+	#define _GET_REGULATOR(var, name) do {				\
+		var = regulator_get(NULL, name);			\
+		if (IS_ERR(var)) {					\
+			pr_err("'%s' regulator not found, rc=%ld\n",	\
+				name, IS_ERR(var));			\
+			var = NULL;					\
+			return -ENODEV;					\
+		}							\
+	} while (0)
+
+	_GET_REGULATOR(reg_8058_l16, "8058_l16");
+	_GET_REGULATOR(reg_8901_l3, "8901_l3");
+	_GET_REGULATOR(reg_8901_hdmi_mvs, "8901_hdmi_mvs");
+
+	#undef _GET_REGULATOR
+
+	return 0;
+}
+
+static int hdmi_msm_regulators(int on)
+{
+	int rc;
+
+	if (!reg_8058_l16 || !reg_8901_l3 || !reg_8901_hdmi_mvs) {
+		if (hdmi_msm_init()) {
+			pr_err("%s: failed, HDMI regulators not initialized\n",
+				__func__);
+			return -ENODEV;
+		}
+	}
+
+	if (on) {
+		rc = regulator_enable(reg_8058_l16);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+				"8058_l16", rc);
+			return rc;
+		}
+		rc = regulator_enable(reg_8901_l3);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+				"8901_l3", rc);
+			return rc;
+		}
+		rc = regulator_enable(reg_8901_hdmi_mvs);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+				"8901_hdmi_mvs", rc);
+			return rc;
+		}
+		pr_info("%s(on): success\n", __func__);
+	} else {
+		rc = regulator_disable(reg_8058_l16);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+				"8058_l16", rc);
+
+		rc = regulator_disable(reg_8901_l3);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+				"8901_l3", rc);
+
+		rc = regulator_disable(reg_8901_hdmi_mvs);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+				"8901_hdmi_mvs", rc);
+		pr_info("%s(off): done\n", __func__);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
 static int lcdc_panel_power(int on)
 {
@@ -2832,6 +2981,10 @@ static int lcdc_panel_power(int on)
 
 static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_power_save   = lcdc_panel_power,
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+	/* TODO: consider moving this into the hdmi platform data */
+	.lcdc_gpio_config  = hdmi_msm_regulators,
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
 static struct msm_panel_common_pdata mdp_pdata = {

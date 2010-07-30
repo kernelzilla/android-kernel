@@ -38,6 +38,22 @@
 
 #define DTV_BASE	0xD0000
 
+/*#define DEBUG*/
+#ifdef DEBUG
+static void __mdp_outp(uint32 port, uint32 value)
+{
+	uint32 in_val;
+
+	outpdw(port, value);
+	in_val = inpdw(port);
+	printk(KERN_INFO "MDP-DTV[%04x] => %08x [%08x]\n",
+		port-(uint32)(MDP_BASE + DTV_BASE), value, in_val);
+}
+
+#undef MDP_OUTP
+#define MDP_OUTP(port, value)	__mdp_outp((uint32)(port), (value))
+#endif
+
 static int first_pixel_start_x;
 static int first_pixel_start_y;
 
