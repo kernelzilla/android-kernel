@@ -26,11 +26,14 @@
 #include "smd_private.h"
 
 #define BUILD_ID_LENGTH 32
+
 enum {
 	HW_PLATFORM_UNKNOWN = 0,
 	HW_PLATFORM_SURF    = 1,
 	HW_PLATFORM_FFA     = 2,
 	HW_PLATFORM_FLUID   = 3,
+	HW_PLATFORM_SVLTE_FFA	= 4,
+	HW_PLATFORM_SVLTE_SURF	= 5,
 	HW_PLATFORM_INVALID
 };
 
@@ -38,7 +41,9 @@ char *hw_platform[] = {
 	"Unknown",
 	"Surf",
 	"FFA",
-	"Fluid"
+	"Fluid",
+	"SVLTE_FFA",
+	"SLVTE_SURF"
 };
 
 /* Used to parse shared memory.  Must match the modem. */
