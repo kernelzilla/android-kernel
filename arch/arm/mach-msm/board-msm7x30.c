@@ -1434,6 +1434,7 @@ static struct msm_ts_platform_data msm_ts_data = {
 	.max_press      = 255,
 	.inv_x          = 4096,
 	.inv_y          = 4096,
+	.can_wakeup	= false,
 };
 
 static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
@@ -1442,6 +1443,7 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	.exit		     =  marimba_tsadc_exit,
 	.level_vote	     =  marimba_tsadc_vote,
 	.tsadc_prechg_en = true,
+	.can_wakeup	= false,
 	.setup = {
 		.pen_irq_en	=	true,
 		.tsadc_en	=	true,
