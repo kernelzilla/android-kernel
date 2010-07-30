@@ -168,6 +168,8 @@
 
 #define NR_SG		32
 
+#define MSM_MMC_IDLE_TIMEOUT	10000 /* msec */
+
 struct clk;
 
 struct msmsdcc_nc_dmadata {

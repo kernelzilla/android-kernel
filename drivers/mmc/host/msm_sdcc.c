@@ -37,6 +37,7 @@
 #include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/memory.h>
+#include <linux/pm_runtime.h>
 
 #include <asm/cacheflush.h>
 #include <asm/div64.h>
@@ -1128,7 +1129,35 @@ static void msmsdcc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 }
 #endif /* CONFIG_MMC_MSM_SDIO_SUPPORT */
 
+static int msmsdcc_enable(struct mmc_host *mmc)
+{
+	int rc;
+
+	rc = pm_runtime_get_sync(mmc->parent);
+
+	if (rc < 0) {
+		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
+				__func__, rc);
+		return rc;
+	}
+	return 0;
+}
+
+static int msmsdcc_disable(struct mmc_host *mmc, int lazy)
+{
+	int rc;
+
+	rc = pm_runtime_put_sync(mmc->parent);
+
+	if (rc < 0)
+		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
+				__func__, rc);
+	return rc;
+}
+
 static const struct mmc_host_ops msmsdcc_ops = {
+	.enable		= msmsdcc_enable,
+	.disable	= msmsdcc_disable,
 	.request	= msmsdcc_request,
 	.set_ios	= msmsdcc_set_ios,
 	.get_ro		= msmsdcc_get_ro,
@@ -1494,6 +1523,42 @@ msmsdcc_probe(struct platform_device *pdev)
 		       mmc_hostname(mmc));
 
 	mmc_set_drvdata(pdev, mmc);
+
+	ret = pm_runtime_set_active(&(pdev)->dev);
+	if (ret < 0)
+		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
+				__func__, ret);
+	/*
+	 * There is no notion of suspend/resume for SD/MMC/SDIO
+	 * cards. So host can be suspended/resumed with out
+	 * worrying about its children.
+	 */
+	pm_suspend_ignore_children(&(pdev)->dev, true);
+
+	/*
+	 * MMC/SD/SDIO bus suspend/resume operations are defined
+	 * only for the slots that will be used for non-removable
+	 * media or for all slots when CONFIG_MMC_UNSAFE_RESUME is
+	 * defined. Otherwise, they simply become card removal and
+	 * insertion events during suspend and resume respectively.
+	 * Hence, enable run-time PM only for slots for which bus
+	 * suspend/resume operations are defined.
+	 */
+#ifdef CONFIG_MMC_UNSAFE_RESUME
+	/*
+	 * If this capability is set, MMC core will enable/disable host
+	 * for every claim/release operation on a host. We use this
+	 * notification to increment/decrement runtime pm usage count.
+	 */
+	mmc->caps |= MMC_CAP_DISABLE;
+	pm_runtime_enable(&(pdev)->dev);
+#else
+	if (mmc->caps & MMC_CAP_NONREMOVABLE) {
+		mmc->caps |= MMC_CAP_DISABLE;
+		pm_runtime_enable(&(pdev)->dev);
+	}
+#endif
+
 	mmc_add_host(mmc);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1542,6 +1607,9 @@ msmsdcc_probe(struct platform_device *pdev)
 	return 0;
 
  platform_irq_free:
+	pm_runtime_disable(&(pdev)->dev);
+	pm_runtime_set_suspended(&(pdev)->dev);
+
 	if (plat->status_irq)
 		free_irq(plat->status_irq, host);
  sdiowakeup_irq_free:
@@ -1583,6 +1651,9 @@ static int msmsdcc_remove(struct platform_device *pdev)
 	if (!mmc)
 		return -ENXIO;
 
+	if (pm_runtime_suspended(&(pdev)->dev))
+		pm_runtime_resume(&(pdev)->dev);
+
 	host = mmc_priv(mmc);
 
 	DBG(host, "Removing SDCC2 device = %d\n", pdev->id);
@@ -1617,24 +1688,41 @@ static int msmsdcc_remove(struct platform_device *pdev)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&host->early_suspend);
 #endif
+	pm_runtime_disable(&(pdev)->dev);
+	pm_runtime_set_suspended(&(pdev)->dev);
 
 	return 0;
 }
 
 #ifdef CONFIG_PM
 static int
-msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
+msmsdcc_runtime_suspend(struct device *dev)
 {
-	struct mmc_host *mmc = mmc_get_drvdata(dev);
+	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msmsdcc_host *host = mmc_priv(mmc);
 	int rc = 0;
 
 	if (mmc) {
-		if (host->plat->status_irq)
-			disable_irq(host->plat->status_irq);
+		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO) {
+			/*
+			 * MMC core thinks that host is disabled by now since
+			 * runtime suspend is scheduled after msmsdcc_disable()
+			 * is called. Thus, MMC core will try to enable the host
+			 * while suspending it. This results in a synchronous
+			 * runtime resume request while in runtime suspending
+			 * context and hence inorder to complete this resume
+			 * requet, it will wait for suspend to be complete,
+			 * but runtime suspend also can not proceed further
+			 * until the host is resumed. Thus, it leads to a hang.
+			 * Hence, increase the pm usage count before suspending
+			 * the host so that any resume requests after this will
+			 * simple become pm usage counter increment operations.
+			 */
+			pm_runtime_get_noresume(dev);
+			rc = mmc_suspend_host(mmc, PMSG_SUSPEND);
+			pm_runtime_put_noidle(dev);
+		}
 
-		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO)
-			rc = mmc_suspend_host(mmc, state);
 		if (!rc) {
 			writel(0, host->base + MMCIMASK0);
 
@@ -1653,9 +1741,9 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 }
 
 static int
-msmsdcc_resume(struct platform_device *dev)
+msmsdcc_runtime_resume(struct device *dev)
 {
-	struct mmc_host *mmc = mmc_get_drvdata(dev);
+	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msmsdcc_host *host = mmc_priv(mmc);
 	unsigned long flags;
 
@@ -1677,24 +1765,77 @@ msmsdcc_resume(struct platform_device *dev)
 
 		if (!mmc->card || mmc->card->type != MMC_TYPE_SDIO)
 			mmc_resume_host(mmc);
-		if (host->plat->status_irq)
-			enable_irq(host->plat->status_irq);
 
 	}
 	return 0;
 }
+
+static int msmsdcc_runtime_idle(struct device *dev)
+{
+	/* Idle timeout is not configurable for now */
+	pm_schedule_suspend(dev, MSM_MMC_IDLE_TIMEOUT);
+
+	return -EAGAIN;
+}
+
+static int msmsdcc_pm_suspend(struct device *dev)
+{
+	struct mmc_host *mmc = dev_get_drvdata(dev);
+	struct msmsdcc_host *host = mmc_priv(mmc);
+	int rc = 0;
+
+	if (host->plat->status_irq)
+		disable_irq(host->plat->status_irq);
+
+	if (!pm_runtime_suspended(dev))
+		rc = msmsdcc_runtime_suspend(dev);
+
+	return rc;
+}
+
+static int msmsdcc_pm_resume(struct device *dev)
+{
+	struct mmc_host *mmc = dev_get_drvdata(dev);
+	struct msmsdcc_host *host = mmc_priv(mmc);
+	int rc = 0;
+
+	rc = msmsdcc_runtime_resume(dev);
+	if (host->plat->status_irq)
+		enable_irq(host->plat->status_irq);
+
+	/* Update the run-time PM status */
+	pm_runtime_disable(dev);
+	rc = pm_runtime_set_active(dev);
+	if (rc < 0)
+		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
+				__func__, rc);
+	pm_runtime_enable(dev);
+
+	return rc;
+}
+
 #else
-#define msmsdcc_suspend NULL
-#define msmsdcc_resume NULL
+#define msmsdcc_runtime_suspend NULL
+#define msmsdcc_runtime_resume NULL
+#define msmsdcc_runtime_idle NULL
+#define msmsdcc_pm_suspend NULL
+#define msmsdcc_pm_resume NULL
 #endif
+
+static const struct dev_pm_ops msmsdcc_dev_pm_ops = {
+	.runtime_suspend = msmsdcc_runtime_suspend,
+	.runtime_resume  = msmsdcc_runtime_resume,
+	.runtime_idle    = msmsdcc_runtime_idle,
+	.suspend 	 = msmsdcc_pm_suspend,
+	.resume		 = msmsdcc_pm_resume,
+};
 
 static struct platform_driver msmsdcc_driver = {
 	.probe		= msmsdcc_probe,
 	.remove		= msmsdcc_remove,
-	.suspend	= msmsdcc_suspend,
-	.resume		= msmsdcc_resume,
 	.driver		= {
 		.name	= "msm_sdcc",
+		.pm	= &msmsdcc_dev_pm_ops,
 	},
 };
 
