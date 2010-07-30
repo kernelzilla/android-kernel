@@ -19,7 +19,7 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
-#include <linux/mfd/marimba-codec.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <linux/mfd/marimba.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
@@ -35,6 +35,14 @@
 
 #define MAX_MDELAY_US 2000
 #define MIN_MDELAY_US 1000
+
+struct adie_codec_path {
+	struct adie_codec_dev_profile *profile;
+	struct adie_codec_register_image img;
+	u32 hwsetting_idx;
+	u32 stage_idx;
+	u32 curr_stage;
+};
 
 static struct adie_codec_register adie_codec_tx_regs[] = {
 	{ 0x04, 0xc0, 0x8C },
