@@ -313,6 +313,9 @@ static void pm8058_irq_ack(unsigned int irq)
 	block = irq / 8;
 
 	config = PM8058_IRQF_WRITE | chip->config[irq] | PM8058_IRQF_CLR;
+	/* Keep the mask */
+	if (!(chip->irqs_allowed[block] & (1 << (irq % 8))))
+		config |= PM8058_IRQF_MASK_FE | PM8058_IRQF_MASK_RE;
 	pm8058_config_irq(chip, &block, &config);
 }
 
