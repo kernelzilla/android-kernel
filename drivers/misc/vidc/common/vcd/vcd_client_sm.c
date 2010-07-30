@@ -1091,23 +1091,15 @@ static void vcd_clnt_cb_in_flushing
 			b_frm_trans_end = TRUE;
 		}
 		if (b_frm_trans_end && !p_cctxt->status.n_frame_submitted) {
-
 			VCD_MSG_HIGH
 			    ("All pending frames recvd from DDL");
-
 			if (p_cctxt->status.
 			    n_flush_mode & VCD_FLUSH_OUTPUT) {
 				vcd_flush_output_buffers(p_cctxt);
-
-				vcd_release_all_clnt_frm_transc
-				    (p_cctxt);
-
 			}
-
 			vcd_send_flush_done(p_cctxt, VCD_S_SUCCESS);
 			vcd_release_interim_frame_channels(p_dev_ctxt);
 			VCD_MSG_HIGH("Flush complete");
-			vcd_release_all_clnt_def_frm_transc(p_cctxt);
 			vcd_do_client_state_transition(p_cctxt,
 				VCD_CLIENT_STATE_RUN,
 				CLIENT_STATE_EVENT_NUMBER
@@ -1637,7 +1629,7 @@ static const struct vcd_clnt_state_table_type_t vcd_clnt_table_flushing = {
 	 NULL,
 	 NULL,
 	 NULL,
-	 NULL,
+	 vcd_fill_output_buffer_cmn,
 	 vcd_clnt_cb_in_flushing,
 	 },
 	vcd_clnt_enter_flushing,
