@@ -56,6 +56,7 @@
 #include <mach/board.h>
 #include <mach/irqs.h>
 #include <mach/msm_spi.h>
+#include <mach/msm_serial_hs.h>
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
 #include <mach/tlmm.h>
@@ -1024,6 +1025,14 @@ static struct i2c_board_info cy8ctmg200_board_info[] = {
 	}
 };
 
+#ifdef CONFIG_SERIAL_MSM_HS
+static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
+       .inject_rx_on_wakeup = 1,
+       .rx_to_inject = 0xFD,
+       .clk_name = "gsbi_uart_clk",
+};
+#endif
+
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 
 #define GPIO_LEFT_LED_1		(GPIO_EXPANDER_GPIO_BASE + (16 * 3))
@@ -1187,6 +1196,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #if defined(CONFIG_SPI_QUP) || defined(CONFIG_SPI_QUP_MODULE)
 	&msm_gsbi1_qup_spi_device,
+#endif
+#ifdef CONFIG_SERIAL_MSM_HS
+	&msm_device_uart_dm1,
 #endif
 #ifdef CONFIG_I2C_SSBI
 	&msm_device_ssbi1,
@@ -2366,6 +2378,10 @@ static void __init msm8x60_init_buses(void)
 #if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_HCD)
 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
 #endif
+#ifdef CONFIG_SERIAL_MSM_HS
+	msm_uart_dm1_pdata.wakeup_irq = gpio_to_irq(54); /* GSBI6(2) */
+	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
+#endif
 }
 
 static void __init msm8x60_map_io(void)
@@ -2584,6 +2600,16 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	GPIO_CFG(34, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	GPIO_CFG(36, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+#endif
+#ifdef CONFIG_SERIAL_MSM_HS
+	/* UARTDM_TX */
+	GPIO_CFG(53, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_RX */
+	GPIO_CFG(54, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_CTS */
+	GPIO_CFG(55, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),
+	/* UARTDM_RFR */
+	GPIO_CFG(56, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 #endif
 #ifdef CONFIG_PMIC8901
 	/* PMIC8901 */
