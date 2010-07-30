@@ -1471,6 +1471,7 @@ sub process {
 		if ($line =~ /^\+/ && $prevrawline !~ /\/\*\*/ &&
 		    $rawline !~ /^.\s*\*\s*\@$Ident\s/ &&
 		    $line !~ /^\+\s*printk\s*\(\s*(?:KERN_\S+\s*)?"[X\t]*"\s*(?:,|\)\s*;)\s*$/ &&
+		    $realfile ne "scripts/checkpatch.pl" &&
 		    $length > 80)
 		{
 			WARN("line over 80 characters\n" . $herecurr);
