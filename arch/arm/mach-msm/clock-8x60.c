@@ -744,6 +744,7 @@ static struct clk_freq_tbl clk_tbl_prng[] = {
 			NS(23, 16, n, m, 5, 4, 3, d, 2, 0, s), \
 			0, MND_EN(B(8), n))
 static struct clk_freq_tbl clk_tbl_sdc[] = {
+	F_SDC(  144000,  BB_MXO,  3, 2, 125),
 	F_SDC(  400000, BB_PLL8,  4, 1, 240),
 	F_SDC(16000000, BB_PLL8,  4, 1,   6),
 	F_SDC(17070000, BB_PLL8,  1, 2,  45),
