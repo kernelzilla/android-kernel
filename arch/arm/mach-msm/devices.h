@@ -98,10 +98,11 @@ extern struct platform_device msm_device_touchscreen;
 #ifdef CONFIG_GPIOLIB
 #define MSM7200A_GPIO_PLATFORM_DATA(ix, begin, end, irq)		\
 	[ix] = {							\
-		.gpio_base	= begin,				\
-		.ngpio		= end - begin + 1,			\
-		.irq_base	= MSM_GPIO_TO_INT(begin),		\
-		.irq_summary	= irq,					\
+		.gpio_base		= begin,			\
+		.ngpio			= end - begin + 1,		\
+		.irq_base		= MSM_GPIO_TO_INT(begin),	\
+		.irq_summary		= irq,				\
+		.latch_level_irqs	= false,			\
 		.regs = {						\
 			.in		= GPIO_IN_ ## ix,		\
 			.out		= GPIO_OUT_ ## ix,		\
