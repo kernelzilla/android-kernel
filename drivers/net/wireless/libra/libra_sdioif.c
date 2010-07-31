@@ -226,6 +226,15 @@ int libra_sdio_enable_polling(void)
 }
 EXPORT_SYMBOL(libra_sdio_enable_polling);
 
+void libra_sdio_set_clock(struct sdio_func *func, unsigned int clk_freq)
+{
+    struct mmc_host *host = func->card->host;
+    host->ios.clock = clk_freq;
+    host->ops->set_ios(host, &host->ios);
+
+}
+EXPORT_SYMBOL(libra_sdio_set_clock);
+
 /*
  * SDIO Probe
  */
