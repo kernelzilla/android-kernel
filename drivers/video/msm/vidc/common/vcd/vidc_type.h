@@ -54,4 +54,6 @@
 #define PMEM_MEMTYPE   PMEM_MEMTYPE_EBI1
 #endif
 
+#define ENA_CLK_GATE 0
+
 #endif
