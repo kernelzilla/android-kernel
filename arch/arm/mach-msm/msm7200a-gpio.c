@@ -44,6 +44,7 @@ struct msm_gpio_dev {
 	bool				latch_level_irqs;
 	struct msm7200a_gpio_regs	regs;
 	u32				irq_masks[IRQ_MASK_MAX];
+	u32				dual_edge_irq_ena;
 	int				nsuspend;
 };
 
@@ -166,33 +167,77 @@ static void msm_gpio_irq_unmask(unsigned int irq)
 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
 }
 
+/* For dual-edge interrupts in software, since the hardware has no
+ * such support:
+ *
+ * At appropriate moments, this function may be called to flip the polarity
+ * settings of both-edge irq lines to try and catch the next edge.
+ *
+ * The attempt is considered successful if:
+ * 1. the input value of the gpio doesn't change during the attempt, or
+ * 2. the status bit goes high, indicating that an edge was caught.
+ * If the value changes twice during the process, that would cause the first
+ * test to fail (falsely) but would force the second, as two opposite
+ * transitions would cause a detection no matter the polarity setting.
+ *
+ * The do-loop tries to sledge-hammer closed the timing hole between
+ * the initial value-read and the polarity-write - if the line value changes
+ * during that window, an interrupt is lost, the new polarity setting is
+ * incorrect, and the first success test will fail.
+ */
+static void update_dual_edge_pos(struct msm_gpio_dev *msm_gpio)
+{
+	int loop_limit = 100;
+	unsigned pol, val, val2, intstat;
+
+	do {
+		pol = readl(msm_gpio->regs.int_pos);
+		val = readl(msm_gpio->regs.in);
+		pol = (pol & ~msm_gpio->dual_edge_irq_ena) |
+		      (~val & msm_gpio->dual_edge_irq_ena);
+		writel(pol, msm_gpio->regs.int_pos);
+		intstat = readl(msm_gpio->regs.int_status);
+		val2 = readl(msm_gpio->regs.in);
+		if (!((val ^ val2) & msm_gpio->dual_edge_irq_ena & ~intstat))
+			return;
+	} while (loop_limit-- > 0);
+	pr_err("%s: dual-edge irq emulation failed to stabilize, "
+	       "interrupts will be dropped. %08x != %08x\n",
+	       __func__, val, val2);
+}
+
 static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 {
 	unsigned long irq_flags;
 	struct msm_gpio_dev *msm_gpio = get_irq_chip_data(irq);
 	unsigned offset = irq - msm_gpio->irq_base;
 
-	if ((flow_type & IRQ_TYPE_EDGE_BOTH) ==	IRQ_TYPE_EDGE_BOTH)
-		return -EINVAL;
-
-	if ((flow_type & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW)) ==
-		(IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW))
-		return -EINVAL;
-
 	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
 
 	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
 		set_gpio_bit(offset, msm_gpio->regs.int_edge);
 		irq_desc[irq].handle_irq = handle_edge_irq;
+
+		if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH) {
+			msm_gpio->dual_edge_irq_ena |= BIT(offset);
+			update_dual_edge_pos(msm_gpio);
+		} else {
+			msm_gpio->dual_edge_irq_ena &= ~BIT(offset);
+			if (flow_type & IRQF_TRIGGER_RISING)
+				set_gpio_bit(offset, msm_gpio->regs.int_pos);
+			else
+				clr_gpio_bit(offset, msm_gpio->regs.int_pos);
+		}
 	} else {
 		clr_gpio_bit(offset, msm_gpio->regs.int_edge);
 		irq_desc[irq].handle_irq = handle_level_irq;
-	}
 
-	if (flow_type & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_RISING))
-		set_gpio_bit(offset, msm_gpio->regs.int_pos);
-	else
-		clr_gpio_bit(offset, msm_gpio->regs.int_pos);
+		msm_gpio->dual_edge_irq_ena &= ~BIT(offset);
+		if (flow_type & IRQF_TRIGGER_HIGH)
+			set_gpio_bit(offset, msm_gpio->regs.int_pos);
+		else
+			clr_gpio_bit(offset, msm_gpio->regs.int_pos);
+	}
 
 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
 
@@ -237,8 +282,10 @@ static irqreturn_t msm_gpio_irq_handler(int irq, void *dev)
 	s = readl(msm_gpio->regs.int_status);
 	e = readl(msm_gpio->regs.int_en);
 	triggered_irqs = s & e;
-	if (triggered_irqs)
+	if (triggered_irqs) {
 		writel(triggered_irqs, msm_gpio->regs.int_clear);
+		update_dual_edge_pos(msm_gpio);
+	}
 	spin_unlock(&msm_gpio->lock);
 
 	if (!triggered_irqs)
