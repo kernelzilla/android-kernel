@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -77,7 +77,9 @@ enum {
 	VDEC_DALRPC_SETBUFFERS_00,
 	VDEC_DALRPC_FREEBUFFERS_00,
 	VDEC_DALRPC_GETPROPERTY,
-	VDEC_DALRPC_SETPROPERTY
+	VDEC_DALRPC_SETPROPERTY,
+	VDEC_DALRPC_GETDECATTRIBUTES_00,
+	VDEC_DALRPC_PERFORMANCE_CHANGE_REQUEST
 };
 
 enum {
@@ -264,7 +266,25 @@ static int vdec_setproperty(struct vdec_data *vd, void *argp)
 
 	return 0;
 }
+static int vdec_performance_change_request(struct vdec_data *vd, void* argp)
+{
+	u32 request_type;
+	int ret;
 
+	ret = copy_from_user(&request_type, argp, sizeof(request_type));
+	if (ret) {
+		pr_err("%s: copy_from_user failed\n", __func__);
+		return ret;
+	}
+	ret = dal_call_f0(vd->vdec_handle,
+			VDEC_DALRPC_PERFORMANCE_CHANGE_REQUEST,
+			request_type);
+	if (ret) {
+		pr_err("%s: remote function failed (%d)\n", __func__, ret);
+		return ret;
+	}
+	return ret;
+}
 static int vdec_initialize(struct vdec_data *vd, void *argp)
 {
 	struct vdec_config_sps vdec_cfg_sps;
@@ -726,6 +746,8 @@ static long vdec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		TRACE("VDEC_IOCTL_SETPROPERTY (pid=%d tid=%d)\n",
 		      current->group_leader->pid, current->pid);
 		ret = vdec_setproperty(vd, argp);
+	case VDEC_IOCTL_PERFORMANCE_CHANGE_REQ:
+		ret = vdec_performance_change_request(vd, argp);
 		break;
 	default:
 		pr_err("%s: invalid ioctl!\n", __func__);
