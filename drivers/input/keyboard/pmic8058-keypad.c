@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -746,15 +746,16 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_gpio_config;
 	}
 
-	rc = request_irq(kp->key_sense_irq, pmic8058_kp_irq,
+	rc = request_threaded_irq(kp->key_sense_irq, NULL, pmic8058_kp_irq,
 				 IRQF_TRIGGER_RISING, "pmic-keypad", kp);
 	if (rc < 0) {
 		dev_err(&pdev->dev, "failed to request keypad sense irq\n");
 		goto err_req_sense_irq;
 	}
 
-	rc = request_irq(kp->key_stuck_irq, pmic8058_kp_stuck_irq,
-				 IRQF_TRIGGER_RISING, "pmic-keypad-stuck", kp);
+	rc = request_threaded_irq(kp->key_stuck_irq, NULL,
+				 pmic8058_kp_stuck_irq, IRQF_TRIGGER_RISING,
+				 "pmic-keypad-stuck", kp);
 	if (rc < 0) {
 		dev_err(&pdev->dev, "failed to request keypad stuck irq\n");
 		goto err_req_stuck_irq;
