@@ -1875,6 +1875,15 @@ static void soc_clk_disable(unsigned id)
 	return;
 }
 
+static void soc_clk_auto_off(unsigned id)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&clock_reg_lock, flags);
+	_soc_clk_disable(id);
+	spin_unlock_irqrestore(&clock_reg_lock, flags);
+}
+
 static int soc_clk_reset(unsigned id, enum clk_reset_action action)
 {
 	struct clk_local *clk = &clk_local_tbl[id];
@@ -2179,6 +2188,7 @@ static int soc_clk_list_rate(unsigned id, unsigned n)
 struct clk_ops clk_ops_8x60 = {
 	.enable = soc_clk_enable,
 	.disable = soc_clk_disable,
+	.auto_off = soc_clk_auto_off,
 	.reset = soc_clk_reset,
 	.set_rate = soc_clk_set_rate,
 	.set_min_rate = soc_clk_set_min_rate,
