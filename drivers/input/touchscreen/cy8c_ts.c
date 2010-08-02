@@ -43,6 +43,7 @@
 #include <linux/workqueue.h>
 #include <linux/input/cy8c_ts.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #define CY8CTMA300	0x0
 #define CY8CTMG200	0x1
@@ -543,6 +544,12 @@ static int __devinit cy8c_ts_probe(struct i2c_client *client,
 	if (!ts)
 		return -ENOMEM;
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&client->dev);
+	if (rc < 0)
+		dev_dbg(&client->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&client->dev);
+
 	ts->client = client;
 	ts->pdata = pdata;
 	i2c_set_clientdata(client, ts);
@@ -568,6 +575,8 @@ error_dev_setup:
 	if (ts->pdata->dev_setup)
 		ts->pdata->dev_setup(0);
 error_touch_data_alloc:
+	pm_runtime_set_suspended(&client->dev);
+	pm_runtime_disable(&client->dev);
 	kfree(ts);
 	return rc;
 }
@@ -576,6 +585,9 @@ static int __devexit cy8c_ts_remove(struct i2c_client *client)
 {
 	struct cy8c_ts *ts = i2c_get_clientdata(client);
 	int rc;
+
+	pm_runtime_set_suspended(&client->dev);
+	pm_runtime_disable(&client->dev);
 
 	rc = cancel_delayed_work_sync(&ts->work);
 
