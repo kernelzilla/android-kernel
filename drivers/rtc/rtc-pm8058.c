@@ -21,6 +21,7 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/pm.h>
 #include <linux/rtc/rtc-pm8058.h>
+#include <linux/pm_runtime.h>
 
 #define PM8058_RTC_CTRL		0x1E8
 	#define PM8058_RTC_ENABLE	BIT(7)
@@ -345,6 +346,12 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&pdev->dev);
+	if (rc < 0)
+		dev_dbg(&pdev->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pdev->dev);
+
 	rtc_dd->rtc_irq = platform_get_irq(pdev, 0);
 	rtc_dd->rtc_alarm_irq = platform_get_irq(pdev, 1);
 	if (!rtc_dd->rtc_alarm_irq || !rtc_dd->rtc_irq) {
@@ -403,6 +410,8 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 fail_req_irq:
 	rtc_device_unregister(rtc_dd->rtc0);
 fail_rtc_enable:
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	kfree(rtc_dd);
 	return rc;
 }
@@ -437,6 +446,9 @@ static struct dev_pm_ops pm8058_rtc_pm_ops = {
 static int __devexit pm8058_rtc_remove(struct platform_device *pdev)
 {
 	struct pm8058_rtc *rtc_dd = platform_get_drvdata(pdev);
+
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	device_init_wakeup(&pdev->dev, 0);
 	free_irq(rtc_dd->rtc_alarm_irq, rtc_dd);
