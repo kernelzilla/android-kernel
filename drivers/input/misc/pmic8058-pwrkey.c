@@ -28,6 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/hrtimer.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #define PON_CNTL_1	0x1C
 #define PON_CNTL_PULL_UP BIT(7)
@@ -183,6 +184,12 @@ static int __devinit pmic8058_pwrkey_probe(struct platform_device *pdev)
 	pwrkey->pm_chip = pm_chip;
 	pwrkey->pdata   = pdata;
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	err = pm_runtime_set_active(&pdev->dev);
+	if (err < 0)
+		dev_dbg(&pdev->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pdev->dev);
+
 	pwr = input_allocate_device();
 	if (!pwr) {
 		dev_dbg(&pdev->dev, "Can't allocate power button\n");
@@ -262,6 +269,8 @@ unreg_input_dev:
 free_input_dev:
 	input_free_device(pwr);
 free_pwrkey:
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	kfree(pwrkey);
 	return err;
 }
@@ -272,6 +281,8 @@ static int __devexit pmic8058_pwrkey_remove(struct platform_device *pdev)
 	int key_release_irq = platform_get_irq(pdev, 0);
 	int key_press_irq = platform_get_irq(pdev, 1);
 
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	device_init_wakeup(&pdev->dev, 0);
 
 	free_irq(key_press_irq, pwrkey);
