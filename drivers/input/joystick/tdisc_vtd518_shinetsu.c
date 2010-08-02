@@ -25,6 +25,7 @@
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 #include <linux/input/tdisc_shinetsu.h>
 
 MODULE_LICENSE("GPL v2");
@@ -120,6 +121,10 @@ static void tdisc_work_f(struct work_struct *work)
 	 */
 	rc = gpio_get_value(dd->pdata->tdisc_gpio);
 	if (rc < 0) {
+		rc = pm_runtime_put_sync(&dd->clientp->dev);
+		if (rc < 0)
+			dev_dbg(&dd->clientp->dev, "%s: pm_runtime_put_sync"
+				" failed\n", __func__);
 		enable_irq(dd->clientp->irq);
 		return;
 	}
@@ -147,6 +152,11 @@ static void tdisc_work_f(struct work_struct *work)
 		 * Enable the IRQ to receive further interrupts.
 		 */
 		enable_irq(dd->clientp->irq);
+
+		rc = pm_runtime_put_sync(&dd->clientp->dev);
+		if (rc < 0)
+			dev_dbg(&dd->clientp->dev, "%s: pm_runtime_put_sync"
+				" failed\n", __func__);
 		return;
 	}
 
@@ -170,7 +180,12 @@ static irqreturn_t tdisc_interrupt(int irq, void *dev_id)
 	 * 4. If the GPIO is pulled high, enable the IRQ and cancel the work.
 	 */
 	struct tdisc_data *dd = dev_id;
+	int rc;
 
+	rc = pm_runtime_get(&dd->clientp->dev);
+	if (rc < 0)
+		dev_dbg(&dd->clientp->dev, "%s: pm_runtime_get"
+			" failed\n", __func__);
 	pr_debug("%s: TDISC IRQ ! :-)\n", __func__);
 
 	/* Schedule the work immediately */
@@ -227,6 +242,7 @@ static int __devexit tdisc_remove(struct i2c_client *client)
 {
 	struct tdisc_data		*dd;
 
+	pm_runtime_disable(&client->dev);
 	dd = i2c_get_clientdata(client);
 	input_unregister_device(dd->tdisc_device);
 	if (dd->pdata->tdisc_release != NULL)
@@ -285,6 +301,12 @@ static int __devinit tdisc_probe(struct i2c_client *client,
 	if (!i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_READ_I2C_BLOCK))
 		return -ENODEV;
+
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&pdev->dev);
+	if (rc < 0)
+		dev_dbg(&pdev->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pdev->dev);
 
 	dd = kzalloc(sizeof *dd, GFP_KERNEL);
 	if (!dd) {
@@ -376,6 +398,7 @@ static int __devinit tdisc_probe(struct i2c_client *client,
 		goto probe_register_fail;
 	}
 
+	pm_runtime_set_suspended(&client->dev);
 	return 0;
 
 probe_register_fail:
@@ -387,6 +410,8 @@ probe_free_exit:
 	i2c_set_clientdata(client, NULL);
 	kfree(dd);
 probe_exit:
+	pm_runtime_set_suspended(&client->dev);
+	pm_runtime_disable(&client->dev);
 	return rc;
 }
 
