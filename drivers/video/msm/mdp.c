@@ -1057,7 +1057,7 @@ static int mdp_probe(struct platform_device *pdev)
 		break;
 
 	case TV_PANEL:
-#ifdef CONFIG_FB_MSM_OVERLAY
+#if defined(CONFIG_FB_MSM_OVERLAY) && defined(CONFIG_FB_MSM_TVOUT)
 		pdata->on = mdp4_atv_on;
 		pdata->off = mdp4_atv_off;
 		mfd->dma_fnc = mdp4_atv_overlay;
