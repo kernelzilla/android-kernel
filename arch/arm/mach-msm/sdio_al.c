@@ -39,7 +39,7 @@
 
 #include <mach/sdio_al.h>
 
-#define MODULE_MAME "sdio_al"
+#define MODULE_NAME "sdio_al"
 #define DRV_VERSION "1.08"
 
 /* #define DEBUG_SDIO_AL_UNIT_TEST 1 */
@@ -445,18 +445,18 @@ static int read_mailbox(int from_isr)
 	u32 thresh_intr_mask = 0;
 
 	if (sdio_al->is_err) {
-		pr_info(MODULE_MAME ":In Error state, ignore request\n");
+		pr_info(MODULE_NAME ":In Error state, ignore request\n");
 		return 0;
 	}
 
-	pr_debug(MODULE_MAME ":start %s from_isr = %d.\n", __func__, from_isr);
+	pr_debug(MODULE_NAME ":start %s from_isr = %d.\n", __func__, from_isr);
 
 	if (!from_isr)
 		sdio_claim_host(sdio_al->card->sdio_func[0]);
-	pr_debug(MODULE_MAME ":before sdio_memcpy_fromio.\n");
+	pr_debug(MODULE_NAME ":before sdio_memcpy_fromio.\n");
 	ret = sdio_memcpy_fromio(func1, mailbox,
 			HW_MAILBOX_ADDR, sizeof(*mailbox));
-	pr_debug(MODULE_MAME ":after sdio_memcpy_fromio.\n");
+	pr_debug(MODULE_NAME ":after sdio_memcpy_fromio.\n");
 
 	eot_pipe =	(mailbox->eot_pipe_0_7) |
 			(mailbox->eot_pipe_8_15<<8);
@@ -471,9 +471,8 @@ static int read_mailbox(int from_isr)
 		(mailbox->mask_thresh_above_limit_pipe_0_7) |
 		(mailbox->mask_thresh_above_limit_pipe_8_15<<8);
 
-
 	if (ret) {
-		pr_err(MODULE_MAME ":Fail to read Mailbox,"
+		pr_err(MODULE_NAME ":Fail to read Mailbox,"
 				    " goto error state\n");
 		sdio_al->is_err = true;
 		/* Stop the timer to stop reading the mailbox */
@@ -482,12 +481,12 @@ static int read_mailbox(int from_isr)
 	}
 
 	if (overflow_pipe || underflow_pipe)
-		pr_info(MODULE_MAME ":Mailbox ERROR "
+		pr_info(MODULE_NAME ":Mailbox ERROR "
 				"overflow=0x%x, underflow=0x%x\n",
 				overflow_pipe, underflow_pipe);
 
 
-	pr_debug(MODULE_MAME ":eot=0x%x, thresh=0x%x\n",
+	pr_debug(MODULE_NAME ":eot=0x%x, thresh=0x%x\n",
 			 eot_pipe, thresh_pipe);
 
 	/* Scan for Rx Packets available and update read vailable bytes */
@@ -504,7 +503,7 @@ static int read_mailbox(int from_isr)
 		read_avail = mailbox->pipe_bytes_avail[ch->rx_pipe_index];
 
 		if (read_avail > INVALID_DATA_AVAILABLE) {
-			pr_info(MODULE_MAME
+			pr_info(MODULE_NAME
 				 ":Invalid read_avail 0x%x for pipe %d\n",
 				 read_avail, ch->rx_pipe_index);
 			continue;
@@ -533,7 +532,7 @@ static int read_mailbox(int from_isr)
 		new_write_avail = mailbox->pipe_bytes_avail[ch->tx_pipe_index];
 
 		if (new_write_avail > INVALID_DATA_AVAILABLE) {
-			pr_info(MODULE_MAME
+			pr_info(MODULE_NAME
 				 ":Invalid write_avail 0x%x for pipe %d\n",
 				 new_write_avail, ch->tx_pipe_index);
 			continue;
@@ -548,9 +547,9 @@ static int read_mailbox(int from_isr)
 	}
 
 	if ((rx_notify_bitmask == 0) && (tx_notify_bitmask == 0))
-		pr_debug(MODULE_MAME ":Nothing to Notify\n");
+		pr_debug(MODULE_NAME ":Nothing to Notify\n");
 	else
-		pr_info(MODULE_MAME ":Notify bitmask rx=0x%x, tx=0x%x.\n",
+		pr_info(MODULE_NAME ":Notify bitmask rx=0x%x, tx=0x%x.\n",
 			rx_notify_bitmask, tx_notify_bitmask);
 
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
@@ -581,7 +580,7 @@ static int read_mailbox(int from_isr)
 			(1<<ch->tx_pipe_index);
 	}
 
-	pr_debug(MODULE_MAME ":end %s.\n", __func__);
+	pr_debug(MODULE_NAME ":end %s.\n", __func__);
 
 exit_err:
 	if (!from_isr)
@@ -605,7 +604,7 @@ static u32 check_pending_rx_packet(struct sdio_channel *ch, u32 eot)
 	rx_pending = ch->rx_pending_bytes;
 	rx_avail = sdio_al->mailbox->pipe_bytes_avail[ch->rx_pipe_index];
 
-	pr_debug(MODULE_MAME ":pipe %d rx_avail=0x%x , rx_pending=0x%x\n",
+	pr_debug(MODULE_NAME ":pipe %d rx_avail=0x%x , rx_pending=0x%x\n",
 	   ch->rx_pipe_index, rx_avail, rx_pending);
 
 
@@ -615,7 +614,7 @@ static u32 check_pending_rx_packet(struct sdio_channel *ch, u32 eot)
 		new_packet_size = rx_avail - rx_pending;
 
 		if ((rx_avail <= rx_pending)) {
-			pr_info(MODULE_MAME ":Invalid new packet size."
+			pr_info(MODULE_NAME ":Invalid new packet size."
 					    " rx_avail=%d.\n", rx_avail);
 			new_packet_size = 0;
 			goto exit_err;
@@ -683,14 +682,14 @@ static void worker(struct work_struct *work)
 {
 	int ret = 0;
 
-	pr_debug(MODULE_MAME ":Worker Started..\n");
+	pr_debug(MODULE_NAME ":Worker Started..\n");
 	while ((sdio_al->is_ready) && (ret == 0)) {
-		pr_debug(MODULE_MAME ":Wait for read mailbox request..\n");
+		pr_debug(MODULE_NAME ":Wait for read mailbox request..\n");
 		wait_event(sdio_al->wait_mbox, sdio_al->ask_mbox);
 		ret = read_mailbox(false);
 		sdio_al->ask_mbox = false;
 	}
-	pr_debug(MODULE_MAME ":Worker Exit!\n");
+	pr_debug(MODULE_NAME ":Worker Exit!\n");
 }
 
 /**
@@ -717,7 +716,7 @@ static int sdio_write_cmd54(struct mmc_card *card, unsigned fn,
 	WARN_ON(blksz == 0);
 
 	write = true;
-	pr_debug(MODULE_MAME ":sdio_write_cmd54()"
+	pr_debug(MODULE_NAME ":sdio_write_cmd54()"
 		"fn=%d,buf=0x%x,blocks=%d,blksz=%d\n",
 		fn, (u32) buf, blocks, blksz);
 
@@ -871,22 +870,22 @@ static int read_sdioc_software_header(struct peer_sdioc_sw_header *header)
 	int ret;
 	struct sdio_func *func1 = sdio_al->card->sdio_func[0];
 
-	pr_debug(MODULE_MAME ":reading sdioc sw header.\n");
+	pr_debug(MODULE_NAME ":reading sdioc sw header.\n");
 
 	ret = sdio_memcpy_fromio(func1, header,
 			SDIOC_SW_HEADER_ADDR, sizeof(*header));
 	if (ret) {
-		pr_info(MODULE_MAME ":fail to read sdioc sw header.\n");
+		pr_info(MODULE_NAME ":fail to read sdioc sw header.\n");
 		goto exit_err;
 	}
 
 	if (header->signature != (u32) PEER_SDIOC_SW_MAILBOX_SIGNATURE) {
-		pr_info(MODULE_MAME ":sdioc sw invalid signature. 0x%x\n",
+		pr_info(MODULE_NAME ":sdioc sw invalid signature. 0x%x\n",
 			header->signature);
 		goto exit_err;
 	}
 
-	pr_info(MODULE_MAME ":SDIOC SW version 0x%x\n", header->version);
+	pr_info(MODULE_NAME ":SDIOC SW version 0x%x\n", header->version);
 
 	return 0;
 
@@ -909,7 +908,7 @@ static int read_sdioc_channel_config(struct sdio_channel *ch)
 	if (sdio_al->sdioc_sw_header->version == 0)
 		return -1;
 
-	pr_debug(MODULE_MAME ":reading sw mailbox %s channel.\n", ch->name);
+	pr_debug(MODULE_NAME ":reading sw mailbox %s channel.\n", ch->name);
 
 	sw_mailbox = kzalloc(sizeof(*sw_mailbox), GFP_KERNEL);
 	if (sw_mailbox == NULL)
@@ -918,22 +917,22 @@ static int read_sdioc_channel_config(struct sdio_channel *ch)
 	ret = sdio_memcpy_fromio(ch->func, sw_mailbox,
 			SDIOC_SW_MAILBOX_ADDR, sizeof(*sw_mailbox));
 	if (ret) {
-		pr_info(MODULE_MAME ":fail to read sw mailbox.\n");
+		pr_info(MODULE_NAME ":fail to read sw mailbox.\n");
 		goto exit_err;
 	}
 
 	ch_config = &sw_mailbox->ch_config[ch->num];
 
 	if (!ch_config->is_ready) {
-		pr_info(MODULE_MAME ":sw mailbox channel not ready.\n");
+		pr_info(MODULE_NAME ":sw mailbox channel not ready.\n");
 		goto exit_err;
 	}
 
-	pr_info(MODULE_MAME ":ch %s max_rx_threshold=%d.\n",
+	pr_info(MODULE_NAME ":ch %s max_rx_threshold=%d.\n",
 		ch->name, ch_config->max_rx_threshold);
-	pr_info(MODULE_MAME ":ch %s max_tx_threshold=%d.\n",
+	pr_info(MODULE_NAME ":ch %s max_tx_threshold=%d.\n",
 		ch->name, ch_config->max_tx_threshold);
-	pr_info(MODULE_MAME ":ch %s tx_buf_size=%d.\n",
+	pr_info(MODULE_NAME ":ch %s tx_buf_size=%d.\n",
 		ch->name, ch_config->tx_buf_size);
 
 	/* Aggregation up to 90% of the maximum size */
@@ -957,7 +956,7 @@ static int read_sdioc_channel_config(struct sdio_channel *ch)
 	return 0;
 
 exit_err:
-	pr_info(MODULE_MAME ":Reading SW Mailbox error.\n");
+	pr_info(MODULE_NAME ":Reading SW Mailbox error.\n");
 	kfree(sw_mailbox);
 
 	return -1;
@@ -986,7 +985,7 @@ static int enable_eot_interrupt(int pipe_index, int enable)
 
 	mask = sdio_readl(func1, addr, &ret);
 	if (ret) {
-		pr_debug(MODULE_MAME ":enable_eot_interrupt fail\n");
+		pr_debug(MODULE_NAME ":enable_eot_interrupt fail\n");
 		goto exit_err;
 	}
 
@@ -1023,7 +1022,7 @@ static int enable_threshold_interrupt(int pipe_index, int enable)
 
 	mask = sdio_readl(func1, addr, &ret);
 	if (ret) {
-		pr_debug(MODULE_MAME ":enable_threshold_interrupt fail\n");
+		pr_debug(MODULE_NAME ":enable_threshold_interrupt fail\n");
 		goto exit_err;
 	}
 
@@ -1052,7 +1051,7 @@ static int set_pipe_threshold(int pipe_index, int threshold)
 	sdio_writel(func1, threshold,
 			PIPES_THRESHOLD_ADDR+pipe_index*4, &ret);
 	if (ret)
-		pr_info(MODULE_MAME ":set_pipe_threshold err=%d\n", -ret);
+		pr_info(MODULE_NAME ":set_pipe_threshold err=%d\n", -ret);
 
 	return ret;
 }
@@ -1086,7 +1085,7 @@ static int open_channel(struct sdio_channel *ch)
 
 	mutex_init(&ch->ch_lock);
 
-	pr_debug(MODULE_MAME ":open_channel %s func#%d\n",
+	pr_debug(MODULE_NAME ":open_channel %s func#%d\n",
 			 ch->name, ch->func->num);
 
 	INIT_LIST_HEAD(&(ch->rx_size_list_head));
@@ -1095,21 +1094,21 @@ static int open_channel(struct sdio_channel *ch)
 	for (i = 0; i < 10; i++) {
 		ret = sdio_enable_func(ch->func);
 		if (ret) {
-			pr_info(MODULE_MAME ":retry enable ch %s func#%d\n",
+			pr_info(MODULE_NAME ":retry enable ch %s func#%d\n",
 					 ch->name, ch->func->num);
 			msleep(1000);
 		} else
 			break;
 	}
 	if (ret) {
-		pr_info(MODULE_MAME ":sdio_enable_func() err=%d\n", -ret);
+		pr_info(MODULE_NAME ":sdio_enable_func() err=%d\n", -ret);
 		goto exit_err;
 	}
 
 	/* Note: Patch Func CIS tuple issue */
 	ret = sdio_set_block_size(ch->func, SDIO_AL_BLOCK_SIZE);
 	if (ret) {
-		pr_info(MODULE_MAME ":sdio_set_block_size() err=%d\n", -ret);
+		pr_info(MODULE_NAME ":sdio_set_block_size() err=%d\n", -ret);
 		goto exit_err;
 	}
 
@@ -1193,7 +1192,7 @@ static int close_channel(struct sdio_channel *ch)
 static void ask_reading_mailbox(void)
 {
 	if (!sdio_al->ask_mbox) {
-		pr_debug(MODULE_MAME ":ask_reading_mailbox\n");
+		pr_debug(MODULE_NAME ":ask_reading_mailbox\n");
 		sdio_al->ask_mbox = true;
 		wake_up(&sdio_al->wait_mbox);
 	}
@@ -1215,7 +1214,7 @@ static void ask_reading_mailbox(void)
  */
 static void sdio_func_irq(struct sdio_func *func)
 {
-	pr_debug(MODULE_MAME ":start %s.\n", __func__);
+	pr_debug(MODULE_NAME ":start %s.\n", __func__);
 
 	/* Restart the timer */
 	if (sdio_al->poll_delay_msec) {
@@ -1226,7 +1225,7 @@ static void sdio_func_irq(struct sdio_func *func)
 
 	read_mailbox(true);
 
-	pr_debug(MODULE_MAME ":end %s.\n", __func__);
+	pr_debug(MODULE_NAME ":end %s.\n", __func__);
 }
 
 /**
@@ -1237,7 +1236,7 @@ static void timer_handler(unsigned long data)
 {
 	struct sdio_al *sdio_al = (struct sdio_al *) data;
 
-	pr_debug(MODULE_MAME " Timer Expired\n");
+	pr_debug(MODULE_NAME " Timer Expired\n");
 
 	ask_reading_mailbox();
 
@@ -1261,10 +1260,10 @@ static int sdio_al_setup(void)
 	int i = 0;
 	int fn = 0;
 
-	pr_info(MODULE_MAME ":sdio_al_setup\n");
+	pr_info(MODULE_NAME ":sdio_al_setup\n");
 
 	if (card == NULL) {
-		pr_info(MODULE_MAME ":No Card detected\n");
+		pr_info(MODULE_NAME ":No Card detected\n");
 		return -ENODEV;
 	}
 
@@ -1284,7 +1283,7 @@ static int sdio_al_setup(void)
 	/* Init Func#1 */
 	ret = sdio_enable_func(func1);
 	if (ret) {
-		pr_info(MODULE_MAME ":Fail to enable Func#%d\n", func1->num);
+		pr_info(MODULE_NAME ":Fail to enable Func#%d\n", func1->num);
 		goto exit_err;
 	}
 
@@ -1313,15 +1312,15 @@ static int sdio_al_setup(void)
 
 		ret = sdio_claim_irq(func1, sdio_func_irq);
 		if (ret) {
-			pr_info(MODULE_MAME ":Fail to claim IRQ\n");
+			pr_info(MODULE_NAME ":Fail to claim IRQ\n");
 			goto exit_err;
 		}
 	} else {
-		pr_debug(MODULE_MAME ":Not using IRQ\n");
+		pr_debug(MODULE_NAME ":Not using IRQ\n");
 	}
 
 	read_sdioc_software_header(sdio_al->sdioc_sw_header);
-	pr_info(MODULE_MAME ":SDIO-AL SW version %s.\n", DRV_VERSION);
+	pr_info(MODULE_NAME ":SDIO-AL SW version %s.\n", DRV_VERSION);
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
 	sdio_al->is_ready = true;
@@ -1329,13 +1328,13 @@ static int sdio_al_setup(void)
 	/* Start worker before interrupt might happen */
 	queue_work(sdio_al->workqueue, &sdio_al->work);
 
-	pr_debug(MODULE_MAME ":Ready.\n");
+	pr_debug(MODULE_NAME ":Ready.\n");
 
 	return 0;
 
 exit_err:
 	sdio_release_host(sdio_al->card->sdio_func[0]);
-	pr_err(MODULE_MAME ":Setup Failure.\n");
+	pr_err(MODULE_NAME ":Setup Failure.\n");
 
 	return ret;
 }
@@ -1403,7 +1402,7 @@ static int get_min_poll_time_msec(void)
 	if (poll_delay_msec == 0x0FFFFFFF)
 		poll_delay_msec = 0;
 
-	pr_debug(MODULE_MAME ":poll delay time is %d msec\n", poll_delay_msec);
+	pr_debug(MODULE_NAME ":poll delay time is %d msec\n", poll_delay_msec);
 
 	return poll_delay_msec;
 }
@@ -1425,7 +1424,7 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 	*ret_ch = NULL; /* default */
 
 	if (sdio_al == NULL) {
-		pr_info(MODULE_MAME
+		pr_info(MODULE_NAME
 			":Try to open ch %s before Module Init\n", name);
 		return -ENODEV;
 	}
@@ -1438,12 +1437,12 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 
 	ch = find_channel_by_name(name);
 	if (ch == NULL) {
-		pr_info(MODULE_MAME ":Can't find channel name %s\n", name);
+		pr_info(MODULE_NAME ":Can't find channel name %s\n", name);
 		return -EINVAL;
 	}
 
 	if (ch->is_open) {
-		pr_info(MODULE_MAME ":Channel already opened %s\n", name);
+		pr_info(MODULE_NAME ":Channel already opened %s\n", name);
 		return -EPERM;
 	}
 
@@ -1455,7 +1454,7 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 	*ret_ch = ch;
 
 	if (ch->is_suspend) {
-		pr_info(MODULE_MAME ":Resume channel %s.\n", name);
+		pr_info(MODULE_NAME ":Resume channel %s.\n", name);
 		ch->is_suspend = false;
 		ch->is_open = true;
 		ask_reading_mailbox();
@@ -1468,9 +1467,9 @@ int sdio_open(const char *name, struct sdio_channel **ret_ch, void *priv,
 	sdio_release_host(sdio_al->card->sdio_func[0]);
 
 	if (ret)
-		pr_info(MODULE_MAME ":sdio_open %s err=%d\n", name, -ret);
+		pr_info(MODULE_NAME ":sdio_open %s err=%d\n", name, -ret);
 	else
-		pr_info(MODULE_MAME ":sdio_open %s completed OK\n", name);
+		pr_info(MODULE_NAME ":sdio_open %s completed OK\n", name);
 
 	/* Read the mailbox after the channel is open to detect
 	   pending rx packets */
@@ -1494,7 +1493,7 @@ int sdio_close(struct sdio_channel *ch)
 	if (!ch->is_open)
 		return -EINVAL;
 
-	pr_info(MODULE_MAME ":sdio_close %s\n", ch->name);
+	pr_info(MODULE_NAME ":sdio_close %s\n", ch->name);
 
 	/* Stop channel notifications, and read/write operations. */
 	ch->is_open = false;
@@ -1525,7 +1524,7 @@ int sdio_write_avail(struct sdio_channel *ch)
 {
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 
-	pr_debug(MODULE_MAME ":sdio_write_avail %s 0x%x\n",
+	pr_debug(MODULE_NAME ":sdio_write_avail %s 0x%x\n",
 			 ch->name, ch->write_avail);
 
 	return ch->write_avail;
@@ -1540,7 +1539,7 @@ int sdio_read_avail(struct sdio_channel *ch)
 {
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 
-	pr_debug(MODULE_MAME ":sdio_read_avail %s 0x%x\n",
+	pr_debug(MODULE_NAME ":sdio_read_avail %s 0x%x\n",
 			 ch->name, ch->read_avail);
 
 	return ch->read_avail;
@@ -1562,27 +1561,27 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 	BUG_ON(ch->signature != SDIO_AL_SIGNATURE);
 
 	if (sdio_al->is_err) {
-		pr_info(MODULE_MAME ":In Error state, ignore sdio_read\n");
+		pr_info(MODULE_NAME ":In Error state, ignore sdio_read\n");
 		return -ENODEV;
 	}
 
 	if (!ch->is_open) {
-		pr_info(MODULE_MAME ":reading from closed channel %s\n",
+		pr_info(MODULE_NAME ":reading from closed channel %s\n",
 				 ch->name);
 		return -EINVAL;
 	}
 
-	pr_info(MODULE_MAME ":start ch %s read %d avail %d.\n",
+	pr_info(MODULE_NAME ":start ch %s read %d avail %d.\n",
 		ch->name, len, ch->read_avail);
 
 	if ((ch->is_packet_mode) && (len != ch->read_avail)) {
-		pr_info(MODULE_MAME ":sdio_read ch %s len != read_avail\n",
+		pr_info(MODULE_NAME ":sdio_read ch %s len != read_avail\n",
 				 ch->name);
 		return -EINVAL;
 	}
 
 	if (len > ch->read_avail) {
-		pr_info(MODULE_MAME ":ERR ch %s read %d avail %d.\n",
+		pr_info(MODULE_NAME ":ERR ch %s read %d avail %d.\n",
 				ch->name, len, ch->read_avail);
 		return -ENOMEM;
 	}
@@ -1591,7 +1590,7 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 	ret = sdio_memcpy_fromio(ch->func, data, PIPE_RX_FIFO_ADDR, len);
 
 	if (ret)
-		pr_info(MODULE_MAME ":sdio_read err=%d\n", -ret);
+		pr_info(MODULE_NAME ":sdio_read err=%d\n", -ret);
 
 	/* Remove handled packet from the list regardless if ret is ok */
 	if (ch->is_packet_mode)
@@ -1600,7 +1599,7 @@ int sdio_read(struct sdio_channel *ch, void *data, int len)
 		ch->read_avail -= len;
 
 	ch->total_rx_bytes += len;
-	pr_info(MODULE_MAME ":end ch %s read %d avail %d total %d.\n",
+	pr_info(MODULE_NAME ":end ch %s read %d avail %d total %d.\n",
 		ch->name, len, ch->read_avail, ch->total_rx_bytes);
 
 	sdio_release_host(sdio_al->card->sdio_func[0]);
@@ -1625,21 +1624,21 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	WARN_ON(len > ch->write_avail);
 
 	if (sdio_al->is_err) {
-		pr_info(MODULE_MAME ":In Error state, ignore sdio_write\n");
+		pr_info(MODULE_NAME ":In Error state, ignore sdio_write\n");
 		return -ENODEV;
 	}
 
 	if (!ch->is_open) {
-		pr_info(MODULE_MAME ":writing to closed channel %s\n",
+		pr_info(MODULE_NAME ":writing to closed channel %s\n",
 				 ch->name);
 		return -EINVAL;
 	}
 
-	pr_info(MODULE_MAME ":start ch %s write %d avail %d.\n",
+	pr_info(MODULE_NAME ":start ch %s write %d avail %d.\n",
 		ch->name, len, ch->write_avail);
 
 	if (len > ch->write_avail) {
-		pr_info(MODULE_MAME ":ERR ch %s write %d avail %d.\n",
+		pr_info(MODULE_NAME ":ERR ch %s write %d avail %d.\n",
 				ch->name, len, ch->write_avail);
 		return -ENOMEM;
 	}
@@ -1648,11 +1647,11 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	ret = sdio_ch_write(ch, data, len);
 
 	ch->total_tx_bytes += len;
-	pr_info(MODULE_MAME ":end ch %s write %d avail %d total %d.\n",
+	pr_info(MODULE_NAME ":end ch %s write %d avail %d total %d.\n",
 		ch->name, len, ch->write_avail, ch->total_tx_bytes);
 
 	if (ret) {
-		pr_info(MODULE_MAME ":sdio_write err=%d\n", -ret);
+		pr_info(MODULE_NAME ":sdio_write err=%d\n", -ret);
 	} else {
 		/* Round up to whole buffer size */
 		len = ROUND_UP(len, ch->peer_tx_buf_size);
@@ -1683,7 +1682,7 @@ int sdio_set_write_threshold(struct sdio_channel *ch, int threshold)
 
 	ch->write_threshold = threshold;
 
-	pr_debug(MODULE_MAME ":sdio_set_write_threshold %s 0x%x\n",
+	pr_debug(MODULE_NAME ":sdio_set_write_threshold %s 0x%x\n",
 			 ch->name, ch->write_threshold);
 
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
@@ -1707,7 +1706,7 @@ int sdio_set_read_threshold(struct sdio_channel *ch, int threshold)
 
 	ch->read_threshold = threshold;
 
-	pr_debug(MODULE_MAME ":sdio_set_write_threshold %s 0x%x\n",
+	pr_debug(MODULE_NAME ":sdio_set_write_threshold %s 0x%x\n",
 			 ch->name, ch->read_threshold);
 
 	sdio_claim_host(sdio_al->card->sdio_func[0]);
@@ -1743,7 +1742,7 @@ EXPORT_SYMBOL(sdio_set_poll_time);
  */
 static void default_sdio_al_release(struct device *dev)
 {
-	pr_info(MODULE_MAME ":platform device released.\n");
+	pr_info(MODULE_NAME ":platform device released.\n");
 }
 
 /**
@@ -1775,7 +1774,7 @@ static int mmc_probe(struct mmc_card *card)
 	sdio_al->card = card;
 
 	#ifdef DEBUG_SDIO_AL_UNIT_TEST
-	pr_info(MODULE_MAME ":==== SDIO-AL UNIT-TEST ====\n");
+	pr_info(MODULE_NAME ":==== SDIO-AL UNIT-TEST ====\n");
 	#else
 	/* Allow clients to probe for this driver */
 	for (i = 0; i < SDIO_AL_MAX_CHANNELS; i++) {
@@ -1801,7 +1800,7 @@ static void mmc_remove(struct mmc_card *card)
 		platform_device_unregister(&sdio_al->channel[i].pdev);
 	#endif
 
-	pr_info(MODULE_MAME ":sdio card removed.\n");
+	pr_info(MODULE_NAME ":sdio card removed.\n");
 }
 
 static struct mmc_driver mmc_driver = {
@@ -1822,7 +1821,7 @@ static int __init sdio_al_init(void)
 {
 	int ret = 0;
 
-	pr_debug(MODULE_MAME ":sdio_al_init\n");
+	pr_debug(MODULE_NAME ":sdio_al_init\n");
 
 	sdio_al = kzalloc(sizeof(struct sdio_al), GFP_KERNEL);
 	if (sdio_al == NULL)
@@ -1854,7 +1853,7 @@ static void __exit sdio_al_exit(void)
 	if (sdio_al == NULL)
 		return;
 
-	pr_debug(MODULE_MAME ":sdio_al_exit\n");
+	pr_debug(MODULE_NAME ":sdio_al_exit\n");
 
 	sdio_al_tear_down();
 
@@ -1864,7 +1863,7 @@ static void __exit sdio_al_exit(void)
 
 	mmc_unregister_driver(&mmc_driver);
 
-	pr_debug(MODULE_MAME ":sdio_al_exit complete\n");
+	pr_debug(MODULE_NAME ":sdio_al_exit complete\n");
 }
 
 module_init(sdio_al_init);
