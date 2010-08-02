@@ -38,6 +38,7 @@
 #include <linux/usb/cdc.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/ch9.h>
+#include <linux/usb/android_composite.h>
 
 #include "gadget_chips.h"
 
@@ -503,8 +504,7 @@ rmnet_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_SEND_ENCAPSULATED_COMMAND:
-		if (w_length > req->length || w_value
-				|| w_index != dev->ifc_id)
+		if (w_length > req->length)
 			goto invalid;
 		ret = w_length;
 		req->complete = rmnet_command_complete;
@@ -514,7 +514,7 @@ rmnet_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 
 	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_GET_ENCAPSULATED_RESPONSE:
-		if (w_value || w_index != dev->ifc_id)
+		if (w_value)
 			goto invalid;
 		else {
 			spin_lock(&dev->lock);
@@ -546,8 +546,6 @@ rmnet_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		 * enabled from device manager (or during enumeration), the
 		 * request will be sent with DTR being '1'.
 		 */
-		if (w_index != dev->ifc_id)
-			goto invalid;
 		if (w_value & ACM_CTRL_DTR)
 			smd_tiocmset(dev->smd_ctl.ch, TIOCM_DTR, 0);
 		else
@@ -1119,3 +1117,19 @@ free_dev:
 
 	return ret;
 }
+
+#ifdef CONFIG_USB_ANDROID_RMNET
+static struct android_usb_function rmnet_function = {
+	.name = "rmnet",
+	.bind_config = rmnet_function_add,
+};
+
+static int __init init(void)
+{
+	printk(KERN_INFO "f_rmnet init\n");
+	android_register_function(&rmnet_function);
+	return 0;
+}
+module_init(init);
+
+#endif /* CONFIG_USB_ANDROID_RMNET */

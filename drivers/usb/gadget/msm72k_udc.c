@@ -361,7 +361,7 @@ static void ulpi_write(struct usb_info *ui, unsigned val, unsigned reg)
 		;
 
 	if (timeout == 0)
-		ERROR("ulpi_write: timeout\n");
+		dev_err(&ui->pdev->dev, "ulpi_write: timeout\n");
 }
 
 static void init_endpoints(struct usb_info *ui)
@@ -2033,6 +2033,16 @@ static void usb_do_remote_wakeup(struct work_struct *w)
 	msm72k_wakeup(&ui->gadget);
 }
 
+static ssize_t usb_remote_wakeup(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct usb_info *ui = the_usb_info;
+
+	msm72k_wakeup(&ui->gadget);
+
+	return count;
+}
+
 static ssize_t show_usb_state(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
@@ -2105,6 +2115,7 @@ static ssize_t show_usb_chg_type(struct device *dev,
 
 	return count;
 }
+static DEVICE_ATTR(wakeup, S_IWUSR, 0, usb_remote_wakeup);
 static DEVICE_ATTR(usb_state, S_IRUSR, show_usb_state, 0);
 static DEVICE_ATTR(usb_speed, S_IRUSR, show_usb_speed, 0);
 static DEVICE_ATTR(chg_type, S_IRUSR, show_usb_chg_type, 0);
@@ -2307,6 +2318,10 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		goto fail;
 	}
 
+	retval = device_create_file(&ui->gadget.dev, &dev_attr_wakeup);
+	if (retval != 0)
+		dev_info(&ui->pdev->dev, "failed to create sysfs entry:"
+			"(wakeup) error: (%d)\n", retval);
 	retval = device_create_file(&ui->gadget.dev, &dev_attr_usb_state);
 	if (retval != 0)
 		dev_info(&ui->pdev->dev, "failed to create sysfs entry:"
@@ -2354,6 +2369,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 	dev->state = USB_STATE_IDLE;
 	atomic_set(&dev->configured, 0);
 	switch_set_state(&dev->sdev, 0);
+	device_remove_file(&dev->gadget.dev, &dev_attr_wakeup);
 	device_remove_file(&dev->gadget.dev, &dev_attr_usb_state);
 	device_remove_file(&dev->gadget.dev, &dev_attr_usb_speed);
 	device_remove_file(&dev->gadget.dev, &dev_attr_chg_type);

@@ -24,6 +24,7 @@
 
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/android_composite.h>
 #include <linux/workqueue.h>
 
 #define WRITE_COMPLETE 0
@@ -532,8 +533,7 @@ static void diag_read_complete(struct usb_ep *ep ,
 			ctxt->operations->diag_char_read_complete(
 				d_req);
 }
-int diag_function_add(struct usb_configuration *c,
-				char *serial_number)
+int diag_function_add(struct usb_configuration *c)
 {
 	struct diag_context *dev = &_context;
 	int ret;
@@ -546,7 +546,6 @@ int diag_function_add(struct usb_configuration *c,
 	dev->function.unbind = diag_function_unbind;
 	dev->function.set_alt = diag_function_set_alt;
 	dev->function.disable = diag_function_disable;
-	dev->serial_number    = serial_number;
 	INIT_LIST_HEAD(&dev->dev_read_req_list);
 	INIT_LIST_HEAD(&dev->dev_write_req_list);
 	INIT_WORK(&dev->diag_work, usb_config_work_func);
@@ -558,3 +557,23 @@ err1:
 	printk(KERN_ERR "diag gadget driver failed to initialize\n");
 	return ret;
 }
+
+#ifdef CONFIG_USB_ANDROID_DIAG
+static struct android_usb_function diag_function = {
+	.name = "diag",
+	.bind_config = diag_function_add,
+};
+
+static int __init init(void)
+{
+	struct diag_context *dev = &_context;
+
+	printk(KERN_INFO "f_diag init\n");
+	/* TBD: serial number should come from platform data */
+	dev->serial_number    = "1234567890ABCDEF";
+	android_register_function(&diag_function);
+	return 0;
+}
+module_init(init);
+
+#endif /* CONFIG_USB_ANDROID_DIAG */
