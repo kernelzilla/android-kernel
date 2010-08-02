@@ -24,6 +24,7 @@
 #include <linux/pmic8058-vibrator.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #include "../staging/android/timed_output.h"
 
@@ -93,6 +94,10 @@ static int pmic8058_vib_set(struct pmic8058_vib *vib, int on)
 	u8 val;
 
 	if (on) {
+		rc = pm_runtime_resume(vib->dev);
+		if (rc < 0)
+			dev_dbg(vib->dev, "pm_runtime_resume failed\n");
+
 		val = vib->reg_vib_drv;
 		val |= ((vib->level << VIB_DRV_SEL_SHIFT) & VIB_DRV_SEL_MASK);
 		rc = pmic8058_vib_write_u8(vib, val, VIB_DRV);
@@ -106,6 +111,10 @@ static int pmic8058_vib_set(struct pmic8058_vib *vib, int on)
 		if (rc < 0)
 			return rc;
 		vib->reg_vib_drv = val;
+
+		rc = pm_runtime_suspend(vib->dev);
+		if (rc < 0)
+			dev_dbg(vib->dev, "pm_runtime_suspend failed\n");
 	}
 	__dump_vib_regs(vib, "vib_set_end");
 
@@ -208,6 +217,12 @@ static int __devinit pmic8058_vib_probe(struct platform_device *pdev)
 	if (!vib)
 		return -ENOMEM;
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&pdev->dev);
+	if (rc < 0)
+		dev_dbg(&pdev->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pdev->dev);
+
 	vib->pm_chip	= pm_chip;
 	vib->pdata	= pdata;
 	vib->level	= pdata->level_mV / 100;
@@ -244,9 +259,12 @@ static int __devinit pmic8058_vib_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, vib);
 
+	pm_runtime_set_suspended(&pdev->dev);
 	return 0;
 
 err_read_vib:
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	kfree(vib);
 	return rc;
 }
@@ -255,6 +273,7 @@ static int __devexit pmic8058_vib_remove(struct platform_device *pdev)
 {
 	struct pmic8058_vib *vib = platform_get_drvdata(pdev);
 
+	pm_runtime_disable(&pdev->dev);
 	cancel_work_sync(&vib->work);
 	hrtimer_cancel(&vib->vib_timer);
 	timed_output_dev_unregister(&vib->timed_dev);
