@@ -226,21 +226,6 @@ static u32 ddl_decoder_seq_done_callback(struct ddl_context_type *p_ddl_context,
 			p_decoder->client_frame_size = p_decoder->frame_size;
 			p_decoder->client_output_buf_req =
 				p_decoder->actual_output_buf_req;
-			if ((p_decoder->frame_size.n_width *
-				p_decoder->frame_size.n_height) >=
-				 VCD_DDL_WVGA_BUF_SIZE) {
-				if ((p_decoder->actual_output_buf_req.\
-					n_actual_count + 2) < 10)
-					p_decoder->client_output_buf_req.\
-						n_actual_count = 10;
-				else
-					p_decoder->client_output_buf_req.\
-						n_actual_count += 2;
-			} else
-				p_decoder->client_output_buf_req.\
-					n_actual_count = p_decoder->\
-					actual_output_buf_req.\
-					n_actual_count + 5;
 			p_decoder->client_input_buf_req =
 				p_decoder->actual_input_buf_req;
 			p_ddl_context->ddl_callback(VCD_EVT_RESP_START,

@@ -1431,7 +1431,7 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data_type *p_decoder,
 	struct vcd_property_frame_size_type *p_frame_size;
 	struct vcd_buffer_requirement_type *p_input_buf_req;
 	struct vcd_buffer_requirement_type *p_output_buf_req;
-	u32  n_min_dpb, n_y_cb_cr_size/*, n_y_size*/;
+	u32  n_min_dpb, n_y_cb_cr_size, num_mb;
 
 	if (!p_decoder->codec_type.e_codec)
 		return;
@@ -1450,12 +1450,21 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data_type *p_decoder,
 		n_min_dpb = p_decoder->n_min_dpb_num;
 		n_y_cb_cr_size = p_decoder->n_y_cb_cr_size;
 	}
+
 	memset(p_output_buf_req, 0,
 		sizeof(struct vcd_buffer_requirement_type));
+
 	p_output_buf_req->n_min_count = n_min_dpb;
-	p_output_buf_req->n_actual_count = p_output_buf_req->n_min_count;
+	num_mb = (p_frame_size->n_width * p_frame_size->n_height) >> 8;
+	if (num_mb >= VCD_DDL_WVGA_MB_CNT) {
+		p_output_buf_req->n_actual_count = n_min_dpb + 2;
+		if (p_output_buf_req->n_actual_count < 10)
+			p_output_buf_req->n_actual_count = 10;
+	} else
+		p_output_buf_req->n_actual_count = n_min_dpb + 5;
 	p_output_buf_req->n_max_count = DDL_MAX_BUFFER_COUNT;
 	p_output_buf_req->n_size = n_y_cb_cr_size;
+
 	DDL_MSG_LOW("p_output_buf_req->n_size : %d", p_output_buf_req->n_size);
 	if (p_decoder->buf_format.e_buffer_format != VCD_BUFFER_FORMAT_NV12)
 		p_output_buf_req->n_align = DDL_TILE_BUFFER_ALIGN_BYTES;
