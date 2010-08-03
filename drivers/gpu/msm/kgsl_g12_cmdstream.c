@@ -38,8 +38,6 @@ int kgsl_g12_cmdstream_init(struct kgsl_device *device)
 	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 	memset(&g12_device->ringbuffer, 0, sizeof(struct kgsl_g12_ringbuffer));
 	g12_device->ringbuffer.prevctx = KGSL_G12_INVALID_CONTEXT;
-	g12_device->timestamp = 0;
-	g12_device->current_timestamp = 0;
 	return kgsl_sharedmem_alloc(0, KGSL_G12_RB_SIZE,
 				    &g12_device->ringbuffer.cmdbufdesc);
 }
@@ -49,6 +47,9 @@ int kgsl_g12_cmdstream_start(struct kgsl_device *device)
 	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
 	int result;
 	unsigned int cmd = VGV3_NEXTCMD_JUMP << VGV3_NEXTCMD_NEXTCMD_FSHIFT;
+
+	g12_device->timestamp = 0;
+	g12_device->current_timestamp = 0;
 
 	result = kgsl_g12_cmdwindow_write(device, KGSL_CMDWINDOW_2D,
 			ADDR_VGV3_MODE, 4);
