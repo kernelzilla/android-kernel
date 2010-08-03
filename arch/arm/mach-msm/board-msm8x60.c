@@ -1487,6 +1487,11 @@ static struct resource resources_keypad[] = {
 	},
 };
 
+static struct matrix_keymap_data ffa_keymap_data = {
+	.keymap_size	= ARRAY_SIZE(ffa_keymap),
+	.keymap		= ffa_keymap,
+};
+
 static struct pmic8058_keypad_data ffa_keypad_data = {
 	.input_name		= "ffa-keypad",
 	.input_phys_device	= "ffa-keypad/input0",
@@ -1494,12 +1499,11 @@ static struct pmic8058_keypad_data ffa_keypad_data = {
 	.num_cols		= 5,
 	.rows_gpio_start	= 8,
 	.cols_gpio_start	= 0,
-	.keymap_size		= ARRAY_SIZE(ffa_keymap),
-	.keymap			= ffa_keymap,
 	.debounce_ms		= {8, 10},
 	.scan_delay_ms		= 32,
 	.row_hold_ns            = 91500,
 	.wakeup			= 1,
+	.keymap_data		= &ffa_keymap_data,
 };
 
 static struct resource resources_pwrkey[] = {

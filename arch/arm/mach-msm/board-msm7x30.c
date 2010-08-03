@@ -541,6 +541,11 @@ static struct resource resources_keypad[] = {
 	},
 };
 
+static struct matrix_keymap_data surf_keymap_data = {
+	.keymap_size	= ARRAY_SIZE(surf_keymap),
+	.keymap		= surf_keymap,
+};
+
 static struct pmic8058_keypad_data surf_keypad_data = {
 	.input_name		= "surf_keypad",
 	.input_phys_device	= "surf_keypad/input0",
@@ -548,12 +553,16 @@ static struct pmic8058_keypad_data surf_keypad_data = {
 	.num_cols		= 8,
 	.rows_gpio_start	= 8,
 	.cols_gpio_start	= 0,
-	.keymap_size		= ARRAY_SIZE(surf_keymap),
-	.keymap			= surf_keymap,
 	.debounce_ms		= {8, 10},
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
+	.keymap_data		= &surf_keymap_data,
+};
+
+static struct matrix_keymap_data fluid_keymap_data = {
+	.keymap_size	= ARRAY_SIZE(fluid_keymap),
+	.keymap		= fluid_keymap,
 };
 
 static struct pmic8058_keypad_data fluid_keypad_data = {
@@ -563,12 +572,11 @@ static struct pmic8058_keypad_data fluid_keypad_data = {
 	.num_cols		= 5,
 	.rows_gpio_start	= 8,
 	.cols_gpio_start	= 0,
-	.keymap_size		= ARRAY_SIZE(fluid_keymap),
-	.keymap			= fluid_keymap,
 	.debounce_ms		= {8, 10},
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
+	.keymap_data		= &fluid_keymap_data,
 };
 
 static struct pm8058_pwm_pdata pm8058_pwm_data = {
