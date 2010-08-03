@@ -102,6 +102,8 @@ static struct clk *camio_camif_pad_pbdg_clk;
 static struct clk *camio_csi_clk;
 static struct clk *camio_csi_pclk;
 static struct clk *camio_csi_vfe_clk;
+static struct clk *camio_jpeg_clk;
+static struct clk *camio_jpeg_pclk;
 static struct msm_camera_io_ext camio_ext;
 static struct resource *camifpadio, *csiio;
 void __iomem *camifpadbase, *csibase;
@@ -312,6 +314,16 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		camio_csi_pclk =
 		clk = clk_get(NULL, "csi_pclk");
 		break;
+
+	case CAMIO_JPEG_CLK:
+		camio_jpeg_clk =
+		clk = clk_get(NULL, "jpeg_clk");
+		clk_set_min_rate(clk, 144000000);
+		break;
+	case CAMIO_JPEG_PCLK:
+		camio_jpeg_pclk =
+		clk = clk_get(NULL, "jpeg_pclk");
+		break;
 	default:
 		break;
 	}
@@ -365,6 +377,12 @@ int msm_camio_clk_disable(enum msm_camio_clk_type clktype)
 	case CAMIO_CSI0_PCLK:
 		clk = camio_csi_pclk;
 		break;
+	case CAMIO_JPEG_CLK:
+		clk = camio_jpeg_clk;
+		break;
+	case CAMIO_JPEG_PCLK:
+		clk = camio_jpeg_pclk;
+		break;
 	default:
 		break;
 	}
@@ -397,6 +415,23 @@ static irqreturn_t msm_io_csi_irq(int irq_num, void *data)
 	msm_io_w(irq, csibase + MIPI_INTERRUPT_STATUS);
 	return IRQ_HANDLED;
 }
+
+int msm_camio_jpeg_clk_disable(void)
+{
+	msm_camio_clk_disable(CAMIO_JPEG_CLK);
+	msm_camio_clk_disable(CAMIO_JPEG_PCLK);
+	/* Need to add the code for remove PM QOS requirement */
+	return 0;
+}
+
+
+int msm_camio_jpeg_clk_enable(void)
+{
+	msm_camio_clk_enable(CAMIO_JPEG_CLK);
+	msm_camio_clk_enable(CAMIO_JPEG_PCLK);
+	return 0;
+}
+
 int msm_camio_enable(struct platform_device *pdev)
 {
 	int rc = 0;

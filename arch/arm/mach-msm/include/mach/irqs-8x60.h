@@ -131,7 +131,7 @@
 #define MMSS_FABRIC_IRQ				(GIC_SPI_START + 74)
 #define INT_MDP					(GIC_SPI_START + 75)
 #define JPEGD_IRQ				(GIC_SPI_START + 76)
-#define JPEG_IRQ				(GIC_SPI_START + 77)
+#define INT_JPEG				(GIC_SPI_START + 77)
 #define MMSS_IMEM_IRQ				(GIC_SPI_START + 78)
 #define HDMI_IRQ				(GIC_SPI_START + 79)
 #define GFX3D_IRQ				(GIC_SPI_START + 80)
