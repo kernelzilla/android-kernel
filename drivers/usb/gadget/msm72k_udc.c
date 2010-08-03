@@ -30,6 +30,7 @@
 #include <linux/debugfs.h>
 #include <linux/workqueue.h>
 #include <linux/switch.h>
+#include <linux/pm_runtime.h>
 
 #include <mach/msm72k_otg.h>
 #include <linux/io.h>
@@ -2170,7 +2171,7 @@ static int msm72k_probe(struct platform_device *pdev)
 	struct usb_info *ui;
 	struct msm_hsusb_gadget_platform_data *pdata;
 	struct msm_otg *otg;
-	int retval;
+	int retval, err;
 
 	dev_dbg(&pdev->dev, "msm72k_probe\n");
 	ui = kzalloc(sizeof(struct usb_info), GFP_KERNEL);
@@ -2221,6 +2222,12 @@ static int msm72k_probe(struct platform_device *pdev)
 
 	the_usb_info = ui;
 
+	err = pm_runtime_set_active(&pdev->dev);
+	if (err < 0)
+		printk(KERN_ERR "pm_runtime: fail to set active\n");
+
+	err = 0;
+
 	wake_lock_init(&ui->wlock,
 			WAKE_LOCK_SUSPEND, "usb_bus_active");
 
@@ -2246,6 +2253,8 @@ static int msm72k_probe(struct platform_device *pdev)
 		wake_lock_destroy(&ui->wlock);
 		return usb_free(ui, retval);
 	}
+
+	pm_runtime_enable(&pdev->dev);
 
 	return 0;
 }
@@ -2363,9 +2372,34 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 EXPORT_SYMBOL(usb_gadget_unregister_driver);
 
 
+static int msm72k_udc_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int msm72k_udc_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static int msm72k_udc_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: idling...\n");
+	return 0;
+}
+
+static struct dev_pm_ops msm72k_udc_dev_pm_ops = {
+	.runtime_suspend = msm72k_udc_runtime_suspend,
+	.runtime_resume = msm72k_udc_runtime_resume,
+	.runtime_idle = msm72k_udc_runtime_idle
+};
+
 static struct platform_driver usb_driver = {
 	.probe = msm72k_probe,
-	.driver = { .name = "msm_hsusb", },
+	.driver = { .name = "msm_hsusb",
+		    .pm = &msm72k_udc_dev_pm_ops, },
 };
 
 static int __init init(void)
