@@ -2151,7 +2151,44 @@ static void msm_timpani_shutdown_power(void)
 	regulator_put(vreg_timpani_2);
 }
 
+/* Power analog function of codec */
+static struct regulator *vreg_timpani_cdc_apwr;
+static int msm_timpani_codec_power(int vreg_on)
+{
+	int rc = 0;
+
+	if (!vreg_timpani_cdc_apwr) {
+
+		vreg_timpani_cdc_apwr = regulator_get(NULL, "8058_s4");
+
+		if (IS_ERR(vreg_timpani_cdc_apwr)) {
+			pr_err("%s: vreg_get failed (%ld)\n",
+			__func__, PTR_ERR(vreg_timpani_cdc_apwr));
+			rc = PTR_ERR(vreg_timpani_cdc_apwr);
+			goto vreg_fail;
+		}
+	}
+
+	if (vreg_on) {
+		rc = regulator_enable(vreg_timpani_cdc_apwr);
+		if (rc)
+			pr_err("%s: vreg_enable failed %d \n",
+			__func__, rc);
+		goto vreg_fail;
+	} else {
+		rc = regulator_disable(vreg_timpani_cdc_apwr);
+		if (rc)
+			pr_err("%s: vreg_disable failed %d \n",
+			__func__, rc);
+		goto vreg_fail;
+	}
+
+vreg_fail:
+	return rc;
+}
+
 static struct marimba_codec_platform_data timpani_codec_pdata = {
+	.marimba_codec_power =  msm_timpani_codec_power,
 };
 
 #define TIMPANI_SLAVE_ID_CDC_ADDR		0X77
