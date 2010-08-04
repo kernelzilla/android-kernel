@@ -140,6 +140,7 @@ struct msm_otg {
 	struct hrtimer timer;
 	struct workqueue_struct *wq;
 	struct work_struct sm_work; /* state machine work */
+	struct work_struct otg_resume_work;
 	struct notifier_block usbdev_nb;
 };
 

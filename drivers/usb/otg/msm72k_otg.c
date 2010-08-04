@@ -228,30 +228,35 @@ static const char *timer_string(int bit)
 	}
 }
 
-static void msm72k_pm_qos_update(int vote)
+/* Prevent idle power collapse(pc) while operating in peripheral mode */
+static void otg_pm_qos_update_latency(struct msm_otg *dev, int vote)
 {
-	struct msm_otg *dev = the_msm_otg;
 	struct msm_otg_platform_data *pdata = dev->pdata;
 	u32 swfi_latency = 0;
 
 	if (pdata)
 		swfi_latency = pdata->swfi_latency + 1;
 
-	if (vote) {
-		if (dev->otg.gadget)
-			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
+	if (vote)
+		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
 				DRIVER_NAME, swfi_latency);
-		if (depends_on_axi_freq(&dev->otg))
-			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
+	else
+		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
+				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
+}
+
+/* Vote for max AXI frequency if pclk is derived from peripheral bus clock */
+static void otg_pm_qos_update_axi(struct msm_otg *dev, int vote)
+{
+	if (!depends_on_axi_freq(&dev->otg))
+		return;
+
+	if (vote)
+		pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
 				DRIVER_NAME, MSM_AXI_MAX_FREQ);
-	} else {
-		if (dev->otg.gadget)
-			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
+	else
+		pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
 				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
-		if (depends_on_axi_freq(&dev->otg))
-			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-				DRIVER_NAME, PM_QOS_DEFAULT_VALUE);
-	}
 }
 
 /* Controller gives interrupt for every 1 mesc if 1MSIE is set in OTGSC.
@@ -450,18 +455,15 @@ static void msm_otg_start_peripheral(struct otg_transceiver *xceiv, int on)
 		return;
 
 	if (on) {
-		/* Prevent idle and suspend power collapse(pc) while USB cable
-		 * is connected in Peripheral mode. Also vote for max
-		 * AXI frequency
+		/* vote for minimum dma_latency to prevent idle
+		 * power collapse(pc) while running in peripheral mode.
 		 */
-		msm72k_pm_qos_update(1);
+		otg_pm_qos_update_latency(dev, 1);
 		usb_gadget_vbus_connect(xceiv->gadget);
 	} else {
-		/* Vote for max AXI as wall-charger may have released it */
-		msm72k_pm_qos_update(1);
 		atomic_set(&dev->chg_type, USB_CHG_TYPE__INVALID);
 		usb_gadget_vbus_disconnect(xceiv->gadget);
-		msm72k_pm_qos_update(0);
+		otg_pm_qos_update_latency(dev, 0);
 	}
 }
 
@@ -521,6 +523,9 @@ static int msm_otg_suspend(struct msm_otg *dev)
 			enable_irq_wake(dev->vbus_on_irq);
 	}
 
+	/* Release vote for max AXI frequency */
+	otg_pm_qos_update_axi(dev, 0);
+
 	atomic_set(&dev->in_lpm, 1);
 
 	if (!vbus && dev->pmic_notif_supp)
@@ -545,6 +550,10 @@ static int msm_otg_resume(struct msm_otg *dev)
 	if (!atomic_read(&dev->in_lpm))
 		return 0;
 
+	/* pclk might be derived from peripheral bus clock. If so then
+	 * vote for max AXI frequency before enabling pclk.
+	 */
+	otg_pm_qos_update_axi(dev, 1);
 
 	if (dev->hs_pclk)
 		clk_enable(dev->hs_pclk);
@@ -573,6 +582,18 @@ static int msm_otg_resume(struct msm_otg *dev)
 	pr_info("%s: usb exited from low power mode\n", __func__);
 
 	return 0;
+}
+static void msm_otg_resume_w(struct work_struct *w)
+{
+	struct msm_otg	*dev = container_of(w, struct msm_otg, otg_resume_work);
+
+	msm_otg_resume(dev);
+
+	/* Enable irq which was disabled before scheduling this work.
+	 * But don't release wake_lock, as we got async interrupt and
+	 * there will be some work pending for OTG state machine.
+	 */
+	enable_irq(dev->irq);
 }
 
 static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
@@ -808,7 +829,9 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	enum usb_otg_state state;
 
 	if (atomic_read(&dev->in_lpm)) {
-		msm_otg_resume(dev);
+		disable_irq_nosync(dev->irq);
+		wake_lock(&dev->wlock);
+		queue_work(dev->wq, &dev->otg_resume_work);
 		goto out;
 	}
 
@@ -1293,7 +1316,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 
 			pr_debug("entering into lpm with wall-charger\n");
 			msm_otg_suspend(dev);
-			msm72k_pm_qos_update(0);
+			/* Allow idle power collapse */
+			otg_pm_qos_update_latency(dev, 0);
 		}
 		break;
 	case OTG_STATE_B_WAIT_ACON:
@@ -1627,7 +1651,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 	 * we might endup releasing wakelock after it is acquired
 	 * in IRQ/sysfs.
 	 */
-	if (!work_pending(&dev->sm_work) && !hrtimer_active(&dev->timer))
+	if (!work_pending(&dev->sm_work) && !hrtimer_active(&dev->timer) &&
+			!work_pending(&dev->otg_resume_work))
 		wake_unlock(&dev->wlock);
 }
 
@@ -1888,6 +1913,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 
 	msm_otg_init_timer(dev);
 	INIT_WORK(&dev->sm_work, msm_otg_sm_work);
+	INIT_WORK(&dev->otg_resume_work, msm_otg_resume_w);
 	spin_lock_init(&dev->lock);
 	wake_lock_init(&dev->wlock, WAKE_LOCK_SUSPEND, "msm_otg");
 
@@ -1896,6 +1922,15 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto free_wlock;
 	}
+
+	/* pclk might be derived from peripheral bus clock. If so then
+	 * vote for max AXI frequency before enabling pclk.
+	 */
+	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME,
+					PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
+					PM_QOS_DEFAULT_VALUE);
+	otg_pm_qos_update_axi(dev, 1);
 
 	/* enable clocks */
 	if (dev->hs_pclk)
@@ -1987,10 +2022,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		goto free_vbus_irq;
 	}
 
-	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME,
-					PM_QOS_DEFAULT_VALUE);
-	pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME,
-					PM_QOS_DEFAULT_VALUE);
 
 	return 0;
 
