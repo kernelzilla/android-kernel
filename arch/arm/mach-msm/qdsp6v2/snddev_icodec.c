@@ -243,6 +243,7 @@ static struct snddev_icodec_drv_state snddev_icodec_drv;
 static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 {
 	int trc;
+	int afe_channel_mode;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
 	wake_lock(&drv->rx_idlelock);
@@ -278,8 +279,17 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	 */
 	adie_codec_setpath(icodec->adie_path, icodec->sample_rate, 256);
 
-	trc = afe_open(PRIMARY_I2S_RX, icodec->sample_rate,
-						icodec->data->channel_mode);
+	switch (icodec->data->channel_mode) {
+	case 2:
+		afe_channel_mode = MSM_AFE_STEREO;
+		break;
+	case 1:
+	default:
+		afe_channel_mode = MSM_AFE_MONO;
+		break;
+	}
+
+	trc = afe_open(PRIMARY_I2S_RX, icodec->sample_rate, afe_channel_mode);
 
 	/* Enable ADIE */
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_READY);
@@ -309,6 +319,7 @@ error_invalid_freq:
 static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 {
 	int trc;
+	int afe_channel_mode;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;;
 
 	wake_lock(&drv->tx_idlelock);
@@ -351,12 +362,21 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	/* Enable ADIE */
 	adie_codec_setpath(icodec->adie_path, icodec->sample_rate, 256);
 
-	trc = afe_open(PRIMARY_I2S_TX, icodec->sample_rate,
-			icodec->data->channel_mode);
+	switch (icodec->data->channel_mode) {
+	case 2:
+		afe_channel_mode = MSM_AFE_STEREO;
+		break;
+	case 1:
+	default:
+		afe_channel_mode = MSM_AFE_MONO;
+		break;
+	}
+
+	trc = afe_open(PRIMARY_I2S_TX, icodec->sample_rate, afe_channel_mode);
 
 	adie_codec_proceed_stage(icodec->adie_path, ADIE_CODEC_DIGITAL_READY);
 	adie_codec_proceed_stage(icodec->adie_path,
-					ADIE_CODEC_DIGITAL_ANALOG_READY);
+		ADIE_CODEC_DIGITAL_ANALOG_READY);
 
 	icodec->enabled = 1;
 

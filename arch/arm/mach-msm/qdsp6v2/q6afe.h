@@ -28,6 +28,11 @@
 #ifndef __Q6AFE_H__
 #define __Q6AFE_H__
 
+#define MSM_AFE_MONO		0
+#define MSM_AFE_MONO_RIGHT	1
+#define MSM_AFE_MONO_LEFT	2
+#define MSM_AFE_STEREO		3
+
 int afe_open(int port_id, int rate, int channel_mode);
 int afe_close(int port_id);
 
