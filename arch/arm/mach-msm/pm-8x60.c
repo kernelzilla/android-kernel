@@ -19,14 +19,18 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/completion.h>
 #include <linux/cpuidle.h>
 #include <linux/io.h>
 #include <linux/pm.h>
 #include <linux/proc_fs.h>
+#include <linux/smp.h>
 #include <linux/suspend.h>
 #include <linux/uaccess.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#include <asm/cacheflush.h>
+#include <asm/hardware/gic.h>
 #ifdef CONFIG_VFP
 #include <asm/vfp.h>
 #endif
@@ -50,7 +54,7 @@ enum {
 	MSM_PM_DEBUG_IDLE = 1U << 6,
 };
 
-static int msm_pm_debug_mask;
+static int msm_pm_debug_mask = 31;
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
@@ -60,13 +64,13 @@ module_param_named(
  * Sleep Modes and Parameters
  *****************************************************************************/
 
-static unsigned int msm_pm_sleep_mode_mask;
+static unsigned int msm_pm_sleep_mode_mask = 0x02;
 module_param_named(
 	sleep_mode_mask, msm_pm_sleep_mode_mask,
 	uint, S_IRUGO | S_IWUSR | S_IWGRP
 );
 
-static unsigned int msm_pm_idle_sleep_mode_mask;
+static unsigned int msm_pm_idle_sleep_mode_mask = 0x10;
 module_param_named(
 	idle_sleep_mode_mask, msm_pm_idle_sleep_mode_mask,
 	uint, S_IRUGO | S_IWUSR | S_IWGRP
@@ -80,7 +84,6 @@ void __init msm_pm_set_platform_data(
 	BUG_ON(MSM_PM_SLEEP_MODE_NR * num_possible_cpus() != count);
 	msm_pm_modes = data;
 }
-
 
 /******************************************************************************
  * CONFIG_MSM_IDLE_STATS
@@ -374,11 +377,14 @@ EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
 
 struct msm_pm_device {
 	unsigned int cpu;
-	uint32_t *reset_vector;
+	void __iomem *boot_vector;
+#ifdef CONFIG_HOTPLUG_CPU
+	struct completion cpu_killed;
+	unsigned int warm_boot;
+#endif
 };
 
 static DEFINE_PER_CPU_SHARED_ALIGNED(struct msm_pm_device, msm_pm_devices);
-
 
 static void msm_pm_swfi(void)
 {
@@ -389,7 +395,7 @@ static void msm_pm_swfi(void)
 static void msm_pm_spm_power_collapse(
 	struct msm_pm_device *dev, bool from_idle, bool notify_rpm)
 {
-	uint32_t saved_vector[2];
+	void *entry;
 	int collapsed = 0;
 	int ret;
 
@@ -401,32 +407,26 @@ static void msm_pm_spm_power_collapse(
 			MSM_SPM_MODE_POWER_COLLAPSE, notify_rpm);
 	WARN_ON(ret);
 
-	saved_vector[0] = dev->reset_vector[0];
-	saved_vector[1] = dev->reset_vector[1];
-	dev->reset_vector[0] = 0xE51FF004; /* ldr pc, 4 */
-	dev->reset_vector[1] = virt_to_phys(msm_pm_collapse_exit);
+	entry = (!dev->cpu || from_idle) ?
+		msm_pm_collapse_exit : msm_secondary_startup;
+	writel(virt_to_phys(entry), dev->boot_vector);
 
 	if (MSM_PM_DEBUG_RESET_VECTOR & msm_pm_debug_mask)
-		pr_info("%s(): vector %x %x -> %x %x\n", __func__,
-			saved_vector[0], saved_vector[1],
-			dev->reset_vector[0], dev->reset_vector[1]);
+		pr_info("%s(): cpu %u, program vector %p to %p\n",
+			__func__, dev->cpu, dev->boot_vector, entry);
 
 #ifdef CONFIG_VFP
-	if (from_idle)
-		vfp_flush_context();
+	vfp_flush_context();
 #endif
 
 	collapsed = msm_pm_collapse();
 
-	dev->reset_vector[0] = saved_vector[0];
-	dev->reset_vector[1] = saved_vector[1];
-
 	if (collapsed) {
 #ifdef CONFIG_VFP
-		if (from_idle)
-			vfp_reinit();
+		vfp_reinit();
 #endif
 		cpu_init();
+		gic_cpu_init(0, MSM_QGIC_CPU_BASE);
 		local_fiq_enable();
 	}
 
@@ -632,6 +632,83 @@ static struct platform_suspend_ops msm_pm_ops = {
 	.valid = suspend_valid_only_mem,
 };
 
+#ifdef CONFIG_HOTPLUG_CPU
+int mach_cpu_disable(unsigned int cpu)
+{
+	return cpu == 0 ? -EPERM : 0;
+}
+
+int platform_cpu_kill(unsigned int cpu)
+{
+	struct completion *killed = &per_cpu(msm_pm_devices, cpu).cpu_killed;
+	return wait_for_completion_timeout(killed, 50000);
+}
+
+void platform_cpu_die(unsigned int cpu)
+{
+	bool allow[MSM_PM_SLEEP_MODE_NR];
+	int i;
+
+	if (unlikely(cpu != smp_processor_id())) {
+		pr_crit("%s(): platform_cpu_die running on %u, should be %u\n",
+			__func__, smp_processor_id(), cpu);
+		BUG();
+	}
+
+	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
+		struct msm_pm_platform_data *mode;
+
+		mode = &msm_pm_modes[MSM_PM_MODE(0, i)];
+		allow[i] = ((msm_pm_sleep_mode_mask >> i) & 0x1) &&
+			mode->supported && mode->suspend_enabled;
+	}
+
+	pr_notice("%s(): shutting down cpu %u\n", __func__, cpu);
+	complete(&__get_cpu_var(msm_pm_devices).cpu_killed);
+
+	flush_cache_all();
+
+	for (;;) {
+		if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE])
+			msm_pm_power_collapse(false, 0);
+		else if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE])
+			msm_pm_power_collapse_standalone(false);
+		else if (allow[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT])
+			msm_pm_swfi();
+
+		if (pen_release == cpu) {
+			/* OK, proper wakeup, we're done */
+			break;
+		}
+	}
+
+	/* set pen_release handshake value before preempt_enable_no_resched
+	 * which has a barrier().
+	 */
+	pen_release = -1;
+	pr_notice("%s(): cpu %u normal wakeup\n", __func__, cpu);
+	preempt_enable_no_resched();
+	local_irq_enable();
+}
+
+int msm_pm_platform_secondary_init(unsigned int cpu)
+{
+	int ret;
+	struct msm_pm_device *dev = &__get_cpu_var(msm_pm_devices);
+
+	if (!dev->warm_boot) {
+		dev->warm_boot = 1;
+		return 0;
+	}
+#ifdef CONFIG_VFP
+	vfp_reinit();
+#endif
+	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING, false);
+	preempt_enable_no_resched();
+
+	return ret;
+}
+#endif  /* CONFIG_HOTPLUG_CPU */
 
 /******************************************************************************
  * Initialization routine
@@ -639,16 +716,26 @@ static struct platform_suspend_ops msm_pm_ops = {
 
 static int __init msm_pm_init(void)
 {
+	void __iomem *boot_page;
 	unsigned int cpu;
 #ifdef CONFIG_MSM_IDLE_STATS
 	struct proc_dir_entry *d_entry;
 #endif
 
+	boot_page = ioremap(0x2a040000, PAGE_SIZE);
+	if (boot_page == NULL) {
+		pr_err("%s: failed to map boot page\n", __func__);
+		return -ENOMEM;
+	}
+
 	for_each_possible_cpu(cpu) {
 		struct msm_pm_device *dev = &per_cpu(msm_pm_devices, cpu);
 
 		dev->cpu = cpu;
-		dev->reset_vector = (uint32_t *) PAGE_OFFSET;
+		dev->boot_vector = boot_page + 0x28 - 0x04 * cpu;
+#ifdef CONFIG_HOTPLUG_CPU
+		init_completion(&dev->cpu_killed);
+#endif
 	}
 
 #ifdef CONFIG_MSM_IDLE_STATS
@@ -689,6 +776,7 @@ static int __init msm_pm_init(void)
 #endif  /* CONFIG_MSM_IDLE_STATS */
 
 	msm_spm_allow_x_cpu_set_vdd(false);
+
 	suspend_set_ops(&msm_pm_ops);
 	msm_cpuidle_init();
 
