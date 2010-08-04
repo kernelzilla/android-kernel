@@ -2718,6 +2718,11 @@ sub process {
 			WARN("unnecessary cast may hide bugs, see http://c-faq.com/malloc/mallocnocast.html\n" . $herecurr);
 		}
 
+# check for return codes on error paths
+		if ($line =~ /\breturn\s+-\d+/) {
+			ERROR("illegal return value, please use an error code");
+		}
+
 # check for gcc specific __FUNCTION__
 		if ($line =~ /__FUNCTION__/) {
 			WARN("__func__ should be used instead of gcc specific __FUNCTION__\n"  . $herecurr);
