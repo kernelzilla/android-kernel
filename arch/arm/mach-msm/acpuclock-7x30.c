@@ -129,7 +129,7 @@ unsigned long acpuclk_wait_for_irq(void)
 
 static int acpuclk_set_acpu_vdd(struct clkctl_acpu_speed *s)
 {
-	int ret = msm_spm_set_vdd(s->vdd_raw);
+	int ret = msm_spm_set_vdd(0, s->vdd_raw);
 	if (ret)
 		return ret;
 
