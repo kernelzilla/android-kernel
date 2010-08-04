@@ -2520,10 +2520,13 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 #else
 	.vbus_power = msm_hsusb_vbus_power,
 #endif
-	.core_clk	= 1,
-	.pemp_level     = PRE_EMPHASIS_WITH_20_PERCENT,
-	.cdr_autoreset  = CDR_AUTO_RESET_DISABLE,
-	.drv_ampl       = HS_DRV_AMPLITUDE_DEFAULT,
+	.core_clk		 = 1,
+	.pemp_level		 = PRE_EMPHASIS_WITH_20_PERCENT,
+	.cdr_autoreset		 = CDR_AUTO_RESET_DISABLE,
+	.drv_ampl		 = HS_DRV_AMPLITUDE_DEFAULT,
+	.chg_vbus_draw		 = hsusb_chg_vbus_draw,
+	.chg_connected		 = hsusb_chg_connected,
+	.chg_init		 = hsusb_chg_init,
 };
 
 #ifdef CONFIG_USB_GADGET

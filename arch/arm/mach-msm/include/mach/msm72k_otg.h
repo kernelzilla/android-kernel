@@ -117,6 +117,10 @@ struct msm_otg {
 	void __iomem		*regs;
 	atomic_t		in_lpm;
 	unsigned int 		core_clk;
+	/* charger-type is modified by gadget for legacy chargers
+	 * and OTG modifies it for ACA
+	 */
+	atomic_t 		chg_type;
 
 	void (*start_host)	(struct usb_bus *bus, int suspend);
 	/* Enable/disable the clocks */

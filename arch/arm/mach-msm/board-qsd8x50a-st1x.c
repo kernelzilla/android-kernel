@@ -1620,6 +1620,9 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.setup_gpio 	= msm_otg_setup_gpio,
 	.otg_mode	= OTG_USER_CONTROL,
 	.vbus_power 	= msm_hsusb_vbus_power,
+	.chg_vbus_draw  = hsusb_chg_vbus_draw,
+	.chg_connected  = hsusb_chg_connected,
+	.chg_init	= hsusb_chg_init,
 };
 
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;

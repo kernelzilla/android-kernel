@@ -480,7 +480,7 @@ int msm_chg_rpc_close(void)
 {
 	int rc = 0;
 
-	if (IS_ERR(chg_ep)) {
+	if (!chg_ep || IS_ERR(chg_ep)) {
 		pr_err("%s: rpc_close failed before call, rc = %ld\n",
 			__func__, PTR_ERR(chg_ep));
 		return -EAGAIN;
@@ -574,11 +574,10 @@ int msm_hsusb_disable_pmic_ulpidata0(void)
 }
 EXPORT_SYMBOL(msm_hsusb_disable_pmic_ulpidata0);
 
-#ifdef CONFIG_USB_GADGET_MSM_72K
 /* charger api wrappers */
-int hsusb_chg_init(int connect)
+int hsusb_chg_init(int init)
 {
-	if (connect)
+	if (init)
 		return msm_chg_rpc_connect();
 	else
 		return msm_chg_rpc_close();
@@ -609,4 +608,3 @@ void hsusb_chg_connected(enum chg_type chgtype)
 	msm_chg_usb_charger_connected(chgtype);
 }
 EXPORT_SYMBOL(hsusb_chg_connected);
-#endif
