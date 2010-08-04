@@ -33,16 +33,6 @@
 
 #include "g12_reg.h"
 
-int kgsl_g12_cmdstream_check_timestamp(struct kgsl_g12_device *g12_device,
-					unsigned int timestamp)
-{
-	int ts_diff;
-
-	ts_diff = g12_device->timestamp - timestamp;
-
-	return (ts_diff >= 0) || (ts_diff < -20000);
-}
-
 int kgsl_g12_cmdstream_init(struct kgsl_device *device)
 {
 	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;

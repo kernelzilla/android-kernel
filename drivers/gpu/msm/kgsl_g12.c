@@ -601,8 +601,8 @@ static int kgsl_g12_waittimestamp(struct kgsl_device *device,
 
 	timeout = wait_event_interruptible_timeout(
 			g12_device->wait_timestamp_wq,
-			kgsl_g12_cmdstream_check_timestamp(g12_device,
-								timestamp),
+			kgsl_check_timestamp((struct kgsl_device *) g12_device,
+					     timestamp),
 			msecs_to_jiffies(msecs));
 
 	if (timeout > 0)

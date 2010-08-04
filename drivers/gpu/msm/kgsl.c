@@ -182,6 +182,17 @@ int kgsl_unregister_ts_notifier(struct kgsl_device *device,
 						nb);
 }
 
+int kgsl_check_timestamp(struct kgsl_device *device, unsigned int timestamp)
+{
+	unsigned int ts_processed;
+	BUG_ON(device->ftbl.device_cmdstream_readtimestamp == NULL);
+
+	ts_processed = device->ftbl.device_cmdstream_readtimestamp(
+			device, KGSL_TIMESTAMP_RETIRED);
+
+	return timestamp_cmp(ts_processed, timestamp);
+}
+
 int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int *value)
 {
