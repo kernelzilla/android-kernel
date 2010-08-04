@@ -277,8 +277,10 @@ EXPORT_SYMBOL(pil_get);
 void pil_put(void *peripheral_handle)
 {
 	struct pil_device *pil = peripheral_handle;
-	if (IS_ERR(pil))
+	if (!pil || IS_ERR(pil)) {
+		WARN(1, "Invalid peripheral handle\n");
 		return;
+	}
 
 	mutex_lock(&pil->lock);
 	WARN(!pil->count, "%s: Reference count mismatch\n", __func__);
