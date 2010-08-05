@@ -73,6 +73,7 @@
 #include "devices-msm8x60.h"
 #include "cpuidle.h"
 #include "pm.h"
+#include "rpm.h"
 #include "spm.h"
 #include "timer.h"
 
@@ -3180,8 +3181,30 @@ static void __init msm8x60_cfg_smsc911x(void)
 		PM8058_GPIO_IRQ(PM8058_IRQ_BASE, 6);
 }
 
+#ifdef CONFIG_MSM_RPM
+static struct msm_rpm_platform_data msm_rpm_data = {
+	.reg_base_addrs = {
+		[MSM_RPM_PAGE_STATUS] = MSM_RPM_BASE,
+		[MSM_RPM_PAGE_CTRL] = MSM_RPM_BASE + 0x400,
+		[MSM_RPM_PAGE_REQ] = MSM_RPM_BASE + 0x600,
+		[MSM_RPM_PAGE_ACK] = MSM_RPM_BASE + 0xa00,
+	},
+
+	.irq_ack = RPM_SCSS_CPU0_GP_HIGH_IRQ,
+	.irq_err = RPM_SCSS_CPU0_GP_LOW_IRQ,
+	.irq_vmpm = RPM_SCSS_CPU0_GP_MEDIUM_IRQ,
+};
+#endif
+
 static void __init msm8x60_init(void)
 {
+	/*
+	 * Initialize RPM first as other drivers and devices may need
+	 * it for their initialization.
+	 */
+#ifdef CONFIG_MSM_RPM
+	BUG_ON(msm_rpm_init(&msm_rpm_data));
+#endif
 	/* initialize SPM before acpuclock as the latter calls into SPM
 	 * driver to set ACPU voltages.
 	 */
