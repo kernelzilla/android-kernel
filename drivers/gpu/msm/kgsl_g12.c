@@ -117,6 +117,62 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 	return result;
 }
 
+static int kgsl_g12_cleanup_pt(struct kgsl_device *device,
+			       struct kgsl_pagetable *pagetable)
+{
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
+
+	if (device->mmu.defaultpagetable == pagetable)
+		device->mmu.defaultpagetable = NULL;
+
+	kgsl_mmu_unmap(pagetable, device->mmu.dummyspace.gpuaddr,
+			device->mmu.dummyspace.size);
+
+	kgsl_mmu_unmap(pagetable, device->memstore.gpuaddr,
+			device->memstore.size);
+
+	kgsl_mmu_unmap(pagetable, g12_device->ringbuffer.cmdbufdesc.gpuaddr,
+			g12_device->ringbuffer.cmdbufdesc.size);
+	return 0;
+}
+
+static int kgsl_g12_setup_pt(struct kgsl_device *device,
+			     struct kgsl_pagetable *pagetable)
+{
+	int result = 0;
+	unsigned int flags = KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K;
+	struct kgsl_g12_device *g12_device = (struct kgsl_g12_device *) device;
+
+	if (device->mmu.defaultpagetable == NULL)
+		device->mmu.defaultpagetable = pagetable;
+
+	result = kgsl_mmu_map_global(pagetable, &device->mmu.dummyspace,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, flags);
+	if (result)
+		goto error;
+
+	result = kgsl_mmu_map_global(pagetable, &device->memstore,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, flags);
+	if (result)
+		goto error_unmap_dummy;
+
+	result = kgsl_mmu_map_global(pagetable,
+				     &g12_device->ringbuffer.cmdbufdesc,
+				     GSL_PT_PAGE_RV, flags);
+	if (result)
+		goto error_unmap_memstore;
+	return result;
+
+error_unmap_dummy:
+	kgsl_mmu_unmap(pagetable, device->mmu.dummyspace.gpuaddr,
+			device->mmu.dummyspace.size);
+error_unmap_memstore:
+	kgsl_mmu_unmap(pagetable, device->memstore.gpuaddr,
+			device->memstore.size);
+error:
+	return result;
+}
+
 int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags)
 {
 #ifdef CONFIG_MSM_KGSL_MMU
@@ -737,6 +793,8 @@ int kgsl_g12_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_drawctxt_create = kgsl_g12_drawctxt_create;
 	ftbl->device_drawctxt_destroy = kgsl_g12_drawctxt_destroy;
 	ftbl->device_ioctl = kgsl_g12_ioctl;
+	ftbl->device_setup_pt = kgsl_g12_setup_pt;
+	ftbl->device_cleanup_pt = kgsl_g12_cleanup_pt;
 
 	return KGSL_SUCCESS;
 }

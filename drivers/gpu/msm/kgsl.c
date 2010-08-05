@@ -261,6 +261,41 @@ void kgsl_timer(unsigned long data)
 	schedule_work(&device->idle_check_ws);
 }
 
+int kgsl_setup_pt(struct kgsl_pagetable *pt)
+{
+	int i = 0;
+	int status = 0;
+
+	for (i = 0; i < kgsl_driver.num_devs; i++) {
+		struct kgsl_device *device = kgsl_driver.devp[i];
+		if (device) {
+			status = device->ftbl.device_setup_pt(device, pt);
+			if (status)
+				goto error_pt;
+		}
+	}
+	return status;
+error_pt:
+	while (i >= 0) {
+		struct kgsl_device *device = kgsl_driver.devp[i];
+		if (device)
+			device->ftbl.device_cleanup_pt(device, pt);
+		i--;
+	}
+	return status;
+}
+
+int kgsl_cleanup_pt(struct kgsl_pagetable *pt)
+{
+	int i;
+	for (i = 0; i < kgsl_driver.num_devs; i++) {
+		struct kgsl_device *device = kgsl_driver.devp[i];
+		if (device)
+			device->ftbl.device_cleanup_pt(device, pt);
+	}
+	return 0;
+}
+
 int kgsl_pwrctrl(unsigned int pwrflag)
 {
 	switch (pwrflag) {
@@ -488,10 +523,13 @@ kgsl_get_process_private(struct kgsl_device_private *cur_dev_priv)
 }
 
 static int
-kgsl_init_process_private(struct kgsl_device *device,
-					struct kgsl_file_private *private)
+kgsl_init_process_private(struct kgsl_file_private *private)
 {
 	int result = 0;
+#ifdef CONFIG_MSM_KGSL_MMU
+	struct kgsl_device *device = NULL;
+	unsigned long pt_name;
+#endif
 
        /* only initialize it once */
 	if (private->refcnt != 1)
@@ -501,29 +539,22 @@ kgsl_init_process_private(struct kgsl_device *device,
 	INIT_LIST_HEAD(&private->preserve_entry_list);
 	private->preserve_list_size = 0;
 
-	/*NOTE: this must happen after start()*/
 #ifdef CONFIG_MSM_KGSL_MMU
 #ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-	private->pagetable =
-		kgsl_mmu_getpagetable(&device->mmu, task_pid_nr(current));
+	pt_name = task_pid_nr(current);
+#else
+	pt_name = KGSL_MMU_GLOBAL_PT;
+#endif
+	device = kgsl_get_device(KGSL_DEVICE_YAMATO);
+	private->pagetable = kgsl_mmu_getpagetable(&device->mmu, pt_name);
 	if (private->pagetable == NULL)
 		return -ENOMEM;
-	result = kgsl_yamato_setup_pt(device, private->pagetable);
-	if (result) {
-		kgsl_mmu_putpagetable(private->pagetable);
-		private->pagetable = NULL;
-		result = -EINVAL;
-	}
-#else
-	private->pagetable = device->mmu.hwpagetable;
-#endif
 	private->vmalloc_size = 0;
 #endif
 	return result;
 }
 
-static void kgsl_cleanup_process_private(struct kgsl_device *device,
-					struct kgsl_file_private *private)
+static void kgsl_cleanup_process_private(struct kgsl_file_private *private)
 {
 	struct kgsl_mem_entry *entry, *entry_tmp;
 
@@ -536,13 +567,12 @@ static void kgsl_cleanup_process_private(struct kgsl_device *device,
 			&private->preserve_entry_list, list)
 		kgsl_remove_mem_entry(entry, false);
 
+#ifdef CONFIG_MSM_KGSL_MMU
 	if (private->pagetable != NULL) {
-#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-		kgsl_yamato_cleanup_pt(device, private->pagetable);
 		kgsl_mmu_putpagetable(private->pagetable);
-#endif
 		private->pagetable = NULL;
 	}
+#endif
 	return;
 }
 
@@ -550,7 +580,7 @@ static void kgsl_put_process_private(struct kgsl_device *device,
 					struct kgsl_file_private *private)
 {
 	if (private->refcnt-- == 1) {
-		kgsl_cleanup_process_private(device, private);
+		kgsl_cleanup_process_private(private);
 		kfree(private);
 	}
 }
@@ -662,7 +692,7 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 		}
 	}
 
-	result = kgsl_init_process_private(device, dev_priv->process_priv);
+	result = kgsl_init_process_private(dev_priv->process_priv);
 
 done:
 	mutex_unlock(&kgsl_driver.mutex);
@@ -1601,6 +1631,10 @@ static void kgsl_device_unregister(void)
 
 static void kgsl_driver_cleanup(void)
 {
+	if (kgsl_driver.global_pt) {
+		kgsl_mmu_putpagetable(kgsl_driver.global_pt);
+		kgsl_driver.global_pt = NULL;
+	}
 
 	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_3d");
 
@@ -1748,6 +1782,7 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 	struct clk *clk, *grp_clk;
 	struct resource *res = NULL;
 	struct kgsl_platform_data *pdata = NULL;
+	struct kgsl_device *device = NULL;
 
 	kgsl_debug_init();
 
@@ -1935,6 +1970,13 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		kgsl_driver.num_devs++;
 	}
 
+	device = kgsl_get_device(KGSL_DEVICE_YAMATO);
+	kgsl_driver.global_pt = kgsl_mmu_getpagetable(&device->mmu,
+						      KGSL_MMU_GLOBAL_PT);
+	if (kgsl_driver.global_pt == NULL) {
+		result = -ENOMEM;
+		goto done;
+	}
 done:
 	if (result)
 		kgsl_driver_cleanup();

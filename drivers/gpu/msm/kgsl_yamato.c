@@ -258,9 +258,12 @@ irqreturn_t kgsl_yamato_isr(int irq, void *data)
 	return result;
 }
 
-int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
+static int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
 			struct kgsl_pagetable *pagetable)
 {
+	if (device->mmu.defaultpagetable == pagetable)
+		device->mmu.defaultpagetable = NULL;
+
 	kgsl_mmu_unmap(pagetable, device->ringbuffer.buffer_desc.gpuaddr,
 			device->ringbuffer.buffer_desc.size);
 
@@ -276,11 +279,11 @@ int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
 	return 0;
 }
 
-int kgsl_yamato_setup_pt(struct kgsl_device *device,
+static int kgsl_yamato_setup_pt(struct kgsl_device *device,
 			struct kgsl_pagetable *pagetable)
 {
 	int result = 0;
-	unsigned int gpuaddr;
+	unsigned int flags = KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K;
 
 	BUG_ON(device->ringbuffer.buffer_desc.physaddr == 0);
 	BUG_ON(device->ringbuffer.memptrs_desc.physaddr == 0);
@@ -288,55 +291,29 @@ int kgsl_yamato_setup_pt(struct kgsl_device *device,
 #ifdef CONFIG_MSM_KGSL_MMU
 	BUG_ON(device->mmu.dummyspace.physaddr == 0);
 #endif
+	if (device->mmu.defaultpagetable == NULL)
+		device->mmu.defaultpagetable = pagetable;
 
-	result = kgsl_mmu_map(pagetable,
-				device->ringbuffer.buffer_desc.physaddr,
-				device->ringbuffer.buffer_desc.size,
-				GSL_PT_PAGE_RV, &gpuaddr,
-				KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K);
-
+	result = kgsl_mmu_map_global(pagetable, &device->ringbuffer.buffer_desc,
+				     GSL_PT_PAGE_RV, flags);
 	if (result)
 		goto error;
 
-	if (device->ringbuffer.buffer_desc.gpuaddr == 0)
-		device->ringbuffer.buffer_desc.gpuaddr = gpuaddr;
-	BUG_ON(device->ringbuffer.buffer_desc.gpuaddr != gpuaddr);
-
-	result = kgsl_mmu_map(pagetable,
-				device->ringbuffer.memptrs_desc.physaddr,
-				device->ringbuffer.memptrs_desc.size,
-				GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, &gpuaddr,
-				KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K);
+	result = kgsl_mmu_map_global(pagetable,
+				     &device->ringbuffer.memptrs_desc,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, flags);
 	if (result)
 		goto unmap_buffer_desc;
 
-	if (device->ringbuffer.memptrs_desc.gpuaddr == 0)
-		device->ringbuffer.memptrs_desc.gpuaddr = gpuaddr;
-	BUG_ON(device->ringbuffer.memptrs_desc.gpuaddr != gpuaddr);
-
-	result = kgsl_mmu_map(pagetable, device->memstore.physaddr,
-				device->memstore.size,
-				GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, &gpuaddr,
-				KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K);
+	result = kgsl_mmu_map_global(pagetable, &device->memstore,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, flags);
 	if (result)
 		goto unmap_memptrs_desc;
 
-	if (device->memstore.gpuaddr == 0)
-		device->memstore.gpuaddr = gpuaddr;
-	BUG_ON(device->memstore.gpuaddr != gpuaddr);
-
-	result = kgsl_mmu_map(pagetable,
-			device->mmu.dummyspace.physaddr,
-			device->mmu.dummyspace.size,
-			GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, &gpuaddr,
-			KGSL_MEMFLAGS_CONPHYS | KGSL_MEMFLAGS_ALIGN4K);
-
+	result = kgsl_mmu_map_global(pagetable, &device->mmu.dummyspace,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV, flags);
 	if (result)
 		goto unmap_memstore_desc;
-
-	if (device->mmu.dummyspace.gpuaddr == 0)
-		device->mmu.dummyspace.gpuaddr = gpuaddr;
-	BUG_ON(device->mmu.dummyspace.gpuaddr != gpuaddr);
 
 	return result;
 
@@ -352,7 +329,6 @@ unmap_buffer_desc:
 			device->ringbuffer.buffer_desc.size);
 error:
 	return result;
-
 }
 
 static int kgsl_yamato_setstate(struct kgsl_device *device, uint32_t flags)
@@ -597,15 +573,6 @@ kgsl_yamato_init(struct kgsl_device *device, struct kgsl_devconfig *config)
 		goto error_close_rb;
 	}
 
-#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-	pr_info("msm_kgsl: initialized dev=%d mmu=%s "
-		"per_process_pagetable=on\n",
-		device->id, kgsl_mmu_isenabled(&device->mmu) ? "on" : "off");
-#else
-	pr_info("msm_kgsl: initialized dev=%d mmu=%s "
-		"per_process_pagetable=off\n",
-		device->id, kgsl_mmu_isenabled(&device->mmu) ? "on" : "off");
-#endif
 	device->flags |= KGSL_FLAGS_INITIALIZED;
 	return 0;
 
@@ -750,6 +717,15 @@ static int kgsl_yamato_start(struct kgsl_device *device)
 
 	mod_timer(&device->idle_timer, jiffies + FIRST_TIMEOUT);
 	device->flags |= KGSL_FLAGS_STARTED;
+#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
+	pr_info("msm_kgsl: initialized dev=%d mmu=%s "
+		"per_process_pagetable=on\n",
+		device->id, kgsl_mmu_isenabled(&device->mmu) ? "on" : "off");
+#else
+	pr_info("msm_kgsl: initialized dev=%d mmu=%s "
+		"per_process_pagetable=off\n",
+		device->id, kgsl_mmu_isenabled(&device->mmu) ? "on" : "off");
+#endif
 	KGSL_DRV_VDBG("return %d\n", status);
 	return status;
 
@@ -1289,6 +1265,8 @@ int kgsl_yamato_getfunctable(struct kgsl_functable *ftbl)
 	ftbl->device_drawctxt_create = kgsl_drawctxt_create;
 	ftbl->device_drawctxt_destroy = kgsl_drawctxt_destroy;
 	ftbl->device_ioctl = kgsl_yamato_ioctl;
+	ftbl->device_setup_pt = kgsl_yamato_setup_pt;
+	ftbl->device_cleanup_pt = kgsl_yamato_cleanup_pt;
 
 	return KGSL_SUCCESS;
 }

@@ -195,6 +195,10 @@ static inline int kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 
 #endif
 
+int kgsl_mmu_map_global(struct kgsl_pagetable *pagetable,
+			struct kgsl_memdesc *memdesc, unsigned int protflags,
+			unsigned int flags);
+
 int kgsl_mmu_querystats(struct kgsl_pagetable *pagetable,
 			struct kgsl_ptstats *stats);
 

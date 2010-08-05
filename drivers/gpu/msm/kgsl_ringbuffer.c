@@ -569,15 +569,6 @@ int kgsl_ringbuffer_init(struct kgsl_device *device)
 		return status;
 	}
 
-	/* last allocation of init process is made here so map all
-	 * allocations to MMU */
-	status = kgsl_yamato_setup_pt(device, device->mmu.defaultpagetable);
-	if (status != 0) {
-		kgsl_ringbuffer_close(rb);
-		KGSL_CMD_VDBG("return %d\n", status);
-		return status;
-	}
-
 	/* overlay structure on memptrs memory */
 	rb->memptrs = (struct kgsl_rbmemptrs *) rb->memptrs_desc.hostptr;
 
@@ -590,9 +581,6 @@ int kgsl_ringbuffer_init(struct kgsl_device *device)
 int kgsl_ringbuffer_close(struct kgsl_ringbuffer *rb)
 {
 	KGSL_CMD_VDBG("enter (rb=%p)\n", rb);
-
-	/* this must happen before first sharedmem_free */
-	kgsl_yamato_cleanup_pt(rb->device, rb->device->mmu.defaultpagetable);
 
 	if (rb->buffer_desc.hostptr)
 		kgsl_sharedmem_free(&rb->buffer_desc);
