@@ -37,7 +37,7 @@
 #include <linux/nmi.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
-
+#include <linux/pm_runtime.h>
 #include <mach/board.h>
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
@@ -510,7 +510,10 @@ static int msm_hsl_startup(struct uart_port *port)
 	snprintf(msm_hsl_port->name, sizeof(msm_hsl_port->name),
 		 "msm_serial_hsl%d", port->line);
 
+#ifndef CONFIG_PM_RUNTIME
 	msm_hsl_init_clock(port);
+#endif
+	pm_runtime_get_sync(port->dev);
 
 	if (likely(port->fifosize > 12))
 		rfr_level = port->fifosize - 12;
@@ -581,8 +584,10 @@ static void msm_hsl_shutdown(struct uart_port *port)
 
 	free_irq(port->irq, port);
 
+#ifndef CONFIG_PM_RUNTIME
 	msm_hsl_deinit_clock(port);
-
+#endif
+	pm_runtime_put_sync(port->dev);
 }
 
 static void msm_hsl_set_termios(struct uart_port *port,
@@ -951,7 +956,12 @@ static int __init msm_hsl_console_setup(struct console *co, char *options)
 
 	port->cons = co;
 
+	pm_runtime_get_noresume(port->dev);
+
+#ifndef CONFIG_PM_RUNTIME
 	msm_hsl_init_clock(port);
+#endif
+	pm_runtime_resume(port->dev);
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
@@ -1072,6 +1082,7 @@ static int __init msm_serial_hsl_probe(struct platform_device *pdev)
 		/* return -ENXIO; */
 	}
 
+	pm_runtime_enable(port->dev);
 	ret = uart_add_one_port(&msm_hsl_uart_driver, port);
 
 	return ret;
@@ -1080,6 +1091,9 @@ static int __init msm_serial_hsl_probe(struct platform_device *pdev)
 static int __devexit msm_serial_hsl_remove(struct platform_device *pdev)
 {
 	struct msm_hsl_port *msm_hsl_port = platform_get_drvdata(pdev);
+
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	clk_put(msm_hsl_port->clk);
 
@@ -1120,6 +1134,33 @@ static int msm_serial_hsl_resume(struct platform_device *pdev)
 #define msm_serial_hsl_resume NULL
 #endif
 
+static int msm_hsl_runtime_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct uart_port *port;
+	port = get_port_from_line(pdev->id);
+
+	dev_dbg(dev, "pm_runtime: suspending\n");
+	msm_hsl_deinit_clock(port);
+	return 0;
+}
+
+static int msm_hsl_runtime_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct uart_port *port;
+	port = get_port_from_line(pdev->id);
+
+	dev_dbg(dev, "pm_runtime: resuming\n");
+	msm_hsl_init_clock(port);
+	return 0;
+}
+
+static struct dev_pm_ops msm_hsl_dev_pm_ops = {
+	.runtime_suspend = msm_hsl_runtime_suspend,
+	.runtime_resume = msm_hsl_runtime_resume,
+};
+
 static struct platform_driver msm_hsl_platform_driver = {
 	.probe = msm_serial_hsl_probe,
 	.remove = msm_serial_hsl_remove,
@@ -1128,6 +1169,7 @@ static struct platform_driver msm_hsl_platform_driver = {
 	.driver = {
 		.name = "msm_serial_hsl",
 		.owner = THIS_MODULE,
+		.pm = &msm_hsl_dev_pm_ops,
 	},
 };
 
