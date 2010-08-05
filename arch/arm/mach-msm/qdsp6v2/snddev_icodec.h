@@ -50,4 +50,5 @@ struct snddev_icodec_data {
 	s32 min_voice_rx_vol[VOC_RX_VOL_ARRAY_NUM];
 	u32 dev_vol_type;
 };
+
 #endif

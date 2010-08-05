@@ -354,11 +354,6 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	trc =  clk_set_rate(drv->tx_bitclk, 8);
 	clk_enable(drv->tx_bitclk);
 
-	trc = pm8058_micbias_enable(OTHC_MICBIAS_0,
-						OTHC_SIGNAL_ALWAYS_ON);
-	if (trc)
-		pr_err("Error Enabling Mic Bias....\n");
-
 	/* Enable ADIE */
 	trc = adie_codec_open(icodec->data->profile, &icodec->adie_path);
 	if (IS_ERR_VALUE(trc))

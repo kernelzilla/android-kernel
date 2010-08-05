@@ -100,8 +100,8 @@ static struct snddev_icodec_data snddev_imic_data = {
 	.pmctl_id = imic_pmctl_id,
 	.pmctl_id_sz = ARRAY_SIZE(imic_pmctl_id),
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_tx_route_config,
-	.pamp_off = msm_snddev_tx_route_deconfig,
+	.pamp_on = msm_snddev_enable_amic_power,
+	.pamp_off = msm_snddev_disable_amic_power,
 };
 
 static struct platform_device msm_imic_device = {
@@ -153,7 +153,7 @@ static struct platform_device msm_iearpiece_ffa_device = {
 };
 
 static struct adie_codec_action_unit imic_ffa_48KHz_osr256_actions[] =
-	AMIC_PRI_MONO_8000_OSR_256;
+	DMIC1_PRI_MONO_8000_OSR_64;
 
 static struct adie_codec_hwsetting_entry imic_ffa_settings[] = {
 	{
@@ -180,8 +180,8 @@ static struct snddev_icodec_data snddev_imic_ffa_data = {
 	.pmctl_id = imic_pmctl_id,
 	.pmctl_id_sz = ARRAY_SIZE(imic_pmctl_id),
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_tx_route_config,
-	.pamp_off = msm_snddev_tx_route_deconfig,
+	.pamp_on = msm_snddev_enable_dmic_power,
+	.pamp_off = msm_snddev_disable_dmic_power,
 };
 
 static struct platform_device msm_imic_ffa_device = {
