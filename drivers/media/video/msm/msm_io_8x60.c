@@ -88,6 +88,7 @@ static struct clk *camio_jpeg_clk;
 static struct clk *camio_jpeg_pclk;
 
 static struct msm_camera_io_ext camio_ext;
+static struct msm_camera_io_clk camio_clk;
 static struct resource *csiio;
 void __iomem *csibase;
 
@@ -236,12 +237,12 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 	case CAMIO_CAM_MCLK_CLK:
 		camio_cam_clk =
 		clk = clk_get(NULL, "cam_clk");
-		msm_camio_clk_rate_set_2(clk, 24000000);
+		msm_camio_clk_rate_set_2(clk, camio_clk.mclk_clk_rate);
 		break;
 
 	case CAMIO_VFE_CLK:
 		clk = clk_get(NULL, "vfe_clk");
-		msm_camio_clk_rate_set_2(clk, 228570000);
+		msm_camio_clk_rate_set_2(clk, camio_clk.vfe_clk_rate);
 		break;
 
 	case CAMIO_CSI0_VFE_CLK:
@@ -406,6 +407,7 @@ int msm_camio_enable(struct platform_device *pdev)
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
 
 	camio_ext = camdev->ioext;
+	camio_clk = camdev->ioclk;
 
 	camdev->camera_gpio_on();
 	msm_camera_vreg_enable();

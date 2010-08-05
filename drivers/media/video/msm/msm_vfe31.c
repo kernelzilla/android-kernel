@@ -48,6 +48,7 @@ atomic_t irq_cnt;
 #endif
 
 static struct vfe31_ctrl_type *vfe31_ctrl;
+static struct msm_camera_io_clk camio_clk;
 static void  *vfe_syncdata;
 
 struct vfe31_isr_queue_cmd {
@@ -182,8 +183,9 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		V31_STATS_IHIST_LEN, V31_STATS_IHIST_OFF},
 		{V31_STATS_IHIST_STOP},
 		{V31_DUMMY_10},
-		{V31_SYNC_TIMER_SETTING},
-/*105*/	{V31_ASYNC_TIMER_SETTING},
+		{V31_SYNC_TIMER_SETTING, V31_SYNC_TIMER_LEN,
+			V31_SYNC_TIMER_OFF},
+/*105*/	{V31_ASYNC_TIMER_SETTING, V31_ASYNC_TIMER_LEN, V31_ASYNC_TIMER_OFF},
 };
 
 static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
@@ -337,6 +339,18 @@ static void vfe31_proc_ops(enum VFE31_MESSAGE_ID id, void *msg, size_t len)
 		rp->type = VFE_MSG_STATS_CS;
 		vfe_addr_convert(&(rp->phy), VFE_MSG_STATS_CS,
 				rp->evt_msg.data, NULL, NULL);
+		break;
+
+	case MSG_ID_SYNC_TIMER0_DONE:
+		rp->type = VFE_MSG_SYNC_TIMER0;
+		break;
+
+	case MSG_ID_SYNC_TIMER1_DONE:
+		rp->type = VFE_MSG_SYNC_TIMER1;
+		break;
+
+	case MSG_ID_SYNC_TIMER2_DONE:
+		rp->type = VFE_MSG_SYNC_TIMER2;
 		break;
 
 	default:
@@ -1032,6 +1046,68 @@ static void vfe31_update(void)
 	return;
 }
 
+void vfe31_sync_timer_stop(void)
+{
+	uint32_t value = 0;
+	vfe31_ctrl->sync_timer_state = 0;
+	if (vfe31_ctrl->sync_timer_number == 0)
+		value = 0x10000;
+	else if (vfe31_ctrl->sync_timer_number == 1)
+		value = 0x20000;
+	else if (vfe31_ctrl->sync_timer_number == 2)
+		value = 0x40000;
+
+	/* Timer Stop */
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF);
+}
+
+void vfe31_sync_timer_start(const uint32_t *tbl)
+{
+	/* set bit 8 for auto increment. */
+	uint32_t value = 1;
+	uint32_t val;
+
+	vfe31_ctrl->sync_timer_state = *tbl++;
+	vfe31_ctrl->sync_timer_repeat_count = *tbl++;
+	vfe31_ctrl->sync_timer_number = *tbl++;
+	CDBG("%s timer_state %d, repeat_cnt %d timer number %d\n",
+		 __func__, vfe31_ctrl->sync_timer_state,
+		 vfe31_ctrl->sync_timer_repeat_count,
+		 vfe31_ctrl->sync_timer_number);
+
+	if (vfe31_ctrl->sync_timer_state) { /* Start Timer */
+		value = value << vfe31_ctrl->sync_timer_number;
+	} else { /* Stop Timer */
+		CDBG("Failed to Start timer\n");
+		 return;
+	}
+
+	/* Timer Start */
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF);
+	/* Sync Timer Line Start */
+	value = *tbl++;
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF +
+		4 + ((vfe31_ctrl->sync_timer_number) * 12));
+	/* Sync Timer Pixel Start */
+	value = *tbl++;
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF +
+			 8 + ((vfe31_ctrl->sync_timer_number) * 12));
+	/* Sync Timer Pixel Duration */
+	value = *tbl++;
+	val = camio_clk.vfe_clk_rate / 10000;
+	val = 10000000 / val;
+	val = value * 10000 / val;
+	CDBG("%s: Pixel Clk Cycles!!! %d \n", __func__, val);
+	msm_io_w(val, vfe31_ctrl->vfebase + V31_SYNC_TIMER_OFF +
+		12 + ((vfe31_ctrl->sync_timer_number) * 12));
+	/* Timer0 Active High/LOW */
+	value = *tbl++;
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_SYNC_TIMER_POLARITY_OFF);
+	/* Selects sync timer 0 output to drive onto timer1 port */
+	value = 0;
+	msm_io_w(value, vfe31_ctrl->vfebase + V31_TIMER_SELECT_OFF);
+}
+
 void vfe31_program_dmi_cfg(enum VFE31_DMI_RAM_SEL bankSel)
 {
 	/* set bit 8 for auto increment. */
@@ -1085,6 +1161,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 	uint32_t *cmdp = NULL;
 	uint32_t *cmdp_local = NULL;
 	uint32_t snapshot_cnt = 0;
+
 	CDBG("vfe31_proc_general: cmdID = %d, length = %d\n",
 		cmd->id, cmd->length);
 	switch (cmd->id) {
@@ -1524,6 +1601,21 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 	case V31_STOP:
 		vfe_stop();
 		break;
+
+	case V31_SYNC_TIMER_SETTING:
+		cmdp = kmalloc(cmd->length, GFP_ATOMIC);
+		if (!cmdp) {
+			rc = -ENOMEM;
+			goto proc_general_done;
+		}
+		if (copy_from_user(cmdp, (void __user *)(cmd->value),
+			cmd->length)) {
+			rc = -EFAULT;
+			goto proc_general_done;
+		}
+		vfe31_sync_timer_start(cmdp);
+		break;
+
 	default: {
 		if (cmd->length != vfe31_cmd[cmd->id].length)
 			return -EINVAL;
@@ -2052,7 +2144,7 @@ static void vfe31_process_camif_sof_irq(void)
 		if (vfe31_ctrl->start_ack_pending) {
 			vfe31_send_msg_no_payload(MSG_ID_START_ACK);
 			vfe31_ctrl->start_ack_pending = FALSE;
-	}
+		}
 		vfe31_ctrl->vfe_capture_count--;
 		/* if last frame to be captured: */
 		if (vfe31_ctrl->vfe_capture_count == 0) {
@@ -2066,8 +2158,14 @@ static void vfe31_process_camif_sof_irq(void)
 	} /* if raw snapshot mode. */
 	vfe31_send_msg_no_payload(MSG_ID_SOF_ACK);
 	vfe31_ctrl->vfeFrameId++;
-	CDBG("camif_sof_irq, frameId = %d\n",
-		vfe31_ctrl->vfeFrameId);
+	CDBG("camif_sof_irq, frameId = %d\n", vfe31_ctrl->vfeFrameId);
+
+	if (vfe31_ctrl->sync_timer_state) {
+		if (vfe31_ctrl->sync_timer_repeat_count == 0)
+			vfe31_sync_timer_stop();
+		else
+		vfe31_ctrl->sync_timer_repeat_count--;
+	}
 }
 
 static void vfe31_process_error_irq(uint32_t errStatus)
@@ -2627,6 +2725,24 @@ static void vfe31_do_tasklet(unsigned long data)
 					CDBG("Stats CS irq occured.\n");
 					vfe31_process_stats_cs_irq();
 				}
+				if (qcmd->vfeInterruptStatus0 &
+						VFE_IRQ_STATUS0_SYNC_TIMER0) {
+					CDBG("SYNC_TIMER 0 irq occured.\n");
+					vfe31_send_msg_no_payload(
+						MSG_ID_SYNC_TIMER0_DONE);
+				}
+				if (qcmd->vfeInterruptStatus0 &
+						VFE_IRQ_STATUS0_SYNC_TIMER1) {
+					CDBG("SYNC_TIMER 1 irq occured.\n");
+					vfe31_send_msg_no_payload(
+						MSG_ID_SYNC_TIMER1_DONE);
+				}
+				if (qcmd->vfeInterruptStatus0 &
+						VFE_IRQ_STATUS0_SYNC_TIMER2) {
+					CDBG("SYNC_TIMER 2 irq occured.\n");
+					vfe31_send_msg_no_payload(
+						MSG_ID_SYNC_TIMER2_DONE);
+				}
 			}
 		} else {
 			/* do we really need spin lock for state? */
@@ -2782,14 +2898,19 @@ cmd_init_failed1:
 }
 
 static int vfe31_init(struct msm_vfe_callback *presp,
-	struct platform_device *dev)
+	struct platform_device *pdev)
 {
 	int rc = 0;
-	rc = vfe31_resource_init(presp, dev, vfe_syncdata);
+	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
+	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
+
+	camio_clk = camdev->ioclk;
+
+	rc = vfe31_resource_init(presp, pdev, vfe_syncdata);
 	if (rc < 0)
 		return rc;
 	/* Bring up all the required GPIOs and Clocks */
-	rc = msm_camio_enable(dev);
+	rc = msm_camio_enable(pdev);
 	return rc;
 }
 

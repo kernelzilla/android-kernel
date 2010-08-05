@@ -834,7 +834,9 @@ struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.camifpadsz  = 0x00000400,
 	.ioext.csiphy = 0xA6100000,
 	.ioext.csisz  = 0x00000400,
-	.ioext.csiirq = INT_CSI
+	.ioext.csiirq = INT_CSI,
+	.ioclk.mclk_clk_rate = 24000000,
+	.ioclk.vfe_clk_rate  = 122880000,
 };
 
 static struct msm_camera_sensor_flash_src msm_flash_src = {

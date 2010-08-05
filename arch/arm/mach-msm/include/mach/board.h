@@ -44,10 +44,16 @@ struct msm_camera_io_ext {
 	uint32_t csiirq;
 };
 
+struct msm_camera_io_clk {
+	uint32_t mclk_clk_rate;
+	uint32_t vfe_clk_rate;
+};
+
 struct msm_camera_device_platform_data {
 	void (*camera_gpio_on) (void);
 	void (*camera_gpio_off)(void);
 	struct msm_camera_io_ext ioext;
+	struct msm_camera_io_clk ioclk;
 };
 enum msm_camera_csi_data_format {
 	CSI_8BIT,

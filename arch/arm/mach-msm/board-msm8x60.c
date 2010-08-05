@@ -488,6 +488,8 @@ struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.csiphy = 0x04800000,
 	.ioext.csisz  = 0x00000400,
 	.ioext.csiirq = CSI_0_IRQ,
+	.ioclk.mclk_clk_rate = 24000000,
+	.ioclk.vfe_clk_rate  = 228570000,
 };
 
 struct resource msm_camera_resources[] = {
