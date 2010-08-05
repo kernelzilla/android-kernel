@@ -33,6 +33,7 @@
 #include <linux/mutex.h>
 #include <linux/timer.h>
 #include <mach/board.h>
+#include <linux/pm_runtime.h>
 
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("0.2");
@@ -960,6 +961,9 @@ qup_i2c_probe(struct platform_device *pdev)
 	dev->clk_state = 0;
 	setup_timer(&dev->pwr_timer, qup_i2c_pwr_timer, (unsigned long) dev);
 
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = i2c_add_numbered_adapter(&dev->adapter);
 	if (ret) {
 		dev_err(&pdev->dev, "i2c_add_adapter failed\n");
@@ -970,6 +974,7 @@ qup_i2c_probe(struct platform_device *pdev)
 		free_irq(dev->err_irq, dev);
 	} else
 		return 0;
+
 
 err_request_irq_failed:
 	iounmap(dev->gsbi);
@@ -1014,6 +1019,9 @@ qup_i2c_remove(struct platform_device *pdev)
 		clk_put(dev->pclk);
 	iounmap(dev->gsbi);
 	iounmap(dev->base);
+
+	pm_runtime_disable(&pdev->dev);
+
 	kfree(dev);
 	gsbi_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"gsbi_qup_i2c_addr");
@@ -1050,6 +1058,24 @@ static int qup_i2c_resume(struct platform_device *pdev)
 #define qup_i2c_resume NULL
 #endif /* CONFIG_PM */
 
+static int i2c_qup_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int i2c_qup_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops i2c_qup_dev_pm_ops = {
+	.runtime_suspend = i2c_qup_runtime_suspend,
+	.runtime_resume = i2c_qup_runtime_resume,
+};
+
+
 static struct platform_driver qup_i2c_driver = {
 	.probe		= qup_i2c_probe,
 	.remove		= __devexit_p(qup_i2c_remove),
@@ -1058,6 +1084,7 @@ static struct platform_driver qup_i2c_driver = {
 	.driver		= {
 		.name	= "qup_i2c",
 		.owner	= THIS_MODULE,
+		.pm = &i2c_qup_dev_pm_ops,
 	},
 };
 
