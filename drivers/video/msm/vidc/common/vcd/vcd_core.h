@@ -168,6 +168,7 @@ struct vcd_clnt_status {
 	u32 time_elapsed;
 	struct vcd_frame_data eos_trig_ip_frm;
 	struct ddl_frame_data_tag eos_prev_op_frm;
+	u32 eos_prev_op_frm_status;
 	u32	last_err;
 	u32	last_evt;
 	u32 mask;

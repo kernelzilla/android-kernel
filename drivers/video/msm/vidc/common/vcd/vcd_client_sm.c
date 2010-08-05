@@ -281,11 +281,14 @@ static u32 vcd_resume_in_paused(struct vcd_clnt_ctxt *cctxt)
 			}
 
 		}
-		if (!VCD_FAILED(rc))
+		if (!VCD_FAILED(rc)) {
+			vcd_do_client_state_transition(cctxt,
+						       VCD_CLIENT_STATE_RUN,
+						       CLIENT_STATE_EVENT_NUMBER
+						       (resume));
 			vcd_try_submit_frame(dev_ctxt);
-	}
-
-	if (!VCD_FAILED(rc)) {
+		}
+	} else {
 		vcd_do_client_state_transition(cctxt,
 					       VCD_CLIENT_STATE_RUN,
 					       CLIENT_STATE_EVENT_NUMBER
