@@ -28,17 +28,123 @@
 #ifndef __Q6_ASM_H__
 #define __Q6_ASM_H__
 
-#include "msm_qdsp6_audio.h"
+#include "apr.h"
 
-struct audio_client *q6asm_out_open(uint32_t bufsz,
-				uint32_t rate, uint32_t channels);
-struct audio_client *q6asm_in_open(uint32_t bufsz,
-				uint32_t rate, uint32_t channels);
+#define IN                      0x000
+#define OUT                     0x001
+#define CH_MODE_MONO            0x001
+#define CH_MODE_STEREO          0x002
 
-int q6asm_in_run(struct audio_client *ac);
-int q6asm_write(struct audio_client *ac, struct audio_buffer *ab);
-int q6asm_read(struct audio_client *ac, struct audio_buffer *ab);
-int q6asm_out_run(struct audio_client *ac);
-int q6asm_close(struct audio_client *ac);
+#define FORMAT_LINEAR_PCM   0x0000
+#define FORMAT_DTMF         0x0001
+#define FORMAT_ADPCM	    0x0002
+#define FORMAT_YADPCM       0x0003
+#define FORMAT_MP3          0x0004
+#define FORMAT_MPEG4_AAC    0x0005
+#define FORMAT_AMRNB	    0x0006
+#define FORMAT_AMRWB	    0x0007
+#define FORMAT_V13K	    0x0008
+#define FORMAT_EVRC	    0x0009
+#define FORMAT_EVRCB	    0x000a
+#define FORMAT_EVRCWB	    0x000b
+#define FORMAT_MIDI	    0x000c
+#define FORMAT_SBC	    0x000d
+#define FORMAT_WMA_V10PRO   0x000e
+#define FORMAT_WMA_V9	    0x000f
+#define FORMAT_AMR_WB_PLUS  0x0010
+
+#define ENCDEC_SBCBITRATE   0x0001
+#define ENCDEC_IMMEDIATE_DECODE 0x0002
+#define ENCDEC_CFG_BLK          0x0003
+
+#define CMD_PAUSE          0x0001
+#define CMD_FLUSH          0x0002
+#define CMD_EOS            0x0003
+#define CMD_CLOSE          0x0004
+
+typedef void (*app_cb)(uint32_t opcode, uint32_t token,
+			uint32_t *payload, void *priv);
+
+struct audio_buffer {
+	dma_addr_t phys;
+	void       *data;
+	uint32_t   used;
+	uint32_t   size;/* size of buffer */
+	uint32_t   actual_size; /* actual number of bytes read by DSP */
+};
+
+struct audio_port_data {
+	struct audio_buffer *buf;
+	uint32_t	    max_buf_cnt;
+	uint32_t	    dsp_buf;
+	uint32_t	    cpu_buf;
+	/* read or write locks */
+	struct mutex	    lock;
+	spinlock_t	    dsp_lock;
+};
+
+struct audio_client {
+	int                    session;
+	/* idx:1 out port, 0: in port*/
+	struct audio_port_data port[2];
+
+	struct apr_svc         *apr;
+	struct mutex	       cmd_lock;
+
+	unsigned char	    cmd_state;
+	unsigned char	    eos_state;
+	wait_queue_head_t   cmd_wait;
+
+	app_cb              cb;
+	void                *priv;
+};
+
+void q6asm_audio_client_free(struct audio_client *ac);
+
+struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv);
+
+int q6asm_audio_client_buf_alloc(unsigned int dir/* 1:Out,0:In */,
+				struct audio_client *ac,
+				unsigned int bufsz,
+				unsigned int bufcnt);
+
+int q6asm_open_read(struct audio_client *ac, uint32_t format);
+
+int q6asm_open_write(struct audio_client *ac, uint32_t format);
+
+int q6asm_open_read_write(struct audio_client *ac,
+			uint32_t rd_format,
+			uint32_t wr_format);
+
+int q6asm_write(struct audio_client *ac, uint32_t len, uint32_t msw_ts,
+				uint32_t lsw_ts, uint32_t flags);
+
+int q6asm_read(struct audio_client *ac);
+
+int q6asm_run(struct audio_client *ac, uint32_t flags,
+		uint32_t msw_ts, uint32_t lsw_ts);
+
+int q6asm_reg_tx_overflow(struct audio_client *ac, uint16_t enable);
+
+int q6asm_cmd(struct audio_client *ac, int cmd);
+
+void *q6asm_is_cpu_buf_avail(int dir, struct audio_client *ac,
+				uint32_t *size, uint32_t *idx);
+
+int q6asm_is_dsp_buf_avail(int dir, struct audio_client *ac);
+
+/* File format specific configurations to be added below */
+
+int q6asm_enc_cfg_blk_aac(struct audio_client *ac,
+			 uint32_t frames_per_buf,
+			uint32_t sample_rate, uint32_t channels,
+			 uint32_t bit_rate,
+			 uint32_t mode, uint32_t format);
+
+int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+			uint32_t rate, uint32_t channels);
+
+int q6asm_media_format_block_pcm(struct audio_client *ac,
+			uint32_t rate, uint32_t channels);
 
 #endif /* __Q6_ASM_H__ */

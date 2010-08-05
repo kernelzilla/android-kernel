@@ -12,30 +12,51 @@
  * GNU General Public License for more details.
  *
  */
-
+#include <linux/fs.h>
 #include <linux/mutex.h>
 #include <linux/wait.h>
+#include <linux/miscdevice.h>
+#include <linux/uaccess.h>
+#include <linux/sched.h>
 #include <linux/dma-mapping.h>
 #include <linux/miscdevice.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 #include <mach/debug_mm.h>
 #include <mach/peripheral-loader.h>
+#include <asm/atomic.h>
+#include <asm/ioctls.h>
 #include "q6asm.h"
 #include "apr_audio.h"
 
-#define SESSION_MAX 8
+#define SESSION_MAX 0x08
+#define TRUE        0x01
+#define FALSE       0x00
+#define READDONE_IDX_STATUS 0
+#define READDONE_IDX_BUFFER 1
+#define READDONE_IDX_SIZE 2
+#define READDONE_IDX_OFFSET 3
+#define READDONE_IDX_MSW_TS 4
+#define READDONE_IDX_LSW_TS 5
+#define READDONE_IDX_FLAGS 6
+#define READDONE_IDX_NUMFRAMES 7
+#define READDONE_IDX_ID 8
 
 static DEFINE_MUTEX(session_lock);
-static DEFINE_MUTEX(lock);
 
-static struct audio_client *session[SESSION_MAX];
+/* session id: 0 reserved */
+static struct audio_client *session[SESSION_MAX+1];
+static int32_t q6asm_callback(struct apr_client_data *data, void *priv);
+static void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
+			uint32_t pkt_size, uint32_t cmd_flg);
 
-static int session_alloc(struct audio_client *ac)
+static void q6asm_reset_buf_state(struct audio_client *ac);
+
+static int q6asm_session_alloc(struct audio_client *ac)
 {
 	int n;
-
 	mutex_lock(&session_lock);
-	for (n = 1; n < SESSION_MAX + 1; n++) {
+	for (n = 1; n <= SESSION_MAX; n++) {
 		if (!session[n]) {
 			session[n] = ac;
 			mutex_unlock(&session_lock);
@@ -46,473 +67,966 @@ static int session_alloc(struct audio_client *ac)
 	return -ENOMEM;
 }
 
-static void session_free(int n, struct audio_client *ac)
+static void q6asm_session_free(struct audio_client *ac)
 {
+	MM_DBG("%s: sessionid[%d]\n", __func__, ac->session);
 	mutex_lock(&session_lock);
-	if (session[n] == ac)
-		session[n] = 0;
+	session[ac->session] = 0;
 	mutex_unlock(&session_lock);
+	return;
 }
 
-static void audio_client_free(struct audio_client *ac)
+void q6asm_audio_client_free(struct audio_client *ac)
 {
-	session_free(ac->session, ac);
+	int cnt;
+	int loopcnt;
+	struct audio_port_data *port;
+	if (!ac || !ac->session)
+		return;
 
-	/* TODO: Need to update for AIO with multiple buffers */
-	if (ac->buf[0].data)
-		dma_free_coherent(NULL, ac->buf[0].size,
-					ac->buf[0].data, ac->buf[0].phys);
-	if (ac->buf[1].data)
-		dma_free_coherent(NULL, ac->buf[1].size,
-					ac->buf[1].data, ac->buf[1].phys);
+	MM_DBG("%s:\n", __func__);
+	for (loopcnt = 0; loopcnt <= OUT; loopcnt++) {
+		port = &ac->port[loopcnt];
+		if (!port->buf)
+			continue;
+		cnt = port->max_buf_cnt - 1;
+		MM_DBG("%s:loopcnt[%d]numofbuf[%d]", __func__, loopcnt,
+								(cnt+1));
+		while (cnt >= 0) {
+			MM_DBG("%s:data[%p]phys[%p][%p]\n", __func__,
+					(void *)port->buf[cnt].data,
+					(void *)port->buf[cnt].phys,
+					(void *)&port->buf[cnt].phys);
+			if (port->buf[cnt].data) {
+				dma_free_coherent(NULL,
+						port->buf[cnt].size,
+						port->buf[cnt].data,
+						port->buf[cnt].phys);
+				port->buf[cnt].data = NULL;
+				port->buf[cnt].phys = 0;
+				--(port->max_buf_cnt);
+			}
+			--cnt;
+		}
+		kfree(port->buf);
+		port->buf = NULL;
+	}
+	q6asm_session_free(ac);
+	apr_deregister(ac->apr);
+
 	kfree(ac);
+	return;
 }
 
-static struct audio_client *audio_client_alloc(unsigned int bufsz)
+struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv)
 {
 	struct audio_client *ac;
 	int n;
-	ac = kzalloc(sizeof(*ac), GFP_KERNEL);
-	if (!ac)
-		return 0;
+	int lcnt = 0;
 
-	n = session_alloc(ac);
+	ac = kzalloc(sizeof(struct audio_client), GFP_KERNEL);
+	if (!ac)
+		return NULL;
+	n = q6asm_session_alloc(ac);
 	if (n <= 0)
 		goto fail_session;
-
 	ac->session = n;
+	ac->cb = cb;
+	ac->priv = priv;
+	ac->apr = apr_register("ADSP", "ASM", \
+				(apr_fn)q6asm_callback,\
+				((ac->session) << 8 | 0x0001),\
+				ac);
 
-	if (bufsz > 0) {
-		ac->buf[0].data = dma_alloc_coherent(NULL, bufsz,
-						&ac->buf[0].phys, GFP_KERNEL);
-		if (!ac->buf[0].data)
+	if (ac->apr == NULL) {
+		MM_ERR("Registration with APR failed\n");
 			goto fail;
-		ac->buf[1].data = dma_alloc_coherent(NULL, bufsz,
-						&ac->buf[1].phys, GFP_KERNEL);
-		if (!ac->buf[1].data)
-			goto fail;
-
-		ac->buf[0].size = bufsz;
-		ac->buf[1].size = bufsz;
 	}
-	init_waitqueue_head(&ac->wait);
 	init_waitqueue_head(&ac->cmd_wait);
-	return ac;
+	mutex_init(&ac->cmd_lock);
+	for (lcnt = 0; lcnt <= OUT; lcnt++) {
+		mutex_init(&ac->port[lcnt].lock);
+		spin_lock_init(&ac->port[lcnt].dsp_lock);
+	}
 
+	MM_DBG("%s: session[%d]\n", __func__, ac->session);
+
+	return ac;
 fail:
-	session_free(n, ac);
+	q6asm_audio_client_free(ac);
+	return NULL;
 fail_session:
-	audio_client_free(ac);
-	return 0;
+	kfree(ac);
+	return NULL;
 }
 
-/* May need to move out, as different stream have different implementation */
-static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
+int q6asm_audio_client_buf_free(unsigned int dir,
+			struct audio_client *ac)
 {
+	struct audio_port_data *port;
+	unsigned int cnt = 0;
 
-	struct audio_client *ac = (struct audio_client *) priv;
-	int n;
-	uint32_t *payload;
-	payload = data->payload;
-
-	pr_info("%s: data->opcode = 0x%x\n", __func__, data->opcode);
-	if (ac == NULL) {
-		pr_err("%s: ac NULL\n", __func__);
+	MM_DBG("%s:\n", __func__);
+	mutex_lock(&ac->cmd_lock);
+	port = &ac->port[dir];
+	if (!port->buf) {
+		mutex_unlock(&ac->cmd_lock);
 		return 0;
 	}
+	cnt = port->max_buf_cnt - 1;
+	MM_DBG("%s:numofbuf[%d]", __func__, (cnt+1));
 
-	if (data->payload_size) {
-		if (data->opcode != APR_BASIC_RSP_RESULT) {
-			switch (data->opcode) {
-			case ASM_DATA_EVENT_READ_DONE: {
-				uint32_t buffer = payload[1];
-				uint32_t nActualSize = payload[2];
-				n = data->token;
-				ac = session[ac->session];
-				ac->buf[n].actual_size = nActualSize;
-
-				if ((void *)ac->buf[n].phys !=
-						(void *)buffer) {
-					pr_err("Buf expected[%p] \
-						rxed[%p]\n",\
-						(void *)ac->buf[n].phys,\
-						(void *)buffer);
-				}
-				ac->buf[n].used = 0;
-				wake_up(&ac->wait);
-				break;
-			}
-			case ASM_DATA_EVENT_WRITE_DONE: {
-				n = data->token;
-				ac = session[ac->session];
-				ac->buf[ac->dsp_buf].used = 0;
-				ac->dsp_buf ^= 1;
-				wake_up(&ac->wait);
-				break;
-			}
-			default:
-				pr_err("%s: unknown cmd=0x%x\n",
-					__func__, data->opcode);
-			break;
-			}
-		} else {
-			switch (payload[0]) {
-			case ASM_STREAM_CMD_OPEN_READ:
-			case ASM_STREAM_CMD_OPEN_WRITE:
-			case ASM_STREAM_CMD_CLOSE:
-			case ASM_SESSION_CMD_RUN:
-				n = data->token;
-				ac = session[n];
-				ac->state = 0;
-				wake_up(&ac->cmd_wait);
-				break;
-			default:
-				pr_err("%s: unknown cmd=0x%x\n",
-					__func__, payload[0]);
-				break;
-			}
+	while (cnt >= 0) {
+		if (port->buf[cnt].data) {
+			MM_DBG("%s:data[%p]phys[%p][%p]\n", __func__,
+				(void *)port->buf[cnt].data,
+				(void *)port->buf[cnt].phys,
+				(void *)&port->buf[cnt].phys);
+			dma_free_coherent(NULL,
+					port->buf[cnt].size,
+					port->buf[cnt].data,
+					port->buf[cnt].phys);
+			port->buf[cnt].data = NULL;
+			port->buf[cnt].phys = 0;
+			--(port->max_buf_cnt);
 		}
+		--cnt;
 	}
+	kfree(port->buf);
+	port->buf = NULL;
+	mutex_unlock(&ac->cmd_lock);
 	return 0;
 }
 
-struct audio_client *q6asm_out_open(uint32_t bufsz,
-			  uint32_t rate, uint32_t channels)
+int q6asm_audio_client_buf_alloc(unsigned int dir,
+			struct audio_client *ac,
+			unsigned int bufsz,
+			unsigned int bufcnt)
 {
+	int cnt = 0;
+	struct audio_buffer *buf;
 
-	struct asm_stream_cmd_open_write open;
-	struct audio_client *ac;
+	MM_DBG("%s:bufsz[%d]bufcnt[%d]\n", __func__, bufsz, bufcnt);
 
-	pr_info("%s\n", __func__);
+	if (!(ac) || ((dir != IN) && (dir != OUT)))
+		return -EINVAL;
 
-	mutex_lock(&lock);
+	if (ac->session <= 0 || ac->session > 8)
+		goto fail;
 
-
-	ac = audio_client_alloc(bufsz);
-	if (!ac) {
-		mutex_unlock(&lock);
+	if (ac->port[dir].buf) {
+		MM_DBG("%s: buffer already allocated\n", __func__);
 		return 0;
 	}
-	if (ac->ref_count == 0) {
-		ac->apr = apr_register("ADSP", "ASM", q6asm_callback,
-							0x101, ac);
-		pr_info("%s: Register ASM\n", __func__);
-		if (ac->apr == NULL) {
-			pr_err("APR register failed\n");
-			goto fail;
-		}
-	}
-	ac->state = 1;
+	mutex_lock(&ac->cmd_lock);
+	buf = kzalloc(((sizeof(struct audio_buffer))*bufcnt), GFP_KERNEL);
 
-	open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	open.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(open) - APR_HDR_SIZE);
-	open.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	open.hdr.src_domain = APR_DOMAIN_APPS;
-	open.hdr.src_port = ac->session << 8 | 0x0001; /* Same as dest */
-	open.hdr.dest_svc = APR_SVC_ASM;
-	open.hdr.dest_domain = APR_DOMAIN_ADSP;
-	open.hdr.dest_port = ac->session << 8 | 0x0001; /* Always new
-						session for each open */
-	open.hdr.token = ac->session;
-	open.hdr.opcode = ASM_STREAM_CMD_OPEN_WRITE;
-
-	open.uMode = ASM_STREAM_PRIORITY_NORMAL;
-	open.sink_endpoint = ASM_END_POINT_DEVICE_MATRIX;
-	open.stream_handle = 0;
-	open.post_proc_top = DEFAULT_TOPOLOGY;
-	open.format = LINEAR_PCM;
-	open.cfg_size = sizeof(struct asm_pcm_cfg);
-	open.write_cfg.pcm_cfg.ch_cfg = channels;
-	open.write_cfg.pcm_cfg.bits_per_sample = 16;
-	open.write_cfg.pcm_cfg.sample_rate = rate;
-	open.write_cfg.pcm_cfg.is_signed = 1;
-	open.write_cfg.pcm_cfg.interleaved = 1;
-
-	if (apr_send_pkt(ac->apr, (uint32_t *) &open) < 0) {
-		pr_err("Comamnd open failed\n");
-		goto fail_cmd;
-	}
-
-	ac->state = 1;
-	if (!wait_event_timeout(ac->cmd_wait, (ac->state == 0), 5*HZ)) {
-		pr_err("[%s:%s] timeout. waited for OPEN_READ?\n",
-						__MM_FILE__, __func__);
-	}
-	ac->ref_count++;
-	mutex_unlock(&lock);
-	return ac;
-fail_cmd:
-	apr_deregister(ac->apr);
-fail:
-	audio_client_free(ac);
-	mutex_unlock(&lock);
-	return 0;
-}
-
-
-int q6asm_out_run(struct audio_client *ac)
-{
-
-	struct asm_stream_cmd_run run;
-
-	pr_info("%s\n", __func__);
-
-	mutex_lock(&lock);
-	run.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	run.hdr.pkt_size =  APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(run) - APR_HDR_SIZE);
-	run.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	run.hdr.src_domain = APR_DOMAIN_APPS;
-	run.hdr.src_port = ac->session << 8 | 0x0001;
-	run.hdr.dest_svc = APR_SVC_ASM;
-	run.hdr.dest_domain = APR_DOMAIN_ADSP;
-	run.hdr.dest_port = ac->session << 8 | 0x0001;
-	run.hdr.token = ac->session;
-	run.hdr.opcode = ASM_SESSION_CMD_RUN;
-	run.flags = 0;
-	run.msw_ts = 0;
-	run.lsw_ts = 0;
-
-	if (apr_send_pkt(ac->apr, (uint32_t *) &run) < 0) {
-		pr_err("Command run failed\n");
-		mutex_unlock(&lock);
-		return -ENODEV;
-	}
-	mutex_unlock(&lock);
-	return 0;
-}
-
-struct audio_client *q6asm_in_open(uint32_t bufsz, uint32_t rate,
-					uint32_t channels)
-{
-	struct asm_stream_cmd_open_read open;
-	struct audio_client *ac;
-
-	pr_info("%s\n", __func__);
-
-	mutex_lock(&lock);
-	ac = audio_client_alloc(bufsz);
-	if (!ac) {
-		mutex_unlock(&lock);
-		return 0;
-	}
-
-	if (ac->ref_count == 0) {
-		ac->apr = apr_register("ADSP", "ASM", q6asm_callback,
-							0x101, ac);
-		pr_info("%s: Register ASM\n", __func__);
-		if (ac->apr == NULL) {
-			pr_err("APR register failed\n");
-			goto fail;
-		}
-	}
-
-	open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	open.hdr.pkt_size =  APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(open) - APR_HDR_SIZE);
-	open.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	open.hdr.src_domain = APR_DOMAIN_APPS;
-	open.hdr.src_port = ac->session << 8 | 0x0001;
-	open.hdr.dest_svc = APR_SVC_ASM;
-	open.hdr.dest_domain = APR_DOMAIN_ADSP;
-	open.hdr.dest_port = ac->session << 8 | 0x0001;
-	open.hdr.token = ac->session;
-	open.hdr.opcode = ASM_STREAM_CMD_OPEN_READ;
-	open.uMode = ASM_STREAM_PRIORITY_NORMAL;
-	open.src_endpoint = ASM_END_POINT_DEVICE_MATRIX;
-	open.pre_proc_top = DEFAULT_TOPOLOGY;
-	open.format = LINEAR_PCM;
-	open.cfg_size = sizeof(struct asm_pcm_cfg);
-	open.read_cfg.pcm_cfg.ch_cfg = channels;
-	open.read_cfg.pcm_cfg.bits_per_sample = 16;
-	open.read_cfg.pcm_cfg.sample_rate = rate;
-	open.read_cfg.pcm_cfg.is_signed = 1;
-	open.read_cfg.pcm_cfg.interleaved = 1;
-
-	if (apr_send_pkt(ac->apr, (uint32_t *) &open) < 0) {
-		pr_err("Comamnd open failed\n");
-		goto fail_cmd;
-	}
-
-	ac->state = 1;
-	if (!wait_event_timeout(ac->cmd_wait, (ac->state == 0), 5*HZ))
-		pr_err("[%s:%s] timeout. waited for OPEN_READ?\n",
-				__MM_FILE__, __func__);
-
-	ac->ref_count++;
-	mutex_unlock(&lock);
-	return ac;
-
-fail_cmd:
-	apr_deregister(ac->apr);
-fail:
-	audio_client_free(ac);
-	mutex_unlock(&lock);
-	return 0;
-}
-
-int q6asm_in_run(struct audio_client *ac)
-{
-	struct asm_stream_cmd_run run;
-	int ret = 0;
-
-	mutex_lock(&lock);
-	run.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	run.hdr.pkt_size =  APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(run) - APR_HDR_SIZE);
-	run.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	run.hdr.src_domain = APR_DOMAIN_APPS;
-	run.hdr.src_port = ac->session << 8 | 0x0001;
-	run.hdr.dest_svc = APR_SVC_ASM;
-	run.hdr.dest_domain = APR_DOMAIN_ADSP;
-	run.hdr.dest_port = ac->session << 8 | 0x0001;
-	run.hdr.token = ac->session;
-	run.hdr.opcode = ASM_SESSION_CMD_RUN;
-	run.flags = 0;
-
-	if (apr_send_pkt(ac->apr, (uint32_t *) &run) < 0) {
-		pr_err("Command run failed\n");
-		ret = -EINVAL;
-		goto fail_cmd;
-	}
-	ac->state = 1;
-	if (!wait_event_timeout(ac->cmd_wait, (ac->state == 0), 5*HZ)) {
-			pr_err("[%s:%s] timeout. waited for CMD_RUN\n",
-						__MM_FILE__, __func__);
-	}
-fail_cmd:
-	mutex_unlock(&lock);
-	return ret;
-}
-
-
-int q6asm_close(struct audio_client *ac)
-{
-	struct apr_hdr close;
-	int ret = 0;
-
-	mutex_lock(&lock);
-
-	if (ac->ref_count == 0) {
-		pr_err("ASM is already closed\n");
-		ret = -EINVAL;
+	if (!buf) {
+		mutex_unlock(&ac->cmd_lock);
 		goto fail;
 	}
-	close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	close.pkt_size =  APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(close) - APR_HDR_SIZE);
-	close.src_svc = ((struct apr_svc *)ac->apr)->id;
-	close.src_domain = APR_DOMAIN_APPS;
-	close.src_port = ac->session << 8 | 0x0001;
-	close.dest_svc = APR_SVC_ASM;
-	close.dest_domain = APR_DOMAIN_ADSP;
-	close.dest_port = ac->session << 8 | 0x0001;
-	close.token = ac->session;
-	close.opcode = ASM_STREAM_CMD_CLOSE;
 
-	if (apr_send_pkt(ac->apr, (uint32_t *) &close) < 0)
-		pr_err("Commmand close failed\n");
-	ac->state = 1;
-	if (!wait_event_timeout(ac->cmd_wait, (ac->state == 0), 5*HZ))
-		pr_err("[%s:%s] timeout. waited for OPEN_WRITE?\n",
-				__MM_FILE__, __func__);
-	ac->ref_count--;
-	if (ac->ref_count == 0) {
-		pr_info("%s: DeRegister ASM\n", __func__);
-		apr_deregister(ac->apr);
+	ac->port[dir].buf = buf;
+
+	while (cnt < bufcnt) {
+		if (bufsz > 0) {
+			buf[cnt].data = dma_alloc_coherent(NULL, bufsz,
+						&buf[cnt].phys, GFP_KERNEL);
+			if (!buf[cnt].data) {
+				MM_ERR("%s: Buf alloc failed\n", __func__);
+				mutex_unlock(&ac->cmd_lock);
+				goto fail;
+			}
+			buf[cnt].used = 1;
+			buf[cnt].size = bufsz;
+			buf[cnt].actual_size = bufsz;
+			MM_DBG("%s:data[%p]phys[%p][%p]\n", __func__,
+					(void *)buf[cnt].data,
+					(void *)buf[cnt].phys,
+					(void *)&buf[cnt].phys);
+		}
+		cnt++;
 	}
-	audio_client_free(ac);
+	ac->port[dir].max_buf_cnt = cnt;
+	mutex_unlock(&ac->cmd_lock);
+	return 0;
 fail:
-	mutex_unlock(&lock);
+	q6asm_audio_client_buf_free(dir, ac);
+	return -EINVAL;
+}
+
+static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
+{
+	int i = 0;
+	struct audio_client *ac = (struct audio_client *)priv;
+	uint32_t token;
+	unsigned long dsp_flags;
+	uint32_t *payload = data->payload;
+
+	MM_DBG("%s: session[%d]ptr0[0x%x]ptr1[0x%x]opcode[0x%x] "
+		"token[0x%x]payload_s[%d] src[%d] dest[%d]\n", __func__,
+		ac->session, payload[0], payload[1], data->opcode,
+		data->token, data->payload_size, data->src_port,
+		data->dest_port);
+
+	if (ac == NULL) {
+		MM_ERR("%s: ac NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (data->opcode == APR_BASIC_RSP_RESULT) {
+		token = data->token;
+		switch (payload[0]) {
+		case ASM_SESSION_CMD_PAUSE:
+		case ASM_DATA_CMD_EOS:
+		case ASM_STREAM_CMD_CLOSE:
+		case ASM_STREAM_CMD_FLUSH:
+		case ASM_SESSION_CMD_RUN:
+		case ASM_SESSION_CMD_REGISTER_FOR_TX_OVERFLOW_EVENTS:
+		if (token != ac->session) {
+			MM_ERR("%s: Invalid session[%d] rxed expected[%d]",
+						__func__, token,
+						ac->session);
+			break;
+		}
+		case ASM_STREAM_CMD_OPEN_READ:
+		case ASM_STREAM_CMD_OPEN_WRITE:
+		case ASM_STREAM_CMD_OPEN_READWRITE:
+		case ASM_DATA_CMD_MEDIA_FORMAT_UPDATE:
+		case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
+			MM_DBG("%s: command[0x%x]success [0x%x]",
+							__func__,
+							payload[0],
+							payload[1]);
+			if (ac->cmd_state) {
+				ac->cmd_state = 0;
+				wake_up(&ac->cmd_wait);
+			}
+			if (ac->cb)
+				ac->cb(data->opcode, data->token,
+					(uint32_t *)data->payload, ac->priv);
+			break;
+		default:
+			MM_DBG("%s: command[0x%x] not expecting rsp",
+							__func__,
+							payload[0]);
+			break;
+		}
+		return 0;
+	}
+
+	switch (data->opcode) {
+	case ASM_DATA_EVENT_WRITE_DONE:{
+		struct audio_port_data *port = &ac->port[IN];
+		MM_DBG("%s: Rxed opcode[0x%x] status[0x%x] token[%d]",
+						__func__,
+						payload[0], payload[1],
+						data->token);
+
+		spin_lock_irqsave(&port->dsp_lock, dsp_flags);
+		token = data->token;
+		port->buf[token].used = 1;
+		spin_unlock_irqrestore(&port->dsp_lock, dsp_flags);
+		for (i = 0; i < port->max_buf_cnt; i++)
+			MM_DBG("%d ", port->buf[i].used);
+
+		break;
+	}
+	case ASM_DATA_EVENT_READ_DONE:{
+
+		struct audio_port_data *port = &ac->port[OUT];
+
+		MM_DBG("R-D: status=%d buff_add=%x act_size=%d offset=%d\n",
+				payload[READDONE_IDX_STATUS],
+				payload[READDONE_IDX_BUFFER],
+				payload[READDONE_IDX_SIZE],
+				payload[READDONE_IDX_OFFSET]);
+		MM_DBG("R-D:msw_ts=%d lsw_ts=%d flags=%d id=%d num=%d\n",
+				payload[READDONE_IDX_MSW_TS],
+				payload[READDONE_IDX_LSW_TS],
+				payload[READDONE_IDX_FLAGS],
+				payload[READDONE_IDX_ID],
+				payload[READDONE_IDX_NUMFRAMES]);
+
+		spin_lock_irqsave(&port->dsp_lock, dsp_flags);
+		token = data->token;
+		if (port->buf[token].phys != payload[READDONE_IDX_BUFFER]) {
+			MM_ERR("%s:Buf expected[%p]rxed[%p]\n",\
+				__func__,
+				(void *)port->buf[token].phys,\
+				(void *)payload[READDONE_IDX_BUFFER]);
+			spin_unlock_irqrestore(&port->dsp_lock, dsp_flags);
+			break;
+		}
+		port->buf[token].actual_size = payload[READDONE_IDX_SIZE];
+		spin_unlock_irqrestore(&port->dsp_lock, dsp_flags);
+		break;
+	}
+	case ASM_DATA_EVENT_EOS:
+	case ASM_DATA_CMDRSP_EOS:
+		MM_DBG("%s: rxed opcode[0x%x]eos[%d]",
+					__func__, data->opcode, ac->eos_state);
+		if (ac->eos_state) {
+			ac->eos_state = 0;
+			wake_up(&ac->cmd_wait);
+		} else
+			return 0;
+		break;
+	case ASM_STREAM_CMDRSP_GET_ENCDEC_PARAM:
+		break;
+	case ASM_STREAM_CMDRSP_GET_PP_PARAMS:
+		break;
+	case ASM_SESSION_EVENT_TX_OVERFLOW:
+		MM_ERR("ASM_SESSION_EVENT_TX_OVERFLOW\n");
+		break;
+	}
+	if (ac->cb)
+		ac->cb(data->opcode, data->token,
+			data->payload, ac->priv);
+
+	return 0;
+}
+
+void *q6asm_is_cpu_buf_avail(int dir, struct audio_client *ac, uint32_t *size,
+				uint32_t *index)
+{
+	void *data;
+	unsigned char idx;
+	struct audio_port_data *port;
+
+	if (!ac || ((dir != IN) && (dir != OUT)))
+		return NULL;
+
+	port = &ac->port[dir];
+
+	mutex_lock(&port->lock);
+	idx = port->cpu_buf;
+	/*  dir 0: used = 0 means buf in use
+	    dir 1: used = 1 means buf in use */
+	if (port->buf[idx].used == dir) {
+		/* To make it more robust, we could loop and get the
+		next avail buf, its risky though */
+		MM_DBG("%s: Next buf idx[0x%x] not available, dir[%d]\n",
+								__func__,
+								idx, dir);
+		mutex_unlock(&port->lock);
+		return NULL;
+	}
+	*size = port->buf[idx].actual_size;
+	*index = port->cpu_buf;
+	data = port->buf[idx].data;
+	MM_DBG("%s:session[%d]index[%d] data[%p]size[%d]\n", __func__,
+						ac->session,
+						port->cpu_buf,
+						data, *size);
+	/* By default increase the cpu_buf cnt
+	user accesses this function,increase cpu buf(to avoid another api)*/
+	port->buf[idx].used = dir;
+	port->cpu_buf = ((port->cpu_buf + 1) & (port->max_buf_cnt - 1));
+	mutex_unlock(&port->lock);
+	return data;
+}
+
+int q6asm_is_dsp_buf_avail(int dir, struct audio_client *ac)
+{
+	int ret = -1;
+	struct audio_port_data *port;
+	uint32_t idx;
+
+	if (!ac || (dir != OUT))
+		return ret;
+
+	port = &ac->port[dir];
+
+	mutex_lock(&port->lock);
+	idx = port->dsp_buf;
+
+	if (port->buf[idx].used == (dir ^ 1)) {
+		/* To make it more robust, we could loop and get the
+		next avail buf, its risky though */
+		MM_ERR("%s: Next buf idx[0x%x] not available, dir[%d]\n",
+								__func__,
+								idx, dir);
+		mutex_unlock(&port->lock);
+		return ret;
+	}
+	MM_DBG("%s:session[%d]dsp_buf=%d cpu_buf=%d\n",  __func__,
+						ac->session,
+							port->dsp_buf,
+						port->cpu_buf);
+	ret = ((port->dsp_buf != port->cpu_buf) ? 0 : -1);
+	mutex_unlock(&port->lock);
 	return ret;
 }
 
-int q6asm_read(struct audio_client *ac, struct audio_buffer *ab)
+static void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
+			uint32_t pkt_size, uint32_t cmd_flg)
+{
+	MM_DBG("%s: pkt size=%d cmd_flg=%d\n", __func__, pkt_size, cmd_flg);
+	mutex_lock(&ac->cmd_lock);
+	MM_DBG("**************\n");
+	hdr->hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD, \
+				APR_HDR_LEN(sizeof(struct apr_hdr)),\
+				APR_PKT_VER);
+	hdr->src_svc = ((struct apr_svc *)ac->apr)->id;
+	hdr->src_domain = APR_DOMAIN_APPS;
+	hdr->dest_svc = APR_SVC_ASM;
+	hdr->dest_domain = APR_DOMAIN_ADSP;
+	hdr->src_port = (ac->session << 8) | 0x0001;
+	hdr->dest_port = (ac->session << 8) | 0x0001;
+	if (cmd_flg) {
+		hdr->token = ac->session;
+		ac->cmd_state = 1;
+	}
+	hdr->pkt_size  = APR_PKT_SIZE(APR_HDR_SIZE, pkt_size);
+	mutex_unlock(&ac->cmd_lock);
+	return;
+}
+
+int q6asm_open_read(struct audio_client *ac,
+		uint32_t format)
+{
+	int rc = 0x00;
+	struct asm_stream_cmd_open_read open;
+
+	MM_DBG("%s:session[%d]", __func__, ac->session);
+
+	if ((ac == NULL) || (ac->apr == NULL)) {
+		MM_ERR("%s:APR handle NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
+	open.hdr.opcode = ASM_STREAM_CMD_OPEN_READ;
+	/* Stream prio : High, provide meta info with encoded frames */
+	open.src_endpoint = ASM_END_POINT_DEVICE_MATRIX;
+	open.pre_proc_top = DEFAULT_TOPOLOGY;
+
+	switch (format) {
+	case FORMAT_LINEAR_PCM:
+		/* bit4:No meta data, lower nibble is prio  */
+		open.uMode = 0x02;
+		open.format = LINEAR_PCM;
+		break;
+	case FORMAT_MPEG4_AAC:
+		/* bit4:with meta data, lower nibble is prio  */
+		open.uMode = 0x12;
+		open.format = MPEG4_AAC;
+		break;
+	default:
+		MM_ERR("%s: Invalid format[%d]\n", __func__, format);
+		goto fail_cmd;
+	}
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &open);
+	if (rc < 0) {
+		MM_ERR("[%s] open failed op[0x%x]rc[%d]\n", \
+						__func__,
+						open.hdr.opcode, rc);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s] timeout. waited for OPEN_WRITR rc[%d]\n",
+				__func__, rc);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_open_write(struct audio_client *ac, uint32_t format)
+{
+	int rc = 0x00;
+	struct asm_stream_cmd_open_write open;
+
+	MM_DBG("%s:session[%d]", __func__, ac->session);
+
+	if ((ac == NULL) || (ac->apr == NULL)) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
+
+	open.hdr.opcode = ASM_STREAM_CMD_OPEN_WRITE;
+	/* Stream prio : High, provide meta info with encoded frames */
+	open.uMode = 0x02;
+	/* source endpoint : matrix */
+	open.sink_endpoint = ASM_END_POINT_DEVICE_MATRIX;
+	open.stream_handle = 0x00;
+	open.post_proc_top = DEFAULT_TOPOLOGY;
+
+	switch (format) {
+	case FORMAT_LINEAR_PCM:
+		open.format = LINEAR_PCM;
+		break;
+	case FORMAT_MPEG4_AAC:
+		open.format = MPEG4_AAC;
+		break;
+	default:
+		MM_ERR("%s: Invalid format[%d]\n", __func__, format);
+		goto fail_cmd;
+	}
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &open);
+	if (rc < 0) {
+		MM_ERR("[%s] open failed op[0x%x]rc[%d]\n", \
+						__func__,
+						open.hdr.opcode, rc);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s] timeout. waited for OPEN_WRITR rc[%d]\n",
+				__func__, rc);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_open_read_write(struct audio_client *ac,
+			uint32_t rd_format,
+			uint32_t wr_format)
+{
+	int rc = 0x00;
+	struct asm_stream_cmd_open_read_write open;
+
+	MM_DBG("%s:session[%d]", __func__, ac->session);
+	MM_DBG("%s:wr_format[0x%x]rd_format[0x%x]",
+		__func__, wr_format, rd_format);
+
+	if ((ac == NULL) || (ac->apr == NULL)) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
+	open.hdr.opcode = ASM_STREAM_CMD_OPEN_READWRITE;
+
+	/* Stream prio : normal(bits 0 and 1), enable meta info(bit-4)*/
+	open.uMode = 0x10;
+	/* source endpoint : matrix */
+	open.post_proc_top = DEFAULT_TOPOLOGY;
+	switch (wr_format) {
+	case FORMAT_LINEAR_PCM:
+		open.write_format = LINEAR_PCM;
+		break;
+	default:
+		MM_ERR("%s: Invalid format[%d]\n", __func__, wr_format);
+		goto fail_cmd;
+	}
+
+	switch (rd_format) {
+	case FORMAT_LINEAR_PCM:
+		open.read_format = LINEAR_PCM;
+		break;
+	case FORMAT_MPEG4_AAC:
+		open.read_format = MPEG4_AAC;
+		break;
+	default:
+		MM_ERR("%s: Invalid format[%d]\n", __func__, rd_format);
+		goto fail_cmd;
+	}
+	MM_DBG("%s: rdformat[0x%x]wrformat[0x%x]\n", __func__,
+					open.read_format, open.write_format);
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &open);
+	if (rc < 0) {
+		MM_ERR("[%s] open failed op[0x%x]rc[%d]\n", \
+						__func__,
+						open.hdr.opcode, rc);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s] timeout. waited for OPEN_WRITR rc[%d]\n",
+				__func__, rc);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_run(struct audio_client *ac, uint32_t flags,
+		uint32_t msw_ts, uint32_t lsw_ts)
+{
+	struct asm_stream_cmd_run run;
+	int rc;
+	MM_DBG("%s:session[%d]", __func__, ac->session);
+	if (!ac || ac->apr == NULL) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	q6asm_add_hdr(ac, &run.hdr, sizeof(run), TRUE);
+
+	run.hdr.opcode = ASM_SESSION_CMD_RUN;
+	run.flags    = flags;
+	run.msw_ts   = msw_ts;
+	run.lsw_ts   = lsw_ts;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &run);
+	if (rc < 0) {
+		MM_ERR("Commmand run failed[%d]", rc);
+		goto fail_cmd;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s:%s] timeout. waited for run success rc[%d]",
+				__MM_FILE__, __func__, rc);
+		goto fail_cmd;
+	}
+
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_enc_cfg_blk_aac(struct audio_client *ac,
+			 uint32_t frames_per_buf,
+			uint32_t sample_rate, uint32_t channels,
+			uint32_t bit_rate, uint32_t mode, uint32_t format)
+{
+	struct asm_stream_cmd_encdec_cfg_blk enc_cfg;
+	int rc = 0;
+
+	MM_DBG("%s:frames[%d]SR[%d]ch[%d]bitrate[%d]mode[%d]format[%d]",
+					__func__, frames_per_buf, sample_rate,
+					channels, bit_rate, mode, format);
+
+	q6asm_add_hdr(ac, &enc_cfg.hdr, (sizeof(enc_cfg) - APR_HDR_SIZE), TRUE);
+
+	enc_cfg.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+	enc_cfg.param_id = ASM_ENCDEC_CFG_BLK_ID;
+	enc_cfg.param_size = sizeof(struct asm_encode_cfg_blk);
+	enc_cfg.enc_blk.frames_per_buf = frames_per_buf;
+	enc_cfg.enc_blk.format_id = MPEG4_AAC;
+	enc_cfg.enc_blk.cfg_size  = sizeof(struct asm_aac_read_cfg);
+	enc_cfg.enc_blk.cfg.aac.bitrate = bit_rate;
+	enc_cfg.enc_blk.cfg.aac.enc_mode = mode;
+	enc_cfg.enc_blk.cfg.aac.format = format;
+	enc_cfg.enc_blk.cfg.aac.ch_cfg = channels;
+	enc_cfg.enc_blk.cfg.aac.sample_rate = sample_rate;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &enc_cfg);
+	if (rc < 0) {
+		MM_ERR("%s: Comamnd %d failed\n", __func__,
+					ASM_STREAM_CMD_SET_ENCDEC_PARAM);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s:%s] timeout. waited for FORMAT_UPDATE\n",
+						__MM_FILE__, __func__);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+			uint32_t rate, uint32_t channels)
+{
+	struct asm_stream_cmd_encdec_cfg_blk  enc_cfg;
+
+	int rc = 0;
+
+	MM_DBG("%s\n", __func__);
+
+	q6asm_add_hdr(ac, &enc_cfg.hdr, (sizeof(enc_cfg) - APR_HDR_SIZE), TRUE);
+
+	enc_cfg.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+	enc_cfg.param_id = ASM_ENCDEC_CFG_BLK_ID;
+	enc_cfg.param_size = sizeof(struct asm_encode_cfg_blk);
+	enc_cfg.enc_blk.frames_per_buf = 1;
+	enc_cfg.enc_blk.format_id = LINEAR_PCM;
+	enc_cfg.enc_blk.cfg_size = sizeof(struct asm_pcm_cfg);
+	enc_cfg.enc_blk.cfg.pcm.ch_cfg = channels;
+	enc_cfg.enc_blk.cfg.pcm.bits_per_sample = 16;
+	enc_cfg.enc_blk.cfg.pcm.sample_rate = rate;
+	enc_cfg.enc_blk.cfg.pcm.is_signed = 1;
+	enc_cfg.enc_blk.cfg.pcm.interleaved = 1;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &enc_cfg);
+	if (rc < 0) {
+		MM_ERR("Comamnd open failed\n");
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s:%s] timeout opcode[0x%x] ",
+						__MM_FILE__, __func__,
+						enc_cfg.hdr.opcode);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_media_format_block_pcm(struct audio_client *ac,
+				uint32_t rate, uint32_t channels)
+{
+	struct asm_stream_media_format_update fmt;
+	int rc = 0;
+
+	MM_DBG("%s:rate[%d]ch[%d]\n", __func__, rate, channels);
+
+	q6asm_add_hdr(ac, &fmt.hdr, (sizeof(fmt) - APR_HDR_SIZE), TRUE);
+
+	fmt.hdr.opcode = ASM_DATA_CMD_MEDIA_FORMAT_UPDATE;
+
+	fmt.format = LINEAR_PCM;
+	fmt.cfg_size = sizeof(struct asm_pcm_cfg);
+	fmt.write_cfg.pcm_cfg.ch_cfg = channels;
+	fmt.write_cfg.pcm_cfg.bits_per_sample = 16;
+	fmt.write_cfg.pcm_cfg.sample_rate = rate;
+	fmt.write_cfg.pcm_cfg.is_signed = 1;
+	fmt.write_cfg.pcm_cfg.interleaved = 1;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &fmt);
+	if (rc < 0) {
+		MM_ERR("Comamnd open failed\n");
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s:%s] timeout. waited for FORMAT_UPDATE\n",
+						__MM_FILE__, __func__);
+		rc = -EINVAL;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_read(struct audio_client *ac)
 {
 	struct asm_stream_cmd_read read;
-	int ret;
+	struct audio_buffer        *ab;
+	int dsp_buf;
+	struct audio_port_data     *port;
+	int rc;
+	if (!ac || ac->apr == NULL) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	port = &ac->port[OUT];
 
-	mutex_lock(&lock);
-	read.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	read.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(read) - APR_HDR_SIZE);
-	read.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	read.hdr.src_domain = APR_DOMAIN_APPS;
-	read.hdr.src_port = ac->session << 8 | 0x0001;
-	read.hdr.dest_svc = APR_SVC_ASM;
-	read.hdr.dest_domain = APR_DOMAIN_ADSP;
-	read.hdr.dest_port = ac->session << 8 | 0x0001;
+	q6asm_add_hdr(ac, &read.hdr, (sizeof(read) - APR_HDR_SIZE), FALSE);
+
+	mutex_lock(&port->lock);
+
+	dsp_buf = port->dsp_buf;
+	ab = &port->buf[dsp_buf];
+	port->buf[dsp_buf].used = 0;
+	MM_DBG("%s:session[%d]dsp-buf[%d][%p]cpu_buf[%d][%p]\n", __func__,
+					ac->session,
+					dsp_buf,
+					(void *)port->buf[dsp_buf].data,
+					port->cpu_buf,
+					(void *)port->buf[port->cpu_buf].phys);
+
 	read.hdr.opcode = ASM_DATA_CMD_READ;
 	read.buf_add = ab->phys;
 	read.buf_size = ab->size;
+	read.uid = port->dsp_buf;
+	read.hdr.token = port->dsp_buf;
 
-	/* TODO: use as ping pong buffer, will need to change for AIO */
-	read.hdr.token = ac->dsp_buf;
-	read.uid = ac->dsp_buf;
-	memset(ab->data, 0, sizeof(ab->size));
-
-	if (apr_send_pkt(ac->apr, (uint32_t *) &read) < 0) {
-		pr_err("Command read failed\n");
-		ret = -EINVAL;
+	port->dsp_buf = (port->dsp_buf + 1) & (port->max_buf_cnt - 1);
+	mutex_unlock(&port->lock);
+	MM_DBG("%s::buf add[0x%x] token[%d] uid[%d]\n", __func__,
+						read.buf_add,
+						read.hdr.token,
+						read.uid);
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &read);
+	if (rc < 0) {
+		MM_ERR("[%s] read op[0x%x]rc[%d]\n", __func__,
+							read.hdr.opcode, rc);
 		goto fail_cmd;
 	}
+	return 0;
 fail_cmd:
-	mutex_unlock(&lock);
-	return ret;
+	return -EINVAL;
 }
 
-int q6asm_write(struct audio_client *ac, struct audio_buffer *ab)
+int q6asm_write(struct audio_client *ac, uint32_t len, uint32_t msw_ts,
+		uint32_t lsw_ts, uint32_t flags)
 {
+	int rc = 0;
 	struct asm_stream_cmd_write write;
-	int ret;
+	struct audio_port_data *port;
+	struct audio_buffer    *ab;
+	int dsp_buf = 0;
 
-	pr_info("%s\n", __func__);
+	MM_DBG("%s:session[%d] len=%d", __func__, ac->session, len);
+	if (!ac || ac->apr == NULL) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	port = &ac->port[IN];
 
-	mutex_lock(&lock);
-	write.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_LEN(20), APR_PKT_VER);
-	write.hdr.pkt_size =  APR_PKT_SIZE(APR_HDR_SIZE,
-						sizeof(write) - APR_HDR_SIZE);
-	write.hdr.src_svc = ((struct apr_svc *)ac->apr)->id;
-	write.hdr.src_domain = APR_DOMAIN_APPS;
-	write.hdr.src_port = ac->session << 8 | 0x0001;
-	write.hdr.dest_svc = APR_SVC_ASM;
-	write.hdr.dest_domain = APR_DOMAIN_ADSP;
-	write.hdr.dest_port = ac->session << 8 | 0x0001;
+	q6asm_add_hdr(ac, &write.hdr, (sizeof(write) - APR_HDR_SIZE), FALSE);
+	mutex_lock(&port->lock);
+
+	dsp_buf = port->dsp_buf;
+	ab = &port->buf[dsp_buf];
+
+	write.hdr.token = port->dsp_buf;
 	write.hdr.opcode = ASM_DATA_CMD_WRITE;
-
 	write.buf_add = ab->phys;
-	write.avail_bytes = ab->actual_size;
-	write.msw_ts = 0;
-	write.lsw_ts = 0;
-	write.uflags = 0;
-	write.hdr.token = ac->cpu_buf;
-	write.uid = ac->cpu_buf;
+	write.avail_bytes = len;
+	write.msw_ts = msw_ts;
+	write.lsw_ts = lsw_ts;
+	write.uflags = (0x8000 | flags);
+	write.uid = port->dsp_buf;
+	port->dsp_buf = (port->dsp_buf + 1) & (port->max_buf_cnt - 1);
 
-	/* TODO: use as ping pong buffer, will need to change for AIO */
+	MM_DBG("%s: ab->phys[0x%x]bufadd[0x%x]token[0x%x]buf_id[0x%x]",\
+							__func__, ab->phys,
+							write.buf_add,
+							write.hdr.token,
+							write.uid);
+	mutex_unlock(&port->lock);
 
-	if (apr_send_pkt(ac->apr, (uint32_t *) &write) < 0) {
-		pr_err("Command read failed\n");
-		ret = -EINVAL;
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &write);
+	if (rc < 0) {
+		MM_ERR("[%s] write op[0x%x]rc[%d]\n", __func__,
+							write.hdr.opcode, rc);
 		goto fail_cmd;
 	}
+	MM_DBG("WRITE SUCCESS\n");
+	return 0;
 fail_cmd:
-	mutex_unlock(&lock);
-	return ret;
+	return -EINVAL;
+}
+
+int q6asm_cmd(struct audio_client *ac, int cmd)
+{
+	struct apr_hdr hdr;
+	int rc;
+	unsigned char *state = NULL;
+
+	if (!ac || ac->apr == NULL) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	q6asm_add_hdr(ac, &hdr, (sizeof(hdr) - APR_HDR_SIZE), TRUE);
+	switch (cmd) {
+	case CMD_PAUSE:
+		hdr.opcode = ASM_SESSION_CMD_PAUSE;
+		state = &ac->cmd_state;
+		break;
+	case CMD_FLUSH:
+		hdr.opcode = ASM_STREAM_CMD_FLUSH;
+		state = &ac->cmd_state;
+		break;
+	case CMD_EOS:
+		hdr.opcode = ASM_DATA_CMD_EOS;
+		ac->eos_state = 1;
+		state = &ac->eos_state;
+		ac->cmd_state = 0;
+		break;
+	case CMD_CLOSE:
+		hdr.opcode = ASM_STREAM_CMD_CLOSE;
+		state = &ac->cmd_state;
+		break;
+	default:
+		MM_ERR("%s: Invalid format[%d]\n", __func__, cmd);
+		goto fail_cmd;
+	}
+	MM_DBG("%s:session[%d]opcode[0x%x] ", __func__, ac->session,
+						hdr.opcode);
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &hdr);
+	if (rc < 0) {
+		MM_ERR("%s: Commmand 0x%x failed\n", __func__, hdr.opcode);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, ((*state) == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s:%s] timeout. waited for response opcode[0x%x]\n",
+				__MM_FILE__, __func__, hdr.opcode);
+		goto fail_cmd;
+	}
+	if (cmd == CMD_FLUSH)
+		q6asm_reset_buf_state(ac);
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+static void q6asm_reset_buf_state(struct audio_client *ac)
+{
+	int cnt = 0;
+	int loopcnt = 0;
+	struct audio_port_data *port = NULL;
+
+	mutex_lock(&ac->cmd_lock);
+	for (loopcnt = 0; loopcnt <= OUT; loopcnt++) {
+		port = &ac->port[loopcnt];
+		cnt = port->max_buf_cnt - 1;
+		port->dsp_buf = 0;
+		port->cpu_buf = 0;
+		while (cnt >= 0) {
+			if (!port->buf)
+				continue;
+			port->buf[cnt].used = 1;
+			cnt--;
+		}
+	}
+	mutex_unlock(&ac->cmd_lock);
+}
+
+int q6asm_reg_tx_overflow(struct audio_client *ac, uint16_t enable)
+{
+	struct asm_stream_cmd_reg_tx_overflow_event tx_overflow;
+	int rc;
+
+	if (!ac || ac->apr == NULL) {
+		MM_ERR("APR handle NULL\n");
+		return -EINVAL;
+	}
+	MM_DBG("%s:session[%d]enable[%d]\n", __func__, ac->session, enable);
+	q6asm_add_hdr(ac, &tx_overflow.hdr, sizeof(tx_overflow), TRUE);
+
+	tx_overflow.hdr.opcode = \
+			ASM_SESSION_CMD_REGISTER_FOR_TX_OVERFLOW_EVENTS;
+	/* tx overflow event: enable */
+	tx_overflow.enable = enable;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &tx_overflow);
+	if (rc < 0) {
+		MM_ERR("[%s] tx overflow op[0x%x]rc[%d]\n", \
+						__func__,
+						tx_overflow.hdr.opcode, rc);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("[%s] timeout. waited for tx overflow\n",
+				__func__);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
 }
 
 static int __init q6asm_init(void)
 {
-	pr_info("%s\n", __func__);
+	MM_INFO("%s\n", __func__);
 	memset(session, 0, sizeof(session));
 	return 0;
 }
 
+static void __exit q6asm_exit(void)
+{
+	MM_INFO("%s\n", __func__);
+	return;
+}
 device_initcall(q6asm_init);

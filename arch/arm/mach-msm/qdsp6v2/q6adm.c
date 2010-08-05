@@ -86,9 +86,8 @@ int adm_open(int port_id, int session_id , int path)
 	if (this_adm.copp_cnt[port_id] == 0) {
 
 		open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-		open.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(open) - APR_HDR_SIZE);
+					APR_HDR_SIZE, APR_PKT_VER);
+		open.hdr.pkt_size = sizeof(open);
 		open.hdr.src_svc = APR_SVC_ADM;
 		open.hdr.src_domain = APR_DOMAIN_APPS;
 		open.hdr.src_port = port_id;
@@ -101,19 +100,19 @@ int adm_open(int port_id, int session_id , int path)
 		open.endpoint_id = port_id;
 		open.topology_id = DEFAULT_TOPOLOGY;
 
-		rc = apr_send_pkt(this_adm.apr, (uint32_t *)&open);
+		this_adm.copp_state[port_id] = 0;
 
+		rc = apr_send_pkt(this_adm.apr, (uint32_t *)&open);
 		if (rc < 0) {
 			pr_err("ADM enable for port %d failed\n", port_id);
-			goto fail;
+			goto fail_cmd;
 		}
-		this_adm.copp_state[port_id] = 0;
 		/* Wait for the callback with copp id */
 		rc = wait_event_timeout(this_adm.wait,
 			this_adm.copp_state[port_id],
 			msecs_to_jiffies(TIMEOUT_MS));
-		if (!rc) {
-			pr_err("ADM open failed for port %d\n", port_id);
+		if (rc < 0) {
+			pr_info("ADM open failed for port %d\n", port_id);
 			goto fail_cmd;
 		}
 		this_adm.copp_cnt[port_id]++;
@@ -123,9 +122,8 @@ int adm_open(int port_id, int session_id , int path)
 	if (this_adm.copp_state[port_id]) {
 
 		route.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-		route.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(route) - APR_HDR_SIZE);
+					APR_HDR_SIZE, APR_PKT_VER);
+		route.hdr.pkt_size = sizeof(route);
 		route.hdr.src_svc = 0;
 		route.hdr.src_domain = APR_DOMAIN_APPS;
 		route.hdr.src_port = this_adm.copp_id[port_id];
@@ -140,15 +138,23 @@ int adm_open(int port_id, int session_id , int path)
 		route.sessions[0].num_copps = 1;
 		route.sessions[0].copp_id[0] = this_adm.copp_id[port_id];
 
+		this_adm.copp_test[port_id] = 0;
+		this_adm.copp_state[port_id] = 0;
+
 		rc = apr_send_pkt(this_adm.apr, (uint32_t *)&route);
 
 		if (rc < 0) {
 			pr_err("ADM routing for port %d failed\n", port_id);
 			goto fail_cmd;
 		}
-		this_adm.copp_test[port_id] = 0;
-		this_adm.copp_state[port_id] = 0;
-		wait_event(this_adm.wait, this_adm.copp_test[port_id]);
+
+		rc = wait_event_timeout(this_adm.wait,
+				this_adm.copp_test[port_id],
+				msecs_to_jiffies(TIMEOUT_MS));
+		if (rc < 0) {
+			pr_info("ADM cmd Route failed for port %d\n", port_id);
+			goto fail_cmd;
+		}
 	}
 
 	this_adm.ref_cnt++;
@@ -156,7 +162,8 @@ int adm_open(int port_id, int session_id , int path)
 	return 0;
 
 fail_cmd:
-	apr_deregister(this_adm.apr);
+	if (this_adm.ref_cnt == 0)
+		apr_deregister(this_adm.apr);
 fail:
 	mutex_unlock(&this_adm.lock);
 	return -EINVAL;
@@ -172,7 +179,7 @@ int adm_close(int port_id)
 	pr_info("%s\n", __func__);
 
 	mutex_lock(&this_adm.lock);
-	if (this_adm.ref_cnt == 0) {
+	if (this_adm.ref_cnt <= 0) {
 		pr_err("ADM is already closed\n");
 		mutex_unlock(&this_adm.lock);
 		return -EINVAL;
@@ -183,8 +190,8 @@ int adm_close(int port_id)
 	if (!this_adm.copp_cnt[port_id]) {
 
 		close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-		close.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE, 0);
+					APR_HDR_SIZE, APR_PKT_VER);
+		close.pkt_size = APR_HDR_SIZE;
 		close.src_svc = APR_SVC_ADM;
 		close.src_domain = APR_DOMAIN_APPS;
 		close.src_port = port_id;
@@ -194,17 +201,25 @@ int adm_close(int port_id)
 		close.token = port_id;
 		close.opcode = ADM_CMD_COPP_CLOSE;
 
-		ret = apr_send_pkt(this_adm.apr, (uint32_t *)&close);
+		this_adm.copp_id[port_id] = 0;
+		this_adm.copp_state[port_id] = 0;
+		this_adm.copp_test[port_id] = 0;
 
+		ret = apr_send_pkt(this_adm.apr, (uint32_t *)&close);
 		if (ret < 0) {
 			pr_err("ADM close failed\n");
 			mutex_unlock(&this_adm.lock);
 			return -EINVAL;
 		}
-		this_adm.copp_id[port_id] = 0;
-		this_adm.copp_state[port_id] = 0;
-		this_adm.copp_test[port_id] = 0;
-		wait_event(this_adm.wait, this_adm.copp_test[port_id]);
+
+		ret = wait_event_timeout(this_adm.wait,
+				this_adm.copp_test[port_id],
+				msecs_to_jiffies(TIMEOUT_MS));
+		if (ret < 0) {
+			pr_info("ADM cmd Route failed for port %d\n", port_id);
+			mutex_unlock(&this_adm.lock);
+			return -EINVAL;
+		}
 	}
 
 	this_adm.ref_cnt--;

@@ -25,7 +25,6 @@
 /* ASM opcodes without APR payloads*/
 #include "apr.h"
 
-
 /*
  * Audio Front End (AFE)
  */
@@ -66,7 +65,7 @@ struct afe_port_stop_command {
 struct afe_port_gain_command {
 	struct apr_hdr hdr;
 	u16 port_id;
-	u16 gain; 		/* Q13 */
+	u16	gain;/* Q13 */
 } __attribute__ ((packed));
 
 #define AFE_PORT_CMD_SIDETONE_CTL 0x000100cd
@@ -169,7 +168,6 @@ struct afe_port_mi2s_cfg {
 				/* 1, word select signal from internal source */
 	u16	reserved;
 } __attribute__ ((packed));
-
 
 
 #define AFE_PORT_AUDIO_IF_CONFIG 0x000100d3
@@ -327,6 +325,14 @@ struct adm_copp_open_respond {
 #define ASM_END_POINT_DEVICE_MATRIX	0
 #define ASM_END_POINT_STREAM		1
 
+#define AAC_ENC_MODE_AAC_LC             0
+#define AAC_ENC_MODE_AAC_P              1
+#define AAC_ENC_MODE_EAAC_P             2
+
+#define AAC_ENC_MODE_AAC_LC             0
+#define AAC_ENC_MODE_AAC_P              1
+#define AAC_ENC_MODE_EAAC_P             2
+
 #define ASM_STREAM_CMD_CLOSE                             0x00010BCD
 #define ASM_STREAM_CMD_FLUSH                             0x00010BCE
 #define ASM_STREAM_CMD_SET_PP_PARAMS                     0x00010BCF
@@ -341,7 +347,7 @@ struct adm_copp_open_respond {
 #define ASM_STREAM_CMD_FLUSH_READBUFS                    0x00010C09
 
 #define ASM_SESSION_EVENT_RX_UNDERFLOW			 0x00010C17
-#define ASM_SESSION_EVENT_TX_OVERFLOW 			 0x00010C18
+#define ASM_SESSION_EVENT_TX_OVERFLOW			 0x00010C18
 #define ASM_SERVICE_CMD_GET_WALLCLOCK_TIME               0x00010C19
 #define ASM_DATA_CMDRSP_EOS                              0x00010C1C
 
@@ -464,16 +470,32 @@ struct asm_sbc_bitrate {
 	u32 bitrate;
 };
 
-struct asm_aac_immed_decode {
+struct asm_immed_decode {
 	u16 mode;
 	u16 padding;
 };
 
+struct asm_encode_cfg_blk {
+	u32 frames_per_buf;
+	u32 format_id;
+	u32 cfg_size;
+	union {
+		struct asm_pcm_cfg          pcm;
+		struct asm_aac_read_cfg     aac;
+		struct asm_amrnb_read_cfg   amr;
+		struct asm_evrc_read_cfg    evrc;
+		struct asm_qcelp13_read_cfg qcelp13;
+		struct asm_sbc_read_cfg     sbc;
+	} __attribute__((packed)) cfg;
+};
+
 struct asm_frame_meta_info {
 	u32 offset_to_frame;
+	u32 frame_size;
 	u32 encoded_pcm_samples;
 	u32 msw_ts;
 	u32 lsw_ts;
+	u32 nflags;
 };
 
 /* Stream level commands */
@@ -482,18 +504,8 @@ struct asm_stream_cmd_open_read {
 	struct apr_hdr hdr;
 	u32            uMode;
 	u32            src_endpoint;
-	u32            frames_per_buf;
 	u32            pre_proc_top;
 	u32            format;
-	u32            cfg_size;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
 } __attribute__((packed));
 
 /* Supported formats */
@@ -518,6 +530,14 @@ struct asm_stream_cmd_open_read {
 #define G711_MLAW_FS 0x00010BF8
 #define G711_PCM_FS  0x00010BF9
 
+#define ASM_ENCDEC_SBCRATE         0x00010C13
+#define ASM_ENCDEC_IMMDIATE_DECODE 0x00010C14
+#define ASM_ENCDEC_CFG_BLK         0x00010C2C
+
+#define ASM_ENCDEC_SBCRATE         0x00010C13
+#define ASM_ENCDEC_IMMDIATE_DECODE 0x00010C14
+#define ASM_ENCDEC_CFG_BLK         0x00010C2C
+
 #define ASM_STREAM_CMD_OPEN_WRITE                        0x00010BCA
 struct asm_stream_cmd_open_write {
 	struct apr_hdr hdr;
@@ -526,219 +546,39 @@ struct asm_stream_cmd_open_write {
 	u16            stream_handle;
 	u32            post_proc_top;
 	u32            format;
-	u32            cfg_size;
-	union {
-		struct asm_pcm_cfg    pcm_cfg;
-		struct asm_adpcm_cfg  adpcm_cfg;
-		struct asm_yadpcm_cfg yadpcm_cfg;
-		struct asm_midi_cfg   midi_cfg;
-		struct asm_wma_cfg    wma_cfg;
-		struct asm_aac_cfg    aac_cfg;
-		struct asm_flac_cfg   flac_cfg;
-		struct asm_vorbis_cfg vorbis_cfg;
-	} __attribute__((packed)) write_cfg;
 } __attribute__((packed));
 
 #define ASM_STREAM_CMD_OPEN_READWRITE                    0x00010BCC
-/* pcm in; aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_pcmwrite {
+
+struct asm_stream_cmd_open_read_write {
 	struct apr_hdr     hdr;
 	u32                uMode;
 	u32                post_proc_top;
-	u32                sample_rate;
 	u32                write_format;
-	u32                write_cfg_size;
-	u32                frames_per_buffer;
 	u32                read_format;
-	u32                read_cfg_size;
-	struct asm_pcm_cfg pcm_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
 } __attribute__((packed));
-
-/* adpcm in;pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_adpcmwrite {
-	struct apr_hdr       hdr;
-	u32                  uMode;
-	u32                  post_proc_top;
-	u32                  sample_rate;
-	u32                  write_format;
-	u32                  write_cfg_size;
-	u32                  frames_per_buffer;
-	u32                  read_format;
-	u32                  read_cfg_size;
-	struct asm_adpcm_cfg adpcm_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* yadpcm in:pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_yadpcmwrite {
-	struct apr_hdr        hdr;
-	u32                   uMode;
-	u32                   post_proc_top;
-	u32                   sample_rate;
-	u32                   write_format;
-	u32                   write_cfg_size;
-	u32                   frames_per_buffer;
-	u32                   read_format;
-	u32                   read_cfg_size;
-	struct asm_yadpcm_cfg yadpcm_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* midi in;pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_midiwrite {
-	struct apr_hdr      hdr;
-	u32                 uMode;
-	u32                 post_proc_top;
-	u32                 sample_rate;
-	u32                 write_format;
-	u32                 write_cfg_size;
-	u32                 frames_per_buffer;
-	u32                 read_format;
-	u32                 read_cfg_size;
-	struct asm_midi_cfg midi_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* wma in: pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_wmawrite {
-	struct apr_hdr     hdr;
-	u32                uMode;
-	u32                post_proc_top;
-	u32                sample_rate;
-	u32                write_format;
-	u32                write_cfg_size;
-	u32                frames_per_buffer;
-	u32                read_format;
-	u32                read_cfg_size;
-	struct asm_wma_cfg wma_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* aac in; pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_aacwrite {
-	struct apr_hdr     hdr;
-	u32                uMode;
-	u32                post_proc_top;
-	u32                sample_rate;
-	u32                write_format;
-	u32                write_cfg_size;
-	u32                frames_per_buffer;
-	u32                read_format;
-	u32                read_cfg_size;
-	struct asm_aac_cfg aac_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* flac in; pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_flacwrite {
-	struct apr_hdr      hdr;
-	u32                 uMode;
-	u32                 post_proc_top;
-	u32                 sample_rate;
-	u32                 write_format;
-	u32                 write_cfg_size;
-	u32                 frames_per_buffer;
-	u32                 read_format;
-	u32                 read_cfg_size;
-	struct asm_flac_cfg flac_write_cfg;
-	union {
-		struct asm_pcm_cfg          pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
-/* vorbis in; pcm, aac, amrnb, evrc, qcelp13, sbc out */
-struct asm_stream_cmd_open_read_vorbiswrite {
-	struct apr_hdr        hdr;
-	u32                   uMode;
-	u32                   post_proc_top;
-	u32                   sample_rate;
-	u32                   write_format;
-	u32                   write_cfg_size;
-	u32                   frames_per_buffer;
-	u32                   read_format;
-	u32                   read_cfg_size;
-	struct asm_vorbis_cfg vorbis_write_cfg;
-	union {
-		struct asm_pcm_cfg         pcm_cfg;
-		struct asm_aac_read_cfg     aac_cfg;
-		struct asm_amrnb_read_cfg   amr_cfg;
-		struct asm_evrc_read_cfg    evrc_cfg;
-		struct asm_qcelp13_read_cfg qcelp13_cfg;
-		struct asm_sbc_read_cfg     sbc_cfg;
-	} __attribute__((packed)) read_cfg;
-} __attribute__((packed));
-
 
 #define ASM_STREAM_CMD_SET_ENCDEC_PARAM                  0x00010C10
-struct asm_stream_cmd_set_readwrite_param{
-	struct apr_hdr hdr;
-	u32            param_id;
-	u16            param_size;
-	u16            padding;
-	union {
-		struct asm_sbc_bitrate      sbc_bitrate;
-		struct asm_aac_immed_decode aac_dec;
-	} __attribute__((packed)) read_write_cfg;
+#define ASM_STREAM_CMD_GET_ENCDEC_PARAM                  0x00010C11
+#define ASM_ENCDEC_CFG_BLK_ID				 0x00010C2C
+struct asm_stream_cmd_encdec_cfg_blk{
+	struct apr_hdr              hdr;
+	u32                         param_id;
+	u32                         param_size;
+	struct asm_encode_cfg_blk   enc_blk;
 } __attribute__((packed));
 
-#define ASM_STREAM_CMD_GET_ENCDEC_PARAM                  0x00010C11
-struct asm_stream_cmd_get_readwrite_param{
+struct asm_stream_cmd_encdec_sbc_bitrate{
 	struct apr_hdr hdr;
 	u32            param_id;
-	u16            param_size;
-	u16            padding;
-	union {
 		struct asm_sbc_bitrate      sbc_bitrate;
-		struct asm_aac_immed_decode aac_dec;
-	} __attribute__((packed)) read_write_cfg;
+} __attribute__((packed));
+
+struct asm_stream_cmd_encdec_immed_decode{
+	struct apr_hdr hdr;
+	u32            param_id;
+	u32            param_size;
+	struct asm_immed_decode dec;
 } __attribute__((packed));
 
 #define ASM_STREAM _CMD_ADJUST_SAMPLES                   0x00010C0A
@@ -830,7 +670,7 @@ struct asm_stream_cmdrsp_get_readwrite_param{
 	u16            padding;
 	union {
 		struct asm_sbc_bitrate      sbc_bitrate;
-		struct asm_aac_immed_decode aac_dec;
+		struct asm_immed_decode aac_dec;
 	} __attribute__((packed)) read_write_cfg;
 } __attribute__((packed));
 
