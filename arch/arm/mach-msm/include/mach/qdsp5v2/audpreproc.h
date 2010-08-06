@@ -33,6 +33,25 @@
 #include <mach/qdsp5v2/qdsp5audpreproccmdi.h>
 #include <mach/qdsp5v2/qdsp5audpreprocmsg.h>
 
+#define MAX_ENC_COUNT 3
+
+#define MSM_ADSP_ENC_CODEC_WAV 0
+#define MSM_ADSP_ENC_CODEC_AAC 1
+#define MSM_ADSP_ENC_CODEC_SBC 2
+#define MSM_ADSP_ENC_CODEC_AMRNB 3
+#define MSM_ADSP_ENC_CODEC_EVRC 4
+#define MSM_ADSP_ENC_CODEC_QCELP 5
+
+#define MSM_ADSP_ENC_MODE_TUNNEL 24
+#define MSM_ADSP_ENC_MODE_NON_TUNNEL 25
+
+#define AUDPREPROC_CODEC_MASK 0x00FF
+#define AUDPREPROC_MODE_MASK 0xFF00
+
+#define MSM_AUD_ENC_MODE_TUNNEL  0x00000100
+#define MSM_AUD_ENC_MODE_NONTUNNEL  0x00000200
+
+
 /* event callback routine prototype*/
 typedef void (*audpreproc_event_func)(void *private, unsigned id, void *msg);
 

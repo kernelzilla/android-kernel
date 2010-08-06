@@ -25,14 +25,6 @@
 #include <mach/qdsp5v2/audpreproc.h>
 #include <mach/debug_mm.h>
 
-#define MAX_ENC_COUNT 2
-
-#define MSM_ADSP_ENC_CODEC_WAV 0
-#define MSM_ADSP_ENC_CODEC_AAC 1
-#define MSM_ADSP_ENC_CODEC_SBC 2
-#define MSM_ADSP_ENC_CODEC_AMRNB 3
-#define MSM_ADSP_ENC_CODEC_EVRC 4
-#define MSM_ADSP_ENC_CODEC_QCELP 5
 
 static DEFINE_MUTEX(audpreproc_lock);
 static struct wake_lock audpre_wake_lock;
@@ -42,13 +34,24 @@ struct msm_adspenc_info {
 	unsigned module_queueids;
 	int module_encid; /* streamid */
 	int enc_formats; /* supported formats */
+	int nr_codec_support; /* number of codec suported */
 };
 
-#define ENC_MODULE_INFO(name, queueids, encid, formats) { .module_name = name, \
-	.module_queueids = queueids, .module_encid = encid, \
-	.enc_formats = formats}
+#define ENC_MODULE_INFO(name, queueids, encid, formats, nr_codec) \
+	{.module_name = name, .module_queueids = queueids, \
+	 .module_encid = encid, .enc_formats = formats, \
+	 .nr_codec_support = nr_codec }
 
 #define MAX_EVENT_CALLBACK_CLIENTS 1
+
+#define ENC0_FORMAT ((1<<MSM_ADSP_ENC_CODEC_WAV)| \
+	(1<<MSM_ADSP_ENC_CODEC_SBC))
+
+#define ENC1_FORMAT ((1<<MSM_ADSP_ENC_CODEC_WAV)| \
+	(1<<MSM_ADSP_ENC_CODEC_AAC) | (1<<MSM_ADSP_ENC_CODEC_AMRNB) | \
+	(1<<MSM_ADSP_ENC_CODEC_EVRC) | (1<<MSM_ADSP_ENC_CODEC_QCELP))
+
+#define ENC2_FORMAT (1<<MSM_ADSP_ENC_CODEC_WAV)
 
 struct msm_adspenc_database {
 	unsigned num_enc;
@@ -57,18 +60,21 @@ struct msm_adspenc_database {
 
 static struct msm_adspenc_info enc_info_list[] = {
 	ENC_MODULE_INFO("AUDREC0TASK", \
-			 ((QDSP_uPAudRec0BitStreamQueue << 16)| \
+			((QDSP_uPAudRec0BitStreamQueue << 16)| \
 			   QDSP_uPAudRec0CmdQueue), 0, \
-			 ((1 << MSM_ADSP_ENC_CODEC_WAV) | \
-			  (1 << MSM_ADSP_ENC_CODEC_SBC))),
+			 (ENC0_FORMAT  | (1 << MSM_ADSP_ENC_MODE_TUNNEL)), 2),
+
 	ENC_MODULE_INFO("AUDREC1TASK", \
 			 ((QDSP_uPAudRec1BitStreamQueue << 16)| \
 			   QDSP_uPAudRec1CmdQueue), 1, \
-			 ((1 << MSM_ADSP_ENC_CODEC_WAV) | \
-			  (1 << MSM_ADSP_ENC_CODEC_AAC) | \
-			  (1 << MSM_ADSP_ENC_CODEC_AMRNB) | \
-			  (1 << MSM_ADSP_ENC_CODEC_EVRC) | \
-			  (1 << MSM_ADSP_ENC_CODEC_QCELP))),
+			 (ENC1_FORMAT | (1 << MSM_ADSP_ENC_MODE_TUNNEL) | \
+			  (1 << MSM_ADSP_ENC_MODE_NON_TUNNEL)), 5),
+
+	ENC_MODULE_INFO("AUDREC2TASK", \
+			 ((QDSP_uPAudRec2BitStreamQueue << 16)| \
+			   QDSP_uPAudRec2CmdQueue), 2, \
+			 (ENC2_FORMAT  | (1 << MSM_ADSP_ENC_MODE_TUNNEL)), 1),
+
 };
 
 static struct msm_adspenc_database msm_enc_database = {
@@ -179,6 +185,20 @@ static void audpreproc_dsp_event(void *data, unsigned id, size_t len,
 			audpreproc->func[record_cfg_done.stream_id](
 			audpreproc->private[record_cfg_done.stream_id], id,
 			&record_cfg_done);
+		break;
+	}
+	case AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG: {
+		struct audpreproc_cmd_routing_mode_done  routing_mode_done;
+
+		getevent(&routing_mode_done,
+			AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG_LEN);
+		MM_DBG("AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG: \
+			stream id %d\n", routing_mode_done.stream_id);
+		if ((routing_mode_done.stream_id < MAX_ENC_COUNT) &&
+				audpreproc->func[routing_mode_done.stream_id])
+			audpreproc->func[routing_mode_done.stream_id](
+			audpreproc->private[routing_mode_done.stream_id], id,
+			&routing_mode_done);
 		break;
 	}
 	default:
@@ -310,27 +330,44 @@ int audpreproc_aenc_alloc(unsigned enc_type, const char **module_name,
 		     unsigned *queue_ids)
 {
 	struct audpreproc_state *audpreproc = &the_audpreproc_state;
-	int encid = -1, idx;
+	int encid = -1, idx, lidx, mode, codec;
+	int codecs_supported, min_codecs_supported;
 	static int wakelock_init;
 
 	mutex_lock(audpreproc->lock);
-	for (idx = (msm_enc_database.num_enc - 1);
-		idx >= 0; idx--) {
+	/* Represents in bit mask */
+	mode = ((enc_type & AUDPREPROC_MODE_MASK) << 16);
+	codec = (1 << (enc_type & AUDPREPROC_CODEC_MASK));
+
+	lidx = msm_enc_database.num_enc;
+	min_codecs_supported = sizeof(unsigned int) * 8;
+	MM_DBG("mode = 0x%08x codec = 0x%08x\n", mode, codec);
+
+	for (idx = lidx-1; idx >= 0; idx--) {
 		/* encoder free and supports the format */
-		if ((!(audpreproc->enc_inuse & (1 << idx))) &&
-			(msm_enc_database.enc_info_list[idx].enc_formats &
-				(1 << enc_type))) {
-				break;
+		if (!(audpreproc->enc_inuse & (1 << (idx))) &&
+		((mode & msm_enc_database.enc_info_list[idx].enc_formats)
+		== mode) && ((codec &
+		msm_enc_database.enc_info_list[idx].enc_formats)
+		== codec)){
+
+			/* Check supports minimum number codecs */
+			codecs_supported =
+			msm_enc_database.enc_info_list[idx].nr_codec_support;
+			if (codecs_supported < min_codecs_supported) {
+				lidx = idx;
+				min_codecs_supported = codecs_supported;
+			}
 		}
 	}
 
-	if (idx >= 0) {
-		audpreproc->enc_inuse |= (1 << idx);
+	if (lidx < msm_enc_database.num_enc) {
+		audpreproc->enc_inuse |= (1 << lidx);
 		*module_name =
-		    msm_enc_database.enc_info_list[idx].module_name;
+		    msm_enc_database.enc_info_list[lidx].module_name;
 		*queue_ids =
-		    msm_enc_database.enc_info_list[idx].module_queueids;
-		encid = msm_enc_database.enc_info_list[idx].module_encid;
+		    msm_enc_database.enc_info_list[lidx].module_queueids;
+		encid = msm_enc_database.enc_info_list[lidx].module_encid;
 	}
 
 	if (!wakelock_init) {
