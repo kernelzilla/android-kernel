@@ -262,7 +262,7 @@ static int lcdc_sharp_panel_off(struct platform_device *pdev)
 		serigo(31, 0xC1);
 		mdelay(40);
 		serigo(31, 0x00);
-		mdelay(100);
+		msleep(16);
 		sharp_state.display_on = FALSE;
 		sharp_state.disp_initialized = FALSE;
 	}
