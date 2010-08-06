@@ -1700,7 +1700,7 @@ ip6mr_fill_mroute(struct sk_buff *skb, struct mfc6_cache *c, struct rtmsg *rtm)
 	struct rtattr *mp_head;
 
 	/* If cache is unresolved, don't try to parse IIF and OIF */
-	if (c->mf6c_parent > MAXMIFS)
+	if (c->mf6c_parent >= MAXMIFS)
 		return -ENOENT;
 
 	if (MIF_EXISTS(net, c->mf6c_parent))
