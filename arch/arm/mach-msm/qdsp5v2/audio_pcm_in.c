@@ -74,6 +74,7 @@ struct audio_in {
 	uint32_t in_head; /* next buffer dsp will write */
 	uint32_t in_tail; /* next buffer read() will read */
 	uint32_t in_count; /* number of buffers available to read() */
+	uint32_t mode;
 
 	const char *module_name;
 	unsigned queue_ids;
@@ -682,13 +683,26 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 		rc = -EBUSY;
 		goto done;
 	}
+	if ((file->f_mode & FMODE_WRITE) &&
+			(file->f_mode & FMODE_READ)) {
+		rc = -EACCES;
+		MM_ERR("Non tunnel encoding is not supported\n");
+		goto done;
+	} else if (!(file->f_mode & FMODE_WRITE) &&
+					(file->f_mode & FMODE_READ)) {
+		audio->mode = MSM_AUD_ENC_MODE_TUNNEL;
+		MM_DBG("Opened for tunnel mode encoding\n");
+	} else {
+		rc = -EACCES;
+		goto done;
+	}
 	/* Settings will be re-config at AUDIO_SET_CONFIG,
 	 * but at least we need to have initial config
 	 */
 	audio->channel_mode = AUDREC_CMD_MODE_MONO;
 	audio->buffer_size = MONO_DATA_SIZE;
 	audio->samp_rate = 8000;
-	audio->enc_type = ENC_TYPE_WAV;
+	audio->enc_type = ENC_TYPE_WAV | audio->mode;
 	audio->source = INTERNAL_CODEC_TX_SOURCE_MIX_MASK;
 
 	encid = audpreproc_aenc_alloc(audio->enc_type, &audio->module_name,

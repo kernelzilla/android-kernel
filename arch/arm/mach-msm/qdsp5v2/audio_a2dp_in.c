@@ -85,6 +85,7 @@ struct audio_a2dp_in {
 	uint32_t in_head; /* next buffer dsp will write */
 	uint32_t in_tail; /* next buffer read() will read */
 	uint32_t in_count; /* number of buffers available to read() */
+	uint32_t mode;
 
 	const char *module_name;
 	unsigned queue_ids;
@@ -821,13 +822,26 @@ static int auda2dp_in_open(struct inode *inode, struct file *file)
 		rc = -EBUSY;
 		goto done;
 	}
+	if ((file->f_mode & FMODE_WRITE) &&
+				(file->f_mode & FMODE_READ)) {
+		rc = -EACCES;
+		MM_ERR("Non tunnel encoding is not supported\n");
+		goto done;
+	} else if (!(file->f_mode & FMODE_WRITE) &&
+					(file->f_mode & FMODE_READ)) {
+		audio->mode = MSM_AUD_ENC_MODE_TUNNEL;
+		MM_DBG("Opened for Tunnel mode encoding\n");
+	} else {
+		rc = -EACCES;
+		goto done;
+	}
 	/* Settings will be re-config at AUDIO_SET_CONFIG/SBC_ENC_CONFIG,
 	 * but at least we need to have initial config
 	 */
 	audio->channel_mode = AUDREC_CMD_MODE_MONO;
 	audio->buffer_size = FRAME_SIZE_SBC;
 	audio->samp_rate = 48000;
-	audio->enc_type = ENC_TYPE_SBC;
+	audio->enc_type = ENC_TYPE_SBC | audio->mode;
 	audio->cfg.bit_allocation = AUDIO_SBC_BA_SNR;
 	audio->cfg.mode = AUDIO_SBC_MODE_JSTEREO;
 	audio->cfg.number_of_subbands = AUDIO_SBC_BANDS_8;
