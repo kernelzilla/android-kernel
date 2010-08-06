@@ -1622,7 +1622,7 @@ ipmr_fill_mroute(struct sk_buff *skb, struct mfc_cache *c, struct rtmsg *rtm)
 	struct rtattr *mp_head;
 
 	/* If cache is unresolved, don't try to parse IIF and OIF */
-	if (c->mfc_parent > MAXVIFS)
+	if (c->mfc_parent >= MAXVIFS)
 		return -ENOENT;
 
 	if (VIF_EXISTS(net, c->mfc_parent))
