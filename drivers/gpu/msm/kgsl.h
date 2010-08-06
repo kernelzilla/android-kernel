@@ -164,6 +164,7 @@ int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int *value);
 int kgsl_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int value);
+int kgsl_check_timestamp(struct kgsl_device *device, unsigned int timestamp);
 
 int kgsl_register_ts_notifier(struct kgsl_device *device,
 			      struct notifier_block *nb);
