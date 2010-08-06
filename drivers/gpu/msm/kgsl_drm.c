@@ -1097,7 +1097,7 @@ int msm_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	/* flush out existing cached mappings */
 	if ((TYPE_IS_MEM(gpriv->type) &&
 		gpriv->type & DRM_KGSL_GEM_CACHE_WCOMBINE) ||
-		gpriv->type & DRM_KGSL_GEM_TYPE_KMEM_NOCACHE)
+		gpriv->type == DRM_KGSL_GEM_TYPE_KMEM_NOCACHE)
 			kgsl_gem_cache_range_op((void *)gpriv->cpuaddr,
 						(obj->size * gpriv->bufcount),
 						(KGSL_GEM_CACHE_VMALLOC_ADDR |
