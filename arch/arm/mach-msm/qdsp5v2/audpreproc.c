@@ -350,7 +350,6 @@ int audpreproc_aenc_alloc(unsigned enc_type, const char **module_name,
 		== mode) && ((codec &
 		msm_enc_database.enc_info_list[idx].enc_formats)
 		== codec)){
-
 			/* Check supports minimum number codecs */
 			codecs_supported =
 			msm_enc_database.enc_info_list[idx].nr_codec_support;
@@ -413,6 +412,12 @@ int audpreproc_send_audreccmdqueue(void *cmd, unsigned len)
 }
 EXPORT_SYMBOL(audpreproc_send_audreccmdqueue);
 
+int audpreproc_send_audrec2cmdqueue(void *cmd, unsigned len)
+{
+	return msm_adsp_write(the_audpreproc_state.mod,
+			      QDSP_uPAudRec2CmdQueue, cmd, len);
+}
+EXPORT_SYMBOL(audpreproc_send_audrec2cmdqueue);
 
 int audpreproc_dsp_set_agc(struct audpreproc_cmd_cfg_agc_params *agc,
 				unsigned len)
