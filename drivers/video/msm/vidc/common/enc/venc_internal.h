@@ -35,7 +35,6 @@
 
 #include "vidc_init.h"
 
-#define VID_ENC_MAX_ENCODER_CLIENTS 16
 #define VID_ENC_MAX_NUM_OF_BUFF 100
 
 enum venc_buffer_dir{
@@ -58,11 +57,10 @@ struct vid_enc_dev {
 	struct clk *hclk;
 	struct clk *hclk_div2;
 	struct clk *pclk;
-	struct clk *vcodec_clk;
 	unsigned long hclk_rate;
 	struct mutex lock;
 	s32 device_handle;
-	struct video_client_ctx venc_clients[VID_ENC_MAX_ENCODER_CLIENTS];
+	struct video_client_ctx venc_clients[VIDC_MAX_NUM_CLIENTS];
 	u32 num_clients;
 };
 

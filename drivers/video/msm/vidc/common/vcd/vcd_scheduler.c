@@ -20,6 +20,15 @@
 #include "vcd.h"
 
 #define NORMALIZATION_FACTOR 3600
+#define ADJUST_CLIENT_ROUNDS(client, rounds) \
+do {\
+	if ((client)->n_rounds < round_adjustment) {\
+		(client)->n_rounds = 0;\
+		VCD_MSG_HIGH("%s(): WARNING: Scheduler list unsorted",\
+			__func__);\
+	} else\
+		(client)->n_rounds -= round_adjustment;\
+} while (0)
 
 u32 vcd_sched_create(struct list_head *p_sched_list)
 {
@@ -257,21 +266,23 @@ u32 vcd_sched_get_client_frame(struct list_head *p_sched_clnt_list,
 					p_sched_clnt->n_rounds)
 					list_move(&(*pp_cctxt)->sched_clnt_hdl\
 						->list, &p_sched_clnt->list);
-				p_sched_clnt->n_rounds -= round_adjustment;
+				ADJUST_CLIENT_ROUNDS(p_sched_clnt,
+					round_adjustment);
 			} else if (p_sched_clnt->n_o_tkns &&
 				!list_empty(&p_sched_clnt->ip_frm_list)) {
 				*pp_cctxt = p_sched_clnt->p_clnt_data;
 				p_sched_clnt->n_rounds += p_sched_clnt->r_p_frm;
 			} else
-				p_sched_clnt->n_rounds -= round_adjustment;
+				ADJUST_CLIENT_ROUNDS(p_sched_clnt,
+					round_adjustment);
 		}
 		if (*pp_cctxt) {
 			rc = vcd_sched_dequeue_buffer(
 				(*pp_cctxt)->sched_clnt_hdl, pp_buffer);
 			if (rc == VCD_S_SUCCESS) {
 				(*pp_cctxt)->sched_clnt_hdl->n_o_tkns--;
-				(*pp_cctxt)->sched_clnt_hdl->n_rounds -=
-					round_adjustment;
+				ADJUST_CLIENT_ROUNDS((*pp_cctxt)->\
+					sched_clnt_hdl, round_adjustment);
 			}
 		}
 	}

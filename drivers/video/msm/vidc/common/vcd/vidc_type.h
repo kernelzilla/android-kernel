@@ -34,7 +34,6 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/time.h>
 #include <linux/dma-mapping.h>
@@ -46,8 +45,9 @@
 #define DEBUG   0
 
 #define USE_RES_TRACKER
-#undef CORE_TIMING_INFO
+#define AXI_CLK_SCALING
 
+#undef CORE_TIMING_INFO
 #ifdef CONFIG_KERNEL_PMEM_SMI_REGION
 #define PMEM_MEMTYPE   PMEM_MEMTYPE_SMI
 #else

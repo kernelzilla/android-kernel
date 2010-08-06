@@ -40,7 +40,6 @@
 #include "vidc_init.h"
 
 
-#define VIDC_HCLK_RATE 228570000
 
 #if DEBUG
 #define DBG(x...) printk(KERN_DEBUG x)
@@ -61,7 +60,7 @@ static s32 vid_dec_get_empty_client_index(void)
 {
 	u32 i, found = FALSE;
 
-	for (i = 0; i < VID_DEC_MAX_DECODER_CLIENTS; i++) {
+	for (i = 0; i < VIDC_MAX_NUM_CLIENTS; i++) {
 		if (!vid_dec_device_p->vdec_clients[i].vcd_handle) {
 			found = TRUE;
 			break;
@@ -422,8 +421,8 @@ static u32 vid_dec_set_codec(struct video_client_ctx *client_ctx,
 	case VDEC_CODECTYPE_H264:
 		codec_type.e_codec = VCD_CODEC_H264;
 		break;
-	case VDEC_CODECTYPE_DIVX_3:
-		codec_type.e_codec = VCD_CODEC_DIVX_3;
+	case VDEC_CODECTYPE_DIVX_5:
+		codec_type.e_codec = VCD_CODEC_DIVX_5;
 		break;
 	case VDEC_CODECTYPE_XVID:
 		codec_type.e_codec = VCD_CODEC_XVID;
@@ -1027,6 +1026,7 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 			return -EIO;
 		break;
 	case VDEC_IOCTL_SET_BUFFER_REQ:
+		DBG("VDEC_IOCTL_SET_BUFFER_REQ\n");
 		if (copy_from_user(&vdec_msg, (void __user *)arg,
 				   sizeof(vdec_msg)))
 			return -EFAULT;
@@ -1091,6 +1091,8 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 			(void __user *)vdec_msg.inputparam, sizeof(setbuffer)))
 			return -EFAULT;
 		result = vid_dec_set_buffer(client_ctx, &setbuffer);
+		if (!result)
+			return -EIO;
 		break;
 	case VDEC_IOCTL_FREE_BUFFER:
 		DBG("VDEC_IOCTL_FREE_BUFFER\n");
@@ -1306,25 +1308,18 @@ static int vid_dec_open(struct inode *inode, struct file *file)
 	s32 client_index;
 	struct video_client_ctx *client_ctx;
 	u32 vcd_status = VCD_ERR_FAIL;
+	u8 client_count = 0;
 
 	INFO("\n msm_vidc_dec: Inside %s()", __func__);
 	mutex_lock(&vid_dec_device_p->lock);
 
-	if (vid_dec_device_p->num_clients == VID_DEC_MAX_DECODER_CLIENTS) {
+	client_count = vcd_get_num_of_clients();
+	if (client_count == VIDC_MAX_NUM_CLIENTS) {
 		ERR("ERROR : vid_dec_open() max number of clients"
 		    "limit reached\n");
 		mutex_unlock(&vid_dec_device_p->lock);
 		return -ENODEV;
 	}
-
-#ifndef USE_RES_TRACKER
-	DBG("Resource Tracker not in use");
-  if (!vidc_enable_clk(VIDC_HCLK_RATE)) {
-		ERR("ERROR : vid_dec_open()	clock enabled failed\n");
-		mutex_unlock(&vid_dec_device_p->lock);
-    return -ENODEV;
-	}
-#endif
 
 	DBG(" Virtual Address of ioremap is %p\n", vid_dec_device_p->virt_base);
 	if (!vid_dec_device_p->num_clients) {
@@ -1415,7 +1410,7 @@ static int vid_dec_vcd_init(void)
 	INFO("\n msm_vidc_dec: Inside %s()", __func__);
 	vid_dec_device_p->num_clients = 0;
 
-	for (i = 0; i < VID_DEC_MAX_DECODER_CLIENTS; i++) {
+	for (i = 0; i < VIDC_MAX_NUM_CLIENTS; i++) {
 		memset((void *)&vid_dec_device_p->vdec_clients[i], 0,
 		       sizeof(vid_dec_device_p->vdec_clients[i]));
 	}

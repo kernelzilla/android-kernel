@@ -34,8 +34,6 @@
 #include <linux/cdev.h>
 #include "vidc_init.h"
 
-#define VID_DEC_MAX_DECODER_CLIENTS 16
-
 struct vid_dec_msg {
 	struct list_head list;
 	struct vdec_msginfo vdec_msg_info;
@@ -50,11 +48,10 @@ struct vid_dec_dev {
 	struct clk *hclk;
 	struct clk *hclk_div2;
 	struct clk *pclk;
-	struct clk *vcodec_clk;
 	unsigned long hclk_rate;
 	struct mutex lock;
 	s32 device_handle;
-	struct video_client_ctx vdec_clients[VID_DEC_MAX_DECODER_CLIENTS];
+	struct video_client_ctx vdec_clients[VIDC_MAX_NUM_CLIENTS];
 	u32 num_clients;
 	void(*pf_timer_handler)(void *);
 };

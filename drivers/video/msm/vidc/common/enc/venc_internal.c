@@ -118,8 +118,11 @@ u32 vid_enc_set_get_inputformat(struct video_client_ctx *client_ctx,
 	if (set_flag) {
 		switch (*input_format) {
 		case VEN_INPUTFMT_NV12:
+			format_type.e_buffer_format = VCD_BUFFER_FORMAT_NV12;
+			break;
+		case VEN_INPUTFMT_NV12_16M2KA:
 			format_type.e_buffer_format =
-				 VCD_BUFFER_FORMAT_NV12_16M2KA;
+				VCD_BUFFER_FORMAT_NV12_16M2KA;
 			break;
 		case VEN_INPUTFMT_NV21:
 			format_type.e_buffer_format =
@@ -148,8 +151,11 @@ u32 vid_enc_set_get_inputformat(struct video_client_ctx *client_ctx,
 			ERR("%s(): Get VCD_I_BUFFER_FORMAT Failed\n", __func__);
 		} else {
 			switch (format_type.e_buffer_format) {
-			case VCD_BUFFER_FORMAT_NV12_16M2KA:
+			case VCD_BUFFER_FORMAT_NV12:
 				*input_format = VEN_INPUTFMT_NV12;
+				break;
+			case VCD_BUFFER_FORMAT_NV12_16M2KA:
+				*input_format = VEN_INPUTFMT_NV12_16M2KA;
 				break;
 			case VCD_BUFFER_FORMAT_TILE_4x2:
 				*input_format = VEN_INPUTFMT_NV21;
@@ -252,26 +258,30 @@ u32 vid_enc_set_get_framesize(struct video_client_ctx *client_ctx,
 	vcd_property_hdr.n_size =
 		sizeof(struct vcd_property_frame_size_type);
 
+	vcd_status = vcd_get_property(client_ctx->vcd_handle,
+					&vcd_property_hdr, &frame_size);
+
+	if (vcd_status) {
+		ERR("%s(): Get VCD_I_FRAME_SIZE Failed\n",
+				__func__);
+		return FALSE;
+	}
 	if (set_flag) {
-		frame_size.n_height = *height;
-		frame_size.n_width = *width;
-		vcd_status = vcd_set_property(client_ctx->vcd_handle,
-				&vcd_property_hdr, &frame_size);
-
-		if (vcd_status) {
-			ERR("%s(): Set VCD_I_FRAME_SIZE Failed\n",
-					__func__);
-			return FALSE;
+		if (frame_size.n_height != *height ||
+			frame_size.n_width != *width) {
+			DBG("%s(): ENC Set Size (%d x %d)\n",
+				__func__, *height, *width);
+			frame_size.n_height = *height;
+			frame_size.n_width = *width;
+			vcd_status = vcd_set_property(client_ctx->vcd_handle,
+					&vcd_property_hdr, &frame_size);
+			if (vcd_status) {
+				ERR("%s(): Set VCD_I_FRAME_SIZE Failed\n",
+						__func__);
+				return FALSE;
+			}
 		}
-	}	else {
-		vcd_status = vcd_get_property(client_ctx->vcd_handle,
-						&vcd_property_hdr, &frame_size);
-
-		if (vcd_status) {
-			ERR("%s(): Get VCD_I_FRAME_SIZE Failed\n",
-					__func__);
-			return FALSE;
-		}
+	} else {
 		*height = frame_size.n_height;
 		*width = frame_size.n_width;
 	}
@@ -564,7 +574,7 @@ u32 vid_enc_set_get_profile_level(struct video_client_ctx *client_ctx,
 			level_type.e_level = VCD_LEVEL_MPEG4_3b;
 			break;
 		case VEN_LEVEL_MPEG4_6:
-			status = FALSE;
+			level_type.e_level = VCD_LEVEL_MPEG4_6;
 			break;
 		case VEN_LEVEL_H264_1:
 			level_type.e_level = VCD_LEVEL_H264_1;
@@ -595,9 +605,6 @@ u32 vid_enc_set_get_profile_level(struct video_client_ctx *client_ctx,
 			break;
 		case VEN_LEVEL_H264_3p1:
 			level_type.e_level = VCD_LEVEL_H264_3p1;
-			break;
-		case VEN_LEVEL_H264_4:
-			level_type.e_level = VCD_LEVEL_H264_4;
 			break;
 
 		case VEN_LEVEL_H263_10:
@@ -703,7 +710,7 @@ u32 vid_enc_set_get_profile_level(struct video_client_ctx *client_ctx,
 				status = FALSE;
 				break;
 			case VCD_LEVEL_H264_4:
-				profile_level->level = VEN_LEVEL_H264_4;
+				status = FALSE;
 				break;
 			case VCD_LEVEL_H263_10:
 				profile_level->level = VEN_LEVEL_H263_10;
@@ -893,9 +900,8 @@ u32 vid_enc_set_get_entropy_cfg(struct video_client_ctx *client_ctx,
 	vcd_property_hdr.prop_id = VCD_I_ENTROPY_CTRL;
 	vcd_property_hdr.n_size =
 		sizeof(struct vcd_property_entropy_control_type);
-
 	if (set_flag) {
-		switch (entropy_cfg->cabacmodel) {
+		switch (entropy_cfg->longentropysel) {
 		case VEN_ENTROPY_MODEL_CAVLC:
 			control_type.e_entropy_sel = VCD_ENTROPY_SEL_CAVLC;
 			break;
