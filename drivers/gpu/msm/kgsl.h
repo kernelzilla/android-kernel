@@ -132,7 +132,6 @@ enum kgsl_status {
 
 #define KGSL_PRE_HWACCESS() \
 while (1) { \
-	mutex_lock(&kgsl_driver.mutex); \
 	if (device == NULL) \
 		break; \
 	if (device->hwaccess_blocked == KGSL_FALSE) { \

@@ -197,6 +197,7 @@ int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int *value)
 {
 	int status = -ENXIO;
+
 	if (device->ftbl.device_regread)
 		status = device->ftbl.device_regread(device, offsetwords,
 					value);
@@ -596,6 +597,7 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 	device = kgsl_driver.devp[iminor(inodep)];
 	BUG_ON(device == NULL);
 
+	mutex_lock(&kgsl_driver.mutex);
 	KGSL_PRE_HWACCESS();
 
 	dev_priv = (struct kgsl_device_private *) filep->private_data;
@@ -1441,7 +1443,8 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 
 	KGSL_DRV_VDBG("filep %p cmd 0x%08x arg 0x%08lx\n", filep, cmd, arg);
 
-	KGSL_PRE_HWACCESS();
+	mutex_lock(&kgsl_driver.mutex);
+
 	switch (cmd) {
 
 	case IOCTL_KGSL_DEVICE_GETPROPERTY:
@@ -1510,7 +1513,6 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 							dev_priv->process_priv,
 							   (void __user *)arg);
 		break;
-
 	case IOCTL_KGSL_SHAREDMEM_FLUSH_CACHE:
 		if (kgsl_cache_enable)
 			result =
