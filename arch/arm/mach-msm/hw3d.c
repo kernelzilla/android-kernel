@@ -192,9 +192,8 @@ static long hw3d_revoke_gpu(struct file *file)
 	struct pmem_region region = {.offset = 0x0, .len = HW3D_REGS_LEN};
 
 	down(&hw3d_sem);
-	if (!hw3d_granted) {
+	if (!hw3d_granted)
 		goto end;
-	}
 	/* revoke the pmem region completely */
 	if ((ret = pmem_remap(&region, file, PMEM_UNMAP)))
 		goto end;

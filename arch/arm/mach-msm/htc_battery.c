@@ -579,11 +579,10 @@ static ssize_t htc_battery_show_property(struct device *dev,
                                 msecs_to_jiffies(cache_time)))
                 goto dont_need_update;
 	
-	if (htc_get_batt_info(&htc_batt_info.rep) < 0) {
+	if (htc_get_batt_info(&htc_batt_info.rep) < 0)
 		printk(KERN_ERR "%s: rpc failed!!!\n", __FUNCTION__);
-	} else {
+	else
 		htc_batt_info.update_time = jiffies;
-	}
 dont_need_update:
 	mutex_unlock(&htc_batt_info.rpc_lock);
 

@@ -247,9 +247,9 @@ int mahimahi_wifi_set_carddetect(int val)
 {
 	pr_info("%s: %d\n", __func__, val);
 	mahimahi_wifi_cd = val;
-	if (wifi_status_cb) {
+	if (wifi_status_cb)
 		wifi_status_cb(val, wifi_status_cb_devid);
-	} else
+	else
 		pr_warning("%s: Nobody to notify\n", __func__);
 	return 0;
 }

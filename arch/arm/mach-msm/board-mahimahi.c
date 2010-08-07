@@ -642,11 +642,10 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 static int capella_cm3602_power(int on)
 {
 	/* TODO eolsen Add Voltage reg control */
-	if (on) {
+	if (on)
 		gpio_direction_output(MAHIMAHI_GPIO_PROXIMITY_EN, 0);
-	} else {
+	else
 		gpio_direction_output(MAHIMAHI_GPIO_PROXIMITY_EN, 1);
-	}
 
 	return 0;
 }
