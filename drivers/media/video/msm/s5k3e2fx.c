@@ -2317,6 +2317,106 @@ static int s5k3e2fx_setting(enum msm_s_reg_update rupdate,
 	return rc;
 }
 
+#define MAX_LAYER_NUM 5
+#define FIRST_LAYER 9
+#define FUSE_ID_FIRST_ADDR 14
+
+static int s5k3e2fx_i2c_read_fuseid(struct sensor_cfg_data *cdata)
+{
+
+        uint32_t otp_vendorid_index = 0;
+        uint32_t otp_fuseid_index = 0;
+        unsigned short otp_vendorid1[MAX_LAYER_NUM];
+        unsigned short otp_vendorid2[MAX_LAYER_NUM];
+        unsigned short otp_vendorid3[MAX_LAYER_NUM];
+        unsigned short otp_fuseid1[MAX_LAYER_NUM];
+        unsigned short otp_fuseid2[MAX_LAYER_NUM];
+        unsigned short otp_fuseid3[MAX_LAYER_NUM];
+        for (otp_vendorid_index = 0;
+                otp_vendorid_index < MAX_LAYER_NUM;
+                otp_vendorid_index++) {
+
+                s5k3e2fx_i2c_write_b(
+                        s5k3e2fx_client->addr,
+                        0x311A, FIRST_LAYER+otp_vendorid_index);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311B, &otp_vendorid1[otp_vendorid_index]);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311C, &otp_vendorid2[otp_vendorid_index]);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311D, &otp_vendorid3[otp_vendorid_index]);
+                pr_info("s5k3e2fx: otp_vendorid1[%d]:0x%4x\n",
+                        otp_vendorid_index, otp_vendorid1[otp_vendorid_index]);
+                pr_info("s5k3e2fx: otp_vendorid2[%d]:0x%4x\n",
+                        otp_vendorid_index, otp_vendorid2[otp_vendorid_index]);
+                pr_info("s5k3e2fx: otp_vendorid3[%d]:0x%4x\n",
+                        otp_vendorid_index, otp_vendorid3[otp_vendorid_index]);
+                if ((otp_vendorid1[otp_vendorid_index] == 0) &&
+                        (otp_vendorid2[otp_vendorid_index] == 0) &&
+                        (otp_vendorid3[otp_vendorid_index] == 0) &&
+                        (otp_vendorid_index != 0)) {
+                        break;
+                }
+        }
+        otp_vendorid_index = otp_vendorid_index-1;
+        /*read fuse id from layer14~layer18.
+        *The last non-all-zero layer contains
+        *correct fuse id */
+
+        for (otp_fuseid_index = 0;
+                otp_fuseid_index < MAX_LAYER_NUM;
+                otp_fuseid_index++) {
+                /*give OTP the address you want to read*/
+                s5k3e2fx_i2c_write_b(
+                        s5k3e2fx_client->addr,
+                        0x311A, FUSE_ID_FIRST_ADDR+otp_fuseid_index);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311B, &otp_fuseid1[otp_fuseid_index]);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311C, &otp_fuseid2[otp_fuseid_index]);
+                s5k3e2fx_i2c_read_b(
+                        s5k3e2fx_client->addr,
+                        0x311D, &otp_fuseid3[otp_fuseid_index]);
+                pr_info("s5k3e2fx: otp_fuseid1[%d]:0x%4x\n",
+                        otp_fuseid_index, otp_fuseid1[otp_fuseid_index]);
+                pr_info("s5k3e2fx: otp_fuseid2[%d]:0x%4x\n",
+                        otp_fuseid_index, otp_fuseid2[otp_fuseid_index]);
+                pr_info("s5k3e2fx: otp_fuseid3[%d]:0x%4x\n",
+                        otp_fuseid_index, otp_fuseid3[otp_fuseid_index]);
+                if ((otp_fuseid1[otp_fuseid_index] == 0) &&
+                        (otp_fuseid2[otp_fuseid_index] == 0) &&
+                        (otp_fuseid3[otp_fuseid_index] == 0) &&
+                        (otp_fuseid_index != 0)) {
+                                break;
+                        }
+        }
+        otp_fuseid_index = otp_fuseid_index-1;
+        cdata->cfg.fuse.fuse_id_word1 = otp_vendorid_index;
+        cdata->cfg.fuse.fuse_id_word2 = otp_fuseid_index;
+        cdata->cfg.fuse.fuse_id_word3 =
+                (((uint32_t)otp_vendorid1[otp_vendorid_index])<<16) |
+                (((uint32_t)otp_vendorid2[otp_vendorid_index])<<8) |
+                ((uint32_t)otp_vendorid3[otp_vendorid_index]);
+        cdata->cfg.fuse.fuse_id_word4 =
+                (((uint32_t)otp_fuseid1[otp_fuseid_index])<<16) |
+                (((uint32_t)otp_fuseid2[otp_fuseid_index])<<8) |
+                ((uint32_t)otp_fuseid3[otp_fuseid_index]);
+        pr_info("s5k3e2fx: fuse->fuse_id_word1:%d\n",
+                cdata->cfg.fuse.fuse_id_word1);
+        pr_info("s5k3e2fx: fuse->fuse_id_word2:%d\n",
+                cdata->cfg.fuse.fuse_id_word2);
+        pr_info("s5k3e2fx: fuse->fuse_id_word3:0x%08x\n",
+                cdata->cfg.fuse.fuse_id_word3);
+        pr_info("s5k3e2fx: fuse->fuse_id_word4:0x%08x\n",
+                cdata->cfg.fuse.fuse_id_word4);
+        return 0;
+}
+
 static int s5k3e2fx_sensor_open_init(const struct msm_camera_sensor_info *data)
 {
 	int rc;
@@ -2890,6 +2990,13 @@ static int s5k3e2fx_sensor_config(void __user *argp)
 	case CFG_SET_EFFECT:
 		rc = s5k3e2fx_set_default_focus();
 		break;
+
+        case CFG_I2C_IOCTL_R_OTP:{
+                rc = s5k3e2fx_i2c_read_fuseid(&cdata);
+                if (copy_to_user(argp, &cdata, sizeof(struct sensor_cfg_data)))
+                        rc = -EFAULT;
+                }
+                break;
 
 	case CFG_SET_LENS_SHADING:
 	default:
