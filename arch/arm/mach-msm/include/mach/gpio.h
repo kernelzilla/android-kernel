@@ -1,39 +1,172 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/*
+ * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Author: Mike Lockwood <lockwood@android.com>
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials provided
- *       with the distribution.
- *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
  *
- * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
  */
-
 #ifndef __ASM_ARCH_MSM_GPIO_H
 #define __ASM_ARCH_MSM_GPIO_H
 
-#if defined(CONFIG_ARCH_MSM8X60)
-#include <mach/gpio-v2.h>
-#else
-#include <mach/gpio-v1.h>
+#ifdef CONFIG_ARCH_MSM8X60
+#define ARCH_NR_GPIOS 512
 #endif
+
+#include <linux/interrupt.h>
+#include <asm-generic/gpio.h>
+#include <mach/irqs.h>
+
+#define FIRST_BOARD_GPIO	NR_GPIO_IRQS
+
+static inline int gpio_get_value(unsigned gpio)
+{
+	return __gpio_get_value(gpio);
+}
+
+static inline void gpio_set_value(unsigned gpio, int value)
+{
+	__gpio_set_value(gpio, value);
+}
+
+static inline int gpio_cansleep(unsigned gpio)
+{
+	return __gpio_cansleep(gpio);
+}
+
+static inline int gpio_to_irq(unsigned gpio)
+{
+	return __gpio_to_irq(gpio);
+}
+
+/**
+ * struct msm_gpio - GPIO pin description
+ * @gpio_cfg - configuration bitmap, as per gpio_tlmm_config()
+ * @label - textual label
+ *
+ * Usually, GPIO's are operated by sets.
+ * This struct accumulate all GPIO information in single source
+ * and facilitete group operations provided by msm_gpios_xxx()
+ */
+struct msm_gpio {
+	u32 gpio_cfg;
+	const char *label;
+};
+
+/**
+ * msm_gpios_request_enable() - request and enable set of GPIOs
+ *
+ * Request and configure set of GPIO's
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_request_enable(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_disable_free() - disable and free set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+void msm_gpios_disable_free(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_request() - request set of GPIOs
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_request(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_free() - free set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+void msm_gpios_free(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_enable() - enable set of GPIOs
+ * In case of error, all operations rolled back.
+ * Return error code.
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_enable(const struct msm_gpio *table, int size);
+
+/**
+ * msm_gpios_disable() - disable set of GPIOs
+ *
+ * @table: GPIO table
+ * @size:  number of entries in @table
+ */
+int msm_gpios_disable(const struct msm_gpio *table, int size);
+
+/* GPIO TLMM (Top Level Multiplexing) Definitions */
+
+/* GPIO TLMM: Function -- GPIO specific */
+
+/* GPIO TLMM: Direction */
+enum {
+	GPIO_CFG_INPUT,
+	GPIO_CFG_OUTPUT,
+};
+
+/* GPIO TLMM: Pullup/Pulldown */
+enum {
+	GPIO_CFG_NO_PULL,
+	GPIO_CFG_PULL_DOWN,
+	GPIO_CFG_KEEPER,
+	GPIO_CFG_PULL_UP,
+};
+
+/* GPIO TLMM: Drive Strength */
+enum {
+	GPIO_CFG_2MA,
+	GPIO_CFG_4MA,
+	GPIO_CFG_6MA,
+	GPIO_CFG_8MA,
+	GPIO_CFG_10MA,
+	GPIO_CFG_12MA,
+	GPIO_CFG_14MA,
+	GPIO_CFG_16MA,
+};
+
+enum {
+	GPIO_CFG_ENABLE,
+	GPIO_CFG_DISABLE,
+};
+
+#define GPIO_CFG(gpio, func, dir, pull, drvstr) \
+	((((gpio) & 0x3FF) << 4)        |	  \
+	 ((func) & 0xf)                  |	  \
+	 (((dir) & 0x1) << 14)           |	  \
+	 (((pull) & 0x3) << 15)          |	  \
+	 (((drvstr) & 0xF) << 17))
+
+/**
+ * extract GPIO pin from bit-field used for gpio_tlmm_config
+ */
+#define GPIO_PIN(gpio_cfg)    (((gpio_cfg) >>  4) & 0x3ff)
+#define GPIO_FUNC(gpio_cfg)   (((gpio_cfg) >>  0) & 0xf)
+#define GPIO_DIR(gpio_cfg)    (((gpio_cfg) >> 14) & 0x1)
+#define GPIO_PULL(gpio_cfg)   (((gpio_cfg) >> 15) & 0x3)
+#define GPIO_DRVSTR(gpio_cfg) (((gpio_cfg) >> 17) & 0xf)
+
+int gpio_tlmm_config(unsigned config, unsigned disable);
 
 #endif /* __ASM_ARCH_MSM_GPIO_H */
