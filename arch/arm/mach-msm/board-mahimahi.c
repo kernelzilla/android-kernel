@@ -927,7 +927,7 @@ static int __init parse_tag_bdaddr(const struct tag *tag)
 	snprintf(bdaddr, BDADDR_STR_SIZE, "%02X:%02X:%02X:%02X:%02X:%02X",
 			b[0], b[1], b[2], b[3], b[4], b[5]);
 
-        return 0;
+	return 0;
 }
 
 __tagtable(ATAG_BDADDR, parse_tag_bdaddr);
