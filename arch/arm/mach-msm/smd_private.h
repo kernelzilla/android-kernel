@@ -19,24 +19,21 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 
-struct smem_heap_info
-{
+struct smem_heap_info {
 	unsigned initialized;
 	unsigned free_offset;
 	unsigned heap_remaining;
 	unsigned reserved;
 };
 
-struct smem_heap_entry
-{
+struct smem_heap_entry {
 	unsigned allocated;
 	unsigned offset;
 	unsigned size;
 	unsigned reserved;
 };
 
-struct smem_proc_comm
-{
+struct smem_proc_comm {
 	unsigned command;
 	unsigned status;
 	unsigned data1;
@@ -55,8 +52,7 @@ struct smem_proc_comm
 
 #define SMD_HEAP_SIZE 512
 
-struct smem_shared
-{
+struct smem_shared {
 	struct smem_proc_comm proc_comm[4];
 	unsigned version[32];
 	struct smem_heap_info heap_info;

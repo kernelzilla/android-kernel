@@ -57,8 +57,7 @@ enum {
 	ACPU_PLL_END,
 };
 
-struct clock_state
-{
+struct clock_state {
 	struct clkctl_acpu_speed	*current_speed;
 	struct mutex			lock;
 	uint32_t			acpu_switch_time_us;
@@ -420,7 +419,8 @@ static int acpuclk_set_vdd_level(int vdd)
 }
 
 /* Set proper dividers for the given clock speed. */
-static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
+static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s)
+{
 	uint32_t reg_clkctl, reg_clksel, clk_div, src_sel;
 
 	reg_clksel = readl(A11S_CLK_SEL_ADDR);
