@@ -186,7 +186,15 @@ int flashlight_control(int mode)
 		this_fl_str->mode_status = FL_MODE_TORCH_LEVEL_2;
 		this_fl_str->fl_lcdev.brightness = LED_HALF - 1;
 	break;
-
+        case FL_MODE_DEATH_RAY:
+		pr_info("%s: death ray\n", __func__);
+		hrtimer_cancel(&this_fl_str->timer);
+		gpio_direction_output(this_fl_str->gpio_flash, 0);
+		udelay(40);
+		gpio_direction_output(this_fl_str->gpio_flash, 1);
+		this_fl_str->mode_status = 0;
+		this_fl_str->fl_lcdev.brightness = 3;
+	break;
 	default:
 		printk(KERN_ERR "%s: unknown flash_light flags: %d\n",
 							__func__, mode);
@@ -219,6 +227,8 @@ static void fl_lcdev_brightness_set(struct led_classdev *led_cdev,
 			mode = FL_MODE_TORCH_LED_A;
 		else if (brightness == 2 && fl_str->led_count)
 			mode = FL_MODE_TORCH_LED_B;
+		else if (brightness == 3)
+			mode = FL_MODE_DEATH_RAY;
 		else
 			mode = FL_MODE_TORCH;
 	} else if (brightness > LED_HALF && brightness <= LED_FULL) {
