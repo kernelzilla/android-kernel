@@ -84,10 +84,7 @@ static void flashlight_hw_command(uint8_t addr, uint8_t data)
 
 static void flashlight_turn_off(void)
 {
-	if (this_fl_str->mode_status == FL_MODE_OFF)
-		return;
-	if (gpio_get_value(this_fl_str->gpio_flash))
-		gpio_direction_output(this_fl_str->gpio_flash, 0);
+	gpio_direction_output(this_fl_str->gpio_flash, 0);
 	gpio_direction_output(this_fl_str->gpio_torch, 0);
 	this_fl_str->mode_status = FL_MODE_OFF;
 	this_fl_str->fl_lcdev.brightness = LED_OFF;
@@ -116,12 +113,6 @@ int flashlight_control(int mode)
 		return -EIO;
 	}
 #endif
-	if (this_fl_str->mode_status == mode) {
-		printk(KERN_INFO "%s: mode is same: %d\n",
-							FLASHLIGHT_NAME, mode);
-		return -EINVAL;
-	}
-
 	spin_lock_irqsave(&this_fl_str->spin_lock,
 						this_fl_str->spinlock_flags);
 	if (this_fl_str->mode_status == FL_MODE_FLASH) {
