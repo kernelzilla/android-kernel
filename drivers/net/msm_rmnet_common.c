@@ -48,8 +48,9 @@
 #define DEVICE_INACTIVE      0
 #define DEVICE_ACTIVE        1
 
-#define HEADROOM_FOR_SDIO   8
+#define HEADROOM_FOR_SDIO   8 /* for mux header */
 #define HEADROOM_FOR_QOS    8
+#define TAILROOM            8 /* for padding by mux layer */
 
 struct rmnet_private {
 	struct net_device_stats stats;
@@ -475,6 +476,7 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 			dev->needed_headroom = HEADROOM_FOR_SDIO +
 			  HEADROOM_FOR_QOS;
+			dev->needed_tailroom = TAILROOM;
 			dev->netdev_ops = &rmnet_ops_ip;
 			spin_lock_irqsave(&p->lock, flags);
 			p->operation_mode &= ~RMNET_MODE_LLP_ETH;
@@ -542,6 +544,7 @@ static void __init rmnet_setup(struct net_device *dev)
 	/* set this after calling ether_setup */
 	dev->mtu = RMNET_DATA_LEN;
 	dev->needed_headroom = HEADROOM_FOR_SDIO + HEADROOM_FOR_QOS ;
+	dev->needed_tailroom = TAILROOM;
 	random_ether_addr(dev->dev_addr);
 
 	dev->watchdog_timeo = 1000; /* 10 seconds? */
