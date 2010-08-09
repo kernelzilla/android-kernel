@@ -337,6 +337,8 @@ union reg_cp_rb_cntl {
 #define REG_MH_MMU_PT_BASE               0x0042
 #define REG_MH_MMU_TRAN_ERROR            0x0044
 #define REG_MH_MMU_VA_RANGE              0x0041
+#define REG_MH_CLNT_INTF_CTRL_CONFIG1    0x0A54
+#define REG_MH_CLNT_INTF_CTRL_CONFIG2    0x0A55
 
 #define REG_PA_CL_VPORT_XSCALE           0x210F
 #define REG_PA_CL_VPORT_ZOFFSET          0x2114
