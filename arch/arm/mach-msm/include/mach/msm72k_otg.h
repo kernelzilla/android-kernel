@@ -100,6 +100,14 @@
 #define A_CONN			11
 #define B_BUS_REQ		12
 #define B_SESS_VLD		13
+#define ID_A			14
+#define ID_B			15
+#define ID_C			16
+
+#define USB_IDCHG_MIN	500
+#define USB_IDCHG_MAX	1500
+#define USB_IB_UNCFG	2
+#define OTG_ID_POLL_MS	1000
 
 struct msm_otg {
 	struct otg_transceiver otg;
@@ -142,6 +150,10 @@ struct msm_otg {
 	struct work_struct sm_work; /* state machine work */
 	struct work_struct otg_resume_work;
 	struct notifier_block usbdev_nb;
+#ifdef CONFIG_USB_MSM_ACA
+	struct timer_list	id_timer;	/* drives id_status polling */
+	unsigned		b_max_power;	/* ACA: max power of accessory*/
+#endif
 };
 
 /* usb controller's protocol engine depends on AXI clock.

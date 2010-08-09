@@ -2,7 +2,8 @@ Introduction
 ============
 This driver implements Session Request Protocol (SRP) and Host negotiation
 Protocol (HNP) described in On-The-Go (OTG) Supplement to the USB 2.0
-Specification.
+Specification. It also provides support for Accessory Charger Adapter (ACA)
+defined in the Battery Charging Specification 1.1.
 
 These protocols provide a means for USB host devices to intelligently manage
 power on VBUS and USB peripheral devices to become the host when paired with
@@ -88,6 +89,17 @@ transition and should not write any register in the core until it gets an
 interrupt from the device controller signifying that a reset interrupt has
 occurred or at least first verify that the core has entered device mode.
 
+The following hardware feature helps in supporting Accessory Charger Adapter:
+
+PHY Support for ID_A/B/C:
+------------------------
+Accessory Charger Adapter has three ports to attach an OTG, charger and A or
+B-device. So, based on what all device are attached to the ACA, it outputs a
+state on the ID pin (i.e GROUND, ID_A, ID_B, ID_C, FLOAT).
+USB PHY has support for these ID states. Once software enables this support,
+PHY sets corresponding bit in its INTS register based on any changes in the
+ID state.
+
 Software description
 ====================
 
@@ -169,6 +181,27 @@ changed to 150 msec from 1 sec. Host software would easily meet this timing
 given that de-bounce delays and root hub port power stabilization delays are
 not required during HNP.
 
+Accessory Charger Adapter (ACA): To support ACA there must be support in the
+USB hardware (Controller and PHY) for the ID_A/B/C states. It should be able
+to interrupt software for any ID state changes. On receiving this interrupt,
+interrupt handler checks the current ID state and invokes OTG state machine
+for further handling. Even if the USB Controller doesn't support these ID_A/B/C
+states, driver can still detect the ID state transitions by depending on USB
+PHY if the PHY supports these ID states. For this scenario, driver relies
+on polling of PHY register to determine the ID state changes as long as an
+ACA is attached to the system. This polling is implemented by using a timer
+running at a frequency of 1 sec. This timer checks for the current ID state
+and on detecting any change it invokes OTG state machine for further handling.
+
+Following are the actions performed by the driver as per the ID state:
+* ID_FLOAT: Configure device to act as peripheral and allow charging if VBUS
+  is present, else move it to LPM (low power mode).
+* ID_GROUND: Configure device to act as host and supply VBUS.
+* ID_A: Configure device to act as host and don't supply VBUS. In this state
+  the device can charge as well.
+* ID_B: Keep the device in IDLE state and allow charging.
+* ID_C: Configure device to act as peripheral and allow charging.
+
 Design
 ======
 
@@ -180,21 +213,25 @@ peripheral
 3. Put Hardware in LPM when ever possible
 4. Pass OTG compliance tests
 5. Report notification/error messages to user space
+6. With ACA, allow charging in Host mode as well
+7. Disable LPM as long as ID state polling is happening
 
 Power Management
 ================
 
 System suspend is negated by acquiring wakelock while processing OTG state
-machine. Wakelock is released:
+machine, or while polling for the PHY ID state in case of ACA.
+Wakelock is released:
 1. After activating the DCD/HCD. It is the responsibility of DCD/HCD to
 acquire wakelock if required.
 2. After putting hardware in LPM.
 3. No state machine events and timers are pending. This would cover scenarios
 mentioned in (1) and (2).
+4. After driver stops polling for ID state in case of ACA.
 
 Wake lock is re-acquired when state machine work is scheduled, which can
-happen from interrupt (exiting LPM) or sysfs entries (initiate SRP, clear
-error, bus drop, etc).
+happen from interrupt (exiting LPM), sysfs entries (initiate SRP, clear
+error, bus drop, etc), or from ID state polling routine.
 
 OTG driver provides set_suspend method for DCD/HCD to put hardware in LPM. DCD
 can use this method upon bus suspend. HCD can use this method upon suspending
@@ -221,7 +258,8 @@ SMP/multi-core
 
 OTG state machine inputs like bus request, bus drop, srp_detect etc accessed
 from interrupt context, and multiple process contexts. Hence atomic bit ops are
-used.
+used. ulpi_read and ulpi_write functions can now be accessed from multiple
+context, hence, these are protected using a spin_lock.
 
 Interface
 =========
@@ -269,6 +307,11 @@ OTG_EVENT_DEV_NOT_SUPPORTED: Host does not support the attached peripheral.
 OTG_EVENT_HNP_FAILED: HNP failed due to not meeting protocol timings.
 OTG_EVENT_NO_RESP_FOR_SRP: No Response for B-device SRP request.
 
+set_power: DCD can use otg_set_power() API to specify about the current that
+can be withdrawn from the VBUS for charging. Based on the current OTG state
+and whether ACA is attached or not, OTG driver makes a decision about the
+charging current and calls the charging APIs.
+
 The following sysfs nodes are provided at /sys/devices/platform/msm_otg
 
 pwr_down: This node can be used to control A-device session. a_bus_drop and
@@ -314,6 +357,11 @@ Phy instability issues are observed when vbus_valid interrupt is enabled.
 Hence a_vbus_vld state machine variable is explicitly asserted after
 a_wait_vrise timer expiration.
 
+Spurious interrupt is seen when trying to put PHY in Low Power Mode with
+ID_A/B/C interrupts enabled in the PHY. As a result of which PHY doesn't stay
+in LPM. Hence, ID_A/B/C interrupts are disabled before entering LPM, and
+enabled while returning.
+
 To do
 =====
 
@@ -323,8 +371,3 @@ Phy instability issues are observed when A-Vbus Valid interrupt is enabled.
 But without this interrupt over current condition can not be determined. Root
 cause analysis for PHY instability issue and alternative methods like PMIC
 interrupt are being pursued.
-
-Device controller driver takes care of calling charging API. But charging can
-happen when acting as a A-device, if device is connected via Accessory charger
-adapter (ACA). otg_set_power method needs to be implemented in OTG driver to
-support charging in both peripheral and host mode.
