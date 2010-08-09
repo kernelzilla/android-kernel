@@ -1730,8 +1730,8 @@ static struct reg_init {
 	/* Deassert MM SW_RESET_ALL signal. */
 	{SW_RESET_ALL_REG, 0x1, 0x0},
 
-	/* Set up MM AHB clock to PLL2/10. */
-	{AHB_NS_REG,		0x43C7,		0x0241},
+	/* Set up MM AHB clock to PLL8/5. */
+	{AHB_NS_REG,		0x43C7,		0x0102},
 
 	/* Enable MM AHB clocks that don't have clock API support.
 	 * These will be put into hardware-controlled mode later. */
