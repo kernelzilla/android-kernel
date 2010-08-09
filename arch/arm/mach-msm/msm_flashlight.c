@@ -88,6 +88,7 @@ static void flashlight_turn_off(void)
 	gpio_direction_output(this_fl_str->gpio_torch, 0);
 	this_fl_str->mode_status = FL_MODE_OFF;
 	this_fl_str->fl_lcdev.brightness = LED_OFF;
+	wake_unlock(&this_fl_str->wake_lock);
 }
 
 static enum hrtimer_restart flashlight_hrtimer_func(struct hrtimer *timer)
@@ -185,6 +186,7 @@ int flashlight_control(int mode)
 		gpio_direction_output(this_fl_str->gpio_flash, 1);
 		this_fl_str->mode_status = 0;
 		this_fl_str->fl_lcdev.brightness = 3;
+		wake_lock(&this_fl_str->wake_lock);
 	break;
 	default:
 		printk(KERN_ERR "%s: unknown flash_light flags: %d\n",
