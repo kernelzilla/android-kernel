@@ -77,6 +77,7 @@
 #include "rpm.h"
 #include "spm.h"
 #include "timer.h"
+#include "saw-regulator.h"
 
 #define MSM_SHARED_RAM_PHYS 0x40000000
 
@@ -162,6 +163,47 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 static struct msm_acpu_clock_platform_data msm8x60_acpu_clock_data = {
 	/* SoC has no frequency step size constraints. */
 	.max_speed_delta_khz = UINT_MAX,
+};
+
+static struct regulator_consumer_supply saw_s0_supply =
+	REGULATOR_SUPPLY("8901_s0", NULL);
+static struct regulator_consumer_supply saw_s1_supply =
+	REGULATOR_SUPPLY("8901_s1", NULL);
+
+static struct regulator_init_data saw_s0_init_data = {
+		.constraints = {
+			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+			.min_uV = 840000,
+			.max_uV = 1200000,
+		},
+		.num_consumer_supplies = 1,
+		.consumer_supplies = &saw_s0_supply,
+};
+
+static struct regulator_init_data saw_s1_init_data = {
+		.constraints = {
+			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+			.min_uV = 840000,
+			.max_uV = 1200000,
+		},
+		.num_consumer_supplies = 1,
+		.consumer_supplies = &saw_s1_supply,
+};
+
+static struct platform_device msm_device_saw_s0 = {
+	.name          = "saw-regulator",
+	.id            = SAW_VREG_ID_S0,
+	.dev           = {
+		.platform_data = &saw_s0_init_data,
+	},
+};
+
+static struct platform_device msm_device_saw_s1 = {
+	.name          = "saw-regulator",
+	.id            = SAW_VREG_ID_S1,
+	.dev           = {
+		.platform_data = &saw_s1_init_data,
+	},
 };
 
 /*
@@ -1252,6 +1294,8 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 };
 
 static struct platform_device *surf_devices[] __initdata = {
+	&msm_device_saw_s0,
+	&msm_device_saw_s1,
 	&msm_device_smd,
 	&smsc911x_device,
 	&msm_device_uart_dm12,
@@ -2316,8 +2360,6 @@ static struct regulator_consumer_supply pm8901_vreg_supply[PM8901_VREG_MAX] = {
 	[PM8901_VREG_ID_L5]  = REGULATOR_SUPPLY("8901_l5",  NULL),
 	[PM8901_VREG_ID_L6]  = REGULATOR_SUPPLY("8901_l6",  NULL),
 
-	[PM8901_VREG_ID_S0] = REGULATOR_SUPPLY("8901_s0", NULL),
-	[PM8901_VREG_ID_S1] = REGULATOR_SUPPLY("8901_s1", NULL),
 	[PM8901_VREG_ID_S3] = REGULATOR_SUPPLY("8901_s3", NULL),
 	[PM8901_VREG_ID_S4] = REGULATOR_SUPPLY("8901_s4", NULL),
 
@@ -2370,8 +2412,6 @@ static struct regulator_init_data pm8901_vreg_init[PM8901_VREG_MAX] = {
 	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L5, 2850000, 2850000),
 	PM8901_VREG_INIT_LDO(PM8901_VREG_ID_L6, 2200000, 2200000),
 
-	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S0, 1100000, 1100000),
-	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S1, 1100000, 1100000),
 	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S3, 1100000, 1100000),
 	PM8901_VREG_INIT_SMPS(PM8901_VREG_ID_S4, 1100000, 1100000),
 
@@ -2404,8 +2444,6 @@ static struct mfd_cell pm8901_subdevs[] = {
 	PM8901_VREG(PM8901_VREG_ID_L4),
 	PM8901_VREG(PM8901_VREG_ID_L5),
 	PM8901_VREG(PM8901_VREG_ID_L6),
-	PM8901_VREG(PM8901_VREG_ID_S0),
-	PM8901_VREG(PM8901_VREG_ID_S1),
 	PM8901_VREG(PM8901_VREG_ID_S3),
 	PM8901_VREG(PM8901_VREG_ID_S4),
 	PM8901_VREG(PM8901_VREG_ID_LVS0),
