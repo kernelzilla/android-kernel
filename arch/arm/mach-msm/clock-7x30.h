@@ -139,6 +139,17 @@ void pll_enable(uint32_t pll);
 void pll_disable(uint32_t pll);
 
 enum {
+	PLL_0 = 0,
+	PLL_1,
+	PLL_2,
+	PLL_3,
+	PLL_4,
+	PLL_5,
+	PLL_6,
+	NUM_PLL
+};
+
+enum {
 	LOW,
 	NOMINAL,
 	HIGH,
