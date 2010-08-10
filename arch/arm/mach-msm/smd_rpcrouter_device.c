@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/smd_rpcrouter_device.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
  * Author: San Mehat <san@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -33,10 +33,14 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
+#include <mach/peripheral-loader.h>
 #include "smd_rpcrouter.h"
 
 /* Support 64KB of data plus some space for headers */
 #define SAFETY_MEM_SIZE (65536 + sizeof(struct rpc_request_hdr))
+
+/* modem load timeout */
+#define MODEM_LOAD_TIMEOUT (10 * HZ)
 
 /* Next minor # available for a remote server */
 static int next_minor = 1;
@@ -47,29 +51,86 @@ dev_t msm_rpcrouter_devno;
 static struct cdev rpcrouter_cdev;
 static struct device *rpcrouter_device;
 
+struct rpcrouter_file_info {
+	struct msm_rpc_endpoint *ept;
+	void *modem_pil;
+};
+
+static void msm_rpcrouter_unload_modem(void *pil)
+{
+	if (pil)
+		pil_put(pil);
+}
+
+static void *msm_rpcrouter_load_modem(void)
+{
+	void *pil;
+	int rc;
+
+	pil = pil_get("modem");
+	if (IS_ERR(pil))
+		pr_err("%s: modem load failed\n", __func__);
+	else {
+		rc = wait_for_completion_interruptible_timeout(
+						&rpc_remote_router_up,
+						MODEM_LOAD_TIMEOUT);
+		if (!rc)
+			rc = -ETIMEDOUT;
+		if (rc < 0) {
+			pr_err("%s: wait for remote router failed %d\n",
+			       __func__, rc);
+			msm_rpcrouter_unload_modem(pil);
+			pil = ERR_PTR(rc);
+		}
+	}
+
+	return pil;
+}
+
 static int rpcrouter_open(struct inode *inode, struct file *filp)
 {
 	int rc;
+	void *pil;
 	struct msm_rpc_endpoint *ept;
+	struct rpcrouter_file_info *file_info;
 
 	rc = nonseekable_open(inode, filp);
 	if (rc < 0)
 		return rc;
 
-	ept = msm_rpcrouter_create_local_endpoint(inode->i_rdev);
-	if (!ept)
+	file_info = kzalloc(sizeof(*file_info), GFP_KERNEL);
+	if (!file_info)
 		return -ENOMEM;
 
-	filp->private_data = ept;
+	ept = msm_rpcrouter_create_local_endpoint(inode->i_rdev);
+	if (!ept) {
+		kfree(file_info);
+		return -ENOMEM;
+	}
+	file_info->ept = ept;
+
+	/* if router device, load the modem */
+	if (inode->i_rdev == msm_rpcrouter_devno) {
+		pil = msm_rpcrouter_load_modem();
+		if (IS_ERR(pil)) {
+			kfree(file_info);
+			msm_rpcrouter_destroy_local_endpoint(ept);
+			return PTR_ERR(pil);
+		}
+		file_info->modem_pil = pil;
+	}
+
+	filp->private_data = file_info;
 	return 0;
 }
 
 static int rpcrouter_release(struct inode *inode, struct file *filp)
 {
+	struct rpcrouter_file_info *file_info = filp->private_data;
 	struct msm_rpc_endpoint *ept;
 	static unsigned int rpcrouter_release_cnt;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *) file_info->ept;
 
 	/* A user program with many files open when ends abruptly,
 	 * will cause a flood of REMOVE_CLIENT messages to the
@@ -80,17 +141,23 @@ static int rpcrouter_release(struct inode *inode, struct file *filp)
 	if (rpcrouter_release_cnt++ % 2)
 		msleep(1);
 
+	/* if router device, unload the modem */
+	if (inode->i_rdev == msm_rpcrouter_devno)
+		msm_rpcrouter_unload_modem(file_info->modem_pil);
+
+	kfree(file_info);
 	return msm_rpcrouter_destroy_local_endpoint(ept);
 }
 
 static ssize_t rpcrouter_read(struct file *filp, char __user *buf,
 			      size_t count, loff_t *ppos)
 {
+	struct rpcrouter_file_info *file_info = filp->private_data;
 	struct msm_rpc_endpoint *ept;
 	struct rr_fragment *frag, *next;
 	int rc;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *) file_info->ept;
 
 	rc = __msm_rpc_read(ept, &frag, count, -1);
 	if (rc < 0)
@@ -116,11 +183,12 @@ static ssize_t rpcrouter_read(struct file *filp, char __user *buf,
 static ssize_t rpcrouter_write(struct file *filp, const char __user *buf,
 				size_t count, loff_t *ppos)
 {
+	struct rpcrouter_file_info *file_info = filp->private_data;
 	struct msm_rpc_endpoint	*ept;
 	int rc = 0;
 	void *k_buffer;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *) file_info->ept;
 
 	/* A check for safety, this seems non-standard */
 	if (count > SAFETY_MEM_SIZE)
@@ -148,9 +216,11 @@ write_out_free:
 static unsigned int rpcrouter_poll(struct file *filp,
 				   struct poll_table_struct *wait)
 {
+	struct rpcrouter_file_info *file_info = filp->private_data;
 	struct msm_rpc_endpoint *ept;
 	unsigned mask = 0;
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+
+	ept = (struct msm_rpc_endpoint *) file_info->ept;
 
 	/* If there's data already in the read queue, return POLLIN.
 	 * Else, wait for the requested amount of time, and check again.
@@ -175,12 +245,13 @@ static unsigned int rpcrouter_poll(struct file *filp,
 static long rpcrouter_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
+	struct rpcrouter_file_info *file_info = filp->private_data;
 	struct msm_rpc_endpoint *ept;
 	struct rpcrouter_ioctl_server_args server_args;
 	int rc = 0;
 	uint32_t n;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *) file_info->ept;
 	switch (cmd) {
 
 	case RPC_ROUTER_IOCTL_GET_VERSION:
