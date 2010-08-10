@@ -36,6 +36,7 @@
 #include <linux/wakelock.h>
 
 #include <asm/mach-types.h>
+#include <mach/msm_hsusb.h>
 
 #define OTGSC_BSVIE            (1 << 27)
 #define OTGSC_IDIE             (1 << 24)
@@ -116,7 +117,6 @@ struct msm_otg {
 	int			vbus_on_irq;
 	void __iomem		*regs;
 	atomic_t		in_lpm;
-	unsigned int 		core_clk;
 	/* charger-type is modified by gadget for legacy chargers
 	 * and OTG modifies it for ACA
 	 */
@@ -162,7 +162,7 @@ static inline int depends_on_axi_freq(struct otg_transceiver *xceiv)
 
 	dev = container_of(xceiv, struct msm_otg, otg);
 
-	return !dev->core_clk;
+	return !dev->pdata->core_clk;
 }
 
 #endif
