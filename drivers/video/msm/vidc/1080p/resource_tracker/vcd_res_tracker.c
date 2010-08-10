@@ -34,7 +34,7 @@
 #define WVGA_PERF_LEVEL (1500 * 30)
 
 static unsigned int mfc_clk_freq_table[3] = {
-	54860000, 133330000, 228570000
+	54860000, 133330000, 200000000
 };
 
 #ifndef CONFIG_MSM_NPA_SYSTEM_BUS
@@ -172,7 +172,7 @@ static u32 res_trk_enable_pwr_rail(void)
 		/*TODO: Set clk_rate to lowest value,Currenlty set to highest
 		  value during bringup*/
 		if (clk_set_rate(resource_context.vcodec_clk,
-			228570000)) {
+			200000000)) {
 			VCDRES_MSG_ERROR("set rate failed in power up\n");
 			mutex_unlock(&resource_context.lock);
 			return FALSE;
