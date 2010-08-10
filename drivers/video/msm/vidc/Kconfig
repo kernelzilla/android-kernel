@@ -3,7 +3,7 @@
 #
 menuconfig MSM_VIDC
 	bool "Video Core Driver"
-	depends on ARCH_MSM8X60
+	depends on ARCH_MSM8X60 || ARCH_MSM7X30
 	default y
 	---help---
 	Say Y here to see options for video device drivers.

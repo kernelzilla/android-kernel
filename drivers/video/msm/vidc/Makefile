@@ -1,6 +1,6 @@
 ifdef CONFIG_MSM_VIDC_720P
-EXTRA_CFLAGS += -Idrivers/misc/vidc/720p/ddl
-EXTRA_CFLAGS += -Idrivers/misc/vidc/720p/resource_tracker
+EXTRA_CFLAGS += -Idrivers/video/msm/vidc/720p/ddl
+EXTRA_CFLAGS += -Idrivers/video/msm/vidc/720p/resource_tracker
 endif
 
 ifdef CONFIG_MSM_VIDC_1080P
