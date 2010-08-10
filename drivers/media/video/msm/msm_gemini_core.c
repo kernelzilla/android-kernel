@@ -124,7 +124,14 @@ irqreturn_t msm_gemini_core_irq(int irq_num, void *context)
 	GMN_DBG("%s:%d] gemini_irq_status = %0x\n", __func__, __LINE__,
 		gemini_irq_status);
 
-	msm_gemini_hw_irq_clear();
+	/*For reset and framedone IRQs, clear all bits*/
+	if ((gemini_irq_status & 0x1) || (gemini_irq_status & 0x400)) {
+		msm_gemini_hw_irq_clear(HWIO_JPEG_IRQ_CLEAR_RMSK,
+			JPEG_IRQ_CLEAR_ALL);
+	} else {
+		msm_gemini_hw_irq_clear(HWIO_JPEG_IRQ_CLEAR_RMSK,
+			gemini_irq_status);
+	}
 
 	if (msm_gemini_hw_irq_is_frame_done(gemini_irq_status)) {
 		data = msm_gemini_core_framedone_irq(gemini_irq_status,

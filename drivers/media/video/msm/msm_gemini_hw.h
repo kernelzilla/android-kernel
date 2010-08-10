@@ -56,7 +56,7 @@ void *msm_gemini_hw_pingpong_irq(struct msm_gemini_hw_pingpong *pingpong_hw);
 void *msm_gemini_hw_pingpong_active_buffer(struct msm_gemini_hw_pingpong
 	*pingpong_hw);
 
-void msm_gemini_hw_irq_clear(void);
+void msm_gemini_hw_irq_clear(uint32_t, uint32_t);
 int msm_gemini_hw_irq_get_status(void);
 long msm_gemini_hw_encode_output_size(void);
 #define MSM_GEMINI_HW_MASK_COMP_FRAMEDONE \
