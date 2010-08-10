@@ -1062,7 +1062,13 @@ int local_timer_ack(void)
 {
 	return 1;
 }
+#endif
 
+#ifdef CONFIG_HOTPLUG_CPU
+void __cpuexit local_timer_stop(void)
+{
+	local_clock_event->set_mode(CLOCK_EVT_MODE_SHUTDOWN, local_clock_event);
+}
 #endif
 
 struct sys_timer msm_timer = {

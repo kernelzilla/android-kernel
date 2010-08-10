@@ -22,6 +22,8 @@
 #include <mach/hardware.h>
 #include <mach/msm_iomap.h>
 
+#include "pm.h"
+
 #define SECONDARY_CPU_WAIT_MS 10
 
 int pen_release = -1;
@@ -73,6 +75,11 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 	sev();
 	dsb();
 
+	/* Use smp_cross_call() to send a soft interrupt to wake up
+	 * the other core.
+	 */
+	smp_cross_call(cpumask_of(cpu));
+
 	/* Wait for done signal. The cpu receiving the signal does not
 	 * have the MMU or caching turned on, so all of its reads and
 	 * writes are to/from memory.  Need to ensure that when
@@ -103,6 +110,10 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 void platform_secondary_init(unsigned int cpu)
 {
 	printk(KERN_DEBUG "%s: cpu:%d\n", __func__, cpu);
+
+#ifdef CONFIG_HOTPLUG_CPU
+	WARN_ON(msm_pm_platform_secondary_init(cpu));
+#endif
 
 	trace_hardirqs_off();
 
