@@ -184,14 +184,14 @@ enum sys_vdd_level {
  * Clock source descriptions
  */
 struct clk_source {
-	int		(*const enable_func)(unsigned src, unsigned enable);
-	const signed 	par;
+	int		(*enable_func)(unsigned src, unsigned enable);
+	const signed	par;
 };
 
 /*
  * Variables from SoC-specific clock drivers
  */
-extern struct clk_local		soc_clk_local_tbl[];
+extern struct clk_local		*soc_clk_local_tbl;
 extern struct clk_source	soc_clk_sources[];
 
 /*

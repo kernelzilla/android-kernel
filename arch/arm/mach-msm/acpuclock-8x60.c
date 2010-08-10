@@ -30,6 +30,7 @@
 #include <mach/msm_iomap.h>
 
 #include "acpuclock.h"
+#include "clock-8x60.h"
 
 #define dprintk(msg...) \
 	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
@@ -43,8 +44,8 @@
 /* PLL calibration limits.
  * The PLL hardware is capable of 384MHz to 1536MHz. The L_VALs
  * used for calibration should respect these limits. */
-#define L_VAL_SCPLL_CAL_MIN	0x08 /* =  432 MHz with MXO source */
-#define L_VAL_SCPLL_CAL_MAX	0x1C /* = 1512 MHz with MXO source */
+#define L_VAL_SCPLL_CAL_MIN	0x08 /* =  432 MHz with 27MHz source */
+#define L_VAL_SCPLL_CAL_MAX	0x1C /* = 1512 MHz with 27MHz source */
 
 /* SCPLL Modes. */
 #define SCPLL_POWER_DOWN	0
@@ -58,7 +59,7 @@
 #define SCPLL_DEBUG_NONE	0
 #define SCPLL_DEBUG_FULL	3
 
-/* PLL Registers. */
+/* SCPLL registers offsets. */
 #define SCPLL_DEBUG_OFFSET		0x0
 #define SCPLL_CTL_OFFSET		0x4
 #define SCPLL_CAL_OFFSET		0x8
@@ -67,7 +68,7 @@
 #define SCPLL_FSM_CTL_EXT_OFFSET	0x24
 #define SCPLL_LUT_A_HW_MAX		(0x38 + ((L_VAL_SCPLL_CAL_MAX / 4) * 4))
 
-/* SCPLL Registers. */
+/* Clock registers. */
 #define SPSS0_CLK_CTL_ADDR		(MSM_ACC0_BASE + 0x04)
 #define SPSS0_CLK_SEL_ADDR		(MSM_ACC0_BASE + 0x08)
 #define SPSS1_CLK_CTL_ADDR		(MSM_ACC1_BASE + 0x04)
@@ -124,7 +125,7 @@ struct clkctl_acpu_speed {
 static struct clkctl_acpu_speed *l2_vote[NR_CPUS];
 
 #define AFAB_IDX 1
-/* L_VAL's below assume MXO (27 MHz) sources for all SCPLLs.
+/* L_VAL's below assume 27 MHz sources for all SCPLLs.
  * SCPLL and L2 frequencies = 2 * 27 MHz * L_VAL */
 static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ {0, 0},  192000, ACPU_PLL_8, 3, 1, 0, 0,    1100, 0, 0    },
@@ -508,20 +509,27 @@ static void __init force_all_to_afab(void)
 	calibrate_delay();
 }
 
-/* Ensure SCPLLs use the MXO reference, not PXO. */
-static void __init scpll_set_refs_mxo(void)
+/* Ensure SCPLLs use the 27MHz XO. */
+static void __init scpll_set_refs(void)
 {
 	int cpu;
 	uint32_t regval;
+	int use_pxo = pxo_is_27mhz();
 
 	/* Bit 4 = 0:PXO, 1:MXO. */
 	for_each_possible_cpu(cpu) {
 		regval = readl(sc_pll_base[cpu] + SCPLL_CFG_OFFSET);
-		regval |= BIT(4);
+		if (use_pxo)
+			regval &= ~BIT(4);
+		else
+			regval |= BIT(4);
 		writel(regval, sc_pll_base[cpu] + SCPLL_CFG_OFFSET);
 	}
 	regval = readl(sc_pll_base[L2] + SCPLL_CFG_OFFSET);
-	regval |= BIT(4);
+	if (use_pxo)
+		regval &= ~BIT(4);
+	else
+		regval |= BIT(4);
 	writel(regval, sc_pll_base[L2] + SCPLL_CFG_OFFSET);
 }
 
@@ -588,7 +596,7 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 
 	/* Configure hardware. */
 	force_all_to_afab();
-	scpll_set_refs_mxo();
+	scpll_set_refs();
 	for_each_possible_cpu(cpu)
 		scpll_init(cpu);
 	scpll_init(L2);
