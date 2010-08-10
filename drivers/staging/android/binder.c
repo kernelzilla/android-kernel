@@ -2469,6 +2469,10 @@ done:
 			     proc->pid, thread->pid);
 		if (put_user(BR_SPAWN_LOOPER, (uint32_t __user *)buffer))
 			return -EFAULT;
+	} else if (proc->requested_threads_started >= proc->max_threads) {
+		printk(KERN_WARNING "binder: %d:%d has [%d] threads with a "
+			"maximum set limit [%d]\n" , proc->pid, thread->pid ,
+			proc->requested_threads_started, proc->max_threads);
 	}
 	return 0;
 }
