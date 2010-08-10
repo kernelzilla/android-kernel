@@ -1751,27 +1751,33 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 
 	if (pdata && pdata->dma_config) {
 		rc = pdata->dma_config();
-		if (rc)
-			goto err_probe_res;
-	}
-	resource = platform_get_resource_byname(pdev, IORESOURCE_DMA,
-						"spidm_channels");
-	if (resource) {
-		dd->rx_dma_chan = resource->start;
-		dd->tx_dma_chan = resource->end;
+		if (rc) {
+			dev_warn(&pdev->dev, "%s: DM mode not supported\n",
+			       __func__);
+			dd->use_dma = 0;
+		} else {
+			resource = platform_get_resource_byname(pdev,
+							IORESOURCE_DMA,
+							"spidm_channels");
+			if (resource) {
+				dd->rx_dma_chan = resource->start;
+				dd->tx_dma_chan = resource->end;
 
-		resource = platform_get_resource_byname(pdev, IORESOURCE_DMA,
-							"spidm_crci");
-		if (!resource) {
-			rc = -ENXIO;
-			goto err_probe_res;
+				resource = platform_get_resource_byname(pdev,
+								IORESOURCE_DMA,
+								"spidm_crci");
+				if (!resource) {
+					rc = -ENXIO;
+					goto err_probe_res;
+				}
+				dd->rx_dma_crci = resource->start;
+				dd->tx_dma_crci = resource->end;
+				dd->use_dma = 1;
+				master->dma_alignment =
+					dma_get_cache_alignment();
+			}
 		}
-		dd->rx_dma_crci = resource->start;
-		dd->tx_dma_crci = resource->end;
-		dd->use_dma = 1;
-		master->dma_alignment = dma_get_cache_alignment();
 	}
-
 	if (pdata && pdata->gpio_config) {
 		rc = pdata->gpio_config();
 		if (rc) {
