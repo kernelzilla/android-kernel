@@ -91,7 +91,7 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		{V31_CHROMA_SUP_CFG, V31_CHROMA_SUP_LEN, V31_CHROMA_SUP_OFF,
 		0xFF},
 		{V31_MCE_CFG, V31_MCE_LEN, V31_MCE_OFF, 0xFF},
-		{V31_SK_ENHAN_CFG},
+		{V31_SK_ENHAN_CFG, V31_SCE_LEN, V31_SCE_OFF, 0xFF},
 /*25*/	{V31_ASF_CFG, V31_ASF_LEN, V31_ASF_OFF, 0xFF},
 		{V31_S2Y_CFG, V31_S2Y_LEN, V31_S2Y_OFF, 0xFF},
 		{V31_S2CbCr_CFG, V31_S2CbCr_LEN, V31_S2CbCr_OFF, 0xFF},
@@ -125,7 +125,7 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		{V31_CHROMA_SUP_UPDATE, V31_CHROMA_SUP_LEN, V31_CHROMA_SUP_OFF,
 		0xFF},
 		{V31_MCE_UPDATE, V31_MCE_LEN, V31_MCE_OFF, 0xFF},
-		{V31_SK_ENHAN_UPDATE},
+		{V31_SK_ENHAN_UPDATE, V31_SCE_LEN, V31_SCE_OFF, 0xFF},
 		{V31_S2CbCr_UPDATE, V31_S2CbCr_LEN, V31_S2CbCr_OFF, 0xFF},
 /*50*/	{V31_S2Y_UPDATE, V31_S2Y_LEN, V31_S2Y_OFF, 0xFF},
 		{V31_ASF_UPDATE, V31_ASF_UPDATE_LEN, V31_ASF_OFF, 0xFF},
@@ -1404,6 +1404,24 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		else
 			vfe31_write_la_cfg(LUMA_ADAPT_LUT_RAM_BANK1 , cmdp);
 		cmdp -= 1;
+		}
+		break;
+
+	case V31_SK_ENHAN_CFG:
+	case V31_SK_ENHAN_UPDATE:{
+		cmdp = kmalloc(cmd->length, GFP_ATOMIC);
+		if (!cmdp) {
+			rc = -ENOMEM;
+			goto proc_general_done;
+		}
+		if (copy_from_user(cmdp,
+			(void __user *)(cmd->value),
+			cmd->length)) {
+			rc = -EFAULT;
+			goto proc_general_done;
+		}
+		msm_io_memcpy(vfe31_ctrl->vfebase + V31_SCE_OFF,
+				cmdp, V31_SCE_LEN);
 		}
 		break;
 
