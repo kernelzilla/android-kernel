@@ -81,15 +81,11 @@ static void smd_tty_read(unsigned long param)
 static void smd_tty_notify(void *priv, unsigned event)
 {
 	struct smd_tty_info *info = priv;
-	struct tty_struct *tty = info->tty;
 
 	if (event != SMD_EVENT_DATA)
 		return;
 
-	if (tty->low_latency)
-		tasklet_hi_schedule(&info->tty_tsklt);
-	else
-		tasklet_schedule(&info->tty_tsklt);
+	tasklet_hi_schedule(&info->tty_tsklt);
 }
 
 static int smd_tty_open(struct tty_struct *tty, struct file *f)
@@ -132,8 +128,7 @@ static int smd_tty_open(struct tty_struct *tty, struct file *f)
 				smsm_change_state(SMSM_APPS_STATE,
 						  0, SMSM_SMD_LOOPBACK);
 				msleep(100);
-			} else if ((n == 0) || (n == 7))
-				tty->low_latency = 1;
+			}
 
 			res = smd_open(name, &info->ch, info,
 				       smd_tty_notify);
