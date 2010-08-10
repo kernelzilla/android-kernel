@@ -311,10 +311,12 @@ static void switch_sc_speed(int cpu, struct clkctl_acpu_speed *tgt_s)
 	drv_state.current_speed[cpu] = tgt_s;
 
 	/* Adjust lpj for the new clock speed. */
-	/* XXX Temporary hack until udelay is fixed to not care about lpj.
-	 * Currently, the per-cpu loop_per_jiffy variables are unused and
-	 * are not even defined on UP kernels. So, just update the global
-	 * loops_per_jiffy variable to be the max of the two CPUs' values. */
+	/* XXX Temporary hack until udelay() is fixed to not care about lpj:
+	 * Update the global loops_per_jiffy variable used by udelay() to be
+	 * the max of the two CPUs' values. */
+#ifdef CONFIG_SMP
+	per_cpu(cpu_data, cpu).loops_per_jiffy = tgt_s->lpj;
+#endif
 	loops_per_jiffy = tgt_s->lpj;
 	for_each_online_cpu(cpu)
 		if (drv_state.current_speed[cpu]->lpj > loops_per_jiffy)
