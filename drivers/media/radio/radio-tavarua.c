@@ -1378,19 +1378,19 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 {
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
-	int bytes_to_copy;
-	int bytes_copied = 0;
-	int bytes_left;
+	unsigned bytes_to_copy;
+	unsigned bytes_copied = 0;
+	unsigned bytes_left;
 	int chunk_index = 0;
 	unsigned char tx_data[XFR_REG_NUM];
 	/* Disable TX of this type first */
 	switch (radio->tx_mode) {
 	case TAVARUA_TX_RT:
-		bytes_left = min((int)count, MAX_RT_LENGTH);
+		bytes_left = min_t(size_t, count, MAX_RT_LENGTH);
 		tx_data[1] = 0;
 		break;
 	case TAVARUA_TX_PS:
-		bytes_left = min((int)count, MAX_PS_LENGTH);
+		bytes_left = min_t(size_t, count, MAX_PS_LENGTH);
 		tx_data[4] = 0;
 		break;
 	default:
@@ -1404,7 +1404,7 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 	/* send payload to FM hardware */
 	while (bytes_left) {
 		chunk_index++;
-		bytes_to_copy = min(bytes_left, XFR_REG_NUM);
+		bytes_to_copy = min_t(unsigned, bytes_left, XFR_REG_NUM);
 		if (copy_from_user(tx_data, data + bytes_copied, bytes_to_copy))
 			return -EFAULT;
 		retval = sync_write_xfr(radio, radio->tx_mode +
