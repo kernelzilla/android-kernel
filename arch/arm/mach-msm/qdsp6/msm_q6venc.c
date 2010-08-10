@@ -117,7 +117,7 @@ struct venc_pmem_list {
 };
 struct venc_dev {
 	bool is_active;
-	bool stop_called;
+	bool pmem_freed;
 	enum venc_state_type state;
 	struct list_head venc_msg_list_head;
 	struct list_head venc_msg_list_free;
@@ -543,7 +543,6 @@ static int venc_stop(struct venc_dev *dvenc)
 	int ret = 0;
 	struct venc_msg msg;
 
-	dvenc->stop_called = 1;
 	ret = dal_call_f0(dvenc->q6_handle, VENC_DALRPC_STOP, 1);
 	if (ret) {
 		pr_err("%s: remote runction failed (%d)\n", __func__, ret);
@@ -773,10 +772,17 @@ static int venc_q6_stop(struct venc_dev *dvenc)
 {
 	int ret = 0;
 	struct venc_pmem_list *plist;
+	unsigned long flags;
 
 	wake_up(&dvenc->venc_msg_evt);
-	list_for_each_entry(plist, &dvenc->venc_pmem_list_head, list)
-		put_pmem_file(plist->buf.file);
+	spin_lock_irqsave(&dvenc->venc_pmem_list_lock, flags);
+	if (!dvenc->pmem_freed) {
+		list_for_each_entry(plist, &dvenc->venc_pmem_list_head, list)
+			put_pmem_file(plist->buf.file);
+		dvenc->pmem_freed = 1;
+	}
+	spin_unlock_irqrestore(&dvenc->venc_pmem_list_lock, flags);
+
 	dvenc->state = VENC_STATE_STOP;
 	return ret;
 }
@@ -1083,13 +1089,13 @@ static int q6venc_release(struct inode *inode, struct file *file)
 	struct venc_msg_list *l, *n;
 	struct venc_pmem_list *plist, *m;
 	struct venc_dev *dvenc;
+	unsigned long flags;
 
 	venc_ref--;
 	dvenc = file->private_data;
 	dvenc->is_active = 0;
 	wake_up_all(&dvenc->venc_msg_evt);
-	if (!dvenc->stop_called)
-		dal_call_f0(dvenc->q6_handle, VENC_DALRPC_STOP, 1);
+	dal_call_f0(dvenc->q6_handle, VENC_DALRPC_STOP, 1);
 	dal_call_f0(dvenc->q6_handle, DAL_OP_CLOSE, 1);
 	dal_detach(dvenc->q6_handle);
 	list_for_each_entry_safe(l, n, &dvenc->venc_msg_list_free, list) {
@@ -1100,11 +1106,13 @@ static int q6venc_release(struct inode *inode, struct file *file)
 		list_del(&l->list);
 		kfree(l);
 	}
-	if (!dvenc->stop_called) {
+	spin_lock_irqsave(&dvenc->venc_pmem_list_lock, flags);
+	if (!dvenc->pmem_freed) {
 		list_for_each_entry(plist, &dvenc->venc_pmem_list_head, list)
 			put_pmem_file(plist->buf.file);
-		dvenc->stop_called = 1;
+		dvenc->pmem_freed = 1;
 	}
+	spin_unlock_irqrestore(&dvenc->venc_pmem_list_lock, flags);
 
 	list_for_each_entry_safe(plist, m, &dvenc->venc_pmem_list_head, list) {
 		list_del(&plist->list);
