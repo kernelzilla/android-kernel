@@ -517,6 +517,11 @@ static int vdec_flush(struct vdec_data *vd, void *argp)
 	u32 flush_type;
 	int ret = 0;
 
+	if (!vd->mem_initialized) {
+		pr_err("%s: memory is not being initialized!\n", __func__);
+		return -EPERM;
+	}
+
 	ret = copy_from_user(&flush_type, argp, sizeof(flush_type));
 	if (ret) {
 		pr_err("%s: copy_from_user failed\n", __func__);
