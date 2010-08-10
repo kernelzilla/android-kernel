@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,7 +45,6 @@ struct msm_vfe8x_ctrl {
 	struct vfe_irq_composite_mask_config vfeIrqCompositeMaskLocal;
 	struct vfe_module_enable vfeModuleEnableLocal;
 	struct vfe_camif_cfg_data vfeCamifConfigLocal;
-	struct vfe_cmds_camif_epoch vfeCamifEpoch1Local;
 	struct vfe_interrupt_mask vfeImaskLocal;
 	struct vfe_stats_cmd_data vfeStatsCmdLocal;
 	struct vfe_bus_cfg_data vfeBusConfigLocal;
@@ -63,10 +62,12 @@ struct msm_vfe8x_ctrl {
 	enum VFE_AXI_OUTPUT_MODE axiOutputMode;
 	enum VFE_START_OPERATION_MODE vfeOperationMode;
 
-	uint32_t vfeSnapShotCount;
-	uint32_t vfeRequestedSnapShotCount;
-	boolean vfeStatsPingPongReloadFlag;
-	uint32_t vfeFrameId;
+	atomic_t vfe_serv_interrupt;
+
+	uint32_t            vfeSnapShotCount;
+	uint32_t            vfeRequestedSnapShotCount;
+	boolean             vfeStatsPingPongReloadFlag;
+	uint32_t            vfeFrameId;
 
 	struct vfe_cmd_frame_skip_config vfeFrameSkip;
 	uint32_t vfeFrameSkipPattern;
@@ -99,6 +100,7 @@ struct msm_vfe8x_ctrl {
 	void __iomem *vfebase;
 
 	void *syncdata;
+	struct msm_camera_sensor_info *s_info;
 };
 
 static struct msm_vfe8x_ctrl *ctrl;
@@ -364,8 +366,8 @@ static void vfe_write_lens_roll_off_table(struct vfe_cmd_roll_off_config *in)
 
 		writel(data, ctrl->vfebase + VFE_DMI_DATA_LO);
 
-		data = (((uint32_t) (*initB)) & 0x0000FFFF) |
-		    (((uint32_t) (*initGr)) << 16);
+		data = (((uint32_t)(*initB)) & 0x0000FFFF) |
+			(((uint32_t)(*initGb))<<16);
 		initB++;
 		initGb++;
 
@@ -378,13 +380,15 @@ static void vfe_write_lens_roll_off_table(struct vfe_cmd_roll_off_config *in)
 
 	/* pack and write delta table */
 	for (i = 0; i < VFE_ROLL_OFF_DELTA_TABLE_SIZE; i++) {
-		data = *pDeltaR | (*pDeltaGr << 16);
+		data = (((int)(*pDeltaR)) & 0x0000FFFF) |
+			(((int)(*pDeltaGr))<<16);
 		pDeltaR++;
 		pDeltaGr++;
 
 		writel(data, ctrl->vfebase + VFE_DMI_DATA_LO);
 
-		data = *pDeltaB | (*pDeltaGb << 16);
+		data = (((int)(*pDeltaB)) & 0x0000FFFF) |
+			(((int)(*pDeltaGb))<<16);
 		pDeltaB++;
 		pDeltaGb++;
 
@@ -602,6 +606,7 @@ static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
 			     int *elen)
 {
 	switch (type) {
+#ifndef CONFIG_720P_CAMERA
 	case VFE_MSG_OUTPUT1:{
 			pinfo->y_phy =
 			    ((struct vfe_message *)data)->_u.msgOutput1.yBuffer;
@@ -656,6 +661,34 @@ static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
 			*elen = sizeof(ctrl->extdata);
 		}
 		break;
+#else
+	case VFE_MSG_OUTPUT_P:
+	case VFE_MSG_OUTPUT_V:{
+		pinfo->y_phy =
+			((struct vfe_message *)data)->_u.msgOutput2.yBuffer;
+		pinfo->cbcr_phy =
+			((struct vfe_message *)data)->_u.msgOutput2.
+			cbcrBuffer;
+
+			CDBG("vfe_addr_convert, pinfo->y_phy = 0x%x\n",
+				pinfo->y_phy);
+		CDBG("vfe_addr_convert, pinfo->cbcr_phy = 0x%x\n",
+			pinfo->cbcr_phy);
+		/*pinfo->output_id = OUTPUT_TYPE_P;*/
+		ctrl->extdata.bpcInfo =
+			((struct vfe_message *)data)->_u.msgOutput2.bpcInfo;
+		ctrl->extdata.asfInfo =
+			((struct vfe_message *)data)->_u.msgOutput2.asfInfo;
+		ctrl->extdata.frameCounter =
+			((struct vfe_message *)data)->_u.msgOutput2.
+			frameCounter;
+		ctrl->extdata.pmData =
+		((struct vfe_message *)data)->_u.msgOutput2.pmData;
+		*ext = &ctrl->extdata;
+		*elen = sizeof(ctrl->extdata);
+	}
+		break;
+#endif
 
 	case VFE_MSG_STATS_AF:
 		pinfo->sbuf_phy =
@@ -672,10 +705,17 @@ static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
 	}			/* switch */
 }
 
-static boolean vfe_send_output1_msg(struct msm_vfe_resp *rp,
+static boolean vfe_send_preview_msg(struct msm_vfe_resp *rp,
 			struct vfe_message *msg, void *data);
-static boolean vfe_send_output2_msg(struct msm_vfe_resp *rp,
+static boolean vfe_send_video_msg(struct msm_vfe_resp *rp,
 			struct vfe_message *msg, void *data);
+#ifdef CONFIG_720P_CAMERA
+static boolean vfe_send_mainimage_msg(struct msm_vfe_resp *rp,
+			struct vfe_message *msg, void *data);
+static boolean vfe_send_thumbnail_msg(struct msm_vfe_resp *rp,
+			struct vfe_message *msg, void *data);
+#endif
+
 static boolean vfe_send_af_stats_msg(struct msm_vfe_resp *rp,
 			struct vfe_message *msg, void *data);
 static boolean vfe_send_awb_stats_msg(struct msm_vfe_resp *rp,
@@ -700,8 +740,15 @@ static struct {
 	[VFE_MSG_ID_START_ACK] = { NULL, VFE_MSG_GENERAL },
 	[VFE_MSG_ID_STOP_ACK] = { NULL, VFE_MSG_GENERAL },
 	[VFE_MSG_ID_UPDATE_ACK] = { NULL, VFE_MSG_GENERAL },
-	[VFE_MSG_ID_OUTPUT1] = { vfe_send_output1_msg, VFE_MSG_OUTPUT1 },
-	[VFE_MSG_ID_OUTPUT2] = { vfe_send_output2_msg, VFE_MSG_OUTPUT2 },
+#ifndef CONFIG_720P_CAMERA
+	[VFE_MSG_ID_OUTPUT1] = { vfe_send_preview_msg, VFE_MSG_OUTPUT1 },
+	[VFE_MSG_ID_OUTPUT2] = { vfe_send_video_msg, VFE_MSG_OUTPUT2 },
+#else
+	[VFE_MSG_ID_OUTPUT_P] = { vfe_send_preview_msg, VFE_MSG_OUTPUT_P },
+	[VFE_MSG_ID_OUTPUT_V] = { vfe_send_video_msg, VFE_MSG_OUTPUT_V },
+	[VFE_MSG_ID_OUTPUT_S] = { vfe_send_mainimage_msg, VFE_MSG_OUTPUT_S },
+	[VFE_MSG_ID_OUTPUT_T] = { vfe_send_thumbnail_msg, VFE_MSG_OUTPUT_T },
+#endif
 	[VFE_MSG_ID_SNAPSHOT_DONE] = { NULL, VFE_MSG_SNAPSHOT },
 	[VFE_MSG_ID_STATS_AUTOFOCUS] = { vfe_send_af_stats_msg, VFE_MSG_STATS_AF },
 	[VFE_MSG_ID_STATS_WB_EXP] = { vfe_send_awb_stats_msg, VFE_MSG_STATS_WE },
@@ -727,7 +774,6 @@ static void vfe_proc_ops(enum VFE_MESSAGE_ID id, void *data)
 {
 	struct msm_vfe_resp *rp;
 	struct vfe_message *msg;
-	struct msm_sync *sync = (struct msm_sync *)ctrl->syncdata;
 
 	CDBG("ctrl->vfeOperationMode = %d, msgId = %d\n",
 	     ctrl->vfeOperationMode, id);
@@ -743,11 +789,17 @@ static void vfe_proc_ops(enum VFE_MESSAGE_ID id, void *data)
 	 * allocate and then immediately free the msm_vfe_resp structure,
 	 * which is wasteful.
 	 */
+#ifndef CONFIG_720P_CAMERA
 	if ((ctrl->vfeOperationMode == VFE_START_OPERATION_MODE_SNAPSHOT) &&
 			(id == VFE_MSG_ID_OUTPUT1 ||
 			 id == VFE_MSG_ID_OUTPUT2))
 		return;
-
+#else
+	if ((ctrl->vfeOperationMode == VFE_START_OPERATION_MODE_SNAPSHOT) &&
+			(id == VFE_MSG_ID_OUTPUT_T ||
+			 id == VFE_MSG_ID_OUTPUT_S))
+		return;
+#endif
 	rp = ctrl->resp->vfe_alloc(sizeof(*rp) +
 					(vfe_funcs[id].fn ? sizeof(*msg) : 0),
 					ctrl->syncdata,
@@ -760,14 +812,10 @@ static void vfe_proc_ops(enum VFE_MESSAGE_ID id, void *data)
 	rp->type = vfe_funcs[id].rt;
 	rp->evt_msg.type = MSM_CAMERA_MSG;
 	rp->evt_msg.msg_id = id;
+	rp->evt_msg.exttype = 0;
 
-	/* Turn off the flash if epoch1 is enabled and snapshot is done. */
-	if (ctrl->vfeCamifEpoch1Local.enable &&
-			ctrl->vfeOperationMode ==
-				VFE_START_OPERATION_MODE_SNAPSHOT &&
-			id == VFE_MSG_ID_SNAPSHOT_DONE) {
-		ctrl->resp->flash_ctrl(sync, MSM_CAMERA_LED_OFF);
-		ctrl->vfeCamifEpoch1Local.enable = 0;
+	if (ctrl->vfeOperationMode == VFE_START_OPERATION_MODE_SNAPSHOT) {
+		rp->evt_msg.exttype = VFE_MSG_SNAPSHOT;
 	}
 
 	if (!vfe_funcs[id].fn) {
@@ -781,6 +829,12 @@ static void vfe_proc_ops(enum VFE_MESSAGE_ID id, void *data)
 		else
 			rp->evt_msg.data = msg = 0;
 		rp->evt_msg.len = sizeof(*msg);
+
+		if (msg == NULL) {
+			pr_err("%s dsp send msg with NULL pointer\n",
+				__func__);
+			return ;
+		}
 		msg->_d = id;
 		if (vfe_funcs[id].fn(rp, msg, data) == FALSE) {
 			pr_info("%s: freeing memory: handler for %d "
@@ -841,27 +895,6 @@ static void vfe_process_error_irq(struct isr_queue_cmd *qcmd)
 		pr_err("%s: violation irq\n", __func__);
 }
 
-/* We use epoch1 interrupt to control flash timing. The purpose is to reduce the
- * flash duration as much as possible. Userspace driver has no way to control
- * the exactly timing like VFE. Currently we skip a frame during snapshot.
- * We want to fire the flash in the middle of the first frame. Epoch1 interrupt
- * allows us to set a line index and we will get an interrupt when VFE reaches
- * the line. Userspace driver sets the line index in camif configuration. VFE
- * will fire the flash in high mode when it gets the epoch1 interrupt. Flash
- * will be turned off after snapshot is done.
- */
-static void vfe_process_camif_epoch1_irq(void)
-{
-	/* Turn on the flash. */
-	struct msm_sync *sync = (struct msm_sync *)ctrl->syncdata;
-	ctrl->resp->flash_ctrl(sync, MSM_CAMERA_LED_HIGH);
-
-	/* Disable the epoch1 interrupt. */
-	ctrl->vfeImaskLocal.camifEpoch1Irq = FALSE;
-	ctrl->vfeImaskPacked = vfe_irq_pack(ctrl->vfeImaskLocal);
-	vfe_program_irq_mask(ctrl->vfeImaskPacked);
-}
-
 static void vfe_process_camif_sof_irq(void)
 {
 	/* increment the frame id number. */
@@ -880,16 +913,25 @@ static void vfe_process_camif_sof_irq(void)
 		if ((1 << ctrl->vfeFrameSkipCount)&ctrl->vfeFrameSkipPattern) {
 
 			ctrl->vfeSnapShotCount--;
-			if (ctrl->vfeSnapShotCount == 0)
+			if (ctrl->vfeSnapShotCount == 0) {
+				ctrl->s_info->kpi_sensor_end =
+					ktime_to_ns(ktime_get());
+				pr_info("KPI PA: get raw snapshot, %u ms\n",
+					(ctrl->s_info->kpi_sensor_end -
+					ctrl->s_info->kpi_sensor_start)/
+					(1000*1000));
 				/* terminate vfe pipeline at frame boundary. */
 				writel(CAMIF_COMMAND_STOP_AT_FRAME_BOUNDARY,
 				       ctrl->vfebase + CAMIF_COMMAND);
+			}
 		}
-
 		/* update frame skip counter for bit checking. */
 		ctrl->vfeFrameSkipCount++;
 		if (ctrl->vfeFrameSkipCount == (ctrl->vfeFrameSkipPeriod + 1))
 			ctrl->vfeFrameSkipCount = 0;
+		CDBG("skip frame in camif, skip = %d ,%d\n",
+				ctrl->vfeFrameSkipCount, __LINE__);
+
 	}
 }
 
@@ -1325,9 +1367,25 @@ static void vfe_process_pingpong_irq(struct vfe_output_path *in,
 	}
 }
 
-static boolean vfe_send_output2_msg(struct msm_vfe_resp *rp,
+static boolean vfe_send_video_msg(struct msm_vfe_resp *rp,
 		struct vfe_message *msg, void *data)
 {
+#ifdef CONFIG_720P_CAMERA
+	struct vfe_msg_output *pPayload = data;
+
+	if (ctrl->vstate != VFE_STATE_ACTIVE)
+		return FALSE;
+	memcpy(&(msg->_u),
+		(void *)pPayload, sizeof(struct vfe_msg_output));
+
+	rp->phy.output_id = OUTPUT_TYPE_V;
+	CDBG("vfe_send_video_msg rp->type= %d\n",rp->type);
+
+	vfe_addr_convert(&(rp->phy),
+			rp->type, msg,
+			&(rp->extdata), &(rp->extlen));
+	return TRUE;
+#else
 	struct vfe_msg_output *pPayload = data;
 
 	if (ctrl->vstate != VFE_STATE_ACTIVE)
@@ -1346,11 +1404,29 @@ static boolean vfe_send_output2_msg(struct msm_vfe_resp *rp,
 			rp->type, msg,
 			&(rp->extdata), &(rp->extlen));
 	return TRUE;
+#endif
 }
 
-static boolean vfe_send_output1_msg(struct msm_vfe_resp *rp,
+static boolean vfe_send_preview_msg(struct msm_vfe_resp *rp,
 		struct vfe_message *msg, void *data)
 {
+#ifdef CONFIG_720P_CAMERA
+	struct vfe_msg_output *pPayload = data;
+
+	if (ctrl->vstate != VFE_STATE_ACTIVE)
+		return FALSE;
+
+	memcpy(&(msg->_u), (void *)pPayload, sizeof(struct vfe_msg_output));
+
+	rp->phy.output_id = OUTPUT_TYPE_P;
+	CDBG("vfe_send_preview_msg rp->type= %d\n",rp->type);
+
+	vfe_addr_convert(&(rp->phy),
+			rp->type, msg,
+			&(rp->extdata), &(rp->extlen));
+
+	return TRUE;
+#else
 	struct vfe_msg_output *pPayload = data;
 
 	if (ctrl->vstate != VFE_STATE_ACTIVE)
@@ -1369,7 +1445,58 @@ static boolean vfe_send_output1_msg(struct msm_vfe_resp *rp,
 			&(rp->extdata), &(rp->extlen));
 
 	return TRUE;
+#endif
 }
+
+#ifdef CONFIG_720P_CAMERA
+
+static boolean vfe_send_thumbnail_msg(struct msm_vfe_resp *rp,
+		struct vfe_message *msg, void *data)
+{
+	struct vfe_msg_output *pPayload = data;
+
+	if (ctrl->vstate != VFE_STATE_ACTIVE)
+		return FALSE;
+
+	memcpy(&(msg->_u), (void *)pPayload, sizeof(struct vfe_msg_output));
+
+	rp->phy.output_id = OUTPUT_TYPE_T;
+	CDBG("vfe_send_thumbnail_msg rp->type= %d\n",rp->type);
+
+	if (ctrl->viewPath.snapshotPendingCount <= 1)
+		ctrl->viewPath.ackPending = FALSE;
+
+	vfe_addr_convert(&(rp->phy),
+			rp->type, msg,
+			&(rp->extdata), &(rp->extlen));
+
+	return TRUE;
+}
+
+static boolean vfe_send_mainimage_msg(struct msm_vfe_resp *rp,
+		struct vfe_message *msg, void *data)
+{
+	struct vfe_msg_output *pPayload = data;
+
+	if (ctrl->vstate != VFE_STATE_ACTIVE)
+		return FALSE;
+
+	memcpy(&(msg->_u), (void *)pPayload, sizeof(struct vfe_msg_output));
+
+	rp->phy.output_id = OUTPUT_TYPE_S;
+	CDBG("vfe_send_mainimage_msg rp->type= %d\n",rp->type);
+
+	if (ctrl->encPath.snapshotPendingCount <=1 ) {
+		ctrl->encPath.ackPending = FALSE;
+	}
+
+	vfe_addr_convert(&(rp->phy),
+			rp->type, msg,
+			&(rp->extdata), &(rp->extlen));
+
+	return TRUE;
+}
+#endif
 
 static void vfe_send_output_msg(boolean whichOutputPath,
 				uint32_t yPathAddr, uint32_t cbcrPathAddr)
@@ -1394,6 +1521,7 @@ static void vfe_send_output_msg(boolean whichOutputPath,
 	/* frame ID is common for both paths. */
 	msgPayload.frameCounter = ctrl->vfeFrameId;
 
+#ifndef CONFIG_720P_CAMERA
 	if (whichOutputPath) {
 		/* msgPayload.pmData = ctrl->vfePmData.encPathPmInfo; */
 		vfe_proc_ops(VFE_MSG_ID_OUTPUT2, &msgPayload);
@@ -1401,6 +1529,35 @@ static void vfe_send_output_msg(boolean whichOutputPath,
 		/* msgPayload.pmData = ctrl->vfePmData.viewPathPmInfo; */
 		vfe_proc_ops(VFE_MSG_ID_OUTPUT1, &msgPayload);
 	}
+#else
+		if (whichOutputPath) {/* vfe output2 physical path */
+		/* msgPayload.pmData = ctrl->vfePmData.encPathPmInfo; */
+		ctrl->encPath.ackPending = TRUE;
+
+		if (ctrl->vfeOperationMode == 0) {
+			if (ctrl->axiOutputMode == VFE_AXI_OUTPUT_MODE_Output1AndOutput2) {
+				/* video mode */
+				vfe_proc_ops(VFE_MSG_ID_OUTPUT_V, &msgPayload);
+			} else { /* preview mode */
+				vfe_proc_ops(VFE_MSG_ID_OUTPUT_P, &msgPayload);
+			}
+		} else {
+			vfe_proc_ops(VFE_MSG_ID_OUTPUT_S, &msgPayload);
+		}
+
+	} else {   /* physical output1 path from vfe */
+		ctrl->viewPath.ackPending = TRUE;
+
+		if (ctrl->vfeOperationMode == 0) {
+			vfe_proc_ops(VFE_MSG_ID_OUTPUT_P, &msgPayload);
+			CDBG(" ==== check output ==== video mode display output.\n");
+
+		} else {
+			vfe_proc_ops(VFE_MSG_ID_OUTPUT_T, &msgPayload);
+			CDBG(" ==== check output ==== snapshot mode thumbnail output.\n");
+		}
+	}
+#endif
 }
 
 static void vfe_process_frame_done_irq_multi_frag(struct vfe_output_path_combo
@@ -1594,6 +1751,7 @@ static void vfe_process_output_path_irq(struct vfe_interrupt_status *irqstatus)
 								      encPath);
 
 		} else {
+			CDBG("horng irqstatus->encIrq = %x\n", irqstatus->encIrq);
 			if (irqstatus->encIrq)
 				vfe_process_frame_done_irq_no_frag(&ctrl->
 								   encPath);
@@ -1628,11 +1786,10 @@ static void __vfe_do_tasklet(struct isr_queue_cmd *qcmd)
 	if (ctrl->vstate != VFE_STATE_ACTIVE)
 		return;
 
-	if (qcmd->vfeInterruptStatus.camifEpoch1Irq) {
-		vfe_process_camif_epoch1_irq();
-	}
-
 #if 0
+	if (qcmd->vfeInterruptStatus.camifEpoch1Irq)
+		vfe_proc_ops(VFE_MSG_ID_EPOCH1);
+
 	if (qcmd->vfeInterruptStatus.camifEpoch2Irq)
 		vfe_proc_ops(VFE_MSG_ID_EPOCH2);
 #endif
@@ -1712,6 +1869,9 @@ static void vfe_do_tasklet(unsigned long data)
 	int cnt = 0;
 	struct isr_queue_cmd *qcmd = NULL;
 
+    if (!ctrl)
+		return;
+
 	CDBG("%s\n", __func__);
 
 	while ((qcmd = next_irq_cmd())) {
@@ -1734,6 +1894,9 @@ static irqreturn_t vfe_parse_irq(int irq_num, void *data)
 	struct isr_queue_cmd *qcmd;
 
 	CDBG("vfe_parse_irq\n");
+
+	if (!atomic_read(&ctrl->vfe_serv_interrupt))
+		return IRQ_HANDLED;
 
 	vfe_read_irq_status(&irq);
 
@@ -1807,9 +1970,8 @@ int vfe_cmd_init(struct msm_vfe_callback *presp,
 		goto cmd_init_failed1;
 	}
 
-	spin_lock_init(&ctrl->irqs_lock);
-
-	ctrl->vfeirq = vfeirq->start;
+	atomic_set(&ctrl->vfe_serv_interrupt, 0);
+	ctrl->vfeirq  = vfeirq->start;
 
 	ctrl->vfebase =
 	    ioremap(vfemem->start, (vfemem->end - vfemem->start) + 1);
@@ -1835,6 +1997,7 @@ int vfe_cmd_init(struct msm_vfe_callback *presp,
 	}
 
 	ctrl->syncdata = sdata;
+	ctrl->s_info = s_info;
 	return 0;
 
 cmd_init_failed3:
@@ -1852,12 +2015,17 @@ void vfe_cmd_release(struct platform_device *dev)
 {
 	struct resource *mem;
 
+	atomic_set(&ctrl->vfe_serv_interrupt, 0);
 	disable_irq(ctrl->vfeirq);
 	free_irq(ctrl->vfeirq, 0);
 
 	iounmap(ctrl->vfebase);
 	mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, (mem->end - mem->start) + 1);
+	if (mem == NULL) {
+		pr_err("%s : platform get resource is NULL pointer\n",
+			__func__);
+	} else
+		release_mem_region(mem->start, (mem->end - mem->start) + 1);
 
 	kfree(ctrl);
 	ctrl = 0;
@@ -2073,6 +2241,7 @@ void vfe_stats_wb_exp_ack(struct vfe_cmd_stats_wb_exp_ack *in)
 	ctrl->awbStatsControl.ackPending = FALSE;
 }
 
+#ifndef CONFIG_720P_CAMERA
 void vfe_output2_ack(struct vfe_cmd_output_ack *in)
 {
 	const uint32_t *psrc;
@@ -2112,6 +2281,69 @@ void vfe_output1_ack(struct vfe_cmd_output_ack *in)
 
 	ctrl->viewPath.ackPending = FALSE;
 }
+
+#else
+
+void vfe_output_v_ack(struct vfe_cmd_output_ack *in)
+{
+	const uint32_t *psrc;
+	uint32_t *pdest;
+	uint8_t i;
+
+	pdest = ctrl->encPath.nextFrameAddrBuf;
+
+//	CDBG("output2_ack: ack addr = 0x%x\n", in->ybufaddr[0]);
+	CDBG("video_frame_ack: ack addr = 0x%x\n", in->ybufaddr[0]);
+
+	psrc = in->ybufaddr;
+	for (i = 0; i < ctrl->encPath.fragCount; i++)
+		*pdest++ = *psrc++;
+
+	psrc = in->chromabufaddr;
+	for (i = 0; i < ctrl->encPath.fragCount; i++)
+		*pdest++ = *psrc++;
+
+	ctrl->encPath.ackPending = FALSE;
+}
+
+void vfe_output_p_ack(struct vfe_cmd_output_ack *in)
+{
+	const uint32_t *psrc;
+	uint32_t *pdest;
+	uint8_t i;
+
+	if (ctrl->axiOutputMode == VFE_AXI_OUTPUT_MODE_Output1AndOutput2 ) {
+		/* video mode, preview comes from output1 path */
+
+	pdest = ctrl->viewPath.nextFrameAddrBuf;
+
+	psrc = in->ybufaddr;
+	for (i = 0; i < ctrl->viewPath.fragCount; i++)
+		*pdest++ = *psrc++;
+
+	psrc = in->chromabufaddr;
+	for (i = 0; i < ctrl->viewPath.fragCount; i++)
+		*pdest++ = *psrc++;
+
+	ctrl->viewPath.ackPending = FALSE;
+
+	} else { /* preview mode, preview comes from output2 path. */
+		pdest = ctrl->encPath.nextFrameAddrBuf;
+
+		psrc = in->ybufaddr;
+		for (i = 0; i < ctrl->encPath.fragCount; i++)
+			*pdest++ = *psrc++;
+
+		psrc = in->chromabufaddr;
+		for (i = 0; i < ctrl->encPath.fragCount; i++)
+			*pdest++ = *psrc++;
+
+		ctrl->encPath.ackPending = FALSE;
+
+	}
+}
+
+#endif
 
 void vfe_start(struct vfe_cmd_start *in)
 {
@@ -3617,27 +3849,6 @@ void vfe_axi_output_config(struct vfe_cmd_axi_output_config *in)
 	vfe_axi_output(in, &ctrl->viewPath, &ctrl->encPath, axioutpw);
 }
 
-void vfe_epoch1_config(struct vfe_cmds_camif_epoch *in)
-{
-	struct vfe_epoch1cfg cmd;
-	memset(&cmd, 0, sizeof(cmd));
-	/* determine if epoch interrupt needs to be enabled. */
-	if (in->enable == TRUE) {
-		cmd.epoch1Line = in->lineindex;
-		vfe_prog_hw(ctrl->vfebase + CAMIF_EPOCH_IRQ, (uint32_t *)&cmd,
-					sizeof(cmd));
-	}
-
-	/* Set the epoch1 interrupt mask. */
-	ctrl->vfeImaskLocal.camifEpoch1Irq = in->enable;
-	ctrl->vfeImaskPacked = vfe_irq_pack(ctrl->vfeImaskLocal);
-	vfe_program_irq_mask(ctrl->vfeImaskPacked);
-
-	/* Store the epoch1 data. */
-	ctrl->vfeCamifEpoch1Local.enable = in->enable;
-	ctrl->vfeCamifEpoch1Local.lineindex = in->lineindex;
-}
-
 void vfe_camif_config(struct vfe_cmd_camif_config *in)
 {
 	struct vfe_camifcfg cmd;
@@ -3810,6 +4021,7 @@ void vfe_reset(void)
 {
 	vfe_reset_internal_variables();
 
+	atomic_set(&ctrl->vfe_serv_interrupt, 1);
 	ctrl->vfeImaskLocal.resetAckIrq = TRUE;
 	ctrl->vfeImaskPacked = vfe_irq_pack(ctrl->vfeImaskLocal);
 

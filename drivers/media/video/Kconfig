@@ -1122,6 +1122,12 @@ config MSM_CAMERA_DEBUG
 	help
 	  Enable printk() debug for msm camera
 
+config 720P_CAMERA
+        bool "Qualcomm MSM camera with 720P video support"
+        depends on MSM_CAMERA
+        help
+          720P video support
+
 source "drivers/media/video/msm/Kconfig"
 
 endif # VIDEO_CAPTURE_DRIVERS

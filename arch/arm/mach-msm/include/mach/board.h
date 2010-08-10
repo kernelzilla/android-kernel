@@ -51,19 +51,51 @@ struct msm_camera_legacy_device_platform_data {
 	void (*config_gpio_off)(void);
 };
 
-struct msm_camera_sensor_info {
-	const char *sensor_name;
-	int sensor_reset;
-	int sensor_pwd;
-	int vcm_pwd;
-	int mclk;
-	int num_flash_levels;
-	int (*camera_flash)(int level);
-	int need_suspend;
-	struct msm_camera_device_platform_data *pdata;
-	struct resource *resource;
-	uint8_t num_resources;
+#define MSM_CAMERA_FLASH_NONE 0
+#define MSM_CAMERA_FLASH_LED  1
+
+struct camera_flash_cfg {
+        int num_flash_levels;
+        int (*camera_flash)(int level);
+        uint16_t low_temp_limit;
+        uint16_t low_cap_limit;
+        uint8_t postpone_led_mode;
 };
+
+#ifdef CONFIG_MSM_CAMERA_OLD
+struct msm_camera_sensor_info {
+        const char *sensor_name;
+        int sensor_reset;
+        int sensor_pwd;
+        int vcm_pwd;
+        int mclk;
+        int num_flash_levels;
+        int (*camera_flash)(int level);
+        int need_suspend;
+        struct msm_camera_device_platform_data *pdata;
+        struct resource *resource;
+        uint8_t num_resources;
+};
+#else
+struct msm_camera_sensor_info {
+        const char *sensor_name;
+        int sensor_reset;
+        int sensor_pwd;
+        int vcm_pwd;
+        void(*camera_clk_switch)(void);
+        int mclk;
+        int need_suspend;
+        struct msm_camera_device_platform_data *pdata;
+        struct resource *resource;
+        uint8_t num_resources;
+        uint32_t waked_up;
+        wait_queue_head_t event_wait;
+        uint32_t kpi_sensor_start;
+        uint32_t kpi_sensor_end;
+        int flash_type; /* for back support */
+        struct camera_flash_cfg* flash_cfg;
+};
+#endif
 
 struct snd_endpoint {
 	int id;

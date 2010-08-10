@@ -22,7 +22,7 @@
 #include <linux/list.h>
 #include <linux/ioctl.h>
 #include <linux/spinlock.h>
-#include <linux/videodev2.h>
+#include <linux/videodev.h>
 #include <linux/proc_fs.h>
 #include <media/v4l2-dev.h>
 #include <media/msm_camera.h>
@@ -272,7 +272,11 @@ static int msm_v4l2_querybuf(struct file *f, void *pctx, struct v4l2_buffer *pb)
 	/* V4L2 videodev will do the copy_from_user. */
 
 	memset(&pmem_buf, 0, sizeof(struct msm_pmem_info));
+#ifndef CONFIG_720P_CAMERA
 	pmem_buf.type = MSM_PMEM_OUTPUT2;
+#else
+	pmem_buf.type = MSM_PMEM_PREVIEW;
+#endif
 	pmem_buf.vaddr = (void *)pb->m.userptr;
 	pmem_buf.y_off = 0;
 	pmem_buf.fd = (int)pb->reserved;
@@ -333,8 +337,11 @@ static int msm_v4l2_qbuf(struct file *f, void *pctx, struct v4l2_buffer *pb)
 
 		D("V4L2_BUF_TYPE_VIDEO_CAPTURE: pb->bytesused = %d \n",
 		  pb->bytesused);
-
+#ifndef CONFIG_720P_CAMERA
 		meminfo.type = MSM_PMEM_OUTPUT2;
+#else
+		meminfo.type = MSM_PMEM_PREVIEW;
+#endif
 		meminfo.fd = (int)pb->reserved;
 		meminfo.vaddr = (void *)pb->m.userptr;
 		meminfo.y_off = 0;
@@ -703,6 +710,7 @@ static const struct v4l2_ioctl_ops msm_ioctl_ops = {
 static int msm_v4l2_video_dev_init(struct video_device *pvd)
 {
 	strncpy(pvd->name, MSM_APPS_ID_V4L2, sizeof(pvd->name));
+	pvd->vfl_type = VID_TYPE_CAPTURE;
 	pvd->fops = &msm_v4l2_fops;
 	pvd->release = msm_v4l2_release_dev;
 	pvd->minor = -1;

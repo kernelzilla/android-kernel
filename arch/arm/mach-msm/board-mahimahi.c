@@ -50,11 +50,11 @@
 #include <mach/msm_serial_hs.h>
 #include <mach/bcm_bt_lpm.h>
 #include <mach/msm_smd.h>
+#include <mach/msm_flashlight.h>
 
 #include "board-mahimahi.h"
 #include "devices.h"
 #include "proc_comm.h"
-#include "board-mahimahi-flashlight.h"
 #include "board-mahimahi-tpa2018d1.h"
 #include "board-mahimahi-smb329.h"
 
@@ -319,6 +319,14 @@ static struct android_pmem_platform_data android_pmem_camera_pdata = {
 	.cached		= 1,
 };
 
+static struct android_pmem_platform_data android_pmem_venc_pdata = {
+        .name           = "pmem_venc",
+        .start          = MSM_PMEM_VENC_BASE,
+        .size           = MSM_PMEM_VENC_SIZE,
+        .no_allocator   = 0,
+        .cached         = 1,
+};
+
 static struct platform_device android_pmem_mdp_device = {
 	.name		= "android_pmem",
 	.id		= 0,
@@ -341,6 +349,14 @@ static struct platform_device android_pmem_camera_device = {
 	.dev		= {
 		.platform_data = &android_pmem_camera_pdata,
 	},
+};
+
+static struct platform_device android_pmem_venc_device = {
+        .name           = "android_pmem",
+        .id             = 3,
+        .dev            = {
+                .platform_data = &android_pmem_venc_pdata,
+        },
 };
 
 static struct resource ram_console_resources[] = {
@@ -620,6 +636,14 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.appsz  = MSM_CLK_CTL_SIZE,
 };
 
+static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
+        .camera_flash           = flashlight_control,
+        .num_flash_levels       = FLASHLIGHT_NUM,
+	.low_temp_limit		= 5,
+	.low_cap_limit		= 15,
+
+};
+
 static struct msm_camera_sensor_info msm_camera_sensor_s5k3e2fx_data = {
 	.sensor_name = "s5k3e2fx",
 	.sensor_reset = 144, /* CAM1_RST */
@@ -628,8 +652,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_s5k3e2fx_data = {
 	.pdata = &msm_camera_device_data,
 	.resource = msm_camera_resources,
 	.num_resources = ARRAY_SIZE(msm_camera_resources),
-	.camera_flash = flashlight_control,
-	.num_flash_levels = FLASHLIGHT_NUM,
+	.flash_cfg      = &msm_camera_sensor_flash_cfg,
 };
 
 static struct platform_device msm_camera_sensor_s5k3e2fx = {
@@ -705,6 +728,7 @@ static struct platform_device mahimahi_flashlight_device = {
 		.platform_data  = &mahimahi_flashlight_data,
 	},
 };
+
 static struct timed_gpio timed_gpios[] = {
 	{
 		.name = "vibrator",
@@ -839,6 +863,9 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_mdp_device,
 	&android_pmem_adsp_device,
 	&android_pmem_camera_device,
+#ifdef CONFIG_720P_CAMERA
+        &android_pmem_venc_device,
+#endif
 	&msm_kgsl_device,
 	&msm_device_i2c,
 	&capella_cm3602,
@@ -1143,7 +1170,7 @@ static void __init mahimahi_fixup(struct machine_desc *desc, struct tag *tags,
 	mi->nr_banks = 2;
 	mi->bank[0].start = PHYS_OFFSET;
 	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-	mi->bank[0].size = (219*1024*1024);
+	mi->bank[0].size = (232*1024*1024);
 	mi->bank[1].start = MSM_HIGHMEM_BASE;
 	mi->bank[1].node = PHYS_TO_NID(MSM_HIGHMEM_BASE);
 	mi->bank[1].size = MSM_HIGHMEM_SIZE;
