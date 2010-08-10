@@ -481,7 +481,7 @@ static int __init lcdc_toshiba_panel_init(void)
 	pinfo->bpp = 18;
 	pinfo->fb_num = 2;
 	/* 30Mhz mdp_lcdc_pclk and mdp_lcdc_pad_pcl */
-	pinfo->clk_rate = 27648000;
+	pinfo->clk_rate = 32691360;
 	pinfo->bl_max = 15;
 	pinfo->bl_min = 1;
 
