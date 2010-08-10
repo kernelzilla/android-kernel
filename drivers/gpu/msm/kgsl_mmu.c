@@ -476,6 +476,14 @@ int kgsl_mmu_start(struct kgsl_device *device)
 		return 0;
 	}
 
+	/* MMU not enabled */
+	if ((mmu->config & 0x1) == 0) {
+		KGSL_MEM_VDBG("return %d\n", 0);
+		return 0;
+	}
+
+	mmu->flags |= KGSL_FLAGS_STARTED;
+
 	/* setup MMU and sub-client behavior */
 	kgsl_regwrite(device, mmu_reg[device->id].config, mmu->config);
 
@@ -484,12 +492,6 @@ int kgsl_mmu_start(struct kgsl_device *device)
 		     GSL_MMU_INT_MASK);
 	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
 				GSL_MMU_INT_MASK);
-
-	/* MMU not enabled */
-	if ((mmu->config & 0x1) == 0) {
-		KGSL_MEM_VDBG("return %d\n", 0);
-		return 0;
-	}
 
 	/* idle device */
 	kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
@@ -531,7 +533,6 @@ int kgsl_mmu_start(struct kgsl_device *device)
 			KGSL_MEM_ERR("Failed to setstate TLBFLUSH\n");
 			goto error;
 		}
-		mmu->flags |= KGSL_FLAGS_STARTED;
 	}
 
 	KGSL_MEM_VDBG("return %d\n", 0);
