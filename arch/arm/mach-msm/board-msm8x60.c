@@ -858,6 +858,11 @@ static struct platform_device hdmi_msm_device = {
 };
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
+static struct platform_device mipi_dsi_video_toshiba_wvga_panel_device = {
+	.name = "dsi_video_toshiba_wvga",
+	.id = 0,
+};
+
 static void __init msm8x60_allocate_memory_regions(void)
 {
 	void *addr;
@@ -1245,6 +1250,7 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 	&hdmi_msm_device,
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+	&mipi_dsi_video_toshiba_wvga_panel_device,
 #ifdef CONFIG_MSM_CAMERA
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
@@ -3171,6 +3177,7 @@ static void __init msm_fb_add_devices(void)
 		msm_fb_register_device("mdp", &mdp_pdata);
 
 	msm_fb_register_device("lcdc", &lcdc_pdata);
+	msm_fb_register_device("mipi_dsi", 0);
 }
 
 static void __init msm8x60_cfg_smsc911x(void)
