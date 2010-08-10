@@ -330,15 +330,14 @@ static int marimba_add_child(struct marimba_platform_data *pdata,
 			return PTR_ERR(child);
 	}
 
-#ifdef CONFIG_I2C_SSBI
-	if (driver_data == MARIMBA_ID) {
+#if defined(CONFIG_I2C_SSBI)
+	if (pdata->tsadc != NULL) {
 		child = add_child(MARIMBA_ID_TSADC, "marimba_tsadc",
-					  pdata->tsadc, sizeof(*pdata->tsadc));
+				pdata->tsadc, sizeof(*pdata->tsadc));
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
 #endif
-
 	return 0;
 }
 
