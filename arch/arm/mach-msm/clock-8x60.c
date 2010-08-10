@@ -942,7 +942,6 @@ static struct clk_freq_tbl clk_tbl_pixel_mdp[] = {
 			NS_DIVSRC_BANKED(29, 26, 25, 22, d, 21, 19, 18, 16, \
 			s), 0, 0, 0, NULL)
 static struct clk_freq_tbl clk_tbl_rot[] = {
-	F_ROT( 24580000, MM_PXO,    1, 0, 0),
 	F_ROT( 27000000, MM_MXO,    1, 0, 0),
 	F_ROT( 29540000, MM_GPERF, 13, 0, 0),
 	F_ROT( 32000000, MM_GPERF, 12, 0, 0),
@@ -1015,7 +1014,6 @@ static struct banked_mnd_masks bmnd_info_vcodec = {
 			NS_MND_BANKED8(11, 19, n, m, 0, 27, s), \
 			CC_BANKED(6, 11, n), MND_EN((B(5) | B(10)), n), 0, NULL)
 static struct clk_freq_tbl clk_tbl_vcodec[] = {
-	F_VCODEC( 24580000, MM_PXO,   0, 0,  0),
 	F_VCODEC( 27000000, MM_MXO,   0, 0,  0),
 	F_VCODEC( 32000000, MM_GPERF, 0, 1, 12),
 	F_VCODEC( 48000000, MM_GPERF, 0, 1,  8),
@@ -1038,7 +1036,6 @@ static struct clk_freq_tbl clk_tbl_vcodec[] = {
 		F_RAW(f, SRC_##s, 0, NS_DIVSRC(15, 12, d, 2, 0, s), \
 			0, 0, 0, NULL)
 static struct clk_freq_tbl clk_tbl_vpe[] = {
-	F_VPE( 24576000, MM_PXO,    1, 0, 0),
 	F_VPE( 27000000, MM_MXO,    1, 0, 0),
 	F_VPE( 34909000, MM_GPERF, 11, 0, 0),
 	F_VPE( 38400000, MM_GPERF, 10, 0, 0),
