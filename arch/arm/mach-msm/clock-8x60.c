@@ -1426,8 +1426,6 @@ struct clk_local soc_clk_local_tbl[] = {
 	/* AHB Interfaces */
 	CLK_NORATE(AMP_P,   AHB_EN_REG, B(24), NULL, 0,
 		DBG_BUS_VEC_F_REG, HALT, 18, TEST_MMLS(0x0D)),
-	CLK_NORATE(APU_P,    AHB_EN_REG, B(28), SW_RESET_AHB_REG, B(18),
-		DBG_BUS_VEC_F_REG, HALT,  8, TEST_MMLS(0x49)),
 	CLK_NORATE(CSI0_P,   AHB_EN_REG, B(7),  SW_RESET_AHB_REG, B(17),
 		DBG_BUS_VEC_H_REG, HALT, 14, TEST_MMLS(0x0F)),
 	CLK_NORATE(CSI1_P,   AHB_EN_REG, B(20), SW_RESET_AHB_REG, B(16),
@@ -1704,14 +1702,16 @@ static struct reg_init {
 	/* Turn on all SC0 voteable PLLs (PLL0, PLL6, PLL8). */
 	{PLL_ENA_SC0_REG, 0x141, 0x141},
 
-	/* Enable locally controlled peripheral HCLKs in software mode. */
-	{TSIF_HCLK_CTL_REG,		0x70,	0x10},
-	{SDCn_HCLK_CTL_REG(1),		0x70,	0x10},
-	{SDCn_HCLK_CTL_REG(2),		0x70,	0x10},
-	{SDCn_HCLK_CTL_REG(3),		0x70,	0x10},
-	{SDCn_HCLK_CTL_REG(4),		0x70,	0x10},
-	{SDCn_HCLK_CTL_REG(5),		0x70,	0x10},
-	{USB_HS1_HCLK_CTL_REG,		0x70,	0x10},
+	/* Enable dynamic clock gating for peripheral HCLKs that support it. */
+	{SDCn_HCLK_CTL_REG(1),		0x70,	0x40},
+	{SDCn_HCLK_CTL_REG(2),		0x70,	0x40},
+	{SDCn_HCLK_CTL_REG(3),		0x70,	0x40},
+	{SDCn_HCLK_CTL_REG(4),		0x70,	0x40},
+	{SDCn_HCLK_CTL_REG(5),		0x70,	0x40},
+	{USB_HS1_HCLK_CTL_REG,		0x70,	0x40},
+
+	/* Enable software-controlled peripheral HCLKs */
+	{TSIF_HCLK_CTL_REG, 		0x70,	0x10},
 	{USB_FS1_HCLK_CTL_REG,		0x70,	0x10},
 	{USB_FS2_HCLK_CTL_REG,		0x70,	0x10},
 	{GSBIn_HCLK_CTL_REG(1),		0x70,	0x10},
@@ -1733,21 +1733,25 @@ static struct reg_init {
 	/* Set up MM AHB clock to PLL8/5. */
 	{AHB_NS_REG,		0x43C7,		0x0102},
 
-	/* Enable MM AHB clocks that don't have clock API support.
-	 * These will be put into hardware-controlled mode later. */
-	{AHB_EN_REG,		0xFFFFFFFF,	0x8CC85F},
-	{AHB_EN2_REG,		0xFFFFFFFF,	0x1},
+	/* Enable MM FPB clock. */
+	{AHB_EN_REG,		B(1),		B(1)},
+
+	/* Enable MM AHB dynamic hardware gating for clocks that support it. */
+	{AHB_EN_REG,		0x6C000001,	0x24000000},
+	{AHB_EN2_REG,		0xFFFF7800,	0x3C705000},
+
+	/* Deassert all MM AHB resets. */
 	{SW_RESET_AHB_REG,	0xFFFFFFFF,	0x0},
 
-	/* Set up MM Fabric (AXI) clock. */
+	/* Set up MM Fabric (AXI) and SMI clocks. */
 	{AXI_NS_REG,		0x0FFFFFFF,	0x4248451},
+	{MAXI_EN_REG,		B(28),		B(28)},
+	{MAXI_EN2_REG,		B(30)|B(29),	B(30)|B(29)},
 
-	/* Enable MM AXI clocks that don't have clock API support.
-	 * These will be put into hardware-controlled mode later. */
-	{MAXI_EN_REG,		0xFFFFFFFF,	0x14F80001},
-	{MAXI_EN2_REG,		0x7FFFFFFF,	0x75200400},
-	{MAXI_EN3_REG,		0xFFFFFFFF,	0x200400},
-	{SAXI_EN_REG,		0x3FFF,		0x1C7},
+	/* Enable MM AXI dynamic hardware gating for clocks that support it. */
+	{MAXI_EN_REG,		0x803F800,	0x3A800},
+	{MAXI_EN2_REG,		B(27)|B(25),	B(27)|B(25)},
+	{SAXI_EN_REG,		0x3C38,		0x3C38},
 
 	/* De-assert MM AXI resets to all hardware blocks. */
 	{SW_RESET_AXI_REG,	0xE37F,		0x0},
