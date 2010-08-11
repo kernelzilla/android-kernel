@@ -2283,8 +2283,8 @@ static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 
 	ret = mdp4_overlay_set(info, &req);
 	if (ret) {
-		printk(KERN_ERR "%s:ioctl failed \n",
-			__func__);
+		printk(KERN_ERR "%s: ioctl failed, rc=%d\n",
+			__func__, ret);
 		return ret;
 	}
 

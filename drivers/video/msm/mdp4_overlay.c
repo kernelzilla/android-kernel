@@ -1160,21 +1160,25 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 
 	if (req->dst_rect.h > (req->src_rect.h * 8)) {	/* too much */
 		mdp4_stat.err_scale++;
+		printk(KERN_ERR "mpd_overlay_req2pipe: too much (h)!\n");
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h > (req->dst_rect.h * 8)) {	/* too little */
 		mdp4_stat.err_scale++;
+		printk(KERN_ERR "mpd_overlay_req2pipe: too little (h)!\n");
 		return -ERANGE;
 	}
 
 	if (req->dst_rect.w > (req->src_rect.w * 8)) {	/* too much */
 		mdp4_stat.err_scale++;
+		printk(KERN_ERR "mpd_overlay_req2pipe: too much (w)!\n");
 		return -ERANGE;
 	}
 
 	if (req->src_rect.w > (req->dst_rect.w * 8)) {	/* too little */
 		mdp4_stat.err_scale++;
+		printk(KERN_ERR "mpd_overlay_req2pipe: too little (w)!\n");
 		return -ERANGE;
 	}
 
@@ -1184,6 +1188,7 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	if (req->src_rect.h > (req->dst_rect.h * 4)) {
 		if (req->src_rect.h % req->dst_rect.h) { /* need integer */
 			mdp4_stat.err_scale++;
+			printk(KERN_ERR "mpd_overlay_req2pipe: need integer (h)!\n");
 			return -ERANGE;
 		}
 	}
@@ -1191,37 +1196,48 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	if (req->src_rect.w > (req->dst_rect.w * 4)) {
 		if (req->src_rect.w % req->dst_rect.w) { /* need integer */
 			mdp4_stat.err_scale++;
+			printk(KERN_ERR "mpd_overlay_req2pipe: need integer (w)!\n");
 			return -ERANGE;
 		}
 	}
 
 	ptype = mdp4_overlay_format2type(req->src.format);
-	if (ptype < 0)
+	if (ptype < 0) {
+		printk(KERN_ERR "mpd_overlay_req2pipe: mdp4_overlay_format2type!\n");
 		return ptype;
+	}
 
 	ret = mdp4_overlay_req_check(req->id, req->z_order, mixer);
-	if (ret < 0)
+	if (ret < 0) {
+		printk(KERN_ERR "mpd_overlay_req2pipe: mdp4_overlay_req_check!\n");
 		return ret;
+	}
 
 	if (req->id == MSMFB_NEW_REQUEST)  /* new request */
 		pipe = mdp4_overlay_pipe_alloc(ptype);
 	else
 		pipe = mdp4_overlay_ndx2pipe(req->id);
 
-	if (pipe == NULL)
+	if (pipe == NULL) {
+		printk(KERN_ERR "mpd_overlay_req2pipe: pipe == NULL!\n");
 		return -ENOMEM;
+	}
 
 	/* no down scale at rgb pipe */
 	if (pipe->pipe_num <= OVERLAY_PIPE_RGB2) {
 		if ((req->src_rect.h > req->dst_rect.h) ||
-			(req->src_rect.w > req->dst_rect.w))
+			(req->src_rect.w > req->dst_rect.w)) {
+				printk(KERN_ERR "mpd_overlay_req2pipe: h>h || w>w!\n");
 				return -ERANGE;
+			}
 	}
 
 	pipe->src_format = req->src.format;
 	ret = mdp4_overlay_format2pipe(pipe);
-	if (ret < 0)
+	if (ret < 0) {
+		printk(KERN_ERR "mpd_overlay_req2pipe: mdp4_overlay_format2pipe!\n");
 		return ret;
+	}
 
 	/*
 	 * base layer == 1, reserved for frame buffer
@@ -1345,20 +1361,25 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	int ret, mixer;
 	struct mdp4_overlay_pipe *pipe;
 
-	if (mfd == NULL)
+	if (mfd == NULL) {
+		pr_err("%s: mfd == NULL, -ENODEV\n", __func__);
 		return -ENODEV;
+	}
 
 	if (req->src.format == MDP_FB_FORMAT)
 		req->src.format = mfd->fb_imgType;
 
-	if (mutex_lock_interruptible(&mfd->dma->ov_mutex))
+	if (mutex_lock_interruptible(&mfd->dma->ov_mutex)) {
+		pr_err("%s: mutex_lock_interruptible, -EINTR\n", __func__);
 		return -EINTR;
+	}
 
 	mixer = mfd->panel_info.pdest;	/* DISPLAY_1 or DISPLAY_2 */
 
 	ret = mdp4_overlay_req2pipe(req, mixer, &pipe);
 	if (ret < 0) {
 		mutex_unlock(&mfd->dma->ov_mutex);
+		pr_err("%s: mdp4_overlay_req2pipe, ret=%d\n", __func__, ret);
 		return ret;
 	}
 
