@@ -66,6 +66,6 @@
 #define VCD_ERR_HW_FATAL            (VCD_S_ERR_BASE + 0xd)
 #define VCD_ERR_BITSTREAM_ERR       (VCD_S_ERR_BASE + 0xe)
 #define VCD_ERR_INDEX_NOMORE        (VCD_S_ERR_BASE + 0xf)
-#define VCD_FAILED(rc)   ((rc > VCD_S_ERR_BASE) ? TRUE : FALSE)
+#define VCD_FAILED(rc)   ((rc > VCD_S_ERR_BASE) ? true : false)
 
 #endif

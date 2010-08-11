@@ -31,70 +31,70 @@
 #define _VIDEO_CORE_PIXCACHE_
 
 
-#include "vidc_type.h"
+#include "vidc.h"
 
-enum vidc_1080P_pix_cache_port_sel_type{
+enum vidc_1080P_pix_cache_port_sel{
 	VIDC_1080P_PIX_CACHE_PORT_A = 0,
 	VIDC_1080P_PIX_CACHE_PORT_B = 1,
 	VIDC_1080P_PIX_CACHE_PORT_32BIT = 0x7FFFFFFF
 };
-enum vidc_1080P_pix_cache_page_size_type{
+enum vidc_1080P_pix_cache_page_size{
 	VIDC_1080P_PIX_CACHE_PAGE_SIZE_1K = 0,
 	VIDC_1080P_PIX_CACHE_PAGE_SIZE_2K = 1,
 	VIDC_1080P_PIX_CACHE_PAGE_SIZE_4K = 2
 };
-struct vidc_1080P_pix_cache_config_type{
-	u32 b_cache_enable;
-	u32 b_prefetch_en;
-	enum vidc_1080P_pix_cache_port_sel_type e_port_select;
-	u32 b_statistics_off;
-	enum vidc_1080P_pix_cache_page_size_type e_page_size;
+struct vidc_1080P_pix_cache_config{
+	u32 cache_enable;
+	u32 prefetch_en;
+	enum vidc_1080P_pix_cache_port_sel port_select;
+	u32 statistics_off;
+	enum vidc_1080P_pix_cache_page_size page_size;
 };
-struct vidc_1080P_pix_cache_statistics_type{
-	u32 n_access_miss;
-	u32 n_access_hit;
-	u32 n_axi_req;
-	u32 n_core_req;
-	u32 n_axi_bus;
-	u32 n_core_bus;
+struct vidc_1080P_pix_cache_statistics{
+	u32 access_miss;
+	u32 access_hit;
+	u32 axi_req;
+	u32 core_req;
+	u32 axi_bus;
+	u32 core_bus;
 };
-struct vidc_1080P_pix_cache_misr_id_filtering_type{
-	u32 b_ignore_id;
-	u32 n_id;
+struct vidc_1080P_pix_cache_misr_id_filtering{
+	u32 ignore_id;
+	u32 id;
 };
-struct vidc_1080P_pix_cache_misr_signature_type{
-	u32 n_signature0;
-	u32 n_signature1;
+struct vidc_1080P_pix_cache_misr_signature{
+	u32 signature0;
+	u32 signature1;
 };
 
 void vidc_pix_cache_sw_reset(void);
-void vidc_pix_cache_init_luma_chroma_base_addr(u32 n_dpb,
+void vidc_pix_cache_init_luma_chroma_base_addr(u32 dpb,
 	u32 *pn_dpb_luma_offset, u32 *pn_dpb_chroma_offset);
-void vidc_pix_cache_set_frame_range(u32 n_luma_size, u32 n_chroma_size);
+void vidc_pix_cache_set_frame_range(u32 luma_size, u32 chroma_size);
 void vidc_pix_cache_init_config(
-	struct vidc_1080P_pix_cache_config_type *p_config);
-void vidc_pix_cache_set_prefetch_page_limit(u32 n_page_size_limit);
-void vidc_pix_cache_enable_prefetch(u32 b_prefetch_enable);
-void vidc_pix_cache_disable_statistics(u32 b_statistics_off);
+	struct vidc_1080P_pix_cache_config *config);
+void vidc_pix_cache_set_prefetch_page_limit(u32 page_size_limit);
+void vidc_pix_cache_enable_prefetch(u32 prefetch_enable);
+void vidc_pix_cache_disable_statistics(u32 statistics_off);
 void vidc_pix_cache_set_port(
-	enum vidc_1080P_pix_cache_port_sel_type e_port_select);
-void vidc_pix_cache_enable_cache(u32 b_cache_enable);
+	enum vidc_1080P_pix_cache_port_sel port_select);
+void vidc_pix_cache_enable_cache(u32 cache_enable);
 void vidc_pix_cache_clear_cache_tags(void);
-void vidc_pix_cache_set_halt(u32 b_halt_enable);
-void vidc_pix_cache_get_status_idle(u32 *p_idle_status);
-void vidc_pix_cache_set_ram(u32 n_ram_select);
-void vidc_pix_cache_set_auto_inc_ram_addr(u32 b_auto_inc_enable);
-void vidc_pix_cache_read_ram_data(u32 n_src_ram_address, u32 n_ram_size,
-	u32 *p_dest_address);
-void vidc_pix_cache_write_ram_data(u32 *p_src_address, u32 n_ram_size,
-	u32 n_dest_ram_address);
+void vidc_pix_cache_set_halt(u32 halt_enable);
+void vidc_pix_cache_get_status_idle(u32 *idle_status);
+void vidc_pix_cache_set_ram(u32 ram_select);
+void vidc_pix_cache_set_auto_inc_ram_addr(u32 auto_inc_enable);
+void vidc_pix_cache_read_ram_data(u32 src_ram_address, u32 ram_size,
+	u32 *dest_address);
+void vidc_pix_cache_write_ram_data(u32 *src_address, u32 ram_size,
+	u32 dest_ram_address);
 void vidc_pix_cache_get_statistics(
-	struct vidc_1080P_pix_cache_statistics_type *p_statistics);
-void vidc_pix_cache_enable_misr(u32 b_misr_enable);
-void vidc_pix_cache_set_misr_interface(u32 n_input_select);
+	struct vidc_1080P_pix_cache_statistics *statistics);
+void vidc_pix_cache_enable_misr(u32 misr_enable);
+void vidc_pix_cache_set_misr_interface(u32 input_select);
 void vidc_pix_cache_set_misr_id_filtering(
-	struct vidc_1080P_pix_cache_misr_id_filtering_type *p_filter_id);
-void vidc_pix_cache_set_misr_filter_trans(u32 n_no_of_trans);
+	struct vidc_1080P_pix_cache_misr_id_filtering *filter_id);
+void vidc_pix_cache_set_misr_filter_trans(u32 no_of_trans);
 void vidc_pix_cache_get_misr_signatures(
-	struct vidc_1080P_pix_cache_misr_signature_type *p_signatures);
+	struct vidc_1080P_pix_cache_misr_signature *signatures);
 #endif

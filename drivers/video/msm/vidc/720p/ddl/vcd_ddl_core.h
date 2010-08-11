@@ -37,8 +37,8 @@
 #define DDL_TILE_BUF_ALIGN_GUARD_BYTES 0x1FFF
 #define DDL_TILE_BUFFER_ALIGN_BYTES  8192
 
-#define DDL_MAX_FRAME_WIDTH   1280
-#define DDL_MAX_FRAME_HEIGHT  720
+#define DDL_MAX_FRAME_WIDTH   (1280)
+#define DDL_MAX_FRAME_HEIGHT  (720)
 
 #define DDL_MAX_DP_FRAME_WIDTH  352
 #define DDL_MAX_DP_FRAME_HEIGHT 288
@@ -48,7 +48,7 @@
 #define VCD_MAX_NO_CLIENT  4
 #define VCD_FRAME_COMMAND_DEPTH 1
 #define VCD_GENERAL_COMMAND_DEPTH 1
-#define VCD_COMMAND_EXCLUSIVE TRUE
+#define VCD_COMMAND_EXCLUSIVE true
 
 #define DDL_HW_TIMEOUT_IN_MS  1000
 
@@ -82,31 +82,19 @@
  (addr) = (u32)((((u32)(addr) + DDL_STREAMBUF_ALIGN_GUARD_BYTES) & \
 			 ~(DDL_STREAMBUF_ALIGN_GUARD_BYTES)) + DDL_BUFEND_PAD)
 
-#define DDL_FRAMESIZE_DIV_FACTOR   0xF
-#define DDL_ALLOW_DEC_FRAMESIZE(n_width, n_height)             \
+#define DDL_FRAMESIZE_DIV_FACTOR   (0xF)
+#define DDL_ALLOW_ENC_FRAMESIZE(width, height)             \
 (\
    (\
-      (n_width <= DDL_MAX_FRAME_WIDTH)  &&                 \
-      (n_height <= DDL_MAX_FRAME_HEIGHT)                   \
+      ((width) <= DDL_MAX_FRAME_WIDTH)  &&                 \
+      ((height) <= DDL_MAX_FRAME_HEIGHT)                   \
    ) &&                                                     \
    (\
-      (n_width >= 32 && n_height >= 16) ||                  \
-      (n_width >= 16 && n_height >= 32)                     \
-   )\
-)
-
-#define DDL_ALLOW_ENC_FRAMESIZE(n_width, n_height)             \
-(\
-   (\
-      (n_width <= DDL_MAX_FRAME_WIDTH)  &&                 \
-      (n_height <= DDL_MAX_FRAME_HEIGHT)                   \
+      ((width) >= 32 && (height) >= 32)                      \
    ) &&                                                     \
    (\
-      (n_width >= 32 && n_height >= 32)                      \
-   ) &&                                                     \
-   (\
-      !(n_width & DDL_FRAMESIZE_DIV_FACTOR) &&              \
-      !(n_height & DDL_FRAMESIZE_DIV_FACTOR)                \
+      !((width) & DDL_FRAMESIZE_DIV_FACTOR) &&              \
+      !((height) & DDL_FRAMESIZE_DIV_FACTOR)                \
    )                                                        \
 )
 
