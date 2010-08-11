@@ -748,8 +748,8 @@ static u32 vcd_fill_output_buffer_cmn
 	buf_entry->frame = *buffer;
 	rc = vcd_return_op_buffer_to_hw(cctxt, buf_entry);
 	if (!VCD_FAILED(rc) && cctxt->sched_clnt_hdl) {
-		vcd_try_submit_frame(cctxt->dev_ctxt);
 		cctxt->sched_clnt_hdl->tkns++;
+		vcd_try_submit_frame(cctxt->dev_ctxt);
 	}
 	return rc;
 }
