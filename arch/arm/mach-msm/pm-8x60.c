@@ -64,18 +64,6 @@ module_param_named(
  * Sleep Modes and Parameters
  *****************************************************************************/
 
-static unsigned int msm_pm_sleep_mode_mask = 0x02;
-module_param_named(
-	sleep_mode_mask, msm_pm_sleep_mode_mask,
-	uint, S_IRUGO | S_IWUSR | S_IWGRP
-);
-
-static unsigned int msm_pm_idle_sleep_mode_mask = 0x10;
-module_param_named(
-	idle_sleep_mode_mask, msm_pm_idle_sleep_mode_mask,
-	uint, S_IRUGO | S_IWUSR | S_IWGRP
-);
-
 static struct msm_pm_platform_data *msm_pm_modes;
 
 void __init msm_pm_set_platform_data(
@@ -83,6 +71,222 @@ void __init msm_pm_set_platform_data(
 {
 	BUG_ON(MSM_PM_SLEEP_MODE_NR * num_possible_cpus() != count);
 	msm_pm_modes = data;
+}
+
+#define MSM_PM_MODE_ATTR_SUSPEND_ENABLED "suspend_enabled"
+#define MSM_PM_MODE_ATTR_IDLE_ENABLED "idle_enabled"
+#define MSM_PM_MODE_ATTR_NR (2)
+
+struct msm_pm_kobj_attribute {
+	unsigned int cpu;
+	struct kobj_attribute ka;
+};
+
+#define GET_CPU_OF_ATTR(attr) \
+	(container_of(attr, struct msm_pm_kobj_attribute, ka)->cpu)
+
+struct msm_pm_sysfs_sleep_mode {
+	struct kobject *kobj;
+	struct attribute_group attr_group;
+	struct attribute *attrs[MSM_PM_MODE_ATTR_NR + 1];
+	struct msm_pm_kobj_attribute kas[MSM_PM_MODE_ATTR_NR];
+};
+
+static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = "power_collapse",
+	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT] = "wfi",
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE] =
+		"standalone_power_collapse",
+};
+
+/*
+ * Write out the attribute.
+ */
+static ssize_t msm_pm_mode_attr_show(
+	struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	int ret = -EINVAL;
+	int i;
+
+	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
+		struct kernel_param kp;
+		unsigned int cpu;
+		struct msm_pm_platform_data *mode;
+
+		if (msm_pm_sleep_mode_labels[i] == NULL)
+			continue;
+
+		if (strcmp(kobj->name, msm_pm_sleep_mode_labels[i]))
+			continue;
+
+		cpu = GET_CPU_OF_ATTR(attr);
+		mode = &msm_pm_modes[MSM_PM_MODE(cpu, i)];
+
+		if (!strcmp(attr->attr.name,
+			MSM_PM_MODE_ATTR_SUSPEND_ENABLED)) {
+			u32 arg = mode->suspend_enabled;
+			kp.arg = &arg;
+			ret = param_get_ulong(buf, &kp);
+		} else if (!strcmp(attr->attr.name,
+			MSM_PM_MODE_ATTR_IDLE_ENABLED)) {
+			u32 arg = mode->idle_enabled;
+			kp.arg = &arg;
+			ret = param_get_ulong(buf, &kp);
+		}
+
+		break;
+	}
+
+	if (ret > 0) {
+		strcat(buf, "\n");
+		ret++;
+	}
+
+	return ret;
+}
+
+/*
+ * Read in the new attribute value.
+ */
+static ssize_t msm_pm_mode_attr_store(struct kobject *kobj,
+	struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret = -EINVAL;
+	int i;
+
+	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
+		struct kernel_param kp;
+		unsigned int cpu;
+		struct msm_pm_platform_data *mode;
+
+		if (msm_pm_sleep_mode_labels[i] == NULL)
+			continue;
+
+		if (strcmp(kobj->name, msm_pm_sleep_mode_labels[i]))
+			continue;
+
+		cpu = GET_CPU_OF_ATTR(attr);
+		mode = &msm_pm_modes[MSM_PM_MODE(cpu, i)];
+
+		if (!strcmp(attr->attr.name,
+			MSM_PM_MODE_ATTR_SUSPEND_ENABLED)) {
+			kp.arg = &mode->suspend_enabled;
+			ret = param_set_byte(buf, &kp);
+		} else if (!strcmp(attr->attr.name,
+			MSM_PM_MODE_ATTR_IDLE_ENABLED)) {
+			kp.arg = &mode->idle_enabled;
+			ret = param_set_byte(buf, &kp);
+		}
+
+		break;
+	}
+
+	return ret ? ret : count;
+}
+
+/*
+ * Add sysfs entries for one cpu.
+ */
+static int __init msm_pm_mode_sysfs_add_cpu(
+	unsigned int cpu, struct kobject *modes_kobj)
+{
+	char cpu_name[8];
+	struct kobject *cpu_kobj;
+	struct msm_pm_sysfs_sleep_mode *mode;
+	int i, k;
+	int ret;
+
+	snprintf(cpu_name, sizeof(cpu_name), "cpu%u", cpu);
+	cpu_kobj = kobject_create_and_add(cpu_name, modes_kobj);
+	if (!cpu_kobj) {
+		pr_err("%s: cannot create %s kobject\n", __func__, cpu_name);
+		ret = -ENOMEM;
+		goto mode_sysfs_add_cpu_exit;
+	}
+
+	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
+		if (!msm_pm_modes[MSM_PM_MODE(cpu, i)].supported)
+			continue;
+
+		mode = kzalloc(sizeof(*mode), GFP_KERNEL);
+		if (!mode) {
+			pr_err("%s: cannot allocate memory for attributes\n",
+				__func__);
+			ret = -ENOMEM;
+			goto mode_sysfs_add_cpu_exit;
+		}
+
+		mode->kobj = kobject_create_and_add(
+				msm_pm_sleep_mode_labels[i], cpu_kobj);
+		if (!mode->kobj) {
+			pr_err("%s: cannot create kobject\n", __func__);
+			ret = -ENOMEM;
+			goto mode_sysfs_add_cpu_exit;
+		}
+
+		mode->kas[0].ka.attr.name = MSM_PM_MODE_ATTR_SUSPEND_ENABLED;
+		mode->kas[1].ka.attr.name = MSM_PM_MODE_ATTR_IDLE_ENABLED;
+
+		for (k = 0; k < MSM_PM_MODE_ATTR_NR; k++) {
+			mode->kas[k].cpu = cpu;
+			mode->kas[k].ka.attr.mode = 0644;
+			mode->kas[k].ka.show = msm_pm_mode_attr_show;
+			mode->kas[k].ka.store = msm_pm_mode_attr_store;
+
+			mode->attrs[k] = &mode->kas[k].ka.attr;
+		}
+		mode->attrs[MSM_PM_MODE_ATTR_NR] = NULL;
+
+		mode->attr_group.attrs = mode->attrs;
+		ret = sysfs_create_group(mode->kobj, &mode->attr_group);
+		if (ret) {
+			pr_err("%s: cannot create kobject attribute group\n",
+				__func__);
+			goto mode_sysfs_add_cpu_exit;
+		}
+	}
+
+	ret = 0;
+
+mode_sysfs_add_cpu_exit:
+	return ret;
+}
+
+/*
+ * Add sysfs entries for the sleep modes.
+ */
+static int __init msm_pm_mode_sysfs_add(void)
+{
+	struct kobject *module_kobj;
+	struct kobject *modes_kobj;
+	unsigned int cpu;
+	int ret;
+
+	module_kobj = kset_find_obj(module_kset, KBUILD_MODNAME);
+	if (!module_kobj) {
+		pr_err("%s: cannot find kobject for module %s\n",
+			__func__, KBUILD_MODNAME);
+		ret = -ENOENT;
+		goto mode_sysfs_add_exit;
+	}
+
+	modes_kobj = kobject_create_and_add("modes", module_kobj);
+	if (!modes_kobj) {
+		pr_err("%s: cannot create modes kobject\n", __func__);
+		ret = -ENOMEM;
+		goto mode_sysfs_add_exit;
+	}
+
+	for_each_possible_cpu(cpu) {
+		ret = msm_pm_mode_sysfs_add_cpu(cpu, modes_kobj);
+		if (ret)
+			goto mode_sysfs_add_exit;
+	}
+
+	ret = 0;
+
+mode_sysfs_add_exit:
+	return ret;
 }
 
 /******************************************************************************
@@ -579,8 +783,7 @@ static int msm_pm_enter(suspend_state_t state)
 		struct msm_pm_platform_data *mode;
 
 		mode = &msm_pm_modes[MSM_PM_MODE(0, i)];
-		allow[i] = ((msm_pm_sleep_mode_mask >> i) & 0x1) &&
-			mode->supported && mode->suspend_enabled;
+		allow[i] = mode->supported && mode->suspend_enabled;
 	}
 
 	if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE]) {
@@ -659,8 +862,7 @@ void platform_cpu_die(unsigned int cpu)
 		struct msm_pm_platform_data *mode;
 
 		mode = &msm_pm_modes[MSM_PM_MODE(0, i)];
-		allow[i] = ((msm_pm_sleep_mode_mask >> i) & 0x1) &&
-			mode->supported && mode->suspend_enabled;
+		allow[i] = mode->supported && mode->suspend_enabled;
 	}
 
 	pr_notice("%s(): shutting down cpu %u\n", __func__, cpu);
@@ -775,6 +977,7 @@ static int __init msm_pm_init(void)
 	}
 #endif  /* CONFIG_MSM_IDLE_STATS */
 
+	msm_pm_mode_sysfs_add();
 	msm_spm_allow_x_cpu_set_vdd(false);
 
 	suspend_set_ops(&msm_pm_ops);
