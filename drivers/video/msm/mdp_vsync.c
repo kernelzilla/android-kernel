@@ -301,10 +301,10 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 			ret = gpio_tlmm_config(GPIO_CFG
 					(vsync_gpio,
 					(mfd->use_mdp_vsync) ? 1 : 0,
-					GPIO_INPUT,
-					GPIO_PULL_DOWN,
-					GPIO_2MA),
-					GPIO_ENABLE);
+					GPIO_CFG_INPUT,
+					GPIO_CFG_PULL_DOWN,
+					GPIO_CFG_2MA),
+					GPIO_CFG_ENABLE);
 			if (ret)
 				goto err_handle;
 

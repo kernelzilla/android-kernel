@@ -272,9 +272,9 @@ static int fsusb_gpio_init(void)
 }
 
 static unsigned fsusb_config[] = {
-	GPIO_CFG(139, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
-	GPIO_CFG(140, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
-	GPIO_CFG(141, 3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	GPIO_CFG(139, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(140, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(141, 3, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static void msm_fsusb_setup_gpio(unsigned int enable)
@@ -283,7 +283,7 @@ static void msm_fsusb_setup_gpio(unsigned int enable)
 
 	for (i = 0; i < ARRAY_SIZE(fsusb_config); i++) {
 		rc = gpio_tlmm_config(fsusb_config[i],
-			enable ? GPIO_ENABLE : GPIO_DISABLE);
+			enable ? GPIO_CFG_ENABLE : GPIO_CFG_DISABLE);
 		if (rc)
 			pr_err("unable to configure fsusb gpios\n");
 	}
@@ -410,8 +410,8 @@ static struct platform_device android_pmem_kernel_ebi1_device = {
 };
 
 static struct msm_gpio bma_spi_gpio_config_data[] = {
-	{ GPIO_CFG(COMET_BMA150_GPIO, 0, GPIO_INPUT,
-		   GPIO_NO_PULL, GPIO_2MA), "bma_irq" },
+	{ GPIO_CFG(COMET_BMA150_GPIO, 0, GPIO_CFG_INPUT,
+		   GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "bma_irq" },
 };
 
 static int msm_bma_gpio_setup(struct device *dev)
@@ -481,10 +481,10 @@ static struct spi_board_info msm_spi_board_info[] __initdata = {
 };
 
 static struct msm_gpio qsd_spi_gpio_config_data[] = {
-	{ GPIO_CFG(17,  1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
-	{ GPIO_CFG(18,  1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_mosi" },
-	{ GPIO_CFG(19,  1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_miso" },
-	{ GPIO_CFG(20,  1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
+	{ GPIO_CFG(17,  1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
+	{ GPIO_CFG(18,  1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_mosi" },
+	{ GPIO_CFG(19,  1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_miso" },
+	{ GPIO_CFG(20,  1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
 };
 
 static int msm_qsd_spi_gpio_config(void)
@@ -697,30 +697,30 @@ enum {
 };
 
 static unsigned bt_config_power_on[] = {
-	GPIO_CFG(29, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* WAKE */
-	GPIO_CFG(40, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA),	/* HOST_WAKE */
-	GPIO_CFG(22, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* PWR_EN */
-	GPIO_CFG(43, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* RFR */
-	GPIO_CFG(44, 2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA),	/* CTS */
-	GPIO_CFG(45, 2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA),	/* Rx */
-	GPIO_CFG(46, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* Tx */
-	GPIO_CFG(68, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* PCM_DOUT */
-	GPIO_CFG(69, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA),	/* PCM_DIN */
-	GPIO_CFG(70, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* PCM_SYNC */
-	GPIO_CFG(71, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),	/* PCM_CLK */
+	GPIO_CFG(29, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* WAKE */
+	GPIO_CFG(40, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* HOST_WAKE */
+	GPIO_CFG(22, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* PWR_EN */
+	GPIO_CFG(43, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* RFR */
+	GPIO_CFG(44, 2, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* CTS */
+	GPIO_CFG(45, 2, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* Rx */
+	GPIO_CFG(46, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* Tx */
+	GPIO_CFG(68, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* PCM_DOUT */
+	GPIO_CFG(69, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* PCM_DIN */
+	GPIO_CFG(70, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* PCM_SYNC */
+	GPIO_CFG(71, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* PCM_CLK */
 };
 static unsigned bt_config_power_off[] = {
-	GPIO_CFG(29, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* WAKE */
-	GPIO_CFG(40, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* HOST_WAKE */
-	GPIO_CFG(22, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* PWR_EN */
-	GPIO_CFG(43, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* RFR */
-	GPIO_CFG(44, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* CTS */
-	GPIO_CFG(45, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* Rx */
-	GPIO_CFG(46, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* Tx */
-	GPIO_CFG(68, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* PCM_DOUT */
-	GPIO_CFG(69, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* PCM_DIN */
-	GPIO_CFG(70, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* PCM_SYNC */
-	GPIO_CFG(71, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),	/* PCM_CLK */
+	GPIO_CFG(29, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* WAKE */
+	GPIO_CFG(40, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* HOST_WAKE */
+	GPIO_CFG(22, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PWR_EN */
+	GPIO_CFG(43, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* RFR */
+	GPIO_CFG(44, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* CTS */
+	GPIO_CFG(45, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* Rx */
+	GPIO_CFG(46, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* Tx */
+	GPIO_CFG(68, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCM_DOUT */
+	GPIO_CFG(69, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCM_DIN */
+	GPIO_CFG(70, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCM_SYNC */
+	GPIO_CFG(71, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCM_CLK */
 };
 
 static int bluetooth_power(int on)
@@ -732,7 +732,7 @@ static int bluetooth_power(int on)
 	if (on) {
 		for (pin = 0; pin < ARRAY_SIZE(bt_config_power_on); pin++) {
 			rc = gpio_tlmm_config(bt_config_power_on[pin],
-					      GPIO_ENABLE);
+					      GPIO_CFG_ENABLE);
 			if (rc) {
 				printk(KERN_ERR
 				       "%s: gpio_tlmm_config(%#x)=%d\n",
@@ -752,7 +752,7 @@ static int bluetooth_power(int on)
 
 		for (pin = 0; pin < ARRAY_SIZE(bt_config_power_off); pin++) {
 			rc = gpio_tlmm_config(bt_config_power_off[pin],
-					      GPIO_ENABLE);
+					      GPIO_CFG_ENABLE);
 			if (rc) {
 				printk(KERN_ERR
 				       "%s: gpio_tlmm_config(%#x)=%d\n",
@@ -878,9 +878,9 @@ static int touchpad_gpio_setup(void)
 	int suspend_pin = TOUCHPAD_SUSPEND;
 	int irq_pin = TOUCHPAD_IRQ;
 	unsigned suspend_cfg =
-		GPIO_CFG(suspend_pin, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA);
+		GPIO_CFG(suspend_pin, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 	unsigned irq_cfg =
-		GPIO_CFG(irq_pin, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA);
+		GPIO_CFG(irq_pin, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
 	rc = gpio_request(irq_pin, "msm_touchpad_irq");
 	if (rc) {
@@ -894,13 +894,13 @@ static int touchpad_gpio_setup(void)
 			suspend_pin, rc);
 		goto err_gpioconfig;
 	}
-	rc = gpio_tlmm_config(suspend_cfg, GPIO_ENABLE);
+	rc = gpio_tlmm_config(suspend_cfg, GPIO_CFG_ENABLE);
 	if (rc) {
 		pr_err("gpio_tlmm_config failed on pin %d (rc=%d)\n",
 			suspend_pin, rc);
 		goto err_gpioconfig;
 	}
-	rc = gpio_tlmm_config(irq_cfg, GPIO_ENABLE);
+	rc = gpio_tlmm_config(irq_cfg, GPIO_CFG_ENABLE);
 	if (rc) {
 		pr_err("gpio_tlmm_config failed on pin %d (rc=%d)\n",
 			irq_pin, rc);
@@ -934,7 +934,7 @@ static int kbd_gpio_setup(void)
 	int irqpin = KBD_IRQ;
 
 	unsigned irqcfg =
-		GPIO_CFG(irqpin, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA);
+		GPIO_CFG(irqpin, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
 	rc = gpio_request(irqpin, "gpio_keybd_irq");
 	if (rc) {
@@ -942,7 +942,7 @@ static int kbd_gpio_setup(void)
 			irqpin, rc);
 		goto err_gpioconfig;
 	}
-	rc = gpio_tlmm_config(irqcfg, GPIO_ENABLE);
+	rc = gpio_tlmm_config(irqcfg, GPIO_CFG_ENABLE);
 	if (rc) {
 		pr_err("gpio_tlmm_config failed on pin %d (rc=%d)\n",
 			irqpin, rc);
@@ -998,11 +998,11 @@ static struct msm_i2ckbd_platform_data msm_kybd_data = {
 };
 
 static struct msm_gpio optnav_config_data[] = {
-	{ GPIO_CFG(OPTNAV_BUTTON_L, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),
+	{ GPIO_CFG(OPTNAV_BUTTON_L, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 	  "optnav_button_l" },
-	{ GPIO_CFG(OPTNAV_BUTTON_R, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),
+	{ GPIO_CFG(OPTNAV_BUTTON_R, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 	  "optnav_button_r" },
-	{ GPIO_CFG(OPTNAV_IRQ, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),
+	{ GPIO_CFG(OPTNAV_IRQ, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 	  "optnav_irq" },
 };
 
@@ -1145,30 +1145,30 @@ static void sdcc_gpio_init(void)
 static unsigned sdcc_cfg_data[][6] = {
 	/* SDC1 configs */
 	{
-	GPIO_CFG(51, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(52, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(53, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(54, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(55, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(56, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	},
 	/* SDC2 configs */
 	{
-	GPIO_CFG(62, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
-	GPIO_CFG(63, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(64, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(65, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(66, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(67, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(62, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(63, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(64, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(66, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(67, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 	},
 	/* SDC3 configs */
 	{
-	GPIO_CFG(88, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
-	GPIO_CFG(89, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(90, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(91, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(92, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
-	GPIO_CFG(93, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	GPIO_CFG(88, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(89, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(90, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(91, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(92, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	GPIO_CFG(93, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 	},
 };
 
@@ -1186,7 +1186,7 @@ static void msm_sdcc_setup_gpio(int dev_id, unsigned int enable)
 
 	for (i = 0; i < ARRAY_SIZE(sdcc_cfg_data[dev_id - 1]); i++) {
 		rc = gpio_tlmm_config(sdcc_cfg_data[dev_id - 1][i],
-			enable ? GPIO_ENABLE : GPIO_DISABLE);
+			enable ? GPIO_CFG_ENABLE : GPIO_CFG_DISABLE);
 		if (rc)
 			printk(KERN_ERR "%s: gpio_tlmm_config(%#x)=%d\n",
 				__func__, sdcc_cfg_data[dev_id - 1][i], rc);
@@ -1288,15 +1288,15 @@ msm_i2c_gpio_config(int iface, int config_type)
 		gpio_sda = 96;
 	}
 	if (config_type) {
-		gpio_tlmm_config(GPIO_CFG(gpio_scl, 1, GPIO_INPUT,
-					GPIO_NO_PULL, GPIO_16MA), GPIO_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(gpio_sda, 1, GPIO_INPUT,
-					GPIO_NO_PULL, GPIO_16MA), GPIO_ENABLE);
+		gpio_tlmm_config(GPIO_CFG(gpio_scl, 1, GPIO_CFG_INPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+		gpio_tlmm_config(GPIO_CFG(gpio_sda, 1, GPIO_CFG_INPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
 	} else {
-		gpio_tlmm_config(GPIO_CFG(gpio_scl, 0, GPIO_OUTPUT,
-					GPIO_NO_PULL, GPIO_16MA), GPIO_ENABLE);
-		gpio_tlmm_config(GPIO_CFG(gpio_sda, 0, GPIO_OUTPUT,
-					GPIO_NO_PULL, GPIO_16MA), GPIO_ENABLE);
+		gpio_tlmm_config(GPIO_CFG(gpio_scl, 0, GPIO_CFG_OUTPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+		gpio_tlmm_config(GPIO_CFG(gpio_sda, 0, GPIO_CFG_OUTPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
 	}
 }
 
