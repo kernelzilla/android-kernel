@@ -148,7 +148,8 @@
 #define	VX6953_HRZ_QTR_BLK_PIXELS	1628
 #define	VX6953_VER_QTR_BLK_LINES	28
 #define	MAX_LINE_LENGTH_PCK		8190
-#define	VX6953_REVISION_NUMBER	0x10/*revision number	for	Cut2.0*/
+#define	VX6953_REVISION_NUMBER_CUT2	0x10/*revision number	for	Cut2.0*/
+#define	VX6953_REVISION_NUMBER_CUT3	0x20/*revision number	for	Cut3.0*/
 /* FIXME: Changes from here */
 struct vx6953_work_t {
 	struct work_struct work;
@@ -3129,7 +3130,10 @@ int vx6953_sensor_open_init(const struct msm_camera_sensor_info *data)
 	if (vx6953_i2c_read(0x0018, &revision_number, 1) < 0)
 		return rc;
 		CDBG("sensor revision number = 0x%x\n", revision_number);
-	if (revision_number == VX6953_REVISION_NUMBER) {
+	if (revision_number == VX6953_REVISION_NUMBER_CUT3) {
+		vx6953_ctrl->sensor_type = VX6953_STM5M0EDOF_CUT_3;
+		CDBG("VX6953 EDof Cut 3.0 sensor\n ");
+	} else if (revision_number == VX6953_REVISION_NUMBER_CUT2) {
 		vx6953_ctrl->sensor_type = VX6953_STM5M0EDOF_CUT_2;
 		CDBG("VX6953 EDof Cut 2.0 sensor\n ");
 	} else {/* Cut1.0 reads 0x00 for register 0x0018*/

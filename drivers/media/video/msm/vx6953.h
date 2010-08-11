@@ -137,7 +137,8 @@ enum mt9p012_reg_update {
 
 enum sensor_revision_t {
 	VX6953_STM5M0EDOF_CUT_1,
-	VX6953_STM5M0EDOF_CUT_2
+	VX6953_STM5M0EDOF_CUT_2,
+	VX6953_STM5M0EDOF_CUT_3
 };
 enum edof_mode_t {
 	VX6953_EDOF_DISABLE,       /* 0x00 */
