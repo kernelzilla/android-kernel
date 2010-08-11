@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,7 +28,7 @@
  */
 #ifndef __MACH_QDSP5_V2_SNDDEV_ICODEC_H
 #define __MACH_QDSP5_V2_SNDDEV_ICODEC_H
-#include <mach/qdsp5v2/adie_marimba.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <mach/qdsp5v2/audio_def.h>
 #include <mach/pmic.h>
 

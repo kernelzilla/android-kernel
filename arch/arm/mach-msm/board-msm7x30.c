@@ -63,6 +63,8 @@
 #include <mach/pmic.h>
 #include <mach/rpc_pmapp.h>
 #include <mach/qdsp5v2/aux_pcm.h>
+#include <mach/qdsp5v2/mi2s.h>
+#include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/msm_battery.h>
 #include <mach/rpc_server_handset.h>
 #include <mach/msm_tsif.h>
@@ -1170,6 +1172,132 @@ static int __init aux_pcm_gpio_init(void)
 	}
 	return rc;
 }
+
+static struct msm_gpio mi2s_clk_gpios[] = {
+	{ GPIO_CFG(145, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_SCLK"},
+	{ GPIO_CFG(144, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_WS"},
+	{ GPIO_CFG(120, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_MCLK_A"},
+};
+
+static struct msm_gpio mi2s_rx_data_lines_gpios[] = {
+	{ GPIO_CFG(121, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD0_A"},
+	{ GPIO_CFG(122, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD1_A"},
+	{ GPIO_CFG(123, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD2_A"},
+	{ GPIO_CFG(146, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD3"},
+};
+
+static struct msm_gpio mi2s_tx_data_lines_gpios[] = {
+	{ GPIO_CFG(146, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	    "MI2S_DATA_SD3"},
+};
+
+int mi2s_config_clk_gpio(void)
+{
+	int rc = 0;
+
+	rc = msm_gpios_request_enable(mi2s_clk_gpios,
+			ARRAY_SIZE(mi2s_clk_gpios));
+	if (rc) {
+		pr_err("%s: enable mi2s clk gpios  failed\n",
+					__func__);
+		return rc;
+	}
+	return 0;
+}
+
+int  mi2s_unconfig_data_gpio(u32 direction, u8 sd_line_mask)
+{
+	int i, rc = 0;
+	sd_line_mask &= MI2S_SD_LINE_MASK;
+
+	switch (direction) {
+	case DIR_TX:
+		msm_gpios_disable_free(mi2s_tx_data_lines_gpios, 1);
+		break;
+	case DIR_RX:
+		i = 0;
+		while (sd_line_mask) {
+			if (sd_line_mask & 0x1)
+				msm_gpios_disable_free(
+					mi2s_rx_data_lines_gpios + i , 1);
+			sd_line_mask = sd_line_mask >> 1;
+			i++;
+		}
+		break;
+	default:
+		pr_err("%s: Invaild direction  direction = %u\n",
+						__func__, direction);
+		rc = -EINVAL;
+		break;
+	}
+	return rc;
+}
+
+int mi2s_config_data_gpio(u32 direction, u8 sd_line_mask)
+{
+	int i , rc = 0;
+	u8 sd_config_done_mask = 0;
+
+	sd_line_mask &= MI2S_SD_LINE_MASK;
+
+	switch (direction) {
+	case DIR_TX:
+		if ((sd_line_mask & MI2S_SD_0) || (sd_line_mask & MI2S_SD_1) ||
+		   (sd_line_mask & MI2S_SD_2) || !(sd_line_mask & MI2S_SD_3)) {
+			pr_err("%s: can not use SD0 or SD1 or SD2 for TX"
+				".only can use SD3. sd_line_mask = 0x%x\n",
+				__func__ , sd_line_mask);
+			rc = -EINVAL;
+		} else {
+			rc = msm_gpios_request_enable(mi2s_tx_data_lines_gpios,
+							 1);
+			if (rc)
+				pr_err("%s: enable mi2s gpios for TX failed\n",
+					   __func__);
+		}
+		break;
+	case DIR_RX:
+		i = 0;
+		while (sd_line_mask && (rc == 0)) {
+			if (sd_line_mask & 0x1) {
+				rc = msm_gpios_request_enable(
+					mi2s_rx_data_lines_gpios + i , 1);
+				if (rc) {
+					pr_err("%s: enable mi2s gpios for"
+					 "RX failed.  SD line = %s\n",
+					 __func__,
+					 (mi2s_rx_data_lines_gpios + i)->label);
+					mi2s_unconfig_data_gpio(DIR_RX,
+						sd_config_done_mask);
+				} else
+					sd_config_done_mask |= (1 << i);
+			}
+			sd_line_mask = sd_line_mask >> 1;
+			i++;
+		}
+		break;
+	default:
+		pr_err("%s: Invaild direction  direction = %u\n",
+			__func__, direction);
+		rc = -EINVAL;
+		break;
+	}
+	return rc;
+}
+
+int mi2s_unconfig_clk_gpio(void)
+{
+	msm_gpios_disable_free(mi2s_clk_gpios, ARRAY_SIZE(mi2s_clk_gpios));
+	return 0;
+}
+
 #endif /* CONFIG_MSM7KV2_AUDIO */
 
 static int __init buses_init(void)
