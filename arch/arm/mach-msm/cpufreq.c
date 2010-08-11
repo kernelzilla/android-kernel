@@ -20,18 +20,58 @@
 #include <linux/earlysuspend.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
+#include <linux/workqueue.h>
+#include <linux/completion.h>
 #include "acpuclock.h"
+
+#ifdef CONFIG_SMP
+struct cpufreq_work_struct {
+	struct work_struct work;
+	struct cpufreq_policy *policy;
+	struct completion complete;
+	int frequency;
+	int status;
+};
+
+static DEFINE_PER_CPU(struct cpufreq_work_struct, cpufreq_work);
+#endif
 
 #define dprintk(msg...) \
 		cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
+
+static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
+{
+	int ret = 0;
+	struct cpufreq_freqs freqs;
+
+	freqs.old = policy->cur;
+	freqs.new = new_freq;
+	freqs.cpu = policy->cpu;
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	ret = acpuclk_set_rate(policy->cpu, new_freq, SETRATE_CPUFREQ);
+	if (!ret)
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+	return ret;
+}
+
+#ifdef CONFIG_SMP
+static void set_cpu_work(struct work_struct *work)
+{
+	struct cpufreq_work_struct *cpu_work =
+		container_of(work, struct cpufreq_work_struct, work);
+
+	cpu_work->status = set_cpu_freq(cpu_work->policy, cpu_work->frequency);
+	complete(&cpu_work->complete);
+}
+#endif
 
 static int msm_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
 				unsigned int relation)
 {
+	int ret = -EFAULT;
 	int index;
-	int ret = 0;
-	struct cpufreq_freqs freqs;
 	struct cpufreq_frequency_table *table;
 
 	table = cpufreq_frequency_get_table(policy->cpu);
@@ -42,17 +82,34 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	}
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
-	dprintk("target %d r %d (%d-%d) selected %d\n", target_freq,
-		relation, policy->min, policy->max, table[index].frequency);
+	dprintk("CPU[%d] target %d relation %d (%d-%d) selected %d\n",
+		policy->cpu, target_freq, relation,
+		policy->min, policy->max, table[index].frequency);
 #endif
-	freqs.old = policy->cur;
-	freqs.new = table[index].frequency;
-	freqs.cpu = policy->cpu;
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	ret = acpuclk_set_rate(policy->cpu, table[index].frequency,
-				SETRATE_CPUFREQ);
-	if (!ret)
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+#ifdef CONFIG_SMP
+	if (get_cpu() == policy->cpu) {
+		/* Issue a direct call, since we are on the same cpu */
+		ret = set_cpu_freq(policy, table[index].frequency);
+		put_cpu();
+	} else {
+		struct cpufreq_work_struct *cpu_work = NULL;
+
+		put_cpu();
+		cpu_work = &per_cpu(cpufreq_work, policy->cpu);
+		cpu_work->policy = policy;
+		cpu_work->frequency = table[index].frequency;
+
+		init_completion(&cpu_work->complete);
+		cancel_work_sync(&cpu_work->work);
+		schedule_work_on(policy->cpu, &cpu_work->work);
+		wait_for_completion(&cpu_work->complete);
+		ret = cpu_work->status;
+	}
+#else
+	ret = set_cpu_freq(policy, table[index].frequency);
+#endif
+
 	return ret;
 }
 
@@ -66,6 +123,9 @@ static int msm_cpufreq_verify(struct cpufreq_policy *policy)
 static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 {
 	struct cpufreq_frequency_table *table;
+#ifdef CONFIG_SMP
+	struct cpufreq_work_struct *cpu_work = NULL;
+#endif
 
 	table = cpufreq_frequency_get_table(policy->cpu);
 	policy->cur = acpuclk_get_rate(policy->cpu);
@@ -82,6 +142,10 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
+#ifdef CONFIG_SMP
+	cpu_work = &per_cpu(cpufreq_work, policy->cpu);
+	INIT_WORK(&cpu_work->work, set_cpu_work);
+#endif
 	return 0;
 }
 
