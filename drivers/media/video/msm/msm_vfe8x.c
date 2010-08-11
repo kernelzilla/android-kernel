@@ -748,3 +748,8 @@ void msm_camvfe_fn_init(struct msm_camvfe_fn *fptr, void *data)
 	fptr->vfe_release = vfe_release;
 	vfe_syncdata = data;
 }
+
+void msm_camvpe_fn_init(struct msm_camvpe_fn *fptr, void *data)
+{
+	return;
+}

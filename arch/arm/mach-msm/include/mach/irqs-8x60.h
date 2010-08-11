@@ -101,7 +101,7 @@
 #define MARM_SCSS_GP_IRQ_7			(GIC_SPI_START + 44)
 #define MARM_SCSS_GP_IRQ_8			(GIC_SPI_START + 45)
 #define MARM_SCSS_GP_IRQ_9			(GIC_SPI_START + 46)
-#define VPE_IRQ					(GIC_SPI_START + 47)
+#define INT_VPE					(GIC_SPI_START + 47)
 #define VFE_IRQ					(GIC_SPI_START + 48)
 #define VCODEC_IRQ				(GIC_SPI_START + 49)
 #define TV_ENC_IRQ				(GIC_SPI_START + 50)

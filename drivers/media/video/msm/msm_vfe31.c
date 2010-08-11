@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <mach/irqs.h>
 #include "msm_vfe31.h"
+#include "msm_vpe1.h"
 #include <mach/camera.h>
 #include <linux/io.h>
 #include <mach/msm_reqs.h>
@@ -223,6 +224,10 @@ static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
 			((struct vfe_message *)data)->_u.msgOut.yBuffer;
 		pinfo->cbcr_phy =
 			((struct vfe_message *)data)->_u.msgOut.cbcrBuffer;
+
+		pinfo->frame_id =
+		((struct vfe_message *)data)->_u.msgOut.frameCounter;
+
 		((struct vfe_msg_output *)(vfe31_ctrl->extdata))->bpcInfo =
 		((struct vfe_message *)data)->_u.msgOut.bpcInfo;
 		((struct vfe_msg_output *)(vfe31_ctrl->extdata))->asfInfo =
@@ -241,6 +246,10 @@ static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
 	case VFE_MSG_STATS_CS:
 		pinfo->sbuf_phy =
 		((struct vfe_message *)data)->_u.msgStats.buffer;
+
+		pinfo->frame_id =
+		((struct vfe_message *)data)->_u.msgStats.frameCounter;
+
 		break;
 
 	default:
@@ -357,6 +366,10 @@ static void vfe31_proc_ops(enum VFE31_MESSAGE_ID id, void *msg, size_t len)
 		rp->type = VFE_MSG_GENERAL;
 		break;
 	}
+
+	/* save the frame id.*/
+	rp->evt_msg.frame_id = rp->phy.frame_id;
+
 	vfe31_ctrl->resp->vfe_resp(rp, MSM_CAM_Q_VFE_MSG, vfe31_ctrl->syncdata,
 		GFP_ATOMIC);
 }
@@ -473,6 +486,8 @@ static void vfe31_release(struct platform_device *pdev)
 
 	vfemem = vfe31_ctrl->vfemem;
 	vfeio  = vfe31_ctrl->vfeio;
+
+	msm_vpe_release();
 
 	kfree(vfe31_ctrl->extdata);
 	free_irq(vfe31_ctrl->vfeirq, 0);
@@ -1299,10 +1314,12 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 			rc = -EFAULT;
 			goto proc_general_done;
 		}
+		/*
 		old_val = msm_io_r(vfe31_ctrl->vfebase + VFE_MODULE_CFG);
 		old_val |= RS_ENABLE_MASK;
 		msm_io_w(old_val,
 			vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+		*/
 		msm_io_memcpy(vfe31_ctrl->vfebase + vfe31_cmd[cmd->id].offset,
 				cmdp, (vfe31_cmd[cmd->id].length));
 		}
@@ -1320,10 +1337,12 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 			rc = -EFAULT;
 			goto proc_general_done;
 		}
+		/*
 		old_val = msm_io_r(vfe31_ctrl->vfebase + VFE_MODULE_CFG);
 		old_val |= CS_ENABLE_MASK;
 		msm_io_w(old_val,
 			vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+		*/
 		msm_io_memcpy(vfe31_ctrl->vfebase + vfe31_cmd[cmd->id].offset,
 				cmdp, (vfe31_cmd[cmd->id].length));
 		}
@@ -1957,7 +1976,7 @@ static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id)
 
 static void vfe31_process_reg_update_irq(void)
 {
-	uint32_t  temp;
+	uint32_t  temp, old_val;
 	unsigned long flags;
 	if (vfe31_ctrl->req_start_video_rec) {
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_V) {
@@ -1984,6 +2003,13 @@ static void vfe31_process_reg_update_irq(void)
 			}
 		}
 		vfe31_ctrl->req_start_video_rec =  FALSE;
+		if (vpe_ctrl->dis_en) {
+			old_val = msm_io_r(
+				vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+			old_val |= RS_CS_ENABLE_MASK;
+			msm_io_w(old_val,
+				vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+		}
 		CDBG("start video triggered .\n");
 	} else if (vfe31_ctrl->req_stop_video_rec) {
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_V) {
@@ -2010,6 +2036,13 @@ static void vfe31_process_reg_update_irq(void)
 			}
 		}
 		vfe31_ctrl->req_stop_video_rec =  FALSE;
+
+		/*disable rs& cs when stop recording. */
+		old_val = msm_io_r(vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+		old_val &= (~RS_CS_ENABLE_MASK);
+		msm_io_w(old_val,
+				vfe31_ctrl->vfebase + VFE_MODULE_CFG);
+
 		CDBG("stop video triggered .\n");
 	}
 	if (vfe31_ctrl->start_ack_pending == TRUE) {
@@ -2386,6 +2419,11 @@ static void vfe31_process_output_path_irq_2(void)
 		((vfe31_ctrl->operation_mode & 1) &&
 		(vfe31_ctrl->vfe_capture_count <= 1)) ||
 		(vfe31_ctrl->outpath.out2.free_buf.available);
+
+	CDBG("%s: op mode = %d, capture_cnt = %d\n", __func__,
+		 vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
+	CDBG("%s: output2.free_buf.available = %d\n", __func__,
+		 vfe31_ctrl->outpath.out2.free_buf.available);
 
 	if (out_bool) {
 			ping_pong = msm_io_r(vfe31_ctrl->vfebase +
@@ -2911,6 +2949,8 @@ static int vfe31_init(struct msm_vfe_callback *presp,
 		return rc;
 	/* Bring up all the required GPIOs and Clocks */
 	rc = msm_camio_enable(pdev);
+	if (msm_vpe_open() < 0)
+		CDBG("%s: vpe_open failed\n", __func__);
 	return rc;
 }
 
@@ -2922,4 +2962,14 @@ void msm_camvfe_fn_init(struct msm_camvfe_fn *fptr, void *data)
 	fptr->vfe_disable = vfe31_disable;
 	fptr->vfe_release = vfe31_release;
 	vfe_syncdata = data;
+}
+
+void msm_camvpe_fn_init(struct msm_camvpe_fn *fptr, void *data)
+{
+	fptr->vpe_reg		= msm_vpe_reg;
+	fptr->send_frame_to_vpe	= msm_send_frame_to_vpe;
+	fptr->vpe_config	= msm_vpe_config;
+	fptr->vpe_cfg_update	= msm_vpe_cfg_update;
+	fptr->dis		= &(vpe_ctrl->dis_en);
+	vpe_ctrl->syncdata = data;
 }

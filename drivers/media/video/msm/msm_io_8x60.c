@@ -86,6 +86,9 @@ static struct clk *camio_csi1_pclk;
 static struct clk *camio_vfe_pclk;
 static struct clk *camio_jpeg_clk;
 static struct clk *camio_jpeg_pclk;
+static struct clk *camio_vpe_clk;
+static struct clk *camio_vpe_pclk;
+
 
 static struct msm_camera_io_ext camio_ext;
 static struct msm_camera_io_clk camio_clk;
@@ -296,6 +299,17 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		clk = clk_get(NULL, "ijpeg_pclk");
 		break;
 
+	case CAMIO_VPE_CLK:
+		camio_vpe_clk =
+		clk = clk_get(NULL, "vpe_clk");
+		msm_camio_clk_rate_set_2(clk, 160000000);
+		break;
+
+	case CAMIO_VPE_PCLK:
+		camio_vpe_pclk =
+		clk = clk_get(NULL, "vpe_pclk");
+		break;
+
 	default:
 		break;
 	}
@@ -353,6 +367,14 @@ int msm_camio_clk_disable(enum msm_camio_clk_type clktype)
 		clk = camio_jpeg_pclk;
 		break;
 
+	case CAMIO_VPE_CLK:
+		clk = camio_vpe_clk;
+		break;
+
+	case CAMIO_VPE_PCLK:
+		clk = camio_vpe_pclk;
+		break;
+
 	default:
 		break;
 	}
@@ -388,16 +410,42 @@ static irqreturn_t msm_io_csi_irq(int irq_num, void *data)
 
 int msm_camio_jpeg_clk_disable(void)
 {
-	msm_camio_clk_disable(CAMIO_JPEG_CLK);
-	msm_camio_clk_disable(CAMIO_JPEG_PCLK);
-	return 0;
+	int rc = 0;
+	rc = msm_camio_clk_disable(CAMIO_JPEG_CLK);
+	if (rc < 0)
+		return rc;
+	rc = msm_camio_clk_disable(CAMIO_JPEG_PCLK);
+	return rc;
 }
 
 int msm_camio_jpeg_clk_enable(void)
 {
-	msm_camio_clk_enable(CAMIO_JPEG_CLK);
-	msm_camio_clk_enable(CAMIO_JPEG_PCLK);
-	return 0;
+	int rc = 0;
+	rc = msm_camio_clk_enable(CAMIO_JPEG_CLK);
+	if (rc < 0)
+		return rc;
+	rc = msm_camio_clk_enable(CAMIO_JPEG_PCLK);
+	return rc;
+}
+
+int msm_camio_vpe_clk_disable(void)
+{
+	int rc = 0;
+	rc = msm_camio_clk_disable(CAMIO_VPE_CLK);
+	if (rc < 0)
+		return rc;
+	rc = msm_camio_clk_disable(CAMIO_VPE_PCLK);
+	return rc;
+}
+
+int msm_camio_vpe_clk_enable(void)
+{
+	int rc = 0;
+	rc = msm_camio_clk_enable(CAMIO_VPE_CLK);
+	if (rc < 0)
+		return rc;
+	rc = msm_camio_clk_enable(CAMIO_VPE_PCLK);
+	return rc;
 }
 
 int msm_camio_enable(struct platform_device *pdev)
