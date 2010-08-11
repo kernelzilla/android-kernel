@@ -59,6 +59,13 @@
 /* MISC register */
 #define	SSBI_REG_ADDR_MISC		0x1CC
 
+/* PON CNTL 1 register */
+#define SSBI_REG_ADDR_PON_CNTL_1	0x01C
+
+#define PM8058_PON_WD_EN_MASK		0x08
+#define PM8058_PON_WD_EN_RESET		0x08
+#define PM8058_PON_WD_EN_PWR_OFF	0x00
+
 #define	MAX_PM_IRQ		256
 #define	MAX_PM_BLOCKS		(MAX_PM_IRQ / 8 + 1)
 #define	MAX_PM_MASTERS		(MAX_PM_BLOCKS / 8 + 1)
@@ -230,6 +237,41 @@ get_out:
 	return rc;
 }
 EXPORT_SYMBOL(pm8058_misc_control);
+
+int pm8058_reset_pwr_off(int reset)
+{
+	int		rc;
+	u8		pon;
+	unsigned long	irqsave;
+
+	if (pmic_chip == NULL)
+		return -ENODEV;
+
+	spin_lock_irqsave(&pmic_chip->pm_lock, irqsave);
+
+	rc = ssbi_read(pmic_chip->dev, SSBI_REG_ADDR_PON_CNTL_1, &pon, 1);
+	if (rc) {
+		pr_err("%s: FAIL ssbi_read(0x%x): rc=%d\n",
+		       __func__, SSBI_REG_ADDR_PON_CNTL_1, rc);
+		goto get_out;
+	}
+
+	pon &= ~PM8058_PON_WD_EN_MASK;
+	pon |= reset ? PM8058_PON_WD_EN_RESET : PM8058_PON_WD_EN_PWR_OFF;
+
+	rc = ssbi_write(pmic_chip->dev, SSBI_REG_ADDR_PON_CNTL_1, &pon, 1);
+	if (rc) {
+		pr_err("%s: FAIL ssbi_write(0x%x)=0x%x: rc=%d\n",
+		       __func__, SSBI_REG_ADDR_PON_CNTL_1, pon, rc);
+		goto get_out;
+	}
+
+get_out:
+	spin_unlock_irqrestore(&pmic_chip->pm_lock, irqsave);
+
+	return rc;
+}
+EXPORT_SYMBOL(pm8058_reset_pwr_off);
 
 /* Internal functions */
 static inline int
