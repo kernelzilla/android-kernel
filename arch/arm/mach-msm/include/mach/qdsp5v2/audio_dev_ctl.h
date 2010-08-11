@@ -41,7 +41,7 @@
 #define VOICE_STATE_INCALL 0x1
 #define VOICE_STATE_OFFCALL 0x2
 #define MAX_COPP_NODE_SUPPORTED 6
-#define MAX_AUDREC_SESSIONS 2
+#define MAX_AUDREC_SESSIONS 3
 
 struct msm_snddev_info {
 	const char *name;

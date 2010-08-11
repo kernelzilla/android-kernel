@@ -47,7 +47,7 @@ struct audio_dev_ctrl_state {
 static struct audio_dev_ctrl_state audio_dev_ctrl;
 struct event_listner event;
 #define MAX_DEC_SESSIONS	7
-#define MAX_ENC_SESSIONS	2
+#define MAX_ENC_SESSIONS	3
 
 struct session_freq {
 	int freq;

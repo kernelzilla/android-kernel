@@ -361,6 +361,18 @@ static int audpcm_in_record_config(struct audio_in *audio, int enable)
 		cmd.destination_activity = AUDIO_RECORDING_TURN_OFF;
 
 	cmd.source_mix_mask = audio->source;
+	if (audio->enc_id == 2) {
+		if ((cmd.source_mix_mask &
+				INTERNAL_CODEC_TX_SOURCE_MIX_MASK) ||
+			(cmd.source_mix_mask & AUX_CODEC_TX_SOURCE_MIX_MASK) ||
+			(cmd.source_mix_mask & VOICE_UL_SOURCE_MIX_MASK) ||
+			(cmd.source_mix_mask & VOICE_DL_SOURCE_MIX_MASK)) {
+			cmd.pipe_id = SOURCE_PIPE_1;
+		}
+		if (cmd.source_mix_mask &
+				AUDPP_A2DP_PIPE_SOURCE_MIX_MASK)
+			cmd.pipe_id |= SOURCE_PIPE_0;
+	}
 
 	return audpreproc_send_audreccmdqueue(&cmd, sizeof(cmd));
 }
@@ -538,17 +550,16 @@ static long audpcm_in_ioctl(struct file *file,
 		}
 		if (cfg.channel_count == 1) {
 			cfg.channel_count = AUDREC_CMD_MODE_MONO;
+			audio->buffer_size = MONO_DATA_SIZE;
 		} else if (cfg.channel_count == 2) {
 			cfg.channel_count = AUDREC_CMD_MODE_STEREO;
+			audio->buffer_size = STEREO_DATA_SIZE;
 		} else {
 			rc = -EINVAL;
 			break;
 		}
 		audio->samp_rate = cfg.sample_rate;
 		audio->channel_mode = cfg.channel_count;
-		audio->buffer_size =
-				audio->channel_mode ? STEREO_DATA_SIZE : \
-					MONO_DATA_SIZE;
 		break;
 	}
 	case AUDIO_GET_CONFIG: {
