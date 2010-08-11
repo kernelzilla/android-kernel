@@ -2644,6 +2644,8 @@ struct msm8x60_tlmm_cfg_struct {
 };
 
 static uint32_t msm8x60_tlmm_cfgs[] = {
+	/* PS_HOLD */
+	GPIO_CFG(92, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_12MA),
 	/*
 	 * EBI2
 	 */
