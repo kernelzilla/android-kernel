@@ -70,8 +70,12 @@ static void mdp_dma2_update_lcd(struct msm_fb_data_type *mfd)
 	uint32 ystride = mfd->fbi->fix.line_length;
 	uint32 mddi_pkt_desc;
 
-	dma2_cfg_reg = DMA_PACK_TIGHT | DMA_PACK_ALIGN_LSB |
-	    DMA_OUT_SEL_AHB | DMA_IBUF_NONCONTIGUOUS;
+	dma2_cfg_reg = DMA_PACK_ALIGN_LSB |
+		    DMA_OUT_SEL_AHB | DMA_IBUF_NONCONTIGUOUS;
+
+#ifdef CONFIG_FB_MSM_MDP22
+	dma2_cfg_reg |= DMA_PACK_TIGHT;
+#endif
 
 #ifdef CONFIG_FB_MSM_MDP30
 	/*
