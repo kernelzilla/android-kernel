@@ -1612,12 +1612,6 @@ static int msmsdcc_remove(struct platform_device *pdev)
 	free_irq(host->irqres->start, host);
 	free_irq(host->irqres->start, host);
 
-	writel(0, host->base + MMCIMASK0);
-	writel(0, host->base + MMCIMASK1);
-	writel(MCI_CLEAR_STATIC_MASK, host->base + MMCICLEAR);
-	writel(0, host->base + MMCIDATACTRL);
-	writel(0, host->base + MMCICOMMAND);
-
 	clk_put(host->clk);
 	if (!IS_ERR(host->pclk))
 		clk_put(host->pclk);
