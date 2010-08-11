@@ -112,12 +112,15 @@ long msm_gemini_hw_encode_output_size(void)
 
 struct msm_gemini_hw_cmd hw_cmd_irq_clear[] = {
 	/* type, repeat n times, offset, mask, data or pdata */
-	{MSM_GEMINI_HW_CMD_TYPE_READ, 1, HWIO_JPEG_IRQ_CLEAR_ADDR,
+	{MSM_GEMINI_HW_CMD_TYPE_WRITE, 1, HWIO_JPEG_IRQ_CLEAR_ADDR,
 		HWIO_JPEG_IRQ_CLEAR_RMSK, {JPEG_IRQ_CLEAR_ALL} },
 };
 
-void msm_gemini_hw_irq_clear(void)
+void msm_gemini_hw_irq_clear(uint32_t mask, uint32_t data)
 {
+	GMN_DBG("%s:%d] mask %0x data %0x", __func__, __LINE__, mask, data);
+	hw_cmd_irq_clear[0].mask = mask;
+	hw_cmd_irq_clear[0].data = data;
 	msm_gemini_hw_write(&hw_cmd_irq_clear[0]);
 }
 
