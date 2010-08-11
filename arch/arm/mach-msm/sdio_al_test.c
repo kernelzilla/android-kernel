@@ -58,16 +58,14 @@ struct test_context {
 	u32 tx_bytes;
 
 	wait_queue_head_t   wait_q;
-	int rx_notify_count;
-	int tx_notify_count;
+	atomic_t rx_notify_count;
+	atomic_t tx_notify_count;
 
 	long testcase;
 
 	const char *name;
 
 	int exit_flag;
-
-	struct mutex lock;
 
 	int wait_counter;
 
@@ -85,7 +83,6 @@ static void loopback_test(void)
 	u32 read_avail = 0;
 	u32 write_avail = 0;
 
-
 	while (1) {
 
 		if (test_ctx->exit_flag) {
@@ -93,12 +90,11 @@ static void loopback_test(void)
 			return;
 		}
 
-
 		pr_info(MODULE_NAME "--LOOPBACK WAIT FOR EVENT--.\n");
-
 		/* wait for data ready event */
-		wait_event(test_ctx->wait_q, test_ctx->rx_notify_count);
-		test_ctx->rx_notify_count--;
+		wait_event(test_ctx->wait_q,
+			   atomic_read(&test_ctx->rx_notify_count));
+		atomic_dec(&test_ctx->rx_notify_count);
 
 		read_avail = sdio_read_avail(test_ctx->ch);
 		if (read_avail == 0)
@@ -111,7 +107,6 @@ static void loopback_test(void)
 				":not enough write avail.\n");
 			continue;
 		}
-
 
 		ret = sdio_read(test_ctx->ch, test_ctx->buf, read_avail);
 		if (ret) {
@@ -174,8 +169,9 @@ static void sender_test(void)
 		write_avail = sdio_write_avail(test_ctx->ch);
 		pr_debug(MODULE_NAME ":write_avail=%d\n", write_avail);
 		if (write_avail < size) {
-			wait_event(test_ctx->wait_q, test_ctx->tx_notify_count);
-			test_ctx->tx_notify_count--;
+			wait_event(test_ctx->wait_q,
+				   atomic_read(&test_ctx->tx_notify_count));
+			atomic_dec(&test_ctx->tx_notify_count);
 		}
 
 		write_avail = sdio_write_avail(test_ctx->ch);
@@ -195,12 +191,12 @@ static void sender_test(void)
 			goto exit_err;
 		}
 
-
 		/* wait for read data ready event */
 		pr_debug(MODULE_NAME ":sender wait for rx data.\n");
 		read_avail = sdio_read_avail(test_ctx->ch);
-		wait_event(test_ctx->wait_q, test_ctx->rx_notify_count);
-		test_ctx->rx_notify_count--;
+		wait_event(test_ctx->wait_q,
+			   atomic_read(&test_ctx->rx_notify_count));
+		atomic_dec(&test_ctx->rx_notify_count);
 
 		read_avail = sdio_read_avail(test_ctx->ch);
 
@@ -254,22 +250,22 @@ exit_err:
 
 int wait_any_notify(void)
 {
-	int wait_time_msec = 0;
 	int max_wait_time_msec = 60*1000; /* 60 seconds */
+	unsigned long expire_time = jiffies +
+		msecs_to_jiffies(max_wait_time_msec);
 
 	test_ctx->wait_counter++;
 
 	pr_debug(MODULE_NAME ":Waiting for event %d ...\n",
 		 test_ctx->wait_counter);
-	while (wait_time_msec < max_wait_time_msec) {
-		if (test_ctx->tx_notify_count > 0)
+	while (time_before(jiffies, expire_time)) {
+		if (atomic_read(&test_ctx->tx_notify_count) > 0)
 			return 0;
 
-		if (test_ctx->rx_notify_count > 0)
+		if (atomic_read(&test_ctx->rx_notify_count) > 0)
 			return 0;
 
-		msleep(10);
-		wait_time_msec += 10;
+		schedule();
 	}
 
 	pr_info(MODULE_NAME ":Wait for event %d sec.\n",
@@ -325,15 +321,12 @@ static void a2_performance_test(void)
 				goto exit_err;
 		}
 
-		mutex_lock(&test_ctx->lock);
-
 		write_avail = sdio_write_avail(test_ctx->ch);
 		if (write_avail > 0) {
 			size = min(test_ctx->buf_size, write_avail) ;
 			pr_debug(MODULE_NAME ":tx size = %d.\n", size);
-			if (test_ctx->tx_notify_count > 0)
-				test_ctx->tx_notify_count--;
-
+			if (atomic_read(&test_ctx->tx_notify_count) > 0)
+				atomic_dec(&test_ctx->tx_notify_count);
 			test_ctx->buf[0] = tx_packet_count;
 			test_ctx->buf[(size/4)-1] = tx_packet_count;
 
@@ -351,11 +344,10 @@ static void a2_performance_test(void)
 		if (read_avail > 0) {
 			size = min(test_ctx->buf_size, read_avail);
 			pr_debug(MODULE_NAME ":rx size = %d.\n", size);
-			if (test_ctx->rx_notify_count > 0)
-				test_ctx->rx_notify_count--;
+			if (atomic_read(&test_ctx->rx_notify_count) > 0)
+				atomic_dec(&test_ctx->rx_notify_count);
 
 			ret = sdio_read(test_ctx->ch, test_ctx->buf, size);
-
 			if (ret) {
 				pr_info(MODULE_NAME ": sdio_read err=%d.\n",
 					-ret);
@@ -371,8 +363,6 @@ static void a2_performance_test(void)
 		pr_debug(MODULE_NAME
 			 ":total tx bytes = %d , tx_packet#=%d.\n",
 			 test_ctx->tx_bytes, tx_packet_count);
-loop_cont:
-		mutex_unlock(&test_ctx->lock);
 
 	   /* pr_info(MODULE_NAME ":packet#=%d.\n", tx_packet_count); */
 
@@ -443,30 +433,26 @@ static void notify(void *priv, unsigned channel_event)
 		pr_info(MODULE_NAME ":notify before ch ready.\n");
 		return;
 	}
-
-	mutex_lock(&test_ctx->lock);
-
 	BUG_ON(test_ctx->signature != TEST_SIGNATURE);
 
 	switch (channel_event) {
 	case SDIO_EVENT_DATA_READ_AVAIL:
-		test_ctx->rx_notify_count++;
+		atomic_inc(&test_ctx->rx_notify_count);
 		pr_debug(MODULE_NAME ":rx_notify_count=%d.\n",
-			 test_ctx->rx_notify_count);
+			 atomic_read(&test_ctx->rx_notify_count));
 		wake_up(&test_ctx->wait_q);
 		break;
 
 	case SDIO_EVENT_DATA_WRITE_AVAIL:
-		test_ctx->tx_notify_count++;
+		atomic_inc(&test_ctx->tx_notify_count);
 		pr_debug(MODULE_NAME ":tx_notify_count=%d.\n",
-			 test_ctx->tx_notify_count);
+			 atomic_read(&test_ctx->tx_notify_count));
 		wake_up(&test_ctx->wait_q);
 		break;
 
 	default:
 		BUG();
 	}
-	mutex_unlock(&test_ctx->lock);
 }
 
 /**
@@ -490,11 +476,12 @@ static int test_start(void)
 	INIT_WORK(&test_ctx->work, worker);
 
 	init_waitqueue_head(&test_ctx->wait_q);
+
 	test_ctx->rx_bytes = 0;
 	test_ctx->tx_bytes = 0;
 
-	test_ctx->tx_notify_count = 0;
-	test_ctx->rx_notify_count = 0;
+	atomic_set(&test_ctx->tx_notify_count, 0);
+	atomic_set(&test_ctx->rx_notify_count, 0);
 
 	ret = sdio_open(test_ctx->name , &test_ctx->ch, test_ctx, notify);
 	if (ret)
@@ -505,8 +492,6 @@ static int test_start(void)
 
 	queue_work(test_ctx->workqueue, &test_ctx->work);
 
-	mutex_init(&test_ctx->lock);
-
 	pr_debug(MODULE_NAME ":Test Start completed OK..\n");
 
 	return 0;
@@ -514,7 +499,6 @@ static int test_start(void)
 err_sdio_open:
 	kfree(test_ctx->buf);
 err_alloc_buf:
-	kfree(test_ctx);
 
 	pr_debug(MODULE_NAME ":Test Start Failure..\n");
 
@@ -646,6 +630,6 @@ module_exit(test_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("SDIO_AL Test");
-MODULE_AUTHOR("Amir Samuelov <amirs@qualcomm.com>");
+MODULE_AUTHOR("Amir Samuelov <amirs@codeaurora.org>");
 
 
