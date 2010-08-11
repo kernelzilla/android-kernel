@@ -2451,6 +2451,7 @@ static void addrconf_ip6_tnl_config(struct net_device *dev)
 
 	ASSERT_RTNL();
 
+	idev = addrconf_add_dev(dev);
 	if (IS_ERR(idev)) {
 		printk(KERN_DEBUG "init ip6-ip6: add_dev failed\n");
 		return;
