@@ -1188,6 +1188,14 @@ config VMALLOC_RESERVE
 
 source "mm/Kconfig"
 
+config ARCH_MEMORY_PROBE
+	def_bool y
+	depends on MEMORY_HOTPLUG
+
+config ARCH_MEMORY_REMOVE
+	def_bool y
+	depends on MEMORY_HOTPLUG
+
 config LEDS
 	bool "Timer and CPU usage LEDs"
 	depends on ARCH_CDB89712 || ARCH_EBSA110 || \
