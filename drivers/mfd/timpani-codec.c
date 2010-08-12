@@ -22,6 +22,9 @@
 #include <linux/mfd/msm-adie-codec.h>
 #include <linux/mfd/marimba.h>
 #include <linux/mfd/timpani-audio.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/string.h>
 
 /* Timpani codec driver is activated through Marimba core driver */
 
@@ -1451,6 +1454,10 @@ static int adie_codec_write(u8 reg, u8 mask, u8 val)
 	return 0;
 }
 
+static int adie_codec_read(u8 reg, u8 *val)
+{
+	return marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
+}
 
 int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
 		u32 num_channels, u32 vol_percentage /* in percentage */)
@@ -1617,6 +1624,24 @@ int adie_codec_proceed_stage(struct adie_codec_path *path_ptr, u32 state)
 }
 EXPORT_SYMBOL(adie_codec_proceed_stage);
 
+static void timpani_codec_bring_up(void)
+{
+	/* Codec power up sequence */
+	adie_codec_write(0xFF, 0xFF, 0x08);
+	adie_codec_write(0xFF, 0xFF, 0x0A);
+	adie_codec_write(0xFF, 0xFF, 0x0E);
+	adie_codec_write(0xFF, 0xFF, 0x07);
+	adie_codec_write(0xFF, 0xFF, 0x17);
+	adie_codec_write(TIMPANI_A_MREF, 0xFF, 0x22);
+	msleep(15);
+}
+
+static void timpani_codec_bring_down(void)
+{
+	adie_codec_write(TIMPANI_A_MREF, 0xFF, TIMPANI_MREF_POR);
+}
+
+
 int adie_codec_open(struct adie_codec_dev_profile *profile,
 	struct adie_codec_path **path_pptr)
 {
@@ -1646,14 +1671,7 @@ int adie_codec_open(struct adie_codec_dev_profile *profile,
 				goto error;
 			}
 		}
-		/* Codec power up sequence */
-		adie_codec_write(0xFF, 0xFF, 0x08);
-		adie_codec_write(0xFF, 0xFF, 0x0A);
-		adie_codec_write(0xFF, 0xFF, 0x0E);
-		adie_codec_write(0xFF, 0xFF, 0x07);
-		adie_codec_write(0xFF, 0xFF, 0x17);
-		adie_codec_write(TIMPANI_A_MREF, 0xFF, 0x22);
-		msleep(15);
+		timpani_codec_bring_up();
 
 	}
 
@@ -1691,7 +1709,7 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 
 	if (!adie_codec.ref_cnt) {
 		/* Timpani CDC power down sequence */
-		 adie_codec_write(TIMPANI_A_MREF, 0xFF, TIMPANI_MREF_POR);
+		timpani_codec_bring_down();
 
 		if (adie_codec.codec_pdata &&
 				adie_codec.codec_pdata->marimba_codec_power) {
@@ -1727,6 +1745,120 @@ static struct platform_driver timpani_codec_driver = {
 	},
 };
 
+#ifdef CONFIG_DEBUG_FS
+static struct dentry *debugfs_timpani_dent;
+static struct dentry *debugfs_peek;
+static struct dentry *debugfs_poke;
+static struct dentry *debugfs_power;
+
+static unsigned char read_data;
+
+static int codec_debug_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
+static int get_parameters(char *buf, long int *param1, int num_of_par)
+{
+	char *token;
+	int base, cnt;
+
+	token = strsep(&buf, " ");
+
+	for (cnt = 0; cnt < num_of_par; cnt++) {
+		if (token != NULL) {
+			if ((token[1] == 'x') || (token[1] == 'X'))
+				base = 16;
+			else
+				base = 10;
+
+			if (strict_strtoul(token, base, &param1[cnt]) != 0)
+				return -EINVAL;
+
+			token = strsep(&buf, " ");
+			}
+		else
+			return -EINVAL;
+	}
+	return 0;
+}
+
+static ssize_t codec_debug_read(struct file *file, char __user *ubuf,
+				size_t count, loff_t *ppos)
+{
+	char lbuf[8];
+
+	snprintf(lbuf, sizeof(lbuf), "0x%x\n", read_data);
+	return simple_read_from_buffer(ubuf, count, ppos, lbuf, strlen(lbuf));
+}
+
+static ssize_t codec_debug_write(struct file *filp,
+	const char __user *ubuf, size_t cnt, loff_t *ppos)
+{
+	char *access_str = filp->private_data;
+	char lbuf[32];
+	int rc;
+	long int param[5];
+
+	if (cnt > sizeof(lbuf) - 1)
+		return -EINVAL;
+
+	rc = copy_from_user(lbuf, ubuf, cnt);
+	if (rc)
+		return -EFAULT;
+
+	lbuf[cnt] = '\0';
+
+	if (!strcmp(access_str, "power")) {
+		if (get_parameters(lbuf, param, 1) == 0) {
+			switch (param[0]) {
+			case 1:
+				adie_codec.codec_pdata->marimba_codec_power(1);
+				timpani_codec_bring_up();
+				break;
+			case 0:
+				timpani_codec_bring_down();
+				adie_codec.codec_pdata->marimba_codec_power(0);
+				break;
+			default:
+				rc = -EINVAL;
+				break;
+			}
+		} else
+			rc = -EINVAL;
+	} else if (!strcmp(access_str, "poke")) {
+		/* write */
+		rc = get_parameters(lbuf, param, 2);
+		if ((param[0] <= 0xFF) && (param[1] <= 0xFF) &&
+			(rc == 0))
+			adie_codec_write(param[0], 0xFF, param[1]);
+		else
+			rc = -EINVAL;
+	} else if (!strcmp(access_str, "peek")) {
+		/* read */
+		rc = get_parameters(lbuf, param, 1);
+		if ((param[0] <= 0xFF) && (rc == 0))
+			adie_codec_read(param[0], &read_data);
+		else
+			rc = -EINVAL;
+	}
+
+	if (rc == 0)
+		rc = cnt;
+	else
+		pr_err("%s: rc = %d\n", __func__, rc);
+
+	return rc;
+}
+
+static const struct file_operations codec_debug_ops = {
+	.open = codec_debug_open,
+	.write = codec_debug_write,
+	.read = codec_debug_read
+};
+#endif
+
 static int __init timpani_codec_init(void)
 {
 	s32 rc;
@@ -1739,12 +1871,36 @@ static int __init timpani_codec_init(void)
 	adie_codec.path[ADIE_CODEC_RX].reg_owner = RA_OWNER_PATH_RX1;
 	adie_codec.path[ADIE_CODEC_LB].reg_owner = RA_OWNER_PATH_LB;
 	mutex_init(&adie_codec.lock);
+
+#ifdef CONFIG_DEBUG_FS
+	debugfs_timpani_dent = debugfs_create_dir("msm_adie_codec", 0);
+	if (!IS_ERR(debugfs_timpani_dent)) {
+		debugfs_peek = debugfs_create_file("peek",
+		S_IFREG | S_IRUGO, debugfs_timpani_dent,
+		(void *) "peek", &codec_debug_ops);
+
+		debugfs_poke = debugfs_create_file("poke",
+		S_IFREG | S_IRUGO, debugfs_timpani_dent,
+		(void *) "poke", &codec_debug_ops);
+
+		debugfs_power = debugfs_create_file("power",
+		S_IFREG | S_IRUGO, debugfs_timpani_dent,
+		(void *) "power", &codec_debug_ops);
+	}
+#endif
+
 error:
 	return rc;
 }
 
 static void __exit timpani_codec_exit(void)
 {
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove(debugfs_peek);
+	debugfs_remove(debugfs_poke);
+	debugfs_remove(debugfs_power);
+	debugfs_remove(debugfs_timpani_dent);
+#endif
 	platform_driver_unregister(&timpani_codec_driver);
 }
 
