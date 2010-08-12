@@ -678,6 +678,13 @@ struct vfe_camifcfg {
 	 uint32_t /* reserved */ : 2;
 } __attribute__ ((packed, aligned(4)));
 
+struct vfe_epoch1cfg {
+	/* Epoch Interrupt */
+	uint32_t epoch1Line:14;
+	uint32_t /* reserved */ : 2;
+} __attribute__ ((packed, aligned(4)));
+
+
 struct vfe_camifframe_update {
 	uint32_t pixelsPerLine:14;
 	 uint32_t /* reserved */ : 2;
