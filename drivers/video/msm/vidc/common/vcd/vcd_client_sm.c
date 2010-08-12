@@ -928,7 +928,7 @@ static void vcd_clnt_cb_in_eos
      void *payload, size_t sz, u32 *ddl_handle, void *const client_data) {
 	struct vcd_dev_ctxt *dev_ctxt = cctxt->dev_ctxt;
 	struct vcd_transc *transc = NULL;
-	u32 frm_trans_end = false;
+	u32 frm_trans_end = false, rc = VCD_S_SUCCESS;
 
 	if (cctxt->ddl_handle != ddl_handle) {
 		VCD_MSG_ERROR("ddl_handle mismatch");
@@ -939,7 +939,7 @@ static void vcd_clnt_cb_in_eos
 	switch (event) {
 	case VCD_EVT_RESP_INPUT_DONE:
 		{
-			vcd_handle_input_done_in_eos(cctxt, payload,
+			rc = vcd_handle_input_done_in_eos(cctxt, payload,
 						     status);
 
 			break;
@@ -947,14 +947,14 @@ static void vcd_clnt_cb_in_eos
 
 	case VCD_EVT_RESP_OUTPUT_DONE:
 		{
-			vcd_handle_frame_done_in_eos(cctxt, payload,
+			rc = vcd_handle_frame_done_in_eos(cctxt, payload,
 						     status);
 
 			break;
 		}
 	case VCD_EVT_RESP_OUTPUT_REQ:
 		{
-			(void)vcd_handle_output_required(cctxt, payload,
+			rc = vcd_handle_output_required(cctxt, payload,
 					status);
 			break;
 		}
@@ -967,11 +967,12 @@ static void vcd_clnt_cb_in_eos
 		}
 	case VCD_EVT_IND_OUTPUT_RECONFIG:
 		{
-			(void) vcd_handle_ind_output_reconfig(cctxt,
+			rc = vcd_handle_ind_output_reconfig(cctxt,
 				payload, status);
-
-			frm_trans_end = true;
-			payload = NULL;
+			if (!VCD_FAILED(rc)) {
+				frm_trans_end = true;
+				payload = NULL;
+			}
 			break;
 		}
 	case VCD_EVT_IND_HWERRFATAL:
@@ -992,10 +993,11 @@ static void vcd_clnt_cb_in_eos
 		}
 
 	}
-	if (event == VCD_EVT_RESP_INPUT_DONE ||
+	if (!VCD_FAILED(rc) &&
+		(event == VCD_EVT_RESP_INPUT_DONE ||
 		event == VCD_EVT_RESP_OUTPUT_DONE ||
 		event == VCD_EVT_RESP_OUTPUT_REQ ||
-		event == VCD_EVT_IND_OUTPUT_RECONFIG) {
+		event == VCD_EVT_IND_OUTPUT_RECONFIG)) {
 		if (payload && ((struct ddl_frame_data_tag *)
 			payload)->frm_trans_end) {
 			vcd_mark_frame_channel(cctxt->dev_ctxt);
@@ -1052,12 +1054,12 @@ static void vcd_clnt_cb_in_flushing
 		}
 	case VCD_EVT_IND_OUTPUT_RECONFIG:
 		{
-			(void) vcd_handle_ind_output_reconfig(cctxt,
+			rc = vcd_handle_ind_output_reconfig(cctxt,
 				payload, status);
-
-			frm_trans_end = true;
-			payload = NULL;
-
+			if (!VCD_FAILED(rc)) {
+				frm_trans_end = true;
+				payload = NULL;
+			}
 			break;
 		}
 	case VCD_EVT_IND_HWERRFATAL:
@@ -1264,12 +1266,12 @@ static void vcd_clnt_cb_in_pausing
 		}
 	case VCD_EVT_IND_OUTPUT_RECONFIG:
 		{
-			(void) vcd_handle_ind_output_reconfig(cctxt,
+			rc = vcd_handle_ind_output_reconfig(cctxt,
 				payload, status);
-
-			frm_trans_end = true;
-			payload = NULL;
-
+			if (!VCD_FAILED(rc)) {
+				frm_trans_end = true;
+				payload = NULL;
+			}
 			break;
 		}
 	case VCD_EVT_IND_HWERRFATAL:
@@ -1345,7 +1347,9 @@ static void  vcd_clnt_cb_in_invalid(
 	switch (event) {
 	case VCD_EVT_RESP_STOP:
 		{
-			vcd_handle_stop_done_in_invalid(cctxt, status);
+			vcd_handle_stop_done_in_invalid(cctxt,
+				(struct vcd_transc *)client_data,
+				status);
 			break;
 		}
 	case VCD_EVT_RESP_INPUT_DONE:
@@ -1359,6 +1363,7 @@ static void  vcd_clnt_cb_in_invalid(
 		{
 			if (status == VCD_ERR_HW_FATAL)
 				vcd_handle_stop_done_in_invalid(cctxt,
+					(struct vcd_transc *)client_data,
 					status);
 
 			break;

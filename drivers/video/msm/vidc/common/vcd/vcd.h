@@ -234,7 +234,7 @@ u32 vcd_handle_input_done
     (struct vcd_clnt_ctxt *cctxt,
      void *payload, u32 event, u32 status);
 
-void vcd_handle_input_done_in_eos
+u32 vcd_handle_input_done_in_eos
     (struct vcd_clnt_ctxt *cctxt, void *payload, u32 status);
 
 void vcd_handle_input_done_failed
@@ -261,7 +261,7 @@ void vcd_handle_frame_done_for_interlacing
      struct ddl_frame_data_tag *op_frm, u32 status);
 
 
-void vcd_handle_frame_done_in_eos
+u32 vcd_handle_frame_done_in_eos
     (struct vcd_clnt_ctxt *cctxt, void *payload, u32 status);
 
 u32 vcd_handle_output_required(struct vcd_clnt_ctxt *cctxt,
@@ -272,7 +272,8 @@ u32 vcd_handle_output_required_in_flushing(struct vcd_clnt_ctxt *cctxt,
 
 u32 vcd_handle_output_req_tran_end_in_eos(struct vcd_clnt_ctxt *cctxt);
 
-u32 vcd_validate_io_done_pyld(void *payload, u32 status);
+u32 vcd_validate_io_done_pyld
+	(struct vcd_clnt_ctxt *cctxt, void *payload, u32 status);
 
 void vcd_handle_eos_trans_end(struct vcd_clnt_ctxt *cctxt);
 
@@ -303,7 +304,7 @@ void vcd_handle_stop_done_in_starting(struct vcd_clnt_ctxt *cctxt,
 	struct vcd_transc *transc, u32 status);
 
 void vcd_handle_stop_done_in_invalid(struct vcd_clnt_ctxt *cctxt,
-		u32 status);
+	struct vcd_transc *transc, u32 status);
 
 void vcd_send_flush_done(struct vcd_clnt_ctxt *cctxt, u32 status);
 

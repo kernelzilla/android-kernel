@@ -1679,7 +1679,7 @@ u32 vcd_handle_input_done(
 		return VCD_ERR_BAD_STATE;
 	}
 
-	rc = vcd_validate_io_done_pyld(payload, status);
+	rc = vcd_validate_io_done_pyld(cctxt, payload, status);
 	VCD_FAILED_RETURN(rc, "Bad input done payload");
 
 	transc = (struct vcd_transc *)frame->vcd_frm.ip_frm_tag;
@@ -1709,7 +1709,7 @@ u32 vcd_handle_input_done(
 	transc->input_done = true;
 
 	if (transc->input_done && transc->frame_done)
-		transc->in_use = false;
+		vcd_release_trans_tbl_entry(transc);
 
 	if (VCD_FAILED(status)) {
 		VCD_MSG_ERROR("INPUT_DONE returned err = 0x%x", status);
@@ -1721,15 +1721,15 @@ u32 vcd_handle_input_done(
 	else
 		cctxt->status.frame_delayed--;
 
-	if (frame->vcd_frm.flags & VCD_FRAME_FLAG_CODECCONFIG) {
-		VCD_MSG_HIGH(
-			"Recvd INPUT_DONE with VCD_FRAME_FLAG_CODECCONFIG");
-		vcd_handle_input_done_with_codec_config(cctxt,
-			transc, frame);
-	}
-
 	if (!VCD_FAILED(status) &&
 		cctxt->decoding) {
+		if (frame->vcd_frm.flags & VCD_FRAME_FLAG_CODECCONFIG) {
+			VCD_MSG_HIGH(
+				"INPUT_DONE with VCD_FRAME_FLAG_CODECCONFIG");
+			vcd_handle_input_done_with_codec_config(cctxt,
+				transc, frame);
+			frame->vcd_frm.flags &= ~VCD_FRAME_FLAG_CODECCONFIG;
+		}
 		if (frame->vcd_frm.interlaced)
 			vcd_handle_input_done_for_interlacing(cctxt);
 		if (frame->frm_trans_end)
@@ -1739,49 +1739,67 @@ u32 vcd_handle_input_done(
 	return VCD_S_SUCCESS;
 }
 
-void vcd_handle_input_done_in_eos(
+u32 vcd_handle_input_done_in_eos(
 	struct vcd_clnt_ctxt *cctxt, void *payload, u32 status)
 {
 	struct vcd_transc *transc;
 	struct ddl_frame_data_tag *frame =
 		(struct ddl_frame_data_tag *) payload;
+	u32 rc = VCD_ERR_FAIL;
 
-	if (VCD_FAILED(vcd_validate_io_done_pyld(payload, status)))
-		return;
+	rc = vcd_validate_io_done_pyld(cctxt, payload, status);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_validate_io_done_pyld");
 
 	transc = (struct vcd_transc *)frame->vcd_frm.ip_frm_tag;
 
-	(void)vcd_handle_input_done(cctxt,
+	rc = vcd_handle_input_done(cctxt,
 		payload, VCD_EVT_RESP_INPUT_DONE, status);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_handle_input_done");
 
 	if ((frame->vcd_frm.flags & VCD_FRAME_FLAG_EOS)) {
 		VCD_MSG_HIGH("Got input done for EOS initiator");
 		transc->input_done = false;
 		transc->in_use = true;
 	}
+	return rc;
 }
 
-u32 vcd_validate_io_done_pyld(void *payload, u32 status)
+u32 vcd_validate_io_done_pyld(
+	struct vcd_clnt_ctxt *cctxt, void *payload, u32 status)
 {
 	struct ddl_frame_data_tag *frame =
 		(struct ddl_frame_data_tag *) payload;
+	struct vcd_dev_ctxt *dev_ctxt = cctxt->dev_ctxt;
+	struct vcd_transc *transc = NULL;
+	u32 rc = VCD_S_SUCCESS;
+	u8 i = 0;
 
 	if (!frame) {
 		VCD_MSG_ERROR("Bad payload from DDL");
 		return VCD_ERR_BAD_POINTER;
 	}
 
-	if (!frame->vcd_frm.ip_frm_tag ||
-		frame->vcd_frm.ip_frm_tag == VCD_FRAMETAG_INVALID) {
-		VCD_MSG_ERROR("bad input frame tag");
-		return VCD_ERR_BAD_POINTER;
-	}
+	transc = (struct vcd_transc *)frame->vcd_frm.ip_frm_tag;
+	if (dev_ctxt->trans_tbl) {
+		while (i < dev_ctxt->trans_tbl_size &&
+			transc != &dev_ctxt->trans_tbl[i])
+			i++;
+		if (i == dev_ctxt->trans_tbl_size ||
+			!dev_ctxt->trans_tbl[i].in_use)
+			rc = VCD_ERR_BAD_POINTER;
+	} else
+		rc = VCD_ERR_BAD_POINTER;
 
-	if (!frame->vcd_frm.virtual &&
+	if (VCD_FAILED(rc)) {
+		VCD_MSG_FATAL(
+			"vcd_validate_io_done_pyld: invalid transaction");
+		vcd_handle_ind_hw_err_fatal(cctxt,
+			VCD_EVT_IND_HWERRFATAL, VCD_ERR_CLIENT_FATAL);
+	} else if (!frame->vcd_frm.virtual &&
 		status != VCD_ERR_INTRLCD_FIELD_DROP)
-		return VCD_ERR_BAD_POINTER;
+		rc = VCD_ERR_BAD_POINTER;
 
-	return VCD_S_SUCCESS;
+	return rc;
 }
 
 void vcd_handle_input_done_failed(
@@ -1789,7 +1807,7 @@ void vcd_handle_input_done_failed(
 {
 	if (cctxt->decoding) {
 		cctxt->sched_clnt_hdl->tkns++;
-		transc->in_use = false;
+		vcd_release_trans_tbl_entry(transc);
 	}
 }
 
@@ -1799,7 +1817,7 @@ void vcd_handle_input_done_with_codec_config(
 {
 	cctxt->sched_clnt_hdl->tkns++;
 	if (frm->frm_trans_end)
-		transc->in_use = false;
+		vcd_release_trans_tbl_entry(transc);
 }
 
 void vcd_handle_input_done_for_interlacing(struct vcd_clnt_ctxt *cctxt)
@@ -1838,7 +1856,7 @@ u32 vcd_handle_output_required(struct vcd_clnt_ctxt
 		return VCD_ERR_BAD_STATE;
 	}
 
-	rc = vcd_validate_io_done_pyld(payload, status);
+	rc = vcd_validate_io_done_pyld(cctxt, payload, status);
 	VCD_FAILED_RETURN(rc, "\n Bad input done payload");
 
 	transc = (struct vcd_transc *)frame->
@@ -1848,6 +1866,8 @@ u32 vcd_handle_output_required(struct vcd_clnt_ctxt
 		 frame->vcd_frm.virtual) ||
 		!transc->ip_buf_entry->in_use) {
 		VCD_MSG_ERROR("\n Bad frm transaction state");
+		vcd_handle_err_fatal(cctxt, VCD_EVT_IND_HWERRFATAL,
+			VCD_ERR_CLIENT_FATAL);
 		return VCD_ERR_BAD_STATE;
 	}
 	rc = vcd_sched_queue_buffer(cctxt->sched_clnt_hdl,
@@ -1855,7 +1875,7 @@ u32 vcd_handle_output_required(struct vcd_clnt_ctxt
 	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_queue_buffer");
 
 	transc->ip_buf_entry = NULL;
-	transc->in_use = false;
+	vcd_release_trans_tbl_entry(transc);
 	frame->frm_trans_end = true;
 
 	if (VCD_FAILED(status))
@@ -1886,7 +1906,7 @@ struct vcd_clnt_ctxt *cctxt, void *payload)
 	u32 rc;
 	struct vcd_transc *transc;
 
-	rc = vcd_validate_io_done_pyld(payload, VCD_S_SUCCESS);
+	rc = vcd_validate_io_done_pyld(cctxt, payload, VCD_S_SUCCESS);
 	VCD_FAILED_RETURN(rc, "Bad input done payload");
 
 	transc = (struct vcd_transc *)
@@ -1898,8 +1918,9 @@ struct vcd_clnt_ctxt *cctxt, void *payload)
 
 	rc = vcd_handle_input_done(cctxt, payload,
 			VCD_EVT_RESP_INPUT_FLUSHED, VCD_S_SUCCESS);
+	VCD_FAILED_RETURN(rc, "Failed: vcd_handle_input_done");
 
-	transc->in_use = false;
+	vcd_release_trans_tbl_entry(transc);
 	((struct ddl_frame_data_tag *)payload)->frm_trans_end = true;
 
 	return rc;
@@ -1915,7 +1936,7 @@ u32 vcd_handle_frame_done(
 	struct vcd_transc *transc;
 	u32 rc;
 
-	rc = vcd_validate_io_done_pyld(payload, status);
+	rc = vcd_validate_io_done_pyld(cctxt, payload, status);
 	VCD_FAILED_RETURN(rc, "Bad payload recvd");
 
 	transc = (struct vcd_transc *)op_frm->vcd_frm.ip_frm_tag;
@@ -1960,7 +1981,7 @@ u32 vcd_handle_frame_done(
 	transc->frame_done = true;
 
 	if (transc->input_done && transc->frame_done)
-		transc->in_use = false;
+		vcd_release_trans_tbl_entry(transc);
 
 	if (status == VCD_ERR_INTRLCD_FIELD_DROP ||
 		(op_frm->vcd_frm.intrlcd_ip_frm_tag !=
@@ -1980,27 +2001,30 @@ u32 vcd_handle_frame_done(
 	return rc;
 }
 
-void vcd_handle_frame_done_in_eos(
+u32 vcd_handle_frame_done_in_eos(
 	struct vcd_clnt_ctxt *cctxt, void *payload, u32 status)
 {
 	struct ddl_frame_data_tag *frame =
 		(struct ddl_frame_data_tag *) payload;
+	u32 rc = VCD_S_SUCCESS;
 
 	VCD_MSG_LOW("vcd_handle_frame_done_in_eos:");
 
-	if (VCD_FAILED(vcd_validate_io_done_pyld(payload, status)))
-		return;
+	rc = vcd_validate_io_done_pyld(cctxt, payload, status);
+	VCD_FAILED_RETURN(rc, "Bad payload received");
 
 	if (cctxt->status.eos_prev_valid) {
-		(void)vcd_handle_frame_done(cctxt,
+		rc = vcd_handle_frame_done(cctxt,
 			(void *)&cctxt->status.
 			eos_prev_op_frm,
 			VCD_EVT_RESP_OUTPUT_DONE,
 			status);
+		VCD_FAILED_RETURN(rc, "Failed: vcd_handle_frame_done");
 	}
 
 	cctxt->status.eos_prev_op_frm = *frame;
 	cctxt->status.eos_prev_valid = true;
+	return rc;
 }
 
 void vcd_handle_frame_done_for_interlacing(
@@ -2022,7 +2046,7 @@ void vcd_handle_frame_done_for_interlacing(
 	transc_ip2->frame_done = true;
 
 	if (transc_ip2->input_done && transc_ip2->frame_done)
-		transc_ip2->in_use = false;
+		vcd_release_trans_tbl_entry(transc_ip2);
 
 	if (!transc_ip1->frame ||
 			!transc_ip2->frame) {
@@ -2127,7 +2151,7 @@ u32 vcd_handle_first_fill_output_buffer_for_dec(
 	struct ddl_frame_data_tag *dpb_list;
 	u8 i;
 
-	frm_entry = NULL;
+	(void)frm_entry;
 	*handled = true;
 	prop_hdr.prop_id = DDL_I_DPB;
 	prop_hdr.sz = sizeof(dpb);
@@ -2157,14 +2181,16 @@ u32 vcd_handle_first_fill_output_buffer_for_dec(
 
 void vcd_handle_eos_trans_end(struct vcd_clnt_ctxt *cctxt)
 {
+	u32 rc = VCD_S_SUCCESS;
 	if (cctxt->status.eos_prev_valid) {
-		(void) vcd_handle_frame_done(cctxt,
+		rc = vcd_handle_frame_done(cctxt,
 			(void *)&cctxt->status.eos_prev_op_frm,
 			VCD_EVT_RESP_OUTPUT_DONE,
 			VCD_S_SUCCESS);
-
 		cctxt->status.eos_prev_valid = false;
 	}
+	if (VCD_FAILED(rc))
+		return;
 
 	if (cctxt->status.flush_mode)
 		vcd_process_pending_flush_in_eos(cctxt);
@@ -2182,6 +2208,7 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 	 struct vcd_transc *transc, u32 status)
 {
 	struct vcd_frame_data  vcd_frm;
+	u32 rc = VCD_S_SUCCESS;
 	VCD_MSG_LOW("vcd_handle_eos_done:");
 
 	if (VCD_FAILED(status))
@@ -2191,12 +2218,11 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 		cctxt->status.eos_prev_op_frm.vcd_frm.flags |=
 			VCD_FRAME_FLAG_EOS;
 
-		(void)vcd_handle_frame_done(cctxt,
+		rc = vcd_handle_frame_done(cctxt,
 						(void *)&cctxt->status.
 						eos_prev_op_frm,
 						VCD_EVT_RESP_OUTPUT_DONE,
 						VCD_S_SUCCESS);
-
 		cctxt->status.eos_prev_valid = false;
 	} else {
 		if (transc->ip_buf_entry) {
@@ -2213,6 +2239,8 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 			vcd_send_frame_done_in_eos(cctxt, &vcd_frm, true);
 		}
 	}
+	if (VCD_FAILED(rc))
+		return;
 	if (transc->ip_buf_entry) {
 		if (transc->ip_buf_entry->frame.virtual) {
 			transc->ip_buf_entry->frame.ip_frm_tag =
@@ -2230,7 +2258,7 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 		cctxt->status.frame_submitted--;
 	}
 
-	transc->in_use = false;
+	vcd_release_trans_tbl_entry(transc);
 	vcd_mark_frame_channel(cctxt->dev_ctxt);
 	if (cctxt->status.flush_mode)
 		vcd_process_pending_flush_in_eos(cctxt);
@@ -2311,11 +2339,15 @@ void vcd_handle_stop_done_in_starting(struct vcd_clnt_ctxt
 	}
 }
 
-void vcd_handle_stop_done_in_invalid(struct vcd_clnt_ctxt
-	*cctxt, u32 status)
+void vcd_handle_stop_done_in_invalid(struct vcd_clnt_ctxt *cctxt,
+	struct vcd_transc *transc, u32 status)
 {
 	u32 rc;
 	VCD_MSG_LOW("vcd_handle_stop_done_in_invalid:");
+
+	cctxt->status.cmd_submitted--;
+	vcd_mark_command_channel(cctxt->dev_ctxt, transc);
+
 	if (!VCD_FAILED(status)) {
 		vcd_client_cmd_flush_and_en_q(cctxt, VCD_CMD_CLIENT_CLOSE);
 		if (cctxt->status.frame_submitted) {
@@ -2371,11 +2403,22 @@ u32 vcd_handle_input_frame(
 			input_frame->virtual, input_frame->alloc_len,
 			input_frame->data_len);
 
-	if ((!input_frame->virtual || !input_frame->data_len)
-		&& !(input_frame->flags & VCD_FRAME_FLAG_EOS)) {
+	if (!input_frame->virtual &&
+		!(input_frame->flags & VCD_FRAME_FLAG_EOS)) {
 		VCD_MSG_ERROR("Bad frame ptr/len/EOS combination");
-
 		return VCD_ERR_ILLEGAL_PARM;
+	}
+
+
+	if (!input_frame->data_len &&
+		!(input_frame->flags & VCD_FRAME_FLAG_EOS)) {
+		VCD_MSG_MED("data_len = 0, returning INPUT DONE");
+		cctxt->callback(VCD_EVT_RESP_INPUT_DONE,
+				  VCD_S_SUCCESS,
+				  input_frame,
+				  sizeof(struct vcd_frame_data),
+				  cctxt, cctxt->client_data);
+		return VCD_S_SUCCESS;
 	}
 
 	if (!cctxt->status.first_ip_frame_recvd) {
@@ -2596,7 +2639,7 @@ u32 vcd_set_frame_size(
 	struct vcd_property_hdr prop_hdr;
 	u32 rc;
 	u32 frm_p_units;
-	frm_size = NULL;
+	(void)frm_size;
 
 	prop_hdr.prop_id = DDL_I_FRAME_PROC_UNITS;
 	prop_hdr.sz = sizeof(frm_p_units);
@@ -2800,7 +2843,7 @@ void vcd_handle_submit_frame_failed(struct vcd_dev_ctxt
 	u32 rc;
 
 	vcd_mark_frame_channel(dev_ctxt);
-	transc->in_use = false;
+	vcd_release_trans_tbl_entry(transc);
 
 	vcd_handle_err_fatal(cctxt, VCD_EVT_IND_HWERRFATAL,
 		VCD_ERR_CLIENT_FATAL);
