@@ -710,12 +710,14 @@ static int __devexit pm8058_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int pm8058_suspend(struct i2c_client *client, pm_message_t mesg)
+static int pm8058_suspend(struct device *dev)
 {
+	struct i2c_client *client;
 	struct	pm8058_chip *chip;
 	int	i;
 	unsigned long	irqsave;
 
+	client = to_i2c_client(dev);
 	chip = i2c_get_clientdata(client);
 
 	for (i = 0; i < MAX_PM_IRQ; i++) {
@@ -734,12 +736,14 @@ static int pm8058_suspend(struct i2c_client *client, pm_message_t mesg)
 	return 0;
 }
 
-static int pm8058_resume(struct i2c_client *client)
+static int pm8058_resume(struct device *dev)
 {
+	struct i2c_client *client;
 	struct	pm8058_chip *chip;
 	int	i;
 	unsigned long	irqsave;
 
+	client = to_i2c_client(dev);
 	chip = i2c_get_clientdata(client);
 
 	for (i = 0; i < MAX_PM_IRQ; i++) {
@@ -768,13 +772,17 @@ static const struct i2c_device_id pm8058_ids[] = {
 };
 MODULE_DEVICE_TABLE(i2c, pm8058_ids);
 
+static struct dev_pm_ops pm8058_pm = {
+	.suspend = pm8058_suspend,
+	.resume = pm8058_resume,
+};
+
 static struct i2c_driver pm8058_driver = {
 	.driver.name	= "pm8058-core",
+	.driver.pm      = &pm8058_pm,
 	.id_table	= pm8058_ids,
 	.probe		= pm8058_probe,
 	.remove		= __devexit_p(pm8058_remove),
-	.suspend	= pm8058_suspend,
-	.resume		= pm8058_resume,
 };
 
 static int __init pm8058_init(void)
