@@ -552,6 +552,8 @@ void vidc_720p_decode_bitstream_header(u32 ch_id,
 {
 	VIDC_IO_OUT(REG_965480, 0x0);
 
+	VIDC_IO_OUT(REG_639999, 0x8080);
+
 	VIDC_IO_OUT(REG_275113_ADDR, ext_buffer_start);
 
 	VIDC_IO_OUT(REG_988007_ADDR, ext_buffer_end);
