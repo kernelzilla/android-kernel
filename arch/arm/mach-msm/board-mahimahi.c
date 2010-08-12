@@ -311,14 +311,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.cached		= 1,
 };
 
-static struct android_pmem_platform_data android_pmem_camera_pdata = {
-	.name		= "pmem_camera",
-	.start		= MSM_PMEM_CAMERA_BASE,
-	.size		= MSM_PMEM_CAMERA_SIZE,
-	.no_allocator	= 1,
-	.cached		= 1,
-};
-
 static struct android_pmem_platform_data android_pmem_venc_pdata = {
         .name           = "pmem_venc",
         .start          = MSM_PMEM_VENC_BASE,
@@ -340,14 +332,6 @@ static struct platform_device android_pmem_adsp_device = {
 	.id		= 1,
 	.dev		= {
 		.platform_data = &android_pmem_adsp_pdata,
-	},
-};
-
-static struct platform_device android_pmem_camera_device = {
-	.name		= "android_pmem",
-	.id		= 2,
-	.dev		= {
-		.platform_data = &android_pmem_camera_pdata,
 	},
 };
 
@@ -862,7 +846,6 @@ static struct platform_device *devices[] __initdata = {
 	&android_usb_device,
 	&android_pmem_mdp_device,
 	&android_pmem_adsp_device,
-	&android_pmem_camera_device,
 #ifdef CONFIG_720P_CAMERA
         &android_pmem_venc_device,
 #endif
