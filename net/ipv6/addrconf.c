@@ -1757,8 +1757,13 @@ static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
 
 	ASSERT_RTNL();
 
-	if ((idev = ipv6_find_idev(dev)) == NULL)
-		return NULL;
+	idev = ipv6_find_idev(dev);
+	if (!idev)
+		return ERR_PTR(-ENOBUFS);
+
+	if (idev->cnf.disable_ipv6)
+		return ERR_PTR(-EACCES);
+
 
 	/* Add default multicast route */
 	addrconf_add_mroute(dev);
@@ -2103,8 +2108,9 @@ static int inet6_addr_add(struct net *net, int ifindex, struct in6_addr *pfx,
 	if (!dev)
 		return -ENODEV;
 
-	if ((idev = addrconf_add_dev(dev)) == NULL)
-		return -ENOBUFS;
+	idev = addrconf_add_dev(dev);
+	if (IS_ERR(idev))
+		return PTR_ERR(idev);
 
 	scope = ipv6_addr_scope(pfx);
 
@@ -2360,7 +2366,7 @@ static void addrconf_dev_config(struct net_device *dev)
 	}
 
 	idev = addrconf_add_dev(dev);
-	if (idev == NULL)
+	if (IS_ERR(idev))
 		return;
 
 	memset(&addr, 0, sizeof(struct in6_addr));
@@ -2450,7 +2456,8 @@ static void addrconf_ip6_tnl_config(struct net_device *dev)
 
 	ASSERT_RTNL();
 
-	if ((idev = addrconf_add_dev(dev)) == NULL) {
+	idev = addrconf_add_dev(dev);
+	if (IS_ERR(idev)) {
 		printk(KERN_DEBUG "init ip6-ip6: add_dev failed\n");
 		return;
 	}
