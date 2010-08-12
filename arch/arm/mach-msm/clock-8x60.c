@@ -1724,123 +1724,112 @@ void __init msm_clk_soc_set_ops(struct clk *clk)
 /*
  * Miscellaneous clock register initializations
  */
-static struct reg_init {
-	void *reg;
-	uint32_t mask;
-	uint32_t val;
-	uint32_t delay_us;
-} ri_list[] __initdata = {
 
-	/* Program MM_PLL0 (PLL1) @ 1320MHz, and turn it on. */
-	{MM_PLL0_MODE_REG, B(0), 0},     /* Disable output */
-	{MM_PLL0_L_VAL_REG, 0xFF,   48}, /* LVAL */
-	{MM_PLL0_M_VAL_REG, 0x7FFFF, 8}, /* MVAL */
-	{MM_PLL0_N_VAL_REG, 0x7FFFF, 9}, /* NVAL */
-	/* Ref = MXO. */
-	{MM_PLL0_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
-	/* Enable MN, set VCO, misc config. */
-	{MM_PLL0_CONFIG_REG, 0xFFFFFFFF, 0x14580},
-	{MM_PLL0_MODE_REG, B(2), B(2)}, /* Deassert reset */
-	{MM_PLL0_MODE_REG, B(0), B(0)}, /* Enable output */
+/* Read, modify, then write-back a register. */
+static void rmwreg(uint32_t val, void *reg, uint32_t mask)
+{
+	uint32_t regval = readl(reg);
+	regval &= ~mask;
+	regval |= val;
+	writel(regval, reg);
+}
 
-	/* Program LPA_PLL (PLL4) @ 540.6720 MHz, and turn it on. */
-	{LCC_PRI_PLL_CLK_CTL_REG, B(0), B(0)}, /* PLL clock select = PLL0 */
-	{LCC_PLL0_MODE_REG, B(0), 0},          /* Disable output */
-	{LCC_PLL0_L_VAL_REG, 0x3FF,     20},   /* LVAL */
-	{LCC_PLL0_M_VAL_REG, 0x7FFFF,   28},   /* MVAL */
-	{LCC_PLL0_N_VAL_REG, 0x7FFFF, 1125},   /* NVAL */
-	/* Ref = MXO, don't bypass, delay 10us after write. */
-	{LCC_PLL0_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
-	/* Enable MN, set VCO, main out. */
-	{LCC_PLL0_CONFIG_REG, 0xFFFFFFFF, 0x00822080},
-	{LCC_PLL0_MODE_REG, B(2), B(2)}, /* Deassert reset */
-	{LCC_PLL0_MODE_REG, B(0), B(0)}, /* Enable output */
+static void reg_init(void)
+{
+/* XXX Start of temporary code, until the RPM takes care of this XXX */
+	/* Program MM_PLL0 (PLL1) @ 1320 MHz and turn it on. */
+	rmwreg(0,  MM_PLL0_MODE_REG, B(0)); /* Disable output */
+	writel(48, MM_PLL0_L_VAL_REG);
+	writel(8,  MM_PLL0_M_VAL_REG);
+	writel(9,  MM_PLL0_N_VAL_REG);
+	rmwreg(B(4)|B(1), MM_PLL0_MODE_REG, B(4)|B(1)); /* Ref = MXO, enable */
+	udelay(10);
+	writel(0x14580, MM_PLL0_CONFIG_REG);  /* Enable MN, set VCO, misc */
+	rmwreg(B(2), MM_PLL0_MODE_REG, B(2)); /* Deassert reset */
+	rmwreg(B(0), MM_PLL0_MODE_REG, B(0)); /* Enable output */
 
-	/* Set MM_PLL1 (PLL2) @ 800MHz, but turn it off. */
-	{MM_PLL1_MODE_REG, B(0), 0},      /* Disable output */
-	/* Ref = MXO, PLL bypassed, reset asserted,
-	 * output disable, test mode disabled. */
-	{MM_PLL1_MODE_REG, BM(4, 0), B(4)},
-	/* Enable MN, set VCO, main out. */
-	{MM_PLL1_CONFIG_REG, 0xFFFFFFFF, 0x00C22080},
-	{MM_PLL1_L_VAL_REG, 0x3FF,   29}, /* LVAL */
-	{MM_PLL1_M_VAL_REG, 0x7FFFF, 17}, /* MVAL */
-	{MM_PLL1_N_VAL_REG, 0x7FFFF, 27}, /* NVAL */
-
-	/* Setup MM_PLL2 (PLL3), but turn it off. Rate set by set_rate_tv(). */
-	{MM_PLL2_MODE_REG, B(0), 0},      /* Disable output */
-	/* Ref = MXO, PLL bypassed, reset asserted,
-	 * output disable, test mode disabled. */
-	{MM_PLL2_MODE_REG, BM(4, 0), B(4)},
-	/* Enable MN and main out. */
-	{MM_PLL2_CONFIG_REG, 0xFFFFFFFF, 0x00C02080},
-
-	/* Enable dynamic clock gating for peripheral HCLKs that support it. */
-	{SDCn_HCLK_CTL_REG(1),		0x70,	0x40},
-	{SDCn_HCLK_CTL_REG(2),		0x70,	0x40},
-	{SDCn_HCLK_CTL_REG(3),		0x70,	0x40},
-	{SDCn_HCLK_CTL_REG(4),		0x70,	0x40},
-	{SDCn_HCLK_CTL_REG(5),		0x70,	0x40},
-	{USB_HS1_HCLK_CTL_REG,		0x70,	0x40},
-
-	/* Deassert MM SW_RESET_ALL signal. */
-	{SW_RESET_ALL_REG, 0x1, 0x0},
+	/* Program LPA_PLL (PLL4) @ 540.6720 MHz and turn it on. */
+	rmwreg(0,    LCC_PLL0_MODE_REG, B(0)); /* Disable output */
+	writel(B(0), LCC_PRI_PLL_CLK_CTL_REG); /* PLL clock select = PLL0 */
+	writel(20,   LCC_PLL0_L_VAL_REG);
+	writel(28,   LCC_PLL0_M_VAL_REG);
+	writel(1125, LCC_PLL0_N_VAL_REG);
+	rmwreg(B(4)|B(1), LCC_PLL0_MODE_REG, B(4)|B(1)); /* Ref = MXO, enable */
+	udelay(10);
+	writel(0x00822080, LCC_PLL0_CONFIG_REG); /* Enable MN, set VCO, misc */
+	rmwreg(B(2), LCC_PLL0_MODE_REG, B(2));   /* Deassert reset */
+	rmwreg(B(0), LCC_PLL0_MODE_REG, B(0));   /* Enable output */
 
 	/* Set up MM AHB clock to PLL8/5. */
-	{AHB_NS_REG,		0x43C7,		0x0102},
+	local_src_enable(PLL_8);
+	rmwreg(0x0102, AHB_NS_REG, 0x43C7);
+	udelay(200); /* Wait before using registers clocked by MM AHB_CLK. */
 
-	/* Enable MM FPB clock. */
-	{AHB_EN_REG,		B(1),		B(1)},
+	/* Set up MM Fabric (AXI). */
+	writel(0x4248451, AXI_NS_REG);
+/* XXX End of temporary code XXX */
 
-	/* Enable MM AHB dynamic hardware gating for clocks that support it. */
-	{AHB_EN_REG,		0x6C000001,	0x24000000},
-	{AHB_EN2_REG,		0xFFFF7800,	0x3C705000},
+	/* Set MM_PLL1 (PLL2) @ 800 MHz but leave it off. */
+	rmwreg(0,  MM_PLL1_MODE_REG, B(0)); /* Disable output */
+	writel(29, MM_PLL1_L_VAL_REG);
+	writel(17, MM_PLL1_M_VAL_REG);
+	writel(27, MM_PLL1_N_VAL_REG);
+	/* Ref = MXO, PLL bypassed, reset asserted,
+	 * output disabled, test mode disabled. */
+	writel(B(4), MM_PLL1_MODE_REG);
+	writel(0x00C22080, MM_PLL1_CONFIG_REG); /* Enable MN, set VCO, misc */
+
+	/* Setup MM_PLL2 (PLL3), but turn it off. Rate set by set_rate_tv(). */
+	rmwreg(0, MM_PLL2_MODE_REG, B(0)); /* Disable output */
+	/* Ref = MXO, PLL bypassed, reset asserted,
+	 * output disable, test mode disabled. */
+	writel(B(4), MM_PLL2_MODE_REG);
+	writel(0x00C02080, MM_PLL2_CONFIG_REG); /* Enable MN, main out, misc. */
+
+	/* Enable dynamic clock gating for peripheral HCLKs that support it. */
+	writel(B(6), SDCn_HCLK_CTL_REG(1));
+	writel(B(6), SDCn_HCLK_CTL_REG(2));
+	writel(B(6), SDCn_HCLK_CTL_REG(3));
+	writel(B(6), SDCn_HCLK_CTL_REG(4));
+	writel(B(6), SDCn_HCLK_CTL_REG(5));
+	writel(B(6), USB_HS1_HCLK_CTL_REG);
+
+	/* Deassert MM SW_RESET_ALL signal. */
+	writel(0, SW_RESET_ALL_REG);
+
+	/* Enable MM FPB clock and HW gating for AHB clocks that support it. */
+	writel(0x24000002, AHB_EN_REG);
+	writel(0x3C705000, AHB_EN2_REG);
 
 	/* Deassert all MM AHB resets. */
-	{SW_RESET_AHB_REG,	0xFFFFFFFF,	0x0},
+	writel(0, SW_RESET_AHB_REG);
 
-	/* Set up MM Fabric (AXI) and SMI clocks. */
-	{AXI_NS_REG,		0x0FFFFFFF,	0x4248451},
-	{MAXI_EN_REG,		B(28),		B(28)},
-	{MAXI_EN2_REG,		B(30)|B(29),	B(30)|B(29)},
-
-	/* Enable MM AXI dynamic hardware gating for clocks that support it. */
-	{MAXI_EN_REG,		0x803F800,	0x3A800},
-	{MAXI_EN2_REG,		B(27)|B(25),	B(27)|B(25)},
-	{SAXI_EN_REG,		0x3C38,		0x3C38},
+	/* Enable MM AXI root and SMI clocks, and HW dynamic gating for
+	 * AXI clocks that support it. */
+	rmwreg(0x1003A800, MAXI_EN_REG,  0x1803F800);
+	rmwreg(0x6A000000, MAXI_EN2_REG, 0x6A000000);
+	writel(0x3C38, SAXI_EN_REG);
 
 	/* De-assert MM AXI resets to all hardware blocks. */
-	{SW_RESET_AXI_REG,	0xE37F,		0x0},
+	writel(0, SW_RESET_AXI_REG);
 
 	/* Deassert all MM core resets. */
-	{SW_RESET_CORE_REG,	0x1FFFFFF,	0x0},
+	writel(0, SW_RESET_CORE_REG);
 
 	/* Set dsi_byte_clk src to the DSI PHY PLL, and dsi_esc_clk to MXO/2. */
-	{MISC_CC2_REG,	B(22)|B(14)|BM(1, 0),	B(22)|B(14)|BVAL(1, 0, 0x1)},
+	rmwreg(B(22)|B(14)|BVAL(1, 0, 0x1), MISC_CC2_REG, B(22)|B(14)|BM(1, 0));
 	/* Set hdmi_ref_clk to MM_PLL2/2. */
-	{MISC_CC2_REG,		B(28)|BM(21, 18), B(28)|BVAL(21, 18, 0x1)},
+	rmwreg(B(28)|BVAL(21, 18, 0x1), MISC_CC2_REG, B(28)|BM(21, 18));
 	/* Set hdmi_app_clk source to MXO and divider to 1 (27MHz). */
-	{MISC_CC2_REG,		B(17),		B(17)},
-	{MISC_CC_REG,		BM(19, 18),	0},
-};
+	rmwreg(B(17), MISC_CC2_REG, B(17));
+	rmwreg(0, MISC_CC_REG, BM(19, 18));
+}
 
 /* Local clock driver initialization. */
 void __init msm_clk_soc_init(void)
 {
-	int i;
-	uint32_t val;
-
-	/* XXX: Temporary until RPM manages MM AHB (which uses PLL8) */
-	local_src_enable(PLL_8);
-
-	for (i = 0; i < ARRAY_SIZE(ri_list); i++) {
-		val = readl(ri_list[i].reg);
-		val &= ~ri_list[i].mask;
-		val |= ri_list[i].val;
-		writel(val, ri_list[i].reg);
-		if (ri_list[i].delay_us)
-			udelay(ri_list[i].delay_us);
-	}
+	/* Initialize clock registers. */
+	reg_init();
 
 	local_clk_enable(C(FAB_P));
 
