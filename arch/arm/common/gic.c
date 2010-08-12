@@ -39,6 +39,11 @@ struct gic_chip_data {
 	unsigned int irq_offset;
 	void __iomem *dist_base;
 	void __iomem *cpu_base;
+	unsigned int max_irq;
+#ifdef CONFIG_PM
+	unsigned int wakeup_irqs[32];
+	unsigned int enabled_irqs[32];
+#endif
 };
 
 #ifndef MAX_GIC_NR
@@ -171,10 +176,64 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 	chip->unmask(irq);
 }
 
+#ifdef CONFIG_PM
+void gic_suspend(unsigned int gic_nr)
+{
+	unsigned int i;
+	void __iomem *base = gic_data[gic_nr].dist_base;
+	/* Dont disable STI's and PPI's. Assume they are quiesced
+	 * by the suspend framework */
+	for (i = 1; i * 32 < gic_data[gic_nr].max_irq; i++) {
+		gic_data[gic_nr].enabled_irqs[i]
+			= readl(base + GIC_DIST_ENABLE_SET + i * 4);
+		/* disable all of them */
+		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4);
+		/* enable the wakeup set */
+		writel(gic_data[gic_nr].wakeup_irqs[i],
+			base + GIC_DIST_ENABLE_SET + i * 4);
+	}
+}
+
+void gic_resume(unsigned int gic_nr)
+{
+	unsigned int i;
+	void __iomem *base = gic_data[gic_nr].dist_base;
+	for (i = 1; i * 32 < gic_data[gic_nr].max_irq; i++) {
+		/* disable all of them */
+		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4);
+		/* enable the enabled set */
+		writel(gic_data[gic_nr].enabled_irqs[i],
+			base + GIC_DIST_ENABLE_SET + i * 4);
+	}
+}
+
+static int gic_set_wake(unsigned int irq, unsigned int on)
+{
+	unsigned int reg_offset, bit_offset;
+	unsigned int gicirq = gic_irq(irq);
+	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
+
+	/* per-cpu interrupts cannot be wakeup interrupts */
+	WARN_ON(gicirq < 32);
+
+	reg_offset = gicirq / 32;
+	bit_offset = gicirq % 32;
+
+	if (on)
+		gic_data->wakeup_irqs[reg_offset] |=  1 << bit_offset;
+	else
+		gic_data->wakeup_irqs[reg_offset] &=  ~(1 << bit_offset);
+
+	return 0;
+}
+#else
+void gic_suspend(unsigned int gic_nr) {}
+void gic_resume(unsigned int gic_nr) {}
 static int gic_set_wake(unsigned int irq, unsigned int on)
 {
 	return 0;
 }
+#endif
 
 static int gic_set_type(unsigned int irq, unsigned int type)
 {
@@ -279,6 +338,7 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
 	if (max_irq > 1020)
 		max_irq = 1020;
 
+	gic_data[gic_nr].max_irq = max_irq;
 	/*
 	 * Set all global interrupts to be level triggered, active low.
 	 */
