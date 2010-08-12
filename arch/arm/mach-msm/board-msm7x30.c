@@ -180,6 +180,35 @@ static int pm8058_gpios_init(void)
 	return 0;
 }
 
+/*virtual key support */
+static ssize_t tma300_vkeys_show(struct kobject *kobj,
+			struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf,
+	__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:904:160:210"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":240:904:160:210"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":400:904:160:210"
+	"\n");
+}
+
+static struct kobj_attribute tma300_vkeys_attr = {
+	.attr = {
+		.mode = S_IRUGO,
+	},
+	.show = &tma300_vkeys_show,
+};
+
+static struct attribute *tma300_properties_attrs[] = {
+	&tma300_vkeys_attr.attr,
+	NULL
+};
+
+static struct attribute_group tma300_properties_attr_group = {
+	.attrs = tma300_properties_attrs,
+};
+
+static struct kobject *properties_kobj;
+
 #define CYTTSP_TS_GPIO_IRQ	150
 static int cyttsp_platform_init(struct i2c_client *client)
 {
@@ -245,6 +274,17 @@ static int cyttsp_platform_init(struct i2c_client *client)
 			__func__, CYTTSP_TS_GPIO_IRQ, rc);
 		goto l8_disable;
 	}
+
+	/* virtual keys */
+	tma300_vkeys_attr.attr.name = "virtualkeys.cyttsp-i2c";
+	properties_kobj = kobject_create_and_add("board_properties",
+				NULL);
+	if (properties_kobj)
+		rc = sysfs_create_group(properties_kobj,
+			&tma300_properties_attr_group);
+	if (!properties_kobj || rc)
+		pr_err("%s: failed to create board_properties\n",
+				__func__);
 
 	return CY_OK;
 
@@ -4993,36 +5033,6 @@ vreg_fail:
 	return rc;
 }
 
-/*virtual key support */
-static ssize_t tma300_vkeys_show(struct kobject *kobj,
-			struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf,
-	__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:904:160:210"
-	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":240:904:160:210"
-	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":400:904:160:210"
-	"\n");
-}
-
-static struct kobj_attribute tma300_vkeys_attr = {
-	.attr = {
-		.name = "virtualkeys.msm_tma300_ts",
-		.mode = S_IRUGO,
-	},
-	.show = &tma300_vkeys_show,
-};
-
-static struct attribute *tma300_properties_attrs[] = {
-	&tma300_vkeys_attr.attr,
-	NULL
-};
-
-static struct attribute_group tma300_properties_attr_group = {
-	.attrs = tma300_properties_attrs,
-};
-
-static struct kobject *properties_kobj;
-
 #define TS_GPIO_IRQ 150
 
 static int tma300_dev_setup(bool enable)
@@ -5067,6 +5077,7 @@ static int tma300_dev_setup(bool enable)
 		}
 
 		/* virtual keys */
+		tma300_vkeys_attr.attr.name = "virtualkeys.msm_tma300_ts";
 		properties_kobj = kobject_create_and_add("board_properties",
 					NULL);
 		if (properties_kobj)
