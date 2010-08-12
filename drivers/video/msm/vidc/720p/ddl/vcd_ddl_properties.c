@@ -477,36 +477,24 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 			struct vcd_property_profile *profile =
 				(struct vcd_property_profile *)
 				property_value;
-			if (
-				(sizeof(struct vcd_property_profile) ==
+			if ((sizeof(struct vcd_property_profile) ==
 				property_hdr->sz) &&
-				(
-				 (
-				  (encoder->codec.
-					codec == VCD_CODEC_MPEG4) &&
-				  (
-				   profile->profile == VCD_PROFILE_MPEG4_SP
-				   || profile->profile ==
-				   VCD_PROFILE_MPEG4_ASP
-				   )
-				  ) ||
-				 (
-				  (
-				  (encoder->codec.
-				   codec == VCD_CODEC_H264) &&
-				   (profile->profile >=
-					VCD_PROFILE_H264_BASELINE)
-				   && (profile->profile <=
-					VCD_PROFILE_H264_HIGH)
-				   )
-				  ) ||
-				 (
-				  (encoder->codec.
-				   codec == VCD_CODEC_H263) &&
+				((encoder->codec.codec ==
+					VCD_CODEC_MPEG4 &&
 				  (profile->profile ==
-				   VCD_PROFILE_H263_BASELINE)
-				  )
-				 )
+					VCD_PROFILE_MPEG4_SP ||
+					profile->profile ==
+					VCD_PROFILE_MPEG4_ASP)) ||
+				 (encoder->codec.codec ==
+					VCD_CODEC_H264 &&
+				 (profile->profile >=
+					VCD_PROFILE_H264_BASELINE ||
+				  profile->profile <=
+					VCD_PROFILE_H264_HIGH)) ||
+				 (encoder->codec.codec ==
+					VCD_CODEC_H263 &&
+				  profile->profile ==
+					VCD_PROFILE_H263_BASELINE))
 				) {
 				encoder->profile = *profile;
 				vcd_status = VCD_S_SUCCESS;
@@ -603,6 +591,9 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 				property_hdr->sz &&
 				!vcd_status) {
 				encoder->multi_slice = *multislice;
+				if (multislice->m_slice_sel ==
+						VCD_MSLICE_OFF)
+					encoder->multi_slice.m_slice_size = 0;
 			}
 			break;
 		}
@@ -1015,12 +1006,13 @@ static u32 ddl_get_dec_property
 			if (sizeof(u32) == property_hdr->sz &&
 			    decoder->client_frame_size.width &&
 			    decoder->client_frame_size.height) {
+				struct vcd_property_frame_size frame_sz =
+					decoder->client_frame_size;
+				ddl_calculate_stride(&frame_sz,
+					!decoder->progressive_only);
 				*(u32 *) property_value =
-				    ((decoder->client_frame_size.
-				      width >> 4) *
-				     (decoder->client_frame_size.
-				      height >> 4)
-				    );
+				    ((frame_sz.stride >> 4) *
+				     (frame_sz.scan_lines >> 4));
 				vcd_status = VCD_S_SUCCESS;
 			}
 			break;
@@ -1506,7 +1498,8 @@ static void ddl_set_default_enc_property(struct ddl_client_context *ddl)
 	encoder->intra_refresh.cir_mb_number = 0;
 	ddl_set_default_enc_vop_timing(encoder);
 
-	encoder->multi_slice.m_slice_size = VCD_MSLICE_OFF;
+	encoder->multi_slice.m_slice_sel = VCD_MSLICE_OFF;
+	encoder->multi_slice.m_slice_size = 0;
 	encoder->short_header.short_header = false;
 
 	encoder->entropy_control.entropy_sel = VCD_ENTROPY_SEL_CAVLC;
@@ -1593,8 +1586,8 @@ static void ddl_set_default_enc_rc_params(
 
 	if (codec == VCD_CODEC_H264) {
 		encoder->qp_range.max_qp = 0x33;
-		encoder->session_qp.i_frame_qp = 0x19;
-		encoder->session_qp.p_frame_qp = 0x19;
+		encoder->session_qp.i_frame_qp = 0x14;
+		encoder->session_qp.p_frame_qp = 0x14;
 
 		encoder->rc_level.mb_level_rc = true;
 		encoder->adaptive_rc.activity_region_flag = true;
@@ -1603,8 +1596,8 @@ static void ddl_set_default_enc_rc_params(
 		encoder->adaptive_rc.static_region_as_flag = true;
 	} else {
 		encoder->qp_range.max_qp = 0x1f;
-		encoder->session_qp.i_frame_qp = 0x14;
-		encoder->session_qp.p_frame_qp = 0x14;
+		encoder->session_qp.i_frame_qp = 0xd;
+		encoder->session_qp.p_frame_qp = 0xd;
 		encoder->rc_level.mb_level_rc = false;
 	}
 
@@ -1819,7 +1812,8 @@ static u32 ddl_valid_buffer_requirement
 
 static u32 ddl_decoder_min_num_dpb(struct ddl_decoder_data *decoder)
 {
-	u32 min_dpb = 0;
+	u32 min_dpb = 0, yuv_size = 0;
+	struct vcd_property_frame_size frame_sz = decoder->client_frame_size;
 	switch (decoder->codec.codec) {
 	default:
 	case VCD_CODEC_MPEG4:
@@ -1845,9 +1839,11 @@ static u32 ddl_decoder_min_num_dpb(struct ddl_decoder_data *decoder)
 		}
 	case VCD_CODEC_H264:
 		{
-			u32 yuv_size =
-			    ((decoder->client_frame_size.height *
-			      decoder->client_frame_size.width * 3) >> 1);
+			ddl_calculate_stride(&frame_sz,
+				!decoder->progressive_only);
+			yuv_size =
+			    ((frame_sz.scan_lines *
+			      frame_sz.stride * 3) >> 1);
 			min_dpb = 6912000 / yuv_size;
 			if (min_dpb > 16)
 				min_dpb = 16;
