@@ -190,7 +190,7 @@ u32 vcd_sched_dequeue_buffer(
 	struct vcd_sched_clnt_ctx *sched_cctxt,
 	struct vcd_buffer_entry **buffer)
 {
-	u32 rc = VCD_S_SCHED_QEMPTY;
+	u32 rc = VCD_ERR_QEMPTY;
 	if (!sched_cctxt || !buffer) {
 		VCD_MSG_ERROR("%s(): Invalid parameter", __func__);
 		rc = VCD_ERR_ILLEGAL_PARM;
@@ -220,7 +220,7 @@ u32 vcd_sched_mark_client_eof(struct vcd_sched_clnt_ctx *sched_cctxt)
 			struct vcd_buffer_entry, sched_list);
 		buffer->frame.flags |= VCD_FRAME_FLAG_EOS;
 	} else
-		rc = VCD_S_SCHED_QEMPTY;
+		rc = VCD_ERR_QEMPTY;
 	return rc;
 }
 
@@ -250,7 +250,7 @@ u32 vcd_sched_get_client_frame(struct list_head *sched_clnt_list,
 	struct vcd_clnt_ctxt **cctxt,
 	struct vcd_buffer_entry **buffer)
 {
-	u32 rc = VCD_S_SCHED_QEMPTY, round_adjustment = 0;
+	u32 rc = VCD_ERR_QEMPTY, round_adjustment = 0;
 	struct vcd_sched_clnt_ctx *sched_clnt, *clnt_nxt;
 	if (!sched_clnt_list || !cctxt || !buffer) {
 		VCD_MSG_ERROR("%s(): Invalid parameter", __func__);

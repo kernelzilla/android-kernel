@@ -64,8 +64,8 @@ static u32  vcd_close_in_invalid(struct vcd_clnt_ctxt *cctxt)
 		return VCD_ERR_ILLEGAL_OP;
 	}
 
-	if (cctxt->status.cleaning_up)
-		cctxt->status.close_pending = true;
+	if (cctxt->status.mask & VCD_CLEANING_UP)
+		cctxt->status.mask |= VCD_CLOSE_PENDING;
 	else
 		vcd_destroy_client_context(cctxt);
 	return VCD_S_SUCCESS;
@@ -312,7 +312,7 @@ static u32 vcd_flush_cmn(struct vcd_clnt_ctxt *cctxt, u32 mode)
 					       (flush));
 	} else {
 		VCD_MSG_HIGH("All buffers are flushed");
-		cctxt->status.flush_mode = mode;
+		cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
 		vcd_send_flush_done(cctxt, VCD_S_SUCCESS);
 	}
 
@@ -323,7 +323,7 @@ static u32  vcd_flush_inopen(struct vcd_clnt_ctxt *cctxt,
 	u32 mode)
 {
    VCD_MSG_LOW("vcd_flush_inopen:");
-   cctxt->status.flush_mode = mode;
+   cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
    vcd_send_flush_done(cctxt, VCD_S_SUCCESS);
    return VCD_S_SUCCESS;
 }
@@ -353,7 +353,7 @@ static u32 vcd_flush_in_eos(struct vcd_clnt_ctxt *cctxt,
 
 	VCD_MSG_MED("Flush mode requested %d", mode);
 
-	cctxt->status.flush_mode |= mode;
+	cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
 
 	return VCD_S_SUCCESS;
 }
@@ -363,11 +363,11 @@ static u32 vcd_flush_in_invalid(struct vcd_clnt_ctxt *cctxt,
 {
 	u32 rc = VCD_S_SUCCESS;
 	VCD_MSG_LOW("vcd_flush_in_invalid:");
-	if (!cctxt->status.cleaning_up) {
+	if (!(cctxt->status.mask & VCD_CLEANING_UP)) {
 		rc = vcd_flush_buffers(cctxt, mode);
 		if (!VCD_FAILED(rc)) {
 			VCD_MSG_HIGH("All buffers are flushed");
-			cctxt->status.flush_mode = mode;
+			cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
 			vcd_send_flush_done(cctxt, VCD_S_SUCCESS);
 		}
 	}
@@ -446,7 +446,8 @@ static u32 vcd_stop_in_run(struct vcd_clnt_ctxt *cctxt)
 
 	rc = vcd_stop_cmn(cctxt);
 
-	if (!VCD_FAILED(rc) && cctxt->status.first_ip_frame_recvd) {
+	if (!VCD_FAILED(rc) &&
+		(cctxt->status.mask & VCD_FIRST_IP_RCVD)) {
 		rc = vcd_power_event(cctxt->dev_ctxt,
 				     cctxt, VCD_EVT_PWR_CLNT_LAST_FRAME);
 	}
@@ -460,7 +461,7 @@ static u32 vcd_stop_in_eos(struct vcd_clnt_ctxt *cctxt)
 
 	VCD_MSG_LOW("vcd_stop_in_eos:");
 
-	cctxt->status.stop_pending = true;
+	cctxt->status.mask |= VCD_STOP_PENDING;
 
 	return rc;
 }
@@ -468,8 +469,8 @@ static u32 vcd_stop_in_eos(struct vcd_clnt_ctxt *cctxt)
 static u32  vcd_stop_in_invalid(struct vcd_clnt_ctxt *cctxt)
 {
 	VCD_MSG_LOW("vcd_stop_in_invalid:");
-	if (cctxt->status.cleaning_up) {
-		cctxt->status.stop_pending = true;
+	if (cctxt->status.mask & VCD_CLEANING_UP) {
+		cctxt->status.mask |= VCD_STOP_PENDING;
 	} else {
 		(void) vcd_flush_buffers(cctxt, VCD_FLUSH_ALL);
 		cctxt->callback(VCD_EVT_RESP_STOP, VCD_S_SUCCESS, NULL,
@@ -563,7 +564,7 @@ static u32 vcd_set_buffer_requirements_cmn
 	struct vcd_property_hdr Prop_hdr;
 	u32 rc = VCD_S_SUCCESS;
 	struct vcd_buffer_pool *buf_pool;
-	u32 first_frm_recvd = false;
+	u32 first_frm_recvd = 0;
 
 	VCD_MSG_LOW("vcd_set_buffer_requirements_cmn in %d:",
 		    cctxt->clnt_state.state);
@@ -581,11 +582,11 @@ static u32 vcd_set_buffer_requirements_cmn
 	if (buffer == VCD_BUFFER_INPUT) {
 		Prop_hdr.prop_id = DDL_I_INPUT_BUF_REQ;
 		buf_pool = &cctxt->in_buf_pool;
-		first_frm_recvd = cctxt->status.first_ip_frame_recvd;
+		first_frm_recvd = VCD_FIRST_IP_RCVD;
 	} else if (buffer == VCD_BUFFER_OUTPUT) {
 		Prop_hdr.prop_id = DDL_I_OUTPUT_BUF_REQ;
 		buf_pool = &cctxt->out_buf_pool;
-		first_frm_recvd = cctxt->status.first_op_frame_recvd;
+		first_frm_recvd = VCD_FIRST_OP_RCVD;
 	} else {
 		rc = VCD_ERR_ILLEGAL_PARM;
 	}
@@ -598,6 +599,7 @@ static u32 vcd_set_buffer_requirements_cmn
 		return VCD_ERR_ILLEGAL_OP;
 	}
 
+	first_frm_recvd &= cctxt->status.mask;
 	if (first_frm_recvd) {
 		VCD_MSG_ERROR("VCD SetBufReq called when data path is active");
 
@@ -721,12 +723,12 @@ static u32 vcd_fill_output_buffer_cmn
 	if (!buf_entry)
 		return VCD_ERR_BAD_POINTER;
 
-	if (!cctxt->status.first_op_frame_recvd) {
+	if (!(cctxt->status.mask & VCD_FIRST_OP_RCVD)) {
 		rc = vcd_handle_first_fill_output_buffer(cctxt, buffer,
 			&handled);
 		VCD_FAILED_RETURN(rc,
 			"Failed: VCD_HandleFirstFillOutputBuffer");
-		cctxt->status.first_op_frame_recvd = true;
+		cctxt->status.mask |= VCD_FIRST_OP_RCVD;
 		if (handled)
 			return rc ;
 	}
@@ -762,7 +764,7 @@ static u32 vcd_fill_output_buffer_in_eos
 	if (!buf_entry)
 		return VCD_ERR_BAD_POINTER;
 
-	if (cctxt->status.eos_wait_for_op_buf) {
+	if (cctxt->status.mask & VCD_EOS_WAIT_OP_BUF) {
 		VCD_MSG_HIGH("Got an output buffer we were waiting for");
 
 		buf_entry->frame = *buffer;
@@ -780,7 +782,7 @@ static u32 vcd_fill_output_buffer_in_eos
 				  sizeof(struct vcd_frame_data),
 				  cctxt, cctxt->client_data);
 
-		cctxt->status.eos_wait_for_op_buf = false;
+		cctxt->status.mask &= ~VCD_EOS_WAIT_OP_BUF;
 
 		vcd_do_client_state_transition(cctxt,
 					       VCD_CLIENT_STATE_RUN,
@@ -1093,10 +1095,8 @@ static void vcd_clnt_cb_in_flushing
 		if (frm_trans_end && !cctxt->status.frame_submitted) {
 			VCD_MSG_HIGH
 			    ("All pending frames recvd from DDL");
-			if (cctxt->status.
-			    flush_mode & VCD_FLUSH_OUTPUT) {
+			if (cctxt->status.mask & VCD_FLUSH_OUTPUT)
 				vcd_flush_output_buffers(cctxt);
-			}
 			vcd_send_flush_done(cctxt, VCD_S_SUCCESS);
 			vcd_release_interim_frame_channels(dev_ctxt);
 			VCD_MSG_HIGH("Flush complete");
@@ -1208,16 +1208,11 @@ static void vcd_clnt_cb_in_stopping
 
 				VCD_MSG_HIGH
 				    ("All pending frames recvd from DDL");
-
 				vcd_flush_output_buffers(cctxt);
-
-				cctxt->status.flush_mode = 0;
-
+				cctxt->status.mask &= ~VCD_FLUSH_ALL;
 				vcd_release_all_clnt_frm_transc(cctxt);
-
 				VCD_MSG_HIGH
 				    ("All buffers flushed. Enqueuing stop cmd");
-
 				vcd_client_cmd_flush_and_en_q(cctxt,
 						VCD_CMD_CODEC_STOP);
 		}
@@ -1433,12 +1428,10 @@ static void vcd_clnt_enter_paused
 static void  vcd_clnt_enter_invalid(struct vcd_clnt_ctxt *cctxt,
 	s32 state_event)
 {
-   VCD_MSG_MED("Entering CLIENT_STATE_INVALID on api %d",
+	VCD_MSG_MED("Entering CLIENT_STATE_INVALID on api %d",
 		state_event);
-
-   cctxt->ddl_hdl_valid = false;
-   cctxt->status.first_ip_frame_recvd = false;
-   cctxt->status.first_op_frame_recvd = false;
+	cctxt->ddl_hdl_valid = false;
+	cctxt->status.mask &= ~(VCD_FIRST_IP_RCVD | VCD_FIRST_OP_RCVD);
 }
 
 static void vcd_clnt_exit_open
