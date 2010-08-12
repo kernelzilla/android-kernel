@@ -184,6 +184,15 @@ void ddl_decode_init_codec(struct ddl_client_context *ddl)
 
 	vidc_720p_decode_set_mpeg4Post_filter(decoder->post_filter.
 					       post_filter);
+
+	if (decoder->codec.codec == VCD_CODEC_H264) {
+		vidc_720p_decode_setH264VSPBuffer(decoder->
+						   h264Vsp_temp_buffer.
+						   align_physical_addr);
+		VIDC_LOG1("VSP_BUF_ADDR_SIZE",
+			   decoder->h264Vsp_temp_buffer.buffer_size);
+	}
+
 	if (decoder->codec.codec == VCD_CODEC_VC1_RCV) {
 		vidc_720p_set_frame_size(decoder->client_frame_size.width,
 			decoder->client_frame_size.height);
@@ -829,17 +838,7 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 		}
 	}
 	ddl_decode_set_metadata_output(decoder);
-
 	ddl_decoder_dpb_transact(decoder, NULL, DDL_DPB_OP_INIT);
-
-	if (decoder->codec.codec == VCD_CODEC_H264) {
-		vidc_720p_decode_setH264VSPBuffer(decoder->
-						   h264Vsp_temp_buffer.
-						   align_physical_addr);
-		VIDC_LOG1("VSP_BUF_ADDR_SIZE",
-			   decoder->h264Vsp_temp_buffer.buffer_size);
-	}
-
 	ddl_move_client_state(ddl, DDL_CLIENT_WAIT_FOR_DPBDONE);
 	ddl_move_command_state(ddl->ddl_context, DDL_CMD_DECODE_SET_DPB);
 

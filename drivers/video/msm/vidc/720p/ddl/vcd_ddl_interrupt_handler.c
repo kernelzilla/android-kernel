@@ -69,15 +69,15 @@ static void ddl_cpu_started_callback(struct ddl_context *ddl_context)
 }
 
 
-static void ddl_eos_done_callback(struct ddl_context *ddl_context)
+static u32 ddl_eos_done_callback(struct ddl_context *ddl_context)
 {
 	struct ddl_client_context *ddl = ddl_context->current_ddl;
-	u32 displaystatus;
+	u32 displaystatus, resl_change;
 
 	if (!DDLCOMMAND_STATE_IS(ddl_context, DDL_CMD_EOS)) {
 		VIDC_LOGERR_STRING("UNKWN_EOSDONE");
 		ddl_client_fatal_cb(ddl_context);
-		return;
+		return true;
 	}
 
 	if (!ddl ||
@@ -86,23 +86,33 @@ static void ddl_eos_done_callback(struct ddl_context *ddl_context)
 		) {
 		VIDC_LOG_STRING("STATE-CRITICAL-EOSDONE");
 		ddl_client_fatal_cb(ddl_context);
-		return;
+		return true;
 	}
 	ddl_move_command_state(ddl_context, DDL_CMD_INVALID);
 
-	vidc_720p_eos_info(&displaystatus);
+	vidc_720p_eos_info(&displaystatus, &resl_change);
 	if ((enum vidc_720p_display_status)displaystatus
 		!= VIDC_720P_EMPTY_BUFFER) {
 		VIDC_LOG_STRING("EOSDONE-EMPTYBUF-ISSUE");
 	}
 
 	ddl_decode_dynamic_property(ddl, false);
+	if (resl_change == 0x1) {
+		ddl->codec_data.decoder.header_in_start = false;
+		ddl->codec_data.decoder.decode_config.sequence_header =
+			ddl->input_frame.vcd_frm.physical;
+		ddl->codec_data.decoder.decode_config.sequence_header_len =
+			ddl->input_frame.vcd_frm.data_len;
+		ddl_decode_init_codec(ddl);
+		return false;
+	}
 	ddl_move_client_state(ddl, DDL_CLIENT_WAIT_FOR_FRAME);
 	VIDC_LOG_STRING("EOS_DONE");
 	ddl_context->ddl_callback(VCD_EVT_RESP_EOS_DONE, VCD_S_SUCCESS,
 		NULL, 0, (u32 *) ddl, ddl_context->client_data);
-
 	DDL_IDLE(ddl_context);
+
+	return true;
 }
 
 static u32 ddl_channel_set_callback(struct ddl_context *ddl_context)
@@ -421,10 +431,13 @@ static u32 ddl_decoder_frame_run_callback(struct ddl_context
 	ddl_decode_dynamic_property(ddl, false);
 
 	if (dec_disp_info->resl_change) {
-		VIDC_LOGERR_STRING
-			("ddl_dec_frm_done:Dec_reconfig_not_supported");
-		ddl_client_fatal_cb(ddl_context);
-		return true;
+		VIDC_LOG_STRING
+			("DEC_FRM_RUN_DONE: RECONFIG");
+		ddl_move_client_state(ddl, DDL_CLIENT_WAIT_FOR_EOS_DONE);
+		ddl_move_command_state(ddl_context, DDL_CMD_EOS);
+		vidc_720p_submit_command(ddl->channel_id,
+			VIDC_720P_CMD_FRAMERUN_REALLOCATE);
+		return false;
 	}
 
 	if ((VCD_FRAME_FLAG_EOS & ddl->input_frame.vcd_frm.flags)) {
@@ -613,7 +626,7 @@ static u32 ddl_process_intr_status(struct ddl_context *ddl_context,
 		 }
 	case VIDC_720P_INTR_FW_DONE:
 		 {
-			ddl_eos_done_callback(ddl_context);
+			status = ddl_eos_done_callback(ddl_context);
 			break;
 		 }
 	case VIDC_720P_INTR_BUFFER_FULL:

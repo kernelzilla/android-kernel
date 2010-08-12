@@ -2524,7 +2524,7 @@ void vidc_720p_decode_frame(u32 ch_id, u32 ext_buffer_start,
 		u32 start_byte_num, u32 input_frame_tag);
 
 void vidc_720p_issue_eos(u32 i_ch_id);
-void vidc_720p_eos_info(u32 *disp_status);
+void vidc_720p_eos_info(u32 *disp_status, u32 *resl_change);
 
 void vidc_720p_decode_display_info
     (struct vidc_720p_dec_disp_info *disp_info);
