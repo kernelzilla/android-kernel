@@ -111,8 +111,8 @@
 /* NCP masks and values */
 #define NCP_VPROG_MASK			0x1F
 
-#define NCP_UV_MIN			-3000000
-#define NCP_UV_MAX			-1500000
+#define NCP_UV_MIN			1500000
+#define NCP_UV_MAX			3000000
 #define NCP_UV_STEP			50000
 
 struct pm8058_vreg {
@@ -617,7 +617,7 @@ static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
 	int rc;
 	u8 val;
 
-	val = (NCP_UV_MAX - min_uV) / NCP_UV_STEP;
+	val = (min_uV - NCP_UV_MIN) / NCP_UV_STEP;
 
 	/* voltage setting */
 	rc = pm8058_vreg_write(chip, vreg->ctrl_addr, val, NCP_VPROG_MASK,
@@ -632,7 +632,7 @@ static int pm8058_ncp_get_voltage(struct regulator_dev *dev)
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
 	u8 vprog = vreg->ctrl_reg & NCP_VPROG_MASK;
-	return NCP_UV_MAX - vprog * NCP_UV_STEP;
+	return NCP_UV_MIN + vprog * NCP_UV_STEP;
 }
 
 static struct regulator_ops pm8058_ldo_ops = {
