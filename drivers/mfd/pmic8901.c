@@ -119,6 +119,15 @@ ssbi_read(struct i2c_client *client, u16 addr, u8 *buf, size_t len)
 }
 
 /* External APIs */
+int pm8901_rev(struct pm8901_chip *chip)
+{
+	if (chip == NULL)
+		return -EINVAL;
+
+	return chip->revision;
+}
+EXPORT_SYMBOL(pm8901_rev);
+
 int pm8901_read(struct pm8901_chip *chip, u16 addr, u8 *values,
 		unsigned int len)
 {

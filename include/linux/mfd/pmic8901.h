@@ -60,10 +60,17 @@ struct pm8901_gpio_platform_data {
 	int	irq_base;
 };
 
+/* chip revision */
+#define PM_8901_REV_1p0			0xF1
+#define PM_8901_REV_1p1			0xF2
+#define PM_8901_REV_2p0			0xF3
+
 int pm8901_read(struct pm8901_chip *pm_chip, u16 addr, u8 *values,
 		unsigned int len);
 int pm8901_write(struct pm8901_chip *pm_chip, u16 addr, u8 *values,
 		 unsigned int len);
+
+int pm8901_rev(struct pm8901_chip *pm_chip);
 
 int pm8901_irq_get_rt_status(struct pm8901_chip *pm_chip, int irq);
 
