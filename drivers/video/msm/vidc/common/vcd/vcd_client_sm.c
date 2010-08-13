@@ -573,7 +573,7 @@ static u32 vcd_set_buffer_requirements_cmn
 	if (!p_cctxt->b_decoding &&
 	    p_cctxt->clnt_state.e_state != VCD_CLIENT_STATE_OPEN) {
 		VCD_MSG_ERROR("Bad state (%d) for encoder",
-			      p_cctxt->clnt_state.e_state);
+					p_cctxt->clnt_state.e_state);
 
 		return VCD_ERR_BAD_STATE;
 	}
@@ -745,7 +745,7 @@ static u32 vcd_fill_output_buffer_cmn
 	p_buf_entry->frame = *p_buffer;
 	rc = vcd_return_op_buffer_to_hw(p_cctxt, p_buf_entry);
 	if (!VCD_FAILED(rc) && p_cctxt->sched_clnt_hdl) {
-			vcd_try_submit_frame(p_cctxt->p_dev_ctxt);
+		vcd_try_submit_frame(p_cctxt->p_dev_ctxt);
 		p_cctxt->sched_clnt_hdl->n_o_tkns++;
 	}
 	return rc;
@@ -887,7 +887,7 @@ static void vcd_clnt_cb_in_run
 		{
 			rc = vcd_handle_ind_output_reconfig(p_cctxt, p_payload,
 				status);
-			break;
+      break;
 		}
 	case VCD_EVT_RESP_TRANSACTION_PENDING:
 		{
@@ -1004,9 +1004,9 @@ static void vcd_clnt_cb_in_eos
 			b_frm_trans_end = TRUE;
 		}
 		if (b_frm_trans_end && !p_cctxt->status.n_frame_submitted)
-				vcd_handle_eos_trans_end(p_cctxt);
-		}
+			vcd_handle_eos_trans_end(p_cctxt);
 	}
+}
 
 static void vcd_clnt_cb_in_flushing
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
@@ -1091,30 +1091,22 @@ static void vcd_clnt_cb_in_flushing
 			b_frm_trans_end = TRUE;
 		}
 		if (b_frm_trans_end && !p_cctxt->status.n_frame_submitted) {
-
-				VCD_MSG_HIGH
-				    ("All pending frames recvd from DDL");
-
-				if (p_cctxt->status.
-				    n_flush_mode & VCD_FLUSH_OUTPUT) {
-					vcd_flush_output_buffers(p_cctxt);
-
-					vcd_release_all_clnt_frm_transc
-					    (p_cctxt);
-
-				}
-
-				vcd_send_flush_done(p_cctxt, VCD_S_SUCCESS);
-				vcd_release_interim_frame_channels(p_dev_ctxt);
-				VCD_MSG_HIGH("Flush complete");
-				vcd_release_all_clnt_def_frm_transc(p_cctxt);
-				vcd_do_client_state_transition(p_cctxt,
-					VCD_CLIENT_STATE_RUN,
-					CLIENT_STATE_EVENT_NUMBER
-					(pf_clnt_cb));
+			VCD_MSG_HIGH
+			    ("All pending frames recvd from DDL");
+			if (p_cctxt->status.
+			    n_flush_mode & VCD_FLUSH_OUTPUT) {
+				vcd_flush_output_buffers(p_cctxt);
 			}
+			vcd_send_flush_done(p_cctxt, VCD_S_SUCCESS);
+			vcd_release_interim_frame_channels(p_dev_ctxt);
+			VCD_MSG_HIGH("Flush complete");
+			vcd_do_client_state_transition(p_cctxt,
+				VCD_CLIENT_STATE_RUN,
+				CLIENT_STATE_EVENT_NUMBER
+				(pf_clnt_cb));
 		}
 	}
+}
 
 static void vcd_clnt_cb_in_stopping
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
@@ -1228,10 +1220,10 @@ static void vcd_clnt_cb_in_stopping
 
 				vcd_client_cmd_flush_and_en_q(p_cctxt,
 						VCD_CMD_CODEC_STOP);
-			}
-
 		}
+
 	}
+}
 
 static void vcd_clnt_cb_in_pausing
     (struct vcd_clnt_ctxt_type_t *p_cctxt,
@@ -1312,33 +1304,33 @@ static void vcd_clnt_cb_in_pausing
 			b_frm_trans_end = TRUE;
 		}
 		if (b_frm_trans_end && !p_cctxt->status.n_frame_submitted) {
-				VCD_MSG_HIGH
-				    ("All pending frames recvd from DDL");
+			VCD_MSG_HIGH
+			    ("All pending frames recvd from DDL");
 
-				p_cctxt->callback(VCD_EVT_RESP_PAUSE,
-						  VCD_S_SUCCESS,
-						  NULL,
-						  0,
-						  p_cctxt,
-						  p_cctxt->p_client_data);
+			p_cctxt->callback(VCD_EVT_RESP_PAUSE,
+					  VCD_S_SUCCESS,
+					  NULL,
+					  0,
+					  p_cctxt,
+					  p_cctxt->p_client_data);
 
-				vcd_do_client_state_transition(p_cctxt,
-						VCD_CLIENT_STATE_PAUSED,
-						CLIENT_STATE_EVENT_NUMBER
-							       (pf_clnt_cb));
+			vcd_do_client_state_transition(p_cctxt,
+					VCD_CLIENT_STATE_PAUSED,
+					CLIENT_STATE_EVENT_NUMBER
+						       (pf_clnt_cb));
 
-				rc = vcd_power_event(p_cctxt->p_dev_ctxt,
-						     p_cctxt,
-						     VCD_EVT_PWR_CLNT_PAUSE);
+			rc = vcd_power_event(p_cctxt->p_dev_ctxt,
+					     p_cctxt,
+					     VCD_EVT_PWR_CLNT_PAUSE);
 
-				if (VCD_FAILED(rc)) {
-					VCD_MSG_ERROR
-					    ("VCD_EVT_PWR_CLNT_PAUSE_END"
-					     "failed");
-				}
+			if (VCD_FAILED(rc)) {
+				VCD_MSG_ERROR
+				    ("VCD_EVT_PWR_CLNT_PAUSE_END"
+				     "failed");
 			}
 		}
 	}
+}
 
 static void  vcd_clnt_cb_in_invalid(
    struct vcd_clnt_ctxt_type_t *p_cctxt, u32 event, u32 status,
@@ -1637,7 +1629,7 @@ static const struct vcd_clnt_state_table_type_t vcd_clnt_table_flushing = {
 	 NULL,
 	 NULL,
 	 NULL,
-	 NULL,
+	 vcd_fill_output_buffer_cmn,
 	 vcd_clnt_cb_in_flushing,
 	 },
 	vcd_clnt_enter_flushing,

@@ -39,7 +39,6 @@
 #include "vidc_init.h"
 
 #define VID_ENC_NAME   	  "msm_vidc_enc"
-#define VIDC_HCLK_RATE    228570000
 
 #if DEBUG
 #define DBG(x...) printk(KERN_DEBUG x)
@@ -62,7 +61,7 @@ static s32 vid_enc_get_empty_client_index(void)
 	u32 i;
 	u32 found = FALSE;
 
-	for (i = 0; i < VID_ENC_MAX_ENCODER_CLIENTS; i++) {
+	for (i = 0; i < VIDC_MAX_NUM_CLIENTS; i++) {
 		if (!vid_enc_device_p->venc_clients[i].vcd_handle) {
 			found = TRUE;
 			break;
@@ -495,27 +494,20 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 	s32 client_index;
 	struct video_client_ctx *client_ctx;
 	u32 vcd_status = VCD_ERR_FAIL;
+	u8 client_count = 0;
 
 	INFO("\n msm_vidc_enc: Inside %s()", __func__);
 
 	mutex_lock(&vid_enc_device_p->lock);
 
 	stop_cmd = 0;
-	if (vid_enc_device_p->num_clients == VID_ENC_MAX_ENCODER_CLIENTS) {
+	client_count = vcd_get_num_of_clients();
+	if (client_count == VIDC_MAX_NUM_CLIENTS) {
 		ERR("ERROR : vid_enc_open() max number of clients"
 		    "limit reached\n");
 		mutex_unlock(&vid_enc_device_p->lock);
 		return -ENODEV;
 	}
-
-#ifndef USE_RES_TRACKER
-	DBG("Resource Tracker not in use");
-	if (!vidc_enable_clk(VIDC_HCLK_RATE)) {
-		ERR("vid_enc_open():	clock enabled failed\n");
-		mutex_unlock(&vid_enc_device_p->lock);
-		return -ENODEV;
-	}
-#endif
 
 	DBG(" Virtual Address of ioremap is %p\n", vid_enc_device_p->virt_base);
 	if (!vid_enc_device_p->num_clients) {
@@ -607,7 +599,7 @@ static int vid_enc_vcd_init(void)
 	INFO("\n msm_vidc_enc: Inside %s()", __func__);
 	vid_enc_device_p->num_clients = 0;
 
-	for (i = 0; i < VID_ENC_MAX_ENCODER_CLIENTS; i++) {
+	for (i = 0; i < VIDC_MAX_NUM_CLIENTS; i++) {
 		memset((void *)&vid_enc_device_p->venc_clients[i], 0,
 		sizeof(vid_enc_device_p->venc_clients[i]));
 	}
@@ -763,7 +755,7 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 		DBG("VEN_IOCTL_CMD_READ_NEXT_MSG\n");
 		result = vid_enc_get_next_msg(client_ctx, &cb_msg);
 		if (!result) {
-			ERR("VEN_IOCTL_CMD_READ_NEXT_MSG failed\n");
+			ERR("VEN_IOCTL_CMD_READ_NEXT_MSG stopped\n");
 			return -EIO;
 		} else
 			if (copy_to_user((void __user *) \
@@ -854,7 +846,7 @@ static int vid_enc_ioctl(struct inode *inode, struct file *file,
 		result = vid_enc_free_buffer(client_ctx, &buffer_info,
 				buffer_dir);
 		if (!result) {
-			ERR("\n VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER"
+			DBG("\n VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER"
 				"/VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER failed");
 			return -EIO;
 		}
