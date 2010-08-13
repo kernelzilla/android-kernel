@@ -1465,28 +1465,9 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,
 	memset(input_buf_req, 0,
 		sizeof(struct vcd_buffer_requirement));
 	input_buf_req->min_count = 1;
-	input_buf_req->actual_count = input_buf_req->min_count;
+	input_buf_req->actual_count = input_buf_req->min_count + 3;
 	input_buf_req->max_count = DDL_MAX_BUFFER_COUNT;
-
-	if (y_cb_cr_size >= VCD_DDL_720P_YUV_BUF_SIZE)
-		y_cb_cr_size = y_cb_cr_size>>1;
-
-	if (y_cb_cr_size < DDL_KILO_BYTE(1))
-		y_cb_cr_size = DDL_KILO_BYTE(1);
-	else {
-		if ((y_cb_cr_size & (y_cb_cr_size - 1))) {
-			u32 shift = 0;
-
-			while (y_cb_cr_size) {
-				y_cb_cr_size >>= 1;
-				shift++;
-			}
-			y_cb_cr_size = 1 << shift;
-		}
-		if (y_cb_cr_size > DDL_MEGA_BYTE(4))
-			y_cb_cr_size = DDL_MEGA_BYTE(4);
-	}
-	input_buf_req->sz = y_cb_cr_size;
+	input_buf_req->sz = (1920*1088*3) >> 2;
 	input_buf_req->align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
 	decoder->min_input_buf_req = *input_buf_req;
 }
