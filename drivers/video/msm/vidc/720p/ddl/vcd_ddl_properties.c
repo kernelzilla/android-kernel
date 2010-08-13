@@ -1654,7 +1654,7 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data *encoder)
 
 	encoder->input_buf_req.min_count = 1;
 	encoder->input_buf_req.actual_count =
-	    encoder->input_buf_req.min_count;
+	    encoder->input_buf_req.min_count + 8;
 	encoder->input_buf_req.max_count = DDL_MAX_BUFFER_COUNT;
 	encoder->input_buf_req.sz = y_cb_cr_size;
 	encoder->input_buf_req.align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
@@ -1666,7 +1666,7 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data *encoder)
 
 	encoder->output_buf_req.min_count = 2;
 	encoder->output_buf_req.actual_count =
-	    encoder->output_buf_req.min_count + 5;
+	    encoder->output_buf_req.min_count + 3;
 	encoder->output_buf_req.max_count = DDL_MAX_BUFFER_COUNT;
 	encoder->output_buf_req.align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
 	encoder->output_buf_req.sz = y_cb_cr_size;
