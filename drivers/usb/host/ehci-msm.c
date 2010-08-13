@@ -271,6 +271,18 @@ static void usb_lpm_exit(struct usb_hcd *hcd)
 	spin_unlock_irqrestore(&mhcd->lock, flags);
 }
 
+static irqreturn_t ehci_msm_irq(struct usb_hcd *hcd)
+{
+	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
+	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, otg);
+
+	/* OTG scheduled a work to get PHY out of LPM, WAIT till then */
+	if (unlikely(atomic_read(&otg->in_lpm)))
+		return IRQ_HANDLED;
+
+	return ehci_irq(hcd);
+}
+
 #ifdef CONFIG_PM
 
 static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
@@ -398,7 +410,7 @@ static struct hc_driver msm_hc_driver = {
 	/*
 	 * generic hardware linkage
 	 */
-	.irq 			= ehci_irq,
+	.irq 			= ehci_msm_irq,
 	.flags 			= HCD_USB2,
 
 	.reset 			= ehci_msm_reset,
