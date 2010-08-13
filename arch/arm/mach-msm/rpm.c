@@ -25,10 +25,12 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/semaphore.h>
 #include <linux/spinlock.h>
+#include <asm/hardware/gic.h>
 #include <mach/msm_iomap.h>
 
 #include "rpm.h"
@@ -368,11 +370,11 @@ static void msm_rpm_busy_wait_for_request_completion(void)
 	int rc;
 
 	do {
-		while (!msm_rpm_read(MSM_RPM_PAGE_CTRL,
-				MSM_RPM_CTRL_ACK_CTX_0))
+		while (!gic_is_spi_pending(msm_rpm_platform->irq_ack))
 			udelay(1);
 
 		rc = msm_rpm_process_ack_interrupt();
+		gic_clear_spi_pending(msm_rpm_platform->irq_ack);
 	} while (rc);
 }
 
@@ -436,6 +438,7 @@ static int msm_rpm_set_exclusive(int ctx,
 static int msm_rpm_set_exclusive_noirq(int ctx,
 	uint32_t *sel_masks, struct msm_rpm_iv_pair *req, int count)
 {
+	unsigned int irq = msm_rpm_platform->irq_ack;
 	unsigned long flags;
 	uint32_t ctx_mask = msm_rpm_get_ctx_mask(ctx);
 	uint32_t ctx_mask_ack;
@@ -448,6 +451,7 @@ static int msm_rpm_set_exclusive_noirq(int ctx,
 	msm_rpm_request_poll_mode.sel_masks_ack = sel_masks_ack;
 	msm_rpm_request_poll_mode.done = NULL;
 
+	get_irq_chip(irq)->mask(irq);
 	spin_lock_irqsave(&msm_rpm_irq_lock, flags);
 	if (msm_rpm_request) {
 		msm_rpm_busy_wait_for_request_completion();
@@ -470,6 +474,7 @@ static int msm_rpm_set_exclusive_noirq(int ctx,
 
 	BUG_ON(msm_rpm_request);
 	spin_unlock_irqrestore(&msm_rpm_irq_lock, flags);
+	get_irq_chip(irq)->unmask(irq);
 
 	BUG_ON((ctx_mask_ack & ~(msm_rpm_get_ctx_mask(MSM_RPM_CTX_REJECTED)))
 		!= ctx_mask);
