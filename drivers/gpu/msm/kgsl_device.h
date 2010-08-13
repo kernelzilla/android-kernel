@@ -73,10 +73,6 @@
 #define KGSL_CHIPID_YAMATODX_REV21  0x20100
 #define KGSL_CHIPID_YAMATODX_REV211 0x20101
 
-int kgsl_yamato_setup_pt(struct kgsl_device *device,
-			 struct kgsl_pagetable *pagetable);
-int kgsl_yamato_cleanup_pt(struct kgsl_device *device,
-			   struct kgsl_pagetable *pagetable);
 
 #define KGSL_GRAPHICS_MEMORY_LOW_WATERMARK  0x1000000
 
@@ -123,6 +119,11 @@ struct kgsl_functable {
 	long (*device_ioctl) (struct kgsl_device_private *dev_priv,
 					unsigned int cmd,
 					unsigned long arg);
+	int (*device_setup_pt)(struct kgsl_device *device,
+			       struct kgsl_pagetable *pagetable);
+
+	int (*device_cleanup_pt)(struct kgsl_device *device,
+				 struct kgsl_pagetable *pagetable);
 
 };
 

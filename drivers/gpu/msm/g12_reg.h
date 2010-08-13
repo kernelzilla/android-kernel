@@ -90,5 +90,6 @@
 #define ADDR_VGV3_MODE                   0x0071
 #define ADDR_VGV3_NEXTADDR               0x0075
 #define ADDR_VGV3_NEXTCMD                0x0076
+#define ADDR_VGV3_WRITEADDR              0x0072
 
 #endif /* _G12_REG_H */

@@ -105,6 +105,8 @@ struct kgsl_driver {
 	struct list_head pagetable_list;
 	/* Mutex for accessing the pagetable list */
 	struct mutex pt_mutex;
+
+	struct kgsl_pagetable *global_pt;
 };
 
 extern struct kgsl_driver kgsl_driver;
@@ -165,6 +167,10 @@ int kgsl_regread(struct kgsl_device *device, unsigned int offsetwords,
 int kgsl_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int value);
 int kgsl_check_timestamp(struct kgsl_device *device, unsigned int timestamp);
+
+int kgsl_setup_pt(struct kgsl_pagetable *);
+
+int kgsl_cleanup_pt(struct kgsl_pagetable *);
 
 int kgsl_register_ts_notifier(struct kgsl_device *device,
 			      struct notifier_block *nb);

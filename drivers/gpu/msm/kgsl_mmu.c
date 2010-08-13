@@ -261,21 +261,27 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 	status = kgsl_sharedmem_alloc(flags,
 				      pagetable->max_entries * GSL_PTE_SIZE,
 				      &pagetable->base);
+	if (status != 0)
+		goto err_pool;
 
-	if (status == 0) {
-		/* reset page table entries
-		 * -- all pte's are marked as not dirty initially
-		 */
-		kgsl_sharedmem_set(&pagetable->base, 0, 0,
-				   pagetable->base.size);
-	}
+	/* reset page table entries
+	 * -- all pte's are marked as not dirty initially
+	 */
+	kgsl_sharedmem_set(&pagetable->base, 0, 0, pagetable->base.size);
+
 	pagetable->base.gpuaddr = pagetable->base.physaddr;
+
+	status = kgsl_setup_pt(pagetable);
+	if (status)
+		goto err_free_sharedmem;
 
 	list_add(&pagetable->list, &kgsl_driver.pagetable_list);
 
 	KGSL_MEM_VDBG("return %p\n", pagetable);
 	return pagetable;
 
+err_free_sharedmem:
+	kgsl_sharedmem_free(&pagetable->base);
 err_pool:
 	gen_pool_destroy(pagetable->pool);
 err_flushfilter:
@@ -293,6 +299,7 @@ static void kgsl_mmu_destroypagetable(struct kgsl_pagetable *pagetable)
 	list_del(&pagetable->list);
 
 	if (pagetable) {
+		kgsl_cleanup_pt(pagetable);
 		if (pagetable->base.gpuaddr)
 			kgsl_sharedmem_free(&pagetable->base);
 
@@ -436,16 +443,6 @@ int kgsl_mmu_init(struct kgsl_device *device)
 		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
 				   mmu->dummyspace.size);
 
-		mmu->defaultpagetable = kgsl_mmu_getpagetable(mmu,
-							 KGSL_MMU_GLOBAL_PT);
-
-		if (!mmu->defaultpagetable) {
-			KGSL_MEM_ERR("Failed to create global page table\n");
-			status = -ENOMEM;
-			goto error_free_dummyspace;
-		}
-		mmu->hwpagetable = mmu->defaultpagetable;
-
 	}
 	mmu->flags |= KGSL_FLAGS_INITIALIZED;
 
@@ -453,8 +450,6 @@ int kgsl_mmu_init(struct kgsl_device *device)
 
 	return 0;
 
-error_free_dummyspace:
-	kgsl_sharedmem_free(&mmu->dummyspace);
 error:
 	return status;
 }
@@ -521,6 +516,7 @@ int kgsl_mmu_start(struct kgsl_device *device)
 		kgsl_regwrite(device, mmu_reg[device->id].tran_error,
 						mmu->dummyspace.physaddr + 32);
 
+		BUG_ON(mmu->defaultpagetable == NULL);
 		mmu->hwpagetable = mmu->defaultpagetable;
 
 		kgsl_regwrite(device, mmu_reg[device->id].pt_page,
@@ -761,6 +757,38 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 }
 #endif /*CONFIG_MSM_KGSL_MMU*/
 
+int kgsl_mmu_map_global(struct kgsl_pagetable *pagetable,
+			struct kgsl_memdesc *memdesc, unsigned int protflags,
+			unsigned int flags)
+{
+	int result = -EINVAL;
+	unsigned int gpuaddr = 0;
+
+	if (memdesc == NULL)
+		goto error;
+
+	result = kgsl_mmu_map(pagetable, memdesc->physaddr, memdesc->size,
+				protflags, &gpuaddr, flags);
+	if (result)
+		goto error;
+
+	/*global mappings must have the same gpu address in all pagetables*/
+	if (memdesc->gpuaddr == 0)
+		memdesc->gpuaddr = gpuaddr;
+
+	else if (memdesc->gpuaddr != gpuaddr) {
+		KGSL_MEM_ERR("pt %p addr mismatch phys 0x%08x gpu 0x%0x 0x%08x",
+				pagetable, memdesc->physaddr,
+				memdesc->gpuaddr, gpuaddr);
+		goto error_unmap;
+	}
+	return result;
+error_unmap:
+	kgsl_mmu_unmap(pagetable, gpuaddr, memdesc->size);
+error:
+	return result;
+}
+
 int kgsl_mmu_stop(struct kgsl_device *device)
 {
 	/*
@@ -806,12 +834,6 @@ int kgsl_mmu_close(struct kgsl_device *device)
 
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED;
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED0;
-		if (mmu->defaultpagetable) {
-			kgsl_mmu_putpagetable(mmu->defaultpagetable);
-			if (mmu->hwpagetable == mmu->defaultpagetable)
-				mmu->hwpagetable = NULL;
-			mmu->defaultpagetable = NULL;
-		}
 	}
 
 	KGSL_MEM_VDBG("return %d\n", 0);

@@ -58,7 +58,7 @@ int kgsl_g12_cmdstream_start(struct kgsl_device *device)
 
 	result = kgsl_g12_cmdwindow_write(device, KGSL_CMDWINDOW_2D,
 			ADDR_VGV3_NEXTADDR,
-			g12_device->ringbuffer.cmdbufdesc.physaddr);
+			g12_device->ringbuffer.cmdbufdesc.gpuaddr);
 	if (result != 0)
 		return result;
 
@@ -69,6 +69,11 @@ int kgsl_g12_cmdstream_start(struct kgsl_device *device)
 
 	result = kgsl_g12_cmdwindow_write(device, KGSL_CMDWINDOW_2D,
 			ADDR_VGV3_CONTROL, 0);
+	if (result != 0)
+		return result;
+
+	result = kgsl_g12_cmdwindow_write(device, KGSL_CMDWINDOW_2D,
+			ADDR_VGV3_WRITEADDR, device->memstore.gpuaddr);
 	if (result != 0)
 		return result;
 
@@ -168,7 +173,7 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 
 	addcmd(&g12_device->ringbuffer, index, cmd + ofs, cnt);
 
-	nextaddr = g12_device->ringbuffer.cmdbufdesc.physaddr
+	nextaddr = g12_device->ringbuffer.cmdbufdesc.gpuaddr
 		 + rb_offset((index + 1) % KGSL_G12_PACKET_COUNT);
 
 	tmp.hostptr = (void *)(tmp.hostptr +
