@@ -839,14 +839,11 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 
 	__dump_kp_regs(kp, "probe");
 
-	/* wakeup or dynamic keypad enable/disable functionality */
-	if (!pdata->wakeup) {
-		rc = device_create_file(&pdev->dev, &dev_attr_disable_kp);
-		if (rc < 0)
-			goto err_create_file;
-	} else {
-		device_init_wakeup(&pdev->dev, pdata->wakeup);
-	}
+	rc = device_create_file(&pdev->dev, &dev_attr_disable_kp);
+	if (rc < 0)
+		goto err_create_file;
+
+	device_init_wakeup(&pdev->dev, pdata->wakeup);
 
 	return 0;
 
@@ -873,14 +870,11 @@ err_alloc_mem:
 static int __devexit pmic8058_kp_remove(struct platform_device *pdev)
 {
 	struct pmic8058_kp *kp = platform_get_drvdata(pdev);
-	struct pmic8058_keypad_data *pdata = pdev->dev.platform_data;
 
 	pm_runtime_set_suspended(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-	if (!pdata->wakeup)
-		device_remove_file(&pdev->dev, &dev_attr_disable_kp);
-	else
-		device_init_wakeup(&pdev->dev, 0);
+	device_remove_file(&pdev->dev, &dev_attr_disable_kp);
+	device_init_wakeup(&pdev->dev, 0);
 	free_irq(kp->key_stuck_irq, NULL);
 	free_irq(kp->key_sense_irq, NULL);
 	input_unregister_device(kp->input);
@@ -896,7 +890,7 @@ static int pmic8058_kp_suspend(struct device *dev)
 {
 	struct pmic8058_kp *kp = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev)) {
+	if (device_may_wakeup(dev) && !pmic8058_kp_disabled(kp)) {
 		enable_irq_wake(kp->key_sense_irq);
 	} else {
 		mutex_lock(&kp->mutex);
@@ -911,7 +905,7 @@ static int pmic8058_kp_resume(struct device *dev)
 {
 	struct pmic8058_kp *kp = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev)) {
+	if (device_may_wakeup(dev) && !pmic8058_kp_disabled(kp)) {
 		disable_irq_wake(kp->key_sense_irq);
 	} else {
 		mutex_lock(&kp->mutex);
