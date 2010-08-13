@@ -607,13 +607,13 @@ int __init trout_init_panel(void)
 
 	trout_new_backlight = system_rev >= 5;
 	if (trout_new_backlight) {
-		uint32_t config = PCOM_GPIO_CFG(27, 0, GPIO_OUTPUT,
-						GPIO_NO_PULL, GPIO_8MA);
+		uint32_t config = PCOM_GPIO_CFG(27, 0, GPIO_CFG_OUTPUT,
+						GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
 		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, 0);
 	}
 	else {
-		uint32_t config = PCOM_GPIO_CFG(27, 1, GPIO_OUTPUT,
-						GPIO_NO_PULL, GPIO_8MA);
+		uint32_t config = PCOM_GPIO_CFG(27, 1, GPIO_CFG_OUTPUT,
+						GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
 		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, 0);
 
 		gp_clk = clk_get(NULL, "gp_clk");

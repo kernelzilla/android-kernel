@@ -620,7 +620,7 @@ static struct platform_device sapphire_backlight = {
 int __init sapphire_init_panel(void)
 {
 	int rc = -1;
-	uint32_t config = PCOM_GPIO_CFG(27, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA); /* GPIO27 */
+	uint32_t config = PCOM_GPIO_CFG(27, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA); /* GPIO27 */
 
 	if (!machine_is_sapphire())
 		return 0;

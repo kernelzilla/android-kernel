@@ -231,8 +231,8 @@ static int cyttsp_platform_init(struct i2c_client *client)
 		goto l15_disable;
 	}
 
-	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_INPUT,
-					GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
+	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_CFG_INPUT,
+					GPIO_CFG_PULL_UP, GPIO_CFG_6MA), GPIO_CFG_ENABLE);
 	if (rc) {
 		pr_err("%s: Could not configure gpio %d\n",
 					 __func__, CYTTSP_TS_GPIO_IRQ);
@@ -728,67 +728,67 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 #ifdef CONFIG_MSM_CAMERA
 static uint32_t camera_off_gpio_table[] = {
 	/* parallel CAMERA interfaces */
-	GPIO_CFG(0,  0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), /* RST */
+	GPIO_CFG(0,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* RST */
 #ifndef CONFIG_TIMPANI_CODEC
-	GPIO_CFG(1,  0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), /* VCM */
+	GPIO_CFG(1,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VCM */
 #endif
-	GPIO_CFG(2,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT2 */
-	GPIO_CFG(3,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT3 */
-	GPIO_CFG(4,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT4 */
-	GPIO_CFG(5,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT5 */
-	GPIO_CFG(6,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT6 */
-	GPIO_CFG(7,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT7 */
-	GPIO_CFG(8,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT8 */
-	GPIO_CFG(9,  0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT9 */
-	GPIO_CFG(10, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT10 */
-	GPIO_CFG(11, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT11 */
-	GPIO_CFG(12, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* PCLK */
-	GPIO_CFG(13, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* HSYNC_IN */
-	GPIO_CFG(14, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* VSYNC_IN */
-	GPIO_CFG(15, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* MCLK */
+	GPIO_CFG(2,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT2 */
+	GPIO_CFG(3,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT3 */
+	GPIO_CFG(4,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT4 */
+	GPIO_CFG(5,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT5 */
+	GPIO_CFG(6,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT6 */
+	GPIO_CFG(7,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT7 */
+	GPIO_CFG(8,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT8 */
+	GPIO_CFG(9,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT9 */
+	GPIO_CFG(10, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT10 */
+	GPIO_CFG(11, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT11 */
+	GPIO_CFG(12, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* PCLK */
+	GPIO_CFG(13, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* HSYNC_IN */
+	GPIO_CFG(14, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VSYNC_IN */
+	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* MCLK */
 };
 
 static uint32_t camera_on_gpio_table[] = {
 	/* parallel CAMERA interfaces */
-	GPIO_CFG(0,  0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), /* RST */
+	GPIO_CFG(0,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* RST */
 #ifndef CONFIG_TIMPANI_CODEC
-	GPIO_CFG(1,  0, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA), /* VCM */
+	GPIO_CFG(1,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), /* VCM */
 #endif
-	GPIO_CFG(2,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT2 */
-	GPIO_CFG(3,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT3 */
-	GPIO_CFG(4,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT4 */
-	GPIO_CFG(5,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT5 */
-	GPIO_CFG(6,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT6 */
-	GPIO_CFG(7,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT7 */
-	GPIO_CFG(8,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT8 */
-	GPIO_CFG(9,  1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT9 */
-	GPIO_CFG(10, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT10 */
-	GPIO_CFG(11, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT11 */
-	GPIO_CFG(12, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* PCLK */
-	GPIO_CFG(13, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* HSYNC_IN */
-	GPIO_CFG(14, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* VSYNC_IN */
-	GPIO_CFG(15, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* MCLK */
+	GPIO_CFG(2,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT2 */
+	GPIO_CFG(3,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT3 */
+	GPIO_CFG(4,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT4 */
+	GPIO_CFG(5,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT5 */
+	GPIO_CFG(6,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT6 */
+	GPIO_CFG(7,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT7 */
+	GPIO_CFG(8,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT8 */
+	GPIO_CFG(9,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT9 */
+	GPIO_CFG(10, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT10 */
+	GPIO_CFG(11, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT11 */
+	GPIO_CFG(12, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* PCLK */
+	GPIO_CFG(13, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* HSYNC_IN */
+	GPIO_CFG(14, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VSYNC_IN */
+	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* MCLK */
 };
 
 static uint32_t camera_off_gpio_fluid_table[] = {
 	/* FLUID: CAM_VGA_RST_N */
-	GPIO_CFG(31, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA),
+	GPIO_CFG(31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 	/* FLUID: Disable CAMIF_STANDBY */
-	GPIO_CFG(143, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA)
+	GPIO_CFG(143, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
 };
 
 static uint32_t camera_on_gpio_fluid_table[] = {
 	/* FLUID: CAM_VGA_RST_N */
-	GPIO_CFG(31, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA),
+	GPIO_CFG(31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 	/* FLUID: Disable CAMIF_STANDBY */
-	GPIO_CFG(143, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA)
+	GPIO_CFG(143, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA)
 };
 
 static void config_gpio_table(uint32_t *table, int len)
 {
 	int n, rc;
 	for (n = 0; n < len; n++) {
-		rc = gpio_tlmm_config(table[n], GPIO_ENABLE);
+		rc = gpio_tlmm_config(table[n], GPIO_CFG_ENABLE);
 		if (rc) {
 			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
 				__func__, table[n], rc);
@@ -1031,17 +1031,17 @@ static struct platform_device msm_gemini_device = {
 
 #ifdef CONFIG_MSM7KV2_AUDIO
 static uint32_t audio_pamp_gpio_config =
-   GPIO_CFG(82, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA);
+   GPIO_CFG(82, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
 static uint32_t audio_fluid_icodec_tx_config =
-  GPIO_CFG(85, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA);
+  GPIO_CFG(85, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
 static int __init snddev_poweramp_gpio_init(void)
 {
 	int rc;
 
 	pr_info("snddev_poweramp_gpio_init \n");
-	rc = gpio_tlmm_config(audio_pamp_gpio_config, GPIO_ENABLE);
+	rc = gpio_tlmm_config(audio_pamp_gpio_config, GPIO_CFG_ENABLE);
 	if (rc) {
 		printk(KERN_ERR
 			"%s: gpio_tlmm_config(%#x)=%d\n",
@@ -1058,7 +1058,7 @@ void msm_snddev_tx_route_config(void)
 
 	if (machine_is_msm7x30_fluid()) {
 		rc = gpio_tlmm_config(audio_fluid_icodec_tx_config,
-		GPIO_ENABLE);
+		GPIO_CFG_ENABLE);
 		if (rc) {
 			printk(KERN_ERR
 				"%s: gpio_tlmm_config(%#x)=%d\n",
@@ -1076,7 +1076,7 @@ void msm_snddev_tx_route_deconfig(void)
 
 	if (machine_is_msm7x30_fluid()) {
 		rc = gpio_tlmm_config(audio_fluid_icodec_tx_config,
-		GPIO_DISABLE);
+		GPIO_CFG_DISABLE);
 		if (rc) {
 			printk(KERN_ERR
 				"%s: gpio_tlmm_config(%#x)=%d\n",
@@ -1152,10 +1152,10 @@ void msm_snddev_hsed_voltage_off(void)
 }
 
 static unsigned aux_pcm_gpio_on[] = {
-	GPIO_CFG(138, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),   /* PCM_DOUT */
-	GPIO_CFG(139, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA),   /* PCM_DIN  */
-	GPIO_CFG(140, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),   /* PCM_SYNC */
-	GPIO_CFG(141, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),   /* PCM_CLK  */
+	GPIO_CFG(138, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),   /* PCM_DOUT */
+	GPIO_CFG(139, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),   /* PCM_DIN  */
+	GPIO_CFG(140, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),   /* PCM_SYNC */
+	GPIO_CFG(141, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),   /* PCM_CLK  */
 };
 
 static int __init aux_pcm_gpio_init(void)
@@ -1165,7 +1165,7 @@ static int __init aux_pcm_gpio_init(void)
 	pr_info("aux_pcm_gpio_init \n");
 	for (pin = 0; pin < ARRAY_SIZE(aux_pcm_gpio_on); pin++) {
 		rc = gpio_tlmm_config(aux_pcm_gpio_on[pin],
-					GPIO_ENABLE);
+					GPIO_CFG_ENABLE);
 		if (rc) {
 			printk(KERN_ERR
 				"%s: gpio_tlmm_config(%#x)=%d\n",
@@ -1176,27 +1176,27 @@ static int __init aux_pcm_gpio_init(void)
 }
 
 static struct msm_gpio mi2s_clk_gpios[] = {
-	{ GPIO_CFG(145, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(145, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_SCLK"},
-	{ GPIO_CFG(144, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(144, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_WS"},
-	{ GPIO_CFG(120, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(120, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_MCLK_A"},
 };
 
 static struct msm_gpio mi2s_rx_data_lines_gpios[] = {
-	{ GPIO_CFG(121, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(121, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_DATA_SD0_A"},
-	{ GPIO_CFG(122, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(122, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_DATA_SD1_A"},
-	{ GPIO_CFG(123, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(123, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_DATA_SD2_A"},
-	{ GPIO_CFG(146, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(146, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_DATA_SD3"},
 };
 
 static struct msm_gpio mi2s_tx_data_lines_gpios[] = {
-	{ GPIO_CFG(146, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(146, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	    "MI2S_DATA_SD3"},
 };
 
@@ -1304,8 +1304,8 @@ int mi2s_unconfig_clk_gpio(void)
 
 static int __init buses_init(void)
 {
-	if (gpio_tlmm_config(GPIO_CFG(PMIC_GPIO_INT, 1, GPIO_INPUT,
-				  GPIO_NO_PULL, GPIO_2MA), GPIO_ENABLE))
+	if (gpio_tlmm_config(GPIO_CFG(PMIC_GPIO_INT, 1, GPIO_CFG_INPUT,
+				  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE))
 		pr_err("%s: gpio_tlmm_config (gpio=%d) failed\n",
 		       __func__, PMIC_GPIO_INT);
 
@@ -1329,10 +1329,10 @@ static int __init buses_init(void)
 
 #ifdef CONFIG_TIMPANI_CODEC
 static uint32_t timpani_reset_on_gpio[] = {
-	GPIO_CFG(1, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA)};
+	GPIO_CFG(1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA)};
 
 static uint32_t timpani_reset_off_gpio[] = {
-	GPIO_CFG(1, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA)};
+	GPIO_CFG(1, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA)};
 
 static void config_timpani_reset_on(void)
 {
@@ -1429,9 +1429,9 @@ static int fm_radio_setup(struct marimba_fm_platform_data *pdata)
 			__func__, rc);
 		goto fm_clock_vote_fail;
 	}
-	irqcfg = GPIO_CFG(147, 0, GPIO_INPUT, GPIO_NO_PULL,
-					GPIO_2MA);
-	rc = gpio_tlmm_config(irqcfg, GPIO_ENABLE);
+	irqcfg = GPIO_CFG(147, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA);
+	rc = gpio_tlmm_config(irqcfg, GPIO_CFG_ENABLE);
 	if (rc) {
 		printk(KERN_ERR "%s: gpio_tlmm_config(%#x)=%d\n",
 				__func__, irqcfg, rc);
@@ -1453,9 +1453,9 @@ static void fm_radio_shutdown(struct marimba_fm_platform_data *pdata)
 {
 	int rc;
 	const char *id = "FMPW";
-	uint32_t irqcfg = GPIO_CFG(147, 0, GPIO_INPUT, GPIO_PULL_UP,
-					GPIO_2MA);
-	rc = gpio_tlmm_config(irqcfg, GPIO_ENABLE);
+	uint32_t irqcfg = GPIO_CFG(147, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+					GPIO_CFG_2MA);
+	rc = gpio_tlmm_config(irqcfg, GPIO_CFG_ENABLE);
 	if (rc) {
 		printk(KERN_ERR "%s: gpio_tlmm_config(%#x)=%d\n",
 				__func__, irqcfg, rc);
@@ -2047,14 +2047,14 @@ static struct platform_device smsc911x_device = {
 };
 
 static struct msm_gpio smsc911x_gpios[] = {
-    { GPIO_CFG(172, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr6" },
-    { GPIO_CFG(173, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr5" },
-    { GPIO_CFG(174, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr4" },
-    { GPIO_CFG(175, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr3" },
-    { GPIO_CFG(176, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr2" },
-    { GPIO_CFG(177, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr1" },
-    { GPIO_CFG(178, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr0" },
-    { GPIO_CFG(88, 2, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), "smsc911x_irq"  },
+    { GPIO_CFG(172, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr6" },
+    { GPIO_CFG(173, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr5" },
+    { GPIO_CFG(174, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr4" },
+    { GPIO_CFG(175, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr3" },
+    { GPIO_CFG(176, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr2" },
+    { GPIO_CFG(177, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr1" },
+    { GPIO_CFG(178, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr0" },
+    { GPIO_CFG(88, 2, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), "smsc911x_irq"  },
 };
 
 static void msm7x30_cfg_smsc911x(void)
@@ -2195,7 +2195,7 @@ static struct platform_device android_usb_device = {
 #endif
 
 static struct msm_gpio optnav_config_data[] = {
-	{ GPIO_CFG(OPTNAV_CHIP_SELECT, 0, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA),
+	{ GPIO_CFG(OPTNAV_CHIP_SELECT, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 	"optnav_chip_select" },
 };
 
@@ -2583,10 +2583,10 @@ static struct spi_board_info lcdc_toshiba_spi_board_info[] __initdata = {
 #endif
 
 static struct msm_gpio qsd_spi_gpio_config_data[] = {
-	{ GPIO_CFG(45, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
-	{ GPIO_CFG(46, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
-	{ GPIO_CFG(47, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA), "spi_mosi" },
-	{ GPIO_CFG(48, 1, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_miso" },
+	{ GPIO_CFG(45, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
+	{ GPIO_CFG(46, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
+	{ GPIO_CFG(47, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "spi_mosi" },
+	{ GPIO_CFG(48, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_miso" },
 };
 
 static int msm_qsd_spi_gpio_config(void)
@@ -2745,10 +2745,10 @@ static int lcdc_gpio_array_num[] = {
 				};
 
 static struct msm_gpio lcdc_gpio_config_data[] = {
-	{ GPIO_CFG(45, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
-	{ GPIO_CFG(46, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
-	{ GPIO_CFG(47, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), "spi_mosi" },
-	{ GPIO_CFG(48, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA), "spi_miso" },
+	{ GPIO_CFG(45, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
+	{ GPIO_CFG(46, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
+	{ GPIO_CFG(47, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_mosi" },
+	{ GPIO_CFG(48, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_miso" },
 };
 
 static void lcdc_config_gpios(int enable)
@@ -2781,45 +2781,45 @@ static struct platform_device lcdc_sharp_panel_device = {
 };
 
 static struct msm_gpio dtv_panel_gpios[] = {
-	{ GPIO_CFG(18, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_4MA), "hdmi_int" },
-	{ GPIO_CFG(120, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_mclk" },
-	{ GPIO_CFG(121, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_sd0" },
-	{ GPIO_CFG(122, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_sd1" },
-	{ GPIO_CFG(123, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "wca_sd2" },
-	{ GPIO_CFG(124, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_8MA), "dtv_pclk" },
-	{ GPIO_CFG(125, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_en" },
-	{ GPIO_CFG(126, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_vsync" },
-	{ GPIO_CFG(127, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_hsync" },
-	{ GPIO_CFG(128, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data0" },
-	{ GPIO_CFG(129, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data1" },
-	{ GPIO_CFG(130, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data2" },
-	{ GPIO_CFG(131, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data3" },
-	{ GPIO_CFG(132, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data4" },
-	{ GPIO_CFG(160, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data5" },
-	{ GPIO_CFG(161, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data6" },
-	{ GPIO_CFG(162, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data7" },
-	{ GPIO_CFG(163, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data8" },
-	{ GPIO_CFG(164, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_data9" },
-	{ GPIO_CFG(165, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat10" },
-	{ GPIO_CFG(166, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat11" },
-	{ GPIO_CFG(167, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat12" },
-	{ GPIO_CFG(168, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat13" },
-	{ GPIO_CFG(169, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat14" },
-	{ GPIO_CFG(170, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat15" },
-	{ GPIO_CFG(171, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat16" },
-	{ GPIO_CFG(172, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat17" },
-	{ GPIO_CFG(173, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat18" },
-	{ GPIO_CFG(174, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat19" },
-	{ GPIO_CFG(175, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat20" },
-	{ GPIO_CFG(176, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat21" },
-	{ GPIO_CFG(177, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat22" },
-	{ GPIO_CFG(178, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_4MA), "dtv_dat23" },
+	{ GPIO_CFG(18, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "hdmi_int" },
+	{ GPIO_CFG(120, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_mclk" },
+	{ GPIO_CFG(121, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_sd0" },
+	{ GPIO_CFG(122, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_sd1" },
+	{ GPIO_CFG(123, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_sd2" },
+	{ GPIO_CFG(124, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "dtv_pclk" },
+	{ GPIO_CFG(125, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_en" },
+	{ GPIO_CFG(126, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_vsync" },
+	{ GPIO_CFG(127, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_hsync" },
+	{ GPIO_CFG(128, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data0" },
+	{ GPIO_CFG(129, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data1" },
+	{ GPIO_CFG(130, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data2" },
+	{ GPIO_CFG(131, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data3" },
+	{ GPIO_CFG(132, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data4" },
+	{ GPIO_CFG(160, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data5" },
+	{ GPIO_CFG(161, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data6" },
+	{ GPIO_CFG(162, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data7" },
+	{ GPIO_CFG(163, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data8" },
+	{ GPIO_CFG(164, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_data9" },
+	{ GPIO_CFG(165, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat10" },
+	{ GPIO_CFG(166, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat11" },
+	{ GPIO_CFG(167, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat12" },
+	{ GPIO_CFG(168, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat13" },
+	{ GPIO_CFG(169, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat14" },
+	{ GPIO_CFG(170, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat15" },
+	{ GPIO_CFG(171, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat16" },
+	{ GPIO_CFG(172, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat17" },
+	{ GPIO_CFG(173, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat18" },
+	{ GPIO_CFG(174, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat19" },
+	{ GPIO_CFG(175, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat20" },
+	{ GPIO_CFG(176, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat21" },
+	{ GPIO_CFG(177, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat22" },
+	{ GPIO_CFG(178, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "dtv_dat23" },
 };
 
 
 #ifdef HDMI_RESET
 static unsigned dtv_reset_gpio =
-	GPIO_CFG(37, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA);
+	GPIO_CFG(37, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 #endif
 
 static int dtv_panel_power(int on)
@@ -2837,7 +2837,7 @@ static int dtv_panel_power(int on)
 #ifdef HDMI_RESET
 	if (on) {
 		/* reset Toshiba WeGA chip -- toggle reset pin -- gpio_180 */
-		rc = gpio_tlmm_config(dtv_reset_gpio, GPIO_ENABLE);
+		rc = gpio_tlmm_config(dtv_reset_gpio, GPIO_CFG_ENABLE);
 		if (rc) {
 			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
 				       __func__, dtv_reset_gpio, rc);
@@ -3116,10 +3116,10 @@ static struct platform_device mddi_toshiba_device = {
 };
 
 static unsigned wega_reset_gpio =
-	GPIO_CFG(180, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA);
+	GPIO_CFG(180, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 
 static struct msm_gpio fluid_vee_reset_gpio[] = {
-	{ GPIO_CFG(20, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), "vee_reset" },
+	{ GPIO_CFG(20, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "vee_reset" },
 };
 
 static int display_common_power(int on)
@@ -3136,7 +3136,7 @@ static int display_common_power(int on)
 
 	if (on) {
 		/* reset Toshiba WeGA chip -- toggle reset pin -- gpio_180 */
-		rc = gpio_tlmm_config(wega_reset_gpio, GPIO_ENABLE);
+		rc = gpio_tlmm_config(wega_reset_gpio, GPIO_CFG_ENABLE);
 		if (rc) {
 			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
 				       __func__, wega_reset_gpio, rc);
@@ -3384,65 +3384,65 @@ static int lcd_panel_spi_gpio_num[] = {
 		};
 
 static struct msm_gpio lcd_panel_gpios[] = {
-	{ GPIO_CFG(18, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn0" },
-	{ GPIO_CFG(19, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn1" },
-	{ GPIO_CFG(20, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu0" },
-	{ GPIO_CFG(21, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu1" },
-	{ GPIO_CFG(22, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu2" },
-	{ GPIO_CFG(23, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red0" },
-	{ GPIO_CFG(24, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red1" },
-	{ GPIO_CFG(25, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red2" },
+	{ GPIO_CFG(18, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn0" },
+	{ GPIO_CFG(19, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn1" },
+	{ GPIO_CFG(20, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu0" },
+	{ GPIO_CFG(21, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu1" },
+	{ GPIO_CFG(22, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu2" },
+	{ GPIO_CFG(23, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red0" },
+	{ GPIO_CFG(24, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red1" },
+	{ GPIO_CFG(25, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red2" },
 #ifndef CONFIG_SPI_QSD
-	{ GPIO_CFG(45, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_clk" },
-	{ GPIO_CFG(46, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_cs0" },
-	{ GPIO_CFG(47, 0, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_mosi" },
-	{ GPIO_CFG(48, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_2MA), "spi_miso" },
+	{ GPIO_CFG(45, 0, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
+	{ GPIO_CFG(46, 0, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
+	{ GPIO_CFG(47, 0, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_mosi" },
+	{ GPIO_CFG(48, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_miso" },
 #endif
-	{ GPIO_CFG(90, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_pclk" },
-	{ GPIO_CFG(91, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_en" },
-	{ GPIO_CFG(92, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_vsync" },
-	{ GPIO_CFG(93, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_hsync" },
-	{ GPIO_CFG(94, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn2" },
-	{ GPIO_CFG(95, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn3" },
-	{ GPIO_CFG(96, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn4" },
-	{ GPIO_CFG(97, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn5" },
-	{ GPIO_CFG(98, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn6" },
-	{ GPIO_CFG(99, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn7" },
-	{ GPIO_CFG(100, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu3" },
-	{ GPIO_CFG(101, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu4" },
-	{ GPIO_CFG(102, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu5" },
-	{ GPIO_CFG(103, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu6" },
-	{ GPIO_CFG(104, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu7" },
-	{ GPIO_CFG(105, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red3" },
-	{ GPIO_CFG(106, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red4" },
-	{ GPIO_CFG(107, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red5" },
-	{ GPIO_CFG(108, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red6" },
-	{ GPIO_CFG(109, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red7" },
+	{ GPIO_CFG(90, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_pclk" },
+	{ GPIO_CFG(91, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_en" },
+	{ GPIO_CFG(92, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_vsync" },
+	{ GPIO_CFG(93, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_hsync" },
+	{ GPIO_CFG(94, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn2" },
+	{ GPIO_CFG(95, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn3" },
+	{ GPIO_CFG(96, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn4" },
+	{ GPIO_CFG(97, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn5" },
+	{ GPIO_CFG(98, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn6" },
+	{ GPIO_CFG(99, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn7" },
+	{ GPIO_CFG(100, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu3" },
+	{ GPIO_CFG(101, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu4" },
+	{ GPIO_CFG(102, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu5" },
+	{ GPIO_CFG(103, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu6" },
+	{ GPIO_CFG(104, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu7" },
+	{ GPIO_CFG(105, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red3" },
+	{ GPIO_CFG(106, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red4" },
+	{ GPIO_CFG(107, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red5" },
+	{ GPIO_CFG(108, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red6" },
+	{ GPIO_CFG(109, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red7" },
 };
 
 static struct msm_gpio lcd_sharp_panel_gpios[] = {
-	{ GPIO_CFG(22, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu2" },
-	{ GPIO_CFG(25, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red2" },
-	{ GPIO_CFG(90, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_pclk" },
-	{ GPIO_CFG(91, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_en" },
-	{ GPIO_CFG(92, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_vsync" },
-	{ GPIO_CFG(93, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_hsync" },
-	{ GPIO_CFG(94, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn2" },
-	{ GPIO_CFG(95, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn3" },
-	{ GPIO_CFG(96, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn4" },
-	{ GPIO_CFG(97, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn5" },
-	{ GPIO_CFG(98, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn6" },
-	{ GPIO_CFG(99, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_grn7" },
-	{ GPIO_CFG(100, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu3" },
-	{ GPIO_CFG(101, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu4" },
-	{ GPIO_CFG(102, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu5" },
-	{ GPIO_CFG(103, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu6" },
-	{ GPIO_CFG(104, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_blu7" },
-	{ GPIO_CFG(105, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red3" },
-	{ GPIO_CFG(106, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red4" },
-	{ GPIO_CFG(107, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red5" },
-	{ GPIO_CFG(108, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red6" },
-	{ GPIO_CFG(109, 1, GPIO_OUTPUT,  GPIO_NO_PULL, GPIO_2MA), "lcdc_red7" },
+	{ GPIO_CFG(22, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu2" },
+	{ GPIO_CFG(25, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red2" },
+	{ GPIO_CFG(90, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_pclk" },
+	{ GPIO_CFG(91, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_en" },
+	{ GPIO_CFG(92, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_vsync" },
+	{ GPIO_CFG(93, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_hsync" },
+	{ GPIO_CFG(94, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn2" },
+	{ GPIO_CFG(95, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn3" },
+	{ GPIO_CFG(96, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn4" },
+	{ GPIO_CFG(97, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn5" },
+	{ GPIO_CFG(98, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn6" },
+	{ GPIO_CFG(99, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn7" },
+	{ GPIO_CFG(100, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu3" },
+	{ GPIO_CFG(101, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu4" },
+	{ GPIO_CFG(102, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu5" },
+	{ GPIO_CFG(103, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu6" },
+	{ GPIO_CFG(104, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu7" },
+	{ GPIO_CFG(105, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red3" },
+	{ GPIO_CFG(106, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red4" },
+	{ GPIO_CFG(107, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red5" },
+	{ GPIO_CFG(108, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red6" },
+	{ GPIO_CFG(109, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_red7" },
 };
 
 static int lcdc_toshiba_panel_power(int on)
@@ -3623,29 +3623,29 @@ enum {
 };
 
 static struct msm_gpio bt_config_power_on[] = {
-	{ GPIO_CFG(134, 1, GPIO_OUTPUT, GPIO_NO_PULL,   GPIO_2MA),
+	{ GPIO_CFG(134, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_RFR" },
-	{ GPIO_CFG(135, 1, GPIO_INPUT,  GPIO_NO_PULL,   GPIO_2MA),
+	{ GPIO_CFG(135, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_CTS" },
-	{ GPIO_CFG(136, 1, GPIO_INPUT,  GPIO_NO_PULL,   GPIO_2MA),
+	{ GPIO_CFG(136, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_Rx" },
-	{ GPIO_CFG(137, 1, GPIO_OUTPUT, GPIO_NO_PULL,   GPIO_2MA),
+	{ GPIO_CFG(137, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,   GPIO_CFG_2MA),
 		"UART1DM_Tx" }
 };
 
 static struct msm_gpio bt_config_power_off[] = {
-	{ GPIO_CFG(134, 0, GPIO_INPUT,  GPIO_PULL_DOWN,   GPIO_2MA),
+	{ GPIO_CFG(134, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
 		"UART1DM_RFR" },
-	{ GPIO_CFG(135, 0, GPIO_INPUT,  GPIO_PULL_DOWN,   GPIO_2MA),
+	{ GPIO_CFG(135, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
 		"UART1DM_CTS" },
-	{ GPIO_CFG(136, 0, GPIO_INPUT,  GPIO_PULL_DOWN,   GPIO_2MA),
+	{ GPIO_CFG(136, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
 		"UART1DM_Rx" },
-	{ GPIO_CFG(137, 0, GPIO_INPUT,  GPIO_PULL_DOWN,   GPIO_2MA),
+	{ GPIO_CFG(137, 0, GPIO_CFG_INPUT,  GPIO_CFG_PULL_DOWN,   GPIO_CFG_2MA),
 		"UART1DM_Tx" }
 };
 
 static struct msm_gpio bt_config_clock[] = {
-	{ GPIO_CFG(34, 0, GPIO_OUTPUT,  GPIO_NO_PULL,    GPIO_2MA),
+	{ GPIO_CFG(34, 0, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL,    GPIO_CFG_2MA),
 		"BT_REF_CLOCK_ENABLE" },
 };
 
@@ -4051,22 +4051,22 @@ static struct platform_device *devices[] __initdata = {
 };
 
 static struct msm_gpio msm_i2c_gpios_hw[] = {
-	{ GPIO_CFG(70, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_16MA), "i2c_scl" },
-	{ GPIO_CFG(71, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_16MA), "i2c_sda" },
+	{ GPIO_CFG(70, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
+	{ GPIO_CFG(71, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
 };
 
 static struct msm_gpio msm_i2c_gpios_io[] = {
-	{ GPIO_CFG(70, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "i2c_scl" },
-	{ GPIO_CFG(71, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "i2c_sda" },
+	{ GPIO_CFG(70, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_scl" },
+	{ GPIO_CFG(71, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "i2c_sda" },
 };
 
 static struct msm_gpio qup_i2c_gpios_io[] = {
-	{ GPIO_CFG(16, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "qup_scl" },
-	{ GPIO_CFG(17, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "qup_sda" },
+	{ GPIO_CFG(16, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "qup_scl" },
+	{ GPIO_CFG(17, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "qup_sda" },
 };
 static struct msm_gpio qup_i2c_gpios_hw[] = {
-	{ GPIO_CFG(16, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_16MA), "qup_scl" },
-	{ GPIO_CFG(17, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_16MA), "qup_sda" },
+	{ GPIO_CFG(16, 2, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "qup_scl" },
+	{ GPIO_CFG(17, 2, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "qup_sda" },
 };
 
 static void
@@ -4184,8 +4184,8 @@ static void __init msm7x30_init_irq(void)
 }
 
 static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
-	{GPIO_CFG(86, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_cs1"},
-	{GPIO_CFG(115, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "ebi2_busy1"},
+	{GPIO_CFG(86, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_cs1"},
+	{GPIO_CFG(115, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_busy1"},
 };
 
 struct vreg *vreg_s3;
@@ -4202,50 +4202,50 @@ struct sdcc_gpio {
 };
 #if defined(CONFIG_MMC_MSM_SDC1_SUPPORT)
 static struct msm_gpio sdc1_lvlshft_cfg_data[] = {
-	{GPIO_CFG(35, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_16MA), "sdc1_lvlshft"},
+	{GPIO_CFG(35, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_16MA), "sdc1_lvlshft"},
 };
 #endif
 static struct msm_gpio sdc1_cfg_data[] = {
-	{GPIO_CFG(38, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc1_clk"},
-	{GPIO_CFG(39, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_cmd"},
-	{GPIO_CFG(40, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_dat_3"},
-	{GPIO_CFG(41, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_dat_2"},
-	{GPIO_CFG(42, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_dat_1"},
-	{GPIO_CFG(43, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc1_dat_0"},
+	{GPIO_CFG(38, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc1_clk"},
+	{GPIO_CFG(39, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_cmd"},
+	{GPIO_CFG(40, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_dat_3"},
+	{GPIO_CFG(41, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_dat_2"},
+	{GPIO_CFG(42, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_dat_1"},
+	{GPIO_CFG(43, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_dat_0"},
 };
 
 static struct msm_gpio sdc2_cfg_data[] = {
-	{GPIO_CFG(64, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc2_clk"},
-	{GPIO_CFG(65, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_cmd"},
-	{GPIO_CFG(66, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_3"},
-	{GPIO_CFG(67, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_2"},
-	{GPIO_CFG(68, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_1"},
-	{GPIO_CFG(69, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_0"},
+	{GPIO_CFG(64, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc2_clk"},
+	{GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_cmd"},
+	{GPIO_CFG(66, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_3"},
+	{GPIO_CFG(67, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_2"},
+	{GPIO_CFG(68, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_1"},
+	{GPIO_CFG(69, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_0"},
 
 #ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
-	{GPIO_CFG(115, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_4"},
-	{GPIO_CFG(114, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_5"},
-	{GPIO_CFG(113, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_6"},
-	{GPIO_CFG(112, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc2_dat_7"},
+	{GPIO_CFG(115, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_4"},
+	{GPIO_CFG(114, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_5"},
+	{GPIO_CFG(113, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_6"},
+	{GPIO_CFG(112, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_7"},
 #endif
 };
 
 static struct msm_gpio sdc3_cfg_data[] = {
-	{GPIO_CFG(110, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc3_clk"},
-	{GPIO_CFG(111, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc3_cmd"},
-	{GPIO_CFG(116, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc3_dat_3"},
-	{GPIO_CFG(117, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc3_dat_2"},
-	{GPIO_CFG(118, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc3_dat_1"},
-	{GPIO_CFG(119, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc3_dat_0"},
+	{GPIO_CFG(110, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc3_clk"},
+	{GPIO_CFG(111, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc3_cmd"},
+	{GPIO_CFG(116, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc3_dat_3"},
+	{GPIO_CFG(117, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc3_dat_2"},
+	{GPIO_CFG(118, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc3_dat_1"},
+	{GPIO_CFG(119, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc3_dat_0"},
 };
 
 static struct msm_gpio sdc4_cfg_data[] = {
-	{GPIO_CFG(58, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_16MA), "sdc4_clk"},
-	{GPIO_CFG(59, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc4_cmd"},
-	{GPIO_CFG(60, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc4_dat_3"},
-	{GPIO_CFG(61, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc4_dat_2"},
-	{GPIO_CFG(62, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc4_dat_1"},
-	{GPIO_CFG(63, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), "sdc4_dat_0"},
+	{GPIO_CFG(58, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc4_clk"},
+	{GPIO_CFG(59, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_cmd"},
+	{GPIO_CFG(60, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_3"},
+	{GPIO_CFG(61, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_2"},
+	{GPIO_CFG(62, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_1"},
+	{GPIO_CFG(63, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_0"},
 };
 
 static struct sdcc_gpio sdcc_cfg_data[] = {
@@ -4557,10 +4557,10 @@ static void __init msm7x30_init_nand(void)
 
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 static struct msm_gpio uart2_config_data[] = {
-	{ GPIO_CFG(49, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_RFR"},
-	{ GPIO_CFG(50, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_CTS"},
-	{ GPIO_CFG(51, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_Rx"},
-	{ GPIO_CFG(52, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_Tx"},
+	{ GPIO_CFG(49, 2, GPIO_CFG_OUTPUT,  GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "UART2_RFR"},
+	{ GPIO_CFG(50, 2, GPIO_CFG_INPUT,   GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "UART2_CTS"},
+	{ GPIO_CFG(51, 2, GPIO_CFG_INPUT,   GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "UART2_Rx"},
+	{ GPIO_CFG(52, 2, GPIO_CFG_OUTPUT,  GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "UART2_Tx"},
 };
 
 static void msm7x30_init_uart2(void)
@@ -4574,10 +4574,10 @@ static void msm7x30_init_uart2(void)
 /* TSIF begin */
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 
-#define TSIF_B_SYNC      GPIO_CFG(37, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA)
-#define TSIF_B_DATA      GPIO_CFG(36, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA)
-#define TSIF_B_EN        GPIO_CFG(35, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA)
-#define TSIF_B_CLK       GPIO_CFG(34, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA)
+#define TSIF_B_SYNC      GPIO_CFG(37, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_B_DATA      GPIO_CFG(36, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_B_EN        GPIO_CFG(35, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_B_CLK       GPIO_CFG(34, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
 
 static const struct msm_gpio tsif_gpios[] = {
 	{ .gpio_cfg = TSIF_B_CLK,  .label =  "tsif_clk", },
@@ -4641,7 +4641,7 @@ static struct msm_spm_platform_data msm_spm_data __initdata = {
 #define TSC2007_TS_PEN_INT	20
 
 static struct msm_gpio tsc2007_config_data[] = {
-	{ GPIO_CFG(TSC2007_TS_PEN_INT, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	{ GPIO_CFG(TSC2007_TS_PEN_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	"tsc2007_irq" },
 };
 
@@ -4767,8 +4767,8 @@ static const int vregs_isa1200_val[] = {
 static struct vreg *vregs_isa1200[ARRAY_SIZE(vregs_isa1200_name)];
 
 static struct msm_gpio fluid_hap_shift_lvl_gpio[] = {
-       { GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0, GPIO_OUTPUT, GPIO_NO_PULL,
-		GPIO_2MA), "haptics_shft_lvl_oe"},
+       { GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+		GPIO_CFG_2MA), "haptics_shft_lvl_oe"},
 };
 
 static int isa1200_power(int vreg_on)
@@ -4992,8 +4992,8 @@ static int tma300_dev_setup(bool enable)
 		}
 
 		/* enable interrupt gpio */
-		rc = gpio_tlmm_config(GPIO_CFG(TS_GPIO_IRQ, 0, GPIO_INPUT,
-				GPIO_PULL_UP, GPIO_6MA), GPIO_ENABLE);
+		rc = gpio_tlmm_config(GPIO_CFG(TS_GPIO_IRQ, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_6MA), GPIO_CFG_ENABLE);
 		if (rc) {
 			pr_err("%s: Could not configure gpio %d\n",
 					__func__, TS_GPIO_IRQ);
