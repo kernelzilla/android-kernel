@@ -24,6 +24,7 @@
 #include <linux/gpio.h>
 #include <linux/switch.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/mfd/pmic8058.h>
 #include <linux/pmic8058-othc.h>
@@ -142,6 +143,8 @@ static int __devexit pm8058_othc_remove(struct platform_device *pd)
 {
 	struct pm8058_othc *dd = platform_get_drvdata(pd);
 
+	pm_runtime_set_suspended(&pd->dev);
+	pm_runtime_disable(&pd->dev);
 	platform_set_drvdata(pd, NULL);
 	device_init_wakeup(&pd->dev, 0);
 
@@ -559,6 +562,12 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 		return -ENOMEM;
 	}
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&pd->dev);
+	if (rc < 0)
+		dev_dbg(&pd->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pd->dev);
+
 	res = platform_get_resource_byname(pd, IORESOURCE_IO, "othc_base");
 	if (res == NULL) {
 		pr_err("%s: othc resource:Base address absent \n", __func__);
@@ -591,10 +600,12 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 
 	pr_debug("%s: Device %s:%d successfully registered\n",
 				__func__, pd->name, pd->id);
-
 	return 0;
 
 fail_get_res:
+	pm_runtime_set_suspended(&pd->dev);
+	pm_runtime_disable(&pd->dev);
+
 	kfree(dd);
 	return rc;
 }

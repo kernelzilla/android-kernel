@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/input/pmic8058-keypad.h>
 
@@ -733,6 +734,12 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_alloc_device;
 	}
 
+	/* Enable runtime PM ops, start in ACTIVE mode */
+	rc = pm_runtime_set_active(&pdev->dev);
+	if (rc < 0)
+		dev_dbg(&pdev->dev, "unable to set runtime pm state\n");
+	pm_runtime_enable(&pdev->dev);
+
 	kp->key_sense_irq = platform_get_irq(pdev, 0);
 	if (kp->key_sense_irq < 0) {
 		dev_err(&pdev->dev, "unable to get keypad sense irq\n");
@@ -853,6 +860,8 @@ err_kpd_init:
 	input_unregister_device(kp->input);
 	kp->input = NULL;
 err_get_irq:
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	input_free_device(kp->input);
 err_alloc_device:
 	kfree(keycodes);
@@ -866,6 +875,8 @@ static int __devexit pmic8058_kp_remove(struct platform_device *pdev)
 	struct pmic8058_kp *kp = platform_get_drvdata(pdev);
 	struct pmic8058_keypad_data *pdata = pdev->dev.platform_data;
 
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	if (!pdata->wakeup)
 		device_remove_file(&pdev->dev, &dev_attr_disable_kp);
 	else
