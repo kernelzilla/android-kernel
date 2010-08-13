@@ -18,6 +18,7 @@
 #include <linux/gpio.h>
 #include <mach/pmic.h>
 #include <mach/msm_qdsp6_audio.h>
+#include <asm/mach-types.h>
 
 #define GPIO_HEADSET_AMP 157
 
@@ -53,6 +54,14 @@ void analog_speaker_enable(int en)
 		pmic_set_spkr_configuration(&scm);
 		pmic_spkr_en(LEFT_SPKR, 1);
 		pmic_spkr_en(RIGHT_SPKR, 1);
+
+		/* Enable Speaker Amplifier */
+		if (machine_is_qsd8x50a_st1_5()) {
+			gpio_set_value(48, (en != 0));
+			pmic_secure_mpp_control_digital_output(
+					PM_MPP_21, PM_MPP__DLOGIC__LVL_VDD,
+					PM_MPP__DLOGIC_OUT__CTRL_HIGH);
+		}
 		
 		/* unmute */
 		pmic_spkr_en_mute(LEFT_SPKR, 1);
@@ -60,6 +69,14 @@ void analog_speaker_enable(int en)
 	} else {
 		pmic_spkr_en_mute(LEFT_SPKR, 0);
 		pmic_spkr_en_mute(RIGHT_SPKR, 0);
+
+		/* Disable Speaker Amplifier */
+		if (machine_is_qsd8x50a_st1_5()) {
+			gpio_set_value(48, (en != 0));
+			pmic_secure_mpp_control_digital_output(
+					PM_MPP_21, PM_MPP__DLOGIC__LVL_VDD,
+					PM_MPP__DLOGIC_OUT__CTRL_LOW);
+		}
 
 		pmic_spkr_en(LEFT_SPKR, 0);
 		pmic_spkr_en(RIGHT_SPKR, 0);
