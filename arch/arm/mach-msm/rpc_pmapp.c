@@ -579,3 +579,4 @@ int pmapp_smps_mode_vote(const char *voter_id, uint vreg_id, uint mode)
 	return pmapp_rpc_set_only(*((uint *) voter_id), vreg_id, mode, 0, 3,
 				  PMAPP_SMPS_MODE_VOTE_PROC);
 }
+EXPORT_SYMBOL(pmapp_smps_mode_vote);
