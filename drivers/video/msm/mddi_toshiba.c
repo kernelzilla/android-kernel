@@ -1651,6 +1651,14 @@ static int mddi_toshiba_lcd_on(struct platform_device *pdev)
 
 static int mddi_toshiba_lcd_off(struct platform_device *pdev)
 {
+	if (mddi_toshiba_vsync_handler != NULL) {
+		(*mddi_toshiba_vsync_handler)
+			    (mddi_toshiba_vsync_handler_arg);
+		mddi_toshiba_vsync_handler = NULL;
+		printk(KERN_INFO "%s: clean up vsyn_handler=%x\n", __func__,
+				(int)mddi_toshiba_vsync_handler);
+	}
+
 	mddi_toshiba_lcd_powerdown(platform_get_drvdata(pdev));
 	return 0;
 }
