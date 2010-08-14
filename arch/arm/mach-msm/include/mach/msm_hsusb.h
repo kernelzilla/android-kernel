@@ -98,6 +98,13 @@ enum cdr_auto_reset {
 	CDR_AUTO_RESET_ENABLE,
 	CDR_AUTO_RESET_DISABLE,
 };
+
+enum se1_gate_state {
+	SE1_GATING_DEFAULT,
+	SE1_GATING_ENABLE,
+	SE1_GATING_DISABLE,
+};
+
 enum hs_drv_amplitude {
 	HS_DRV_AMPLITUDE_DEFAULT,
 	HS_DRV_AMPLITUDE_ZERO_PERCENT,
@@ -151,6 +158,7 @@ struct msm_otg_platform_data {
 	enum pre_emphasis_level	pemp_level;
 	enum cdr_auto_reset	cdr_autoreset;
 	enum hs_drv_amplitude	drv_ampl;
+	enum se1_gate_state	se1_gating;
 	int			phy_reset_sig_inverted;
 	int			phy_can_powercollapse;
 
