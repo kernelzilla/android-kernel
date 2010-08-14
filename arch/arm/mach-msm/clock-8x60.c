@@ -1710,23 +1710,6 @@ static struct reg_init {
 	{SDCn_HCLK_CTL_REG(5),		0x70,	0x40},
 	{USB_HS1_HCLK_CTL_REG,		0x70,	0x40},
 
-	/* Enable software-controlled peripheral HCLKs */
-	{TSIF_HCLK_CTL_REG, 		0x70,	0x10},
-	{USB_FS1_HCLK_CTL_REG,		0x70,	0x10},
-	{USB_FS2_HCLK_CTL_REG,		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(1),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(2),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(3),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(4),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(5),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(6),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(7),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(8),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(9),		0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(10),	0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(11),	0x70,	0x10},
-	{GSBIn_HCLK_CTL_REG(12),	0x70,	0x10},
-
 	/* Deassert MM SW_RESET_ALL signal. */
 	{SW_RESET_ALL_REG, 0x1, 0x0},
 
