@@ -51,6 +51,8 @@
 
 #define YAMATO_PFP_FW "yamato_pfp.fw"
 #define YAMATO_PM4_FW "yamato_pm4.fw"
+#define LEIA_PFP_470_FW "leia_pfp_470.fw"
+#define LEIA_PM4_470_FW "leia_pm4_470.fw"
 
 /*  ringbuffer size log2 quadwords equivalent */
 inline unsigned int kgsl_ringbuffer_sizelog2quadwords(unsigned int sizedwords)
@@ -301,12 +303,26 @@ static int kgsl_ringbuffer_load_pm4_ucode(struct kgsl_device *device)
 	unsigned int *fw_ptr = NULL;
 	size_t fw_word_size = 0;
 
-	status = request_firmware(&fw, YAMATO_PM4_FW,
-				kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
-	if (status != 0) {
-		KGSL_DRV_ERR("request_firmware failed for %s with error %d\n",
+	if (device->chip_id == KGSL_CHIPID_LEIA_REV470) {
+		status = request_firmware(&fw, LEIA_PM4_470_FW,
+			kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
+		if (status != 0) {
+			KGSL_DRV_ERR(
+				"request_firmware failed for %s  \
+				 with error %d\n",
+				LEIA_PM4_470_FW, status);
+			goto done;
+		}
+	} else {
+		status = request_firmware(&fw, YAMATO_PM4_FW,
+			kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
+		if (status != 0) {
+			KGSL_DRV_ERR(
+				"request_firmware failed for %s  \
+				 with error %d\n",
 				YAMATO_PM4_FW, status);
-		goto done;
+			goto done;
+		}
 	}
 	/*this firmware must come in 3 word chunks. plus 1 word of version*/
 	if ((fw->size % (sizeof(uint32_t)*3)) != 4) {
@@ -336,12 +352,26 @@ static int kgsl_ringbuffer_load_pfp_ucode(struct kgsl_device *device)
 	unsigned int *fw_ptr = NULL;
 	size_t fw_word_size = 0;
 
-	status = request_firmware(&fw, YAMATO_PFP_FW,
+	if (device->chip_id == KGSL_CHIPID_LEIA_REV470) {
+		status = request_firmware(&fw, LEIA_PFP_470_FW,
 				kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
-	if (status != 0) {
-		KGSL_DRV_ERR("request_firmware for %s failed with error %d\n",
+		if (status != 0) {
+			KGSL_DRV_ERR(
+				"request_firmware for %s \
+				 failed with error %d\n",
+				LEIA_PFP_470_FW, status);
+			return status;
+		}
+	} else {
+		status = request_firmware(&fw, YAMATO_PFP_FW,
+				kgsl_driver.base_dev[KGSL_DEVICE_YAMATO]);
+		if (status != 0) {
+			KGSL_DRV_ERR(
+				"request_firmware for %s \
+				 failed with error %d\n",
 				YAMATO_PFP_FW, status);
-		return status;
+			return status;
+		}
 	}
 	/*this firmware must come in 1 word chunks. */
 	if ((fw->size % sizeof(uint32_t)) != 0) {

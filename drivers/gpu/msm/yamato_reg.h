@@ -355,6 +355,7 @@ union reg_cp_rb_cntl {
 #define REG_PA_SC_WINDOW_SCISSOR_TL      0x2081
 #define REG_PA_SU_FACE_DATA              0x0C86
 #define REG_PA_SU_POINT_SIZE             0x2280
+#define REG_PA_SU_LINE_CNTL              0x2282
 #define REG_PA_SU_POLY_OFFSET_BACK_OFFSET 0x2383
 #define REG_PA_SU_POLY_OFFSET_FRONT_SCALE 0x2380
 #define REG_PA_SU_SC_MODE_CNTL           0x2205

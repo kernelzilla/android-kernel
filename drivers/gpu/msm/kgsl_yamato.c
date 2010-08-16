@@ -147,7 +147,9 @@ static int kgsl_yamato_gmeminit(struct kgsl_yamato_device *yamato_device)
 	rb_edram_info.val = 0;
 
 	rb_edram_info.f.edram_size = edram_value;
-	rb_edram_info.f.edram_mapping_mode = 0; /* EDRAM_MAP_UPPER */
+	if (device->chip_id != KGSL_CHIPID_LEIA_REV470)
+		rb_edram_info.f.edram_mapping_mode = 0; /* EDRAM_MAP_UPPER */
+
 	/* must be aligned to size */
 	rb_edram_info.f.edram_range = (yamato_device->gmemspace.gpu_base >> 14);
 
@@ -468,6 +470,11 @@ kgsl_yamato_getchipid(struct kgsl_device *device)
 	/* Hardware revision 211 (8650) returns the wrong chip ID */
 	if (chipid == KGSL_CHIPID_YAMATODX_REV21)
 		chipid = KGSL_CHIPID_YAMATODX_REV211;
+
+	/* Workaround Hardware revision issue of Z470 */
+	if (chipid == KGSL_CHIPID_LEIA_REV470_TEMP)
+		chipid = KGSL_CHIPID_LEIA_REV470;
+
 
 	return chipid;
 }
