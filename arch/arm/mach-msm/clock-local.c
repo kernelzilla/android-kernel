@@ -317,7 +317,9 @@ void local_clk_enable_reg(unsigned id)
 	/* Wait for clock to enable before returning. */
 	if (clk->halt_check == DELAY)
 		udelay(HALT_CHECK_DELAY_US);
-	else if (clk->halt_check == ENABLE || clk->halt_check == HALT) {
+	else if (clk->halt_check == ENABLE || clk->halt_check == HALT
+			|| clk->halt_check == ENABLE_VOTED
+			|| clk->halt_check == HALT_VOTED) {
 		int count;
 		/* Use a memory barrier since some halt status registers are
 		 * not within the same 1K segment as the branch/root enable
@@ -349,7 +351,8 @@ void local_clk_disable_reg(unsigned id)
 	}
 
 	/* Wait for clock to disable before continuing. */
-	if (clk->halt_check == DELAY)
+	if (clk->halt_check == DELAY || clk->halt_check == ENABLE_VOTED
+				     || clk->halt_check == HALT_VOTED)
 		udelay(HALT_CHECK_DELAY_US);
 	else if (clk->halt_check == ENABLE || clk->halt_check == HALT) {
 		int count;
