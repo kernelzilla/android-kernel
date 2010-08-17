@@ -48,7 +48,7 @@
 struct mdp4_overlay_ctrl {
 	struct mdp4_pipe_desc ov_pipe[OVERLAY_PIPE_MAX];/* 4 */
 	struct mdp4_overlay_pipe plist[MDP4_MAX_PIPE];	/* 4 + 2 */
-	struct mdp4_overlay_pipe *stage[MDP4_MAX_MIXER][MDP4_MAX_STAGE];
+	struct mdp4_overlay_pipe *stage[MDP4_MAX_MIXER][MDP4_MAX_STAGE + 1];
 } mdp4_overlay_db = {
 	.plist = {
 		{
@@ -1116,7 +1116,7 @@ int mdp4_overlay_req_check(uint32 id, uint32 z_order, uint32 mixer)
 {
 	struct mdp4_overlay_pipe *pipe;
 
-	pipe = ctrl->stage[mixer][z_order];
+	pipe = ctrl->stage[mixer][z_order + MDP4_MIXER_STAGE0];
 
 	if (pipe == NULL)
 		return 0;
