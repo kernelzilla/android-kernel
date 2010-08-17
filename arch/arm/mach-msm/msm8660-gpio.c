@@ -234,7 +234,7 @@ static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 }
 
 static struct irq_chip msm_gpio_irq_chip = {
-	.name		= "msm_gpio",
+	.name		= "msmgpio",
 	.mask		= msm_gpio_irq_mask,
 	.unmask		= msm_gpio_irq_unmask,
 	.ack		= msm_gpio_irq_ack,
@@ -357,18 +357,31 @@ static struct platform_driver msm_gpio_driver = {
 	.probe = msm_gpio_probe,
 	.remove = __devexit_p(msm_gpio_remove),
 	.driver = {
-		.name = "msm8660-gpio",
+		.name = "msmgpio",
 		.owner = THIS_MODULE,
 		.pm = &msm_gpio_dev_pm_ops,
 	},
 };
+
+static struct platform_device msm_device_gpio = {
+	.name = "msmgpio",
+	.id   = 0,
+};
+
 static int __init msm_gpio_init(void)
 {
-	return platform_driver_register(&msm_gpio_driver);
+	int rc;
+
+	rc = platform_driver_register(&msm_gpio_driver);
+	if (rc == 0)
+		rc = platform_device_register(&msm_device_gpio);
+
+	return rc;
 }
 
 static void __exit msm_gpio_exit(void)
 {
+	platform_device_unregister(&msm_device_gpio);
 	platform_driver_unregister(&msm_gpio_driver);
 }
 
