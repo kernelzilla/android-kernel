@@ -453,14 +453,6 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 		bf = bf_next;
 	}
 
-	/* prepend un-acked frames to the beginning of the pending frame queue */
-	if (!list_empty(&bf_pending)) {
-		spin_lock_bh(&txq->axq_lock);
-		list_splice(&bf_pending, &tid->buf_q);
-		ath_tx_queue_tid(txq, tid);
-		spin_unlock_bh(&txq->axq_lock);
-	}
-
 	if (tid->state & AGGR_CLEANUP) {
 		if (tid->baw_head == tid->baw_tail) {
 			tid->state &= ~AGGR_ADDBA_COMPLETE;
@@ -471,6 +463,14 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 		}
 		rcu_read_unlock();
 		return;
+	}
+
+	/* prepend un-acked frames to the beginning of the pending frame queue */
+	if (!list_empty(&bf_pending)) {
+		spin_lock_bh(&txq->axq_lock);
+		list_splice(&bf_pending, &tid->buf_q);
+		ath_tx_queue_tid(txq, tid);
+		spin_unlock_bh(&txq->axq_lock);
 	}
 
 	rcu_read_unlock();
@@ -2230,37 +2230,37 @@ void ath_tx_node_init(struct ath_softc *sc, struct ath_node *an)
 
 void ath_tx_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 {
-	struct ath_atx_ac *ac;
-	struct ath_atx_tid *tid;
+	int i;
+	struct ath_atx_ac *ac, *ac_tmp;
+	struct ath_atx_tid *tid, *tid_tmp;
 	struct ath_txq *txq;
-	int i, tidno;
 
-	for (tidno = 0, tid = &an->tid[tidno];
-	     tidno < WME_NUM_TID; tidno++, tid++) {
-		i = tid->ac->qnum;
+	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++) {
+		if (ATH_TXQ_SETUP(sc, i)) {
+			txq = &sc->tx.txq[i];
 
-		if (!ATH_TXQ_SETUP(sc, i))
-			continue;
+			spin_lock_bh(&txq->axq_lock);
 
-		txq = &sc->tx.txq[i];
-		ac = tid->ac;
+			list_for_each_entry_safe(ac,
+					ac_tmp, &txq->axq_acq, list) {
+				tid = list_first_entry(&ac->tid_q,
+						struct ath_atx_tid, list);
+				if (tid && tid->an != an)
+					continue;
+				list_del(&ac->list);
+				ac->sched = false;
 
-		spin_lock_bh(&txq->axq_lock);
+				list_for_each_entry_safe(tid,
+						tid_tmp, &ac->tid_q, list) {
+					list_del(&tid->list);
+					tid->sched = false;
+					ath_tid_drain(sc, txq, tid);
+					tid->state &= ~AGGR_ADDBA_COMPLETE;
+					tid->state &= ~AGGR_CLEANUP;
+				}
+			}
 
-		if (tid->sched) {
-			list_del(&tid->list);
-			tid->sched = false;
+			spin_unlock_bh(&txq->axq_lock);
 		}
-
-		if (ac->sched) {
-			list_del(&ac->list);
-			tid->ac->sched = false;
-		}
-
-		ath_tid_drain(sc, txq, tid);
-		tid->state &= ~AGGR_ADDBA_COMPLETE;
-		tid->state &= ~AGGR_CLEANUP;
-
-		spin_unlock_bh(&txq->axq_lock);
 	}
 }

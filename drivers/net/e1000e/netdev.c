@@ -3041,18 +3041,13 @@ static int e1000_test_msi(struct e1000_adapter *adapter)
 
 	/* disable SERR in case the MSI write causes a master abort */
 	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
-	if (pci_cmd & PCI_COMMAND_SERR)
-		pci_write_config_word(adapter->pdev, PCI_COMMAND,
-				      pci_cmd & ~PCI_COMMAND_SERR);
+	pci_write_config_word(adapter->pdev, PCI_COMMAND,
+			      pci_cmd & ~PCI_COMMAND_SERR);
 
 	err = e1000_test_msi_interrupt(adapter);
 
-	/* re-enable SERR */
-	if (pci_cmd & PCI_COMMAND_SERR) {
-		pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
-		pci_cmd |= PCI_COMMAND_SERR;
-		pci_write_config_word(adapter->pdev, PCI_COMMAND, pci_cmd);
-	}
+	/* restore previous setting of command word */
+	pci_write_config_word(adapter->pdev, PCI_COMMAND, pci_cmd);
 
 	/* success ! */
 	if (!err)

@@ -950,7 +950,7 @@ static int check_overlay_src(struct drm_device *dev,
 	    || rec->src_width < N_HORIZ_Y_TAPS*4)
 		return -EINVAL;
 
-	/* check alignment constraints */
+	/* check alingment constrains */
 	switch (rec->flags & I915_OVERLAY_TYPE_MASK) {
 		case I915_OVERLAY_RGB:
 			/* not implemented */
@@ -982,10 +982,7 @@ static int check_overlay_src(struct drm_device *dev,
 		return -EINVAL;
 
 	/* stride checking */
-	if (IS_I830(dev) || IS_845G(dev))
-		stride_mask = 255;
-	else
-		stride_mask = 63;
+	stride_mask = 63;
 
 	if (rec->stride_Y & stride_mask || rec->stride_UV & stride_mask)
 		return -EINVAL;
