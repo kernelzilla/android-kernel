@@ -270,12 +270,42 @@ static struct platform_device msm_snddev_hdmi_stereo_rx_device = {
 };
 
 
+static struct snddev_ecodec_data snddev_bt_sco_earpiece_data = {
+	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
+	.name = "bt_sco_rx",
+	.copp_id = PCM_RX,
+	.acdb_id = 22,
+	.channel_mode = 1,
+};
+
+static struct snddev_ecodec_data snddev_bt_sco_mic_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "bt_sco_tx",
+	.copp_id = PCM_TX,
+	.acdb_id = 21,
+	.channel_mode = 1,
+};
+
+struct platform_device msm_bt_sco_earpiece_device = {
+	.name = "msm_snddev_ecodec",
+	.id = 0,
+	.dev = { .platform_data = &snddev_bt_sco_earpiece_data },
+};
+
+struct platform_device msm_bt_sco_mic_device = {
+	.name = "msm_snddev_ecodec",
+	.id = 1,
+	.dev = { .platform_data = &snddev_bt_sco_mic_data },
+};
+
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
 	&msm_ispkr_stereo_device,
 	&msm_snddev_hdmi_stereo_rx_device,
 	&msm_ispkr_mic_device,
+	&msm_bt_sco_earpiece_device,
+	&msm_bt_sco_mic_device,
 };
 
 static struct platform_device *snd_devices_surf[] __initdata = {
@@ -284,6 +314,8 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_ispkr_stereo_device,
 	&msm_snddev_hdmi_stereo_rx_device,
 	&msm_ispkr_mic_device,
+	&msm_bt_sco_earpiece_device,
+	&msm_bt_sco_mic_device,
 };
 
 void __init msm_snddev_init(void)

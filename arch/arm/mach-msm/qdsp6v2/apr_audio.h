@@ -131,6 +131,25 @@ struct afe_get_active_handles_command {
 	u16 reserved;
 } __attribute__ ((packed));
 
+#define AFE_PCM_CFG_MODE_PCM			0x0
+#define AFE_PCM_CFG_MODE_AUX			0x1
+#define AFE_PCM_CFG_SYNC_EXT			0x0
+#define AFE_PCM_CFG_SYNC_INT			0x1
+#define AFE_PCM_CFG_FRM_8BPF			0x0
+#define AFE_PCM_CFG_FRM_16BPF			0x1
+#define AFE_PCM_CFG_FRM_32BPF			0x2
+#define AFE_PCM_CFG_FRM_64BPF			0x3
+#define AFE_PCM_CFG_FRM_128BPF			0x4
+#define AFE_PCM_CFG_FRM_256BPF			0x5
+#define AFE_PCM_CFG_QUANT_ALAW_NOPAD		0x0
+#define AFE_PCM_CFG_QUANT_MULAW_NOPAD		0x1
+#define AFE_PCM_CFG_QUANT_LINEAR_NOPAD		0x2
+#define AFE_PCM_CFG_QUANT_ALAW_PAD		0x3
+#define AFE_PCM_CFG_QUANT_MULAW_PAD		0x4
+#define AFE_PCM_CFG_QUANT_LINEAR_PAD		0x5
+#define AFE_PCM_CFG_CDATAOE_MASTER		0x0
+#define AFE_PCM_CFG_CDATAOE_SHARE		0x1
+
 struct afe_port_pcm_cfg {
 	u16	port_id;
 	u16	mode;	/* PCM (short sync) = 0, AUXPCM (long sync) = 1 */

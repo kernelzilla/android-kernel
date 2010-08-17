@@ -15,181 +15,276 @@
  * 02110-1301, USA.
  *
  */
-#include <mach/debug_mm.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/err.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
+#include <linux/io.h>
 #include <asm/uaccess.h>
-#include "snddev_ecodec.h"
-#include <mach/qdsp5v2/audio_dev_ctl.h>
+#include <asm/io.h>
+#include <mach/clk.h>
+#include <mach/qdsp6v2/audio_dev_ctl.h>
 
+#include "snddev_ecodec.h"
+#include "q6afe.h"
+#include "apr_audio.h"
 
 /* Context for each external codec device */
 struct snddev_ecodec_state {
 	struct snddev_ecodec_data *data;
 	u32 sample_rate;
-	bool enabled;
 };
 
 /* Global state for the driver */
 struct snddev_ecodec_drv_state {
 	struct mutex dev_lock;
-	u32 rx_active; /* ensure one rx device at a time */
-	u32 tx_active; /* ensure one tx device at a time */
-	struct clk *lpa_core_clk;
+	int ref_cnt;		/* ensure one rx device at a time */
 	struct clk *ecodec_clk;
 };
 
-#define ADSP_CTL 1
-
 static struct snddev_ecodec_drv_state snddev_ecodec_drv;
 
-static int snddev_ecodec_open_rx(struct snddev_ecodec_state *ecodec)
+struct aux_pcm_state {
+	unsigned int dout;
+	unsigned int din;
+	unsigned int syncout;
+	unsigned int clkin_a;
+};
+
+static struct aux_pcm_state the_aux_pcm_state;
+
+static int aux_pcm_gpios_request(void)
 {
-	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
+	int rc = 0;
 
-	MM_INFO(" snddev_ecodec_open_rx\n");
-
-	if (!drv->tx_active) {
-		/* config clocks */
-		clk_enable(drv->lpa_core_clk);
-
-		/* enable ecodec clk */
-		clk_enable(drv->ecodec_clk);
+	pr_debug("%s\n", __func__);
+	rc = gpio_request(the_aux_pcm_state.dout, "AUX PCM DOUT");
+	if (rc < 0) {
+		pr_err("%s: GPIO request for AUX PCM DOUT failed\n", __func__);
+		return rc;
 	}
 
-	ecodec->enabled = 1;
-	return 0;
-}
-
-static int snddev_ecodec_close_rx(struct snddev_ecodec_state *ecodec)
-{
-	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
-
-	/* free GPIO */
-	if (!drv->tx_active)
-		clk_disable(drv->ecodec_clk);
-
-	ecodec->enabled = 0;
-
-	return 0;
-}
-
-static int snddev_ecodec_open_tx(struct snddev_ecodec_state *ecodec)
-{
-	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
-
-	MM_INFO(" snddev_ecodec_open_tx \n");
-
-	/* request GPIO */
-	if (!drv->rx_active) {
-		/* config clocks */
-		clk_enable(drv->lpa_core_clk);
-
-		/* enable ecodec clk */
-		clk_enable(drv->ecodec_clk);
+	rc = gpio_request(the_aux_pcm_state.din, "AUX PCM DIN");
+	if (rc < 0) {
+		pr_err("%s: GPIO request for AUX PCM DIN failed\n", __func__);
+		gpio_free(the_aux_pcm_state.dout);
+		return rc;
 	}
 
-	ecodec->enabled = 1;
-	return 0;
+	rc = gpio_request(the_aux_pcm_state.syncout, "AUX PCM SYNC OUT");
+	if (rc < 0) {
+		pr_err("%s: GPIO request for AUX PCM SYNC OUT failed\n",
+				__func__);
+		gpio_free(the_aux_pcm_state.dout);
+		gpio_free(the_aux_pcm_state.din);
+		return rc;
+	}
+
+	rc = gpio_request(the_aux_pcm_state.clkin_a, "AUX PCM CLKIN A");
+	if (rc < 0) {
+		pr_err("%s: GPIO request for AUX PCM CLKIN A failed\n",
+				__func__);
+		gpio_free(the_aux_pcm_state.dout);
+		gpio_free(the_aux_pcm_state.din);
+		gpio_free(the_aux_pcm_state.syncout);
+		return rc;
+	}
+
+	return rc;
 }
 
-static int snddev_ecodec_close_tx(struct snddev_ecodec_state *ecodec)
+static void aux_pcm_gpios_free(void)
 {
-	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
-
-	/* free GPIO */
-	if (!drv->rx_active)
-		clk_disable(drv->ecodec_clk);
-
-	ecodec->enabled = 0;
-
-	return 0;
+	pr_debug("%s\n", __func__);
+	gpio_free(the_aux_pcm_state.dout);
+	gpio_free(the_aux_pcm_state.din);
+	gpio_free(the_aux_pcm_state.syncout);
+	gpio_free(the_aux_pcm_state.clkin_a);
 }
 
+static int get_aux_pcm_gpios(struct platform_device *pdev)
+{
+	int rc = 0;
+	struct resource *res;
+
+	/* Claim all of the GPIOs. */
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO, "aux_pcm_dout");
+	if (!res) {
+		pr_err("%s: failed to get gpio AUX PCM DOUT\n", __func__);
+		return -ENODEV;
+	}
+
+	the_aux_pcm_state.dout = res->start;
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO, "aux_pcm_din");
+	if (!res) {
+		pr_err("%s: failed to get gpio AUX PCM DIN\n", __func__);
+		return -ENODEV;
+	}
+
+	the_aux_pcm_state.din = res->start;
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
+					   "aux_pcm_syncout");
+	if (!res) {
+		pr_err("%s: failed to get gpio AUX PCM SYNC OUT\n", __func__);
+		return -ENODEV;
+	}
+
+	the_aux_pcm_state.syncout = res->start;
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
+					   "aux_pcm_clkin_a");
+	if (!res) {
+		pr_err("%s: failed to get gpio AUX PCM CLKIN A\n", __func__);
+		return -ENODEV;
+	}
+
+	the_aux_pcm_state.clkin_a = res->start;
+
+	pr_info("%s: dout = %u, din = %u , syncout = %u, clkin_a =%u\n",
+		__func__, the_aux_pcm_state.dout, the_aux_pcm_state.din,
+		the_aux_pcm_state.syncout, the_aux_pcm_state.clkin_a);
+
+	return rc;
+}
+
+static int aux_pcm_probe(struct platform_device *pdev)
+{
+	int rc = 0;
+
+	pr_info("%s:\n", __func__);
+
+	rc = get_aux_pcm_gpios(pdev);
+	if (rc < 0) {
+		pr_err("%s: GPIO configuration failed\n", __func__);
+		return -ENODEV;
+	}
+	return rc;
+}
+
+static struct platform_driver aux_pcm_driver = {
+	.probe = aux_pcm_probe,
+	.driver = { .name = "msm_aux_pcm"}
+};
 
 static int snddev_ecodec_open(struct msm_snddev_info *dev_info)
 {
-	int rc = 0;
-	struct snddev_ecodec_state *ecodec;
+	int rc;
 	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
+	struct afe_port_pcm_cfg pcm_cfg;
 
-	if (!dev_info) {
-		rc = -EINVAL;
-		goto error;
+	pr_debug("%s\n", __func__);
+
+	mutex_lock(&drv->dev_lock);
+
+	if (dev_info->opened) {
+		pr_err("%s: ERROR: %s already opened\n", __func__,
+				dev_info->name);
+		mutex_unlock(&drv->dev_lock);
+		return -EBUSY;
 	}
 
-	ecodec = dev_info->private_data;
-
-	if (ecodec->data->capability & SNDDEV_CAP_RX) {
-		mutex_lock(&drv->dev_lock);
-		if (drv->rx_active) {
-			mutex_unlock(&drv->dev_lock);
-			rc = -EBUSY;
-			goto error;
-		}
-		rc = snddev_ecodec_open_rx(ecodec);
-		if (!IS_ERR_VALUE(rc))
-			drv->rx_active = 1;
+	if (drv->ref_cnt != 0) {
+		pr_debug("%s: opened %s\n", __func__, dev_info->name);
+		drv->ref_cnt++;
 		mutex_unlock(&drv->dev_lock);
-	} else {
-		mutex_lock(&drv->dev_lock);
-		if (drv->tx_active) {
-			mutex_unlock(&drv->dev_lock);
-			rc = -EBUSY;
-			goto error;
-		}
-		rc = snddev_ecodec_open_tx(ecodec);
-		if (!IS_ERR_VALUE(rc))
-			drv->tx_active = 1;
-		mutex_unlock(&drv->dev_lock);
+		return 0;
 	}
-error:
-	return rc;
+
+	pr_info("%s: opening %s\n", __func__, dev_info->name);
+
+	rc = aux_pcm_gpios_request();
+	if (rc < 0) {
+		pr_err("%s: GPIO request failed\n", __func__);
+		return rc;
+	}
+
+	clk_reset(drv->ecodec_clk, CLK_RESET_ASSERT);
+
+	pcm_cfg.port_id = PCM_RX;
+	pcm_cfg.mode = AFE_PCM_CFG_MODE_PCM;
+	pcm_cfg.sync = AFE_PCM_CFG_SYNC_INT;
+	pcm_cfg.frame = AFE_PCM_CFG_FRM_256BPF;
+	pcm_cfg.quant = AFE_PCM_CFG_QUANT_LINEAR_NOPAD;
+	pcm_cfg.slot = 0;
+	pcm_cfg.data = AFE_PCM_CFG_CDATAOE_MASTER;
+
+	rc = afe_open_pcmif(pcm_cfg);
+	if (rc < 0) {
+		pr_err("%s: afe open failed for PCM_RX\n", __func__);
+		goto err_rx_afe;
+	}
+
+	pcm_cfg.port_id = PCM_TX;
+
+	rc = afe_open_pcmif(pcm_cfg);
+	if (rc < 0) {
+		pr_err("%s: afe open failed for PCM_TX\n", __func__);
+		goto err_tx_afe;
+	}
+
+	rc = clk_set_rate(drv->ecodec_clk, 2048000);
+	if (rc < 0) {
+		pr_err("%s: clk_set_rate failed\n", __func__);
+		goto err_clk;
+	}
+
+	clk_enable(drv->ecodec_clk);
+
+	clk_reset(drv->ecodec_clk, CLK_RESET_DEASSERT);
+
+	drv->ref_cnt++;
+	mutex_unlock(&drv->dev_lock);
+
+	return 0;
+
+err_clk:
+	afe_close(PCM_TX);
+err_tx_afe:
+	afe_close(PCM_RX);
+err_rx_afe:
+	aux_pcm_gpios_free();
+	mutex_unlock(&drv->dev_lock);
+	return -ENODEV;
 }
 
-static int snddev_ecodec_close(struct msm_snddev_info *dev_info)
+int snddev_ecodec_close(struct msm_snddev_info *dev_info)
 {
-	int rc = 0;
-	struct snddev_ecodec_state *ecodec;
 	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
-	if (!dev_info) {
-		rc = -EINVAL;
-		goto error;
+
+	pr_debug("%s: closing %s\n", __func__, dev_info->name);
+
+	mutex_lock(&drv->dev_lock);
+
+	if (!dev_info->opened) {
+		pr_err("%s: ERROR: %s is not opened\n", __func__,
+				dev_info->name);
+		mutex_unlock(&drv->dev_lock);
+		return -EPERM;
 	}
 
-	ecodec = dev_info->private_data;
+	drv->ref_cnt--;
 
-	if (ecodec->data->capability & SNDDEV_CAP_RX) {
-		mutex_lock(&drv->dev_lock);
-		if (!drv->rx_active) {
-			mutex_unlock(&drv->dev_lock);
-			rc = -EPERM;
-			goto error;
-		}
-		rc = snddev_ecodec_close_rx(ecodec);
-		if (!IS_ERR_VALUE(rc))
-			drv->rx_active = 0;
-		mutex_unlock(&drv->dev_lock);
-	} else {
-		mutex_lock(&drv->dev_lock);
-		if (!drv->tx_active) {
-			mutex_unlock(&drv->dev_lock);
-			rc = -EPERM;
-			goto error;
-		}
-		rc = snddev_ecodec_close_tx(ecodec);
-		if (!IS_ERR_VALUE(rc))
-			drv->tx_active = 0;
-		mutex_unlock(&drv->dev_lock);
+	if (drv->ref_cnt == 0) {
+
+		pr_info("%s: closing all devices\n", __func__);
+
+		clk_disable(drv->ecodec_clk);
+		aux_pcm_gpios_free();
+
+		afe_close(PCM_RX);
+		afe_close(PCM_TX);
 	}
 
-error:
-	return rc;
+	mutex_unlock(&drv->dev_lock);
+
+	return 0;
 }
 
-static int snddev_ecodec_set_freq(struct msm_snddev_info *dev_info, u32 rate)
+int snddev_ecodec_set_freq(struct msm_snddev_info *dev_info, u32 rate)
 {
 	int rc = 0;
 
@@ -205,13 +300,15 @@ error:
 
 static int snddev_ecodec_probe(struct platform_device *pdev)
 {
-	int rc = 0, i;
+	int rc = 0;
 	struct snddev_ecodec_data *pdata;
 	struct msm_snddev_info *dev_info;
 	struct snddev_ecodec_state *ecodec;
 
+	pr_info("%s:\n", __func__);
+
 	if (!pdev || !pdev->dev.platform_data) {
-		printk(KERN_ALERT "Invalid caller \n");
+		printk(KERN_ALERT "Invalid caller\n");
 		rc = -1;
 		goto error;
 	}
@@ -233,7 +330,7 @@ static int snddev_ecodec_probe(struct platform_device *pdev)
 	dev_info->name = pdata->name;
 	dev_info->copp_id = pdata->copp_id;
 	dev_info->acdb_id = pdata->acdb_id;
-	dev_info->private_data = (void *) ecodec;
+	dev_info->private_data = (void *)ecodec;
 	dev_info->dev_ops.open = snddev_ecodec_open;
 	dev_info->dev_ops.close = snddev_ecodec_close;
 	dev_info->dev_ops.set_freq = snddev_ecodec_set_freq;
@@ -242,75 +339,61 @@ static int snddev_ecodec_probe(struct platform_device *pdev)
 	dev_info->opened = 0;
 
 	msm_snddev_register(dev_info);
+
 	ecodec->data = pdata;
-	ecodec->sample_rate = 8000; /* Default to 8KHz */
-	 if (pdata->capability & SNDDEV_CAP_RX) {
-		for (i = 0; i < VOC_RX_VOL_ARRAY_NUM; i++) {
-			dev_info->max_voc_rx_vol[i] =
-				pdata->max_voice_rx_vol[i];
-			dev_info->min_voc_rx_vol[i] =
-				pdata->min_voice_rx_vol[i];
-		}
-	}
+	ecodec->sample_rate = 8000;	/* Default to 8KHz */
 error:
 	return rc;
 }
 
-static int snddev_ecodec_remove(struct platform_device *pdev)
-{
-	return 0;
-}
-
-static struct platform_driver snddev_ecodec_driver = {
+struct platform_driver snddev_ecodec_driver = {
 	.probe = snddev_ecodec_probe,
-	.remove = snddev_ecodec_remove,
-	.driver = { .name = "msm_snddev_ecodec" }
+	.driver = {.name = "msm_snddev_ecodec"}
 };
 
-static int __init snddev_ecodec_init(void)
+int __init snddev_ecodec_init(void)
 {
 	int rc = 0;
-	struct snddev_ecodec_drv_state *ecodec_drv = &snddev_ecodec_drv;
+	struct snddev_ecodec_drv_state *drv = &snddev_ecodec_drv;
 
-	MM_INFO(" snddev_ecodec_init \n");
+	pr_info("%s:\n", __func__);
+
+	mutex_init(&drv->dev_lock);
+	drv->ref_cnt = 0;
+
+	drv->ecodec_clk = clk_get(NULL, "pcm_clk");
+	if (IS_ERR(drv->ecodec_clk)) {
+		pr_err("%s: could not get pcm_clk\n", __func__);
+		return PTR_ERR(drv->ecodec_clk);
+	}
+
+	rc = platform_driver_register(&aux_pcm_driver);
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("%s: platform_driver_register for aux pcm failed\n",
+				__func__);
+		goto error_aux_pcm_platform_driver;
+	}
+
 	rc = platform_driver_register(&snddev_ecodec_driver);
-	if (IS_ERR_VALUE(rc))
-		goto error_platform_driver;
-	ecodec_drv->ecodec_clk = clk_get(NULL, "ecodec_clk");
-	if (IS_ERR(ecodec_drv->ecodec_clk))
-		goto error_ecodec_clk;
-	ecodec_drv->lpa_core_clk = clk_get(NULL, "lpa_core_clk");
-	if (IS_ERR(ecodec_drv->lpa_core_clk))
-		goto error_lpa_core_clk;
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("%s: platform_driver_register for ecodec failed\n",
+				__func__);
+		goto error_ecodec_platform_driver;
+	}
+	pr_info("%s: done\n", __func__);
 
-
-	mutex_init(&ecodec_drv->dev_lock);
-	ecodec_drv->rx_active = 0;
-	ecodec_drv->tx_active = 0;
 	return 0;
 
-error_lpa_core_clk:
-	clk_put(ecodec_drv->ecodec_clk);
-error_ecodec_clk:
-	platform_driver_unregister(&snddev_ecodec_driver);
-error_platform_driver:
+error_ecodec_platform_driver:
+	platform_driver_unregister(&aux_pcm_driver);
+error_aux_pcm_platform_driver:
+	clk_put(drv->ecodec_clk);
 
-	MM_ERR("%s: encounter error\n", __func__);
+	pr_err("%s: encounter error\n", __func__);
 	return -ENODEV;
 }
 
-static void __exit snddev_ecodec_exit(void)
-{
-	struct snddev_ecodec_drv_state *ecodec_drv = &snddev_ecodec_drv;
-
-	platform_driver_unregister(&snddev_ecodec_driver);
-	clk_put(ecodec_drv->ecodec_clk);
-
-	return;
-}
-
-module_init(snddev_ecodec_init);
-module_exit(snddev_ecodec_exit);
+device_initcall(snddev_ecodec_init);
 
 MODULE_DESCRIPTION("ECodec Sound Device driver");
 MODULE_VERSION("1.0");

@@ -1535,6 +1535,42 @@ static struct platform_device msm_bt_power_device = {
 };
 #endif
 
+static struct resource msm_aux_pcm_resources[] = {
+
+	{
+		.name   = "aux_pcm_dout",
+		.start  = 111,
+		.end    = 111,
+		.flags  = IORESOURCE_IO,
+	},
+	{
+		.name   = "aux_pcm_din",
+		.start  = 112,
+		.end    = 112,
+		.flags  = IORESOURCE_IO,
+	},
+	{
+		.name   = "aux_pcm_syncout",
+		.start  = 113,
+		.end    = 113,
+		.flags  = IORESOURCE_IO,
+	},
+	{
+		.name   = "aux_pcm_clkin_a",
+		.start  = 114,
+		.end    = 114,
+		.flags  = IORESOURCE_IO,
+	},
+};
+
+static struct platform_device msm_aux_pcm_device = {
+	.name   = "msm_aux_pcm",
+	.id     = 0,
+	.num_resources  = ARRAY_SIZE(msm_aux_pcm_resources),
+	.resource       = msm_aux_pcm_resources,
+};
+
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 	&msm_device_uart_dm12,
@@ -1587,7 +1623,8 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #ifdef CONFIG_MSM_VPE
 	&msm_vpe_device,
 #endif
-	&msm_device_vidc
+	&msm_device_vidc,
+	&msm_aux_pcm_device,
 };
 
 static struct platform_device *surf_devices[] __initdata = {
@@ -1672,6 +1709,7 @@ static struct platform_device *surf_devices[] __initdata = {
 	(defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
 	&msm_bt_power_device,
 #endif
+	&msm_aux_pcm_device,
 };
 
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
@@ -4588,6 +4626,22 @@ static struct msm_rpm_platform_data msm_rpm_data = {
 };
 #endif
 
+static uint32_t auxpcm_gpio_table[] = {
+	GPIO_CFG(111, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(112, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(113, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(114, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+};
+
+static void msm_auxpcm_init(void)
+{
+	gpio_tlmm_config(auxpcm_gpio_table[0], GPIO_CFG_ENABLE);
+	gpio_tlmm_config(auxpcm_gpio_table[1], GPIO_CFG_ENABLE);
+	gpio_tlmm_config(auxpcm_gpio_table[2], GPIO_CFG_ENABLE);
+	gpio_tlmm_config(auxpcm_gpio_table[3], GPIO_CFG_ENABLE);
+}
+
+
 static void __init msm8x60_init(void)
 {
 	/*
@@ -4632,6 +4686,7 @@ static void __init msm8x60_init(void)
 	msm_cpuidle_set_states(msm_cstates, ARRAY_SIZE(msm_cstates),
 				msm_pm_data);
 
+	msm_auxpcm_init();
 	msm_snddev_init();
 }
 
