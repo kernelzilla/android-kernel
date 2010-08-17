@@ -77,7 +77,7 @@ static struct resource mahimahi_wifi_resources[] = {
 		.name		= "bcm4329_wlan_irq",
 		.start		= MSM_GPIO_TO_INT(MAHIMAHI_GPIO_WIFI_IRQ),
 		.end		= MSM_GPIO_TO_INT(MAHIMAHI_GPIO_WIFI_IRQ),
-		.flags          = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+		.flags		= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
 	},
 };
 
@@ -89,13 +89,13 @@ static struct wifi_platform_data mahimahi_wifi_control = {
 };
 
 static struct platform_device mahimahi_wifi_device = {
-        .name           = "bcm4329_wlan",
-        .id             = 1,
-        .num_resources  = ARRAY_SIZE(mahimahi_wifi_resources),
-        .resource       = mahimahi_wifi_resources,
-        .dev            = {
-                .platform_data = &mahimahi_wifi_control,
-        },
+	.name		= "bcm4329_wlan",
+	.id		= 1,
+	.num_resources	= ARRAY_SIZE(mahimahi_wifi_resources),
+	.resource	= mahimahi_wifi_resources,
+	.dev		= {
+		.platform_data	= &mahimahi_wifi_control,
+	},
 };
 
 extern unsigned char *get_wifi_nvs_ram(void);
@@ -134,7 +134,7 @@ static int __init mahimahi_wifi_init(void)
 	mahimahi_wifi_update_nvs("sd_oobonly=1\r\n");
 	mahimahi_init_wifi_mem();
 	ret = platform_device_register(&mahimahi_wifi_device);
-        return ret;
+	return ret;
 }
 
 late_initcall(mahimahi_wifi_init);
