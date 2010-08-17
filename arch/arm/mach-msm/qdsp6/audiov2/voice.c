@@ -121,7 +121,7 @@ static int voice_thread(void *data)
 
 static void remote_cb_function(void *data, int len, void *cookie)
 {
-	struct apr_command_hdr *apr = data + 2*sizeof(uint32_t);
+	struct apr_command_pkt *apr = data + 2*sizeof(uint32_t);
 
 	memcpy(&voice.apr_pkt, apr, sizeof(struct apr_command_pkt));
 
@@ -167,7 +167,8 @@ static int __init voice_init(void)
 	}
 
 	if (check_version(voice.cvd, VOICE_DAL_VERSION) != 0) {
-		pr_err("Incompatible cvd version\n", __MM_FILE__, __func__);
+		pr_err("[%s:%s] Incompatible cvd version\n",
+				__MM_FILE__, __func__);
 		res = -ENODEV;
 		goto done;
 	}
