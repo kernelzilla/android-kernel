@@ -708,8 +708,7 @@ static int msm_reboot_call(struct notifier_block *this, unsigned long code, void
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block msm_reboot_notifier =
-{
+static struct notifier_block msm_reboot_notifier = {
 	.notifier_call = msm_reboot_call,
 };
 
