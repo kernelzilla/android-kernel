@@ -328,12 +328,11 @@ static int pm8901_ldo_set_voltage(struct regulator_dev *dev,
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
 	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
-	int uV = (min_uV + max_uV) / 2;
 
 	if (vreg->is_nmos)
-		return pm8901_nldo_set_voltage(chip, vreg, uV);
+		return pm8901_nldo_set_voltage(chip, vreg, min_uV);
 	else
-		return pm8901_pldo_set_voltage(chip, vreg, uV);
+		return pm8901_pldo_set_voltage(chip, vreg, min_uV);
 }
 
 static int pm8901_pldo_get_voltage(struct pm8901_vreg *vreg)
@@ -445,18 +444,17 @@ static int pm8901_smps_set_voltage(struct regulator_dev *dev,
 {
 	struct pm8901_vreg *vreg = rdev_get_drvdata(dev);
 	struct pm8901_chip *chip = dev_get_drvdata(dev->dev.parent);
-	int uV = (min_uV + max_uV) / 2;
 	int rc;
 	u8 val, band;
 
-	if (uV < SMPS_BAND_2_UV_MIN) {
-		val = ((uV - SMPS_BAND_1_UV_MIN) / SMPS_BAND_1_UV_STEP);
+	if (min_uV < SMPS_BAND_2_UV_MIN) {
+		val = ((min_uV - SMPS_BAND_1_UV_MIN) / SMPS_BAND_1_UV_STEP);
 		band = SMPS_VCTRL_BAND_1;
-	} else if (uV < SMPS_BAND_3_UV_MIN) {
-		val = ((uV - SMPS_BAND_2_UV_MIN) / SMPS_BAND_2_UV_STEP);
+	} else if (min_uV < SMPS_BAND_3_UV_MIN) {
+		val = ((min_uV - SMPS_BAND_2_UV_MIN) / SMPS_BAND_2_UV_STEP);
 		band = SMPS_VCTRL_BAND_2;
 	} else {
-		val = ((uV - SMPS_BAND_3_UV_MIN) / SMPS_BAND_3_UV_STEP);
+		val = ((min_uV - SMPS_BAND_3_UV_MIN) / SMPS_BAND_3_UV_STEP);
 		band = SMPS_VCTRL_BAND_3;
 	}
 
