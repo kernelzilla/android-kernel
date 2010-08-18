@@ -544,7 +544,17 @@ CONFIG_IPV6_NDISC_NODETYPE=y
 # CONFIG_IRDA is not set
 # CONFIG_BT is not set
 # CONFIG_AF_RXRPC is not set
-# CONFIG_WIRELESS is not set
+CONFIG_WIRELESS=y
+# CONFIG_CFG80211 is not set
+CONFIG_CFG80211_DEFAULT_PS_VALUE=0
+# CONFIG_WIRELESS_OLD_REGULATORY is not set
+CONFIG_WIRELESS_EXT=y
+# CONFIG_WIRELESS_EXT_SYSFS is not set
+# CONFIG_LIB80211 is not set
+
+#
+# CFG80211 needs to be enabled for MAC80211
+#
 # CONFIG_WIMAX is not set
 # CONFIG_RFKILL is not set
 # CONFIG_NET_9P is not set
@@ -699,7 +709,11 @@ CONFIG_SMSC911X=y
 # CONFIG_KS8851_MLL is not set
 # CONFIG_NETDEV_1000 is not set
 # CONFIG_NETDEV_10000 is not set
-# CONFIG_WLAN is not set
+CONFIG_WLAN=y
+# CONFIG_WLAN_PRE80211 is not set
+# CONFIG_WLAN_80211 is not set
+CONFIG_LIBRA_SDIOIF=m
+# CONFIG_BCM4329 is not set
 
 #
 # Enable WiMAX (Networking options) to see the WiMAX drivers
@@ -1747,6 +1761,7 @@ CONFIG_RTC_PM8058=y
 CONFIG_STAGING=y
 # CONFIG_STAGING_EXCLUDE_BUILD is not set
 # CONFIG_USB_IP_COMMON is not set
+# CONFIG_PRISM2_USB is not set
 # CONFIG_ECHO is not set
 # CONFIG_COMEDI is not set
 # CONFIG_ASUS_OLED is not set
@@ -1783,6 +1798,7 @@ CONFIG_MSM_RPCSERVERS=y
 # CONFIG_POHMELFS is not set
 # CONFIG_PLAN9AUTH is not set
 # CONFIG_LINE6_USB is not set
+# CONFIG_VT6656 is not set
 # CONFIG_FB_UDL is not set
 
 #
