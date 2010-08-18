@@ -24,6 +24,7 @@
 %{
 
 #include <assert.h>
+#include <malloc.h>
 #include "genksyms.h"
 
 static int is_typedef;
