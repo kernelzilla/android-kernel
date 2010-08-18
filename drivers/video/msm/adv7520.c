@@ -114,7 +114,7 @@ static int create_hdmi_state_kobj(void)
 	}
 	hdmi_state_obj->hdmi_connection_state = 0;
 	ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_ADD);
-	printk(KERN_DEBUG "kobject uevent returned %d \n", ret);
+	printk(KERN_DEBUG "kobject uevent returned %d\n", ret);
 	return 0;
 }
 
@@ -128,7 +128,7 @@ static int change_hdmi_state(int online)
 		ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_ONLINE);
 	else
 		ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_OFFLINE);
-	printk(KERN_DEBUG "kobject uevent returned %d \n", ret);
+	printk(KERN_DEBUG "kobject uevent returned %d\n", ret);
 	hdmi_state_obj->hdmi_connection_state = online;
 	return 0;
 }
@@ -203,7 +203,7 @@ static void adv7520_read_edid(void)
 	/* Read EDID memory */
 	for (i = 0; i <= 0xff; i++) {
 		ereg[i] = adv7520_read_reg(eclient, i);
-		printk(KERN_DEBUG "ereg[%x] =%x \n " , i, ereg[i]);
+		printk(KERN_DEBUG "ereg[%x] =%x\n" , i, ereg[i]);
 	}
 
 	/* Parse EDID Data */
@@ -220,13 +220,13 @@ static void adv7520_read_edid(void)
 		vertical_resolution   = (p_video_spec->vert_high  & 0xF0) * 256
 			+ p_video_spec->vert_active    ;
 	} else {
-		printk(KERN_DEBUG " Unable to read EDID \n");
-		printk(KERN_DEBUG " Setting default 720p resolution \n");
+		printk(KERN_DEBUG " Unable to read EDID\n");
+		printk(KERN_DEBUG " Setting default 720p resolution\n");
 		horizontal_resolution = 1280 ;
 		vertical_resolution   = 720;
 	}
 
-	printk(KERN_INFO "\n Monitor resolution is %d ** %d \n ",
+	printk(KERN_INFO "\n Monitor resolution is %d ** %d\n",
 			horizontal_resolution, vertical_resolution) ;
 
 }
@@ -240,20 +240,21 @@ static int adv7520_power_on(struct platform_device *pdev)
 	if (pdev)
 		mfd = platform_get_drvdata(pdev);
 
-	printk(KERN_INFO " mfd->var_xres = %d \n ", mfd->var_xres);
-	printk(KERN_INFO " mfd->var_yres = %d \n ", mfd->var_yres);
+	if (mfd != NULL) {
+		printk(KERN_INFO " mfd->var_xres = %d\n", mfd->var_xres);
+		printk(KERN_INFO " mfd->var_yres = %d\n", mfd->var_yres);
 
-	if (mfd->var_xres == 1280 && mfd->var_yres == 720)
-		printk(KERN_INFO "\n iconfiguring 720 p \n ") ;
+		if (mfd->var_xres == 1280 && mfd->var_yres == 720)
+			printk(KERN_INFO "\n iconfiguring 720 p\n");
+		if (mfd->var_xres == 720 && mfd->var_yres == 480)
+			printk(KERN_INFO "\n configuring 480 p\n");
+	}
 
-	if (mfd->var_xres == 720 && mfd->var_yres == 480)
-		printk(KERN_INFO "\n configuring 480 p \n ") ;
-
-	 if (hpd_first) {
+	if (hpd_first) {
 		hpd_first = 0 ;
-		printk(KERN_ERR " %s INSIDE HPD_FIRST \n ", __func__);
+		printk(KERN_ERR " %s INSIDE HPD_FIRST\n", __func__);
 		return 0 ;
-      }
+	}
 
 	/* Attempting to enable power */
 	/* Get the register holding the HPD bit, this must
@@ -423,15 +424,15 @@ static void adv7520_enable(void)
 static void adv7520_handle_cable_work(struct work_struct *work)
 {
 	if ((monitor_sense & 0x4)) {
-		printk(KERN_DEBUG "calling read edid.. \n");
-		adv7520_read_edid();
-		printk(KERN_DEBUG " \n %s Power ON from Interrupt handler \n ",
+		printk(KERN_DEBUG "calling read edid..\n");
+		printk(KERN_DEBUG "\n %s Power ON from Interrupt handler\n",
 				__func__);
 		adv7520_power_on(NULL);
+		adv7520_read_edid();
 		change_hdmi_state(1);
 	} else {
 		change_hdmi_state(0);
-		printk(KERN_DEBUG "\n %s Power OFF from Interrupt handler \n",
+		printk(KERN_DEBUG "\n %s Power OFF from Interrupt handler\n",
 				__func__);
 	}
 }
@@ -450,24 +451,24 @@ static void adv7520_work_f(struct work_struct *work)
 	reg0x94 = adv7520_read_reg(hclient, 0x94);
 
 	printk(KERN_ERR "In work queue reg96 is %x "
-			"and 0x94 is %x \n", reg0x96, reg0x94);
+			"and 0x94 is %x\n", reg0x96, reg0x94);
 	if ((reg0x96 == 0xC0) || (reg0x96 & 0x40)) {
 		adv7520_write_reg(hclient, 0x96, 0x0);
 		hpd_state = adv7520_read_reg(hclient, 0x42);
 		monitor_sense = adv7520_read_reg(hclient, 0xC6);
 		printk(KERN_DEBUG "from timer work queue:: reg[0x42] is %x && "
-			" monitor sense is = %x \n ", hpd_state, monitor_sense);
+			" monitor sense is = %x\n", hpd_state, monitor_sense);
 
 		/* Timer for catching interrupt debouning */
 		if (!timer_pending(&hpd_timer)) {
 			init_timer(&hpd_timer);
-			printk(KERN_DEBUG "%s Add Timer \n", __func__);
+			printk(KERN_DEBUG "%s Add Timer\n", __func__);
 			hpd_timer.function = adv7520_handle_cable;
 			hpd_timer.data = (unsigned long)NULL;
 			hpd_timer.expires = jiffies + 1*HZ;
 			add_timer(&hpd_timer);
 		} else {
-			printk(KERN_DEBUG "%s MOD Timer pending \n", __func__);
+			printk(KERN_DEBUG "%s MOD Timer pending\n", __func__);
 			mod_timer(&hpd_timer, jiffies + 1*HZ);
 		}
 	}
@@ -520,7 +521,7 @@ adv7520_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	eclient = i2c_new_dummy(edid_adap, ADV7520_EDIDI2CSLAVEADDRESS >> 1);
 
 	if (!eclient)
-		printk(KERN_ERR "Address %02x unavailable \n",
+		printk(KERN_ERR "Address %02x unavailable\n",
 				ADV7520_EDIDI2CSLAVEADDRESS >> 1);
 
 	adv7520_enable();
@@ -559,7 +560,7 @@ static int __devexit adv7520_remove(struct i2c_client *client)
 {
 	int err = 0 ;
 	if (!client->adapter) {
-		printk(KERN_ERR "<%s> No HDMI Device \n",
+		printk(KERN_ERR "<%s> No HDMI Device\n",
 			__func__);
 		return -ENODEV;
 	}
