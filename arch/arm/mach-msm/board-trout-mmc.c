@@ -240,9 +240,9 @@ int trout_wifi_set_carddetect(int val)
 {
 	printk("%s: %d\n", __func__, val);
 	trout_wifi_cd = val;
-	if (wifi_status_cb) {
+	if (wifi_status_cb)
 		wifi_status_cb(val, wifi_status_cb_devid);
-	} else
+	else
 		printk(KERN_WARNING "%s: Nobody to notify\n", __func__);
 	return 0;
 }
@@ -274,9 +274,8 @@ int trout_wifi_power(int on)
 	mdelay(100);
 	gpio_set_value( TROUT_GPIO_WIFI_EN, on);
 	mdelay(100);
-	if (!on) {
+	if (!on)
 		vreg_disable(vreg_wifi_osc);
-	}
 	trout_wifi_power_state = on;
 	return 0;
 }

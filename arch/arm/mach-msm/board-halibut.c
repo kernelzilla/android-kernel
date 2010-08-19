@@ -814,11 +814,10 @@ static int mddi_toshiba_backlight_level(int level, int max, int min)
 	if (!max)
 		return 0;
 
-	if (machine_is_msm7201a_ffa()) {
+	if (machine_is_msm7201a_ffa())
 		out_val = 2200 + (((max - level) * (4000 - 2200)) / max);
-	} else {
+	else
 		out_val = (level * 4999) / max;
-	}
 
 	return out_val;
 }

@@ -45,9 +45,8 @@ static int __init parse_tag_msm_wifi(const struct tag *tag)
 	unsigned i;
 	
 	printk("WiFi Data size = %d , 0x%x\n", tag->hdr.size, tag->hdr.tag);
-	for(i=0;( i < size );i++) {
+	for (i = 0; i < size; i++)
 		printk("%02x ", *dptr++);
-	}
 #endif	
 	memcpy( (void *)wifi_nvs_ram, (void *)dptr, size );
 	return 0;
