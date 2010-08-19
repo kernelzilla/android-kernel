@@ -33,6 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include "msm_fb.h"
 #include "mddihosti.h"
@@ -62,6 +63,30 @@ static struct clk *mddi_clk;
 static struct clk *mddi_pclk;
 static struct mddi_platform_data *mddi_pdata;
 
+static int mddi_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int mddi_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static int mddi_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: idling...\n");
+	return 0;
+}
+
+static struct dev_pm_ops mddi_dev_pm_ops = {
+	.runtime_suspend = mddi_runtime_suspend,
+	.runtime_resume = mddi_runtime_resume,
+	.runtime_idle = mddi_runtime_idle,
+};
+
 static struct platform_driver mddi_driver = {
 	.probe = mddi_probe,
 	.remove = mddi_remove,
@@ -73,7 +98,8 @@ static struct platform_driver mddi_driver = {
 #endif
 	.shutdown = NULL,
 	.driver = {
-		   .name = "mddi",
+		.name = "mddi",
+		.pm = &mddi_dev_pm_ops,
 		   },
 };
 
@@ -88,6 +114,7 @@ static int mddi_off(struct platform_device *pdev)
 	if (mddi_pdata && mddi_pdata->mddi_power_save)
 		mddi_pdata->mddi_power_save(0);
 
+	pm_runtime_put(&pdev->dev);
 	return ret;
 }
 
@@ -98,7 +125,7 @@ static int mddi_on(struct platform_device *pdev)
 	struct msm_fb_data_type *mfd;
 
 	mfd = platform_get_drvdata(pdev);
-
+	pm_runtime_get(&pdev->dev);
 	if (mddi_pdata && mddi_pdata->mddi_power_save)
 		mddi_pdata->mddi_power_save(1);
 
@@ -226,7 +253,12 @@ static int mddi_probe(struct platform_device *pdev)
 	 * set driver data
 	 */
 	platform_set_drvdata(mdp_dev, mfd);
+	rc = pm_runtime_set_active(&pdev->dev);
+	if (rc < 0)
+		printk(KERN_ERR "pm_runtime: fail to set active\n");
 
+	rc = 0;
+	pm_runtime_enable(&pdev->dev);
 	/*
 	 * register in mdp driver
 	 */
@@ -340,6 +372,7 @@ static void mddi_early_resume(struct early_suspend *h)
 
 static int mddi_remove(struct platform_device *pdev)
 {
+	pm_runtime_disable(&pdev->dev);
 	if (mddi_host_timer.function)
 		del_timer_sync(&mddi_host_timer);
 
