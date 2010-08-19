@@ -9,31 +9,38 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+KERNEL_ABI ?= 2.6.32-1
+SANITIZED_KERNEL_HEADERS ?= /usr/local/include
+
+hdrs_pkg_name := linux-headers-$(KERNEL_ABI)
+hdrs_pkg_dir  := $(CURDIR)/debian/$(hdrs_pkg_name)/usr/src/$(hdrs_pkg_name)
+
+sanitized_pkg_name := sanitized-linux-headers
+sanitized_pkg_dir  := $(CURDIR)/debian/$(sanitized_pkg_name)
+sanitized_tmp_dir  := $(CURDIR)/debian/tmp-headers
 
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
-	# Add here commands to configure the package.
-
+	# Ensure the kernel is configured
+	@test -e .config || (                           \
+	echo;                                           \
+	echo "  ERROR: Kernel hasn't been configured."; \
+	echo;                                           \
+	/bin/false)
 	touch configure-stamp
-
 
 build: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
-
-	# Add here commands to compile the package.
-
+	$(MAKE) modules_prepare
 	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
-
-	# Add here commands to clean up after the build process.
 	$(MAKE) clean
-
 	dh_clean
 
 install: build
@@ -42,18 +49,6 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	# Add here commands to install the package into debian/tmp
-
-hdrs_pkg_name= linux-headers-2.6.32-1
-hdrs_pkg_dir = $(CURDIR)/debian/$(hdrs_pkg_name)/usr/src/$(hdrs_pkg_name)
-install-headers:
-	dh_testdir
-	dh_testroot
-	dh_clean -k -p$(hdrs_pkg_name)
-
-	$(MAKE) modules_prepare
-
-	install -d $(hdrs_pkg_dir)
 	find . -path './debian' -prune -o -path './$(DEBIAN)' -prune \
 	  -o -path './include/*' -prune \
 	  -o -path './scripts/*' -prune -o -type f \
@@ -69,26 +64,24 @@ install-headers:
 		cpio -pd --preserve-modification-time $(hdrs_pkg_dir)
 
 
+	$(MAKE) INSTALL_HDR_PATH=$(sanitized_tmp_dir)/install headers_install
+	(cd $(sanitized_tmp_dir)/install/include/ && \
+		find . -name '.' -o -name '.*' -prune -o -print | \
+		cpio -pd --preserve-modification-time \
+			$(sanitized_pkg_dir)/$(SANITIZED_KERNEL_HEADERS))
+	rm -rf $(sanitized_tmp_dir)
+
 # Build architecture-independent files here.
-binary-indep: install install-headers
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs -i
-	dh_installdocs -i
-	dh_compress -i
-	dh_fixperms -i
-	dh_installdeb -i
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
+binary-indep: install
+# We have nothing to do by default.
 
 # Build architecture-dependent files here.
-binary-arch: install install-headers
+binary-arch: install
 	dh_testdir
 	dh_testroot
-	dh_installchangelogs -a
-	dh_installdocs -a
-	dh_installexamples -a
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
 #	dh_install
 #	dh_installmenu
 #	dh_installdebconf
@@ -99,19 +92,19 @@ binary-arch: install install-headers
 #	dh_installinit
 #	dh_installcron
 #	dh_installinfo
-	dh_installman -a
-	dh_link -a
-	dh_strip -a
-	dh_compress -a
-	dh_fixperms -a
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
 #	dh_perl
 #	dh_python
 #	dh_makeshlibs
-	dh_installdeb -a
-	dh_shlibdeps -a
-	dh_gencontrol -a
-	dh_md5sums -a
-	dh_builddeb -a
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
 
 binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install configure install-headers
+.PHONY: build clean binary-indep binary-arch binary install configure

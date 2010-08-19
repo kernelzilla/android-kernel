@@ -12,3 +12,10 @@ Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Provides: linux-headers, linux-headers-2.6
 Description: Header files related to Linux kernel version 2.6.32
+
+Package: sanitized-linux-headers
+Section: devel
+Architecture: armel
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Linux kernel headers for development
