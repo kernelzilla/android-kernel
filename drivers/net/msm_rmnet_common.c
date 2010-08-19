@@ -530,8 +530,8 @@ static int rmnet_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -EINVAL;
 	}
 
-	pr_info("rmnet_ioctl(): dev=%d cmd=0x%x opmode old=0x%08x new=0x%08x\n",
-		p->ch_id, cmd, old_opmode, p->operation_mode);
+	pr_debug("%s: dev=%d cmd=0x%x opmode old=0x%08x new=0x%08x\n",
+		__func__, p->ch_id, cmd, old_opmode, p->operation_mode);
 	return rc;
 }
 
