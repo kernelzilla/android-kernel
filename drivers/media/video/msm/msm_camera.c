@@ -2231,41 +2231,54 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 		}
 
 	case VFE_MSG_OUTPUT_V:
-		printk(KERN_ERR "dis_en = %d \n", *sync->vpefn.dis);
-		if (*(sync->vpefn.dis)) {
-			memset(&(vdata->vpe_bf), 0, sizeof(vdata->vpe_bf));
-			if (sync->cropinfo != NULL)
-				vdata->vpe_bf.vpe_crop =
+		if (sync->vpefn.vpe_cfg_update) {
+			CDBG("dis_en = %d\n", *sync->vpefn.dis);
+			if (*(sync->vpefn.dis)) {
+				memset(&(vdata->vpe_bf), 0,
+					sizeof(vdata->vpe_bf));
+
+				if (sync->cropinfo != NULL)
+					vdata->vpe_bf.vpe_crop =
 				*(struct video_crop_t *)(sync->cropinfo);
-			vdata->vpe_bf.y_phy = vdata->phy.y_phy;
-			vdata->vpe_bf.cbcr_phy = vdata->phy.cbcr_phy;
-			vdata->vpe_bf.ts = (qcmd->ts);
-			vdata->vpe_bf.frame_id = vdata->phy.frame_id;
-			qcmd->command = vdata;
-			msm_enqueue_vpe(&sync->vpe_q, &qcmd->list_vpe_frame);
-			return;
-		} else {
-			if (sync->vpefn.vpe_cfg_update(sync->cropinfo)) {
+
+				vdata->vpe_bf.y_phy = vdata->phy.y_phy;
+				vdata->vpe_bf.cbcr_phy = vdata->phy.cbcr_phy;
+				vdata->vpe_bf.ts = (qcmd->ts);
+				vdata->vpe_bf.frame_id = vdata->phy.frame_id;
+				qcmd->command = vdata;
+				msm_enqueue_vpe(&sync->vpe_q,
+					&qcmd->list_vpe_frame);
+				return;
+			} else if (sync->vpefn.vpe_cfg_update(sync->cropinfo)) {
 				if (qcmd->on_heap)
 					qcmd->on_heap++;
-				CDBG("%s: msm_enqueue video frame to vpe "
-					"time = %ld\n",
-					__func__, qcmd->ts.tv_nsec);
+
+				CDBG("%s: msm_enqueue video frame to vpe time "
+					"= %ld\n", __func__, qcmd->ts.tv_nsec);
+
 				sync->vpefn.send_frame_to_vpe(
 					vdata->phy.y_phy,
 					vdata->phy.cbcr_phy,
 					&(qcmd->ts));
+
 				free_qcmd(qcmd);
 				return;
 			} else {
 				CDBG("%s: msm_enqueue video frame_q\n",
 					__func__);
-				msm_enqueue(&sync->frame_q,
-					&qcmd->list_frame);
+				msm_enqueue(&sync->frame_q, &qcmd->list_frame);
+
 				if (qcmd->on_heap)
 					qcmd->on_heap++;
 				break;
 			}
+		} else {
+			CDBG("%s: msm_enqueue video frame_q\n",	__func__);
+			msm_enqueue(&sync->frame_q, &qcmd->list_frame);
+
+			if (qcmd->on_heap)
+				qcmd->on_heap++;
+			break;
 		}
 
 	case VFE_MSG_SNAPSHOT:
