@@ -30,9 +30,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef CSDIO_H
 #define CSDIO_H
 
-#include <linux/fs.h>
-
-
 #define CSDIO_IOC_MAGIC  'm'
 
 #define CSDIO_IOC_ENABLE_HIGHSPEED_MODE      _IO(CSDIO_IOC_MAGIC, 0)
