@@ -40,6 +40,19 @@
 #define REQUEST_HNP_SUSPEND	3
 #define REQUEST_HNP_RESUME	4
 
+/* Flags required to read ID state of PHY for ACA */
+#define PHY_ID_MASK		0xB0
+#define PHY_ID_GND		0
+#define PHY_ID_C		0x10
+#define PHY_ID_B		0x30
+#define PHY_ID_A		0x90
+
+#define phy_id_state(ints)	((ints) & PHY_ID_MASK)
+#define phy_id_state_a(ints)	(phy_id_state((ints)) == PHY_ID_A)
+#define phy_id_state_b(ints)	(phy_id_state((ints)) == PHY_ID_B)
+#define phy_id_state_c(ints)	(phy_id_state((ints)) == PHY_ID_C)
+#define phy_id_state_gnd(ints)	(phy_id_state((ints)) == PHY_ID_GND)
+
 enum hsusb_phy_type {
 	UNDEFINED,
 	INTEGRATED,
