@@ -267,7 +267,7 @@ msm_i2c_poll_writeready(struct msm_i2c_dev *dev)
 		if (!(status & I2C_STATUS_WR_BUFFER_FULL))
 			return 0;
 		if (retries++ > 1000)
-			udelay(100);
+			usleep_range(100, 200);
 	}
 	return -ETIMEDOUT;
 }
@@ -283,7 +283,7 @@ msm_i2c_poll_notbusy(struct msm_i2c_dev *dev)
 		if (!(status & I2C_STATUS_BUS_ACTIVE))
 			return 0;
 		if (retries++ > 1000)
-			udelay(100);
+			usleep_range(100, 200);
 	}
 	return -ETIMEDOUT;
 }
@@ -333,7 +333,7 @@ msm_i2c_recover_bus_busy(struct msm_i2c_dev *dev, struct i2c_adapter *adap)
 		gpio_direction_input(gpio_clk);
 		udelay(5);
 		if (!gpio_get_value(gpio_clk))
-			udelay(20);
+			usleep_range(20, 30);
 		if (!gpio_get_value(gpio_clk))
 			msleep(10);
 		gpio_clk_status = gpio_get_value(gpio_clk);
