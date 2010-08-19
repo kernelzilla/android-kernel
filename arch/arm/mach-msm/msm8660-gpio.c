@@ -26,6 +26,7 @@
 #include <linux/pm_runtime.h>
 #include <mach/msm_iomap.h>
 #include "tlmm-msm8660.h"
+#include "gpiomux.h"
 
 /**
  * struct msm_gpio_dev: the MSM8660 SoC GPIO device structure
@@ -106,6 +107,16 @@ static inline int msm_irq_to_gpio(struct gpio_chip *chip, unsigned irq)
 	return irq - MSM_GPIO_TO_INT(chip->base);
 }
 
+static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	return msm_gpiomux_get(chip->base + offset);
+}
+
+static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
+{
+	msm_gpiomux_put(chip->base + offset);
+}
+
 static struct msm_gpio_dev msm_gpio = {
 	.gpio_chip = {
 		.base             = 0,
@@ -115,6 +126,8 @@ static struct msm_gpio_dev msm_gpio = {
 		.get              = msm_gpio_get,
 		.set              = msm_gpio_set,
 		.to_irq           = msm_gpio_to_irq,
+		.request          = msm_gpio_request,
+		.free             = msm_gpio_free,
 	},
 };
 
