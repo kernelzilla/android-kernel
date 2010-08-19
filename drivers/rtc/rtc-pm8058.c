@@ -394,8 +394,9 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, rtc_dd);
 
 	/* Request the alarm IRQ */
-	rc = request_irq(rtc_dd->rtc_alarm_irq, pm8058_alarm_trigger,
-			IRQF_TRIGGER_RISING, "pm8058_rtc_alarm", rtc_dd);
+	rc = request_threaded_irq(rtc_dd->rtc_alarm_irq, NULL,
+				 pm8058_alarm_trigger, IRQF_TRIGGER_RISING,
+				 "pm8058_rtc_alarm", rtc_dd);
 	if (rc < 0) {
 		pr_err("%s: Request IRQ failed (%d)\n", __func__, rc);
 		goto fail_req_irq;
