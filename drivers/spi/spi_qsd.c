@@ -164,7 +164,9 @@ enum msm_spi_state {
 #define SPI_NUM_CHIPSELECTS           4
 #define SPI_SUPPORTED_MODES  (SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP)
 
-#define SPI_NUM_RETRIES               20
+#define SPI_DELAY_THRESHOLD           1
+/* Default timeout is 10 milliseconds */
+#define SPI_DEFAULT_TIMEOUT           10
 /* 250 microseconds */
 #define SPI_TRYLOCK_DELAY             250
 
@@ -684,15 +686,39 @@ static inline bool msm_spi_is_valid_state(struct msm_spi *dd)
 
 static inline int msm_spi_wait_valid(struct msm_spi *dd)
 {
-	int i = 0;
+	unsigned long delay = 0;
+	unsigned long timeout = 0;
 
+	if (dd->clock_speed == 0)
+		return -EINVAL;
+	/*
+	 * Based on the SPI clock speed, sufficient time
+	 * should be given for the SPI state transition
+	 * to occur
+	 */
+	delay = (10 * USEC_PER_SEC) / dd->clock_speed;
+	/*
+	 * For small delay values, the default timeout would
+	 * be one jiffy
+	 */
+	if (delay < SPI_DELAY_THRESHOLD)
+		delay = SPI_DELAY_THRESHOLD;
+	timeout = jiffies + msecs_to_jiffies(delay * SPI_DEFAULT_TIMEOUT);
 	while (!msm_spi_is_valid_state(dd)) {
-		if (i++ > SPI_NUM_RETRIES) {
+		if (time_after(jiffies, timeout)) {
 			dd->cur_msg->status = -EIO;
 			dev_err(dd->dev, "%s: SPI operational state not valid"
 				"\n", __func__);
 			return -1;
 		}
+		/*
+		 * For smaller values of delay, context switch time
+		 * would negate the usage of usleep
+		 */
+		if (delay > 20)
+			usleep(delay);
+		else if (delay)
+			udelay(delay);
 	}
 	return 0;
 }
@@ -706,7 +732,8 @@ static inline int msm_spi_set_state(struct msm_spi *dd,
 	cur_state = readl(dd->base + SPI_STATE);
 	/* Per spec:
 	   For PAUSE_STATE to RESET_STATE, two writes of (10) are required */
-	if (cur_state == SPI_OP_STATE_PAUSE && state == SPI_OP_STATE_RESET) {
+	if (((cur_state & SPI_OP_STATE) == SPI_OP_STATE_PAUSE) &&
+			(state == SPI_OP_STATE_RESET)) {
 		writel(SPI_OP_STATE_CLEAR_BITS, dd->base + SPI_STATE);
 		writel(SPI_OP_STATE_CLEAR_BITS, dd->base + SPI_STATE);
 	} else {
