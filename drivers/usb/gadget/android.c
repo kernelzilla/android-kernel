@@ -29,6 +29,7 @@
 #include <linux/miscdevice.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/usb/android.h>
 #include <linux/usb/ch9.h>
@@ -636,6 +637,7 @@ static int __init android_probe(struct platform_device *pdev)
 {
 	struct android_usb_platform_data *pdata = pdev->dev.platform_data;
 	struct android_dev *dev = _android_dev;
+	int result;
 	int ret;
 
 	pr_debug("android_probe pdata: %p\n", pdata);
@@ -652,6 +654,17 @@ static int __init android_probe(struct platform_device *pdev)
 	dev->nluns = pdata->nluns;
 	dev->pdata = pdata;
 
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
+	result = pm_runtime_get(&pdev->dev);
+	if (result < 0) {
+		dev_err(&pdev->dev,
+			"Runtime PM: Unable to wake up the device, rc = %d\n",
+			result);
+		return result;
+	}
+
 	ret = sysfs_create_group(&pdev->dev.kobj, &android_attr_grp);
 	if (ret < 0) {
 		pr_err("%s: Failed to create the sysfs entry \n", __func__);
@@ -667,8 +680,25 @@ static int __init android_probe(struct platform_device *pdev)
 	return ret;
 }
 
+static int andr_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int andr_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static struct dev_pm_ops andr_dev_pm_ops = {
+	.runtime_suspend = andr_runtime_suspend,
+	.runtime_resume = andr_runtime_resume,
+};
+
 static struct platform_driver android_platform_driver = {
-	.driver = { .name = "android_usb", },
+	.driver = { .name = "android_usb", .pm = &andr_dev_pm_ops},
 	.probe = android_probe,
 };
 
@@ -749,6 +779,7 @@ static void __exit cleanup(void)
 	usb_composite_unregister(&android_usb_driver);
 	misc_deregister(&adb_enable_device);
 	platform_driver_unregister(&android_platform_driver);
+
 	adb_function_exit();
 	kfree(_android_dev);
 	_android_dev = NULL;
