@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/device.h>
 #include <linux/pm_qos_params.h>
@@ -2258,6 +2259,14 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, 1);
 
+	ret = pm_runtime_set_active(&pdev->dev);
+	if (ret < 0)
+		printk(KERN_ERR "pm_runtime: fail to set active\n");
+
+	ret = 0;
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_get(&pdev->dev);
+
 	if (vbus_on_irq) {
 		ret = request_irq(vbus_on_irq, pmic_vbus_on_irq,
 				IRQF_TRIGGER_RISING, "msm_otg_vbus_on", NULL);
@@ -2359,17 +2368,44 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	if (dev->pdata->rpc_connect)
 		dev->pdata->rpc_connect(0);
 
+	pm_runtime_put(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	kfree(dev);
 	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, DRIVER_NAME);
 	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, DRIVER_NAME);
 	return 0;
 }
 
+static int msm_otg_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return  0;
+}
+
+static int msm_otg_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return  0;
+}
+
+static int msm_otg_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: idling...\n");
+	return  0;
+}
+
+static struct dev_pm_ops msm_otg_dev_pm_ops = {
+	.runtime_suspend = msm_otg_runtime_suspend,
+	.runtime_resume = msm_otg_runtime_resume,
+	.runtime_idle = msm_otg_runtime_idle,
+};
+
 static struct platform_driver msm_otg_driver = {
 	.remove = __exit_p(msm_otg_remove),
 	.driver = {
 		.name = DRIVER_NAME,
 		.owner = THIS_MODULE,
+		.pm = &msm_otg_dev_pm_ops,
 	},
 };
 
