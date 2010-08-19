@@ -38,7 +38,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
 
-#include "csdio.h"
+#include <linux/csdio.h>
 
 #define FALSE   0
 #define TRUE    1
