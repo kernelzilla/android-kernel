@@ -330,6 +330,7 @@ static void usb_chg_detect(struct work_struct *w)
 	 * wakelock which will be re-acquired for any sub-sequent usb interrupts
 	 * */
 	if (temp == USB_CHG_TYPE__WALLCHARGER) {
+		pm_runtime_put_sync(&ui->pdev->dev);
 		wake_unlock(&ui->wlock);
 	}
 }
@@ -1284,6 +1285,8 @@ static void usb_do_work(struct work_struct *w)
 					break;
 				}
 
+				pm_runtime_get_noresume(&ui->pdev->dev);
+				pm_runtime_resume(&ui->pdev->dev);
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: IDLE -> ONLINE\n");
 				usb_reset(ui);
@@ -1369,6 +1372,8 @@ static void usb_do_work(struct work_struct *w)
 
 				ui->state = USB_STATE_OFFLINE;
 				usb_do_work_check_vbus(ui);
+				pm_runtime_put_noidle(&ui->pdev->dev);
+				pm_runtime_suspend(&ui->pdev->dev);
 				wake_unlock(&ui->wlock);
 				break;
 			}
@@ -1424,6 +1429,8 @@ static void usb_do_work(struct work_struct *w)
 			if ((flags & USB_FLAG_VBUS_ONLINE) && _vbus) {
 				int ret;
 
+				pm_runtime_get_noresume(&ui->pdev->dev);
+				pm_runtime_resume(&ui->pdev->dev);
 				dev_info(&ui->pdev->dev,
 					"msm72k_udc: OFFLINE -> ONLINE\n");
 
@@ -2162,7 +2169,7 @@ static int msm72k_probe(struct platform_device *pdev)
 	struct usb_info *ui;
 	struct msm_hsusb_gadget_platform_data *pdata;
 	struct msm_otg *otg;
-	int retval, err;
+	int retval;
 
 	dev_dbg(&pdev->dev, "msm72k_probe\n");
 	ui = kzalloc(sizeof(struct usb_info), GFP_KERNEL);
@@ -2212,12 +2219,6 @@ static int msm72k_probe(struct platform_device *pdev)
 		return usb_free(ui, retval);
 
 	the_usb_info = ui;
-
-	err = pm_runtime_set_active(&pdev->dev);
-	if (err < 0)
-		printk(KERN_ERR "pm_runtime: fail to set active\n");
-
-	err = 0;
 
 	wake_lock_init(&ui->wlock,
 			WAKE_LOCK_SUSPEND, "usb_bus_active");
