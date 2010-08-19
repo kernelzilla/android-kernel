@@ -43,7 +43,7 @@
 #include <linux/videodev2.h>
 
 
-#define FM_DEBUG
+#undef FM_DEBUG
 
 /* constants */
 #define  RDS_BLOCKS_NUM             (4)

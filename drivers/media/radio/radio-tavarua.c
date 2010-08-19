@@ -78,7 +78,7 @@ actual tavaura registers */
 struct tavarua_device {
 	struct video_device *videodev;
 	/* driver management */
-	atomic_t users;
+	int users;
 	/* top level driver data */
 	struct marimba *marimba;
 	struct device *dev;
@@ -136,6 +136,7 @@ MODULE_PARM_DESC(rds_buf, "RDS buffer entries: *100*");
 /* static variables */
 static struct tavarua_device *private_data;
 /* forward declerations */
+static int tavarua_disable_interrupts(struct tavarua_device *radio);
 static int tavarua_setup_interrupts(struct tavarua_device *radio,
 					enum radio_state_t state);
 static int tavarua_start(struct tavarua_device *radio,
@@ -1378,19 +1379,19 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 {
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
-	unsigned bytes_to_copy;
-	unsigned bytes_copied = 0;
-	unsigned bytes_left;
+	int bytes_to_copy;
+	int bytes_copied = 0;
+	int bytes_left;
 	int chunk_index = 0;
 	unsigned char tx_data[XFR_REG_NUM];
 	/* Disable TX of this type first */
 	switch (radio->tx_mode) {
 	case TAVARUA_TX_RT:
-		bytes_left = min_t(size_t, count, MAX_RT_LENGTH);
+		bytes_left = min((int)count, MAX_RT_LENGTH);
 		tx_data[1] = 0;
 		break;
 	case TAVARUA_TX_PS:
-		bytes_left = min_t(size_t, count, MAX_PS_LENGTH);
+		bytes_left = min((int)count, MAX_PS_LENGTH);
 		tx_data[4] = 0;
 		break;
 	default:
@@ -1404,7 +1405,7 @@ static ssize_t tavarua_fops_write(struct file *file, const char __user *data,
 	/* send payload to FM hardware */
 	while (bytes_left) {
 		chunk_index++;
-		bytes_to_copy = min_t(unsigned, bytes_left, XFR_REG_NUM);
+		bytes_to_copy = min(bytes_left, XFR_REG_NUM);
 		if (copy_from_user(tx_data, data + bytes_copied, bytes_to_copy))
 			return -EFAULT;
 		retval = sync_write_xfr(radio, radio->tx_mode +
@@ -1464,10 +1465,14 @@ static int tavarua_fops_open(struct file *file)
 	/* FM core bring up */
 	char buffer[] = {0x00, 0x48, 0x8A, 0x8E, 0x97, 0xB7};
 
-	if (!atomic_inc_and_test(&radio->users)) {
-		atomic_dec(&radio->users);
+	mutex_lock(&radio->lock);
+	if (radio->users) {
+		mutex_unlock(&radio->lock);
 		return -EBUSY;
+	} else {
+		radio->users++;
 	}
+	mutex_unlock(&radio->lock);
 
 	/* initial gpio pin config & Power up */
 	retval = radio->pdata->fm_setup(radio->pdata);
@@ -1545,7 +1550,7 @@ open_err_req_irq:
 	radio->pdata->fm_shutdown(radio->pdata);
 open_err_setup:
 	radio->handle_irq = 1;
-	atomic_dec(&radio->users);
+	radio->users = 0;
 	return retval;
 }
 
@@ -1590,7 +1595,7 @@ static int tavarua_fops_release(struct file *file)
 	/* teardown gpio and pmic */
 	radio->pdata->fm_shutdown(radio->pdata);
 	radio->handle_irq = 1;
-	atomic_set(&radio->users, -1);
+	radio->users = 0;
 	return 0;
 }
 
@@ -1933,7 +1938,7 @@ static int tavarua_vidioc_g_ctrl(struct file *file, void *priv,
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH:
 		retval = sync_read_xfr(radio, RX_CONFIG, xfr_buf);
-		ctrl->value  = xfr_buf[0];
+		ctrl->value = xfr_buf[0];
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY:
 		ctrl->value = radio->srch_params.srch_pty;
@@ -2026,7 +2031,6 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
 	unsigned char value;
-	char lp_buf[] = {0x00, 0x00, 0x00};
 	char xfr_buf[XFR_REG_NUM];
 
 	switch (ctrl->id) {
@@ -2160,16 +2164,12 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 			break;
 		if (ctrl->value) {
 			FMDBG("going into low power mode\n");
-			retval = tavarua_write_registers(radio, STATUS_REG1,
-					lp_buf,	ARRAY_SIZE(lp_buf));
+			retval = tavarua_disable_interrupts(radio);
 		} else {
-
 			FMDBG("going into normal power mode\n");
 			tavarua_setup_interrupts(radio,
 				(radio->registers[RDCTRL] & 0x03));
 		}
-		if (retval > -1)
-			radio->lp_mode = ctrl->value;
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_ANTENNA:
 		SET_REG_FIELD(radio->registers[IOCTRL], ctrl->value,
@@ -2527,6 +2527,10 @@ static int tavarua_setup_interrupts(struct tavarua_device *radio,
 {
 	int retval;
 	unsigned char int_ctrl[XFR_REG_NUM];
+
+	if (!radio->lp_mode)
+		return 0;
+
 	int_ctrl[STATUS_REG1] = READY | TUNE | SEARCH | SCANNEXT |
 				SIGNAL | INTF | SYNC | AUDIO;
 	if (state == FM_RECV)
@@ -2557,6 +2561,7 @@ static int tavarua_setup_interrupts(struct tavarua_device *radio,
 			return retval;
 	}
 
+	radio->lp_mode = 0;
 	tavarua_handle_interrupts(radio);
 	return retval;
 
@@ -2576,17 +2581,24 @@ FUNCTION:  tavarua_disable_interrupts
 static int tavarua_disable_interrupts(struct tavarua_device *radio)
 {
 	unsigned char lpm_buf[XFR_REG_NUM];
+	int retval;
+	if (radio->lp_mode)
+		return 0;
 	FMDBG("%s\n", __func__);
 	lpm_buf[STATUS_REG1] = 0x00;
 	lpm_buf[STATUS_REG2] = 0x00;
 	lpm_buf[STATUS_REG3] = 0x00;
 	/* use xfr for interrupt setup */
 	if (radio->chipID == MARIMBA_2_1)
-		return sync_write_xfr(radio, INT_CTRL, lpm_buf);
+		retval = sync_write_xfr(radio, INT_CTRL, lpm_buf);
 	/* use register write to setup interrupts */
 	else
-		return tavarua_write_registers(radio, STATUS_REG1, lpm_buf,
+		retval = tavarua_write_registers(radio, STATUS_REG1, lpm_buf,
 							ARRAY_SIZE(lpm_buf));
+	if (retval > -1)
+		radio->lp_mode = 1;
+
+	return retval;
 
 }
 
@@ -2785,7 +2797,7 @@ static int  __init tavarua_probe(struct platform_device *pdev)
 		}
 	}
 	/* init xfr status */
-	atomic_set(&radio->users, -1);
+	radio->users = 0;
 	radio->xfr_in_progress = 0;
 	radio->xfr_bytes_left = 0;
 	for (i = 0; i < TAVARUA_XFR_MAX; i++)
@@ -2798,8 +2810,8 @@ static int  __init tavarua_probe(struct platform_device *pdev)
 	radio->srch_params.srch_pi = 0;
 	radio->srch_params.preset_num = 0;
 	radio->srch_params.get_list = 0;
-	/* set to normal power mode */
-	radio->lp_mode = 0;
+	/* radio initializes to low power mode */
+	radio->lp_mode = 1;
 	radio->handle_irq = 1;
 	/* init lock */
 	mutex_init(&radio->lock);
