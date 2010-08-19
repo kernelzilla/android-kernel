@@ -423,6 +423,28 @@ static struct platform_device android_usb_device = {
 };
 #endif
 
+#ifdef CONFIG_MSM_VPE
+static struct resource msm_vpe_resources[] = {
+	{
+		.start	= 0x05300000,
+		.end	= 0x05300000 + SZ_1M - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_VPE,
+		.end	= INT_VPE,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device msm_vpe_device = {
+	.name = "msm_vpe",
+	.id   = 0,
+	.num_resources = ARRAY_SIZE(msm_vpe_resources),
+	.resource = msm_vpe_resources,
+};
+#endif
+
 #ifdef CONFIG_MSM_CAMERA
 
 static uint32_t camera_off_gpio_table[] = {
@@ -1191,6 +1213,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
 #endif
+#ifdef CONFIG_MSM_VPE
+	&msm_vpe_device,
+#endif
 	&msm_device_vidc
 };
 
@@ -1260,6 +1285,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
+#endif
+#ifdef CONFIG_MSM_VPE
+	&msm_vpe_device,
 #endif
 	&msm_device_vidc
 };

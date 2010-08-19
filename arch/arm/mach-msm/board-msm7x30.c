@@ -1027,6 +1027,28 @@ static struct platform_device msm_gemini_device = {
 };
 #endif
 
+#ifdef CONFIG_MSM_VPE
+static struct resource msm_vpe_resources[] = {
+	{
+		.start	= 0xAD200000,
+		.end	= 0xAD200000 + SZ_1M - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_VPE,
+		.end	= INT_VPE,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device msm_vpe_device = {
+       .name = "msm_vpe",
+       .id   = 0,
+       .num_resources = ARRAY_SIZE(msm_vpe_resources),
+       .resource = msm_vpe_resources,
+};
+#endif
+
 #endif /*CONFIG_MSM_CAMERA*/
 
 #ifdef CONFIG_MSM7KV2_AUDIO
@@ -4042,6 +4064,9 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_vidc_720p,
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
+#endif
+#ifdef CONFIG_MSM_VPE
+	&msm_vpe_device,
 #endif
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 	&msm_device_tsif,

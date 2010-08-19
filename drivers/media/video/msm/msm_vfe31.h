@@ -153,6 +153,7 @@
 #define IHIST_ENABLE_MASK 0x00008000   /* bit 15 */
 #define RS_ENABLE_MASK 0x00000100      /* bit 8  */
 #define CS_ENABLE_MASK 0x00000200      /* bit 9  */
+#define RS_CS_ENABLE_MASK 0x00000300   /* bit 8,9  */
 
 
 #define VFE_REG_UPDATE_TRIGGER           1

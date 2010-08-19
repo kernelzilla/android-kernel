@@ -96,6 +96,12 @@
 #define MSM_CAM_IOCTL_SENSOR_IO_CFG \
 	_IOW(MSM_CAM_IOCTL_MAGIC, 21, struct sensor_cfg_data *)
 
+#define MSM_CAM_IOCTL_CONFIG_VPE \
+	_IOW(MSM_CAM_IOCTL_MAGIC, 27, struct msm_camera_vpe_cfg_cmd *)
+
+#define MSM_CAM_IOCTL_AXI_VPE_CONFIG \
+	_IOW(MSM_CAM_IOCTL_MAGIC, 28, struct msm_camera_vpe_cfg_cmd *)
+
 #define MSM_CAMERA_LED_OFF  0
 #define MSM_CAMERA_LED_LOW  1
 #define MSM_CAMERA_LED_HIGH 2
@@ -150,6 +156,15 @@ struct msm_vfe_evt_msg {
 	unsigned short type;	/* 1 == event (RPC), 0 == message (adsp) */
 	unsigned short msg_id;
 	unsigned int len;	/* size in, number of bytes out */
+	uint32_t frame_id;
+	void *data;
+};
+
+struct msm_vpe_evt_msg {
+	unsigned short type; /* 1 == event (RPC), 0 == message (adsp) */
+	unsigned short msg_id;
+	unsigned int len; /* size in, number of bytes out */
+	uint32_t frame_id;
 	void *data;
 };
 
@@ -229,9 +244,17 @@ struct msm_camera_cfg_cmd {
 #define CMD_STATS_IHIST_ENABLE 38
 #define CMD_STATS_RS_ENABLE 39
 #define CMD_STATS_CS_ENABLE 40
+#define CMD_VPE 41
+#define CMD_AXI_CFG_VPE 42
 
 /* vfe config command: config command(from config thread)*/
 struct msm_vfe_cfg_cmd {
+	int cmd_type;
+	uint16_t length;
+	void *value;
+};
+
+struct msm_vpe_cfg_cmd {
 	int cmd_type;
 	uint16_t length;
 	void *value;
@@ -258,8 +281,8 @@ struct camera_enable_cmd {
 #define MSM_PMEM_SKIN			13
 #define MSM_PMEM_VIDEO			14
 #define MSM_PMEM_PREVIEW		15
-#define MSM_PMEM_MAX			16
-
+#define MSM_PMEM_VIDEO_VPE		16
+#define MSM_PMEM_MAX			17
 
 #define STAT_AEAW			0
 #define STAT_AEC			1

@@ -105,6 +105,7 @@ static struct clk *camio_csi_pclk;
 static struct clk *camio_csi_vfe_clk;
 static struct clk *camio_jpeg_clk;
 static struct clk *camio_jpeg_pclk;
+static struct clk *camio_vpe_clk;
 static struct msm_camera_io_ext camio_ext;
 static struct msm_camera_io_clk camio_clk;
 static struct resource *camifpadio, *csiio;
@@ -326,6 +327,11 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		camio_jpeg_pclk =
 		clk = clk_get(NULL, "jpeg_pclk");
 		break;
+	case CAMIO_VPE_CLK:
+		camio_vpe_clk =
+		clk = clk_get(NULL, "vpe_clk");
+		msm_camio_clk_rate_set_2(clk, 160000000);
+		break;
 	default:
 		break;
 	}
@@ -385,6 +391,9 @@ int msm_camio_clk_disable(enum msm_camio_clk_type clktype)
 	case CAMIO_JPEG_PCLK:
 		clk = camio_jpeg_pclk;
 		break;
+	case CAMIO_VPE_CLK:
+		clk = camio_vpe_clk;
+		break;
 	default:
 		break;
 	}
@@ -431,6 +440,18 @@ int msm_camio_jpeg_clk_enable(void)
 {
 	msm_camio_clk_enable(CAMIO_JPEG_CLK);
 	msm_camio_clk_enable(CAMIO_JPEG_PCLK);
+	return 0;
+}
+
+int msm_camio_vpe_clk_disable(void)
+{
+	msm_camio_clk_disable(CAMIO_VPE_CLK);
+	return 0;
+}
+
+int msm_camio_vpe_clk_enable(void)
+{
+	msm_camio_clk_enable(CAMIO_VPE_CLK);
 	return 0;
 }
 

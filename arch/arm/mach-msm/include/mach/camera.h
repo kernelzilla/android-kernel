@@ -49,6 +49,7 @@ enum msm_queue {
 	MSM_CAM_Q_VFE_EVT,  /* adsp event */
 	MSM_CAM_Q_VFE_MSG,  /* adsp message */
 	MSM_CAM_Q_V4L2_REQ, /* v4l2 request */
+	MSM_CAM_Q_VPE_MSG,  /* adsp message */
 };
 
 enum vfe_resp_msg {
@@ -72,6 +73,24 @@ enum vfe_resp_msg {
 	VFE_MSG_SYNC_TIMER2,
 };
 
+enum vpe_resp_msg {
+	VPE_EVENT,
+	VPE_MSG_GENERAL,
+	VPE_MSG_SNAPSHOT,
+	VPE_MSG_OUTPUT_P,   /* preview (continuous mode ) */
+	VPE_MSG_OUTPUT_T,   /* thumbnail (snapshot mode )*/
+	VPE_MSG_OUTPUT_S,   /* main image (snapshot mode )*/
+	VPE_MSG_OUTPUT_V,   /* video   (continuous mode ) */
+};
+
+struct msm_vpe_phy_info {
+	uint32_t sbuf_phy;
+	uint32_t y_phy;
+	uint32_t cbcr_phy;
+	uint8_t  output_id; /* VFE31_OUTPUT_MODE_PT/S/V */
+	uint32_t frame_id;
+};
+
 #define VFE31_OUTPUT_MODE_PT (0x1 << 0)
 #define VFE31_OUTPUT_MODE_S (0x1 << 1)
 #define VFE31_OUTPUT_MODE_V (0x1 << 2)
@@ -81,14 +100,52 @@ struct msm_vfe_phy_info {
 	uint32_t y_phy;
 	uint32_t cbcr_phy;
 	uint8_t  output_id; /* VFE31_OUTPUT_MODE_PT/S/V */
+	uint32_t frame_id;
+};
+
+struct video_crop_t{
+	uint32_t  in1_w;
+	uint32_t  out1_w;
+	uint32_t  in1_h;
+	uint32_t  out1_h;
+	uint32_t  in2_w;
+	uint32_t  out2_w;
+	uint32_t  in2_h;
+	uint32_t  out2_h;
+	uint8_t update_flag;
+};
+
+struct msm_vpe_buf_info {
+	uint32_t y_phy;
+	uint32_t cbcr_phy;
+	struct   timespec ts;
+	uint32_t frame_id;
+	struct	 video_crop_t vpe_crop;
 };
 
 struct msm_vfe_resp {
 	enum vfe_resp_msg type;
 	struct msm_vfe_evt_msg evt_msg;
 	struct msm_vfe_phy_info phy;
+	struct msm_vpe_buf_info vpe_bf;
 	void    *extdata;
 	int32_t extlen;
+};
+
+struct msm_vpe_resp {
+	enum vpe_resp_msg type;
+	struct msm_vpe_evt_msg evt_msg;
+	struct msm_vpe_phy_info phy;
+	void    *extdata;
+	int32_t extlen;
+};
+
+struct msm_vpe_callback {
+	void (*vpe_resp)(struct msm_vpe_resp *,
+					enum msm_queue, void *syncdata,
+		void *time_stamp, gfp_t gfp);
+	void* (*vpe_alloc)(int, void *syncdata, gfp_t gfp);
+	void (*vpe_free)(void *ptr);
 };
 
 struct msm_vfe_callback {
@@ -108,6 +165,15 @@ struct msm_camvfe_fn {
 	void (*vfe_release)(struct platform_device *);
 };
 
+struct msm_camvpe_fn {
+	int (*vpe_reg)(struct msm_vpe_callback *);
+	int (*vpe_cfg_update) (void *);
+	void (*send_frame_to_vpe) (uint32_t y_phy, uint32_t cbcr_phy,
+							struct timespec *ts);
+	int (*vpe_config)(struct msm_vpe_cfg_cmd *, void *);
+	int *dis;
+};
+
 struct msm_sensor_ctrl {
 	int (*s_init)(const struct msm_camera_sensor_info *);
 	int (*s_release)(void);
@@ -120,6 +186,7 @@ struct msm_queue_cmd {
 	struct list_head list_control;
 	struct list_head list_frame;
 	struct list_head list_pict;
+	struct list_head list_vpe_frame;
 	enum msm_queue type;
 	void *command;
 	int on_heap;
@@ -161,9 +228,11 @@ struct msm_sync {
 	 */
 	struct msm_device_queue pict_q;
 	int get_pic_abort;
+	struct msm_device_queue vpe_q;
 
 	struct msm_camera_sensor_info *sdata;
 	struct msm_camvfe_fn vfefn;
+	struct msm_camvpe_fn vpefn;
 	struct msm_sensor_ctrl sctrl;
 	struct wake_lock wake_lock;
 	struct platform_device *pdev;
@@ -171,10 +240,12 @@ struct msm_sync {
 	void *cropinfo;
 	int  croplen;
 
+	atomic_t vpe_enable;
 	uint32_t pp_mask;
 	struct msm_queue_cmd *pp_prev;
 	struct msm_queue_cmd *pp_snap;
 	struct msm_queue_cmd *pp_thumb;
+	int video_fd;
 
 	const char *apps_id;
 
@@ -262,6 +333,7 @@ int msm_v4l2_unregister(struct msm_v4l2_driver *);
 void msm_camvfe_init(void);
 int msm_camvfe_check(void *);
 void msm_camvfe_fn_init(struct msm_camvfe_fn *, void *);
+void msm_camvpe_fn_init(struct msm_camvpe_fn *, void *);
 int msm_camera_drv_start(struct platform_device *dev,
 		int (*sensor_probe)(const struct msm_camera_sensor_info *,
 					struct msm_sensor_ctrl *));
@@ -288,6 +360,8 @@ enum msm_camio_clk_type {
 	CAMIO_CSI1_PCLK,
 	CAMIO_JPEG_CLK,
 	CAMIO_JPEG_PCLK,
+	CAMIO_VPE_CLK,
+	CAMIO_VPE_PCLK,
 	CAMIO_MAX_CLK
 };
 
@@ -329,6 +403,8 @@ enum msm_s_setting {
 int msm_camio_enable(struct platform_device *dev);
 int msm_camio_jpeg_clk_enable(void);
 int msm_camio_jpeg_clk_disable(void);
+int msm_camio_vpe_clk_enable(void);
+int msm_camio_vpe_clk_disable(void);
 
 int  msm_camio_clk_enable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_disable(enum msm_camio_clk_type clk);

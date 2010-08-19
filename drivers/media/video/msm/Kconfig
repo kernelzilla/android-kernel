@@ -83,7 +83,14 @@ config MSM_CAMERA_FLASH
 
 config MSM_GEMINI
 	tristate "Qualcomm MSM Gemini Jpeg Engine support"
-	depends on MSM_CAMERA
+	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60)
 	default M
 	---help---
 	  Enable support for Gemini Jpeg Engine
+
+config MSM_VPE
+	tristate "Qualcomm MSM Video Pre-processing Engine support"
+	depends on MSM_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	default y
+	---help---
+	  Enable support for Video Pre-processing Engine
