@@ -50,8 +50,7 @@ static int bluetooth_power_rfkill_probe(struct platform_device *pdev)
 			      pdev->dev.platform_data);
 
 	if (!rfkill) {
-		printk(KERN_DEBUG
-			"%s: rfkill allocate failed\n", __func__);
+		dev_err(&pdev->dev, "rfkill allocate failed\n");
 		return -ENOMEM;
 	}
 
@@ -60,9 +59,7 @@ static int bluetooth_power_rfkill_probe(struct platform_device *pdev)
 
 	ret = rfkill_register(rfkill);
 	if (ret) {
-		printk(KERN_DEBUG
-			"%s: rfkill register failed=%d\n", __func__,
-			ret);
+		dev_err(&pdev->dev, "rfkill register failed=%d\n", ret);
 		rfkill_destroy(rfkill);
 		return ret;
 	}
@@ -76,6 +73,8 @@ static void bluetooth_power_rfkill_remove(struct platform_device *pdev)
 {
 	struct rfkill *rfkill;
 
+	dev_dbg(&pdev->dev, "%s\n", __func__);
+
 	rfkill = platform_get_drvdata(pdev);
 	if (rfkill)
 		rfkill_unregister(rfkill);
@@ -87,11 +86,10 @@ static int __init bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
-	printk(KERN_DEBUG "%s\n", __func__);
+	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	if (!pdev->dev.platform_data) {
-		printk(KERN_ERR "%s: platform data not initialized\n",
-				__func__);
+		dev_err(&pdev->dev, "platform data not initialized\n");
 		return -ENOSYS;
 	}
 
@@ -102,7 +100,7 @@ static int __init bt_power_probe(struct platform_device *pdev)
 
 static int __devexit bt_power_remove(struct platform_device *pdev)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
+	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	bluetooth_power_rfkill_remove(pdev);
 
@@ -122,20 +120,18 @@ static int __init bluetooth_power_init(void)
 {
 	int ret;
 
-	printk(KERN_DEBUG "%s\n", __func__);
 	ret = platform_driver_register(&bt_power_driver);
 	return ret;
 }
 
 static void __exit bluetooth_power_exit(void)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
 	platform_driver_unregister(&bt_power_driver);
 }
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM Bluetooth power control driver");
-MODULE_VERSION("1.30");
+MODULE_VERSION("1.40");
 
 module_init(bluetooth_power_init);
 module_exit(bluetooth_power_exit);
