@@ -106,6 +106,8 @@ static struct clk *camio_csi_vfe_clk;
 static struct clk *camio_jpeg_clk;
 static struct clk *camio_jpeg_pclk;
 static struct clk *camio_vpe_clk;
+static struct vreg *vreg_gp2;
+static struct vreg *vreg_lvsw1;
 static struct msm_camera_io_ext camio_ext;
 static struct msm_camera_io_clk camio_clk;
 static struct resource *camifpadio, *csiio;
@@ -189,75 +191,57 @@ void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len)
 
 static void msm_camera_vreg_enable(void)
 {
-	struct vreg *sensor_vreg;
-	int rc;
-	sensor_vreg = vreg_get(NULL, "gp2");
-	if (IS_ERR(sensor_vreg)) {
-		CDBG("%s: vreg_get(%s) failed (%ld)\n",
-			__func__, "gp2", PTR_ERR(sensor_vreg));
+	vreg_gp2 = vreg_get(NULL, "gp2");
+	if (IS_ERR(vreg_gp2)) {
+		pr_err("%s: VREG GP2 get failed %ld\n", __func__,
+			PTR_ERR(vreg_gp2));
+		vreg_gp2 = NULL;
 		return;
 	}
-	if (sensor_vreg) {
-		rc = vreg_set_level(sensor_vreg, 2600);
-		if (rc) {
-			CDBG("%s: vreg_set level failed (%d)\n",
-				__func__, rc);
-		}
-		rc = vreg_enable(sensor_vreg);
-		if (rc) {
-			CDBG("%s: vreg_enable() = %d \n",
-				__func__, rc);
-		}
+
+	if (vreg_set_level(vreg_gp2, 2600)) {
+		pr_err("%s: VREG GP2 set failed\n", __func__);
+		goto gp2_put;
 	}
-	sensor_vreg = vreg_get(NULL, "lvsw1");
-	if (IS_ERR(sensor_vreg)) {
-		CDBG("%s: vreg_get(%s) failed (%ld)\n",
-			__func__, "lvsw1", PTR_ERR(sensor_vreg));
-		return;
-	}
-	if (sensor_vreg) {
-		rc = vreg_set_level(sensor_vreg, 1800);
-		if (rc) {
-			CDBG("%s: vreg_set level failed (%d)\n",
-				__func__, rc);
+
+	if (vreg_enable(vreg_gp2)) {
+		pr_err("%s: VREG GP2 enable failed\n", __func__);
+		goto gp2_put;
 		}
-		rc = vreg_enable(sensor_vreg);
-		if (rc) {
-			CDBG("%s: vreg_enable() = %d \n",
-				__func__, rc);
+
+	vreg_lvsw1 = vreg_get(NULL, "lvsw1");
+	if (IS_ERR(vreg_lvsw1)) {
+		pr_err("%s: VREG LVSW1 get failed %ld\n", __func__,
+			PTR_ERR(vreg_lvsw1));
+		vreg_lvsw1 = NULL;
+		goto gp2_disable;
 		}
+	if (vreg_set_level(vreg_lvsw1, 1800)) {
+		pr_err("%s: VREG LVSW1 set failed\n", __func__);
+		goto lvsw1_put;
 	}
+	if (vreg_enable(vreg_lvsw1))
+		pr_err("%s: VREG LVSW1 enable failed\n", __func__);
+
+	return;
+
+lvsw1_put:
+	vreg_put(vreg_lvsw1);
+gp2_disable:
+	vreg_disable(vreg_gp2);
+gp2_put:
+	vreg_put(vreg_gp2);
 }
 
 static void msm_camera_vreg_disable(void)
 {
-	struct vreg *sensor_vreg;
-	int rc;
-	sensor_vreg = vreg_get(NULL, "gp2");
-	if (IS_ERR(sensor_vreg)) {
-		CDBG("%s: sensor_vreg(%s) failed (%ld)\n",
-			__func__, "gp2", PTR_ERR(sensor_vreg));
-		return;
+	if (vreg_gp2) {
+		vreg_disable(vreg_gp2);
+		vreg_put(vreg_gp2);
 	}
-	if (sensor_vreg) {
-		rc = vreg_disable(sensor_vreg);
-		if (rc) {
-			CDBG("%s: vreg disable failed (%d)\n",
-				__func__, rc);
-		}
-	}
-	sensor_vreg = vreg_get(NULL, "lvsw1");
-	if (IS_ERR(sensor_vreg)) {
-		CDBG("%s: sensor_vreg(%s) failed (%ld)\n",
-			__func__, "lvsw1", PTR_ERR(sensor_vreg));
-		return;
-	}
-	if (sensor_vreg) {
-		rc = vreg_disable(sensor_vreg);
-		if (rc) {
-			CDBG("%s: vreg disable failed (%d)\n",
-				__func__, rc);
-		}
+	if (vreg_lvsw1) {
+		vreg_disable(vreg_lvsw1);
+		vreg_put(vreg_lvsw1);
 	}
 }
 
