@@ -1401,6 +1401,8 @@ static struct platform_device *snd_devices_fluid[] __initdata = {
 	&msm_a2dp_tx_device,
 	&msm_snddev_mi2s_stereo_rx_device,
 	&msm_uplink_rx_device,
+	&msm_ifmradio_speaker_device,
+	&msm_ifmradio_headset_device,
 };
 
 #ifdef CONFIG_DEBUG_FS
