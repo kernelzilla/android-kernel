@@ -364,12 +364,11 @@ static int pm8058_ldo_set_voltage(struct regulator_dev *dev,
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
 	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
-	int uV = (min_uV + max_uV) / 2;
 
 	if (vreg->is_nmos)
-		return pm8058_nldo_set_voltage(chip, vreg, uV);
+		return pm8058_nldo_set_voltage(chip, vreg, min_uV);
 	else
-		return pm8058_pldo_set_voltage(chip, vreg, uV);
+		return pm8058_pldo_set_voltage(chip, vreg, min_uV);
 }
 
 static int pm8058_pldo_get_voltage(struct pm8058_vreg *vreg)
@@ -506,20 +505,20 @@ static int pm8058_smps_set_voltage(struct regulator_dev *dev,
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
 	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
-	int rc, uV = (min_uV + max_uV) / 2;
+	int rc;
 	u8 val, mask, vlow;
 
-	if (uV >= SMPS_MODE3_UV_MIN && uV <= SMPS_MODE3_UV_MAX) {
+	if (min_uV >= SMPS_MODE3_UV_MIN && min_uV <= SMPS_MODE3_UV_MAX) {
 		vlow = SMPS_VLOW_SEL_MASK;
-		val = ((uV  - SMPS_MODE3_UV_MIN) / SMPS_MODE3_STEP) |
+		val = ((min_uV  - SMPS_MODE3_UV_MIN) / SMPS_MODE3_STEP) |
 			SMPS_VREF_SEL_MASK;
-	} else if (uV >= SMPS_MODE2_UV_MIN && uV <= SMPS_MODE2_UV_MAX) {
+	} else if (min_uV >= SMPS_MODE2_UV_MIN && min_uV <= SMPS_MODE2_UV_MAX) {
 		vlow = 0;
-		val = ((uV - SMPS_MODE2_UV_MIN) / SMPS_MODE2_STEP) |
+		val = ((min_uV - SMPS_MODE2_UV_MIN) / SMPS_MODE2_STEP) |
 			SMPS_VREF_SEL_MASK;
-	} else if (uV >= SMPS_MODE1_UV_MIN && uV <= SMPS_MODE1_UV_MAX) {
+	} else if (min_uV >= SMPS_MODE1_UV_MIN && min_uV <= SMPS_MODE1_UV_MAX) {
 		vlow = 0;
-		val = (uV - SMPS_MODE1_UV_MIN) / SMPS_MODE1_STEP;
+		val = (min_uV - SMPS_MODE1_UV_MIN) / SMPS_MODE1_STEP;
 	} else {
 		return -EINVAL;
 	}
@@ -615,10 +614,10 @@ static int pm8058_ncp_set_voltage(struct regulator_dev *dev,
 {
 	struct pm8058_vreg *vreg = rdev_get_drvdata(dev);
 	struct pm8058_chip *chip = dev_get_drvdata(dev->dev.parent);
-	int rc, uV = (min_uV + max_uV) / 2;
+	int rc;
 	u8 val;
 
-	val = (NCP_UV_MAX - uV) / NCP_UV_STEP;
+	val = (NCP_UV_MAX - min_uV) / NCP_UV_STEP;
 
 	/* voltage setting */
 	rc = pm8058_vreg_write(chip, vreg->ctrl_addr, val, NCP_VPROG_MASK,
