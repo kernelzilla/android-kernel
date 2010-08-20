@@ -5090,6 +5090,13 @@ static struct i2c_board_info cy8ctma300_board_info[] = {
 
 static void __init msm7x30_init(void)
 {
+	int rc;
+	uint32_t usb_hub_gpio_cfg_value = GPIO_CFG(56,
+						0,
+						GPIO_CFG_OUTPUT,
+						GPIO_CFG_NO_PULL,
+						GPIO_CFG_2MA);
+
 	if (socinfo_init() < 0)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
 		       __func__);
@@ -5205,6 +5212,13 @@ static void __init msm7x30_init(void)
 		}
 		i2c_register_board_info(0, cy8ctma300_board_info,
 			ARRAY_SIZE(cy8ctma300_board_info));
+	}
+
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa()) {
+		rc = gpio_tlmm_config(usb_hub_gpio_cfg_value, GPIO_CFG_ENABLE);
+		if (rc)
+			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
+				__func__, usb_hub_gpio_cfg_value, rc);
 	}
 }
 
