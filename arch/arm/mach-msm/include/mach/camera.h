@@ -252,6 +252,7 @@ struct msm_sync {
 
 	struct mutex lock;
 	struct list_head list;
+	uint8_t liveshot_enabled;
 };
 
 #define MSM_APPS_ID_V4L2 "msm_v4l2"

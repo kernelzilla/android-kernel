@@ -187,6 +187,7 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		{V31_SYNC_TIMER_SETTING, V31_SYNC_TIMER_LEN,
 			V31_SYNC_TIMER_OFF},
 /*105*/	{V31_ASYNC_TIMER_SETTING, V31_ASYNC_TIMER_LEN, V31_ASYNC_TIMER_OFF},
+		{V31_LIVESHOT},
 };
 
 static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
@@ -943,6 +944,12 @@ static int vfe31_stop_recording(void){
 	return 0;
 }
 
+static void vfe31_liveshot(void){
+	struct msm_sync* p_sync = (struct msm_sync *)vfe_syncdata;
+	if (p_sync) {
+		p_sync->liveshot_enabled = true;
+	}
+}
 
 static int vfe31_capture(uint32_t num_frames_capture)
 {
@@ -1517,6 +1524,10 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		msm_io_memcpy(vfe31_ctrl->vfebase + V31_SCE_OFF,
 				cmdp, V31_SCE_LEN);
 		}
+		break;
+
+	case V31_LIVESHOT:
+		vfe31_liveshot();
 		break;
 
 	case V31_RGB_G_CFG: {

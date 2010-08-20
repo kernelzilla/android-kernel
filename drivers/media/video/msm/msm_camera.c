@@ -2266,8 +2266,14 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 			} else {
 				CDBG("%s: msm_enqueue video frame_q\n",
 					__func__);
-				msm_enqueue(&sync->frame_q, &qcmd->list_frame);
-
+				if (sync->liveshot_enabled) {
+					CDBG("%s: msm_enqueue liveshot\n",
+						__func__);
+					vdata->phy.output_id |= OUTPUT_TYPE_L;
+					sync->liveshot_enabled = false;
+				}
+				msm_enqueue(&sync->frame_q,
+					&qcmd->list_frame);
 				if (qcmd->on_heap)
 					qcmd->on_heap++;
 				break;
@@ -2364,7 +2370,13 @@ static void msm_vpe_sync(struct msm_vpe_resp *vdata,
 	CDBG("%s: vdata->type %d\n", __func__, vdata->type);
 	switch (vdata->type) {
 	case VFE_MSG_OUTPUT_V:
-		CDBG("%s: msm_enqueue video frame_q from VPE \n", __func__);
+		CDBG("%s: msm_enqueue video frame_q from VPE\n", __func__);
+		if (sync->liveshot_enabled) {
+			CDBG("%s: msm_enqueue liveshot %d\n", __func__,
+				sync->liveshot_enabled);
+			vdata->phy.output_id |= OUTPUT_TYPE_L;
+			sync->liveshot_enabled = false;
+		}
 		msm_enqueue(&sync->frame_q, &qcmd->list_frame);
 		if (qcmd->on_heap)
 			qcmd->on_heap++;
