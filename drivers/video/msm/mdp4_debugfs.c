@@ -24,14 +24,13 @@
 #include <linux/spinlock.h>
 #include <linux/hrtimer.h>
 #include <linux/clk.h>
-#include <mach/hardware.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>
-
-#include <asm/system.h>
-#include <asm/mach-types.h>
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
+#include <asm/system.h>
+#include <asm/mach-types.h>
+#include <mach/hardware.h>
 
 #include "mdp.h"
 #include "msm_fb.h"
@@ -332,13 +331,17 @@ static ssize_t mdp_stat_read(
 					mdp4_stat.kickoff_lcdc);
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "kickoff_dtv:       %08lu\n\n",
+	len = snprintf(bp, dlen, "kickoff_dtv:       %08lu\n",
 					mdp4_stat.kickoff_dtv);
 
 	bp += len;
 	dlen -= len;
-	len = snprintf(bp, dlen, "kickoff_atv:       %08lu\n\n",
+	len = snprintf(bp, dlen, "kickoff_atv:       %08lu\n",
 					mdp4_stat.kickoff_atv);
+	bp += len;
+	dlen -= len;
+	len = snprintf(bp, dlen, "kickoff_dsi:       %08lu\n\n",
+					mdp4_stat.kickoff_dsi);
 	bp += len;
 	dlen -= len;
 	len = snprintf(bp, dlen, "overlay0_set:   %08lu\n",
@@ -767,6 +770,14 @@ static ssize_t dbg_base_read(
 	bp += len;
 	dlen -= len;
 #endif
+
+#ifdef CONFIG_FB_MSM_MIPI_DSI
+	len = snprintf(bp, dlen, "mipi_dsi_base: %08x\n",
+				(int)mipi_dsi_base);
+	bp += len;
+	dlen -= len;
+#endif
+
 	tot = (uint32)bp - (uint32)debug_buf;
 	*bp = 0;
 	tot++;
@@ -795,7 +806,7 @@ static ssize_t dbg_offset_write(
 	size_t count,
 	loff_t *ppos)
 {
-	uint32 off, cnt, base;
+	uint32 off, cnt, num, base;
 
 	if (count > sizeof(debug_buf))
 		return -EFAULT;
@@ -805,14 +816,17 @@ static ssize_t dbg_offset_write(
 
 	debug_buf[count] = 0;	/* end of string */
 
-	sscanf(debug_buf, "%x %d %x", &off, &cnt, &base);
+	cnt = sscanf(debug_buf, "%x %d %x", &off, &num, &base);
 
-	if (cnt <= 0)
-		cnt = 1;
+	if (cnt < 0)
+		cnt = 0;
 
-	dbg_offset = off;
-	dbg_count = cnt;
-	dbg_base = (char *)base;
+	if (cnt >= 1)
+		dbg_offset = off;
+	if (cnt >= 2)
+		dbg_count = num;
+	if (cnt >= 3)
+		dbg_base = (char *)base;
 
 	printk(KERN_INFO "%s: offset=%x cnt=%d base=%x\n", __func__,
 				dbg_offset, dbg_count, (int)dbg_base);
@@ -905,7 +919,7 @@ static ssize_t dbg_reg_read(
 	bp = debug_buf;
 	cp = (char *)(dbg_base + dbg_offset);
 	dlen = sizeof(debug_buf);
-	while (j++ < 8) {
+	while (j++ < 16) {
 		len = snprintf(bp, dlen, "0x%08x: ", (int)cp);
 		tot += len;
 		bp += len;
