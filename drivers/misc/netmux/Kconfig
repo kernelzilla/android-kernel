@@ -1,0 +1,11 @@
+#
+# Netmux configuration
+#
+
+menu "Motorola netmux driver"
+
+config NETMUX_DRIVER
+        tristate "Motorola netmux driver"
+        default n
+
+endmenu

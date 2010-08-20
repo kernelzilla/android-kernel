@@ -1,0 +1,69 @@
+#
+# Siano Mobile Silicon Digital TV device configuration
+#
+
+# w21558, SPI interface between OMAP and SMS1130
+config MOT_FEAT_SPI_SMS1130
+	bool "Siano and OMAP SPI interface support"
+	default n
+
+config SMS_SIANO_MDTV_TDMB
+	tristate "Siano SMS1xxx based MDTV receiver"
+	default n
+	---help---
+	Choose Y or M here if you have MDTV receiver with a Siano chipset.
+	To compile this driver as a module, choose M here
+	(The modules will be called smsmdtv).
+	Note: All dependents, if selected, will be part of this module.
+	Further documentation on this driver can be found on the WWW at http://www.siano-ms.com/
+
+if SMS_SIANO_MDTV_TDMB
+menu "Siano module components"
+
+# Kernel sub systems support
+
+config SMS_DVB3_SUBSYS
+	bool "DVB v.3 Subsystem support"
+	default n
+	---help---
+	Choose
+
+config SMS_HOSTLIB_SUBSYS
+	bool "Host Library Subsystem support."
+	default n
+	---help---
+	Choose if you would like to have Siano's host library kernel sub-system support.
+
+if SMS_HOSTLIB_SUBSYS
+
+config SMS_NET_SUBSYS
+	bool "Siano Network Adapter"
+	default n
+	---help---
+	Choose if you would like to have Siano's network adapter support.
+
+endif # SMS_HOSTLIB_SUBSYS
+
+# Hardware interfaces support
+
+config SMS_SPI_DRV
+	bool "SPI interface support"
+	default n
+	---help---
+	Choose if you would like to have Siano's support for OMAP34XX SPI interface
+
+config SMS_USB_DRV
+        bool "USB inteface support"
+        default n
+        ---help---
+        Choose
+
+config SMS_SDIO_DRV
+        bool "SDIO interface support"
+        default n
+        ---help---
+        Choose
+
+endmenu
+endif # SMS_SIANO_MDTV_TDMB
+

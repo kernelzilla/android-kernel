@@ -1,0 +1,68 @@
+config SGX
+	tristate "PowerVR SGX"
+	---help---
+	  Support for the PowerVR SGX 3D core.
+
+config SGX_CORE_REV
+	int "SGX Core Revision"
+	range 100 1999
+	default 121
+	depends on SGX
+	---help---
+	  Select SGX Core Revision number.
+	  Range 100 - 1999
+	  Examples:
+		121 => 121
+		1111 => 1111
+
+choice
+	prompt "PowerVR build type"
+	depends on SGX
+	default SGX_BUILD_RELEASE
+
+config SGX_BUILD_RELEASE
+       bool "RELEASE"
+
+config SGX_BUILD_DEBUG
+       bool "DEBUG"
+
+endchoice
+
+config SGX_RELEASE_LOGGING
+       bool "Error logging in release build"
+       ---help---
+          Includes error logging in release build
+
+config SGX_EDM_TRACING
+       bool "EDM Status Tracing"
+       ---help---
+         Enable EDM status trace dumping on HW Recovery
+config SGX_MK_TRACE
+       bool "MK Trace"
+       ---help---
+         Enable suppport for dumping EDM status tracing from userspace
+
+config PVR_OMAPLFB
+	tristate "PowerVR OMAP buffer class"
+	depends on SGX
+	---help---
+	  Support for the OMAP frame buffer in PowerVR.
+
+config PVR_OMAP_DSS2
+	depends on SGX && PVR_OMAPLFB
+	tristate "PowerVR OMAP dss2"
+	depends on SGX
+	---help---
+	  Support for the OMAP dss2 frame buffer in PowerVR.
+
+config PVR_OMAP_USE_VSYNC
+	tristate "PowerVR OMAP use vsync"
+	depends on SGX
+	---help---
+	  Support for the OMAP vsync interrupt in PowerVR.
+
+config PVR_APM
+	tristate "Enable PowerVR Active Power Managemt"
+	depends on SGX
+	---help---
+	   Enable PowerVR Active Power Managemt

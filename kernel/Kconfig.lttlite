@@ -1,0 +1,11 @@
+menu "LTT-Lite (Linux Tracing Tool)"
+config LTT_LITE
+		bool "Lite version of the Linux Trace Toolkit support"
+		depends on !LTT
+		default n
+		help
+				provide a scaled-down version of LTT: logs only some
+				of the events;
+				logs them to a file rather than to relayfs;
+				does not require a user-space daemon.
+endmenu

@@ -1,0 +1,83 @@
+Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+
+Redistribution and use in source form and compiled forms (SGML, HTML, PDF,
+PostScript, RTF and so forth) with or without modification, are permitted
+provided that the following conditions are met:
+
+Redistributions in source form must retain the above copyright notice, this
+list of conditions and the following disclaimer as the first lines of this
+file unmodified.
+
+Redistributions in compiled form (transformed to other DTDs, converted to
+PDF, PostScript, RTF and other formats) must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+THIS DOCUMENTATION IS PROVIDED BY THE CODE AURORA FORUM "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+AND NON-INFRINGEMENT ARE DISCLAIMED. IN NO EVENT SHALL THE FREEBSD
+DOCUMENTATION PROJECT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The Android system logger has a kernel interface, a module parameter
+interface and a sysfs interface as well as the currently documented user space
+interface.
+
+sysfs hierarchy is as follows:
+/sys/kernel/logger --> top level directory
+| + log_main --> directory, one of three logger buffers
+| | + TAG1 --> directory, one for each tag submitted, auto register
+| | | + enable --> read/write, local for this tag
+| | | - priority --> read/write, local for this tag
+| | + TAG2 --> directory, one for each tag submitted, auto register
+| | + enable --> read/write, global for this buffer
+| | + priority --> read/write, global for this buffer
+| | + flush --> write-only, global for this buffer
+| | - was_overrrun --> read-only, global for this buffer
+| + log_radio --> directory, same files as log_main
+---- log_events --> directory, same files as log_main, log_radio
+
+See below for format and permissible values for 'enable' and 'priority'. The
+permissible value for 'flush' is the integer value '1'.  'was_overrun' will
+return an integer value of '0' if no overrun occurred, and an integer value
+of '1' if an overrun occurred.
+
+
+The kernel interface is very simple: one function call:
+int logger_write(const enum logidx index,
+	const unsigned char priority,
+	const char __kernel * const tag,
+	const char __kernel * const fmt,
+	...);
+
+The possible integer values to pass as a log index are defined in logger.h:
+0 (LOG_MAIN_IDX), 1 (LOG_EVENTS_IDX), or 2 (LOG_RADIO_IDX).
+
+Any other value passed as a logger index is invalid and will result
+in the logger function returning an -EINVAL as an error return and
+no other action occurring.
+
+
+There are two module parameters.  The first is named 'default_priority',
+corresponding to all sysfs values called 'priority' (see above).
+
+The permissible integer values for this parameter are specified in logger.h
+as:
+0 (LOG_PRIORITY_UNKNOWN), 1 (LOG_PRIORITY_DEFAULT), 2 (LOG_PRIORITY_VERBOSE),
+3 (LOG_PRIORITY_DEBUG), 4 (LOG_PRIORITY_INFO), 5 (LOG_PRIORITY_WARN),
+6 (LOG_PRIORITY_ERROR), 7 (LOG_PRIORITY_FATAL), or 8 (LOG_PRIORITY_SILENT).
+This parameter is validated and the module will fail to load if passed any
+values that are outside of this range.
+
+The second parameter is named 'default_enabled', corresponding to all sysfs
+values named 'enable' (see above).
+
+The permissible integer values for this parameter are either '0' for disabled
+or the integer number '1' for enabled. This parameter is validated and the
+module will fail to load upon any values passed that are outside of this range.
