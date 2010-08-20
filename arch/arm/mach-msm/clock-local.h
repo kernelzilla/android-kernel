@@ -30,6 +30,7 @@
 #ifndef __ARCH_ARM_MACH_MSM_CLOCK_LOCAL_H
 #define __ARCH_ARM_MACH_MSM_CLOCK_LOCAL_H
 
+#include <linux/spinlock.h>
 #include "clock.h"
 
 /*
