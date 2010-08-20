@@ -88,6 +88,18 @@ enum {
 	L_USB_FS2_XCVR_CLK,
 	L_USB_FS2_SYS_CLK,
 
+	/* HW-Voteable Clocks */
+	L_ADM0_CLK,
+	L_ADM0_P_CLK,
+	L_ADM1_CLK,
+	L_ADM1_P_CLK,
+	L_MODEM_AHB1_P_CLK,
+	L_MODEM_AHB2_P_CLK,
+	L_PMIC_ARB0_P_CLK,
+	L_PMIC_ARB1_P_CLK,
+	L_PMIC_SSBI2_CLK,
+	L_RPM_MSG_RAM_P_CLK,
+
 	/* Fast Peripheral Bus Clocks */
 	L_GSBI1_P_CLK,
 	L_GSBI2_P_CLK,
