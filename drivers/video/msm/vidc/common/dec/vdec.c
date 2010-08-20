@@ -1268,6 +1268,7 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 
 static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 {
+	struct vid_dec_msg *vdec_msg;
 	u32 vcd_status;
 	int rc;
 
@@ -1291,6 +1292,17 @@ static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 			ERR("%s:ERROR vcd_stop event_status failure\n",
 					__func__);
 	}
+	mutex_lock(&client_ctx->msg_queue_lock);
+	while (!list_empty(&client_ctx->msg_queue)) {
+		DBG("%s(): Delete remaining entries\n", __func__);
+		vdec_msg = list_first_entry(&client_ctx->msg_queue,
+						   struct vid_dec_msg, list);
+		if (vdec_msg) {
+			list_del(&vdec_msg->list);
+			kfree(vdec_msg);
+		}
+	}
+	mutex_unlock(&client_ctx->msg_queue_lock);
 	vcd_status = vcd_close(client_ctx->vcd_handle);
 
 	if (vcd_status) {
