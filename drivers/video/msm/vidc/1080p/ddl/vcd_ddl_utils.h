@@ -33,6 +33,7 @@
 #include <linux/delay.h>
 #include "vidc_type.h"
 
+#define DDL_MSG_LOG
 #ifdef DDL_MSG_LOG
 #define DDL_MSG_LOW(x...)    printk(KERN_INFO x)
 #define DDL_MSG_MED(x...)    printk(KERN_INFO x)
@@ -46,8 +47,8 @@
 #define DDL_MSG_ERROR(x...)  printk(KERN_INFO x)
 #define DDL_MSG_FATAL(x...)  printk(KERN_INFO x)
 
-#define DDL_ALIGN_SIZE(n_size, n_guard_bytes, n_align_mask) \
-	(((u32)(n_size) + n_guard_bytes) & n_align_mask)
+#define DDL_ALIGN_SIZE(sz, guard_bytes, align_mask) \
+	(((u32)(sz) + guard_bytes) & align_mask)
 #define DDL_ADDR_IS_ALIGNED(addr, align_bytes) \
 	(!((u32)(addr) & ((align_bytes) - 1)))
 #define  DDL_ALIGN(val, grid) ((!(grid)) ? (val) : \
@@ -56,9 +57,9 @@
 		(((val) / (grid)) * (grid)))
 #define DDL_OFFSET(base, addr) ((!(addr)) ? 0 : (u32)((u8 *) \
 		(addr) - (u8 *) (base)))
-#define DDL_ADDR_OFFSET(base, addr) DDL_OFFSET((base).p_align_physical_addr, \
-		(addr).p_align_physical_addr)
-#define DDL_GET_ALIGNED_VITUAL(x)   ((x).p_align_virtual_addr)
+#define DDL_ADDR_OFFSET(base, addr) DDL_OFFSET((base).align_physical_addr, \
+		(addr).align_physical_addr)
+#define DDL_GET_ALIGNED_VITUAL(x)   ((x).align_virtual_addr)
 #define DDL_KILO_BYTE(x)   ((x)*1024)
 #define DDL_MEGA_BYTE(x)   ((x)*1024*1024)
 #define DDL_FRAMERATE_SCALE(x)            ((x) * 1000)
@@ -67,9 +68,9 @@
 #define DDL_MAX(x, y)  ((x > y) ? x : y)
 
 #ifdef DDL_PROFILE
-void ddl_get_core_start_time(u8 codec_type);
-void ddl_calc_core_time(u8 codec_type);
-void ddl_reset_time_variables(u8 codec_type);
+void ddl_get_core_start_time(u8 codec);
+void ddl_calc_core_time(u8 codec);
+void ddl_reset_time_variables(u8 codec);
 #endif
 
 #endif

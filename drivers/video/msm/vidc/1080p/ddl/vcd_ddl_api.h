@@ -30,7 +30,7 @@
 #ifndef _VCD_DDL_API_H_
 #define _VCD_DDL_API_H_
 
-#include "vidc_type.h"
+#include "vidc.h"
 #include "vcd_api.h"
 
 #define VCD_EVT_RESP_DDL_BASE             0x3000
@@ -61,61 +61,61 @@
 #define DDL_I_FRAME_PROC_UNITS   (VCD_I_CUSTOM_DDL_BASE + 0x9)
 #define DDL_I_SEQHDR_PRESENT     (VCD_I_CUSTOM_DDL_BASE + 0xA)
 
-struct vcd_property_rc_level_type{
-	u32 b_frame_level_rc;
-	u32 b_mb_level_rc;
+struct vcd_property_rc_level{
+	u32 frame_level_rc;
+	u32 mb_level_rc;
 };
-struct vcd_property_frame_level_rc_params_type{
-	u32 n_reaction_coeff;
+struct vcd_property_frame_level_rc_params{
+	u32 reaction_coeff;
 };
-struct vcd_property_adaptive_rc_params_type{
-	u32 b_dark_region_as_flag;
-	u32 b_smooth_region_as_flag;
-	u32 b_static_region_as_flag;
-	u32 b_activity_region_flag;
+struct vcd_property_adaptive_rc_params{
+	u32 dark_region_as_flag;
+	u32 smooth_region_as_flag;
+	u32 static_region_as_flag;
+	u32 activity_region_flag;
 };
-struct ddl_property_dec_pic_buffers_type{
-	struct ddl_frame_data_type_tag *a_dec_pic_buffers;
-	u32 n_no_of_dec_pic_buf;
+struct ddl_property_dec_pic_buffers{
+	struct ddl_frame_data_tag *dec_pic_buffers;
+	u32 no_of_dec_pic_buf;
 };
-struct ddl_property_capability_type{
-	u32 n_max_num_client;
-	u32 n_general_command_depth;
-	u32 b_exclusive;
-	u32 n_frame_command_depth;
-	u32 n_ddl_time_out_in_ms;
+struct ddl_property_capability{
+	u32 max_num_client;
+	u32 general_command_depth;
+	u32 exclusive;
+	u32 frame_command_depth;
+	u32 ddl_time_out_in_ms;
 };
-struct ddl_init_config_type{
-	u8 *p_core_virtual_base_addr;
-	void (*pf_interrupt_clr) (void);
-	void (*ddl_callback) (u32 event, u32 status, void *payload, u32 size,
-		u32 *p_ddl_handle, void *const p_client_data);
+struct ddl_init_config{
+	u8 *core_virtual_base_addr;
+	void (*interrupt_clr) (void);
+	void (*ddl_callback) (u32 event, u32 status, void *payload, size_t sz,
+		u32 *ddl_handle, void *const client_data);
 };
-struct ddl_frame_data_type_tag{
-	struct vcd_frame_data_type vcd_frm;
-	u32 b_frm_trans_end;
-	u32 n_frm_delta;
+struct ddl_frame_data_tag{
+	struct vcd_frame_data vcd_frm;
+	u32 frm_trans_end;
+	u32 frm_delta;
 };
-u32 ddl_device_init(struct ddl_init_config_type *p_ddl_init_config,
-	void *p_client_data);
-u32 ddl_device_release(void *p_client_data);
-u32 ddl_open(u32 **p_ddl_handle, u32 b_decoding);
-u32 ddl_close(u32 **p_ddl_handle);
-u32 ddl_encode_start(u32 *ddl_handle, void *p_client_data);
+u32 ddl_device_init(struct ddl_init_config *ddl_init_config,
+	void *client_data);
+u32 ddl_device_release(void *client_data);
+u32 ddl_open(u32 **ddl_handle, u32 decoding);
+u32 ddl_close(u32 **ddl_handle);
+u32 ddl_encode_start(u32 *ddl_handle, void *client_data);
 u32 ddl_encode_frame(u32 *ddl_handle,
-	struct ddl_frame_data_type_tag *p_input_frame,
-	struct ddl_frame_data_type_tag *p_output_bit, void *p_client_data);
-u32 ddl_encode_end(u32 *ddl_handle, void *p_client_data);
-u32 ddl_decode_start(u32 *ddl_handle, struct vcd_sequence_hdr_type *p_header,
-	void *p_client_data);
+	struct ddl_frame_data_tag *input_frame,
+	struct ddl_frame_data_tag *output_bit, void *client_data);
+u32 ddl_encode_end(u32 *ddl_handle, void *client_data);
+u32 ddl_decode_start(u32 *ddl_handle, struct vcd_sequence_hdr *header,
+	void *client_data);
 u32 ddl_decode_frame(u32 *ddl_handle,
-	struct ddl_frame_data_type_tag *p_input_bits, void *p_client_data);
-u32 ddl_decode_end(u32 *ddl_handle, void *p_client_data);
+	struct ddl_frame_data_tag *input_bits, void *client_data);
+u32 ddl_decode_end(u32 *ddl_handle, void *client_data);
 u32 ddl_set_property(u32 *ddl_handle,
-	struct vcd_property_hdr_type *p_property_hdr, void *p_property_value);
+	struct vcd_property_hdr *property_hdr, void *property_value);
 u32 ddl_get_property(u32 *ddl_handle,
-	struct vcd_property_hdr_type *p_property_hdr, void *p_property_value);
+	struct vcd_property_hdr *property_hdr, void *property_value);
 u32 ddl_process_core_response(void);
-u32 ddl_reset_hw(u32 n_mode);
+u32 ddl_reset_hw(u32 mode);
 void ddl_read_and_clear_interrupt(void);
 #endif

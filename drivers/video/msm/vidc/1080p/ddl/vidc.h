@@ -190,17 +190,17 @@
 #define VIDC_1080P_DATA_PAGE_FAULT_EXCEPTION_HANDLER  0x200
 #define VIDC_1080P_INST_PAGE_FAULT_EXCEPTION_HANDLER  0x400
 
-enum vidc_1080p_reset_type{
+enum vidc_1080p_reset{
 	VIDC_1080P_RESET_IN_SEQ_FIRST_STAGE   = 0x0,
 	VIDC_1080P_RESET_IN_SEQ_SECOND_STAGE  = 0x1,
 };
-enum vidc_1080p_memory_access_method_type{
+enum vidc_1080p_memory_access_method{
 	VIDC_1080P_TILE_LINEAR = 0,
 	VIDC_1080P_TILE_16x16  = 2,
 	VIDC_1080P_TILE_64x32  = 3,
 	VIDC_1080P_TILE_32BIT  = 0x7FFFFFFF
 };
-enum vidc_1080p_host2risc_cmd_type{
+enum vidc_1080p_host2risc_cmd{
 	VIDC_1080P_HOST2RISC_CMD_EMPTY          = 0,
 	VIDC_1080P_HOST2RISC_CMD_OPEN_CH        = 1,
 	VIDC_1080P_HOST2RISC_CMD_CLOSE_CH       = 2,
@@ -210,19 +210,19 @@ enum vidc_1080p_host2risc_cmd_type{
 	VIDC_1080P_HOST2RISC_CMD_ABORT_ENC      = 8,
 	VIDC_1080P_HOST2RISC_CMD_32BIT          = 0x7FFFFFFF
 };
-enum vidc_1080p_decode_p_cache_enable_type{
+enum vidc_1080p_decode_p_cache_enable{
 	VIDC_1080P_DECODE_PCACHE_ENABLE_P   = 0,
 	VIDC_1080P_DECODE_PCACHE_ENABLE_B   = 1,
 	VIDC_1080P_DECODE_PCACHE_ENABLE_PB  = 2,
 	VIDC_1080P_DECODE_PCACHE_DISABLE    = 3,
 	VIDC_1080P_DECODE_PCACHE_32BIT      = 0x7FFFFFFF
 };
-enum vidc_1080p_encode_p_cache_enable_type{
+enum vidc_1080p_encode_p_cache_enable{
 	VIDC_1080P_ENCODE_PCACHE_ENABLE  = 0,
 	VIDC_1080P_ENCODE_PCACHE_DISABLE = 3,
 	VIDC_1080P_ENCODE_PCACHE_32BIT   = 0x7FFFFFFF
 };
-enum vidc_1080p_codec_type{
+enum vidc_1080p_codec{
 	VIDC_1080P_H264_DECODE     = 0,
 	VIDC_1080P_VC1_DECODE      = 1,
 	VIDC_1080P_MPEG4_DECODE    = 2,
@@ -238,24 +238,24 @@ enum vidc_1080p_codec_type{
 	VIDC_1080P_H263_ENCODE    = 18,
 	VIDC_1080P_CODEC_32BIT    = 0x7FFFFFFF
 };
-enum vidc_1080p_entropy_sel_type{
+enum vidc_1080p_entropy_sel{
 	VIDC_1080P_ENTROPY_SEL_CAVLC = 0,
 	VIDC_1080P_ENTROPY_SEL_CABAC = 1,
 	VIDC_1080P_ENTROPY_32BIT     = 0x7FFFFFFF
 };
-enum vidc_1080p_DBConfig_type{
+enum vidc_1080p_DBConfig{
 	VIDC_1080P_DB_ALL_BLOCKING_BOUNDARY  = 0,
 	VIDC_1080P_DB_DISABLE                = 1,
 	VIDC_1080P_DB_SKIP_SLICE_BOUNDARY    = 2,
 	VIDC_1080P_DB_32BIT                  = 0x7FFFFFFF
 };
-enum vidc_1080p_MSlice_selection_type{
+enum vidc_1080p_MSlice_selection{
 	VIDC_1080P_MSLICE_DISABLE        = 0,
 	VIDC_1080P_MSLICE_BY_MB_COUNT    = 1,
 	VIDC_1080P_MSLICE_BY_BYTE_COUNT  = 3,
 	VIDC_1080P_MSLICE_32BIT          = 0x7FFFFFFF
 };
-enum vidc_1080p_display_status_type{
+enum vidc_1080p_display_status{
 	VIDC_1080P_DISPLAY_STATUS_DECODE_ONLY        = 0,
 	VIDC_1080P_DISPLAY_STATUS_DECODE_AND_DISPLAY = 1,
 	VIDC_1080P_DISPLAY_STATUS_DISPLAY_ONLY       = 2,
@@ -263,12 +263,12 @@ enum vidc_1080p_display_status_type{
 	VIDC_1080P_DISPLAY_STATUS_NOOP               = 4,
 	VIDC_1080P_DISPLAY_STATUS_32BIT              = 0x7FFFFFFF
 };
-enum vidc_1080p_display_coding_type{
+enum vidc_1080p_display_coding{
 	VIDC_1080P_DISPLAY_CODING_PROGRESSIVE_SCAN = 0,
 	VIDC_1080P_DISPLAY_CODING_INTERLACED       = 1,
 	VIDC_1080P_DISPLAY_CODING_32BIT            = 0x7FFFFFFF
 };
-enum vidc_1080p_decode_frame_type{
+enum vidc_1080p_decode_frame{
 	VIDC_1080P_DECODE_FRAMETYPE_NOT_CODED  = 0,
 	VIDC_1080P_DECODE_FRAMETYPE_I          = 1,
 	VIDC_1080P_DECODE_FRAMETYPE_P          = 2,
@@ -276,7 +276,7 @@ enum vidc_1080p_decode_frame_type{
 	VIDC_1080P_DECODE_FRAMETYPE_OTHERS     = 4,
 	VIDC_1080P_DECODE_FRAMETYPE_32BIT      = 0x7FFFFFFF
 };
-enum vidc_1080p_encode_frame_type{
+enum vidc_1080p_encode_frame{
 	VIDC_1080P_ENCODE_FRAMETYPE_NOT_CODED  = 0,
 	VIDC_1080P_ENCODE_FRAMETYPE_I          = 1,
 	VIDC_1080P_ENCODE_FRAMETYPE_P          = 2,
@@ -295,236 +295,236 @@ enum vidc_1080p_encode_frame_type{
 #define VIDC_1080P_PROFILE_H264_BASELINE     0x00000002
 
 
-enum vidc_1080p_decode_type{
+enum vidc_1080p_decode{
 	VIDC_1080P_DEC_TYPE_SEQ_HEADER       = 0x00010000,
 	VIDC_1080P_DEC_TYPE_FRAME_DATA       = 0x00020000,
 	VIDC_1080P_DEC_TYPE_LAST_FRAME_DATA  = 0x00030000,
 	VIDC_1080P_DEC_TYPE_32BIT            = 0x7FFFFFFF
 };
-enum vidc_1080p_encode_type{
+enum vidc_1080p_encode{
 	VIDC_1080P_ENC_TYPE_SEQ_HEADER       = 0x00010000,
 	VIDC_1080P_ENC_TYPE_FRAME_DATA       = 0x00020000,
 	VIDC_1080P_ENC_TYPE_LAST_FRAME_DATA  = 0x00030000,
 	VIDC_1080P_ENC_TYPE_32BIT            = 0x7FFFFFFF
 };
-struct vidc_1080p_dec_seq_start_param_type{
-	u32 n_cmd_seq_num;
-	u32 n_inst_id;
-	u32 n_shared_mem_addr_offset;
-	u32 n_stream_buffer_addr_offset;
-	u32 n_stream_buffersize;
-	u32 n_stream_frame_size;
-	u32 n_descriptor_buffer_addr_offset;
-	u32 n_descriptor_buffer_size;
+struct vidc_1080p_dec_seq_start_param{
+	u32 cmd_seq_num;
+	u32 inst_id;
+	u32 shared_mem_addr_offset;
+	u32 stream_buffer_addr_offset;
+	u32 stream_buffersize;
+	u32 stream_frame_size;
+	u32 descriptor_buffer_addr_offset;
+	u32 descriptor_buffer_size;
 };
-struct vidc_1080p_dec_frame_start_param_type{
-	u32 n_cmd_seq_num;
-	u32 n_inst_id;
-	u32 n_shared_mem_addr_offset;
-	u32 n_stream_buffer_addr_offset;
-	u32 n_stream_buffersize;
-	u32 n_stream_frame_size;
-	u32 n_descriptor_buffer_addr_offset;
-	u32 n_descriptor_buffer_size;
-	u32 n_release_dpb_bit_mask;
-	u32 n_dpb_count;
-	u32 b_dpb_flush;
-	enum vidc_1080p_decode_type e_decode_type;
+struct vidc_1080p_dec_frame_start_param{
+	u32 cmd_seq_num;
+	u32 inst_id;
+	u32 shared_mem_addr_offset;
+	u32 stream_buffer_addr_offset;
+	u32 stream_buffersize;
+	u32 stream_frame_size;
+	u32 descriptor_buffer_addr_offset;
+	u32 descriptor_buffer_size;
+	u32 release_dpb_bit_mask;
+	u32 dpb_count;
+	u32 dpb_flush;
+	enum vidc_1080p_decode decode;
 };
-struct vidc_1080p_dec_init_buffers_param_type{
-	u32 n_cmd_seq_num;
-	u32 n_inst_id;
-	u32 n_shared_mem_addr_offset;
-	u32 n_dpb_count;
+struct vidc_1080p_dec_init_buffers_param{
+	u32 cmd_seq_num;
+	u32 inst_id;
+	u32 shared_mem_addr_offset;
+	u32 dpb_count;
 };
-struct vidc_1080p_seq_hdr_info_type{
-	u32 n_img_size_x;
-	u32 n_img_size_y;
-	u32 n_dec_frm_size;
-	u32 n_min_num_dpb;
-	u32 n_min_luma_dpb_size;
-	u32 n_min_chroma_dpb_size;
-	u32 n_profile;
-	u32 n_level;
-	u32 n_progressive;
-	u32 n_crop_exists;
-	u32 n_crop_right_offset;
-	u32 n_crop_left_offset;
-	u32 n_crop_bottom_offset;
-	u32 n_crop_top_offset;
+struct vidc_1080p_seq_hdr_info{
+	u32 img_size_x;
+	u32 img_size_y;
+	u32 dec_frm_size;
+	u32 min_num_dpb;
+	u32 min_luma_dpb_size;
+	u32 min_chroma_dpb_size;
+	u32 profile;
+	u32 level;
+	u32 progressive;
+	u32 crop_exists;
+	u32 crop_right_offset;
+	u32 crop_left_offset;
+	u32 crop_bottom_offset;
+	u32 crop_top_offset;
 };
-struct vidc_1080p_enc_seq_start_param_type{
-	u32 n_cmd_seq_num;
-	u32 n_inst_id;
-	u32 n_shared_mem_addr_offset;
-	u32 n_stream_buffer_addr_offset;
-	u32 n_stream_buffer_size;
+struct vidc_1080p_enc_seq_start_param{
+	u32 cmd_seq_num;
+	u32 inst_id;
+	u32 shared_mem_addr_offset;
+	u32 stream_buffer_addr_offset;
+	u32 stream_buffer_size;
 };
-struct vidc_1080p_enc_frame_start_param_type{
-	u32 n_cmd_seq_num;
-	u32 n_inst_id;
-	u32 n_shared_mem_addr_offset;
-	u32 n_current_y_addr_offset;
-	u32 n_current_c_addr_offset;
-	u32 n_stream_buffer_addr_offset;
-	u32 n_stream_buffer_size;
-	u32 b_intra_frame;
-	u32 b_input_flush;
-	enum vidc_1080p_encode_type e_encode_type;
+struct vidc_1080p_enc_frame_start_param{
+	u32 cmd_seq_num;
+	u32 inst_id;
+	u32 shared_mem_addr_offset;
+	u32 current_y_addr_offset;
+	u32 current_c_addr_offset;
+	u32 stream_buffer_addr_offset;
+	u32 stream_buffer_size;
+	u32 intra_frame;
+	u32 input_flush;
+	enum vidc_1080p_encode encode;
 };
-struct vidc_1080p_enc_frame_info_type{
-	u32 n_enc_frame_size;
-	u32 n_enc_picture_count;
-	u32 n_enc_write_pointer;
-	u32 n_enc_luma_address;
-	u32 n_enc_chroma_address;
-	enum vidc_1080p_encode_frame_type e_enc_frame_type;
+struct vidc_1080p_enc_frame_info{
+	u32 enc_frame_size;
+	u32 enc_picture_count;
+	u32 enc_write_pointer;
+	u32 enc_luma_address;
+	u32 enc_chroma_address;
+	enum vidc_1080p_encode_frame enc_frame;
 };
-struct vidc_1080p_dec_disp_info_type{
-	u32 n_resl_change;
-	u32 n_reconfig_flush_done;
-	u32 n_img_size_x;
-	u32 n_img_size_y;
-	u32 n_display_y_addr;
-	u32 n_display_c_addr;
-	u32 n_decode_y_addr;
-	u32 n_decode_c_addr;
-	u32 n_tag_top;
-	u32 n_pic_time_top;
-	u32 n_tag_bottom;
-	u32 n_pic_time_bottom;
-	u32 n_metadata_exists;
-	u32 n_crop_exists;
-	u32 n_crop_right_offset;
-	u32 n_crop_left_offset;
-	u32 n_crop_bottom_offset;
-	u32 n_crop_top_offset;
-	u32 n_input_bytes_consumed;
-	u32 n_input_is_interlace;
-	u32 n_input_frame_num;
-	enum vidc_1080p_display_status_type e_display_status;
-	enum vidc_1080p_display_status_type e_decode_status;
-	enum vidc_1080p_display_coding_type e_display_coding;
-	enum vidc_1080p_display_coding_type e_decode_coding;
-	enum vidc_1080p_decode_frame_type e_input_frame_type;
+struct vidc_1080p_dec_disp_info{
+	u32 resl_change;
+	u32 reconfig_flush_done;
+	u32 img_size_x;
+	u32 img_size_y;
+	u32 display_y_addr;
+	u32 display_c_addr;
+	u32 decode_y_addr;
+	u32 decode_c_addr;
+	u32 tag_top;
+	u32 pic_time_top;
+	u32 tag_bottom;
+	u32 pic_time_bottom;
+	u32 metadata_exists;
+	u32 crop_exists;
+	u32 crop_right_offset;
+	u32 crop_left_offset;
+	u32 crop_bottom_offset;
+	u32 crop_top_offset;
+	u32 input_bytes_consumed;
+	u32 input_is_interlace;
+	u32 input_frame_num;
+	enum vidc_1080p_display_status display_status;
+	enum vidc_1080p_display_status decode_status;
+	enum vidc_1080p_display_coding display_coding;
+	enum vidc_1080p_display_coding decode_coding;
+	enum vidc_1080p_decode_frame input_frame;
 };
-void vidc_1080p_do_sw_reset(enum vidc_1080p_reset_type n_init_flag);
+void vidc_1080p_do_sw_reset(enum vidc_1080p_reset init_flag);
 void vidc_1080p_release_sw_reset(void);
 void vidc_1080p_clear_interrupt(void);
 void vidc_1080p_set_host2risc_cmd(
-	enum vidc_1080p_host2risc_cmd_type e_host2risc_command,
-	u32 n_host2risc_arg1, u32 n_host2risc_arg2,
-	u32 n_host2risc_arg3, u32 n_host2risc_arg4);
+	enum vidc_1080p_host2risc_cmd host2risc_command,
+	u32 host2risc_arg1, u32 host2risc_arg2,
+	u32 host2risc_arg3, u32 host2risc_arg4);
 void vidc_1080p_get_risc2host_cmd(u32 *pn_risc2host_command,
 	u32 *pn_risc2host_arg1, u32 *pn_risc2host_arg2,
 	u32 *pn_risc2host_arg3, u32 *pn_risc2host_arg4);
 void vidc_1080p_clear_risc2host_cmd(void);
 void vidc_1080p_get_fw_version(u32 *pn_fw_version);
 void vidc_1080p_get_fw_status(u32 *pn_fw_status);
-void vidc_1080p_init_memory_controller(u32 n_dram_base_addr_a,
-	u32 n_dram_base_addr_b);
+void vidc_1080p_init_memory_controller(u32 dram_base_addr_a,
+	u32 dram_base_addr_b);
 void vidc_1080p_get_memory_controller_status(u32 *pb_mc_abusy,
 	u32 *pb_mc_bbusy);
-void vidc_1080p_set_h264_decode_buffers(u32 n_dpb, u32 n_dec_vert_nb_mv_offset,
-	u32 n_dec_nb_ip_offset, u32 *pn_dpb_luma_offset,
+void vidc_1080p_set_h264_decode_buffers(u32 dpb, u32 dec_vert_nb_mv_offset,
+	u32 dec_nb_ip_offset, u32 *pn_dpb_luma_offset,
 	u32 *pn_dpb_chroma_offset, u32 *pn_mv_buffer_offset);
-void vidc_1080p_set_decode_recon_buffers(u32 n_recon_buffer, u32 *pn_dec_luma,
+void vidc_1080p_set_decode_recon_buffers(u32 recon_buffer, u32 *pn_dec_luma,
 	u32 *pn_dec_chroma);
-void vidc_1080p_set_mpeg4_divx_decode_work_buffers(u32 n_nb_dcac_buffer_offset,
-	u32 n_upnb_mv_buffer_offset, u32 n_sub_anchor_buffer_offset,
-	u32 n_overlay_transform_buffer_offset, u32 n_stx_parser_buffer_offset);
-void vidc_1080p_set_h263_decode_work_buffers(u32 n_nb_dcac_buffer_offset,
-	u32 n_upnb_mv_buffer_offset, u32 n_sub_anchor_buffer_offset,
-	u32 n_overlay_transform_buffer_offset);
-void vidc_1080p_set_vc1_decode_work_buffers(u32 n_nb_dcac_buffer_offset,
-	u32 n_upnb_mv_buffer_offset, u32 n_sub_anchor_buffer_offset,
-	u32 n_overlay_transform_buffer_offset, u32 n_bitplain1Buffer_offset,
-	u32 n_bitplain2Buffer_offset, u32 n_bitplain3Buffer_offset);
-void vidc_1080p_set_encode_recon_buffers(u32 n_recon_buffer, u32 *pn_enc_luma,
+void vidc_1080p_set_mpeg4_divx_decode_work_buffers(u32 nb_dcac_buffer_offset,
+	u32 upnb_mv_buffer_offset, u32 sub_anchor_buffer_offset,
+	u32 overlay_transform_buffer_offset, u32 stx_parser_buffer_offset);
+void vidc_1080p_set_h263_decode_work_buffers(u32 nb_dcac_buffer_offset,
+	u32 upnb_mv_buffer_offset, u32 sub_anchor_buffer_offset,
+	u32 overlay_transform_buffer_offset);
+void vidc_1080p_set_vc1_decode_work_buffers(u32 nb_dcac_buffer_offset,
+	u32 upnb_mv_buffer_offset, u32 sub_anchor_buffer_offset,
+	u32 overlay_transform_buffer_offset, u32 bitplain1Buffer_offset,
+	u32 bitplain2Buffer_offset, u32 bitplain3Buffer_offset);
+void vidc_1080p_set_encode_recon_buffers(u32 recon_buffer, u32 *pn_enc_luma,
 	u32 *pn_enc_chroma);
-void vidc_1080p_set_h264_encode_work_buffers(u32 n_up_row_mv_buffer_offset,
-	u32 n_direct_colzero_flag_buffer_offset,
-	u32 n_upper_intra_md_buffer_offset,
-	u32 n_upper_intra_pred_buffer_offset, u32 n_nbor_infor_buffer_offset,
-	u32 n_mb_info_offset);
-void vidc_1080p_set_h263_encode_work_buffers(u32 n_up_row_mv_buffer_offset,
-	u32 n_up_row_inv_quanti_coeff_buffer_offset);
-void vidc_1080p_set_mpeg4_encode_work_buffers(u32 n_skip_flag_buffer_offset,
-	u32 n_up_row_inv_quanti_coeff_buffer_offset, u32 n_upper_mv_offset);
-void vidc_1080p_set_encode_frame_size(u32 n_hori_size, u32 n_vert_size);
-void vidc_1080p_set_encode_profile_level(u32 n_encode_profile, u32 n_enc_level);
-void vidc_1080p_set_encode_field_picture_structure(u32 b_enc_field_picture);
-void vidc_1080p_set_encode_deblock_filter(u32 b_lf_enables);
-void vidc_1080p_set_decode_qp_save_control(u32 b_enable_q_pout);
+void vidc_1080p_set_h264_encode_work_buffers(u32 up_row_mv_buffer_offset,
+	u32 direct_colzero_flag_buffer_offset,
+	u32 upper_intra_md_buffer_offset,
+	u32 upper_intra_pred_buffer_offset, u32 nbor_infor_buffer_offset,
+	u32 mb_info_offset);
+void vidc_1080p_set_h263_encode_work_buffers(u32 up_row_mv_buffer_offset,
+	u32 up_row_inv_quanti_coeff_buffer_offset);
+void vidc_1080p_set_mpeg4_encode_work_buffers(u32 skip_flag_buffer_offset,
+	u32 up_row_inv_quanti_coeff_buffer_offset, u32 upper_mv_offset);
+void vidc_1080p_set_encode_frame_size(u32 hori_size, u32 vert_size);
+void vidc_1080p_set_encode_profile_level(u32 encode_profile, u32 enc_level);
+void vidc_1080p_set_encode_field_picture_structure(u32 enc_field_picture);
+void vidc_1080p_set_encode_deblock_filter(u32 lf_enables);
+void vidc_1080p_set_decode_qp_save_control(u32 enable_q_pout);
 void vidc_1080p_get_returned_channel_inst_id(u32 *pn_rtn_chid);
 void vidc_1080p_clear_returned_channel_inst_id(void);
 void vidc_1080p_get_decode_seq_start_result(
-	struct vidc_1080p_seq_hdr_info_type *p_seq_hdr_info);
+	struct vidc_1080p_seq_hdr_info *seq_hdr_info);
 void vidc_1080p_get_decoded_frame_size(u32 *pn_decoded_size);
 void vidc_1080p_get_display_frame_result(
-	struct vidc_1080p_dec_disp_info_type *p_dec_disp_info);
-void vidc_1080p_get_decode_frame_type(
-	enum vidc_1080p_decode_frame_type *pe_frame_type);
+	struct vidc_1080p_dec_disp_info *dec_disp_info);
+void vidc_1080p_get_decode_frame(
+	enum vidc_1080p_decode_frame *pe_frame);
 void vidc_1080p_get_decode_frame_result(
-	struct vidc_1080p_dec_disp_info_type *p_dec_disp_info);
+	struct vidc_1080p_dec_disp_info *dec_disp_info);
 void vidc_1080p_decode_seq_start_ch0(
-	struct vidc_1080p_dec_seq_start_param_type *p_param);
+	struct vidc_1080p_dec_seq_start_param *param);
 void vidc_1080p_decode_seq_start_ch1(
-	struct vidc_1080p_dec_seq_start_param_type *p_param);
+	struct vidc_1080p_dec_seq_start_param *param);
 void vidc_1080p_decode_init_buffers_ch0
-	(struct vidc_1080p_dec_init_buffers_param_type *p_param);
+	(struct vidc_1080p_dec_init_buffers_param *param);
 void vidc_1080p_decode_init_buffers_ch1(
-	struct vidc_1080p_dec_init_buffers_param_type *p_param);
+	struct vidc_1080p_dec_init_buffers_param *param);
 void vidc_1080p_decode_frame_start_ch0(
-	struct vidc_1080p_dec_frame_start_param_type *p_param);
+	struct vidc_1080p_dec_frame_start_param *param);
 void vidc_1080p_decode_frame_start_ch1(
-	struct vidc_1080p_dec_frame_start_param_type *p_param);
-void vidc_1080p_set_divx3_resolution_ch0(u32 n_width, u32 n_height);
-void vidc_1080p_set_divx3_resolution_ch1(u32 n_width, u32 n_height);
+	struct vidc_1080p_dec_frame_start_param *param);
+void vidc_1080p_set_divx3_resolution_ch0(u32 width, u32 height);
+void vidc_1080p_set_divx3_resolution_ch1(u32 width, u32 height);
 void vidc_1080p_get_encode_frame_info(
-	struct vidc_1080p_enc_frame_info_type *p_frame_info);
+	struct vidc_1080p_enc_frame_info *frame_info);
 void vidc_1080p_encode_seq_start_ch0(
-	struct vidc_1080p_enc_seq_start_param_type *p_param);
+	struct vidc_1080p_enc_seq_start_param *param);
 void vidc_1080p_encode_seq_start_ch1(
-	struct vidc_1080p_enc_seq_start_param_type *p_param);
+	struct vidc_1080p_enc_seq_start_param *param);
 void vidc_1080p_encode_frame_start_ch0(
-	struct vidc_1080p_enc_frame_start_param_type *p_param);
+	struct vidc_1080p_enc_frame_start_param *param);
 void vidc_1080p_encode_frame_start_ch1(
-	struct vidc_1080p_enc_frame_start_param_type *p_param);
-void vidc_1080p_set_encode_picture_type(u32 n_ifrm_ctrl, u32 n_number_b);
+	struct vidc_1080p_enc_frame_start_param *param);
+void vidc_1080p_set_encode_picture(u32 ifrm_ctrl, u32 number_b);
 void vidc_1080p_set_encode_multi_slice_control(
-	enum vidc_1080p_MSlice_selection_type e_multiple_slice_selection,
-	u32 n_mslice_mb, u32 n_mslice_byte);
-void vidc_1080p_set_encode_circular_intra_refresh(u32 n_cir_num);
+	enum vidc_1080p_MSlice_selection multiple_slice_selection,
+	u32 mslice_mb, u32 mslice_byte);
+void vidc_1080p_set_encode_circular_intra_refresh(u32 cir_num);
 void vidc_1080p_set_encode_input_frame_format(
-	enum vidc_1080p_memory_access_method_type e_memory_format);
-void vidc_1080p_set_encode_padding_control(u32 b_pad_ctrl_on,
-	u32 n_cr_pad_val, u32 n_cb_pad_val, u32 n_luma_pad_val);
-void vidc_1080p_encode_set_rc_config(u32 b_enable_frame_level_rc,
-	u32 b_enable_mb_level_rc_flag, u32 n_frame_qp);
-void vidc_1080p_encode_set_frame_level_rc_params(u32 n_rc_frame_rate,
-	u32 n_target_bitrate, u32 n_reaction_coeff);
-void vidc_1080p_encode_set_qp_params(u32 n_max_qp, u32 n_min_qp);
-void vidc_1080p_encode_set_mb_level_rc_params(u32 b_dark_region_as_flag,
-	u32 b_smooth_region_as_flag, u32 b_static_region_as_flag,
-	u32 b_activity_region_flag);
+	enum vidc_1080p_memory_access_method memory_format);
+void vidc_1080p_set_encode_padding_control(u32 pad_ctrl_on,
+	u32 cr_pad_val, u32 cb_pad_val, u32 luma_pad_val);
+void vidc_1080p_encode_set_rc_config(u32 enable_frame_level_rc,
+	u32 enable_mb_level_rc_flag, u32 frame_qp);
+void vidc_1080p_encode_set_frame_level_rc_params(u32 rc_frame_rate,
+	u32 target_bitrate, u32 reaction_coeff);
+void vidc_1080p_encode_set_qp_params(u32 max_qp, u32 min_qp);
+void vidc_1080p_encode_set_mb_level_rc_params(u32 dark_region_as_flag,
+	u32 smooth_region_as_flag, u32 static_region_as_flag,
+	u32 activity_region_flag);
 void vidc_1080p_get_qp(u32 *pn_frame_qp);
 void vidc_1080p_set_h264_encode_entropy(
-	enum vidc_1080p_entropy_sel_type e_entropy_sel);
+	enum vidc_1080p_entropy_sel entropy_sel);
 void vidc_1080p_set_h264_encode_loop_filter(
-	enum vidc_1080p_DBConfig_type e_db_config, u32 n_slice_alpha_offset,
-	u32 n_slice_beta_offset);
-void vidc_1080p_set_h264_encoder_ref_count(u32 n_max_reference);
-void vidc_1080p_set_h264_encode_8x8transform_control(u32 b_enable_8x8transform);
+	enum vidc_1080p_DBConfig db_config, u32 slice_alpha_offset,
+	u32 slice_beta_offset);
+void vidc_1080p_set_h264_encoder_ref_count(u32 max_reference);
+void vidc_1080p_set_h264_encode_8x8transform_control(u32 enable_8x8transform);
 void vidc_1080p_set_mpeg4_encode_quarter_pel_control(
-	u32 b_enable_mpeg4_quarter_pel);
+	u32 enable_mpeg4_quarter_pel);
 void vidc_1080p_set_device_base_addr(u8 *mapped_va);
-void vidc_1080p_get_intra_bias(u32 *p_intra_bias);
+void vidc_1080p_get_intra_bias(u32 *intra_bias);
 void vidc_1080p_set_intra_bias(u32 intra_bias);
-void vidc_1080p_get_bi_directional_bias(u32 *p_bi_directional_bias);
+void vidc_1080p_get_bi_directional_bias(u32 *bi_directional_bias);
 void vidc_1080p_set_bi_directional_bias(u32 bi_directional_bias);
-void vidc_1080p_get_encoder_sequence_header_size(u32 *p_seq_header_size);
+void vidc_1080p_get_encoder_sequence_header_size(u32 *seq_header_size);
 void vidc_1080p_get_intermedia_stage_debug_counter(
-	u32 *p_intermediate_stage_counter);
-void vidc_1080p_get_exception_status(u32 *p_exception_status);
+	u32 *intermediate_stage_counter);
+void vidc_1080p_get_exception_status(u32 *exception_status);
 #endif

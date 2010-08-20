@@ -23,7 +23,7 @@
 #include <mach/clk.h>
 #include <mach/msm_reqs.h>
 #include <linux/interrupt.h>
-#include "vidc_type.h"
+#include "vidc.h"
 #include "vcd_res_tracker.h"
 #include "vidc_init.h"
 
@@ -76,11 +76,11 @@ static u32 res_trk_disable_pwr_rail(void)
 	/*TODO: Power rail functions needs to added here*/
 	if (!resource_context.rail_enabled) {
 		mutex_unlock(&resource_context.lock);
-		return FALSE;
+		return false;
 	}
 	resource_context.rail_enabled = 0;
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 u32 res_trk_enable_clocks(void)
@@ -97,12 +97,12 @@ u32 res_trk_enable_clocks(void)
 		if (clk_enable(resource_context.vcodec_clk)) {
 			VCDRES_MSG_ERROR("vidc pclk Enable failed \n");
 			mutex_unlock(&resource_context.lock);
-			return FALSE;
+			return false;
 		}
 	}
 	resource_context.clock_enabled = 1;
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 static u32 res_trk_sel_clk_rate(unsigned long hclk_rate)
@@ -112,28 +112,28 @@ static u32 res_trk_sel_clk_rate(unsigned long hclk_rate)
 		hclk_rate)) {
 		VCDRES_MSG_ERROR("vidc hclk set rate failed \n");
 		mutex_unlock(&resource_context.lock);
-		return FALSE;
+		return false;
 	}
 	resource_context.vcodec_clk_rate = hclk_rate;
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 static u32 res_trk_get_clk_rate(unsigned long *phclk_rate)
 {
 	if (!phclk_rate) {
 		VCDRES_MSG_ERROR("%s(): phclk_rate is NULL\n", __func__);
-		return FALSE;
+		return false;
 	}
 	mutex_lock(&resource_context.lock);
 	*phclk_rate = clk_get_rate(resource_context.vcodec_clk);
 	if (!(*phclk_rate)) {
 		VCDRES_MSG_ERROR("vidc hclk get rate failed \n");
 		mutex_unlock(&resource_context.lock);
-		return FALSE;
+		return false;
 	}
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 u32 res_trk_disable_clocks(void)
@@ -144,7 +144,7 @@ u32 res_trk_disable_clocks(void)
 
 	if (!resource_context.clock_enabled) {
 		mutex_unlock(&resource_context.lock);
-		return FALSE;
+		return false;
 	}
 
 	VCDRES_MSG_LOW("Disabling IRQ in %s()\n", __func__);
@@ -154,7 +154,7 @@ u32 res_trk_disable_clocks(void)
 	resource_context.clock_enabled = 0;
 	clk_disable(resource_context.vcodec_clk);
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 static u32 res_trk_enable_pwr_rail(void)
@@ -167,7 +167,7 @@ static u32 res_trk_enable_pwr_rail(void)
 			VCDRES_MSG_ERROR("%s(): vcodec_clk get failed \n"
 							 , __func__);
 			mutex_unlock(&resource_context.lock);
-			return FALSE;
+			return false;
 		}
 		/*TODO: Set clk_rate to lowest value,Currenlty set to highest
 		  value during bringup*/
@@ -175,46 +175,46 @@ static u32 res_trk_enable_pwr_rail(void)
 			200000000)) {
 			VCDRES_MSG_ERROR("set rate failed in power up\n");
 			mutex_unlock(&resource_context.lock);
-			return FALSE;
+			return false;
 		}
 	}
 	/*TODO: Power rail functions needs to be added*/
 	resource_context.rail_enabled = 1;
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
-static u32 res_trk_convert_freq_to_perf_lvl(u64 n_freq)
+static u32 res_trk_convert_freq_to_perf_lvl(u64 freq)
 {
-	u64 n_perf_lvl;
-	u64 n_temp;
+	u64 perf_lvl;
+	u64 temp;
 
-	VCDRES_MSG_MED("\n %s():: n_freq = %u\n", __func__, (u32)n_freq);
+	VCDRES_MSG_MED("\n %s():: freq = %u\n", __func__, (u32)freq);
 
-	if (!n_freq)
+	if (!freq)
 		return 0;
 
-	n_temp = n_freq * 1000;
-	do_div(n_temp, VCD_RESTRK_HZ_PER_1000_PERFLVL);
-	n_perf_lvl = (u32)n_temp;
-	VCDRES_MSG_MED("\n %s(): n_perf_lvl = %u\n", __func__,
-		(u32)n_perf_lvl);
+	temp = freq * 1000;
+	do_div(temp, VCD_RESTRK_HZ_PER_1000_PERFLVL);
+	perf_lvl = (u32)temp;
+	VCDRES_MSG_MED("\n %s(): perf_lvl = %u\n", __func__,
+		(u32)perf_lvl);
 
-	return (u32)n_perf_lvl;
+	return (u32)perf_lvl;
 }
 
-static u32 res_trk_convert_perf_lvl_to_freq(u64 n_perf_lvl)
+static u32 res_trk_convert_perf_lvl_to_freq(u64 perf_lvl)
 {
-	u64 n_freq, n_temp;
+	u64 freq, temp;
 
-	VCDRES_MSG_MED("\n %s():: n_perf_lvl = %u\n", __func__,
-		(u32)n_perf_lvl);
-	n_temp = (n_perf_lvl * VCD_RESTRK_HZ_PER_1000_PERFLVL) + 999;
-	do_div(n_temp, 1000);
-	n_freq = (u32)n_temp;
-	VCDRES_MSG_MED("\n %s(): n_freq = %u\n", __func__, (u32)n_freq);
+	VCDRES_MSG_MED("\n %s():: perf_lvl = %u\n", __func__,
+		(u32)perf_lvl);
+	temp = (perf_lvl * VCD_RESTRK_HZ_PER_1000_PERFLVL) + 999;
+	do_div(temp, 1000);
+	freq = (u32)temp;
+	VCDRES_MSG_MED("\n %s(): freq = %u\n", __func__, (u32)freq);
 
-	return (u32)n_freq;
+	return (u32)freq;
 }
 
 u32 res_trk_power_up(void)
@@ -231,7 +231,7 @@ u32 res_trk_power_up(void)
 	if (rc < 0)	{
 		VCDRES_MSG_ERROR("Request AXI bus QOS fails. rc = %d\n",
 			rc);
-		return FALSE;
+		return false;
 	}
 }
 #endif
@@ -260,36 +260,36 @@ u32 res_trk_get_max_perf_level(u32 *pn_max_perf_lvl)
 	if (!pn_max_perf_lvl) {
 		VCDRES_MSG_ERROR("%s(): pn_max_perf_lvl is NULL\n",
 			__func__);
-		return FALSE;
+		return false;
 	}
 
 	*pn_max_perf_lvl = VCD_RESTRK_MAX_PERF_LEVEL;
-	return TRUE;
+	return true;
 }
 
-u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
-	struct vcd_clnt_ctxt_type_t *p_cctxt)
+u32 res_trk_set_perf_level(u32 req_perf_lvl, u32 *pn_set_perf_lvl,
+	struct vcd_clnt_ctxt *cctxt)
 {
 	u32 axi_freq = 0, mfc_freq = 0, calc_mfc_freq = 0;
 
 	if (!pn_set_perf_lvl) {
 		VCDRES_MSG_ERROR("%s(): pn_perf_lvl is NULL\n",
 			__func__);
-		return FALSE;
+		return false;
 	}
 
-	VCDRES_MSG_LOW("%s(), n_req_perf_lvl = %d", __func__, n_req_perf_lvl);
-	if (p_cctxt) {
+	VCDRES_MSG_LOW("%s(), req_perf_lvl = %d", __func__, req_perf_lvl);
+	if (cctxt) {
 		calc_mfc_freq = res_trk_convert_perf_lvl_to_freq(
-			(u64)n_req_perf_lvl);
+			(u64)req_perf_lvl);
 
 		if (calc_mfc_freq < VCD_RESTRK_MIN_FREQ_POINT)
 			calc_mfc_freq = VCD_RESTRK_MIN_FREQ_POINT;
 		else if (calc_mfc_freq > VCD_RESTRK_MAX_FREQ_POINT)
 			calc_mfc_freq = VCD_RESTRK_MAX_FREQ_POINT;
 
-		if (!p_cctxt->b_decoding) {
-			if (n_req_perf_lvl >= VGA_PERF_LEVEL) {
+		if (!cctxt->decoding) {
+			if (req_perf_lvl >= VGA_PERF_LEVEL) {
 				mfc_freq = mfc_clk_freq_table[2];
 				axi_freq = axi_clk_freq_table_enc[1];
 			} else {
@@ -298,18 +298,18 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 			}
 			VCDRES_MSG_HIGH("\n ENCODER: axi_freq = %u"
 				", mfc_freq = %u, calc_mfc_freq = %u,"
-				" n_req_perf_lvl = %u", axi_freq,
+				" req_perf_lvl = %u", axi_freq,
 				mfc_freq, calc_mfc_freq,
-				n_req_perf_lvl);
+				req_perf_lvl);
 		} else {
-			if (n_req_perf_lvl <= QVGA_PERF_LEVEL) {
+			if (req_perf_lvl <= QVGA_PERF_LEVEL) {
 				mfc_freq = mfc_clk_freq_table[0];
 				axi_freq = axi_clk_freq_table_dec[0];
 			} else {
 				axi_freq = axi_clk_freq_table_dec[0];
-				if (n_req_perf_lvl <= VGA_PERF_LEVEL)
+				if (req_perf_lvl <= VGA_PERF_LEVEL)
 					mfc_freq = mfc_clk_freq_table[0];
-				else if (n_req_perf_lvl <= WVGA_PERF_LEVEL)
+				else if (req_perf_lvl <= WVGA_PERF_LEVEL)
 					mfc_freq = mfc_clk_freq_table[1];
 				else {
 					mfc_freq = mfc_clk_freq_table[2];
@@ -318,17 +318,17 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 			}
 			VCDRES_MSG_HIGH("\n DECODER: axi_freq = %u"
 				", mfc_freq = %u, calc_mfc_freq = %u,"
-				" n_req_perf_lvl = %u", axi_freq,
+				" req_perf_lvl = %u", axi_freq,
 				mfc_freq, calc_mfc_freq,
-				n_req_perf_lvl);
+				req_perf_lvl);
 		}
 	} else {
-		VCDRES_MSG_HIGH("%s() WARNING:: p_cctxt is NULL", __func__);
-		return TRUE;
+		VCDRES_MSG_HIGH("%s() WARNING:: cctxt is NULL", __func__);
+		return true;
 	}
 
 #ifdef AXI_CLK_SCALING
-    if (n_req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
+    if (req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
 		int rc = -1;
 		VCDRES_MSG_HIGH("\n %s(): Setting AXI freq to %u",
 			__func__, axi_freq);
@@ -338,50 +338,50 @@ u32 res_trk_set_perf_level(u32 n_req_perf_lvl, u32 *pn_set_perf_lvl,
 		if (rc < 0)	{
 			VCDRES_MSG_ERROR("\n Update AXI bus QOS fails,"
 				"rc = %d\n", rc);
-			return FALSE;
+			return false;
 		}
 	}
 #endif
 
 #ifdef USE_RES_TRACKER
-    if (n_req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
+    if (req_perf_lvl != VCD_RESTRK_MIN_PERF_LEVEL) {
 		VCDRES_MSG_HIGH("\n %s(): Setting MFC freq to %u",
 			__func__, mfc_freq);
 		if (!res_trk_sel_clk_rate(mfc_freq)) {
 			VCDRES_MSG_ERROR("%s(): res_trk_sel_clk_rate FAILED\n",
 				__func__);
 			*pn_set_perf_lvl = 0;
-			return FALSE;
+			return false;
 		}
 	}
 #endif
 
 	*pn_set_perf_lvl =
 	    res_trk_convert_freq_to_perf_lvl((u64) mfc_freq);
-	return TRUE;
+	return true;
 }
 
 u32 res_trk_get_curr_perf_level(u32 *pn_perf_lvl)
 {
-	unsigned long n_freq;
+	unsigned long freq;
 
 	if (!pn_perf_lvl) {
 		VCDRES_MSG_ERROR("%s(): pn_perf_lvl is NULL\n",
 			__func__);
-		return FALSE;
+		return false;
 	}
 	VCDRES_MSG_LOW("clk_regime_msm_get_clk_freq_hz");
-	if (!res_trk_get_clk_rate(&n_freq)) {
+	if (!res_trk_get_clk_rate(&freq)) {
 		VCDRES_MSG_ERROR("%s(): res_trk_get_clk_rate FAILED\n",
 			__func__);
 		*pn_perf_lvl = 0;
-		return FALSE;
+		return false;
 	}
 
-	*pn_perf_lvl = res_trk_convert_freq_to_perf_lvl((u64) n_freq);
-	VCDRES_MSG_MED("%s(): n_freq = %lu, *pn_perf_lvl = %u", __func__,
-		n_freq, *pn_perf_lvl);
-	return TRUE;
+	*pn_perf_lvl = res_trk_convert_freq_to_perf_lvl((u64) freq);
+	VCDRES_MSG_MED("%s(): freq = %lu, *pn_perf_lvl = %u", __func__,
+		freq, *pn_perf_lvl);
+	return true;
 }
 
 u32 res_trk_download_firmware(void)
@@ -398,12 +398,12 @@ u32 res_trk_download_firmware(void)
 		VCDRES_MSG_ERROR("request_firmware for %s error %d\n",
 				VIDC_FW, rc);
 		mutex_unlock(&resource_context.lock);
-		return FALSE;
+		return false;
 	}
 	vidc_video_codec_fw = (unsigned char *)fw_video->data;
 	vidc_video_codec_fw_size = (u32) fw_video->size;
 	mutex_unlock(&resource_context.lock);
-	return TRUE;
+	return true;
 }
 
 void res_trk_init(struct device *device, u32 irq)

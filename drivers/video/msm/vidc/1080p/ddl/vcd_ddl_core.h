@@ -47,7 +47,7 @@
 #define VCD_MAX_NO_CODECTYPE             7
 #define VCD_FRAME_COMMAND_DEPTH          1
 #define VCD_GENEVIDC_COMMAND_DEPTH        1
-#define VCD_COMMAND_EXCLUSIVE            TRUE
+#define VCD_COMMAND_EXCLUSIVE            true
 #define DDL_HW_TIMEOUT_IN_MS             1000
 #define DDL_STREAMBUF_ALIGN_GUARD_BYTES  0x7FF
 
@@ -75,15 +75,15 @@
 
 #define DDL_NO_OF_MB(nWidth, nHeight) \
 	((((nWidth) + 15) >> 4) * (((nHeight) + 15) >> 4))
-#define DDL_ALLOW_DEC_FRAMESIZE(n_width, n_height) \
-	(((n_width <= DDL_MAX_FRAME_WIDTH) && \
-	(n_height <= DDL_MAX_FRAME_HEIGHT)) && \
-	((n_width >= 32 && n_height >= 16) || \
-	(n_width >= 16 && n_height >= 32)))
-#define DDL_ALLOW_ENC_FRAMESIZE(n_width, n_height) \
-	(((n_width <= DDL_MAX_FRAME_WIDTH) && \
-	(n_height <= DDL_MAX_FRAME_HEIGHT)) && \
-	((n_width >= 32 && n_height >= 32)))
+#define DDL_ALLOW_DEC_FRAMESIZE(width, height) \
+	(((width <= DDL_MAX_FRAME_WIDTH) && \
+	(height <= DDL_MAX_FRAME_HEIGHT)) && \
+	((width >= 32 && height >= 16) || \
+	(width >= 16 && height >= 32)))
+#define DDL_ALLOW_ENC_FRAMESIZE(width, height) \
+	(((width <= DDL_MAX_FRAME_WIDTH) && \
+	(height <= DDL_MAX_FRAME_HEIGHT)) && \
+	((width >= 32 && height >= 32)))
 #define DDL_LINEAR_ALIGN_WIDTH      16
 #define DDL_LINEAR_ALIGN_HEIGHT     16
 #define DDL_LINEAR_MULTIPLY_FACTOR  2048
@@ -93,8 +93,8 @@
 #define DDL_TILE_ALIGN(val, grid) \
 	(((val) + (grid) - 1) / (grid) * (grid))
 
-#define VCD_DDL_720P_YUV_BUF_SIZE   ((1280*720*3) >> 1)
-#define VCD_DDL_WVGA_MB_CNT         1500
+#define VCD_DDL_720P_YUV_BUF_SIZE     ((1280*720*3) >> 1)
+#define VCD_DDL_WVGA_BUF_SIZE         (800*480)
 
 #define VCD_DDL_TEST_MAX_WIDTH        (DDL_MAX_FRAME_WIDTH)
 #define VCD_DDL_TEST_MAX_HEIGHT       (DDL_MAX_FRAME_HEIGHT)
