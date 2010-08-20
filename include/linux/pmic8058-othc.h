@@ -73,6 +73,7 @@ struct othc_hsed_config {
 	u32 othc_period_clk_us;
 	int othc_nc_gpio;
 	int othc_wakeup;
+	unsigned long switch_debounce_ms;
 	int (*othc_nc_gpio_setup)(void);
 };
 

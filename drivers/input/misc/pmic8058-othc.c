@@ -25,6 +25,7 @@
 #include <linux/switch.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
+#include <linux/hrtimer.h>
 
 #include <linux/mfd/pmic8058.h>
 #include <linux/pmic8058-othc.h>
@@ -56,7 +57,11 @@ struct pm8058_othc {
 	int othc_irq_ir;
 	bool othc_sw_state;
 	bool othc_ir_state;
+	bool switch_reject;
 	int othc_nc_gpio;
+	unsigned long switch_debounce_ms;
+	spinlock_t lock;
+	struct hrtimer timer;
 	struct pm8058_chip *pm_chip;
 	struct work_struct switch_work;
 };
@@ -157,6 +162,19 @@ static int __devexit pm8058_othc_remove(struct platform_device *pd)
 	return 0;
 }
 
+static enum hrtimer_restart pm8058_othc_timer(struct hrtimer *timer)
+{
+	unsigned long flags;
+	struct pm8058_othc *dd = container_of(timer,
+					struct pm8058_othc, timer);
+
+	spin_lock_irqsave(&dd->lock, flags);
+	dd->switch_reject = false;
+	spin_unlock_irqrestore(&dd->lock, flags);
+
+	return HRTIMER_NORESTART;
+}
+
 static void switch_work_f(struct work_struct *work)
 {
 	struct pm8058_othc *dd =
@@ -187,13 +205,34 @@ pm8058_headset_switch(struct input_dev *dev, int key, int value)
  */
 static irqreturn_t pm8058_no_sw(int irq, void *dev_id)
 {
+	int level;
 	struct pm8058_othc *dd = dev_id;
+	unsigned long flags;
 
-	if (dd->othc_sw_state == false) {
+	spin_lock_irqsave(&dd->lock, flags);
+	if (dd->switch_reject == true) {
+		spin_unlock_irqrestore(&dd->lock, flags);
+		return IRQ_HANDLED;
+	}
+	spin_unlock_irqrestore(&dd->lock, flags);
+
+	level = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_sw);
+	if (level < 0) {
+		pr_err("%s: Unable to read IRQ status register\n", __func__);
+		return IRQ_HANDLED;
+	}
+
+	/*
+	 * It is necessary to check the software state and the hardware state
+	 * to make sure that the residual interrupt after the debounce time does
+	 * not disturb the software state machine.
+	 */
+
+	if (level == 1 && dd->othc_sw_state == false) {
 		/*  Switch has been pressed */
 		dd->othc_sw_state = true;
 		input_report_key(dd->othc_ipd, KEY_MEDIA, 1);
-	} else {
+	} else if (level == 0 && dd->othc_sw_state == true) {
 		/* Switch has been released */
 		dd->othc_sw_state = false;
 		input_report_key(dd->othc_ipd, KEY_MEDIA, 0);
@@ -245,11 +284,28 @@ static void othc_process_nc(struct pm8058_othc *dd)
  * The pm8058_nc_ir detects insert / remove of the headset (for NO and NC),
  * as well as button press / release (for NC type).
  * The current state of the headset is maintained in othc_ir_state variable.
+ * Due to a hardware bug, false switch interrupts are seen during headset
+ * insert. This is handled in the software by rejecting the switch interrupts
+ * for a small period of time after the headset has been inserted.
  */
 static irqreturn_t pm8058_nc_ir(int irq, void *dev_id)
 {
+	unsigned long flags;
 	struct pm8058_othc *dd = dev_id;
 	struct othc_hsed_config *hsed_config = dd->othc_pdata->hsed_config;
+
+	spin_lock_irqsave(&dd->lock, flags);
+	/* Enable the switch reject flag */
+	dd->switch_reject = true;
+	spin_unlock_irqrestore(&dd->lock, flags);
+
+	/* Start the HR timer if one is not active */
+	if (hrtimer_active(&dd->timer))
+		hrtimer_cancel(&dd->timer);
+
+	hrtimer_start(&dd->timer,
+		ktime_set((dd->switch_debounce_ms / 1000),
+		(dd->switch_debounce_ms % 1000) * 1000000), HRTIMER_MODE_REL);
 
 	if (hsed_config->othc_headset == OTHC_HEADSET_NC)
 		othc_process_nc(dd);
@@ -449,6 +505,8 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 	dd->othc_ipd = ipd;
 	dd->othc_sw_state = false;
 	dd->othc_ir_state = false;
+	dd->switch_debounce_ms = hsed_config->switch_debounce_ms;
+	spin_lock_init(&dd->lock);
 
 	if (hsed_config->othc_headset == OTHC_HEADSET_NC) {
 		/* Check if NC specific pdata is present */
@@ -485,8 +543,11 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 		input_sync(dd->othc_ipd);
 	}
 
+	hrtimer_init(&dd->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	dd->timer.function = pm8058_othc_timer;
+
 	rc = request_threaded_irq(dd->othc_irq_ir, NULL, pm8058_nc_ir,
-				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_DISABLED,
 				"pm8058_othc_ir", dd);
 	if (rc < 0) {
 		pr_err("%s: Unable to request pm8058_othc_ir IRQ\n", __func__);
@@ -496,10 +557,10 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 	if (hsed_config->othc_headset == OTHC_HEADSET_NO) {
 		/* This irq is used only for NO type headset */
 		rc = request_threaded_irq(dd->othc_irq_sw, NULL, pm8058_no_sw,
-			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_DISABLED,
 				"pm8058_othc_sw", dd);
 		if (rc < 0) {
-			pr_err("%s: Unable to request pm8058_othc_sw IRQ \n",
+			pr_err("%s: Unable to request pm8058_othc_sw IRQ\n",
 								__func__);
 			goto fail_sw_irq;
 		}

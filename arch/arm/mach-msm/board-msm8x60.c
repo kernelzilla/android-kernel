@@ -1620,6 +1620,7 @@ static struct othc_hsed_config hsed_config_1 = {
 	.othc_hyst_clk_us = 121000,
 	.othc_period_clk_us = 312500,
 	.othc_wakeup = 1,
+	.switch_debounce_ms = 1000,
 };
 
 /* MIC_BIAS0 is configured as normal MIC BIAS */
