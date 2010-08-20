@@ -475,7 +475,8 @@ u32 ddl_handle_core_errors(struct ddl_context *ddl_context)
 	u32 status = false;
 
 	if (!ddl_context->cmd_err_status &&
-		!ddl_context->disp_pic_err_status)
+		!ddl_context->disp_pic_err_status &&
+		!ddl_context->op_failed)
 		return false;
 
 	if (ddl_context->cmd_state == DDL_CMD_INVALID) {

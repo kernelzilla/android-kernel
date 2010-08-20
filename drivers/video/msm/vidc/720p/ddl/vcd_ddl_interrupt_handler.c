@@ -660,10 +660,6 @@ u32 ddl_process_core_response(void)
 		VIDC_LOGERR_STRING("UNKWN_INTR");
 		return false;
 	}
-	if (ddl_context->intr_status == DDL_INVALID_INTR_STATUS) {
-		VIDC_LOGERR_STRING("INTERRUPT_NOT_READ");
-		return false;
-	}
 
 	if (!ddl_handle_core_errors(ddl_context)) {
 		return_status = ddl_process_intr_status(ddl_context,
@@ -673,7 +669,6 @@ u32 ddl_process_core_response(void)
 	if (ddl_context->interrupt_clr)
 		(*ddl_context->interrupt_clr)();
 
-	ddl_context->intr_status = DDL_INVALID_INTR_STATUS;
 	return return_status;
 }
 

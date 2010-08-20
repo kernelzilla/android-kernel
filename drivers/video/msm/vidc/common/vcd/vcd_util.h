@@ -65,6 +65,4 @@
 	((VCD_FAILED_DEVICE_FATAL(rc) || VCD_FAILED_CLIENT_FATAL(rc)) \
 	? true : false)
 
-
-#define vcd_assert()                     VCD_MSG_FATAL("ASSERT")
 #endif
