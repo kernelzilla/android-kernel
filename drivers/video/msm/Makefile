@@ -100,6 +100,7 @@ obj-$(CONFIG_FB_MSM_TVOUT_PAL) += tv_pal.o
 obj-$(CONFIG_FB_MSM_EXTMDDI_SVGA) += mddi_ext_lcd.o
 
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
+obj-$(CONFIG_MSM_VIDC_720P) += vidc/
 
 clean:
 	rm *.o .*cmd
