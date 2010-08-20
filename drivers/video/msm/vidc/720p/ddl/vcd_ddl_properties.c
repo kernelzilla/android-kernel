@@ -316,9 +316,6 @@ static u32 ddl_set_dec_property
 				    frame_size->width) {
 					decoder->client_frame_size =
 					    *frame_size;
-					ddl_calculate_stride(
-					&decoder->client_frame_size,
-					!decoder->progressive_only);
 					ddl_set_default_decoder_buffer_req
 					    (decoder, true);
 				}
@@ -899,14 +896,13 @@ static u32 ddl_get_dec_property
 		{
 			if (sizeof(struct vcd_property_frame_size) ==
 			    property_hdr->sz) {
-				if (decoder->client_frame_size.width) {
+					ddl_calculate_stride(
+					&decoder->client_frame_size,
+					!decoder->progressive_only);
 					*(struct vcd_property_frame_size *)
 					    property_value =
 					    decoder->client_frame_size;
 					vcd_status = VCD_S_SUCCESS;
-				} else {
-					vcd_status = VCD_ERR_ILLEGAL_OP;
-				}
 			}
 			break;
 		}
@@ -1754,20 +1750,20 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,
 u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size *frame_size,
      struct vcd_property_buffer_format *buf_format, u32 inter_lace)
 {
-	u32 width = frame_size->stride;
-	u32 height = frame_size->scan_lines;
+	struct vcd_property_frame_size frame_sz = *frame_size;
 	u32 total_memory_size;
+	ddl_calculate_stride(&frame_sz, inter_lace);
 
 	if (buf_format->buffer_format != VCD_BUFFER_FORMAT_NV12) {
 		u32 component_mem_size;
 		u32 width_round_up;
 		u32 height_round_up;
-		u32 height_chroma = (height >> 1);
+		u32 height_chroma = (frame_sz.scan_lines >> 1);
 
 		width_round_up =
-		    DDL_TILE_ALIGN(width, DDL_TILE_ALIGN_WIDTH);
+		    DDL_TILE_ALIGN(frame_sz.stride, DDL_TILE_ALIGN_WIDTH);
 		height_round_up =
-		    DDL_TILE_ALIGN(height, DDL_TILE_ALIGN_HEIGHT);
+		    DDL_TILE_ALIGN(frame_sz.scan_lines, DDL_TILE_ALIGN_HEIGHT);
 
 		component_mem_size = width_round_up * height_round_up;
 		component_mem_size = DDL_TILE_ALIGN(component_mem_size,
@@ -1784,7 +1780,7 @@ u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size *frame_size,
 						      DDL_TILE_MULTIPLY_FACTOR);
 		total_memory_size += component_mem_size;
 	} else {
-		total_memory_size = height * width;
+		total_memory_size = frame_sz.scan_lines * frame_sz.stride;
 		total_memory_size += (total_memory_size >> 1);
 	}
 	return total_memory_size;

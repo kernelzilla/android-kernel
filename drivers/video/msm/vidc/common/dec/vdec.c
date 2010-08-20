@@ -68,7 +68,7 @@ static s32 vid_dec_get_empty_client_index(void)
 	}
 	if (!found) {
 		ERR("%s():ERROR No space for new client\n", __func__);
-		return -1;
+		return -ENOMEM;
 	} else {
 		DBG("%s(): available client index = %u\n", __func__, i);
 		return i;
@@ -500,6 +500,8 @@ static u32 vid_dec_set_frame_resolution(struct video_client_ctx *client_ctx,
 	vcd_property_hdr.sz = sizeof(struct vcd_property_frame_size);
 	frame_resolution.width = video_resoultion->frame_width;
 	frame_resolution.height = video_resoultion->frame_height;
+	frame_resolution.stride = video_resoultion->stride;
+	frame_resolution.scan_lines = video_resoultion->scan_lines;
 
 	vcd_status = vcd_set_property(client_ctx->vcd_handle,
 				      &vcd_property_hdr, &frame_resolution);

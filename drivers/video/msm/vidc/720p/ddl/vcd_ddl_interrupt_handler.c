@@ -240,15 +240,18 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 			NULL, 0, (u32 *) ddl,	ddl_context->client_data);
 		DDL_IDLE(ddl_context);
 	} else {
-		DBG("%s(): width = %d client_frame_size.width = %d\n",
-			__func__, decoder->frame_size.width,
-			decoder->client_frame_size.width);
-		DBG("%s(): height = %d client_frame_size.height = %d\n",
-			__func__, decoder->frame_size.height,
-			decoder->client_frame_size.height);
-		DBG("%s(): sz = %d client_frame_size sz = %d\n",
-			__func__, decoder->actual_output_buf_req.sz,
+		DBG("%s(): Client data: WxH(%u x %u) SxSL(%u x %u) Sz(%u)\n",
+			__func__, decoder->client_frame_size.width,
+			decoder->client_frame_size.height,
+			decoder->client_frame_size.stride,
+			decoder->client_frame_size.scan_lines,
 			decoder->client_output_buf_req.sz);
+		DBG("%s(): DDL data: WxH(%u x %u) SxSL(%u x %u) Sz(%u)\n",
+			__func__, decoder->frame_size.width,
+			decoder->frame_size.height,
+			decoder->frame_size.stride,
+			decoder->frame_size.scan_lines,
+			decoder->actual_output_buf_req.sz);
 		DBG("%s(): min_dpb_num = %d actual_count = %d\n", __func__,
 			decoder->min_dpb_num,
 			decoder->client_output_buf_req.actual_count);
@@ -259,6 +262,10 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 			decoder->client_frame_size.width
 			&& decoder->frame_size.height ==
 			decoder->client_frame_size.height
+			&& decoder->frame_size.stride ==
+			decoder->client_frame_size.stride
+			&& decoder->frame_size.scan_lines ==
+			decoder->client_frame_size.scan_lines
 			&& decoder->actual_output_buf_req.sz <=
 			decoder->client_output_buf_req.sz
 			&& decoder->min_dpb_num <=
