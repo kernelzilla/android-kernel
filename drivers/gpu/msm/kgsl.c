@@ -32,7 +32,6 @@
 #include <linux/pm_qos_params.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
-#include <asm/cacheflush.h>
 #include <linux/notifier.h>
 #include <linux/pm_runtime.h>
 
@@ -77,80 +76,21 @@ static void kgsl_runpending_all(void)
 	return;
 }
 
-#ifdef CONFIG_MSM_KGSL_MMU
-static long kgsl_cache_range_op(unsigned long addr, int size,
-					unsigned int flags)
+static void kgsl_clean_cache_all(struct kgsl_file_private *private)
 {
-#ifdef CONFIG_OUTER_CACHE
-	unsigned long end;
-#endif
-	BUG_ON(addr & (KGSL_PAGESIZE - 1));
-	BUG_ON(size & (KGSL_PAGESIZE - 1));
-
-	if (flags & KGSL_MEMFLAGS_CACHE_FLUSH)
-		dmac_flush_range((const void *)addr,
-				(const void *)(addr + size));
-	else
-		if (flags & KGSL_MEMFLAGS_CACHE_CLEAN)
-			dmac_clean_range((const void *)addr,
-					(const void *)(addr + size));
-		else if (flags & KGSL_MEMFLAGS_CACHE_INV)
-			dmac_inv_range((const void *)addr,
-					(const void *)(addr + size));
-
-#ifdef CONFIG_OUTER_CACHE
-	for (end = addr; end < (addr + size); end += KGSL_PAGESIZE) {
-		unsigned long physaddr;
-		if (flags & KGSL_MEMFLAGS_VMALLOC_MEM)
-			physaddr = page_to_phys(vmalloc_to_page((void *) end));
-		else
-			if (flags & KGSL_MEMFLAGS_HOSTADDR) {
-				physaddr = kgsl_virtaddr_to_physaddr(end);
-				if (!physaddr) {
-					KGSL_MEM_ERR
-					("Unable to find physaddr for "
-					"address: %x\n", (unsigned int)end);
-					return -EINVAL;
-				}
-			} else
-				return -EINVAL;
-
-		if (flags & KGSL_MEMFLAGS_CACHE_FLUSH)
-			outer_flush_range(physaddr, physaddr + KGSL_PAGESIZE);
-		else
-			if (flags & KGSL_MEMFLAGS_CACHE_CLEAN)
-				outer_clean_range(physaddr,
-					physaddr + KGSL_PAGESIZE);
-			else if (flags & KGSL_MEMFLAGS_CACHE_INV)
-				outer_inv_range(physaddr,
-					physaddr + KGSL_PAGESIZE);
-	}
-#endif
-	return 0;
-}
-
-static long kgsl_clean_cache_all(struct kgsl_file_private *private)
-{
-	int result = 0;
 	struct kgsl_mem_entry *entry = NULL;
 
 	kgsl_runpending_all();
 
 	list_for_each_entry(entry, &private->mem_list, list) {
 		if (KGSL_MEMFLAGS_CACHE_MASK & entry->memdesc.priv) {
-			result =
 			    kgsl_cache_range_op((unsigned long)entry->
 						   memdesc.hostptr,
 						   entry->memdesc.size,
-							entry->memdesc.priv);
-			if (result)
-				goto done;
+						   entry->memdesc.priv);
 		}
 	}
-done:
-	return result;
 }
-#endif /*CONFIG_MSM_KGSL_MMU*/
 
 /*this is used for logging, so that we can call the dev_printk
  functions without export struct kgsl_driver everywhere*/
@@ -1418,8 +1358,8 @@ static long kgsl_ioctl_sharedmem_flush_cache(struct kgsl_file_private *private,
 		result = -EINVAL;
 		goto done;
 	}
-	result = kgsl_cache_range_op((unsigned long)entry->memdesc.hostptr,
-					entry->memdesc.size,
+	kgsl_cache_range_op((unsigned long)entry->memdesc.hostptr,
+				entry->memdesc.size,
 				KGSL_MEMFLAGS_CACHE_CLEAN |
 				KGSL_MEMFLAGS_HOSTADDR);
 	/* Mark memory as being flushed so we don't flush it again */
