@@ -708,11 +708,11 @@ static struct platform_device msm_batt_device = {
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
  * Note: must be multiple of 4096 */
-#define MSM_FB_SIZE 0x8A5000;
+#define MSM_FB_SIZE 0x8A5000
 #else /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
-#define MSM_FB_SIZE 0x500000;
+#define MSM_FB_SIZE 0x500000
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
-#define MSM_PMEM_SF_SIZE 0x1700000;
+#define MSM_PMEM_SF_SIZE 0x1700000
 #define MSM_GPU_PHYS_SIZE       SZ_2M
 
 #define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000
