@@ -704,10 +704,11 @@ void vidc_720p_issue_eos(u32 i_ch_id)
     vidc_720p_submit_command(i_ch_id, VIDC_720P_CMD_FRAMERUN);
 }
 
-void vidc_720p_eos_info(u32 *disp_status)
+void vidc_720p_eos_info(u32 *disp_status, u32 *resl_change)
 {
    VIDC_IO_INF(REG_612715, DISPLAY_STATUS, disp_status);
    (*disp_status) = (*disp_status) & 0x3;
+   VIDC_IO_INF(REG_724381, RESOLUTION_CHANGE, resl_change);
 }
 
 void vidc_720p_decode_display_info(struct vidc_720p_dec_disp_info

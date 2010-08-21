@@ -40,17 +40,6 @@
 
 #define VCD_MIN_PERF_LEVEL                   37900
 
-#define VCD_MAX_SCHEDULER_QUEUE_DURATION     1
-
-#define VCD_MAX_SCHEDULER_QUEUE_SIZE(fps_n, fps_d)          \
-      (fps_n / fps_d * VCD_MAX_SCHEDULER_QUEUE_DURATION)
-
-#define VCD_SCHEDULER_INITIAL_PERF_LEVEL        108000
-
-#define VCD_SCHEDULER_ENC_DFLT_OTKN_PERFRM        1
-
-#define VCD_SCHEDULER_DEC_DFLT_OTKN_PERFRM        1
-
 #define VCD_DRIVER_INSTANCE_MAX              4
 
 #define VCD_MAX_CLIENT_TRANSACTIONS          32
@@ -64,11 +53,14 @@
 #define VCD_TIMESTAMP_RESOLUTION             1000000
 #define VCD_DEC_INITIAL_FRAME_RATE           30
 
-#define VCD_S_SCHED_STAT_BASE  0x20000000
-#define VCD_S_SCHED_EOS        (VCD_S_SCHED_STAT_BASE + 0x1)
-#define VCD_S_SCHED_SLEEP      (VCD_S_SCHED_STAT_BASE + 0x2)
-#define VCD_S_SCHED_QEMPTY     (VCD_S_SCHED_STAT_BASE + 0x3)
-#define VCD_S_SCHED_QFULL      (VCD_S_SCHED_STAT_BASE + 0x4)
+#define VCD_FIRST_IP_RCVD                    0x00000004
+#define VCD_FIRST_OP_RCVD                    0x00000008
+#define VCD_EOS_PREV_VALID                   0x00000010
+#define VCD_EOS_WAIT_OP_BUF                  0x00000020
+#define VCD_CLEANING_UP                      0x00000040
+#define VCD_STOP_PENDING                     0x00000080
+#define VCD_CLOSE_PENDING                    0x00000100
+#define VCD_IN_RECONFIG                      0x00000200
 
 enum vcd_command {
 	VCD_CMD_NONE,
@@ -167,32 +159,18 @@ struct vcd_dev_ctxt {
 
 struct vcd_clnt_status {
 	u32 req_perf_lvl;
-
-	u32 first_ip_frame_recvd;
-	u32 first_op_frame_recvd;
-
 	u32 frame_submitted;
 	u32 frame_delayed;
 	u32 cmd_submitted;
-
 	u32 int_field_cnt;
-
 	s64 first_ts;
 	s64 prev_ts;
 	u32 time_elapsed;
-
-	u32 stop_pending;
-	u32 flush_mode;
-
-	u32 eos_wait_for_op_buf;
 	struct vcd_frame_data eos_trig_ip_frm;
-
-	u32 eos_prev_valid;
 	struct ddl_frame_data_tag eos_prev_op_frm;
 	u32	last_err;
 	u32	last_evt;
-	u32	cleaning_up;
-	u32	close_pending;
+	u32 mask;
 };
 
 struct vcd_sched_clnt_ctx {

@@ -65,7 +65,8 @@
 #define VCD_ERR_INTRLCD_FIELD_DROP  (VCD_S_ERR_BASE + 0xc)
 #define VCD_ERR_HW_FATAL            (VCD_S_ERR_BASE + 0xd)
 #define VCD_ERR_BITSTREAM_ERR       (VCD_S_ERR_BASE + 0xe)
-#define VCD_ERR_INDEX_NOMORE        (VCD_S_ERR_BASE + 0xf)
+#define VCD_ERR_QEMPTY              (VCD_S_ERR_BASE + 0xf)
+#define VCD_ERR_INDEX_NOMORE        (VCD_S_ERR_BASE + 0x10)
 #define VCD_FAILED(rc)   ((rc > VCD_S_ERR_BASE) ? true : false)
 
 #endif
