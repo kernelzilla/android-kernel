@@ -296,6 +296,25 @@ unlock:
 }
 EXPORT_SYMBOL(pil_put);
 
+int pil_force_reset(const char *name)
+{
+	int ret = 0;
+	struct pil_device *pil;
+
+	pil = find_peripheral(name);
+	if (!pil)
+		return -EINVAL;
+
+	mutex_lock(&pil->lock);
+	if (pil->count) {
+		peripheral_shutdown(pil->id);
+		ret = load_image(pil);
+	}
+	mutex_unlock(&pil->lock);
+	return ret;
+}
+EXPORT_SYMBOL(pil_force_reset);
+
 #ifdef CONFIG_DEBUG_FS
 int msm_pil_debugfs_open(struct inode *inode, struct file *filp)
 {

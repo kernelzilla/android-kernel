@@ -31,9 +31,11 @@
 #ifdef CONFIG_MSM_PIL
 extern void *pil_get(const char *name);
 extern void pil_put(void *peripheral_handle);
+extern int pil_force_reset(const char *name);
 #else
 static inline void *pil_get(const char *name) { return NULL; }
 static inline void pil_put(void *peripheral_handle) { }
+static inline int pil_force_reset(const char *name) { return -ENOSYS; }
 #endif
 
 #endif
