@@ -165,6 +165,15 @@ config TIMPANI_CODEC
 	 This driver programs Timpani Wideband Codec for input/output of
 	 audio signal.
 
+config BAHAMA_CORE
+	tristate "Bahama Core"
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	default n
+	help
+	  Enables the Bahama Core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  Bahama core.
+
 config TWL4030_POWER
 	bool "Support power resources on TWL4030 family chips"
 	depends on TWL4030_CORE && ARM
