@@ -192,7 +192,7 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 {
 	struct vid_dec_msg *vdec_msg;
 
-	unsigned long kernel_vaddr, phy_addr, user_vaddr;
+	unsigned long kernel_vaddr = 0, phy_addr = 0, user_vaddr = 0;
 	int pmem_fd;
 	struct file *file;
 	s32 buffer_index = -1;
@@ -227,7 +227,8 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 	if (vidc_lookup_addr_table(client_ctx, BUFFER_TYPE_OUTPUT,
 				      false, &user_vaddr, &kernel_vaddr,
 				      &phy_addr, &pmem_fd, &file,
-				      &buffer_index)) {
+				      &buffer_index) ||
+		(vcd_frame_data->flags & VCD_FRAME_FLAG_EOS)) {
 
 		/* Buffer address in user space */
 		vdec_msg->vdec_msg_info.msgdata.output_frame.bufferaddr =

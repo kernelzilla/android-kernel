@@ -2018,11 +2018,12 @@ u32 vcd_handle_frame_done_in_eos(
 			(void *)&cctxt->status.
 			eos_prev_op_frm,
 			VCD_EVT_RESP_OUTPUT_DONE,
-			status);
+			cctxt->status.eos_prev_op_frm_status);
 		VCD_FAILED_RETURN(rc, "Failed: vcd_handle_frame_done");
 	}
 
 	cctxt->status.eos_prev_op_frm = *frame;
+	cctxt->status.eos_prev_op_frm_status = status;
 	cctxt->status.mask |= VCD_EOS_PREV_VALID;
 	return rc;
 }
@@ -2195,7 +2196,7 @@ void vcd_handle_eos_trans_end(struct vcd_clnt_ctxt *cctxt)
 		rc = vcd_handle_frame_done(cctxt,
 			(void *)&cctxt->status.eos_prev_op_frm,
 			VCD_EVT_RESP_OUTPUT_DONE,
-			VCD_S_SUCCESS);
+			cctxt->status.eos_prev_op_frm_status);
 		cctxt->status.mask &= ~VCD_EOS_PREV_VALID;
 	}
 	if (VCD_FAILED(rc))
@@ -2217,7 +2218,7 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 	 struct vcd_transc *transc, u32 status)
 {
 	struct vcd_frame_data  vcd_frm;
-	u32 rc = VCD_S_SUCCESS;
+	u32 rc = VCD_S_SUCCESS, sent_eos_frm = false;
 	VCD_MSG_LOW("vcd_handle_eos_done:");
 
 	if (VCD_FAILED(status))
@@ -2231,9 +2232,15 @@ void vcd_handle_eos_done(struct vcd_clnt_ctxt *cctxt,
 						(void *)&cctxt->status.
 						eos_prev_op_frm,
 						VCD_EVT_RESP_OUTPUT_DONE,
-						VCD_S_SUCCESS);
+						cctxt->status.
+							eos_prev_op_frm_status);
 		cctxt->status.mask &= ~VCD_EOS_PREV_VALID;
-	} else {
+		if (!VCD_FAILED(rc) &&
+			cctxt->status.eos_prev_op_frm_status !=
+				VCD_ERR_INTRLCD_FIELD_DROP)
+			sent_eos_frm = true;
+	}
+	if (!sent_eos_frm) {
 		if (transc->ip_buf_entry) {
 			transc->ip_buf_entry->frame.ip_frm_tag =
 				transc->ip_frm_tag;

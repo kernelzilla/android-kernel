@@ -1817,6 +1817,15 @@ do { \
 #define VIDC_REG_625444_FRAME_RATE_BMSK      0xffffffff
 #define VIDC_REG_625444_FRAME_RATE_SHFT               0
 
+#define VIDC_REG_639999_ADDR                    \
+	(VIDC_720P_WRAPPER_REG_BASE      + 0x00000d20)
+#define VIDC_REG_639999_PHYS                    \
+	(VIDC_720P_WRAPPER_REG_BASE_PHYS + 0x00000d20)
+#define VIDC_REG_639999_RMSK                    0xffff
+#define VIDC_REG_639999_SHFT                         0
+#define VIDC_REG_639999_OUT(v)                  \
+	out_dword(VIDC_REG_639999_ADDR, v)
+
 #define VIDC_REG_64895_ADDR                    \
 	(VIDC_720P_WRAPPER_REG_BASE      + 0x00000e00)
 #define VIDC_REG_64895_PHYS                    \
@@ -2005,10 +2014,12 @@ do { \
 			VIDC_REG_724381_RMSK)
 #define VIDC_REG_724381_INM(m)      \
 	in_dword_masked(VIDC_REG_724381_ADDR,  m)
+#define VIDC_REG_724381_MORE_FIELD_NEEDED_BMSK       0x4
+#define VIDC_REG_724381_MORE_FIELD_NEEDED_SHFT       0x2
 #define VIDC_REG_724381_OPERATION_FAILED_BMSK        0x2
 #define VIDC_REG_724381_OPERATION_FAILED_SHFT        0x1
-#define VIDC_REG_724381_RESOLUTION_CHANGE_BMSK        0x1
-#define VIDC_REG_724381_RESOLUTION_CHANGE_SHFT          0
+#define VIDC_REG_724381_RESOLUTION_CHANGE_BMSK       0x1
+#define VIDC_REG_724381_RESOLUTION_CHANGE_SHFT         0
 
 #define VIDC_REG_854681_ADDR               \
 	(VIDC_720P_WRAPPER_REG_BASE      + 0x00000ec4)
