@@ -52,8 +52,6 @@
 #define MODEM_DATA 		1
 #define QDSP_DATA  		2
 #define APPS_DATA  		3
-#define NON_SMD_CONTEXT	0
-#define SMD_CONTEXT		1
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
