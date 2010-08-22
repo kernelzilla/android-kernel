@@ -1131,7 +1131,7 @@ static int too_many_isolated(struct zone *zone, int file,
  * This will stall high-order allocations noticeably. Only do that when really
  * need to free the pages under high memory pressure.
  */
-+static inline bool should_reclaim_stall(unsigned long nr_taken,
+static inline bool should_reclaim_stall(unsigned long nr_taken,
 					unsigned long nr_freed,
 					int priority,
 					struct scan_control *sc)
