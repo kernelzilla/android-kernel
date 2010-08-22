@@ -59,6 +59,7 @@ struct clock_state {
 	struct mutex			lock;
 	uint32_t			acpu_switch_time_us;
 	uint32_t			vdd_switch_time_us;
+	struct clk			*ebi1_clk;
 };
 
 struct clkctl_acpu_speed {
@@ -213,8 +214,8 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	 * increasing the ACPU frequency, since voting for high AXI rates
 	 * implicitly takes care of increasing the MSMC1 voltage, as needed. */
 	if (tgt_s->axi_clk_khz > strt_s->axi_clk_khz) {
-		rc = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK,
-						tgt_s->axi_clk_khz * 1000);
+		rc = clk_set_min_rate(drv_state.ebi1_clk,
+					tgt_s->axi_clk_khz * 1000);
 		if (rc < 0) {
 			pr_err("Setting AXI min rate failed (%d)\n", rc);
 			goto out;
@@ -244,8 +245,8 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 
 	/* Decrease the AXI bus frequency if we can. */
 	if (tgt_s->axi_clk_khz < strt_s->axi_clk_khz) {
-		res = ebi1_clk_set_min_rate(CLKVOTE_ACPUCLK,
-						tgt_s->axi_clk_khz * 1000);
+		res = clk_set_min_rate(drv_state.ebi1_clk,
+					tgt_s->axi_clk_khz * 1000);
 		if (res < 0)
 			pr_warning("Setting AXI min rate failed (%d)\n", res);
 	}
@@ -309,6 +310,9 @@ static void __init acpuclk_init(void)
 	uint32_t div, sel, src_num;
 	uint32_t reg_clksel, reg_clkctl;
 	int res;
+
+	drv_state.ebi1_clk = clk_get(NULL, "ebi1_clk");
+	BUG_ON(IS_ERR(drv_state.ebi1_clk));
 
 	reg_clksel = readl(SCSS_CLK_SEL_ADDR);
 
