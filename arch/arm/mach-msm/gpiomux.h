@@ -74,7 +74,7 @@ enum {
 
 /* Each architecture must provide its own instance of this table.
  * To avoid having gpiomux manage any given gpio, one or both of
- * the entries can be or'ed with GPIOMUX_UNUSED - the presence
+ * the entries can avoid setting GPIOMUX_VALID - the absence
  * of that flag will prevent the configuration from being applied
  * during state transitions.
  */
