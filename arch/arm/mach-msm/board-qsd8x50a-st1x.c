@@ -176,11 +176,13 @@ static char *usb_functions_default_adb[] = {
 
 static char *usb_functions_rndis[] = {
 	"rndis",
+	"usb_mass_storage",
 };
 
 static char *usb_functions_rndis_adb[] = {
 	"rndis",
 	"adb",
+	"usb_mass_storage",
 };
 
 static char *usb_functions_all[] = {
@@ -267,6 +269,7 @@ static struct android_usb_platform_data android_usb_pdata = {
 	.num_functions = ARRAY_SIZE(usb_functions_all),
 	.functions = usb_functions_all,
 	.serial_number = "1234567890ABCDEF",
+	.enable_rndis_msc	= 1,
 };
 
 static struct platform_device android_usb_device = {
