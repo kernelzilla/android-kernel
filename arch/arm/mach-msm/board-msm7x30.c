@@ -180,10 +180,39 @@ static int pm8058_gpios_init(void)
 	return 0;
 }
 
+/*virtual key support */
+static ssize_t tma300_vkeys_show(struct kobject *kobj,
+			struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf,
+	__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:904:160:210"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":240:904:160:210"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":400:904:160:210"
+	"\n");
+}
+
+static struct kobj_attribute tma300_vkeys_attr = {
+	.attr = {
+		.mode = S_IRUGO,
+	},
+	.show = &tma300_vkeys_show,
+};
+
+static struct attribute *tma300_properties_attrs[] = {
+	&tma300_vkeys_attr.attr,
+	NULL
+};
+
+static struct attribute_group tma300_properties_attr_group = {
+	.attrs = tma300_properties_attrs,
+};
+
+static struct kobject *properties_kobj;
+
 #define CYTTSP_TS_GPIO_IRQ	150
 static int cyttsp_platform_init(struct i2c_client *client)
 {
-	int rc = -EINVAL, data;
+	int rc = -EINVAL;
 	struct vreg *vreg_ldo8, *vreg_ldo15;
 
 	vreg_ldo8 = vreg_get(NULL, "gp7");
@@ -215,20 +244,20 @@ static int cyttsp_platform_init(struct i2c_client *client)
 	rc = vreg_set_level(vreg_ldo15, 3050);
 	if (rc) {
 		pr_err("%s: VREG L15 set failed\n", __func__);
-		goto l15_put;
+		goto l8_disable;
 	}
 
 	rc = vreg_enable(vreg_ldo15);
 	if (rc) {
 		pr_err("%s: VREG L15 enable failed\n", __func__);
-		goto l15_put;
+		goto l8_disable;
 	}
 
 	/* check this device active by reading first byte/register */
-	data = i2c_smbus_read_byte_data(client, 0x01);
-	if (data < 0) {
+	rc = i2c_smbus_read_byte_data(client, 0x01);
+	if (rc < 0) {
 		pr_err("%s: i2c sanity check failed\n", __func__);
-		goto l15_disable;
+		goto l8_disable;
 	}
 
 	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_CFG_INPUT,
@@ -236,22 +265,29 @@ static int cyttsp_platform_init(struct i2c_client *client)
 	if (rc) {
 		pr_err("%s: Could not configure gpio %d\n",
 					 __func__, CYTTSP_TS_GPIO_IRQ);
-		goto l15_disable;
+		goto l8_disable;
 	}
 
 	rc = gpio_request(CYTTSP_TS_GPIO_IRQ, "ts_irq");
 	if (rc) {
 		pr_err("%s: unable to request gpio %d (%d)\n",
 			__func__, CYTTSP_TS_GPIO_IRQ, rc);
-		goto l15_disable;
+		goto l8_disable;
 	}
+
+	/* virtual keys */
+	tma300_vkeys_attr.attr.name = "virtualkeys.cyttsp-i2c";
+	properties_kobj = kobject_create_and_add("board_properties",
+				NULL);
+	if (properties_kobj)
+		rc = sysfs_create_group(properties_kobj,
+			&tma300_properties_attr_group);
+	if (!properties_kobj || rc)
+		pr_err("%s: failed to create board_properties\n",
+				__func__);
 
 	return CY_OK;
 
-l15_disable:
-	vreg_disable(vreg_ldo15);
-l15_put:
-	vreg_put(vreg_ldo15);
 l8_disable:
 	vreg_disable(vreg_ldo8);
 l8_put:
@@ -4997,36 +5033,6 @@ vreg_fail:
 	return rc;
 }
 
-/*virtual key support */
-static ssize_t tma300_vkeys_show(struct kobject *kobj,
-			struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf,
-	__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:904:160:210"
-	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":240:904:160:210"
-	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":400:904:160:210"
-	"\n");
-}
-
-static struct kobj_attribute tma300_vkeys_attr = {
-	.attr = {
-		.name = "virtualkeys.msm_tma300_ts",
-		.mode = S_IRUGO,
-	},
-	.show = &tma300_vkeys_show,
-};
-
-static struct attribute *tma300_properties_attrs[] = {
-	&tma300_vkeys_attr.attr,
-	NULL
-};
-
-static struct attribute_group tma300_properties_attr_group = {
-	.attrs = tma300_properties_attrs,
-};
-
-static struct kobject *properties_kobj;
-
 #define TS_GPIO_IRQ 150
 
 static int tma300_dev_setup(bool enable)
@@ -5071,6 +5077,7 @@ static int tma300_dev_setup(bool enable)
 		}
 
 		/* virtual keys */
+		tma300_vkeys_attr.attr.name = "virtualkeys.msm_tma300_ts";
 		properties_kobj = kobject_create_and_add("board_properties",
 					NULL);
 		if (properties_kobj)
