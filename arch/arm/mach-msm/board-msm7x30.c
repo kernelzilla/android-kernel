@@ -695,6 +695,9 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{	.name = "pm8058-nfc",
 		.id		= -1,
 	},
+	{	.name = "pm8058-upl",
+		.id		= -1,
+	},
 };
 
 static struct pmic8058_leds_platform_data pm8058_surf_leds_data = {
