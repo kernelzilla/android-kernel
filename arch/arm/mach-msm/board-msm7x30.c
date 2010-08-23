@@ -2919,7 +2919,7 @@ static int dtv_panel_power(int on)
 {
 	int flag_on = !!on;
 	static int dtv_power_save_on;
-	struct vreg *vreg_ldo17, *vreg_ldo8;
+	struct vreg *vreg_ldo17, *vreg_ldo8, *vreg_ldo10;
 	int rc;
 
 	if (dtv_power_save_on == flag_on)
@@ -2960,17 +2960,16 @@ static int dtv_panel_power(int on)
 	}
 
 	vreg_ldo8 = vreg_get(NULL, "gp7");
-
 	if (IS_ERR(vreg_ldo8)) {
 		rc = PTR_ERR(vreg_ldo8);
-		pr_err("%s:  vreg17 get failed (%d)\n",
+		pr_err("%s:  vreg LDO8 get failed (%d)\n",
 			__func__, rc);
 		return rc;
 	}
 
 	rc = vreg_set_level(vreg_ldo8, 1800);
 	if (rc) {
-		pr_err("%s: vreg LDO18 set level failed (%d)\n",
+		pr_err("%s: vreg LDO8 set level failed (%d)\n",
 			__func__, rc);
 		return rc;
 	}
@@ -2981,7 +2980,32 @@ static int dtv_panel_power(int on)
 		rc = vreg_disable(vreg_ldo8);
 
 	if (rc) {
-		pr_err("%s: LDO8 vreg enable failed (%d)\n",
+		pr_err("%s: vreg LDO8 enable failed (%d)\n",
+			__func__, rc);
+		return rc;
+
+	}
+
+	vreg_ldo10 = vreg_get(NULL, "gp4");
+	if (IS_ERR(vreg_ldo10)) {
+		rc = PTR_ERR(vreg_ldo10);
+		pr_err("%s:  vreg LDO10 get failed (%d)\n",
+			__func__, rc);
+		return rc;
+	}
+	rc = vreg_set_level(vreg_ldo10, 2600);
+	if (rc) {
+		pr_err("%s: vreg LDO10 set level failed (%d)\n",
+			__func__, rc);
+		return rc;
+	}
+
+	if (on)
+		rc = vreg_enable(vreg_ldo10);
+	else
+		rc = vreg_disable(vreg_ldo10);
+	if (rc) {
+		pr_err("%s: vreg LDO10 enable failed (%d)\n",
 			__func__, rc);
 		return rc;
 	}
