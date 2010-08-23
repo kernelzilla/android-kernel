@@ -47,7 +47,7 @@
 
 #include <linux/cyttsp.h>
 
-uint32_t cyttsp_tsdebug1 = 0;
+uint32_t cyttsp_tsdebug1 = 0xff;
 module_param_named(tsdebug1, cyttsp_tsdebug1, uint, 0664);
 
 /* CY TTSP I2C Driver private data */
@@ -65,7 +65,9 @@ struct cyttsp {
 	u16 prv_mt_tch[CY_NUM_MT_TCH_ID];
 	u16 prv_mt_pos[CY_NUM_TRK_ID][2];
 	atomic_t irq_enabled;
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 };
 static u8 irq_cnt;		/* comparison counter with register valuw */
 static u32 irq_cnt_total;	/* total interrupts */
@@ -270,41 +272,36 @@ void cyttsp_xy_worker(struct work_struct *work)
 		/* terminate all active tracks */
 		cur_tch = CY_NTCH;
 		/* reset TTSP part and take it back out of Bootloader mode */
+		/* reset TTSP Device back to bootloader mode */
 		host_reg = CY_SOFT_RESET_MODE;
-		retval = i2c_smbus_write_i2c_block_data(ts->client,
-			CY_REG_BASE,
+		retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
 			sizeof(host_reg), &host_reg);
+		/* wait for TTSP Device to complete reset back to bootloader */
 		tries = 0;
 		do {
-			mdelay(1000);
-
-			/* set arg2 to non-0 to activate */
-			retval = cyttsp_putbl(ts, 1, false, false, false);
-		} while (!(retval < CY_OK) &&
-			!GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
-			!(g_bl_data.bl_file ==
-			CY_OP_MODE + CY_LOW_PWR_MODE) &&
-			tries++ < 10);
+			mdelay(1);
+			cyttsp_putbl(ts, 1, false, false, false);
+		} while (g_bl_data.bl_status != 0x10 &&
+			g_bl_data.bl_status != 0x11 &&
+			tries++ < 100);
+		retval = cyttsp_putbl(ts, 1, true, true, true);
 		/* switch back to operational mode */
-		if (GET_BOOTLOADERMODE(g_bl_data.bl_status)) {
+		/* take TTSP device out of bootloader mode;
+		 * switch back to TrueTouch operational mode */
+		if (!(retval < CY_OK)) {
+			int tries;
 			retval = i2c_smbus_write_i2c_block_data(ts->client,
 				CY_REG_BASE,
 				sizeof(bl_cmd), bl_cmd);
+			/* wait for TTSP Device to complete
+			 * switch to Operational mode */
 			tries = 0;
 			do {
-				mdelay(1000);
-				cyttsp_putbl(ts, 1, false, false, false);
+				mdelay(100);
+				cyttsp_putbl(ts, 2, false, false, false);
 			} while (GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
-				tries++ < 10);
-		}
-		if (!(retval < CY_OK)) {
-			host_reg = CY_OP_MODE
-				/* + CY_LOW_PWR_MODE */;
-			retval = i2c_smbus_write_i2c_block_data(ts->client,
-				CY_REG_BASE,
-				sizeof(host_reg), &host_reg);
-			/* wait for TTSP Device to complete switch to Op mode */
-			mdelay(1000);
+				tries++ < 100);
+			cyttsp_putbl(ts, 2, true, false, false);
 		}
 		goto exit_xy_worker;
 	} else {
@@ -869,7 +866,7 @@ void cyttsp_xy_worker(struct work_struct *work)
 						cur_mt_pos[id][CY_YPOS]);
 					CY_MT_SYNC(ts->input);
 					ts->act_trk[id] = CY_TCH;
-					ts->prv_mt_pos[id][CY_XPOS] = 
+					ts->prv_mt_pos[id][CY_XPOS] =
 						cur_mt_pos[id][CY_XPOS];
 					ts->prv_mt_pos[id][CY_YPOS] =
 						cur_mt_pos[id][CY_YPOS];
@@ -1007,15 +1004,17 @@ void cyttsp_xy_worker(struct work_struct *work)
 			 * previous track memory */
 			for (id = 0; id < CY_NUM_MT_TCH_ID; id++) {
 				ts->prv_mt_tch[id] = snd_trk[id];
-				ts->prv_mt_pos[snd_trk[id]][CY_XPOS] =
-					cur_mt_pos[snd_trk[id]][CY_XPOS];
-				ts->prv_mt_pos[snd_trk[id]][CY_YPOS] =
-					cur_mt_pos[snd_trk[id]][CY_YPOS];
-				cyttsp_xdebug("MT4->TID:%2d X:%3d Y:%3d Z:%3d save for previous\n", \
-					snd_trk[id], \
-					ts->prv_mt_pos[snd_trk[id]][CY_XPOS], \
-					ts->prv_mt_pos[snd_trk[id]][CY_YPOS], \
-					CY_NTCH);
+				if (snd_trk[id] < CY_NUM_TRK_ID) {
+					ts->prv_mt_pos[snd_trk[id]][CY_XPOS] =
+						cur_mt_pos[snd_trk[id]][CY_XPOS];
+					ts->prv_mt_pos[snd_trk[id]][CY_YPOS] =
+						cur_mt_pos[snd_trk[id]][CY_YPOS];
+					cyttsp_xdebug("MT4->TID:%2d X:%3d Y:%3d Z:%3d save for previous\n", \
+						snd_trk[id], \
+						ts->prv_mt_pos[snd_trk[id]][CY_XPOS], \
+						ts->prv_mt_pos[snd_trk[id]][CY_YPOS], \
+						CY_NTCH);
+				}
 			}
 			for (id = 0; id < CY_NUM_TRK_ID; id++)
 				ts->act_trk[id] = CY_NTCH;
@@ -1050,8 +1049,7 @@ exit_xy_worker:
 	if (cyttsp_disable_touch) {
 		/* Turn off the touch interrupts */
 		cyttsp_debug("Not enabling touch\n");
-	}
-	else {
+	} else {
 		if (ts->client->irq == 0) {
 			/* restart event timer */
 			mod_timer(&ts->timer, jiffies + TOUCHSCREEN_TIMEOUT);
@@ -1181,7 +1179,6 @@ static int cyttsp_putbl(struct cyttsp *ts, int show,
 				g_bl_data.cid_1, \
 				g_bl_data.cid_2);
 		}
-		mdelay(CY_DLY_DFLT);
 	}
 
 	return retval;
@@ -1192,28 +1189,8 @@ static int cyttsp_putbl(struct cyttsp *ts, int show,
 #define CY_MAX_TRY		10
 #define CY_BL_PAGE_SIZE	16
 #define CY_BL_NUM_PAGES	5
-static int cyttsp_i2c_wr_blk_data(struct i2c_client *client, u8 command,
-			       u8 length, const u8 *values)
-{
-	int retval = CY_OK;
-
-	u8 dataray[CY_MAX_I2C_LEN];
-	u8 try;
-	dataray[0] = command;
-	if (length)
-		memcpy(&dataray[1], values, length);
-
-	try = CY_MAX_TRY;
-	do {
-		retval = i2c_master_send(client, dataray, length+1);
-		mdelay(CY_DLY_DFLT*2);
-	} while ((retval != length+1) && try--);
-
-	return retval;
-}
-
 static int cyttsp_i2c_wr_blk_chunks(struct cyttsp *ts, u8 command,
-			       u8 length, const u8 *values)
+	u8 length, const u8 *values)
 {
 	int retval = CY_OK;
 	int block = 1;
@@ -1223,7 +1200,6 @@ static int cyttsp_i2c_wr_blk_chunks(struct cyttsp *ts, u8 command,
 	/* first page already includes the bl page offset */
 	retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
 		CY_BL_PAGE_SIZE+1, values);
-	mdelay(10);
 	values += CY_BL_PAGE_SIZE+1;
 	length -= CY_BL_PAGE_SIZE+1;
 
@@ -1231,6 +1207,7 @@ static int cyttsp_i2c_wr_blk_chunks(struct cyttsp *ts, u8 command,
 	while (length &&
 		(block < CY_BL_NUM_PAGES) &&
 		!(retval < CY_OK)) {
+		udelay(43*2);	/* TRM * 2 */
 		dataray[0] = CY_BL_PAGE_SIZE*block;
 		memcpy(&dataray[1], values,
 			length >= CY_BL_PAGE_SIZE ?
@@ -1239,7 +1216,6 @@ static int cyttsp_i2c_wr_blk_chunks(struct cyttsp *ts, u8 command,
 			CY_REG_BASE,
 			length >= CY_BL_PAGE_SIZE ?
 			CY_BL_PAGE_SIZE + 1 : length+1, dataray);
-		mdelay(10);
 		values += CY_BL_PAGE_SIZE;
 		length = length >= CY_BL_PAGE_SIZE ?
 			length - CY_BL_PAGE_SIZE : 0;
@@ -1261,8 +1237,13 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 	retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
 		sizeof(host_reg), &host_reg);
 	/* wait for TTSP Device to complete reset back to bootloader */
-	mdelay(1000);
-	cyttsp_putbl(ts, 3, true, true, true);
+	tries = 0;
+	do {
+		mdelay(1);
+		cyttsp_putbl(ts, 3, false, false, false);
+	} while (g_bl_data.bl_status != 0x10 &&
+		g_bl_data.bl_status != 0x11 &&
+		tries++ < 100);
 	cyttsp_debug("load file - tver=0x%02X%02X a_id=0x%02X%02X aver=0x%02X%02X\n", \
 		cyttsp_fw_tts_verh, cyttsp_fw_tts_verl, \
 		cyttsp_fw_app_idh, cyttsp_fw_app_idl, \
@@ -1282,15 +1263,15 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 			/* delay to allow bl to get ready for block writes */
 			i++;
 			tries = 0;
+			do {
+				mdelay(100);
+				cyttsp_putbl(ts, 4, false, false, false);
+			} while (g_bl_data.bl_status != 0x10 &&
+				g_bl_data.bl_status != 0x11 &&
+				tries++ < 100);
 			cyttsp_debug("wait init f=%02X, s=%02X, e=%02X t=%d\n", \
 				g_bl_data.bl_file, g_bl_data.bl_status, \
 				g_bl_data.bl_error, tries);
-			do {
-				mdelay(1000);
-				cyttsp_putbl(ts, 4, true, false, false);
-			} while (g_bl_data.bl_status != 0x10 &&
-				g_bl_data.bl_status != 0x11 &&
-				tries++ < 10);
 			/* send bootload firmware load blocks */
 			if (!(retval < CY_OK)) {
 				while (cyttsp_fw[i].Command == CY_BL_WRITE_BLK) {
@@ -1298,9 +1279,7 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 						CY_REG_BASE,
 						cyttsp_fw[i].Length,
 						cyttsp_fw[i].Block);
-					/* bl requires dly after blocks */
-					mdelay(100);
-					cyttsp_debug("BL DNLD Rec=% 3d Len=% 3d Addr=%04X\n", \
+					cyttsp_xdebug("BL DNLD Rec=% 3d Len=% 3d Addr=%04X\n", \
 						cyttsp_fw[i].Record, \
 						cyttsp_fw[i].Length, \
 						cyttsp_fw[i].Address);
@@ -1311,15 +1290,19 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 							retval);
 						break;
 					} else {
-						/* reset TTSP I2C counter */
-						retval = cyttsp_i2c_wr_blk_data(ts->client,
-							CY_REG_BASE,
-							0, NULL);
-						mdelay(10);
-						cyttsp_putbl(ts, 5,
-							true, false, false);
+						tries = 0;
+						cyttsp_putbl(ts, 5, false, false, false);
+						while (!((g_bl_data.bl_status == 0x10) &&
+							(g_bl_data.bl_error == 0x20)) &&
+							!((g_bl_data.bl_status == 0x11) &&
+							(g_bl_data.bl_error == 0x20)) &&
+							(tries++ < 100)) {
+							mdelay(1);
+							cyttsp_putbl(ts, 5, false, false, false);
+						}
 					}
 				}
+
 				if (!(retval < CY_OK)) {
 					while (i < cyttsp_fw_records) {
 						retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
@@ -1327,18 +1310,17 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 							cyttsp_fw[i].Block);
 						i++;
 						tries = 0;
-						cyttsp_debug("wait init f=%02X, s=%02X, e=%02X t=%d\n", \
+						do {
+							mdelay(100);
+							cyttsp_putbl(ts, 6, true, false, false);
+						} while (g_bl_data.bl_status != 0x10 &&
+							g_bl_data.bl_status != 0x11 &&
+							tries++ < 100);
+						cyttsp_debug("wait term f=%02X, s=%02X, e=%02X t=%d\n", \
 							g_bl_data.bl_file, \
 							g_bl_data.bl_status, \
 							g_bl_data.bl_error, \
 							tries);
-						do {
-							mdelay(1000);
-							cyttsp_putbl(ts, 6, true, false, false);
-						} while (g_bl_data.bl_status != 0x10 &&
-							g_bl_data.bl_status != 0x11 &&
-							tries++ < 10);
-						cyttsp_putbl(ts, 7, true, false, false);
 						if (retval < CY_OK)
 							break;
 					}
@@ -1352,7 +1334,13 @@ static int cyttsp_bootload_app(struct cyttsp *ts)
 	retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
 		sizeof(host_reg), &host_reg);
 	/* wait for TTSP Device to complete reset back to bootloader */
-	mdelay(1000);
+	tries = 0;
+	do {
+		mdelay(1);
+		cyttsp_putbl(ts, 3, false, false, false);
+	} while (g_bl_data.bl_status != 0x10 &&
+		g_bl_data.bl_status != 0x11 &&
+		tries++ < 100);
 
 	/* set arg2 to non-0 to activate */
 	retval = cyttsp_putbl(ts, 8, true, true, true);
@@ -1382,7 +1370,7 @@ static int cyttsp_power_on(struct cyttsp *ts)
 		sizeof(host_reg), &host_reg);
 	tries = 0;
 	do {
-		mdelay(1000);
+		mdelay(1);
 
 		/* set arg2 to non-0 to activate */
 		retval = cyttsp_putbl(ts, 1, true, true, true);
@@ -1404,7 +1392,7 @@ static int cyttsp_power_on(struct cyttsp *ts)
 	} while (!(retval < CY_OK) &&
 		!GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
 		!(g_bl_data.bl_file == CY_OP_MODE + CY_LOW_PWR_MODE) &&
-		tries++ < 10);
+		tries++ < 100);
 
 	/* is bootloader missing? */
 	if (!(retval < CY_OK)) {
@@ -1434,7 +1422,7 @@ static int cyttsp_power_on(struct cyttsp *ts)
 			CY_REG_BASE, sizeof(bl_cmd), bl_cmd);
 		tries = 0;
 		do {
-			mdelay(1000);
+			mdelay(100);
 			cyttsp_putbl(ts, 4, true, false, false);
 			cyttsp_info("BL%d: f=%02X s=%02X err=%02X bl=%02X%02X bld=%02X%02X\n", \
 				104, \
@@ -1443,14 +1431,13 @@ static int cyttsp_power_on(struct cyttsp *ts)
 				g_bl_data.blver_hi, g_bl_data.blver_lo, \
 				g_bl_data.bld_blver_hi, g_bl_data.bld_blver_lo);
 		} while (GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
-			tries++ < 10);
+			tries++ < 100);
 	}
 
 
 
 	if (!(retval < CY_OK) &&
 		cyttsp_app_load()) {
-		mdelay(1000);
 		if (CY_DIFF(g_bl_data.ttspver_hi, cyttsp_tts_verh())  ||
 			CY_DIFF(g_bl_data.ttspver_lo, cyttsp_tts_verl())  ||
 			CY_DIFF(g_bl_data.appid_hi, cyttsp_app_idh())  ||
@@ -1488,7 +1475,13 @@ static int cyttsp_power_on(struct cyttsp *ts)
 					sizeof(bl_cmd), bl_cmd);
 				/* wait for TTSP Device to complete
 				 * switch to Operational mode */
-				mdelay(1000);
+				tries = 0;
+				do {
+					mdelay(100);
+					cyttsp_putbl(ts, 9, false, false, false);
+				} while (GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
+					tries++ < 100);
+				cyttsp_putbl(ts, 9, true, false, false);
 			}
 		}
 	}
@@ -1502,7 +1495,7 @@ bypass:
 		retval = i2c_smbus_write_i2c_block_data(ts->client,
 			CY_REG_BASE, sizeof(host_reg), &host_reg);
 		/* wait for TTSP Device to complete switch to SysInfo mode */
-		mdelay(1000);
+		mdelay(100);
 		if (!(retval < CY_OK)) {
 			retval = i2c_smbus_read_i2c_block_data(ts->client,
 				CY_REG_BASE,
@@ -1545,16 +1538,20 @@ bypass:
 						sizeof(ts->platform_data->lp_intrvl)];
 					u8 i = 0;
 
-					intrvl_ray[i++] = ts->platform_data->act_intrvl;
-					intrvl_ray[i++] = ts->platform_data->tch_tmout;
-					intrvl_ray[i++] = ts->platform_data->lp_intrvl;
+					intrvl_ray[i++] =
+						ts->platform_data->act_intrvl;
+					intrvl_ray[i++] =
+						ts->platform_data->tch_tmout;
+					intrvl_ray[i++] =
+						ts->platform_data->lp_intrvl;
 
 					cyttsp_debug("SI2: platinfo act_intrvl=0x%02X tch_tmout=0x%02X lp_intrvl=0x%02X\n", \
 						ts->platform_data->act_intrvl, \
 						ts->platform_data->tch_tmout, \
 						ts->platform_data->lp_intrvl);
 					/* set intrvl registers */
-					retval = i2c_smbus_write_i2c_block_data(ts->client,
+					retval = i2c_smbus_write_i2c_block_data(
+						ts->client,
 						CY_REG_ACT_INTRVL,
 						sizeof(intrvl_ray), intrvl_ray);
 					mdelay(CY_DLY_SYSINFO);
@@ -1570,7 +1567,7 @@ bypass:
 				sizeof(host_reg), &host_reg);
 			/* wait for TTSP Device to complete
 			 * switch to Operational mode */
-			mdelay(1000);
+			mdelay(100);
 		}
 	}
 	/* init gesture setup;
@@ -1833,26 +1830,22 @@ static int cyttsp_resume(struct i2c_client *client)
 		if (ts->platform_data->resume)
 			retval = ts->platform_data->resume(client);
 		if (!(retval < CY_OK)) {
-			retval = i2c_smbus_read_i2c_block_data(ts->client,
-				CY_REG_BASE,
-				sizeof(struct cyttsp_bootloader_data_t),
-				(u8 *)&g_bl_data);
-			if (!(retval < CY_OK) &&
-				GET_BOOTLOADERMODE(g_bl_data.bl_status)) {
-				u8 tries;
-				retval = i2c_smbus_write_i2c_block_data(
-					ts->client,
+			/* take TTSP device out of bootloader mode;
+			 * switch back to TrueTouch operational mode */
+			if (!(retval < CY_OK)) {
+				int tries;
+				retval = i2c_smbus_write_i2c_block_data(ts->client,
 					CY_REG_BASE,
 					sizeof(bl_cmd), bl_cmd);
-				/* switch back to operational mode */
+				/* wait for TTSP Device to complete
+				 * switch to Operational mode */
 				tries = 0;
-				mdelay(10);
-				while (GET_BOOTLOADERMODE(g_bl_data.bl_status)
-					&& tries++ < 10) {
+				do {
 					mdelay(100);
-					cyttsp_putbl(ts, 16,
-						false, false, false);
-				}
+					cyttsp_putbl(ts, 16, false, false, false);
+				} while (GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
+					tries++ < 100);
+				cyttsp_putbl(ts, 16, true, false, false);
 			}
 		}
 	}
