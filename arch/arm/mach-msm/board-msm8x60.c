@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/io.h>
 #include <linux/mfd/pmic8058.h>
+#include <linux/mfd/bahama.h>
 #include <linux/input/pmic8058-keypad.h>
 #include <linux/pmic8058-pwrkey.h>
 #include <linux/pmic8058-vibrator.h>
@@ -2429,6 +2430,73 @@ static struct i2c_board_info pm8901_boardinfo[] __initdata = {
 
 #endif /* CONFIG_PMIC8901 */
 
+#if defined(CONFIG_BAHAMA_CORE) && (defined(CONFIG_GPIO_SX150X) \
+	|| defined(CONFIG_GPIO_SX150X_MODULE))
+/* the Bahama reset line is on the first expander pin 3 */
+#define GPIO_BAHAMA_RST_OUT_N (GPIO_EXPANDER_GPIO_BASE + 3)
+
+static struct regulator *vreg_bahama;
+
+static int msm_bahama_setup_power(struct device *dev)
+{
+	int rc = 0;
+
+	vreg_bahama = regulator_get(dev, "8058_l8");
+	if (IS_ERR(vreg_bahama))
+		rc = PTR_ERR(vreg_bahama);
+
+	if (!rc)
+		rc = regulator_enable(vreg_bahama);
+	else
+		goto unget;
+
+	if (!rc)
+		rc = gpio_request(GPIO_BAHAMA_RST_OUT_N, "bahama sys_rst_n");
+	else
+		goto unenable;
+
+	if (!rc)
+		rc = gpio_direction_output(GPIO_BAHAMA_RST_OUT_N, 1);
+	else
+		goto unrequest;
+
+	return rc;
+
+unrequest:
+	gpio_free(GPIO_BAHAMA_RST_OUT_N);
+unenable:
+	(void) regulator_disable(vreg_bahama);
+unget:
+	regulator_put(vreg_bahama);
+	return rc;
+};
+
+static void msm_bahama_shutdown_power(struct device *dev)
+{
+	int rc;
+
+	gpio_set_value(GPIO_BAHAMA_RST_OUT_N, 0);
+
+	gpio_free(GPIO_BAHAMA_RST_OUT_N);
+
+	rc = regulator_disable(vreg_bahama);
+
+	regulator_put(vreg_bahama);
+};
+
+static struct bahama_platform_data bahama_pdata = {
+	.bahama_setup = msm_bahama_setup_power,
+	.bahama_shutdown = msm_bahama_shutdown_power,
+};
+
+static struct i2c_board_info msm_i2c_gsbi7_bahama_info[] = {
+	{
+		I2C_BOARD_INFO("bahama", 0xc),
+		.platform_data = &bahama_pdata,
+	}
+};
+#endif /* CONFIG_BAHAMA_CORE */
+
 unsigned long clk_get_max_axi_khz(void)
 {
 	return 0;
@@ -2513,6 +2581,14 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		msm_i2c_gsbi7_timpani_info,
 		ARRAY_SIZE(msm_i2c_gsbi7_timpani_info),
 	},
+#if defined(CONFIG_BAHAMA_CORE)
+	{
+		I2C_SURF | I2C_FFA,
+		MSM_GSBI7_QUP_I2C_BUS_ID,
+		msm_i2c_gsbi7_bahama_info,
+		ARRAY_SIZE(msm_i2c_gsbi7_bahama_info),
+	},
+#endif /* CONFIG_BAHAMA_CORE */
 };
 #endif /* CONFIG_I2C */
 
@@ -2781,7 +2857,7 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	/* GSBI3 QUP I2C */
 	GPIO_CFG(43, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(44, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
-	/* GSBI7 QUP I2C (Marimba) */
+	/* GSBI7 QUP I2C (Bahama) */
 	GPIO_CFG(59, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	GPIO_CFG(60, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 	/* GSBI8 QUP I2C */
