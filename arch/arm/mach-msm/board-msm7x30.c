@@ -3501,7 +3501,12 @@ static int lcd_panel_spi_gpio_num[] = {
 		};
 
 static struct msm_gpio lcd_panel_gpios[] = {
+/* Workaround, since HDMI_INT is using the same GPIO line (18), and is used as
+ * input.  if there is a hardware revision; we should reassign this GPIO to a
+ * new open line; and removing it will just ensure that this will be missed in
+ * the future.
 	{ GPIO_CFG(18, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn0" },
+ */
 	{ GPIO_CFG(19, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_grn1" },
 	{ GPIO_CFG(20, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu0" },
 	{ GPIO_CFG(21, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "lcdc_blu1" },
