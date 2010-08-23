@@ -124,32 +124,47 @@ void diag_read_smd_qdsp_work_fn(struct work_struct *work)
 static int diagchar_open(struct inode *inode, struct file *file)
 {
 	int i = 0;
+	char currtask_name[FIELD_SIZEOF(struct task_struct, comm) + 1];
 
 	if (driver) {
 		mutex_lock(&driver->diagchar_mutex);
 
 		for (i = 0; i < driver->num_clients; i++)
-			if (driver->client_map[i] == 0)
+			if (driver->client_map[i].pid == 0)
 				break;
 
-		if (i < driver->num_clients)
-			driver->client_map[i] = current->tgid;
-		else {
+		if (i < driver->num_clients) {
+			driver->client_map[i].pid = current->tgid;
+			strncpy(driver->client_map[i].name, get_task_comm(
+						currtask_name, current), 20);
+			driver->client_map[i].name[19] = '\0';
+		} else {
 			if (i < threshold_client_limit) {
 				driver->num_clients++;
-				driver->client_map = krealloc(
-					driver->client_map, (driver->
-						num_clients) * 4, GFP_KERNEL);
-				driver->client_map[i] = current->tgid;
+				driver->client_map = krealloc(driver->client_map
+					, (driver->num_clients) * sizeof(struct
+						 diag_client_map), GFP_KERNEL);
+				driver->client_map[i].pid = current->tgid;
+				strncpy(driver->client_map[i].name,
+					get_task_comm(currtask_name,
+							 current), 20);
+				driver->client_map[i].name[19] = '\0';
 			} else {
 				mutex_unlock(&driver->diagchar_mutex);
-				printk(KERN_ALERT "Max client limit "
-						"for DIAG driver reached\n");
-				printk(KERN_INFO "Cannot open handle for"
-				   " the new process %d\n", current->tgid);
+				if (driver->alert_count == 0 ||
+						 driver->alert_count == 10) {
+					printk(KERN_ALERT "Max client limit for"
+						 "DIAG driver reached\n");
+					printk(KERN_INFO "Cannot open handle %s"
+					   " %d", get_task_comm(currtask_name,
+						 current), current->tgid);
 				for (i = 0; i < driver->num_clients; i++)
-					printk(KERN_INFO "Client%d has Process"
-					 " ID=%d", i, driver->client_map[i]);
+					printk(KERN_INFO "%d) %s PID=%d"
+					, i, driver->client_map[i].name,
+					 driver->client_map[i].pid);
+					driver->alert_count = 0;
+				}
+				driver->alert_count++;
 				return -ENOMEM;
 			}
 		}
@@ -185,9 +200,9 @@ static int diagchar_close(struct inode *inode, struct file *file)
 				driver->ref_count--;
 				diagmem_exit(driver);
 				for (i = 0; i < driver->num_clients; i++)
-					if (driver->client_map[i] ==
+					if (driver->client_map[i].pid ==
 					     current->tgid) {
-						driver->client_map[i] = 0;
+						driver->client_map[i].pid = 0;
 						break;
 					}
 		mutex_unlock(&driver->diagchar_mutex);
@@ -272,7 +287,7 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 		}
 	} else if (iocmd == DIAG_IOCTL_LSM_DEINIT) {
 		for (i = 0; i < driver->num_clients; i++)
-			if (driver->client_map[i] == current->tgid)
+			if (driver->client_map[i].pid == current->tgid)
 				break;
 		if (i == -1)
 			return -EINVAL;
@@ -332,7 +347,7 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	int index = -1, i = 0, ret = 0;
 	int num_data = 0, data_type;
 	for (i = 0; i < driver->num_clients; i++)
-		if (driver->client_map[i] == current->tgid)
+		if (driver->client_map[i].pid == current->tgid)
 			index = i;
 
 	if (index == -1) {
@@ -765,6 +780,7 @@ static int __init diagchar_init(void)
 		driver->used = 0;
 		timer_in_progress = 0;
 		driver->debug_flag = 1;
+		driver->alert_count = 0;
 		setup_timer(&drain_timer, drain_timer_func, 1234);
 		driver->itemsize = itemsize;
 		driver->poolsize = poolsize;

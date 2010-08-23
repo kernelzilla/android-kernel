@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -83,6 +83,11 @@ struct diag_write_device {
 	int length;
 };
 
+struct diag_client_map {
+	char name[20];
+	int pid;
+};
+
 struct diagchar_dev {
 
 	/* State for the char driver */
@@ -96,7 +101,7 @@ struct diagchar_dev {
 	int ref_count;
 	struct mutex diagchar_mutex;
 	wait_queue_head_t wait_q;
-	int *client_map;
+	struct diag_client_map *client_map;
 	int *data_ready;
 	int num_clients;
 	struct diag_write_device *buf_tbl;
@@ -109,6 +114,7 @@ struct diagchar_dev {
 	unsigned int itemsize_usb_struct;
 	unsigned int poolsize_usb_struct;
 	unsigned int debug_flag;
+	unsigned int alert_count;
 	/* State for the mempool for the char driver */
 	mempool_t *diagpool;
 	mempool_t *diag_hdlc_pool;
