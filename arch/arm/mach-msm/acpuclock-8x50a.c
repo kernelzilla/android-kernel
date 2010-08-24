@@ -68,6 +68,8 @@
 #define dprintk(msg...) \
 	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
 
+#define MAX_AXI_KHZ 192000
+
 enum {
 	ACPU_PLL_TCXO	= -1,
 	ACPU_PLL_0	= 0,
@@ -96,7 +98,7 @@ struct clkctl_acpu_speed {
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 0,  19200, ACPU_PLL_TCXO, 0, 0, 0, 0, 14000, 0, 0, 1225 },
 	/* Use AXI source. Row number in acpuclk_init() must match this. */
-	{ 0,  192000, ACPU_PLL_1, 1, 5, 0, 0, 14000, 2, 0, 1225 },
+	{ 0,  MAX_AXI_KHZ, ACPU_PLL_1, 1, 5, 0, 0, 14000, 2, 0, 1225 },
 	{ 1,  245760, ACPU_PLL_0, 4, 0, 0, 0, 29000, 0, 0, 1225 },
 	{ 1,  384000, ACPU_PLL_3, 0, 0, 0, 0, 58000, 1, 0xA, 1225 },
 	{ 0,  422400, ACPU_PLL_3, 0, 0, 0, 0, 117000, 1, 0xB, 1225 },
@@ -146,7 +148,7 @@ uint32_t acpuclk_get_switch_time(void)
 	return drv_state.acpu_switch_time_us;
 }
 
-#define POWER_COLLAPSE_KHZ 128000
+#define POWER_COLLAPSE_KHZ MAX_AXI_KHZ
 unsigned long acpuclk_power_collapse(void)
 {
 	int ret = acpuclk_get_rate(smp_processor_id());
@@ -154,7 +156,7 @@ unsigned long acpuclk_power_collapse(void)
 	return ret;
 }
 
-#define WAIT_FOR_IRQ_KHZ 128000
+#define WAIT_FOR_IRQ_KHZ MAX_AXI_KHZ
 unsigned long acpuclk_wait_for_irq(void)
 {
 	int ret = acpuclk_get_rate(smp_processor_id());
