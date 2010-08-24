@@ -1349,7 +1349,13 @@ int q6audio_set_tx_mute(int mute)
 
 	adev = audio_tx_device_id;
 	rc = audio_tx_mute(ac_control, adev, mute);
-	if (!rc) tx_mute_status = mute;
+
+	/* DSP caches the requested MUTE state when it cannot apply the state
+	  immediately. In that case, it returns EUNSUPPORTED and applies the
+	  cached state later */
+	if ((rc == ADSP_AUDIO_STATUS_SUCCESS) ||
+			(rc == ADSP_AUDIO_STATUS_EUNSUPPORTED))
+		tx_mute_status = mute;
 	mutex_unlock(&audio_path_lock);
 	return 0;
 }
