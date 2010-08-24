@@ -278,8 +278,9 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 			decoder->client_frame_size.scan_lines
 			&& decoder->actual_output_buf_req.sz <=
 			decoder->client_output_buf_req.sz
-			&& decoder->min_dpb_num <=
-			decoder->client_output_buf_req.actual_count)
+			&& decoder->actual_output_buf_req.actual_count <=
+			decoder->client_output_buf_req.actual_count
+			&& decoder->progressive_only)
 			need_reconfig = false;
 		input_vcd_frm->offset +=
 			seq_hdr_info.dec_frm_size;
