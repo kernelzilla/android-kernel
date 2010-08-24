@@ -662,8 +662,7 @@ static int fsg_function_setup(struct usb_function *f,
 	u16			w_length = le16_to_cpu(ctrl->wLength);
 
 	DBG(fsg, "fsg_function_setup\n");
-	if (w_index != intf_desc.bInterfaceNumber)
-		return value;
+
 	/* Handle Bulk-only class-specific requests */
 	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_CLASS) {
 	DBG(fsg, "USB_TYPE_CLASS\n");
@@ -2253,25 +2252,12 @@ static int alloc_request(struct fsg_dev *fsg, struct usb_ep *ep,
  */
 static int do_set_interface(struct fsg_dev *fsg, int altsetting)
 {
-	struct usb_composite_dev *cdev = fsg->cdev;
 	int	rc = 0;
 	int	i;
-	const struct usb_endpoint_descriptor	*d;
 
 	if (fsg->running)
 		DBG(fsg, "reset interface\n");
 reset:
-	 /* Disable the endpoints */
-	if (fsg->bulk_in_enabled) {
-		DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_in->name);
-		usb_ep_disable(fsg->bulk_in);
-		fsg->bulk_in_enabled = 0;
-	}
-	if (fsg->bulk_out_enabled) {
-		DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_out->name);
-		usb_ep_disable(fsg->bulk_out);
-		fsg->bulk_out_enabled = 0;
-	}
 
 	/* Deallocate the requests */
 	for (i = 0; i < NUM_BUFFERS; ++i) {
@@ -2293,17 +2279,6 @@ reset:
 
 	DBG(fsg, "set interface %d\n", altsetting);
 
-	/* Enable the endpoints */
-	d = ep_desc(cdev->gadget, &fs_bulk_in_desc, &hs_bulk_in_desc);
-	if ((rc = enable_endpoint(fsg, fsg->bulk_in, d)) != 0)
-		goto reset;
-	fsg->bulk_in_enabled = 1;
-
-	d = ep_desc(cdev->gadget, &fs_bulk_out_desc, &hs_bulk_out_desc);
-	if ((rc = enable_endpoint(fsg, fsg->bulk_out, d)) != 0)
-		goto reset;
-	fsg->bulk_out_enabled = 1;
-	fsg->bulk_out_maxpacket = le16_to_cpu(d->wMaxPacketSize);
 
 	/* Allocate the requests */
 	for (i = 0; i < NUM_BUFFERS; ++i) {
@@ -2362,18 +2337,19 @@ static int do_set_config(struct fsg_dev *fsg, u8 new_config)
 {
 	int	rc = 0;
 
-	if (new_config == fsg->config)
-		return rc;
-
 	/* Disable the single interface */
 	if (fsg->config != 0) {
 		DBG(fsg, "reset config\n");
 		fsg->config = 0;
+		rc = do_set_interface(fsg, -1);
 	}
 
 	/* Enable the interface */
-	if (new_config != 0)
+	if (new_config != 0) {
 		fsg->config = new_config;
+		if ((rc = do_set_interface(fsg, 0)) != 0)
+			fsg->config = 0;	// Reset on errors
+	}
 
 	switch_set_state(&fsg->sdev, new_config);
 	adjust_wake_lock(fsg);
@@ -2388,6 +2364,7 @@ static void handle_exception(struct fsg_dev *fsg)
 	siginfo_t		info;
 	int			sig;
 	int			i;
+	int			num_active;
 	struct fsg_buffhd	*bh;
 	enum fsg_state		old_state;
 	u8			new_config;
@@ -2406,6 +2383,28 @@ static void handle_exception(struct fsg_dev *fsg)
 				DBG(fsg, "Main thread exiting on signal\n");
 			raise_exception(fsg, FSG_STATE_EXIT);
 		}
+	}
+
+	/* Cancel all the pending transfers */
+	for (i = 0; i < NUM_BUFFERS; ++i) {
+		bh = &fsg->buffhds[i];
+		if (bh->inreq_busy)
+			usb_ep_dequeue(fsg->bulk_in, bh->inreq);
+		if (bh->outreq_busy)
+			usb_ep_dequeue(fsg->bulk_out, bh->outreq);
+	}
+
+	/* Wait until everything is idle */
+	for (;;) {
+		num_active = 0;
+		for (i = 0; i < NUM_BUFFERS; ++i) {
+			bh = &fsg->buffhds[i];
+			num_active += bh->outreq_busy;
+		}
+		if (num_active == 0)
+			break;
+		if (sleep_thread(fsg))
+			return;
 	}
 
 	/*
@@ -2478,10 +2477,6 @@ static void handle_exception(struct fsg_dev *fsg)
 
 	case FSG_STATE_EXIT:
 	case FSG_STATE_TERMINATED:
-		if (new_config)  {
-			fsg->new_config = 0;
-			do_set_interface(fsg, -1);
-		}
 		do_set_config(fsg, 0);			/* Free resources */
 		spin_lock_irq(&fsg->lock);
 		fsg->state = FSG_STATE_TERMINATED;	/* Stop the thread */
@@ -2990,9 +2985,29 @@ static int fsg_function_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
 	struct fsg_dev	*fsg = func_to_dev(f);
+	struct usb_composite_dev *cdev = fsg->cdev;
+	const struct usb_endpoint_descriptor	*d;
+	int rc;
+
 	DBG(fsg, "fsg_function_set_alt intf: %d alt: %d\n", intf, alt);
+
+	/* Enable the endpoints */
+	d = ep_desc(cdev->gadget, &fs_bulk_in_desc, &hs_bulk_in_desc);
+	rc = enable_endpoint(fsg, fsg->bulk_in, d);
+	if (rc)
+		return rc;
+	fsg->bulk_in_enabled = 1;
+
+	d = ep_desc(cdev->gadget, &fs_bulk_out_desc, &hs_bulk_out_desc);
+	rc = enable_endpoint(fsg, fsg->bulk_out, d);
+	if (rc) {
+		usb_ep_disable(fsg->bulk_in);
+		fsg->bulk_in_enabled = 0;
+		return rc;
+	}
+	fsg->bulk_out_enabled = 1;
+	fsg->bulk_out_maxpacket = le16_to_cpu(d->wMaxPacketSize);
 	fsg->new_config = 1;
-	do_set_interface(fsg, 0);
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
 	return 0;
 }
@@ -3001,8 +3016,18 @@ static void fsg_function_disable(struct usb_function *f)
 {
 	struct fsg_dev	*fsg = func_to_dev(f);
 	DBG(fsg, "fsg_function_disable\n");
-	if (fsg->new_config)
-		do_set_interface(fsg, -1);
+
+	/* Disable the endpoints */
+	if (fsg->bulk_in_enabled) {
+		DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_in->name);
+		usb_ep_disable(fsg->bulk_in);
+		fsg->bulk_in_enabled = 0;
+	}
+	if (fsg->bulk_out_enabled) {
+		DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_out->name);
+		usb_ep_disable(fsg->bulk_out);
+		fsg->bulk_out_enabled = 0;
+	}
 	fsg->new_config = 0;
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
 }
