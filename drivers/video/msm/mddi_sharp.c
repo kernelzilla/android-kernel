@@ -739,6 +739,14 @@ static int mddi_sharp_lcd_on(struct platform_device *pdev)
 
 static int mddi_sharp_lcd_off(struct platform_device *pdev)
 {
+	if (mddi_sharp_vsync_handler != NULL) {
+		(*mddi_sharp_vsync_handler)
+			    (mddi_sharp_vsync_handler_arg);
+		mddi_sharp_vsync_handler = NULL;
+		printk(KERN_INFO "%s: clean up vsyn_handler=%x\n", __func__,
+				(int)mddi_sharp_vsync_handler);
+	}
+
 	mddi_sharp_lcd_powerdown();
 	return 0;
 }
