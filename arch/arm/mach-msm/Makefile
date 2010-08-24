@@ -113,6 +113,7 @@ obj-$(CONFIG_ARCH_MSM8X60) += devices-msm8x60.o
 obj-$(CONFIG_ARCH_MSM8X60) += clock-local.o clock-8x60.o acpuclock-8x60.o
 obj-$(CONFIG_ARCH_MSM8X60) += clock-rpm.o spm.o restart.o
 obj-$(CONFIG_ARCH_MSM8X60) += subsystem-fatal-8x60.o
+obj-$(CONFIG_ARCH_MSM8X60) += saw-regulator.o
 
 ifdef CONFIG_ARCH_MSM8X60
 	obj-$(CONFIG_CPU_IDLE) += cpuidle.o
