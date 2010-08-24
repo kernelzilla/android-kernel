@@ -34,6 +34,10 @@
 #endif
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#ifdef CONFIG_CPU_V7
+#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
+#endif
 #ifdef CONFIG_CACHE_L2X0
 #include <asm/hardware/cache-l2x0.h>
 #endif
@@ -1753,6 +1757,22 @@ static int __init msm_pm_init(void)
 	struct proc_dir_entry *d_entry;
 #endif
 	int ret;
+#ifdef CONFIG_CPU_V7
+	pgd_t *pc_pgd;
+	pmd_t *pmd;
+
+	/* Page table for cores to come back up safely. */
+	pc_pgd = pgd_alloc(&init_mm);
+	if (!pc_pgd)
+		return -ENOMEM;
+	pmd = pmd_offset(pc_pgd +
+			 pgd_index(virt_to_phys(msm_pm_collapse_exit)),
+			 virt_to_phys(msm_pm_collapse_exit));
+	*pmd = __pmd((virt_to_phys(msm_pm_collapse_exit) & PGDIR_MASK) |
+		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE);
+	flush_pmd_entry(pmd);
+	msm_pm_pc_pgd = virt_to_phys(pc_pgd);
+#endif
 
 	pm_power_off = msm_pm_power_off;
 	arm_pm_restart = msm_pm_restart;

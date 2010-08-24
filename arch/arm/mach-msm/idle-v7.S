@@ -18,6 +18,14 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
+#ifdef CONFIG_MSM_CPU_AVS
+/* 11 general purpose registers (r4-r14), 10 cp15 registers, 3 AVS registers */
+#define CPU_SAVED_STATE_SIZE (4 * 11 + 4 * 10 + 4 * 3)
+#else
+/* 11 general purpose registers (r4-r14), 10 cp15 registers */
+#define CPU_SAVED_STATE_SIZE (4 * 11 + 4 * 10)
+#endif
+
 ENTRY(msm_arch_idle)
 	wfi
 	bx      lr
@@ -28,6 +36,12 @@ ENTRY(msm_pm_collapse)
 #endif
 
 	ldr     r0, =saved_state
+#if defined(CONFIG_NR_CPUS) && (CONFIG_NR_CPUS >= 2)
+	mrc	p15, 0, r1, c0, c0, 5	/* MPIDR */
+	ands	r1, r1, #15		/* What CPU am I */
+	addne	r0, r0, #CPU_SAVED_STATE_SIZE
+#endif
+
 	stmia   r0!, {r4-r14}
 	mrc     p15, 0, r1, c1, c0, 0 /* MMU control */
 	mrc     p15, 0, r2, c2, c0, 0 /* TTBR0 */
@@ -72,7 +86,13 @@ ENTRY(msm_pm_collapse)
 	cpsie   f
 #endif
 
-	ldr     r0, =saved_state         /* restore registers */
+	ldr     r0, =saved_state        /* restore registers */
+#if defined(CONFIG_NR_CPUS) && (CONFIG_NR_CPUS >= 2)
+	mrc	p15, 0, r1, c0, c0, 5	/* MPIDR */
+	ands	r1, r1, #15		/* What CPU am I */
+	addne	r0, r0, #CPU_SAVED_STATE_SIZE
+#endif
+
 	ldmfd   r0, {r4-r14}
 	mov     r0, #0                   /* return power collapse failed */
 	bx      lr
@@ -92,6 +112,12 @@ ENTRY(msm_pm_collapse_exit)
 	adr     r3, msm_pm_collapse_exit
 	add     r1, r1, r3
 	sub     r1, r1, r2
+#if defined(CONFIG_NR_CPUS) && (CONFIG_NR_CPUS >= 2)
+	mrc	p15, 0, r2, c0, c0, 5	/* MPIDR */
+	ands	r2, r2, #15		/* What CPU am I */
+	subeq	r1, r1, #CPU_SAVED_STATE_SIZE
+#endif
+
 #ifdef CONFIG_MSM_CPU_AVS
 	ldmdb   r1!, {r2-r4}
 	mcr     p15, 7, r4, c15, c1, 0 /* TSCSR */
@@ -110,37 +136,25 @@ ENTRY(msm_pm_collapse_exit)
 	mcr     p15, 0, r11, c13, c0, 1 /* context ID */
 	isb
 	ldmdb   r1!, {r4-r14}
-	/* Add 1:1 map in the PMD to allow smooth switch when turning on MMU */
-	and     r3, r3, #~0x7F  /* mask off lower 7 bits of TTB */
-	adr     r0, msm_pm_mapped_pa /* get address of the mapped instr */
-	lsr     r1, r0, #20     /* get the addr range of addr in MB */
-	lsl     r1, r1, #2      /* multiply by 4 to get to the pg index */
-	add     r3, r3, r1      /* pgd + pgd_index(addr) */
-	ldr     r1, [r3]        /* save current entry to r1 */
-	lsr     r0, #20         /* align current addr to 1MB boundary */
-	lsl     r0, #20
-	/* Create new entry for this 1MB page */
-	orr     r0, r0, #0x4     /* PMD_SECT_BUFFERED */
-	orr     r0, r0, #0x400   /* PMD_SECT_AP_WRITE */
-	orr     r0, r0, #0x2     /* PMD_TYPE_SECT|PMD_DOMAIN(DOMAIN_KERNEL) */
-	str     r0, [r3]         /* put new entry into the MMU table */
-	mcr     p15, 0, r3, c7, c10, 1  /* flush_pmd */
-	dsb
+	ldr	r0, =msm_pm_pc_pgd
+	ldr	r1, =msm_pm_collapse_exit
+	adr	r3, msm_pm_collapse_exit
+	add	r0, r0, r3
+	sub	r0, r0, r1
+	ldr	r0, [r0]
+	mrc     p15, 0, r1, c2, c0, 0 /* save current TTBR0 */
+	and	r3, r1, #0x7f /* mask to get TTB flags */
+	orr	r0, r0, r3 /* add TTB flags to switch TTBR value */
+	mcr     p15, 0, r0, c2, c0, 0 /* temporary switch TTBR0 */
 	isb
 	mcr     p15, 0, r2, c1, c0, 0   /* MMU control */
 	isb
 msm_pm_mapped_pa:
 	/* Switch to virtual */
-	adr     r2, msm_pm_pa_to_va
 	ldr     r0, =msm_pm_pa_to_va
 	mov     pc, r0
 msm_pm_pa_to_va:
-	sub     r0, r0, r2
-	/* Restore r1 in MMU table */
-	add     r3, r3, r0
-	str     r1, [r3]
-	mcr     p15, 0, r3, c7, c10, 1  /* flush_pmd */
-	dsb
+	mcr     p15, 0, r1, c2, c0, 0 /* restore TTBR0 */
 	isb
 	mcr     p15, 0, r3, c8, c7, 0   /* UTLBIALL */
 	mcr     p15, 0, r3, c7, c5, 6   /* BPIALL */
@@ -164,12 +178,14 @@ msm_pm_pa_to_va:
 
 	.data
 
+	.globl msm_pm_pc_pgd
+msm_pm_pc_pgd:
+	.long	0x0
+
 saved_state:
-	.space  4 * 11 /* r4-14 */
-	.space  4 * 10  /* cp15 */
-#ifdef CONFIG_MSM_CPU_AVS
-	.space  4 * 3  /* AVS control registers */
+#if defined(CONFIG_NR_CPUS) && (CONFIG_NR_CPUS >= 2)
+	.space	CPU_SAVED_STATE_SIZE * 2 /* This code only supports 2 cores */
+#else
+	.space	CPU_SAVED_STATE_SIZE
 #endif
 saved_state_end:
-
-
