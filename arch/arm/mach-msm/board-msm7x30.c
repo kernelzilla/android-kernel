@@ -48,7 +48,6 @@
 #include <asm/setup.h>
 
 #include <mach/mpp.h>
-#include <mach/gpio.h>
 #include <mach/board.h>
 #include <mach/camera.h>
 #include <mach/memory.h>
@@ -4055,19 +4054,6 @@ static struct platform_device msm_batt_device = {
 	.dev.platform_data  = &msm_psy_batt_data,
 };
 
-static struct platform_device *early_devices[] __initdata = {
-#ifdef CONFIG_GPIOLIB
-	&msm_gpio_devices[0],
-	&msm_gpio_devices[1],
-	&msm_gpio_devices[2],
-	&msm_gpio_devices[3],
-	&msm_gpio_devices[4],
-	&msm_gpio_devices[5],
-	&msm_gpio_devices[6],
-	&msm_gpio_devices[7],
-#endif
-};
-
 static char *msm_adc_fluid_device_names[] = {
 	"LTC_ADC1",
 	"LTC_ADC2",
@@ -5191,7 +5177,6 @@ static void __init msm7x30_init(void)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
 		       __func__);
 	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
-	platform_add_devices(early_devices, ARRAY_SIZE(early_devices));
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 	msm7x30_init_uart2();
 #endif
