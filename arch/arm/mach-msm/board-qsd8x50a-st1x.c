@@ -1887,7 +1887,6 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 	return 0;
 }
 
-#endif
 
 static int msm_sdcc_get_wpswitch(struct device *dv)
 {
@@ -2021,6 +2020,7 @@ static void __init qsd8x50_init_mmc(void)
 #endif
 }
 
+#endif
 static int __init qsd8x50_cfg_smsc911x(void)
 {
 	int rc = 0;
@@ -2228,7 +2228,13 @@ static void __init qsd8x50_init(void)
 	msm_fb_add_devices();
 
 	qsd8x50_init_host();
+
+#if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
+	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT))
 	qsd8x50_init_mmc();
+#endif
 	bt_power_init_st_1_5();
 	audio_gpio_init();
 	msm_device_i2c_init();
