@@ -120,9 +120,9 @@ u32 vid_enc_set_get_inputformat(struct video_client_ctx *client_ctx,
 		case VEN_INPUTFMT_NV12:
 			format.buffer_format = VCD_BUFFER_FORMAT_NV12;
 			break;
-		case VEN_INPUTFMT_NV21:
+		case VEN_INPUTFMT_NV12_16M2KA:
 			format.buffer_format =
-				VCD_BUFFER_FORMAT_TILE_4x2;
+				VCD_BUFFER_FORMAT_NV12_16M2KA;
 			break;
 		default:
 			status = false;
