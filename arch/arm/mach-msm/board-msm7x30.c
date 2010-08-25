@@ -98,6 +98,7 @@
 #define PMIC_VREG_WLAN_LEVEL	2900
 #define PMIC_GPIO_SD_DET	36
 #define PMIC_GPIO_SDC4_EN	17  /* PMIC GPIO Number 18 */
+#define PMIC_GPIO_HDMI_5V_EN	39  /* PMIC GPIO Number 40 */
 
 #define FPGA_SDCC_STATUS       0x8E0001A8
 
@@ -147,6 +148,13 @@ static int pm8058_gpios_init(void)
 		.output_value   = 0,
 	};
 
+	struct pm8058_gpio hdmi_5V_en = {
+		.direction      = PM_GPIO_DIR_OUT,
+		.pull           = PM_GPIO_PULL_NO,
+		.vin_sel        = PM_GPIO_VIN_VPH,
+		.function       = PM_GPIO_FUNC_NORMAL,
+	};
+
 	if (machine_is_msm7x30_fluid()) {
 		rc = pm8058_gpio_config(PMIC_GPIO_HAP_ENABLE, &haptics_enable);
 		if (rc) {
@@ -167,6 +175,19 @@ static int pm8058_gpios_init(void)
 	}
 #endif
 
+	rc = pm8058_gpio_config(PMIC_GPIO_HDMI_5V_EN, &hdmi_5V_en);
+	if (rc) {
+		pr_err("%s PMIC_GPIO_HDMI_5V_EN config failed\n", __func__);
+		return rc;
+	}
+	rc = gpio_request(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HDMI_5V_EN),
+		"hdmi_5V_en");
+	if (rc) {
+		pr_err("%s PMIC_GPIO_HDMI_5V_EN gpio_request failed\n",
+			__func__);
+		return rc;
+	}
+
 	if (machine_is_msm7x30_fluid()) {
 		rc = pm8058_gpio_config(PMIC_GPIO_SDC4_EN, &sdc4_en);
 		if (rc) {
@@ -174,7 +195,8 @@ static int pm8058_gpios_init(void)
 								 __func__);
 			return rc;
 		}
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN), 1);
+		gpio_set_value(PM8058_GPIO_PM_TO_SYS(
+			PMIC_GPIO_SDC4_EN), 1);
 	}
 
 	return 0;
@@ -2926,6 +2948,10 @@ static int dtv_panel_power(int on)
 		return 0;
 
 	dtv_power_save_on = flag_on;
+	pr_info("%s: %d\n", __func__, on);
+
+	gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HDMI_5V_EN),
+		on);
 
 #ifdef HDMI_RESET
 	if (on) {
@@ -2937,7 +2963,8 @@ static int dtv_panel_power(int on)
 			return rc;
 		}
 
-		gpio_set_value(37, 0);	/* bring reset line low to hold reset*/
+		/* bring reset line low to hold reset*/
+		gpio_set_value(37, 0);
 	}
 #endif
 
@@ -3260,7 +3287,8 @@ static int display_common_power(int on)
 			return rc;
 		}
 
-		gpio_set_value(180, 0);	/* bring reset line low to hold reset*/
+		/* bring reset line low to hold reset*/
+		gpio_set_value(180, 0);
 	}
 
 	/* Toshiba WeGA power -- has 3 power source */
@@ -3409,7 +3437,7 @@ static int display_common_power(int on)
 			}
 		}
 
-		gpio_set_value(180, 1);	/* bring reset line high */
+		gpio_set_value(180, 1); /* bring reset line high */
 		mdelay(10);	/* 10 msec before IO can be accessed */
 		rc = pmapp_display_clock_config(1);
 		if (rc) {
@@ -3434,7 +3462,7 @@ static int display_common_power(int on)
 			return rc;
 		}
 
-		gpio_set_value(180, 0);	/* bring reset line low */
+		gpio_set_value(180, 0); /* bring reset line low */
 
 		if (machine_is_msm7x30_fluid()) {
 			rc = vreg_disable(vreg_ldo8);
@@ -3947,7 +3975,8 @@ static int bluetooth_power(int on)
 
 		if (machine_is_msm8x55_svlte_surf() ||
 				machine_is_msm8x55_svlte_ffa())
-			gpio_set_value(GPIO_PIN(bt_config_clock->gpio_cfg), 1);
+			gpio_set_value(
+				GPIO_PIN(bt_config_clock->gpio_cfg), 1);
 
 		rc = marimba_bt(on);
 		if (rc < 0)
@@ -3960,7 +3989,8 @@ static int bluetooth_power(int on)
 
 		if (machine_is_msm8x55_svlte_surf() ||
 				machine_is_msm8x55_svlte_ffa())
-			gpio_set_value(GPIO_PIN(bt_config_clock->gpio_cfg), 0);
+			gpio_set_value(
+				GPIO_PIN(bt_config_clock->gpio_cfg), 0);
 
 		rc = msm_gpios_enable(bt_config_power_on,
 			ARRAY_SIZE(bt_config_power_on));
