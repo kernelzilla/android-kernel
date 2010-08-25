@@ -191,25 +191,25 @@
 #define SRC_SEL_LPA_CXO		1
 #define SRC_SEL_LPA_PLL0	2
 
-/* Source name to PLL mappings. */
-#define SRC_BB_PXO		SRC_NONE
-#define SRC_BB_MXO		SRC_NONE
-#define SRC_BB_CXO		SRC_NONE
+/* Source name mapping. */
+#define SRC_BB_PXO		PXO
+#define SRC_BB_MXO		MXO
+#define SRC_BB_CXO		CXO
 #define SRC_BB_PLL0		PLL_0
 #define SRC_BB_PLL8		PLL_8
 #define SRC_BB_PLL6		PLL_6
-#define SRC_MM_PXO		SRC_NONE
+#define SRC_MM_PXO		PXO
 #define SRC_MM_PLL0		PLL_1
 #define SRC_MM_PLL1		PLL_2
 #define SRC_MM_PLL2		PLL_3
 #define SRC_MM_GPERF		PLL_8
 #define SRC_MM_GPLL0		PLL_0
-#define SRC_MM_MXO		SRC_NONE
-#define SRC_XO_CXO		SRC_NONE
-#define SRC_XO_PXO		SRC_NONE
-#define SRC_XO_MXO		SRC_NONE
-#define SRC_LPA_PXO		SRC_NONE
-#define SRC_LPA_CXO		SRC_NONE
+#define SRC_MM_MXO		MXO
+#define SRC_XO_CXO		CXO
+#define SRC_XO_PXO		PXO
+#define SRC_XO_MXO		MXO
+#define SRC_LPA_PXO		PXO
+#define SRC_LPA_CXO		CXO
 #define SRC_LPA_PLL0		PLL_4
 
 /* Test Vector Macros */
@@ -1516,6 +1516,13 @@ struct clk_local soc_clk_local_tbl[] = {
  * SoC-specific functions required by clock-local driver
  */
 
+/* Enable/disable for XO sources. */
+static int xo_enable(unsigned src, unsigned enable)
+{
+	/* TODO */
+	return 0;
+}
+
 /* Enable/disable for hardware-voteable PLLs. */
 static int voteable_pll_enable(unsigned src, unsigned enable)
 {
@@ -1594,7 +1601,7 @@ static int nt_pll_enable(unsigned src, unsigned enable)
 #define CLK_SRC(_src, _func, _par) \
 	[(_src)] = { .enable_func = (_func), .par = (_par), }
 struct clk_source soc_clk_sources[NUM_SRC] = {
-	CLK_SRC(CXO,   NULL, SRC_NONE),	/* TODO */
+	CLK_SRC(CXO,   xo_enable, SRC_NONE),
 	CLK_SRC(MXO,   NULL, SRC_NONE),	/* TODO */
 	CLK_SRC(PXO,   NULL, SRC_NONE),	/* TODO */
 	CLK_SRC(PLL_0, voteable_pll_enable, MXO),
