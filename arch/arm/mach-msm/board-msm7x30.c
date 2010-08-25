@@ -2695,7 +2695,7 @@ static void msm_qsd_spi_gpio_release(void)
 }
 
 static struct msm_spi_platform_data qsd_spi_pdata = {
-	.max_clock_speed = 26000000,
+	.max_clock_speed = 26331429,
 	.clk_name = "spi_clk",
 	.pclk_name = "spi_pclk",
 	.gpio_config  = msm_qsd_spi_gpio_config,
