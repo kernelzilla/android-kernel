@@ -2647,26 +2647,39 @@ static unsigned int msm_timpani_setup_power(void)
 	vreg_timpani_2 = regulator_get(NULL, "8058_s3");
 	if (IS_ERR(vreg_timpani_2)) {
 		pr_err("%s: Unable to get 8058_s3\n", __func__);
+		regulator_put(vreg_timpani_1);
 		return -ENODEV;
 	}
 
-	rc = regulator_enable(vreg_timpani_1);
+	rc = regulator_set_voltage(vreg_timpani_1, 1200000, 1200000);
+	if (rc) {
+		pr_err("%s: unable to set L0 voltage to 1.2V\n", __func__);
+		goto fail;
+	}
 
+	rc = regulator_set_voltage(vreg_timpani_2, 1800000, 1800000);
+	if (rc) {
+		pr_err("%s: unable to set S3 voltage to 1.8V\n", __func__);
+		goto fail;
+	}
+
+	rc = regulator_enable(vreg_timpani_1);
 	if (rc) {
 		pr_err("%s: Enable regulator 8058_l0 failed\n", __func__);
-		return rc;
+		goto fail;
 	}
 
 	rc = regulator_enable(vreg_timpani_2);
-
 	if (rc) {
 		pr_err("%s: Enable regulator 8058_s3 failed\n", __func__);
-		goto fail_s3;
+		regulator_disable(vreg_timpani_1);
+		goto fail;
 	}
 	return rc;
 
-fail_s3:
+fail:
 	regulator_put(vreg_timpani_1);
+	regulator_put(vreg_timpani_2);
 	return rc;
 }
 
@@ -2701,25 +2714,39 @@ static int msm_timpani_codec_power(int vreg_on)
 			pr_err("%s: vreg_get failed (%ld)\n",
 			__func__, PTR_ERR(vreg_timpani_cdc_apwr));
 			rc = PTR_ERR(vreg_timpani_cdc_apwr);
-			goto vreg_fail;
+			return rc;
 		}
 	}
 
 	if (vreg_on) {
+
+		rc = regulator_set_voltage(vreg_timpani_cdc_apwr,
+				2200000, 2200000);
+		if (rc) {
+			pr_err("%s: unable to set 8058_s4 voltage to 2.2 V\n",
+					__func__);
+			goto vreg_fail;
+		}
+
 		rc = regulator_enable(vreg_timpani_cdc_apwr);
-		if (rc)
-			pr_err("%s: vreg_enable failed %d \n",
-			__func__, rc);
-		goto vreg_fail;
+		if (rc) {
+			pr_err("%s: vreg_enable failed %d\n", __func__, rc);
+			goto vreg_fail;
+		}
 	} else {
 		rc = regulator_disable(vreg_timpani_cdc_apwr);
-		if (rc)
-			pr_err("%s: vreg_disable failed %d \n",
+		if (rc) {
+			pr_err("%s: vreg_disable failed %d\n",
 			__func__, rc);
-		goto vreg_fail;
+			goto vreg_fail;
+		}
 	}
 
+	return 0;
+
 vreg_fail:
+	regulator_put(vreg_timpani_cdc_apwr);
+	vreg_timpani_cdc_apwr = NULL;
 	return rc;
 }
 
