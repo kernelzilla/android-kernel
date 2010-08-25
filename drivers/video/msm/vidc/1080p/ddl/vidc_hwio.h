@@ -32,7 +32,6 @@
 
 #include "vidc_hwio_reg.h"
 
-#define VIDC_REGISTER_LOG
 #ifdef VIDC_REGISTER_LOG
 #define VIDC_REG_OUT(x...)  printk(KERN_DEBUG x)
 #define VIDC_REG_IN(x...)   printk(KERN_DEBUG x)

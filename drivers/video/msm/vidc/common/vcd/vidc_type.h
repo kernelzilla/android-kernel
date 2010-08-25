@@ -42,8 +42,6 @@
 #define DEBUG   0
 
 #define USE_RES_TRACKER
-#define AXI_CLK_SCALING
-
 #undef CORE_TIMING_INFO
 
 #ifdef CONFIG_KERNEL_PMEM_SMI_REGION
@@ -54,9 +52,11 @@
 
 #ifdef CONFIG_ARCH_MSM7X30
 #define ENA_CLK_GATE 1
+#define AXI_CLK_SCALING
 #else
 #define ENA_CLK_GATE 0
 #endif
 
+#define ENA_VIDC_CLK_SCALING 0
 
 #endif
