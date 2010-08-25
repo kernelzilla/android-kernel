@@ -143,8 +143,6 @@ static int dtv_probe(struct platform_device *pdev)
 
 	if (pdev->id == 0) {
 		dtv_pdata = pdev->dev.platform_data;
-		if (dtv_pdata && dtv_pdata->lcdc_power_save)
-			dtv_pdata->lcdc_power_save(1);
 		return 0;
 	}
 

@@ -2937,18 +2937,54 @@ static unsigned dtv_reset_gpio =
 	GPIO_CFG(37, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 #endif
 
+static int gpio_set(const char *label, const char *name, int level, int on)
+{
+	struct vreg *vreg = vreg_get(NULL, label);
+	int rc;
+
+	if (IS_ERR(vreg)) {
+		rc = PTR_ERR(vreg);
+		pr_err("%s: vreg %s get failed (%d)\n",
+			__func__, name, rc);
+		return rc;
+	}
+
+	rc = vreg_set_level(vreg, level);
+	if (rc) {
+		pr_err("%s: vreg %s set level failed (%d)\n",
+			__func__, name, rc);
+		return rc;
+	}
+
+	if (on)
+		rc = vreg_enable(vreg);
+	else
+		rc = vreg_disable(vreg);
+	if (rc)
+		pr_err("%s: vreg %s enable failed (%d)\n",
+			__func__, name, rc);
+	return rc;
+}
+
+static int i2c_gpio_power(int on)
+{
+	int rc = gpio_set("gp7", "LDO8", 1800, on);
+	if (rc)
+		return rc;
+	return gpio_set("gp4", "LDO10", 2600, on);
+}
+
 static int dtv_panel_power(int on)
 {
 	int flag_on = !!on;
 	static int dtv_power_save_on;
-	struct vreg *vreg_ldo17, *vreg_ldo8, *vreg_ldo10;
 	int rc;
 
 	if (dtv_power_save_on == flag_on)
 		return 0;
 
 	dtv_power_save_on = flag_on;
-	pr_info("%s: %d\n", __func__, on);
+	pr_info("%s: %d >>\n", __func__, on);
 
 	gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HDMI_5V_EN),
 		on);
@@ -2986,86 +3022,16 @@ static int dtv_panel_power(int on)
 		}
 	}
 
-	vreg_ldo8 = vreg_get(NULL, "gp7");
-	if (IS_ERR(vreg_ldo8)) {
-		rc = PTR_ERR(vreg_ldo8);
-		pr_err("%s:  vreg LDO8 get failed (%d)\n",
-			__func__, rc);
+	rc = i2c_gpio_power(on);
+	if (rc)
 		return rc;
-	}
-
-	rc = vreg_set_level(vreg_ldo8, 1800);
-	if (rc) {
-		pr_err("%s: vreg LDO8 set level failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
-
-	if (on)
-		rc = vreg_enable(vreg_ldo8);
-	else
-		rc = vreg_disable(vreg_ldo8);
-
-	if (rc) {
-		pr_err("%s: vreg LDO8 enable failed (%d)\n",
-			__func__, rc);
-		return rc;
-
-	}
-
-	vreg_ldo10 = vreg_get(NULL, "gp4");
-	if (IS_ERR(vreg_ldo10)) {
-		rc = PTR_ERR(vreg_ldo10);
-		pr_err("%s:  vreg LDO10 get failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
-	rc = vreg_set_level(vreg_ldo10, 2600);
-	if (rc) {
-		pr_err("%s: vreg LDO10 set level failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
-
-	if (on)
-		rc = vreg_enable(vreg_ldo10);
-	else
-		rc = vreg_disable(vreg_ldo10);
-	if (rc) {
-		pr_err("%s: vreg LDO10 enable failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
 
 	mdelay(5);		/* ensure power is stable */
 
 	/*  -- LDO17 for HDMI */
-	vreg_ldo17 = vreg_get(NULL, "gp11");
-
-	if (IS_ERR(vreg_ldo17)) {
-		rc = PTR_ERR(vreg_ldo17);
-		pr_err("%s:  vreg17 get failed (%d)\n",
-			__func__, rc);
+	rc = gpio_set("gp11", "LDO17", 2600, on);
+	if (rc)
 		return rc;
-	}
-
-	rc = vreg_set_level(vreg_ldo17, 2600);
-	if (rc) {
-		pr_err("%s: vreg LDO17 set level failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
-
-	if (on)
-		rc = vreg_enable(vreg_ldo17);
-	else
-		rc = vreg_disable(vreg_ldo17);
-
-	if (rc) {
-		pr_err("%s: LDO17 vreg enable failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
 
 	mdelay(5);		/* ensure power is stable */
 
@@ -3075,6 +3041,7 @@ static int dtv_panel_power(int on)
 		mdelay(10);		/* 10 msec before IO can be accessed */
 	}
 #endif
+	pr_info("%s: %d <<\n", __func__, on);
 
 	return rc;
 }
