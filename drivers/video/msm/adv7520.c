@@ -36,8 +36,6 @@ static bool gpio_power_on = FALSE;	/* For dtv power on/off (I2C) */
 
 static u8 reg[256];	/* HDMI panel registers */
 
-static short  *hdtv_mux ;
-
 struct hdmi_data {
 	struct msm_hdmi_platform_data *pd;
 	struct work_struct work;
@@ -45,92 +43,29 @@ struct hdmi_data {
 static struct hdmi_data *dd;
 static struct work_struct handle_work;
 
-/* static int online ; */
 static struct timer_list hpd_timer;
-static unsigned int hpd_state ;
 static unsigned int monitor_sense;
 
-/* EDID variables */
-static int horizontal_resolution = 1280 ;
-static int vertical_resolution = 720;
-
-/* HDMI hotplug detection using kobject */
-static struct hdmi_state *hdmi_state_obj;
-
-static ssize_t hdmi_attr_show(struct kobject *kobj, struct attribute *attr,
-								char *buf)
-{
-	return sprintf(buf, "%d RES=%dx%d", \
-		hdmi_state_obj->hdmi_connection_state, horizontal_resolution,
-						vertical_resolution);
-}
-
-static ssize_t hdmi_attr_store(struct kobject *kobj, struct attribute *attr,
-						const char *buf, size_t len)
-{
-	return 0;
-}
-
-static struct sysfs_ops hdmi_sysfs_ops = {
-	.show = hdmi_attr_show,
-	.store = hdmi_attr_store,
-};
-
-static void hdmi_release(struct kobject *kobj)
-{
-	kobject_uevent(&hdmi_state_obj->kobj, KOBJ_REMOVE);
-	kfree(hdmi_state_obj);
-}
-
-static struct kobj_attribute hdmi_attr =
-	__ATTR(hdmi_state_obj, 0666, NULL, NULL);
-
-static struct attribute *hdmi_attrs[] = {
-	&hdmi_attr.attr,
-	NULL,
-};
-
-static struct kobj_type hdmi_ktype = {
-	.sysfs_ops = &hdmi_sysfs_ops,
-	.release = hdmi_release,
-	.default_attrs = hdmi_attrs,
-};
-
-/* create HDMI kobject and initialize */
-static int create_hdmi_state_kobj(void)
-{
-	int ret;
-	hdmi_state_obj = kzalloc(sizeof(struct hdmi_state), GFP_KERNEL);
-	if (!hdmi_state_obj)
-		return -1;
-	hdmi_state_obj->kobj.kset =
-		kset_create_and_add("hdmi_kset", NULL, kernel_kobj);
-
-	ret = kobject_init_and_add(&hdmi_state_obj->kobj,
-			&hdmi_ktype, NULL, "hdmi_kobj");
-	if (ret) {
-		kobject_put(&hdmi_state_obj->kobj);
-		return -1;
-	}
-	hdmi_state_obj->hdmi_connection_state = 0;
-	ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_ADD);
-	DEV_DBG("kobject uevent returned %d\n", ret);
-	return 0;
-}
-
 /* Change HDMI state */
-static int change_hdmi_state(int online)
+static void change_hdmi_state(int online)
 {
-	int ret;
-	if (!hdmi_state_obj)
-		return -1;
-	hdmi_state_obj->hdmi_connection_state = online;
+	if (!hdmi_common_state)
+		return;
+
+	mutex_lock(&hdmi_common_state_hpd_mutex);
+	hdmi_common_state->hpd_state = online;
+	mutex_unlock(&hdmi_common_state_hpd_mutex);
+
+	if (!hdmi_common_state->uevent_kobj)
+		return;
+
 	if (online)
-		ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_ONLINE);
+		kobject_uevent(hdmi_common_state->uevent_kobj,
+			KOBJ_ONLINE);
 	else
-		ret = kobject_uevent(&hdmi_state_obj->kobj, KOBJ_OFFLINE);
-	DEV_DBG("adv7520_uevent: %d (ret=%d)\n", online, ret);
-	return 0;
+		kobject_uevent(hdmi_common_state->uevent_kobj,
+			KOBJ_OFFLINE);
+	DEV_DBG("adv7520_uevent: %d\n", online);
 }
 
 
@@ -148,7 +83,7 @@ static u8 adv7520_read_reg(struct i2c_client *client, u8 reg)
 	if (!client->adapter)
 		return -ENODEV;
 	if (!gpio_power_on) {
-		pr_warning("%s: WARN: missing GPIO power\n", __func__);
+		DEV_WARN("%s: WARN: missing GPIO power\n", __func__);
 		return -ENODEV;
 	}
 
@@ -188,7 +123,7 @@ static int adv7520_write_reg(struct i2c_client *client, u8 reg, u8 val)
 	if (!client->adapter)
 		return -ENODEV;
 	if (!gpio_power_on) {
-		pr_warning("%s: WARN: missing GPIO power\n", __func__);
+		DEV_WARN("%s: WARN: missing GPIO power\n", __func__);
 		return -ENODEV;
 	}
 
@@ -232,29 +167,8 @@ static int adv7520_read_edid_block(int block, uint8 *edid_buf)
 
 static void adv7520_read_edid(void)
 {
-	boolean has720p = FALSE, has480p = FALSE;
-	int i;
-
 	hdmi_common_state->read_edid_block = adv7520_read_edid_block;
 	hdmi_common_read_edid();
-
-	for (i = 0; i < hdmi_common_state->disp_mode_list.num_of_elements; ++i)
-		switch (hdmi_common_state->disp_mode_list.disp_mode_list[i]) {
-		case HDMI_VFRMT_720x480p60_16_9:
-			has480p = TRUE;
-			break;
-		case HDMI_VFRMT_1280x720p60_16_9:
-			has720p = TRUE;
-			break;
-		}
-
-	if (has480p && !has720p) {
-		horizontal_resolution = 720;
-		vertical_resolution = 480;
-	} else {
-		horizontal_resolution = 1280;
-		vertical_resolution = 720;
-	}
 }
 
 static void adv7520_chip_on(void)
@@ -306,13 +220,15 @@ static int adv7520_power_on(struct platform_device *pdev)
 
 	hdmi_common_state->dev = &pdev->dev;
 	if (mfd != NULL) {
-		if (mfd->var_xres == 1280 && mfd->var_yres == 720)
-			DEV_INFO("%s: configuring 720p\n", __func__);
-		else if (mfd->var_xres == 720 && mfd->var_yres == 480)
-			DEV_INFO("%s: configuring 480p\n", __func__);
-		else
-			DEV_INFO("%s: mfd->var_xres = %d, mfd->var_yres = %d\n",
-				__func__, mfd->var_xres, mfd->var_yres);
+		if (!hdmi_common_state->uevent_kobj) {
+			int ret = hdmi_common_state_create(pdev);
+			if (ret)
+				return ret;
+		}
+
+		DEV_INFO("adv7520_power: ON (%dx%d %d)\n",
+			mfd->var_xres, mfd->var_yres, mfd->var_pixclock);
+		hdmi_common_get_video_format_from_drv_data(mfd);
 	}
 
 	gpio_power_on = TRUE;
@@ -321,7 +237,7 @@ static int adv7520_power_on(struct platform_device *pdev)
 		init_done = TRUE;
 	}
 
-	pr_info("%s: 'enable_irq'\n", __func__);
+	DEV_INFO("%s: 'enable_irq'\n", __func__);
 	if (adv7520_read_reg(hclient, 0x42) & (1 << 6)) {
 		monitor_sense = adv7520_read_reg(hclient, 0xC6);
 		schedule_work(&handle_work);
@@ -385,7 +301,7 @@ static void adb7520_chip_init(void)
 	/* Hard coded values provided by ADV7520 data sheet. */
 	reg[0x98] = 0x03;
 	reg[0x9c] = 0x38;
-	reg[0x9d] = 0x61 ;
+	reg[0x9d] = 0x61;
 	reg[0xa2] = 0x94;
 	reg[0xa3] = 0x94;
 	reg[0xde] = 0x88;
@@ -397,16 +313,16 @@ static void adb7520_chip_init(void)
 	reg[0x01] = 0x00;
 	reg[0x02] = 0x2d;
 	reg[0x03] = 0x80;
-	reg[0x0a] = 0x4d ;
-	reg[0x0b] = 0x0e ;
-	reg[0x0c] =  0x84 ;
-	reg[0x0d] =  0x10 ;
-	reg[0x12] =  0x00 ;
-	reg[0x14] =  0x00 ;
-	reg[0x15] =  0x20 ;
-	reg[0x44] =  0x79 ;
-	reg[0x73] =  0x1 ;
-	reg[0x76] =  0x00 ;
+	reg[0x0a] = 0x4d;
+	reg[0x0b] = 0x0e;
+	reg[0x0c] = 0x84;
+	reg[0x0d] = 0x10;
+	reg[0x12] = 0x00;
+	reg[0x14] = 0x00;
+	reg[0x15] = 0x20;
+	reg[0x44] = 0x79;
+	reg[0x73] = 0x01;
+	reg[0x76] = 0x00;
 
 	/* Set 720p display related registers */
 	reg[0x16] = 0x00;
@@ -452,7 +368,7 @@ static void adb7520_chip_init(void)
 	adv7520_write_reg(hclient, 0x73, reg[0x73]);
 	adv7520_write_reg(hclient, 0x76, reg[0x76]);
 
-       /* Enable  720p display */
+	/* Enable  720p display */
 	adv7520_write_reg(hclient, 0x16, reg[0x16]);
 	adv7520_write_reg(hclient, 0x18, reg[0x18]);
 	adv7520_write_reg(hclient, 0x55, reg[0x55]);
@@ -464,11 +380,11 @@ static void adb7520_chip_init(void)
 static void adv7520_handle_cable_work(struct work_struct *work)
 {
 	if (!gpio_power_on) {
-		pr_warning("adv7520_timer: WARN GPIO power off, skipping\n");
+		DEV_WARN("adv7520_timer: WARN GPIO power off, skipping\n");
 		return;
 	}
 
-	if ((monitor_sense & 0x4)) {
+	if (monitor_sense & 0x4) {
 		int timeout;
 		DEV_DBG("adv7520_timer: Power ON\n");
 		adv7520_chip_on();
@@ -498,7 +414,7 @@ static void adv7520_isr(struct work_struct *work)
 
 	DEV_INFO("adv7520_irq: reg[0x96]=%x\n", reg0x96);
 	if ((reg0x96 == 0xC0) || (reg0x96 & 0x40)) {
-		hpd_state = adv7520_read_reg(hclient, 0x42);
+		unsigned int hpd_state = adv7520_read_reg(hclient, 0x42);
 		monitor_sense = adv7520_read_reg(hclient, 0xC6);
 		DEV_DBG("adv7520_irq: reg[0x42]=%x && reg[0xC6]=%x\n",
 			hpd_state, monitor_sense);
@@ -522,11 +438,11 @@ static void adv7520_isr(struct work_struct *work)
 static irqreturn_t adv7520_interrupt(int irq, void *dev_id)
 {
 	if (!gpio_power_on) {
-		pr_warning("adv7520_irq: WARN: GPIO power off, skipping\n");
-		return IRQ_HANDLED ;
+		DEV_WARN("adv7520_irq: WARN: GPIO power off, skipping\n");
+		return IRQ_HANDLED;
 	}
 	schedule_work(&dd->work);
-	return IRQ_HANDLED ;
+	return IRQ_HANDLED;
 }
 
 static const struct i2c_device_id adv7520_id[] = {
@@ -550,13 +466,12 @@ static struct platform_device hdmi_device = {
 static int __devinit
 adv7520_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-
-	int rc ;
+	int rc;
 	dd = kzalloc(sizeof *dd, GFP_KERNEL);
 	if (!dd) {
-			rc = -ENOMEM ;
-			goto probe_exit;
-		}
+		rc = -ENOMEM;
+		goto probe_exit;
+	}
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
@@ -569,13 +484,12 @@ adv7520_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, dd);
 	dd->pd = client->dev.platform_data;
 	if (!dd->pd) {
-			rc = -ENODEV ;
-			goto probe_free;
-		}
+		rc = -ENODEV;
+		goto probe_free;
+	}
 
 	INIT_WORK(&dd->work, adv7520_isr);
 	INIT_WORK(&handle_work, adv7520_handle_cable_work);
-	create_hdmi_state_kobj();
 	msm_fb_add_device(&hdmi_device);
 	return 0;
 
@@ -589,12 +503,12 @@ probe_exit:
 
 static int __devexit adv7520_remove(struct i2c_client *client)
 {
-	int err = 0 ;
+	int err = 0;
 	if (!client->adapter) {
 		DEV_ERR("%s: No HDMI Device\n", __func__);
 		return -ENODEV;
 	}
-	return err ;
+	return err;
 }
 
 static struct i2c_driver hdmi_i2c_driver = {
@@ -625,9 +539,10 @@ static int __init adv7520_init(void)
 	}
 
 	if (machine_is_msm7x30_surf()) {
-		hdtv_mux  = (short *)ioremap(0x8e000170 , 0x100);
+		short *hdtv_mux = (short *)ioremap(0x8e000170 , 0x100);
 		*hdtv_mux++  = 0x020b;
 		*hdtv_mux  = 0x8000;
+		iounmap(hdtv_mux);
 	}
 	return 0;
 

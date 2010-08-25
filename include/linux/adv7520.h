@@ -39,9 +39,4 @@ Pixel clock: 74.25 Mhz, Audio sampling: 44.1 Khz -> N
 value = 6272 */
 #define ADV7520_AUDIO_CTS_20BIT_N   6272
 
-struct hdmi_state {
-	struct kobject kobj;
-	int hdmi_connection_state;
-};
-
 #endif
