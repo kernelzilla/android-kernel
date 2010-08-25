@@ -63,6 +63,20 @@ config USB_MSM_OTG_72K
 	  required for even peripheral only or host only mode configuration.
 	  Supports SRP and HNP when both gadget and Host are selected.
 
+config MSM_OTG_ENABLE_A_WAIT_BCON_TIMEOUT
+	bool "Enable A-device timeout for B-device connection"
+	depends on USB_MSM_OTG_72K
+	default n
+	help
+	   OTG specification allows A-device to turn off VBUS if B-device
+	   fails to signal connect event before TA_WAIT_BCON (1.1 - 30 sec).
+	   SRP detection is enabled and hardware is put into low power mode
+	   upon this timeout.
+
+	   If you say yes, VBUS will be turned off if B-device does not signal
+	   connect in 30 sec. Otherwise VBUS is not turned off when Micro-A
+	   cable is connected. But hardware is put into LPM. Say no if leakage
+	   currents in your system are minimum.
 
 config USB_MSM_ACA
 	bool "Support for Accessory Charger Adapter (ACA)"
