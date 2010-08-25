@@ -1470,6 +1470,11 @@ static struct platform_device msm_rpm_log_device = {
 };
 #endif
 
+static struct platform_device *early_devices[] __initdata = {
+	&msm_device_saw_s0,
+	&msm_device_saw_s1,
+};
+
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&smc91x_device,
 	&msm_device_uart_dm12,
@@ -1526,8 +1531,6 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 };
 
 static struct platform_device *surf_devices[] __initdata = {
-	&msm_device_saw_s0,
-	&msm_device_saw_s1,
 	&msm_device_smd,
 	&smsc911x_device,
 	&msm_device_uart_dm12,
@@ -4184,6 +4187,7 @@ static void __init msm8x60_init(void)
 	 * driver to set ACPU voltages.
 	 */
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
+	platform_add_devices(early_devices, ARRAY_SIZE(early_devices));
 	/* CPU frequency control is not supported on simulated targets. */
 	if (!machine_is_msm8x60_rumi3() && !machine_is_msm8x60_sim())
 		msm_acpu_clock_init(&msm8x60_acpu_clock_data);

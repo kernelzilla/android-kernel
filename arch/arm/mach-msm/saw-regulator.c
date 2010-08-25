@@ -137,7 +137,7 @@ static void __exit saw_exit(void)
 	platform_driver_unregister(&saw_driver);
 }
 
-subsys_initcall(saw_init);
+postcore_initcall(saw_init);
 module_exit(saw_exit);
 
 MODULE_LICENSE("GPL v2");
