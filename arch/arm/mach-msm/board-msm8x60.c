@@ -256,16 +256,24 @@ static struct platform_device smsc911x_device = {
 static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR * 2] = {
 	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE)] = {
 		.supported = 1,
-		.suspend_enabled = 1,
-		.idle_enabled = 1,
+		.suspend_enabled = 0,
+		.idle_enabled = 0,
+		.latency = 4000,
+		.residency = 13000,
+	},
+
+	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN)] = {
+		.supported = 1,
+		.suspend_enabled = 0,
+		.idle_enabled = 0,
 		.latency = 1000,
 		.residency = 9000,
 	},
 
 	[MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)] = {
 		.supported = 1,
-		.suspend_enabled = 1,
-		.idle_enabled = 1,
+		.suspend_enabled = 0,
+		.idle_enabled = 0,
 		.latency = 500,
 		.residency = 6000,
 	},
@@ -280,7 +288,7 @@ static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR * 2] = {
 
 	[MSM_PM_MODE(1, MSM_PM_SLEEP_MODE_POWER_COLLAPSE)] = {
 		.supported = 1,
-		.suspend_enabled = 1,
+		.suspend_enabled = 0,
 		.idle_enabled = 0,
 		.latency = 600,
 		.residency = 7200,
@@ -288,8 +296,8 @@ static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR * 2] = {
 
 	[MSM_PM_MODE(1, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)] = {
 		.supported = 1,
-		.suspend_enabled = 1,
-		.idle_enabled = 1,
+		.suspend_enabled = 0,
+		.idle_enabled = 0,
 		.latency = 500,
 		.residency = 6000,
 	},
@@ -304,8 +312,23 @@ static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR * 2] = {
 };
 
 static struct msm_cpuidle_state msm_cstates[] __initdata = {
-	{0, 0, "C0", "WFI", MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
-	{1, 0, "C0", "WFI", MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
+	{0, 0, "C0", "WFI",
+		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
+
+	{0, 1, "C1", "STANDALONE_POWER_COLLAPSE",
+		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE},
+
+	{0, 2, "C2", "POWER_COLLAPSE_SHALLOW_VDD_MIN",
+		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN},
+
+	{0, 3, "C3", "POWER_COLLAPSE",
+		MSM_PM_SLEEP_MODE_POWER_COLLAPSE},
+
+	{1, 0, "C0", "WFI",
+		MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
+
+	{1, 1, "C1", "STANDALONE_POWER_COLLAPSE",
+		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE},
 };
 
 #if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_MSM)

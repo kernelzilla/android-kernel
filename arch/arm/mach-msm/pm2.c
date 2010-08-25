@@ -168,6 +168,9 @@ static ssize_t msm_pm_mode_attr_show(
 	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
 		struct kernel_param kp;
 
+		if (msm_pm_sleep_mode_labels[i] == NULL)
+			continue;
+
 		if (strcmp(kobj->name, msm_pm_sleep_mode_labels[i]))
 			continue;
 
@@ -213,6 +216,9 @@ static ssize_t msm_pm_mode_attr_store(struct kobject *kobj,
 
 	for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
 		struct kernel_param kp;
+
+		if (msm_pm_sleep_mode_labels[i] == NULL)
+			continue;
 
 		if (strcmp(kobj->name, msm_pm_sleep_mode_labels[i]))
 			continue;

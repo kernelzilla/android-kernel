@@ -51,6 +51,8 @@ void __init msm_cpuidle_set_states(struct msm_cpuidle_state *states,
 		int i;
 
 		dev->cpu = cpu;
+		dev->prepare = msm_pm_idle_prepare;
+
 		for (i = 0; i < nr_states; i++) {
 			struct msm_cpuidle_state *cstate = &states[i];
 			struct cpuidle_state *state;

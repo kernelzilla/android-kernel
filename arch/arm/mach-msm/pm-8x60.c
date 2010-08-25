@@ -97,6 +97,8 @@ static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
 	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT] = "wfi",
 	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE] =
 		"standalone_power_collapse",
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN] =
+		"power_collapse_shallow_vdd_min",
 };
 
 /*
@@ -569,7 +571,7 @@ void msm_pm_set_max_sleep_time(int64_t max_sleep_time_ns)
 	}
 
 	if (msm_pm_debug_mask & MSM_PM_DEBUG_SUSPEND)
-		pr_info("%s(): Requested %lld ns Giving %u sclk ticks\n",
+		pr_info("%s: Requested %lld ns Giving %u sclk ticks\n",
 			__func__, max_sleep_time_ns, msm_pm_max_sleep_time);
 }
 EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
@@ -604,8 +606,8 @@ static void msm_pm_spm_power_collapse(
 	int ret;
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): cpu %u, notify_rpm %d\n",
-			__func__, dev->cpu, (int) notify_rpm);
+		pr_info("CPU%u: %s: notify_rpm %d\n",
+			dev->cpu, __func__, (int) notify_rpm);
 
 	ret = msm_spm_set_low_power_mode(
 			MSM_SPM_MODE_POWER_COLLAPSE, notify_rpm);
@@ -616,8 +618,8 @@ static void msm_pm_spm_power_collapse(
 	writel(virt_to_phys(entry), dev->boot_vector);
 
 	if (MSM_PM_DEBUG_RESET_VECTOR & msm_pm_debug_mask)
-		pr_info("%s(): cpu %u, program vector %p to %p\n",
-			__func__, dev->cpu, dev->boot_vector, entry);
+		pr_info("CPU%u: %s: program vector %p to %p\n",
+			dev->cpu, __func__, dev->boot_vector, entry);
 
 #ifdef CONFIG_VFP
 	vfp_flush_context();
@@ -635,8 +637,8 @@ static void msm_pm_spm_power_collapse(
 	}
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): msm_pm_collapse returned, collapsed = %d\n",
-			__func__, collapsed);
+		pr_info("CPU%u: %s: msm_pm_collapse returned, collapsed %d\n",
+			dev->cpu, __func__, collapsed);
 
 	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING, false);
 	WARN_ON(ret);
@@ -655,33 +657,33 @@ static void msm_pm_power_collapse(bool from_idle, uint32_t sleep_delay)
 	unsigned long saved_acpuclk_rate;
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): cpu %u, idle %d, delay %u\n",
-			__func__, dev->cpu, (int)from_idle, sleep_delay);
+		pr_info("CPU%u: %s: idle %d, delay %u\n",
+			dev->cpu, __func__, (int)from_idle, sleep_delay);
 
 	msm_pm_config_hw_before_power_down();
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): pre power down\n", __func__);
+		pr_info("CPU%u: %s: pre power down\n", dev->cpu, __func__);
 
 	saved_acpuclk_rate = acpuclk_power_collapse();
 	if (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask)
-		pr_info("%s(): change clock rate (old rate = %lu)\n",
-			__func__, saved_acpuclk_rate);
+		pr_info("CPU%u: %s: change clock rate (old rate = %lu)\n",
+			dev->cpu, __func__, saved_acpuclk_rate);
 
 	msm_pm_spm_power_collapse(dev, from_idle, notify_rpm);
 
 	if (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask)
-		pr_info("%s(): restore clock rate to %lu\n",
-			__func__, saved_acpuclk_rate);
+		pr_info("CPU%u: %s: restore clock rate to %lu\n",
+			dev->cpu, __func__, saved_acpuclk_rate);
 	if (acpuclk_set_rate(dev->cpu, saved_acpuclk_rate, SETRATE_PC) < 0)
-		pr_err("%s(): failed to restore clock rate(%lu)\n",
-			__func__, saved_acpuclk_rate);
+		pr_err("CPU%u: %s: failed to restore clock rate(%lu)\n",
+			dev->cpu, __func__, saved_acpuclk_rate);
 
 	msm_pm_config_hw_after_power_up();
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): post power up\n", __func__);
+		pr_info("CPU%u: %s: post power up\n", dev->cpu, __func__);
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("%s(): return\n", __func__);
+		pr_info("CPU%u: %s: return\n", dev->cpu, __func__);
 }
 
 
@@ -694,6 +696,46 @@ void arch_idle(void)
 	return;
 }
 
+int msm_pm_idle_prepare(struct cpuidle_device *dev)
+{
+	unsigned int nr_online = num_online_cpus();
+	int i;
+
+	for (i = 0; i < dev->state_count; i++) {
+		struct cpuidle_state *state = &dev->states[i];
+		enum msm_pm_sleep_mode mode;
+		bool allow;
+
+		mode = (enum msm_pm_sleep_mode) state->driver_data;
+		allow = msm_pm_modes[MSM_PM_MODE(dev->cpu, mode)].idle_enabled;
+
+		switch (mode) {
+		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE:
+			if (!dev->cpu && nr_online > 1)
+				allow = false;
+			break;
+		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
+		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN:
+			if (nr_online > 1)
+				allow = false;
+			break;
+		default:
+			break;
+		}
+
+		if (MSM_PM_DEBUG_IDLE & msm_pm_debug_mask)
+			pr_info("CPU%u: %s: allow %s: %d\n",
+				dev->cpu, __func__, state->desc, (int)allow);
+
+		if (allow)
+			state->flags &= ~CPUIDLE_FLAG_IGNORE;
+		else
+			state->flags |= CPUIDLE_FLAG_IGNORE;
+	}
+
+	return 0;
+}
+
 int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode)
 {
 	int64_t time;
@@ -704,11 +746,11 @@ int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode)
 #endif
 
 	if (MSM_PM_DEBUG_IDLE & msm_pm_debug_mask)
-		pr_info("%s(): cpu %u, mode %d\n",
-			__func__, smp_processor_id(), sleep_mode);
+		pr_info("CPU%u: %s: mode %d\n",
+			smp_processor_id(), __func__, sleep_mode);
 
 	time = ktime_to_ns(ktime_get());
-	timer_expiration = 0; /* msm_timer_enter_idle(); */
+	timer_expiration = msm_timer_enter_idle();
 	timer_halted = false;
 
 	switch (sleep_mode) {
@@ -747,7 +789,7 @@ int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode)
 		goto cpuidle_enter_bail_timer;
 	}
 
-	/* msm_timer_exit_idle((int) timer_halted); */
+	msm_timer_exit_idle((int) timer_halted);
 	time = ktime_to_ns(ktime_get()) - time;
 #ifdef CONFIG_MSM_IDLE_STATS
 	msm_pm_add_stat(exit_stat, time);
@@ -757,7 +799,7 @@ int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode)
 	return (int) time;
 
 cpuidle_enter_bail_timer:
-	/* msm_timer_exit_idle((int) timer_halted); */
+	msm_timer_exit_idle((int) timer_halted);
 	return 0;
 }
 
@@ -772,7 +814,7 @@ static int msm_pm_enter(suspend_state_t state)
 #endif
 
 	if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
-		pr_info("%s()\n", __func__);
+		pr_info("%s\n", __func__);
 
 	if (smp_processor_id()) {
 		__WARN();
@@ -786,9 +828,10 @@ static int msm_pm_enter(suspend_state_t state)
 		allow[i] = mode->supported && mode->suspend_enabled;
 	}
 
-	if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE]) {
+	if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN] ||
+		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE]) {
 		if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
-			pr_info("%s(): power collapse\n", __func__);
+			pr_info("%s: power collapse\n", __func__);
 
 #ifdef CONFIG_MSM_SLEEP_TIME_OVERRIDE
 		if (msm_pm_sleep_time_override > 0) {
@@ -815,17 +858,17 @@ static int msm_pm_enter(suspend_state_t state)
 #endif /* CONFIG_MSM_IDLE_STATS */
 	} else if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE]) {
 		if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
-			pr_info("%s(): standalone power collapse\n", __func__);
+			pr_info("%s: standalone power collapse\n", __func__);
 		msm_pm_power_collapse_standalone(false);
 	} else if (allow[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT]) {
 		if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
-			pr_info("%s(): swfi\n", __func__);
+			pr_info("%s: swfi\n", __func__);
 		msm_pm_swfi();
 	}
 
 enter_exit:
 	if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
-		pr_info("%s(): return\n", __func__);
+		pr_info("%s: return\n", __func__);
 
 	return 0;
 }
@@ -853,7 +896,7 @@ void platform_cpu_die(unsigned int cpu)
 	int i;
 
 	if (unlikely(cpu != smp_processor_id())) {
-		pr_crit("%s(): platform_cpu_die running on %u, should be %u\n",
+		pr_crit("%s: running on %u, should be %u\n",
 			__func__, smp_processor_id(), cpu);
 		BUG();
 	}
@@ -865,7 +908,7 @@ void platform_cpu_die(unsigned int cpu)
 		allow[i] = mode->supported && mode->suspend_enabled;
 	}
 
-	pr_notice("%s(): shutting down cpu %u\n", __func__, cpu);
+	pr_notice("CPU%u: %s: shutting down cpu\n", cpu, __func__);
 	complete(&__get_cpu_var(msm_pm_devices).cpu_killed);
 
 	flush_cache_all();
@@ -884,11 +927,12 @@ void platform_cpu_die(unsigned int cpu)
 		}
 	}
 
-	/* set pen_release handshake value before preempt_enable_no_resched
+	/*
+	 * Set pen_release handshake value before preempt_enable_no_resched
 	 * which has a barrier().
 	 */
 	pen_release = -1;
-	pr_notice("%s(): cpu %u normal wakeup\n", __func__, cpu);
+	pr_notice("CPU%u: %s: normal wakeup\n", cpu, __func__);
 	preempt_enable_no_resched();
 	local_irq_enable();
 }
