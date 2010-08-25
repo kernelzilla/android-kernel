@@ -393,7 +393,6 @@ static int32_t sn12m0pz_i2c_write_byte_bridge(unsigned short saddr,
 	buf[1] = (waddr & 0x00FF);
 	buf[2] = bdata;
 
-	msleep(90);
 	CDBG("i2c_write_b addr = %x, val = %x", waddr, bdata);
 	rc = sn12m0pz_i2c_txdata(saddr, buf, 3);
 
