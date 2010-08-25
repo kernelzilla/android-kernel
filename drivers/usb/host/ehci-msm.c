@@ -36,6 +36,7 @@
 #include <mach/clk.h>
 #include <linux/wakelock.h>
 #include <linux/pm_qos_params.h>
+#include <linux/pm_runtime.h>
 
 #include <mach/msm72k_otg.h>
 
@@ -289,6 +290,7 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 {
 	int ret;
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
+	struct device *dev = hcd->self.controller;
 
 	ret = ehci_bus_suspend(hcd);
 	if (ret) {
@@ -300,6 +302,8 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 	else
 		ret = usb_lpm_enter(hcd);
 
+	pm_runtime_put_noidle(dev);
+	pm_runtime_suspend(dev);
 	wake_unlock(&mhcd->wlock);
 	return ret;
 }
@@ -307,8 +311,11 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 static int ehci_msm_bus_resume(struct usb_hcd *hcd)
 {
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
+	struct device *dev = hcd->self.controller;
 
 	wake_lock(&mhcd->wlock);
+	pm_runtime_get_noresume(dev);
+	pm_runtime_resume(dev);
 
 	if (PHY_TYPE(mhcd->pdata->phy_info) == USB_PHY_INTEGRATED) {
 		otg_set_suspend(mhcd->xceiv, 0);
@@ -450,6 +457,7 @@ static void msm_hsusb_request_host(void *handle, int request)
 	struct msm_usb_host_platform_data *pdata = mhcd->pdata;
 	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, otg);
 	struct usb_device *udev = hcd->self.root_hub;
+	struct device *dev = hcd->self.controller;
 
 	switch (request) {
 #ifdef CONFIG_USB_OTG
@@ -465,10 +473,14 @@ static void msm_hsusb_request_host(void *handle, int request)
 			udev->state = USB_STATE_NOTATTACHED;
 			clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 			hcd->state = HC_STATE_HALT;
+			pm_runtime_put_noidle(dev);
+			pm_runtime_suspend(dev);
 		}
 		break;
 	case REQUEST_HNP_RESUME:
 		if (PHY_TYPE(pdata->phy_info) == USB_PHY_INTEGRATED) {
+			pm_runtime_get_noresume(dev);
+			pm_runtime_resume(dev);
 			disable_irq(hcd->irq);
 			ehci_msm_reset(hcd);
 			ehci_msm_run(hcd);
@@ -485,6 +497,8 @@ static void msm_hsusb_request_host(void *handle, int request)
 	case REQUEST_START:
 		if (mhcd->running)
 			break;
+		pm_runtime_get_noresume(dev);
+		pm_runtime_resume(dev);
 		wake_lock(&mhcd->wlock);
 		msm_xusb_pm_qos_update(mhcd, 1);
 		msm_xusb_enable_clks(mhcd);
@@ -519,6 +533,8 @@ static void msm_hsusb_request_host(void *handle, int request)
 		msm_xusb_disable_clks(mhcd);
 		wake_lock_timeout(&mhcd->wlock, HZ/2);
 		msm_xusb_pm_qos_update(mhcd, 0);
+		pm_runtime_put_noidle(dev);
+		pm_runtime_suspend(dev);
 		break;
 	}
 }
@@ -720,6 +736,8 @@ static int __init ehci_msm_probe(struct platform_device *pdev)
 				(char *) dev_name(&pdev->dev));
 	}
 
+	pm_runtime_enable(&pdev->dev);
+
 	return retval;
 }
 
@@ -763,11 +781,39 @@ static int __exit ehci_msm_remove(struct platform_device *pdev)
 	wake_lock_destroy(&mhcd->wlock);
 	pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, (char *) dev_name(&pdev->dev));
 
+	pm_runtime_disable(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+
 	return retval;
 }
+
+static int ehci_msm_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int ehci_msm_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static int ehci_msm_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: idling...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops ehci_msm_dev_pm_ops = {
+	.runtime_suspend = ehci_msm_runtime_suspend,
+	.runtime_resume = ehci_msm_runtime_resume,
+	.runtime_idle = ehci_msm_runtime_idle
+};
 
 static struct platform_driver ehci_msm_driver = {
 	.probe	= ehci_msm_probe,
 	.remove	= __exit_p(ehci_msm_remove),
-	.driver	= {.name = "msm_hsusb_host"},
+	.driver	= {.name = "msm_hsusb_host",
+		    .pm = &ehci_msm_dev_pm_ops, },
 };
