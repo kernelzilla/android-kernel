@@ -312,7 +312,7 @@ static void get_audpp_mbadrc_block(u32 *phy_addr)
 
 static s32 acdb_fill_audpp_mbadrc(void)
 {
-	u32 mbadrc_phys_addr = 0;
+	u32 mbadrc_phys_addr = -1;
 
 	get_audpp_mbadrc_block(&mbadrc_phys_addr);
 	if (IS_ERR_VALUE(mbadrc_phys_addr)) {
