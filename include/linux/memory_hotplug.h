@@ -10,6 +10,8 @@ struct zone;
 struct pglist_data;
 struct mem_section;
 
+extern unsigned long movable_reserved_start, movable_reserved_size;
+
 #ifdef CONFIG_MEMORY_HOTPLUG
 
 /*
