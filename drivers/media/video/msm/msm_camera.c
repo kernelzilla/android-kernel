@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1881,6 +1881,36 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 		} else
 			rc = msm_camera_flash_set_led_state(pmsm->sync->
 					sdata->flash_data, led_state);
+		break;
+	}
+
+	case MSM_CAM_IOCTL_STROBE_FLASH_CFG: {
+		uint32_t flash_type;
+		if (copy_from_user(&flash_type, argp, sizeof(flash_type))) {
+			CDBG("msm_strobe_flash_init failed");
+			ERR_COPY_FROM_USER();
+			rc = -EFAULT;
+		} else {
+			CDBG("msm_strobe_flash_init enter");
+			rc = msm_strobe_flash_init(pmsm->sync, flash_type);
+		}
+		break;
+	}
+
+	case MSM_CAM_IOCTL_STROBE_FLASH_RELEASE:
+		rc = pmsm->sync->sfctrl.strobe_flash_release(pmsm->sync->
+			sdata->strobe_flash_data);
+		break;
+
+	case MSM_CAM_IOCTL_STROBE_FLASH_CHARGE: {
+		uint32_t charge_en;
+		if (copy_from_user(&charge_en, argp, sizeof(charge_en))) {
+			ERR_COPY_FROM_USER();
+			rc = -EFAULT;
+		} else
+			rc = pmsm->sync->sfctrl.strobe_flash_charge(
+			pmsm->sync->sdata->strobe_flash_data->flash_charge,
+			charge_en);
 		break;
 	}
 

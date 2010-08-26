@@ -664,12 +664,23 @@ static struct platform_device msm_vpe_device = {
 
 #ifdef CONFIG_MSM_CAMERA
 
+#define VFE_CAMIF_TIMER1_GPIO 29
+#define VFE_CAMIF_TIMER2_GPIO 30
+#define VFE_CAMIF_TIMER3_GPIO_INT 31
+
 static uint32_t camera_off_gpio_table[] = {
 	GPIO_CFG(47, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 	GPIO_CFG(48, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 	GPIO_CFG(32, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(105, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(106, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER1_GPIO, 1,
+		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER2_GPIO, 0,
+		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER3_GPIO_INT, 0,
+		GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+
 };
 
 static uint32_t camera_on_gpio_table[] = {
@@ -678,6 +689,12 @@ static uint32_t camera_on_gpio_table[] = {
 	GPIO_CFG(32, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(105, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(106, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER1_GPIO, 1,
+		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER2_GPIO, 0,
+		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(VFE_CAMIF_TIMER3_GPIO_INT, 0,
+		GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static void config_gpio_table(uint32_t *table, int len)
@@ -783,12 +800,18 @@ struct resource msm_camera_resources[] = {
 	},
 };
 static struct msm_camera_sensor_flash_src msm_flash_src = {
-	.flash_sr_type				= MSM_CAMERA_FLASH_SRC_PWM,
-	._fsrc.pwm_src.freq			= 1000,
-	._fsrc.pwm_src.max_load		= 300,
-	._fsrc.pwm_src.low_load		= 30,
-	._fsrc.pwm_src.high_load	= 100,
-	._fsrc.pwm_src.channel		= 7,
+	.flash_sr_type = MSM_CAMERA_FLASH_SRC_PMIC,
+	._fsrc.pmic_src.num_of_src = 2,
+	._fsrc.pmic_src.low_current  = 100,
+	._fsrc.pmic_src.high_current = 300,
+	._fsrc.pmic_src.led_src_1 = PMIC8058_ID_FLASH_LED_0,
+	._fsrc.pmic_src.led_src_2 = PMIC8058_ID_FLASH_LED_1,
+	._fsrc.pmic_src.pmic_set_current = pm8058_set_flash_led_current,
+};
+static struct msm_camera_sensor_strobe_flash_data strobe_flash_xenon = {
+	.flash_charge = VFE_CAMIF_TIMER2_GPIO,
+	.flash_recharge_duration = 50000,
+	.irq = MSM_GPIO_TO_INT(VFE_CAMIF_TIMER3_GPIO_INT),
 };
 #ifdef CONFIG_IMX074
 static struct msm_camera_sensor_flash_data flash_imx074 = {
@@ -806,6 +829,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_imx074_data = {
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
 	.flash_data		= &flash_imx074,
+	.strobe_flash_data	= &strobe_flash_xenon,
 	.csi_if			= 1
 };
 struct platform_device msm_camera_sensor_imx074 = {

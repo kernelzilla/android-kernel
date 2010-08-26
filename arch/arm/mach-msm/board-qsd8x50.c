@@ -1648,10 +1648,20 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.appsz  = MSM_CLK_CTL_SIZE,
 };
 
+int pmic_set_flash_led_current(enum pmic8058_leds id, unsigned mA)
+{
+	int rc;
+	rc = pmic_flash_led_set_current(mA);
+	return rc;
+}
 static struct msm_camera_sensor_flash_src msm_flash_src = {
 	.flash_sr_type = MSM_CAMERA_FLASH_SRC_PMIC,
+	._fsrc.pmic_src.num_of_src = 1,
 	._fsrc.pmic_src.low_current  = 30,
 	._fsrc.pmic_src.high_current = 100,
+	._fsrc.pmic_src.led_src_1 = 0,
+	._fsrc.pmic_src.led_src_2 = 0,
+	._fsrc.pmic_src.pmic_set_current = pmic_set_flash_led_current,
 };
 
 #ifdef CONFIG_MT9D112

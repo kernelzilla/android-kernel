@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/input.h>
 #include <linux/usb.h>
+#include <linux/leds-pmic8058.h>
 
 /* platform device data structures */
 struct msm_acpu_clock_platform_data {
@@ -85,8 +86,12 @@ struct msm_camera_legacy_device_platform_data {
 #define MSM_CAMERA_FLASH_SRC_PWM  (0x00000001<<1)
 
 struct msm_camera_sensor_flash_pmic {
+	uint8_t num_of_src;
 	uint32_t low_current;
 	uint32_t high_current;
+	enum pmic8058_leds led_src_1;
+	enum pmic8058_leds led_src_2;
+	int (*pmic_set_current)(enum pmic8058_leds id, unsigned mA);
 };
 
 struct msm_camera_sensor_flash_pwm {
@@ -111,6 +116,14 @@ struct msm_camera_sensor_flash_data {
 	struct msm_camera_sensor_flash_src *flash_src;
 };
 
+struct msm_camera_sensor_strobe_flash_data {
+	int flash_charge; /* pin for charge */
+	uint32_t flash_recharge_duration;
+	uint32_t irq;
+	spinlock_t spin_lock;
+	spinlock_t timer_lock;
+};
+
 struct msm_camera_sensor_info {
 	const char *sensor_name;
 	int sensor_reset;
@@ -125,6 +138,7 @@ struct msm_camera_sensor_info {
 	struct msm_camera_sensor_flash_data *flash_data;
 	int csi_if;
 	struct msm_camera_csi_params csi_params;
+	struct msm_camera_sensor_strobe_flash_data *strobe_flash_data;
 };
 
 struct clk;

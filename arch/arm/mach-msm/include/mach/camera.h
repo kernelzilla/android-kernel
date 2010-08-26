@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -180,6 +180,13 @@ struct msm_sensor_ctrl {
 	int (*s_release)(void);
 	int (*s_config)(void __user *);
 };
+struct msm_strobe_flash_ctrl {
+	int (*strobe_flash_init)
+		(struct msm_camera_sensor_strobe_flash_data *);
+	int (*strobe_flash_release)
+		(struct msm_camera_sensor_strobe_flash_data *);
+	int (*strobe_flash_charge)(int32_t, int32_t);
+};
 
 /* this structure is used in kernel */
 struct msm_queue_cmd {
@@ -235,6 +242,7 @@ struct msm_sync {
 	struct msm_camvfe_fn vfefn;
 	struct msm_camvpe_fn vpefn;
 	struct msm_sensor_ctrl sctrl;
+	struct msm_strobe_flash_ctrl sfctrl;
 	struct wake_lock wake_lock;
 	struct platform_device *pdev;
 	uint8_t opencnt;
@@ -306,10 +314,16 @@ struct axidata {
 	int msm_camera_flash_set_led_state(
 		struct msm_camera_sensor_flash_data *fdata,
 		unsigned led_state);
+	int msm_strobe_flash_init(struct msm_sync *sync, uint32_t sftype);
 #else
 	static inline int msm_camera_flash_set_led_state(
 		struct msm_camera_sensor_flash_data *fdata,
 		unsigned led_state)
+	{
+		return -ENOTSUPP;
+	}
+	static inline int msm_strobe_flash_init(
+		struct msm_sync *sync, uint32_t sftype)
 	{
 		return -ENOTSUPP;
 	}

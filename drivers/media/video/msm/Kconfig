@@ -85,7 +85,7 @@ config VB6801
 
 config MSM_CAMERA_FLASH
 	bool "Qualcomm MSM camera flash support"
-	depends on MSM_CAMERA && !ARCH_MSM8X60
+	depends on MSM_CAMERA
 	default y
 	---help---
 	  Enable support for LED flash for msm camera

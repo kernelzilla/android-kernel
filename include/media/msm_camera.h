@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -106,6 +106,9 @@
 #define MSM_CAMERA_LED_LOW  1
 #define MSM_CAMERA_LED_HIGH 2
 
+#define MSM_CAMERA_STROBE_FLASH_NONE 0
+#define MSM_CAMERA_STROBE_FLASH_XENON 1
+
 #define MSM_CAM_IOCTL_FLASH_LED_CFG \
 	_IOW(MSM_CAM_IOCTL_MAGIC, 22, unsigned *)
 
@@ -119,6 +122,15 @@
 	_IOR(MSM_CAM_IOCTL_MAGIC, 25, struct msm_ctrl_cmt_t *)
 #define MSM_CAM_IOCTL_AF_CTRL_DONE \
 	_IOW(MSM_CAM_IOCTL_MAGIC, 26, struct msm_ctrl_cmt_t *)
+
+#define MSM_CAM_IOCTL_STROBE_FLASH_CFG \
+	_IOW(MSM_CAM_IOCTL_MAGIC, 29, uint32_t *)
+
+#define MSM_CAM_IOCTL_STROBE_FLASH_CHARGE \
+	_IOW(MSM_CAM_IOCTL_MAGIC, 30, uint32_t *)
+
+#define MSM_CAM_IOCTL_STROBE_FLASH_RELEASE \
+	_IO(MSM_CAM_IOCTL_MAGIC, 31)
 
 #define MAX_SENSOR_NUM  3
 #define MAX_SENSOR_NAME 32
