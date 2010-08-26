@@ -578,6 +578,35 @@ static void config_camera_off_gpios(void)
 	gpio_free(GPIO_CAM_EN);
 }
 
+#define GPIO_CAM_EN_WEB_CAM (GPIO_EXPANDER_GPIO_BASE + (16 * 3) + 8 + 4)
+
+static void config_camera_on_gpios_web_cam(void)
+{
+	int rc;
+	config_gpio_table(camera_on_gpio_table,
+		ARRAY_SIZE(camera_on_gpio_table));
+
+	rc = gpio_request(GPIO_CAM_EN_WEB_CAM, "CAM_EN");
+	if (rc) {
+		pr_err(KERN_ERR "%s: CAMSENSOR gpio %d request"
+			"failed\n", __func__, GPIO_CAM_EN_WEB_CAM);
+		return;
+	}
+	gpio_direction_output(GPIO_CAM_EN_WEB_CAM, 0);
+	msleep(20);
+	gpio_set_value(GPIO_CAM_EN_WEB_CAM, 0);
+	msleep(50);
+}
+
+static void config_camera_off_gpios_web_cam(void)
+{
+	config_gpio_table(camera_off_gpio_table,
+		ARRAY_SIZE(camera_off_gpio_table));
+
+	gpio_set_value(GPIO_CAM_EN_WEB_CAM, 0);
+	msleep(20);
+	gpio_free(GPIO_CAM_EN_WEB_CAM);
+}
 
 struct msm_camera_device_platform_data msm_camera_device_data = {
 	.camera_gpio_on  = config_camera_on_gpios,
@@ -585,6 +614,16 @@ struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.csiphy = 0x04800000,
 	.ioext.csisz  = 0x00000400,
 	.ioext.csiirq = CSI_0_IRQ,
+	.ioclk.mclk_clk_rate = 24000000,
+	.ioclk.vfe_clk_rate  = 228570000,
+};
+
+struct msm_camera_device_platform_data msm_camera_device_data_web_cam = {
+	.camera_gpio_on  = config_camera_on_gpios_web_cam,
+	.camera_gpio_off = config_camera_off_gpios_web_cam,
+	.ioext.csiphy = 0x04900000,
+	.ioext.csisz  = 0x00000400,
+	.ioext.csiirq = CSI_1_IRQ,
 	.ioclk.mclk_clk_rate = 24000000,
 	.ioclk.vfe_clk_rate  = 228570000,
 };
@@ -634,10 +673,39 @@ struct platform_device msm_camera_sensor_imx074 = {
 	},
 };
 #endif
+#ifdef CONFIG_WEBCAM_OV7692
+static struct msm_camera_sensor_flash_data flash_ov7692 = {
+	.flash_type		= MSM_CAMERA_FLASH_LED,
+	.flash_src		= &msm_flash_src
+};
+static struct msm_camera_sensor_info msm_camera_sensor_ov7692_data = {
+	.sensor_name	= "ov7692",
+	.sensor_reset	= 106,
+	.sensor_pwd		= 85,
+	.vcm_pwd		= 1,
+	.vcm_enable		= 0,
+	.pdata			= &msm_camera_device_data_web_cam,
+	.resource		= msm_camera_resources,
+	.num_resources	= ARRAY_SIZE(msm_camera_resources),
+	.flash_data		= &flash_ov7692,
+	.csi_if			= 1
+};
+struct platform_device msm_camera_sensor_webcam = {
+	.name	= "msm_camera_ov7692",
+	.dev	= {
+		.platform_data = &msm_camera_sensor_ov7692_data,
+	},
+};
+#endif
 static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 	#ifdef CONFIG_IMX074
 	{
 		I2C_BOARD_INFO("imx074", 0x1A),
+	},
+	#endif
+	#ifdef CONFIG_WEBCAM_OV7692
+	{
+		I2C_BOARD_INFO("ov7692", 0x78),
 	},
 	#endif
 };
@@ -1301,6 +1369,9 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
 #endif
+#ifdef CONFIG_WEBCAM_OV7692
+	&msm_camera_sensor_webcam,
+#endif
 #endif
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
@@ -1376,6 +1447,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_MSM_CAMERA
 #ifdef CONFIG_IMX074
 	&msm_camera_sensor_imx074,
+#endif
+#ifdef CONFIG_WEBCAM_OV7692
+	&msm_camera_sensor_webcam,
 #endif
 #endif
 #ifdef CONFIG_MSM_GEMINI
