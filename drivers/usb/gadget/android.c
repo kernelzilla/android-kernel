@@ -69,6 +69,7 @@ struct android_dev {
 
 	int product_id;
 	int version;
+	int enable_rndis_msc;
 };
 
 static struct android_dev *_android_dev;
@@ -366,14 +367,17 @@ void android_enable_function(struct usb_function *f, int enable)
 				dev->cdev->desc.bDeviceProtocol      = 0;
 			}
 
-			/* Windows does not support other interfaces when RNDIS is enabled,
-			 * so we disable UMS when RNDIS is on.
-			 * Disable other interfaces except adb as we have only
-			 * RNDIS + ADB composition.
-			 */
 			list_for_each_entry(func, &android_config_driver.functions, list) {
-				if (strcmp(func->name, "rndis") && strcmp(func->name, "adb"))
-					func->hidden = enable;
+				if (dev->enable_rndis_msc) {
+					if (strcmp(func->name, "rndis") &&
+					strcmp(func->name, "adb") &&
+					strcmp(func->name, "usb_mass_storage"))
+						func->hidden = enable;
+				} else {
+					if (strcmp(func->name, "rndis") &&
+					strcmp(func->name, "adb"))
+						func->hidden = enable;
+				}
 			}
 		}
 #endif
@@ -435,6 +439,8 @@ static int __init android_probe(struct platform_device *pdev)
 					pdata->manufacturer_name;
 		if (pdata->serial_number)
 			strings_dev[STRING_SERIAL_IDX].s = pdata->serial_number;
+		if (pdata->enable_rndis_msc)
+			dev->enable_rndis_msc = pdata->enable_rndis_msc;
 	}
 
 	return usb_composite_register(&android_usb_driver);
