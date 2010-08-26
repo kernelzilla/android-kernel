@@ -173,7 +173,8 @@ struct vpe_ctrl_type {
 	uint32_t          state;
 	struct timespec   ts;
 	struct dis_offset_type   dis_offset;
-	uint32_t          pcbcr_dis;
+	uint32_t          pcbcr_before_dis;
+	uint32_t          pcbcr_dis_offset;
 };
 
 /*
