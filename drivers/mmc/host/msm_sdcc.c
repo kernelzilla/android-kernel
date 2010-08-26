@@ -1747,7 +1747,8 @@ msmsdcc_runtime_suspend(struct device *dev)
 			}
 		}
 
-		if (host->plat->sdiowakeup_irq)
+		if (host->plat->sdiowakeup_irq && mmc->card &&
+				mmc->card->type == MMC_TYPE_SDIO)
 			enable_irq(host->plat->sdiowakeup_irq);
 	}
 	return rc;
@@ -1774,7 +1775,8 @@ msmsdcc_runtime_resume(struct device *dev)
 
 		if (host->plat->sdiowakeup_irq && !host->sdio_irq_disabled) {
 			spin_unlock_irqrestore(&host->lock, flags);
-			disable_irq(host->plat->sdiowakeup_irq);
+			if (mmc->card && mmc->card->type == MMC_TYPE_SDIO)
+				disable_irq(host->plat->sdiowakeup_irq);
 		} else {
 			release_lock = 1;
 			host->sdio_irq_disabled = 0;
