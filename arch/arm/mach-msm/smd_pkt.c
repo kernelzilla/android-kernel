@@ -55,7 +55,6 @@ struct smd_pkt_dev {
 	struct mutex ch_lock;
 	struct mutex rx_lock;
 	struct mutex tx_lock;
-	struct mutex is_open_lock;
 	wait_queue_head_t ch_wait_queue;
 	wait_queue_head_t ch_opened_wait_queue;
 
@@ -103,9 +102,7 @@ static void clean_and_signal(struct smd_pkt_dev *smd_pkt_devp)
 	smd_pkt_devp->has_reset = 1;
 	mutex_unlock(&smd_pkt_devp->has_reset_lock);
 
-	mutex_lock(&smd_pkt_devp->is_open_lock);
 	smd_pkt_devp->is_open = 0;
-	mutex_unlock(&smd_pkt_devp->is_open_lock);
 
 	wake_up_interruptible(&smd_pkt_devp->ch_wait_queue);
 	wake_up_interruptible(&smd_pkt_devp->ch_opened_wait_queue);
@@ -420,6 +417,13 @@ static int smd_pkt_dummy_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static uint32_t is_modem_smsm_inited(void)
+{
+	uint32_t modem_state;
+	modem_state = smsm_get_state(SMSM_MODEM_STATE);
+	return modem_state & SMSM_INIT;
+}
+
 int smd_pkt_open(struct inode *inode, struct file *file)
 {
 	int r = 0;
@@ -440,6 +444,19 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 			r = PTR_ERR(smd_pkt_devp->pil);
 			goto out;
 		}
+
+		/* Wait for the modem SMSM to be inited for the SMD
+		** Loopback channel to be allocated at the modem. Since
+		** the wait need to be done atmost once, using msleep
+		** doesn't degrade the performance. */
+		if (!strcmp(smd_ch_name[smd_pkt_devp->i], "LOOPBACK")) {
+			if (!is_modem_smsm_inited())
+				msleep(5000);
+			smsm_change_state(SMSM_APPS_STATE,
+				0, SMSM_SMD_LOOPBACK);
+			msleep(100);
+		}
+
 		/*
 		 * Wait for a packet channel to be allocated so we know
 		 * the modem is ready enough.
@@ -449,22 +466,10 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 		if (r == 0) {
 			pr_err("Timed out waiting for SMD channel\n");
 			r = -ETIMEDOUT;
-			pil_put(smd_pkt_devp->pil);
-			goto out;
+			goto release_pil;
 		} else if (r < 0) {
 			pr_err("Error waiting for SMD channel: %d\n", r);
-			pil_put(smd_pkt_devp->pil);
-			goto out;
-		}
-
-		if (!strcmp(smd_ch_name[smd_pkt_devp->i], "LOOPBACK")) {
-			/* set smsm state to SMSM_SMD_LOOPBACK state
-			** and wait allowing enough time for Modem side
-			** to open the loopback port (Currently, this is
-			** this is effecient than polling).*/
-			smsm_change_state(SMSM_APPS_STATE,
-					  0, SMSM_SMD_LOOPBACK);
-			msleep(100);
+			goto release_pil;
 		}
 
 		r = smd_open(smd_ch_name[smd_pkt_devp->i],
@@ -475,9 +480,30 @@ int smd_pkt_open(struct inode *inode, struct file *file)
 			printk(KERN_ERR "%s failed for %s with rc %d\n",
 					__func__, smd_ch_name[smd_pkt_devp->i],
 					r);
-			pil_put(smd_pkt_devp->pil);
+			goto release_pil;
 		}
+
+		r = wait_event_interruptible_timeout(
+				smd_pkt_devp->ch_opened_wait_queue,
+				smd_pkt_devp->is_open, (2 * HZ));
+		if (r < 0)
+			printk(KERN_ERR "%s: ERROR in"
+					" wait_event_interruptible - rc %d\n",
+					__func__, r);
+		else if (r == 0) {
+			printk(KERN_ERR "%s: Timed out waiting for %s to open",
+					__func__,
+					smd_ch_name[smd_pkt_devp->i]);
+			r = -ETIMEDOUT;
+		} else if (!smd_pkt_devp->is_open) {
+			printk("%s: Invalid open notification\n", __func__);
+			r = -ENODEV;
+		} else
+			r = 0;
 	}
+release_pil:
+	if (r < 0)
+		pil_put(smd_pkt_devp->pil);
 out:
 	mutex_unlock(&smd_pkt_devp->ch_lock);
 
@@ -569,7 +595,6 @@ static int __init smd_pkt_init(void)
 		mutex_init(&smd_pkt_devp[i]->ch_lock);
 		mutex_init(&smd_pkt_devp[i]->rx_lock);
 		mutex_init(&smd_pkt_devp[i]->tx_lock);
-		mutex_init(&smd_pkt_devp[i]->is_open_lock);
 
 		cdev_init(&smd_pkt_devp[i]->cdev, &smd_pkt_fops);
 		smd_pkt_devp[i]->cdev.owner = THIS_MODULE;
