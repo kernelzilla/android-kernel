@@ -39,7 +39,6 @@
 #include <linux/uaccess.h>
 #include <linux/mutex.h>
 #include <linux/msm_kgsl.h>
-
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
@@ -1399,8 +1398,10 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 
 	if (pull) /* LCDC or DTV mode */
 		mdp4_overlay_reg_flush(pipe, 0);
+#ifdef CONFIG_FB_MSM_MDDI
 	else  	/* mddi */
 		mdp4_mddi_overlay_restore();
+#endif
 
 	mdp4_stat.overlay_unset[pipe->mixer_num]++;
 
@@ -1520,6 +1521,7 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 
 	if (pull)	/* LCDC or DTV mode */
 		mdp4_overlay_reg_flush(pipe, 1);
+#ifdef CONFIG_FB_MSM_MDDI
 	else { 	/* MDDI mode */
 
 #ifdef MDP4_NONBLOCKING
@@ -1530,6 +1532,7 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 			mdp4_mddi_overlay_kickoff(mfd, pipe);
 
 	}
+#endif
 
 	mdp4_stat.overlay_play[pipe->mixer_num]++;
 

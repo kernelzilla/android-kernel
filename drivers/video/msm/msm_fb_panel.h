@@ -43,14 +43,16 @@ typedef struct panel_id_s {
 } panel_id_type;
 
 /* panel type list */
-#define NO_PANEL       0xffff	/* No Panel */
-#define MDDI_PANEL     1	/* MDDI */
-#define EBI2_PANEL     2	/* EBI2 */
-#define LCDC_PANEL     3	/* internal LCDC type */
-#define EXT_MDDI_PANEL 4	/* Ext.MDDI */
-#define TV_PANEL       5	/* TV */
-#define HDMI_PANEL     6	/* HDMI TV */
-#define DTV_PANEL      7	/* DTV */
+#define NO_PANEL		0xffff	/* No Panel */
+#define MDDI_PANEL		1	/* MDDI */
+#define EBI2_PANEL		2	/* EBI2 */
+#define LCDC_PANEL		3	/* internal LCDC type */
+#define EXT_MDDI_PANEL		4	/* Ext.MDDI */
+#define TV_PANEL		5	/* TV */
+#define HDMI_PANEL		6	/* HDMI TV */
+#define DTV_PANEL		7	/* DTV */
+#define MIPI_VIDEO_PANEL	8	/* MIPI */
+#define MIPI_CMD_PANEL		9	/* MIPI */
 
 /* panel class */
 typedef enum {

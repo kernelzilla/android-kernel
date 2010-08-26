@@ -616,7 +616,27 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	return platform_device_register(pdev);
 }
 
-#define MDP_HW_BASE 0x05100000
+#define MIPI_DSI_HW_BASE	0x04700000
+#define ROTATOR_HW_BASE		0x04E00000
+#define TVENC_HW_BASE		0x04F00000
+#define MDP_HW_BASE		0x05100000
+
+static struct resource msm_mipi_dsi_resources[] = {
+	{
+		.name   = "mipi_dsi",
+		.start  = MIPI_DSI_HW_BASE,
+		.end    = MIPI_DSI_HW_BASE + 0x000F0000 - 1,
+		.flags  = IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device msm_mipi_dsi_device = {
+	.name   = "mipi_dsi",
+	.id     = 0,
+	.num_resources  = ARRAY_SIZE(msm_mipi_dsi_resources),
+	.resource       = msm_mipi_dsi_resources,
+};
+
 static struct resource msm_mdp_resources[] = {
 	{
 		.name   = "mdp",
@@ -700,6 +720,8 @@ void __init msm_fb_register_device(char *name, void *data)
 		msm_register_device(&msm_mdp_device, data);
 	else if (!strncmp(name, "lcdc", 4))
 		msm_register_device(&msm_lcdc_device, data);
+	else if (!strncmp(name, "mipi_dsi", 8))
+		msm_register_device(&msm_mipi_dsi_device, data);
 	else
 		printk(KERN_ERR "%s: unknown device! %s\n", __func__, name);
 }
