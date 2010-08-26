@@ -3106,14 +3106,197 @@ static void __init msm8x60_init_tlmm(void)
 	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC5_SUPPORT))
 
-static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
+struct sdcc_reg {
+	/* VDD/VCC/VCCQ regulator name on PMIC8058/PMIC8089*/
+	const char *reg_name;
+	/*
+	 * is set voltage supported for this regulator?
+	 * 0 = not supported, 1 = supported
+	 */
+	unsigned char set_voltage_sup;
+	/* VDD/VCC/VCCQ voltage regulator handle */
+	struct regulator *reg;
+};
+/* all 5 SDCC controllers requires VDD/VCC voltage  */
+static struct sdcc_reg sdcc_vdd_reg_data[5];
+/* only SDCC1 requires VCCQ voltage */
+static struct sdcc_reg sdcc_vccq_reg_data[1];
+
+struct sdcc_reg_data {
+	struct sdcc_reg *vdd_data; /* keeps VDD/VCC regulator info */
+	struct sdcc_reg *vccq_data; /* keeps VCCQ regulator info */
+	unsigned char sts; /* regulator enable/disable status */
+};
+/* msm8x60 have 5 SDCC controllers */
+static struct sdcc_reg_data sdcc_vreg_data[5];
+
+/* this init function should be called only once for each SDCC */
+static int msm_sdcc_vreg_init(int dev_id, unsigned char init)
 {
 	int rc = 0;
+	struct sdcc_reg *curr_vdd_reg;
+	struct sdcc_reg *curr_vccq_reg;
+	struct sdcc_reg_data *curr;
+
+	curr = &sdcc_vreg_data[dev_id - 1];
+	curr_vdd_reg = curr->vdd_data;
+	curr_vccq_reg = curr->vccq_data;
+
+	if (init) {
+		/*
+		 * get the regulator handle from voltage regulator framework
+		 * and then try to set the voltage level for the regulator
+		 */
+		if (curr_vdd_reg) {
+			curr_vdd_reg->reg =
+				regulator_get(NULL, curr_vdd_reg->reg_name);
+			if (IS_ERR(curr_vdd_reg->reg)) {
+				rc = PTR_ERR(curr_vdd_reg->reg);
+				pr_err("%s: regulator_get(%s) failed = %d\n",
+					__func__, curr_vdd_reg->reg_name, rc);
+				goto out;
+			}
+
+			if (curr_vdd_reg->set_voltage_sup) {
+				rc = regulator_set_voltage(curr_vdd_reg->reg,
+					2850000, 2850000);
+				if (rc) {
+					pr_err("%s: regulator_set_voltage(%s)"
+						" = %d\n", __func__,
+						curr_vdd_reg->reg_name, rc);
+					goto vdd_reg_put;
+				}
+			}
+		}
+
+		if (curr_vccq_reg) {
+			curr_vccq_reg->reg =
+				regulator_get(NULL, curr_vccq_reg->reg_name);
+			if (IS_ERR(curr_vccq_reg->reg)) {
+				rc = PTR_ERR(curr_vccq_reg->reg);
+				pr_err("%s: regulator get of %s failed (%d)\n",
+					__func__, curr_vccq_reg->reg_name, rc);
+				goto vdd_reg_put;
+			}
+			if (curr_vccq_reg->set_voltage_sup) {
+				rc = regulator_set_voltage(curr_vccq_reg->reg,
+						2850000, 2850000);
+				if (rc) {
+					pr_err("%s: regulator_set_voltage()"
+						"= %d\n", __func__, rc);
+					goto vccq_reg_put;
+				}
+			}
+		}
+	} else {
+		/* deregister with voltage regulator framework */
+		rc = 0;
+		goto vccq_reg_put;
+	}
+	goto out;
+
+vccq_reg_put:
+	if (curr_vccq_reg)
+		regulator_put(curr_vccq_reg->reg);
+vdd_reg_put:
+	if (curr_vdd_reg)
+		regulator_put(curr_vdd_reg->reg);
+out:
+	return rc;
+}
+
+static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
+{
+	int rc = 0;
+	struct sdcc_reg *curr_vdd_reg;
+	struct sdcc_reg *curr_vccq_reg;
+	struct sdcc_reg_data *curr;
+
+	curr = &sdcc_vreg_data[dev_id - 1];
+	curr_vdd_reg = curr->vdd_data;
+	curr_vccq_reg = curr->vccq_data;
+
+	/* check if regulators are initialized or not? */
+	if ((curr_vdd_reg && !curr_vdd_reg->reg) ||
+		(curr_vccq_reg && !curr_vccq_reg->reg)) {
+		/* initialize voltage regulators required for this SDCC */
+		rc = msm_sdcc_vreg_init(dev_id, 1);
+		if (rc) {
+			pr_err("%s: regulator init failed = %d\n",
+					__func__, rc);
+			goto out;
+		}
+	}
+
+	if (curr->sts == enable)
+		goto out;
+
+	if (enable) {
+		if (curr_vdd_reg) {
+			rc = regulator_enable(curr_vdd_reg->reg);
+			if (rc) {
+				pr_err("%s: regulator_enable(%s) failed"
+					" = %d\n", __func__,
+					curr_vdd_reg->reg_name, rc);
+				goto out;
+			}
+		}
+		if (curr_vccq_reg) {
+			rc = regulator_enable(curr_vccq_reg->reg);
+			if (rc) {
+				pr_err("%s: regulator_enable(%s) failed"
+					" = %d\n", __func__,
+					curr_vccq_reg->reg_name, rc);
+				goto vdd_reg_disable;
+			}
+		}
+		/*
+		 * now we can safely say that all required regulators
+		 * are enabled for this SDCC
+		 */
+		curr->sts = enable;
+	} else {
+		if (curr_vdd_reg) {
+			rc = regulator_disable(curr_vdd_reg->reg);
+			if (rc) {
+				pr_err("%s: regulator_disable(%s) = %d\n",
+					__func__, curr_vdd_reg->reg_name, rc);
+				goto out;
+			}
+		}
+
+		if (curr_vccq_reg) {
+			rc = regulator_disable(curr_vccq_reg->reg);
+			if (rc) {
+				pr_err("%s: regulator_disable(%s) = %d\n",
+					__func__, curr_vccq_reg->reg_name, rc);
+				goto out;
+			}
+		}
+		/*
+		 * now we can safely say that all required
+		 * regulators are disabled for this SDCC
+		 */
+		curr->sts = enable;
+	}
+	goto out;
+
+vdd_reg_disable:
+	if (curr_vdd_reg)
+		regulator_disable(curr_vdd_reg->reg);
+out:
+	return rc;
+}
+
+
+static u32 msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
+{
+	u32 rc = 0;
 	struct platform_device *pdev;
 
 	pdev = container_of(dv, struct platform_device, dev);
 
-	/* Handle VREGs here once VREG support is available */
+	rc = msm_sdcc_setup_vreg(pdev->id, (vdd ? 1 : 0));
 
 	return rc;
 }
@@ -3224,18 +3407,45 @@ static struct mmc_platform_data msm8x60_sdc5_data = {
 static void __init msm8x60_init_mmc(void)
 {
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
+	/* SDCC1 : eMMC card connected */
+	sdcc_vreg_data[0].vdd_data = &sdcc_vdd_reg_data[0];
+	sdcc_vreg_data[0].vdd_data->reg_name = "8901_l5";
+	sdcc_vreg_data[0].vdd_data->set_voltage_sup = 1;
+	sdcc_vreg_data[0].vccq_data = &sdcc_vccq_reg_data[0];
+	sdcc_vreg_data[0].vccq_data->reg_name = "8901_lvs0";
+	sdcc_vreg_data[0].vccq_data->set_voltage_sup = 0;
 	msm_add_sdcc(1, &msm8x60_sdc1_data);
 #endif
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+	/* SDCC2 : NC (no card connected)*/
+	sdcc_vreg_data[1].vdd_data = &sdcc_vdd_reg_data[1];
+	sdcc_vreg_data[1].vdd_data->reg_name = "8058_s3";
+	sdcc_vreg_data[1].vdd_data->set_voltage_sup = 1;
+	sdcc_vreg_data[1].vccq_data = NULL;
 	msm_add_sdcc(2, &msm8x60_sdc2_data);
 #endif
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+	/* SDCC3 : External card slot connected */
+	sdcc_vreg_data[2].vdd_data = &sdcc_vdd_reg_data[2];
+	sdcc_vreg_data[2].vdd_data->reg_name = "8058_l14";
+	sdcc_vreg_data[2].vdd_data->set_voltage_sup = 1;
+	sdcc_vreg_data[2].vccq_data = NULL;
 	msm_add_sdcc(3, &msm8x60_sdc3_data);
 #endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+	/* SDCC4 : NC (no card connected)*/
+	sdcc_vreg_data[3].vdd_data = &sdcc_vdd_reg_data[3];
+	sdcc_vreg_data[3].vdd_data->reg_name = "8058_s3";
+	sdcc_vreg_data[3].vdd_data->set_voltage_sup = 1;
+	sdcc_vreg_data[3].vccq_data = NULL;
 	msm_add_sdcc(4, &msm8x60_sdc4_data);
 #endif
 #ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
+	/* SDCC4 : NC (no card connected)*/
+	sdcc_vreg_data[4].vdd_data = &sdcc_vdd_reg_data[4];
+	sdcc_vreg_data[4].vdd_data->reg_name = "8058_s3";
+	sdcc_vreg_data[4].vdd_data->set_voltage_sup = 1;
+	sdcc_vreg_data[4].vccq_data = NULL;
 	msm_add_sdcc(5, &msm8x60_sdc5_data);
 #endif
 }
