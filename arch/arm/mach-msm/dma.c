@@ -608,8 +608,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 }
 
 #ifndef CONFIG_MSM_ADM3
-static int msm_dmov_suspend_late(struct platform_device *pdev,
-			    pm_message_t state)
+static int msm_dmov_suspend_late(struct device *dev)
 {
 	int i;
 	unsigned long irq_flags[ARRAY_SIZE(dmov_conf)];
@@ -649,10 +648,10 @@ static struct dev_pm_ops msm_dmov_dev_pm_ops = {
 	.runtime_suspend = msm_dmov_runtime_suspend,
 	.runtime_resume = msm_dmov_runtime_resume,
 	.runtime_idle = msm_dmov_runtime_idle,
+	.suspend = msm_dmov_suspend_late,
 };
 
 static struct platform_driver msm_dmov_driver = {
-	.suspend = msm_dmov_suspend_late,
 	.driver = {
 		.name = MODULE_NAME,
 		.owner = THIS_MODULE,
