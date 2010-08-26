@@ -58,10 +58,12 @@
 /*
  * Halt/Status Checking Mode Macros
  */
-#define NOCHECK 0	/* No bit to check, do nothing */
-#define HALT	1	/* Bit polarity: 1 = halted */
-#define ENABLE	2	/* Bit polarity: 1 = running */
-#define DELAY	3	/* No bit to check, just delay */
+#define NOCHECK		0	/* No bit to check, do nothing */
+#define HALT		1	/* Bit pol: 1 = halted */
+#define HALT_VOTED	2	/* Bit pol: 1 = halted; delay on disable */
+#define ENABLE		3	/* Bit pol: 1 = running */
+#define ENABLE_VOTED	4	/* Bit pol: 1 = running; delay on disable */
+#define DELAY		5	/* No bit to check, just delay */
 
 /*
  * Generic frequency-definition structs and macros
