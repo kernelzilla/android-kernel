@@ -49,7 +49,10 @@
 #define GSBIn_SIM_CLK_CTL_REG(n)	REG(0x29D8+(0x20*((n)-1)))
 #define GSBIn_UART_APPS_NS_REG(n)	REG(0x29D4+(0x20*((n)-1)))
 #define PDM_CLK_NS_REG			REG(0x2CC0)
-#define PLL_ENA_SC0_REG			REG(0x34C0)
+#define BB_PLL_ENA_SC0_REG		REG(0x34C0)
+#define BB_PLL0_STATUS_REG		REG(0x30D8)
+#define BB_PLL6_STATUS_REG		REG(0x3118)
+#define BB_PLL8_STATUS_REG		REG(0x3158)
 #define PRNG_CLK_NS_REG			REG(0x2E80)
 #define RINGOSC_NS_REG			REG(0x2DC0)
 #define RINGOSC_STATUS_REG		REG(0x2DCC)
@@ -109,21 +112,24 @@
 #define MISC_CC2_REG			REG_MM(0x005C)
 #define PIXEL_CC_REG			REG_MM(0x00D4)
 #define PIXEL_NS_REG			REG_MM(0x00DC)
-#define PLL0_CONFIG_REG			REG_MM(0x0310)
-#define PLL0_L_VAL_REG			REG_MM(0x0304)
-#define PLL0_M_VAL_REG			REG_MM(0x0308)
-#define PLL0_MODE_REG			REG_MM(0x0300)
-#define PLL0_N_VAL_REG			REG_MM(0x030C)
-#define PLL1_CONFIG_REG			REG_MM(0x032C)
-#define PLL1_L_VAL_REG			REG_MM(0x0320)
-#define PLL1_M_VAL_REG			REG_MM(0x0324)
-#define PLL1_MODE_REG			REG_MM(0x031C)
-#define PLL1_N_VAL_REG			REG_MM(0x0328)
-#define PLL2_CONFIG_REG			REG_MM(0x0348)
-#define PLL2_L_VAL_REG			REG_MM(0x033C)
-#define PLL2_M_VAL_REG			REG_MM(0x0340)
-#define PLL2_MODE_REG			REG_MM(0x0338)
-#define PLL2_N_VAL_REG			REG_MM(0x0344)
+#define MM_PLL0_CONFIG_REG		REG_MM(0x0310)
+#define MM_PLL0_L_VAL_REG		REG_MM(0x0304)
+#define MM_PLL0_M_VAL_REG		REG_MM(0x0308)
+#define MM_PLL0_MODE_REG		REG_MM(0x0300)
+#define MM_PLL0_N_VAL_REG		REG_MM(0x030C)
+#define MM_PLL0_STATUS_REG		REG_MM(0x0318)
+#define MM_PLL1_CONFIG_REG		REG_MM(0x032C)
+#define MM_PLL1_L_VAL_REG		REG_MM(0x0320)
+#define MM_PLL1_M_VAL_REG		REG_MM(0x0324)
+#define MM_PLL1_MODE_REG		REG_MM(0x031C)
+#define MM_PLL1_N_VAL_REG		REG_MM(0x0328)
+#define MM_PLL1_STATUS_REG		REG_MM(0x0334)
+#define MM_PLL2_CONFIG_REG		REG_MM(0x0348)
+#define MM_PLL2_L_VAL_REG		REG_MM(0x033C)
+#define MM_PLL2_M_VAL_REG		REG_MM(0x0340)
+#define MM_PLL2_MODE_REG		REG_MM(0x0338)
+#define MM_PLL2_N_VAL_REG		REG_MM(0x0344)
+#define MM_PLL2_STATUS_REG		REG_MM(0x0350)
 #define ROT_NS_REG			REG_MM(0x00E8)
 #define SAXI_EN_REG			REG_MM(0x0030)
 #define SW_RESET_AHB_REG		REG_MM(0x020C)
@@ -155,6 +161,7 @@
 #define LCC_PLL0_M_VAL_REG		REG_LPA(0x0008)
 #define LCC_PLL0_MODE_REG		REG_LPA(0x0000)
 #define LCC_PLL0_N_VAL_REG		REG_LPA(0x000C)
+#define LCC_PLL0_STATUS_REG		REG_LPA(0x0018)
 #define LCC_PRI_PLL_CLK_CTL_REG		REG_LPA(0x00C4)
 #define LCC_SPARE_I2S_MIC_NS_REG	REG_LPA(0x0078)
 #define LCC_SPARE_I2S_MIC_STATUS_REG	REG_LPA(0x0080)
@@ -215,21 +222,6 @@
 #define TEST_MMHS(v)	((TEST_TYPE_MMHS << TEST_TYPE_SHIFT) | BVAL(7, 0, v))
 #define TEST_LPA(v)	((TEST_TYPE_LPA << TEST_TYPE_SHIFT)  | BVAL(7, 0, v))
 
-struct clk_source soc_clk_sources[NUM_SRC] = {
-	[PLL_0].par = SRC_NONE,
-	[PLL_1].par = SRC_NONE,
-	[PLL_2].par = SRC_NONE,
-	[PLL_3].par = SRC_NONE,
-	[PLL_4].par = SRC_NONE,
-	[PLL_5].par = SRC_NONE,
-	[PLL_6].par = SRC_NONE,
-	[PLL_7].par = SRC_NONE,
-	[PLL_8].par = SRC_NONE,
-	[MXO].par = SRC_NONE,
-	[PXO].par = SRC_NONE,
-	[CXO].par = SRC_NONE,
-};
-
 /*
  * SoC-specific Set-Rate Functions
  */
@@ -270,36 +262,36 @@ static void set_rate_tv(struct clk_local *clk, struct clk_freq_tbl *nf)
 	uint32_t pll_mode, pll_config;
 
 	/* Disable PLL output. */
-	pll_mode = readl(PLL2_MODE_REG);
+	pll_mode = readl(MM_PLL2_MODE_REG);
 	pll_mode &= ~B(0);
-	writel(pll_mode, PLL2_MODE_REG);
+	writel(pll_mode, MM_PLL2_MODE_REG);
 
 	/* Assert active-low PLL reset. */
 	pll_mode &= ~B(2);
-	writel(pll_mode, PLL2_MODE_REG);
+	writel(pll_mode, MM_PLL2_MODE_REG);
 
 	/* Program L, M and N values. */
-	writel(rate->l_val, PLL2_L_VAL_REG);
-	writel(rate->m_val, PLL2_M_VAL_REG);
-	writel(rate->n_val, PLL2_N_VAL_REG);
+	writel(rate->l_val, MM_PLL2_L_VAL_REG);
+	writel(rate->m_val, MM_PLL2_M_VAL_REG);
+	writel(rate->n_val, MM_PLL2_N_VAL_REG);
 
 	/* Configure post-divide and VCO. */
-	pll_config = readl(PLL2_CONFIG_REG);
+	pll_config = readl(MM_PLL2_CONFIG_REG);
 	pll_config &= ~(BM(21, 20) | BM(17, 16));
 	pll_config |= (BVAL(21, 20, rate->post_div));
 	pll_config |= (BVAL(17, 16, rate->vco));
-	writel(pll_config, PLL2_CONFIG_REG);
+	writel(pll_config, MM_PLL2_CONFIG_REG);
 
 	/* Configure MND. */
 	set_rate_mnd(clk, nf);
 
 	/* De-assert active-low PLL reset. */
 	pll_mode |= B(2);
-	writel(pll_mode, PLL2_MODE_REG);
+	writel(pll_mode, MM_PLL2_MODE_REG);
 
 	/* Enable PLL output. */
 	pll_mode |= B(0);
-	writel(pll_mode, PLL2_MODE_REG);
+	writel(pll_mode, MM_PLL2_MODE_REG);
 }
 
 static void set_rate_mnd_banked(struct clk_local *clk, struct clk_freq_tbl *nf)
@@ -1486,6 +1478,98 @@ struct clk_local soc_clk_local_tbl[] = {
  * SoC-specific functions required by clock-local driver
  */
 
+/* Enable/disable for hardware-voteable PLLs. */
+static int voteable_pll_enable(unsigned src, unsigned enable)
+{
+	/* PLL enable/disable voting registers and masks. */
+	static const struct {
+		uint32_t *const enable_reg;
+		const uint32_t enable_mask;
+		uint32_t *const status_reg;
+	} pll_reg[] = {
+		[PLL_0] = { BB_PLL_ENA_SC0_REG, B(0), BB_PLL0_STATUS_REG },
+		[PLL_6] = { BB_PLL_ENA_SC0_REG, B(6), BB_PLL6_STATUS_REG },
+		[PLL_8] = { BB_PLL_ENA_SC0_REG, B(8), BB_PLL8_STATUS_REG },
+	};
+	int reg_val;
+
+	reg_val = readl(pll_reg[src].enable_reg);
+	if (enable) {
+		reg_val |= pll_reg[src].enable_mask;
+		writel(reg_val, pll_reg[src].enable_reg);
+
+		/* Wait until PLL is enabled. */
+		while (!(readl(pll_reg[src].status_reg) & B(16)))
+			cpu_relax();
+	} else {
+		reg_val &= ~(pll_reg[src].enable_mask);
+		writel(reg_val, pll_reg[src].enable_reg);
+	}
+
+	return 0;
+}
+
+/* Enable/disable for non-shared NT PLLs. */
+static int nt_pll_enable(unsigned src, unsigned enable)
+{
+	static const struct {
+		uint32_t *const mode_reg;
+		uint32_t *const status_reg;
+	} pll_reg[] = {
+		[PLL_1] = { MM_PLL0_MODE_REG, MM_PLL0_STATUS_REG },
+		[PLL_2] = { MM_PLL1_MODE_REG, MM_PLL1_STATUS_REG },
+		[PLL_3] = { MM_PLL2_MODE_REG, MM_PLL2_STATUS_REG },
+	};
+	uint32_t pll_mode;
+
+	pll_mode = readl(pll_reg[src].mode_reg);
+	if (enable) {
+		/* Disable PLL bypass mode. */
+		pll_mode |= B(1);
+		writel(pll_mode, pll_reg[src].mode_reg);
+
+		/* H/W requires a 5us delay between disabling the bypass and
+		 * de-asserting the reset. Delay 10us just to be safe. */
+		udelay(10);
+
+		/* De-assert active-low PLL reset. */
+		pll_mode |= B(2);
+		writel(pll_mode, pll_reg[src].mode_reg);
+
+		/* Enable PLL output. */
+		pll_mode |= B(0);
+		writel(pll_mode, pll_reg[src].mode_reg);
+
+		/* Wait until PLL is enabled. */
+		while (!readl(pll_reg[src].status_reg))
+			cpu_relax();
+	} else {
+		/* Disable the PLL output, disable test mode, enable
+		 * the bypass mode, and assert the reset. */
+		pll_mode &= ~BM(3, 0);
+		writel(pll_mode, pll_reg[src].mode_reg);
+	}
+
+	return 0;
+}
+
+#define CLK_SRC(_src, _func, _par) \
+	[(_src)] = { .enable_func = (_func), .par = (_par), }
+struct clk_source soc_clk_sources[NUM_SRC] = {
+	CLK_SRC(CXO,   NULL, SRC_NONE),	/* TODO */
+	CLK_SRC(MXO,   NULL, SRC_NONE),	/* TODO */
+	CLK_SRC(PXO,   NULL, SRC_NONE),	/* TODO */
+	CLK_SRC(PLL_0, voteable_pll_enable, MXO),
+	CLK_SRC(PLL_1, nt_pll_enable, MXO),
+	CLK_SRC(PLL_2, nt_pll_enable, MXO),
+	CLK_SRC(PLL_3, nt_pll_enable, MXO),
+	CLK_SRC(PLL_4, NULL, MXO),	/* TODO */
+	CLK_SRC(PLL_5, NULL, CXO),
+	CLK_SRC(PLL_6, voteable_pll_enable, CXO),
+	CLK_SRC(PLL_7, nt_pll_enable, MXO),
+	CLK_SRC(PLL_8, voteable_pll_enable, MXO),
+};
+
 /* Update the sys_vdd voltage given a level. */
 int soc_update_sys_vdd(enum sys_vdd_level level)
 {
@@ -1647,43 +1731,19 @@ static struct reg_init {
 	uint32_t delay_us;
 } ri_list[] __initdata = {
 
-	/* Program MM_PLL0 (PLL1) @ 1320MHz */
-	{PLL0_MODE_REG, B(0), 0},     /* Disable output */
-	{PLL0_L_VAL_REG, 0xFF,   48}, /* LVAL */
-	{PLL0_M_VAL_REG, 0x7FFFF, 8}, /* MVAL */
-	{PLL0_N_VAL_REG, 0x7FFFF, 9}, /* NVAL */
-	/* Ref = MXO, don't bypass, delay 10us after write. */
-	{PLL0_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
+	/* Program MM_PLL0 (PLL1) @ 1320MHz, and turn it on. */
+	{MM_PLL0_MODE_REG, B(0), 0},     /* Disable output */
+	{MM_PLL0_L_VAL_REG, 0xFF,   48}, /* LVAL */
+	{MM_PLL0_M_VAL_REG, 0x7FFFF, 8}, /* MVAL */
+	{MM_PLL0_N_VAL_REG, 0x7FFFF, 9}, /* NVAL */
+	/* Ref = MXO. */
+	{MM_PLL0_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
 	/* Enable MN, set VCO, misc config. */
-	{PLL0_CONFIG_REG, 0xFFFFFFFF, 0x14580},
-	{PLL0_MODE_REG, B(2), B(2)}, /* Deassert reset */
-	{PLL0_MODE_REG, B(0), B(0)}, /* Enable output */
+	{MM_PLL0_CONFIG_REG, 0xFFFFFFFF, 0x14580},
+	{MM_PLL0_MODE_REG, B(2), B(2)}, /* Deassert reset */
+	{MM_PLL0_MODE_REG, B(0), B(0)}, /* Enable output */
 
-	/* Program MM_PLL1 (PLL2) @ 800MHz */
-	{PLL1_MODE_REG, B(0), 0},      /* Disable output */
-	{PLL1_L_VAL_REG, 0x3FF,   29}, /* LVAL */
-	{PLL1_M_VAL_REG, 0x7FFFF, 17}, /* MVAL */
-	{PLL1_N_VAL_REG, 0x7FFFF, 27}, /* NVAL */
-	/* Ref = MXO, don't bypass, delay 10us after write. */
-	{PLL1_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
-	/* Enable MN, set VCO, main out. */
-	{PLL1_CONFIG_REG, 0xFFFFFFFF, 0x00C22080},
-	{PLL1_MODE_REG, B(2), B(2)}, /* Deassert reset */
-	{PLL1_MODE_REG, B(0), B(0)}, /* Enable output */
-
-	/* Program MM_PLL2 (PLL3) @ <Varies>, 50.4005MHz for now. */
-	{PLL2_MODE_REG, B(0), 0},         /* Disable output */
-	{PLL2_L_VAL_REG, 0x3FF,       7}, /* LVAL */
-	{PLL2_M_VAL_REG, 0x7FFFF,  6301}, /* MVAL */
-	{PLL2_N_VAL_REG, 0x7FFFF, 13500}, /* NVAL */
-	/* Ref = MXO, don't bypass, delay 10us after write. */
-	{PLL2_MODE_REG, B(4)|B(1), B(4)|B(1), 10},
-	/* Enable MN, set VCO, main out, postdiv4. */
-	{PLL2_CONFIG_REG, 0xFFFFFFFF, 0x00E02080},
-	{PLL2_MODE_REG, B(2), B(2)}, /* Deassert reset */
-	{PLL2_MODE_REG, B(0), B(0)}, /* Enable output */
-
-	/* Program LPA_PLL (PLL4) @ 540.6720 MHz */
+	/* Program LPA_PLL (PLL4) @ 540.6720 MHz, and turn it on. */
 	{LCC_PRI_PLL_CLK_CTL_REG, B(0), B(0)}, /* PLL clock select = PLL0 */
 	{LCC_PLL0_MODE_REG, B(0), 0},          /* Disable output */
 	{LCC_PLL0_L_VAL_REG, 0x3FF,     20},   /* LVAL */
@@ -1696,8 +1756,24 @@ static struct reg_init {
 	{LCC_PLL0_MODE_REG, B(2), B(2)}, /* Deassert reset */
 	{LCC_PLL0_MODE_REG, B(0), B(0)}, /* Enable output */
 
-	/* Turn on all SC0 voteable PLLs (PLL0, PLL6, PLL8). */
-	{PLL_ENA_SC0_REG, 0x141, 0x141},
+	/* Set MM_PLL1 (PLL2) @ 800MHz, but turn it off. */
+	{MM_PLL1_MODE_REG, B(0), 0},      /* Disable output */
+	/* Ref = MXO, PLL bypassed, reset asserted,
+	 * output disable, test mode disabled. */
+	{MM_PLL1_MODE_REG, BM(4, 0), B(4)},
+	/* Enable MN, set VCO, main out. */
+	{MM_PLL1_CONFIG_REG, 0xFFFFFFFF, 0x00C22080},
+	{MM_PLL1_L_VAL_REG, 0x3FF,   29}, /* LVAL */
+	{MM_PLL1_M_VAL_REG, 0x7FFFF, 17}, /* MVAL */
+	{MM_PLL1_N_VAL_REG, 0x7FFFF, 27}, /* NVAL */
+
+	/* Setup MM_PLL2 (PLL3), but turn it off. Rate set by set_rate_tv(). */
+	{MM_PLL2_MODE_REG, B(0), 0},      /* Disable output */
+	/* Ref = MXO, PLL bypassed, reset asserted,
+	 * output disable, test mode disabled. */
+	{MM_PLL2_MODE_REG, BM(4, 0), B(4)},
+	/* Enable MN and main out. */
+	{MM_PLL2_CONFIG_REG, 0xFFFFFFFF, 0x00C02080},
 
 	/* Enable dynamic clock gating for peripheral HCLKs that support it. */
 	{SDCn_HCLK_CTL_REG(1),		0x70,	0x40},
@@ -1753,6 +1829,9 @@ void __init msm_clk_soc_init(void)
 {
 	int i;
 	uint32_t val;
+
+	/* XXX: Temporary until RPM manages MM AHB (which uses PLL8) */
+	local_src_enable(PLL_8);
 
 	for (i = 0; i < ARRAY_SIZE(ri_list); i++) {
 		val = readl(ri_list[i].reg);
