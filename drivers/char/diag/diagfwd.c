@@ -29,7 +29,7 @@
 #include "diagchar.h"
 #include "diagfwd.h"
 #include "diagchar_hdlc.h"
-
+#include <linux/pm_runtime.h>
 
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
@@ -605,11 +605,32 @@ static int diag_smd_probe(struct platform_device *pdev)
 
 	}
 #endif
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	printk(KERN_INFO "diag opened SMD port ; r = %d\n", r);
 
 err:
 	return 0;
 }
+
+static int diagfwd_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int diagfwd_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops diagfwd_dev_pm_ops = {
+	.runtime_suspend = diagfwd_runtime_suspend,
+	.runtime_resume = diagfwd_runtime_resume,
+};
+
 
 static struct platform_driver msm_smd_ch1_driver = {
 
@@ -617,8 +638,10 @@ static struct platform_driver msm_smd_ch1_driver = {
 	.driver = {
 		   .name = "DIAG",
 		   .owner = THIS_MODULE,
+		   .pm   = &diagfwd_dev_pm_ops,
 		   },
 };
+
 
 void diag_read_work_fn(struct work_struct *work)
 {
