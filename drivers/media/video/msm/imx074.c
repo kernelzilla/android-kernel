@@ -289,6 +289,8 @@ static void imx074_get_pict_fps(uint16_t fps, uint16_t *pfps)
 	uint16_t preview_frame_length_lines, snapshot_frame_length_lines;
 	uint16_t preview_line_length_pck, snapshot_line_length_pck;
 	uint32_t divider, d1, d2;
+	uint32_t pclk_mult;/*Q10 */
+
 	/* Total frame_length_lines and line_length_pck for preview */
 	preview_frame_length_lines = IMX074_QTR_SIZE_HEIGHT +
 		IMX074_VER_QTR_BLK_LINES;
@@ -303,8 +305,12 @@ static void imx074_get_pict_fps(uint16_t fps, uint16_t *pfps)
 		snapshot_frame_length_lines;
 	d2 = preview_line_length_pck * 0x00000400 /
 		snapshot_line_length_pck;
-	divider = d1 * d2 / 0x400;
-	*pfps = (uint16_t) (fps * divider / 0x400);
+	pclk_mult =
+		(uint32_t) ((imx074_regs.reg_pat[RES_CAPTURE].pll_multiplier *
+		0x00000400) /
+		(imx074_regs.reg_pat[RES_PREVIEW].pll_multiplier));
+	divider = d1 * d2 * pclk_mult / 0x400;
+	*pfps = (uint16_t) (fps * divider / 0x400 / 0x400);
 }
 
 static uint16_t imx074_get_prev_lines_pf(void)
