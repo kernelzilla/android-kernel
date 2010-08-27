@@ -1071,6 +1071,7 @@ static int msm_fb_lcdc_gpio_config(int on)
 	} else {
 		gpio_set_value(17, 0);
 		gpio_set_value(19, 0);
+		gpio_set_value(20, 0);
 		gpio_set_value(22, 0);
 		gpio_set_value(32, 0);
 		gpio_set_value(155, 0);
