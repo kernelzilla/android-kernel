@@ -45,13 +45,6 @@ struct sirc_cascade_regs {
 };
 
 void msm_init_sirc(void);
-#ifdef CONFIG_ARCH_QSD8X50
-void msm_sirc_enter_sleep(void);
-void msm_sirc_exit_sleep(void);
-#else
-static inline void msm_sirc_enter_sleep(void) { }
-static inline void msm_sirc_exit_sleep(void) { }
-#endif
 
 #if defined(CONFIG_ARCH_MSM_SCORPION)
 
