@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -128,7 +128,8 @@ int diag_device_write(void *buf, int proc_num)
 				}
 		}
 		for (i = 0; i < driver->num_clients; i++)
-			if (driver->client_map[i] == driver->logging_process_id)
+			if (driver->client_map[i].pid ==
+						 driver->logging_process_id)
 				break;
 		if (i < driver->num_clients) {
 			driver->data_ready[i] |= MEMORY_DEVICE_LOG_TYPE;
@@ -309,7 +310,7 @@ void diag_update_userspace_clients(unsigned int type)
 
 	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients; i++)
-		if (driver->client_map[i] != 0)
+		if (driver->client_map[i].pid != 0)
 			driver->data_ready[i] |= type;
 	wake_up_interruptible(&driver->wait_q);
 	mutex_unlock(&driver->diagchar_mutex);
@@ -321,7 +322,7 @@ void diag_update_sleeping_process(int process_id)
 
 	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients; i++)
-		if (driver->client_map[i] == process_id) {
+		if (driver->client_map[i].pid == process_id) {
 			driver->data_ready[i] |= PKT_TYPE;
 			break;
 		}
@@ -677,7 +678,8 @@ void diagfwd_init(void)
 		goto err;
 	if (driver->client_map == NULL &&
 	    (driver->client_map = kzalloc
-	     ((driver->num_clients) * 4, GFP_KERNEL)) == NULL)
+	     ((driver->num_clients) * sizeof(struct diag_client_map),
+		   GFP_KERNEL)) == NULL)
 		goto err;
 	if (driver->buf_tbl == NULL)
 			driver->buf_tbl = kzalloc(buf_tbl_size *
@@ -685,8 +687,8 @@ void diagfwd_init(void)
 	if (driver->buf_tbl == NULL)
 		goto err;
 	if (driver->data_ready == NULL &&
-	     (driver->data_ready = kzalloc(driver->num_clients * 4,
-					    GFP_KERNEL)) == NULL)
+	     (driver->data_ready = kzalloc(driver->num_clients * sizeof(struct
+					 diag_client_map), GFP_KERNEL)) == NULL)
 		goto err;
 	if (driver->table == NULL &&
 	     (driver->table = kzalloc(diag_max_registration*
