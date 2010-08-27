@@ -757,7 +757,10 @@ EXPORT_SYMBOL(pm8058_pwm_lut_enable);
 #define SSBI_REG_ADDR_LED_BASE		0x131
 #define SSBI_REG_ADDR_LED(n)		(SSBI_REG_ADDR_LED_BASE + (n))
 #define SSBI_REG_ADDR_FLASH_BASE	0x48
-#define SSBI_REG_ADDR_FLASH(n)		(SSBI_REG_ADDR_FLASH_BASE + (n))
+#define SSBI_REG_ADDR_FLASH_DRV_1	0xFB
+#define SSBI_REG_ADDR_FLASH(n)		(((n) < 2 ? \
+					    SSBI_REG_ADDR_FLASH_BASE + (n) : \
+					    SSBI_REG_ADDR_FLASH_DRV_1))
 
 #define PM8058_LED_CURRENT_SHIFT	3
 #define PM8058_LED_MODE_MASK		0x07
@@ -787,6 +790,7 @@ int pm8058_pwm_config_led(struct pwm_device *pwm, int id,
 
 	case PM_PWM_LED_KPD:
 	case PM_PWM_LED_FLASH:
+	case PM_PWM_LED_FLASH1:
 		switch (mode) {
 		case PM_PWM_CONF_PWM1:
 		case PM_PWM_CONF_PWM2:

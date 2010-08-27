@@ -58,6 +58,7 @@ struct pm8058_pwm_pdata {
 #define	PM_PWM_LED_2		2
 #define	PM_PWM_LED_KPD		3
 #define	PM_PWM_LED_FLASH	4
+#define	PM_PWM_LED_FLASH1	5
 
 /* PWM LED configuration mode */
 #define	PM_PWM_CONF_NONE	0x0
