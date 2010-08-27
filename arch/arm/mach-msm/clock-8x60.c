@@ -998,32 +998,15 @@ static struct clk_freq_tbl clk_tbl_tv[] = {
 };
 
 /* VCODEC */
-static struct banked_mnd_masks bmnd_info_vcodec = {
-	.bank_sel_mask =		B(13),
-	.bank0_mask = {
-			.md_reg = 		VCODEC_MD0_REG,
-			.ns_mask =		BM(18, 11) | BM(2, 0),
-			.rst_mask =		B(31),
-			.mnd_en_mask =		B(5),
-			.mode_mask =		BM(7, 6),
-	},
-	.bank1_mask = {
-			.md_reg = 		VCODEC_MD1_REG,
-			.ns_mask =		BM(29, 27) | BM(26, 19),
-			.rst_mask =		B(30),
-			.mnd_en_mask =		B(10),
-			.mode_mask =		BM(12, 11),
-	},
-};
+#define NS_MASK_VCODEC (BM(18, 11) | BM(2, 0))
 #define CLK_VCODEC(id, ns, h_r, h_c, h_b, tv) \
 		CLK(id, MND, ns, (ns-8), (ns-4), NULL, 0, h_r, h_c, h_b, \
-				B(0), B(2), 0, 0, set_rate_mnd_banked, \
-				clk_tbl_vcodec, &bmnd_info_vcodec, NONE, \
-				NULL, tv)
+				B(0), B(2), NS_MASK_VCODEC, 0, set_rate_mnd, \
+				clk_tbl_vcodec, NULL, NONE, NULL, tv)
 #define F_VCODEC(f, s, d, m, n, v) \
 		F_RAW(f, SRC_##s, MD8(8, m, 0, n), \
-			NS_MND_BANKED8(11, 19, n, m, 0, 27, s), \
-			CC_BANKED(6, 11, n), MND_EN((B(5) | B(10)), n), v, NULL)
+			NS_MM(18, 11, n, m, 0, 0, 1, 2, 0, s), \
+			CC(6, n), MND_EN(B(5), n), v, NULL)
 static struct clk_freq_tbl clk_tbl_vcodec[] = {
 	F_VCODEC( 27000000, MM_PXO,   0, 0,  0, LOW),
 	F_VCODEC( 32000000, MM_GPERF, 0, 1, 12, LOW),
