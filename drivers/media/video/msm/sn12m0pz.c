@@ -1463,7 +1463,12 @@ static int sn12m0pz_probe_init_sensor(const struct msm_camera_sensor_info *data)
 		msleep(20);
 		gpio_direction_output(data->vcm_pwd, 1);
 		msleep(13);
+	} else {
+		gpio_direction_output(data->sensor_reset, 0);
+		gpio_free(data->sensor_reset);
+		goto init_probe_done;
 	}
+
 	msleep(20);
 
 	/* 3. Read sensor Model ID: */
