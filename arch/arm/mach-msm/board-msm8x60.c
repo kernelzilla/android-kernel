@@ -3304,13 +3304,17 @@ static int hdmi_msm_regulators(int on)
 	}
 
 	if (on) {
-		rc = regulator_enable(reg_8058_l16);
+		rc = regulator_set_voltage(reg_8058_l16, 1800000, 1800000);
+		if (!rc)
+			rc = regulator_enable(reg_8058_l16);
 		if (rc) {
 			pr_err("'%s' regulator enable failed, rc=%d\n",
 				"8058_l16", rc);
 			return rc;
 		}
-		rc = regulator_enable(reg_8901_l3);
+		rc = regulator_set_voltage(reg_8901_l3, 3300000, 3300000);
+		if (!rc)
+			rc = regulator_enable(reg_8901_l3);
 		if (rc) {
 			pr_err("'%s' regulator enable failed, rc=%d\n",
 				"8901_l3", rc);
