@@ -188,6 +188,7 @@ static int change_memory_power_state(unsigned long start_pfn,
 			"memory node", NPA_CLIENT_REQUIRED);
 		if (IS_ERR(npa_memory_client)) {
 			rc = PTR_ERR(npa_memory_client);
+			atomic_inc(&node_created_flag);
 			return rc;
 		}
 	}
@@ -212,7 +213,7 @@ int platform_physical_remove_pages(unsigned long start_pfn,
 		MEMORY_DEEP_POWERDOWN);
 }
 
-int platform_physical_add_pages(unsigned long start_pfn,
+int platform_physical_active_pages(unsigned long start_pfn,
 	unsigned long nr_pages)
 {
 	return change_memory_power_state(start_pfn, nr_pages, MEMORY_ACTIVE);
