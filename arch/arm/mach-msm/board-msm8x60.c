@@ -2027,8 +2027,9 @@ static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 	};
 
 	int rc = -EINVAL;
-	int id;
+	int id, mode, max_mA;
 
+	id = mode = max_mA = 0;
 	switch (ch) {
 	case 0:
 	case 1:
@@ -2040,9 +2041,33 @@ static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 				pr_err("%s: pm8058_gpio_config(%d): rc=%d\n",
 					__func__, id, rc);
 		}
+		break;
+
+	case 6:
+		id = PM_PWM_LED_FLASH;
+		mode = PM_PWM_CONF_PWM1;
+		max_mA = 300;
+		break;
+
+	case 7:
+		id = PM_PWM_LED_FLASH1;
+		mode = PM_PWM_CONF_PWM1;
+		max_mA = 300;
+		break;
 
 	default:
 		break;
+	}
+
+	if (ch >= 6 && ch <= 7) {
+		if (!on) {
+			mode = PM_PWM_CONF_NONE;
+			max_mA = 0;
+		}
+		rc = pm8058_pwm_config_led(pwm, id, mode, max_mA);
+		if (rc)
+			pr_err("%s: pm8058_pwm_config_led(ch=%d): rc=%d\n",
+			       __func__, ch, rc);
 	}
 	return rc;
 
