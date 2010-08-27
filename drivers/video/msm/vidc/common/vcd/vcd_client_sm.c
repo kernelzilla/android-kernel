@@ -977,6 +977,10 @@ static void vcd_clnt_cb_in_eos
 			if (!VCD_FAILED(rc)) {
 				frm_trans_end = true;
 				payload = NULL;
+				vcd_do_client_state_transition(cctxt,
+					VCD_CLIENT_STATE_RUN,
+					CLIENT_STATE_EVENT_NUMBER
+					(clnt_cb));
 			}
 			break;
 		}

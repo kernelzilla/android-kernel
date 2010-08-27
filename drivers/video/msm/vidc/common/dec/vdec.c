@@ -50,7 +50,7 @@
 #define INFO(x...) printk(KERN_INFO x)
 #define ERR(x...) printk(KERN_ERR x)
 
-#define VID_DEC_NAME   		"msm_vidc_dec"
+#define VID_DEC_NAME		"msm_vidc_dec"
 
 static struct vid_dec_dev *vid_dec_device_p;
 static dev_t vid_dec_dev_num;
@@ -150,7 +150,7 @@ static void vid_dec_input_frame_done(struct video_client_ctx *client_ctx,
 	struct vid_dec_msg *vdec_msg;
 
 	if (!client_ctx || !vcd_frame_data) {
-		ERR("vid_dec_input_frame_done() NULL pointer \n");
+		ERR("vid_dec_input_frame_done() NULL pointer\n");
 		return;
 	}
 
@@ -198,7 +198,7 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 	s32 buffer_index = -1;
 
 	if (!client_ctx || !vcd_frame_data) {
-		ERR("vid_dec_input_frame_done() NULL pointer \n");
+		ERR("vid_dec_input_frame_done() NULL pointer\n");
 		return;
 	}
 
@@ -218,7 +218,7 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 	else if (event == VCD_EVT_RESP_OUTPUT_FLUSHED)
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_RESP_OUTPUT_FLUSHED;
 	else {
-		ERR("QVD: vid_dec_output_frame_done invalid cmd type \n");
+		ERR("QVD: vid_dec_output_frame_done invalid cmd type\n");
 		return;
 	}
 
@@ -277,7 +277,7 @@ static void vid_dec_lean_event(struct video_client_ctx *client_ctx,
 	struct vid_dec_msg *vdec_msg;
 
 	if (!client_ctx) {
-		ERR("%s(): !client_ctx pointer \n", __func__);
+		ERR("%s(): !client_ctx pointer\n", __func__);
 		return;
 	}
 
@@ -333,7 +333,7 @@ static void vid_dec_lean_event(struct video_client_ctx *client_ctx,
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_RESP_PAUSE_DONE;
 		break;
 	default:
-		ERR("%s() : unknown event type \n", __func__);
+		ERR("%s() : unknown event type\n", __func__);
 		break;
 	}
 
@@ -354,7 +354,7 @@ void vid_dec_vcd_cb(u32 event, u32 status,
 	DBG("Entering %s()\n", __func__);
 
 	if (!client_ctx) {
-		ERR("%s(): client_ctx is NULL \n", __func__);
+		ERR("%s(): client_ctx is NULL\n", __func__);
 		return;
 	}
 
@@ -535,6 +535,21 @@ static u32 vid_dec_get_frame_resolution(struct video_client_ctx *client_ctx,
 	video_resoultion->stride = frame_resolution.stride;
 
 	if (vcd_status)
+		return false;
+	else
+		return true;
+}
+
+static u32 vid_dec_get_progressive_only(struct video_client_ctx *client_ctx,
+					u32 *progressive_only)
+{
+	struct vcd_property_hdr vcd_property_hdr;
+	if (!client_ctx || !progressive_only)
+		return false;
+	vcd_property_hdr.prop_id = VCD_I_PROGRESSIVE_ONLY;
+	vcd_property_hdr.sz = sizeof(u32);
+	if (vcd_get_property(client_ctx->vcd_handle, &vcd_property_hdr,
+						 progressive_only))
 		return false;
 	else
 		return true;
@@ -894,13 +909,13 @@ static u32 vid_dec_get_next_msg(struct video_client_ctx *client_ctx,
 	rc = wait_event_interruptible(client_ctx->msg_wait,
 				      vid_dec_msg_pending(client_ctx));
 	if (rc < 0 || client_ctx->stop_msg) {
-		DBG("rc = %d, stop_msg = %u \n", rc, client_ctx->stop_msg);
+		DBG("rc = %d, stop_msg = %u\n", rc, client_ctx->stop_msg);
 		return false;
 	}
 
 	mutex_lock(&client_ctx->msg_queue_lock);
 	if (!list_empty(&client_ctx->msg_queue)) {
-		DBG("%s(): After Wait \n", __func__);
+		DBG("%s(): After Wait\n", __func__);
 		vid_dec_msg = list_first_entry(&client_ctx->msg_queue,
 					       struct vid_dec_msg, list);
 		list_del(&vid_dec_msg->list);
@@ -960,7 +975,7 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 				"Meta Data Disable\n", __func__);
 			return -ENODEV;
 		}
-		DBG("Disabled Meta Data \n");
+		DBG("Disabled Meta Data\n");
 		break;
 	}
 	case VDEC_IOCTL_SET_OUTPUT_FORMAT:
@@ -1205,16 +1220,16 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		struct vcd_sequence_hdr vcd_seq_hdr;
 		DBG("VDEC_IOCTL_SET_SEQUENCE_HEADER\n");
 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg))) {
-			ERR("Copy from user vdec_msg failed \n");
+			ERR("Copy from user vdec_msg failed\n");
 			return -EFAULT;
 		}
 		if (copy_from_user(&seq_header,	vdec_msg.in,
 				   sizeof(seq_header))) {
-			ERR("Copy from user seq_header failed \n");
+			ERR("Copy from user seq_header failed\n");
 			return -EFAULT;
 		}
 		if (!seq_header.seq_header_len) {
-			ERR("Seq Len is Zero \n");
+			ERR("Seq Len is Zero\n");
 			return -EFAULT;
 		}
 
@@ -1234,11 +1249,11 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		}
 		client_ctx->seq_header_set = true;
 		if (vcd_decode_start(client_ctx->vcd_handle, &vcd_seq_hdr)) {
-			ERR("Decode start Failed \n");
+			ERR("Decode start Failed\n");
 			client_ctx->seq_header_set = false;
 			return -EFAULT;
 		}
-		DBG("Wait Client completion Sequence Header \n");
+		DBG("Wait Client completion Sequence Header\n");
 		wait_for_completion(&client_ctx->event);
 		vcd_seq_hdr.sequence_header = NULL;
 		if (client_ctx->event_status) {
@@ -1255,6 +1270,25 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		if (copy_to_user(vdec_msg.out,
 			&vid_dec_device_p->num_clients, sizeof(u32)))
 			return -EFAULT;
+		break;
+	}
+	case VDEC_IOCTL_GET_INTERLACE_FORMAT:
+	{
+		u32 progressive_only, interlace_format;
+		DBG("VDEC_IOCTL_GET_INTERLACE_FORMAT\n");
+		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+			return -EFAULT;
+		result = vid_dec_get_progressive_only(client_ctx,
+					&progressive_only);
+		if (result) {
+			interlace_format = progressive_only ?
+				VDEC_InterlaceFrameProgressive :
+				VDEC_InterlaceInterleaveFrameTopFieldFirst;
+			if (copy_to_user(vdec_msg.out, &interlace_format,
+					sizeof(u32)))
+				return -EFAULT;
+		} else
+			return -EIO;
 		break;
 	}
 	default:

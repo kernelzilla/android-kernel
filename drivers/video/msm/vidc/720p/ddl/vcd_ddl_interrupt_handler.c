@@ -190,8 +190,8 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 	u32 seq_hdr_only_frame = false;
 	u32 need_reconfig = true;
 	struct vcd_frame_data *input_vcd_frm;
-	struct ddl_frame_data_tag *reconfig_payload;
-	u32 reconfig_payload_size;
+	struct ddl_frame_data_tag *reconfig_payload = NULL;
+	u32 reconfig_payload_size = 0;
 
 	if (!ddl ||
 		!ddl->decoding ||
@@ -278,18 +278,19 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 			decoder->client_frame_size.scan_lines
 			&& decoder->actual_output_buf_req.sz <=
 			decoder->client_output_buf_req.sz
-			&& decoder->min_dpb_num <=
-			decoder->client_output_buf_req.actual_count)
+			&& decoder->actual_output_buf_req.actual_count <=
+			decoder->client_output_buf_req.actual_count
+			&& decoder->progressive_only)
 			need_reconfig = false;
-		if ((input_vcd_frm->flags & VCD_FRAME_FLAG_CODECCONFIG) ||
-				input_vcd_frm->data_len ==
-				seq_hdr_info.dec_frm_size) {
-			seq_hdr_only_frame = true;
-			input_vcd_frm->offset +=
-				seq_hdr_info.dec_frm_size;
-			input_vcd_frm->data_len -=
-				seq_hdr_info.dec_frm_size;
+		input_vcd_frm->offset +=
+			seq_hdr_info.dec_frm_size;
+		input_vcd_frm->data_len -=
+			seq_hdr_info.dec_frm_size;
+		if (((input_vcd_frm->flags & VCD_FRAME_FLAG_CODECCONFIG) ||
+			input_vcd_frm->data_len == 0) && (!need_reconfig ||
+			!(input_vcd_frm->flags & VCD_FRAME_FLAG_EOS))) {
 			input_vcd_frm->flags |= VCD_FRAME_FLAG_CODECCONFIG;
+			seq_hdr_only_frame = true;
 			ddl->input_frame.frm_trans_end = !need_reconfig;
 			ddl_context->ddl_callback(VCD_EVT_RESP_INPUT_DONE,
 				VCD_S_SUCCESS, &ddl->input_frame,
@@ -298,17 +299,15 @@ static u32 ddl_header_done_callback(struct ddl_context *ddl_context)
 				ddl->ddl_context->client_data);
 		}
 		if (need_reconfig) {
-			reconfig_payload = &ddl->input_frame;
-			reconfig_payload_size =
-				sizeof(struct ddl_frame_data_tag);
 			decoder->client_frame_size = decoder->frame_size;
 			decoder->client_output_buf_req =
 				decoder->actual_output_buf_req;
 			decoder->client_input_buf_req =
 				decoder->actual_input_buf_req;
-			if (seq_hdr_only_frame) {
-				reconfig_payload = NULL;
-				reconfig_payload_size = 0;
+			if (!seq_hdr_only_frame) {
+				reconfig_payload = &ddl->input_frame;
+				reconfig_payload_size =
+					sizeof(struct ddl_frame_data_tag);
 			}
 			ddl_context->ddl_callback(VCD_EVT_IND_OUTPUT_RECONFIG,
 					VCD_S_SUCCESS, reconfig_payload,
