@@ -2959,36 +2959,6 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 	/* ADV */
 	GPIO_CFG(153, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
 
-#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-	/*
-	 * SD/MMC Slot-1 (CLK, CMD, D0-D7)
-	 */
-	GPIO_CFG(167, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA),
-	GPIO_CFG(168, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(159, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(160, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(161, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(162, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-#ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
-	GPIO_CFG(163, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(164, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(165, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(166, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-#endif
-#endif
-
-#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
-	/*
-	 * SD/MMC Slot-5 (CLK, CMD, D0-D3)
-	 */
-	GPIO_CFG(97,  2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA),
-	GPIO_CFG(95,  2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(100, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(99,  2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(98,  2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-	GPIO_CFG(96,  2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
-#endif
-
 #ifdef CONFIG_I2C_QUP
 	/* GSBI3 QUP I2C */
 	GPIO_CFG(43, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
@@ -3057,30 +3027,6 @@ static uint32_t msm8x60_tlmm_cfgs[] = {
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 };
 
-static uint32_t msm8x60_hdrive_cfgs[][2] = {
-#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_8MA},
-	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_8MA},
-	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_8MA},
-#endif
-#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-	{TLMM_HDRV_SDC4_CLK, GPIO_CFG_8MA},
-	{TLMM_HDRV_SDC4_CMD, GPIO_CFG_8MA},
-	{TLMM_HDRV_SDC4_DATA, GPIO_CFG_8MA},
-#endif
-};
-
-static uint32_t msm8x60_pull_cfgs[][2] = {
-#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-	{TLMM_PULL_SDC3_CMD, GPIO_CFG_PULL_UP},
-	{TLMM_PULL_SDC3_DATA, GPIO_CFG_PULL_UP},
-#endif
-#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-	{TLMM_PULL_SDC4_CMD, GPIO_CFG_PULL_UP},
-	{TLMM_PULL_SDC4_DATA, GPIO_CFG_PULL_UP},
-#endif
-};
-
 static void __init msm8x60_init_tlmm(void)
 {
 	unsigned n;
@@ -3090,12 +3036,6 @@ static void __init msm8x60_init_tlmm(void)
 	else if (machine_is_msm8x60_surf() || machine_is_msm8x60_ffa()) {
 		for (n = 0; n < ARRAY_SIZE(msm8x60_tlmm_cfgs); ++n)
 			gpio_tlmm_config(msm8x60_tlmm_cfgs[n], 0);
-		for (n = 0; n < ARRAY_SIZE(msm8x60_hdrive_cfgs); ++n)
-			msm_tlmm_set_hdrive(msm8x60_hdrive_cfgs[n][0],
-					msm8x60_hdrive_cfgs[n][1]);
-		for (n = 0; n < ARRAY_SIZE(msm8x60_pull_cfgs); ++n)
-			msm_tlmm_set_pull(msm8x60_pull_cfgs[n][0],
-					msm8x60_pull_cfgs[n][1]);
 	}
 }
 
@@ -3105,6 +3045,265 @@ static void __init msm8x60_init_tlmm(void)
 	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC5_SUPPORT))
+struct msm_sdcc_gpio {
+	/* maximum 10 GPIOs per SDCC controller */
+	s16 no;
+	/* name of this GPIO */
+	const char *name;
+};
+
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
+static struct msm_sdcc_gpio sdc1_gpio_cfg[] = {
+	{159, "sdc1_dat_0"},
+	{160, "sdc1_dat_1"},
+	{161, "sdc1_dat_2"},
+	{162, "sdc1_dat_3"},
+#ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
+	{163, "sdc1_dat_4"},
+	{164, "sdc1_dat_5"},
+	{165, "sdc1_dat_6"},
+	{166, "sdc1_dat_7"},
+#endif
+	{167, "sdc1_clk"},
+	{168, "sdc1_cmd"}
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+static struct msm_sdcc_gpio sdc2_gpio_cfg[] = {
+	{143, "sdc2_dat_0"},
+	{144, "sdc2_dat_1"},
+	{145, "sdc2_dat_2"},
+	{146, "sdc2_dat_3"},
+#ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
+	{147, "sdc2_dat_4"},
+	{148, "sdc2_dat_5"},
+	{149, "sdc2_dat_6"},
+	{150, "sdc2_dat_7"},
+#endif
+	{151, "sdc2_cmd"},
+	{152, "sdc2_clk"}
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
+static struct msm_sdcc_gpio sdc5_gpio_cfg[] = {
+	{95, "sdc5_cmd"},
+	{96, "sdc5_dat_3"},
+	{97, "sdc5_clk"},
+	{98, "sdc5_dat_2"},
+	{99, "sdc5_dat_1"},
+	{100, "sdc5_dat_0"}
+};
+#endif
+
+struct msm_sdcc_pad_pull_cfg {
+	enum msm_tlmm_pull_tgt pull;
+	u32 pull_val;
+};
+
+struct msm_sdcc_pad_drv_cfg {
+	enum msm_tlmm_hdrive_tgt drv;
+	u32 drv_val;
+};
+
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+static struct msm_sdcc_pad_drv_cfg sdc3_pad_on_drv_cfg[] = {
+	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_8MA},
+	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_8MA},
+	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_8MA}
+};
+
+static struct msm_sdcc_pad_pull_cfg sdc3_pad_on_pull_cfg[] = {
+	{TLMM_PULL_SDC3_CMD, GPIO_CFG_PULL_UP},
+	{TLMM_PULL_SDC3_DATA, GPIO_CFG_PULL_UP}
+};
+
+static struct msm_sdcc_pad_drv_cfg sdc3_pad_off_drv_cfg[] = {
+	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_2MA},
+	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_2MA},
+	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_2MA}
+};
+
+static struct msm_sdcc_pad_pull_cfg sdc3_pad_off_pull_cfg[] = {
+	{TLMM_PULL_SDC3_CMD, GPIO_CFG_PULL_DOWN},
+	{TLMM_PULL_SDC3_DATA, GPIO_CFG_PULL_DOWN}
+};
+#endif
+
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+static struct msm_sdcc_pad_drv_cfg sdc4_pad_on_drv_cfg[] = {
+	{TLMM_HDRV_SDC4_CLK, GPIO_CFG_8MA},
+	{TLMM_HDRV_SDC4_CMD, GPIO_CFG_8MA},
+	{TLMM_HDRV_SDC4_DATA, GPIO_CFG_8MA}
+};
+
+static struct msm_sdcc_pad_pull_cfg sdc4_pad_on_pull_cfg[] = {
+	{TLMM_PULL_SDC4_CMD, GPIO_CFG_PULL_UP},
+	{TLMM_PULL_SDC4_DATA, GPIO_CFG_PULL_UP}
+};
+
+static struct msm_sdcc_pad_drv_cfg sdc4_pad_off_drv_cfg[] = {
+	{TLMM_HDRV_SDC4_CLK, GPIO_CFG_2MA},
+	{TLMM_HDRV_SDC4_CMD, GPIO_CFG_2MA},
+	{TLMM_HDRV_SDC4_DATA, GPIO_CFG_2MA}
+};
+
+static struct msm_sdcc_pad_pull_cfg sdc4_pad_off_pull_cfg[] = {
+	{TLMM_PULL_SDC4_CMD, GPIO_CFG_PULL_DOWN},
+	{TLMM_PULL_SDC4_DATA, GPIO_CFG_PULL_DOWN}
+};
+#endif
+
+struct msm_sdcc_pin_cfg {
+	/*
+	 * = 1 if controller pins are using gpios
+	 * = 0 if controller has dedicated MSM pins
+	 */
+	u8 is_gpio;
+	u8 cfg_sts;
+	u8 gpio_data_size;
+	struct msm_sdcc_gpio *gpio_data;
+	struct msm_sdcc_pad_drv_cfg *pad_drv_on_data;
+	struct msm_sdcc_pad_drv_cfg *pad_drv_off_data;
+	struct msm_sdcc_pad_pull_cfg *pad_pull_on_data;
+	struct msm_sdcc_pad_pull_cfg *pad_pull_off_data;
+	u8 pad_drv_data_size;
+	u8 pad_pull_data_size;
+};
+
+
+static struct msm_sdcc_pin_cfg sdcc_pin_cfg_data[5] = {
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
+	[0] = {
+		.is_gpio = 1,
+		.gpio_data_size = ARRAY_SIZE(sdc1_gpio_cfg),
+		.gpio_data = sdc1_gpio_cfg
+	},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+	[1] = {
+		.is_gpio = 1
+		.gpio_data_size = ARRAY_SIZE(sdc2_gpio_cfg),
+		.gpio_data = sdc2_gpio_cfg
+	},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
+	[2] = {
+		.is_gpio = 0,
+		.pad_drv_on_data = sdc3_pad_on_drv_cfg,
+		.pad_drv_off_data = sdc3_pad_off_drv_cfg,
+		.pad_pull_on_data = sdc3_pad_on_pull_cfg,
+		.pad_pull_off_data = sdc3_pad_off_pull_cfg,
+		.pad_drv_data_size = ARRAY_SIZE(sdc3_pad_on_drv_cfg),
+		.pad_pull_data_size = ARRAY_SIZE(sdc3_pad_on_pull_cfg)
+	},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
+	[3] = {
+		.is_gpio = 0,
+		.pad_drv_on_data = sdc4_pad_on_drv_cfg,
+		.pad_drv_off_data = sdc4_pad_off_drv_cfg,
+		.pad_pull_on_data = sdc4_pad_on_pull_cfg,
+		.pad_pull_off_data = sdc4_pad_off_pull_cfg,
+		.pad_drv_data_size = ARRAY_SIZE(sdc4_pad_on_drv_cfg),
+		.pad_pull_data_size = ARRAY_SIZE(sdc4_pad_on_pull_cfg)
+	},
+#endif
+#ifdef CONFIG_MMC_MSM_SDC5_SUPPORT
+	[4] = {
+		.is_gpio = 1,
+		.gpio_data_size = ARRAY_SIZE(sdc5_gpio_cfg),
+		.gpio_data = sdc5_gpio_cfg
+	}
+#endif
+};
+
+static int msm_sdcc_setup_gpio(int dev_id, unsigned int enable)
+{
+	int rc = 0;
+	struct msm_sdcc_pin_cfg *curr;
+	int n;
+
+	curr = &sdcc_pin_cfg_data[dev_id - 1];
+	if (!curr->gpio_data)
+		goto out;
+
+	for (n = 0; n < curr->gpio_data_size; n++) {
+		if (enable) {
+			rc = gpio_request(curr->gpio_data[n].no,
+				curr->gpio_data[n].name);
+			if (rc) {
+				pr_err("%s: gpio_request(%d, %s)"
+					"failed", __func__,
+					curr->gpio_data[n].no,
+					curr->gpio_data[n].name);
+				goto free_gpios;
+			}
+			/* set direction as output for all GPIOs */
+			rc = gpio_direction_output(
+				curr->gpio_data[n].no, 1);
+			if (rc) {
+				pr_err("%s: gpio_direction_output"
+					"(%d, 1) failed\n", __func__,
+					curr->gpio_data[n].no);
+				goto free_gpios;
+			}
+		} else {
+			/*
+			 * now free this GPIO which will put GPIO
+			 * in low power mode and will also put GPIO
+			 * in input mode
+			 */
+			gpio_free(curr->gpio_data[n].no);
+		}
+	}
+	curr->cfg_sts = enable;
+	goto out;
+
+free_gpios:
+	for (; n >= 0; n--)
+		gpio_free(curr->gpio_data[n].no);
+out:
+	return rc;
+}
+
+static int msm_sdcc_setup_pad(int dev_id, unsigned int enable)
+{
+	int rc = 0;
+	struct msm_sdcc_pin_cfg *curr;
+	int n;
+
+	curr = &sdcc_pin_cfg_data[dev_id - 1];
+	if (!curr->pad_drv_on_data || !curr->pad_pull_on_data)
+		goto out;
+
+	if (enable) {
+		/*
+		 * set up the normal driver strength and
+		 * pull config for pads
+		 */
+		for (n = 0; n < curr->pad_drv_data_size; n++)
+			msm_tlmm_set_hdrive(curr->pad_drv_on_data[n].drv,
+				curr->pad_drv_on_data[n].drv_val);
+		for (n = 0; n < curr->pad_pull_data_size; n++)
+			msm_tlmm_set_pull(curr->pad_pull_on_data[n].pull,
+				curr->pad_pull_on_data[n].pull_val);
+	} else {
+		/* set the low power config for pads */
+		for (n = 0; n < curr->pad_drv_data_size; n++)
+			msm_tlmm_set_hdrive(
+				curr->pad_drv_off_data[n].drv,
+				curr->pad_drv_off_data[n].drv_val);
+		for (n = 0; n < curr->pad_pull_data_size; n++)
+			msm_tlmm_set_pull(
+				curr->pad_pull_off_data[n].pull,
+				curr->pad_pull_off_data[n].pull_val);
+	}
+	curr->cfg_sts = enable;
+out:
+	return rc;
+}
 
 struct sdcc_reg {
 	/* VDD/VCC/VCCQ regulator name on PMIC8058/PMIC8089*/
@@ -3293,8 +3492,18 @@ static u32 msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 {
 	u32 rc = 0;
 	struct platform_device *pdev;
+	struct msm_sdcc_pin_cfg *curr;
 
 	pdev = container_of(dv, struct platform_device, dev);
+	curr = &sdcc_pin_cfg_data[pdev->id - 1];
+
+	if (curr->cfg_sts == !!vdd)
+		return rc;
+
+	if (curr->is_gpio)
+		rc = msm_sdcc_setup_gpio(pdev->id, !!vdd);
+	else
+		rc = msm_sdcc_setup_pad(pdev->id, !!vdd);
 
 	rc = msm_sdcc_setup_vreg(pdev->id, (vdd ? 1 : 0));
 
