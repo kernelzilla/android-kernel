@@ -1173,6 +1173,7 @@ static int msm_adsp_probe(struct platform_device *pdev)
 	}
 
 	msm_adsp_publish_cdevs(adsp_modules, count);
+	rmtask_init();
 
 	return 0;
 
