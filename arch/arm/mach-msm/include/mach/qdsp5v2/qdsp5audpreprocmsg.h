@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -112,6 +112,30 @@ struct audpreproc_cmd_enc_param_cfg_done_msg {
 
 struct audpreproc_afe_cmd_audio_record_cfg_done {
 	unsigned short stream_id;
+} __attribute__((packed));
+
+/*
+ * Message to indicate Routing mode
+ * configuration success or failure
+ */
+
+#define AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG  0x0007
+#define AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG_LEN \
+	sizeof(struct audpreproc_cmd_routing_mode_done)
+
+struct audpreproc_cmd_routing_mode_done {
+	unsigned short stream_id;
+	unsigned short configuration;
+} __attribute__((packed));
+
+
+#define AUDPREPROC_CMD_PCM_CFG_ARM_TO_PREPROC_DONE_MSG	0x0008
+#define AUDPREPROC_CMD_PCM_CFG_ARM_TO_PREPROC_DONE_MSG_LEN \
+	sizeof(struct audreproc_cmd_pcm_cfg_arm_to_preproc_done)
+
+struct audreproc_cmd_pcm_cfg_arm_to_preproc_done {
+	unsigned short stream_id;
+	unsigned short configuration;
 } __attribute__((packed));
 
 #endif /* QDSP5AUDPREPROCMSG_H */

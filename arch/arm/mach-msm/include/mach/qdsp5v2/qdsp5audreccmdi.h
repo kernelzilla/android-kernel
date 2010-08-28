@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,18 +33,18 @@
 /*
  * AUDRECTASK COMMANDS
  * ARM uses 2 queues to communicate with the AUDRECTASK
- * 1.uPAudRec[i]CmdQueue, where i=0,1
+ * 1.uPAudRec[i]CmdQueue, where i=0,1,2
  * Location :MEMC
  * Buffer Size : 5
  * No of Buffers in a queue : 2
- * 2.uPAudRec[i]BitstreamQueue, where i=0,1
+ * 2.uPAudRec[i]BitstreamQueue, where i=0,1,2
  * Location : MEMC
- * Buffer Size : 3
+ * Buffer Size : 5
  * No of buffers in a queue : 3
  */
 
 /*
- * Commands on uPAudRec[i]CmdQueue, where i=0,1
+ * Commands on uPAudRec[i]CmdQueue, where i=0,1,2
  */
 
 /*
@@ -64,7 +64,55 @@ struct audrec_cmd_arecmem_cfg {
 } __attribute__((packed));
 
 /*
- * Commands on uPAudRec[i]BitstreamQueue, where i=0,1
+ * Command to configure pcm input memory
+ */
+
+#define AUDREC_CMD_PCM_CFG_ARM_TO_ENC 0x0001
+#define AUDREC_CMD_PCM_CFG_ARM_TO_ENC_LEN	\
+	sizeof(struct audrec_cmd_pcm_cfg_arm_to_enc)
+
+struct audrec_cmd_pcm_cfg_arm_to_enc {
+	unsigned short cmd_id;
+	unsigned short config_update_flag;
+	unsigned short enable_flag;
+	unsigned short sampling_freq;
+	unsigned short channels;
+	unsigned short frequency_of_intimation;
+	unsigned short max_number_of_buffers;
+} __attribute__((packed));
+
+/*
+ * Command to intimate available pcm buffer
+ */
+
+#define AUDREC_CMD_PCM_BUFFER_PTR_REFRESH_ARM_TO_ENC 0x0002
+#define AUDREC_CMD_PCM_BUFFER_PTR_REFRESH_ARM_TO_ENC_LEN \
+  sizeof(struct audrec_cmd_pcm_buffer_ptr_refresh_arm_enc)
+
+struct audrec_cmd_pcm_buffer_ptr_refresh_arm_enc {
+	unsigned short cmd_id;
+	unsigned short num_buffers;
+	unsigned short buffer_write_cnt_msw;
+	unsigned short buffer_write_cnt_lsw;
+	unsigned short buf_address_length[8];/*this array holds address
+						and length details of
+						two buffers*/
+} __attribute__((packed));
+
+/*
+ * Command to flush
+ */
+
+#define AUDREC_CMD_FLUSH 0x0003
+#define AUDREC_CMD_FLUSH_LEN	\
+	sizeof(struct audrec_cmd_flush)
+
+struct audrec_cmd_flush {
+	unsigned short cmd_id;
+} __attribute__((packed));
+
+/*
+ * Commands on uPAudRec[i]BitstreamQueue, where i=0,1,2
  */
 
 /*
