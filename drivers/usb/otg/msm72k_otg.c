@@ -35,6 +35,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <mach/clk.h>
+#include <mach/msm_xo.h>
 
 #define MSM_USB_BASE	(dev->regs)
 #define USB_LINK_RESET_TIMEOUT	(msecs_to_jiffies(10))
@@ -554,6 +555,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 {
 	unsigned long timeout;
 	int vbus = 0;
+	unsigned ret;
 
 	disable_irq(dev->irq);
 	if (atomic_read(&dev->in_lpm))
@@ -589,6 +591,12 @@ static int msm_otg_suspend(struct msm_otg *dev)
 		clk_disable(dev->hs_pclk);
 	if (dev->hs_cclk)
 		clk_disable(dev->hs_cclk);
+	/* usb phy no more require TCXO clock, hence vote for TCXO disable*/
+	ret = msm_xo_mode_vote(dev->xo_handle, XO_MODE_OFF);
+	if (ret)
+		pr_err("%s failed to devote for"
+			"TCXO D1 buffer%d\n", __func__, ret);
+
 	if (device_may_wakeup(dev->otg.dev)) {
 		enable_irq_wake(dev->irq);
 		if (dev->vbus_on_irq)
@@ -624,9 +632,16 @@ out:
 static int msm_otg_resume(struct msm_otg *dev)
 {
 	unsigned temp;
+	unsigned ret;
 
 	if (!atomic_read(&dev->in_lpm))
 		return 0;
+
+	/* Vote for TCXO when waking up the phy */
+	ret = msm_xo_mode_vote(dev->xo_handle, XO_MODE_ON);
+	if (ret)
+		pr_err("%s failed to vote for"
+			"TCXO D1 buffer%d\n", __func__, ret);
 
 	/* pclk might be derived from peripheral bus clock. If so then
 	 * vote for max AXI frequency before enabling pclk.
@@ -2214,6 +2229,21 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto free_regs;
 	}
+	dev->xo_handle = msm_xo_get(TCXO_D1, "usb");
+	if (IS_ERR(dev->xo_handle)) {
+		pr_err(" %s not able to get the handle"
+			"to vote for TCXO D1 buffer\n", __func__);
+		ret = PTR_ERR(dev->xo_handle);
+		goto free_regs;
+	}
+
+	ret = msm_xo_mode_vote(dev->xo_handle, XO_MODE_ON);
+	if (ret) {
+		pr_err("%s failed to vote for TCXO"
+			"D1 buffer%d\n", __func__, ret);
+		goto free_xo_handle;
+	}
+
 
 	msm_otg_init_timer(dev);
 	INIT_WORK(&dev->sm_work, msm_otg_sm_work);
@@ -2371,6 +2401,8 @@ free_wq:
 	destroy_workqueue(dev->wq);
 free_wlock:
 	wake_lock_destroy(&dev->wlock);
+free_xo_handle:
+	msm_xo_put(dev->xo_handle);
 free_regs:
 	iounmap(dev->regs);
 put_phy_clk:
@@ -2437,6 +2469,7 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 		clk_put(dev->phy_reset_clk);
 	if (dev->pdata->rpc_connect)
 		dev->pdata->rpc_connect(0);
+	msm_xo_put(dev->xo_handle);
 
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
