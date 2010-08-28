@@ -76,6 +76,7 @@
 #include "pm.h"
 #include "rpm.h"
 #include "spm.h"
+#include "rpm_log.h"
 #include "timer.h"
 #include "saw-regulator.h"
 
@@ -1237,6 +1238,27 @@ static struct platform_device gpio_leds = {
 };
 #endif
 
+#if defined(CONFIG_MSM_RPM_LOG) || defined(CONFIG_MSM_RPM_LOG_MODULE)
+
+static struct msm_rpm_log_platform_data msm_rpm_log_pdata = {
+	.phys_addr_base = 0x00106000,
+	.reg_offsets = {
+		[MSM_RPM_LOG_PAGE_INDICES] = 0x00000C80,
+		[MSM_RPM_LOG_PAGE_BUFFER]  = 0x00000CA0,
+	},
+	.phys_size = SZ_8K,
+	.log_len = 4096,		  /* log's buffer length in bytes */
+	.log_len_mask = (4096 >> 2) - 1,  /* length mask in units of u32 */
+};
+static struct platform_device msm_rpm_log_device = {
+	.name	= "msm_rpm_log",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &msm_rpm_log_pdata,
+	},
+};
+#endif
+
 static struct platform_device *early_devices[] __initdata = {
 	&msm_device_gpio,
 };
@@ -1365,6 +1387,9 @@ static struct platform_device *surf_devices[] __initdata = {
 #endif
 #ifdef CONFIG_MSM_VPE
 	&msm_vpe_device,
+#endif
+#if defined(CONFIG_MSM_RPM_LOG) || defined(CONFIG_MSM_RPM_LOG_MODULE)
+	&msm_rpm_log_device,
 #endif
 	&msm_device_vidc
 };

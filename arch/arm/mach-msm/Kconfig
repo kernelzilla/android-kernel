@@ -1136,6 +1136,17 @@ config MSM_PIL
 config SMMU_8X60
 	bool
 
+config MSM_RPM_LOG
+	tristate "MSM Resource Power Manager Log Driver"
+	depends on DEBUG_FS
+	depends on ARCH_MSM8X60
+	default n
+	help
+	  This option enables a driver which can read from a circular buffer
+	  of messages produced by the RPM. These messages provide diagnostic
+	  information about RPM operation. The driver outputs the messages
+	  via a debugfs node.
+
 config SMMU
 	bool "System MMU support"
 	depends on MMU
