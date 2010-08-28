@@ -42,6 +42,7 @@ enum {
 	RMT_STORAGE_EVNT_WRITE_BLOCK,
 	RMT_STORAGE_EVNT_GET_DEV_ERROR,
 	RMT_STORAGE_EVNT_WRITE_IOVEC,
+	RMT_STORAGE_EVNT_READ_IOVEC,
 	RMT_STORAGE_EVNT_SEND_USER_DATA,
 } rmt_storage_event;
 
@@ -85,13 +86,17 @@ static struct rmt_storage_client_info *_rmc;
 static struct msm_rpc_client *client;
 
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
+struct rmt_storage_op_stats {
+	unsigned long count;
+	ktime_t start;
+	ktime_t min;
+	ktime_t max;
+	ktime_t total;
+};
 struct rmt_storage_stats {
        char path[MAX_PATH_NAME];
-       unsigned long count;
-       ktime_t start;
-       ktime_t min;
-       ktime_t max;
-       ktime_t total;
+       struct rmt_storage_op_stats rd_stats;
+       struct rmt_storage_op_stats wr_stats;
 };
 static struct rmt_storage_stats client_stats[MAX_NUM_CLIENTS];
 static struct dentry *stats_dentry;
@@ -99,16 +104,19 @@ static struct dentry *stats_dentry;
 
 #define RMT_STORAGE_APIPROG            0x300000A7
 
-#define RMT_STORAGE_FORCE_SYNC_PROC 7
-#define RMT_STORAGE_GET_SYNC_STATUS_PROC 8
-#define RMT_STORAGE_WRITE_FINISH_PROC 2
-#define RMT_STORAGE_REGISTER_OPEN_PROC 3
-#define RMT_STORAGE_REGISTER_WRITE_IOVEC_PROC 4
-#define RMT_STORAGE_REGISTER_CB_PROC 5
-#define RMT_STORAGE_UN_REGISTER_CB_PROC 6
-#define RMT_STORAGE_OPEN_CB_TYPE_PROC 1
-#define RMT_STORAGE_WRITE_IOVEC_CB_TYPE_PROC 2
-#define RMT_STORAGE_EVENT_CB_TYPE_PROC 3
+#define RMT_STORAGE_OP_FINISH_PROC              2
+#define RMT_STORAGE_REGISTER_OPEN_PROC          3
+#define RMT_STORAGE_REGISTER_WRITE_IOVEC_PROC   4
+#define RMT_STORAGE_REGISTER_CB_PROC            5
+#define RMT_STORAGE_UN_REGISTER_CB_PROC         6
+#define RMT_STORAGE_FORCE_SYNC_PROC             7
+#define RMT_STORAGE_GET_SYNC_STATUS_PROC        8
+#define RMT_STORAGE_REGISTER_READ_IOVEC_PROC    9
+
+#define RMT_STORAGE_OPEN_CB_TYPE_PROC           1
+#define RMT_STORAGE_WRITE_IOVEC_CB_TYPE_PROC    2
+#define RMT_STORAGE_EVENT_CB_TYPE_PROC          3
+#define RMT_STORAGE_READ_IOVEC_CB_TYPE_PROC     4
 
 static int rmt_storage_send_sts_arg(struct msm_rpc_client *client,
 				struct msm_rpc_xdr *xdr, void *data)
@@ -176,10 +184,10 @@ static int rmt_storage_event_open_cb(struct rmt_storage_event *event_args,
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 	stats = &client_stats[cid - 1];
 	memcpy(stats->path, event_args->path, len);
-	stats->count = 0;
-	stats->min.tv64 = KTIME_MAX;
-	stats->max.tv64 =  0;
-	stats->total.tv64 = 0;
+	memset(stats->rd_stats, 0, sizeof(struct rmt_storage_op_stats));
+	memset(stats->wr_stats, 0, sizeof(struct rmt_storage_op_stats));
+	stats->rd_stats.min.tv64 = KTIME_MAX;
+	stats->wr_stats.min.tv64 = KTIME_MAX;
 #endif
 	event_args->id = RMT_STORAGE_OPEN;
 	event_args->handle = cid;
@@ -192,7 +200,7 @@ struct rmt_storage_close_args {
 	uint32_t handle;
 };
 
-struct rmt_storage_write_block_args {
+struct rmt_storage_rw_block_args {
 	uint32_t handle;
 	uint32_t data_phy_addr;
 	uint32_t sector_addr;
@@ -212,7 +220,7 @@ struct rmt_storage_event_params {
 	uint32_t type;
 	union {
 		struct rmt_storage_close_args close;
-		struct rmt_storage_write_block_args write_block;
+		struct rmt_storage_rw_block_args block;
 		struct rmt_storage_get_err_args get_err;
 		struct rmt_storage_user_data_args user_data;
 	} params;
@@ -233,8 +241,8 @@ static int rmt_storage_parse_params(struct msm_rpc_xdr *xdr,
 	}
 
 	case RMT_STORAGE_EVNT_WRITE_BLOCK: {
-		struct rmt_storage_write_block_args *args;
-		args = &event->params.write_block;
+		struct rmt_storage_rw_block_args *args;
+		args = &event->params.block;
 
 		xdr_recv_uint32(xdr, &args->handle);
 		xdr_recv_uint32(xdr, &args->data_phy_addr);
@@ -301,7 +309,7 @@ static int rmt_storage_event_write_block_cb(
 		struct msm_rpc_xdr *xdr)
 {
 	struct rmt_storage_event_params *event;
-	struct rmt_storage_write_block_args *write_block;
+	struct rmt_storage_rw_block_args *write_block;
 	struct rmt_storage_iovec_desc *xfer;
 	uint32_t event_type;
 	int ret;
@@ -318,7 +326,7 @@ static int rmt_storage_event_write_block_cb(
 	if (ret || !event)
 		return -1;
 
-	write_block = &event->params.write_block;
+	write_block = &event->params.block;
 	event_args->handle = write_block->handle;
 	xfer = &event_args->xfer_desc[0];
 	xfer->sector_addr = write_block->sector_addr;
@@ -424,7 +432,7 @@ static int rmt_storage_event_write_iovec_cb(
 
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 	stats = &client_stats[event_args->handle - 1];
-	stats->start = ktime_get();
+	stats->wr_stats.start = ktime_get();
 #endif
 	for (i = 0; i < ent; i++) {
 		xfer = &event_args->xfer_desc[i];
@@ -443,6 +451,53 @@ static int rmt_storage_event_write_iovec_cb(
 	}
 	xdr_recv_uint32(xdr, &event_args->xfer_cnt);
 	event_args->id = RMT_STORAGE_WRITE;
+	if (atomic_inc_return(&_rmc->wcount) == 1)
+		wake_lock(&_rmc->wlock);
+
+	pr_debug("iovec transfer count = %d\n\n", event_args->xfer_cnt);
+	return RMT_STORAGE_NO_ERROR;
+}
+
+static int rmt_storage_event_read_iovec_cb(
+		struct rmt_storage_event *event_args,
+		struct msm_rpc_xdr *xdr)
+{
+	struct rmt_storage_iovec_desc *xfer;
+	uint32_t i, ent, event_type;
+#ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
+	struct rmt_storage_stats *stats;
+#endif
+
+	xdr_recv_uint32(xdr, &event_type);
+	if (event_type != RMT_STORAGE_EVNT_READ_IOVEC)
+		return -EINVAL;
+
+	pr_info("%s: read iovec callback received\n", __func__);
+	xdr_recv_uint32(xdr, &event_args->handle);
+	xdr_recv_uint32(xdr, &ent);
+	pr_debug("handle = %d\n", event_args->handle);
+
+#ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
+	stats = &client_stats[event_args->handle - 1];
+	stats->rd_stats.start = ktime_get();
+#endif
+	for (i = 0; i < ent; i++) {
+		xfer = &event_args->xfer_desc[i];
+		xdr_recv_uint32(xdr, &xfer->sector_addr);
+		xdr_recv_uint32(xdr, &xfer->data_phy_addr);
+		xdr_recv_uint32(xdr, &xfer->num_sector);
+
+		if (xfer->data_phy_addr < _rmc->rmt_shrd_mem.start ||
+		   xfer->data_phy_addr > (_rmc->rmt_shrd_mem.start +
+		   _rmc->rmt_shrd_mem.size))
+			return -EINVAL;
+
+		pr_debug("sec_addr = %u, data_addr = %x, num_sec = %d\n",
+			xfer->sector_addr, xfer->data_phy_addr,
+			xfer->num_sector);
+	}
+	xdr_recv_uint32(xdr, &event_args->xfer_cnt);
+	event_args->id = RMT_STORAGE_READ;
 	if (atomic_inc_return(&_rmc->wcount) == 1)
 		wake_lock(&_rmc->wlock);
 
@@ -473,6 +528,9 @@ static int handle_rmt_storage_call(struct msm_rpc_client *client,
 		/* fall through */
 
 	case RMT_STORAGE_WRITE_IOVEC_CB_TYPE_PROC:
+		/* fall through */
+
+	case RMT_STORAGE_READ_IOVEC_CB_TYPE_PROC:
 		/* fall through */
 
 	case RMT_STORAGE_EVENT_CB_TYPE_PROC: {
@@ -555,6 +613,7 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 	struct rmt_storage_send_sts status;
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 	struct rmt_storage_stats *stats;
+	struct rmt_storage_op_stats *op_stats;
 	ktime_t curr_stat;
 #endif
 
@@ -601,16 +660,20 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 		}
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 		stats = &client_stats[status.handle - 1];
-		curr_stat = ktime_sub(ktime_get(), stats->start);
-		stats->total = ktime_add(stats->total, curr_stat);
-		stats->count++;
+		if (status.xfer_dir == RMT_STORAGE_WRITE)
+			op_stats = &stats->wr_stats;
+		else
+			op_stats = &stats->rd_stats;
+		curr_stat = ktime_sub(ktime_get(), op_stats->start);
+		op_stats->total = ktime_add(op_stats->total, curr_stat);
+		op_stats->count++;
 		if (curr_stat.tv64 < stats->min.tv64)
-			stats->min = curr_stat;
+			op_stats->min = curr_stat;
 		if (curr_stat.tv64 > stats->max.tv64)
-			stats->max = curr_stat;
+			op_stats->max = curr_stat;
 #endif
 		ret = msm_rpc_client_req2(client,
-				RMT_STORAGE_WRITE_FINISH_PROC,
+				RMT_STORAGE_OP_FINISH_PROC,
 				rmt_storage_send_sts_arg,
 				&status, NULL, NULL, -1);
 		if (ret < 0)
@@ -716,6 +779,7 @@ static int rmt_storage_mmap(struct file *file, struct vm_area_struct *vma)
 		goto out;
 	}
 
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	ret = io_remap_pfn_range(vma, vma->vm_start,
 			rmc->rmt_shrd_mem.start >> PAGE_SHIFT,
 			vsize, vma->vm_page_prot);
@@ -781,17 +845,33 @@ static ssize_t rmt_storage_stats_read(struct file *file, char __user *ubuf,
 		stats = &client_stats[j];
 		i += scnprintf(buf + i, max - i, "stats for partition %s:\n",
 				stats->path);
-		i += scnprintf(buf + i, max - i, "Min time: %lld us\n",
-				ktime_to_us(stats->min));
-		i += scnprintf(buf + i, max - i, "Max time: %lld us\n",
-				ktime_to_us(stats->max));
-		i += scnprintf(buf + i, max - i, "Total time: %lld us\n",
-				ktime_to_us(stats->total));
-		i += scnprintf(buf + i, max - i, "Total requests: %ld\n",
-				stats->count);
+		i += scnprintf(buf + i, max - i, "Min read time: %lld us\n",
+				ktime_to_us(stats->rd_stats.min));
+		i += scnprintf(buf + i, max - i, "Max read time: %lld us\n",
+				ktime_to_us(stats->rd_stats.max));
+		i += scnprintf(buf + i, max - i, "Total read time: %lld us\n",
+				ktime_to_us(stats->rd_stats.total));
+		i += scnprintf(buf + i, max - i, "Total read requests: %ld\n",
+				stats->rd_stats.count);
 		if (stats->count)
-			i += scnprintf(buf + i, max - i, "Avg time: %lld us\n",
-			     div_s64(ktime_to_us(stats->total), stats->count));
+			i += scnprintf(buf + i, max - i,
+				"Avg read time: %lld us\n",
+				div_s64(ktime_to_us(stats->total),
+				stats->rd_stats.count));
+
+		i += scnprintf(buf + i, max - i, "Min write time: %lld us\n",
+				ktime_to_us(stats->wr_stats.min));
+		i += scnprintf(buf + i, max - i, "Max write time: %lld us\n",
+				ktime_to_us(stats->wr_stats.max));
+		i += scnprintf(buf + i, max - i, "Total write time: %lld us\n",
+				ktime_to_us(stats->wr_stats.total));
+		i += scnprintf(buf + i, max - i, "Total read requests: %ld\n",
+				stats->wr_stats.count);
+		if (stats->count)
+			i += scnprintf(buf + i, max - i,
+				"Avg write time: %lld us\n",
+				div_s64(ktime_to_us(stats->total),
+				stats->wr_stats.count));
 	}
 	return simple_read_from_buffer(ubuf, count, ppos, buf, i);
 }
@@ -976,6 +1056,14 @@ static int rmt_storage_probe(struct platform_device *pdev)
 
 	if (ret)
 		goto unregister_client;
+
+	ret = rmt_storage_reg_cb(RMT_STORAGE_REGISTER_READ_IOVEC_PROC,
+			RMT_STORAGE_EVNT_READ_IOVEC,
+			rmt_storage_event_read_iovec_cb);
+
+	if (ret)
+		pr_err("%s: unable to register read iovec callback %d\n",
+			__func__, ret);
 
 	ret = rmt_storage_reg_cb(RMT_STORAGE_REGISTER_CB_PROC,
 			RMT_STORAGE_EVNT_SEND_USER_DATA,
