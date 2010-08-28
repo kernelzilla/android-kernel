@@ -2421,10 +2421,15 @@ config FB_MSM_SECONDARY_PANEL_NONE
 	  No secondary panel
 endchoice
 
+config FB_MSM_HDMI_COMMON
+	bool
+	default n
+
 config FB_MSM_HDMI_ADV7520_PANEL
 	depends on FB_MSM_MDP40 && FB_MSM_OVERLAY
         bool "LCDC HDMI ADV7520 720p Panel"
         select FB_MSM_DTV
+	select FB_MSM_HDMI_COMMON
 	default n
         ---help---
         Support for LCDC 720p HDMI panel attached to ADV7520
@@ -2433,6 +2438,7 @@ config FB_MSM_HDMI_MSM_PANEL
 	depends on FB_MSM_MDP40
 	bool "MSM HDMI 1080p Panel"
 	select FB_MSM_DTV
+	select FB_MSM_HDMI_COMMON
 	default n
 	---help---
 	  Support for 480p/720p/1080i/1080p output through MSM HDMI
