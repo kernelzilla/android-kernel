@@ -165,63 +165,20 @@ void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
 	return (void *)addr;
 }
 
-#if defined(CONFIG_MSM_NPA_REMOTE)
-struct npa_client *npa_memory_client;
-#endif
-
-static int change_memory_power_state(unsigned long start_pfn,
-	unsigned long nr_pages, int state)
-{
-#if defined(CONFIG_MSM_NPA_REMOTE)
-	static atomic_t node_created_flag = ATOMIC_INIT(1);
-#else
-	unsigned long start;
-	unsigned long size;
-	unsigned long virtual;
-#endif
-	int rc = 0;
-
-#if defined(CONFIG_MSM_NPA_REMOTE)
-	if (atomic_dec_and_test(&node_created_flag)) {
-		/* Create NPA 'required' client. */
-		npa_memory_client = npa_create_sync_client(NPA_MEMORY_NODE_NAME,
-			"memory node", NPA_CLIENT_REQUIRED);
-		if (IS_ERR(npa_memory_client)) {
-			rc = PTR_ERR(npa_memory_client);
-			atomic_inc(&node_created_flag);
-			return rc;
-		}
-	}
-
-	rc = npa_issue_required_request(npa_memory_client, state);
-#else
-	if (state == MEMORY_DEEP_POWERDOWN) {
-		/* simulate turning off memory by writing bit pattern into it */
-		start = start_pfn << PAGE_SHIFT;
-		size = nr_pages << PAGE_SHIFT;
-		virtual = __phys_to_virt(start);
-		memset((void *)virtual, 0x27, size);
-	}
-#endif
-	return rc;
-}
-
 int platform_physical_remove_pages(unsigned long start_pfn,
 	unsigned long nr_pages)
 {
-	return change_memory_power_state(start_pfn, nr_pages,
-		MEMORY_DEEP_POWERDOWN);
+	return 1;
 }
 
 int platform_physical_active_pages(unsigned long start_pfn,
 	unsigned long nr_pages)
 {
-	return change_memory_power_state(start_pfn, nr_pages, MEMORY_ACTIVE);
+	return 1;
 }
 
 int platform_physical_low_power_pages(unsigned long start_pfn,
 	unsigned long nr_pages)
 {
-	return change_memory_power_state(start_pfn, nr_pages,
-		MEMORY_SELF_REFRESH);
+	return 1;
 }
