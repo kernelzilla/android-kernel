@@ -33,7 +33,6 @@
 #endif
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
-#include <mach/sirc.h>
 #ifdef CONFIG_CACHE_L2X0
 #include <asm/hardware/cache-l2x0.h>
 #endif
@@ -52,6 +51,7 @@
 #include "timer.h"
 #include "pm.h"
 #include "spm.h"
+#include "sirc.h"
 
 /******************************************************************************
  * Debug Definitions
