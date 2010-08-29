@@ -88,7 +88,11 @@ static struct clk *camio_jpeg_clk;
 static struct clk *camio_jpeg_pclk;
 static struct clk *camio_vpe_clk;
 static struct clk *camio_vpe_pclk;
-
+static struct regulator *fs_vfe;
+static struct regulator *fs_ijpeg;
+static struct regulator *fs_vpe;
+static struct regulator *ldo15;
+static struct regulator *lvs0;
 
 static struct msm_camera_io_ext camio_ext;
 static struct msm_camera_io_clk camio_clk;
@@ -173,61 +177,66 @@ void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len)
 
 static void msm_camera_vreg_enable(void)
 {
-	struct regulator *ldo15 = regulator_get(NULL, "ldo15");
-	struct regulator *ldo25 = regulator_get(NULL, "ldo25");
-	struct regulator *lvs0 = regulator_get(NULL, "lvs0");
-	int rc;
-	if (!IS_ERR(ldo15)) {
-		rc = regulator_enable(ldo15);
-		if (rc != 0)
-			CDBG(" ERROR: could not enable ldo15 regulator\n");
-
-		rc = regulator_set_voltage(ldo15, 2800000, 2800000);
-		if (rc != 0)
-			CDBG(" ERROR: could not set ldo15 voltage\n");
-
+	ldo15 = regulator_get(NULL, "8058_l15");
+	if (IS_ERR(ldo15)) {
+		pr_err("%s: VREG LDO15 get failed\n", __func__);
+		ldo15 = NULL;
+		return;
+	}
+	if (regulator_set_voltage(ldo15, 2850000, 2850000)) {
+		pr_err("%s: VREG LDO15 set voltage failed\n",  __func__);
+		goto ldo15_disable;
+	}
+	if (regulator_enable(ldo15)) {
+		pr_err("%s: VREG LDO15 enable failed\n", __func__);
+		goto ldo15_put;
 	}
 
-	if (!IS_ERR(ldo25)) {
-		rc = regulator_enable(ldo15);
-		if (rc != 0)
-			CDBG(" ERROR: could not enable ldo25 regulator\n");
-
-		rc = regulator_set_voltage(ldo25, 1200000, 1200000);
-		if (rc != 0)
-			CDBG(" ERROR: could not set ldo25 voltage\n");
-
+	lvs0 = regulator_get(NULL, "8058_lvs0");
+	if (IS_ERR(lvs0)) {
+		pr_err("%s: VREG LVS0 get failed\n", __func__);
+		lvs0 = NULL;
+		goto ldo15_disable;
 	}
-	if (!IS_ERR(lvs0)) {
-		rc = regulator_enable(lvs0);
-		if (rc != 0)
-			CDBG(" ERROR: could not enable lvs0 regulator\n");
-
-		rc = regulator_set_voltage(lvs0, 1200000, 1200000);
-		if (rc != 0)
-			CDBG(" ERROR: could not set lvs0 voltage\n");
-
+	if (regulator_enable(lvs0)) {
+		pr_err("%s: VREG LVS0 enable failed\n", __func__);
+		goto lvs0_put;
 	}
+
+	fs_vfe = regulator_get(NULL, "fs_vfe");
+	if (IS_ERR(fs_vfe)) {
+		CDBG("%s: Regulator FS_VFE get failed %ld\n", __func__,
+			PTR_ERR(fs_vfe));
+		fs_vfe = NULL;
+	} else if (regulator_enable(fs_vfe)) {
+		CDBG("%s: Regulator FS_VFE enable failed\n", __func__);
+		regulator_put(fs_vfe);
+	}
+	return;
+
+lvs0_put:
+	regulator_put(lvs0);
+ldo15_disable:
+	regulator_disable(ldo15);
+ldo15_put:
+	regulator_put(ldo15);
 }
 
 static void msm_camera_vreg_disable(void)
 {
-	struct regulator *ldo15 = regulator_get(NULL, "ldo15");
-	struct regulator *ldo25 = regulator_get(NULL, "ldo25");
-	struct regulator *lvs0 = regulator_get(NULL, "lvs0");
-	if (!IS_ERR(ldo15)) {
+	if (ldo15) {
 		regulator_disable(ldo15);
 		regulator_put(ldo15);
 	}
 
-	if (!IS_ERR(ldo25)) {
-		regulator_disable(ldo25);
-		regulator_put(ldo25);
-	}
-
-	if (!IS_ERR(lvs0)) {
+	if (lvs0) {
 		regulator_disable(lvs0);
 		regulator_put(lvs0);
+	}
+
+	if (fs_vfe) {
+		regulator_disable(fs_vfe);
+		regulator_put(fs_vfe);
 	}
 }
 
@@ -411,6 +420,10 @@ static irqreturn_t msm_io_csi_irq(int irq_num, void *data)
 int msm_camio_jpeg_clk_disable(void)
 {
 	int rc = 0;
+	if (fs_ijpeg) {
+		regulator_disable(fs_ijpeg);
+		regulator_put(fs_ijpeg);
+	}
 	rc = msm_camio_clk_disable(CAMIO_JPEG_CLK);
 	if (rc < 0)
 		return rc;
@@ -421,6 +434,16 @@ int msm_camio_jpeg_clk_disable(void)
 int msm_camio_jpeg_clk_enable(void)
 {
 	int rc = 0;
+	fs_ijpeg = regulator_get(NULL, "fs_ijpeg");
+	if (IS_ERR(fs_ijpeg)) {
+		CDBG("%s: Regulator FS_IJPEG get failed %ld\n", __func__,
+			PTR_ERR(fs_ijpeg));
+		fs_ijpeg = NULL;
+	} else if (regulator_enable(fs_ijpeg)) {
+		CDBG("%s: Regulator FS_IJPEG enable failed\n", __func__);
+		regulator_put(fs_ijpeg);
+	}
+
 	rc = msm_camio_clk_enable(CAMIO_JPEG_CLK);
 	if (rc < 0)
 		return rc;
@@ -431,6 +454,11 @@ int msm_camio_jpeg_clk_enable(void)
 int msm_camio_vpe_clk_disable(void)
 {
 	int rc = 0;
+	if (fs_vpe) {
+		regulator_disable(fs_vpe);
+		regulator_put(fs_vpe);
+	}
+
 	rc = msm_camio_clk_disable(CAMIO_VPE_CLK);
 	if (rc < 0)
 		return rc;
@@ -441,6 +469,16 @@ int msm_camio_vpe_clk_disable(void)
 int msm_camio_vpe_clk_enable(void)
 {
 	int rc = 0;
+	fs_vpe = regulator_get(NULL, "fs_vpe");
+	if (IS_ERR(fs_vpe)) {
+		CDBG("%s: Regulator FS_VPE get failed %ld\n", __func__,
+			PTR_ERR(fs_vpe));
+		fs_vpe = NULL;
+	} else if (regulator_enable(fs_vpe)) {
+		CDBG("%s: Regulator FS_VPE enable failed\n", __func__);
+		regulator_put(fs_vpe);
+	}
+
 	rc = msm_camio_clk_enable(CAMIO_VPE_CLK);
 	if (rc < 0)
 		return rc;
