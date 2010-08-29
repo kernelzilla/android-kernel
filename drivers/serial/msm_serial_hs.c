@@ -39,6 +39,7 @@
 #include <linux/timer.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
 #include <linux/wait.h>
@@ -1485,6 +1486,11 @@ static int msm_hs_startup(struct uart_port *uport)
 	msm_hs_start_rx_locked(uport);
 
 	spin_unlock_irqrestore(&uport->lock, flags);
+	ret = pm_runtime_set_active(uport->dev);
+	if (ret)
+		dev_err(uport->dev, "set active error:%d\n", ret);
+	pm_runtime_enable(uport->dev);
+
 
 	return 0;
 }
@@ -1712,6 +1718,9 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	spin_lock_irqsave(&uport->lock, flags);
 	clk_enable(msm_uport->clk);
 
+	pm_runtime_disable(uport->dev);
+	pm_runtime_set_suspended(uport->dev);
+
 	/* Disable the transmitter */
 	msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_TX_DISABLE_BMSK);
 	/* Disable the receiver */
@@ -1750,12 +1759,46 @@ static void __exit msm_serial_hs_exit(void)
 	uart_unregister_driver(&msm_hs_driver);
 }
 
+static int msm_hs_runtime_idle(struct device *dev)
+{
+	/*
+	 * returning success from idle results in runtime suspend to be
+	 * called
+	 */
+	return 0;
+}
+
+static int msm_hs_runtime_resume(struct device *dev)
+{
+	struct platform_device *pdev = container_of(dev, struct
+						    platform_device, dev);
+	struct msm_hs_port *msm_uport = &q_uart_port[pdev->id];
+	msm_hs_request_clock_on(&msm_uport->uport);
+	return 0;
+}
+
+static int msm_hs_runtime_suspend(struct device *dev)
+{
+	struct platform_device *pdev = container_of(dev, struct
+						    platform_device, dev);
+	struct msm_hs_port *msm_uport = &q_uart_port[pdev->id];
+	msm_hs_request_clock_off(&msm_uport->uport);
+	return 0;
+}
+
+static const struct dev_pm_ops msm_hs_dev_pm_ops = {
+	.runtime_suspend = msm_hs_runtime_suspend,
+	.runtime_resume  = msm_hs_runtime_resume,
+	.runtime_idle    = msm_hs_runtime_idle,
+};
+
 static struct platform_driver msm_serial_hs_platform_driver = {
-	.probe = msm_hs_probe,
+	.probe  = msm_hs_probe,
 	.remove = msm_hs_remove,
 	.driver = {
-		   .name = "msm_serial_hs",
-		   },
+		.name = "msm_serial_hs",
+		.pm   = &msm_hs_dev_pm_ops,
+	},
 };
 
 static struct uart_driver msm_hs_driver = {
