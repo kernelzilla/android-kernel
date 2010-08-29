@@ -510,8 +510,8 @@ wait_for_int:
 		}
 		if (dev->err) {
 			dev_err(dev->dev,
-				"Error during data xfer (%d)\n",
-				dev->err);
+				"(%04x) Error during data xfer (%d)\n",
+				addr, dev->err);
 			ret = dev->err;
 			goto out_err;
 		}
