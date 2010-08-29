@@ -148,6 +148,17 @@ config GPIO_PCF857X
 	  This driver provides an in-kernel interface to those GPIOs using
 	  platform-neutral GPIO calls.
 
+config GPIO_SX150X
+	bool "Semtech SX150x I2C GPIO expander"
+	depends on I2C=y
+	default n
+	help
+	  Say yes here to provide support for Semtech SX150-series I2C
+	  GPIO expanders. Compatible models include:
+
+	  8 bits:  sx1508q
+	  16 bits: sx1509q
+
 config GPIO_TWL4030
 	tristate "TWL4030, TWL5030, and TPS659x0 GPIOs"
 	depends on TWL4030_CORE
@@ -171,14 +182,6 @@ config GPIO_ADP5520
 
 	  To compile this driver as a module, choose M here: the module will
 	  be called adp5520-gpio.
-
-config GPIO_SX150X
-	tristate "SX150x I2C GPIO expander"
-	depends on I2C
-	default n
-	help
-	  Say yes here to provide support for the Semtech SX150x I2C
-	  GPIO expanders.
 
 config MPP_PMIC8901
 	tristate "Qualcomm PMIC8901 MPP"
