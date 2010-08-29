@@ -58,6 +58,7 @@
 #define BB_PLL8_MODE_REG			REG(0x3140)
 #define BB_PLL8_N_VAL_REG			REG(0x314C)
 #define BB_PLL8_STATUS_REG			REG(0x3158)
+#define PLLTEST_PAD_CFG_REG			REG(0x2FA4)
 #define PRNG_CLK_NS_REG				REG(0x2E80)
 #define RINGOSC_NS_REG				REG(0x2DC0)
 #define RINGOSC_STATUS_REG			REG(0x2DCC)
@@ -1738,6 +1739,8 @@ int soc_clk_measure_rate(unsigned id)
 		ret = (int)raw_count_full;
 	}
 
+	/* Route dbg_hs_clk to PLLTEST.  300mV single-ended amplitude. */
+	writel(0x3CF8, PLLTEST_PAD_CFG_REG);
 err:
 	spin_unlock_irqrestore(&local_clock_reg_lock, flags);
 
