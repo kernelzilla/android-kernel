@@ -33,6 +33,9 @@
 #define KGSL_CONTEXT_SAVE_GMEM		1
 #define KGSL_CONTEXT_NO_GMEM_ALLOC	2
 
+/* Memory allocayion flags */
+#define KGSL_MEMFLAGS_GPUREADONLY	0x01000000
+
 /* generic flag values */
 #define KGSL_FLAGS_NORMALMODE  0x00000000
 #define KGSL_FLAGS_SAFEMODE    0x00000001
@@ -310,9 +313,7 @@ struct kgsl_bind_gmem_shadow {
 struct kgsl_sharedmem_from_vmalloc {
 	unsigned int gpuaddr;	/*output param */
 	unsigned int hostptr;
-	/* If set from user space then will attempt to
-	 * allocate even if low watermark is crossed */
-	int force_no_low_watermark;
+	unsigned int flags;
 };
 
 #define IOCTL_KGSL_SHAREDMEM_FROM_VMALLOC \
