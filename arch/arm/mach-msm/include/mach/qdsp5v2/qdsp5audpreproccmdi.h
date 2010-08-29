@@ -225,7 +225,24 @@ struct audpreproc_afe_cmd_audio_record_cfg {
 	unsigned short stream_id;
 	unsigned short destination_activity;
 	unsigned short source_mix_mask;
-	unsigned short reserved[2];
+	unsigned short pipe_id;
+	unsigned short reserved;
+} __attribute__((packed));
+
+/*
+ * Command to configure Tunnel(RT) or Non-Tunnel(FTRT) mode
+ */
+#define AUDPREPROC_AUDREC_CMD_ROUTING_MODE 0x0003
+#define	AUDPREPROC_AUDREC_CMD_ROUTING_MODE_LEN	\
+	sizeof(struct audpreproc_audrec_cmd_routing_mode)
+
+#define AUDIO_ROUTING_MODE_FTRT		0x0001
+#define AUDIO_ROUTING_MODE_RT		0x0002
+
+struct audpreproc_audrec_cmd_routing_mode {
+	unsigned short cmd_id;
+	unsigned short stream_id;
+	unsigned short routing_mode;
 } __attribute__((packed));
 
 /*
