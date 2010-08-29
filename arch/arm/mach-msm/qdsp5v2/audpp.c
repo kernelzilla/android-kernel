@@ -89,6 +89,7 @@ static struct wake_lock audpp_wake_lock;
 #define AUDPP_CMD_QRUMBLE		9
 #define AUDPP_CMD_MBADRC		10
 #define AUDPP_CMD_CALIB_GAIN_RX         15
+#define AUDPP_CMD_PBE                   16
 
 #define MAX_EVENT_CALLBACK_CLIENTS 	1
 
@@ -639,6 +640,42 @@ int audpp_dsp_set_gain_rx(unsigned id,
 			sizeof(struct audpp_cmd_cfg_cal_gain));
 }
 EXPORT_SYMBOL(audpp_dsp_set_gain_rx);
+
+int audpp_dsp_set_pbe(unsigned id, unsigned enable,
+			struct audpp_cmd_cfg_pbe *pbe_block,
+			enum obj_type objtype)
+{
+	if (objtype) {
+		if (id > 5) {
+			MM_ERR("Wrong POPP decoder id: %d\n", id);
+			return -EINVAL;
+		}
+	} else {
+		if (id > 3) {
+			MM_ERR("Wrong COPP decoder id: %d\n", id);
+			return -EINVAL;
+		}
+	}
+
+	pbe_block->common.cmd_id = AUDPP_CMD_CFG_OBJECT_PARAMS;
+	if (objtype)
+		pbe_block->common.stream = AUDPP_CMD_POPP_STREAM;
+	else
+		pbe_block->common.stream = AUDPP_CMD_COPP_STREAM;
+
+	pbe_block->common.stream_id = id;
+	pbe_block->common.obj_cfg = AUDPP_CMD_CFG_OBJ_UPDATE;
+	pbe_block->common.command_type = AUDPP_CMD_PBE;
+
+	if (enable)
+		pbe_block->pbe_enable = AUDPP_CMD_PBE_FLAG_ENA;
+	else
+		pbe_block->pbe_enable = AUDPP_CMD_PBE_FLAG_DIS;
+
+	return audpp_send_queue3(pbe_block,
+			sizeof(struct audpp_cmd_cfg_pbe));
+}
+EXPORT_SYMBOL(audpp_dsp_set_pbe);
 
 
 /* Implementation Of COPP + POPP */

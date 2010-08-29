@@ -133,4 +133,32 @@ struct acdb_calib_gain_tx {
 	u16 reserved;
 };
 
+struct acdb_pbe_block {
+	s16 realbassmix;
+	s16 basscolorcontrol;
+	u16 mainchaindelay;
+	u16 xoverfltorder;
+	u16 bandpassfltorder;
+	s16 adrcdelay;
+	u16 downsamplelevel;
+	u16 comprmstav;
+	s16 expthreshold;
+	u16 expslope;
+	u16 compthreshold;
+	u16 compslope;
+	u16 cpmpattack_lsw;
+	u16 compattack_msw;
+	u16 comprelease_lsw;
+	u16 comprelease_msw;
+	u16 compmakeupgain;
+	s16 baselimthreshold;
+	s16 highlimthreshold;
+	s16 basslimmakeupgain;
+	s16 highlimmakeupgain;
+	s16 limbassgrc;
+	s16 limhighgrc;
+	s16 limdelay;
+	u16 filter_coeffs[90];
+};
+
 #endif
