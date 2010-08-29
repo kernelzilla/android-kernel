@@ -31,7 +31,7 @@
 
 #include <linux/bitops.h>
 
-#if defined(CONFIG_MSM8660_TLMM)
+#if defined(CONFIG_MSM_V2_TLMM)
 #include "gpiomux-8x60.h"
 #else
 #include "gpiomux-7x00.h"

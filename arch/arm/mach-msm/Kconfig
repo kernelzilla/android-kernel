@@ -10,7 +10,6 @@ config ARCH_MSM7X01A
 	select MSM_VIC
 	select CPU_V6
 	select MSM_REMOTE_SPINLOCK_SWP
-	select MSM7200A_TLMM
 
 config ARCH_MSM7X25
 	bool "MSM7x25"
@@ -18,7 +17,6 @@ config ARCH_MSM7X25
 	select MSM_VIC
 	select CPU_V6
 	select MSM_REMOTE_SPINLOCK_SWP
-	select MSM7200A_TLMM
 
 config ARCH_MSM7X27
 	bool "MSM7x27"
@@ -26,7 +24,6 @@ config ARCH_MSM7X27
 	select MSM_VIC
 	select CPU_V6
 	select MSM_REMOTE_SPINLOCK_SWP
-	select MSM7200A_TLMM
 
 config ARCH_MSM7X30
 	bool "MSM7x30"
@@ -34,7 +31,6 @@ config ARCH_MSM7X30
 	select MSM_VIC
 	select CPU_V7
 	select MSM_REMOTE_SPINLOCK_DEKKERS
-	select MSM7200A_TLMM
 
 config ARCH_QSD8X50
 	bool "QSD8X50"
@@ -42,7 +38,6 @@ config ARCH_QSD8X50
 	select MSM_VIC
 	select CPU_V7
 	select MSM_REMOTE_SPINLOCK_LDREX
-	select MSM7200A_TLMM
 
 config ARCH_MSM8X60
 	bool "MSM8X60"
@@ -54,7 +49,7 @@ config ARCH_MSM8X60
 	select MSM_ADM3
 	select REGULATOR
 	select MSM_PIL
-	select MSM8660_TLMM
+	select MSM_V2_TLMM
 	select ARCH_HAS_CPU_IDLE_WAIT
 	select MSM_DIRECT_SCLK_ACCESS
 	select MSM_RPM
@@ -1171,10 +1166,7 @@ config MSM_DIRECT_SCLK_ACCESS
 	bool "Direct access to the SCLK timer"
 	default n
 
-config MSM7200A_TLMM
-       bool
-
-config MSM8660_TLMM
+config MSM_V2_TLMM
        bool
 
 config MSM_BUS_SCALING
