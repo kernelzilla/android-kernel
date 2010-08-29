@@ -33,7 +33,6 @@
 #include <linux/delay.h>
 #include "vidc_type.h"
 
-#define DDL_MSG_LOG
 #ifdef DDL_MSG_LOG
 #define DDL_MSG_LOW(x...)    printk(KERN_INFO x)
 #define DDL_MSG_MED(x...)    printk(KERN_INFO x)

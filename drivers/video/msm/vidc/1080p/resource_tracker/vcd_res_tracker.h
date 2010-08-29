@@ -31,11 +31,12 @@
 
 #include "vcd_res_tracker_api.h"
 
-#define VCD_RESTRK_MIN_PERF_LEVEL 37900
-#define VCD_RESTRK_MAX_PERF_LEVEL 108000
-#define VCD_RESTRK_MIN_FREQ_POINT 61440000
-#define VCD_RESTRK_MAX_FREQ_POINT 170667000
-#define VCD_RESTRK_HZ_PER_1000_PERFLVL 1580250
+#define RESTRK_1080P_VGA_PERF_LEVEL    36000
+#define RESTRK_1080P_720P_PERF_LEVEL   108000
+#define RESTRK_1080P_1080P_PERF_LEVEL  244800
+
+#define RESTRK_1080P_MIN_PERF_LEVEL RESTRK_1080P_VGA_PERF_LEVEL
+#define RESTRK_1080P_MAX_PERF_LEVEL RESTRK_1080P_1080P_PERF_LEVEL
 
 struct res_trk_context {
 	struct device *device;
@@ -45,6 +46,7 @@ struct res_trk_context {
 	unsigned long vcodec_clk_rate;
 	unsigned int clock_enabled;
 	unsigned int rail_enabled;
+	unsigned int perf_level;
 };
 
 #if DEBUG
