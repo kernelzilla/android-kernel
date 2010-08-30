@@ -62,6 +62,13 @@
    ((_t & DRM_KGSL_GEM_TYPE_MEM_MASK) == DRM_KGSL_GEM_TYPE_KMEM_NOCACHE) || \
    ((_t) & DRM_KGSL_GEM_TYPE_MEM))
 
+/* Returns true if KMEM region is uncached */
+
+#define IS_MEM_UNCACHED(_t) \
+  ((_t == DRM_KGSL_GEM_TYPE_KMEM_NOCACHE) || \
+   (_t == DRM_KGSL_GEM_TYPE_KMEM) || \
+   (TYPE_IS_MEM(_t) && (_t & DRM_KGSL_GEM_CACHE_WCOMBINE)))
+
 struct drm_kgsl_gem_object {
 	struct drm_gem_object *obj;
 	uint32_t cpuaddr;
@@ -1042,10 +1049,9 @@ int msm_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 			pgprot_writecombine(vma->vm_page_prot);
 	}
 
-	/* flush out existing cached mappings */
-	if ((TYPE_IS_MEM(gpriv->type) &&
-		gpriv->type & DRM_KGSL_GEM_CACHE_WCOMBINE) ||
-		gpriv->type == DRM_KGSL_GEM_TYPE_KMEM_NOCACHE)
+	/* flush out existing KMEM cached mappings if new ones are
+	 * of uncached type */
+	if (IS_MEM_UNCACHED(gpriv->type))
 			kgsl_cache_range_op((unsigned long) gpriv->cpuaddr,
 					    (obj->size * gpriv->bufcount),
 					    KGSL_MEMFLAGS_CACHE_FLUSH |
