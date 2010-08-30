@@ -1,7 +1,7 @@
 /* include/asm-arm/arch-msm/msm_adsp.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -96,6 +96,8 @@ int msm_adsp_write(struct msm_adsp_module *module,
 #define QDSP_uPAudRec1BitStreamQueue      38
 #define QDSP_uPAudRec1CmdQueue            39
 #define QDSP_apuRmtQueue                  40
-#define QDSP_MAX_NUM_QUEUES               41
+#define QDSP_uPAudRec2BitStreamQueue      41
+#define QDSP_uPAudRec2CmdQueue            42
+#define QDSP_MAX_NUM_QUEUES               43
 
 #endif
