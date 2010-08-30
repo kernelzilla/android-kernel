@@ -192,6 +192,7 @@ void vpe_output_plane_config(uint32_t *p)
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_YSTRIDE1_OFFSET);
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_SIZE_OFFSET);
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_XY_OFFSET);
+	vpe_ctrl->pcbcr_dis_offset = *(++p);
 }
 
 static int vpe_operation_config(uint32_t *p)
@@ -702,12 +703,11 @@ void msm_send_frame_to_vpe(uint32_t pyaddr, uint32_t pcbcraddr,
 	if (vpe_ctrl->dis_en) {
 		/* Changing the VPE output CBCR address,
 		to make Y/CBCR continuous */
-		vpe_ctrl->pcbcr_dis = msm_io_r(vpe_device->vpebase +
+		vpe_ctrl->pcbcr_before_dis = msm_io_r(vpe_device->vpebase +
 			VPE_OUTP1_ADDR_OFFSET);
 		temp_pyaddr = msm_io_r(vpe_device->vpebase +
 			VPE_OUTP0_ADDR_OFFSET);
-		temp_pcbcraddr = temp_pyaddr +
-			(vpe_ctrl->out_w * vpe_ctrl->out_h);
+		temp_pcbcraddr = temp_pyaddr + vpe_ctrl->pcbcr_dis_offset;
 		msm_io_w(temp_pcbcraddr, vpe_device->vpebase +
 			VPE_OUTP1_ADDR_OFFSET);
 	}
@@ -1020,7 +1020,7 @@ static void vpe_do_tasklet(unsigned long data)
 			msm_io_r(vpe_device->vpebase + VPE_OUTP1_ADDR_OFFSET);
 
 		if (vpe_ctrl->dis_en)
-			pcbcraddr = vpe_ctrl->pcbcr_dis;
+			pcbcraddr = vpe_ctrl->pcbcr_before_dis;
 
 		src_y =
 			msm_io_r(vpe_device->vpebase + VPE_SRCP0_ADDR_OFFSET);
