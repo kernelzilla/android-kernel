@@ -143,7 +143,11 @@ static int verify_vdec_pkt_cmd(struct msm_adsp_module *module,
 		 skip = 0;
 		 start_pos = 6;
 		 break;
-
+	case 0xDD01: /* VP6 */
+		num_addr = 3;
+		skip = 0;
+		start_pos = 10;
+		break;
 	default:
 		return 0;
 	}
