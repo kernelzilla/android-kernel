@@ -96,6 +96,7 @@ static struct regulator *lvs0;
 
 static struct msm_camera_io_ext camio_ext;
 static struct msm_camera_io_clk camio_clk;
+static struct platform_device *camio_dev;
 static struct resource *csiio;
 void __iomem *csibase;
 
@@ -264,7 +265,7 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 
 	case CAMIO_CSI1_VFE_CLK:
 		camio_csi1_vfe_clk =
-		clk = clk_get(NULL, "csi_vfe_clk");
+		clk = clk_get(&camio_dev->dev, "csi_vfe_clk");
 		break;
 
 	case CAMIO_CSI_SRC_CLK:
@@ -279,7 +280,7 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 
 	case CAMIO_CSI1_CLK:
 		camio_csi1_clk =
-		clk = clk_get(NULL, "csi_clk");
+		clk = clk_get(&camio_dev->dev, "csi_clk");
 		break;
 
 	case CAMIO_VFE_PCLK:
@@ -294,7 +295,7 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 
 	case CAMIO_CSI1_PCLK:
 		camio_csi1_pclk =
-		clk = clk_get(NULL, "csi_pclk");
+		clk = clk_get(&camio_dev->dev, "csi_pclk");
 		break;
 
 	case CAMIO_JPEG_CLK:
@@ -492,6 +493,7 @@ int msm_camio_enable(struct platform_device *pdev)
 	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
 
+	camio_dev = pdev;
 	camio_ext = camdev->ioext;
 	camio_clk = camdev->ioclk;
 
@@ -501,10 +503,13 @@ int msm_camio_enable(struct platform_device *pdev)
 	msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 	msm_camio_clk_enable(CAMIO_VFE_CLK);
 	msm_camio_clk_enable(CAMIO_CSI0_VFE_CLK);
+	msm_camio_clk_enable(CAMIO_CSI1_VFE_CLK);
 	msm_camio_clk_enable(CAMIO_CSI_SRC_CLK);
 	msm_camio_clk_enable(CAMIO_CSI0_CLK);
+	msm_camio_clk_enable(CAMIO_CSI1_CLK);
 	msm_camio_clk_enable(CAMIO_VFE_PCLK);
 	msm_camio_clk_enable(CAMIO_CSI0_PCLK);
+	msm_camio_clk_enable(CAMIO_CSI1_PCLK);
 
 	csiio = request_mem_region(camio_ext.csiphy,
 		camio_ext.csisz, pdev->name);
@@ -533,8 +538,11 @@ common_fail:
 	msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
 	msm_camio_clk_disable(CAMIO_CSI0_VFE_CLK);
 	msm_camio_clk_disable(CAMIO_CSI0_CLK);
+	msm_camio_clk_disable(CAMIO_CSI1_VFE_CLK);
+	msm_camio_clk_disable(CAMIO_CSI1_CLK);
 	msm_camio_clk_disable(CAMIO_VFE_PCLK);
 	msm_camio_clk_disable(CAMIO_CSI0_PCLK);
+	msm_camio_clk_disable(CAMIO_CSI1_PCLK);
 /* Disable CAMIO_CSI1_VFE_CLK, CAMIO_CSI1_CLK,
 	CAMIO_CSI1_PCLK for the secondary sensor */
 	msm_camera_vreg_disable();
@@ -555,8 +563,11 @@ void msm_camio_disable(struct platform_device *pdev)
 	msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
 	msm_camio_clk_disable(CAMIO_CSI0_VFE_CLK);
 	msm_camio_clk_disable(CAMIO_CSI0_CLK);
+	msm_camio_clk_disable(CAMIO_CSI1_VFE_CLK);
+	msm_camio_clk_disable(CAMIO_CSI1_CLK);
 	msm_camio_clk_disable(CAMIO_VFE_PCLK);
 	msm_camio_clk_disable(CAMIO_CSI0_PCLK);
+	msm_camio_clk_disable(CAMIO_CSI1_PCLK);
 /* Disable CAMIO_CSI1_VFE_CLK, CAMIO_CSI1_CLK,
 	CAMIO_CSI1_PCLK for the secondary sensor */
 	msm_camera_vreg_disable();

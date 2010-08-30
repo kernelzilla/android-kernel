@@ -18,6 +18,15 @@ config IMX074
 	default y
 	---help---
 	SONY 13.5 MP Bayer Sensor
+config WEBCAM_OV7692
+	bool "Sensor OV7692 (VGA YUV)"
+	depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	  Omni Vision VGA YUV Sensor.
+#	This Senosr is used as a webcam.
+#	This uses the CSI interface.
+#	Need to enable CSI1 clks for this sensor.
 config VX6953
 	bool "Sensor VX6953 (BAYER 5M)"
 	depends on MSM_CAMERA && ARCH_MSM7X30

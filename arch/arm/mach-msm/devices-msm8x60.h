@@ -46,5 +46,8 @@ extern struct platform_device msm_device_smd;
 extern struct platform_device msm_device_kgsl;
 extern struct platform_device msm_device_gpio;
 extern struct platform_device msm_device_vidc;
+#ifdef CONFIG_WEBCAM_OV7692
+extern struct platform_device msm_camera_sensor_webcam;
+#endif
 
 #endif
