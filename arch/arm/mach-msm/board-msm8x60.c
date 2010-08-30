@@ -309,6 +309,128 @@ static struct msm_cpuidle_state msm_cstates[] __initdata = {
 	{1, 0, "C0", "WFI", MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT},
 };
 
+#if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_MSM)
+static struct regulator *ldo6_3p3;
+static struct regulator *ldo7_1p8;
+static struct regulator *vdd_cx;
+static int msm_hsusb_ldo_init(int init)
+{
+	if (init) {
+		ldo6_3p3 = regulator_get(NULL, "8058_l6");
+		if (IS_ERR(ldo6_3p3))
+			return PTR_ERR(ldo6_3p3);
+
+		ldo7_1p8 = regulator_get(NULL, "8058_l7");
+		if (IS_ERR(ldo7_1p8)) {
+			regulator_put(ldo6_3p3);
+			return PTR_ERR(ldo7_1p8);
+		}
+		/*digital core voltage for usb phy*/
+		vdd_cx = regulator_get(NULL, "8058_s1");
+		if (IS_ERR(vdd_cx)) {
+			regulator_put(ldo6_3p3);
+			regulator_put(ldo7_1p8);
+			return PTR_ERR(vdd_cx);
+		}
+
+		regulator_set_voltage(ldo7_1p8, 1800000, 1800000);
+		regulator_set_voltage(ldo6_3p3, 3075000, 3075000);
+	} else {
+		regulator_put(ldo6_3p3);
+		regulator_put(ldo7_1p8);
+		regulator_put(vdd_cx);
+	}
+	return 0;
+}
+
+static int msm_hsusb_ldo_enable(int on)
+{
+	static int ldo_status;
+	int ret = 0;
+
+	if (!ldo7_1p8 || IS_ERR(ldo7_1p8)) {
+		pr_err("%s: ldo7_1p8 is not initialized\n", __func__);
+		return -ENODEV;
+	}
+
+	if (!ldo6_3p3 || IS_ERR(ldo6_3p3)) {
+		pr_err("%s: ldo6_3p3 is not initialized\n", __func__);
+		return -ENODEV;
+	}
+
+	if (!vdd_cx || IS_ERR(vdd_cx)) {
+		pr_err("%s: vdd_cx is not initialized\n", __func__);
+		return -ENODEV;
+	}
+	if (ldo_status == on)
+		return 0;
+
+	ldo_status = on;
+
+	if (on) {
+		ret = regulator_enable(ldo7_1p8);
+		if (ret) {
+			pr_err("%s: Unable to enable the regulator:"
+				"ldo7_1p8\n", __func__);
+			ldo_status = !on;
+			return ret;
+		}
+		ret = regulator_enable(ldo6_3p3);
+		if (ret) {
+			pr_err("%s: Unable to enable the regulator:"
+				"ldo6_3p3\n", __func__);
+			regulator_disable(ldo7_1p8);
+			ldo_status = !on;
+			return ret;
+		}
+		ret = regulator_enable(vdd_cx);
+		if (ret) {
+			pr_err("%s: Unable to enable VDDCX digital core:"
+				" vdd_dig\n", __func__);
+			regulator_disable(ldo6_3p3);
+			regulator_disable(ldo7_1p8);
+			ldo_status = !on;
+			return ret;
+		}
+	} else {
+		/* calling regulator_disable when its already disabled might
+		 * * print WARN_ON. Trying to avoid it by regulator_is_enable
+		 * * */
+		if (regulator_is_enabled(ldo6_3p3)) {
+			ret = regulator_disable(ldo6_3p3);
+			if (ret) {
+				pr_err("%s: Unable to disable the regulator:"
+					"ldo6_3p3\n", __func__);
+				ldo_status = !on;
+				return ret;
+			}
+		}
+
+		if (regulator_is_enabled(ldo7_1p8)) {
+			ret = regulator_disable(ldo7_1p8);
+			if (ret) {
+				pr_err("%s: Unable to enable the regulator:"
+					" ldo7_1p8\n", __func__);
+				ldo_status = !on;
+				return ret;
+			}
+		}
+
+		if (regulator_is_enabled(vdd_cx)) {
+			ret = regulator_disable(vdd_cx);
+			if (ret) {
+				pr_err("%s: Unable to enable the regulator:"
+					"vdd_cx\n", __func__);
+				ldo_status = !on;
+				return ret;
+			}
+		}
+	}
+
+	pr_debug("reg (%s)\n", on ? "ENABLED" : "DISABLED");
+	return 0;
+ }
+#endif
 #ifdef CONFIG_USB_EHCI_MSM
 struct regulator *votg_5v_switch;
 static void msm_hsusb_vbus_power(unsigned phy_info, int on)
@@ -352,7 +474,11 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	 * used instead
 	 */
 	.usb_in_sps = 1,
+#ifdef CONFIG_USB_EHCI_MSM
 	.vbus_power = msm_hsusb_vbus_power,
+#endif
+	.ldo_init		 = msm_hsusb_ldo_init,
+	.ldo_enable		 = msm_hsusb_ldo_enable,
 };
 #endif
 

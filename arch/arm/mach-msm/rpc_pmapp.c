@@ -51,9 +51,7 @@ struct rpc_pmapp_ids {
 };
 
 static struct rpc_pmapp_ids rpc_ids;
-static struct vreg *boost_vreg, *usb_vreg;
 static struct msm_rpc_client *client;
-static int ldo_on;
 
 static void rpc_pmapp_init_rpc_ids(unsigned long vers)
 {
@@ -129,48 +127,15 @@ void msm_pm_app_unregister_vbus_sn(void (*callback)(int online))
 }
 EXPORT_SYMBOL(msm_pm_app_unregister_vbus_sn);
 
-int msm_pm_app_enable_usb_ldo(int enable)
+int pmic_vote_3p3_pwr_sel_switch(int boost)
 {
 	int ret;
 
-	if (ldo_on == enable)
-		return 0;
-	ldo_on = enable;
+	ret = msm_pm_app_vote_usb_pwr_sel_switch(boost);
 
-	if (enable) {
-		/* vote to turn ON Boost Vreg_5V */
-		ret = vreg_enable(boost_vreg);
-		if (ret < 0)
-			return ret;
-		/* vote to switch it to VREG_5V source */
-		ret = msm_pm_app_vote_usb_pwr_sel_switch(1);
-		if (ret < 0) {
-			vreg_disable(boost_vreg);
-			return ret;
-		}
-		ret = vreg_enable(usb_vreg);
-		if (ret < 0) {
-			msm_pm_app_vote_usb_pwr_sel_switch(0);
-			vreg_disable(boost_vreg);
-			return ret;
-		}
-
-	} else {
-		ret = vreg_disable(usb_vreg);
-		if (ret < 0)
-			return ret;
-		ret = vreg_disable(boost_vreg);
-		if (ret < 0)
-			return ret;
-		/* vote to switch it to VBUS source */
-		ret = msm_pm_app_vote_usb_pwr_sel_switch(0);
-		if (ret < 0)
-			return ret;
-	}
-
-	return 0;
+	return ret;
 }
-EXPORT_SYMBOL(msm_pm_app_enable_usb_ldo);
+EXPORT_SYMBOL(pmic_vote_3p3_pwr_sel_switch);
 
 struct vbus_sn_notification_args {
 	uint32_t cb_id;
@@ -238,19 +203,6 @@ int msm_pm_app_rpc_init(void)
 			&& !machine_is_msm7x27_ffa())
 		return -ENOTSUPP;
 
-	boost_vreg = vreg_get(NULL, "boost");
-	if (IS_ERR(boost_vreg)) {
-		pr_err("%s: boost vreg get failed\n", __func__);
-		return PTR_ERR(boost_vreg);
-	}
-
-	usb_vreg = vreg_get(NULL, "usb");
-	if (IS_ERR(usb_vreg)) {
-		pr_err("%s: usb vreg get failed\n", __func__);
-		vreg_put(usb_vreg);
-		return PTR_ERR(usb_vreg);
-	}
-
 	client = msm_rpc_register_client("pmapp_usb",
 			PMAPP_RPC_PROG,
 			PMAPP_RPC_VER_2_1, 1,
@@ -285,12 +237,8 @@ EXPORT_SYMBOL(msm_pm_app_rpc_init);
 
 void msm_pm_app_rpc_deinit(void)
 {
-	if (client) {
+	if (client)
 		msm_rpc_unregister_client(client);
-		msm_pm_app_enable_usb_ldo(0);
-		vreg_put(boost_vreg);
-		vreg_put(usb_vreg);
-	}
 }
 EXPORT_SYMBOL(msm_pm_app_rpc_deinit);
 
