@@ -87,6 +87,14 @@ int mdp4_atv_on(struct platform_device *pdev)
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
+	/* Turn the next panel on, get correct resolution
+		before configuring overlay pipe */
+	ret = panel_next_on(pdev);
+
+	pr_info("%s: fbi->var.yres: %d | fbi->var.xres: %d",
+			__func__, fbi->var.yres, fbi->var.xres);
+
+	/* MDP4 Config */
 	pipe->src_height = fbi->var.yres;
 	pipe->src_width = fbi->var.xres;
 	pipe->src_h = fbi->var.yres;
@@ -105,7 +113,6 @@ int mdp4_atv_on(struct platform_device *pdev)
 
 	mdp4_overlayproc_cfg(pipe);
 
-	ret = panel_next_on(pdev);
 	if (ret == 0)
 		mdp_pipe_ctrl(MDP_OVERLAY1_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
