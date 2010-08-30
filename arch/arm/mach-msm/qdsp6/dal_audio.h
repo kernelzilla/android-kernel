@@ -607,4 +607,8 @@ struct adsp_buffer_event {
 #define ADSP_AUDIO_DEVICE_CONTEXT_RECORD		0x20
 #define ADSP_AUDIO_DEVICE_CONTEXT_PCM_LOOPBACK		0x40
 
+/* ADSP audio driver return codes */
+#define ADSP_AUDIO_STATUS_SUCCESS               0
+#define ADSP_AUDIO_STATUS_EUNSUPPORTED          20
+
 #endif
