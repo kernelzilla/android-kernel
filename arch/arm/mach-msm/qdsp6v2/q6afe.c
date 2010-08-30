@@ -59,8 +59,6 @@ int afe_open(int port_id, int rate, int channel_mode)
 	struct afe_audioif_config_command config;
 	int ret;
 
-	init_waitqueue_head(&this_afe.wait);
-
 	mutex_lock(&afe_lock);
 
 	pr_info("%s %d %d %d\n", __func__, port_id, rate, channel_mode);
@@ -77,9 +75,8 @@ int afe_open(int port_id, int rate, int channel_mode)
 	}
 
 	config.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	config.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(config) - APR_HDR_SIZE);
+					APR_HDR_SIZE, APR_PKT_VER);
+	config.hdr.pkt_size = sizeof(config);
 	config.hdr.src_port = 0;
 	config.hdr.dest_port = 0;
 	config.hdr.token = 0;
@@ -106,9 +103,8 @@ int afe_open(int port_id, int rate, int channel_mode)
 	}
 
 	start.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	start.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(start) - APR_HDR_SIZE);
+					APR_HDR_SIZE, APR_PKT_VER);
+	start.hdr.pkt_size = sizeof(start);
 	start.hdr.src_port = 0;
 	start.hdr.dest_port = 0;
 	start.hdr.token = 0;
@@ -138,18 +134,18 @@ fail:
 int afe_close(int port_id)
 {
 	struct afe_port_stop_command stop;
-	int rc;
+	int rc = 0;
 
 	mutex_lock(&afe_lock);
-	if (!(this_afe.ref_cnt > 0)) {
+	if (this_afe.ref_cnt == 0) {
 		pr_err("AFE is already closed\n");
+		rc = -EINVAL;
 		goto fail_cmd;
 	}
 
 	stop.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_LEN(20), APR_PKT_VER);
-	stop.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
-					sizeof(stop) - APR_HDR_SIZE);
+					APR_HDR_SIZE, APR_PKT_VER);
+	stop.hdr.pkt_size = sizeof(stop);
 	stop.hdr.src_port = 0;
 	stop.hdr.dest_port = 0;
 	stop.hdr.token = 0;
@@ -176,9 +172,16 @@ int afe_close(int port_id)
 		pr_info("%s: Deregister AFE\n", __func__);
 		apr_deregister(this_afe.apr);
 	}
-	mutex_unlock(&afe_lock);
-	return 0;
 fail_cmd:
 	mutex_unlock(&afe_lock);
-	return -EINVAL;
+	return rc;
 }
+
+static int __init q6afe_init(void)
+{
+	pr_info("%s\n", __func__);
+	init_waitqueue_head(&this_afe.wait);
+	return 0;
+}
+
+device_initcall(q6afe_init);

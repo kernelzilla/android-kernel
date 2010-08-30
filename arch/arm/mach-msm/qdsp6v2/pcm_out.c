@@ -1,6 +1,6 @@
-/* arch/arm/mach-msm/qdsp6/pcm_out.c
- *
+/*
  * Copyright (C) 2009 Google, Inc.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -21,14 +21,11 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 #include <linux/uaccess.h>
-
 #include <linux/msm_audio.h>
-
-#include <mach/msm_qdsp6_audio.h>
 #include <mach/debug_mm.h>
+#include "q6asm.h"
 
-
-#define BUFSZ (3072)
+#define BUFSZ (4800)
 
 struct pcm {
 	struct mutex lock;
@@ -36,6 +33,7 @@ struct pcm {
 	uint32_t sample_rate;
 	uint32_t channel_count;
 	size_t buffer_size;
+	int run;
 };
 
 static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -62,34 +60,38 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 	case AUDIO_START: {
-		uint32_t acdb_id;
-		if (arg == 0) {
-			acdb_id = 0;
-		} else if (copy_from_user(&acdb_id, (void *) arg,
-							sizeof(acdb_id))) {
-			pr_info("[%s:%s] copy acdb_id from user failed\n",
-					__MM_FILE__, __func__);
-			rc = -EFAULT;
-			break;
-		}
-		if (pcm->ac) {
-			rc = -EBUSY;
-		} else {
-			if (!pcm->ac)
+		struct audio_buffer *ab;
+		struct audio_client *ac;
+
+		if (!pcm->run) {
+			if (q6asm_out_run(pcm->ac)) {
 				rc = -ENOMEM;
+				break;
+			}
+			ac = pcm->ac;
+			ab = &ac->buf[0];
+			q6asm_write(ac, ab);
+			ab = &ac->buf[1];
+			q6asm_write(ac, ab);
+			pcm->run = 1;
 		}
 		break;
 	}
+	case AUDIO_GET_SESSION_ID: {
+		unsigned short session = 1;
+		pr_info("AUDIO_GET_SESSION_ID\n");
+		if (copy_to_user((void *) arg, &session,
+					sizeof(unsigned short)))
+			rc = -EFAULT;
+		}
+		break;
 	case AUDIO_STOP:
 		break;
 	case AUDIO_FLUSH:
 		break;
 	case AUDIO_SET_CONFIG: {
 		struct msm_audio_config config;
-		if (pcm->ac) {
-			rc = -EBUSY;
-			break;
-		}
+		pr_info("AUDIO_SET_CONFIG\n");
 		if (copy_from_user(&config, (void *) arg, sizeof(config))) {
 			rc = -EFAULT;
 			break;
@@ -113,6 +115,7 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	case AUDIO_GET_CONFIG: {
 		struct msm_audio_config config;
+		pr_info("AUDIO_GET_CONFIG\n");
 		config.buffer_size = pcm->buffer_size;
 		config.buffer_count = 2;
 		config.sample_rate = pcm->sample_rate;
@@ -140,6 +143,7 @@ static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return rc;
 }
 
+
 static int pcm_open(struct inode *inode, struct file *file)
 {
 	struct pcm *pcm;
@@ -150,10 +154,19 @@ static int pcm_open(struct inode *inode, struct file *file)
 	if (!pcm)
 		return -ENOMEM;
 
-	mutex_init(&pcm->lock);
 	pcm->channel_count = 2;
 	pcm->sample_rate = 44100;
 	pcm->buffer_size = BUFSZ;
+	pcm->ac = q6asm_out_open(pcm->buffer_size,
+				pcm->sample_rate,
+				pcm->channel_count);
+	if (!pcm->ac) {
+		pr_info("%s: q6asm_out_open failed\n", __func__);
+		kfree(pcm);
+		return -ENOMEM;
+	}
+
+	mutex_init(&pcm->lock);
 	file->private_data = pcm;
 	return 0;
 }
@@ -167,8 +180,7 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 	const char __user *start = buf;
 	int xfer;
 
-	if (!pcm->ac)
-		pcm_ioctl(file, AUDIO_START, 0);
+	pr_info("%s\n", __func__);
 
 	ac = pcm->ac;
 	if (!ac)
@@ -177,11 +189,13 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 	while (count > 0) {
 		ab = ac->buf + ac->cpu_buf;
 
-		if (ab->used)
+		if (ab->used) {
 			if (!wait_event_timeout(ac->wait, (ab->used == 0),
-								5*HZ))
+								5*HZ)) {
 				pr_err("[%s:%s] timeout. dsp dead?\n",
 						__MM_FILE__, __func__);
+			}
+		}
 
 		xfer = count;
 		if (xfer > ab->size)
@@ -195,6 +209,10 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 
 		ab->used = 1;
 		ab->actual_size = xfer;
+
+		/* TODO: change to use pause/resume/run */
+		if (pcm->run)
+			q6asm_write(ac, ab);
 		ac->cpu_buf ^= 1;
 	}
 
@@ -204,6 +222,8 @@ static ssize_t pcm_write(struct file *file, const char __user *buf,
 static int pcm_release(struct inode *inode, struct file *file)
 {
 	struct pcm *pcm = file->private_data;
+	if (pcm->ac)
+		q6asm_close(pcm->ac);
 	kfree(pcm);
 	pr_info("[%s:%s] release\n", __MM_FILE__, __func__);
 	return 0;
