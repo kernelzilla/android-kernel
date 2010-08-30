@@ -419,6 +419,9 @@ static u32 vid_dec_set_codec(struct video_client_ctx *client_ctx,
 	case VDEC_CODECTYPE_H264:
 		codec.codec = VCD_CODEC_H264;
 		break;
+	case VDEC_CODECTYPE_DIVX_3:
+		codec.codec = VCD_CODEC_DIVX_3;
+		break;
 	case VDEC_CODECTYPE_DIVX_5:
 		codec.codec = VCD_CODEC_DIVX_5;
 		break;
