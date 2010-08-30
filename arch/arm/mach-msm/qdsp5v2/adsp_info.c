@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -64,6 +64,7 @@
 #define QDSP_MODULE_VDEC_LP_MODE_TURBO      0x01089f7a
 #define QDSP_MODULE_AUDREC0TASK             0x0109696f
 #define QDSP_MODULE_AUDREC1TASK             0x01096970
+#define QDSP_MODULE_AUDREC2TASK             0x010a2f59
 #define QDSP_MODULE_MAX                     0x7fffffff
 
    /* DO NOT USE: Force this enum to be a 32bit type to improve speed */
@@ -87,6 +88,7 @@ static struct adsp_module_info module_info[] = {
 	QDSP_MODULE(AFETASK , NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDREC0TASK, NULL, 0, NULL, NULL),
 	QDSP_MODULE(AUDREC1TASK, NULL, 0, NULL, NULL),
+	QDSP_MODULE(AUDREC2TASK, NULL, 0, NULL, NULL),
 };
 
 int adsp_init_info(struct adsp_info *info)
