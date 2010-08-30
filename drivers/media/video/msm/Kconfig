@@ -1,0 +1,10 @@
+comment "Camera Sensor Selection"
+config MT9T013
+	bool "Sensor mt9t013 (BAYER 3M)"
+	---help---
+	  MICRON 3M Bayer Sensor with AutoFocus
+
+config MT9D112
+	bool "Sensor mt9d112 (YUV   2M)"
+	---help---
+	  MICRON 2M YUV Sensor

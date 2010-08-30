@@ -1,0 +1,17 @@
+menu "SoC Audio support Qualcomm"
+
+config SND_MSM_SOC
+	tristate "SoC Audio for the MSM chip"
+	depends on ARCH_MSM && SND_SOC
+	select MSM_ADSP
+	help
+	  To add support for ALSA PCM driver for MSM7k board.
+
+config SND_QSD_SOC
+	tristate "SoC Audio for the QSD chip"
+	depends on ARCH_QSD && SND_SOC && QSD_AUDIO
+	default y
+	help
+	  To add support for ALSA PCM driver for QSD8k board.
+
+endmenu
