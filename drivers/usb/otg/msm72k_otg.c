@@ -709,6 +709,11 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 
 	if (suspend) {
 		switch (state) {
+#ifndef CONFIG_MSM_OTG_ENABLE_A_WAIT_BCON_TIMEOUT
+		case OTG_STATE_A_WAIT_BCON:
+			msm_otg_put_suspend(dev);
+			break;
+#endif
 		case OTG_STATE_A_HOST:
 			clear_bit(A_BUS_REQ, &dev->inputs);
 			wake_lock(&dev->wlock);
@@ -1604,7 +1609,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
+			if (TA_WAIT_BCON > 0)
+				msm_otg_start_timer(dev, TA_WAIT_BCON,
+					A_WAIT_BCON);
 			/* Start HCD to detect peripherals. */
 			msm_otg_start_host(&dev->otg, REQUEST_START);
 		}
@@ -1711,7 +1718,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
+			if (TA_WAIT_BCON > 0)
+				msm_otg_start_timer(dev, TA_WAIT_BCON,
+					A_WAIT_BCON);
 		} else if (test_bit(ID_A, &dev->inputs)) {
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			msm_otg_set_power(&dev->otg,
@@ -1787,7 +1796,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_lock_irq(&dev->lock);
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irq(&dev->lock);
-			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
+			if (TA_WAIT_BCON > 0)
+				msm_otg_start_timer(dev, TA_WAIT_BCON,
+					A_WAIT_BCON);
 			msm_otg_set_power(&dev->otg, 0);
 		} else if (test_bit(ID_A, &dev->inputs)) {
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
@@ -1841,7 +1852,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			spin_unlock_irq(&dev->lock);
 			set_bit(A_BUS_REQ, &dev->inputs);
 			msm_otg_start_host(&dev->otg, REQUEST_HNP_RESUME);
-			msm_otg_start_timer(dev, TA_WAIT_BCON, A_WAIT_BCON);
+			if (TA_WAIT_BCON > 0)
+				msm_otg_start_timer(dev, TA_WAIT_BCON,
+					A_WAIT_BCON);
 			msm_otg_set_power(&dev->otg, 0);
 		} else if (test_bit(ID_A, &dev->inputs)) {
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);

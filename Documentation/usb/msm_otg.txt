@@ -346,6 +346,15 @@ to turn on/off clocks.
 If VBUS power is controlled by modem processor, RPC interface is used to turn
 on/off VBUS power.
 
+Config options
+==============
+
+CONFIG_USB_MSM_ACA: Enable support for Accessory Charger Adapter (ACA)
+CONFIG_ENABLE_MSM_OTG_A_WAIT_BCON_TIMEOUT: Enable A_WAIT_BCON timeout. VBUS
+will be turned off and SRP detection is enabled upon this timeout. If this
+config is not selected, VBUS will not be turned off when Mini/Micro-A cable
+is connected. But hardware is put into LPM.
+
 Other
 =====
 On-The-Go and Embedded Host Supplement to the USB Revision 2.0 Specification

@@ -62,7 +62,17 @@
 
 #define TA_WAIT_VRISE	100	/* ( - 100)  */
 #define TA_WAIT_VFALL	500	/* ( - 1000) */
+
+/*
+ * This option is set for embedded hosts or OTG devices in which leakage
+ * currents are very minimal.
+ */
+#ifdef CONFIG_MSM_OTG_ENABLE_A_WAIT_BCON_TIMEOUT
 #define TA_WAIT_BCON	30000	/* (1100 - 30000) */
+#else
+#define TA_WAIT_BCON	-1
+#endif
+
 /* AIDL_BDIS should be 500 */
 #define TA_AIDL_BDIS	200	/* (200 - ) */
 #define TA_BIDL_ADIS	155	/* (155 - 200) */
