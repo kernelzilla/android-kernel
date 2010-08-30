@@ -940,6 +940,7 @@ static struct clk_freq_tbl clk_tbl_pixel_mdp[] = {
 	F_PIXEL_MDP(43192000, MM_GPERF, 1,  64, 569, LOW),
 	F_PIXEL_MDP(48000000, MM_GPERF, 4,   1,   2, LOW),
 	F_PIXEL_MDP(53990000, MM_GPERF, 2, 169, 601, LOW),
+	F_PIXEL_MDP(76800000, MM_GPERF, 1,   1,   5, LOW),
 	F_END,
 };
 
