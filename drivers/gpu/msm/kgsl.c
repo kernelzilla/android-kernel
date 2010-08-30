@@ -38,6 +38,7 @@
 #include <linux/delay.h>
 #include <asm/atomic.h>
 #include <mach/internal_power_rail.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/ashmem.h>
 
@@ -324,6 +325,8 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 			internal_pwr_rail_ctl(PWR_RAIL_GRP_CLK, KGSL_FALSE);
 			internal_pwr_rail_mode(PWR_RAIL_GRP_CLK,
 					PWR_RAIL_CTL_AUTO);
+			if (kgsl_driver.yamato_reg)
+				regulator_disable(kgsl_driver.yamato_reg);
 			kgsl_driver.power_flags &=
 					~(KGSL_PWRFLAGS_YAMATO_POWER_ON);
 			kgsl_driver.power_flags |=
@@ -335,6 +338,8 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 			internal_pwr_rail_mode(PWR_RAIL_GRP_CLK,
 					PWR_RAIL_CTL_MANUAL);
 			internal_pwr_rail_ctl(PWR_RAIL_GRP_CLK, KGSL_TRUE);
+			if (kgsl_driver.yamato_reg)
+				regulator_enable(kgsl_driver.yamato_reg);
 			kgsl_driver.power_flags &=
 					~(KGSL_PWRFLAGS_YAMATO_POWER_OFF);
 			kgsl_driver.power_flags |=
@@ -346,6 +351,8 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 			internal_pwr_rail_ctl(PWR_RAIL_GRP_2D_CLK, KGSL_FALSE);
 			internal_pwr_rail_mode(PWR_RAIL_GRP_2D_CLK,
 					PWR_RAIL_CTL_AUTO);
+			if (kgsl_driver.g12_reg)
+				regulator_disable(kgsl_driver.g12_reg);
 			kgsl_driver.power_flags &=
 					~(KGSL_PWRFLAGS_G12_POWER_ON);
 			kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_POWER_OFF;
@@ -356,6 +363,8 @@ int kgsl_pwrctrl(unsigned int pwrflag)
 			internal_pwr_rail_mode(PWR_RAIL_GRP_2D_CLK,
 					PWR_RAIL_CTL_MANUAL);
 			internal_pwr_rail_ctl(PWR_RAIL_GRP_2D_CLK, KGSL_TRUE);
+			if (kgsl_driver.g12_reg)
+				regulator_enable(kgsl_driver.g12_reg);
 			kgsl_driver.power_flags &=
 					~(KGSL_PWRFLAGS_G12_POWER_OFF);
 			kgsl_driver.power_flags |= KGSL_PWRFLAGS_G12_POWER_ON;
@@ -1608,6 +1617,14 @@ static void kgsl_driver_cleanup(void)
 		kgsl_driver.g12_grp_clk = NULL;
 		pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "kgsl_2d");
 	}
+	if (kgsl_driver.yamato_reg) {
+		regulator_put(kgsl_driver.yamato_reg);
+		kgsl_driver.yamato_reg = NULL;
+	}
+	if (kgsl_driver.g12_reg) {
+		regulator_put(kgsl_driver.g12_reg);
+		kgsl_driver.g12_reg = NULL;
+	}
 
 	kgsl_driver.pdev = NULL;
 	kgsl_driver.power_flags = 0;
@@ -1757,6 +1774,9 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 	}
 	kgsl_driver.yamato_grp_src_clk = clk;
 
+	kgsl_driver.yamato_reg = regulator_get(NULL, "fs_gfx3d");
+	if (IS_ERR(kgsl_driver.yamato_reg))
+		kgsl_driver.yamato_reg = NULL;
 
 	/* put the AXI bus into asynchronous mode with the graphics cores */
 	if (pdata != NULL) {
@@ -1795,6 +1815,11 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 		clk = NULL;
 	}
 	kgsl_driver.g12_grp_clk = clk;
+
+	kgsl_driver.g12_reg = regulator_get(NULL, "fs_gfx2d0");
+	if (IS_ERR(kgsl_driver.g12_reg))
+		kgsl_driver.g12_reg = NULL;
+
 #else
 	kgsl_driver.g12_grp_clk = NULL;
 	kgsl_driver.g12_grp_pclk = NULL;

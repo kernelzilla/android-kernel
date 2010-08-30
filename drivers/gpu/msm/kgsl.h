@@ -35,6 +35,7 @@
 #include <linux/clk.h>
 #include <linux/mutex.h>
 #include <linux/cdev.h>
+#include <linux/regulator/consumer.h>
 
 #include <asm/atomic.h>
 
@@ -91,6 +92,9 @@ struct kgsl_driver {
 	unsigned int power_flags;
 	unsigned int is_suspended;
 	unsigned int clk_freq[KGSL_NUM_FREQ];
+
+	struct regulator *yamato_reg;
+	struct regulator *g12_reg;
 
 	struct kgsl_devconfig g12_config;
 	struct kgsl_devconfig yamato_config;
