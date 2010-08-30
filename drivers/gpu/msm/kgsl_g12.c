@@ -365,6 +365,9 @@ static int kgsl_g12_start(struct kgsl_device *device)
 	kgsl_g12_regwrite(device, ADDR_MH_ARBITER_CONFIG,
 			  KGSL_G12_CFG_G12_MHARB);
 
+	kgsl_g12_regwrite(device, ADDR_MH_CLNT_INTF_CTRL_CONFIG1, 0x00030F27);
+	kgsl_g12_regwrite(device, ADDR_MH_CLNT_INTF_CTRL_CONFIG2, 0x004B274F);
+
 	kgsl_g12_regwrite(device, (ADDR_VGC_IRQENABLE >> 2), 0x3);
 
 	status = kgsl_mmu_start(device);
@@ -614,7 +617,7 @@ int kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 
 	KGSL_PRE_HWACCESS();
 	if ((offsetwords >= ADDR_MH_ARBITER_CONFIG &&
-	     offsetwords <= ADDR_MH_AXI_HALT_CONTROL) ||
+	     offsetwords <= ADDR_MH_CLNT_INTF_CTRL_CONFIG2) ||
 	    (offsetwords >= ADDR_MH_MMU_CONFIG &&
 	     offsetwords <= ADDR_MH_MMU_MPU_END)) {
 		kgsl_g12_cmdwindow_write(device, KGSL_CMDWINDOW_MMU,
