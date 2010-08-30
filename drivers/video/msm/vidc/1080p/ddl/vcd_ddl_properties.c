@@ -278,8 +278,6 @@ static u32 ddl_set_dec_property(struct ddl_client_context *ddl,
 				frame_size->height ||
 				decoder->client_frame_size.width !=
 				frame_size->width) {
-				ddl_calculate_stride(frame_size,
-					!decoder->progressive_only);
 				decoder->client_frame_size = *frame_size;
 				ddl_set_default_decoder_buffer_req(decoder,
 					true);
@@ -768,19 +766,17 @@ static u32 ddl_get_dec_property(struct ddl_client_context *ddl,
 {
 	struct ddl_decoder_data *decoder = &ddl->codec_data.decoder;
 	u32 vcd_status = VCD_ERR_ILLEGAL_PARM;
-
-	DDL_MSG_HIGH("property_hdr->prop_id: %x \n", property_hdr->prop_id);
+	DDL_MSG_HIGH("property_hdr->prop_id:%x\n", property_hdr->prop_id);
 	switch (property_hdr->prop_id) {
 	case VCD_I_FRAME_SIZE:
 		if (sizeof(struct vcd_property_frame_size) ==
 			property_hdr->sz) {
-			if (decoder->client_frame_size.width) {
-				*(struct vcd_property_frame_size *)
-					property_value =
-						decoder->client_frame_size;
-				vcd_status = VCD_S_SUCCESS;
-			} else
-				vcd_status = VCD_ERR_ILLEGAL_OP;
+			ddl_calculate_stride(&decoder->client_frame_size,
+				!decoder->progressive_only);
+			*(struct vcd_property_frame_size *)
+				property_value =
+					decoder->client_frame_size;
+			vcd_status = VCD_S_SUCCESS;
 		}
 	break;
 	case VCD_I_PROFILE:
@@ -1452,8 +1448,15 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,
 	}
 	memset(output_buf_req, 0,
 		sizeof(struct vcd_buffer_requirement));
+	if ((frame_size->width * frame_size->height) >=
+		 VCD_DDL_WVGA_BUF_SIZE) {
+		output_buf_req->actual_count = min_dpb + 2;
+		if (output_buf_req->actual_count < 10)
+			output_buf_req->actual_count = 10;
+	} else
+		output_buf_req->actual_count = min_dpb + 5;
+
 	output_buf_req->min_count = min_dpb;
-	output_buf_req->actual_count = output_buf_req->min_count;
 	output_buf_req->max_count = DDL_MAX_BUFFER_COUNT;
 	output_buf_req->sz = y_cb_cr_size;
 	DDL_MSG_LOW("output_buf_req->sz : %d", output_buf_req->sz);
@@ -1476,19 +1479,19 @@ u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size *frame_size,
 	struct vcd_property_buffer_format *buf_format,
 	u32 interlace, u32 *pn_c_offset)
 {
-	u32 width = frame_size->stride, height =
-		frame_size->scan_lines;
+	struct vcd_property_frame_size frame_sz = *frame_size;
 	u32 total_memory_size = 0, c_offset = 0;
-
+	ddl_calculate_stride(&frame_sz, interlace);
 	if (/*(buf_format->buffer_format == VCD_BUFFER_FORMAT_TILE_1x1) ||*/
 		(buf_format->buffer_format == VCD_BUFFER_FORMAT_TILE_4x2)) {
 		u32 component_mem_size, width_round_up;
-		u32 height_round_up, height_chroma = (height >> 1);
+		u32 height_round_up, height_chroma = (frame_sz.scan_lines >> 1);
 
 		width_round_up =
-			DDL_TILE_ALIGN(width, DDL_TILE_ALIGN_WIDTH);
+			DDL_TILE_ALIGN(frame_sz.stride, DDL_TILE_ALIGN_WIDTH);
 		height_round_up =
-			DDL_TILE_ALIGN(height, DDL_TILE_ALIGN_HEIGHT);
+			DDL_TILE_ALIGN(frame_sz.scan_lines,
+						   DDL_TILE_ALIGN_HEIGHT);
 		component_mem_size = width_round_up * height_round_up;
 		component_mem_size = DDL_TILE_ALIGN(component_mem_size,
 			DDL_TILE_MULTIPLY_FACTOR);
@@ -1503,8 +1506,7 @@ u32 ddl_get_yuv_buffer_size(struct vcd_property_frame_size *frame_size,
 					DDL_TILE_MULTIPLY_FACTOR);
 		total_memory_size += component_mem_size;
 	} else {
-		height = frame_size->height;
-		total_memory_size = height * width;
+		total_memory_size = frame_sz.scan_lines * frame_sz.stride;
 		c_offset = DDL_ALIGN(total_memory_size,
 			DDL_LINEAR_MULTIPLY_FACTOR);
 		total_memory_size = c_offset + DDL_ALIGN(
