@@ -279,7 +279,6 @@ static int16_t imx074_af_init(void)
 	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x04, 0x14);
 	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x05, 0xB6);
 	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x06, 0x4F);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x07, 0x00);
 	return rc;
 }
 
@@ -1012,11 +1011,14 @@ int imx074_sensor_open_init(const struct msm_camera_sensor_info *data)
 	}
 
 	rc = imx074_sensor_setting(REG_INIT, RES_PREVIEW);
+
+	rc1 = imx074_af_init();
+	if (rc1 < 0)
+		CDBG("AF initialisation failed\n");
 	if (rc < 0)
 		goto init_fail;
 	else
 		goto init_done;
-	rc1 = imx074_af_init();
 
 
 
