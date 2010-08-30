@@ -828,14 +828,9 @@ static int msm_otg_set_peripheral(struct otg_transceiver *xceiv,
 		disable_sess_valid(dev);
 		if (!dev->otg.host)
 			disable_idabc(dev);
-		if (dev->pmic_notif_supp && dev->pdata->pmic_unregister_vbus_sn)
-			dev->pdata->pmic_unregister_vbus_sn
-				(&msm_otg_set_vbus_state);
 		return 0;
 	}
 	dev->otg.gadget = gadget;
-	if (dev->pmic_notif_supp && dev->pdata->pmic_register_vbus_sn)
-		dev->pdata->pmic_register_vbus_sn(&msm_otg_set_vbus_state);
 	pr_info("peripheral driver registered w/ tranceiver\n");
 
 	wake_lock(&dev->wlock);
@@ -937,7 +932,7 @@ static int msm_otg_set_host(struct otg_transceiver *xceiv, struct usb_bus *host)
 }
 #endif
 
-static void msm_otg_set_vbus_state(int online)
+void msm_otg_set_vbus_state(int online)
 {
 	struct msm_otg *dev = the_msm_otg;
 
@@ -945,22 +940,6 @@ static void msm_otg_set_vbus_state(int online)
 		msm_otg_set_suspend(&dev->otg, 0);
 }
 
-/* pmic irq handlers are called from thread context and
- * are allowed to sleep
- */
-static irqreturn_t pmic_vbus_on_irq(int irq, void *data)
-{
-	struct msm_otg *dev = the_msm_otg;
-
-	if (!dev->otg.gadget)
-		return IRQ_HANDLED;
-
-	pr_info("%s: vbus notification from pmic\n", __func__);
-
-	msm_otg_set_suspend(&dev->otg, 0);
-
-	return IRQ_HANDLED;
-}
 
 static irqreturn_t msm_otg_irq(int irq, void *data)
 {
@@ -2131,7 +2110,6 @@ static void otg_debugfs_cleanup(void)
 static int __init msm_otg_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-	int vbus_on_irq = 0;
 	struct resource *res;
 	struct msm_otg *dev;
 
@@ -2154,14 +2132,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 #endif
 
-	if (dev->pdata->pmic_vbus_irq) {
-		vbus_on_irq = platform_get_irq_byname(pdev, "vbus_on");
-		if (vbus_on_irq < 0) {
-			pr_err("%s: unable to get vbus on irq\n", __func__);
-			ret = vbus_on_irq;
-			goto free_dev;
-		}
-	}
 
 	if (dev->pdata->rpc_connect) {
 		ret = dev->pdata->rpc_connect(1);
@@ -2271,7 +2241,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	 * session change.
 	 */
 	if (dev->pdata->pmic_notif_init) {
-		ret = dev->pdata->pmic_notif_init();
+		ret = dev->pdata->pmic_notif_init(&msm_otg_set_vbus_state, 1);
 		if (!ret) {
 			dev->pmic_notif_supp = 1;
 		} else if (ret != -ENOTSUPP) {
@@ -2280,6 +2250,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			goto free_wq;
 		}
 	}
+	if (dev->pdata->pmic_vbus_irq)
+		dev->vbus_on_irq = dev->pdata->pmic_vbus_irq;
 
 	if (dev->pdata->ldo_init) {
 		ret = dev->pdata->ldo_init(1);
@@ -2299,8 +2271,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (vbus_on_irq)
-		dev->pmic_notif_supp = 1;
 
 	/* ACk all pending interrupts and clear interrupt enable registers */
 	writel((readl(USB_OTGSC) & ~OTGSC_INTR_MASK), USB_OTGSC);
@@ -2315,7 +2285,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 
 	the_msm_otg = dev;
-	dev->vbus_on_irq = vbus_on_irq;
 	dev->otg.set_peripheral = msm_otg_set_peripheral;
 #ifdef CONFIG_USB_EHCI_MSM
 	dev->otg.set_host = msm_otg_set_host;
@@ -2353,35 +2322,23 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_get(&pdev->dev);
 
-	if (vbus_on_irq) {
-		ret = request_irq(vbus_on_irq, pmic_vbus_on_irq,
-				IRQF_TRIGGER_RISING, "msm_otg_vbus_on", NULL);
-		if (ret) {
-			pr_info("%s: request_irq for vbus_on"
-					"interrupt failed\n", __func__);
-			goto chg_deinit;
-		}
-	}
 
 	ret = otg_debugfs_init(dev);
 	if (ret) {
 		pr_info("%s: otg_debugfs_init failed\n", __func__);
-		goto free_vbus_irq;
+		goto chg_deinit;
 	}
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &msm_otg_attr_grp);
 	if (ret < 0) {
 		pr_err("%s: Failed to create the sysfs entry\n", __func__);
 		otg_debugfs_cleanup();
-		goto free_vbus_irq;
+		goto chg_deinit;
 	}
 
 
 	return 0;
 
-free_vbus_irq:
-	if (vbus_on_irq)
-		free_irq(vbus_on_irq, 0);
 chg_deinit:
 	if (dev->pdata->chg_init)
 		dev->pdata->chg_init(0);
@@ -2394,9 +2351,8 @@ free_ldo_init:
 	if (dev->pdata->ldo_init)
 		dev->pdata->ldo_init(0);
 free_pmic_notif:
-	if (dev->pmic_notif_supp && dev->pdata->pmic_notif_deinit)
-		if (!vbus_on_irq)
-			dev->pdata->pmic_notif_deinit();
+	if (dev->pmic_notif_supp && dev->pdata->pmic_notif_init)
+		dev->pdata->pmic_notif_init(&msm_otg_set_vbus_state, 0);
 free_wq:
 	destroy_workqueue(dev->wq);
 free_wlock:
@@ -2443,8 +2399,8 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	if (dev->pdata->ldo_init)
 		dev->pdata->ldo_init(0);
 
-	if (dev->pmic_notif_supp && !dev->vbus_on_irq)
-		dev->pdata->pmic_notif_deinit();
+	if (dev->pmic_notif_supp)
+		dev->pdata->pmic_notif_init(&msm_otg_set_vbus_state, 0);
 
 #ifdef CONFIG_USB_MSM_ACA
 	del_timer_sync(&dev->id_timer);
@@ -2452,8 +2408,6 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 	if (dev->pdata->chg_init)
 		dev->pdata->chg_init(0);
 	free_irq(dev->irq, pdev);
-	if (dev->vbus_on_irq)
-		free_irq(dev->irq, 0);
 	iounmap(dev->regs);
 	if (dev->hs_cclk) {
 		clk_disable(dev->hs_cclk);

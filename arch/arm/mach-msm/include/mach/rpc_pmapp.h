@@ -69,8 +69,8 @@ enum {
 	PMAPP_SMPS_MODE_VOTE_AUTO
 };
 
-int msm_pm_app_rpc_init(void);
-void msm_pm_app_rpc_deinit(void);
+int msm_pm_app_rpc_init(void(*callback)(int online));
+void msm_pm_app_rpc_deinit(void(*callback)(int online));
 int msm_pm_app_register_vbus_sn(void (*callback)(int online));
 void msm_pm_app_unregister_vbus_sn(void (*callback)(int online));
 int msm_pm_app_enable_usb_ldo(int);

@@ -467,6 +467,19 @@ static struct msm_usb_host_platform_data msm_usb_host_pdata = {
 };
 #endif
 
+#if defined(CONFIG_BATTERY_MSM8X60) && !defined(CONFIG_USB_EHCI_MSM)
+static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init)
+{
+	if (init) {
+		/* TBD: right API will get filled here as a part of
+		 * PMIC chanrger patch and removes thsi comments.*/
+	} else {
+		/* TBD: right API will get filled here as a part of
+		 * PMIC chanrger patch and removes thsi comments.*/
+	}
+	return 0;
+}
+#endif
 #if defined(CONFIG_USB_GADGET_MSM_72K) || defined(CONFIG_USB_EHCI_MSM)
 static struct msm_otg_platform_data msm_otg_pdata = {
 	/* if usb link is in sps there is no need for
@@ -476,6 +489,10 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.usb_in_sps = 1,
 #ifdef CONFIG_USB_EHCI_MSM
 	.vbus_power = msm_hsusb_vbus_power,
+#endif
+#if defined(CONFIG_BATTERY_MSM8X60) && !defined(CONFIG_USB_EHCI_MSM)
+	.pmic_notif_init         = msm_hsusb_pmic_notif_init,
+	.pmic_notif_deinit         = msm_hsusb_pmic_notif_deinit,
 #endif
 	.ldo_init		 = msm_hsusb_ldo_init,
 	.ldo_enable		 = msm_hsusb_ldo_enable,

@@ -1818,15 +1818,24 @@ static int hsusb_rpc_connect(int connect)
 		return msm_hsusb_rpc_close();
 }
 
+static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init)
+{
+	int ret;
+
+	if (init) {
+		ret = msm_pm_app_rpc_init(callback);
+	} else {
+		msm_pm_app_rpc_deinit(callback);
+		ret = 0;
+	}
+	return ret;
+}
 static int msm_hsusb_ldo_init(int init);
 static int msm_hsusb_ldo_enable(int enable);
 
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
-	.pmic_notif_init         = msm_pm_app_rpc_init,
-	.pmic_notif_deinit       = msm_pm_app_rpc_deinit,
-	.pmic_register_vbus_sn   = msm_pm_app_register_vbus_sn,
-	.pmic_unregister_vbus_sn = msm_pm_app_unregister_vbus_sn,
+	.pmic_notif_init         = msm_hsusb_pmic_notif_init,
 	.pemp_level              = PRE_EMPHASIS_WITH_10_PERCENT,
 	.cdr_autoreset           = CDR_AUTO_RESET_DEFAULT,
 	.drv_ampl                = HS_DRV_AMPLITUDE_5_PERCENT,
