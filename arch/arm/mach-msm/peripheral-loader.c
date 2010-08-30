@@ -414,6 +414,17 @@ static int msm_pil_debugfs_init(void)
 static int msm_pil_debugfs_init(void) { return 0; }
 #endif
 
+static int msm_pil_shutdown_at_boot(void)
+{
+	struct pil_device *pil;
+
+	for_each_pil(pil)
+		peripheral_shutdown(pil->id);
+
+	return 0;
+}
+late_initcall(msm_pil_shutdown_at_boot);
+
 static int __init msm_pil_init(void)
 {
 	int ret;
