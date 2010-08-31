@@ -2778,48 +2778,44 @@ static int hsusb_rpc_connect(int connect)
 #endif
 
 #ifdef CONFIG_USB_MSM_OTG_72K
-#ifndef CONFIG_USB_EHCI_MSM
-static int ldo_on;
-static struct vreg *usb_vreg;
-static int msm_pmic_enable_ldo(int enable)
+static struct vreg *vreg_3p3;
+static int msm_hsusb_ldo_init(int init)
 {
-	if (ldo_on == enable)
-		return 0;
-
-	ldo_on = enable;
-
-	if (enable)
-		return vreg_enable(usb_vreg);
-	else
-		return vreg_disable(usb_vreg);
-}
-
-static int msm_pmic_notify_init(void)
-{
-	usb_vreg = vreg_get(NULL, "usb");
-	if (IS_ERR(usb_vreg)) {
-		pr_err("%s: usb vreg get failed\n", __func__);
-		vreg_put(usb_vreg);
-		return PTR_ERR(usb_vreg);
-	}
+	if (init) {
+		vreg_3p3 = vreg_get(NULL, "usb");
+		if (IS_ERR(vreg_3p3))
+			return PTR_ERR(vreg_3p3);
+		/*TBD: modem currently doesn't support setting the
+		 * voltage more than 3.075V, hence set it to 3.075V */
+		vreg_set_level(vreg_3p3, 3075);
+	} else
+		vreg_put(vreg_3p3);
 
 	return 0;
 }
 
-static void msm_pmic_notify_deinit(void)
+static int msm_hsusb_ldo_enable(int enable)
 {
-	msm_pmic_enable_ldo(0);
-	vreg_put(usb_vreg);
+	static int ldo_status;
+
+	if (!vreg_3p3 || IS_ERR(vreg_3p3))
+		return -ENODEV;
+
+	if (ldo_status == enable)
+		return 0;
+
+	ldo_status = enable;
+
+	if (enable)
+		return vreg_enable(vreg_3p3);
+
+	return vreg_disable(vreg_3p3);
 }
-#endif
+
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
 
 #ifndef CONFIG_USB_EHCI_MSM
-	/* vbus notification through pmic call backs */
-	.pmic_notif_init         = msm_pmic_notify_init,
-	.pmic_notif_deinit       = msm_pmic_notify_deinit,
-	.pmic_enable_ldo         = msm_pmic_enable_ldo,
 	.pmic_vbus_irq	= 1,
 #else
 	.vbus_power = msm_hsusb_vbus_power,
@@ -2831,6 +2827,8 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 	.chg_vbus_draw		 = hsusb_chg_vbus_draw,
 	.chg_connected		 = hsusb_chg_connected,
 	.chg_init		 = hsusb_chg_init,
+	.ldo_enable		 = msm_hsusb_ldo_enable,
+	.ldo_init		 = msm_hsusb_ldo_init,
 };
 
 #ifdef CONFIG_USB_GADGET

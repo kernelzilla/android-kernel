@@ -34,6 +34,7 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
 #include <linux/wakelock.h>
+#include <mach/msm_hsusb.h>
 
 #include <asm/mach-types.h>
 #include <mach/msm_hsusb.h>
@@ -186,6 +187,14 @@ static inline int depends_on_axi_freq(struct otg_transceiver *xceiv)
 	dev = container_of(xceiv, struct msm_otg, otg);
 
 	return !dev->pdata->core_clk;
+}
+
+static inline int can_phy_power_collapse(struct msm_otg *dev)
+{
+	if (!dev || !dev->pdata)
+		return -ENODEV;
+
+	return dev->pdata->phy_can_powercollapse;
 }
 
 #endif

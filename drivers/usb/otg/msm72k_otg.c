@@ -600,8 +600,14 @@ static int msm_otg_suspend(struct msm_otg *dev)
 
 	atomic_set(&dev->in_lpm, 1);
 
-	if (!vbus && dev->pmic_notif_supp)
-		dev->pdata->pmic_enable_ldo(0);
+	if (!vbus && dev->pmic_notif_supp) {
+		pr_debug("phy can power collapse: (%d)\n",
+			can_phy_power_collapse(dev));
+		if (can_phy_power_collapse(dev) && dev->pdata->ldo_enable) {
+			pr_debug("disabling the regulators\n");
+			dev->pdata->ldo_enable(0);
+		}
+	}
 
 	pr_info("%s: usb in low power mode\n", __func__);
 
@@ -764,7 +770,9 @@ static int msm_otg_set_suspend(struct otg_transceiver *xceiv, int suspend)
 
 		disable_irq(dev->irq);
 		if (dev->pmic_notif_supp)
-			dev->pdata->pmic_enable_ldo(1);
+			if (can_phy_power_collapse(dev) &&
+					dev->pdata->ldo_enable)
+				dev->pdata->ldo_enable(1);
 
 		msm_otg_get_resume(dev);
 
@@ -2076,9 +2084,11 @@ const struct file_operations otgfs_fops = {
 
 struct dentry *otg_debug_root;
 struct dentry *otg_debug_mode;
+#endif
 
 static int otg_debugfs_init(struct msm_otg *dev)
 {
+#ifdef CONFIG_DEBUG_FS
 	otg_debug_root = debugfs_create_dir("otg", NULL);
 	if (!otg_debug_root)
 		return -ENOENT;
@@ -2091,16 +2101,18 @@ static int otg_debugfs_init(struct msm_otg *dev)
 		otg_debug_root = NULL;
 		return -ENOENT;
 	}
-
+#endif
 	return 0;
 }
 
 static void otg_debugfs_cleanup(void)
 {
+#ifdef CONFIG_DEBUG_FS
        debugfs_remove(otg_debug_mode);
        debugfs_remove(otg_debug_root);
-}
 #endif
+}
+
 static int __init msm_otg_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -2161,6 +2173,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			ret = PTR_ERR(dev->hs_pclk);
 			goto put_hs_clk;
 		}
+		clk_enable(dev->hs_pclk);
 	}
 
 	if (dev->pdata->core_clk) {
@@ -2170,6 +2183,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			ret = PTR_ERR(dev->hs_cclk);
 			goto put_hs_pclk;
 		}
+		clk_enable(dev->hs_cclk);
 	}
 
 	if (!dev->pdata->phy_reset) {
@@ -2222,12 +2236,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 					PM_QOS_DEFAULT_VALUE);
 	otg_pm_qos_update_axi(dev, 1);
 
-	/* enable clocks */
-	if (dev->hs_pclk)
-		clk_enable(dev->hs_pclk);
-	if (dev->hs_cclk)
-		clk_enable(dev->hs_cclk);
-
 	/* To reduce phy power consumption and to avoid external LDO
 	 * on the board, PMIC comparators can be used to detect VBUS
 	 * session change.
@@ -2236,15 +2244,33 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		ret = dev->pdata->pmic_notif_init();
 		if (!ret) {
 			dev->pmic_notif_supp = 1;
-			dev->pdata->pmic_enable_ldo(1);
 		} else if (ret != -ENOTSUPP) {
-			if (dev->hs_pclk)
-				clk_disable(dev->hs_pclk);
-			if (dev->hs_cclk)
-				clk_disable(dev->hs_cclk);
+			pr_err("%s: pmic_notif_init() failed, err:%d\n",
+					__func__, ret);
 			goto free_wq;
 		}
 	}
+
+	if (dev->pdata->ldo_init) {
+		ret = dev->pdata->ldo_init(1);
+		if (ret) {
+			pr_err("%s: ldo_init failed with err:%d\n",
+					__func__, ret);
+			goto free_pmic_notif;
+		}
+	}
+
+	if (dev->pdata->ldo_enable) {
+		ret = dev->pdata->ldo_enable(1);
+		if (ret) {
+			pr_err("%s: ldo_enable failed with err:%d\n",
+					__func__, ret);
+			goto free_ldo_init;
+		}
+	}
+
+	if (vbus_on_irq)
+		dev->pmic_notif_supp = 1;
 
 	/* ACk all pending interrupts and clear interrupt enable registers */
 	writel((readl(USB_OTGSC) & ~OTGSC_INTR_MASK), USB_OTGSC);
@@ -2255,11 +2281,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 					"msm_otg", dev);
 	if (ret) {
 		pr_info("%s: request irq failed\n", __func__);
-		if (dev->hs_pclk)
-			clk_disable(dev->hs_pclk);
-		if (dev->hs_cclk)
-			clk_disable(dev->hs_cclk);
-		goto free_wq;
+		goto free_ldo_enable;
 	}
 
 	the_msm_otg = dev;
@@ -2311,20 +2333,16 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		}
 	}
 
-#ifdef CONFIG_DEBUG_FS
 	ret = otg_debugfs_init(dev);
 	if (ret) {
 		pr_info("%s: otg_debugfs_init failed\n", __func__);
 		goto free_vbus_irq;
 	}
-#endif
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &msm_otg_attr_grp);
 	if (ret < 0) {
-		pr_err("%s: Failed to create the sysfs entry \n", __func__);
-#ifdef CONFIG_DEBUG_FS
+		pr_err("%s: Failed to create the sysfs entry\n", __func__);
 		otg_debugfs_cleanup();
-#endif
 		goto free_vbus_irq;
 	}
 
@@ -2339,6 +2357,16 @@ chg_deinit:
 		dev->pdata->chg_init(0);
 free_otg_irq:
 	free_irq(dev->irq, dev);
+free_ldo_enable:
+	if (dev->pdata->ldo_enable)
+		dev->pdata->ldo_enable(0);
+free_ldo_init:
+	if (dev->pdata->ldo_init)
+		dev->pdata->ldo_init(0);
+free_pmic_notif:
+	if (dev->pmic_notif_supp && dev->pdata->pmic_notif_deinit)
+		if (!vbus_on_irq)
+			dev->pdata->pmic_notif_deinit();
 free_wq:
 	destroy_workqueue(dev->wq);
 free_wlock:
@@ -2349,11 +2377,15 @@ put_phy_clk:
 	if (dev->phy_reset_clk)
 		clk_put(dev->phy_reset_clk);
 put_hs_cclk:
-	if (dev->hs_cclk)
+	if (dev->hs_cclk) {
+		clk_disable(dev->hs_cclk);
 		clk_put(dev->hs_cclk);
+	}
 put_hs_pclk:
-	if (dev->hs_pclk)
+	if (dev->hs_pclk) {
+		clk_disable(dev->hs_pclk);
 		clk_put(dev->hs_pclk);
+	}
 put_hs_clk:
 	if (dev->hs_clk)
 		clk_put(dev->hs_clk);
@@ -2368,14 +2400,18 @@ static int __exit msm_otg_remove(struct platform_device *pdev)
 {
 	struct msm_otg *dev = the_msm_otg;
 
-#ifdef CONFIG_DEBUG_FS
 	otg_debugfs_cleanup();
-#endif
 	sysfs_remove_group(&pdev->dev.kobj, &msm_otg_attr_grp);
 	destroy_workqueue(dev->wq);
 	wake_lock_destroy(&dev->wlock);
 
-	if (dev->pmic_notif_supp)
+	if (dev->pdata->ldo_enable)
+		dev->pdata->ldo_enable(0);
+
+	if (dev->pdata->ldo_init)
+		dev->pdata->ldo_init(0);
+
+	if (dev->pmic_notif_supp && !dev->vbus_on_irq)
 		dev->pdata->pmic_notif_deinit();
 
 #ifdef CONFIG_USB_MSM_ACA

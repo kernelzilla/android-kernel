@@ -74,6 +74,7 @@ void msm_pm_app_rpc_deinit(void);
 int msm_pm_app_register_vbus_sn(void (*callback)(int online));
 void msm_pm_app_unregister_vbus_sn(void (*callback)(int online));
 int msm_pm_app_enable_usb_ldo(int);
+int pmic_vote_3p3_pwr_sel_switch(int boost);
 
 int pmapp_display_clock_config(uint enable);
 

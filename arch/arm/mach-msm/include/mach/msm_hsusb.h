@@ -152,6 +152,10 @@ struct msm_otg_platform_data {
 	enum cdr_auto_reset	cdr_autoreset;
 	enum hs_drv_amplitude	drv_ampl;
 	int			phy_reset_sig_inverted;
+	int			phy_can_powercollapse;
+
+	int (*ldo_init) (int init);
+	int (*ldo_enable) (int enable);
 
 	u32 			swfi_latency;
 	/* pmic notfications apis */
