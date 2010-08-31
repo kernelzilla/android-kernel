@@ -273,12 +273,12 @@ static int16_t imx074_af_init(void)
 {
 	int32_t rc;
 	/* Initialize waveform */
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x01, 0xA9);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x02, 0xD2);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x03, 0x0C);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x04, 0x14);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x05, 0xB6);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x06, 0x4F);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x01, 0xA9);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x02, 0xD2);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x03, 0x0C);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x04, 0x14);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x05, 0xB6);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x06, 0x4F);
 	return rc;
 }
 
@@ -506,7 +506,7 @@ static int32_t imx074_move_focus(int direction,
 		dest_step_position = 0;
 	else if (dest_step_position > IMX074_TOTAL_STEPS_NEAR_TO_FAR)
 		dest_step_position = IMX074_TOTAL_STEPS_NEAR_TO_FAR;
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x00,
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x00,
 		((num_steps * imx074_l_region_code_per_step) | bit_mask));
 	imx074_ctrl->curr_step_pos = dest_step_position;
 	return rc;
@@ -517,8 +517,8 @@ static int32_t imx074_set_default_focus(uint8_t af_step)
 {
 	int32_t rc;
 	/* Initialize to infinity */
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x00, 0x7F);
-	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID >> 1, 0x00, 0x7F);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x00, 0x7F);
+	rc = imx074_i2c_write_b_af(IMX074_AF_I2C_SLAVE_ID, 0x00, 0x7F);
 	imx074_ctrl->curr_step_pos = 0;
 	return rc;
 }
