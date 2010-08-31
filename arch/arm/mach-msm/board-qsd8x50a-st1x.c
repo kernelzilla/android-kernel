@@ -1096,7 +1096,6 @@ static struct lcdc_platform_data lcdc_pdata = {
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 98,
-	.mdp_ver = 1,
 };
 
 #define LID_SENSOR_GPIO		41

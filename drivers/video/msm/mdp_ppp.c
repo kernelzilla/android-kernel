@@ -1117,15 +1117,6 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 	 * 0x0124: PPP source config register
 	 * 0x0128: unpacked pattern from lsb to msb (eg. RGB->BGR)
 	 */
-
-	if (mdp_ver == 1) {
-		if ((ppp_operation_reg & PPP_OP_SCALE_X_ON) &&
-			(iBuf->roi.width == 1)) {
-			ppp_operation_reg &= ~(PPP_OP_SCALE_X_ON);
-			iBuf->roi.width = dst_roi_width;
-		}
-	}
-
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x0108, (iBuf->roi.height << 16 |
 						      iBuf->roi.width));
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x010c, src0); /* comp.plane 0 */
