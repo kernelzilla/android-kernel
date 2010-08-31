@@ -86,7 +86,7 @@ int adm_open(int port_id, int session_id , int path)
 	if (this_adm.copp_cnt[port_id] == 0) {
 
 		open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 		open.hdr.pkt_size = sizeof(open);
 		open.hdr.src_svc = APR_SVC_ADM;
 		open.hdr.src_domain = APR_DOMAIN_APPS;
@@ -122,7 +122,7 @@ int adm_open(int port_id, int session_id , int path)
 	if (this_adm.copp_state[port_id]) {
 
 		route.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 		route.hdr.pkt_size = sizeof(route);
 		route.hdr.src_svc = 0;
 		route.hdr.src_domain = APR_DOMAIN_APPS;
@@ -190,8 +190,8 @@ int adm_close(int port_id)
 	if (!this_adm.copp_cnt[port_id]) {
 
 		close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
-		close.pkt_size = APR_HDR_SIZE;
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+		close.pkt_size = sizeof(close);
 		close.src_svc = APR_SVC_ADM;
 		close.src_domain = APR_DOMAIN_APPS;
 		close.src_port = port_id;
