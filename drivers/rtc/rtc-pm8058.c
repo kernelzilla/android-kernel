@@ -20,7 +20,6 @@
 #include <linux/rtc.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/pm.h>
-#include <linux/rtc/rtc-pm8058.h>
 #include <linux/pm_runtime.h>
 
 #define PM8058_RTC_CTRL		0x1E8
@@ -304,6 +303,7 @@ pm8058_rtc0_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 static struct rtc_class_ops pm8058_rtc0_ops = {
 	.read_time	= pm8058_rtc0_read_time,
+	.set_time	= pm8058_rtc0_set_time,
 	.set_alarm	= pm8058_rtc0_set_alarm,
 	.read_alarm	= pm8058_rtc0_read_alarm,
 };
@@ -327,12 +327,6 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 	u8 reg;
 	struct pm8058_rtc *rtc_dd;
 	struct pm8058_chip *pm_chip;
-	struct pm8058_rtc_pdata *pdata = pdev->dev.platform_data;
-
-	if (pdata == NULL) {
-		pr_err("%s: Platform data not specified\n", __func__);
-		return -ENXIO;
-	}
 
 	pm_chip = platform_get_drvdata(pdev);
 	if (pm_chip == NULL) {
@@ -377,9 +371,6 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 			goto fail_rtc_enable;
 		}
 	}
-
-	if (pdata->rtc_write_enable == true)
-		pm8058_rtc0_ops.set_time = pm8058_rtc0_set_time;
 
 	/* Register the RTC device */
 	rtc_dd->rtc0 = rtc_device_register("pm8058_rtc0", &pdev->dev,
