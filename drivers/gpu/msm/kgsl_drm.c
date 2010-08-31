@@ -592,7 +592,7 @@ kgsl_gem_map(struct drm_gem_object *obj)
 			kgsl_get_device(KGSL_DEVICE_YAMATO);
 		struct kgsl_mmu *mmu = kgsl_get_mmu(kgsldev);
 
-		if (mmu == NULL || !kgsl_mmu_isenabled(mmu))
+		if (mmu == NULL)
 			return -EINVAL;
 
 		priv->pagetable =
