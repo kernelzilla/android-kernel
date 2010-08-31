@@ -730,8 +730,7 @@ static u32 vcd_fill_output_buffer_cmn
 		rc = vcd_handle_first_fill_output_buffer(cctxt, buffer,
 			&handled);
 		VCD_FAILED_RETURN(rc,
-			"Failed: VCD_HandleFirstFillOutputBuffer");
-		cctxt->status.mask |= VCD_FIRST_OP_RCVD;
+			"Failed: vcd_handle_first_fill_output_buffer");
 		if (handled)
 			return rc ;
 	}
