@@ -19,11 +19,11 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/msm_audio.h>
-#include <asm/uaccess.h>
-#include <asm/atomic.h>
-#include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <asm/uaccess.h>
+#include <asm/atomic.h>
+#include <mach/qdsp6v2/audio_dev_ctl.h>
 #include <mach/debug_mm.h>
 #include "q6adm.h"
 
@@ -971,6 +971,8 @@ voc_events:
 					SNDDEV_CAP_TX : SNDDEV_CAP_RX;
 				evt_payload->voc_devinfo.acdb_dev_id =
 					dev_info->acdb_id;
+				evt_payload->voc_devinfo.dev_port_id =
+					dev_info->copp_id;
 				evt_payload->voc_devinfo.dev_sample =
 					dev_info->set_sample_rate ?
 					dev_info->set_sample_rate :
