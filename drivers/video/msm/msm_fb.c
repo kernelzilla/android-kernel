@@ -197,6 +197,74 @@ int msm_fb_detect_client(const char *name)
 	return ret;
 }
 
+static ssize_t msm_fb_msm_fb_type(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct msm_fb_panel_data *pdata =
+		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+
+	switch (pdata->panel_info.type) {
+	case NO_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "no panel\n");
+		break;
+	case MDDI_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "mddi panel\n");
+		break;
+	case EBI2_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "ebi2 panel\n");
+		break;
+	case LCDC_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "lcdc panel\n");
+		break;
+	case EXT_MDDI_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "ext mddi panel\n");
+		break;
+	case TV_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "tv panel\n");
+		break;
+	case HDMI_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "hdmi panel\n");
+		break;
+	case DTV_PANEL:
+		ret = snprintf(buf, PAGE_SIZE, "dtv panel\n");
+		break;
+	default:
+		ret = snprintf(buf, PAGE_SIZE, "unknown panel\n");
+		break;
+	}
+
+	return ret;
+}
+
+static DEVICE_ATTR(msm_fb_type, S_IRUGO, msm_fb_msm_fb_type, NULL);
+static struct attribute *msm_fb_attrs[] = {
+	&dev_attr_msm_fb_type.attr,
+	NULL,
+};
+static struct attribute_group msm_fb_attr_group = {
+	.attrs = msm_fb_attrs,
+};
+
+static int msm_fb_create_sysfs(struct platform_device *pdev)
+{
+	int rc;
+	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
+
+	rc = sysfs_create_group(&mfd->fbi->dev->kobj, &msm_fb_attr_group);
+	if (rc)
+		MSM_FB_ERR("%s: sysfs group creation failed, rc=%d\n", __func__,
+			rc);
+	return rc;
+}
+static void msm_fb_remove_sysfs(struct platform_device *pdev)
+{
+	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
+	sysfs_remove_group(&mfd->fbi->dev->kobj, &msm_fb_attr_group);
+}
+
 static int msm_fb_probe(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -266,6 +334,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 
 	pdev_list[pdev_list_cnt++] = pdev;
+	msm_fb_create_sysfs(pdev);
 	return 0;
 }
 
@@ -276,6 +345,8 @@ static int msm_fb_remove(struct platform_device *pdev)
 	MSM_FB_DEBUG("msm_fb_remove\n");
 
 	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
+
+	msm_fb_remove_sysfs(pdev);
 
 	pm_runtime_disable(&pdev->dev);
 
