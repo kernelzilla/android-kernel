@@ -103,8 +103,6 @@ enum {
 /* Count of the number of MDP_FB_PAGE_PROTECTION_... values. */
 #define MDP_NUM_FB_PAGE_PROTECTION_VALUES        (5)
 
-extern int mdp_ver;
-
 struct mdp_rect {
 	uint32_t x;
 	uint32_t y;
