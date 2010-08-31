@@ -967,6 +967,42 @@ show_sync_sts(struct device *dev, struct device_attribute *attr, char *buf)
 	return snprintf(buf, PAGE_SIZE, "%d\n", rmt_storage_get_sync_status());
 }
 
+#define RAMFS_SHARED_EFS_RAM_BASE	0x46100000
+#define RAMFS_SHARED_EFS_RAM_SIZE	(3 * 1024 * 1024)
+
+#define RAMFS_NUM_ENTRIES		1
+#define RAMFS_DEFAULT			0xFFFFFFFF
+
+static int rmt_storage_init_ramfs(void)
+{
+	struct shared_ramfs_table *ramfs_table;
+
+	ramfs_table = smem_alloc(SMEM_SEFS_INFO,
+				 sizeof(struct shared_ramfs_table));
+
+	if (!ramfs_table) {
+		pr_err("%s: No RAMFS table in SMEM\n", __func__);
+		return -ENOENT;
+	}
+
+	if (ramfs_table->magic_id == RAMFS_INFO_MAGICNUMBER) {
+		pr_debug("RAMFS table already filled... skipping %s", \
+			__func__);
+		return 0;
+	}
+
+	ramfs_table->magic_id = RAMFS_INFO_MAGICNUMBER;
+	ramfs_table->version  = RAMFS_INFO_VERSION;
+	ramfs_table->entries  = RAMFS_NUM_ENTRIES;
+
+	ramfs_table->ramfs_entry[0].client_id  = RAMFS_MODEMSTORAGE_ID;
+	ramfs_table->ramfs_entry[0].base_addr  = RAMFS_SHARED_EFS_RAM_BASE;
+	ramfs_table->ramfs_entry[0].size       = RAMFS_SHARED_EFS_RAM_SIZE;
+	ramfs_table->ramfs_entry[0].client_sts = RAMFS_DEFAULT;
+
+	return 0;
+}
+
 static DEVICE_ATTR(force_sync, S_IRUGO | S_IWUSR, NULL, set_force_sync);
 static DEVICE_ATTR(sync_sts, S_IRUGO | S_IWUSR, show_sync_sts, NULL);
 static struct attribute *dev_attrs[] = {
@@ -983,6 +1019,10 @@ static int rmt_storage_probe(struct platform_device *pdev)
 	struct rpcsvr_platform_device *dev;
 	struct rmt_storage_client_info *rmc;
 	int ret;
+
+	ret = rmt_storage_init_ramfs();
+	if (ret)
+		return ret;
 
 	dev = container_of(pdev, struct rpcsvr_platform_device, base);
 	rmc = kzalloc(sizeof(struct rmt_storage_client_info), GFP_KERNEL);
