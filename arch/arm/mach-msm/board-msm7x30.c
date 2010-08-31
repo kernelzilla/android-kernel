@@ -115,7 +115,6 @@
 #define HAP_LVL_SHFT_MSM_GPIO 24
 
 #define	PM_FLIP_MPP 5 /* PMIC MPP 06 */
-
 static int pm8058_gpios_init(void)
 {
 	int rc;
@@ -2811,12 +2810,15 @@ static int msm_hsusb_ldo_enable(int enable)
 
 	return vreg_disable(vreg_3p3);
 }
-
+#endif
+#ifndef CONFIG_USB_EHCI_MSM
+static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init);
+#endif
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
 
 #ifndef CONFIG_USB_EHCI_MSM
-	.pmic_vbus_irq	= 1,
+	.pmic_notif_init         = msm_hsusb_pmic_notif_init,
 #else
 	.vbus_power = msm_hsusb_vbus_power,
 #endif
@@ -2834,6 +2836,49 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 #ifdef CONFIG_USB_GADGET
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata;
 #endif
+#ifndef CONFIG_USB_EHCI_MSM
+typedef void (*notify_vbus_state) (int);
+notify_vbus_state notify_vbus_state_func_ptr;
+int vbus_on_irq;
+static irqreturn_t pmic_vbus_on_irq(int irq, void *data)
+{
+	pr_info("%s: vbus notification from pmic\n", __func__);
+
+	(*notify_vbus_state_func_ptr) (1);
+
+	return IRQ_HANDLED;
+}
+static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init)
+{
+	int ret;
+
+	if (init) {
+		if (!callback)
+			return -ENODEV;
+
+		notify_vbus_state_func_ptr = callback;
+		vbus_on_irq = platform_get_irq_byname(&msm_device_otg,
+			"vbus_on");
+		if (vbus_on_irq <= 0) {
+			pr_err("%s: unable to get vbus on irq\n", __func__);
+			return -ENODEV;
+		}
+
+		ret = request_irq(vbus_on_irq, pmic_vbus_on_irq,
+			IRQF_TRIGGER_RISING, "msm_otg_vbus_on", NULL);
+		if (ret) {
+			pr_info("%s: request_irq for vbus_on"
+				"interrupt failed\n", __func__);
+			return ret;
+		}
+		msm_otg_pdata.pmic_vbus_irq = vbus_on_irq;
+		return 0;
+	} else {
+		free_irq(vbus_on_irq, 0);
+		notify_vbus_state_func_ptr = NULL;
+		return 0;
+	}
+}
 #endif
 
 static struct android_pmem_platform_data android_pmem_pdata = {

@@ -105,27 +105,6 @@ static int vbus_sess_valid_arg_cb(struct msm_rpc_client *client,
 	return sizeof(struct vbus_sess_valid_args);
 }
 
-int msm_pm_app_register_vbus_sn(void (*callback)(int online))
-{
-	uint32_t cb_id = msm_rpc_add_cb_func(client, (void *)callback);
-
-	/* In case of NULL callback funtion, cb_id would be -1 */
-	if ((int) cb_id < -1)
-		return cb_id;
-
-	return msm_rpc_client_req(client,
-			rpc_ids.reg_for_vbus_valid,
-			vbus_sess_valid_arg_cb,
-			&cb_id, NULL, NULL, -1);
-
-}
-EXPORT_SYMBOL(msm_pm_app_register_vbus_sn);
-
-void msm_pm_app_unregister_vbus_sn(void (*callback)(int online))
-{
-	msm_rpc_remove_cb_func(client, (void *)callback);
-}
-EXPORT_SYMBOL(msm_pm_app_unregister_vbus_sn);
 
 int pmic_vote_3p3_pwr_sel_switch(int boost)
 {
@@ -196,8 +175,9 @@ static int pm_app_usb_cb_func(struct msm_rpc_client *client,
 	return rc;
 }
 
-int msm_pm_app_rpc_init(void)
+int msm_pm_app_rpc_init(void (*callback)(int online))
 {
+	uint32_t cb_id, rc;
 
 	if (!machine_is_qsd8x50_ffa() && !machine_is_qsd8x50a_ffa()
 			&& !machine_is_msm7x27_ffa())
@@ -231,14 +211,24 @@ int msm_pm_app_rpc_init(void)
 		return PTR_ERR(client);
 
 done:
-	return 0;
+	cb_id = msm_rpc_add_cb_func(client, (void *)callback);
+	/* In case of NULL callback funtion, cb_id would be -1 */
+	if ((int) cb_id < -1)
+		return cb_id;
+	rc =  msm_rpc_client_req(client,
+		rpc_ids.reg_for_vbus_valid,
+			vbus_sess_valid_arg_cb,
+				&cb_id, NULL, NULL, -1);
+	return rc;
 }
 EXPORT_SYMBOL(msm_pm_app_rpc_init);
 
-void msm_pm_app_rpc_deinit(void)
+void msm_pm_app_rpc_deinit(void(*callback)(int online))
 {
-	if (client)
+	if (client) {
+		msm_rpc_remove_cb_func(client, (void *)callback);
 		msm_rpc_unregister_client(client);
+	}
 }
 EXPORT_SYMBOL(msm_pm_app_rpc_deinit);
 

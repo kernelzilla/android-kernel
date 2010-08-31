@@ -159,8 +159,7 @@ struct msm_otg_platform_data {
 
 	u32 			swfi_latency;
 	/* pmic notfications apis */
-	int (*pmic_notif_init) (void);
-	void (*pmic_notif_deinit) (void);
+	int (*pmic_notif_init) (void (*callback)(int online), int init);
 	int (*pmic_register_vbus_sn) (void (*callback)(int online));
 	void (*pmic_unregister_vbus_sn) (void (*callback)(int online));
 	int (*pmic_enable_ldo) (int);
