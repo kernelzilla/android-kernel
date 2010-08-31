@@ -85,7 +85,7 @@ pm8058_rtc_write_bytes(struct pm8058_rtc *rtc_dd, u8 *rtc_val, int base)
  * 3. Write Byte[1], Byte[2], Byte[3] then Byte[0].
  * 4. Enable alarm if disabled earlier.
  */
-
+#ifdef CONFIG_RTC_PM8058_WRITE_ENABLE
 static int
 pm8058_rtc0_set_time(struct device *dev, struct rtc_time *tm)
 {
@@ -158,6 +158,7 @@ pm8058_rtc0_set_time(struct device *dev, struct rtc_time *tm)
 
 	return 0;
 }
+#endif
 
 static int
 pm8058_rtc0_read_time(struct device *dev, struct rtc_time *tm)
@@ -303,7 +304,6 @@ pm8058_rtc0_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 static struct rtc_class_ops pm8058_rtc0_ops = {
 	.read_time	= pm8058_rtc0_read_time,
-	.set_time	= pm8058_rtc0_set_time,
 	.set_alarm	= pm8058_rtc0_set_alarm,
 	.read_alarm	= pm8058_rtc0_read_alarm,
 };
@@ -371,6 +371,10 @@ static int __devinit pm8058_rtc_probe(struct platform_device *pdev)
 			goto fail_rtc_enable;
 		}
 	}
+
+#ifdef CONFIG_RTC_PM8058_WRITE_ENABLE
+	pm8058_rtc0_ops.set_time	= pm8058_rtc0_set_time,
+#endif
 
 	/* Register the RTC device */
 	rtc_dd->rtc0 = rtc_device_register("pm8058_rtc0", &pdev->dev,

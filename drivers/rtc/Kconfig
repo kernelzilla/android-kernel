@@ -886,4 +886,14 @@ config RTC_PM8058
 	  To compile this driver as a module, choose M here: the
 	  module will be called pmic8058-rtc.
 
+config RTC_PM8058_WRITE_ENABLE
+	bool "PM8058 RTC write enable"
+	default n
+	depends on RTC_PM8058
+	help
+	  Say Y here if you want to support the write operation for
+	  PMIC8058 RTC.
+
+	  By default the write operation is not supported.
+
 endif # RTC_CLASS
