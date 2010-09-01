@@ -236,10 +236,19 @@ static int __devinit isa1200_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	haptic = kzalloc(sizeof(struct isa1200_chip), GFP_KERNEL);
-	if (!haptic)
-		return -ENOMEM;
+	if (pdata->dev_setup) {
+		ret = pdata->dev_setup(true);
+		if (ret < 0) {
+			dev_err(&client->dev, "dev setup failed\n");
+			return -EINVAL;
+		}
+	}
 
+	haptic = kzalloc(sizeof(struct isa1200_chip), GFP_KERNEL);
+	if (!haptic) {
+		ret = -ENOMEM;
+		goto mem_alloc_fail;
+	}
 	haptic->client = client;
 	haptic->enable = 0;
 	haptic->pdata = pdata;
@@ -312,6 +321,9 @@ timed_reg_fail:
 		pdata->power_on(0);
 pwr_up_fail:
 	kfree(haptic);
+mem_alloc_fail:
+	if (pdata->dev_setup)
+		pdata->dev_setup(false);
 	return ret;
 }
 
@@ -336,6 +348,9 @@ static int __devexit isa1200_remove(struct i2c_client *client)
 				ISA1200_HCTRL0_RESET);
 	i2c_smbus_write_byte_data(client, ISA1200_HCTRL1,
 				ISA1200_HCTRL1_RESET);
+
+	if (haptic->pdata->dev_setup)
+		haptic->pdata->dev_setup(false);
 
 	/* power-off the chip */
 	if (haptic->pdata->power_on)
