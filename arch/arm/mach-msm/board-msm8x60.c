@@ -2857,9 +2857,14 @@ static int msm_bahama_setup_power(struct device *dev)
 {
 	int rc = 0;
 
-	vreg_bahama = regulator_get(dev, "8058_l8");
+	vreg_bahama = regulator_get(dev, "8058_s3");
 	if (IS_ERR(vreg_bahama))
 		rc = PTR_ERR(vreg_bahama);
+
+	if (!rc)
+		rc = regulator_set_voltage(vreg_bahama, 1800000, 1800000);
+	else
+		goto unget;
 
 	if (!rc)
 		rc = regulator_enable(vreg_bahama);
