@@ -291,7 +291,7 @@ struct msm_gpio_chip msm_gpio_chips[] = {
 #elif defined(CONFIG_ARCH_MSM7X30)
 			.base = 107,
 			.ngpio = 27,
-#elif defined(CONFIG_ARCH_MSM7X27)
+#elif defined(CONFIG_ARCH_MSM7X27) || defined(CONFIG_ARCH_MSM7X25)
 			.base = 107,
 			.ngpio = 26,
 #else

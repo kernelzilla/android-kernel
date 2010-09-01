@@ -39,7 +39,8 @@
 #define GPIO2_REG(off) (MSM_GPIO2_BASE + 0xC00 + (off))
 #endif
 
-#if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27)
+#if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27) || \
+	defined(CONFIG_ARCH_MSM7X25)
 
 /* output value */
 #define GPIO_OUT_0         GPIO1_REG(0x00)  /* gpio  15-0  */
