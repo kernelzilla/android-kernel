@@ -2917,10 +2917,22 @@ static struct regulator *vreg_bahama;
 static int msm_bahama_setup_power(struct device *dev)
 {
 	int rc = 0;
+	const char *msm_bahama_regulator = "8058_s3";
 
-	vreg_bahama = regulator_get(dev, "8058_s3");
-	if (IS_ERR(vreg_bahama))
+	vreg_bahama = regulator_get(dev, msm_bahama_regulator);
+	if (IS_ERR(vreg_bahama)) {
 		rc = PTR_ERR(vreg_bahama);
+		dev_err(dev, "%s: regulator_get %s = %d\n", __func__,
+			msm_bahama_regulator, rc);
+	}
+
+	if (!rc)
+		rc = regulator_set_voltage(vreg_bahama, 1800000, 1800000);
+	else {
+		dev_err(dev, "%s: regulator_set_voltage %s = %d\n", __func__,
+			msm_bahama_regulator, rc);
+		goto unget;
+	}
 
 	if (!rc)
 		rc = regulator_set_voltage(vreg_bahama, 1800000, 1800000);
@@ -2929,25 +2941,34 @@ static int msm_bahama_setup_power(struct device *dev)
 
 	if (!rc)
 		rc = regulator_enable(vreg_bahama);
-	else
+	else {
+		dev_err(dev, "%s: regulator_enable %s = %d\n", __func__,
+			msm_bahama_regulator, rc);
 		goto unget;
+	}
 
 	if (!rc)
 		rc = gpio_request(GPIO_BAHAMA_RST_OUT_N, "bahama sys_rst_n");
-	else
+	else {
+		dev_err(dev, "%s: gpio_request %d = %d\n", __func__,
+			GPIO_BAHAMA_RST_OUT_N, rc);
 		goto unenable;
+	}
 
 	if (!rc)
 		rc = gpio_direction_output(GPIO_BAHAMA_RST_OUT_N, 1);
-	else
+	else {
+		dev_err(dev, "%s: gpio_direction_output %d = %d\n", __func__,
+			GPIO_BAHAMA_RST_OUT_N, rc);
 		goto unrequest;
+	}
 
 	return rc;
 
 unrequest:
 	gpio_free(GPIO_BAHAMA_RST_OUT_N);
 unenable:
-	(void) regulator_disable(vreg_bahama);
+	regulator_disable(vreg_bahama);
 unget:
 	regulator_put(vreg_bahama);
 	return rc;
@@ -2955,13 +2976,11 @@ unget:
 
 static void msm_bahama_shutdown_power(struct device *dev)
 {
-	int rc;
-
 	gpio_set_value(GPIO_BAHAMA_RST_OUT_N, 0);
 
 	gpio_free(GPIO_BAHAMA_RST_OUT_N);
 
-	rc = regulator_disable(vreg_bahama);
+	regulator_disable(vreg_bahama);
 
 	regulator_put(vreg_bahama);
 };
