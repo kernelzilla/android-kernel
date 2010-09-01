@@ -83,6 +83,30 @@ static struct platform_driver mipi_dsi_driver = {
 
 struct device dsi_dev;
 
+
+/*
+ * mipi_dsi_mxo_selected() -
+ *
+ *	determine if PXO or MXO should be used as clk_ref for the
+ *	DSI PLL.
+ *
+ *	Note - this function can only be called after clk_enable()
+ *	is called for the dsi_esc_clk, as that is what ensures that
+ *	the MXO/PXO slection has been made for the dsi_esc_clk.  This
+ *	function simply reads what the kernel's clock manager has
+ *	configured for dsi_esc_clk.
+ *
+ *	Returns 1 if MXO should be used, 0 if PXO should be used
+ *
+ */
+static int mipi_dsi_mxo_selected(void)
+{
+	uint32_t data = MIPI_INP(mmss_cc_base + 0x005c);
+
+	return (data & BIT(14)) != 0;
+}
+
+
 #ifdef DSI_CLK_CALCULATE
 static void mipi_dsi_clk(int on, struct dsi_clk_desc *clk)
 {
@@ -110,6 +134,9 @@ static void mipi_dsi_clk(int on, struct dsi_clk_desc *clk)
 	MIPI_OUTP(cc, 0x0145);
 }
 #else
+
+static uint32_t dsi_cc_data = 0x25;
+
 static void mipi_dsi_clk(int on)
 {
 	char	*cc, *ns, *md;
@@ -118,7 +145,7 @@ static void mipi_dsi_clk(int on)
 	md = mmss_cc_base + 0x0050;
 	ns = mmss_cc_base + 0x0054;
 
-	MIPI_OUTP(cc, 0x125);
+	MIPI_OUTP(cc, dsi_cc_data);
 	wmb();
 	MIPI_OUTP(md, 0x1fd);
 	wmb();
@@ -442,6 +469,11 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		disable_irq(DSI_IRQ);
 
 		mipi_dsi_calibration();
+
+		if (mipi_dsi_mxo_selected())
+			dsi_cc_data |= BIT(8);	/* use MXO for DSI PLL clkref */
+		else
+			dsi_cc_data &= ~BIT(8);	/* use PXO */
 
 		mipi_dsi_resource_initialized = 1;
 
