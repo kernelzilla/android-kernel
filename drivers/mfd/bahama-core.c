@@ -230,7 +230,6 @@ static int bahama_probe(struct i2c_client *client,
 	if (pdata->bahama_setup != NULL) {
 		status = pdata->bahama_setup(&client->dev);
 		if (status < 0) {
-			pdata->bahama_shutdown(&client->dev);
 			return status;
 		}
 	}
