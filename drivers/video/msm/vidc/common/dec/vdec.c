@@ -437,6 +437,9 @@ static u32 vid_dec_set_codec(struct video_client_ctx *client_ctx,
 	case VDEC_CODECTYPE_VC1:
 		codec.codec = VCD_CODEC_VC1;
 		break;
+	case VDEC_CODECTYPE_VC1_RCV:
+		codec.codec = VCD_CODEC_VC1_RCV;
+		break;
 	default:
 		result = false;
 		break;
