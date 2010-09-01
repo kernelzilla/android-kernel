@@ -114,9 +114,16 @@ static int dtv_on(struct platform_device *pdev)
 						pm_qos_rate);
 	mfd = platform_get_drvdata(pdev);
 
-	clk_set_rate(tv_src_clk, mfd->fbi->var.pixclock);
-	pr_info("%s: tv_src_clk=%dkHz, pm_qos_rate=%ldkHz\n", __func__,
-		mfd->fbi->var.pixclock/1000, pm_qos_rate);
+	ret = clk_set_rate(tv_src_clk, mfd->fbi->var.pixclock);
+	if (ret) {
+		pr_info("%s: clk_set_rate(%d) failed\n", __func__,
+			mfd->fbi->var.pixclock);
+		if (mfd->fbi->var.pixclock == 27030000)
+			mfd->fbi->var.pixclock = 27000000;
+		ret = clk_set_rate(tv_src_clk, mfd->fbi->var.pixclock);
+	}
+	pr_info("%s: tv_src_clk=%dkHz, pm_qos_rate=%ldkHz, [%d]\n", __func__,
+		mfd->fbi->var.pixclock/1000, pm_qos_rate, ret);
 
 	clk_enable(tv_enc_clk);
 	clk_enable(tv_dac_clk);
@@ -246,8 +253,11 @@ static int __init dtv_driver_init(void)
 	}
 
 	tv_src_clk = clk_get(NULL, "tv_src_clk");
-	if (IS_ERR(tv_src_clk))
+	if (IS_ERR(tv_src_clk)) {
 		tv_src_clk = tv_enc_clk; /* Fallback to slave */
+		pr_info("%s: tv_src_clk not available, using tv_enc_clk"
+			" instead\n", __func__);
+	}
 
 	hdmi_clk = clk_get(NULL, "hdmi_clk");
 	if (IS_ERR(hdmi_clk)) {
