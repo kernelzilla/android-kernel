@@ -79,7 +79,7 @@ int afe_open(int port_id, int rate, int channel_mode)
 	}
 
 	config.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	config.hdr.pkt_size = sizeof(config);
 	config.hdr.src_port = 0;
 	config.hdr.dest_port = 0;
@@ -109,7 +109,7 @@ int afe_open(int port_id, int rate, int channel_mode)
 	}
 
 	start.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	start.hdr.pkt_size = sizeof(start);
 	start.hdr.src_port = 0;
 	start.hdr.dest_port = 0;
@@ -157,7 +157,7 @@ int afe_close(int port_id)
 	}
 
 	stop.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	stop.hdr.pkt_size = sizeof(stop);
 	stop.hdr.src_port = 0;
 	stop.hdr.dest_port = 0;
