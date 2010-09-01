@@ -35,7 +35,6 @@
 #include <linux/pwm.h>
 #include <linux/pmic8058-pwm.h>
 #include <linux/leds-pmic8058.h>
-#include <linux/rtc/rtc-pm8058.h>
 #include <linux/mfd/marimba.h>
 
 #include <linux/i2c.h>
@@ -2152,10 +2151,6 @@ static struct resource resources_rtc[] = {
        },
 };
 
-static struct pm8058_rtc_pdata pm8058_rtc_data = {
-	.rtc_write_enable = false,
-};
-
 static struct pmic8058_led pmic8058_flash_leds[] = {
 	[0] = {
 		.name		= "camera:flash0",
@@ -2240,8 +2235,6 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{
 		.name = "pm8058-rtc",
 		.id = -1,
-		.platform_data = &pm8058_rtc_data,
-		.data_size = sizeof(pm8058_rtc_data),
 		.num_resources  = ARRAY_SIZE(resources_rtc),
 		.resources      = resources_rtc,
 	},
