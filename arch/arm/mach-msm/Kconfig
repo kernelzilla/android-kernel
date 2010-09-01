@@ -60,6 +60,7 @@ config ARCH_MSM8X60
 	select ARCH_HAS_CPU_IDLE_WAIT
 	select MSM_DIRECT_SCLK_ACCESS
 	select MSM_RPM
+	select MSM_XO
 
 endchoice
 
@@ -88,6 +89,9 @@ config  MSM_VIC
 
 config MSM_RPM
 	bool "Resource Power Manager"
+
+config MSM_XO
+	bool
 
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
