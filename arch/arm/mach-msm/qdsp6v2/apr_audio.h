@@ -169,6 +169,16 @@ struct afe_port_mi2s_cfg {
 	u16	reserved;
 } __attribute__ ((packed));
 
+struct afe_port_hdmi_cfg {
+	u16	port_id;
+	u16	bitwidth;	/* 16,24,32 */
+	u16	channel_mode;	/* HDMI Stereo = 0 */
+				/* HDMI_3Point1 (4-ch) = 1 */
+				/* HDMI_5Point1 (6-ch) = 2 */
+				/* HDMI_6Point1 (8-ch) = 3 */
+	u16	data_type;	/* HDMI_Linear = 0 */
+				/* HDMI_non_Linaer = 1 */
+} __attribute__ ((packed));
 
 #define AFE_PORT_AUDIO_IF_CONFIG 0x000100d3
 struct afe_audioif_config_command {
@@ -176,6 +186,7 @@ struct afe_audioif_config_command {
 	union {
 		struct afe_port_pcm_cfg		pcm;
 		struct afe_port_mi2s_cfg	mi2s;
+		struct afe_port_hdmi_cfg	hdmi;
 	} __attribute__((packed)) port;
 } __attribute__ ((packed));
 

@@ -63,9 +63,9 @@ int afe_open(int port_id, int rate, int channel_mode)
 	struct afe_audioif_config_command config;
 	int ret;
 
-	mutex_lock(&afe_lock);
-
 	pr_info("%s %d %d %d\n", __func__, port_id, rate, channel_mode);
+
+	mutex_lock(&afe_lock);
 
 	if (this_afe.ref_cnt == 0) {
 		this_afe.apr = apr_register("ADSP", "AFE", afe_callback,
@@ -85,11 +85,30 @@ int afe_open(int port_id, int rate, int channel_mode)
 	config.hdr.dest_port = 0;
 	config.hdr.token = 0;
 	config.hdr.opcode = AFE_PORT_AUDIO_IF_CONFIG;
-	config.port.mi2s.port_id = port_id;
-	config.port.mi2s.bitwidth = 16;
-	config.port.mi2s.line = 1;
-	config.port.mi2s.channel = channel_mode;
-	config.port.mi2s.ws = 1;
+
+	if ((port_id == PRIMARY_I2S_RX) || (port_id == PRIMARY_I2S_TX)) {
+
+		pr_info("%s I2S %d %d %d\n", __func__, port_id, rate,
+				channel_mode);
+
+		config.port.mi2s.port_id = port_id;
+		config.port.mi2s.bitwidth = 16;
+		config.port.mi2s.line = 1;
+		config.port.mi2s.channel = channel_mode;
+		config.port.mi2s.ws = 1;
+	} else if (port_id == HDMI_RX) {
+
+		pr_info("%s HDMI %d %d %d\n", __func__, port_id, rate,
+				channel_mode);
+		config.port.hdmi.port_id = port_id;
+		config.port.hdmi.bitwidth = 16;
+		config.port.hdmi.channel_mode = channel_mode;
+		config.port.hdmi.data_type = 0;
+	} else {
+		pr_err("%s Failed : Invalid Port id = %d\n", __func__, port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
 
 	this_afe.state = 1;
 
@@ -97,7 +116,7 @@ int afe_open(int port_id, int rate, int channel_mode)
 	if (ret < 0) {
 		pr_err("AFE enable for port %d failed\n", port_id);
 		ret = -EINVAL;
-		goto fail;
+		goto fail_cmd;
 	}
 
 	ret = wait_event_timeout(this_afe.wait, (this_afe.state == 0),
@@ -138,7 +157,8 @@ int afe_open(int port_id, int rate, int channel_mode)
 	mutex_unlock(&afe_lock);
 	return ret;
 fail_cmd:
-	apr_deregister(this_afe.apr);
+	if (this_afe.ref_cnt == 0)
+		apr_deregister(this_afe.apr);
 fail:
 	mutex_unlock(&afe_lock);
 	return ret;
