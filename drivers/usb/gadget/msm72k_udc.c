@@ -57,7 +57,7 @@ static const char driver_name[] = "msm72k_udc";
 
 #define EPT_FLAG_IN        0x0001
 
-#define SETUP_BUF_SIZE      4096
+#define SETUP_BUF_SIZE     8
 
 
 static const char *const ep_name[] = {
