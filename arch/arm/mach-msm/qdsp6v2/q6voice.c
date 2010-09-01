@@ -139,7 +139,7 @@ static int voice_create_mvm_cvs_session(struct voice_data *v)
 	if (!v->mvm_handle) {
 		mvm_session_cmd.hdr.hdr_field = APR_HDR_FIELD(
 						APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 		mvm_session_cmd.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 					sizeof(mvm_session_cmd) - APR_HDR_SIZE);
 		MM_INFO("send mvm create session pkt size = %d\n",
@@ -167,7 +167,7 @@ static int voice_create_mvm_cvs_session(struct voice_data *v)
 	if (!v->cvs_handle) {
 		cvs_session_cmd.hdr.hdr_field = APR_HDR_FIELD(
 						APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 		cvs_session_cmd.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 					sizeof(cvs_session_cmd) - APR_HDR_SIZE);
 		MM_INFO("send stream create session pkt size = %d\n",
@@ -214,7 +214,7 @@ static int voice_start_modem_voice(struct voice_data *v)
 
 	/* create cvp session and wait for response */
 	cvp_session_cmd.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	cvp_session_cmd.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(cvp_session_cmd) - APR_HDR_SIZE);
 	MM_INFO(" send create cvp session, pkt size = %d\n",
@@ -232,8 +232,11 @@ static int voice_start_modem_voice(struct voice_data *v)
 	cvp_session_cmd.cvp_session.network_id = VSS_NETWORK_ID_DEFAULT;
 	cvp_session_cmd.cvp_session.tx_port_id = v->dev_tx.dev_port_id;
 	cvp_session_cmd.cvp_session.rx_port_id = v->dev_rx.dev_port_id;
-	MM_INFO(" tx_port_id=%d, rx_port_id=%d\n", v->dev_tx.dev_port_id,
-						v->dev_rx.dev_port_id);
+	MM_INFO("net_id=%d, dir=%d tx_port_id=%d, rx_port_id=%d\n",
+			cvp_session_cmd.cvp_session.network_id,
+			cvp_session_cmd.cvp_session.direction,
+			cvp_session_cmd.cvp_session.tx_port_id,
+			cvp_session_cmd.cvp_session.rx_port_id);
 
 	v->cvp_state = 1;
 	ret = apr_send_pkt(v->apr_cvp, (uint32_t *) &cvp_session_cmd);
@@ -251,7 +254,7 @@ static int voice_start_modem_voice(struct voice_data *v)
 
 	/* enable vocproc and wait for respose */
 	cvp_enable_cmd.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	cvp_enable_cmd.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(cvp_enable_cmd) - APR_HDR_SIZE);
 	MM_DBG("cvp_enable_cmd pkt size = %d, cvp_handle=%d\n",
@@ -276,7 +279,7 @@ static int voice_start_modem_voice(struct voice_data *v)
 
 	/* attach vocproc and wait for response */
 	mvm_a_vocproc_cmd.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	mvm_a_vocproc_cmd.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(mvm_a_vocproc_cmd) - APR_HDR_SIZE);
 	MM_INFO("send mvm_a_vocproc_cmd pkt size = %d\n",
@@ -302,7 +305,7 @@ static int voice_start_modem_voice(struct voice_data *v)
 
 	/* start voice and wait for response */
 	mvm_start_voice_cmd.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	mvm_start_voice_cmd.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(mvm_start_voice_cmd) - APR_HDR_SIZE);
 	MM_INFO("send mvm_start_voice_cmd pkt size = %d\n",
@@ -346,7 +349,7 @@ static int voice_stop_modem_voice(struct voice_data *v)
 
 	/* stop voice and wait for the response from mvm */
 	mvm_stop_voice_cmd.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	mvm_stop_voice_cmd.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(mvm_stop_voice_cmd) - APR_HDR_SIZE);
 	MM_INFO("send mvm_stop_voice_cmd pkt size = %d\n",
@@ -371,7 +374,7 @@ static int voice_stop_modem_voice(struct voice_data *v)
 
 	/* detach VOCPROC and wait for response from mvm */
 	mvm_d_vocproc_cmd.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	mvm_d_vocproc_cmd.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(mvm_d_vocproc_cmd) - APR_HDR_SIZE);
 	MM_INFO("mvm_d_vocproc_cmd  pkt size = %d\n",
@@ -397,7 +400,7 @@ static int voice_stop_modem_voice(struct voice_data *v)
 
 	/* destrop cvp session */
 	cvp_destroy_session_cmd.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-					APR_HDR_SIZE, APR_PKT_VER);
+					APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	cvp_destroy_session_cmd.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
 				sizeof(cvp_destroy_session_cmd) - APR_HDR_SIZE);
 	MM_INFO("cvp_destroy_session_cmd pkt size = %d\n",
@@ -430,41 +433,6 @@ fail:
 	apr_deregister(v->apr_cvp);
 
 	return -EINVAL;
-}
-
-static int voice_send_mute_cmd(struct voice_data *v)
-{
-	struct cvs_set_mute_cmd cvs_mute_cmd;
-	int ret = 0;
-
-	cvs_mute_cmd.hdr.hdr_field = APR_HDR_FIELD(
-						APR_MSG_TYPE_SEQ_CMD,
-						APR_HDR_SIZE,
-						APR_PKT_VER);
-	cvs_mute_cmd.hdr.pkt_size = APR_PKT_SIZE(
-						APR_HDR_SIZE,
-						sizeof(cvs_mute_cmd)
-							- APR_HDR_SIZE);
-	cvs_mute_cmd.hdr.src_port = 0;
-	cvs_mute_cmd.hdr.dest_port = v->cvs_handle;
-	cvs_mute_cmd.hdr.token = 0;
-	cvs_mute_cmd.hdr.opcode = VSS_ISTREAM_CMD_SET_MUTE;
-	cvs_mute_cmd.cvs_set_mute.direction = 0; /*tx*/
-	cvs_mute_cmd.cvs_set_mute.mute_flag = v->dev_tx.mute;
-
-	v->cvs_state = 1;
-	ret = apr_send_pkt(v->apr_cvs, (uint32_t *) &cvs_mute_cmd);
-	if (ret < 0) {
-		MM_ERR("Fail in sending MUTE command\n");
-		goto fail;
-	}
-	ret = wait_event_timeout(v->cvs_wait, (v->cvs_state == 0),
-						msecs_to_jiffies(TIMEOUT_MS));
-	if (ret < 0)
-		MM_INFO("%s: wait_event timeout\n", __func__);
-
-fail:
-	return 0;
 }
 
 static void voice_auddev_cb_function(u32 evt_id,
@@ -567,9 +535,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 		if (evt_payload->voc_devinfo.dev_type == DIR_TX) {
 			v->dev_tx.mute =
 				evt_payload->voc_vm_info.dev_vm_val.mute;
-			if (v->voc_state == VOC_RUN)
-				/* send mute/unmute to cvs */
-				voice_send_mute_cmd(v);
 		}
 		break;
 	case AUDDEV_EVT_REL_PENDING:
