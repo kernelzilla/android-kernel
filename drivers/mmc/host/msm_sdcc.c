@@ -1148,6 +1148,9 @@ static int msmsdcc_disable(struct mmc_host *mmc, int lazy)
 {
 	int rc;
 
+	if (mmc->card && mmc->card->type == MMC_TYPE_SDIO)
+		return -ENOTSUPP;
+
 	rc = pm_runtime_put_sync(mmc->parent);
 
 	if (rc < 0)
