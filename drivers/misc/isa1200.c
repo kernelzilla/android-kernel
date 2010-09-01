@@ -165,9 +165,9 @@ static int isa1200_setup(struct i2c_client *client)
 	struct isa1200_chip *haptic = i2c_get_clientdata(client);
 	int value, temp, rc;
 
-	gpio_set_value(haptic->pdata->hap_en_gpio, 0);
+	gpio_set_value_cansleep(haptic->pdata->hap_en_gpio, 0);
 	udelay(250);
-	gpio_set_value(haptic->pdata->hap_en_gpio, 1);
+	gpio_set_value_cansleep(haptic->pdata->hap_en_gpio, 1);
 
 	value =	(haptic->pdata->smart_en << 3) |
 		(haptic->pdata->is_erm << 5) |
