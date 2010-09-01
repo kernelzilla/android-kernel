@@ -648,16 +648,11 @@ u32 vcd_alloc_buffer_pool_entries(
 
 void vcd_free_buffer_pool_entries(struct vcd_buffer_pool *buf_pool)
 {
-	struct vcd_buffer_entry *list_itr, *list_next;
 	VCD_MSG_LOW("vcd_free_buffer_pool_entries:");
-
-	if (!list_empty(&buf_pool->queue))
-		list_for_each_entry_safe(list_itr, list_next,
-			&buf_pool->queue, list)
-			list_del(&list_itr->list);
 
 	kfree(buf_pool->entries);
 	memset(buf_pool, 0, sizeof(struct vcd_buffer_pool));
+	INIT_LIST_HEAD(&buf_pool->queue);
 }
 
 void vcd_flush_in_use_buffer_pool_entries(struct vcd_clnt_ctxt *cctxt,
@@ -697,7 +692,7 @@ void vcd_reset_buffer_pool_for_reuse(struct vcd_buffer_pool *buf_pool)
 	buf_pool->validated = 0;
 	buf_pool->allocated = 0;
 	buf_pool->in_use = 0;
-
+	INIT_LIST_HEAD(&buf_pool->queue);
 }
 
 struct vcd_buffer_entry *vcd_get_free_buffer_pool_entry
