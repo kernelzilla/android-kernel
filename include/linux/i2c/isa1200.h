@@ -40,6 +40,7 @@ struct isa1200_platform_data {
 	unsigned int chip_en;
 	unsigned int duty;
 	int (*power_on)(int on);
+	int (*dev_setup)(bool on);
 };
 
 #endif /* __LINUX_ISA1200_H */
