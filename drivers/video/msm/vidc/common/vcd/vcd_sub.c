@@ -2069,12 +2069,11 @@ u32 vcd_handle_first_fill_output_buffer(
 	}
 	rc = vcd_check_if_buffer_req_met(cctxt, VCD_BUFFER_OUTPUT);
 	VCD_FAILED_RETURN(rc, "Output buffer requirements not met");
-
 	if (cctxt->out_buf_pool.q_len > 0) {
 		VCD_MSG_ERROR("Old output buffers were not flushed out");
 		return VCD_ERR_BAD_STATE;
 	}
-
+	cctxt->status.mask |= VCD_FIRST_OP_RCVD;
 	if (cctxt->sched_clnt_hdl)
 		rc = vcd_sched_suspend_resume_clnt(cctxt, true);
 	VCD_FAILED_RETURN(rc, "Failed: vcd_sched_suspend_resume_clnt");
@@ -2084,7 +2083,6 @@ u32 vcd_handle_first_fill_output_buffer(
 	else
 		rc = vcd_handle_first_fill_output_buffer_for_enc(
 			cctxt, buffer, handled);
-
 	return rc;
 }
 
