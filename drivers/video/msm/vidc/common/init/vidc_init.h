@@ -61,6 +61,8 @@ struct video_client_ctx {
 	u32 event_status;
 	u32 seq_header_set;
 	u32 stop_msg;
+	u32 stop_called;
+	u32 stop_sync_cb;
 };
 
 void __iomem *vidc_get_ioaddr(void);
