@@ -2581,35 +2581,36 @@ void msm_snddev_enable_dmic_power(void)
 	ret = regulator_set_voltage(s3, 1800000, 1800000);
 	if (ret) {
 		pr_err("%s: error setting voltage\n", __func__);
-		goto fail;
+		goto fail_s3;
 	}
 
 	ret = regulator_enable(s3);
 	if (ret) {
 		pr_err("%s: error enabling regulator\n", __func__);
-		goto fail;
+		goto fail_s3;
 	}
 
 	mvs = regulator_get(NULL, "8901_mvs0");
 	if (IS_ERR(mvs))
-		goto fail;
-
-	ret = regulator_set_voltage(mvs, 1800000, 1800000);
-	if (ret) {
-		pr_err("%s: error setting voltage\n", __func__);
-		goto fail;
-	}
+		goto fail_mvs0_get;
 
 	ret = regulator_enable(mvs);
+
 	if (ret) {
 		pr_err("%s: error enabling regulator\n", __func__);
-		goto fail;
+		goto fail_mvs0_enable;
 	}
-fail:
-	if (s3)
-		regulator_put(s3);
-	if (mvs)
-		regulator_put(mvs);
+
+	return;
+
+fail_mvs0_enable:
+	regulator_put(mvs);
+	mvs = NULL;
+fail_mvs0_get:
+	regulator_disable(s3);
+fail_s3:
+	regulator_put(s3);
+	s3 = NULL;
 }
 
 void msm_snddev_disable_dmic_power(void)
@@ -2618,17 +2619,21 @@ void msm_snddev_disable_dmic_power(void)
 
 	msm_snddev_tx_route_deconfig();
 
-	ret = regulator_disable(mvs);
-	if (ret < 0)
-		pr_err("%s: error disabling regulator mvs\n", __func__);
-	regulator_put(mvs);
-	mvs = NULL;
+	if (mvs) {
+		ret = regulator_disable(mvs);
+		if (ret < 0)
+			pr_err("%s: error disabling vreg mvs\n", __func__);
+		regulator_put(mvs);
+		mvs = NULL;
+	}
 
-	ret = regulator_disable(s3);
-	if (ret < 0)
-		pr_err("%s: error disabling regulator s3\n", __func__);
-	regulator_put(s3);
-	s3 = NULL;
+	if (s3) {
+		ret = regulator_disable(s3);
+		if (ret < 0)
+			pr_err("%s: error disabling regulator s3\n", __func__);
+		regulator_put(s3);
+		s3 = NULL;
+	}
 }
 
 static struct regulator *vreg_timpani_1;
