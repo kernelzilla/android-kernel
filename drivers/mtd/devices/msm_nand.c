@@ -4007,21 +4007,15 @@ int msm_onenand_read_oob(struct mtd_info *mtd,
 		return -EINVAL;
 	}
 
-	if (ops->oobbuf && !ops->datbuf)
+	if (ops->oobbuf && !ops->datbuf) {
 		page_count = ops->ooblen / ((ops->mode == MTD_OOB_AUTO) ?
 			mtd->oobavail : mtd->oobsize);
-	else if (ops->mode != MTD_OOB_RAW)
-		page_count = ops->len / mtd->writesize;
-	else
-		page_count = ops->len / (mtd->writesize + mtd->oobsize);
-
-	if ((ops->mode == MTD_OOB_AUTO) && (ops->oobbuf != NULL)) {
-		if (page_count * mtd->oobavail > ops->ooblen) {
-			pr_err("%s: unsupported ops->ooblen for "
-				"AUTO, %d\n", __func__, ops->ooblen);
-			return -EINVAL;
-		}
-	}
+		if ((page_count == 0) && (ops->ooblen))
+			page_count = 1;
+	} else if (ops->mode != MTD_OOB_RAW)
+			page_count = ops->len / mtd->writesize;
+		else
+			page_count = ops->len / (mtd->writesize + mtd->oobsize);
 
 	if ((ops->mode == MTD_OOB_PLACE) && (ops->oobbuf != NULL)) {
 		if (page_count * mtd->oobsize > ops->ooblen) {
@@ -4697,13 +4691,15 @@ static int msm_onenand_write_oob(struct mtd_info *mtd, loff_t to,
 		return -EINVAL;
 	}
 
-	if (ops->oobbuf && !ops->datbuf)
+	if (ops->oobbuf && !ops->datbuf) {
 		page_count = ops->ooblen / ((ops->mode == MTD_OOB_AUTO) ?
 			mtd->oobavail : mtd->oobsize);
-	else if (ops->mode != MTD_OOB_RAW)
-		page_count = ops->len / mtd->writesize;
-	else
-		page_count = ops->len / (mtd->writesize + mtd->oobsize);
+		if ((page_count == 0) && (ops->ooblen))
+			page_count = 1;
+	} else if (ops->mode != MTD_OOB_RAW)
+			page_count = ops->len / mtd->writesize;
+		else
+			page_count = ops->len / (mtd->writesize + mtd->oobsize);
 
 	if ((ops->mode == MTD_OOB_AUTO) && (ops->oobbuf != NULL)) {
 		if (page_count > 1) {
