@@ -115,8 +115,8 @@ int adm_open(int port_id, int session_id , int path)
 			pr_info("ADM open failed for port %d\n", port_id);
 			goto fail_cmd;
 		}
-		this_adm.copp_cnt[port_id]++;
 	}
+	this_adm.copp_cnt[port_id]++;
 
 
 	if (this_adm.copp_state[port_id]) {
