@@ -126,12 +126,14 @@ struct diagchar_dev {
 	int used;
 
 	/* State for diag forwarding */
-	unsigned char *usb_buf_in;
+	unsigned char *usb_buf_in_1;
+	unsigned char *usb_buf_in_2;
 	unsigned char *usb_buf_in_qdsp;
 	unsigned char *usb_buf_out;
 	smd_channel_t *ch;
 	smd_channel_t *chqdsp;
-	int in_busy;
+	int in_busy_1;
+	int in_busy_2;
 	int in_busy_qdsp;
 	int read_len;
 	unsigned char *hdlc_buf;
@@ -149,7 +151,8 @@ struct diagchar_dev {
 	struct diag_master_table *table;
 	uint8_t *pkt_buf;
 	int pkt_length;
-	struct diag_request *usb_write_ptr;
+	struct diag_request *usb_write_ptr_1;
+	struct diag_request *usb_write_ptr_2;
 	struct diag_request *usb_read_ptr;
 	struct diag_request *usb_write_ptr_svc;
 	struct diag_request *usb_write_ptr_qdsp;

@@ -37,7 +37,6 @@ MODULE_VERSION("1.0");
 
 int diag_debug_buf_idx;
 unsigned char diag_debug_buf[1024];
-
 /* Number of maximum USB requests that the USB layer should handle at
    one time. */
 #define MAX_DIAG_USB_REQUESTS 12
@@ -48,41 +47,51 @@ static unsigned int buf_tbl_size = 8; /*Number of entries in table of buffers */
 
 void __diag_smd_send_req(void)
 {
-	void *buf;
+	void *buf = NULL;
+	int *in_busy_ptr = NULL;
+	struct diag_request *write_ptr_modem = NULL;
 
-	if (driver->ch && (!driver->in_busy)) {
+	if (!driver->in_busy_1) {
+		buf = driver->usb_buf_in_1;
+		write_ptr_modem = driver->usb_write_ptr_1;
+		in_busy_ptr = &(driver->in_busy_1);
+	} else if (!driver->in_busy_2) {
+		buf = driver->usb_buf_in_2;
+		write_ptr_modem = driver->usb_write_ptr_2;
+		in_busy_ptr = &(driver->in_busy_2);
+	}
+
+	if (driver->ch && buf) {
 		int r = smd_read_avail(driver->ch);
 
-	if (r > USB_MAX_IN_BUF) {
-		if (r < MAX_BUF_SIZE) {
+		if (r > USB_MAX_IN_BUF) {
+			if (r < MAX_BUF_SIZE) {
 				printk(KERN_ALERT "\n diag: SMD sending in "
-					   "packets upto %d bytes", r);
-				driver->usb_buf_in = krealloc(
-					driver->usb_buf_in, r, GFP_KERNEL);
-		} else {
-			printk(KERN_ALERT "\n diag: SMD sending in "
-				 "packets more than %d bytes", MAX_BUF_SIZE);
-			return;
-		}
-	}
-		if (r > 0) {
-
-			buf = driver->usb_buf_in;
-			if (!buf) {
-				printk(KERN_INFO "Out of diagmem for a9\n");
+						   "packets upto %d bytes", r);
+				buf = krealloc(buf, r, GFP_KERNEL);
 			} else {
+				printk(KERN_ALERT "\n diag: SMD sending in "
+				"packets more than %d bytes", MAX_BUF_SIZE);
+				return;
+			}
+		}
+		if (r > 0) {
+			if (!buf)
+				printk(KERN_INFO "Out of diagmem for a9\n");
+			else {
 				APPEND_DEBUG('i');
 				smd_read(driver->ch, buf, r);
 				APPEND_DEBUG('j');
-				driver->usb_write_ptr->length = r;
-				driver->in_busy = 1;
-				diag_device_write(buf, MODEM_DATA);
+				write_ptr_modem->length = r;
+				*in_busy_ptr = 1;
+				diag_device_write(buf, MODEM_DATA,
+							 write_ptr_modem);
 			}
 		}
 	}
 }
 
-int diag_device_write(void *buf, int proc_num)
+int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 {
 	int i, err = 0;
 
@@ -95,17 +104,15 @@ int diag_device_write(void *buf, int proc_num)
 			driver->usb_write_ptr_svc->buf = buf;
 			err = diag_write(driver->usb_write_ptr_svc);
 		} else if (proc_num == MODEM_DATA) {
-				driver->usb_write_ptr->buf = buf;
+			write_ptr->buf = buf;
 #ifdef DIAG_DEBUG
-				printk(KERN_INFO "writing data to USB,"
-						 " pkt length %d \n",
-				       driver->usb_write_ptr->length);
-				print_hex_dump(KERN_DEBUG, "Written Packet Data"
-					       " to USB: ", 16, 1, DUMP_PREFIX_
-					       ADDRESS, buf, driver->
-					       usb_write_ptr->length, 1);
+			printk(KERN_INFO "writing data to USB,"
+				"pkt length %d\n", write_ptr->length);
+			print_hex_dump(KERN_DEBUG, "Written Packet Data to"
+					   " USB: ", 16, 1, DUMP_PREFIX_ADDRESS,
+					    buf, write_ptr->length, 1);
 #endif
-			err = diag_write(driver->usb_write_ptr);
+			err = diag_write(write_ptr);
 		} else if (proc_num == QDSP_DATA) {
 			driver->usb_write_ptr_qdsp->buf = buf;
 			err = diag_write(driver->usb_write_ptr_qdsp);
@@ -138,7 +145,8 @@ int diag_device_write(void *buf, int proc_num)
 			return -EINVAL;
 	} else if (driver->logging_mode == NO_LOGGING_MODE) {
 		if (proc_num == MODEM_DATA) {
-			driver->in_busy = 0;
+			driver->in_busy_1 = 0;
+			driver->in_busy_2 = 0;
 			queue_work(driver->diag_wq, &(driver->
 							diag_read_smd_work));
 		} else if (proc_num == QDSP_DATA) {
@@ -172,7 +180,7 @@ void __diag_smd_qdsp_send_req(void)
 				APPEND_DEBUG('m');
 				driver->usb_write_ptr_qdsp->length = r;
 				driver->in_busy_qdsp = 1;
-				diag_device_write(buf, QDSP_DATA);
+				diag_device_write(buf, QDSP_DATA, NULL);
 			}
 		}
 
@@ -492,7 +500,8 @@ int diagfwd_connect(void)
 	if (err)
 		printk(KERN_ERR "diag: USB port open failed");
 	driver->usb_connected = 1;
-	driver->in_busy = 0;
+	driver->in_busy_1 = 0;
+	driver->in_busy_2 = 0;
 	driver->in_busy_qdsp = 0;
 
 	/* Poll SMD channels to check for data*/
@@ -511,7 +520,8 @@ int diagfwd_disconnect(void)
 {
 	printk(KERN_DEBUG "diag: USB disconnected\n");
 	driver->usb_connected = 0;
-	driver->in_busy = 1;
+	driver->in_busy_1 = 1;
+	driver->in_busy_2 = 1;
 	driver->in_busy_qdsp = 1;
 	driver->debug_flag = 1;
 	diag_close();
@@ -524,9 +534,13 @@ int diagfwd_write_complete(struct diag_request *diag_write_ptr)
 	unsigned char *buf = diag_write_ptr->buf;
 	/*Determine if the write complete is for data from arm9/apps/q6 */
 	/* Need a context variable here instead */
-	if (buf == (void *)driver->usb_buf_in) {
-		driver->in_busy = 0;
+	if (buf == (void *)driver->usb_buf_in_1) {
+		driver->in_busy_1 = 0;
 		APPEND_DEBUG('o');
+		queue_work(driver->diag_wq, &(driver->diag_read_smd_work));
+	} else if (buf == (void *)driver->usb_buf_in_2) {
+		driver->in_busy_2 = 0;
+		APPEND_DEBUG('O');
 		queue_work(driver->diag_wq, &(driver->diag_read_smd_work));
 	} else if (buf == (void *)driver->usb_buf_in_qdsp) {
 		driver->in_busy_qdsp = 0;
@@ -583,14 +597,24 @@ static int diag_smd_probe(struct platform_device *pdev)
 	int r = 0;
 
 	if (pdev->id == 0) {
-		if (driver->usb_buf_in == NULL &&
-			(driver->usb_buf_in =
-			kzalloc(USB_MAX_IN_BUF, GFP_KERNEL)) == NULL)
-
-			goto err;
+		if (driver->usb_buf_in_1 == NULL ||
+					 driver->usb_buf_in_2 == NULL) {
+			if (driver->usb_buf_in_1 == NULL)
+				driver->usb_buf_in_1 = kzalloc(USB_MAX_IN_BUF,
+								GFP_KERNEL);
+			if (driver->usb_buf_in_2 == NULL)
+				driver->usb_buf_in_2 = kzalloc(USB_MAX_IN_BUF,
+								GFP_KERNEL);
+			if (driver->usb_buf_in_1 == NULL ||
+				 driver->usb_buf_in_2 == NULL)
+				goto err;
+			else
+				r = smd_open("DIAG", &driver->ch, driver,
+						 diag_smd_notify);
+		}
 		else
-
-		r = smd_open("DIAG", &driver->ch, driver, diag_smd_notify);
+			r = smd_open("DIAG", &driver->ch, driver,
+						 diag_smd_notify);
 	}
 #if defined(CONFIG_MSM_N_WAY_SMD)
 	if (pdev->id == 1) {
@@ -692,27 +716,32 @@ void diagfwd_init(void)
 		goto err;
 	if (driver->table == NULL &&
 	     (driver->table = kzalloc(diag_max_registration*
-				      sizeof(struct diag_master_table),
-				       GFP_KERNEL)) == NULL)
+		      sizeof(struct diag_master_table),
+		       GFP_KERNEL)) == NULL)
 		goto err;
-	if (driver->usb_write_ptr == NULL)
-			driver->usb_write_ptr = kzalloc(
-				sizeof(struct diag_request), GFP_KERNEL);
-			if (driver->usb_write_ptr == NULL)
-					goto err;
+	if (driver->usb_write_ptr_1 == NULL)
+		driver->usb_write_ptr_1 = kzalloc(
+			sizeof(struct diag_request), GFP_KERNEL);
+		if (driver->usb_write_ptr_1 == NULL)
+			goto err;
+	if (driver->usb_write_ptr_2 == NULL)
+		driver->usb_write_ptr_2 = kzalloc(
+			sizeof(struct diag_request), GFP_KERNEL);
+		if (driver->usb_write_ptr_2 == NULL)
+			goto err;
 	if (driver->usb_write_ptr_qdsp == NULL)
-			driver->usb_write_ptr_qdsp = kzalloc(
-				sizeof(struct diag_request), GFP_KERNEL);
-			if (driver->usb_write_ptr_qdsp == NULL)
-					goto err;
+		driver->usb_write_ptr_qdsp = kzalloc(
+			sizeof(struct diag_request), GFP_KERNEL);
+		if (driver->usb_write_ptr_qdsp == NULL)
+			goto err;
 	if (driver->usb_read_ptr == NULL)
-			driver->usb_read_ptr = kzalloc(
-				sizeof(struct diag_request), GFP_KERNEL);
-			if (driver->usb_read_ptr == NULL)
-				goto err;
+		driver->usb_read_ptr = kzalloc(
+			sizeof(struct diag_request), GFP_KERNEL);
+		if (driver->usb_read_ptr == NULL)
+			goto err;
 	if (driver->pkt_buf == NULL &&
 	     (driver->pkt_buf = kzalloc(PKT_SIZE,
-					 GFP_KERNEL)) == NULL)
+			 GFP_KERNEL)) == NULL)
 		goto err;
 
 	driver->diag_wq = create_singlethread_workqueue("diag_wq");
@@ -735,7 +764,8 @@ err:
 		kfree(driver->data_ready);
 		kfree(driver->table);
 		kfree(driver->pkt_buf);
-		kfree(driver->usb_write_ptr);
+		kfree(driver->usb_write_ptr_1);
+		kfree(driver->usb_write_ptr_2);
 		kfree(driver->usb_write_ptr_qdsp);
 		kfree(driver->usb_read_ptr);
 }
@@ -754,7 +784,8 @@ void diagfwd_exit(void)
 
 	diag_usb_unregister();
 
-	kfree(driver->usb_buf_in);
+	kfree(driver->usb_buf_in_1);
+	kfree(driver->usb_buf_in_2);
 	kfree(driver->usb_buf_in_qdsp);
 	kfree(driver->usb_buf_out);
 	kfree(driver->hdlc_buf);
@@ -766,7 +797,8 @@ void diagfwd_exit(void)
 	kfree(driver->data_ready);
 	kfree(driver->table);
 	kfree(driver->pkt_buf);
-	kfree(driver->usb_write_ptr);
+	kfree(driver->usb_write_ptr_1);
+	kfree(driver->usb_write_ptr_2);
 	kfree(driver->usb_write_ptr_qdsp);
 	kfree(driver->usb_read_ptr);
 }

@@ -35,7 +35,7 @@ void diagfwd_exit(void);
 void diag_process_hdlc(void *data, unsigned len);
 void __diag_smd_send_req(void);
 void __diag_smd_qdsp_send_req(void);
-int diag_device_write(void *buf, int proc_num);
+int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr);
 int diagfwd_connect(void);
 int diagfwd_disconnect(void);
 int mask_request_validate(unsigned char mask_buf[]);
