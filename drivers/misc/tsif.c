@@ -920,6 +920,8 @@ struct dentry *debugfs_create_iomem_x32(const char *name, mode_t mode,
 static int action_open(struct msm_tsif_device *tsif_device)
 {
 	int rc = -EINVAL;
+	int result;
+
 	dev_info(&tsif_device->pdev->dev, "%s\n", __func__);
 	if (tsif_device->state != tsif_state_stopped)
 		return -EAGAIN;
@@ -943,6 +945,15 @@ static int action_open(struct msm_tsif_device *tsif_device)
 		tsif_clock(tsif_device, 0);
 		return rc;
 	}
+
+	result = pm_runtime_get(&tsif_device->pdev->dev);
+	if (result < 0) {
+		dev_err(&tsif_device->pdev->dev,
+			"Runtime PM: Unable to wake up the device, rc = %d\n",
+			result);
+		return result;
+	}
+
 	wake_lock(&tsif_device->wake_lock);
 	return rc;
 }
@@ -959,6 +970,8 @@ static int action_close(struct msm_tsif_device *tsif_device)
 	tsif_dma_exit(tsif_device);
 	tsif_clock(tsif_device, 0);
 	disable_irq(tsif_device->irq);
+
+	pm_runtime_put(&tsif_device->pdev->dev);
 	wake_unlock(&tsif_device->wake_lock);
 	return 0;
 }
@@ -1202,6 +1215,10 @@ static int __init msm_tsif_probe(struct platform_device *pdev)
 	rc = tsif_start_gpios(tsif_device);
 	if (rc)
 		goto err_gpio;
+
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	tsif_debugfs_init(tsif_device);
 	rc = platform_get_irq(pdev, 0);
 	if (rc > 0) {
@@ -1258,15 +1275,37 @@ static int __devexit msm_tsif_remove(struct platform_device *pdev)
 	tsif_stop_gpios(tsif_device);
 	iounmap(tsif_device->base);
 	tsif_put_clocks(tsif_device);
+
+	pm_runtime_put(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	kfree(tsif_device);
 	return 0;
 }
+
+static int tsif_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int tsif_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops tsif_dev_pm_ops = {
+	.runtime_suspend = tsif_runtime_suspend,
+	.runtime_resume = tsif_runtime_resume,
+};
+
 
 static struct platform_driver msm_tsif_driver = {
 	.probe          = msm_tsif_probe,
 	.remove         = __exit_p(msm_tsif_remove),
 	.driver         = {
 		.name   = "msm_tsif",
+		.pm     = &tsif_dev_pm_ops,
 	},
 };
 
