@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
@@ -504,14 +505,24 @@ int q6asm_open_read(struct audio_client *ac,
 
 	switch (format) {
 	case FORMAT_LINEAR_PCM:
-		/* bit4:No meta data, lower nibble is prio  */
-		open.uMode = 0x02;
+		open.uMode = STREAM_PRIORITY_HIGH;
 		open.format = LINEAR_PCM;
 		break;
 	case FORMAT_MPEG4_AAC:
-		/* bit4:with meta data, lower nibble is prio  */
-		open.uMode = 0x12;
+		open.uMode = BUFFER_META_ENABLE | STREAM_PRIORITY_HIGH;
 		open.format = MPEG4_AAC;
+		break;
+	case FORMAT_V13K:
+		open.uMode = BUFFER_META_ENABLE | STREAM_PRIORITY_HIGH;
+		open.format = V13K_FS;
+		break;
+	case FORMAT_EVRC:
+		open.uMode = BUFFER_META_ENABLE | STREAM_PRIORITY_HIGH;
+		open.format = EVRC_FS;
+		break;
+	case FORMAT_AMRNB:
+		open.uMode = BUFFER_META_ENABLE | STREAM_PRIORITY_HIGH;
+		open.format = AMRNB_FS;
 		break;
 	default:
 		MM_ERR("%s: Invalid format[%d]\n", __func__, format);
@@ -549,8 +560,7 @@ int q6asm_open_write(struct audio_client *ac, uint32_t format)
 	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
 
 	open.hdr.opcode = ASM_STREAM_CMD_OPEN_WRITE;
-	/* Stream prio : High, provide meta info with encoded frames */
-	open.uMode = 0x02;
+	open.uMode = STREAM_PRIORITY_HIGH;
 	/* source endpoint : matrix */
 	open.sink_endpoint = ASM_END_POINT_DEVICE_MATRIX;
 	open.stream_handle = 0x00;
@@ -603,8 +613,7 @@ int q6asm_open_read_write(struct audio_client *ac,
 	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
 	open.hdr.opcode = ASM_STREAM_CMD_OPEN_READWRITE;
 
-	/* Stream prio : normal(bits 0 and 1), enable meta info(bit-4)*/
-	open.uMode = 0x10;
+	open.uMode = BUFFER_META_ENABLE | STREAM_PRIORITY_NORMAL;
 	/* source endpoint : matrix */
 	open.post_proc_top = DEFAULT_TOPOLOGY;
 	switch (wr_format) {
@@ -622,6 +631,15 @@ int q6asm_open_read_write(struct audio_client *ac,
 		break;
 	case FORMAT_MPEG4_AAC:
 		open.read_format = MPEG4_AAC;
+		break;
+	case FORMAT_V13K:
+		open.read_format = V13K_FS;
+		break;
+	case FORMAT_EVRC:
+		open.read_format = EVRC_FS;
+		break;
+	case FORMAT_AMRNB:
+		open.read_format = AMRNB_FS;
 		break;
 	default:
 		MM_ERR("%s: Invalid format[%d]\n", __func__, rd_format);
@@ -761,6 +779,126 @@ int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
 		MM_ERR("[%s:%s] timeout opcode[0x%x] ",
 						__MM_FILE__, __func__,
 						enc_cfg.hdr.opcode);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_enc_cfg_blk_qcelp(struct audio_client *ac, uint32_t frames_per_buf,
+		uint16_t min_rate, uint16_t max_rate,
+		uint16_t reduced_rate_level, uint16_t rate_modulation_cmd)
+{
+	struct asm_stream_cmd_encdec_cfg_blk enc_cfg;
+	int rc = 0;
+
+	MM_DBG("frames[%d]min_rate[0x%4x]max_rate[0x%4x] \
+		reduced_rate_level[0x%4x]rate_modulation_cmd[0x%4x]",
+		frames_per_buf, min_rate, max_rate,
+		reduced_rate_level, rate_modulation_cmd);
+
+	q6asm_add_hdr(ac, &enc_cfg.hdr, (sizeof(enc_cfg) - APR_HDR_SIZE), TRUE);
+
+	enc_cfg.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+
+	enc_cfg.param_id = ASM_ENCDEC_CFG_BLK_ID;
+	enc_cfg.param_size = sizeof(struct asm_encode_cfg_blk);
+
+	enc_cfg.enc_blk.frames_per_buf = frames_per_buf;
+	enc_cfg.enc_blk.format_id = V13K_FS;
+	enc_cfg.enc_blk.cfg_size  = sizeof(struct asm_qcelp13_read_cfg);
+	enc_cfg.enc_blk.cfg.qcelp13.min_rate = min_rate;
+	enc_cfg.enc_blk.cfg.qcelp13.max_rate = max_rate;
+	enc_cfg.enc_blk.cfg.qcelp13.reduced_rate_level = reduced_rate_level;
+	enc_cfg.enc_blk.cfg.qcelp13.rate_modulation_cmd = rate_modulation_cmd;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &enc_cfg);
+	if (rc < 0) {
+		MM_ERR("Comamnd %d failed\n", ASM_STREAM_CMD_SET_ENCDEC_PARAM);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("timeout. waited for FORMAT_UPDATE\n");
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_enc_cfg_blk_evrc(struct audio_client *ac, uint32_t frames_per_buf,
+		uint16_t min_rate, uint16_t max_rate,
+		uint16_t rate_modulation_cmd)
+{
+	struct asm_stream_cmd_encdec_cfg_blk enc_cfg;
+	int rc = 0;
+
+	MM_DBG("frames[%d]min_rate[0x%4x]max_rate[0x%4x] \
+		rate_modulation_cmd[0x%4x]", frames_per_buf,
+		min_rate, max_rate, rate_modulation_cmd);
+
+	q6asm_add_hdr(ac, &enc_cfg.hdr, (sizeof(enc_cfg) - APR_HDR_SIZE), TRUE);
+
+	enc_cfg.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+
+	enc_cfg.param_id = ASM_ENCDEC_CFG_BLK_ID;
+	enc_cfg.param_size = sizeof(struct asm_encode_cfg_blk);
+
+	enc_cfg.enc_blk.frames_per_buf = frames_per_buf;
+	enc_cfg.enc_blk.format_id = EVRC_FS;
+	enc_cfg.enc_blk.cfg_size  = sizeof(struct asm_evrc_read_cfg);
+	enc_cfg.enc_blk.cfg.evrc.min_rate = min_rate;
+	enc_cfg.enc_blk.cfg.evrc.max_rate = max_rate;
+	enc_cfg.enc_blk.cfg.evrc.rate_modulation_cmd = rate_modulation_cmd;
+	enc_cfg.enc_blk.cfg.evrc.reserved = 0;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &enc_cfg);
+	if (rc < 0) {
+		MM_ERR("Comamnd %d failed\n", ASM_STREAM_CMD_SET_ENCDEC_PARAM);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("timeout. waited for FORMAT_UPDATE\n");
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_enc_cfg_blk_amrnb(struct audio_client *ac, uint32_t frames_per_buf,
+			uint16_t band_mode, uint16_t dtx_enable)
+{
+	struct asm_stream_cmd_encdec_cfg_blk enc_cfg;
+	int rc = 0;
+
+	MM_DBG("frames[%d]band_mode[0x%4x]dtx_enable[0x%4x]",
+		frames_per_buf, band_mode, dtx_enable);
+
+	q6asm_add_hdr(ac, &enc_cfg.hdr, (sizeof(enc_cfg) - APR_HDR_SIZE), TRUE);
+
+	enc_cfg.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+
+	enc_cfg.param_id = ASM_ENCDEC_CFG_BLK_ID;
+	enc_cfg.param_size = sizeof(struct asm_encode_cfg_blk);
+
+	enc_cfg.enc_blk.frames_per_buf = frames_per_buf;
+	enc_cfg.enc_blk.format_id = AMRNB_FS;
+	enc_cfg.enc_blk.cfg_size  = sizeof(struct asm_amrnb_read_cfg);
+	enc_cfg.enc_blk.cfg.amrnb.mode = band_mode;
+	enc_cfg.enc_blk.cfg.amrnb.dtx_mode = dtx_enable;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &enc_cfg);
+	if (rc < 0) {
+		MM_ERR("Comamnd %d failed\n", ASM_STREAM_CMD_SET_ENCDEC_PARAM);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait, (ac->cmd_state == 0), 5*HZ);
+	if (rc < 0) {
+		MM_ERR("timeout. waited for FORMAT_UPDATE\n");
 		goto fail_cmd;
 	}
 	return 0;
