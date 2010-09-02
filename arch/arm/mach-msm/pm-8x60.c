@@ -31,6 +31,8 @@
 #include <mach/system.h>
 #include <asm/cacheflush.h>
 #include <asm/hardware/gic.h>
+#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 #ifdef CONFIG_VFP
 #include <asm/vfp.h>
 #endif
@@ -54,7 +56,7 @@ enum {
 	MSM_PM_DEBUG_IDLE = 1U << 6,
 };
 
-static int msm_pm_debug_mask = 31;
+static int msm_pm_debug_mask = 1;
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
@@ -710,10 +712,6 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 		allow = msm_pm_modes[MSM_PM_MODE(dev->cpu, mode)].idle_enabled;
 
 		switch (mode) {
-		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE:
-			if (!dev->cpu && nr_online > 1)
-				allow = false;
-			break;
 		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
 		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SHALLOW_VDD_MIN:
 			if (nr_online > 1)
@@ -967,6 +965,20 @@ static int __init msm_pm_init(void)
 #ifdef CONFIG_MSM_IDLE_STATS
 	struct proc_dir_entry *d_entry;
 #endif
+	pgd_t *pc_pgd;
+	pmd_t *pmd;
+
+	/* Page table for cores to come back up safely. */
+	pc_pgd = pgd_alloc(&init_mm);
+	if (!pc_pgd)
+		return -ENOMEM;
+	pmd = pmd_offset(pc_pgd +
+			 pgd_index(virt_to_phys(msm_pm_collapse_exit)),
+			 virt_to_phys(msm_pm_collapse_exit));
+	*pmd = __pmd((virt_to_phys(msm_pm_collapse_exit) & PGDIR_MASK) |
+		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE);
+	flush_pmd_entry(pmd);
+	msm_pm_pc_pgd = virt_to_phys(pc_pgd);
 
 	boot_page = ioremap(0x2a040000, PAGE_SIZE);
 	if (boot_page == NULL) {
