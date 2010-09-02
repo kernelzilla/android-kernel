@@ -925,14 +925,8 @@ void platform_cpu_die(unsigned int cpu)
 		}
 	}
 
-	/*
-	 * Set pen_release handshake value before preempt_enable_no_resched
-	 * which has a barrier().
-	 */
 	pen_release = -1;
 	pr_notice("CPU%u: %s: normal wakeup\n", cpu, __func__);
-	preempt_enable_no_resched();
-	local_irq_enable();
 }
 
 int msm_pm_platform_secondary_init(unsigned int cpu)
