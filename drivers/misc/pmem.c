@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/sizes.h>
+#include <linux/pm_runtime.h>
 
 #define PMEM_MAX_USER_SPACE_DEVICES (10)
 #define PMEM_MAX_KERNEL_SPACE_DEVICES (2)
@@ -2911,6 +2912,10 @@ static int pmem_probe(struct platform_device *pdev)
 		return -1;
 	}
 	pdata = pdev->dev.platform_data;
+
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	return pmem_setup(pdata, NULL, NULL);
 }
 
@@ -2918,14 +2923,34 @@ static int pmem_remove(struct platform_device *pdev)
 {
 	int id = pdev->id;
 	__free_page(pfn_to_page(pmem[id].garbage_pfn));
+	pm_runtime_disable(&pdev->dev);
 	misc_deregister(&pmem[id].dev);
 	return 0;
 }
 
+static int pmem_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int pmem_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops pmem_dev_pm_ops = {
+	.runtime_suspend = pmem_runtime_suspend,
+	.runtime_resume = pmem_runtime_resume,
+};
+
 static struct platform_driver pmem_driver = {
 	.probe = pmem_probe,
 	.remove = pmem_remove,
-	.driver = { .name = "android_pmem" }
+	.driver = { .name = "android_pmem",
+		    .pm = &pmem_dev_pm_ops,
+  }
 };
 
 
