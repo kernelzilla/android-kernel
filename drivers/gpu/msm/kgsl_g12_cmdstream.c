@@ -151,9 +151,9 @@ kgsl_g12_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 		kgsl_mmu_setstate(device, pagetable);
 		cnt = PACKETSIZE_STATESTREAM;
 		ofs = 0;
-	} else {
-		kgsl_g12_setstate(device, device->mmu.tlb_flags);
 	}
+
+	kgsl_g12_setstate(device, device->mmu.tlb_flags);
 
 	result = wait_event_interruptible_timeout(g12_device->wait_timestamp_wq,
 				  room_in_rb(g12_device),
