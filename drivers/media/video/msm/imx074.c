@@ -928,6 +928,7 @@ static int32_t imx074_power_down(void)
 static int imx074_probe_init_done(const struct msm_camera_sensor_info *data)
 {
 	gpio_direction_output(data->sensor_reset, 0);
+	gpio_direction_input(data->sensor_reset);
 	gpio_free(data->sensor_reset);
 	return 0;
 }
@@ -1208,6 +1209,7 @@ static int imx074_sensor_release(void)
 	imx074_power_down();
 	gpio_direction_output(imx074_ctrl->sensordata->sensor_reset,
 		0);
+	gpio_direction_input(imx074_ctrl->sensordata->sensor_reset);
 	gpio_free(imx074_ctrl->sensordata->sensor_reset);
 	kfree(imx074_ctrl);
 	imx074_ctrl = NULL;
