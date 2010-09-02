@@ -738,14 +738,19 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 		}
 	} else {
 		INFO("\n %s(): Calling vcd_stop()", __func__);
+		mutex_lock(&vid_dec_device_p->lock);
 		vcd_status = vcd_stop(client_ctx->vcd_handle);
+		(void)wait_for_completion_timeout(
+			&client_ctx->event, (5 * HZ)/10);
 		if (vcd_status) {
 
 			ERR("%s(): vcd_stop failed.  vcd_status = %u\n",
 			    __func__, vcd_status);
+			mutex_unlock(&vid_dec_device_p->lock);
 			return false;
 		}
 		DBG("Send STOP_DONE message to client = %p\n", client_ctx);
+		mutex_unlock(&vid_dec_device_p->lock);
 	}
 	return true;
 }

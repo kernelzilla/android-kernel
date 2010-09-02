@@ -38,6 +38,7 @@ static unsigned int vidc_clk_table[3] = {
 #endif
 
 static struct res_trk_context resource_context;
+static int clock_enabled;
 
 #define VIDC_FW	"vidc_1080p.fw"
 
@@ -47,7 +48,10 @@ u32 vidc_video_codec_fw_size;
 static u32 res_trk_disable_pwr_rail(void)
 {
 	mutex_lock(&resource_context.lock);
-
+	if (clock_enabled == 1) {
+		mutex_unlock(&resource_context.lock);
+		return true;
+	}
 	if (resource_context.clock_enabled) {
 		mutex_unlock(&resource_context.lock);
 		VCDRES_MSG_LOW("\n Calling CLK disable in Power Down\n");
@@ -70,6 +74,10 @@ u32 res_trk_enable_clocks(void)
 	VCDRES_MSG_LOW("\n in res_trk_enable_clocks()");
 
 	mutex_lock(&resource_context.lock);
+	if (clock_enabled == 1) {
+		mutex_unlock(&resource_context.lock);
+		return true;
+	}
 	if (!resource_context.clock_enabled) {
 		VCDRES_MSG_LOW("Enabling IRQ in %s()\n", __func__);
 		enable_irq(resource_context.irq_num);
@@ -90,6 +98,10 @@ u32 res_trk_enable_clocks(void)
 static u32 res_trk_sel_clk_rate(unsigned long hclk_rate)
 {
 	mutex_lock(&resource_context.lock);
+	if (clock_enabled == 1) {
+		mutex_unlock(&resource_context.lock);
+		return true;
+	}
 	if (clk_set_rate(resource_context.vcodec_clk,
 		hclk_rate)) {
 		VCDRES_MSG_ERROR("vidc hclk set rate failed\n");
@@ -123,7 +135,10 @@ u32 res_trk_disable_clocks(void)
 	VCDRES_MSG_LOW("in res_trk_disable_clocks()\n");
 
 	mutex_lock(&resource_context.lock);
-
+	if (clock_enabled == 1) {
+		mutex_unlock(&resource_context.lock);
+		return true;
+	}
 	if (!resource_context.clock_enabled) {
 		mutex_unlock(&resource_context.lock);
 		return false;
@@ -141,6 +156,10 @@ u32 res_trk_disable_clocks(void)
 static u32 res_trk_enable_pwr_rail(void)
 {
 	mutex_lock(&resource_context.lock);
+	if (clock_enabled == 1) {
+		mutex_unlock(&resource_context.lock);
+		return true;
+	}
 	if (!resource_context.rail_enabled) {
 		resource_context.vcodec_clk = clk_get(resource_context.device,
 			"vcodec_clk");
@@ -158,9 +177,13 @@ static u32 res_trk_enable_pwr_rail(void)
 			mutex_unlock(&resource_context.lock);
 			return false;
 		}
+		mutex_unlock(&resource_context.lock);
+		res_trk_enable_clocks();
+		mutex_lock(&resource_context.lock);
 	}
 	/*TODO: Power rail functions needs to be added*/
 	resource_context.rail_enabled = 1;
+	clock_enabled = 1;
 	mutex_unlock(&resource_context.lock);
 	return true;
 }
