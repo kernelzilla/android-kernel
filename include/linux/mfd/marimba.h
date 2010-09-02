@@ -165,4 +165,6 @@ int timpani_read(struct marimba*, u8 reg, u8 *value, unsigned num_bytes);
 int timpani_write(struct marimba*, u8 reg, u8 *value,
 				unsigned num_bytes);
 
+/* Get the detected codec type */
+int adie_get_detected_codec_type(void);
 #endif

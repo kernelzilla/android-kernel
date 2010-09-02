@@ -258,6 +258,14 @@ int timpani_write(struct marimba *marimba, u8 reg,
 }
 EXPORT_SYMBOL(timpani_write);
 
+static int cur_codec_type = -1;
+
+int adie_get_detected_codec_type(void)
+{
+	return cur_codec_type;
+}
+EXPORT_SYMBOL(adie_get_detected_codec_type);
+
 static struct device *
 add_numbered_child(unsigned chip, const char *name, int num,
 					void *pdata, unsigned pdata_len)
@@ -341,6 +349,30 @@ static int marimba_add_child(struct marimba_platform_data *pdata,
 	return 0;
 }
 
+static int get_codec_type(void)
+{
+
+	struct marimba *marimba = &marimba_modules[MARIMBA_SLAVE_ID_MARIMBA];
+	u8 rd_val;
+	int ret;
+
+	marimba->mod_id = MARIMBA_SLAVE_ID_MARIMBA;
+	/* Enable the Mode for Marimba/Timpani */
+	ret = marimba_read(marimba, MARIMBA_VERSION_REG, &rd_val, 1);
+
+	if (ret >= 0) {
+		if (rd_val & 0x20) {
+			return TIMPANI_ID;
+		} else {
+			ret = marimba_read(marimba, 0x02, &rd_val, 1);
+			if (rd_val == 0x77)
+				return MARIMBA_ID;
+		}
+	}
+
+	return -ENODEV;
+}
+
 static void marimba_init_reg(struct i2c_client *client, u8 driver_data)
 {
 	struct marimba_platform_data *pdata = client->dev.platform_data;
@@ -381,43 +413,54 @@ static int marimba_probe(struct i2c_client *client,
 		return -EBUSY;
 	}
 
-	for (i = 0; i <= NUM_ADD; i++) {
-		marimba = &marimba_modules[i];
+	/* First, identify the codec type */
+	if (pdata->marimba_setup != NULL)
+		pdata->marimba_setup();
 
-		if (i == 0) {
-			marimba = &marimba_modules[i];
+	marimba = &marimba_modules[0];
 			marimba->client = client;
-		} else {
-			/* Skip adding BT/FM for Timpani */
-			if (i == 1 && id->driver_data == TIMPANI_ID)
-				i++;
-			marimba = &marimba_modules[i];
-			if (i != MARIMBA_ID_TSADC)
-				marimba->client = i2c_new_dummy(client->adapter,
-							pdata->slave_id[i]);
-			else {
-				ssbi_adap = i2c_get_adapter(MARIMBA_SSBI_ADAP);
-				marimba->client = i2c_new_dummy(ssbi_adap,
-							pdata->slave_id[i]);
-			}
+	mutex_init(&marimba->xfer_lock);
 
-			if (!marimba->client) {
-				dev_err(&marimba->client->dev,
-					"can't attach client %d\n", i);
-				status = -ENOMEM;
-				goto fail;
-			}
-			strlcpy(marimba->client->name, id->name,
-						sizeof(marimba->client->name));
+	if (get_codec_type() != (int)id->driver_data) {
+		if (pdata->marimba_shutdown != NULL)
+			pdata->marimba_shutdown();
+		status = -ENODEV;
+		mutex_destroy(&marimba->xfer_lock);
+		goto fail;
+
+		} else {
+		cur_codec_type = (int)id->driver_data;
+		dev_dbg(&client->dev, "Device %d available\n",
+			(int)id->driver_data);
+	}
+
+	for (i = 1; i <= NUM_ADD; i++) {
+
+		/* Skip adding BT/FM for Timpani */
+		if (i == 1 && id->driver_data == TIMPANI_ID)
+			i++;
+		marimba = &marimba_modules[i];
+		if (i != MARIMBA_ID_TSADC)
+			marimba->client = i2c_new_dummy(client->adapter,
+						pdata->slave_id[i]);
+		else {
+			ssbi_adap = i2c_get_adapter(MARIMBA_SSBI_ADAP);
+			marimba->client = i2c_new_dummy(ssbi_adap,
+						pdata->slave_id[i]);
 		}
+		if (!marimba->client) {
+			dev_err(&marimba->client->dev,
+				"can't attach client %d\n", i);
+			status = -ENOMEM;
+			goto fail;
+		}
+		strlcpy(marimba->client->name, id->name,
+			sizeof(marimba->client->name));
 
 		mutex_init(&marimba->xfer_lock);
 	}
 
 	inuse = true;
-
-	if (pdata->marimba_setup != NULL)
-		pdata->marimba_setup();
 
 	marimba_init_reg(client, id->driver_data);
 
