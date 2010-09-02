@@ -4971,18 +4971,13 @@ static const int vregs_isa1200_val[] = {
 };
 static struct vreg *vregs_isa1200[ARRAY_SIZE(vregs_isa1200_name)];
 
-static struct msm_gpio fluid_hap_shift_lvl_gpio[] = {
-       { GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
-		GPIO_CFG_2MA), "haptics_shft_lvl_oe"},
-};
-
 static int isa1200_power(int vreg_on)
 {
 	int i, rc = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
 		if (!vregs_isa1200[i]) {
-			printk(KERN_ERR "%s: vreg_get %s failed (%d)\n",
+			pr_err("%s: vreg_get %s failed (%d)\n",
 				__func__, vregs_isa1200_name[i], rc);
 			goto vreg_fail;
 		}
@@ -4990,7 +4985,7 @@ static int isa1200_power(int vreg_on)
 		rc = vreg_on ? vreg_enable(vregs_isa1200[i]) :
 			  vreg_disable(vregs_isa1200[i]);
 		if (rc < 0) {
-			printk(KERN_ERR "%s: vreg %s %s failed (%d)\n",
+			pr_err("%s: vreg %s %s failed (%d)\n",
 				__func__, vregs_isa1200_name[i],
 			       vreg_on ? "enable" : "disable", rc);
 			goto vreg_fail;
@@ -5004,28 +4999,64 @@ vreg_fail:
 	return rc;
 }
 
-static int hap_lvl_shft_config(void)
+static int isa1200_dev_setup(bool enable)
 {
-	int rc;
+	int i, rc;
 
-	rc = msm_gpios_request_enable(fluid_hap_shift_lvl_gpio,
-			ARRAY_SIZE(fluid_hap_shift_lvl_gpio));
-	if (rc) {
-		pr_err("%s gpio_request_enable failed rc=%d\n",
-				__func__, rc);
-		goto gpio_request_fail;
+	if (enable == true) {
+		for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
+			vregs_isa1200[i] = vreg_get(NULL,
+						vregs_isa1200_name[i]);
+			if (IS_ERR(vregs_isa1200[i])) {
+				pr_err("%s: vreg get %s failed (%ld)\n",
+					__func__, vregs_isa1200_name[i],
+					PTR_ERR(vregs_isa1200[i]));
+				rc = PTR_ERR(vregs_isa1200[i]);
+				goto vreg_get_fail;
+			}
+			rc = vreg_set_level(vregs_isa1200[i],
+					vregs_isa1200_val[i]);
+			if (rc) {
+				pr_err("%s: vreg_set_level() = %d\n",
+					__func__, rc);
+				goto vreg_get_fail;
+			}
+		}
+
+		rc = gpio_tlmm_config(GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0,
+				GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+		if (rc) {
+			pr_err("%s: Could not configure gpio %d\n",
+					__func__, HAP_LVL_SHFT_MSM_GPIO);
+			goto vreg_get_fail;
+		}
+
+		rc = gpio_request(HAP_LVL_SHFT_MSM_GPIO, "haptics_shft_lvl_oe");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n",
+					__func__, HAP_LVL_SHFT_MSM_GPIO, rc);
+			goto vreg_get_fail;
+		}
+
+		gpio_set_value(HAP_LVL_SHFT_MSM_GPIO, 1);
+	} else {
+		for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++)
+			vreg_put(vregs_isa1200[i]);
+
+		gpio_free(HAP_LVL_SHFT_MSM_GPIO);
 	}
 
-	gpio_set_value(HAP_LVL_SHFT_MSM_GPIO, 1);
-
 	return 0;
-gpio_request_fail:
+vreg_get_fail:
+	while (i)
+		vreg_put(vregs_isa1200[--i]);
 	return rc;
 }
-
 static struct isa1200_platform_data isa1200_1_pdata = {
 	.name = "vibrator",
 	.power_on = isa1200_power,
+	.dev_setup = isa1200_dev_setup,
 	.pwm_ch_id = 1, /*channel id*/
 	/*gpio to enable haptic*/
 	.hap_en_gpio = PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
@@ -5047,42 +5078,6 @@ static struct i2c_board_info msm_isa1200_board_info[] = {
 	},
 };
 
-static void isa1200_init(void)
-{
-	int i, rc;
-
-	for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
-		vregs_isa1200[i] = vreg_get(NULL, vregs_isa1200_name[i]);
-		if (IS_ERR(vregs_isa1200[i])) {
-			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
-				__func__, vregs_isa1200_name[i],
-				PTR_ERR(vregs_isa1200[i]));
-			rc = PTR_ERR(vregs_isa1200[i]);
-			goto vreg_get_fail;
-		}
-		rc = vreg_set_level(vregs_isa1200[i],
-				vregs_isa1200_val[i]);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_set_level() = %d\n",
-				__func__, rc);
-			goto vreg_get_fail;
-		}
-	}
-
-	rc = hap_lvl_shft_config();
-	if (rc) {
-		pr_err("%s: Haptic level shifter gpio %d configuration"
-			" failed\n", __func__, HAP_LVL_SHFT_MSM_GPIO);
-		goto vreg_get_fail;
-	}
-
-	i2c_register_board_info(0, msm_isa1200_board_info,
-		ARRAY_SIZE(msm_isa1200_board_info));
-	return;
-vreg_get_fail:
-	while (i)
-		vreg_put(vregs_isa1200[--i]);
-}
 
 static int kp_flip_mpp_config(void)
 {
@@ -5352,7 +5347,8 @@ static void __init msm7x30_init(void)
 	msm_device_ssbi7.dev.platform_data = &msm_i2c_ssbi7_pdata;
 #endif
 	if (machine_is_msm7x30_fluid())
-		isa1200_init();
+		i2c_register_board_info(0, msm_isa1200_board_info,
+			ARRAY_SIZE(msm_isa1200_board_info));
 
 #if defined(CONFIG_TOUCHSCREEN_TSC2007) || \
 	defined(CONFIG_TOUCHSCREEN_TSC2007_MODULE)
