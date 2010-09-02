@@ -4208,9 +4208,9 @@ static void config_class_d1_gpio(int enable)
 			return;
 		}
 		gpio_direction_output(GPIO_CLASS_D1_EN, 1);
-		gpio_set_value(GPIO_CLASS_D1_EN, 1);
+		gpio_set_value_cansleep(GPIO_CLASS_D1_EN, 1);
 	} else {
-		gpio_set_value(GPIO_CLASS_D1_EN, 0);
+		gpio_set_value_cansleep(GPIO_CLASS_D1_EN, 0);
 		gpio_free(GPIO_CLASS_D1_EN);
 	}
 }
