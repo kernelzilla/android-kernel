@@ -931,9 +931,11 @@ unsigned long long sched_clock(void)
 	static unsigned long long result;
 	struct clocksource *cs;
 	struct msm_clock *clock;
+	static DEFINE_SPINLOCK(msm_timer_sched_clock_lock);
 
-	local_irq_save(irq_flags);
-	clock = __get_cpu_var(msm_active_clock);
+	spin_lock_irqsave(&msm_timer_sched_clock_lock, irq_flags);
+
+	clock = &msm_clocks[MSM_GLOBAL_TIMER];
 	if (clock) {
 		cs = &clock->clocksource;
 
@@ -962,7 +964,7 @@ unsigned long long sched_clock(void)
 		base = result = last_result;
 		saved_ticks_valid = 0;
 	}
-	local_irq_restore(irq_flags);
+	spin_unlock_irqrestore(&msm_timer_sched_clock_lock, irq_flags);
 	return result; 
 }
 
