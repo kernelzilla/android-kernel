@@ -18,7 +18,7 @@
 
 /* IO devices are mapped at 0xF8000000 and above */
 
-#define VMALLOC_END	  0xF8000000
+#define VMALLOC_END	0xF8000000UL
 
 #endif
 
