@@ -94,7 +94,7 @@ void diag_drain_work_fn(struct work_struct *work)
 
 	mutex_lock(&driver->diagchar_mutex);
 	if (buf_hdlc) {
-		err = diag_device_write(buf_hdlc, APPS_DATA);
+		err = diag_device_write(buf_hdlc, APPS_DATA, NULL);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -307,11 +307,13 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 			diagfwd_connect();
 		else if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
 							== NO_LOGGING_MODE) {
-			driver->in_busy = 1;
+			driver->in_busy_1 = 1;
+			driver->in_busy_2 = 1;
 			driver->in_busy_qdsp = 1;
 		} else if (temp == NO_LOGGING_MODE && driver->logging_mode
 							== MEMORY_DEVICE_MODE) {
-			driver->in_busy = 0;
+			driver->in_busy_1 = 0;
+			driver->in_busy_2 = 0;
 			driver->in_busy_qdsp = 0;
 			/* Poll SMD channels to check for data*/
 			if (driver->ch)
@@ -323,7 +325,8 @@ static int diagchar_ioctl(struct inode *inode, struct file *filp,
 		} else if (temp == USB_MODE && driver->logging_mode
 							== MEMORY_DEVICE_MODE) {
 			diagfwd_disconnect();
-			driver->in_busy = 0;
+			driver->in_busy_1 = 0;
+			driver->in_busy_2 = 0;
 			driver->in_busy_qdsp = 0;
 			/* Poll SMD channels to check for data*/
 			if (driver->ch)
@@ -407,15 +410,27 @@ drop:
 		}
 
 		/* copy modem data */
-		if (driver->in_busy == 1) {
+		if (driver->in_busy_1 == 1) {
 			num_data++;
 			/*Copy the length of data being passed*/
 			COPY_USER_SPACE_OR_EXIT(buf+ret,
-					 (driver->usb_write_ptr->length), 4);
+					 (driver->usb_write_ptr_1->length), 4);
 			/*Copy the actual data being passed*/
-			COPY_USER_SPACE_OR_EXIT(buf+ret, *(driver->usb_buf_in),
-					 driver->usb_write_ptr->length);
-			driver->in_busy = 0;
+			COPY_USER_SPACE_OR_EXIT(buf+ret,
+					*(driver->usb_buf_in_1),
+					 driver->usb_write_ptr_1->length);
+			driver->in_busy_1 = 0;
+		}
+		if (driver->in_busy_2 == 1) {
+			num_data++;
+			/*Copy the length of data being passed*/
+			COPY_USER_SPACE_OR_EXIT(buf+ret,
+					 (driver->usb_write_ptr_2->length), 4);
+			/*Copy the actual data being passed*/
+			COPY_USER_SPACE_OR_EXIT(buf+ret,
+					 *(driver->usb_buf_in_2),
+					 driver->usb_write_ptr_2->length);
+			driver->in_busy_2 = 0;
 		}
 
 		/* copy q6 data */
@@ -579,7 +594,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 		goto fail_free_hdlc;
 	}
 	if (HDLC_OUT_BUF_SIZE - driver->used <= (2*payload_size) + 3) {
-		err = diag_device_write(buf_hdlc, APPS_DATA);
+		err = diag_device_write(buf_hdlc, APPS_DATA, NULL);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -610,7 +625,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	and start aggregation in a newly allocated buffer */
 	if ((unsigned int) enc.dest >=
 		 (unsigned int)(buf_hdlc + HDLC_OUT_BUF_SIZE)) {
-		err = diag_device_write(buf_hdlc, APPS_DATA);
+		err = diag_device_write(buf_hdlc, APPS_DATA, NULL);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
@@ -638,7 +653,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 
 	driver->used = (uint32_t) enc.dest - (uint32_t) buf_hdlc;
 	if (pkt_type == DATA_TYPE_RESPONSE) {
-		err = diag_device_write(buf_hdlc, APPS_DATA);
+		err = diag_device_write(buf_hdlc, APPS_DATA, NULL);
 		if (err) {
 			/*Free the buffer right away if write failed */
 			diagmem_free(driver, buf_hdlc, POOL_TYPE_HDLC);
