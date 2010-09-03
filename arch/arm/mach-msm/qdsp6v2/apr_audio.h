@@ -454,18 +454,20 @@ struct asm_aac_read_cfg {
 struct asm_amrnb_read_cfg {
 	u16 mode;
 	u16 dtx_mode;
-	u16 min_rate;
-	u16 max_rate;
 };
 
 struct asm_evrc_read_cfg {
-	u16 min_rate;
 	u16 max_rate;
+	u16 min_rate;
+	u16 rate_modulation_cmd;
+	u16 reserved;
 };
 
 struct asm_qcelp13_read_cfg {
-	u16 min_rate;
 	u16 max_rate;
+	u16 min_rate;
+	u16 reduced_rate_level;
+	u16 rate_modulation_cmd;
 };
 
 struct asm_sbc_read_cfg {
@@ -493,7 +495,7 @@ struct asm_encode_cfg_blk {
 	union {
 		struct asm_pcm_cfg          pcm;
 		struct asm_aac_read_cfg     aac;
-		struct asm_amrnb_read_cfg   amr;
+		struct asm_amrnb_read_cfg   amrnb;
 		struct asm_evrc_read_cfg    evrc;
 		struct asm_qcelp13_read_cfg qcelp13;
 		struct asm_sbc_read_cfg     sbc;
