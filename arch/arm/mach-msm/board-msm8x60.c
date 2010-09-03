@@ -3774,25 +3774,32 @@ out:
 	return rc;
 }
 
-
 static u32 msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 {
+	u32 rc_pin_cfg = 0;
+	u32 rc_vreg_cfg = 0;
 	u32 rc = 0;
 	struct platform_device *pdev;
-	struct msm_sdcc_pin_cfg *curr;
+	struct msm_sdcc_pin_cfg *curr_pin_cfg;
 
 	pdev = container_of(dv, struct platform_device, dev);
-	curr = &sdcc_pin_cfg_data[pdev->id - 1];
 
-	if (curr->cfg_sts == !!vdd)
-		return rc;
+	/* setup gpio/pad */
+	curr_pin_cfg = &sdcc_pin_cfg_data[pdev->id - 1];
+	if (curr_pin_cfg->cfg_sts == !!vdd)
+		goto setup_vreg;
 
-	if (curr->is_gpio)
-		rc = msm_sdcc_setup_gpio(pdev->id, !!vdd);
+	if (curr_pin_cfg->is_gpio)
+		rc_pin_cfg = msm_sdcc_setup_gpio(pdev->id, !!vdd);
 	else
-		rc = msm_sdcc_setup_pad(pdev->id, !!vdd);
+		rc_pin_cfg = msm_sdcc_setup_pad(pdev->id, !!vdd);
 
-	rc = msm_sdcc_setup_vreg(pdev->id, (vdd ? 1 : 0));
+setup_vreg:
+	/* setup voltage regulators */
+	rc_vreg_cfg = msm_sdcc_setup_vreg(pdev->id, !!vdd);
+
+	if (rc_pin_cfg || rc_vreg_cfg)
+		rc = rc_pin_cfg ? rc_pin_cfg : rc_vreg_cfg;
 
 	return rc;
 }
