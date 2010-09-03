@@ -158,6 +158,20 @@ ENTRY(v7_coherent_user_range)
 	dcache_line_size r2, r3
 	sub	r3, r2, #1
 	bic	r0, r0, r3
+#ifdef CONFIG_SCORPION_Uni_45nm_BUG
+1:
+ USER(	mcr	p15, 0, r0, c7, c11, 1	)	@ clean D line to PoU (DCCMVAU)
+	add	r0, r0, r2
+2:
+	cmp	r0, r1
+	blo	1b
+	dsb
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I-Cache and BTB
+	dsb
+	isb
+	mov	pc, lr
+#else
 1:
  USER(	mcr	p15, 0, r0, c7, c11, 1	)	@ clean D line to the point of unification
 	dsb
@@ -171,6 +185,7 @@ ENTRY(v7_coherent_user_range)
 	dsb
 	isb
 	mov	pc, lr
+#endif
 
 /*
  * Fault handling for the cache operation above. If the virtual address in r0
