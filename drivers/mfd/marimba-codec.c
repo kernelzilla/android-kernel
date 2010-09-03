@@ -920,7 +920,7 @@ static int __init marimba_codec_init(void)
 	mutex_init(&adie_codec.lock);
 
 #ifdef CONFIG_DEBUG_FS
-	debugfs_marimba_dent = debugfs_create_dir("marimba_codec", 0);
+	debugfs_marimba_dent = debugfs_create_dir("msm_adie_codec", 0);
 	if (!IS_ERR(debugfs_marimba_dent)) {
 		debugfs_peek = debugfs_create_file("peek",
 		S_IFREG | S_IRUGO, debugfs_marimba_dent,
