@@ -32,7 +32,7 @@ static LIST_HEAD(clocks);
  * Bitmap of enabled clocks, excluding ACPU which is always
  * enabled
  */
-static DECLARE_BITMAP(clock_map_enabled, NR_CLKS);
+static DECLARE_BITMAP(clock_map_enabled, MAX_NR_CLKS);
 static DEFINE_SPINLOCK(clock_map_lock);
 static struct notifier_block axi_freq_notifier_block;
 
@@ -75,6 +75,7 @@ int clk_enable(struct clk *clk)
 		ret = clk->ops->enable(clk->id);
 		if (ret)
 			goto out;
+		BUG_ON(clk->id >= MAX_NR_CLKS);
 		spin_lock(&clock_map_lock);
 		clock_map_enabled[BIT_WORD(clk->id)] |= BIT_MASK(clk->id);
 		spin_unlock(&clock_map_lock);
@@ -247,9 +248,9 @@ int msm_clock_require_tcxo(unsigned long *reason, int nbits)
 	int ret;
 
 	spin_lock_irqsave(&clock_map_lock, flags);
-	ret = !bitmap_empty(clock_map_enabled, NR_CLKS);
+	ret = !bitmap_empty(clock_map_enabled, MAX_NR_CLKS);
 	if (nbits > 0)
-		bitmap_copy(reason, clock_map_enabled, min(nbits, NR_CLKS));
+		bitmap_copy(reason, clock_map_enabled, min(nbits, MAX_NR_CLKS));
 	spin_unlock_irqrestore(&clock_map_lock, flags);
 
 	return ret;
