@@ -4932,6 +4932,9 @@ static int tsc2007_get_pendown_state(void)
 static void tsc2007_exit(void)
 {
 	vreg_disable(vreg_tsc_s3);
+	vreg_put(vreg_tsc_s3);
+	vreg_disable(vreg_tsc_s2);
+	vreg_put(vreg_tsc_s2);
 
 	msm_gpios_disable_free(tsc2007_config_data,
 		ARRAY_SIZE(tsc2007_config_data));
