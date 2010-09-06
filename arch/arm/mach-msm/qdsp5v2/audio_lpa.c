@@ -186,9 +186,11 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 
 		if (audio->running == 1 && audio->enabled == 1) {
 			audpp_route_stream(audio->dec_id, audio->source);
-			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
-				&audio->vol_pan,
-				COPP);
+			if (audio->source & AUDPP_MIXER_HLB)
+				audpp_dsp_set_vol_pan(
+					AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+					&audio->vol_pan,
+					COPP);
 			if (audio->device_switch == DEVICE_SWITCH_STATE_READY) {
 				audio->wflush = 1;
 				audio->device_switch =
@@ -249,12 +251,18 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 		break;
 	case AUDDEV_EVT_STREAM_VOL_CHG:
 		audio->vol_pan.volume = evt_payload->session_vol;
-		MM_DBG("\n:AUDDEV_EVT_STREAM_VOL_CHG, stream vol %d\n",
-						audio->vol_pan.volume);
-		if (audio->running)
-			audpp_dsp_set_vol_pan(AUDPP_CMD_CFG_DEV_MIXER_ID_4,
-						&audio->vol_pan,
-						COPP);
+		MM_DBG(":AUDDEV_EVT_STREAM_VOL_CHG, stream vol %d,"
+			"audio->running = %d, audio->source = 0x%x\n",
+			audio->vol_pan.volume, audio->running, audio->source);
+		if (audio->running) {
+			if (audio->source & AUDPP_MIXER_HLB)
+				audpp_dsp_set_vol_pan(
+					AUDPP_CMD_CFG_DEV_MIXER_ID_4,
+					&audio->vol_pan, COPP);
+			else if (audio->source & AUDPP_MIXER_NONHLB)
+				audpp_dsp_set_vol_pan(
+					audio->dec_id, &audio->vol_pan, POPP);
+		}
 		break;
 	default:
 		MM_ERR(":ERROR:wrong event\n");
