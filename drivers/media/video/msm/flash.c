@@ -32,7 +32,7 @@ static int msm_camera_flash_pwm(
 	unsigned led_state)
 {
 	int rc = 0;
-	int PWM_PERIOD = NSEC_PER_SEC / pwm->freq;
+	int PWM_PERIOD = USEC_PER_SEC / pwm->freq;
 
 	static struct pwm_device *flash_pwm;
 
