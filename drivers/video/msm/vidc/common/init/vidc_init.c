@@ -70,13 +70,12 @@ static void vidc_timer_fn(unsigned long data)
 {
 	unsigned long flag;
 	struct vidc_timer *hw_timer = NULL;
-
-	DBG("%s() Timer expired \n", __func__);
+	DBG("%s() Timer expired\n", __func__);
 	spin_lock_irqsave(&vidc_spin_lock, flag);
 	hw_timer = (struct vidc_timer *)data;
 	list_add_tail(&hw_timer->list, &vidc_device_p->vidc_timer_queue);
 	spin_unlock_irqrestore(&vidc_spin_lock, flag);
-	DBG("Queue the work for timer \n");
+	DBG("Queue the work for timer\n");
 	queue_work(vidc_timer_wq, &vidc_device_p->vidc_timer_worker);
 }
 
@@ -86,7 +85,7 @@ static void vidc_timer_handler(struct work_struct *work)
 	u32 islist_empty = 0;
 	struct vidc_timer *hw_timer = NULL;
 
-	DBG("%s() Timer expired \n", __func__);
+	DBG("%s() Timer expired\n", __func__);
 	do {
 		spin_lock_irqsave(&vidc_spin_lock, flag);
 		islist_empty = list_empty(&vidc_device_p->vidc_timer_queue);
@@ -131,7 +130,7 @@ static int __init vidc_720p_probe(struct platform_device *pdev)
 
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (unlikely(!resource)) {
-		ERR("%s(): Invalid resource \n", __func__);
+		ERR("%s(): Invalid resource\n", __func__);
 		return -ENXIO;
 	}
 
@@ -148,7 +147,7 @@ static int __init vidc_720p_probe(struct platform_device *pdev)
 
 	vidc_wq = create_singlethread_workqueue("vidc_worker_queue");
 	if (!vidc_wq) {
-		ERR("%s: create workque failed \n", __func__);
+		ERR("%s: create workque failed\n", __func__);
 		return -ENOMEM;
 	}
 	return 0;
@@ -248,7 +247,7 @@ static int __init vidc_init(void)
 
 	vidc_timer_wq = create_singlethread_workqueue("vidc_timer_wq");
 	if (!vidc_timer_wq) {
-		ERR("%s: create workque failed \n", __func__);
+		ERR("%s: create workque failed\n", __func__);
 		rc = -ENOMEM;
 		goto error_vidc_platfom_register;
 	}
@@ -334,12 +333,12 @@ u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,
 	if (buffer == BUFFER_TYPE_INPUT) {
 		buf_addr_table = client_ctx->input_buf_addr_table;
 		num_of_buffers = client_ctx->num_of_input_buffers;
-		DBG("%s(): buffer = INPUT \n", __func__);
+		DBG("%s(): buffer = INPUT\n", __func__);
 
 	} else {
 		buf_addr_table = client_ctx->output_buf_addr_table;
 		num_of_buffers = client_ctx->num_of_output_buffers;
-		DBG("%s(): buffer = OUTPUT \n", __func__);
+		DBG("%s(): buffer = OUTPUT\n", __func__);
 	}
 
 	for (i = 0; i < num_of_buffers; ++i) {
@@ -373,12 +372,12 @@ u32 vidc_lookup_addr_table(struct video_client_ctx *client_ctx,
 		if (search_with_user_vaddr)
 			DBG("kernel_vaddr = 0x%08lx, phy_addr = 0x%08lx "
 			" pmem_fd = %d, struct *file	= %p "
-			"buffer_index = %d \n", *kernel_vaddr,
+			"buffer_index = %d\n", *kernel_vaddr,
 			*phy_addr, *pmem_fd, *file, *buffer_index);
 		else
 			DBG("user_vaddr = 0x%08lx, phy_addr = 0x%08lx "
 			" pmem_fd = %d, struct *file	= %p "
-			"buffer_index = %d \n", *user_vaddr, *phy_addr,
+			"buffer_index = %d\n", *user_vaddr, *phy_addr,
 			*pmem_fd, *file, *buffer_index);
 		return true;
 	} else {
@@ -474,12 +473,12 @@ u32 vidc_delete_addr_table(struct video_client_ctx *client_ctx,
 	if (buffer == BUFFER_TYPE_INPUT) {
 		buf_addr_table = client_ctx->input_buf_addr_table;
 		num_of_buffers = &client_ctx->num_of_input_buffers;
-		DBG("%s(): buffer = INPUT \n", __func__);
+		DBG("%s(): buffer = INPUT\n", __func__);
 
 	} else {
 		buf_addr_table = client_ctx->output_buf_addr_table;
 		num_of_buffers = &client_ctx->num_of_output_buffers;
-		DBG("%s(): buffer = OUTPUT \n", __func__);
+		DBG("%s(): buffer = OUTPUT\n", __func__);
 	}
 
 	if (!*num_of_buffers)
@@ -521,12 +520,12 @@ u32 vidc_timer_create(void (*timer_handler)(void *),
 {
 	struct vidc_timer *hw_timer = NULL;
 	if (!timer_handler || !timer_handle) {
-		DBG("%s(): timer creation failed \n ", __func__);
+		DBG("%s(): timer creation failed\n ", __func__);
 		return false;
 	}
 	hw_timer = kzalloc(sizeof(struct vidc_timer), GFP_KERNEL);
 	if (!hw_timer) {
-		DBG("%s(): timer creation failed in allocation \n ", __func__);
+		DBG("%s(): timer creation failed in allocation\n ", __func__);
 		return false;
 	}
 	init_timer(&hw_timer->hw_timeout);

@@ -55,7 +55,6 @@
 static struct vid_dec_dev *vid_dec_device_p;
 static dev_t vid_dec_dev_num;
 static struct class *vid_dec_class;
-
 static s32 vid_dec_get_empty_client_index(void)
 {
 	u32 i, found = false;
@@ -338,6 +337,12 @@ static void vid_dec_lean_event(struct video_client_ctx *client_ctx,
 	}
 
 	vdec_msg->vdec_msg_info.msgdatasize = 0;
+	if (client_ctx->stop_sync_cb &&
+	   (event == VCD_EVT_RESP_STOP || event == VCD_EVT_IND_HWERRFATAL)) {
+		client_ctx->stop_sync_cb = false;
+		complete(&client_ctx->event);
+		return;
+	}
 	mutex_lock(&client_ctx->msg_queue_lock);
 	list_add_tail(&vdec_msg->list, &client_ctx->msg_queue);
 	mutex_unlock(&client_ctx->msg_queue_lock);
@@ -739,13 +744,14 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 	} else {
 		INFO("\n %s(): Calling vcd_stop()", __func__);
 		mutex_lock(&vid_dec_device_p->lock);
-		vcd_status = vcd_stop(client_ctx->vcd_handle);
-		(void)wait_for_completion_timeout(
-			&client_ctx->event, (5 * HZ)/10);
+		vcd_status = VCD_ERR_FAIL;
+		if (!client_ctx->stop_called) {
+			client_ctx->stop_called = true;
+			vcd_status = vcd_stop(client_ctx->vcd_handle);
+		}
 		if (vcd_status) {
-
 			ERR("%s(): vcd_stop failed.  vcd_status = %u\n",
-			    __func__, vcd_status);
+				__func__, vcd_status);
 			mutex_unlock(&vid_dec_device_p->lock);
 			return false;
 		}
@@ -1315,7 +1321,6 @@ static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 {
 	struct vid_dec_msg *vdec_msg;
 	u32 vcd_status;
-	int rc;
 
 	INFO("\n msm_vidc_dec: Inside %s()", __func__);
 	if (!client_ctx || (!client_ctx->vcd_handle)) {
@@ -1324,18 +1329,14 @@ static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 	}
 
 	mutex_lock(&vid_dec_device_p->lock);
-	vcd_status = vcd_stop(client_ctx->vcd_handle);
-
-	if (!vcd_status) {
-		rc = wait_for_completion_timeout(&client_ctx->event,
-								(5 * HZ)/10);
-		if (!rc)
-			DBG("%s:ERROR vcd_stop time out  rc = %d\n",
-			       __func__, rc);
-
-		if (client_ctx->event_status)
-			ERR("%s:ERROR vcd_stop event_status failure\n",
-					__func__);
+	if (!client_ctx->stop_called) {
+		client_ctx->stop_called = true;
+		client_ctx->stop_sync_cb = true;
+		vcd_status = vcd_stop(client_ctx->vcd_handle);
+		DBG("\n Stuck at the stop call");
+		if (!vcd_status)
+			wait_for_completion(&client_ctx->event);
+		DBG("\n Came out of wait event");
 	}
 	mutex_lock(&client_ctx->msg_queue_lock);
 	while (!list_empty(&client_ctx->msg_queue)) {
@@ -1396,7 +1397,8 @@ static int vid_dec_open(struct inode *inode, struct file *file)
 	INIT_LIST_HEAD(&client_ctx->msg_queue);
 	init_waitqueue_head(&client_ctx->msg_wait);
 	client_ctx->stop_msg = 0;
-
+	client_ctx->stop_called = false;
+	client_ctx->stop_sync_cb = false;
 	vcd_status = vcd_open(vid_dec_device_p->device_handle, true,
 			      vid_dec_vcd_cb, client_ctx);
 	if (!vcd_status) {
