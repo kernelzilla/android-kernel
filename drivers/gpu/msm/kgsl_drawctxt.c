@@ -497,14 +497,34 @@ static void build_regsave_cmds(struct kgsl_device *device,
 			       REG_PA_SC_SCREEN_SCISSOR_BR, &cmd, drawctxt);
 	build_reg_to_mem_range(REG_PA_SC_WINDOW_OFFSET,
 			       REG_PA_SC_WINDOW_SCISSOR_BR, &cmd, drawctxt);
-	build_reg_to_mem_range(REG_VGT_MAX_VTX_INDX, REG_RB_FOG_COLOR, &cmd,
-			       drawctxt);
+	if (device->chip_id != KGSL_CHIPID_LEIA_REV470) {
+		build_reg_to_mem_range(REG_VGT_MAX_VTX_INDX,
+				       REG_RB_FOG_COLOR, &cmd,
+				       drawctxt);
+	} else {
+		build_reg_to_mem_range(REG_VGT_MAX_VTX_INDX,
+				       REG_PC_INDEX_OFFSET, &cmd,
+				       drawctxt);
+		build_reg_to_mem_range(REG_RB_COLOR_MASK,
+				       REG_RB_FOG_COLOR, &cmd,
+				       drawctxt);
+	}
+
 	build_reg_to_mem_range(REG_RB_STENCILREFMASK_BF,
 			       REG_PA_CL_VPORT_ZOFFSET, &cmd, drawctxt);
 	build_reg_to_mem_range(REG_SQ_PROGRAM_CNTL, REG_SQ_WRAPPING_1, &cmd,
 			       drawctxt);
-	build_reg_to_mem_range(REG_RB_DEPTHCONTROL, REG_RB_MODECONTROL, &cmd,
-			       drawctxt);
+	if (device->chip_id != KGSL_CHIPID_LEIA_REV470) {
+		build_reg_to_mem_range(REG_RB_DEPTHCONTROL, REG_RB_MODECONTROL,
+					&cmd, drawctxt);
+	} else {
+		build_reg_to_mem_range(REG_RB_DEPTHCONTROL, REG_RB_COLORCONTROL,
+				       &cmd, drawctxt);
+		build_reg_to_mem_range(REG_RA_CL_CLIP_CNTL, REG_PA_CL_VTE_CNTL,
+				       &cmd, drawctxt);
+		build_reg_to_mem_range(REG_RB_MODECONTROL, REG_RB_SAMPLE_POS,
+				       &cmd, drawctxt);
+	}
 
 	if (device->chip_id != KGSL_CHIPID_LEIA_REV470) {
 		build_reg_to_mem_range(REG_PA_SU_POINT_SIZE,
@@ -522,8 +542,16 @@ static void build_regsave_cmds(struct kgsl_device *device,
 			       drawctxt);
 	build_reg_to_mem_range(REG_PA_SC_AA_MASK, REG_PA_SC_AA_MASK, &cmd,
 			       drawctxt);
-	build_reg_to_mem_range(REG_VGT_VERTEX_REUSE_BLOCK_CNTL,
-			       REG_RB_DEPTH_CLEAR, &cmd, drawctxt);
+	if (device->chip_id != KGSL_CHIPID_LEIA_REV470) {
+		build_reg_to_mem_range(REG_VGT_VERTEX_REUSE_BLOCK_CNTL,
+				       REG_RB_DEPTH_CLEAR, &cmd, drawctxt);
+	} else {
+		build_reg_to_mem_range(REG_VGT_VERTEX_REUSE_BLOCK_CNTL,
+				       REG_VGT_VERTEX_REUSE_BLOCK_CNTL,
+					&cmd, drawctxt);
+		build_reg_to_mem_range(REG_RB_COPY_CONTROL,
+				       REG_RB_DEPTH_CLEAR, &cmd, drawctxt);
+	}
 	build_reg_to_mem_range(REG_RB_SAMPLE_COUNT_CTL, REG_RB_COLOR_DEST_MASK,
 			       &cmd, drawctxt);
 	build_reg_to_mem_range(REG_PA_SU_POLY_OFFSET_FRONT_SCALE,
