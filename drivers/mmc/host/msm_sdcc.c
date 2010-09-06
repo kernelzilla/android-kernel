@@ -1047,6 +1047,11 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			WARN_ON(rc < 0);
 			host->clk_rate = ios->clock;
 		}
+		/*
+		 * give atleast 2 MCLK cycles delay for clocks
+		 * and SDCC core to stabilize
+		 */
+		msmsdcc_delay(host);
 		clk |= MCI_CLK_ENABLE;
 	}
 
