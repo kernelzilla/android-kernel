@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009 - 2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -413,17 +413,13 @@ static int vfe31_enable(struct camera_enable_cmd *enable)
 
 void vfe_stop(void)
 {
-	uint8_t  axiBusyFlag = true;
-	unsigned long flags;
+	atomic_set(&(vfe31_ctrl->vstate), 0);
+	atomic_set(&(vfe31_ctrl->stop_ack_pending), 1);
 
-	spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
-	vfe31_ctrl->vstate = VFE_STATE_IDLE;
-	spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
-
-	/* for reset hw modules, and send msg when reset_irq comes.*/
-	spin_lock_irqsave(&vfe31_ctrl->stop_flag_lock, flags);
-	vfe31_ctrl->stop_ack_pending = TRUE;
-	spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
+	/* in either continuous or snapshot mode, stop command can be issued
+	 * at any time. stop camif immediately. */
+	msm_io_w_mb(CAMIF_COMMAND_STOP_IMMEDIATELY,
+		vfe31_ctrl->vfebase + VFE_CAMIF_COMMAND);
 
 	/* disable all interrupts.  */
 	msm_io_w(VFE_DISABLE_ALL_IRQS,
@@ -441,36 +437,15 @@ void vfe_stop(void)
 	msm_io_w_mb(1,
 		vfe31_ctrl->vfebase + VFE_IRQ_CMD);
 
-	/* in either continuous or snapshot mode, stop command can be issued
-	 * at any time. stop camif immediately. */
-	msm_io_w(CAMIF_COMMAND_STOP_IMMEDIATELY,
-		vfe31_ctrl->vfebase + VFE_CAMIF_COMMAND);
-	wmb();
-	/* axi halt command. */
-	msm_io_w(AXI_HALT,
-		vfe31_ctrl->vfebase + VFE_AXI_CMD);
-	wmb();
-	while (axiBusyFlag) {
-		if (msm_io_r(vfe31_ctrl->vfebase + VFE_AXI_STATUS) & 0x1)
-			axiBusyFlag = false;
-	}
-	/* Ensure the write order while writing
-	to the command register using the barrier */
-	msm_io_w_mb(AXI_HALT_CLEAR,
-		vfe31_ctrl->vfebase + VFE_AXI_CMD);
-
-	/* after axi halt, then ok to apply global reset. */
-	/* enable reset_ack and async timer interrupt only while
-	stopping the pipeline.*/
-	msm_io_w(0xf0000000,
+	/* now enable only halt_irq & reset_irq */
+	msm_io_w(0xf0000000,          /* this is for async timer. */
 		vfe31_ctrl->vfebase + VFE_IRQ_MASK_0);
 	msm_io_w(VFE_IMASK_WHILE_STOPPING_1,
 		vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
 
-	/* Ensure the write order while writing
-	to the command register using the barrier */
-	msm_io_w_mb(VFE_RESET_UPON_STOP_CMD,
-		vfe31_ctrl->vfebase + VFE_GLOBAL_RESET);
+	/* then apply axi halt command. */
+	msm_io_w_mb(AXI_HALT,
+		vfe31_ctrl->vfebase + VFE_AXI_CMD);
 }
 
 static int vfe31_disable(struct camera_enable_cmd *enable,
@@ -708,9 +683,8 @@ static void vfe31_reset_internal_variables(void)
 	vfe31_ctrl->start_ack_pending = FALSE;
 	atomic_set(&irq_cnt, 0);
 
-	spin_lock_irqsave(&vfe31_ctrl->stop_flag_lock, flags);
-	vfe31_ctrl->stop_ack_pending  = FALSE;
-	spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
+	atomic_set(&(vfe31_ctrl->stop_ack_pending), 0);
+	atomic_set(&(vfe31_ctrl->vstate), 0);
 
 	vfe31_ctrl->reset_ack_pending  = FALSE;
 
@@ -720,10 +694,6 @@ static void vfe31_reset_internal_variables(void)
 
 	vfe31_ctrl->req_stop_video_rec = FALSE;
 	vfe31_ctrl->req_start_video_rec = FALSE;
-
-	spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
-	vfe31_ctrl->vstate = VFE_STATE_IDLE;
-	spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
 
 	/* 0 for continuous mode, 1 for snapshot mode */
 	vfe31_ctrl->operation_mode = 0;
@@ -781,7 +751,7 @@ static void vfe31_reset(void)
 	msm_io_w_mb(1, vfe31_ctrl->vfebase + VFE_IRQ_CMD);
 
 	/* enable reset_ack interrupt.  */
-	msm_io_w(VFE_IMASK_WHILE_STOPPING_1,
+	msm_io_w(VFE_IMASK_RESET,
 		vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
 
 	/* Write to VFE_GLOBAL_RESET_CMD to reset the vfe hardware. Once reset
@@ -896,14 +866,13 @@ static uint32_t vfe_stats_cs_buf_init(struct vfe_cmd_stats_buf *in)
 
 
 static void vfe31_start_common(void){
-	unsigned long flags;
 
 	vfe31_ctrl->start_ack_pending = TRUE;
 	CDBG("VFE opertaion mode = 0x%x.\n", vfe31_ctrl->operation_mode);
 	CDBG("VFE output path out mode = 0x%x.\n",
 		vfe31_ctrl->outpath.output_mode);
 	msm_io_w(0x00EFE021, vfe31_ctrl->vfebase + VFE_IRQ_MASK_0);
-	msm_io_w(VFE_IMASK_WHILE_STOPPING_1,
+	msm_io_w(VFE_IMASK_RESET,
 		vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
 
 	msm_io_dump(vfe31_ctrl->vfebase, 0x600);
@@ -914,10 +883,7 @@ static void vfe31_start_common(void){
 	msm_io_w(1, vfe31_ctrl->vfebase + VFE_CAMIF_COMMAND);
 	wmb();
 
-	spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
-	vfe31_ctrl->vstate = VFE_STATE_ACTIVE;
-	spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
-
+	atomic_set(&(vfe31_ctrl->vstate), 1);
 }
 
 static int vfe31_start_recording(void){
@@ -2157,19 +2123,14 @@ static void vfe31_set_default_reg_values(void)
 
 static void vfe31_process_reset_irq(void)
 {
-	unsigned long flags;
 
-	spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
-	vfe31_ctrl->vstate = VFE_STATE_IDLE;
-	spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
+	atomic_set(&(vfe31_ctrl->vstate), 0);
 
-	spin_lock_irqsave(&vfe31_ctrl->stop_flag_lock, flags);
-	if (vfe31_ctrl->stop_ack_pending) {
-		vfe31_ctrl->stop_ack_pending = FALSE;
-		spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
+	if (atomic_read(&vfe31_ctrl->stop_ack_pending)) {
+		/* this is from the stop command. */
+		atomic_set(&(vfe31_ctrl->stop_ack_pending), 0);
 		vfe31_send_msg_no_payload(MSG_ID_STOP_ACK);
 	} else {
-		spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
 		/* this is from reset command. */
 		vfe31_set_default_reg_values();
 
@@ -2177,6 +2138,43 @@ static void vfe31_process_reset_irq(void)
 		msm_io_w(0x7FFF, vfe31_ctrl->vfebase + VFE_BUS_CMD);
 		vfe31_send_msg_no_payload(MSG_ID_RESET_ACK);
 	}
+}
+
+
+static void vfe31_process_axi_halt_irq(void)
+{
+	/* Ensure the write order while writing
+	to the command register using the barrier */
+	msm_io_w_mb(AXI_HALT_CLEAR,
+		vfe31_ctrl->vfebase + VFE_AXI_CMD);
+
+
+	/* disable all interrupts.  */
+	msm_io_w(VFE_DISABLE_ALL_IRQS,
+		vfe31_ctrl->vfebase + VFE_IRQ_MASK_0);
+	msm_io_w(VFE_DISABLE_ALL_IRQS,
+		vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
+
+	/* clear all pending interrupts*/
+	msm_io_w(VFE_CLEAR_ALL_IRQS,
+		vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_0);
+	msm_io_w(VFE_CLEAR_ALL_IRQS,
+		vfe31_ctrl->vfebase + VFE_IRQ_CLEAR_1);
+	/* Ensure the write order while writing
+	to the command register using the barrier */
+	msm_io_w_mb(1,
+		vfe31_ctrl->vfebase + VFE_IRQ_CMD);
+
+	/* now enable only halt_irq & reset_irq */
+	msm_io_w(0xf0000000,          /* this is for async timer. */
+		vfe31_ctrl->vfebase + VFE_IRQ_MASK_0);
+	msm_io_w(VFE_IMASK_RESET,
+		vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
+
+	/* Ensure the write order while writing
+	to the command register using the barrier */
+	msm_io_w_mb(VFE_RESET_UPON_STOP_CMD,
+		vfe31_ctrl->vfebase + VFE_GLOBAL_RESET);
 }
 
 static void vfe31_process_camif_sof_irq(void)
@@ -2676,28 +2674,34 @@ static void vfe31_do_tasklet(unsigned long data)
 
 		/* interrupt to be processed,  *qcmd has the payload.  */
 		if (qcmd->vfeInterruptStatus0 &
-				VFE_IRQ_STATUS0_REG_UPDATE_MASK) {
-			CDBG("irq	regUpdateIrq\n");
+			VFE_IRQ_STATUS0_REG_UPDATE_MASK) {
+			CDBG("irq regUpdateIrq\n");
 			vfe31_process_reg_update_irq();
 		}
 
 		if (qcmd->vfeInterruptStatus1 &
-				VFE_IMASK_WHILE_STOPPING_1) {
-			CDBG("irq	resetAckIrq\n");
+			VFE_IMASK_RESET) {
+			CDBG("irq resetAckIrq\n");
 			vfe31_process_reset_irq();
 		}
 
 		if (qcmd->vfeInterruptStatus1 &
-				VFE31_IMASK_ERROR_ONLY_1) {
-			CDBG("irq	errorIrq\n");
+			VFE_IMASK_AXI_HALT) {
+			CDBG("irq axi halt irq\n");
+			vfe31_process_axi_halt_irq();
+		}
+
+
+		if (qcmd->vfeInterruptStatus1 &
+			VFE31_IMASK_ERROR_ONLY_1) {
+			CDBG("irq errorIrq\n");
 			vfe31_process_error_irq(qcmd->vfeInterruptStatus1 &
 				VFE31_IMASK_ERROR_ONLY_1);
 		}
 
-		spin_lock_irqsave(&vfe31_ctrl->state_lock, flags);
-		if (vfe31_ctrl->vstate == VFE_STATE_ACTIVE) {
+
+		if (atomic_read(&vfe31_ctrl->vstate)) {
 			/* irqs below are only valid when in active state. */
-			spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
 			/* next, check output path related interrupts. */
 			if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_IMAGE_COMPOSIT_DONE0_MASK) {
@@ -2791,9 +2795,6 @@ static void vfe31_do_tasklet(unsigned long data)
 						MSG_ID_SYNC_TIMER2_DONE);
 				}
 			}
-		} else {
-			/* do we really need spin lock for state? */
-			spin_unlock_irqrestore(&vfe31_ctrl->state_lock, flags);
 		}
 		if (qcmd->vfeInterruptStatus0 &
 				VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
@@ -2812,6 +2813,7 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 	unsigned long flags;
 	struct vfe31_irq_status irq;
 	struct vfe31_isr_queue_cmd *qcmd;
+	uint32_t temp;
 
 	CDBG("vfe_parse_irq\n");
 
@@ -2829,12 +2831,20 @@ static irqreturn_t vfe31_parse_irq(int irq_num, void *data)
 		return IRQ_HANDLED;
 	}
 
-	spin_lock_irqsave(&vfe31_ctrl->stop_flag_lock, flags);
-	if (vfe31_ctrl->stop_ack_pending) {
+	if (atomic_read(&vfe31_ctrl->stop_ack_pending)) {
 		irq.vfeIrqStatus0 &= VFE_IMASK_WHILE_STOPPING_0;
 		irq.vfeIrqStatus1 &= VFE_IMASK_WHILE_STOPPING_1;
+
+		if (irq.vfeIrqStatus1 & VFE_IMASK_AXI_HALT) {
+			msm_io_w_mb(AXI_HALT_CLEAR,
+				vfe31_ctrl->vfebase + VFE_AXI_CMD);
+
+			temp = msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
+			temp &= MASK_AXI_HALT_IRQ;
+			/* mask the axi_halt_irq*/
+			msm_io_w(temp, vfe31_ctrl->vfebase + VFE_IRQ_MASK_1);
+		}
 	}
-	spin_unlock_irqrestore(&vfe31_ctrl->stop_flag_lock, flags);
 
 	CDBG("vfe_parse_irq: Irq_status0 = 0x%x, Irq_status1 = 0x%x.\n",
 		irq.vfeIrqStatus0, irq.vfeIrqStatus1);
@@ -2918,8 +2928,6 @@ static int vfe31_resource_init(struct msm_vfe_callback *presp,
 
 	vfe31_ctrl->extlen = sizeof(struct vfe31_frame_extra);
 
-	spin_lock_init(&vfe31_ctrl->stop_flag_lock);
-	spin_lock_init(&vfe31_ctrl->state_lock);
 	spin_lock_init(&vfe31_ctrl->io_lock);
 	spin_lock_init(&vfe31_ctrl->update_ack_lock);
 	spin_lock_init(&vfe31_ctrl->tasklet_lock);
