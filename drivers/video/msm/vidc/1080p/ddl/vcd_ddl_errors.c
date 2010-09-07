@@ -243,7 +243,7 @@ static u32 ddl_handle_core_recoverable_errors(
 			default:
 			break;
 			}
-			if (((!vcd_status) || (vcd_event !=
+			if (((vcd_status) || (vcd_event !=
 				VCD_EVT_RESP_INPUT_DONE)) && !status) {
 				ddl->input_frame.frm_trans_end = true;
 				eos = ((vcd_event ==
