@@ -23,6 +23,7 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/cpu.h>
+#include <linux/regulator/consumer.h>
 
 #include <asm/cpu.h>
 
@@ -46,6 +47,8 @@
  * used for calibration should respect these limits. */
 #define L_VAL_SCPLL_CAL_MIN	0x08 /* =  432 MHz with 27MHz source */
 #define L_VAL_SCPLL_CAL_MAX	0x1C /* = 1512 MHz with 27MHz source */
+
+#define MAX_VDD_SC		1200000 /* uV */
 
 /* SCPLL Modes. */
 #define SCPLL_POWER_DOWN	0
@@ -79,6 +82,8 @@ static const void * const clk_ctl_addr[] = {SPSS0_CLK_CTL_ADDR,
 static const void * const clk_sel_addr[] = {SPSS0_CLK_SEL_ADDR,
 			SPSS1_CLK_SEL_ADDR, SPSS_L2_CLK_SEL_ADDR};
 
+static struct regulator *regulator_sc[NR_CPUS];
+
 enum scplls {
 	CPU0 = 0,
 	CPU1,
@@ -102,8 +107,8 @@ static struct clock_state {
 	struct clkctl_acpu_speed	*current_l2_speed;
 	struct mutex			lock;
 	uint32_t			acpu_switch_time_us;
+	uint32_t			vdd_switch_time_us;
 	uint32_t			max_speed_delta_khz;
-	unsigned int			max_vdd;
 } drv_state;
 
 struct clkctl_acpu_speed {
@@ -114,9 +119,9 @@ struct clkctl_acpu_speed {
 	unsigned int     acpuclk_src_div;
 	unsigned int     core_src_sel;
 	unsigned int     sc_l_val;
-	int              vdd;
 	unsigned int     l2_src_sel;
 	unsigned int     l2_l_val;
+	unsigned int     vdd_sc;
 	unsigned long    lpj; /* loops_per_jiffy */
 	struct clkctl_acpu_speed *up;
 	struct clkctl_acpu_speed *down;
@@ -128,15 +133,15 @@ static struct clkctl_acpu_speed *l2_vote[NR_CPUS];
 /* L_VAL's below assume 27 MHz sources for all SCPLLs.
  * SCPLL and L2 frequencies = 2 * 27 MHz * L_VAL */
 static struct clkctl_acpu_speed acpu_freq_tbl[] = {
-	{ {0, 0},  192000, ACPU_PLL_8, 3, 1, 0, 0,    1100, 0, 0    },
-	{ {1, 1},  262000, ACPU_AFAB,  1, 0, 0, 0,    1100, 0, 0    },
-	{ {1, 1},  384000, ACPU_PLL_8, 3, 0, 0, 0,    1100, 0, 0    },
-	{ {1, 1},  432000, ACPU_SCPLL, 0, 0, 1, 0x08, 1100, 1, 0x08 },
-	{ {1, 1},  648000, ACPU_SCPLL, 0, 0, 1, 0x0C, 1100, 1, 0x0C },
-	{ {1, 1},  810000, ACPU_SCPLL, 0, 0, 1, 0x0F, 1100, 1, 0x0F },
-	{ {0, 0},  972000, ACPU_SCPLL, 0, 0, 1, 0x12, 1100, 1, 0x10 },
-	{ {1, 1}, 1080000, ACPU_SCPLL, 0, 0, 1, 0x14, 1100, 1, 0x10 },
-	{ {0, 0}, 1188000, ACPU_SCPLL, 0, 0, 1, 0x16, 1100, 1, 0x10 },
+	{ {0, 0},  192000, ACPU_PLL_8, 3, 1, 0, 0,    0, 0,     950000 },
+	{ {1, 1},  262000, ACPU_AFAB,  1, 0, 0, 0,    0, 0,     950000 },
+	{ {1, 1},  384000, ACPU_PLL_8, 3, 0, 0, 0,    0, 0,     950000 },
+	{ {1, 1},  432000, ACPU_SCPLL, 0, 0, 1, 0x08, 1, 0x08,  950000 },
+	{ {1, 1},  648000, ACPU_SCPLL, 0, 0, 1, 0x0C, 1, 0x0C, 1100000 },
+	{ {1, 1},  810000, ACPU_SCPLL, 0, 0, 1, 0x0F, 1, 0x0F, 1100000 },
+	{ {0, 0},  972000, ACPU_SCPLL, 0, 0, 1, 0x12, 1, 0x10, 1200000 },
+	{ {1, 1}, 1080000, ACPU_SCPLL, 0, 0, 1, 0x14, 1, 0x10, 1200000 },
+	{ {0, 0}, 1188000, ACPU_SCPLL, 0, 0, 1, 0x16, 1, 0x10, 1200000 },
 	{ {0, 0}, 0 },
 };
 
@@ -239,13 +244,6 @@ static void scpll_change_freq(int sc_pll, uint32_t l_val)
 	/* Wait for frequency switch to finish. */
 	while (readl(base_addr + SCPLL_STATUS_OFFSET) & 0x1)
 		cpu_relax();
-}
-
-static int acpuclk_set_vdd_level(int vdd)
-{
-	/* Assume support for scaling the processor to its
-	 * maximum frequency at its default voltage. */
-	return 0;
 }
 
 static void l2_set_speed(struct clkctl_acpu_speed *tgt_s)
@@ -355,15 +353,17 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 		goto out;
 	}
 
+	/* Increase VDD levels if needed. */
 	if (reason == SETRATE_CPUFREQ) {
-		/* Increase VDD if needed. */
-		if (tgt_s->vdd > strt_s->vdd) {
-			rc = acpuclk_set_vdd_level(tgt_s->vdd);
+		if (tgt_s->vdd_sc > strt_s->vdd_sc) {
+			rc = regulator_set_voltage(regulator_sc[cpu],
+				tgt_s->vdd_sc, MAX_VDD_SC);
 			if (rc) {
-				pr_err("Unable to increase ACPU vdd (%d)\n",
-					rc);
+				pr_err("Unable to increase CPU VDD (%d)\n", rc);
 				goto out;
 			}
+			/* Wait for voltage to stabilize. */
+			udelay(drv_state.vdd_switch_time_us);
 		}
 	}
 
@@ -395,11 +395,12 @@ int acpuclk_set_rate(int cpu, unsigned long rate, enum setrate_reason reason)
 	if (reason == SETRATE_PC)
 		goto out;
 
-	/* Drop VDD level if we can. */
-	if (tgt_s->vdd < strt_s->vdd) {
-		res = acpuclk_set_vdd_level(tgt_s->vdd);
+	/* Drop VDD levels if we can. */
+	if (tgt_s->vdd_sc < strt_s->vdd_sc) {
+		res = regulator_set_voltage(regulator_sc[cpu],
+				tgt_s->vdd_sc, MAX_VDD_SC);
 		if (res)
-			pr_warning("Unable to drop ACPU vdd (%d)\n", res);
+			pr_warning("Unable to decrease CPU VDD (%d)\n", res);
 	}
 
 	dprintk("ACPU%d speed change complete\n", cpu);
@@ -585,16 +586,33 @@ static void __init cpufreq_table_init(void)
 static void __init cpufreq_table_init(void) {}
 #endif
 
+/* Voltage regulator initialization. */
+void __init regulator_init(void)
+{
+	int cpu;
+	const char *regulator_sc_name[] = {"8901_s0", "8901_s1"};
+
+	for_each_possible_cpu(cpu) {
+		regulator_sc[cpu] = regulator_get(NULL, regulator_sc_name[cpu]);
+		if (IS_ERR(regulator_sc[cpu])) {
+			pr_err("%s: unable to get SC%d voltage regulator\n",
+				__func__, cpu);
+			BUG();
+		}
+	}
+}
+
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 {
 	int cpu;
 
 	mutex_init(&drv_state.lock);
 	drv_state.acpu_switch_time_us = clkdata->acpu_switch_time_us;
+	drv_state.vdd_switch_time_us = clkdata->vdd_switch_time_us;
 	drv_state.max_speed_delta_khz = clkdata->max_speed_delta_khz;
-	drv_state.max_vdd = clkdata->max_vdd;
 
 	/* Configure hardware. */
+	regulator_init();
 	force_all_to_afab();
 	scpll_set_refs();
 	for_each_possible_cpu(cpu)
