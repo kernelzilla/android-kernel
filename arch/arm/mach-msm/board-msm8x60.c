@@ -2543,9 +2543,9 @@ void msm_snddev_enable_amic_power(void)
 #ifdef CONFIG_PMIC8058_OTHC
 	int ret;
 
-	ret = pm8058_micbias_enable(OTHC_MICBIAS_0, OTHC_SIGNAL_ALWAYS_ON);
+	ret = pm8058_micbias_enable(OTHC_MICBIAS_2, OTHC_SIGNAL_ALWAYS_ON);
 	if (ret)
-		pr_err("Epickrror Enabling Mic Bias....\n");
+		pr_err("%s: Enabling amic power failed\n", __func__);
 #endif
 
 	msm_snddev_tx_route_config();
@@ -2557,9 +2557,9 @@ void msm_snddev_disable_amic_power(void)
 #ifdef CONFIG_PMIC8058_OTHC
 	int ret;
 
-	ret = pm8058_micbias_enable(OTHC_MICBIAS_0, OTHC_SIGNAL_OFF);
+	ret = pm8058_micbias_enable(OTHC_MICBIAS_2, OTHC_SIGNAL_OFF);
 	if (ret)
-		pr_err("Error Enabling Mic Bias....\n");
+		pr_err("%s: Disabling amic power failed\n", __func__);
 #endif
 
 	msm_snddev_tx_route_deconfig();
