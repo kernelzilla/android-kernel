@@ -168,6 +168,7 @@ struct ept_queue_item {
 #define ULPI_DIGOUT_CTRL	0X31
 #define ULPI_CDR_AUTORESET	(1 << 5)
 #endif
+#define ULPI_SE1_GATE		(1 << 2)
 #define ULPI_CONFIG_REG1	0x30
 #define ULPI_CONFIG_REG2	0X31
 #define ULPI_CONFIG_REG3	0X32

@@ -239,6 +239,20 @@ static inline void set_cdr_auto_reset(struct msm_otg *dev)
 	ulpi_write(dev, res, ULPI_DIGOUT_CTRL);
 }
 
+static inline void set_se1_gating(struct msm_otg *dev)
+{
+	unsigned res = 0;
+
+	if (!dev->pdata || dev->pdata->se1_gating == SE1_GATING_DEFAULT)
+		return;
+
+	res = ulpi_read(dev, ULPI_DIGOUT_CTRL);
+	if (dev->pdata->se1_gating == SE1_GATING_ENABLE)
+		res &=  ~ULPI_SE1_GATE;
+	else
+		res |=  ULPI_SE1_GATE;
+	ulpi_write(dev, res, ULPI_DIGOUT_CTRL);
+}
 static inline void set_driver_amplitude(struct msm_otg *dev)
 {
 	unsigned res = 0;
@@ -1284,6 +1298,7 @@ reset_link:
 	set_pre_emphasis_level(dev);
 	set_cdr_auto_reset(dev);
 	set_driver_amplitude(dev);
+	set_se1_gating(dev);
 
 	writel(0x0, USB_AHB_BURST);
 	writel(0x00, USB_AHB_MODE);
