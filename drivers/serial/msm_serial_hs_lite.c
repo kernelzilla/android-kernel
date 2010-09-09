@@ -503,8 +503,6 @@ static void msm_hsl_init_clock(struct uart_port *port)
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
 	msm_hsl_port->clk_state = MSM_HSL_CLK_ON;
 #endif
-
-	clk_en(port, 0);
 }
 
 static void msm_hsl_deinit_clock(struct uart_port *port)
