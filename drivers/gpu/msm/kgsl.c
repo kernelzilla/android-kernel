@@ -538,7 +538,7 @@ static void kgsl_put_process_private(struct kgsl_device *device,
 static int kgsl_release(struct inode *inodep, struct file *filep)
 {
 	int result = 0;
-	unsigned int i;
+	unsigned int i = 0;
 	struct kgsl_device_private *dev_priv = NULL;
 	struct kgsl_file_private *private = NULL;
 	struct kgsl_device *device;
@@ -557,10 +557,12 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 	filep->private_data = NULL;
 	list_del(&dev_priv->list);
 
-	for (i = 0; i < KGSL_CONTEXT_MAX; i++) {
+	while (dev_priv->ctxt_id_mask) {
 		if (dev_priv->ctxt_id_mask & (1 << i)) {
 			device->ftbl.device_drawctxt_destroy(device, i);
+			dev_priv->ctxt_id_mask &= ~(1 << i);
 		}
+		i++;
 	}
 
 	kgsl_put_process_private(device, private);
