@@ -30,6 +30,7 @@
 
 struct pil_device {
 	const char *name;
+	const char *depends_on;
 	int count;
 	int id;
 	struct mutex lock;
@@ -39,6 +40,7 @@ struct pil_device {
 static struct pil_device peripherals[] = {
 	{
 		.name = "modem",
+		.depends_on = "q6",
 		.id = PIL_MODEM,
 		.pdev = {
 			.name = "pil_modem",
@@ -69,6 +71,9 @@ static struct pil_device peripherals[] = {
 static struct pil_device *find_peripheral(const char *str)
 {
 	struct pil_device *pil;
+
+	if (!str)
+		return NULL;
 
 	for_each_pil(pil) {
 		if (!strcmp(pil->name, str))
@@ -273,11 +278,19 @@ void *pil_get(const char *name)
 {
 	int ret;
 	struct pil_device *pil;
+	struct pil_device *pil_d;
 	void *retval;
 
 	pil = retval = find_peripheral(name);
 	if (!pil)
 		return ERR_PTR(-ENODEV);
+
+	pil_d = find_peripheral(pil->depends_on);
+	if (pil_d) {
+		void *p = pil_get(pil_d->name);
+		if (IS_ERR(p))
+			return p;
+	}
 
 	mutex_lock(&pil->lock);
 	if (pil->count) {
@@ -307,6 +320,7 @@ EXPORT_SYMBOL(pil_get);
  */
 void pil_put(void *peripheral_handle)
 {
+	struct pil_device *pil_d;
 	struct pil_device *pil = peripheral_handle;
 	if (!pil || IS_ERR(pil)) {
 		WARN(1, "Invalid peripheral handle\n");
@@ -324,6 +338,10 @@ void pil_put(void *peripheral_handle)
 		peripheral_shutdown(pil->id);
 unlock:
 	mutex_unlock(&pil->lock);
+
+	pil_d = find_peripheral(pil->depends_on);
+	if (pil_d)
+		pil_put(pil_d);
 }
 EXPORT_SYMBOL(pil_put);
 
