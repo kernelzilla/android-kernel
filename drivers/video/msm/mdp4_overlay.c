@@ -1344,6 +1344,7 @@ static int mdp4_pull_mode(int mixer)
 	uint32 lcdc;
 	int off;
 
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	if (mixer == MDP4_MIXER1) /* DTV */
 		off = 0xd0000;
 	else			/* LCDC */
@@ -1351,6 +1352,7 @@ static int mdp4_pull_mode(int mixer)
 
 	lcdc = inpdw(MDP_BASE + off);
 	lcdc &= 0x01;
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	return lcdc;
 }
