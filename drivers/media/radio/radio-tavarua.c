@@ -1516,7 +1516,10 @@ static int tavarua_fops_open(struct file *file)
 						__func__);
 		goto open_err_all;
 	}
-  /* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
+	/* Wait for interrupt i.e. complete(&radio->sync_req_done); call */
+	/*Initialize the completion variable for
+	for the proper behavior*/
+	init_completion(&radio->sync_req_done);
 	if (!wait_for_completion_timeout(&radio->sync_req_done,
 		msecs_to_jiffies(WAIT_TIMEOUT))) {
 		retval = -1;
@@ -1926,7 +1929,8 @@ static int tavarua_vidioc_g_ctrl(struct file *file, void *priv,
 {
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
-	char xfr_buf[XFR_REG_NUM];
+	unsigned char xfr_buf[XFR_REG_NUM];
+	signed char cRmssiThreshold;
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_VOLUME:
@@ -1950,7 +1954,15 @@ static int tavarua_vidioc_g_ctrl(struct file *file, void *priv,
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH:
 		retval = sync_read_xfr(radio, RX_CONFIG, xfr_buf);
-		ctrl->value = xfr_buf[0];
+		if (retval < 0) {
+			FMDBG("[G IOCTL=V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH]\n");
+			FMDBG("sync_read_xfr error: [retval=%d]\n", retval);
+			break;
+		}
+		/* Since RMSSI Threshold is signed value */
+		cRmssiThreshold = (signed char)xfr_buf[0];
+		ctrl->value  = cRmssiThreshold;
+		FMDBG("cRmssiThreshold: %d\n", cRmssiThreshold);
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY:
 		ctrl->value = radio->srch_params.srch_pty;
@@ -2043,7 +2055,7 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 	struct tavarua_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
 	unsigned char value;
-	char xfr_buf[XFR_REG_NUM];
+	unsigned char xfr_buf[XFR_REG_NUM];
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_VOLUME:
@@ -2114,13 +2126,21 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH:
 		retval = sync_read_xfr(radio, RX_CONFIG, xfr_buf);
-		if (retval < 0)
+		if (retval < 0)	{
+			FMDBG("[S IOCTL=V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH]\n");
+			FMDBG("sync_read_xfr error: [retval=%d]\n", retval);
 			break;
+		}
 		/* RMSSI Threshold is a signed 8 bit value */
-		xfr_buf[0] = (char)ctrl->value;
-		xfr_buf[1] = (char)ctrl->value;
+		xfr_buf[0] = (unsigned char)ctrl->value;
+		xfr_buf[1] = (unsigned char)ctrl->value;
 		xfr_buf[4] = 0x01;
 		retval = sync_write_xfr(radio, RX_CONFIG, xfr_buf);
+		if (retval < 0) {
+			FMDBG("[S IOCTL=V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH]\n");
+			FMDBG("sync_write_xfr error: [retval=%d]\n", retval);
+			break;
+		}
 		break;
 	case V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY:
 		radio->srch_params.srch_pty = ctrl->value;
