@@ -1898,6 +1898,10 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	device_remove_file(&dev->gadget.dev, &dev_attr_wakeup);
 	driver->unbind(&dev->gadget);
+	if (dev->irq) {
+		free_irq(dev->irq, dev);
+		dev->irq = 0;
+	}
 	dev->gadget.dev.driver = NULL;
 	dev->driver = NULL;
 
