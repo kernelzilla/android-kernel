@@ -71,6 +71,10 @@ config MSM_AMSS_SUPPORT_256MB_EBI1
 	default n
 	bool "AMSS that support unified 128MB and 256MB EBI1"
 
+config MSM_AMSS_RADIO2708_MEMMAP
+	default n
+	bool "Dream/Sapphire 2.22.27.08 Memory Map support"
+
 config MSM_DEBUG_UART
 	int
 	default 1 if MSM_DEBUG_UART1
