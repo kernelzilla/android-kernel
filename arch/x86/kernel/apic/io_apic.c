@@ -1484,7 +1484,7 @@ static struct {
 
 static void __init setup_IO_APIC_irqs(void)
 {
-	int apic_id, pin, idx, irq;
+	int apic_id = 0, pin, idx, irq;
 	int notcon = 0;
 	struct irq_desc *desc;
 	struct irq_cfg *cfg;
@@ -1492,7 +1492,14 @@ static void __init setup_IO_APIC_irqs(void)
 
 	apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
-	for (apic_id = 0; apic_id < nr_ioapics; apic_id++)
+#ifdef CONFIG_ACPI
+	if (!acpi_disabled && acpi_ioapic) {
+		apic_id = mp_find_ioapic(0);
+		if (apic_id < 0)
+			apic_id = 0;
+	}
+#endif
+
 	for (pin = 0; pin < nr_ioapic_registers[apic_id]; pin++) {
 		idx = find_irq_entry(apic_id, pin, mp_INT);
 		if (idx == -1) {
@@ -1513,9 +1520,6 @@ static void __init setup_IO_APIC_irqs(void)
 		}
 
 		irq = pin_2_irq(idx, apic_id, pin);
-
-		if ((apic_id > 0) && (irq > 16))
-			continue;
 
 		/*
 		 * Skip the timer IRQ if there's a quirk handler
@@ -1543,56 +1547,6 @@ static void __init setup_IO_APIC_irqs(void)
 	if (notcon)
 		apic_printk(APIC_VERBOSE,
 			" (apicid-pin) not connected\n");
-}
-
-/*
- * for the gsit that is not in first ioapic
- * but could not use acpi_register_gsi()
- * like some special sci in IBM x3330
- */
-void setup_IO_APIC_irq_extra(u32 gsi)
-{
-	int apic_id = 0, pin, idx, irq;
-	int node = cpu_to_node(boot_cpu_id);
-	struct irq_desc *desc;
-	struct irq_cfg *cfg;
-
-	/*
-	 * Convert 'gsi' to 'ioapic.pin'.
-	 */
-	apic_id = mp_find_ioapic(gsi);
-	if (apic_id < 0)
-		return;
-
-	pin = mp_find_ioapic_pin(apic_id, gsi);
-	idx = find_irq_entry(apic_id, pin, mp_INT);
-	if (idx == -1)
-		return;
-
-	irq = pin_2_irq(idx, apic_id, pin);
-#ifdef CONFIG_SPARSE_IRQ
-	desc = irq_to_desc(irq);
-	if (desc)
-		return;
-#endif
-	desc = irq_to_desc_alloc_node(irq, node);
-	if (!desc) {
-		printk(KERN_INFO "can not get irq_desc for %d\n", irq);
-		return;
-	}
-
-	cfg = desc->chip_data;
-	add_pin_to_irq_node(cfg, node, apic_id, pin);
-
-	if (test_bit(pin, mp_ioapic_routing[apic_id].pin_programmed)) {
-		pr_debug("Pin %d-%d already programmed\n",
-			 mp_ioapics[apic_id].apicid, pin);
-		return;
-	}
-	set_bit(pin, mp_ioapic_routing[apic_id].pin_programmed);
-
-	setup_IO_APIC_irq(apic_id, pin, irq, desc,
-			irq_trigger(idx), irq_polarity(idx));
 }
 
 /*
@@ -1736,8 +1690,6 @@ __apicdebuginit(void) print_IO_APIC(void)
 		struct irq_pin_list *entry;
 
 		cfg = desc->chip_data;
-		if (!cfg)
-			continue;
 		entry = cfg->irq_2_pin;
 		if (!entry)
 			continue;
@@ -3213,9 +3165,12 @@ unsigned int create_irq_nr(unsigned int irq_want, int node)
 	}
 	spin_unlock_irqrestore(&vector_lock, flags);
 
-	if (irq > 0)
-		dynamic_irq_init_keep_chip_data(irq);
-
+	if (irq > 0) {
+		dynamic_irq_init(irq);
+		/* restore it, in case dynamic_irq_init clear it */
+		if (desc_new)
+			desc_new->chip_data = cfg_new;
+	}
 	return irq;
 }
 
@@ -3238,12 +3193,17 @@ void destroy_irq(unsigned int irq)
 {
 	unsigned long flags;
 	struct irq_cfg *cfg;
+	struct irq_desc *desc;
 
-	dynamic_irq_cleanup_keep_chip_data(irq);
+	/* store it, in case dynamic_irq_cleanup clear it */
+	desc = irq_to_desc(irq);
+	cfg = desc->chip_data;
+	dynamic_irq_cleanup(irq);
+	/* connect back irq_cfg */
+	desc->chip_data = cfg;
 
 	free_irte(irq);
 	spin_lock_irqsave(&vector_lock, flags);
-	cfg = irq_to_desc(irq)->chip_data;
 	__clear_irq_vector(irq, cfg);
 	spin_unlock_irqrestore(&vector_lock, flags);
 }
@@ -4081,22 +4041,26 @@ int acpi_get_override_irq(int bus_irq, int *trigger, int *polarity)
 #ifdef CONFIG_SMP
 void __init setup_ioapic_dest(void)
 {
-	int pin, ioapic, irq, irq_entry;
+	int pin, ioapic = 0, irq, irq_entry;
 	struct irq_desc *desc;
 	const struct cpumask *mask;
 
 	if (skip_ioapic_setup == 1)
 		return;
 
-	for (ioapic = 0; ioapic < nr_ioapics; ioapic++)
+#ifdef CONFIG_ACPI
+	if (!acpi_disabled && acpi_ioapic) {
+		ioapic = mp_find_ioapic(0);
+		if (ioapic < 0)
+			ioapic = 0;
+	}
+#endif
+
 	for (pin = 0; pin < nr_ioapic_registers[ioapic]; pin++) {
 		irq_entry = find_irq_entry(ioapic, pin, mp_INT);
 		if (irq_entry == -1)
 			continue;
 		irq = pin_2_irq(irq_entry, ioapic, pin);
-
-		if ((ioapic > 0) && (irq > 16))
-			continue;
 
 		desc = irq_to_desc(irq);
 

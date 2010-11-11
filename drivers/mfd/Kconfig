@@ -121,6 +121,23 @@ config TWL4030_POWER
 	  and load scripts controling which resources are switched off/on
 	  or reset when a sleep, wakeup or warm reset event occurs.
 
+config MARIMBA_CORE
+	tristate "Marimba Core"
+	depends on I2C && ARCH_MSM7X30
+	default n
+	help
+	  Enables the Marimba Core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  marimba core.
+
+config MARIMBA_CODEC
+	tristate "Marimba Codec"
+	depends on MARIMBA_CORE
+	default n
+	help
+	 This driver programs Marimba Wideband Codec for input/output of
+	 audio signal.
+
 config MFD_TMIO
 	bool
 	default n
@@ -304,6 +321,22 @@ config EZX_PCAP
 	help
 	  This enables the PCAP ASIC present on EZX Phones. This is
 	  needed for MMC, TouchScreen, Sound, USB, etc..
+
+config PMIC8058
+	tristate "PMIC8058 Power Management chip"
+	depends on I2C && ARCH_MSM7X30
+	default y if I2C && ARCH_MSM7X30
+	select MFD_CORE
+	help
+	  Say yes here for Qualcomm PM8058 chip.
+
+config MARIMBA_TSADC
+	tristate "Support for Marimba Touchscreen ADC"
+	depends on MARIMBA_CORE
+	default y if MARIMBA_CORE
+	help
+	  Say yes here if you want to include support for TSADC in the
+	  Qualcomm Marimba chip.
 
 endmenu
 

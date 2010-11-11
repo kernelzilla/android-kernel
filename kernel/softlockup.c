@@ -27,7 +27,7 @@ static DEFINE_PER_CPU(unsigned long, print_timestamp);
 static DEFINE_PER_CPU(struct task_struct *, watchdog_task);
 
 static int __read_mostly did_panic;
-int __read_mostly softlockup_thresh = 60;
+int __read_mostly softlockup_thresh = 30;
 
 /*
  * Should we panic (and reboot, if panic_timeout= is set) when a
@@ -157,8 +157,7 @@ void softlockup_tick(void)
 	print_irqtrace_events(current);
 	if (regs)
 		show_regs(regs);
-	else
-		dump_stack();
+	dump_stack();
 	spin_unlock(&print_lock);
 
 	if (softlockup_panic)

@@ -1560,6 +1560,9 @@ void submit_bio(int rw, struct bio *bio)
 	 * go through the normal accounting stuff before submission.
 	 */
 	if (bio_has_data(bio)) {
+#if defined(CONFIG_MSM_RMT_STORAGE_SERVER)
+		char bde[BDEVNAME_SIZE];
+#endif
 		if (rw & WRITE) {
 			count_vm_events(PGPGOUT, count);
 		} else {
@@ -1569,12 +1572,28 @@ void submit_bio(int rw, struct bio *bio)
 
 		if (unlikely(block_dump)) {
 			char b[BDEVNAME_SIZE];
-			printk(KERN_DEBUG "%s(%d): %s block %Lu on %s\n",
+			printk(KERN_DEBUG "%s(%d): %s block %Lu on %s (%u sectors)\n",
 			current->comm, task_pid_nr(current),
 				(rw & WRITE) ? "WRITE" : "READ",
 				(unsigned long long)bio->bi_sector,
-				bdevname(bio->bi_bdev, b));
+				bdevname(bio->bi_bdev, b),
+				count);
 		}
+#if defined(CONFIG_MSM_RMT_STORAGE_SERVER)
+		/* Get process info for the bio of writing radio partition in eMMC boot */
+		if (!strcmp(bdevname(bio->bi_bdev, bde), "mmcblk0")) {
+			/* 131072 mean modem_st1 partition*/
+			if (bio->bi_sector < 131072) {
+				printk(KERN_DEBUG "[%s] %s(%d): %s block %Lu on %s (%u sectors)\n",
+					__func__, current->comm, task_pid_nr(current),
+					(rw & WRITE) ? "WRITE" : "READ",
+					(unsigned long long)bio->bi_sector,
+					bde, count);
+				if (rw & WRITE)
+					dump_stack();
+			}
+		}
+#endif
 	}
 
 	generic_make_request(bio);

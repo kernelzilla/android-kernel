@@ -83,7 +83,12 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	spin_lock_init(&host->lock);
 	init_waitqueue_head(&host->wq);
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+	INIT_DELAYED_WORK(&host->remove, mmc_remove_sd_card);
 	INIT_DELAYED_WORK_DEFERRABLE(&host->disable, mmc_host_deeper_disable);
+
+	snprintf(host->wakelock_name, sizeof(host->wakelock_name),
+			"mmc%d_delay_work", host->index);
+	wake_lock_init(&host->wakelock, WAKE_LOCK_SUSPEND, host->wakelock_name);
 
 	/*
 	 * By default, hosts do not support SGIO or large requests.
@@ -169,6 +174,7 @@ EXPORT_SYMBOL(mmc_remove_host);
  */
 void mmc_free_host(struct mmc_host *host)
 {
+	wake_lock_destroy(&host->wakelock);
 	spin_lock(&mmc_host_lock);
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);

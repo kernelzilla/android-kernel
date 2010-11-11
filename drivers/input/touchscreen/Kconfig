@@ -11,6 +11,18 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+config TOUCHSCREEN_ATMEL
+	tristate "Atmel i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Atmel over I2C based touchscreens.
+
+config TOUCHSCREEN_NTRIG
+	tristate "N-trig spi touchscreen"
+	depends on SPI_TOUCHSCREEN_NTRIG
+	help
+	  This is support for N-trig over spi based touchscreens
+
 config TOUCHSCREEN_ADS7846
 	tristate "ADS7846/TSC2046 and ADS7843 based touchscreens"
 	depends on SPI_MASTER
@@ -103,6 +115,17 @@ config TOUCHSCREEN_CORGI
 	  NOTE: this driver is deprecated, try enable SPI and generic
 	  ADS7846-based touchscreen driver.
 
+config TOUCHSCREEN_CYPRESS_TMG
+	tristate "Support for Cypress TMC i2c touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for cy8ctmg touchcreens.
+
+	  If unsure, say N
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called h3600_ts_input.
+
 config TOUCHSCREEN_DA9034
 	tristate "Touchscreen support for Dialog Semiconductor DA9034"
 	depends on PMIC_DA903X
@@ -144,6 +167,16 @@ config TOUCHSCREEN_GUNZE
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called gunze.
+
+config TOUCHSCREEN_ELAN_I2C_8232
+	tristate "Elan 8232 I2C touchscreen"
+	depends on I2C
+
+config TOUCHSCREEN_ELAN_KTF2K
+	tristate "Elan KTF2000 I2C touchscreen"
+	depends on I2C
+	help
+	  This enables support for Elan KTF2000 over I2C based touchscreens.
 
 config TOUCHSCREEN_ELO
 	tristate "Elo serial touchscreens"
@@ -260,6 +293,15 @@ config TOUCHSCREEN_PENMOUNT
 	  To compile this driver as a module, choose M here: the
 	  module will be called penmount.
 
+config TOUCHSCREEN_MSM
+	bool "Qualcomm MSM touchscreen controller"
+	depends on ARCH_MSM
+	default n
+	help
+	  Say Y here if you have a 4-wire resistive touchscreen panel
+	  connected to the TSSC touchscreen controller on a
+	  Qualcomm MSM/QSD based SoC.
+
 config TOUCHSCREEN_MIGOR
 	tristate "Renesas MIGO-R touchscreen"
 	depends on SH_MIGOR && I2C
@@ -270,6 +312,47 @@ config TOUCHSCREEN_MIGOR
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called migor_ts.
+
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
+
+config TOUCHSCREEN_COMPATIBLE_REPORT
+	bool "Touchscreen compatible report"
+	depends on I2C
+	default n
+	help
+	  This enables support for old report style in touchscreen driver
+
+config TOUCHSCREEN_CONCATENATE_REPORT
+	bool "Touchscreen concatenate report"
+	depends on I2C
+	default n
+	help
+	  This enables support for concatenate report style in touchscreen driver
+	  This support could reduce the number of reports in touchscreen driver
+
+config TOUCHSCREEN_DUPLICATED_FILTER
+	bool "Touchscreen duplicated report filter"
+	depends on TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	default n
+	help
+	  This enables filter for duplicated report in touchscreen driver
+	  This support will discard small movement report in touchscreen driver
+
+config TOUCHSCREEN_SYNAPTICS_T1021
+        tristate "Synaptics T1021 i2c touchscreen"
+        depends on I2C
+        help
+          This enables support for Synaptics RMI4 over I2C based touchscreens.
+
+config TOUCHSCREEN_SYNAPTICS_3K
+        tristate "Synaptics 3k serious i2c touchscreen"
+        depends on I2C
+        help
+          This enables support for Synaptics RMI4 over I2C based touchscreens.
 
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"

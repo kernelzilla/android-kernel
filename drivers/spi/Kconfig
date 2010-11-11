@@ -150,6 +150,44 @@ config SPI_MPC8xxx
 	  This driver uses a simple set of shift registers for data (opposed
 	  to the CPM based descriptor model).
 
+config SPI_QSD
+        tristate "QSD SPI support"
+        default n
+	depends on ARCH_QSD8X50 || ARCH_MSM7X30
+        help
+          Support for Serial Peripheral Interface for Qualcomm 8x50
+
+          This driver can also be built as a module.  If so, the module
+          will be called spi_qsd.
+
+config SPI_QSD_NEW
+        tristate "QSD SPI support"
+        default n
+        depends on SPI_QSD
+        help
+	  none
+
+config SPI_CRUCIAL_OJ
+        tristate "SPI support for CRUCIAL OJ"
+        default n
+	depends on ARCH_MSM7X30
+        help
+          SPI driver for CRUCIAL OJ
+
+config SPI_TOUCHSCREEN_NTRIG
+	tristate "SPI support for Touchscreen"
+	default y
+	depends on ARCH_MSM7X30
+	help
+		SPI driver for N-trig Touchscreen
+
+config SPI_AIC3254
+	tristate "TI AIC3254 SPI support"
+        default n
+	depends on ARCH_MSM7X30
+	help
+	  TI AIC3254 is external codec for audio RX
+
 config SPI_OMAP_UWIRE
 	tristate "OMAP1 MicroWire"
 	depends on ARCH_OMAP1

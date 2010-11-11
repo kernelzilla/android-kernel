@@ -443,8 +443,7 @@ out:
 
 void wl1251_debugfs_reset(struct wl1251 *wl)
 {
-	if (wl->stats.fw_stats != NULL)
-		memset(wl->stats.fw_stats, 0, sizeof(*wl->stats.fw_stats));
+	memset(wl->stats.fw_stats, 0, sizeof(*wl->stats.fw_stats));
 	wl->stats.retry_count = 0;
 	wl->stats.excessive_retries = 0;
 }

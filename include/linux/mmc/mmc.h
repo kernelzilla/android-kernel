@@ -24,6 +24,7 @@
 #ifndef MMC_MMC_H
 #define MMC_MMC_H
 
+#define MMC_SECTOR_SIZE_2G      0x400000l /*sector count 4194304*/
 /* Standard MMC commands (4.1)           type  argument     response */
    /* class 1 */
 #define MMC_GO_IDLE_STATE         0   /* bc                          */
@@ -40,7 +41,9 @@
 #define MMC_READ_DAT_UNTIL_STOP  11   /* adtc [31:0] dadr        R1  */
 #define MMC_STOP_TRANSMISSION    12   /* ac                      R1b */
 #define MMC_SEND_STATUS          13   /* ac   [31:16] RCA        R1  */
+#define MMC_BUSTEST_R            14   /* adtc                    R1  */
 #define MMC_GO_INACTIVE_STATE    15   /* ac   [31:16] RCA            */
+#define MMC_BUSTEST_W            19   /* adtc                    R1  */
 #define MMC_SPI_READ_OCR         58   /* spi                  spi_R3 */
 #define MMC_SPI_CRC_ON_OFF       59   /* spi  [0:0] flag      spi_R1 */
 
@@ -198,6 +201,8 @@ struct _mmc_csd {
 	u8  ecc;
 };
 
+#define MMC_ACCESS_MODE_MASK	0x60000000
+#define MMC_ACCESS_MODE_SECTOR	0x40000000
 /*
  * OCR bits are mostly in host.h
  */
@@ -266,8 +271,12 @@ struct _mmc_csd {
 #define EXT_CSD_CMD_SET_SECURE		(1<<1)
 #define EXT_CSD_CMD_SET_CPSECURE	(1<<2)
 
-#define EXT_CSD_CARD_TYPE_26	(1<<0)	/* Card can run at 26MHz */
-#define EXT_CSD_CARD_TYPE_52	(1<<1)	/* Card can run at 52MHz */
+#define EXT_CSD_CARD_TYPE_26		(1<<0)	/* Card can run at 26MHz */
+#define EXT_CSD_CARD_TYPE_52		(1<<1)	/* Card can run at 52MHz */
+#if defined(CONFIG_ARCH_MSM7X30)
+#define EXT_CSD_CARD_TYPE_DDR_HV	(1<<2)	/* Card can run at 52MHz */
+#define EXT_CSD_CARD_TYPE_DDR_LV	(1<<3)	/* Card can run at 52MHz */
+#endif
 
 #define EXT_CSD_BUS_WIDTH_1	0	/* Card is in 1 bit mode */
 #define EXT_CSD_BUS_WIDTH_4	1	/* Card is in 4 bit mode */

@@ -14,10 +14,14 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/scatterlist.h>
+#include <linux/delay.h>
 
+#include <linux/mmc/mmc.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include "queue.h"
+
+#include <mach/msm_sdcc.h>
 
 #define MMC_QUEUE_BOUNCESZ	65536
 
@@ -45,12 +49,13 @@ static int mmc_queue_thread(void *d)
 {
 	struct mmc_queue *mq = d;
 	struct request_queue *q = mq->queue;
+	struct request *req;
 
 	current->flags |= PF_MEMALLOC;
 
 	down(&mq->thread_sem);
 	do {
-		struct request *req = NULL;
+		req = NULL;	/* Must be set to NULL at each iteration */
 
 		spin_lock_irq(q->queue_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -70,8 +75,48 @@ static int mmc_queue_thread(void *d)
 			continue;
 		}
 		set_current_state(TASK_RUNNING);
+#ifdef CONFIG_MMC_AUTO_SUSPEND
+		mmc_auto_suspend(mq->card->host, 0);
+#endif
+#ifdef CONFIG_MMC_BLOCK_PARANOID_RESUME
+		if (mq->check_status) {
+			struct mmc_command cmd;
+			int retries = 3;
+			unsigned long delay = jiffies + HZ;
 
-		mq->issue_fn(mq, req);
+			do {
+				int err;
+
+				cmd.opcode = MMC_SEND_STATUS;
+				cmd.arg = mq->card->rca << 16;
+				cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+
+				mmc_claim_host(mq->card->host);
+				err = mmc_wait_for_cmd(mq->card->host, &cmd, 5);
+				mmc_release_host(mq->card->host);
+
+				if (err) {
+					printk(KERN_ERR "%s: failed to get status (%d)\n",
+					       __func__, err);
+					msleep(5);
+					retries--;
+					continue;
+				}
+
+				if (time_after(jiffies, delay)) {
+					printk(KERN_ERR
+						"failed to get card ready\n");
+					break;
+				}
+				printk(KERN_DEBUG "%s: status 0x%.8x\n", __func__, cmd.resp[0]);
+			} while (retries &&
+				(!(cmd.resp[0] & R1_READY_FOR_DATA) ||
+				(R1_CURRENT_STATE(cmd.resp[0]) == 7)));
+			mq->check_status = 0;
+		}
+#endif
+		if (!(mq->issue_fn(mq, req)))
+			printk(KERN_ERR "mmc_blk_issue_rq failed!!\n");
 	} while (1);
 	up(&mq->thread_sem);
 
@@ -197,7 +242,17 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 
 	init_MUTEX(&mq->thread_sem);
 
-	mq->thread = kthread_run(mmc_queue_thread, mq, "mmcqd");
+	if (is_svlte_type_mmc_card(card))
+		mq->thread = kthread_run(mmc_queue_thread, mq, "svlte-qd");
+	else if (mmc_card_sd(card))
+		mq->thread = kthread_run(mmc_queue_thread, mq, "sd-qd");
+	else if (mmc_card_mmc(card))
+		mq->thread = kthread_run(mmc_queue_thread, mq, "emmc-qd");
+	else if (mmc_card_sdio(card))
+		mq->thread = kthread_run(mmc_queue_thread, mq, "sdio-qd");
+	else
+		mq->thread = kthread_run(mmc_queue_thread, mq, "mmcqd");
+
 	if (IS_ERR(mq->thread)) {
 		ret = PTR_ERR(mq->thread);
 		goto free_bounce_sg;

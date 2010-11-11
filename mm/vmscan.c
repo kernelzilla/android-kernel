@@ -1093,8 +1093,8 @@ static int too_many_isolated(struct zone *zone, int file,
 static inline bool should_reclaim_stall(unsigned long nr_taken,
 					unsigned long nr_freed,
 					int priority,
-					int lumpy_reclaim,
-					struct scan_control *sc)
+					struct scan_control *sc,
+					int lumpy_reclaim)
 {
 	int lumpy_stall_priority;
 
@@ -1218,11 +1218,8 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 		nr_scanned += nr_scan;
 		nr_freed = shrink_page_list(&page_list, sc, PAGEOUT_IO_ASYNC);
 
-		/* Check if we should syncronously wait for writeback */
-		if (should_reclaim_stall(nr_taken, nr_freed, priority,
-					lumpy_reclaim, sc)) {
-			congestion_wait(BLK_RW_ASYNC, HZ/10);
-
+		/* Check if we should synchronously wait for writeback */
+		if (should_reclaim_stall(nr_taken, nr_reclaimed, priority, sc, lumpy_reclaim)) {
 			/*
 			 * The attempt at page out may have made some
 			 * of the pages active, mark them inactive again.

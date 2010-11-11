@@ -23,6 +23,10 @@
 #include "sdio_cis.h"
 #include "sdio_ops.h"
 
+#ifdef CONFIG_MMC_MSM7X00A
+#include <mach/msm_sdcc.h>
+#endif
+
 static int cistpl_vers_1(struct mmc_card *card, struct sdio_func *func,
 			 const unsigned char *buf, unsigned size)
 {
@@ -140,7 +144,7 @@ static int cistpl_funce_func(struct sdio_func *func,
 		return -EILSEQ;
 
 	vsn = func->card->cccr.sdio_vsn;
-	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 42;
+	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 34;
 
 	if (size < min_size || buf[0] != 1)
 		return -EINVAL;
@@ -242,8 +246,14 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 			break;
 
 		/* null entries have no link field or data */
-		if (tpl_code == 0x00)
-			continue;
+		if (tpl_code == 0x00) {
+#ifdef CONFIG_MMC_MSM7X00A
+			if (is_svlte_type_mmc_card(card))
+				break;
+			else
+#endif
+				continue;
+		}
 
 		ret = mmc_io_rw_direct(card, 0, 0, ptr++, 0, &tpl_link);
 		if (ret)

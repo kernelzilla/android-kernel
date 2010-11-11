@@ -1997,8 +1997,12 @@ static void set_curr_task_fair(struct rq *rq)
 static void moved_group_fair(struct task_struct *p)
 {
 	struct cfs_rq *cfs_rq = task_cfs_rq(p);
+	s64 delta;
 
 	update_curr(cfs_rq);
+	delta = (s64) (p->se.vruntime - cfs_rq->min_vruntime);
+	if(delta > 0)
+		p->se.vruntime = cfs_rq->min_vruntime;
 	place_entity(cfs_rq, &p->se, 1);
 }
 #endif

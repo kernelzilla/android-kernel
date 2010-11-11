@@ -11,4 +11,4 @@ mmc_block-objs			:= block.o queue.o
 obj-$(CONFIG_MMC_TEST)		+= mmc_test.o
 
 obj-$(CONFIG_SDIO_UART)		+= sdio_uart.o
-
+obj-$(CONFIG_MMC_TI_SDIO_ADAPT)	+= ti_sdio_adapt.o

@@ -852,6 +852,151 @@ int spi_write_then_read(struct spi_device *spi,
 }
 EXPORT_SYMBOL_GPL(spi_write_then_read);
 
+/**
+ * spi_write_and_read - SPI synchronous write and read in full duplex
+ * @spi: device with which data will be exchanged
+ * @txbuf: data to be written (need not be dma-safe)
+ * @rxbuf: buffer into which data will be read (need not be dma-safe)
+ * @size: size of transmission, in bytes
+ * Context: can sleep
+ * (Modify from spi_write_then_read)
+ *
+ * This performs a full duplex MicroWire style transaction with the
+ * device, sending txbuf and reading rxbuf at same time. The return value
+ * is zero for success, else a negative errno status code.
+ * This call may only be used from a context that may sleep.
+ *
+ * Parameters to this routine are always copied using a small buffer;
+ * portable code should never use this for more than 32 bytes.
+ * Performance-sensitive or bulk transfer code should instead use
+ * spi_{async,sync}() calls with dma-safe buffers.
+ */
+int spi_write_and_read(struct spi_device *spi,
+		u8 *txbuf, u8 *rxbuf, unsigned size)
+{
+	static DEFINE_MUTEX(lock);
+
+	int			status;
+	struct spi_message	message;
+	struct spi_transfer	x;
+	u8			*local_buf;
+
+	/* Use preallocated DMA-safe buffer.  We can't avoid copying here,
+	 * (as a pure convenience thing), but we can keep heap costs
+	 * out of the hot path ...
+	 */
+	if (size > SPI_BUFSIZ)
+		return -EINVAL;
+
+	spi_message_init(&message);
+	memset(&x, 0, sizeof x);
+	if (size) {
+		x.len = size;
+		spi_message_add_tail(&x, &message);
+	}
+
+	/* ... unless someone else is using the pre-allocated buffer */
+	if (!mutex_trylock(&lock)) {
+		local_buf = kmalloc(SPI_BUFSIZ, GFP_KERNEL);
+		if (!local_buf)
+			return -ENOMEM;
+	} else
+		local_buf = buf;
+
+	memcpy(local_buf, txbuf, size);
+	x.tx_buf = local_buf;
+	x.rx_buf = local_buf + size;
+
+	/* do the i/o */
+	status = spi_sync(spi, &message);
+	if (status == 0)
+		memcpy(rxbuf, x.rx_buf, size);
+
+	if (x.tx_buf == buf)
+		mutex_unlock(&lock);
+	else
+		kfree(local_buf);
+
+	return status;
+}
+EXPORT_SYMBOL_GPL(spi_write_and_read);
+
+static inline int spi_Duplex(struct spi_device *spi,  char *txbuf,
+	char *rxbuf, size_t len)
+{
+	int spiRet;
+	struct spi_transfer t = {
+		.tx_buf = txbuf,
+		.rx_buf = rxbuf,
+		.len = len,
+	};
+	struct spi_message m;
+
+	spi_message_init(&m);
+	spi_message_add_tail(&t, &m);
+
+	spiRet = spi_sync(spi, &m);
+/*
+	if (len > 128) {
+		printk(KERN_INFO "[TSDUP_T]:%x%x%x%x %x%x%x%x %x%x%x%x %x%x%x%x %x%x%x%x %x%x%x%x %x%x%x%x %x%x%x%x \n[TSDUP_R]:%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x02%x \n" ,
+					   *(txbuf+0), *(txbuf+1), *(txbuf+2), *(txbuf+3),
+					   *(txbuf+4), *(txbuf+5), *(txbuf+6), *(txbuf+7),
+					   *(txbuf+8), *(txbuf+9), *(txbuf+10), *(txbuf+11),
+					   *(txbuf+12), *(txbuf+13), *(txbuf+14), *(txbuf+15),
+					   *(txbuf+16), *(txbuf+17), *(txbuf+18), *(txbuf+19),
+					   *(txbuf+20), *(txbuf+21), *(txbuf+22), *(txbuf+23),
+					   *(txbuf+24), *(txbuf+25), *(txbuf+26), *(txbuf+27),
+					   *(txbuf+28), *(txbuf+29), *(txbuf+30), *(txbuf+31),
+					   *(rxbuf+0), *(rxbuf+1), *(rxbuf+2), *(rxbuf+3),
+					   *(rxbuf+4), *(rxbuf+5), *(rxbuf+6), *(rxbuf+7),
+					   *(rxbuf+8), *(rxbuf+9), *(rxbuf+10), *(rxbuf+11),
+					   *(rxbuf+12), *(rxbuf+13), *(rxbuf+14), *(rxbuf+15),
+					   *(rxbuf+16), *(rxbuf+17), *(rxbuf+18), *(rxbuf+19),
+					   *(rxbuf+20), *(rxbuf+21), *(rxbuf+22), *(rxbuf+23),
+					   *(rxbuf+24), *(rxbuf+25), *(rxbuf+26), *(rxbuf+27),
+					   *(rxbuf+28), *(rxbuf+29), *(rxbuf+30), *(rxbuf+31)
+					   );
+	} else {
+		printk(KERN_INFO "[TSDUP_T]:%02x%02x%02x%02x_%02x%02x%02x%02x \n[TSDUP_R]:%02x%02x%02x%02x_%02x%02x%02x%02x \n" ,
+					   *(txbuf+0), *(txbuf+1), *(txbuf+2), *(txbuf+3),
+					   *(txbuf+4), *(txbuf+5), *(txbuf+6), *(txbuf+7),
+					   *(rxbuf+0), *(rxbuf+1), *(rxbuf+2), *(rxbuf+3),
+					    *(rxbuf+4), *(rxbuf+5), *(rxbuf+6), *(rxbuf+7)
+					    );
+	}*/
+	return spiRet;
+}
+EXPORT_SYMBOL_GPL(spi_Duplex);
+
+
+static DEFINE_MUTEX(spi_lock);
+int
+spi_read_write_lock(struct spi_device *spidev, struct spi_msg *msg, char *buf, int size, int func)
+{
+	int err =  -EINVAL;
+	mutex_lock(&spi_lock);
+	switch (func) {
+	case 0:
+		if (!buf)
+			break;
+		err = spi_read(spidev, buf, size);
+		break;
+	case 1:
+		if (!msg)
+			break;
+		err = spi_write(spidev, msg->buffer, (msg->len + 1)*size);
+		break;
+	case 2:
+		if (!msg)
+			break;
+		err = spi_Duplex(spidev, msg->buffer, buf, size);
+		break;
+	}
+	mutex_unlock(&spi_lock);
+	return err;
+}
+
+
 /*-------------------------------------------------------------------------*/
 
 static int __init spi_init(void)

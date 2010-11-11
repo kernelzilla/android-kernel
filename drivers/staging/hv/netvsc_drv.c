@@ -413,7 +413,8 @@ static int netvsc_probe(struct device *device)
 	if (!net_drv_obj->Base.OnDeviceAdd)
 		return -1;
 
-	net = alloc_etherdev(sizeof(struct net_device_context));
+	net = alloc_netdev(sizeof(struct net_device_context), "seth%d",
+			   ether_setup);
 	if (!net)
 		return -1;
 

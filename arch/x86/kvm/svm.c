@@ -27,7 +27,6 @@
 #include <linux/sched.h>
 #include <linux/ftrace_event.h>
 
-#include <asm/tlbflush.h>
 #include <asm/desc.h>
 
 #include <asm/virtext.h>
@@ -62,8 +61,6 @@ MODULE_LICENSE("GPL");
 #else
 #define nsvm_printk(fmt, args...) do {} while(0)
 #endif
-
-static bool erratum_383_found __read_mostly;
 
 static const u32 host_save_user_msrs[] = {
 #ifdef CONFIG_X86_64
@@ -302,31 +299,6 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 	svm_set_interrupt_shadow(vcpu, 0);
 }
 
-static void svm_init_erratum_383(void)
-{
-	u32 low, high;
-	int err;
-	u64 val;
-
-	/* Only Fam10h is affected */
-	if (boot_cpu_data.x86 != 0x10)
-		return;
-
-	/* Use _safe variants to not break nested virtualization */
-	val = native_read_msr_safe(MSR_AMD64_DC_CFG, &err);
-	if (err)
-		return;
-
-	val |= (1ULL << 47);
-
-	low  = lower_32_bits(val);
-	high = upper_32_bits(val);
-
-	native_write_msr_safe(MSR_AMD64_DC_CFG, low, high);
-
-	erratum_383_found = true;
-}
-
 static int has_svm(void)
 {
 	const char *msg;
@@ -346,6 +318,7 @@ static void svm_hardware_disable(void *garbage)
 
 static void svm_hardware_enable(void *garbage)
 {
+
 	struct svm_cpu_data *svm_data;
 	uint64_t efer;
 	struct descriptor_table gdt_descr;
@@ -377,10 +350,6 @@ static void svm_hardware_enable(void *garbage)
 
 	wrmsrl(MSR_VM_HSAVE_PA,
 	       page_to_pfn(svm_data->save_area) << PAGE_SHIFT);
-
-	svm_init_erratum_383();
-
-	return;
 }
 
 static void svm_cpu_uninit(int cpu)
@@ -656,12 +625,11 @@ static void init_vmcb(struct vcpu_svm *svm)
 	save->rip = 0x0000fff0;
 	svm->vcpu.arch.regs[VCPU_REGS_RIP] = save->rip;
 
-	/* This is the guest-visible cr0 value.
-	 * svm_set_cr0() sets PG and WP and clears NW and CD on save->cr0.
+	/*
+	 * cr0 val on cpu init should be 0x60000010, we enable cpu
+	 * cache by default. the orderly way is to enable cache in bios.
 	 */
-	svm->vcpu.arch.cr0 = X86_CR0_NW | X86_CR0_CD | X86_CR0_ET;
-	kvm_set_cr0(&svm->vcpu, svm->vcpu.arch.cr0);
-
+	save->cr0 = 0x00000010 | X86_CR0_PG | X86_CR0_WP;
 	save->cr4 = X86_CR4_PAE;
 	/* rdx = ?? */
 
@@ -725,27 +693,28 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 	if (err)
 		goto free_svm;
 
-	err = -ENOMEM;
 	page = alloc_page(GFP_KERNEL);
-	if (!page)
+	if (!page) {
+		err = -ENOMEM;
 		goto uninit;
+	}
 
+	err = -ENOMEM;
 	msrpm_pages = alloc_pages(GFP_KERNEL, MSRPM_ALLOC_ORDER);
 	if (!msrpm_pages)
-		goto free_page1;
+		goto uninit;
 
 	nested_msrpm_pages = alloc_pages(GFP_KERNEL, MSRPM_ALLOC_ORDER);
 	if (!nested_msrpm_pages)
-		goto free_page2;
-
-	hsave_page = alloc_page(GFP_KERNEL);
-	if (!hsave_page)
-		goto free_page3;
-
-	svm->nested.hsave = page_address(hsave_page);
+		goto uninit;
 
 	svm->msrpm = page_address(msrpm_pages);
 	svm_vcpu_init_msrpm(svm->msrpm);
+
+	hsave_page = alloc_page(GFP_KERNEL);
+	if (!hsave_page)
+		goto uninit;
+	svm->nested.hsave = page_address(hsave_page);
 
 	svm->nested.msrpm = page_address(nested_msrpm_pages);
 
@@ -763,12 +732,6 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 
 	return &svm->vcpu;
 
-free_page3:
-	__free_pages(nested_msrpm_pages, MSRPM_ALLOC_ORDER);
-free_page2:
-	__free_pages(msrpm_pages, MSRPM_ALLOC_ORDER);
-free_page1:
-	__free_page(page);
 uninit:
 	kvm_vcpu_uninit(&svm->vcpu);
 free_svm:
@@ -1288,59 +1251,8 @@ static int nm_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
 	return 1;
 }
 
-static bool is_erratum_383(void)
+static int mc_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
 {
-	int err, i;
-	u64 value;
-
-	if (!erratum_383_found)
-		return false;
-
-	value = native_read_msr_safe(MSR_IA32_MC0_STATUS, &err);
-	if (err)
-		return false;
-
-	/* Bit 62 may or may not be set for this mce */
-	value &= ~(1ULL << 62);
-
-	if (value != 0xb600000000010015ULL)
-		return false;
-
-	/* Clear MCi_STATUS registers */
-	for (i = 0; i < 6; ++i)
-		native_write_msr_safe(MSR_IA32_MCx_STATUS(i), 0, 0);
-
-	value = native_read_msr_safe(MSR_IA32_MCG_STATUS, &err);
-	if (!err) {
-		u32 low, high;
-
-		value &= ~(1ULL << 2);
-		low    = lower_32_bits(value);
-		high   = upper_32_bits(value);
-
-		native_write_msr_safe(MSR_IA32_MCG_STATUS, low, high);
-	}
-
-	/* Flush tlb to evict multi-match entries */
-	__flush_tlb_all();
-
-	return true;
-}
-
-static void svm_handle_mce(struct vcpu_svm *svm)
-{
-	if (is_erratum_383()) {
-		/*
-		 * Erratum 383 triggered. Guest state is corrupt so kill the
-		 * guest.
-		 */
-		pr_err("KVM: Guest triggered AMD Erratum 383\n");
-
-		set_bit(KVM_REQ_TRIPLE_FAULT, &svm->vcpu.requests);
-
-		return;
-	}
-
 	/*
 	 * On an #MC intercept the MCE handler is not called automatically in
 	 * the host. So do it by hand here.
@@ -1349,11 +1261,6 @@ static void svm_handle_mce(struct vcpu_svm *svm)
 		"int $0x12\n");
 	/* not sure if we ever come back to this point */
 
-	return;
-}
-
-static int mc_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
-{
 	return 1;
 }
 
@@ -2804,14 +2711,6 @@ static void svm_vcpu_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 		vcpu->arch.regs_avail &= ~(1 << VCPU_EXREG_PDPTR);
 		vcpu->arch.regs_dirty &= ~(1 << VCPU_EXREG_PDPTR);
 	}
-
-	/*
-	 * We need to handle MC intercepts here before the vcpu has a chance to
-	 * change the physical cpu
-	 */
-	if (unlikely(svm->vmcb->control.exit_code ==
-		     SVM_EXIT_EXCP_BASE + MC_VECTOR))
-		svm_handle_mce(svm);
 }
 
 #undef R

@@ -160,14 +160,13 @@ ENTRY(v7_coherent_user_range)
 	bic	r0, r0, r3
 1:
  USER(	mcr	p15, 0, r0, c7, c11, 1	)	@ clean D line to the point of unification
-	dsb
- USER(	mcr	p15, 0, r0, c7, c5, 1	)	@ invalidate I line
 	add	r0, r0, r2
 2:
 	cmp	r0, r1
 	blo	1b
+	dsb
 	mov	r0, #0
-	mcr	p15, 0, r0, c7, c5, 6		@ invalidate BTB
+	mcr	p15, 0, r0, c7, c5, 0		@ Invalidate Entire IC and BTB, ICIALLU
 	dsb
 	isb
 	mov	pc, lr

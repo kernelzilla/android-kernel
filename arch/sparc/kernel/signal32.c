@@ -120,8 +120,8 @@ struct rt_signal_frame32 {
 };
 
 /* Align macros */
-#define SF_ALIGNEDSZ  (((sizeof(struct signal_frame32) + 15) & (~15)))
-#define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame32) + 15) & (~15)))
+#define SF_ALIGNEDSZ  (((sizeof(struct signal_frame32) + 7) & (~7)))
+#define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame32) + 7) & (~7)))
 
 int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 {
@@ -420,17 +420,15 @@ static void __user *get_sigframe(struct sigaction *sa, struct pt_regs *regs, uns
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	sp -= framesize;
-
 	/* Always align the stack frame.  This handles two cases.  First,
 	 * sigaltstack need not be mindful of platform specific stack
 	 * alignment.  Second, if we took this signal because the stack
 	 * is not aligned properly, we'd like to take the signal cleanly
 	 * and report that.
 	 */
-	sp &= ~15UL;
+	sp &= ~7UL;
 
-	return (void __user *) sp;
+	return (void __user *)(sp - framesize);
 }
 
 static int save_fpu_state32(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)

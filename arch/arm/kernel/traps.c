@@ -33,6 +33,9 @@
 #include "signal.h"
 
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+static unsigned c_op_vma_count;
+#define WARN_NOISE_LEVEL 10
+
 
 #ifdef CONFIG_DEBUG_USER
 unsigned int user_debug;
@@ -427,8 +430,14 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 	struct mm_struct *mm = current->active_mm;
 	struct vm_area_struct *vma;
 
-	if (end < start || flags)
+	if (end < start || flags) {
+		printk(KERN_ALERT "[Skip Cacheop] invalid param\n");
+		printk(KERN_ALERT "start %lx end %lx flags %d",
+			start, end , flags);
+		/* Some caller is definitely buggy */
+		BUG_ON(1);
 		return;
+	}
 
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, start);
@@ -438,7 +447,18 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 		if (end > vma->vm_end)
 			end = vma->vm_end;
 
-		flush_cache_user_range(vma, start, end);
+		up_read(&mm->mmap_sem);
+		flush_cache_user_range(start, end);
+		return;
+	} else {
+		printk(KERN_ALERT "[Skip Cacheop] couldnt find vma\n");
+		printk(KERN_ALERT "start %lx end %lx flags %d",
+				start, end , flags);
+		/* Reduce the noise, might not reflect correct caller */
+		c_op_vma_count++;
+		if(c_op_vma_count % WARN_NOISE_LEVEL) {
+			WARN_ON(1);
+		}
 	}
 	up_read(&mm->mmap_sem);
 }
@@ -505,7 +525,8 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		thread->tp_value = regs->ARM_r0;
 #if defined(CONFIG_HAS_TLS_REG)
 		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
-#elif !defined(CONFIG_TLS_REG_EMUL)
+//#elif !defined(CONFIG_TLS_REG_EMUL)
+#endif
 		/*
 		 * User space must never try to access this directly.
 		 * Expect your app to break eventually if you do so.
@@ -513,7 +534,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		 * (see entry-armv.S for details)
 		 */
 		*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
-#endif
+//#endif
 		return 0;
 
 #ifdef CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG

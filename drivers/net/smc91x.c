@@ -550,7 +550,6 @@ static void smc_hardware_send_pkt(unsigned long data)
 	struct sk_buff *skb;
 	unsigned int packet_no, len;
 	unsigned char *buf;
-	unsigned long flags;
 
 	DBG(3, "%s: %s\n", dev->name, __func__);
 
@@ -636,7 +635,6 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct smc_local *lp = netdev_priv(dev);
 	void __iomem *ioaddr = lp->base;
 	unsigned int numPages, poll_count, status;
-	unsigned long flags;
 
 	DBG(3, "%s: %s\n", dev->name, __func__);
 

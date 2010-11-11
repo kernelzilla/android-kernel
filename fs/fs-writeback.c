@@ -25,6 +25,7 @@
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+#include <linux/delay.h>
 #include "internal.h"
 
 #define inode_to_bdi(inode)	((inode)->i_mapping->backing_dev_info)
@@ -150,8 +151,12 @@ static void wb_clear_pending(struct bdi_writeback *wb, struct bdi_work *work)
 	}
 }
 
+#define MAX_WAKEUP_RETRIES		3
 static void bdi_queue_work(struct backing_dev_info *bdi, struct bdi_work *work)
 {
+	int success = 0;
+	int retries = 0;
+
 	work->seen = bdi->wb_mask;
 	BUG_ON(!work->seen);
 	atomic_set(&work->pending, bdi->wb_cnt);
@@ -175,8 +180,33 @@ static void bdi_queue_work(struct backing_dev_info *bdi, struct bdi_work *work)
 	else {
 		struct bdi_writeback *wb = &bdi->wb;
 
+#if 0
 		if (wb->task)
 			wake_up_process(wb->task);
+#else
+		if (wb->task) {
+			success = wake_up_process(wb->task);
+			while (!success && ++retries <= MAX_WAKEUP_RETRIES) {
+				mdelay(10);
+				if (!wb->task) {
+					pr_err("(%s) %s: wake up %s FAIL, retries %d, wb_task %p\n",
+						current->comm, __func__, wb->task->comm,
+						retries, wb->task);
+					break;
+				}
+				success = wake_up_process(wb->task);
+				/*
+				pr_info("(%s) %s: wake_up %s %s, retries %d\n",
+					current->comm, __func__, wb->task->comm,
+					success ? "success" : "fail", retries);
+				*/
+			}
+			if (!success && retries > MAX_WAKEUP_RETRIES)
+				pr_err("(%s) %s: wake up %s FAIL, retries %d\n",
+					current->comm, __func__, wb->task->comm,
+					retries);
+		}
+#endif
 	}
 }
 
@@ -1081,7 +1111,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	if ((inode->i_state & flags) == flags)
 		return;
 
-	if (unlikely(block_dump))
+	if (unlikely(block_dump > 1))
 		block_dump___mark_inode_dirty(inode);
 
 	spin_lock(&inode_lock);

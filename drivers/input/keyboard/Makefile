@@ -36,4 +36,8 @@ obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
 obj-$(CONFIG_KEYBOARD_TOSA)		+= tosakbd.o
 obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
 obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
+ifeq ($(CONFIG_MSM_SSBI),y)
+else
+obj-$(CONFIG_KEYBOARD_PMIC8058)         += pmic8058-keypad.o
+endif
 obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o

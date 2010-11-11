@@ -544,7 +544,7 @@ static void flush_devices_by_domain(struct protection_domain *domain)
 
 	for (i = 0; i <= amd_iommu_last_bdf; ++i) {
 		if ((domain == NULL && amd_iommu_pd_table[i] == NULL) ||
-		    (domain != NULL && amd_iommu_pd_table[i] != domain))
+		    (amd_iommu_pd_table[i] != domain))
 			continue;
 
 		iommu = amd_iommu_rlookup_table[i];
@@ -2239,7 +2239,9 @@ static void amd_iommu_domain_destroy(struct iommu_domain *dom)
 
 	free_pagetable(domain);
 
-	protection_domain_free(domain);
+	domain_id_free(domain->id);
+
+	kfree(domain);
 
 	dom->priv = NULL;
 }

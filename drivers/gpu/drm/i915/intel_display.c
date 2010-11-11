@@ -785,8 +785,8 @@ intel_g4x_find_best_PLL(const intel_limit_t *limit, struct drm_crtc *crtc,
 	intel_clock_t clock;
 	int max_n;
 	bool found;
-	/* approximately equals target * 0.00585 */
-	int err_most = (target >> 8) + (target >> 9);
+	/* approximately equals target * 0.00488 */
+	int err_most = (target >> 8) + (target >> 10);
 	found = false;
 
 	if (intel_pipe_has_type(crtc, INTEL_OUTPUT_LVDS)) {
@@ -1402,7 +1402,6 @@ static void igdng_enable_pll_edp (struct drm_crtc *crtc)
 	dpa_ctl = I915_READ(DP_A);
 	dpa_ctl |= DP_PLL_ENABLE;
 	I915_WRITE(DP_A, dpa_ctl);
-	POSTING_READ(DP_A);
 	udelay(200);
 }
 
@@ -4323,7 +4322,7 @@ static void intel_init_display(struct drm_device *dev)
 	}
 
 	/* Returns the core display clock speed */
-	if (IS_I945G(dev) || (IS_G33(dev) && ! IS_IGDGM(dev)))
+	if (IS_I945G(dev))
 		dev_priv->display.get_display_clock_speed =
 			i945_get_display_clock_speed;
 	else if (IS_I915G(dev))

@@ -213,6 +213,12 @@ static struct mem_type mem_types[] = {
 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
 		.domain		= DOMAIN_IO,
 	},	
+	[MT_DEVICE_STRONGLY_ORDERED] = {  /* Guaranteed strongly ordered */
+		.prot_pte       = PROT_PTE_DEVICE,
+		.prot_l1        = PMD_TYPE_TABLE,
+		.prot_sect      = PROT_SECT_DEVICE | PMD_SECT_UNCACHED,
+		.domain         = DOMAIN_IO,
+	},
 	[MT_DEVICE_WC] = {	/* ioremap_wc */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
 		.prot_l1	= PMD_TYPE_TABLE,
@@ -338,6 +344,8 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_XN;
+			mem_types[MT_DEVICE_STRONGLY_ORDERED].prot_sect |=
+								PMD_SECT_XN;
 		}
 		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
 			/*
@@ -664,7 +672,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 		create_mapping(io_desc + i);
 }
 
-static unsigned long __initdata vmalloc_reserve = SZ_128M;
+static unsigned long __initdata vmalloc_reserve = CONFIG_VMALLOC_RESERVE;
 
 /*
  * vmalloc=size forces the vmalloc area to be exactly 'size'
@@ -913,6 +921,11 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	 */
 	res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
 #endif
+
+#ifdef CONFIG_ARCH_MSM_SCORPION
+	res_size = PAGE_SIZE;
+#endif
+
 	if (res_size)
 		reserve_bootmem_node(pgdat, PHYS_OFFSET, res_size,
 				BOOTMEM_DEFAULT);

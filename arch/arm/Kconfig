@@ -115,10 +115,9 @@ config GENERIC_LOCKBREAK
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
-	default y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
+	def_bool y
 
 config ARCH_HAS_ILOG2_U32
 	bool
@@ -561,15 +560,18 @@ config ARCH_PXA
 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
 
 config ARCH_MSM
-	bool "Qualcomm MSM"
-	select CPU_V6
+	bool "Qualcomm MSM/QSD"
+	select ARCH_HAS_CPUFREQ
+	select GENERIC_GPIO
+	select ARCH_REQUIRE_GPIOLIB
 	select GENERIC_TIME
 	select GENERIC_CLOCKEVENTS
 	help
-	  Support for Qualcomm MSM7K based systems.  This runs on the ARM11
-	  apps processor of the MSM7K and depends on a shared memory
-	  interface to the ARM9 modem processor which runs the baseband stack
-	  and controls some vital subsystems (clock and power control, etc).
+	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+	  ARM11/Scorpion apps processor of the MSM/QSD and depends on a
+	  shared memory interface to the ARM9 modem processor which
+	  runs the baseband stack and controls some vital subsystems
+	  (clock and power control, etc).
 
 config ARCH_RPC
 	bool "RiscPC"
@@ -887,18 +889,6 @@ config ARM_ERRATA_460075
 	  ACTLR register. Note that setting specific bits in the ACTLR register
 	  may not be available in non-secure mode.
 
-config ARM_ERRATA_720789
-	bool "ARM errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty ASID"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for the 720789 Cortex-A9 (prior to
-	  r2p0) erratum. A faulty ASID can be sent to the other CPUs for the
-	  broadcasted CP15 TLB maintenance operations TLBIASIDIS and TLBIMVAIS.
-	  As a consequence of this erratum, some TLB entries which should be
-	  invalidated are not, resulting in an incoherency in the system page
-	  tables. The workaround changes the TLB flushing routines to invalidate
-	  entries regardless of the ASID.
-
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1148,6 +1138,13 @@ config HIGHPTE
 	bool "Allocate 2nd-level pagetables from highmem"
 	depends on HIGHMEM
 	depends on !OUTER_CACHE
+
+config VMALLOC_RESERVE
+	hex "Reserved vmalloc space"
+	default 0x08000000
+	depends on MMU
+	help
+	  Reserved vmalloc space if not specified on the kernel commandline.
 
 source "mm/Kconfig"
 

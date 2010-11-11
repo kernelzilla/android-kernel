@@ -61,6 +61,25 @@ static struct vreg vregs[] = {
 	VREG("s3",	29),
 	VREG("rfubm",	30),
 	VREG("ncp",	31),
+#if defined(CONFIG_ARCH_MSM7X30)
+	VREG("gp7",	32),
+	VREG("gp8",	33),
+	VREG("gp9",	34),
+	VREG("gp10",	35),
+	VREG("gp11",	36),
+	VREG("gp12",	37),
+	VREG("gp13",	38),
+	VREG("gp14",	39),
+	VREG("gp15",	40),
+	VREG("gp16",	41),
+	VREG("gp17",	42),
+	VREG("s4",	43),
+	VREG("usb2",	44),
+	VREG("wlan2",	45),
+	VREG("xo_out",	46),
+	VREG("lvsw0",	47),
+	VREG("lvsw1",	48),
+#endif
 };
 
 struct vreg *vreg_get(struct device *dev, const char *id)
@@ -84,11 +103,11 @@ int vreg_enable(struct vreg *vreg)
 	return msm_proc_comm(PCOM_VREG_SWITCH, &id, &enable);
 }
 
-void vreg_disable(struct vreg *vreg)
+int vreg_disable(struct vreg *vreg)
 {
 	unsigned id = vreg->id;
 	unsigned enable = 0;
-	msm_proc_comm(PCOM_VREG_SWITCH, &id, &enable);
+	return msm_proc_comm(PCOM_VREG_SWITCH, &id, &enable);
 }
 
 int vreg_set_level(struct vreg *vreg, unsigned mv)

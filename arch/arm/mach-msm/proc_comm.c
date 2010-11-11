@@ -18,16 +18,26 @@
 #include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/spinlock.h>
+#include <linux/jiffies.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
 
 #include "proc_comm.h"
 
+#if defined(CONFIG_ARCH_MSM7X30)
+#define MSM_TRIG_A2M_INT(n) (writel(1 << n, MSM_GCC_BASE + 0x8))
+#endif
+
 #define MSM_A2M_INT(n) (MSM_CSR_BASE + 0x400 + (n) * 4)
+#define PROC_COMM_TIMEOUT	(10 * HZ)
 
 static inline void notify_other_proc_comm(void)
 {
+#if defined(CONFIG_ARCH_MSM7X30)
+	MSM_TRIG_A2M_INT(6);
+#else
 	writel(1, MSM_A2M_INT(6));
+#endif
 }
 
 #define APP_COMMAND 0x00
@@ -41,6 +51,8 @@ static inline void notify_other_proc_comm(void)
 #define MDM_DATA2   0x1C
 
 static DEFINE_SPINLOCK(proc_comm_lock);
+
+void msm_pm_flush_console(void);
 
 /* The higher level SMD support will install this to
  * provide a way to check for and handle modem restart.
@@ -57,6 +69,10 @@ int (*msm_check_for_modem_crash)(void);
  */
 static int proc_comm_wait_for(void __iomem *addr, unsigned value)
 {
+#ifdef CONFIG_PROC_COMM_TIMEOUT_RESET
+	unsigned long expired_time = jiffies + PROC_COMM_TIMEOUT;
+#endif
+
 	for (;;) {
 		if (readl(addr) == value)
 			return 0;
@@ -64,6 +80,18 @@ static int proc_comm_wait_for(void __iomem *addr, unsigned value)
 		if (msm_check_for_modem_crash)
 			if (msm_check_for_modem_crash())
 				return -EAGAIN;
+#ifdef CONFIG_PROC_COMM_TIMEOUT_RESET
+		if (time_after(jiffies, expired_time)) {
+			if (msm_hw_reset_hook) {
+				pr_err("proc_comm: TIMEOUT. modem has probably "
+						"crashed.\n");
+				msm_pm_flush_console();
+				msm_hw_reset_hook();
+			} else
+				pr_err("proc_comm: TIMEOUT. modem has probably "
+						"crashed. retrying.\n");
+		}
+#endif
 	}
 }
 
