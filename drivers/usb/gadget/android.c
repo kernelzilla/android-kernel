@@ -504,7 +504,11 @@ int android_switch_function(unsigned func)
 	* if we are using RNDIS.
 	*/
 	if (product_id == PID_RNDIS || product_id == PID_ECM || product_id == PID_ACM)
+#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
+		dev->cdev->desc.bDeviceClass = USB_CLASS_WIRELESS_CONTROLLER;
+#else
 		dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
+#endif
 	else
 		dev->cdev->desc.bDeviceClass = USB_CLASS_PER_INTERFACE;
 
@@ -540,7 +544,11 @@ void android_enable_function(struct usb_function *f, int enable)
 		* if we are using RNDIS.
 		*/
 		if (product_id == PID_RNDIS)
-			dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
+#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
+        	        dev->cdev->desc.bDeviceClass = USB_CLASS_WIRELESS_CONTROLLER;
+#else
+	                dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
+#endif
 		else
 			dev->cdev->desc.bDeviceClass = USB_CLASS_PER_INTERFACE;
 #endif
