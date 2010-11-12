@@ -47,6 +47,7 @@ Module.symvers
 #
 include/asm
 include/asm-*/asm-offsets.h
+include/asm-arm
 include/config
 include/linux/autoconf.h
 include/linux/compile.h
