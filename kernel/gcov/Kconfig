@@ -1,0 +1,55 @@
+#
+# GCOV coverage profiling
+#
+
+menu "GCOV coverage profiling"
+
+config GCOV_PROFILE
+	bool "Include GCOV coverage profiling"
+	---help---
+        Provide infrastructure for GCOV kernel coverage support.
+
+        Enable GCOV_ALL to get coverage data for the entire kernel
+        source.
+
+        To get coverage data for only specific files or directories,
+        add the following line to the respective Makefile:
+
+                EXTRA_CFLAGS += $(GCOV_FLAGS)
+
+        Note that GCOV_PROC has to be enabled to access GCOV kernel
+        coverage data.
+
+config GCOV_ALL
+	bool "Profile entire Kernel"
+	depends on GCOV_PROFILE
+	---help---
+	If you say Y here, it will compile the entire kernel with coverage
+	option enabled.
+
+config GCOV_PROC
+	tristate "Provide GCOV proc file system entry"
+	depends on GCOV_PROFILE && PROC_FS
+	---help---
+        Install a proc file system entry at /proc/gcov which provides
+        access to the current coverage state of the kernel code.
+
+        This option is also available as a module called gcov-proc.o.
+        It can be loaded using:
+
+          modprobe gcov-proc
+
+config GCOV_HAMMER
+	bool "Support for modified GCC version 3.3.x (hammer patch)"
+	depends on GCOV_PROFILE
+	---help---
+	Some Linux distributions ship a modified version of GCC 3.3.x that
+	produces GCOV data incompatible with the format of the standard
+	GCC 3.3.x. If you are using such a distribution, you need to enable
+	this option for the GCOV kernel support to work correctly.
+
+	Distributions known to include this modification:
+		SUSE SLES9
+		Mandrake Linux 10.x
+
+endmenu

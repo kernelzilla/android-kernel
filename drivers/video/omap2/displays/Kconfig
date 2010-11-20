@@ -1,0 +1,69 @@
+menu "OMAP2/3 Display Device Drivers"
+        depends on OMAP2_DSS
+
+config USER_PANEL_DRIVER
+        tristate "User Panel Driver"
+        help
+	  User side panel driver interface.
+
+config PANEL_GENERIC
+        tristate "Generic Panel"
+        help
+	  Generic panel driver.
+	  Used for DVI output for Beagle and OMAP3 SDP.
+
+config PANEL_SAMSUNG_LTE430WQ_F0C
+        tristate "Samsung LTE430WQ-F0C LCD Panel"
+        depends on OMAP2_DSS
+        help
+          LCD Panel used on Overo Palo43
+
+config PANEL_SHARP_LS037V7DW01
+        tristate "Sharp LS037V7DW01 LCD Panel"
+        depends on OMAP2_DSS
+        help
+          LCD Panel used in TI's SDP3430 and EVM boards
+
+config PANEL_N800
+        tristate "Panel N8x0"
+        help
+          N8x0 LCD (hack)
+
+config PANEL_ZOOM2
+        tristate "TI Zoom2 Panel"
+        help
+          LCD Panel used in the TI Zoom2
+
+config CTRL_BLIZZARD
+        tristate "Blizzard Controller"
+        help
+          Blizzard Controller (hack)
+
+config PANEL_ACX565AKM
+        tristate "ACX565AKM LCD Panel"
+        depends on OMAP2_DSS_SDI
+        select BACKLIGHT_CLASS_DEVICE
+        help
+          LCD Panel used in RX51
+
+config CTRL_EDISCO
+        tristate "Edisco Controller"
+        help
+          Toshiba EDISCO Controller
+
+config PANEL_SHOLES
+        tristate "Sholes Panel"
+        help
+	  LCD Panel used in sholes
+
+config PANEL_MAPPHONE
+        tristate "Mapphone Panel"
+        help
+          LCD Panel used in Mapphone
+
+config PANEL_MAPPHONE_HDTV
+        tristate "Mapphone HDTV Panel"
+        help
+	  HDTV Panel used in Mapphone
+
+endmenu

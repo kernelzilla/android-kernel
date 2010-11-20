@@ -1,0 +1,39 @@
+# 
+# "-Wall" is used for gcc by default when building kernel
+# Any warnings reported by gcc will lead to build failure
+#
+# Change "gcc_warn_filter.cfg" to filter out specific warnings
+# 
+# NOTE: 
+# The main purpose of filter is to handle warnings in 
+# a) Original OSS code
+# b) Code from 3rd paty
+# "zero build warning" is expected for code changed/added by Motorola
+#
+# !!!WARNING!!! 
+# To remove filter(s), CLEAN build MUST be done for verification
+#
+# For example:
+# 1) To ignore gcc warnings at line#720 in .../arch/arm/mm/mmu.c
+#    "arch/arm/mm/mmu.c:720" shall be added in gcc_warn_filter.cfg
+#
+#    NOTE: 
+#    a) Relative path shall be used rather than absolute path
+#    	I.e. NOT use "/my_repo/xxx/.../kernel/arch/arm/..." 
+#    b) There is NO space allowed before/after ":"
+#    c) There is NO space alloed after "720"
+#    d) More than one rule can be added for one file
+#    	arch/arm/mm/mmu.c:720
+#    	arch/arm/mm/mmu.c:900
+#
+# 2) To ignore ALL gcc warnings in .../arch/arm/mm/mmu.c
+#    "arch/arm/mm/mmu.c" shall be added to gcc_warn_filter.cfg
+#
+# 3) To ignore gcc warnings for ALL files under .../arch/arm/mm
+#    "arch/arm/mm" shall be added in gcc_warn_filter.cfg
+#     NOTE:
+#     a) There is NO "/" at the end of folder name
+#     b) Only the lowest level folder is supported
+#        I.e. Don't expect "arch/arm" can filter warnings from "...arch/arm"
+#
+
