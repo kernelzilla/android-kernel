@@ -120,6 +120,20 @@ config USB_FUNCTION_ETHER
 
 	default USB_FUNCTION_MSM_HSUSB
 
+config USB_FUNCTION_RNDIS
+        boolean "USB RNDIS support"
+        depends on USB_FUNCTION_ETHER
+        default y
+
+config USB_FUNCTION_RNDIS_WCEIS
+        boolean "Use Windows Internet Sharing Class/SubClass/Protocol"
+        depends on USB_FUNCTION_RNDIS
+        help
+         Causes the driver to look like a Windows-compatible Internet
+         Sharing device, so Windows auto-detects it.
+         If you enable this option, the device is no longer CDC ethernet
+         compatible.
+
 config USB_FUNCTION_SERIAL
 	tristate "USB Serial Function"
 	depends on USB_FUNCTION
