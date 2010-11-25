@@ -36,6 +36,7 @@
 #include "prm.h"
 #include "cm.h"
 #include "pm.h"
+#include "smartreflex.h"
 
 #ifdef CONFIG_PM_DEBUG
 int omap2_pm_debug = 0;
@@ -555,6 +556,8 @@ static int __init pm_dbg_init(void)
 				pm_dbg_dir, (void *)(i+1), &debug_reg_fops);
 
 		}
+
+	(void)sr_debugfs_create_entries(d);
 
 	pm_dbg_init_done = 1;
 

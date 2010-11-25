@@ -15,6 +15,21 @@
 
 #ifndef _ANDROID_PMEM_H_
 #define _ANDROID_PMEM_H_
+#ifdef CONFIG_ARCH_MSM
+enum pmem_allocator_type {
+	/* Zero is a default in platform PMEM structures in the board files,
+	 * when the "allocator_type" structure element is not explicitly
+	 * defined
+	 */
+	PMEM_ALLOCATORTYPE_BITMAP = 0, /* forced to be zero here */
+
+	PMEM_ALLOCATORTYPE_ALLORNOTHING,
+	PMEM_ALLOCATORTYPE_BUDDYBESTFIT,
+
+	PMEM_ALLOCATORTYPE_MAX,
+};
+#define PMEM_KERNEL_EBI1_DATA_NAME "pmem_kernel_ebi1"
+#endif
 
 #define PMEM_IOCTL_MAGIC 'p'
 #define PMEM_GET_PHYS		_IOW(PMEM_IOCTL_MAGIC, 1, unsigned int)
@@ -33,6 +48,12 @@
  * struct (with offset set to 0). 
  */
 #define PMEM_GET_TOTAL_SIZE	_IOW(PMEM_IOCTL_MAGIC, 7, unsigned int)
+#define HW3D_REVOKE_GPU		_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+#define HW3D_GRANT_GPU		_IOW(PMEM_IOCTL_MAGIC, 9, unsigned int)
+
+#define PMEM_CLEAN_INV_CACHES	_IOW(PMEM_IOCTL_MAGIC, 11, unsigned int)
+#define PMEM_CLEAN_CACHES	_IOW(PMEM_IOCTL_MAGIC, 12, unsigned int)
+#define PMEM_INV_CACHES		_IOW(PMEM_IOCTL_MAGIC, 13, unsigned int)
 
 struct android_pmem_platform_data
 {
@@ -41,6 +62,14 @@ struct android_pmem_platform_data
 	unsigned long start;
 	/* size of memory region */
 	unsigned long size;
+#ifdef CONFIG_ARCH_MSM
+	enum pmem_allocator_type allocator_type;
+	/* treated as a 'hidden' variable in the board files. Can be
+	 * set, but default is the system init value of 0 which becomes a
+	 * quantum of 4K pages.
+	 */
+	unsigned int quantum;
+#endif
 	/* set to indicate the region should not be managed with an allocator */
 	unsigned no_allocator;
 	/* set to indicate maps of this region should be cached, if a mix of
@@ -56,13 +85,19 @@ struct pmem_region {
 	unsigned long len;
 };
 
+struct pmem_addr {
+	unsigned long vaddr;
+	unsigned long offset;
+	unsigned long length;
+};
+
 #ifdef CONFIG_ANDROID_PMEM
 int is_pmem_file(struct file *file);
 int get_pmem_file(int fd, unsigned long *start, unsigned long *vstart,
 		  unsigned long *end, struct file **filp);
 int get_pmem_user_addr(struct file *file, unsigned long *start,
 		       unsigned long *end);
-void put_pmem_file(struct file* file);
+void put_pmem_file(struct file *file);
 void flush_pmem_file(struct file *file, unsigned long start, unsigned long len);
 int pmem_setup(struct android_pmem_platform_data *pdata,
 	       long (*ioctl)(struct file *, unsigned int, unsigned long),
@@ -77,7 +112,7 @@ static inline int get_pmem_file(int fd, unsigned long *start,
 				struct file **filp) { return -ENOSYS; }
 static inline int get_pmem_user_addr(struct file *file, unsigned long *start,
 				     unsigned long *end) { return -ENOSYS; }
-static inline void put_pmem_file(struct file* file) { return; }
+static inline void put_pmem_file(struct file *file) { return; }
 static inline void flush_pmem_file(struct file *file, unsigned long start,
 				   unsigned long len) { return; }
 static inline int pmem_setup(struct android_pmem_platform_data *pdata,

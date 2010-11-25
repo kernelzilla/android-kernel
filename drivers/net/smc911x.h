@@ -2,6 +2,7 @@
  . smc911x.h - macros for SMSC's LAN911{5,6,7,8} single-chip Ethernet device.
  .
  . Copyright (C) 2005 Sensoria Corp.
+ . Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  . Derived from the unified SMC91x driver by Nicolas Pitre
  .
  . This program is free software; you can redistribute it and/or modify
@@ -52,6 +53,10 @@
   #define SMC_USE_32BIT		1
   #define SMC_IRQ_SENSE		IRQF_TRIGGER_LOW
   #define SMC_MEM_RESERVED	1
+#elif defined(CONFIG_ARCH_MSM_SCORPION)
+  #define SMC_USE_16BIT		0
+  #define SMC_USE_32BIT		1
+  #define SMC_IRQ_SENSE		IRQF_TRIGGER_LOW
 #else
 /*
  * Default configuration
@@ -308,6 +313,9 @@ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
 
 #define SMC911X_EEPROM_LEN	 7
 
+/* Direct FIFO access for 9221 chip */
+#define DIRECT_DATA_FIFO  (0x100)
+
 /* Below are the register offsets and bit definitions
  * of the Lan911x memory space
  */
@@ -455,6 +463,8 @@ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
 #define	TX_CFG_STOP_TX_			(0x00000001)  /* Self Clearing */
 
 #define HW_CFG			(0x74)
+#define HW_CFG_FPORTEND_    (0x20000000)    /* R/W NASR */
+#define HW_CFG_FSELEND_     (0x10000000)    /* R/W NASR */
 #define	HW_CFG_TTM_			(0x00200000)  /* R/W */
 #define	HW_CFG_SF_			(0x00100000)  /* R/W */
 #define	HW_CFG_TX_FIF_SZ_		(0x000F0000)  /* R/W */
@@ -629,6 +639,11 @@ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
 #define WUCSR_WAKE_EN_			(0x00000004)
 #define WUCSR_MPEN_			(0x00000002)
 
+#define COE_CR          (0x0D)  /* R/W */
+#define COE_CR_TXCOE_EN_    (0x00010000)
+#define COE_CR_RXCOE_MODE_  (0x00000002)
+#define COE_CR_RXCOE_EN_    (0x00000001)
+
 /*
  ****************************************************************************
  * Chip Specific MII Defines
@@ -649,6 +664,17 @@ smc_pxa_dma_outsl(struct smc911x_local *lp, u_long physaddr,
 //#define MODE_CTRL_STS_PHYADBP_	   ((u16)0x0008)
 //#define MODE_CTRL_STS_FORCE_G_LINK_ ((u16)0x0004)
 #define MODE_CTRL_STS_ENERGYON_	 	((u16)0x0002)
+
+#define PHY_SPECIAL_MODES       ((u32)18)
+#define PHY_SPECIAL_MODES_PHYMODE_   ((u16))0x00E0)
+#define PHY_SPECIAL_MODES_PHYADDR_   ((u16))0x001F)
+
+#define PHY_SPL_CTRL_STS    ((u32)27)
+#define PHY_SPL_CTRL_STS_AMDIX_STP_     ((u16)0x8000)
+#define PHY_SPL_CTRL_STS_AMDIX_EN_      ((u16)0x4000)
+#define PHY_SPL_CTRL_STS_AMDIX_STATE_   ((u16)0x2000)
+#define PHY_SPL_CTRL_STS_VCOFF_LP_      ((u16)0x0400)
+#define PHY_SPL_CTRL_STS_XPOL_          ((u16)0x0010)
 
 #define PHY_INT_SRC			((u32)29)
 #define PHY_INT_SRC_ENERGY_ON_			((u16)0x0080)
@@ -721,6 +747,11 @@ static const struct chip_id chip_ids[] =  {
 #define SMC_SET_TX_FIFO(lp, x) 	SMC_outl( x, lp, TX_DATA_FIFO )
 #define SMC_GET_RX_FIFO(lp)	SMC_inl( lp, RX_DATA_FIFO )
 
+/* Direct FIFO access macros for read and write for 9221 chip */
+#define SMC_PUSH_DIRECT_DATA(lp, p, l) \
+	SMC_outsl(lp, DIRECT_DATA_FIFO, p, (l) >> 2)
+#define SMC_PULL_DIRECT_DATA(lp, p, l) \
+	SMC_insl(lp, DIRECT_DATA_FIFO, p, (l) >> 2)
 
 /* I/O mapped register read/write macros */
 #define SMC_GET_TX_STS_FIFO(lp)		SMC_inl( lp, TX_STATUS_FIFO )
@@ -844,6 +875,8 @@ static const struct chip_id chip_ids[] =  {
 #define SMC_SET_WUFF(lp, x)		SMC_SET_MAC_CSR( (lp), WUFF, x )
 #define SMC_GET_WUCSR(lp, x)	SMC_GET_MAC_CSR( (lp), WUCSR, x )
 #define SMC_SET_WUCSR(lp, x)	SMC_SET_MAC_CSR( (lp), WUCSR, x )
+#define SMC_GET_COECR(lp, x)	SMC_GET_MAC_CSR((lp), COE_CR, x)
+#define SMC_SET_COECR(lp, x)	SMC_SET_MAC_CSR((lp), COE_CR, x)
 
 /* PHY register read/write macros */
 #define SMC_GET_MII(lp,a,phy,v)					\
@@ -889,7 +922,14 @@ static const struct chip_id chip_ids[] =  {
 #define SMC_GET_PHY_INT_MASK(lp,phy,x)	SMC_GET_MII( (lp), PHY_INT_MASK, phy, x )
 #define SMC_SET_PHY_INT_MASK(lp,phy,x)	SMC_SET_MII( (lp), PHY_INT_MASK, phy, x )
 #define SMC_GET_PHY_SPECIAL(lp,phy,x)	SMC_GET_MII( (lp), PHY_SPECIAL, phy, x )
-
+#define SMC_SET_PHY_SPL_MODES(lp, phy, x)	\
+			SMC_SET_MII((lp), PHY_SPECIAL_MODES, phy, x)
+#define SMC_GET_PHY_SPL_MODES(lp, phy, x)	\
+			SMC_GET_MII((lp), PHY_SPECIAL_MODES, phy, x)
+#define SMC_SET_PHY_SPL_CTRL_STS(lp, phy, x)	\
+			SMC_SET_MII((lp), PHY_SPL_CTRL_STS, phy, x)
+#define SMC_GET_PHY_SPL_CTRL_STS(lp, phy, x)	\
+			SMC_GET_MII((lp), PHY_SPL_CTRL_STS, phy, x)
 
 
 /* Misc read/write macros */

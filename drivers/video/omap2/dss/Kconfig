@@ -87,3 +87,7 @@ config OMAP2_DSS_MIN_FCK_PER_PCK
 	  is very high.
 
 endif
+
+config TVOUT_SHOLEST
+	tristate
+	default n

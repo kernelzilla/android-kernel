@@ -58,5 +58,13 @@ config CPCAP_USB
 	  Enable this to support the USB OTG transceiver on the
 	  Motorola CPCAP PMIC
 
+config USB_MSM_OTG_72K
+	bool "OTG support for Qualcomm on-chip USB controller"
+	depends on ARCH_MSM
+	select USB_OTG_UTILS
+	default USB_MSM_72K
+	help
+	  Minimal tranceiver driver which would start/stop the host/gadget
+	  depending on ID and VBUS interrupts.
 
 endif # USB || OTG

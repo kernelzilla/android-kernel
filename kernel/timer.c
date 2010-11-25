@@ -37,7 +37,9 @@
 #include <linux/delay.h>
 #include <linux/tick.h>
 #include <linux/kallsyms.h>
-
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 #include <asm/div64.h>
@@ -628,6 +630,9 @@ int __mod_timer(struct timer_list *timer, unsigned long expires)
 	}
 
 	timer->expires = expires;
+#ifdef CONFIG_LTT_LITE
+	ltt_lite_log_timer(timer, LTT_LITE_EVENT_ENTER);
+#endif
 	internal_add_timer(base, timer);
 	spin_unlock_irqrestore(&base->lock, flags);
 
@@ -651,6 +656,9 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	timer_stats_timer_set_start_info(timer);
 	BUG_ON(timer_pending(timer) || !timer->function);
 	spin_lock_irqsave(&base->lock, flags);
+#ifdef CONFIG_LTT_LITE
+	ltt_lite_log_timer(timer, LTT_LITE_EVENT_ENTER);
+#endif
 	timer_set_base(timer, base);
 	debug_timer_activate(timer);
 	internal_add_timer(base, timer);
@@ -730,6 +738,10 @@ int del_timer(struct timer_list *timer)
 		}
 		spin_unlock_irqrestore(&base->lock, flags);
 	}
+
+#ifdef CONFIG_LTT_LITE
+	ltt_lite_log_timer(timer, LTT_LITE_EVENT_RETURN);
+#endif
 
 	return ret;
 }
@@ -864,6 +876,12 @@ static inline void __run_timers(struct tvec_base *base)
 			spin_unlock_irq(&base->lock);
 			{
 				int preempt_count = preempt_count();
+#ifdef CONFIG_LTT_LITE
+				ltt_lite_run_timer(
+					LTT_LITE_RUN_TIMER,
+					(unsigned long)fn,
+					data);
+#endif
 				fn(data);
 				if (preempt_count != preempt_count()) {
 					printk(KERN_ERR "huh, entered %p "

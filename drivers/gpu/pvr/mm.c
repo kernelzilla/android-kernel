@@ -32,7 +32,6 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <asm/io.h>
-#include <asm/cacheflush.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
 #include <linux/wrapper.h>
 #endif
@@ -570,9 +569,7 @@ _VMallocWrapper(IMG_UINT32 ui32Bytes,
             dump_stack();
             return NULL;
     }
-
     pvRet = __vmalloc(ui32Bytes, GFP_KERNEL | __GFP_HIGHMEM, PGProtFlags);
-
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
     if(pvRet)
     {

@@ -2,11 +2,17 @@
  *  linux/init/main.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 2009 Motorola, Inc.
  *
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
  *  Added initrd & change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Moan early if gcc is old, avoiding bogus kernels - Paul Gortmaker, May '96
  *  Simplified starting of init:  Michael A. Griffith <grif@acm.org> 
+ *
+ *  Revision History:
+ *  Date         Author        Comment
+ *  ---------    ----------    ---------
+ *  Jun 30,2008   Motorola      Update cmdline param for emu_uart_debug option
  */
 
 #include <linux/types.h>
@@ -63,6 +69,9 @@
 #include <linux/idr.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <trace/boot.h>
 
 #include <asm/io.h>
@@ -73,6 +82,9 @@
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
+#endif
+#ifdef CONFIG_EMU_UART_DEBUG
+#include <mach/board-mapphone-emu_uart.h>
 #endif
 
 static int kernel_init(void *);
@@ -342,6 +354,15 @@ static int __init rdinit_setup(char *str)
 }
 __setup("rdinit=", rdinit_setup);
 
+#ifdef CONFIG_EMU_UART_DEBUG
+static int __init emu_uart_debug(char *str)
+{
+    activate_emu_uart();
+    return 0;
+}
+early_param("emu_uart_debug", emu_uart_debug);
+#endif
+
 #ifndef CONFIG_SMP
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -451,6 +472,11 @@ static noinline void __init_refok rest_init(void)
 	__releases(kernel_lock)
 {
 	int pid;
+
+#ifdef CONFIG_LTT_LITE
+	/* initialize before the init process is started */
+	ltt_lite_early_init();
+#endif
 
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
@@ -644,6 +670,10 @@ asmlinkage void __init start_kernel(void)
 	kmem_cache_init();
 	debug_objects_mem_init();
 	idr_init_cache();
+#ifdef CONFIG_DEBUG_MEMLEAK
+	radix_tree_init();
+	memleak_init();
+#endif
 	setup_per_cpu_pageset();
 	numa_policy_init();
 	if (late_time_init)
@@ -665,7 +695,9 @@ asmlinkage void __init start_kernel(void)
 	key_init();
 	security_init();
 	vfs_caches_init(num_physpages);
+#ifndef CONFIG_DEBUG_MEMLEAK
 	radix_tree_init();
+#endif
 	signals_init();
 	/* rootfs populating might need page-writeback */
 	page_writeback_init();

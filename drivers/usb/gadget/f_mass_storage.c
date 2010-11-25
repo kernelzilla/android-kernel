@@ -75,6 +75,10 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/android.h>
 
+#ifdef CONFIG_USB_MOT_ANDROID
+#include "f_mot_android.h"
+#endif
+
 #include "f_mass_storage.h"
 #include "gadget_chips.h"
 
@@ -85,6 +89,8 @@
 
 #define DRIVER_NAME		"usb_mass_storage"
 #define MAX_LUNS		8
+#define VENDOR_NAME		"Generic"
+#define PRODUCT_NAME		"Disk Drive"
 
 static const char shortname[] = DRIVER_NAME;
 
@@ -137,6 +143,17 @@ static const char shortname[] = DRIVER_NAME;
 
 
 /*-------------------------------------------------------------------------*/
+
+#ifdef CONFIG_USB_MOT_ANDROID
+static int cdrom_enable ;
+
+module_param_named(cdrom, cdrom_enable, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(cdrom, "true to emulate cdrom instead of disk");
+
+/* SCSI device types */
+#define TYPE_DISK      0x00
+#define TYPE_CDROM     0x05
+#endif
 
 /* Bulk-only data structures */
 
@@ -200,6 +217,12 @@ struct bulk_cs_wrap {
 #define SC_WRITE_6			0x0a
 #define SC_WRITE_10			0x2a
 #define SC_WRITE_12			0xaa
+
+#ifdef CONFIG_USB_MOT_ANDROID
+#define SC_READ_TOC         0x43
+#define SC_READ_HEADER      0x44
+#define SC_MOT_MODE_SWITCH	0xD6
+#endif
 
 /* SCSI Sense Key/Additional Sense Code/ASC Qualifier values */
 #define SS_NO_SENSE				0
@@ -472,6 +495,31 @@ static void put_be32(u8 *buf, u32 val)
  * descriptors are built on demand.  Also the (static) config and interface
  * descriptors are adjusted during fsg_bind().
  */
+#ifdef CONFIG_USB_MOT_ANDROID
+
+/* used when eth function is disabled */
+static struct usb_descriptor_header *null_msc_descs[] = {
+	NULL,
+};
+
+#define STRING_INTERFACE        0
+
+/* static strings, in UTF-8 */
+static struct usb_string usbmsc_string_defs[] = {
+	[STRING_INTERFACE].s = "Motorola MSD Interface",
+	{  /* ZEROES END LIST */ },
+};
+
+static struct usb_gadget_strings usbmsc_string_table = {
+	.language =             0x0409, /* en-us */
+	.strings =              usbmsc_string_defs,
+};
+
+static struct usb_gadget_strings *usbmsc_strings[] = {
+	&usbmsc_string_table,
+	NULL,
+};
+#endif
 
 /* There is only one interface. */
 
@@ -679,15 +727,15 @@ static int fsg_function_setup(struct usb_function *f,
 		}
 	}
 
-		/* respond with data transfer or status phase? */
-		if (value >= 0) {
-			int rc;
-			cdev->req->zero = value < w_length;
-			cdev->req->length = value;
-			rc = usb_ep_queue(cdev->gadget->ep0, cdev->req, GFP_ATOMIC);
-			if (rc < 0)
-				printk("%s setup response queue error\n", __func__);
-		}
+	/* respond with data transfer or status phase? */
+	if (value >= 0) {
+		int rc;
+		cdev->req->zero = value < w_length;
+		cdev->req->length = value;
+		rc = usb_ep_queue(cdev->gadget->ep0, cdev->req, GFP_ATOMIC);
+		if (rc < 0)
+			printk("%s setup response queue error\n", __func__);
+	}
 
 	if (value == -EOPNOTSUPP)
 		VDBG(fsg,
@@ -1238,10 +1286,16 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		fsg->bad_lun_okay = 1;
 		memset(buf, 0, 36);
 		buf[0] = 0x7f;		/* Unsupported, no device-type */
+#ifdef CONFIG_USB_MOT_ANDROID
+		buf[4] = 31;	/* Additional length */
+#endif
 		return 36;
 	}
 
 	memset(buf, 0, 8);	/* Non-removable, direct-access device */
+#ifdef CONFIG_USB_MOT_ANDROID
+	buf[0] = (cdrom_enable ? TYPE_CDROM : TYPE_DISK);
+#endif
 
 	buf[1] = 0x80;	/* set removable bit */
 	buf[2] = 2;		/* ANSI SCSI level 2 */
@@ -1326,6 +1380,74 @@ static int do_read_capacity(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	return 8;
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+static void store_cdrom_address(u8 *dest, int msf, u32 addr)
+{
+	if (msf) {
+		/* Convert to Minutes-Seconds-Frames */
+		addr >>= 2;	/* Convert to 2048-byte frames */
+		addr += 2 * 75;	/* Lead-in occupies 2 seconds */
+		dest[3] = addr % 75;	/* Frames */
+		addr /= 75;
+		dest[2] = addr % 60;	/* Seconds */
+		addr /= 60;
+		dest[1] = addr;	/* Minutes */
+		dest[0] = 0;	/* Reserved */
+	} else {
+		/* Absolute sector */
+		put_be32(dest, addr);
+	}
+}
+
+static int do_read_header(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	struct lun *curlun = fsg->curlun;
+	int msf = fsg->cmnd[1] & 0x02;
+	u32 lba = get_be32(&fsg->cmnd[2]);
+	u8 *buf = (u8 *) bh->buf;
+
+	if ((fsg->cmnd[1] & ~0x02) != 0) {	/* Mask away MSF */
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+	if (lba >= curlun->num_sectors) {
+		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
+		return -EINVAL;
+	}
+
+	memset(buf, 0, 8);
+	buf[0] = 0x01;		/* 2048 bytes of user data, rest is EC */
+	store_cdrom_address(&buf[4], msf, lba);
+	return 8;
+}
+
+static int do_read_toc(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	struct lun *curlun = fsg->curlun;
+	int msf = fsg->cmnd[1] & 0x02;
+	int start_track = fsg->cmnd[6];
+	u8 *buf = (u8 *) bh->buf;
+
+	if ((fsg->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
+	    start_track > 1) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	memset(buf, 0, 20);
+	buf[1] = (20 - 2);	/* TOC data length */
+	buf[2] = 1;		/* First track number */
+	buf[3] = 1;		/* Last track number */
+	buf[5] = 0x16;		/* Data track, copying allowed */
+	buf[6] = 0x01;		/* Only track is number 1 */
+	store_cdrom_address(&buf[8], msf, 0);
+
+	buf[13] = 0x16;		/* Lead-out track is data */
+	buf[14] = 0xAA;		/* Lead-out track number */
+	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
+	return 20;
+}
+#endif
 
 static int do_mode_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
@@ -1902,6 +2024,30 @@ static int do_scsi_command(struct fsg_dev *fsg)
 			reply = do_read_capacity(fsg, bh);
 		break;
 
+#ifdef CONFIG_USB_MOT_ANDROID
+	case SC_READ_HEADER:
+		if (!cdrom_enable)
+			goto unknown_cmnd;
+		fsg->data_size_from_cmnd = get_be16(&fsg->cmnd[7]);
+		reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
+				(3 << 7) | (0x1f << 1), 1,
+				"READ HEADER");
+		if (reply == 0)
+			reply = do_read_header(fsg, bh);
+		break;
+
+	case SC_READ_TOC:
+		if (!cdrom_enable)
+			goto unknown_cmnd;
+		fsg->data_size_from_cmnd = get_be16(&fsg->cmnd[7]);
+		reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
+				(7 << 6) | (1 << 1), 1,
+				"READ TOC");
+		if (reply == 0)
+			reply = do_read_toc(fsg, bh);
+		break;
+#endif
+
 	case SC_READ_FORMAT_CAPACITIES:
 		fsg->data_size_from_cmnd = get_be16(&fsg->cmnd[7]);
 		if ((reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
@@ -1976,6 +2122,18 @@ static int do_scsi_command(struct fsg_dev *fsg)
 			reply = do_write(fsg);
 		break;
 
+#ifdef CONFIG_USB_MOT_ANDROID
+	case SC_MOT_MODE_SWITCH:
+	{
+		u8 mode;
+		fsg->data_size_from_cmnd = 0;
+		mode = fsg->cmnd[10];
+		mode_switch_cb((int)mode);
+		reply = 0;
+		break;
+	}
+#endif
+
 	/* Some mandatory commands that we recognize but don't implement.
 	 * They don't mean much in this setting.  It's left as an exercise
 	 * for anyone interested to implement RESERVE and RELEASE in terms
@@ -1987,6 +2145,9 @@ static int do_scsi_command(struct fsg_dev *fsg)
 		/* Fall through */
 
 	default:
+#ifdef CONFIG_USB_MOT_ANDROID
+unknown_cmnd:
+#endif
 		fsg->data_size_from_cmnd = 0;
 		sprintf(unknown, "Unknown x%02x", fsg->cmnd[0]);
 		if ((reply = check_command(fsg, fsg->cmnd_size,
@@ -2072,12 +2233,8 @@ static int get_next_command(struct fsg_dev *fsg)
 	bh = fsg->next_buffhd_to_fill;
 	while (bh->state != BUF_STATE_EMPTY) {
 		rc = sleep_thread(fsg);
-		if (rc) {
-			usb_ep_dequeue(fsg->bulk_out, bh->outreq);
-			bh->outreq_busy = 0;
-			bh->state = BUF_STATE_EMPTY;
+		if (rc)
 			return rc;
-		}
 	}
 
 	/* Queue a request to read a Bulk-only CBW */
@@ -2147,7 +2304,7 @@ static int do_set_interface(struct fsg_dev *fsg, int altsetting)
 	if (fsg->running)
 		DBG(fsg, "reset interface\n");
 reset:
-	 /* Disable the endpoints */
+	/* Disable the endpoints */
 	if (fsg->bulk_in_enabled) {
 		DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_in->name);
 		usb_ep_disable(fsg->bulk_in);
@@ -2171,7 +2328,6 @@ reset:
 			bh->outreq = NULL;
 		}
 	}
-
 
 	fsg->running = 0;
 	if (altsetting < 0 || rc != 0)
@@ -2463,6 +2619,9 @@ static int open_backing_file(struct fsg_dev *fsg, struct lun *curlun,
 	struct inode			*inode = NULL;
 	loff_t				size;
 	loff_t				num_sectors;
+#ifdef CONFIG_USB_MOT_ANDROID
+	loff_t				min_sectors;
+#endif
 
 	/* R/W if we can, R/O if we must */
 	ro = curlun->ro;
@@ -2507,7 +2666,22 @@ static int open_backing_file(struct fsg_dev *fsg, struct lun *curlun,
 		goto out;
 	}
 	num_sectors = size >> 9;	/* File size in 512-byte sectors */
+#ifdef CONFIG_USB_MOT_ANDROID
+	min_sectors = 1;
+	if (cdrom_enable) {
+		num_sectors &= ~3;	/* Reduce to a multiple of 2048 */
+		min_sectors = 300 * 4;	/* Smallest track is 300 frames */
+		if (num_sectors >= 256 * 60 * 75 * 4) {
+			num_sectors = (256 * 60 * 75 - 1) * 4;
+			LINFO(curlun, "file too big: %s\n", filename);
+			LINFO(curlun, "using only first %d blocks\n",
+			      (int) num_sectors);
+		}
+	}
+	if (num_sectors < min_sectors) {
+#else
 	if (num_sectors == 0) {
+#endif
 		LINFO(curlun, "file too small: %s\n", filename);
 		rc = -ETOOSMALL;
 		goto out;
@@ -2708,7 +2882,6 @@ fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	/* Free the data buffers */
 	for (i = 0; i < NUM_BUFFERS; ++i)
 		kfree(fsg->buffhds[i].buf);
-	switch_dev_unregister(&fsg->sdev);
 }
 
 static int __init
@@ -2749,7 +2922,14 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 
 	for (i = 0; i < fsg->nluns; ++i) {
 		curlun = &fsg->luns[i];
+#ifdef CONFIG_USB_MOT_ANDROID
+		if (cdrom_enable)
+			curlun->ro = 1;
+		else
+			curlun->ro = 0;
+#else
 		curlun->ro = 0;
+#endif
 		curlun->dev.release = lun_release;
 		/* use "usb_mass_storage" platform device as parent if available */
 		if (fsg->pdev)
@@ -2801,8 +2981,11 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 				fs_bulk_in_desc.bEndpointAddress;
 		hs_bulk_out_desc.bEndpointAddress =
 				fs_bulk_out_desc.bEndpointAddress;
-
+#ifdef CONFIG_USB_MOT_ANDROID
+		f->hs_descriptors = null_msc_descs;
+#else
 		f->hs_descriptors = hs_function;
+#endif
 	}
 
 	/* Allocate the data buffers */
@@ -2869,9 +3052,15 @@ static int fsg_function_set_alt(struct usb_function *f,
 {
 	struct fsg_dev	*fsg = func_to_dev(f);
 	DBG(fsg, "fsg_function_set_alt intf: %d alt: %d\n", intf, alt);
+	printk(KERN_DEBUG "fsg_function_set_alt intf: %d alt: %d\n",
+	intf, alt);
 	fsg->new_config = 1;
 	do_set_interface(fsg, 0);
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
+
+#ifdef CONFIG_USB_MOT_ANDROID
+	usb_interface_enum_cb(cdrom_enable ? CDROM_TYPE_FLAG : MSC_TYPE_FLAG);
+#endif
 	return 0;
 }
 
@@ -2879,6 +3068,7 @@ static void fsg_function_disable(struct usb_function *f)
 {
 	struct fsg_dev	*fsg = func_to_dev(f);
 	DBG(fsg, "fsg_function_disable\n");
+	printk(KERN_DEBUG "fsg_function_disable\n");
 	if (fsg->new_config)
 		do_set_interface(fsg, -1);
 	fsg->new_config = 0;
@@ -2917,14 +3107,25 @@ int __init mass_storage_function_add(struct usb_composite_dev *cdev,
 {
 	int		rc;
 	struct fsg_dev	*fsg;
-
+#ifdef CONFIG_USB_MOT_ANDROID
+	int status;
+#endif
 	printk(KERN_INFO "mass_storage_function_add\n");
 	rc = fsg_alloc();
 	if (rc)
 		return rc;
 	fsg = the_fsg;
 	fsg->nluns = nluns;
+	fsg->vendor = VENDOR_NAME;
+	fsg->product = PRODUCT_NAME;
 
+#ifdef CONFIG_USB_MOT_ANDROID
+	status = usb_string_id(c->cdev);
+	if (status >= 0) {
+		usbmsc_string_defs[STRING_INTERFACE].id = status;
+		intf_desc.iInterface = status;
+	}
+#endif
 	spin_lock_init(&fsg->lock);
 	init_rwsem(&fsg->filesem);
 	kref_init(&fsg->ref);
@@ -2947,12 +3148,20 @@ int __init mass_storage_function_add(struct usb_composite_dev *cdev,
 
 	fsg->cdev = cdev;
 	fsg->function.name = shortname;
+#ifdef CONFIG_USB_MOT_ANDROID
+	fsg->function.descriptors = null_msc_descs;
+#else
 	fsg->function.descriptors = fs_function;
+#endif
 	fsg->function.bind = fsg_function_bind;
 	fsg->function.unbind = fsg_function_unbind;
 	fsg->function.setup = fsg_function_setup;
 	fsg->function.set_alt = fsg_function_set_alt;
 	fsg->function.disable = fsg_function_disable;
+
+#ifdef CONFIG_USB_MOT_ANDROID
+	fsg->function.strings = usbmsc_strings;
+#endif
 
 	rc = usb_add_function(c, &fsg->function);
 	if (rc != 0)
@@ -2972,4 +3181,25 @@ err_switch_dev_register:
 	return rc;
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+struct usb_function *msc_function_enable(int enable, int id)
+{
+	struct fsg_dev	*fsg = the_fsg;
 
+	printk(KERN_DEBUG "%s enable = %d id=%d\n", __func__, enable, id);
+	if (fsg) {
+		DBG(fsg, "msc_function_enable(%s)\n",
+			enable ? "true" : "false");
+
+		if (enable) {
+			fsg->function.descriptors = fs_function;
+			fsg->function.hs_descriptors = hs_function;
+			intf_desc.bInterfaceNumber = id;
+		} else {
+			fsg->function.descriptors = null_msc_descs;
+			fsg->function.hs_descriptors = null_msc_descs;
+		}
+	}
+	return &fsg->function;
+}
+#endif

@@ -263,16 +263,30 @@ struct overlay_attribute {
 	__ATTR(_name, _mode, _show, _store)
 
 static OVERLAY_ATTR(name, S_IRUGO, overlay_name_show, NULL);
+#ifdef CONFIG_TVOUT_SHOLEST
+static OVERLAY_ATTR(manager, S_IRWXUGO|S_IWUSR,
+		overlay_manager_show, overlay_manager_store);
+#else
 static OVERLAY_ATTR(manager, S_IRUGO|S_IWUSR,
 		overlay_manager_show, overlay_manager_store);
+#endif
 static OVERLAY_ATTR(input_size, S_IRUGO, overlay_input_size_show, NULL);
 static OVERLAY_ATTR(screen_width, S_IRUGO, overlay_screen_width_show, NULL);
+#ifdef CONFIG_TVOUT_SHOLEST
+static OVERLAY_ATTR(position, S_IRWXUGO|S_IWUSR,
+		overlay_position_show, overlay_position_store);
+static OVERLAY_ATTR(output_size, S_IRWXUGO|S_IWUSR,
+		overlay_output_size_show, overlay_output_size_store);
+static OVERLAY_ATTR(enabled, S_IRWXUGO|S_IWUSR,
+		overlay_enabled_show, overlay_enabled_store);
+#else
 static OVERLAY_ATTR(position, S_IRUGO|S_IWUSR,
 		overlay_position_show, overlay_position_store);
 static OVERLAY_ATTR(output_size, S_IRUGO|S_IWUSR,
 		overlay_output_size_show, overlay_output_size_store);
 static OVERLAY_ATTR(enabled, S_IRUGO|S_IWUSR,
 		overlay_enabled_show, overlay_enabled_store);
+#endif
 static OVERLAY_ATTR(global_alpha, S_IRUGO|S_IWUSR,
 		overlay_global_alpha_show, overlay_global_alpha_store);
 

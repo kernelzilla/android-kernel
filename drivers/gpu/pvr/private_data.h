@@ -37,7 +37,7 @@ typedef struct
 	IMG_HANDLE hKernelMemInfo;
 #endif 
 
-#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 	
 	IMG_UINT64 ui64Stamp;
 #endif 

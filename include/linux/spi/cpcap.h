@@ -25,6 +25,10 @@
 #include <linux/power_supply.h>
 #endif
 
+#ifdef CONFIG_RTC_INTF_SECCLKD
+#include <linux/rtc.h>
+#endif
+
 #define CPCAP_DEV_NAME "cpcap"
 #define CPCAP_NUM_REG_CPCAP (CPCAP_REG_END - CPCAP_REG_START + 1)
 
@@ -271,6 +275,9 @@ enum cpcap_reg {
 
 	CPCAP_REG_MAX		/* The largest valid register value. */
 	= CPCAP_REG_END,
+
+	CPCAP_REG_SIZE = CPCAP_REG_MAX + 1,
+	CPCAP_REG_UNUSED = CPCAP_REG_MAX + 2,
 };
 
 enum {
@@ -292,7 +299,16 @@ enum {
 
 	CPCAP_IOCTL_NUM_UC__START,
 	CPCAP_IOCTL_NUM_UC_MACRO_START,
+	CPCAP_IOCTL_NUM_UC_MACRO_STOP,
+	CPCAP_IOCTL_NUM_UC_GET_VENDOR,
+	CPCAP_IOCTL_NUM_UC_SET_TURBO_MODE,
 	CPCAP_IOCTL_NUM_UC__END,
+
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	CPCAP_IOCTL_NUM_RTC__START,
+	CPCAP_IOCTL_NUM_RTC_COUNT,
+	CPCAP_IOCTL_NUM_RTC__END,
+#endif
 };
 
 enum cpcap_irqs {
@@ -477,6 +493,48 @@ struct cpcap_adc_ato {
 	unsigned short atox_ps_factor_out;
 };
 
+struct cpcap_display_led {
+	unsigned int display_reg;
+	unsigned int display_mask;
+	unsigned int display_on;
+	unsigned int display_off;
+	unsigned int display_init;
+	unsigned int poll_intvl;
+	unsigned int zone0;
+	unsigned int zone1;
+	unsigned int zone2;
+	unsigned int zone3;
+	unsigned int zone4;
+};
+
+struct cpcap_button_led {
+	unsigned int button_reg;
+	unsigned int button_mask;
+	unsigned int button_on;
+	unsigned int button_off;
+};
+
+struct cpcap_kpad_led {
+	unsigned int kpad_reg;
+	unsigned int kpad_mask;
+	unsigned int kpad_on;
+	unsigned int kpad_off;
+};
+
+struct cpcap_rgb_led {
+	unsigned int rgb_reg;
+	unsigned int rgb_mask;
+	unsigned int rgb_on;
+	unsigned int rgb_off;
+};
+
+struct cpcap_leds {
+	struct cpcap_display_led display_led;
+	struct cpcap_button_led button_led;
+	struct cpcap_kpad_led kpad_led;
+	struct cpcap_rgb_led rgb_led;
+};
+
 struct cpcap_batt_data {
 	int status;
 	int health;
@@ -496,6 +554,12 @@ struct cpcap_batt_usb_data {
 	enum cpcap_batt_usb_model model;
 };
 
+#ifdef CONFIG_RTC_INTF_SECCLKD
+struct cpcap_rtc_time_cnt {
+	struct rtc_time time;
+	unsigned short count;
+};
+#endif
 struct cpcap_device;
 
 #ifdef __KERNEL__
@@ -503,9 +567,10 @@ struct cpcap_platform_data {
 	struct cpcap_spi_init_data *init;
 	int init_len;
 	unsigned short *regulator_mode_values;
+	unsigned short *regulator_off_mode_values;
 	struct regulator_init_data *regulator_init;
 	struct cpcap_adc_ato *adc_ato;
-
+	struct cpcap_leds *leds;
 	void (*ac_changed)(struct power_supply *,
 			   struct cpcap_batt_ac_data *);
 	void (*batt_changed)(struct power_supply *,
@@ -565,6 +630,11 @@ struct cpcap_regacc {
  * OUTPUTS: The command writes the register data back to user space at the
  * location specified, or it may return an error code.
  */
+#ifdef CONFIG_RTC_INTF_SECCLKD
+#define CPCAP_IOCTL_GET_RTC_TIME_COUNTER \
+	_IOR(0, CPCAP_IOCTL_NUM_RTC_COUNT, struct cpcap_rtc_time_cnt)
+#endif
+
 #define CPCAP_IOCTL_TEST_READ_REG \
 	_IOWR(0, CPCAP_IOCTL_NUM_TEST_READ_REG, struct cpcap_regacc*)
 
@@ -601,6 +671,15 @@ struct cpcap_regacc {
 
 #define CPCAP_IOCTL_UC_MACRO_START \
 	_IOWR(0, CPCAP_IOCTL_NUM_UC_MACRO_START, enum cpcap_macro)
+
+#define CPCAP_IOCTL_UC_MACRO_STOP \
+	_IOWR(0, CPCAP_IOCTL_NUM_UC_MACRO_STOP, enum cpcap_macro)
+
+#define CPCAP_IOCTL_UC_GET_VENDOR \
+	_IOWR(0, CPCAP_IOCTL_NUM_UC_GET_VENDOR, enum cpcap_vendor)
+
+#define CPCAP_IOCTL_UC_SET_TURBO_MODE \
+	_IOW(0, CPCAP_IOCTL_NUM_UC_SET_TURBO_MODE, unsigned short)
 
 #ifdef __KERNEL__
 struct cpcap_device {
@@ -682,5 +761,11 @@ int cpcap_uc_stop(struct cpcap_device *cpcap, enum cpcap_macro macro);
 
 unsigned char cpcap_uc_status(struct cpcap_device *cpcap,
 			      enum cpcap_macro macro);
+
+#if defined(CONFIG_LEDS_FLASH_RESET)
+int cpcap_direct_misc_write(unsigned short reg, unsigned short value,\
+			    unsigned short mask);
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SPI_CPCAP_H */

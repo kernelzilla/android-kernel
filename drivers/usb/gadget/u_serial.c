@@ -4,6 +4,7 @@
  * Copyright (C) 2003 Al Borchers (alborchers@steinerpoint.com)
  * Copyright (C) 2008 David Brownell
  * Copyright (C) 2008 by Nokia Corporation
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This code also borrows from usbserial.c, which is
  * Copyright (C) 1999 - 2002 Greg Kroah-Hartman (greg@kroah.com)
@@ -599,7 +600,8 @@ static void gs_write_complete(struct usb_ep *ep, struct usb_request *req)
 		/* FALL THROUGH */
 	case 0:
 		/* normal completion */
-		gs_start_tx(port);
+		if (port->port_usb)
+			gs_start_tx(port);
 		break;
 
 	case -ESHUTDOWN:
@@ -998,23 +1000,125 @@ static int gs_break_ctl(struct tty_struct *tty, int duration)
 	return status;
 }
 
+static int gs_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct gs_port	*port = tty->driver_data;
+	struct gserial	*gser;
+	unsigned int result = 0;
+
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (!gser) {
+		result = -ENODEV;
+		goto fail;
+	}
+
+	if (gser->get_dtr)
+		result |= (gser->get_dtr(gser) ? TIOCM_DTR : 0);
+
+	if (gser->get_rts)
+		result |= (gser->get_rts(gser) ? TIOCM_RTS : 0);
+
+	if (gser->serial_state & TIOCM_CD)
+		result |= TIOCM_CD;
+
+	if (gser->serial_state & TIOCM_RI)
+		result |= TIOCM_RI;
+fail:
+	spin_unlock_irq(&port->port_lock);
+	return result;
+}
+#ifdef CONFIG_USB_MOT_ANDROID
+/* Add TIOCMSET which is used by ATCMD */
+static int gs_tiocmset(struct tty_struct *tty, struct file *file,
+	unsigned int set, unsigned int clear)
+{
+	struct gs_port  *port = tty->driver_data;
+	int		status = 0;
+	struct gserial	*gser;
+
+	pr_vdebug("gs_tiocmset: ttyGS%d, set = (%d), clear = (%d) \n",
+			port->port_num, set, clear);
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (gser && gser->tiocmset)
+		status = gser->tiocmset(gser, set, clear);
+	spin_unlock_irq(&port->port_lock);
+
+	return status;
+}
+#else
+static int gs_tiocmset(struct tty_struct *tty, struct file *file,
+	unsigned int set, unsigned int clear)
+{
+	struct gs_port	*port = tty->driver_data;
+	struct gserial *gser;
+	int	status = 0;
+
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (!gser) {
+		status = -ENODEV;
+		goto fail;
+	}
+
+	if (set & TIOCM_RI) {
+		if (gser->send_ring_indicator) {
+			gser->serial_state |= TIOCM_RI;
+			status = gser->send_ring_indicator(gser, 1);
+		}
+	}
+	if (clear & TIOCM_RI) {
+		if (gser->send_ring_indicator) {
+			gser->serial_state &= ~TIOCM_RI;
+			status = gser->send_ring_indicator(gser, 0);
+		}
+	}
+	if (set & TIOCM_CD) {
+		if (gser->send_carrier_detect) {
+			gser->serial_state |= TIOCM_CD;
+			status = gser->send_carrier_detect(gser, 1);
+		}
+	}
+	if (clear & TIOCM_CD) {
+		if (gser->send_carrier_detect) {
+			gser->serial_state &= ~TIOCM_CD;
+			status = gser->send_carrier_detect(gser, 0);
+		}
+	}
+fail:
+	spin_unlock_irq(&port->port_lock);
+	return status;
+}
+#endif
+
 static const struct tty_operations gs_tty_ops = {
 	.open =			gs_open,
 	.close =		gs_close,
 	.write =		gs_write,
+
+#ifdef CONFIG_USB_MOT_ANDROID
+	.tiocmset =             gs_tiocmset,
+#endif
 	.put_char =		gs_put_char,
 	.flush_chars =		gs_flush_chars,
 	.write_room =		gs_write_room,
 	.chars_in_buffer =	gs_chars_in_buffer,
 	.unthrottle =		gs_unthrottle,
 	.break_ctl =		gs_break_ctl,
+	.tiocmget  =		gs_tiocmget,
+	.tiocmset  =		gs_tiocmset,
 };
 
 /*-------------------------------------------------------------------------*/
 
 static struct tty_driver *gs_tty_driver;
 
+#ifdef CONFIG_USB_MOT_ANDROID
 static int __init
+#else
+static int
+#endif
 gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
 {
 	struct gs_port	*port;
@@ -1060,7 +1164,11 @@ gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
  *
  * Returns negative errno or zero.
  */
+#ifdef CONFIG_USB_MOT_ANDROID
+int gserial_setup(struct usb_gadget *g, unsigned count)
+#else
 int __init gserial_setup(struct usb_gadget *g, unsigned count)
+#endif
 {
 	unsigned			i;
 	struct usb_cdc_line_coding	coding;
@@ -1080,7 +1188,8 @@ int __init gserial_setup(struct usb_gadget *g, unsigned count)
 
 	gs_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
 	gs_tty_driver->subtype = SERIAL_TYPE_NORMAL;
-	gs_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
+	gs_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV
+				| TTY_DRIVER_RESET_TERMIOS;
 	gs_tty_driver->init_termios = tty_std_termios;
 
 	/* 9600-8-N-1 ... matches defaults expected by "usbser.sys" on
@@ -1313,6 +1422,8 @@ void gserial_disconnect(struct gserial *gser)
 	spin_unlock_irqrestore(&port->port_lock, flags);
 
 	/* disable endpoints, aborting down any active I/O */
+	usb_ep_fifo_flush(gser->out);
+	usb_ep_fifo_flush(gser->in);
 	usb_ep_disable(gser->out);
 	gser->out->driver_data = NULL;
 

@@ -45,6 +45,18 @@ config MTD_PARTITIONS
 	  devices. Partitioning on NFTL 'devices' is a different - that's the
 	  'normal' form of partitioning used on a block device.
 
+config MTD_LAZYECCSTATS
+	bool "MTD Lazy ECC Stats collection support"
+	depends on MTD_PARTITIONS
+	default n
+	help
+	  Normally bad block counts for ECC stats are collected at boot time.
+	  This option delays the badblock stats collection until ECCGETSTATS
+	  ioctl is invoked on the partition.
+
+	  This can significantly decrease boot times depending on the size of
+	  the partition.  If unsure, say 'N'.
+
 config MTD_TESTS
 	tristate "MTD tests support"
 	depends on m

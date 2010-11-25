@@ -1060,7 +1060,7 @@ typedef struct PVRSRV_BRIDGE_OUT_EXPORTDEVICEMEM_TAG
 {
 	PVRSRV_ERROR			eError;
 	IMG_HANDLE				hMemInfo;
-#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 	IMG_UINT64				ui64Stamp;
 #endif
 

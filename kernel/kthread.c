@@ -13,6 +13,9 @@
 #include <linux/file.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <trace/sched.h>
 
 #define KTHREAD_NICE_LEVEL (-5)
@@ -159,6 +162,10 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 		vsnprintf(create.result->comm, sizeof(create.result->comm),
 			  namefmt, args);
 		va_end(args);
+#ifdef CONFIG_LTT_LITE
+		ltt_lite_ev_process(LTT_LITE_EV_PROCESS_COMM_CHANGE,
+			create.result);
+#endif
 	}
 	return create.result;
 }
@@ -175,11 +182,19 @@ EXPORT_SYMBOL(kthread_create);
  */
 void kthread_bind(struct task_struct *k, unsigned int cpu)
 {
+#ifdef CONFIG_MACH_MOT
+	if (k->state != TASK_UNINTERRUPTIBLE) {
+		WARN_ON(1);
+		return;
+	}
+	wait_task_inactive(k, 0);
+#else
 	/* Must have done schedule() in kthread() before we set_task_cpu */
 	if (!wait_task_inactive(k, TASK_UNINTERRUPTIBLE)) {
 		WARN_ON(1);
 		return;
 	}
+#endif
 	set_task_cpu(k, cpu);
 	k->cpus_allowed = cpumask_of_cpu(cpu);
 	k->rt.nr_cpus_allowed = 1;

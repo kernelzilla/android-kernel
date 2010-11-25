@@ -448,6 +448,41 @@ static int _omap2_clk_enable(struct clk *clk)
 	return 0;
 }
 
+/** omap3_pwrdn_bug_clk_enable - enable clocks suffering from PWRDN bug
+ * @clk: DPLL output struct clk
+ *
+ * 3630 only: dpll3_m3_ck, dpll4_m2_ck, dpll4_m3_ck, dpll4_m4_ck, dpll4_m5_ck
+ * & dpll4_m6_ck dividers get lost after their respective PWRDN bits are set.
+ * Any write to the corresponding CM_CLKSEL register will refresh the
+ * dividers.  Only x2 clocks are affected, so it is safe to trust the parent
+ * clock information to refresh the CM_CLKSEL registers.
+ */
+int omap3_pwrdn_bug_clk_enable(struct clk *clk)
+{
+	u32 v;
+
+	v = _omap2_clk_read_reg(clk->enable_reg, clk);
+	if (clk->flags & INVERT_ENABLE)
+		v &= ~(1 << clk->enable_bit);
+	else
+		v |= (1 << clk->enable_bit);
+	_omap2_clk_write_reg(v, clk->enable_reg, clk);
+	v = _omap2_clk_read_reg(clk->enable_reg, clk); /* OCP barrier */
+
+	omap2_clk_wait_ready(clk);
+
+	v = __raw_readl(OMAP34XX_CM_REGADDR(clk->parent->prcm_mod,
+				clk->parent->clksel_reg));
+	v += (1 << clk->parent->clksel_shift);
+	__raw_writel(v, OMAP34XX_CM_REGADDR(clk->parent->prcm_mod,
+				clk->parent->clksel_reg));
+	v -= (1 << clk->parent->clksel_shift);
+	__raw_writel(v, OMAP34XX_CM_REGADDR(clk->parent->prcm_mod,
+				clk->parent->clksel_reg));
+
+	return 0;
+}
+
 /* Disables clock without considering parent dependencies or use count */
 static void _omap2_clk_disable(struct clk *clk)
 {

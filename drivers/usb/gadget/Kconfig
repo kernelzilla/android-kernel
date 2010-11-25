@@ -464,6 +464,24 @@ config USB_GOKU
 # LAST -- dummy/emulated controller
 #
 
+config USB_GADGET_MSM_72K
+	boolean "MSM 72K Device Controller"
+	depends on ARCH_MSM_ARM11
+	select USB_GADGET_SELECTED
+	select USB_GADGET_DUALSPEED
+	help
+	   USB gadget driver for Qualcomm MSM 72K architecture.
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "msm72k" and force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_MSM_72K
+	tristate
+	depends on USB_GADGET_MSM_72K
+	default USB_GADGET
+	select USB_GADGET_SELECTED
+
 config USB_GADGET_DUMMY_HCD
 	boolean "Dummy HCD (DEVELOPMENT)"
 	depends on USB=y || (USB=m && USB_GADGET=m)
@@ -699,14 +717,50 @@ config USB_G_PRINTER
 	  For more information, see Documentation/usb/gadget_printer.txt
 	  which includes sample code for accessing the device file.
 
+config USB_MOT_ANDROID
+        tristate "MOTO Android Gadget"
+        help
+          The MOTO Android gadget provides mass storage, adb and ethernet transport.
+
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_mot_android".
+
 config USB_ANDROID
 	tristate "Android Gadget"
-	depends on SWITCH
 	help
 	  The Android gadget provides mass storage and adb transport.
 
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_android".
+
+config USB_ANDROID_DIAG
+	tristate "diag function driver"
+	depends on USB_ANDROID
+	default n
+	help
+	  Say "y" to link the driver statically, or "m" to build
+	  as a part of "g_android"
+
+config USB_F_SERIAL
+	tristate "generic serial function driver"
+	depends on USB_ANDROID
+	default n
+	help
+	  Say "y" to link the driver statically, or "m" to build
+	  as a part of "g_android"
+
+config MODEM_SUPPORT
+	tristate "modem support in generic serial function driver"
+	depends on USB_F_SERIAL
+	default n
+	help
+          This feature enables the modem functionality in the
+	  generic serial.
+	  adds interrupt endpoint support to send modem notifications
+	  to host.
+	  adds CDC descriptors to enumerate the generic serial as MODEM.
+	  adds CDC class requests to configure MODEM line settings.
+	  Say "y" to enable MODEM support in the generic serial driver.
 
 config USB_CDC_COMPOSITE
 	tristate "CDC Composite Device (Ethernet and ACM)"
@@ -730,3 +784,8 @@ config USB_CDC_COMPOSITE
 endchoice
 
 endif # USB_GADGET
+
+config MOT_FEAT_ADB_ENDEV
+        tristate "ADB Enable Device"
+        default n
+

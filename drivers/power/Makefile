@@ -32,3 +32,6 @@ obj-$(CONFIG_CHARGER_CPCAP)	+= cpcap-charger.o
 obj-$(CONFIG_CHARGER_CPCAP)	+= cpcap-usb-charger.o
 obj-$(CONFIG_CHARGER_CPCAP)	+= cpcap-factory.o
 obj-$(CONFIG_BATTERY_CPCAP)	+= cpcap-battery.o
+obj-$(CONFIG_BATTERY_MSM)	+= msm_battery.o
+obj-$(CONFIG_TTA_CHARGER)	+= cpcap-tta.o
+obj-$(CONFIG_BATTERY_MOT)	+= mot_battery.o

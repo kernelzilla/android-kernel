@@ -22,6 +22,11 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 
+#ifdef CONFIG_ARM_OF
+#include <mach/dt_path.h>
+#include <asm/prom.h>
+#endif
+
 struct keypad_led_data {
 	struct cpcap_device *cpcap;
 	struct led_classdev ld_cpcap_keypad_class_dev;
@@ -104,8 +109,44 @@ static struct platform_driver ld_cpcap_kpad_driver = {
 		   },
 };
 
+#ifdef CONFIG_ARM_OF
+static int lights_of_init(void)
+{
+	u8 device_available;
+	struct device_node *node;
+	const void *prop;
+
+	node = of_find_node_by_path(DT_KPAD_LED);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_KPAD_LED);
+		return -ENODEV;
+	}
+
+	prop = of_get_property(node, "tablet_kpad_led", NULL);
+	if (prop)
+		device_available = *(u8 *)prop;
+	else {
+		pr_err("Read property %s error!\n", DT_PROP_TABLET_KPAD_LED);
+		of_node_put(node);
+		return -ENODEV;
+	}
+
+	of_node_put(node);
+	return device_available;
+}
+#endif
+
 static int __init ld_cpcap_kpad_init(void)
 {
+#ifdef CONFIG_ARM_OF
+	int err = lights_of_init();
+	if (err <= 0) {
+		pr_err("Tablet keyboard led device declared unavailable: %d\n",
+			 err);
+		return err;
+	}
+#endif
 	return platform_driver_register(&ld_cpcap_kpad_driver);
 }
 

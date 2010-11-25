@@ -1,33 +1,33 @@
 /**********************************************************************
  *
  * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
+ *
+ * This program is distributed in the hope it will be useful but, except
+ * as otherwise stated in writing, without any warranty; without even the
+ * implied warranty of merchantability or fitness for a particular purpose.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
+ *
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
  * Contact Information:
  * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+ * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK
  *
  ******************************************************************************/
 
 #ifndef _SYSCOMMON_H
 #define _SYSCOMMON_H
 
-#include "sysconfig.h"      
+#include "sysconfig.h"
 #include "sysinfo.h"		
 #include "servicesint.h"
 #include "queue.h"
@@ -36,7 +36,7 @@
 #include "ra.h"
 #include "device.h"
 #include "buffer_manager.h"
- 
+
 #if defined(NO_HARDWARE) && defined(__linux__) && defined(__KERNEL__)
 #include <asm/io.h>
 #endif
@@ -69,25 +69,24 @@ typedef struct _SYS_DATA_TAG_
    	PVRSRV_KERNEL_SYNC_INFO 	*psSharedSyncInfoList;		
     IMG_PVOID                   pvEnvSpecificData;      	
     IMG_PVOID                   pvSysSpecificData;    	  	
-	PVRSRV_RESOURCE				sQProcessResource;			
-	IMG_VOID					*pvSOCRegsBase;				
-    IMG_HANDLE                  hSOCTimerRegisterOSMemHandle; 
-	IMG_UINT32					*pvSOCTimerRegisterKM;		
-	IMG_VOID					*pvSOCClockGateRegsBase;	
-	IMG_UINT32					ui32SOCClockGateRegsSize;
-	PFN_CMD_PROC				*ppfnCmdProcList[SYS_DEVICE_COUNT];
-															
-
-
-	PCOMMAND_COMPLETE_DATA		*ppsCmdCompleteData[SYS_DEVICE_COUNT];
-															
-
+	PVRSRV_RESOURCE				sQProcessResource;
+	IMG_VOID					*pvSOCRegsBase;
+    IMG_HANDLE                  hSOCTimerRegisterOSMemHandle;
+	IMG_UINT32					*pvSOCTimerRegisterKM;
+	IMG_VOID					*pvSOCClockGateRegsBase;
+	IMG_UINT32		ui32SOCClockGateRegsSize;
+	PFN_CMD_PROC		* ppfnCmdProcList[SYS_DEVICE_COUNT];
+	PCOMMAND_COMPLETE_DATA		* ppsCmdCompleteData[SYS_DEVICE_COUNT];
 	IMG_BOOL                    bReProcessQueues;    		
 
-	RA_ARENA					*apsLocalDevMemArena[SYS_MAX_LOCAL_DEVMEM_ARENAS]; 
+	RA_ARENA	* apsLocalDevMemArena[SYS_MAX_LOCAL_DEVMEM_ARENAS];
 
-    IMG_CHAR                    *pszVersionString;          
-	PVRSRV_EVENTOBJECT			*psGlobalEventObject;			
+	IMG_CHAR	*pszVersionString;
+	PVRSRV_EVENTOBJECT	*psGlobalEventObject;
+
+#if defined(SUPPORT_CPU_CACHED_BUFFERS)
+	IMG_BOOL					bFlushCPUCache;
+#endif
 } SYS_DATA;
 
 
@@ -123,11 +122,11 @@ PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData);
 IMG_VOID SysPowerLockUnwrap(SYS_DATA *psSysData);
 #endif
 
-PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID, 
-								IMG_VOID	*pvIn,
-								IMG_UINT32  ulInSize,
-								IMG_VOID	*pvOut,
-								IMG_UINT32	ulOutSize);
+PVRSRV_ERROR SysOEMFunction(IMG_UINT32	ui32ID,
+			IMG_VOID	*pvIn,
+			IMG_UINT32  ulInSize,
+			IMG_VOID	*pvOut,
+			IMG_UINT32	ulOutSize);
 
 
 IMG_DEV_PHYADDR SysCpuPAddrToDevPAddr (PVRSRV_DEVICE_TYPE eDeviceType, IMG_CPU_PHYADDR cpu_paddr);
@@ -188,7 +187,7 @@ static INLINE IMG_VOID SysDeinitialiseCommon(SYS_DATA *psSysData)
 
 	OSDestroyResource(&psSysData->sPowerStateChangeResource);
 }
-#endif 
+#endif
 
 
 #if !(defined(NO_HARDWARE) && defined(__linux__) && defined(__KERNEL__))

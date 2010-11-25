@@ -50,6 +50,9 @@
 #include <linux/cn_proc.h>
 #include <linux/audit.h>
 #include <linux/tracehook.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <linux/kmod.h>
 #include <linux/fsnotify.h>
 
@@ -1336,6 +1339,11 @@ int do_execve(char * filename,
 	if (retval < 0)
 		goto out;
 
+#ifdef CONFIG_LTT_LITE
+	/* Trace only if exec has been successful */
+	ltt_lite_ev_process(LTT_LITE_EV_PROCESS_EXEC, current);
+#endif
+
 	/* execve succeeded */
 	mutex_unlock(&current->cred_exec_mutex);
 	acct_update_integrals(current);
@@ -1831,12 +1839,16 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 	   but keep the previous behaviour for now. */
 	if (!ispipe && !S_ISREG(inode->i_mode))
 		goto close_fail;
+
+#ifndef CONFIG_CORE_DUMP_PERMISSION	
 	/*
 	 * Dont allow local users get cute and trick others to coredump
 	 * into their pre-created files:
 	 */
 	if (inode->i_uid != current_fsuid())
 		goto close_fail;
+#endif
+
 	if (!file->f_op)
 		goto close_fail;
 	if (!file->f_op->write)

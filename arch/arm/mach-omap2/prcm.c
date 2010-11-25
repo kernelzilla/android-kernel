@@ -147,7 +147,7 @@ void omap_prcm_arch_reset(char mode)
 	} else
 		WARN_ON(1);
 
-#ifdef CONFIG_MACH_SHOLES
+#if defined(CONFIG_MACH_SHOLES) || defined(CONFIG_MACH_MAPPHONE)
 	prm_set_mod_reg_bits(OMAP_RST_GS, prcm_offs, RM_RSTCTRL);
 #else
 	prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs, RM_RSTCTRL);

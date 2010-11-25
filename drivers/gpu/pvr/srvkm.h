@@ -55,15 +55,13 @@ extern "C" {
 
 #define LOOP_UNTIL_TIMEOUT(TIMEOUT) \
 {\
-	IMG_UINT32 uiOffset, uiStart, uiCurrent; \
-	if (irqs_disabled()) \
-		pr_err("pvr: BUG: LOOP_UNTIL_TIMEOUT called with irqs disabled\n"); \
-	BUG_ON(irqs_disabled()); \
-	for(uiOffset = 0, uiStart = OSClockus(), uiCurrent = uiStart+1; \
-		(uiCurrent - uiStart + uiOffset) < TIMEOUT; \
-		uiCurrent = OSClockus(), \
-		uiOffset = uiCurrent < uiStart ? IMG_UINT32_MAX - uiStart : uiOffset, \
-		uiStart = uiCurrent < uiStart ? 0 : uiStart)
+	IMG_UINT32 uiOffset, uiStart, uiCurrent, uiNotLastLoop;	\
+	for (uiOffset = 0, uiStart = OSClockus(), \
+	uiCurrent = uiStart + 1, uiNotLastLoop = 1;\
+	((uiCurrent - uiStart + uiOffset) < TIMEOUT) || uiNotLastLoop--;\
+	uiCurrent = OSClockus(),\
+	uiOffset = uiCurrent < uiStart ? IMG_UINT32_MAX - uiStart : uiOffset,\
+	uiStart = uiCurrent < uiStart ? 0 : uiStart)
 
 #define END_LOOP_UNTIL_TIMEOUT() \
 }

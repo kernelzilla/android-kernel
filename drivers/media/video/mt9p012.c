@@ -723,6 +723,8 @@ static int mt9p012_read_reg(struct i2c_client *client, u16 data_length,
 	data[0] = (u8) (reg >> 8);;
 	data[1] = (u8) (reg & 0xff);
 	err = i2c_transfer(client->adapter, msg, 1);
+	udelay(50);
+
 	if (err >= 0) {
 		msg->len = data_length;
 		msg->flags = I2C_M_RD;
@@ -774,7 +776,7 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 again:
 	msg->addr = client->addr;
 	msg->flags = 0;
-	msg->len = 2 + data_length;
+	msg->len = data_length + 2;
 	msg->buf = data;
 
 	/* high byte goes out first */
@@ -797,12 +799,12 @@ again:
 	if (err >= 0)
 		return 0;
 
-	v4l_dbg(1, debug, client, "wrote 0x%x to offset 0x%x error %d", val,
-							reg, err);
 	if (retry <= MT9P012_I2C_RETRY_COUNT) {
-		v4l_warn(client, "retry ... %d", retry);
+		dev_dbg(&client->dev, "0x%x=0x%x retry ... %d\n",
+			reg, val, retry);
 		retry++;
-		mdelay(20);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(msecs_to_jiffies(20));
 		goto again;
 	}
 
@@ -885,7 +887,8 @@ static enum mt9p012_image_size mt9p012_find_isize(unsigned int width)
 	return isize;
 }
 
-static enum mt9p012_frame_type mt9p012_find_iframe(enum mt9p012_image_size isize)
+static enum mt9p012_frame_type mt9p012_find_iframe(
+		enum mt9p012_image_size isize)
 {
 	enum mt9p012_frame_type iframe = 0;
 
@@ -1275,7 +1278,7 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	sensor->abs_max_exposure_time = (line_time_q8 *
 				     (MT9P012_MAX_FRAME_LENGTH_LINES - 1)) >> 8;
 	sensor->fps_max_exposure_time = (line_time_q8 *
-				     (frame_length_lines - 1)) >> 8;
+				(frame_length_lines - 1)) >> 8;
 
 	/* Update Exposure Time */
 	i = find_vctrl(sensor, V4L2_CID_EXPOSURE);
@@ -1290,10 +1293,10 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	}
 
 	v4l_info(client, "MT9P012 Set Framerate: fper=%d/%d, "
-		 "frame_len_lines=%d, fps_max_expT=%dus, "
-		 "abs_max_expT=%dus\n",
-		 fper->numerator, fper->denominator, frame_length_lines,
-		 sensor->fps_max_exposure_time, sensor->abs_max_exposure_time);
+		"frame_len_lines=%d, fps_max_expT=%dus, "
+		"abs_max_expT=%dus\n",
+		fper->numerator, fper->denominator, frame_length_lines,
+		sensor->fps_max_exposure_time, sensor->abs_max_exposure_time);
 
 	return err;
 }
@@ -1415,6 +1418,7 @@ int mt9p012_configure_frame(struct v4l2_int_device *s,
 
 	err |= mt9p012_write_reg(client, MT9P012_16BIT, REG_FINE_CORRECTION,
 				 sensor_settings[iframe].exposure.fine_correction);
+
 	/* update */
 	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD, 0x00);
 
@@ -2113,8 +2117,23 @@ err_on:
 		sensor->pdata->set_xclk(0);
 		break;
 	case V4L2_POWER_STANDBY:
-		if (sensor->detected)
+		if (sensor->detected) {
 			mt9p012_write_regs(c, stream_off_list);
+			/*
+			 * Work around, black image is captured on HW with 39pf
+			 * capacitor in camera pclk line (for RF desense).
+			 *
+			 * Resetting the sensor here eliminates the issue.
+			 * Remove this workaround after root cause determined.
+			 *
+			 * Workaround allows HW with cap to function properly.
+			 * The capacitor has been removed for production.
+			 * This has no other effect on operation, since the
+			 * sensor is always reset on V4L2_POWER_ON
+			 * (i.e. out of standby) in mt9p012_configure.
+			 */
+			mt9p012_write_regs(c, mt9p012_common_pre);
+		}
 		sensor->power_on = false;
 		rval = sensor->pdata->power_set(sensor->dev, V4L2_POWER_STANDBY);
 		sensor->pdata->set_xclk(0);

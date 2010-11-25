@@ -78,7 +78,7 @@ static off_t printLinuxBridgeStats(IMG_CHAR * buffer, size_t size, off_t off);
 
 extern PVRSRV_LINUX_MUTEX gPVRSRVLock;
 
-#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 static IMG_UINT64 ui64Stamp;
 #endif 
 
@@ -560,14 +560,14 @@ PVRSRV_BridgeDispatchKM(struct file *pFile, IMG_UINT unref__ ioctlCmd, IMG_UINT3
 			PVRSRV_FILE_PRIVATE_DATA *psPrivateData = PRIVATE_DATA(pFile);
 
 			psPrivateData->hKernelMemInfo = psExportDeviceMemOUT->hMemInfo;
-#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 			psExportDeviceMemOUT->ui64Stamp = psPrivateData->ui64Stamp = ++ui64Stamp;
 #endif
 			break;
 		}
 #endif 
 
-#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 		case PVRSRV_BRIDGE_MAP_DEV_MEMORY:
 		{
 			PVRSRV_BRIDGE_OUT_MAP_DEV_MEMORY *psMapDeviceMemoryOUT =

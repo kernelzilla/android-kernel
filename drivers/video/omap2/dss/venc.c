@@ -39,6 +39,12 @@
 
 #include "dss.h"
 
+#ifdef CONFIG_TVOUT_SHOLEST
+#include <mach/prcm.h>
+#include <mach/gpio.h>
+#define OMAP_TVINT_GPIO 33
+#endif
+
 #define VENC_BASE	0x48050C00
 
 /* Venc registers */
@@ -171,7 +177,11 @@ static const struct venc_config venc_config_pal_trm = {
 
 	.tvdetgp_int_start_stop_x		= 0x00140001,
 	.tvdetgp_int_start_stop_y		= 0x00010001,
+#ifdef CONFIG_TVOUT_SHOLEST
+	.gen_ctrl				= 0x00FF0001,
+#else
 	.gen_ctrl				= 0x00FF0000,
+#endif
 };
 
 /* from TRM */
@@ -216,13 +226,23 @@ static const struct venc_config venc_config_ntsc_trm = {
 
 	.tvdetgp_int_start_stop_x		= 0x00140001,
 	.tvdetgp_int_start_stop_y		= 0x00010001,
+#ifdef CONFIG_TVOUT_SHOLEST
+	.gen_ctrl				= 0x00F90001,
+#else
 	.gen_ctrl				= 0x00F90000,
+#endif
 };
 
 static const struct venc_config venc_config_pal_bdghi = {
+#ifdef CONFIG_TVOUT_SHOLEST
+	.f_control				= 0x0,
+	.vidout_ctrl				= 0x1,
+	.sync_ctrl				= 0x00001040,
+#else
 	.f_control				= 0,
 	.vidout_ctrl				= 0,
 	.sync_ctrl				= 0,
+#endif
 	.hfltr_ctrl				= 0,
 	.x_color				= 0,
 	.line21					= 0,
@@ -230,7 +250,11 @@ static const struct venc_config venc_config_pal_bdghi = {
 	.htrigger_vtrigger			= 0,
 	.tvdetgp_int_start_stop_x		= 0x00140001,
 	.tvdetgp_int_start_stop_y		= 0x00010001,
+#ifdef CONFIG_TVOUT_SHOLEST
+	.gen_ctrl				= 0x00FB0001,
+#else
 	.gen_ctrl				= 0x00FB0000,
+#endif
 
 	.llen					= 864-1,
 	.flens					= 625-1,
@@ -378,21 +402,45 @@ static void venc_reset(void)
 	msleep(20);
 }
 
+#ifdef CONFIG_TVOUT_SHOLEST
+static u32
+cm_merge_mode_reg(s16 module, u16 idx, u32 val, u32 mask)
+{
+	u32 new_val = (cm_read_mod_reg(module, idx) & ~mask)|(val&mask);
+
+	cm_write_mod_reg(new_val, module, idx);
+	return new_val;
+}
+#endif
+
 static void venc_enable_clocks(int enable)
 {
-	if (enable)
+	if (enable) {
 		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_54M |
 				DSS_CLK_96M);
-	else
+#ifdef CONFIG_TVOUT_SHOLEST
+		/*divide 16x CM_CLKSEL_DSS*/
+		cm_merge_mode_reg(0x600, 0x0040, 0x10<<8, 0x1f<<8);
+#endif
+	} else {
 		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_54M |
 				DSS_CLK_96M);
+#ifdef CONFIG_TVOUT_SHOLEST
+		/*divide 16x CM_CLKSEL_DSS*/
+		cm_merge_mode_reg(0x600, 0x0040, 0x0<<8, 0x1f<<8);
+#endif
+	}
 }
 
 static const struct venc_config *venc_timings_to_config(
 		struct omap_video_timings *timings)
 {
 	if (memcmp(&omap_dss_pal_timings, timings, sizeof(*timings)) == 0)
+#ifdef CONFIG_TVOUT_SHOLEST
+		return &venc_config_pal_bdghi;
+#else
 		return &venc_config_pal_trm;
+#endif
 
 	if (memcmp(&omap_dss_ntsc_timings, timings, sizeof(*timings)) == 0)
 		return &venc_config_ntsc_trm;
@@ -407,7 +455,11 @@ static const struct venc_config *venc_timings_to_config(
 /* driver */
 static int venc_panel_probe(struct omap_dss_device *dssdev)
 {
+#ifdef CONFIG_TVOUT_SHOLEST
+	dssdev->panel.timings = omap_dss_ntsc_timings;
+#else
 	dssdev->panel.timings = omap_dss_pal_timings;
+#endif
 
 	return 0;
 }
@@ -481,8 +533,11 @@ int venc_init(struct platform_device *pdev)
 		DSSERR("can't ioremap VENC\n");
 		return -ENOMEM;
 	}
-
+#ifdef CONFIG_TVOUT_SHOLEST
+	venc.vdda_dac_reg = regulator_get(NULL, "vdac");
+#else
 	venc.vdda_dac_reg = regulator_get(&pdev->dev, "vdda_dac");
+#endif
 	if (IS_ERR(venc.vdda_dac_reg)) {
 		iounmap(venc.base);
 		DSSERR("can't get VDDA_DAC regulator\n");
@@ -508,8 +563,12 @@ void venc_exit(void)
 	iounmap(venc.base);
 }
 
+#include <mach/omap-pm.h>
+
 static void venc_power_on(struct omap_dss_device *dssdev)
 {
+	omap_pm_set_min_bus_tput(&dssdev->dev, OCP_INITIATOR_AGENT, 124416*3);
+
 	venc_enable_clocks(1);
 
 	venc_reset();
@@ -531,7 +590,9 @@ static void venc_power_on(struct omap_dss_device *dssdev)
 			dssdev->panel.timings.y_res/2);
 
 	regulator_enable(venc.vdda_dac_reg);
-
+#ifdef CONFIG_TVOUT_SHOLEST
+	regulator_set_voltage(venc.vdda_dac_reg, 1800000, 1800000);
+#endif
 	if (dssdev->platform_enable)
 		dssdev->platform_enable(dssdev);
 
@@ -551,6 +612,8 @@ static void venc_power_off(struct omap_dss_device *dssdev)
 	regulator_disable(venc.vdda_dac_reg);
 
 	venc_enable_clocks(0);
+
+	omap_pm_set_min_bus_tput(&dssdev->dev, OCP_INITIATOR_AGENT, 0);
 }
 
 static int venc_enable_display(struct omap_dss_device *dssdev)
@@ -737,6 +800,37 @@ int venc_init_display(struct omap_dss_device *dssdev)
 
 	return 0;
 }
+
+#ifdef CONFIG_TVOUT_SHOLEST
+int venc_tv_connect(void)
+{
+    int tv_int;
+
+    printk(KERN_INFO "Entered tv_connect()\n");
+
+    venc_enable_clocks(1);
+
+    venc_write_reg(VENC_TVDETGP_INT_START_STOP_X, 0x00140001);
+    venc_write_reg(VENC_TVDETGP_INT_START_STOP_Y, 0x00010001);
+    venc_write_reg(VENC_GEN_CTRL, 0x00010001);
+
+    msleep(10);
+
+    tv_int = gpio_get_value(OMAP_TVINT_GPIO);
+    printk("venc_tv_connect() %d \n", tv_int);
+
+    venc_enable_clocks(0);
+
+    return tv_int;
+}
+EXPORT_SYMBOL(venc_tv_connect);
+
+void venc_tv_disconnect(void)
+{
+    printk(KERN_INFO "Entered tv_disconnect()\n");
+}
+EXPORT_SYMBOL(venc_tv_disconnect);
+#endif
 
 void venc_dump_regs(struct seq_file *s)
 {

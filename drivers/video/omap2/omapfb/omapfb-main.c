@@ -29,6 +29,9 @@
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
 #include <linux/earlysuspend.h>
+#ifdef CONFIG_FB_OMAP2_MTD_LOGO
+#include <linux/mtd/mtd.h>
+#endif
 
 #include <mach/display.h>
 #include <mach/vram.h>
@@ -51,7 +54,6 @@ static unsigned int omapfb_test_pattern;
 module_param_named(test, omapfb_test_pattern, bool, 0644);
 #endif
 
-#ifdef DEBUG
 static void draw_pixel(struct fb_info *fbi, int x, int y, unsigned color)
 {
 	struct fb_var_screeninfo *var = &fbi->var;
@@ -86,7 +88,7 @@ static void draw_pixel(struct fb_info *fbi, int x, int y, unsigned color)
 		__raw_writel(color, p);
 	}
 }
-
+#ifdef DEBUG
 static void fill_fb(struct fb_info *fbi)
 {
 	struct fb_var_screeninfo *var = &fbi->var;
@@ -759,6 +761,7 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct fb_var_screeninfo *var = &fbi->var;
 	struct omap_overlay *ovl;
+	struct omap_overlay_info info;
 	u16 posx, posy;
 	u16 outw, outh;
 	int i;
@@ -781,6 +784,8 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 			continue;
 		}
 
+		ovl->get_overlay_info(ovl, &info);
+
 		if (init || (ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
 			int rotation = (var->rotate + ofbi->rotation[i]) % 4;
 			if (rotation == FB_ROTATE_CW ||
@@ -792,16 +797,16 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 				outh = var->yres;
 			}
 		} else {
-			outw = ovl->info.out_width;
-			outh = ovl->info.out_height;
+			outw = info.out_width;
+			outh = info.out_height;
 		}
 
 		if (init) {
 			posx = 0;
 			posy = 0;
 		} else {
-			posx = ovl->info.pos_x;
-			posy = ovl->info.pos_y;
+			posx = info.pos_x;
+			posy = info.pos_y;
 		}
 
 		r = omapfb_setup_overlay(fbi, ovl, posx, posy, outw, outh);
@@ -2009,6 +2014,102 @@ static int omapfb_parse_def_modes(struct omapfb2_device *fbdev)
 	return r;
 }
 
+#ifdef CONFIG_FB_OMAP2_MTD_LOGO
+/* The mtd logo image size is fixed at 2 eraseblocks */
+#define LOGO_IMAGE_BLOCKS  2
+#define LOGO_MTD_NAME	"logo"
+
+int show_mtd_logo(struct fb_info *info)
+{
+	struct mtd_info *mtd = NULL;
+	struct fb_image image;
+	unsigned int color;
+	unsigned int image_size;
+	unsigned int num_blocks;
+	int ret, retbuf, i, j, p, blocks;
+
+	DBG("\nshow_mtd_logo");
+
+	mtd = get_mtd_device_nm(LOGO_MTD_NAME);
+	if (!mtd) {
+		printk(KERN_ERR "Cann't find logo mtd info\n");
+		return -ENODEV;
+	}
+
+	image_size = mtd->erasesize * LOGO_IMAGE_BLOCKS;
+	num_blocks = (unsigned int)((unsigned int)mtd->size / mtd->erasesize);
+
+	image.data = kmalloc(image_size, GFP_KERNEL);
+	if (!image.data) {
+		printk(KERN_ERR "show_mtd_logo oom\n");
+		return -ENOMEM;
+	}
+
+	memset((void *)image.data, 0, image_size);
+
+	blocks = 0;
+	for (i = 0; i < num_blocks; i++) {
+		if (blocks < LOGO_IMAGE_BLOCKS) {
+
+			ret = mtd->block_isbad(mtd, i * mtd->erasesize);
+			if (ret) {
+				printk(KERN_DEBUG "bad blocks at %d in logo\n",
+									i);
+				/* skip the bad eraseblock */
+				continue;
+
+			} else {
+				mtd->read(mtd, i*mtd->erasesize,
+						mtd->erasesize, &retbuf,
+				(char *)(image.data + blocks * mtd->erasesize));
+				blocks++;
+
+				if (blocks == LOGO_IMAGE_BLOCKS)
+					break;
+			}
+		}
+	}
+
+	if (blocks != LOGO_IMAGE_BLOCKS) {
+		printk(KERN_ERR "too many bad blocks at logo partition\n");
+		kfree(image.data);
+		return -ENOMEM;
+	}
+
+	image.width = info->var.xres;
+	/* 3 bytes per pixel, the logo image format is fixed at RGB888 */
+	image.height = (unsigned int)((image_size/info->var.xres)/3);
+
+	if (image.height > info->var.yres)
+		image.height = info->var.yres;
+
+	image.dx = 0;
+	image.dy = (unsigned int)((info->var.yres - image.height)/2);
+
+	/* Per requirement, the first pixel will be the background color */
+	color = (image.data[0] << 16) | (image.data[1] << 8) | image.data[2];
+
+	/* draw the background */
+	for (i = 0 ; i < info->var.yres ; i++)
+		for (j = 0 ; j < info->var.xres; j++)
+			draw_pixel(info, j, i, color);
+
+	/* draw the logo */
+	p = 0;
+	for (i = 0; i < image.height; i++)
+		for (j = 0; j < image.width; j++) {
+			color = ((image.data[p] << 16) |
+				 (image.data[p+1] << 8) | image.data[p+2]);
+			p += 3;
+			draw_pixel(info, image.dx+j, image.dy+i, color);
+	}
+
+	kfree(image.data);
+
+	return 0;
+}
+#endif
+
 static int omapfb_probe(struct platform_device *pdev)
 {
 	struct omapfb2_device *fbdev = NULL;
@@ -2090,6 +2191,9 @@ static int omapfb_probe(struct platform_device *pdev)
 	}
 
 	DBG("mgr->apply'ed\n");
+#ifdef CONFIG_FB_OMAP2_MTD_LOGO
+	show_mtd_logo(fbdev->fbs[0]);
+#endif
 
 	r = def_display->enable(def_display);
 	if (r) {
@@ -2116,6 +2220,22 @@ static int omapfb_probe(struct platform_device *pdev)
 			def_display->set_update_mode(def_display,
 					OMAP_DSS_UPDATE_AUTO);
 	}
+
+
+#ifdef CONFIG_FB_OMAP2_MTD_LOGO
+	for (i = 0; i < fbdev->num_displays; i++) {
+		struct omap_dss_device *display = fbdev->displays[i];
+		u16 w, h;
+
+		if (!display->get_update_mode || !display->update)
+			continue;
+
+		display->get_resolution(display, &w, &h);
+		display->update(display, 0, 0, w, h);
+
+	}
+#endif
+
 
 	DBG("display->updated\n");
 
@@ -2177,7 +2297,7 @@ module_param_named(mirror, def_mirror, bool, 0);
 /* late_initcall to let panel/ctrl drivers loaded first.
  * I guess better option would be a more dynamic approach,
  * so that omapfb reacts to new panels when they are loaded */
-late_initcall(omapfb_init);
+device_initcall_sync(omapfb_init);
 /*module_init(omapfb_init);*/
 module_exit(omapfb_exit);
 

@@ -7,6 +7,7 @@
  * Copyright (c) 2004 Jon Smirl <jonsmirl@gmail.com>
  * Copyright (c) 2003-2004 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (c) 2003-2004 IBM Corp.
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This file is released under the GPLv2
  *
@@ -477,7 +478,11 @@ int drm_sysfs_device_add(struct drm_minor *minor)
 	int i, j;
 	char *minor_str;
 
-	minor->kdev.parent = &minor->dev->pdev->dev;
+	if (minor->dev->platformdev != NULL)
+		minor->kdev.parent = &minor->dev->platformdev->dev;
+	else
+		minor->kdev.parent = &minor->dev->pdev->dev;
+
 	minor->kdev.class = drm_class;
 	minor->kdev.release = drm_sysfs_device_release;
 	minor->kdev.devt = minor->device;

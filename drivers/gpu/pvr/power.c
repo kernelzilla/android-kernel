@@ -499,9 +499,11 @@ PVRSRV_ERROR PVRSRVSystemPostPowerStateKM(PVRSRV_SYS_POWER_STATE eNewSysPowerSta
 		}
 	}
 	
-	PVR_DPF((PVR_DBG_MESSAGE,
+   /*
+	PVR_DPF((PVR_DBG_WARNING,
 			"PVRSRVSystemPostPowerStateKM: System Power Transition from %d to %d OK",
 			psSysData->eCurrentPowerState, eNewSysPowerState));
+	*/
 
 	psSysData->eCurrentPowerState = eNewSysPowerState;
 

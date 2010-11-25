@@ -50,7 +50,8 @@ static inline u32 sms_read_reg(u16 reg)
 #else
 #define OMAP242X_SDRC_REGADDR(reg)	IO_ADDRESS(OMAP2420_SDRC_BASE + (reg))
 #define OMAP243X_SDRC_REGADDR(reg)	IO_ADDRESS(OMAP243X_SDRC_BASE + (reg))
-#define OMAP34XX_SDRC_REGADDR(reg)	IO_ADDRESS(OMAP343X_SDRC_BASE + (reg))
+#define OMAP34XX_SDRC_REGADDR(reg)	omap343x_l3_io_p2v(OMAP343X_SDRC_BASE \
+						+ (reg))
 #endif	/* __ASSEMBLER__ */
 
 #endif

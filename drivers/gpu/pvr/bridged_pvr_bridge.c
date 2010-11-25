@@ -559,6 +559,7 @@ PVRSRVFreeDeviceMemBW(IMG_UINT32 ui32BridgeID,
 
 	
 	psKernelMemInfo = (PVRSRV_KERNEL_MEM_INFO*)pvKernelMemInfo;
+
 	if (psKernelMemInfo->ui32RefCount == 1)
 	{
 		psRetOUT->eError =
@@ -566,7 +567,8 @@ PVRSRVFreeDeviceMemBW(IMG_UINT32 ui32BridgeID,
 	}
 	else
 	{
-		PVR_DPF((PVR_DBG_WARNING, "PVRSRVFreeDeviceMemBW: mappings are open in other processes, deferring free!"));
+		PVR_DPF((PVR_DBG_WARNING, "PVRSRVFreeDeviceMemBW:\
+		mappings are open in other processes, deferring free!"));
 		psKernelMemInfo->bPendingFree = IMG_TRUE;
 		psRetOUT->eError = PVRSRV_OK;
 	}
@@ -2944,7 +2946,6 @@ static PVRSRV_ERROR ModifyCompleteSyncOpsCallBack(IMG_PVOID		pvParam,
 {
 	MODIFY_SYNC_OP_INFO		*psModSyncOpInfo;
 	PVRSRV_KERNEL_SYNC_INFO *psKernelSyncInfo;
-	int printCount = 0;
 
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
 	
@@ -2964,19 +2965,10 @@ static PVRSRV_ERROR ModifyCompleteSyncOpsCallBack(IMG_PVOID		pvParam,
 		{
 			goto OpFlushedComplete;
 		}
-		if (printCount > 0) {
-			PVR_DPF((PVR_DBG_WARNING,
-				 "ModifyCompleteSyncOpsCallBack: "
-				 "waiting for old Ops to flush %d",
-				 printCount));
-			printCount++;
-		}
+		PVR_DPF((PVR_DBG_ERROR, "ModifyCompleteSyncOpsCallBack:\
+		waiting for old Ops to flush"));
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
 	} END_LOOP_UNTIL_TIMEOUT();
-
-	if((psModSyncOpInfo->ui32WriteOpsPendingSnapShot == psKernelSyncInfo->psSyncData->ui32WriteOpsComplete)
-	   && (psModSyncOpInfo->ui32ReadOpsPendingSnapShot == psKernelSyncInfo->psSyncData->ui32ReadOpsComplete))
-		goto OpFlushedComplete;
 
 	PVR_DPF((PVR_DBG_ERROR, "ModifyCompleteSyncOpsCallBack: waiting for old Ops to flush timed out"));
 	
@@ -2984,7 +2976,7 @@ static PVRSRV_ERROR ModifyCompleteSyncOpsCallBack(IMG_PVOID		pvParam,
 
 OpFlushedComplete:
 	
-
+	
 	if(psModSyncOpInfo->ui32ModifyFlags & PVRSRV_MODIFYSYNCOPS_FLAGS_WO_INC)
 	{
 		psKernelSyncInfo->psSyncData->ui32WriteOpsComplete++;

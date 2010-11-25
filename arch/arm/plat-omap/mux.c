@@ -53,6 +53,10 @@ int __init omap_mux_register(struct omap_mux_cfg *arch_mux_cfg)
 int __init_or_module omap_cfg_reg(const unsigned long index)
 {
 	struct pin_config *reg;
+#if defined(CONFIG_MOT_FEAT_MDTV) || defined(CONFIG_PANEL_HDTV)\
+    || defined(CONFIG_VIB_PWM) || defined(CONFIG_VIDEO_MIPI_INTERFACE)
+	int is_mux_config = 0;
+#endif
 
 	if (mux_cfg == NULL) {
 		printk(KERN_ERR "Pin mux table not initialized\n");
@@ -71,7 +75,33 @@ int __init_or_module omap_cfg_reg(const unsigned long index)
 	if (!mux_cfg->cfg_reg)
 		return -ENODEV;
 
+#ifdef CONFIG_MOT_FEAT_MDTV
+	if (index >= F1_34XX_MDTV_INT_OFF && index <= AA3_34XX_MDTV_CLK_ON)
+		is_mux_config = 1;
+#endif
+#ifdef CONFIG_PANEL_HDTV
+	if ((index >= AG22_34XX_DSS_DATA0 && index <= AH24_34XX_DSS_DATA5)
+		|| (index >= AG22_34XX_DSI_DX0 && index <= AH24_34XX_DSI_DY2))
+		is_mux_config = 1;
+#endif
+#ifdef CONFIG_VIB_PWM
+	if (index == AF22_34XX_GPIO9_OUT)
+		is_mux_config = 1;
+#endif
+#if defined(CONFIG_VIDEO_MIPI_INTERFACE)
+	if ((index >= A24_34XX_CAM_HS && index <= H2_34XX_GPMC_A3) ||\
+		(index >= AG17_34XX_CAM_D0 && index <= AE17_34XX_CSI2_DY1))
+		is_mux_config = 1;
+#endif
+#if defined(CONFIG_MOT_FEAT_MDTV) || defined(CONFIG_PANEL_HDTV)\
+	|| defined(CONFIG_VIB_PWM) || defined(CONFIG_VIDEO_MIPI_INTERFACE)
+	if (is_mux_config == 1)
+		return mux_cfg->cfg_reg(reg);
+	else
+		return 0;
+#else
 	return mux_cfg->cfg_reg(reg);
+#endif
 }
 EXPORT_SYMBOL(omap_cfg_reg);
 #else

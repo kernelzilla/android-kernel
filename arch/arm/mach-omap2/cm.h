@@ -21,7 +21,8 @@
 #define OMAP2430_CM_REGADDR(module, reg)				\
 			IO_ADDRESS(OMAP2430_CM_BASE + (module) + (reg))
 #define OMAP34XX_CM_REGADDR(module, reg)				\
-			IO_ADDRESS(OMAP3430_CM_BASE + (module) + (reg))
+			OMAP343X_L4_IO_ADDRESS(OMAP3430_CM_BASE +	\
+			(module) + (reg))
 
 /*
  * Architecture-specific global CM registers

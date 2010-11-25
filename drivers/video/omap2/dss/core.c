@@ -445,6 +445,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* DISPC_CONTROL */
 	skip_init = 1;
+	if (pdata->default_device->phy.dsi.xfer_mode
+		== OMAP_DSI_XFER_VIDEO_MODE)
+		skip_init = 0;
 #endif
 
 	r = dss_init(skip_init);
@@ -907,7 +910,7 @@ static int __init omap_dss_init2(void)
 }
 
 core_initcall(omap_dss_init);
-device_initcall(omap_dss_init2);
+device_initcall_sync(omap_dss_init2);
 #endif
 
 MODULE_AUTHOR("Tomi Valkeinen <tomi.valkeinen@nokia.com>");

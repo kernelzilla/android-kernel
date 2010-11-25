@@ -14,13 +14,17 @@
 #include <linux/bootmem.h>
 #include <linux/mman.h>
 #include <linux/nodemask.h>
-
+#include <linux/ioport.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <asm/cputype.h>
 #include <asm/mach-types.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/sizes.h>
 #include <asm/tlb.h>
+#include <asm/pgtable.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -191,6 +195,12 @@ static struct mem_type mem_types[] = {
 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
 		.domain		= DOMAIN_IO,
 	},
+	[MT_DEVICE_STRONGLY_ORDERED] = {  /* Guaranteed strongly ordered */
+		.prot_pte       = PROT_PTE_DEVICE,
+		.prot_l1        = PMD_TYPE_TABLE,
+		.prot_sect      = PROT_SECT_DEVICE | PMD_SECT_UNCACHED,
+		.domain         = DOMAIN_IO,
+	},
 	[MT_DEVICE_NONSHARED] = { /* ARMv6 non-shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_NONSHARED,
 		.prot_l1	= PMD_TYPE_TABLE,
@@ -238,6 +248,7 @@ static struct mem_type mem_types[] = {
 	[MT_MEMORY] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
+		.prot_l1   = PMD_TYPE_TABLE,
 	},
 	[MT_ROM] = {
 		.prot_sect = PMD_TYPE_SECT,
@@ -246,6 +257,18 @@ static struct mem_type mem_types[] = {
 	[MT_MEMORY_NONCACHED] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
+	},
+	[MT_MEMORY_RO] = {
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_APX,
+		.domain    = DOMAIN_KERNEL,
+		.prot_l1   = PMD_TYPE_TABLE,
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_EXEC,
+	},
+	[MT_MEMORY_DATA] = {
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
+		.domain    = DOMAIN_KERNEL,
+		.prot_l1   = PMD_TYPE_TABLE,
 	},
 };
 
@@ -327,6 +350,9 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_XN;
+			mem_types[MT_MEMORY_DATA].prot_sect |= PMD_SECT_XN;
+			mem_types[MT_DEVICE_STRONGLY_ORDERED].prot_sect |=
+								PMD_SECT_XN;
 		}
 		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
 			/*
@@ -449,6 +475,11 @@ static void __init build_mem_type_table(void)
 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
 	mem_types[MT_MEMORY].prot_sect |= ecc_mask | cp->pmd;
 	mem_types[MT_ROM].prot_sect |= cp->pmd;
+	mem_types[MT_MEMORY_RO].prot_sect |= ecc_mask | cp->pmd;
+	mem_types[MT_MEMORY].prot_pte = pgprot_kernel;
+	mem_types[MT_MEMORY_RO].prot_pte |= cp->pte;
+	mem_types[MT_MEMORY_DATA].prot_sect |= ecc_mask | cp->pmd;
+	mem_types[MT_MEMORY_DATA].prot_pte = pgprot_kernel & (~L_PTE_EXEC);
 
 	switch (cp->pmd) {
 	case PMD_SECT_WT:
@@ -479,7 +510,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 {
 	pte_t *pte;
 
-	if (pmd_none(*pmd)) {
+	if (pmd_none(*pmd) || ((pmd_val(*pmd) & 0x3) != PMD_TYPE_TABLE)) {
 		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
 	}
@@ -717,7 +748,7 @@ static void __init sanity_check_meminfo(void)
 		 * the vmalloc area.
 		 */
 		if (__va(bank->start) >= VMALLOC_MIN ||
-		    __va(bank->start) < PAGE_OFFSET) {
+		    __va(bank->start) < (void *)PAGE_OFFSET) {
 			printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
 			       "(vmalloc region overlap).\n",
 			       bank->start, bank->start + bank->size - 1);
@@ -747,6 +778,7 @@ static inline void prepare_page_table(void)
 {
 	unsigned long addr;
 
+
 	/*
 	 * Clear out all the mappings below the kernel image.
 	 */
@@ -772,9 +804,19 @@ static inline void prepare_page_table(void)
 /*
  * Reserve the various regions of node 0
  */
+#ifdef CONFIG_MEM_DUMP
+#define MLOADER_CODE_START 0x87000000
+#define MLOADER_CODE_SIZE 0x10000
+#endif
 void __init reserve_node_zero(pg_data_t *pgdat)
 {
 	unsigned long res_size = 0;
+#ifdef CONFIG_LTT_LITE
+	int res;
+#endif
+#ifdef CONFIG_MEM_DUMP
+	int res1;
+#endif
 
 	/*
 	 * Register the kernel text and data with bootmem.
@@ -829,6 +871,30 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	 */
 	res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
 #endif
+#ifdef CONFIG_LTT_LITE
+	/* reserve memory for ltt lite */
+	if (ltt_lite_res.start) {
+		printk(KERN_DEBUG "LTT-LITE: reserve 0x%lx\n",
+			(unsigned long)ltt_lite_res.start);
+		res = reserve_bootmem_node(pgdat, ltt_lite_res.start,
+			ltt_lite_res.end - ltt_lite_res.start+1,
+			BOOTMEM_DEFAULT);
+		if (res)
+			printk(KERN_ERR "LTT-LITE: reserve memory failed, err=%d\n",
+					res);
+	}
+#endif
+#ifdef CONFIG_MEM_DUMP
+	/* reserve memory for memory dump */
+	printk(KERN_INFO "Reserve 0x%x, size=0x%x for memory dump...\n",
+			MLOADER_CODE_START, MLOADER_CODE_SIZE);
+	res1 = reserve_bootmem_node(pgdat, MLOADER_CODE_START,
+			MLOADER_CODE_SIZE, BOOTMEM_DEFAULT);
+	if (res1)
+		printk(KERN_ERR "reserve memory failed for memory dump, err=%d \n",
+				res1);
+#endif
+
 	if (res_size)
 		reserve_bootmem_node(pgdat, PHYS_OFFSET, res_size,
 				BOOTMEM_DEFAULT);
@@ -846,6 +912,9 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	struct map_desc map;
 	unsigned long addr;
 	void *vectors;
+#ifdef CONFIG_RO_TEXT
+	struct map_desc text_map, rest_map;
+#endif
 
 	/*
 	 * Allocate the vector page early.
@@ -867,6 +936,27 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	create_mapping(&map);
 #endif
 
+#ifdef CONFIG_RO_TEXT
+	printk(KERN_CRIT "Create RO text memory mapping\n");
+	text_map.pfn = __phys_to_pfn(virt_to_phys(_text));
+	text_map.virtual = (u32)_text;
+	text_map.length = (u32)_etext - (u32)_text;
+	text_map.type = MT_MEMORY_RO;
+	create_mapping(&text_map);
+	printk(KERN_CRIT "Create rest memory mapping\n");
+	rest_map.pfn = __phys_to_pfn(
+			virt_to_phys((void *)((u32)_text & PMD_MASK)));
+	rest_map.virtual = (u32)_text & PMD_MASK;
+	rest_map.length = (u32)_text - rest_map.virtual;
+	rest_map.type = MT_MEMORY;
+	create_mapping(&rest_map);
+	rest_map.pfn = __phys_to_pfn(virt_to_phys(_etext));
+	rest_map.virtual = (u32)_etext;
+	rest_map.length = (u32)high_memory - (u32)_etext;
+	rest_map.type = MT_MEMORY_DATA;
+	create_mapping(&rest_map);
+	printk(KERN_CRIT "Creating RO text and data mapping sucessful\n");
+#endif
 	/*
 	 * Map the cache flushing regions.
 	 */

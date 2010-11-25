@@ -33,7 +33,9 @@
 
 
 /* ----- global defines ----------------------------------------------- */
-
+#if defined(CONFIG_MACH_CALGARY) || defined(CONFIG_MACH_MOT)
+#define DEBUG
+#endif
 #ifdef DEBUG
 #define bit_dbg(level, dev, format, args...) \
 	do { \
@@ -56,6 +58,10 @@ static int i2c_debug = 1;
 module_param(i2c_debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(i2c_debug,
 		 "debug level - 0 off; 1 normal; 2 verbose; 3 very verbose");
+#endif
+#ifdef CONFIG_MACH_MOT
+extern int i2c_gpio_configure_gpio(void);
+extern int i2c_gpio_unconfigure_gpio(void);
 #endif
 
 /* --- setting states on the bus with the right timing: ---------------	*/
@@ -521,7 +527,9 @@ static int bit_xfer(struct i2c_adapter *i2c_adap,
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 	int i, ret;
 	unsigned short nak_ok;
-
+#ifdef CONFIG_MACH_MOT
+	i2c_gpio_configure_gpio();
+#endif
 	bit_dbg(3, &i2c_adap->dev, "emitting start condition\n");
 	i2c_start(adap);
 	for (i = 0; i < num; i++) {
@@ -570,6 +578,9 @@ static int bit_xfer(struct i2c_adapter *i2c_adap,
 bailout:
 	bit_dbg(3, &i2c_adap->dev, "emitting stop condition\n");
 	i2c_stop(adap);
+#ifdef CONFIG_MACH_MOT
+	i2c_gpio_unconfigure_gpio();
+#endif
 	return ret;
 }
 
@@ -626,7 +637,9 @@ EXPORT_SYMBOL(i2c_bit_add_bus);
 int i2c_bit_add_numbered_bus(struct i2c_adapter *adap)
 {
 	int err;
-
+#ifdef CONFIG_MACH_MOT
+	printk(KERN_ERR "i2c_bit_add_numbered_bus\n");
+#endif
 	err = i2c_bit_prepare_bus(adap);
 	if (err)
 		return err;

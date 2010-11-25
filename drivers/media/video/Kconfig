@@ -50,6 +50,15 @@ config VIDEO_TUNER
 	depends on MEDIA_TUNER
 
 source "drivers/media/video/omap-vout/Kconfig"
+
+# NXP HDMI TDA19989 configuration
+config HDMI_TDA19989
+	tristate "NXP HDMI 1.3 Transmitter driver"
+	depends on I2C
+	help
+	  to support HDMI1.3 transmitter
+	  with 3*8bit video inputs and CEC.
+
 #
 # Multimedia Video device configuration
 #
@@ -314,6 +323,26 @@ config VIDEO_MT9P012
 	---help---
 	  This is a Video4Linux2 sensor-level driver for the Micron
 	  MT9P012 camera.  It is currently working with the TI OMAP3
+	  camera controller.
+
+config VIDEO_MIPI_INTERFACE
+	tristate "MIPI INTERFACE functionality"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is for MIPI INTERFACE functiionality
+
+config VIDEO_MIPI_DLI_TEST
+	tristate "MIPI DLI TEST functionality"
+	depends on VIDEO_MIPI_INTERFACE && VIDEO_V4L2
+	---help---
+	  This is for MIPI INTERFACE functiionality
+
+config VIDEO_OV8810
+	tristate "OV8810 raw sensor driver (8MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Omni-Vision
+	  OV8810 camera.  It is currently working with the TI OMAP3
 	  camera controller.
 
 config VIDEO_OMAP3_HPLENS
@@ -828,6 +857,30 @@ config VIDEO_PXA27x
 	---help---
 	  This is a v4l2 driver for the PXA27x Quick Capture Interface
 
+#
+# MSM camera configuration
+#
+
+comment "Qualcomm MSM Camera And Video"
+
+menuconfig MSM_CAMERA
+	bool "Qualcomm MSM camera and video capture support"
+	depends on ARCH_MSM && VIDEO_V4L2 && I2C && ANDROID_PMEM
+	default y
+	help
+	  Say Y here to enable selecting the video adapters for
+	  Qualcomm msm camera and video encoding
+
+config MSM_CAMERA_DEBUG
+	bool "Qualcomm MSM camera debugging with printk"
+	depends on MSM_CAMERA
+	default n
+	help
+	  Enable printk() debug for msm camera
+
+
+source "drivers/media/video/msm/Kconfig"
+
 config VIDEO_SH_MOBILE_CEU
 	tristate "SuperH Mobile CEU Interface driver"
 	depends on VIDEO_DEV && SOC_CAMERA && HAS_DMA && HAVE_CLK
@@ -989,4 +1042,11 @@ config USB_S2255
 
 endif # V4L_USB_DRIVERS
 
+
 endif # VIDEO_CAPTURE_DRIVERS
+config VIDEO_CAM_ISE
+	bool "Motorola Camera ISE Interface"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 isp and vl42 configuration handler for
+	  the motorole ISE driver, which resides in the user space.

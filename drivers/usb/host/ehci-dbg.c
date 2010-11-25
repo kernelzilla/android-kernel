@@ -358,8 +358,7 @@ struct debug_buffer {
 	struct usb_bus *bus;
 	struct mutex mutex;	/* protect filling of buffer */
 	size_t count;		/* number of characters filled into buffer */
-	char *output_buf;
-	size_t alloc_size;
+	char *page;
 };
 
 #define speed_char(info1) ({ char tmp; \
@@ -455,7 +454,9 @@ static void qh_lines (
 				(scratch >> 16) & 0x7fff,
 				scratch,
 				td->urb);
-		if (size < temp)
+		if (temp < 0)
+			temp = 0;
+		else if (size < temp)
 			temp = size;
 		size -= temp;
 		next += temp;
@@ -464,7 +465,9 @@ static void qh_lines (
 	}
 
 	temp = snprintf (next, size, "\n");
-	if (size < temp)
+	if (temp < 0)
+		temp = 0;
+	else if (size < temp)
 		temp = size;
 	size -= temp;
 	next += temp;
@@ -485,8 +488,8 @@ static ssize_t fill_async_buffer(struct debug_buffer *buf)
 
 	hcd = bus_to_hcd(buf->bus);
 	ehci = hcd_to_ehci (hcd);
-	next = buf->output_buf;
-	size = buf->alloc_size;
+	next = buf->page;
+	size = PAGE_SIZE;
 
 	*next = 0;
 
@@ -507,7 +510,7 @@ static ssize_t fill_async_buffer(struct debug_buffer *buf)
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
-	return strlen(buf->output_buf);
+	return strlen(buf->page);
 }
 
 #define DBG_SCHED_LIMIT 64
@@ -528,8 +531,8 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 
 	hcd = bus_to_hcd(buf->bus);
 	ehci = hcd_to_ehci (hcd);
-	next = buf->output_buf;
-	size = buf->alloc_size;
+	next = buf->page;
+	size = PAGE_SIZE;
 
 	temp = scnprintf (next, size, "size = %d\n", ehci->periodic_size);
 	size -= temp;
@@ -565,16 +568,14 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 				for (temp = 0; temp < seen_count; temp++) {
 					if (seen [temp].ptr != p.ptr)
 						continue;
-					if (p.qh->qh_next.ptr) {
+					if (p.qh->qh_next.ptr)
 						temp = scnprintf (next, size,
 							" ...");
-						size -= temp;
-						next += temp;
-					}
+					p.ptr = NULL;
 					break;
 				}
 				/* show more info the first time around */
-				if (temp == seen_count) {
+				if (temp == seen_count && p.ptr) {
 					u32	scratch = hc32_to_cpup(ehci,
 							&p.qh->hw_info1);
 					struct ehci_qtd	*qtd;
@@ -648,7 +649,7 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	kfree (seen);
 
-	return buf->alloc_size - size;
+	return PAGE_SIZE - size;
 }
 #undef DBG_SCHED_LIMIT
 
@@ -664,14 +665,14 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 
 	hcd = bus_to_hcd(buf->bus);
 	ehci = hcd_to_ehci (hcd);
-	next = buf->output_buf;
-	size = buf->alloc_size;
+	next = buf->page;
+	size = PAGE_SIZE;
 
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
 		size = scnprintf (next, size,
-			"bus %s, device %s\n"
+			"bus %s, device %s (driver " DRIVER_VERSION ")\n"
 			"%s\n"
 			"SUSPENDED (no register access)\n",
 			hcd->self.controller->bus->name,
@@ -683,7 +684,7 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 	/* Capability Registers */
 	i = HC_VERSION(ehci_readl(ehci, &ehci->caps->hc_capbase));
 	temp = scnprintf (next, size,
-		"bus %s, device %s\n"
+		"bus %s, device %s (driver " DRIVER_VERSION ")\n"
 		"%s\n"
 		"EHCI %x.%02x, hcd state %d\n",
 		hcd->self.controller->bus->name,
@@ -807,7 +808,7 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
-	return buf->alloc_size - size;
+	return PAGE_SIZE - size;
 }
 
 static struct debug_buffer *alloc_buffer(struct usb_bus *bus,
@@ -821,7 +822,6 @@ static struct debug_buffer *alloc_buffer(struct usb_bus *bus,
 		buf->bus = bus;
 		buf->fill_func = fill_func;
 		mutex_init(&buf->mutex);
-		buf->alloc_size = PAGE_SIZE;
 	}
 
 	return buf;
@@ -831,10 +831,10 @@ static int fill_buffer(struct debug_buffer *buf)
 {
 	int ret = 0;
 
-	if (!buf->output_buf)
-		buf->output_buf = (char *)vmalloc(buf->alloc_size);
+	if (!buf->page)
+		buf->page = (char *)get_zeroed_page(GFP_KERNEL);
 
-	if (!buf->output_buf) {
+	if (!buf->page) {
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -867,7 +867,7 @@ static ssize_t debug_output(struct file *file, char __user *user_buf,
 	mutex_unlock(&buf->mutex);
 
 	ret = simple_read_from_buffer(user_buf, len, offset,
-				      buf->output_buf, buf->count);
+				      buf->page, buf->count);
 
 out:
 	return ret;
@@ -879,8 +879,8 @@ static int debug_close(struct inode *inode, struct file *file)
 	struct debug_buffer *buf = file->private_data;
 
 	if (buf) {
-		if (buf->output_buf)
-			vfree(buf->output_buf);
+		if (buf->page)
+			free_page((unsigned long)buf->page);
 		kfree(buf);
 	}
 
@@ -895,14 +895,10 @@ static int debug_async_open(struct inode *inode, struct file *file)
 
 static int debug_periodic_open(struct inode *inode, struct file *file)
 {
-	struct debug_buffer *buf;
-	buf = alloc_buffer(inode->i_private, fill_periodic_buffer);
-	if (!buf)
-		return -ENOMEM;
+	file->private_data = alloc_buffer(inode->i_private,
+					  fill_periodic_buffer);
 
-	buf->alloc_size = (sizeof(void *) == 4 ? 6 : 8)*PAGE_SIZE;
-	file->private_data = buf;
-	return 0;
+	return file->private_data ? 0 : -ENOMEM;
 }
 
 static int debug_registers_open(struct inode *inode, struct file *file)

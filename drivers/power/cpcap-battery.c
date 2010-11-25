@@ -16,6 +16,7 @@
  * 02111-1307, USA
  */
 
+#include <asm/div64.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -25,11 +26,14 @@
 #include <linux/poll.h>
 #include <linux/power_supply.h>
 #include <linux/types.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/spi/spi.h>
+#include <linux/time.h>
 #include <linux/miscdevice.h>
+#include <linux/debugfs.h>
 
 #define CPCAP_BATT_IRQ_BATTDET 0x01
 #define CPCAP_BATT_IRQ_OV      0x02
@@ -47,6 +51,7 @@ static ssize_t cpcap_batt_read(struct file *file, char *buf, size_t count,
 			       loff_t *ppos);
 static int cpcap_batt_probe(struct platform_device *pdev);
 static int cpcap_batt_remove(struct platform_device *pdev);
+static int cpcap_batt_resume(struct platform_device *pdev);
 
 struct cpcap_batt_ps {
 	struct power_supply batt;
@@ -62,6 +67,8 @@ struct cpcap_batt_ps {
 	char data_pending;
 	wait_queue_head_t wait;
 	char async_req_pending;
+	unsigned long last_run_time;
+	bool no_update;
 };
 
 static const struct file_operations batt_fops = {
@@ -103,6 +110,7 @@ static enum power_supply_property cpcap_batt_usb_props[] =
 static struct platform_driver cpcap_batt_driver = {
 	.probe		= cpcap_batt_probe,
 	.remove		= cpcap_batt_remove,
+	.resume		= cpcap_batt_resume,
 	.driver		= {
 		.name	= "cpcap_battery",
 		.owner	= THIS_MODULE,
@@ -116,7 +124,6 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 	struct cpcap_batt_ps *sply = data;
 
 	mutex_lock(&sply->lock);
-
 	sply->data_pending = 1;
 
 	switch (irq) {
@@ -191,6 +198,7 @@ static ssize_t cpcap_batt_read(struct file *file,
 {
 	struct cpcap_batt_ps *sply = file->private_data;
 	int ret = -EFBIG;
+	unsigned long long temp;
 
 	if (count >= sizeof(char)) {
 		mutex_lock(&sply->lock);
@@ -200,6 +208,10 @@ static ssize_t cpcap_batt_read(struct file *file,
 		else
 			ret = -EFAULT;
 		sply->data_pending = 0;
+		temp = sched_clock();
+		do_div(temp, NSEC_PER_SEC);
+		sply->last_run_time = (unsigned long)temp;
+
 		sply->irq_status = 0;
 		mutex_unlock(&sply->lock);
 	}
@@ -223,6 +235,8 @@ static int cpcap_batt_ioctl(struct inode *inode,
 
 	switch (cmd) {
 	case CPCAP_IOCTL_BATT_DISPLAY_UPDATE:
+		if (sply->no_update)
+			return 0;
 		if (copy_from_user((void *)&sply->batt_state,
 				   (void *)arg, sizeof(struct cpcap_batt_data)))
 			return -EFAULT;
@@ -449,6 +463,8 @@ static int cpcap_batt_probe(struct platform_device *pdev)
 	sply->usb.name = "usb";
 	sply->usb.type = POWER_SUPPLY_TYPE_USB;
 
+	sply->no_update = false;
+
 	ret = power_supply_register(&pdev->dev, &sply->ac);
 	if (ret)
 		goto prb_exit;
@@ -560,6 +576,31 @@ static int cpcap_batt_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int cpcap_batt_resume(struct platform_device *pdev)
+{
+	struct cpcap_batt_ps *sply = platform_get_drvdata(pdev);
+	unsigned long cur_time;
+	unsigned long long temp;
+
+	temp = sched_clock();
+	do_div(temp, NSEC_PER_SEC);
+	cur_time = ((unsigned long)temp);
+	if ((cur_time - sply->last_run_time) < 0)
+		sply->last_run_time = 0;
+
+	if ((cur_time - sply->last_run_time) > 50) {
+		mutex_lock(&sply->lock);
+		sply->data_pending = 1;
+		sply->irq_status |= CPCAP_BATT_IRQ_MACRO;
+
+		mutex_unlock(&sply->lock);
+
+		wake_up_interruptible(&sply->wait);
+	}
+
+	return 0;
+}
+
 void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
@@ -609,6 +650,126 @@ void cpcap_batt_set_usb_prop_curr(struct cpcap_device *cpcap, unsigned int curr)
 	}
 }
 EXPORT_SYMBOL(cpcap_batt_set_usb_prop_curr);
+
+/*
+ * Debugfs interface to test how system works with different values of
+ * the battery properties. Once the propety value is set through the
+ * debugfs, updtes from the drivers will be discarded.
+ */
+#ifdef CONFIG_DEBUG_FS
+
+static int cpcap_batt_debug_set(void *prop, u64 val)
+{
+	int data = (int)val;
+	enum power_supply_property psp = (enum power_supply_property)prop;
+	struct cpcap_batt_ps *sply = cpcap_batt_sply;
+	bool changed = true;
+	sply->no_update = true;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_STATUS:
+		sply->batt_state.status = data;
+		break;
+
+	case POWER_SUPPLY_PROP_HEALTH:
+		sply->batt_state.health = data;
+		break;
+
+	case POWER_SUPPLY_PROP_PRESENT:
+		sply->batt_state.present = data;
+		break;
+
+	case POWER_SUPPLY_PROP_CAPACITY:
+		sply->batt_state.capacity = data;
+		break;
+
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		sply->batt_state.batt_volt = data;
+		break;
+
+	case POWER_SUPPLY_PROP_TEMP:
+		sply->batt_state.batt_temp = data;
+		break;
+
+	default:
+		changed = false;
+		break;
+	}
+
+	if (changed)
+		power_supply_changed(&sply->batt);
+
+	return 0;
+}
+
+static int cpcap_batt_debug_get(void *prop, u64 *val)
+{
+	enum power_supply_property psp = (enum power_supply_property)prop;
+	struct cpcap_batt_ps *sply = cpcap_batt_sply;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_STATUS:
+		*val = sply->batt_state.status;
+		break;
+
+	case POWER_SUPPLY_PROP_HEALTH:
+		*val = sply->batt_state.health;
+		break;
+
+	case POWER_SUPPLY_PROP_PRESENT:
+		*val = sply->batt_state.present;
+		break;
+
+	case POWER_SUPPLY_PROP_CAPACITY:
+		*val = sply->batt_state.capacity;
+		break;
+
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		*val = sply->batt_state.batt_volt;
+		break;
+
+	case POWER_SUPPLY_PROP_TEMP:
+		*val = sply->batt_state.batt_temp;
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(cpcap_battery_fops, cpcap_batt_debug_get,
+			cpcap_batt_debug_set, "%llu\n");
+
+static int __init cpcap_batt_debug_init(void)
+{
+	struct dentry *dent = debugfs_create_dir("battery", 0);
+	int            ret  = 0;
+
+	if (!IS_ERR(dent)) {
+		debugfs_create_file("status", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_STATUS, &cpcap_battery_fops);
+		debugfs_create_file("health", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_HEALTH, &cpcap_battery_fops);
+		debugfs_create_file("present", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_PRESENT, &cpcap_battery_fops);
+		debugfs_create_file("voltage", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_VOLTAGE_NOW, &cpcap_battery_fops);
+		debugfs_create_file("capacity", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_CAPACITY, &cpcap_battery_fops);
+		debugfs_create_file("temp", 0666, dent,
+		  (void *)POWER_SUPPLY_PROP_TEMP, &cpcap_battery_fops);
+	} else {
+		ret = PTR_ERR(dent);
+	}
+
+	return ret;
+}
+
+late_initcall(cpcap_batt_debug_init);
+
+#endif /* CONFIG_DEBUG_FS */
 
 static int __init cpcap_batt_init(void)
 {

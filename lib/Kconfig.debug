@@ -35,6 +35,13 @@ config FRAME_WARN
 	  Setting this too low will cause a lot of warnings.
 	  Setting it to 0 disables the warning.
 	  Requires gcc 4.4
+config MUDFLAP
+	bool "Enable mudflap to check slab write after free"
+	depends on DEBUG_SLAB_LEAK || SLUB_DEBUG_ON
+	help
+	  This uses mudflap which introduced by gcc4 to check slab corruption
+	  which is caused by writing after free.
+	  This is smaller and faster than kmemcheck.
 
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
@@ -297,6 +304,143 @@ config SLUB_STATS
 	  supports the determination of the most active slabs to figure
 	  out which slabs are relevant to a particular load.
 	  Try running: slabinfo -DA
+
+menuconfig DEBUG_MEMLEAK
+	bool "Kernel memory leak detector"
+	default n
+	depends on EXPERIMENTAL && DEBUG_SLAB
+	select DEBUG_FS
+	select STACKTRACE
+	select FRAME_POINTER
+	select KALLSYMS
+	help
+	  Say Y here if you want to enable the memory leak
+	  detector. The memory allocation/freeing is traced in a way
+	  similar to the Boehm's conservative garbage collector, the
+	  difference being that the orphan objects are not freed but
+	  only shown in /sys/kernel/debug/memleak. Enabling this
+	  feature will introduce an overhead to memory
+	  allocations. See Documentation/kmemleak.txt for more
+	  details.
+
+	  In order to access the memleak file, debugfs needs to be
+	  mounted (usually at /sys/kernel/debug).
+
+config DEBUG_MEMLEAK_DYNAMIC_NR
+	bool "Dynamic maximum number of reported leaks"
+	default n
+	depends on DEBUG_MEMLEAK
+	help
+	  This option sets the maximum number of leaks reported. If
+	  this number is too big and there are leaks to be reported,
+	  reading the /sys/kernel/debug/memleak file could lead to
+	  some soft-locks.
+
+config DEBUG_MEMLEAK_HASH_BITS
+	int "Pointer hash bits"
+	default 16
+	depends on DEBUG_MEMLEAK
+	help
+	  This option sets the number of bits used for the pointer
+	  hash table. Higher values give better memory scanning
+	  performance but also lead to bigger RAM usage. The size of
+	  the allocated hash table is (sizeof(void*) * 2^hash_bits).
+
+	  The minimum recommended value is 16. A maximum value of
+	  around 20 should be sufficient.
+
+config DEBUG_MEMLEAK_TRACE_LENGTH
+	int "Stack trace length"
+	default 4
+	depends on DEBUG_MEMLEAK && FRAME_POINTER
+	help
+	  This option sets the length of the stack trace for the
+	  allocated objects tracked by kmemleak.
+
+config DEBUG_MEMLEAK_PREINIT_OBJECTS
+	int "Pre-init actions buffer size"
+	default 512
+	depends on DEBUG_MEMLEAK
+	help
+	  This is the buffer for storing the memory allocation/freeing
+	  calls before kmemleak is fully initialized. Each element in
+	  the buffer takes 24 bytes on a 32 bit architecture. This
+	  buffer will be freed once the system initialization is
+	  completed.
+
+config DEBUG_MEMLEAK_SECONDARY_ALIASES
+	bool "Create secondary level pointer aliases"
+	default y
+	depends on DEBUG_MEMLEAK
+	help
+	  This option creates aliases for container_of(container_of(member))
+	  access to objects. Disabling this option reduces the chances of
+	  false negatives but it can slightly increase the number of false
+	  positives.
+
+config DEBUG_MEMLEAK_TASK_STACKS
+	bool "Scan task kernel stacks"
+	default y
+	depends on DEBUG_MEMLEAK
+	help
+	  This option enables the scanning of the task kernel
+	  stacks. This option can introduce false negatives because of
+	  the randomness of stacks content.
+
+	  If unsure, say Y.
+
+config DEBUG_MEMLEAK_ORPHAN_FREEING
+	bool "Notify when freeing orphan objects"
+	default n
+	depends on DEBUG_MEMLEAK
+	help
+	  This option enables the notification when objects
+	  considered leaks are freed. The stack dump and the object
+	  information displayed allow an easier identification of
+	  false positives. Use this mainly for debugging kmemleak.
+
+	  If unsure, say N.
+
+config DEBUG_MEMLEAK_REPORT_THLD
+	int "Unreferenced reporting threshold"
+	default 1
+	depends on DEBUG_MEMLEAK
+	help
+	  This option sets the number of times an object needs to be
+	  detected as unreferenced before being reported as a memory
+	  leak. A value of 0 means that the object will be reported
+	  the first time it is found as unreferenced. Other positive
+	  values mean that the object needs to be found as
+	  unreferenced a specified number of times prior to being
+	  reported.
+
+	  This is useful to avoid the reporting of transient false
+	  positives where the pointers might be held in CPU registers,
+	  especially on SMP systems, or on the stack when the stack
+	  scanning option is disabled.
+
+config DEBUG_KEEP_INIT
+	bool "Do not free the __init code/data"
+	default n
+	depends on DEBUG_MEMLEAK
+	help
+	  This option moves the __init code/data out of the
+	  .init.text/.init.data sections. It is useful for identifying
+	  memory leaks happening during the kernel or modules
+	  initialization.
+
+	  If unsure, say N.
+
+config DEBUG_MEMLEAK_TEST
+	tristate "Test the kernel memory leak detector"
+	default n
+	depends on DEBUG_MEMLEAK
+	help
+	  Say Y or M here to build the test harness for the kernel
+	  memory leak detector. At the moment, this option enables a
+	  module that explicitly leaks memory.
+
+	  If unsure, say N.
 
 config DEBUG_PREEMPT
 	bool "Debug preemptible kernel"
@@ -905,3 +1049,4 @@ config DYNAMIC_PRINTK_DEBUG
 source "samples/Kconfig"
 
 source "lib/Kconfig.kgdb"
+source "kernel/gcov/Kconfig"

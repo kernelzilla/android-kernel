@@ -30,6 +30,7 @@
 #include <mach/control.h>
 #include <mach/serial.h>
 #include <mach/irqs.h>
+#include <linux/pm_qos_params.h>
 
 #include "pm.h"
 
@@ -58,6 +59,24 @@ struct omap3_processor_cx {
 struct omap3_processor_cx omap3_power_states[OMAP3_MAX_STATES];
 struct omap3_processor_cx current_cx_state;
 struct powerdomain *mpu_pd, *core_pd, *per_pd;
+
+/* Gate long latency C states for 60 seconds to reduce boot time */
+static unsigned int __initdata boot_noidle_time = 60;
+
+/* Command line override to allow matching with application start time */
+static int __init boot_noidle_time_setup(char *str)
+{
+	get_option(&str, &boot_noidle_time);
+	return 1;
+}
+__setup("boot_noidle_time=", boot_noidle_time_setup);
+
+
+struct timer_list boot_timer;
+static void omap_boot_timer(unsigned long arg)
+{
+	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, "idle_delay");
+}
 
 static int omap3_idle_bm_check(void)
 {
@@ -109,6 +128,9 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 		if (core_state < PWRDM_POWER_RET)
 			core_state = PWRDM_POWER_RET;
 	}
+	/* Temporarily disable CORE OFF mode */
+	if (core_state < PWRDM_POWER_RET)
+		core_state = PWRDM_POWER_RET;
 
 	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
 	pwrdm_set_next_pwrst(core_pd, core_state);
@@ -183,7 +205,7 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C1].sleep_latency = 0;
 	omap3_power_states[OMAP3_STATE_C1].wakeup_latency = 12;
 	omap3_power_states[OMAP3_STATE_C1].threshold = 15;
-	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_INACTIVE;
+	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C1].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
 
@@ -204,18 +226,18 @@ void omap_init_power_states(void)
 	omap3_power_states[OMAP3_STATE_C3].wakeup_latency = 260;
 	omap3_power_states[OMAP3_STATE_C3].threshold = 500;
 	omap3_power_states[OMAP3_STATE_C3].mpu_state = PWRDM_POWER_RET;
-	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_INACTIVE;
+	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID |
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C4 . MPU OFF + Core inactive */
-	omap3_power_states[OMAP3_STATE_C4].valid = 1;
+	omap3_power_states[OMAP3_STATE_C4].valid = 0;
 	omap3_power_states[OMAP3_STATE_C4].type = OMAP3_STATE_C4;
 	omap3_power_states[OMAP3_STATE_C4].sleep_latency = 1600;
 	omap3_power_states[OMAP3_STATE_C4].wakeup_latency = 1850;
 	omap3_power_states[OMAP3_STATE_C4].threshold = 4000;
 	omap3_power_states[OMAP3_STATE_C4].mpu_state = PWRDM_POWER_OFF;
-	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_INACTIVE;
+	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_ON;
 	omap3_power_states[OMAP3_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID |
 				CPUIDLE_FLAG_CHECK_BM;
 
@@ -231,7 +253,7 @@ void omap_init_power_states(void)
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C6 . MPU OFF + Core CSWR */
-	omap3_power_states[OMAP3_STATE_C6].valid = 1;
+	omap3_power_states[OMAP3_STATE_C6].valid = 0;
 	omap3_power_states[OMAP3_STATE_C6].type = OMAP3_STATE_C6;
 	omap3_power_states[OMAP3_STATE_C6].sleep_latency = 1800;
 	omap3_power_states[OMAP3_STATE_C6].wakeup_latency = 4450;
@@ -242,7 +264,7 @@ void omap_init_power_states(void)
 				CPUIDLE_FLAG_CHECK_BM;
 
 	/* C7 . MPU OFF + Core OFF */
-	omap3_power_states[OMAP3_STATE_C7].valid = 1;
+	omap3_power_states[OMAP3_STATE_C7].valid = 0;
 	omap3_power_states[OMAP3_STATE_C7].type = OMAP3_STATE_C7;
 	omap3_power_states[OMAP3_STATE_C7].sleep_latency = 10000;
 	omap3_power_states[OMAP3_STATE_C7].wakeup_latency = 30000;
@@ -270,6 +292,21 @@ int omap3_idle_init(void)
 	struct omap3_processor_cx *cx;
 	struct cpuidle_state *state;
 	struct cpuidle_device *dev;
+
+   /* To speed up boot process, restrict C-State to C0.
+      Below, we set the CPU_DMA_LATENCY to 10, which is
+	   less than the C1 state exit latency. This will ensure
+	   that the cpuidle governor does not transition to C1 or
+	   higher states till the CPU_DMA_LATENCY is relaxed.
+      The CPU_DMA_LATENCY requirement is removed when the
+      boot timer (which is set to 60 secs right now) expires.
+	*/
+	init_timer(&boot_timer);
+	boot_timer.function = omap_boot_timer;
+	boot_timer.data = (unsigned long)NULL;
+	boot_timer.expires = boot_noidle_time * HZ + jiffies;
+	add_timer(&boot_timer);
+	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, "idle_delay", 10);
 
 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
 	core_pd = pwrdm_lookup("core_pwrdm");

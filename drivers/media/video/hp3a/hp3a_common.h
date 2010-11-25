@@ -43,7 +43,7 @@
 #define  AND_REG(x, v)		(x &= (u32)v)
 
 /* hp3a specific default values. */
-#define  MIN_RAW_CAPTURE_INTERVAL	2
+#define  MIN_RAW_CAPTURE_INTERVAL	1
 #define  MAX_STAT_BUFFERS_PER_FRAME	3
 
 enum {
@@ -167,9 +167,9 @@ struct hp3a_histogram_config {
    u32 enable;
 	u8 hist_source;		/* CCDC or Memory */
 	u8 input_bit_width;	/* Needed o know the size per pixel */
-	u8 hist_frames;		/* Numbers of frames to be processed and accumulated */
-	u8 hist_h_v_info;	/* frame-input width and height if source is memory */
-	u8 hist_packed_pxl;	/* If data is packed packed 8-bit into 16 bits */
+	u8 hist_frames;		/* Num frames to be processed, accumulated */
+	u8 hist_h_v_info;	/* input width and height if source is memory */
+	u8 hist_packed_pxl;	/* If data is packed packed 8 into 16 bits */
 	u16 hist_radd;		/* frame-input address in memory */
 	u16 hist_radd_off;	/* line-offset for frame-input */
 	u16 hist_bins;		/* number of bins: 32, 64, 128, or 256 */
@@ -245,6 +245,7 @@ struct hp3a_statistics {
  **/
 struct hp3a_context {
 	int initialized;
+	int default_v4l2_dev;
 	int v4l2_streaming;
 	int update_hardpipe;
 	int hist_done;

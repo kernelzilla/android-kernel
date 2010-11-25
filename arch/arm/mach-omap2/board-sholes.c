@@ -490,7 +490,7 @@ static struct qtouch_ts_platform_data sholes_ts_platform_data = {
 		.cfg		= sholes_key_array_data,
 		.num_keys   = ARRAY_SIZE(sholes_key_array_data),
 	},
-	.vkeys			= { 
+	.vkeys			= {
 		.keys		= sholes_touch_vkeys,
 		.count		= ARRAY_SIZE(sholes_touch_vkeys),
 		.start		= 961,
@@ -1229,7 +1229,7 @@ static void sholes_pm_power_off(void)
 	printk(KERN_INFO "sholes_pm_power_off start...\n");
 	local_irq_disable();
 
-        /* config gpio 176 back from safe mode to reset the device*/
+	/* config gpio 176 back from safe mode to reset the device*/
 	omap_writew(0x4, 0x480021D2);
 	gpio_direction_output(SHOLES_POWER_OFF_GPIO, 0);
 

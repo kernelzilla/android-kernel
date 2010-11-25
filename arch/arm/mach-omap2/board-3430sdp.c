@@ -425,7 +425,31 @@ static inline void __init sdp3430_init_smc91x(void)
 static void __init omap_3430sdp_init_irq(void)
 {
 	omap2_init_common_hw(hyb18m512160af6_sdrc_params, omap3_mpu_rate_table,
-			     omap3_dsp_rate_table, omap3_l3_rate_table);
+	switch (omap_rev_id()) {
+	case OMAP_3420:
+		omap2_init_common_hw(hyb18m512160af6_sdrc_params,
+		omap3_mpu_rate_table, omap3_dsp_rate_table_3420,
+		omap3_l3_rate_table);
+		break;
+
+	case OMAP_3430:
+		omap2_init_common_hw(hyb18m512160af6_sdrc_params,
+		omap3_mpu_rate_table, omap3_dsp_rate_table,
+		omap3_l3_rate_table);
+		break;
+
+	case OMAP_3440:
+		omap2_init_common_hw(hyb18m512160af6_sdrc_params,
+		omap3_mpu_rate_table, omap3_dsp_rate_table_3440,
+		omap3_l3_rate_table);
+		break;
+
+	default:
+		omap2_init_common_hw(hyb18m512160af6_sdrc_params,
+		omap3_mpu_rate_table, omap3_dsp_rate_table,
+		omap3_l3_rate_table);
+		break;
+		}
 	omap_init_irq();
 	omap_gpio_init();
 	sdp3430_init_smc91x();

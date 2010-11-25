@@ -23,11 +23,23 @@
 #include <linux/rtc.h>
 #include <linux/err.h>
 #include <linux/spi/cpcap.h>
+#ifdef CONFIG_RTC_INTF_SECCLKD
+#include <linux/miscdevice.h>
 
+#define CNT_MASK  0xFFFF
+#endif
 #define SECS_PER_DAY 86400
 #define DAY_MASK  0x7FFF
 #define TOD1_MASK 0x00FF
 #define TOD2_MASK 0x01FF
+
+#ifdef CONFIG_RTC_INTF_SECCLKD
+static int cpcap_rtc_open(struct inode *inode, struct file *file);
+static int cpcap_rtc_ioctl(struct inode *inode, struct file *file,
+			    unsigned int cmd, unsigned long arg);
+static unsigned int cpcap_rtc_poll(struct file *file, poll_table *wait);
+static int cpcap_rtc_read_time(struct device *dev, struct rtc_time *tm);
+#endif
 
 struct cpcap_time {
 	unsigned short day;
@@ -40,7 +52,98 @@ struct cpcap_rtc {
 	struct rtc_device *rtc_dev;
 	int alarm_enabled;
 	int second_enabled;
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	struct device *dev;
+	struct mutex lock;	/* protect access to flags */
+	wait_queue_head_t wait;
+	bool data_pending;
+	bool reset_flag;
+#endif
 };
+
+#ifdef CONFIG_RTC_INTF_SECCLKD
+static const struct file_operations cpcap_rtc_fops = {
+	.owner = THIS_MODULE,
+	.open = cpcap_rtc_open,
+	.ioctl = cpcap_rtc_ioctl,
+	.poll = cpcap_rtc_poll,
+};
+
+static struct cpcap_rtc *rtc_ptr;
+
+static struct miscdevice cpcap_rtc_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= "cpcap_mot_rtc",
+	.fops	= &cpcap_rtc_fops,
+};
+
+static int cpcap_rtc_open(struct inode *inode, struct file *file)
+{
+	file->private_data = rtc_ptr;
+	return 0;
+}
+
+static int cpcap_rtc_ioctl(struct inode *inode,
+			    struct file *file,
+			    unsigned int cmd,
+			    unsigned long arg)
+{
+	struct cpcap_rtc *rtc = file->private_data;
+	struct cpcap_rtc_time_cnt local_val;
+	int ret = 0;
+
+	mutex_lock(&rtc->lock);
+	switch (cmd) {
+	case CPCAP_IOCTL_GET_RTC_TIME_COUNTER:
+		ret = cpcap_rtc_read_time(rtc->dev, &local_val.time);
+		ret |= cpcap_regacc_read(rtc->cpcap, CPCAP_REG_VAL2,
+				&local_val.count);
+
+		if (ret)
+			break;
+
+		if (rtc->reset_flag) {
+			rtc->reset_flag = 0;
+			local_val.count = 0;
+		}
+
+		/* Copy the result back to the user. */
+		if (copy_to_user((struct cpcap_rtc_time_cnt *)arg, &local_val,
+			sizeof(struct cpcap_rtc_time_cnt)) == 0) {
+			if (local_val.count == 0) {
+				ret = cpcap_regacc_write(rtc->cpcap,
+						CPCAP_REG_VAL2, 0x0001,
+						CNT_MASK);
+				if (ret)
+					break;
+			}
+			rtc->data_pending = 0;
+		} else
+			ret = -EFAULT;
+		break;
+
+	default:
+		ret = -ENOTTY;
+
+	}
+
+	mutex_unlock(&rtc->lock);
+	return ret;
+}
+
+static unsigned int cpcap_rtc_poll(struct file *file, poll_table *wait)
+{
+	struct cpcap_rtc *rtc = file->private_data;
+	unsigned int ret = 0;
+
+	poll_wait(file, &rtc->wait, wait);
+
+	if (rtc->data_pending)
+		ret = (POLLIN | POLLRDNORM);
+
+	return ret;
+}
+#endif
 
 static void cpcap2rtc_time(struct rtc_time *rtc, struct cpcap_time *cpcap)
 {
@@ -140,7 +243,10 @@ static int cpcap_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct cpcap_time cpcap_tm;
 	int second_masked;
 	int alarm_masked;
-	int ret;
+	int ret = 0;
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	unsigned short local_cnt;
+#endif
 
 	rtc = dev_get_drvdata(dev);
 
@@ -158,23 +264,59 @@ static int cpcap_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	if (!alarm_masked)
 		cpcap_irq_mask(rtc->cpcap, CPCAP_IRQ_TODA);
 
-	/* Clearing the upper lower 8 bits of the TOD guarantees that the
-	 * upper half of TOD (TOD2) will not increment for 0xFF RTC ticks
-	 * (255 seconds).  During this time we can safely write to DAY, TOD2,
-	 * then TOD1 (in that order) and expect RTC to be synchronized to
-	 * the exact time requested upon the final write to TOD1. */
-	ret = cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD1, 0, TOD1_MASK);
-	ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_DAY, cpcap_tm.day,
-				  DAY_MASK);
-	ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD2, cpcap_tm.tod2,
-				  TOD2_MASK);
-	ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD1, cpcap_tm.tod1,
-				  TOD1_MASK);
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	/* Increment the counter and update validity 2 register */
+	ret = cpcap_regacc_read(rtc->cpcap, CPCAP_REG_VAL2, &local_cnt);
+
+	if (local_cnt == 0)
+		rtc->reset_flag = 1;
+
+	if (local_cnt == CNT_MASK)
+		local_cnt = 0x0001;
+	else
+		local_cnt++;
+
+	ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_VAL2, local_cnt,
+					 CNT_MASK);
+#endif
+
+	if (rtc->cpcap->vendor == CPCAP_VENDOR_ST) {
+		/* The TOD1 and TOD2 registers MUST be written in this order
+		 * for the change to properly set. */
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD1,
+					  cpcap_tm.tod1, TOD1_MASK);
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD2,
+					  cpcap_tm.tod2, TOD2_MASK);
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_DAY,
+					  cpcap_tm.day, DAY_MASK);
+	} else {
+		/* Clearing the upper lower 8 bits of the TOD guarantees that
+		 * the upper half of TOD (TOD2) will not increment for 0xFF RTC
+		 * ticks (255 seconds).  During this time we can safely write
+		 * to DAY, TOD2, then TOD1 (in that order) and expect RTC to be
+		 * synchronized to the exact time requested upon the final write
+		 * to TOD1. */
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD1,
+					  0, TOD1_MASK);
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_DAY,
+					  cpcap_tm.day, DAY_MASK);
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD2,
+					  cpcap_tm.tod2, TOD2_MASK);
+		ret |= cpcap_regacc_write(rtc->cpcap, CPCAP_REG_TOD1,
+					  cpcap_tm.tod1, TOD1_MASK);
+	}
 
 	if (!second_masked)
 		cpcap_irq_unmask(rtc->cpcap, CPCAP_IRQ_1HZ);
 	if (!alarm_masked)
 		cpcap_irq_unmask(rtc->cpcap, CPCAP_IRQ_TODA);
+
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	mutex_lock(&rtc->lock);
+	rtc->data_pending = 1;
+	mutex_unlock(&rtc->lock);
+	wake_up_interruptible(&rtc->wait);
+#endif
 
 	return ret;
 }
@@ -199,7 +341,6 @@ static int cpcap_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	}
 
 	cpcap2rtc_time(&alrm->time, &cpcap_tm);
-
 	return rtc_valid_tm(&alrm->time);
 }
 
@@ -260,6 +401,9 @@ static void cpcap_rtc_irq(enum cpcap_irqs irq, void *data)
 static int __devinit cpcap_rtc_probe(struct platform_device *pdev)
 {
 	struct cpcap_rtc *rtc;
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	int ret = 0;
+#endif
 
 	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
 	if (!rtc)
@@ -275,6 +419,19 @@ static int __devinit cpcap_rtc_probe(struct platform_device *pdev)
 		return PTR_ERR(rtc->rtc_dev);
 	}
 
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	rtc->dev = &pdev->dev;
+	ret = misc_register(&cpcap_rtc_dev);
+	if (ret != 0) {
+		rtc_device_unregister(rtc->rtc_dev);
+		kfree(rtc);
+		return ret;
+	}
+
+	mutex_init(&rtc->lock);
+	init_waitqueue_head(&rtc->wait);
+	rtc_ptr = rtc;
+#endif
 	cpcap_irq_register(rtc->cpcap, CPCAP_IRQ_TODA, cpcap_rtc_irq, rtc);
 	cpcap_irq_mask(rtc->cpcap, CPCAP_IRQ_TODA);
 
@@ -294,6 +451,9 @@ static int __devexit cpcap_rtc_remove(struct platform_device *pdev)
 	cpcap_irq_free(rtc->cpcap, CPCAP_IRQ_TODA);
 	cpcap_irq_free(rtc->cpcap, CPCAP_IRQ_1HZ);
 
+#ifdef CONFIG_RTC_INTF_SECCLKD
+	misc_deregister(&cpcap_rtc_dev);
+#endif
 	rtc_device_unregister(rtc->rtc_dev);
 	kfree(rtc);
 

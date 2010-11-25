@@ -572,4 +572,4 @@ config SOUND_CPCAP_OMAP
 	bool "Audio driver for OMAP3430 with CPCAP"
 	default n
 	help
-	Audio driver for products using OMAP3430 and CPCAP.
+	  Audio driver for products using OMAP3430 and CPCAP.

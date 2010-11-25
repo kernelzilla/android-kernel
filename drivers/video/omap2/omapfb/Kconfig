@@ -33,3 +33,9 @@ config FB_OMAP2_NUM_FBS
 	help
 	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
 	  so normally this would be 3.
+config FB_OMAP2_MTD_LOGO
+	tristate "Show MTD logo"
+	depends on FB_OMAP2
+	default n
+	help
+	  Read the logo from mtd logo parition and show it when booting.

@@ -24,7 +24,11 @@ struct devres_node {
 struct devres {
 	struct devres_node		node;
 	/* -- 3 pointers */
+#ifdef CONFIG_DEBUG_MEMLEAK
+	unsigned long long		data[0];/* guarantee ull alignment */
+#else
 	unsigned long long		data[];	/* guarantee ull alignment */
+#endif
 };
 
 struct devres_group {

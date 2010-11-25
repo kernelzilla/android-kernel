@@ -11,6 +11,7 @@
  *
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -85,7 +86,8 @@ void drm_dma_takedown(struct drm_device *dev)
 				  dma->bufs[i].seg_count);
 			for (j = 0; j < dma->bufs[i].seg_count; j++) {
 				if (dma->bufs[i].seglist[j]) {
-					drm_pci_free(dev, dma->bufs[i].seglist[j]);
+					drm_dma_free(dev,
+						dma->bufs[i].seglist[j]);
 				}
 			}
 			drm_free(dma->bufs[i].seglist,
@@ -178,3 +180,144 @@ void drm_core_reclaim_buffers(struct drm_device *dev,
 }
 
 EXPORT_SYMBOL(drm_core_reclaim_buffers);
+
+/**
+ * \brief Allocate a consistent memory block for DMA.
+ */
+drm_dma_handle_t *drm_dma_alloc(struct drm_device * dev, size_t size,
+				size_t align, dma_addr_t maxaddr)
+{
+	drm_dma_handle_t *dmah;
+#if 1
+	unsigned long addr;
+	size_t sz;
+#endif
+#ifdef DRM_DEBUG_MEMORY
+	int area = DRM_MEM_DMA;
+
+	spin_lock(&drm_mem_lock);
+	if ((drm_ram_used >> PAGE_SHIFT)
+	    > (DRM_RAM_PERCENT * drm_ram_available) / 100) {
+		spin_unlock(&drm_mem_lock);
+		return 0;
+	}
+	spin_unlock(&drm_mem_lock);
+#endif
+
+	/* pci_alloc_consistent only guarantees alignment to the smallest
+	 * PAGE_SIZE order which is greater than or equal to the requested
+	 * size. Return NULL here for now to make sure nobody tries for
+	 * larger alignment
+	 */
+	if (align > size)
+		return NULL;
+
+#ifdef CONFIG_PCI
+	if (!drm_core_check_feature(dev, DRIVER_USE_PLATFORM_DEVICE)) {
+		if (pci_set_dma_mask(dev->pdev, maxaddr) != 0) {
+			DRM_ERROR("Setting pci dma mask failed\n");
+			return NULL;
+		}
+	}
+#endif
+
+	dmah = kmalloc(sizeof(drm_dma_handle_t), GFP_KERNEL);
+	if (!dmah)
+		return NULL;
+
+	dmah->size = size;
+	dmah->vaddr = dma_alloc_coherent(drm_get_device(dev), size,
+		&dmah->busaddr, GFP_KERNEL | __GFP_COMP);
+
+#ifdef DRM_DEBUG_MEMORY
+	if (dmah->vaddr == NULL) {
+		spin_lock(&drm_mem_lock);
+		++drm_mem_stats[area].fail_count;
+		spin_unlock(&drm_mem_lock);
+		kfree(dmah);
+		return NULL;
+	}
+
+	spin_lock(&drm_mem_lock);
+	++drm_mem_stats[area].succeed_count;
+	drm_mem_stats[area].bytes_allocated += size;
+	drm_ram_used += size;
+	spin_unlock(&drm_mem_lock);
+#else
+	if (dmah->vaddr == NULL) {
+		kfree(dmah);
+		return NULL;
+	}
+#endif
+
+	memset(dmah->vaddr, 0, size);
+
+	/* XXX - Is virt_to_page() legal for consistent mem? */
+	/* Reserve */
+	for (addr = (unsigned long)dmah->vaddr, sz = size;
+	     sz > 0; addr += PAGE_SIZE, sz -= PAGE_SIZE) {
+		SetPageReserved(virt_to_page(addr));
+	}
+
+	return dmah;
+}
+EXPORT_SYMBOL(drm_dma_alloc);
+
+
+/**
+ * \brief Free a consistent memory block without freeing its descriptor.
+ *
+ * This function is for internal use in the Linux-specific DRM core code.
+ */
+void __drm_dma_free(struct drm_device *dev, drm_dma_handle_t *dmah)
+{
+#if 1
+	unsigned long addr;
+	size_t sz;
+#endif
+#ifdef DRM_DEBUG_MEMORY
+	int area = DRM_MEM_DMA;
+	int alloc_count;
+	int free_count;
+#endif
+
+	if (!dmah->vaddr) {
+#ifdef DRM_DEBUG_MEMORY
+		DRM_MEM_ERROR(area, "Attempt to free address 0\n");
+#endif
+	} else {
+		/* XXX - Is virt_to_page() legal for consistent mem? */
+		/* Unreserve */
+		for (addr = (unsigned long)dmah->vaddr, sz = dmah->size;
+		     sz > 0; addr += PAGE_SIZE, sz -= PAGE_SIZE) {
+			ClearPageReserved(virt_to_page(addr));
+		}
+		dma_free_coherent(drm_get_device(dev), dmah->size, dmah->vaddr,
+				  dmah->busaddr);
+	}
+
+#ifdef DRM_DEBUG_MEMORY
+	spin_lock(&drm_mem_lock);
+	free_count = ++drm_mem_stats[area].free_count;
+	alloc_count = drm_mem_stats[area].succeed_count;
+	drm_mem_stats[area].bytes_freed += size;
+	drm_ram_used -= size;
+	spin_unlock(&drm_mem_lock);
+	if (free_count > alloc_count) {
+		DRM_MEM_ERROR(area,
+			      "Excess frees: %d frees, %d allocs\n",
+			      free_count, alloc_count);
+	}
+#endif
+
+}
+
+/**
+ * \brief Free a consistent memory block
+ */
+void drm_dma_free(struct drm_device *dev, drm_dma_handle_t *dmah)
+{
+	__drm_dma_free(dev, dmah);
+	kfree(dmah);
+}
+EXPORT_SYMBOL(drm_dma_free);

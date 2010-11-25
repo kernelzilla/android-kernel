@@ -31,8 +31,6 @@
 #include "pdump_km.h"
 #include "pvr_bridge_km.h"
 
-#include <asm/cacheflush.h>
-
 static PVRSRV_ERROR AllocDeviceMem(IMG_HANDLE		hDevCookie,
 									IMG_HANDLE		hDevMemHeap,
 									IMG_UINT32		ui32Flags,
@@ -453,7 +451,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 			psKernelSyncInfo->psSyncDataMemInfoKM,
 			0,
 			psKernelSyncInfo->psSyncDataMemInfoKM->ui32AllocSize,
-			0,
+			PDUMP_FLAGS_CONTINUOUS,
 			MAKEUNIQUETAG(psKernelSyncInfo->psSyncDataMemInfoKM));
 #endif
 
@@ -588,12 +586,16 @@ PVRSRV_ERROR IMG_CALLCONV _PVRSRVAllocDeviceMemKM(IMG_HANDLE					hDevCookie,
 	BM_HEAP					*psBMHeap;
 	IMG_HANDLE				hDevMemContext;
 
-	flush_cache_all();
-
 	if (!hDevMemHeap ||
 		(ui32Size == 0))
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	if (ui32Flags & PVRSRV_HAP_CACHETYPE_MASK) {
+		if (((ui32Size % HOST_PAGESIZE()) != 0) ||
+			((ui32Alignment % HOST_PAGESIZE()) != 0))
+			return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	eError = AllocDeviceMem(hDevCookie,
@@ -1009,22 +1011,9 @@ static PVRSRV_ERROR UnmapDeviceMemoryCallBack(IMG_PVOID pvParam,
 
 	
 	psMapData->psSrcMemInfo->ui32RefCount--;
-
 	if (psMapData->psSrcMemInfo->ui32RefCount == 1 &&
-		psMapData->psSrcMemInfo->bPendingFree == IMG_TRUE)
+		 psMapData->psSrcMemInfo->bPendingFree == IMG_TRUE)
 	{
-		if ((psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32WriteOpsPending !=
-			 psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32WriteOpsComplete))
-		{
-			PVR_DPF((PVR_DBG_ERROR, "UnmapDeviceMemoryCallBack: Unflushed pending write operations!"));
-		}
-
-		if ((psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32ReadOpsPending !=
-			 psMapData->psSrcMemInfo->psKernelSyncInfo->psSyncData->ui32ReadOpsComplete))
-		{
-			PVR_DPF((PVR_DBG_ERROR, "UnmapDeviceMemoryCallBack: Unflushed pending read operations!"));
-		}
-
 		if (psMapData->psSrcMemInfo->sMemBlk.hResItem != IMG_NULL)
 		{
 			eError = ResManFreeResByPtr(psMapData->psSrcMemInfo->sMemBlk.hResItem);
@@ -1105,12 +1094,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPer
 	sDevVAddr.uiAddr = psSrcMemInfo->sDevVAddr.uiAddr - IMG_CAST_TO_DEVVADDR_UINT(ui32PageOffset);
 	for(i=0; i<ui32PageCount; i++)
 	{
-		eError = BM_GetPhysPageAddr(psSrcMemInfo, sDevVAddr, &sDevPAddr);
-		if(eError != PVRSRV_OK)
-		{
-			PVR_DPF((PVR_DBG_ERROR,"PVRSRVMapDeviceMemoryKM: Failed to retrieve page list from device"));
-			goto ErrorExit;
-		}
+		BM_GetPhysPageAddr(psSrcMemInfo, sDevVAddr, &sDevPAddr);
 
 		
 		psSysPAddr[i] = SysDevPAddrToSysPAddr (psDeviceNode->sDevId.eDeviceType, sDevPAddr);
@@ -1142,6 +1126,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPer
 	}
 
 	OSMemSet(psMemInfo, 0, sizeof(*psMemInfo));
+	psMemInfo->ui32Flags = psSrcMemInfo->ui32Flags;
 
 	psMemBlock = &(psMemInfo->sMemBlk);
 

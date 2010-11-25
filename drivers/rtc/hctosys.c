@@ -22,7 +22,7 @@
  * the best guess is to add 0.5s.
  */
 
-static int __init rtc_hctosys(void)
+int rtc_hctosys(void)
 {
 	int err;
 	struct rtc_time tm;
@@ -39,11 +39,22 @@ static int __init rtc_hctosys(void)
 		err = rtc_valid_tm(&tm);
 		if (err == 0) {
 			struct timespec tv;
+#ifdef CONFIG_RTC_DRV_MSM
+			struct timeval curtv;
+#endif
 
 			tv.tv_nsec = NSEC_PER_SEC >> 1;
 
 			rtc_tm_to_time(&tm, &tv.tv_sec);
 
+#ifdef CONFIG_RTC_DRV_MSM
+			/* Only update kernel time if seconds changed.. otherwise this 
+			   causes confusion with A2DP.  RTC time is in seconds.. so every
+			   invocation of do_settimeofday() will cause cur ms to skip.. */
+			do_gettimeofday(&curtv);
+			if ((tv.tv_sec > (curtv.tv_sec + 1)) ||
+			    ((tv.tv_sec + 1) < curtv.tv_sec)) {
+#endif
 			do_settimeofday(&tv);
 
 			dev_info(rtc->dev.parent,
@@ -52,6 +63,9 @@ static int __init rtc_hctosys(void)
 				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 				tm.tm_hour, tm.tm_min, tm.tm_sec,
 				(unsigned int) tv.tv_sec);
+#ifdef CONFIG_RTC_DRV_MSM
+			}
+#endif
 		}
 		else
 			dev_err(rtc->dev.parent,

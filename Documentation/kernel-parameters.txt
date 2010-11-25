@@ -2483,6 +2483,8 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	wdt=		[WDT] Watchdog
 			See Documentation/watchdog/wdt.txt.
+	wdt_stat=        [WDT] Watchdog
+	        Turn off wdt option.
 
 	xd=		[HW,XT] Original XT pre-IDE (RLL encoded) disks.
 	xd_geo=		See header of drivers/block/xd.c.

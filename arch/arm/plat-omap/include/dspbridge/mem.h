@@ -185,7 +185,7 @@
  *  Ensures:
  *      Cache is synchronized
  */
-	extern void MEM_FlushCache(void *pMemBuf, u32 cBytes, s32 FlushType);
+	extern void MEM_FlushCache(void *pMemBuf, u32 cBytes, u32 FlushType);
 
 /*
  *  ======== MEM_Free ========

@@ -109,7 +109,7 @@
 #define L3_34XX_SIZE		SZ_1M   /* 44kB of 128MB used, want 1MB sect */
 
 #define L4_34XX_PHYS		L4_34XX_BASE	/* 0x48000000 */
-#define L4_34XX_VIRT		0xd8000000
+#define L4_34XX_VIRT		0xfa000000
 #define L4_34XX_SIZE		SZ_4M   /* 1MB of 128MB used, want 1MB sect */
 
 /*
@@ -118,16 +118,16 @@
  */
 
 #define L4_WK_34XX_PHYS		L4_WK_34XX_BASE /* 0x48300000 */
-#define L4_WK_34XX_VIRT		0xd8300000
+#define L4_WK_34XX_VIRT		0xfa300000
 #define L4_WK_34XX_SIZE		SZ_1M
 
 #define L4_PER_34XX_PHYS	L4_PER_34XX_BASE /* 0x49000000 */
-#define L4_PER_34XX_VIRT	0xd9000000
+#define L4_PER_34XX_VIRT	0xfb000000
 #define L4_PER_34XX_SIZE	SZ_1M
 
 #define L4_EMU_34XX_PHYS	L4_EMU_34XX_BASE /* 0x54000000 */
-#define L4_EMU_34XX_VIRT	0xe4000000
-#define L4_EMU_34XX_SIZE	SZ_64M
+#define L4_EMU_34XX_VIRT	0xf9000000
+#define L4_EMU_34XX_SIZE	SZ_8M
 
 #define OMAP34XX_GPMC_PHYS	OMAP34XX_GPMC_BASE /* 0x6E000000 */
 #define OMAP34XX_GPMC_VIRT	0xFE000000
@@ -141,12 +141,18 @@
 #define OMAP343X_SDRC_VIRT	0xFD000000
 #define OMAP343X_SDRC_SIZE	SZ_1M
 
-
-#define IO_OFFSET		0x90000000
-#define __IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
-#define __OMAP2_IO_ADDRESS(pa)	((pa) + IO_OFFSET) /* Works for L3 and L4 */
-#define io_v2p(va)		((va) - IO_OFFSET) /* Works for L3 and L4 */
-#define io_p2v(pa)		((pa) + IO_OFFSET) /* Works for L3 and L4 */
+#define L3_IO_OFFSET		0x90000000
+#define L4_IO_OFFSET		0xb2000000
+#define omap343x_l3_io_p2v(pa)	((pa) + L3_IO_OFFSET)
+#define omap343x_l4_io_p2v(pa)	((pa) + L4_IO_OFFSET)
+#if !defined(__ASSEMBLER__)
+#define __IO_ADDRESS(pa)	((pa) > L3_34XX_PHYS ? omap343x_l3_io_p2v(pa) \
+		: omap343x_l4_io_p2v(pa)) /* Works for L3 and L4 */
+#define __OMAP2_IO_ADDRESS(pa)	__IO_ADDRESS(pa) /* Works for L3 and L4 */
+#define io_v2p(va)		((va) > L4_34XX_VIRT ? (va) - L4_IO_OFFSET \
+		: (va) - L3_IO_OFFSET) /* Works for L3 and L4 */
+#define io_p2v(pa)		__IO_ADDRESS(pa) /* Works for L3 and L4 */
+#endif /* !defined(__ASSEMBLER__) */
 
 /* DSP */
 #define DSP_MEM_34XX_PHYS	OMAP34XX_DSP_MEM_BASE	/* 0x58000000 */
@@ -161,9 +167,14 @@
 
 #endif
 
+#define OMAP343X_L3_IO_ADDRESS(pa)  IOMEM(omap343x_l3_io_p2v(pa))
+#define OMAP343X_L4_IO_ADDRESS(pa)  IOMEM(omap343x_l4_io_p2v(pa))
+
+#if !defined(__ASSEMBLER__)
 #define IO_ADDRESS(pa)		IOMEM(__IO_ADDRESS(pa))
 #define OMAP1_IO_ADDRESS(pa)	IOMEM(__OMAP1_IO_ADDRESS(pa))
 #define OMAP2_IO_ADDRESS(pa)	IOMEM(__OMAP2_IO_ADDRESS(pa))
+#endif
 
 #ifdef __ASSEMBLER__
 #define IOMEM(x)		x

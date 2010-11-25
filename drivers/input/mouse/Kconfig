@@ -262,6 +262,25 @@ config MOUSE_VSXXXAA
 	  described in the source file). This driver also works with the
 	  digitizer (VSXXX-AB) DEC produced.
 
+config MOUSE_MSM_TOUCHPAD
+	tristate "MSM Touchpad"
+	depends on ARCH_MSM_SCORPION && I2C_MSM
+	help
+	  Say Y here if you have a touchpad attached.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called msm_touchpad.
+
+config MOUSE_OFN_ATLAB
+	tristate "Atlab Optical finger navigation"
+	depends on ARCH_MSM_SCORPION && I2C_MSM
+	default n
+	help
+	  Say Y here if you have an Atlab OFN device attached.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ofn_atlab.
+
 config MOUSE_HIL
 	tristate "HIL pointers (mice etc)."
 	depends on GSC || HP300

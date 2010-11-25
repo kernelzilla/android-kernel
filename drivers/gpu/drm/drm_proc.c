@@ -15,6 +15,7 @@
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -213,13 +214,24 @@ static int drm_name_info(char *buf, char **start, off_t offset, int request,
 	*start = &buf[offset];
 	*eof = 0;
 
-	if (master->unique) {
-		DRM_PROC_PRINT("%s %s %s\n",
-			       dev->driver->pci_driver.name,
-			       pci_name(dev->pdev), master->unique);
+	if (drm_core_check_feature(dev, DRIVER_USE_PLATFORM_DEVICE)) {
+		if (master->unique) {
+			DRM_PROC_PRINT("%s %s\n",
+					dev->driver->platform_device->name,
+					master->unique);
+		} else {
+			DRM_PROC_PRINT("%s\n",
+				dev->driver->platform_device->name);
+		}
 	} else {
-		DRM_PROC_PRINT("%s %s\n", dev->driver->pci_driver.name,
-			       pci_name(dev->pdev));
+		if (master->unique) {
+			DRM_PROC_PRINT("%s %s %s\n",
+				dev->driver->pci_driver.name,
+				pci_name(dev->pdev), master->unique);
+		} else {
+			DRM_PROC_PRINT("%s %s\n", dev->driver->pci_driver.name,
+				pci_name(dev->pdev));
+		}
 	}
 
 	if (len > request + offset)

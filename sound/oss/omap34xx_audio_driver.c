@@ -33,9 +33,12 @@
 
 #include <mach/mux.h>
 #include <mach/control.h>
+#include <mach/gpio.h>
+#include <mach/hardware.h>
+#include <linux/spi/cpcap.h>
+#include <linux/sound_fm_mixer.h>
 #include "omap34xx_audio_driver.h"
 #include "cpcap_audio_driver.h"
-#include <mach/gpio.h>
 
 #define AUDIO_DRIVER_NAME "cpcap_audio"
 #define CONFIG_USE_MCBSP_FIFO
@@ -254,10 +257,6 @@ static struct {
 	struct audio_stream *stdac_in_stream;
 	struct audio_stream *codec_out_stream;
 	struct audio_stream *codec_in_stream;
-	unsigned int accy_client_id;
-	unsigned long int connected_accy_mask;
-	unsigned long int interested_accy_mask;
-	wait_queue_head_t accy_wait_queue;
 } state;
 
 struct cpcap_audio_state cpcap_audio_state = {
@@ -302,7 +301,9 @@ static int primary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int secondary_spkr_setting = CPCAP_AUDIO_OUT_NONE;
 static int mic_setting = CPCAP_AUDIO_IN_NONE;
 static unsigned int capture_mode;
+static u8 enable_tx;
 static struct omap_mcbsp_wrapper *mcbsp_wrapper;
+static DEFINE_SPINLOCK(audio_write_lock);
 #ifdef CONFIG_WAKELOCK
 static struct wake_lock mcbsp_wakelock;
 #endif
@@ -355,15 +356,6 @@ static void omap2_mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data)
 		return;
 	}
 	io_base = mcbsp_dma_tx->io_base;
-
-	/* If we are at the last transfer, Shut down the Transmitter */
-	if ((mcbsp_wrapper[id].auto_reset & OMAP_MCBSP_AUTO_XRST)
-	    && (omap_dma_chain_status(mcbsp_dma_tx->dma_tx_lch) ==
-		OMAP_DMA_CHAIN_INACTIVE))
-		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
-				 omap_mcbsp_read(io_base,
-						 OMAP_MCBSP_REG_SPCR2) &
-				 (~XRST));
 
 	if (mcbsp_wrapper[id].tx_callback != NULL)
 		mcbsp_wrapper[id].tx_callback(ch_status,
@@ -1010,7 +1002,6 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 {
 	struct omap_mcbsp *mcbsp;
 	void __iomem *io_base;
-	u8 enable_tx = 0;
 	int e_count = 0;
 	int f_count = 0;
 	int ret = 0;
@@ -1019,16 +1010,6 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 	io_base = mcbsp->io_base;
 	mcbsp_wrapper[id].tx_cb_arg = cbdata;
 
-	/* Auto RRST handling logic - disable the Reciever before 1st dma */
-	if ((mcbsp_wrapper[id].auto_reset & OMAP_MCBSP_AUTO_XRST) &&
-	    (omap_dma_chain_status(mcbsp->dma_tx_lch)
-	     == OMAP_DMA_CHAIN_INACTIVE)) {
-		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
-				 omap_mcbsp_read(io_base,
-						 OMAP_MCBSP_REG_SPCR2) &
-				 (~XRST));
-		enable_tx = 1;
-	}
 	/*
 	 * for skip_first and second, we need to set e_count =2, and
 	 * f_count = number of frames = number of elements/e_count
@@ -1071,11 +1052,13 @@ int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
 	}
 
 	/* Auto XRST handling logic - Enable the Reciever after 1st dma */
-	if (enable_tx && (omap_dma_chain_status(mcbsp->dma_tx_lch)
-			  == OMAP_DMA_CHAIN_ACTIVE))
+	if ((enable_tx == 0) && (omap_dma_chain_status(mcbsp->dma_tx_lch)
+			  == OMAP_DMA_CHAIN_ACTIVE)) {
 		omap_mcbsp_write(io_base, OMAP_MCBSP_REG_SPCR2,
 				 omap_mcbsp_read(io_base,
 						 OMAP_MCBSP_REG_SPCR2) | XRST);
+		enable_tx = 1;
+	}
 
 	return 0;
 }
@@ -1114,9 +1097,10 @@ static void map_audioic_speakers(void)
 		cpcap_audio_state.ext_secondary_speaker =
 							secondary_spkr_setting;
 		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
-	} else if (state.codec_out_stream != NULL) {
+	} else if ((state.codec_out_stream != NULL) ||
+			(cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_UMTS)) {
 		cpcap_audio_state.codec_primary_speaker = primary_spkr_setting;
-			cpcap_audio_state.codec_secondary_speaker =
+		cpcap_audio_state.codec_secondary_speaker =
 							secondary_spkr_setting;
 	}
 
@@ -1133,11 +1117,15 @@ static void map_audioic_speakers(void)
 			cpcap_audio_state.codec_mode =
 						CPCAP_AUDIO_CODEC_CLOCK_ONLY;
 			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
-			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+			if (is_cdma_phone())
+				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
+									1);
 		} else {
 			AUDIO_LEVEL1_LOG("Setting codec in Normal mode\n");
 			cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_ON;
-			gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+			if (is_cdma_phone())
+				gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP,
+									1);
 		}
 	}
 }
@@ -1320,6 +1308,7 @@ static void audio_discard_buf(struct audio_stream *str, struct inode *inode)
 static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 {
 	int ret = 0;
+	unsigned long flags;
 
 	if (str == NULL) {
 		AUDIO_ERROR_LOG("Invalid stream parameter\n");
@@ -1345,6 +1334,14 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 		if (++str->buf_head >= str->nbfrags)
 			str->buf_head = 0;
 	} else {
+		spin_lock_irqsave(&audio_write_lock, flags);
+		if (str->in_use) {
+			spin_unlock_irqrestore(&audio_write_lock, flags);
+			return ret;
+		}
+		str->in_use = 1;
+		spin_unlock_irqrestore(&audio_write_lock, flags);
+
 		while (str->pending_frags) {
 			struct audio_buf *b = &str->buffers[str->buf_head];
 			u32 buf_size = str->fragsize - b->offset;
@@ -1359,12 +1356,6 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 						buf_size, str->inode);
 			}
 
-			/* Do not continue and move the frags forward..
-			 * the completion of the next transfer will
-			 * put it thru. */
-			if (ret == -EBUSY)
-				return ret;
-
 			if (ret)
 				goto out;
 
@@ -1377,12 +1368,12 @@ static int audio_process_buf(struct audio_stream *str, struct inode *inode)
 					str->buf_head = 0;
 			}
 		}
+out:
+		spin_lock_irqsave(&audio_write_lock, flags);
+		str->in_use = 0;
+		spin_unlock_irqrestore(&audio_write_lock, flags);
 	}
 
-	return ret;
-
-out:
-	str->in_use = 0;
 	return ret;
 }
 
@@ -1406,6 +1397,7 @@ static void audio_buffer_reset(struct audio_stream *str, struct inode *inode)
 	str->buf_head = 0;
 	str->usr_head = 0;
 	str->fragsize = 0;
+	str->in_use   = 0;
 }
 
 static void mcbsp_dma_tx_cb(u32 ch_status, void *arg)
@@ -1500,7 +1492,7 @@ static int audio_configure_ssi(struct inode *inode, struct file *file)
 		tx_cfg_params.word_length1 = OMAP_MCBSP_WORD_32;
 		tx_params.word_length1 = OMAP_MCBSP_WORD_32;
 		ssi = STDAC_SSI;
-
+		tx_cfg_params.fs_polarity  = OMAP_MCBSP_FS_ACTIVE_LOW;
 		omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) |
 					(1 << OMAP2_CONTROL_DEVCONF0_BIT6),
 						OMAP2_CONTROL_DEVCONF0);
@@ -1559,10 +1551,10 @@ int audio_stop_ssi(struct inode *inode, struct file *file)
 	if (file->f_mode & FMODE_WRITE) {
 		TRY(omap2_mcbsp_set_xrst(ssi, OMAP_MCBSP_XRST_DISABLE))
 		TRY(omap2_mcbsp_stop_datatx(ssi))
+		enable_tx = 0;
 		omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) &
 					~(1 << OMAP2_CONTROL_DEVCONF0_BIT6),
 						OMAP2_CONTROL_DEVCONF0);
-
 	}
 
 	if (file->f_mode & FMODE_READ) {
@@ -1868,6 +1860,64 @@ static int audio_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	   /* w21095 add FM Radio Audio path */
+	case SOUND_MIXER_FMPATH:
+	{
+		int spkr;
+		TRY(copy_from_user(&spkr, (int *)arg, sizeof(int)))
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_FMPATH with spkr = %#x\n", spkr);
+		cpcap_audio_state.ext_primary_speaker = spkr;
+		cpcap_audio_state.output_gain = 15;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
+
+	case SOUND_MIXER_FMON:
+	{
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_FMON\n");
+		/*power_ic_gpio_config(POWER_IC_GPIO_NUM_1,
+		POWER_IC_GPIO_DIR_OUTPUT, POWER_IC_GPIO_LVL_HIGH);*/
+		cpcap_regacc_write(cpcap_audio_state.cpcap, CPCAP_REG_GPIO1,
+								0x0204, 0x0204);
+		cpcap_audio_state.analog_source =
+					CPCAP_AUDIO_ANALOG_SOURCE_STEREO;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
+
+	case SOUND_MIXER_FMOFF:
+	{
+		AUDIO_LEVEL2_LOG("SOUND_MIXER_FMOFF\n");
+		/*power_ic_gpio_config(POWER_IC_GPIO_NUM_1,
+		POWER_IC_GPIO_DIR_OUTPUT, POWER_IC_GPIO_LVL_LOW);*/
+		cpcap_regacc_write(cpcap_audio_state.cpcap, CPCAP_REG_GPIO1,
+								0x0004, 0x0004);
+		cpcap_audio_state.ext_primary_speaker = CPCAP_AUDIO_OUT_NONE;
+		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_OFF;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
+
+	case SOUND_MIXER_PRIVATE1:  /* Codec loopback mode */
+	{
+		AUDIO_LEVEL2_LOG("Audio IC loopback ioctl called\n");
+		cpcap_audio_state.codec_mode = CPCAP_AUDIO_CODEC_LOOPBACK;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
+
+	case SOUND_MIXER_PRIVATE2: /* Balance control */
+	{
+		unsigned int balance;
+		TRY(copy_from_user(&balance, (unsigned int *)arg,
+						sizeof(unsigned int)))
+		cpcap_audio_state.stdac_primary_balance = balance;
+		cpcap_audio_state.codec_primary_balance = balance;
+		cpcap_audio_state.ext_primary_balance =  balance;
+		cpcap_audio_set_audio_state(&cpcap_audio_state);
+		break;
+	}
+
 	default:
 		break;
 
@@ -1953,20 +2003,20 @@ static ssize_t audio_write(struct file *file, const char *buffer, size_t count,
 		}
 
 		/* Workaround for CPCAP channel inversion issue */
-		if (minor == state.dev_dsp &&
-			(cpcap_audio_state.stdac_primary_speaker ==
+		if (cpcap_audio_state.cpcap->revision == CPCAP_REVISION_2_1 &&
+			cpcap_audio_state.cpcap->vendor == CPCAP_VENDOR_TI) {
+			if (minor == state.dev_dsp &&
+				(cpcap_audio_state.stdac_primary_speaker ==
 					CPCAP_AUDIO_OUT_STEREO_HEADSET ||
-			cpcap_audio_state.stdac_secondary_speaker ==
+				cpcap_audio_state.stdac_secondary_speaker ==
 					CPCAP_AUDIO_OUT_STEREO_HEADSET)) {
-			int lc;
-			short *ptr = (short *)(buf->data + buf->offset);
-			for (lc = 0; lc < chunksize / 2; lc += 2) {
-				/* since -(SHORT_MIN) is not a valid short
-				 * if -(SHORT_MIN) set to SHORT_MAX */
-				if (ptr[lc] == SHORT_MIN)
-					ptr[lc] = SHORT_MAX;
-				else
+				int lc;
+				short *ptr = (short *)(buf->data + buf->offset);
+				for (lc = 0; lc < chunksize / 2; lc += 2) {
 					ptr[lc] = -ptr[lc];
+					if (ptr[lc] == (short)0x8000)
+						ptr[lc] = (short)0x7FFF;
+				}
 			}
 		}
 
@@ -2013,23 +2063,42 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 
 	if (file->f_flags & O_TRUNC) {
 		AUDIO_LEVEL1_LOG("CODEC in phone mode called \n");
-		cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_CDMA;
+
+		if (is_cdma_phone())
+			cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_CDMA;
+		else
+			cpcap_audio_state.rat_type = CPCAP_AUDIO_RAT_UMTS;
+
 		cpcap_audio_state.output_gain = 0;
 		cpcap_audio_state.codec_rate = CPCAP_AUDIO_CODEC_RATE_8000_HZ;
-		cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+
+		if (is_cdma_phone()) {
+			cpcap_audio_state.codec_mute = CPCAP_AUDIO_CODEC_MUTE;
+			cpcap_audio_state.analog_source =
+						CPCAP_AUDIO_ANALOG_SOURCE_L;
+		}
+
 		if (primary_spkr_setting == CPCAP_AUDIO_OUT_LOUDSPEAKER) {
-			cpcap_audio_state.ext_primary_speaker =
+			if (is_cdma_phone())
+				cpcap_audio_state.ext_primary_speaker =
 							CPCAP_AUDIO_OUT_HANDSET;
+			else
+				cpcap_audio_state.codec_primary_speaker =
+							CPCAP_AUDIO_OUT_HANDSET;
+
 			cpcap_audio_state.microphone =
 						CPCAP_AUDIO_IN_DUAL_INTERNAL;
 			primary_spkr_setting = CPCAP_AUDIO_OUT_HANDSET;
 			mic_setting = CPCAP_AUDIO_IN_DUAL_INTERNAL;
 		} else {
-			cpcap_audio_state.ext_primary_speaker =
+			if (is_cdma_phone())
+				cpcap_audio_state.ext_primary_speaker =
+							primary_spkr_setting;
+			else
+				cpcap_audio_state.codec_primary_speaker =
 							primary_spkr_setting;
 			cpcap_audio_state.microphone = mic_setting;
 		}
-		cpcap_audio_state.analog_source = CPCAP_AUDIO_ANALOG_SOURCE_L;
 		cpcap_audio_set_audio_state(&cpcap_audio_state);
 	} else {
 		if (file->f_mode & FMODE_WRITE) {
@@ -2058,6 +2127,8 @@ static int audio_codec_open(struct inode *inode, struct file *file)
 		}
 	}
 
+	/* TODO: see if this section of code can be somehow merged with
+		map_audioic_speakers */
 	if ((cpcap_audio_state.rat_type == CPCAP_AUDIO_RAT_CDMA) &&
 		(primary_spkr_setting == CPCAP_AUDIO_OUT_BT_MONO)
 		&& (secondary_spkr_setting == CPCAP_AUDIO_OUT_NONE)) {
@@ -2112,9 +2183,11 @@ static int audio_codec_release(struct inode *inode, struct file *file)
 		}
 	}
 
-	/* Set GPIO to normal */
-	AUDIO_LEVEL1_LOG("GPIO 143 HIGH\n");
-	gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+	if (is_cdma_phone()) {
+		/* Set GPIO to normal */
+		AUDIO_LEVEL1_LOG("GPIO 143 HIGH\n");
+		gpio_direction_output(GPIO_AUDIO_SELECT_CPCAP, 1);
+	}
 	cpcap_audio_set_audio_state(&cpcap_audio_state);
 	mutex_unlock(&audio_lock);
 
@@ -2318,6 +2391,7 @@ static int audio_probe(struct platform_device *dev)
 	state.codec_out_stream = NULL;
 	state.codec_in_stream = NULL;
 
+	enable_tx = 0;
 	cpcap_audio_state.cpcap = dev->dev.platform_data;
 	cpcap_audio_init(&cpcap_audio_state);
 

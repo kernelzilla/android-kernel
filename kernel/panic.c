@@ -23,6 +23,8 @@
 #include <linux/kallsyms.h>
 #include <linux/dmi.h>
 
+extern void set_powerdown_panic(void);
+
 int panic_on_oops;
 static unsigned long tainted_mask;
 static int pause_on_oops;
@@ -78,6 +80,9 @@ NORET_TYPE void panic(const char * fmt, ...)
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 	bust_spinlocks(0);
+
+	/* Inform modem that the power down reason is due to Panic */
+	set_powerdown_panic();
 
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle

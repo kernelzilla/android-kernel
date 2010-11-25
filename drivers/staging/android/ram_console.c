@@ -42,6 +42,9 @@ static char __initdata
 static char *ram_console_old_log;
 static size_t ram_console_old_log_size;
 
+static char *bpp_log;
+static size_t bpp_log_size;
+
 static struct ram_console_buffer *ram_console_buffer;
 static size_t ram_console_buffer_size;
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_ERROR_CORRECTION
@@ -138,6 +141,13 @@ ram_console_write(struct console *console, const char *s, unsigned int count)
 		buffer->size += count;
 	ram_console_update_header();
 }
+
+#if defined(CONFIG_MACH_MOT)
+void ram_console_scribble(const char* s, unsigned int count)
+{
+	ram_console_write(NULL, s, count);
+}
+#endif
 
 static struct console ram_console = {
 	.name	= "ram",
@@ -373,15 +383,55 @@ static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 	return count;
 }
 
+
+static ssize_t bpp_read_old(struct file *file, char __user *buf,
+				    size_t len, loff_t *offset)
+{
+	loff_t pos = *offset;
+	ssize_t count;
+
+	if (pos >= bpp_log_size)
+		return 0;
+
+	count = min(len, (size_t)(bpp_log_size - pos));
+	if (copy_to_user(buf, bpp_log + pos, count))
+		return -EFAULT;
+
+	*offset += count;
+	return count;
+}
+
 static struct file_operations ram_console_file_ops = {
 	.owner = THIS_MODULE,
 	.read = ram_console_read_old,
 };
 
+static struct file_operations bpp_fops = {
+	.owner = THIS_MODULE,
+	.read = bpp_read_old,
+};
+
+
+extern char* getBPPanic(size_t*);
+
 static int __init ram_console_late_init(void)
 {
 	struct proc_dir_entry *entry;
 
+	bpp_log = getBPPanic(&bpp_log_size);
+	if(bpp_log)
+	{
+		entry = create_proc_entry("bppanic", S_IFREG | S_IRUGO, NULL);
+		if(!entry)
+		{
+			printk(KERN_ERR "ram_console: failed to create bpp proc entry.\n");
+		}
+		else
+		{
+			entry->proc_fops = &bpp_fops;
+			entry->size = bpp_log_size;
+		}
+	}
 	if (ram_console_old_log == NULL)
 		return 0;
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_EARLY_INIT

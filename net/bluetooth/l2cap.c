@@ -400,8 +400,10 @@ static void l2cap_conn_start(struct l2cap_conn *conn)
 					struct sock *parent = bt_sk(sk)->parent;
 					rsp.result = cpu_to_le16(L2CAP_CR_PEND);
 					rsp.status = cpu_to_le16(L2CAP_CS_AUTHOR_PEND);
-					parent->sk_data_ready(parent, 0);
-
+					if (parent) {
+						parent->sk_data_ready(parent,
+									0);
+					}
 				} else {
 					sk->sk_state = BT_CONFIG;
 					rsp.result = cpu_to_le16(L2CAP_CR_SUCCESS);
@@ -2227,7 +2229,8 @@ static inline int l2cap_information_rsp(struct l2cap_conn *conn, struct l2cap_cm
 
 	del_timer(&conn->info_timer);
 
-	if (type == L2CAP_IT_FEAT_MASK) {
+	/* only continue info req if FEAT success */
+	if (type == L2CAP_IT_FEAT_MASK && !result) {
 		conn->feat_mask = get_unaligned_le32(rsp->data);
 
 		if (conn->feat_mask & 0x0080) {
@@ -2244,6 +2247,12 @@ static inline int l2cap_information_rsp(struct l2cap_conn *conn, struct l2cap_cm
 
 			l2cap_conn_start(conn);
 		}
+	} else if (type == L2CAP_IT_FEAT_MASK && result) {
+		/* FEAT is not supported */
+		conn->info_state |= L2CAP_INFO_FEAT_MASK_REQ_DONE;
+		conn->info_ident = 0;
+
+		l2cap_conn_start(conn);
 	} else if (type == L2CAP_IT_FIXED_CHAN) {
 		conn->info_state |= L2CAP_INFO_FEAT_MASK_REQ_DONE;
 		conn->info_ident = 0;
@@ -2562,7 +2571,14 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
 		}
 
 		if (sk->sk_state == BT_CONNECT) {
-			if (!status) {
+			if (!status && (conn->info_state &
+					L2CAP_INFO_FEAT_MASK_REQ_SENT) &&
+					!(conn->info_state &
+					L2CAP_INFO_FEAT_MASK_REQ_DONE)) {
+				BT_DBG("INFO pending");
+				bh_unlock_sock(sk);
+				continue;
+			} else if (!status) {
 				struct l2cap_conn_req req;
 				req.scid = cpu_to_le16(l2cap_pi(sk)->scid);
 				req.psm  = l2cap_pi(sk)->psm;

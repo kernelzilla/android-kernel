@@ -667,6 +667,7 @@ int videobuf_dqbuf(struct videobuf_queue *q,
 		buf->state = VIDEOBUF_IDLE;
 		break;
 	case VIDEOBUF_DONE:
+	case VIDEOBUF_IDLE:
 		dprintk(1, "dqbuf: state is done\n");
 		CALL(q, sync, q, buf);
 		buf->state = VIDEOBUF_IDLE;

@@ -176,4 +176,10 @@ config GPIO_MCP23S08
 	  SPI driver for Microchip MCP23S08 I/O expander.  This provides
 	  a GPIO interface supporting inputs and outputs.
 
+config GPIO_MAPPING
+	bool "Support GPIO mapping"
+	default n
+	help
+	  GPIO interface supports pin number and name mapping.
+
 endif

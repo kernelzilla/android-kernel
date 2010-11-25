@@ -49,4 +49,8 @@
 int mass_storage_function_add(struct usb_composite_dev *cdev,
 	struct usb_configuration *c, int nluns);
 
+#ifdef CONFIG_USB_MOT_ANDROID
+struct usb_function *msc_function_enable(int enable, int id);
+#endif
+
 #endif /* __F_MASS_STORAGE_H */

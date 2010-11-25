@@ -29,6 +29,11 @@
 
 #include <linux/bu52014hfv.h>
 
+#ifdef CONFIG_ARM_OF
+#include <mach/dt_path.h>
+#include <asm/prom.h>
+#endif
+
 struct bu52014hfv_info {
 	int gpio_north;
 	int gpio_south;
@@ -224,8 +229,44 @@ static struct platform_driver bu52014hfv_driver = {
 		   },
 };
 
+#ifdef CONFIG_ARM_OF
+static int halleffect_of_init(void)
+{
+	int device_available;
+	struct device_node *node;
+	const void *prop;
+
+	node = of_find_node_by_path(DT_HALLEFFECT_DOCK);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_HALLEFFECT_DOCK);
+		return -ENODEV;
+	}
+
+	prop = of_get_property(node, "device_available", NULL);
+	if (prop)
+		device_available = (int) *(u8 *)prop;
+	else {
+		pr_err("Read property %s error!\n", DT_PROP_DEV_AVAILABLE);
+		of_node_put(node);
+		return -ENODEV;
+	}
+
+	of_node_put(node);
+	return device_available;
+}
+#endif
+
 static int __init bu52014hfv_os_init(void)
 {
+#ifdef CONFIG_ARM_OF
+	int available = halleffect_of_init();
+	if (available != 1) {
+		pr_err("Cannot configure bu52014hfv device. Reason =  %d\n",
+			available);
+		return -1;
+	}
+#endif
 	return platform_driver_register(&bu52014hfv_driver);
 }
 

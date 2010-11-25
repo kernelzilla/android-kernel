@@ -92,6 +92,14 @@ config BT_HCIBPA10X
 	  Say Y here to compile support for HCI BPA10x devices into the
 	  kernel or say M to compile it as module (bpa10x).
 
+config BT_MSM_SLEEP
+	tristate "MSM Bluesleep driver"
+	depends on BT && SERIAL_MSM_HS
+	default n
+	help
+	Bluetooth MSM bluesleep  driver.
+	This driver provides support for BTS sleep.
+
 config BT_HCIBFUSB
 	tristate "HCI BlueFRITZ! USB driver"
 	depends on USB
@@ -191,5 +199,19 @@ config BT_HCIVHCI
 	  Say Y here to compile support for virtual HCI devices into the
 	  kernel or say M to compile it as module (hci_vhci).
 
+config MSM_BT_POWER
+	tristate "MSM Bluetooth Power Control"
+	depends on ARCH_MSM && RFKILL
+	default m
+	help
+	  Provides a parameter to switch on/off power from PMIC
+	  to Bluetooth device.
+
+config BT_HCIUART_BRCM
+	tristate "Broadcomm HCIUART Bluetooth protocol"
+	depends on BT_HCIUART && KERNEL_MOTOROLA
+	default n
+	help
+            Configure for external Broadcomm driver support.
 endmenu
 

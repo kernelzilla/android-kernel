@@ -60,9 +60,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		ret = hp3a_collect_statistics(&statistics);
 		if (SUCCEEDED(ret)) {
 			if (copy_to_user((struct hp3a_statistics *)arg,
-				&statistics, sizeof(struct hp3a_statistics)) != 0) {
+				&statistics,
+				sizeof(struct hp3a_statistics)) != 0)
 				ret = -EFAULT;
-			}
 		}
 		break;
 	}
@@ -107,7 +107,8 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 
 		if (index < fh->buffer_count && index > -1) {
 			ibuffer = &(fh->buffers[index]);
-			ret = hp3a_enqueue_irqsave(&g_tc.hist_stat_queue, &ibuffer);
+			ret = hp3a_enqueue_irqsave(&g_tc.hist_stat_queue,
+				&ibuffer);
 		}
 
 		break;
@@ -122,16 +123,19 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (index < fh->buffer_count && index > -1) {
 			ibuffer = &(fh->buffers[index]);
 			if (ibuffer->isp_addr == 0) {
-				ibuffer->isp_addr = ispmmu_map_pages(ibuffer->pages,
+				ibuffer->isp_addr =
+					ispmmu_map_pages(ibuffer->pages,
 					NR_PAGES((unsigned long)ibuffer->user_addr,
 					ibuffer->buffer_size));
 				if (ibuffer->isp_addr == 0) {
-					dev_err(device->dev , "isp mmu failed to map memory!\n");
+					dev_err(device->dev , \
+						"isp mmu fail to map memory\n");
 					return -EFAULT;
 				}
 			}
 			flush_dcache_ibuffer(ibuffer);
-			ret = hp3a_enqueue_irqsave(&g_tc.af_stat_queue, &ibuffer);
+			ret = hp3a_enqueue_irqsave(&g_tc.af_stat_queue,
+				&ibuffer);
 		}
 
 		break;
@@ -146,15 +150,18 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (index < fh->buffer_count && index > -1) {
 			ibuffer = &(fh->buffers[index]);
 			if (ibuffer->isp_addr == 0) {
-				ibuffer->isp_addr = ispmmu_map_pages(ibuffer->pages,
+				ibuffer->isp_addr =
+					ispmmu_map_pages(ibuffer->pages,
 					NR_PAGES((unsigned long)ibuffer->user_addr,
 					ibuffer->buffer_size));
 				if (ibuffer->isp_addr == 0) {
-					dev_err(device->dev , "isp mmu failed to map memory!\n");
+					dev_err(device->dev , \
+						"isp mmu fail to map memory\n");
 					return -EFAULT;
 				}
 			}
-			ret = hp3a_enqueue_irqsave(&g_tc.raw_frame_queue, &ibuffer);
+			ret = hp3a_enqueue_irqsave(&g_tc.raw_frame_queue,
+				&ibuffer);
 		}
 
 		break;
@@ -172,13 +179,12 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 			ret = -1;
 			if (req_buf.count > 0) {
 				fh->buffers = kzalloc(req_buf.count * \
-						sizeof(struct hp3a_internal_buffer),
-						GFP_KERNEL);
+					sizeof(struct hp3a_internal_buffer),
+					GFP_KERNEL);
 				if (fh->buffers) {
 					fh->buffer_count = req_buf.count;
-					for (i = 0; i < fh->buffer_count; ++i) {
+					for (i = 0; i < fh->buffer_count; ++i)
 						fh->buffers[i].index = i;
-					}
 					ret = 0;
 				}
 			}
@@ -198,10 +204,12 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 				(struct hp3a_buffer *)arg,
 				sizeof(struct hp3a_buffer)) == 0) {
 			ret = -1;
-			if (buffer.index >= 0 && buffer.index < fh->buffer_count) {
-				if (fh->buffers[buffer.index].buffer_size == 0) {
+			if (buffer.index >= 0 && buffer.index <
+				fh->buffer_count) {
+				if (fh->buffers[buffer.index].buffer_size
+					==	0) {
 					ret = map_user_to_kernel(&buffer,
-							&(fh->buffers[buffer.index]));
+						&(fh->buffers[buffer.index]));
 				}
 			}
 		} else {
@@ -220,10 +228,12 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 				(struct hp3a_buffer *)arg,
 				sizeof(struct hp3a_buffer)) == 0) {
 			ret = -1;
-			if (buffer.index >= 0 && buffer.index < fh->buffer_count) {
+			if (buffer.index >= 0 && buffer.index <
+				fh->buffer_count) {
 				if (fh->buffers[buffer.index].buffer_size &&
-						fh->buffers[buffer.index].pages) {
-					unmap_buffer_from_kernel(&(fh->buffers[buffer.index]));
+					fh->buffers[buffer.index].pages) {
+					unmap_buffer_from_kernel(
+						&(fh->buffers[buffer.index]));
 					ret = 0;
 				}
 			}
@@ -278,10 +288,9 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 			ret = hp3a_configure_raw(&config);
 			if (SUCCEEDED(ret)) {
 				if (copy_to_user((struct hp3a_raw_config *)arg,
-						&config,
-						sizeof(struct hp3a_raw_config)) != 0) {
+					&config,
+					sizeof(struct hp3a_raw_config)) != 0)
 					ret = -EFAULT;
-				}
 			}
 		} else {
 			ret = -EFAULT;
@@ -318,6 +327,7 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 	 */
 	case HP3A_S_V4L2_DEV_INDEX: {
 		fh->v4l2_dev = (int)arg;
+		g_tc.default_v4l2_dev = fh->v4l2_dev;
 		ret = 0;
 		break;
 	}

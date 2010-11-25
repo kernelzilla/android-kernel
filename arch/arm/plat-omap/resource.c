@@ -310,34 +310,20 @@ int resource_unregister(struct shared_resource *resp)
 }
 EXPORT_SYMBOL(resource_unregister);
 
-/**
- * resource_request - Request for a required level of a resource
- * @name: The name of the resource requested
- * @dev: Uniquely identifes the caller
- * @level: The requested level for the resource
+/* _resource_request - Request for a required level of a resource
  *
- * This function recomputes the target level of the resource based on
- * the level requested by the user. The level of the resource is
- * changed to the target level, if it is not the same as the existing level
- * of the resource. Multiple calls to this function by the same device will
- * replace the previous level requested
- * Returns 0 on success, -EINVAL if the resource name passed in invalid.
- * -ENOMEM if no static pool available or dynamic allocations fails.
- * Else returns a non-zero error value returned by one of the failing
- * shared_resource_ops.
- */
-int resource_request(const char *name, struct device *dev,
-					unsigned long level)
+ * The res_mutex isn't needed to be required for this function, which
+ * can avoid a deadlock in set_opp()/set_freq() in which res_mutex will
+ * be required couple of times in a single excution path.
+ * */
+int _resource_request(struct shared_resource *resp, struct device *dev,
+		unsigned long level)
 {
-	struct shared_resource *resp;
 	struct  users_list *user;
 	int 	found = 0, ret = 0;
 
-	resp = resource_lookup(name);
-	if (!resp) {
-		printk(KERN_ERR "resource_request: Invalid resource name\n");
+	if (!resp)
 		return -EINVAL;
-	}
 
 	mutex_lock(&resp->resource_mutex);
 	/* Call the resource specific validate function */
@@ -374,31 +360,52 @@ res_unlock:
 	mutex_unlock(&resp->resource_mutex);
 	return ret;
 }
-EXPORT_SYMBOL(resource_request);
 
 /**
- * resource_release - Release a previously requested level of a resource
- * @name: The name of the resource to be released
+ * resource_request - Request for a required level of a resource
+ * @name: The name of the resource requested
  * @dev: Uniquely identifes the caller
+ * @level: The requested level for the resource
  *
- * This function recomputes the target level of the resource after removing
+ * This function recomputes the target level of the resource based on
  * the level requested by the user. The level of the resource is
  * changed to the target level, if it is not the same as the existing level
- * of the resource.
- * Returns 0 on success, -EINVAL if the resource name or dev structure
- * is invalid.
+ * of the resource. Multiple calls to this function by the same device will
+ * replace the previous level requested
+ * Returns 0 on success, -EINVAL if the resource name passed in invalid.
+ * -ENOMEM if no static pool available or dynamic allocations fails.
+ * Else returns a non-zero error value returned by one of the failing
+ * shared_resource_ops.
  */
-int resource_release(const char *name, struct device *dev)
+int resource_request(const char *name, struct device *dev,
+					unsigned long level)
 {
 	struct shared_resource *resp;
-	struct users_list *user;
-	int found = 0, ret = 0;
 
 	resp = resource_lookup(name);
 	if (!resp) {
-		printk(KERN_ERR "resource_release: Invalid resource name\n");
+		printk(KERN_ERR "resource_request: Invalid resource name\n");
 		return -EINVAL;
 	}
+
+	return _resource_request(resp, dev, level);
+}
+EXPORT_SYMBOL(resource_request);
+
+
+/* _resource_release - Release a previously requested level of a resource
+ *
+ * The res_mutex isn't needed to be required for this function, which
+ * can avoid a deadlock in set_opp()/set_freq() in which res_mutex will
+ * be required couple of times in a single excution path.
+ * */
+int _resource_release(struct shared_resource *resp, struct device *dev)
+{
+	struct users_list *user;
+	int found = 0, ret = 0;
+
+	if (!resp)
+		return -EINVAL;
 
 	mutex_lock(&resp->resource_mutex);
 	list_for_each_entry(user, &resp->users_list, node) {
@@ -423,6 +430,31 @@ int resource_release(const char *name, struct device *dev)
 res_unlock:
 	mutex_unlock(&resp->resource_mutex);
 	return ret;
+}
+
+/**
+ * resource_release - Release a previously requested level of a resource
+ * @name: The name of the resource to be released
+ * @dev: Uniquely identifes the caller
+ *
+ * This function recomputes the target level of the resource after removing
+ * the level requested by the user. The level of the resource is
+ * changed to the target level, if it is not the same as the existing level
+ * of the resource.
+ * Returns 0 on success, -EINVAL if the resource name or dev structure
+ * is invalid.
+ */
+int resource_release(const char *name, struct device *dev)
+{
+	struct shared_resource *resp;
+
+	resp = resource_lookup(name);
+	if (!resp) {
+		printk(KERN_ERR "resource_release: Invalid resource name\n");
+		return -EINVAL;
+	}
+
+	return _resource_release(resp, dev);
 }
 EXPORT_SYMBOL(resource_release);
 

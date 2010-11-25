@@ -40,6 +40,7 @@
 #define HCI_UART_3WIRE	2
 #define HCI_UART_H4DS	3
 #define HCI_UART_LL	4
+#define HCI_UART_BRCM  0 	
 
 struct hci_uart;
 
@@ -90,4 +91,9 @@ int bcsp_deinit(void);
 #ifdef CONFIG_BT_HCIUART_LL
 int ll_init(void);
 int ll_deinit(void);
+#endif
+
+#ifdef CONFIG_BT_HCIUART_BRCM
+int brcm_init(void);
+int brcm_deinit(void);
 #endif

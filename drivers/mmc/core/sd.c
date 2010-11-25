@@ -21,7 +21,9 @@
 #include "bus.h"
 #include "mmc_ops.h"
 #include "sd_ops.h"
-
+#if defined(CONFIG_MACH_CALGARY)
+#define DEBUG_SD
+#endif
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -252,6 +254,10 @@ static int mmc_switch_hs(struct mmc_card *card)
 		return 0;
 
 	if (card->sw_caps.hs_max_dtr == 0)
+		return 0;
+
+	/* LIBtt04854 : All of 2GB sd card set to 24Mhz */
+	if (card->csd.read_blkbits == 10)
 		return 0;
 
 	err = -EIO;
@@ -571,6 +577,9 @@ static void mmc_sd_detect(struct mmc_host *host)
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	while(retries) {
 		err = mmc_send_status(host->card, NULL);
+#ifdef DEBUG_SD
+		printk("%s(%s): err = %d\n", __func__, mmc_hostname(host), err);
+#endif
 		if (err) {
 			retries--;
 			udelay(5);
@@ -578,10 +587,12 @@ static void mmc_sd_detect(struct mmc_host *host)
 		}
 		break;
 	}
+#ifdef DEBUG_SD
 	if (!retries) {
 		printk(KERN_ERR "%s(%s): Unable to re-detect card (%d)\n",
 		       __func__, mmc_hostname(host), err);
 	}
+#endif
 #else
 	err = mmc_send_status(host->card, NULL);
 #endif
@@ -731,7 +742,11 @@ int mmc_attach_sd(struct mmc_host *host, u32 ocr)
 	 * Detect and init the card.
 	 */
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
+#if defined(CONFIG_KERNEL_MOTOROLA)
+	retries = 1;
+#else /* defined(CONFIG_KERNEL_MOTOROLA) */
 	retries = 5;
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 	while (retries) {
 		err = mmc_sd_init_card(host, host->ocr, NULL);
 		if (err) {

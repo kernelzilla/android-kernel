@@ -123,9 +123,8 @@ void hp3a_disable_af(void)
 static void hp3a_af_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 			void *arg2)
 {
-	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE)) {
+	if (unlikely((H3A_AF_DONE & status) != H3A_AF_DONE))
 		return;
-	}
 
 	/* clear IRQ status bit.*/
 	/*
@@ -158,9 +157,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		/* Install AF callback. */
 		ret = isp_set_callback(CBK_H3A_AF_DONE, hp3a_af_isr,
 					(void *)NULL, (void *)NULL);
-		if (ret) {
+		if (ret)
 			return ret;
-		}
 
 		if (hp3a_af_busy()) {
 			dev_info(device->dev, "Error: AF engine is busy!\n");
@@ -206,7 +204,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 
 		/* Validate paxel dimessions. */
 		if (config->paxel.width < 16 || config->paxel.width > 256 ||
-			config->paxel.height < 2 ||  config->paxel.height > 256) {
+			config->paxel.height < 2 ||
+			config->paxel.height > 256) {
 			dev_info(device->dev,
 				"Error: Invalid paxel dimention %d-%d\n",
 				config->paxel.width, config->paxel.height);
@@ -222,12 +221,13 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		/* IIR filter hz start setup. */
 		WRITE_REG(isp_af_regs[4].val, config->iir.hz_start_pos);
 
-		/* Setup paxel start position after IIR filter hz start setup. */
+		/* Setup paxel start position after */
+		/* IIR filter hz start setup. */
 		if (config->paxel.hz_start < (config->iir.hz_start_pos + 1) ||
 			config->paxel.hz_start > 4095 ||
 			config->paxel.vt_start > 4095) {
 			dev_info(device->dev,
-				"Error : Invalid paxel start position. (hz=%d vt=%d)\n",
+				"Error : Invalid paxel start. (hz=%d vt=%d)\n",
 				config->paxel.hz_start, config->paxel.vt_start);
 			goto func_exit;
 		}
@@ -250,7 +250,8 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 			goto func_exit;
 		}
 
-		if (config->paxel.line_incr > 8 || config->paxel.line_incr < 2) {
+		if (config->paxel.line_incr > 8 ||
+			config->paxel.line_incr < 2) {
 			dev_info(device->dev,
 				"Error: Invalid paxel line increment %d\n",
 				config->paxel.line_incr);
@@ -262,18 +263,23 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		OR_REG(isp_af_regs[2].val,
 			(config->paxel.vt_cnt - 1) << AF_VT_COUNT_SHIFT);
 		OR_REG(isp_af_regs[2].val,
-			((config->paxel.line_incr >> 1) - 1) << AF_LINE_INCR_SHIFT);
+			((config->paxel.line_incr >> 1) - 1) <<
+			AF_LINE_INCR_SHIFT);
 
 		/* Validate IIR filter coefficients. */
 		for (index = 0; index < AF_NUMBER_OF_COEF; ++index) {
 			if ((config->iir.coeff_set0[index]) > AF_COEF_MAX) {
 				dev_info(device->dev,
-					"Error : Coefficient(%d) for set 0 is incorrect\n", index);
+					"Err : Coefficient %d for set 0 "
+					" is incorrect\n",
+					index);
 				goto func_exit;
 			}
 			if ((config->iir.coeff_set1[index]) > AF_COEF_MAX) {
 				dev_info(device->dev,
-					"Error : Coefficient for(%d) set 1 is incorrect\n", index);
+					"Err : Coefficient %d for set 1 "
+					"wrong\n",
+					index);
 				goto func_exit;
 			}
 		}

@@ -11,7 +11,8 @@
 #define _OMAP_BOARD_H
 
 #include <linux/types.h>
-
+#include <linux/platform_device.h>
+#include <linux/usb/omap.h>
 #include <mach/gpio-switch.h>
 
 /* Different peripheral ids */
@@ -74,6 +75,7 @@ struct omap_usb_config {
 	u8		pins[3];
 	int (*usbhost_standby_status)(void);
 	u8		usb_remote_wake_gpio;
+	struct omap_usb_platform_data *plat_data;
 };
 
 struct omap_lcd_config {

@@ -32,6 +32,9 @@
 #include <linux/security.h>
 #include <linux/bootmem.h>
 #include <linux/syscalls.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 
 #include <asm/uaccess.h>
 
@@ -721,6 +724,11 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 #ifdef	CONFIG_DEBUG_LL
 	printascii(printk_buf);
 #endif
+#ifdef CONFIG_LTT_LITE
+#ifdef CONFIG_LTT_LITE_ANDROID_LOG
+	ltt_lite_log_printk(printk_buf, printed_len);
+#endif
+#endif
 
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
@@ -941,7 +949,7 @@ void suspend_console(void)
 {
 	if (!console_suspend_enabled)
 		return;
-	printk("Suspending console(s) (use no_console_suspend to debug)\n");
+	/*printk("Suspending console(s) (use no_console_suspend to debug)\n");*/
 	acquire_console_sem();
 	console_suspended = 1;
 	up(&console_sem);

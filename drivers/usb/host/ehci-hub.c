@@ -112,6 +112,14 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 	int			port;
 	int			mask;
 
+	port = HCS_N_PORTS(ehci->hcs_params);
+	while (port--) {
+		u32 __iomem	*reg = &ehci->regs->port_status[port];
+		u32		t1 = ehci_readl(ehci, reg);
+		if (t1 & PORT_RESUME)
+			return -EBUSY;
+	}
+
 	ehci_dbg(ehci, "suspend root hub\n");
 
 	if (time_before (jiffies, ehci->next_statechange))
@@ -183,6 +191,11 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irq (&ehci->lock);
+
+	/* ehci_work() may have re-enabled the watchdog timer, which we do not
+	 * want, and so we must delete any pending watchdog timer events.
+	 */
+	del_timer_sync(&ehci->watchdog);
 	return 0;
 }
 
@@ -227,11 +240,16 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 	/* restore CMD_RUN, framelist size, and irq threshold */
 	ehci_writel(ehci, ehci->command, &ehci->regs->command);
 
+#if 0
+	/* We don't need this on the OMAP. Hence removing this delay */
+
 	/* Some controller/firmware combinations need a delay during which
 	 * they set up the port statuses.  See Bugzilla #8190. */
+
 	spin_unlock_irq(&ehci->lock);
 	msleep(8);
 	spin_lock_irq(&ehci->lock);
+#endif
 
 	/* manually resume the ports we suspended during bus_suspend() */
 	i = HCS_N_PORTS (ehci->hcs_params);
@@ -240,6 +258,7 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 		temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 		if (test_bit(i, &ehci->bus_suspended) &&
 				(temp & PORT_SUSPEND)) {
+			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
 			temp |= PORT_RESUME;
 			resume_needed = 1;
 		}
@@ -283,7 +302,7 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 	ehci_writel(ehci, INTR_MASK, &ehci->regs->intr_enable);
 
 	spin_unlock_irq (&ehci->lock);
-	ehci_handover_companion_ports(ehci);
+		ehci_handover_companion_ports(ehci);
 	return 0;
 }
 
@@ -420,29 +439,38 @@ static int check_reset_complete (
 
 		/* with integrated TT, there's nobody to hand it to! */
 		if (ehci_is_TDI(ehci)) {
-			ehci_dbg (ehci,
+			ehci_dbg(ehci,
 				"Failed to enable port %d on root hub TT\n",
 				index+1);
 			return port_status;
 		}
 
-		ehci_dbg (ehci, "port %d full speed --> companion\n",
+		ehci_dbg(ehci, "port %d full speed --> companion\n",
 			index + 1);
 
-		// what happens if HCS_N_CC(params) == 0 ?
-		port_status |= PORT_OWNER;
-		port_status &= ~PORT_RWC_BITS;
-		ehci_writel(ehci, port_status, status_reg);
-
-		/* ensure 440EPX ohci controller state is operational */
-		if (ehci->has_amcc_usb23)
-			set_ohci_hcfs(ehci, 1);
-	} else {
+		/* when detect a full speed device, it's compliant with EHCI
+		 * specification to give up ownership of that port. But for our
+		 * case, there is really no other device connected to port 3,
+		 * and for some reason when a panic in the device happens,
+		 * the peripheral shows up as full speed device, hence
+		 * enumeration with EHCI fails. To workaround this issue, BP
+		 * reset USB controller and restart enumeration process if
+		 * enumeration doesn't seem to happen, and in EHCI driver, we
+		 * don't give up ownership of the port, simply waiting for the
+		 * of the port, simply waiting for the peripheral to connect
+		 * again. */
+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+		if ((index != 2) || is_cdma_phone()) {
+#else
+		if (index != 2) {
+#endif
+			// what happens if HCS_N_CC(params) == 0 ?
+			port_status |= PORT_OWNER;
+			port_status &= ~PORT_RWC_BITS;
+			ehci_writel(ehci, port_status, status_reg);
+		}
+	} else
 		ehci_dbg (ehci, "port %d high speed\n", index + 1);
-		/* ensure 440EPx ohci controller state is suspended */
-		if (ehci->has_amcc_usb23)
-			set_ohci_hcfs(ehci, 0);
-	}
 
 	return port_status;
 }
@@ -499,9 +527,10 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 		 * controller by the user.
 		 */
 
-		if ((temp & mask) != 0 || test_bit(i, &ehci->port_c_suspend)
-				|| (ehci->reset_done[i] && time_after_eq(
-					jiffies, ehci->reset_done[i]))) {
+		if ((temp & mask) != 0
+				|| ((temp & PORT_RESUME) != 0
+					&& time_after_eq(jiffies,
+						ehci->reset_done[i]))) {
 			if (i < 7)
 			    buf [0] |= 1 << (i + 1);
 			else
@@ -567,6 +596,7 @@ static int ehci_hub_control (
 	unsigned long	flags;
 	int		retval = 0;
 	unsigned	selector;
+	u32	runstop;
 
 	/*
 	 * FIXME:  support SetPortFeatures USB_PORT_FEAT_INDICATOR.
@@ -704,9 +734,19 @@ static int ehci_hub_control (
 			/* resume completed? */
 			else if (time_after_eq(jiffies,
 					ehci->reset_done[wIndex])) {
-				clear_bit(wIndex, &ehci->suspended_ports);
 				set_bit(wIndex, &ehci->port_c_suspend);
 				ehci->reset_done[wIndex] = 0;
+
+		/* Workaround for OMAP errata:
+		 * The errata effects suspend-resume and remote-wakeup
+		 * We need to halt the controller before clearing the
+		 * resume bit in PORTSC
+		 */
+		runstop = ehci_readl(ehci, &ehci->regs->command);
+		ehci_writel(ehci, (runstop & ~CMD_RUN), &ehci->regs->command);
+		(void) ehci_readl(ehci, &ehci->regs->command);
+		handshake(ehci, &ehci->regs->status,
+				STS_HALT, STS_HALT, 2000);
 
 				/* stop resume signaling */
 				temp = ehci_readl(ehci, status_reg);
@@ -715,6 +755,10 @@ static int ehci_hub_control (
 					status_reg);
 				retval = handshake(ehci, status_reg,
 					   PORT_RESUME, 0, 2000 /* 2msec */);
+
+		ehci_writel(ehci, (runstop), &ehci->regs->command);
+		(void) ehci_readl(ehci, &ehci->regs->command);
+
 				if (retval != 0) {
 					ehci_err(ehci,
 						"port %d resume error %d\n",
@@ -751,9 +795,6 @@ static int ehci_hub_control (
 					ehci_readl(ehci, status_reg));
 		}
 
-		if (!(temp & (PORT_RESUME|PORT_RESET)))
-			ehci->reset_done[wIndex] = 0;
-
 		/* transfer dedicated ports to the companion hc */
 		if ((temp & PORT_CONNECT) &&
 				test_bit(wIndex, &ehci->companion_ports)) {
@@ -777,17 +818,8 @@ static int ehci_hub_control (
 		}
 		if (temp & PORT_PE)
 			status |= 1 << USB_PORT_FEAT_ENABLE;
-
-		/* maybe the port was unsuspended without our knowledge */
-		if (temp & (PORT_SUSPEND|PORT_RESUME)) {
+		if (temp & (PORT_SUSPEND|PORT_RESUME))
 			status |= 1 << USB_PORT_FEAT_SUSPEND;
-		} else if (test_bit(wIndex, &ehci->suspended_ports)) {
-			clear_bit(wIndex, &ehci->suspended_ports);
-			ehci->reset_done[wIndex] = 0;
-			if (temp & PORT_PE)
-				set_bit(wIndex, &ehci->port_c_suspend);
-		}
-
 		if (temp & PORT_OC)
 			status |= 1 << USB_PORT_FEAT_OVER_CURRENT;
 		if (temp & PORT_RESET)
@@ -832,7 +864,6 @@ static int ehci_hub_control (
 					|| (temp & PORT_RESET) != 0)
 				goto error;
 			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
-			set_bit(wIndex, &ehci->suspended_ports);
 			break;
 		case USB_PORT_FEAT_POWER:
 			if (HCS_PPC (ehci->hcs_params))

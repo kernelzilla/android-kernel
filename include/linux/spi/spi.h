@@ -803,4 +803,8 @@ spi_unregister_device(struct spi_device *spi)
 		device_unregister(&spi->dev);
 }
 
+#ifdef CONFIG_MOT_FEAT_SPI_SMS1130
+struct spi_device *spi_get_spi_device(char *modalias);
+#endif
+
 #endif /* __LINUX_SPI_H */

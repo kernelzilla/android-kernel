@@ -51,6 +51,10 @@ MODULE_ALIAS("mmc:block");
 
 static DECLARE_BITMAP(dev_use, MMC_NUM_MINORS);
 
+#if defined(CONFIG_KERNEL_MOTOROLA)
+extern void report_sd_failure(struct mmc_host *mmc);
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
+
 /*
  * There is one mmc_blk_data per slot.
  */
@@ -267,6 +271,9 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_card *card = md->queue.card;
 	struct mmc_blk_request brq;
 	int ret = 1, disable_multi = 0;
+#if defined(CONFIG_KERNEL_MOTOROLA)
+	int status_failure = 0;
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (mmc_bus_needs_resume(card->host)) {
@@ -418,6 +425,9 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 				if (err) {
 					printk(KERN_ERR "%s: error %d requesting status\n",
 					       req->rq_disk->disk_name, err);
+#if defined(CONFIG_KERNEL_MOTOROLA)
+					status_failure = err;
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 					goto cmd_err;
 				}
 				/*
@@ -495,6 +505,11 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
 	spin_unlock_irq(&md->lock);
 
+#if defined(CONFIG_KERNEL_MOTOROLA)
+	/* catch cases where the card is unresponsive in case of esd issues */
+	if((brq.cmd.error && brq.data.error) || (brq.cmd.error && status_failure))
+		report_sd_failure(card->host);
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 	return 0;
 }
 

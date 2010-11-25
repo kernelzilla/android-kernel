@@ -3,6 +3,18 @@ config SGX
 	---help---
 	  Support for the PowerVR SGX 3D core.
 
+config SGX_CORE_REV
+	int "SGX Core Revision"
+	range 100 1999
+	default 121
+	depends on SGX
+	---help---
+	  Select SGX Core Revision number.
+	  Range 100 - 1999
+	  Examples:
+		121 => 121
+		1111 => 1111
+
 choice
 	prompt "PowerVR build type"
 	depends on SGX
@@ -25,12 +37,11 @@ config SGX_EDM_TRACING
        bool "EDM Status Tracing"
        ---help---
          Enable EDM status trace dumping on HW Recovery
-
-config CONFIG_SGX_MK_TRACE
+config SGX_MK_TRACE
        bool "MK Trace"
        ---help---
          Enable suppport for dumping EDM status tracing from userspace
-	
+
 config PVR_OMAPLFB
 	tristate "PowerVR OMAP buffer class"
 	depends on SGX

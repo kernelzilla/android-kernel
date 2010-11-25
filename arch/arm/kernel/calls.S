@@ -8,6 +8,11 @@
  * published by the Free Software Foundation.
  *
  *  This file is included thrice in entry-common.S
+ *
+ * -------------------------------- REVISIONS ----------------------------------
+ * Date         Author               Comments
+ * ---------  -------------------  ---------------------------------------------
+ * 09/01/2008   Motorola Inc.        Add support for LTT-Lite syscall
  */
 /* 0 */		CALL(sys_restart_syscall)
 		CALL(sys_exit)
@@ -370,6 +375,12 @@
 		CALL(sys_dup3)
 		CALL(sys_pipe2)
 /* 360 */	CALL(sys_inotify_init1)
+/* 361 */
+#ifdef CONFIG_LTT_LITE
+		CALL(sys_lttlite)
+#else
+		CALL(sys_ni_syscall)
+#endif
 #ifndef syscalls_counted
 .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
 #define syscalls_counted

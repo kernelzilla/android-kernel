@@ -95,20 +95,26 @@ IMG_BOOL PDumpOSIsSuspended(IMG_VOID);
 
 IMG_BOOL PDumpOSJTInitialised(IMG_VOID);
 
-PVRSRV_ERROR PDumpOSWriteString(IMG_HANDLE hDbgStream,
+IMG_BOOL PDumpOSWriteString(IMG_HANDLE hDbgStream,
 		IMG_UINT8 *psui8Data,
 		IMG_UINT32 ui32Size,
 		IMG_UINT32 ui32Flags);
 
 IMG_BOOL PDumpOSWriteString2(IMG_HANDLE	hScript, IMG_UINT32 ui32Flags);
 
-IMG_VOID PDumpOSBufprintf(IMG_HANDLE hBuf, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR* pszFormat, ...);
+PVRSRV_ERROR PDumpOSBufprintf(IMG_HANDLE hBuf,
+			IMG_UINT32 ui32ScriptSizeMax,
+			IMG_CHAR *pszFormat, ...);
 
 IMG_VOID PDumpOSDebugPrintf(IMG_CHAR* pszFormat, ...);
 
-IMG_VOID PDumpOSSprintf(IMG_CHAR *pszComment, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR *pszFormat, ...);
+PVRSRV_ERROR PDumpOSSprintf(IMG_CHAR *pszComment,
+			IMG_UINT32 ui32ScriptSizeMax,
+			IMG_CHAR *pszFormat, ...);
 
-IMG_VOID PDumpOSVSprintf(IMG_CHAR *pszMsg, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR* pszFormat, PDUMP_va_list vaArgs);
+PVRSRV_ERROR PDumpOSVSprintf(IMG_CHAR *pszMsg,
+			IMG_UINT32 ui32ScriptSizeMax,
+			IMG_CHAR *pszFormat, PDUMP_va_list vaArgs);
 
 IMG_UINT32 PDumpOSBuflen(IMG_HANDLE hBuffer, IMG_UINT32 ui32BufferSizeMax);
 

@@ -622,19 +622,17 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32* pui32LinMemAddr,
 										  IMG_UINT32 ui32Waitus,
 										  IMG_UINT32 ui32Tries)
 {
-	IMG_UINT32	uiMaxTime = ui32Tries * ui32Waitus;
-
-	LOOP_UNTIL_TIMEOUT(uiMaxTime)
 	{
-		if((*pui32LinMemAddr & ui32Mask) == ui32Value)
-		{
-			return PVRSRV_OK;
-		}
-		OSWaitus(ui32Waitus);
-	} END_LOOP_UNTIL_TIMEOUT();
+		IMG_UINT32	uiMaxTime = ui32Tries * ui32Waitus;
 
-	if((*pui32LinMemAddr & ui32Mask) == ui32Value)
-		return PVRSRV_OK;
+		LOOP_UNTIL_TIMEOUT(uiMaxTime)
+		{
+			if ((*pui32LinMemAddr & ui32Mask) == ui32Value)
+				return PVRSRV_OK;
+			OSWaitus(ui32Waitus);
+		} END_LOOP_UNTIL_TIMEOUT();
+	}
+
 
 	return PVRSRV_ERROR_GENERIC;
 }
@@ -663,12 +661,6 @@ PVRSRV_ERROR PollForInterruptKM (IMG_UINT32 ui32Value,
 		}
 		OSWaitus(ui32Waitus);
 	} END_LOOP_UNTIL_TIMEOUT();
-
-	if ((gui32EventStatusServicesByISR & ui32Mask) == ui32Value)
-	{
-		gui32EventStatusServicesByISR = 0;
-		return PVRSRV_OK;
-	}
 
 	return PVRSRV_ERROR_GENERIC;
 }

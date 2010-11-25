@@ -46,11 +46,16 @@
 #include <linux/rculist.h>
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
+#include <linux/gcov.h>
 #include <linux/license.h>
 #include <asm/sections.h>
 #include <linux/tracepoint.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
+
+#ifdef CONFIG_DEBUG_MEMLEAK
+int kmemleak_module;
+#endif
 
 #if 0
 #define DEBUGP printk
@@ -336,6 +341,19 @@ static unsigned long find_symbol(const char *name,
 				 bool warn)
 {
 	struct find_symbol_arg fsa;
+
+#ifdef CONFIG_DEBUG_MEMLEAK
+	if (kmemleak_module) {
+		if (strcmp(name, "__kmalloc") == 0)
+			name = "__memleak_kmalloc";
+		else if (strcmp(name, "kfree") == 0)
+			name = "memleak_kfree";
+		else if (strcmp(name, "vfree") == 0)
+			name = "memleak_vfree";
+		else if (strcmp(name, "vmalloc") == 0)
+			name = "memleak_vmalloc";
+	}
+#endif
 
 	fsa.name = name;
 	fsa.gplok = gplok;
@@ -1454,6 +1472,11 @@ static void free_module(struct module *mod)
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
 
+#ifdef CONFIG_GCOV_PROFILE
+	if (mod->ctors_start && mod->ctors_end)
+		remove_bb_link(mod);
+#endif
+
 	/* Module unload stuff */
 	module_unload_free(mod);
 
@@ -1856,6 +1879,40 @@ static void *module_alloc_update_bounds(unsigned long size)
 	return ret;
 }
 
+#ifdef CONFIG_DEBUG_MEMLEAK
+static void memleak_load_module(struct module *mod, Elf_Ehdr *hdr,
+				Elf_Shdr *sechdrs, char *secstrings)
+{
+	unsigned int mloffindex, i;
+
+	/* insert any new pointer aliases */
+	mloffindex = find_sec(hdr, sechdrs, secstrings,
+				".init.memleak_offsets");
+	if (mloffindex)
+		memleak_insert_aliases((void *)sechdrs[mloffindex].sh_addr,
+				       (void *)sechdrs[mloffindex].sh_addr
+				       + sechdrs[mloffindex].sh_size);
+
+	/* only scan the sections containing data */
+	memleak_scan_area(mod->module_core,
+			  (unsigned long)mod - (unsigned long)mod->module_core,
+			  sizeof(struct module));
+
+	for (i = 1; i < hdr->e_shnum; i++) {
+		if (!(sechdrs[i].sh_flags & SHF_ALLOC))
+			continue;
+		if (strncmp(secstrings + sechdrs[i].sh_name, ".data", 5) != 0
+		    && strncmp(secstrings + sechdrs[i].sh_name, ".bss", 4) != 0)
+			continue;
+
+		memleak_scan_area(mod->module_core,
+				  sechdrs[i].sh_addr -
+				  (unsigned long)mod->module_core,
+				  sechdrs[i].sh_size);
+	}
+}
+#endif
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static noinline struct module *load_module(void __user *umod,
@@ -1948,6 +2005,9 @@ static noinline struct module *load_module(void __user *umod,
 	}
 	/* This is temporary: point mod into copy of data. */
 	mod = (void *)sechdrs[modindex].sh_addr;
+#ifdef CONFIG_DEBUG_MEMLEAK
+	memleak_load_module(mod, hdr, sechdrs, secstrings);
+#endif
 
 	if (symindex == 0) {
 		printk(KERN_WARNING "%s: module has no symbols (stripped?)\n",
@@ -2081,6 +2141,13 @@ static noinline struct module *load_module(void __user *umod,
 		err = -ENOMEM;
 		goto free_init;
 	}
+#endif
+
+#ifdef CONFIG_GCOV_PROFILE
+	modindex = find_sec(hdr, sechdrs, secstrings, ".init_array");
+	mod->ctors_start = (char *)sechdrs[modindex].sh_addr;
+	mod->ctors_end   = (char *)(mod->ctors_start +
+				sechdrs[modindex].sh_size);
 #endif
 	/* Now we've moved module, initialize linked lists, etc. */
 	module_unload_init(mod);
@@ -2288,8 +2355,8 @@ static noinline struct module *load_module(void __user *umod,
 	ftrace_release(mod->module_core, mod->core_size);
  free_unload:
 	module_unload_free(mod);
- free_init:
 #if defined(CONFIG_MODULE_UNLOAD) && defined(CONFIG_SMP)
+ free_init:
 	percpu_modfree(mod->refptr);
 #endif
 	module_free(mod, mod->module_init);
@@ -2339,6 +2406,14 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 
 	blocking_notifier_call_chain(&module_notify_list,
 			MODULE_STATE_COMING, mod);
+
+#ifdef CONFIG_GCOV_PROFILE
+	if (mod->ctors_start && mod->ctors_end) {
+		do_global_ctors((ctor_t *) mod->ctors_start,
+			(mod->ctors_end - mod->ctors_start) / sizeof(ctor_t),
+			 mod);
+	}
+#endif
 
 	/* Start the module */
 	if (mod->init != NULL)

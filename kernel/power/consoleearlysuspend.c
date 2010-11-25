@@ -29,6 +29,10 @@ static void console_early_suspend(struct early_suspend *h)
 	orig_fgconsole = fg_console;
 	if (vc_allocate(EARLY_SUSPEND_CONSOLE))
 		goto err;
+
+	/* cursor off */
+	vc_cons[EARLY_SUSPEND_CONSOLE].d->vc_deccm = 0;
+
 	if (set_console(EARLY_SUSPEND_CONSOLE))
 		goto err;
 	release_console_sem();

@@ -119,6 +119,14 @@ config RTC_INTF_ALARM
 	  Also provides an ioctl to set the wall time which must be used
 	  for elapsed realtime to work.
 
+config RTC_INTF_SECCLKD
+	tristate "RTC SECCLKD"
+	default n
+	help
+	  CPCAP RTC driver provide support for secure clock daemon in
+	  gettting the counter maintained to keep track of the change
+	  in RTC time.
+
 config RTC_DRV_TEST
 	tristate "Test driver/device"
 	help
@@ -533,6 +541,21 @@ config RTC_DRV_CPCAP
 	  CPCAP used in embedded systems.
 
 comment "on-CPU RTC drivers"
+
+config RTC_DRV_MSM
+	tristate "RTC on Qualcomm Chipsets"
+	depends on ARCH_MSM
+	default y
+	help
+	  RTC driver for Qualcomm chipsets
+
+config RTC_SECURE_TIME_SUPPORT
+	bool "Support for secure time on Qualcomm Chipsets"
+	depends on RTC_DRV_MSM = y
+	default y
+	help
+	  Say yes here to have additional handle for reading secure time
+	  maintained by ARM9.
 
 config RTC_DRV_OMAP
 	tristate "TI OMAP1"

@@ -1,8 +1,9 @@
 /* arch/arm/mach-msm/io.c
  *
- * MSM7K io support
+ * MSM7K, QSD io support
  *
  * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -19,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/module.h>
 
 #include <mach/hardware.h>
 #include <asm/page.h>
@@ -34,6 +36,24 @@
 		.type = MT_DEVICE_NONSHARED, \
 	 }
 
+/* msm_shared_ram_phys default value of 0x00100000 is the most common value
+ * and should work as-is for any target without stacked memory.
+ */
+int msm_shared_ram_phys = 0x00100000;
+
+static void msm_map_io(struct map_desc *io_desc, int size)
+{
+	int i;
+
+	BUG_ON(!size);
+	for (i = 0; i < size; i++)
+		if (io_desc[i].virtual == (unsigned long)MSM_SHARED_RAM_BASE)
+			io_desc[i].pfn = __phys_to_pfn(msm_shared_ram_phys);
+
+	iotable_init(io_desc, size);
+}
+
+#if defined(CONFIG_ARCH_MSM7X01A) || defined(CONFIG_ARCH_MSM7X27)
 static struct map_desc msm_io_desc[] __initdata = {
 	MSM_DEVICE(VIC),
 	MSM_DEVICE(CSR),
@@ -42,9 +62,21 @@ static struct map_desc msm_io_desc[] __initdata = {
 	MSM_DEVICE(GPIO1),
 	MSM_DEVICE(GPIO2),
 	MSM_DEVICE(CLK_CTL),
+	MSM_DEVICE(AD5),
+	MSM_DEVICE(MDC),
+#ifdef CONFIG_MSM_DEBUG_UART
+	MSM_DEVICE(DEBUG_UART),
+#endif
+#ifdef CONFIG_CACHE_L2X0
+	{
+		.virtual =  (unsigned long) MSM_L2CC_BASE,
+		.pfn =      __phys_to_pfn(MSM_L2CC_PHYS),
+		.length =   MSM_L2CC_SIZE,
+		.type =     MT_DEVICE,
+	},
+#endif
 	{
 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
-		.pfn =      __phys_to_pfn(MSM_SHARED_RAM_PHYS),
 		.length =   MSM_SHARED_RAM_SIZE,
 		.type =     MT_DEVICE,
 	},
@@ -57,9 +89,97 @@ void __init msm_map_common_io(void)
 	 * pages are peripheral interface or not.
 	 */
 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
-
-	iotable_init(msm_io_desc, ARRAY_SIZE(msm_io_desc));
+	msm_map_io(msm_io_desc, ARRAY_SIZE(msm_io_desc));
 }
+#endif
+
+#ifdef CONFIG_ARCH_QSD8X50
+static struct map_desc qsd8x50_io_desc[] __initdata = {
+	MSM_DEVICE(VIC),
+	MSM_DEVICE(CSR),
+	MSM_DEVICE(GPT),
+	MSM_DEVICE(DMOV),
+	MSM_DEVICE(GPIO1),
+	MSM_DEVICE(GPIO2),
+	MSM_DEVICE(CLK_CTL),
+	MSM_DEVICE(SIRC),
+	MSM_DEVICE(SCPLL),
+	MSM_DEVICE(AD5),
+	MSM_DEVICE(MDC),
+#ifdef CONFIG_MSM_DEBUG_UART
+	MSM_DEVICE(DEBUG_UART),
+#endif
+	{
+		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
+		.length =   MSM_SHARED_RAM_SIZE,
+		.type =     MT_DEVICE,
+	},
+};
+
+void __init msm_map_qsd8x50_io(void)
+{
+	msm_map_io(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
+}
+#endif /* CONFIG_ARCH_QSD8X50 */
+
+#ifdef CONFIG_ARCH_MSM7X30
+static struct map_desc msm7x30_io_desc[] __initdata = {
+	MSM_DEVICE(VIC),
+	MSM_DEVICE(CSR),
+	MSM_DEVICE(GPT),
+	MSM_DEVICE(DMOV),
+	MSM_DEVICE(GPIO1),
+	MSM_DEVICE(GPIO2),
+	MSM_DEVICE(CLK_CTL),
+	MSM_DEVICE(SIRC),
+	MSM_DEVICE(SCPLL),
+	MSM_DEVICE(AD5),
+	MSM_DEVICE(MDC),
+	MSM_DEVICE(GCC),
+#ifdef CONFIG_MSM_DEBUG_UART
+	MSM_DEVICE(DEBUG_UART),
+#endif
+	{
+		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
+		.length =   MSM_SHARED_RAM_SIZE,
+		.type =     MT_DEVICE,
+	},
+};
+
+void __init msm_map_msm7x30_io(void)
+{
+	msm_map_io(msm7x30_io_desc, ARRAY_SIZE(msm7x30_io_desc));
+}
+#endif /* CONFIG_ARCH_MSM7X30 */
+
+#ifdef CONFIG_MACH_QSD8X50_COMET
+static struct map_desc comet_io_desc[] __initdata = {
+	MSM_DEVICE(VIC),
+	MSM_DEVICE(CSR),
+	MSM_DEVICE(GPT),
+	MSM_DEVICE(DMOV),
+	MSM_DEVICE(GPIO1),
+	MSM_DEVICE(GPIO2),
+	MSM_DEVICE(CLK_CTL),
+	MSM_DEVICE(SIRC),
+	MSM_DEVICE(SCPLL),
+	MSM_DEVICE(AD5),
+	MSM_DEVICE(MDC),
+#ifdef CONFIG_MSM_DEBUG_UART
+	MSM_DEVICE(DEBUG_UART),
+#endif
+	{
+		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
+		.length =   MSM_SHARED_RAM_SIZE,
+		.type =     MT_DEVICE,
+	},
+};
+
+void __init msm_map_comet_io(void)
+{
+	msm_map_io(comet_io_desc, ARRAY_SIZE(comet_io_desc));
+}
+#endif /* CONFIG_MACH_QSD8X50_COMET */
 
 void __iomem *
 __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
@@ -75,3 +195,4 @@ __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 
 	return __arm_ioremap(phys_addr, size, mtype);
 }
+EXPORT_SYMBOL(__msm_ioremap);

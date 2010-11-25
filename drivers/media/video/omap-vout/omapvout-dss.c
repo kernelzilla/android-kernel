@@ -27,6 +27,9 @@
 
 #define VRFB_TX_TIMEOUT		1000
 
+#define DSS_MANUAL_MODE_THRESHOLD 307200 /* 640*480 */
+static bool toggleUpdateMode;
+
 /*=== Local Functions ==================================================*/
 
 static int omapvout_dss_format_bytespp(u32 pixelformat)
@@ -177,7 +180,7 @@ static void omapvout_dss_set_global_alpha(struct omapvout_device *vout)
 	alpha = 255 - vout->win.global_alpha;
 
 	if (omapvout_dss_get_overlays(&gfx, &vid1, &vid2)) {
-		DBG("Not all planes available\n");
+		printk(KERN_ERR "Not all planes available\n");
 		return;
 	}
 
@@ -235,7 +238,7 @@ static bool omapvout_dss_clr_global_alpha(struct omapvout_device *vout)
 	u8 t;
 
 	if (omapvout_dss_get_overlays(&gfx, &vid1, &vid2)) {
-		DBG("Not all planes available\n");
+		printk(KERN_ERR "Not all planes available\n");
 		return false;
 	}
 
@@ -359,13 +362,13 @@ static int omapvout_dss_acquire_vrfb(struct omapvout_device *vout)
 
 	rc = omap_vrfb_request_ctx(&vrfb->ctx[0]);
 	if (rc != 0) {
-		DBG("VRFB context allocation 0 failed %d\n", rc);
+		printk(KERN_ERR "VRFB context allocation 0 failed %d\n", rc);
 		goto failed_ctx0;
 	}
 
 	rc = omap_vrfb_request_ctx(&vrfb->ctx[1]);
 	if (rc != 0) {
-		DBG("VRFB context allocation 1 failed %d\n", rc);
+		printk(KERN_ERR "VRFB context allocation 1 failed %d\n", rc);
 		goto failed_ctx1;
 	}
 
@@ -380,13 +383,13 @@ static int omapvout_dss_acquire_vrfb(struct omapvout_device *vout)
 
 	rc = omapvout_mem_alloc(size, &vrfb->phy_addr[0], &vrfb->virt_addr[0]);
 	if (rc != 0) {
-		DBG("VRFB buffer alloc 0 failed %d\n", rc);
+		printk(KERN_ERR "VRFB buffer alloc 0 failed %d\n", rc);
 		goto failed_mem0;
 	}
 
 	rc = omapvout_mem_alloc(size, &vrfb->phy_addr[1], &vrfb->virt_addr[1]);
 	if (rc != 0) {
-		DBG("VRFB buffer alloc 1 failed %d\n", rc);
+		printk(KERN_ERR "VRFB buffer alloc 1 failed %d\n", rc);
 		goto failed_mem1;
 	}
 
@@ -395,7 +398,7 @@ static int omapvout_dss_acquire_vrfb(struct omapvout_device *vout)
 				(void *)vrfb,
 				&vrfb->dma_ch);
 	if (rc != 0) {
-		printk(KERN_INFO "No VRFB DMA channel for %d\n", vout->id);
+		printk(KERN_ERR "No VRFB DMA channel for %d\n", vout->id);
 		goto failed_dma;
 	}
 
@@ -465,19 +468,46 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 
 		w = vout->crop.width;
 		h = vout->crop.height;
+		if (vrfb->decimate_src) {
+			w = w / 2;
+			h = h / 2;
+		}
 
 		dss_fmt = omapvout_dss_color_mode(vout->pix.pixelformat);
+		bytespp = omapvout_dss_format_bytespp(vout->pix.pixelformat);
+
 		omap_vrfb_setup(&vrfb->ctx[0], vrfb->phy_addr[0],
 				w, h, dss_fmt, rot);
 		omap_vrfb_setup(&vrfb->ctx[1], vrfb->phy_addr[1],
 				w, h, dss_fmt, rot);
-
 		omapvout_dss_calc_offset(vout, vrfb->ctx[0].bytespp,
 				vrfb->ctx[0].xoffset, vrfb->ctx[0].yoffset);
 
-		bytespp = omapvout_dss_format_bytespp(vout->pix.pixelformat);
 		vrfb->en = (w * bytespp) / 4; /* 32 bit ES */
 		vrfb->fn = h;
+
+		if (!vrfb->decimate_src) {
+			/* Maintain the previous settings to reduce risk */
+			vrfb->src_mode = OMAP_DMA_AMODE_POST_INC;
+			vrfb->src_ei = 0;
+			vrfb->src_fi = 0;
+		} else {
+			/* Decimate source frame by 2 */
+
+			/* Need to use double indexed DMA */
+			vrfb->src_mode = OMAP_DMA_AMODE_DOUBLE_IDX;
+			/* Skip every other word */
+			vrfb->src_ei = 4 + 1;
+			/* Skip every other line.
+			 * - Mult width by 2 to get real input frame line
+			 *   width for the skip.
+			 * - Add 4 to account for the trailing word  of the
+			 *   previous line that needs still needs to be
+			 *   skipped.
+			 */
+			vrfb->src_fi = (w * bytespp * 2) + 4 + 1;
+		}
+
 		vrfb->dst_ei = 1;
 		if (fmt == V4L2_PIX_FMT_YUYV || fmt == V4L2_PIX_FMT_UYVY) {
 			vrfb->dst_fi = (OMAP_VRFB_LINE_LEN * bytespp * 2)
@@ -493,9 +523,9 @@ static int omapvout_dss_perform_vrfb_dma(struct omapvout_device *vout,
 
 	omap_set_dma_transfer_params(vrfb->dma_ch, OMAP_DMA_DATA_TYPE_S32,
 				vrfb->en, vrfb->fn, OMAP_DMA_SYNC_ELEMENT,
-				vrfb->dma_id, 0x0);
-	omap_set_dma_src_params(vrfb->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
-				src_paddr, 0, 0);
+				vrfb->dma_id, 0);
+	omap_set_dma_src_params(vrfb->dma_ch, 0, vrfb->src_mode,
+				src_paddr, vrfb->src_ei, vrfb->src_fi);
 	omap_set_dma_src_burst_mode(vrfb->dma_ch, OMAP_DMA_DATA_BURST_16);
 	omap_set_dma_dest_params(vrfb->dma_ch, 0, OMAP_DMA_AMODE_DOUBLE_IDX,
 				dst_paddr, vrfb->dst_ei, vrfb->dst_fi);
@@ -546,13 +576,18 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 		o_info.height = vout->crop.height;
 	}
 
+	if (vrfb->decimate_src) { /* Decimate source frame by 2 */
+		o_info.width = o_info.width / 2;
+		o_info.height = o_info.height / 2;
+	}
+
 	o_info.pos_x = vout->win.w.left & ~1;
 	o_info.pos_y = vout->win.w.top & ~1;
 	o_info.out_width = vout->win.w.width;
 	o_info.out_height = vout->win.w.height;
 	o_info.color_mode = omapvout_dss_color_mode(vout->pix.pixelformat);
 	o_info.rotation_type = OMAP_DSS_ROT_VRFB;
-	o_info.rotation = vout->rotation; // Rotation value, not buffer index
+	o_info.rotation = vout->rotation; /* Rotation value, not buffer index */
 	o_info.mirror = false;
 
 	rc = ovly->set_overlay_info(ovly, &o_info);
@@ -567,10 +602,12 @@ static int omapvout_dss_update_overlay(struct omapvout_device *vout,
 		return rc;
 	}
 
-	rc = ovly->manager->device->update(ovly->manager->device, 0, 0,
-					vout->disp_width, vout->disp_height);
-	if (rc)
-		DBG("Overlay update failed %d\n", rc);
+	if (ovly->manager->device->update) {
+		rc = ovly->manager->device->update(ovly->manager->device, 0, 0,
+				vout->disp_width, vout->disp_height);
+		if (rc)
+			DBG("Overlay update failed %d\n", rc);
+	}
 
 	return rc;
 }
@@ -653,7 +690,7 @@ static void omapvout_dss_perform_update(struct work_struct *work)
 		 * is unlocked since the sync may take some time.
 		 */
 		dev = dss->overlay->manager->device;
-		if (dev->sync)
+		if (dev && dev->sync)
 			dev->sync(dev);
 
 		/* Since the mutex was unlocked, it is possible that the DSS
@@ -717,14 +754,14 @@ int  omapvout_dss_init(struct omapvout_device *vout, enum omap_plane plane)
 	}
 
 	if (vout->dss->overlay == NULL) {
-		DBG("No overlay %d found\n", plane);
+		printk(KERN_ERR "No overlay %d found\n", plane);
 		rc = -ENODEV;
 		goto failed_mem;
 	}
 
 	rc = omapvout_dss_acquire_vrfb(vout);
 	if (rc != 0) {
-		DBG("VRFB allocation failed\n");
+		printk(KERN_ERR "VRFB allocation failed\n");
 		goto failed_mem;
 	}
 
@@ -754,13 +791,13 @@ int omapvout_dss_open(struct omapvout_device *vout, u16 *disp_w, u16 *disp_h)
 	/* It is assumed that the caller has locked the vout mutex */
 
 	if (vout->dss->overlay->manager == NULL) {
-		DBG("No manager found\n");
+		printk(KERN_ERR "No manager found\n");
 		rc = -ENODEV;
 		goto failed;
 	}
 
 	if (vout->dss->overlay->manager->device == NULL) {
-		DBG("No device found\n");
+		printk(KERN_ERR "No device found\n");
 		rc = -ENODEV;
 		goto failed;
 	}
@@ -779,6 +816,7 @@ int omapvout_dss_open(struct omapvout_device *vout, u16 *disp_w, u16 *disp_h)
 	INIT_WORK(&vout->dss->work, omapvout_dss_perform_update);
 
 	vout->dss->enabled = false;
+	vout->dss->vrfb.decimate_src = false;
 
 failed:
 	return rc;
@@ -804,6 +842,16 @@ int omapvout_dss_enable(struct omapvout_device *vout)
 {
 	/* It is assumed that the caller has locked the vout mutex */
 
+	if (vout->win.w.height*vout->win.w.width > DSS_MANUAL_MODE_THRESHOLD) {
+		struct omap_dss_device *dev;
+		dev = vout->dss->overlay->manager->device;
+
+		if (dev && dev->set_update_mode) {
+			if (!dev->set_update_mode(dev, OMAP_DSS_UPDATE_AUTO))
+				toggleUpdateMode = true;
+		}
+	}
+
 	/* Reset the current frame idx */
 	vout->dss->cur_q_idx = -1;
 
@@ -822,7 +870,6 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 	struct omap_overlay *ovly;
 	struct omap_dss_device *dev;
 	struct videobuf_buffer *buf, *tmp;
-
 	/* It is assumed that the caller has locked the vout mutex */
 
 	memset(&o_info, 0, sizeof(o_info));
@@ -831,6 +878,15 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 	vout->dss->enabled = false;
 
 	dev = vout->dss->overlay->manager->device;
+
+	if (toggleUpdateMode) {
+		rc = dev->set_update_mode(dev, OMAP_DSS_UPDATE_MANUAL);
+	if (rc)
+		DBG("Setting DSS update mode failed %d\n", rc);
+	else
+		toggleUpdateMode = false;
+	}
+
 	if (vout->dss->working && dev->sync) {
 		/* Allow the current frame to finish */
 		mutex_unlock(&vout->mtx);
@@ -845,21 +901,23 @@ void omapvout_dss_disable(struct omapvout_device *vout)
 
 	rc = omapvout_dss_disable_transparency(vout);
 	if (rc)
-		DBG("Disabling transparency failed %d\n", rc);
+		printk(KERN_ERR "Disabling transparency failed %d\n", rc);
 
 	ovly = vout->dss->overlay;
 	rc = ovly->set_overlay_info(ovly, &o_info);
 	if (rc)
-		DBG("Setting overlay info failed %d\n", rc);
+		printk(KERN_ERR "Setting overlay info failed %d\n", rc);
 
 	rc = ovly->manager->apply(ovly->manager);
 	if (rc)
-		DBG("Overlay manager apply failed %d\n", rc);
+		printk(KERN_ERR "Overlay manager apply failed %d\n", rc);
 
-	rc = ovly->manager->device->update(ovly->manager->device,
+	if (ovly->manager->device->update) {
+		rc = ovly->manager->device->update(ovly->manager->device,
 				0, 0, vout->disp_width, vout->disp_height);
-	if (rc)
-		DBG("Display update failed %d\n", rc);
+		if (rc)
+			printk(KERN_ERR "Display update failed %d\n", rc);
+	}
 }
 
 int omapvout_dss_update(struct omapvout_device *vout)
@@ -883,5 +941,15 @@ int omapvout_dss_update(struct omapvout_device *vout)
 	}
 
 	return 0;
+}
+
+bool omapvout_dss_get_decimate(struct omapvout_device *vout)
+{
+	return vout->dss->vrfb.decimate_src;
+}
+
+void omapvout_dss_set_decimate(struct omapvout_device *vout, bool enable)
+{
+	vout->dss->vrfb.decimate_src = enable;
 }
 

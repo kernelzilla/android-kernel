@@ -1218,6 +1218,11 @@ BM_Alloc (  IMG_HANDLE			hDevMemHeap,
 	*phBuf = (BM_HANDLE)pBuf;
 	*pui32Flags = uFlags | psBMHeap->ui32Attribs;
 
+	if (uFlags & PVRSRV_HAP_CACHETYPE_MASK) {
+		*pui32Flags &= ~PVRSRV_HAP_CACHETYPE_MASK;
+		*pui32Flags |= (uFlags & PVRSRV_HAP_CACHETYPE_MASK);
+	}
+
 	return IMG_TRUE;
 }
 
@@ -1299,8 +1304,10 @@ BM_Wrap (	IMG_HANDLE hDevMemHeap,
 
 	uFlags = psBMHeap->ui32Attribs & (PVRSRV_HAP_CACHETYPE_MASK | PVRSRV_HAP_MAPTYPE_MASK);
 
-	if(pui32Flags)
-		uFlags |= *pui32Flags;
+	if (pui32Flags && (*pui32Flags & PVRSRV_HAP_CACHETYPE_MASK)) {
+		uFlags &= ~PVRSRV_HAP_CACHETYPE_MASK;
+		uFlags |= *pui32Flags & PVRSRV_HAP_CACHETYPE_MASK;
+	}
 
 	PVR_DPF ((PVR_DBG_MESSAGE,
 		  "BM_Wrap (uSize=0x%x, uOffset=0x%x, bPhysContig=0x%x, pvCPUVAddr=0x%x, uFlags=0x%x)",
@@ -1733,8 +1740,16 @@ BM_ImportMemory (IMG_VOID *pH,
 
 	if(pBMHeap->ui32Attribs & PVRSRV_BACKINGSTORE_SYSMEM_NONCONTIG)
 	{
+		IMG_UINT32 ui32Attribs = pBMHeap->ui32Attribs;
+
 		
-		if (OSAllocPages(pBMHeap->ui32Attribs,
+		if (pMapping->ui32Flags & PVRSRV_HAP_CACHETYPE_MASK) {
+			ui32Attribs &= ~PVRSRV_HAP_CACHETYPE_MASK;
+			ui32Attribs |= (pMapping->ui32Flags &
+			PVRSRV_HAP_CACHETYPE_MASK);
+		}
+
+		if (OSAllocPages(ui32Attribs,
 						 uPSize,
 						 pBMHeap->sDevArena.ui32DataPageSize,
 						 (IMG_VOID **)&pMapping->CpuVAddr,
@@ -1752,6 +1767,13 @@ BM_ImportMemory (IMG_VOID *pH,
 	else if(pBMHeap->ui32Attribs & PVRSRV_BACKINGSTORE_LOCALMEM_CONTIG)
 	{
 		IMG_SYS_PHYADDR sSysPAddr;
+		IMG_UINT32 ui32Attribs = pBMHeap->ui32Attribs;
+
+		if (pMapping->ui32Flags & PVRSRV_HAP_CACHETYPE_MASK) {
+			ui32Attribs &= ~PVRSRV_HAP_CACHETYPE_MASK;
+			ui32Attribs |=
+			(pMapping->ui32Flags & PVRSRV_HAP_CACHETYPE_MASK);
+		}
 
 		
 		PVR_ASSERT(pBMHeap->pLocalDevMemArena != IMG_NULL);
@@ -1773,7 +1795,7 @@ BM_ImportMemory (IMG_VOID *pH,
 		pMapping->CpuPAddr = SysSysPAddrToCpuPAddr(sSysPAddr);
 		if(OSReservePhys(pMapping->CpuPAddr,
 						 uPSize,
-						 pBMHeap->ui32Attribs,
+						 ui32Attribs,
 						 &pMapping->CpuVAddr,
 						 &pMapping->hOSMemHandle) != PVRSRV_OK)
 		{
@@ -1929,7 +1951,7 @@ BM_FreeMemory (IMG_VOID *h, IMG_UINTPTR_T _base, BM_MAPPING *psMapping)
 			h, _base, psMapping));
 }
 
-PVRSRV_ERROR BM_GetPhysPageAddr(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
+IMG_VOID BM_GetPhysPageAddr(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
 								IMG_DEV_VIRTADDR sDevVPageAddr,
 								IMG_DEV_PHYADDR *psDevPAddr)
 {
@@ -1937,11 +1959,7 @@ PVRSRV_ERROR BM_GetPhysPageAddr(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
 
 	PVR_DPF((PVR_DBG_MESSAGE, "BM_GetPhysPageAddr"));
 
-	if(!psMemInfo || !psDevPAddr)
-	{
-		PVR_DPF((PVR_DBG_ERROR,	"BM_GetPhysPageAddr: Invalid params"));
-		return PVRSRV_ERROR_INVALID_PARAMS;
-	}
+	PVR_ASSERT(psMemInfo && psDevPAddr)
 
 	
 	PVR_ASSERT((sDevVPageAddr.uiAddr & 0xFFF) == 0);
@@ -1950,8 +1968,6 @@ PVRSRV_ERROR BM_GetPhysPageAddr(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
 
 	*psDevPAddr = psDeviceNode->pfnMMUGetPhysPageAddr(((BM_BUF*)psMemInfo->sMemBlk.hBuffer)->pMapping->pBMHeap->pMMUHeap, 
 												sDevVPageAddr);
-
-	return PVRSRV_OK;
 }
 
 

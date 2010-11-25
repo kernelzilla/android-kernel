@@ -26,4 +26,8 @@
 #define SDIO_VENDOR_ID_MARVELL			0x02df
 #define SDIO_DEVICE_ID_MARVELL_LIBERTAS		0x9103
 
+#if defined(CONFIG_KERNEL_MOTOROLA)
+#define SDIO_VENDOR_ID_BROADCOM                 0x02d0
+#define SDIO_DEVICE_ID_BROADCOM_4325            0x0000
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 #endif

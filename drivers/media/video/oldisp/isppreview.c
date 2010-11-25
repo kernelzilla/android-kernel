@@ -460,30 +460,29 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 {
 	int ctr;
 
+	mutex_lock(&ispprev_obj.ispprev_mutex);
 	if ((ISP_ABS_TBL_NF & isptables_struct->flag) == ISP_ABS_TBL_NF) {
 		NF_enable = 1;
 		params->features |= (PREV_NOISE_FILTER);
 		if ((ISP_ABS_TBL_NF & isptables_struct->update) ==
 							ISP_ABS_TBL_NF) {
-			mutex_lock(&ispprev_obj.ispprev_mutex);
+			spin_lock(&ispprev_obj.ispprev_lock);
+
 			if (copy_from_user(&prev_nf_t, (struct ispprev_nf *)
 						(isptables_struct->prev_nf),
 						sizeof(struct ispprev_nf))) {
-				mutex_unlock(&ispprev_obj.ispprev_mutex);
+				spin_unlock(&ispprev_obj.ispprev_lock);
 				goto err_copy_from_user;
 			}
 
-			mutex_unlock(&ispprev_obj.ispprev_mutex);
+			spin_unlock(&ispprev_obj.ispprev_lock);
 
-			spin_lock(&ispprev_obj.ispprev_lock);
 			if (ispprev_obj.stream_on == 0) {
 				NF_update = 0;
 				isppreview_config_noisefilter(prev_nf_t);
 				isppreview_enable_noisefilter(NF_enable);
 			} else
 				NF_update = 1;
-
-			spin_unlock(&ispprev_obj.ispprev_lock);
 		} else
 			NF_update = 0;
 	} else {
@@ -498,15 +497,16 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 
 	if ((ISP_ABS_TBL_REDGAMMA & isptables_struct->update) ==
 							ISP_ABS_TBL_REDGAMMA) {
-		mutex_lock(&ispprev_obj.ispprev_mutex);
-		if (copy_from_user(redgamma_table, isptables_struct->red_gamma,
+		spin_lock(&ispprev_obj.ispprev_lock);
+
+		if (copy_from_user(redgamma_table,
+						isptables_struct->red_gamma,
 						sizeof(redgamma_table))) {
 			RG_update = 0;
-			mutex_unlock(&ispprev_obj.ispprev_mutex);
+			spin_unlock(&ispprev_obj.ispprev_lock);
 			goto err_copy_from_user;
 		}
-		mutex_unlock(&ispprev_obj.ispprev_mutex);
-		spin_lock(&ispprev_obj.ispprev_lock);
+
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_RED_G_START,
 							ISPPRV_SET_TBL_ADDR);
@@ -517,24 +517,20 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 			RG_update = 1;
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
-	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		RG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
 	if ((ISP_ABS_TBL_GREENGAMMA & isptables_struct->update) ==
 						ISP_ABS_TBL_GREENGAMMA) {
-		mutex_lock(&ispprev_obj.ispprev_mutex);
+		spin_lock(&ispprev_obj.ispprev_lock);
+
 		if (copy_from_user(greengamma_table,
 						isptables_struct->green_gamma,
 						sizeof(greengamma_table))) {
 			GG_update = 0;
-			mutex_unlock(&ispprev_obj.ispprev_mutex);
+			spin_unlock(&ispprev_obj.ispprev_lock);
 			goto err_copy_from_user;
 		}
-		mutex_unlock(&ispprev_obj.ispprev_mutex);
-		spin_lock(&ispprev_obj.ispprev_lock);
+
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_GREEN_G_START,
 							ISPPRV_SET_TBL_ADDR);
@@ -545,24 +541,20 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 			GG_update = 1;
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
-	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		GG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
 	if ((ISP_ABS_TBL_BLUEGAMMA & isptables_struct->update) ==
 					ISP_ABS_TBL_BLUEGAMMA) {
-		mutex_lock(&ispprev_obj.ispprev_mutex);
-		if (copy_from_user(bluegamma_table, (isptables_struct->
-						blue_gamma),
+		spin_lock(&ispprev_obj.ispprev_lock);
+
+		if (copy_from_user(bluegamma_table,
+						(isptables_struct->blue_gamma),
 						sizeof(bluegamma_table))) {
 			BG_update = 0;
-			mutex_unlock(&ispprev_obj.ispprev_mutex);
+			spin_unlock(&ispprev_obj.ispprev_lock);
 			goto err_copy_from_user;
 		}
-		mutex_unlock(&ispprev_obj.ispprev_mutex);
-		spin_lock(&ispprev_obj.ispprev_lock);
+
 		if (ispprev_obj.stream_on == 0) {
 			omap_writel(ISPPRV_TBL_ADDR_BLUE_G_START,
 							ISPPRV_SET_TBL_ADDR);
@@ -573,15 +565,14 @@ int omap34xx_isp_tables_update(struct isptables_update *isptables_struct)
 			BG_update = 1;
 
 		spin_unlock(&ispprev_obj.ispprev_lock);
-	} else {
-		spin_lock(&ispprev_obj.ispprev_lock);
-		BG_update = 0;
-		spin_unlock(&ispprev_obj.ispprev_lock);
 	}
 
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
 	return 0;
 
 err_copy_from_user:
+	mutex_unlock(&ispprev_obj.ispprev_mutex);
+
 	printk(KERN_ERR "Preview Tables:Copy From User Error");
 	return -EINVAL;
 }
@@ -632,29 +623,29 @@ void isppreview_config_shadow_registers()
 	}
 
 	if (GG_update) {
+		GG_update = 0;
 		omap_writel(ISPPRV_TBL_ADDR_GREEN_G_START, ISPPRV_SET_TBL_ADDR);
 
 		for (ctr = 0; ctr < ISP_GAMMA_TABLE_SIZE; ctr++) {
 			omap_writel(greengamma_table[ctr],
 							ISPPRV_SET_TBL_DATA);
 		}
-		GG_update = 0;
 	}
 
 	if (RG_update) {
+		RG_update = 0;
 		omap_writel(ISPPRV_TBL_ADDR_RED_G_START, ISPPRV_SET_TBL_ADDR);
 
 		for (ctr = 0; ctr < ISP_GAMMA_TABLE_SIZE; ctr++)
 			omap_writel(redgamma_table[ctr], ISPPRV_SET_TBL_DATA);
-		RG_update = 0;
 	}
 
 	if (BG_update) {
+		BG_update = 0;
 		omap_writel(ISPPRV_TBL_ADDR_BLUE_G_START, ISPPRV_SET_TBL_ADDR);
 
 		for (ctr = 0; ctr < ISP_GAMMA_TABLE_SIZE; ctr++)
 			omap_writel(bluegamma_table[ctr], ISPPRV_SET_TBL_DATA);
-		BG_update = 0;
 	}
 
 	if (NF_update && NF_enable) {
@@ -756,6 +747,8 @@ int isppreview_config_datapath(enum preview_input input,
 		pcr &= ~(ISPPRV_PCR_SOURCE);
 		pcr &= ~(ISPPRV_PCR_ONESHOT);
 		ispprev_obj.prev_inpfmt = PRV_RAW_CCDC;
+		isppreview_set_inaddr(0);
+		isppreview_config_inlineoffset(0);
 		break;
 	case PRV_RAW_MEM:
 		pcr |= ISPPRV_PCR_SOURCE;

@@ -130,7 +130,7 @@
 # ifdef CPU_PABORT_HANDLER
 #  define MULTI_PABORT 1
 # else
-#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2
+#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2 @asm macro;
 # endif
 #endif
 
@@ -138,12 +138,22 @@
 # ifdef CPU_PABORT_HANDLER
 #  define MULTI_PABORT 1
 # else
-#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn
+#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn                @asm macro;
 # endif
 #endif
 
 #ifndef CPU_PABORT_HANDLER
 #error Unknown prefetch abort handler type
+#endif
+
+/*
+ * Instruction Fault Status Register.  (New register as of ARMv6)
+ * If processor has IFSR then set value, else set translation fault
+ */
+#if defined(CONFIG_CPU_ABRT_EV7) || defined(CONFIG_CPU_ABRT_EV6)
+# define CPU_PABORT_IFSR(reg)	mrc p15, 0, reg, cr5, cr0, 1         @asm macro;
+#else
+# define CPU_PABORT_IFSR(reg)	mov reg, #5                          @asm macro;
 #endif
 
 #endif

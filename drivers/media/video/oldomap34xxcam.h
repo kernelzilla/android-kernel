@@ -41,6 +41,7 @@
 #define OMAP34XXCAM_SLAVE_FLASH		2 /* This is the last slave! */
 
 #define OMAP34XXCAM_VIDEODEVS		4
+#define CAM_DEVICE_SOC				3
 
 struct omap34xxcam_device;
 struct omap34xxcam_videodev;

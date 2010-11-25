@@ -2,3 +2,4 @@
 obj-y += dss/
 obj-y += displays/
 obj-y += omapfb/
+obj-y += misc/

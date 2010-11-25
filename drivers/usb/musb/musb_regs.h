@@ -333,7 +333,7 @@ static inline u16 musb_read_hwvers(void __iomem *mbase)
 
 static inline void __iomem *musb_read_target_reg_base(u8 i, void __iomem *mbase)
 {
-	return (MUSB_BUSCTL_OFFSET(i, 0) + mbase);
+	return MUSB_BUSCTL_OFFSET(i, 0) + mbase;
 }
 
 static inline void musb_write_rxfunaddr(void __iomem *ep_target_regs,

@@ -9,7 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
-*/
+ */
+
+#if defined(CONFIG_ARCH_OMAP34XX)
+#include <mach/io.h>
+#endif
 
 		.macro	addruart,rx
 		mrc	p15, 0, \rx, c1, c0
@@ -42,7 +46,7 @@
 		movne   \rx, #0xfb000000        @ virtual base address
 #else
 		moveq	\rx, #0x48000000	@ physical base address
-		movne	\rx, #0xd8000000	@ virtual base
+		movne	\rx, #omap343x_l4_io_p2v(0x48000000)	@ virtual base
 		orr	\rx, \rx, #0x0006a000
 #ifdef CONFIG_OMAP_LL_DEBUG_UART2
 		add	\rx, \rx, #0x00002000	@ UART 2

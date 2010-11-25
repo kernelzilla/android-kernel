@@ -48,10 +48,11 @@ struct erase_info {
 };
 
 struct mtd_erase_region_info {
-	uint64_t offset;			/* At which this region starts, from the beginning of the MTD */
-	uint32_t erasesize;		/* For this region */
-	uint32_t numblocks;		/* Number of blocks of erasesize in this region */
-	unsigned long *lockmap;		/* If keeping bitmap of locks */
+	uint64_t offset;	/* Offset at which this region starts, */
+				/* from the beginning of the MTD */
+	uint32_t erasesize;	/* For this region */
+	uint32_t numblocks;	/* Number of blocks of erasesize in this region */
+	unsigned long *lockmap;	/* If keeping bitmap of locks */
 };
 
 /*

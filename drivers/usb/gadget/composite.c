@@ -27,6 +27,9 @@
 
 #include <linux/usb/composite.h>
 
+#ifdef CONFIG_USB_MOT_ANDROID
+#include "f_mot_android.h"
+#endif
 
 /*
  * The code in this file is utility code, used to build a gadget driver
@@ -235,7 +238,6 @@ static int config_buf(struct usb_configuration *config,
 	int				len = USB_BUFSIZ - USB_DT_CONFIG_SIZE;
 	struct usb_function		*f;
 	int				status;
-	int				interfaceCount = 0;
 
 	/* write the config descriptor */
 	c = buf;
@@ -266,16 +268,8 @@ static int config_buf(struct usb_configuration *config,
 			descriptors = f->hs_descriptors;
 		else
 			descriptors = f->descriptors;
-		if (!descriptors || descriptors[0] == NULL) {
-			for (; f != config->interface[interfaceCount];) {
-				interfaceCount++;
-				c->bNumInterfaces--;
-			}
+		if (!descriptors)
 			continue;
-		}
-		for (; f != config->interface[interfaceCount];)
-			interfaceCount++;
-
 		status = usb_descriptor_fillbuf(next, len,
 			(const struct usb_descriptor_header **) descriptors);
 		if (status < 0)
@@ -685,6 +679,7 @@ static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
  * housekeeping for the gadget function we're implementing.  Most of
  * the work is in config and function specific setup.
  */
+
 static int
 composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 {
@@ -710,6 +705,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 
 	/* we handle all standard USB descriptors */
 	case USB_REQ_GET_DESCRIPTOR:
+#ifdef CONFIG_USB_MOT_ANDROID
+		usb_data_transfer_callback();
+#endif
 		if (ctrl->bRequestType != USB_DIR_IN)
 			goto unknown;
 		switch (w_value >> 8) {
@@ -816,12 +814,14 @@ unknown:
 		 * take such requests too, if that's ever needed:  to work
 		 * in config 0, etc.
 		 */
+#ifndef CONFIG_USB_MOT_ANDROID
 		if ((ctrl->bRequestType & USB_RECIP_MASK)
 				== USB_RECIP_INTERFACE) {
 			if (cdev->config == NULL)
 				return value;
 
 			f = cdev->config->interface[intf];
+
 			if (f && f->setup)
 				value = f->setup(f, ctrl);
 			else
@@ -834,26 +834,16 @@ unknown:
 			if (c && c->setup)
 				value = c->setup(c, ctrl);
 		}
-
-		/* If the vendor request is not processed (value < 0),
-		* call all device registered configure setup callbacks
-		* to process it.
-		* This is used to handle the following cases:
-		* - vendor request is for the device and arrives before
-		* setconfiguration.
-		* - Some devices are required to handle vendor request before
-		* setconfiguration such as MTP, USBNET.
-		*/
-
-		if (value < 0) {
+#else
+		{
 			struct usb_configuration        *cfg;
 
 			list_for_each_entry(cfg, &cdev->configs, list) {
-			if (cfg && cfg->setup)
-				value = cfg->setup(cfg, ctrl);
+				if (cfg && cfg->setup)
+					value = cfg->setup(cfg, ctrl);
 			}
 		}
-
+#endif
 		goto done;
 	}
 

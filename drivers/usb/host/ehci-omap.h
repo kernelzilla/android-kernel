@@ -2,6 +2,7 @@
  * ehci-omap.h - register definitions for USBHOST in OMAP 34xx
  *
  * Copyright (C) 2007-2008 Texas Instruments, Inc.
+ * Copyright (C) 2009 Motorola, Inc.
  * 	Author: Vikram Pandita <vikram.pandita@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,6 +18,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ *
+ *
+ * Revision History:
+ *
+ * Date         Author    Comment
+ * ----------   --------  ----------------------------
+ * 03/25/2009   Motorola  Define more USBHOST Registers
  *
  */
 
@@ -58,7 +66,7 @@
 
 #define	OMAP_TLL_CHANNEL_CONF(num)\
 			(OMAP_USBHOST_TLL_BASE + (0x040 + 0x004 * num))
-	#define	OMAP_TLL_CHANNEL_CONF_FSLSMODE(x)		(((x)&0xf)<<24)
+	#define OMAP_TLL_CHANNEL_CONF_FSLSMODE(x)               (((x)&0xf)<<24)
 	#define	OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT		24
 	#define	OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT	11
 	#define	OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE_SHIFT	10
@@ -103,6 +111,9 @@
 	#define	OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT	0
 
 #define	OMAP_UHH_SYSSTATUS	(OMAP_USBHOST_UHH_BASE + 0x14)
+	#define OMAP_UHH_SYSSTATUS_EHCI_RESETDONE_SHIFT	2
+	#define OMAP_UHH_SYSSTATUS_OHCI_RESETDONE_SHIFT	1
+	#define OMAP_UHH_SYSSTATUS_RESETDONE_SHIFT	0
 #define	OMAP_UHH_HOSTCONFIG	(OMAP_USBHOST_UHH_BASE + 0x40)
 	#define	OMAP_UHH_HOSTCONFIG_P1_ULPI_BYPASS_SHIFT	0
 	#define	OMAP_UHH_HOSTCONFIG_P2_ULPI_BYPASS_SHIFT	11
@@ -111,12 +122,14 @@
 	#define OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN_SHIFT	3
 	#define OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN_SHIFT	4
 	#define OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN_SHIFT	5
-	#define	OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK		\
+	#define OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK            \
 	((1<<OMAP_UHH_HOSTCONFIG_P1_ULPI_BYPASS_SHIFT) | \
-	 (1<<OMAP_UHH_HOSTCONFIG_P2_ULPI_BYPASS_SHIFT) | \
-	 (1<<OMAP_UHH_HOSTCONFIG_P3_ULPI_BYPASS_SHIFT))
+	(1<<OMAP_UHH_HOSTCONFIG_P2_ULPI_BYPASS_SHIFT) | \
+	(1<<OMAP_UHH_HOSTCONFIG_P3_ULPI_BYPASS_SHIFT))
+
 
 #define	OMAP_UHH_DEBUG_CSR	(OMAP_USBHOST_UHH_BASE + 0x44)
+	#define OMAP_UHH_DEBUG_CSR_OHCI_GLOBALSUSPEND		16
 
 /* EHCI Register Set */
 #define	OMAP_USBHOST_EHCI_BASE	(OMAP_USBHOST_BASE + 0x4800)

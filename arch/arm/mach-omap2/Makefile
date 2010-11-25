@@ -25,6 +25,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP24XX)		+= sleep24xx.o
 obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o cpuidle34xx.o
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+obj-y					+= wakeup-timer.o
 endif
 
 # SmartReflex driver
@@ -83,8 +84,35 @@ obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 					   board-sholes-hsmmc.o \
 					   board-sholes-keypad.o \
 					   board-sholes-wifi.o \
-					   board-sholes-mmcprobe.o 
-
+					   board-sholes-mmcprobe.o
+obj-$(CONFIG_MACH_SHOLEST)             	+= board-sholest.o \
+					   board-sholest-camera.o \
+					   board-sholest-flash.o \
+					   board-sholest-padconf.o \
+					   board-sholest-panel.o \
+					   board-sholest-spi.o \
+					   board-sholest-sensors.o \
+					   board-sholest-hsmmc.o \
+					   board-sholest-keypad.o \
+					   board-sholest-wifi.o \
+					   board-sholest-gpio.o \
+                                           board-sholes-mmcprobe.o \
+					   board-sholest-mdtv.o
+ifeq ($(CONFIG_MACH_SHOLEST),)
+obj-$(CONFIG_MACH_MAPPHONE)		+= board-mapphone.o \
+					   board-mapphone-camera.o \
+					   board-mapphone-flash.o \
+					   board-mapphone-padconf.o \
+					   board-mapphone-panel.o \
+					   board-mapphone-spi.o \
+					   board-mapphone-sensors.o \
+					   board-mapphone-hsmmc.o \
+					   board-mapphone-keypad.o \
+					   board-mapphone-wifi.o \
+					   board-mapphone-gpio.o \
+					   board-mapphone-mmcprobe.o
+obj-$(CONFIG_MOT_FEAT_MDTV)             += board-mapphone-mdtv.o
+endif
 obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o \
 					   board-apollon-mmc.o	\
 					   board-apollon-keys.o
@@ -107,12 +135,10 @@ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
 					   twl4030-generic-scripts.o
 obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
 					   mmc-twl4030.o
+obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 
 # Platform specific device init code
 obj-y								+= usb-musb.o
 obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
-
-ifneq ($(CONFIG_USB_EHCI_HCD),)
-	obj-y				+= usb-ehci.o
-endif
+obj-$(CONFIG_PROC_OMAP_PHONE_ID)       	+= phoneid.o
 

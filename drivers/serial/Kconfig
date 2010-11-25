@@ -1298,6 +1298,40 @@ config SERIAL_SGI_IOC3
 	  If you have an SGI Altix with an IOC3 serial card,
 	  say Y or M.  Otherwise, say N.
 
+config SERIAL_MSM
+	bool "MSM on-chip serial port support"
+	depends on ARM && ARCH_MSM
+	select SERIAL_CORE
+
+config SERIAL_MSM_CONSOLE
+	bool "MSM serial console support"
+	depends on SERIAL_MSM=y
+	select SERIAL_CORE_CONSOLE
+
+config SERIAL_MSM_CLOCK_CONTROL
+	bool "Allow tty clients to make clock requests to msm uarts."
+	depends on SERIAL_MSM=y
+	default y
+	help
+	 Provides an interface for tty clients to request the msm uart clock
+	 to be turned on or off for power savings.
+
+config SERIAL_MSM_RX_WAKEUP
+	bool "Wakeup the msm uart clock on GPIO activity."
+	depends on SERIAL_MSM_CLOCK_CONTROL
+	default n
+	help
+	 Requires SERIAL_MSM_CLOCK_CONTROL. Wake up the uart while the uart
+	 clock is off, using a wakeup GPIO.
+
+config SERIAL_MSM_HS
+	tristate "MSM UART High Speed: Serial Driver"
+	depends on ARM && ARCH_MSM
+	select SERIAL_CORE
+	default n
+	help
+	  Select this module to enable MSM high speed UART driver.
+
 config SERIAL_NETX
 	tristate "NetX serial port support"
 	depends on ARM && ARCH_NETX
@@ -1503,5 +1537,12 @@ config SPORT_BAUD_RATE
 	default 38400 if (SERIAL_SPORT_BAUD_RATE_38400)
 	default 19200 if (SERIAL_SPORT_BAUD_RATE_19200)
 	default 9600 if (SERIAL_SPORT_BAUD_RATE_9600)
+
+config SERIAL_OMAP3430_HW_FLOW_CONTROL
+    bool "Support OMAP3430 uart HW flow control"
+    default n
+    help
+      This option make the application have a chance to enable the uart working in
+      the hardware flow control mode.
 
 endmenu

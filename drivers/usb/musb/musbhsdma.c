@@ -175,6 +175,10 @@ static int dma_channel_program(struct dma_channel *channel,
 	BUG_ON(channel->status == MUSB_DMA_STATUS_UNKNOWN ||
 		channel->status == MUSB_DMA_STATUS_BUSY);
 
+	/* make sure the DMA address is 4 byte aligned */
+	if ((dma_addr % 4) && cpu_is_omap3630())
+		return false;
+
 	channel->actual_len = 0;
 	musb_channel->start_addr = dma_addr;
 	musb_channel->len = len;
@@ -254,8 +258,30 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
 	spin_lock_irqsave(&musb->lock, flags);
 
 	int_hsdma = musb_readb(mbase, MUSB_HSDMA_INTR);
-	if (!int_hsdma)
-		goto done;
+	if (!int_hsdma) {
+		DBG(2, "spurious DMA irq\n");
+
+		if (!cpu_is_omap3630())
+			goto done;
+
+		for (bchannel = 0; bchannel < MUSB_HSDMA_CHANNELS; bchannel++) {
+			musb_channel = (struct musb_dma_channel *)
+				&(controller->channel[bchannel]);
+			channel = &musb_channel->channel;
+			if (channel->status == MUSB_DMA_STATUS_BUSY) {
+				csr = musb_readw(mbase,
+					MUSB_HSDMA_CHANNEL_OFFSET(bchannel,
+						MUSB_HSDMA_COUNT));
+				if (csr == 0)
+					int_hsdma |= (1 << bchannel);
+			}
+		}
+
+		DBG(2, "int_hsdma = 0x%x\n", int_hsdma);
+
+		if (!int_hsdma)
+			goto done;
+	}
 
 	for (bchannel = 0; bchannel < MUSB_HSDMA_CHANNELS; bchannel++) {
 		if (int_hsdma & (1 << bchannel)) {

@@ -10,7 +10,7 @@ obj-vdso32 := $(addprefix $(obj)/, $(obj-vdso32))
 KBUILD_AFLAGS_31 := $(filter-out -m64,$(KBUILD_AFLAGS))
 KBUILD_AFLAGS_31 += -m31 -s
 
-KBUILD_CFLAGS_31 := $(filter-out -m64,$(KBUILD_CFLAGS))
+KBUILD_CFLAGS_31 := $(filter-out -m64 $(KBUILD_GCOV_FLAGS),$(KBUILD_CFLAGS))
 KBUILD_CFLAGS_31 += -m31 -fPIC -shared -fno-common -fno-builtin
 KBUILD_CFLAGS_31 += -nostdlib -Wl,-soname=linux-vdso32.so.1 \
 			$(call ld-option, -Wl$(comma)--hash-style=sysv)

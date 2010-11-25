@@ -72,6 +72,11 @@ extern "C" {
                                             |PVRSRV_HAP_MULTI_PROCESS \
                                             |PVRSRV_HAP_FROM_EXISTING_PROCESS \
                                             |PVRSRV_HAP_NO_CPU_VIRTUAL)
+
+#define PVRSRV_MEM_CACHED		PVRSRV_HAP_CACHED
+#define PVRSRV_MEM_UNCACHED		PVRSRV_HAP_UNCACHED
+#define PVRSRV_MEM_WRITECOMBINE				PVRSRV_HAP_WRITECOMBINE
+
 #define PVRSRV_MEM_BACKINGSTORE_FIELD_SHIFT	(24)
 
 #define PVRSRV_MAP_NOUSERVIRTUAL            (1UL<<27)
@@ -268,17 +273,17 @@ typedef struct _PVRSRV_CLIENT_MEM_INFO_
 	
 	IMG_HANDLE							hResItem;
 
-	#if defined(ANDROID)
+#if defined(SUPPORT_MEMINFO_IDS)
 	#if !defined(USE_CODE)
 	
 	IMG_UINT64							ui64Stamp;
 	#else 
 	IMG_UINT32							dummy1;
 	IMG_UINT32							dummy2;
-	#endif 
-	#endif 
+	#endif
+#endif
 
-	
+
 
 
 	struct _PVRSRV_CLIENT_MEM_INFO_		*psNext;

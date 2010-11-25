@@ -133,18 +133,43 @@ IMG_BOOL PDumpOSWriteString2(IMG_HANDLE hScript, IMG_UINT32 ui32Flags)
 	return PDumpWriteString2(hScript, ui32Flags);
 }
 
-IMG_VOID PDumpOSBufprintf(IMG_HANDLE hBuf, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR* pszFormat, ...)
+PVRSRV_ERROR PDumpOSBufprintf(IMG_HANDLE hBuf,
+IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR *pszFormat, ...)
 {
 	IMG_CHAR* pszBuf = hBuf;
+	IMG_UINT32 n;
 	va_list	vaArgs;
+
 	va_start(vaArgs, pszFormat);
-	vsnprintf(pszBuf, ui32ScriptSizeMax, pszFormat, vaArgs);
+
+	n = vsnprintf(pszBuf, ui32ScriptSizeMax, pszFormat, vaArgs);
+
 	va_end(vaArgs);
+
+	if (n >= ui32ScriptSizeMax || n == -1) {
+		PVR_DPF((PVR_DBG_ERROR,
+		"Buffer overflow detected, pdump output may be incomplete."));
+
+		return PVRSRV_ERROR_PDUMP_BUF_OVERFLOW;
+	}
+
+	return PVRSRV_OK;
 }
 
-IMG_VOID PDumpOSVSprintf(IMG_CHAR *pszComment, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR* pszFormat, PDUMP_va_list vaArgs)
+PVRSRV_ERROR PDumpOSVSprintf(IMG_CHAR *pszComment,
+IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR *pszFormat, PDUMP_va_list vaArgs)
 {
-	vsnprintf(pszComment, ui32ScriptSizeMax, pszFormat, vaArgs);
+	IMG_UINT32 n;
+
+	n = vsnprintf(pszComment, ui32ScriptSizeMax, pszFormat, vaArgs);
+
+	if (n >= ui32ScriptSizeMax || n == -1) {
+		PVR_DPF((PVR_DBG_ERROR, "Buffer overflow detected,\
+		pdump output may be incomplete."));
+		return PVRSRV_ERROR_PDUMP_BUF_OVERFLOW;
+	}
+
+	return PVRSRV_OK;
 }
 
 IMG_VOID PDumpOSDebugPrintf(IMG_CHAR* pszFormat, ...)
@@ -152,12 +177,26 @@ IMG_VOID PDumpOSDebugPrintf(IMG_CHAR* pszFormat, ...)
 	
 }
 
-IMG_VOID PDumpOSSprintf(IMG_CHAR *pszComment, IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR *pszFormat, ...)
+PVRSRV_ERROR PDumpOSSprintf(IMG_CHAR *pszComment,
+IMG_UINT32 ui32ScriptSizeMax, IMG_CHAR *pszFormat, ...)
 {
+	IMG_UINT32 n;
 	va_list	vaArgs;
+
 	va_start(vaArgs, pszFormat);
-	vsnprintf(pszComment, ui32ScriptSizeMax, pszFormat, vaArgs);
+
+	n = vsnprintf(pszComment, ui32ScriptSizeMax, pszFormat, vaArgs);
+
 	va_end(vaArgs);
+
+	if (n >= ui32ScriptSizeMax || n == -1) {
+		PVR_DPF((PVR_DBG_ERROR, "Buffer overflow detected,\
+		pdump output may be incomplete."));
+
+		return PVRSRV_ERROR_PDUMP_BUF_OVERFLOW;
+	}
+
+	return PVRSRV_OK;
 }
 
 IMG_UINT32 PDumpOSBuflen(IMG_HANDLE hBuffer, IMG_UINT32 ui32BufferSizeMax)
@@ -212,7 +251,7 @@ IMG_UINT32 PDumpOSGetParamFileNum(IMG_VOID)
 	return gsDBGPdumpState.ui32ParamFileNum;
 }
 
-PVRSRV_ERROR PDumpOSWriteString(IMG_HANDLE hStream,
+IMG_BOOL PDumpOSWriteString(IMG_HANDLE hStream,
 		IMG_UINT8 *psui8Data,
 		IMG_UINT32 ui32Size,
 		IMG_UINT32 ui32Flags)

@@ -76,11 +76,13 @@ int hci_register_notifier(struct notifier_block *nb)
 {
 	return atomic_notifier_chain_register(&hci_notifier, nb);
 }
+EXPORT_SYMBOL(hci_register_notifier);
 
 int hci_unregister_notifier(struct notifier_block *nb)
 {
 	return atomic_notifier_chain_unregister(&hci_notifier, nb);
 }
+EXPORT_SYMBOL(hci_unregister_notifier);
 
 static void hci_notify(struct hci_dev *hdev, int event)
 {
@@ -1125,6 +1127,7 @@ static int hci_send_frame(struct sk_buff *skb)
 	/* Get rid of skb owner, prior to sending to the driver. */
 	skb_orphan(skb);
 
+	hci_notify(hdev, HCI_DEV_WRITE);
 	return hdev->send(skb);
 }
 
@@ -1191,10 +1194,47 @@ static void hci_add_acl_hdr(struct sk_buff *skb, __u16 handle, __u16 flags)
 	hdr->dlen   = cpu_to_le16(len);
 }
 
+
+int A2DP_prioritization_trigger=0;
+EXPORT_SYMBOL(A2DP_prioritization_trigger);
+
 int hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags)
 {
+  static unsigned int acl_packet_counter = 0;
+  static unsigned long last_jiffy = 0;
+
 	struct hci_dev *hdev = conn->hdev;
 	struct sk_buff *list;
+
+	if(A2DP_prioritization_trigger)
+	  if( ((jiffies - last_jiffy) > msecs_to_jiffies(6000))
+	      ||
+	      ((acl_packet_counter++ & 0xff) == 0x0f) )
+	    { // mot change to minimize A2DP dropouts when WLAN is associated
+	      // Data/Command OGF  OCF    Data  Parameters
+	      // 57FC020B00   0x3F 0x0057 0B 00 # connection handle, uint16 (little endian) 
+
+	      __le16 param;
+	      last_jiffy = jiffies;
+
+	      //printk(KERN_INFO
+	      //     "BLUETOOTH: Counting down to sending Broadcom specific HCI command "
+	      //     "to prioritize A2DP traffic on ACL handle %d (0x%02X) [%u] (count=%d)\n",
+	      //     conn->handle,conn->handle,acl_packet_counter,A2DP_prioritization_trigger);
+
+	      param = cpu_to_le16(conn->handle);
+	      if(A2DP_prioritization_trigger){A2DP_prioritization_trigger--;}
+	      if(!A2DP_prioritization_trigger)
+		{
+		  //BT_DBG(
+		  printk(KERN_INFO
+			 "BLUETOOTH: Sending Broadcom specific command "
+			 "to prioritize A2DP traffic on ACL handle %d (0x%02X) [%u]\n",
+			 conn->handle,conn->handle,acl_packet_counter);
+
+		  hci_send_cmd(conn->hdev, 0xFC57, 2, &param);
+		}
+	    }
 
 	BT_DBG("%s conn %p flags 0x%x", hdev->name, conn, flags);
 

@@ -1,6 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29-omap1
+# Tue Oct 20 13:15:45 2009
 # Fri Oct 23 20:03:54 2009
 #
 CONFIG_ARM=y
@@ -370,6 +371,7 @@ CONFIG_BINFMT_MISC=y
 # Power management options
 #
 CONFIG_PM=y
+# CONFIG_PM_DEBUG is not set
 CONFIG_PM_DEBUG=y
 CONFIG_PM_SLEEP=y
 CONFIG_SUSPEND=y
@@ -530,7 +532,8 @@ CONFIG_RFKILL_PM=y
 CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
-# CONFIG_FW_LOADER is not set
+CONFIG_FW_LOADER=y
+CONFIG_FIRMWARE_IN_KERNEL=y
 # CONFIG_DEBUG_DRIVER is not set
 # CONFIG_DEBUG_DEVRES is not set
 # CONFIG_SYS_HYPERVISOR is not set

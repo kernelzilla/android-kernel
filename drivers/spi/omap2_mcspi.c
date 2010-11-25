@@ -4,6 +4,7 @@
  * Copyright (C) 2005, 2006 Nokia Corporation
  * Author:	Samuel Ortiz <samuel.ortiz@nokia.com> and
  *		Juha Yrjölä <juha.yrjola@nokia.com>
+ *  Copyright (C) 2009 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +20,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
+ *  Revision History:
+ *  Date         Author        Comment
+ *  ---------    ----------    ---------
+ *  Jun 30,2008   Motorola      Update cmdline param for emu_uart_debug option
  */
 
 #include <linux/kernel.h>
@@ -37,7 +42,9 @@
 
 #include <mach/dma.h>
 #include <mach/clock.h>
-
+#ifdef CONFIG_EMU_UART_DEBUG
+#include <mach/board-mapphone-emu_uart.h>
+#endif
 
 #define OMAP2_MCSPI_MAX_FREQ		48000000
 
@@ -896,6 +903,53 @@ static int omap2_mcspi_transfer(struct spi_device *spi, struct spi_message *m)
 					OMAP2_MCSPI_MAX_FREQ/(1<<16));
 			return -EINVAL;
 		}
+
+#ifdef CONFIG_EMU_UART_DEBUG
+		if (is_emu_uart_active() && tx_buf != NULL) {
+			char *buf = (char *) tx_buf;
+			unsigned short addr = (buf[3] & 0x7F)<<6 | buf[2]>>2;
+			unsigned short old_val;
+
+			/* If trying to write CPCAP VBUSC or USBC2 register */
+			if ((buf[3] & 0x80) &&
+				(!strncmp(spi->dev.driver->name, "cpcap", 5)) &&
+				(addr == 897 || addr == 411)) {
+				old_val = *(unsigned short *)&buf[0];
+				/*
+				 * Update value to be written into
+				 * "USB Control 2" register
+				 */
+				if (addr == 897) {
+					/*
+					 * Make sure EMUMODE and UART setting
+					 * fields not changed
+					 * */
+					buf[1] = (buf[1] & 0xF0) | 0x01;
+					buf[0] = (buf[0] & 0xF8) | 0x01;
+				}
+				/*
+				 * Update value to be written into
+				 * "VUSB Control" register
+				 */
+				else if (addr == 411) {
+					/* Make sure VBUS power mode fields
+					 * not changed
+					 */
+					buf[1] = 0x01;
+					buf[0] = 0x4C;
+				}
+				if (old_val != *(unsigned short *)&buf[0]) {
+					printk(KERN_ALERT
+						"omap2_mcspi_transfer: write"
+						"CPCAP reg %d with 0x%04x "
+						"instead of 0x%04x\n",
+						addr,\
+						*(unsigned short *)&buf[0],\
+						old_val);
+				}
+			}
+		}
+#endif
 
 		if (m->is_dma_mapped || len < DMA_MIN_BYTES)
 			continue;

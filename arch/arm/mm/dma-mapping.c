@@ -493,8 +493,6 @@ void dma_cache_maint(const void *start, size_t size, int direction)
 	void (*inner_op)(const void *, const void *);
 	void (*outer_op)(unsigned long, unsigned long);
 
-	BUG_ON(!virt_addr_valid(start) || !virt_addr_valid(start + size - 1));
-
 	switch (direction) {
 	case DMA_FROM_DEVICE:		/* invalidate only */
 		inner_op = dmac_inv_range;
@@ -513,7 +511,16 @@ void dma_cache_maint(const void *start, size_t size, int direction)
 	}
 
 	inner_op(start, start + size);
+
+#ifdef CONFIG_OUTER_CACHE
+	/*
+	 * A page table walk would be required if the address isnt linearly
+	 * mapped. Simply BUG_ON for now.
+	 */
+	BUG_ON(!virt_addr_valid(start) || !virt_addr_valid(start + size - 1));
 	outer_op(__pa(start), __pa(start) + size);
+#endif
+
 }
 EXPORT_SYMBOL(dma_cache_maint);
 

@@ -9,6 +9,7 @@
  * Created: Fri Jan 19 10:48:35 2001 by faith@acm.org
  *
  * Copyright 2001 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -185,11 +186,11 @@ int drm_dropmaster_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
-static int drm_fill_in_dev(struct drm_device * dev, struct pci_dev *pdev,
+int drm_fill_in_dev(struct drm_device *dev,
 			   const struct pci_device_id *ent,
 			   struct drm_driver *driver)
 {
-	int retcode;
+	int retcode = 0;
 
 	INIT_LIST_HEAD(&dev->filelist);
 	INIT_LIST_HEAD(&dev->ctxlist);
@@ -203,14 +204,6 @@ static int drm_fill_in_dev(struct drm_device * dev, struct pci_dev *pdev,
 	mutex_init(&dev->ctxlist_mutex);
 
 	idr_init(&dev->drw_idr);
-
-	dev->pdev = pdev;
-	dev->pci_device = pdev->device;
-	dev->pci_vendor = pdev->vendor;
-
-#ifdef __alpha__
-	dev->hose = pdev->sysdata;
-#endif
 
 	if (drm_ht_create(&dev->map_hash, 12)) {
 		return -ENOMEM;
@@ -246,6 +239,16 @@ static int drm_fill_in_dev(struct drm_device * dev, struct pci_dev *pdev,
 	}
 
 
+	if (dev->driver->load) {
+		if (drm_core_check_feature(dev, DRIVER_USE_PLATFORM_DEVICE))
+			retcode = dev->driver->load(dev, 0);
+		else
+			retcode = dev->driver->load(dev, ent->driver_data);
+
+		if (retcode)
+			goto error_out_unreg;
+	}
+
 	retcode = drm_ctxbitmap_init(dev);
 	if (retcode) {
 		DRM_ERROR("Cannot allocate memory for context bitmap.\n");
@@ -280,7 +283,7 @@ static int drm_fill_in_dev(struct drm_device * dev, struct pci_dev *pdev,
  * create the proc init entry via proc_init(). This routines assigns
  * minor numbers to secondary heads of multi-headed cards
  */
-static int drm_get_minor(struct drm_device *dev, struct drm_minor **minor, int type)
+int drm_get_minor(struct drm_device *dev, struct drm_minor **minor, int type)
 {
 	struct drm_minor *new_minor;
 	int ret;
@@ -339,78 +342,6 @@ err_idr:
 }
 
 /**
- * Register.
- *
- * \param pdev - PCI device structure
- * \param ent entry from the PCI ID table with device type flags
- * \return zero on success or a negative number on failure.
- *
- * Attempt to gets inter module "drm" information. If we are first
- * then register the character device and inter module information.
- * Try and register, if we fail to register, backout previous work.
- */
-int drm_get_dev(struct pci_dev *pdev, const struct pci_device_id *ent,
-		struct drm_driver *driver)
-{
-	struct drm_device *dev;
-	int ret;
-
-	DRM_DEBUG("\n");
-
-	dev = drm_calloc(1, sizeof(*dev), DRM_MEM_STUB);
-	if (!dev)
-		return -ENOMEM;
-
-	ret = pci_enable_device(pdev);
-	if (ret)
-		goto err_g1;
-
-	pci_set_master(pdev);
-	if ((ret = drm_fill_in_dev(dev, pdev, ent, driver))) {
-		printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
-		goto err_g2;
-	}
-
-	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = drm_get_minor(dev, &dev->control, DRM_MINOR_CONTROL);
-		if (ret)
-			goto err_g2;
-	}
-
-	if ((ret = drm_get_minor(dev, &dev->primary, DRM_MINOR_LEGACY)))
-		goto err_g3;
-
-	if (dev->driver->load) {
-		ret = dev->driver->load(dev, ent->driver_data);
-		if (ret)
-			goto err_g3;
-	}
-
-        /* setup the grouping for the legacy output */
-	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = drm_mode_group_init_legacy_group(dev, &dev->primary->mode_group);
-		if (ret)
-			goto err_g3;
-	}
-
-	list_add_tail(&dev->driver_item, &driver->device_list);
-
-	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d\n",
-		 driver->name, driver->major, driver->minor, driver->patchlevel,
-		 driver->date, dev->primary->index);
-
-	return 0;
-
-err_g3:
-	drm_put_minor(&dev->primary);
-err_g2:
-	pci_disable_device(pdev);
-err_g1:
-	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);
-	return ret;
-}
-
-/**
  * Put a device minor number.
  *
  * \param dev device data structure
@@ -422,8 +353,6 @@ err_g1:
  */
 int drm_put_dev(struct drm_device * dev)
 {
-	DRM_DEBUG("release primary %s\n", dev->driver->pci_driver.name);
-
 	if (dev->devname) {
 		drm_free(dev->devname, strlen(dev->devname) + 1,
 			 DRM_MEM_DRIVER);

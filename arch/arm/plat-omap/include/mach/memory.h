@@ -9,6 +9,8 @@
  * This file was derived from arch/arm/mach-intergrator/include/mach/memory.h
  * Copyright (C) 1999 ARM Limited
  *
+ * Copyright (C) 2009 Motorola, Inc.
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -38,7 +40,7 @@
  */
 #if defined(CONFIG_ARCH_OMAP1)
 #define PHYS_OFFSET		UL(0x10000000)
-#elif defined(CONFIG_MACH_SHOLES_UMTS)
+#elif defined(CONFIG_MACH_SHOLES_UMTS) || defined(CONFIG_MACH_MAPPHONE)
 #define PHYS_OFFSET		UL(0x80C00000)
 #elif defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 #define PHYS_OFFSET		UL(0x80000000)

@@ -120,6 +120,7 @@ int __must_check rfkill_register(struct rfkill *rfkill);
 void rfkill_unregister(struct rfkill *rfkill);
 
 int rfkill_force_state(struct rfkill *rfkill, enum rfkill_state state);
+void rfkill_switch_all(enum rfkill_type type, enum rfkill_state state);
 int rfkill_set_default(enum rfkill_type type, enum rfkill_state state);
 
 /**

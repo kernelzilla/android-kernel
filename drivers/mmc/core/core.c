@@ -870,7 +870,7 @@ void mmc_rescan(struct work_struct *work)
 
 	/* if there is a card registered, check whether it is still present */
 	if ((host->bus_ops != NULL) &&
-            host->bus_ops->detect && !host->bus_dead) {
+		host->bus_ops->detect && !host->bus_dead) {
 		host->bus_ops->detect(host);
 		/* If the card was removed the bus will be marked
 		 * as dead - extend the wakelock so userspace
@@ -995,7 +995,7 @@ void mmc_stop_host(struct mmc_host *host)
  */
 int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 {
-	if (mmc_bus_needs_resume(host))
+	if (mmc_bus_needs_resume(host) || !(host->bus_resume_flags))
 		return 0;
 
 	cancel_delayed_work(&host->detect);

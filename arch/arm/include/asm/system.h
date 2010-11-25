@@ -3,6 +3,8 @@
 
 #ifdef __KERNEL__
 
+#include <asm/memory.h>
+
 #define CPU_ARCH_UNKNOWN	0
 #define CPU_ARCH_ARMv3		1
 #define CPU_ARCH_ARMv4		2
@@ -114,6 +116,10 @@ extern unsigned int user_debug;
 #define vectors_high()	(0)
 #endif
 
+#ifndef arch_barrier_extra
+#define arch_barrier_extra() do {} while (0)
+#endif
+
 #if __LINUX_ARM_ARCH__ >= 7
 #define isb() __asm__ __volatile__ ("isb" : : : "memory")
 #define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
@@ -123,8 +129,9 @@ extern unsigned int user_debug;
 				    : : "r" (0) : "memory")
 #define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
 				    : : "r" (0) : "memory")
-#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-				    : : "r" (0) : "memory")
+#define dmb() do { __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+					 : : "r" (0) : "memory"); \
+		arch_barrier_extra(); } while (0)
 #else
 #define isb() __asm__ __volatile__ ("" : : : "memory")
 #define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \

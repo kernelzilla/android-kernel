@@ -299,6 +299,11 @@ DSP_STATUS WMD_MSG_Get(struct MSG_QUEUE *hMsgQueue,
 				   (struct LST_ELEM *)pMsgFrame);
 			if (LST_IsEmpty(hMsgQueue->msgUsedList))
 				SYNC_ResetEvent(hMsgQueue->hSyncEvent);
+			else {
+				NTFY_Notify(hMsgQueue->hNtfy,
+				    DSP_NODEMESSAGEREADY);
+				SYNC_SetEvent(hMsgQueue->hSyncEvent);
+			}
 
 			fGotMsg = true;
 		}
@@ -346,8 +351,11 @@ DSP_STATUS WMD_MSG_Get(struct MSG_QUEUE *hMsgQueue,
 			}
 			hMsgQueue->refCount--;
 			/* Reset the event if there are still queued messages */
-			if (!LST_IsEmpty(hMsgQueue->msgUsedList))
+			if (!LST_IsEmpty(hMsgQueue->msgUsedList)) {
+				NTFY_Notify(hMsgQueue->hNtfy,
+					DSP_NODEMESSAGEREADY);
 				SYNC_SetEvent(hMsgQueue->hSyncEvent);
+			}
 
 			/* Exit critical section */
 			(void)SYNC_LeaveCS(hMsgMgr->hSyncCS);

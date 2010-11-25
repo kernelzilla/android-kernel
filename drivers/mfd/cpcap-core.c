@@ -18,6 +18,8 @@
 
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/leds-cpcap-display.h>
+#include <linux/leds-cpcap-button.h>
 #include <linux/leds-ld-cpcap.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
@@ -28,6 +30,7 @@
 #include <linux/reboot.h>
 #include <linux/notifier.h>
 #include <linux/delay.h>
+#include <asm/bootinfo.h>
 
 static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg);
@@ -76,6 +79,14 @@ static struct platform_device cpcap_batt_device = {
 
 struct platform_device cpcap_disp_button_led = {
 	.name		= LD_DISP_BUTTON_DEV,
+	.id		= -1,
+	.dev		= {
+		.platform_data  = NULL,
+	},
+};
+
+struct platform_device cpcap_display_led = {
+	.name		= "backlight-driver",
 	.id		= -1,
 	.dev		= {
 		.platform_data  = NULL,
@@ -146,14 +157,37 @@ static struct platform_device cpcap_rtc_device = {
 	.dev.platform_data = NULL,
 };
 
+#ifdef CONFIG_TTA_CHARGER
+static struct platform_device cpcap_tta_det_device = {
+  .name           = "cpcap_tta_charger",
+  .id             = -1,
+  .dev.platform_data = NULL,
+};
+#endif
+
+#ifdef CONFIG_LEDS_AF_LED
+struct platform_device cpcap_af_led = {
+	.name		= LD_AF_LED_DEV,
+	.id		= -1,
+	.dev		= {
+		.platform_data  = NULL,
+	},
+};
+#endif
+
 static struct platform_device *cpcap_devices[] = {
+	&cpcap_uc_device,
 	&cpcap_adc_device,
 	&cpcap_key_device,
 	&cpcap_batt_device,
 	&cpcap_disp_button_led,
+	&cpcap_display_led,
 	&cpcap_rgb_led,
 	&cpcap_keypad_led,
+#if !defined(CONFIG_LEDS_FLASH_RESET)
+/* FIXME: disable lm3554 until CPCAP<->board config issue is resolved (IKMAP-3373). */
 	&cpcap_lm3554,
+#endif
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
@@ -163,7 +197,12 @@ static struct platform_device *cpcap_devices[] = {
 #endif
 	&cpcap_3mm5_device,
 	&cpcap_rtc_device,
-	&cpcap_uc_device,
+#ifdef CONFIG_TTA_CHARGER
+	&cpcap_tta_det_device,
+#endif
+#ifdef CONFIG_LEDS_AF_LED
+	&cpcap_af_led,
+#endif
 };
 
 static struct cpcap_device *misc_cpcap;
@@ -186,13 +225,25 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 	}
 
 	if (code == SYS_RESTART) {
-		/* Set the soft reset bit in the cpcap */
-		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
-				CPCAP_BIT_SOFT_RESET, CPCAP_BIT_SOFT_RESET);
-		if (ret) {
-			dev_err(&(misc_cpcap->spi->dev),
-				"SW Reset cpcap set failure.\n");
-			result = NOTIFY_BAD;
+		if (mode != NULL && !strncmp("outofcharge", mode, 12)) {
+			/* Set the outofcharge bit in the cpcap */
+			ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				CPCAP_BIT_OUT_CHARGE_ONLY,
+				CPCAP_BIT_OUT_CHARGE_ONLY);
+			if (ret) {
+				dev_err(&(misc_cpcap->spi->dev),
+					"outofcharge cpcap set failure.\n");
+				result = NOTIFY_BAD;
+			}
+			/* Set the soft reset bit in the cpcap */
+			cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+				CPCAP_BIT_SOFT_RESET,
+				CPCAP_BIT_SOFT_RESET);
+			if (ret) {
+				dev_err(&(misc_cpcap->spi->dev),
+					"reset cpcap set failure.\n");
+				result = NOTIFY_BAD;
+			}
 		}
 
 		/* Check if we are starting recovery mode */
@@ -228,6 +279,15 @@ static int cpcap_reboot(struct notifier_block *this, unsigned long code,
 		}
 		cpcap_regacc_write(misc_cpcap, CPCAP_REG_MI2, 0, 0xFFFF);
 	} else {
+		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+					 0,
+					 CPCAP_BIT_OUT_CHARGE_ONLY);
+		if (ret) {
+			dev_err(&(misc_cpcap->spi->dev),
+				"outofcharge cpcap set failure.\n");
+			result = NOTIFY_BAD;
+		}
+
 		/* Clear the soft reset bit in the cpcap */
 		ret = cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1, 0,
 					CPCAP_BIT_SOFT_RESET);
@@ -324,9 +384,15 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 	if (retval < 0)
 		goto free_cpcap_irq;
 
-	/* Set Kpanic bit, which will be cleared at normal reboot */
-	cpcap_regacc_write(cpcap, CPCAP_REG_VAL1,
+	if (bi_powerup_reason() != PU_REASON_CHARGER) {
+		/* Set Kpanic bit, which will be cleared at normal reboot */
+		cpcap_regacc_write(cpcap, CPCAP_REG_VAL1,
 			CPCAP_BIT_AP_KERNEL_PANIC, CPCAP_BIT_AP_KERNEL_PANIC);
+
+	/* Set the soft reset bit in the cpcap */
+	cpcap_regacc_write(misc_cpcap, CPCAP_REG_VAL1,
+			CPCAP_BIT_SOFT_RESET, CPCAP_BIT_SOFT_RESET);
+	}
 
 	cpcap_vendor_read(cpcap);
 
@@ -461,6 +527,18 @@ static int adc_ioctl(unsigned int cmd, unsigned long arg)
 
 	return retval;
 }
+
+#if defined(CONFIG_LEDS_FLASH_RESET)
+int cpcap_direct_misc_write(unsigned short reg, unsigned short value,\
+						unsigned short mask)
+{
+	int retval = -EINVAL;
+
+	retval = cpcap_regacc_write(misc_cpcap, reg, value, mask);
+
+	return retval;
+}
+#endif
 
 static int ioctl(struct inode *inode,
 		 struct file *file, unsigned int cmd, unsigned long arg)

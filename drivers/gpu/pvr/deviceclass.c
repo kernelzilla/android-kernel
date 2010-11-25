@@ -40,6 +40,12 @@ IMG_VOID* MatchDeviceKM_AnyVaCb(PVRSRV_DEVICE_NODE* psDeviceNode, va_list va);
 PVRSRV_ERROR AllocateDeviceID(SYS_DATA *psSysData, IMG_UINT32 *pui32DevID);
 PVRSRV_ERROR FreeDeviceID(SYS_DATA *psSysData, IMG_UINT32 ui32DevID);
 
+#if defined(SUPPORT_MISR_IN_THREAD)
+/* Following function is not used */
+/*	void OSVSyncMISR(IMG_HANDLE, IMG_BOOL); */
+#endif
+
+
 typedef struct PVRSRV_DC_SRV2DISP_KMJTABLE_TAG *PPVRSRV_DC_SRV2DISP_KMJTABLE;
 
 typedef struct PVRSRV_DC_BUFFER_TAG
@@ -1220,9 +1226,6 @@ PVRSRV_ERROR PVRSRVSwapToDCBufferKM(IMG_HANDLE	hDeviceKM,
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
 	} END_LOOP_UNTIL_TIMEOUT();
 
-	if(PVRSRVProcessQueues(KERNEL_ID, IMG_FALSE) != PVRSRV_ERROR_PROCESSING_BLOCKED)
-		goto ProcessedQueues;
-
 	PVR_DPF((PVR_DBG_ERROR,"PVRSRVSwapToDCBufferKM: Failed to process queues"));
 
 	eError = PVRSRV_ERROR_GENERIC;
@@ -1329,6 +1332,12 @@ PVRSRV_ERROR PVRSRVSwapToDCSystemKM(IMG_HANDLE	hDeviceKM,
 		goto Exit;
 	}
 
+
+
+
+
+
+
 	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
 	{
 		if(PVRSRVProcessQueues(KERNEL_ID, IMG_FALSE) != PVRSRV_ERROR_PROCESSING_BLOCKED)
@@ -1338,9 +1347,6 @@ PVRSRV_ERROR PVRSRVSwapToDCSystemKM(IMG_HANDLE	hDeviceKM,
 
 		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
 	} END_LOOP_UNTIL_TIMEOUT();
-
-	if(PVRSRVProcessQueues(KERNEL_ID, IMG_FALSE) != PVRSRV_ERROR_PROCESSING_BLOCKED)
-		goto ProcessedQueues;
 
 	PVR_DPF((PVR_DBG_ERROR,"PVRSRVSwapToDCSystemKM: Failed to process queues"));
 	eError = PVRSRV_ERROR_GENERIC;
@@ -1433,7 +1439,12 @@ IMG_BOOL PVRGetDisplayClassJTable(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable)
 	psJTable->pfnPVRSRVOEMFunction = SysOEMFunction;
 	psJTable->pfnPVRSRVRegisterCmdProcList = PVRSRVRegisterCmdProcListKM;
 	psJTable->pfnPVRSRVRemoveCmdProcList = PVRSRVRemoveCmdProcListKM;
+#if defined(SUPPORT_MISR_IN_THREAD)
+	/* Following function not used */
+	/* psJTable->pfnPVRSRVCmdComplete = OSVSyncMISR; */
+#else
 	psJTable->pfnPVRSRVCmdComplete = PVRSRVCommandCompleteKM;
+#endif
 	psJTable->pfnPVRSRVRegisterSystemISRHandler = PVRSRVRegisterSystemISRHandler;
 	psJTable->pfnPVRSRVRegisterPowerDevice = PVRSRVRegisterPowerDevice;
 

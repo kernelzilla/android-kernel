@@ -1617,7 +1617,7 @@ static void reset_terminal(struct vc_data *vc, int do_clear)
 	vc->vc_decscnm		= 0;
 	vc->vc_decom		= 0;
 	vc->vc_decawm		= 1;
-	vc->vc_deccm		= 1;
+	vc->vc_deccm		= 0;
 	vc->vc_decim		= 0;
 
 	set_kbd(vc, decarm);

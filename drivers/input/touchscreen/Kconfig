@@ -11,6 +11,13 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+config TOUCHSCREEN_KEY08
+        tristate "QUANTUM touchpad driver"
+	depends on KERNEL_MOTOROLA || MACH_MOT
+        default y
+        help
+          This enables support for Quantum over I2C based touchscreens.
+
 config TOUCHSCREEN_ADS7846
 	tristate "ADS7846/TSC2046 and ADS7843 based touchscreens"
 	depends on SPI_MASTER
@@ -90,6 +97,10 @@ config TOUCHSCREEN_GUNZE
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called gunze.
+
+config TOUCHSCREEN_ELAN_I2C_8232
+	tristate "Elan 8232 I2C touchscreen"
+	depends on I2C
 
 config TOUCHSCREEN_ELO
 	tristate "Elo serial touchscreens"
@@ -194,6 +205,15 @@ config TOUCHSCREEN_PENMOUNT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called penmount.
+
+config TOUCHSCREEN_MSM
+	bool "Qualcomm MSM touchscreen controller"
+	depends on ARCH_MSM
+	default n
+	help
+	  Say Y here if you have a 4-wire resistive touchscreen panel
+	  connected to the TSSC touchscreen controller on a
+	  Qualcomm MSM/QSD based SoC.
 
 config TOUCHSCREEN_MIGOR
 	tristate "Renesas MIGO-R touchscreen"
@@ -443,10 +463,39 @@ config TOUCHSCREEN_TSC2007
 config TOUCHSCREEN_QUANTUM_OBP
 	tristate "Quantum OBP based touchscreens"
 	depends on I2C
+	default y if MACH_MOT
 	help
 	  Say Y here if you have a Quantum touchscreen that uses
 	  the Object Based Protocol based firmware.
 
 	  If unsure, say N.
+
+config TOUCHSCREEN_MINIPAD
+        tristate "QUANTUM minipad driver"
+	depends on I2C
+	default y if MACH_MOT
+        help
+        This enables support for Quantum over I2C based minipad.
+
+config TOUCHSCREEN_MSM_LEGACY
+	default n
+	tristate "MSM Touchscreen"
+	depends on ARCH_MSM
+	help
+	  Say Y here if you have a touchscreen interface using MSM
+	  touchscreen controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called msm_touch.
+
+config ANDROID_TOUCHSCREEN_MSM_HACKS
+	default y
+	depends on TOUCHSCREEN_MSM_LEGACY
+	bool "Android MSM Touchscreen hacks"
+	help
+	  Say Y here if you are running Android framework on Qualcomm
+	  MSM/QSD based Surf or FFAs. These hacks are required inorder
+	  to Android framework to receive adjusted x, y co-ordinates
+	  until proper calibration framework is in place.
 
 endif

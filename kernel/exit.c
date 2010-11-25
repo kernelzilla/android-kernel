@@ -47,6 +47,9 @@
 #include <linux/task_io_accounting_ops.h>
 #include <linux/tracehook.h>
 #include <linux/init_task.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <trace/sched.h>
 
 #include <asm/uaccess.h>
@@ -472,6 +475,11 @@ void daemonize(const char *name, ...)
 	atomic_inc(&current->files->count);
 
 	reparent_to_kthreadd();
+
+#ifdef CONFIG_LTT_LITE
+	ltt_lite_ev_process(LTT_LITE_EV_PROCESS_COMM_CHANGE,
+		current);
+#endif
 }
 
 EXPORT_SYMBOL(daemonize);
@@ -1070,6 +1078,9 @@ NORET_TYPE void do_exit(long code)
 	taskstats_exit(tsk, group_dead);
 
 	exit_mm(tsk);
+#ifdef CONFIG_LTT_LITE
+	ltt_ev_process_exit(0, 0);
+#endif
 
 	if (group_dead)
 		acct_process();

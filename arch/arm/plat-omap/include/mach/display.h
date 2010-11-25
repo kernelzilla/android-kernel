@@ -55,6 +55,11 @@ enum omap_display_type {
 	OMAP_DISPLAY_TYPE_VENC		= 1 << 4,
 };
 
+enum omap_dsi_xfer_mode {
+	OMAP_DSI_XFER_CMD_MODE		= 0,
+	OMAP_DSI_XFER_VIDEO_MODE	= 1
+};
+
 enum omap_plane {
 	OMAP_DSS_GFX	= 0,
 	OMAP_DSS_VIDEO1	= 1,
@@ -234,6 +239,11 @@ struct omap_video_timings {
 	u16 h;
 	/* Unit: KHz */
 	u32 pixel_clock;
+
+	u32 dsi1_pll_fclk;	/* func clk for DISPC from DSI PLL */
+	/* Unit: kHz */
+	u32 dsi2_pll_fclk;	/* func clk for DSI from DSI PLL */
+
 	/* Unit: pixel clocks */
 	u16 hsw;	/* Horizontal synchronization pulse width */
 	/* Unit: pixel clocks */
@@ -246,6 +256,21 @@ struct omap_video_timings {
 	u16 vfp;	/* Vertical front porch */
 	/* Unit: line clocks */
 	u16 vbp;	/* Vertical back porch */
+};
+
+struct omap_dsi_video_timings {
+	/* Unit: pixel clocks */
+	u16 hsa;        /* Horizontal synch active */
+	/* Unit: pixel clocks */
+	u16 hfp;        /* Horizontal front porch */
+	/* Unit: pixel clocks */
+	u16 hbp;        /* Horizontal back porch */
+	/* Unit: line clocks */
+	u16 vsa;        /* Vertical synch active */
+	/* Unit: line clocks */
+	u16 vfp;        /* Vertical front porch */
+	/* Unit: line clocks */
+	u16 vbp;        /* Vertical back porch */
 };
 
 #ifdef CONFIG_OMAP2_DSS_VENC
@@ -366,8 +391,8 @@ struct omap_dss_device {
 
 		struct {
 			u8 datapairs;
-			unsigned pad_off_pe : 1; /* pull pads if disabled */
-			unsigned pad_off_pu : 1; /* pull up */
+			unsigned pad_off_pe:1; /* pull pads if disabled */
+			unsigned pad_off_pu:1; /* pull up */
 		} sdi;
 
 		struct {
@@ -382,6 +407,9 @@ struct omap_dss_device {
 
 			bool ext_te;
 			u8 ext_te_gpio;
+
+			bool xfer_mode;
+			struct omap_dsi_video_timings vm_timing;
 		} dsi;
 
 		struct {
@@ -400,6 +428,7 @@ struct omap_dss_device {
 
 		u8 recommended_bpp;
 
+		unsigned long panel_id;
 		struct omap_dss_device *ctrl;
 	} panel;
 
@@ -491,6 +520,7 @@ struct omap_dss_driver {
 	void (*remove)(struct omap_dss_device *);
 
 	int (*enable)(struct omap_dss_device *display);
+	int (*framedone)(struct omap_dss_device *dssdev);
 	void (*disable)(struct omap_dss_device *display);
 	int (*suspend)(struct omap_dss_device *display);
 	int (*resume)(struct omap_dss_device *display);
@@ -502,7 +532,7 @@ struct omap_dss_driver {
 	int (*enable_te)(struct omap_dss_device *dssdev, bool enable);
 	int (*wait_for_te)(struct omap_dss_device *dssdev);
 
-	u8 (*get_rotate)(struct omap_dss_device *dssdev);
+    u8 (*get_rotate)(struct omap_dss_device *dssdev);
 	int (*set_rotate)(struct omap_dss_device *dssdev, u8 rotate);
 
 	bool (*get_mirror)(struct omap_dss_device *dssdev);

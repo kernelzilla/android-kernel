@@ -25,6 +25,7 @@
 #include <linux/io.h>
 
 #include <linux/usb/musb.h>
+#include <linux/usb/android.h>
 
 #include <asm/sizes.h>
 
@@ -225,6 +226,7 @@ void __init usb_musb_init(void)
 	}
 
 	musb_resources[0].end = musb_resources[0].start + SZ_8K - 1;
+
 
 #ifdef CONFIG_NOP_USB_XCEIV
 	if (platform_device_register(&nop_xceiv_device) < 0) {

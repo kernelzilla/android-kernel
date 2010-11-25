@@ -8,6 +8,7 @@ HEAD	= head.o
 OBJS	= misc.o
 FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
 
+KBUILD_CFLAGS := $(KBUILD_CFLAGS_NOGCOV)
 #
 # Architecture dependencies
 #

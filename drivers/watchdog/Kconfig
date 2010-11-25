@@ -197,8 +197,15 @@ config OMAP_WATCHDOG_AUTOPET
 	depends on OMAP_WATCHDOG
 	default n
 	help
-	  Select if you want the kernel to auto-enable and pet the watchdog 
+	  Select if you want the kernel to auto-enable and pet the watchdog
 	  itself.
+
+config OMAP_WATCHDOG_CONTROL
+    bool "Control watchdog disable from user space"
+	depends on OMAP_WATCHDOG
+	default n
+	help
+	 Select if you want to control watchdog at debug Mode.
 
 config PNX4008_WATCHDOG
 	tristate "PNX4008 Watchdog"

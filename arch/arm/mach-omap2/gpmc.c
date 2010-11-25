@@ -36,10 +36,6 @@
 #define GPMC_ERR_TYPE		0x48
 #define GPMC_CONFIG		0x50
 #define GPMC_STATUS		0x54
-#define GPMC_PREFETCH_CONFIG1	0x1e0
-#define GPMC_PREFETCH_CONFIG2	0x1e4
-#define GPMC_PREFETCH_CONTROL	0x1ec
-#define GPMC_PREFETCH_STATUS	0x1f0
 #define GPMC_ECC_CONFIG		0x1f4
 #define GPMC_ECC_CONTROL	0x1f8
 #define GPMC_ECC_SIZE_CONFIG	0x1fc
@@ -87,19 +83,10 @@ static DEFINE_SPINLOCK(gpmc_mem_lock);
 static unsigned		gpmc_cs_map;
 static struct omap3_gpmc_regs gpmc_context;
 
-static void __iomem *gpmc_base;
+void __iomem *gpmc_base;
 
 static struct clk *gpmc_l3_clk;
 
-static void gpmc_write_reg(int idx, u32 val)
-{
-	__raw_writel(val, gpmc_base + idx);
-}
-
-static u32 gpmc_read_reg(int idx)
-{
-	return __raw_readl(gpmc_base + idx);
-}
 
 void gpmc_cs_write_reg(int cs, int idx, u32 val)
 {
@@ -411,6 +398,18 @@ void gpmc_cs_free(int cs)
 }
 EXPORT_SYMBOL(gpmc_cs_free);
 
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+/*
+ * gpmc_prefetch_init - configures default configuration for prefetch engine
+ */
+static void gpmc_prefetch_init(void)
+{
+	/* Setting the default threshold to 64 */
+	gpmc_write_reg(GPMC_PREFETCH_CONTROL, 0x0);
+	gpmc_write_reg(GPMC_PREFETCH_CONFIG1, GPMC_PREFETCH_CONFIG1_INIT);
+	gpmc_write_reg(GPMC_PREFETCH_CONFIG2, 0x0);
+}
+#endif
 static void __init gpmc_mem_init(void)
 {
 	int cs;
@@ -475,6 +474,10 @@ void __init gpmc_init(void)
 	l |= (0x02 << 3) | (1 << 0);
 	gpmc_write_reg(GPMC_SYSCONFIG, l);
 
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+	gpmc_prefetch_init();
+	printk(KERN_INFO "GPMC Prefetch is enabled....\n");
+#endif
 	gpmc_mem_init();
 }
 

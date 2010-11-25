@@ -9,6 +9,7 @@
  * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -38,7 +39,7 @@
 static int drm_ati_alloc_pcigart_table(struct drm_device *dev,
 				       struct drm_ati_pcigart_info *gart_info)
 {
-	gart_info->table_handle = drm_pci_alloc(dev, gart_info->table_size,
+	gart_info->table_handle = drm_dma_alloc(dev, gart_info->table_size,
 						PAGE_SIZE,
 						gart_info->table_mask);
 	if (gart_info->table_handle == NULL)
@@ -50,7 +51,7 @@ static int drm_ati_alloc_pcigart_table(struct drm_device *dev,
 static void drm_ati_free_pcigart_table(struct drm_device *dev,
 				       struct drm_ati_pcigart_info *gart_info)
 {
-	drm_pci_free(dev, gart_info->table_handle);
+	drm_dma_free(dev, gart_info->table_handle);
 	gart_info->table_handle = NULL;
 }
 

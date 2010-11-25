@@ -1,3 +1,31 @@
+/*
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of Code Aurora nor
+ *       the names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior written
+ *       permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #ifndef _ASMARM_UCONTEXT_H
 #define _ASMARM_UCONTEXT_H
 
@@ -59,16 +87,24 @@ struct iwmmxt_sigframe {
 #endif /* CONFIG_IWMMXT */
 
 #ifdef CONFIG_VFP
+
+/*
+ * Linux ARM kernel has yet to standardize the VFP ucontext format.
+ * Modify magic numbers for this special temporary implementation.
+ * Should be fixed 2.6.31+ kernel.
+ */
+#define VFP_TEMPORARY_UCONTEXT_FMT 0xBEAF0A1D
+
 #if __LINUX_ARM_ARCH__ < 6
 /* For ARM pre-v6, we use fstmiax and fldmiax.  This adds one extra
  * word after the registers, and a word of padding at the end for
  * alignment.  */
-#define VFP_MAGIC		0x56465001
-#define VFP_STORAGE_SIZE	152
+#define VFP_MAGIC		(0x56465001 ^ VFP_TEMPORARY_UCONTEXT_FMT)
 #else
-#define VFP_MAGIC		0x56465002
-#define VFP_STORAGE_SIZE	144
+#define VFP_MAGIC		(0x56465002 ^ VFP_TEMPORARY_UCONTEXT_FMT)
 #endif
+
+#define VFP_STORAGE_SIZE	sizeof(struct vfp_sigframe)
 
 struct vfp_sigframe
 {
@@ -91,7 +127,7 @@ struct aux_sigframe {
 #ifdef CONFIG_IWMMXT
 	struct iwmmxt_sigframe	iwmmxt;
 #endif
-#if 0 && defined CONFIG_VFP /* Not yet saved.  */
+#ifdef CONFIG_VFP
 	struct vfp_sigframe	vfp;
 #endif
 	/* Something that isn't a valid magic number for any coprocessor.  */

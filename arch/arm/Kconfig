@@ -158,6 +158,34 @@ config ARCH_MTD_XIP
 config GENERIC_HARDIRQS_NO__DO_IRQ
 	def_bool y
 
+config ARM_OF
+	bool "Support for open firmware device tree (ARM port)"
+	default n
+
+config OF
+	bool "Support for open firmware device tree"
+	depends on ARM_OF
+	default n
+
+config BOOTINFO
+    bool "Boot Information Feature"
+    default n
+    help
+      This feature provides access to certain boot information
+      from both kernel context (via function call) and user
+      context (via /proc/bootinfo).
+
+config PROC_DEVICETREE
+	bool "Support for device tree in /proc"
+	depends on PROC_FS && OF
+	help
+          This option adds a device-tree directory under /proc which contains
+          an image of the device tree that the kernel copies from Open
+          Firmware or other boot firmware. If unsure, say Y here.
+
+config RO_TEXT
+	bool "Mapping kernel text segment read-only"
+
 if OPROFILE
 
 config OPROFILE_ARMV6
@@ -574,14 +602,16 @@ config ARCH_OMAP
 
 config ARCH_MSM
 	bool "Qualcomm MSM"
-	select CPU_V6
+	select GENERIC_GPIO
+	select HAVE_CLK
 	select GENERIC_TIME
 	select GENERIC_CLOCKEVENTS
 	help
-	  Support for Qualcomm MSM7K based systems.  This runs on the ARM11
-	  apps processor of the MSM7K and depends on a shared memory
-	  interface to the ARM9 modem processor which runs the baseband stack
-	  and controls some vital subsystems (clock and power control, etc).
+	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+	  apps processor of the MSM/QSD and depends on a shared memory
+	  interface to the modem processor which runs the baseband
+	  stack and controls some vital subsystems
+	  (clock and power control, etc).
 
 config ARCH_W90X900
 	bool "Nuvoton W90X900 CPU"
@@ -892,7 +922,7 @@ config AEABI
 
 config OABI_COMPAT
 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
-	depends on AEABI && EXPERIMENTAL
+	depends on AEABI && EXPERIMENTAL  && (!MMU || BROKEN)
 	default y
 	help
 	  This option preserves the old syscall interface along with the
@@ -1102,7 +1132,7 @@ endmenu
 
 menu "CPU Power Management"
 
-if (ARCH_SA1100 || ARCH_INTEGRATOR || ARCH_OMAP || ARCH_IMX || ARCH_PXA)
+if (ARCH_SA1100 || ARCH_INTEGRATOR || ARCH_OMAP || ARCH_IMX || ARCH_PXA || ARCH_MSM)
 
 source "drivers/cpufreq/Kconfig"
 
@@ -1147,6 +1177,14 @@ endif
 source "drivers/cpuidle/Kconfig"
 
 endmenu
+
+config CPU_FREQ_MSM
+	bool
+	depends on CPU_FREQ && ARCH_MSM
+	default y
+	help
+	  This enables the CPUFreq driver for Qualcomm CPUs.
+	  If in doubt, say Y.
 
 menu "Floating point emulation"
 
@@ -1347,6 +1385,7 @@ source "drivers/staging/Kconfig"
 
 if ARCH_OMAP
 source "drivers/cbus/Kconfig"
+source "drivers/sim/Kconfig"
 endif
 
 source "drivers/dsp/bridge/Kconfig"
@@ -1362,3 +1401,5 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
+
+source "kernel/Kconfig.lttlite"

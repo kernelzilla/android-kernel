@@ -41,13 +41,14 @@ extern "C" {
 	IMG_BOOL			bInUse;
 		
 	IMG_UINT32			ui32DstSyncCount;	
-	IMG_UINT32			ui32SrcSyncCount;	
-	PVRSRV_SYNC_OBJECT	*psDstSync;			
-	PVRSRV_SYNC_OBJECT	*psSrcSync;			
-	IMG_UINT32	ui32AllocSize;				
+	IMG_UINT32			ui32SrcSyncCount;
+	PVRSRV_SYNC_OBJECT	*psDstSync;
+	PVRSRV_SYNC_OBJECT	*psSrcSync;
+	IMG_UINT32			ui32AllocSize;
  }COMMAND_COMPLETE_DATA, *PCOMMAND_COMPLETE_DATA;
 
 #if !defined(USE_CODE)
+IMG_VOID QueueDumpDebugInfo(IMG_VOID);
 
 IMG_IMPORT
 PVRSRV_ERROR PVRSRVProcessQueues (IMG_UINT32	ui32CallerID,

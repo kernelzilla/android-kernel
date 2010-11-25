@@ -12,6 +12,13 @@ omap2cam-objs	:=	omap24xxcam.o omap24xxcam-dma.o
 
 videodev-objs	:=	v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-subdev.o
 
+ifeq ($(CONFIG_ARM),y)
+# Remove the -Werror until i2c deprecated functions are fixed
+ifeq ($(CONFIG_VIDEO_V4L2_COMMON),y)
+CFLAGS_REMOVE_v4l2-common.o = -Werror
+endif
+endif
+
 obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-int-device.o
 ifeq ($(CONFIG_COMPAT),y)
   obj-$(CONFIG_VIDEO_DEV) += v4l2-compat-ioctl32.o
@@ -112,6 +119,8 @@ obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
 
 obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
 obj-$(CONFIG_VIDEO_MT9P012)     += mt9p012.o
+obj-$(CONFIG_VIDEO_OV8810)     += ov8810.o
+obj-$(CONFIG_VIDEO_MIPI_DLI_TEST) += mipi_dli.o
 obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a/
 obj-$(CONFIG_VIDEO_OMAP3_HPLENS) += hplens.o
 
@@ -160,6 +169,9 @@ obj-$(CONFIG_SOC_CAMERA_TW9910)		+= tw9910.o
 obj-$(CONFIG_VIDEO_AU0828) += au0828/
 
 obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc/
+obj-$(CONFIG_VIDEO_CAM_ISE)    += motcam.o
+
+obj-$(CONFIG_MSM_CAMERA) += msm/
 
 EXTRA_CFLAGS += -Idrivers/media/dvb/dvb-core
 EXTRA_CFLAGS += -Idrivers/media/dvb/frontends
@@ -168,3 +180,6 @@ EXTRA_CFLAGS += -Idrivers/media/common/tuners
 ifdef CONFIG_VIDEO_OMAP3_HP3A
 EXTRA_CFLAGS += -Idrivers/media/video/hp3a
 endif
+
+obj-$(CONFIG_HDMI_TDA19989) += tda19989.o
+

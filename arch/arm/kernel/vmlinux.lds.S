@@ -68,6 +68,11 @@ SECTIONS
 			*(.data.percpu)
 			*(.data.percpu.shared_aligned)
 		__per_cpu_end = .;
+#ifdef CONFIG_DEBUG_MEMLEAK
+		__memleak_offsets_start = .;
+			*(.init.memleak_offsets)
+		__memleak_offsets_end = .;
+#endif
 #ifndef CONFIG_XIP_KERNEL
 		__init_begin = _stext;
 		INIT_DATA
@@ -120,7 +125,9 @@ SECTIONS
 
 	.data : AT(__data_loc) {
 		_data = .;		/* address in memory */
-
+#ifdef CONFIG_DEBUG_MEMLEAK
+		_sdata = .;
+#endif
 		/*
 		 * first, the init task union, aligned
 		 * to an 8192 byte boundary.
@@ -171,6 +178,9 @@ SECTIONS
 		__bss_start = .;	/* BSS				*/
 		*(.bss)
 		*(COMMON)
+#ifdef CONFIG_DEBUG_MEMLEAK
+		__bss_stop = .;
+#endif
 		_end = .;
 	}
 					/* Stabs debugging sections.	*/

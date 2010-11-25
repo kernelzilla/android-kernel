@@ -335,7 +335,7 @@ static void mtdoops_console_sync(void)
 		/* Interrupt context, we're going to panic so try and log */
 		mtdoops_write(cxt, 1);
 	else
-		schedule_work(&cxt->work_write);
+		mtdoops_write(cxt, 0);
 }
 
 static void
@@ -375,7 +375,7 @@ mtdoops_console_write(struct console *co, const char *s, unsigned int count)
 
 	spin_unlock_irqrestore(&cxt->writecount_lock, flags);
 
-	if (cxt->writecount == OOPS_PAGE_SIZE)
+	if ((cxt->writecount == OOPS_PAGE_SIZE) && !in_interrupt())
 		mtdoops_console_sync();
 }
 

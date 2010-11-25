@@ -60,6 +60,9 @@
 #include <linux/tty.h>
 #include <linux/proc_fs.h>
 #include <linux/blkdev.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <trace/sched.h>
 
 #include <asm/pgtable.h>
@@ -1268,6 +1271,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		attach_pid(p, PIDTYPE_PID, pid);
 		nr_threads++;
 	}
+
+#ifdef CONFIG_LTT_LITE
+	ltt_lite_ev_process(LTT_LITE_EV_PROCESS_FORK, p);
+#endif
 
 	total_forks++;
 	spin_unlock(&current->sighand->siglock);

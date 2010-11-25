@@ -16,6 +16,9 @@
 #include <linux/log2.h>
 #include <linux/typecheck.h>
 #include <linux/ratelimit.h>
+#ifdef CONFIG_DEBUG_MEMLEAK
+#include <linux/memleak.h>
+#endif
 #include <linux/dynamic_printk.h>
 #include <asm/byteorder.h>
 #include <asm/bug.h>
@@ -490,9 +493,20 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
  * @member:	the name of the member within the struct.
  *
  */
+#ifdef CONFIG_DEBUG_MEMLEAK
+#define __container_of(ptr, type, member) ({			\
+	const typeof(((type *)0)->member) *__mptr = (ptr);	\
+	(type *)((char *)__mptr - offsetof(type, member)); })
+
+#define container_of(ptr, type, member) ({                    \
+		DECLARE_MEMLEAK_OFFSET(container_of, type, member);     \
+		__container_of(ptr, type, member);                      \
+})
+#else
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
+#endif
 
 struct sysinfo;
 extern int do_sysinfo(struct sysinfo *info);

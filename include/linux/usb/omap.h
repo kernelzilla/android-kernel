@@ -48,6 +48,7 @@ struct omap_usb_platform_data {
 	u32	flags;
 	struct omap_usb_port_data	*port_data;
 	int	num_ports;
+	int (*usbhost_standby_status)(void);
 };
 
 

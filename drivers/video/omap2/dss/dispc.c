@@ -160,7 +160,7 @@ static struct {
 
 	u32	fifo_size[3];
 
-	spinlock_t irq_lock;
+	spinlock_t irq_lock; /* need comment */
 	u32 irq_error_mask;
 	struct omap_dispc_isr_data registered_isr[DISPC_MAX_NR_ISRS];
 	u32 error_irqs;
@@ -490,7 +490,6 @@ bool dispc_go_busy(enum omap_channel channel)
 		bit = 5; /* GOLCD */
 	else
 		bit = 6; /* GODIGIT */
-
 	enable_clocks(1);
 	ret = REG_GET(DISPC_CONTROL, bit, bit) == 1;
 	enable_clocks(0);
@@ -499,7 +498,7 @@ bool dispc_go_busy(enum omap_channel channel)
 
 void dispc_go(enum omap_channel channel)
 {
-	int bit;
+	int bit, count;
 
 	enable_clocks(1);
 
@@ -525,6 +524,15 @@ void dispc_go(enum omap_channel channel)
 	DSSDBG("GO %s\n", channel == OMAP_DSS_CHANNEL_LCD ? "LCD" : "DIGIT");
 
 	REG_FLD_MOD(DISPC_CONTROL, 1, bit, bit);
+
+	count = 100000;
+	/* wait until GOLCD = 0 */
+	while (dispc_go_busy(OMAP_DSS_CHANNEL_LCD) && (count > 0))
+		count--;
+
+	if (count == 0)
+		DSSERR(" GOLCD bit is NOT clear \n");
+
 end:
 	enable_clocks(0);
 }
@@ -1793,12 +1801,14 @@ void dispc_enable_digit_out(bool enable)
 		DSSERR("failed to unregister EVSYNC isr\n");
 
 	if (enable) {
+#ifndef CONFIG_TVOUT_SHOLEST
 		unsigned long flags;
 		spin_lock_irqsave(&dispc.irq_lock, flags);
 		dispc.irq_error_mask = DISPC_IRQ_MASK_ERROR;
 		dispc_write_reg(DISPC_IRQSTATUS, DISPC_IRQ_SYNC_LOST_DIGIT);
 		_omap_dispc_set_irqs();
 		spin_unlock_irqrestore(&dispc.irq_lock, flags);
+#endif
 	}
 
 	enable_clocks(0);
@@ -1938,6 +1948,7 @@ void dispc_enable_trans_key(enum omap_channel ch, bool enable)
 		REG_FLD_MOD(DISPC_CONFIG, enable, 12, 12);
 	enable_clocks(0);
 }
+
 void dispc_enable_alpha_blending(enum omap_channel ch, bool enable)
 {
 	enable_clocks(1);
@@ -1947,6 +1958,7 @@ void dispc_enable_alpha_blending(enum omap_channel ch, bool enable)
 		REG_FLD_MOD(DISPC_CONFIG, enable, 19, 19);
 	enable_clocks(0);
 }
+
 bool dispc_alpha_blending_enabled(enum omap_channel ch)
 {
 	bool enabled;
@@ -1963,7 +1975,6 @@ bool dispc_alpha_blending_enabled(enum omap_channel ch)
 	return enabled;
 
 }
-
 
 bool dispc_trans_key_enabled(enum omap_channel ch)
 {
@@ -2028,9 +2039,15 @@ void dispc_set_parallel_interface_mode(enum omap_parallel_interface_mode mode)
 		break;
 
 	case OMAP_DSS_PARALLELMODE_DSI:
+	case OMAP_DSS_PARALLELMODE_DSI_CMD:
 		stallmode = 1;
 		gpout1 = 1;
 		break;
+	case OMAP_DSS_PARALLELMODE_DSI_VM:
+		stallmode = 0;
+		gpout1 = 1;
+	break;
+
 
 	default:
 		BUG();
@@ -2497,8 +2514,16 @@ retry:
 
 		goto found;
 	} else if (cpu_is_omap34xx()) {
-		for (cur.fck_div = 16; cur.fck_div > 0; --cur.fck_div) {
-			cur.fck = prate / cur.fck_div * 2;
+		if (cpu_is_omap3630())
+			cur.fck_div = 32;
+		else
+			cur.fck_div = 16;
+
+		for ( ; cur.fck_div > 0; --cur.fck_div) {
+			if (cpu_is_omap3630())
+				cur.fck = prate / cur.fck_div ;
+			else
+				cur.fck = prate / cur.fck_div * 2;
 
 			if (cur.fck > DISPC_MAX_FCK)
 				continue;
@@ -2816,7 +2841,13 @@ static void dispc_error_worker(struct work_struct *work)
 				continue;
 
 			if (ovl->id == 0) {
-				dispc_enable_plane(ovl->id, 0);
+				/* **** SHOLES TABLET HACK ****
+				 * Removing the disable of the graphics plane
+				 * for underflows as this causes problems
+				 * when switching displays.
+				 * Need more investigation.
+				dispc_enable_plane(ovl->id, 0); */
+
 				dispc_go(ovl->manager->id);
 				mdelay(50);
 				break;

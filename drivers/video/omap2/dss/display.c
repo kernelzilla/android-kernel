@@ -277,16 +277,31 @@ static ssize_t display_wss_store(struct device *dev,
 	return size;
 }
 
+#ifdef CONFIG_TVOUT_SHOLEST
+static DEVICE_ATTR(enabled, S_IRWXUGO|S_IWUSR,
+		display_enabled_show, display_enabled_store);
+#else
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);
+#endif
 static DEVICE_ATTR(update_mode, S_IRUGO|S_IWUSR,
 		display_upd_mode_show, display_upd_mode_store);
 static DEVICE_ATTR(tear_elim, S_IRUGO|S_IWUSR,
 		display_tear_show, display_tear_store);
+#ifdef CONFIG_TVOUT_SHOLEST
+static DEVICE_ATTR(timings, S_IRWXUGO|S_IWUSR,
+		display_timings_show, display_timings_store);
+#else
 static DEVICE_ATTR(timings, S_IRUGO|S_IWUSR,
 		display_timings_show, display_timings_store);
+#endif
+#ifdef CONFIG_TVOUT_SHOLEST
+static DEVICE_ATTR(rotate, S_IRWXUGO|S_IWUSR,
+		display_rotate_show, display_rotate_store);
+#else
 static DEVICE_ATTR(rotate, S_IRUGO|S_IWUSR,
 		display_rotate_show, display_rotate_store);
+#endif
 static DEVICE_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DEVICE_ATTR(wss, S_IRUGO|S_IWUSR,

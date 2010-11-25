@@ -165,8 +165,8 @@ static struct inode *yaffs_iget(struct super_block *sb, unsigned long ino);
 
 #define update_dir_time(dir) do {\
 			(dir)->i_ctime = (dir)->i_mtime = CURRENT_TIME; \
-		} while(0)
-		
+		} while (0)
+
 static void yaffs_put_super(struct super_block *sb);
 
 static ssize_t yaffs_file_write(struct file *f, const char *buf, size_t n,
@@ -197,6 +197,9 @@ static struct dentry *yaffs_lookup(struct inode *dir, struct dentry *dentry);
 static int yaffs_link(struct dentry *old_dentry, struct inode *dir,
 			struct dentry *dentry);
 static int yaffs_unlink(struct inode *dir, struct dentry *dentry);
+//MOT_BUGFIX start
+static int yaffs_rmdir(struct inode *dir, struct dentry *dentry);
+//MOT_BUGFIX end
 static int yaffs_symlink(struct inode *dir, struct dentry *dentry,
 			const char *symname);
 static int yaffs_mkdir(struct inode *dir, struct dentry *dentry, int mode);
@@ -336,7 +339,10 @@ static const struct inode_operations yaffs_dir_inode_operations = {
 	.unlink = yaffs_unlink,
 	.symlink = yaffs_symlink,
 	.mkdir = yaffs_mkdir,
-	.rmdir = yaffs_unlink,
+//MOT_BUGFIX start
+//	.rmdir = yaffs_unlink,
+	.rmdir = yaffs_rmdir,
+//MOT_BUGFIX end
 	.mknod = yaffs_mknod,
 	.rename = yaffs_rename,
 	.setattr = yaffs_setattr,
@@ -1351,6 +1357,51 @@ static int yaffs_unlink(struct inode *dir, struct dentry *dentry)
 	return -ENOTEMPTY;
 }
 
+//MOT_BUGFIX start
+static int yaffs_rmdir(struct inode *dir, struct dentry *dentry)
+{
+        yaffs_Device *dev;
+        int retVal = YAFFS_FAIL;
+        yaffs_Object *target;
+
+        T(YAFFS_TRACE_OS,
+                ("yaffs_rmdir %d:%s\n", (int)(dir->i_ino),
+                dentry->d_name.name));
+
+        dev = yaffs_InodeToObject(dir)->myDev;
+
+        yaffs_GrossLock(dev);
+
+        /* Check if the target is an existing directory that is not empty. */
+        target = yaffs_FindObjectByName(yaffs_InodeToObject(dir),
+                                dentry->d_name.name);
+
+
+
+        if (target && target->variantType == YAFFS_OBJECT_TYPE_DIRECTORY &&
+                !ylist_empty(&target->variant.directoryVariant.children)) {
+
+                T(YAFFS_TRACE_OS, ("target is non-empty dir\n"));
+
+                retVal = YAFFS_FAIL;
+        } else {
+                T(YAFFS_TRACE_OS, ("calling yaffs_Unlink\n"));
+
+                retVal = yaffs_Unlink(yaffs_InodeToObject(dir), dentry->d_name.name);
+        }
+
+        if (retVal == YAFFS_OK) {
+                dentry->d_inode->i_nlink--;
+                dir->i_version++;
+                yaffs_GrossUnlock(dev);
+                mark_inode_dirty(dentry->d_inode);
+                return 0;
+        }
+        yaffs_GrossUnlock(dev);
+        return -ENOTEMPTY;
+}
+
+//MOT_BGUFIX end
 /*
  * Create a link...
  */
@@ -1385,7 +1436,7 @@ static int yaffs_link(struct dentry *old_dentry, struct inode *dir,
 
 	yaffs_GrossUnlock(dev);
 
-	if (link){
+	if (link) {
 		update_dir_time(dir);
 		return 0;
 	}
@@ -1487,9 +1538,9 @@ static int yaffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			new_dentry->d_inode->i_nlink--;
 			mark_inode_dirty(new_dentry->d_inode);
 		}
-		
+
 		update_dir_time(old_dir);
-		if(old_dir != new_dir)
+		if (old_dir != new_dir)
 			update_dir_time(new_dir);
 		return 0;
 	} else {

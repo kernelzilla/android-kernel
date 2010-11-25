@@ -118,7 +118,7 @@ struct scan_control {
 /*
  * From 0 .. 100.  Higher means more swappy.
  */
-int vm_swappiness = 60;
+int vm_swappiness = 20; //Motorola IKMAP-663 change from 60 to 20
 long vm_total_pages;	/* The total number of pages which the VM controls */
 
 static LIST_HEAD(shrinker_list);
@@ -2009,6 +2009,9 @@ static int kswapd(void *p)
 			/* We can speed up thawing tasks if we don't call
 			 * balance_pgdat after returning from the refrigerator
 			 */
+
+			/* reassign reclaim_state by Rob Stoddard... in some rare case, it got nulled! */
+			current->reclaim_state = &reclaim_state;
 			balance_pgdat(pgdat, order);
 		}
 	}

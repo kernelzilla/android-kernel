@@ -83,6 +83,7 @@ static struct omap_dss_device sholes_lcd_device = {
 	.phy.dsi.ddr_clk_hz = 160000000,
 	.phy.dsi.lp_clk_hz = 10000000,
 	.reset_gpio = SHOLES_DISPLAY_RESET_GPIO,
+	.xfer_mode = OMAP_DSI_XFER_CMD_MODE,
 	.platform_enable = sholes_panel_enable,
 	.platform_disable = sholes_panel_disable,
 };

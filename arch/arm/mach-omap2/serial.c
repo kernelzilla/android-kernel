@@ -4,6 +4,7 @@
  * OMAP2 serial support.
  *
  * Copyright (C) 2005-2008 Nokia Corporation
+ * Copyright (C) 2009 Motorola, Inc.
  * Author: Paul Mundt <paul.mundt@nokia.com>
  *
  * Major rework for PM support by Kevin Hilman
@@ -38,7 +39,7 @@
 #include "pm.h"
 #include "prm-regbits-34xx.h"
 
-#define DEFAULT_TIMEOUT (HZ / 2)
+#define DEFAULT_TIMEOUT HZ
 
 struct omap_uart_state {
 	int num;
@@ -59,7 +60,7 @@ struct omap_uart_state {
 	struct clk *fck;
 	int clocked;
 
-        struct plat_serialomap_port *p;
+	struct plat_serialomap_port *p;
 	struct list_head node;
 
 #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
@@ -77,7 +78,7 @@ struct omap_uart_state {
 
 static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS];
 static LIST_HEAD(uart_list);
-static unsigned int fifo_idleblks = 0;
+static unsigned int fifo_idleblks;
 
 #ifdef CONFIG_SERIAL_OMAP
 static struct plat_serialomap_port serial_platform_data[] = {
@@ -85,18 +86,27 @@ static struct plat_serialomap_port serial_platform_data[] = {
 		.membase	= IO_ADDRESS(OMAP_UART1_BASE),
 		.irq		= 72,
 		.regshift	= 2,
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+		.rtscts		= SERIALOMAP_AUTO_RTS,
+#endif
 		.flags		= UPF_BOOT_AUTOCONF,
 	},
 	{
 		.membase	= IO_ADDRESS(OMAP_UART2_BASE),
 		.irq		= 73,
 		.regshift	= 2,
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+		.rtscts		= SERIALOMAP_AUTO_RTS | SERIALOMAP_AUTO_CTS,
+#endif
 		.flags		= UPF_BOOT_AUTOCONF,
 	},
 	{
 		.membase	= IO_ADDRESS(OMAP_UART3_BASE),
 		.irq		= 74,
 		.regshift	= 2,
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+		.rtscts		= SERIALOMAP_AUTO_RTS,
+#endif
 		.flags		= UPF_BOOT_AUTOCONF,
 	},
 };
@@ -237,7 +247,9 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 	u16 lcr = 0;
 	struct plat_serialomap_port *p = uart->p;
 
-	if (!enable_off_mode)
+	/* Due to TI errata for OFF mode, we don't allow
+	*  CORE and PER to enter OFF mode */
+	if ((!enable_off_mode) || (omap_rev() <= OMAP3430_REV_ES3_1))
 		return;
 
 	lcr = serial_read_reg(p, UART_LCR);
@@ -258,7 +270,9 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	u16 efr = 0;
 	struct plat_serialomap_port *p = uart->p;
 
-	if (!enable_off_mode)
+	/* Due to TI errata for OFF mode, we don't allow
+	*  CORE and PER to enter OFF mode */
+	if ((!enable_off_mode) || (omap_rev() <= OMAP3430_REV_ES3_1))
 		return;
 
 	if (!uart->context_valid)
@@ -503,7 +517,7 @@ static void omap_uart_rtspad_init(struct omap_uart_state *uart)
 {
 	if (!cpu_is_omap34xx())
 		return;
-	switch(uart->num) {
+	switch (uart->num) {
 	case 0:
 		uart->rts_padconf = 0x17e;
 		break;

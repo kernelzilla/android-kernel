@@ -238,6 +238,10 @@ config AUDIT_TREE
 	def_bool y
 	depends on AUDITSYSCALL && INOTIFY
 
+config KERNEL_MOTOROLA
+	default n
+	bool "Motorola Modified Kernel"
+
 menu "RCU Subsystem"
 
 choice

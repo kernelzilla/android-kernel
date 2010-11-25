@@ -107,4 +107,21 @@ config BATTERY_CPCAP
 	help
 	 Say Y to include support for CPCAP Main Battery.
 
+config BATTERY_MSM
+	tristate "MSM battery"
+	depends on ARCH_MSM
+	help
+	  Say Y to enable support for the battery in Qualcomm MSM.
+
+config TTA_CHARGER
+        tristate "Support for TTA charger"
+        depends on BATTERY_CPCAP
+        help
+         Say Y to include support for the TTA CHARGER.
+
+config BATTERY_MOT
+	tristate "Motorola battery driver"
+	help
+	  Say Y to enable support for the battery and charger in Motorola phones.
+
 endif # POWER_SUPPLY

@@ -137,9 +137,11 @@ static int wakelocks_read_proc(char *page, char **start, off_t off,
 	len += snprintf(page + len, count - len,
 			"name\tcount\texpire_count\twake_count\tactive_since"
 			"\ttotal_time\tsleep_time\tmax_time\tlast_change\n");
+/*
 	list_for_each_entry(lock, &inactive_locks, link) {
 		len += print_lock_stat(page + len, count - len, lock);
 	}
+*/
 	for (type = 0; type < WAKE_LOCK_TYPE_COUNT; type++) {
 		list_for_each_entry(lock, &active_wake_locks[type], link)
 			len += print_lock_stat(page + len, count - len, lock);
@@ -225,7 +227,6 @@ static void expire_wake_lock(struct wake_lock *lock)
 /* Caller must acquire the list_lock spinlock */
 static void print_active_locks(int type)
 {
-	unsigned long irqflags;
 	struct wake_lock *lock;
 
 	BUG_ON(type >= WAKE_LOCK_TYPE_COUNT);
@@ -444,7 +445,8 @@ static void wake_lock_internal(
 		list_add(&lock->link, &active_wake_locks[type]);
 	}
 	if (type == WAKE_LOCK_SUSPEND) {
-		current_event_num++;
+		if (lock == &main_wake_lock)
+			current_event_num++;
 #ifdef CONFIG_WAKELOCK_STAT
 		if (lock == &main_wake_lock)
 			update_sleep_wait_stats_locked(1);

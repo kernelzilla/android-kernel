@@ -218,6 +218,8 @@ static irqreturn_t dss_irq_handler_omap3(int irq, void *arg)
 {
 	u32 irqstatus;
 
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+
 	irqstatus = dss_read_reg(DSS_IRQSTATUS);
 
 	if (irqstatus & (1<<0))	/* DISPC_IRQ */
@@ -226,6 +228,8 @@ static irqreturn_t dss_irq_handler_omap3(int irq, void *arg)
 	if (irqstatus & (1<<1))	/* DSI_IRQ */
 		dsi_irq_handler();
 #endif
+
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	return IRQ_HANDLED;
 }

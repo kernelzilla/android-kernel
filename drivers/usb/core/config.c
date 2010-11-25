@@ -4,6 +4,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <asm/byteorder.h>
 #include "usb.h"
 #include "hcd.h"
@@ -620,6 +621,7 @@ int usb_get_configuration(struct usb_device *dev)
 
 		dev->rawdescriptors[cfgno] = bigbuffer;
 
+		dma_cache_maint(bigbuffer, length, DMA_FROM_DEVICE);
 		result = usb_parse_configuration(&dev->dev, cfgno,
 		    &dev->config[cfgno], bigbuffer, length);
 		if (result < 0) {

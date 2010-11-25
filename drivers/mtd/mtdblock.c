@@ -200,9 +200,36 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 	unsigned int sect_size = mtdblk->cache_size;
 	size_t retlen;
 	int ret;
+#ifdef CONFIG_MACH_CALGARY
+        unsigned int vfat_page_offset = 0;
+        static char __attribute__((aligned(512))) msm_buf[2048];
+        char * swap_buf = buf;        
+#endif	
 
 	DEBUG(MTD_DEBUG_LEVEL2, "mtdblock: read on \"%s\" at 0x%lx, size 0x%x\n",
 			mtd->name, pos, len);
+
+
+#ifdef CONFIG_MACH_CALGARY
+         /* 
+          *  FAT fs driver reads 512-byte pages and MSM NAND controller 
+	  *   returns 2048 byte pages.This hampers the mount of CDROM partition.
+	  *  We use a larger buffer to extract the appropriate 512-byte page 
+	  */
+
+        if  ((mtd->name) && ((strcmp(mtd->name, "cdrom") == 0)))
+        {
+          /* 
+	   *  Pass a larger buffer to accomodate MSM NAND read.
+	   *  Mark the offset of the desired VFAT page 
+	   */
+	   
+	   vfat_page_offset = pos & 0x00000700; //0x200 * [0,2,4 or 6]
+	   len = 2048;                          // MSM NAND PAGE length
+           pos &= 0xfffff800;                   //align to 2048 byte boundary
+           buf = (char *)&msm_buf;              //Use larger buffer
+        }
+#endif	
 
 	if (!sect_size)
 		return mtd->read(mtd, pos, len, &retlen, buf);
@@ -235,6 +262,17 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 		pos += size;
 		len -= size;
 	}
+
+#ifdef CONFIG_MACH_CALGARY
+          /* 
+	   *  Re-position to seek the appropriate 512-byte block 
+	   */	
+        
+        if  ((mtd->name) && ((strcmp(mtd->name, "cdrom") == 0))){
+          memcpy(swap_buf, ((char *)&msm_buf) + vfat_page_offset, 512);
+	}
+        
+#endif	
 
 	return 0;
 }

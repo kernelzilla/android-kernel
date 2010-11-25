@@ -110,6 +110,9 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 	unsigned short keycode = keyentry & MATRIX_KEY_MASK;
 	unsigned short dev = keyentry >> MATRIX_CODE_BITS;
 
+	if (mi->sw_fixup && !mi->sw_fixup(key_index))
+		return;
+
 	if (pressed != test_bit(keycode, kp->input_devs->dev[dev]->key)) {
 		if (keycode == KEY_RESERVED) {
 			if (mi->flags & GPIOKPF_PRINT_UNMAPPED_KEYS)
@@ -228,7 +231,7 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 			gpio_direction_input(mi->output_gpios[i]);
 	}
 	wake_lock(&kp->wake_lock);
-	hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+	hrtimer_start(&kp->timer, ktime_set(0, 10000), HRTIMER_MODE_REL);
 	return IRQ_HANDLED;
 }
 
@@ -388,7 +391,8 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 
 		if (kp->use_irq)
 			wake_lock(&kp->wake_lock);
-		hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+		hrtimer_start(&kp->timer, ktime_set(0, 10000),
+				 HRTIMER_MODE_REL);
 
 		return 0;
 	}

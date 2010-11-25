@@ -263,12 +263,33 @@ config INPUT_PROXIMITY_SFH7743
 	  If unsure, say N.
 	  To compile this driver a a module, choose M here.
 
+config INPUT_MSM_SFH7743
+        tristate "Proximity sensor SFH 7743 for QualCommon MSM"
+        depends on KERNEL_MOTOROLA || MACH_MOT
+        default n
+        help
+          Say Y here if you are using a driver for a SFH 7743
+          proximity device.
+
+          If unsure, say N.
+
 config INPUT_HALLEFFECT_BU52014HV
 	tristate "BU52014HV Hall Effect Sensor"
-	default y
+	default n
 	help
 	  Say Y here if you wish to include support for the BU52014HV hall
 	  effect sensor.
 
 	  If unsure, say N.
+
+config BMA150
+	tristate "Bosch BMA150 accelerometer"
+	default n
+	help
+	  Say Y here if you want support for the BMA150 accelerometer
+	  device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called bma150.
+
 endif

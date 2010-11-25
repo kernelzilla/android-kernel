@@ -255,6 +255,8 @@ struct usb_device_descriptor {
 #define USB_CLASS_MISC			0xef
 #define USB_CLASS_APP_SPEC		0xfe
 #define USB_CLASS_VENDOR_SPEC		0xff
+#define USB_SUB_CLASS_COMMON		0x02
+#define USB_PROTOCOL_IAD		0x01
 
 /*-------------------------------------------------------------------------*/
 
@@ -412,6 +414,8 @@ struct usb_interface_assoc_descriptor {
 	__u8  iFunction;
 } __attribute__ ((packed));
 
+
+#define USB_DT_INTERFACE_ASSOCIATION_SIZE  8
 
 /*-------------------------------------------------------------------------*/
 

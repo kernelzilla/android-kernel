@@ -106,19 +106,18 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 	u32 i;
 	struct hp3a_internal_buffer *ibuffer = NULL;
 
-	if (unlikely((HIST_DONE & status) != HIST_DONE)) {
+	if (unlikely((HIST_DONE & status) != HIST_DONE))
 		return;
-	}
 
 	omap_writel(omap_readl(ISPHIST_PCR) & ~(ISPHIST_PCR_EN), ISPHIST_PCR);
 
-	if (unlikely(g_tc.v4l2_streaming == 0)) {
+	if (unlikely(g_tc.v4l2_streaming == 0))
 		return;
-	}
 
 	if (hp3a_dequeue(&g_tc.hist_hw_queue,  &ibuffer) == 0) {
 		/* If there is a buffer available then fill it. */
-		hist_buffer = (u32 *)phys_to_virt(page_to_phys(ibuffer->pages[0]));
+		hist_buffer = (u32 *)phys_to_virt(
+			page_to_phys(ibuffer->pages[0]));
 
 		omap_writel((omap_readl(ISPHIST_CNT)) | \
 			ISPHIST_CNT_CLR_EN, ISPHIST_CNT);
@@ -129,10 +128,10 @@ static void hp3a_histogram_isr(unsigned long status, isp_vbq_callback_ptr arg1,
 		omap_writel((omap_readl(ISPHIST_CNT)) & ~ISPHIST_CNT_CLR_EN,
 			ISPHIST_CNT);
 	} else {
-		/* There are no buffers availavle so just clear internal histogram memory. */
-		for (i = g_tc.hist_bin_size; i--;) {
+		/* There are no buffers availavle so just */
+		/* clear internal histogram memory. */
+		for (i = g_tc.hist_bin_size; i--;)
 			omap_writel(0, ISPHIST_DATA);
-		}
 	}
 
 	/* Set memory HW memory address and enable. */
@@ -169,12 +168,12 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		/* Install HIST_IRQ callback. */
 		ret = isp_set_callback(CBK_HIST_DONE, hp3a_histogram_isr,
 					(void *)NULL, (void *)NULL);
-		if (ret) {
+		if (ret)
 			return ret;
-		}
 
 		if (hp3a_hist_busy()) {
-			dev_info(device->dev, "Error: Histogram engine is busy!\n");
+			dev_info(device->dev, \
+				"Error: Histogram engine is busy\n");
 			return -EINVAL;
 		}
 
@@ -190,27 +189,35 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 
 		if (config->hist_source) {
 			/* source is memory. */
-			WRITE_HV_INFO(isp_hist_regs[14].val, config->hist_h_v_info);
+			WRITE_HV_INFO(isp_hist_regs[14].val,
+				config->hist_h_v_info);
 
-			if ((config->hist_radd & ISP_32B_BOUNDARY_BUF) == config->hist_radd) {
-				WRITE_RADD(isp_hist_regs[12].val, config->hist_radd);
+			if ((config->hist_radd & ISP_32B_BOUNDARY_BUF) ==
+				config->hist_radd) {
+				WRITE_RADD(isp_hist_regs[12].val,
+					config->hist_radd);
 			} else {
-				dev_info(device->dev, "Error: Address should be in 32 byte boundary\n");
+				dev_info(device->dev,
+					"Err: Addr needs 32 byte boundary\n");
 				goto func_exit;
 			}
 
-			if ((config->hist_radd_off & ISP_32B_BOUNDARY_OFFSET) == config->hist_radd_off) {
-				WRITE_RADD_OFF(isp_hist_regs[13].val, config->hist_radd_off);
+			if ((config->hist_radd_off &
+				ISP_32B_BOUNDARY_OFFSET) ==
+				config->hist_radd_off) {
+				WRITE_RADD_OFF(isp_hist_regs[13].val, \
+					config->hist_radd_off);
 			} else {
-				dev_info(device->dev, "Error: Offset should be in 32 byte boundary\n");
+				dev_info(device->dev,
+					"Err: Offset needs 32 byte boundary\n");
 				goto func_exit;
 			}
 		}
 
-		/* set data size bit if the pixel data is 8-bit wide and 2 pixels are packed in to 16-bits. */
-		if (config->hist_packed_pxl) {
+		/* set data size bit if the pixel data is 8-bit wide and */
+		/* 2 pixels are packed in to 16-bits. */
+		if (config->hist_packed_pxl)
 			WRITE_DATA_SIZE(isp_hist_regs[1].val, 1);
-		}
 
 		/* White Balance Field-to-Pattern Assignments */
 		if (unlikely((config->wb_gain_R > MAX_WB_GAIN)
@@ -227,9 +234,8 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		}
 
 		/* Regions size and position */
-		if (config->num_regions > MAX_REGIONS) {
+		if (config->num_regions > MAX_REGIONS)
 			goto func_exit;
-		}
 
 		/* Region 0. */
 		WRITE_REG_HORIZ(isp_hist_regs[3].val, config->reg0_hor);
@@ -251,8 +257,10 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		/* Number of Bins. */
 		if (unlikely(((config->hist_bins > BINS_256) &&
 			(config->hist_bins != BINS_32)) ||
-			((config->hist_bins == BINS_256) && config->num_regions != 0) ||
-			((config->hist_bins == BINS_128) && config->num_regions >= 2))) {
+			((config->hist_bins == BINS_256) &&
+			config->num_regions != 0) ||
+			((config->hist_bins == BINS_128) &&
+			config->num_regions >= 2))) {
 			dev_info(device->dev,
 				"Error: Invalid Bins Number: %d\n",
 				config->hist_bins);
@@ -273,13 +281,16 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 				g_tc.hist_bin_size = HIST_MEM_SIZE;
 			} else if (config->hist_bins == BINS_128) {
 				bit_shift = config->input_bit_width - 7;
-				g_tc.hist_bin_size = (HIST_MEM_SIZE>>(1-config->num_regions));
+				g_tc.hist_bin_size = (HIST_MEM_SIZE>>
+					(1-config->num_regions));
 			} else if (config->hist_bins == BINS_64) {
 				bit_shift = config->input_bit_width - 6;
-				g_tc.hist_bin_size = (HIST_MEM_SIZE>>(2-config->num_regions));
+				g_tc.hist_bin_size = (HIST_MEM_SIZE>>
+					(2-config->num_regions));
 			} else if (config->hist_bins == BINS_32) {
 				bit_shift = config->input_bit_width - 5;
-				g_tc.hist_bin_size = (HIST_MEM_SIZE>>(3-config->num_regions));
+				g_tc.hist_bin_size = (HIST_MEM_SIZE>>
+					(3-config->num_regions));
 			} else {
 				goto func_exit;
 			}

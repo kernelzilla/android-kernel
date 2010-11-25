@@ -1255,6 +1255,17 @@ void vfree(const void *addr)
 }
 EXPORT_SYMBOL(vfree);
 
+#ifdef CONFIG_DEBUG_MEMLEAK
+void memleak_vfree(void *addr)
+{
+	BUG_ON(in_interrupt());
+
+	memleak_free(addr);
+
+	__vunmap(addr, 1);
+}
+EXPORT_SYMBOL(memleak_vfree);
+#endif
 /**
  *	vunmap  -  release virtual mapping obtained by vmap()
  *	@addr:		memory base address
@@ -1394,12 +1405,47 @@ static void *__vmalloc_node(unsigned long size, gfp_t gfp_mask, pgprot_t prot,
 	return __vmalloc_area_node(area, gfp_mask, prot, node, caller);
 }
 
+#ifdef CONFIG_DEBUG_MEMLEAK
+static void *__memleak_vmalloc_node(unsigned long size, gfp_t gfp_mask,
+					pgprot_t prot, int node, void *caller)
+{
+	struct vm_struct *area;
+	void *addr;
+	unsigned long real_size = size;
+
+	size = PAGE_ALIGN(size);
+	if (!size || (size >> PAGE_SHIFT) > num_physpages)
+		return NULL;
+
+	area = get_vm_area_node(size, VM_ALLOC, node, gfp_mask);
+	if (!area)
+		return NULL;
+
+	addr = __vmalloc_area_node(area, gfp_mask, prot, node, caller);
+
+	/* this needs ref_count = 2 since the vm_struct also contains
+	   a pointer to this address */
+	memleak_alloc(addr, real_size, 2);
+
+	return addr;
+}
+#endif
+
 void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
 {
 	return __vmalloc_node(size, gfp_mask, prot, -1,
 				__builtin_return_address(0));
 }
 EXPORT_SYMBOL(__vmalloc);
+
+#ifdef CONFIG_DEBUG_MEMLEAK
+void *__memleak_vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
+{
+	return __memleak_vmalloc_node(size, gfp_mask, prot, -1,
+			__builtin_return_address(0));
+}
+EXPORT_SYMBOL(__memleak_vmalloc);
+#endif
 
 /**
  *	vmalloc  -  allocate virtually contiguous memory
@@ -1416,6 +1462,14 @@ void *vmalloc(unsigned long size)
 					-1, __builtin_return_address(0));
 }
 EXPORT_SYMBOL(vmalloc);
+
+#ifdef CONFIG_DEBUG_MEMLEAK
+void *memleak_vmalloc(unsigned long size)
+{
+	return __memleak_vmalloc(size, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
+}
+EXPORT_SYMBOL(memleak_vmalloc);
+#endif
 
 /**
  * vmalloc_user - allocate zeroed virtually contiguous memory for userspace

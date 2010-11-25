@@ -42,6 +42,11 @@
 static DEFINE_MUTEX(core_lock);
 static DEFINE_IDR(i2c_adapter_idr);
 
+#if defined(CONFIG_MACH_MOT)
+static struct mutex __i2c_common_mutex;
+bool __i2c_common_mutex_flag = 0;
+#endif
+
 #define is_newstyle_driver(d) ((d)->probe || (d)->remove || (d)->detect)
 
 static int i2c_detect(struct i2c_adapter *adapter, struct i2c_driver *driver);
@@ -443,6 +448,13 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	/* Can't register until after driver model init */
 	if (unlikely(WARN_ON(!i2c_bus_type.p)))
 		return -EAGAIN;
+
+#if defined(CONFIG_MACH_MOT)
+	if (!__i2c_common_mutex_flag) {
+		mutex_init(&__i2c_common_mutex);
+		__i2c_common_mutex_flag = 1;
+	}
+#endif
 
 	mutex_init(&adap->bus_lock);
 	mutex_init(&adap->clist_lock);
@@ -1033,6 +1045,20 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg *msgs, int num)
 	 *    (discarding status on the first one).
 	 */
 
+#if defined(CONFIG_MACH_MOT)
+	/* Per I2C spec, address below 0x08 is reserved for high speed devices
+	 * MSM cannot support fast speed devices for these addresses,
+	 * so we need use I2C over GPIO with a low address devices
+	 */
+	if (msgs[0].addr < 0x08) {
+		printk(KERN_INFO"i2c_transfer: low addr: %02x\n", msgs[0].addr);
+		adap = i2c_get_adapter(1);
+		if (!adap)
+			return -ENODEV;
+	}
+	/* end hack */
+#endif
+
 	if (adap->algo->master_xfer) {
 #ifdef DEBUG
 		for (ret = 0; ret < num; ret++) {
@@ -1052,7 +1078,13 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg *msgs, int num)
 			mutex_lock_nested(&adap->bus_lock, adap->level);
 		}
 
+#if defined(CONFIG_MACH_MOT)
+		mutex_lock(&__i2c_common_mutex);
+#endif
 		ret = adap->algo->master_xfer(adap,msgs,num);
+#if defined(CONFIG_MACH_MOT)
+		mutex_unlock(&__i2c_common_mutex);
+#endif
 		mutex_unlock(&adap->bus_lock);
 
 		return ret;

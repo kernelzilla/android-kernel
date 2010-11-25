@@ -88,9 +88,10 @@ config OMAP_SMARTREFLEX
 	  compensation for VDD1 and VDD2, user must write 1 to
 	  /sys/power/sr_vddX_autocomp, where X is 1 or 2.
 
-config OMAP_SMARTREFLEX_TESTING
-	bool "Smartreflex testing support"
+config OMAP_SMARTREFLEX_TESTING_NVALUES
+	bool "Use SmartReflex Test NVALUES"
 	depends on OMAP_SMARTREFLEX
+	depends on EXPERIMENTAL
 	default n
 	help
 	  Say Y if you want to enable SmartReflex testing with SW hardcoded
@@ -100,7 +101,18 @@ config OMAP_SMARTREFLEX_TESTING
 	  SmartReflex modules are included. Using these hardcoded values set
 	  in software, one can test the SmartReflex features without E-fuse.
 
-	  WARNING: Enabling this option may cause your device to hang!
+	  WARNING:
+	  * Enabling this option may cause your device to hang!
+	  * If you don't know what you are doing, leave this option as n
+
+config OMAP_VC_BYPASS_UPDATE
+	bool "Use VC Bypass method of updating voltage"
+	depends on OMAP_SMARTREFLEX
+	default n
+	help
+	   Say Y if you would like to use VC Bypass method of
+	   update. If this is disabled, the default
+	   VP forceupdate method is used.
 
 config OMAP_RESET_CLOCKS
 	bool "Reset unused clocks during boot"
@@ -113,6 +125,13 @@ config OMAP_RESET_CLOCKS
 	  If you are booting from another operating system, you
 	  probably do not want this option enabled until your
 	  device drivers work properly.
+
+config OMAP_PM_POWER_OFF
+	bool "Power down the omap devices."
+	depends on ARCH_OMAP
+        default n
+	help
+	  Say Y if you want to power off the devices.
 
 config OMAP_BOOT_TAG
 	bool "OMAP bootloader information passing"
@@ -180,6 +199,14 @@ config OMAP_MCBSP
 	help
 	  Say Y here if you want support for the OMAP Multichannel
 	  Buffered Serial Port.
+
+config MEM_DUMP
+	bool " memory dump support"
+	depends on ARCH_OMAP
+	default y
+	help
+	  Say Y here if you want support for warmreset system when panic
+	  happens for memory dump purpose.
 
 config OMAP_MBOX_FWK
 	tristate "Mailbox framework support"

@@ -28,6 +28,11 @@
 #include <linux/led-lm3530.h>
 #include <linux/types.h>
 
+#ifdef CONFIG_ARM_OF
+#include <mach/dt_path.h>
+#include <asm/prom.h>
+#endif
+
 int als_resistor_val[16] = {1, 9260, 4630, 3090, 2310,
 1850, 1540, 1320, 1160, 1030, 925, 842, 772, 712, 661, 617};
 
@@ -574,7 +579,7 @@ static int ld_lm3530_probe(struct i2c_client *client,
 		goto error_input_allocate_failed;
 	}
 
-	als_data->idev->name = LD_LM3530_NAME;
+	als_data->idev->name = ALS_IP_DEV;
 	input_set_capability(als_data->idev, EV_MSC, MSC_RAW);
 	input_set_capability(als_data->idev, EV_LED, LED_MISC);
 
@@ -771,8 +776,44 @@ static struct i2c_driver ld_lm3530_i2c_driver = {
 		   },
 };
 
+#ifdef CONFIG_ARM_OF
+static int lights_of_init(void)
+{
+	u8 device_available;
+	struct device_node *node;
+	const void *prop;
+
+	node = of_find_node_by_path(DT_BACKLIGHT);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_BACKLIGHT);
+		return -ENODEV;
+	}
+
+	prop = of_get_property(node, "tablet_lcd", NULL);
+	if (prop)
+		device_available = *(u8 *)prop;
+	else {
+		pr_err("Read property %s error!\n", DT_PROP_TABLET_BUTTON);
+		of_node_put(node);
+		return -ENODEV;
+	}
+
+	of_node_put(node);
+	return device_available;
+}
+#endif
+
 static int __init ld_lm3530_init(void)
 {
+#ifdef CONFIG_ARM_OF
+	int err = lights_of_init();
+	if (err <= 0) {
+		pr_err("Tablet lcd device declared unavailable: %d\n",
+			err);
+		return err;
+	}
+#endif
 	return i2c_add_driver(&ld_lm3530_i2c_driver);
 }
 

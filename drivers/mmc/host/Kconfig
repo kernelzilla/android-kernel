@@ -235,3 +235,67 @@ config MMC_TMIO
 	help
 	  This provides support for the SD/MMC cell found in TC6393XB,
 	  T7L66XB and also ipaq ASIC3
+
+config MMC_TST
+    bool "MMC insert/removal auto test support"
+    default n
+    help
+           This flag controls Motorola specific changes that allows to
+           simulate MMC card insert/removal in software way instead of
+           doing it manually.
+
+config MMC_MSM
+	tristate "Qualcomm SDCC Controller Support"
+	depends on MMC && ARCH_MSM
+	help
+	  This provides support for the SD/MMC cell found in the
+          MSM and QSD SOCs from Qualcomm.
+
+config MMC_MSM7X00A_RESUME_IN_WQ
+	bool "Perform MMC resume in work-queue (EXPERIMENTAL)"
+        depends on EXPERIMENTAL && MMC_MSM
+	default n
+	help
+	  This forces msm host-controller driver to perform
+          the majority of its resume-work in a work-queue.
+
+config MMC_MSM_SDIO_SUPPORT
+	boolean "Qualcomm MSM SDIO support"
+	depends on MMC_MSM
+	help
+	  This enables SDIO support in the msm_sdcc driver.
+
+config MMC_MSM_CARD_HW_DETECTION
+	boolean "Qualcomm MMC Hardware detection support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y if the hardware has support to detect card insertion/removal.
+
+config MMC_MSM_SDC1_SUPPORT
+	boolean "Qualcomm SDC1 support"
+	depends on MMC_MSM
+	default y
+	help
+	  Select Y to enable Slot 1.
+
+config MMC_MSM_SDC2_SUPPORT
+	boolean "Qualcomm SDC2 support"
+	depends on MMC_MSM
+	default y
+	help
+	  Select Y to enable Slot 2.
+
+config MMC_MSM_SDC3_SUPPORT
+	boolean "Qualcomm SDC3 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 3.
+
+config MMC_MSM_SDC4_SUPPORT
+	boolean "Qualcomm SDC4 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 4.

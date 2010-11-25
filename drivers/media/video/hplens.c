@@ -258,7 +258,8 @@ static int hplens_ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
  * from the video_control[] array.  Otherwise, returns -EINVAL if the
  * control is not supported.
  */
-static int hplens_ioctl_queryctrl(struct v4l2_int_device *s, struct v4l2_queryctrl *qc)
+static int hplens_ioctl_queryctrl(struct v4l2_int_device *s,
+			struct v4l2_queryctrl *qc)
 {
 	int i;
 
@@ -298,36 +299,42 @@ static int hplens_ioctl_s_ctrl(struct v4l2_int_device *s,
 
 	switch (vc->id) {
 	case V4L2_CID_HPLENS_CMD_READ: {
-		ret = copy_from_user(&reg, (void *)vc->value,  sizeof(struct hplens_reg));
+		ret = copy_from_user(&reg, (void *)vc->value,  \
+			sizeof(struct hplens_reg));
 		if (ret == 0) {
-			if (reg.addr[0] != 0xff) {   /* valid register address */
+			if (reg.addr[0] != 0xff) {
+				/* valid register address */
 				/* write the register address to read */
-				ret = hplens_reg_write(reg.dev_addr, reg.addr, reg.len_addr);
+				ret = hplens_reg_write(reg.dev_addr, \
+					reg.addr, reg.len_addr);
 			}
 			/* Read the register */
-			ret = hplens_reg_read(reg.dev_addr, reg.data, reg.len_data);
+			ret = hplens_reg_read(reg.dev_addr, \
+				reg.data, reg.len_data);
 			if (ret == 0) {
-				ret = copy_to_user((void *)vc->value, &reg, sizeof(struct hplens_reg));
+				ret = copy_to_user((void *)vc->value, &reg, \
+					sizeof(struct hplens_reg));
 			}
 		}
 	}
 	break;
 	case V4L2_CID_HPLENS_CMD_WRITE: {
-		ret = copy_from_user(&reg, (void *)vc->value,  sizeof(struct hplens_reg));
+		ret = copy_from_user(&reg, (void *)vc->value,  \
+			sizeof(struct hplens_reg));
 		if (ret == 0) {
 			if (reg.addr[0] != 0xff) { /* valid register address */
 				while (fdb < reg.len_addr) {
-					/* put the register address to write in the buffer first */
+					/* write register address in buffer */
 					write_buffer[fdb] = reg.addr[fdb];
 					fdb++;
 				}
 			}
 
-			for (idx = fdb; idx <= reg.len_data; idx++) {
+			for (idx = fdb; idx <= reg.len_data; idx++)
 				write_buffer[idx] = reg.data[idx-fdb];
-			}
 
-			ret = hplens_reg_write(reg.dev_addr, write_buffer, reg.len_data + fdb);
+			ret = hplens_reg_write(reg.dev_addr, \
+				write_buffer, reg.len_data + fdb);
 		}
 	}
 	break;
@@ -335,22 +342,25 @@ static int hplens_ioctl_s_ctrl(struct v4l2_int_device *s,
 
 		/* Using dynamic memory. */
 		eeprom = kmalloc(sizeof(struct hplens_eeprom), GFP_KERNEL);
-		if(eeprom == NULL){
+		if (eeprom == NULL)
 			return -EINVAL;
-		}
 
-		ret = copy_from_user(eeprom, (void *)vc->value,  sizeof(struct hplens_eeprom));
+		ret = copy_from_user(eeprom, (void *)vc->value,  \
+			sizeof(struct hplens_eeprom));
 		if (ret == 0) {
-			if (eeprom->addr[0] != 0xff) {   /* valid register address */
+			if (eeprom->addr[0] != 0xff) {
+				/* valid register address */
 				/* write the register address to read */
-				ret = hplens_reg_write(eeprom->dev_addr, eeprom->addr, eeprom->len_addr);
+				ret = hplens_reg_write(eeprom->dev_addr, \
+					eeprom->addr, eeprom->len_addr);
 			}
 
 			/* Read the register */
-			ret = hplens_reg_read(eeprom->dev_addr, eeprom->data, eeprom->len_data);
-			if (ret == 0) {
-				ret = copy_to_user((void *)vc->value, eeprom, sizeof(struct hplens_eeprom));
-			}
+			ret = hplens_reg_read(eeprom->dev_addr, \
+				eeprom->data, eeprom->len_data);
+			if (ret == 0)
+				ret = copy_to_user((void *)vc->value, eeprom, \
+					sizeof(struct hplens_eeprom));
 		}
 
 		/* clean up. */
@@ -401,7 +411,8 @@ static struct v4l2_int_device hplens_int_device = {
  *
  * Returns 0 if successful, or -EBUSY if unable to get client attached data.
  **/
-static int hplens_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int hplens_probe(struct i2c_client *client,
+			const struct i2c_device_id *id)
 {
 	struct hplens_device *lens = &hplens;
 	int err;
@@ -427,7 +438,8 @@ static int hplens_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	err = v4l2_int_device_register(lens->v4l2_int_device);
 	if (err) {
-		printk(KERN_ERR "Failed to Register " DRIVER_NAME " as V4L2 device.\n");
+		printk(KERN_ERR "Failed to Register " \
+			DRIVER_NAME " as V4L2 device.\n");
 		i2c_set_clientdata(client, NULL);
 	} else {
 		printk(KERN_ERR "Registered " DRIVER_NAME " as V4L2 device.\n");

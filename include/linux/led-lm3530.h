@@ -24,6 +24,8 @@
 #define	MANUAL_SENSOR	2
 
 
+#define ALS_IP_DEV "als"
+
 #define LD_LM3530_LED_DEV "lcd-backlight"
 
 #define LD_LM3530_NAME "lm3530_led"

@@ -248,6 +248,10 @@ SECTIONS
 		*(.toc)
 	}
 #endif
+	/* We need constructor data for the gcov patch. */
+	.data.gcov : {
+		CONSTRUCTORS
+	}
 
 	. = ALIGN(PAGE_SIZE);
 	_edata  =  .;

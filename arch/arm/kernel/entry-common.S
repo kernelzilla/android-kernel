@@ -6,6 +6,9 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ * Date      Author    Comment
+ * --------- --------- ---------------------------------------
+ * 11/05/2007 Motorola add system call log for LTT-LITE
  */
 
 #include <asm/unistd.h>
@@ -22,6 +25,18 @@
  * stack.
  */
 ret_fast_syscall:
+#ifdef CONFIG_LTT_LITE
+/*
+ * The syscall number is stored in r7.
+ * We add it as an additional parameter for LTT-LITE.
+ * The LTT function will ignore it.
+ */
+	mov     r1, r0                          @ save returned r0
+	mov     r0, r7
+	mov     r7, r1
+	bl      trace_real_syscall_exit
+	mov     r0, r7
+#endif
 	disable_irq				@ disable interrupts
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
@@ -240,6 +255,18 @@ ENTRY(vector_swi)
 	mcr	p15, 0, ip, c1, c0		@ update control register
 #endif
 	enable_irq
+
+#ifdef CONFIG_LTT_LITE
+	/*
+	 * note that validity of scno is not yet checked.
+	 * The visualizer checks it.
+	 */
+	add     r1, sp, #S_R0                   @ pointer to regs
+	mov     r0, scno
+	bl      trace_real_syscall_entry
+	add     r1, sp, #S_R0                   @ pointer to regs
+	ldmia   r1, {r0 - r3}                   @ have to reload r0 - r3
+#endif
 
 	get_thread_info tsk
 	adr	tbl, sys_call_table		@ load syscall table pointer

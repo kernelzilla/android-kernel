@@ -31,6 +31,8 @@
 
 #include <linux/lis331dlh.h>
 
+#define MODULE_NAME "lis331dlh"
+
 #define NAME				"lis331dlh"
 
 /** Maximum polled-device-reported g value */
@@ -67,6 +69,13 @@
 #define I2C_RETRY_DELAY		5
 #define I2C_RETRIES		5
 #define AUTO_INCREMENT		0x80
+
+static int poll_interval;
+module_param(poll_interval, int, 0444);
+static unsigned g_range;
+module_param(g_range, uint, 0444);
+static unsigned enabled;
+module_param(enabled, uint, 0444);
 
 struct {
 	unsigned int cutoff;
@@ -365,6 +374,7 @@ static int lis331dlh_enable(struct lis331dlh_data *lis)
 		schedule_delayed_work(&lis->input_work,
 				      msecs_to_jiffies(lis->
 						       pdata->poll_interval));
+        enabled = atomic_read (&lis->enabled);
 	}
 
 	return 0;
@@ -416,6 +426,7 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 
 		lis->pdata->poll_interval =
 		    max(interval, lis->pdata->min_interval);
+        poll_interval = lis->pdata->poll_interval;
 		err = lis331dlh_update_odr(lis, lis->pdata->poll_interval);
 		/* TODO: if update fails poll is still set */
 		if (err < 0)
@@ -450,6 +461,7 @@ static int lis331dlh_misc_ioctl(struct inode *inode, struct file *file,
 		if (err < 0)
 			return err;
 
+        g_range = arg;
 		break;
 
 	default:
@@ -512,6 +524,7 @@ static int lis331dlh_validate_pdata(struct lis331dlh_data *lis)
 	lis->pdata->poll_interval = max(lis->pdata->poll_interval,
 					lis->pdata->min_interval);
 
+    poll_interval = lis->pdata->poll_interval;
 	if (lis->pdata->axis_map_x > 2 ||
 	    lis->pdata->axis_map_y > 2 || lis->pdata->axis_map_z > 2) {
 		dev_err(&lis->client->dev,

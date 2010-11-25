@@ -225,6 +225,7 @@ static void akm8973_device_power_off(struct akm8973_data *akm)
 {
 	if (akm->pdata->power_off) {
 		disable_irq_nosync(akm->client->irq);
+		mutex_unlock(&akm->lock);
 		akm->pdata->power_off();
 		clear_bit(BUSY, &akm->flags);
 		akm->hw_initialized = 0;
@@ -243,6 +244,7 @@ static int akm8973_device_power_on(struct akm8973_data *akm)
 	}
 
 	if (!akm->hw_initialized) {
+		udelay(600);
 		err = akm8973_hw_init(akm);
 		if (err < 0) {
 			akm8973_device_power_off(akm);

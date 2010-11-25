@@ -387,6 +387,9 @@
 #define __NR_dup3			(__NR_SYSCALL_BASE+358)
 #define __NR_pipe2			(__NR_SYSCALL_BASE+359)
 #define __NR_inotify_init1		(__NR_SYSCALL_BASE+360)
+#ifdef CONFIG_LTT_LITE
+#define __NR_lttlite		(__NR_SYSCALL_BASE+361)
+#endif
 
 /*
  * The following SWIs are ARM private.

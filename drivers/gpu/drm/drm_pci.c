@@ -1,7 +1,7 @@
-/* drm_pci.h -- PCI DMA memory management wrappers for DRM -*- linux-c -*- */
+/* drm_pci.h -- DMA memory management wrappers for DRM -*- linux-c -*- */
 /**
  * \file drm_pci.c
- * \brief Functions and ioctls to manage PCI memory
+ * \brief Functions and ioctls to manage DMA memory
  *
  * \warning These interfaces aren't stable yet.
  *
@@ -15,6 +15,7 @@
 /*
  * Copyright 2003 José Fonseca.
  * Copyright 2003 Leif Delgass.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -40,144 +41,122 @@
 #include <linux/dma-mapping.h>
 #include "drmP.h"
 
+#ifdef CONFIG_PCI
+
+static int drm_fill_in_pci_dev(struct drm_device *dev,
+				struct pci_dev *pdev,
+				const struct pci_device_id *ent,
+				struct drm_driver *driver)
+{
+	dev->pdev = pdev;
+	dev->pci_device = pdev->device;
+	dev->pci_vendor = pdev->vendor;
+
+	return drm_fill_in_dev(dev, ent, driver);
+}
+
 /**********************************************************************/
 /** \name PCI memory */
 /*@{*/
 
 /**
- * \brief Allocate a PCI consistent memory block, for DMA.
- */
-drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t align,
-				dma_addr_t maxaddr)
-{
-	drm_dma_handle_t *dmah;
-#if 1
-	unsigned long addr;
-	size_t sz;
-#endif
-#ifdef DRM_DEBUG_MEMORY
-	int area = DRM_MEM_DMA;
-
-	spin_lock(&drm_mem_lock);
-	if ((drm_ram_used >> PAGE_SHIFT)
-	    > (DRM_RAM_PERCENT * drm_ram_available) / 100) {
-		spin_unlock(&drm_mem_lock);
-		return 0;
-	}
-	spin_unlock(&drm_mem_lock);
-#endif
-
-	/* pci_alloc_consistent only guarantees alignment to the smallest
-	 * PAGE_SIZE order which is greater than or equal to the requested size.
-	 * Return NULL here for now to make sure nobody tries for larger alignment
-	 */
-	if (align > size)
-		return NULL;
-
-	if (pci_set_dma_mask(dev->pdev, maxaddr) != 0) {
-		DRM_ERROR("Setting pci dma mask failed\n");
-		return NULL;
-	}
-
-	dmah = kmalloc(sizeof(drm_dma_handle_t), GFP_KERNEL);
-	if (!dmah)
-		return NULL;
-
-	dmah->size = size;
-	dmah->vaddr = dma_alloc_coherent(&dev->pdev->dev, size, &dmah->busaddr, GFP_KERNEL | __GFP_COMP);
-
-#ifdef DRM_DEBUG_MEMORY
-	if (dmah->vaddr == NULL) {
-		spin_lock(&drm_mem_lock);
-		++drm_mem_stats[area].fail_count;
-		spin_unlock(&drm_mem_lock);
-		kfree(dmah);
-		return NULL;
-	}
-
-	spin_lock(&drm_mem_lock);
-	++drm_mem_stats[area].succeed_count;
-	drm_mem_stats[area].bytes_allocated += size;
-	drm_ram_used += size;
-	spin_unlock(&drm_mem_lock);
-#else
-	if (dmah->vaddr == NULL) {
-		kfree(dmah);
-		return NULL;
-	}
-#endif
-
-	memset(dmah->vaddr, 0, size);
-
-	/* XXX - Is virt_to_page() legal for consistent mem? */
-	/* Reserve */
-	for (addr = (unsigned long)dmah->vaddr, sz = size;
-	     sz > 0; addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-		SetPageReserved(virt_to_page(addr));
-	}
-
-	return dmah;
-}
-
-EXPORT_SYMBOL(drm_pci_alloc);
-
-/**
- * \brief Free a PCI consistent memory block without freeing its descriptor.
+ * Register.
  *
- * This function is for internal use in the Linux-specific DRM core code.
+ * \param pdev - PCI device structure
+ * \param ent entry from the PCI ID table with device type flags
+ * \return zero on success or a negative number on failure.
+ *
+ * Attempt to gets inter module "drm" information. If we are first
+ * then register the character device and inter module information.
+ * Try and register, if we fail to register, backout previous work.
  */
-void __drm_pci_free(struct drm_device * dev, drm_dma_handle_t * dmah)
+
+int drm_get_pci_dev(struct pci_dev *pdev, const struct pci_device_id *ent,
+		struct drm_driver *driver)
 {
-#if 1
-	unsigned long addr;
-	size_t sz;
-#endif
-#ifdef DRM_DEBUG_MEMORY
-	int area = DRM_MEM_DMA;
-	int alloc_count;
-	int free_count;
-#endif
+	struct drm_device *dev;
+	int ret;
 
-	if (!dmah->vaddr) {
-#ifdef DRM_DEBUG_MEMORY
-		DRM_MEM_ERROR(area, "Attempt to free address 0\n");
-#endif
-	} else {
-		/* XXX - Is virt_to_page() legal for consistent mem? */
-		/* Unreserve */
-		for (addr = (unsigned long)dmah->vaddr, sz = dmah->size;
-		     sz > 0; addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-			ClearPageReserved(virt_to_page(addr));
-		}
-		dma_free_coherent(&dev->pdev->dev, dmah->size, dmah->vaddr,
-				  dmah->busaddr);
+	DRM_DEBUG("\n");
+
+	dev = drm_calloc(1, sizeof(*dev), DRM_MEM_STUB);
+	if (!dev)
+		return -ENOMEM;
+
+	ret = pci_enable_device(pdev);
+	if (ret)
+		goto err_g1;
+
+	pci_set_master(pdev);
+
+	ret = drm_fill_in_pci_dev(dev, pdev, ent, driver);
+	if (ret) {
+		printk(KERN_ERR "DRM: Fill_in_pci_dev failed.\n");
+		goto err_g2;
 	}
 
-#ifdef DRM_DEBUG_MEMORY
-	spin_lock(&drm_mem_lock);
-	free_count = ++drm_mem_stats[area].free_count;
-	alloc_count = drm_mem_stats[area].succeed_count;
-	drm_mem_stats[area].bytes_freed += size;
-	drm_ram_used -= size;
-	spin_unlock(&drm_mem_lock);
-	if (free_count > alloc_count) {
-		DRM_MEM_ERROR(area,
-			      "Excess frees: %d frees, %d allocs\n",
-			      free_count, alloc_count);
-	}
-#endif
+	ret = drm_get_minor(dev, &dev->primary, DRM_MINOR_LEGACY);
+	if (ret)
+		goto err_g2;
 
+	list_add_tail(&dev->driver_item, &driver->device_list);
+
+	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d\n",
+		 driver->name, driver->major, driver->minor, driver->patchlevel,
+		 driver->date, dev->primary->index);
+
+	return 0;
+
+err_g2:
+	pci_disable_device(pdev);
+err_g1:
+	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);
+	return ret;
 }
 
 /**
- * \brief Free a PCI consistent memory block
+ * PCI device initialization. Called via drm_init at module load time,
+ *
+ * \return zero on success or a negative number on failure.
+ *
+ * Initializes a drm_device structures,registering the
+ * stubs and initializing the AGP device.
+ *
+ * Expands the \c DRIVER_PREINIT and \c DRIVER_POST_INIT macros before and
+ * after the initialization for driver customization.
  */
-void drm_pci_free(struct drm_device * dev, drm_dma_handle_t * dmah)
+
+int drm_pci_init(struct drm_driver *driver)
 {
-	__drm_pci_free(dev, dmah);
-	kfree(dmah);
+	struct pci_dev *pdev = NULL;
+	struct pci_device_id *pid;
+	int i;
+
+	DRM_DEBUG("\n");
+
+	for (i = 0; driver->pci_driver.id_table[i].vendor != 0; i++) {
+		pid = (struct pci_device_id *)&driver->pci_driver.id_table[i];
+
+		pdev = NULL;
+		/* pass back in pdev to account for multiple identical cards */
+		while ((pdev =
+			pci_get_subsys(pid->vendor, pid->device, pid->subvendor,
+				       pid->subdevice, pdev)) != NULL) {
+			/* stealth mode requires a manual probe */
+			pci_dev_get(pdev);
+			drm_get_pci_dev(pdev, pid, driver);
+		}
+	}
+	return 0;
 }
 
-EXPORT_SYMBOL(drm_pci_free);
+#else
+
+int drm_pci_init(struct drm_driver *driver)
+{
+	return -1;
+}
+
+#endif
 
 /*@}*/

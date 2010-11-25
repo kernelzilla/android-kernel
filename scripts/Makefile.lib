@@ -4,6 +4,11 @@ ccflags-y  += $(EXTRA_CFLAGS)
 cppflags-y += $(EXTRA_CPPFLAGS)
 ldflags-y  += $(EXTRA_LDFLAGS)
 
+# flags that take effect in sub directories
+export KBUILD_SUBDIR_ASFLAGS := $(KBUILD_SUBDIR_ASFLAGS) $(subdir-asflags-y)
+export KBUILD_SUBDIR_CCFLAGS := $(KBUILD_SUBDIR_CCFLAGS) $(subdir-ccflags-y)
+
+
 # Figure out what we need to build from the various variables
 # ===========================================================================
 
@@ -105,7 +110,7 @@ debug_flags =
 endif
 
 orig_c_flags   = $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS)                     \
-                 $(ccflags-y) $(CFLAGS_$(basetarget).o)
+                 $(ccflags-y) $(KBUILD_SUBDIR_CCFLAGS) $(CFLAGS_$(basetarget).o)
 _c_flags       = $(filter-out $(CFLAGS_REMOVE_$(basetarget).o), $(orig_c_flags))
 _a_flags       = $(KBUILD_CPPFLAGS) $(KBUILD_AFLAGS)                     \
                  $(asflags-y) $(AFLAGS_$(basetarget).o)
@@ -114,7 +119,7 @@ _cpp_flags     = $(KBUILD_CPPFLAGS) $(cppflags-y) $(CPPFLAGS_$(@F))
 # If building the kernel in a separate objtree expand all occurrences
 # of -Idir to -I$(srctree)/dir except for absolute paths (starting with '/').
 
-ifeq ($(KBUILD_SRC),)
+ifeq ($(KBUILD_SRC)$(CONFIG_GCOV_PROFILE),)
 __c_flags	= $(_c_flags)
 __a_flags	= $(_a_flags)
 __cpp_flags     = $(_cpp_flags)
@@ -124,15 +129,27 @@ else
 # $(call addtree,-I$(obj)) locates .h files in srctree, from generated .c files
 #   and locates generated .h files
 # FIXME: Replace both with specific CFLAGS* statements in the makefiles
+ifdef CONFIG_GCOV_PROFILE
+__c_flags      = $(call addtree,-I$(obj)) $(call addtree2,-I$(obj)) $(call flags,_c_flags)
+else
 __c_flags	= $(call addtree,-I$(obj)) $(call flags,_c_flags)
+endif
 __a_flags	=                          $(call flags,_a_flags)
 __cpp_flags     =                          $(call flags,_cpp_flags)
 endif
 
+ifdef CONFIG_GCOV_PROFILE
+nogcov = $(if $(NOGCOV_$(basetarget).o),$(filter-out $(KBUILD_GCOV_FLAGS),$(1)),$(1))
+c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) \
+                       $(call nogcov,$(__c_flags)) $(modkern_cflags) \
+                       -D"KBUILD_STR(s)=\#s" $(basename_flags) $(modname_flags) \
+                       $(debug_flags)
+else
 c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
 		 $(__c_flags) $(modkern_cflags)                           \
 		 -D"KBUILD_STR(s)=\#s" $(basename_flags) $(modname_flags) \
 		  $(debug_flags)
+endif
 
 a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
 		 $(__a_flags) $(modkern_aflags)

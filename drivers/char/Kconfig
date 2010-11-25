@@ -433,6 +433,8 @@ config SGI_MBCS
 
 source "drivers/serial/Kconfig"
 
+source "drivers/char/diag/Kconfig"
+
 config UNIX98_PTYS
 	bool "Unix98 PTY support" if EMBEDDED
 	default y
@@ -1116,7 +1118,48 @@ config DCC_TTY
 	tristate "DCC tty driver"
 	depends on ARM
 
+config Q6_VENC
+	tristate "q6 video encoder driver"
+	depends on ARCH_MSM_SCORPION && MSM_DALRPC
+	default m
+	help
+	  Kernel driver for MSM QDSP6 video encoding.
+
+config MSM_KGSL
+	tristate "MSM 3D Graphics driver"
+	default n
+	depends on FB && ARM && (ARCH_QSD8X50 || ARCH_MSM7X27 || ARCH_MSM7X30) && !MSM_HW3D
+	select GENERIC_ALLOCATOR
+	select FW_LOADER
+	---help---
+	  3D graphics driver. Required to use hardware accelerated
+	  OpenGL ES 2.0 and 1.1.
+
+config MSM_KGSL_DRM
+	bool "Build a DRM interface for the MSM_KGSL driver"
+	depends on MSM_KGSL && DRM
+
 source "drivers/s390/char/Kconfig"
+
+config GPIODEV_DEVICE_TREE
+	bool "Motorola GPIODev configuration by device tree"
+	depends on ARM_OF
+	default n
+	help
+	  This feature enables configuration of GPIODev module node by device tree.
+
+config GPIODEV
+	tristate "Enable Motorola GPIODev"
+	default n
+	help
+	  This feature enables GPIODev for accessing GPIO pins in user space.
+
+config MSM_Q6VDEC
+	tristate "MSM QDSP6 Video Decoder Driver"
+	depends on ARCH_MSM_SCORPION && MSM_DALRPC
+	default m
+	---help---
+	  This driver provides access to MSM QDSP6 for video frame decoding.
 
 endmenu
 

@@ -6,6 +6,7 @@
  *  Based on drivers/char/serial.c, by Linus Torvalds, Theodore Ts'o.
  *
  *  Copyright (C) 2001 Russell King.
+ *  Copyright (C) 2009 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -153,6 +154,10 @@ struct uart_8250_port {
 	 */
 	void			(*pm)(struct uart_port *port,
 				      unsigned int state, unsigned int old);
+
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+	unsigned char		autortscts;	/* bit0 for rts; bit1 for cts */
+#endif
 };
 
 struct irq_info {
@@ -640,13 +645,17 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
 	if (p->capabilities & UART_CAP_SLEEP) {
 		if (p->capabilities & UART_CAP_EFR) {
 			serial_outp(p, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 			serial_outp(p, UART_EFR, UART_EFR_ECB);
+#endif
 			serial_outp(p, UART_LCR, 0);
 		}
 		serial_outp(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
 		if (p->capabilities & UART_CAP_EFR) {
 			serial_outp(p, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 			serial_outp(p, UART_EFR, 0);
+#endif
 			serial_outp(p, UART_LCR, 0);
 		}
 	}
@@ -823,7 +832,9 @@ static void autoconfig_has_efr(struct uart_8250_port *up)
 	 */
 	up->acr = 0;
 	serial_out(up, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 	serial_out(up, UART_EFR, UART_EFR_ECB);
+#endif
 	serial_out(up, UART_LCR, 0x00);
 	id1 = serial_icr_read(up, UART_ID1);
 	id2 = serial_icr_read(up, UART_ID2);
@@ -1161,7 +1172,9 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	 * EFR occupies the same register location as the FCR and IIR.
 	 */
 	serial_outp(up, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 	serial_outp(up, UART_EFR, 0);
+#endif
 	serial_outp(up, UART_LCR, 0);
 
 	serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
@@ -1948,12 +1961,16 @@ static int serial8250_startup(struct uart_port *port)
 		/* Wake up and initialize UART */
 		up->acr = 0;
 		serial_outp(up, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 		serial_outp(up, UART_EFR, UART_EFR_ECB);
+#endif
 		serial_outp(up, UART_IER, 0);
 		serial_outp(up, UART_LCR, 0);
 		serial_icr_write(up, UART_CSR, 0); /* Reset the UART */
 		serial_outp(up, UART_LCR, 0xBF);
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 		serial_outp(up, UART_EFR, UART_EFR_ECB);
+#endif
 		serial_outp(up, UART_LCR, 0);
 	}
 
@@ -2226,6 +2243,93 @@ static unsigned int serial8250_get_divisor(struct uart_port *port, unsigned int 
 	return quot;
 }
 
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+void serial8250_set_autortscts(struct uart_8250_port *port, int set)
+{
+	u32 lcr_val = 0, mcr_val = 0, efr_val = 0;
+	u32 lcr_backup = 0, mcr_backup = 0, efr_backup = 0;
+
+	if (port->autortscts == 0)
+		return ;
+
+	/* Step 1
+	 * Switch to register configuration mode A to access the
+	 * UARTi.MCR_REG register
+	 */
+	lcr_val = serial_in(port, UART_LCR);
+	lcr_backup = lcr_val;
+	serial_out(port, UART_LCR, 0x80);
+
+	/* Step 2
+	 * Enable register submode TCR_TLR to access the
+	 * UARTi.TCR_REG register
+	 */
+	mcr_val = serial_in(port, UART_MCR);
+	mcr_backup = mcr_val;
+	serial_out(port, UART_MCR, mcr_val | 0x40);
+
+	/* Step 3
+	 * Switch to register configuration mode B to access the
+	 * UARTi.EFR_REG register
+	 */
+	serial_out(port, UART_LCR, 0xBF);
+
+	/* Step 4
+	 * Enable register submode TCR_TLR to access the
+	 * UARTi.TCR_REG register
+	 */
+	efr_val = serial_in(port, UART_EFR);
+	efr_backup = efr_val;
+	serial_out(port, UART_EFR, efr_val | 0x10);
+
+	/* Step 5
+	 * Load the new start and halt trigger values for HW
+	 * flow control:
+	 * 0x06 is the offset of the TCR_REG
+	 * UARTi.TCR_REG[7:4] = 0x5		AUTO_RTS_START
+	 * UARTi.TCR_REG[3:0] = 0xF		AUTO_RTS_HALT
+	 */
+	serial_out(port, 0x06, 0x5F);
+
+	/* Step 6
+	 * Set UARTi auto HW flow control mode
+	 * The bit0 and bit1 of the port->autortscts is the
+	 * auto-rts and auto-cts settings, in the EFR_REG,
+	 * bit7 is the auto-cts enable bit, bit6 is the auto-rts
+	 * enable bit. So the port->autortscts should shift
+	 * left six bits.
+	 */
+	efr_val = serial_in(port, UART_EFR);
+	if (set)
+		serial_out(port, UART_EFR,
+			(efr_val & (~0x00C0)) | ((port->autortscts) << 6));
+	else
+		serial_out(port, UART_EFR, (efr_val & (~0x00C0)));
+
+	/* Restore the UARTi.EFR_REG[4] ENHANCED_EN value saved in step 4. */
+	efr_val = serial_in(port, UART_EFR);
+	serial_out(port, UART_EFR,
+				(efr_val & (~0x0010)) | (efr_backup & 0x0010));
+
+	/* Step 7
+	 * Switch to register configuration mode A to access UARTi.MCR_REG
+	 */
+	serial_out(port, UART_LCR, 0x80);
+
+	/* Step 8
+	 * Restore the UARTi.MCR_REG[6] TCR_TLR value saved in step 2.
+	 */
+	mcr_val = serial_in(port, UART_MCR);
+	serial_out(port, UART_MCR,
+				(mcr_val & (~0x0040)) | (mcr_backup & 0x0040));
+
+	/* Step 9
+	 * Restore the UARTi.LCR_REG value saved in step 1.
+	 */
+	serial_out(port, UART_LCR, lcr_backup);
+}
+#endif
+
 static void
 serial8250_set_termios(struct uart_port *port, struct ktermios *termios,
 		       struct ktermios *old)
@@ -2347,17 +2451,29 @@ serial8250_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_IER, up->ier);
 
 	if (up->capabilities & UART_CAP_EFR) {
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 		unsigned char efr = 0;
+#else
+		int set = 0;
+#endif
 		/*
 		 * TI16C752/Startech hardware flow control.  FIXME:
 		 * - TI16C752 requires control thresholds to be set.
 		 * - UART_MCR_RTS is ineffective if auto-RTS mode is enabled.
 		 */
 		if (termios->c_cflag & CRTSCTS)
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 			efr |= UART_EFR_CTS;
+#else
+			set = 1;
+#endif
 
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 		serial_outp(up, UART_LCR, 0xBF);
 		serial_outp(up, UART_EFR, efr);
+#else
+		serial8250_set_autortscts(up, set);
+#endif
 	}
 
 #ifdef CONFIG_ARCH_OMAP
@@ -2400,11 +2516,15 @@ serial8250_set_termios(struct uart_port *port, struct ktermios *termios,
 		 * possible TX fifo settings. */
 		if (uart_config[up->port.type].flags & UART_CAP_EFR) {
 			serial_outp(up, UART_LCR, 0xbf);	/* Access EFR */
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 			serial_outp(up, UART_EFR, UART_EFR_ECB);
+#endif
 			serial_outp(up, UART_LCR, 0x0);		/* Access FCR */
 			serial_outp(up, UART_FCR, fcr);
 			serial_outp(up, UART_LCR, 0xbf);	/* Access EFR */
+#ifndef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
 			serial_outp(up, UART_EFR, 0);
+#endif
 			serial_outp(up, UART_LCR, cval);	/* Access FCR */
         } else
 		serial_outp(up, UART_FCR, fcr);		/* set fcr */
@@ -2951,6 +3071,9 @@ static int __devinit serial8250_probe(struct platform_device *dev)
 		port.serial_in		= p->serial_in;
 		port.serial_out		= p->serial_out;
 		port.dev		= &dev->dev;
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+		port.unused1	= p->rtscts;
+#endif
 		if (share_irqs)
 			port.flags |= UPF_SHARE_IRQ;
 		ret = serial8250_register_port(&port);
@@ -3101,6 +3224,9 @@ int serial8250_register_port(struct uart_port *port)
 		uart->port.flags        = port->flags | UPF_BOOT_AUTOCONF;
 		uart->port.mapbase      = port->mapbase;
 		uart->port.private_data = port->private_data;
+#ifdef CONFIG_SERIAL_OMAP3430_HW_FLOW_CONTROL
+		uart->autortscts    = port->unused1;
+#endif
 		if (port->dev)
 			uart->port.dev = port->dev;
 

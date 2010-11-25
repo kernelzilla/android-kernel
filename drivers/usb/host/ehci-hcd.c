@@ -24,7 +24,6 @@
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/timer.h>
@@ -60,6 +59,7 @@
  * providing early devices for those host controllers to talk to!
  */
 
+#define DRIVER_VERSION "10 Dec 2004"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -485,7 +485,6 @@ static int ehci_init(struct usb_hcd *hcd)
 	 * periodic_size can shrink by USBCMD update if hcc_params allows.
 	 */
 	ehci->periodic_size = DEFAULT_I_TDPS;
-	INIT_LIST_HEAD(&ehci->cached_itd_list);
 	if ((retval = ehci_mem_init(ehci, GFP_KERNEL)) < 0)
 		return retval;
 
@@ -498,7 +497,6 @@ static int ehci_init(struct usb_hcd *hcd)
 
 	ehci->reclaim = NULL;
 	ehci->next_uframe = -1;
-	ehci->clock_frame = -1;
 
 	/*
 	 * dedicate a qh for the async ring head, since we couldn't unlink
@@ -622,9 +620,9 @@ static int ehci_run (struct usb_hcd *hcd)
 
 	temp = HC_VERSION(ehci_readl(ehci, &ehci->caps->hc_capbase));
 	ehci_info (ehci,
-		"USB %x.%x started, EHCI %x.%02x%s\n",
+		"USB %x.%x started, EHCI %x.%02x, driver %s%s\n",
 		((ehci->sbrn & 0xf0)>>4), (ehci->sbrn & 0x0f),
-		temp >> 8, temp & 0xff,
+		temp >> 8, temp & 0xff, DRIVER_VERSION,
 		ignore_oc ? ", overcurrent ignored" : "");
 
 	ehci_writel(ehci, INTR_MASK,
@@ -708,7 +706,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 		pcd_status = status;
 
 		/* resume root hub? */
-		if (!(cmd & CMD_RUN))
+		if (!(ehci_readl(ehci, &ehci->regs->command) & CMD_RUN))
 			usb_hcd_resume_root_hub(hcd);
 
 		while (i--) {
@@ -717,11 +715,8 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 
 			if (pstatus & PORT_OWNER)
 				continue;
-			if (!(test_bit(i, &ehci->suspended_ports) &&
-					((pstatus & PORT_RESUME) ||
-						!(pstatus & PORT_SUSPEND)) &&
-					(pstatus & PORT_PE) &&
-					ehci->reset_done[i] == 0))
+			if (!(pstatus & PORT_RESUME)
+					|| ehci->reset_done [i] != 0)
 				continue;
 
 			/* start 20 msec resume signaling from this port,
@@ -731,14 +726,18 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
 			ehci_dbg (ehci, "port %d remote wakeup\n", i + 1);
 			mod_timer(&hcd->rh_timer, ehci->reset_done[i]);
+#ifdef CONFIG_HAS_WAKELOCK
+			wake_lock_timeout(&ehci->wake_lock_ehci_rwu, HZ/2);
+#endif
 		}
 	}
 
 	/* PCI errors [4.15.2.4] */
 	if (unlikely ((status & STS_FATAL) != 0)) {
 		ehci_err(ehci, "fatal error\n");
-		dbg_cmd(ehci, "fatal", cmd);
-		dbg_status(ehci, "fatal", status);
+		dbg_cmd (ehci, "fatal", ehci_readl(ehci,
+						   &ehci->regs->command));
+		dbg_status (ehci, "fatal", status);
 		ehci_halt(ehci);
 dead:
 		ehci_reset(ehci);
@@ -997,7 +996,9 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 
 /*-------------------------------------------------------------------------*/
 
-MODULE_DESCRIPTION(DRIVER_DESC);
+#define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
+
+MODULE_DESCRIPTION (DRIVER_INFO);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_LICENSE ("GPL");
 
@@ -1026,6 +1027,11 @@ MODULE_LICENSE ("GPL");
 #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
 #endif
 
+#if defined(CONFIG_440EPX) && !defined(CONFIG_PPC_MERGE)
+#include "ehci-ppc-soc.c"
+#define	PLATFORM_DRIVER		ehci_ppc_soc_driver
+#endif
+
 #ifdef CONFIG_USB_EHCI_HCD_PPC_OF
 #include "ehci-ppc-of.c"
 #define OF_PLATFORM_DRIVER	ehci_hcd_ppc_of_driver
@@ -1041,6 +1047,11 @@ MODULE_LICENSE ("GPL");
 #define	PLATFORM_DRIVER		ixp4xx_ehci_driver
 #endif
 
+#ifdef CONFIG_USB_EHCI_MSM
+#include "ehci-msm.c"
+#define PLATFORM_DRIVER		ehci_msm_driver
+#endif
+
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER)
 #error "missing bus glue for ehci-hcd"
@@ -1050,10 +1061,6 @@ static int __init ehci_hcd_init(void)
 {
 	int retval = 0;
 
-	if (usb_disabled())
-		return -ENODEV;
-
-	printk(KERN_INFO "%s: " DRIVER_DESC "\n", hcd_name);
 	set_bit(USB_EHCI_LOADED, &usb_hcds_loaded);
 	if (test_bit(USB_UHCI_LOADED, &usb_hcds_loaded) ||
 			test_bit(USB_OHCI_LOADED, &usb_hcds_loaded))

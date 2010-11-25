@@ -181,8 +181,7 @@ enum {
 
 enum {
 	CPCAP_AUDIO_RAT_NONE,	/* Not in a call mode */
-	CPCAP_AUDIO_RAT_2G,		/* In 2G call mode */
-	CPCAP_AUDIO_RAT_3G,		/* In 3G call mode */
+	CPCAP_AUDIO_RAT_UMTS,	/* 3GSM mode */
 	CPCAP_AUDIO_RAT_CDMA	/* In CDMA call mode */
 };
 

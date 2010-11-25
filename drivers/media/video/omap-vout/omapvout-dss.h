@@ -26,8 +26,12 @@ struct omapvout_dss_vrfb {
 	/* VRFB dma config data */
 	u32 en;
 	u32 fn;
+	u32 src_mode;
+	u32 src_ei;
+	u32 src_fi;
 	u32 dst_ei;
 	u32 dst_fi;
+	bool decimate_src;
 
 	/* VRFB dma channel data */
 	int dma_id;
@@ -75,6 +79,8 @@ extern bool omapvout_dss_is_rotation_supported(struct omapvout_device *vout);
 extern int  omapvout_dss_enable(struct omapvout_device *vout);
 extern void omapvout_dss_disable(struct omapvout_device *vout);
 extern int  omapvout_dss_update(struct omapvout_device *vout);
+extern bool omapvout_dss_get_decimate(struct omapvout_device *vout);
+extern void omapvout_dss_set_decimate(struct omapvout_device *vout, bool en);
 
 #endif /* __OMAPVOUT_DSS_H__ */
 

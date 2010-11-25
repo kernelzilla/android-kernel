@@ -41,11 +41,25 @@
 #include <asm/mach/time.h>
 #include <asm/traps.h>
 
+#ifdef CONFIG_ARM_OF
+#include <asm/prom.h>
+#include <mach/hardware.h>
+#endif
+#ifdef CONFIG_BOOTINFO
+#include <asm/bootinfo.h>
+#endif
+
 #include "compat.h"
 #include "atags.h"
 
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
+#endif
+
+#ifdef CONFIG_ARM_OF
+#define DT_PATH_MACHINE		"/Machine@0"
+#define DT_PROP_MACHINE_TYPE	"machine_type"
+#define DT_PROP_CPU_TIER	"cpu_tier"
 #endif
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
@@ -114,6 +128,7 @@ EXPORT_SYMBOL(elf_platform);
 
 static const char *cpu_name;
 static const char *machine_name;
+static char *cpu_tier;
 static char __initdata command_line[COMMAND_LINE_SIZE];
 
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
@@ -619,6 +634,60 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
+#ifdef CONFIG_BOOTINFO
+static int __init parse_tag_powerup_reason(const struct tag *tag)
+{
+	bi_set_powerup_reason(tag->u.powerup_reason.powerup_reason);
+	printk(KERN_WARNING "%s: powerup reason=0x%08x\n",
+				__func__, bi_powerup_reason());
+	return 0;
+}
+
+__tagtable(ATAG_POWERUP_REASON, parse_tag_powerup_reason);
+
+static int __init parse_tag_mbm_version(const struct tag *tag)
+{
+	bi_set_mbm_version(tag->u.mbm_version.mbm_version);
+	printk(KERN_INFO "%s: mbm_version=0x%08x\n",
+				__func__, bi_mbm_version());
+	return 0;
+}
+
+__tagtable(ATAG_MBM_VERSION, parse_tag_mbm_version);
+
+static int __init parse_tag_mbm_loader_version(const struct tag *tag)
+{
+	bi_set_mbm_loader_version(tag->
+			u.mbm_loader_version.mbm_loader_version);
+	printk(KERN_INFO "%s: mbm_loader_version=0x%08x\n",
+				__func__, bi_mbm_loader_version());
+	return 0;
+}
+
+__tagtable(ATAG_MBM_LOADER_VERSION, parse_tag_mbm_loader_version);
+
+static int __init parse_tag_battery_status_at_boot(const struct tag *tag)
+{
+	bi_set_battery_status_at_boot(tag->
+			u.battery_status_at_boot.battery_status_at_boot);
+	printk(KERN_INFO "%s: battery_status_at_boot=0x%08x\n",
+				__func__, bi_battery_status_at_boot());
+	return 0;
+}
+
+__tagtable(ATAG_BATTERY_STATUS_AT_BOOT, parse_tag_battery_status_at_boot);
+
+static int __init parse_tag_cid_recover_boot(const struct tag *tag)
+{
+	bi_set_cid_recover_boot(tag->u.cid_recover_boot.cid_recover_boot);
+	printk(KERN_INFO "%s: cid_recover_boot=\"%d\"\n",
+				__func__, bi_cid_recover_boot());
+	return 0;
+}
+
+__tagtable(ATAG_CID_RECOVER_BOOT, parse_tag_cid_recover_boot);
+
+#endif /* CONFIG_BOOTINFO */
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable
@@ -725,6 +794,31 @@ void __init setup_arch(char **cmdline_p)
 	boot_command_line[COMMAND_LINE_SIZE-1] = '\0';
 	parse_cmdline(cmdline_p, from);
 	paging_init(mdesc);
+#if defined(CONFIG_ARM_OF)
+	unflatten_device_tree();
+
+	{
+		struct device_node *machine_node;
+		const void *machine_prop;
+		const void *cpu_tier_prop;
+
+		cpu_tier = NULL;
+		machine_node = of_find_node_by_path(DT_PATH_MACHINE);
+		if (machine_node) {
+			machine_prop = of_get_property(machine_node, \
+				DT_PROP_MACHINE_TYPE, NULL);
+			if (machine_prop)
+				machine_name = (char *)machine_prop;
+
+			cpu_tier_prop = of_get_property(machine_node, \
+				DT_PROP_CPU_TIER, NULL);
+			if (cpu_tier_prop)
+				cpu_tier = (char *)cpu_tier_prop;
+
+			of_node_put(machine_node);
+		}
+	}
+#endif
 	request_standard_resources(&meminfo, mdesc);
 
 #ifdef CONFIG_SMP
@@ -789,6 +883,20 @@ static int c_show(struct seq_file *m, void *v)
 {
 	int i;
 
+#if defined(CONFIG_ARM_OF)
+	static char *p = NULL;
+	int len = strlen(bp_model);
+
+	if (!p && len) {
+		p = kmalloc(strlen(machine_name) + len + 1, GFP_KERNEL);
+		if (p) {
+			*p = '\0';
+			strcat(p, machine_name);
+			machine_name = strcat(p, bp_model);
+		}
+	}
+#endif
+
 	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
 		   cpu_name, read_cpuid_id() & 15, elf_platform);
 
@@ -844,6 +952,8 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "Revision\t: %04x\n", system_rev);
 	seq_printf(m, "Serial\t\t: %08x%08x\n",
 		   system_serial_high, system_serial_low);
+	if (cpu_tier)
+		seq_printf(m, "CPU Tier\t: %s\n", cpu_tier);
 
 	return 0;
 }

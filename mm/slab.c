@@ -3661,6 +3661,96 @@ static __always_inline void *__do_kmalloc(size_t size, gfp_t flags,
 
 
 #ifdef CONFIG_DEBUG_SLAB
+
+#ifdef CONFIG_DEBUG_MEMLEAK
+static __always_inline void *
+__memleak_cache_alloc(struct kmem_cache *cachep, gfp_t flags, void *caller)
+{
+	unsigned long save_flags;
+	void *objp;
+
+	if (should_failslab(obj_size(cachep), flags))
+		return NULL;
+
+	cache_alloc_debugcheck_before(cachep, flags);
+	local_irq_save(save_flags);
+	objp = __do_cache_alloc(cachep, flags);
+	local_irq_restore(save_flags);
+	objp = cache_alloc_debugcheck_after(cachep, flags, objp, caller);
+	memleak_alloc(objp, obj_size(cachep), 1);
+	prefetchw(objp);
+
+	if (unlikely((flags & __GFP_ZERO) && objp))
+		memset(objp, 0, obj_size(cachep));
+
+	return objp;
+}
+
+static __always_inline void *__memleak_do_kmalloc(size_t size, gfp_t flags,
+		void *caller)
+{
+	struct kmem_cache *cachep;
+	void *ptr;
+
+	/* If you want to save a few bytes .text space: replace
+	 * __ with kmem_.
+	 * Then kmalloc uses the uninlined functions instead of the inline
+	 * functions.
+	 */
+	cachep = __find_general_cachep(size, flags);
+	if (unlikely(cachep == NULL))
+		return NULL;
+	ptr = __memleak_cache_alloc(cachep, flags, caller);
+	memleak_padding(ptr, 0, size);
+
+	return ptr;
+}
+
+static inline void __memleak_cache_free(struct kmem_cache *cachep, void *objp)
+{
+	struct array_cache *ac = cpu_cache_get(cachep);
+
+	check_irq_off();
+	memleak_free(objp);
+	objp = cache_free_debugcheck(cachep, objp, __builtin_return_address(0));
+
+	if (cache_free_alien(cachep, objp))
+		return;
+
+	if (likely(ac->avail < ac->limit)) {
+		STATS_INC_FREEHIT(cachep);
+		ac->entry[ac->avail++] = objp;
+		return;
+	} else {
+		STATS_INC_FREEMISS(cachep);
+		cache_flusharray(cachep, ac);
+		ac->entry[ac->avail++] = objp;
+	}
+}
+
+void memleak_kfree(void *objp)
+{
+	struct kmem_cache *c;
+	unsigned long flags;
+
+	if (unlikely(!objp))
+		return;
+	local_irq_save(flags);
+	kfree_debugcheck(objp);
+	c = virt_to_cache(objp);
+	debug_check_no_locks_freed(objp, obj_size(c));
+	__memleak_cache_free(c, objp);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(memleak_kfree);
+
+void *__memleak_kmalloc(size_t size, gfp_t flags)
+{
+	return __memleak_do_kmalloc(size, flags, __builtin_return_address(0));
+}
+EXPORT_SYMBOL(__memleak_kmalloc);
+#endif
+
 void *__kmalloc(size_t size, gfp_t flags)
 {
 	return __do_kmalloc(size, flags, __builtin_return_address(0));
@@ -4458,3 +4548,43 @@ size_t ksize(const void *objp)
 	return obj_size(virt_to_cache(objp));
 }
 EXPORT_SYMBOL(ksize);
+
+#ifdef CONFIG_MUDFLAP
+void slab_check_write(void *ptr, unsigned int sz, const char *location)
+{
+	struct page *page;
+	struct kmem_cache *cache;
+	struct slab *slab;
+	char *realobj;
+	void *obj;
+	unsigned long objnr, size;
+
+	page = virt_to_head_page(ptr);
+	if (!PageSlab(page))
+		return;
+
+	cache = page_get_cache(page);
+	slab = page_get_slab(page);
+	objnr = (unsigned)(ptr - slab->s_mem) / cache->buffer_size;
+	obj = index_to_obj(cache, slab, objnr);
+	realobj = obj + obj_offset(cache);
+	size = obj_size(cache);
+
+	if (slab_bufctl(slab)[objnr] != BUFCTL_FREE)
+		return;
+
+	printk(KERN_ERR "ptr: %p, sz: %d, location: %s\n",
+			ptr, sz, location);
+	printk(KERN_ERR "write to freed object, size %ld\n",
+			size);
+	if (cache->flags & SLAB_STORE_USER) {
+		printk(KERN_ERR "Last user: [<%p>]",
+				*dbg_userword(cache, obj));
+		print_symbol("(%s)",
+				(unsigned long)*dbg_userword(cache, obj));
+		printk("\n");
+	}
+
+	dump_stack();
+}
+#endif

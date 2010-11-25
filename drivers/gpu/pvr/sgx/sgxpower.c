@@ -1,26 +1,26 @@
 /**********************************************************************
  *
  * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
+ *
+ * This program is distributed in the hope it will be useful but, except
+ * as otherwise stated in writing, without any warranty; without even the
+ * implied warranty of merchantability or fitness for a particular purpose.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
+ *
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
  * Contact Information:
  * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+ * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK
  *
  ******************************************************************************/
 
@@ -93,7 +93,7 @@ static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 		psDevInfo->psSGXHostCtl->ui32HWRecoverySampleRate =
 			psSGXTimingInfo->ui32uKernelFreq / psSGXTimingInfo->ui32HWRecoveryFreq;
 	}
-#endif 
+#endif
 	
 	
 	psDevInfo->ui32CoreClockSpeed = psSGXTimingInfo->ui32CoreClockSpeed;
@@ -107,7 +107,7 @@ static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 			 offsetof(SGXMKIF_HOST_CTL, ui32uKernelTimerClock),
 			 sizeof(IMG_UINT32), PDUMP_FLAGS_CONTINUOUS,
 			 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
-#endif 
+#endif
 
 	if (psSGXTimingInfo->bEnableActivePM)
 	{
@@ -134,7 +134,7 @@ static IMG_VOID SGXGetTimingInfo(PVRSRV_DEVICE_NODE	*psDeviceNode)
 			 offsetof(SGXMKIF_HOST_CTL, ui32ActivePowManSampleRate),
 			 sizeof(IMG_UINT32), PDUMP_FLAGS_CONTINUOUS,
 			 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
-#endif 
+#endif
 }
 
 
@@ -150,14 +150,14 @@ IMG_VOID SGXStartTimer(PVRSRV_SGXDEV_INFO	*psDevInfo)
 	}
 	#else
 	PVR_UNREFERENCED_PARAMETER(psDevInfo);
-	#endif 
+	#endif
 }
 
 
-static IMG_VOID SGXPollForClockGating (PVRSRV_SGXDEV_INFO	*psDevInfo, 
-									   IMG_UINT32			ui32Register,
-									   IMG_UINT32			ui32RegisterValue,
-									   IMG_CHAR				*pszComment)
+static IMG_VOID SGXPollForClockGating(PVRSRV_SGXDEV_INFO	*psDevInfo,
+					IMG_UINT32	ui32Register,
+					IMG_UINT32	ui32RegisterValue,
+					IMG_CHAR	*pszComment)
 {
 	PVR_UNREFERENCED_PARAMETER(psDevInfo);
 	PVR_UNREFERENCED_PARAMETER(ui32Register);
@@ -166,8 +166,6 @@ static IMG_VOID SGXPollForClockGating (PVRSRV_SGXDEV_INFO	*psDevInfo,
 
 	#if !defined(NO_HARDWARE)
 	PVR_ASSERT(psDevInfo != IMG_NULL);
-	
-	 
 	if (PollForValueKM((IMG_UINT32 *)psDevInfo->pvRegsBaseKM + (ui32Register >> 2),
 						0,
 						ui32RegisterValue,
@@ -176,16 +174,16 @@ static IMG_VOID SGXPollForClockGating (PVRSRV_SGXDEV_INFO	*psDevInfo,
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SGXPrePowerState: %s failed.", pszComment));
 	}
-	#endif 
+	#endif
 	
 	PDUMPCOMMENT(pszComment);
 	PDUMPREGPOL(ui32Register, 0, ui32RegisterValue);
 }
 
 
-PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle, 
-							   PVRSRV_DEV_POWER_STATE	eNewPowerState, 
-							   PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPrePowerState(IMG_HANDLE	hDevHandle,
+				PVRSRV_DEV_POWER_STATE	eNewPowerState,
+				PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	if ((eNewPowerState != eCurrentPowerState) &&
 		(eNewPowerState != PVRSRV_DEV_POWER_STATE_ON))
@@ -205,7 +203,7 @@ PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 			PVR_DPF((PVR_DBG_ERROR,"SGXPrePowerState: Failed to disable timer"));
 			return eError;
 		}
-		#endif 
+		#endif
 
 		if (eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
@@ -242,7 +240,7 @@ PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 			PVR_DPF((PVR_DBG_ERROR,"SGXPrePowerState: Wait for SGX ukernel power transition failed."));
 			PVR_DBG_BREAK;
 		}
-		#endif 
+		#endif
 
 		#if defined(PDUMP)
 		PDUMPCOMMENT("TA/3D CCB Control - Wait for power event on uKernel.");
@@ -253,7 +251,7 @@ PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 					PDUMP_POLL_OPERATOR_EQUAL,
 					0,
 					MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
-		#endif 
+		#endif
 
 		for (ui32Core = 0; ui32Core < SGX_FEATURE_MP_CORE_COUNT; ui32Core++)
 		{
@@ -270,7 +268,7 @@ PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 							  psDevInfo->ui32MasterClkGateStatusReg,
 							  psDevInfo->ui32MasterClkGateStatusMask,
 							  "Wait for SGX master clock gating");
-		#endif 
+		#endif
 				
 		if (eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
@@ -288,9 +286,9 @@ PVRSRV_ERROR SGXPrePowerState (IMG_HANDLE				hDevHandle,
 }
 
 
-PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle, 
-								PVRSRV_DEV_POWER_STATE	eNewPowerState, 
-								PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
+PVRSRV_ERROR SGXPostPowerState(IMG_HANDLE	hDevHandle,
+				PVRSRV_DEV_POWER_STATE	eNewPowerState,
+				PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
 {
 	if ((eNewPowerState != eCurrentPowerState) &&
 		(eCurrentPowerState != PVRSRV_DEV_POWER_STATE_ON))
@@ -308,19 +306,11 @@ PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 				 offsetof(SGXMKIF_HOST_CTL, ui32PowerStatus),
 				 sizeof(IMG_UINT32), PDUMP_FLAGS_CONTINUOUS,
 				 MAKEUNIQUETAG(psDevInfo->psKernelSGXHostCtlMemInfo));
-		#endif 
+		#endif
 
 		if (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_OFF)
 		{
-			
-
-			
-			
-
 			SGXGetTimingInfo(psDeviceNode);
-
-			
-
 			eError = SGXInitialise(psDevInfo);
 			if (eError != PVRSRV_OK)
 			{

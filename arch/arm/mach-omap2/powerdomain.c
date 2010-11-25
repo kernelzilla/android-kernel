@@ -1064,10 +1064,10 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 	 * warn & fail if it is not ON.
 	 */
 
-	pr_debug("powerdomain: clearing previous power state reg for %s\n",
+	pr_debug("powerdomain: clearing previous power state to ON for %s\n",
 		 pwrdm->name);
 
-	prm_write_mod_reg(0, pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST);
+	prm_write_mod_reg(0xFF, pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST);
 
 	return 0;
 }

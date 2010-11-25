@@ -185,15 +185,24 @@ wait_dll_unlock:
 	bne	wait_dll_unlock
 	bx	lr
 configure_sdrc:
-	ldr	r11, omap3_sdrc_rfr_ctrl
+	ldr	r11, omap3_sdrc_rfr_ctrl_0
 	str	r0, [r11]
-	ldr	r11, omap3_sdrc_actim_ctrla
+	ldr	r11, omap3_sdrc_actim_ctrla_0
 	str	r1, [r11]
-	ldr	r11, omap3_sdrc_actim_ctrlb
+	ldr	r11, omap3_sdrc_actim_ctrlb_0
 	str	r2, [r11]
 	ldr	r11, omap3_sdrc_mr_0
 	str	r6, [r11]
 	ldr	r6, [r11]		@ posted-write barrier for SDRC
+    ldr r11, omap3_sdrc_rfr_ctrl_1
+    str r0, [r11]
+    ldr r11, omap3_sdrc_actim_ctrla_1
+    str r1, [r11]
+    ldr r11, omap3_sdrc_actim_ctrlb_1
+    str r2, [r11]
+    ldr r11, omap3_sdrc_mr_1
+    str r6, [r11]
+    ldr r6, [r11]       @ posted-write barrier for SDRC
 	bx	lr
 
 omap3_sdrc_power:
@@ -204,14 +213,22 @@ omap3_cm_idlest1_core:
 	.word OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST)
 omap3_cm_iclken1_core:
 	.word OMAP34XX_CM_REGADDR(CORE_MOD, CM_ICLKEN1)
-omap3_sdrc_rfr_ctrl:
+omap3_sdrc_rfr_ctrl_0:
 	.word OMAP34XX_SDRC_REGADDR(SDRC_RFR_CTRL_0)
-omap3_sdrc_actim_ctrla:
+omap3_sdrc_actim_ctrla_0:
 	.word OMAP34XX_SDRC_REGADDR(SDRC_ACTIM_CTRL_A_0)
-omap3_sdrc_actim_ctrlb:
+omap3_sdrc_actim_ctrlb_0:
 	.word OMAP34XX_SDRC_REGADDR(SDRC_ACTIM_CTRL_B_0)
 omap3_sdrc_mr_0:
 	.word OMAP34XX_SDRC_REGADDR(SDRC_MR_0)
+omap3_sdrc_rfr_ctrl_1:
+    .word OMAP34XX_SDRC_REGADDR(SDRC_RFR_CTRL_1)
+omap3_sdrc_actim_ctrla_1:
+    .word OMAP34XX_SDRC_REGADDR(SDRC_ACTIM_CTRL_A_1)
+omap3_sdrc_actim_ctrlb_1:
+    .word OMAP34XX_SDRC_REGADDR(SDRC_ACTIM_CTRL_B_1)
+omap3_sdrc_mr_1:
+    .word OMAP34XX_SDRC_REGADDR(SDRC_MR_1)
 omap3_sdrc_dlla_status:
 	.word OMAP34XX_SDRC_REGADDR(SDRC_DLLA_STATUS)
 omap3_sdrc_dlla_ctrl:

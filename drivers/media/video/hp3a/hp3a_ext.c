@@ -57,9 +57,19 @@ EXPORT_SYMBOL(hp3a_ccdc_start);
 void hp3a_frame_done(void)
 {
 	hp3a_update_stats_pipe_done();
-	hp3a_update_hardpipe();
 }
 EXPORT_SYMBOL(hp3a_frame_done);
+
+/**
+ * hp3a_update_wb - Update WB related hw settings.
+ *
+ * No return value.
+ **/
+void hp3a_update_wb(void)
+{
+	hp3a_update_hardpipe();
+}
+EXPORT_SYMBOL(hp3a_update_wb);
 
 /**
  * hp3a_stream_on - Perform stream on specific tasks.

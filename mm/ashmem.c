@@ -211,6 +211,16 @@ static int ashmem_release(struct inode *ignored, struct file *file)
 	return 0;
 }
 
+//BEGIN Motorola, a21190, 08/2010, IKMORRISON-2177 / Porting of Google security fixes
+static inline unsigned long
+calc_vm_may_flags(unsigned long prot)
+{
+       return _calc_vm_trans(prot, PROT_READ,  VM_MAYREAD ) |
+              _calc_vm_trans(prot, PROT_WRITE, VM_MAYWRITE) |
+              _calc_vm_trans(prot, PROT_EXEC,  VM_MAYEXEC);
+}
+//END IKMORRISON-2177
+
 static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct ashmem_area *asma = file->private_data;
@@ -225,10 +235,14 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 	}
 
 	/* requested protection bits must match our allowed protection mask */
-	if (unlikely((vma->vm_flags & ~asma->prot_mask) & PROT_MASK)) {
+        //BEGIN Motorola, a21190, 08/2010, IKMORRISON-2177 / Porting of Google security fixes   
+        if (unlikely((vma->vm_flags & ~calc_vm_prot_bits(asma->prot_mask)) &
+                                                calc_vm_prot_bits(PROT_MASK))) {
 		ret = -EPERM;
 		goto out;
 	}
+        vma->vm_flags &= ~calc_vm_may_flags(~asma->prot_mask);
+        //END IKMORRISON-2177
 
 	if (!asma->file) {
 		char *name = ASHMEM_NAME_DEF;

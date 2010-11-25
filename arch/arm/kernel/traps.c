@@ -2,6 +2,7 @@
  *  linux/arch/arm/kernel/traps.c
  *
  *  Copyright (C) 1995-2002 Russell King
+ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *  Fragments that appear the same as linux/arch/i386/kernel/traps.c (C) Linus Torvalds
  *
  * This program is free software; you can redistribute it and/or modify
@@ -11,6 +12,12 @@
  *  'traps.c' handles hardware exceptions after we have saved some state in
  *  'linux/arch/arm/lib/traps.S'.  Mostly a debugging aid, but will probably
  *  kill the offending process.
+ *  Revision History:
+ *
+ *  Date        Author          Comment
+ *  ---------   --------------  ------------------------------------
+ *  11/05/2007  Motorola        add trap log for LTT-LITE
+ *
  */
 #include <linux/module.h>
 #include <linux/signal.h>
@@ -21,7 +28,9 @@
 #include <linux/hardirq.h>
 #include <linux/init.h>
 #include <linux/uaccess.h>
-
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <asm/atomic.h>
 #include <asm/cacheflush.h>
 #include <asm/system.h>
@@ -194,6 +203,30 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 	barrier();
 }
 
+#ifdef CONFIG_LTT_LITE
+asmlinkage void trace_real_syscall_entry(int scno)
+{
+	/*
+	 * The caller didn't bother checking for a
+	 * valid syscall number...
+	 */
+	if ((scno & 0x00f00000) != __NR_SYSCALL_BASE)
+		return;
+
+	/* mark the ARM private syscalls */
+	if ((scno & 0x00ff0000) == __ARM_NR_BASE)
+		scno |= 0x00008000;
+	ltt_lite_log_syscall(LTT_LITE_EVENT_ENTER, scno);
+}
+
+asmlinkage void trace_real_syscall_exit(int scno)
+{
+	/* mark the ARM private syscalls */
+	if ((scno & 0x00ff0000) == __ARM_NR_BASE)
+		scno |= 0x00008000;
+	ltt_lite_log_syscall(LTT_LITE_EVENT_RETURN, scno);
+}
+#endif /* CONFIG_LTT_LITE */
 #ifdef CONFIG_PREEMPT
 #define S_PREEMPT " PREEMPT"
 #else
@@ -210,7 +243,7 @@ static void __die(const char *str, int err, struct thread_info *thread, struct p
 	struct task_struct *tsk = thread->task;
 	static int die_counter;
 
-	printk("Internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
+	printk("Dying from internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
 	       str, err, ++die_counter);
 	print_modules();
 	__show_regs(regs);
@@ -401,13 +434,44 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	return regs->ARM_r0;
 }
 
+#ifdef CONFIG_ARCH_MSM_ARM11
+#define CACHE_LINE_SIZE 32
+void flush_axi_bus_buffer(void);
+
+static inline void
+clean_and_invalidate_user_range(unsigned long start, unsigned long end)
+{
+	unsigned long addr;
+
+	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
+		asm ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));
+	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
+	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
+
+	flush_axi_bus_buffer();
+}
+#endif
+
+
 static inline void
 do_cache_op(unsigned long start, unsigned long end, int flags)
 {
 	struct vm_area_struct *vma;
 
+#ifdef CONFIG_ARCH_MSM_ARM11
+	if (end < start)
+#else
 	if (end < start || flags)
+#endif
 		return;
+
+#ifdef CONFIG_ARCH_MSM_ARM11
+	if (flags == 1) {
+		clean_and_invalidate_user_range(start & PAGE_MASK,
+						PAGE_ALIGN(end));
+		return;
+	}
+#endif
 
 	vma = find_vma(current->active_mm, start);
 	if (vma && vma->vm_start < end) {
@@ -482,7 +546,10 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		thread->tp_value = regs->ARM_r0;
 #if defined(CONFIG_HAS_TLS_REG)
 		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
-#elif !defined(CONFIG_TLS_REG_EMUL)
+#endif
+
+#if (!defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)) || \
+      defined(CONFIG_ARCH_MSM_SCORPION)
 		/*
 		 * User space must never try to access this directly.
 		 * Expect your app to break eventually if you do so.

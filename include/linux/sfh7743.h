@@ -23,6 +23,14 @@
 
 #ifdef __KERNEL__
 
+#ifdef CONFIG_ARCH_MSM
+struct sfh7743_platform_data {
+	const char *name;
+	unsigned    gpio_en;
+	const char *vreg_en;
+	unsigned    gpio_intr;
+};
+#else
 struct sfh7743_platform_data {
 	int (*init)(void);
 	void (*exit)(void);
@@ -31,12 +39,19 @@ struct sfh7743_platform_data {
 
 	int gpio;
 } __attribute__ ((packed));
+#endif
 
 #endif /* __KERNEL__ */
 
 #define SFH7743_IO			0xA2
 
-#define SFH7743_IOCTL_GET_ENABLE	_IOR(SFH7743_IO, 0x00, char)
-#define SFH7743_IOCTL_SET_ENABLE	_IOW(SFH7743_IO, 0x01, char)
+#define SFH7743_IOCTL_GET_ENABLE		_IOR(SFH7743_IO, 0x00, char)
+#define SFH7743_IOCTL_SET_ENABLE		_IOW(SFH7743_IO, 0x01, char)
+#define SFH7743_IOCTL_GET_PRESENCE     	_IOR(SFH7743_IO, 0x02, char)
+#define SFH7743_IOCTL_PUSH_PRESENCE    	_IOW(SFH7743_IO, 0x03, char)
+#define SFH7743_IOCTL_GET_STATUS        _IOR(SFH7743_IO, 0x04, char)
+#define SFH7743_IOCTL_DISABLE			_IOW(SFH7743_IO, 0x05, char)
+#define SFH7743_IOCTL_ENABLE			_IOW(SFH7743_IO, 0x06, char)
+
 
 #endif /* _LINUX_SFH7743_H__ */

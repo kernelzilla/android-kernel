@@ -441,6 +441,27 @@ static void adc_convert(struct cpcap_adc_request *req, int index)
 		req->result[index] = convert_to_kelvins(req->result[tbl_index]);
 }
 
+static void adc_raw(struct cpcap_adc_request *req, int index)
+{
+	struct conversion_tbl *conv_tbl = bank0_conversion;
+	struct phasing_tbl *phase_tbl = bank0_phasing;
+	int tbl_index = index;
+
+	if (req->type == CPCAP_ADC_TYPE_BANK_1)
+		return;
+
+	if (req->type == CPCAP_ADC_TYPE_BATT_PI)
+		tbl_index = (tbl_index % 2) ? CPCAP_ADC_BATTI_ADC :
+			    CPCAP_ADC_BATTP;
+
+	req->result[index] += conv_tbl[tbl_index].align_offset;
+
+	if (req->result[index] < phase_tbl[tbl_index].min)
+		req->result[index] = phase_tbl[tbl_index].min;
+	else if (req->result[index] > phase_tbl[tbl_index].max)
+		req->result[index] = phase_tbl[tbl_index].max;
+}
+
 static void adc_result(struct cpcap_device *cpcap,
 		       struct cpcap_adc_request *req)
 {
@@ -463,6 +484,9 @@ static void adc_result(struct cpcap_device *cpcap,
 			break;
 
 		case CPCAP_ADC_FORMAT_RAW:
+			adc_raw(req, j);
+			break;
+
 		default:
 			break;
 		}
@@ -544,6 +568,7 @@ static void cpcap_adc_cancel(struct work_struct *work)
 static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 {
 	struct cpcap_adc *adc;
+	unsigned short cal_data;
 
 	if (pdev->dev.platform_data == NULL) {
 		dev_err(&pdev->dev, "no platform_data\n");
@@ -564,9 +589,14 @@ static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 	adc_setup_calibrate(adc->cpcap, CPCAP_ADC_CHG_ISENSE);
 	adc_setup_calibrate(adc->cpcap, CPCAP_ADC_BATTI_ADC);
 
-	cpcap_regacc_write(adc->cpcap, CPCAP_REG_ADCC2,
-			   CPCAP_BIT_CAL_FACTOR_ENABLE,
-			   CPCAP_BIT_CAL_FACTOR_ENABLE);
+	cal_data = 0;
+	cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL1, &cal_data);
+	bank0_conversion[CPCAP_ADC_CHG_ISENSE].align_offset =
+		((short)cal_data * -1);
+	cal_data = 0;
+	cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL2, &cal_data);
+	bank0_conversion[CPCAP_ADC_BATTI_ADC].align_offset =
+		((short)cal_data * -1);
 
 	INIT_DELAYED_WORK(&adc->work, cpcap_adc_cancel);
 

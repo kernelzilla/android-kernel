@@ -23,12 +23,10 @@
 
 #ifndef __ASM_ARCH_OMAP34XX_H
 #define __ASM_ARCH_OMAP34XX_H
-
 /*
  * Please place only base defines here and put the rest in device
  * specific headers.
  */
-
 #define L4_34XX_BASE		0x48000000
 #define L4_WK_34XX_BASE		0x48300000
 #define L4_WK_OMAP_BASE		L4_WK_34XX_BASE
@@ -93,7 +91,7 @@
 #define OMAP2_32KSYNCT_BASE		OMAP3430_32KSYNCT_BASE
 #define OMAP2_CM_BASE			OMAP3430_CM_BASE
 #define OMAP2_PRM_BASE			OMAP3430_PRM_BASE
-#define OMAP2_VA_IC_BASE		IO_ADDRESS(OMAP34XX_IC_BASE)
+#define OMAP2_VA_IC_BASE		omap343x_l4_io_p2v(OMAP34XX_IC_BASE)
 
 #endif
 
@@ -112,16 +110,19 @@
 #define VDD1_OPP3	0x3
 #define VDD1_OPP4	0x4
 #define VDD1_OPP5	0x5
+#define VDD1_OPP6	0x6
 
 /* VDD2 OPPS */
 #define VDD2_OPP1	0x1
 #define VDD2_OPP2	0x2
 #define VDD2_OPP3	0x3
+#define VDD2_OPP4	0x4
 
-#define MIN_VDD1_OPP	VDD1_OPP1
-#define MAX_VDD1_OPP	VDD1_OPP5
-#define MIN_VDD2_OPP	VDD2_OPP1
-#define MAX_VDD2_OPP	VDD2_OPP3
+#define MIN_VDD1_OPP	(omap_pm_get_min_vdd1_opp())
+#define MAX_VDD1_OPP	(omap_pm_get_max_vdd1_opp())
+#define MIN_VDD2_OPP	(omap_pm_get_min_vdd2_opp())
+#define MAX_VDD2_OPP	(omap_pm_get_max_vdd2_opp())
+#define VDD1_THRESHOLD  MAX_VDD2_OPP
 
 #endif /* __ASM_ARCH_OMAP34XX_H */
 

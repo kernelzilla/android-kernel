@@ -36,11 +36,34 @@
 
 #include "f_adb.h"
 
+#ifdef CONFIG_USB_MOT_ANDROID
+#include "f_mot_android.h"
+#endif
+
 #define BULK_BUFFER_SIZE           4096
 
 /* number of rx and tx requests to allocate */
 #define RX_REQ_MAX 4
 #define TX_REQ_MAX 4
+
+#define STRING_INTERFACE        0
+
+/* static strings, in UTF-8 */
+static struct usb_string adb_string_defs[] = {
+	[STRING_INTERFACE].s = "Motorola ADB Interface",
+	{  /* ZEROES END LIST */ },
+};
+
+static struct usb_gadget_strings adb_string_table = {
+	.language =             0x0409, /* en-us */
+	.strings =              adb_string_defs,
+};
+
+static struct usb_gadget_strings *adb_strings[] = {
+	&adb_string_table,
+	NULL,
+};
+
 
 static const char shortname[] = "android_adb";
 
@@ -251,6 +274,9 @@ static int __init create_bulk_endpoints(struct adb_dev *dev,
 		return -ENODEV;
 	}
 	DBG(cdev, "usb_ep_autoconfig for ep_in got %s\n", ep->name);
+#if CONFIG_USB_MOT_ANDROID
+	ep->driver_data = _adb_dev;
+#endif
 	dev->ep_in = ep;
 
 	ep = usb_ep_autoconfig(cdev->gadget, out_desc);
@@ -259,6 +285,9 @@ static int __init create_bulk_endpoints(struct adb_dev *dev,
 		return -ENODEV;
 	}
 	DBG(cdev, "usb_ep_autoconfig for adb ep_out got %s\n", ep->name);
+#if CONFIG_USB_MOT_ANDROID
+	ep->driver_data = _adb_dev;
+#endif
 	dev->ep_out = ep;
 
 	/* now allocate requests for our endpoints */
@@ -548,6 +577,26 @@ adb_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	_adb_dev = NULL;
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+static void adb_start_out_receive(struct adb_dev *dev)
+{
+	struct usb_request *req;
+	int ret;
+
+	/* if we have idle read requests, get them queued */
+	while ((req = req_get(dev, &dev->rx_idle))) {
+		req->length = BULK_BUFFER_SIZE;
+		ret = usb_ep_queue(dev->ep_out, req, GFP_ATOMIC);
+
+		if (ret < 0) {
+			dev->error = 1;
+			req_put(dev, &dev->rx_idle, req);
+			break;
+		}
+	}
+}
+#endif
+
 static int adb_function_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
@@ -572,6 +621,10 @@ static int adb_function_set_alt(struct usb_function *f,
 	}
 	dev->online = 1;
 
+#ifdef CONFIG_USB_MOT_ANDROID
+	adb_start_out_receive(dev);
+	usb_interface_enum_cb(ADB_TYPE_FLAG);
+#endif
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
 	return 0;
@@ -598,7 +651,7 @@ int __init adb_function_add(struct usb_composite_dev *cdev,
 	struct usb_configuration *c)
 {
 	struct adb_dev *dev;
-	int ret;
+	int ret, status;
 
 	printk(KERN_INFO "adb_function_add\n");
 
@@ -619,6 +672,12 @@ int __init adb_function_add(struct usb_composite_dev *cdev,
 	INIT_LIST_HEAD(&dev->rx_done);
 	INIT_LIST_HEAD(&dev->tx_idle);
 
+	status = usb_string_id(c->cdev);
+	if (status >= 0) {
+		adb_string_defs[STRING_INTERFACE].id = status;
+		adb_interface_desc.iInterface = status;
+	}
+
 	dev->cdev = cdev;
 	dev->function.name = "adb";
 	dev->function.descriptors = null_adb_descs;
@@ -627,6 +686,7 @@ int __init adb_function_add(struct usb_composite_dev *cdev,
 	dev->function.unbind = adb_function_unbind;
 	dev->function.set_alt = adb_function_set_alt;
 	dev->function.disable = adb_function_disable;
+	dev->function.strings = adb_strings;
 
 	/* _adb_dev must be set before calling usb_gadget_register_driver */
 	_adb_dev = dev;
@@ -666,3 +726,22 @@ void adb_function_enable(int enable)
 	}
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+struct usb_function *adb_function_enable_id(int enable, int id)
+{
+	struct adb_dev *dev = _adb_dev;
+
+	printk(KERN_DEBUG "%s enable=%d id =%d\n", __func__, enable, id);
+	if (dev) {
+		if (enable) {
+			dev->function.descriptors = fs_adb_descs;
+			dev->function.hs_descriptors = hs_adb_descs;
+			adb_interface_desc.bInterfaceNumber = id;
+		} else {
+			dev->function.descriptors = null_adb_descs;
+			dev->function.hs_descriptors = null_adb_descs;
+		}
+	}
+	return &dev->function;
+}
+#endif

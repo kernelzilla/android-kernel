@@ -253,6 +253,22 @@ static const struct clksel_rate div16_dpll_rates[] = {
 	{ .div = 14, .val = 14, .flags = RATE_IN_343X },
 	{ .div = 15, .val = 15, .flags = RATE_IN_343X },
 	{ .div = 16, .val = 16, .flags = RATE_IN_343X },
+	{ .div = 17, .val = 17, .flags = RATE_IN_343X },
+	{ .div = 18, .val = 18, .flags = RATE_IN_343X },
+	{ .div = 19, .val = 19, .flags = RATE_IN_343X },
+	{ .div = 20, .val = 20, .flags = RATE_IN_343X },
+	{ .div = 21, .val = 21, .flags = RATE_IN_343X },
+	{ .div = 22, .val = 22, .flags = RATE_IN_343X },
+	{ .div = 23, .val = 23, .flags = RATE_IN_343X },
+	{ .div = 24, .val = 24, .flags = RATE_IN_343X },
+	{ .div = 25, .val = 25, .flags = RATE_IN_343X },
+	{ .div = 26, .val = 26, .flags = RATE_IN_343X },
+	{ .div = 27, .val = 27, .flags = RATE_IN_343X },
+	{ .div = 28, .val = 28, .flags = RATE_IN_343X },
+	{ .div = 29, .val = 29, .flags = RATE_IN_343X },
+	{ .div = 30, .val = 30, .flags = RATE_IN_343X },
+	{ .div = 31, .val = 31, .flags = RATE_IN_343X },
+	{ .div = 32, .val = 32, .flags = RATE_IN_343X },
 	{ .div = 0 }
 };
 
@@ -350,7 +366,15 @@ static struct dpll_data dpll2_dd = {
 	.idlest_mask	= OMAP3430_ST_IVA2_CLK_MASK,
 	.bypass_clk	= &dpll2_fck,
 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+#ifdef CONFIG_ARCH_OMAP3430
+	/*Change IVA2 DPLL N min to 13 per HW request due to
+	 *a limitation on the freqsel value, only for 3430,
+	 *not apply for 3630
+	 */
+	.min_divider	= 13,
+#else
 	.min_divider	= 1,
+#endif
 	.max_divider	= OMAP3_MAX_DPLL_DIV,
 	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
 };
@@ -514,6 +538,7 @@ static struct clk dpll3_m3_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= CM_CLKSEL1,
 	.clksel_mask	= OMAP3430_DIV_DPLL3_MASK,
+	.clksel_shift	= OMAP3430_DIV_DPLL3_SHIFT,
 	.clksel		= div16_dpll3_clksel,
 	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
 	.clkdm		= { .name = "dpll3_clkdm" },
@@ -592,6 +617,7 @@ static struct clk dpll4_m2_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP3430_CM_CLKSEL3,
 	.clksel_mask	= OMAP3430_DIV_96M_MASK,
+	.clksel_shift	= OMAP3430_DIV_96M_SHIFT,
 	.clksel		= div16_dpll4_clksel,
 	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
 	.clkdm		= { .name = "dpll4_clkdm" },
@@ -616,6 +642,27 @@ static struct clk dpll4_m2x2_ck = {
  * 96M_ALWON_FCLK (called "omap_96m_alwon_fck" below) and
  * CM_96K_(F)CLK.
  */
+
+static struct clk omap_192m_alwon_ck = {
+	.name		= "omap_192m_alwon_ck",
+	.parent		= &dpll4_m2x2_ck,
+	.flags		= CLOCK_IN_OMAP363X | PARENT_CONTROLS_CLOCK,
+	.clkdm		= { .name = "prm_clkdm" },
+	.recalc		= &followparent_recalc,
+   };
+
+static const struct clksel_rate omap_96m_alwon_fck_rates[] = {
+	{ .div = 1, .val = 1, .flags = RATE_IN_363X },
+	{ .div = 2, .val = 2, .flags = RATE_IN_363X | DEFAULT_RATE },
+	{ .div = 0 }
+};
+
+static const struct clksel omap_96m_alwon_fck_clksel[] = {
+	{ .parent = &omap_192m_alwon_ck, .rates = omap_96m_alwon_fck_rates },
+	{ .parent = NULL }
+};
+
+
 static struct clk omap_96m_alwon_fck = {
 	.name		= "omap_96m_alwon_fck",
 	.parent		= &dpll4_m2x2_ck,
@@ -669,8 +716,11 @@ static struct clk dpll4_m3_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= CM_CLKSEL,
 	.clksel_mask	= OMAP3430_CLKSEL_TV_MASK,
+	.clksel_mask2 = OMAP3630_CLKSEL_TV_MASK,
+	.clksel_shift = OMAP3430_CLKSEL_TV_SHIFT,
 	.clksel		= div16_dpll4_clksel,
-	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
+	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK
+					| CLOCK_IN_OMAP363X,
 	.clkdm		= { .name = "dpll4_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -761,8 +811,11 @@ static struct clk dpll4_m4_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= CM_CLKSEL,
 	.clksel_mask	= OMAP3430_CLKSEL_DSS1_MASK,
+	.clksel_mask2	= OMAP3630_CLKSEL_DSS1_MASK,
+	.clksel_shift	= OMAP3430_CLKSEL_DSS1_SHIFT,
 	.clksel		= div16_dpll4_clksel,
-	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
+	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK
+					| CLOCK_IN_OMAP363X,
 	.clkdm		= { .name = "dpll4_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
 	.set_rate	= &omap2_clksel_set_rate,
@@ -789,8 +842,11 @@ static struct clk dpll4_m5_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= CM_CLKSEL,
 	.clksel_mask	= OMAP3430_CLKSEL_CAM_MASK,
+	.clksel_mask2	= OMAP3630_CLKSEL_CAM_MASK,
+	.clksel_shift	= OMAP3430_CLKSEL_CAM_SHIFT,
 	.clksel		= div16_dpll4_clksel,
-	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
+	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK
+					| CLOCK_IN_OMAP363X,
 	.clkdm		= { .name = "dpll4_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -815,8 +871,11 @@ static struct clk dpll4_m6_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= CM_CLKSEL1,
 	.clksel_mask	= OMAP3430_DIV_DPLL4_MASK,
+	.clksel_mask2	= OMAP3630_DIV_DPLL4_MASK,
+	.clksel_shift	= OMAP3430_DIV_DPLL4_SHIFT,
 	.clksel		= div16_dpll4_clksel,
-	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK,
+	.flags		= CLOCK_IN_OMAP343X | PARENT_CONTROLS_CLOCK
+					| CLOCK_IN_OMAP363X,
 	.clkdm		= { .name = "dpll4_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -847,13 +906,14 @@ static struct clk emu_per_alwon_ck = {
 /* Type: DPLL */
 /* 3430ES2 only */
 static struct dpll_data dpll5_dd = {
+	.default_rate	= 120000000,
 	.mult_div1_reg	= OMAP3430ES2_CM_CLKSEL4,
 	.mult_mask	= OMAP3430ES2_PERIPH2_DPLL_MULT_MASK,
 	.div1_mask	= OMAP3430ES2_PERIPH2_DPLL_DIV_MASK,
 	.freqsel_mask	= OMAP3430ES2_PERIPH2_DPLL_FREQSEL_MASK,
 	.control_reg	= OMAP3430ES2_CM_CLKEN2,
 	.enable_mask	= OMAP3430ES2_EN_PERIPH2_DPLL_MASK,
-	.modes		= (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+	.modes		= (1 << DPLL_LOCKED),
 	.auto_recal_bit	= OMAP3430ES2_EN_PERIPH2_DPLL_DRIFTGUARD_SHIFT,
 	.recal_en_bit	= OMAP3430ES2_SND_PERIPH_DPLL_RECAL_EN_SHIFT,
 	.recal_st_bit	= OMAP3430ES2_SND_PERIPH_DPLL_ST_SHIFT,
@@ -983,9 +1043,13 @@ static struct clk corex2_fck = {
 /* DPLL power domain clock controls */
 
 static const struct clksel_rate div4_rates[] = {
-	{ .div = 1, .val = 1, .flags = RATE_IN_343X | DEFAULT_RATE },
+	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
 	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
-	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
+	/*IVA2_CLK_SRC need to be CORE_CLK/4, right now it is CORE_CLK/1.
+	*This is a recommendation from TI to avoid stability issues
+	*when SR is activated.In any case, it can be 4 all the time.
+	*/
+	{ .div = 4, .val = 4, .flags = RATE_IN_343X | DEFAULT_RATE },
 	{ .div = 0 }
 };
 
@@ -1207,6 +1271,18 @@ static const struct clksel_rate sgx_core_rates[] = {
 	{ .div = 3, .val = 0, .flags = RATE_IN_343X | DEFAULT_RATE },
 	{ .div = 4, .val = 1, .flags = RATE_IN_343X },
 	{ .div = 6, .val = 2, .flags = RATE_IN_343X },
+	{ .div = 2, .val = 5, .flags = RATE_IN_363X },
+	{ .div = 0 },
+};
+
+static const struct clksel_rate sgx_192m_rates[] = {
+	{ .div = 1,  .val = 4, .flags = RATE_IN_363X | DEFAULT_RATE },
+	{ .div = 0 },
+};
+
+static const struct clksel_rate sgx_corex2_rates[] = {
+	{ .div = 3, .val = 6, .flags = RATE_IN_363X | DEFAULT_RATE },
+	{ .div = 5, .val = 7, .flags = RATE_IN_363X },
 	{ .div = 0 },
 };
 
@@ -1218,6 +1294,9 @@ static const struct clksel_rate sgx_96m_rates[] = {
 static const struct clksel sgx_clksel[] = {
 	{ .parent = &core_ck,	 .rates = sgx_core_rates },
 	{ .parent = &cm_96m_fck, .rates = sgx_96m_rates },
+	{ .parent = &omap_192m_alwon_ck, .rates = sgx_192m_rates },
+	{ .parent = &corex2_fck, .rates = sgx_corex2_rates },
+
 	{ .parent = NULL },
 };
 
@@ -2451,6 +2530,7 @@ static struct clk usim_fck = {
 	.flags		= CLOCK_IN_OMAP3430ES2 | WAIT_READY,
 	.clkdm		= { .name = "prm_clkdm" },
 	.recalc		= &omap2_clksel_recalc,
+	.set_rate       = &omap2_clksel_set_rate,
 };
 
 /* XXX should gpt1's clksel have wkup_32k_fck as the 32k opt? */
@@ -3369,6 +3449,7 @@ static struct clk *onchip_34xx_clks[] __initdata = {
 	&dpll3_m3x2_ck,
 	&emu_core_alwon_ck,
 	&dpll4_ck,
+	&omap_192m_alwon_ck,
 	&omap_96m_alwon_fck,
 	&omap_96m_fck,
 	&cm_96m_fck,

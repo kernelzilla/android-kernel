@@ -1826,6 +1826,8 @@ static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 	return -EBUSY;
 }
 
+static int hub_port_debounce(struct usb_hub *hub, int port1);
+
 static int hub_port_reset(struct usb_hub *hub, int port1,
 				struct usb_device *udev, unsigned int delay)
 {
@@ -1845,6 +1847,9 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 					"cannot reset port %d (err = %d)\n",
 					port1, status);
 		else {
+			 /* port debounce */
+			status = hub_port_debounce(hub, port1);
+
 			status = hub_port_wait_reset(hub, port1, udev, delay);
 			if (status && status != -ENOTCONN)
 				dev_dbg(hub->intfdev,
@@ -2876,7 +2881,8 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 			status = usb_get_status(udev, USB_RECIP_DEVICE, 0,
 					&devstat);
 			if (status < 2) {
-				dev_dbg(&udev->dev, "get status %d ?\n", status);
+				dev_dbg(&udev->dev, "get status %d ?\n",
+					status);
 				goto loop_disable;
 			}
 			le16_to_cpus(&devstat);
@@ -3141,7 +3147,7 @@ static void hub_events(void)
 			dev_err (hub_dev, "get_hub_status failed\n");
 		else {
 			if (hubchange & HUB_CHANGE_LOCAL_POWER) {
-				dev_dbg (hub_dev, "power change\n");
+				dev_dbg(hub_dev, "power change\n");
 				clear_hub_feature(hdev, C_HUB_LOCAL_POWER);
 				if (hubstatus & HUB_STATUS_LOCAL_POWER)
 					/* FIXME: Is this always true? */
@@ -3150,7 +3156,7 @@ static void hub_events(void)
 					hub->limited_power = 0;
 			}
 			if (hubchange & HUB_CHANGE_OVERCURRENT) {
-				dev_dbg (hub_dev, "overcurrent change\n");
+				dev_dbg(hub_dev, "overcurrent change\n");
 				msleep(500);	/* Cool down */
 				clear_hub_feature(hdev, C_HUB_OVER_CURRENT);
                         	hub_power_on(hub, true);

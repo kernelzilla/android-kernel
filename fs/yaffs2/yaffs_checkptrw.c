@@ -171,7 +171,7 @@ int yaffs_CheckpointOpen(yaffs_Device *dev, int forWriting)
 		dev->blocksInCheckpoint = 0;
 		dev->checkpointMaxBlocks = (dev->internalEndBlock - dev->internalStartBlock)/16 + 2;
 		dev->checkpointBlockList = YMALLOC(sizeof(int) * dev->checkpointMaxBlocks);
-		if(!dev->checkpointBlockList)
+		if (!dev->checkpointBlockList)
 			return 0;
 
 		for (i = 0; i < dev->checkpointMaxBlocks; i++)
@@ -314,7 +314,6 @@ int yaffs_CheckpointRead(yaffs_Device *dev, void *data, int nBytes)
 					dev->checkpointCurrentChunk;
 
 				realignedChunk = chunk - dev->chunkOffset;
-				
 				dev->nPageReads++;
 
 				/* read in the next chunk */

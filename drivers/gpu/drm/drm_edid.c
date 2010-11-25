@@ -658,6 +658,9 @@ struct edid *drm_get_edid(struct drm_connector *connector,
 {
 	struct edid *edid;
 
+	if (drm_core_check_feature(connector->dev, DRIVER_USE_PLATFORM_DEVICE))
+		return NULL;
+
 	edid = (struct edid *)drm_ddc_read(adapter);
 	if (!edid) {
 		dev_info(&connector->dev->pdev->dev, "%s: no EDID data\n",

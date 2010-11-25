@@ -7,8 +7,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <elf.h>
-
+#include "elf.h"
 #include "elfconfig.h"
 
 #if KERNEL_ELFCLASS == ELFCLASS32

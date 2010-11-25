@@ -119,7 +119,7 @@ config MACH_OMAP_ZOOM2
 
 config WIFI_CONTROL_FUNC
         bool "Enable WiFi control function abstraction"
-	depends on MACH_OMAP_ZOOM2 || MACH_SHOLES
+	depends on MACH_OMAP_ZOOM2 || MACH_SHOLES || MACH_MAPPHONE
         help
           Enables Power/Reset/Carddetect function abstraction
 
@@ -164,6 +164,14 @@ config MACH_SHOLES_UMTS
         bool "Motorola sholes umts"
         depends on MACH_SHOLES
 
+config MACH_SHOLEST
+        bool "Motorola sholes tablet"
+        depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_MAPPHONE
+        bool "Motorola Android Platform phone"
+        depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
 config MACH_OVERO
 	bool "Gumstix Overo board"
 	depends on ARCH_OMAP3 && ARCH_OMAP34XX
@@ -171,3 +179,23 @@ config MACH_OVERO
 config MACH_OMAP3_PANDORA
 	bool "OMAP3 Pandora"
 	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MOT_FEAT_MDTV
+	bool "support MDTV system for motorola"
+	default n
+
+config EMU_UART_DEBUG
+	bool "Provide the option of setting MiniUSB port as UART3 to debug kernel"
+	default n
+	help
+	  If enabling this feature, USB functionality is NOT available
+	  any more. Only including "emu_uart_debug" parameters in command line
+	  could activate UART3 console over miniUSB port. This feature is
+	  specific for Motorola phone with CPCAP power IC.
+
+config PROC_OMAP_PHONE_ID
+        bool "/proc/phoneid support"
+        depends on PROC_FS && ARCH_OMAP34XX
+	default n
+	help
+	  Exports the DIE_ID reg value.

@@ -10,6 +10,8 @@
  *	Madhusudhan		<madhu.cr@ti.com>
  *	Mohit Jalori		<mjalori@ti.com>
  *
+ * Copyright (C) 2009 Motorola, Inc.
+ *
  * This file is licensed under the terms of the GNU General Public License
  * version 2. This program is licensed "as is" without any warranty of any
  * kind, whether express or implied.
@@ -32,6 +34,7 @@
 #include <mach/board.h>
 #include <mach/mmc.h>
 #include <mach/cpu.h>
+#include <mach/control.h>
 
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSCONFIG	0x0010
@@ -150,6 +153,7 @@ struct mmc_omap_host {
 	int			slot_id;
 	int			dbclk_enabled;
 	int 			clks_enabled;
+	/* Clocks lock to prevent race condition */
 	spinlock_t		clk_lock;
 	struct timer_list	inact_timer;
 	struct	omap_mmc_platform_data	*pdata;
@@ -558,6 +562,9 @@ static irqreturn_t mmc_omap_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+
+
+
 /*
  * Switch MMC interface voltage ... only relevant for MMC1.
  *
@@ -572,7 +579,6 @@ static int omap_mmc_switch_opcond(struct mmc_omap_host *host, int vdd)
 
 	if (host->id != OMAP_MMC1_DEVID)
 		return 0;
-
 	/* Disable the clocks */
 	omap_hsmmc_disable_clks(host);
 
@@ -1024,6 +1030,19 @@ static struct mmc_host_ops mmc_omap_ops = {
 	/* NYET -- enable_sdio_irq */
 };
 
+#ifdef CONFIG_MMC_TST
+
+static struct mmc_omap_host *hsmmc_host;
+
+void hsmmc_schedule_4test(int carddetect)
+{
+      printk(KERN_ERR"carddetect=%d\n", carddetect);
+      hsmmc_host->carddetect = carddetect;
+      schedule_work(&hsmmc_host->mmc_carddetect_work);
+}
+EXPORT_SYMBOL(hsmmc_schedule_4test);
+#endif
+
 static int __init omap_mmc_probe(struct platform_device *pdev)
 {
 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
@@ -1210,6 +1229,10 @@ static int __init omap_mmc_probe(struct platform_device *pdev)
 		if (ret < 0)
 			goto err_cover_switch;
 	}
+#ifdef CONFIG_MMC_TST
+		if (host->id == OMAP_MMC1_DEVID)
+			hsmmc_host = host;
+#endif
 
 	return 0;
 
@@ -1271,6 +1294,7 @@ static int omap_mmc_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
 
 #ifdef CONFIG_PM
 static int omap_mmc_suspend(struct platform_device *pdev, pm_message_t state)
@@ -1351,6 +1375,7 @@ static int omap_mmc_resume(struct platform_device *pdev)
 #define omap_mmc_suspend	NULL
 #define omap_mmc_resume		NULL
 #endif
+
 
 static struct platform_driver omap_mmc_driver = {
 	.probe		= omap_mmc_probe,

@@ -1474,6 +1474,8 @@ static int usb_autopm_do_interface(struct usb_interface *intf,
 	else {
 		udev->auto_pm = 1;
 		intf->pm_usage_cnt += inc_usage_cnt;
+		if (intf->pm_usage_cnt < 0)
+			intf->pm_usage_cnt = 0;
 		udev->last_busy = jiffies;
 		if (inc_usage_cnt >= 0 && intf->pm_usage_cnt > 0) {
 			if (udev->state == USB_STATE_SUSPENDED)

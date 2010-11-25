@@ -125,6 +125,9 @@ struct omap_nand_info {
 	unsigned long			phys_base;
 	void __iomem			*gpmc_cs_baseaddr;
 	void __iomem			*gpmc_baseaddr;
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+	void __iomem			*nand_pref_fifo_add;
+#endif
 	bool				wait_for_rb;
 };
 
@@ -244,6 +247,82 @@ static void omap_write_buf16(struct mtd_info *mtd, const u_char * buf, int len)
 						GPMC_STATUS) & GPMC_BUF_FULL));
 	}
 }
+
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+/*
+ * omap_read_buf_pref - read data from NAND controller into buffer
+ * @mtd: MTD device structure
+ * @buf: buffer to store date
+ * @len: number of bytes to read
+ */
+static void omap_read_buf_pref(struct mtd_info *mtd, u_char *buf, int len)
+{
+	struct omap_nand_info *info = container_of(mtd,
+						struct omap_nand_info, mtd);
+	uint32_t prefetch_status = 0, read_count = 0;
+	u32 *p = (u32 *)buf;
+
+	/* take care of subpage reads */
+	for (; len % 4 != 0; ) {
+		*buf++ = __raw_readb(info->nand.IO_ADDR_R);
+		len--;
+	}
+	p = (u32 *) buf;
+
+	/* configure and start prefetch transfer */
+	gpmc_prefetch_start(info->gpmc_cs, 0x0, len, 0x0);
+
+	do {
+		prefetch_status = gpmc_prefetch_status();
+		read_count = ((prefetch_status >> 24) & 0x7F) >> 2;
+		__raw_readsl(info->nand_pref_fifo_add, p,
+						read_count);
+		p += read_count;
+		len -= read_count << 2;
+	} while (len);
+
+	/* disable and stop the PFPW engine */
+	gpmc_prefetch_stop();
+}
+
+/*
+ * omap_write_buf_pref - write buffer to NAND controller
+ * @mtd: MTD device structure
+ * @buf: data buffer
+ * @len: number of bytes to write
+ */
+static void omap_write_buf_pref(struct mtd_info *mtd,
+					const u_char *buf, int len)
+{
+	struct omap_nand_info *info = container_of(mtd,
+						struct omap_nand_info, mtd);
+	uint32_t prefetch_status = 0, write_count = 0;
+	int i = 0;
+	u16 *p = (u16 *) buf;
+
+
+	/* take care of subpage writes */
+	if (len % 2 != 0) {
+		writeb(*buf, info->nand.IO_ADDR_R);
+		p = (u16 *)(buf + 1);
+		len--;
+	}
+
+	/*  configure and start prefetch transfer */
+	gpmc_prefetch_start(info->gpmc_cs, 0x0, len, 0x1);
+
+	prefetch_status = gpmc_prefetch_status();
+	while (prefetch_status & 0x3FFF) {
+		write_count = ((prefetch_status >> 24) & 0x7F) >> 1;
+		for (i = 0; (i < write_count) && len; i++, len -= 2)
+			__raw_writew(*p++, info->nand_pref_fifo_add);
+			prefetch_status = gpmc_prefetch_status();
+	}
+
+	/* disable and stop the PFPW engine */
+	gpmc_prefetch_stop();
+}
+#endif /* CONFIG_MTD_NAND_OMAP_PREFETCH */
 /*
  * omap_verify_buf - Verify chip data against buffer
  * @mtd: MTD device structure
@@ -664,17 +743,23 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto out_release_mem_region;
 	}
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+		info->nand_pref_fifo_add = info->nand.IO_ADDR_R;
+#endif
 	info->nand.controller = &info->controller;
 
 	info->nand.IO_ADDR_W = info->nand.IO_ADDR_R;
 	info->nand.cmd_ctrl  = omap_hwcontrol;
 
 	/* REVISIT:  only supports 16-bit NAND flash */
-
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+	info->nand.read_buf   = omap_read_buf_pref;
+	info->nand.write_buf  = omap_write_buf_pref;
+#else
 	info->nand.read_buf   = omap_read_buf16;
 	info->nand.write_buf  = omap_write_buf16;
+#endif
 	info->nand.verify_buf = omap_verify_buf;
-
 	/*
 	* If RDY/BSY line is connected to OMAP then use the omap ready funcrtion
 	* and the generic nand_wait function which reads the status register
@@ -752,7 +837,11 @@ static int omap_nand_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 	/* Release NAND device, its internal structures and partitions */
 	nand_release(&info->mtd);
+#ifdef CONFIG_MTD_NAND_OMAP_PREFETCH
+	iounmap(info->nand_pref_fifo_add);
+#else
 	iounmap(info->nand.IO_ADDR_R);
+#endif
 	kfree(&info->mtd);
 	return 0;
 }

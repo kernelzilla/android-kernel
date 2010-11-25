@@ -2,21 +2,33 @@
  *  linux/arch/arm/kernel/signal.c
  *
  *  Copyright (C) 1995-2002 Russell King
+ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ *  Date        Author          Comment
+ *  ---------   --------------  ------------------------------------
+ *  3/6/2008    Motorola        Add LTT-Lite support.
+ *
  */
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/personality.h>
 #include <linux/freezer.h>
 #include <linux/uaccess.h>
-
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
+#endif
 #include <asm/elf.h>
 #include <asm/cacheflush.h>
 #include <asm/ucontext.h>
 #include <asm/unistd.h>
+
+#ifdef CONFIG_VFP
+#include <asm/vfp.h>
+#endif
 
 #include "ptrace.h"
 #include "signal.h"
@@ -100,7 +112,7 @@ sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs *r
 	}
 }
 
-asmlinkage int 
+asmlinkage int
 sys_sigaction(int sig, const struct old_sigaction __user *act,
 	      struct old_sigaction __user *oact)
 {
@@ -255,7 +267,7 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
 #endif
 #ifdef CONFIG_VFP
 //	if (err == 0)
-//		err |= vfp_restore_state(&sf->aux.vfp);
+//		err |= vfp_restore_context(&aux->vfp);
 #endif
 
 	return err;
@@ -370,7 +382,7 @@ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
 #endif
 #ifdef CONFIG_VFP
 //	if (err == 0)
-//		err |= vfp_save_state(&sf->aux.vfp);
+//		err |= vfp_save_context(&aux->vfp);
 #endif
 	__put_user_error(0, &aux->end_magic, err);
 
@@ -548,7 +560,7 @@ static inline void restart_syscall(struct pt_regs *regs)
 
 /*
  * OK, we're invoking a handler
- */	
+ */
 static void
 handle_signal(unsigned long sig, struct k_sigaction *ka,
 	      siginfo_t *info, sigset_t *oldset,
@@ -647,6 +659,11 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
+#ifdef CONFIG_LTT_LITE
+		ltt_lite_ev_handle_sig((unsigned short)current->pid,
+			(unsigned short)signr,
+			(unsigned long)ka.sa.sa_handler);
+#endif
 		handle_signal(signr, &ka, &info, oldset, regs, syscall);
 		single_step_set(current);
 		return 1;

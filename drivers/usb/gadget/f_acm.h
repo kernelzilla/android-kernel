@@ -18,6 +18,8 @@
 #ifndef __F_ACM_H
 #define __F_ACM_H
 
+struct usb_function *acm_function_enable(int enable, int id);
+
 int acm_function_add(struct usb_composite_dev *cdev,
 	struct usb_configuration *c);
 

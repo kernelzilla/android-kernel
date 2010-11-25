@@ -27,7 +27,11 @@ enum {
 	DEBUG_USER_STATE = 1U << 0,
 	DEBUG_SUSPEND = 1U << 2,
 };
+#if defined(CONFIG_KERNEL_MOTOROLA)
+static int debug_mask = DEBUG_USER_STATE|DEBUG_SUSPEND;
+#else /* defined(CONFIG_KERNEL_MOTOROLA) */
 static int debug_mask = DEBUG_USER_STATE;
+#endif /* defined(CONFIG_KERNEL_MOTOROLA) */
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 static DEFINE_MUTEX(early_suspend_lock);

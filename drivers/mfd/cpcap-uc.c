@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Motorola, Inc.
+ * Copyright (C) 2008-2010 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,7 +18,9 @@
 
 #include <linux/completion.h>
 #include <linux/errno.h>
+#include <linux/firmware.h>
 #include <linux/fs.h>
+#include <linux/ihex.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
@@ -28,19 +30,20 @@
 #include <linux/spi/cpcap-regbits.h>
 #include <linux/spi/spi.h>
 
-
 #define ERROR_MACRO_TIMEOUT  0x81
 #define ERROR_MACRO_WRITE    0x82
 #define ERROR_MACRO_READ     0x83
 
-#define RAM_START            0x9000
-#define RAM_END              0x9FA0
-
+#define RAM_START_TI         0x9000
+#define RAM_END_TI           0x9FA0
+#define RAM_START_ST         0x0000
+#define RAM_END_ST           0x0FFF
 
 enum {
 	READ_STATE_1,	/* Send size and location of RAM read. */
-	READ_STATE_2,	/* Read data from uC. */
-	READ_STATE_3	/* Check for error. */
+	READ_STATE_2,   /*!< Read MT registers. */
+	READ_STATE_3,   /*!< Read data from uC. */
+	READ_STATE_4,   /*!< Check for error. */
 };
 
 enum {
@@ -92,11 +95,19 @@ static struct miscdevice uc_dev = {
 	.fops = &fops,
 };
 
-static int is_valid_address(unsigned short address,
+static int is_valid_address(struct cpcap_device *cpcap, unsigned short address,
 			    unsigned short num_words)
 {
-	return (int) ((address >= RAM_START) &&
-		      ((address + num_words) <= RAM_END));
+	int vld = 0;
+
+	if (cpcap->vendor == CPCAP_VENDOR_TI) {
+		vld = (address >= RAM_START_TI) &&
+		    ((address + num_words) <= RAM_END_TI);
+	} else if (cpcap->vendor == CPCAP_VENDOR_ST) {
+		vld = ((address + num_words) <= RAM_END_ST);
+	}
+
+	return vld;
 }
 
 static void ram_read_state_machine(enum cpcap_irqs irq, void *data)
@@ -115,11 +126,37 @@ static void ram_read_state_machine(enum cpcap_irqs irq, void *data)
 				   uc_data->req.num_words, 0xFFFF);
 		cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_MT3, 0, 0xFFFF);
 
-		uc_data->state = READ_STATE_2;
+		if (uc_data->cpcap->vendor == CPCAP_VENDOR_ST)
+			uc_data->state = READ_STATE_2;
+		else
+			uc_data->state = READ_STATE_3;
+
 		cpcap_irq_unmask(uc_data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
+
 		break;
 
 	case READ_STATE_2:
+		cpcap_regacc_read(uc_data->cpcap, CPCAP_REG_MT1, &temp);
+
+		if (temp == ERROR_MACRO_READ) {
+			uc_data->state = READ_STATE_1;
+			uc_data->state_cntr = 0;
+
+			cpcap_irq_mask(uc_data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
+
+			uc_data->cb_status = -EIO;
+
+			complete(&uc_data->completion);
+		} else {
+			cpcap_regacc_read(uc_data->cpcap, CPCAP_REG_MT2, &temp);
+			cpcap_regacc_read(uc_data->cpcap, CPCAP_REG_MT3, &temp);
+
+			uc_data->state = READ_STATE_3;
+			cpcap_irq_unmask(uc_data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
+		}
+		break;
+
+	case READ_STATE_3:
 		cpcap_regacc_read(uc_data->cpcap, CPCAP_REG_MT1,
 				  uc_data->req.data + uc_data->state_cntr);
 
@@ -146,12 +183,12 @@ static void ram_read_state_machine(enum cpcap_irqs irq, void *data)
 		}
 
 		if (uc_data->state_cntr == uc_data->req.num_words)
-			uc_data->state = READ_STATE_3;
+			uc_data->state = READ_STATE_4;
 
 		cpcap_irq_unmask(uc_data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
 		break;
 
-	case READ_STATE_3:
+	case READ_STATE_4:
 		cpcap_regacc_read(uc_data->cpcap, CPCAP_REG_MT1, &temp);
 
 		if (temp != ERROR_MACRO_READ)
@@ -313,8 +350,15 @@ static int ram_write(struct cpcap_uc_data *uc_data, unsigned short address,
 
 	mutex_lock(&uc_data->lock);
 
+	if ((uc_data->cpcap->vendor == CPCAP_VENDOR_ST) &&
+	    (uc_data->cpcap->revision <= CPCAP_REVISION_2_0)) {
+		cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_UCTM,
+				   CPCAP_BIT_UCTM, CPCAP_BIT_UCTM);
+	}
+
 	if (uc_data->is_supported && (num_words > 0) &&
-	    (data != NULL) && is_valid_address(address, num_words) &&
+		(data != NULL) &&
+		is_valid_address(uc_data->cpcap, address, num_words) &&
 	    !uc_data->uc_reset) {
 		uc_data->req.address = address;
 		uc_data->req.data = data;
@@ -324,8 +368,8 @@ static int ram_write(struct cpcap_uc_data *uc_data, unsigned short address,
 		INIT_COMPLETION(uc_data->completion);
 
 		retval = cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_MI2,
-					    CPCAP_BIT_PRIRAMW,
-					    CPCAP_BIT_PRIRAMW);
+					CPCAP_BIT_PRIRAMW,
+					CPCAP_BIT_PRIRAMW);
 		if (retval)
 			goto err;
 
@@ -341,7 +385,14 @@ static int ram_write(struct cpcap_uc_data *uc_data, unsigned short address,
 	}
 
 err:
+	if ((uc_data->cpcap->vendor == CPCAP_VENDOR_ST) &&
+	    (uc_data->cpcap->revision <= CPCAP_REVISION_2_0)) {
+		cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_UCTM,
+				   0, CPCAP_BIT_UCTM);
+	}
+
 	mutex_unlock(&uc_data->lock);
+
 	return retval;
 }
 
@@ -352,8 +403,15 @@ static int ram_read(struct cpcap_uc_data *uc_data, unsigned short address,
 
 	mutex_lock(&uc_data->lock);
 
+	if ((uc_data->cpcap->vendor == CPCAP_VENDOR_ST) &&
+	    (uc_data->cpcap->revision <= CPCAP_REVISION_2_0)) {
+		cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_UCTM,
+				   CPCAP_BIT_UCTM, CPCAP_BIT_UCTM);
+	}
+
 	if (uc_data->is_supported && (num_words > 0) &&
-	    is_valid_address(address, num_words) && !uc_data->uc_reset) {
+	    is_valid_address(uc_data->cpcap, address, num_words) &&
+		!uc_data->uc_reset) {
 		uc_data->req.address = address;
 		uc_data->req.data = data;
 		uc_data->req.num_words = num_words;
@@ -379,7 +437,14 @@ static int ram_read(struct cpcap_uc_data *uc_data, unsigned short address,
 	}
 
 err:
+	if ((uc_data->cpcap->vendor == CPCAP_VENDOR_ST) &&
+	    (uc_data->cpcap->revision <= CPCAP_REVISION_2_0)) {
+		cpcap_regacc_write(uc_data->cpcap, CPCAP_REG_UCTM,
+				   0, CPCAP_BIT_UCTM);
+	}
+
 	mutex_unlock(&uc_data->lock);
+
 	return retval;
 }
 
@@ -462,6 +527,7 @@ static ssize_t fops_read(struct file *file, char *buf,
 			num_words = (unsigned short) (count >> 1);
 
 			retval = ram_read(uc_data, address, num_words, data);
+
 			if (retval)
 				goto err;
 
@@ -499,6 +565,24 @@ static int fops_ioctl(struct inode *inode, struct file *file,
 
 		break;
 
+	case CPCAP_IOCTL_UC_MACRO_STOP:
+		retval = cpcap_uc_stop(data->cpcap, (enum cpcap_macro)arg);
+		break;
+
+	case CPCAP_IOCTL_UC_GET_VENDOR:
+		retval = copy_to_user((enum cpcap_vendor *)arg,
+					&(data->cpcap->vendor),
+					sizeof(enum cpcap_vendor));
+		break;
+
+	case CPCAP_IOCTL_UC_SET_TURBO_MODE:
+		if (arg != 0)
+			arg = 1;
+		retval = cpcap_regacc_write(data->cpcap, CPCAP_REG_UCTM,
+					(unsigned short)arg,
+					CPCAP_BIT_UCTM);
+		break;
+
 	default:
 		break;
 	}
@@ -528,8 +612,16 @@ int cpcap_uc_start(struct cpcap_device *cpcap, enum cpcap_macro macro)
 	if ((data->is_ready) &&
 	    (macro > CPCAP_MACRO_USEROFF) && (macro < CPCAP_MACRO__END) &&
 	    (data->uc_reset == 0)) {
-		retval = cpcap_regacc_write(cpcap, CPCAP_REG_MI2, (1 << macro),
-					    (1 << macro));
+		if ((macro == CPCAP_MACRO_4) ||
+		    ((cpcap->vendor == CPCAP_VENDOR_ST) &&
+		     (macro == CPCAP_MACRO_12))) {
+			retval = cpcap_regacc_write(cpcap, CPCAP_REG_MI2,
+						    (1 << macro),
+						    (1 << macro));
+		} else {
+			retval = cpcap_regacc_write(cpcap, CPCAP_REG_MIM1,
+						    0, (1 << macro));
+		}
 	}
 
 	return retval;
@@ -542,8 +634,14 @@ int cpcap_uc_stop(struct cpcap_device *cpcap, enum cpcap_macro macro)
 
 	if ((macro > CPCAP_MACRO_4) &&
 	    (macro < CPCAP_MACRO__END)) {
-		retval = cpcap_regacc_write(cpcap, CPCAP_REG_MI2, 0,
-					    (1 << macro));
+		if ((cpcap->vendor == CPCAP_VENDOR_ST) &&
+		     (macro == CPCAP_MACRO_12)) {
+			retval = cpcap_regacc_write(cpcap, CPCAP_REG_MI2,
+						    0, (1 << macro));
+		} else {
+			retval = cpcap_regacc_write(cpcap, CPCAP_REG_MIM1,
+						    (1 << macro), (1 << macro));
+		}
 	}
 
 	return retval;
@@ -557,15 +655,102 @@ unsigned char cpcap_uc_status(struct cpcap_device *cpcap,
 	unsigned short regval;
 
 	if (macro < CPCAP_MACRO__END) {
-		cpcap_regacc_read(cpcap, CPCAP_REG_MI2, &regval);
+		if ((macro <= CPCAP_MACRO_4) ||
+		    ((cpcap->vendor == CPCAP_VENDOR_ST) &&
+		     (macro == CPCAP_MACRO_12))) {
+			cpcap_regacc_read(cpcap, CPCAP_REG_MI2, &regval);
 
-		if (regval & (1 << macro))
-			retval = 1;
+			if (regval & (1 << macro))
+				retval = 1;
+		} else {
+			cpcap_regacc_read(cpcap, CPCAP_REG_MIM1, &regval);
+
+			if (!(regval & (1 << macro)))
+				retval = 1;
+		}
 	}
 
 	return retval;
 }
 EXPORT_SYMBOL_GPL(cpcap_uc_status);
+
+static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
+{
+	int err;
+	const struct ihex_binrec *rec;
+	const struct firmware *fw;
+	unsigned short *buf;
+	int i;
+	unsigned short num_bytes;
+	unsigned short num_words;
+	unsigned char odd_bytes;
+
+	if (!uc_data || !dev)
+		return -EINVAL;
+
+	if (uc_data->cpcap->vendor == CPCAP_VENDOR_ST)
+		err = request_ihex_firmware(&fw, "cpcap/firmware_0_2x.fw", dev);
+	else
+		err = request_ihex_firmware(&fw, "cpcap/firmware_1_2x.fw", dev);
+
+	if (err) {
+		dev_err(dev, "Failed to load \"cpcap/firmware_%d_2x.fw\": %d\n",
+			uc_data->cpcap->vendor, err);
+		goto err;
+	}
+
+	for (rec = (void *)fw->data; rec; rec = ihex_next_binrec(rec)) {
+		odd_bytes = 0;
+		num_bytes = be16_to_cpu(rec->len);
+
+		/* Since loader requires words, need even number of bytes. */
+		if (be16_to_cpu(rec->len) % 2) {
+			num_bytes++;
+			odd_bytes = 1;
+		}
+
+		num_words = num_bytes >> 1;
+		dev_info(dev, "Loading %d word(s) at 0x%04x\n",
+			 num_words, be32_to_cpu(rec->addr));
+
+		buf = kzalloc(num_bytes, GFP_KERNEL);
+		if (buf) {
+			for (i = 0; i < num_words; i++) {
+				if (odd_bytes && (i == (num_words - 1)))
+					buf[i] = rec->data[i * 2];
+				else
+					buf[i] = ((uint16_t *)rec->data)[i];
+
+				buf[i] = be16_to_cpu(buf[i]);
+			}
+
+			err = ram_write(uc_data, be32_to_cpu(rec->addr),
+					num_words, buf);
+			kfree(buf);
+
+			if (err) {
+				dev_err(dev, "RAM write failed: %d\n", err);
+				break;
+			}
+		} else {
+			err = -ENOMEM;
+			dev_err(dev, "RAM write failed: %d\n", err);
+			break;
+		}
+	}
+
+	release_firmware(fw);
+
+	if (!err) {
+		uc_data->is_ready = 1;
+
+		err = cpcap_uc_start(uc_data->cpcap, CPCAP_MACRO_4);
+		dev_info(dev, "Started macro 4: %d\n", err);
+	}
+
+err:
+	return err;
+}
 
 static int cpcap_uc_probe(struct platform_device *pdev)
 {
@@ -594,9 +779,9 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 	cpcap_uc_info = data;
 	data->cpcap->ucdata = data;
 
-	/* Only the TI CPCAP (2.0 and later) is currently supported */
-	if ((data->cpcap->vendor == CPCAP_VENDOR_TI) &&
-	    (data->cpcap->revision >= CPCAP_REVISION_2_0)) {
+	if (((data->cpcap->vendor == CPCAP_VENDOR_TI) &&
+	     (data->cpcap->revision >= CPCAP_REVISION_2_0)) ||
+		(data->cpcap->vendor == CPCAP_VENDOR_ST)) {
 		retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_PRIMAC,
 					    primac_handler, data);
 		if (retval)
@@ -628,12 +813,17 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 
 		cpcap_regacc_write(data->cpcap, CPCAP_REG_MIM1, 0xFFFF,
 				   0xFFFF);
-	} else {
+
+		retval = fw_load(data, &pdev->dev);
+		if (retval)
+			goto err_fw;
+	} else
 		retval = -ENODEV;
-	}
 
 	return retval;
 
+err_fw:
+	misc_deregister(&uc_dev);
 err_priramw:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIRAMW);
 err_priramr:
@@ -677,7 +867,7 @@ static int __init cpcap_uc_init(void)
 {
 	return platform_driver_register(&cpcap_uc_driver);
 }
-module_init(cpcap_uc_init);
+subsys_initcall(cpcap_uc_init);
 
 static void __exit cpcap_uc_exit(void)
 {
@@ -689,3 +879,5 @@ MODULE_ALIAS("platform:cpcap_uc");
 MODULE_DESCRIPTION("CPCAP uC driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
+MODULE_FIRMWARE("cpcap/firmware_0_2x.fw");
+MODULE_FIRMWARE("cpcap/firmware_1_2x.fw");

@@ -205,43 +205,11 @@ static struct file_operations bridge_fops = {
 static u32 timeOut = 1000;
 #ifdef CONFIG_BRIDGE_DVFS
 static struct clk *clk_handle;
-s32 dsp_max_opps = VDD1_OPP5;
-#endif
-
-/* Maximum Opps that can be requested by IVA*/
-/*vdd1 rate table*/
-#ifdef CONFIG_BRIDGE_DVFS
-const struct omap_opp  vdd1_rate_table_bridge[] = {
-	{0, 0, 0},
-	/*OPP1*/
-	{S125M, VDD1_OPP1, 0},
-	/*OPP2*/
-	{S250M, VDD1_OPP2, 0},
-	/*OPP3*/
-	{S500M, VDD1_OPP3, 0},
-	/*OPP4*/
-	{S550M, VDD1_OPP4, 0},
-	/*OPP5*/
-	{S600M, VDD1_OPP5, 0},
-};
 #endif
 #endif
 
 struct dspbridge_platform_data *omap_dspbridge_pdata;
 
-u32 vdd1_dsp_freq[6][4] = {
-	{0, 0, 0, 0},
-	/*OPP1*/
-	{0, 90000, 0, 86000},
-	/*OPP2*/
-	{0, 180000, 80000, 170000},
-	/*OPP3*/
-	{0, 360000, 160000, 340000},
-	/*OPP4*/
-	{0, 396000, 325000, 376000},
-	/*OPP5*/
-	{0, 430000, 355000, 430000},
-};
 
 #ifdef CONFIG_BRIDGE_DVFS
 static int dspbridge_post_scale(struct notifier_block *op, unsigned long level,
@@ -267,9 +235,6 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 	u32 temp;
 	dev_t   dev = 0 ;
 	int     result;
-#ifdef CONFIG_BRIDGE_DVFS
-	int i = 0;
-#endif
 	struct dspbridge_platform_data *pdata = pdev->dev.platform_data;
 
 	omap_dspbridge_dev = pdev;
@@ -405,8 +370,13 @@ static int __devinit omap34xx_bridge_probe(struct platform_device *pdev)
 	}
 	if (DSP_SUCCEEDED(initStatus)) {
 #ifdef CONFIG_BRIDGE_DVFS
-		for (i = 0; i < 6; i++)
-			pdata->mpu_speed[i] = vdd1_rate_table_bridge[i].rate;
+		if (pdata->mpu_get_rate_table)
+			pdata->mpu_rate_table = (*pdata->mpu_get_rate_table)();
+		else {
+			GT_0trace(driverTrace, GT_7CLASS, "dspbridge failed to"
+				"get mpu opp table\n");
+			return -EFAULT;
+		}
 
 		clk_handle = clk_get(NULL, "iva2_ck");
 		if (!clk_handle) {

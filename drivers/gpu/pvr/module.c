@@ -201,9 +201,20 @@ static LDM_DRV powervr_driver = {
 
 LDM_DEV *gpsPVRLDMDev;
 
-#if defined(PVR_LDM_PLATFORM_MODULE)
-static IMG_VOID PVRSRVDeviceRelease(struct device *device);
+#if defined(MODULE) && defined(PVR_LDM_PLATFORM_MODULE)
 
+static IMG_VOID PVRSRVDeviceRelease(struct device *pDevice)
+{
+	PVR_UNREFERENCED_PARAMETER(pDevice);
+}
+
+static struct platform_device powervr_device = {
+	.name			= DEVNAME,
+	.id				= -1,
+	.dev 			= {
+		.release	= PVRSRVDeviceRelease
+	}
+};
 
 #endif 
 
@@ -290,14 +301,7 @@ static IMG_VOID PVRSRVDriverShutdown(LDM_DEV *pDevice)
 	(IMG_VOID) PVRSRVSetPowerStateKM(PVRSRV_SYS_POWER_STATE_D3);
 }
 
-
-#if defined(PVR_LDM_PLATFORM_MODULE)
-static IMG_VOID PVRSRVDeviceRelease(struct device *pDevice)
-{
-	PVR_DPF((PVR_DBG_WARNING, "PVRSRVDeviceRelease(pDevice=%p)", pDevice));
-}
-#endif 
-#endif 
+#endif
 
 
 #if defined(PVR_LDM_MODULE) || defined(SUPPORT_DRI_DRM)
@@ -530,8 +534,19 @@ static IMG_INT __init PVRCore_Init(IMG_VOID)
 
 		goto init_failed;
 	}
-#endif
 
+#if defined(MODULE)
+	error = platform_device_register(&powervr_device);
+	if (error != 0) {
+		platform_driver_unregister(&powervr_driver);
+
+		PVR_DPF((PVR_DBG_ERROR, "PVRCore_Init:
+		unable to register platform device (%d)", error));
+
+		goto init_failed;
+	}
+#endif
+#endif
 
 #if defined(PVR_LDM_PCI_MODULE)
 	if ((error = pci_register_driver(&powervr_driver)) != 0)
@@ -595,7 +610,6 @@ static IMG_INT __init PVRCore_Init(IMG_VOID)
 		goto destroy_class;
 	}
 #endif 
-	pr_info("pvrsrvkm: module loaded\n");
 
 	return 0;
 
@@ -614,6 +628,9 @@ sys_deinit:
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
+#if defined(MODULE)
+	platform_device_unregister(&powervr_device);
+#endif
 	platform_driver_unregister(&powervr_driver);
 #endif
 
@@ -679,6 +696,9 @@ static IMG_VOID __exit PVRCore_Cleanup(IMG_VOID)
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
+#if defined(MODULE)
+	platform_device_unregister(&powervr_device);
+#endif
 	platform_driver_unregister(&powervr_driver);
 #endif
 

@@ -68,6 +68,7 @@ obj-$(CONFIG_BLK_DEV_TC86C001)		+= tc86c001.o
 obj-$(CONFIG_BLK_DEV_TRIFLEX)		+= triflex.o
 obj-$(CONFIG_BLK_DEV_TRM290)		+= trm290.o
 obj-$(CONFIG_BLK_DEV_VIA82CXXX)		+= via82cxxx.o
+obj-$(CONFIG_BLK_DEV_IDE_S1R72V05)	+= s1r72v05.o
 
 # Must appear at the end of the block
 obj-$(CONFIG_BLK_DEV_GENERIC)		+= ide-pci-generic.o

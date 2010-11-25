@@ -16,6 +16,71 @@
 
 #include <asm/gpio.h>
 
+#if defined(CONFIG_MACH_MOT)
+
+#define I2C_GPIO_SCL     60
+#define I2C_GPIO_SDA     61
+#define I2C_AF_ADDRESS     0x05
+
+static bool i2c_gpio_active = 0;
+
+int i2c_gpio_unconfigure_gpio(void)
+{
+   int ret = 0;
+   unsigned gpio_cfg;
+
+   if(i2c_gpio_active)
+   {
+
+      i2c_gpio_active = 0;
+      gpio_cfg = GPIO_CFG(I2C_GPIO_SCL, 1, GPIO_OUTPUT,\
+                 GPIO_PULL_UP, GPIO_16MA);
+      ret = gpio_tlmm_config(gpio_cfg, GPIO_ENABLE);
+      if (ret) {
+		enable_irq(INT_PWB_I2C);
+              return ret;
+      }
+      gpio_cfg = GPIO_CFG(I2C_GPIO_SDA, 1, GPIO_OUTPUT,\
+                 GPIO_PULL_UP, GPIO_16MA);
+      ret = gpio_tlmm_config(gpio_cfg, GPIO_ENABLE);
+      if (ret) {
+		enable_irq(INT_PWB_I2C);
+              return ret;
+      }
+//	printk(KERN_ERR "i2c_gpio_unconfigure_gpio\n");
+      enable_irq(INT_PWB_I2C);
+   }
+   return ret;
+}
+EXPORT_SYMBOL(i2c_gpio_unconfigure_gpio);
+
+int i2c_gpio_configure_gpio(void)
+{
+   int ret;
+   unsigned gpio_cfg;
+
+   i2c_gpio_active = 1;
+   disable_irq(INT_PWB_I2C);
+   gpio_cfg = GPIO_CFG(I2C_GPIO_SCL, 0, GPIO_OUTPUT,\
+              GPIO_NO_PULL, GPIO_16MA);
+   ret = gpio_tlmm_config(gpio_cfg, GPIO_ENABLE);
+   if (ret) {
+           return ret;
+   }
+   gpio_cfg = GPIO_CFG(I2C_GPIO_SDA, 0, GPIO_OUTPUT,\
+              GPIO_NO_PULL, GPIO_16MA);
+   ret = gpio_tlmm_config(gpio_cfg, GPIO_ENABLE);
+   if (ret) {
+           return ret;
+   }
+
+//   printk(KERN_ERR "i2c_gpio_configure_gpio\n");
+   return ret;
+}
+EXPORT_SYMBOL(i2c_gpio_configure_gpio);
+
+#endif
+
 /* Toggle SDA by changing the direction of the pin */
 static void i2c_gpio_setsda_dir(void *data, int state)
 {
@@ -96,26 +161,36 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
 	if (!bit_data)
 		goto err_alloc_bit_data;
 
+#ifndef CONFIG_MACH_MOT
 	ret = gpio_request(pdata->sda_pin, "sda");
 	if (ret)
 		goto err_request_sda;
 	ret = gpio_request(pdata->scl_pin, "scl");
 	if (ret)
 		goto err_request_scl;
+#endif
 
 	if (pdata->sda_is_open_drain) {
+#ifndef CONFIG_MACH_MOT
 		gpio_direction_output(pdata->sda_pin, 1);
+#endif
 		bit_data->setsda = i2c_gpio_setsda_val;
 	} else {
+#ifndef CONFIG_MACH_MOT
 		gpio_direction_input(pdata->sda_pin);
+#endif
 		bit_data->setsda = i2c_gpio_setsda_dir;
 	}
 
 	if (pdata->scl_is_open_drain || pdata->scl_is_output_only) {
+#ifndef CONFIG_MACH_MOT
 		gpio_direction_output(pdata->scl_pin, 1);
+#endif
 		bit_data->setscl = i2c_gpio_setscl_val;
 	} else {
+#ifndef CONFIG_MACH_MOT
 		gpio_direction_input(pdata->scl_pin);
+#endif
 		bit_data->setscl = i2c_gpio_setscl_dir;
 	}
 
@@ -159,18 +234,25 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
 		 pdata->sda_pin, pdata->scl_pin,
 		 pdata->scl_is_output_only
 		 ? ", no clock stretching" : "");
-
+#if defined(CONFIG_MACH_MOT)
+	if((ret = i2c_gpio_unconfigure_gpio())) return ret;
+#endif
 	return 0;
 
 err_add_bus:
 	gpio_free(pdata->scl_pin);
+#ifndef CONFIG_MACH_MOT
 err_request_scl:
 	gpio_free(pdata->sda_pin);
 err_request_sda:
 	kfree(bit_data);
+#endif
 err_alloc_bit_data:
 	kfree(adap);
 err_alloc_adap:
+#if defined(CONFIG_MACH_MOT)
+	if((ret = i2c_gpio_unconfigure_gpio())) return ret;
+#endif
 	return ret;
 }
 

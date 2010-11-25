@@ -1,6 +1,11 @@
 menu "OMAP2/3 Display Device Drivers"
         depends on OMAP2_DSS
 
+config USER_PANEL_DRIVER
+        tristate "User Panel Driver"
+        help
+	  User side panel driver interface.
+
 config PANEL_GENERIC
         tristate "Generic Panel"
         help
@@ -50,5 +55,15 @@ config PANEL_SHOLES
         tristate "Sholes Panel"
         help
 	  LCD Panel used in sholes
+
+config PANEL_MAPPHONE
+        tristate "Mapphone Panel"
+        help
+          LCD Panel used in Mapphone
+
+config PANEL_MAPPHONE_HDTV
+        tristate "Mapphone HDTV Panel"
+        help
+	  HDTV Panel used in Mapphone
 
 endmenu

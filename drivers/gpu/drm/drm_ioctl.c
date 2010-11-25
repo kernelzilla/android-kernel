@@ -11,6 +11,7 @@
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Code Aurora Forum.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -78,6 +79,9 @@ int drm_getunique(struct drm_device *dev, void *data,
  * in interface version 1.1 and will return EBUSY when setversion has requested
  * version 1.1 or greater.
  */
+
+/* JHC: This will fail in platform mode, but it is depreciated in 1.1 mode */
+
 int drm_setunique(struct drm_device *dev, void *data,
 		  struct drm_file *file_priv)
 {
@@ -136,30 +140,58 @@ static int drm_set_busid(struct drm_device *dev, struct drm_file *file_priv)
 	if (master->unique != NULL)
 		return -EBUSY;
 
-	master->unique_len = 40;
-	master->unique_size = master->unique_len;
-	master->unique = drm_alloc(master->unique_size, DRM_MEM_DRIVER);
-	if (master->unique == NULL)
-		return -ENOMEM;
+	if (drm_core_check_feature(dev, DRIVER_USE_PLATFORM_DEVICE)) {
+		master->unique_len = 10 + strlen(dev->platformdev->name);
+		master->unique = drm_alloc(master->unique_len + 1,
+			DRM_MEM_DRIVER);
 
-	len = snprintf(master->unique, master->unique_len, "pci:%04x:%02x:%02x.%d",
-		       drm_get_pci_domain(dev),
-		       dev->pdev->bus->number,
-		       PCI_SLOT(dev->pdev->devfn),
-		       PCI_FUNC(dev->pdev->devfn));
-	if (len >= master->unique_len)
-		DRM_ERROR("buffer overflow");
-	else
-		master->unique_len = len;
+		if (master->unique == NULL)
+			return -ENOMEM;
 
-	dev->devname =
-	    drm_alloc(strlen(dev->driver->pci_driver.name) + master->unique_len +
-		      2, DRM_MEM_DRIVER);
-	if (dev->devname == NULL)
-		return -ENOMEM;
+		len = snprintf(master->unique, master->unique_len,
+			"platform:%s", dev->platformdev->name);
 
-	sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name,
-		master->unique);
+		if (len > master->unique_len)
+			DRM_ERROR("Unique buffer overflowed\n");
+
+		dev->devname =
+			drm_alloc(strlen(dev->platformdev->name) +
+				master->unique_len + 2, DRM_MEM_DRIVER);
+
+		if (dev->devname == NULL)
+			return -ENOMEM;
+
+		sprintf(dev->devname, "%s@%s", dev->platformdev->name,
+			master->unique);
+
+	} else {
+		master->unique_len = 40;
+		master->unique_size = master->unique_len;
+		master->unique = drm_alloc(master->unique_size, DRM_MEM_DRIVER);
+		if (master->unique == NULL)
+			return -ENOMEM;
+
+		len = snprintf(master->unique, master->unique_len,
+			"pci:%04x:%02x:%02x.%d",
+			drm_get_pci_domain(dev),
+			dev->pdev->bus->number,
+			PCI_SLOT(dev->pdev->devfn),
+			PCI_FUNC(dev->pdev->devfn));
+		if (len >= master->unique_len)
+			DRM_ERROR("buffer overflow");
+		else
+			master->unique_len = len;
+
+		dev->devname =
+			drm_alloc(strlen(dev->driver->pci_driver.name) +
+				master->unique_len + 2, DRM_MEM_DRIVER);
+
+		if (dev->devname == NULL)
+			return -ENOMEM;
+
+		sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name,
+			master->unique);
+	}
 
 	return 0;
 }

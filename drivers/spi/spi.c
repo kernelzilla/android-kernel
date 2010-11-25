@@ -25,6 +25,9 @@
 #include <linux/mutex.h>
 #include <linux/spi/spi.h>
 
+#ifdef CONFIG_MOT_FEAT_SPI_SMS1130
+static struct spi_device *spi_device_smsmdtv;
+#endif
 
 /* SPI bustype and spi_master class are registered after board init code
  * provides the SPI device tables, ensuring that both are present by the
@@ -381,6 +384,9 @@ spi_register_board_info(struct spi_board_info const *info, unsigned n)
 static void scan_boardinfo(struct spi_master *master)
 {
 	struct boardinfo	*bi;
+#ifdef CONFIG_MOT_FEAT_SPI_SMS1130
+	struct spi_device *spi;
+#endif
 
 	mutex_lock(&board_lock);
 	list_for_each_entry(bi, &board_list, list) {
@@ -393,7 +399,19 @@ static void scan_boardinfo(struct spi_master *master)
 			/* NOTE: this relies on spi_new_device to
 			 * issue diagnostics when given bogus inputs
 			 */
+#ifdef CONFIG_MOT_FEAT_SPI_SMS1130
+		spi = spi_new_device(master, chip);
+/* note: this macro is remove from include/linux/kobject.h */
+#define KOBJ_NAME_LEN 20
+
+	if (strncmp(chip->modalias, "smsspi", KOBJ_NAME_LEN) == 0) {
+		spi_device_smsmdtv = spi;
+
+		printk(KERN_INFO "smsspi device is added.\n");
+	}
+#else
 			(void) spi_new_device(master, chip);
+#endif
 		}
 	}
 	mutex_unlock(&board_lock);
@@ -698,6 +716,19 @@ int spi_write_then_read(struct spi_device *spi,
 	return status;
 }
 EXPORT_SYMBOL_GPL(spi_write_then_read);
+
+#ifdef CONFIG_MOT_FEAT_SPI_SMS1130
+struct spi_device *spi_get_spi_device(char *modalias)
+{
+#define KOBJ_NAME_LEN   20
+
+	if (strncmp(modalias, "smsspi", KOBJ_NAME_LEN) == 0)
+		return spi_device_smsmdtv;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(spi_get_spi_device);
+#endif
 
 /*-------------------------------------------------------------------------*/
 

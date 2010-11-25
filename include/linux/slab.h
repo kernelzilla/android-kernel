@@ -126,7 +126,13 @@ int kmem_ptr_validate(struct kmem_cache *cachep, const void *ptr);
  */
 void * __must_check __krealloc(const void *, size_t, gfp_t);
 void * __must_check krealloc(const void *, size_t, gfp_t);
+/* CONFIG_MEMLEAK_BLD is only for built-in code */
+#if !defined(CONFIG_MEMLEAK_BLD) || defined(MODULE)
 void kfree(const void *);
+#else
+void memleak_kfree(const void *);
+#define kfree memleak_kfree
+#endif
 void kzfree(const void *);
 size_t ksize(const void *);
 

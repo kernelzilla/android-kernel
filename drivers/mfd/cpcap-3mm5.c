@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/switch.h>
+#include <linux/workqueue.h>
 
 #include <linux/regulator/consumer.h>
 
@@ -40,7 +41,9 @@ struct cpcap_3mm5_data {
 	struct switch_dev sdev;
 	unsigned int key_state;
 	struct regulator *regulator;
-	unsigned char audio_low_power;
+	unsigned char audio_low_pwr_det;
+	unsigned char audio_low_pwr_mac13;
+	struct delayed_work work;
 };
 
 static ssize_t print_name(struct switch_dev *sdev, char *buf)
@@ -57,19 +60,21 @@ static ssize_t print_name(struct switch_dev *sdev, char *buf)
 	return -EINVAL;
 }
 
-static void audio_low_power_set(struct cpcap_3mm5_data *data)
+static void audio_low_power_set(struct cpcap_3mm5_data *data,
+				unsigned char *flag)
 {
-	if (!data->audio_low_power) {
+	if (!(*flag)) {
 		regulator_set_mode(data->regulator, REGULATOR_MODE_STANDBY);
-		data->audio_low_power = 1;
+		*flag = 1;
 	}
 }
 
-static void audio_low_power_clear(struct cpcap_3mm5_data *data)
+static void audio_low_power_clear(struct cpcap_3mm5_data *data,
+				  unsigned char *flag)
 {
-	if (data->audio_low_power) {
+	if (*flag) {
 		regulator_set_mode(data->regulator, REGULATOR_MODE_NORMAL);
-		data->audio_low_power = 0;
+		*flag = 0;
 	}
 }
 
@@ -98,7 +103,7 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN));
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_RXOA, 0,
 				   CPCAP_BIT_ST_HS_CP_EN);
-		audio_low_power_set(data_3mm5);
+		audio_low_power_set(data_3mm5, &data_3mm5->audio_low_pwr_det);
 
 		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
@@ -109,6 +114,8 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 
 		send_key_event(data_3mm5, 0);
+
+		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_5);
 	} else {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI,
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN),
@@ -116,7 +123,7 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_RXOA,
 				   CPCAP_BIT_ST_HS_CP_EN,
 				   CPCAP_BIT_ST_HS_CP_EN);
-		audio_low_power_clear(data_3mm5);
+		audio_low_power_clear(data_3mm5, &data_3mm5->audio_low_pwr_det);
 
 		/* Give PTTS time to settle */
 		mdelay(2);
@@ -134,6 +141,8 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+
+		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 	}
 
 	switch_set_state(&data_3mm5->sdev, new_state);
@@ -162,17 +171,37 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 		send_key_event(data_3mm5, 1);
 
 		/* If macro not available, only short presses are supported */
-		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_4)) {
+		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_5)) {
 			send_key_event(data_3mm5, 0);
 
 			/* Attempt to restart the macro for next time. */
-			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_4);
+			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 		}
 	} else
 		send_key_event(data_3mm5, 0);
 
 	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+}
+
+static void mac13_work(struct work_struct *work)
+{
+	struct cpcap_3mm5_data *data_3mm5 =
+		container_of(work, struct cpcap_3mm5_data, work.work);
+
+	audio_low_power_set(data_3mm5, &data_3mm5->audio_low_pwr_mac13);
+	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_13);
+}
+
+static void mac13_handler(enum cpcap_irqs irq, void *data)
+{
+	struct cpcap_3mm5_data *data_3mm5 = data;
+
+	if (irq != CPCAP_IRQ_UC_PRIMACRO_13)
+		return;
+
+	audio_low_power_clear(data_3mm5, &data_3mm5->audio_low_pwr_mac13);
+	schedule_delayed_work(&data_3mm5->work, msecs_to_jiffies(200));
 }
 
 static int __init cpcap_3mm5_probe(struct platform_device *pdev)
@@ -190,10 +219,12 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	data->cpcap = pdev->dev.platform_data;
-	data->audio_low_power = 1;
+	data->audio_low_pwr_det = 1;
+	data->audio_low_pwr_mac13 = 1;
 	data->sdev.name = "h2w";
 	data->sdev.print_name = print_name;
 	switch_dev_register(&data->sdev);
+	INIT_DELAYED_WORK(&data->work, mac13_work);
 	platform_set_drvdata(pdev, data);
 
 	data->regulator = regulator_get(NULL, "vaudio");
@@ -208,6 +239,7 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	retval  = cpcap_irq_clear(data->cpcap, CPCAP_IRQ_HS);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_MB2);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_13);
 	if (retval)
 		goto reg_put;
 
@@ -226,10 +258,22 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	if (retval)
 		goto free_mb2;
 
+	if (data->cpcap->vendor == CPCAP_VENDOR_ST) {
+		retval = cpcap_irq_register(data->cpcap,
+					    CPCAP_IRQ_UC_PRIMACRO_13,
+					    mac13_handler, data);
+		if (retval)
+			goto free_mac5;
+
+		cpcap_uc_start(data->cpcap, CPCAP_MACRO_13);
+	}
+
 	hs_handler(CPCAP_IRQ_HS, data);
 
 	return 0;
 
+free_mac5:
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 free_mb2:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 free_hs:
@@ -246,9 +290,12 @@ static int __exit cpcap_3mm5_remove(struct platform_device *pdev)
 {
 	struct cpcap_3mm5_data *data = platform_get_drvdata(pdev);
 
+	cancel_delayed_work_sync(&data->work);
+
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_HS);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_13);
 
 	switch_dev_unregister(&data->sdev);
 	regulator_put(data->regulator);

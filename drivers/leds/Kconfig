@@ -144,6 +144,13 @@ config LEDS_LP5521
 	  This driver can be built as a module by choosing 'M'. The module
 	  will be called leds-lp5521.
 
+config LEDS_CPLD
+	tristate "LED Support for CPLD connected LEDs"
+	default y
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs connected to CPLD
+
 config LEDS_CLEVO_MAIL
 	tristate "Mail LED on Clevo notebook (EXPERIMENTAL)"
 	depends on LEDS_CLASS && X86 && SERIO_I8042 && DMI && EXPERIMENTAL
@@ -195,6 +202,30 @@ config LEDS_SHOLES
 	help
 	  This option enables support for LEDs on Sholes.
 
+config LEDS_SHOLEST
+	tristate "LED Support for Sholes Tablet device"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for LEDs on Sholes Tablet.
+
+config LEDS_BUTTON
+	tristate "LED Support for Button lighting device"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for Button LEDs.
+
+config LEDS_DISPLAY
+	tristate "LED Support for Display lighting device"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for display LEDs.
+
+config LEDS_KPAD
+	tristate "LED Support for Keypad lighting device"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for Keypad LEDs.
+
 config LEDS_LM3530
 	tristate "LM3530 ALS driver"
 	depends on LEDS_CLASS && I2C
@@ -206,6 +237,109 @@ config LEDS_LM3554
 	depends on LEDS_CLASS && I2C
 	help
 	  This option enables support for the LM3554 .
+
+config LEDS_BD7885
+	tristate "LED Support for BD7885 I2C chips"
+	depends on LEDS_CLASS && I2C
+	help
+	  This option enables support for LEDs connected to BD7885
+	  LED driver chips accessed via the I2C bus.  Supported
+
+config LEDS_BU9847
+	tristate "LED Support for BU9847 I2C chips"
+	depends on LEDS_CLASS && I2C
+	help
+	  This option enables support for LEDs connected to BU9847
+	  LED driver chips accessed via the I2C bus.  Supported
+
+config LEDS_AF_LED
+	tristate "LED Support for AF LED operatiion"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for LEDs connected to CPCAP.
+
+config LEDS_MSM_PMIC
+	tristate "LED Support for Qualcomm PMIC connected LEDs"
+	depends on LEDS_CLASS && ( ARCH_MSM_SCORPION || KERNEL_MOTOROLA )
+	help
+	  This option enables support for LEDs connected over PMIC
+	  (Power Management IC) chip on Qualcomm reference boards,
+	  for example SURF and FFAs.
+
+config LEDS_FAN5646
+	tristate "Fairchild FAN5646 LED Driver"
+	depends on KERNEL_MOTOROLA
+	default n
+	help
+	    Fairchild FAN5646 LED Driver support
+config LEDS_FLASH_RESET
+	tristate "LED Support for FLASH_RESET pin control"
+	depends on LEDS_CLASS && LEDS_BD7885
+	help
+	  This option enables support for LED's FLASH_RESET pin operation.
+
+config LEDS_MSM_PMIC
+	tristate "LED Support for Qualcomm PMIC connected LEDs"
+	default y
+	depends on LEDS_CLASS && (ARCH_MSM_SCORPION || ARCH_MSM7X27)
+	help
+	  This option enables support for LEDs connected over PMIC
+	  (Power Management IC) chip on Qualcomm reference boards,
+	  for example SURF and FFAs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+config LEDS_ADP8862
+    tristate "ADP8862 Display Backlight Driver"
+    default n
+    help
+        ADP8862 Display Backlight Driver support
+
+config LEDS_PM7540_BTN
+    tristate "PM7540 Button LEDS"
+    default n
+    help
+        PM7540 Button LEDS
+
+config LEDS_PM7540_SOC
+    tristate "PM7540 SOC LED"
+    default n
+    help
+        PM7540 SOC LED
+
+config LEDS_PM7540_KPD
+    tristate "PM7540 Keypad LEDS"
+    default n
+    help
+        PM7540 Keypad LEDS
+
+config LEDS_CAMERA
+    tristate "Camera LED Driver"
+    default n
+    help
+        Camera LED Driver support
+
+config LEDS_MORRISON_KPD
+    tristate "Morrison Keypad Backlight Driver"
+    default n
+    help
+        Morrison Keypad Backlight Driver support
+
+config LEDS_FAN5646
+    tristate "Fairchild FAN5646 LED Driver"
+    default n
+    help
+        Fairchild FAN5646 LED Driver support
 
 comment "LED Triggers"
 
@@ -264,5 +398,50 @@ config LEDS_TRIGGER_SLEEP
 	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
 	help
 	  This turns LEDs on when the screen is off but the cpu still running.
+
+config ADP8860_DISP_BL
+	tristate "ADP8860 Display Backlight Driver"
+	depends on KERNEL_MOTOROLA
+	depends on I2C
+	default n
+	help
+	  ADP8860 Display Backlight Driver support
+
+config ADP8870_DISP_BL
+	tristate "ADP8870 Display Backlight Driver"
+	depends on KERNEL_MOTOROLA
+	depends on I2C
+	default n
+	help
+	  ADP8870 Display Backlight Driver support
+
+config ADP5588_LEDS_BL
+	tristate "ADP5588 Qwerty Keyboard Backlight Driver"
+	depends on KERNEL_MOTOROLA
+	depends on I2C
+	depends on ADP5588_KEYPAD
+	help
+	  ADP5588 Qwerty Keyboard Backlight Driver
+
+config LEDS_LM3535
+    tristate "LM3535 Display Backlight Driver"
+	depends on KERNEL_MOTOROLA  || MACH_MOT
+    default n
+    help
+        LM3535 Display Backlight Driver support
+
+config LM3535_ESD_RECOVERY
+    tristate "LM3535 Display Backlight Driver ESD Recovery Algorithm"
+    depends on LEDS_LM3535
+    default y if LEDS_LM3535
+    help
+        LM3535 Display Backlight ESD Recovery support
+
+config LM3535_BUTTON_BL
+    tristate "LM3535 Display Backlight Driver Button LED Support"
+    depends on LEDS_LM3535
+    default y if LEDS_LM3535
+    help
+        LM3535 Display Backlight Button LED Support
 
 endif # NEW_LEDS

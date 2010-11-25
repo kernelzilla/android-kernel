@@ -1,7 +1,8 @@
 /*
  * Gadget Driver for Android USBNET
  *
- * Copyright (C) 2009 Motorola, Inc.
+ * Copyright (C) 2008 Google, Inc.
+ * Author: Mike Lockwood <lockwood@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -19,5 +20,7 @@
 
 int usbnet_function_add(struct usb_composite_dev *cdev,
 	struct usb_configuration *c);
+
+struct usb_function *usbnet_function_enable(int enable, int id);
 
 #endif /* __F_USBNET_H */

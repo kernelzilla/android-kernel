@@ -179,3 +179,16 @@ void input_unregister_polled_device(struct input_polled_dev *dev)
 }
 EXPORT_SYMBOL(input_unregister_polled_device);
 
+void input_stop_polled_device (struct input_polled_dev *dev)
+{
+	cancel_delayed_work_sync(&dev->work);
+}
+EXPORT_SYMBOL(input_stop_polled_device);
+
+void input_start_polled_device (struct input_polled_dev *dev)
+{
+	queue_delayed_work(polldev_wq, &dev->work,
+			   msecs_to_jiffies(dev->poll_interval));
+}
+EXPORT_SYMBOL(input_start_polled_device);
+

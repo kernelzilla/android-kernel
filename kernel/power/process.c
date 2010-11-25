@@ -5,8 +5,9 @@
  * Originally from swsusp.
  */
 
-
-#undef DEBUG
+#ifdef CONFIG_PM_VERBOSE
+#define DEBUG
+#endif
 
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
@@ -105,7 +106,7 @@ static int try_to_freeze_tasks(bool sig_only)
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 	} else {
-		printk("(elapsed %d.%02d seconds) ", elapsed_csecs / 100,
+		pr_debug("(elapsed %d.%02d seconds) ", elapsed_csecs / 100,
 			elapsed_csecs % 100);
 	}
 
@@ -119,20 +120,20 @@ int freeze_processes(void)
 {
 	int error;
 
-	printk("Freezing user space processes ... ");
+	pr_debug("Freezing user space processes ... ");
 	error = try_to_freeze_tasks(true);
 	if (error)
 		goto Exit;
-	printk("done.\n");
+	pr_debug("done.\n");
 
-	printk("Freezing remaining freezable tasks ... ");
+	pr_debug("Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);
 	if (error)
 		goto Exit;
-	printk("done.");
+	pr_debug("done.");
  Exit:
 	BUG_ON(in_atomic());
-	printk("\n");
+	pr_debug("\n");
 	return error;
 }
 
@@ -158,10 +159,10 @@ static void thaw_tasks(bool nosig_only)
 
 void thaw_processes(void)
 {
-	printk("Restarting tasks ... ");
+	pr_debug("Restarting tasks ... ");
 	thaw_tasks(true);
 	thaw_tasks(false);
 	schedule();
-	printk("done.\n");
+	pr_debug("done.\n");
 }
 

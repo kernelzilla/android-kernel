@@ -37,6 +37,8 @@
 
 #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | (1 << PWRDM_POWER_ON))
 
+#define PWRSTS_RET_ON		((1 << PWRDM_POWER_RET) | \
+				1 << PWRDM_POWER_ON)
 
 /* Powerdomain flags */
 #define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */

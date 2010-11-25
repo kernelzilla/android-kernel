@@ -24,6 +24,11 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 
+#ifdef CONFIG_ARM_OF
+#include <mach/dt_path.h>
+#include <asm/prom.h>
+#endif
+
 struct msg_ind_led_data {
 	struct led_classdev msg_ind_red_class_dev;
 	struct led_classdev msg_ind_green_class_dev;
@@ -36,12 +41,20 @@ struct msg_ind_led_data {
 void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 				int color, enum led_brightness value)
 {
+#ifdef CONFIG_LEDS_SHOLEST
+	unsigned short brightness = LD_MSG_IND_LO_CURRENT | LD_MSG_IND_ON;
+#else
 	unsigned short brightness = LD_MSG_IND_CURRENT | LD_MSG_IND_ON;
+#endif
 	int cpcap_status = 0;
 	int cpcap_register = 0;
 
 	if (color & LD_LED_RED)
+#ifdef CONFIG_LEDS_SHOLEST
+        cpcap_register = CPCAP_REG_ADLC;
+#else
 		cpcap_register = CPCAP_REG_REDC;
+#endif
 	else if (color & LD_LED_GREEN)
 		cpcap_register = CPCAP_REG_GREENC;
 	else if (color & LD_LED_BLUE)
@@ -56,7 +69,25 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 					  LD_MSG_IND_CPCAP_MASK);
 
 		brightness = 0x00;
-	} else if (value <= 51)
+	}
+#ifdef CONFIG_LEDS_SHOLEST
+	else if (value <= 51)
+		brightness |= (LD_MSG_IND_LOW << \
+				((cpcap_register == CPCAP_REG_ADLC) << 1));
+	else if (value <= 104)
+		brightness |= (LD_MSG_IND_LOW_MED << \
+				((cpcap_register == CPCAP_REG_ADLC) << 1));
+	else if (value <= 155)
+		brightness |= (LD_MSG_IND_MEDIUM << \
+				((cpcap_register == CPCAP_REG_ADLC) << 1));
+	else if (value <= 201)
+		brightness |= (LD_MSG_IND_MED_HIGH << \
+				((cpcap_register == CPCAP_REG_ADLC) << 1));
+	else
+		brightness |= (LD_MSG_IND_HIGH << \
+				((cpcap_register == CPCAP_REG_ADLC) << 1));
+#else
+    else if (value <= 51)
 		brightness |= LD_MSG_IND_LOW;
 	else if (value <= 104)
 		brightness |= LD_MSG_IND_LOW_MED;
@@ -66,6 +97,7 @@ void msg_ind_set_rgb_brightness(struct msg_ind_led_data *msg_ind_data,
 		brightness |= LD_MSG_IND_MED_HIGH;
 	else
 		brightness |= LD_MSG_IND_HIGH;
+#endif
 
 	cpcap_status = cpcap_regacc_write(msg_ind_data->cpcap,
 					  cpcap_register, brightness,
@@ -138,9 +170,9 @@ msg_ind_blink(struct device *dev, struct device_attribute *attr,
 		return -1;
 	}
 	if (led_blink > LED_OFF)
-		cpcap_irq_unmask(msg_ind_data->cpcap, CPCAP_IRQ_UC_PRIMACRO_6);
+		cpcap_uc_start(msg_ind_data->cpcap, CPCAP_MACRO_6);
 	else
-		cpcap_irq_mask(msg_ind_data->cpcap, CPCAP_IRQ_UC_PRIMACRO_6);
+		cpcap_uc_stop(msg_ind_data->cpcap, CPCAP_MACRO_6);
 
 	return 0;
 }
@@ -242,8 +274,41 @@ static struct platform_driver ld_msg_ind_rgb_driver = {
 		   },
 };
 
+static int lights_of_init(void)
+{
+	u8 device_available;
+	struct device_node *node;
+	const void *prop;
+
+	node = of_find_node_by_path(DT_NOTIFICATION_LED);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_NOTIFICATION_LED);
+		return -ENODEV;
+	}
+
+	prop = of_get_property(node, "tablet_rgb_led", NULL);
+	if (prop)
+		device_available = *(u8 *)prop;
+	else {
+		pr_err("Read property %s error!\n", DT_PROP_TABLET_RGB_LED);
+		of_node_put(node);
+		return -ENODEV;
+	}
+
+	of_node_put(node);
+	return device_available;
+}
+
 static int __init ld_msg_ind_rgb_init(void)
 {
+#ifdef CONFIG_ARM_OF
+	int err = lights_of_init();
+	if (err <= 0) {
+		pr_err("Tablet RGB led device declared unavailable: %d\n", err);
+		return err;
+	}
+#endif
 	return platform_driver_register(&ld_msg_ind_rgb_driver);
 }
 

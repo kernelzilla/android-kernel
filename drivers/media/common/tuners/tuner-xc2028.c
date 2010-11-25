@@ -516,8 +516,8 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 			 v4l2_std_id *id)
 {
 	struct xc2028_data *priv = fe->tuner_priv;
-	int                pos, rc;
-	unsigned char      *p, *endp, buf[priv->ctrl.max_len];
+	int                pos, rc, ret = -EINVAL;
+	unsigned char      *p, *endp, *buf;
 
 	tuner_dbg("%s called\n", __func__);
 
@@ -532,6 +532,9 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 
 	p = priv->firm[pos].ptr;
 	endp = p + priv->firm[pos].size;
+	buf = kmalloc(priv->ctrl.max_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
 	while (p < endp) {
 		__u16 size;
@@ -539,14 +542,16 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		/* Checks if there's enough bytes to read */
 		if (p + sizeof(size) > endp) {
 			tuner_err("Firmware chunk size is wrong\n");
-			return -EINVAL;
+			goto fail;
 		}
 
 		size = le16_to_cpu(*(__u16 *) p);
 		p += sizeof(size);
 
-		if (size == 0xffff)
-			return 0;
+		if (size == 0xffff) {
+			ret = 0;
+			goto fail;
+		}
 
 		if (!size) {
 			/* Special callback command received */
@@ -554,7 +559,7 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 			if (rc < 0) {
 				tuner_err("Error at RESET code %d\n",
 					   (*p) & 0x7f);
-				return -EINVAL;
+				goto fail;
 			}
 			continue;
 		}
@@ -565,13 +570,13 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 				if (rc < 0) {
 					tuner_err("Error at RESET code %d\n",
 						  (*p) & 0x7f);
-					return -EINVAL;
+					goto fail;
 				}
 				break;
 			default:
 				tuner_info("Invalid RESET code %d\n",
 					   size & 0x7f);
-				return -EINVAL;
+				goto fail;
 
 			}
 			continue;
@@ -586,7 +591,7 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		if ((size + p > endp)) {
 			tuner_err("missing bytes: need %d, have %d\n",
 				   size, (int)(endp - p));
-			return -EINVAL;
+			goto fail;
 		}
 
 		buf[0] = *p;
@@ -603,14 +608,17 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 			rc = i2c_send(priv, buf, len + 1);
 			if (rc < 0) {
 				tuner_err("%d returned from send\n", rc);
-				return -EINVAL;
+				goto fail;
 			}
 
 			p += len;
 			size -= len;
 		}
 	}
-	return 0;
+	ret = 0;
+fail:
+	kfree(buf);
+	return ret;
 }
 
 static int load_scode(struct dvb_frontend *fe, unsigned int type,

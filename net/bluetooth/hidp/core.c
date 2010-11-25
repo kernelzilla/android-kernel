@@ -18,6 +18,10 @@
    ALL LIABILITY, INCLUDING LIABILITY FOR INFRINGEMENT OF ANY PATENTS,
    COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS, RELATING TO USE OF THIS
    SOFTWARE IS DISCLAIMED.
+
+   Author         Date        CR           Description
+   prvb86       09/23/2009  LIBtt24429    Disconnecting L2CAP channels during 
+					  VIRTUAL_CABLE_UNPLUG
 */
 
 #include <linux/module.h>
@@ -371,9 +375,13 @@ static void hidp_process_hid_control(struct hidp_session *session,
 		/* Flush the transmit queues */
 		skb_queue_purge(&session->ctrl_transmit);
 		skb_queue_purge(&session->intr_transmit);
+                session->intr_sock->sk->sk_err = EUNATCH;
+                session->ctrl_sock->sk->sk_err = EUNATCH;
+                /* Kill session thread */
+                atomic_inc(&session->terminate);
+                hidp_schedule(session);
+                /* Kill session thread */
 
-		/* Kill session thread */
-		atomic_inc(&session->terminate);
 	}
 }
 

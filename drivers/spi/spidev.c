@@ -39,7 +39,7 @@
 
 
 /*
- * This supports acccess to SPI devices using normal userspace I/O calls.
+ * This supports access to SPI devices using normal userspace I/O calls.
  * Note that while traditional UNIX/POSIX I/O semantics are half duplex,
  * and often mask message boundaries, full SPI support requires full duplex
  * transfers.  There are several kinds of of internal message boundaries to
@@ -86,6 +86,26 @@ static DEFINE_MUTEX(device_list_lock);
 static unsigned bufsiz = 4096;
 module_param(bufsiz, uint, S_IRUGO);
 MODULE_PARM_DESC(bufsiz, "data bytes in biggest supported SPI message");
+
+/* This can be used for testing the controller, given the busnum and the cs
+   required to sit on. If those parameters are used, spidev is dynamically added
+   as device on the busnum, and messages can be sent via this interface.
+   Please notice that we don't check if there is a module that is responsible
+   for this chipselect, hence this should be used for testing only.
+   */
+static int busnum = -1;
+module_param(busnum, int, S_IRUGO);
+MODULE_PARM_DESC(busnum, "bus num of the controller");
+
+static int chipselect = -1;
+module_param(chipselect, int, S_IRUGO);
+MODULE_PARM_DESC(chipselect, "chip select of the desired device");
+
+static int maxspeed = 10000000;
+module_param(maxspeed, int, S_IRUGO);
+MODULE_PARM_DESC(maxspeed, "max_speed of the desired device");
+
+static struct spi_device *spi;
 
 /*-------------------------------------------------------------------------*/
 
@@ -262,15 +282,15 @@ static int spidev_message(struct spidev_data *spidev,
 		k_tmp->delay_usecs = u_tmp->delay_usecs;
 		k_tmp->speed_hz = u_tmp->speed_hz;
 #ifdef VERBOSE
-		dev_dbg(&spi->dev,
+		dev_dbg(&spidev->spi->dev,
 			"  xfer len %zd %s%s%s%dbits %u usec %uHz\n",
 			u_tmp->len,
 			u_tmp->rx_buf ? "rx " : "",
 			u_tmp->tx_buf ? "tx " : "",
 			u_tmp->cs_change ? "cs " : "",
-			u_tmp->bits_per_word ? : spi->bits_per_word,
+			u_tmp->bits_per_word ? : spidev->spi->bits_per_word,
 			u_tmp->delay_usecs,
-			u_tmp->speed_hz ? : spi->max_speed_hz);
+			u_tmp->speed_hz ? : spidev->spi->max_speed_hz);
 #endif
 		spi_message_add_tail(k_tmp, &msg);
 	}
@@ -647,6 +667,7 @@ static struct spi_driver spidev_spi = {
 static int __init spidev_init(void)
 {
 	int status;
+	struct spi_master *master;
 
 	/* Claim our 256 reserved device numbers.  Then register a class
 	 * that will key udev/mdev to add/remove /dev nodes.  Last, register
@@ -660,20 +681,65 @@ static int __init spidev_init(void)
 	spidev_class = class_create(THIS_MODULE, "spidev");
 	if (IS_ERR(spidev_class)) {
 		unregister_chrdev(SPIDEV_MAJOR, spidev_spi.driver.name);
-		return PTR_ERR(spidev_class);
+		status = PTR_ERR(spidev_class);
+		goto error_class;
 	}
 
 	status = spi_register_driver(&spidev_spi);
-	if (status < 0) {
-		class_destroy(spidev_class);
-		unregister_chrdev(SPIDEV_MAJOR, spidev_spi.driver.name);
+	if (status < 0)
+		goto error_register;
+
+	if (busnum != -1 && chipselect != -1) {
+
+		master = spi_busnum_to_master(busnum);
+		if (!master) {
+			status = -ENODEV;
+			goto error_busnum;
+		}
+
+		/* We create a virtual device that will sit on the bus */
+		spi = kzalloc(sizeof(*spi), GFP_KERNEL);
+		if (!spi) {
+			status = -ENOMEM;
+			goto error_mem;
+		}
+		spi->master = master;
+		spi->chip_select = chipselect;
+		spi->dev = master->dev;
+		spi->max_speed_hz = maxspeed;
+		dev_dbg(&spi->dev, "busnum=%d cs=%d bufsiz=%d maxspeed=%d",
+			 busnum, chipselect, bufsiz, maxspeed);
+
+		status = spidev_probe(spi);
+		if (status)
+			goto error_probe;
 	}
+
+	return 0;
+
+error_probe:
+	kfree(spi);
+	spi = NULL;
+error_mem:
+	spi_master_put(master);
+error_busnum:
+	spi_unregister_driver(&spidev_spi);
+error_register:
+	class_destroy(spidev_class);
+error_class:
+	unregister_chrdev(SPIDEV_MAJOR, spidev_spi.driver.name);
 	return status;
 }
 module_init(spidev_init);
 
 static void __exit spidev_exit(void)
 {
+	if (spi) {
+		spidev_remove(spi);
+		spi_master_put(spi->master);
+		kfree(spi);
+		spi = NULL;
+	}
 	spi_unregister_driver(&spidev_spi);
 	class_destroy(spidev_class);
 	unregister_chrdev(SPIDEV_MAJOR, spidev_spi.driver.name);

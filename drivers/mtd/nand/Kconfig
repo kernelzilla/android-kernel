@@ -88,6 +88,13 @@ config MTD_NAND_OMAP_HWECC
           The ECC compuatation for the data to be written/read can be either by
           software or omap has Hw ecc engine which calculates it.
 
+config MTD_NAND_OMAP_PREFETCH
+	bool "MTD NAND OMAP PREFETCH"
+	depends on MTD_NAND && MTD_NAND_OMAP2
+	default n
+	help
+	 The NAND device can be accessed for Read/Write using GPMC PREFETCH engine
+	 to improve the performance.
 config MTD_NAND_OMAP
 	tristate "NAND Flash device on OMAP H3/H2/P2 boards"
 	depends on ARM && ARCH_OMAP1 && MTD_NAND && (MACH_OMAP_H2 || MACH_OMAP_H3 || MACH_OMAP_PERSEUS2)

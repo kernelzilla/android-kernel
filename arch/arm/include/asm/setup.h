@@ -2,6 +2,10 @@
  *  linux/include/asm/setup.h
  *
  *  Copyright (C) 1997-1999 Russell King
+ *  Copyright (C) 2006-2009 Motorola, Inc.
+ *    
+ * Date         Author          Comment
+ * 06/2009      Motorola        Added Motorola specific ATAGs support.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +22,12 @@
 
 #define COMMAND_LINE_SIZE 1024
 
+#if defined(CONFIG_MACH_MAPPHONE) || defined(CONFIG_MOT_FEAT_DEVICE_TREE)
+/* Magic number at the beginning of the serialized device tree. */
+#define FLATTREE_BEGIN_SERIALIZED           0xD00DFEED
+#define FLATTREE_BEGIN_SERIALIZED_OTHEREND  0xEDFE0DD0
+#endif
+
 /* The list ends with an ATAG_NONE node. */
 #define ATAG_NONE	0x00000000
 
@@ -25,6 +35,15 @@ struct tag_header {
 	__u32 size;
 	__u32 tag;
 };
+
+#ifdef CONFIG_MACH_MOT
+/* KEYPAD TYPE */
+#define ATAG_KEYPAD     0x54410010
+
+struct tag_keypad {
+	char name[8];
+};
+#endif
 
 /* The list must start with an ATAG_CORE node */
 #define ATAG_CORE	0x54410001
@@ -150,6 +169,54 @@ struct tag_memclk {
 	__u32 fmemclk;
 };
 
+#if defined(CONFIG_MACH_MAPPHONE) || defined(CONFIG_BOOTINFO)
+/* Powerup Reason */
+#define ATAG_POWERUP_REASON 0xf1000401
+
+struct tag_powerup_reason {
+	u32 powerup_reason;
+};
+
+/* MBM version */
+#define ATAG_MBM_VERSION 0xf1000407
+struct tag_mbm_version {
+	u32 mbm_version;
+};
+
+/* MBM loader version */
+#define ATAG_MBM_LOADER_VERSION 0xf1000408
+struct tag_mbm_loader_version {
+	u32 mbm_loader_version;
+};
+
+/* Flat dev tree address */
+#define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
+struct tag_flat_dev_tree_address {
+	u32 address;
+	u32 size;
+};
+
+/* Battery status at boot */
+#define ATAG_BATTERY_STATUS_AT_BOOT 0xf100040E
+struct tag_battery_status_at_boot {
+	u16 battery_status_at_boot;
+	u16 padding; /* each atag must be at least 4 bytes */
+};
+
+/* CID recover boot */
+#define ATAG_CID_RECOVER_BOOT 0xf1000414
+struct tag_cid_recover_boot {
+	u8 cid_recover_boot;
+};
+#else
+/* Flat dev tree address */
+#define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
+struct tag_flat_dev_tree_address {
+	u32 address;
+	u32 size;
+};
+#endif /* CONFIG_BOOTINFO */
+
 struct tag {
 	struct tag_header hdr;
 	union {
@@ -164,7 +231,20 @@ struct tag {
 		struct tag_cmdline	cmdline;
 
 		/*
+		 * Keypad type Motorola scpecific
+		 */
+#ifdef CONFIG_MACH_MOT
+		struct tag_keypad keypad;
+#endif
+		/*
 		 * Acorn specific
+
+
+
+
+
+
+
 		 */
 		struct tag_acorn	acorn;
 
@@ -177,6 +257,19 @@ struct tag {
 		 * DC21285 specific
 		 */
 		struct tag_memclk	memclk;
+#if defined(CONFIG_MACH_MAPPHONE) || defined(CONFIG_BOOTINFO)
+		/*
+		 * Motorola specific ATAGs
+		 */
+		struct tag_powerup_reason powerup_reason;
+		struct tag_mbm_version mbm_version;
+                struct tag_mbm_loader_version mbm_loader_version;
+		struct tag_flat_dev_tree_address flat_dev_tree;
+                struct tag_battery_status_at_boot battery_status_at_boot;
+				struct tag_cid_recover_boot cid_recover_boot;
+#else
+		struct tag_flat_dev_tree_address flat_dev_tree_address;
+#endif /* CONFIG_BOOTINFO */
 	} u;
 };
 

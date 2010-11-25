@@ -755,25 +755,32 @@ void DSPClkWakeupEventCtrl(u32 ClkId, bool enable)
  */
 DSP_STATUS tiomap3430_bump_dsp_opp_level(void)
 {
-#ifndef CONFIG_BRIDGE_DVFS
-	u32 opplevel;
-
-	struct dspbridge_platform_data *pdata =
+#ifdef CONFIG_BRIDGE_DVFS
+	if (cpu_is_omap3430()) {
+		return DSP_SOK;
+	} else {
+		if (cpu_is_omap3630()) {
+			u32 opplevel = 0;
+			struct dspbridge_platform_data *pdata =
 			omap_dspbridge_dev->dev.platform_data;
-
-	if (pdata->dsp_get_opp)
-		opplevel = (*pdata->dsp_get_opp)();
-
-		/*
-		 * If OPP is at minimum level, increase it before waking
-		 * up the DSP.
-		 */
-		if (opplevel == 1 && pdata->dsp_set_min_opp) {
-			(*pdata->dsp_set_min_opp)(VDD1_OPP2);
-			DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP: Setting "
-				"the vdd1 constraint level to %d before "
-				"waking DSP \n", VDD1_OPP2);
+			if (pdata->dsp_get_opp)
+				opplevel = (*pdata->dsp_get_opp)();
+			/*
+			* If OPP is at minimum level, increase it
+			* before waking up the DSP.
+			*/
+			if (opplevel == 1 && pdata->dsp_set_min_opp) {
+				(*pdata->dsp_set_min_opp)(VDD1_OPP2);
+				DBG_Trace(DBG_LEVEL7, "CHNLSM_InterruptDSP:"
+				"Setting the vdd1 constraint level to %d"
+				"before waking DSP \n", VDD1_OPP2);
+			}
+			} else {
+				DBG_Trace(DBG_LEVEL7, "Failed Unsupported \
+				OMAP chip ID \n");
+				return DSP_EFAIL;
 		}
+		return DSP_SOK;
+	}
 #endif
-	return DSP_SOK;
 }

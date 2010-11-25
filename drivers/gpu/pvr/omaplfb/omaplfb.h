@@ -261,11 +261,6 @@ typedef enum _OMAP_ERROR_
 OMAP_ERROR OMAPLFBInit(void);
 OMAP_ERROR OMAPLFBDeinit(void);
 
-#ifdef	LDM_PLATFORM
-void OMAPLFBDriverSuspend(void);
-void OMAPLFBDriverResume(void);
-#endif
-
 void *OMAPLFBAllocKernelMem(unsigned long ulSize);
 void OMAPLFBFreeKernelMem(void *pvMem);
 OMAP_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable);
@@ -279,5 +274,7 @@ void OMAPLFBDisableDisplayRegisterAccess(void);
 void OMAPLFBSync(void);
 void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr);
 void OMAPLFBDisplayInit(void);
+void OMAPLFBDriverSuspend(void);
+void OMAPLFBDriverResume(void);
 
 #endif

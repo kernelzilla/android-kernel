@@ -246,4 +246,8 @@ static __always_inline void *kmalloc_node(size_t size, gfp_t flags, int node)
 }
 #endif
 
+#ifdef CONFIG_MUDFLAP
+void slab_check_write(void *ptr, unsigned int sz, const char *location);
+#endif
+
 #endif /* _LINUX_SLUB_DEF_H */

@@ -35,7 +35,6 @@
 
 #include "f_mass_storage.h"
 #include "f_adb.h"
-#include "f_usbnet.h"
 
 #include "gadget_chips.h"
 
@@ -71,7 +70,6 @@ struct android_dev {
 	int version;
 
 	int adb_enabled;
-	int factory_enabled;
 	int nluns;
 };
 
@@ -130,46 +128,19 @@ static int __init android_bind_config(struct usb_configuration *c)
 	int ret;
 	printk(KERN_DEBUG "android_bind_config\n");
 
-	if (dev->factory_enabled) {
-		ret = usbnet_function_add(dev->cdev, c);
-		return ret;
-	}
-
 	ret = mass_storage_function_add(dev->cdev, c, dev->nluns);
 	if (ret)
 		return ret;
-	ret = adb_function_add(dev->cdev, c);
-	return ret;
+	return adb_function_add(dev->cdev, c);
 }
-
-static  int android_setup_config(struct usb_configuration *c,
-		const struct usb_ctrlrequest *ctrl);
 
 static struct usb_configuration android_config_driver = {
 	.label		= "android",
 	.bind		= android_bind_config,
-	.setup		= android_setup_config,
 	.bConfigurationValue = 1,
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
 	.bMaxPower	= CONFIG_USB_GADGET_VBUS_DRAW / 2,
 };
-
-static  int android_setup_config(struct usb_configuration *c,
-		const struct usb_ctrlrequest *ctrl)
-{
-	int i;
-	int ret = -EOPNOTSUPP;
-
-	for (i = 0; i < android_config_driver.next_interface_id; i++) {
-		if (android_config_driver.interface[i]->setup) {
-			ret = android_config_driver.interface[i]->setup(
-				android_config_driver.interface[i], ctrl);
-			if (ret >= 0)
-				return ret;
-		}
-	}
-	return ret;
-}
 
 static int __init android_bind(struct usb_composite_dev *cdev)
 {
@@ -201,6 +172,9 @@ static int __init android_bind(struct usb_composite_dev *cdev)
 		return id;
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
+
+	if (gadget->ops->wakeup)
+		android_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
 	/* register our configuration */
 	ret = usb_add_config(cdev, &android_config_driver);
@@ -240,7 +214,7 @@ static struct usb_composite_driver android_usb_driver = {
 
 static void enable_adb(struct android_dev *dev, int enable)
 {
-	if (!(dev->factory_enabled) && enable != dev->adb_enabled) {
+	if (enable != dev->adb_enabled) {
 		dev->adb_enabled = enable;
 		adb_function_enable(enable);
 
@@ -326,13 +300,6 @@ static int __init android_probe(struct platform_device *pdev)
 		if (pdata->serial_number)
 			strings_dev[STRING_SERIAL_IDX].s = pdata->serial_number;
 		dev->nluns = pdata->nluns;
-
-		if (pdata->factory_enabled) {
-			dev->factory_enabled = pdata->factory_enabled;
-			device_desc.bDeviceClass = USB_CLASS_COMM;
-			device_desc.bDeviceSubClass = USB_CLASS_COMM;
-			device_desc.bDeviceProtocol = USB_CLASS_PER_INTERFACE;
-		}
 	}
 
 	return 0;

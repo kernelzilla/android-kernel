@@ -45,12 +45,20 @@
 #ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
 #include <linux/timer.h>
 #endif
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+#include <linux/debugfs.h>
+#endif
 #include <mach/hardware.h>
 #include <mach/prcm.h>
 
 #include "omap_wdt.h"
 
 static struct platform_device *omap_wdt_dev;
+
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+static unsigned int cntrl_flag = ~CLOSE_WDT;
+static int wdt_cntrl_set(void *data, u64 val);
+#endif
 
 static unsigned timer_margin;
 module_param(timer_margin, uint, 0);
@@ -204,7 +212,6 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 static int omap_wdt_release(struct inode *inode, struct file *file)
 {
 	struct omap_wdt_dev *wdev = file->private_data;
-
 	/*
 	 *      Shut off the timer unless NOWAYOUT is defined.
 	 */
@@ -431,6 +438,12 @@ static int __init omap_wdt_probe(struct platform_device *pdev)
 	pr_info("Watchdog auto-pet enabled at %d sec intervals\n",
 		TIMER_AUTOPET_FREQ);
 #endif
+
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+	if (CLOSE_WDT == cntrl_flag)
+		wdt_cntrl_set(NULL, 0);
+#endif
+
 	return 0;
 
 err_misc:
@@ -512,12 +525,18 @@ static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+	if (CLOSE_WDT == cntrl_flag)
+		return 0;
+#endif
+
 	if (wdev->omap_wdt_users) {
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
 		wdev->jiffies_exp -= jiffies - wdev->jiffies_start;
 		del_timer(&wdev->autopet_timer);
+#endif
 		omap_wdt_disable(wdev);
 	}
-
 	return 0;
 }
 
@@ -525,8 +544,15 @@ static int omap_wdt_resume(struct platform_device *pdev)
 {
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+	if (CLOSE_WDT == cntrl_flag)
+		return 0;
+#endif
+
 	if (wdev->omap_wdt_users) {
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
 		mod_timer(&wdev->autopet_timer, jiffies + wdev->jiffies_exp);
+#endif
 		omap_wdt_enable(wdev);
 	}
 
@@ -554,9 +580,41 @@ static struct notifier_block panic_blk = {
 	.notifier_call  = omap_wdt_panic,
 };
 
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+static int wdt_cntrl_set(void *data, u64 val)
+{
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
+
+	if (wdev->omap_wdt_users) {
+		cntrl_flag = CLOSE_WDT;
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+		wdev->jiffies_exp -= jiffies - wdev->jiffies_start;
+		del_timer(&wdev->autopet_timer);
+#endif
+		omap_wdt_disable(wdev);
+	}
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(wdt_cntrl_fops, NULL, wdt_cntrl_set, "%llu\n");
+
+static int __init wdt_ctrl_init(char *s)
+{
+	if (!strncmp(s, "off", 3))
+		cntrl_flag = CLOSE_WDT;
+
+	return 0;
+}
+__setup("wdt_stat=", wdt_ctrl_init);
+#endif
+
 static int __init omap_wdt_init(void)
 {
 	spin_lock_init(&wdt_lock);
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
+	debugfs_create_file("diswdt", 0644, NULL, NULL, &wdt_cntrl_fops);
+#endif
 	return platform_driver_register(&omap_wdt_driver);
 }
 
@@ -571,6 +629,8 @@ module_exit(omap_wdt_exit);
 static int __init omap_wdt_panic_init(void)
 {
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
+
+	return 0;
 }
 
 arch_initcall(omap_wdt_panic_init);

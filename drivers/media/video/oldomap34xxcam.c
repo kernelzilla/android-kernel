@@ -147,7 +147,12 @@ int omap34xxcam_update_vbq(struct videobuf_buffer *vb)
 	struct isp_af_xtrastats af_xtrastats;
 #endif
 
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+	ktime_get_ts((struct timespec *)&vb->ts);
+#else
 	do_gettimeofday(&vb->ts);
+#endif
+
 	vb->field_count = atomic_add_return(2, &fh->field_count);
 	vb->state = VIDEOBUF_DONE;
 #ifndef CONFIG_VIDEO_OMAP3_HP3A
@@ -405,9 +410,12 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 
 	if (wanted_pix_out->pixelformat == V4L2_PIX_FMT_W1S_PATT)
 		best_pix_in->pixelformat = V4L2_PIX_FMT_W1S_PATT;
-	else
-		best_pix_in->pixelformat = V4L2_PIX_FMT_SGRBG10;
-
+	else {
+		if (vdev->vfd->minor == CAM_DEVICE_SOC)
+			best_pix_in->pixelformat = V4L2_PIX_FMT_YUYV;
+		else
+			best_pix_in->pixelformat = V4L2_PIX_FMT_SGRBG10;
+	}
 	best_pix_out.height = INT_MAX >> 1;
 	best_pix_out.width = best_pix_out.height;
 
@@ -496,7 +504,8 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 			 * Select bigger resolution if it's available
 			 * at same fps.
 			 */
-			if (frmi.width > best_pix_in->width
+			if ((frmi.width > best_pix_in->width ||
+				frmi.height > best_pix_in->height)
 			    && FPS_ABS_DIFF(fps, frmi.discrete)
 			    <= FPS_ABS_DIFF(fps, *best_ival))
 				goto do_it_now;
@@ -1040,6 +1049,12 @@ static int vidioc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 
 	mutex_lock(&vdev->mutex);
 
+	/* If streaming, just change fps, don't try to change resolution */
+	if (vdev->streaming) {
+		rval = vidioc_int_s_parm(vdev->vdev_sensor, a);
+		goto out;
+	}
+
 	vdev->want_timeperframe = a->parm.capture.timeperframe;
 
 	pix_tmp = vdev->want_pix;
@@ -1047,6 +1062,7 @@ static int vidioc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	rval = s_pix_parm(vdev, &pix_tmp_sensor, &pix_tmp,
 			  &a->parm.capture.timeperframe);
 
+out:
 	mutex_unlock(&vdev->mutex);
 
 	return rval;
@@ -1152,7 +1168,10 @@ static int vidioc_enum_framesizes(struct file *file, void *fh,
 	int rval;
 
 	pixel_format = frms->pixel_format;
-	frms->pixel_format = V4L2_PIX_FMT_SGRBG10; /* We can accept any. */
+	if (vdev->vfd->minor == CAM_DEVICE_SOC)
+		frms->pixel_format = V4L2_PIX_FMT_YUYV;
+	else
+		frms->pixel_format = V4L2_PIX_FMT_SGRBG10;
 
 	mutex_lock(&vdev->mutex);
 	rval = vidioc_int_enum_framesizes(vdev->vdev_sensor, frms);
@@ -1196,7 +1215,7 @@ static int vidioc_enum_frameintervals(struct file *file, void *fh,
  * feedback. The request is then passed on to the ISP private IOCTL handler,
  * isp_handle_private()
  */
-static int vidioc_default(struct file *file, void *fh, int cmd, void *arg)
+static long vidioc_default(struct file *file, void *fh, int cmd, void *arg)
 {
 	struct omap34xxcam_fh *ofh = file->private_data;
 	struct omap34xxcam_videodev *vdev = ofh->vdev;
@@ -1287,9 +1306,9 @@ out:
  * @dev: numeric device identifier.
  * @settings: ptr to a sensor settings structure.
  *
- * This request is passed to the sensor driver based on the bit masked flags field of the
- * settings structure. If the sensor does not support the requested operation, an error is
- * returned.
+ * This request is passed to the sensor driver based on the bit masked flags
+ * field of the settings structure. If the sensor does not support the
+ * requested operation, an error is returned.
  *
  * If the requested device id is not valid, -ENODEV is returned.
  */
@@ -1430,7 +1449,8 @@ static int omap34xxcam_open(struct file *file)
 	int i;
 
 	for (i = 0; i < OMAP34XXCAM_VIDEODEVS; i++) {
-		if (cam->vdevs[i].vfd) {
+	  if ((cam->vdevs[i].vfd) && (cam->vdevs[i].vfd->minor ==
+				      iminor(file->f_dentry->d_inode))) {
 			vdev = &cam->vdevs[i];
 			break;
 		}

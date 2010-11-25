@@ -714,7 +714,11 @@ static void rpc_async_schedule(struct work_struct *work)
 
 struct rpc_buffer {
 	size_t	len;
+#ifdef CONFIG_DEBUG_MEMLEAK
+	char	data[0];
+#else
 	char	data[];
+#endif
 };
 
 /**

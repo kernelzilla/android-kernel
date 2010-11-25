@@ -194,6 +194,11 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_PU_SPI |
 					     CPCAP_BIT_DMPD_SPI |
 					     CPCAP_BIT_DPPD_SPI);
+
+		if ((data->cpcap->vendor == CPCAP_VENDOR_ST) &&
+			(data->cpcap->revision == CPCAP_REVISION_2_0))
+				vusb_enable(data);
+
 		break;
 
 	case CPCAP_ACCY_CHARGER:
@@ -408,6 +413,9 @@ static void detection_work(struct work_struct *work)
 		 * charger is attached.
 		 */
 		if (data->sense & CPCAP_BIT_SE1_S) {
+#ifdef CONFIG_TTA_CHARGER
+			enable_tta();
+#endif
 			data->state = CONFIG;
 			schedule_delayed_work(&data->work, 0);
 		} else {

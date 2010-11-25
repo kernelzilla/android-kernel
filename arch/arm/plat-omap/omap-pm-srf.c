@@ -27,6 +27,7 @@
 #include <mach/powerdomain.h>
 #include <mach/resource.h>
 #include <mach/omapdev.h>
+#include <mach/omap34xx.h>
 
 struct omap_opp *dsp_opps;
 struct omap_opp *mpu_opps;
@@ -183,7 +184,7 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 	 * array should have .rate = .opp_id = 0.
 	 */
 
-	return NULL;
+	return dsp_opps;
 }
 EXPORT_SYMBOL(omap_pm_dsp_get_opp_table);
 
@@ -352,3 +353,70 @@ void omap_pm_if_exit(void)
 {
 	/* Deallocate CPUFreq frequency table here */
 }
+
+u8 omap_pm_get_max_vdd1_opp()
+{
+	if (cpu_is_omap3630()) {
+		switch (omap_rev_id()) {
+		case OMAP_3630:
+		default:
+			return VDD1_OPP4;
+		case OMAP_3630_800:
+			return VDD1_OPP3;
+		case OMAP_3630_1000:
+			return VDD1_OPP4;
+		}
+	} else {
+		if (omap_rev() < OMAP3430_REV_ES3_1)
+			return VDD1_OPP5;
+		else {
+			switch (omap_rev_id()) {
+			case OMAP_3420:
+			case OMAP_3430:
+				return VDD1_OPP5;
+			case OMAP_3440:
+				return VDD1_OPP6;
+			default:
+				return VDD1_OPP5;
+			}
+		}
+	}
+}
+EXPORT_SYMBOL(omap_pm_get_max_vdd1_opp);
+
+u8 omap_pm_get_min_vdd1_opp(void)
+{
+	return VDD1_OPP1;
+}
+EXPORT_SYMBOL(omap_pm_get_min_vdd1_opp);
+
+
+u8 omap_pm_get_max_vdd2_opp(void)
+{
+	if (cpu_is_omap3630())
+		return VDD2_OPP2;
+	else
+		return VDD2_OPP3;
+}
+EXPORT_SYMBOL(omap_pm_get_max_vdd2_opp);
+
+u8 omap_pm_get_min_vdd2_opp(void)
+{
+	if (cpu_is_omap3630())
+		return VDD2_OPP1;
+	else
+		return VDD2_OPP2;
+}
+EXPORT_SYMBOL(omap_pm_get_min_vdd2_opp);
+
+struct omap_opp *omap_get_mpu_rate_table()
+{
+	return mpu_opps;
+}
+EXPORT_SYMBOL(omap_get_mpu_rate_table);
+
+struct omap_opp *omap_get_dsp_rate_table()
+{
+	return dsp_opps;
+}
+EXPORT_SYMBOL(omap_get_dsp_rate_table);

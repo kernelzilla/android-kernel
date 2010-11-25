@@ -17,6 +17,16 @@ config ANDROID_PMEM
 	bool "Android pmem allocator"
 	default y
 
+config ANDROID_PMEM_DEBUG
+	bool "Android pmem debug"
+	depends on ANDROID_PMEM
+	default n
+
+config ANDROID_PMEM_KAPI_TEST
+	tristate "Simple module to test Android pmem kernel API"
+	depends on ANDROID_PMEM
+	default n
+
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
 	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
@@ -156,7 +166,7 @@ config ATMEL_SSC
 
 config OMAP_MODEM_CONTROL
    bool "OMAP device driver to interface with a modem co-processor"
-   default y
+   default n
    ---help---
          This option enables the omap device driver to control and
          interface with a modem co-processor.  This module is needed to
@@ -261,8 +271,13 @@ config UID_STAT
 	bool "UID based statistics tracking exported to /proc/uid_stat"
 	default n
 
-config VIB_OMAP_PWM
-	bool "OMAP PWM Vibrator"
+config UID_STAT_INET_ONLY
+	bool "Include only AF_INET and AF_INET6 counts for /proc/uid_stat"
+	depends on UID_STAT
+	default n
+
+config VIB_PWM
+	bool "PWM Vibrator"
 	default n
 
 config VIB_GPIO
@@ -283,6 +298,13 @@ config SENSORS_AKM8973_AKMD
 	help
 	 Support for the AKM8973 tri-axis magnetometer (compass)
 
+config SENSORS_AIRC
+	tristate "Motorola AIRC"
+	default n
+	depends on I2C
+	help
+	 Support for the AIRC driver
+
 config SENSORS_LIS331DLH
 	tristate "LIS331DLH Accelerometer"
 	default n
@@ -290,6 +312,48 @@ config SENSORS_LIS331DLH
 	help
 	 Say yes here if you wish to include the STI Micro
 	 LIS331DLH accelerometer driver.
+
+config SENSORS_KXTF9
+	tristate "KXTF9 Accelerometer"
+	default n
+	depends on I2C
+	help
+	 Say yes here if you wish to include the Kionix
+	 KXTF9 accelerometer driver.
+
+config UMTS_SYSPANIC
+        tristate "Motorola UMTS phone syspanic driver"
+	default n
+        help 
+         This option enables support to detect BP panic from AP, with the syspanic IRQ.
+         Only available on SAM-OMAP platform.
+         say y if your BP support this feature (needed for panic daemon)
+
+config TSIF
+	depends on ARCH_MSM
+	tristate "TSIF (Transport Stream InterFace) support"
+	default n
+	---help---
+	  This driver supports low level TSIF interface. It provides API
+	  for upper layer drivers. If you have a TSIF hardware, say
+	  Y here and read <file:Documentation/arm/msm/tsif.txt>.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called msm_tsif.
+
+config TSIF_CHRDEV
+	tristate "TSIF character device"
+	depends on TSIF
+	default n
+	---help---
+	  This driver uses low level TSIF interface. It provides character
+	  device useable from user space programs: one can read TSIF stream
+	  from this device.
+
+	  This driver may be used as example for TSIF API usage.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called tsif_chrdev.
 
 config WL127X_RFKILL
 	tristate "Bluetooth power control driver for TI wl127x"
@@ -301,7 +365,7 @@ config WL127X_RFKILL
 
 config WL127X_TEST
 	tristate "TI wl127x Bluetooth GPIO test driver for board-sholes"
-	depends on MACH_SHOLES && WL127X_RFKILL && BT
+	depends on (MACH_SHOLES || MACH_MAPPHONE || MACH_SHOLEST) && WL127X_RFKILL && BT
 	default n
 	---help---
 	 Creates sysfs GPIO entries for testing TI wl127x BT on board-sholes.
@@ -320,8 +384,15 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+source "drivers/misc/mot_camera_misc/Kconfig"
+source "drivers/misc/mot_camera_misc_msm/Kconfig"
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/ts27010mux/Kconfig"
+source "drivers/misc/netmux/Kconfig"
+source "drivers/misc/netmux_linkdriver/Kconfig"
+source "drivers/misc/modem_pm_driver/Kconfig"
+source "drivers/misc/smc/Kconfig"
+source "drivers/misc/sec/Kconfig"
 
 endif # MISC_DEVICES

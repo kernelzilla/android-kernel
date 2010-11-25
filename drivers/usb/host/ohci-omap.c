@@ -19,6 +19,8 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/gpio.h>
+#include <mach/gpio.h>
+#include "ehci-omap.h"
 
 #include <mach/hardware.h>
 #include <asm/io.h>
@@ -72,6 +74,7 @@ static struct clk *usb_dc_ck;
 
 static int host_enabled;
 static int host_initialized;
+static int ohci_irq_num;
 
 static void omap_ohci_clock_power(int on)
 {
@@ -191,6 +194,182 @@ static void start_hnp(struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
+static int omap_usb_port_ulpi_bypass(enum omap_usb_port_mode mode)
+{
+	return mode != OMAP_USB_PORT_MODE_ULPI_PHY;
+}
+
+static int omap_usb_port_ttl_chanel_config(enum omap_usb_port_mode mode)
+{
+	return (mode == OMAP_USB_PORT_MODE_UTMI_PHY_6PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_6PIN_ALT) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_3PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_PHY_4PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_6PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_6PIN_ALT) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_3PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_4PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_2PIN) ||
+		(mode == OMAP_USB_PORT_MODE_UTMI_TLL_2PIN_ALT);
+}
+
+static unsigned omap_usb_port_fslsmode(enum omap_usb_port_mode mode)
+{
+	switch (mode) {
+	/* non serial modes */
+	case OMAP_USB_PORT_MODE_ULPI_PHY:
+	case OMAP_USB_PORT_MODE_ULPI_TLL_SDR:
+	case OMAP_USB_PORT_MODE_ULPI_TLL_DDR:
+		return 0x0;
+
+	/* serial modes */
+	case OMAP_USB_PORT_MODE_UTMI_PHY_6PIN:
+		return 0x0;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_6PIN_ALT:
+		return 0x1;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_3PIN:
+		return 0x2;
+
+	case OMAP_USB_PORT_MODE_UTMI_PHY_4PIN:
+		return 0x3;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_6PIN:
+		return 0x4;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_6PIN_ALT:
+		return 0x5;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_3PIN:
+		return 0x6;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_4PIN:
+		return 0x7;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_2PIN:
+		return 0xa;
+
+	case OMAP_USB_PORT_MODE_UTMI_TLL_2PIN_ALT:
+		return 0xB;
+	}
+
+	return 0x0;
+}
+
+static void omap_usb_setup_ports(struct usb_hcd *hcd,
+			struct omap_usb_platform_data *data)
+{
+	int i;
+	u32 val;
+
+	val = (1<<OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN_SHIFT)|
+		(1<<OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN_SHIFT)|
+		(1<<OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN_SHIFT)|
+		(0<<OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN_SHIFT);
+
+
+	if ((data->num_ports > 0) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[0].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P1_ULPI_BYPASS_SHIFT);
+	if ((data->num_ports > 1) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[1].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P2_ULPI_BYPASS_SHIFT);
+	if ((data->num_ports > 2) &&
+	    (omap_usb_port_ulpi_bypass(data->port_data[2].mode)))
+		val |= (1 << OMAP_UHH_HOSTCONFIG_P3_ULPI_BYPASS_SHIFT);
+
+	omap_writel(val, OMAP_UHH_HOSTCONFIG);
+
+	/* wait for change to sync */
+	while ((omap_readl(OMAP_UHH_HOSTCONFIG) &
+		OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK) !=
+	       (val & OMAP_UHH_HOSTCONFIG_ULPI_BYPASS_MASK))
+		cpu_relax();
+
+	dev_dbg(hcd->self.controller, "ULPI Byppass mode congfigured: %08x\n",
+		omap_readl(OMAP_UHH_HOSTCONFIG));
+
+	/* Program the 3 channels upfront */
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		/* AutoIdle */
+		if ((data->num_ports > i) &&
+		    (data->port_data[i].flags & OMAP_USB_PORT_FLAG_AUTOIDLE))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				    1<<OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE_SHIFT,
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+				~(1<<OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
+
+		/* BitStuffing */
+		if ((data->num_ports > i) &&
+		    (data->port_data[i].flags & OMAP_USB_PORT_FLAG_NOBITSTUFF))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				1<<OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT,
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+			~(1<<OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
+
+		/* SDR/DDR */
+		if ((data->num_ports > i) &&
+		(data->port_data[i].mode == OMAP_USB_PORT_MODE_ULPI_TLL_DDR))
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) |
+				(1<<OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
+		else
+			omap_writel(omap_readl(OMAP_TLL_CHANNEL_CONF(i)) &
+				~(1<<OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE_SHIFT),
+				    OMAP_TLL_CHANNEL_CONF(i));
+	}
+
+	/* Program Common TLL register */
+	omap_writel((1 << OMAP_TLL_SHARED_CONF_FCLK_IS_ON_SHIFT) |
+			(1 << OMAP_TLL_SHARED_CONF_USB_DIVRATION_SHIFT) |
+			(0 << OMAP_TLL_SHARED_CONF_USB_180D_SDR_EN_SHIFT) |
+			(0 << OMAP_TLL_SHARED_CONF_USB_90D_DDR_EN_SHFT),
+				OMAP_TLL_SHARED_CONF);
+
+	/* Enable channels */
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		u32 channel_conf;
+
+		if ((data->num_ports <= i) ||
+		   !(data->port_data[i].flags & OMAP_USB_PORT_FLAG_ENABLED)) {
+			dev_dbg(hcd->self.controller,
+				"port %d disabled. skipping.\n", i);
+			continue;
+		}
+
+		channel_conf = omap_readl(OMAP_TLL_CHANNEL_CONF(i));
+		channel_conf |= 1<<OMAP_TLL_CHANNEL_CONF_CHANEN_SHIFT;
+
+		if (omap_usb_port_ttl_chanel_config(data->port_data[i].mode))
+			channel_conf |= 1<<OMAP_TLL_CHANNEL_CONF_CHANMODE_SHIFT;
+		else
+			channel_conf &=
+				~(3<<OMAP_TLL_CHANNEL_CONF_CHANMODE_SHIFT);
+
+		channel_conf &= ~(OMAP_TLL_CHANNEL_CONF_FSLSMODE(0xf));
+		channel_conf |= OMAP_TLL_CHANNEL_CONF_FSLSMODE(
+			omap_usb_port_fslsmode(data->port_data[i].mode));
+
+
+		omap_writel(channel_conf, OMAP_TLL_CHANNEL_CONF(i));
+		dev_dbg(hcd->self.controller,
+			"port %d enabled: OMAP_TTL_CHANNEL_CONF_%d=%08x\n",
+			i, i+1, omap_readl(OMAP_TLL_CHANNEL_CONF(i)));
+
+		omap_writeb(0xBE, OMAP_TLL_ULPI_SCRATCH_REGISTER(i));
+		dev_dbg(hcd->self.controller, "ULPI_SCRATCH_REG[ch=%d]"
+			"= 0x%02x\n",
+			i+1, omap_readb(OMAP_TLL_ULPI_SCRATCH_REGISTER(i)));
+	}
+}
+
 static int ohci_omap_init(struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
@@ -286,6 +465,150 @@ static int ohci_omap_init(struct usb_hcd *hcd)
 	return 0;
 }
 
+/* omap_start_ohci
+ *  - Start the TI USBHOST controller
+ *  - Under the assumpation that only OHCI is used
+ */
+static int omap_start_ohci(struct platform_device *dev, struct usb_hcd *hcd)
+{
+	struct omap_usb_config *data = dev->dev.platform_data;
+	int i, r, reset_delay;
+
+	dev_dbg(hcd->self.controller,
+		 "Configure TI OHCI USB Controller Register\n");
+
+	/* Start DPLL5 Programming:
+	 * Clock Framework is not doing this now:
+	 * This will be done in clock framework later
+	 */
+	/* Enable DPLL 5 : Based on Input of 13Mhz*/
+	cm_write_mod_reg((12 << OMAP3430ES2_PERIPH2_DPLL_DIV_SHIFT)|
+			(120 << OMAP3430ES2_PERIPH2_DPLL_MULT_SHIFT),
+			PLL_MOD, OMAP3430ES2_CM_CLKSEL4);
+
+	cm_write_mod_reg(1 << OMAP3430ES2_DIV_120M_SHIFT,
+			PLL_MOD, OMAP3430ES2_CM_CLKSEL5);
+
+	cm_write_mod_reg((7 << OMAP3430ES2_PERIPH2_DPLL_FREQSEL_SHIFT) |
+			(7 << OMAP3430ES2_EN_PERIPH2_DPLL_SHIFT),
+			PLL_MOD, OMAP3430ES2_CM_CLKEN2);
+
+	while (!(cm_read_mod_reg(PLL_MOD, CM_IDLEST2) &
+		OMAP3430ES2_ST_PERIPH2_CLK_MASK))
+		dev_dbg(hcd->self.controller,
+			"idlest2 = 0x%x\n",
+			cm_read_mod_reg(PLL_MOD, CM_IDLEST2));
+	/* End DPLL5 programming */
+
+
+	/* PRCM settings for USBHOST:
+	 * Interface clk un-related to domain transition
+	 */
+	cm_write_mod_reg(0 << OMAP3430ES2_AUTO_USBHOST_SHIFT,
+		OMAP3430ES2_USBHOST_MOD, CM_AUTOIDLE);
+
+	/* Disable sleep dependency with MPU and IVA */
+	cm_write_mod_reg((0 << OMAP3430ES2_EN_MPU_SHIFT) |
+			(0 << OMAP3430ES2_EN_IVA2_SHIFT),
+			OMAP3430ES2_USBHOST_MOD, OMAP3430_CM_SLEEPDEP);
+
+	/* Disable Automatic transition of clock */
+	cm_write_mod_reg(0 << OMAP3430ES2_CLKTRCTRL_USBHOST_SHIFT,
+			OMAP3430ES2_USBHOST_MOD, CM_CLKSTCTRL);
+
+	clk_enable(clk_get(NULL, "usbhost_ick"));
+	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
+	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+
+	reset_delay = 0;
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if ((data->plat_data->num_ports > i) &&
+			 (data->plat_data->port_data[i].startup)) {
+			reset_delay =
+			reset_delay > data->plat_data->port_data[i].reset_delay ?
+			reset_delay : data->plat_data->port_data[i].reset_delay;
+			r = data->plat_data->port_data[i].startup(dev, i);
+			if (r < 0)
+				return r;
+		}
+	}
+	if (reset_delay)
+		udelay(reset_delay);
+
+	clk_enable(clk_get(NULL, "usbtll_ick"));
+	clk_enable(clk_get(NULL, "usbtll_fck"));
+
+	/* Enable Auto Idle of USBTLL */
+	cm_write_mod_reg((1 << OMAP3430ES2_AUTO_USBTLL_SHIFT),
+				CORE_MOD, CM_AUTOIDLE3);
+
+	/* Wait for TLL to be Active */
+	while ((cm_read_mod_reg(CORE_MOD, OMAP2430_CM_IDLEST3)
+		& (1 << OMAP3430ES2_ST_USBTLL_SHIFT)))
+		cpu_relax();
+
+	/* perform TLL soft reset, and wait until reset is complete */
+	omap_writel(1 << OMAP_USBTLL_SYSCONFIG_SOFTRESET_SHIFT,
+		OMAP_USBTLL_SYSCONFIG);
+	/* Wait for TLL reset to complete */
+	while (!(omap_readl(OMAP_USBTLL_SYSSTATUS)
+		& (1 << OMAP_USBTLL_SYSSTATUS_RESETDONE_SHIFT)))
+		cpu_relax();
+
+	dev_dbg(hcd->self.controller, "TLL RESET DONE\n");
+
+	/* Smart Idle mode */
+	omap_writel((1 << OMAP_USBTLL_SYSCONFIG_ENAWAKEUP_SHIFT) |
+		(2 << OMAP_USBTLL_SYSCONFIG_SIDLEMODE_SHIFT) |
+		(0 << OMAP_USBTLL_SYSCONFIG_CACTIVITY_SHIFT) |
+		(1 << OMAP_USBTLL_SYSCONFIG_AUTOIDLE_SHIFT),
+		OMAP_USBTLL_SYSCONFIG);
+
+	/* Put UHH in SmartIdle/SmartStandby mode */
+	omap_writel((1 << OMAP_UHH_SYSCONFIG_AUTOIDLE_SHIFT) |
+		(1 << OMAP_UHH_SYSCONFIG_ENAWAKEUP_SHIFT) |
+		(2 << OMAP_UHH_SYSCONFIG_SIDLEMODE_SHIFT) |
+		(0 << OMAP_UHH_SYSCONFIG_CACTIVITY_SHIFT) |
+		(2 << OMAP_UHH_SYSCONFIG_MIDLEMODE_SHIFT),
+		OMAP_UHH_SYSCONFIG);
+
+	omap_usb_setup_ports(hcd, data->plat_data);
+
+	reset_delay = 0;
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if (data->plat_data->num_ports > i)
+			reset_delay =
+			reset_delay > data->plat_data->port_data[i].reset_delay ?
+			reset_delay : data->plat_data->port_data[i].reset_delay;
+	}
+
+	if (reset_delay)
+		udelay(reset_delay);
+
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		if ((data->plat_data->num_ports > i)
+			&& (data->plat_data->port_data[i].reset))
+			data->plat_data->port_data[i].reset(dev, i, 1);
+	}
+
+	if (data->plat_data->flags & OMAP_USB_FLAG_VBUS_INTERNAL_CHARGEPUMP) {
+		/* Refer ISSUE2: LINK assumes external charge pump */
+		/* use Port1 VBUS to charge externally Port2: */
+		/* So for PHY mode operation use Port2 only */
+		omap_writel((0xA << EHCI_INSNREG05_ULPI_REGADD_SHIFT) |
+					/* OTG ctrl reg*/
+			(2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT) |/*   Write */
+			(1 << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT) |/* Port1 */
+			(1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT) |/* Start */
+			(0x26),
+			EHCI_INSNREG05_ULPI);
+		while (!(omap_readl(EHCI_INSNREG05_ULPI)
+			& (1<<EHCI_INSNREG05_ULPI_CONTROL_SHIFT)))
+			cpu_relax();
+	}
+	return 0;
+}
+
 static void ohci_omap_stop(struct usb_hcd *hcd)
 {
 	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
@@ -323,6 +646,8 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		return -ENODEV;
 	}
 
+	printk(KERN_INFO "%s Enter. \n", __func__);
+
 #ifndef CONFIG_ARCH_OMAP34XX
 	usb_host_ck = clk_get(0, "usb_hhc_ck");
 	if (IS_ERR(usb_host_ck))
@@ -346,11 +671,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		goto err0;
 	}
 #if defined(CONFIG_ARCH_OMAP34XX)
-	clk_enable(clk_get(NULL, "usbhost_ick"));
-	clk_enable(clk_get(NULL, "usbtll_ick"));
-	clk_enable(clk_get(NULL, "usbtll_fck"));
-	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
-	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
+	omap_start_ohci(pdev, hcd);
 #endif
 	hcd->rsrc_start = pdev->resource[0].start;
 	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
@@ -382,6 +703,9 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 	retval = usb_add_hcd(hcd, irq, IRQF_DISABLED);
 	if (retval)
 		goto err3;
+	else
+		ohci_irq_num = irq;
+
 
 	host_initialized = 1;
 
@@ -468,12 +792,27 @@ ohci_omap_start (struct usb_hcd *hcd)
 #ifdef CONFIG_PM
 static int omap_ohci_bus_suspend(struct usb_hcd *hcd)
 {
-	int res;
+	int res = 0;
 	int ret = 0;
 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+	int chix;
+	struct usb_device *childdev;
+	int count = 0;
 #if defined(CONFIG_ARCH_OMAP34XX)
 	struct omap_usb_config *config = hcd->self.controller->platform_data;
 #endif
+	printk(KERN_INFO "%s Enter. \n", __func__);
+
+	for (chix = 0; chix < hcd->self.root_hub->maxchild; chix++) {
+		childdev = hcd->self.root_hub->children[chix];
+		if (childdev)
+			count++;
+	}
+
+	if (!count) {
+		printk(KERN_ERR " %s no device, suspend failed. \n", __func__);
+		return -EBUSY ;
+	}
 
 	ret = ohci_bus_suspend(hcd);
 	if (ret)
@@ -490,6 +829,9 @@ static int omap_ohci_bus_suspend(struct usb_hcd *hcd)
 		return -EBUSY ;
 	}
 
+	if (ohci_irq_num)
+		disable_irq(ohci_irq_num);
+
 	/* go ahead turn off clock */
 	clk_disable(clk_get(NULL, "usbtll_fck"));
 	clk_disable(clk_get(NULL, "usbhost_120m_fck"));
@@ -502,6 +844,9 @@ static int omap_ohci_bus_suspend(struct usb_hcd *hcd)
 	clk_disable(clk_get(NULL, "usbtll_ick"));
 
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	if (ohci_irq_num)
+		enable_irq(ohci_irq_num);
+
 	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
 
 	return ret;
@@ -511,6 +856,10 @@ static int omap_ohci_bus_resume(struct usb_hcd *hcd)
 {
 	int ret = 0;
 
+
+	printk(KERN_INFO "%s Enter. \n", __func__);
+	if (ohci_irq_num)
+		disable_irq(ohci_irq_num);
 	/* the omap usb host auto-idle is not fully functional,
 	 * manually enable/disable usbtll_ick during
 	 * the suspend/resume time.
@@ -520,6 +869,9 @@ static int omap_ohci_bus_resume(struct usb_hcd *hcd)
 	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
+	if (ohci_irq_num)
+		enable_irq(ohci_irq_num);
 
 	ohci_finish_controller_resume(hcd);
 	ret = ohci_bus_resume(hcd);
@@ -534,6 +886,7 @@ static void omap_ohci_shutdown(struct usb_hcd *hcd)
 	clk_enable(clk_get(NULL, "usbhost_120m_fck"));
 	clk_enable(clk_get(NULL, "usbhost_48m_fck"));
 	ohci_shutdown(hcd);
+	ohci_irq_num = 0;
 }
 
 /*-------------------------------------------------------------------------*/

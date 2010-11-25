@@ -773,6 +773,9 @@ struct net_device
 /*
  * One part is mostly used on xmit path (device)
  */
+#ifdef CONFIG_MACH_MOT
+	void			*priv;	/* pointer to private data	*/
+#endif
 	/* These may be needed for future network-power-down code. */
 	unsigned long		trans_start;	/* Time (in jiffies) of last Tx	*/
 

@@ -26,10 +26,16 @@ struct cache_sizes {
 extern struct cache_sizes malloc_sizes[];
 
 void *kmem_cache_alloc(struct kmem_cache *, gfp_t);
+#ifndef CONFIG_MEMLEAK_BLD
 void *__kmalloc(size_t size, gfp_t flags);
+#else
+void *__memleak_kmalloc(size_t size, gfp_t flags);
+#define __kmalloc(size, flags) __memleak_kmalloc(size, flags)
+#endif
 
 static inline void *kmalloc(size_t size, gfp_t flags)
 {
+#ifndef CONFIG_DEBUG_MEMLEAK
 	if (__builtin_constant_p(size)) {
 		int i = 0;
 
@@ -52,6 +58,7 @@ found:
 #endif
 		return kmem_cache_alloc(malloc_sizes[i].cs_cachep, flags);
 	}
+#endif
 	return __kmalloc(size, flags);
 }
 
@@ -61,6 +68,7 @@ extern void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
 
 static inline void *kmalloc_node(size_t size, gfp_t flags, int node)
 {
+#ifndef CONFIG_DEBUG_MEMLEAK
 	if (__builtin_constant_p(size)) {
 		int i = 0;
 
@@ -84,9 +92,14 @@ found:
 		return kmem_cache_alloc_node(malloc_sizes[i].cs_cachep,
 						flags, node);
 	}
+#endif
 	return __kmalloc_node(size, flags, node);
 }
 
 #endif	/* CONFIG_NUMA */
+
+#ifdef CONFIG_MUDFLAP
+void slab_check_write(void *ptr, unsigned int sz, const char *location);
+#endif
 
 #endif	/* _LINUX_SLAB_DEF_H */

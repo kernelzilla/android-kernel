@@ -29,7 +29,8 @@
  *
  * No return value.
  **/
-int hp3a_initialize_queue(struct hp3a_queue *queue, int queue_size, unsigned int element_size)
+int hp3a_initialize_queue(struct hp3a_queue *queue,
+		int queue_size, unsigned int element_size)
 {
 	if (queue_size > 0 && element_size > 0) {
 		queue->data = kmalloc(queue_size * element_size,  GFP_KERNEL);

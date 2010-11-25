@@ -50,7 +50,13 @@ static inline void vmalloc_init(void)
 }
 #endif
 
+/* CONFIG_MEMLEAK_BLD is only for built-in code */
+#if !defined(CONFIG_MEMLEAK_BLD) || defined(MODULE)
 extern void *vmalloc(unsigned long size);
+#else
+extern void *memleak_vmalloc(unsigned long size);
+#define vmalloc(size) memleak_vmalloc(size)
+#endif
 extern void *vmalloc_user(unsigned long size);
 extern void *vmalloc_node(unsigned long size, int node);
 extern void *vmalloc_exec(unsigned long size);
@@ -59,7 +65,13 @@ extern void *vmalloc_32_user(unsigned long size);
 extern void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot);
 extern void *__vmalloc_area(struct vm_struct *area, gfp_t gfp_mask,
 				pgprot_t prot);
+/* CONFIG_MEMLEAK_BLD is only for built-in code */
+#if !defined(CONFIG_MEMLEAK_BLD) || defined(MODULE)
 extern void vfree(const void *addr);
+#else
+extern void memleak_vfree(void *addr);
+#define vfree(addr) memleak_vfree(addr)
+#endif
 
 extern void *vmap(struct page **pages, unsigned int count,
 			unsigned long flags, pgprot_t prot);

@@ -954,6 +954,9 @@ typedef unsigned char mixer_record[128];
 #define SOUND_MIXER_PRIVATE4		_SIOWR('M', 114, int)
 #define SOUND_MIXER_PRIVATE5		_SIOWR('M', 115, int)
 
+#define SOUND_MIXER_FMON            _SIOR('M', 120, int)
+#define SOUND_MIXER_FMOFF           _SIOR('M', 121, int)
+#define SOUND_MIXER_FMPATH          _SIOR('M', 122, int)
 /*
  * SOUND_MIXER_GETLEVELS and SOUND_MIXER_SETLEVELS calls can be used
  * for querying current mixer settings from the driver and for loading
