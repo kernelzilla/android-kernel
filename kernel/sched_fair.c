@@ -54,13 +54,13 @@ enum sched_tunable_scaling sysctl_sched_tunable_scaling
  * Minimal preemption granularity for CPU-bound tasks:
  * (default: 2 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_min_granularity = 2000000ULL;
-unsigned int normalized_sysctl_sched_min_granularity = 2000000ULL;
+unsigned int sysctl_sched_min_granularity = 4726000ULL;
+unsigned int normalized_sysctl_sched_min_granularity = 4726000ULL;
 
 /*
  * is kept at sysctl_sched_latency / sysctl_sched_min_granularity
  */
-static unsigned int sched_nr_latency = 3;
+static unsigned int sched_nr_latency = 6;
 
 /*
  * After fork, child runs first. If set to 0 (default) then
@@ -688,7 +688,7 @@ static void enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		se->statistics.sum_sleep_runtime += delta;
 
 		if (tsk) {
-			if (tsk->in_iowait) {
+			if (tsk->sched_in_iowait) {
 				se->statistics.iowait_sum += delta;
 				se->statistics.iowait_count++;
 				trace_sched_stat_iowait(tsk, delta);
@@ -718,7 +718,7 @@ static void check_spread(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	if (d < 0)
 		d = -d;
 
-	if (d > 3*sysctl_sched_latency)
+	if (d > 3*cfs_rq->nr_running*sysctl_sched_latency)
 		schedstat_inc(cfs_rq, nr_spread_over);
 #endif
 }
@@ -752,9 +752,7 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 	}
 
 	/* ensure we never gain time by being placed backwards. */
-	vruntime = max_vruntime(se->vruntime, vruntime);
-
-	se->vruntime = vruntime;
+	se->vruntime = max_vruntime(se->vruntime, vruntime);
 }
 
 static void
@@ -806,6 +804,7 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 * Update run-time statistics of the 'current'.
 	 */
 	update_curr(cfs_rq);
+	check_spread(cfs_rq, se);
 
 	update_stats_dequeue(cfs_rq, se);
 	if (flags & DEQUEUE_SLEEP) {
@@ -872,7 +871,7 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 		struct sched_entity *se = __pick_next_entity(cfs_rq);
 		s64 delta = curr->vruntime - se->vruntime;
 
-		if (delta > ideal_runtime)
+		if (delta > calc_delta_fair(ideal_runtime, curr))
 			resched_task(rq_of(cfs_rq)->curr);
 	}
 }
@@ -935,11 +934,9 @@ static void put_prev_entity(struct cfs_rq *cfs_rq, struct sched_entity *prev)
 	 * If still on the runqueue then deactivate_task()
 	 * was not called and update_curr() has to be done:
 	 */
-	if (prev->on_rq)
-		update_curr(cfs_rq);
-
-	check_spread(cfs_rq, prev);
 	if (prev->on_rq) {
+		update_curr(cfs_rq);
+		check_spread(cfs_rq, prev);
 		update_stats_wait_start(cfs_rq, prev);
 		/* Put 'current' back into the tree. */
 		__enqueue_entity(cfs_rq, prev);
@@ -1653,7 +1650,11 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	struct task_struct *curr = rq->curr;
 	struct sched_entity *se = &curr->se, *pse = &p->se;
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
-	int scale = cfs_rq->nr_running >= sched_nr_latency;
+	/*
+	 * The buddy logic doesn't work well when there's not actually enough
+	 * tasks for there to be buddies.
+	 */
+	int buddies = (cfs_rq->nr_running >= 2);
 
 	if (unlikely(rt_prio(p->prio)))
 		goto preempt;
@@ -1664,7 +1665,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	if (unlikely(se == pse))
 		return;
 
-	if (sched_feat(NEXT_BUDDY) && scale && !(wake_flags & WF_FORK))
+	if (sched_feat(NEXT_BUDDY) && buddies && !(wake_flags & WF_FORK))
 		set_next_buddy(pse);
 
 	/*
@@ -1710,7 +1711,7 @@ preempt:
 	if (unlikely(!se->on_rq || curr == rq->idle))
 		return;
 
-	if (sched_feat(LAST_BUDDY) && scale && entity_is_task(se))
+	if (sched_feat(LAST_BUDDY) && buddies && entity_is_task(se))
 		set_last_buddy(se);
 }
 
@@ -1765,6 +1766,10 @@ static void pull_task(struct rq *src_rq, struct task_struct *p,
 	set_task_cpu(p, this_cpu);
 	activate_task(this_rq, p, 0);
 	check_preempt_curr(this_rq, p, 0);
+
+	/* re-arm NEWIDLE balancing when moving tasks */
+	src_rq->avg_idle = this_rq->avg_idle = 2*sysctl_sched_migration_cost;
+	this_rq->idle_stamp = 0;
 }
 
 /*
@@ -2031,12 +2036,15 @@ struct sd_lb_stats {
 	unsigned long this_load;
 	unsigned long this_load_per_task;
 	unsigned long this_nr_running;
+	unsigned long this_group_capacity;
+	unsigned long this_has_capacity;
 
 	/* Statistics of the busiest group */
 	unsigned long max_load;
 	unsigned long busiest_load_per_task;
 	unsigned long busiest_nr_running;
 	unsigned long busiest_group_capacity;
+	unsigned long busiest_has_capacity;
 
 	int group_imb; /* Is there imbalance in this sd */
 #if defined(CONFIG_SCHED_MC) || defined(CONFIG_SCHED_SMT)
@@ -2059,6 +2067,7 @@ struct sg_lb_stats {
 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
 	unsigned long group_capacity;
 	int group_imb; /* Is there an imbalance in the group ? */
+	int group_has_capacity; /* Is there extra capacity in the group? */
 };
 
 /**
@@ -2354,7 +2363,7 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 			int local_group, const struct cpumask *cpus,
 			int *balance, struct sg_lb_stats *sgs)
 {
-	unsigned long load, max_cpu_load, min_cpu_load;
+	unsigned long load, max_cpu_load, min_cpu_load, max_nr_running;
 	int i;
 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
 	unsigned long avg_load_per_task = 0;
@@ -2365,6 +2374,7 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 	/* Tally up the load of all CPUs in the group */
 	max_cpu_load = 0;
 	min_cpu_load = ~0UL;
+	max_nr_running = 0;
 
 	for_each_cpu_and(i, sched_group_cpus(group), cpus) {
 		struct rq *rq = cpu_rq(i);
@@ -2382,8 +2392,10 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 			load = target_load(i, load_idx);
 		} else {
 			load = source_load(i, load_idx);
-			if (load > max_cpu_load)
+			if (load > max_cpu_load) {
 				max_cpu_load = load;
+				max_nr_running = rq->nr_running;
+			}
 			if (min_cpu_load > load)
 				min_cpu_load = load;
 		}
@@ -2423,11 +2435,15 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 	if (sgs->sum_nr_running)
 		avg_load_per_task = sgs->sum_weighted_load / sgs->sum_nr_running;
 
-	if ((max_cpu_load - min_cpu_load) > 2*avg_load_per_task)
+	if ((max_cpu_load - min_cpu_load) > 2*avg_load_per_task &&
+			max_nr_running > 1)
 		sgs->group_imb = 1;
 
 	sgs->group_capacity =
 		DIV_ROUND_CLOSEST(group->cpu_power, SCHED_LOAD_SCALE);
+
+	if (sgs->group_capacity > sgs->sum_nr_running)
+		sgs->group_has_capacity = 1;
 }
 
 /**
@@ -2474,16 +2490,20 @@ static inline void update_sd_lb_stats(struct sched_domain *sd, int this_cpu,
 		/*
 		 * In case the child domain prefers tasks go to siblings
 		 * first, lower the group capacity to one so that we'll try
-		 * and move all the excess tasks away.
+		 * and move all the excess tasks away. We lower capacity only
+		 * if the local group can handle the extra capacity.
 		 */
-		if (prefer_sibling)
+		if (prefer_sibling && !local_group &&
+		    sds->this_nr_running < sds->this_group_capacity)
 			sgs.group_capacity = min(sgs.group_capacity, 1UL);
 
 		if (local_group) {
 			sds->this_load = sgs.avg_load;
 			sds->this = group;
 			sds->this_nr_running = sgs.sum_nr_running;
+			sds->this_group_capacity = sgs.group_capacity;
 			sds->this_load_per_task = sgs.sum_weighted_load;
+			sds->this_has_capacity = sgs.group_has_capacity;
 		} else if (sgs.avg_load > sds->max_load &&
 			   (sgs.sum_nr_running > sgs.group_capacity ||
 				sgs.group_imb)) {
@@ -2492,6 +2512,7 @@ static inline void update_sd_lb_stats(struct sched_domain *sd, int this_cpu,
 			sds->busiest_nr_running = sgs.sum_nr_running;
 			sds->busiest_group_capacity = sgs.group_capacity;
 			sds->busiest_load_per_task = sgs.sum_weighted_load;
+			sds->busiest_has_capacity = sgs.group_has_capacity;
 			sds->group_imb = sgs.group_imb;
 		}
 
@@ -2637,6 +2658,15 @@ static inline void calculate_imbalance(struct sd_lb_stats *sds, int this_cpu,
 		return fix_small_imbalance(sds, this_cpu, imbalance);
 
 }
+
+bool check_utilization(struct sd_lb_stats *sds)
+{
+	if (!sds->this_has_capacity || sds->busiest_has_capacity)
+		return false;
+
+	return true;
+}
+
 /******* find_busiest_group() helpers end here *********************/
 
 /**
@@ -2695,6 +2725,10 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 	if (!sds.busiest || sds.busiest_nr_running == 0)
 		goto out_balanced;
 
+	/*  SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
+	if (idle == CPU_NEWLY_IDLE && check_utilization(&sds))
+		goto force_balance;
+
 	if (sds.this_load >= sds.max_load)
 		goto out_balanced;
 
@@ -2706,6 +2740,7 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 	if (100 * sds.max_load <= sd->imbalance_pct * sds.this_load)
 		goto out_balanced;
 
+force_balance:
 	/* Looks like there is an imbalance. Compute it */
 	calculate_imbalance(&sds, this_cpu, imbalance);
 	return sds.busiest;
@@ -3017,10 +3052,8 @@ static void idle_balance(int this_cpu, struct rq *this_rq)
 		interval = msecs_to_jiffies(sd->balance_interval);
 		if (time_after(next_balance, sd->last_balance + interval))
 			next_balance = sd->last_balance + interval;
-		if (pulled_task) {
-			this_rq->idle_stamp = 0;
+		if (pulled_task)
 			break;
-		}
 	}
 
 	raw_spin_lock(&this_rq->lock);
@@ -3615,13 +3648,26 @@ static void set_curr_task_fair(struct rq *rq)
 }
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-static void moved_group_fair(struct task_struct *p, int on_rq)
+static void task_move_group_fair(struct task_struct *p, int on_rq)
 {
-	struct cfs_rq *cfs_rq = task_cfs_rq(p);
-
-	update_curr(cfs_rq);
+   /*
+    * If the task was not on the rq at the time of this cgroup movement
+    * it must have been asleep, sleeping tasks keep their ->vruntime
+    * absolute on their old rq until wakeup (needed for the fair sleeper
+    * bonus in place_entity()).
+    *
+    * If it was on the rq, we've just 'preempted' it, which does convert
+    * ->vruntime to a relative base.
+    *
+    * Make sure both cases convert their relative position when migrating
+    * to another cgroup's rq. This does somewhat interfere with the
+    * fair sleeper stuff for the first placement, but who cares.
+    */
 	if (!on_rq)
-		place_entity(cfs_rq, &p->se, 1);
+		p->se.vruntime -= cfs_rq_of(&p->se)->min_vruntime;
+	set_task_rq(p, task_cpu(p));
+	if (!on_rq)
+	p->se.vruntime += cfs_rq_of(&p->se)->min_vruntime;
 }
 #endif
 
@@ -3673,7 +3719,7 @@ static const struct sched_class fair_sched_class = {
 	.get_rr_interval	= get_rr_interval_fair,
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	.moved_group		= moved_group_fair,
+	.task_move_group  = task_move_group_fair,
 #endif
 };
 

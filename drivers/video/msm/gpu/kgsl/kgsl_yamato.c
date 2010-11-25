@@ -802,7 +802,7 @@ int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout)
 	struct kgsl_mmu_debug mmu_dbg;
 	unsigned int rbbm_status;
 	int idle_count = 0;
-#define IDLE_COUNT_MAX 1000000
+#define IDLE_COUNT_MAX 2000000
 
 	KGSL_DRV_VDBG("enter (device=%p, timeout=%d)\n", device, timeout);
 
@@ -817,8 +817,13 @@ int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout)
 			GSL_RB_GET_READPTR(rb, &rb->rptr);
 
 		} while (rb->rptr != rb->wptr && idle_count < IDLE_COUNT_MAX);
-		if (idle_count == IDLE_COUNT_MAX)
-			goto err;
+		if (idle_count == IDLE_COUNT_MAX) {
+			KGSL_DRV_ERR("spun too long waiting for RB to idle\n");
+			status = -EINVAL;
+			kgsl_ringbuffer_dump(rb);
+			kgsl_mmu_debug(&device->mmu, &mmu_dbg);
+			goto done;
+		}
 	}
 	/* now, wait for the GPU to finish its operations */
 	for (idle_count = 0; idle_count < IDLE_COUNT_MAX; idle_count++) {
@@ -826,17 +831,17 @@ int kgsl_yamato_idle(struct kgsl_device *device, unsigned int timeout)
 
 		if (rbbm_status == 0x110) {
 			status = 0;
-			goto done;
+			break;
 		}
 	}
 
-err:
-	KGSL_DRV_ERR("spun too long waiting for RB to idle\n");
-	kgsl_register_dump(device);
-	kgsl_ringbuffer_dump(rb);
-	kgsl_mmu_debug(&device->mmu, &mmu_dbg);
-	BUG();
-
+	if (idle_count == IDLE_COUNT_MAX) {
+		KGSL_DRV_ERR("spun too long waiting for RBBM status to idle\n");
+		status = -EINVAL;
+		kgsl_ringbuffer_dump(rb);
+		kgsl_mmu_debug(&device->mmu, &mmu_dbg);
+		goto done;
+	}
 done:
 	KGSL_DRV_VDBG("return %d\n", status);
 

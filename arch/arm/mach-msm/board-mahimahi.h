@@ -21,32 +21,29 @@
 #define MSM_SMI_BASE		0x02B00000
 #define MSM_SMI_SIZE		0x01500000
 
+#define MSM_PMEM_VENC_BASE      0x02B00000
+#define MSM_PMEM_VENC_SIZE      0x00800000
+
+#define MSM_GPU_MEM_BASE        0x03300000
+#define MSM_GPU_MEM_SIZE        0x00500000
+
 #define MSM_RAM_CONSOLE_BASE	0x03A00000
 #define MSM_RAM_CONSOLE_SIZE	0x00040000
 
 #define MSM_FB_BASE		0x03B00000
-#define MSM_FB_SIZE		0x00465000
+#define MSM_FB_SIZE		0x00300000
 
-#define MSM_EBI1_BANK0_BASE	0x20000000
-#define MSM_EBI1_BANK0_SIZE	0x0E000000
-
-#define MSM_GPU_MEM_BASE	0x2DB00000
-#define MSM_GPU_MEM_SIZE	0x00500000
+#define MSM_EBI1_BANK0_BASE  0x20000000
+#define MSM_EBI1_BANK0_SIZE  0x0E800000
 
 #define MSM_EBI1_BANK1_BASE	0x30000000
-#define MSM_EBI1_BANK1_SIZE	0x10000000
+#define MSM_EBI1_BANK1_SIZE	0x0B700000
 
-#define MSM_PMEM_MDP_BASE	0x30000000
+#define MSM_PMEM_MDP_BASE	0x3B700000
 #define MSM_PMEM_MDP_SIZE	0x02000000
 
-#define MSM_PMEM_ADSP_BASE	0x32000000
+#define MSM_PMEM_ADSP_BASE	0x3D700000
 #define MSM_PMEM_ADSP_SIZE	0x02900000
-
-#define MSM_PMEM_CAMERA_BASE	0x34900000
-#define MSM_PMEM_CAMERA_SIZE	0x00800000
-
-#define MSM_HIGHMEM_BASE	0x35100000
-#define MSM_HIGHMEM_SIZE	0x0AF00000
 
 #define MAHIMAHI_GPIO_PS_HOLD		25
 
@@ -126,6 +123,7 @@
 
 #define MAHIMAHI_GPIO_LED_3V3_EN	85
 #define MAHIMAHI_GPIO_LCD_RST_N		29
+#define MAHIMAHI_GPIO_LCD_ID0		147
 
 /* 3.5mm remote control key interrupt shutdown signal */
 #define MAHIMAHI_GPIO_35MM_KEY_INT_SHUTDOWN	19
@@ -144,7 +142,31 @@
 
 #define MAHIMAHI_CDMA_SD_2V85_EN		100
 #define MAHIMAHI_CDMA_JOG_2V6_EN		150
-
+/* display relative */
+#define MAHIMAHI_LCD_SPI_CLK            (17)
+#define MAHIMAHI_LCD_SPI_DO             (18)
+#define MAHIMAHI_LCD_SPI_CSz            (20)
+#define MAHIMAHI_LCD_RSTz               (29)
+#define MAHIMAHI_LCD_R1                 (114)
+#define MAHIMAHI_LCD_R2                 (115)
+#define MAHIMAHI_LCD_R3                 (116)
+#define MAHIMAHI_LCD_R4                 (117)
+#define MAHIMAHI_LCD_R5                 (118)
+#define MAHIMAHI_LCD_G0                 (121)
+#define MAHIMAHI_LCD_G1                 (122)
+#define MAHIMAHI_LCD_G2                 (123)
+#define MAHIMAHI_LCD_G3                 (124)
+#define MAHIMAHI_LCD_G4                 (125)
+#define MAHIMAHI_LCD_G5                 (126)
+#define MAHIMAHI_LCD_B1                 (130)
+#define MAHIMAHI_LCD_B2                 (131)
+#define MAHIMAHI_LCD_B3                 (132)
+#define MAHIMAHI_LCD_B4                 (133)
+#define MAHIMAHI_LCD_B5                 (134)
+#define MAHIMAHI_LCD_PCLK               (135)
+#define MAHIMAHI_LCD_VSYNC              (136)
+#define MAHIMAHI_LCD_HSYNC              (137)
+#define MAHIMAHI_LCD_DE                 (138)
 #define is_cdma_version(rev) (((rev) & 0xF0) == 0xC0)
 
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_MAHIMAHI_H */

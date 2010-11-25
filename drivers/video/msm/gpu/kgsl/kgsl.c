@@ -190,11 +190,6 @@ static int kgsl_first_open_locked(void)
 
 	kgsl_clk_enable();
 
-	/* init memory apertures */
-	result = kgsl_sharedmem_init(&kgsl_driver.shmem);
-	if (result != 0)
-		goto done;
-
 	/* init devices */
 	result = kgsl_yamato_init(&kgsl_driver.yamato_device,
 					&kgsl_driver.yamato_config);
@@ -220,9 +215,6 @@ static int kgsl_last_release_locked(void)
 
 	/* close devices */
 	kgsl_yamato_close(&kgsl_driver.yamato_device);
-
-	/* shutdown memory apertures */
-	kgsl_sharedmem_close(&kgsl_driver.shmem);
 
 	kgsl_clk_disable();
 	kgsl_driver.active = false;
@@ -712,7 +704,7 @@ static int kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_file_private *private,
 		 * overwrite this memory */
 		dmac_flush_range(vmalloc_area, vmalloc_area + len);
 		KGSL_MEM_INFO("Caching for memory allocation turned off\n");
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	} else {
 		KGSL_MEM_INFO("Caching for memory allocation turned on\n");
 	}
@@ -1035,52 +1027,10 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	return result;
 }
 
-static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
-{
-	int result;
-	struct kgsl_memdesc *memdesc = NULL;
-	unsigned long vma_size = vma->vm_end - vma->vm_start;
-	unsigned long vma_offset = vma->vm_pgoff << PAGE_SHIFT;
-	struct kgsl_device *device = NULL;
-
-	mutex_lock(&kgsl_driver.mutex);
-
-	device = &kgsl_driver.yamato_device;
-
-	/*allow yamato memstore to be mapped read only */
-	if (vma_offset == device->memstore.physaddr) {
-		if (vma->vm_flags & VM_WRITE) {
-			result = -EPERM;
-			goto done;
-		}
-		memdesc = &device->memstore;
-	}
-
-	if (memdesc->size != vma_size) {
-		KGSL_MEM_ERR("file %p bad size %ld, should be %d\n",
-			file, vma_size, memdesc->size);
-		result = -EINVAL;
-		goto done;
-	}
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-	result = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-				vma_size, vma->vm_page_prot);
-	if (result != 0) {
-		KGSL_MEM_ERR("remap_pfn_range returned %d\n",
-				result);
-		goto done;
-	}
-done:
-	mutex_unlock(&kgsl_driver.mutex);
-	return result;
-}
-
 static struct file_operations kgsl_fops = {
 	.owner = THIS_MODULE,
 	.release = kgsl_release,
 	.open = kgsl_open,
-	.mmap = kgsl_mmap,
 	.unlocked_ioctl = kgsl_ioctl,
 };
 
@@ -1107,6 +1057,9 @@ static void kgsl_driver_cleanup(void)
 		}
 		kgsl_driver.interrupt_num = 0;
 	}
+
+	/* shutdown memory apertures */
+	kgsl_sharedmem_close(&kgsl_driver.shmem);
 
 	if (kgsl_driver.grp_clk) {
 		clk_put(kgsl_driver.grp_clk);
@@ -1211,6 +1164,9 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 
 	kgsl_driver.shmem.physbase = res->start;
 	kgsl_driver.shmem.size = resource_size(res);
+
+	/* init memory apertures */
+	result = kgsl_sharedmem_init(&kgsl_driver.shmem);
 
 done:
 	if (result)

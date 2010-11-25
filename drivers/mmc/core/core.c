@@ -439,17 +439,6 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 int mmc_host_disable(struct mmc_host *host)
 {
 	int err;
-	unsigned long flags;
-
-	spin_lock_irqsave(&host->lock, flags);
-
-	if (host->rescan_disable) {
-		spin_unlock_irqrestore(&host->lock, flags);
-		return;
-	}
-
-	spin_unlock_irqrestore(&host->lock, flags);
-
 
 	if (!(host->caps & MMC_CAP_DISABLE))
 		return 0;
@@ -991,11 +980,17 @@ static inline void mmc_bus_put(struct mmc_host *host)
 
 int mmc_resume_bus(struct mmc_host *host)
 {
+	unsigned long flags;
+
 	if (!mmc_bus_needs_resume(host))
 		return -EINVAL;
 
 	printk("%s: Starting deferred resume\n", mmc_hostname(host));
+	spin_lock_irqsave(&host->lock, flags);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
+	host->rescan_disable = 0;
+	spin_unlock_irqrestore(&host->lock, flags);
+
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
 		mmc_power_up(host);
@@ -1174,10 +1169,10 @@ void mmc_rescan(struct work_struct *work)
 	mmc_power_off(host);
 
 out:
-	if (extend_wakelock)
-		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
-	else
-		wake_unlock(&mmc_delayed_work_wake_lock);
+        if (extend_wakelock)
+                wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+        else
+                wake_unlock(&mmc_delayed_work_wake_lock);
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
@@ -1320,6 +1315,19 @@ int mmc_suspend_host(struct mmc_host *host)
 	if (host->bus_ops && !host->bus_dead) {
 		if (host->bus_ops->suspend)
 			err = host->bus_ops->suspend(host);
+	        if (err == -ENOSYS || !host->bus_ops->resume) {
+		 /*
+		  * We simply "remove" the card in this case.
+		  * It will be redetected on resume.
+		  */
+		 if (host->bus_ops->remove)
+		  host->bus_ops->remove(host);
+		 mmc_claim_host(host);
+		 mmc_detach_bus(host);
+		 mmc_release_host(host);
+		 host->pm_flags = 0;
+		 err = 0;
+		}
 	}
 	mmc_bus_put(host);
 
@@ -1340,7 +1348,7 @@ int mmc_resume_host(struct mmc_host *host)
 	int err = 0;
 
 	mmc_bus_get(host);
-	if (host->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME) {
+	if (mmc_bus_manual_resume(host)) {
 		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
 		mmc_bus_put(host);
 		return 0;
@@ -1357,10 +1365,22 @@ int mmc_resume_host(struct mmc_host *host)
 			printk(KERN_WARNING "%s: error %d during resume "
 					    "(card was removed?)\n",
 					    mmc_hostname(host), err);
+		if (host->bus_ops->remove)
+		 host->bus_ops->remove(host);
+		mmc_claim_host(host);
+		mmc_detach_bus(host);
+		mmc_release_host(host);
+		/* no need to bother upper layers */
 			err = 0;
 		}
 	}
 	mmc_bus_put(host);
+	
+	/*
+	 * We add a slight delay here so that resume can progress
+	 * in parallel
+	 */
+	mmc_detect_change(host, 1);
 
 	return err;
 }
@@ -1384,6 +1404,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 1;
+		if (mmc_bus_needs_resume(host)) {
+			spin_unlock_irqrestore(&host->lock, flags);
+			break;
+		}
 		spin_unlock_irqrestore(&host->lock, flags);
 		cancel_delayed_work_sync(&host->detect);
 
@@ -1405,6 +1429,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 0;
+		if (mmc_bus_manual_resume(host)) {
+			spin_unlock_irqrestore(&host->lock, flags);
+			break;
+		}
 		spin_unlock_irqrestore(&host->lock, flags);
 		mmc_detect_change(host, 0);
 
@@ -1434,7 +1462,7 @@ static int __init mmc_init(void)
 {
 	int ret;
 
-	wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
+        wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
 
 	workqueue = create_singlethread_workqueue("kmmcd");
 	if (!workqueue)

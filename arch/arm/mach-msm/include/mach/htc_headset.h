@@ -24,6 +24,8 @@ struct h2w_platform_data {
 	int h2w_data;
 	int debug_uart;
 	int headset_mic_35mm;
+	int ext_mic_sel;
+	int wfm_ant_sw;
 	void (*config_cpld)(int);
 	void (*init_cpld)(void);
 	void (*set_dat)(int);
@@ -174,6 +176,7 @@ typedef enum {
 	H2W_NUM_KEYFUNC	 = 9,
 } KEYFUNC;
 
+extern void extended_headset(int insert);
 extern int turn_mic_bias_on(int on);
 
 #endif

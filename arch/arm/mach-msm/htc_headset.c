@@ -89,8 +89,12 @@
 #endif
 
 static struct workqueue_struct *g_detection_work_queue;
+
 static void detection_work(struct work_struct *work);
 static DECLARE_WORK(g_detection_work, detection_work);
+
+static void headset35mm_detection_work(struct work_struct *work);
+static DECLARE_WORK(g_extend_detection_work, headset35mm_detection_work);
 
 struct h2w_info {
 	struct switch_dev sdev;
@@ -110,6 +114,8 @@ struct h2w_info {
 	int h2w_data;
 	int debug_uart;
 	int headset_mic_35mm;
+	int ext_mic_sel;
+	int wfm_ant_sw;
 
 	void (*config_cpld) (int);
 	void (*init_cpld) (void);
@@ -122,7 +128,9 @@ struct h2w_info {
 	int (*get_clk)(void);
 
 	int htc_headset_flag;
+	int headset_35mm_flag;
 	int btn_11pin_35mm_flag;
+	int headset_35mm_insert;
 
 	struct hrtimer timer;
 	ktime_t debounce_time;
@@ -1061,6 +1069,80 @@ static irqreturn_t button_35mm_irq_handler(int irq, void *dev_id)
 
 }
 
+static void headset35mm_detection_work(struct work_struct *work)
+{
+	int state;
+
+	if (hi->htc_headset_flag && hi->headset_35mm_insert)
+		remove_headset();
+	mutex_lock(&hi->mutex_lock);
+	state = switch_get_state(&hi->sdev);
+	state &= ~(BIT_HEADSET | BIT_HEADSET_NO_MIC);
+	if (hi->headset_35mm_insert) {
+		printk(KERN_INFO "3.5mm_headset plug in\n");
+		/* ext mic switch to 3.5mm */
+		if (hi->ext_mic_sel)
+			gpio_direction_output(hi->ext_mic_sel, 0);
+		/* fm ant switch to 3.5 mm */
+		if (hi->wfm_ant_sw)
+			gpio_direction_output(hi->wfm_ant_sw, 0);
+		/* Turn On Mic Bias */
+		turn_mic_bias_on(1);
+		/* Wait for pin stable */
+		msleep(200);
+		/* Detect headset with or without microphone */
+		if (gpio_get_value(hi->headset_mic_35mm)) {
+			/* without microphone */
+			turn_mic_bias_on(0);
+			state |= BIT_HEADSET_NO_MIC;
+			hi->headset_35mm_flag = 1;
+			printk(KERN_INFO
+			       "3.5mm_headset without microphone\n");
+		} else { /* with microphone */
+			hi->ignore_btn = gpio_get_value(hi->headset_mic_35mm);
+			if (!hi->headset_35mm_flag) {
+				set_irq_type(hi->irq_btn_35mm,
+					     IRQF_TRIGGER_HIGH);
+				enable_irq(hi->irq_btn_35mm);
+			}
+			state |= BIT_HEADSET;
+			hi->headset_35mm_flag = 2;
+			printk(KERN_INFO
+			       "3.5mm_headset with microphone\n");
+		}
+		switch_set_state(&hi->sdev, state);
+		mutex_unlock(&hi->mutex_lock);
+	} else {
+		printk(KERN_INFO "3.5mm_headset plug out\n");
+		if (hi->headset_35mm_flag == 2) {
+			disable_irq(hi->irq_btn_35mm);
+			turn_mic_bias_on(0);
+		}
+		if (atomic_read(&hi->btn_state))
+			button_released();
+		hi->headset_35mm_flag = 0;
+		/* ext mic switch to 11 pin */
+		if (hi->ext_mic_sel)
+			gpio_direction_output(hi->ext_mic_sel, 1);
+		/* fm ant switch to 11 pin */
+		if (hi->wfm_ant_sw)
+			gpio_direction_output(hi->wfm_ant_sw, 1);
+		switch_set_state(&hi->sdev, state);
+		mutex_unlock(&hi->mutex_lock);
+		if (hi->htc_headset_flag)
+			insert_headset(hi->htc_headset_flag);
+	}
+}
+
+void extended_headset(int insert)
+{
+	if (hi->headset_mic_35mm) {
+		hi->headset_35mm_insert = insert;
+		queue_work(g_detection_work_queue, &g_extend_detection_work);
+	}
+}
+EXPORT_SYMBOL(extended_headset);
+
 #if defined(CONFIG_DEBUG_FS)
 static int h2w_debug_set(void *data, u64 val)
 {
@@ -1117,6 +1199,8 @@ static int h2w_probe(struct platform_device *pdev)
 	hi->h2w_data = pdata->h2w_data;
 	hi->debug_uart = pdata->debug_uart;
 	hi->headset_mic_35mm = pdata->headset_mic_35mm;
+	hi->ext_mic_sel = pdata->ext_mic_sel;
+	hi->wfm_ant_sw = pdata->wfm_ant_sw;
 	hi->config_cpld = pdata->config_cpld;
 	hi->init_cpld = pdata->init_cpld;
 	hi->set_dat = pdata->set_dat;
@@ -1225,7 +1309,12 @@ static int h2w_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_request_input_dev;
 
-
+	/* ext mic switch to 11 pin*/
+	if (hi->ext_mic_sel)
+		gpio_direction_output(hi->ext_mic_sel, 1);
+	/* fm ant switch to 11 pin */
+	if (hi->wfm_ant_sw)
+		gpio_direction_output(hi->wfm_ant_sw, 1);
 
 	hi->input = input_allocate_device();
 	if (!hi->input) {

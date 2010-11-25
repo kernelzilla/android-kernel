@@ -1024,14 +1024,14 @@ struct sched_domain;
 /*
  * wake flags
  */
-#define WF_SYNC		0x01		/* waker goes to sleep after wakup */
-#define WF_FORK		0x02		/* child wakeup after fork */
+#define WF_SYNC    0x01    /* waker goes to sleep after wakup */
+#define WF_FORK    0x02    /* child wakeup after fork */
 
-#define ENQUEUE_WAKEUP		1
-#define ENQUEUE_WAKING		2
-#define ENQUEUE_HEAD		4
+#define ENQUEUE_WAKEUP    1
+#define ENQUEUE_WAKING    2
+#define ENQUEUE_HEAD    4
 
-#define DEQUEUE_SLEEP		1
+#define DEQUEUE_SLEEP    1
 
 struct sched_class {
 	const struct sched_class *next;
@@ -1076,7 +1076,7 @@ struct sched_class {
 					 struct task_struct *task);
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	void (*moved_group) (struct task_struct *p, int on_rq);
+	void (*task_move_group) (struct task_struct *p, int on_rq);
 #endif
 };
 
@@ -1124,7 +1124,7 @@ struct sched_entity {
 	struct load_weight	load;		/* for load-balancing */
 	struct rb_node		run_node;
 	struct list_head	group_node;
-	unsigned int		on_rq;
+	unsigned int    	on_rq;
 
 	u64			exec_start;
 	u64			sum_exec_runtime;
@@ -1206,12 +1206,17 @@ struct task_struct {
 	unsigned int policy;
 	cpumask_t cpus_allowed;
 
-#ifdef CONFIG_TREE_PREEMPT_RCU
+#ifdef CONFIG_PREEMPT_RCU
 	int rcu_read_lock_nesting;
 	char rcu_read_unlock_special;
-	struct rcu_node *rcu_blocked_node;
 	struct list_head rcu_node_entry;
+#endif /* #ifdef CONFIG_PREEMPT_RCU */
+#ifdef CONFIG_TREE_PREEMPT_RCU
+	struct rcu_node *rcu_blocked_node;
 #endif /* #ifdef CONFIG_TREE_PREEMPT_RCU */
+#ifdef CONFIG_RCU_BOOST
+	struct rt_mutex *rcu_boost_mutex;
+#endif /* #ifdef CONFIG_RCU_BOOST */
 
 #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 	struct sched_info sched_info;
@@ -1233,11 +1238,10 @@ struct task_struct {
 	unsigned did_exec:1;
 	unsigned in_execve:1;	/* Tell the LSMs that the process is doing an
 				 * execve */
-	unsigned in_iowait:1;
 
-
-	/* Revert to default priority/policy when forking */
-	unsigned sched_reset_on_fork:1;
+	unsigned sched_in_iowait:1;		/* Called io_schedule() */
+	unsigned sched_reset_on_fork:1;		/* Revert to default
+						 * priority/policy on fork */
 
 	pid_t pid;
 	pid_t tgid;
@@ -1746,16 +1750,22 @@ extern int task_free_unregister(struct notifier_block *n);
 #define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
 #define used_math() tsk_used_math(current)
 
-#ifdef CONFIG_TREE_PREEMPT_RCU
+#ifdef CONFIG_PREEMPT_RCU
 
 #define RCU_READ_UNLOCK_BLOCKED (1 << 0) /* blocked while in RCU read-side. */
-#define RCU_READ_UNLOCK_NEED_QS (1 << 1) /* RCU core needs CPU response. */
+#define RCU_READ_UNLOCK_BOOSTED (1 << 1) /* boosted while in RCU read-side. */
+#define RCU_READ_UNLOCK_NEED_QS (1 << 2) /* RCU core needs CPU response. */
 
 static inline void rcu_copy_process(struct task_struct *p)
 {
 	p->rcu_read_lock_nesting = 0;
 	p->rcu_read_unlock_special = 0;
+#ifdef CONFIG_TREE_PREEMPT_RCU
 	p->rcu_blocked_node = NULL;
+#endif /* #ifdef CONFIG_TREE_PREEMPT_RCU */
+#ifdef CONFIG_RCU_BOOST
+	p->rcu_boost_mutex = NULL;
+#endif /* #ifdef CONFIG_RCU_BOOST */
 	INIT_LIST_HEAD(&p->rcu_node_entry);
 }
 

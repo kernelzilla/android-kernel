@@ -265,9 +265,6 @@ struct rcu_data {
 
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
 
-#define ULONG_CMP_GE(a, b)	(ULONG_MAX / 2 >= (a) - (b))
-#define ULONG_CMP_LT(a, b)	(ULONG_MAX / 2 < (a) - (b))
-
 /*
  * RCU global state, including node hierarchy.  This hierarchy is
  * represented in "heap" form in a dense array.  The root (first level)
@@ -365,6 +362,7 @@ static void rcu_report_unblock_qs_rnp(struct rcu_node *rnp,
 #ifdef CONFIG_RCU_CPU_STALL_DETECTOR
 static void rcu_print_detail_task_stall(struct rcu_state *rsp);
 static void rcu_print_task_stall(struct rcu_node *rnp);
+static void rcu_preempt_stall_reset(void);
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
 static void rcu_preempt_check_blocked_tasks(struct rcu_node *rnp);
 #ifdef CONFIG_HOTPLUG_CPU

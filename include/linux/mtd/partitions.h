@@ -51,6 +51,7 @@ struct mtd_info;
 
 int add_mtd_partitions(struct mtd_info *, const struct mtd_partition *, int);
 int del_mtd_partitions(struct mtd_info *);
+void part_fill_badblockstats(struct mtd_info *mtd);
 
 /*
  * Functions dealing with the various ways of partitioning the space

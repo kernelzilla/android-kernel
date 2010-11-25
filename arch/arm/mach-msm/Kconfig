@@ -53,6 +53,44 @@ config MSM_MDP40
 	depends on ARCH_MSM7X30
 	default y
 
+config PERFLOCK
+  depends on CPU_FREQ
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "HTC Performance Lock"
+
+config PERFLOCK_BOOT_LOCK
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Boot Time Performance Lock"
+
+config PERFLOCK_SCREEN_POLICY
+  depends on PERFLOCK
+  depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  default n
+  bool "Change Cpufreq Policy while Screen ON/OFF"
+
+config PERFLOCK_SCREEN_ON_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen on"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_ON_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen on"
+  default MSM_CPU_FREQ_MAX
+
+config PERFLOCK_SCREEN_OFF_MIN
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Minimum speed while screen off"
+  default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_OFF_MAX
+  depends on PERFLOCK_SCREEN_POLICY
+  int "Maximum speed while screen off"
+  default MSM_CPU_FREQ_MAX
+
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
 
@@ -70,6 +108,14 @@ config MSM_REMOTE_SPINLOCK
 
 config MSM_LEGACY_7X00A_AMSS
 	bool
+
+config TURBO_MODE
+	bool "Turbo mode"
+	depends on ARCH_MSM7225 || ARCH_MSM7X00A
+	default n
+	help
+	  This option is used to indicate hardware support for running the
+	  memory bus at a higher speed.(only for 7X00A/7225)
 
 config MSM_AMSS_VERSION
 	int
@@ -101,6 +147,17 @@ choice
 endchoice
 
 menu "Qualcomm MSM Board Type"
+
+config HOLES_IN_ZONE
+	depends on ARCH_MSM7X00A || ARCH_QSD8X50
+	bool "Support for non-aligned zones"
+	default n
+	help
+	 Select this to support boards with zones that aren't aligned
+	 to MAX_ORDER boundaries (4MB by default).
+
+	 Both the start and end of all zones must be aligned without
+	 this option.
 
 config MACH_HALIBUT
 	depends on ARCH_MSM
@@ -143,6 +200,14 @@ config MACH_QSD8X50A_ST1_5
 	  Support for the Qualcomm ST1.5.
 
 endmenu
+
+config MSM_AMSS_SUPPORT_256MB_EBI1
+	default n
+	bool "AMSS that support unified 128MB and 256MB EBI1"
+
+config MSM_AMSS_RADIO2708_MEMMAP 
+  	default n 
+	bool "Dream/Sapphire 2.22.27.08 Memory Map support" 
 
 config MSM_DEBUG_UART
 	int
@@ -228,6 +293,14 @@ config HTC_PWRSINK
 	default y
 	bool "HTC Power Sink Driver"
 
+config HTC_POWER_COLLAPSE_MAGIC
+  default n
+  bool "Check Power Collapse State"
+
+config HTC_ONMODE_CHARGING
+  default n
+  bool "Low-power hibernate charging support"
+
 config CACHE_FLUSH_RANGE_LIMIT
 	hex "Cache flush range limit"
 	default 0x40000
@@ -249,7 +322,7 @@ choice
 		bool "DG Timer"
 	help
 	  High resolution timer.
-endchoice	  
+endchoice
 
 choice
 	prompt "Suspend sleep mode"
@@ -276,7 +349,7 @@ choice
 
 	config MSM7X00A_SLEEP_WAIT_FOR_INTERRUPT
 		bool "Wait for interrupt"
-endchoice	  
+endchoice
 
 config MSM7X00A_SLEEP_MODE
 	int
@@ -311,7 +384,7 @@ choice
 
 	config MSM7X00A_IDLE_SLEEP_WAIT_FOR_INTERRUPT
 		bool "Wait for interrupt"
-endchoice	  
+endchoice
 
 config MSM7X00A_IDLE_SLEEP_MODE
 	int
@@ -402,7 +475,7 @@ config MSM_SMD
 	bool
 
 config MSM_DAL
-	default n 
+	default n
 	bool "MSM Driver Access Layer (DAL RPC)"
 	help
 	  Support for the DAL RPC interface used to communicate with
@@ -424,24 +497,34 @@ config MSM_RPCSERVERS
 	help
 	  none
 
-config MSM_CPU_FREQ_SCREEN
-	bool
-	default n
-	depends on HAS_EARLYSUSPEND
-	help
-	  Simple cpufreq scaling based on screen ON/OFF.
+if CPU_FREQ_MSM
 
-if MSM_CPU_FREQ_SCREEN
+config MSM_CPU_FREQ_SET_MIN_MAX
+        bool "Set Min/Max CPU frequencies."
+        default n
+        help
+          Allow setting min and max CPU frequencies. Sysfs can be used
+          to override these values.
 
-config MSM_CPU_FREQ_SCREEN_OFF
-	int "Screen off cpu frequency"
-	default 245760
+config MSM_CPU_FREQ_MAX
+        int "Max CPU Frequency"
+        depends on MSM_CPU_FREQ_SET_MIN_MAX
+        default 384000
 
-config MSM_CPU_FREQ_SCREEN_ON
-	int "Screen on cpu frequency"
-	default 384000
+config MSM_CPU_FREQ_MIN
+        int "Min CPU Frequency"
+        depends on MSM_CPU_FREQ_SET_MIN_MAX
+        default 245760
 
-endif # MSM_CPU_FREQ_SCREEN
+endif # CPU_FREQ_MSM
+
+config AXI_SCREEN_POLICY
+        depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+  depends on HAS_EARLYSUSPEND
+  bool "Use higher AXI bus while screen ON"
+  default n
+  help
+    Simple AXI scaling based on screen ON/OFF and PWRC.
 
 config MSM_HW3D
 	tristate "MSM Hardware 3D Register Driver"
@@ -457,6 +540,21 @@ config MSM_ADSP
 	default y
 	help
 	  Provides access to registers needed by the userspace aDSP library.
+
+config HTC_ACOUSTIC
+        tristate "HTC acoustic driver"
+        default y
+        help
+          The driver provide user space use shared memory allocate by using
+          RPC code.
+
+config HTC_ACOUSTIC_QSD
+        tristate "HTC acoustic driver for QSD"
+        depends on ARCH_QSD8X50
+        default n
+        help
+          Provides user space use shared memory allocate by using RPC code.
+          Provides headset amp, mic bias and speaker amp control.
 
 config MSM_ADSP_REPORT_EVENTS
 	bool "Report modem events from the DSP"
@@ -492,12 +590,44 @@ config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
 	help
 	  Enables Power/Reset/Carddetect function abstraction
-	
+
 config WIFI_MEM_PREALLOC
 	depends on WIFI_CONTROL_FUNC
 	bool "Preallocate memory for WiFi buffers"
 	help
 	  Preallocates memory buffers for WiFi driver
+
+config ARCH_MSM_FLASHLIGHT
+        bool "Flashlight Driver"
+        depends on ARCH_MSM
+        help
+          The flashlight driver is for MSM series.
+
+config MICROP_COMMON
+        tristate "MICROP COMMON Driver"
+        depends on I2C
+        help
+          HTC Microp-P support.
+
+config HTC_HEADSET_MGR
+        tristate "HTC headset manager driver"
+        default n
+        help
+          Provides support of HTC headset manager.
+
+config HTC_HEADSET_GPIO
+        tristate "HTC GPIO headset detection driver"
+        depends on HTC_HEADSET_MGR
+        default n
+        help
+          Provides support of HTC GPIO headset detection.
+
+config HTC_HEADSET_MICROP
+        tristate "HTC Micro-P headset detection driver"
+        depends on HTC_HEADSET_MGR && MICROP_COMMON
+        default n
+        help
+          Provides support of HTC Micro-P headset detection.
 
 config VIRTUAL_KPANIC_PARTITION
 	bool "Create virtual kpanic partition"
@@ -520,5 +650,6 @@ config VIRTUAL_KPANIC_SRC
 	default "cache"
 	help
 	  Sets the partition to steal from to make the virtual one.
-	
+
+
 endif

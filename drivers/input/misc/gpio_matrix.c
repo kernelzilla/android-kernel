@@ -204,8 +204,10 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		else
 			gpio_direction_output(mi->output_gpios[out], polarity);
 	}
-	for (in = 0; in < mi->ninputs; in++)
+	for (in = 0; in < mi->ninputs; in++) {
 		enable_irq(gpio_to_irq(mi->input_gpios[in]));
+		enable_irq_wake(gpio_to_irq(mi->input_gpios[in]));
+	}
 	wake_unlock(&kp->wake_lock);
 	return HRTIMER_NORESTART;
 }
@@ -224,8 +226,10 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-	for (i = 0; i < mi->ninputs; i++)
+	for (i = 0; i < mi->ninputs; i++) {
+		disable_irq_wake(gpio_to_irq(mi->input_gpios[i]));
 		disable_irq_nosync(gpio_to_irq(mi->input_gpios[i]));
+	}
 	for (i = 0; i < mi->noutputs; i++) {
 		if (gpio_keypad_flags & GPIOKPF_DRIVE_INACTIVE)
 			gpio_set_value(mi->output_gpios[i],
@@ -271,11 +275,6 @@ static int gpio_keypad_request_irqs(struct gpio_kp *kp)
 			pr_err("gpiomatrix: request_irq failed for input %d, "
 				"irq %d\n", mi->input_gpios[i], irq);
 			goto err_request_irq_failed;
-		}
-		err = set_irq_wake(irq, 1);
-		if (err) {
-			pr_err("gpiomatrix: set_irq_wake failed for input %d, "
-				"irq %d\n", mi->input_gpios[i], irq);
 		}
 		disable_irq(irq);
 		if (kp->disabled_irq) {

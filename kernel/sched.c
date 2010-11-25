@@ -722,7 +722,7 @@ sched_feat_write(struct file *filp, const char __user *ubuf,
 		size_t cnt, loff_t *ppos)
 {
 	char buf[64];
-	char *cmp = buf;
+	char *cmp;
 	int neg = 0;
 	int i;
 
@@ -733,6 +733,7 @@ sched_feat_write(struct file *filp, const char __user *ubuf,
 		return -EFAULT;
 
 	buf[cnt] = 0;
+	cmp = strstrip(buf);
 
 	if (strncmp(buf, "NO_", 3) == 0) {
 		neg = 1;
@@ -740,9 +741,7 @@ sched_feat_write(struct file *filp, const char __user *ubuf,
 	}
 
 	for (i = 0; sched_feat_names[i]; i++) {
-		int len = strlen(sched_feat_names[i]);
-
-		if (strncmp(cmp, sched_feat_names[i], len) == 0) {
+		if (strcmp(cmp, sched_feat_names[i]) == 0) {
 			if (neg)
 				sysctl_sched_features &= ~(1UL << i);
 			else
@@ -1831,12 +1830,6 @@ static void dec_nr_running(struct rq *rq)
 
 static void set_load_weight(struct task_struct *p)
 {
-	if (task_has_rt_policy(p)) {
-		p->se.load.weight = 0;
-		p->se.load.inv_weight = WMULT_CONST;
-		return;
-	}
-
 	/*
 	 * SCHED_IDLE tasks get minimal weight:
 	 */
@@ -1974,6 +1967,9 @@ task_hot(struct task_struct *p, u64 now, struct sched_domain *sd)
 	s64 delta;
 
 	if (p->sched_class != &fair_sched_class)
+		return 0;
+
+	if (p->policy == SCHED_IDLE)
 		return 0;
 
 	/*
@@ -3350,9 +3346,9 @@ void task_times(struct task_struct *p, cputime_t *ut, cputime_t *st)
 	rtime = nsecs_to_cputime(p->se.sum_exec_runtime);
 
 	if (total) {
-		u64 temp;
+		u64 temp = rtime;
 
-		temp = (u64)(rtime * utime);
+		temp *= utime;
 		do_div(temp, total);
 		utime = (cputime_t)temp;
 	} else
@@ -3383,9 +3379,9 @@ void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st)
 	rtime = nsecs_to_cputime(cputime.sum_exec_runtime);
 
 	if (total) {
-		u64 temp;
+		u64 temp = rtime;
 
-		temp = (u64)(rtime * cputime.utime);
+		temp *= cputime.utime;
 		do_div(temp, total);
 		utime = (cputime_t)temp;
 	} else
@@ -3933,7 +3929,7 @@ void complete_all(struct completion *x)
 EXPORT_SYMBOL(complete_all);
 
 static inline long __sched
-do_wait_for_common(struct completion *x, long timeout, int state)
+do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 {
 	if (!x->done) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -3946,7 +3942,10 @@ do_wait_for_common(struct completion *x, long timeout, int state)
 			}
 			__set_current_state(state);
 			spin_unlock_irq(&x->wait.lock);
-			timeout = schedule_timeout(timeout);
+			if (iowait)
+				timeout = io_schedule_timeout(timeout);
+			else
+				timeout = schedule_timeout(timeout);
 			spin_lock_irq(&x->wait.lock);
 		} while (!x->done && timeout);
 		__remove_wait_queue(&x->wait, &wait);
@@ -3958,12 +3957,12 @@ do_wait_for_common(struct completion *x, long timeout, int state)
 }
 
 static long __sched
-wait_for_common(struct completion *x, long timeout, int state)
+wait_for_common(struct completion *x, long timeout, int state, int iowait)
 {
 	might_sleep();
 
 	spin_lock_irq(&x->wait.lock);
-	timeout = do_wait_for_common(x, timeout, state);
+	timeout = do_wait_for_common(x, timeout, state, iowait);
 	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
@@ -3980,9 +3979,22 @@ wait_for_common(struct completion *x, long timeout, int state)
  */
 void __sched wait_for_completion(struct completion *x)
 {
-	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE);
+	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion);
+
+/**
+ * wait_for_completion_io: - waits for completion of a task
+ * @x:  holds the state of this particular completion
+ *
+ * This waits for completion of a specific task to be signaled. Treats any
+ * sleeping as waiting for IO for the purposes of process accounting.
+ */
+void __sched wait_for_completion_io(struct completion *x)
+{
+	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 1);
+}
+EXPORT_SYMBOL(wait_for_completion_io);
 
 /**
  * wait_for_completion_timeout: - waits for completion of a task (w/timeout)
@@ -3996,7 +4008,7 @@ EXPORT_SYMBOL(wait_for_completion);
 unsigned long __sched
 wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE);
+	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
 
@@ -4009,7 +4021,8 @@ EXPORT_SYMBOL(wait_for_completion_timeout);
  */
 int __sched wait_for_completion_interruptible(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE);
+	long t =
+	  wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE, 0);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -4028,7 +4041,7 @@ unsigned long __sched
 wait_for_completion_interruptible_timeout(struct completion *x,
 					  unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE);
+	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
 
@@ -4041,7 +4054,7 @@ EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
  */
 int __sched wait_for_completion_killable(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE);
+	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE, 0);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -4061,7 +4074,7 @@ unsigned long __sched
 wait_for_completion_killable_timeout(struct completion *x,
 				     unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_KILLABLE);
+	return wait_for_common(x, timeout, TASK_KILLABLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_killable_timeout);
 
@@ -4957,9 +4970,9 @@ void __sched io_schedule(void)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
-	current->in_iowait = 1;
+	current->sched_in_iowait = 1;
 	schedule();
-	current->in_iowait = 0;
+	current->sched_in_iowait = 0;
 	atomic_dec(&rq->nr_iowait);
 	delayacct_blkio_end();
 }
@@ -4972,9 +4985,9 @@ long __sched io_schedule_timeout(long timeout)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
-	current->in_iowait = 1;
+	current->sched_in_iowait = 1;
 	ret = schedule_timeout(timeout);
-	current->in_iowait = 0;
+	current->sched_in_iowait = 0;
 	atomic_dec(&rq->nr_iowait);
 	delayacct_blkio_end();
 	return ret;
@@ -8098,12 +8111,12 @@ void sched_move_task(struct task_struct *tsk)
 	if (unlikely(running))
 		tsk->sched_class->put_prev_task(rq, tsk);
 
-	set_task_rq(tsk, task_cpu(tsk));
-
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	if (tsk->sched_class->moved_group)
-		tsk->sched_class->moved_group(tsk, on_rq);
+	if (tsk->sched_class->task_move_group)
+		tsk->sched_class->task_move_group(tsk, on_rq);
+	else
 #endif
+	set_task_rq(tsk, task_cpu(tsk));
 
 	if (unlikely(running))
 		tsk->sched_class->set_curr_task(rq);

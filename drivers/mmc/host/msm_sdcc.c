@@ -1215,6 +1215,10 @@ msmsdcc_probe(struct platform_device *pdev)
 	msmsdcc_writel(host, MCI_IRQENABLE, MMCIMASK0);
 	host->saved_irq0mask = MCI_IRQENABLE;
 
+	mmc->pm_caps = MMC_PM_KEEP_POWER | MMC_PM_IGNORE_PM_NOTIFY;
+	if (plat->built_in)
+		mmc->pm_flags = MMC_PM_KEEP_POWER | MMC_PM_IGNORE_PM_NOTIFY;
+
 	/*
 	 * Setup card detect change
 	 */
@@ -1326,6 +1330,9 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 
 		if (host->stat_irq)
 			disable_irq(host->stat_irq);
+
+		if (host->plat->built_in)
+			mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 		if (mmc->card && mmc->card->type != MMC_TYPE_SDIO)
 			rc = mmc_suspend_host(mmc);

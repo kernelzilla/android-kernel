@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 35
-EXTRAVERSION = .5
-NAME = Sheep on Meth
+EXTRAVERSION = .9
+NAME = Yokohama
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -336,8 +336,8 @@ MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
-CFLAGS_KERNEL	=
-AFLAGS_KERNEL	=
+CFLAGS_KERNEL   = -O1 -mtune=cortex-a8 -ftree-vectorize -ffast-math -fsingle-precision-constant
+AFLAGS_KERNEL   = -O1 -mtune=cortex-a8 -ftree-vectorize -ffast-math -fsingle-precision-constant
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 

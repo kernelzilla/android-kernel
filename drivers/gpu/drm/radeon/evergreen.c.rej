@@ -1,0 +1,11 @@
+--- drivers/gpu/drm/radeon/evergreen.c
++++ drivers/gpu/drm/radeon/evergreen.c
+@@ -739,7 +776,7 @@
+ 	rdev->cp.rptr = RREG32(CP_RB_RPTR);
+ 	rdev->cp.wptr = RREG32(CP_RB_WPTR);
+ 
+-	r600_cp_start(rdev);
++	evergreen_cp_start(rdev);
+ 	rdev->cp.ready = true;
+ 	r = radeon_ring_test(rdev);
+ 	if (r) {

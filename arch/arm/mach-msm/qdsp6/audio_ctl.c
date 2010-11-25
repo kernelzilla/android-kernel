@@ -21,14 +21,18 @@
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
+#include <mach/htc_acoustic_qsd.h>
 
 #define BUFSZ (0)
 
 static DEFINE_MUTEX(voice_lock);
+static DEFINE_MUTEX(fm_lock);
 static int voice_started;
+static int fm_started;
 
 static struct audio_client *voc_tx_clnt;
 static struct audio_client *voc_rx_clnt;
+static struct audio_client *fm_clnt;
 
 static int q6_voice_start(uint32_t rx_acdb_id, uint32_t tx_acdb_id)
 {
@@ -71,6 +75,42 @@ static int q6_voice_stop(void)
 		voice_started = 0;
 	}
 	mutex_unlock(&voice_lock);
+	return 0;
+}
+
+static int q6_fm_start(void)
+{
+	int rc = 0;
+
+	mutex_lock(&fm_lock);
+
+	if (fm_started) {
+		pr_err("fm: busy\n");
+		rc = -EBUSY;
+		goto done;
+	}
+
+	fm_clnt = q6fm_open();
+	if (!fm_clnt) {
+		pr_err("fm: open failed.\n");
+		rc = -ENOMEM;
+		goto done;
+	}
+
+	fm_started = 1;
+done:
+	mutex_unlock(&fm_lock);
+	return rc;
+}
+
+static int q6_fm_stop(void)
+{
+	mutex_lock(&fm_lock);
+	if (fm_started) {
+		q6fm_close(fm_clnt);
+		fm_started = 0;
+	}
+	mutex_unlock(&fm_lock);
 	return 0;
 }
 
@@ -121,11 +161,26 @@ static int q6_ioctl(struct inode *inode, struct file *file,
 	case AUDIO_STOP_VOICE:
 		rc = q6_voice_stop();
 		break;
+	case AUDIO_START_FM:
+		rc = q6_fm_start();
+		break;
+	case AUDIO_STOP_FM:
+		rc = q6_fm_stop();
+		break;
 	case AUDIO_REINIT_ACDB:
 		rc = copy_from_user(&filename, (void *)arg, sizeof(filename));
 		if (!rc)
 			rc = q6audio_reinit_acdb(filename);
 		break;
+	case AUDIO_ENABLE_AUXPGA_LOOPBACK: {
+		uint32_t enable;
+		if (copy_from_user(&enable, (void*) arg, sizeof(enable))) {
+			rc = -EFAULT;
+			break;
+		}
+		rc = enable_aux_loopback(enable);
+		break;
+	}
 	default:
 		rc = -EINVAL;
 	}

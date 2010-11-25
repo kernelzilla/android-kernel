@@ -1253,8 +1253,9 @@ static void usb_do_work(struct work_struct *w)
 					printk(KERN_INFO "usb: notify offline\n");
 					ui->driver->disconnect(&ui->gadget);
 				}
-
+#ifdef CONFIG_ARCH_MSM_SCORPION
 				usb_phy_reset(ui);
+#endif
 
 				/* power down phy, clock down usb */
 				spin_lock_irqsave(&ui->lock, iflags);
@@ -1284,7 +1285,7 @@ static void usb_do_work(struct work_struct *w)
 			 * present when we received the signal, go online.
 			 */
 			if ((flags & USB_FLAG_VBUS_ONLINE) && _vbus) {
-				pr_info("msm72k_udc: OFFLINE -> ONLINE\n");
+				pr_info("msm72k_udc: OFFLINE -> ONLINE vbus\n");
 				clk_set_rate(ui->ebi1clk, 128000000);
 				udelay(10);
 				if (ui->coreclk)

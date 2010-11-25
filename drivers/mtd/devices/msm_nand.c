@@ -115,6 +115,11 @@ static void *msm_nand_get_dma_buffer(struct msm_nand_chip *chip, size_t size)
 	do {
 		free_index = __ffs(free_bitmask);
 		current_need_mask = need_mask << free_index;
+
+		if (size + free_index * MSM_NAND_DMA_BUFFER_SLOTS >=
+						 MSM_NAND_DMA_BUFFER_SIZE)
+			return NULL;
+
 		if ((bitmask & current_need_mask) == 0) {
 			old_bitmask =
 				atomic_cmpxchg(&chip->dma_buffer_busy,

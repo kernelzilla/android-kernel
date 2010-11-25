@@ -49,6 +49,26 @@ static struct gatt_mask intel_i810_masks[] =
 	 .type = INTEL_AGP_CACHED_MEMORY}
 };
 
+#define INTEL_AGP_UNCACHED_MEMORY              0
+#define INTEL_AGP_CACHED_MEMORY_LLC            1
+#define INTEL_AGP_CACHED_MEMORY_LLC_GFDT       2
+#define INTEL_AGP_CACHED_MEMORY_LLC_MLC        3
+#define INTEL_AGP_CACHED_MEMORY_LLC_MLC_GFDT   4
+
+static struct gatt_mask intel_gen6_masks[] =
+{
+	{.mask = I810_PTE_VALID | GEN6_PTE_UNCACHED,
+	 .type = INTEL_AGP_UNCACHED_MEMORY },
+	{.mask = I810_PTE_VALID | GEN6_PTE_LLC,
+         .type = INTEL_AGP_CACHED_MEMORY_LLC },
+	{.mask = I810_PTE_VALID | GEN6_PTE_LLC | GEN6_PTE_GFDT,
+         .type = INTEL_AGP_CACHED_MEMORY_LLC_GFDT },
+	{.mask = I810_PTE_VALID | GEN6_PTE_LLC_MLC,
+         .type = INTEL_AGP_CACHED_MEMORY_LLC_MLC },
+	{.mask = I810_PTE_VALID | GEN6_PTE_LLC_MLC | GEN6_PTE_GFDT,
+         .type = INTEL_AGP_CACHED_MEMORY_LLC_MLC_GFDT },
+};
+
 static struct _intel_private {
 	struct pci_dev *pcidev;	/* device one */
 	u8 __iomem *registers;
@@ -175,13 +195,6 @@ static void intel_agp_insert_sg_entries(struct agp_memory *mem,
 					off_t pg_start, int mask_type)
 {
 	int i, j;
-	u32 cache_bits = 0;
-
-	if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB ||
-	    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB)
-	{
-		cache_bits = I830_PTE_SYSTEM_CACHED;
-	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		writel(agp_bridge->driver->mask_memory(agp_bridge,
@@ -313,6 +326,23 @@ static int intel_i830_type_to_mask_type(struct agp_bridge_data *bridge,
 	else
 		return 0;
 }
+
+static int intel_gen6_type_to_mask_type(struct agp_bridge_data *bridge,
+					int type)
+{
+	unsigned int type_mask = type & ~AGP_USER_CACHED_MEMORY_GFDT;
+	unsigned int gfdt = type & AGP_USER_CACHED_MEMORY_GFDT;
+
+	if (type_mask == AGP_USER_UNCACHED_MEMORY)
+		return INTEL_AGP_UNCACHED_MEMORY;
+	else if (type_mask == AGP_USER_CACHED_MEMORY_LLC_MLC)
+		return gfdt ? INTEL_AGP_CACHED_MEMORY_LLC_MLC_GFDT :
+			      INTEL_AGP_CACHED_MEMORY_LLC_MLC;
+	else /* set 'normal'/'cached' to LLC by default */
+		return gfdt ? INTEL_AGP_CACHED_MEMORY_LLC_GFDT :
+			      INTEL_AGP_CACHED_MEMORY_LLC;
+}
+
 
 static int intel_i810_insert_entries(struct agp_memory *mem, off_t pg_start,
 				int type)
@@ -585,8 +615,7 @@ static void intel_i830_init_gtt_entries(void)
 			gtt_entries = 0;
 			break;
 		}
-	} else if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB ||
-		   agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB) {
+	} else if (IS_SNB) {
 		/*
 		 * SandyBridge has new memory control reg at 0x50.w
 		 */
@@ -1156,7 +1185,7 @@ static int intel_i915_insert_entries(struct agp_memory *mem, off_t pg_start,
 
 	mask_type = agp_bridge->driver->agp_type_to_mask_type(agp_bridge, type);
 
-	if (mask_type != 0 && mask_type != AGP_PHYS_MEMORY &&
+	if (!IS_SNB && mask_type != 0 && mask_type != AGP_PHYS_MEMORY &&
 	    mask_type != INTEL_AGP_CACHED_MEMORY)
 		goto out_err;
 
@@ -1318,6 +1347,16 @@ static unsigned long intel_i965_mask_memory(struct agp_bridge_data *bridge,
 	return addr | bridge->driver->masks[type].mask;
 }
 
+static unsigned long intel_gen6_mask_memory(struct agp_bridge_data *bridge,
+					    dma_addr_t addr, int type)
+{
+	/* gen6 has bit11-4 for physical addr bit39-32 */
+	addr |= (addr >> 28) & 0xff0;
+
+	/* Type checking must be done elsewhere */
+	return addr | bridge->driver->masks[type].mask;
+}
+
 static void intel_i965_get_gtt_range(int *gtt_offset, int *gtt_size)
 {
 	u16 snb_gmch_ctl;
@@ -1337,6 +1376,7 @@ static void intel_i965_get_gtt_range(int *gtt_offset, int *gtt_size)
 		break;
 	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB:
 	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB:
+	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_S_HB:
 		*gtt_offset = MB(2);
 
 		pci_read_config_word(intel_private.pcidev, SNB_GMCH_CTRL, &snb_gmch_ctl);
@@ -1517,6 +1557,39 @@ static const struct agp_bridge_driver intel_i965_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 	.agp_destroy_pages      = agp_generic_destroy_pages,
 	.agp_type_to_mask_type	= intel_i830_type_to_mask_type,
+	.chipset_flush		= intel_i915_chipset_flush,
+#ifdef USE_PCI_DMA_API
+	.agp_map_page		= intel_agp_map_page,
+	.agp_unmap_page		= intel_agp_unmap_page,
+	.agp_map_memory		= intel_agp_map_memory,
+	.agp_unmap_memory	= intel_agp_unmap_memory,
+#endif
+};
+
+static const struct agp_bridge_driver intel_gen6_driver = {
+	.owner			= THIS_MODULE,
+	.aperture_sizes		= intel_i830_sizes,
+	.size_type		= FIXED_APER_SIZE,
+	.num_aperture_sizes	= 4,
+	.needs_scratch_page	= true,
+	.configure		= intel_i9xx_configure,
+	.fetch_size		= intel_i9xx_fetch_size,
+	.cleanup		= intel_i915_cleanup,
+	.mask_memory		= intel_gen6_mask_memory,
+	.masks			= intel_gen6_masks,
+	.agp_enable		= intel_i810_agp_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= intel_i965_create_gatt_table,
+	.free_gatt_table	= intel_i830_free_gatt_table,
+	.insert_memory		= intel_i915_insert_entries,
+	.remove_memory		= intel_i915_remove_entries,
+	.alloc_by_type		= intel_i830_alloc_by_type,
+	.free_by_type		= intel_i810_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_alloc_pages        = agp_generic_alloc_pages,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.agp_destroy_pages      = agp_generic_destroy_pages,
+	.agp_type_to_mask_type	= intel_gen6_type_to_mask_type,
 	.chipset_flush		= intel_i915_chipset_flush,
 #ifdef USE_PCI_DMA_API
 	.agp_map_page		= intel_agp_map_page,

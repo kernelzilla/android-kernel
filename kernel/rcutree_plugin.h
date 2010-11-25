@@ -417,6 +417,16 @@ static void rcu_print_task_stall(struct rcu_node *rnp)
 	}
 }
 
+/*
+ * Suppress preemptible RCU's CPU stall warnings by pushing the
+ * time of the next stall-warning message comfortably far into the
+ * future.
+ */
+static void rcu_preempt_stall_reset(void)
+{
+	rcu_preempt_state.jiffies_stall = jiffies + ULONG_MAX / 2;
+}
+
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
 
 /*
@@ -865,6 +875,14 @@ static void rcu_print_task_stall(struct rcu_node *rnp)
 {
 }
 
+/*
+ * Because preemptible RCU does not exist, there is no need to suppress
+ * its CPU stall warnings.
+ */
+static void rcu_preempt_stall_reset(void)
+{
+}
+
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
 
 /*
@@ -917,15 +935,6 @@ static void rcu_preempt_check_callbacks(int cpu)
 static void rcu_preempt_process_callbacks(void)
 {
 }
-
-/*
- * In classic RCU, call_rcu() is just call_rcu_sched().
- */
-void call_rcu(struct rcu_head *head, void (*func)(struct rcu_head *rcu))
-{
-	call_rcu_sched(head, func);
-}
-EXPORT_SYMBOL_GPL(call_rcu);
 
 /*
  * Wait for an rcu-preempt grace period, but make it happen quickly.

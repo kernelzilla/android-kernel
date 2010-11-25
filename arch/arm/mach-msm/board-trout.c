@@ -90,6 +90,7 @@ struct trout_axis_info {
 };
 static bool nav_just_on;
 static int nav_on_jiffies;
+static int smi_sz = 64;
 
 uint16_t trout_axis_map(struct gpio_event_axis_info *info, uint16_t in)
 {
@@ -534,19 +535,34 @@ static struct platform_device trout_rfkill = {
 	.id = -1,
 };
 
-static struct msm_pmem_setting pmem_setting = {
-	.pmem_start = MSM_PMEM_MDP_BASE,
-	.pmem_size = MSM_PMEM_MDP_SIZE,
-	.pmem_adsp_start = MSM_PMEM_ADSP_BASE,
-	.pmem_adsp_size = MSM_PMEM_ADSP_SIZE,
-	.pmem_gpu0_start = MSM_PMEM_GPU0_BASE,
-	.pmem_gpu0_size = MSM_PMEM_GPU0_SIZE,
-	.pmem_gpu1_start = MSM_PMEM_GPU1_BASE,
-	.pmem_gpu1_size = MSM_PMEM_GPU1_SIZE,
-	.pmem_camera_start = MSM_PMEM_CAMERA_BASE,
-	.pmem_camera_size = MSM_PMEM_CAMERA_SIZE,
-	.ram_console_start = MSM_RAM_CONSOLE_BASE,
-	.ram_console_size = MSM_RAM_CONSOLE_SIZE,
+static struct msm_pmem_setting pmem_setting_32 = {
+        .pmem_start = SMI32_MSM_PMEM_MDP_BASE,
+        .pmem_size = SMI32_MSM_PMEM_MDP_SIZE,
+        .pmem_adsp_start = SMI32_MSM_PMEM_ADSP_BASE,
+        .pmem_adsp_size = SMI32_MSM_PMEM_ADSP_SIZE,
+        .pmem_gpu0_start = MSM_PMEM_GPU0_BASE,
+        .pmem_gpu0_size = MSM_PMEM_GPU0_SIZE,
+        .pmem_gpu1_start = SMI32_MSM_PMEM_GPU1_BASE,
+        .pmem_gpu1_size = SMI32_MSM_PMEM_GPU1_SIZE,
+        .pmem_camera_start = SMI32_MSM_PMEM_CAMERA_BASE,
+        .pmem_camera_size = SMI32_MSM_PMEM_CAMERA_SIZE,
+        .ram_console_start = SMI32_MSM_RAM_CONSOLE_BASE,
+        .ram_console_size = SMI32_MSM_RAM_CONSOLE_SIZE,
+};
+
+static struct msm_pmem_setting pmem_setting_64 = {
+        .pmem_start = SMI64_MSM_PMEM_MDP_BASE,
+        .pmem_size = SMI64_MSM_PMEM_MDP_SIZE,
+        .pmem_adsp_start = SMI64_MSM_PMEM_ADSP_BASE,
+        .pmem_adsp_size = SMI64_MSM_PMEM_ADSP_SIZE,
+        .pmem_gpu0_start = MSM_PMEM_GPU0_BASE,
+        .pmem_gpu0_size = MSM_PMEM_GPU0_SIZE,
+        .pmem_gpu1_start = SMI64_MSM_PMEM_GPU1_BASE,
+        .pmem_gpu1_size = SMI64_MSM_PMEM_GPU1_SIZE,
+        .pmem_camera_start = SMI64_MSM_PMEM_CAMERA_BASE,
+        .pmem_camera_size = SMI64_MSM_PMEM_CAMERA_SIZE,
+        .ram_console_start = SMI64_MSM_RAM_CONSOLE_BASE,
+        .ram_console_size = SMI64_MSM_RAM_CONSOLE_SIZE,
 };
 
 #ifdef CONFIG_WIFI_CONTROL_FUNC
@@ -758,7 +774,11 @@ static struct msm_acpu_clock_platform_data trout_clock_data = {
 	.max_speed_delta_khz = 256000,
 	.vdd_switch_time_us = 62,
 	.power_collapse_khz = 19200000,
+#if defined(CONFIG_TURBO_MODE)
+	.wait_for_irq_khz = 176000000,
+#else
 	.wait_for_irq_khz = 128000000,
+#endif
 };
 
 #ifdef CONFIG_SERIAL_MSM_HS
@@ -810,7 +830,10 @@ static void __init trout_init(void)
 #endif
 	msm_add_usb_devices(trout_phy_reset);
 
-	msm_add_mem_devices(&pmem_setting);
+        if (32 == smi_sz)
+                msm_add_mem_devices(&pmem_setting_32);
+        else
+                msm_add_mem_devices(&pmem_setting_64);
 
 	rc = trout_init_mmc(system_rev);
 	if (rc)
@@ -838,13 +861,56 @@ static struct map_desc trout_io_desc[] __initdata = {
 	}
 };
 
+int trout_get_smi_size(void)
+{
+        printk(KERN_DEBUG "get_smi_size=%d\n", smi_sz);
+        return smi_sz;
+}
+
 static void __init trout_fixup(struct machine_desc *desc, struct tag *tags,
 				char **cmdline, struct meminfo *mi)
 {
+        smi_sz = parse_tag_smi((const struct tag *)tags);
+        printk("trout_fixup:smisize=%d\n", smi_sz);
+
 	mi->nr_banks=1;
 	mi->bank[0].start = PHYS_OFFSET;
 	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-	mi->bank[0].size = (101*1024*1024);
+        mi->bank[0].start = PHYS_OFFSET;
+        mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+
+#if     defined(CONFIG_MSM_AMSS_SUPPORT_256MB_EBI1)
+        if (32 == smi_sz) {
+                mi->bank[0].size = MSM_EBI_SMI32_256MB_SIZE;
+        } else if (64 == smi_sz){
+                mi->bank[0].size = MSM_EBI_SMI64_128MB_SIZE;
+        } else {
+                printk(KERN_ERR "can not get smi size\n");
+
+                /*Give a default value when not get smi size*/
+                smi_sz = 64;
+                mi->bank[0].size = MSM_EBI_SMI64_128MB_SIZE;
+                printk(KERN_ERR "use default  :  smisize=%d\n", smi_sz);
+        }
+#else
+        if (32 == smi_sz) {
+                mi->bank[0].size = (84*1024*1024);
+        } else if (64 == smi_sz){
+		mi->nr_banks = 2;
+                mi->bank[0].size = SMI64_MSM_LINUX_SIZE;        //(101*1024*1024);
+		mi->bank[1].start = SMI64_MSM_LINUX2_BASE;
+		mi->bank[1].size = SMI64_MSM_LINUX2_SIZE; 
+		mi->bank[1].node = PHYS_TO_NID(SMI64_MSM_LINUX2_BASE);
+        } else {
+                printk(KERN_ERR "can not get smi size\n");
+
+                /*Give a default value when not get smi size*/
+                smi_sz = 64;
+                mi->bank[0].size = SMI64_MSM_LINUX_SIZE;        //(101*1024*1024);
+                printk(KERN_ERR "use default  :  smisize=%d\n", smi_sz);
+        }
+#endif
+        printk("trout_fixup:bank size=0x%x\n", mi->bank[0].size);
 }
 
 static void __init trout_map_io(void)
@@ -860,7 +926,15 @@ MACHINE_START(TROUT, "trout")
 	.phys_io        = MSM_DEBUG_UART_PHYS,
 	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
+#if defined(CONFIG_MSM_AMSS_SUPPORT_256MB_EBI1)
+        .boot_params    = 0x19200100,
+#else
+#if defined(CONFIG_MSM_AMSS_RADIO2708_MEMMAP) 
+    .boot_params    = 0x02000100, 
+#else 
 	.boot_params    = 0x10000100,
+#endif
+#endif
 	.fixup          = trout_fixup,
 	.map_io         = trout_map_io,
 	.init_irq       = trout_init_irq,

@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.129 2010/08/19 20:36:22 Exp $
+ * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.129.4.1 2010/09/02 23:13:16 Exp $
  */
 
 #include <typedefs.h>
@@ -2719,6 +2719,9 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 	BUS_WAKE(bus);
 
+	/* Change our idea of bus state */
+	bus->dhd->busstate = DHD_BUS_DOWN;
+
 	/* Enable clock for device interrupts */
 	dhdsdio_clkctl(bus, CLK_AVAIL, FALSE);
 
@@ -2726,9 +2729,6 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 	W_SDREG(0, &bus->regs->hostintmask, retries);
 	local_hostintmask = bus->hostintmask;
 	bus->hostintmask = 0;
-
-	/* Change our idea of bus state */
-	bus->dhd->busstate = DHD_BUS_DOWN;
 
 	/* Force clocks on backplane to be sure F2 interrupt propagates */
 	saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
@@ -4218,11 +4218,6 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	bus->intstatus = intstatus;
 
 clkwait:
-
-#if defined(OOB_INTR_ONLY)
-	bcmsdh_oob_intr_set(1);
-#endif
-
 	/* Re-enable interrupts to detect new device events (mailbox, rx frame)
 	 * or clock availability.  (Allows tx loop to check ipend if desired.)
 	 * (Unless register access seems hosed, as we may not be able to ACK...)
@@ -4231,6 +4226,9 @@ clkwait:
 		DHD_INTR(("%s: enable SDIO interrupts, rxdone %d framecnt %d\n",
 		          __FUNCTION__, rxdone, framecnt));
 		bus->intdis = FALSE;
+#if defined(OOB_INTR_ONLY)
+		bcmsdh_oob_intr_set(1);
+#endif /* (OOB_INTR_ONLY) */
 		bcmsdh_intr_enable(sdh);
 	}
 
@@ -5803,13 +5801,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 			/* Force flow control as protection when stop come before ifconfig_down */
 			dhd_txflowcontrol(bus->dhd, 0, ON);
 #endif /* !defined(IGNORE_ETH0_DOWN) */
-			/* save country settinng if was pre-setup with priv ioctl */
-			dhd_os_proto_block(dhdp);
-			dhdcdc_query_ioctl(bus->dhd, 0, WLC_GET_COUNTRY,
-				bus->dhd->country_code, sizeof(bus->dhd->country_code));
-			dhd_os_proto_unblock(dhdp);
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */
+			dhd_os_sdlock(dhdp);
 			dhd_bus_stop(bus, FALSE);
 
 			/* Clean tx/rx buffer pointers, detach from the dongle */
@@ -5817,6 +5811,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 			bus->dhd->dongle_reset = TRUE;
 			bus->dhd->up = FALSE;
+			dhd_os_sdunlock(dhdp);
 
 			DHD_TRACE(("%s:  WLAN OFF DONE\n", __FUNCTION__));
 			/* App can now remove power from device */
@@ -5829,6 +5824,8 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 		if (bus->dhd->dongle_reset) {
 			/* Turn on WLAN */
+			dhd_os_sdlock(dhdp);
+
 			/* Reset SD client */
 			bcmsdh_reset(bus->sdh);
 
@@ -5860,6 +5857,8 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					bcmerror = BCME_SDIO_ERROR;
 			} else
 				bcmerror = BCME_SDIO_ERROR;
+
+			dhd_os_sdunlock(dhdp);
 		} else {
 			bcmerror = BCME_NOTDOWN;
 			DHD_ERROR(("%s: Set DEVRESET=FALSE invoked when device is on\n",

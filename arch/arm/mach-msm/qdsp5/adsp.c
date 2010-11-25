@@ -34,6 +34,7 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 #include <linux/wakelock.h>
+#include "adsp.h"
 
 static struct wake_lock adsp_wake_lock;
 static inline void prevent_suspend(void)
@@ -401,6 +402,11 @@ int __msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 		pr_err("adsp: module %s not enabled before write\n",
 		       module->name);
 		return -ENODEV;
+	}
+	if (dsp_queue_addr > QDSP_QUEUE_MAX) {
+		spin_unlock_irqrestore(&adsp_cmd_lock, flags);
+		pr_info("Invalid Queue Index: %d\n", dsp_queue_addr);
+		return -ENXIO;
 	}
 	if (adsp_validate_module(module->id)) {
 		spin_unlock_irqrestore(&adsp_cmd_lock, flags);

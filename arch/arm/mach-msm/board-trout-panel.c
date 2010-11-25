@@ -549,10 +549,18 @@ static struct platform_driver trout_backlight_driver = {
 	},
 };
 
+static struct resource resources_msm_fb_smi32[] = {
+        {
+                .start = SMI32_MSM_FB_BASE,
+                .end = SMI32_MSM_FB_BASE + SMI32_MSM_FB_SIZE - 1,
+                .flags = IORESOURCE_MEM,
+        },
+};
+
 static struct resource resources_msm_fb[] = {
 	{
-		.start = MSM_FB_BASE,
-		.end = MSM_FB_BASE + MSM_FB_SIZE,
+                .start = SMI64_MSM_FB_BASE,
+                .end = SMI64_MSM_FB_BASE + SMI64_MSM_FB_SIZE - 1,
 		.flags = IORESOURCE_MEM,
 	},
 };
@@ -629,6 +637,11 @@ int __init trout_init_panel(void)
 			printk(KERN_ERR "trout_init_panel: set clock rate "
 			       "failed\n");
 	}
+
+        /* setup FB by SMI size */
+        if(32 == trout_get_smi_size()) {
+                mddi_pdata.fb_resource = resources_msm_fb_smi32;
+        }
 
 	rc = gpio_request(VSYNC_GPIO, "vsync");
 	if (rc)
