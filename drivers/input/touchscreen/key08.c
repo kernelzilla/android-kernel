@@ -42,6 +42,7 @@
 #include <../board-mot.h>
 #endif
 
+#define GOOGLE_MULTITOUCH 1
 
 #define	IRQ_REASON_IRQ		1
 #define	IRQ_REASON_SLIDER	2
@@ -942,6 +943,14 @@ static void key08_ts_work_func(struct work_struct *work)
                     }
 
                     if(buf[1] && (buf[0]&0x0f))
+#ifdef GOOGLE_MULTITOUCH
+//FIXME: reboot sometimes when 3rd finger pressed ?
+		if (finger > 1)
+			break;
+#endif
+
+#ifndef GOOGLE_MULTITOUCH
+                    if(buf[1] & (buf[0]&0x0f))
                     {
                         // touch
                         KEY08_PRINTK("%s: touch f=%d x=%d y=%d\n", __FUNCTION__, finger, x,y);
@@ -976,6 +985,7 @@ static void key08_ts_work_func(struct work_struct *work)
                             break;
                         }
                     }
+#endif
 
 
 
@@ -1034,8 +1044,10 @@ static void key08_ts_work_func(struct work_struct *work)
 						}
 					}
 
+#ifndef GOOGLE_MULTITOUCH
 					if ( needCalibration )
 						key08_calibrate(ts);
+#endif						
 					needCalibration = FALSE;						
 						base = 2;
 #ifdef CONFIG_MACH_MOT
@@ -1043,6 +1055,7 @@ static void key08_ts_work_func(struct work_struct *work)
 					y = Q51001211009AK08_TS_MAX_Y - y;
 #endif
 
+#ifndef GOOGLE_MULTITOUCH
 						pos[0][0] = x;
 						pos[0][1] = y;
 						
@@ -1086,6 +1099,33 @@ static void key08_ts_work_func(struct work_struct *work)
 								prevX = x;
 								prevY = y;
 							}
+#else
+					currPoints[finger].X = x;
+					currPoints[finger].Y = y;
+					currPoints[finger].W = w;
+					//get Z from tf[]
+					if (!ts->suspendMode)
+					{
+						for (i = 0; i < 2; i ++)
+						{
+							KEY08_PRINTK("%s: i=%d, x=%d, y=%d, z=%d", __FUNCTION__, i, currPoints[i].X, currPoints[i].Y, tf[i] ? 1 : 0);
+							input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, tf[i] ? 1 : 0);
+							tims[tIndex++] = ktime_get();
+							input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, currPoints[i].W);
+							tims[tIndex++] = ktime_get();
+							input_report_abs(ts->input_dev, ABS_MT_POSITION_X, currPoints[i].X);
+							tims[tIndex++] = ktime_get();
+							input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, currPoints[i].Y);
+							tims[tIndex++] = ktime_get();
+							input_mt_sync(ts->input_dev);
+							tims[tIndex++] = ktime_get();
+						}
+						input_sync(ts->input_dev);
+						tims[tIndex++] = ktime_get();
+					}
+#endif			
+
+							
 					need2sendRelease = FALSE;
 						snprintf(dbgBuffer,DBG_BUFFER_SIZE-1,"%s: times: ", __FUNCTION__ );
 						tIndex--;
@@ -1495,7 +1535,8 @@ int key08_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		inactive_area_top =0;
 		inactive_area_right=0;
 		inactive_area_bottom=0;
-			
+
+#ifndef GOOGLE_MULTITOUCH			
 		input_set_abs_params(tsGl->input_dev, ABS_X, 2, SCREEN_X, 0, 0);
 		input_set_abs_params(tsGl->input_dev, ABS_Y, 0, SCREEN_Y, 0, 0);
 		
@@ -1503,6 +1544,12 @@ int key08_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		input_set_abs_params(tsGl->input_dev, ABS_TOOL_WIDTH, 0, 0xf, 2, 0);
 		input_set_abs_params(tsGl->input_dev, ABS_HAT0X, 0, 0xfff, 2, 0);
 		input_set_abs_params(tsGl->input_dev, ABS_HAT0Y, 0, 0xfff, 2, 0);
+#else // copy from qtm_obp_ts.c
+		input_set_abs_params(tsGl->input_dev, ABS_MT_POSITION_X, 0, 1023, 0, 0);
+		input_set_abs_params(tsGl->input_dev, ABS_MT_POSITION_Y, 0, 1023, 0, 0);
+		input_set_abs_params(tsGl->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
+		input_set_abs_params(tsGl->input_dev, ABS_MT_WIDTH_MAJOR, 0, 15, 0, 0);
+#endif		
 		/* tsGl->input_dev->name = tsGl->keypad_info->name; */
 
 		ret = input_register_handler(&slider_handler);
