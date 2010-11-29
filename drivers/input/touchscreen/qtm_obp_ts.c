@@ -1,7 +1,8 @@
-/* drivers/input/keyboard/qtm_obp_touch.c
-		  }
+/*
+ * drivers/input/touchscreen/qtouch_obp_ts.c - driver for Quantum touch IC
  *
- * Copyright (C) 2008 Motorola Inc.
+ * Copyright (C) 2009 Google, Inc.
+ * Copyright (C) 2009-2010 Motorola, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,92 +13,48 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * Derived from the Motorola OBP touch driver.
+ *
  */
-
-#include <stdarg.h>
-#include <linux/init.h>
-#include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/earlysuspend.h>
+#include <linux/gpio.h>
+#include <linux/uaccess.h>
+#include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
-#include <linux/hrtimer.h>
-#include <linux/platform_device.h>
-#include <linux/i2c.h>
-#include <linux/delay.h>
-#include <linux/slab.h>
 #include <linux/irq.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/hrtimer.h>
+#include <linux/slab.h>
 #include <linux/miscdevice.h>
+#include <linux/kernel.h>
+#include <linux/platform_device.h>
+#include <linux/qtouch_obp_ts.h>
+#include <linux/qtouch_obp_ts_firmware.h>
+#include <linux/timer.h>
 
-#include <asm/gpio.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_LTT_LITE
+#include <linux/lttlite-events.h>
 #endif
 
-#include "qtm_obp_ts.h"
+#define IGNORE_CHECKSUM_MISMATCH
 
-#ifndef FALSE
-#define	FALSE	0
-#define	TRUE	(!FALSE)
-#endif
-
-#define GOOGLE_MULTITOUCH 1
-
-// Optimized for multitouch
-#define KEY08_PRINTK(args...) \
-				if (qtm_debugOn) qtm_obp_printk(args);
-
-extern unsigned long msleep_interruptible(unsigned int);
-
-#define clk_busy_wait(time)	msleep_interruptible(time/1000)
-
-#define swap(x, y) do { typeof(x) z = x; x = y; y = z; } while (0)
-
-#define KEY08_TS_RESET 84
-#define KEY08_TS_GPIO 41
-
-#define KEY08_I2C_NAME "qtm_obp"
-#define KEY08_PF_NAME	"touchpad"
-
-#define KEY08_REG_ADDR_SIZE    2
-
-enum 
-{
-	KEY08_FLIP_X = 1UL << 0,
-	KEY08_FLIP_Y = 1UL << 1,
-	KEY08_SWAP_XY = 1UL << 2,
-	KEY08_SNAP_TO_INACTIVE_EDGE = 1UL << 3,
+struct qtm_object {
+	struct qtm_obj_entry		entry;
+	uint8_t				report_id_min;
+	uint8_t				report_id_max;
 };
 
-// Local Functions
-static int qtm_obp_ts_probe(struct i2c_client *client, const struct i2c_device_id *id);
-static void qtm_obp_slider_event(struct input_handle *, unsigned int, unsigned int, int );
-static int qtm_obp_ts_remove(struct i2c_client *);
-static int qtm_obp_slider_connect(struct input_handler *, struct input_dev *, const struct input_device_id*);
-static void qtm_obp_slider_disconnect(struct input_handle *);
-static  int qtm_obp_open(struct inode *inode, struct file *filp);
-static int qtm_obp_ioctl(struct inode *node, struct file *filp, unsigned int cmd, unsigned long arg);
-static int qtm_obp_release(struct inode *inode, struct file *filp);
-static int qtm_obp_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos );
-static void qtm_obp_load_obp_objects(void);
-static int qtm_obp_send_message_processor_pointer(void);
-static void qtm_obp_printk (char *, ...);
-static void qtm_obp_doReset(void);
-static void qtm_obp_hardReset(void);
-static int qtm_obp_get_touch_sens_data (char * arg);
-static int save_low_power_regs(void);
+struct axis_map {
+	int	key;
+	int	x;
+	int	y;
+};
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void qtm_obp_ts_early_suspend(struct early_suspend *h);
-static void qtm_obp_ts_late_resume(struct early_suspend *h);
-#endif
-
-// this structure maintains the current status of the touchscreen device.
-// it is setup as a global in the driver
-
-struct	coordinate_map
-{
+struct coordinate_map {
 	int x_data;
 	int y_data;
 	int z_data;
@@ -105,1442 +62,2273 @@ struct	coordinate_map
 	int down;
 };
 
-#define	_NUM_FINGERS	10
+#define _BITMAP_LEN			BITS_TO_LONGS(QTM_OBP_MAX_OBJECT_NUM)
+#define _NUM_FINGERS			10
+struct qtouch_ts_data {
+	struct i2c_client		*client;
+	struct input_dev		*input_dev;
+	struct work_struct		init_work;
+	struct work_struct		work;
+	struct work_struct		boot_work;
+	struct qtouch_ts_platform_data	*pdata;
+	struct coordinate_map		finger_data[_NUM_FINGERS];
+	struct early_suspend		early_suspend;
 
-struct qtm_obp_ts_data {
-	uint16_t addr;
-	struct i2c_client *client;
-	struct input_dev *input_dev;
-	struct input_dev *sw_dev;
-	int use_irq;
-	struct hrtimer timer;
-	struct work_struct  work;
-	struct coordinate_map	finger_data[_NUM_FINGERS];
-	uint8_t XferStatus;
-	int     cntBadCRC;
-	uint16_t max[2];
-	int snap_down[2];
-	int snap_up[2];
-	uint32_t flags;
-	char	mode;
-	bool	useData;
-	bool	inCall;
-        bool    suspendMode;
-	char	sendMode;
-	char	calibrate;
-	int		irqCount;
-	int (*power)(int on);
-        struct mutex transaction_mutex;
+	struct qtm_object		obj_tbl[QTM_OBP_MAX_OBJECT_NUM];
+	unsigned long			obj_map[_BITMAP_LEN];
+
+	uint32_t			last_keystate;
+	uint16_t			eeprom_checksum;
+	uint8_t				checksum_cnt;
+	int                             x_delta;
+	int                             y_delta;
+	uint8_t				family_id;
+	uint8_t				variant_id;
+	uint8_t				fw_version;
+	uint8_t				build_version;
+	uint8_t				fw_error_count;
+	uint32_t			touch_fw_size;
+	uint8_t				*touch_fw_image;
+	uint8_t				base_fw_version;
+
+	atomic_t			irq_enabled;
+	int				status;
+
+	uint8_t				mode;
+	int				boot_pkt_size;
+	int				current_pkt_sz;
+	uint8_t				org_i2c_addr;
+
+
+	/* Note: The message buffer is reused for reading different messages.
+	 * MUST enforce that there is no concurrent access to msg_buf. */
+	uint8_t				*msg_buf;
+	int				msg_size;
+};
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+#define MINIPAD_KEY_RELEASE 		0
+#define MINIPAD_KEY_PRESS			1
+
+#define MINIPAD_TAP_TIME_MIN_TH 	0	/* x10 milliseconds */
+#define MINIPAD_TAP_TIME_MAX_TH 	35	/* x10 milliseconds */
+
+#define MINIPAD_DOUBLE_TAP_TIME_MIN_TH	5	/* x10 milliseconds */
+#define MINIPAD_DOUBLE_TAP_TIME_MAX_TH	100	/* x10 milliseconds */
+
+/* ignore tap when moving */
+#define MINIPAD_TAP_BOUND_X		90
+#define MINIPAD_TAP_BOUND_Y 		90
+
+/* ignore tap close to edge */
+#define MINIPAD_TAP_GUTTER_X		0
+#define MINIPAD_TAP_GUTTER_Y		0
+
+/* threshold to send movement events */
+#define MINIPAD_MOUSE_TH_X		90
+#define MINIPAD_MOUSE_TH_Y		90
+
+#define MINIPAD_INITIAL_JIFFIES 	0
+
+typedef enum {
+	MOUSE_UP = 0,
+	MOUSE_DOWN,
+	MOUSE_LEFT,
+	MOUSE_RIGHT
+} MINIPAD_MOUSE_MOVEMENT_T;
+
+typedef struct {
+	int  min_x;
+	int  max_x;
+	int  min_y;
+	int  max_y;
+	bool swap_xy;
+	bool invertx;
+	bool inverty;
+	int  mouse_th_x;
+	int  mouse_th_y;
+	bool send_relxy;
+} MINIPAD_LOGIC_PARAMS_T;
+
+
+static int minipad_open(struct inode *inode, struct file *filp);
+static int minipad_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos);
+static int minipad_release(struct inode *inode, struct file *filp);
+
+const struct    file_operations    minipad_fops = {
+    .owner      = THIS_MODULE,
+    .open       = minipad_open,
+    .release    = minipad_release,
+    .write      = minipad_write,
+};
+static struct miscdevice minipad_pf_driver = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = QTOUCH_TS_NAME,
+    .fops = &minipad_fops,
+};
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
+static void qtouch_ts_early_suspend(struct early_suspend *handler);
+static void qtouch_ts_late_resume(struct early_suspend *handler);
 #endif
-};
 
-static const struct i2c_device_id qtm_obp_ts_id[] = {
-	{ KEY08_I2C_NAME, 0 },
-	{ }
-};
+static struct workqueue_struct *qtouch_ts_wq;
 
-static struct i2c_driver qtm_obp_ts_driver = {
-#ifndef CONFIG_HAS_EARLYSUSPEND
-	.suspend	= qtm_obp_ts_suspend,
-	.resume		= qtm_obp_ts_resume,
+static struct timer_list keyarray_timer;
+static int ignore_keyarray_touches = 0;
+#define KEYARRAY_IGNORE_TIME (msecs_to_jiffies(100))
+
+static uint32_t qtouch_tsdebug;
+module_param_named(tsdebug, qtouch_tsdebug, uint, 0664);
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+/* minipad parameters */
+static MINIPAD_LOGIC_PARAMS_T minipad_params;
+/* starting X position for the mouse */
+static unsigned int minipad_x_start;
+/* starting Y position for the mouse */
+static unsigned int minipad_y_start;
+
+static int minipad_delta_x;
+static int minipad_delta_y;
+static int minipad_moved;
+
+/* indicates whether the mouse scroll was enabled */
+static unsigned int minipad_tap_enabled;
+/* first tap time in jiffies */
+static unsigned long minipad_touchdown_jiffies = MINIPAD_INITIAL_JIFFIES;
+/* previous tap time in jiffies for double tap */
+static unsigned long minipad_touchdown_prev_jiffies = MINIPAD_INITIAL_JIFFIES;
+/* indicate if the minipad is enabled */
+static int minipadEnabled = 1;
+
+static struct qtouch_ts_data *ts;
 #endif
-	.probe	= qtm_obp_ts_probe,
-	.remove	= qtm_obp_ts_remove,
-	.id_table	= qtm_obp_ts_id,
-	.driver = {
-		.name	= KEY08_I2C_NAME,
-	},
-};
 
-static const struct input_device_id slider_ids[] = {
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT_MASK(EV_SW) },
-	},
-	{ },
-};
+static struct qtm_id_info qtm_info;
 
-MODULE_DEVICE_TABLE(input,slider_ids);
-
-static struct input_handler slider_handler = {
-	.event =	qtm_obp_slider_event,
-	.connect = 	qtm_obp_slider_connect,
-	.disconnect = 	qtm_obp_slider_disconnect,
-	.name	= "qtm_obp_slider",
-	.id_table = slider_ids,
-};
-
-struct	file_operations	qtm_obp_fops =
+static irqreturn_t qtouch_ts_irq_handler(int irq, void *dev_id)
 {
-	.owner		= THIS_MODULE,
-	.open		= qtm_obp_open,
-	.ioctl		= qtm_obp_ioctl,
-	.release	= qtm_obp_release,
-	.write		= qtm_obp_write,
-};
+	struct qtouch_ts_data *ts = dev_id;
 
-static struct miscdevice qtm_obp_pf_driver = 
+#ifdef CONFIG_LTT_LITE
+	static char message[] = "qtouch_ts_irq_handler\n";
+	ltt_lite_log_string(message, sizeof(message) - 1);
+#endif
+
+	disable_irq_nosync(ts->client->irq);
+	if (ts->mode == 1)
+		queue_work(qtouch_ts_wq, &ts->boot_work);
+	else
+		queue_work(qtouch_ts_wq, &ts->work);
+
+	return IRQ_HANDLED;
+}
+
+static void keyarray_ignore_timer(unsigned long handle)
 {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = KEY08_PF_NAME,
-	.fops = &qtm_obp_fops,
-};
+	ignore_keyarray_touches = 0;
+}
 
-typedef struct  
+static int qtouch_write(struct qtouch_ts_data *ts, void *buf, int buf_sz)
 {
-	uint16_t reg;
-	uint8_t  data[4]; 
-} KEY08_INIT_DATA_T;
+	int retries = 10;
+	int ret;
+	do {
+		ret = i2c_master_send(ts->client, (char *)buf, buf_sz);
+	} while ((ret < buf_sz) && (--retries > 0));
 
-typedef struct {
-   uint8_t  type;
-   uint16_t start_pos;
-   uint8_t  obj_size;
-   uint8_t  num_of_instances;
-   uint8_t  num_of_report_ids;
-   uint8_t  report_id_low;
-   uint8_t  report_id_high;
-}QTM_OBJ_TABLE_ELEMENT_T, *QTM_OBJ_TABLE_ELEMENT_PTR;
+	if (ret < 0)
+		pr_info("%s: Error while trying to write %d bytes\n", __func__,
+			buf_sz);
+	else if (ret != buf_sz) {
+		pr_info("%s: Write %d bytes, expected %d\n", __func__,
+			ret, buf_sz);
+		ret = -EIO;
+	}
+	return ret;
+}
 
-typedef union {
-    struct {
-    uint8_t  family_id;
-    uint8_t  variant_id;
-    uint8_t  version;
-    uint8_t  build;
-    uint8_t  matrix_x_size;
-    uint8_t  matrix_y_size;
-    uint8_t  num_of_objects;
-    }qtm_info_bytes;
-    unsigned char        qtm_info_buf[QTM_OBP_INFO_BLOCK_SIZE];
-}U_QTM_INFO_BYTES_T, *U_QTM_INFO_BYTES_PTR;
-
-typedef struct {
-    uint8_t  obj_id_cfg_size[QTM_OBP_MAX_OBJECT_NUM];
-    uint8_t  obj_cfgs[QTM_OBP_MAX_OBJECT_NUM];
-    uint8_t  *object[QTM_OBP_MAX_OBJECT_NUM];
-}OBJ_ID_T, *OBJ_ID_PTR;
-
-
-// GLOBALS
-
-/*! @brief Variable used to define if the IC is calibrating or not */
-static unsigned char calibrating = 0;
-U_QTM_INFO_BYTES_T        qtm_obp_info_block;
-QTM_OBJ_TABLE_ELEMENT_T   qtm_obp_obj_table_elem[QTM_OBP_MAX_OBJECT_NUM];
-
-int qtm_pos[2][2];
-struct qtm_obp_ts_data *qtmTsGl;
-int	qtm_debugOn;
-
-int	qtm_obp_normal_addr;
-int	qtm_obp_bl_addr;
-static	char	lpIdleValueEeprom = 14;
-static	char	lpActiveValueEeprom = 14;
-static	int	prevX;
-static	int	prevY;
-static	int	threshX;
-static	int	threshY;
-int cntSigerr = 0;
-
-int	qtm_lastKeyPressed;
-
-/*! @brief Global value to keep track of which finger id pressed or released - sajid added for multi touch*/
-static int finger_press_release = 0;
-
-
-// This function is used to write to a register with a given value
-// The write function is common between the 2 protocols (original and OBP)
-// byte[0] = LSByte of 2 byte register addr
-// byte[1] = MSByte of 2 byte register addr
-// byte[2] = reg_value[0]
-// byte[len-1] = reg_value[len-1]
-// The i2c_master_send will return the number of bytes written (reg_addr_size+len)
-// but function will return 0 on success
-
-int qtm_obp_reg_write (struct i2c_client *client, unsigned int reg, unsigned int length, unsigned char *reg_value)
+static int qtouch_set_addr(struct qtouch_ts_data *ts, uint16_t addr)
 {
-	unsigned char value[24];
-	int retval = 0;
-	int i = 10;
+	int ret;
 
-        KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
+	/* Note: addr on the wire is LSB first */
+	ret = qtouch_write(ts, (char *)&addr, sizeof(uint16_t));
+	if (ret < 0)
+		pr_info("%s: Can't send obp addr 0x%4x\n", __func__, addr);
 
-	/* Copy the data into a buffer for correct format */
-	value[0] = reg & 0xFF;
-	value[1] = reg >> 8;
-	memcpy(&value[2], reg_value, length);
+	return ret >= 0 ? 0 : ret;
+}
 
-	KEY08_PRINTK("qtm_obp_reg_write: memcpy(): OK\n");
+static int qtouch_read(struct qtouch_ts_data *ts, void *buf, int buf_sz)
+{
+	int retries = 10;
+	int ret;
 
-	/* Write the data to the device (retrying if necessary) */
-	do
-	{
-		KEY08_PRINTK("qtm_obp_reg_write: trying to write to 0x%x\n", client->addr);
-		retval = i2c_master_send (client, value, KEY08_REG_ADDR_SIZE + length);
+	do {
+		memset(buf, 0, buf_sz);
+		ret = i2c_master_recv(ts->client, (char *)buf, buf_sz);
+	} while ((ret < 0) && (--retries > 0));
 
-		/* On failure, output the error code and delay before trying again */
-		if (retval < 0)
-		{
-			KEY08_PRINTK(KERN_ERR "qtm_obp_reg_write: write of reg 0x%X failed: %d\n", reg, retval);
-			clk_busy_wait(3000);
+	if (ret < 0)
+		pr_info("%s: Error while trying to read %d bytes\n", __func__,
+			buf_sz);
+	else if (ret != buf_sz) {
+		pr_info("%s: Read %d bytes, expected %d\n", __func__,
+			ret, buf_sz);
+		ret = -EIO;
+	}
+
+	return ret >= 0 ? 0 : ret;
+}
+
+static int qtouch_read_addr(struct qtouch_ts_data *ts, uint16_t addr,
+			    void *buf, int buf_sz)
+{
+	int ret;
+
+	ret = qtouch_set_addr(ts, addr);
+	if (ret != 0)
+		return ret;
+
+	return qtouch_read(ts, buf, buf_sz);
+}
+
+static struct qtm_obj_message *qtouch_read_msg(struct qtouch_ts_data *ts)
+{
+	int ret;
+
+	ret = qtouch_read(ts, ts->msg_buf, ts->msg_size);
+	if (!ret)
+		return (struct qtm_obj_message *)ts->msg_buf;
+	return NULL;
+}
+
+static int qtouch_write_addr(struct qtouch_ts_data *ts, uint16_t addr,
+			     void *buf, int buf_sz)
+{
+	int ret;
+	uint8_t *write_buf;
+
+	write_buf = kmalloc((buf_sz + sizeof(uint16_t)), GFP_KERNEL);
+	if (write_buf == NULL) {
+		pr_err("%s: Can't allocate write buffer (%d)\n", __func__, buf_sz);
+		return -ENOMEM;
+	}
+
+	memcpy(write_buf, (void *)&addr, sizeof(addr));
+	memcpy((void *)write_buf + sizeof(addr), buf, buf_sz);
+
+	ret = qtouch_write(ts, write_buf, buf_sz + sizeof(addr));
+
+	kfree (write_buf);
+
+	if (ret < 0) {
+		pr_err("%s: Could not write %d bytes.\n", __func__, buf_sz);
+		return ret;
+	}
+
+	return 0;
+}
+
+static uint16_t calc_csum(uint16_t curr_sum, void *_buf, int buf_sz)
+{
+	uint8_t *buf = _buf;
+	uint32_t new_sum;
+	int i;
+
+	while (buf_sz-- > 0) {
+		new_sum = (((uint32_t) curr_sum) << 8) | *(buf++);
+		for (i = 0; i < 8; ++i) {
+			if (new_sum & 0x800000)
+				new_sum ^= 0x800500;
+			new_sum <<= 1;
 		}
-		else
-			KEY08_PRINTK("qtm_obp_reg_write: i2c_master_send(): OK\n");
-	}
-	while ((retval < 0) && (i-- >= 0));
-
-	KEY08_PRINTK("qtm_obp_reg_write: i2c_master_send(): Done\n");
-
-	/* On success, set retval to 0 (i2c_master_send returns no. of bytes transfered) */
-	if (retval == (KEY08_REG_ADDR_SIZE + length))
-	{
-		retval = 0;
+		curr_sum = ((uint32_t) new_sum >> 8) & 0xffff;
 	}
 
-	/* Delay after every I2C access or IC will NAK */
-	clk_busy_wait(3000);
-
-	if ( qtmTsGl->mode == KEY08_MODE_OBP )
-	  {
-	    qtm_obp_send_message_processor_pointer();
-	  }
-
-	/* Delay after every I2C access or IC will NAK */
-	clk_busy_wait(3000);
-
-        KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-	return retval;
+	return curr_sum;
 }
 
-// This function is used to read from a specified register.
-// In OBP mode
-//   byte[0] = LSByte of 2 byte register addr
-//   byte[1] = MSByte of 2 byte register addr
-//   this data is sent to the IC via I2C
-//   wait 3 msec 
-//   read back 1 byte of data over I2C
-
-static uint8_t qtm_obp_ts_read_register(struct i2c_client *client , int reg )
-{    
-  uint8_t data[6];
-  int   rc;
-  uint8_t reg_value=0;
-
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-     
-  // setup the register to read
-  data[0] = reg & 0xFF;
-  data[1] = (reg & 0xFF00)>>8;
-
-  rc = i2c_master_send(client, data, QTM_OBP_REG_ADDR_SIZE);
-  if (rc < 0)
-    {
-      KEY08_PRINTK(KERN_ERR "i2c_master_send error  %d\n,",rc);
-    }
-  else
-    {
-      clk_busy_wait(3000);
-      
-      // clear the data to be read back
-      memset(data, 0, sizeof(data));
-
-      // read 1 byte of data
-      rc = i2c_master_recv(client, data, 1);
-
-      if (rc < 0)
-	{
-	  KEY08_PRINTK(KERN_ERR "i2c_master_recv error  %d\n,",rc);
-	}
-      else 
-	    {
-	      reg_value = data[0];
-	      KEY08_PRINTK("qtm_obp_obp_ts_read_register reg=0x%x value=0x%X\n",reg,reg_value);
-	    }
-    }
-
-  /* Delay after every I2C access or IC will NAK */
-  clk_busy_wait(3000);
-
-  if ( qtmTsGl->mode == KEY08_MODE_OBP )
-    {
-      qtm_obp_send_message_processor_pointer();
-    }
-
-  /* Delay after every I2C access or IC will NAK */
-  clk_busy_wait(3000);
-
-  
-  KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-  return reg_value;
-}
-
-// This function is used to calibrate the IC
-//   write a non-zero value to the calibrate register, which is in the command processor object
-
-static int qtm_obp_calibrate(struct i2c_client *client)
+static inline struct qtm_object *find_obj(struct qtouch_ts_data *ts, int id)
 {
-	char	regValue = 0x01; 
-	int		ret = 0;
-
-        KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-        if ( qtmTsGl->mode == KEY08_MODE_OBP)
-        {
-	  ret = qtm_obp_reg_write (client,
-                                   qtm_obp_obj_table_elem[OBJ_ID_GEN_COMMANDPROCESSOR_T6].start_pos+QTM_OBP_T6_CALIBRATE, sizeof(regValue), (char *)&regValue);
-        }
-	
-	clk_busy_wait(6000);
-
-        KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-	return ret;
+	return &ts->obj_tbl[id];
 }
 
-static int qtm_obp_init_panel(struct qtm_obp_ts_data *ts)
+static struct qtm_object *create_obj(struct qtouch_ts_data *ts,
+				     struct qtm_obj_entry *entry)
 {
-	int ret=0;
-        KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-        KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-	return ret;
+	struct qtm_object *obj;
+
+	obj = &ts->obj_tbl[entry->type];
+	memcpy(&obj->entry, entry, sizeof(*entry));
+	set_bit(entry->type, ts->obj_map);
+
+	return obj;
 }
 
-// This function is used to reset the IC
-// This needs to change to write to command processor reset register since the reset line is shared with minipad ???
-static void qtm_obp_doReset(void)
-{
-    int     ret;
-    int     regValue = 0x01;
-
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-    ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_COMMANDPROCESSOR_T6].start_pos,
-                             sizeof(char), (char *)&regValue);
-
-    clk_busy_wait(6000);
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-}
-
-static int qtm_obp_save_config(void)
-{
-    int     ret;
-    int     regValue;
-    regValue = QTM_OBP_T6_BACKUP_CMD;
-
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-    ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_COMMANDPROCESSOR_T6].start_pos + QTM_OBP_T6_BACKUPNV,
-                           sizeof(char), (char *)&regValue);
-
-    clk_busy_wait(6000);
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-    return ret;
-}
-
-static void qtm_obp_hardReset(void)
-{
-   	gpio_set_value(84,0);
-	clk_busy_wait(3000);
-	gpio_set_value(84,1);
-}
-
-// This is the work function for the driver
-static void qtm_obp_ts_work_func(struct work_struct *work)
+static struct qtm_object *find_object_rid(struct qtouch_ts_data *ts, int rid)
 {
 	int i;
+
+	for_each_bit(i, ts->obj_map, QTM_OBP_MAX_OBJECT_NUM) {
+		struct qtm_object *obj = &ts->obj_tbl[i];
+
+		if ((rid >= obj->report_id_min) && (rid <= obj->report_id_max))
+			return obj;
+	}
+
+	return NULL;
+}
+
+static void qtouch_force_reset(struct qtouch_ts_data *ts, uint8_t sw_reset)
+{
+	struct qtm_object *obj;
+	uint16_t addr;
+	uint8_t val = 1;
 	int ret;
-	uint8_t buf[15];
-	int	x,y,z,w,finger,press_release_flag;
-	ktime_t	t1,t2;
-	int i2c_retry = QTM_OBP_READ_RETRIES;
-	int	down;
 
-	KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
+	if (ts->pdata->hw_reset && !sw_reset) {
+		pr_info("%s: Forcing HW reset\n", __func__);
+		ts->pdata->hw_reset();
+	} else if (sw_reset) {
+		pr_info("%s: Forcing SW reset\n", __func__);
+		obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
+		addr =
+		    obj->entry.addr + offsetof(struct qtm_gen_cmd_proc, reset);
+		/* Check to see if to reset into boot mode */
+		if (sw_reset == 2)
+			val = 0xa5;
+		ret = qtouch_write_addr(ts, addr, &val, 1);
+		if (ret)
+			pr_err("%s: Unable to send the reset msg\n", __func__);
+	}
+}
 
-	qtmTsGl = container_of(work, struct qtm_obp_ts_data, work);
+static int qtouch_force_calibration(struct qtouch_ts_data *ts)
+{
+	struct qtm_object *obj;
+	uint16_t addr;
+	uint8_t val;
+	int ret;
 
-	KEY08_PRINTK("%s: Locking transaction mutex\n",__FUNCTION__);
-	mutex_lock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Obtained transaction mutex\n",__FUNCTION__);
-	
-	t1 = ktime_get();
+	pr_info("%s: Forcing calibration\n", __func__);
 
-        // Check if we are bootloader mode
+	obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
 
-	if ( qtmTsGl->mode == KEY08_MODE_BOOTLOADER )
-	{
-                KEY08_PRINTK("qtm_obp_work_func: trying to read to 0x%x\n", qtmTsGl->client->addr);
+	addr = obj->entry.addr + offsetof(struct qtm_gen_cmd_proc, calibrate);
+	val = 1;
+	ret = qtouch_write_addr(ts, addr, &val, 1);
+	if (ret)
+		pr_err("%s: Unable to send the calibrate message\n", __func__);
+	return ret;
+}
 
-		ret = i2c_master_recv(qtmTsGl->client, buf,1);
-		clk_busy_wait(3000);
+#undef min
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+static int qtouch_power_config(struct qtouch_ts_data *ts, int on)
+{
+	struct qtm_gen_power_cfg pwr_cfg;
+	struct qtm_object *obj;
 
-		if (ret < 0)
-		{
-			/* Receive failed. Reset status  */
-			printk("qtm_obp_ts_work_func: in Bootloader mode i2c_master_recv failed\n");
-			qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_NOTHING;
-		}
+	if (!on) {
+		/* go to standby mode */
+		pwr_cfg.idle_acq_int = 0;
+		pwr_cfg.active_acq_int = 0;
+	} else {
+		pwr_cfg.idle_acq_int = ts->pdata->power_cfg.idle_acq_int;
+		pwr_cfg.active_acq_int = ts->pdata->power_cfg.active_acq_int;
+	}
+
+	pwr_cfg.active_idle_to = ts->pdata->power_cfg.active_idle_to;
+
+	obj = find_obj(ts, QTM_OBJ_GEN_PWR_CONF);
+	return qtouch_write_addr(ts, obj->entry.addr, &pwr_cfg,
+				 min(sizeof(pwr_cfg), obj->entry.size));
+}
+
+
+/* Apply the configuration provided in the platform_data to the hardware */
+static int qtouch_hw_init(struct qtouch_ts_data *ts)
+{
+	struct qtm_object *obj;
+	int i;
+	int ret;
+	uint16_t adj_addr;
+
+	pr_info("%s: Doing hw init\n", __func__);
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	pr_info("%s: %s found. family 0x%x, variant 0x%x, version 0x%x, "
+		"build 0x%x, matrix %dx%d, %d objects.\n", __func__,
+		QTOUCH_TS_NAME, qtm_info.family_id, qtm_info.variant_id,
+		qtm_info.version, qtm_info.build, qtm_info.matrix_x_size,
+		qtm_info.matrix_y_size, qtm_info.num_objs);
+#endif
+
+	/* take the IC out of suspend */
+	qtouch_power_config(ts, 1);
+
+	/* configure the acquisition object. */
+	obj = find_obj(ts, QTM_OBJ_GEN_ACQUIRE_CONF);
+	ret = qtouch_write_addr(ts, obj->entry.addr, &ts->pdata->acquire_cfg,
+				min(sizeof(ts->pdata->acquire_cfg),
+				    obj->entry.size));
+	if (ret != 0) {
+		pr_err("%s: Can't write acquisition config\n", __func__);
+		return ret;
+	}
+
+	/* The multitouch and keyarray objects have very similar memory
+	 * layout, but are just different enough where we basically have to
+	 * repeat the same code */
+
+	/* configure the multi-touch object. */
+	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
+	if (obj && obj->entry.num_inst > 0) {
+		struct qtm_touch_multi_cfg cfg;
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+		pr_info("%s: MULTI_TOUCH object found. %d instances.\n",
+			__func__, obj->entry.num_inst);
+#endif
+
+		memcpy(&cfg, &ts->pdata->multi_touch_cfg, sizeof(cfg));
+		if (ts->pdata->flags & QTOUCH_USE_MULTITOUCH)
+			cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
 		else
-		{
-			KEY08_PRINTK("qtm_obp_ts_work_func: buf[0] = 0x%x\n", buf[0]);
+			cfg.ctrl = 0;
+		ret = qtouch_write_addr(ts, obj->entry.addr, &cfg,
+					min(sizeof(cfg), obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write multi-touch config\n",
+			       __func__);
+			return ret;
+		}
 
-			/* Determine which code we got and set status appropriately */
-			if ( (buf[0] & 0xF0) == 0xC0 )
-			{
-				qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_COMMAND;
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+		/* configure the minipad object. */
+		if (obj->entry.num_inst > 1) {
+			struct qtm_touch_multi_cfg cfg;
+			memcpy(&cfg, &ts->pdata->minipad_cfg, sizeof(cfg));
+			if ((ts->pdata->minipad_flags & QTOUCH_USE_MULTITOUCH) && minipadEnabled)
+				cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
+			else
+				cfg.ctrl = 0;
+			ret = qtouch_write_addr(ts,
+				obj->entry.addr + obj->entry.size, &cfg,
+				min(sizeof(cfg), obj->entry.size));
+			if (ret != 0) {
+				pr_err("%s: Can't write minipad config\n",
+					__func__);
+				return ret;
 			}
-			else if ( (buf[0] & 0xF0) == 0x80 )
-			{
-				if ( qtmTsGl->sendMode == KEY08_BL_GOT_BAD_CRC )
-					qtmTsGl->sendMode = KEY08_BL_WAITING_AFTER_BAD_CRC;
-				else
-					qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_DATA;
-			}
-			else if ( buf[0] == 0x02 )
-			{
-				qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_CRC;
-			}
-			else if ( buf[0] == 0x04 )
-			{
-				qtmTsGl->sendMode = KEY08_BL_WAITING_AFTER_GOOD_CRC;
-			}
-			else if ( buf[0] == 0x03 )
-			{
-				/* We got bad CRC on the record */
-				qtmTsGl->sendMode = KEY08_BL_GOT_BAD_CRC;
-                                qtmTsGl->cntBadCRC++;
+		}
+#endif
+	}
 
+	/* configure the key-array object. */
+	obj = find_obj(ts, QTM_OBJ_TOUCH_KEYARRAY);
+	if (obj && obj->entry.num_inst > 0) {
+		struct qtm_touch_keyarray_cfg cfg;
+		for (i = 0; i < obj->entry.num_inst; i++) {
+			if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
+				memcpy(&cfg, &ts->pdata->key_array.cfg[i],
+				       sizeof(cfg));
+			} else
+				memset(&cfg, 0, sizeof(cfg));
+
+			adj_addr = obj->entry.addr +
+				((obj->entry.size + 1) * i);
+			ret = qtouch_write_addr(ts, adj_addr, &cfg,
+						min(sizeof(cfg),
+						    obj->entry.size));
+			if (ret != 0) {
+				pr_err("%s: Can't write keyarray config\n",
+					   __func__);
+				return ret;
 			}
-                        else
-                        {
-			      /* We should never get here ! */ 
-                              printk("qtm_obp_ts_work_func: **NOTHING** buf[0] = 0x%x\n", buf[0]);
-                        }
 		}
 	}
-	else if ( qtmTsGl->mode == KEY08_MODE_OBP )
-	{
-	  KEY08_PRINTK("in OBP mode\n");
 
-	  /* Read the data from the device (retrying if necessary) */
-	  do
-	    {
-	      memset(buf,0, QTM_OBP_READ_DATA_SIZE);
-              qtm_obp_send_message_processor_pointer();  // ??? NEED TO CHECK ???
-	      ret = i2c_master_recv(qtmTsGl->client, buf,  QTM_OBP_READ_DATA_SIZE); // ??? NEED TO CHECK ???
-	      
-	      if (ret < 0) 
-		{
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: i2c_master_recv failed\n");
-		  clk_busy_wait(QTM_OBP_READ_WRITE_DELAY);
+	/* configure the signal filter */
+	obj = find_obj(ts, QTM_OBJ_PROCG_SIG_FILTER);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->sig_filter_cfg,
+					min(sizeof(ts->pdata->sig_filter_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write signal filter config\n",
+			       __func__);
+			return ret;
 		}
-	    }
-	  while ((ret < 0) && (i2c_retry-- >= 0));
-	  
-          KEY08_PRINTK("qtm_obp_obp_ts_work_func: Buffer\n");
-          for (i=0;i<ret;i++)
-            KEY08_PRINTK("buf[%d] = 0x%x\n", i, buf[i]);
+	}
 
-	  if(ret < 0)
-	    {
-	      KEY08_PRINTK("qtm_obp_ts_obp_work_func: I2C failed to read data from the device\n");
-	      goto exit_func;
-	    }
-
-	  /* Check for OBJ_ID_GEN_COMMANDPROCESSOR_T6 report IDs*/
-	  if ( buf[QTM_OBP_REPORT_ID_BYTE] >= qtm_obp_obj_table_elem[OBJ_ID_GEN_COMMANDPROCESSOR_T6].report_id_low \
-	       && buf[QTM_OBP_REPORT_ID_BYTE] <= qtm_obp_obj_table_elem[OBJ_ID_GEN_COMMANDPROCESSOR_T6].report_id_high )
-	  {
-	      if( (buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_RESET) == QTM_OBP_T6_STATUS_RESET )
-		{
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: T6-Reset\n");
-
-                  ret =  qtm_obp_save_config();  // ??? NEED TO CHECK ???
-
-		  /* Set touch mode */
-		  /* OBP : send the message processor pointer */
-                  qtm_obp_send_message_processor_pointer();	  
+	/* configure the linearization table */
+	obj = find_obj(ts, QTM_OBJ_PROCI_LINEAR_TBL);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->linear_tbl_cfg,
+					min(sizeof(ts->pdata->linear_tbl_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write linear table config\n",
+			       __func__);
+			return ret;
 		}
-	     
-#if 0 
-	      /* Check for Calibration.  If we are calibrating, indicate in a message */
-	      if ((calibrating == 0) && (buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CAL))
-		{
-		  calibrating = 1;
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: The IC is calibrating.\n");
+	}
+
+
+	/* configure the comms configuration */
+	obj = find_obj(ts, QTM_OBJ_SPT_COM_CONFIG);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->comms_config_cfg,
+					min(sizeof(ts->pdata->comms_config_cfg),
+					obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the comms configuration config\n",
+				__func__);
+			return ret;
+		}
+	}
+
+
+	/* configure the GPIO PWM support */
+	obj = find_obj(ts, QTM_OBJ_SPT_GPIO_PWM);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->gpio_pwm_cfg,
+					min(sizeof(ts->pdata->gpio_pwm_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the GPIO PWM config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure the grip suppression table */
+	obj = find_obj(ts, QTM_OBJ_PROCI_GRIPFACESUPPRESSION);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->grip_suppression_cfg,
+					min(sizeof
+					    (ts->pdata->grip_suppression_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the grip suppression config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure noise suppression */
+	obj = find_obj(ts, QTM_OBJ_PROCG_NOISE_SUPPRESSION);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->noise_suppression_cfg,
+					min(sizeof(ts->pdata->noise_suppression_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the noise suppression config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure the touch proximity sensor */
+	obj = find_obj(ts, QTM_OBJ_TOUCH_PROXIMITY);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->touch_proximity_cfg,
+					min(sizeof(ts->pdata->touch_proximity_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the touch proximity config\n",
+			       __func__);
+			return ret;
+		}
+	}
+	
+	/* configure the one touch gesture processor */
+	obj = find_obj(ts, QTM_OBJ_PROCI_ONE_TOUCH_GESTURE_PROC);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->one_touch_gesture_proc_cfg,
+					min(sizeof(ts->pdata->one_touch_gesture_proc_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the one touch gesture processor config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure self test */
+	obj = find_obj(ts, QTM_OBJ_SPT_SELF_TEST);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->self_test_cfg,
+					min(sizeof(ts->pdata->self_test_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the self test config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure the two touch gesture processor */
+	obj = find_obj(ts, QTM_OBJ_PROCI_TWO_TOUCH_GESTURE_PROC);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->two_touch_gesture_proc_cfg,
+					min(sizeof(ts->pdata->two_touch_gesture_proc_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the two touch gesture processor config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure the capacitive touch engine  */
+	obj = find_obj(ts, QTM_OBJ_SPT_CTE_CONFIG);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->cte_config_cfg,
+					min(sizeof(ts->pdata->cte_config_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the capacitive touch engine config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	/* configure the noise suppression table */
+	obj = find_obj(ts, QTM_OBJ_NOISESUPPRESSION_1);
+	if (obj && obj->entry.num_inst > 0) {
+		ret = qtouch_write_addr(ts, obj->entry.addr,
+					&ts->pdata->noise1_suppression_cfg,
+					min(sizeof
+					    (ts->pdata->noise1_suppression_cfg),
+					    obj->entry.size));
+		if (ret != 0) {
+			pr_err("%s: Can't write the noise suppression config\n",
+			       __func__);
+			return ret;
+		}
+	}
+
+	ret = qtouch_force_calibration(ts);
+	if (ret != 0) {
+		pr_err("%s: Unable to recalibrate after reset\n", __func__);
+		return ret;
+	}
+
+	/* Write the settings into nvram, if needed */
+	if (ts->pdata->flags & QTOUCH_CFG_BACKUPNV) {
+		uint8_t val;
+		uint16_t addr;
+
+		obj = find_obj(ts, QTM_OBJ_GEN_CMD_PROC);
+		addr = obj->entry.addr + offsetof(struct qtm_gen_cmd_proc,
+						  backupnv);
+		val = 0x55;
+		ret = qtouch_write_addr(ts, addr, &val, 1);
+		if (ret != 0) {
+			pr_err("%s: Can't backup nvram settings\n", __func__);
+			return ret;
+		}
+		/* Since the IC does not indicate that has completed the
+		backup place a hard wait here.  If we communicate with the
+		IC during backup the EEPROM may be corrupted */
+
+		msleep(QTM_OBP_SLEEP_WAIT_FOR_BACKUP);
+	}
+
+	/* If debugging, read back and print all settings */
+	if (qtouch_tsdebug) {
+		int object;
+		int size;
+		uint8_t *data_buff;
+		int byte;
+		int msg_bytes;
+		int msg_location;
+		char *msg;
+
+		msg = kmalloc(1024, GFP_KERNEL);
+		if (msg != NULL) {
+			for (object = 7; object < QTM_OBP_MAX_OBJECT_NUM; object++) {
+
+				size = ts->obj_tbl[object].entry.size
+				       * ts->obj_tbl[object].entry.num_inst;
+				if (size != 0) {
+					data_buff = kmalloc(size, GFP_KERNEL);
+					if (data_buff == NULL) {
+						pr_err("%s: Object %d: Malloc failed\n",
+						       __func__, object);
+						continue;
+					}
+
+					qtouch_read_addr(ts,
+					                 ts->obj_tbl[object].entry.addr,
+					                 (void *)data_buff, size);
+
+					msg_location = sprintf(msg, "%s: Object %d:",
+						__func__, object);
+					for (byte=0; byte < size; byte++) {
+						msg_bytes = snprintf((msg + msg_location),
+						                    (1024 - msg_location),
+						                    " 0x%02x",
+						                    *(data_buff + byte));
+						msg_location += msg_bytes;
+						if (msg_location >= 1024)
+							break;
+					}
+					if (msg_location < 1024) {
+						pr_info("%s\n", msg);
+					} else {
+						pr_info("%s:  Object %d: String overflow\n",
+							__func__, object);
+					}
+	
+					kfree (data_buff);
+				}
+			}
+
+			kfree (msg);
 		}
 
+		qtouch_set_addr(ts, ts->obj_tbl[QTM_OBJ_GEN_MSG_PROC].entry.addr);
+	}
+
+	/* reset the address pointer */
+	ret = qtouch_set_addr(ts, ts->obj_tbl[QTM_OBJ_GEN_MSG_PROC].entry.addr);
+	if (ret != 0) {
+		pr_err("%s: Unable to reset address pointer after reset\n",
+		       __func__);
+		return ret;
+	}
+
+	return 0;
+}
+
+/* Handles a message from the command processor object. */
+static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
+			   void *_msg)
+{
+	struct qtm_cmd_proc_msg *msg = _msg;
+	int ret = 0;
+	int hw_reset = 0;
+
+	if (msg->status & QTM_CMD_PROC_STATUS_RESET) {
+		if (qtouch_tsdebug)
+			pr_info("%s:EEPROM checksum is 0x%X cnt %i\n",
+				__func__, msg->checksum, ts->checksum_cnt);
+		if (msg->checksum != ts->eeprom_checksum) {
+			if (ts->checksum_cnt > 2) {
+				/* Assume the checksum is what it is, cannot
+				disable the touch screen so set the checksum*/
+				ts->eeprom_checksum = msg->checksum;
+				ts->checksum_cnt = 0;
+			} else {
+				pr_info("%s:EEPROM checksum doesn't match 0x%x\n", __func__, msg->checksum);
+				ret = qtouch_hw_init(ts);
+				if (ret != 0)
+					pr_err("%s:Cannot init the touch IC\n",
+						   __func__);
+				hw_reset = 1;
+				ts->checksum_cnt++;
+			}
+		} else {
+			pr_info("%s:EEPROM checksum matches\n", __func__);
+		}
+		pr_info("%s: Reset done.\n", __func__);
+	}
+
+	if (msg->status & QTM_CMD_PROC_STATUS_CAL)
+		pr_info("%s: Self-calibration started.\n", __func__);
+
+	if (msg->status & QTM_CMD_PROC_STATUS_OFL)
+		pr_err("%s: Acquisition cycle length overflow\n", __func__);
+
+	if (msg->status & QTM_CMD_PROC_STATUS_SIGERR)
+		pr_err("%s: Acquisition error\n", __func__);
+
+	if (msg->status & QTM_CMD_PROC_STATUS_CFGERR) {
+		pr_err("%s: Configuration error\n", __func__);
+		ret = qtouch_hw_init(ts);
+		if (ret != 0)
+			pr_err("%s:Cannot init the touch IC\n", __func__);
+
+	}
+	/* Check the EEPROM checksum.  An ESD event may cause
+	the checksum to change during operation so we need to
+	reprogram the EEPROM and reset the IC */
+	if (ts->pdata->flags & QTOUCH_EEPROM_CHECKSUM) {
+		if (msg->checksum != ts->eeprom_checksum) {
+			if (qtouch_tsdebug)
+				pr_info("%s:EEPROM checksum is 0x%X cnt %i\n",
+
+					__func__, msg->checksum,
+					ts->checksum_cnt);
+			if (ts->checksum_cnt > 2) {
+				/* Assume the checksum is what it is, cannot
+				disable the touch screen so set the checksum*/
+				ts->eeprom_checksum = msg->checksum;
+				ts->checksum_cnt = 0;
+			} else {
+				if (!hw_reset) {
+					ret = qtouch_hw_init(ts);
+					if (ret != 0)
+						pr_err
+						    ("%s:Cannot init the touch IC\n",
+						__func__);
+					qtouch_force_reset(ts, 0);
+					ts->checksum_cnt++;
+				}
+			}
+		}
+	}
+	return ret;
+}
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+/*!
+ * This function implements the mouse function.  This function
+ * will process mouse movements in the X,Y plane and produce the
+ * corresponding trackball events. Double Tap is a timed event that must
+ * occur within the same area on the touch area.
+ *
+ *
+ * @param ts	 Touch screen structure pointer.
+ * @param x 	 Raw X data from the IC
+ * @param y 	 Raw Y data from the IC
+ * @param touch  Indicates the status of the touch.
+ *
+ * @return None
+ */
+static void minipad_process_as_trackball(struct qtouch_ts_data *ts, unsigned int x, unsigned int y, unsigned int touch)
+{
+
+	/* initial touchdown */
+	if (!minipad_x_start && !minipad_y_start && touch) {
+		minipad_x_start = x;
+		minipad_y_start = y;
+		minipad_delta_x = 0;
+		minipad_delta_y = 0;
+		minipad_moved = 0;
+		if (qtouch_tsdebug & 2)
+			pr_info("===+===press\n");
+		input_report_key(ts->input_dev, BTN_MOUSE, MINIPAD_KEY_PRESS);
+		input_sync(ts->input_dev);
+		return;
+	}
+
+	if (!touch) {
+		minipad_x_start = 0;
+		minipad_y_start = 0;
+
+		if ((!minipad_moved) && (minipad_delta_x != 0 || minipad_delta_y != 0)) {
+			input_report_rel(ts->input_dev, REL_X, minipad_delta_x);
+			input_report_rel(ts->input_dev, REL_Y, minipad_delta_y);
+			input_sync(ts->input_dev);
+			if (qtouch_tsdebug & 2)
+			pr_info("===+===move after release delta_x:%d; delta_y%d; touch:%d\n",
+				minipad_delta_x, minipad_delta_y, touch);
+			minipad_delta_x = 0;
+			minipad_delta_y = 0;
+			msleep(15);
+		}
+
+		if (qtouch_tsdebug & 2)
+			pr_info("===+===release\n");
+		input_report_key(ts->input_dev, BTN_MOUSE, MINIPAD_KEY_RELEASE);
+		input_sync(ts->input_dev);
+		return;
+	}
+
+	minipad_delta_x = (int)x-(int)minipad_x_start;
+	minipad_delta_y = (int)y-(int)minipad_y_start;
+
+	if (abs(minipad_delta_x) > 2 || abs(minipad_delta_y) > 2) {
+		input_report_rel(ts->input_dev, REL_X, minipad_delta_x);
+		input_report_rel(ts->input_dev, REL_Y, minipad_delta_y);
+		input_sync(ts->input_dev);
+		if (qtouch_tsdebug & 2)
+			pr_info("===+===move delta_x:%d; delta_y%d; touch:%d\n", minipad_delta_x,
+				minipad_delta_y, touch);
+
+		minipad_x_start = x;
+		minipad_y_start = y;
+		minipad_delta_x = 0;
+		minipad_delta_y = 0;
+		minipad_moved = 1;
+		msleep(15);
+	}
+
+	return;
+
+#if 0
+	int x_temp = 0;
+	int y_temp = 0;
+	int mouse_direction = 0;
+	long comp_jiffies = 0;
+	long current_jiffies = jiffies;
+
+	/* initial touchdown */
+	if (!minipad_x_start && !minipad_y_start && touch) {
+		minipad_x_start = x;
+		minipad_y_start = y;
+		minipad_tap_enabled = 1;
+		minipad_touchdown_jiffies = current_jiffies;
+		return;
+	}
+
+	/* calc how far finger moved in x and y and get moving direction */
+	x_temp = abs(x - minipad_x_start);
+	y_temp = abs(y - minipad_y_start);
+	if (x_temp >= y_temp) {
+		if (x > minipad_x_start)
+			mouse_direction = MOUSE_RIGHT;
+		else
+			mouse_direction = MOUSE_LEFT;
+	} else {
+		if (y > minipad_y_start)
+			mouse_direction = MOUSE_DOWN;
+		else
+			mouse_direction = MOUSE_UP;
+	}
+
+	/* finger released */
+	if (!touch) {
+		/* If we see a liftoff after a recorded mouse movement then reset the varieables */
+		if (minipad_tap_enabled) {
+			/* Check to see if the alotted time was there for a tap to be detected if the time was to long */
+			comp_jiffies = (long)current_jiffies - (long)minipad_touchdown_jiffies;
+			if (
+			   (comp_jiffies >= MINIPAD_TAP_TIME_MIN_TH) && (comp_jiffies <= MINIPAD_TAP_TIME_MAX_TH) &&
+			   (x_temp <= MINIPAD_TAP_BOUND_X) &&
+			   (y_temp <= MINIPAD_TAP_BOUND_Y) &&
+			   (x >= (minipad_params.min_x + MINIPAD_TAP_GUTTER_X)) &&
+			   (x <= (minipad_params.max_x - MINIPAD_TAP_GUTTER_X)) &&
+			   (y >= (minipad_params.min_y + MINIPAD_TAP_GUTTER_Y)) &&
+			   (y <= (minipad_params.max_y - MINIPAD_TAP_GUTTER_Y))) {
+				/* check double tap */
+				comp_jiffies = (long)minipad_touchdown_jiffies - (long)minipad_touchdown_prev_jiffies;
+				if ((comp_jiffies >= MINIPAD_DOUBLE_TAP_TIME_MIN_TH)
+				   && (comp_jiffies <= MINIPAD_DOUBLE_TAP_TIME_MAX_TH)) {
+					/* yes, this is the second tap of double tap
+					 * Touch event happened within the alotted time so send the select */
+					if (qtouch_tsdebug & 2)
+						pr_info("mouse: Double tap -> press CENTER\n");
+					input_report_key(ts->input_dev, BTN_MOUSE, MINIPAD_KEY_PRESS);
+					input_report_key(ts->input_dev, BTN_MOUSE, MINIPAD_KEY_RELEASE);
+					minipad_touchdown_prev_jiffies = MINIPAD_INITIAL_JIFFIES;
+				} else {
+					/* no, this is the first tap */
+					minipad_touchdown_prev_jiffies = minipad_touchdown_jiffies;
+				}
+			}
+		}
+		/* bye */
+		minipad_x_start = 0;
+		minipad_y_start = 0;
+		minipad_tap_enabled = 0;
+		minipad_touchdown_jiffies = MINIPAD_INITIAL_JIFFIES;
+		return;
+	 }
+
+	/* general mouse moving - check the movement to see if it matches the threshold */
+	switch (mouse_direction) {
+	case MOUSE_RIGHT:
+		while (x_temp > minipad_params.mouse_th_x) {
+			input_report_rel(ts->input_dev, REL_X, 1);
+			if (qtouch_tsdebug & 2)
+				pr_info("mouse: Mouse x++\n");
+			input_sync(ts->input_dev);
+
+			minipad_x_start = minipad_x_start + minipad_params.mouse_th_x;
+			if (minipad_x_start > minipad_params.max_x)
+				minipad_x_start = minipad_params.max_x;
+			x_temp = x - minipad_x_start;
+			minipad_tap_enabled = 0;
+		}
+		break;
+	case MOUSE_LEFT:
+		while (x_temp > minipad_params.mouse_th_x) {
+			input_report_rel(ts->input_dev, REL_X, -1);
+			if (qtouch_tsdebug & 2)
+				pr_info("mouse: Mouse x--\n");
+			input_sync(ts->input_dev);
+
+			minipad_x_start = minipad_x_start - minipad_params.mouse_th_x;
+			if (minipad_x_start < minipad_params.min_x)
+				minipad_x_start = minipad_params.min_x;
+			x_temp = minipad_x_start - x;
+			minipad_tap_enabled = 0;
+		}
+		break;
+	case MOUSE_DOWN:
+		while (y_temp > minipad_params.mouse_th_y) {
+			input_report_rel(ts->input_dev, REL_Y, 1);
+			if (qtouch_tsdebug & 2)
+				pr_info("mouse: Mouse y++\n");
+			input_sync(ts->input_dev);
+
+			minipad_y_start = minipad_y_start + minipad_params.mouse_th_y;
+			if (minipad_y_start > minipad_params.max_x)
+				minipad_y_start = minipad_params.max_x;
+			y_temp = y - minipad_y_start;
+			minipad_tap_enabled = 0;
+		}
+		break;
+	case MOUSE_UP:
+		while (y_temp > minipad_params.mouse_th_y) {
+			input_report_rel(ts->input_dev, REL_Y, -1);
+			if (qtouch_tsdebug & 2)
+				pr_info("mouse: Mouse y--\n");
+			input_sync(ts->input_dev);
+
+			minipad_y_start = minipad_y_start - minipad_params.mouse_th_y;
+			if (minipad_y_start < minipad_params.min_y)
+				minipad_y_start = minipad_params.min_y;
+			y_temp = minipad_y_start - y;
+			minipad_tap_enabled = 0;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return;
 #endif
-	      /* Check for Calibration.  If we are calibrating, indicate in a message */
-	    if ((buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CAL))
-		{
-		  calibrating = 1;
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: The IC is calibrating.\n");
-		}
-	    else if ((calibrating != 0) && 
-		       ((buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CAL) == 0))
-		{
-		  calibrating = 0;
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: The IC is done calibrating.\n");
-		  clk_busy_wait(3000);
-		}
-	      
-	      /* Check for a possible overflow from the HW.  If there has been an overflow, log a message. */
-	    if (buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_OFL)
-		{
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: An overflow has occurred.\n");
-		}
-	      
-	      /* SIGERR: Error in acquisition */
-	    if (buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_SIGERR)
-		{
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: An SIGERR has occurred.\n");
-                  cntSigerr++;
-                  if (cntSigerr > 1000) {
-                     ret = qtm_obp_calibrate(qtmTsGl->client);    
-		     cntSigerr = 0;
-		  }
-		}
-	      
-	      /* CFGERR: Error with object setup */
-	    if (buf[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CFGERR)
-		{
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: An CFGERR has occurred.\n");
-		}
-	  }
+}
 
-	  /* Check for OBJ_ID_TOUCH_MULTITOUCHSCREEN_T9 report IDs*/
-	  else if ( buf[QTM_OBP_REPORT_ID_BYTE] >= qtm_obp_obj_table_elem[OBJ_ID_TOUCH_MULTITOUCHSCREEN_T9].report_id_low \
-		    && buf[QTM_OBP_REPORT_ID_BYTE] <= qtm_obp_obj_table_elem[OBJ_ID_TOUCH_MULTITOUCHSCREEN_T9].report_id_high )
-	  {
-	      /* Align X and Y LSB and MSB bits for 10-bit PTR */
-	      x = buf[QTM_OBP_T9_XPOS_MSB];
-	      x = (x << QTM_OBP_T9_XYPOS_LSB_POS_SHIFT) |	\
-		((buf[QTM_OBP_T9_XYPOS_LSB] & QTM_OBP_T9_XYPOS_LSB_XPOS_MASK) >> QTM_OBP_T9_XYPOS_LSB_POS_SHIFT);
-	      x = x >> 2;
-	      
-	      y = buf[QTM_OBP_T9_YPOS_MSB];
-	      y = (y << QTM_OBP_T9_XYPOS_LSB_POS_SHIFT) | (buf[QTM_OBP_T9_XYPOS_LSB] & QTM_OBP_T9_XYPOS_LSB_YPOS_MASK);
-	      y = y >> 2;
-	      
-	      /*
-	      ** X and Y are flipped on the sensor panel so manipulate the data so
-	      ** X data is Y and Y data is reported as X.
-	      ** Swap the x y data due to sensor orientation
-	      */
-	      swap(x, y);
-	      
-	      /* Reverse the x or y value based on sensor to screen layout */
-	      // for Zeppelin remove the x stuff
-           // x = Q51001211009AK08_TS_MAX_X - x; /* UNCOMMENT MORRISON & MOTUS */
-           // x = Q51001211009AK08_TS_MAX_X - x; /* COMMENT Zeppelin -- Need to Clean this up ??? */
-	      y = Q51001211009AK08_TS_MAX_X - y;
-	      
-	      /* capture width/area */
-	      w = buf[QTM_OBP_T9_TCH_AREA];
-	      
-	      /* capture pressure/amplitude */
-	      z = buf[QTM_OBP_T9_TCH_AMPLI];
-	      
-	      /* Report touch */
-	      finger = (buf[QTM_OBP_REPORT_ID_BYTE] - qtm_obp_obj_table_elem[OBJ_ID_TOUCH_MULTITOUCHSCREEN_T9].report_id_low) ; //removed the +1;
-		  
-	      if( ((buf[QTM_OBP_T9_STATUS] & QTM_OBP_T9_STATUS_TOUCH_MASK) == QTM_OBP_T9_STATUS_TOUCH_MASK ) \
-		  || ((buf[QTM_OBP_T9_STATUS] & QTM_OBP_T9_STATUS_PRESS_MASK) == QTM_OBP_T9_STATUS_PRESS_MASK ) \
-		  || ((buf[QTM_OBP_T9_STATUS] &  QTM_OBP_T9_STATUS_MOVE_MASK) == QTM_OBP_T9_STATUS_MOVE_MASK ))
-		{
-		  press_release_flag = 1;
-		  finger_press_release |= ( 1 << finger ); 
-		}
-	      
-	      if( (buf[QTM_OBP_T9_STATUS] & QTM_OBP_T10_STATUS_RELEASE_MASK) == QTM_OBP_T10_STATUS_RELEASE_MASK)
-		{
-		  press_release_flag = 0;
-		  finger_press_release &= ~( 1 << finger ); 
-		}
-	      
-	    KEY08_PRINTK("qtm_obp_obp_ts_work_func: input report : finger=%d x=%d, y=%d, z=%d, w=%d, press=0x%x, ABS_MISC=0x%x\n",
-			   finger, (x*SCREEN_X/KEY08_MAX_X),(y*SCREEN_Y/KEY08_MAX_Y),z,w,press_release_flag,
-			   ((finger<<16)|finger_press_release));
-		down = press_release_flag;
-#ifndef GOOGLE_MULTITOUCH
-	    input_report_abs(qtmTsGl->input_dev, ABS_MISC,
-			       ( (finger << 16) | finger_press_release )); 
-	      
-	    input_report_abs(qtmTsGl->input_dev, ABS_X, (x * SCREEN_X / KEY08_MAX_X));
-	    input_report_abs(qtmTsGl->input_dev, ABS_Y, (y * SCREEN_Y / KEY08_MAX_Y));
-	    input_report_abs(qtmTsGl->input_dev, ABS_PRESSURE, z);
-	    input_report_abs(qtmTsGl->input_dev, ABS_TOOL_WIDTH, w);
-	    input_report_key(qtmTsGl->input_dev, BTN_TOUCH, press_release_flag);
-	      
-#else
+
+/* Handles a message from the minipad touch object. */
+static int do_minipad_touch_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
+				  void *_msg)
+{
+	struct qtm_touch_multi_msg *msg = _msg;
+	int x;
+	int y;
+	int pressure;
+	int width;
+	int down;
+	uint32_t finger;
+
+	/* just one finger is allowed at minipad */
+	finger = msg->report_id - (obj->report_id_min + obj->entry.num_rids);
+	if (finger != 0)
+		return 0;
+
+	/* x/y are 10bit values, with bottom 2 bits inside the xypos_lsb */
+	x = (msg->xpos_msb << 2) | ((msg->xypos_lsb >> 6) & 0x3);
+	y = (msg->ypos_msb << 2) | ((msg->xypos_lsb >> 2) & 0x3);
+	width = msg->touch_area;
+	pressure = msg->touch_amp;
+
+	if (ts->pdata->minipad_flags & QTOUCH_FLIP_X)
+		x = minipad_params.max_x - x;
+
+	if (ts->pdata->minipad_flags & QTOUCH_FLIP_Y)
+		y = minipad_params.max_y - y;
+
+	if (ts->pdata->minipad_flags & QTOUCH_SWAP_XY)
+		swap(x, y);
+
+	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
+
+	if (qtouch_tsdebug & 2)
+		pr_info("%s: x=%d y=%d p=%d w=%d touch=%d\n", __func__,
+			x, y, pressure, width, down);
+       if (width < 6)
+               minipad_process_as_trackball(ts, x, y, down);
+	return 0;
+}
+#endif
+
+/* Handles a message from a multi-touch object. */
+static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
+			      void *_msg)
+{
+	struct qtm_touch_multi_msg *msg = _msg;
+	int i;
+	int x;
+	int y;
+	int pressure;
+	int width;
+	uint32_t finger;
+	int down;
+
+	finger = msg->report_id - obj->report_id_min;
+	if (finger >= ts->pdata->multi_touch_cfg.num_touch)
+		return 0;
+
+	/* x/y are 10bit values, with bottom 2 bits inside the xypos_lsb */
+	x = (msg->xpos_msb << 2) | ((msg->xypos_lsb >> 6) & 0x3);
+	y = (msg->ypos_msb << 2) | ((msg->xypos_lsb >> 2) & 0x3);
+	width = msg->touch_area;
+	pressure = msg->touch_amp;
+
+
+	if (ts->pdata->flags & QTOUCH_SWAP_XY)
+		swap(x, y);
+
+	if (qtouch_tsdebug & 2)
+		pr_info("%s: stat=%02x, f=%d x=%d y=%d p=%d w=%d\n", __func__,
+			msg->status, finger, x, y, pressure, width);
+
+	if (finger >= _NUM_FINGERS) {
+		pr_err("%s: Invalid finger number %dd\n", __func__, finger);
+		return 1;
+	}
+
+	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
+
 	/* The chip may report erroneous points way
 	beyond what a user could possibly perform so we filter
 	these out */
-	if (qtmTsGl->finger_data[finger].down &&
-			(abs(qtmTsGl->finger_data[finger].x_data - x) > 400 ||
-			abs(qtmTsGl->finger_data[finger].y_data - y) > 250)) 
-	{
-		down = 0;
-		KEY08_PRINTK("%s: x0 %i x1 %i y0 %i y1 %i\n",
-				__func__,
-				qtmTsGl->finger_data[finger].x_data, x,
-						qtmTsGl->finger_data[finger].y_data, y);
-	} 
-	else 
-	{
-		qtmTsGl->finger_data[finger].x_data = x;
-		qtmTsGl->finger_data[finger].y_data = y;
-		qtmTsGl->finger_data[finger].w_data = w;
+	if (ts->finger_data[finger].down &&
+			(abs(ts->finger_data[finger].x_data - x) > ts->x_delta ||
+			abs(ts->finger_data[finger].y_data - y) > ts->y_delta)) {
+				down = 0;
+				if (qtouch_tsdebug & 2)
+					pr_info("%s: x0 %i x1 %i y0 %i y1 %i\n",
+						__func__,
+						ts->finger_data[finger].x_data, x,
+						ts->finger_data[finger].y_data, y);
+	} else {
+		ts->finger_data[finger].x_data = x;
+		ts->finger_data[finger].y_data = y;
+		ts->finger_data[finger].w_data = width;
 	}
 
 	/* The touch IC will not give back a pressure of zero
 	   so send a 0 when a liftoff is produced */
-	qtmTsGl->finger_data[finger].down = down;
-	if (!down) 
-	{
-		qtmTsGl->finger_data[finger].z_data = 0;
-	} 
-	else 
-	{
-		qtmTsGl->finger_data[finger].z_data = 1;
+	if (!down) {
+		ts->finger_data[finger].z_data = 0;
+
+		if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
+			if (ts->finger_data[finger].y_data > ((9 * ts->pdata->abs_max_y) / 10)) {
+				ignore_keyarray_touches = 1;
+				mod_timer(&keyarray_timer, jiffies + KEYARRAY_IGNORE_TIME);
+				if (qtouch_tsdebug)
+					pr_info("%s: Keyarray press suppressed\n",__func__);
+			}
+		}
+	} else {
+		ts->finger_data[finger].z_data = pressure;
+		ts->finger_data[finger].down = down;
 	}
 
-	for (i = 0; i < 2; i++) 
+#ifdef CONFIG_LTT_LITE
 	{
-/*
-		if (qtmTsGl->finger_data[i].down == 0)
+		static char message[] = "input_report begin\n";
+		ltt_lite_log_string(message, sizeof(message) - 1);
+	}
+#endif
+
+	for (i = 0; i < ts->pdata->multi_touch_cfg.num_touch; i++) {
+		if (ts->finger_data[i].down == 0)
 			continue;
-*/
-		input_report_abs(qtmTsGl->input_dev, ABS_MT_TOUCH_MAJOR,
-				 qtmTsGl->finger_data[i].z_data);
-		input_report_abs(qtmTsGl->input_dev, ABS_MT_WIDTH_MAJOR,
-				 qtmTsGl->finger_data[i].w_data);
-		input_report_abs(qtmTsGl->input_dev, ABS_MT_POSITION_X,
-				 qtmTsGl->finger_data[i].x_data);
-		input_report_abs(qtmTsGl->input_dev, ABS_MT_POSITION_Y,
-				 qtmTsGl->finger_data[i].y_data);
-		input_mt_sync(qtmTsGl->input_dev);
+		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
+				 ts->finger_data[i].z_data);
+		input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
+				 ts->finger_data[i].w_data);
+		input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+				 ts->finger_data[i].x_data);
+		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+				 ts->finger_data[i].y_data);
+		input_mt_sync(ts->input_dev);
 	}
-	input_sync(qtmTsGl->input_dev);
-	
-	if (!down) 
+	input_sync(ts->input_dev);
+
+#ifdef CONFIG_LTT_LITE
 	{
-		memset(&qtmTsGl->finger_data[finger], 0, sizeof(struct coordinate_map));
+		static char message[] = "input_report end\n";
+		ltt_lite_log_string(message, sizeof(message) - 1);
 	}
-
-#endif
-	    input_sync(qtmTsGl->input_dev);
-	      
-	    } /* Check for OBJ_ID_TOUCH_MULTITOUCHSCREEN_T9 report IDs*/
-
-          /* OBJ_ID_TOUCH_KEYARRAY_T15 */
-          else if ( buf[QTM_OBP_REPORT_ID_BYTE] >= qtm_obp_obj_table_elem[OBJ_ID_TOUCH_KEYARRAY_T15].report_id_low \
-                    && buf[QTM_OBP_REPORT_ID_BYTE] <= qtm_obp_obj_table_elem[OBJ_ID_TOUCH_KEYARRAY_T15].report_id_high )
-            {
-                  // Check if press
-
-                  if ( buf[QTM_OBP_T15_STATUS] & QTM_OBP_T15_KEY_PRESS_MASK)
-                  {
-                       if ( buf[QTM_OBP_T15_CHANNEL] == QTM_OBP_T15_BACK_KEY)
-                       {
-                           input_report_key(qtmTsGl->input_dev, 158, 1);
-                           qtm_lastKeyPressed = 158;
-                       }
-                       if ( buf[QTM_OBP_T15_CHANNEL] == QTM_OBP_T15_HOME_KEY)
-                       {
-                           input_report_key(qtmTsGl->input_dev, 102, 1);
-                           qtm_lastKeyPressed = 102;
-                       }
-                       if ( buf[QTM_OBP_T15_CHANNEL] == QTM_OBP_T15_MENU_KEY)
-                       {
-                           input_report_key(qtmTsGl->input_dev, 139, 1);
-                           qtm_lastKeyPressed = 139;
-                       }
-                  }
-                  else
-                  {
-                       
-		    if ( qtm_lastKeyPressed != 0 &&  //  buf[QTM_OBP_T15_CHANNEL] == 0 ???
-                            buf[QTM_OBP_T15_CHANNEL] != 0x02 && 
-                            buf[QTM_OBP_T15_CHANNEL] != 0x04 && 
-                            buf[QTM_OBP_T15_CHANNEL] != 0x10 )
-                       {
-                           input_report_key(qtmTsGl->input_dev, qtm_lastKeyPressed, 0 );
-                           qtm_lastKeyPressed = 0;
-                       }
-                       input_sync(qtmTsGl->input_dev);
-                  }
-
-		  KEY08_PRINTK("qtm_obp_obp_ts_work_func: key report : press=0x%x key=0x%x qtm_lastKeyPressed=0x%x\n",buf[1],buf[2],qtm_lastKeyPressed);
-
-
-            } /* OBJ_ID_TOUCH_KEYARRAY_T15 */
-          
-	  else
-	    {
-	      KEY08_PRINTK("qtm_obp_obp_ts_work_func: Message is default.  Data sent is 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", \
-			  buf[0], buf[1], buf[2],buf[3], buf[4], buf[5]);
-              qtm_obp_send_message_processor_pointer();
-	    }
-	  
-	} // if ( qtmTsGl->mode == KEY08_MODE_OBP )
-
-exit_func:
-
-	KEY08_PRINTK("%s: Unlocking transaction mutex\n",__FUNCTION__);
-	mutex_unlock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Released transaction mutex\n",__FUNCTION__);
-	
-	if (qtmTsGl->use_irq) 
-	{
-		KEY08_PRINTK("%s: Enabling irq %d\n", __FUNCTION__, qtmTsGl->client->irq);
-		enable_irq(qtmTsGl->client->irq);
-	}
-
-	t2 = ktime_get();
-
-	KEY08_PRINTK("qtm_obp_ts_work: final total %llu\n", ktime_to_ns(t2) - ktime_to_ns(t1));
-	KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-}
-
-// Used to poll instead of irq .. not really used
-static enum hrtimer_restart qtm_obp_ts_timer_func(struct hrtimer *timer)
-{
-  struct qtm_obp_ts_data *ts = container_of(timer, struct qtm_obp_ts_data, timer);
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-  
-  schedule_work(&ts->work);
-  
-  hrtimer_start(&ts->timer, ktime_set(0, 1250000000), HRTIMER_MODE_REL);
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-  return HRTIMER_NORESTART;
-}
-
-// This is the IRQ handler
-static irqreturn_t qtm_obp_ts_irq_handler(int irq, void *dev_id)
-{
-  struct qtm_obp_ts_data *ts = dev_id;
-  
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-  KEY08_PRINTK("%s: Disable irq %d\n",__FUNCTION__, ts->client->irq);
-  disable_irq(ts->client->irq);
-  
-  schedule_work(&ts->work);
-  KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-  return IRQ_HANDLED;
-}
-
-// This is used to read the version
-// In OBP mode read the version at offset 2 in the info block
-static int  qtm_obp_ts_read_app_version(void)
-{
-  struct	i2c_client *client;
-  uint8_t data[6];
-  int	reg;
-  int	rc=0;
-  int	version = -1;
-  
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-  KEY08_PRINTK("qtm_obp_ts_read_app_version: qtmTsGl: 0x%x, qtmTsGl->client: 0x%x\n", (int)qtmTsGl, (int)qtmTsGl->client);
-  client = qtmTsGl->client;
-  
-  if ( qtmTsGl->mode == KEY08_MODE_OBP )
-    {
-      reg = QTM_OBP_INFO_BLOCK_VERSION;
-      version = qtm_obp_ts_read_register(client , reg);
-      KEY08_PRINTK("qtm_obp_ts_read_app_version: Got: %d from reading reg 0x%x\n", version,reg);
-      
-    }
-  else
-    {
-      /* we are in bootloader mode. So, read 1 byte from bootloader client */
-      client->addr = qtm_obp_bl_addr;;
-      if ((rc = i2c_master_recv(client, data, 1 )) < 0 )
-	{
-	  KEY08_PRINTK("qtm_obp_ts_read_app_version: i2c_master_revc bootloader error  %d\n,",rc);
-	}
-      else 
-	{
-	  version = data[0];
-	  KEY08_PRINTK("qtm_obp_ts_read_app_version: In bootloader mode version 0x%x\n", version);
-	}
-    }
-  KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-  return(version);
-}
-
-// This is the probe function that is initially called to "detect" the device
-int qtm_obp_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
-{
-	struct platform_device *pdev;
-	unsigned long request_flags =  IRQ_TYPE_LEVEL_LOW;
-	int ret = 0;
-	uint16_t max_x, max_y;
-	int fuzz_x, fuzz_y, fuzz_p, fuzz_w;
-	int inactive_area_left;
-	int inactive_area_right;
-	int inactive_area_top;
-	int inactive_area_bottom;
-	int	numNeededReads;
-	char	data[10];
-	int retry = 10;
-
-        printk("%s: Entering.....\n", __FUNCTION__);
-
-	prevX = 0;
-	prevY = 0;
-	threshX = 20;
-	threshY = 20;
-	ret = misc_register(&qtm_obp_pf_driver);
-
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) 
-	{
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: need I2C_FUNC_I2C\n");
-		ret = -ENODEV;
-		goto err_check_functionality_failed;
-	}
-
-	qtmTsGl = kzalloc(sizeof(*qtmTsGl), GFP_KERNEL);
-	if (qtmTsGl == NULL) 
-	{
-		ret = -ENOMEM;
-		goto err_alloc_data_failed;
-	}
-
-	INIT_WORK(&qtmTsGl->work, qtm_obp_ts_work_func);
-
-	qtmTsGl->client = client;
-	i2c_set_clientdata(client, qtmTsGl);
-	client->flags = 0;
-	qtmTsGl->calibrate = FALSE;
-	qtmTsGl->suspendMode = FALSE;
-	qtmTsGl->irqCount = 0;
-        qtmTsGl->XferStatus = KEY08_FM_DOWNLOAD_NOT_STARTED | KEY08_CFG_DOWNLOAD_NOT_STARTED;
-        qtmTsGl->cntBadCRC = 0;
-
-	// initialize i2c addresses 
-
-	qtm_obp_normal_addr = 0x11;
-	qtm_obp_bl_addr = 0x5F;
-
-	// initialize transaction mutex
-        mutex_init(&qtmTsGl->transaction_mutex);
-
-	pdev = (struct platform_device *)client->dev.platform_data;
-	if ( pdev && pdev->num_resources && (!strcmp(pdev->name,"qtm_obp")))
-	{
-		struct	resource *resource;
-		printk("qtm_obp_ts_probe: paltform data for '%s', num_resources %d\n",
-			pdev->name, pdev->num_resources);
-		resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-		if ( resource)
-		{
-			qtm_obp_normal_addr = resource->start;
-			qtm_obp_bl_addr = resource->end;
-			printk("qtm_obp_ts_probe: Got resource. Normal Addr: 0x%x, Bootloader: 0x%x\n",
-				qtm_obp_normal_addr, qtm_obp_bl_addr);
-		}
-		else
-		{
-			printk("qtm_obp_ts_probe: Could not optain GPIO information. Using default values\n");
-		}
-	} 
-	else
-	{
-		printk("qtm_obp_ts_probe: Could not get platform reousrces. Using default values\n");
-			
-	}
-
-	printk("qtm_obp_ts_probe: attached, client: 0x%x\n", (unsigned)client);
-	printk("qtm_obp_ts_probe: irq: 0x%x\n", client->irq);
-
-	inactive_area_left = 0;
-	inactive_area_right = 0;
-	inactive_area_top = 0;
-	inactive_area_bottom = 0;
-	fuzz_x = 0;
-	fuzz_y = 0;
-	fuzz_p = 0;
-	fuzz_w = 0;
-
-	if (qtmTsGl->power) 
-	{
-		ret = qtmTsGl->power(1);
-		if (ret < 0) 
-		{
-			KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe power on failed\n");
-			goto err_power_failed;
-		}
-	}
-	KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe STARTED\n");
-	KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe Getting Versions\n");
-
-/*
-   This hardware requires to read all data from the buffers when it starts.
-   Until all data is read, it will not assert the IRQ to high. So, we need to
-   read bunch of sets of 6 bytes until there are no more.
-
-   NOTE: if we faile to read version, we may be in the bootloader mode. In that case,
-   we have to read from different address.
-*/
-
-/* Determine the current operation mode (Normal, OBP, Bootloader)
-   Read 6 bytes from i2c_normal_addr
-   if read fails, we check to see if we are in bootloader mode
-     we read 1 byte from i2c_bl_addr
-     if read fails, we assume no flip is connected and set mode to UNKNOWN
-     if read passes, we send unlock command to bootloader and set mode to BOOTLOADER.
-        remianing bootloader processing will be handled by the work function
-   if read passes
-     set mode to NORMAL
-     check if first byte read is 0xFF. this implies the buffer is empty and we are in NORMAL mode.
-     check if first byte read is 0x70. this implies the chip in normal mode is sending status messages. keep reading these messages.
-     if first byte read is neither 0xFF nor 0x70, we can assume we are in OBP mode.
-   if we are in here for more than 20 loops, we assume something bad has happened and get out with an error message
- */
-
-	numNeededReads = 1;
-	do
-	{
-		clk_busy_wait(3000);
-		memset(data,0,sizeof(data));
-
-		if ((ret = i2c_master_recv(client, data, 6 )) < 0 )
-		{
-			printk("qtm_obp_ts_probe: i2c_master_recv (normal client) error  %d\n",ret);
-			client->addr = qtm_obp_bl_addr;
-			if ((ret = i2c_master_recv(client, data, 1 )) < 0 )
-			{
-				printk("qtm_obp_ts_probe: i2c_master_recv (bootloader client) error  %d\n",ret);
-				printk("qtm_obp_ts_probe: Cause: touch device is probably missing. \n");
-				qtmTsGl->mode = KEY08_MODE_UNKNOWN;
-				return ret;
-			}
-			else
-			{
-				printk("qtm_obp_ts_probe: Firmware Not Present, Firmware loading will start now ");
-				printk("qtm_obp_ts_probe: i2c_master_recv (bootloader client) data: 0x%x\n",data[0]);
-				printk("qtm_obp_ts_probe: entering bootloader mode\n");
-				client->addr = qtm_obp_bl_addr;
-				qtmTsGl->mode = KEY08_MODE_BOOTLOADER;
-				/* wait until we get 0x8n */
-				while ( (data[0] & 0xF0) != 0x80 )
-				{
-					printk("qtm_obp_ts_probe: Sending Unblock command (0xDC,0xAA)\n");
-					data[0] = 0xDC;
-					data[1] = 0xAA;
-					ret = i2c_master_send (client, data, 2);
-					clk_busy_wait(3000);
-					ret = i2c_master_recv(client, data, 1);
-					if ( ret < 0 )
-					{
-						printk("qtm_obp_ts_probe: i2c_master_recv (bootloader client waiting for 0x8n) error  %d\n",ret);
-						return ret;
-					}
-					clk_busy_wait(3000);
-				}
-			}
-		}
-		else 
-                {
-			printk("qtm_obp_ts_probe: (%d) receiving from 0x%x(number of bytes: %d, type: %d): 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
-			numNeededReads++, client->addr, ret, ((data[0]>>4&0x07)), data[0], data[1], data[2], data[3], data[4], data[5] );
-
-                        qtmTsGl->mode = KEY08_MODE_NORMAL;
-                        
-                        // if we got a 0xff it means the buffer is empty so get out of the loop, we must be in Normal mode
-			if ( data[0] == 0xff )
-			{
-				printk("qtm_obp_ts_probe: Got all data.\n");
-				ret = 0;
-			}
-
-                        // if we have the pre-OBP firmware a read from register 0 will read back the status message event (0x70), 
-                        // but if we do not get 0x70 we can assume we are in OBP mode
-                        else if (data[0] != 0x70)
-                        {
-                               qtmTsGl->mode = KEY08_MODE_OBP;
-                        }
-                }
-	} while ( ret == 6 && qtmTsGl->mode == KEY08_MODE_NORMAL && numNeededReads < 20);
-
-        // if we have read 20 times from the status register, something bad happened so get out.
-        if (numNeededReads >= 20)
-	{
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: stuck reading status \n");
-		goto err_detect_failed;
-	}
- 
-        // if we are in NORMAL mode, keep reading from register 0 .. empty the buffer ???
-	while (retry-- > 0 && qtmTsGl->mode == KEY08_MODE_NORMAL )
-	{
-		ret = qtm_obp_ts_read_register(client, (int)0x0);
-		if (ret >= 0)
-			break;
-		msleep(100);
-	}
-
-	if (ret < 0)
-	{
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: i2c_smbus_read_byte_data failed\n");
-		goto err_detect_failed;
-	}
-
-	if ( qtmTsGl->mode == KEY08_MODE_NORMAL )
-	{
-		printk("qtm_obp_ts_probe: Chip ID 0x%x\n", ret);
-		ret = qtm_obp_ts_read_register(client, (int)0x1);
-		if (ret < 0)
-		{
-			KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: i2c_smbus_read_byte_data failed\n");
-			goto err_detect_failed;
-		}
-
-		printk("qtm_obp_ts_probe: Product Code Version 0x%x\n", ret);
-
-	}
-
-        if ( qtmTsGl->mode == KEY08_MODE_OBP)
-        {
-                qtm_obp_load_obp_objects();
-                save_low_power_regs();
-        }
-
-	if ( qtmTsGl->mode != KEY08_MODE_UNKNOWN )
-	{
-		max_x = KEY08_MAX_X;
-		max_y = KEY08_MAX_Y;
-
-		qtmTsGl->max[1] = max_y = (ret >> 8 & 0xff) | ((ret & 0x1f) << 8);
-		qtmTsGl->max[1] = max_y;
-
-		if (qtmTsGl->flags & KEY08_SWAP_XY)
-			swap(max_x, max_y);
-
-		qtmTsGl->input_dev = input_allocate_device();
-		if (qtmTsGl->input_dev == NULL) 
-		{
-			ret = -ENOMEM;
-			KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: Failed to allocate input device\n");
-			goto err_input_dev_alloc_failed;
-		}
-		qtmTsGl->input_dev->name = "touchscreen";
-
-		inactive_area_left = inactive_area_left * max_x / 0x10000;
-		inactive_area_right = inactive_area_right * max_x / 0x10000;
-		inactive_area_top = inactive_area_top * max_y / 0x10000;
-		inactive_area_bottom = inactive_area_bottom * max_y / 0x10000;
-		fuzz_x = fuzz_x * max_x / 0x10000;
-		fuzz_y = fuzz_y * max_y / 0x10000;
-		qtmTsGl->snap_down[!!(qtmTsGl->flags & KEY08_SWAP_XY)] = -inactive_area_left;
-		qtmTsGl->snap_up[!!(qtmTsGl->flags & KEY08_SWAP_XY)] = max_x + inactive_area_right;
-		qtmTsGl->snap_down[!(qtmTsGl->flags & KEY08_SWAP_XY)] = -inactive_area_top;
-		qtmTsGl->snap_up[!(qtmTsGl->flags & KEY08_SWAP_XY)] = max_y + inactive_area_bottom;
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: max_x %d, max_y %d\n", max_x, max_y);
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: inactive_x %d %d, inactive_y %d %d\n",
-			inactive_area_left, inactive_area_right,
-			inactive_area_top, inactive_area_bottom);
-		inactive_area_left =0;
-		inactive_area_top =0;
-		inactive_area_right=0;
-		inactive_area_bottom=0;
-		
-		KEY08_PRINTK("qtm_obp_ts_probe: ABS_MISC=0xFFFFF, ABS_X=%d, ABS_Y=%d, ABS_PRESSURE=0xff, ABS_TOOL_WIDTH=0xf\n",
-                SCREEN_X, SCREEN_Y);
-#ifndef GOOGLE_MULTITOUCH
-		input_set_abs_params(qtmTsGl->input_dev, ABS_MISC, 0,0x000FFFFF, 0, 0); //sajid - added for multitouch
-		input_set_abs_params(qtmTsGl->input_dev, ABS_X, 0, SCREEN_X, 0, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_Y, 0, SCREEN_Y, 0, 0);
-		
-		input_set_abs_params(qtmTsGl->input_dev, ABS_PRESSURE, 0, 0xff, 2, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_TOOL_WIDTH, 0,0xf , 2, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_HAT0X, 0, 0xfff, 2, 0); //sajid - not needed ??
-		input_set_abs_params(qtmTsGl->input_dev, ABS_HAT0Y, 0, 0xfff, 2, 0); //sajid - not needed ??
-		/* qtmTsGl->input_dev->name = qtmTsGl->keypad_info->name; */
-		set_bit(EV_SYN, qtmTsGl->input_dev->evbit);
-		set_bit(EV_KEY, qtmTsGl->input_dev->evbit);
-		set_bit(BTN_TOUCH, qtmTsGl->input_dev->keybit);
-		set_bit(KEY_HOME, qtmTsGl->input_dev->keybit);
-		set_bit(KEY_BACK, qtmTsGl->input_dev->keybit);
-		set_bit(KEY_MENU, qtmTsGl->input_dev->keybit);
-		set_bit(BTN_2, qtmTsGl->input_dev->keybit);     
-		set_bit(EV_ABS, qtmTsGl->input_dev->evbit);
-#else
-		/* Hard code the values. It's for Zeppelin product ONLY. Next version of the driver uses different mechanism. This will not be re-used in the future. */ 
-		input_set_abs_params(qtmTsGl->input_dev, ABS_MT_POSITION_X, 0, 1023, 0, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_MT_POSITION_Y, 0, 1023, 0, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-		input_set_abs_params(qtmTsGl->input_dev, ABS_MT_WIDTH_MAJOR, 0, 15, 0, 0);
-
-		set_bit(EV_ABS, qtmTsGl->input_dev->evbit);
-		set_bit(EV_KEY, qtmTsGl->input_dev->keybit);
-		set_bit(EV_SYN, qtmTsGl->input_dev->keybit);
-		set_bit(BTN_TOUCH, qtmTsGl->input_dev->keybit);
-		set_bit(ABS_X, qtmTsGl->input_dev->keybit);
-		set_bit(ABS_Y, qtmTsGl->input_dev->keybit);
-
 #endif
 
-		ret = input_register_handler(&slider_handler);
-		if (ret) 
-		{
-			KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: Unable to register slider input device\n");
-			goto err_input_register_device_failed;
-		}
-		ret = input_register_device(qtmTsGl->input_dev);
-		if (ret) 
-		{
-			KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: Unable to register %s input device\n", qtmTsGl->input_dev->name);
-			goto err_input_register_device_failed;
-		}
-		
-		// Setup the Interrupt
-
-		printk("qtm_obp_ts_probe Gpio request\n");
-
-		ret = gpio_request(KEY08_TS_GPIO, "qtm_obp_ts_gpio");
-		if (ret) 
-		{
-			KEY08_PRINTK(KERN_ERR " gpio_request failed for input %d\n", KEY08_TS_GPIO);
-			goto err_input_register_device_failed;
-		}
-		
-		ret = gpio_direction_input(KEY08_TS_GPIO);
-		if (ret) 
-		{
-			KEY08_PRINTK(KERN_ERR " gpio_direction_input failed for input %d\n", KEY08_TS_GPIO);
-			goto err_input_register_device_failed;
-		}
-
-		client->irq = gpio_to_irq(KEY08_TS_GPIO);
-		ret = gpio_direction_input(KEY08_TS_GPIO);
-		printk("qtm_obp_ts_probe: ret from gpio_direction_input = %d\n", ret);
-		KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: gpio_request KEY08_TS_GPIO =  %d\n", gpio_get_value(KEY08_TS_GPIO));
-
-
-		if (client->irq) 
-		{
-			
-			ret = request_irq(client->irq, qtm_obp_ts_irq_handler, request_flags , pdev->name, qtmTsGl);
-			if (ret == 0) 
-			{
-				if (ret)
-					free_irq(client->irq, qtmTsGl);
-			}
-			if (ret == 0)
-				qtmTsGl->use_irq = 1;
-			else
-				dev_err(&client->dev, "request_irq failed\n");
-		}
-		if (!qtmTsGl->use_irq) 
-		{
-			hrtimer_init(&qtmTsGl->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-			qtmTsGl->timer.function = qtm_obp_ts_timer_func;
-			hrtimer_start(&qtmTsGl->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
-		}
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		qtmTsGl->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
-		qtmTsGl->early_suspend.suspend = qtm_obp_ts_early_suspend;
-		qtmTsGl->early_suspend.resume = qtm_obp_ts_late_resume;
-		register_early_suspend(&qtmTsGl->early_suspend);
-#endif
-		qtmTsGl->useData = TRUE;
-		qtmTsGl->inCall = FALSE;
-			
-		KEY08_PRINTK(KERN_INFO "qtm_obp_ts_probe: Start touchscreen %s in %s mode\n", qtmTsGl->input_dev->name, qtmTsGl->use_irq ? "interrupt" : "polling");
-
-		qtm_lastKeyPressed = 0;
-
-		printk("qtm_obp_ts_probe: GPIO 84: %d\n", gpio_get_value(84) );
+	if (!down) {
+		memset(&ts->finger_data[finger], 0,
+		sizeof(struct coordinate_map));
 	}
-	printk("qtm_obp_ts_probe: Exit\n");
+
 	return 0;
+}
 
+/* Handles a message from a keyarray object. */
+static int do_touch_keyarray_msg(struct qtouch_ts_data *ts,
+				 struct qtm_object *obj, void *_msg)
+{
+	struct qtm_touch_keyarray_msg *msg = _msg;
+	int i;
 
-err_input_register_device_failed:
-	input_free_device(qtmTsGl->input_dev);
-// exit_kfree:
-err_input_dev_alloc_failed:
-err_detect_failed:
-err_power_failed:
-	kfree(qtmTsGl);
-err_alloc_data_failed:
-err_check_functionality_failed:
-// exit_detach:
-	i2c_detach_client(client);
-	printk("qtm_obp_ts_probe: Exit after error\n");
+	/* nothing changed.. odd. */
+	if (ts->last_keystate == msg->keystate)
+		return 0;
+
+	for (i = 0; i < ts->pdata->key_array.num_keys; ++i) {
+		struct qtouch_key *key = &ts->pdata->key_array.keys[i];
+		uint32_t bit = 1 << (key->channel & 0x1f);
+		if ((msg->keystate & bit) != (ts->last_keystate & bit)) {
+			if (msg->keystate & bit) {
+				if (ignore_keyarray_touches)
+					return 0;
+				input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 4);
+			} else {
+				input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
+			}
+			input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, 4);
+			input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+					 ts->pdata->key_array.keys[i].x_coord);
+			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+					 ts->pdata->key_array.keys[i].y_coord);
+			input_mt_sync(ts->input_dev);
+			input_sync(ts->input_dev);
+		}
+	}
+
+	if (qtouch_tsdebug & 2)
+		pr_info("%s: key state changed 0x%08x -> 0x%08x\n", __func__,
+			ts->last_keystate, msg->keystate);
+
+	/* update our internal state */
+	ts->last_keystate = msg->keystate;
+
+	return 0;
+}
+
+static int qtouch_handle_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
+			     struct qtm_obj_message *msg)
+{
+	int ret = 0;
+
+	/* These are all the known objects that we know how to handle. */
+	switch (obj->entry.type) {
+	case QTM_OBJ_GEN_CMD_PROC:
+		ret = do_cmd_proc_msg(ts, obj, msg);
+		break;
+
+	case QTM_OBJ_TOUCH_MULTI:
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+		/* check the device that sent the message */
+		if (msg->report_id < (obj->report_id_min + obj->entry.num_rids))
+			ret = do_touch_multi_msg(ts, obj, msg);
+		else
+			ret = do_minipad_touch_msg(ts, obj, msg);
+#else
+                ret = do_touch_multi_msg(ts, obj, msg);
+#endif
+		break;
+
+	case QTM_OBJ_TOUCH_KEYARRAY:
+		ret = do_touch_keyarray_msg(ts, obj, msg);
+		break;
+
+	default:
+		/* probably not fatal? */
+		ret = 0;
+		pr_info("%s: No handler defined for message from object "
+			"type %d, report_id %d\n", __func__, obj->entry.type,
+			msg->report_id);
+	}
+
 	return ret;
 }
 
-static int qtm_obp_ts_remove(struct i2c_client *client)
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+/*********
+ * Defines the rear touch pad parameters.
+********/
+static void minipad_params_init(struct qtouch_ts_data *ts)
 {
-	struct qtm_obp_ts_data *ts = i2c_get_clientdata(client);
-	unregister_early_suspend(&ts->early_suspend);
-	KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-	if (ts->use_irq)
-	  free_irq(client->irq, ts);
-	else
-	  hrtimer_cancel(&ts->timer);
+	/* TODO: the + 100 is a work-around. verify the final firmware */
+	minipad_params.min_x	= 0;
+	minipad_params.max_x	= ts->pdata->abs_max_x + 100;
+	minipad_params.min_y	= 0;
+	minipad_params.max_y	= ts->pdata->abs_max_y + 100;
+
+	minipad_params.mouse_th_x = MINIPAD_MOUSE_TH_X;
+	minipad_params.mouse_th_y = MINIPAD_MOUSE_TH_Y;
+}
+#endif
+
+static int qtouch_ts_register_input(struct qtouch_ts_data *ts)
+{
+	struct qtm_object *obj;
+	int err;
+	int i;
+
+	if (ts->input_dev == NULL) {
+		ts->input_dev = input_allocate_device();
+		if (ts->input_dev == NULL) {
+			pr_err("%s: failed to alloc input device\n", __func__);
+			err = -ENOMEM;
+			return err;
+		}
+	}
+
+	ts->input_dev->name = "qtouch-touchscreen";
+	input_set_drvdata(ts->input_dev, ts);
+
+	ts->msg_buf = kmalloc(ts->msg_size, GFP_KERNEL);
+	if (ts->msg_buf == NULL) {
+		pr_err("%s: Cannot allocate msg_buf\n", __func__);
+		err = -ENOMEM;
+		goto err_alloc_msg_buf;
+	}
+
+	/* Point the address pointer to the message processor.
+	 * Must do this before enabling interrupts */
+	obj = find_obj(ts, QTM_OBJ_GEN_MSG_PROC);
+	err = qtouch_set_addr(ts, obj->entry.addr);
+	if (err != 0) {
+		pr_err("%s: Can't to set addr to msg processor\n", __func__);
+		goto err_rst_addr_msg_proc;
+	}
+
+	set_bit(EV_SYN, ts->input_dev->evbit);
+
+	/* register the harwdare assisted virtual keys, if any */
+	obj = find_obj(ts, QTM_OBJ_TOUCH_KEYARRAY);
+	if (obj && (obj->entry.num_inst > 0) &&
+	    (ts->pdata->flags & QTOUCH_USE_KEYARRAY)) {
+		for (i = 0; i < ts->pdata->key_array.num_keys; ++i)
+			input_set_capability(ts->input_dev, EV_KEY,
+					ts->pdata->key_array.keys[i].code);
+	}
+
+	/* register the software virtual keys, if any are provided */
+	for (i = 0; i < ts->pdata->vkeys.count; ++i)
+		input_set_capability(ts->input_dev, EV_KEY,
+				ts->pdata->vkeys.keys[i].code);
+
+	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
+	if (obj && obj->entry.num_inst > 0) {
+		set_bit(EV_ABS, ts->input_dev->evbit);
+		/* Legacy support for testing only */
+		input_set_capability(ts->input_dev, EV_KEY, BTN_TOUCH);
+		input_set_capability(ts->input_dev, EV_KEY, BTN_2);
+		input_set_abs_params(ts->input_dev, ABS_X,
+				     ts->pdata->abs_min_x, ts->pdata->abs_max_x,
+				     ts->pdata->fuzz_x, 0);
+		input_set_abs_params(ts->input_dev, ABS_HAT0X,
+				     ts->pdata->abs_min_x, ts->pdata->abs_max_x,
+				     ts->pdata->fuzz_x, 0);
+		input_set_abs_params(ts->input_dev, ABS_Y,
+				     ts->pdata->abs_min_y, ts->pdata->abs_max_y,
+				     ts->pdata->fuzz_y, 0);
+		input_set_abs_params(ts->input_dev, ABS_HAT0Y,
+				     ts->pdata->abs_min_x, ts->pdata->abs_max_x,
+				     ts->pdata->fuzz_x, 0);
+		input_set_abs_params(ts->input_dev, ABS_PRESSURE,
+				     ts->pdata->abs_min_p, ts->pdata->abs_max_p,
+				     ts->pdata->fuzz_p, 0);
+		input_set_abs_params(ts->input_dev, ABS_TOOL_WIDTH,
+				     ts->pdata->abs_min_w, ts->pdata->abs_max_w,
+				     ts->pdata->fuzz_w, 0);
+
+		/* multi touch */
+		input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
+				     ts->pdata->abs_min_x, ts->pdata->abs_max_x,
+				     ts->pdata->fuzz_x, 0);
+		input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y,
+				     ts->pdata->abs_min_y, ts->pdata->abs_max_y,
+				     ts->pdata->fuzz_y, 0);
+		input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR,
+				     ts->pdata->abs_min_p, ts->pdata->abs_max_p,
+				     ts->pdata->fuzz_p, 0);
+		input_set_abs_params(ts->input_dev, ABS_MT_WIDTH_MAJOR,
+				     ts->pdata->abs_min_w, ts->pdata->abs_max_w,
+				     ts->pdata->fuzz_w, 0);
+	}
+
+	memset(&ts->finger_data[0], 0,
+	       (sizeof(struct coordinate_map) *
+	       _NUM_FINGERS));
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	minipad_params_init(ts);
+
+	/* register the keys which are triggered by the minipad */
+	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
+	if (obj && obj->entry.num_inst > 1) {
+		set_bit(EV_REL, ts->input_dev->evbit);
+		set_bit(REL_X, ts->input_dev->relbit);
+		set_bit(REL_Y, ts->input_dev->relbit);
+		input_set_capability(ts->input_dev, EV_KEY, BTN_MOUSE);
+	}
+#endif
+
+	err = input_register_device(ts->input_dev);
+	if (err != 0) {
+		pr_err("%s: Cannot register input device \"%s\"\n", __func__,
+		       ts->input_dev->name);
+		goto err_input_register_dev;
+	}
+	return 0;
+
+err_input_register_dev:
+err_rst_addr_msg_proc:
+	if (ts->msg_buf)
+		kfree(ts->msg_buf);
+
+err_alloc_msg_buf:
+	input_free_device(ts->input_dev);
+	ts->input_dev = NULL;
+
+	return err;
+}
+
+static int qtouch_process_info_block(struct qtouch_ts_data *ts)
+{
+	uint16_t our_csum = 0x0;
+	uint16_t their_csum;
+	uint8_t report_id;
+	uint16_t addr;
+	int err;
+	int i;
+
+	/* query the device and get the info block. */
+	err = qtouch_read_addr(ts, QTM_OBP_ID_INFO_ADDR, &qtm_info,
+			       sizeof(qtm_info));
+	if (err != 0) {
+		pr_err("%s: Cannot read info object block\n", __func__);
+		goto err_read_info_block;
+	}
+	our_csum = calc_csum(our_csum, &qtm_info, sizeof(qtm_info));
+
+	/* TODO: Add a version/family/variant check? */
+	pr_info("%s: Build version is 0x%x\n", __func__, qtm_info.version);
+
+	if (qtm_info.num_objs == 0) {
+		pr_err("%s: Device (0x%x/0x%x/0x%x/0x%x) does not export any "
+		       "objects.\n", __func__, qtm_info.family_id,
+		       qtm_info.variant_id, qtm_info.version, qtm_info.build);
+		err = -ENODEV;
+		goto err_no_objects;
+	}
+
+	addr = QTM_OBP_ID_INFO_ADDR + sizeof(qtm_info);
+	report_id = 1;
+
+	/* Clear the object table */
+	for (i = 0; i < QTM_OBP_MAX_OBJECT_NUM; ++i) {
+		ts->obj_tbl[i].entry.type = 0;
+		ts->obj_tbl[i].entry.addr = 0;
+		ts->obj_tbl[i].entry.size = 0;
+		ts->obj_tbl[i].entry.num_inst = 0;
+		ts->obj_tbl[i].entry.num_rids = 0;
+		ts->obj_tbl[i].report_id_min = 0;
+		ts->obj_tbl[i].report_id_max = 0;
+	}
+
+	/* read out the object entries table */
+	for (i = 0; i < qtm_info.num_objs; ++i) {
+		struct qtm_object *obj;
+		struct qtm_obj_entry entry;
+
+		err = qtouch_read_addr(ts, addr, &entry, sizeof(entry));
+		if (err != 0) {
+			pr_err("%s: Can't read object (%d) entry.\n",
+			       __func__, i);
+			err = -EIO;
+			goto err_read_entry;
+		}
+		our_csum = calc_csum(our_csum, &entry, sizeof(entry));
+		addr += sizeof(entry);
+
+		entry.size++;
+		entry.num_inst++;
+
+		pr_info("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
+			__func__, entry.type, entry.addr, entry.size,
+			entry.num_inst, entry.num_rids);
+
+		if (entry.type >= QTM_OBP_MAX_OBJECT_NUM) {
+			pr_warning("%s: Unknown object type (%d) encountered\n",
+				   __func__, entry.type);
+			/* Not fatal */
+			continue;
+		}
+
+		/* save the message_procesor msg_size for easy reference. */
+		if (entry.type == QTM_OBJ_GEN_MSG_PROC)
+			ts->msg_size = entry.size;
+
+		obj = create_obj(ts, &entry);
+		/* set the report_id range that the object is responsible for */
+		if ((obj->entry.num_rids * obj->entry.num_inst) != 0) {
+			obj->report_id_min = report_id;
+			report_id += obj->entry.num_rids * obj->entry.num_inst;
+			obj->report_id_max = report_id - 1;
+		}
+	}
+
+	if (!ts->msg_size) {
+		pr_err("%s: Message processing object not found. Bailing.\n",
+		       __func__);
+		err = -ENODEV;
+		goto err_no_msg_proc;
+	}
+
+	/* verify that some basic objects are present. These objects are
+	 * assumed to be present by the rest of the driver, so fail out now
+	 * if the firmware is busted. */
+	if (!find_obj(ts, QTM_OBJ_GEN_PWR_CONF) ||
+	    !find_obj(ts, QTM_OBJ_GEN_ACQUIRE_CONF) ||
+	    !find_obj(ts, QTM_OBJ_GEN_MSG_PROC) ||
+	    !find_obj(ts, QTM_OBJ_GEN_CMD_PROC)) {
+		pr_err("%s: Required objects are missing\n", __func__);
+		err = -ENOENT;
+		goto err_missing_objs;
+	}
+
+	err = qtouch_read_addr(ts, addr, &their_csum, sizeof(their_csum));
+	if (err != 0) {
+		pr_err("%s: Unable to read remote checksum\n", __func__);
+		err = -ENODEV;
+		goto err_no_checksum;
+	}
+
+	/* FIXME: The algorithm described in the datasheet doesn't seem to
+	 * match what the touch firmware is doing on the other side. We
+	 * always get mismatches! */
+	if (our_csum != their_csum) {
+		pr_warning("%s: Checksum mismatch (0x%04x != 0x%04x)\n",
+			   __func__, our_csum, their_csum);
+#ifndef IGNORE_CHECKSUM_MISMATCH
+		err = -ENODEV;
+		goto err_bad_checksum;
+#endif
+	}
+
+	pr_info("%s: %s found. family 0x%x, variant 0x%x, ver 0x%x, "
+		"build 0x%x, matrix %dx%d, %d objects.\n", __func__,
+		QTOUCH_TS_NAME, qtm_info.family_id, qtm_info.variant_id,
+		qtm_info.version, qtm_info.build, qtm_info.matrix_x_size,
+		qtm_info.matrix_y_size, qtm_info.num_objs);
+
+	ts->eeprom_checksum = ts->pdata->nv_checksum;
+	ts->family_id = qtm_info.family_id;
+	ts->variant_id = qtm_info.variant_id;
+	ts->fw_version = qtm_info.version;
+	ts->build_version = qtm_info.build;
+
+	return 0;
+
+err_no_checksum:
+err_missing_objs:
+err_no_msg_proc:
+err_read_entry:
+err_no_objects:
+err_read_info_block:
+	return err;
+}
+
+static int qtouch_ts_unregister_input(struct qtouch_ts_data *ts)
+{
 	input_unregister_device(ts->input_dev);
-	kfree(ts);
-	KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
+	input_free_device(ts->input_dev);
+	ts->input_dev = NULL;
 	return 0;
 }
 
-static int qtm_obp_ts_suspend(struct i2c_client *client, pm_message_t mesg)
+static void qtouch_ts_boot_work_func(struct work_struct *work)
 {
-       int ret;
-       int regValue=0;
+	int err = 0;
+	unsigned char boot_msg[3];
 
-       KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	ts = container_of(work, struct qtouch_ts_data,
+			boot_work);
 
-       if (!qtmTsGl->suspendMode)
-       {
-         qtmTsGl->suspendMode = TRUE; 
-         if (qtmTsGl->mode == KEY08_MODE_OBP)
-	 {
-	       ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+QTM_OBP_T7_IDLE,
-					sizeof(char), (char *)&regValue);
-	       clk_busy_wait(3000);
-
-               if (ret)
-                  printk("%s: Failed to write Idle Low Power Register\n", __FUNCTION__);
-
-               ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+QTM_OBP_T7_ACTIVE,
-                                   sizeof(char), (char *)&regValue);
-               clk_busy_wait(3000);
-
-               if (ret)
-                  printk("%s: Failed to write Active Low Power Register\n", __FUNCTION__);
-	     }
-	   
-	   if (qtmTsGl->use_irq)
-	     {
-	       KEY08_PRINTK("%s: Do Not Disable irq\n",__FUNCTION__);
-               KEY08_PRINTK("%s: qtmTsGl->use_irq is true \n", __FUNCTION__);
-               // disable_irq(client->irq);
-	     }
-	   else
-	     {
-               KEY08_PRINTK("%s: qtmTsGl->use_irq is false \n", __FUNCTION__);
-               hrtimer_cancel(&qtmTsGl->timer);
-	     }
-
-#if 0
-	   // cancel_work_sync will cancel the work if it is queued. 
-	   // If the work's callback appears to be running, cancel_work_sync will block until it has completed.
-
-	   ret = cancel_work_sync(&qtmTsGl->work);
-
-	   if (ret && qtmTsGl->use_irq)
-	     {
-	       
-	       KEY08_PRINTK("%s: Enable irq\n",__FUNCTION__);
-               KEY08_PRINTK("%s: qtmTsGl->use_irq && cancel_work_sync ret is true \n", __FUNCTION__);
-               enable_irq(client->irq);
-	     }
+do {
+#else
+        struct qtouch_ts_data *ts = container_of(work,
+                                                 struct qtouch_ts_data,
+                                                 boot_work);
 #endif
 
-	   if (qtmTsGl->power)
-	     {
-	       KEY08_PRINTK("%s: qtmTsGl->power is true \n", __FUNCTION__);
-	       ret = qtmTsGl->power(0);
-	       if (ret < 0)
-		 {
-		   KEY08_PRINTK(KERN_ERR "qtm_obp_ts_suspend: power off failed\n");
-		 }
-	     }
-       }
-       else {
-          KEY08_PRINTK("%s: Already suspended\n", __FUNCTION__);
-       }
+	err = qtouch_read(ts, &boot_msg, sizeof(boot_msg));
+	if (err) {
+		pr_err("%s: Cannot read message\n", __func__);
+		goto done;
+	}
+	if (qtouch_tsdebug & 8)
+		pr_err("%s: Message is 0x%X err is %i\n",
+		       __func__, boot_msg[0], err);
 
-       KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-       return 0;
+	if (boot_msg[0] == QTM_OBP_BOOT_CRC_CHECK) {
+		if (qtouch_tsdebug & 8)
+		    pr_err("%s: CRC Check\n", __func__);
+		goto done;
+	} else if (boot_msg[0] == QTM_OBP_BOOT_CRC_FAIL) {
+		if (qtouch_tsdebug & 8)
+			pr_err("%s: Boot size %i current pkt size %i\n",
+			__func__, ts->boot_pkt_size, ts->current_pkt_sz);
+
+		if (ts->fw_error_count > 3) {
+			pr_err("%s: Resetting the IC fw upgrade failed\n",
+				__func__);
+			goto reset_touch_ic;
+		} else {
+			/* If this is a failure on the first packet then
+			reset the boot packet size to 0 */
+			if (!ts->fw_error_count) {
+				if (ts->current_pkt_sz == 0) {
+					ts->current_pkt_sz = ts->boot_pkt_size;
+					ts->boot_pkt_size -= ts->boot_pkt_size;
+				}
+			}
+			ts->fw_error_count++;
+			pr_err("%s: Frame CRC check failed %i times\n",
+				__func__, ts->fw_error_count);
+		}
+		goto done;
+	} else if (boot_msg[0] == QTM_OBP_BOOT_CRC_PASSED) {
+		if (qtouch_tsdebug & 8)
+		    pr_err("%s: Frame CRC check passed\n", __func__);
+
+		ts->status =
+		    (ts->boot_pkt_size * 100) / ts->touch_fw_size;
+
+		ts->boot_pkt_size += ts->current_pkt_sz;
+		ts->fw_error_count = 0;
+
+		/* Check to see if the update is done if it is
+		   then register the touch with the system */
+		if (ts->boot_pkt_size == ts->touch_fw_size) {
+			pr_info("%s: Touch FW update done\n", __func__);
+			ts->status = 100;
+			goto touch_to_normal_mode;
+		}
+		goto done;
+	} else if (boot_msg[0] & QTM_OBP_BOOT_WAIT_FOR_DATA) {
+		if (qtouch_tsdebug & 8)
+			pr_err("%s: Data sent so far %i\n",
+				__func__, ts->boot_pkt_size);
+
+		/* Don't change the packet size if there was a failure */
+		if (!ts->fw_error_count) {
+			ts->current_pkt_sz =
+			    ((ts->touch_fw_image[ts->boot_pkt_size] << 8) |
+				ts->touch_fw_image[ts->boot_pkt_size + 1]) + 2;
+		}
+		if (qtouch_tsdebug & 8)
+			pr_err("%s: Size of the next packet is %i\n",
+				__func__, ts->current_pkt_sz);
+
+		err = qtouch_write(ts, &ts->touch_fw_image[ts->boot_pkt_size],
+			ts->current_pkt_sz);
+		if (err != ts->current_pkt_sz) {
+			pr_err("%s: Could not write the packet %i\n",
+				__func__, err);
+			ts->status = 0xff; /*rkj473 add for support status query.*/
+			goto reset_touch_ic;
+		}
+	} else {
+		pr_err("%s: Message is 0x%X is not handled\n",
+			__func__, boot_msg[0]);
+	}
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+} while (gpio_get_value(164) == 0);
+#endif
+
+done:
+	enable_irq(ts->client->irq);
+	return;
+
+reset_touch_ic:
+	qtouch_force_reset(ts, 0);
+touch_to_normal_mode:
+	ts->client->addr = ts->org_i2c_addr;
+	ts->mode = 0;
+	/* Wait for the IC to recover */
+	msleep(QTM_OBP_SLEEP_WAIT_FOR_RESET);
+	err = qtouch_process_info_block(ts);
+	if (err != 0) {
+		pr_err("%s:Cannot read info block %i\n", __func__, err);
+	}
+	err = qtouch_ts_register_input(ts);
+	if (err != 0)
+		pr_err("%s: Registering input failed %i\n", __func__, err);
+	enable_irq(ts->client->irq);
+	return;
+
 }
 
-static int qtm_obp_ts_resume(struct i2c_client *client)
+static void qtouch_ts_work_func(struct work_struct *work)
 {
-        int ret;
+	struct qtm_obj_message *msg;
+	struct qtm_object *obj;
+	int ret;
+#ifdef CONFIG_LTT_LITE
+	static char *message;
+#endif
 
-        KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	ts = container_of(work, struct qtouch_ts_data, work);
+#else
+        struct qtouch_ts_data *ts =
+               container_of(work, struct qtouch_ts_data, work);
+#endif
+#ifdef CONFIG_LTT_LITE
+	message = "qtouch_ts_work_func\n";
+	ltt_lite_log_string(message, sizeof(message) - 1);
+#endif
 
-        if (qtmTsGl->suspendMode)
-        {
-           qtmTsGl->suspendMode = FALSE;
-           if (qtmTsGl->mode == KEY08_MODE_OBP)
-           {
-				/* If we were suspended while a touch was happening
-				   we need to tell the upper layers so they do not hang
-				   waiting on the liftoff that will not come. */
-				int i;
-				for (i = 0; i < 2; i++) 
-				{
-					KEY08_PRINTK("%s: Finger %i down state %i\n",
-							__func__, i, qtmTsGl->finger_data[i].down);
-					if (qtmTsGl->finger_data[i].down == 0)
-						continue;
-					input_report_abs(qtmTsGl->input_dev, ABS_MT_TOUCH_MAJOR, 0);
-					input_mt_sync(qtmTsGl->input_dev);
-					memset(&qtmTsGl->finger_data[i], 0, sizeof(struct coordinate_map));
+	msg = qtouch_read_msg(ts);
+	if (msg == NULL) {
+		pr_err("%s: Cannot read message\n", __func__);
+		goto done;
+	}
+
+	obj = find_object_rid(ts, msg->report_id);
+	if (!obj) {
+		pr_err("%s: Unknown object for report_id %d\n", __func__,
+		       msg->report_id);
+		goto done;
+	}
+
+	ret = qtouch_handle_msg(ts, obj, msg);
+	if (ret != 0) {
+		pr_err("%s: Unable to process message for obj %d, "
+		       "report_id %d\n", __func__, obj->entry.type,
+		       msg->report_id);
+		goto done;
+	}
+
+done:
+	enable_irq(ts->client->irq);
+}
+
+static int qtouch_set_boot_mode(struct qtouch_ts_data *ts)
+{
+	unsigned char FWupdateInfo[3];
+	int err;
+	int try_again = 0;
+
+	err = qtouch_read(ts, FWupdateInfo, 3);
+	if (err)
+		pr_err("%s: Could not read back data\n", __func__);
+
+	while ((FWupdateInfo[0] & QTM_OBP_BOOT_CMD_MASK) != QTM_OBP_BOOT_WAIT_FOR_DATA) {
+		err = qtouch_read(ts, FWupdateInfo, 3);
+		if (err)
+			pr_err("%s: Could not read back data\n", __func__);
+
+		if ((FWupdateInfo[0] & QTM_OBP_BOOT_CMD_MASK) == QTM_OBP_BOOT_WAIT_ON_BOOT_CMD) {
+			FWupdateInfo[0] = 0xDC;
+			FWupdateInfo[1] = 0xAA;
+			err = qtouch_write(ts, FWupdateInfo, 2);
+			if (err != 2) {
+				pr_err("%s: Could not write to BL %i\n",
+				       __func__, err);
+				return -EIO;
+			}
+		} else if (try_again > 10) {
+				pr_err("%s: Cannot get into bootloader mode\n",
+					__func__);
+			return -ENODEV;
+		} else {
+			try_again++;
+			msleep(QTM_OBP_SLEEP_WAIT_FOR_BOOT);
+		}
+	}
+
+	return err;
+}
+
+static ssize_t qtouch_irq_status(struct device *dev,
+                                 struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = container_of(dev,
+	                                         struct i2c_client, dev);
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	return sprintf(buf, "%u\n", atomic_read(&ts->irq_enabled));
+}
+
+static ssize_t qtouch_irq_enable(struct device *dev,
+                                 struct device_attribute *attr,
+                                 const char *buf, size_t size)
+{
+	struct i2c_client *client = container_of(dev,
+	                                         struct i2c_client, dev);
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	int err = 0;
+	unsigned long value;
+	struct qtm_obj_message *msg;
+
+	if (size > 2)
+		return -EINVAL;
+
+	err = strict_strtoul(buf, 10, &value);
+	if (err != 0)
+		return err;
+
+	switch (value) {
+	case 0:
+		if (atomic_cmpxchg(&ts->irq_enabled, 1, 0)) {
+			pr_info("touch irq disabled!\n");
+			disable_irq_nosync(ts->client->irq);
+		}
+		err = size;
+		break;
+	case 1:
+		if (!atomic_cmpxchg(&ts->irq_enabled, 0, 1)) {
+			pr_info("touch irq enabled!\n");
+			msg = qtouch_read_msg(ts);
+			if (msg == NULL)
+				pr_err("%s: Cannot read message\n", __func__);
+			enable_irq(ts->client->irq);
+		}
+		err = size;
+		break;
+	default:
+		pr_info("qtouch_irq_enable failed -> irq_enabled = %d\n",
+		atomic_read(&ts->irq_enabled));
+		err = -EINVAL;
+		break;
+	}
+
+	return err;
+}
+
+static DEVICE_ATTR(irq_enable, 0777, qtouch_irq_status, qtouch_irq_enable);
+
+static ssize_t qtouch_update_status(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = container_of(dev,
+						 struct i2c_client, dev);
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+
+	return sprintf(buf, "%u\n", ts->status);
+}
+
+static DEVICE_ATTR(update_status, 0777, qtouch_update_status, NULL);
+
+static ssize_t qtouch_fw_version(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = container_of(dev,
+						 struct i2c_client, dev);
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+
+	return sprintf(buf, "0x%X%X\n", ts->fw_version, ts->build_version);
+}
+
+static DEVICE_ATTR(fw_version, 0777, qtouch_fw_version, NULL);
+
+static int qtouch_ts_probe(struct i2c_client *client,
+			   const struct i2c_device_id *id)
+{
+	struct qtouch_ts_platform_data *pdata = client->dev.platform_data;
+	struct qtouch_ts_data *ts;
+	int err;
+	struct touch_fw_entry *touch_fw_table_ptr;
+	unsigned char boot_info;
+	int loop_count;
+
+	if (pdata == NULL) {
+		pr_err("%s: platform data required\n", __func__);
+		return -ENODEV;
+	} else if (!client->irq) {
+		pr_err("%s: polling mode currently not supported\n", __func__);
+		return -ENODEV;
+	} else if (!pdata->hw_reset) {
+		pr_err("%s: Must supply a hw reset function\n", __func__);
+		return -ENODEV;
+	}
+
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	/* register the driver as a mic device */
+	err = misc_register(&minipad_pf_driver);
+	pr_info("%s: misc_register() returns %d\n", __func__, err);
+#endif
+
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		pr_err("%s: need I2C_FUNC_I2C\n", __func__);
+		return -ENODEV;
+	}
+
+	ts = kzalloc(sizeof(struct qtouch_ts_data), GFP_KERNEL);
+	if (ts == NULL) {
+		err = -ENOMEM;
+		goto err_alloc_data_failed;
+	}
+	ts->pdata = pdata;
+	ts->client = client;
+	i2c_set_clientdata(client, ts);
+	ts->checksum_cnt = 0;
+	ts->fw_version = 0;
+	ts->build_version = 0;
+	ts->fw_error_count = 0;
+	ts->current_pkt_sz = 0;
+	ts->x_delta = ts->pdata->x_delta;
+	ts->y_delta = ts->pdata->y_delta;
+	atomic_set(&ts->irq_enabled, 1);
+	ts->status = 0xfe; /*rkj473 add for support status query.*/
+	ts->touch_fw_size = 0;
+	ts->touch_fw_image = NULL;
+	ts->base_fw_version = 0;
+	touch_fw_table_ptr = touch_fw_table;
+
+	qtouch_force_reset(ts, 0);
+	err = qtouch_process_info_block(ts);
+	if ((err == 0) && (ts->family_id == 0x31)) {
+		pr_info("%s: Need to verify FW checksum\n", __func__);
+		if (ts->fw_version >= ts->base_fw_version) {
+			qtouch_force_reset(ts, 2);
+			msleep(QTM_OBP_SLEEP_WAIT_FOR_RESET);
+			ts->org_i2c_addr = ts->client->addr;
+			ts->client->addr = ts->pdata->boot_i2c_addr;
+			err = qtouch_set_boot_mode(ts);
+			if (err < 0)
+				pr_err("%s: Failed unlocking IC in boot mode %i\n",
+				       __func__, err);
+			if (qtouch_tsdebug) {
+				qtouch_read(ts, &boot_info, 1);
+				pr_info("%s:Data read 0x%x\n", __func__, boot_info);
+			}
+			ts->client->addr = ts->org_i2c_addr;
+			qtouch_force_reset(ts, 0);
+			msleep(QTM_OBP_SLEEP_WAIT_FOR_CKSUM);
+		} else {
+			pr_err("%s:Can't verify FW checksum - FW 0x%X does not support boot mode\n",
+			       __func__, ts->fw_version);
+		}
+		err = qtouch_process_info_block(ts);
+	}
+	if (err == 0) {
+		pr_info("%s: FW version is 0x%X Build 0x%X\n", __func__,
+					   ts->fw_version, ts->build_version);
+
+		while (touch_fw_table_ptr->family_id != 0x00) {
+			if ((ts->family_id == touch_fw_table_ptr->family_id)
+			    && (ts->variant_id == touch_fw_table_ptr->variant_id)) {
+				pr_info("%s: Chip type matched\n", __func__);
+
+				if ((ts->fw_version != touch_fw_table_ptr->fw_version)
+				    || (ts->build_version != touch_fw_table_ptr->fw_build)) {
+					pr_info("%s: Reflash needed\n", __func__);
+					ts->touch_fw_size = touch_fw_table_ptr->size;
+					ts->touch_fw_image = touch_fw_table_ptr->image;
+					ts->base_fw_version = touch_fw_table_ptr->base_fw_version;
+				} else {
+					pr_info("%s: Reflash not needed\n", __func__);
 				}
-				input_sync(qtmTsGl->input_dev); 
+				break;
+			}
+			touch_fw_table_ptr++;
+		}
 
-               if (qtmTsGl->power)
-               {
-                   KEY08_PRINTK("%s: qtmTsGl->power is true \n", __FUNCTION__);
-                   ret = qtmTsGl->power(1);
-                   if (ret < 0)
-                   {
-                           KEY08_PRINTK(KERN_ERR "qtm_obp_ts_resume power on failed\n");
-                   }
-               }
+		if ((ts->touch_fw_size != 0) && (ts->touch_fw_image != NULL)) {
+			/* Reset the chip into bootloader mode */
+			if (ts->fw_version >= ts->base_fw_version) {
+				qtouch_force_reset(ts, 2);
+				msleep(QTM_OBP_SLEEP_WAIT_FOR_RESET);
 
-               ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+QTM_OBP_T7_IDLE,
-                                   sizeof(char), (char *)&lpIdleValueEeprom);
-               clk_busy_wait(3000);
+				ts->org_i2c_addr = ts->client->addr;
+				ts->client->addr = ts->pdata->boot_i2c_addr;
+			} else {
+				pr_err("%s:FW 0x%X does not support boot mode\n",
+				       __func__, ts->fw_version);
+				ts->touch_fw_size = 0;
+				ts->touch_fw_image = NULL;
+			} 
+		}
+	} else {
+		pr_info("%s:Cannot read info block %i, checking for bootloader mode.\n", __func__, err);
 
-               if (ret)
-                  printk("%s: Failed to write Idle Low Power Register\n", __FUNCTION__);
+		qtouch_force_reset(ts, 0);
+		msleep(QTM_OBP_SLEEP_WAIT_FOR_RESET);
 
-               ret = qtm_obp_reg_write (qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+ QTM_OBP_T7_ACTIVE,
-                                   sizeof(char), (char *)&lpActiveValueEeprom);
-               clk_busy_wait(3000);
+		ts->org_i2c_addr = ts->client->addr;
+		ts->client->addr = ts->pdata->boot_i2c_addr;
 
-               if (ret)
-                  printk("%s: Failed to write Active Low Power Register\n", __FUNCTION__);
+		err = qtouch_read(ts, &boot_info, 1);
+		if (err) {
+			pr_err("%s:Read failed %d\n", __func__, err);
+		} else {
+			pr_info("%s:Data read 0x%x\n", __func__, boot_info);
+			loop_count = 0;
+			while ((boot_info & QTM_OBP_BOOT_CMD_MASK) != QTM_OBP_BOOT_WAIT_ON_BOOT_CMD) {
+				err = qtouch_read(ts, &boot_info, 1);
+				if (err) {
+					pr_err("%s:Read failed %d\n", __func__, err);
+					break;
+				}
+				pr_info("%s:Data read 0x%x\n", __func__, boot_info);
+				loop_count++;
+				if (loop_count == 10) {
+					err = 1;
+					break;
+				}
+			}
+		}
+		if (!err) {
+			boot_info &= QTM_OBP_BOOT_VERSION_MASK;
+			pr_info("%s:Bootloader version %d\n", __func__, boot_info);
 
-               KEY08_PRINTK("qtm_obp_ts_resume: try to read from OBP firmware\n");
+			while (touch_fw_table_ptr->family_id != 0x00) {
+				if (boot_info == touch_fw_table_ptr->boot_version) {
+					pr_info("%s: Chip type matched\n", __func__);
+					ts->touch_fw_size = touch_fw_table_ptr->size;
+					ts->touch_fw_image = touch_fw_table_ptr->image;
+					ts->base_fw_version = touch_fw_table_ptr->base_fw_version;
+					break;
+				}
+				touch_fw_table_ptr++;
+			}
+		}
+	}
 
-               ret = qtm_obp_calibrate(qtmTsGl->client);
+	INIT_WORK(&ts->work, qtouch_ts_work_func);
+	INIT_WORK(&ts->boot_work, qtouch_ts_boot_work_func);
 
-               if (qtmTsGl->use_irq)
-               {
-	          KEY08_PRINTK("%s: Do not Enable irq\n",__FUNCTION__);
-                  KEY08_PRINTK("%s: qtmTsGl->use_irq is true \n", __FUNCTION__);
-                  // enable_irq(client->irq);
-               }
-               else
-               {
-                   KEY08_PRINTK("%s: qtmTsGl->use_irq is false \n", __FUNCTION__);
-                   hrtimer_start(&qtmTsGl->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
-               }
-           }
-        }
-        else {
-           KEY08_PRINTK("%s: Already resumed\n", __FUNCTION__);
-        }
+	if (ts->pdata->flags & QTOUCH_USE_KEYARRAY) {
+		setup_timer(&keyarray_timer, keyarray_ignore_timer, (unsigned long) ts);
+	}
 
-        KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-        return 0;
+	if ((ts->touch_fw_size != 0) && (ts->touch_fw_image != NULL)) {
+		err = qtouch_set_boot_mode(ts);
+		if (err < 0) {
+			pr_err("%s: Failed setting IC in boot mode %i\n",
+			       __func__, err);
+			/* We must have been in boot mode to begin with
+			or the IC is not present so just exit out of probe */
+			if (ts->fw_version == 0) {
+				ts->status = 0xfd;
+				return err;
+			}
+
+			ts->client->addr = ts->org_i2c_addr;
+			qtouch_force_reset(ts, 0);
+			pr_err("%s: I2C address is 0x%X\n",
+				__func__, ts->client->addr);
+			err = qtouch_process_info_block(ts);
+			if (err) {
+				pr_err("%s: Failed reading info block %i\n",
+				       __func__, err);
+				goto err_reading_info_block;
+			}
+			goto err_boot_mode_failure;
+		}
+
+		ts->mode = 1;
+		/* Add 2 because the firmware packet size bytes
+		are not taken into account for the total size */
+		ts->boot_pkt_size = ((ts->touch_fw_image[0] << 8) |
+			ts->touch_fw_image[1]) + 2;
+
+		err = qtouch_write(ts, &ts->touch_fw_image[0], ts->boot_pkt_size);
+		if (err != ts->boot_pkt_size) {
+			pr_err("%s: Could not write the first packet %i\n",
+			       __func__, err);
+                        ts->status = 0xff;  /*rkj473 add for support status query.*/
+			ts->client->addr = ts->org_i2c_addr;
+			qtouch_force_reset(ts, 0);
+			err = qtouch_process_info_block(ts);
+			if (err) {
+				pr_err("%s: Failed reading info block %i\n",
+				__func__, err);
+				goto err_reading_info_block;
+			}
+			goto err_boot_mode_failure;
+		}
+		goto finish_touch_setup;
+
+	}
+
+/* If the update should fail the touch should still work */
+err_boot_mode_failure:
+	ts->mode = 0;
+	err = qtouch_ts_register_input(ts);
+	if (err != 0) {
+		pr_err("%s: Registering input failed %i\n", __func__, err);
+		goto err_input_register_dev;
+	}
+
+finish_touch_setup:
+	err = request_irq(ts->client->irq, qtouch_ts_irq_handler,
+			  IRQ_DISABLED | pdata->irqflags, "qtouch_ts_int", ts);
+	if (err != 0) {
+		pr_err("%s: request_irq (%d) failed\n", __func__,
+		       ts->client->irq);
+		goto err_request_irq;
+	}
+
+	err = device_create_file(&ts->client->dev, &dev_attr_irq_enable);
+	if (err != 0) {
+		pr_err("%s:File device creation failed: %d\n", __func__, err);
+		err = -ENODEV;
+		goto err_create_file_failed;
+	}
+
+	err = device_create_file(&ts->client->dev, &dev_attr_update_status);
+	if (err != 0) {
+		pr_err("%s:File device creation failed: %d\n", __func__, err);
+		err = -ENODEV;
+		goto err_create_update_status_failed;
+	}
+
+	err = device_create_file(&ts->client->dev, &dev_attr_fw_version);
+	if (err != 0) {
+		pr_err("%s:File device creation failed: %d\n", __func__, err);
+		err = -ENODEV;
+		goto err_create_fw_version_file_failed;
+	}
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	ts->early_suspend.suspend = qtouch_ts_early_suspend;
+	ts->early_suspend.resume = qtouch_ts_late_resume;
+	register_early_suspend(&ts->early_suspend);
+#endif
+
+	return 0;
+
+err_create_fw_version_file_failed:
+	device_remove_file(&ts->client->dev, &dev_attr_update_status);
+err_create_update_status_failed:
+	device_remove_file(&ts->client->dev, &dev_attr_irq_enable);
+err_create_file_failed:
+	free_irq(ts->client->irq, ts);
+err_request_irq:
+	qtouch_ts_unregister_input(ts);
+
+err_input_register_dev:
+err_reading_info_block:
+	i2c_set_clientdata(client, NULL);
+	kfree(ts);
+
+	if (ts->pdata->flags & QTOUCH_USE_KEYARRAY)
+		del_timer(&keyarray_timer);
+
+err_alloc_data_failed:
+	return err;
+}
+
+static int qtouch_ts_remove(struct i2c_client *client)
+{
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+
+	device_remove_file(&ts->client->dev, &dev_attr_irq_enable);
+	device_remove_file(&ts->client->dev, &dev_attr_update_status);
+	device_remove_file(&ts->client->dev, &dev_attr_fw_version);
+
+	if (ts->pdata->flags & QTOUCH_USE_KEYARRAY)
+		del_timer(&keyarray_timer);
+
+	unregister_early_suspend(&ts->early_suspend);
+	free_irq(ts->client->irq, ts);
+	qtouch_ts_unregister_input(ts);
+
+	i2c_set_clientdata(client, NULL);
+	kfree(ts);
+	return 0;
+}
+
+static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	int ret;
+	if (qtouch_tsdebug & 4)
+		pr_info("%s: Suspending\n", __func__);
+
+	if (!atomic_read(&ts->irq_enabled))
+		return 0;
+
+	if (ts->mode == 1)
+		return -EBUSY;
+
+	disable_irq_nosync(ts->client->irq);
+	ret = cancel_work_sync(&ts->work);
+	if (ret) { /* if work was pending disable-count is now 2 */
+		pr_info("%s: Pending work item\n", __func__);
+		enable_irq(ts->client->irq);
+	}
+
+	ret = qtouch_power_config(ts, 0);
+	if (ret < 0)
+		pr_err("%s: Cannot write power config\n", __func__);
+
+	return 0;
+}
+
+static int qtouch_ts_resume(struct i2c_client *client)
+{
+	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	int ret;
+	int i;
+
+	if (qtouch_tsdebug & 4)
+		pr_info("%s: Resuming\n", __func__);
+
+	if (!atomic_read(&ts->irq_enabled))
+		return 0;
+
+	if (ts->mode == 1)
+		return -EBUSY;
+
+	/* If we were suspended while a touch was happening
+	   we need to tell the upper layers so they do not hang
+	   waiting on the liftoff that will not come. */
+	for (i = 0; i < ts->pdata->multi_touch_cfg.num_touch; i++) {
+		if (qtouch_tsdebug & 4)
+			pr_info("%s: Finger %i down state %i\n",
+				__func__, i, ts->finger_data[i].down);
+		if (ts->finger_data[i].down == 0)
+			continue;
+		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
+		input_mt_sync(ts->input_dev);
+		memset(&ts->finger_data[i], 0, sizeof(struct coordinate_map));
+
+	}
+	input_sync(ts->input_dev);
+
+	ret = qtouch_power_config(ts, 1);
+	if (ret < 0) {
+		pr_err("%s: Cannot write power config\n", __func__);
+		return -EIO;
+	}
+	qtouch_force_reset(ts, 0);
+
+	enable_irq(ts->client->irq);
+	return 0;
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-static void qtm_obp_ts_early_suspend(struct early_suspend *h)
+static void qtouch_ts_early_suspend(struct early_suspend *handler)
 {
-	struct qtm_obp_ts_data *ts;
-	KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-	ts = container_of(h, struct qtm_obp_ts_data, early_suspend);
+	struct qtouch_ts_data *ts;
 
-	KEY08_PRINTK("%s: Locking transaction mutex\n",__FUNCTION__);
-	mutex_lock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Obtained transaction mutex\n",__FUNCTION__);
-
-	qtm_obp_ts_suspend(ts->client, PMSG_SUSPEND);
-
-	KEY08_PRINTK("%s: Unlocking transaction mutex\n",__FUNCTION__);
-	mutex_unlock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Released transaction mutex\n",__FUNCTION__);
-
-
-	KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
+	ts = container_of(handler, struct qtouch_ts_data, early_suspend);
+	qtouch_ts_suspend(ts->client, PMSG_SUSPEND);
 }
 
-static void qtm_obp_ts_late_resume(struct early_suspend *h)
+static void qtouch_ts_late_resume(struct early_suspend *handler)
 {
-	struct qtm_obp_ts_data *ts;
+	struct qtouch_ts_data *ts;
 
-	KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-	ts = container_of(h, struct qtm_obp_ts_data, early_suspend);
-
-	KEY08_PRINTK("%s: Locking transaction mutex\n",__FUNCTION__);
-	mutex_lock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Obtained transaction mutex\n",__FUNCTION__);
-
-	qtm_obp_ts_resume(ts->client);
-
-	KEY08_PRINTK("%s: Unlocking transaction mutex\n",__FUNCTION__);
-	mutex_unlock(&qtmTsGl->transaction_mutex);
-	KEY08_PRINTK("%s: Released transaction mutex\n",__FUNCTION__);
-
-	KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
+	ts = container_of(handler, struct qtouch_ts_data, early_suspend);
+	qtouch_ts_resume(ts->client);
 }
 #endif
 
-// Is there any OBP impact here ???
-// How wil this impact Zeppelin ???
-
-static void qtm_obp_slider_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
-{
-	KEY08_PRINTK("%s: enter....\n",__FUNCTION__);
-	KEY08_PRINTK("%s: exit....\n",__FUNCTION__);
-}
-
-static int qtm_obp_slider_connect(struct input_handler *handler, struct input_dev *dev,
-			const struct	input_device_id *id)
-{
-	struct input_handle *handle;
-	int error ,sw_value;
-
-     KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-	if( qtmTsGl->input_dev == dev )   
-		return -ENODEV;
-
-	if ( !(strncmp(dev->name,"adp5588",7)))
-		return -ENODEV;
-
-	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
-   	if (!handle)
-		return -ENOMEM;
-
-	// qtmTsGl->sliderDev = dev;
-	handle->dev = dev;
-	handle->handler = handler;
-	handle->name = "qtm_obp_slider";
-	error = input_register_handle(handle);
-	if (error)
-		goto err_free_handle;
-
-   	error = input_open_device(handle);
-	if (error)
-		goto err_unregister_handle;
-	sw_value = !!test_bit(SW_TABLET_MODE, dev->sw);
-
-	KEY08_PRINTK("%s: Connected device: \"%s\", %s\n  sw state  %d ", __FUNCTION__, dev->name, dev->phys,sw_value);
-
-	KEY08_PRINTK("%s: exit....\n",__FUNCTION__);
-   	return 0;
-
-err_unregister_handle:
- 	input_unregister_handle(handle);
-err_free_handle:
-	kfree(handle);
-     KEY08_PRINTK("%s: Exiting with error=%d.....\n", __FUNCTION__, error);
-	return error;
-}
-
-static void qtm_obp_slider_disconnect(struct input_handle *handle)
-{
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-    input_close_device(handle);
-    input_unregister_handle(handle);
-    kfree(handle);
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-}
-
+#ifdef CONFIG_TOUCHSCREEN_BASIL
 /**
  * Open device
  *
@@ -1548,473 +2336,74 @@ static void qtm_obp_slider_disconnect(struct input_handle *handle)
  * @param filp
  * @return 0
  */
-static	int	qtm_obp_open(struct inode *inode, struct file *filp)
+static int minipad_open(struct inode *inode, struct file *filp)
 {
-	KEY08_PRINTK("qtm_obp_open: entering\n");
-	KEY08_PRINTK("qtm_obp_open: exiting\n");
-
+	if (qtouch_tsdebug & 2)
+		pr_info("%s: entering\n", __func__);
 	return 0;
 }
 
-unsigned char	qtm_kernelBuffer[255];
 /**
- * Ioctl implementation
+ * Release device
  *
- * Device can be used only by one user process at the time
- * ioctl returns -EBUSY if device is already in use
- *
- * @param node File in /proc
- * @param f Kernel level file structure
- * @param cmd Ioctl command
- * @param arg Ioctl argument
- * @return 0 in success, or negative error code
+ * @param inode
+ * @param filp
+ * @return 0
  */
-static int qtm_obp_ioctl(struct inode *node, struct file *filp, unsigned int cmd, unsigned long arg)
+static int minipad_release(struct inode *inode, struct file *filp)
 {
-	A_TOUCH_POINT_PTR	dataPoint;
-	char * 	dataPtr;
-	unsigned long	bCount;
-	int	regValue;
-	int	rc = -1;
-	int	ret = 0;
-	char	data[10];
-        int     loopCount;
-        int     cntEndFirmwareAttempts = 0;
-        int     flagFirm = 1;
-        int i = 0;
-
-     KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-     KEY08_PRINTK("%s: Locking transaction mutex\n",__FUNCTION__);
-     mutex_lock(&qtmTsGl->transaction_mutex);
-     KEY08_PRINTK("%s: Obtained transaction mutex\n",__FUNCTION__);
-
-
-	switch (cmd) 
-	{
-	case KEY08_IOCTL_SET_IN_CALL:
-		qtmTsGl->inCall = TRUE;
-		break;
-	case KEY08_IOCTL_SET_NOT_IN_CALL:
-		qtmTsGl->inCall = FALSE;
-		break;
-	case KEY08_IOCTL_SET_BOOTLOADER_MODE:
-
-          if ( qtmTsGl->mode == KEY08_MODE_OBP )
-          {
-              KEY08_PRINTK("qtm_obp_ioctl:Setting BOOTLOADER mode\n");
-
-              rc = -1;
-
-              // disable interrupts since we are about to set the change line
-              // to an ouput to set the device into bootloader mode
-
-              if (qtmTsGl->use_irq)
-              {
-                  disable_irq(qtmTsGl->client->irq);
-              }
-
-              // set Change pin to LOW
-
-              gpio_request(KEY08_TS_GPIO, "qtm_obp_ts_gpio");
-              gpio_direction_output(KEY08_TS_GPIO, 0);
-              gpio_set_value(KEY08_TS_GPIO,0);
-
-              // set RESET to Low
-
-              gpio_request(KEY08_TS_RESET, "touch_rst_n");
-              gpio_set_value(KEY08_TS_RESET,0);
-
-              // wait 10us
-              clk_busy_wait(10);
-
-              // set RESET to high
-              gpio_set_value(KEY08_TS_RESET ,1);
-
-              // wait 100ms
-              clk_busy_wait(100000);
-
-              // set Change pin to high
-              gpio_set_value(KEY08_TS_GPIO ,1);
-
-              // set Change pin back to input for interrupt
-              gpio_direction_input(KEY08_TS_GPIO);
-
-              // re-enable irq
-              if (qtmTsGl->use_irq)
-              {
-                  enable_irq(qtmTsGl->client->irq);
-              }
-
-              /* Confirm that we are in BOOTLOADER mode */
-              qtmTsGl->client->addr = qtm_obp_bl_addr;
-              data[0] = 0;
-              loopCount =0;
-
-              // Check if we are waiting for bootloader command state (data retured=0xCx)
-              while ( (data[0] & 0xF0) != 0xC0 &&
-                      (data[0] & 0xF0) != 0x80 &&
-                      (loopCount < 100 ) )
-              {
-                  rc = i2c_master_recv(qtmTsGl->client, data, 1);
-                  KEY08_PRINTK("qtm_obp_ioctl: reading BL status = 0x%02X\n",data[0]);
-                  clk_busy_wait(3000);
-                  loopCount++;
-              }
-
-              // if loopCount reached max, something is wrong.
-              // exit with error and don't set mode to BOOTLOADER
-
-              if (loopCount >=100)
-              {
-                  KEY08_PRINTK("qtm_obp_ioctl: unable to set to BL mode\n");
-                  qtmTsGl->client->addr = qtm_obp_normal_addr;
-                  rc = -1;
-              }
-              else
-              {
-                  // we are bootloader mode
-                  qtmTsGl->mode = KEY08_MODE_BOOTLOADER;
-
-                  KEY08_PRINTK("qtm_obp_ioctl: We are in BL mode, got 0x%02X\n",data[0]);
-
-                  if ( (data[0] & 0xF0 ) == 0xC0 )
-                  {
-                      KEY08_PRINTK("qtm_obp_ioctl: send unlock code\n");
-
-                      data[0] = 0xDC;
-                      data[1] = 0xAA;
-                      rc = i2c_master_send (qtmTsGl->client, data, 2);
-                      clk_busy_wait(3000);
-
-                      // Check if Bootloader is ready for receiving data
-                      loopCount = 0; 
-                      while ( (data[0] & 0xF0) != 0x80 &&
-                            ( loopCount < 1000 ) )
-                      {
-                          rc = i2c_master_recv(qtmTsGl->client, data,1);
-                          clk_busy_wait(3000);
-                          loopCount++;
-                      }
-                
-                      if (loopCount >=1000)
-                      {
-                          // Something wrong, Bootloader is not ready for receiving data
-                          printk("qtm_obp_ioctl: Something wrong, Bootloader is not ready for receiving data \n");
-                          rc = -1;
-                      }
-                      else
-                      { 
-                         rc = KEY08_MODE_BOOTLOADER;
-                         // change the mode to waiting for data
-                         qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_DATA;
-                      }
-                  }
-                  else if ( (data[0] & 0xF0 ) == 0x80 )
-                  {
-                      KEY08_PRINTK("qtm_obp_ioctl: Already in BOOTLOADER mode\n");
-                      rc = KEY08_MODE_BOOTLOADER;
-                  }
-              
-              }
-          }
-	  else 
-	  {
-			KEY08_PRINTK("qtm_obp_ioctl: Already in BOOTLOADER mode\n");
-                        // change the mode to waiting for data
-                        rc = KEY08_MODE_BOOTLOADER;
-                        qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_DATA;
-          }
-	  if ( rc != -1 )
-          {
-		// qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_DATA;
-	        qtmTsGl->mode = KEY08_MODE_BOOTLOADER;
-                rc = KEY08_MODE_BOOTLOADER;
-          }
-
-	  KEY08_PRINTK("qtm_obp_ioctl: Mode is set to  %d\n", qtmTsGl->mode);
-
-	  break;
-
-	case KEY08_IOCTL_DL_GET_STATUS:
-		rc = qtmTsGl->sendMode;
-		break;
-
-	case KEY08_IOCTL_CAL_STATUS:
-		rc = calibrating;
-		break;
-
-	case KEY08_IOCTL_GET_MODE:
-		rc = qtmTsGl->mode;
-		break;
-
-	case KEY08_IOCTL_SET_NORMAL_MODE:
-          if ((qtmTsGl->mode != KEY08_MODE_NORMAL) && (qtmTsGl->mode != KEY08_MODE_OBP))
-          {
-              KEY08_PRINTK("qtm_obp_ioctl: NORMAL_MODE re-setting flags to normal mode\n");
-
-              qtmTsGl->client->addr = qtm_obp_normal_addr;
-              memset(data,0,sizeof(data));
-
-              if ((ret = i2c_master_recv(qtmTsGl->client, data, 1 )) < 0 )
-              {
-                  KEY08_PRINTK("qtm_obp_ioctl: i2c_master_recv (normal client) error  %d\n",ret);
-              }
-              else
-              {
-                  KEY08_PRINTK("qtm_obp_ioctl: Check First Byte data[0] : %x \n", data[0]);
-                  if (data[0] == 0x70 || data[0] == 0xFF)
-                  {
-                      qtmTsGl->mode = KEY08_MODE_NORMAL;
-                  }
-                  else
-                  {
-                      qtmTsGl->mode = KEY08_MODE_OBP;
-                  }
-              }
-              qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_NOTHING;
-              rc = qtm_obp_calibrate(qtmTsGl->client);
-          }
-          else
-          {
-              KEY08_PRINTK("qtm_obp_ioctl: Mode is Already set to  %d\n", qtmTsGl->mode);
-              rc = qtmTsGl->sendMode;
-          }
-          KEY08_PRINTK("qtm_obp_ioctl: Mode is set to  %d\n", qtmTsGl->mode);
-          break;
-
-	case KEY08_IOCTL_GET_VERSION:
-		rc = qtm_obp_ts_read_app_version();
-		break;
-
-	case KEY08_IOCTL_WRITE_REGISTER:
-		bCount = copy_from_user(qtm_kernelBuffer, (char *)arg, (unsigned long)sizeof(A_REG)); 
-		if ( bCount == 0 )
-		{
-			A_REG_PTR	regV;
-			regV = (A_REG_PTR) qtm_kernelBuffer;
-			rc = qtm_obp_reg_write (qtmTsGl->client,
-				regV->reg,
-				sizeof(char), (char *)&regV->value);
-
-			clk_busy_wait(6000);
-			KEY08_PRINTK("qtm_obp_ioctl: setting register %d = %d\n", (int)regV->reg, (int)regV->value);
-		}
-		break;
-
-	case KEY08_IOCTL_READ_REGISTER:
-		regValue = (int)arg;
-		rc = qtm_obp_ts_read_register(qtmTsGl->client,regValue);
-		KEY08_PRINTK("qtm_obp_ioctl: Register %d = %d\n", (int)regValue, (int)rc);
-		break;
-
-	case KEY08_IOCTL_END_FIRMWARE:
-                printk("qtm_obp_ioctl: Firmware Upgrade is Complete \n");
-		printk("qtm_obp_ioctl: Config File will be Loaded \n");
-		KEY08_PRINTK("qtm_obp_ioctl: END_FIRMWARE re-setting flags to normal mode\n");
-                disable_irq(qtmTsGl->client->irq); // Touchpad Cleanup
-		qtmTsGl->client->addr = qtm_obp_normal_addr;
-		qtmTsGl->mode = KEY08_MODE_OBP;
-                // Average Time to switch to normal mode is 500 ms, so wait 600 ms
-		clk_busy_wait(600000);
-		memset(data,0,sizeof(data));
-                rc = 0;
-
-                flagFirm = 1;
-                while (flagFirm)
-                {
-		    if ((ret = i2c_master_recv(qtmTsGl->client, data, 6 )) < 0 )
-		    {
-		       printk("qtm_obp_ioctl: i2c_master_recv (normal client) error  %d\n",ret);
-                       if (cntEndFirmwareAttempts > 100)
-                       {
-                          flagFirm = 0;
-                          rc = -1;
-                          cntEndFirmwareAttempts = 0;
-                       }
-                       cntEndFirmwareAttempts++;
-		    }
-		    else
-		    {
-                        printk("END_FIRMWARE: Buffer\n");
-                        for (i=0;i<ret;i++)
-                           printk("data[%d] = 0x%x\n", i, data[i]);
-
-                        // If Doing Calibrate Wait till Calibration is Complete
-                        if ((data[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CAL))
-                        {
-		            printk("qtm_obp_ioctl: Calibrating in END_FIRMWARE \n");
-                            calibrating = 1;
-		            clk_busy_wait(250000); // Allow IC to finish calibration
-                        }
-                        else if ((calibrating != 0) && ((data[QTM_OBP_T6_STATUS] & QTM_OBP_T6_STATUS_CAL) == 0))
-                        {
-		            printk("qtm_obp_ioctl: Calibration Done!! in END_FIRMWARE \n");
-                            calibrating = 0;
-                            flagFirm = 0;
-                        }
-                        else if (!calibrating)
-                        {
-                            printk("qtm_obp_ioctl: ** IC Resets to Normal Mode ** \n");
-                            flagFirm = 0;
-                        }
-		    }
-		    clk_busy_wait(3000);
-                 }
-                 if (rc < 0)
-                   printk ( "qtm_obp_ioctl: Unable to Switch to NORMAL MODE");
-                 else
-		   qtm_obp_load_obp_objects();
-		 break;
-
-	case KEY08_IOCTL_DISPLAY_ONE_POINT:
-		bCount = copy_from_user(qtm_kernelBuffer, (char *)arg, (unsigned long)sizeof(A_TOUCH_POINT)); 
-		if ( bCount == 0 )
-		{
-			dataPoint = (A_TOUCH_POINT_PTR) qtm_kernelBuffer;
-
-			KEY08_PRINTK("qtm_obp_ioctl: touching point: (%d, %d), finger: %d\n", dataPoint->X, dataPoint->Y, dataPoint->finger);
-			input_report_abs(qtmTsGl->input_dev, ABS_X, dataPoint->X);
-			input_report_abs(qtmTsGl->input_dev, ABS_Y, dataPoint->Y);
-			input_report_abs(qtmTsGl->input_dev, ABS_PRESSURE, dataPoint->Z);
-			input_report_abs(qtmTsGl->input_dev, ABS_TOOL_WIDTH, dataPoint->W);
-			input_report_key(qtmTsGl->input_dev, BTN_TOUCH, dataPoint->finger);
-			input_sync(qtmTsGl->input_dev);
-			rc = qtmTsGl->mode;	
-		}
-		else
-		{
-			KEY08_PRINTK("qtm_obp_ioctl: touching point: copy_from_user() failed. Not touching anything!\n");
-		}
-		break;
-
-        case KEY08_IOCTL_GET_TOUCH_SENS_DATA:
-          dataPtr = (char *) arg;
-          qtm_obp_get_touch_sens_data ((char *) dataPtr);
-	  break;
-
-	case KEY08_IOCTL_RESET:
-	  KEY08_PRINTK("qtm_obp_ioctl: RESET !\n");
-	  if (qtmTsGl->mode == KEY08_MODE_NORMAL)
-		    rc = KEY08_MODE_NORMAL;
-		else 
-		    rc = KEY08_MODE_OBP;
-	  qtm_obp_doReset();
-	  break;
-
-	case KEY08_IOCTL_DEBUG:
-		bCount = copy_from_user(qtm_kernelBuffer, (char *)arg, (unsigned long)sizeof(char)); 
-		if ( bCount == 0 )
-				qtm_debugOn = qtm_kernelBuffer[0];
-		rc = 0;
-		break;
-
-	case KEY08_IOCTL_CALIBRATE:
-            if (qtmTsGl->mode == KEY08_MODE_OBP)
-            {
-                calibrating = 1;
-                enable_irq(qtmTsGl->client->irq); // Touchpad Cleanup
-		rc = qtm_obp_calibrate(qtmTsGl->client);
-            }
-            else
-                calibrating = 0;
-		break;
-
-	case KEY08_IOCTL_SETIRQ:
-
-                bCount = copy_from_user(qtm_kernelBuffer, (char *)arg, (unsigned long)sizeof(char));
-                if ( bCount == 0 )
-                        regValue = qtm_kernelBuffer[0];
-                if ( regValue )
-                {
-                        enable_irq(qtmTsGl->client->irq);
-                        KEY08_PRINTK("%s: Enabling irq %d\n", __FUNCTION__, qtmTsGl->client->irq);
-                }
-                else
-                {
-                        disable_irq(qtmTsGl->client->irq);
-                        KEY08_PRINTK("%s: Disabling irq: %d\n", __FUNCTION__, qtmTsGl->client->irq);
-                }
-                break;
-
-        case KEY08_IOCTL_DISABLE:
-             KEY08_PRINTK("%s: Disabling touchscreen\n", __FUNCTION__);
-             qtm_obp_ts_suspend (qtmTsGl->client, PMSG_SUSPEND);
-             break;
-
-        case KEY08_IOCTL_ENABLE:
-             KEY08_PRINTK("%s: Enabling touchscreen\n", __FUNCTION__);
-             qtm_obp_ts_resume (qtmTsGl->client); 
-             rc = 0;
-             break;
-
-	case KEY08_IOCTL_SET_MESSAGE_PTR:
-             rc = qtm_obp_send_message_processor_pointer();
-             break;
-
-	case KEY08_IOCTL_SAVE_CONFIG: 
-             save_low_power_regs();
-             // enable_irq(qtmTsGl->client->irq); // Touchpad Cleanup
-             rc = qtm_obp_save_config();
-             break;
-
-     case KEY08_IOCTL_GET_CMD_STATUS:
-             KEY08_PRINTK("%s: File transfer status: 0x%x\n",__FUNCTION__,
-                           qtmTsGl->XferStatus);
-             rc = qtmTsGl->XferStatus;
-             break;
-
-     case KEY08_IOCTL_SET_CMD_STATUS:
-             bCount = copy_from_user(&qtmTsGl->XferStatus, (char *)arg, (unsigned long)sizeof(qtmTsGl->XferStatus));
-             if ( bCount != sizeof(qtmTsGl->XferStatus) )
-                  rc = -EFAULT;
-	     /*
-	      * This can only be status of the configuration transfer
-	      * This means we have to put it into the high byte of the status
-	      */
-
-             KEY08_PRINTK("%s: File transfer status: 0x%x\n",__FUNCTION__,
-                           qtmTsGl->XferStatus);
-             rc = qtmTsGl->XferStatus;
-
-             break;
-              
-      case KEY08_IOCTL_GET_BAD_CRC_COUNT:
-                rc = qtmTsGl->cntBadCRC;
-                break;
-
-      case KEY08_IOCTL_READ_REGISTER16:
-           rc = 0;
-           break;
-
-      case KEY08_IOCTL_GETIRQ:
-           rc = 0;
-           break;
-
-      case KEY08_IOCTL_READ_4_REGS:
-           rc = 0;
-           break;
-
-      case KEY08_IOCTL_SUSPEND:
-           rc = 0;
-           break;
-
-      case KEY08_IOCTL_GET_POINT:
-           rc = 0;
-           break;
-      
-	default:
-		return EINVAL;
-		break;
-	}	
-
-     KEY08_PRINTK("%s: Unlocking transaction mutex\n",__FUNCTION__);
-     mutex_unlock(&qtmTsGl->transaction_mutex);
-     KEY08_PRINTK("%s: Released transaction mutex\n",__FUNCTION__);
-
-     KEY08_PRINTK("%s: Exiting.....rc=%d\n", __FUNCTION__, rc);
-     return rc;
+	if (qtouch_tsdebug & 2)
+		pr_info("%s: entering\n", __func__);
+	return 0;
 }
+
+
+/*
+ * This function is called to enable and disable the minipad device.
+ * @param ts     Touch screen structure pointer.
+ * @param enable Indicate 1 to  enable or 0 to disable
+ */
+static void enableMinipad(struct qtouch_ts_data *ts, int enable)
+{
+	struct qtm_object *obj;
+	int ret;
+
+	pr_info("%s: currentStatus %d  setStatus %d !\n", __func__, minipadEnabled,
+		enable);
+
+
+	if (enable == minipadEnabled || ts == NULL || ts->mode == 1) {
+		minipadEnabled = enable;
+		return;
+	}
+
+	minipadEnabled = enable;
+
+	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
+	if (obj->entry.num_inst > 1) {
+		struct qtm_touch_multi_cfg cfg;
+		memcpy(&cfg, &ts->pdata->minipad_cfg, sizeof(cfg));
+		if ((ts->pdata->minipad_flags & QTOUCH_USE_MULTITOUCH)
+			&& minipadEnabled)
+			cfg.ctrl |= (1 << 1) | (1 << 0); /* reporten | enable */
+		else
+			cfg.ctrl = 0;
+		ret = qtouch_write_addr(ts, obj->entry.addr + obj->entry.size,
+			&cfg, min(sizeof(cfg), obj->entry.size));
+		if (ret != 0)
+			pr_err("%s: Can't write minipad config\n", __func__);
+	}
+
+	/* A new configuration was set, so when the reset was called,
+	 * it must be executed as it was the first time (calling the
+	 * hw_init function). */
+	ts->eeprom_checksum = ts->pdata->nv_checksum;
+	ts->checksum_cnt = 0;
+
+	/* reset the address pointer */
+	qtouch_set_addr(ts, ts->obj_tbl[QTM_OBJ_GEN_MSG_PROC].entry.addr);
+}
+
 
 /**
  * Write to device
@@ -2025,380 +2414,73 @@ static int qtm_obp_ioctl(struct inode *node, struct file *filp, unsigned int cmd
  * @param pos
  * @return number of bytes written to the device
  */
-
-
-static int qtm_obp_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos )
+static int minipad_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos)
 {
-    int	retval=-1;
-    int	i;
-    int	reg;
-    unsigned long	bCount;
+	int    retval = -1;
+	int    param;
+	unsigned long    bCount;
 
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-    if ( qtmTsGl->mode == KEY08_MODE_BOOTLOADER )
-    {
-      KEY08_PRINTK("qtm_obp_write: Currently in BOOTLOADER mode.\n");
-      qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_DATA;
-      /* get data from user space into kernel space */
-      bCount = copy_from_user(qtm_kernelBuffer, buf, (unsigned long)count);
-      KEY08_PRINTK("qtm_obp_write: copy_from_user() returned %d\n", (int)bCount);
-      qtmTsGl->client->addr = qtm_obp_bl_addr;
-      do
-        {
-          KEY08_PRINTK("qtm_obp_write: record to IC: size=%d\nqtm_obp_write: record data:\n",count);
-          for ( i = 0; i < count; i++)
-            {
-              if ( !(i%20) )
-                KEY08_PRINTK("\nqtm_obp_write: ");
-              KEY08_PRINTK("%02x ", qtm_kernelBuffer[i]);
-            }
-          KEY08_PRINTK("\n");
-          retval = i2c_master_send (qtmTsGl->client, qtm_kernelBuffer, count);
-         
-          /* On failure, output the error code and delay before trying again */
-          if (retval < 0)
-            {
-              printk(KERN_ERR "qtm_obp_write: write failed: %d\n", retval);
-              qtmTsGl->sendMode = KEY08_BL_WAITING_FAILED;
-            }
-          else
-            {
-              KEY08_PRINTK("qtm_obp_write: i2c_master_send(): rc= %d\n",retval);
-              qtmTsGl->sendMode = KEY08_BL_WAITING_FOR_COMMAND;
-              retval = count;
-            }
-          clk_busy_wait(3000);
-        }
-      while (retval < 0);
-    }
-    else if (qtmTsGl->mode == KEY08_MODE_OBP)
-      {
-	KEY08_PRINTK("qtm_obp_write: Currently in NORMAL/OBP mode.\n");
-	/* Get the data from the user space */
-	bCount = copy_from_user(qtm_kernelBuffer, buf, (unsigned long)count); 
-	KEY08_PRINTK("qtm_obp_write: copy_from_user() returned %d\n", (int)bCount);
-	
-	reg = ((qtm_kernelBuffer[0]<<8) | qtm_kernelBuffer[1]);
-	KEY08_PRINTK("qtm_obp_write: config record: size: %d, reg = %d\n",count, reg);
-	KEY08_PRINTK("qtm_obp_write: ");
-	for ( i = 0; i < count; i++)
-	  {
-	    char	ch = qtm_kernelBuffer[i];
-	    KEY08_PRINTK("%02X ", ch);
-	  }
-	KEY08_PRINTK("\n");
-	qtmTsGl->client->addr = qtm_obp_normal_addr;
-	if ( (retval = qtm_obp_reg_write (qtmTsGl->client, reg, 4, (char *)&(qtm_kernelBuffer[2]))) == 0 )
-	  {
-	    KEY08_PRINTK("qtm_obp_write: finished writing config info\n");
-	    retval = 6;
-	  }
-	else
-	  {
-	    KEY08_PRINTK("qtm_obp_write: finished writing config info\n");
-	  }
-      }
-    else
-      retval = -1;
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-    return retval;
-}
+	/* check size */
+	if (count == sizeof(int)) {
+		/* Get the data from the user space */
+		bCount = copy_from_user(&param, buf, (unsigned long)count);
 
+		if ((param == MINIPAD_REQ_SET_DISABLE) || (param == MINIPAD_REQ_SET_ENABLE)) {
+			pr_info("%s: received request to enable/disable rear touch - %d\n", __func__, param);
 
-/**
- * Release device
- *
- * @param inode
- * @param filp
- * @return 0
- */
-static int qtm_obp_release(struct inode *inode, struct file *filp)
-{
-     KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-     KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-     return 0;
-}
+			enableMinipad(ts, param == MINIPAD_REQ_SET_ENABLE);
 
-static int __devinit qtm_obp_ts_init(void)
-{
-     KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-     qtm_debugOn = OFF;
-     KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-     return i2c_add_driver(&qtm_obp_ts_driver);
-}
-
-static void __exit qtm_obp_ts_exit(void)
-{
-     i2c_del_driver(&qtm_obp_ts_driver);
-}
-
-/*!
- * @brief Logs data
- *
- * This function is called as a replacement to printk
- *
- * @param fmt Text of message to log
- */
-
-static void qtm_obp_printk (char *fmt, ...)
-{
-	if ( qtm_debugOn )
-	{
-		static va_list args;
-		va_start(args, fmt);
-		vprintk(fmt, args);
-		va_end(args);
+			retval = count;
+		} else {
+			pr_err("%s: invalid device write request - %d\n", __func__, param);
+		}
 	}
-}
 
-static void qtm_obp_load_obp_objects (void)
+	return retval;
+}
+#endif
+
+/******** init ********/
+static const struct i2c_device_id qtouch_ts_id[] = {
+	{ QTOUCH_TS_NAME, 0 },
+	{ }
+};
+
+
+static struct i2c_driver qtouch_ts_driver = {
+	.probe		= qtouch_ts_probe,
+	.remove		= qtouch_ts_remove,
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend	= qtouch_ts_suspend,
+	.resume		= qtouch_ts_resume,
+#endif
+	.id_table	= qtouch_ts_id,
+	.driver = {
+		.name	= QTOUCH_TS_NAME,
+		.owner	= THIS_MODULE,
+	},
+};
+
+static int __devinit qtouch_ts_init(void)
 {
-    unsigned char value[QTM_OBP_REG_ADDR_SIZE];
-    uint8_t qtm_obp_table_buf[QTM_OBP_INFO_BLOCK_SIZE];
-    uint8_t object_type = 0;
-    uint8_t report_id = 0;
-    int i = 0;
-    int ret = 0;
-    uint16_t reg;
-
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-    // Setup register 0 - Info Block
-    memset(qtm_obp_info_block.qtm_info_buf,0,QTM_OBP_INFO_BLOCK_SIZE);
-
-    value[0] = 0;
-    value[1] = 0;
-    ret = i2c_master_send(qtmTsGl->client, value, QTM_OBP_REG_ADDR_SIZE);
-
-    if (ret < 0)
-    {
-        KEY08_PRINTK(KERN_ERR "qtm_obp_ts_probe: failed to read from OBP\n");
-        //goto err_detect_failed;
-    }
-
-    // Read Info Block
-    clk_busy_wait(3000);
-
-    ret = i2c_master_recv(qtmTsGl->client, qtm_obp_info_block.qtm_info_buf, 7);
-
-    // clk_busy_wait(3000);
-    // clk_busy_wait(3000);
-    KEY08_PRINTK( "qtm_obj: family_id :%x \n",qtm_obp_info_block.qtm_info_bytes.family_id);
-    KEY08_PRINTK( "qtm_obj: variant_id:%x \n",qtm_obp_info_block.qtm_info_bytes.variant_id);
-    KEY08_PRINTK( "qtm_obj: version   :%x \n",qtm_obp_info_block.qtm_info_bytes.version);
-    KEY08_PRINTK( "qtm_obj: build     :%x \n",qtm_obp_info_block.qtm_info_bytes.build);
-    KEY08_PRINTK( "qtm_obj: matrix_x_size :%x \n",qtm_obp_info_block.qtm_info_bytes.matrix_x_size);
-    KEY08_PRINTK( "qtm_obj: matrix_y_size :%x \n",qtm_obp_info_block.qtm_info_bytes.matrix_y_size);
-    KEY08_PRINTK( "qtm_obj: num_of_objects:%x \n",qtm_obp_info_block.qtm_info_bytes.num_of_objects);
-
-    // Read the objects to setup the object table
-
-    if(qtm_obp_info_block.qtm_info_bytes.num_of_objects != 0x0)
-    {
-                   
-         memset(qtm_obp_table_buf,0, QTM_OBP_INFO_BLOCK_SIZE);
-         reg=QTM_OBP_INFO_BLOCK_SIZE;
-         report_id = 1;
-
-         for(i=0;i<qtm_obp_info_block.qtm_info_bytes.num_of_objects;i++)
-         {
-              memcpy(&value[0], (unsigned char *)&reg, QTM_OBP_REG_ADDR_SIZE);
-              ret = i2c_master_send(qtmTsGl->client, value, QTM_OBP_REG_ADDR_SIZE);
-
-              /* On failure, output the error code and delay before trying again */
-              if (ret < 0)
-              {
-                   KEY08_PRINTK( "qtm_obp_reg_write: write of reg 0x%X failed: %d\n", reg, ret);
-                   clk_busy_wait(QTM_OBP_READ_WRITE_DELAY);
-              }
-
-              clk_busy_wait(QTM_OBP_READ_WRITE_DELAY);
-
-              ret = i2c_master_recv(qtmTsGl->client, qtm_obp_table_buf, QTM_OBP_OBJ_TBL_BLK_SIZE);
-
-              if (ret < 0)
-              {
-                  KEY08_PRINTK( "qtm_obp_reg_read: writeread of object_id 0x%X reg 0x%X failed: %d\n", i, reg, ret)
-;
-                  clk_busy_wait(QTM_OBP_READ_WRITE_DELAY);
-              }
-
-              /* Copy object table data into the struct at object type offset */
-              object_type =  qtm_obp_table_buf[QTM_OBP_OBJ_TBL_TYPE];
-
-              qtm_obp_obj_table_elem[object_type].type = qtm_obp_table_buf[QTM_OBP_OBJ_TBL_TYPE];
-              qtm_obp_obj_table_elem[object_type].start_pos = (qtm_obp_table_buf[QTM_OBP_OBJ_TBL_START_POS2] << 8) | qtm_obp_table_buf[QTM_OBP_OBJ_TBL_START_POS1];
-              qtm_obp_obj_table_elem[object_type].obj_size = qtm_obp_table_buf[QTM_OBP_OBJ_TBL_OBJ_SIZE] + 1;
-              qtm_obp_obj_table_elem[object_type].num_of_instances = qtm_obp_table_buf[QTM_OBP_OBJ_TBL_NUM_INST] + 1;
-              qtm_obp_obj_table_elem[object_type].num_of_report_ids = qtm_obp_table_buf[QTM_OBP_OBJ_TBL_NUM_REPORTID];
-
-              if((qtm_obp_obj_table_elem[object_type].num_of_instances * qtm_obp_obj_table_elem[object_type].num_of_report_ids) != 0)
-              {
-                  qtm_obp_obj_table_elem[object_type].report_id_low = report_id;
-                  report_id = report_id + (qtm_obp_obj_table_elem[object_type].num_of_instances * qtm_obp_obj_table_elem[object_type].num_of_report_ids);
-                  qtm_obp_obj_table_elem[object_type].report_id_high = report_id - 1;
-              }
-
-              KEY08_PRINTK("qtm_obp object_index = 0x%X\n",i);
-              KEY08_PRINTK("qtm_obp object_type = 0x%X\n",qtm_obp_obj_table_elem[object_type].type);
-              KEY08_PRINTK("qtm_obp object_start_pos = 0x%X\n",qtm_obp_obj_table_elem[object_type].start_pos);
-              KEY08_PRINTK("qtm_obp object_obj_size = 0x%X\n",qtm_obp_obj_table_elem[object_type].obj_size);
-              KEY08_PRINTK("qtm_obp object_num_of_instances = 0x%X\n",qtm_obp_obj_table_elem[object_type].num_of_instances);
-              KEY08_PRINTK("qtm_obp object_num_of_report_ids = 0x%X\n",qtm_obp_obj_table_elem[object_type].num_of_report_ids);
-
-              memset(qtm_obp_table_buf,0, QTM_OBP_INFO_BLOCK_SIZE);
-              reg=reg + QTM_OBP_OBJ_TBL_BLK_SIZE;
-
-         }
-     } /* if(qtm_obp_info_block.qtm_info_bytes.num_of_objects != 0x0) */
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
+	qtouch_ts_wq = create_singlethread_workqueue("qtouch_obp_ts_wq");
+	if (qtouch_ts_wq == NULL) {
+		pr_err("%s: No memory for qtouch_ts_wq\n", __func__);
+		return -ENOMEM;
+	}
+	return i2c_add_driver(&qtouch_ts_driver);
 }
 
-static int save_low_power_regs (void)
+static void __exit qtouch_ts_exit(void)
 {
-    lpIdleValueEeprom = qtm_obp_ts_read_register(qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+QTM_OBP_T7_IDLE);
-    if (!lpIdleValueEeprom) 
-    { 
-        /* This should not be 0, but just in case it is, set to a default value */
-        lpIdleValueEeprom=14;
-        printk("ERROR : qtm_obp loaded IdleValueEeprom 0");
-    }
-    printk("qtm_obp lowpwer = 0x%X\n",lpIdleValueEeprom);
-
-    lpActiveValueEeprom = qtm_obp_ts_read_register(qtmTsGl->client, qtm_obp_obj_table_elem[OBJ_ID_GEN_POWERCONFIG_T7].start_pos+QTM_OBP_T7_ACTIVE);
-    if (!lpActiveValueEeprom) 
-    { 
-       /* This should not be 0, but just in case it is, set to a default value */
-       lpActiveValueEeprom=14;
-       printk("ERROR : qtm_obp loaded ActiveValueEeprom 0");
-    }
-    printk("qtm_obp lowpwer = 0x%X\n",lpActiveValueEeprom);
-	return(0);
+	i2c_del_driver(&qtouch_ts_driver);
+	if (qtouch_ts_wq)
+		destroy_workqueue(qtouch_ts_wq);
 }
 
-static int qtm_obp_send_message_processor_pointer (void)
-{
-    int ret;
-    unsigned char value[QTM_OBP_REG_ADDR_SIZE];
-    unsigned int reg;
+module_init(qtouch_ts_init);
+module_exit(qtouch_ts_exit);
 
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-    reg=qtm_obp_obj_table_elem[OBJ_ID_GEN_MESSAGEPROCESSOR_T5].start_pos;
-    memcpy(&value[0], (unsigned char *)&reg, 2);
-    ret = i2c_master_send(qtmTsGl->client, value, 2);
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-    return ret;
-}
-
-static int qtm_obp_get_touch_sens_data (char * dataPtr)
-{
-    unsigned char value[QTM_OBP_REG_ADDR_SIZE];
-    uint8_t qtm_obp_touch_delta_buf[168];
-    uint8_t qtm_obp_touch_ref_buf[168];
-    int i = 0;
-    int ret = 0;
-    int index = 0;
-    int length = 0;
-
-    KEY08_PRINTK("%s: Entering.....\n", __FUNCTION__);
-
-    disable_irq(qtmTsGl->client->irq);
-    
-    memset(qtm_obp_touch_delta_buf,0,qtm_obp_obj_table_elem[OBJ_ID_DEBUG_DELTAS_T2].obj_size);
-
-    value[0] = qtm_obp_obj_table_elem[OBJ_ID_DEBUG_DELTAS_T2].start_pos & 0xFF;
-    value[1] = (qtm_obp_obj_table_elem[OBJ_ID_DEBUG_DELTAS_T2].start_pos & 0xFF00)>>8;
-    clk_busy_wait(3000);
-    
-    ret = i2c_master_send(qtmTsGl->client, value, QTM_OBP_REG_ADDR_SIZE);
-   
-    if (ret < 0)
-    {
-        KEY08_PRINTK(KERN_ERR "%s: i2c delta write Failed\n", __FUNCTION__);
-    }
-    clk_busy_wait(3000);
-
-    ret = i2c_master_recv(qtmTsGl->client, qtm_obp_touch_delta_buf, 
-                          qtm_obp_obj_table_elem[OBJ_ID_DEBUG_DELTAS_T2].obj_size);
-
-    if (ret < 0)
-    {
-        KEY08_PRINTK(KERN_ERR "%s: i2c delta Read Failed\n", __FUNCTION__);
-    }
-    memset(qtm_obp_touch_ref_buf,0,qtm_obp_obj_table_elem[OBJ_ID_DEBUG_REFERENCES_T3].obj_size);  
-
-    value[0] = qtm_obp_obj_table_elem[OBJ_ID_DEBUG_REFERENCES_T3].start_pos & 0xFF;
-    value[1] = (qtm_obp_obj_table_elem[OBJ_ID_DEBUG_REFERENCES_T3].start_pos & 0xFF00)>>8;
-    clk_busy_wait(3000);
-   
-    ret = i2c_master_send(qtmTsGl->client, value, QTM_OBP_REG_ADDR_SIZE);
-  
-    if (ret < 0)
-    {
-        KEY08_PRINTK(KERN_ERR "%s: i2c ref write Failed\n", __FUNCTION__);
-    }
-
-    clk_busy_wait(3000);
-
-    // TODO
-    ret = i2c_master_recv(qtmTsGl->client, qtm_obp_touch_ref_buf, 
-                          qtm_obp_obj_table_elem[OBJ_ID_DEBUG_REFERENCES_T3].obj_size);
-
-    if (ret < 0)
-    {
-        KEY08_PRINTK(KERN_ERR "%s: i2c ref Read Failed\n", __FUNCTION__);
-    }
-   
-    // Process
-    /* Make sure that MSByte goes into the buffer first */
-
-    index = 0;
-    for ( i = 0; i < 84; i++)
-    {
-       char    lsbyte;
-       char    msbyte;
-       msbyte = qtm_obp_touch_ref_buf [index];
-       index++;
-       lsbyte = qtm_obp_touch_ref_buf [index];
-       index++;
-       *dataPtr = msbyte;
-       dataPtr++;
-       length++;
-       *dataPtr = lsbyte;
-       dataPtr++;
-       length++;
-       KEY08_PRINTK("%s: Ref_Index %d = %d \n", __FUNCTION__, i, lsbyte);
-       KEY08_PRINTK("%s: Ref_Index %d = %d \n", __FUNCTION__, i, msbyte);
-    }
-
-    index = 0;
-    for ( i = 0; i < 84; i++)
-    {
-       char    lsbyte;
-       char    msbyte;
-       msbyte = qtm_obp_touch_delta_buf [index];
-       index++; 
-       lsbyte = qtm_obp_touch_delta_buf [index]; 
-       index++; 
-       *dataPtr = msbyte;
-       dataPtr++;
-       length++;
-       *dataPtr = lsbyte;
-       dataPtr++;
-       length++;
-       KEY08_PRINTK("%s: Delta_Index %d = %d \n", __FUNCTION__, i, lsbyte);
-       KEY08_PRINTK("%s: Delta_Index %d = %d \n", __FUNCTION__, i, msbyte);
-    }
-    enable_irq(qtmTsGl->client->irq);
-    KEY08_PRINTK("%s: Exiting.....\n", __FUNCTION__);
-    return ret; 
-}
-
-module_init(qtm_obp_ts_init);
-// subsys_initcall(qtm_obp_ts_init);
-module_exit(qtm_obp_ts_exit);
-
-MODULE_DESCRIPTION("qtm_obp Touchpad Driver");
+MODULE_AUTHOR("Dima Zavin <dima@android.com>");
+MODULE_DESCRIPTION("Quantum OBP Touchscreen Driver");
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Boris Dubinsky <Boris.Dubinsky@motorola.com>");
-MODULE_VERSION("1.0");
