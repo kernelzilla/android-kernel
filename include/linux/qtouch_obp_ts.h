@@ -33,8 +33,15 @@
 #define QTM_OBP_BOOT_CRC_PASSED		0x04
 
 #define QTM_OBP_SLEEP_WAIT_FOR_BOOT	100
-#define QTM_OBP_SLEEP_WAIT_FOR_RESET	500
-#define QTM_OBP_SLEEP_WAIT_FOR_BACKUP	500
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+#define QTM_OBP_SLEEP_WAIT_FOR_RESET	1000
+#define QTM_OBP_SLEEP_WAIT_FOR_BACKUP	550
+#define QTM_OBP_SLEEP_WAIT_FOR_CKSUM	1000
+#else
+#define QTM_OBP_SLEEP_WAIT_FOR_RESET    500
+#define QTM_OBP_SLEEP_WAIT_FOR_BACKUP   500
+#define QTM_OBP_SLEEP_WAIT_FOR_CKSUM	1000
+#endif
 #define QTM_OBP_SLEEP_RESET_HOLD	20
 #define QTM_OBP_SLEEP_WAIT_FOR_HW_RESET	40
 
@@ -414,6 +421,8 @@ struct virt_keys {
 struct qtouch_key {
 	uint8_t				channel;
 	int				code;
+	int				x_coord;
+	int				y_coord;
 };
 
 struct qtouch_key_array {
@@ -429,6 +438,9 @@ struct qtouch_key_array {
 #define QTOUCH_USE_KEYARRAY	(1 << 4)
 #define QTOUCH_CFG_BACKUPNV	(1 << 5)
 #define QTOUCH_EEPROM_CHECKSUM  (1 << 6)
+
+#define MINIPAD_REQ_SET_ENABLE  0
+#define MINIPAD_REQ_SET_DISABLE 1
 
 struct qtouch_ts_platform_data {
 	uint32_t		flags;
@@ -478,6 +490,13 @@ struct qtouch_ts_platform_data {
 	struct qtm_proci_noise1_suppression_cfg		noise1_suppression_cfg;
 
 	struct virt_keys	vkeys;
+#ifdef CONFIG_TOUCHSCREEN_BASIL
+	uint32_t                minipad_flags;
+	struct qtm_touch_multi_cfg                      minipad_cfg;
+#endif
+
+
+
 };
 
 struct touch_fw_entry {
