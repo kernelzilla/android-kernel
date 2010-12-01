@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -63,8 +63,7 @@ int au_reval_dpath(struct dentry *dentry, unsigned int sigen);
 
 /* dinfo.c */
 void au_di_init_once(void *_di);
-int au_di_init(struct dentry *dentry);
-void au_di_fin(struct dentry *dentry);
+int au_alloc_dinfo(struct dentry *dentry);
 int au_di_realloc(struct au_dinfo *dinfo, int nbr);
 
 void di_read_lock(struct dentry *d, int flags, unsigned int lsc);
@@ -100,7 +99,7 @@ static inline struct au_dinfo *au_di(struct dentry *dentry)
 /* lock subclass for dinfo */
 enum {
 	AuLsc_DI_CHILD,		/* child first */
-	AuLsc_DI_CHILD2,	/* rename(2), link(2), and cpup at hnotify */
+	AuLsc_DI_CHILD2,	/* rename(2), link(2), and cpup at hinotify */
 	AuLsc_DI_CHILD3,	/* copyup dirs */
 	AuLsc_DI_PARENT,
 	AuLsc_DI_PARENT2,
@@ -157,8 +156,7 @@ static inline void au_h_dentry_init(struct au_hdentry *hdentry)
 
 static inline void au_hdput(struct au_hdentry *hd)
 {
-	if (hd)
-		dput(hd->hd_dentry);
+	dput(hd->hd_dentry);
 }
 
 static inline aufs_bindex_t au_dbstart(struct dentry *dentry)
@@ -213,19 +211,22 @@ static inline void au_set_dbdiropq(struct dentry *dentry, aufs_bindex_t bindex)
 
 /* ---------------------------------------------------------------------- */
 
-#ifdef CONFIG_AUFS_HNOTIFY
+#ifdef CONFIG_AUFS_HINOTIFY
 static inline void au_digen_dec(struct dentry *d)
 {
 	atomic_dec_return(&au_di(d)->di_generation);
 }
 
-static inline void au_hn_di_reinit(struct dentry *dentry)
+static inline void au_hin_di_reinit(struct dentry *dentry)
 {
 	dentry->d_fsdata = NULL;
 }
 #else
-AuStubVoid(au_hn_di_reinit, struct dentry *dentry __maybe_unused)
-#endif /* CONFIG_AUFS_HNOTIFY */
+static inline void au_hin_di_reinit(struct dentry *dentry __maybe_unused)
+{
+	/* empty */
+}
+#endif /* CONFIG_AUFS_HINOTIFY */
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DENTRY_H__ */

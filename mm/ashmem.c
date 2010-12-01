@@ -178,7 +178,7 @@ static int ashmem_open(struct inode *inode, struct file *file)
 	struct ashmem_area *asma;
 	int ret;
 
-	ret = nonseekable_open(inode, file);
+	ret = generic_file_open(inode, file);
 	if (unlikely(ret))
 		return ret;
 
@@ -230,6 +230,42 @@ static ssize_t ashmem_read(struct file *file, char __user *buf,
 	}
 
 	ret = asma->file->f_op->read(asma->file, buf, len, pos);
+	if (ret < 0) {
+		goto out;
+	}
+
+	/** Update backing file pos, since f_ops->read() doesn't */
+	asma->file->f_pos = *pos;
+
+out:
+	mutex_unlock(&ashmem_mutex);
+	return ret;
+}
+
+static loff_t ashmem_llseek(struct file *file, loff_t offset, int origin)
+{
+	struct ashmem_area *asma = file->private_data;
+	int ret;
+
+	mutex_lock(&ashmem_mutex);
+
+	if (asma->size == 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!asma->file) {
+		ret = -EBADF;
+		goto out;
+	}
+
+	ret = asma->file->f_op->llseek(asma->file, offset, origin);
+	if (ret < 0) {
+		goto out;
+	}
+
+	/** Copy f_pos from backing file, since f_ops->llseek() sets it */
+	file->f_pos = asma->file->f_pos;
 
 out:
 	mutex_unlock(&ashmem_mutex);
@@ -311,7 +347,7 @@ out:
  * chunks of ashmem regions LRU-wise one-at-a-time until we hit 'nr_to_scan'
  * pages freed.
  */
-static int ashmem_shrink(int nr_to_scan, gfp_t gfp_mask)
+static int ashmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 {
 	struct ashmem_range *range, *next;
 
@@ -626,8 +662,8 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case ASHMEM_PURGE_ALL_CACHES:
 		ret = -EPERM;
 		if (capable(CAP_SYS_ADMIN)) {
-			ret = ashmem_shrink(0, GFP_KERNEL);
-			ashmem_shrink(ret, GFP_KERNEL);
+			ret = ashmem_shrink(&ashmem_shrinker, 0, GFP_KERNEL);
+			ashmem_shrink(&ashmem_shrinker, ret, GFP_KERNEL);
 		}
 		break;
 	}
@@ -640,6 +676,7 @@ static struct file_operations ashmem_fops = {
 	.open = ashmem_open,
 	.release = ashmem_release,
         .read = ashmem_read,
+        .llseek = ashmem_llseek,
 	.mmap = ashmem_mmap,
 	.unlocked_ioctl = ashmem_ioctl,
 	.compat_ioctl = ashmem_ioctl,

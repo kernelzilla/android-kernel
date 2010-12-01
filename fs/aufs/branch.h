@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -123,9 +123,9 @@ static inline int au_br_rdonly(struct au_branch *br)
 		? -EROFS : 0;
 }
 
-static inline int au_br_hnotifyable(int brperm __maybe_unused)
+static inline int au_br_hinotifyable(int brperm __maybe_unused)
 {
-#ifdef CONFIG_AUFS_HNOTIFY
+#ifdef CONFIG_AUFS_HINOTIFY
 	return brperm != AuBrPerm_RR && brperm != AuBrPerm_RRWH;
 #else
 	return 0;
@@ -157,7 +157,8 @@ ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 struct file *au_xino_create2(struct file *base_file, struct file *copy_src);
 struct file *au_xino_create(struct super_block *sb, char *fname, int silent);
 ino_t au_xino_new_ino(struct super_block *sb);
-void au_xino_delete_inode(struct inode *inode, const int unlinked);
+int au_xino_write0(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
+		   ino_t ino);
 int au_xino_write(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 		  ino_t ino);
 int au_xino_read(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -56,19 +56,18 @@ struct dentry *au_wh_create(struct dentry *dentry, aufs_bindex_t bindex,
 			    struct dentry *h_parent);
 
 /* real rmdir for the whiteout-ed dir */
-struct au_whtmp_rmdir {
+struct au_whtmp_rmdir_args {
 	struct inode *dir;
 	aufs_bindex_t bindex;
 	struct dentry *wh_dentry;
 	struct au_nhash whlist;
 };
 
-struct au_whtmp_rmdir *au_whtmp_rmdir_alloc(struct super_block *sb, gfp_t gfp);
-void au_whtmp_rmdir_free(struct au_whtmp_rmdir *whtmp);
 int au_whtmp_rmdir(struct inode *dir, aufs_bindex_t bindex,
 		   struct dentry *wh_dentry, struct au_nhash *whlist);
 void au_whtmp_kick_rmdir(struct inode *dir, aufs_bindex_t bindex,
-			 struct dentry *wh_dentry, struct au_whtmp_rmdir *args);
+			 struct dentry *wh_dentry, struct au_nhash *whlist,
+			 struct au_whtmp_rmdir_args *args);
 
 /* ---------------------------------------------------------------------- */
 

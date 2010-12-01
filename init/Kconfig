@@ -326,6 +326,15 @@ choice
 	prompt "RCU Implementation"
 	default TREE_RCU
 
+config CLASSIC_RCU
+	bool "Classic RCU"
+	help
+	  This option selects the classic RCU implementation that is
+	  designed for best read-side performance on non-realtime
+	  systems.
+
+	  Select this option if you are unsure.
+
 config TREE_RCU
 	bool "Tree-based hierarchical RCU"
 	help

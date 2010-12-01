@@ -35,6 +35,7 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
+#include <linux/fs.h>
 #include <linux/swap.h>
 
 static uint32_t lowmem_debug_level = 2;
@@ -68,18 +69,26 @@ static struct notifier_block task_nb = {
 	.notifier_call	= task_notify_func,
 };
 
+
+static void task_free_fn(struct work_struct *work)
+{
+	task_free_unregister(&task_nb);
+}
+static DECLARE_WORK(task_free_work, task_free_fn);
+
 static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
+
 	if (task == lowmem_deathpending) {
 		lowmem_deathpending = NULL;
-		task_free_unregister(&task_nb);
+		schedule_work(&task_free_work);
 	}
 	return NOTIFY_OK;
 }
 
-static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
+static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 {
 	struct task_struct *p;
 	struct task_struct *selected = NULL;
@@ -91,11 +100,9 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	int selected_tasksize = 0;
 	int selected_oom_adj;
 	int array_size = ARRAY_SIZE(lowmem_adj);
-	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_ACTIVE_FILE) + global_page_state(NR_INACTIVE_FILE);
 #ifdef CONFIG_SWAP
-	si_swapinfo(&si);
-	other_free += si.freeswap;
+	other_file += (int)total_swapcache_pages; /* add swapcache to other_file */
 #endif
 
 	/*
@@ -113,15 +120,14 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
 	for (i = 0; i < array_size; i++) {
-		if (other_free < lowmem_minfree[i] &&
-		    other_file < lowmem_minfree[i]) {
+		if (other_file < lowmem_minfree[i]) {
 			min_adj = lowmem_adj[i];
 			break;
 		}
 	}
 	if (nr_to_scan > 0)
-		lowmem_print(3, "lowmem_shrink %d, %x, ofree %d %d, ma %d\n",
-			     nr_to_scan, gfp_mask, other_free, other_file,
+		lowmem_print(3, "lowmem_shrink %d, %x, ofree %d, ma %d\n",
+			     nr_to_scan, gfp_mask, other_file,
 			     min_adj);
 	rem = global_page_state(NR_ACTIVE_ANON) +
 		global_page_state(NR_ACTIVE_FILE) +

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,8 +20,6 @@
  * sub-routines for VFS
  */
 
-#include <linux/file.h>
-#include <linux/ima.h>
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/splice.h>
@@ -50,51 +48,9 @@ int vfsub_update_h_iattr(struct path *h_path, int *did)
 
 /* ---------------------------------------------------------------------- */
 
-static int au_conv_oflags(int flags)
-{
-	int mask = 0;
-
 #ifdef CONFIG_IMA
-	fmode_t fmode;
-
-	/* mask = MAY_OPEN; */
-	fmode = OPEN_FMODE(flags);
-	if (fmode & FMODE_READ)
-		mask |= MAY_READ;
-	if ((fmode & FMODE_WRITE)
-	    || (flags & O_TRUNC))
-		mask |= MAY_WRITE;
-	/*
-	 * if (flags & O_APPEND)
-	 *	mask |= MAY_APPEND;
-	 */
-	if (flags & vfsub_fmode_to_uint(FMODE_EXEC))
-		mask |= MAY_EXEC;
-
-	AuDbg("flags 0x%x, mask 0x%x\n", flags, mask);
+#error IMA is not supported since it does not work well. Wait for their fixing.
 #endif
-
-	return mask;
-}
-
-struct file *vfsub_dentry_open(struct path *path, int flags)
-{
-	struct file *file;
-	int err;
-
-	path_get(path);
-	file = dentry_open(path->dentry, path->mnt, flags, current_cred());
-	if (IS_ERR(file))
-		goto out;
-
-	err = ima_file_check(file, au_conv_oflags(flags));
-	if (unlikely(err)) {
-		fput(file);
-		file = ERR_PTR(err);
-	}
-out:
-	return file;
-}
 
 struct file *vfsub_filp_open(const char *path, int oflags, int mode)
 {
@@ -173,9 +129,9 @@ struct dentry *vfsub_lock_rename(struct dentry *d1, struct au_hinode *hdir1,
 	lockdep_off();
 	d = lock_rename(d1, d2);
 	lockdep_on();
-	au_hn_suspend(hdir1);
+	au_hin_suspend(hdir1);
 	if (hdir1 != hdir2)
-		au_hn_suspend(hdir2);
+		au_hin_suspend(hdir2);
 
 	return d;
 }
@@ -183,9 +139,9 @@ struct dentry *vfsub_lock_rename(struct dentry *d1, struct au_hinode *hdir1,
 void vfsub_unlock_rename(struct dentry *d1, struct au_hinode *hdir1,
 			 struct dentry *d2, struct au_hinode *hdir2)
 {
-	au_hn_resume(hdir1);
+	au_hin_resume(hdir1);
 	if (hdir1 != hdir2)
-		au_hn_resume(hdir2);
+		au_hin_resume(hdir2);
 	lockdep_off();
 	unlock_rename(d1, d2);
 	lockdep_on();
@@ -214,8 +170,9 @@ int vfsub_create(struct inode *dir, struct path *path, int mode)
 
 		memset(&h_nd, 0, sizeof(h_nd));
 		h_nd.flags = LOOKUP_CREATE;
-		h_nd.intent.open.flags = O_CREAT
-			| vfsub_fmode_to_uint(FMODE_READ);
+		/* cf. fs/namei.c:open_to_namei_flags() */
+		h_nd.intent.open.flags = O_CREAT | O_RDONLY;
+		h_nd.intent.open.flags++;
 		h_nd.intent.open.create_mode = mode;
 		h_nd.path.dentry = path->dentry->d_parent;
 		h_nd.path.mnt = path->mnt;
@@ -302,26 +259,12 @@ int vfsub_mknod(struct inode *dir, struct path *path, int mode, dev_t dev)
 	return err;
 }
 
-static int au_test_nlink(struct inode *inode)
-{
-	const unsigned int link_max = UINT_MAX >> 1; /* rough margin */
-
-	if (!au_test_fs_no_limit_nlink(inode->i_sb)
-	    || inode->i_nlink < link_max)
-		return 0;
-	return -EMLINK;
-}
-
 int vfsub_link(struct dentry *src_dentry, struct inode *dir, struct path *path)
 {
 	int err;
 	struct dentry *d;
 
 	IMustLock(dir);
-
-	err = au_test_nlink(src_dentry->d_inode);
-	if (unlikely(err))
-		return err;
 
 	d = path->dentry;
 	path->dentry = d->d_parent;
@@ -473,15 +416,10 @@ ssize_t vfsub_read_k(struct file *file, void *kbuf, size_t count,
 {
 	ssize_t err;
 	mm_segment_t oldfs;
-	union {
-		void *k;
-		char __user *u;
-	} buf;
 
-	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_read_u(file, buf.u, count, ppos);
+	err = vfsub_read_u(file, (char __user *)kbuf, count, ppos);
 	set_fs(oldfs);
 	return err;
 }
@@ -503,30 +441,11 @@ ssize_t vfsub_write_k(struct file *file, void *kbuf, size_t count, loff_t *ppos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
-	union {
-		void *k;
-		const char __user *u;
-	} buf;
 
-	buf.k = kbuf;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfsub_write_u(file, buf.u, count, ppos);
+	err = vfsub_write_u(file, (const char __user *)kbuf, count, ppos);
 	set_fs(oldfs);
-	return err;
-}
-
-int vfsub_flush(struct file *file, fl_owner_t id)
-{
-	int err;
-
-	err = 0;
-	if (file->f_op && file->f_op->flush) {
-		err = file->f_op->flush(file, id);
-		if (!err)
-			vfsub_update_h_iattr(&file->f_path, /*did*/NULL);
-		/*ignore*/
-	}
 	return err;
 }
 
@@ -551,7 +470,6 @@ long vfsub_splice_to(struct file *in, loff_t *ppos,
 	/* lockdep_off(); */
 	err = do_splice_to(in, ppos, pipe, len, flags);
 	/* lockdep_on(); */
-	file_accessed(in);
 	if (err >= 0)
 		vfsub_update_h_iattr(&in->f_path, /*did*/NULL); /*ignore*/
 	return err;
@@ -576,6 +494,12 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 {
 	int err;
 	struct inode *h_inode;
+	union {
+		unsigned int u;
+		fmode_t m;
+	} u;
+
+	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
 
 	h_inode = h_path->dentry->d_inode;
 	if (!h_file) {
@@ -588,7 +512,8 @@ int vfsub_trunc(struct path *h_path, loff_t length, unsigned int attr,
 		err = get_write_access(h_inode);
 		if (err)
 			goto out_mnt;
-		err = break_lease(h_inode, O_WRONLY);
+		u.m = FMODE_WRITE;
+		err = break_lease(h_inode, u.u);
 		if (err)
 			goto out_inode;
 	}

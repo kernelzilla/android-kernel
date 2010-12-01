@@ -2341,12 +2341,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
 			init_data->consumer_supplies[i].dev,
 			init_data->consumer_supplies[i].dev_name,
 			init_data->consumer_supplies[i].supply);
-		if (ret < 0) {
-			for (--i; i >= 0; i--)
-				unset_consumer_device_supply(rdev,
-				    init_data->consumer_supplies[i].dev_name,
-				    init_data->consumer_supplies[i].dev);
-			goto scrub;
+		if (ret < 0){
+			goto unset_supplies;
 		}
 	}
 
@@ -2354,6 +2350,9 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
 out:
 	mutex_unlock(&regulator_list_mutex);
 	return rdev;
+
+unset_supplies:
+	unset_regulator_supplies(rdev);
 
 scrub:
 	device_unregister(&rdev->dev);

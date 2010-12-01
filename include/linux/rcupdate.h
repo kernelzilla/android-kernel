@@ -62,6 +62,7 @@ extern void rcu_barrier(void);
 extern void rcu_barrier_bh(void);
 extern void rcu_barrier_sched(void);
 extern void synchronize_sched_expedited(void);
+extern void synchronize_sched(void);
 extern int sched_expedited_torture_stats(char *page);
 
 /* Internal to kernel */
@@ -73,6 +74,8 @@ extern void rcu_scheduler_starting(void);
 #include <linux/rcutree.h>
 #elif defined(CONFIG_TINY_RCU)
 #include <linux/rcutiny.h>
+#elif defined(CONFIG_CLASSIC_RCU)
+#include <linux/rcuclassic.h>
 #else
 #error "Unknown RCU implementation specified to kernel configuration"
 #endif

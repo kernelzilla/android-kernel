@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -419,7 +419,6 @@ static void au_mfs(struct dentry *dentry)
 	bavail = 0;
 	sb = dentry->d_sb;
 	mfs = &au_sbi(sb)->si_wbr_mfs;
-	MtxMustLock(&mfs->mfs_lock);
 	mfs->mfs_bindex = -EROFS;
 	mfs->mfsrr_bytes = 0;
 	bend = au_sbend(sb);

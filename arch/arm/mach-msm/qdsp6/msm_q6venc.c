@@ -64,8 +64,8 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
 #include <linux/wakelock.h>
+#include <linux/slab.h>
 #include <linux/android_pmem.h>
 #include <linux/msm_q6venc.h>
 #include "dal.h"
@@ -279,9 +279,9 @@ static struct venc_pmem_list *venc_add_pmem_to_list(struct venc_dev *dvenc,
 	unsigned long vaddr;
 	struct venc_pmem_list *plist = NULL;
 
-	plist = kmalloc(sizeof(*plist), GFP_KERNEL);
+	plist = kzalloc(sizeof(struct venc_pmem_list), GFP_KERNEL);
 	if (!plist) {
-		pr_err("%s: kmalloc failed\n", __func__);
+		pr_err("%s: kzalloc failed\n", __func__);
 		return NULL;
 	}
 
@@ -1072,7 +1072,7 @@ static int q6venc_open(struct inode *inode, struct file *file)
 	struct venc_msg_list *plist;
 	struct dal_info version_info;
 
-	dvenc = kmalloc(sizeof(*dvenc), GFP_KERNEL);
+	dvenc = kzalloc(sizeof(struct venc_dev), GFP_KERNEL);
 	if (!dvenc) {
 		pr_err("%s: unable to allocate memory for struct venc_dev\n",
 			__func__);
@@ -1087,9 +1087,9 @@ static int q6venc_open(struct inode *inode, struct file *file)
 	spin_lock_init(&dvenc->venc_pmem_list_lock);
 	venc_ref++;
 	for (i = 0; i < VENC_MSG_MAX; i++) {
-		plist = kmalloc(sizeof(*plist), GFP_KERNEL);
+		plist = kzalloc(sizeof(struct venc_msg_list), GFP_KERNEL);
 		if (!plist) {
-			pr_err("%s: kmalloc failed\n", __func__);
+			pr_err("%s: kzalloc failed\n", __func__);
 			ret = -ENOMEM;
 			goto err_venc_create_msg_list;
 		}
@@ -1191,7 +1191,7 @@ static int __init q6venc_init(void)
 	wake_lock_init(&idlelock, WAKE_LOCK_IDLE, "venc_idle");
 	wake_lock_init(&wakelock, WAKE_LOCK_SUSPEND, "venc_suspend");
 
-	venc_device_p = kmalloc(sizeof(*venc_device_p), GFP_KERNEL);
+	venc_device_p = kzalloc(sizeof(struct venc_dev), GFP_KERNEL);
 	if (!venc_device_p) {
 		pr_err("%s: unable to allocate memory for venc_device_p\n",
 			__func__);

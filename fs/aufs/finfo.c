@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,8 +25,7 @@
 
 void au_hfput(struct au_hfile *hf, struct file *file)
 {
-	/* todo: direct access f_flags */
-	if (vfsub_file_flags(file) & vfsub_fmode_to_uint(FMODE_EXEC))
+	if (file->f_mode & FMODE_EXEC)
 		allow_write_access(hf->hf_file);
 	fput(hf->hf_file);
 	hf->hf_file = NULL;
@@ -38,16 +37,9 @@ void au_set_h_fptr(struct file *file, aufs_bindex_t bindex, struct file *val)
 {
 	struct au_finfo *finfo = au_fi(file);
 	struct au_hfile *hf;
-	struct au_fidir *fidir;
 
-	fidir = finfo->fi_hdir;
-	if (!fidir) {
-		AuDebugOn(finfo->fi_btop != bindex);
-		hf = &finfo->fi_htop;
-	} else
-		hf = fidir->fd_hfile + bindex;
-
-	if (hf && hf->hf_file)
+	hf = finfo->fi_hfile + bindex;
+	if (hf->hf_file)
 		au_hfput(hf, file);
 	if (val) {
 		FiMustWriteLock(file);
@@ -64,70 +56,26 @@ void au_update_figen(struct file *file)
 
 /* ---------------------------------------------------------------------- */
 
-void au_fi_mmap_lock(struct file *file)
-{
-	FiMustWriteLock(file);
-	lockdep_off();
-	mutex_lock(&au_fi(file)->fi_mmap);
-	lockdep_on();
-}
-
-void au_fi_mmap_unlock(struct file *file)
-{
-	lockdep_off();
-	mutex_unlock(&au_fi(file)->fi_mmap);
-	lockdep_on();
-}
-
-/* ---------------------------------------------------------------------- */
-
-struct au_fidir *au_fidir_alloc(struct super_block *sb)
-{
-	struct au_fidir *fidir;
-	int nbr;
-
-	nbr = au_sbend(sb) + 1;
-	if (nbr < 2)
-		nbr = 2; /* initial allocate for 2 branches */
-	fidir = kzalloc(au_fidir_sz(nbr), GFP_NOFS);
-	if (fidir) {
-		fidir->fd_bbot = -1;
-		fidir->fd_nent = nbr;
-		fidir->fd_vdir_cache = NULL;
-	}
-
-	return fidir;
-}
-
-int au_fidir_realloc(struct au_finfo *finfo, int nbr)
-{
-	int err;
-	struct au_fidir *fidir, *p;
-
-	AuRwMustWriteLock(&finfo->fi_rwsem);
-	fidir = finfo->fi_hdir;
-	AuDebugOn(!fidir);
-
-	err = -ENOMEM;
-	p = au_kzrealloc(fidir, au_fidir_sz(fidir->fd_nent), au_fidir_sz(nbr),
-			 GFP_NOFS);
-	if (p) {
-		p->fd_nent = nbr;
-		finfo->fi_hdir = p;
-		err = 0;
-	}
-
-	return err;
-}
-
-/* ---------------------------------------------------------------------- */
-
 void au_finfo_fin(struct file *file)
 {
 	struct au_finfo *finfo;
+	aufs_bindex_t bindex, bend;
+
+	fi_write_lock(file);
+	bend = au_fbend(file);
+	bindex = au_fbstart(file);
+	if (bindex >= 0)
+		/*
+		 * calls fput() instead of filp_close(),
+		 * since no dnotify or lock for the lower file.
+		 */
+		for (; bindex <= bend; bindex++)
+			au_set_h_fptr(file, bindex, NULL);
 
 	finfo = au_fi(file);
-	AuDebugOn(finfo->fi_hdir);
+	au_dbg_verify_hf(finfo);
+	kfree(finfo->fi_hfile);
+	fi_write_unlock(file);
 	AuRwDestroy(&finfo->fi_rwsem);
 	au_cache_free_finfo(finfo);
 }
@@ -137,31 +85,61 @@ void au_fi_init_once(void *_fi)
 	struct au_finfo *fi = _fi;
 
 	au_rw_init(&fi->fi_rwsem);
-	mutex_init(&fi->fi_vm_mtx);
-	mutex_init(&fi->fi_mmap);
 }
 
-int au_finfo_init(struct file *file, struct au_fidir *fidir)
+int au_finfo_init(struct file *file)
 {
-	int err;
 	struct au_finfo *finfo;
 	struct dentry *dentry;
+	union {
+		unsigned int u;
+		fmode_t m;
+	} u;
 
-	err = -ENOMEM;
+	BUILD_BUG_ON(sizeof(u.m) != sizeof(u.u));
+
 	dentry = file->f_dentry;
 	finfo = au_cache_alloc_finfo();
 	if (unlikely(!finfo))
 		goto out;
 
-	err = 0;
+	finfo->fi_hfile = kcalloc(au_sbend(dentry->d_sb) + 1,
+				  sizeof(*finfo->fi_hfile), GFP_NOFS);
+	if (unlikely(!finfo->fi_hfile))
+		goto out_finfo;
+
 	au_rw_write_lock(&finfo->fi_rwsem);
-	finfo->fi_btop = -1;
-	finfo->fi_hdir = fidir;
+	finfo->fi_bstart = -1;
+	finfo->fi_bend = -1;
 	atomic_set(&finfo->fi_generation, au_digen(dentry));
 	/* smp_mb(); */ /* atomic_set */
 
+	/* cf. au_store_oflag() */
+	u.u = (unsigned int)file->private_data;
+	file->f_mode |= (u.m & FMODE_EXEC);
 	file->private_data = finfo;
+	return 0; /* success */
 
-out:
+ out_finfo:
+	au_cache_free_finfo(finfo);
+ out:
+	return -ENOMEM;
+}
+
+int au_fi_realloc(struct au_finfo *finfo, int nbr)
+{
+	int err, sz;
+	struct au_hfile *hfp;
+
+	err = -ENOMEM;
+	sz = sizeof(*hfp) * (finfo->fi_bend + 1);
+	if (!sz)
+		sz = sizeof(*hfp);
+	hfp = au_kzrealloc(finfo->fi_hfile, sz, sizeof(*hfp) * nbr, GFP_NOFS);
+	if (hfp) {
+		finfo->fi_hfile = hfp;
+		err = 0;
+	}
+
 	return err;
 }

@@ -988,7 +988,7 @@ msmsdcc_check_status(unsigned long data)
 	if (status ^ host->oldstat) {
 		pr_info("%s: Slot status change detected (%d -> %d)\n",
 			mmc_hostname(host->mmc), host->oldstat, status);
-		if (status)
+		if (status && !host->plat->built_in)
 			mmc_detect_change(host->mmc, (5 * HZ) / 2);
 		else
 			mmc_detect_change(host->mmc, 0);
@@ -1325,6 +1325,9 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 
 		if (host->stat_irq)
 			disable_irq(host->stat_irq);
+
+		if (host->plat->built_in)
+			mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 		if (mmc->card && mmc->card->type != MMC_TYPE_SDIO)
 			rc = mmc_suspend_host(mmc, state);

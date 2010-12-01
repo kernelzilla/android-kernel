@@ -123,10 +123,9 @@ config GENERIC_LOCKBREAK
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
-	default y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
+	def_bool y
 
 config ARCH_HAS_ILOG2_U32
 	bool
@@ -1040,6 +1039,19 @@ config ARM_ERRATA_720789
 	  invalidated are not, resulting in an incoherency in the system page
 	  tables. The workaround changes the TLB flushing routines to invalidate
 	  entries regardless of the ASID.
+
+config KSAPI
+        tristate "KSAPI support (EXPERIMENTAL)"
+	depends on ARCH_MSM_SCORPION || ARCH_MSM_SCORPIONMP
+        default n
+        help
+          KSAPI: Performance monitoring tool for linux.
+          KSAPI records performance statistics for Snapdragon linux platform.
+          It uses the /proc FS as a means to exchange configuration data and
+          counter statistics. It can monitor the counter statistics for
+          Scorpion processor supported hardware performance counters on a per
+          thread basis or AXI counters on an overall system basis.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1573,6 +1585,14 @@ config CPU_FREQ_S3C24XX_DEBUGFS
 endif
 
 source "drivers/cpuidle/Kconfig"
+
+config CPU_FREQ_MSM
+        bool
+        depends on CPU_FREQ && ARCH_MSM
+        default y
+        help
+          This enables the CPUFreq driver for Qualcomm CPUs.
+          If in doubt, say Y.
 
 endmenu
 

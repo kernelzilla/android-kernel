@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ static void au_cache_fin(void)
 {
 	int i;
 
-	/* including AuCache_HNOTIFY */
+	/* including AuCache_HINOTIFY */
 	for (i = 0; i < AuCache_Last; i++)
 		if (au_cachep[i]) {
 			kmem_cache_destroy(au_cachep[i]);
@@ -125,7 +125,7 @@ static int __init aufs_init(void)
 	err = au_wkq_init();
 	if (unlikely(err))
 		goto out_sysaufs;
-	err = au_hnotify_init();
+	err = au_hinotify_init();
 	if (unlikely(err))
 		goto out_wkq;
 	err = au_sysrq_init();
@@ -137,8 +137,7 @@ static int __init aufs_init(void)
 	err = register_filesystem(&aufs_fs_type);
 	if (unlikely(err))
 		goto out_cache;
-	/* since we define pr_fmt, call printk directly */
-	printk(KERN_INFO AUFS_NAME " " AUFS_VERSION "\n");
+	pr_info(AUFS_NAME " " AUFS_VERSION "\n");
 	goto out; /* success */
 
  out_cache:
@@ -146,7 +145,7 @@ static int __init aufs_init(void)
  out_sysrq:
 	au_sysrq_fin();
  out_hin:
-	au_hnotify_fin();
+	au_hinotify_fin();
  out_wkq:
 	au_wkq_fin();
  out_sysaufs:
@@ -161,7 +160,7 @@ static void __exit aufs_exit(void)
 	unregister_filesystem(&aufs_fs_type);
 	au_cache_fin();
 	au_sysrq_fin();
-	au_hnotify_fin();
+	au_hinotify_fin();
 	au_wkq_fin();
 	sysaufs_fin();
 	au_dy_fin();

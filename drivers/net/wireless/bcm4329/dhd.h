@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h,v 1.32.4.7.2.4.14.44 2010/06/03 21:27:48 Exp $
+ * $Id: dhd.h,v 1.32.4.7.2.4.14.49.4.1 2010/09/23 02:33:19 Exp $
  */
 
 /****************
@@ -86,6 +86,7 @@ enum dhd_bus_wake_state {
 	WAKE_LOCK_TMOUT,
 	WAKE_LOCK_WATCHDOG,
 	WAKE_LOCK_LINK_DOWN_TMOUT,
+	WAKE_LOCK_PNO_FIND_TMOUT,
 	WAKE_LOCK_SOFTAP_SET,
 	WAKE_LOCK_SOFTAP_STOP,
 	WAKE_LOCK_SOFTAP_START,
@@ -151,8 +152,12 @@ typedef struct dhd_pub {
 	int dongle_error;
 
 	/* Suspend disable flag and "in suspend" flag */
-	int suspend_disable_flag;
-	int in_suspend;
+	int suspend_disable_flag; /* "1" to disable all extra powersaving during suspend */
+	int in_suspend;			/* flag set to 1 when early suspend called */
+#ifdef PNO_SUPPORT
+	int pno_enable;                 /* pno status : "1" is pno enable */
+#endif /* PNO_SUPPORT */
+	int dtim_skip;         /* dtim skip , default 0 means wake each dtim */
 
 	/* Pkt filter defination */
 	char * pktfilter[100];
@@ -213,6 +218,9 @@ extern int dhd_os_wake_lock(dhd_pub_t *pub);
 extern int dhd_os_wake_unlock(dhd_pub_t *pub);
 extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
 extern int dhd_os_wake_lock_timeout_enable(dhd_pub_t *pub);
+
+extern void dhd_os_start_lock(dhd_pub_t *pub);
+extern void dhd_os_start_unlock(dhd_pub_t *pub);
 
 typedef struct dhd_if_event {
 	uint8 ifidx;
@@ -343,6 +351,8 @@ typedef enum cust_gpio_modes {
 } cust_gpio_modes_t;
 extern int wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag);
 extern int wl_iw_send_priv_event(struct net_device *dev, char *flag);
+extern int net_os_send_hang_message(struct net_device *dev);
+
 /*
  * Insmod parameters for debug/test
  */
@@ -392,6 +402,10 @@ extern uint dhd_sdiod_drive_strength;
 /* Override to force tx queueing all the time */
 extern uint dhd_force_tx_queueing;
 
+/* Default KEEP_ALIVE Period is 55 sec to prevent AP from sending Keep Alive probe frame */
+#define KEEP_ALIVE_PERIOD 55000
+#define NULL_PKT_STR	"null_pkt"
+
 #ifdef SDTEST
 /* Echo packet generator (SDIO), pkts/s */
 extern uint dhd_pktgen;
@@ -412,9 +426,6 @@ extern char nv_path[MOD_PARAM_PATHLEN];
 #define DHD_DEL_IF	-0xe
 #define DHD_BAD_IF	-0xf
 
-#ifdef APSTA_PINGTEST
-#define MAX_GUEST 8
-#endif
 
 extern void dhd_wait_for_event(dhd_pub_t *dhd, bool *lockvar);
 extern void dhd_wait_event_wakeup(dhd_pub_t*dhd);

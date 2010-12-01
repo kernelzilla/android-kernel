@@ -425,7 +425,14 @@ struct msm_snapshot_pp_status {
 #define CFG_SET_SHARPNESS 30
 #define CFG_SET_SATURATION 31
 #define CFG_SET_OV_LSC_RAW_CAPTURE 32/*20100330 vincent for LSC calibration*/
-#define CFG_MAX	33
+#define CFG_SET_ISO			33
+#define CFG_SET_COORDINATE		34
+#define CFG_RUN_AUTO_FOCUS		35
+#define CFG_CANCEL_AUTO_FOCUS		36
+#define CFG_GET_EXP_FOR_LED		37
+#define CFG_UPDATE_AEC_FOR_LED		38
+#define CFG_SET_FRONT_CAMERA_MODE	39
+#define CFG_MAX        			40
 
 #define MOVE_NEAR	0
 #define MOVE_FAR	1
@@ -511,8 +518,14 @@ enum brightness_t{
 	CAMERA_BRIGHTNESS_P1,
 	CAMERA_BRIGHTNESS_P2,
 	CAMERA_BRIGHTNESS_P3,
+        CAMERA_BRIGHTNESS_P4,
+        CAMERA_BRIGHTNESS_N4,
 };
 
+enum frontcam_t{
+	CAMERA_MIRROR,
+	CAMERA_REVERSE,
+};
 
 enum wb_mode{
 	CAMERA_AWB_AUTO,/*auto*/
@@ -569,6 +582,7 @@ struct sensor_cfg_data {
 		struct lsc_cfg lsctable;/*Vincent for LSC calibration*/
 		enum antibanding_mode antibanding_value;
 		enum brightness_t brightness_value;
+		enum frontcam_t frontcam_value;
 		enum wb_mode wb_value;
 		enum sharpness_mode sharpness_value;
 		enum saturation_mode saturation_value;

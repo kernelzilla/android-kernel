@@ -333,8 +333,8 @@ MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
-CFLAGS_KERNEL	=
-AFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -O1 -ftree-vectorize -ffast-math -fsingle-precision-constant
+AFLAGS_KERNEL	= -O1 -ftree-vectorize -ffast-math -fsingle-precision-constant
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 

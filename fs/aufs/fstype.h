@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -292,50 +292,18 @@ static inline int au_test_xenfs(struct super_block *sb __maybe_unused)
 #endif
 }
 
-static inline int au_test_debugfs(struct super_block *sb __maybe_unused)
-{
-#ifdef CONFIG_DEBUG_FS
-	return sb->s_magic == DEBUGFS_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_nilfs(struct super_block *sb __maybe_unused)
-{
-#if defined(CONFIG_NILFS) || defined(CONFIG_NILFS_MODULE)
-	return sb->s_magic == NILFS_SUPER_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_hfsplus(struct super_block *sb __maybe_unused)
-{
-#if defined(CONFIG_HFSPLUS_FS) || defined(CONFIG_HFSPLUS_FS_MODULE)
-	return sb->s_magic == HFSPLUS_SUPER_MAGIC;
-#else
-	return 0;
-#endif
-}
-
 /* ---------------------------------------------------------------------- */
 /*
  * they can't be an aufs branch.
  */
 static inline int au_test_fs_unsuppoted(struct super_block *sb)
 {
-	return
-#ifndef CONFIG_AUFS_BR_RAMFS
-		au_test_ramfs(sb) ||
-#endif
-		au_test_procfs(sb)
+	return au_test_procfs(sb)
 		|| au_test_sysfs(sb)
 		|| au_test_configfs(sb)
-		|| au_test_debugfs(sb)
 		|| au_test_securityfs(sb)
 		|| au_test_xenfs(sb)
-		|| au_test_ecryptfs(sb)
+		|| au_test_ramfs(sb)
 		/* || !strcmp(au_sbtype(sb), "unionfs") */
 		|| au_test_aufs(sb); /* will be supported in next version */
 }
@@ -353,9 +321,6 @@ static inline int au_test_fs_null_nd(struct super_block *sb)
 static inline int au_test_fs_remote(struct super_block *sb)
 {
 	return !au_test_tmpfs(sb)
-#ifdef CONFIG_AUFS_BR_RAMFS
-		&& !au_test_ramfs(sb)
-#endif
 		&& !(sb->s_type->fs_flags & FS_REQUIRES_DEV);
 }
 
@@ -390,13 +355,12 @@ static inline int au_test_fs_refresh_iattr(struct super_block *sb)
 static inline int au_test_fs_bad_iattr_size(struct super_block *sb)
 {
 	return au_test_xfs(sb)
-		|| au_test_btrfs(sb)
-		|| au_test_ubifs(sb)
-		|| au_test_hfsplus(sb)	/* maintained, but incorrect */
 		/* || au_test_ext4(sb) */	/* untested */
 		/* || au_test_ocfs2(sb) */	/* untested */
 		/* || au_test_ocfs2_dlmfs(sb) */ /* untested */
 		/* || au_test_sysv(sb) */	/* untested */
+		/* || au_test_ramfs(sb)*/	/* unsupported */
+		/* || au_test_ubifs(sb) */	/* untested */
 		/* || au_test_minix(sb) */	/* untested */
 		;
 }
@@ -414,18 +378,6 @@ static inline int au_test_fs_bad_iattr(struct super_block *sb)
 		|| au_test_vfat(sb);
 }
 
-/* they don't check i_nlink in link(2) */
-static inline int au_test_fs_no_limit_nlink(struct super_block *sb)
-{
-	return au_test_tmpfs(sb)
-#ifdef CONFIG_AUFS_BR_RAMFS
-		|| au_test_ramfs(sb)
-#endif
-		|| au_test_ubifs(sb)
-		|| au_test_btrfs(sb)
-		|| au_test_hfsplus(sb);
-}
-
 /*
  * filesystems which sets S_NOATIME and S_NOCMTIME.
  */
@@ -433,8 +385,8 @@ static inline int au_test_fs_notime(struct super_block *sb)
 {
 	return au_test_nfs(sb)
 		|| au_test_fuse(sb)
-		|| au_test_ubifs(sb)
 		/* || au_test_cifs(sb) */	/* untested */
+		/* || au_test_ubifs(sb) */	/* untested */
 		;
 }
 
@@ -443,8 +395,7 @@ static inline int au_test_fs_notime(struct super_block *sb)
  */
 static inline int au_test_fs_bad_mapping(struct super_block *sb)
 {
-	return au_test_fuse(sb)
-		|| au_test_ubifs(sb);
+	return au_test_fuse(sb);
 }
 
 /* temporary support for i#1 in cramfs */
@@ -465,21 +416,15 @@ static inline int au_test_fs_bad_xino(struct super_block *sb)
 {
 	return au_test_fs_remote(sb)
 		|| au_test_fs_bad_iattr_size(sb)
-#ifdef CONFIG_AUFS_BR_RAMFS
-		|| !(au_test_ramfs(sb) || au_test_fs_null_nd(sb))
-#else
 		|| !au_test_fs_null_nd(sb) /* to keep xino code simple */
-#endif
 		/* don't want unnecessary work for xino */
 		|| au_test_aufs(sb)
-		|| au_test_ecryptfs(sb)
-		|| au_test_nilfs(sb);
+		|| au_test_ecryptfs(sb);
 }
 
 static inline int au_test_fs_trunc_xino(struct super_block *sb)
 {
-	return au_test_tmpfs(sb)
-		|| au_test_ramfs(sb);
+	return au_test_tmpfs(sb);
 }
 
 /*

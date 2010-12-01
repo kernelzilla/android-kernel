@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ void au_cpup_attr_timesizes(struct inode *inode)
 
 	h_inode = au_h_iptr(inode, au_ibstart(inode));
 	fsstack_copy_attr_times(inode, h_inode);
-	fsstack_copy_inode_size(inode, h_inode);
+	vfsub_copy_inode_size(inode, h_inode);
 }
 
 void au_cpup_attr_nlink(struct inode *inode, int force)
@@ -141,7 +141,7 @@ void au_dtime_revert(struct au_dtime *dt)
 
 	err = vfsub_notify_change(&dt->dt_h_path, &attr);
 	if (unlikely(err))
-		pr_warning("restoring timestamps failed(%d). ignored\n", err);
+		AuWarn("restoring timestamps failed(%d). ignored\n", err);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -409,31 +409,29 @@ static int au_do_cpup_symlink(struct path *h_path, struct dentry *h_src,
 {
 	int err, symlen;
 	mm_segment_t old_fs;
-	union {
-		char *k;
-		char __user *u;
-	} sym;
+	char *sym;
 
 	err = -ENOSYS;
 	if (unlikely(!h_src->d_inode->i_op->readlink))
 		goto out;
 
 	err = -ENOMEM;
-	sym.k = __getname_gfp(GFP_NOFS);
-	if (unlikely(!sym.k))
+	sym = __getname();
+	if (unlikely(!sym))
 		goto out;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	symlen = h_src->d_inode->i_op->readlink(h_src, sym.u, PATH_MAX);
+	symlen = h_src->d_inode->i_op->readlink(h_src, (char __user *)sym,
+						PATH_MAX);
 	err = symlen;
 	set_fs(old_fs);
 
 	if (symlen > 0) {
-		sym.k[symlen] = 0;
-		err = vfsub_symlink(h_dir, h_path, sym.k);
+		sym[symlen] = 0;
+		err = vfsub_symlink(h_dir, h_path, sym);
 	}
-	__putname(sym.k);
+	__putname(sym);
 
  out:
 	return err;
@@ -609,7 +607,7 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 		} else
 			/* todo: cpup_wh_file? */
 			/* udba work */
-			au_update_ibrange(inode, /*do_put_zero*/1);
+			au_update_brange(inode, 1);
 	}
 
 	old_ibstart = au_ibstart(inode);
@@ -622,14 +620,8 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	err = cpup_iattr(dentry, bdst, h_src);
 	isdir = S_ISDIR(dst_inode->i_mode);
 	if (!err) {
-		if (bdst < old_ibstart) {
-			if (S_ISREG(inode->i_mode)) {
-				err = au_dy_iaop(inode, bdst, dst_inode);
-				if (unlikely(err))
-					goto out_rev;
-			}
+		if (bdst < old_ibstart)
 			au_set_ibstart(inode, bdst);
-		}
 		au_set_h_iptr(inode, bdst, au_igrab(dst_inode),
 			      au_hi_flags(inode, isdir));
 		mutex_unlock(&dst_inode->i_mutex);
@@ -641,7 +633,6 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	}
 
 	/* revert */
-out_rev:
 	h_path.dentry = h_parent;
 	mutex_unlock(&dst_inode->i_mutex);
 	au_dtime_store(&dt, dst_parent, &h_path);
@@ -818,7 +809,8 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	hdp[0 + bdst].hd_dentry = wh_dentry;
 	h_d_start = hdp[0 + bstart].hd_dentry;
 	if (file)
-		hdp[0 + bstart].hd_dentry = au_hf_top(file)->f_dentry;
+		hdp[0 + bstart].hd_dentry
+			= au_h_fptr(file, au_fbstart(file))->f_dentry;
 	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME,
 			     /*h_parent*/NULL);
 	if (!err && file) {
@@ -915,7 +907,7 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 
 		/* this temporary unlock is safe */
 		if (file)
-			h_dentry = au_hf_top(file)->f_dentry;
+			h_dentry = au_h_fptr(file, au_fbstart(file))->f_dentry;
 		else
 			h_dentry = au_h_dptr(dentry, au_dbstart(dentry));
 		h_inode = h_dentry->d_inode;

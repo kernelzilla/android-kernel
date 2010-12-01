@@ -372,7 +372,7 @@ static int mahimahi_ts_power(int on)
 	} else {
 		gpio_set_value(MAHIMAHI_GPIO_TP_LS_EN, 0);
 		gpio_set_value(MAHIMAHI_GPIO_TP_EN, 0);
-		udelay(50);
+		usleep(50);
 	}
 
 	return 0;
@@ -437,7 +437,7 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 950000,
+			.min_uV = 975000,
 			.max_uV = 1275000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},

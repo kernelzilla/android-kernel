@@ -17,7 +17,7 @@ SCHED_FEAT(GENTLE_FAIR_SLEEPERS, 1)
  * longer period, and lighter task an effective shorter period they
  * are considered running.
  */
-SCHED_FEAT(NORMALIZED_SLEEPER, 0)
+SCHED_FEAT(NORMALIZED_SLEEPER, 1)
 
 /*
  * Place new tasks ahead so that they do not starve already running
@@ -109,6 +109,12 @@ SCHED_FEAT(DOUBLE_TICK, 0)
 SCHED_FEAT(LB_BIAS, 1)
 SCHED_FEAT(LB_SHARES_UPDATE, 1)
 SCHED_FEAT(ASYM_EFF_LOAD, 1)
+
+/*
+ * Push the min_vruntime spread floor value when descheduling a task. This
+ * ensures the spread does not grow beyond control.
+ */
+SCHED_FEAT(DYN_MIN_VRUNTIME, 0)
 
 /*
  * Spin-wait on mutex acquisition when the mutex owner is running on

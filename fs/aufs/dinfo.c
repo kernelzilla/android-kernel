@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ void au_di_init_once(void *_di)
 	au_rw_init(&di->di_rwsem);
 }
 
-int au_di_init(struct dentry *dentry)
+int au_alloc_dinfo(struct dentry *dentry)
 {
 	struct au_dinfo *dinfo;
 	struct super_block *sb;
@@ -63,26 +63,6 @@ int au_di_init(struct dentry *dentry)
 	au_cache_free_dinfo(dinfo);
  out:
 	return -ENOMEM;
-}
-
-void au_di_fin(struct dentry *dentry)
-{
-	struct au_dinfo *di;
-	struct au_hdentry *p;
-	aufs_bindex_t bend, bindex;
-
-	/* dentry may not be revalidated */
-	di = dentry->d_fsdata;
-	bindex = di->di_bstart;
-	if (bindex >= 0) {
-		bend = di->di_bend;
-		p = di->di_hdentry + bindex;
-		while (bindex++ <= bend)
-			au_hdput(p++);
-	}
-	kfree(di->di_hdentry);
-	AuRwDestroy(&di->di_rwsem);
-	au_cache_free_dinfo(di);
 }
 
 int au_di_realloc(struct au_dinfo *dinfo, int nbr)
@@ -296,7 +276,8 @@ void au_set_h_dptr(struct dentry *dentry, aufs_bindex_t bindex,
 
 	DiMustWriteLock(dentry);
 
-	au_hdput(hd);
+	if (hd->hd_dentry)
+		au_hdput(hd);
 	hd->hd_dentry = h_dentry;
 }
 

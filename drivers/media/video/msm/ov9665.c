@@ -18,6 +18,7 @@
 
 #include <linux/delay.h>
 #include <linux/types.h>
+#include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
@@ -52,7 +53,7 @@ static int op_mode;
 static DECLARE_WAIT_QUEUE_HEAD(ov9665_wait_queue);
 DECLARE_MUTEX(ov9665_sem);
 
-
+static int sensor_probe_node = 0;
 
 #define MAX_I2C_RETRIES 20
 static int i2c_transfer_retry(struct i2c_adapter *adap,
@@ -459,6 +460,11 @@ static int ov9665_set_brightness(enum brightness_t brightness_value)
 		return 0;
 	ov9665_i2c_write_mask(0xc8, 0x04, 0x04);
 	switch (brightness_value) {
+	case CAMERA_BRIGHTNESS_N4:
+		ov9665_i2c_write_mask(0xc7, 0x18, 0x18);
+		ov9665_i2c_write(ov9665_client->addr,
+			0xd1, 0x40, BYTE_LEN);
+		break;
 	case CAMERA_BRIGHTNESS_N3:
 		ov9665_i2c_write_mask(0xc7, 0x18, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
@@ -467,12 +473,12 @@ static int ov9665_set_brightness(enum brightness_t brightness_value)
 	case CAMERA_BRIGHTNESS_N2:
 		ov9665_i2c_write_mask(0xc7, 0x18, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
-			0xd1, 0x40, BYTE_LEN);
+			0xd1, 0x20, BYTE_LEN);
 		break;
 	case CAMERA_BRIGHTNESS_N1:
 		ov9665_i2c_write_mask(0xc7, 0x18, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
-			0xd1, 0x20, BYTE_LEN);
+			0xd1, 0x10, BYTE_LEN);
 		break;
 	case CAMERA_BRIGHTNESS_D:
 		ov9665_i2c_write_mask(0xc7, 0x10, 0x18);
@@ -482,14 +488,19 @@ static int ov9665_set_brightness(enum brightness_t brightness_value)
 	case CAMERA_BRIGHTNESS_P1:
 		ov9665_i2c_write_mask(0xc7, 0x10, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
-			0xd1, 0x20, BYTE_LEN);
+			0xd1, 0x10, BYTE_LEN);
 		break;
 	case CAMERA_BRIGHTNESS_P2:
 		ov9665_i2c_write_mask(0xc7, 0x10, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
-			0xd1, 0x40, BYTE_LEN);
+			0xd1, 0x20, BYTE_LEN);
 		break;
 	case CAMERA_BRIGHTNESS_P3:
+		ov9665_i2c_write_mask(0xc7, 0x10, 0x18);
+		ov9665_i2c_write(ov9665_client->addr,
+			0xd1, 0x30, BYTE_LEN);
+		break;
+	case CAMERA_BRIGHTNESS_P4:
 		ov9665_i2c_write_mask(0xc7, 0x10, 0x18);
 		ov9665_i2c_write(ov9665_client->addr,
 			0xd1, 0x40, BYTE_LEN);
@@ -695,6 +706,32 @@ static int ov9665_set_contrast(enum contrast_mode contrast_value)
 	return 0;
 }
 
+static int ov9665_set_front_camera_mode(enum frontcam_t frontcam_value)
+{
+	if (op_mode == SENSOR_SNAPSHOT_MODE)
+		return 0;
+
+	switch (frontcam_value) {
+	case CAMERA_MIRROR:
+		/*mirror and flip*/
+		ov9665_i2c_write(ov9665_client->addr,
+			0x04, 0xa8, BYTE_LEN);
+		ov9665_i2c_write(ov9665_client->addr,
+			0x33, 0xc8, BYTE_LEN);
+		break;
+	case CAMERA_REVERSE:
+		/*reverse mode*/
+		ov9665_i2c_write(ov9665_client->addr,
+			0x04, 0x28, BYTE_LEN);
+		ov9665_i2c_write(ov9665_client->addr,
+			0x33, 0xc0, BYTE_LEN);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 static int ov9665_sensor_init(const struct msm_camera_sensor_info *data)
 {
 	uint8_t model_id_h = 0,model_id_l = 0;
@@ -760,7 +797,7 @@ int ov9665_sensor_open_init(struct msm_camera_sensor_info *data)
 
 	msm_camio_camif_pad_reg_reset();
 
-	rc = ov9665_i2c_write_table(&ov9665_regs.plltbl[0],
+    rc = ov9665_i2c_write_table(&ov9665_regs.plltbl[0],
 				     ov9665_regs.plltbl_size);
 
 	/*read ID*/
@@ -779,7 +816,10 @@ init_done:
 	return rc;
 
 init_fail:
-	kfree(ov9665_ctrl);
+	if (ov9665_ctrl) {
+		kfree(ov9665_ctrl);
+		ov9665_ctrl = NULL;
+	}
 	return rc;
 }
 
@@ -831,8 +871,11 @@ int ov9665_sensor_config(void __user *argp)
 	case CFG_SET_CONTRAST:
 		rc = ov9665_set_contrast(cfg_data.cfg.contrast_value);
 		break;
+	case CFG_SET_FRONT_CAMERA_MODE:
+		rc = ov9665_set_front_camera_mode(cfg_data.cfg.frontcam_value);
+		break;
 	default:
-		printk(KERN_ERR "unhandled cfgtype: %d\n", cfg_data.cfgtype);
+		rc = -EINVAL;
 		break;
 	}
 
@@ -852,8 +895,10 @@ int ov9665_sensor_release(void)
 			ov9665_ctrl->sensordata->sensor_pwd);
 	gpio_free(ov9665_ctrl->sensordata->sensor_pwd);
 
-	kfree(ov9665_ctrl);
-	ov9665_ctrl = NULL;
+	if (ov9665_ctrl) {
+		kfree(ov9665_ctrl);
+		ov9665_ctrl = NULL;
+	}
 
 	up(&ov9665_sem);
 
@@ -904,8 +949,17 @@ static ssize_t htcwc_set(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(node, 0444, sensor_vendor_show, NULL);
+static ssize_t sensor_read_node(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	ssize_t length;
+	length = sprintf(buf, "%d\n", sensor_probe_node);
+	return length;
+}
+
+static DEVICE_ATTR(sensor, 0444, sensor_vendor_show, NULL);
 static DEVICE_ATTR(htcwc, 0777, htcwc_get, htcwc_set);
+static DEVICE_ATTR(node, 0444, sensor_read_node, NULL);
 
 static struct kobject *android_ov9665;
 
@@ -921,7 +975,7 @@ static int ov9665_sysfs_init(void)
 		return ret ;
 	}
 	pr_info("ov9665:sysfs_create_file\n");
-	ret = sysfs_create_file(android_ov9665, &dev_attr_node.attr);
+	ret = sysfs_create_file(android_ov9665, &dev_attr_sensor.attr);
 	if (ret) {
 		pr_info("ov9665_sysfs_init: sysfs_create_file " \
 		"failed\n");
@@ -931,6 +985,12 @@ static int ov9665_sysfs_init(void)
 	ret = sysfs_create_file(android_ov9665, &dev_attr_htcwc.attr);
 	if (ret) {
 		pr_info("ov9665_sysfs_init: sysfs_create_file htcwc failed\n");
+		kobject_del(android_ov9665);
+	}
+
+	ret = sysfs_create_file(android_ov9665, &dev_attr_node.attr);
+	if (ret) {
+		pr_info("ov9665_sysfs_init: dev_attr_node failed\n");
 		kobject_del(android_ov9665);
 	}
 
@@ -991,6 +1051,10 @@ static int ov9665_sensor_probe(struct msm_camera_sensor_info *info,
 		rc = -ENOTSUPP;
 		goto probe_done;
 	}
+
+	pr_info("ov9665 s->node %d\n", s->node);
+	sensor_probe_node = s->node;
+
 	/*switch clk source*/
 	pr_info("ov9665: ov9665_sensor_probe switch clk\n");
 	if(info->camera_clk_switch != NULL)

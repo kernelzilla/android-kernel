@@ -351,12 +351,7 @@ typedef struct {
 /*--------------------------- Tnode -------------------------- */
 
 union yaffs_Tnode_union {
-#ifdef CONFIG_YAFFS_TNODE_LIST_DEBUG
-	union yaffs_Tnode_union *internal[YAFFS_NTNODES_INTERNAL + 1];
-#else
 	union yaffs_Tnode_union *internal[YAFFS_NTNODES_INTERNAL];
-#endif
-/*	__u16 level0[YAFFS_NTNODES_LEVEL0]; */
 
 };
 
@@ -606,7 +601,7 @@ struct yaffs_DeviceParamStruct {
 #ifdef CONFIG_YAFFS_AUTO_UNICODE
 	int autoUnicode;
 #endif
-	
+	int alwaysCheckErased; /* Force chunk erased check always on */
 };
 
 typedef struct yaffs_DeviceParamStruct yaffs_DeviceParam;
@@ -762,6 +757,7 @@ struct yaffs_DeviceStruct {
 	__u32 allGCs;
 	__u32 passiveGCs;
 	__u32 oldestDirtyGCs;
+	__u32 nGCBlocks;
 	__u32 backgroundGCs;
 	__u32 nRetriedWrites;
 	__u32 nRetiredBlocks;
@@ -926,7 +922,6 @@ int yaffs_DumpObject(yaffs_Object *obj);
 void yaffs_GutsTest(yaffs_Device *dev);
 
 /* A few useful functions to be used within the core files*/
-void yaffs_InitialiseTags(yaffs_ExtendedTags *tags);
 void yaffs_DeleteChunk(yaffs_Device *dev, int chunkId, int markNAND, int lyn);
 int yaffs_CheckFF(__u8 *buffer, int nBytes);
 void yaffs_HandleChunkError(yaffs_Device *dev, yaffs_BlockInfo *bi);
@@ -957,9 +952,7 @@ yaffs_Tnode *yaffs_AddOrFindLevel0Tnode(yaffs_Device *dev,
 					yaffs_FileStructure *fStruct,
 					__u32 chunkId,
 					yaffs_Tnode *passedTn);
-void yaffs_VerifyObjects(yaffs_Device *dev);
-void yaffs_VerifyBlocks(yaffs_Device *dev);
-void yaffs_VerifyFreeChunks(yaffs_Device *dev);
+
 int yaffs_DoWriteDataToFile(yaffs_Object *in, const __u8 *buffer, loff_t offset,
 			int nBytes, int writeThrough);
 void yaffs_ResizeDown( yaffs_Object *obj, loff_t newSize);

@@ -38,7 +38,6 @@
 DEFINE_MUTEX(hlist_mut);
 
 #define MSM_MAX_CAMERA_SENSORS 5
-DEFINE_MUTEX(ctrl_cmd_lock);
 
 #define ERR_USER_COPY(to) pr_err("%s(%d): copy %s user\n", \
 				__func__, __LINE__, ((to) ? "to" : "from"))
@@ -255,10 +254,6 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	region->file = file;
 	memcpy(&region->info, info, sizeof(region->info));
 
-	if (info->vfe_can_write) {
-		dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
-	}
-
 	hlist_add_head(&(region->list), ptype);
 
 	return 0;
@@ -300,13 +295,19 @@ static int msm_pmem_frame_ptov_lookup(struct msm_sync *sync,
 
 	hlist_for_each_entry_safe(region, node, n, &sync->pmem_frames, list) {
 		if (pyaddr == (region->paddr + region->info.y_off) &&
+#ifndef CONFIG_ARCH_MSM7225
 				pcbcraddr == (region->paddr +
 						region->info.cbcr_off) &&
+#endif
 				region->info.vfe_can_write) {
 			*pmem_region = region;
-			dmac_unmap_area((void*)region->kvaddr, region->len,
-					DMA_FROM_DEVICE);
 			region->info.vfe_can_write = !take_from_vfe;
+#ifdef CONFIG_ARCH_MSM7225
+			if (pcbcraddr != (region->paddr + region->info.cbcr_off)) {
+				pr_err("%s cbcr addr = %lx, NOT EQUAL to region->paddr + region->info.cbcr_off = %lx\n",
+					__func__, pcbcraddr, region->paddr + region->info.cbcr_off);
+			}
+#endif
 			return 0;
 		}
 	}
@@ -325,8 +326,6 @@ static unsigned long msm_pmem_stats_ptov_lookup(struct msm_sync *sync,
 			/* offset since we could pass vaddr inside a
 			 * registered pmem buffer */
 			*fd = region->info.fd;
-			dmac_unmap_area((void*)region->kvaddr, region->len,
-					DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 0;
 			return (unsigned long)(region->info.vaddr);
 		}
@@ -360,7 +359,6 @@ static unsigned long msm_pmem_frame_vtop_lookup(struct msm_sync *sync,
 				(region->info.cbcr_off == cbcroff) &&
 				(region->info.fd == fd) &&
 				(region->info.vfe_can_write == 0)) {
-			dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 1;
 			return region->paddr;
 		}
@@ -381,7 +379,6 @@ static unsigned long msm_pmem_stats_vtop_lookup(
 		if (((unsigned long)(region->info.vaddr) == buffer) &&
 				(region->info.fd == fd) &&
 				region->info.vfe_can_write == 0) {
-			dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 1;
 			return region->paddr;
 		}
@@ -416,10 +413,6 @@ static int __msm_pmem_table_del(struct msm_sync *sync,
 					pinfo->fd == region->info.fd) {
 				hlist_del(node);
 				put_pmem_file(region->file);
-				if (region->info.vfe_can_write) {
-					dmac_unmap_area((void*)region->kvaddr, region->len,
-							DMA_FROM_DEVICE);
-				}
 				kfree(region);
 			}
 		}
@@ -435,10 +428,6 @@ static int __msm_pmem_table_del(struct msm_sync *sync,
 					pinfo->fd == region->info.fd) {
 				hlist_del(node);
 				put_pmem_file(region->file);
-				if (region->info.vfe_can_write) {
-					dmac_unmap_area((void*)region->kvaddr, region->len,
-							DMA_FROM_DEVICE);
-				}
 				kfree(region);
 			}
 		}
@@ -681,7 +670,7 @@ static int msm_control(struct msm_control_device *ctrl_pmsm,
 	struct msm_ctrl_cmd udata;
 	struct msm_queue_cmd qcmd;
 	struct msm_queue_cmd *qcmd_resp = NULL;
-	uint8_t data[max_control_command_size];
+	uint8_t data[50];
 
 	if (copy_from_user(&udata, arg, sizeof(struct msm_ctrl_cmd))) {
 		ERR_COPY_FROM_USER();
@@ -1010,6 +999,7 @@ static int msm_get_stats(struct msm_sync *sync, void __user *arg)
 		se.ctrl_cmd.resp_fd = ctrl->resp_fd;
 		break;
 
+#ifdef CONFIG_MSM_CAMERA_V4L2
 	case MSM_CAM_Q_V4L2_REQ:
 		/* control command from v4l2 client */
 		ctrl = (struct msm_ctrl_cmd *)(qcmd->command);
@@ -1032,6 +1022,7 @@ static int msm_get_stats(struct msm_sync *sync, void __user *arg)
 		se.ctrl_cmd.type   = ctrl->type;
 		se.ctrl_cmd.length = ctrl->length;
 		break;
+#endif
 
 	default:
 		rc = -EFAULT;
@@ -1632,8 +1623,7 @@ static int __msm_get_pic(struct msm_sync *sync, struct msm_ctrl_cmd *ctrl)
 static int msm_get_pic(struct msm_sync *sync, void __user *arg)
 {
 	struct msm_ctrl_cmd ctrlcmd;
-	struct msm_pmem_region *pic_pmem_region = NULL, *region;
-	struct hlist_node *node, *n;
+	struct msm_pmem_region pic_pmem_region;
 	int rc;
 	unsigned long end;
 	int cline_mask;
@@ -1665,31 +1655,31 @@ static int msm_get_pic(struct msm_sync *sync, void __user *arg)
 		}
 	}
 
-	hlist_for_each_entry_safe(region, node, n, &sync->pmem_frames, list) {
-		if (region->info.vfe_can_write &&
-				(region->info.type == MSM_PMEM_MAINIMG ||
-				region->info.type == MSM_PMEM_RAW_MAINIMG)) {
-			pic_pmem_region = region;
-			break;
+	if (msm_pmem_region_lookup(&sync->pmem_frames,
+			MSM_PMEM_MAINIMG,
+			&pic_pmem_region, 1) == 0) {
+		pr_err("%s pmem region lookup error\n", __func__);
+		pr_info("%s probably getting RAW\n", __func__);
+		if (msm_pmem_region_lookup(&sync->pmem_frames,
+				MSM_PMEM_RAW_MAINIMG,
+				&pic_pmem_region, 1) == 0) {
+			pr_err("%s RAW pmem region lookup error\n", __func__);
+			return -EIO;
 		}
 	}
 
-	if (!pic_pmem_region) {
-		pr_err("%s pmem region lookup error\n", __func__);
-		return -EIO;
-	}
 	cline_mask = cache_line_size() - 1;
-	end = pic_pmem_region->kvaddr + pic_pmem_region->len;
+	end = pic_pmem_region.kvaddr + pic_pmem_region.len;
 	end = (end + cline_mask) & ~cline_mask;
 
 	pr_info("%s: flushing cache for [%08lx, %08lx)\n",
 		__func__,
-		pic_pmem_region->kvaddr, end);
+		pic_pmem_region.kvaddr, end);
 
-	/* HACK: Invalidate buffer */
-	dmac_unmap_area((void*)pic_pmem_region->kvaddr, pic_pmem_region->len,
-			DMA_FROM_DEVICE);
-	pic_pmem_region->info.vfe_can_write = 0;
+        /* HACK: Invalidate buffer */
+        dmac_unmap_area((void*)pic_pmem_region.kvaddr, pic_pmem_region.len,
+                        DMA_FROM_DEVICE);
+        pic_pmem_region.info.vfe_can_write = 0;
 
 	CDBG("%s: copy snapshot frame to user\n", __func__);
 	if (copy_to_user((void *)arg,
@@ -2010,9 +2000,7 @@ static long msm_ioctl_control(struct file *filep, unsigned int cmd,
 	case MSM_CAM_IOCTL_CTRL_COMMAND:
 		/* Coming from control thread, may need to wait for
 		 * command status */
-		mutex_lock(&ctrl_cmd_lock);
 		rc = msm_control(ctrl_pmsm, 1, argp);
-		mutex_unlock(&ctrl_cmd_lock);
 		break;
 	case MSM_CAM_IOCTL_CTRL_COMMAND_2:
 		/* Sends a message, returns immediately */
@@ -2456,6 +2444,7 @@ static int msm_open_control(struct inode *inode, struct file *filep)
 	return rc;
 }
 
+#ifdef CONFIG_MSM_CAMERA_V4L2
 static int __msm_v4l2_control(struct msm_sync *sync,
 		struct msm_ctrl_cmd *out)
 {
@@ -2492,6 +2481,7 @@ end:
 	CDBG("%s: rc %d\n", __func__, rc);
 	return rc;
 }
+#endif
 
 static const struct file_operations msm_fops_config = {
 	.owner = THIS_MODULE,
@@ -2717,7 +2707,7 @@ error:
 	return ret;
 }
 
-
+#ifdef CONFIG_MSM_CAMERA_V4L2
 int msm_v4l2_register(struct msm_v4l2_driver *drv)
 {
 	/* FIXME: support multiple sensors */
@@ -2744,11 +2734,12 @@ int msm_v4l2_unregister(struct msm_v4l2_driver *drv)
 	return 0;
 }
 EXPORT_SYMBOL(msm_v4l2_unregister);
+#endif
 
 static int msm_sync_init(struct msm_sync *sync,
 		struct platform_device *pdev,
 		int (*sensor_probe)(struct msm_camera_sensor_info *,
-				struct msm_sensor_ctrl *))
+				struct msm_sensor_ctrl *), int camera_node)
 {
 	int rc = 0;
 	struct msm_sensor_ctrl sctrl;
@@ -2764,6 +2755,8 @@ static int msm_sync_init(struct msm_sync *sync,
 	rc = msm_camio_probe_on(pdev);
 	if (rc < 0)
 		return rc;
+	sctrl.node = camera_node;
+	pr_info("sctrl.node %d\n", sctrl.node);
 	rc = sensor_probe(sync->sdata, &sctrl);
 	if (rc >= 0) {
 		sync->pdev = pdev;
@@ -2845,7 +2838,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 	struct msm_device *pmsm = NULL;
 	struct msm_sync *sync;
 	int rc = -ENODEV;
-	static int camera_node;
+	static int camera_node = 0;
 
 	if (camera_node >= MSM_MAX_CAMERA_SENSORS) {
 		pr_err("%s: too many camera sensors\n", __func__);
@@ -2878,7 +2871,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 		return -ENOMEM;
 	sync = (struct msm_sync *)(pmsm + 3);
 
-	rc = msm_sync_init(sync, dev, sensor_probe);
+	rc = msm_sync_init(sync, dev, sensor_probe, camera_node);
 	if (rc < 0) {
 		kfree(pmsm);
 		return rc;

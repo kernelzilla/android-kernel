@@ -71,30 +71,30 @@ struct clkctl_acpu_speed {
 #define SRC_PLL1	3 /* 768 MHz */
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
-	{  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 950 },
-	{ 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 950 },
-	{ 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 950 },
-	{ 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 950 },
-	{ 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 975 },
-	{ 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 1000 },
-	{ 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1025 },
-	{ 499200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0D, 0, 1050 },
-	{ 537600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0E, 0, 1050 },
-	{ 576000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0F, 0, 1075 },
-	{ 614400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x10, 0, 1100 },
-	{ 652800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x11, 0, 1125 },
-	{ 691200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x12, 0, 1150 },
-	{ 729600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x13, 0, 1175 },
-	{ 768000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x14, 0, 1200 },
-	{ 806400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x15, 0, 1225 },
-	{ 844800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x16, 0, 1225 },
-	{ 883200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x17, 0, 1250 },
-	{ 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1275 },
-	{ 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1275 },
-	{ 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1275 },
-	{ 1036800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1B, 0, 1275 },
-	{ 1075200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1C, 0, 1275 },
-	{ 1113600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1D, 0, 1275 },
+        {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 975 },
+        { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 975 },
+        { 245000, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1000 },
+        { 256000, CCTL(CLK_GLOBAL_PLL, 3),      SRC_RAW, 0, 0, 1000 },
+        { 384000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0A, 0, 1025 },
+        { 422400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0B, 0, 1050 },
+        { 460800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0C, 0, 1050 },
+        { 499200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0D, 0, 1075 },
+        { 537600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0E, 0, 1075 },
+        { 576000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0F, 0, 1100 },
+        { 614400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x10, 0, 1100 },
+        { 652800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x11, 0, 1125 },
+        { 691200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x12, 0, 1150 },
+        { 729600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x13, 0, 1175 },
+        { 768000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x14, 0, 1200 },
+        { 806400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x15, 0, 1225 },
+        { 844800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x16, 0, 1250 },
+        { 883200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x17, 0, 1275 },
+        { 921600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x18, 0, 1275 },
+        { 960000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x19, 0, 1275 },
+        { 998400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x1A, 0, 1275 },
+        { 1036800, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1B, 0, 1275 },
+        { 1075200, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1C, 0, 1275 },
+        { 1113600, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1D, 0, 1275 },
 	{ 0 },
 };
 
@@ -418,15 +418,15 @@ static void __init acpuclk_init(void)
 		BUG();
 	}
 
-	/* Move to 883MHz for boot, which is a safe frequency
+	/* Move to 806MHz for boot, which is a safe frequency
 	 * for all versions of Scorpion at the moment.
 	 */
 	speed = acpu_freq_tbl;
 	for (;;) {
-		if (speed->acpu_khz == 883200)
+		if (speed->acpu_khz == 806400)
 			break;
 		if (speed->acpu_khz == 0) {
-			pr_err("acpuclk_init: cannot find 883MHz\n");
+			pr_err("acpuclk_init: cannot find 806MHz\n");
 			BUG();
 		}
 		speed++;
@@ -465,22 +465,24 @@ uint32_t acpuclk_get_switch_time(void)
 unsigned long acpuclk_power_collapse(void)
 {
 	int ret = acpuclk_get_rate();
+        ret *= 1000; 
 	if (ret > drv_state.power_collapse_khz)
-		acpuclk_set_rate(drv_state.power_collapse_khz * 1000, 1);
-	return ret * 1000;
+		acpuclk_set_rate(drv_state.power_collapse_khz, 1);
+	return ret;
 }
 
 unsigned long acpuclk_get_wfi_rate(void)
 {
-	return drv_state.wait_for_irq_khz * 1000;
+	return drv_state.wait_for_irq_khz;
 }
 
 unsigned long acpuclk_wait_for_irq(void)
 {
 	int ret = acpuclk_get_rate();
+        ret *= 1000; 
 	if (ret > drv_state.wait_for_irq_khz)
-		acpuclk_set_rate(drv_state.wait_for_irq_khz * 1000, 1);
-	return ret * 1000;
+		acpuclk_set_rate(drv_state.wait_for_irq_khz, 1);
+	return ret;
 }
 
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)

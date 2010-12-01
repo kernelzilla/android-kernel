@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,8 +41,6 @@ struct attribute_group *sysaufs_attr_group = &sysaufs_attr_group_body;
 int sysaufs_si_xi_path(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
-
-	SiMustAnyLock(sb);
 
 	err = 0;
 	if (au_opt_test(au_mntflags(sb), XINO)) {
@@ -222,7 +220,6 @@ void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 			 "%d", bindex);
 		err = sysfs_create_file(kobj, &br->br_attr);
 		if (unlikely(err))
-			pr_warning("failed %s under sysfs(%d)\n",
-				   br->br_name, err);
+			AuWarn("failed %s under sysfs(%d)\n", br->br_name, err);
 	}
 }

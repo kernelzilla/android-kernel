@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -49,8 +49,8 @@ enum {
 	AuCache_FINFO,
 	AuCache_VDIR,
 	AuCache_DEHSTR,
-#ifdef CONFIG_AUFS_HNOTIFY
-	AuCache_HNOTIFY,
+#ifdef CONFIG_AUFS_HINOTIFY
+	AuCache_HINOTIFY,
 #endif
 	AuCache_Last
 };
@@ -64,19 +64,18 @@ enum {
 extern struct kmem_cache *au_cachep[];
 
 #define AuCacheFuncs(name, index) \
-static inline struct au_##name *au_cache_alloc_##name(void) \
+static inline void *au_cache_alloc_##name(void) \
 { return kmem_cache_alloc(au_cachep[AuCache_##index], GFP_NOFS); } \
-static inline void au_cache_free_##name(struct au_##name *p) \
+static inline void au_cache_free_##name(void *p) \
 { kmem_cache_free(au_cachep[AuCache_##index], p); }
 
 AuCacheFuncs(dinfo, DINFO);
 AuCacheFuncs(icntnr, ICNTNR);
 AuCacheFuncs(finfo, FINFO);
 AuCacheFuncs(vdir, VDIR);
-AuCacheFuncs(vdir_dehstr, DEHSTR);
-#ifdef CONFIG_AUFS_HNOTIFY
-AuCacheFuncs(hnotify, HNOTIFY);
-#endif
+AuCacheFuncs(dehstr, DEHSTR);
+
+/*  ---------------------------------------------------------------------- */
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_MODULE_H__ */

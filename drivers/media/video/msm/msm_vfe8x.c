@@ -18,11 +18,11 @@
 
 #include <linux/uaccess.h>
 #include <linux/interrupt.h>
+#include <linux/slab.h>
 #include <mach/irqs.h>
 #include <linux/clk.h>
 #include "msm_vfe8x_proc.h"
 #include <mach/camera.h>
-#include <linux/slab.h>
 
 #define ON  1
 #define OFF 0

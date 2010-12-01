@@ -52,9 +52,10 @@ obj-$(CONFIG_MACH_MAHIMAHI) += board-mahimahi-microp.o
 obj-$(CONFIG_MACH_MAHIMAHI) += htc_acoustic_qsd.o
 
 obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
-obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
+obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
+
 obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
 obj-$(CONFIG_HTC_AUDIO_JACK) += htc_audio_jack.o
 obj-$(CONFIG_HTC_35MM_JACK) += htc_35mm_jack.o

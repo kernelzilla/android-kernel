@@ -27,7 +27,7 @@
 #include <linux/hrtimer.h>
 #include <linux/slab.h>
 #include <linux/wakelock.h>
-#include <mach/htc_battery.h>
+/*#include <mach/htc_battery.h>*/
 #include <mach/msm_flashlight.h>
 #include <mach/msm_iomap.h>
 

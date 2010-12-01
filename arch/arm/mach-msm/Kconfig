@@ -34,6 +34,44 @@ config MSM_MDP31
 	depends on ARCH_QSD8X50
 	default y
 
+config PERFLOCK
+	depends on CPU_FREQ
+	depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+	default n
+	bool "HTC Performance Lock"
+
+config PERFLOCK_BOOT_LOCK
+	depends on PERFLOCK
+	depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+	default n
+	bool "Boot Time Performance Lock"
+
+config PERFLOCK_SCREEN_POLICY
+	depends on PERFLOCK
+	depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
+	default n
+	bool "Change Cpufreq Policy while Screen ON/OFF"
+
+config PERFLOCK_SCREEN_ON_MIN	
+	depends on PERFLOCK_SCREEN_POLICY
+	int "Minimum speed while screen on"
+	default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_ON_MAX
+	depends on PERFLOCK_SCREEN_POLICY
+	int "Maximum speed while screen on"
+	default MSM_CPU_FREQ_MAX
+
+config PERFLOCK_SCREEN_OFF_MIN
+	depends on PERFLOCK_SCREEN_POLICY
+	int "Minimum speed while screen off"
+	default MSM_CPU_FREQ_MIN
+
+config PERFLOCK_SCREEN_OFF_MAX
+	depends on PERFLOCK_SCREEN_POLICY
+	int "Maximum speed while screen off"
+	default MSM_CPU_FREQ_MAX
+
 config TURBO_MODE
     bool "Turbo mode"
     depends on ARCH_MSM7225 || ARCH_MSM7X00A
@@ -190,6 +228,10 @@ config HTC_PWRSINK
 	depends on MSM_SMD
 	default y
 	bool "HTC Power Sink Driver"
+
+config HTC_POWER_COLLAPSE_MAGIC
+	default n
+	bool "Check Power Collapse State"
 
 config CACHE_FLUSH_RANGE_LIMIT
 	hex "Cache flush range limit"
@@ -389,24 +431,34 @@ config MSM_RPCSERVERS
 	help
 	  none
 
-config MSM_CPU_FREQ_SCREEN
-	bool
-	default n
+if CPU_FREQ_MSM
+
+config MSM_CPU_FREQ_SET_MIN_MAX
+        bool "Set Min/Max CPU frequencies."
+        default n
+        help
+          Allow setting min and max CPU frequencies. Sysfs can be used
+          to override these values.
+
+config MSM_CPU_FREQ_MAX
+        int "Max CPU Frequency"
+        depends on MSM_CPU_FREQ_SET_MIN_MAX
+        default 384000
+
+config MSM_CPU_FREQ_MIN
+        int "Min CPU Frequency"
+        depends on MSM_CPU_FREQ_SET_MIN_MAX
+        default 245760
+
+endif # CPU_FREQ_MSM
+
+config AXI_SCREEN_POLICY
+	depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
 	depends on HAS_EARLYSUSPEND
+	bool "Use higher AXI bus while screen ON"
+	default n
 	help
-	  Simple cpufreq scaling based on screen ON/OFF.
-
-if MSM_CPU_FREQ_SCREEN
-
-config MSM_CPU_FREQ_SCREEN_OFF
-	int "Screen off cpu frequency"
-	default 245760
-
-config MSM_CPU_FREQ_SCREEN_ON
-	int "Screen on cpu frequency"
-	default 384000
-
-endif # MSM_CPU_FREQ_SCREEN
+		Simple AXI scaling based on screen ON/OFF and PWRC.
 
 config MSM_HW3D
 	tristate "MSM Hardware 3D Register Driver"

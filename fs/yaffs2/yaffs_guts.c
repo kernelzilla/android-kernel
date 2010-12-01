@@ -72,9 +72,6 @@ static void yaffs_RemoveObjectFromDirectory(yaffs_Object *obj);
 static int yaffs_CheckStructures(void);
 static int yaffs_DoGenericObjectDeletion(yaffs_Object *in);
 
-static yaffs_BlockInfo *yaffs_GetBlockInfo(yaffs_Device *dev, int blockNo);
-
-
 static int yaffs_CheckChunkErased(struct yaffs_DeviceStruct *dev,
 				int chunkInNAND);
 
@@ -434,9 +431,9 @@ static int yaffs_WriteNewChunkWithTagsToNAND(struct yaffs_DeviceStruct *dev,
 		/* let's give it a try */
 		attempts++;
 
-#ifdef CONFIG_YAFFS_ALWAYS_CHECK_CHUNK_ERASED
-		bi->skipErasedCheck = 0;
-#endif
+		if(dev->param.alwaysCheckErased)
+			bi->skipErasedCheck = 0;
+
 		if (!bi->skipErasedCheck) {
 			erasedOk = yaffs_CheckChunkErased(dev, chunk);
 			if (erasedOk != YAFFS_OK) {
@@ -2223,6 +2220,7 @@ static int yaffs_GarbageCollectBlock(yaffs_Device *dev, int block,
 					 * We have to decrement free chunks so this works out properly.
 					 */
 					dev->nFreeChunks--;
+					bi->softDeletions--;
 
 					object->nDataChunks--;
 
@@ -2434,7 +2432,16 @@ static unsigned yaffs_FindBlockForGarbageCollection(yaffs_Device *dev,
 			threshold = dev->param.nChunksPerBlock;
 			iterations = nBlocks;
 		} else {
-			int maxThreshold = dev->param.nChunksPerBlock/2;
+			int maxThreshold;
+
+			if(background)
+				maxThreshold = dev->param.nChunksPerBlock/2;
+			else
+				maxThreshold = dev->param.nChunksPerBlock/8;
+
+			if(maxThreshold <  YAFFS_GC_PASSIVE_THRESHOLD)
+				maxThreshold = YAFFS_GC_PASSIVE_THRESHOLD;
+
 			threshold = background ?
 				(dev->gcNotDone + 2) * 2 : 0;
 			if(threshold <YAFFS_GC_PASSIVE_THRESHOLD)
@@ -2499,8 +2506,10 @@ static unsigned yaffs_FindBlockForGarbageCollection(yaffs_Device *dev,
 		  dev->param.nChunksPerBlock - dev->gcPagesInUse,
 		  prioritised));
 
+		dev->nGCBlocks++;
 		if(background)
 			dev->backgroundGCs++;
+
 		dev->gcDirtiest = 0;
 		dev->gcPagesInUse = 0;
 		dev->gcNotDone = 0;
@@ -2534,10 +2543,8 @@ static int yaffs_CheckGarbageCollection(yaffs_Device *dev, int background)
 	int aggressive = 0;
 	int gcOk = YAFFS_OK;
 	int maxTries = 0;
-
 	int minErased;
 	int erasedChunks;
-
 	int checkpointBlockAdjust;
 
 	if(dev->param.gcControl &&
@@ -2565,6 +2572,9 @@ static int yaffs_CheckGarbageCollection(yaffs_Device *dev, int background)
 		if (dev->nErasedBlocks < minErased)
 			aggressive = 1;
 		else {
+			if(!background && erasedChunks > (dev->nFreeChunks / 4))
+				break;
+
 			if(dev->gcSkip > 20)
 				dev->gcSkip = 20;
 			if(erasedChunks < dev->nFreeChunks/2 ||
@@ -2998,7 +3008,7 @@ int yaffs_UpdateObjectHeader(yaffs_Object *in, const YCHAR *name, int force,
 	int newChunkId;
 	yaffs_ExtendedTags newTags;
 	yaffs_ExtendedTags oldTags;
-	YCHAR *alias = NULL;
+	const YCHAR *alias = NULL;
 
 	__u8 *buffer = NULL;
 	YCHAR oldName[YAFFS_MAX_NAME_LENGTH + 1];
@@ -4957,7 +4967,7 @@ static int yaffs_DoXFetch(yaffs_Object *obj, const YCHAR *name, void *value, int
 	int x_offs = sizeof(yaffs_ObjectHeader);
 	int x_size = dev->nDataBytesPerChunk - sizeof(yaffs_ObjectHeader);
 
-	__u8 * x_buffer;
+	char * x_buffer;
 
 	int retval = 0;
 
@@ -4974,11 +4984,11 @@ static int yaffs_DoXFetch(yaffs_Object *obj, const YCHAR *name, void *value, int
 			return 0;
 	}
 
-	buffer = yaffs_GetTempBuffer(dev, __LINE__);
+	buffer = (char *) yaffs_GetTempBuffer(dev, __LINE__);
 	if(!buffer)
 		return -ENOMEM;
 
-	result = yaffs_ReadChunkWithTagsFromNAND(dev,obj->hdrChunk, buffer, &tags);
+	result = yaffs_ReadChunkWithTagsFromNAND(dev,obj->hdrChunk, (__u8 *)buffer, &tags);
 
 	if(result != YAFFS_OK)
 		retval = -ENOENT;
@@ -4995,7 +5005,7 @@ static int yaffs_DoXFetch(yaffs_Object *obj, const YCHAR *name, void *value, int
 		else
 			retval = nval_list(x_buffer, x_size, value,size);
 	}
-	yaffs_ReleaseTempBuffer(dev,buffer,__LINE__);
+	yaffs_ReleaseTempBuffer(dev,(__u8 *)buffer,__LINE__);
 	return retval;
 }
 
@@ -5525,9 +5535,8 @@ static int yaffs_CheckStructures(void)
 /*      yaffs_CheckStruct(yaffs_Tags,8,"yaffs_Tags"); */
 /*      yaffs_CheckStruct(yaffs_TagsUnion,8,"yaffs_TagsUnion"); */
 /*      yaffs_CheckStruct(yaffs_Spare,16,"yaffs_Spare"); */
-#ifndef CONFIG_YAFFS_TNODE_LIST_DEBUG
 /*	yaffs_CheckStruct(yaffs_Tnode, 2 * YAFFS_NTNODES_LEVEL0, "yaffs_Tnode"); */
-#endif
+
 #ifndef CONFIG_YAFFS_WINCE
 	yaffs_CheckStruct(yaffs_ObjectHeader, 512, "yaffs_ObjectHeader");
 #endif

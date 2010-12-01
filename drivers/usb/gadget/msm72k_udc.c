@@ -1269,7 +1269,7 @@ static void usb_do_work(struct work_struct *w)
 			 * present when we received the signal, go online.
 			 */
 			if ((flags & USB_FLAG_VBUS_ONLINE) && _vbus) {
-				pr_info("msm72k_udc: OFFLINE -> ONLINE\n");
+				pr_info("msm72k_udc: OFFLINE -> ONLINE vbus\n");
 				clk_set_rate(ui->ebi1clk, 128000000);
 				udelay(10);
 				clk_enable(ui->clk);

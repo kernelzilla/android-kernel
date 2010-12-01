@@ -2524,12 +2524,12 @@ static void e1000_configure_rx(struct e1000_adapter *adapter)
 			 * excessive C-state transition latencies result in
 			 * dropped transactions.
 			 */
-			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
-						  adapter->netdev->name, 55);
+			pm_qos_update_request(
+				&adapter->netdev->pm_qos_req, 55);
 		} else {
-			pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY,
-						  adapter->netdev->name,
-						  PM_QOS_DEFAULT_VALUE);
+			pm_qos_update_request(
+				&adapter->netdev->pm_qos_req,
+				PM_QOS_DEFAULT_VALUE);
 		}
 	}
 
@@ -2824,9 +2824,9 @@ int e1000e_up(struct e1000_adapter *adapter)
 
 	/* DMA latency requirement to workaround early-receive/jumbo issue */
 	if (adapter->flags & FLAG_HAS_ERT)
-		pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY,
-		                       adapter->netdev->name,
-				       PM_QOS_DEFAULT_VALUE);
+		pm_qos_add_request(&adapter->netdev->pm_qos_req,
+				   PM_QOS_CPU_DMA_LATENCY,
+				   PM_QOS_DEFAULT_VALUE);
 
 	/* hardware has been reset, we need to reload some things */
 	e1000_configure(adapter);
@@ -2888,8 +2888,7 @@ void e1000e_down(struct e1000_adapter *adapter)
 	e1000_clean_rx_ring(adapter);
 
 	if (adapter->flags & FLAG_HAS_ERT)
-		pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY,
-		                          adapter->netdev->name);
+		pm_qos_remove_request(&adapter->netdev->pm_qos_req);
 
 	/*
 	 * TODO: for power management, we could drop the link and

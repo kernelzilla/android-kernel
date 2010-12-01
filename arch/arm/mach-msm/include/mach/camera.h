@@ -28,7 +28,6 @@
 #define NUM_AUTOFOCUS_MULTI_WINDOW_GRIDS 16
 #define NUM_STAT_OUTPUT_BUFFERS      3
 #define NUM_AF_STAT_OUTPUT_BUFFERS      3
-#define max_control_command_size 150
 
 enum msm_queue {
 	MSM_CAM_Q_CTRL,     /* control command or control command status */
@@ -53,6 +52,10 @@ enum vfe_resp_msg {
 	VFE_MSG_STATS_AF,
 	VFE_MSG_STATS_WE,
 };
+
+#define VFE31_OUTPUT_MODE_PT (0x1 << 0)
+#define VFE31_OUTPUT_MODE_S (0x1 << 1)
+#define VFE31_OUTPUT_MODE_V (0x1 << 2)
 
 struct msm_vfe_phy_info {
 	uint32_t sbuf_phy;
@@ -90,21 +93,19 @@ struct msm_sensor_ctrl {
 	int (*s_init)(struct msm_camera_sensor_info *);
 	int (*s_release)(void);
 	int (*s_config)(void __user *);
+	int node;
 };
 
 /* this structure is used in kernel */
 struct msm_queue_cmd {
-#ifdef CONFIG_MSM_CAMERA_OLD
-	struct list_head list;
-#else
 	struct list_head list_config;
 	struct list_head list_control;
 	struct list_head list_frame;
 	struct list_head list_pict;
-#endif
 	enum msm_queue type;
 	void *command;
 	int on_heap;
+	struct timespec ts;
 };
 
 struct msm_device_queue {
@@ -117,51 +118,6 @@ struct msm_device_queue {
 };
 
 struct msm_sync {
-#ifdef CONFIG_MSM_CAMERA_OLD
-        /* These two queues are accessed from a process context only. */
-        struct hlist_head frame; /* most-frequently accessed */
-        struct hlist_head stats;
-
-        /* The message queue is used by the control thread to send commands
-         * to the config thread, and also by the DSP to send messages to the
-         * config thread.  Thus it is the only queue that is accessed from
-         * both interrupt and process context.
-         */
-        spinlock_t msg_event_q_lock;
-        struct list_head msg_event_q;
-        wait_queue_head_t msg_event_wait;
-
-        /* This queue contains preview frames. It is accessed by the DSP (in
-         * in interrupt context, and by the frame thread.
-         */
-        spinlock_t prev_frame_q_lock;
-        struct list_head prev_frame_q;
-        wait_queue_head_t prev_frame_wait;
-        int unblock_poll_frame;
-
-        /* This queue contains snapshot frames.  It is accessed by the DSP (in
-         * interrupt context, and by the control thread.
-         */
-        spinlock_t pict_frame_q_lock;
-        struct list_head pict_frame_q;
-        wait_queue_head_t pict_frame_wait;
-
-        struct msm_camera_sensor_info *sdata;
-        struct msm_camvfe_fn vfefn;
-        struct msm_sensor_ctrl sctrl;
-        struct wake_lock wake_lock;
-        struct platform_device *pdev;
-        uint8_t opencnt;
-        void *cropinfo;
-        int  croplen;
-        unsigned pict_pp;
-        uint8_t pp_sync_flag;
-
-        const char *apps_id;
-
-        struct mutex lock;
-        struct list_head list;
-#else
 	/* These two queues are accessed from a process context only.  They contain
 	 * pmem descriptors for the preview frames and the stats coming from the
 	 * camera sensor.
@@ -186,6 +142,7 @@ struct msm_sync {
 	 * interrupt context, and by the control thread.
 	 */
 	struct msm_device_queue pict_q;
+	int get_pic_abort;
 
 	struct msm_camera_sensor_info *sdata;
 	struct msm_camvfe_fn vfefn;
@@ -210,7 +167,6 @@ struct msm_sync {
 
 	struct mutex lock;
 	struct list_head list;
-#endif
 };
 
 #define MSM_APPS_ID_V4L2 "msm_v4l2"
@@ -226,27 +182,11 @@ struct msm_device {
 	atomic_t opened;
 };
 
-#ifdef CONFIG_MSM_CAMERA_OLD
-struct msm_control_device_queue {
-        spinlock_t ctrl_status_q_lock;
-        struct list_head ctrl_status_q;
-        wait_queue_head_t ctrl_status_wait;
-};
-
-struct msm_control_device {
-        struct msm_device *pmsm;
-
-        /* This queue used by the config thread to send responses back to the
-         * control thread.  It is accessed only from a process context.
-         */
-        struct msm_control_device_queue ctrl_q;
-};
-#else
 struct msm_control_device {
 	struct msm_device *pmsm;
 
 	/* Used for MSM_CAM_IOCTL_CTRL_CMD_DONE responses */
-	uint8_t ctrl_data[max_control_command_size];
+	uint8_t ctrl_data[50];
 	struct msm_ctrl_cmd ctrl;
 	struct msm_queue_cmd qcmd;
 
@@ -255,7 +195,6 @@ struct msm_control_device {
 	 */
 	struct msm_device_queue ctrl_q;
 };
-#endif
 
 struct register_address_value_pair {
 	uint16_t register_address;
@@ -265,7 +204,9 @@ struct register_address_value_pair {
 struct msm_pmem_region {
 	struct hlist_node list;
 	unsigned long paddr;
+//#ifdef CONFIG_MSM_CAMERA_LEGACY
 	unsigned long kvaddr;
+//#endif
 	unsigned long len;
 	struct file *file;
 	struct msm_pmem_info info;
@@ -274,12 +215,26 @@ struct msm_pmem_region {
 struct axidata {
 	uint32_t bufnum1;
 	uint32_t bufnum2;
-#ifdef CONFIG_720P_CAMERA
+//#ifdef CONFIG_720P_CAMERA
 	uint32_t bufnum3;
-#endif
+//#endif
 	struct msm_pmem_region *region;
 };
 
+#ifdef CONFIG_MSM_CAMERA_FLASH
+	int msm_camera_flash_set_led_state(
+		struct msm_camera_sensor_flash_data *fdata,
+		unsigned led_state);
+#else
+	static inline int msm_camera_flash_set_led_state(
+		struct msm_camera_sensor_flash_data *fdata,
+		unsigned led_state)
+	{
+		return -ENOTSUPP;
+	}
+#endif
+
+#ifdef CONFIG_MSM_CAMERA_V4L2
 /* Below functions are added for V4L2 kernel APIs */
 struct msm_v4l2_driver {
 	struct msm_sync *sync;
@@ -296,25 +251,30 @@ struct msm_v4l2_driver {
 
 int msm_v4l2_register(struct msm_v4l2_driver *);
 int msm_v4l2_unregister(struct msm_v4l2_driver *);
+#endif
 
 void msm_camvfe_init(void);
 int msm_camvfe_check(void *);
 void msm_camvfe_fn_init(struct msm_camvfe_fn *, void *);
-#ifdef CONFIG_MSM_CAMERA_OLD
-int msm_camera_drv_start(struct platform_device *dev,
-                int (*sensor_probe)(const struct msm_camera_sensor_info *,
-                                        struct msm_sensor_ctrl *));
-#else
 int msm_camera_drv_start(struct platform_device *dev,
 		int (*sensor_probe)(struct msm_camera_sensor_info *,
 					struct msm_sensor_ctrl *));
-#endif
 
 enum msm_camio_clk_type {
 	CAMIO_VFE_MDC_CLK,
 	CAMIO_MDC_CLK,
 	CAMIO_VFE_CLK,
 	CAMIO_VFE_AXI_CLK,
+//#ifdef CONFIG_MSM_CAMERA_7X30
+	CAMIO_VFE_CLK_FOR_MIPI_2_LANE,
+	CAMIO_VFE_CAMIF_CLK,
+	CAMIO_VFE_PBDG_CLK,
+	CAMIO_CAM_MCLK_CLK,
+	CAMIO_CAMIF_PAD_PBDG_CLK,
+	CAMIO_CSI_CLK,
+	CAMIO_CSI_VFE_CLK,
+	CAMIO_CSI_PCLK,
+//#endif
 	CAMIO_MAX_CLK
 };
 
@@ -370,4 +330,22 @@ void msm_camio_clk_sel(enum msm_camio_clk_src_type);
 void msm_camio_disable(struct platform_device *);
 int msm_camio_probe_on(struct platform_device *);
 int msm_camio_probe_off(struct platform_device *);
+
+#ifdef CONFIG_MSM_CAMERA_7X30
+void msm_camio_clk_rate_set_2(struct clk *clk, int rate);
+void msm_disable_io_gpio_clk(struct platform_device *);
+int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
+int request_axi_qos(uint32_t freq);
+int update_axi_qos(uint32_t freq);
+void release_axi_qos(void);
+int msm_camio_read_camif_status(void);
+
+void msm_io_w(u32 data, void __iomem *addr);
+void msm_io_w_mb(u32 data, void __iomem *addr);
+u32 msm_io_r(void __iomem *addr);
+u32 msm_io_r_mb(void __iomem *addr);
+void msm_io_dump(void __iomem *addr, int size);
+void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len);
+#endif
+
 #endif

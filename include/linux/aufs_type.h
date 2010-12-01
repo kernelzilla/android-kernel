@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <linux/limits.h>
 #include <linux/types.h>
 
-#define AUFS_VERSION	"2-34"
+#define AUFS_VERSION	"2"
 
 /* todo? move this to linux-2.6.19/include/magic.h */
 #define AUFS_SUPER_MAGIC	('a' << 24 | 'u' << 16 | 'f' << 8 | 's')
@@ -110,10 +110,7 @@ enum {
 
 	/* readdir in userspace */
 	AuCtl_RDU,
-	AuCtl_RDU_INO,
-
-	/* pathconf wrapper */
-	AuCtl_WBR_FD
+	AuCtl_RDU_INO
 };
 
 /* borrowed from linux/include/linux/kernel.h */
@@ -179,8 +176,8 @@ struct aufs_rdu {
 	union au_rdu_ent_ul	tail;
 	/* number of entries which were added in a single call */
 	__u64			rent;
-	__u8			full;
 	__u8			shwh;
+	__u8			full;
 
 	struct au_rdu_cookie	cookie;
 } __aligned(8);
@@ -190,6 +187,5 @@ struct aufs_rdu {
 #define AUFS_CTL_PLINK_CLEAN	_IO(AuCtlType, AuCtl_PLINK_CLEAN)
 #define AUFS_CTL_RDU		_IOWR(AuCtlType, AuCtl_RDU, struct aufs_rdu)
 #define AUFS_CTL_RDU_INO	_IOWR(AuCtlType, AuCtl_RDU_INO, struct aufs_rdu)
-#define AUFS_CTL_WBR_FD		_IO(AuCtlType, AuCtl_WBR_FD)
 
 #endif /* __AUFS_TYPE_H__ */

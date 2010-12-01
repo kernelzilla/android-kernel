@@ -285,9 +285,9 @@ static int ekt8232_ts_init(struct i2c_client *client)
 				"%s: set adc failed\n", __func__);
 		}
 		cmd[0] = 0x54;
-		cmd[0] = 0x43;
-		cmd[0] = 0x00;
-		cmd[0] = 0x01;
+		cmd[1] = 0x43;
+		cmd[2] = 0x00;
+		cmd[3] = 0x01;
 		if ((i2c_master_send(client, cmd, 4)) != 4) {
 			dev_err(&client->dev,
 				"%s: set gain failed\n", __func__);
