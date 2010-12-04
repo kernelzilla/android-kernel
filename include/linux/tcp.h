@@ -101,6 +101,7 @@ enum {
 #define TCPI_OPT_SACK		2
 #define TCPI_OPT_WSCALE		4
 #define TCPI_OPT_ECN		8
+#define TCP_CWND		18	/* Set congestion window */
 
 enum tcp_ca_state
 {

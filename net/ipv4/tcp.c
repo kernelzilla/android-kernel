@@ -2243,6 +2243,24 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		}
 		break;
 
+	case TCP_CWND:
+		if (sysctl_tcp_user_cwnd_max <= 0)
+			err = -EPERM;
+		else if (val > 0 && sk->sk_state == TCP_ESTABLISHED &&
+		    icsk->icsk_ca_state == TCP_CA_Open) {
+			u32 cwnd = val;
+			cwnd = min(cwnd, (u32)sysctl_tcp_user_cwnd_max);
+			cwnd = min(cwnd, tp->snd_cwnd_clamp);
+
+			if (tp->snd_cwnd != cwnd) {
+				tp->snd_cwnd = cwnd;
+				tp->snd_cwnd_stamp = tcp_time_stamp;
+				tp->snd_cwnd_cnt = 0;
+			}
+		} else
+			err = -EINVAL;
+		break;
+
 #ifdef CONFIG_TCP_MD5SIG
 	case TCP_MD5SIG:
 		/* Read the IP->Key mappings from userspace */
