@@ -138,6 +138,9 @@ struct kmem_cache *vm_area_cachep;
 /* SLAB cache for mm_struct structures (tsk->mm) */
 static struct kmem_cache *mm_cachep;
 
+/* Notifier list called when a task struct is freed */
+static ATOMIC_NOTIFIER_HEAD(task_free_notifier);
+
 void free_task(struct task_struct *tsk)
 {
 	prop_local_destroy_single(&tsk->dirties);
@@ -147,6 +150,18 @@ void free_task(struct task_struct *tsk)
 	free_task_struct(tsk);
 }
 EXPORT_SYMBOL(free_task);
+
+int task_free_register(struct notifier_block *n)
+{
+	return atomic_notifier_chain_register(&task_free_notifier, n);
+}
+EXPORT_SYMBOL(task_free_register);
+
+int task_free_unregister(struct notifier_block *n)
+{
+	return atomic_notifier_chain_unregister(&task_free_notifier, n);
+}
+EXPORT_SYMBOL(task_free_unregister);
 
 void __put_task_struct(struct task_struct *tsk)
 {
@@ -158,6 +173,7 @@ void __put_task_struct(struct task_struct *tsk)
 	put_cred(tsk->cred);
 	delayacct_tsk_free(tsk);
 
+	atomic_notifier_call_chain(&task_free_notifier, 0, tsk);
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
 }
@@ -871,6 +887,8 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
 	acct_init_pacct(&sig->pacct);
 
 	tty_audit_fork(sig);
+
+	sig->oom_adj = current->signal->oom_adj;
 
 	return 0;
 }

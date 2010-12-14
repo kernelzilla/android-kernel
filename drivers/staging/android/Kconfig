@@ -6,6 +6,8 @@ config ANDROID
 	---help---
 	  Enable support for various drivers needed on the Android platform
 
+if ANDROID
+
 config ANDROID_BINDER_IPC
 	bool "Android Binder IPC Driver"
 	default n
@@ -93,4 +95,5 @@ config ANDROID_LOW_MEMORY_KILLER
 	---help---
 	  Register processes to be killed when memory is low
 
+endif # if ANDROID
 endmenu
