@@ -579,7 +579,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 		}
 	} else {
 		if (!conn) {
-			conn = hci_conn_add(hdev, ACL_LINK, &cp->bdaddr);
+			conn = hci_conn_add(hdev, ACL_LINK, 0, &cp->bdaddr);
 			if (conn) {
 				conn->out = 1;
 				conn->link_mode |= HCI_LM_MASTER;
@@ -785,8 +785,12 @@ static void hci_cs_sniff_mode(struct hci_dev *hdev, __u8 status)
 	hci_dev_lock(hdev);
 
 	conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(cp->handle));
-	if (conn)
+	if (conn) {
 		clear_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->pend);
+
+		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->pend))
+			hci_sco_setup(conn, status);
+	}
 
 	hci_dev_unlock(hdev);
 }
@@ -808,8 +812,12 @@ static void hci_cs_exit_sniff_mode(struct hci_dev *hdev, __u8 status)
 	hci_dev_lock(hdev);
 
 	conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(cp->handle));
-	if (conn)
+	if (conn) {
 		clear_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->pend);
+
+		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->pend))
+			hci_sco_setup(conn, status);
+	}
 
 	hci_dev_unlock(hdev);
 }
@@ -905,20 +913,8 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 	} else
 		conn->state = BT_CLOSED;
 
-	if (conn->type == ACL_LINK) {
-		struct hci_conn *sco = conn->link;
-		if (sco) {
-			if (!ev->status) {
-				if (lmp_esco_capable(hdev))
-					hci_setup_sync(sco, conn->handle);
-				else
-					hci_add_sco(sco, conn->handle);
-			} else {
-				hci_proto_connect_cfm(sco, ev->status);
-				hci_conn_del(sco);
-			}
-		}
-	}
+	if (conn->type == ACL_LINK)
+		hci_sco_setup(conn, ev->status);
 
 	if (ev->status) {
 		hci_proto_connect_cfm(conn, ev->status);
@@ -954,7 +950,9 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 
 		conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
 		if (!conn) {
-			if (!(conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr))) {
+			/* pkt_type not yet used for incoming connections */
+			if (!(conn = hci_conn_add(hdev, ev->link_type, 0,
+							&ev->bdaddr))) {
 				BT_ERR("No memmory for new connection");
 				hci_dev_unlock(hdev);
 				return;
@@ -1465,6 +1463,9 @@ static inline void hci_mode_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 			else
 				conn->power_save = 0;
 		}
+
+		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->pend))
+			hci_sco_setup(conn, ev->status);
 	}
 
 	hci_dev_unlock(hdev);
