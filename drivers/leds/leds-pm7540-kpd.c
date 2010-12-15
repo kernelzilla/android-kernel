@@ -40,7 +40,7 @@
 #include <linux/earlysuspend.h>
 #endif
 
-#define PM7540_KPD_LEDS_DEBUG
+#define PM7540_KPD_LEDS_DEBUG 1
 
 #define MODULE_NAME "leds_pm7540_kpd"
 
