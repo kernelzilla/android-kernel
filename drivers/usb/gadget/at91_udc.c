@@ -1570,9 +1570,6 @@ static irqreturn_t at91_vbus_irq(int irq, void *_udc)
 	return IRQ_HANDLED;
 }
 
-<<<<<<< HEAD
-int usb_gadget_register_driver (struct usb_gadget_driver *driver)
-=======
 static void at91_vbus_timer_work(struct work_struct *work)
 {
 	struct at91_udc *udc = container_of(work, struct at91_udc,
@@ -1599,7 +1596,6 @@ static void at91_vbus_timer(unsigned long data)
 
 int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 		int (*bind)(struct usb_gadget *))
->>>>>>> b0fca50... usb gadget: don't save bind callback in struct usb_gadget_driver
 {
 	struct at91_udc	*udc = &controller;
 	int		retval;

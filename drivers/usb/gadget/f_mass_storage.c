@@ -3185,7 +3185,7 @@ int mass_storage_bind_config(struct usb_configuration *c)
 	struct fsg_common *common = fsg_common_init(NULL, c->cdev, &fsg_cfg);
 	if (IS_ERR(common))
 		return -1;
-	return fsg_add(c->cdev, c, common);
+	return fsg_bind_config(c->cdev, c, common);
 }
 
 static struct android_usb_function mass_storage_function = {

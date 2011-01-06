@@ -1470,16 +1470,12 @@ extern int usb_composite_probe(struct usb_composite_driver *driver,
 	composite = driver;
 	composite_gadget_bind = bind;
 
-<<<<<<< HEAD
 	driver->class = class_create(THIS_MODULE, "usb_composite");
 	if (IS_ERR(driver->class))
 		return PTR_ERR(driver->class);
 	driver->class->dev_uevent = composite_uevent;
 
-	return usb_gadget_register_driver(&composite_driver);
-=======
 	return usb_gadget_probe_driver(&composite_driver, composite_bind);
->>>>>>> b0fca50... usb gadget: don't save bind callback in struct usb_gadget_driver
 }
 
 /**
