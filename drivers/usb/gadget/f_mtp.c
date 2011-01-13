@@ -725,8 +725,10 @@ static int mtp_receive_file(struct mtp_dev *dev, struct file *filp,
 			/* wait for our last read to complete */
 			ret = wait_event_interruptible(dev->read_wq,
 				dev->rx_done || dev->state != STATE_BUSY);
-			if (ret < 0 || dev->state != STATE_BUSY) {
-				r = ret;
+			if (dev->state == STATE_CANCELED) {
+				r = -ECANCELED;
+				if (!dev->rx_done)
+					usb_ep_dequeue(dev->ep_out, read_req);
 				break;
 			}
 			count -= read_req->actual;
