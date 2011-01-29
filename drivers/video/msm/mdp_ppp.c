@@ -45,6 +45,7 @@ static uint32_t bytes_per_pixel[] = {
 	[MDP_ARGB_8888] = 4,
 	[MDP_RGBA_8888] = 4,
 	[MDP_BGRA_8888] = 4,
+	[MDP_RGBX_8888] = 4,
 	[MDP_Y_CBCR_H2V1] = 1,
 	[MDP_Y_CBCR_H2V2] = 1,
 	[MDP_Y_CRCB_H2V1] = 1,
@@ -400,6 +401,7 @@ static void mdp_ppp_setbg(MDPIBUF *iBuf)
 	case MDP_RGBA_8888:
 	case MDP_ARGB_8888:
 	case MDP_XRGB_8888:
+	case MDP_RGBX_8888:
 		/*
 		 * 8888 = 4bytes
 		 * ARGB = 4Components
@@ -415,9 +417,14 @@ static void mdp_ppp_setbg(MDPIBUF *iBuf)
 			unpack_pattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
-		else if (iBuf->ibuf_type == MDP_RGBA_8888)
+		else if (iBuf->ibuf_type == MDP_RGBA_8888 ||
+				iBuf->ibuf_type == MDP_RGBX_8888)
 			unpack_pattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_B, CLR_G, CLR_R,
+						 8);
+		else if (iBuf->ibuf_type == MDP_XRGB_8888)
+			unpack_pattern =
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			unpack_pattern =
@@ -610,16 +617,23 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 		    PPP_DST_BPP_3BYTES | PPP_DST_PLANE_INTERLVD;
 		break;
 
+	case MDP_BGRA_8888:
 	case MDP_XRGB_8888:
 	case MDP_ARGB_8888:
 	case MDP_RGBA_8888:
+	case MDP_RGBX_8888:
 		if (iBuf->ibuf_type == MDP_BGRA_8888)
 			dst_packPattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
-		else if (iBuf->ibuf_type == MDP_RGBA_8888)
+		else if (iBuf->ibuf_type == MDP_RGBA_8888 ||
+				iBuf->ibuf_type == MDP_RGBX_8888)
 			dst_packPattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_B, CLR_G, CLR_R,
+						 8);
+		else if (iBuf->ibuf_type == MDP_XRGB_8888)
+			dst_packPattern =
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			dst_packPattern =
@@ -803,6 +817,7 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 	case MDP_ARGB_8888:
 		perPixelAlpha = TRUE;
 	case MDP_XRGB_8888:
+	case MDP_RGBX_8888:
 		inpBpp = 4;
 		/*
 		 * 8888 = 4bytes
@@ -820,9 +835,14 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 			packPattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
-		else if (iBuf->mdpImg.imgType == MDP_RGBA_8888)
+		else if (iBuf->mdpImg.imgType == MDP_RGBA_8888 ||
+				iBuf->mdpImg.imgType == MDP_RGBX_8888)
 			packPattern =
 			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_B, CLR_G, CLR_R,
+						 8);
+		else if (iBuf->ibuf_type == MDP_XRGB_8888)
+			packPattern =
+			    MDP_GET_PACK_PATTERN(CLR_ALPHA, CLR_R, CLR_G, CLR_B,
 						 8);
 		else
 			packPattern =
@@ -1099,7 +1119,9 @@ struct mdp_blit_req *req, struct file *p_src_file, struct file *p_dst_file)
 	 * 0x0154: PPP packing pattern
 	 */
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x0138, ppp_operation_reg);
-	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x014c, alpha << 24 | tpVal);
+	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x014c, alpha << 24 | (tpVal &
+								0xffffff));
+
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x0150, ppp_dst_cfg_reg);
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x0154, dst_packPattern);
 
@@ -1230,6 +1252,14 @@ int get_img(struct mdp_img *img, struct fb_info *info, unsigned long *start,
 	return ret;
 }
 
+void put_img(struct file *p_src_file)
+{
+#ifdef CONFIG_ANDROID_PMEM
+	if (p_src_file)
+		put_pmem_file(p_src_file);
+#endif
+}
+
 int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 	struct file **pp_src_file, struct file **pp_dst_file)
 {
@@ -1301,12 +1331,16 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 		iBuf.mdpImg.mdpOp |= MDPOP_TRANSP;
 		iBuf.mdpImg.tpVal = req->transp_mask;
 		iBuf.mdpImg.tpVal = mdp_calc_tpval(&iBuf.mdpImg);
+	} else {
+		iBuf.mdpImg.tpVal = 0;
 	}
 
 	req->alpha &= 0xff;
 	if (req->alpha < MDP_ALPHA_NOP) {
 		iBuf.mdpImg.mdpOp |= MDPOP_ALPHAB;
 		iBuf.mdpImg.alpha = req->alpha;
+	} else {
+		iBuf.mdpImg.alpha = 0xff;
 	}
 	/* rotation check */
 	if (req->flags & MDP_FLIP_LR)
@@ -1317,13 +1351,28 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 		iBuf.mdpImg.mdpOp |= MDPOP_ROT90;
 	if (req->flags & MDP_DITHER)
 		iBuf.mdpImg.mdpOp |= MDPOP_DITHER;
+	if (req->flags & MDP_BLEND_FG_PREMULT) {
+#ifdef CONFIG_FB_MSM_MDP31
+		iBuf.mdpImg.mdpOp |= MDPOP_FG_PM_ALPHA;
+#else
+		put_img(p_src_file);
+		put_img(p_dst_file);
+		return -EINVAL;
+#endif
+	}
+
 
 	if (req->flags & MDP_DEINTERLACE) {
 #ifdef CONFIG_FB_MSM_MDP31
 		if ((req->src.format != MDP_Y_CBCR_H2V2) &&
-			(req->src.format != MDP_Y_CRCB_H2V2))
+			(req->src.format != MDP_Y_CRCB_H2V2)) {
 #endif
+		put_img(p_src_file);
+		put_img(p_dst_file);
 		return -EINVAL;
+#ifdef CONFIG_FB_MSM_MDP31
+		}
+#endif
 	}
 
 	/* scale check */
@@ -1379,9 +1428,11 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 	if (((iBuf.mdpImg.mdpOp & (MDPOP_TRANSP | MDPOP_ALPHAB)) ||
 	     (req->src.format == MDP_ARGB_8888) ||
 	     (req->src.format == MDP_BGRA_8888) ||
+	     (req->src.format == MDP_RGBX_8888) ||
 	     (req->src.format == MDP_RGBA_8888)) &&
 	    (iBuf.mdpImg.mdpOp & MDPOP_ROT90) && (req->dst_rect.w <= 16)) {
 		int dst_h, src_w, i;
+		uint32 mdpOp = iBuf.mdpImg.mdpOp;
 
 		src_w = req->src_rect.w;
 		dst_h = iBuf.roi.dst_height;
@@ -1413,6 +1464,8 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 			/* this is for a remainder update */
 			dst_h -= 16;
 			src_w -= iBuf.roi.width;
+			/* restore mdpOp since MDPOP_ASCALE have been cleared */
+			iBuf.mdpImg.mdpOp = mdpOp;
 		}
 
 		if ((dst_h < 0) || (src_w < 0))
@@ -1454,7 +1507,16 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req,
 				iBuf.roi.width = tmp_v;
 			}
 
-			mdp_start_ppp(mfd, &iBuf, req, p_src_file, p_dst_file);
+#if 0                          
+			printk(KERN_INFO "%s():  roi-final:(%d,%d)(%d,%d)\n", __func__, 
+			iBuf.roi.width, iBuf.roi.height, iBuf.roi.dst_width, iBuf.roi.dst_height);
+#endif
+			if(iBuf.roi.width<=16)
+				mdp_start_ppp(mfd, &iBuf, req, p_src_file, p_dst_file);
+			else{
+				printk(KERN_ERR "%s(): roi.width(%d) > 16, skip ppp.\n",__func__,iBuf.roi.width);
+			}
+
 		}
 	} else {
 		mdp_start_ppp(mfd, &iBuf, req, p_src_file, p_dst_file);

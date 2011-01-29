@@ -29,6 +29,19 @@
 /* new ioctls's for set/get ccs matrix */
 #define MSMFB_GET_CCS_MATRIX  _IOWR(MSMFB_IOCTL_MAGIC, 133, struct mdp_ccs)
 #define MSMFB_SET_CCS_MATRIX  _IOW(MSMFB_IOCTL_MAGIC, 134, struct mdp_ccs)
+#define MSMFB_OVERLAY_SET       _IOWR(MSMFB_IOCTL_MAGIC, 135, \
+					struct mdp_overlay)
+#define MSMFB_OVERLAY_UNSET     _IOW(MSMFB_IOCTL_MAGIC, 136, unsigned int)
+#define MSMFB_OVERLAY_PLAY      _IOW(MSMFB_IOCTL_MAGIC, 137, \
+					struct msmfb_overlay_data)
+#define MSMFB_GET_PAGE_PROTECTION _IOR(MSMFB_IOCTL_MAGIC, 138, \
+					struct mdp_page_protection)
+#define MSMFB_SET_PAGE_PROTECTION _IOW(MSMFB_IOCTL_MAGIC, 139, \
+					struct mdp_page_protection)
+#define MSMFB_OVERLAY_GET      _IOR(MSMFB_IOCTL_MAGIC, 140, \
+					struct mdp_overlay)
+#define MSMFB_OVERLAY_PLAY_ENABLE     _IOW(MSMFB_IOCTL_MAGIC, 141, unsigned int)
+
 
 #define MDP_IMGTYPE2_START 0x10000
 enum {
@@ -43,6 +56,7 @@ enum {
 	MDP_Y_CBCR_H2V1,   /* Y and CrCb, pseduo planer w/ Cr is in MSB */
 	MDP_RGBA_8888,    /* ARGB 888 */
 	MDP_BGRA_8888,	  /* ABGR 888 */
+	MDP_RGBX_8888,	  /* RGBX 888 */
 	MDP_IMGTYPE_LIMIT,
 	MDP_BGR_565 = MDP_IMGTYPE2_START,      /* BGR 565 planer */
 	MDP_FB_FORMAT,    /* framebuffer format */
@@ -53,6 +67,8 @@ enum {
 	PMEM_IMG,
 	FB_IMG,
 };
+
+#define MDP_BLEND_FG_PREMULT 0x20000
 
 /* flag values */
 #define MDP_ROT_NOP 0
@@ -67,8 +83,26 @@ enum {
 #define MDP_DEINTERLACE 0x80000000
 #define MDP_SHARPENING  0x40000000
 
+#define MDP_NO_DMA_BARRIER_START       0x20000000
+#define MDP_NO_DMA_BARRIER_END         0x10000000
+#define MDP_NO_BLIT                    0x08000000
+#define MDP_BLIT_WITH_DMA_BARRIERS     0x000
+#define MDP_BLIT_WITH_NO_DMA_BARRIERS    \
+	(MDP_NO_DMA_BARRIER_START | MDP_NO_DMA_BARRIER_END)
+
+
 #define MDP_TRANSP_NOP 0xffffffff
 #define MDP_ALPHA_NOP 0xff
+
+#define MDP_FB_PAGE_PROTECTION_NONCACHED	 (0)
+#define MDP_FB_PAGE_PROTECTION_WRITECOMBINE	 (1)
+#define MDP_FB_PAGE_PROTECTION_WRITETHROUGHCACHE (2)
+#define MDP_FB_PAGE_PROTECTION_WRITEBACKCACHE	 (3)
+#define MDP_FB_PAGE_PROTECTION_WRITEBACKWACACHE	 (4)
+/* Sentinel: Don't use! */
+#define MDP_FB_PAGE_PROTECTION_INVALID		 (5)
+/* Count of the number of MDP_FB_PAGE_PROTECTION_... values. */
+#define MDP_NUM_FB_PAGE_PROTECTION_VALUES	 (5)
 
 struct mdp_rect {
 	uint32_t x;
