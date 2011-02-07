@@ -637,6 +637,10 @@ static int mtp_send_file(struct mtp_dev *dev, struct file *filp,
 		ret = wait_event_interruptible(dev->write_wq,
 			(req = req_get(dev, &dev->tx_idle))
 			|| dev->state != STATE_BUSY);
+		if (dev->state == STATE_CANCELED) {
+			r = -ECANCELED;
+			break;
+		}
 		if (!req) {
 			r = ret;
 			break;
@@ -1111,14 +1115,13 @@ static int mtp_function_setup(struct usb_function *f,
 			/* device status is "busy" until we report
 			 * the cancelation to userspace
 			 */
-			if (dev->state == STATE_BUSY
-					|| dev->state == STATE_CANCELED)
+			if (dev->state == STATE_CANCELED)
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_DEVICE_BUSY);
 			else
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_OK);
-				spin_unlock_irqrestore(&dev->lock, flags);
+			spin_unlock_irqrestore(&dev->lock, flags);
 			value = sizeof(*status);
 		}
 	}
@@ -1198,7 +1201,7 @@ static void mtp_function_disable(struct usb_function *f)
 static int mtp_bind_config(struct usb_configuration *c)
 {
 	struct mtp_dev *dev;
-	int ret;
+	int ret = 0;
 
 	printk(KERN_INFO "mtp_bind_config\n");
 
