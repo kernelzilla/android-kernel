@@ -1364,6 +1364,13 @@ static struct platform_device msm_bluesleep_device = {
 	.resource    = bluesleep_resources,
 };
 
+static struct platform_device mot_rfkill = {
+	.name = "mot_rfkill",
+	.id = -1,
+};
+
+
+
 #else
 #define bt_power_init(x) do {} while (0)
 #endif /* CONFIG_BT */
@@ -1391,6 +1398,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_bt_power_device,
 	&msm_bluesleep_device,
 #endif
+	&mot_rfkill,
 	&mot_snd,
 	&msm_fb_device,
 	&msm_sfh7743_device,     /* Proximity sensor */
