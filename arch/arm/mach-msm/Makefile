@@ -20,7 +20,7 @@ obj-$(CONFIG_CPU_V6) += idle-v6.o
 obj-$(CONFIG_CPU_V7) += idle-v7.o
 obj-$(CONFIG_MSM_JTAG_V7) += jtag-v7.o
 
-obj-$(CONFIG_MACH_MOT) += board-mot-7x01a.o mot_battery_info.o keypad-mot.o switch-mot.o timed_vibrator.o mot_akm_cal.o misc_helper.o
+obj-$(CONFIG_MACH_MOT) += board-mot-7x01a.o board-mot-7x01a-rfkill.o mot_battery_info.o keypad-mot.o switch-mot.o timed_vibrator.o mot_akm_cal.o misc_helper.o
 ifdef CONFIG_MACH_MOT
 obj-$(CONFIG_PUPD) += powerup_info.o
 endif
