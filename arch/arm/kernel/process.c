@@ -113,9 +113,6 @@ void arm_machine_restart(char mode)
 /*
  * Function pointers to optional machine specific functions
  */
-void (*pm_idle)(void);
-EXPORT_SYMBOL(pm_idle);
-
 void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 
@@ -138,6 +135,9 @@ static void default_idle(void)
 		local_irq_enable();
 	}
 }
+
+void (*pm_idle)(void) = default_idle;
+EXPORT_SYMBOL(pm_idle);
 
 /*
  * The idle thread.  We try to conserve power, while trying to keep
