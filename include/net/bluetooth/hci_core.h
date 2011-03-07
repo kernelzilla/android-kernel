@@ -90,6 +90,7 @@ struct hci_dev {
 	__u32		idle_timeout;
 	__u16		sniff_min_interval;
 	__u16		sniff_max_interval;
+	__u16		link_supervision_timeout;
 
 	unsigned long	quirks;
 

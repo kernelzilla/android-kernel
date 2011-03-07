@@ -535,6 +535,12 @@ struct hci_cp_host_buffer_size {
 	__le16   sco_max_pkt;
 } __attribute__ ((packed));
 
+#define HCI_OP_WRITE_LINK_SUPERVISION_TIMEOUT	0x0c37
+struct hci_cp_write_link_supervision_timeout {
+	__le16   handle;
+	__le16   link_supervision_timeout;
+} __attribute__ ((packed));
+
 #define HCI_OP_READ_SSP_MODE		0x0c55
 struct hci_rp_read_ssp_mode {
 	__u8     status;

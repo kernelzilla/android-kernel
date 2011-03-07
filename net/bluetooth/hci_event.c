@@ -910,6 +910,19 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 			hci_send_cmd(hdev, HCI_OP_CHANGE_CONN_PTYPE,
 							sizeof(cp), &cp);
 		}
+
+		/* Set non-default link supervision timeout */
+		if ((conn->type == ACL_LINK) &&
+				(hdev->link_supervision_timeout != 0x7d00) &&
+				(conn->link_mode == HCI_LM_MASTER)) {
+			struct hci_cp_write_link_supervision_timeout cp;
+			cp.handle = ev->handle;
+			cp.link_supervision_timeout =
+				hdev->link_supervision_timeout;
+			hci_send_cmd(hdev,
+					HCI_OP_WRITE_LINK_SUPERVISION_TIMEOUT,
+					sizeof(cp), &cp);
+		}
 	} else
 		conn->state = BT_CLOSED;
 

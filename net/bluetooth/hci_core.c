@@ -873,6 +873,7 @@ int hci_register_dev(struct hci_dev *hdev)
 	hdev->link_mode = (HCI_LM_ACCEPT);
 
 	hdev->idle_timeout = 0;
+	hdev->link_supervision_timeout = 0x7d00;
 	hdev->sniff_max_interval = 800;
 	hdev->sniff_min_interval = 80;
 

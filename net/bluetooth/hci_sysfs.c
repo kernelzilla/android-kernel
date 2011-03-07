@@ -353,6 +353,34 @@ static ssize_t store_sniff_min_interval(struct device *dev, struct device_attrib
 	return count;
 }
 
+static ssize_t show_link_supervision_timeout(struct device *dev,
+						struct device_attribute *attr,
+						char *buf)
+{
+	struct hci_dev *hdev = dev_get_drvdata(dev);
+	return sprintf(buf, "%d\n", hdev->link_supervision_timeout);
+}
+
+static ssize_t store_link_supervision_timeout(struct device *dev,
+						struct device_attribute *attr,
+						const char *buf, size_t count)
+{
+	struct hci_dev *hdev = dev_get_drvdata(dev);
+	char *ptr;
+	__u32 val;
+
+	val = simple_strtoul(buf, &ptr, 10);
+	if (ptr == buf)
+		return -EINVAL;
+
+	if (val != 0 && (val < 0x0190 || val > 0xffff))
+		return -EINVAL;
+
+	hdev->link_supervision_timeout = val;
+
+	return count;
+}
+
 static DEVICE_ATTR(type, S_IRUGO, show_type, NULL);
 static DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
 static DEVICE_ATTR(class, S_IRUGO, show_class, NULL);
@@ -369,6 +397,9 @@ static DEVICE_ATTR(sniff_max_interval, S_IRUGO | S_IWUSR,
 				show_sniff_max_interval, store_sniff_max_interval);
 static DEVICE_ATTR(sniff_min_interval, S_IRUGO | S_IWUSR,
 				show_sniff_min_interval, store_sniff_min_interval);
+static DEVICE_ATTR(link_supervision_timeout, S_IRUGO | S_IWUSR,
+				show_link_supervision_timeout,
+				store_link_supervision_timeout);
 
 static struct attribute *bt_host_attrs[] = {
 	&dev_attr_type.attr,
@@ -383,6 +414,7 @@ static struct attribute *bt_host_attrs[] = {
 	&dev_attr_idle_timeout.attr,
 	&dev_attr_sniff_max_interval.attr,
 	&dev_attr_sniff_min_interval.attr,
+	&dev_attr_link_supervision_timeout.attr,
 	NULL
 };
 
