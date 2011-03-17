@@ -1036,9 +1036,10 @@ static void key08_ts_work_func(struct work_struct *work)
 						}
 					}
 
+#ifndef GOOGLE_MULTITOUCH
 					if ( needCalibration )
 						key08_calibrate(ts);
-
+#endif						
 					needCalibration = FALSE;						
 						base = 2;
 #ifdef CONFIG_MACH_MOT
