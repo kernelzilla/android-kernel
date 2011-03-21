@@ -71,6 +71,13 @@ static ssize_t power_supply_show_property(struct device *dev,
 		return sprintf(buf, "%s\n", health_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_TECHNOLOGY)
 		return sprintf(buf, "%s\n", technology_text[value.intval]);
+#ifdef CONFIG_MACH_MOT
+	else if (off == POWER_SUPPLY_PROP_VOLTAGE_NOW || \
+                 off == POWER_SUPPLY_PROP_VOLTAGE_MAX || \
+                 off == POWER_SUPPLY_PROP_VOLTAGE_MIN || \
+                 off == POWER_SUPPLY_PROP_CURRENT_NOW)
+                return sprintf(buf, "%d\n", value.intval * 1000);
+#endif
 	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
 		return sprintf(buf, "%s\n", value.strval);
 

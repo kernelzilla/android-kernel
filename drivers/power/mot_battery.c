@@ -205,9 +205,7 @@ static int mot_battery_get_property(struct power_supply *psy,
 			} else if (psp == POWER_SUPPLY_PROP_TEMP) {
 				/* Prevent charging when battery temperature
 				 * cannot be obtained */
-				pr_err("prevening battery charging\
-					 since battery temp cannot\
-					 be obtained\n");
+				pr_err("prevening battery charge since battery temp cannot be obtained\n");
 				set_mot_battery_temp(MOT_BATTERY_TEMP_NO_CHARGING);
 			}
 		}
