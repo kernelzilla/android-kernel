@@ -46,6 +46,7 @@ endif #ifeq ($(CONFIG_KERNEL_MOTOROLA),y)
 obj-$(CONFIG_TOUCHSCREEN_MSM_LEGACY)		+= msm_touch.o
 ifeq (y, $(findstring y, $(CONFIG_MACH_CALGARY) $(CONFIG_MACH_MOT)))
 obj-$(CONFIG_TOUCHSCREEN_KEY08) 	+= key08.o
+obj-$(CONFIG_TOUCHSCREEN_KEY08_MULTITOUCH)         += key08_mt.o
 endif
 ifeq ($(CONFIG_KERNEL_MOTOROLA),y)
 EXTRA_CFLAGS += -Iarch/arm/mach-msm

@@ -11,12 +11,25 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+
+choice
+        prompt "QUANTUM Key08 touchpad"
+        default TOUCHSCREEN_KEY08
+
 config TOUCHSCREEN_KEY08
         tristate "QUANTUM touchpad driver"
 	depends on KERNEL_MOTOROLA || MACH_MOT
         default y
         help
           This enables support for Quantum over I2C based touchscreens.
+
+config TOUCHSCREEN_KEY08_MULTITOUCH
+        tristate "QUANTUM touchpad driver(Multi-Touch)"
+	depends on MACH_MOT 
+        help
+          This enables multitouch support for Quantum over I2C based touchscreens.
+
+endchoice
 
 config TOUCHSCREEN_ADS7846
 	tristate "ADS7846/TSC2046 and ADS7843 based touchscreens"
