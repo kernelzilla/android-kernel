@@ -172,6 +172,12 @@ config MACH_QSD8X50_COMET
 
 endmenu
 
+config MSM_ARM11_OC
+	bool "ARM11 Overclock"
+	default n
+	help
+	  Enable Overclocking capability for ARM11 CPUs.
+
 config MSM_STACKED_MEMORY
 	bool "Stacked Memory"
 	default y

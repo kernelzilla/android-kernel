@@ -142,6 +142,11 @@ static struct clkctl_acpu_speed pll0_245_pll1_960_pll2_1056[] = {
 	{ 0, 352000, ACPU_PLL_2, 2, 2,  88000, 3, 5, 120000 },
 	{ 1, 480000, ACPU_PLL_1, 1, 1, 120000, 3, 6, 120000 },
 	{ 1, 528000, ACPU_PLL_2, 2, 1, 132000, 3, 7, 122880 },
+#ifdef CONFIG_MSM_ARM11_OC
+	{ 1, 614400, ACPU_PLL_2, 2, 0, 153600, 3, 7, 122880 },
+	{ 1, 691200, ACPU_PLL_2, 2, 0, 172800, 3, 7, 122880 },
+	{ 1, 768000, ACPU_PLL_2, 2, 0, 192000, 3, 7, 122880 },
+#endif
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0}, {0, 0, 0} }
 };
 
@@ -156,6 +161,11 @@ static struct clkctl_acpu_speed pll0_196_pll1_960_pll2_1056[] = {
 	{ 0, 352000, ACPU_PLL_2, 2, 2,  88000, 3, 5, 120000 },
 	{ 1, 480000, ACPU_PLL_1, 1, 1, 120000, 3, 6, 120000 },
 	{ 1, 528000, ACPU_PLL_2, 2, 1, 132000, 3, 7, 120000 },
+#ifdef CONFIG_MSM_ARM11_OC
+	{ 1, 614400, ACPU_PLL_2, 2, 0, 153600, 3, 7, 120000 },
+	{ 1, 691200, ACPU_PLL_2, 2, 0, 172800, 3, 7, 120000 },
+	{ 1, 768000, ACPU_PLL_2, 2, 0, 192000, 3, 7, 120000 },
+#endif
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0}, {0, 0, 0} }
 };
 
@@ -378,6 +388,8 @@ static int acpuclk_set_vdd_level(int vdd)
 	return 0;
 }
 
+
+
 /* Set proper dividers for the given clock speed. */
 static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
 	uint32_t reg_clkctl, reg_clksel, clk_div, src_sel;
@@ -388,7 +400,16 @@ static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
 	clk_div = (reg_clksel >> 1) & 0x03;
 	/* CLK_SEL_SRC1NO */
 	src_sel = reg_clksel & 1;
-
+#ifdef CONFIG_MSM_ARM11_OC
+	/*
+	 * If the new freq is an OC one we must first lower pll2 freq,
+	 * then the div can be lowered
+	 */
+	if(hunt_s->a11clk_khz > 528000) {
+		writel(hunt_s->a11clk_khz / 19200, PLLn_L_VAL(2));
+		udelay(50);
+	}
+#endif
 	/*
 	 * If the new clock divider is higher than the previous, then
 	 * program the divider before switching the clock
@@ -419,6 +440,21 @@ static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
 		reg_clksel |= (hunt_s->ahbclk_div << 1);
 		writel(reg_clksel, A11S_CLK_SEL_ADDR);
 	}
+
+#ifdef CONFIG_MSM_ARM11_OC
+	/*
+	 * If the new freq isn't a OC one and uses PLL2 we must reset PLL2
+	 * to its original freq, but only after we have put the higher div
+	 */
+	if(hunt_s->pll == ACPU_PLL_2 && hunt_s->a11clk_khz <= 528000
+		&& readl(PLLn_L_VAL(2)) != 55) {
+		writel(55, PLLn_L_VAL(2));
+		udelay(50);
+#if PERF_SWITCH_DEBUG
+		printk(KERN_DEBUG "Resetting PLL2 to 1056mhz\n");
+#endif
+	}
+#endif
 }
 
 int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
@@ -491,7 +527,7 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 	reg_clkctl |= (100 << 16); /* set WT_ST_CNT */
 	writel(reg_clkctl, A11S_CLK_CNTL_ADDR);
 
-#if PERF_SWITCH_DEBUG
+#ifdef PERF_SWITCH_DEBUG
 	printk(KERN_INFO "acpuclock: Switching from ACPU rate %u -> %u\n",
 	       strt_s->a11clk_khz * 1000, tgt_s->a11clk_khz * 1000);
 #endif
@@ -534,9 +570,12 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 		} else {
 			cur_s = tgt_s;
 		}
-#if PERF_SWITCH_STEP_DEBUG
+#ifdef PERF_SWITCH_STEP_DEBUG
 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
 			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
+
+		/*debug info about our dear PLL2 base freq*/
+		printk(KERN_DEBUG "pll2 clock before= %d\n", readl(PLLn_L_VAL(2)));
 #endif
 		if (cur_s->pll != ACPU_PLL_TCXO
 		    && !(plls_enabled & (1 << cur_s->pll))) {
@@ -554,6 +593,10 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 		/* Re-adjust lpj for the new clock speed. */
 		loops_per_jiffy = cur_s->lpj;
 		udelay(drv_state.acpu_switch_time_us);
+#ifdef PERF_SWITCH_STEP_DEBUG
+		/* Like pll2 before */
+		printk(KERN_DEBUG "pll2 clock after= %d\n", readl(PLLn_L_VAL(2)));
+#endif
 	}
 
 	/* Nothing else to do for SWFI. */
