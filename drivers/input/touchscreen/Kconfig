@@ -19,7 +19,6 @@ choice
 config TOUCHSCREEN_KEY08
         tristate "QUANTUM touchpad driver"
 	depends on KERNEL_MOTOROLA || MACH_MOT
-        default y
         help
           This enables support for Quantum over I2C based touchscreens.
 
