@@ -450,9 +450,11 @@ static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
 		&& readl(PLLn_L_VAL(2)) != 55) {
 		writel(55, PLLn_L_VAL(2));
 		udelay(50);
+#endif
 #if PERF_SWITCH_DEBUG
 		printk(KERN_DEBUG "Resetting PLL2 to 1056mhz\n");
 #endif
+#ifdef CONFIG_MSM_ARM11_OC
 	}
 #endif
 }
@@ -527,7 +529,7 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 	reg_clkctl |= (100 << 16); /* set WT_ST_CNT */
 	writel(reg_clkctl, A11S_CLK_CNTL_ADDR);
 
-#ifdef PERF_SWITCH_DEBUG
+#if PERF_SWITCH_DEBUG
 	printk(KERN_INFO "acpuclock: Switching from ACPU rate %u -> %u\n",
 	       strt_s->a11clk_khz * 1000, tgt_s->a11clk_khz * 1000);
 #endif
@@ -570,7 +572,7 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 		} else {
 			cur_s = tgt_s;
 		}
-#ifdef PERF_SWITCH_STEP_DEBUG
+#if PERF_SWITCH_STEP_DEBUG
 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
 			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
 
@@ -593,7 +595,7 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 		/* Re-adjust lpj for the new clock speed. */
 		loops_per_jiffy = cur_s->lpj;
 		udelay(drv_state.acpu_switch_time_us);
-#ifdef PERF_SWITCH_STEP_DEBUG
+#if PERF_SWITCH_STEP_DEBUG
 		/* Like pll2 before */
 		printk(KERN_DEBUG "pll2 clock after= %d\n", readl(PLLn_L_VAL(2)));
 #endif
