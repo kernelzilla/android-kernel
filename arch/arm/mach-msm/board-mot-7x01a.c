@@ -577,7 +577,6 @@ static struct platform_device msm_sfh7743_device = {
 static struct snd_endpoint snd_endpoints_list[] = {
     SND(HANDSET_HAC, 0), //e4366c for Motus HAC bug29873
     SND(HANDSET, 16),  		/* Redefine HANDSET to IN_S_SADC_OUT_HANDSET for dial mic */
-
     SND(HEADSET, 3),    	/* Stereo headset */
     SND(HEADPHONE, 4),    	/* Stereo headphone, no mic */
     SND(HEADSET_MOS, 5),    /* Stereo headset MOS */
@@ -1192,187 +1191,16 @@ static struct platform_device msm_camera_sensor_mot_mt9p012 = {
 };
 
 /*
-	Bluetooth stuff
+	Bluetooth rfkill interface
 ----------------------------------------------------------------
 */
 #ifdef CONFIG_BT
-
-static struct platform_device msm_bt_power_device = {
-    .name = "bt_power",
-};
-
-enum {
-	BT_WAKE,
-	BT_RFR,
-	BT_CTS,
-	BT_RX,
-	BT_TX,
-	BT_PCM_DOUT,
-	BT_PCM_DIN,
-	BT_PCM_SYNC,
-	BT_PCM_CLK,
-	BT_HOST_WAKE,
-};
-
-static unsigned bt_config_power_on[] = {
-/* GPIO_CFG(91, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), */ /* WAKE */
-    GPIO_CFG(91, 0, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA),    /* WAKE */
-    GPIO_CFG(43, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA),    /* RFR */
-    GPIO_CFG(44, 2, GPIO_INPUT,  GPIO_PULL_UP, GPIO_2MA),    /* CTS */
-    GPIO_CFG(45, 2, GPIO_INPUT,  GPIO_PULL_UP, GPIO_2MA),    /* Rx */
-    GPIO_CFG(46, 3, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_2MA),    /* Tx */
-    GPIO_CFG(68, 1, GPIO_OUTPUT, GPIO_KEEPER, GPIO_2MA),    /* PCM_DOUT */
-    GPIO_CFG(69, 1, GPIO_INPUT,  GPIO_KEEPER, GPIO_2MA),    /* PCM_DIN */
-    GPIO_CFG(70, 2, GPIO_OUTPUT, GPIO_KEEPER, GPIO_2MA),    /* PCM_SYNC */
-    GPIO_CFG(71, 2, GPIO_OUTPUT, GPIO_KEEPER, GPIO_2MA),    /* PCM_CLK */
-    GPIO_CFG(90, 0, GPIO_INPUT,  GPIO_PULL_UP, GPIO_2MA),    /* HOST_WAKE */
-};
-static unsigned bt_config_power_off[] = {
-/*    GPIO_CFG(91, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),*/  /* WAKE */
-    GPIO_CFG(91, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),    /* WAKE */
-    GPIO_CFG(43, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* RFR */
-    GPIO_CFG(44, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* CTS */
-    GPIO_CFG(45, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* Rx */
-    GPIO_CFG(46, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* Tx */
-    GPIO_CFG(68, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* PCM_DOUT */
-    GPIO_CFG(69, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* PCM_DIN */
-    GPIO_CFG(70, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* PCM_SYNC */
-    GPIO_CFG(71, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),    /* PCM_CLK */
-    GPIO_CFG(90, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),    /* HOST_WAKE */
-};
-
-static int bluetooth_power(int on)
-{
-    struct vreg *vreg_bt;
-    int pin, rc;
-
-    printk(KERN_INFO "BLUETOOTH: bluetooth_power(%d) (board-mot init)\n", on);
-
-    printk(KERN_DEBUG "%s\n", __func__);
-
-    /* VREG_GP3 is supplying power to BT/WiFi */
-    vreg_bt = vreg_get(0, "gp3");
-
-    if (!vreg_bt) {
-	printk(KERN_ERR "%s: vreg get failed\n", __func__);
-	return -EIO;
-    }
-
-    if (on) {
-	for (pin = 0; pin < ARRAY_SIZE(bt_config_power_on); pin++) {
-		rc = gpio_request(0x3ff & (bt_config_power_on[pin] >> 4),
-			"BT PIN");
-		if (rc) {
-		printk(KERN_ERR
-			"%s.%d: gpio_request()=%d [gpio #%d, array idx=%d]\n",
-			__func__, __LINE__, rc,
-			0x3ff & (bt_config_power_on[pin] >> 4), pin);
-		}
-
-	rc = gpio_tlmm_config(bt_config_power_on[pin], GPIO_ENABLE);
-
-	if (rc) {
-		printk(KERN_ERR
-			"%s.%d: gpio_tlmm_config(%#x)=%d [gpio #%d, array idx=%d]\n",
-			__func__, __LINE__, bt_config_power_on[pin], rc,
-			0x3ff & (bt_config_power_on[pin] >> 4), pin);
-		/* return -EIO;*/
-		}
-	}
-
-	/* units of mV, steps of 50 mV */
-	rc = vreg_set_level(vreg_bt, 2600);
-	if (rc) {
-		printk(KERN_ERR "%s.%d: vreg set level failed (%d)\n",
-			__func__, __LINE__, rc);
-		return -EIO;
-	}
-	rc = vreg_enable(vreg_bt);
-	if (rc) {
-		printk(KERN_ERR "%s.%d: vreg enable failed (%d)\n",
-			__func__, __LINE__, rc);
-		return -EIO;
-	}
-
-	/* turn on internal BT VREG*/
-	gpio_request(BT_REG_ON_SIGNAL, "bt_reg_on");
-	gpio_direction_output(BT_REG_ON_SIGNAL, 1);
-
-	/* BCM4325 powerup requirement*/
-	msleep_interruptible(100);
-
-	/* take BT out of reset*/
-	gpio_request(BT_RESET_N_SIGNAL, "bt_reset_n");
-	gpio_direction_output(BT_RESET_N_SIGNAL, 1);
-
-	} else {
-
-	/* turn off internal BT VREG */
-	gpio_request(BT_REG_ON_SIGNAL, "bt_reg_on");
-	gpio_direction_output(BT_REG_ON_SIGNAL, 0);
-
-	rc = vreg_disable(vreg_bt);
-	if (rc) {
-		printk(KERN_ERR "%s.%d: vreg disable failed (%d)\n",
-			__func__, __LINE__, rc);
-		return -EIO;
-	}
-	for (pin = 0; pin < ARRAY_SIZE(bt_config_power_off); pin++) {
-		rc = gpio_tlmm_config(bt_config_power_off[pin],
-						GPIO_ENABLE);
-		if (rc) {
-			printk(KERN_ERR
-				"%s.%d: gpio_tlmm_config(%#x)=%d\n",
-				__func__, __LINE__, bt_config_power_off[pin], rc);
-			return -EIO;
-			}
-		}
-	}
-	return 0;
-}
-
-void __init bt_power_init(void)
-{
-	msm_bt_power_device.dev.platform_data = &bluetooth_power;
-}
-
-static struct resource bluesleep_resources[] = {
-	{
-		.name    = "gpio_host_wake",
-		.start    = BT_HOST_WAKE_SIGNAL,
-		.end    = BT_HOST_WAKE_SIGNAL,
-		.flags    = IORESOURCE_IO,
-	},
-	{
-		.name    = "gpio_ext_wake",
-		.start    = BT_EXT_WAKE_SIGNAL,
-		.end    = BT_EXT_WAKE_SIGNAL,
-		.flags    = IORESOURCE_IO,
-	},
-	{
-		.name    = "host_wake",
-		.start    = MSM_GPIO_TO_INT(BT_HOST_WAKE_SIGNAL),
-		.end    = MSM_GPIO_TO_INT(BT_HOST_WAKE_SIGNAL),
-		.flags    = IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device msm_bluesleep_device = {
-	.name = "bluesleep",
-	.id        = -1,
-	.num_resources    = ARRAY_SIZE(bluesleep_resources),
-	.resource    = bluesleep_resources,
-};
 
 static struct platform_device mot_rfkill = {
 	.name = "mot_rfkill",
 	.id = -1,
 };
 
-
-
-#else
-#define bt_power_init(x) do {} while (0)
 #endif /* CONFIG_BT */
 
 /* 
@@ -1395,10 +1223,8 @@ static struct platform_device *devices[] __initdata = {
 	&usb_mass_storage_device,
 #endif
 #ifdef CONFIG_BT
-	&msm_bt_power_device,
-	&msm_bluesleep_device,
-#endif
 	&mot_rfkill,
+#endif
 	&mot_snd,
 	&msm_fb_device,
 	&msm_sfh7743_device,     /* Proximity sensor */
@@ -1764,8 +1590,6 @@ static void __init mot_init(void)
 #ifdef CONFIG_USB_FUNCTION
 	hsusb_gpio_init();
 #endif
-	bt_power_init();
-
 	platform_device_register(&msm_camera_sensor_mot_mt9p012);
 
 	msm_pm_set_platform_data(msm_pm_data);
