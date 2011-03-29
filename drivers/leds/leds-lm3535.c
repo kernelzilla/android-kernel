@@ -51,7 +51,7 @@
 #include <mot/esd_poll.h>
 #endif /* CONFIG_LM3535_ESD_RECOVERY */
 
-
+#define LM3535_DEBUG 0
 #define LM3535_ADDRESS_HACK
 #ifndef CONFIG_MACH_MOT
 #if defined(LM3535_ADDRESS_HACK)
@@ -562,8 +562,10 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
         reg = res;
     else
         reg = res / als_denom;
+#if LM3535_DEBUG
     printk_br (KERN_INFO "%s: v=%d, z=%d, res=0x%x, reg=0x%x\n", 
         __FUNCTION__, value, zone, res, reg);
+#endif
     return reg;
 }
 
@@ -578,8 +580,10 @@ static void lm3535_brightness_set (struct led_classdev *led_cdev,
     unsigned bvalue;
     unsigned do_ramp = 1;
 
+#if LM3535_DEBUG
     printk_br ("%s: %s, 0x%x (%d)\n", __FUNCTION__, 
         led_cdev->name, value, value);
+#endif
     if (!lm3535_data.initialized) {
         printk (KERN_ERR "%s: not initialized\n", __FUNCTION__);
         return;
@@ -617,11 +621,11 @@ static void lm3535_brightness_set (struct led_classdev *led_cdev,
         nsteps = nsteps * (-1);
 
     lm3535_set_ramp (client, do_ramp, nsteps, &total_time);
-
+#if LM3535_DEBUG
     printk_br ("%s: zone %d, 0x%x => 0x%x, %d steps, ramp time %dus\n",
         __FUNCTION__, bright_zone,
         lm3535_data.bvalue, bvalue, nsteps, total_time);
-
+#endif
     /* Write to each zone brightness register so that when it jumps into
      * the next zone the value is adjusted automatically 
      */
@@ -662,8 +666,10 @@ static void lm3535_button_brightness_set (struct led_classdev *led_cdev,
     unsigned breg = LM3535_BRIGHTNESS_CTRL_REG_C;
     struct i2c_client *client = lm3535_data.client;
 
+#if LM3535_DEBUG
     printk_br ("%s: %s, 0x%x (%d)\n", __FUNCTION__, 
         led_cdev->name, value, value);
+#endif
 
     mutex_lock (&lm3535_mutex);
 
