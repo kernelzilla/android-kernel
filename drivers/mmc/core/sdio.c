@@ -489,9 +489,7 @@ int sdio_reset_comm(struct mmc_card *card)
 	int err;
 
 	printk("%s():\n", __func__);
-#if defined(CONFIG_KERNEL_MOTOROLA)
 	mmc_claim_host(host);
-#endif
 	mmc_go_idle(host);
 
 	mmc_set_clock(host, host->f_min);
@@ -532,9 +530,7 @@ int sdio_reset_comm(struct mmc_card *card)
 	err = sdio_enable_wide(card);
 	if (err)
 		goto err;
-#if defined(CONFIG_KERNEL_MOTOROLA)
 	mmc_release_host(host);
-#endif
 	return 0;
 err:
 	printk("%s: Error resetting SDIO communications (%d)\n",
