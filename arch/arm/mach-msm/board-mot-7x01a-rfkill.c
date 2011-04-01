@@ -30,7 +30,7 @@
 #include "board-mot.h"
 
 static struct rfkill *bt_rfk;
-static const char bt_name[] = "bcm4325";
+static const char bt_name[] = "mot_rfkill";
 
 enum {
 	BT_WAKE,
@@ -72,7 +72,7 @@ static unsigned bt_config_power_off[] = {
     GPIO_CFG(90, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA),    /* HOST_WAKE */
 };
 
-static int bluetooth_set_power(void *data, enum rfkill_state state)
+static int bluetooth_set_power(void *data, bool blocked)
 {
 
 	struct vreg *vreg_bt;
@@ -80,9 +80,7 @@ static int bluetooth_set_power(void *data, enum rfkill_state state)
 
 	vreg_bt = vreg_get(0, "gp3");
 
-	switch (state) {
-	case RFKILL_STATE_UNBLOCKED:
-	
+	if (!blocked) {	
 		for (pin = 0; pin < ARRAY_SIZE(bt_config_power_on); pin++) {
 			rc = gpio_request(0x3ff & (bt_config_power_on[pin] >> 4),
 				"BT PIN");
@@ -111,8 +109,7 @@ static int bluetooth_set_power(void *data, enum rfkill_state state)
 		gpio_request(BT_RESET_N_SIGNAL, "bt_reset_n"); // take BT out of reset
 		gpio_direction_output(BT_RESET_N_SIGNAL, 1);
 		printk(KERN_INFO "BLUETOOTH: mot_rfkill: ON\n");
-		break;
-	case RFKILL_STATE_SOFT_BLOCKED:
+	} else {
 		gpio_set_value (BT_RESET_N_SIGNAL, 0); // put BT into reset
 		gpio_set_value (BT_REG_ON_SIGNAL, 0); // turn off internal BT VREG
 		msleep_interruptible(100);
@@ -128,44 +125,42 @@ static int bluetooth_set_power(void *data, enum rfkill_state state)
 				}
 		}
 		printk(KERN_INFO "BLUETOOTH: mot_rfkill: OFF\n");
-		break;
-	default:
-		printk(KERN_ERR "bad bluetooth rfkill state %d\n", state);
 	}
 	return 0;
 }
 
+static struct rfkill_ops mot_rfkill_ops = {
+       .set_block = bluetooth_set_power,
+};
+
 static int mot_rfkill_probe(struct platform_device *pdev)
 {
 	int rc = 0;
-	enum rfkill_state default_state = RFKILL_STATE_SOFT_BLOCKED;  /* off */
+	bool default_state = true;  /* off */
 
-	rfkill_set_default(RFKILL_TYPE_BLUETOOTH, default_state);
 	bluetooth_set_power(NULL, default_state);
 
-	bt_rfk = rfkill_allocate(&pdev->dev, RFKILL_TYPE_BLUETOOTH);
+	bt_rfk = rfkill_alloc(bt_name, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+				&mot_rfkill_ops, NULL);
 	if (!bt_rfk)
 		return -ENOMEM;
 
-	bt_rfk->name = bt_name;
-	bt_rfk->state = default_state;
-	/* userspace cannot take exclusive control */
-	bt_rfk->user_claim_unsupported = 1;
-	bt_rfk->user_claim = 0;
-	bt_rfk->data = NULL;  // user data
-	bt_rfk->toggle_radio = bluetooth_set_power;
+	rfkill_set_states(bt_rfk, default_state, false);
 
 	rc = rfkill_register(bt_rfk);
 
 	if (rc)
-		rfkill_free(bt_rfk);
+		rfkill_destroy(bt_rfk);
 	return rc;
 }
 
 static int mot_rfkill_remove(struct platform_device *dev)
 {
 	rfkill_unregister(bt_rfk);
-	rfkill_free(bt_rfk);
+	rfkill_destroy(bt_rfk);
+
+	gpio_free(BT_REG_ON_SIGNAL);
+	gpio_free(BT_RESET_N_SIGNAL);
 
 	return 0;
 }
@@ -191,6 +186,6 @@ static void __exit mot_rfkill_exit(void)
 
 module_init(mot_rfkill_init);
 module_exit(mot_rfkill_exit);
-MODULE_DESCRIPTION("mot 7x01a rfkill");
+MODULE_DESCRIPTION("mot-7x01a rfkill");
 MODULE_AUTHOR("Patrick Jacques <kernelzilla@kinetic-computing.com>");
 MODULE_LICENSE("GPL");
