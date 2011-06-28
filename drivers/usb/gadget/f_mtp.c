@@ -1132,31 +1132,44 @@ static int mtp_function_set_alt(struct usb_function *f,
 	int ret;
 
 	DBG(cdev, "mtp_function_set_alt intf: %d alt: %d\n", intf, alt);
-	ret = usb_ep_enable(dev->ep_in,
-			ep_choose(cdev->gadget,
-				&mtp_highspeed_in_desc,
-				&mtp_fullspeed_in_desc));
+
+	ret = config_ep_by_speed(cdev->gadget, f, dev->ep_in);
 	if (ret)
-		return ret;
-	ret = usb_ep_enable(dev->ep_out,
-			ep_choose(cdev->gadget,
-				&mtp_highspeed_out_desc,
-				&mtp_fullspeed_out_desc));
-	if (ret) {
-		usb_ep_disable(dev->ep_in);
-		return ret;
-	}
-	ret = usb_ep_enable(dev->ep_intr, &mtp_intr_desc);
-	if (ret) {
-		usb_ep_disable(dev->ep_out);
-		usb_ep_disable(dev->ep_in);
-		return ret;
-	}
+		goto ep_in_cfg_fail;
+
+	ret = config_ep_by_speed(cdev->gadget, f, dev->ep_out);
+	if (ret)
+		goto ep_out_cfg_fail;
+
+	ret = usb_ep_enable(dev->ep_in);
+	if (ret)
+		goto ep_in_enable_fail;
+
+	ret = usb_ep_enable(dev->ep_out);
+	if (ret)
+		goto ep_out_enable_fail;
+
+	dev->ep_intr->desc = &mtp_intr_desc;
+	ret = usb_ep_enable(dev->ep_intr);
+	if (ret)
+		goto ep_intr_enable_fail;
+
 	dev->state = STATE_READY;
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
 	return 0;
+
+ep_intr_enable_fail:
+	usb_ep_disable(dev->ep_out);
+ep_out_enable_fail:
+	usb_ep_disable(dev->ep_in);
+ep_in_enable_fail:
+	dev->ep_out->desc = NULL;
+ep_out_cfg_fail:
+	dev->ep_in->desc = NULL;
+ep_in_cfg_fail:
+	return ret;
 }
 
 static void mtp_function_disable(struct usb_function *f)
@@ -1192,6 +1205,9 @@ static int mtp_bind_config(struct usb_configuration *c, bool ptp_config)
 		mtp_interface_desc.iInterface = ret;
 	}
 
+	init_waitqueue_head(&dev->intr_wq);
+	INIT_LIST_HEAD(&dev->intr_idle);
+
 	dev->cdev = c->cdev;
 	dev->function.name = "mtp";
 	dev->function.strings = mtp_strings;
@@ -1222,11 +1238,9 @@ static int mtp_setup(void)
 	spin_lock_init(&dev->lock);
 	init_waitqueue_head(&dev->read_wq);
 	init_waitqueue_head(&dev->write_wq);
-	init_waitqueue_head(&dev->intr_wq);
 	atomic_set(&dev->open_excl, 0);
 	atomic_set(&dev->ioctl_excl, 0);
 	INIT_LIST_HEAD(&dev->tx_idle);
-	INIT_LIST_HEAD(&dev->intr_idle);
 
 	dev->wq = create_singlethread_workqueue("f_mtp");
 	if (!dev->wq) {

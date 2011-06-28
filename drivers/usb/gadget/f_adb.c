@@ -22,7 +22,7 @@
 #include <linux/wait.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
-
+#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
@@ -508,25 +508,37 @@ static int adb_function_set_alt(struct usb_function *f,
 	int ret;
 
 	DBG(cdev, "adb_function_set_alt intf: %d alt: %d\n", intf, alt);
-	ret = usb_ep_enable(dev->ep_in,
-			ep_choose(cdev->gadget,
-				&adb_highspeed_in_desc,
-				&adb_fullspeed_in_desc));
+	
+	ret = config_ep_by_speed(cdev->gadget, f, dev->ep_in);
 	if (ret)
-		return ret;
-	ret = usb_ep_enable(dev->ep_out,
-			ep_choose(cdev->gadget,
-				&adb_highspeed_out_desc,
-				&adb_fullspeed_out_desc));
-	if (ret) {
-		usb_ep_disable(dev->ep_in);
-		return ret;
-	}
+		goto ep_in_cfg_fail;
+
+	ret = config_ep_by_speed(cdev->gadget, f, dev->ep_out);
+	if (ret)
+		goto ep_out_cfg_fail;
+
+	ret = usb_ep_enable(dev->ep_in);
+	if (ret)
+		goto ep_in_enable_fail;
+
+	ret = usb_ep_enable(dev->ep_out);
+	if (ret)
+		goto ep_out_enable_fail;
+
 	dev->online = 1;
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
 	return 0;
+
+ep_out_enable_fail:
+	usb_ep_disable(dev->ep_in);
+ep_in_enable_fail:
+	dev->ep_out->desc = NULL;
+ep_out_cfg_fail:
+	dev->ep_in->desc = NULL;
+ep_in_cfg_fail:
+	return ret;
 }
 
 static void adb_function_disable(struct usb_function *f)
