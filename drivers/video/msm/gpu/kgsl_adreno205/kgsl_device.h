@@ -155,6 +155,7 @@ struct kgsl_device {
 	atomic_t open_count;
 
 	struct atomic_notifier_head ts_notifier_list;
+	struct mutex mutex;
 };
 
 struct kgsl_file_private {
