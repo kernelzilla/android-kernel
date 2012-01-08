@@ -1570,14 +1570,43 @@ static irqreturn_t at91_vbus_irq(int irq, void *_udc)
 	return IRQ_HANDLED;
 }
 
+<<<<<<< HEAD
 int usb_gadget_register_driver (struct usb_gadget_driver *driver)
+=======
+static void at91_vbus_timer_work(struct work_struct *work)
+{
+	struct at91_udc *udc = container_of(work, struct at91_udc,
+					    vbus_timer_work);
+
+	at91_vbus_update(udc, gpio_get_value_cansleep(udc->board.vbus_pin));
+
+	if (!timer_pending(&udc->vbus_timer))
+		mod_timer(&udc->vbus_timer, jiffies + VBUS_POLL_TIMEOUT);
+}
+
+static void at91_vbus_timer(unsigned long data)
+{
+	struct at91_udc *udc = (struct at91_udc *)data;
+
+	/*
+	 * If we are polling vbus it is likely that the gpio is on an
+	 * bus such as i2c or spi which may sleep, so schedule some work
+	 * to read the vbus gpio
+	 */
+	if (!work_pending(&udc->vbus_timer_work))
+		schedule_work(&udc->vbus_timer_work);
+}
+
+int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
+		int (*bind)(struct usb_gadget *))
+>>>>>>> b0fca50... usb gadget: don't save bind callback in struct usb_gadget_driver
 {
 	struct at91_udc	*udc = &controller;
 	int		retval;
 
 	if (!driver
 			|| driver->speed < USB_SPEED_FULL
-			|| !driver->bind
+			|| !bind
 			|| !driver->setup) {
 		DBG("bad parameter.\n");
 		return -EINVAL;
@@ -1594,9 +1623,9 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 	udc->enabled = 1;
 	udc->selfpowered = 1;
 
-	retval = driver->bind(&udc->gadget);
+	retval = bind(&udc->gadget);
 	if (retval) {
-		DBG("driver->bind() returned %d\n", retval);
+		DBG("bind() returned %d\n", retval);
 		udc->driver = NULL;
 		udc->gadget.dev.driver = NULL;
 		dev_set_drvdata(&udc->gadget.dev, NULL);
@@ -1612,7 +1641,7 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 	DBG("bound to %s\n", driver->driver.name);
 	return 0;
 }
-EXPORT_SYMBOL (usb_gadget_register_driver);
+EXPORT_SYMBOL(usb_gadget_probe_driver);
 
 int usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 {

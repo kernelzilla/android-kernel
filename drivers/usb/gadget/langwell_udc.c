@@ -1807,7 +1807,8 @@ static DEVICE_ATTR(langwell_udc, S_IRUGO, show_langwell_udc, NULL);
  * the driver might get unbound.
  */
 
-int usb_gadget_register_driver(struct usb_gadget_driver *driver)
+int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
+		int (*bind)(struct usb_gadget *))
 {
 	struct langwell_udc	*dev = the_controller;
 	unsigned long		flags;
@@ -1830,7 +1831,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 
 	spin_unlock_irqrestore(&dev->lock, flags);
 
-	retval = driver->bind(&dev->gadget);
+	retval = bind(&dev->gadget);
 	if (retval) {
 		DBG(dev, "bind to driver %s --> %d\n",
 				driver->driver.name, retval);
@@ -1868,7 +1869,7 @@ err_unbind:
 	DBG(dev, "<--- %s()\n", __func__);
 	return retval;
 }
-EXPORT_SYMBOL(usb_gadget_register_driver);
+EXPORT_SYMBOL(usb_gadget_probe_driver);
 
 
 /* unregister gadget driver */
@@ -1882,7 +1883,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	DBG(dev, "---> %s()\n", __func__);
 
-	if (unlikely(!driver || !driver->bind || !driver->unbind))
+	if (unlikely(!driver || !driver->unbind))
 		return -EINVAL;
 
 	/* unbind OTG transceiver */

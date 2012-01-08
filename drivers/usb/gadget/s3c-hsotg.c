@@ -2478,7 +2478,8 @@ static int s3c_hsotg_corereset(struct s3c_hsotg *hsotg)
 	return 0;
 }
 
-int usb_gadget_register_driver(struct usb_gadget_driver *driver)
+int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
+		int (*bind)(struct usb_gadget *))
 {
 	struct s3c_hsotg *hsotg = our_hsotg;
 	int ret;
@@ -2498,7 +2499,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		dev_err(hsotg->dev, "%s: bad speed\n", __func__);
 	}
 
-	if (!driver->bind || !driver->setup) {
+	if (!bind || !driver->setup) {
 		dev_err(hsotg->dev, "%s: missing entry points\n", __func__);
 		return -EINVAL;
 	}
@@ -2517,7 +2518,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		goto err;
 	}
 
-	ret = driver->bind(&hsotg->gadget);
+	ret = bind(&hsotg->gadget);
 	if (ret) {
 		dev_err(hsotg->dev, "failed bind %s\n", driver->driver.name);
 
@@ -2641,7 +2642,7 @@ err:
 	hsotg->gadget.dev.driver = NULL;
 	return ret;
 }
-EXPORT_SYMBOL(usb_gadget_register_driver);
+EXPORT_SYMBOL(usb_gadget_probe_driver);
 
 int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 {
