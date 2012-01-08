@@ -204,7 +204,6 @@ static struct usb_composite_driver gfs_driver = {
 	.name		= gfs_short_name,
 	.dev		= &gfs_dev_desc,
 	.strings	= gfs_dev_strings,
-	.bind		= gfs_bind,
 	.unbind		= gfs_unbind,
 };
 
@@ -243,7 +242,7 @@ static int functionfs_ready_callback(struct ffs_data *ffs)
 		return -EBUSY;
 
 	gfs_ffs_data = ffs;
-	ret = usb_composite_register(&gfs_driver);
+	ret = usb_composite_probe(&gfs_driver, gfs_bind);
 	if (unlikely(ret < 0))
 		clear_bit(0, &gfs_registered);
 	return ret;

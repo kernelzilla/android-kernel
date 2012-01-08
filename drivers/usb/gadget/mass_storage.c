@@ -225,7 +225,6 @@ static struct usb_composite_driver msg_driver = {
 	.name		= "g_mass_storage",
 	.dev		= &msg_device_desc,
 	.strings	= dev_strings,
-	.bind		= msg_bind,
 };
 
 MODULE_DESCRIPTION(DRIVER_DESC);
@@ -234,7 +233,7 @@ MODULE_LICENSE("GPL");
 
 static int __init msg_init(void)
 {
-	return usb_composite_register(&msg_driver);
+	return usb_composite_probe(&msg_driver, msg_bind);
 }
 module_init(msg_init);
 
