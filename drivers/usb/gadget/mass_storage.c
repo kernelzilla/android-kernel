@@ -165,7 +165,6 @@ static int __init msg_do_config(struct usb_configuration *c)
 
 static struct usb_configuration msg_config_driver = {
 	.label			= "Linux File-Backed Storage",
-	.bind			= msg_do_config,
 	.bConfigurationValue	= 1,
 	/* .iConfiguration = DYNAMIC */
 	.bmAttributes		= USB_CONFIG_ATT_SELFPOWER,
@@ -208,7 +207,7 @@ static int __init msg_bind(struct usb_composite_dev *cdev)
 	msg_config_driver.iConfiguration = status;
 
 	/* register our second configuration */
-	status = usb_add_config(cdev, &msg_config_driver);
+	status = usb_add_config(cdev, &msg_config_driver, msg_do_config);
 	if (status < 0)
 		return status;
 
