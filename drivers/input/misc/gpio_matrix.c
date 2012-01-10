@@ -145,10 +145,12 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
 		} else {
+#if 0
 			KEY_LOGI("gpiomatrix: key %d, %d-%d (%d-%d) "
 					"changed to %d\n", keycode,
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
+#endif
 #ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 			if (mi->info.oj_btn && keycode == BTN_MOUSE)
 				;
