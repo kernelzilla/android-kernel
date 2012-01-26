@@ -90,9 +90,9 @@ struct mtp_dev {
 
 	wait_queue_head_t read_wq;
 	wait_queue_head_t write_wq;
-	wait_queue_head_t intr_wq;
 	struct usb_request *rx_req[RX_REQ_MAX];
 	int rx_done;
+	int intr_busy;
 
 	/* for processing MTP_SEND_FILE, MTP_RECEIVE_FILE and
 	 * MTP_SEND_FILE_WITH_HEADER ioctls on a work queue
@@ -376,8 +376,6 @@ static void mtp_complete_intr(struct usb_ep *ep, struct usb_request *req)
 		dev->state = STATE_ERROR;
 
 	mtp_req_put(dev, &dev->intr_idle, req);
-
-	wake_up(&dev->intr_wq);
 }
 
 static int mtp_create_bulk_endpoints(struct mtp_dev *dev,
@@ -821,11 +819,12 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 		return -EINVAL;
 	if (dev->state == STATE_OFFLINE)
 		return -ENODEV;
-
-	ret = wait_event_interruptible_timeout(dev->intr_wq,
-		(req = mtp_req_get(dev, &dev->intr_idle)), msecs_to_jiffies(1000));
-	if (!req)
-	    return -ETIME;
+	/*
+	 * is not listening on the interrupt endpoint, so instead of waiting,
+	 * we just fail if the endpoint is busy.
+	 */
+	if (dev->intr_busy)
+		return -EBUSY;
 
 	if (copy_from_user(req->buf, (void __user *)event->data, length)) {
 		mtp_req_put(dev, &dev->intr_idle, req);
@@ -1205,7 +1204,6 @@ static int mtp_bind_config(struct usb_configuration *c, bool ptp_config)
 		mtp_interface_desc.iInterface = ret;
 	}
 
-	init_waitqueue_head(&dev->intr_wq);
 	INIT_LIST_HEAD(&dev->intr_idle);
 
 	dev->cdev = c->cdev;
