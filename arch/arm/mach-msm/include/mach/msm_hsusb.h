@@ -19,6 +19,8 @@
 
 #include <linux/types.h>
 
+#define MSM7230_GPIO_USB_ID_PIN			(145)
+
 /* platform device data for msm_hsusb driver */
 
 #ifdef CONFIG_USB_FUNCTION

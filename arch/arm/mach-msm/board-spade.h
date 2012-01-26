@@ -140,10 +140,6 @@
 #define SPADE_GPIO_BT_PCM_SYNC       (140)
 #define SPADE_GPIO_BT_PCM_CLK        (141)
 
-/* USB */
-#define SPADE_GPIO_USB_ID_PIN        (145)
-#define SPADE_DISABLE_USB_CHARGER               (125)
-
 /* Camera */
 #define SPADE_CAM_RST                (31)
 #define SPADE_CAM_PWD                (124)

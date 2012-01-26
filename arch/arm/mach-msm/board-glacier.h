@@ -131,7 +131,6 @@
 #define GLACIER_GPIO_BT_CHIP_WAKE      (50)
 #define GLACIER_GPIO_BT_SHUTDOWN_N     (38)
 
-#define GLACIER_GPIO_USB_ID_PIN			(145)
 #define GLACIER_GPIO_DOCK_PIN			(37)
 
 #define GLACIER_CAM_PWD                (34)

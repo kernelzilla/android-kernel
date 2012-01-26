@@ -78,6 +78,7 @@ void __init msm_enable_car_kit_detect(bool enable);
 void __init msm_change_usb_id(__u16 vendor_id, __u16 product_id);
 void __init msm_add_mem_devices(struct msm_pmem_setting *setting);
 void __init msm_init_pmic_vibrator(int);
+void __init htc_add_usb_devices(void);
 #ifdef CONFIG_USB_FUNCTION
 void __init msm_register_uart_usb_switch(void (*usb_uart_switch) (int));
 void __init msm_register_usb_phy_init_seq(int *int_seq);

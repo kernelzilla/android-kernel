@@ -125,8 +125,6 @@
 #define VISION_GPIO_BT_HOST_WAKE      (44)
 #define VISION_GPIO_BT_CHIP_WAKE      (50)
 #define VISION_GPIO_BT_SHUTDOWN_N     (38)
-/* USB */
-#define VISION_GPIO_USB_ID_PIN			(145)
 
 #define VISION_SPI_CS2                (87)
 #define VISION_SPI_DO                 (47)

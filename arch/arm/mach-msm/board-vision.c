@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2009 Google, Inc.
  * Copyright (C) 2010 HTC Corporation.
+ * Copyright (C) 2012 CyanogenMod.
  * Author: Tony Liu <tony_liu@htc.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -103,102 +104,6 @@ static uint opt_disable_uart2;
 unsigned int engineerid;
 
 module_param_named(disable_uart2, opt_disable_uart2, uint, 0);
-
-static uint32_t usb_ID_PIN_input_table[] = {
-	PCOM_GPIO_CFG(VISION_GPIO_USB_ID_PIN, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_4MA),
-};
-
-static uint32_t usb_ID_PIN_ouput_table[] = {
-	PCOM_GPIO_CFG(VISION_GPIO_USB_ID_PIN, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA),
-};
-
-void config_vision_usb_id_gpios(bool output)
-{
-	if (output) {
-		config_gpio_table(usb_ID_PIN_ouput_table,
-			ARRAY_SIZE(usb_ID_PIN_ouput_table));
-		gpio_set_value(VISION_GPIO_USB_ID_PIN, 1);
-	} else
-		config_gpio_table(usb_ID_PIN_input_table,
-			ARRAY_SIZE(usb_ID_PIN_input_table));
-}
-#ifdef CONFIG_USB_ANDROID
-static int phy_init_seq[] = { 0x06, 0x36, 0x0C, 0x31, 0x31, 0x32, 0x1, 0x0D, 0x1, 0x10, -1 };
-
-static struct msm_hsusb_platform_data msm_hsusb_pdata = {
-	.phy_init_seq		= phy_init_seq,
-	.phy_reset		= (void *) msm_hsusb_phy_reset,
-	.usb_id_pin_gpio  = VISION_GPIO_USB_ID_PIN,
-	.accessory_detect = 1, /* detect by ID pin gpio */
-};
-
-static struct usb_mass_storage_platform_data mass_storage_pdata = {
-	.nluns		= 1,
-	.vendor		= "HTC",
-	.product	= "Android Phone",
-	.release	= 0x0100,
-};
-
-static struct platform_device usb_mass_storage_device = {
-	.name	= "usb_mass_storage",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &mass_storage_pdata,
-	},
-};
-
-#ifdef CONFIG_USB_ANDROID_RNDIS
-static struct usb_ether_platform_data rndis_pdata = {
-	/* ethaddr is filled by board_serialno_setup */
-	.vendorID       = 0x18d1,
-	.vendorDescr    = "Google, Inc.",
-};
-
-static struct platform_device rndis_device = {
-	.name   = "rndis",
-	.id     = -1,
-	.dev    = {
-		.platform_data = &rndis_pdata,
-	},
-};
-#endif
-
-static struct android_usb_platform_data android_usb_pdata = {
-	.vendor_id	= 0x0bb4,
-	.product_id	= 0x0c91,
-	.version	= 0x0100,
-	.product_name		= "Android Phone",
-	.manufacturer_name	= "HTC",
-	.num_products = ARRAY_SIZE(usb_products),
-	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_all),
-	.functions = usb_functions_all,
-};
-
-static struct platform_device android_usb_device = {
-	.name	= "android_usb",
-	.id		= -1,
-	.dev		= {
-		.platform_data = &android_usb_pdata,
-	},
-};
-
-void vision_add_usb_devices(void)
-{
-	android_usb_pdata.products[0].product_id =
-		android_usb_pdata.product_id;
-	msm_hsusb_pdata.serial_number = board_serialno();
-	android_usb_pdata.serial_number = board_serialno();
-	msm_device_hsusb.dev.platform_data = &msm_hsusb_pdata;
-	config_vision_usb_id_gpios(0);
-	platform_device_register(&msm_device_hsusb);
-#ifdef CONFIG_USB_ANDROID_RNDIS
-	platform_device_register(&rndis_device);
-#endif
-	platform_device_register(&usb_mass_storage_device);
-	platform_device_register(&android_usb_device);
-}
-#endif
 
 int vision_pm8058_gpios_init(struct pm8058_chip *pm_chip)
 {
@@ -2697,11 +2602,12 @@ static void __init vision_init(void)
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 	vision_init_panel();
 
-#ifdef CONFIG_USB_ANDROID
-	vision_add_usb_devices();
+#ifdef CONFIG_USB_G_ANDROID
+	htc_add_usb_devices();
 #endif
+
 	if (board_emmc_boot()) {
-#if defined(CONFIG_MSM_RMT_STORAGE_SERVER)
+#ifdef CONFIG_MSM_RMT_STORAGE_SERVER
 		rmt_storage_add_ramfs();
 #endif
 		create_proc_read_entry("emmc", 0, NULL, emmc_partition_read_proc, NULL);

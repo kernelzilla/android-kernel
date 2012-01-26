@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2007-2009 HTC Corporation.
+ * Copyright (C) 2012 CyanogenMod.
  * Author: Thomas Tsai <thomas_tsai@htc.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -25,7 +26,7 @@
 #include <mach/board.h>
 #include <mach/board_htc.h>
 #include <mach/msm_hsusb.h>
-#include <linux/usb/android_composite.h>
+#include <mach/rpc_hsusb.h>
 
 #include <asm/mach/flash.h>
 #include <asm/setup.h>
@@ -33,6 +34,7 @@
 #include <linux/mtd/partitions.h>
 #include <linux/delay.h>
 #include <linux/android_pmem.h>
+#include <linux/usb/android.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_iomap.h>
 #include <asm/mach/mmc.h>
@@ -476,6 +478,59 @@ int __init msm_add_serial_devices(unsigned num)
 	return platform_device_register(msm_serial_devices[num]);
 }
 #endif
+
+static uint32_t usb_ID_PIN_input_table[] = {
+	PCOM_GPIO_CFG(MSM7230_GPIO_USB_ID_PIN, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_4MA),
+};
+
+static uint32_t usb_ID_PIN_ouput_table[] = {
+	PCOM_GPIO_CFG(MSM7230_GPIO_USB_ID_PIN, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA),
+};
+
+void config_htc_usb_id_gpios(bool output)
+{
+	if (output) {
+		config_gpio_table(usb_ID_PIN_ouput_table,
+			ARRAY_SIZE(usb_ID_PIN_ouput_table));
+		gpio_set_value(MSM7230_GPIO_USB_ID_PIN, 1);
+	} else
+		config_gpio_table(usb_ID_PIN_input_table,
+			ARRAY_SIZE(usb_ID_PIN_input_table));
+}
+
+static int phy_init_seq[] = { 0x06, 0x36, 0x0C, 0x31, 0x31, 0x32, 0x1, 0x0D, 0x1, 0x10, -1 };
+
+static struct msm_hsusb_platform_data msm_hsusb_pdata = {
+	.phy_init_seq		= phy_init_seq,
+	.phy_reset		= (void *) msm_hsusb_phy_reset,
+	.usb_id_pin_gpio	= MSM7230_GPIO_USB_ID_PIN,
+	.accessory_detect	= 1, /* detect by ID pin gpio */
+};
+
+int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
+{
+	return 0;
+};
+
+static struct android_usb_platform_data android_usb_pdata = {
+	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
+};
+
+static struct platform_device android_usb_device = {
+	.name	= "android_usb",
+	.id		= -1,
+	.dev            = {
+	.platform_data = &android_usb_pdata,
+	},
+};
+
+void __init htc_add_usb_devices(void)
+{
+	msm_device_hsusb.dev.platform_data = &msm_hsusb_pdata;
+	config_htc_usb_id_gpios(0);
+	platform_device_register(&msm_device_hsusb);
+	platform_device_register(&android_usb_device);
+};
 
 #define ATAG_SMI 0x4d534D71
 /* setup calls mach->fixup, then parse_tags, parse_cmdline
