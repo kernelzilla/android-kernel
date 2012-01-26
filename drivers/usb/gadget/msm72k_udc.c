@@ -932,6 +932,13 @@ static void handle_endpoint(struct usb_info *ui, unsigned bit)
 		ept->num, (ept->flags & EPT_FLAG_IN) ? "in" : "out",
 		ept->req, ept->req ? ept->req->item_dma : 0);
 #endif
+	/* USB hardware sometimes generate interrupt before
+	 * 8 bytes of SETUP packet are written to system memory.
+	 * This results in fetching wrong setup_data sometimes.
+	 * TODO: Remove below workaround of adding 1us delay once
+	 * it gets fixed in hardware.
+	 */
+	udelay(10);
 
 	/* expire all requests that are no longer active */
 	spin_lock_irqsave(&ui->lock, flags);
