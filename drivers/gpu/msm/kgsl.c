@@ -243,7 +243,6 @@ static void kgsl_memqueue_freememontimestamp(struct kgsl_device *device,
 static void kgsl_memqueue_drain(struct kgsl_device *device)
 {
 	struct kgsl_mem_entry *entry, *entry_tmp;
-	struct kgsl_event *event, *event_tmp;
 	uint32_t ts_processed;
 
 	BUG_ON(!mutex_is_locked(&device->mutex));
