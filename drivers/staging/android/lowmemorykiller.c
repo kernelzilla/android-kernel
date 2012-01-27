@@ -67,6 +67,7 @@ static int lowmem_minfile_size = 6;
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
 static uint32_t lowmem_check_filepages = 0;
+static DEFINE_SPINLOCK(lowmem_deathpending_lock);
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -83,13 +84,23 @@ static struct notifier_block task_nb = {
 	.notifier_call	= task_notify_func,
 };
 
+static void task_free_fn(struct work_struct *work)
+{
+	unsigned long flags;
+
+	task_free_unregister(&task_nb);
+	spin_lock_irqsave(&lowmem_deathpending_lock, flags);
+	lowmem_deathpending = NULL;
+	spin_unlock_irqrestore(&lowmem_deathpending_lock, flags);
+}
+static DECLARE_WORK(task_free_work, task_free_fn);
+
 static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
 
 	if (task == lowmem_deathpending) {
-		lowmem_deathpending = NULL;
 		lowmem_print(2, "deathpending end %d (%s)\n",
 			task->pid, task->comm);
 	}
@@ -149,6 +160,7 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 						global_page_state(NR_SHMEM);
 	int lru_file = global_page_state(NR_ACTIVE_FILE) +
 			global_page_state(NR_INACTIVE_FILE);
+	unsigned long flags;
 
 	/*
 	 * If we already have a death outstanding, then
@@ -228,14 +240,20 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 		lowmem_print(2, "select %d (%s), adj %d, size %d, to kill\n",
 			     p->pid, p->comm, oom_adj, tasksize);
 	}
+
 	if (selected) {
-		lowmem_print(1, "send sigkill to %d (%s), adj %d, size %d\n",
-			     selected->pid, selected->comm,
-			     selected_oom_adj, selected_tasksize);
-		lowmem_deathpending = selected;
-		lowmem_deathpending_timeout = jiffies + HZ;
-		force_sig(SIGKILL, selected);
-		rem -= selected_tasksize;
+		spin_lock_irqsave(&lowmem_deathpending_lock, flags);
+		if (!lowmem_deathpending) {
+			lowmem_print(1,
+				"send sigkill to %d (%s), adj %d, size %d\n",
+				selected->pid, selected->comm,
+				selected_oom_adj, selected_tasksize);
+			lowmem_deathpending = selected;
+			task_free_register(&task_nb);
+			force_sig(SIGKILL, selected);
+			rem -= selected_tasksize;
+		}
+		spin_unlock_irqrestore(&lowmem_deathpending_lock, flags);
 	}
 	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
 		     nr_to_scan, gfp_mask, rem);
